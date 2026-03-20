@@ -12,8 +12,8 @@ import (
 )
 
 // RunOrchestra는 설정에 따라 오케스트레이션을 실행한다.
-// @MX:ANCHOR: 오케스트레이션의 주 진입점 — 모든 전략 분기가 여기서 시작된다.
-// @MX:REASON: StrategyFunc 맵과 파이프라인/fastest 특수 경로 모두 이 함수를 통해 접근된다.
+// @AX:ANCHOR: 오케스트레이션의 주 진입점 — 모든 전략 분기가 여기서 시작된다.
+// @AX:REASON: StrategyFunc 맵과 파이프라인/fastest 특수 경로 모두 이 함수를 통해 접근된다.
 func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, error) {
 	if len(cfg.Providers) == 0 {
 		return nil, fmt.Errorf("providers 목록이 비어있습니다")
@@ -183,30 +183,42 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 
 	// 실행 명령 구성
 	args := append([]string{}, provider.Args...)
-	// @MX:WARN: exec.CommandContext는 컨텍스트 취소 시 프로세스를 강제 종료한다.
-	// @MX:REASON: 타임아웃/취소 후 좀비 프로세스 방지를 위해 의도적 설계
-	cmd := newCommand(ctx, provider.Binary, args...)
 
-	// stdin에 프롬프트 주입
-	stdinPipe, err := cmd.StdinPipe()
-	if err != nil {
-		return nil, fmt.Errorf("%s stdin 파이프 생성 실패: %w", provider.Name, err)
+	// PromptViaArgs=true인 경우 프롬프트를 마지막 인자로 추가 (예: gemini -p "prompt")
+	if provider.PromptViaArgs {
+		args = append(args, prompt)
 	}
+
+	// @AX:WARN: exec.CommandContext는 컨텍스트 취소 시 프로세스를 강제 종료한다.
+	// @AX:REASON: 타임아웃/취소 후 좀비 프로세스 방지를 위해 의도적 설계
+	cmd := newCommand(ctx, provider.Binary, args...)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.SetStdout(&stdoutBuf)
 	cmd.SetStderr(&stderrBuf)
 
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("%s 시작 실패: %w", provider.Name, err)
-	}
+	// PromptViaArgs=false인 경우 stdin으로 프롬프트 전달 (claude, codex)
+	if !provider.PromptViaArgs {
+		stdinPipe, err := cmd.StdinPipe()
+		if err != nil {
+			return nil, fmt.Errorf("%s stdin 파이프 생성 실패: %w", provider.Name, err)
+		}
 
-	// 프롬프트 전송 후 stdin 닫기
-	if _, err := io.WriteString(stdinPipe, prompt); err != nil {
-		_ = cmd.Wait()
-		return nil, fmt.Errorf("%s stdin 쓰기 실패: %w", provider.Name, err)
+		if err := cmd.Start(); err != nil {
+			return nil, fmt.Errorf("%s 시작 실패: %w", provider.Name, err)
+		}
+
+		// 프롬프트 전송 후 stdin 닫기
+		if _, err := io.WriteString(stdinPipe, prompt); err != nil {
+			_ = cmd.Wait()
+			return nil, fmt.Errorf("%s stdin 쓰기 실패: %w", provider.Name, err)
+		}
+		stdinPipe.Close()
+	} else {
+		if err := cmd.Start(); err != nil {
+			return nil, fmt.Errorf("%s 시작 실패: %w", provider.Name, err)
+		}
 	}
-	stdinPipe.Close()
 
 	waitErr := cmd.Wait()
 	duration := time.Since(start)

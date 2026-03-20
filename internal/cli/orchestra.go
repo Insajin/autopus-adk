@@ -11,6 +11,20 @@ import (
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
+// buildFileContents는 파일 목록의 내용을 읽어 포맷된 문자열로 반환한다.
+func buildFileContents(files []string) string {
+	var sb strings.Builder
+	for _, f := range files {
+		content, err := os.ReadFile(f)
+		if err != nil {
+			sb.WriteString(fmt.Sprintf("--- %s (읽기 실패: %v) ---\n\n", f, err))
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("--- %s ---\n```\n%s\n```\n\n", f, string(content)))
+	}
+	return sb.String()
+}
+
 // newOrchestraCmd는 orchestra 커맨드를 생성한다.
 // @MX:ANCHOR: orchestra 서브커맨드 트리의 루트 — review, plan, secure가 여기서 등록된다.
 // @MX:REASON: 세 개의 서브커맨드가 이 함수를 통해 CobraCommand 트리에 추가된다.
@@ -143,9 +157,12 @@ func runOrchestraCommand(ctx context.Context, strategyStr string, providerNames 
 func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	// 알려진 프로바이더 이름 → 바이너리 + 기본 인자 매핑
 	knownProviders := map[string]orchestra.ProviderConfig{
-		"claude": {Name: "claude", Binary: "claude", Args: []string{"--print"}},
-		"codex":  {Name: "codex", Binary: "codex", Args: []string{"--quiet"}},
-		"gemini": {Name: "gemini", Binary: "gemini", Args: []string{}},
+		// claude: -p 플래그로 비대화형 모드, stdin으로 프롬프트 전달
+		"claude": {Name: "claude", Binary: "claude", Args: []string{"-p"}, PromptViaArgs: false},
+		// codex: -q 플래그로 quiet 모드, stdin으로 프롬프트 전달
+		"codex": {Name: "codex", Binary: "codex", Args: []string{"-q"}, PromptViaArgs: false},
+		// gemini: -p 플래그가 프롬프트를 인자로 직접 받음 (stdin 미사용)
+		"gemini": {Name: "gemini", Binary: "gemini", Args: []string{"-p"}, PromptViaArgs: true},
 	}
 
 	var result []orchestra.ProviderConfig
@@ -170,19 +187,27 @@ func defaultProviders() []string {
 }
 
 // buildReviewPrompt는 리뷰 프롬프트를 생성한다.
+// 파일이 지정된 경우 파일 내용을 프롬프트에 포함한다.
 func buildReviewPrompt(files []string) string {
 	if len(files) == 0 {
 		return "현재 프로젝트의 코드를 리뷰해주세요. 품질, 가독성, 잠재적 버그를 중심으로 분석하세요."
 	}
-	return fmt.Sprintf("다음 파일들을 코드 리뷰해주세요:\n%s\n\n품질, 가독성, 잠재적 버그를 중심으로 분석하세요.",
-		strings.Join(files, "\n"))
+	var sb strings.Builder
+	sb.WriteString("다음 파일들을 코드 리뷰해주세요:\n\n")
+	sb.WriteString(buildFileContents(files))
+	sb.WriteString("품질, 가독성, 잠재적 버그를 중심으로 분석하세요.")
+	return sb.String()
 }
 
 // buildSecurePrompt는 보안 분석 프롬프트를 생성한다.
+// 파일이 지정된 경우 파일 내용을 프롬프트에 포함한다.
 func buildSecurePrompt(files []string) string {
 	if len(files) == 0 {
 		return "현재 프로젝트의 보안 취약점을 분석해주세요. OWASP Top 10을 기준으로 검토하세요."
 	}
-	return fmt.Sprintf("다음 파일들의 보안 취약점을 분석해주세요:\n%s\n\nOWASP Top 10을 기준으로 검토하세요.",
-		strings.Join(files, "\n"))
+	var sb strings.Builder
+	sb.WriteString("다음 파일들의 보안 취약점을 분석해주세요:\n\n")
+	sb.WriteString(buildFileContents(files))
+	sb.WriteString("OWASP Top 10을 기준으로 검토하세요.")
+	return sb.String()
 }

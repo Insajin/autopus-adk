@@ -28,9 +28,10 @@ func (s Strategy) IsValid() bool {
 
 // ProviderConfig는 프로바이더 실행 설정이다.
 type ProviderConfig struct {
-	Name   string   // 프로바이더 이름 (claude, codex, gemini)
-	Binary string   // 실행 바이너리 경로
-	Args   []string // 추가 인자 (--print, --quiet 등)
+	Name          string   // 프로바이더 이름 (claude, codex, gemini)
+	Binary        string   // 실행 바이너리 경로
+	Args          []string // 추가 인자 (-p, -q 등)
+	PromptViaArgs bool     // true: 프롬프트를 마지막 인자로 전달 (gemini), false: stdin으로 전달 (claude, codex)
 }
 
 // ProviderResponse는 프로바이더 실행 결과이다.

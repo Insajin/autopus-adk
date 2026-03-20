@@ -102,6 +102,9 @@ func newInitCmd() *cobra.Command {
 
 			fmt.Fprintf(cmd.OutOrStdout(), "✓ Autopus harness initialized (%s mode)\n", mode)
 			fmt.Fprintf(cmd.OutOrStdout(), "  Platforms: %s\n", strings.Join(platformList, ", "))
+			fmt.Fprintf(cmd.OutOrStdout(), "\n  PATH 확인: auto 바이너리가 PATH에 포함되어야 합니다.\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  코딩 CLI에서 /plan, /go 등의 명령어가 auto CLI를 호출합니다.\n")
+			fmt.Fprintf(cmd.OutOrStdout(), "  확인: which auto\n")
 			return nil
 		},
 	}

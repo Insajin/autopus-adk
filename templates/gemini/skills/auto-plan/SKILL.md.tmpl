@@ -45,6 +45,17 @@ EARS 형식 요구사항과 기술 설계를 포함합니다.
 - 유사한 기존 구현(reference implementation) 탐색
 - 발견 내용 기록 (Step 4-7에서 참조)
 
+### SPEC 문서 스캐폴딩
+
+`auto spec new` 명령어로 SPEC 디렉터리와 4개 파일을 자동 생성합니다.
+
+```bash
+auto spec new {DOMAIN}-{NUMBER} --title "기능 제목"
+```
+
+이 명령어는 `.autopus/specs/SPEC-{ID}/` 디렉터리에 spec.md, plan.md, acceptance.md, research.md 4개 파일을 생성합니다.
+이후 Steps에서 각 파일의 내용을 채웁니다.
+
 {{if .IsFullMode}}
 ### Step 2: Lore 컨텍스트 확인
 
