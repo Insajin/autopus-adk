@@ -1,15 +1,10 @@
 ---
 name: architect
-role: 시스템 설계 및 아키텍처 결정 전문 에이전트
-model_tier: opus
-category: planning
-triggers:
-  - architecture
-  - design
-  - system design
-  - 아키텍처
-  - 설계
-  - 시스템 설계
+description: 시스템 설계 및 아키텍처 결정 전문 에이전트. 장기적 확장성과 유지보수성을 고려한 아키텍처를 설계한다.
+model: opus
+tools: Read, Grep, Glob, Bash, mcp__sequential-thinking__sequentialthinking
+permissionMode: plan
+maxTurns: 30
 skills:
   - planning
   - subagent-dev

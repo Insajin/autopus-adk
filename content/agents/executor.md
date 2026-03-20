@@ -1,14 +1,10 @@
 ---
 name: executor
-role: TDD/DDD 기반 코드 구현 전문 에이전트
-model_tier: sonnet
-category: implementation
-triggers:
-  - implement
-  - execute
-  - 구현
-  - 코드 작성
-  - coding
+description: TDD/DDD 기반 코드 구현 전문 에이전트. SPEC과 요구사항을 받아 테스트와 구현 코드를 작성한다.
+model: sonnet
+tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite
+permissionMode: acceptEdits
+maxTurns: 50
 skills:
   - tdd
   - ddd

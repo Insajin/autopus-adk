@@ -1,14 +1,10 @@
 ---
 name: planner
-role: 기능 기획 및 요구사항 분석 전문 에이전트
-model_tier: sonnet
-category: planning
-triggers:
-  - plan
-  - planning
-  - 기획
-  - 요구사항 분석
-  - feature planning
+description: 기능 기획 및 요구사항 분석 전문 에이전트. 사용자 요청을 명확한 요구사항과 구현 계획으로 변환한다.
+model: opus
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, mcp__sequential-thinking__sequentialthinking
+permissionMode: plan
+maxTurns: 20
 skills:
   - planning
   - brainstorming

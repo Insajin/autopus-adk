@@ -1,15 +1,10 @@
 ---
 name: debugger
-role: 버그 수정 및 근본 원인 분석 전문 에이전트
-model_tier: sonnet
-category: quality
-triggers:
-  - debug
-  - bug fix
-  - error fix
-  - 버그
-  - 에러 수정
-  - fix
+description: 버그 수정 및 근본 원인 분석 전문 에이전트. 재현 테스트를 우선 작성하고 최소한의 수정으로 버그를 해결한다.
+model: sonnet
+tools: Read, Write, Edit, Grep, Glob, Bash
+permissionMode: acceptEdits
+maxTurns: 40
 skills:
   - debugging
   - tdd

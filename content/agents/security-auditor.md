@@ -1,14 +1,10 @@
 ---
 name: security-auditor
-role: 보안 감사 및 취약점 탐지 전문 에이전트
-model_tier: opus
-category: security
-triggers:
-  - security audit
-  - vulnerability
-  - 보안 감사
-  - 취약점
-  - penetration test
+description: 보안 감사 및 취약점 탐지 전문 에이전트. OWASP Top 10 기준으로 코드와 아키텍처의 보안 취약점을 탐지한다.
+model: opus
+tools: Read, Grep, Glob, Bash
+permissionMode: plan
+maxTurns: 30
 skills:
   - security-audit
   - review
