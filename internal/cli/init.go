@@ -25,9 +25,8 @@ var gitignorePatterns = []string{
 	".codex/skills/",
 	".gemini/skills/autopus/",
 	".agents/skills/",
-	".autopus/manifest.json",
-	".autopus/*-manifest.json",
-	".autopus/backup/",
+	".autopus/",
+	".mcp.json",
 }
 
 func newInitCmd() *cobra.Command {

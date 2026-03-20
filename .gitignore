@@ -18,6 +18,5 @@ coverage.out
 
 # Autopus-ADK generated files
 .claude/commands/auto.md
-.autopus/manifest.json
-.autopus/*-manifest.json
-.autopus/backup/
+.autopus/
+.mcp.json
