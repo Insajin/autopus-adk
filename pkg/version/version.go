@@ -5,7 +5,7 @@ import "fmt"
 
 // 빌드 시 ldflags로 주입
 var (
-	version = "0.0.1"
+	version = "0.3.0"
 	commit  = "none"
 	date    = "unknown"
 )

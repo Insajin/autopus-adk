@@ -8,7 +8,7 @@ import (
 
 func TestVersion_Defaults(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, "0.0.1", Version())
+	assert.Equal(t, "0.3.0", Version())
 	assert.Equal(t, "none", Commit())
 	assert.Equal(t, "unknown", Date())
 }
@@ -17,5 +17,5 @@ func TestString(t *testing.T) {
 	t.Parallel()
 	s := String()
 	assert.Contains(t, s, "auto")
-	assert.Contains(t, s, "0.0.1")
+	assert.Contains(t, s, "0.3.0")
 }
