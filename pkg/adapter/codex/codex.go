@@ -15,6 +15,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	tmpl "github.com/insajin/autopus-adk/pkg/template"
+	"github.com/insajin/autopus-adk/templates"
 )
 
 const (
@@ -81,6 +82,13 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 			Content:         []byte(agentsMD),
 		},
 	}
+
+	// 스킬 템플릿 렌더링 후 .codex/skills/ 에 작성
+	skillFiles, err := a.renderSkillTemplates(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("스킬 템플릿 렌더링 실패: %w", err)
+	}
+	files = append(files, skillFiles...)
 
 	return &adapter.PlatformFiles{
 		Files:    files,
@@ -195,6 +203,56 @@ func removeMarkerSection(content string) string {
 func checksum(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:])
+}
+
+// renderSkillTemplates는 embedded FS에서 Codex 스킬 템플릿을 읽어 렌더링 후 .codex/skills/ 에 저장한다.
+func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	var files []adapter.FileMapping
+
+	entries, err := templates.FS.ReadDir("codex/skills")
+	if err != nil {
+		return nil, fmt.Errorf("코덱스 스킬 템플릿 디렉터리 읽기 실패: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".tmpl") {
+			continue
+		}
+
+		// 스킬명 추출 (예: auto-plan.md.tmpl -> auto-plan.md)
+		skillFile := strings.TrimSuffix(name, ".tmpl")
+
+		// 템플릿 내용 읽기
+		tmplContent, err := templates.FS.ReadFile("codex/skills/" + name)
+		if err != nil {
+			return nil, fmt.Errorf("코덱스 스킬 템플릿 읽기 실패 %s: %w", name, err)
+		}
+
+		// 템플릿 렌더링
+		rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+		if err != nil {
+			return nil, fmt.Errorf("코덱스 스킬 템플릿 렌더링 실패 %s: %w", name, err)
+		}
+
+		// 대상 경로: .codex/skills/{skill}.md
+		targetPath := filepath.Join(a.root, ".codex", "skills", skillFile)
+		if err := os.WriteFile(targetPath, []byte(rendered), 0644); err != nil {
+			return nil, fmt.Errorf("코덱스 스킬 파일 쓰기 실패 %s: %w", targetPath, err)
+		}
+
+		files = append(files, adapter.FileMapping{
+			TargetPath:      filepath.Join(".codex", "skills", skillFile),
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(rendered),
+			Content:         []byte(rendered),
+		})
+	}
+
+	return files, nil
 }
 
 // agentsMDTemplate은 AGENTS.md AUTOPUS 섹션 템플릿이다.

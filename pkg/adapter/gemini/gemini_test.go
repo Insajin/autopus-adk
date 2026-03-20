@@ -69,20 +69,23 @@ func TestGeminiAdapter_Generate_CreatesSkillsWithFrontmatter(t *testing.T) {
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	// .gemini/skills/<name>/SKILL.md 생성 확인
-	geminiSkillsDir := filepath.Join(dir, ".gemini", "skills")
+	// .gemini/skills/autopus 디렉터리 존재 확인
+	geminiSkillsDir := filepath.Join(dir, ".gemini", "skills", "autopus")
 	info, statErr := os.Stat(geminiSkillsDir)
-	require.NoError(t, statErr, ".gemini/skills 디렉터리가 존재해야 함")
+	require.NoError(t, statErr, ".gemini/skills/autopus 디렉터리가 존재해야 함")
 	assert.True(t, info.IsDir())
 
-	// autopus 스킬 SKILL.md 확인
-	skillPath := filepath.Join(dir, ".gemini", "skills", "autopus", "SKILL.md")
-	data, err := os.ReadFile(skillPath)
-	require.NoError(t, err)
-	content := string(data)
-	// YAML frontmatter 확인
-	assert.Contains(t, content, "---")
-	assert.Contains(t, content, "name:")
+	// 각 스킬 서브디렉터리의 SKILL.md 확인 (auto-plan, auto-go, auto-fix, auto-sync, auto-review)
+	skills := []string{"auto-plan", "auto-go", "auto-fix", "auto-sync", "auto-review"}
+	for _, skill := range skills {
+		skillPath := filepath.Join(dir, ".gemini", "skills", "autopus", skill, "SKILL.md")
+		data, readErr := os.ReadFile(skillPath)
+		require.NoError(t, readErr, "SKILL.md가 존재해야 함: %s", skill)
+		content := string(data)
+		// YAML frontmatter 확인
+		assert.Contains(t, content, "---", "YAML frontmatter가 있어야 함: %s", skill)
+		assert.Contains(t, content, "name: "+skill, "스킬명이 포함되어야 함: %s", skill)
+	}
 }
 
 func TestGeminiAdapter_Generate_CreatesAgentsAliases(t *testing.T) {

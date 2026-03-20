@@ -15,6 +15,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	tmpl "github.com/insajin/autopus-adk/pkg/template"
+	"github.com/insajin/autopus-adk/templates"
 )
 
 const (
@@ -87,22 +88,12 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 		Content:         []byte(geminiMD),
 	})
 
-	// .gemini/skills/autopus/SKILL.md 생성 (YAML frontmatter 포함)
-	skillMD, err := a.engine.RenderString(skillMDTemplate, cfg)
+	// 스킬 템플릿 렌더링 후 .gemini/skills/autopus/{skill}/SKILL.md 에 작성
+	skillFiles, err := a.renderSkillTemplates(cfg, geminiSkillDir)
 	if err != nil {
-		return nil, fmt.Errorf("SKILL.md 템플릿 렌더링 실패: %w", err)
+		return nil, fmt.Errorf("제미니 스킬 템플릿 렌더링 실패: %w", err)
 	}
-
-	skillPath := filepath.Join(geminiSkillDir, "SKILL.md")
-	if err := os.WriteFile(skillPath, []byte(skillMD), 0644); err != nil {
-		return nil, fmt.Errorf("SKILL.md 쓰기 실패: %w", err)
-	}
-	files = append(files, adapter.FileMapping{
-		TargetPath:      filepath.Join(".gemini", "skills", "autopus", "SKILL.md"),
-		OverwritePolicy: adapter.OverwriteAlways,
-		Checksum:        checksum(skillMD),
-		Content:         []byte(skillMD),
-	})
+	files = append(files, skillFiles...)
 
 	return &adapter.PlatformFiles{
 		Files:    files,
@@ -138,14 +129,17 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 		})
 	}
 
-	// .gemini/skills/autopus/SKILL.md 확인
-	skillPath := filepath.Join(a.root, ".gemini", "skills", "autopus", "SKILL.md")
-	if _, err := os.Stat(skillPath); os.IsNotExist(err) {
-		errs = append(errs, adapter.ValidationError{
-			File:    skillPath,
-			Message: "SKILL.md가 없음",
-			Level:   "error",
-		})
+	// .gemini/skills/autopus/{skill}/SKILL.md 확인 (auto-plan, auto-go 등)
+	skillDirs := []string{"auto-plan", "auto-go", "auto-fix", "auto-sync", "auto-review"}
+	for _, sd := range skillDirs {
+		skillPath := filepath.Join(a.root, ".gemini", "skills", "autopus", sd, "SKILL.md")
+		if _, err := os.Stat(skillPath); os.IsNotExist(err) {
+			errs = append(errs, adapter.ValidationError{
+				File:    skillPath,
+				Message: fmt.Sprintf("SKILL.md가 없음: %s", sd),
+				Level:   "error",
+			})
+		}
 	}
 
 	// .agents/skills 확인
@@ -232,6 +226,58 @@ func checksum(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// renderSkillTemplates는 embedded FS에서 Gemini 스킬 템플릿을 읽어 렌더링 후
+// .gemini/skills/autopus/{skill}/SKILL.md 에 저장한다.
+// geminiSkillBaseDir는 .gemini/skills/autopus 의 절대 경로이다.
+func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig, geminiSkillBaseDir string) ([]adapter.FileMapping, error) {
+	var files []adapter.FileMapping
+
+	// gemini/skills 하위의 스킬 디렉터리 목록 조회
+	entries, err := templates.FS.ReadDir("gemini/skills")
+	if err != nil {
+		return nil, fmt.Errorf("제미니 스킬 템플릿 디렉터리 읽기 실패: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		skillName := entry.Name() // 예: "auto-plan"
+
+		tmplPath := "gemini/skills/" + skillName + "/SKILL.md.tmpl"
+		tmplContent, err := templates.FS.ReadFile(tmplPath)
+		if err != nil {
+			return nil, fmt.Errorf("제미니 스킬 템플릿 읽기 실패 %s: %w", tmplPath, err)
+		}
+
+		rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+		if err != nil {
+			return nil, fmt.Errorf("제미니 스킬 템플릿 렌더링 실패 %s: %w", skillName, err)
+		}
+
+		// .gemini/skills/autopus/{skill}/ 디렉터리 생성
+		skillDir := filepath.Join(geminiSkillBaseDir, skillName)
+		if err := os.MkdirAll(skillDir, 0755); err != nil {
+			return nil, fmt.Errorf("제미니 스킬 디렉터리 생성 실패 %s: %w", skillDir, err)
+		}
+
+		destPath := filepath.Join(skillDir, "SKILL.md")
+		if err := os.WriteFile(destPath, []byte(rendered), 0644); err != nil {
+			return nil, fmt.Errorf("제미니 SKILL.md 쓰기 실패 %s: %w", destPath, err)
+		}
+
+		relPath := filepath.Join(".gemini", "skills", "autopus", skillName, "SKILL.md")
+		files = append(files, adapter.FileMapping{
+			TargetPath:      relPath,
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(rendered),
+			Content:         []byte(rendered),
+		})
+	}
+
+	return files, nil
+}
+
 // geminiMDTemplate은 GEMINI.md AUTOPUS 섹션 템플릿이다.
 const geminiMDTemplate = `# Autopus-ADK Harness
 
@@ -246,19 +292,3 @@ const geminiMDTemplate = `# Autopus-ADK Harness
 - Cross-platform: .agents/skills/
 `
 
-// skillMDTemplate은 SKILL.md YAML frontmatter 포함 템플릿이다.
-const skillMDTemplate = `---
-name: autopus
-version: "1.0.0"
-description: Autopus-ADK harness skill for {{.ProjectName}}
-platform: gemini-cli
-mode: {{.Mode}}
----
-
-# Autopus Skill
-
-이 스킬은 Autopus-ADK에 의해 자동 생성되었습니다.
-
-- **프로젝트**: {{.ProjectName}}
-- **모드**: {{.Mode}}
-`

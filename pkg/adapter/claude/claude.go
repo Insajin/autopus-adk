@@ -7,15 +7,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	tmpl "github.com/insajin/autopus-adk/pkg/template"
+	"github.com/insajin/autopus-adk/templates"
 )
 
 const (
@@ -94,6 +97,28 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 		Checksum:        checksum(claudeMD),
 		Content:         []byte(claudeMD),
 	})
+
+	// 커맨드 템플릿 렌더링 후 .claude/commands/autopus/ 에 작성
+	commandFiles, err := a.renderCommandTemplates(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("커맨드 템플릿 렌더링 실패: %w", err)
+	}
+	files = append(files, commandFiles...)
+
+	// Full 모드: 스킬/에이전트 컨텐츠 파일 복사
+	if cfg.IsFullMode() {
+		skillFiles, err := a.copyContentFiles(cfg, "skills", ".claude/skills/autopus")
+		if err != nil {
+			return nil, fmt.Errorf("스킬 파일 복사 실패: %w", err)
+		}
+		files = append(files, skillFiles...)
+
+		agentFiles, err := a.copyContentFiles(cfg, "agents", ".claude/agents/autopus")
+		if err != nil {
+			return nil, fmt.Errorf("에이전트 파일 복사 실패: %w", err)
+		}
+		files = append(files, agentFiles...)
+	}
 
 	return &adapter.PlatformFiles{
 		Files:    files,
@@ -264,6 +289,118 @@ func removeMarkerSection(content string) string {
 func checksum(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:])
+}
+
+// fullOnlyCommands는 Full 모드에서만 생성되는 커맨드 목록이다.
+var fullOnlyCommands = map[string]bool{
+	"go":     true,
+	"review": true,
+	"secure": true,
+}
+
+// renderCommandTemplates는 embedded FS에서 커맨드 템플릿을 읽어 렌더링 후 파일로 저장한다.
+// Lite 모드에서는 fullOnlyCommands를 건너뛴다.
+func (a *Adapter) renderCommandTemplates(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	var files []adapter.FileMapping
+
+	// embedded FS에서 claude/commands/*.tmpl 목록 조회
+	entries, err := templates.FS.ReadDir("claude/commands")
+	if err != nil {
+		return nil, fmt.Errorf("커맨드 템플릿 디렉터리 읽기 실패: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".tmpl") {
+			continue
+		}
+
+		// 커맨드명 추출 (예: plan.md.tmpl -> plan)
+		cmdName := strings.TrimSuffix(strings.TrimSuffix(name, ".tmpl"), ".md")
+
+		// Lite 모드에서 Full 전용 커맨드 건너뜀
+		if !cfg.IsFullMode() && fullOnlyCommands[cmdName] {
+			continue
+		}
+
+		// 템플릿 내용 읽기
+		tmplContent, err := templates.FS.ReadFile("claude/commands/" + name)
+		if err != nil {
+			return nil, fmt.Errorf("커맨드 템플릿 읽기 실패 %s: %w", name, err)
+		}
+
+		// 템플릿 렌더링
+		rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+		if err != nil {
+			return nil, fmt.Errorf("커맨드 템플릿 렌더링 실패 %s: %w", name, err)
+		}
+
+		// 대상 경로: .claude/commands/autopus/{cmd}.md
+		targetName := cmdName + ".md"
+		targetPath := filepath.Join(a.root, ".claude", "commands", "autopus", targetName)
+		if err := os.WriteFile(targetPath, []byte(rendered), 0644); err != nil {
+			return nil, fmt.Errorf("커맨드 파일 쓰기 실패 %s: %w", targetPath, err)
+		}
+
+		files = append(files, adapter.FileMapping{
+			TargetPath:      filepath.Join(".claude", "commands", "autopus", targetName),
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(rendered),
+			Content:         []byte(rendered),
+		})
+	}
+
+	return files, nil
+}
+
+// copyContentFiles는 embedded content FS에서 파일을 읽어 대상 디렉터리에 복사한다.
+// subDir: "skills" 또는 "agents"
+// targetRelDir: 대상 상대 경로 (예: ".claude/skills/autopus")
+func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, targetRelDir string) ([]adapter.FileMapping, error) {
+	_ = cfg // 향후 확장을 위해 보존
+
+	var files []adapter.FileMapping
+
+	entries, err := contentfs.FS.ReadDir(subDir)
+	if err != nil {
+		return nil, fmt.Errorf("컨텐츠 디렉터리 읽기 실패 %s: %w", subDir, err)
+	}
+
+	// 대상 디렉터리 생성
+	absTargetDir := filepath.Join(a.root, targetRelDir)
+	if err := os.MkdirAll(absTargetDir, 0755); err != nil {
+		return nil, fmt.Errorf("대상 디렉터리 생성 실패 %s: %w", absTargetDir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		srcPath := subDir + "/" + entry.Name()
+		data, err := fs.ReadFile(contentfs.FS, srcPath)
+		if err != nil {
+			return nil, fmt.Errorf("컨텐츠 파일 읽기 실패 %s: %w", srcPath, err)
+		}
+
+		destPath := filepath.Join(absTargetDir, entry.Name())
+		if err := os.WriteFile(destPath, data, 0644); err != nil {
+			return nil, fmt.Errorf("컨텐츠 파일 쓰기 실패 %s: %w", destPath, err)
+		}
+
+		relPath := filepath.Join(targetRelDir, entry.Name())
+		files = append(files, adapter.FileMapping{
+			TargetPath:      relPath,
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(string(data)),
+			Content:         data,
+		})
+	}
+
+	return files, nil
 }
 
 // claudeMDTemplate은 CLAUDE.md AUTOPUS 섹션 템플릿이다.
