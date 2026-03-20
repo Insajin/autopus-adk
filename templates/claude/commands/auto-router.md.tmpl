@@ -9,6 +9,13 @@ ARGUMENTS: $ARGUMENTS
 $ARGUMENTS의 첫 번째 단어로 서브커맨드를 결정하고, 나머지를 해당 워크플로우에 전달합니다.
 
 알 수 없는 서브커맨드이거나 인자가 없으면 아래 서브커맨드 목록을 표시하세요.
+{{if .IsFullMode}}
+### 글로벌 플래그
+
+| 플래그 | 설명 |
+|--------|------|
+| `--think` | Sequential Thinking MCP 활성화. 심층 분석 모드. ToolSearch로 `mcp__sequential-thinking__sequentialthinking` 도구를 로드한 후 단계별 사고를 수행합니다. |
+{{end}}
 
 ### 서브커맨드 목록
 

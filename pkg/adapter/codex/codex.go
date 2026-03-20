@@ -90,15 +90,128 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, skillFiles...)
 
-	return &adapter.PlatformFiles{
+	pf := &adapter.PlatformFiles{
 		Files:    files,
 		Checksum: checksum(agentsMD),
-	}, nil
+	}
+
+	// 매니페스트 저장
+	m := adapter.ManifestFromFiles(adapterName, pf)
+	if err := m.Save(a.root); err != nil {
+		return nil, fmt.Errorf("매니페스트 저장 실패: %w", err)
+	}
+
+	return pf, nil
 }
 
-// Update는 기존 파일을 업데이트한다.
+// Update는 매니페스트 기반으로 파일을 업데이트한다.
 func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
-	return a.Generate(ctx, cfg)
+	oldManifest, err := adapter.LoadManifest(a.root, adapterName)
+	if err != nil {
+		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
+	}
+
+	if oldManifest == nil {
+		return a.Generate(ctx, cfg)
+	}
+
+	// 새 파일 준비
+	newFiles, err := a.prepareFiles(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	var backupDir string
+	var finalFiles []adapter.FileMapping
+
+	for _, f := range newFiles {
+		action := adapter.ResolveAction(a.root, f.TargetPath, f.OverwritePolicy, oldManifest)
+
+		if action == adapter.ActionSkip {
+			continue
+		}
+		if action == adapter.ActionBackup {
+			if backupDir == "" {
+				backupDir, err = adapter.CreateBackupDir(a.root)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if _, backupErr := adapter.BackupFile(a.root, f.TargetPath, backupDir); backupErr != nil {
+				return nil, backupErr
+			}
+		}
+
+		targetPath := filepath.Join(a.root, f.TargetPath)
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			return nil, fmt.Errorf("디렉터리 생성 실패: %w", err)
+		}
+		if err := os.WriteFile(targetPath, f.Content, 0644); err != nil {
+			return nil, fmt.Errorf("파일 쓰기 실패 %s: %w", f.TargetPath, err)
+		}
+		finalFiles = append(finalFiles, f)
+	}
+
+	pf := &adapter.PlatformFiles{
+		Files:    finalFiles,
+		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
+	}
+
+	m := adapter.ManifestFromFiles(adapterName, pf)
+	if saveErr := m.Save(a.root); saveErr != nil {
+		return nil, fmt.Errorf("매니페스트 저장 실패: %w", saveErr)
+	}
+
+	if backupDir != "" {
+		fmt.Fprintf(os.Stderr, "  백업됨: %s\n", backupDir)
+	}
+
+	return pf, nil
+}
+
+// prepareFiles는 Generate와 동일한 파일을 준비하되 디스크에 쓰지 않는다.
+func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	var files []adapter.FileMapping
+
+	// AGENTS.md
+	agentsMD, err := a.injectMarkerSection(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("AGENTS.md 마커 주입 실패: %w", err)
+	}
+	files = append(files, adapter.FileMapping{
+		TargetPath:      "AGENTS.md",
+		OverwritePolicy: adapter.OverwriteMarker,
+		Checksum:        checksum(agentsMD),
+		Content:         []byte(agentsMD),
+	})
+
+	// 스킬 템플릿
+	entries, err := templates.FS.ReadDir("codex/skills")
+	if err != nil {
+		return nil, fmt.Errorf("코덱스 스킬 템플릿 디렉터리 읽기 실패: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tmpl") {
+			continue
+		}
+		skillFile := strings.TrimSuffix(entry.Name(), ".tmpl")
+		tmplContent, err := templates.FS.ReadFile("codex/skills/" + entry.Name())
+		if err != nil {
+			return nil, fmt.Errorf("코덱스 스킬 템플릿 읽기 실패 %s: %w", entry.Name(), err)
+		}
+		rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+		if err != nil {
+			return nil, fmt.Errorf("코덱스 스킬 템플릿 렌더링 실패 %s: %w", entry.Name(), err)
+		}
+		files = append(files, adapter.FileMapping{
+			TargetPath:      filepath.Join(".codex", "skills", skillFile),
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(rendered),
+			Content:         []byte(rendered),
+		})
+	}
+
+	return files, nil
 }
 
 // Validate는 설치된 파일의 유효성을 검증한다.

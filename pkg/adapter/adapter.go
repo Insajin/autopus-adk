@@ -53,6 +53,7 @@ const (
 	OverwriteAlways OverwritePolicy = "always"
 	OverwriteNever  OverwritePolicy = "never"
 	OverwriteMarker OverwritePolicy = "marker" // AUTOPUS:BEGIN/END 마커 섹션만 업데이트
+	OverwriteMerge  OverwritePolicy = "merge"  // 기존 내용에 머지 (예: .mcp.json)
 )
 
 // ValidationError는 검증 에러이다.

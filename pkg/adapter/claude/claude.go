@@ -79,6 +79,15 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 		}
 	}
 
+	// 레거시 .claude/commands/autopus/ 디렉터리 정리 (v1 → v2 마이그레이션)
+	// auto update 시 구 개별 커맨드 파일이 남아 /autopus:* 접두사로 노출되는 것을 방지
+	legacyCmdDir := filepath.Join(a.root, ".claude", "commands", "autopus")
+	if _, err := os.Stat(legacyCmdDir); err == nil {
+		if err := os.RemoveAll(legacyCmdDir); err != nil {
+			return nil, fmt.Errorf("레거시 커맨드 디렉터리 정리 실패 %s: %w", legacyCmdDir, err)
+		}
+	}
+
 	var files []adapter.FileMapping
 
 	// CLAUDE.md 마커 섹션 처리
@@ -105,6 +114,19 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, commandFiles...)
 
+	// .mcp.json 생성
+	mcpFiles, err := a.prepareMCPConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("MCP 설정 생성 실패: %w", err)
+	}
+	for _, f := range mcpFiles {
+		targetPath := filepath.Join(a.root, f.TargetPath)
+		if err := os.WriteFile(targetPath, f.Content, 0644); err != nil {
+			return nil, fmt.Errorf(".mcp.json 쓰기 실패: %w", err)
+		}
+	}
+	files = append(files, mcpFiles...)
+
 	// Full 모드: 스킬/에이전트 컨텐츠 파일 복사
 	if cfg.IsFullMode() {
 		skillFiles, err := a.copyContentFiles(cfg, "skills", ".claude/skills/autopus")
@@ -120,16 +142,254 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 		files = append(files, agentFiles...)
 	}
 
-	return &adapter.PlatformFiles{
+	pf := &adapter.PlatformFiles{
 		Files:    files,
 		Checksum: checksum(claudeMD),
-	}, nil
+	}
+
+	// 매니페스트 저장
+	m := adapter.ManifestFromFiles(adapterName, pf)
+	if err := m.Save(a.root); err != nil {
+		return nil, fmt.Errorf("매니페스트 저장 실패: %w", err)
+	}
+
+	return pf, nil
 }
 
-// Update는 기존 파일을 업데이트한다. 체크섬 비교 후 변경된 파일만 업데이트한다.
+// Update는 매니페스트 기반으로 파일을 업데이트한다.
+// 사용자가 수정한 파일은 백업 후 덮어쓰고, 삭제한 파일은 재생성하지 않는다.
 func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
-	// Generate와 동일 로직: 마커 섹션만 업데이트하고 사용자 수정 보존
-	return a.Generate(ctx, cfg)
+	// 이전 매니페스트 로드
+	oldManifest, err := adapter.LoadManifest(a.root, adapterName)
+	if err != nil {
+		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
+	}
+
+	// 매니페스트가 없으면 init 이전 상태 → Generate로 폴백
+	if oldManifest == nil {
+		pf, err := a.Generate(ctx, cfg)
+		if err != nil {
+			return nil, err
+		}
+		// 매니페스트 저장
+		m := adapter.ManifestFromFiles(adapterName, pf)
+		if saveErr := m.Save(a.root); saveErr != nil {
+			return nil, fmt.Errorf("매니페스트 저장 실패: %w", saveErr)
+		}
+		return pf, nil
+	}
+
+	// 새 파일 목록 생성 (디스크에 쓰지 않고 내용만 준비)
+	newFiles, err := a.prepareFiles(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// 백업 디렉터리 (필요 시 생성)
+	var backupDir string
+	var results []adapter.UpdateResult
+
+	var finalFiles []adapter.FileMapping
+	for _, f := range newFiles {
+		action := adapter.ResolveAction(a.root, f.TargetPath, f.OverwritePolicy, oldManifest)
+
+		switch action {
+		case adapter.ActionSkip:
+			results = append(results, adapter.UpdateResult{
+				Path:   f.TargetPath,
+				Action: adapter.ActionSkip,
+			})
+			continue
+
+		case adapter.ActionBackup:
+			if backupDir == "" {
+				backupDir, err = adapter.CreateBackupDir(a.root)
+				if err != nil {
+					return nil, err
+				}
+			}
+			backupPath, backupErr := adapter.BackupFile(a.root, f.TargetPath, backupDir)
+			if backupErr != nil {
+				return nil, backupErr
+			}
+			results = append(results, adapter.UpdateResult{
+				Path:       f.TargetPath,
+				Action:     adapter.ActionBackup,
+				BackupPath: backupPath,
+			})
+		}
+
+		// 파일 쓰기 (Overwrite, Backup, Create 모두 쓰기 수행)
+		targetPath := filepath.Join(a.root, f.TargetPath)
+		targetDir := filepath.Dir(targetPath)
+		if err := os.MkdirAll(targetDir, 0755); err != nil {
+			return nil, fmt.Errorf("디렉터리 생성 실패 %s: %w", targetDir, err)
+		}
+		if err := os.WriteFile(targetPath, f.Content, 0644); err != nil {
+			return nil, fmt.Errorf("파일 쓰기 실패 %s: %w", f.TargetPath, err)
+		}
+		finalFiles = append(finalFiles, f)
+	}
+
+	pf := &adapter.PlatformFiles{
+		Files:    finalFiles,
+		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
+	}
+
+	// 새 매니페스트 저장
+	m := adapter.ManifestFromFiles(adapterName, pf)
+	// 스킵된 파일도 매니페스트에 기록 (삭제 상태 유지)
+	for _, r := range results {
+		if r.Action == adapter.ActionSkip {
+			if prev, ok := oldManifest.Files[r.Path]; ok {
+				m.Files[r.Path] = prev
+			}
+		}
+	}
+	if saveErr := m.Save(a.root); saveErr != nil {
+		return nil, fmt.Errorf("매니페스트 저장 실패: %w", saveErr)
+	}
+
+	// 백업 알림
+	if backupDir != "" {
+		fmt.Fprintf(os.Stderr, "  백업됨: %s\n", backupDir)
+	}
+
+	return pf, nil
+}
+
+// prepareFiles는 Generate와 동일한 파일을 준비하되, 디스크에 쓰지 않고 내용만 반환한다.
+func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	var files []adapter.FileMapping
+
+	// CLAUDE.md 마커 섹션
+	claudeMD, err := a.injectMarkerSection(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("CLAUDE.md 마커 주입 실패: %w", err)
+	}
+	files = append(files, adapter.FileMapping{
+		TargetPath:      "CLAUDE.md",
+		OverwritePolicy: adapter.OverwriteMarker,
+		Checksum:        checksum(claudeMD),
+		Content:         []byte(claudeMD),
+	})
+
+	// 라우터 커맨드
+	tmplContent, err := templates.FS.ReadFile("claude/commands/auto-router.md.tmpl")
+	if err != nil {
+		return nil, fmt.Errorf("라우터 템플릿 읽기 실패: %w", err)
+	}
+	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+	if err != nil {
+		return nil, fmt.Errorf("라우터 템플릿 렌더링 실패: %w", err)
+	}
+	files = append(files, adapter.FileMapping{
+		TargetPath:      filepath.Join(".claude", "commands", "auto.md"),
+		OverwritePolicy: adapter.OverwriteAlways,
+		Checksum:        checksum(rendered),
+		Content:         []byte(rendered),
+	})
+
+	// .mcp.json
+	mcpFiles, err := a.prepareMCPConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("MCP 설정 준비 실패: %w", err)
+	}
+	files = append(files, mcpFiles...)
+
+	// Full 모드: 스킬/에이전트
+	if cfg.IsFullMode() {
+		skillFiles, err := a.prepareContentFiles("skills", ".claude/skills/autopus")
+		if err != nil {
+			return nil, fmt.Errorf("스킬 파일 준비 실패: %w", err)
+		}
+		files = append(files, skillFiles...)
+
+		agentFiles, err := a.prepareContentFiles("agents", ".claude/agents/autopus")
+		if err != nil {
+			return nil, fmt.Errorf("에이전트 파일 준비 실패: %w", err)
+		}
+		files = append(files, agentFiles...)
+	}
+
+	return files, nil
+}
+
+// prepareContentFiles는 컨텐츠 파일을 읽어 FileMapping 슬라이스로 반환한다 (디스크 쓰기 없음).
+func (a *Adapter) prepareContentFiles(subDir string, targetRelDir string) ([]adapter.FileMapping, error) {
+	var files []adapter.FileMapping
+
+	entries, err := contentfs.FS.ReadDir(subDir)
+	if err != nil {
+		return nil, fmt.Errorf("컨텐츠 디렉터리 읽기 실패 %s: %w", subDir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		srcPath := subDir + "/" + entry.Name()
+		data, err := fs.ReadFile(contentfs.FS, srcPath)
+		if err != nil {
+			return nil, fmt.Errorf("컨텐츠 파일 읽기 실패 %s: %w", srcPath, err)
+		}
+		files = append(files, adapter.FileMapping{
+			TargetPath:      filepath.Join(targetRelDir, entry.Name()),
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(string(data)),
+			Content:         data,
+		})
+	}
+	return files, nil
+}
+
+// prepareMCPConfig는 .mcp.json 내용을 준비한다 (디스크 쓰기 없음).
+func (a *Adapter) prepareMCPConfig(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	tmplContent, err := templates.FS.ReadFile("claude/mcp.json.tmpl")
+	if err != nil {
+		return nil, fmt.Errorf("MCP 템플릿 읽기 실패: %w", err)
+	}
+
+	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+	if err != nil {
+		return nil, fmt.Errorf("MCP 템플릿 렌더링 실패: %w", err)
+	}
+
+	// 렌더링된 JSON 파싱
+	var newMCP map[string]interface{}
+	if err := json.Unmarshal([]byte(rendered), &newMCP); err != nil {
+		return nil, fmt.Errorf("MCP JSON 파싱 실패: %w", err)
+	}
+
+	// 기존 .mcp.json이 있으면 사용자 서버를 보존하며 머지
+	targetPath := filepath.Join(a.root, ".mcp.json")
+	if data, err := os.ReadFile(targetPath); err == nil {
+		var existing map[string]interface{}
+		if err := json.Unmarshal(data, &existing); err == nil {
+			existingServers, _ := existing["mcpServers"].(map[string]interface{})
+			newServers, _ := newMCP["mcpServers"].(map[string]interface{})
+			if existingServers != nil && newServers != nil {
+				for k, v := range newServers {
+					existingServers[k] = v
+				}
+				existing["mcpServers"] = existingServers
+				newMCP = existing
+			}
+		}
+	}
+
+	out, err := json.MarshalIndent(newMCP, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("MCP JSON 직렬화 실패: %w", err)
+	}
+	outStr := string(out) + "\n"
+
+	return []adapter.FileMapping{{
+		TargetPath:      ".mcp.json",
+		OverwritePolicy: adapter.OverwriteMerge,
+		Checksum:        checksum(outStr),
+		Content:         []byte(outStr),
+	}}, nil
 }
 
 // Validate는 설치된 파일의 유효성을 검증한다.
@@ -159,6 +419,16 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 			File:    autoMDPath,
 			Message: "라우터 커맨드 파일이 없음: .claude/commands/auto.md",
 			Level:   "error",
+		})
+	}
+
+	// .mcp.json 확인
+	mcpPath := filepath.Join(a.root, ".mcp.json")
+	if _, err := os.Stat(mcpPath); os.IsNotExist(err) {
+		errs = append(errs, adapter.ValidationError{
+			File:    ".mcp.json",
+			Message: "MCP 설정 파일이 없음: .mcp.json",
+			Level:   "warning",
 		})
 	}
 
@@ -331,6 +601,7 @@ func (a *Adapter) renderRouterCommand(cfg *config.HarnessConfig) ([]adapter.File
 		Content:         []byte(rendered),
 	}}, nil
 }
+
 
 // copyContentFiles는 embedded content FS에서 파일을 읽어 대상 디렉터리에 복사한다.
 // subDir: "skills" 또는 "agents"

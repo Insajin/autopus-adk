@@ -6,3 +6,12 @@ coverage.out
 *.dylib
 .DS_Store
 *.out
+
+# Autopus-ADK generated files
+.claude/rules/autopus/
+.claude/skills/autopus/
+.claude/commands/autopus/
+.claude/agents/autopus/
+.codex/skills/
+.gemini/skills/autopus/
+.agents/skills/
