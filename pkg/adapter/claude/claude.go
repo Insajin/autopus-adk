@@ -127,6 +127,13 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, mcpFiles...)
 
+	// Rules 컨텐츠 파일 복사 (모든 모드)
+	ruleFiles, err := a.copyContentFiles(cfg, "rules", filepath.Join(".claude", "rules", "autopus"))
+	if err != nil {
+		return nil, fmt.Errorf("룰 파일 복사 실패: %w", err)
+	}
+	files = append(files, ruleFiles...)
+
 	// Full 모드: 스킬/에이전트 컨텐츠 파일 복사
 	if cfg.IsFullMode() {
 		skillFiles, err := a.copyContentFiles(cfg, "skills", ".claude/skills/autopus")
@@ -296,6 +303,13 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		return nil, fmt.Errorf("MCP 설정 준비 실패: %w", err)
 	}
 	files = append(files, mcpFiles...)
+
+	// Rules 컨텐츠 파일 준비 (모든 모드)
+	ruleFiles, err := a.prepareContentFiles("rules", filepath.Join(".claude", "rules", "autopus"))
+	if err != nil {
+		return nil, fmt.Errorf("룰 파일 준비 실패: %w", err)
+	}
+	files = append(files, ruleFiles...)
 
 	// Full 모드: 스킬/에이전트
 	if cfg.IsFullMode() {
@@ -665,4 +679,21 @@ const claudeMDTemplate = `# Autopus-ADK Harness
 - Skills: .claude/skills/autopus/
 - Commands: .claude/commands/auto.md
 - Agents: .claude/agents/autopus/
+
+## Core Guidelines
+
+### Subagent Delegation
+
+IMPORTANT: Use subagents for complex tasks that modify 3+ files, span multiple domains, or exceed 200 lines of new code. Define clear scope, provide full context, review output before integrating.
+
+### File Size Limit
+
+IMPORTANT: No source code file may exceed 300 lines. Target under 200 lines. Split by type, concern, or layer when approaching the limit. Excluded: generated files (*_generated.go, *.pb.go), documentation (*.md), and config files (*.yaml, *.json).
+
+### Code Review
+
+During review, verify:
+- No file exceeds 300 lines (REQUIRED)
+- Complex changes use subagent delegation (SUGGESTED)
+- See .claude/rules/autopus/ for detailed guidelines
 `

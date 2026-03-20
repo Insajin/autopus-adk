@@ -403,5 +403,21 @@ const geminiMDTemplate = `# Autopus-ADK Harness
 
 - Gemini Skills: .gemini/skills/
 - Cross-platform: .agents/skills/
+
+## Core Guidelines
+
+### Subagent Delegation
+
+IMPORTANT: Use subagents for complex tasks that modify 3+ files, span multiple domains, or exceed 200 lines of new code. Define clear scope, provide full context, review output before integrating.
+
+### File Size Limit
+
+IMPORTANT: No source code file may exceed 300 lines. Target under 200 lines. Split by type, concern, or layer when approaching the limit. Excluded: generated files (*_generated.go, *.pb.go), documentation (*.md), and config files (*.yaml, *.json).
+
+### Code Review
+
+During review, verify:
+- No file exceeds 300 lines (REQUIRED)
+- Complex changes use subagent delegation (SUGGESTED)
 `
 

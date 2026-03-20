@@ -48,6 +48,12 @@ TRUST 5 기준으로 코드를 체계적으로 검토하는 스킬입니다.
 - [ ] 커밋 메시지가 명확한가?
 - [ ] SPEC/이슈 번호 참조
 
+### Structure Gate
+- [ ] No source code file exceeds 300 lines (hard limit)
+- [ ] Source files over 200 lines flagged for splitting
+- [ ] Non-code files excluded: generated (*_generated.go, *.pb.go), docs (*.md), config (*.yaml, *.json)
+- [ ] Complex changes delegated to subagents (3+ files)
+
 ## 리뷰 출력 형식
 
 ```markdown
@@ -63,6 +69,10 @@ TRUST 5 기준으로 코드를 체계적으로 검토하는 스킬입니다.
 - Unified: ✅ / ⚠️ / ❌
 - Secured: ✅ / ⚠️ / ❌
 - Trackable: ✅ / ⚠️ / ❌
+
+### 구조 검사
+- File Size: ✅ / ⚠️ / ❌
+- Subagent Usage: ✅ / ⚠️ / N/A
 
 ### 필수 수정 사항
 1. [파일:라인] 이유 및 수정 방법

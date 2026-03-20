@@ -6,5 +6,5 @@ import "embed"
 
 // FS는 임베딩된 컨텐츠 파일시스템이다.
 //
-//go:embed skills/*.md agents/*.md hooks/*.sh methodology/*.yaml
+//go:embed skills/*.md agents/*.md hooks/*.sh methodology/*.yaml rules/*.md
 var FS embed.FS

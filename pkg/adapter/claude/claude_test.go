@@ -235,3 +235,49 @@ func TestClaudeAdapter_Clean(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(dir, ".claude", "rules", "autopus"))
 	assert.True(t, os.IsNotExist(statErr), "autopus 규칙 디렉터리가 제거되어야 함")
 }
+
+func TestClaudeAdapter_Generate_InstallsRules(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := claude.NewWithRoot(dir)
+	cfg := config.DefaultLiteConfig("test-project")
+	cfg.Platforms = []string{"claude-code"}
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	// rules 디렉터리에 파일이 생성되는지 검증
+	rulesDir := filepath.Join(dir, ".claude", "rules", "autopus")
+	info, statErr := os.Stat(rulesDir)
+	require.NoError(t, statErr, "rules 디렉터리가 존재해야 함")
+	assert.True(t, info.IsDir())
+
+	// subagent-delegation.md 존재 확인
+	_, statErr = os.Stat(filepath.Join(rulesDir, "subagent-delegation.md"))
+	require.NoError(t, statErr, "subagent-delegation.md가 존재해야 함")
+
+	// file-size-limit.md 존재 확인
+	_, statErr = os.Stat(filepath.Join(rulesDir, "file-size-limit.md"))
+	require.NoError(t, statErr, "file-size-limit.md가 존재해야 함")
+}
+
+func TestClaudeAdapter_Generate_CLAUDEMDContainsGuidelines(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := claude.NewWithRoot(dir)
+	cfg := config.DefaultLiteConfig("test-project")
+	cfg.Platforms = []string{"claude-code"}
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	require.NoError(t, err)
+	content := string(data)
+
+	// CLAUDE.md에 Core Guidelines 섹션 포함 확인
+	assert.Contains(t, content, "Subagent Delegation")
+	assert.Contains(t, content, "File Size Limit")
+	assert.Contains(t, content, "300 lines")
+	assert.Contains(t, content, "Core Guidelines")
+}
