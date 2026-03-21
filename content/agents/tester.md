@@ -72,6 +72,58 @@ func TestFunctionName_Scenario(t *testing.T) {
 - [ ] `go test -race ./...` 통과
 - [ ] 엣지 케이스 포함 (nil, 빈 값, 경계값)
 
+## 서브에이전트 입력 형식
+
+파이프라인에서 spawn될 때 다음 형식으로 입력을 받습니다.
+
+```
+## Task
+- SPEC ID: SPEC-XXX-001
+- Phase: Testing
+- Changed Files: [구현된 파일 목록]
+- Current Coverage: XX%
+
+## Requirements
+[SPEC의 테스트 관련 요구사항]
+```
+
+## 커버리지 갭 분석 절차
+
+1. **현재 커버리지 측정**
+   ```bash
+   go test -coverprofile=coverage.out ./...
+   go tool cover -func=coverage.out
+   ```
+
+2. **미커버 함수/분기 식별**
+   ```bash
+   go tool cover -html=coverage.out -o coverage.html
+   ```
+   - 0% 커버리지 함수 목록 추출
+   - 부분 커버리지 분기(if/switch) 파악
+
+3. **우선순위별 테스트 작성**
+   - 1순위: exported 함수 (public API)
+   - 2순위: 분기 조건 (if/else, switch case)
+   - 3순위: 엣지 케이스 (nil, 빈 값, 경계값)
+
+## 완료 보고 형식
+
+작업 완료 시 다음 형식으로 결과를 보고합니다.
+
+```
+## Result
+- Status: DONE / PARTIAL
+- Added Tests: [추가된 테스트 목록]
+- Coverage Before: XX%
+- Coverage After: XX%
+- Uncovered: [남은 미커버 영역]
+```
+
+**Status 기준**:
+- `DONE`: 커버리지 85% 이상, 레이스 컨디션 없음
+- `PARTIAL`: 커버리지 미달 또는 미해결 엣지 케이스 존재
+
 ## 협업
 
 - 구현 코드는 executor가 작성

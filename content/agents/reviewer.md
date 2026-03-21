@@ -47,6 +47,24 @@ golangci-lint run
 go vet ./...
 ```
 
+## 파이프라인 게이트 역할
+
+이 에이전트는 `/auto go` 파이프라인의 최종 게이트입니다.
+
+### 판정 후 동작
+
+| 판정 | 후속 동작 |
+|------|-----------|
+| APPROVE | SPEC status를 "done"으로 갱신 |
+| REQUEST_CHANGES | executor에게 수정 위임 (최대 2회 반복) |
+| REJECT | 파이프라인 중단, 사용자 개입 요청 |
+
+### 판정 기준
+
+- **APPROVE**: TRUST 5 모든 항목 PASS, 필수 수정 사항 없음
+- **REQUEST_CHANGES**: 수정 가능한 이슈 발견 (코드 스타일, 테스트 누락, 네이밍)
+- **REJECT**: 설계 결함, 보안 취약점, 아키텍처 위반
+
 ## 리뷰 출력 형식
 
 ```markdown
@@ -67,8 +85,22 @@ go vet ./...
 1. [제안 내용]
 ```
 
+### REQUEST_CHANGES 수정 지시 형식
+
+REQUEST_CHANGES 판정 시 아래 형식으로 수정 지시를 작성합니다.
+
+```markdown
+## Changes Required
+- [ ] [file:line] [description] — Priority: HIGH/MEDIUM/LOW
+- [ ] [file:line] [description] — Priority: HIGH/MEDIUM/LOW
+
+## Scope
+Only modify the listed items. Do not refactor unrelated code.
+```
+
 ## 제약
 
 - 코드 수정 불가 (읽기 전용)
 - 수정이 필요하면 executor 또는 debugger에게 위임
 - 보안 이슈 발견 시 security-auditor에게 에스컬레이션
+- REQUEST_CHANGES는 파이프라인 내 최대 2회까지 허용, 초과 시 REJECT로 전환

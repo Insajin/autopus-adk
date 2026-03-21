@@ -3,6 +3,7 @@ package orchestra
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -80,7 +81,14 @@ func MergeStructuredConsensus(responses []ProviderResponse, threshold float64) (
 	var disputedLines []string
 	agreedCount := 0
 
-	for key := range keySet {
+	// Sort keys for deterministic output order
+	keys := make([]int, 0, len(keySet))
+	for k := range keySet {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+
+	for _, key := range keys {
 		// Count how many providers have this key
 		count := 0
 		var texts []string

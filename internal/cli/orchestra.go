@@ -11,7 +11,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
-// buildFileContents는 파일 목록의 내용을 읽어 포맷된 문자열로 반환한다.
+// buildFileContents reads each file and returns formatted content string.
 func buildFileContents(files []string) string {
 	var sb strings.Builder
 	for _, f := range files {
@@ -25,7 +25,7 @@ func buildFileContents(files []string) string {
 	return sb.String()
 }
 
-// newOrchestraCmd는 orchestra 커맨드를 생성한다.
+// newOrchestraCmd creates the orchestra root command.
 // @MX:ANCHOR: orchestra 서브커맨드 트리의 루트 — review, plan, secure가 여기서 등록된다.
 // @MX:REASON: 세 개의 서브커맨드가 이 함수를 통해 CobraCommand 트리에 추가된다.
 func newOrchestraCmd() *cobra.Command {
@@ -43,7 +43,7 @@ func newOrchestraCmd() *cobra.Command {
 	return cmd
 }
 
-// newOrchestraReviewCmd는 코드 리뷰 서브커맨드를 생성한다.
+// newOrchestraReviewCmd creates the code review subcommand.
 func newOrchestraReviewCmd() *cobra.Command {
 	var (
 		strategy  string
@@ -57,20 +57,23 @@ func newOrchestraReviewCmd() *cobra.Command {
 		Short: "여러 모델로 코드를 리뷰한다",
 		Long:  "여러 코딩 CLI를 사용하여 지정된 파일을 리뷰하고 결과를 병합합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Pass only explicitly set flags; empty string means "use config"
+			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
+			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			prompt := buildReviewPrompt(args)
-			return runOrchestraCommand(cmd.Context(), strategy, providers, timeout, judge, prompt)
+			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt)
 		},
 	}
 
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "debate", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
-	cmd.Flags().StringSliceVarP(&providers, "providers", "p", defaultProviders(), "사용할 프로바이더 목록")
+	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
+	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "사용할 프로바이더 목록")
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
 	cmd.Flags().StringVar(&judge, "judge", "", "debate 전략에서 최종 판정 프로바이더")
 
 	return cmd
 }
 
-// newOrchestraPlanCmd는 계획 생성 서브커맨드를 생성한다.
+// newOrchestraPlanCmd creates the plan subcommand.
 func newOrchestraPlanCmd() *cobra.Command {
 	var (
 		strategy  string
@@ -84,19 +87,21 @@ func newOrchestraPlanCmd() *cobra.Command {
 		Long:  "여러 코딩 CLI를 사용하여 기능 구현 계획을 합의 방식으로 수립합니다.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
+			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			prompt := fmt.Sprintf("다음 기능 구현 계획을 수립해주세요:\n\n%s", args[0])
-			return runOrchestraCommand(cmd.Context(), strategy, providers, timeout, "", prompt)
+			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt)
 		},
 	}
 
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "consensus", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
-	cmd.Flags().StringSliceVarP(&providers, "providers", "p", defaultProviders(), "사용할 프로바이더 목록")
+	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
+	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "사용할 프로바이더 목록")
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
 
 	return cmd
 }
 
-// newOrchestraSecureCmd는 보안 분석 서브커맨드를 생성한다.
+// newOrchestraSecureCmd creates the security analysis subcommand.
 func newOrchestraSecureCmd() *cobra.Command {
 	var (
 		strategy  string
@@ -109,26 +114,62 @@ func newOrchestraSecureCmd() *cobra.Command {
 		Short: "여러 모델로 보안 취약점을 분석한다",
 		Long:  "여러 코딩 CLI를 사용하여 지정된 파일의 보안 취약점을 분석합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
+			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			prompt := buildSecurePrompt(args)
-			return runOrchestraCommand(cmd.Context(), strategy, providers, timeout, "", prompt)
+			return runOrchestraCommand(cmd.Context(), "secure", flagStrategy, flagProviders, timeout, "", prompt)
 		},
 	}
 
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "consensus", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
-	cmd.Flags().StringSliceVarP(&providers, "providers", "p", defaultProviders(), "사용할 프로바이더 목록")
+	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
+	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "사용할 프로바이더 목록")
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
 
 	return cmd
 }
 
-// runOrchestraCommand는 오케스트레이션을 실행하고 결과를 출력한다.
-func runOrchestraCommand(ctx context.Context, strategyStr string, providerNames []string, timeout int, judge string, prompt string) error {
+// runOrchestraCommand resolves config and runs the orchestration.
+// It loads autopus.yaml first, resolves strategy and providers via config,
+// and falls back to buildProviderConfigs when config is unavailable.
+func runOrchestraCommand(
+	ctx context.Context,
+	commandName string,
+	flagStrategy string,
+	flagProviders []string,
+	timeout int,
+	judge string,
+	prompt string,
+) error {
+	// Attempt to load config; fall back to hardcoded defaults on failure
+	orchConf, configErr := loadOrchestraConfig()
+
+	var (
+		strategyStr string
+		providers   []orchestra.ProviderConfig
+	)
+
+	if configErr != nil || orchConf == nil {
+		// Config load failed: use CLI flags directly or hardcoded defaults
+		strategyStr = flagStrategy
+		if strategyStr == "" {
+			strategyStr = "consensus"
+		}
+		names := flagProviders
+		if len(names) == 0 {
+			names = defaultProviders()
+		}
+		providers = buildProviderConfigs(names)
+	} else {
+		// Config loaded: resolve strategy and providers with priority
+		strategyStr = resolveStrategy(orchConf, commandName, flagStrategy)
+		providers = resolveProviders(orchConf, commandName, flagProviders)
+	}
+
 	s := orchestra.Strategy(strategyStr)
 	if !s.IsValid() {
 		return fmt.Errorf("유효하지 않은 전략: %q (가능한 값: consensus, pipeline, debate, fastest)", strategyStr)
 	}
 
-	providers := buildProviderConfigs(providerNames)
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다")
 	}
@@ -141,6 +182,10 @@ func runOrchestraCommand(ctx context.Context, strategyStr string, providerNames 
 		JudgeProvider:  judge,
 	}
 
+	providerNames := make([]string, len(providers))
+	for i, p := range providers {
+		providerNames[i] = p.Name
+	}
 	fmt.Fprintf(os.Stderr, "전략: %s, 프로바이더: %s\n", strategyStr, strings.Join(providerNames, ", "))
 
 	result, err := orchestra.RunOrchestra(ctx, cfg)
@@ -153,15 +198,16 @@ func runOrchestraCommand(ctx context.Context, strategyStr string, providerNames 
 	return nil
 }
 
-// buildProviderConfigs는 프로바이더 이름 목록을 ProviderConfig 슬라이스로 변환한다.
+// buildProviderConfigs converts provider names to ProviderConfig slice.
+// This is the hardcoded fallback used when config is unavailable.
 func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
-	// 알려진 프로바이더 이름 → 바이너리 + 기본 인자 매핑
+	// Known provider mappings: binary + default args
 	knownProviders := map[string]orchestra.ProviderConfig{
-		// claude: -p 플래그로 비대화형 모드, stdin으로 프롬프트 전달
+		// claude: non-interactive mode via stdin
 		"claude": {Name: "claude", Binary: "claude", Args: []string{"-p"}, PromptViaArgs: false},
-		// codex: -q 플래그로 quiet 모드, stdin으로 프롬프트 전달
+		// codex: quiet mode via stdin
 		"codex": {Name: "codex", Binary: "codex", Args: []string{"-q"}, PromptViaArgs: false},
-		// gemini: -p 플래그가 프롬프트를 인자로 직접 받음 (stdin 미사용)
+		// gemini: prompt passed as last argument (not stdin)
 		"gemini": {Name: "gemini", Binary: "gemini", Args: []string{"-p"}, PromptViaArgs: true},
 	}
 
@@ -170,7 +216,7 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 		if p, ok := knownProviders[name]; ok {
 			result = append(result, p)
 		} else {
-			// 알 수 없는 프로바이더는 이름을 바이너리로 사용
+			// Unknown provider: use name as binary
 			result = append(result, orchestra.ProviderConfig{
 				Name:   name,
 				Binary: name,
@@ -181,13 +227,12 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	return result
 }
 
-// defaultProviders는 기본 프로바이더 목록을 반환한다.
+// defaultProviders returns the hardcoded default provider list.
 func defaultProviders() []string {
 	return []string{"claude", "codex", "gemini"}
 }
 
-// buildReviewPrompt는 리뷰 프롬프트를 생성한다.
-// 파일이 지정된 경우 파일 내용을 프롬프트에 포함한다.
+// buildReviewPrompt builds the review prompt, including file contents if provided.
 func buildReviewPrompt(files []string) string {
 	if len(files) == 0 {
 		return "현재 프로젝트의 코드를 리뷰해주세요. 품질, 가독성, 잠재적 버그를 중심으로 분석하세요."
@@ -199,8 +244,7 @@ func buildReviewPrompt(files []string) string {
 	return sb.String()
 }
 
-// buildSecurePrompt는 보안 분석 프롬프트를 생성한다.
-// 파일이 지정된 경우 파일 내용을 프롬프트에 포함한다.
+// buildSecurePrompt builds the security analysis prompt, including file contents if provided.
 func buildSecurePrompt(files []string) string {
 	if len(files) == 0 {
 		return "현재 프로젝트의 보안 취약점을 분석해주세요. OWASP Top 10을 기준으로 검토하세요."
@@ -210,4 +254,22 @@ func buildSecurePrompt(files []string) string {
 	sb.WriteString(buildFileContents(files))
 	sb.WriteString("OWASP Top 10을 기준으로 검토하세요.")
 	return sb.String()
+}
+
+// flagStringIfChanged returns the flag value only if the flag was explicitly set.
+// Returns empty string when using default (not changed).
+func flagStringIfChanged(cmd *cobra.Command, name, value string) string {
+	if cmd.Flags().Changed(name) {
+		return value
+	}
+	return ""
+}
+
+// flagStringSliceIfChanged returns the flag value only if the flag was explicitly set.
+// Returns nil when using default (not changed).
+func flagStringSliceIfChanged(cmd *cobra.Command, name string, value []string) []string {
+	if cmd.Flags().Changed(name) {
+		return value
+	}
+	return nil
 }

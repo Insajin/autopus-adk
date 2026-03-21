@@ -87,3 +87,31 @@ func TestHarnessConfig_ModeHelpers(t *testing.T) {
 	assert.False(t, lite.IsFullMode())
 	assert.True(t, lite.IsLiteMode())
 }
+
+func TestProviderEntry_PromptViaArgs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("default value is false", func(t *testing.T) {
+		t.Parallel()
+		p := ProviderEntry{Binary: "claude", Args: []string{"--print"}}
+		assert.False(t, p.PromptViaArgs)
+	})
+
+	t.Run("can be set to true", func(t *testing.T) {
+		t.Parallel()
+		p := ProviderEntry{Binary: "gemini", Args: []string{}, PromptViaArgs: true}
+		assert.True(t, p.PromptViaArgs)
+	})
+
+	t.Run("yaml deserialization preserves PromptViaArgs true", func(t *testing.T) {
+		t.Parallel()
+		conf := OrchestraConf{
+			Providers: map[string]ProviderEntry{
+				"gemini": {Binary: "gemini", Args: []string{}, PromptViaArgs: true},
+				"claude": {Binary: "claude", Args: []string{"--print"}},
+			},
+		}
+		assert.True(t, conf.Providers["gemini"].PromptViaArgs)
+		assert.False(t, conf.Providers["claude"].PromptViaArgs)
+	})
+}

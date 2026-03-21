@@ -46,8 +46,9 @@ type OrchestraConf struct {
 
 // ProviderEntry는 프로바이더 실행 설정이다.
 type ProviderEntry struct {
-	Binary string   `yaml:"binary"`
-	Args   []string `yaml:"args,flow"`
+	Binary        string   `yaml:"binary"`
+	Args          []string `yaml:"args,flow"`
+	PromptViaArgs bool     `yaml:"prompt_via_args,omitempty"`
 }
 
 // CommandEntry는 커맨드별 오케스트레이션 설정이다.

@@ -79,7 +79,10 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 		}
 	}
 	if len(responses) == 0 {
-		return nil, rebuttalResults[0].err
+		if len(rebuttalResults) > 0 {
+			return nil, rebuttalResults[0].err
+		}
+		return nil, fmt.Errorf("rebuttal round: no providers configured")
 	}
 	return responses, nil
 }

@@ -147,14 +147,6 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 	return responses, failed, nil
 }
 
-// runParallelWithPrompt executes all providers in parallel using the given prompt.
-// Used internally by debate flow.
-func runParallelWithPrompt(ctx context.Context, cfg OrchestraConfig, prompt string) ([]ProviderResponse, []FailedProvider, error) {
-	modified := cfg
-	modified.Prompt = prompt
-	return runParallel(ctx, modified)
-}
-
 // runPipeline은 프로바이더를 순차적으로 실행하며 이전 출력을 다음 입력에 추가한다.
 func runPipeline(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, error) {
 	responses := make([]ProviderResponse, 0, len(cfg.Providers))

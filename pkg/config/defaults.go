@@ -65,7 +65,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Providers: map[string]ProviderEntry{
 				"claude": {Binary: "claude", Args: []string{"--print"}},
 				"codex":  {Binary: "codex", Args: []string{"--quiet"}},
-				"gemini": {Binary: "gemini", Args: []string{}},
+				"gemini": {Binary: "gemini", Args: []string{}, PromptViaArgs: true},
 			},
 			Commands: map[string]CommandEntry{
 				"review": {Strategy: "debate", Providers: []string{"claude", "codex", "gemini"}},
