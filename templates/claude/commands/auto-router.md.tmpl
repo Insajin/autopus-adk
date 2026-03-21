@@ -12,6 +12,21 @@
 
 ARGUMENTS: $ARGUMENTS
 
+## 컨텍스트 로드 (매 세션 시작 시)
+
+서브커맨드 처리 전에, 프로젝트 컨텍스트 문서가 존재하면 반드시 먼저 읽어서 컨텍스트를 로드하세요:
+
+1. `ARCHITECTURE.md` — 아키텍처 맵 (도메인, 레이어, 의존성)
+2. `.autopus/project/product.md` — 프로젝트 개요, 핵심 기능
+3. `.autopus/project/structure.md` — 디렉토리 구조, 패키지 역할
+4. `.autopus/project/tech.md` — 기술스택, 빌드, 테스트
+
+문서가 하나도 존재하지 않으면 다음을 안내하세요:
+
+```
+프로젝트 컨텍스트 문서가 없습니다. `/auto setup`으로 초기화하세요.
+```
+
 ## 서브커맨드 라우팅
 
 $ARGUMENTS의 첫 번째 단어로 서브커맨드를 결정하고, 나머지를 해당 워크플로우에 전달합니다.
@@ -29,11 +44,13 @@ $ARGUMENTS의 첫 번째 단어로 서브커맨드를 결정하고, 나머지를
 
 | 서브커맨드 | 설명 | 모드 |
 |-----------|------|------|
+| setup | 프로젝트 컨텍스트 문서 생성/업데이트 | all |
 | plan | SPEC 작성 | all |
 | go | SPEC 구현 | full |
 | fix | 버그 수정 | all |
 | map | 코드베이스 구조 분석 | all |
 | review | 코드 리뷰 | full |
+| spec review | SPEC 멀티-프로바이더 리뷰 | full |
 | secure | 보안 감사 | full |
 | stale | 오래된 결정 감지 | all |
 | sync | 문서 동기화 | all |
@@ -45,13 +62,68 @@ $ARGUMENTS의 첫 번째 단어로 서브커맨드를 결정하고, 나머지를
 
 ---
 
+## setup — 프로젝트 컨텍스트 문서 생성/업데이트
+
+프로젝트의 아키텍처, 구조, 기술스택을 분석하여 컨텍스트 문서를 생성합니다.
+에이전트는 매 세션마다 초기화되므로, 이 문서들이 세션 간 컨텍스트 연속성을 보장합니다.
+
+### Pipeline
+
+1. **코드베이스 분석**: Explore 에이전트로 프로젝트 전체 구조 분석
+2. **ARCHITECTURE.md 생성/업데이트**: `auto arch generate` 실행 또는 에이전트가 직접 분석하여 생성
+3. **프로젝트 문서 생성/업데이트**: `.autopus/project/` 디렉토리에 3개 파일 생성
+
+### 생성 파일
+
+| 파일 | 내용 |
+|------|------|
+| `ARCHITECTURE.md` | 도메인, 레이어, 의존성 맵, 규칙 위반 |
+| `.autopus/project/product.md` | 프로젝트명, 설명, 핵심 기능, 유스케이스, 모드 |
+| `.autopus/project/structure.md` | 디렉토리 구조, 패키지 역할, 엔트리포인트, 파일 통계 |
+| `.autopus/project/tech.md` | 기술스택, 빌드, 테스트, 아키텍처 패턴 |
+
+### 실행 방법
+
+에이전트가 직접 코드베이스를 탐색하고 분석하여 문서를 작성합니다:
+
+1. `go.mod`, `autopus.yaml`, 디렉토리 구조, 소스 파일을 읽어 분석
+2. 기존 파일이 있으면 현재 코드 상태를 반영하여 덮어쓰기
+3. `.autopus/project/` 디렉토리가 없으면 자동 생성
+
+사용법: `/auto setup`
+
+### 완료 후 안내
+
+```
+프로젝트 컨텍스트 문서가 생성/업데이트되었습니다.
+다음 세션부터 자동으로 컨텍스트가 로드됩니다.
+```
+
+---
+
 ## plan — SPEC 작성
 
 @.claude/skills/autopus/planning.md 참조
 
-SPEC 문서를 작성합니다. 코드베이스를 분석하고 컨텍스트를 수집한 후 SPEC을 작성합니다.
+SPEC 문서를 작성합니다. `spec-writer` 에이전트에 위임하여 코드베이스 분석 후 SPEC 4개 파일을 생성합니다.
+
+### Pipeline
+
+1. **에이전트 위임**: `spec-writer` 에이전트를 호출하여 SPEC 생성
+   - 기능 설명과 프로젝트 디렉토리를 전달
+   - 에이전트가 코드베이스 분석, DOMAIN 결정, 4개 파일 생성
+2. **Review Gate**: `spec.review_gate.enabled`이면 멀티-프로바이더 리뷰 자동 실행 (`auto spec review SPEC-ID`)
+3. **Status Update**: PASS → approved, REVISE → 수정 루프 (max_revisions까지)
 
 사용법: `/auto plan "기능 설명"`
+
+### 완료 후 다음 단계 안내
+
+plan 완료 시 반드시 다음 안내를 출력하세요:
+
+```
+다음 단계: /auto go {SPEC-ID}
+```
 
 ---
 
@@ -63,7 +135,30 @@ SPEC 문서를 작성합니다. 코드베이스를 분석하고 컨텍스트를 
 
 SPEC 문서를 기반으로 코드를 구현합니다. {{.Methodology.Mode | upper}} 방법론을 따릅니다.
 
+### Pipeline
+
+1. **SPEC Load**: `.autopus/specs/SPEC-{ID}/spec.md` 로드 + status 확인
+2. **Draft Guard**: status가 "draft"이고 review_gate가 활성화되어 있으면 구현 거부, 리뷰 먼저 안내
+3. **TDD Implementation**: plan.md의 태스크를 기반으로 RED → GREEN → REFACTOR
+4. **Post-Implementation**: acceptance.md 기준 검증 + status: done 갱신
+
 사용법: `/auto go SPEC-ID`, `/auto go SPEC-ID --continue`
+
+### Flags
+
+| 플래그 | 설명 |
+|--------|------|
+| `--auto` | 자율 모드: 사용자 확인 없이 전체 파이프라인 실행 |
+| `--loop` | 루프 모드: Phase 완료 후 다음 Phase로 자동 진행 |
+| `--continue` | 이전 세션에서 중단된 구현을 이어서 진행 |
+
+### 완료 후 다음 단계 안내
+
+go 완료 시 반드시 다음 안내를 출력하세요:
+
+```
+다음 단계: /auto sync {SPEC-ID}
+```
 {{end}}
 
 ---
@@ -106,6 +201,33 @@ SPEC 문서를 기반으로 코드를 구현합니다. {{.Methodology.Mode | upp
 
 ---
 
+## spec review — SPEC 멀티-프로바이더 리뷰
+{{if not .IsFullMode}}
+> spec review는 Full 모드 전용입니다. `auto init --full`로 업그레이드하세요.
+{{else}}
+@.claude/skills/autopus/spec-review.md 참조
+
+SPEC 문서를 멀티-프로바이더(claude, gemini 등)로 리뷰하여 품질을 검증합니다. Orchestra 엔진을 통해 PASS/REVISE/REJECT 판정을 내립니다.
+
+### Pipeline
+
+1. **SPEC 로드**: `.autopus/specs/SPEC-{ID}/spec.md` 로드 및 요구사항 추출
+2. **코드 컨텍스트 수집**: `auto_collect_context: true`이면 관련 소스 코드 수집
+3. **멀티-프로바이더 리뷰**: 설정된 프로바이더로 독립적 리뷰 실행
+4. **판정 병합**: 전략(debate, consensus)에 따라 최종 verdict 결정
+5. **결과 저장**: `review.md`를 SPEC 디렉터리에 저장
+
+### 판정 기준
+
+- **PASS**: SPEC 승인, status를 "approved"로 갱신
+- **REVISE**: 수정 필요, finding 목록과 함께 반환
+- **REJECT**: 근본적 재설계 필요
+
+사용법: `/auto spec review SPEC-ID`, `/auto spec review SPEC-ID --strategy debate --timeout 180`
+{{end}}
+
+---
+
 ## secure — 보안 감사
 {{if not .IsFullMode}}
 > secure는 Full 모드 전용입니다. `auto init --full`로 업그레이드하세요.
@@ -138,12 +260,29 @@ SPEC 문서를 기반으로 코드를 구현합니다. {{.Methodology.Mode | upp
 
 동기화 항목:
 - SPEC 상태 갱신 (completed)
+- 프로젝트 컨텍스트 문서 업데이트 (ARCHITECTURE.md + `.autopus/project/*`)
 - API 문서 업데이트
 - @MX 태그 검증{{if .IsFullMode}}
 - Lore 기록 캡처
 - CHANGELOG.md 갱신{{end}}
 
+### 프로젝트 문서 업데이트
+
+sync 실행 시 코드베이스의 구조적 변경을 감지하여 다음 파일을 업데이트합니다:
+- `ARCHITECTURE.md` — 새 패키지/의존성 반영
+- `.autopus/project/structure.md` — 디렉토리/파일 변경 반영
+- `.autopus/project/tech.md` — 의존성/빌드 변경 반영
+- `.autopus/project/product.md` — 새 기능/커맨드 반영
+
 사용법: `/auto sync SPEC-ID`, `/auto sync`
+
+### 완료 후 다음 단계 안내
+
+sync 완료 시 반드시 다음 안내를 출력하세요:
+
+```
+파이프라인 완료: plan -> go -> sync 전체 사이클이 완료되었습니다.
+```
 
 ---
 

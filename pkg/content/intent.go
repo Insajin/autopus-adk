@@ -30,6 +30,8 @@ func DefaultRules() []IntentRule {
 		{Pattern: `commit.*message|커밋.*메시지`, TargetSkill: "lore-commit", Priority: 14},
 		{Pattern: `refactor.*code|코드.*리팩토링`, TargetSkill: "ast-refactoring", Priority: 11},
 		{Pattern: `search.*context|컨텍스트.*검색`, TargetSkill: "context-search", Priority: 9},
+		{Pattern: `spec.*작성|spec.*생성|SPEC.*write|SPEC.*create|스펙.*작성`, TargetAgent: "spec-writer", Priority: 16},
+		{Pattern: `spec.*review|spec.*리뷰|SPEC.*리뷰|리뷰.*게이트|review.*gate`, TargetSkill: "spec-review", Priority: 17},
 	}
 }
 
