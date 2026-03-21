@@ -32,7 +32,7 @@ git log --oneline -5
 - **Readable**: 명확한 네이밍, 함수 50줄 이하
 - **Unified**: gofmt, golangci-lint 통과
 - **Secured**: 입력 검증, SQL 인젝션 방지
-- **Trackable**: 커밋 메시지 명확, 이슈 참조
+- **Trackable**: 커밋 메시지 명확, 이슈 참조, @AX 규칙 준수
 
 ### 3단계: 구조 검사
 
@@ -46,6 +46,17 @@ go test -race ./...
 golangci-lint run
 go vet ./...
 ```
+
+### 5단계: @AX Compliance 검증
+
+Verify @AX tag compliance on all changed files:
+- @AX:REASON present on WARN and ANCHOR tags
+- Per-file limits enforced (ANCHOR ≤ 3, WARN ≤ 5)
+- [AUTO] prefix on agent-generated tags
+- Comment syntax matches file language
+- ANCHOR fan_in ≥ 3 verified (grep heuristic)
+
+Reference: `pkg/content/ax.go:GenerateAXInstruction()` for canonical rules.
 
 ## 파이프라인 게이트 역할
 

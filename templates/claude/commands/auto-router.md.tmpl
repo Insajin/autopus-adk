@@ -571,7 +571,7 @@ Analysis includes:
 - Directory structure and package hierarchy
 - Core entry points (main, handlers)
 - Dependency flow (inter-module imports)
-- @MX ANCHOR points (high fan-in functions)
+- @AX ANCHOR points (high fan-in functions)
 - Complexity hotspots
 
 Usage: `/auto map`, `/auto map path/to/package`
@@ -637,10 +637,10 @@ Detect outdated decisions, expired TODOs, and obsolete architecture patterns.
 
 Detects:
 - Lore entries older than {{.Lore.StaleThresholdDays}} days
-- Stale @MX:TODO tags
+- Stale @AX:TODO tags
 - Unused interfaces and redundant abstractions
 
-Usage: `/auto stale`, `/auto stale --lore`, `/auto stale --mx`
+Usage: `/auto stale`, `/auto stale --lore`, `/auto stale --ax`
 
 ---
 
@@ -652,7 +652,8 @@ Sync targets:
 - Update SPEC status (completed)
 - Update project context documents (ARCHITECTURE.md + `.autopus/project/*`)
 - Update API documentation
-- Validate @MX tags{{if .IsFullMode}}
+- Manage @AX tag lifecycle (CYCLE tracking, TODO escalation, ANCHOR verification)
+{{if .IsFullMode}}
 - Capture Lore records
 - Update CHANGELOG.md{{end}}
 
@@ -665,6 +666,26 @@ On sync, detect structural changes in the codebase and update:
 - `.autopus/project/product.md` — reflect new features/commands
 
 Usage: `/auto sync SPEC-ID`, `/auto sync`
+
+### @AX Lifecycle Management
+
+On sync, manage @AX tag lifecycle across the codebase:
+
+#### TODO Cycle Tracking
+1. Find all `@AX:TODO` tags in source files
+2. Increment `@AX:CYCLE:N` counter (or add `@AX:CYCLE:1` if absent)
+3. Escalate to `@AX:WARN` if CYCLE >= 3, adding `@AX:REASON: escalated from TODO after N cycles`
+
+#### ANCHOR Fan-In Verification
+1. Find all `@AX:ANCHOR` tags
+2. Grep for function name references to count callers
+3. If caller count < 3, downgrade to `@AX:NOTE` with updated reason
+
+#### NOTE Cleanup
+1. Find all `@AX:NOTE` tags referencing specific functions
+2. Verify the referenced function still exists in the codebase
+3. Remove orphaned NOTE tags
+
 {{if .IsFullMode}}
 ### Lore Commit
 
@@ -752,7 +773,7 @@ Look up the rationale behind code or architecture decisions.
 Query methods:
 - Keyword search across Lore entries
 - Extract decision context from commit history
-- Look up NOTE/ANCHOR in @MX tags
+- Look up NOTE/ANCHOR in @AX tags
 - Link to related SPEC documents
 
 Usage: `/auto why "why was this pattern used?"`, `/auto why path/to/file.go`

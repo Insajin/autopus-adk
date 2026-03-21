@@ -48,11 +48,19 @@ TRUST 5 기준으로 코드를 체계적으로 검토하는 스킬입니다.
 - [ ] 커밋 메시지가 명확한가?
 - [ ] SPEC/이슈 번호 참조
 
+#### @AX Compliance
+- [ ] @AX:REASON present on all WARN and ANCHOR tags
+- [ ] Per-file limits: ANCHOR ≤ 3, WARN ≤ 5
+- [ ] Agent-generated tags include [AUTO] prefix
+- [ ] Comment syntax matches file language (Go: `//`, Python: `#`)
+- [ ] ANCHOR tags verified: fan_in ≥ 3 callers (grep heuristic)
+
 ### Structure Gate
 - [ ] No source code file exceeds 300 lines (hard limit)
 - [ ] Source files over 200 lines flagged for splitting
 - [ ] Non-code files excluded: generated (*_generated.go, *.pb.go), docs (*.md), config (*.yaml, *.json)
 - [ ] Complex changes delegated to subagents (3+ files)
+- [ ] @AX tag compliance verified (see Trackable > @AX Compliance)
 
 ## 리뷰 출력 형식
 

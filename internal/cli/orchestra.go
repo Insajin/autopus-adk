@@ -17,17 +17,16 @@ func buildFileContents(files []string) string {
 	for _, f := range files {
 		content, err := os.ReadFile(f)
 		if err != nil {
-			sb.WriteString(fmt.Sprintf("--- %s (읽기 실패: %v) ---\n\n", f, err))
+			fmt.Fprintf(&sb, "--- %s (읽기 실패: %v) ---\n\n", f, err)
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("--- %s ---\n```\n%s\n```\n\n", f, string(content)))
+		fmt.Fprintf(&sb, "--- %s ---\n```\n%s\n```\n\n", f, string(content))
 	}
 	return sb.String()
 }
 
 // newOrchestraCmd creates the orchestra root command.
-// @MX:ANCHOR: orchestra 서브커맨드 트리의 루트 — review, plan, secure가 여기서 등록된다.
-// @MX:REASON: 세 개의 서브커맨드가 이 함수를 통해 CobraCommand 트리에 추가된다.
+// @AX:NOTE: [AUTO] [downgraded from ANCHOR — fan_in < 3] orchestra 서브커맨드 트리의 루트
 func newOrchestraCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "orchestra",

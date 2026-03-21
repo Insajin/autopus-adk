@@ -10,6 +10,7 @@ skills:
   - ddd
   - debugging
   - ast-refactoring
+  - ax-annotation
 ---
 
 # Executor Agent
@@ -37,6 +38,20 @@ SPEC과 요구사항을 받아 테스트와 구현 코드를 작성합니다.
 3. 최소 구현으로 통과
 4. 리팩토링 후 재확인
 ```
+
+## @AX Tag Application
+
+After completing the GREEN/REFACTOR phase, apply @AX tags to modified files.
+
+Reference: `pkg/content/ax.go:GenerateAXInstruction()` — canonical @AX rules.
+Skill: `.claude/skills/autopus/ax-annotation.md` — application workflow.
+
+### Post-GREEN Steps
+
+1. Scan modified files for @AX trigger conditions
+2. Apply tags with `[AUTO]` prefix (e.g., `// @AX:NOTE: [AUTO] magic constant — payment SLA`)
+3. Validate per-file limits (ANCHOR ≤ 3, WARN ≤ 5)
+4. Handle overflow per ax-annotation skill rules
 
 ## 파일 소유권
 
