@@ -247,97 +247,233 @@ After displaying, also show agent result summary:
 
 Implement code based on a SPEC document. Follows TDD methodology.
 
-### Pipeline (default mode: single session)
+### Step 0: Parse Flags (REQUIRED — do this FIRST)
 
-1. **Load SPEC**: Load `.autopus/specs/SPEC-{ID}/spec.md` and check status
-2. **Draft Guard**: If status is "draft" and review_gate is enabled, refuse implementation and prompt for review first
-3. **TDD Implementation**: Execute RED → GREEN → REFACTOR based on tasks in plan.md
-4. **Post-Implementation**: Validate against acceptance.md criteria and update status to done
+IMPORTANT: You MUST parse these flags from $ARGUMENTS before any other action.
 
-### Pipeline (--team mode: multi-agent)
+Extract the following flags:
+- `--team` → `TEAM_MODE = true/false`
+- `--auto` → `AUTO_MODE = true/false`
+- `--multi` → `MULTI_MODE = true/false`
+- `--quality <value>` → `QUALITY = value` (ultra | balanced)
+- `--strategy <value>` → `STRATEGY = value`
+- `--continue` → `CONTINUE_MODE = true/false`
+- `--loop` → `LOOP_MODE = true/false`
+- Remaining text (non-flag word) → `SPEC_ID`
 
-When `--team` flag is set, switch to a subagent pipeline:
+After parsing, display the detected configuration:
 
 ```
-Phase 1: Planning        → planner     (model: depends on quality mode, plan)
-Gate 1:  Approval        → skip if --auto
-Phase 2: Implementation  → executor×N  (sonnet, acceptEdits, parallelizable)
-Gate 2:  Validation      → validator   (haiku,  plan)  — retry up to 3× on FAIL
-Phase 3: Testing         → tester      (sonnet, acceptEdits)
+Mode: {single | team | team+multi}
+SPEC: {SPEC_ID}
+Quality: {ultra | balanced | pending selection}
+```
+
+### Step 1: Load SPEC
+
+Load `.autopus/specs/SPEC-{SPEC_ID}/spec.md` and check status.
+
+**Draft Guard**: If status is "draft" and review_gate is enabled, refuse implementation and prompt:
+```
+SPEC {SPEC_ID} is in draft status. Run review first: /auto spec review {SPEC_ID}
+```
+
+### Step 2: Route to Pipeline
+
+IMPORTANT: If `TEAM_MODE = true`, you MUST use the **Multi-Agent Pipeline** below. Do NOT fall back to single session mode. You MUST call the Agent tool with the specified subagent_type for each Phase.
+
+#### Route A: Single Session Pipeline (TEAM_MODE = false)
+
+1. **TDD Implementation**: Execute RED → GREEN → REFACTOR based on tasks in plan.md
+2. **Post-Implementation**: Validate against acceptance.md criteria and update status to done
+
+#### Route B: Multi-Agent Pipeline (TEAM_MODE = true)
+
+IMPORTANT: This route REQUIRES spawning subagents using the Agent tool. Each Phase below MUST use an Agent() call — do NOT implement these phases yourself in the main session.
+
+```
+Phase 1: Planning        → planner     (mode: plan)
+Gate 1:  Approval        → skip if AUTO_MODE
+Phase 2: Implementation  → executor×N  (mode: bypassPermissions, parallelizable)
+Gate 2:  Validation      → validator   (mode: plan)  — retry up to 3× on FAIL
+Phase 3: Testing         → tester      (mode: bypassPermissions)
 Gate 3:  Coverage        → verify 85%+ coverage
-Phase 4: Review          → reviewer    (sonnet, plan)  — delegate fixes up to 2× on REQUEST_CHANGES
+Phase 4: Review          → reviewer    (mode: plan)  — retry up to 2× on REQUEST_CHANGES
 ```
 
-> Model assignments above are for Balanced mode. In Ultra mode, all agents run on opus.
+**Step 2.1: Determine Quality Mode**
 
-**Pipeline Progress Display:**
+Priority order:
+1. If `QUALITY` is set → use it. If invalid value, print error and stop.
+2. If `AUTO_MODE = true` and `QUALITY` is not set → auto-select "balanced"
+3. Otherwise → show interactive selection UI (see Quality Mode Selection below)
 
-At the start of `--team` mode and after each Phase transition, display the progress bar:
+Quality mode determines the `model` parameter in Agent() calls:
+- **Ultra**: add `model: "opus"` to ALL Agent() calls
+- **Balanced**: omit `model` parameter (use each agent's default)
 
+Display after determination:
+```
+품질 모드: {Ultra | Balanced} — {description}
+```
+
+**Step 2.2: Phase 1 — Planning (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "planner",
+  model = "opus",          ← Ultra only; omit for Balanced
+  mode = "plan",
+  prompt = """
+    SPEC file: .autopus/specs/SPEC-{SPEC_ID}/spec.md
+    Plan file: .autopus/specs/SPEC-{SPEC_ID}/plan.md
+
+    Decompose the SPEC into implementation tasks.
+    Return an agent assignment table:
+    | Task ID | Description | Agent    | Mode       | File Ownership  |
+    |---------|-------------|----------|------------|-----------------|
+    | T1      | ...         | executor | parallel   | pkg/foo/*.go    |
+    | T2      | ...         | executor | sequential | pkg/foo/*.go    |
+  """
+)
+```
+
+Display progress after completion:
 ```
 🐙 Pipeline ─────────────────────────
   ✓ Phase 1: Planning
-  → Phase 2: Implementation [N/M tasks]
+  → Phase 2: Implementation [0/N tasks]
   ○ Phase 3: Testing
   ○ Phase 4: Review
 ```
 
-Use `✓` for completed phases, `→` for the current phase, `○` for pending phases.
-Replace `[N/M tasks]` with actual counts (e.g., `[3/7 tasks]`) for Phase 2.
+**Gate 1: Approval** — If `AUTO_MODE = false`, show the planner's assignment table and ask user to approve before proceeding.
 
-**Execution procedure:**
+**Step 2.3: Phase 2 — Implementation (MUST call Agent tool)**
 
-0. **Determine quality mode** using this priority order:
-   - If `--quality <mode>` flag is present: use that mode (normalize to lowercase). If invalid, print error and stop.
-   - If `--auto` is present and `--quality` is not: auto-select "balanced"
-   - If neither: show interactive selection UI
+For each task in the planner's assignment table, spawn executor agents:
 
-1. **Spawn planner**: Pass SPEC spec.md + plan.md to decompose tasks and produce an agent assignment table
-2. **Review agent assignment table**: Inspect the table returned by planner (auto-approve if --auto)
-3. **Spawn executor(s)**: Independent tasks in parallel (multiple Agent calls in a single message), dependent tasks sequentially
-4. **Spawn validator**: Run quality validation → on PASS proceed, on FAIL delegate fixes to the agent recommended in Gate Verdict
-5. **Spawn tester**: Analyze coverage gaps and strengthen tests
-6. **Spawn reviewer**: TRUST 5 review → on APPROVE done, on REQUEST_CHANGES delegate fixes
+Parallel tasks (Mode = "parallel" AND no file ownership conflict):
+```
+# Call MULTIPLE Agent() in a SINGLE message for parallel execution
+Agent(
+  subagent_type = "executor",
+  model = "opus",          ← Ultra only; omit for Balanced
+  mode = "bypassPermissions",
+  prompt = "Implement T1: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}"
+)
+Agent(
+  subagent_type = "executor",
+  model = "opus",          ← Ultra only; omit for Balanced
+  mode = "bypassPermissions",
+  prompt = "Implement T2: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}"
+)
+```
 
-After each agent completes, display the agent result summary:
+Sequential tasks (Mode = "sequential" OR file ownership conflict):
+```
+# Call Agent() one at a time, passing previous result to next
+result_t1 = Agent(subagent_type = "executor", prompt = "Implement T1: ...")
+Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ...")
+```
 
-- executor:
-  ```
-  🐙 executor ─────────────────────────
-    파일: {N}개 수정 | 테스트: {N}개 추가 | 커버리지: {N}%
-    다음: 검증 단계로 진행
-  ```
-- validator:
-  ```
-  🐙 validator ────────────────────────
-    Verdict: {PASS|FAIL} | 검사 항목: {N}개 | 이슈: {N}개
-    다음: {pass → 테스트 단계 | fail → 수정 후 재검증}
-  ```
-- tester:
-  ```
-  🐙 tester ───────────────────────────
-    테스트: {N}개 추가 | 커버리지: {before}% → {after}% | 통과: {N}/{N}
-    다음: 리뷰 단계로 진행
-  ```
-- reviewer:
-  ```
-  🐙 reviewer ─────────────────────────
-    Verdict: {APPROVE|REQUEST_CHANGES} | Issues: {N}개 | 심각도: {low|medium|high}
-    다음: {verdict-based guidance}
-  ```
+After each executor, display:
+```
+🐙 executor ─────────────────────────
+  파일: {N}개 수정 | 테스트: {N}개 추가 | 커버리지: {N}%
+  다음: 검증 단계로 진행
+```
+
+**Step 2.4: Gate 2 — Validation (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "validator",
+  mode = "plan",
+  prompt = """
+    Validate the implementation. Check:
+    - go build ./... passes
+    - go vet ./... passes
+    - golangci-lint run passes
+    - No file exceeds 300 lines
+
+    Return format:
+    Verdict: PASS | FAIL
+    Issues: <list>
+    Recommended Agent: executor | tester | planner
+  """
+)
+```
+
+- **PASS** → proceed to Phase 3
+- **FAIL** → spawn the Recommended Agent to fix issues, then re-validate (up to 3 retries)
+
+After validation, display:
+```
+🐙 validator ────────────────────────
+  Verdict: {PASS|FAIL} | 검사 항목: {N}개 | 이슈: {N}개
+  다음: {pass → 테스트 단계 | fail → 수정 후 재검증}
+```
+
+**Step 2.5: Phase 3 — Testing (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "tester",
+  mode = "bypassPermissions",
+  prompt = """
+    Raise test coverage to 85%+.
+    Add missing edge case tests.
+    Run: go test -race -cover ./...
+    Ensure all tests pass.
+  """
+)
+```
+
+After tester, display:
+```
+🐙 tester ───────────────────────────
+  테스트: {N}개 추가 | 커버리지: {before}% → {after}% | 통과: {N}/{N}
+  다음: 리뷰 단계로 진행
+```
+
+**Gate 3: Coverage** — verify 85%+ coverage from tester output. If below, re-spawn tester.
+
+**Step 2.6: Phase 4 — Review (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "reviewer",
+  mode = "plan",
+  prompt = """
+    Review all changes using TRUST 5 criteria.
+    Return format:
+    Verdict: APPROVE | REQUEST_CHANGES
+    Issues: <list with file:line references>
+  """
+)
+```
+
+- **APPROVE** → pipeline complete
+- **REQUEST_CHANGES** → spawn executor to fix issues, then re-review (up to 2 retries)
+
+After reviewer, display:
+```
+🐙 reviewer ─────────────────────────
+  Verdict: {APPROVE|REQUEST_CHANGES} | Issues: {N}개 | 심각도: {low|medium|high}
+  다음: {verdict-based guidance}
+```
 
 **Parallel execution rules:**
-- Only parallelize tasks whose Mode is "parallel" in the planner's agent assignment table
-- Tasks that modify the same file are automatically serialized
+- Only parallelize tasks whose Mode is "parallel" in the planner's assignment table
+- File ownership conflict (same path pattern) → force sequential
 - Pass SPEC requirements, task description, and relevant file context to each subagent
 
 **Retry limits:**
-- Validation: up to 3× → stop on exceeded, guide user to resume with `--continue`
-- Review: up to 2× → stop on exceeded, request user intervention
+- Gate 2 (Validation): up to 3× → stop on exceeded, guide user to resume with `--continue`
+- Phase 4 (Review): up to 2× → stop on exceeded, request user intervention
 
 **Error Recovery:**
-
-When a Phase fails, display the recovery guide:
 
 Validation failure (Gate 2):
 ```
@@ -347,7 +483,7 @@ Validation failure (Gate 2):
   2. /auto fix "{specific issue}"   (개별 이슈 수정)
 ```
 
-Review failure (Gate 3 — REQUEST_CHANGES, retries exceeded):
+Review failure (retries exceeded):
 ```
 ✗ Review 실패: {N}개 변경 요청 (재시도 초과)
   복구 옵션:
@@ -363,7 +499,7 @@ Subagent failure:
   2. {manual fallback instruction}  (수동 처리)
 ```
 
-**Fallback:** If a subagent fails, handle in the main session directly.
+**Fallback:** If a subagent fails 2 consecutive times, handle in the main session directly.
 
 ### Pipeline (--multi mode: multi-provider)
 
@@ -388,30 +524,6 @@ Usage: `/auto go SPEC-ID`, `/auto go SPEC-ID --team`, `/auto go SPEC-ID --team -
 | `--multi` | Multi-provider mode: activate orchestra engine-based review |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |
 | `--quality` | Quality mode: ultra (all agents Opus), balanced (mixed). Requires --team |
-
-### Quality Mode Selection (interactive)
-
-Selection UI shown in `--team` mode when `--quality` is not specified:
-
-```
-품질 모드를 선택하세요:
-
-[1] Ultra — 모든 에이전트를 Opus로 실행. 최고 품질. (비용: 높음)
-    planner=opus, executor=opus, validator=opus, tester=opus, reviewer=opus
-
-[2] Balanced — 핵심 분석은 Opus, 구현은 Sonnet, 검증은 Haiku. (비용: 보통)
-    planner=opus, executor=sonnet, validator=haiku, tester=sonnet, reviewer=sonnet
-
-선택 (1-2):
-```
-
-### Quality Mode Display
-
-Show before starting the pipeline after mode is determined:
-
-```
-품질 모드: [Ultra | Balanced] — [모드 설명]
-```
 
 ### Harness-Only Tasks
 
