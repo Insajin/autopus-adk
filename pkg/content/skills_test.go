@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -171,6 +172,88 @@ func TestSkillConvertToPlatform_UnknownPlatform(t *testing.T) {
 
 	skill := content.SkillDefinition{Name: "test"}
 	_, err := content.ConvertSkillToPlatform(skill, "unknown")
+	assert.Error(t, err)
+}
+
+func TestSkillRegistry_LoadFromFS(t *testing.T) {
+	t.Parallel()
+
+	fsys := fstest.MapFS{
+		"skills/planning.md": &fstest.MapFile{
+			Data: []byte(`---
+name: planning
+description: 기능 기획 스킬
+triggers:
+  - "plan"
+  - "기획"
+category: workflow
+level1_metadata: "기획 메타데이터"
+---
+
+# Planning Skill
+
+기획 단계에서 사용하는 스킬입니다.
+`),
+		},
+		"skills/debugging.md": &fstest.MapFile{
+			Data: []byte(`---
+name: debugging
+description: 디버깅 스킬
+triggers:
+  - "debug"
+category: quality
+---
+
+# Debugging Skill
+`),
+		},
+	}
+
+	registry := &content.SkillRegistry{}
+	err := registry.LoadFromFS(fsys, "skills")
+	require.NoError(t, err)
+
+	skills := registry.List()
+	assert.Len(t, skills, 2)
+
+	skill, err := registry.Get("planning")
+	require.NoError(t, err)
+	assert.Equal(t, "기능 기획 스킬", skill.Description)
+	assert.Equal(t, "workflow", skill.Category)
+	assert.Equal(t, "기획 메타데이터", skill.Level1Metadata)
+	assert.Contains(t, skill.Level2Body, "Planning Skill")
+}
+
+func TestSkillRegistry_LoadFromFS_FallbackName(t *testing.T) {
+	t.Parallel()
+
+	// Skill without name in frontmatter uses filename as name.
+	fsys := fstest.MapFS{
+		"skills/no-name.md": &fstest.MapFile{
+			Data: []byte(`---
+description: 이름 없는 스킬
+---
+
+body
+`),
+		},
+	}
+
+	registry := &content.SkillRegistry{}
+	err := registry.LoadFromFS(fsys, "skills")
+	require.NoError(t, err)
+
+	skill, err := registry.Get("no-name")
+	require.NoError(t, err)
+	assert.Equal(t, "no-name", skill.Name)
+}
+
+func TestSkillRegistry_LoadFromFS_InvalidDir(t *testing.T) {
+	t.Parallel()
+
+	fsys := fstest.MapFS{}
+	registry := &content.SkillRegistry{}
+	err := registry.LoadFromFS(fsys, "nonexistent")
 	assert.Error(t, err)
 }
 

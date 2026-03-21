@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,6 +106,81 @@ func TestConvertAgentToPlatform_UnknownPlatform(t *testing.T) {
 
 	agent := content.AgentDefinition{Name: "test"}
 	_, err := content.ConvertAgentToPlatform(agent, "unknown")
+	assert.Error(t, err)
+}
+
+func TestLoadAgentsFromFS(t *testing.T) {
+	t.Parallel()
+
+	fsys := fstest.MapFS{
+		"agents/planner.md": &fstest.MapFile{
+			Data: []byte(`---
+name: planner
+role: 기획 전문 에이전트
+model_tier: opus
+category: planning
+triggers:
+  - "plan"
+skills:
+  - planning
+---
+
+# Planner Agent
+
+기획을 담당하는 에이전트입니다.
+`),
+		},
+		"agents/executor.md": &fstest.MapFile{
+			Data: []byte(`---
+name: executor
+role: 실행 에이전트
+model_tier: sonnet
+category: execution
+---
+
+# Executor Agent
+`),
+		},
+	}
+
+	agents, err := content.LoadAgentsFromFS(fsys, "agents")
+	require.NoError(t, err)
+	assert.Len(t, agents, 2)
+
+	names := make(map[string]bool)
+	for _, a := range agents {
+		names[a.Name] = true
+	}
+	assert.True(t, names["planner"])
+	assert.True(t, names["executor"])
+}
+
+func TestLoadAgentsFromFS_FallbackName(t *testing.T) {
+	t.Parallel()
+
+	// Agent without name uses filename as name.
+	fsys := fstest.MapFS{
+		"agents/no-name.md": &fstest.MapFile{
+			Data: []byte(`---
+role: 이름 없는 에이전트
+---
+
+body
+`),
+		},
+	}
+
+	agents, err := content.LoadAgentsFromFS(fsys, "agents")
+	require.NoError(t, err)
+	require.Len(t, agents, 1)
+	assert.Equal(t, "no-name", agents[0].Name)
+}
+
+func TestLoadAgentsFromFS_InvalidDir(t *testing.T) {
+	t.Parallel()
+
+	fsys := fstest.MapFS{}
+	_, err := content.LoadAgentsFromFS(fsys, "nonexistent")
 	assert.Error(t, err)
 }
 

@@ -2,6 +2,7 @@ package content
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -35,6 +36,21 @@ type Stage struct {
 // LoadMethodology는 YAML 파일에서 방법론을 로드한다.
 func LoadMethodology(path string) (*MethodologyDef, error) {
 	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("방법론 파일 읽기 실패 %s: %w", path, err)
+	}
+
+	var def MethodologyDef
+	if err := yaml.Unmarshal(data, &def); err != nil {
+		return nil, fmt.Errorf("YAML 파싱 실패: %w", err)
+	}
+
+	return &def, nil
+}
+
+// LoadMethodologyFromFS loads methodology from an embedded filesystem.
+func LoadMethodologyFromFS(fsys fs.FS, path string) (*MethodologyDef, error) {
+	data, err := fs.ReadFile(fsys, path)
 	if err != nil {
 		return nil, fmt.Errorf("방법론 파일 읽기 실패 %s: %w", path, err)
 	}

@@ -3,6 +3,7 @@ package content
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,15 +170,47 @@ func convertSkillGemini(skill SkillDefinition) string {
 	return sb.String()
 }
 
+// LoadFromFS loads skill files from an embedded filesystem.
+func (r *SkillRegistry) LoadFromFS(fsys fs.FS, dir string) error {
+	r.skills = make(map[string]SkillDefinition)
+
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return fmt.Errorf("스킬 디렉토리 읽기 실패 %s: %w", dir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+
+		data, err := fs.ReadFile(fsys, dir+"/"+entry.Name())
+		if err != nil {
+			return fmt.Errorf("스킬 파일 읽기 실패 %s: %w", entry.Name(), err)
+		}
+
+		skill, err := parseSkillData(data, entry.Name())
+		if err != nil {
+			return fmt.Errorf("스킬 파일 파싱 실패 %s: %w", entry.Name(), err)
+		}
+		r.skills[skill.Name] = skill
+	}
+	return nil
+}
+
 // parseSkillFile은 마크다운 스킬 파일을 파싱한다.
 func parseSkillFile(path string) (SkillDefinition, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return SkillDefinition{}, fmt.Errorf("파일 읽기 실패: %w", err)
 	}
+	return parseSkillData(data, filepath.Base(path))
+}
 
-	content := string(data)
-	fm, body, err := splitFrontmatter(content)
+// parseSkillData parses skill definition from raw bytes.
+func parseSkillData(data []byte, filename string) (SkillDefinition, error) {
+	raw := string(data)
+	fm, body, err := splitFrontmatter(raw)
 	if err != nil {
 		return SkillDefinition{}, fmt.Errorf("프론트매터 파싱 실패: %w", err)
 	}
@@ -197,10 +230,8 @@ func parseSkillFile(path string) (SkillDefinition, error) {
 		Category:        frontmatter.Category,
 	}
 
-	// 파일명에서 이름 추론 (frontmatter에 없을 경우)
 	if skill.Name == "" {
-		base := filepath.Base(path)
-		skill.Name = strings.TrimSuffix(base, ".md")
+		skill.Name = strings.TrimSuffix(filename, ".md")
 	}
 
 	return skill, nil

@@ -2,6 +2,7 @@ package content
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,15 +150,47 @@ func convertAgentGemini(agent AgentDefinition) string {
 	return sb.String()
 }
 
+// LoadAgentsFromFS loads agent definitions from an embedded filesystem.
+func LoadAgentsFromFS(fsys fs.FS, dir string) ([]AgentDefinition, error) {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return nil, fmt.Errorf("에이전트 디렉토리 읽기 실패 %s: %w", dir, err)
+	}
+
+	var agents []AgentDefinition
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+
+		data, err := fs.ReadFile(fsys, dir+"/"+entry.Name())
+		if err != nil {
+			return nil, fmt.Errorf("에이전트 파일 읽기 실패 %s: %w", entry.Name(), err)
+		}
+
+		agent, err := parseAgentData(data, entry.Name())
+		if err != nil {
+			return nil, fmt.Errorf("에이전트 파일 파싱 실패 %s: %w", entry.Name(), err)
+		}
+		agents = append(agents, agent)
+	}
+
+	return agents, nil
+}
+
 // parseAgentFile은 마크다운 에이전트 파일을 파싱한다.
 func parseAgentFile(path string) (AgentDefinition, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return AgentDefinition{}, fmt.Errorf("파일 읽기 실패: %w", err)
 	}
+	return parseAgentData(data, filepath.Base(path))
+}
 
-	content := string(data)
-	fm, body, err := splitFrontmatter(content)
+// parseAgentData parses agent definition from raw bytes.
+func parseAgentData(data []byte, filename string) (AgentDefinition, error) {
+	raw := string(data)
+	fm, body, err := splitFrontmatter(raw)
 	if err != nil {
 		return AgentDefinition{}, fmt.Errorf("프론트매터 파싱 실패: %w", err)
 	}
@@ -178,8 +211,7 @@ func parseAgentFile(path string) (AgentDefinition, error) {
 	}
 
 	if agent.Name == "" {
-		base := filepath.Base(path)
-		agent.Name = strings.TrimSuffix(base, ".md")
+		agent.Name = strings.TrimSuffix(filename, ".md")
 	}
 
 	return agent, nil

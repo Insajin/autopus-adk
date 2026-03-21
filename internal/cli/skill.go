@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/content"
 )
 
@@ -130,17 +131,21 @@ func runSkillInfo(cmd *cobra.Command, name, skillsDir string) error {
 	return nil
 }
 
-// loadSkillRegistry는 스킬 레지스트리를 로드한다.
-// skillsDir가 빈 문자열이면 빌트인 디렉토리를 사용한다.
+// loadSkillRegistry loads skill registry from embedded FS or user-specified directory.
 func loadSkillRegistry(skillsDir string) (*content.SkillRegistry, error) {
-	if skillsDir == "" {
-		// 빌트인 스킬 디렉토리 경로 (바이너리 위치 기준)
-		skillsDir = "content/skills"
+	registry := &content.SkillRegistry{}
+
+	if skillsDir != "" {
+		// User-specified directory: load from disk.
+		if err := registry.Load(skillsDir); err != nil {
+			return nil, fmt.Errorf("스킬 로드 실패: %w", err)
+		}
+		return registry, nil
 	}
 
-	registry := &content.SkillRegistry{}
-	if err := registry.Load(skillsDir); err != nil {
-		return nil, fmt.Errorf("스킬 로드 실패: %w", err)
+	// Default: load from embedded filesystem.
+	if err := registry.LoadFromFS(contentfs.FS, "skills"); err != nil {
+		return nil, fmt.Errorf("빌트인 스킬 로드 실패: %w", err)
 	}
 	return registry, nil
 }

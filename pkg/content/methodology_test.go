@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,6 +92,42 @@ func TestGenerateInstruction_DDD(t *testing.T) {
 	assert.Contains(t, instruction, "IMPROVE")
 }
 
+func TestLoadMethodologyFromFS(t *testing.T) {
+	t.Parallel()
+
+	fsys := fstest.MapFS{
+		"methodology/tdd.yaml": &fstest.MapFile{
+			Data: []byte(`name: tdd
+review_gate: true
+enforce_rules:
+  - "테스트 없이 코드 작성 금지"
+stages:
+  - name: red
+    description: 실패하는 테스트 작성
+  - name: green
+    description: 최소 구현으로 테스트 통과
+  - name: refactor
+    description: 코드 정리
+`),
+		},
+	}
+
+	def, err := content.LoadMethodologyFromFS(fsys, "methodology/tdd.yaml")
+	require.NoError(t, err)
+	assert.Equal(t, "tdd", def.Name)
+	assert.True(t, def.ReviewGate)
+	assert.Len(t, def.Stages, 3)
+	assert.Equal(t, "red", def.Stages[0].Name)
+}
+
+func TestLoadMethodologyFromFS_NotFound(t *testing.T) {
+	t.Parallel()
+
+	fsys := fstest.MapFS{}
+	_, err := content.LoadMethodologyFromFS(fsys, "methodology/nonexistent.yaml")
+	assert.Error(t, err)
+}
+
 func TestGenerateInstruction_DoubleDiamond(t *testing.T) {
 	t.Parallel()
 
@@ -109,4 +146,22 @@ func TestGenerateInstruction_DoubleDiamond(t *testing.T) {
 	assert.Contains(t, instruction, "Define")
 	assert.Contains(t, instruction, "Develop")
 	assert.Contains(t, instruction, "Deliver")
+}
+
+func TestGenerateInstruction_Generic(t *testing.T) {
+	t.Parallel()
+
+	def := &content.MethodologyDef{
+		Name: "custom-method",
+		Stages: []content.Stage{
+			{Name: "stage1", Description: "첫 번째 단계", Rules: []string{"규칙 A"}},
+			{Name: "stage2", Description: "두 번째 단계"},
+		},
+	}
+
+	instruction := content.GenerateInstruction(def)
+	assert.Contains(t, instruction, "custom-method")
+	assert.Contains(t, instruction, "stage1")
+	assert.Contains(t, instruction, "첫 번째 단계")
+	assert.Contains(t, instruction, "규칙 A")
 }
