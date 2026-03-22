@@ -245,6 +245,7 @@ After displaying, also show agent result summary:
 {{else}}
 @.claude/skills/autopus/tdd.md
 @.claude/skills/autopus/agent-pipeline.md
+@.claude/skills/autopus/worktree-isolation.md
 
 Implement code based on a SPEC document. Follows TDD methodology.
 
@@ -253,7 +254,8 @@ Implement code based on a SPEC document. Follows TDD methodology.
 IMPORTANT: You MUST parse these flags from $ARGUMENTS before any other action.
 
 Extract the following flags:
-- `--team` → `TEAM_MODE = true/false`
+- `--team` → `TEAMS_MODE = true/false` (Agent Teams)
+- `--solo` → `SOLO_MODE = true/false` (single session, no subagents)
 - `--auto` → `AUTO_MODE = true/false`
 - `--multi` → `MULTI_MODE = true/false`
 - `--quality <value>` → `QUALITY = value` (ultra | balanced)
@@ -262,10 +264,15 @@ Extract the following flags:
 - `--loop` → `LOOP_MODE = true/false`
 - Remaining text (non-flag word) → `SPEC_ID`
 
+Determine execution mode:
+- `TEAMS_MODE = true` → Agent Teams mode
+- `SOLO_MODE = true` → Single session mode
+- Otherwise → **Subagent pipeline** (default)
+
 After parsing, display the detected configuration:
 
 ```
-Mode: {single | team | team+multi}
+Mode: {subagent | teams | teams+multi | solo}
 SPEC: {SPEC_ID}
 Quality: {ultra | balanced | pending selection}
 ```
@@ -281,21 +288,34 @@ SPEC {SPEC_ID} is in draft status. Run review first: /auto spec review {SPEC_ID}
 
 ### Step 2: Route to Pipeline
 
-IMPORTANT: If `TEAM_MODE = true`, you MUST use the **Multi-Agent Pipeline** below. Do NOT fall back to single session mode. You MUST call the Agent tool with the specified subagent_type for each Phase.
+Route based on the execution mode determined in Step 0.
 
-#### Route A: Single Session Pipeline (TEAM_MODE = false)
+#### Route A: Subagent Pipeline (default, no --team, no --solo)
+
+IMPORTANT: This is the DEFAULT route. It REQUIRES spawning subagents using the Agent tool. Each Phase below MUST use an Agent() call — do NOT implement these phases yourself in the main session.
+
+For parallel tasks, include `isolation: "worktree"` in Agent() calls to enable worktree isolation.
+
+#### Route B: Agent Teams (`--team`)
+
+IMPORTANT: This route uses Claude Code Agent Teams (experimental). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+
+Use TeamCreate to create a team, then assign tasks to teammates via SendMessage. Each teammate operates with independent context and can communicate directly with other teammates.
+
+The pipeline phases are the same as Route A, but orchestrated through Agent Teams instead of individual Agent() calls. Worktree safety rules R1-R5 apply equally — each team member works in an independent worktree. See @.claude/skills/autopus/worktree-isolation.md and `.claude/rules/autopus/worktree-safety.md`.
+
+#### Route C: Single Session (`--solo`)
 
 1. **TDD Implementation**: Execute RED → GREEN → REFACTOR based on tasks in plan.md
 2. **Post-Implementation**: Validate against acceptance.md criteria and update status to done
 
-#### Route B: Multi-Agent Pipeline (TEAM_MODE = true)
-
-IMPORTANT: This route REQUIRES spawning subagents using the Agent tool. Each Phase below MUST use an Agent() call — do NOT implement these phases yourself in the main session.
+#### Subagent Pipeline Phases (Route A)
 
 ```
 Phase 1: Planning        → planner     (mode: plan)
 Gate 1:  Approval        → skip if AUTO_MODE
-Phase 2: Implementation  → executor×N  (mode: bypassPermissions, parallelizable)
+Phase 2: Implementation  → executor×N  (mode: bypassPermissions, parallel with worktree isolation)
+Phase 2.1: Worktree Merge → main session (merge worktree branches into working branch)
 Gate 2:  Validation      → validator   (mode: plan)  — retry up to 3× on FAIL
 Phase 3: Testing         → tester      (mode: bypassPermissions)
 Gate 3:  Coverage        → verify 85%+ coverage
@@ -354,29 +374,65 @@ Display progress after completion:
 
 For each task in the planner's assignment table, spawn executor agents:
 
+**GC Suppression**: During parallel worktree execution, all git commands MUST use `git -c gc.auto=0` to prevent garbage collection interference. See `.claude/rules/autopus/worktree-safety.md`.
+
 Parallel tasks (Mode = "parallel" AND no file ownership conflict):
 ```
 # Call MULTIPLE Agent() in a SINGLE message for parallel execution
+# Each parallel executor runs in an isolated git worktree (R1)
+# Use git -c gc.auto=0 for all git commands during parallel execution (R5)
 Agent(
   subagent_type = "executor",
   model = "opus",          ← Ultra only; omit for Balanced
   mode = "bypassPermissions",
+  isolation = "worktree",  ← R1: worktree isolation for parallel tasks
   prompt = "Implement T1: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}"
 )
 Agent(
   subagent_type = "executor",
   model = "opus",          ← Ultra only; omit for Balanced
   mode = "bypassPermissions",
+  isolation = "worktree",  ← R1: worktree isolation for parallel tasks
   prompt = "Implement T2: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}"
 )
 ```
 
-Sequential tasks (Mode = "sequential" OR file ownership conflict):
+Max concurrent worktrees: **5**. Queue overflow tasks and spawn as slots free.
+
+Sequential tasks (Mode = "sequential" OR file ownership conflict) do NOT use worktree isolation:
 ```
 # Call Agent() one at a time, passing previous result to next
+# Sequential: merge worktree branch immediately after each task before spawning next
+#   git -c gc.auto=0 merge <branch_T1> && git worktree remove <path_T1>
 result_t1 = Agent(subagent_type = "executor", prompt = "Implement T1: ...")
 Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ...")
 ```
+
+**Step 2.3.1: Phase 2.1 — Worktree Merge (parallel tasks only)**
+
+WHEN all parallel executors complete, merge their worktree branches into the working branch before Gate 2:
+
+```bash
+# Merge in task-ID order (R3)
+git -c gc.auto=0 merge <branch_T1>   # R5: gc.auto=0 suppresses auto GC
+git worktree remove <path_T1>
+git -c gc.auto=0 merge <branch_T2>
+git worktree remove <path_T2>
+```
+
+On lock error (`.git/refs.lock`, etc.), retry with exponential backoff: 3s → 6s → 12s (max 3 retries). See `.claude/rules/autopus/worktree-safety.md`.
+
+After merge, display:
+```
+🐙 merge ────────────────────────────
+  브랜치: {N}개 머지 | 충돌: 0 | 정리: {N}개 워크트리 제거
+  다음: 검증 단계로 진행
+```
+
+**Merge conflict handling** (R4):
+- `git merge --abort` to restore clean state
+- Log: `[MERGE ERROR] T{id} merge failed: ownership validation gap detected. Files: {list}`
+- Abort pipeline even in `--auto` mode (never auto-resolve to prevent data loss)
 
 After each executor, display:
 ```
@@ -500,6 +556,16 @@ Subagent failure:
   2. {manual fallback instruction}  (수동 처리)
 ```
 
+Worktree merge failure:
+```
+✗ Worktree 머지 실패: {file list}
+  원인: 파일 소유권 검증 갭 (ownership validation gap)
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (수정 후 재개)
+  2. git worktree list              (워크트리 상태 확인)
+  3. git worktree remove --force    (수동 정리)
+```
+
 **Fallback:** If a subagent fails 2 consecutive times, handle in the main session directly.
 
 ### Pipeline (--multi mode: multi-provider)
@@ -510,9 +576,9 @@ When `--multi` flag is set, activate multi-provider orchestration:
 - Validate with multi-provider consensus at the review gate
 - Can be combined with `--strategy`: consensus (default), debate, pipeline, fastest
 
-`--team --multi` combination: multi-agent pipeline + multi-provider review activated in the Review Phase.
+`--team --multi` combination: Agent Teams + multi-provider review activated in the Review Phase.
 
-Usage: `/auto go SPEC-ID`, `/auto go SPEC-ID --team`, `/auto go SPEC-ID --team --quality ultra`, `/auto go SPEC-ID --team --auto --loop`
+Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent Teams), `/auto go SPEC-ID --solo` (single session), `/auto go SPEC-ID --quality ultra`, `/auto go SPEC-ID --auto --loop`
 
 ### Flags
 
@@ -521,10 +587,11 @@ Usage: `/auto go SPEC-ID`, `/auto go SPEC-ID --team`, `/auto go SPEC-ID --team -
 | `--auto` | Autonomous mode: run the full pipeline without user confirmation |
 | `--loop` | Loop mode: automatically advance to the next phase after each phase completes |
 | `--continue` | Resume an interrupted implementation from a previous session |
-| `--team` | Multi-agent mode: run via subagent pipeline |
+| `--team` | Agent Teams mode: use Claude Code Agent Teams (experimental) for multi-agent collaboration |
+| `--solo` | Single session mode: no subagents, main session implements directly |
 | `--multi` | Multi-provider mode: activate orchestra engine-based review |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |
-| `--quality` | Quality mode: ultra (all agents Opus), balanced (mixed). Requires --team |
+| `--quality` | Quality mode: ultra (all agents Opus), balanced (mixed) |
 
 ### Harness-Only Tasks
 
@@ -871,11 +938,12 @@ After sync:
 
 | Flag | Description |
 |------|-------------|
-| `--team` | Run `go` in multi-agent pipeline mode |
-| `--quality` | Quality mode for `--team`: ultra or balanced |
+| `--team` | Run `go` with Agent Teams (experimental) |
+| `--solo` | Run `go` in single session mode (no subagents) |
+| `--quality` | Quality mode: ultra or balanced |
 | `--multi` | Enable multi-provider review in all stages |
 
-Usage: `/auto dev "feature description"`, `/auto dev "feature description" --team`, `/auto dev "feature description" --team --quality ultra`
+Usage: `/auto dev "feature description"`, `/auto dev "feature description" --team`, `/auto dev "feature description" --quality ultra`
 {{end}}
 
 ---
