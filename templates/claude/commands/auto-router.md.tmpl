@@ -71,6 +71,7 @@ When displaying the subcommand list (empty `/auto` invocation), use the categori
 | spec review | SPEC multi-provider review |
 | secure | Security audit |
 | stale | Detect stale decisions |
+| verify | Frontend UX verification |
 
 **탐색 & 분석**
 
@@ -551,6 +552,34 @@ If the SPEC status is now `implemented`, also check project state:
 - No project docs found → suggest `/auto setup` before sync
 {{end}}
 
+---
+
+## verify — Frontend UX Verification
+{{if .IsFullMode}}
+@.claude/skills/autopus/frontend-verify.md
+
+Verify frontend UX changes using VLM-powered visual analysis and Playwright E2E tests.
+
+### Pipeline
+
+Phase 0: Change Analysis → git diff → impact scope
+Phase 1: Test Gen/Heal → generate/repair Playwright tests
+Phase 2: Test Runner → execute tests, capture screenshots
+Phase 3: VLM Verifier → semantic visual check (PASS/WARN/FAIL)
+Phase 4: Reporter → fix issues, produce report
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--fix` | Enable auto-fix mode (default: enabled) |
+| `--report-only` | Skip auto-fix, output findings only |
+| `--viewport <size>` | Viewport size: desktop, mobile, or WxH (default: desktop) |
+
+Usage: `/auto verify`, `/auto verify --report-only`, `/auto verify --viewport mobile`
+{{else}}
+Frontend UX verification requires Full mode. Run `/auto update` to upgrade.
+{{end}}
 ---
 
 ## fix — Fix a Bug

@@ -58,3 +58,54 @@ func TestIntentRule_TargetSkillOrAgent(t *testing.T) {
 	assert.Empty(t, agentRule.TargetSkill)
 	assert.NotEmpty(t, agentRule.TargetAgent)
 }
+
+func TestGenerateSkillActivationInstruction_Empty(t *testing.T) {
+	t.Parallel()
+
+	result := content.GenerateSkillActivationInstruction(nil)
+	assert.Empty(t, result)
+
+	result = content.GenerateSkillActivationInstruction([]content.ActivationResult{})
+	assert.Empty(t, result)
+}
+
+func TestGenerateSkillActivationInstruction_Single(t *testing.T) {
+	t.Parallel()
+
+	results := []content.ActivationResult{
+		{
+			Skill:  content.SkillDefinition{Name: "debugging"},
+			Reason: "keyword: debug",
+			Source: "keyword",
+		},
+	}
+
+	out := content.GenerateSkillActivationInstruction(results)
+	assert.Contains(t, out, "## Auto-Activated Skills")
+	assert.Contains(t, out, "debugging")
+	assert.Contains(t, out, "keyword: debug")
+	assert.Contains(t, out, "keyword")
+}
+
+func TestGenerateSkillActivationInstruction_Multiple(t *testing.T) {
+	t.Parallel()
+
+	results := []content.ActivationResult{
+		{
+			Skill:  content.SkillDefinition{Name: "debugging"},
+			Reason: "keyword: debug",
+			Source: "keyword",
+		},
+		{
+			Skill:  content.SkillDefinition{Name: "tdd"},
+			Reason: "keyword: test",
+			Source: "keyword",
+		},
+	}
+
+	out := content.GenerateSkillActivationInstruction(results)
+	assert.Contains(t, out, "## Auto-Activated Skills")
+	assert.Contains(t, out, "debugging")
+	assert.Contains(t, out, "tdd")
+	assert.Contains(t, out, "Loaded skill instructions follow below.")
+}

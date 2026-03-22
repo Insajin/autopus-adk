@@ -24,6 +24,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 | Template | `pkg/template` | Go text/template wrapper with custom functions |
 | Detect | `pkg/detect` | Platform binary detection |
 | Version | `pkg/version` | Build metadata (ldflags injection) |
+| Verify | `internal/cli/verify.go` | Frontend UX verification via Playwright screenshots |
 
 ## Layers
 
@@ -79,6 +80,7 @@ cmd/auto/main.go
 | Marker Update | `pkg/adapter/manifest.go` | AUTOPUS:BEGIN/END for partial file updates |
 | Agent Pipeline | `.claude/skills/autopus/agent-pipeline.md` | 5-Phase multi-agent orchestration (planner→executor→validator→tester→reviewer) |
 | Shared Templates | `templates/shared/` | Cross-platform branding & UX format fragments |
+| Activator | `pkg/content/activator.go` | Skills auto-activation based on user query and context |
 
 ## Architecture Rules
 

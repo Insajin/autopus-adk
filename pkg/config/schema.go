@@ -30,6 +30,16 @@ type QualityConf struct {
 	Presets map[string]QualityPreset `yaml:"presets,omitempty"`
 }
 
+// SkillsConf holds configuration for the skills activation system.
+type SkillsConf struct {
+	// AutoActivate enables automatic skill activation (default true).
+	AutoActivate bool `yaml:"auto_activate"`
+	// MaxActiveSkills limits the number of concurrently active skills (default 5).
+	MaxActiveSkills int `yaml:"max_active_skills"`
+	// CategoryWeights maps category names to priority weights for skill selection.
+	CategoryWeights map[string]int `yaml:"category_weights,omitempty"`
+}
+
 // HarnessConfig는 autopus.yaml의 최상위 설정 구조이다.
 type HarnessConfig struct {
 	Mode          Mode              `yaml:"mode"`
@@ -46,6 +56,8 @@ type HarnessConfig struct {
 	Session       SessionConf       `yaml:"session,omitempty"`
 	Orchestra     OrchestraConf     `yaml:"orchestra,omitempty"`
 	Quality       QualityConf       `yaml:"quality,omitempty"`
+	Skills        SkillsConf        `yaml:"skills,omitempty"`
+	Verify        VerifyConf        `yaml:"verify,omitempty"`
 }
 
 // OrchestraConf는 다중 모델 오케스트레이션 설정이다 (Full 전용).
@@ -133,6 +145,14 @@ type SessionConf struct {
 	MaxContextTokens int    `yaml:"max_context_tokens"`
 }
 
+// VerifyConf is the frontend UX verification configuration.
+type VerifyConf struct {
+	Enabled         bool   `yaml:"enabled"`
+	DefaultViewport string `yaml:"default_viewport"`
+	AutoFix         bool   `yaml:"auto_fix"`
+	MaxFixAttempts  int    `yaml:"max_fix_attempts"`
+}
+
 // Validate는 설정의 유효성을 검증한다.
 func (c *HarnessConfig) Validate() error {
 	if c.Mode != ModeFull && c.Mode != ModeLite {
@@ -162,6 +182,9 @@ func (c *HarnessConfig) Validate() error {
 				return fmt.Errorf("quality.presets[%s].agents[%s]: unknown model tier %q", presetName, agentName, tier)
 			}
 		}
+	}
+	if c.Skills.MaxActiveSkills < 0 {
+		return fmt.Errorf("skills.max_active_skills must be non-negative, got %d", c.Skills.MaxActiveSkills)
 	}
 	return nil
 }

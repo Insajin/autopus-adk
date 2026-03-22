@@ -74,6 +74,7 @@ type Dependency struct {
 // FullModeDeps는 Full 모드의 의존성 목록이다.
 var FullModeDeps = []Dependency{
 	{Name: "ast-grep", Binary: "sg", InstallCmd: "npm i -g @ast-grep/cli", Required: true, Description: "Structural code search"},
+	{Name: "node", Binary: "node", InstallCmd: "https://nodejs.org", Required: false, Description: "Node.js runtime (required for Playwright)"},
 	{Name: "playwright", Binary: "playwright", InstallCmd: "npm i -g playwright", Required: false, Description: "E2E testing + screenshots"},
 	{Name: "agent-browser", Binary: "agent-browser", InstallCmd: "npm i -g agent-browser", Required: true, Description: "Web browsing"},
 	{Name: "gh", Binary: "gh", InstallCmd: "", Required: false, Description: "GitHub CLI"},

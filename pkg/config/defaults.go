@@ -99,6 +99,22 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				},
 			},
 		},
+		Skills: SkillsConf{
+			AutoActivate:    true,
+			MaxActiveSkills: 5,
+			CategoryWeights: map[string]int{
+				"security": 30,
+				"quality":  20,
+				"agentic":  15,
+				"workflow": 10,
+			},
+		},
+		Verify: VerifyConf{
+			Enabled:         true,
+			DefaultViewport: "desktop",
+			AutoFix:         true,
+			MaxFixAttempts:  2,
+		},
 	}
 }
 
@@ -126,6 +142,10 @@ func DefaultLiteConfig(projectName string) *HarnessConfig {
 		},
 		Orchestra: OrchestraConf{
 			Enabled: false,
+		},
+		Skills: SkillsConf{
+			AutoActivate:    true,
+			MaxActiveSkills: 3,
 		},
 	}
 }

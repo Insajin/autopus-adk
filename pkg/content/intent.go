@@ -5,19 +5,19 @@ import (
 	"strings"
 )
 
-// IntentRule은 인텐트 라우팅 규칙이다.
+// IntentRule defines a single intent routing rule.
 type IntentRule struct {
-	// Pattern은 매칭 패턴 (정규식)이다.
+	// Pattern is the matching pattern (regular expression).
 	Pattern string
-	// TargetSkill은 대상 스킬 이름이다 (TargetAgent와 상호 배타적).
+	// TargetSkill is the target skill name (mutually exclusive with TargetAgent).
 	TargetSkill string
-	// TargetAgent는 대상 에이전트 이름이다 (TargetSkill과 상호 배타적).
+	// TargetAgent is the target agent name (mutually exclusive with TargetSkill).
 	TargetAgent string
-	// Priority는 규칙 우선순위이다 (높을수록 먼저 평가).
+	// Priority is the rule evaluation order; higher values are evaluated first.
 	Priority int
 }
 
-// DefaultRules는 기본 인텐트 라우팅 규칙을 반환한다.
+// DefaultRules returns the built-in set of intent routing rules.
 func DefaultRules() []IntentRule {
 	return []IntentRule{
 		{Pattern: `plan.*feature|기능.*기획|feature.*plan`, TargetSkill: "planning", Priority: 10},
@@ -35,7 +35,8 @@ func DefaultRules() []IntentRule {
 	}
 }
 
-// GenerateIntentGateInstruction은 인텐트 게이트 지침 텍스트를 생성한다.
+// GenerateIntentGateInstruction builds the intent gate instruction text
+// from the provided routing rules, formatted for inclusion in a system prompt.
 func GenerateIntentGateInstruction(rules []IntentRule) string {
 	var sb strings.Builder
 
@@ -44,7 +45,7 @@ func GenerateIntentGateInstruction(rules []IntentRule) string {
 	sb.WriteString("## 라우팅 규칙\n\n")
 	sb.WriteString("우선순위 순서로 평가됩니다 (높은 숫자 = 높은 우선순위):\n\n")
 
-	// 우선순위 내림차순 정렬
+	// Sort rules by priority descending before rendering.
 	sorted := sortRulesByPriority(rules)
 	for _, rule := range sorted {
 		target := ""
@@ -65,12 +66,34 @@ func GenerateIntentGateInstruction(rules []IntentRule) string {
 	return sb.String()
 }
 
-// sortRulesByPriority는 규칙을 우선순위 내림차순으로 정렬한다.
+// GenerateSkillActivationInstruction produces a supplementary instruction block
+// that lists the auto-activated skills and their triggers for inclusion in
+// the harness system prompt. Returns an empty string when results is empty.
+func GenerateSkillActivationInstruction(results []ActivationResult) string {
+	if len(results) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+
+	sb.WriteString("## Auto-Activated Skills\n\n")
+	sb.WriteString("The following skills were automatically activated based on context:\n\n")
+
+	for _, r := range results {
+		sb.WriteString(fmt.Sprintf("- **%s** — %s (source: %s)\n", r.Skill.Name, r.Reason, r.Source))
+	}
+
+	sb.WriteString("\nLoaded skill instructions follow below.")
+
+	return sb.String()
+}
+
+// sortRulesByPriority returns a copy of rules sorted by Priority descending.
 func sortRulesByPriority(rules []IntentRule) []IntentRule {
 	sorted := make([]IntentRule, len(rules))
 	copy(sorted, rules)
 
-	// 간단한 삽입 정렬 (규칙 수가 적어 효율 충분)
+	// Insertion sort is sufficient given the small number of rules.
 	for i := 1; i < len(sorted); i++ {
 		for j := i; j > 0 && sorted[j].Priority > sorted[j-1].Priority; j-- {
 			sorted[j], sorted[j-1] = sorted[j-1], sorted[j]
