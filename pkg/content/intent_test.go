@@ -22,6 +22,54 @@ func TestDefaultRules(t *testing.T) {
 	}
 }
 
+func TestDefaultRules_TelemetryCostRule(t *testing.T) {
+	t.Parallel()
+
+	rules := content.DefaultRules()
+
+	var found bool
+	for _, r := range rules {
+		if r.TargetSkill == "telemetry-cost" {
+			found = true
+			assert.Equal(t, 22, r.Priority)
+			assert.NotEmpty(t, r.Pattern)
+		}
+	}
+	assert.True(t, found, "telemetry-cost rule must be present in DefaultRules")
+}
+
+func TestDefaultRules_TelemetrySummaryRule(t *testing.T) {
+	t.Parallel()
+
+	rules := content.DefaultRules()
+
+	var found bool
+	for _, r := range rules {
+		if r.TargetSkill == "telemetry-summary" {
+			found = true
+			assert.Equal(t, 21, r.Priority)
+			assert.NotEmpty(t, r.Pattern)
+		}
+	}
+	assert.True(t, found, "telemetry-summary rule must be present in DefaultRules")
+}
+
+func TestDefaultRules_TelemetryCompareRule(t *testing.T) {
+	t.Parallel()
+
+	rules := content.DefaultRules()
+
+	var found bool
+	for _, r := range rules {
+		if r.TargetSkill == "telemetry-compare" {
+			found = true
+			assert.Equal(t, 19, r.Priority)
+			assert.NotEmpty(t, r.Pattern)
+		}
+	}
+	assert.True(t, found, "telemetry-compare rule must be present in DefaultRules")
+}
+
 func TestGenerateIntentGateInstruction(t *testing.T) {
 	t.Parallel()
 

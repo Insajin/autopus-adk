@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -16,8 +17,7 @@ type CheckOptions struct {
 	Extensions []string
 }
 
-// @AX:ANCHOR [AUTO]: Public API boundary — fan_in >= 9 callers detected
-// @AX:REASON: Primary entry point for all violation scanning; signature change breaks CLI, registry, and test consumers
+// @AX:NOTE [AUTO]: Public API entry point for violation scanning
 // Check scans files in the given directory for constraint violations.
 // It walks the directory recursively, reads each file line by line,
 // and reports lines that contain a constraint pattern as a substring.
@@ -51,7 +51,7 @@ func Check(dir string, constraints []Constraint, opts CheckOptions) ([]Violation
 
 		fileViolations, scanErr := checkFile(path, filtered)
 		if scanErr != nil {
-			// @AX:TODO [AUTO]: Propagate or log scan errors — SPEC-ANTI-001 @AX:CYCLE:1
+			// @AX:TODO [AUTO]: Propagate or log scan errors — SPEC-ANTI-001 @AX:CYCLE:2
 			return nil // skip unreadable files
 		}
 		violations = append(violations, fileViolations...)
@@ -67,7 +67,7 @@ func checkFile(path string, constraints []Constraint) ([]Violation, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var violations []Violation
 	scanner := bufio.NewScanner(f)
@@ -96,13 +96,13 @@ func FormatViolations(violations []Violation) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Found %d constraint violation(s):\n\n", len(violations)))
+	fmt.Fprintf(&sb, "Found %d constraint violation(s):\n\n", len(violations))
 	for i, v := range violations {
-		sb.WriteString(fmt.Sprintf("%d. %s:%d\n", i+1, v.File, v.Line))
-		sb.WriteString(fmt.Sprintf("   Pattern: %s\n", v.Constraint.Pattern))
-		sb.WriteString(fmt.Sprintf("   Reason:  %s\n", v.Constraint.Reason))
-		sb.WriteString(fmt.Sprintf("   Suggest: %s\n", v.Constraint.Suggest))
-		sb.WriteString(fmt.Sprintf("   Match:   %s\n", v.Match))
+		fmt.Fprintf(&sb, "%d. %s:%d\n", i+1, v.File, v.Line)
+		fmt.Fprintf(&sb, "   Pattern: %s\n", v.Constraint.Pattern)
+		fmt.Fprintf(&sb, "   Reason:  %s\n", v.Constraint.Reason)
+		fmt.Fprintf(&sb, "   Suggest: %s\n", v.Constraint.Suggest)
+		fmt.Fprintf(&sb, "   Match:   %s\n", v.Match)
 	}
 	return sb.String()
 }
@@ -132,11 +132,5 @@ func matchesExtension(path string, extensions []string) bool {
 	if len(extensions) == 0 {
 		return true
 	}
-	ext := filepath.Ext(path)
-	for _, e := range extensions {
-		if ext == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(extensions, filepath.Ext(path))
 }

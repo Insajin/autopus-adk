@@ -74,10 +74,10 @@ func (r *Registry) GeneratePromptText() string {
 	sb.WriteString("NEVER do the following in this project:\n\n")
 
 	for i, c := range r.constraints {
-		sb.WriteString(fmt.Sprintf("%d. **NEVER**: `%s`\n", i+1, c.Pattern))
-		sb.WriteString(fmt.Sprintf("   - Reason: %s\n", c.Reason))
-		sb.WriteString(fmt.Sprintf("   - Instead: %s\n", c.Suggest))
-		sb.WriteString(fmt.Sprintf("   - Category: %s\n", c.Category))
+		fmt.Fprintf(&sb, "%d. **NEVER**: `%s`\n", i+1, c.Pattern)
+		fmt.Fprintf(&sb, "   - Reason: %s\n", c.Reason)
+		fmt.Fprintf(&sb, "   - Instead: %s\n", c.Suggest)
+		fmt.Fprintf(&sb, "   - Category: %s\n", c.Category)
 	}
 
 	return sb.String()

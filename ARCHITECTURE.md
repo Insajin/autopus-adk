@@ -26,6 +26,8 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 | Version | `pkg/version` | Build metadata (ldflags injection) |
 | SigMap | `pkg/sigmap` | AST-based exported API signature extraction and rendering |
 | Constraint | `pkg/constraint` | Anti-pattern registry and violation scanning |
+| Telemetry | `pkg/telemetry` | Pipeline execution telemetry recording and reporting (JSONL) |
+| Cost | `pkg/cost` | Token-based cost estimation and pricing tables |
 | Verify | `internal/cli/verify.go` | Frontend UX verification via Playwright screenshots |
 
 ## Layers
@@ -41,6 +43,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 │  pkg/arch/       pkg/orchestra/     │
 │  pkg/content/    pkg/search/        │
 │  pkg/sigmap/     pkg/constraint/    │
+│  pkg/telemetry/  pkg/cost/          │
 │  pkg/lsp/                           │
 ├─────────────────────────────────────┤
 │  pkg/config/     pkg/template/      │  Infrastructure
@@ -67,6 +70,8 @@ cmd/auto/main.go
         ├→ pkg/orchestra/
         ├→ pkg/sigmap/
         ├→ pkg/constraint/
+        ├→ pkg/telemetry/
+        ├→ pkg/cost/            → pkg/telemetry/
         ├→ pkg/detect/
         └→ pkg/version/
 ```
@@ -88,6 +93,8 @@ cmd/auto/main.go
 | Activator | `pkg/content/activator.go` | Skills auto-activation based on user query and context |
 | SigMap | `pkg/sigmap/extractor.go` | go/ast-based exported API inventory extraction |
 | Constraint | `pkg/constraint/checker.go` | Pattern-based anti-pattern violation scanning |
+| Recorder | `pkg/telemetry/recorder.go` | JSONL-based pipeline execution telemetry |
+| Estimator | `pkg/cost/estimator.go` | Token-based cost estimation with 3:1 split ratio |
 
 ## Architecture Rules
 

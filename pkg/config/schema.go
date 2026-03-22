@@ -40,6 +40,13 @@ type SkillsConf struct {
 	CategoryWeights map[string]int `yaml:"category_weights,omitempty"`
 }
 
+// TelemetryConf is the pipeline telemetry configuration.
+type TelemetryConf struct {
+	Enabled       bool `yaml:"enabled"`
+	RetentionDays int  `yaml:"retention_days"`
+	CostTracking  bool `yaml:"cost_tracking"`
+}
+
 // HarnessConfig는 autopus.yaml의 최상위 설정 구조이다.
 type HarnessConfig struct {
 	Mode          Mode              `yaml:"mode"`
@@ -60,6 +67,7 @@ type HarnessConfig struct {
 	Verify        VerifyConf        `yaml:"verify,omitempty"`
 	Constraints   ConstraintConf    `yaml:"constraints,omitempty"`
 	Context       ContextConf       `yaml:"context,omitempty"`
+	Telemetry     TelemetryConf     `yaml:"telemetry,omitempty"`
 }
 
 // OrchestraConf는 다중 모델 오케스트레이션 설정이다 (Full 전용).

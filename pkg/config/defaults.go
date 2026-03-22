@@ -118,6 +118,11 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 		Context: ContextConf{
 			SignatureMap: true,
 		},
+		Telemetry: TelemetryConf{
+			Enabled:       true,
+			RetentionDays: 30,
+			CostTracking:  true,
+		},
 	}
 }
 
@@ -152,6 +157,9 @@ func DefaultLiteConfig(projectName string) *HarnessConfig {
 		},
 		Context: ContextConf{
 			SignatureMap: true,
+		},
+		Telemetry: TelemetryConf{
+			Enabled: false,
 		},
 	}
 }

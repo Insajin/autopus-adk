@@ -32,6 +32,9 @@ func DefaultRules() []IntentRule {
 		{Pattern: `search.*context|컨텍스트.*검색`, TargetSkill: "context-search", Priority: 9},
 		{Pattern: `spec.*작성|spec.*생성|SPEC.*write|SPEC.*create|스펙.*작성`, TargetAgent: "spec-writer", Priority: 16},
 		{Pattern: `spec.*review|spec.*리뷰|SPEC.*리뷰|리뷰.*게이트|review.*gate`, TargetSkill: "spec-review", Priority: 17},
+		{Pattern: `비용|cost|얼마|how.*much`, TargetSkill: "telemetry-cost", Priority: 22},
+		{Pattern: `텔레메트리|telemetry|파이프라인.*결과|pipeline.*result`, TargetSkill: "telemetry-summary", Priority: 21},
+		{Pattern: `비교|compare|지난번|이전`, TargetSkill: "telemetry-compare", Priority: 19},
 	}
 }
 
