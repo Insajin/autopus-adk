@@ -32,6 +32,8 @@ autopus-adk/
 │   ├── telemetry.go            #   auto telemetry: 파이프라인 텔레메트리
 │   ├── telemetry_record.go     #   telemetry record 핸들러
 │   ├── issue.go                #   auto issue: 이슈 리포터
+│   ├── experiment.go           #   auto experiment: 자율 반복 실험
+│   ├── experiment_helpers.go   #   experiment CLI 헬퍼 함수
 │   ├── prompts.go               #   대화형 프롬프트
 │   ├── tui/                     #   Terminal UI 컴포넌트
 │   └── *_test.go                #   CLI 테스트 (11+ 파일)
@@ -134,6 +136,13 @@ autopus-adk/
 │   │   ├── sanitizer.go         #     경로/키/토큰/시크릿 제거
 │   │   ├── formatter.go         #     마크다운 템플릿 렌더링
 │   │   └── submitter.go         #     gh CLI 이슈 생성/중복 검색
+│   ├── experiment/              #   자율 반복 실험 엔진
+│   │   ├── types.go             #     Config, Result, MetricOutput, Direction 타입
+│   │   ├── metric.go            #     메트릭 실행, JSON 파싱, median 계산
+│   │   ├── git.go               #     브랜치 생성, commit, reset+clean, diff stats
+│   │   ├── recorder.go          #     results.tsv 기록, 실험 요약
+│   │   ├── circuit.go           #     Circuit breaker 로직
+│   │   └── simplicity.go        #     Simplicity Score 계산
 │   ├── detect/                  #   플랫폼 감지
 │   │   └── detect.go
 │   ├── plugin/                  #   플러그인 인터페이스
@@ -179,9 +188,10 @@ autopus-adk/
 
 | Category | Count |
 |----------|-------|
-| Go source files | ~105 |
-| Test files | ~100 |
+| Go source files | ~113 |
+| Test files | ~108 |
 | Template files | ~22 |
-| Content files | ~63 |
-| CLI commands | 21 |
+| Content files | ~64 |
+| CLI commands | 22 |
+| Experiment pkg files | 6 |
 | Platform adapters | 5 |

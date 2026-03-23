@@ -51,6 +51,7 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 | Telemetry | `auto telemetry` | 파이프라인 실행 텔레메트리 기록/조회/비교 |
 | Cost Tracking | `auto telemetry cost` | 토큰 기반 파이프라인 비용 추정 및 리포트 |
 | Issue Reporter | `auto issue` | 에러 컨텍스트 자동 수집, 민감 정보 제거, GitHub 이슈 생성 (report/list/search) |
+| Experiment Loop | `/auto experiment` | 자율 반복 실험 엔진 — 메트릭 기반 keep/discard, circuit breaker, simplicity scoring, scope 제한 |
 
 ## Supported Platforms
 
@@ -80,6 +81,7 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 14. **안티패턴 제약**: `.autopus/context/constraints.yaml`로 프로젝트별 금지 패턴 정의 및 자동 검사
 15. **파이프라인 텔레메트리**: `auto telemetry`로 실행 기록 조회, 비용 추정, 이전 실행 비교
 16. **자동 이슈 리포트**: `auto issue report`로 에러 컨텍스트 수집, 민감 정보 제거 후 GitHub 이슈 자동 생성
+17. **자율 반복 실험**: `/auto experiment`으로 메트릭 기반 자율 코드 개선 — 에이전트가 코드 수정 → 메트릭 실행 → keep/discard 반복
 
 ## Modes
 

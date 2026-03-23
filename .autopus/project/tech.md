@@ -76,6 +76,7 @@
 | Constraint | `pkg/constraint/checker.go` | 안티패턴 레지스트리 기반 위반 스캔 |
 | Telemetry Recorder | `pkg/telemetry/recorder.go` | JSONL 기반 파이프라인 실행 기록 |
 | Cost Estimator | `pkg/cost/estimator.go` | 토큰 기반 비용 추정 (3:1 분할) |
+| Experiment Loop | `pkg/experiment/` | 스킬 오케스트레이션 + CLI 유틸리티 분리 (메트릭 실행, git 상태 관리, circuit breaker) |
 | Worktree Isolation | `content/skills/worktree-isolation.md` | 병렬 executor 워크트리 격리, Phase 2.1 배치 머지 |
 
 ## Configuration

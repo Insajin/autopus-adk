@@ -29,6 +29,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 | Telemetry | `pkg/telemetry` | Pipeline execution telemetry recording and reporting (JSONL) |
 | Cost | `pkg/cost` | Token-based cost estimation and pricing tables |
 | Issue | `pkg/issue` | Auto issue reporter: error context collection, sanitization, GitHub issue submission |
+| Experiment | `pkg/experiment` | Autonomous experiment loop: metric execution, git operations, circuit breaker, simplicity scoring |
 | Verify | `internal/cli/verify.go` | Frontend UX verification via Playwright screenshots |
 
 ## Layers
@@ -45,7 +46,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 │  pkg/content/    pkg/search/        │
 │  pkg/sigmap/     pkg/constraint/    │
 │  pkg/telemetry/  pkg/cost/          │
-│  pkg/lsp/                           │
+│  pkg/experiment/ pkg/lsp/           │
 ├─────────────────────────────────────┤
 │  pkg/config/     pkg/template/      │  Infrastructure
 │  pkg/detect/     pkg/version/       │
@@ -74,6 +75,7 @@ cmd/auto/main.go
         ├→ pkg/telemetry/
         ├→ pkg/cost/            → pkg/telemetry/
         ├→ pkg/issue/           → pkg/version/, pkg/config/, pkg/telemetry/
+        ├→ pkg/experiment/
         ├→ pkg/detect/
         └→ pkg/version/
 ```
@@ -106,6 +108,7 @@ cmd/auto/main.go
 | Recorder | `pkg/telemetry/recorder.go` | JSONL-based pipeline execution telemetry |
 | Estimator | `pkg/cost/estimator.go` | Token-based cost estimation with 3:1 split ratio |
 | Brainstorm | `internal/cli/orchestra_brainstorm.go` | Multi-provider SCAMPER/HMW brainstorming with divergence-preserving judge and ICE scoring |
+| Experiment Loop | `pkg/experiment/` + `.claude/skills/autopus/experiment.md` | Skill-orchestrated autonomous iteration loop with CLI utility commands for metric execution, git state management, circuit breaking, and simplicity scoring |
 
 ## Architecture Rules
 
