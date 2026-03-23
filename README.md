@@ -3,20 +3,24 @@
   <img src="https://img.shields.io/badge/go-1.23-00ADD8?logo=go" alt="Go">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/platforms-5-orange" alt="Platforms">
+  <img src="https://img.shields.io/badge/agents-15-blueviolet" alt="Agents">
+  <img src="https://img.shields.io/badge/skills-35-ff69b4" alt="Skills">
 </p>
 
 <h1 align="center">🐙 Autopus-ADK</h1>
-<h3 align="center">Agentic Development Kit</h3>
+<h3 align="center">The Operating System for AI-Powered Development</h3>
 
 <p align="center">
-  Install the Autopus harness across multiple AI coding CLI platforms.<br>
-  One config — consistent agents, skills, hooks, and workflows everywhere.
+  <strong>One command. 15 AI agents. Every platform.</strong><br>
+  Your AI coding assistants don't just autocomplete — they plan, debate, implement, test, review, and ship.<br>
+  Across Claude Code, Codex, Gemini CLI, Cursor, and OpenCode.
 </p>
 
 <p align="center">
+  <a href="#-3-minute-demo">Demo</a> •
+  <a href="#-why-autopus">Why Autopus</a> •
   <a href="#-quick-start">Quick Start</a> •
-  <a href="#-architecture">Architecture</a> •
-  <a href="#-user-guide">User Guide</a> •
+  <a href="#-the-pipeline">Pipeline</a> •
   <a href="#-platforms">Platforms</a> •
   <a href="#-configuration">Configuration</a>
 </p>
@@ -27,18 +31,163 @@
 
 ---
 
-## What is Autopus-ADK?
+## 🎬 3-Minute Demo
 
-Autopus-ADK is a Go CLI tool that installs the **Autopus harness** into AI coding CLI platforms. It provides a unified development environment with:
+```bash
+# You describe what you want. Autopus does the rest.
+/auto plan "Add OAuth2 with Google and GitHub providers"
 
-- **11 specialized agents** (planner, executor, tester, validator, reviewer, etc.)
-- **29 skills** (TDD, debugging, security audit, code review, etc.)
-- **SPEC-driven development** with EARS requirement syntax
-- **Lore decision tracking** with a 9-trailer commit protocol
-- **Multi-model orchestration** (consensus, debate, pipeline, fastest)
-- **Multi-agent pipeline** (planner → executor → tester → validator → reviewer)
-- **Architecture analysis** and rule enforcement
-- **5 platform adapters** with a single `autopus.yaml` config
+# 15 specialized agents execute a 7-phase pipeline:
+# Planner decomposes → Tester scaffolds failing tests → Executors implement in parallel
+# → Validator checks → Annotator documents → Tester raises coverage → Reviewer approves
+/auto go SPEC-AUTH-001 --auto --loop
+
+# Result: production-ready code with 85%+ coverage, security audit, and full documentation.
+```
+
+```
+🐙 Pipeline ─────────────────────────
+  ✓ Phase 1:   Planning         (planner decomposed 5 tasks)
+  ✓ Phase 1.5: Test Scaffold    (12 failing tests created)
+  ✓ Phase 2:   Implementation   (3 executors in parallel worktrees)
+  ✓ Phase 2.5: Annotation       (@AX tags applied to 8 files)
+  ✓ Phase 3:   Testing          (coverage: 62% → 91%)
+  ✓ Phase 4:   Review           (TRUST 5: APPROVE | Security: PASS)
+  ────────────────────────────────────
+  Tasks: 5/5 | Coverage: 91% | Time: 4m 32s
+```
+
+---
+
+## 💡 Why Autopus?
+
+### The Problem
+
+AI coding tools are powerful — but they're **isolated, inconsistent, and reactive.**
+
+- Switch from Claude to Codex? Rewrite all your rules and prompts.
+- Ask an AI to "add auth"? It writes code, but skips tests, ignores security, and forgets docs.
+- Multi-file refactoring? One agent, one context, praying it doesn't break something.
+
+### The Autopus Answer
+
+Autopus-ADK doesn't replace your AI coding tool — it **gives it structure, memory, and a team.**
+
+| Without Autopus | With Autopus |
+|----------------|-------------|
+| "Add this feature" → hope for the best | SPEC-driven requirements → deterministic pipeline |
+| One AI, one shot | 15 specialized agents with defined roles |
+| Manual copy-paste between tools | One `autopus.yaml`, every platform |
+| "Why did we do this?" → git blame | Lore commits: Why, Decision, Alternatives |
+| Tests? Maybe later | TDD enforced — tests written *before* code |
+| Review? You, at 2am | Automated TRUST 5 review + OWASP security audit |
+
+---
+
+## 🔥 Killer Features
+
+### 1. AI Agents That Argue With Each Other
+
+Not one model — **multiple models debating your code.**
+
+```bash
+auto orchestra review --strategy debate
+```
+
+Claude, Codex, and Gemini independently review your code, then **debate each other's findings** in a structured 2-phase argument. A judge model renders the final verdict.
+
+```mermaid
+graph LR
+    subgraph "Phase 1: Independent Review"
+        CL["Claude<br>🔍 Review"]
+        CDX["Codex<br>🔍 Review"]
+        GEM["Gemini<br>🔍 Review"]
+    end
+    subgraph "Phase 2: Debate"
+        DEB["⚔️ Rebuttal<br>& Counter-arguments"]
+    end
+    subgraph "Verdict"
+        J["🏛️ Judge<br>Final Decision"]
+    end
+    CL --> DEB
+    CDX --> DEB
+    GEM --> DEB
+    DEB --> J
+```
+
+4 orchestration strategies: **Consensus** (agreement-based merge), **Debate** (adversarial review), **Pipeline** (sequential refinement), **Fastest** (first response wins).
+
+### 2. Self-Healing Pipeline with RALF Loop
+
+Quality gates that **fix themselves.**
+
+```bash
+/auto go SPEC-AUTH-001 --auto --loop
+```
+
+When a gate fails, Autopus doesn't just report it — it spawns the right agent to fix the issue and re-validates. Up to 5 iterations with a built-in circuit breaker.
+
+```
+🐙 RALF [Gate 2] ──────────────────
+  Iteration: 2/5 | Issues: 3 → 1
+  Progress: golangci-lint warnings resolved
+  Status: RETRY
+```
+
+**RALF = RED → GREEN → REFACTOR → LOOP** — TDD principles applied to the pipeline itself.
+
+### 3. Parallel Agents in Isolated Worktrees
+
+Multiple executors work simultaneously in **separate git worktrees**, then merge cleanly.
+
+```
+Phase 2: Implementation
+  ├── Executor 1 (worktree/T1) → pkg/auth/provider.go
+  ├── Executor 2 (worktree/T2) → pkg/auth/handler.go
+  └── Executor 3 (worktree/T3) → pkg/auth/middleware.go
+
+Phase 2.1: Worktree Merge
+  ✓ T1: merged → working branch
+  ✓ T2: merged → working branch
+  ✓ T3: merged → working branch
+```
+
+File ownership prevents conflicts. GC suppression prevents corruption. Up to 5 concurrent worktrees.
+
+### 4. Lore: Your Codebase Never Forgets
+
+Every commit captures the *why*, not just the *what*.
+
+```
+feat(auth): add OAuth2 provider abstraction
+
+Why: Need Google + GitHub support, extensible for future providers
+Decision: Interface-based abstraction over direct SDK usage
+Alternatives: Direct SDK calls (rejected: too coupled)
+Ref: SPEC-AUTH-001
+
+🐙 Autopus <noreply@autopus.co>
+```
+
+9 structured trailers. Queryable with `auto lore query "why interface?"`. Stale decisions auto-detected after 90 days.
+
+### 5. One Config, Five Platforms
+
+```bash
+auto init  # auto-detects Claude Code, Codex, Gemini CLI, Cursor, OpenCode
+```
+
+One `autopus.yaml` generates platform-native configuration for all detected tools. Same agents, same skills, same rules — everywhere.
+
+| Platform | Binary | What Gets Generated |
+|----------|--------|-------------------|
+| Claude Code | `claude` | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
+| Codex | `codex` | `.codex/`, `AGENTS.md` |
+| Gemini CLI | `gemini` | `.gemini/`, `GEMINI.md` |
+| Cursor | `cursor` | `.cursor/rules/`, `.cursorrules` |
+| OpenCode | `opencode` | `.opencode/`, `agents.json` |
+
+---
 
 ## 🚀 Quick Start
 
@@ -47,9 +196,7 @@ Autopus-ADK is a Go CLI tool that installs the **Autopus harness** into AI codin
 ```bash
 # From source
 git clone https://github.com/insajin/autopus-adk.git
-cd autopus-adk
-make build
-make install
+cd autopus-adk && make build && make install
 
 # Verify
 auto --version
@@ -58,449 +205,245 @@ auto --version
 ### Initialize a Project
 
 ```bash
-# Detect platforms and generate harness files
-auto init
-
-# Generate project context documents
-auto setup
+auto init       # Detect platforms and generate harness files
+auto setup      # Generate project context documents
 ```
 
-This creates:
-- `autopus.yaml` — project configuration
-- `ARCHITECTURE.md` — architecture map
-- `.autopus/project/` — product, structure, and tech docs
-- Platform-specific files (e.g., `.claude/rules/`, `.claude/skills/`, `.claude/agents/`)
-
-### First Workflow
+### Your First Pipeline
 
 ```bash
-# 1. Plan — create a SPEC
-auto spec new "Add user authentication"
+# Inside your AI coding CLI (e.g., Claude Code):
 
-# 2. Review the SPEC (multi-provider)
-auto spec review SPEC-AUTH-001
+# Step 1: Plan — AI writes a SPEC with EARS requirements
+/auto plan "Add rate limiting to the API gateway"
 
-# 3. Implement with TDD
-# (inside your AI coding CLI)
-/auto go SPEC-AUTH-001
+# Step 2: Go — 15 agents execute a 7-phase pipeline
+/auto go SPEC-RATE-001 --auto
 
-# 4. Sync documentation
-/auto sync SPEC-AUTH-001
+# Step 3: Sync — update docs, architecture, changelog
+/auto sync SPEC-RATE-001
 ```
 
-## 🏗 Architecture
+---
 
-### High-Level Overview
+## 🤖 The Pipeline
 
-```mermaid
-graph TB
-    subgraph "Entry Point"
-        MAIN["cmd/auto/main.go"]
-    end
+### 7-Phase Multi-Agent Pipeline
 
-    subgraph "Command Layer"
-        CLI["internal/cli/<br>Cobra Commands"]
-    end
-
-    subgraph "Business Logic"
-        ADAPTER["pkg/adapter/<br>Platform Adapters"]
-        CONFIG["pkg/config/<br>Configuration"]
-        CONTENT["pkg/content/<br>Content Generation"]
-        SETUP["pkg/setup/<br>Project Docs"]
-        ARCH["pkg/arch/<br>Architecture Analysis"]
-        SPEC["pkg/spec/<br>SPEC Engine"]
-        LORE["pkg/lore/<br>Decision Tracking"]
-        ORCH["pkg/orchestra/<br>Multi-Model"]
-        LSP["pkg/lsp/<br>LSP Integration"]
-        SEARCH["pkg/search/<br>Knowledge Search"]
-    end
-
-    subgraph "Infrastructure"
-        TMPL["pkg/template/<br>Template Engine"]
-        DETECT["pkg/detect/<br>Platform Detection"]
-        VER["pkg/version/<br>Version Info"]
-    end
-
-    subgraph "Static Assets"
-        TEMPLATES["templates/<br>Platform Templates"]
-        CONTENTDIR["content/<br>Agents, Skills, Hooks"]
-    end
-
-    MAIN --> CLI
-    CLI --> ADAPTER
-    CLI --> CONFIG
-    CLI --> CONTENT
-    CLI --> SETUP
-    CLI --> ARCH
-    CLI --> SPEC
-    CLI --> LORE
-    CLI --> ORCH
-    CLI --> LSP
-    CLI --> SEARCH
-    ADAPTER --> TMPL
-    CONTENT --> TEMPLATES
-    CONTENT --> CONTENTDIR
-    SPEC --> TMPL
 ```
-
-### Platform Adapter Pattern
-
-```mermaid
-classDiagram
-    class PlatformAdapter {
-        <<interface>>
-        +Name() string
-        +Version() string
-        +CLIBinary() string
-        +Detect(ctx) bool, error
-        +Generate(ctx, cfg) PlatformFiles, error
-        +Update(ctx, cfg) PlatformFiles, error
-        +Validate(ctx) ValidationError[], error
-        +Clean(ctx) error
-        +SupportsHooks() bool
-        +InstallHooks(ctx, hooks) error
-    }
-
-    class ClaudeAdapter {
-        .claude/rules/
-        .claude/skills/
-        .claude/agents/
-        .claude/commands/
-        CLAUDE.md
-    }
-
-    class CodexAdapter {
-        .codex/
-        AGENTS.md
-    }
-
-    class GeminiAdapter {
-        .gemini/
-        GEMINI.md
-    }
-
-    class OpenCodeAdapter {
-        .opencode/
-        agents.json
-    }
-
-    class CursorAdapter {
-        .cursor/rules/
-        .cursorrules
-    }
-
-    PlatformAdapter <|.. ClaudeAdapter
-    PlatformAdapter <|.. CodexAdapter
-    PlatformAdapter <|.. GeminiAdapter
-    PlatformAdapter <|.. OpenCodeAdapter
-    PlatformAdapter <|.. CursorAdapter
+/auto go SPEC-ID
 ```
-
-### Multi-Agent Pipeline (`--team` mode)
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant M as Main Session
-    participant P as Planner (opus)
-    participant E as Executor×N (sonnet)
-    participant V as Validator (haiku)
-    participant T as Tester (sonnet)
-    participant R as Reviewer (sonnet)
+    participant P as 🧠 Planner
+    participant S as 🧪 Tester (scaffold)
+    participant E as ⚡ Executor ×N
+    participant A as 📝 Annotator
+    participant V as ✅ Validator
+    participant T as 🧪 Tester
+    participant R as 🔍 Reviewer + 🛡️ Security
 
-    U->>M: /auto go SPEC-ID --team
-    M->>P: Phase 1: Task decomposition
-    P-->>M: Task table + agent assignments
+    U->>P: /auto go SPEC-ID
+    P-->>U: Task table + agent assignments
+
+    Note over S: Phase 1.5: Test-First
+    S-->>U: Failing test skeletons (RED)
 
     rect rgb(230, 245, 255)
-        Note over M,E: Phase 2: Parallel Implementation
-        M->>E: T1: Implement feature A
-        M->>E: T2: Implement feature B
-        E-->>M: Results
+        Note over E: Phase 2: Parallel Worktrees
+        E-->>U: T1: feature A ✓
+        E-->>U: T2: feature B ✓
+        E-->>U: T3: feature C ✓
     end
 
-    M->>V: Gate 2: Validation
-    alt FAIL (max 3 retries)
-        V-->>M: FAIL + recommended agent
-        M->>E: Fix issues
-        M->>V: Re-validate
+    Note over A: Phase 2.5: @AX Annotation
+
+    V-->>U: Gate 2: Build + Lint + Vet ✓
+
+    T-->>U: Phase 3: Coverage 62% → 91% ✓
+
+    rect rgb(255, 245, 230)
+        Note over R: Phase 4: Parallel Review
+        R-->>U: TRUST 5: APPROVE
+        R-->>U: OWASP: PASS
     end
-    V-->>M: PASS
-
-    M->>T: Phase 3: Coverage ≥ 85%
-    T-->>M: Tests added
-
-    M->>R: Phase 4: TRUST 5 Review
-    alt REQUEST_CHANGES (max 2 retries)
-        R-->>M: REQUEST_CHANGES + issues
-        M->>E: Fix issues
-        M->>R: Re-review
-    end
-    R-->>M: APPROVE
-
-    M-->>U: Pipeline complete ✅
 ```
 
-### Multi-Model Orchestration
+### 15 Specialized Agents
 
-```mermaid
-graph LR
-    subgraph "Strategies"
-        CON["🤝 Consensus<br>Key-based agreement"]
-        DEB["⚔️ Debate<br>2-phase + judge"]
-        PIPE["🔗 Pipeline<br>Sequential refinement"]
-        FAST["⚡ Fastest<br>First response wins"]
-    end
+| Agent | Role | Phase |
+|-------|------|-------|
+| **Planner** | SPEC decomposition, task assignment, complexity assessment | 1 |
+| **Spec Writer** | SPEC document generation (spec.md, plan.md, acceptance.md, research.md) | plan |
+| **Tester** | Test scaffold (RED), coverage boost (GREEN) | 1.5, 3 |
+| **Executor** | TDD implementation, parallel worktree execution | 2 |
+| **Annotator** | @AX tag lifecycle management | 2.5 |
+| **Validator** | Build, vet, lint, file size checks | Gate 2 |
+| **Reviewer** | TRUST 5 code review (Tested, Readable, Unified, Secured, Trackable) | 4 |
+| **Security Auditor** | OWASP Top 10 vulnerability scan | 4 |
+| **Architect** | System design, architecture decisions, long-term scalability | on-demand |
+| **Debugger** | Reproduction-first bug fixing | on-demand |
+| **DevOps** | CI/CD pipelines, Docker, infrastructure configuration | on-demand |
+| **Frontend Specialist** | Playwright E2E + VLM visual regression | 3.5 |
+| **UX Validator** | Frontend component visual validation | 3.5 |
+| **Performance Engineer** | Benchmark, pprof profiling, regression detection | on-demand |
+| **Explorer** | Codebase structure analysis | on-demand |
 
-    subgraph "Providers"
-        CL["Claude"]
-        CDX["Codex"]
-        GEM["Gemini"]
-    end
-
-    CL --> CON
-    CDX --> CON
-    GEM --> CON
-
-    CL --> DEB
-    CDX --> DEB
-    GEM --> DEB
-
-    CL --> PIPE
-    CDX --> PIPE
-
-    CL --> FAST
-    CDX --> FAST
-    GEM --> FAST
-
-    CON --> RES["Merged Result"]
-    DEB --> RES
-    PIPE --> RES
-    FAST --> RES
-```
-
-### Layer Architecture
-
-```mermaid
-graph TB
-    subgraph L1["Layer 1: Entry Point"]
-        EP["cmd/auto/main.go"]
-    end
-
-    subgraph L2["Layer 2: Command Layer"]
-        COBRA["internal/cli/ — 16 Cobra Commands"]
-    end
-
-    subgraph L3["Layer 3: Business Logic"]
-        BL["adapter · config · content · setup<br>spec · lore · arch · orchestra<br>lsp · search"]
-    end
-
-    subgraph L4["Layer 4: Infrastructure"]
-        INF["template · detect · version"]
-    end
-
-    subgraph L5["Layer 5: Static Assets"]
-        SA["templates/ · content/"]
-    end
-
-    L1 --> L2 --> L3 --> L4
-    L3 --> L5
-
-    style L1 fill:#e1f5fe
-    style L2 fill:#b3e5fc
-    style L3 fill:#81d4fa
-    style L4 fill:#4fc3f7
-    style L5 fill:#29b6f6
-```
-
-## 📖 User Guide
-
-### Commands Overview
-
-| Command | Description |
-|---------|-------------|
-| `auto init` | Initialize harness — detect platforms, generate files |
-| `auto update` | Update harness files (preserves user edits via markers) |
-| `auto doctor` | Health check — verify installation integrity |
-| `auto platform` | List detected CLI platforms |
-| `auto arch generate` | Analyze codebase and generate `ARCHITECTURE.md` |
-| `auto arch lint` | Validate architecture rules |
-| `auto spec new` | Create a new SPEC with EARS requirements |
-| `auto spec review` | Multi-provider SPEC review gate |
-| `auto lore query` | Query decision history |
-| `auto orchestra review` | Multi-model orchestration review |
-| `auto setup` | Generate project context documents |
-| `auto skill list` | List available skills |
-| `auto search` | Knowledge search (Context7/Exa) |
-| `auto lsp` | LSP integration commands |
-| `auto hash` | Compute file hashes |
-
-### Slash Commands (inside AI Coding CLI)
-
-When using Autopus inside your coding CLI (e.g., Claude Code), use these slash commands:
-
-| Command | Description |
-|---------|-------------|
-| `/auto plan "description"` | Create a SPEC for a new feature |
-| `/auto go SPEC-ID` | Implement a SPEC with TDD |
-| `/auto go SPEC-ID --team` | Multi-agent pipeline implementation |
-| `/auto go SPEC-ID --team --auto` | Fully autonomous pipeline |
-| `/auto go SPEC-ID --multi` | Multi-provider orchestration |
-| `/auto fix "bug description"` | Debug and fix a bug |
-| `/auto review` | Code review (TRUST 5) |
-| `/auto secure` | Security audit (OWASP Top 10) |
-| `/auto map` | Codebase structure analysis |
-| `/auto sync SPEC-ID` | Sync docs after implementation |
-| `/auto setup` | Generate/update project context docs |
-
-### SPEC-Driven Development Workflow
-
-The recommended development workflow follows the **plan → go → sync** cycle:
-
-```
-┌─────────┐     ┌─────────┐     ┌─────────┐
-│  plan   │────▶│   go    │────▶│  sync   │
-│ (SPEC)  │     │ (TDD)   │     │ (docs)  │
-└─────────┘     └─────────┘     └─────────┘
-     │               │               │
-     ▼               ▼               ▼
-  spec.md      Source code     ARCHITECTURE.md
-  plan.md      *_test.go      Updated docs
-  acceptance.md                CHANGELOG.md
-  research.md
-```
-
-**Step 1: Plan**
-```bash
-/auto plan "Add OAuth2 authentication with Google and GitHub providers"
-```
-This creates 4 files in `.autopus/specs/SPEC-AUTH-001/`:
-- `spec.md` — Requirements in EARS format
-- `plan.md` — Implementation plan with task breakdown
-- `acceptance.md` — Acceptance criteria
-- `research.md` — Technical research notes
-
-**Step 2: Go (Implement)**
-```bash
-# Single session (default)
-/auto go SPEC-AUTH-001
-
-# Multi-agent pipeline
-/auto go SPEC-AUTH-001 --team
-
-# Fully autonomous with RALF loop (auto-retry failed gates)
-/auto go SPEC-AUTH-001 --team --auto --loop
-```
-
-**Step 3: Sync**
-```bash
-/auto sync SPEC-AUTH-001
-```
-
-### Lore: Decision Tracking
-
-Every commit uses the Lore format to capture **why** decisions were made:
-
-```
-feat(auth): add OAuth2 provider abstraction
-
-Implement provider interface to support multiple OAuth2 providers
-without coupling to specific implementations.
-
-Why: Need to support Google and GitHub initially, with extensibility for future providers
-Decision: Interface-based abstraction over direct SDK usage
-Alternatives: Direct SDK calls (rejected: too coupled), Generic HTTP client (rejected: loses type safety)
-Ref: SPEC-AUTH-001
-
-🐙 Autopus <noreply@autopus.co>
-```
-
-Required trailers: `Why`, `Decision`
-Optional trailers: `Alternatives`, `Ref`, `Risk`, `Context`, `Scope`, `Blocked-By`, `Supersedes`
-
-### Multi-Model Orchestration
-
-Run tasks across multiple AI models and merge results:
+### Quality Modes
 
 ```bash
-# Consensus — all providers answer, merge by agreement
-auto orchestra review --strategy consensus
-
-# Debate — providers argue, judge decides
-auto orchestra review --strategy debate
-
-# Pipeline — sequential refinement
-auto orchestra review --strategy pipeline
-
-# Fastest — first response wins
-auto orchestra review --strategy fastest
+/auto go SPEC-ID --quality ultra      # All agents run on Opus — max quality
+/auto go SPEC-ID --quality balanced   # Adaptive: Opus for planning, Sonnet for code, Haiku for validation
 ```
 
-**Strategies:**
+| Mode | Planner | Executor | Validator | Cost |
+|------|---------|----------|-----------|------|
+| **Ultra** | Opus | Opus | Opus | $$$ |
+| **Balanced** | Opus | Adaptive* | Haiku | $ |
 
-| Strategy | How it works | Best for |
+*Adaptive Quality: HIGH complexity tasks → Opus, MEDIUM → Sonnet, LOW → Haiku
+
+### Execution Modes
+
+```bash
+/auto go SPEC-ID                   # Subagent pipeline (default)
+/auto go SPEC-ID --team            # Agent Teams (Lead/Builder/Guardian roles)
+/auto go SPEC-ID --solo            # Single session, no subagents
+/auto go SPEC-ID --auto --loop     # Fully autonomous with RALF self-healing
+/auto go SPEC-ID --multi           # Multi-provider review (debate/consensus)
+```
+
+---
+
+## 📐 SPEC-Driven Development
+
+Every feature starts with a **SPEC** — structured requirements in EARS format.
+
+```bash
+/auto plan "Add webhook delivery system with retry and dead letter queue"
+```
+
+This generates 4 files:
+
+| File | Content |
+|------|---------|
+| `spec.md` | EARS requirements: WHEN trigger, THE SYSTEM SHALL action |
+| `plan.md` | Task breakdown with agent assignments and file ownership |
+| `acceptance.md` | Given-When-Then acceptance criteria |
+| `research.md` | Technical research, alternatives, risks |
+
+### PRD → SPEC → Code Pipeline
+
+```
+PRD (10 or 5 sections)
+  └─→ SPEC (EARS requirements + MoSCoW priority)
+        └─→ Multi-Provider Review Gate (debate/consensus)
+              └─→ TDD Implementation Pipeline
+                    └─→ Documentation Sync
+```
+
+---
+
+## 🎯 Code Review: TRUST 5
+
+Every review scores across 5 dimensions:
+
+| | Dimension | What It Checks |
+|---|-----------|----------------|
+| **T** | Tested | 85%+ coverage, edge cases, race condition tests |
+| **R** | Readable | Clear naming, single responsibility, ≤300 LOC |
+| **U** | Unified | gofmt, goimports, golangci-lint, consistent patterns |
+| **S** | Secured | OWASP Top 10, no injection, no hardcoded secrets |
+| **T** | Trackable | Meaningful logs, error context, SPEC references |
+
+---
+
+## 📊 Multi-Model Orchestration
+
+```bash
+auto orchestra review --strategy debate     # Models argue, judge decides
+auto orchestra review --strategy consensus  # Independent reviews, merged by agreement
+auto orchestra review --strategy pipeline   # Sequential refinement chain
+auto orchestra review --strategy fastest    # First response wins
+```
+
+| Strategy | How It Works | Best For |
 |----------|-------------|----------|
-| Consensus | All providers answer independently, results merged by key agreement | Code review, planning |
-| Debate | 2-phase debate with rebuttal, judge renders verdict | Controversial decisions |
-| Pipeline | Output of provider N becomes input of provider N+1 | Iterative refinement |
-| Fastest | First completed response is used | Quick queries |
+| **Debate** | 2-phase adversarial review with rebuttal + judge | Critical decisions, security review |
+| **Consensus** | Independent answers merged by key agreement | Planning, code review |
+| **Pipeline** | Provider N's output → Provider N+1's input | Iterative refinement |
+| **Fastest** | First completed response | Quick queries |
 
-### TDD Methodology
+Supported providers: **Claude**, **Codex**, **Gemini** — with graceful degradation if a provider is unavailable.
 
-Autopus enforces Test-Driven Development:
-
-1. **RED** — Write a failing test first
-2. **GREEN** — Write minimum code to pass
-3. **REFACTOR** — Clean up while keeping tests green
-
-```go
-// RED: Write the test first
-func TestCalculateDiscount_WithPremiumUser_Returns20Percent(t *testing.T) {
-    t.Parallel()
-    user := User{Tier: "premium"}
-    got := CalculateDiscount(user, 100.0)
-    assert.Equal(t, 80.0, got)
-}
-```
-
-### Code Review: TRUST 5
-
-Reviews are scored across 5 dimensions:
-
-| Dimension | Checks |
-|-----------|--------|
-| **T**ested | 85%+ coverage, edge cases, race condition tests |
-| **R**eadable | Clear naming, single responsibility, appropriate comments |
-| **U**nified | Consistent style, gofmt/goimports, golangci-lint clean |
-| **S**ecured | No injection, input validation, no hardcoded secrets |
-| **T**rackable | Meaningful logs, contextual errors, SPEC references |
-
-### File Size Limit
-
-Hard limit: **300 lines** per source file. Target under 200 lines.
-
-Splitting strategies:
-- By type: Move structs and methods to separate files
-- By concern: Group related functions
-- By layer: Separate handler, service, repository
-
-Exclusions: generated files (`*_generated.go`), docs (`*.md`), config (`*.yaml`)
+---
 
 ## 🔌 Platforms
 
-| Platform | Binary | Adapter | Status |
-|----------|--------|---------|--------|
-| Claude Code | `claude` | `pkg/adapter/claude/` | ✅ Full support |
-| Codex | `codex` | `pkg/adapter/codex/` | ✅ Full support |
-| Gemini CLI | `gemini` | `pkg/adapter/gemini/` | ✅ Full support |
-| OpenCode | `opencode` | `pkg/adapter/opencode/` | ✅ Full support |
-| Cursor | `cursor` | `pkg/adapter/cursor/` | ✅ Full support |
+| Platform | Binary | Status |
+|----------|--------|--------|
+| Claude Code | `claude` | ✅ Full support |
+| Codex | `codex` | ✅ Full support |
+| Gemini CLI | `gemini` | ✅ Full support |
+| OpenCode | `opencode` | ✅ Full support |
+| Cursor | `cursor` | ✅ Full support |
 
 ### Adding a New Platform
 
 1. Create `pkg/adapter/<name>/<name>.go` implementing `PlatformAdapter`
 2. Add templates in `templates/<name>/`
 3. Register in `pkg/adapter/registry.go`
+
+---
+
+## 📖 All Commands
+
+### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `auto init` | Initialize harness — detect platforms, generate files |
+| `auto update` | Update harness (preserves user edits via markers) |
+| `auto doctor` | Health diagnostics |
+| `auto platform` | List detected platforms |
+| `auto arch generate` | Generate `ARCHITECTURE.md` |
+| `auto arch lint` | Validate architecture rules |
+| `auto spec new` | Create SPEC with EARS requirements |
+| `auto spec review` | Multi-provider SPEC review gate |
+| `auto lore query` | Query decision history |
+| `auto orchestra review` | Multi-model orchestration review |
+| `auto setup` | Generate project context documents |
+| `auto status` | SPEC dashboard (done/in-progress/draft) |
+| `auto telemetry` | Pipeline execution telemetry and cost tracking |
+| `auto skill list` | List available skills |
+| `auto search` | Knowledge search (Exa) |
+| `auto docs` | Library documentation lookup (Context7) |
+| `auto lsp` | LSP integration (diagnostics, refs, rename, symbols) |
+| `auto verify` | Harness state and rule verification |
+| `auto check` | Harness rule checks (anti-pattern scanning) |
+
+### Slash Commands (inside AI Coding CLI)
+
+| Command | Description |
+|---------|-------------|
+| `/auto plan "description"` | Create a SPEC for a new feature |
+| `/auto go SPEC-ID` | Implement a SPEC with full pipeline |
+| `/auto go SPEC-ID --auto --loop` | Fully autonomous with self-healing |
+| `/auto go SPEC-ID --team` | Agent Teams (Lead/Builder/Guardian) |
+| `/auto go SPEC-ID --multi` | Multi-provider orchestration |
+| `/auto fix "bug"` | Reproduction-first bug fix |
+| `/auto review` | TRUST 5 code review |
+| `/auto secure` | OWASP Top 10 security audit |
+| `/auto map` | Codebase structure analysis |
+| `/auto sync SPEC-ID` | Sync docs after implementation |
+| `/auto dev "description"` | One-shot: plan → go → sync |
+| `/auto setup` | Generate/update project context docs |
+| `/auto stale` | Detect stale decisions and outdated patterns |
+| `/auto why "question"` | Query decision rationale from Lore history |
+
+---
 
 ## ⚙️ Configuration
 
@@ -528,31 +471,17 @@ lore:
 # SPEC engine
 spec:
   id_format: "SPEC-{NAME}-{NUMBER}"
-  ears_types: [ubiquitous, event_driven, unwanted_behavior, state_driven, optional]
   review_gate:
     enabled: true
     strategy: debate
     providers: [claude, gemini]
     judge: claude
-    max_revisions: 2
 
-# TDD methodology
+# TDD enforcement
 methodology:
   mode: tdd
   enforce: true
   review_gate: true
-
-# Model routing
-router:
-  strategy: category
-  tiers:
-    fast: gemini-2.0-flash
-    smart: claude-sonnet-4
-    ultra: claude-opus-4
-  categories:
-    visual: fast
-    deep: ultra
-    quick: fast
 
 # Multi-model orchestration
 orchestra:
@@ -569,29 +498,51 @@ orchestra:
     gemini:
       binary: gemini
       prompt_via_args: true
-
-# Hooks
-hooks:
-  pre_commit_arch: true
-  pre_commit_lore: true
-
-# Session continuity
-session:
-  handoff_enabled: true
-  continue_file: .auto-continue.md
-  max_context_tokens: 2000
 ```
 
-### Modes
+---
 
-| Mode | Features |
-|------|----------|
-| **Full** | All features: agents, skills, hooks, SPEC, Lore, orchestra, TDD |
-| **Lite** | Minimal: basic skills + rules only |
+## 🏗 Architecture
+
+### Layer Architecture
+
+```
+autopus-adk/
+├── cmd/auto/           # Entry point
+├── internal/cli/       # 19 Cobra commands (52 with subcommands)
+├── pkg/
+│   ├── adapter/        # 5 platform adapters (Claude, Codex, Gemini, Cursor, OpenCode)
+│   ├── config/         # YAML config schema
+│   ├── content/        # Agent/skill/hook generation + skill activator
+│   ├── arch/           # Architecture analysis + rule enforcement
+│   ├── spec/           # SPEC engine (EARS format)
+│   ├── lore/           # Decision tracking (9-trailer protocol)
+│   ├── orchestra/      # Multi-model orchestration (4 strategies)
+│   ├── sigmap/         # go/ast-based API signature extraction
+│   ├── constraint/     # Anti-pattern registry + violation scanning
+│   ├── telemetry/      # Pipeline execution recording + cost estimation
+│   ├── cost/           # Token-based cost estimator
+│   ├── setup/          # Project documentation generation
+│   ├── lsp/            # LSP integration
+│   ├── search/         # Knowledge search (Context7/Exa)
+│   ├── template/       # Go template engine
+│   ├── detect/         # Platform detection
+│   └── version/        # Build metadata
+├── templates/          # Platform-specific templates
+├── content/            # Embedded content (15 agents, 36 skills)
+└── configs/            # Default configuration
+```
+
+### Architecture Rules
+
+- `internal/cli` depends on `pkg/*` only (never reverse)
+- `pkg/*` packages do not depend on each other (except `pkg/template`)
+- `cmd/` contains only the entry point
+- No source file exceeds 300 lines (hard limit, enforced by pipeline)
+
+---
 
 ## 🛠 Development
-
-### Build
 
 ```bash
 make build      # Build binary to bin/auto
@@ -601,41 +552,19 @@ make coverage   # Generate coverage report
 make install    # Install to $GOPATH/bin
 ```
 
-### Project Structure
+---
 
-```
-autopus-adk/
-├── cmd/auto/           # Entry point
-├── internal/cli/       # 16 Cobra commands
-├── pkg/
-│   ├── adapter/        # 5 platform adapters
-│   ├── config/         # YAML config schema
-│   ├── content/        # Agent/skill/hook generation
-│   ├── setup/          # Project documentation
-│   ├── arch/           # Architecture analysis
-│   ├── spec/           # SPEC engine (EARS)
-│   ├── lore/           # Decision tracking (9-trailer)
-│   ├── orchestra/      # Multi-model orchestration
-│   ├── lsp/            # LSP integration
-│   ├── search/         # Knowledge search
-│   ├── template/       # Go template engine
-│   ├── detect/         # Platform detection
-│   └── version/        # Build metadata
-├── templates/          # Platform-specific templates
-├── content/            # Embedded content (11 agents, 29 skills)
-└── configs/            # Default configuration
-```
+## 🤝 Contributing
 
-### Architecture Rules
+Autopus-ADK is open source under the MIT license.
 
-- `internal/cli` depends on `pkg/*` only (never reverse)
-- `pkg/*` packages do not depend on each other (except `pkg/template`)
-- `cmd/` contains only the entry point
-- Platform-specific code lives in `pkg/adapter/{platform}/`
-- No file exceeds 300 lines
+1. Fork the repository
+2. Create a feature branch
+3. Run `make test` to ensure all tests pass
+4. Submit a pull request
 
 ---
 
 <p align="center">
-  <b>🐙 Autopus</b> — One harness, every platform.
+  <b>🐙 Autopus</b> — Your AI agents deserve a team, not a chatbox.
 </p>
