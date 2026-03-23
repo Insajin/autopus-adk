@@ -13,7 +13,7 @@
 [![Agents](https://img.shields.io/badge/Agents-15-blueviolet)](#-15-specialized-agents)
 [![Skills](https://img.shields.io/badge/Skills-35-ff69b4)](#-all-commands)
 
-[Quick Start](#-30-second-install) · [Why Autopus](#-the-problem) · [Features](#-what-makes-autopus-different) · [Pipeline](#-the-pipeline) · [Docs](#-all-commands)
+[Quick Start](#-30-second-install) · [Why Autopus](#-the-problem) · [**Core Workflow**](#-the-workflow-three-commands-to-ship) · [Features](#-what-makes-autopus-different) · [Pipeline](#-the-pipeline) · [Docs](#-all-commands)
 
 [🇰🇷 한국어](docs/README.ko.md)
 
@@ -21,10 +21,9 @@
 
 ---
 
-<!-- TODO: Replace with actual demo GIF when available -->
-<!-- <p align="center"><img src="docs/assets/demo.gif" width="720" alt="Autopus pipeline demo" /></p> -->
-
 ## 🎬 See It In Action
+
+<p align="center"><img src="demo/hero.gif" width="720" alt="Autopus-ADK demo — version, doctor, platform, status, skills" /></p>
 
 ```bash
 # You describe what you want.
@@ -32,6 +31,9 @@
 
 # 15 agents handle the rest — planning, testing, implementing, reviewing.
 /auto go SPEC-AUTH-001 --auto --loop
+
+# Docs, changelog, and SPEC status — all synced in one command.
+/auto sync SPEC-AUTH-001
 ```
 
 ```
@@ -258,29 +260,76 @@ Phase 4    │ 🔍 Reviewer + 🛡️    │ TRUST 5 review + OWASP security au
 
 ---
 
-## 📐 SPEC-Driven Development
+## 📐 The Workflow: Three Commands to Ship
 
-Every feature follows **plan → go → sync**:
+Every feature in Autopus follows the same **plan → go → sync** lifecycle. No exceptions.
 
 ```
+  ┌──────────┐       ┌──────────┐       ┌──────────┐
+  │  📋 plan │──────▶│  🚀 go   │──────▶│  📦 sync │
+  │  Describe │       │  Build    │       │  Ship     │
+  └──────────┘       └──────────┘       └──────────┘
+```
+
+### 📋 Step 1 · `/auto plan` — Describe What You Want
+
+Turn a plain-English description into a full **SPEC** — requirements, tasks, acceptance criteria, and risk analysis.
+
+```bash
 /auto plan "Add webhook delivery with retry and dead letter queue"
-         │
-         ▼
-  ┌─────────────────────────────────────────────────────┐
-  │  .autopus/specs/SPEC-HOOK-001/                      │
-  │  ├── prd.md          PRD (10 or 5 sections)         │
-  │  ├── spec.md         EARS requirements              │
-  │  ├── plan.md         Task breakdown + assignments   │
-  │  ├── acceptance.md   Given-When-Then criteria       │
-  │  └── research.md     Technical research + risks     │
-  └─────────────────────────────────────────────────────┘
-         │
-         ▼
-/auto go SPEC-HOOK-001 --auto --loop    # 15 agents execute
-         │
-         ▼
-/auto sync SPEC-HOOK-001               # docs + changelog updated
 ```
+
+The spec-writer agent produces 5 documents:
+
+```
+.autopus/specs/SPEC-HOOK-001/
+├── prd.md          # Product Requirements Document
+├── spec.md         # EARS-format requirements
+├── plan.md         # Task breakdown + agent assignments
+├── acceptance.md   # Given-When-Then criteria
+└── research.md     # Technical research + risks
+```
+
+Options: `--multi` for multi-provider review · `--prd-mode minimal` for lightweight PRDs · `--skip-prd` to go straight to SPEC
+
+### 🚀 Step 2 · `/auto go` — Build It
+
+Feed the SPEC to **15 agents** that plan, scaffold tests, implement in parallel, validate, annotate, test, and review — all automatically.
+
+```bash
+/auto go SPEC-HOOK-001 --auto --loop
+```
+
+```
+Phase 1    │ 🧠 Planner         │ SPEC → tasks + agent assignments
+Phase 1.5  │ 🧪 Tester          │ Failing test skeletons (RED)
+Phase 2    │ ⚡ Executor ×N      │ TDD in parallel worktrees
+Phase 2.5  │ 📝 Annotator       │ @AX documentation tags
+Gate  2    │ ✅ Validator        │ Build + lint + vet
+Phase 3    │ 🧪 Tester          │ Coverage → 85%+
+Phase 4    │ 🔍 Reviewer + 🛡️    │ TRUST 5 + OWASP audit
+```
+
+Options: `--team` for Agent Teams · `--solo` for single-session TDD · `--quality ultra` for all-Opus execution · `--multi` for multi-model review
+
+### 📦 Step 3 · `/auto sync` — Ship and Document
+
+Update SPEC status, regenerate project docs, manage @AX tag lifecycle, and commit with structured Lore history.
+
+```bash
+/auto sync SPEC-HOOK-001
+```
+
+```
+╭────────────────────────────────────╮
+│ 🐙 Pipeline Complete!              │
+│ SPEC-HOOK-001: Webhook Delivery    │
+│ Tasks: 5/5 │ Coverage: 91%         │
+│ Review: APPROVE                    │
+╰────────────────────────────────────╯
+```
+
+**That's it.** Three commands: describe → build → ship. Every decision recorded. Every test enforced.
 
 ---
 
