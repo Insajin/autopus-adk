@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,13 +8,6 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/config"
 )
-
-// writeAutopusYAML writes minimal autopus.yaml into dir for testing.
-func writeAutopusYAML(t *testing.T, dir, content string) {
-	t.Helper()
-	err := os.WriteFile(filepath.Join(dir, "autopus.yaml"), []byte(content), 0644)
-	require.NoError(t, err)
-}
 
 func TestResolveProviders_FlagOverride(t *testing.T) {
 	t.Parallel()

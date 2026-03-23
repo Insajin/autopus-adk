@@ -35,7 +35,7 @@ func TestNewClient_Initialize(t *testing.T) {
 	if err != nil {
 		t.Skipf("cat 명령 실행 불가: %v", err)
 	}
-	defer client.Shutdown()
+	defer func() { _ = client.Shutdown() }()
 
 	// Initialize는 sendRequest를 호출하므로 실행이 되어야 함
 	err = client.Initialize("file:///tmp/test")

@@ -2,8 +2,6 @@ package lsp_test
 
 import (
 	"encoding/json"
-	"io"
-	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,57 +10,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/lsp"
 )
 
-// mockLSPServer는 테스트용 모의 LSP 서버이다.
-type mockLSPServer struct {
-	listener net.Listener
-	conn     net.Conn
-}
-
-// startMockServer는 TCP 기반 모의 LSP 서버를 시작한다.
-func startMockServer(t *testing.T) (*mockLSPServer, string) {
-	t.Helper()
-
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	srv := &mockLSPServer{listener: l}
-
-	go func() {
-		conn, err := l.Accept()
-		if err != nil {
-			return
-		}
-		srv.conn = conn
-		// 모의 응답 처리
-		handleMockLSP(conn)
-	}()
-
-	return srv, l.Addr().String()
-}
-
-func handleMockLSP(conn net.Conn) {
-	defer conn.Close()
-	buf := make([]byte, 4096)
-	for {
-		n, err := conn.Read(buf)
-		if err == io.EOF || err != nil {
-			return
-		}
-		_ = n
-		// 간단한 initialize 응답
-		resp := `{"jsonrpc":"2.0","id":1,"result":{"capabilities":{}}}`
-		header := "Content-Length: " + string(rune(len(resp))) + "\r\n\r\n"
-		conn.Write([]byte(header + resp))
-	}
-}
-
-func (s *mockLSPServer) Close() {
-	s.listener.Close()
-	if s.conn != nil {
-		s.conn.Close()
-	}
-}
-
 func TestNewClient_InvalidCommand(t *testing.T) {
 	t.Parallel()
 
@@ -70,7 +17,7 @@ func TestNewClient_InvalidCommand(t *testing.T) {
 	client, err := lsp.NewClient("nonexistent-lsp-server-xyz", []string{})
 	if err == nil {
 		// 일부 시스템에서는 프로세스 시작 자체는 성공할 수 있어 Close 호출
-		client.Shutdown()
+		_ = client.Shutdown()
 	}
 	// 존재하지 않는 명령이므로 오류이거나 nil이어야 함
 	_ = err

@@ -152,7 +152,9 @@ func TestCollectContext_WithinLimit(t *testing.T) {
 	dir := t.TempDir()
 	// Create a small Go file
 	goFile := filepath.Join(dir, "auth.go")
-	os.WriteFile(goFile, []byte("package auth\n\nfunc Login() error {\n\treturn nil\n}\n"), 0o644)
+	if err := os.WriteFile(goFile, []byte("package auth\n\nfunc Login() error {\n\treturn nil\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, err := CollectContext(dir, 500)
 	require.NoError(t, err)
@@ -165,9 +167,15 @@ func TestCollectContext_RecursiveSubdirs(t *testing.T) {
 	dir := t.TempDir()
 	// Create nested directory structure
 	subDir := filepath.Join(dir, "pkg", "auth")
-	os.MkdirAll(subDir, 0o755)
-	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644)
-	os.WriteFile(filepath.Join(subDir, "handler.go"), []byte("package auth\n\nfunc Handle() {}\n"), 0o644)
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subDir, "handler.go"), []byte("package auth\n\nfunc Handle() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, err := CollectContext(dir, 500)
 	require.NoError(t, err)

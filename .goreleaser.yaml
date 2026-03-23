@@ -42,16 +42,16 @@ changelog:
       - '^test:'
       - '^ci:'
 
-brews:
-  - ids:
-      - auto
-    repository:
-      owner: insajin
-      name: homebrew-autopus
-    homepage: "https://github.com/insajin/autopus-adk"
-    description: "Agentic Development Kit for coding CLIs"
-    license: "MIT"
-    install: |
-      bin.install "auto"
-    test: |
-      system "#{bin}/auto", "version"
+# brews:
+#   - ids:
+#       - auto
+#     repository:
+#       owner: insajin
+#       name: homebrew-autopus
+#     homepage: "https://github.com/insajin/autopus-adk"
+#     description: "Agentic Development Kit for coding CLIs"
+#     license: "MIT"
+#     install: |
+#       bin.install "auto"
+#     test: |
+#       system "#{bin}/auto", "version"

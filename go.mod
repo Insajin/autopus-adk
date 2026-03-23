@@ -1,6 +1,6 @@
 module github.com/insajin/autopus-adk
 
-go 1.23
+go 1.26
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0

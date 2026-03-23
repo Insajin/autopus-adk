@@ -246,7 +246,7 @@ func TestArchCmd_GenerateCurrentDir(t *testing.T) {
 	origDir, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(dir))
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	cmd := newTestRootCmd()
 	cmd.SetArgs([]string{"arch", "generate", dir})
@@ -282,7 +282,7 @@ func TestSpecCmd_New(t *testing.T) {
 	origDir, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(dir))
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	cmd := newTestRootCmd()
 	cmd.SetArgs([]string{"spec", "new", "TEST-001", "--title", "테스트 스펙"})
@@ -305,7 +305,7 @@ func TestSpecCmd_NewDefaultTitle(t *testing.T) {
 	origDir, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(dir))
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	cmd := newTestRootCmd()
 	cmd.SetArgs([]string{"spec", "new", "TEST-002"})
@@ -327,7 +327,7 @@ func TestSpecCmd_ValidateExisting(t *testing.T) {
 	origDir, err := os.Getwd()
 	require.NoError(t, err)
 	require.NoError(t, os.Chdir(dir))
-	defer os.Chdir(origDir)
+	defer func() { _ = os.Chdir(origDir) }()
 
 	// 먼저 SPEC 생성
 	createCmd := newTestRootCmd()

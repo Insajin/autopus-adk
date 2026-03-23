@@ -17,7 +17,7 @@ func TestResolveLibrary_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":"/cobra-org/cobra","name":"cobra","description":"Cobra CLI library"}`))
+		_, _ = w.Write([]byte(`{"id":"/cobra-org/cobra","name":"cobra","description":"Cobra CLI library"}`))
 	}))
 	defer server.Close()
 
@@ -33,7 +33,7 @@ func TestResolveLibrary_NotFound(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error":"library not found"}`))
+		_, _ = w.Write([]byte(`{"error":"library not found"}`))
 	}))
 	defer server.Close()
 
@@ -49,7 +49,7 @@ func TestGetDocs_Success(t *testing.T) {
 		assert.Contains(t, r.URL.Path, "cobra")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"content":"# Cobra Documentation\n\nCobra is a CLI library..."}`))
+		_, _ = w.Write([]byte(`{"content":"# Cobra Documentation\n\nCobra is a CLI library..."}`))
 	}))
 	defer server.Close()
 

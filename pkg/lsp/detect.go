@@ -3,7 +3,6 @@ package lsp
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 )
 
@@ -36,11 +35,5 @@ func DetectServer(projectDir string) (serverCmd string, args []string, err error
 // fileExists는 파일 또는 디렉터리의 존재 여부를 확인한다.
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	return err == nil
-}
-
-// isBinaryAvailable는 바이너리가 PATH에 존재하는지 확인한다.
-func isBinaryAvailable(name string) bool {
-	_, err := exec.LookPath(name)
 	return err == nil
 }

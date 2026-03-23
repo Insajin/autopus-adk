@@ -178,7 +178,7 @@ func createLSPClient(projectDir string) (lsp.Commander, func(), error) {
 	// LSP 클라이언트를 Commander 어댑터로 래핑
 	adapter := &lspClientAdapter{client: realClient}
 	cleanup := func() {
-		realClient.Shutdown()
+		_ = realClient.Shutdown()
 	}
 
 	return adapter, cleanup, nil

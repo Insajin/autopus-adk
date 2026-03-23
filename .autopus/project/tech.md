@@ -6,7 +6,7 @@
 
 | Item | Value |
 |------|-------|
-| Language | Go 1.23 |
+| Language | Go 1.26 |
 | Module | `github.com/insajin/autopus-adk` |
 | Binary | `auto` |
 
