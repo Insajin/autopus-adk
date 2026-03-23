@@ -49,6 +49,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newStatusCmd())
 	root.AddCommand(newVerifyCmd())
 	root.AddCommand(newTelemetryCmd())
+	root.AddCommand(newCheckCmd())
 
 	return root
 }

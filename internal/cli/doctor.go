@@ -3,8 +3,10 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -134,6 +136,43 @@ func newDoctorCmd() *cobra.Command {
 				for _, p := range detected {
 					tui.OK(out, fmt.Sprintf("%s (%s)", p.Name, p.Version))
 				}
+			}
+
+			// 6. Hooks & Permissions validation
+			tui.SectionHeader(out, "Hooks & Permissions")
+			settingsPath := filepath.Join(dir, ".claude", "settings.json")
+			if settingsData, err := os.ReadFile(settingsPath); err == nil {
+				var settings map[string]interface{}
+				if err := json.Unmarshal(settingsData, &settings); err != nil {
+					tui.FAIL(out, "settings.json 파싱 실패")
+					allOK = false
+				} else {
+					// Check hooks
+					if hooksVal, ok := settings["hooks"]; ok {
+						if hooksMap, ok := hooksVal.(map[string]interface{}); ok && len(hooksMap) > 0 {
+							tui.OK(out, fmt.Sprintf("hooks: %d event(s) configured", len(hooksMap)))
+						} else {
+							tui.SKIP(out, "hooks: empty or invalid format")
+						}
+					} else {
+						tui.SKIP(out, "hooks: not configured (run 'auto update' to install)")
+					}
+
+					// Check permissions
+					if permsVal, ok := settings["permissions"]; ok {
+						if permsMap, ok := permsVal.(map[string]interface{}); ok {
+							if allowList, ok := permsMap["allow"].([]interface{}); ok && len(allowList) > 0 {
+								tui.OK(out, fmt.Sprintf("permissions: %d allow rule(s)", len(allowList)))
+							} else {
+								tui.SKIP(out, "permissions.allow: empty")
+							}
+						}
+					} else {
+						tui.SKIP(out, "permissions: not configured (run 'auto update' to install)")
+					}
+				}
+			} else {
+				tui.SKIP(out, ".claude/settings.json not found (run 'auto init' to generate)")
 			}
 
 			fmt.Fprintln(out)
