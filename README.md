@@ -91,19 +91,12 @@ auto orchestra review --strategy debate
 
 Claude, Codex, and Gemini independently review your code, then **debate each other's findings** in a structured 2-phase argument. A judge renders the final verdict.
 
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Claude     │    │   Codex     │    │   Gemini    │
-│  🔍 Review   │    │  🔍 Review   │    │  🔍 Review   │
-└──────┬──────┘    └──────┬──────┘    └──────┬──────┘
-       │                  │                  │
-       └──────────┬───────┴──────────────────┘
-                  ▼
-         ⚔️  Debate Phase
-         (rebuttals & counter-arguments)
-                  │
-                  ▼
-          🏛️  Judge Verdict
+```mermaid
+flowchart TB
+    C["🔍 Claude\nIndependent Review"] --> D["⚔️ Debate Phase\nRebuttals & Counter-arguments"]
+    X["🔍 Codex\nIndependent Review"] --> D
+    G["🔍 Gemini\nIndependent Review"] --> D
+    D --> J["🏛️ Judge Verdict"]
 ```
 
 4 strategies: **Consensus** · **Debate** · **Pipeline** · **Fastest**
@@ -184,10 +177,26 @@ Same 15 agents. Same 35 skills. Same rules. **Everywhere.**
 ## 📦 30-Second Install
 
 ```bash
+# Homebrew (macOS / Linux)
+brew install insajin/autopus/auto
+
+# or curl one-liner
+curl -sSfL https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.sh | sh
+```
+
+<details>
+<summary>Other methods</summary>
+
+```bash
+# go install (development)
+go install github.com/Insajin/autopus-adk/cmd/auto@latest
+
+# Build from source
 git clone https://github.com/Insajin/autopus-adk.git
 cd autopus-adk && make build && make install
-auto --version
 ```
+
+</details>
 
 Then, in any project:
 
@@ -204,14 +213,29 @@ auto setup      # Generate project context docs
 
 Every `/auto go` runs this:
 
-```
-Phase 1    │ 🧠 Planner         │ SPEC → task decomposition + agent assignment
-Phase 1.5  │ 🧪 Tester          │ Scaffold failing tests (RED)
-Phase 2    │ ⚡ Executor ×N      │ TDD implementation (parallel worktrees)
-Phase 2.5  │ 📝 Annotator       │ @AX tag lifecycle management
-Gate  2    │ ✅ Validator        │ Build + lint + vet + file size
-Phase 3    │ 🧪 Tester          │ Coverage boost → 85%+
-Phase 4    │ 🔍 Reviewer + 🛡️    │ TRUST 5 review + OWASP security audit
+```mermaid
+sequenceDiagram
+    participant S as SPEC
+    participant P as 🧠 Planner
+    participant T as 🧪 Tester
+    participant E as ⚡ Executor ×N
+    participant A as 📝 Annotator
+    participant V as ✅ Validator
+    participant R as 🔍 Reviewer + 🛡️
+
+    S->>P: Phase 1: Task decomposition + agent assignment
+    P->>T: Phase 1.5: Scaffold failing tests (RED)
+
+    rect rgb(230, 245, 255)
+        Note over E: Phase 2: TDD in parallel worktrees
+        T->>E: T1, T2, T3 ... (parallel)
+    end
+
+    E->>A: Phase 2.5: @AX tag management
+    A->>V: Gate 2: Build + lint + vet
+    V->>T: Phase 3: Coverage → 85%+
+    T->>R: Phase 4: TRUST 5 + OWASP audit
+    R-->>S: ✅ APPROVE
 ```
 
 ### 15 Specialized Agents
@@ -266,11 +290,10 @@ Phase 4    │ 🔍 Reviewer + 🛡️    │ TRUST 5 review + OWASP security au
 
 Every feature in Autopus follows the same **plan → go → sync** lifecycle. No exceptions.
 
-```
-  ┌──────────┐       ┌──────────┐       ┌──────────┐
-  │  📋 plan │──────▶│  🚀 go   │──────▶│  📦 sync │
-  │  Describe │       │  Build    │       │  Ship     │
-  └──────────┘       └──────────┘       └──────────┘
+```mermaid
+flowchart LR
+    PLAN["📋 plan\nDescribe"] -->|SPEC created| GO["🚀 go\nBuild"]
+    GO -->|Code + Tests| SYNC["📦 sync\nShip"]
 ```
 
 ### 📋 Step 1 · `/auto plan` — Describe What You Want

@@ -177,10 +177,26 @@ auto init   # 설치된 모든 AI 코딩 CLI 자동 감지
 ## 📦 30초 설치
 
 ```bash
+# Homebrew (macOS / Linux)
+brew install insajin/autopus/auto
+
+# 또는 curl 원라이너
+curl -sSfL https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.sh | sh
+```
+
+<details>
+<summary>기타 설치 방법</summary>
+
+```bash
+# go install (개발용)
+go install github.com/Insajin/autopus-adk/cmd/auto@latest
+
+# 소스에서 빌드
 git clone https://github.com/Insajin/autopus-adk.git
 cd autopus-adk && make build && make install
-auto --version
 ```
+
+</details>
 
 그런 다음, 아무 프로젝트에서:
 
