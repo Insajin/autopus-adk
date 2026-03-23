@@ -1,6 +1,6 @@
 # Demo GIFs
 
-Terminal demo GIFs generated with [VHS](https://github.com/charmbracelet/vhs) and optimized with [gifsicle](https://www.lcdf.org/gifsicle/).
+Terminal demo GIF generated with [VHS](https://github.com/charmbracelet/vhs) and optimized with [gifsicle](https://www.lcdf.org/gifsicle/).
 
 ## Prerequisites
 
@@ -8,17 +8,18 @@ Terminal demo GIFs generated with [VHS](https://github.com/charmbracelet/vhs) an
 brew install vhs gifsicle
 ```
 
-## Generate GIFs
+## Generate
 
 ```bash
 cd demo
-for tape in *.tape; do vhs "$tape"; done
-for f in *.gif; do gifsicle -O3 --lossy=80 "$f" -o "$f.opt" && mv "$f.opt" "$f"; done
+vhs hero.tape
+gifsicle -O3 --lossy=80 hero.gif -o hero.opt.gif && mv hero.opt.gif hero.gif
 ```
 
 ## Files
 
-| Tape | Output | README Section |
-|------|--------|----------------|
-| `hero.tape` + `simulate-claude.sh` | `hero.gif` | Top — Claude Code session: plan → go → sync |
-| `workflow.tape` | `workflow.gif` | "Three Commands to Ship" — CLI commands showcase |
+| File | Description |
+|------|-------------|
+| `simulate-claude.sh` | ANSI escape codes로 Claude Code UI 재현 |
+| `hero.tape` | VHS 스크립트 — Hide/Show로 셋업 숨기고 시뮬레이션 녹화 |
+| `hero.gif` | README 상단 데모 — Claude Code에서 plan → go → sync |
