@@ -35,7 +35,7 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 			Event:   "PreToolUse",
 			Matcher: "Bash",
 			Type:    "command",
-			Command: "auto check --arch --quiet",
+			Command: "auto check --arch --quiet --warn-only",
 			Timeout: 30,
 		})
 	}

@@ -166,6 +166,38 @@ func TestCheckCmd_LoreSkipsOnExperimentBranch(t *testing.T) {
 	}
 }
 
+// TestCheckCmd_WarnOnlyExitsZero verifies that --warn-only causes the check to
+// exit 0 even when violations are found.
+func TestCheckCmd_WarnOnlyExitsZero(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create a .go file with 301 lines.
+	var sb strings.Builder
+	sb.WriteString("package dummy\n")
+	for i := 0; i < 300; i++ {
+		sb.WriteString(fmt.Sprintf("// line %d\n", i))
+	}
+	if err := os.WriteFile(filepath.Join(dir, "big.go"), []byte(sb.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := newTestRootCmd()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs([]string{"check", "--arch", "--quiet", "--warn-only", "--dir", dir})
+
+	err := root.Execute()
+	if err != nil {
+		t.Fatalf("--warn-only should exit 0 even with violations, got: %v", err)
+	}
+
+	// Violations should still be printed
+	if !strings.Contains(buf.String(), "big.go") {
+		t.Errorf("violations should still be printed in warn-only mode, got: %s", buf.String())
+	}
+}
+
 // TestCheckCmd_LoreSkipsWhenNoCommits verifies that lore check passes gracefully
 // in a directory without any git history.
 func TestCheckCmd_LoreSkipsWhenNoCommits(t *testing.T) {

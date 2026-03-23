@@ -13,10 +13,11 @@ import (
 
 func newCheckCmd() *cobra.Command {
 	var (
-		archFlag  bool
-		loreFlag  bool
-		quietFlag bool
-		dir       string
+		archFlag     bool
+		loreFlag     bool
+		quietFlag    bool
+		warnOnlyFlag bool
+		dir          string
 	)
 
 	cmd := &cobra.Command{
@@ -37,7 +38,7 @@ func newCheckCmd() *cobra.Command {
 				tui.BannerWithInfo(out, "autopus-adk", "check")
 			}
 
-			allOK := runChecks(archFlag, loreFlag, dir, out, quietFlag)
+			allOK := runChecks(archFlag, loreFlag, dir, out, quietFlag, warnOnlyFlag)
 			if !allOK {
 				return fmt.Errorf("check failed")
 			}
@@ -48,6 +49,7 @@ func newCheckCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&archFlag, "arch", false, "Check architecture rules (file size limit)")
 	cmd.Flags().BoolVar(&loreFlag, "lore", false, "Check Lore commit format")
 	cmd.Flags().BoolVar(&quietFlag, "quiet", false, "Suppress non-error output")
+	cmd.Flags().BoolVar(&warnOnlyFlag, "warn-only", false, "Exit 0 even if checks fail (advisory mode)")
 	cmd.Flags().StringVar(&dir, "dir", "", "Project root directory")
 
 	return cmd
@@ -55,7 +57,8 @@ func newCheckCmd() *cobra.Command {
 
 // runChecks executes the selected checks and returns true if all pass.
 // If neither arch nor lore is selected, all checks run.
-func runChecks(archFlag, loreFlag bool, dir string, out io.Writer, quiet bool) bool {
+// When warnOnly is true, violations are still printed but the function always returns true.
+func runChecks(archFlag, loreFlag bool, dir string, out io.Writer, quiet, warnOnly bool) bool {
 	runAll := !archFlag && !loreFlag
 	allOK := true
 
@@ -68,6 +71,10 @@ func runChecks(archFlag, loreFlag bool, dir string, out io.Writer, quiet bool) b
 		if !checkLore(dir, out, quiet) {
 			allOK = false
 		}
+	}
+
+	if warnOnly {
+		return true
 	}
 	return allOK
 }
