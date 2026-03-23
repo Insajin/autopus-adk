@@ -27,8 +27,8 @@ type PlatformAdapter interface {
 	Clean(ctx context.Context) error
 	// SupportsHooks는 코딩 CLI 훅 지원 여부를 반환한다.
 	SupportsHooks() bool
-	// InstallHooks는 코딩 CLI 훅을 설치한다.
-	InstallHooks(ctx context.Context, hooks []HookConfig) error
+	// InstallHooks는 코딩 CLI 훅과 권한을 설치한다.
+	InstallHooks(ctx context.Context, hooks []HookConfig, perms *PermissionSet) error
 }
 
 // PlatformFiles는 어댑터가 생성한 파일 목록이다.
@@ -65,7 +65,15 @@ type ValidationError struct {
 
 // HookConfig는 훅 설정이다.
 type HookConfig struct {
-	Event   string `json:"event"`
-	Command string `json:"command"`
-	Timeout int    `json:"timeout"`
+	Event   string `json:"event"`   // hook event name (PreToolUse, PostToolUse, etc.)
+	Matcher string `json:"matcher"` // regex matcher for tool names
+	Type    string `json:"type"`    // hook type: "command", "prompt", etc.
+	Command string `json:"command"` // shell command to execute
+	Timeout int    `json:"timeout"` // timeout in seconds
+}
+
+// PermissionSet는 플랫폼별 권한 설정이다.
+type PermissionSet struct {
+	Allow []string `json:"allow,omitempty"`
+	Deny  []string `json:"deny,omitempty"`
 }

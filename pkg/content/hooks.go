@@ -1,6 +1,9 @@
 package content
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -30,6 +33,8 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 	if cfg.PreCommitArch {
 		hooks = append(hooks, adapter.HookConfig{
 			Event:   "PreToolUse",
+			Matcher: "Bash",
+			Type:    "command",
 			Command: "auto check --arch --quiet",
 			Timeout: 30,
 		})
@@ -38,6 +43,8 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 	if cfg.PreCommitLore {
 		hooks = append(hooks, adapter.HookConfig{
 			Event:   "PreToolUse",
+			Matcher: "Bash",
+			Type:    "command",
 			Command: "auto check --lore --quiet",
 			Timeout: 30,
 		})
@@ -46,6 +53,8 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 	if cfg.ReactCIFailure {
 		hooks = append(hooks, adapter.HookConfig{
 			Event:   "PostToolUse",
+			Matcher: "Bash",
+			Type:    "command",
 			Command: "auto react --ci-failure --quiet",
 			Timeout: 60,
 		})
@@ -54,6 +63,8 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 	if cfg.ReactReview {
 		hooks = append(hooks, adapter.HookConfig{
 			Event:   "PostToolUse",
+			Matcher: "Bash",
+			Type:    "command",
 			Command: "auto react --review --quiet",
 			Timeout: 60,
 		})
@@ -92,4 +103,52 @@ func buildPreCommitScript(cfg config.HooksConf) string {
 
 	s += "exit 0\n"
 	return s
+}
+
+// DetectPermissions는 프로젝트 루트를 분석하여 기본 권한을 생성한다.
+func DetectPermissions(projectRoot string, extra config.PermissionsConf) *adapter.PermissionSet {
+	allow := []string{
+		// Common: always included
+		"Bash(auto *)",
+		"Bash(auto:*)",
+		"Bash(git *)",
+		"Bash(git:*)",
+		"Bash(make:*)",
+		"mcp__sequential-thinking__sequentialthinking",
+		"WebSearch",
+	}
+
+	// Go project detection
+	if fileExists(filepath.Join(projectRoot, "go.mod")) {
+		allow = append(allow,
+			"Bash(go build:*)", "Bash(go test:*)", "Bash(go vet:*)",
+			"Bash(go run:*)", "Bash(go mod:*)", "Bash(go tool:*)",
+			"Bash(go get:*)", "Bash(go install:*)", "Bash(go version:*)",
+			"Bash(golangci-lint:*)",
+		)
+	}
+
+	// Node project detection
+	if fileExists(filepath.Join(projectRoot, "package.json")) {
+		allow = append(allow,
+			"Bash(npm *)", "Bash(npx *)", "Bash(node *)",
+			"Bash(pnpm *)", "Bash(yarn *)",
+		)
+	}
+
+	// Merge extra permissions from autopus.yaml
+	allow = append(allow, extra.ExtraAllow...)
+
+	var deny []string
+	deny = append(deny, extra.ExtraDeny...)
+
+	return &adapter.PermissionSet{
+		Allow: allow,
+		Deny:  deny,
+	}
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

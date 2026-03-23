@@ -29,7 +29,9 @@ func (m *mockAdapter) Update(_ context.Context, _ *config.HarnessConfig) (*Platf
 func (m *mockAdapter) Validate(_ context.Context) ([]ValidationError, error) { return nil, nil }
 func (m *mockAdapter) Clean(_ context.Context) error                         { return nil }
 func (m *mockAdapter) SupportsHooks() bool                                   { return false }
-func (m *mockAdapter) InstallHooks(_ context.Context, _ []HookConfig) error  { return nil }
+func (m *mockAdapter) InstallHooks(_ context.Context, _ []HookConfig, _ *PermissionSet) error {
+	return nil
+}
 
 func TestRegistry_RegisterAndGet(t *testing.T) {
 	t.Parallel()

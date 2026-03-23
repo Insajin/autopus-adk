@@ -22,7 +22,7 @@ func TestClaudeAdapter_InstallHooks_Empty(t *testing.T) {
 	dir := t.TempDir()
 	a := claude.NewWithRoot(dir)
 
-	err := a.InstallHooks(context.Background(), nil)
+	err := a.InstallHooks(context.Background(), nil, nil)
 	assert.NoError(t, err)
 
 	// settings.json이 생성되어야 함
@@ -32,6 +32,7 @@ func TestClaudeAdapter_InstallHooks_Empty(t *testing.T) {
 }
 
 // TestClaudeAdapter_InstallHooks_WithHooks는 훅 설정을 포함한 InstallHooks를 테스트한다.
+// New schema: hooks are nested by event name.
 func TestClaudeAdapter_InstallHooks_WithHooks(t *testing.T) {
 	t.Parallel()
 
@@ -39,11 +40,11 @@ func TestClaudeAdapter_InstallHooks_WithHooks(t *testing.T) {
 	a := claude.NewWithRoot(dir)
 
 	hooks := []adapter.HookConfig{
-		{Event: "PostCommit", Command: "echo done", Timeout: 30},
-		{Event: "PrePush", Command: "go test ./...", Timeout: 60},
+		{Event: "PreToolUse", Matcher: "Bash", Type: "command", Command: "auto check --arch --quiet", Timeout: 30},
+		{Event: "PostToolUse", Matcher: "Bash", Type: "command", Command: "auto react --ci-failure --quiet", Timeout: 60},
 	}
 
-	err := a.InstallHooks(context.Background(), hooks)
+	err := a.InstallHooks(context.Background(), hooks, nil)
 	require.NoError(t, err)
 
 	// settings.json 내용 확인
@@ -54,12 +55,51 @@ func TestClaudeAdapter_InstallHooks_WithHooks(t *testing.T) {
 	var settings map[string]interface{}
 	require.NoError(t, json.Unmarshal(data, &settings))
 
-	// hooks 필드 확인
+	// hooks 필드가 맵(nested schema)으로 있어야 함
 	hooksVal, ok := settings["hooks"]
 	assert.True(t, ok, "hooks 필드가 있어야 함")
-	hooksSlice, ok := hooksVal.([]interface{})
+	hooksMap, ok := hooksVal.(map[string]interface{})
+	assert.True(t, ok, "hooks는 event별 맵이어야 함")
+	// PreToolUse 이벤트 항목 확인
+	preToolUse, ok := hooksMap["PreToolUse"]
+	assert.True(t, ok, "PreToolUse 이벤트가 있어야 함")
+	entries, ok := preToolUse.([]interface{})
 	assert.True(t, ok)
-	assert.Len(t, hooksSlice, 2)
+	assert.Len(t, entries, 1)
+}
+
+// TestClaudeAdapter_InstallHooks_WithPermissions는 권한 설정을 포함한 InstallHooks를 테스트한다.
+func TestClaudeAdapter_InstallHooks_WithPermissions(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := claude.NewWithRoot(dir)
+
+	perms := &adapter.PermissionSet{
+		Allow: []string{"Bash(go test:*)", "Bash(git *)", "WebSearch"},
+		Deny:  []string{"Bash(rm -rf:*)"},
+	}
+
+	err := a.InstallHooks(context.Background(), nil, perms)
+	require.NoError(t, err)
+
+	settingsPath := filepath.Join(dir, ".claude", "settings.json")
+	data, readErr := os.ReadFile(settingsPath)
+	require.NoError(t, readErr)
+
+	var settings map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &settings))
+
+	permVal, ok := settings["permissions"]
+	assert.True(t, ok, "permissions 필드가 있어야 함")
+	permMap, ok := permVal.(map[string]interface{})
+	assert.True(t, ok)
+	allowList, ok := permMap["allow"].([]interface{})
+	assert.True(t, ok)
+	assert.Len(t, allowList, 3)
+	denyList, ok := permMap["deny"].([]interface{})
+	assert.True(t, ok)
+	assert.Len(t, denyList, 1)
 }
 
 // TestClaudeAdapter_InstallHooks_MergesExisting는 기존 settings.json과 병합을 테스트한다.
@@ -79,10 +119,10 @@ func TestClaudeAdapter_InstallHooks_MergesExisting(t *testing.T) {
 
 	a := claude.NewWithRoot(dir)
 	hooks := []adapter.HookConfig{
-		{Event: "PostCommit", Command: "echo hi", Timeout: 10},
+		{Event: "PreToolUse", Matcher: "Bash", Type: "command", Command: "auto check --arch --quiet", Timeout: 30},
 	}
 
-	err := a.InstallHooks(context.Background(), hooks)
+	err := a.InstallHooks(context.Background(), hooks, nil)
 	require.NoError(t, err)
 
 	// 결과 확인: 기존 필드와 새 hooks 모두 있어야 함
@@ -91,9 +131,11 @@ func TestClaudeAdapter_InstallHooks_MergesExisting(t *testing.T) {
 	var result map[string]interface{}
 	require.NoError(t, json.Unmarshal(updated, &result))
 
-	// hooks 추가됨
+	// hooks 추가됨, 기존 theme 보존됨
 	_, hasHooks := result["hooks"]
 	assert.True(t, hasHooks)
+	theme, _ := result["theme"].(string)
+	assert.Equal(t, "dark", theme)
 }
 
 // TestClaudeAdapter_InstallHooks_InvalidJSON은 잘못된 JSON settings.json이 있을 때를 테스트한다.
@@ -109,11 +151,11 @@ func TestClaudeAdapter_InstallHooks_InvalidJSON(t *testing.T) {
 
 	a := claude.NewWithRoot(dir)
 	hooks := []adapter.HookConfig{
-		{Event: "PostCommit", Command: "echo test", Timeout: 10},
+		{Event: "PreToolUse", Matcher: "Bash", Type: "command", Command: "auto check --arch --quiet", Timeout: 30},
 	}
 
 	// 잘못된 JSON이어도 오류 없이 처리되어야 함 (기본 맵으로 초기화)
-	err := a.InstallHooks(context.Background(), hooks)
+	err := a.InstallHooks(context.Background(), hooks, nil)
 	assert.NoError(t, err)
 }
 

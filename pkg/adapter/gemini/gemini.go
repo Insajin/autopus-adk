@@ -294,7 +294,7 @@ func (a *Adapter) Clean(_ context.Context) error {
 }
 
 // InstallHooks는 Gemini CLI에서 no-op이다 (SupportsHooks=false).
-func (a *Adapter) InstallHooks(_ context.Context, _ []adapter.HookConfig) error {
+func (a *Adapter) InstallHooks(_ context.Context, _ []adapter.HookConfig, _ *adapter.PermissionSet) error {
 	return nil
 }
 

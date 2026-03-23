@@ -183,7 +183,7 @@ func TestClaudeAdapter_InstallHooks(t *testing.T) {
 	_ = hooks
 
 	// 빈 훅 목록으로 설치
-	err := a.InstallHooks(context.Background(), nil)
+	err := a.InstallHooks(context.Background(), nil, nil)
 	require.NoError(t, err)
 
 	// settings.json 생성 확인

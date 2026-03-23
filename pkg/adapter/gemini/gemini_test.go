@@ -144,7 +144,7 @@ func TestGeminiAdapter_Update(t *testing.T) {
 func TestGeminiAdapter_InstallHooks_NoOp(t *testing.T) {
 	t.Parallel()
 	a := gemini.New()
-	err := a.InstallHooks(context.Background(), nil)
+	err := a.InstallHooks(context.Background(), nil, nil)
 	require.NoError(t, err)
 }
 

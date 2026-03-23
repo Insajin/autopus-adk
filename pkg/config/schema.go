@@ -142,10 +142,19 @@ type RouterConf struct {
 
 // HooksConf는 훅 설정이다.
 type HooksConf struct {
-	PreCommitArch  bool `yaml:"pre_commit_arch"`
-	PreCommitLore  bool `yaml:"pre_commit_lore"`
-	ReactCIFailure bool `yaml:"react_ci_failure"`
-	ReactReview    bool `yaml:"react_review"`
+	PreCommitArch  bool            `yaml:"pre_commit_arch"`
+	PreCommitLore  bool            `yaml:"pre_commit_lore"`
+	ReactCIFailure bool            `yaml:"react_ci_failure"`
+	ReactReview    bool            `yaml:"react_review"`
+	Permissions    PermissionsConf `yaml:"permissions,omitempty"`
+}
+
+// PermissionsConf는 코딩 CLI 권한 설정이다.
+type PermissionsConf struct {
+	// ExtraAllow는 autopus.yaml에서 사용자가 추가하는 allow 규칙이다.
+	ExtraAllow []string `yaml:"extra_allow,omitempty"`
+	// ExtraDeny는 autopus.yaml에서 사용자가 추가하는 deny 규칙이다.
+	ExtraDeny []string `yaml:"extra_deny,omitempty"`
 }
 
 // SessionConf는 세션 연속성 설정이다 (Full 전용).

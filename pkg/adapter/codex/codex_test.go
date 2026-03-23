@@ -118,7 +118,7 @@ func TestCodexAdapter_InstallHooks_NoOp(t *testing.T) {
 	t.Parallel()
 	a := codex.New()
 	// SupportsHooks()가 false이므로 InstallHooks는 no-op이어야 함
-	err := a.InstallHooks(context.Background(), nil)
+	err := a.InstallHooks(context.Background(), nil, nil)
 	require.NoError(t, err)
 }
 
