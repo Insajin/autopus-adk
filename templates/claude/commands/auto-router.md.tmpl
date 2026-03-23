@@ -151,14 +151,14 @@ Usage: `/auto plan "feature description"`, `/auto plan "feature description" --m
 
 ### Pipeline (execute in this exact order)
 
-#### Step 1: Parse Flags
+#### [REQUIRED] Step 1: Parse Flags
 
 Extract flags from $ARGUMENTS:
 - Check for `--multi` → `MULTI_FLAG = true/false`
 - Extract `--strategy <value>` → `STRATEGY = value` (default: consensus)
 - Remaining text → `FEATURE_DESC`
 
-#### Step 2: Spawn spec-writer Agent
+#### [REQUIRED] Step 2: Spawn spec-writer Agent
 
 Spawn a `spec-writer` agent to generate the SPEC:
 
@@ -174,20 +174,26 @@ Agent(
 
 Extract the **SPEC-ID** (e.g., SPEC-UX-001) from the agent's output.
 
-#### Step 3: Review Gate Decision
+> **⏭ POST-AGENT**: spec-writer returned. NEXT REQUIRED STEP: [CONDITIONAL] Step 3: Review Gate Decision. Do NOT skip to Completion.
 
-Proceed to Step 4 if **either** condition is met:
+#### [CONDITIONAL] Step 3: Review Gate Decision
 
-1. `MULTI_FLAG == true` (user specified `--multi`)
-2. `autopus.yaml` has `spec.review_gate.enabled == true`
+```
+┌─────────────────────────────────────────────┐
+│ MULTI_FLAG == true                          │
+│   OR autopus.yaml → review_gate.enabled?    │
+├──────────┬──────────────────────────────────┤
+│ TRUE     │ FALSE                            │
+│ ↓        │ ↓                                │
+│ Step 4   │ Step 5 [INTENDED SKIP: Step 4]   │
+└──────────┴──────────────────────────────────┘
+```
 
 **How to check:**
 - Run `cat autopus.yaml | grep -A2 "review_gate"` via Bash to check the enabled value
 - Or Read `autopus.yaml` directly
 
-**If neither condition is met** → skip to Step 5 (no review)
-
-#### Step 4: Run Multi-Provider Review
+#### [CONDITIONAL] Step 4: Run Multi-Provider Review
 
 Run the `auto spec review` CLI command via the Bash tool:
 
@@ -206,7 +212,18 @@ auto spec review {SPEC-ID} --strategy {STRATEGY}
   - Keep Status as `draft`
   - Proceed to Step 5
 
-#### Step 5: Completion Guidance
+#### [REQUIRED] Pre-Completion Verification
+
+Before displaying completion output, verify ALL steps were evaluated:
+
+- [ ] Step 1: Parse Flags — completed
+- [ ] Step 2: Spawn spec-writer Agent — completed, SPEC-ID extracted
+- [ ] Step 3: Review Gate Decision — evaluated (result: Step 4 or INTENDED SKIP)
+- [ ] Step 4: Multi-Provider Review — completed OR [INTENDED SKIP]
+
+IF any item is unchecked → return to that step. Do NOT display Completion Guidance.
+
+#### [REQUIRED] Step 5: Completion Guidance
 
 Display the workflow lifecycle bar:
 
@@ -322,6 +339,15 @@ Gate 3:  Coverage        → verify 85%+ coverage
 Phase 4: Review          → reviewer    (mode: plan)  — retry up to 2× on REQUEST_CHANGES
 ```
 
+### Retry Limits Reference
+
+| Gate / Phase | Max Retries | On Exceeded |
+|-------------|-------------|-------------|
+| Gate 1: Approval | skip if AUTO_MODE | N/A |
+| Gate 2: Validation | 3 | Abort, guide: `--continue` |
+| Gate 3: Coverage | re-spawn tester | Until 85%+ |
+| Phase 4: Review | 2 | Abort, request user intervention |
+
 **Step 2.1: Determine Quality Mode**
 
 Priority order:
@@ -338,7 +364,7 @@ Display after determination:
 품질 모드: {Ultra | Balanced} — {description}
 ```
 
-**Step 2.2: Phase 1 — Planning (MUST call Agent tool)**
+**[REQUIRED] Phase 1 — Planning (MUST call Agent tool)**
 
 ```
 Agent(
@@ -368,9 +394,11 @@ Display progress after completion:
   ○ Phase 4: Review
 ```
 
-**Gate 1: Approval** — If `AUTO_MODE = false`, show the planner's assignment table and ask user to approve before proceeding.
+> **⏭ POST-AGENT**: planner returned. NEXT REQUIRED STEP: Gate 1: Approval. Do NOT skip to Completion.
 
-**Step 2.3: Phase 2 — Implementation (MUST call Agent tool)**
+**[GATE] Gate 1: Approval** — If `AUTO_MODE = false`, show the planner's assignment table and ask user to approve before proceeding. If `AUTO_MODE = true` → [INTENDED SKIP: Gate 1]
+
+**[REQUIRED] Phase 2 — Implementation (MUST call Agent tool)**
 
 For each task in the planner's assignment table, spawn executor agents:
 
@@ -408,7 +436,9 @@ result_t1 = Agent(subagent_type = "executor", prompt = "Implement T1: ...")
 Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ...")
 ```
 
-**Step 2.3.1: Phase 2.1 — Worktree Merge (parallel tasks only)**
+> **⏭ POST-AGENT**: executor(s) returned. NEXT REQUIRED STEP: [REQUIRED] Phase 2.1: Worktree Merge. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 2.1 — Worktree Merge (parallel tasks only)**
 
 WHEN all parallel executors complete, merge their worktree branches into the working branch before Gate 2:
 
@@ -429,19 +459,31 @@ After merge, display:
   다음: 검증 단계로 진행
 ```
 
+**[CHECKPOINT] Phase 2.1 Complete** — All worktree branches merged. Proceed to Gate 2.
+
 **Merge conflict handling** (R4):
 - `git merge --abort` to restore clean state
 - Log: `[MERGE ERROR] T{id} merge failed: ownership validation gap detected. Files: {list}`
 - Abort pipeline even in `--auto` mode (never auto-resolve to prevent data loss)
 
+**Worktree merge failure recovery:**
+```
+✗ Worktree 머지 실패: {file list}
+  원인: 파일 소유권 검증 갭 (ownership validation gap)
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (수정 후 재개)
+  2. git worktree list              (워크트리 상태 확인)
+  3. git worktree remove --force    (수동 정리)
+```
+
 After each executor, display:
 ```
 🐙 executor ─────────────────────────
   파일: {N}개 수정 | 테스트: {N}개 추가 | 커버리지: {N}%
-  다음: 검증 단계로 진행
+  다음: Phase 2.1 Worktree Merge (병합 필수)
 ```
 
-**Step 2.4: Gate 2 — Validation (MUST call Agent tool)**
+**[GATE] Gate 2 — Validation (MUST call Agent tool)**
 
 ```
 Agent(
@@ -465,6 +507,14 @@ Agent(
 - **PASS** → proceed to Phase 3
 - **FAIL** → spawn the Recommended Agent to fix issues, then re-validate (up to 3 retries)
 
+**Validation failure recovery (Gate 2):**
+```
+✗ Validation 실패: {N}개 이슈 발견
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (중단점에서 재개)
+  2. /auto fix "{specific issue}"   (개별 이슈 수정)
+```
+
 After validation, display:
 ```
 🐙 validator ────────────────────────
@@ -472,7 +522,9 @@ After validation, display:
   다음: {pass → 테스트 단계 | fail → 수정 후 재검증}
 ```
 
-**Step 2.5: Phase 3 — Testing (MUST call Agent tool)**
+> **⏭ POST-AGENT**: validator returned. NEXT REQUIRED STEP: Phase 3: Testing. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 3 — Testing (MUST call Agent tool)**
 
 ```
 Agent(
@@ -494,9 +546,11 @@ After tester, display:
   다음: 리뷰 단계로 진행
 ```
 
-**Gate 3: Coverage** — verify 85%+ coverage from tester output. If below, re-spawn tester.
+> **⏭ POST-AGENT**: tester returned. NEXT REQUIRED STEP: Gate 3: Coverage Check. Do NOT skip to Completion.
 
-**Step 2.6: Phase 4 — Review (MUST call Agent tool)**
+**[GATE] Gate 3: Coverage** — verify 85%+ coverage from tester output. If below, re-spawn tester. For harness-only tasks → [INTENDED SKIP: Gate 3]
+
+**[REQUIRED] Phase 4 — Review (MUST call Agent tool)**
 
 ```
 Agent(
@@ -514,33 +568,7 @@ Agent(
 - **APPROVE** → pipeline complete
 - **REQUEST_CHANGES** → spawn executor to fix issues, then re-review (up to 2 retries)
 
-After reviewer, display:
-```
-🐙 reviewer ─────────────────────────
-  Verdict: {APPROVE|REQUEST_CHANGES} | Issues: {N}개 | 심각도: {low|medium|high}
-  다음: {verdict-based guidance}
-```
-
-**Parallel execution rules:**
-- Only parallelize tasks whose Mode is "parallel" in the planner's assignment table
-- File ownership conflict (same path pattern) → force sequential
-- Pass SPEC requirements, task description, and relevant file context to each subagent
-
-**Retry limits:**
-- Gate 2 (Validation): up to 3× → stop on exceeded, guide user to resume with `--continue`
-- Phase 4 (Review): up to 2× → stop on exceeded, request user intervention
-
-**Error Recovery:**
-
-Validation failure (Gate 2):
-```
-✗ Validation 실패: {N}개 이슈 발견
-  복구 옵션:
-  1. /auto go {SPEC-ID} --continue  (중단점에서 재개)
-  2. /auto fix "{specific issue}"   (개별 이슈 수정)
-```
-
-Review failure (retries exceeded):
+**Review failure recovery (retries exceeded):**
 ```
 ✗ Review 실패: {N}개 변경 요청 (재시도 초과)
   복구 옵션:
@@ -548,25 +576,44 @@ Review failure (retries exceeded):
   2. /auto review                   (변경사항 직접 검토)
 ```
 
-Subagent failure:
+After reviewer, display:
+```
+🐙 reviewer ─────────────────────────
+  Verdict: {APPROVE|REQUEST_CHANGES} | Issues: {N}개 | 심각도: {low|medium|high}
+  다음: {verdict-based guidance}
+```
+
+> **⏭ POST-AGENT**: reviewer returned. NEXT REQUIRED STEP: Gate 4: Review Result Handling. Do NOT skip to Completion.
+
+**[GATE] Gate 4: Review Result Handling**
+
+- **APPROVE** → pipeline complete, proceed to Pre-Completion Verification
+- **REQUEST_CHANGES** → spawn executor to fix issues, then re-review (max 2 retries, see **Retry Limits Reference**)
+
+**Review failure recovery (retries exceeded):**
+```
+✗ Review 실패: {N}개 변경 요청 (재시도 초과)
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (수정 후 재개)
+  2. /auto review                   (변경사항 직접 검토)
+```
+
+**Parallel execution rules:**
+- Only parallelize tasks whose Mode is "parallel" in the planner's assignment table
+- File ownership conflict (same path pattern) → force sequential
+- Pass SPEC requirements, task description, and relevant file context to each subagent
+
+**Retry limits:** See **Retry Limits Reference** table above.
+
+**Fallback:** If a subagent fails 2 consecutive times, handle in the main session directly.
+
+**Subagent failure recovery:**
 ```
 ✗ {agent-name} 실패: {error description}
   복구 옵션:
   1. /auto go {SPEC-ID} --continue  (파이프라인 재개)
   2. {manual fallback instruction}  (수동 처리)
 ```
-
-Worktree merge failure:
-```
-✗ Worktree 머지 실패: {file list}
-  원인: 파일 소유권 검증 갭 (ownership validation gap)
-  복구 옵션:
-  1. /auto go {SPEC-ID} --continue  (수정 후 재개)
-  2. git worktree list              (워크트리 상태 확인)
-  3. git worktree remove --force    (수동 정리)
-```
-
-**Fallback:** If a subagent fails 2 consecutive times, handle in the main session directly.
 
 ### Pipeline (--multi mode: multi-provider)
 
@@ -598,6 +645,21 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 If all tasks modify only `.md` files:
 - Skip Go build/test validation
 - Validator performs format-only checks (frontmatter validity, 300-line limit)
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying completion output, verify ALL phases were evaluated:
+
+- [ ] Phase 1: Planning — completed
+- [ ] Gate 1: Approval — completed OR skipped (AUTO_MODE)
+- [ ] Phase 2: Implementation — all tasks completed
+- [ ] Phase 2.1: Worktree Merge — completed (if parallel tasks existed) OR N/A
+- [ ] Gate 2: Validation — PASS
+- [ ] Phase 3: Testing — completed (or skipped for harness-only)
+- [ ] Gate 3: Coverage — 85%+ verified (or N/A for harness-only)
+- [ ] Phase 4: Review — APPROVE
+
+IF any item is unchecked → return to that phase/gate. Do NOT display Completion Guidance.
 
 ### Completion Guidance
 
