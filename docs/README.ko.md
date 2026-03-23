@@ -1,489 +1,421 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/version-v0.4.2-blue" alt="Version">
-  <img src="https://img.shields.io/badge/go-1.23-00ADD8?logo=go" alt="Go">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/platforms-5-orange" alt="Platforms">
-</p>
+<div align="center">
 
-<h1 align="center">🐙 Autopus-ADK</h1>
-<h3 align="center">Agentic Development Kit</h3>
+# 🐙 Autopus-ADK
 
-<p align="center">
-  AI 코딩 CLI 플랫폼에 Autopus 하네스를 설치합니다.<br>
-  하나의 설정으로 에이전트, 스킬, 훅, 워크플로우를 모든 플랫폼에서 일관되게.
-</p>
+### AI 개발을 위한 운영 체제
 
-<p align="center">
-  <a href="../README.md">🇺🇸 English</a>
-</p>
+**AI 에이전트가 자동완성만 하는 시대는 끝났습니다 — 기획하고, 토론하고, 구현하고, 테스트하고, 리뷰하고, 배포합니다.**
+
+[![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go&logoColor=white)](https://golang.org)
+[![Platforms](https://img.shields.io/badge/Platforms-5-orange)](#-하나의-설정-다섯-개-플랫폼)
+[![Agents](https://img.shields.io/badge/Agents-15-blueviolet)](#-15개-전문-에이전트)
+[![Skills](https://img.shields.io/badge/Skills-35-ff69b4)](#-전체-명령어)
+
+[빠른 시작](#-30초-설치) · [왜 Autopus인가](#-문제점) · [**핵심 워크플로우**](#-워크플로우-세-개의-명령으로-배포까지) · [주요 기능](#-autopus가-다른-이유) · [파이프라인](#-파이프라인) · [명령어](#-전체-명령어)
+
+[🇺🇸 English](../README.md)
+
+</div>
 
 ---
 
-## Autopus-ADK란?
+## 🎬 실제 동작
 
-Autopus-ADK는 AI 코딩 CLI 플랫폼에 **Autopus 하네스**를 설치하는 Go CLI 도구입니다. 하나의 설정으로 일관된 개발 환경을 제공합니다:
-
-- **11개 전문 에이전트** (planner, executor, tester, validator, reviewer 등)
-- **29개 스킬** (TDD, 디버깅, 보안 감사, 코드 리뷰 등)
-- **SPEC 기반 개발** — EARS 요구사항 문법
-- **Lore 의사결정 추적** — 9-trailer 커밋 프로토콜
-- **멀티 모델 오케스트레이션** (consensus, debate, pipeline, fastest)
-- **멀티 에이전트 파이프라인** (planner → executor → tester → validator → reviewer)
-- **아키텍처 분석** 및 규칙 강제
-- **5개 플랫폼 어댑터** — 하나의 `autopus.yaml` 설정으로 통합
-
-## 🚀 빠른 시작
-
-### 설치
+<p align="center"><img src="../demo/hero.gif" width="720" alt="Autopus-ADK 데모 — version, doctor, platform, status, skills" /></p>
 
 ```bash
-# 소스에서 빌드
-git clone https://github.com/insajin/autopus-adk.git
-cd autopus-adk
-make build
-make install
+# 원하는 것을 설명하세요.
+/auto plan "Google과 GitHub 프로바이더로 OAuth2 인증 추가"
 
-# 확인
-auto --version
-```
+# 15개 에이전트가 나머지를 처리합니다 — 기획, 테스트, 구현, 리뷰.
+/auto go SPEC-AUTH-001 --auto --loop
 
-### 프로젝트 초기화
-
-```bash
-# 플랫폼 감지 및 하네스 파일 생성
-auto init
-
-# 프로젝트 컨텍스트 문서 생성
-auto setup
-```
-
-생성되는 파일:
-- `autopus.yaml` — 프로젝트 설정
-- `ARCHITECTURE.md` — 아키텍처 맵
-- `.autopus/project/` — 제품, 구조, 기술 문서
-- 플랫폼별 파일 (예: `.claude/rules/`, `.claude/skills/`, `.claude/agents/`)
-
-### 첫 번째 워크플로우
-
-```bash
-# 1. 기획 — SPEC 작성
-auto spec new "사용자 인증 추가"
-
-# 2. SPEC 리뷰 (멀티 프로바이더)
-auto spec review SPEC-AUTH-001
-
-# 3. TDD로 구현 (AI 코딩 CLI 내부에서)
-/auto go SPEC-AUTH-001
-
-# 4. 문서 동기화
+# 문서, 변경 이력, SPEC 상태 — 한 명령으로 동기화.
 /auto sync SPEC-AUTH-001
 ```
 
-## 🏗 아키텍처
-
-### 전체 구조
-
-```mermaid
-graph TB
-    subgraph "진입점"
-        MAIN["cmd/auto/main.go"]
-    end
-
-    subgraph "명령 레이어"
-        CLI["internal/cli/<br>Cobra 명령어 16개"]
-    end
-
-    subgraph "비즈니스 로직"
-        ADAPTER["pkg/adapter/<br>플랫폼 어댑터 5개"]
-        CONFIG["pkg/config/<br>설정 관리"]
-        CONTENT["pkg/content/<br>콘텐츠 생성"]
-        SETUP["pkg/setup/<br>프로젝트 문서화"]
-        ARCH["pkg/arch/<br>아키텍처 분석"]
-        SPEC["pkg/spec/<br>SPEC 엔진"]
-        LORE["pkg/lore/<br>의사결정 추적"]
-        ORCH["pkg/orchestra/<br>멀티 모델"]
-        LSP["pkg/lsp/<br>LSP 연동"]
-        SEARCH["pkg/search/<br>지식 검색"]
-    end
-
-    subgraph "인프라"
-        TMPL["pkg/template/<br>템플릿 엔진"]
-        DETECT["pkg/detect/<br>플랫폼 감지"]
-        VER["pkg/version/<br>버전 정보"]
-    end
-
-    subgraph "정적 자산"
-        TEMPLATES["templates/<br>플랫폼별 템플릿"]
-        CONTENTDIR["content/<br>에이전트, 스킬, 훅"]
-    end
-
-    MAIN --> CLI
-    CLI --> ADAPTER
-    CLI --> CONFIG
-    CLI --> CONTENT
-    CLI --> SETUP
-    CLI --> ARCH
-    CLI --> SPEC
-    CLI --> LORE
-    CLI --> ORCH
-    CLI --> LSP
-    CLI --> SEARCH
-    ADAPTER --> TMPL
-    CONTENT --> TEMPLATES
-    CONTENT --> CONTENTDIR
-    SPEC --> TMPL
+```
+🐙 Pipeline ─────────────────────────────────────────────
+  ✓ Phase 1:   Planning         planner가 5개 태스크 분해
+  ✓ Phase 1.5: Test Scaffold    12개 실패 테스트 생성 (RED)
+  ✓ Phase 2:   Implementation   3개 executor가 병렬 워크트리에서 구현
+  ✓ Phase 2.5: Annotation       8개 파일에 @AX 태그 적용
+  ✓ Phase 3:   Testing          커버리지: 62% → 91%
+  ✓ Phase 4:   Review           TRUST 5: APPROVE | 보안: PASS
+  ───────────────────────────────────────────────────────
+  ✅ 5/5 태스크 │ 91% 커버리지 │ 보안 이슈 0건 │ 4분 32초
 ```
 
-### 플랫폼 어댑터 패턴
+> 💡 슬래시 명령 하나로. 테스트, 보안 감사, 문서, 의사결정 이력이 포함된 프로덕션 수준의 코드.
 
-```mermaid
-classDiagram
-    class PlatformAdapter {
-        <<인터페이스>>
-        +Name() string
-        +Detect(ctx) bool, error
-        +Generate(ctx, cfg) PlatformFiles, error
-        +Update(ctx, cfg) PlatformFiles, error
-        +Validate(ctx) ValidationError[], error
-        +SupportsHooks() bool
-    }
+---
 
-    class ClaudeAdapter {
-        rules, skills, agents
-        commands, CLAUDE.md
-    }
+## 😤 문제점
 
-    class CodexAdapter {
-        .codex/, AGENTS.md
-    }
+AI 코딩 도구를 사용하고 계시죠. 강력합니다. 하지만...
 
-    class GeminiAdapter {
-        .gemini/, GEMINI.md
-    }
+- 🔄 **플랫폼 종속** — Claude에서 Codex로 바꾸려면? 모든 규칙과 프롬프트를 처음부터 다시 작성.
+- 🎲 **희망 주도 개발** — "인증 추가해줘" → AI가 코드를 쓰고, 테스트를 건너뛰고, 보안을 무시하고, 문서를 잊음. *아마* 동작할 수도.
+- 🧠 **건망증** — 다음 세션에서 AI는 모든 결정을 잊음. "왜 이 패턴을 썼지?" → 침묵.
+- 👤 **솔로 에이전트** — 하나의 모델, 하나의 컨텍스트, 한 번의 기회. 다중 파일 리팩토링? 행운을 빕니다.
 
-    class OpenCodeAdapter {
-        .opencode/, agents.json
-    }
+---
 
-    class CursorAdapter {
-        .cursor/rules/
-    }
+## 🔥 Autopus가 다른 이유
 
-    PlatformAdapter <|.. ClaudeAdapter
-    PlatformAdapter <|.. CodexAdapter
-    PlatformAdapter <|.. GeminiAdapter
-    PlatformAdapter <|.. OpenCodeAdapter
-    PlatformAdapter <|.. CursorAdapter
-```
+### 🤖 챗봇이 아닌, 팀을 구성하는 AI 에이전트
 
-### 멀티 에이전트 파이프라인 (`--team` 모드)
-
-```mermaid
-sequenceDiagram
-    participant U as 사용자
-    participant M as 메인 세션
-    participant P as Planner (opus)
-    participant E as Executor×N (sonnet)
-    participant V as Validator (haiku)
-    participant T as Tester (sonnet)
-    participant R as Reviewer (sonnet)
-
-    U->>M: /auto go SPEC-ID --team
-    M->>P: Phase 1: 태스크 분해
-    P-->>M: 태스크 테이블 + 에이전트 할당
-
-    rect rgb(230, 245, 255)
-        Note over M,E: Phase 2: 병렬 구현
-        M->>E: T1: 기능 A 구현
-        M->>E: T2: 기능 B 구현
-        E-->>M: 결과
-    end
-
-    M->>V: Gate 2: 검증
-    alt 실패 (최대 3회 재시도)
-        V-->>M: FAIL + 추천 에이전트
-        M->>E: 이슈 수정
-        M->>V: 재검증
-    end
-    V-->>M: PASS
-
-    M->>T: Phase 3: 커버리지 ≥ 85%
-    T-->>M: 테스트 추가
-
-    M->>R: Phase 4: TRUST 5 리뷰
-    alt 수정 요청 (최대 2회)
-        R-->>M: REQUEST_CHANGES + 이슈
-        M->>E: 이슈 수정
-        M->>R: 재리뷰
-    end
-    R-->>M: APPROVE
-
-    M-->>U: 파이프라인 완료 ✅
-```
-
-### 멀티 모델 오케스트레이션 전략
-
-```mermaid
-graph LR
-    subgraph "전략"
-        CON["🤝 Consensus<br>키 기반 합의"]
-        DEB["⚔️ Debate<br>2단계 토론 + 판사"]
-        PIPE["🔗 Pipeline<br>순차 정제"]
-        FAST["⚡ Fastest<br>가장 빠른 응답"]
-    end
-
-    subgraph "프로바이더"
-        CL["Claude"]
-        CDX["Codex"]
-        GEM["Gemini"]
-    end
-
-    CL --> CON
-    CDX --> CON
-    GEM --> CON
-
-    CL --> DEB
-    CDX --> DEB
-    GEM --> DEB
-
-    CL --> PIPE
-    CDX --> PIPE
-
-    CL --> FAST
-    CDX --> FAST
-    GEM --> FAST
-
-    CON --> RES["병합된 결과"]
-    DEB --> RES
-    PIPE --> RES
-    FAST --> RES
-```
-
-### 레이어 구조
-
-```mermaid
-graph TB
-    subgraph L1["레이어 1: 진입점"]
-        EP["cmd/auto/main.go"]
-    end
-
-    subgraph L2["레이어 2: 명령 레이어"]
-        COBRA["internal/cli/ — Cobra 명령어 16개"]
-    end
-
-    subgraph L3["레이어 3: 비즈니스 로직"]
-        BL["adapter · config · content · setup<br>spec · lore · arch · orchestra<br>lsp · search"]
-    end
-
-    subgraph L4["레이어 4: 인프라"]
-        INF["template · detect · version"]
-    end
-
-    subgraph L5["레이어 5: 정적 자산"]
-        SA["templates/ · content/"]
-    end
-
-    L1 --> L2 --> L3 --> L4
-    L3 --> L5
-
-    style L1 fill:#e1f5fe
-    style L2 fill:#b3e5fc
-    style L3 fill:#81d4fa
-    style L4 fill:#4fc3f7
-    style L5 fill:#29b6f6
-```
-
-## 📖 사용자 가이드
-
-### CLI 명령어 목록
-
-| 명령어 | 설명 |
-|--------|------|
-| `auto init` | 하네스 초기화 — 플랫폼 감지, 파일 생성 |
-| `auto update` | 하네스 업데이트 (마커 기반 부분 업데이트, 사용자 편집 보존) |
-| `auto doctor` | 상태 진단 — 설치 무결성 검증 |
-| `auto platform` | 감지된 CLI 플랫폼 목록 |
-| `auto arch generate` | 코드베이스 분석, `ARCHITECTURE.md` 생성 |
-| `auto arch lint` | 아키텍처 규칙 검증 |
-| `auto spec new` | EARS 형식 SPEC 생성 |
-| `auto spec review` | 멀티 프로바이더 SPEC 리뷰 게이트 |
-| `auto lore query` | 의사결정 히스토리 조회 |
-| `auto orchestra review` | 멀티 모델 오케스트레이션 리뷰 |
-| `auto setup` | 프로젝트 컨텍스트 문서 생성/업데이트 |
-| `auto skill list` | 사용 가능한 스킬 목록 |
-| `auto search` | 지식 검색 (Context7/Exa) |
-| `auto lsp` | LSP 연동 명령 |
-
-### 슬래시 명령어 (AI 코딩 CLI 내부)
-
-코딩 CLI (예: Claude Code) 내부에서 사용하는 슬래시 명령어:
-
-| 명령어 | 설명 |
-|--------|------|
-| `/auto plan "설명"` | 새 기능 SPEC 작성 |
-| `/auto go SPEC-ID` | TDD 기반 SPEC 구현 |
-| `/auto go SPEC-ID --team` | 멀티 에이전트 파이프라인 구현 |
-| `/auto go SPEC-ID --team --auto` | 완전 자율 파이프라인 |
-| `/auto go SPEC-ID --multi` | 멀티 프로바이더 오케스트레이션 |
-| `/auto fix "버그 설명"` | 버그 디버깅 및 수정 |
-| `/auto review` | 코드 리뷰 (TRUST 5) |
-| `/auto secure` | 보안 감사 (OWASP Top 10) |
-| `/auto map` | 코드베이스 구조 분석 |
-| `/auto sync SPEC-ID` | 구현 후 문서 동기화 |
-| `/auto setup` | 프로젝트 컨텍스트 문서 생성/업데이트 |
-
-### SPEC 기반 개발 워크플로우
-
-권장 개발 워크플로우는 **plan → go → sync** 사이클입니다:
+Autopus는 하나의 AI 어시스턴트가 아닌 — 역할 정의, 품질 게이트, 재시도 로직을 갖춘 **15개 전문 에이전트 소프트웨어 엔지니어링 팀**을 제공합니다.
 
 ```
-┌─────────┐     ┌─────────┐     ┌─────────┐
-│  plan   │────▶│   go    │────▶│  sync   │
-│ (SPEC)  │     │ (TDD)   │     │ (문서)  │
-└─────────┘     └─────────┘     └─────────┘
-     │               │               │
-     ▼               ▼               ▼
-  spec.md       소스 코드      ARCHITECTURE.md
-  plan.md       *_test.go     업데이트된 문서
-  acceptance.md               CHANGELOG.md
-  research.md
+🧠 Planner        →  요구사항을 태스크로 분해
+⚡ Executor ×N    →  병렬 워크트리에서 코드 구현
+🧪 Tester         →  코드 작성 전에 테스트 먼저 (TDD 강제)
+✅ Validator       →  빌드, 린트, vet 검사
+🔍 Reviewer       →  TRUST 5 코드 리뷰
+🛡️ Security       →  OWASP Top 10 보안 감사
+📝 Annotator      →  @AX 태그로 코드 문서화
+🏗️ Architect      →  시스템 설계 결정
+... 외 7개
 ```
 
-**1단계: Plan (기획)**
+### ⚔️ AI 모델들이 서로 토론한다
+
+하나의 모델이 코드를 리뷰하는 게 아닙니다 — **여러 모델이 서로의 발견에 대해 논쟁합니다.**
+
 ```bash
-/auto plan "Google과 GitHub 프로바이더를 지원하는 OAuth2 인증 추가"
+auto orchestra review --strategy debate
 ```
-`.autopus/specs/SPEC-AUTH-001/`에 4개 파일 생성:
-- `spec.md` — EARS 형식 요구사항
-- `plan.md` — 태스크 분해 구현 계획
-- `acceptance.md` — 수락 기준
-- `research.md` — 기술 조사 메모
 
-**2단계: Go (구현)**
+Claude, Codex, Gemini가 독립적으로 코드를 리뷰한 후, 구조화된 2단계 토론에서 **서로의 발견에 반박합니다.** 판사가 최종 판정을 내립니다.
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Claude     │    │   Codex     │    │   Gemini    │
+│  🔍 리뷰     │    │  🔍 리뷰     │    │  🔍 리뷰     │
+└──────┬──────┘    └──────┬──────┘    └──────┬──────┘
+       │                  │                  │
+       └──────────┬───────┴──────────────────┘
+                  ▼
+         ⚔️  토론 단계
+         (반박 및 재반론)
+                  │
+                  ▼
+          🏛️  판사 판정
+```
+
+4가지 전략: **Consensus** · **Debate** · **Pipeline** · **Fastest**
+
+### 🔁 자가 치유 파이프라인 (RALF 루프)
+
+품질 게이트는 실패만 하지 않습니다 — **스스로 고치고 재시도합니다.**
+
 ```bash
-# 단일 세션 (기본)
-/auto go SPEC-AUTH-001
-
-# 멀티 에이전트 파이프라인
-/auto go SPEC-AUTH-001 --team
-
-# 완전 자율 모드 (RALF 루프: 품질 게이트 자동 재시도)
-/auto go SPEC-AUTH-001 --team --auto --loop
+/auto go SPEC-AUTH-001 --auto --loop
 ```
 
-**3단계: Sync (문서 동기화)**
-```bash
-/auto sync SPEC-AUTH-001
+```
+🐙 RALF [Gate 2] ──────────────────
+  Iteration: 1/5 │ Issues: 3
+  → golangci-lint 경고 수정을 위해 executor 스폰 중...
+
+🐙 RALF [Gate 2] ──────────────────
+  Iteration: 2/5 │ Issues: 3 → 0
+  Status: PASS ✅
 ```
 
-### Lore: 의사결정 추적
+**RALF = RED → GREEN → REFACTOR → LOOP** — TDD 원칙을 파이프라인 자체에 적용. 내장 서킷 브레이커가 무한 루프를 방지합니다.
 
-모든 커밋은 Lore 형식으로 **왜** 그런 결정을 했는지 기록합니다:
+### 🌳 격리된 워크트리에서 병렬 에이전트 실행
+
+여러 executor가 **동시에** 작업합니다 — 각각 자체 git 워크트리에서. 충돌 없음. 손상 없음.
+
+```
+Phase 2: Implementation
+  ├── ⚡ Executor 1 (worktree/T1) → pkg/auth/provider.go     ✓
+  ├── ⚡ Executor 2 (worktree/T2) → pkg/auth/handler.go      ✓
+  └── ⚡ Executor 3 (worktree/T3) → pkg/auth/middleware.go    ✓
+
+Phase 2.1: Merge (태스크 ID 순서)
+  ✓ T1 병합 → T2 병합 → T3 병합 → 작업 브랜치
+```
+
+파일 소유권으로 충돌 방지. GC 억제로 손상 방지. 최대 **5개 동시 워크트리.**
+
+### 📜 Lore: 코드베이스는 절대 잊지 않는다
+
+모든 커밋이 what이 아닌 **why**를 기록합니다. 영원히 조회 가능.
 
 ```
 feat(auth): OAuth2 프로바이더 추상화 추가
 
-특정 구현에 결합되지 않고 여러 OAuth2 프로바이더를
-지원하기 위한 프로바이더 인터페이스 구현.
-
-Why: Google과 GitHub을 우선 지원하되, 향후 프로바이더 확장이 필요
+Why: Google + GitHub 지원이 필요하고, 향후 프로바이더 확장 가능해야 함
 Decision: 직접 SDK 사용 대신 인터페이스 기반 추상화
-Alternatives: 직접 SDK 호출 (거부: 결합도 높음), 범용 HTTP 클라이언트 (거부: 타입 안전성 손실)
+Alternatives: 직접 SDK 호출 (거부: 결합도 높음)
 Ref: SPEC-AUTH-001
 
 🐙 Autopus <noreply@autopus.co>
 ```
 
-필수 트레일러: `Why`, `Decision`
-선택 트레일러: `Alternatives`, `Ref`, `Risk`, `Context`, `Scope`, `Blocked-By`, `Supersedes`
+9개 구조화된 트레일러. `auto lore query "왜 인터페이스?"`로 조회. 90일 지난 결정은 자동 감지.
 
-### 멀티 모델 오케스트레이션
-
-여러 AI 모델에서 태스크를 실행하고 결과를 병합합니다:
+### 🌐 하나의 설정, 다섯 개 플랫폼
 
 ```bash
-# Consensus — 모든 프로바이더가 응답, 합의 기반 병합
-auto orchestra review --strategy consensus
-
-# Debate — 프로바이더 간 토론, 판사가 결정
-auto orchestra review --strategy debate
-
-# Pipeline — 순차 정제
-auto orchestra review --strategy pipeline
-
-# Fastest — 가장 빠른 응답 사용
-auto orchestra review --strategy fastest
+auto init   # 설치된 모든 AI 코딩 CLI 자동 감지
 ```
 
-**전략 비교:**
+하나의 `autopus.yaml`이 감지된 모든 플랫폼에 **네이티브 설정**을 생성합니다.
+
+| 플랫폼 | 생성되는 파일 |
+|--------|-------------|
+| **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
+| **Codex** | `.codex/`, `AGENTS.md` |
+| **Gemini CLI** | `.gemini/`, `GEMINI.md` |
+| **Cursor** | `.cursor/rules/`, `.cursorrules` |
+| **OpenCode** | `.opencode/`, `agents.json` |
+
+동일한 15개 에이전트. 동일한 35개 스킬. 동일한 규칙. **어디서나.**
+
+---
+
+## 📦 30초 설치
+
+```bash
+git clone https://github.com/Insajin/autopus-adk.git
+cd autopus-adk && make build && make install
+auto --version
+```
+
+그런 다음, 아무 프로젝트에서:
+
+```bash
+auto init       # 플랫폼 감지, 하네스 생성
+auto setup      # 프로젝트 컨텍스트 문서 생성
+```
+
+---
+
+## 🤖 파이프라인
+
+### 7단계 멀티 에이전트 파이프라인
+
+모든 `/auto go`가 이 파이프라인을 실행합니다:
+
+```
+Phase 1    │ 🧠 Planner         │ SPEC → 태스크 분해 + 에이전트 할당
+Phase 1.5  │ 🧪 Tester          │ 실패하는 테스트 스캐폴드 (RED)
+Phase 2    │ ⚡ Executor ×N      │ TDD 구현 (병렬 워크트리)
+Phase 2.5  │ 📝 Annotator       │ @AX 태그 라이프사이클 관리
+Gate  2    │ ✅ Validator        │ 빌드 + 린트 + vet + 파일 크기
+Phase 3    │ 🧪 Tester          │ 커버리지 부스트 → 85%+
+Phase 4    │ 🔍 Reviewer + 🛡️    │ TRUST 5 리뷰 + OWASP 보안 감사
+```
+
+### 15개 전문 에이전트
+
+| 에이전트 | 역할 | 실행 시점 |
+|---------|------|----------|
+| **Planner** | SPEC 분해, 태스크 할당, 복잡도 평가 | Phase 1 |
+| **Spec Writer** | spec.md, plan.md, acceptance.md, research.md 생성 | `/auto plan` |
+| **Tester** | 테스트 스캐폴드 (RED) + 커버리지 부스트 (GREEN) | Phase 1.5, 3 |
+| **Executor** | 병렬 워크트리에서 TDD 구현 | Phase 2 |
+| **Annotator** | @AX 태그 라이프사이클 관리 | Phase 2.5 |
+| **Validator** | 빌드, vet, 린트, 파일 크기 검사 | Gate 2 |
+| **Reviewer** | TRUST 5 코드 리뷰 | Phase 4 |
+| **Security Auditor** | OWASP Top 10 취약점 스캔 | Phase 4 |
+| **Architect** | 시스템 설계, 아키텍처 결정 | 온디맨드 |
+| **Debugger** | 재현 우선 버그 수정 | `/auto fix` |
+| **DevOps** | CI/CD, Docker, 인프라 | 온디맨드 |
+| **Frontend Specialist** | Playwright E2E + VLM 시각적 회귀 감지 | Phase 3.5 |
+| **UX Validator** | 프론트엔드 컴포넌트 시각적 검증 | Phase 3.5 |
+| **Perf Engineer** | 벤치마크, pprof, 성능 회귀 감지 | 온디맨드 |
+| **Explorer** | 코드베이스 구조 분석 | `/auto map` |
+
+### 품질 모드
+
+```bash
+/auto go SPEC-ID --quality ultra      # 모든 에이전트를 Opus로 — 최고 품질
+/auto go SPEC-ID --quality balanced   # 적응형: 태스크 복잡도별 Opus/Sonnet/Haiku
+```
+
+| 모드 | Planner | Executor | Validator | 비용 |
+|------|---------|----------|-----------|------|
+| **Ultra** | Opus | Opus | Opus | $$$ |
+| **Balanced** | Opus | 적응형* | Haiku | $ |
+
+\* HIGH 복잡도 → Opus · MEDIUM → Sonnet · LOW → Haiku
+
+### 실행 모드
+
+| 플래그 | 모드 | 설명 |
+|--------|------|------|
+| *(기본)* | 서브에이전트 파이프라인 | 메인 세션이 Agent() 호출 오케스트레이션 |
+| `--team` | Agent Teams | Lead / Builder / Guardian 역할 기반 팀 |
+| `--solo` | 단일 세션 | 서브에이전트 없이 직접 TDD |
+| `--auto --loop` | 완전 자율 | RALF 자가 치유, 사용자 승인 없음 |
+| `--multi` | 멀티 프로바이더 | 여러 모델로 토론/합의 리뷰 |
+
+---
+
+## 📐 워크플로우: 세 개의 명령으로 배포까지
+
+Autopus의 모든 기능은 동일한 **plan → go → sync** 라이프사이클을 따릅니다. 예외 없음.
+
+```
+  ┌──────────┐       ┌──────────┐       ┌──────────┐
+  │  📋 plan │──────▶│  🚀 go   │──────▶│  📦 sync │
+  │  기획     │       │  구현     │       │  배포     │
+  └──────────┘       └──────────┘       └──────────┘
+```
+
+### 📋 1단계 · `/auto plan` — 원하는 것을 설명하세요
+
+자연어 설명을 완전한 **SPEC**으로 변환합니다 — 요구사항, 태스크, 수락 기준, 리스크 분석까지.
+
+```bash
+/auto plan "재시도와 데드 레터 큐를 갖춘 웹훅 전송 추가"
+```
+
+spec-writer 에이전트가 5개 문서를 생성합니다:
+
+```
+.autopus/specs/SPEC-HOOK-001/
+├── prd.md          # 제품 요구사항 문서
+├── spec.md         # EARS 형식 요구사항
+├── plan.md         # 태스크 분해 + 에이전트 할당
+├── acceptance.md   # Given-When-Then 수락 기준
+└── research.md     # 기술 조사 + 리스크
+```
+
+옵션: `--multi` 멀티 프로바이더 리뷰 · `--prd-mode minimal` 경량 PRD · `--skip-prd` PRD 건너뛰고 바로 SPEC
+
+### 🚀 2단계 · `/auto go` — 구현하기
+
+SPEC을 **15개 에이전트**에 전달합니다. 기획, 테스트 스캐폴드, 병렬 구현, 검증, 어노테이션, 테스트, 리뷰까지 — 모두 자동으로.
+
+```bash
+/auto go SPEC-HOOK-001 --auto --loop
+```
+
+```
+Phase 1    │ 🧠 Planner         │ SPEC → 태스크 + 에이전트 할당
+Phase 1.5  │ 🧪 Tester          │ 실패하는 테스트 스켈레톤 (RED)
+Phase 2    │ ⚡ Executor ×N      │ 병렬 워크트리에서 TDD
+Phase 2.5  │ 📝 Annotator       │ @AX 문서화 태그
+Gate  2    │ ✅ Validator        │ 빌드 + 린트 + vet
+Phase 3    │ 🧪 Tester          │ 커버리지 → 85%+
+Phase 4    │ 🔍 Reviewer + 🛡️    │ TRUST 5 + OWASP 감사
+```
+
+옵션: `--team` Agent Teams · `--solo` 단일 세션 TDD · `--quality ultra` 전체 Opus 실행 · `--multi` 멀티 모델 리뷰
+
+### 📦 3단계 · `/auto sync` — 배포하고 문서화하기
+
+SPEC 상태 업데이트, 프로젝트 문서 재생성, @AX 태그 라이프사이클 관리, 구조화된 Lore 이력으로 커밋.
+
+```bash
+/auto sync SPEC-HOOK-001
+```
+
+```
+╭────────────────────────────────────╮
+│ 🐙 파이프라인 완료!                 │
+│ SPEC-HOOK-001: 웹훅 전송           │
+│ 태스크: 5/5 │ 커버리지: 91%         │
+│ 리뷰: APPROVE                      │
+╰────────────────────────────────────╯
+```
+
+**끝입니다.** 세 개의 명령: 기획 → 구현 → 배포. 모든 결정이 기록됩니다. 모든 테스트가 강제됩니다.
+
+---
+
+## 🎯 TRUST 5 코드 리뷰
+
+모든 리뷰는 5개 차원으로 평가됩니다:
+
+| | 차원 | 검사 항목 |
+|---|------|----------|
+| **T** | Tested (테스트) | 85%+ 커버리지, 엣지 케이스, `go test -race` |
+| **R** | Readable (가독성) | 명확한 네이밍, 단일 책임, ≤ 300 LOC |
+| **U** | Unified (일관성) | gofmt, goimports, golangci-lint, 일관된 패턴 |
+| **S** | Secured (보안) | OWASP Top 10, 인젝션 없음, 하드코딩된 시크릿 없음 |
+| **T** | Trackable (추적성) | 의미 있는 로그, 에러 컨텍스트, SPEC/Lore 참조 |
+
+---
+
+## 📊 멀티 모델 오케스트레이션
 
 | 전략 | 작동 방식 | 적합한 용도 |
 |------|----------|------------|
-| Consensus | 모든 프로바이더가 독립 응답, 키 합의 기반 병합 | 코드 리뷰, 기획 |
-| Debate | 2단계 토론 + 반론 + 판사 판정 | 논쟁적 결정 |
-| Pipeline | N번째 프로바이더 출력이 N+1번째 입력 | 반복 정제 |
-| Fastest | 가장 먼저 완료된 응답 사용 | 빠른 질문 |
+| **🤝 Consensus** | 독립 응답을 키 합의로 병합 | 기획, 코드 리뷰 |
+| **⚔️ Debate** | 2단계 토론 + 판사 판정 | 중요 결정, 보안 |
+| **🔗 Pipeline** | N번째 출력 → N+1번째 입력 | 반복 정제 |
+| **⚡ Fastest** | 가장 먼저 완료된 응답 사용 | 빠른 질문 |
 
-### TDD 방법론
+프로바이더: **Claude** · **Codex** · **Gemini** — 그레이스풀 디그레이드 지원.
 
-Autopus는 테스트 주도 개발을 강제합니다:
+---
 
-1. **RED** — 실패하는 테스트를 먼저 작성
-2. **GREEN** — 테스트를 통과하는 최소 코드 작성
-3. **REFACTOR** — 테스트 통과 상태를 유지하며 코드 정리
+## 📖 전체 명령어
 
-```go
-// RED: 테스트 먼저 작성
-func TestCalculateDiscount_WithPremiumUser_Returns20Percent(t *testing.T) {
-    t.Parallel()
-    user := User{Tier: "premium"}
-    got := CalculateDiscount(user, 100.0)
-    assert.Equal(t, 80.0, got)
-}
-```
+<details>
+<summary><strong>CLI 명령어</strong> (루트 19개, 서브커맨드 포함 52개)</summary>
 
-### 코드 리뷰: TRUST 5
+| 명령어 | 설명 |
+|--------|------|
+| `auto init` | 하네스 초기화 — 플랫폼 감지, 파일 생성 |
+| `auto update` | 하네스 업데이트 (마커 기반, 사용자 편집 보존) |
+| `auto doctor` | 상태 진단 |
+| `auto platform` | 플랫폼 관리 (list / add / remove) |
+| `auto arch` | 아키텍처 분석 (generate / lint) |
+| `auto spec` | SPEC 관리 (new / validate / review) |
+| `auto lore` | 의사결정 추적 (context / commit / validate / stale) |
+| `auto orchestra` | 멀티 모델 오케스트레이션 (review / plan / secure) |
+| `auto setup` | 프로젝트 컨텍스트 문서 (generate / update / validate) |
+| `auto status` | SPEC 대시보드 (done / in-progress / draft) |
+| `auto telemetry` | 파이프라인 텔레메트리 (record / summary / cost / compare) |
+| `auto skill` | 스킬 관리 (list / info) |
+| `auto search` | 지식 검색 (Exa) |
+| `auto docs` | 라이브러리 문서 조회 (Context7) |
+| `auto lsp` | LSP 연동 (diagnostics / refs / rename / symbols) |
+| `auto verify` | 하네스 상태 및 규칙 검증 |
+| `auto check` | 하네스 규칙 검사 (안티패턴 스캔) |
+| `auto hash` | 파일 해싱 (xxhash) |
 
-5개 차원으로 리뷰를 평가합니다:
+</details>
 
-| 차원 | 검사 항목 |
-|------|----------|
-| **T**ested (테스트됨) | 85%+ 커버리지, 엣지 케이스, 레이스 컨디션 테스트 |
-| **R**eadable (가독성) | 명확한 네이밍, 단일 책임, 적절한 주석 |
-| **U**nified (일관성) | 일관된 스타일, gofmt/goimports, golangci-lint 클린 |
-| **S**ecured (보안) | 인젝션 방지, 입력 검증, 하드코딩된 시크릿 없음 |
-| **T**rackable (추적 가능) | 의미 있는 로그, 컨텍스트 포함 에러, SPEC 참조 |
+<details>
+<summary><strong>슬래시 명령어</strong> (AI 코딩 CLI 내부)</summary>
 
-### 파일 크기 제한
+| 명령어 | 설명 |
+|--------|------|
+| `/auto plan "설명"` | 새 기능의 SPEC 작성 |
+| `/auto go SPEC-ID` | 전체 파이프라인으로 구현 |
+| `/auto go SPEC-ID --auto --loop` | 완전 자율 + 자가 치유 |
+| `/auto go SPEC-ID --team` | Agent Teams (Lead/Builder/Guardian) |
+| `/auto go SPEC-ID --multi` | 멀티 프로바이더 오케스트레이션 |
+| `/auto fix "버그"` | 재현 우선 버그 수정 |
+| `/auto review` | TRUST 5 코드 리뷰 |
+| `/auto secure` | OWASP Top 10 보안 감사 |
+| `/auto map` | 코드베이스 구조 분석 |
+| `/auto sync SPEC-ID` | 구현 후 문서 동기화 |
+| `/auto dev "설명"` | 원샷: plan → go → sync |
+| `/auto setup` | 프로젝트 컨텍스트 문서 생성/업데이트 |
+| `/auto stale` | 오래된 결정 및 패턴 감지 |
+| `/auto why "질문"` | 의사결정 근거 조회 |
 
-하드 리밋: 소스 파일당 **300줄**. 200줄 이하 권장.
+</details>
 
-분할 전략:
-- 타입별: 구조체와 메서드를 별도 파일로
-- 관심사별: 관련 함수 그룹화
-- 레이어별: 핸들러, 서비스, 리포지토리 분리
-
-예외: 생성된 파일 (`*_generated.go`), 문서 (`*.md`), 설정 (`*.yaml`)
-
-## 🔌 지원 플랫폼
-
-| 플랫폼 | 바이너리 | 어댑터 | 상태 |
-|--------|---------|--------|------|
-| Claude Code | `claude` | `pkg/adapter/claude/` | ✅ 완전 지원 |
-| Codex | `codex` | `pkg/adapter/codex/` | ✅ 완전 지원 |
-| Gemini CLI | `gemini` | `pkg/adapter/gemini/` | ✅ 완전 지원 |
-| OpenCode | `opencode` | `pkg/adapter/opencode/` | ✅ 완전 지원 |
-| Cursor | `cursor` | `pkg/adapter/cursor/` | ✅ 완전 지원 |
-
-### 새 플랫폼 추가
-
-1. `pkg/adapter/<name>/<name>.go`에 `PlatformAdapter` 구현
-2. `templates/<name>/`에 템플릿 추가
-3. `pkg/adapter/registry.go`에 등록
+---
 
 ## ⚙️ 설정
 
-### `autopus.yaml`
+<details>
+<summary><strong><code>autopus.yaml</code></strong> — 모든 것을 위한 단일 설정</summary>
 
 ```yaml
 mode: full                    # full 또는 lite
@@ -491,101 +423,84 @@ project_name: my-project
 platforms:
   - claude-code
 
-# 아키텍처 분석
 architecture:
   auto_generate: true
   enforce: true
-  layers: [cmd, internal, pkg, domain, infrastructure]
 
-# 의사결정 추적
 lore:
   enabled: true
-  auto_inject: true
   required_trailers: [Why, Decision]
   stale_threshold_days: 90
 
-# SPEC 엔진
 spec:
-  id_format: "SPEC-{NAME}-{NUMBER}"
-  ears_types: [ubiquitous, event_driven, unwanted_behavior, state_driven, optional]
   review_gate:
     enabled: true
     strategy: debate
     providers: [claude, gemini]
     judge: claude
-    max_revisions: 2
 
-# TDD 방법론
 methodology:
   mode: tdd
   enforce: true
-  review_gate: true
 
-# 모델 라우팅
-router:
-  strategy: category
-  tiers:
-    fast: gemini-2.0-flash
-    smart: claude-sonnet-4
-    ultra: claude-opus-4
-
-# 멀티 모델 오케스트레이션
 orchestra:
   enabled: true
   default_strategy: consensus
-  timeout_seconds: 120
   providers:
     claude:
       binary: claude
-      args: ["-p"]
     codex:
       binary: codex
-      args: ["-q"]
     gemini:
       binary: gemini
-      prompt_via_args: true
-
-# 훅
-hooks:
-  pre_commit_arch: true
-  pre_commit_lore: true
-
-# 세션 연속성
-session:
-  handoff_enabled: true
-  continue_file: .auto-continue.md
-  max_context_tokens: 2000
 ```
 
-### 모드
-
-| 모드 | 기능 |
-|------|------|
-| **Full** | 전체 기능: 에이전트, 스킬, 훅, SPEC, Lore, 오케스트라, TDD |
-| **Lite** | 최소 구성: 기본 스킬 + 규칙만 |
-
-## 🛠 개발
-
-### 빌드
-
-```bash
-make build      # bin/auto로 바이너리 빌드
-make test       # 레이스 디텍션 테스트
-make lint       # go vet 실행
-make coverage   # 커버리지 리포트 생성
-make install    # $GOPATH/bin에 설치
-```
-
-### 아키텍처 규칙
-
-- `internal/cli`는 `pkg/*`에만 의존 (역방향 금지)
-- `pkg/*` 패키지 간 상호 의존 없음 (`pkg/template` 유틸리티 제외)
-- `cmd/`는 진입점만 포함, 비즈니스 로직 없음
-- 플랫폼별 코드는 `pkg/adapter/{platform}/`에만 존재
-- 소스 파일 300줄 초과 금지
+</details>
 
 ---
 
-<p align="center">
-  <b>🐙 Autopus</b> — 하나의 하네스, 모든 플랫폼.
-</p>
+## 🏗️ 아키텍처
+
+```
+autopus-adk/
+├── cmd/auto/           # 진입점
+├── internal/cli/       # Cobra 명령어 19개 (서브커맨드 포함 52개)
+├── pkg/
+│   ├── adapter/        # 플랫폼 어댑터 5개 (Claude, Codex, Gemini, Cursor, OpenCode)
+│   ├── orchestra/      # 멀티 모델 오케스트레이션 (전략 4개)
+│   ├── spec/           # SPEC 엔진 (EARS 형식)
+│   ├── lore/           # 의사결정 추적 (9-trailer 프로토콜)
+│   ├── content/        # 에이전트/스킬/훅 생성 + 스킬 활성화
+│   ├── arch/           # 아키텍처 분석 + 규칙 강제
+│   ├── sigmap/         # go/ast API 시그니처 추출
+│   ├── constraint/     # 안티패턴 스캔
+│   ├── telemetry/      # 파이프라인 텔레메트리 + 비용 추정
+│   ├── cost/           # 토큰 기반 비용 추정
+│   ├── setup/          # 프로젝트 문서 생성
+│   ├── lsp/            # LSP 연동
+│   ├── search/         # 지식 검색 (Context7/Exa)
+│   └── ...             # template, detect, config, version
+├── templates/          # 플랫폼별 템플릿
+├── content/            # 임베디드 콘텐츠 (15개 에이전트, 36개 스킬)
+└── configs/            # 기본 설정
+```
+
+---
+
+## 🤝 기여하기
+
+Autopus-ADK는 MIT 라이선스의 오픈 소스입니다. PR 환영합니다!
+
+```bash
+make test       # 레이스 디텍션 테스트 실행
+make lint       # go vet 실행
+make coverage   # 커버리지 리포트 생성
+```
+
+---
+
+<div align="center">
+
+**🐙 Autopus** — AI 에이전트는 챗봇이 아닌, 팀이 되어야 합니다.
+
+</div>
