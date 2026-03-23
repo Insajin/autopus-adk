@@ -22,6 +22,8 @@ import (
 
 func newDoctorCmd() *cobra.Command {
 	var dir string
+	var fix bool
+	var yes bool
 
 	cmd := &cobra.Command{
 		Use:   "doctor",
@@ -107,6 +109,16 @@ func newDoctorCmd() *cobra.Command {
 				}
 			}
 
+			// Run auto-install if --fix flag is set
+			if fix {
+				missingDeps := filterMissing(statuses)
+				if len(missingDeps) > 0 {
+					if err := runDoctorFix(cmd.OutOrStdout(), missingDeps, yes); err != nil {
+						tui.FAIL(out, fmt.Sprintf("Auto-install failed: %v", err))
+					}
+				}
+			}
+
 			// 4. 부모 디렉터리 규칙 충돌 검사
 			conflicts := detect.CheckParentRuleConflicts(dir)
 			if len(conflicts) > 0 {
@@ -136,7 +148,49 @@ func newDoctorCmd() *cobra.Command {
 				}
 			}
 
-			// 6. Hooks & Permissions validation
+			// @AX:WARN [AUTO]: Quality Gate section has 8+ conditional branches — cyclomatic complexity risk
+			// @AX:REASON: Accumulated from preset check + review gate check + provider loop; refactor to helpers if complexity grows
+			// 6. Quality Gate diagnostics
+			tui.SectionHeader(out, "Quality Gate")
+
+			// Check quality preset
+			if cfg.Quality.Default != "" {
+				if _, ok := cfg.Quality.Presets[cfg.Quality.Default]; ok {
+					tui.OK(out, fmt.Sprintf("quality preset: %s", cfg.Quality.Default))
+				} else {
+					tui.FAIL(out, fmt.Sprintf("quality preset %q not found in presets", cfg.Quality.Default))
+					allOK = false
+				}
+			} else {
+				tui.SKIP(out, "quality preset: not configured")
+			}
+
+			// Check review gate
+			if cfg.Spec.ReviewGate.Enabled {
+				tui.OK(out, "review gate: enabled")
+
+				// Check each configured provider
+				installedCount := 0
+				for _, provName := range cfg.Spec.ReviewGate.Providers {
+					if detect.IsInstalled(provName) {
+						tui.OK(out, fmt.Sprintf("  provider: %s", provName))
+						installedCount++
+					} else {
+						tui.FAIL(out, fmt.Sprintf("  provider: %s not installed", provName))
+						allOK = false
+					}
+				}
+				if installedCount < 2 {
+					tui.SKIP(out, "review gate: fewer than 2 providers available")
+				}
+			} else {
+				tui.SKIP(out, "review gate: disabled")
+			}
+
+			// Show methodology
+			tui.OK(out, fmt.Sprintf("methodology: %s (enforce: %v)", cfg.Methodology.Mode, cfg.Methodology.Enforce))
+
+			// 7. Hooks & Permissions validation
 			tui.SectionHeader(out, "Hooks & Permissions")
 			settingsPath := filepath.Join(dir, ".claude", "settings.json")
 			if settingsData, err := os.ReadFile(settingsPath); err == nil {
@@ -186,5 +240,7 @@ func newDoctorCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&dir, "dir", "", "프로젝트 루트 디렉터리 (기본값: 현재 디렉터리)")
+	cmd.Flags().BoolVar(&fix, "fix", false, "Auto-install missing dependencies")
+	cmd.Flags().BoolVar(&yes, "yes", false, "Skip interactive prompts (use with --fix)")
 	return cmd
 }

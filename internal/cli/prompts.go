@@ -98,6 +98,7 @@ func warnParentRuleConflicts(cmd *cobra.Command, dir string, cfg *config.Harness
 	}
 }
 
+// @AX:NOTE [AUTO]: langCodes and langLabels are parallel slices — indices must stay in sync
 var langCodes = []string{"en", "ko", "ja", "zh"}
 var langLabels = []string{
 	"English",
@@ -142,4 +143,74 @@ func promptLanguageSettings(cmd *cobra.Command, dir string, cfg *config.HarnessC
 
 	fmt.Fprintf(out, "\n  Language configured: comments=%s, commits=%s, ai=%s\n",
 		cfg.Language.Comments, cfg.Language.Commits, cfg.Language.AIResponses)
+}
+
+// promptQualityMode asks the user to select a quality mode preset.
+// Skips if --quality flag is set or --yes mode.
+func promptQualityMode(cmd *cobra.Command, dir string, cfg *config.HarnessConfig) {
+	out := cmd.OutOrStdout()
+	fmt.Fprintln(out, "\n  Quality Mode:")
+	options := []string{
+		"Ultra — all agents use Opus (highest quality, higher cost)",
+		"Balanced — Opus for analysis, Sonnet for implementation, Haiku for validation (recommended)",
+	}
+	idx := promptChoice(out, "Select quality mode:", options, 1) // default: balanced
+	modes := []string{"ultra", "balanced"}
+	cfg.Quality.Default = modes[idx]
+	if err := config.Save(dir, cfg); err != nil {
+		fmt.Fprintf(out, "  [ERROR] autopus.yaml save failed: %v\n", err)
+	}
+}
+
+// promptReviewGate configures the review gate based on detected orchestra providers.
+func promptReviewGate(cmd *cobra.Command, dir string, cfg *config.HarnessConfig, providers []detect.OrchestraProvider) {
+	out := cmd.OutOrStdout()
+	fmt.Fprintln(out, "\n  Review Gate:")
+
+	// Show detected providers.
+	var installed []string
+	for _, p := range providers {
+		status := "not found"
+		if p.Installed {
+			status = "installed"
+			installed = append(installed, p.Name)
+		}
+		fmt.Fprintf(out, "    %s: %s\n", p.Name, status)
+	}
+
+	// @AX:NOTE [AUTO]: Threshold 2 — review gate requires at least 2 providers for cross-validation
+	if len(installed) < 2 {
+		cfg.Spec.ReviewGate.Enabled = false
+		cfg.Spec.ReviewGate.Providers = installed
+		fmt.Fprintln(out, "  Review gate disabled: fewer than 2 providers detected.")
+	} else {
+		cfg.Spec.ReviewGate.Enabled = true
+		cfg.Spec.ReviewGate.Providers = installed
+		fmt.Fprintf(out, "  Review gate enabled with %d providers.\n", len(installed))
+	}
+
+	if err := config.Save(dir, cfg); err != nil {
+		fmt.Fprintf(out, "  [ERROR] autopus.yaml save failed: %v\n", err)
+	}
+}
+
+// promptMethodology asks the user to select a methodology mode.
+func promptMethodology(cmd *cobra.Command, dir string, cfg *config.HarnessConfig) {
+	out := cmd.OutOrStdout()
+	fmt.Fprintln(out, "\n  Methodology:")
+	options := []string{
+		"TDD — Test-Driven Development (recommended)",
+		"None — no methodology enforcement",
+	}
+	idx := promptChoice(out, "Select methodology:", options, 0)
+	if idx == 0 {
+		cfg.Methodology.Mode = "tdd"
+		cfg.Methodology.Enforce = true
+	} else {
+		cfg.Methodology.Mode = "none"
+		cfg.Methodology.Enforce = false
+	}
+	if err := config.Save(dir, cfg); err != nil {
+		fmt.Fprintf(out, "  [ERROR] autopus.yaml save failed: %v\n", err)
+	}
 }

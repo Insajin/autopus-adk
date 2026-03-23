@@ -117,3 +117,36 @@ func TestHashFile_LineNumbering(t *testing.T) {
 		assert.Equal(t, i+1, l.LineNumber)
 	}
 }
+
+func TestFormatHashLine(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		line search.HashLine
+		want string
+	}{
+		{
+			name: "basic format",
+			line: search.HashLine{LineNumber: 1, Hash: "abc123"},
+			want: "1#abc123",
+		},
+		{
+			name: "large line number",
+			line: search.HashLine{LineNumber: 9999, Hash: "def456"},
+			want: "9999#def456",
+		},
+		{
+			name: "empty hash",
+			line: search.HashLine{LineNumber: 5, Hash: ""},
+			want: "5#",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, search.FormatHashLine(tc.line))
+		})
+	}
+}

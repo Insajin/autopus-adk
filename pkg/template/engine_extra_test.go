@@ -193,6 +193,33 @@ func TestRenderString_IndentEmpty(t *testing.T) {
 	assert.Contains(t, result, "    line3")
 }
 
+// TestRenderString_LangName tests the langName funcmap function.
+func TestRenderString_LangName(t *testing.T) {
+	t.Parallel()
+
+	e := New()
+	tests := []struct {
+		name string
+		code string
+		want string
+	}{
+		{"english", "en", "English"},
+		{"korean", "ko", "Korean"},
+		{"japanese", "ja", "Japanese"},
+		{"chinese", "zh", "Chinese"},
+		{"unknown code", "fr", "fr"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result, err := e.RenderString(`{{langName .Code}}`, map[string]string{"Code": tt.code})
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result)
+		})
+	}
+}
+
 // TestRenderFile_EmptyTemplate은 빈 파일 템플릿을 테스트한다.
 func TestRenderFile_EmptyTemplate(t *testing.T) {
 	t.Parallel()

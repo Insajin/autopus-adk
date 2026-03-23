@@ -43,6 +43,8 @@ func DetectPlatforms() []Platform {
 	return platforms
 }
 
+// @AX:ANCHOR [AUTO]: Do not rename or change the signature of IsInstalled
+// @AX:REASON: Called by 6+ consumers — doctor, doctor_fix, spec_review, verify, orchestra, detect internals
 // IsInstalled는 특정 바이너리의 설치 여부를 확인한다.
 func IsInstalled(binary string) bool {
 	_, err := exec.LookPath(binary)
@@ -62,20 +64,70 @@ func detectBinary(binary, versionArg string) (string, bool) {
 	return strings.TrimSpace(string(out)), true
 }
 
+// OrchestraProvider represents an orchestra provider and its install status.
+type OrchestraProvider struct {
+	Name      string // claude, codex, gemini
+	Binary    string // binary name to look up
+	Installed bool   // whether the binary is in PATH
+}
+
+// @AX:NOTE [AUTO]: Fixed set of 3 orchestra providers — expand here when adding a new provider binary
+// knownOrchestraProviders lists the known orchestra provider binaries.
+var knownOrchestraProviders = []struct {
+	name   string
+	binary string
+}{
+	{"claude", "claude"},
+	{"codex", "codex"},
+	{"gemini", "gemini"},
+}
+
+// DetectOrchestraProviders checks which orchestra provider binaries are installed.
+func DetectOrchestraProviders() []OrchestraProvider {
+	var providers []OrchestraProvider
+	for _, p := range knownOrchestraProviders {
+		providers = append(providers, OrchestraProvider{
+			Name:      p.name,
+			Binary:    p.binary,
+			Installed: IsInstalled(p.binary),
+		})
+	}
+	return providers
+}
+
+// InstalledOrchestraProviders returns only the installed orchestra providers.
+func InstalledOrchestraProviders() []string {
+	var names []string
+	for _, p := range DetectOrchestraProviders() {
+		if p.Installed {
+			names = append(names, p.Name)
+		}
+	}
+	return names
+}
+
 // Dependency는 외부 도구 의존성이다.
 type Dependency struct {
-	Name        string
-	Binary      string
-	InstallCmd  string
-	Required    bool // true이면 필수, false이면 권장
-	Description string
+	Name           string
+	Binary         string
+	InstallCmd     string
+	Required       bool   // true이면 필수, false이면 권장
+	Description    string
+	DependsOn      string // dependency name that must be installed first
+	PostInstallCmd string // command to run after install (e.g., browser download)
+}
+
+// IsNpmBased reports whether this dependency is installed via npm.
+// @AX:NOTE [AUTO] public method with single call site; add test coverage for non-npm prefix cases
+func (d Dependency) IsNpmBased() bool {
+	return strings.HasPrefix(d.InstallCmd, "npm ")
 }
 
 // FullModeDeps는 Full 모드의 의존성 목록이다.
 var FullModeDeps = []Dependency{
 	{Name: "ast-grep", Binary: "sg", InstallCmd: "npm i -g @ast-grep/cli", Required: true, Description: "Structural code search"},
 	{Name: "node", Binary: "node", InstallCmd: "https://nodejs.org", Required: false, Description: "Node.js runtime (required for Playwright)"},
-	{Name: "playwright", Binary: "playwright", InstallCmd: "npm i -g playwright", Required: false, Description: "E2E testing + screenshots"},
+	{Name: "playwright", Binary: "playwright", InstallCmd: "npm i -g playwright", Required: false, Description: "E2E testing + screenshots", DependsOn: "node", PostInstallCmd: "npx playwright install chromium"},
 	{Name: "agent-browser", Binary: "agent-browser", InstallCmd: "npm i -g agent-browser", Required: true, Description: "Web browsing"},
 	{Name: "gh", Binary: "gh", InstallCmd: "", Required: false, Description: "GitHub CLI"},
 }

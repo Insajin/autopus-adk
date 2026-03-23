@@ -1,0 +1,36 @@
+Autopus-ADK는 코딩 CLI에 하네스를 설치하는 Go 기반 셋업 도구입니다.
+
+Usage:
+  auto [command]
+
+Available Commands:
+  arch        Architecture analysis and enforcement
+  check       Run harness rule checks
+  completion  Generate the autocompletion script for the specified shell
+  docs        Lookup library documentation via Context7
+  doctor      Check autopus harness health
+  experiment  Run and manage experiment loops
+  hash        Hash each line of a file using xxhash
+  help        Help about any command
+  init        Initialize autopus harness in the current project
+  issue       Manage auto issue reports
+  lore        Decision knowledge management via git trailers
+  lsp         LSP-based code intelligence
+  orchestra   다중 모델 오케스트레이션으로 코드를 분석한다
+  platform    Manage platforms
+  search      Search the web using Exa API (requires EXA_API_KEY)
+  setup       Generate and manage project documentation for AI agents
+  skill       Autopus 빌트인 스킬 관리
+  spec        SPEC document management
+  status      Show SPEC dashboard
+  telemetry   Manage pipeline telemetry
+  update      Update autopus harness files
+  verify      Run frontend UX verification via Playwright screenshots
+  version     Print version information
+
+Flags:
+      --config string   Config file path (default: ./autopus.yaml)
+  -h, --help            help for auto
+  -v, --verbose         Enable verbose output
+
+Use "auto [command] --help" for more information about a command.

@@ -22,7 +22,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 | Search | `pkg/search` | Context7 MCP, Exa API, hash-based knowledge search |
 | Orchestra | `pkg/orchestra` | Multi-model orchestration (consensus, pipeline, debate, fastest) with judge-based debate, structured consensus, graceful degradation |
 | Template | `pkg/template` | Go text/template wrapper with custom functions |
-| Detect | `pkg/detect` | Platform binary detection |
+| Detect | `pkg/detect` | Platform binary detection, orchestra provider detection |
 | Version | `pkg/version` | Build metadata (ldflags injection) |
 | SigMap | `pkg/sigmap` | AST-based exported API signature extraction and rendering |
 | Constraint | `pkg/constraint` | Anti-pattern registry and violation scanning |

@@ -34,9 +34,12 @@ autopus-adk/
 │   ├── issue.go                #   auto issue: 이슈 리포터
 │   ├── experiment.go           #   auto experiment: 자율 반복 실험
 │   ├── experiment_helpers.go   #   experiment CLI 헬퍼 함수
-│   ├── prompts.go               #   대화형 프롬프트
+│   ├── prompts.go               #   대화형 프롬프트 (quality mode, review gate, methodology)
+│   ├── init_helpers.go          #   Init 헬퍼 함수 (gitignore, summary 생성)
+│   ├── doctor_fix.go            #   Doctor 자동 수정 (의존성 설치)
 │   ├── tui/                     #   Terminal UI 컴포넌트
-│   └── *_test.go                #   CLI 테스트 (11+ 파일)
+│   │   └── wizard.go            #     SummaryTable, WizardHeader 위젯
+│   └── *_test.go                #   CLI 테스트 (14+ 파일)
 ├── pkg/                         # Core packages
 │   ├── adapter/                 #   플랫폼 추상화 레이어
 │   │   ├── adapter.go           #     PlatformAdapter 인터페이스
@@ -189,8 +192,8 @@ autopus-adk/
 
 | Category | Count |
 |----------|-------|
-| Go source files | ~113 |
-| Test files | ~108 |
+| Go source files | ~116 |
+| Test files | ~114 |
 | Template files | ~22 |
 | Content files | ~64 |
 | CLI commands | 22 |

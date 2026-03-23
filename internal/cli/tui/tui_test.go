@@ -141,3 +141,67 @@ func TestDivider_WritesLine(t *testing.T) {
 	tui.Divider(&buf)
 	assert.Contains(t, buf.String(), "─")
 }
+
+func TestSKIP_WritesLabel(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	tui.SKIP(&buf, "optional check skipped")
+	out := buf.String()
+	assert.Contains(t, out, "WARN")
+	assert.Contains(t, out, "optional check skipped")
+}
+
+func TestSuccessf_FormatsMessage(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	tui.Successf(&buf, "item %d done", 3)
+	assert.Contains(t, buf.String(), "item 3 done")
+}
+
+func TestErrorf_FormatsMessage(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	tui.Errorf(&buf, "step %s failed", "build")
+	assert.Contains(t, buf.String(), "step build failed")
+}
+
+func TestWarnf_FormatsMessage(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	tui.Warnf(&buf, "retry %d", 2)
+	assert.Contains(t, buf.String(), "retry 2")
+}
+
+func TestInfof_FormatsMessage(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	tui.Infof(&buf, "version %s", "1.2.3")
+	assert.Contains(t, buf.String(), "version 1.2.3")
+}
+
+func TestInfoBox_ContainsTitleAndContent(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	tui.InfoBox(&buf, "Info", "details here")
+	out := buf.String()
+	assert.Contains(t, out, "Info")
+	assert.Contains(t, out, "details here")
+	assert.Contains(t, out, "╭")
+}
+
+func TestErrorBox_ContainsTitleAndContent(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	tui.ErrorBox(&buf, "Error", "something went wrong")
+	out := buf.String()
+	assert.Contains(t, out, "Error")
+	assert.Contains(t, out, "something went wrong")
+	assert.Contains(t, out, "╭")
+}
+
+func TestOctopus_WritesEmoji(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
+	tui.Octopus(&buf)
+	assert.Contains(t, buf.String(), "🐙")
+}

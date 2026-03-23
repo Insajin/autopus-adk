@@ -1,3 +1,5 @@
+//go:build integration
+
 // Package cli는 auto init E2E 통합 테스트이다.
 package cli_test
 

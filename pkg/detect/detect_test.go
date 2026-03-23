@@ -192,6 +192,72 @@ func TestDetectPlatforms_PlatformFields(t *testing.T) {
 	}
 }
 
+// TestDetectOrchestraProviders_ReturnsAllThree verifies that exactly 3 providers are returned.
+func TestDetectOrchestraProviders_ReturnsAllThree(t *testing.T) {
+	t.Parallel()
+
+	providers := DetectOrchestraProviders()
+	assert.Len(t, providers, 3, "DetectOrchestraProviders must return exactly 3 providers")
+
+	names := make(map[string]bool)
+	for _, p := range providers {
+		names[p.Name] = true
+		assert.NotEmpty(t, p.Name, "OrchestraProvider.Name must not be empty")
+		assert.NotEmpty(t, p.Binary, "OrchestraProvider.Binary must not be empty")
+	}
+	assert.True(t, names["claude"], "claude provider must be present")
+	assert.True(t, names["codex"], "codex provider must be present")
+	assert.True(t, names["gemini"], "gemini provider must be present")
+}
+
+// TestInstalledOrchestraProviders_FiltersCorrectly verifies that only installed providers are returned.
+func TestInstalledOrchestraProviders_FiltersCorrectly(t *testing.T) {
+	t.Parallel()
+
+	// InstalledOrchestraProviders must return a subset of DetectOrchestraProviders.
+	all := DetectOrchestraProviders()
+	installed := InstalledOrchestraProviders()
+
+	// All names in installed must appear in all with Installed=true.
+	allMap := make(map[string]bool)
+	for _, p := range all {
+		if p.Installed {
+			allMap[p.Name] = true
+		}
+	}
+	for _, name := range installed {
+		assert.True(t, allMap[name], "installed provider %q must be marked Installed in DetectOrchestraProviders", name)
+	}
+	// Count must match.
+	assert.Len(t, installed, len(allMap), "InstalledOrchestraProviders length must match installed count from DetectOrchestraProviders")
+}
+
+// TestIsNpmBased verifies IsNpmBased identifies npm-prefixed install commands.
+func TestIsNpmBased(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		installCmd string
+		want       bool
+	}{
+		{"npm install command", "npm i -g @ast-grep/cli", true},
+		{"npm global install", "npm install -g playwright", true},
+		{"brew install", "brew install gh", false},
+		{"empty command", "", false},
+		{"npx command (not npm)", "npx playwright install chromium", false},
+		{"https url", "https://nodejs.org", false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dep := Dependency{Name: "test", InstallCmd: tc.installCmd}
+			assert.Equal(t, tc.want, dep.IsNpmBased())
+		})
+	}
+}
+
 // TestDependencyStatus_Fields verifies DependencyStatus embeds Dependency correctly.
 func TestDependencyStatus_Fields(t *testing.T) {
 	t.Parallel()

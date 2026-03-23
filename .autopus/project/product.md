@@ -18,10 +18,10 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 
 | Feature | CLI Command | Description |
 |---------|-------------|-------------|
-| Harness Init | `auto init` | 플랫폼 감지 후 하네스 파일 생성 |
+| Harness Init | `auto init` | 플랫폼 감지 후 하네스 파일 생성 (Quality Gate wizard, orchestra provider 자동 감지) |
 | Harness Update | `auto update` | Marker 기반 부분 업데이트 (사용자 편집 보존) |
 | Hooks/Permissions | `auto init` | Hooks/permissions 자동 설치 (프로젝트 타입 감지, autopus.yaml 오버라이드) |
-| Health Check | `auto doctor` | 설치 상태 검증 및 진단 |
+| Health Check | `auto doctor` | 설치 상태 검증 및 진단 (Quality Gate 섹션 포함) |
 | Platform Detect | `auto platform` | 설치된 CLI 플랫폼 목록 |
 | Architecture | `auto arch` | 코드 구조 분석 및 ARCHITECTURE.md 생성 |
 | PRD Generation | `/auto plan` | PRD(Product Requirements Document) 자동 생성 (Standard 10섹션 / Minimal 5섹션) |
