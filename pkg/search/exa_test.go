@@ -82,8 +82,7 @@ func TestExaSearch_EmptyResults(t *testing.T) {
 }
 
 func TestExaClient_ReadsFromEnv(t *testing.T) {
-	t.Parallel()
-
+	// t.Setenv is incompatible with t.Parallel — env mutation is process-global.
 	t.Setenv("EXA_API_KEY", "env-api-key")
 
 	client := search.NewExaClientFromEnv()
