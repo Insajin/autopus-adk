@@ -13,7 +13,11 @@
 [![Agents](https://img.shields.io/badge/Agents-15-blueviolet)](#-15-specialized-agents)
 [![Skills](https://img.shields.io/badge/Skills-35-ff69b4)](#-all-commands)
 
-[Quick Start](#-30-second-install) · [Why Autopus](#-the-problem) · [**Core Workflow**](#-the-workflow-three-commands-to-ship) · [Features](#-what-makes-autopus-different) · [Pipeline](#-the-pipeline) · [Docs](#-all-commands)
+```bash
+curl -sSfL https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.sh | sh
+```
+
+[Why Autopus](#-the-problem) · [**Core Workflow**](#-the-workflow-three-commands-to-ship) · [Features](#-what-makes-autopus-different) · [Pipeline](#-the-pipeline) · [Docs](#-all-commands)
 
 [🇰🇷 한국어](docs/README.ko.md)
 
