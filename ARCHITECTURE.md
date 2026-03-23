@@ -105,6 +105,7 @@ cmd/auto/main.go
 | Constraint | `pkg/constraint/checker.go` | Pattern-based anti-pattern violation scanning |
 | Recorder | `pkg/telemetry/recorder.go` | JSONL-based pipeline execution telemetry |
 | Estimator | `pkg/cost/estimator.go` | Token-based cost estimation with 3:1 split ratio |
+| Brainstorm | `internal/cli/orchestra_brainstorm.go` | Multi-provider SCAMPER/HMW brainstorming with divergence-preserving judge and ICE scoring |
 
 ## Architecture Rules
 

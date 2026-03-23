@@ -70,7 +70,8 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Commands: map[string]CommandEntry{
 				"review": {Strategy: "debate", Providers: []string{"claude", "codex", "gemini"}},
 				"plan":   {Strategy: "consensus", Providers: []string{"claude", "gemini"}},
-				"secure": {Strategy: "consensus", Providers: []string{"claude", "gemini"}},
+				"secure":     {Strategy: "consensus", Providers: []string{"claude", "gemini"}},
+				"brainstorm": {Strategy: "debate", Providers: []string{"claude", "codex", "gemini"}},
 			},
 		},
 		// Quality presets map agent roles to model tiers.

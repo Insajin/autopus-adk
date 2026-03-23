@@ -38,6 +38,7 @@ func newOrchestraCmd() *cobra.Command {
 	cmd.AddCommand(newOrchestraReviewCmd())
 	cmd.AddCommand(newOrchestraPlanCmd())
 	cmd.AddCommand(newOrchestraSecureCmd())
+	cmd.AddCommand(newOrchestraBrainstormCmd())
 
 	return cmd
 }

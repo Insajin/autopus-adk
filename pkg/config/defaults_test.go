@@ -92,3 +92,18 @@ func TestDefaultLiteConfig_NoQuality(t *testing.T) {
 	assert.Empty(t, cfg.Quality.Default, "lite config must have empty Quality.Default")
 	assert.Nil(t, cfg.Quality.Presets, "lite config must have nil Quality.Presets")
 }
+
+// TestDefaultFullConfig_BrainstormCommand verifies that DefaultFullConfig includes
+// a brainstorm command entry with debate strategy and all three providers.
+func TestDefaultFullConfig_BrainstormCommand(t *testing.T) {
+	t.Parallel()
+	cfg := DefaultFullConfig("test-project")
+	require.NotNil(t, cfg)
+
+	brainstorm, ok := cfg.Orchestra.Commands["brainstorm"]
+	require.True(t, ok, "brainstorm command must exist in orchestra commands")
+	assert.Equal(t, "debate", brainstorm.Strategy)
+	assert.Contains(t, brainstorm.Providers, "claude")
+	assert.Contains(t, brainstorm.Providers, "codex")
+	assert.Contains(t, brainstorm.Providers, "gemini")
+}

@@ -84,6 +84,9 @@ orchestra:
         secure:
             strategy: consensus
             providers: [claude, gemini]
+        brainstorm:
+            strategy: debate
+            providers: [claude, codex, gemini]
 quality:
     default: balanced
     presets:

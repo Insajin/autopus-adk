@@ -12,7 +12,7 @@ import (
 )
 
 // TestNewOrchestraCmd_SubcommandRegistration verifies that newOrchestraCmd
-// registers exactly 3 subcommands: review, plan, secure.
+// registers exactly 4 subcommands: review, plan, secure, brainstorm.
 func TestNewOrchestraCmd_SubcommandRegistration(t *testing.T) {
 	t.Parallel()
 
@@ -21,7 +21,7 @@ func TestNewOrchestraCmd_SubcommandRegistration(t *testing.T) {
 	assert.Equal(t, "orchestra", cmd.Use)
 
 	subCmds := cmd.Commands()
-	require.Len(t, subCmds, 3)
+	require.Len(t, subCmds, 4)
 
 	names := make([]string, len(subCmds))
 	for i, sc := range subCmds {
@@ -30,6 +30,7 @@ func TestNewOrchestraCmd_SubcommandRegistration(t *testing.T) {
 	assert.Contains(t, names, "review")
 	assert.Contains(t, names, "plan")
 	assert.Contains(t, names, "secure")
+	assert.Contains(t, names, "brainstorm")
 }
 
 // TestNewOrchestraReviewCmd_Flags verifies that review cmd registers all expected flags.
