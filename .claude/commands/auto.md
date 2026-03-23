@@ -1,6 +1,6 @@
 # /auto — Autopus-ADK
 
-> 🐙 Autopus v0.4 | {{.ProjectName}} | {{.Mode}}
+> 🐙 Autopus v0.4 | autopus-adk | full
 
 At the start of every response, output the following banner:
 
@@ -20,6 +20,7 @@ Before processing any subcommand, load project context by reading these files if
 2. `.autopus/project/product.md` — project overview, core features
 3. `.autopus/project/structure.md` — directory structure, package roles
 4. `.autopus/project/tech.md` — tech stack, build, testing
+5. `.autopus/context/signatures.md` — exported API signatures (if exists)
 
 If none of these files exist, display:
 
@@ -30,68 +31,44 @@ No project context documents found. Run `/auto setup` to initialize.
 ## Subcommand Routing
 
 **Strip global flags first** from $ARGUMENTS, then determine the subcommand from the first remaining word.
-{{if .IsFullMode}}
+
 ### Global Flags
 
 | Flag | Description |
 |------|-------------|
 | `--think` | Activate Sequential Thinking MCP for deep analysis mode. Load the `mcp__sequential-thinking__sequentialthinking` tool via ToolSearch, then perform step-by-step reasoning. |
 | `--ultrathink` | Same as `--think` but with higher reasoning effort. |
-{{end}}
+
 ### Routing Rules
 
 1. **Strip global flags**: Separate `--think`, `--ultrathink`, and other global flags from $ARGUMENTS
 2. **Match subcommand**: Use the first remaining word to determine the subcommand
 3. **Smart routing (natural language → auto-trigger plan)**:
    - If the first word does not match a known subcommand and the remaining text has 2+ words:
-   - Treat as a **natural language feature/development request** and **auto-invoke the `plan` workflow**
+   - Treat as a **natural language feature/development request** and **auto-invoke the `plan` workflow** (including PRD generation unless `--skip-prd` is specified)
    - Pass the full text as the feature description to the `spec-writer` agent
    - After SPEC generation, prompt: `/auto go {SPEC-ID}`
 4. **Empty arguments**: Show the subcommand list
 
 ### Subcommand List
 
-When displaying the subcommand list (empty `/auto` invocation), use the categorized format below.
-
-**개발 워크플로우**
-
-| Subcommand | Description |
-|-----------|-------------|
-| plan | Write a SPEC |
-| go | Implement a SPEC |
-| sync | Synchronize documentation |
-| fix | Fix a bug |
-| dev | Full cycle: plan → go → sync |
-
-**품질 & 리뷰**
-
-| Subcommand | Description |
-|-----------|-------------|
-| review | Code review |
-| spec review | SPEC multi-provider review |
-| secure | Security audit |
-| stale | Detect stale decisions |
-| verify | Frontend UX verification |
-
-**탐색 & 분석**
-
-| Subcommand | Description |
-|-----------|-------------|
-| map | Analyze codebase structure |
-| why | Query decision rationale |
-| status | SPEC dashboard |
-
-**관리**
-
-| Subcommand | Description |
-|-----------|-------------|
-| setup | Generate project context |
-| init | Initialize harness |
-| update | Update harness |
-| doctor | Health diagnostics |
-| platform | Platform management |
-
-> 자연어로 기능을 설명하면 자동으로 plan 워크플로우가 시작됩니다.
+| Subcommand | Description | Mode |
+|-----------|-------------|------|
+| setup | Generate/update project context documents | all |
+| plan | Write a SPEC | all |
+| go | Implement a SPEC | full |
+| fix | Fix a bug | all |
+| map | Analyze codebase structure | all |
+| review | Code review | full |
+| spec review | SPEC multi-provider review | full |
+| secure | Security audit | full |
+| stale | Detect stale decisions | all |
+| sync | Synchronize documentation | all |
+| why | Query decision rationale | all |
+| init | Initialize harness | all |
+| update | Update harness | all |
+| doctor | Health diagnostics | all |
+| platform | Platform management | all |
 
 ---
 
@@ -146,8 +123,11 @@ Write a SPEC document. Delegate to the `spec-writer` agent to analyze the codeba
 |------|-------------|
 | `--multi` | Enable multi-provider review. Automatically runs multi-provider review after SPEC generation. |
 | `--strategy` | Multi-provider strategy: consensus (default), debate, pipeline, fastest (requires `--multi`) |
+| `--skip-prd` | Skip PRD phase and proceed directly to SPEC generation. |
+| `--prd-mode` | PRD writing mode: `standard` (10 sections, default) or `minimal` (5 sections). |
+| `--auto` | Autonomous mode: skip user confirmation gates including PRD review. |
 
-Usage: `/auto plan "feature description"`, `/auto plan "feature description" --multi`, `/auto plan "feature description" --multi --strategy debate`
+Usage: `/auto plan "feature description"`, `/auto plan "feature description" --multi`, `/auto plan "feature description" --multi --strategy debate`, `/auto plan "feature description" --skip-prd`, `/auto plan "feature description" --prd-mode minimal`
 
 ### Pipeline (execute in this exact order)
 
@@ -156,7 +136,74 @@ Usage: `/auto plan "feature description"`, `/auto plan "feature description" --m
 Extract flags from $ARGUMENTS:
 - Check for `--multi` → `MULTI_FLAG = true/false`
 - Extract `--strategy <value>` → `STRATEGY = value` (default: consensus)
+- Check for `--skip-prd` → `SKIP_PRD = true/false`
+- Extract `--prd-mode <value>` → `PRD_MODE = value` (default: standard)
+- Check for `--auto` → `AUTO_MODE = true/false`
 - Remaining text → `FEATURE_DESC`
+
+#### Step 1.5: PRD Generation
+
+@.claude/skills/autopus/prd.md
+
+WHEN `SKIP_PRD = false` (default), generate a PRD before SPEC creation.
+
+##### Step 1.5.1: Generate SPEC-ID
+
+Determine the SPEC-ID (DOMAIN + NUMBER) before PRD generation:
+- Analyze the feature description to determine appropriate DOMAIN keyword
+- Check existing `.autopus/specs/` to avoid NUMBER collision
+- Create the directory: `.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/`
+
+##### Step 1.5.1.5: Multi-Provider Brainstorm (Conditional)
+
+WHEN `MULTI_FLAG = true` AND `SKIP_PRD = false`:
+
+Run multi-provider brainstorming via the Orchestra engine:
+
+```bash
+auto orchestra brainstorm "{FEATURE_DESC}" --strategy debate
+```
+
+Save the result to `.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/brainstorm.md`.
+
+WHEN `MULTI_FLAG = false` → [INTENDED SKIP: Step 1.5.1.5]
+
+##### Step 1.5.2: Select Template
+
+- If `PRD_MODE = standard` → reference `templates/shared/prd-standard.md.tmpl` (10 sections)
+- If `PRD_MODE = minimal` → reference `templates/shared/prd-minimal.md.tmpl` (5 sections)
+
+##### Step 1.5.3: Generate PRD
+
+Generate the PRD by analyzing the feature description and codebase context:
+- Scan relevant source files for existing patterns and constraints
+- Fill in the template sections based on the analysis
+- WHEN `brainstorm.md` exists: Read `.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/brainstorm.md` and use top-ranked ideas as PRD input
+- Save to `.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/prd.md`
+
+##### Step 1.5.4: Quality Validation (R10)
+
+Validate the generated PRD:
+- All required sections present (Standard: 10, Minimal: 5)
+- Goals contain at least 1 measurable success metric
+- Requirements contain at least 1 P0 priority item
+- Out of Scope contains at least 1 item
+
+If validation fails, display warnings but continue (do not block).
+
+##### Step 1.5.5: User Confirmation Gate (R9)
+
+WHEN `AUTO_MODE = false`:
+1. Display PRD summary (section headings + key points)
+2. Ask user: approve or request revision
+3. If revision requested: accept revision text, regenerate PRD, re-validate (max 2 iterations)
+4. If approved: proceed to Step 2
+
+WHEN `AUTO_MODE = true`:
+- Skip confirmation gate, proceed directly to Step 2
+
+WHEN `SKIP_PRD = true`:
+- Skip this entire step, proceed to Step 2 (no prd.md generated)
 
 #### [REQUIRED] Step 2: Spawn spec-writer Agent
 
@@ -168,9 +215,13 @@ Agent(
   prompt = """
     Feature description: {FEATURE_DESC}
     Project directory: {current directory}
+    PRD file: .autopus/specs/SPEC-{DOMAIN}-{NUMBER}/prd.md  ← (if exists, otherwise omit this line)
+    Brainstorm file: .autopus/specs/SPEC-{DOMAIN}-{NUMBER}/brainstorm.md  ← (if exists, use top-ranked ideas as additional context)
   """
 )
 ```
+
+When a PRD file exists, the spec-writer agent MUST read it first and use its Goals, Requirements, and Out of Scope sections as the authoritative top-level context for the generated SPEC.
 
 Extract the **SPEC-ID** (e.g., SPEC-UX-001) from the agent's output.
 
@@ -225,41 +276,24 @@ IF any item is unchecked → return to that step. Do NOT display Completion Guid
 
 #### [REQUIRED] Step 5: Completion Guidance
 
-Display the workflow lifecycle bar:
-
-```
-🐙 Workflow: {SPEC-ID}
-  ● plan  →  ○ go  →  ○ sync
-```
-
-Then show state-aware next step guidance:
+Guide the next step based on review outcome:
 
 - If Status is `approved`:
   ```
   ✓ SPEC {SPEC-ID} approved
-  다음 단계: /auto go {SPEC-ID}
+  Next step: /auto go {SPEC-ID}
   ```
 - If Status is `draft` (review skipped or not run):
   ```
-  SPEC {SPEC-ID} 생성됨 (status: draft)
-  다음 단계: /auto go {SPEC-ID}
-  리뷰 실행: /auto spec review {SPEC-ID}
+  SPEC {SPEC-ID} created (status: draft)
+  Next step: /auto go {SPEC-ID}
+  Run review: /auto spec review {SPEC-ID}
   ```
-
-After displaying, also show agent result summary:
-
-```
-🐙 spec-writer ──────────────────────
-  SPEC: {SPEC-ID} | 파일: 4개 | 요구사항: {N}개
-  다음: /auto go {SPEC-ID}
-```
 
 ---
 
 ## go — Implement a SPEC
-{{if not .IsFullMode}}
-> go is Full mode only. Upgrade with `auto init --full`.
-{{else}}
+
 @.claude/skills/autopus/tdd.md
 @.claude/skills/autopus/agent-pipeline.md
 @.claude/skills/autopus/worktree-isolation.md
@@ -312,6 +346,8 @@ Route based on the execution mode determined in Step 0.
 
 IMPORTANT: This is the DEFAULT route. It REQUIRES spawning subagents using the Agent tool. Each Phase below MUST use an Agent() call — do NOT implement these phases yourself in the main session.
 
+@.claude/skills/autopus/worktree-isolation.md
+
 For parallel tasks, include `isolation: "worktree"` in Agent() calls to enable worktree isolation.
 
 #### Route B: Agent Teams (`--team`)
@@ -360,7 +396,7 @@ The pipeline phases are the same as Route A, but orchestrated through Agent Team
 Phase 1: Planning        → planner     (mode: plan)
 Phase 1.5: Test Scaffold → tester      (mode: bypassPermissions) — skip if --skip-scaffold
 Gate 1:  Approval        → skip if AUTO_MODE
-Phase 2: Implementation  → executor×N  (mode: bypassPermissions, parallel with worktree isolation)
+Phase 2: Implementation  → executor×N  (mode: bypassPermissions, parallelizable)
 Phase 2.1: Worktree Merge → main session (merge worktree branches into working branch)
 Gate 2:  Validation      → validator   (mode: plan)  — retry up to 3× on FAIL
 Phase 2.5: Annotation    → annotator   (mode: bypassPermissions) — @AX tags on modified files
@@ -455,7 +491,27 @@ WHEN `LOOP_MODE = true` AND a retry iteration occurs, THE SYSTEM SHALL display:
 Priority order:
 1. If `QUALITY` is set → use it. If invalid value, print error and stop.
 2. If `AUTO_MODE = true` and `QUALITY` is not set → auto-select "balanced"
-3. Otherwise → show interactive selection UI (see Quality Mode Selection below)
+3. Otherwise → show interactive selection UI:
+
+```
+품질 모드를 선택하세요:
+
+[1] Ultra — 모든 에이전트를 Opus로 실행. 최고 품질. (비용: 높음)
+    planner=opus, executor=opus, validator=opus, tester=opus, reviewer=opus
+
+[2] Balanced — 핵심 분석은 Opus, 구현은 Sonnet, 검증은 Haiku. Adaptive Quality로 태스크 복잡도별 모델 자동 선택. (비용: 보통)
+    planner=opus, executor=sonnet, validator=haiku, tester=sonnet, reviewer=sonnet
+
+예상 비용 비교 (100K 토큰 기준):
+| Mode | Estimated Cost |
+|------|---------------|
+| Ultra | ~$2.25 |
+| Balanced | ~$0.45 |
+
+선택 (1-2):
+```
+
+When telemetry is enabled (`autopus.yaml → telemetry.enabled: true`), run `auto telemetry cost` output via Bash to get actual historical cost data. If previous runs exist, display historical average instead of the static table above.
 
 Quality mode determines the `model` parameter in Agent() calls:
 - **Ultra**: add `model: "opus"` to ALL Agent() calls
@@ -465,6 +521,33 @@ Display after determination:
 ```
 품질 모드: {Ultra | Balanced} — {description}
 ```
+
+**Step 2.1.1: Initialize Telemetry (R8)**
+
+WHEN telemetry is enabled (`autopus.yaml → telemetry.enabled: true`), THE SYSTEM SHALL record telemetry at each pipeline phase boundary. Run via Bash before Phase 1:
+
+```bash
+auto telemetry record --spec-id {SPEC_ID} --action start --quality-mode {QUALITY_MODE}
+```
+
+WHEN a phase starts, record:
+```bash
+auto telemetry record --spec-id {SPEC_ID} --action start --phase "{PHASE_NAME}"
+```
+
+WHEN an agent completes, record:
+```bash
+auto telemetry record --spec-id {SPEC_ID} --action agent --agent "{AGENT_NAME}" --phase "{PHASE_NAME}" --status {PASS|FAIL} --files {N} --tokens {estimated}
+```
+
+Token estimation: count the agent's output text length, divide by 4, multiply by 4 (input:output = 3:1).
+
+WHEN a phase ends, record:
+```bash
+auto telemetry record --spec-id {SPEC_ID} --action end --phase "{PHASE_NAME}" --status {PASS|FAIL}
+```
+
+If telemetry is disabled or `auto telemetry record` fails, silently skip — telemetry must never block the pipeline.
 
 **[REQUIRED] Phase 1 — Planning (MUST call Agent tool)**
 
@@ -547,14 +630,16 @@ Agent(
 )
 ```
 
+Collect `worktree_path` and `branch` from each agent return value for Step 2.3.1 merge.
+
 Max concurrent worktrees: **5**. Queue overflow tasks and spawn as slots free.
 
 Sequential tasks (Mode = "sequential" OR file ownership conflict) do NOT use worktree isolation:
 ```
 # Call Agent() one at a time, passing previous result to next
-# Sequential: merge worktree branch immediately after each task before spawning next
-#   git -c gc.auto=0 merge <branch_T1> && git worktree remove <path_T1>
 result_t1 = Agent(subagent_type = "executor", prompt = "Implement T1: ...")
+# If T1 used a worktree branch, merge it immediately before spawning T2 (R3):
+#   git -c gc.auto=0 merge <branch_T1> && git worktree remove <path_T1>
 Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ...")
 ```
 
@@ -562,31 +647,32 @@ Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 res
 
 **[REQUIRED] Phase 2.1 — Worktree Merge (parallel tasks only)**
 
-WHEN all parallel executors complete, merge their worktree branches into the working branch before Gate 2:
+WHEN all parallel executors complete, merge their worktree branches into the working branch before proceeding to Gate 2 (R3).
 
+Merge in ascending task-ID order:
 ```bash
-# Merge in task-ID order (R3)
+# Phase 2.1: batch merge — repeat for each parallel task branch in task-ID order
 git -c gc.auto=0 merge <branch_T1>   # R5: gc.auto=0 suppresses auto GC
 git worktree remove <path_T1>
 git -c gc.auto=0 merge <branch_T2>
 git worktree remove <path_T2>
+# ... continue for all collected parallel branches
 ```
 
-On lock error (`.git/refs.lock`, etc.), retry with exponential backoff: 3s → 6s → 12s (max 3 retries). See `.claude/rules/autopus/worktree-safety.md`.
+On merge conflict (R4):
+1. `git merge --abort` — restore clean state
+2. Log conflicting files and task IDs
+3. Abort pipeline — do NOT auto-resolve even in `AUTO_MODE`:
+   ```
+   ✗ [MERGE ERROR] T{id} merge failed: ownership validation gap detected. Files: {list}
+     복구 옵션:
+     1. Resolve conflicts manually and re-run: /auto go {SPEC-ID} --continue
+     2. Review file ownership with planner: /auto plan {SPEC-ID}
+   ```
 
-After merge, display:
-```
-🐙 merge ────────────────────────────
-  브랜치: {N}개 머지 | 충돌: 0 | 정리: {N}개 워크트리 제거
-  다음: 검증 단계로 진행
-```
-
-**[CHECKPOINT] Phase 2.1 Complete** — All worktree branches merged. Proceed to Gate 2.
-
-**Merge conflict handling** (R4):
-- `git merge --abort` to restore clean state
-- Log: `[MERGE ERROR] T{id} merge failed: ownership validation gap detected. Files: {list}`
-- Abort pipeline even in `--auto` mode (never auto-resolve to prevent data loss)
+On lock error during merge (R5 — shared resource lock retry):
+- Retry with exponential backoff: 3s → 6s → 12s (max 3 retries, 4 total attempts)
+- On final failure: abort affected agent, log error, continue other merges
 
 **Worktree merge failure recovery:**
 ```
@@ -597,6 +683,15 @@ After merge, display:
   2. git worktree list              (워크트리 상태 확인)
   3. git worktree remove --force    (수동 정리)
 ```
+
+Display merge progress after each branch:
+```
+🐙 worktree merge ───────────────────
+  ✓ T{id}: merged {branch} → working branch
+  워크트리 정리: {path} 제거됨
+```
+
+**[CHECKPOINT] Phase 2.1 Complete** — All worktree branches merged. Proceed to Gate 2.
 
 After each executor, display:
 ```
@@ -776,7 +871,7 @@ After reviewer, display:
 
 ### Pipeline (--multi mode: multi-provider)
 
-When `--multi` flag is set, activate multi-provider orchestration:
+When `MULTI_MODE = true`, activate multi-provider orchestration:
 
 - Use the `auto orchestra review` engine to review with multiple AI providers (claude, gemini, codex)
 - Validate with multi-provider consensus at the review gate
@@ -825,52 +920,19 @@ IF any item is unchecked → return to that phase/gate. Do NOT display Completio
 
 ### Completion Guidance
 
-After go completes, display the workflow lifecycle bar:
+After go completes:
 
-```
-🐙 Workflow: {SPEC-ID}
-  ✓ plan  →  ● go  →  ○ sync
-```
+1. **Record pipeline end** (R8): `auto telemetry record --spec-id {SPEC_ID} --action end --status PASS`
+2. **Show cost** (R6): When telemetry is enabled, run `auto telemetry cost --spec-id {SPEC_ID}` via Bash and include the one-line cost summary in the completion output:
+   ```
+   소요: {duration} | 추정 비용: ${amount} ({Quality Mode})
+   ```
+3. **Guide next step**:
+   ```
+   Next step: /auto sync {SPEC-ID}
+   ```
 
-Then show state-aware next step guidance:
 
-```
-다음 단계: /auto sync {SPEC-ID}
-```
-
-If the SPEC status is now `implemented`, also check project state:
-- SPEC status `implemented` → suggest `/auto sync {SPEC-ID}`
-- No project docs found → suggest `/auto setup` before sync
-{{end}}
-
----
-
-## verify — Frontend UX Verification
-{{if .IsFullMode}}
-@.claude/skills/autopus/frontend-verify.md
-
-Verify frontend UX changes using VLM-powered visual analysis and Playwright E2E tests.
-
-### Pipeline
-
-Phase 0: Change Analysis → git diff → impact scope
-Phase 1: Test Gen/Heal → generate/repair Playwright tests
-Phase 2: Test Runner → execute tests, capture screenshots
-Phase 3: VLM Verifier → semantic visual check (PASS/WARN/FAIL)
-Phase 4: Reporter → fix issues, produce report
-
-### Flags
-
-| Flag | Description |
-|------|-------------|
-| `--fix` | Enable auto-fix mode (default: enabled) |
-| `--report-only` | Skip auto-fix, output findings only |
-| `--viewport <size>` | Viewport size: desktop, mobile, or WxH (default: desktop) |
-
-Usage: `/auto verify`, `/auto verify --report-only`, `/auto verify --viewport mobile`
-{{else}}
-Frontend UX verification requires Full mode. Run `/auto update` to upgrade.
-{{end}}
 ---
 
 ## fix — Fix a Bug
@@ -899,22 +961,18 @@ Usage: `/auto map`, `/auto map path/to/package`
 ---
 
 ## review — Code Review
-{{if not .IsFullMode}}
-> review is Full mode only. Upgrade with `auto init --full`.
-{{else}}
+
 @.claude/skills/autopus/review.md
 
 Review changed code against TRUST 5 criteria (Tested, Readable, Unified, Secured, Trackable).
 
 Usage: `/auto review`, `/auto review HEAD~3..HEAD`, `/auto review --pr 123`
-{{end}}
+
 
 ---
 
 ## spec review — SPEC Multi-Provider Review
-{{if not .IsFullMode}}
-> spec review is Full mode only. Upgrade with `auto init --full`.
-{{else}}
+
 @.claude/skills/autopus/spec-review.md
 
 Review a SPEC document using multiple providers (claude, gemini, etc.) to validate quality. Delivers a PASS/REVISE/REJECT verdict via the Orchestra engine.
@@ -934,20 +992,18 @@ Review a SPEC document using multiple providers (claude, gemini, etc.) to valida
 - **REJECT**: Fundamental redesign required
 
 Usage: `/auto spec review SPEC-ID`, `/auto spec review SPEC-ID --strategy debate --timeout 180`
-{{end}}
+
 
 ---
 
 ## secure — Security Audit
-{{if not .IsFullMode}}
-> secure is Full mode only. Upgrade with `auto init --full`.
-{{else}}
+
 @.claude/skills/autopus/security-audit.md
 
 Detect security vulnerabilities in the codebase and suggest fixes. Includes OWASP Top 10 coverage.
 
 Usage: `/auto secure`, `/auto secure --owasp`, `/auto secure --secrets`
-{{end}}
+
 
 ---
 
@@ -956,7 +1012,7 @@ Usage: `/auto secure`, `/auto secure --owasp`, `/auto secure --secrets`
 Detect outdated decisions, expired TODOs, and obsolete architecture patterns.
 
 Detects:
-- Lore entries older than {{.Lore.StaleThresholdDays}} days
+- Lore entries older than 90 days
 - Stale @AX:TODO tags
 - Unused interfaces and redundant abstractions
 
@@ -973,9 +1029,8 @@ Sync targets:
 - Update project context documents (ARCHITECTURE.md + `.autopus/project/*`)
 - Update API documentation
 - Manage @AX tag lifecycle (CYCLE tracking, TODO escalation, ANCHOR verification)
-{{if .IsFullMode}}
 - Capture Lore records
-- Update CHANGELOG.md{{end}}
+- Update CHANGELOG.md
 
 ### Project Document Update
 
@@ -1006,7 +1061,6 @@ On sync, manage @AX tag lifecycle across the codebase:
 2. Verify the referenced function still exists in the codebase
 3. Remove orphaned NOTE tags
 
-{{if .IsFullMode}}
 ### Lore Commit
 
 After all sync targets are complete, commit the changed files in Lore format.
@@ -1050,7 +1104,7 @@ Decision: 변경 감지된 문서만 선별 갱신
 
 **Skip commit when:**
 - No changes reported by `git status` — skip the commit and print a notice only
-{{end}}
+
 ### Completion Guidance
 
 After sync completes, display the workflow lifecycle bar:
@@ -1100,87 +1154,15 @@ Usage: `/auto why "why was this pattern used?"`, `/auto why path/to/file.go`
 
 ---
 
-## status — SPEC Dashboard
-
-Display the current status of all SPECs in the project.
-
-### Output
-
-Scan `.autopus/specs/` for all SPEC directories and display:
-
-```
-🐙 SPEC Dashboard ───────────────────
-  SPEC-XXX-001  [approved]    Feature Title
-  SPEC-XXX-002  [draft]       Feature Title
-  SPEC-XXX-003  [implemented] Feature Title
-  SPEC-XXX-004  [completed]   Feature Title
-```
-
-Show a summary line at the bottom:
-
-```
-총 {N}개 | draft: {N} | approved: {N} | implemented: {N} | completed: {N}
-```
-
-Usage: `/auto status`
-
----
-
-## dev — Full Development Cycle
-{{if not .IsFullMode}}
-> dev is Full mode only. Upgrade with `auto init --full`.
-{{else}}
-Execute the complete plan → go → sync cycle in one command.
-
-### Pipeline
-
-1. Run `plan` with the feature description → get SPEC-ID
-2. Run `go SPEC-ID --auto --loop` → implement
-3. Run `sync SPEC-ID` → synchronize documentation
-
-Display the workflow lifecycle bar between each stage:
-
-After plan:
-```
-🐙 Workflow: {SPEC-ID}
-  ● plan  →  ○ go  →  ○ sync
-```
-
-After go:
-```
-🐙 Workflow: {SPEC-ID}
-  ✓ plan  →  ● go  →  ○ sync
-```
-
-After sync:
-```
-🐙 Workflow: {SPEC-ID}
-  ✓ plan  →  ✓ go  →  ● sync
-```
-
-### Flags
-
-| Flag | Description |
-|------|-------------|
-| `--team` | Run `go` with Agent Teams (experimental) |
-| `--solo` | Run `go` in single session mode (no subagents) |
-| `--quality` | Quality mode: ultra or balanced |
-| `--multi` | Enable multi-provider review in all stages |
-
-Usage: `/auto dev "feature description"`, `/auto dev "feature description" --team`, `/auto dev "feature description" --quality ultra`
-{{end}}
-
----
-
 ## ADK Management — init, update, doctor, platform
 
 Manage the Autopus-ADK harness itself.
 
 ### Current Configuration
 
-- **Project**: {{.ProjectName}}
-- **Mode**: {{.Mode}}
-- **Platform**: {{join ", " .Platforms}}
+- **Project**: autopus-adk
+- **Mode**: full
+- **Platform**: claude-code
 
 ### Usage
 
