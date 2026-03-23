@@ -7,7 +7,7 @@
 - **Name**: autopus-adk (Agentic Development Kit)
 - **Module**: `github.com/insajin/autopus-adk`
 - **Binary**: `auto`
-- **Version**: v0.5.0
+- **Version**: v0.6.0
 - **Mode**: full
 
 ## Description
@@ -86,4 +86,3 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 ## Modes
 
 - **Full**: 모든 기능 활성화 (에이전트, 스킬, 훅, SPEC, Lore, Orchestra)
-- **Lite**: 최소 설정 (기본 스킬 + 규칙만)

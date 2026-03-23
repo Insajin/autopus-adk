@@ -36,6 +36,15 @@ func newUpdateCmd() *cobra.Command {
 				return fmt.Errorf("설정 로드 실패: %w", err)
 			}
 
+			// Orchestra config migration
+			if changed, migrateErr := config.MigrateOrchestraConfig(cfg); migrateErr != nil {
+				return fmt.Errorf("orchestra 마이그레이션 실패: %w", migrateErr)
+			} else if changed {
+				if saveErr := config.Save(dir, cfg); saveErr != nil {
+					return fmt.Errorf("마이그레이션 설정 저장 실패: %w", saveErr)
+				}
+			}
+
 			// 프로젝트 설정 프롬프트 (미설정 항목만)
 			promptLanguageSettings(cmd, dir, cfg)
 			warnParentRuleConflicts(cmd, dir, cfg)

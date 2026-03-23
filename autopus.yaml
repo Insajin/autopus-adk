@@ -71,19 +71,20 @@ orchestra:
         codex:
             binary: codex
             args: [--quiet]
+            prompt_via_args: true
         gemini:
             binary: gemini
             args: []
     commands:
         plan:
             strategy: consensus
-            providers: [claude, gemini]
+            providers: [claude, codex, gemini]
         review:
             strategy: debate
             providers: [claude, codex, gemini]
         secure:
             strategy: consensus
-            providers: [claude, gemini]
+            providers: [claude, codex, gemini]
         brainstorm:
             strategy: debate
             providers: [claude, codex, gemini]

@@ -54,7 +54,8 @@ autopus-adk/
 │   ├── config/                  #   설정 관리
 │   │   ├── schema.go            #     HarnessConfig (Full/Lite)
 │   │   ├── loader.go            #     YAML 로딩
-│   │   └── defaults.go          #     기본 설정 템플릿
+│   │   ├── defaults.go          #     기본 설정 템플릿
+│   │   └── migrate.go           #     Orchestra config 마이그레이션
 │   ├── content/                 #   콘텐츠 생성
 │   │   ├── router.go            #     콘텐츠 타입 라우팅 (7 카테고리)
 │   │   ├── agents.go            #     에이전트 마크다운 생성
