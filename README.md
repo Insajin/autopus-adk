@@ -67,6 +67,35 @@ You're using AI coding tools. They're powerful. But...
 
 ---
 
+## 🧠 The Philosophy: Design for Your Agent
+
+Most AI coding tools are designed around a simple model: **you prompt, it responds.**
+
+Autopus starts from a different question: *What if the agent is the primary audience of your project's documentation?*
+
+Think about onboarding a new engineer. You wouldn't hand them a blank editor and say "build the auth system." You'd give them:
+- An architecture overview so they understand the system
+- Coding conventions so their code fits in
+- Decision history so they don't repeat past mistakes
+- A review process so mistakes get caught before shipping
+
+**AI agents need the same things.** The difference is that every session is their first day.
+
+Autopus is a **harness** — a structured environment that gives agents the context, constraints, and workflows they need to produce code that a senior engineer would approve. Not through hope. Through design.
+
+### Four Principles
+
+| Principle | What It Means |
+|-----------|--------------|
+| **Agent-First Authorship** | Rules, skills, and docs are written to be parsed by agents, not just read by humans. Structure over prose. |
+| **Every Session is Day One** | Agents lose all context between sessions. The harness provides institutional memory — architecture, decisions, conventions — so they start informed, not blank. |
+| **Constraints Liberate** | A 300-line file limit, mandatory TDD, quality gates — these aren't restrictions. They're guardrails that let agents focus on solving problems instead of inventing process. |
+| **The Harness is the Culture** | In a human team, culture is implicit. For agents, it must be explicit. The harness encodes your team's standards so every agent — on every platform — works like your best engineer. |
+
+> 🐙 **Autopus doesn't make agents smarter. It makes them informed.**
+
+---
+
 ## 🔥 What Makes Autopus Different
 
 ### 🤖 AI Agents That Form a Team, Not a Chatbot
