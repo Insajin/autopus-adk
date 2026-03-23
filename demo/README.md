@@ -12,19 +12,13 @@ brew install vhs gifsicle
 
 ```bash
 cd demo
-
-# Generate all
 for tape in *.tape; do vhs "$tape"; done
-
-# Optimize all
 for f in *.gif; do gifsicle -O3 --lossy=80 "$f" -o "$f.opt" && mv "$f.opt" "$f"; done
 ```
 
 ## Files
 
-| Tape | Output | Description | README Section |
-|------|--------|-------------|----------------|
-| `hero.tape` | `hero.gif` | Claude Code session: plan → go → sync | Top ("See It In Action") |
-| `workflow.tape` | `workflow.gif` | spec new → status → skills → platforms | "Three Commands to Ship" |
-| `doctor.tape` | `doctor.gif` | Health check + CLI detection | "30-Second Install" |
-| `check.tape` | `check.gif` | Architecture rule enforcement | standalone |
+| Tape | Output | README Section |
+|------|--------|----------------|
+| `hero.tape` + `simulate-claude.sh` | `hero.gif` | Top — Claude Code session: plan → go → sync |
+| `workflow.tape` | `workflow.gif` | "Three Commands to Ship" — CLI commands showcase |
