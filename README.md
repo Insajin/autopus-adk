@@ -2,9 +2,9 @@
 
 # 🐙 Autopus-ADK
 
-### The Operating System for AI-Powered Development
+### The Autopus where AI agents remember, debate, and ship.
 
-**Your AI agents don't just autocomplete — they plan, debate, implement, test, review, and ship.**
+**Superpowers for AI Coding CLIs — 15 agents, 35 skills, one config, every platform.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -523,6 +523,6 @@ make coverage   # Generate coverage report
 
 <div align="center">
 
-**🐙 Autopus** — Your AI agents deserve a team, not a chatbox.
+**🐙 Autopus** — Remember. Debate. Ship.
 
 </div>
