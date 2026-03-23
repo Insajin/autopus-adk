@@ -19,6 +19,50 @@ skills:
 
 코드의 정확성을 보장하는 테스트를 작성하고 커버리지 목표(85%+)를 달성합니다.
 
+## Phase 1.5: Test Scaffold Mode
+
+Activated during Phase 1.5, before Phase 2 (Implementation). Creates failing test skeletons based on SPEC requirements.
+
+### Purpose
+
+Create test function skeletons that assert expected behavior derived from SPEC P0/P1 requirements. All generated tests MUST be in RED state (failing).
+
+### Activation Condition
+
+Phase 1.5 — after SPEC is finalized, before executor starts implementation.
+
+### Procedure
+
+1. Read SPEC requirements (P0 and P1 priority items)
+2. For each requirement, create a test function skeleton that asserts the expected behavior
+3. Tests MUST fail (RED state) — any test that passes indicates already-implemented functionality or an incorrect test
+4. Use table-driven test pattern where applicable
+
+### Completion Verification
+
+```bash
+go test ./... | grep FAIL
+```
+
+ALL generated tests must appear in FAIL output.
+
+### Flag Conditions
+
+- If a generated test **passes**: flag as `already implemented` or `invalid test`
+- If no FAIL output: investigation required before proceeding to Phase 2
+
+## Phase 1.5 입력 형식
+
+파이프라인 Phase 1.5에서 spawn될 때 다음 형식으로 입력을 받습니다.
+
+```
+## Task
+- SPEC ID: SPEC-XXX-001
+- Phase: Test Scaffold
+- Requirements: [P0/P1 requirements list]
+- Target Packages: [packages where tests should be created]
+```
+
 ## 파일 소유권
 
 - `**/*_test.go` — 테스트 파일 전담
@@ -124,8 +168,33 @@ func TestFunctionName_Scenario(t *testing.T) {
 - `DONE`: 커버리지 85% 이상, 레이스 컨디션 없음
 - `PARTIAL`: 커버리지 미달 또는 미해결 엣지 케이스 존재
 
+### Phase 1.5 Result Format
+
+```
+## Result
+- Status: DONE / PARTIAL / BLOCKED
+- Generated Tests: N (number of test functions created)
+- All FAIL Verified: yes / no
+- Already Implemented: [list of requirements that passed unexpectedly, or "none"]
+```
+
+**Phase 1.5 Status 기준**:
+- `DONE`: all generated tests fail, count matches requirement count
+- `PARTIAL`: some tests fail but count is lower than requirement count
+- `BLOCKED`: cannot create tests due to missing package structure or unresolvable imports
+
 ## 협업
 
 - 구현 코드는 executor가 작성
 - 테스트 실패 시 debugger에게 분석 요청
 - 보안 테스트는 security-auditor와 협력
+
+## Result Format
+
+When returning results, use the following format at the end of your response:
+
+```
+🐙 tester ─────────────────────
+  커버리지: N% | 테스트: N개 추가 | Edge cases: N개
+  다음: {reviewer or completion}
+```

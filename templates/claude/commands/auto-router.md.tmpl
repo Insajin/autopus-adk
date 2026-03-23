@@ -279,6 +279,7 @@ Extract the following flags:
 - `--strategy <value>` → `STRATEGY = value`
 - `--continue` → `CONTINUE_MODE = true/false`
 - `--loop` → `LOOP_MODE = true/false`
+- `--skip-scaffold` → `SKIP_SCAFFOLD = true/false`
 - Remaining text (non-flag word) → `SPEC_ID`
 
 Determine execution mode:
@@ -319,6 +320,13 @@ IMPORTANT: This route uses Claude Code Agent Teams (experimental). Requires `CLA
 
 Use TeamCreate to create a team, then assign tasks to teammates via SendMessage. Each teammate operates with independent context and can communicate directly with other teammates.
 
+Team composition (auto-created via TeamCreate):
+- **Lead** (1): planner + reviewer roles — task assignment, result consolidation
+- **Builder** (1-2): executor + tester + annotator + frontend-specialist — implementation
+- **Guardian** (1): validator + security-auditor + perf-engineer — quality assurance
+
+Reference: `.claude/skills/autopus/agent-teams.md`
+
 The pipeline phases are the same as Route A, but orchestrated through Agent Teams instead of individual Agent() calls. Worktree safety rules R1-R5 apply equally — each team member works in an independent worktree. See @.claude/skills/autopus/worktree-isolation.md and `.claude/rules/autopus/worktree-safety.md`.
 
 #### Route C: Single Session (`--solo`)
@@ -330,13 +338,15 @@ The pipeline phases are the same as Route A, but orchestrated through Agent Team
 
 ```
 Phase 1: Planning        → planner     (mode: plan)
+Phase 1.5: Test Scaffold → tester      (mode: bypassPermissions) — skip if --skip-scaffold
 Gate 1:  Approval        → skip if AUTO_MODE
 Phase 2: Implementation  → executor×N  (mode: bypassPermissions, parallel with worktree isolation)
 Phase 2.1: Worktree Merge → main session (merge worktree branches into working branch)
 Gate 2:  Validation      → validator   (mode: plan)  — retry up to 3× on FAIL
+Phase 2.5: Annotation    → annotator   (mode: bypassPermissions) — @AX tags on modified files
 Phase 3: Testing         → tester      (mode: bypassPermissions)
 Gate 3:  Coverage        → verify 85%+ coverage
-Phase 4: Review          → reviewer    (mode: plan)  — retry up to 2× on REQUEST_CHANGES
+Phase 4: Review          → reviewer + security-auditor (parallel, mode: plan)  — retry up to 2× on REQUEST_CHANGES
 ```
 
 ### Retry Limits Reference
@@ -466,7 +476,27 @@ Display progress after completion:
   ○ Phase 4: Review
 ```
 
-> **⏭ POST-AGENT**: planner returned. NEXT REQUIRED STEP: Gate 1: Approval. Do NOT skip to Completion.
+> **⏭ POST-AGENT**: planner returned. NEXT REQUIRED STEP: Phase 1.5: Test Scaffold. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 1.5 — Test Scaffold (MUST call Agent tool)**
+
+WHEN `SKIP_SCAFFOLD = false`:
+```
+Agent(
+  subagent_type = "tester",
+  mode = "bypassPermissions",
+  prompt = """
+    Phase: Test Scaffold (Phase 1.5)
+    SPEC file: .autopus/specs/SPEC-{SPEC_ID}/spec.md
+    Create failing test skeletons for P0/P1 requirements.
+    All tests MUST FAIL. Report any passing tests.
+  """
+)
+```
+
+WHEN `SKIP_SCAFFOLD = true` → [INTENDED SKIP: Phase 1.5]
+
+> **⏭ POST-AGENT**: tester (scaffold) returned. NEXT REQUIRED STEP: Gate 1: Approval. Do NOT skip to Completion.
 
 **[GATE] Gate 1: Approval** — If `AUTO_MODE = false`, show the planner's assignment table and ask user to approve before proceeding. If `AUTO_MODE = true` → [INTENDED SKIP: Gate 1]
 
@@ -596,7 +626,23 @@ After validation, display:
   다음: {pass → 테스트 단계 | fail → 수정 후 재검증}
 ```
 
-> **⏭ POST-AGENT**: validator returned. NEXT REQUIRED STEP: Phase 3: Testing. Do NOT skip to Completion.
+> **⏭ POST-AGENT**: validator returned. NEXT REQUIRED STEP: Phase 2.5: Annotation. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 2.5 — Annotation (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "annotator",
+  mode = "bypassPermissions",
+  prompt = """
+    Apply @AX tags to all files modified during Phase 2.
+    Follow ax-annotation skill rules.
+    Validate per-file limits: ANCHOR ≤ 3, WARN ≤ 5.
+  """
+)
+```
+
+> **⏭ POST-AGENT**: annotator returned. NEXT REQUIRED STEP: Phase 3: Testing. Do NOT skip to Completion.
 
 **[REQUIRED] Phase 3 — Testing (MUST call Agent tool)**
 
@@ -628,7 +674,10 @@ WHEN `LOOP_MODE = true`: extend coverage retry limit to 3 (default: 1). Display 
 
 **[REQUIRED] Phase 4 — Review (MUST call Agent tool)**
 
+Run reviewer and security-auditor in **parallel**:
+
 ```
+# Call BOTH in a SINGLE message for parallel execution
 Agent(
   subagent_type = "reviewer",
   mode = "plan",
@@ -639,10 +688,22 @@ Agent(
     Issues: <list with file:line references>
   """
 )
+Agent(
+  subagent_type = "security-auditor",
+  mode = "plan",
+  prompt = """
+    Audit all changed files for security vulnerabilities.
+    Return format:
+    Verdict: PASS | FAIL
+    Issues: <list with file:line references and severity>
+  """
+)
 ```
 
-- **APPROVE** → pipeline complete
-- **REQUEST_CHANGES** → spawn executor to fix issues, then re-review (up to 2 retries)
+Both must return APPROVE/PASS for the gate to pass. If results conflict, Lead consolidates issue lists with priority: security issues > code quality issues. Consolidated issue list sent to executor for remediation.
+
+- **Both APPROVE/PASS** → pipeline complete
+- **Either REQUEST_CHANGES/FAIL** → spawn executor to fix consolidated issues, then re-review (up to 2 retries)
 
 WHEN `LOOP_MODE = true`: extend review retry limit to 3. Display RALF iteration status after each retry. Apply circuit breaker if 3 consecutive identical issues.
 
@@ -717,6 +778,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--multi` | Multi-provider mode: activate orchestra engine-based review |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |
 | `--quality` | Quality mode: ultra (all agents Opus), balanced (mixed) |
+| `--skip-scaffold` | Skip Phase 1.5 Test Scaffold |
 
 ### Harness-Only Tasks
 
@@ -729,10 +791,12 @@ If all tasks modify only `.md` files:
 Before displaying completion output, verify ALL phases were evaluated:
 
 - [ ] Phase 1: Planning — completed
+- [ ] Phase 1.5: Test Scaffold — completed OR skipped (--skip-scaffold)
 - [ ] Gate 1: Approval — completed OR skipped (AUTO_MODE)
 - [ ] Phase 2: Implementation — all tasks completed
 - [ ] Phase 2.1: Worktree Merge — completed (if parallel tasks existed) OR N/A
 - [ ] Gate 2: Validation — PASS
+- [ ] Phase 2.5: Annotation — completed
 - [ ] Phase 3: Testing — completed (or skipped for harness-only)
 - [ ] Gate 3: Coverage — 85%+ verified (or N/A for harness-only)
 - [ ] Phase 4: Review — APPROVE

@@ -78,16 +78,72 @@ skills:
   - 다른 태스크의 출력에 의존하는 경우 (의존성 존재)
   - 동일한 파일을 수정하는 태스크가 2개 이상인 경우 (파일 충돌)
 
+## Complexity Assessment
+
+Each decomposed task is assigned a complexity level based on the following criteria.
+
+### Levels
+
+| Level | File Count | Estimated Lines | Logic/Architecture |
+|-------|-----------|----------------|--------------------|
+| HIGH | 3+ files | 200+ lines | Complex logic or architecture changes |
+| MEDIUM | 1–2 files | 50–200 lines | Moderate logic changes |
+| LOW | 1 file | Under 50 lines | Simple or mechanical changes |
+
+### Assessment Factors
+
+- **File count**: number of distinct files to be modified or created
+- **Estimated lines of change**: new + modified lines combined
+- **Requirement count**: number of SPEC requirements the task covers
+- **Dependency count**: number of other tasks this task depends on
+
+Assign HIGH if ANY two factors are at the HIGH threshold. Assign LOW only if ALL factors are at LOW threshold.
+
+## Adaptive Quality
+
+Subextension of the global Quality Mode (`ultra` / `balanced`). Controls which model is used per task.
+
+### Ultra Mode
+
+ALL tasks receive `model: "opus"` regardless of complexity. Complexity field is IGNORED for model assignment.
+
+### Balanced Mode
+
+Model is selected per task based on complexity:
+
+| Complexity | Model Assignment |
+|-----------|-----------------|
+| HIGH | `model: "opus"` |
+| MEDIUM | *(omit — sonnet default)* |
+| LOW | `model: "haiku"` |
+
+### Override
+
+Override via `autopus.yaml`:
+
+```yaml
+quality:
+  presets:
+    balanced:
+      adaptive: true   # enable adaptive quality in balanced mode
+```
+
+When `adaptive: false`, balanced mode uses sonnet for all tasks regardless of complexity.
+
+### Cost Estimation
+
+Refer to cost estimator for token/cost projection per model tier before finalizing the plan.
+
 ## 에이전트 할당 표 출력 형식
 
 태스크 분해 완료 후 아래 형식으로 실행 계획을 출력합니다.
 
 ```markdown
-| Task | Agent | Dependencies | Files | Mode |
-|------|-------|-------------|-------|------|
-| T1 | executor | - | pkg/foo/bar.go | parallel |
-| T2 | executor | T1 | pkg/foo/baz.go | sequential |
-| T3 | tester | T1,T2 | pkg/foo/*_test.go | sequential |
+| Task | Agent | Dependencies | Files | Mode | Complexity |
+|------|-------|-------------|-------|------|-----------|
+| T1 | executor | - | pkg/foo/bar.go | parallel | LOW |
+| T2 | executor | T1 | pkg/foo/baz.go | sequential | MEDIUM |
+| T3 | tester | T1,T2 | pkg/foo/*_test.go | sequential | HIGH |
 ```
 
 - **Task**: plan.md의 태스크 ID (T1, T2, ...)
@@ -95,6 +151,7 @@ skills:
 - **Dependencies**: 선행 완료 필요 태스크 (없으면 `-`)
 - **Files**: 주요 수정 대상 파일 목록
 - **Mode**: `parallel` (병렬 실행 가능) 또는 `sequential` (순차 실행 필요)
+- **Complexity**: `HIGH` / `MEDIUM` / `LOW` — Adaptive Quality model selection 기준
 
 ## 파일 소유권 충돌 감지
 
@@ -114,3 +171,13 @@ skills:
 2. 의존성 없는 충돌 태스크 중 실행 순서 결정 (plan.md 순서 우선)
 3. 후행 태스크에 선행 태스크를 Dependencies로 자동 추가
 4. Mode를 `sequential`로 변경
+
+## Result Format
+
+When returning results, use the following format at the end of your response:
+
+```
+🐙 planner ─────────────────────
+  태스크: N개 | 병렬: N개 | 순차: N개
+  다음: executor 스폰
+```

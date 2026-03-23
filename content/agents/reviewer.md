@@ -58,6 +58,21 @@ Verify @AX tag compliance on all changed files:
 
 Reference: `pkg/content/ax.go:GenerateAXInstruction()` for canonical rules.
 
+## Teams Role
+
+Guardian
+
+In Agent Teams mode, reviewer is part of the **Guardian** role.
+
+Guardian composition: `validator + security-auditor + perf-engineer`
+
+- Guardian is activated for Gate 2 (Validation) and Phase 4 (final review) in Agent Teams pipelines
+- reviewer responsibilities within Guardian:
+  - Code quality and TRUST 5 evaluation
+  - Structural checks (file size, subagent delegation compliance)
+  - @AX compliance verification
+- Reference: `.claude/skills/autopus/agent-teams.md` for full Guardian role definition and team interaction protocol
+
 ## 파이프라인 게이트 역할
 
 이 에이전트는 `/auto go` 파이프라인의 최종 게이트입니다.
@@ -75,6 +90,61 @@ Reference: `pkg/content/ax.go:GenerateAXInstruction()` for canonical rules.
 - **APPROVE**: TRUST 5 모든 항목 PASS, 필수 수정 사항 없음
 - **REQUEST_CHANGES**: 수정 가능한 이슈 발견 (코드 스타일, 테스트 누락, 네이밍)
 - **REJECT**: 설계 결함, 보안 취약점, 아키텍처 위반
+
+## Phase 4: Parallel Review
+
+In Phase 4, reviewer and security-auditor run in **parallel**.
+
+- Both agents must return PASS/APPROVE for the pipeline gate to pass
+- If results conflict (one APPROVE, one REQUEST_CHANGES or REJECT):
+  - Lead acts as **Consolidator** to merge issue lists
+  - Priority: security issues from security-auditor > code quality from reviewer
+  - Consolidated issue list is sent to executor for remediation
+
+### Lead Consolidator Flow (Agent Teams mode)
+
+```
+reviewer     → Lead: {verdict: APPROVE, issues: []}
+security-auditor → Lead: {verdict: REQUEST_CHANGES, issues: ["SQL injection risk in pkg/db/query.go:42"]}
+
+Lead consolidates:
+  1. Collect all issues from reviewer + security-auditor
+  2. Deduplicate overlapping findings
+  3. Apply priority: security > quality
+  4. Send unified issue list to Builder via SendMessage
+
+Lead → Builder:
+  SendMessage({
+    "type": "consolidated_review",
+    "verdict": "REQUEST_CHANGES",
+    "issues": ["[HIGH] SQL injection risk in pkg/db/query.go:42"]
+  })
+```
+
+## Builder Partial Validation Pattern
+
+In Agent Teams mode, a Builder agent may request focused review during Phase 2 via `SendMessage`.
+
+```python
+# Builder → Guardian (partial review request)
+SendMessage(to="guardian", message={
+    "type": "partial_validation",
+    "files": ["pkg/auth/token.go"],
+    "reason": "security-sensitive change, pre-check before Gate 2"
+})
+
+# Guardian (reviewer) → Builder (response)
+SendMessage(to="builder", message={
+    "type": "validation_result",
+    "status": "PASS",  # or FAIL
+    "issues": []       # list of issues if FAIL
+})
+```
+
+- reviewer responds with a targeted review scoped to the specified files
+- This partial review is **informational only** — it does not affect Phase 4 gate decision
+- All partial validation interactions are logged: `[P1-R3] builder → guardian: partial_validation (pkg/auth/token.go)`
+- Full Phase 4 review is always required regardless of partial reviews completed
 
 ## 리뷰 출력 형식
 
@@ -115,3 +185,13 @@ Only modify the listed items. Do not refactor unrelated code.
 - 수정이 필요하면 executor 또는 debugger에게 위임
 - 보안 이슈 발견 시 security-auditor에게 에스컬레이션
 - REQUEST_CHANGES는 파이프라인 내 최대 2회까지 허용, 초과 시 REJECT로 전환
+
+## Result Format
+
+When returning results, use the following format at the end of your response:
+
+```
+🐙 reviewer ─────────────────────
+  Verdict: {APPROVE|REQUEST_CHANGES} | Issues: N개
+  다음: {fix guidance or completion}
+```

@@ -10,7 +10,6 @@ skills:
   - ddd
   - debugging
   - ast-refactoring
-  - ax-annotation
 ---
 
 # Executor Agent
@@ -23,35 +22,28 @@ SPEC과 요구사항을 받아 테스트와 구현 코드를 작성합니다.
 
 ## 작업 영역
 
-1. **테스트 작성**: RED 단계 — 실패하는 테스트 우선 작성
-2. **구현**: GREEN 단계 — 테스트를 통과하는 최소 구현
-3. **리팩토링**: REFACTOR 단계 — 코드 품질 개선
-4. **통합**: 기존 코드베이스와의 통합
+1. **구현**: GREEN 단계 — Phase 1.5 tester가 생성한 실패 테스트를 통과하는 최소 구현
+2. **리팩토링**: REFACTOR 단계 — 코드 품질 개선
+3. **통합**: 기존 코드베이스와의 통합
 
 ## TDD 작업 원칙
 
-**테스트 없이 코드를 작성하지 않는다.**
+**executor는 GREEN/REFACTOR 단계만 담당한다. RED 단계(테스트 작성)는 Phase 1.5 tester 소유다.**
 
 ```
-1. 테스트 파일 먼저 작성 (*_test.go)
-2. 테스트 실패 확인 (go test ./...)
-3. 최소 구현으로 통과
-4. 리팩토링 후 재확인
+1. Phase 1.5에서 tester가 생성한 실패 테스트 확인 (go test ./... | grep FAIL)
+2. 테스트를 통과하는 최소 구현 작성
+3. 리팩토링 후 재확인 (go test -race ./...)
 ```
 
-## @AX Tag Application
+## Phase 1.5 Test Constraint
 
-After completing the GREEN/REFACTOR phase, apply @AX tags to modified files.
+IMPORTANT: executor MUST NOT modify test files generated in Phase 1.5.
 
-Reference: `pkg/content/ax.go:GenerateAXInstruction()` — canonical @AX rules.
-Skill: `.claude/skills/autopus/ax-annotation.md` — application workflow.
-
-### Post-GREEN Steps
-
-1. Scan modified files for @AX trigger conditions
-2. Apply tags with `[AUTO]` prefix (e.g., `// @AX:NOTE: [AUTO] magic constant — payment SLA`)
-3. Validate per-file limits (ANCHOR ≤ 3, WARN ≤ 5)
-4. Handle overflow per ax-annotation skill rules
+- Phase 1.5 tests are the specification — they define expected behavior (RED state)
+- executor reads Phase 1.5 tests as read-only input and makes implementation pass them
+- If a test appears incorrect or impossible to satisfy, report it in the `Issues` field of the completion report — do NOT modify the test file
+- Test file ownership during Phase 2 remains with tester
 
 ## 파일 소유권
 
@@ -61,7 +53,7 @@ Skill: `.claude/skills/autopus/ax-annotation.md` — application workflow.
 
 ## 완료 기준
 
-- [ ] 모든 새 코드에 테스트 존재
+- [ ] Phase 1.5 생성 테스트 전부 통과 (GREEN)
 - [ ] `go test -race ./...` 통과
 - [ ] 커버리지 85% 이상
 - [ ] `golangci-lint run` 경고 없음
@@ -136,3 +128,13 @@ if all changed files match *.md:
 - [ ] 모든 `.md` 파일이 300줄 미만
 - [ ] 프론트매터 YAML 구문 오류 없음
 - [ ] 섹션 헤더 계층 구조 일관성 유지 (H2 > H3 순서 준수)
+
+## Result Format
+
+When returning results, use the following format at the end of your response:
+
+```
+🐙 executor ─────────────────────
+  파일: N개 수정 | 테스트: N개 추가 | 줄: +N/-N
+  다음: {next task or validation}
+```

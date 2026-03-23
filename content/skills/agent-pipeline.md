@@ -25,21 +25,24 @@ This skill is the default for `/auto go SPEC-ID`.
 | `--solo` | **단일 세션** | 메인 세션이 직접 TDD 구현. 서브에이전트 없음 |
 | `--multi` | **멀티프로바이더** | Review Phase에서 orchestra engine 사용. 다른 모드와 조합 가능 |
 
+For Agent Teams mode (`--team`), see `.claude/skills/autopus/agent-teams.md` for role-based team composition (Lead/Builder/Guardian).
+
 @.claude/skills/autopus/worktree-isolation.md
 
 ## Pipeline Overview
 
 ```
-Phase 1: Planning        → planner     (model: depends on quality mode, plan)
-Gate 1:  Approval        → skipped if --auto
-Phase 2: Implementation  → executor×N  (sonnet, acceptEdits, parallel with worktree isolation)
-Phase 2.1: Worktree Merge → main session (merge worktree branches into working branch)
-Gate 2:  Validation      → validator   (haiku,  plan)  — retry up to 3x on FAIL
-Phase 2.5: Annotation    → executor    (sonnet, bypassPermissions) — @AX tags on modified files
-Phase 3: Testing         → tester      (sonnet, acceptEdits)
-Gate 3:  Coverage        → verify 85%+ coverage
-Phase 3.5: UX Verify    → ux-validator (sonnet, plan)  — optional, frontend only
-Phase 4: Review          → reviewer    (sonnet, plan)  — retry up to 2x on REQUEST_CHANGES
+Phase 1:   Planning        → planner     (model: depends on quality mode, plan)
+Phase 1.5: Test Scaffold   → tester      (sonnet, bypassPermissions) — skip if --skip-scaffold
+Gate 1:    Approval        → skipped if --auto
+Phase 2:   Implementation  → executor×N  (sonnet, acceptEdits, parallel with worktree isolation)
+Phase 2.1: Worktree Merge  → main session (merge worktree branches into working branch)
+Gate 2:    Validation      → validator   (haiku,  plan)  — retry up to 3x on FAIL
+Phase 2.5: Annotation      → annotator   (sonnet, bypassPermissions) — @AX tags on modified files
+Phase 3:   Testing         → tester      (sonnet, acceptEdits)
+Gate 3:    Coverage        → verify 85%+ coverage
+Phase 3.5: UX Verify       → frontend-specialist (sonnet, bypassPermissions) — optional, frontend only
+Phase 4:   Review          → reviewer + security-auditor (parallel) — retry up to 2x on REQUEST_CHANGES
 ```
 
 > The model assignments above are for Balanced mode. In Ultra mode, all agents run with opus.
@@ -71,6 +74,20 @@ Agent(
 )
 ```
 
+### Adaptive Quality (Balanced Mode Only)
+
+In Balanced mode, task complexity determines the model per Agent() call:
+
+| Complexity | Model Parameter |
+|-----------|----------------|
+| HIGH | `model: "opus"` |
+| MEDIUM | omit (sonnet default) |
+| LOW | `model: "haiku"` |
+
+In Ultra mode, complexity is IGNORED — all agents use opus.
+
+Reference: `.claude/skills/autopus/adaptive-quality.md`
+
 ### Agents Not in Preset
 
 If an agent is not defined in the selected preset, omit the `model` parameter (use frontmatter default).
@@ -92,6 +109,33 @@ Agent(
   """
 )
 ```
+
+### Phase 1.5: Test Scaffold (Test-First)
+
+WHEN Phase 1 completes, THE SYSTEM SHALL spawn a tester agent to create failing test skeletons based on SPEC requirements before Phase 2 begins.
+
+```
+Agent(
+  subagent_type = "tester",
+  prompt = """
+    Phase: Test Scaffold (Phase 1.5)
+    SPEC: .autopus/specs/SPEC-{SPEC_ID}/spec.md
+
+    Create failing test skeletons for each P0/P1 requirement.
+    All generated tests MUST FAIL (RED state).
+    Any test that passes indicates already-implemented functionality.
+
+    Return: list of generated test files and FAIL verification result.
+  """,
+  permissionMode = "bypassPermissions"
+)
+```
+
+Completion criteria: ALL generated tests must FAIL. PASS tests are flagged.
+
+Skip Phase 1.5 when `--skip-scaffold` flag is set.
+
+Executor constraint: Phase 2 executors MUST NOT modify test files generated in Phase 1.5. These tests serve as read-only specifications.
 
 ### Phase 2: Implementation
 
@@ -151,14 +195,16 @@ Agent(
 
 WHEN Gate 2 returns PASS, THE SYSTEM SHALL execute an annotation step before proceeding to Phase 3.
 
-The executor agent that implemented the code is re-spawned to apply @AX tags:
+A dedicated annotator agent is spawned to apply @AX tags:
 
 ```
 Agent(
-  subagent_type = "executor",
+  subagent_type = "annotator",
   prompt = """
     Apply @AX tags to modified files based on the ax-annotation skill.
     Reference: pkg/content/ax.go:GenerateAXInstruction() for canonical rules.
+
+    Executor work log: {modified files list, change intent from Phase 2}
 
     For each modified file:
     1. Scan for NOTE triggers (magic constants, undocumented exports >100 lines)
@@ -169,7 +215,6 @@ Agent(
     6. Apply overflow strategy if limits exceeded
 
     All tags MUST include the [AUTO] prefix.
-    Modified files: {list of files from Phase 2}
   """,
   permissionMode = "bypassPermissions"
 )
@@ -183,7 +228,7 @@ WHEN the target project contains frontend components (.tsx/.jsx files) AND the p
 
 ```
 Agent(
-  subagent_type = "general-purpose",
+  subagent_type = "frontend-specialist",
   prompt = """
     Run frontend UX verification on all modified frontend components.
     Reference: .claude/skills/autopus/frontend-verify.md for the full pipeline.
@@ -223,18 +268,25 @@ Agent(
 )
 ```
 
-### Phase 4: Review
+### Phase 4: Review (Parallel)
+
+reviewer and security-auditor run in parallel:
 
 ```
-Agent(
-  subagent_type = "reviewer",
-  prompt = """
+Agent(subagent_type = "reviewer", prompt = """
     Perform a code review using TRUST 5 criteria. Return format:
     Verdict: APPROVE | REQUEST_CHANGES
     Issues: <list of issues>
-  """
-)
+""")
+Agent(subagent_type = "security-auditor", prompt = """
+    Perform a security audit. Return format:
+    Verdict: PASS | FAIL
+    Issues: <list of security issues>
+""")
 ```
+
+Both must return PASS/APPROVE. On conflict, Lead (planner) consolidates issue lists.
+Priority: security issues > code quality issues.
 
 ## Parallel vs Sequential Decision Criteria
 
