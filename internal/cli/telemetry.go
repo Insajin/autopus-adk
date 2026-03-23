@@ -91,7 +91,7 @@ func newTelemetrySummaryCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(cmd.OutOrStdout(), telemetry.FormatSummary(*run))
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), telemetry.FormatSummary(*run))
 			return nil
 		},
 	}
@@ -118,7 +118,7 @@ func newTelemetryCostCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(cmd.OutOrStdout(), cost.FormatCostReport(*run))
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), cost.FormatCostReport(*run))
 			return nil
 		},
 	}

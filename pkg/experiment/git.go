@@ -120,8 +120,8 @@ func (g *Git) GetDiffStats(baseCommit string) (added int, removed int, files []s
 		}
 
 		var a, r int
-		fmt.Sscanf(parts[0], "%d", &a)
-		fmt.Sscanf(parts[1], "%d", &r)
+		_, _ = fmt.Sscanf(parts[0], "%d", &a)
+		_, _ = fmt.Sscanf(parts[1], "%d", &r)
 
 		added += a
 		removed += r

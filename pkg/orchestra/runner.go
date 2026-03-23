@@ -242,7 +242,7 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 			_ = cmd.Wait()
 			return nil, fmt.Errorf("%s stdin 쓰기 실패: %w", provider.Name, err)
 		}
-		stdinPipe.Close()
+		_ = stdinPipe.Close()
 	} else {
 		if err := cmd.Start(); err != nil {
 			return nil, fmt.Errorf("%s 시작 실패: %w", provider.Name, err)

@@ -95,9 +95,7 @@ func TestSearchCmd_NoAPIKey(t *testing.T) {
 	// Setenv와 Parallel은 함께 사용 불가
 
 	// EXA_API_KEY 임시 제거
-	origKey := os.Getenv("EXA_API_KEY")
-	require.NoError(t, os.Setenv("EXA_API_KEY", ""))
-	defer os.Setenv("EXA_API_KEY", origKey)
+	t.Setenv("EXA_API_KEY", "")
 
 	cmd := newTestRootCmd()
 	cmd.SetArgs([]string{"search", "golang testing"})

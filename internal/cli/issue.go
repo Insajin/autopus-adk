@@ -123,7 +123,7 @@ func buildIssueTitle(errMsg, command string) string {
 
 // confirmIssue reads a yes/no answer from the user via stdin.
 func confirmIssue(cmd *cobra.Command, prompt string) bool {
-	fmt.Fprint(cmd.OutOrStdout(), prompt)
+	_, _ = fmt.Fprint(cmd.OutOrStdout(), prompt)
 	scanner := bufio.NewScanner(cmd.InOrStdin())
 	if scanner.Scan() {
 		ans := strings.TrimSpace(strings.ToLower(scanner.Text()))

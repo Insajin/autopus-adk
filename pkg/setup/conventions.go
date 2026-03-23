@@ -301,7 +301,7 @@ func sampleGoErrorPatterns(dir string, files []string) []string {
 				patterns["if err != nil guard"]++
 			}
 		}
-		file.Close()
+		_ = file.Close()
 	}
 
 	var result []string

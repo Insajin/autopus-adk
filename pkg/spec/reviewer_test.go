@@ -199,7 +199,9 @@ func TestCollectContext_ExceedsLimit(t *testing.T) {
 	dir := t.TempDir()
 	// Create a large file exceeding the limit
 	bigContent := strings.Repeat("line of code\n", 100)
-	os.WriteFile(filepath.Join(dir, "big.go"), []byte(bigContent), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "big.go"), []byte(bigContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, err := CollectContext(dir, 10)
 	require.NoError(t, err)

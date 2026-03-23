@@ -46,7 +46,7 @@ func (c *Context7Client) ResolveLibrary(name string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("라이브러리 조회 실패: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -81,7 +81,7 @@ func (c *Context7Client) GetDocs(libraryID string, topic string) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("문서 조회 실패: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

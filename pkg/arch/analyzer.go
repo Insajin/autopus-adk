@@ -228,13 +228,13 @@ func analyzePython(dir string) ([]Domain, []Layer, []Dependency) {
 	return domains, layers, dependencies
 }
 
-// parseGoImports는 Go 파일에서 import 경로를 추출한다.
+// parseGoImports extracts import paths from a Go file.
 func parseGoImports(path string) []string {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var imports []string
 	inImport := false
@@ -267,13 +267,13 @@ func parseGoImports(path string) []string {
 	return imports
 }
 
-// parseTSImports는 TypeScript 파일에서 import 경로를 추출한다.
+// parseTSImports extracts import paths from a TypeScript file.
 func parseTSImports(path string) []string {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var imports []string
 	scanner := bufio.NewScanner(f)
@@ -305,13 +305,13 @@ func parseTSImports(path string) []string {
 	return imports
 }
 
-// parsePythonImports는 Python 파일에서 import 경로를 추출한다.
+// parsePythonImports extracts import paths from a Python file.
 func parsePythonImports(path string) []string {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var imports []string
 	scanner := bufio.NewScanner(f)

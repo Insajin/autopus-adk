@@ -45,7 +45,7 @@ func setupTestRepo(t *testing.T) (string, func()) {
 	}
 
 	cleanup := func() {
-		os.RemoveAll(dir)
+		_ = os.RemoveAll(dir)
 	}
 
 	return dir, cleanup

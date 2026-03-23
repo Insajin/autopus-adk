@@ -40,7 +40,7 @@ func setupRepo(t *testing.T) (string, func()) {
 		require.NoError(t, cmd.Run())
 	}
 
-	return dir, func() { os.RemoveAll(dir) }
+	return dir, func() { _ = os.RemoveAll(dir) }
 }
 
 // --- circuit.go coverage ---

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,7 +56,7 @@ func TestExaSearch_APIError(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error": "Invalid API key"}`))
+		_, _ = w.Write([]byte(`{"error": "Invalid API key"}`))
 	}))
 	defer server.Close()
 
@@ -85,8 +84,7 @@ func TestExaSearch_EmptyResults(t *testing.T) {
 func TestExaClient_ReadsFromEnv(t *testing.T) {
 	t.Parallel()
 
-	os.Setenv("EXA_API_KEY", "env-api-key")
-	defer os.Unsetenv("EXA_API_KEY")
+	t.Setenv("EXA_API_KEY", "env-api-key")
 
 	client := search.NewExaClientFromEnv()
 	assert.NotNil(t, client)

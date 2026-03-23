@@ -18,7 +18,7 @@ func Box(w io.Writer, title, content string) {
 	header := BrandStyle.Render(title)
 	body := fmt.Sprintf("%s\n%s", header, content)
 
-	fmt.Fprintln(w, style.Render(body))
+	_, _ = fmt.Fprintln(w, style.Render(body))
 }
 
 // InfoBox prints content inside a blue info box.

@@ -78,7 +78,7 @@ func (c *ExaClient) Search(query string, numResults int) ([]SearchResult, error)
 	if err != nil {
 		return nil, fmt.Errorf("API 요청 실패: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
