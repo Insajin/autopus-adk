@@ -67,7 +67,15 @@ You're using AI coding tools. They're powerful. But...
 
 ---
 
-## 🧠 The Philosophy: Design for Your Agent
+## 🧠 The Philosophy: AX — Agent Experience
+
+> **AX** is not "AI Transformation." AX is **Agent Experience** — how AI agents perceive, navigate, and operate within your codebase. Just as UX designs for users and DX designs for developers, **AX designs for agents.**
+
+```
+UX  =  User Experience        How users interact with your product
+DX  =  Developer Experience   How developers interact with your tools
+AX  =  Agent Experience       How AI agents interact with your codebase
+```
 
 Most AI coding tools are designed around a simple model: **you prompt, it responds.**
 
@@ -92,7 +100,7 @@ Autopus is a **harness** — a structured environment that gives agents the cont
 | **Constraints Liberate** | A 300-line file limit, mandatory TDD, quality gates — these aren't restrictions. They're guardrails that let agents focus on solving problems instead of inventing process. |
 | **The Harness is the Culture** | In a human team, culture is implicit. For agents, it must be explicit. The harness encodes your team's standards so every agent — on every platform — works like your best engineer. |
 
-> 🐙 **Autopus doesn't make agents smarter. It makes them informed.**
+> 🐙 **Autopus doesn't make agents smarter. It makes them informed. That's AX.**
 
 ---
 
