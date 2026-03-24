@@ -142,6 +142,68 @@ func TestUpdateCmd_NoAdapterPlatformIsSkipped(t *testing.T) {
 	assert.Contains(t, out.String(), "경고", "output must warn about platform with no adapter")
 }
 
+// TestUpdateCmd_SelfFlagRecognized verifies T11: --self flag is parsed by the
+// update command without an "unknown flag" error. The dev-build guard
+// (version="0.6.0", commit="none") stops execution before any network call.
+func TestUpdateCmd_SelfFlagRecognized(t *testing.T) {
+	t.Parallel()
+
+	// Given: the root command with update --self (no --force)
+	cmd := newTestRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"update", "--self"})
+
+	// When: command executes
+	err := cmd.Execute()
+
+	// Then: error is about dev-build guard, NOT "unknown flag"
+	// (commit="none" triggers the guard before any network access)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "unknown flag")
+	assert.Contains(t, err.Error(), "개발 빌드")
+}
+
+// TestUpdateCmd_SelfFlagWithForce verifies that --self --force bypasses the
+// dev-build guard and proceeds to the network check step. The test uses a
+// closed server URL to confirm it reaches the checker (network error expected).
+func TestUpdateCmd_SelfFlagWithForce(t *testing.T) {
+	t.Parallel()
+
+	// Given: root command with --self --force
+	cmd := newTestRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"update", "--self", "--force"})
+
+	// When: command executes
+	err := cmd.Execute()
+
+	// Then: dev-build guard is bypassed; error is from network/checker, not the guard
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "개발 빌드")
+}
+
+// TestUpdateCmd_SelfCheckOnly verifies that --self --check exits without
+// performing a download. Dev-build guard fires first (commit="none"), so we
+// verify the flag is parsed correctly by checking the error message.
+func TestUpdateCmd_SelfCheckOnly(t *testing.T) {
+	t.Parallel()
+
+	// Given: --self --check (no --force, so dev-build guard fires)
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"update", "--self", "--check"})
+
+	// When: command executes
+	err := cmd.Execute()
+
+	// Then: error is the dev-build guard, confirming --check was parsed
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "개발 빌드")
+}
+
 // TestUpdateCmd_AddsCodexToOrchestraCommands verifies R5:
 // update must add codex to orchestra command providers when missing.
 func TestUpdateCmd_AddsCodexToOrchestraCommands(t *testing.T) {

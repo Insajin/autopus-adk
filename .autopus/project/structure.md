@@ -149,6 +149,12 @@ autopus-adk/
 │   │   ├── verify.go            #     검증 프리미티브 (exit_code, stdout_contains 등)
 │   │   ├── env.go               #     계층형 환경변수 해결
 │   │   └── sync.go              #     증분 시나리오 동기화
+│   ├── selfupdate/              #   CLI 바이너리 자동 업데이트
+│   │   ├── types.go             #     ReleaseInfo, UpdateResult 타입
+│   │   ├── checker.go           #     GitHub API 호출, semver 비교
+│   │   ├── downloader.go        #     아카이브 다운로드, SHA256 검증, tar 추출
+│   │   ├── replacer.go          #     임시 파일 → os.Rename atomic replace
+│   │   └── platform.go          #     GOOS/GOARCH → 아카이브 이름 매핑
 │   ├── experiment/              #   자율 반복 실험 엔진
 │   │   ├── types.go             #     Config, Result, MetricOutput, Direction 타입
 │   │   ├── metric.go            #     메트릭 실행, JSON 파싱, median 계산
@@ -201,8 +207,8 @@ autopus-adk/
 
 | Category | Count |
 |----------|-------|
-| Go source files | ~124 |
-| Test files | ~127 |
+| Go source files | ~129 |
+| Test files | ~131 |
 | Template files | ~22 |
 | Content files | ~64 |
 | CLI commands | 23 |

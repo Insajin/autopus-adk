@@ -31,6 +31,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 | Issue | `pkg/issue` | Auto issue reporter: error context collection, sanitization, GitHub issue submission |
 | Experiment | `pkg/experiment` | Autonomous experiment loop: metric execution, git operations, circuit breaker, simplicity scoring |
 | E2E | `pkg/e2e` | E2E scenario generation, execution, verification, sync for target projects |
+| SelfUpdate | `pkg/selfupdate` | CLI binary self-update: GitHub Releases check, download, SHA256 verify, atomic replace |
 | Verify | `internal/cli/verify.go` | Frontend UX verification via Playwright screenshots |
 
 ## Layers
@@ -48,7 +49,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 │  pkg/sigmap/     pkg/constraint/    │
 │  pkg/telemetry/  pkg/cost/          │
 │  pkg/experiment/ pkg/lsp/           │
-│  pkg/e2e/                          │
+│  pkg/e2e/        pkg/selfupdate/   │
 ├─────────────────────────────────────┤
 │  pkg/config/     pkg/template/      │  Infrastructure
 │  pkg/detect/     pkg/version/       │
@@ -79,6 +80,7 @@ cmd/auto/main.go
         ├→ pkg/issue/           → pkg/version/, pkg/config/, pkg/telemetry/
         ├→ pkg/experiment/
         ├→ pkg/e2e/
+        ├→ pkg/selfupdate/
         ├→ pkg/detect/
         └→ pkg/version/
 ```
@@ -113,6 +115,7 @@ cmd/auto/main.go
 | Brainstorm | `internal/cli/orchestra_brainstorm.go` | Multi-provider SCAMPER/HMW brainstorming with divergence-preserving judge and ICE scoring |
 | Experiment Loop | `pkg/experiment/` + `.claude/skills/autopus/experiment.md` | Skill-orchestrated autonomous iteration loop with CLI utility commands for metric execution, git state management, circuit breaking, and simplicity scoring |
 | E2E Scenarios | `pkg/e2e/` + `pkg/setup/scenarios.go` | User-facing E2E scenario generation (Cobra extraction), execution engine, verification primitives, incremental sync |
+| Self-Update | `pkg/selfupdate/` + `internal/cli/update.go` | GitHub Releases API check, SHA256 checksum verification, atomic binary replacement via os.Rename |
 
 ## Architecture Rules
 
