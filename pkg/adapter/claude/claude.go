@@ -242,7 +242,11 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		if err := os.MkdirAll(targetDir, 0755); err != nil {
 			return nil, fmt.Errorf("디렉터리 생성 실패 %s: %w", targetDir, err)
 		}
-		if err := os.WriteFile(targetPath, f.Content, 0644); err != nil {
+		perm := os.FileMode(0644)
+		if filepath.Ext(f.TargetPath) == ".sh" {
+			perm = 0755
+		}
+		if err := os.WriteFile(targetPath, f.Content, perm); err != nil {
 			return nil, fmt.Errorf("파일 쓰기 실패 %s: %w", f.TargetPath, err)
 		}
 		finalFiles = append(finalFiles, f)

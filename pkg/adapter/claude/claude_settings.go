@@ -98,13 +98,11 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 		settings["permissions"] = permMap
 	}
 
-	// Statusline configuration
-	if _, exists := settings["statusLine"]; !exists {
-		settings["statusLine"] = map[string]any{
-			"type":    "command",
-			"command": ".claude/statusline.sh",
-			"padding": 1,
-		}
+	// Statusline configuration — always set to autopus statusline
+	settings["statusLine"] = map[string]any{
+		"type":    "command",
+		"command": ".claude/statusline.sh",
+		"padding": 1,
 	}
 
 	out, err := json.MarshalIndent(settings, "", "  ")
