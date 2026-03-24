@@ -116,7 +116,7 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 
 	// Check latest
 	checker := selfupdate.NewChecker()
-	info, err := checker.CheckLatest(currentVer)
+	info, err := checker.CheckLatest(currentVer, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return fmt.Errorf("업데이트 확인 실패: %w", err)
 	}

@@ -31,7 +31,7 @@ func TestCheckLatest_NewVersionAvailable(t *testing.T) {
 
 	// When: CheckLatest is called with current version 0.6.0
 	checker := NewChecker(WithAPIBaseURL(srv.URL))
-	info, err := checker.CheckLatest("0.6.0")
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
 
 	// Then: ReleaseInfo is returned with the newer version
 	require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestCheckLatest_AlreadyUpToDate(t *testing.T) {
 
 	// When: CheckLatest is called with current version 0.6.0
 	checker := NewChecker(WithAPIBaseURL(srv.URL))
-	info, err := checker.CheckLatest("0.6.0")
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
 
 	// Then: nil ReleaseInfo is returned (no update needed)
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestCheckLatest_APIError(t *testing.T) {
 
 	// When: CheckLatest is called
 	checker := NewChecker(WithAPIBaseURL(srv.URL))
-	info, err := checker.CheckLatest("0.6.0")
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
 
 	// Then: an error is returned
 	require.Error(t, err)
@@ -97,7 +97,7 @@ func TestCheckLatest_InvalidJSON(t *testing.T) {
 
 	// When: CheckLatest is called
 	checker := NewChecker(WithAPIBaseURL(srv.URL))
-	info, err := checker.CheckLatest("0.6.0")
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
 
 	// Then: an error is returned
 	require.Error(t, err)
@@ -115,7 +115,7 @@ func TestCheckLatest_MissingTagName(t *testing.T) {
 	defer srv.Close()
 
 	checker := NewChecker(WithAPIBaseURL(srv.URL))
-	info, err := checker.CheckLatest("0.6.0")
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
 	require.Error(t, err)
 	assert.Nil(t, info)
 	assert.Contains(t, err.Error(), "tag_name")
@@ -132,7 +132,7 @@ func TestCheckLatest_MissingAssets(t *testing.T) {
 	defer srv.Close()
 
 	checker := NewChecker(WithAPIBaseURL(srv.URL))
-	info, err := checker.CheckLatest("0.6.0")
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
 	require.Error(t, err)
 	assert.Nil(t, info)
 	assert.Contains(t, err.Error(), "assets")

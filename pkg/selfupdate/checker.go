@@ -13,7 +13,8 @@ type Checker struct {
 }
 
 // CheckLatest checks GitHub API for the latest release.
-func (c *Checker) CheckLatest(currentVersion string) (*ReleaseInfo, error) {
+// goos and goarch are used to select the correct platform archive.
+func (c *Checker) CheckLatest(currentVersion, goos, goarch string) (*ReleaseInfo, error) {
 	resp, err := http.Get(c.apiBaseURL)
 	if err != nil {
 		return nil, err
@@ -44,6 +45,7 @@ func (c *Checker) CheckLatest(currentVersion string) (*ReleaseInfo, error) {
 		return nil, fmt.Errorf("unexpected API response: missing or invalid assets")
 	}
 	var archiveURL, checksumURL, archiveName string
+	expectedArchive := ArchiveName(goos, goarch, latestVersion)
 
 	for _, asset := range assets {
 		a, ok := asset.(map[string]any)
@@ -59,7 +61,7 @@ func (c *Checker) CheckLatest(currentVersion string) (*ReleaseInfo, error) {
 			continue
 		}
 
-		if strings.HasSuffix(name, ".tar.gz") {
+		if name == expectedArchive {
 			archiveName = name
 			archiveURL = url
 		} else if name == "checksums.txt" {
