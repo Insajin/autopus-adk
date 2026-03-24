@@ -98,6 +98,32 @@ Autopus is a **harness** — a structured environment that gives agents the cont
 
 ## 🔥 What Makes Autopus Different
 
+### 📏 Code That Agents Can Actually Read
+
+Most codebases aren't written for AI. A 1,200-line file overwhelms context windows. Tangled responsibilities confuse intent. Autopus enforces a **hard 300-line limit** on every source file — not for aesthetics, but because **agents work better when each file has one job and fits in one read.**
+
+```
+❌ Traditional:
+   service.go (1,200 lines) → Agent loses context halfway through
+
+✅ Autopus:
+   service.go       (180 lines)  Handler logic
+   service_auth.go  (120 lines)  Auth middleware
+   service_repo.go  (150 lines)  Data access
+   → Every file fits in one context window. Every file has one job.
+```
+
+This isn't just about file size. The entire harness is **agent-readable by design:**
+
+| Layer | How It's Agent-Friendly |
+|-------|------------------------|
+| **Rules** | Structured markdown with IMPORTANT markers — agents parse, not skim |
+| **Skills** | YAML frontmatter with triggers — agents auto-activate the right skill |
+| **Docs** | Tables over paragraphs, checklists over prose — parseable, not readable |
+| **Code** | ≤ 300 lines, single responsibility, split by concern — fits in one context |
+
+> 🐙 **Human-readable is a bonus. Agent-readable is the requirement.**
+
 ### 🤖 AI Agents That Form a Team, Not a Chatbot
 
 Autopus doesn't give you one AI assistant — it gives you a **software engineering team of 15 specialized agents** with defined roles, quality gates, and retry logic.
