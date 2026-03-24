@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Agent",
+      "AskUserQuestion",
+      "TaskCreate",
+      "TaskUpdate",
+      "TeamCreate",
+      "SendMessage",
+      "ToolSearch",
+      "WebSearch",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(go run:*)",
+      "Bash(go mod:*)",
+      "Bash(go tool:*)",
+      "Bash(go env:*)",
+      "Bash(go install:*)",
+      "Bash(go clean:*)",
+      "Bash(go get:*)",
+      "Bash(go version:*)",
+      "Bash(golangci-lint:*)",
+      "Bash(gofmt:*)",
+      "Bash(git:*)",
+      "Bash(auto:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(sort:*)",
+      "Bash(mkdir:*)",
+      "Bash(echo:*)",
+      "Bash(gh:*)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": ".claude/statusline.sh",
+    "padding": 1
+  }
+}

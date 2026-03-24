@@ -114,6 +114,15 @@ func DetectPermissions(projectRoot string, extra config.PermissionsConf) *adapte
 		"Bash(git *)",
 		"Bash(git:*)",
 		"Bash(make:*)",
+		"Bash(ls:*)",
+		"Bash(cat:*)",
+		"Bash(find:*)",
+		"Bash(grep:*)",
+		"Bash(wc:*)",
+		"Bash(sort:*)",
+		"Bash(mkdir:*)",
+		"Bash(echo:*)",
+		"Bash(gh:*)",
 		"mcp__sequential-thinking__sequentialthinking",
 		"WebSearch",
 
@@ -133,7 +142,8 @@ func DetectPermissions(projectRoot string, extra config.PermissionsConf) *adapte
 			"Bash(go build:*)", "Bash(go test:*)", "Bash(go vet:*)",
 			"Bash(go run:*)", "Bash(go mod:*)", "Bash(go tool:*)",
 			"Bash(go get:*)", "Bash(go install:*)", "Bash(go version:*)",
-			"Bash(golangci-lint:*)",
+			"Bash(go env:*)", "Bash(go clean:*)",
+			"Bash(golangci-lint:*)", "Bash(gofmt:*)",
 		)
 	}
 

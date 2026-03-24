@@ -388,6 +388,7 @@ Spawn a `spec-writer` agent to generate the SPEC:
 ```
 Agent(
   subagent_type = "spec-writer",
+  mode = "bypassPermissions",   ← always bypass: spec-writer only reads codebase and writes SPEC files
   prompt = """
     Feature description: {FEATURE_DESC}
     Project directory: {current directory}
@@ -729,13 +730,19 @@ auto telemetry record --spec-id {SPEC_ID} --action end --phase "{PHASE_NAME}" --
 
 If telemetry is disabled or `auto telemetry record` fails, silently skip — telemetry must never block the pipeline.
 
+**Permission Mode Rule for AUTO_MODE:**
+
+WHEN `AUTO_MODE = true`, ALL Agent() calls in the pipeline MUST use `mode = "bypassPermissions"` instead of `mode = "plan"`. This eliminates interactive approval prompts for plan-mode agents (planner, validator, reviewer, security-auditor). The `--auto` flag signals the user's intent to run without interruption.
+
+WHEN `AUTO_MODE = false`, use the mode specified in each Agent() call below (typically `"plan"` for review/validation agents).
+
 **[REQUIRED] Phase 1 — Planning (MUST call Agent tool)**
 
 ```
 Agent(
   subagent_type = "planner",
   model = "opus",          ← Ultra only; omit for Balanced
-  mode = "plan",
+  mode = "plan",           ← AUTO_MODE=true → "bypassPermissions" (see Permission Mode Rule)
   prompt = """
     SPEC file: .autopus/specs/SPEC-{SPEC_ID}/spec.md
     Plan file: .autopus/specs/SPEC-{SPEC_ID}/plan.md
@@ -885,7 +892,7 @@ After each executor, display:
 ```
 Agent(
   subagent_type = "validator",
-  mode = "plan",
+  mode = "plan",           ← AUTO_MODE=true → "bypassPermissions" (see Permission Mode Rule)
   prompt = """
     Validate the implementation. Check:
     - go build ./... passes
@@ -975,7 +982,7 @@ Run reviewer and security-auditor in **parallel**:
 # Call BOTH in a SINGLE message for parallel execution
 Agent(
   subagent_type = "reviewer",
-  mode = "plan",
+  mode = "plan",           ← AUTO_MODE=true → "bypassPermissions" (see Permission Mode Rule)
   prompt = """
     Review all changes using TRUST 5 criteria.
     Return format:
@@ -985,7 +992,7 @@ Agent(
 )
 Agent(
   subagent_type = "security-auditor",
-  mode = "plan",
+  mode = "plan",           ← AUTO_MODE=true → "bypassPermissions" (see Permission Mode Rule)
   prompt = """
     Audit all changed files for security vulnerabilities.
     Return format:
