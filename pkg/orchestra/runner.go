@@ -250,6 +250,8 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 		}
 		_ = stdinPipe.Close()
 	} else {
+		// Close stdin explicitly to prevent CLIs (e.g. claude -p) from waiting for input
+		cmd.SetStdin(nil)
 		if err := cmd.Start(); err != nil {
 			return nil, fmt.Errorf("%s 시작 실패: %w", provider.Name, err)
 		}

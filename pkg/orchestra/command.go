@@ -9,6 +9,7 @@ import (
 // command는 실행 커맨드 인터페이스이다 (테스트 목 지원).
 type command interface {
 	StdinPipe() (io.WriteCloser, error)
+	SetStdin(r io.Reader)
 	SetStdout(w io.Writer)
 	SetStderr(w io.Writer)
 	Start() error
@@ -28,6 +29,10 @@ var newCommand = func(ctx context.Context, name string, args ...string) command 
 
 func (e *execCommand) StdinPipe() (io.WriteCloser, error) {
 	return e.cmd.StdinPipe()
+}
+
+func (e *execCommand) SetStdin(r io.Reader) {
+	e.cmd.Stdin = r
 }
 
 func (e *execCommand) SetStdout(w io.Writer) {
