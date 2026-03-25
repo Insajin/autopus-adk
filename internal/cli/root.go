@@ -56,6 +56,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newAutoTestCmd())
 	root.AddCommand(newAgentCmd())
 	root.AddCommand(newReactCmd())
+	root.AddCommand(newTerminalCmd())
 
 	return root
 }

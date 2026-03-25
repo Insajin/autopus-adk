@@ -61,6 +61,7 @@ func newAgentCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newAgentCreateSubCmd())
+	cmd.AddCommand(newAgentRunSubCmd())
 	return cmd
 }
 
