@@ -39,10 +39,10 @@ No project context documents found. Run `/auto setup` to initialize.
 |------|-------------|
 | `--think` | Activate Sequential Thinking MCP for deep analysis mode. Load the `mcp__sequential-thinking__sequentialthinking` tool via ToolSearch, then perform step-by-step reasoning. |
 | `--ultrathink` | Same as `--think` but with higher reasoning effort. |
-| `--auto` | Autonomous mode: skip user confirmations and approval gates. Triage auto-proceeds, Gate 1 skipped, etc. |
+| `--auto` | Autonomous mode: skip user confirmations and approval gates. Quality defaults to `autopus.yaml → quality.default` (not hardcoded). |
 | `--loop` | RALF loop mode: auto-retry failed quality gates with extended iteration limits until PASS or circuit break. |
 | `--multi` | Multi-provider mode: activate orchestra engine for reviews and decisions. |
-| `--quality <value>` | Agent quality mode: `ultra` (all agents Opus) or `balanced` (mixed, default). |
+| `--quality <value>` | Agent quality mode: `ultra` (all agents Opus) or `balanced` (mixed). Overrides `autopus.yaml → quality.default`. |
 {{end}}
 ### Routing Rules
 
@@ -728,9 +728,12 @@ WHEN `LOOP_MODE = true` AND a retry iteration occurs, THE SYSTEM SHALL display:
 **Step 2.1: Determine Quality Mode**
 
 Priority order:
-1. If `QUALITY` is set → use it. If invalid value, print error and stop.
-2. If `AUTO_MODE = true` and `QUALITY` is not set → auto-select "balanced"
-3. Otherwise → show interactive selection UI (see Quality Mode Selection below)
+1. If `QUALITY` is set via `--quality` flag → use it. If invalid value, print error and stop.
+2. Read `autopus.yaml` → `quality.default` → use as default (applies to both `--auto` and interactive modes)
+3. If `AUTO_MODE = true` and no default found → fallback to "balanced"
+4. Otherwise → show interactive selection UI with `quality.default` pre-selected
+
+**Reading quality.default**: Use Bash tool to extract: `grep '^quality:' -A1 autopus.yaml | grep 'default:' | awk '{print $2}'` or Read autopus.yaml directly and parse the `quality.default` field.
 
 Quality mode determines the `model` parameter in Agent() calls:
 - **Ultra**: add `model: "opus"` to ALL Agent() calls
