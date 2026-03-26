@@ -48,7 +48,7 @@ skills:
 
 - `requirements.md`: EARS 형식 요구사항
 - `design.md`: 기술 설계 문서
-- SPEC 문서 (`.autopus/specs/SPEC-XXX/spec.md`)
+- SPEC 문서 (resolved via SPEC Path Resolution — see auto-router)
 
 ## 협업
 

@@ -29,6 +29,25 @@ If none of these files exist, display:
 No project context documents found. Run `/auto setup` to initialize.
 ```
 
+## SPEC Path Resolution
+
+WHEN any subcommand receives a SPEC-ID, resolve the actual file path using this standard procedure:
+
+1. Check `.autopus/specs/{SPEC-ID}/spec.md` (top-level — legacy and cross-module SPECs)
+2. Glob `*/.autopus/specs/{SPEC-ID}/spec.md` (submodule depth 1)
+
+From the resolved path, extract:
+- `SPEC_PATH`: full relative path to spec.md
+- `SPEC_DIR`: SPEC directory path
+- `TARGET_MODULE`: submodule path (or "." if top-level)
+- `WORKING_DIR`: same as TARGET_MODULE — the directory where build/test commands run
+
+Error handling:
+- 0 results → error: "SPEC-{ID} not found. Available SPECs:" then list all found via `*/.autopus/specs/*/spec.md`
+- 2+ results → error: "Duplicate SPEC-{ID} found:" then list each path
+
+All subcommands that reference a SPEC-ID MUST use this resolution procedure instead of hardcoded paths.
+
 ## Subcommand Routing
 
 **Strip global flags first** from $ARGUMENTS, then determine the subcommand from the first remaining word.
@@ -479,6 +498,7 @@ Write a SPEC document. Delegate to the `spec-writer` agent to analyze the codeba
 |------|-------------|
 | `--from-idea <BS-ID>` | Create SPEC from a brainstorm file. Loads `.autopus/brainstorms/BS-{ID}.md` as context for the spec-writer. |
 | `--strategy` | Multi-provider strategy: consensus (default), debate, pipeline, fastest (requires `--multi`) |
+| `--target <module>` | Target submodule for SPEC storage (e.g., `autopus-adk`). Auto-detected if omitted. |
 
 Global flags `--auto` and `--multi` also apply:
 - `--auto` → skip confirmations
@@ -493,12 +513,13 @@ Usage: `/auto plan "feature description"`, `/auto plan --from-idea BS-001`, `/au
 Global flags (`--auto`, `--loop`, `--multi`, `--quality`) are already stripped. Extract plan-specific flags:
 - Extract `--from-idea <BS-ID>` → `FROM_IDEA = BS-ID` (load brainstorm context)
 - Extract `--strategy <value>` → `STRATEGY = value` (default: consensus)
+- Extract `--target <module>` → `TARGET_MODULE` (auto-detect if omitted)
 - `MULTI_FLAG` ← inherited from global `--multi`
 - Remaining text → `FEATURE_DESC`
 
 #### [REQUIRED] Step 2: Spawn spec-writer Agent
 
-If `FROM_IDEA` is set, read `.autopus/brainstorms/BS-{FROM_IDEA}.md` and include its content as brainstorm context.
+If `FROM_IDEA` is set, search for the BS file: check `.autopus/brainstorms/BS-{FROM_IDEA}.md` (top-level) then `*/.autopus/brainstorms/BS-{FROM_IDEA}.md` (submodules). Include its content as brainstorm context.
 
 Spawn a `spec-writer` agent to generate the SPEC:
 
@@ -507,6 +528,7 @@ Agent(
   subagent_type = "spec-writer",
   prompt = """
     Feature description: {FEATURE_DESC}
+    Target module: {TARGET_MODULE or auto-detect}
     Project directory: {current directory}
     Brainstorm context: {BS file content if FROM_IDEA is set, otherwise omit}
   """
@@ -543,7 +565,7 @@ auto spec review {SPEC-ID} --strategy {STRATEGY}
 ```
 
 **Handling results:**
-- **PASS** → Update Status in `.autopus/specs/{SPEC-ID}/spec.md` to `approved` (use Edit tool)
+- **PASS** → Update Status in the resolved SPEC_PATH to `approved` (use Edit tool)
 - **REVISE** → Print finding list, apply fixes, and re-run review (up to 2 iterations)
 - **REJECT** → Print finding list and guide the user to redesign
 
@@ -635,12 +657,13 @@ After parsing, display the detected configuration:
 ```
 Mode: {subagent | teams | teams+multi | solo}
 SPEC: {SPEC_ID}
+Target: {TARGET_MODULE}
 Quality: {ultra | balanced | pending selection}
 ```
 
 ### Step 1: Load SPEC
 
-Load `.autopus/specs/SPEC-{SPEC_ID}/spec.md` and check status.
+Run SPEC Path Resolution for {SPEC_ID}. Load the resolved SPEC_PATH and check status. Extract TARGET_MODULE and WORKING_DIR for subsequent phases.
 
 **Draft Guard**: If status is "draft" and review_gate is enabled, refuse implementation and prompt:
 ```
@@ -820,8 +843,9 @@ Agent(
   model = "opus",          ← Ultra only; omit for Balanced
   mode = "plan",
   prompt = """
-    SPEC file: .autopus/specs/SPEC-{SPEC_ID}/spec.md
-    Plan file: .autopus/specs/SPEC-{SPEC_ID}/plan.md
+    SPEC file: {SPEC_PATH}
+    Plan file: {SPEC_DIR}/plan.md
+    Working directory: {WORKING_DIR}
 
     Decompose the SPEC into implementation tasks.
     Return an agent assignment table:
@@ -853,7 +877,7 @@ Agent(
   mode = "bypassPermissions",
   prompt = """
     Phase: Test Scaffold (Phase 1.5)
-    SPEC file: .autopus/specs/SPEC-{SPEC_ID}/spec.md
+    SPEC file: {SPEC_PATH}
     Create failing test skeletons for P0/P1 requirements.
     All tests MUST FAIL. Report any passing tests.
   """
@@ -882,14 +906,14 @@ Agent(
   model = "opus",          ← Ultra only; omit for Balanced
   mode = "bypassPermissions",
   isolation = "worktree",  ← R1: worktree isolation for parallel tasks
-  prompt = "Implement T1: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}"
+  prompt = "Implement T1: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}. Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./..."
 )
 Agent(
   subagent_type = "executor",
   model = "opus",          ← Ultra only; omit for Balanced
   mode = "bypassPermissions",
   isolation = "worktree",  ← R1: worktree isolation for parallel tasks
-  prompt = "Implement T2: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}"
+  prompt = "Implement T2: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}. Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./..."
 )
 ```
 
@@ -900,8 +924,8 @@ Sequential tasks (Mode = "sequential" OR file ownership conflict) do NOT use wor
 # Call Agent() one at a time, passing previous result to next
 # Sequential: merge worktree branch immediately after each task before spawning next
 #   git -c gc.auto=0 merge <branch_T1> && git worktree remove <path_T1>
-result_t1 = Agent(subagent_type = "executor", prompt = "Implement T1: ...")
-Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ...")
+result_t1 = Agent(subagent_type = "executor", prompt = "Implement T1: ... Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./...")
+Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ... Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./...")
 ```
 
 > **⏭ POST-AGENT**: executor(s) returned. NEXT REQUIRED STEP: [REQUIRED] Phase 2.1: Worktree Merge. Do NOT skip to Completion.
@@ -1505,7 +1529,7 @@ Review a SPEC document using multiple providers (claude, gemini, etc.) to valida
 
 #### [REQUIRED] Step 1: Load SPEC
 
-Load `.autopus/specs/SPEC-{ID}/spec.md` and extract requirements. Verify the file exists before proceeding.
+Run SPEC Path Resolution for {SPEC-ID}. Load the resolved SPEC_PATH and extract requirements. Verify the file exists before proceeding.
 
 > **⏭ POST-STEP**: SPEC loaded. NEXT REQUIRED STEP: Step 2: Collect Code Context. Do NOT skip to Completion.
 
@@ -1536,7 +1560,7 @@ Determine final verdict according to the configured strategy (debate, consensus)
 
 #### [REQUIRED] Step 5: Save Results
 
-Write `review.md` to `.autopus/specs/SPEC-{ID}/` with the full verdict and findings. Update SPEC status if PASS.
+Write `review.md` to {SPEC_DIR} with the full verdict and findings. Update SPEC status if PASS.
 
 ### Verdict Criteria
 
@@ -1626,7 +1650,7 @@ Synchronize code and documentation after implementation is complete. Updates SPE
 
 ### [REQUIRED] Sync Target 1: Update SPEC Status
 
-If a SPEC-ID is provided, update `.autopus/specs/SPEC-{ID}/spec.md` status to `completed`.
+If a SPEC-ID is provided, run SPEC Path Resolution for {SPEC-ID}. Update the resolved SPEC_PATH status to `completed`. Use TARGET_MODULE for git operations.
 
 > **⏭ POST-TARGET**: SPEC status updated. NEXT REQUIRED TARGET: Sync Target 2: Project Docs. Do NOT skip to Lore Commit.
 
@@ -1656,9 +1680,11 @@ IMPORTANT: You MUST run git operations via the Bash tool. Do NOT skip the commit
 
 Run git status, stage files, and commit in Lore format:
 
+WHEN TARGET_MODULE is not '.', use `git -C {TARGET_MODULE}` for git operations targeting the submodule.
+
 ```bash
 git status
-git add .autopus/specs/ ARCHITECTURE.md .autopus/project/ CHANGELOG.md
+git add {SPEC_DIR} ARCHITECTURE.md .autopus/project/ CHANGELOG.md
 git commit -m "$(cat <<'EOF'
 docs(<scope>): sync SPEC-{ID} 문서 및 상태 갱신
 ...
@@ -1717,7 +1743,7 @@ After all sync targets are complete, commit the changed files in Lore format.
 
 **Determining files to commit:**
 1. Check changed/added files with `git status`
-2. Stage SPEC-related files (`.autopus/specs/`) and project docs (`ARCHITECTURE.md`, `.autopus/project/*`)
+2. Stage SPEC-related files ({SPEC_DIR}) and project docs (`ARCHITECTURE.md`, `.autopus/project/*`)
 3. If implementation code changes are included, stage those files as well
 
 **Commit message templates:**
@@ -1810,15 +1836,26 @@ Display the current status of all SPECs in the project.
 
 ### Output
 
-Scan `.autopus/specs/` for all SPEC directories and display:
+Scan for all SPECs across the project:
+1. `.autopus/specs/*/spec.md` (top-level — legacy and cross-module)
+2. `*/.autopus/specs/*/spec.md` (submodules, depth 1)
+
+Group by module and display:
 
 ```
 🐙 SPEC Dashboard ───────────────────
-  SPEC-XXX-001  [approved]    Feature Title
-  SPEC-XXX-002  [draft]       Feature Title
-  SPEC-XXX-003  [implemented] Feature Title
-  SPEC-XXX-004  [completed]   Feature Title
+  [autopus-adk]
+    SPEC-ORCH-003  [draft]       Orchestra Provider
+    SPEC-GAP-001   [approved]    Gap Analysis
+
+  [Autopus]
+    SPEC-AUTOTEST-001 [draft]    Auto Test
+
+  [cross-module]
+    SPEC-AI-001    [approved]    AI Integration
 ```
+
+Top-level SPECs (`.autopus/specs/`) are grouped under `[cross-module]`.
 
 Show a summary line at the bottom:
 

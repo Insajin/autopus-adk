@@ -24,16 +24,19 @@ SPEC 문서를 생성하는 전문 에이전트입니다.
 
 ## 역할
 
-사용자의 기능 요청을 받아 코드베이스를 분석하고, **git root**의 `.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/`에 4개 파일을 생성합니다.
+사용자의 기능 요청을 받아 코드베이스를 분석하고, **대상 모듈**의 `.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/`에 4개 파일을 생성합니다.
 
 ## SPEC 저장 위치 규칙
 
-SPEC은 반드시 **현재 git root** 기준으로 저장합니다.
+SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니다.
 
-1. `git rev-parse --show-toplevel`로 git root를 감지
-2. `{git-root}/.autopus/specs/`에 SPEC 디렉토리 생성
-3. SPEC ID는 **해당 git root 내에서만** 유일하면 됨
-4. 기존 SPEC ID 스캔: `{git-root}/.autopus/specs/SPEC-{DOMAIN}-*` 패턴으로 중복 방지
+1. 프롬프트의 `Target module` 값을 확인
+   - 명시적 모듈 경로가 있으면 (예: `autopus-adk`) → 해당 모듈 기준
+   - `auto-detect`이면 → 코드베이스 분석으로 가장 관련된 서브모듈 자동 감지
+   - 감지 실패 시 → CWD 기준 `.autopus/specs/`에 저장
+2. `{target-module}/.autopus/specs/`에 SPEC 디렉토리 생성
+3. SPEC ID는 **프로젝트 전체에서** 유일해야 함 (최상단 + 모든 서브모듈)
+4. 기존 SPEC ID 스캔: `.autopus/specs/SPEC-{DOMAIN}-*` AND `*/.autopus/specs/SPEC-{DOMAIN}-*` 패턴으로 중복 방지
 
 이 규칙은 monorepo, submodule, 독립 repo 모든 경우에 동일하게 적용됩니다.
 
@@ -42,14 +45,16 @@ SPEC은 반드시 **현재 git root** 기준으로 저장합니다.
 프롬프트에 다음 정보가 포함되어야 합니다:
 
 - **기능 설명**: 사용자가 요청한 기능
+- **Target module**: 대상 서브모듈 경로 (예: `autopus-adk`) 또는 `auto-detect`
 - **프로젝트 디렉토리**: 코드베이스 루트 경로
 
 ## 작업 절차
 
-### 1. Git Root 감지 및 코드베이스 분석
+### 1. Target Module 확인 및 코드베이스 분석
 
-- `git rev-parse --show-toplevel`로 git root 경로 확인
-- `{git-root}/.autopus/specs/` 에서 기존 SPEC ID 스캔 (DOMAIN, NUMBER 중복 방지)
+- 프롬프트의 `Target module` 값 확인 (명시적 경로 또는 auto-detect)
+- auto-detect인 경우: 기능 설명의 키워드로 코드베이스 검색하여 가장 관련된 서브모듈 결정
+- `.autopus/specs/` AND `*/.autopus/specs/` 에서 기존 SPEC ID 스캔 (전체 프로젝트 중복 방지)
 - `go.mod` 또는 `package.json` 등에서 프로젝트 타입 파악
 - 관련 소스 코드 탐색 (Grep, Glob)
 - 기존 패턴과 컨벤션 파악
@@ -120,7 +125,7 @@ SPEC은 반드시 **현재 git root** 기준으로 저장합니다.
 
 ### 4. 디렉토리 생성
 
-`{git-root}/.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/` 디렉토리를 생성하고 4개 파일을 작성합니다. 프롬프트에 프로젝트 디렉토리가 명시된 경우에도 SPEC 저장 경로는 반드시 git root 기준입니다.
+`{target-module}/.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/` 디렉토리를 생성하고 4개 파일을 작성합니다. target module이 auto-detect된 경우, 결정된 모듈 경로를 출력에 포함합니다.
 
 ## 출력
 

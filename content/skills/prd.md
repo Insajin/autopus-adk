@@ -33,11 +33,11 @@ Gather relevant context to ground the PRD in the current state of the system:
 
 - **Related files**: Identify existing modules, packages, or services affected
 - **Existing patterns**: Review coding conventions, API patterns, data models
-- **Prior SPECs**: Check `.autopus/specs/` for related SPEC documents
+- **Prior SPECs**: Check for related SPEC documents across top-level and submodules
 
 ```
-ls .autopus/specs/          # list existing SPECs
-cat .autopus/specs/SPEC-*/prd.md 2>/dev/null  # review related PRDs
+ls .autopus/specs/ */.autopus/specs/ 2>/dev/null   # list existing SPECs (top-level + submodules)
+cat .autopus/specs/SPEC-*/prd.md */.autopus/specs/SPEC-*/prd.md 2>/dev/null  # review related PRDs
 ```
 
 Use this context to ensure the PRD aligns with existing architecture and avoids conflicts.
@@ -105,7 +105,7 @@ Run the following checklist before finalizing the PRD:
 - [ ] At least 1 Out of Scope item explicitly listed
 
 ### Consistency
-- [ ] No conflicts with existing SPECs in `.autopus/specs/`
+- [ ] No conflicts with existing SPECs (check both `.autopus/specs/` and `*/.autopus/specs/`)
 - [ ] Terminology matches codebase conventions
 ```
 
@@ -113,18 +113,18 @@ Flag any checklist failures to the user before saving.
 
 ### Step 5: File Save
 
-Save the completed PRD to the standard location:
+Save the completed PRD to the target module's SPEC directory:
 
 ```
-.autopus/specs/SPEC-{ID}/prd.md
+{target-module}/.autopus/specs/SPEC-{ID}/prd.md
 ```
 
-Where `{ID}` is the next available SPEC identifier (e.g., `SPEC-AUTH-001`).
+Where `{ID}` is the next available SPEC identifier (e.g., `SPEC-AUTH-001`), unique across the entire project. The target module is determined by the spec-writer's module detection logic.
 
 If the directory does not exist, create it:
 
 ```bash
-mkdir -p .autopus/specs/SPEC-{ID}
+mkdir -p {target-module}/.autopus/specs/SPEC-{ID}
 ```
 
 ## Relationship to Other Skills

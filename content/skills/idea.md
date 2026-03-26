@@ -27,11 +27,12 @@ level1_metadata: "멀티 프로바이더 아이디어 토론, SCAMPER/HMW/ICE, B
 
 ## 저장 위치 규칙
 
-BS 파일은 반드시 **현재 git root** 기준으로 저장합니다.
+BS 파일은 **대상 모듈** 기준으로 저장합니다.
 
-1. `git rev-parse --show-toplevel`로 git root를 감지
-2. `{git-root}/.autopus/brainstorms/`에 BS 파일 생성
-3. BS ID는 해당 git root 내에서 자동 증분
+1. 아이디어 설명에서 관련 코드를 검색하여 대상 서브모듈을 자동 감지
+2. `{target-module}/.autopus/brainstorms/`에 BS 파일 생성
+3. 감지 실패 시 CWD 기준 `.autopus/brainstorms/`에 저장
+4. BS ID는 프로젝트 전체에서 유일해야 함: `.autopus/brainstorms/BS-*` AND `*/.autopus/brainstorms/BS-*` 스캔
 
 이 규칙은 monorepo, submodule, 독립 repo 모든 경우에 동일하게 적용됩니다.
 
@@ -88,11 +89,11 @@ auto orchestra brainstorm "{structured idea}" --strategy {strategy}
 
 BS-{ID} 파일 저장 후 Workflow Lifecycle 바 표시 및 다음 단계 안내.
 
-**ID 자동 증분**: `{git-root}/.autopus/brainstorms/BS-{ID}.md` 파일이 이미 존재하면 ID를 증분합니다.
+**ID 자동 증분**: `{target-module}/.autopus/brainstorms/BS-{ID}.md` 파일이 이미 존재하면 ID를 증분합니다. 전체 프로젝트 스캔으로 ID 유일성을 보장합니다.
 
 ## BS 파일 형식
 
-`{git-root}/.autopus/brainstorms/BS-{ID}.md`:
+`{target-module}/.autopus/brainstorms/BS-{ID}.md`:
 
 ```markdown
 # BS-{ID}: {title}
