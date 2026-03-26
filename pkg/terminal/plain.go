@@ -27,5 +27,16 @@ func (a *PlainAdapter) SendCommand(_ context.Context, _ PaneID, _ string) error 
 // Notify is a no-op.
 func (a *PlainAdapter) Notify(_ context.Context, _ string) error { return nil }
 
+// ReadScreen is a no-op that returns an empty string.
+func (a *PlainAdapter) ReadScreen(_ context.Context, _ PaneID, _ ReadScreenOpts) (string, error) {
+	return "", nil
+}
+
+// PipePaneStart is a no-op.
+func (a *PlainAdapter) PipePaneStart(_ context.Context, _ PaneID, _ string) error { return nil }
+
+// PipePaneStop is a no-op.
+func (a *PlainAdapter) PipePaneStop(_ context.Context, _ PaneID) error { return nil }
+
 // Close is a no-op.
 func (a *PlainAdapter) Close(_ context.Context, _ string) error { return nil }

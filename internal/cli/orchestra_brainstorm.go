@@ -13,6 +13,7 @@ func newOrchestraBrainstormCmd() *cobra.Command {
 		providers []string
 		timeout   int
 		judge     string
+		noDetach  bool
 	)
 
 	cmd := &cobra.Command{
@@ -27,7 +28,7 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			prompt := buildBrainstormPrompt(args[0])
-			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, false, keepRelay)
+			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, noDetach, keepRelay)
 		},
 	}
 
@@ -36,6 +37,7 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 	// @AX:NOTE: [AUTO] magic constant — default timeout 120s matches orchestra consensus SLA
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
 	cmd.Flags().StringVar(&judge, "judge", "", "debate 전략에서 최종 판정 프로바이더")
+	cmd.Flags().BoolVar(&noDetach, "no-detach", false, "Disable auto-detach mode")
 	cmd.Flags().Bool("keep-relay-output", false, "relay 전략 실행 후 임시 파일 보존")
 
 	return cmd

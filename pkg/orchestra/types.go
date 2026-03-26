@@ -2,6 +2,7 @@
 package orchestra
 
 import (
+	"regexp"
 	"slices"
 	"time"
 
@@ -74,4 +75,24 @@ type OrchestraConfig struct {
 	Terminal       terminal.Terminal // Optional terminal for pane-based execution. Nil means non-interactive mode.
 	NoDetach        bool              // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
 	KeepRelayOutput bool              // when true, preserve temp relay output files after execution
+	Interactive     bool              // when true, use interactive pane mode instead of sentinel-based
 }
+
+// CompletionPattern defines a provider-specific prompt detection pattern.
+type CompletionPattern struct {
+	Provider string         // provider name (claude, codex, gemini)
+	Pattern  *regexp.Regexp // compiled regex for prompt detection
+}
+
+// DefaultCompletionPatterns returns the built-in prompt patterns for known providers.
+// @AX:NOTE [AUTO] hardcoded provider prompt patterns — update when adding new providers
+func DefaultCompletionPatterns() []CompletionPattern {
+	return []CompletionPattern{
+		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^>\s*$`)},
+		{Provider: "codex", Pattern: regexp.MustCompile(`(?m)^codex>\s*$`)},
+		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^>\s*$`)},
+	}
+}
+
+// IdleThreshold is the default duration for idle detection (no new output).
+const IdleThreshold = 10 * time.Second

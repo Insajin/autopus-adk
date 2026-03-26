@@ -16,6 +16,12 @@ const (
 // PaneID is the identifier for a terminal pane.
 type PaneID string
 
+// ReadScreenOpts configures ReadScreen behavior.
+type ReadScreenOpts struct {
+	Scrollback bool // include scrollback buffer
+	Lines      int  // limit to N lines (0 = all)
+}
+
 // Terminal is the unified interface for terminal multiplexer adapters.
 // @AX:ANCHOR [AUTO] core public API contract — all adapters (cmux, tmux, plain) implement this interface
 // @AX:REASON: any method signature change here breaks all three adapters and every CLI handler that calls them; treat as a stable boundary
@@ -30,6 +36,12 @@ type Terminal interface {
 	SendCommand(ctx context.Context, paneID PaneID, cmd string) error
 	// Notify displays a notification message in the terminal.
 	Notify(ctx context.Context, message string) error
+	// ReadScreen reads the visible content of the specified pane.
+	ReadScreen(ctx context.Context, paneID PaneID, opts ReadScreenOpts) (string, error)
+	// PipePaneStart starts streaming pane output to the specified file.
+	PipePaneStart(ctx context.Context, paneID PaneID, outputFile string) error
+	// PipePaneStop stops pipe-pane output streaming.
+	PipePaneStop(ctx context.Context, paneID PaneID) error
 	// Close removes the workspace/session.
 	Close(ctx context.Context, name string) error
 }

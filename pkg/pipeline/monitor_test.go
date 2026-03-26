@@ -35,6 +35,13 @@ func (m *mockTerminal) Close(_ context.Context, _ string) error {
 	m.closed = true
 	return nil
 }
+func (m *mockTerminal) ReadScreen(_ context.Context, _ terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
+	return "", nil
+}
+func (m *mockTerminal) PipePaneStart(_ context.Context, _ terminal.PaneID, _ string) error {
+	return nil
+}
+func (m *mockTerminal) PipePaneStop(_ context.Context, _ terminal.PaneID) error { return nil }
 
 // TestMonitorSession_Start_WithCmux verifies that Start creates 2 panes
 // when a cmux terminal is used.
@@ -141,6 +148,13 @@ func (e *errorTerminal) Close(_ context.Context, _ string) error {
 	e.closed = true
 	return nil
 }
+func (e *errorTerminal) ReadScreen(_ context.Context, _ terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
+	return "", nil
+}
+func (e *errorTerminal) PipePaneStart(_ context.Context, _ terminal.PaneID, _ string) error {
+	return nil
+}
+func (e *errorTerminal) PipePaneStop(_ context.Context, _ terminal.PaneID) error { return nil }
 
 // TestMonitorSession_Start_FirstSplitError verifies Start returns error
 // when the first SplitPane call fails.

@@ -107,6 +107,51 @@ func (a *CmuxAdapter) Close(_ context.Context, name string) error {
 	return nil
 }
 
+// ReadScreen reads pane content via cmux read-screen.
+func (a *CmuxAdapter) ReadScreen(_ context.Context, paneID PaneID, opts ReadScreenOpts) (string, error) {
+	if err := validatePaneID(paneID); err != nil {
+		return "", fmt.Errorf("cmux: %w", err)
+	}
+	args := []string{"read-screen", "--surface", string(paneID)}
+	if opts.Scrollback {
+		args = append(args, "--scrollback")
+	}
+	if opts.Lines > 0 {
+		args = append(args, "--lines", fmt.Sprintf("%d", opts.Lines))
+	}
+	cmd := execCommand("cmux", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("cmux: read-screen pane %s: %w", paneID, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// PipePaneStart starts streaming pane output to a file via cmux pipe-pane.
+func (a *CmuxAdapter) PipePaneStart(_ context.Context, paneID PaneID, outputFile string) error {
+	if err := validatePaneID(paneID); err != nil {
+		return fmt.Errorf("cmux: %w", err)
+	}
+	// SEC-007: shell-escape outputFile to prevent command injection via malicious paths
+	cmd := execCommand("cmux", "pipe-pane", "--surface", string(paneID), "--command", "cat >> '"+strings.ReplaceAll(outputFile, "'", "'\\''")+"'")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("cmux: pipe-pane start pane %s: %w", paneID, err)
+	}
+	return nil
+}
+
+// PipePaneStop stops pipe-pane output streaming via empty command.
+func (a *CmuxAdapter) PipePaneStop(_ context.Context, paneID PaneID) error {
+	if err := validatePaneID(paneID); err != nil {
+		return fmt.Errorf("cmux: %w", err)
+	}
+	cmd := execCommand("cmux", "pipe-pane", "--surface", string(paneID), "--command", "")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("cmux: pipe-pane stop pane %s: %w", paneID, err)
+	}
+	return nil
+}
+
 // parseCmuxRef extracts a typed ref (e.g., "surface:7") from cmux CLI output.
 // Output format: "OK surface:7 workspace:1" or "OK workspace:5".
 func parseCmuxRef(output, refType string) string {

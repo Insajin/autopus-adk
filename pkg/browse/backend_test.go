@@ -25,6 +25,13 @@ func (m *mockTerminal) SendCommand(_ context.Context, _ terminal.PaneID, _ strin
 }
 func (m *mockTerminal) Notify(_ context.Context, _ string) error { return nil }
 func (m *mockTerminal) Close(_ context.Context, _ string) error  { return nil }
+func (m *mockTerminal) ReadScreen(_ context.Context, _ terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
+	return "", nil
+}
+func (m *mockTerminal) PipePaneStart(_ context.Context, _ terminal.PaneID, _ string) error {
+	return nil
+}
+func (m *mockTerminal) PipePaneStop(_ context.Context, _ terminal.PaneID) error { return nil }
 
 // TestNewBackend_CmuxTerminal_ReturnsCmuxBackend verifies that a cmux terminal
 // produces a CmuxBrowserBackend from the factory.

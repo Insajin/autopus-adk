@@ -33,6 +33,11 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 		return RunOrchestra(ctx, cfg)
 	}
 
+	// Interactive mode: use interactive CLI sessions instead of sentinel-based (SPEC-ORCH-006)
+	if cfg.Interactive {
+		return RunInteractivePaneOrchestra(ctx, cfg)
+	}
+
 	// Relay strategy uses sequential pane execution (SPEC-ORCH-005)
 	if cfg.Strategy == StrategyRelay {
 		return runRelayPaneOrchestra(ctx, cfg)
@@ -185,15 +190,18 @@ func buildPaneCommand(provider ProviderConfig, prompt, outputFile string) string
 	// SEC-006: escape binary path to prevent shell metacharacter injection
 	binary := shellEscapeArg(provider.Binary)
 
+	// SEC-007: escape outputFile to prevent command injection
+	safeOutput := shellEscapeArg(outputFile)
+
 	if provider.PromptViaArgs {
 		// SEC-001: use shell-escaped prompt instead of raw double quotes
 		return fmt.Sprintf("%s %s %s | tee %s; echo %s >> %s",
-			binary, args, shellEscapeArg(prompt), outputFile, sentinel, outputFile)
+			binary, args, shellEscapeArg(prompt), safeOutput, sentinel, safeOutput)
 	}
 	// SEC-001: use unique heredoc delimiter to prevent prompt content from terminating it
 	delim := uniqueHeredocDelimiter("PROMPT_EOF", prompt, randomHex())
 	return fmt.Sprintf("%s %s <<'%s'\n%s\n%s\n | tee %s; echo %s >> %s",
-		binary, args, delim, prompt, delim, outputFile, sentinel, outputFile)
+		binary, args, delim, prompt, delim, safeOutput, sentinel, safeOutput)
 }
 
 // waitForSentinel polls the output file until the sentinel marker is found.

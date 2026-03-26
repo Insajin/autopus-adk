@@ -77,6 +77,47 @@ func (a *TmuxAdapter) Notify(_ context.Context, message string) error {
 	return nil
 }
 
+// ReadScreen reads pane content via tmux capture-pane.
+func (a *TmuxAdapter) ReadScreen(_ context.Context, paneID PaneID, opts ReadScreenOpts) (string, error) {
+	if err := validatePaneID(paneID); err != nil {
+		return "", fmt.Errorf("tmux: %w", err)
+	}
+	target := a.session + ":" + string(paneID)
+	cmd := execCommand("tmux", "capture-pane", "-t", target, "-p")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("tmux: capture-pane %s: %w", paneID, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// PipePaneStart starts streaming pane output to a file via tmux pipe-pane.
+func (a *TmuxAdapter) PipePaneStart(_ context.Context, paneID PaneID, outputFile string) error {
+	if err := validatePaneID(paneID); err != nil {
+		return fmt.Errorf("tmux: %w", err)
+	}
+	target := a.session + ":" + string(paneID)
+	// SEC-007: shell-escape outputFile to prevent command injection via malicious paths
+	cmd := execCommand("tmux", "pipe-pane", "-t", target, "-O", "cat >> '"+strings.ReplaceAll(outputFile, "'", "'\\''")+"'")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("tmux: pipe-pane start %s: %w", paneID, err)
+	}
+	return nil
+}
+
+// PipePaneStop stops pipe-pane output streaming via no-arg pipe-pane.
+func (a *TmuxAdapter) PipePaneStop(_ context.Context, paneID PaneID) error {
+	if err := validatePaneID(paneID); err != nil {
+		return fmt.Errorf("tmux: %w", err)
+	}
+	target := a.session + ":" + string(paneID)
+	cmd := execCommand("tmux", "pipe-pane", "-t", target)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("tmux: pipe-pane stop %s: %w", paneID, err)
+	}
+	return nil
+}
+
 // Close kills the named tmux session.
 func (a *TmuxAdapter) Close(_ context.Context, name string) error {
 	cmd := execCommand("tmux", "kill-session", "-t", name)

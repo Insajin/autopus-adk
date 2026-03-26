@@ -70,3 +70,11 @@ func (m *teamMockTerminal) Close(_ context.Context, name string) error {
 	}
 	return nil
 }
+
+func (m *teamMockTerminal) ReadScreen(_ context.Context, _ terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
+	return "", nil
+}
+func (m *teamMockTerminal) PipePaneStart(_ context.Context, _ terminal.PaneID, _ string) error {
+	return nil
+}
+func (m *teamMockTerminal) PipePaneStop(_ context.Context, _ terminal.PaneID) error { return nil }
