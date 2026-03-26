@@ -14,7 +14,7 @@ import (
 )
 
 // newOrchestraCmd creates the orchestra root command.
-// @AX:NOTE: [AUTO] [downgraded from ANCHOR — fan_in < 3] orchestra 서브커맨드 트리의 루트
+// @AX:ANCHOR: [AUTO] CLI entry point — registers all 7 orchestra subcommands; changes here affect all orchestra routes
 func newOrchestraCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "orchestra",
@@ -52,16 +52,18 @@ func newOrchestraReviewCmd() *cobra.Command {
 			// Pass only explicitly set flags; empty string means "use config"
 			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
+			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			prompt := buildReviewPrompt(args)
-			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, noDetach)
+			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, noDetach, keepRelay)
 		},
 	}
 
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
+	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest|relay)")
 	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "사용할 프로바이더 목록")
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
 	cmd.Flags().StringVar(&judge, "judge", "", "debate 전략에서 최종 판정 프로바이더")
 	cmd.Flags().BoolVar(&noDetach, "no-detach", false, "Disable auto-detach mode")
+	cmd.Flags().Bool("keep-relay-output", false, "relay 전략 실행 후 임시 파일 보존")
 
 	return cmd
 }
@@ -82,14 +84,16 @@ func newOrchestraPlanCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
+			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			prompt := fmt.Sprintf("다음 기능 구현 계획을 수립해주세요:\n\n%s", args[0])
-			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt)
+			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt, false, keepRelay)
 		},
 	}
 
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
+	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest|relay)")
 	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "사용할 프로바이더 목록")
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
+	cmd.Flags().Bool("keep-relay-output", false, "relay 전략 실행 후 임시 파일 보존")
 
 	return cmd
 }
@@ -109,14 +113,16 @@ func newOrchestraSecureCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
+			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			prompt := buildSecurePrompt(args)
-			return runOrchestraCommand(cmd.Context(), "secure", flagStrategy, flagProviders, timeout, "", prompt)
+			return runOrchestraCommand(cmd.Context(), "secure", flagStrategy, flagProviders, timeout, "", prompt, false, keepRelay)
 		},
 	}
 
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
+	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest|relay)")
 	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "사용할 프로바이더 목록")
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
+	cmd.Flags().Bool("keep-relay-output", false, "relay 전략 실행 후 임시 파일 보존")
 
 	return cmd
 }
@@ -124,6 +130,7 @@ func newOrchestraSecureCmd() *cobra.Command {
 // runOrchestraCommand resolves config and runs the orchestration.
 // It loads autopus.yaml first, resolves strategy and providers via config,
 // and falls back to buildProviderConfigs when config is unavailable.
+// @AX:ANCHOR: [AUTO] fan_in=4 CLI callers (review, plan, secure, brainstorm); variadic boolFlags order is load-bearing
 func runOrchestraCommand(
 	ctx context.Context,
 	commandName string,
@@ -132,7 +139,7 @@ func runOrchestraCommand(
 	timeout int,
 	judge string,
 	prompt string,
-	noDetach ...bool,
+	boolFlags ...bool,
 ) error {
 	// @AX:NOTE [AUTO] REQ-11 opportunistic GC — fires on every orchestra invocation; 1h TTL
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
@@ -168,22 +175,25 @@ func runOrchestraCommand(
 
 	s := orchestra.Strategy(strategyStr)
 	if !s.IsValid() {
-		return fmt.Errorf("유효하지 않은 전략: %q (가능한 값: consensus, pipeline, debate, fastest)", strategyStr)
+		return fmt.Errorf("유효하지 않은 전략: %q (가능한 값: consensus, pipeline, debate, fastest, relay)", strategyStr)
 	}
 
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다")
 	}
 
-	nd := len(noDetach) > 0 && noDetach[0]
+	// @AX:WARN: [AUTO] positional variadic bool extraction — boolFlags[0]=noDetach, boolFlags[1]=keepRelay; order must match all callers
+	nd := len(boolFlags) > 0 && boolFlags[0]
+	keepRelay := len(boolFlags) > 1 && boolFlags[1]
 	cfg := orchestra.OrchestraConfig{
-		Providers:      providers,
-		Strategy:       s,
-		Prompt:         prompt,
-		TimeoutSeconds: timeout,
-		JudgeProvider:  judge,
-		Terminal:       terminal.DetectTerminal(),
-		NoDetach:       nd,
+		Providers:       providers,
+		Strategy:        s,
+		Prompt:          prompt,
+		TimeoutSeconds:  timeout,
+		JudgeProvider:   judge,
+		Terminal:        terminal.DetectTerminal(),
+		NoDetach:        nd,
+		KeepRelayOutput: keepRelay,
 	}
 
 	providerNames := make([]string, len(providers))
@@ -219,6 +229,7 @@ func runOrchestraCommand(
 
 // buildProviderConfigs converts provider names to ProviderConfig slice.
 // This is the hardcoded fallback used when config is unavailable.
+// @AX:NOTE: [AUTO] hardcoded provider registry — add new providers here and in agenticArgs when expanding provider support
 func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	// Known provider mappings: binary + default args
 	knownProviders := map[string]orchestra.ProviderConfig{

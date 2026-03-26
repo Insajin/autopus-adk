@@ -25,22 +25,25 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
+			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			prompt := buildBrainstormPrompt(args[0])
-			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt)
+			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, false, keepRelay)
 		},
 	}
 
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest)")
+	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest|relay)")
 	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "사용할 프로바이더 목록")
 	// @AX:NOTE: [AUTO] magic constant — default timeout 120s matches orchestra consensus SLA
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
 	cmd.Flags().StringVar(&judge, "judge", "", "debate 전략에서 최종 판정 프로바이더")
+	cmd.Flags().Bool("keep-relay-output", false, "relay 전략 실행 후 임시 파일 보존")
 
 	return cmd
 }
 
 // buildBrainstormPrompt builds a structured brainstorming prompt using SCAMPER and HMW.
 // The prompt instructs the judge to AUGMENT and INTEGRATE ideas rather than filter them.
+// @AX:NOTE: [AUTO] domain-specific prompt engineering — SCAMPER + HMW + ICE scoring; update when framework changes
 func buildBrainstormPrompt(feature string) string {
 	return fmt.Sprintf(`You are a divergent-thinking assistant. Generate creative ideas for the following feature using the SCAMPER framework and HMW questions. Do NOT filter — augment and integrate all ideas.
 

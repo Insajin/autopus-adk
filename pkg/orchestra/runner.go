@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -13,7 +14,7 @@ import (
 )
 
 // RunOrchestra는 설정에 따라 오케스트레이션을 실행한다.
-// @AX:NOTE [AUTO] [downgraded from ANCHOR — fan_in < 3] 오케스트레이션의 주 진입점 — 2개 호출자 (spec_review, orchestra)
+// @AX:ANCHOR: [AUTO] public API — 4 callers (pane_runner x2, orchestra.go, spec_review.go); do not change signature
 func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, error) {
 	if len(cfg.Providers) == 0 {
 		return nil, fmt.Errorf("providers 목록이 비어있습니다")
@@ -23,8 +24,13 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	}
 
 	// Delegate to pane runner when a non-plain terminal is configured
+	// REQ-10: relay strategy does not support pane mode; fall back to standard execution
 	if cfg.Terminal != nil && cfg.Terminal.Name() != "plain" {
-		return RunPaneOrchestra(ctx, cfg)
+		if cfg.Strategy == StrategyRelay {
+			fmt.Fprintf(os.Stderr, "relay pane mode not yet supported — using standard execution\n")
+		} else {
+			return RunPaneOrchestra(ctx, cfg)
+		}
 	}
 
 	// 타임아웃 설정
@@ -54,6 +60,8 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		responses, err = runFastest(timeoutCtx, cfg)
 	case StrategyDebate:
 		responses, err = runDebate(timeoutCtx, cfg)
+	case StrategyRelay:
+		responses, err = runRelay(timeoutCtx, &cfg)
 	default:
 		// consensus: prepend structured prompt prefix, then run parallel with graceful degradation
 		consensusCfg := cfg
@@ -81,6 +89,9 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 			merged = responses[0].Output
 			summary = fmt.Sprintf("최속 응답: %s (%.1fs)", responses[0].Provider, responses[0].Duration.Seconds())
 		}
+	case StrategyRelay:
+		merged = FormatRelay(responses)
+		summary = fmt.Sprintf("릴레이: %d단계 완료", len(responses))
 	}
 
 	// Append failed provider info to summary if any
@@ -112,6 +123,7 @@ type providerResult struct {
 // runParallel executes all providers in parallel with graceful degradation.
 // It collects all successful responses and failed provider info.
 // Returns (responses, failed, error). Error is non-nil only when ALL providers fail.
+// @AX:WARN: [AUTO] goroutines launched without per-goroutine context propagation — cancellation relies on shared ctx
 func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, []FailedProvider, error) {
 	results := make([]providerResult, len(cfg.Providers))
 	var wg sync.WaitGroup
@@ -218,6 +230,7 @@ func runFastest(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, e
 }
 
 // runProvider는 단일 프로바이더를 실행하고 결과를 반환한다.
+// @AX:ANCHOR: [AUTO] internal fan_in=6 (relay, debate x2, runParallel, runPipeline, runFastest); signature is a stable contract
 func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*ProviderResponse, error) {
 	start := time.Now()
 

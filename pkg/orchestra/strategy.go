@@ -10,11 +10,13 @@ import (
 type StrategyFunc func(ctx context.Context, responses []ProviderResponse, cfg OrchestraConfig) (string, string, error)
 
 // strategyHandlers는 전략별 후처리 핸들러 맵이다.
+// @AX:NOTE: [AUTO] global strategy registry — add new strategy here and in runner.go switch when extending strategies
 var strategyHandlers = map[Strategy]StrategyFunc{
 	StrategyConsensus: handleConsensus,
 	StrategyPipeline:  handlePipeline,
 	StrategyDebate:    handleDebate,
 	StrategyFastest:   handleFastest,
+	StrategyRelay:     handleRelay,
 }
 
 // GetStrategyFunc는 전략에 맞는 StrategyFunc를 반환한다.
@@ -42,6 +44,13 @@ func handlePipeline(_ context.Context, responses []ProviderResponse, _ Orchestra
 // handleDebate는 토론 전략 후처리이다.
 func handleDebate(_ context.Context, responses []ProviderResponse, cfg OrchestraConfig) (string, string, error) {
 	merged, summary := buildDebateMerged(responses, cfg)
+	return merged, summary, nil
+}
+
+// handleRelay is the relay strategy post-processor.
+func handleRelay(_ context.Context, responses []ProviderResponse, _ OrchestraConfig) (string, string, error) {
+	merged := FormatRelay(responses)
+	summary := fmt.Sprintf("릴레이: %d단계 완료", len(responses))
 	return merged, summary, nil
 }
 

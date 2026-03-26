@@ -2,6 +2,7 @@
 package orchestra
 
 import (
+	"slices"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
@@ -15,19 +16,15 @@ const (
 	StrategyPipeline  Strategy = "pipeline"
 	StrategyDebate    Strategy = "debate"
 	StrategyFastest   Strategy = "fastest"
+	StrategyRelay     Strategy = "relay"
 )
 
 // ValidStrategies는 유효한 전략 목록이다.
-var ValidStrategies = []Strategy{StrategyConsensus, StrategyPipeline, StrategyDebate, StrategyFastest}
+var ValidStrategies = []Strategy{StrategyConsensus, StrategyPipeline, StrategyDebate, StrategyFastest, StrategyRelay}
 
 // IsValid는 전략의 유효성을 검증한다.
 func (s Strategy) IsValid() bool {
-	for _, v := range ValidStrategies {
-		if s == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ValidStrategies, s)
 }
 
 // ProviderConfig는 프로바이더 실행 설정이다.
@@ -75,5 +72,6 @@ type OrchestraConfig struct {
 	JudgeProvider  string            // debate 전략에서 최종 판정 프로바이더
 	DebateRounds   int               // Number of debate rounds (1=no rebuttal, 2=with rebuttal). 0 defaults to 1.
 	Terminal       terminal.Terminal // Optional terminal for pane-based execution. Nil means non-interactive mode.
-	NoDetach       bool              // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
+	NoDetach        bool              // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
+	KeepRelayOutput bool              // when true, preserve temp relay output files after execution
 }

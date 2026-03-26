@@ -23,7 +23,6 @@ func TestStrategy_IsValid(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.want, tc.strategy.IsValid())
@@ -33,7 +32,7 @@ func TestStrategy_IsValid(t *testing.T) {
 
 func TestValidStrategies_Count(t *testing.T) {
 	t.Parallel()
-	assert.Len(t, ValidStrategies, 4)
+	assert.Len(t, ValidStrategies, 5)
 }
 
 func TestOrchestraConfig_Fields(t *testing.T) {
