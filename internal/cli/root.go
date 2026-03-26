@@ -76,6 +76,10 @@ func newVersionCmd() *cobra.Command {
 
 // Execute runs the CLI.
 func Execute() {
+	// Initialize styles with NO_COLOR guard for non-TTY environments.
+	// Must run before any lipgloss.NewStyle() or .Render() call.
+	tui.InitStyles()
+
 	if err := NewRootCmd().Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
