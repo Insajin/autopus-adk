@@ -104,7 +104,10 @@ format_reset() {
 
 # --- Version check (cached, non-blocking) ---
 get_current_version() {
-  auto version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//' || echo "0.6.0"
+  # NO_COLOR=1 prevents lipgloss OSC 11 hang in non-TTY environments
+  local ver
+  ver=$(NO_COLOR=1 auto version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  echo "${ver:-unknown}"
 }
 
 check_latest_version() {

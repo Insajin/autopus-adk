@@ -54,14 +54,26 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 	}
 
 	// Build hooks in Claude Code nested schema, merging with existing user hooks.
-	// Autopus-managed event keys (PreToolUse, PostToolUse) are replaced;
+	// Autopus-managed event keys are replaced entirely to prevent duplication;
 	// other event keys set by the user are preserved.
 	if len(hooks) > 0 {
 		existingHooks, _ := settings["hooks"].(map[string]any)
 		hooksMap := make(map[string]any)
-		for k, v := range existingHooks {
-			hooksMap[k] = v
+
+		// Collect which event keys autopus manages
+		managedEvents := make(map[string]bool)
+		for _, h := range hooks {
+			managedEvents[h.Event] = true
 		}
+
+		// Preserve user-defined event keys that autopus does not manage
+		for k, v := range existingHooks {
+			if !managedEvents[k] {
+				hooksMap[k] = v
+			}
+		}
+
+		// Set autopus-managed events fresh (no append to existing)
 		for _, h := range hooks {
 			entry := map[string]any{
 				"matcher": h.Matcher,
