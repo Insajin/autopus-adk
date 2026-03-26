@@ -118,15 +118,21 @@ autopus-adk/
 │   │   ├── hash.go              #     해시 검색
 │   │   └── client.go            #     통합 클라이언트
 │   ├── orchestra/               #   멀티-모델 오케스트레이션
-│   │   ├── types.go             #     Strategy enum, FailedProvider
+│   │   ├── types.go             #     Strategy enum, FailedProvider, OrchestraConfig
 │   │   ├── command.go           #     명령 처리
 │   │   ├── runner.go            #     실행기 (graceful degradation)
 │   │   ├── strategy.go          #     전략 구현
 │   │   ├── debate.go            #     2-phase debate + judge 판정
 │   │   ├── consensus.go         #     구조화 합의 추출
+│   │   ├── merger.go            #     응답 병합 유틸리티
+│   │   ├── relay.go             #     Relay 전략 (agentic one-shot 순차)
+│   │   ├── relay_pane.go        #     Relay pane 인터랙티브 모드
 │   │   ├── job.go               #     Job struct, persistence, status, cleanup
 │   │   ├── detach.go            #     Detach mode entry, ShouldDetach() 판정
-│   │   └── pane_runner.go       #     Pane 오케스트레이션, RunPaneOrchestraDetached()
+│   │   ├── pane_runner.go       #     Pane 오케스트레이션, RunPaneOrchestraDetached()
+│   │   ├── pane_shell.go        #     Shell 이스케이프, 프로바이더명 정제
+│   │   ├── interactive.go       #     인터랙티브 pane 실행 플로우 (pipe capture, session launch, completion wait)
+│   │   └── interactive_detect.go #    완료 감지 로직 (프롬프트 패턴, idle 감지, ANSI 스트립)
 │   ├── template/                #   템플릿 엔진
 │   │   ├── engine.go            #     Go template 래퍼
 │   │   └── funcmap.go           #     커스텀 함수
