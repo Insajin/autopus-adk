@@ -1,6 +1,6 @@
 # SPEC-TEAMPANE-001: Agent Teams 터미널 패널 시각화
 
-**Status**: implemented
+**Status**: completed
 **Created**: 2026-03-26
 **Revision**: 2
 **Domain**: TEAMPANE
