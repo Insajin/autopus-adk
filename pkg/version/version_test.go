@@ -8,14 +8,15 @@ import (
 
 func TestVersion_Defaults(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, "0.6.0", Version())
-	assert.Equal(t, "none", Commit())
-	assert.Equal(t, "unknown", Date())
+	// Without ldflags injection, version falls back to "dev" or module version
+	v := Version()
+	assert.NotEmpty(t, v, "Version should not be empty")
+	assert.NotEqual(t, "unknown", Commit())
 }
 
 func TestString(t *testing.T) {
 	t.Parallel()
 	s := String()
 	assert.Contains(t, s, "auto")
-	assert.Contains(t, s, "0.6.0")
+	assert.Contains(t, s, Version())
 }

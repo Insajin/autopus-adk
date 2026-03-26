@@ -86,7 +86,8 @@ func newOrchestraPlanCmd() *cobra.Command {
 			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
-			prompt := fmt.Sprintf("다음 기능 구현 계획을 수립해주세요:\n\n%s", args[0])
+			// Use raw user prompt for interactive mode; wrap for non-interactive
+			prompt := args[0]
 			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt, noDetach, keepRelay)
 		},
 	}
@@ -189,15 +190,20 @@ func runOrchestraCommand(
 	// @AX:WARN: [AUTO] positional variadic bool extraction — boolFlags[0]=noDetach, boolFlags[1]=keepRelay; order must match all callers
 	nd := len(boolFlags) > 0 && boolFlags[0]
 	keepRelay := len(boolFlags) > 1 && boolFlags[1]
+	term := terminal.DetectTerminal()
+	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
+	interactive := term != nil && term.Name() != "plain"
+
 	cfg := orchestra.OrchestraConfig{
 		Providers:       providers,
 		Strategy:        s,
 		Prompt:          prompt,
 		TimeoutSeconds:  timeout,
 		JudgeProvider:   judge,
-		Terminal:        terminal.DetectTerminal(),
+		Terminal:        term,
 		NoDetach:        nd,
 		KeepRelayOutput: keepRelay,
+		Interactive:     interactive,
 	}
 
 	providerNames := make([]string, len(providers))

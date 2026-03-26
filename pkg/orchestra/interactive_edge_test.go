@@ -161,8 +161,8 @@ func TestInteractive_SendPrompt_Error(t *testing.T) {
 	assert.True(t, result.Responses[0].TimedOut, "prompt send failure should mark provider as timed out")
 }
 
-// TestInteractive_LaunchWithPaneArgs verifies PaneArgs are used in launch command.
-func TestInteractive_LaunchWithPaneArgs(t *testing.T) {
+// TestInteractive_LaunchWithBareBinary verifies interactive mode launches binary alone without flags.
+func TestInteractive_LaunchWithBareBinary(t *testing.T) {
 	mock := newCmuxMock()
 	mock.readScreenOutput = ">\n"
 	cfg := OrchestraConfig{
@@ -178,12 +178,10 @@ func TestInteractive_LaunchWithPaneArgs(t *testing.T) {
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	// First sendCommand call should be the launch with PaneArgs
+	// First sendCommand call should be the bare binary name (no -p or --json)
 	require.True(t, len(mock.sendCommandCalls) >= 1)
 	launchCmd := mock.sendCommandCalls[0].Cmd
-	assert.Contains(t, launchCmd, "claude")
-	assert.Contains(t, launchCmd, "--json")
-	assert.NotContains(t, launchCmd, "-p", "PaneArgs should override Args")
+	assert.Equal(t, "claude\n", launchCmd, "interactive mode should launch bare binary with Enter")
 }
 
 // TestInteractive_ReadScreenError_ContinuesPolling verifies ReadScreen errors don't break polling.

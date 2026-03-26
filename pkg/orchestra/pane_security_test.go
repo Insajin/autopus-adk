@@ -114,7 +114,7 @@ func TestBuildPaneCommand_SpecialCharsInPrompt(t *testing.T) {
 			p := ProviderConfig{Name: "test", Binary: "test", PromptViaArgs: tt.viaArg}
 			cmd := buildPaneCommand(p, tt.prompt, "/tmp/out.txt")
 			assert.Contains(t, cmd, sentinel)
-			assert.Contains(t, cmd, "tee /tmp/out.txt")
+			assert.Contains(t, cmd, "tee '/tmp/out.txt'")
 		})
 	}
 }

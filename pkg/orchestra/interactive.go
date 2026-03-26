@@ -88,16 +88,14 @@ func startPipeCapture(ctx context.Context, term terminal.Terminal, panes []paneI
 }
 
 // launchInteractiveSessions sends the provider binary name to each pane to start an interactive session.
-// Uses PaneArgs if set (R6), otherwise just the binary name.
+// In interactive mode, we launch the bare binary (no -p/-q flags) to get a real CLI session.
 func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []FailedProvider {
 	var failed []FailedProvider
 	for i, pi := range panes {
-		// R6: if pane_args is empty, launch binary alone (interactive mode)
-		cmd := pi.provider.Binary
-		args := paneArgs(pi.provider)
-		if len(args) > 0 {
-			cmd = cmd + " " + shellEscapeArgs(args)
-		}
+		// Interactive mode: launch binary alone without print/pipe flags
+		// The user prompt will be sent separately via sendPrompts()
+		// Append \n to press Enter (cmux send requires explicit \n for Enter)
+		cmd := pi.provider.Binary + "\n"
 		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, cmd); err != nil {
 			failed = append(failed, FailedProvider{
 				Name:  pi.provider.Name,
@@ -116,7 +114,7 @@ func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []pa
 		if pi.skipWait {
 			continue
 		}
-		pollUntilPrompt(ctx, term, pi.paneID, patterns, 5*time.Second)
+		pollUntilPrompt(ctx, term, pi.paneID, patterns, 30*time.Second)
 	}
 }
 
@@ -151,7 +149,8 @@ func sendPrompts(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []F
 		if pi.skipWait {
 			continue
 		}
-		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, cfg.Prompt); err != nil {
+		// Append \n to press Enter after prompt (cmux send requires explicit \n)
+		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, cfg.Prompt+"\n"); err != nil {
 			failed = append(failed, FailedProvider{
 				Name:  pi.provider.Name,
 				Error: fmt.Sprintf("send prompt failed: %v", err),

@@ -89,7 +89,7 @@ func TestBuildPaneCommand_PromptViaArgs(t *testing.T) {
 	cmd := buildPaneCommand(p, "hello world", "/tmp/test.out")
 	// SEC-001: prompt is now single-quoted for shell safety
 	assert.Contains(t, cmd, "'hello world'")
-	assert.Contains(t, cmd, "tee /tmp/test.out")
+	assert.Contains(t, cmd, "tee '/tmp/test.out'")
 	assert.NotContains(t, cmd, "PROMPT_EOF")
 }
 
@@ -100,7 +100,7 @@ func TestBuildPaneCommand_StdinMode(t *testing.T) {
 	cmd := buildPaneCommand(p, "test prompt", "/tmp/test.out")
 	assert.Contains(t, cmd, "PROMPT_EOF")
 	assert.Contains(t, cmd, "test prompt")
-	assert.Contains(t, cmd, "tee /tmp/test.out")
+	assert.Contains(t, cmd, "tee '/tmp/test.out'")
 }
 
 // TestReadOutputFile_StripsSentinel covers sentinel stripping in readOutputFile.
