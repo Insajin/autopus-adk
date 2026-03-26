@@ -4,20 +4,20 @@
 
 ### The Autopus where AI agents remember, debate, and ship.
 
-**Superpowers for AI Coding CLIs — 16 agents, 37 skills, one config, every platform.**
+**Superpowers for AI Coding CLIs — 16 agents, 40 skills, one config, every platform.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://golang.org)
-[![Platforms](https://img.shields.io/badge/Platforms-5-orange)](#-one-config-five-platforms)
+[![Platforms](https://img.shields.io/badge/Platforms-3-orange)](#-one-config-three-platforms)
 [![Agents](https://img.shields.io/badge/Agents-16-blueviolet)](#-16-specialized-agents)
-[![Skills](https://img.shields.io/badge/Skills-37-ff69b4)](#-all-commands)
+[![Skills](https://img.shields.io/badge/Skills-40-ff69b4)](#-all-commands)
 
 ```bash
 curl -sSfL https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.sh | sh
 ```
 
-[Why Autopus](#-the-problem) · [**Core Workflow**](#-the-workflow-three-commands-to-ship) · [Features](#-what-makes-autopus-different) · [Pipeline](#-the-pipeline) · [Docs](#-all-commands)
+[Why Autopus](#-the-problem) · [**Core Workflow**](#-the-workflow-three-commands-to-ship) · [Features](#-what-makes-autopus-different) · [Pipeline](#-the-pipeline) · [Security](#-security) · [Docs](#-all-commands)
 
 [🇰🇷 한국어](docs/README.ko.md)
 
@@ -276,7 +276,7 @@ Autopus analyzes your codebase (Cobra commands, API routes, frontend pages) and 
 | **Signature Map** | `auto setup` | Extract exported API signatures (Go + TypeScript) via AST analysis |
 | **Test Runner Detection** | `auto init` | Auto-detect jest, vitest, pytest, cargo test frameworks |
 
-### 🌐 One Config, Five Platforms
+### 🌐 One Config, Three Platforms
 
 ```bash
 auto init   # auto-detects all installed AI coding CLIs
@@ -289,10 +289,8 @@ One `autopus.yaml` generates **native configuration** for every detected platfor
 | **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
 | **Codex** | `.codex/`, `AGENTS.md` |
 | **Gemini CLI** | `.gemini/`, `GEMINI.md` |
-| **Cursor** | `.cursor/rules/`, `.cursorrules` |
-| **OpenCode** | `.opencode/`, `agents.json` |
 
-Same 16 agents. Same 37 skills. Same rules. **Everywhere.**
+Same 16 agents. Same 40 skills. Same rules. **Everywhere.**
 
 ---
 
@@ -327,7 +325,7 @@ cd your-project
 auto init
 ```
 
-`auto init` scans your machine for installed AI coding CLIs (Claude Code, Codex, Gemini CLI, Cursor, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
+`auto init` scans your machine for installed AI coding CLIs (Claude Code, Codex, Gemini CLI) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
 
 ```
 ✓ Detected: claude-code, gemini-cli
@@ -580,7 +578,7 @@ Providers: **Claude** · **Codex** · **Gemini** — with graceful degradation.
 ## 📖 All Commands
 
 <details>
-<summary><strong>CLI Commands</strong> (28 root commands, 55+ total with subcommands)</summary>
+<summary><strong>CLI Commands</strong> (26 root commands, 85 total with subcommands)</summary>
 
 | Command | Description |
 |---------|-------------|
@@ -588,26 +586,27 @@ Providers: **Claude** · **Codex** · **Gemini** — with graceful degradation.
 | `auto update` | Update harness (preserves user edits via markers) |
 | `auto doctor` | Health diagnostics |
 | `auto platform` | Manage platforms (list / add / remove) |
-| `auto arch` | Architecture analysis (generate / lint) |
+| `auto arch` | Architecture analysis (generate / enforce) |
 | `auto spec` | SPEC management (new / validate / review) |
 | `auto lore` | Decision tracking (context / commit / validate / stale) |
-| `auto orchestra` | Multi-model orchestration (review / plan / secure / brainstorm) |
-| `auto setup` | Project context documents (generate / update / validate) |
+| `auto orchestra` | Multi-model orchestration (review / plan / secure / brainstorm / job-status / job-wait / job-result) |
+| `auto setup` | Project context documents (generate / update / validate / status) |
 | `auto status` | SPEC dashboard (done / in-progress / draft) |
 | `auto telemetry` | Pipeline telemetry (record / summary / cost / compare) |
-| `auto skill` | Skill management (list / info) |
+| `auto skill` | Skill management (list / info / create) |
 | `auto search` | Knowledge search (Exa) |
 | `auto docs` | Library documentation lookup (Context7) |
-| `auto lsp` | LSP integration (diagnostics / refs / rename / symbols) |
+| `auto lsp` | LSP integration (diagnostics / refs / rename / symbols / definition) |
 | `auto verify` | Frontend UX verification (Playwright + VLM) |
 | `auto check` | Harness rule checks (anti-pattern scanning) |
 | `auto hash` | File hashing (xxhash) |
-| `auto issue` | Auto issue reporter (error context collection, GitHub submission) |
-| `auto experiment` | Autonomous experiment loop (metric-driven keep/discard) |
-| `auto test` | E2E scenario runner (generate, execute, verify) |
-| `auto react` | Reaction engine (CI failure detection, fix reports) |
-| `auto agent create` | Meta-agent builder (scaffold custom agents) |
-| `auto skill create` | Meta-skill builder (scaffold custom skills) |
+| `auto issue` | Auto issue reporter (report / list / search) |
+| `auto experiment` | Autonomous experiment loop (init / metric / record / commit / reset / summary / status) |
+| `auto test` | E2E scenario runner (run) |
+| `auto react` | Reaction engine (check / apply) |
+| `auto agent` | Agent management (create / run) |
+| `auto terminal` | Terminal multiplexer management (detect / workspace / split / send / notify) |
+| `auto pipeline` | Pipeline state management and monitoring |
 | `auto update --self` | CLI binary self-update (GitHub Releases + SHA256) |
 
 </details>
@@ -691,31 +690,107 @@ orchestra:
 ```
 autopus-adk/
 ├── cmd/auto/           # Entry point
-├── internal/cli/       # 28 Cobra commands (55+ with subcommands)
+├── internal/cli/       # 26 Cobra commands (85 total with subcommands)
 ├── pkg/
-│   ├── adapter/        # 5 platform adapters (Claude, Codex, Gemini, Cursor, OpenCode)
-│   ├── orchestra/      # Multi-model orchestration (4 strategies + brainstorm)
+│   ├── adapter/        # 3 platform adapters (Claude, Codex, Gemini)
+│   ├── orchestra/      # Multi-model orchestration (4 strategies + brainstorm + job management)
 │   ├── spec/           # SPEC engine (EARS format)
 │   ├── lore/           # Decision tracking (9-trailer protocol)
-│   ├── content/        # Agent/skill/hook generation + skill activator
+│   ├── content/        # Agent/skill/hook/profile generation + skill activator
 │   ├── arch/           # Architecture analysis + rule enforcement
 │   ├── sigmap/         # go/ast API signature extraction
 │   ├── constraint/     # Anti-pattern scanning
-│   ├── telemetry/      # Pipeline telemetry + cost estimation
+│   ├── telemetry/      # Pipeline telemetry (JSONL event recording)
 │   ├── cost/           # Token-based cost estimator
-│   ├── setup/          # Project doc generation
+│   ├── setup/          # Project doc generation + validation
 │   ├── lsp/            # LSP integration
-│   ├── search/         # Knowledge search (Context7/Exa)
+│   ├── search/         # Knowledge search (Context7/Exa) + hash-based search
 │   ├── issue/          # Auto issue reporter (context collection, sanitization)
 │   ├── experiment/     # Autonomous experiment loop (metric execution, circuit breaker)
 │   ├── e2e/            # E2E scenario generation, execution, verification
 │   ├── selfupdate/     # CLI binary self-update (SHA256, atomic replace)
-│   ├── pipeline/       # Pipeline state persistence + checkpoint resume
-│   └── ...             # template, detect, config, version
+│   ├── pipeline/       # Pipeline state persistence + checkpoint resume + monitoring
+│   ├── browse/         # Browser automation backend (cmux/agent-browser routing)
+│   ├── terminal/       # Terminal multiplexer adapters (cmux, tmux, plain)
+│   ├── detect/         # Framework detection + test runner identification
+│   └── ...             # template, config, version
 ├── templates/          # Platform-specific templates
-├── content/            # Embedded content (16 agents, 37 skills)
+├── content/            # Embedded content (16 agents, 40 skills)
 └── configs/            # Default configuration
 ```
+
+---
+
+## 🔒 Security
+
+### 🛡️ Supply Chain Attack Protection
+
+> *"A popular Python package with tens of millions of monthly downloads was injected with malicious code. A simple `pip install` could steal SSH keys, AWS credentials, and DB passwords — not from the package you installed, but from somewhere deep in its dependency tree."* — [Andrej Karpathy](https://x.com/karpathy)
+
+AI coding environments make this worse: agents auto-install packages, expand dependency trees, and execute code — all without human review. **Autopus builds defense into the pipeline itself.**
+
+#### How Autopus Protects Your Development Workflow
+
+| Layer | Protection | How |
+|-------|-----------|-----|
+| **Pipeline Gate** | Dependency vulnerability scan at every `/auto go` | Security Auditor agent runs `govulncheck ./...` in Phase 4 |
+| **Secret Detection** | Hardcoded credentials caught before commit | `gitleaks detect` scans all changed files |
+| **Dependency Audit** | Known CVE detection in dependency tree | `go list -m -json all \| nancy sleuth` for Go projects |
+| **Lock File Integrity** | Checksum-verified dependencies | Go's `go.sum` ensures reproducible, tamper-proof builds |
+| **OWASP Top 10** | Injection, auth bypass, SSRF — all checked | Security Auditor covers A01–A10 systematically |
+| **AI Agent Guardrails** | Agents can't blindly install packages | Harness rules constrain agent actions; security gate blocks deploy on FAIL |
+
+#### For Non-Go Projects
+
+The same principles apply when Autopus manages Python, Node.js, or other ecosystems:
+
+```yaml
+# autopus.yaml — configure per-ecosystem security scans
+security:
+  scanners:
+    go: "govulncheck ./..."
+    python: "pip-audit && safety check"
+    node: "npm audit --audit-level=high"
+```
+
+**Best practices enforced by the harness:**
+- **Version pinning** — Lock all dependencies to exact versions (`go.sum`, `package-lock.json`, `requirements.txt`)
+- **Minimal dependencies** — The 300-line file limit and single-responsibility rule naturally reduce unnecessary imports
+- **Isolation** — Parallel executors run in isolated git worktrees; no cross-contamination between tasks
+- **No blind installs** — Security Auditor agent flags unknown or unvetted packages before they enter the codebase
+
+### Binary Distribution Safety
+
+Every binary release includes **SHA256 checksums** (`checksums.txt`), verified automatically during installation. No blind `curl | sh` — every download is integrity-checked before execution.
+
+**Recommended: Inspect before you install**
+
+```bash
+# 1. Download the script first — review it before running
+curl -sSfL https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.sh -o install.sh
+less install.sh          # Read what it does
+sh install.sh            # Run only after review
+```
+
+**Or verify manually:**
+
+```bash
+# Download binary + checksums separately
+VERSION=$(curl -s https://api.github.com/repos/Insajin/autopus-adk/releases/latest | grep tag_name | sed 's/.*"v\(.*\)".*/\1/')
+curl -LO "https://github.com/Insajin/autopus-adk/releases/download/v${VERSION}/autopus-adk_${VERSION}_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz"
+curl -LO "https://github.com/Insajin/autopus-adk/releases/download/v${VERSION}/checksums.txt"
+
+# Verify SHA256
+shasum -a 256 -c checksums.txt --ignore-missing
+```
+
+`auto update --self` also verifies SHA256 checksums before replacing the binary.
+
+### What We Don't Do
+
+- No telemetry or analytics collection
+- No network calls except explicit commands (`orchestra`, `search`, `update --self`)
+- No access to your AI provider API keys — Autopus orchestrates CLI tools, not API calls
 
 ---
 

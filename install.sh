@@ -53,6 +53,24 @@ download() {
     fi
 }
 
+# SHA256 체크섬 검증
+verify_checksum() {
+    archive="$1"
+    expected_checksum="$2"
+
+    if command -v sha256sum > /dev/null 2>&1; then
+        actual=$(sha256sum "$archive" | awk '{print $1}')
+    elif command -v shasum > /dev/null 2>&1; then
+        actual=$(shasum -a 256 "$archive" | awk '{print $1}')
+    else
+        err "sha256sum 또는 shasum이 필요합니다 (체크섬 검증 불가)"
+    fi
+
+    if [ "$actual" != "$expected_checksum" ]; then
+        err "체크섬 불일치! 다운로드가 변조되었을 수 있습니다.\n  expected: ${expected_checksum}\n  actual:   ${actual}"
+    fi
+}
+
 main() {
     OS="$(detect_os)"
     ARCH="$(detect_arch)"
@@ -65,13 +83,26 @@ main() {
     info "autopus-adk v${VERSION} 설치 중... (${OS}/${ARCH})"
 
     ARCHIVE="autopus-adk_${VERSION}_${OS}_${ARCH}.tar.gz"
-    URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARCHIVE}"
+    BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}"
+    URL="${BASE_URL}/${ARCHIVE}"
+    CHECKSUMS_URL="${BASE_URL}/checksums.txt"
 
     TMPDIR="$(mktemp -d)"
     trap 'rm -rf "$TMPDIR"' EXIT
 
     info "다운로드: ${URL}"
     download "$URL" "${TMPDIR}/${ARCHIVE}"
+
+    # SHA256 체크섬 검증
+    info "체크섬 검증 중..."
+    download "$CHECKSUMS_URL" "${TMPDIR}/checksums.txt"
+    EXPECTED=$(grep "${ARCHIVE}" "${TMPDIR}/checksums.txt" | awk '{print $1}')
+    if [ -n "$EXPECTED" ]; then
+        verify_checksum "${TMPDIR}/${ARCHIVE}" "$EXPECTED"
+        ok "체크섬 검증 통과 ✓"
+    else
+        err "checksums.txt에서 ${ARCHIVE}의 체크섬을 찾을 수 없습니다"
+    fi
 
     info "압축 해제 중..."
     tar -xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"

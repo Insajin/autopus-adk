@@ -187,7 +187,7 @@ When displaying the subcommand list (empty `/auto` invocation), use the categori
 | secure | Security audit |
 | stale | Detect stale decisions |
 | verify | Frontend UX verification |
-| browse | Browser automation (agent-browser) |
+| browse | Browser automation (cmux/agent-browser auto-detect) |
 | test | Run E2E scenarios |
 
 **탐색 & 분석**
@@ -1347,41 +1347,74 @@ Frontend UX verification requires Full mode. Run `/auto update` to upgrade.
 
 @.claude/skills/autopus/browser-automation.md
 
-Open a browser and interact with web pages using the agent-browser CLI. Designed for AI agents to directly navigate, inspect, and verify web UIs — including production environments.
+Open a browser and interact with web pages. Automatically selects cmux browser (in cmux terminal) or agent-browser (fallback) based on terminal detection.
 
 ### Prerequisites
 
-agent-browser must be installed: `npm install -g agent-browser && agent-browser install`
+**cmux**: Built-in — no installation needed.
+**agent-browser** (fallback): `npm install -g agent-browser && agent-browser install`
 
 ### Pipeline
 
+#### [REQUIRED] Step 0: Detect Browser Backend
+
+```bash
+BACKEND=$(auto terminal detect)
+```
+
+- `cmux` → Use `cmux browser` commands
+- `tmux` or `plain` → Use `agent-browser` commands
+
+All subsequent steps MUST use the detected backend's command syntax. See browser-automation.md skill for the command mapping table.
+
 #### [REQUIRED] Step 1: Open URL (MUST call Bash tool)
 
+**cmux:**
+```bash
+cmux browser open <url>
+```
+
+**agent-browser:**
 ```bash
 agent-browser open <url>
 ```
 
 If no URL is provided, use the project's production URL from project context or ask the user.
 
-WHEN `--headed` flag is set, add `--headed` to the open command to show browser window.
+WHEN `--headed` flag is set AND backend is agent-browser, add `--headed` to the open command. (cmux always shows in terminal panel — `--headed` is ignored.)
 
 #### [REQUIRED] Step 2: Snapshot — Get Accessibility Tree
 
+**cmux:**
+```bash
+cmux browser --surface <ref> snapshot
+```
+
+**agent-browser:**
 ```bash
 agent-browser snapshot
 ```
 
-Parse the snapshot output to identify interactive elements (`@e1`, `@e2`, etc.) and their roles (button, switch, input, heading, etc.).
+Parse the snapshot output to identify interactive elements and their roles.
 
 #### [REQUIRED] Step 3: Act & Verify
 
-Based on the user's intent, interact with elements and verify results:
+Based on the user's intent, interact with elements and verify results using the detected backend's command syntax. See browser-automation.md skill for the full command mapping.
 
+**cmux example:**
 ```bash
-agent-browser click @e3              # Interact
-agent-browser wait 1000              # Wait for state change
-agent-browser snapshot               # Re-check state
-agent-browser screenshot /tmp/result.png  # Visual evidence
+cmux browser --surface <ref> click --selector "@e3"
+cmux browser --surface <ref> wait --text "Updated"
+cmux browser --surface <ref> snapshot
+cmux browser --surface <ref> screenshot --out /tmp/result.png
+```
+
+**agent-browser example:**
+```bash
+agent-browser click @e3
+agent-browser wait --text "Updated"
+agent-browser snapshot
+agent-browser screenshot /tmp/result.png
 ```
 
 Use the Read tool to view captured screenshots and analyze them visually.
@@ -1405,7 +1438,7 @@ Summarize findings:
 | Flag | Description |
 |------|-------------|
 | `--url <url>` | Target URL (default: production URL from project context) |
-| `--headed` | Show browser window (default: headless) |
+| `--headed` | Show browser window (agent-browser only; cmux always shows in terminal) |
 | `--login` | Perform login flow before testing |
 | `--screenshot` | Capture screenshots at each step |
 | `--viewport <size>` | Viewport size: desktop (default), mobile, or WxH |
@@ -1415,6 +1448,7 @@ Summarize findings:
 - **Read-only by default**: Do not click destructive actions (delete, remove, reset) unless explicitly requested
 - **Production caution**: Warn before performing write operations on production environments
 - **Screenshot evidence**: Capture screenshots before and after state-changing actions
+- **Backend consistency**: Once detected, use the same backend throughout the session. Do not mix cmux browser and agent-browser commands.
 
 Usage: `/auto browse`, `/auto browse --url https://example.com/settings`, `/auto browse --headed --login`
 
