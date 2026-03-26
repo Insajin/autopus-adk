@@ -29,3 +29,7 @@ coverage.html
 sigmap.test
 internal/cli/test-results/
 .claude/analysis/
+.claude/hooks/
+.claude/settings.json
+.claude/settings.local.json
+.claude/statusline.sh
