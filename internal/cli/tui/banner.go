@@ -19,7 +19,7 @@ func Banner(w io.Writer) {
 	line := MutedStyle.Render(strings.Repeat("─", bannerWidth-14))
 	_, _ = fmt.Fprintf(w, "%s %s %s\n", octopus, name, line)
 
-	ver := MutedStyle.Render(fmt.Sprintf("v%s", version.Version()))
+	ver := MutedStyle.Render(version.Version())
 	_, _ = fmt.Fprintf(w, "   %s\n", ver)
 }
 
@@ -30,7 +30,7 @@ func BannerWithInfo(w io.Writer, project, mode string) {
 	line := MutedStyle.Render(strings.Repeat("─", bannerWidth-14))
 	_, _ = fmt.Fprintf(w, "%s %s %s\n", octopus, name, line)
 
-	ver := MutedStyle.Render(fmt.Sprintf("v%s", version.Version()))
+	ver := MutedStyle.Render(version.Version())
 	proj := lipgloss.NewStyle().Foreground(ColorPurple).Render(project)
 	m := MutedStyle.Render(mode)
 	_, _ = fmt.Fprintf(w, "   %s │ %s │ %s\n", ver, proj, m)
