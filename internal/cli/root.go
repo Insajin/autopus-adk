@@ -63,15 +63,22 @@ func NewRootCmd() *cobra.Command {
 }
 
 func newVersionCmd() *cobra.Command {
-	return &cobra.Command{
+	var short bool
+	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			out := cmd.OutOrStdout()
+			if short {
+				fmt.Fprintln(out, version.Version())
+				return
+			}
 			tui.Banner(out)
 			fmt.Fprintln(out, version.String())
 		},
 	}
+	cmd.Flags().BoolVar(&short, "short", false, "Print version number only (no banner)")
+	return cmd
 }
 
 // Execute runs the CLI.

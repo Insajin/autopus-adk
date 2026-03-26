@@ -104,9 +104,9 @@ format_reset() {
 
 # --- Version check (cached, non-blocking) ---
 get_current_version() {
-  # NO_COLOR=1 prevents lipgloss OSC 11 hang in non-TTY environments
+  # --short bypasses Banner/lipgloss entirely, avoiding OSC 11 hang
   local ver
-  ver=$(NO_COLOR=1 auto version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  ver=$(auto version --short 2>/dev/null)
   echo "${ver:-unknown}"
 }
 
