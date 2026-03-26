@@ -33,6 +33,11 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 		return RunOrchestra(ctx, cfg)
 	}
 
+	// Relay strategy uses sequential pane execution (SPEC-ORCH-005)
+	if cfg.Strategy == StrategyRelay {
+		return runRelayPaneOrchestra(ctx, cfg)
+	}
+
 	start := time.Now()
 	timeout := cfg.TimeoutSeconds
 	if timeout <= 0 {

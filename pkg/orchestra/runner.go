@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -24,13 +23,8 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	}
 
 	// Delegate to pane runner when a non-plain terminal is configured
-	// REQ-10: relay strategy does not support pane mode; fall back to standard execution
 	if cfg.Terminal != nil && cfg.Terminal.Name() != "plain" {
-		if cfg.Strategy == StrategyRelay {
-			fmt.Fprintf(os.Stderr, "relay pane mode not yet supported — using standard execution\n")
-		} else {
-			return RunPaneOrchestra(ctx, cfg)
-		}
+		return RunPaneOrchestra(ctx, cfg)
 	}
 
 	// 타임아웃 설정
