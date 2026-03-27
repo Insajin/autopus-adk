@@ -2,9 +2,9 @@
 
 # 🐙 Autopus-ADK
 
-### AI 개발을 위한 운영 체제
+### 에이전트*로 이루어진*, 에이전트*에 의해 운영되는*, 에이전트*를 위한* 하네스.
 
-**AI 에이전트가 자동완성만 하는 시대는 끝났습니다 — 기획하고, 토론하고, 구현하고, 테스트하고, 리뷰하고, 배포합니다.**
+**16개 에이전트. 40개 스킬. 하나의 설정. 모든 플랫폼.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -67,10 +67,17 @@ AI 코딩 도구를 사용하고 계시죠. 강력합니다. 하지만...
 
 > **AX**는 "AI Transformation"이 아닙니다. AX는 **Agent Experience** — AI 에이전트가 코드베이스를 인식하고, 탐색하고, 작업하는 방식입니다. UX가 사용자를 위해 설계하고 DX가 개발자를 위해 설계하듯, **AX는 에이전트를 위해 설계합니다.**
 
-```
-UX  =  User Experience        사용자가 제품을 경험하는 방식
-DX  =  Developer Experience   개발자가 도구를 경험하는 방식
-AX  =  Agent Experience       AI 에이전트가 코드베이스를 경험하는 방식
+```mermaid
+flowchart LR
+    UX["🧑 UX\nUser Experience"]
+    DX["👩‍💻 DX\nDeveloper Experience"]
+    AX["🤖 AX\nAgent Experience"]
+
+    UX -->|"설계 대상"| U["사용자"]
+    DX -->|"설계 대상"| D["개발자"]
+    AX -->|"설계 대상"| A["AI 에이전트"]
+
+    style AX fill:#ff6b6b,stroke:#c92a2a,color:#fff
 ```
 
 대부분의 AI 코딩 도구는 단순한 모델에 기반합니다: **당신이 지시하면, AI가 응답한다.**
@@ -87,14 +94,41 @@ Autopus는 다른 질문에서 시작합니다: *프로젝트 문서의 1차 독
 
 Autopus는 **하네스**입니다 — 에이전트가 시니어 엔지니어가 승인할 코드를 생산하기 위해 필요한 맥락, 제약, 워크플로우를 제공하는 구조화된 환경. 희망이 아닌 설계로.
 
-### 네 가지 원칙
+### 에이전트로. 에이전트에 의해. 에이전트를 위해.
+
+```mermaid
+flowchart TB
+    subgraph OF ["🧬 에이전트로 이루어진 (Of)"]
+        direction TB
+        O1["16개 특화 에이전트가\n소프트웨어 팀을 구성"]
+        O2["Planner · Executor · Tester\nReviewer · Architect · ..."]
+    end
+
+    subgraph BY ["⚡ 에이전트에 의해 운영되는 (By)"]
+        direction TB
+        B1["에이전트가 파이프라인을\n자율적으로 운영"]
+        B2["셀프힐링 게이트\n병렬 워크트리\n멀티모델 토론"]
+    end
+
+    subgraph FOR ["🎯 에이전트를 위해 설계된 (For)"]
+        direction TB
+        F1["모든 파일, 규칙, 문서가\n에이전트가 파싱하도록 설계"]
+        F2["300줄 제한 · @AX 태그\n구조화된 Lore · SPEC 형식"]
+    end
+
+    OF --> BY --> FOR
+
+    style OF fill:#4c6ef5,stroke:#364fc7,color:#fff
+    style BY fill:#7950f2,stroke:#5f3dc4,color:#fff
+    style FOR fill:#f06595,stroke:#c2255c,color:#fff
+```
 
 | 원칙 | 의미 |
 |------|------|
-| **에이전트 퍼스트** | 규칙, 스킬, 문서는 사람이 읽기 위해서가 아니라 에이전트가 파싱할 수 있도록 작성됩니다. 산문보다 구조. |
+| **에이전트로 이루어진 (Of)** | 16개 특화 에이전트가 실제 엔지니어링 팀을 구성합니다 — 기획자, 구현자, 테스터, 리뷰어, 보안 감사관 등. 하나의 챗봇이 아닌 팀. |
+| **에이전트에 의해 운영 (By)** | 에이전트가 파이프라인을 자율적으로 운영합니다 — 셀프힐링 품질 게이트, 병렬 워크트리, 멀티모델 토론. 사람은 목표를 설정하고, 에이전트가 실행합니다. |
+| **에이전트를 위해 설계 (For)** | 모든 파일, 규칙, 문서가 에이전트가 파싱하도록 설계됩니다. 산문보다 구조. 그것이 AX입니다. |
 | **매 세션이 첫 출근** | 에이전트는 세션 간 모든 맥락을 잃습니다. 하네스가 아키텍처, 의사결정, 컨벤션이라는 조직 기억을 제공합니다. |
-| **제약이 자유를 만든다** | 300줄 파일 제한, 필수 TDD, 품질 게이트 — 이것은 제한이 아닙니다. 에이전트가 프로세스를 발명하는 대신 문제 해결에 집중하게 하는 가드레일입니다. |
-| **하네스가 곧 팀 문화** | 사람 팀에서 문화는 암묵적입니다. 에이전트에게는 명시적이어야 합니다. 하네스는 팀의 기준을 인코딩하여 모든 에이전트가 — 어느 플랫폼에서든 — 최고의 엔지니어처럼 일하게 합니다. |
 
 > 🐙 **Autopus는 에이전트를 더 똑똑하게 만들지 않습니다. 더 잘 알게 만듭니다. 그것이 AX입니다.**
 
@@ -807,6 +841,6 @@ make coverage   # 커버리지 리포트 생성
 
 <div align="center">
 
-**🐙 Autopus** — AI 에이전트는 챗봇이 아닌, 팀이 되어야 합니다.
+**🐙 Autopus** — 에이전트로. 에이전트에 의해. 에이전트를 위해.
 
 </div>

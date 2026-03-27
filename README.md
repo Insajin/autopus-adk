@@ -2,9 +2,9 @@
 
 # 🐙 Autopus-ADK
 
-### The Autopus where AI agents remember, debate, and ship.
+### A harness *of* the agents, *by* the agents, *for* the agents.
 
-**Superpowers for AI Coding CLIs — 16 agents, 40 skills, one config, every platform.**
+**16 agents. 40 skills. One config. Every platform.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -71,10 +71,17 @@ You're using AI coding tools. They're powerful. But...
 
 > **AX** is not "AI Transformation." AX is **Agent Experience** — how AI agents perceive, navigate, and operate within your codebase. Just as UX designs for users and DX designs for developers, **AX designs for agents.**
 
-```
-UX  =  User Experience        How users interact with your product
-DX  =  Developer Experience   How developers interact with your tools
-AX  =  Agent Experience       How AI agents interact with your codebase
+```mermaid
+flowchart LR
+    UX["🧑 UX\nUser Experience"]
+    DX["👩‍💻 DX\nDeveloper Experience"]
+    AX["🤖 AX\nAgent Experience"]
+
+    UX -->|"designs for"| U["Users"]
+    DX -->|"designs for"| D["Developers"]
+    AX -->|"designs for"| A["AI Agents"]
+
+    style AX fill:#ff6b6b,stroke:#c92a2a,color:#fff
 ```
 
 Most AI coding tools are designed around a simple model: **you prompt, it responds.**
@@ -91,14 +98,41 @@ Think about onboarding a new engineer. You wouldn't hand them a blank editor and
 
 Autopus is a **harness** — a structured environment that gives agents the context, constraints, and workflows they need to produce code that a senior engineer would approve. Not through hope. Through design.
 
-### Four Principles
+### Of the agents. By the agents. For the agents.
+
+```mermaid
+flowchart TB
+    subgraph OF ["🧬 Of the Agents"]
+        direction TB
+        O1["16 specialized agents\nform a software team"]
+        O2["Planner · Executor · Tester\nReviewer · Architect · ..."]
+    end
+
+    subgraph BY ["⚡ By the Agents"]
+        direction TB
+        B1["Agents run the pipeline\nautonomously"]
+        B2["Self-healing gates\nParallel worktrees\nMulti-model debate"]
+    end
+
+    subgraph FOR ["🎯 For the Agents"]
+        direction TB
+        F1["Every file, rule, and doc\nis designed for agents to parse"]
+        F2["300-line limit · @AX tags\nStructured Lore · SPEC format"]
+    end
+
+    OF --> BY --> FOR
+
+    style OF fill:#4c6ef5,stroke:#364fc7,color:#fff
+    style BY fill:#7950f2,stroke:#5f3dc4,color:#fff
+    style FOR fill:#f06595,stroke:#c2255c,color:#fff
+```
 
 | Principle | What It Means |
 |-----------|--------------|
-| **Agent-First Authorship** | Rules, skills, and docs are written to be parsed by agents, not just read by humans. Structure over prose. |
+| **Of the Agents** | 16 specialized agents form a real engineering team — planner, executor, tester, reviewer, security auditor, and more. Not one chatbot. A team. |
+| **By the Agents** | Agents run the pipeline autonomously — self-healing quality gates, parallel worktrees, multi-model debate. Humans set the goal; agents handle the rest. |
+| **For the Agents** | Every file, rule, and document is designed to be parsed by agents, not just read by humans. Structure over prose. That's AX. |
 | **Every Session is Day One** | Agents lose all context between sessions. The harness provides institutional memory — architecture, decisions, conventions — so they start informed, not blank. |
-| **Constraints Liberate** | A 300-line file limit, mandatory TDD, quality gates — these aren't restrictions. They're guardrails that let agents focus on solving problems instead of inventing process. |
-| **The Harness is the Culture** | In a human team, culture is implicit. For agents, it must be explicit. The harness encodes your team's standards so every agent — on every platform — works like your best engineer. |
 
 > 🐙 **Autopus doesn't make agents smarter. It makes them informed. That's AX.**
 
@@ -172,6 +206,22 @@ flowchart TB
 ### 🔁 Self-Healing Pipeline (RALF Loop)
 
 Quality gates don't just fail — they **fix themselves and retry.**
+
+```mermaid
+flowchart LR
+    R["🔴 RED\nRun Phase"] --> G["🟢 GREEN\nGate Check"]
+    G -->|PASS| Done["✅ Next Phase"]
+    G -->|FAIL| F["🔧 REFACTOR\nFix Issues"]
+    F --> L["🔁 LOOP\nRetry"]
+    L --> R
+    L -.->|"3× no progress"| CB["⛔ Circuit Break"]
+
+    style R fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    style G fill:#51cf66,stroke:#2b8a3e,color:#fff
+    style F fill:#ffd43b,stroke:#f08c00,color:#000
+    style L fill:#748ffc,stroke:#4263eb,color:#fff
+    style CB fill:#868e96,stroke:#495057,color:#fff
+```
 
 ```bash
 /auto go SPEC-AUTH-001 --auto --loop
@@ -455,6 +505,23 @@ sequenceDiagram
 ```bash
 /auto go SPEC-ID --quality ultra      # All agents on Opus — max quality
 /auto go SPEC-ID --quality balanced   # Adaptive: Opus/Sonnet/Haiku by task complexity
+```
+
+```mermaid
+flowchart LR
+    subgraph Ultra ["🔥 Ultra — All Opus"]
+        U1["Planner\nOpus"] --> U2["Executor\nOpus"] --> U3["Validator\nOpus"]
+    end
+
+    subgraph Balanced ["⚖️ Balanced — Adaptive"]
+        B1["Planner\nOpus"] --> B2["Executor\nby complexity"]
+        B2 -->|HIGH| BH["Opus"]
+        B2 -->|MEDIUM| BM["Sonnet"]
+        B2 -->|LOW| BL["Haiku"]
+    end
+
+    style Ultra fill:#fff3bf,stroke:#f08c00
+    style Balanced fill:#d0ebff,stroke:#1971c2
 ```
 
 | Mode | Planner | Executor | Validator | Cost |
@@ -808,6 +875,6 @@ make coverage   # Generate coverage report
 
 <div align="center">
 
-**🐙 Autopus** — Remember. Debate. Ship.
+**🐙 Autopus** — Of the agents. By the agents. For the agents.
 
 </div>
