@@ -74,11 +74,13 @@ type OrchestraConfig struct {
 	JudgeProvider  string            // debate 전략에서 최종 판정 프로바이더
 	DebateRounds   int               // Number of debate rounds (1=no rebuttal, 2=with rebuttal). 0 defaults to 1.
 	Terminal       terminal.Terminal // Optional terminal for pane-based execution. Nil means non-interactive mode.
-	NoDetach        bool              // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
-	KeepRelayOutput bool              // when true, preserve temp relay output files after execution
-	Interactive     bool              // when true, use interactive pane mode instead of sentinel-based
-	HookMode        bool              // when true, use hook file signals instead of ReadScreen for result collection
-	SessionID       string            // unique session ID for hook file signal directory
+	NoDetach           bool             // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
+	KeepRelayOutput    bool             // when true, preserve temp relay output files after execution
+	Interactive        bool             // when true, use interactive pane mode instead of sentinel-based
+	HookMode           bool             // when true, use hook file signals instead of ReadScreen for result collection
+	SessionID          string           // unique session ID for hook file signal directory
+	ConsensusThreshold float64          // consensus threshold (0 uses default 0.66)
+	InitialDelay       time.Duration    // delay before completion polling starts (0 uses default 20s)
 }
 
 // CompletionPattern defines a provider-specific prompt detection pattern.

@@ -64,7 +64,7 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 					others = append(others, r)
 				}
 			}
-			rebuttalPrompt := buildRebuttalPrompt(cfg.Prompt, others)
+			rebuttalPrompt := buildRebuttalPrompt(cfg.Prompt, others, 2)
 			resp, err := runProvider(ctx, provider, rebuttalPrompt)
 			if err != nil {
 				rebuttalResults[idx] = providerResult{err: err, idx: idx}
@@ -90,14 +90,25 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 	return responses, nil
 }
 
+// topicIsolationInstruction prevents providers from reading project files during debate.
+// @AX:NOTE [AUTO] REQ-2 hardcoded prompt prefix — injected by executeRound caller, not by buildRebuttalPrompt
+const topicIsolationInstruction = "IMPORTANT: Discuss ONLY the topic below. Do NOT read, reference, or analyze any existing files in the project directory. Focus exclusively on the given discussion topic.\n\n"
+
 // buildRebuttalPrompt creates a rebuttal prompt including other debaters' arguments.
+// For round >= 3, each provider's output is truncated to 500 chars to keep prompt size manageable.
 // Works with both ReadScreen and hook-based results as both populate Output field.
-func buildRebuttalPrompt(original string, otherResponses []ProviderResponse) string {
+// @AX:NOTE [AUTO] REQ-4 magic constant 500 — truncation limit for round >= 3; increase requires prompt budget review
+func buildRebuttalPrompt(original string, otherResponses []ProviderResponse, round int) string {
 	var sb strings.Builder
 	sb.WriteString(original)
 	sb.WriteString("\n\n## Other debaters' arguments:\n")
 	for _, r := range otherResponses {
-		sb.WriteString(fmt.Sprintf("\n### %s:\n%s\n", r.Provider, r.Output))
+		output := r.Output
+		// REQ-4: Truncate long outputs for later rounds to keep prompt size manageable
+		if round >= 3 && len(output) > 500 {
+			output = output[:500] + "[...truncated]"
+		}
+		sb.WriteString(fmt.Sprintf("\n### %s:\n%s\n", r.Provider, output))
 	}
 	sb.WriteString("\nPlease provide your rebuttal:")
 	return sb.String()

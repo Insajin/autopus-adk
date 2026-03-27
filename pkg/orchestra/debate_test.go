@@ -13,12 +13,45 @@ func TestBuildRebuttalPrompt(t *testing.T) {
 		{Provider: "alice", Output: "I think X"},
 		{Provider: "bob", Output: "I think Y"},
 	}
-	prompt := buildRebuttalPrompt("original topic", others)
+	prompt := buildRebuttalPrompt("original topic", others, 2)
 	assert.Contains(t, prompt, "original topic")
 	assert.Contains(t, prompt, "alice")
 	assert.Contains(t, prompt, "I think X")
 	assert.Contains(t, prompt, "bob")
 	assert.Contains(t, prompt, "rebuttal")
+}
+
+// TestBuildRebuttalPrompt_TopicIsolation verifies buildRebuttalPrompt does NOT add isolation prefix.
+func TestBuildRebuttalPrompt_TopicIsolation(t *testing.T) {
+	t.Parallel()
+	others := []ProviderResponse{
+		{Provider: "alice", Output: "I think X"},
+	}
+	prompt := buildRebuttalPrompt("topic", others, 2)
+	// buildRebuttalPrompt itself must NOT contain isolation prefix — caller adds it
+	assert.NotContains(t, prompt, "IMPORTANT: Discuss ONLY")
+	assert.NotContains(t, prompt, topicIsolationInstruction)
+}
+
+// TestBuildRebuttalPrompt_Summarization verifies round-based truncation.
+func TestBuildRebuttalPrompt_Summarization(t *testing.T) {
+	t.Parallel()
+	longOutput := strings.Repeat("x", 2000)
+	others := []ProviderResponse{
+		{Provider: "alice", Output: longOutput},
+	}
+
+	// Round 2 — full output preserved
+	promptR2 := buildRebuttalPrompt("topic", others, 2)
+	assert.Contains(t, promptR2, longOutput, "round 2 should preserve full output")
+	assert.NotContains(t, promptR2, "[...truncated]")
+
+	// Round 3 — truncated to 500 chars
+	promptR3 := buildRebuttalPrompt("topic", others, 3)
+	assert.NotContains(t, promptR3, longOutput, "round 3 should truncate long output")
+	assert.Contains(t, promptR3, "[...truncated]")
+	// Verify the truncated output is 500 chars + "[...truncated]"
+	assert.Contains(t, promptR3, longOutput[:500])
 }
 
 func TestBuildJudgmentPrompt(t *testing.T) {

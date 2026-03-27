@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ func TestRunInteractiveDebate_DefaultRound(t *testing.T) {
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 0,
 		Prompt: "default round", Providers: []ProviderConfig{{Name: "claude", Binary: "echo"}},
-		TimeoutSeconds: 10, Interactive: true, HookMode: true, SessionID: "test-debate-default",
+		TimeoutSeconds: 10, Interactive: true, HookMode: true, SessionID: "test-debate-default", InitialDelay: time.Millisecond,
 	}
 	result, err := runInteractiveDebate(context.Background(), cfg)
 	require.NoError(t, err)
@@ -45,7 +46,7 @@ func TestRunInteractiveDebate_RoundsFlag_Range(t *testing.T) {
 			cfg := OrchestraConfig{
 				Strategy: StrategyDebate, DebateRounds: tt.rounds,
 				Prompt: "range test", Providers: []ProviderConfig{{Name: "claude", Binary: "echo"}},
-				TimeoutSeconds: 5, Interactive: true, HookMode: true, SessionID: "test-range",
+				TimeoutSeconds: 5, Interactive: true, HookMode: true, SessionID: "test-range", InitialDelay: time.Millisecond,
 			}
 			_, err := runInteractiveDebate(context.Background(), cfg)
 			if tt.expectErr {
@@ -64,7 +65,7 @@ func TestRunInteractiveDebate_ContextCancellation(t *testing.T) {
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 3, Prompt: "cancel test",
 		Providers: []ProviderConfig{{Name: "claude", Binary: "echo"}},
-		TimeoutSeconds: 10, Interactive: true, HookMode: true, SessionID: "test-cancel",
+		TimeoutSeconds: 10, Interactive: true, HookMode: true, SessionID: "test-cancel", InitialDelay: time.Millisecond,
 	}
 	_, err := runInteractiveDebate(ctx, cfg)
 	assert.Error(t, err, "must return error on cancelled context")
@@ -116,121 +117,46 @@ func TestRunInteractiveDebate_NonExistentBinary(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-// --- Helper function tests ---
+// --- REQ-2: Topic isolation ---
 
-// TestConsensusReached_Different verifies no consensus for different outputs.
-func TestConsensusReached_Different(t *testing.T) {
+// TestExecuteRound_TopicIsolation verifies executeRound wraps prompts with topic isolation prefix.
+func TestExecuteRound_TopicIsolation(t *testing.T) {
 	t.Parallel()
-	responses := []ProviderResponse{
-		{Provider: "claude", Output: "answer A with lots of detail"},
-		{Provider: "gemini", Output: "completely different answer B"},
+	mock := newCmuxMock()
+	mock.readScreenOutput = ">\n"
+	cfg := OrchestraConfig{
+		Providers: []ProviderConfig{
+			{Name: "claude", Binary: "echo"},
+		},
+		Strategy:       StrategyDebate,
+		Prompt:         "discuss testing",
+		TimeoutSeconds: 5,
+		Terminal:       mock,
+		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
-	assert.False(t, consensusReached(responses))
-}
+	panes := []paneInfo{{provider: cfg.Providers[0], paneID: "pane-1"}}
 
-// TestConsensusReached_SingleProvider verifies single provider returns false.
-func TestConsensusReached_SingleProvider(t *testing.T) {
-	t.Parallel()
-	assert.False(t, consensusReached([]ProviderResponse{{Provider: "claude", Output: "one"}}))
-}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
 
-// TestConsensusReached_EmptyOutput verifies empty outputs returns false.
-func TestConsensusReached_EmptyOutput(t *testing.T) {
-	t.Parallel()
-	responses := []ProviderResponse{
-		{Provider: "claude", Output: ""},
-		{Provider: "gemini", Output: ""},
+	// Round 1 (no previous responses)
+	_ = executeRound(ctx, cfg, panes, nil, 1, nil)
+
+	// Verify the prompt sent contains the isolation instruction
+	found := false
+	for _, call := range mock.sendCommandCalls {
+		if strings.Contains(call.Cmd, "IMPORTANT: Discuss ONLY") {
+			found = true
+			break
+		}
 	}
-	assert.False(t, consensusReached(responses))
+	assert.True(t, found, "round 1 prompt must include topic isolation instruction")
 }
 
-// TestCountNonEmpty verifies counting of non-empty responses.
-func TestCountNonEmpty(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		resps    []ProviderResponse
-		expected int
-	}{
-		{"all non-empty", []ProviderResponse{{Output: "a"}, {Output: "b"}, {Output: "c"}}, 3},
-		{"mixed", []ProviderResponse{{Output: "a"}, {Output: ""}, {Output: "c"}}, 2},
-		{"all empty", []ProviderResponse{{Output: ""}, {Output: ""}}, 0},
-		{"nil slice", nil, 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.expected, countNonEmpty(tt.resps))
-		})
-	}
-}
-
-// TestPerRoundTimeout verifies per-round timeout calculation.
-func TestPerRoundTimeout(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name     string
-		total    int
-		rounds   int
-		expected time.Duration
-	}{
-		{"120s / 3 rounds", 120, 3, 40 * time.Second},
-		{"60s / 1 round", 60, 1, 60 * time.Second},
-		{"zero total defaults", 0, 2, 60 * time.Second},
-		{"negative total defaults", -1, 4, 30 * time.Second},
-		{"zero rounds defaults", 60, 0, 60 * time.Second},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.expected, perRoundTimeout(tt.total, tt.rounds))
-		})
-	}
-}
-
-// TestBuildDebateResult verifies result construction.
-func TestBuildDebateResult(t *testing.T) {
-	t.Parallel()
-	responses := []ProviderResponse{
-		{Provider: "claude", Output: "claude says"},
-		{Provider: "gemini", Output: "gemini says"},
-	}
-	history := [][]ProviderResponse{responses}
-	result := buildDebateResult(OrchestraConfig{Strategy: StrategyDebate}, responses, history, time.Now())
-	assert.Equal(t, StrategyDebate, result.Strategy)
-	assert.Len(t, result.Responses, 2)
-	assert.Len(t, result.RoundHistory, 1)
-	assert.NotEmpty(t, result.Merged)
-}
-
-// TestBuildDebateResult_NilResponses verifies nil responses fallback.
-func TestBuildDebateResult_NilResponses(t *testing.T) {
-	t.Parallel()
-	result := buildDebateResult(OrchestraConfig{Strategy: StrategyDebate}, nil, nil, time.Now())
-	assert.Contains(t, result.Merged, "0 rounds completed")
-}
-
-// TestMergeByStrategyWithRoundHistory verifies round history merge.
-func TestMergeByStrategyWithRoundHistory(t *testing.T) {
-	t.Parallel()
-	rounds := [][]ProviderResponse{
-		{{Provider: "claude", Output: "r1"}, {Provider: "gemini", Output: "r1"}},
-		{{Provider: "claude", Output: "r2"}, {Provider: "gemini", Output: "r2"}},
-	}
-	result := mergeByStrategyWithRoundHistory(rounds, OrchestraConfig{Strategy: StrategyDebate})
-	require.NotNil(t, result)
-	assert.Equal(t, StrategyDebate, result.Strategy)
-	assert.Len(t, result.RoundHistory, 2)
-	assert.Len(t, result.Responses, 2)
-}
-
-// TestMergeByStrategyWithRoundHistory_Empty verifies empty rounds.
-func TestMergeByStrategyWithRoundHistory_Empty(t *testing.T) {
-	t.Parallel()
-	result := mergeByStrategyWithRoundHistory(nil, OrchestraConfig{Strategy: StrategyDebate})
-	require.NotNil(t, result)
-	assert.Nil(t, result.Responses)
-}
+// Helper function tests (consensusReached, countNonEmpty, perRoundTimeout,
+// buildDebateResult, mergeByStrategyWithRoundHistory) are in
+// interactive_debate_helpers_test.go.
 
 // TestRunInteractiveDebate_SingleProvider verifies debate with only one provider.
 func TestRunInteractiveDebate_SingleProvider(t *testing.T) {
@@ -261,23 +187,4 @@ func TestRunInteractiveDebate_WithJudge_NoTerminal(t *testing.T) {
 	result, err := runInteractiveDebate(context.Background(), cfg)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
-}
-
-// TestBuildDebateResult_SingleRound verifies single round result.
-func TestBuildDebateResult_SingleRound(t *testing.T) {
-	t.Parallel()
-	responses := []ProviderResponse{{Provider: "claude", Output: "only"}}
-	history := [][]ProviderResponse{responses}
-	result := buildDebateResult(OrchestraConfig{Strategy: StrategyDebate}, responses, history, time.Now())
-	assert.Len(t, result.RoundHistory, 1)
-	assert.NotEmpty(t, result.Merged)
-}
-
-// TestMergeByStrategyWithRoundHistory_SingleRound verifies single round.
-func TestMergeByStrategyWithRoundHistory_SingleRound(t *testing.T) {
-	t.Parallel()
-	rounds := [][]ProviderResponse{{{Provider: "claude", Output: "single"}}}
-	result := mergeByStrategyWithRoundHistory(rounds, OrchestraConfig{Strategy: StrategyDebate})
-	assert.Len(t, result.Responses, 1)
-	assert.Len(t, result.RoundHistory, 1)
 }

@@ -82,13 +82,17 @@ func runJudgeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, h
 }
 
 // consensusReached checks if all responses are substantially similar.
-// Uses line-based consensus with 66% threshold.
-func consensusReached(responses []ProviderResponse) bool {
+// REQ-7: Uses configurable threshold from OrchestraConfig (default 0.66).
+// @AX:NOTE [AUTO] REQ-7 magic constant 0.66 — default consensus threshold; configurable via ConsensusThreshold field
+func consensusReached(responses []ProviderResponse, cfg OrchestraConfig) bool {
 	if len(responses) < 2 {
 		return false
 	}
-	// @AX:NOTE: [AUTO] magic constant 0.66 — consensus threshold (66%); lowering increases false-positive consensus
-	_, summary := MergeConsensus(responses, 0.66)
+	threshold := cfg.ConsensusThreshold
+	if threshold <= 0 {
+		threshold = 0.66 // Default consensus threshold
+	}
+	_, summary := MergeConsensus(responses, threshold)
 	n := countNonEmpty(responses)
 	return summary == fmt.Sprintf("합의율: %d/%d (100%%)", n, n)
 }
@@ -105,6 +109,8 @@ func countNonEmpty(responses []ProviderResponse) int {
 }
 
 // perRoundTimeout calculates the timeout for each debate round.
+// REQ-5: Enforces a 45-second minimum floor per round.
+// @AX:NOTE [AUTO] REQ-5 magic constant 45s — minimum floor per debate round; lowering risks premature timeout
 func perRoundTimeout(totalSeconds, rounds int) time.Duration {
 	if totalSeconds <= 0 {
 		totalSeconds = 120
@@ -112,7 +118,11 @@ func perRoundTimeout(totalSeconds, rounds int) time.Duration {
 	if rounds <= 0 {
 		rounds = 1
 	}
-	return time.Duration(totalSeconds/rounds) * time.Second
+	perRound := totalSeconds / rounds
+	if perRound < 45 {
+		perRound = 45
+	}
+	return time.Duration(perRound) * time.Second
 }
 
 // buildDebateResult constructs the final OrchestraResult from debate rounds.

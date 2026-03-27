@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ func TestInteractive_FullFlow_SplitPipelaunchWaitCollectMergeCleanup(t *testing.
 		TimeoutSeconds: 30,
 		Terminal:       mock,
 		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -49,6 +51,7 @@ func TestInteractive_Flow_PipePaneStartCalledPerProvider(t *testing.T) {
 		TimeoutSeconds: 30,
 		Terminal:       mock,
 		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
 	_, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -66,6 +69,7 @@ func TestInteractive_Flow_PipePaneStopCalledOnCleanup(t *testing.T) {
 		TimeoutSeconds: 30,
 		Terminal:       mock,
 		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
 	_, _ = RunInteractivePaneOrchestra(context.Background(), cfg)
 	assert.Equal(t, 1, mock.pipePaneStopCalls, "pipe-pane stop must be called during cleanup")
@@ -82,6 +86,7 @@ func TestInteractive_Flow_ResultsCollectedFromOutputFiles(t *testing.T) {
 		TimeoutSeconds: 30,
 		Terminal:       mock,
 		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -103,6 +108,7 @@ func TestInteractive_SentinelFallback_PlainTerminal(t *testing.T) {
 		TimeoutSeconds: 10,
 		Terminal:       mock,
 		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -121,6 +127,7 @@ func TestInteractive_SentinelFallback_InteractiveModeFails(t *testing.T) {
 		TimeoutSeconds: 10,
 		Terminal:       mock,
 		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err, "should fall back, not error")
@@ -141,6 +148,7 @@ func TestInteractive_SessionTimeout_ProducesPartialResult(t *testing.T) {
 		TimeoutSeconds: 1, // very short timeout
 		Terminal:       mock,
 		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -172,6 +180,7 @@ func TestInteractive_SessionTimeout_PartialOutputPreserved(t *testing.T) {
 		TimeoutSeconds: 1,
 		Terminal:       mock,
 		Interactive:    true,
+		InitialDelay:  time.Millisecond,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -195,4 +204,96 @@ func TestInteractive_ConfigField_InteractiveBool(t *testing.T) {
 	assert.True(t, cfg.Interactive)
 }
 
-// Error paths and completion detection tests are in interactive_edge_test.go
+// --- REQ-1: Permission bypass ---
+
+// TestBuildInteractiveLaunchCmd_PermissionBypass verifies Claude gets --dangerously-skip-permissions.
+func TestBuildInteractiveLaunchCmd_PermissionBypass(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		provider ProviderConfig
+		want     bool
+	}{
+		{
+			"claude includes flag",
+			ProviderConfig{Name: "claude", Binary: "claude", PaneArgs: []string{"--model", "opus"}},
+			true,
+		},
+		{
+			"opencode excludes flag",
+			ProviderConfig{Name: "opencode", Binary: "opencode", PaneArgs: []string{"-m", "gpt-5.4"}},
+			false,
+		},
+		{
+			"gemini excludes flag",
+			ProviderConfig{Name: "gemini", Binary: "gemini"},
+			false,
+		},
+		{
+			"claude with flag already in PaneArgs",
+			ProviderConfig{Name: "claude", Binary: "claude", PaneArgs: []string{"--dangerously-skip-permissions"}},
+			true, // should be present but NOT duplicated
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := buildInteractiveLaunchCmd(tt.provider)
+			if tt.want {
+				assert.Contains(t, cmd, "--dangerously-skip-permissions")
+				// Verify no duplication
+				count := strings.Count(cmd, "--dangerously-skip-permissions")
+				assert.Equal(t, 1, count, "flag should appear exactly once")
+			} else {
+				assert.NotContains(t, cmd, "--dangerously-skip-permissions")
+			}
+		})
+	}
+}
+
+// --- REQ-3: 2-phase completion detection ---
+
+// TestWaitForCompletion_TwoPhase_ConsecutiveMatch verifies two consecutive prompt matches return true.
+func TestWaitForCompletion_TwoPhase_ConsecutiveMatch(t *testing.T) {
+	t.Parallel()
+	mock := newCmuxMock()
+	mock.readScreenOutput = ">\n" // always returns prompt — two consecutive matches
+	patterns := DefaultCompletionPatterns()
+	pi := paneInfo{provider: ProviderConfig{Name: "claude"}, paneID: "pane-1"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result := waitForCompletion(ctx, mock, pi, patterns)
+	assert.True(t, result, "two consecutive prompt matches should confirm completion")
+}
+
+// TestWaitForCompletion_TwoPhase_ContextCancel verifies context cancellation returns false.
+func TestWaitForCompletion_TwoPhase_ContextCancel(t *testing.T) {
+	t.Parallel()
+	mock := newCmuxMock()
+	mock.readScreenOutput = "" // no prompt match — never completes
+	patterns := DefaultCompletionPatterns()
+	pi := paneInfo{provider: ProviderConfig{Name: "claude"}, paneID: "pane-1"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result := waitForCompletion(ctx, mock, pi, patterns)
+	assert.False(t, result, "context cancel should return false")
+}
+
+// TestWaitForCompletion_TwoPhase_ReadScreenError verifies ReadScreen error resets candidate.
+func TestWaitForCompletion_TwoPhase_ReadScreenError(t *testing.T) {
+	t.Parallel()
+	mock := newCmuxMock()
+	mock.readScreenErr = fmt.Errorf("read error")
+	patterns := DefaultCompletionPatterns()
+	pi := paneInfo{provider: ProviderConfig{Name: "claude"}, paneID: "pane-1"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result := waitForCompletion(ctx, mock, pi, patterns)
+	assert.False(t, result, "persistent ReadScreen errors should prevent completion")
+}

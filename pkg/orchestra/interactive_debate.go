@@ -132,7 +132,7 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 		// Early consensus detection: check if all responses are substantially similar.
 		if round < rounds && len(roundResponses) >= 2 {
-			if consensusReached(roundResponses) {
+			if consensusReached(roundResponses, cfg) {
 				fmt.Fprintf(os.Stderr, "[Debate] 조기 합의 도달 — 라운드 %d에서 중단\n", round)
 				break
 			}
@@ -166,7 +166,8 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 
 		var prompt string
 		if prevResponses == nil {
-			prompt = cfg.Prompt
+			// REQ-2: Topic isolation for round 1
+			prompt = topicIsolationInstruction + cfg.Prompt
 		} else {
 			var others []ProviderResponse
 			for _, r := range prevResponses {
@@ -174,7 +175,8 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 					others = append(others, r)
 				}
 			}
-			prompt = buildRebuttalPrompt(cfg.Prompt, others)
+			// REQ-2: Topic isolation for rebuttal rounds
+			prompt = topicIsolationInstruction + buildRebuttalPrompt(cfg.Prompt, others, round)
 		}
 
 		if round > 1 {
@@ -187,8 +189,12 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		_ = cfg.Terminal.SendCommand(ctx, pi.paneID, "\n")
 	}
 
-	// @AX:NOTE: [AUTO] magic constant 5s — AI processing head start before polling; too short causes false completion
-	time.Sleep(5 * time.Second)
+	// @AX:NOTE: [AUTO] REQ-3 configurable initial delay — AI processing head start before polling
+	debateDelay := cfg.InitialDelay
+	if debateDelay <= 0 {
+		debateDelay = 10 * time.Second
+	}
+	time.Sleep(debateDelay)
 
 	// Collect results via hook or screen polling.
 	if cfg.HookMode && hookSession != nil {

@@ -78,7 +78,12 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 	// Step 5.5: Wait for AI to start processing before completion detection.
 	// Without this delay, the prompt pattern on the current screen triggers
 	// immediate "completion" before the AI even begins responding.
-	time.Sleep(15 * time.Second)
+	// REQ-3: configurable initial delay (default 20s)
+	initialDelay := cfg.InitialDelay
+	if initialDelay <= 0 {
+		initialDelay = 20 * time.Second
+	}
+	time.Sleep(initialDelay)
 
 	// Step 6-7: Wait for completion and collect results
 	patterns := DefaultCompletionPatterns()
@@ -250,50 +255,35 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 	return responses
 }
 
-// waitForCompletion polls for completion using ReadScreen prompt pattern detection only.
-// Idle detection is disabled because it cannot distinguish "AI thinking" from "AI done".
-// @AX:NOTE [AUTO] prompt pattern only — idle detection disabled to avoid false positives during AI thinking
+// waitForCompletion polls for completion using 2-phase consecutive match logic.
+// A single prompt match is treated as a candidate; a second consecutive match confirms completion.
+// This prevents false positives when the prompt flickers briefly during AI output.
+// @AX:NOTE [AUTO] REQ-3 — 2-phase consecutive match; idle detection disabled
 func waitForCompletion(ctx context.Context, term terminal.Terminal, pi paneInfo, patterns []CompletionPattern) bool {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
+	candidateDetected := false
 	for {
 		select {
 		case <-ctx.Done():
-			return false // R9: timeout reached
+			return false
 		case <-ticker.C:
-			// ReadScreen prompt pattern detection — wait for CLI to show a new input prompt
 			screen, err := term.ReadScreen(ctx, pi.paneID, terminal.ReadScreenOpts{})
-			if err == nil && isPromptVisible(screen, patterns) {
-				return true
+			if err != nil {
+				candidateDetected = false
+				continue
+			}
+			if isPromptVisible(screen, patterns) {
+				if candidateDetected {
+					return true // Two consecutive matches — confirmed completion
+				}
+				candidateDetected = true // First match — wait for confirmation
+			} else {
+				candidateDetected = false // Reset — AI resumed output
 			}
 		}
 	}
 }
 
-// buildInteractiveLaunchCmd constructs the launch command for interactive mode.
-// Uses the binary name plus model/variant flags from PaneArgs, excluding print/pipe flags.
-// For claude: "claude --model opus --effort high"
-// For opencode: "opencode -m openai/gpt-5.4"
-// For gemini: "gemini -m gemini-3.1-pro-preview"
-func buildInteractiveLaunchCmd(p ProviderConfig) string {
-	cmd := p.Binary
-	for _, arg := range paneArgs(p) {
-		// Skip non-interactive flags that conflict with TUI mode
-		if arg == "--print" || arg == "-p" || arg == "--quiet" || arg == "-q" || arg == "run" {
-			continue
-		}
-		cmd += " " + arg
-	}
-	return cmd
-}
-
-// cleanupInteractivePanes stops pipe capture and closes panes.
-func cleanupInteractivePanes(term terminal.Terminal, panes []paneInfo) {
-	ctx := context.Background()
-	for _, pi := range panes {
-		_ = term.PipePaneStop(ctx, pi.paneID)
-		_ = term.Close(ctx, string(pi.paneID))
-		_ = os.Remove(pi.outputFile)
-	}
-}
+// buildInteractiveLaunchCmd and cleanupInteractivePanes are in interactive_launch.go.
