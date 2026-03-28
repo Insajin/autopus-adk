@@ -153,9 +153,17 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 		return reExecWithSudo()
 	}
 
-	// Use info from checker, or construct one if targetVersion is set
+	// Force mode with no newer version: re-fetch latest release info
 	if info == nil {
-		info = &selfupdate.ReleaseInfo{}
+		info, err = checker.FetchLatest(runtime.GOOS, runtime.GOARCH)
+		if err != nil {
+			return fmt.Errorf("최신 릴리즈 정보 조회 실패: %w", err)
+		}
+	}
+
+	// Validate download URLs before proceeding
+	if info.ArchiveURL == "" || info.ChecksumURL == "" {
+		return fmt.Errorf("다운로드 URL을 찾을 수 없음 (tag: %s)", info.TagName)
 	}
 
 	// R2: Download archive
