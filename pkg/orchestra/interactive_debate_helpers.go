@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -45,48 +46,17 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 }
 
 // runJudgeRound executes the judge verdict after all debate rounds.
-func runJudgeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, hookSession *HookSession, responses []ProviderResponse, lastRound int) *ProviderResponse {
+// Always runs judge as a non-interactive subprocess for reliable completion detection.
+// Interactive pane-based judge execution is unreliable because the pane already contains
+// previous round output, making prompt-based completion detection ambiguous.
+func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *HookSession, responses []ProviderResponse, _ int) *ProviderResponse {
 	judgment := buildJudgmentPrompt(cfg.Prompt, responses)
 	judgeCfg := findOrBuildJudgeConfig(cfg)
 
-	// Try to find an existing pane for the judge (if judge is a participant).
-	for _, pi := range panes {
-		if pi.provider.Name == cfg.JudgeProvider && !pi.skipWait {
-			patterns := DefaultCompletionPatterns()
-			pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, 10*time.Second)
-			// Use SendLongText for judgment prompt — it contains all provider responses and can be very long
-			_ = cfg.Terminal.SendLongText(ctx, pi.paneID, judgment)
-			time.Sleep(500 * time.Millisecond)
-			_ = cfg.Terminal.SendCommand(ctx, pi.paneID, "\n")
-
-			if cfg.HookMode && hookSession != nil {
-				judgeRound := lastRound + 1
-				resps := collectRoundHookResults(ctx, cfg, hookSession, judgeRound)
-				for _, r := range resps {
-					if r.Provider == cfg.JudgeProvider {
-						r.Provider = cfg.JudgeProvider + " (judge)"
-						return &r
-					}
-				}
-			}
-			// Non-hook mode: collect judge result via screen polling
-			judgeDelay := cfg.InitialDelay
-			if judgeDelay <= 0 {
-				judgeDelay = 10 * time.Second
-			}
-			time.Sleep(judgeDelay)
-			resps := waitAndCollectResults(ctx, cfg, []paneInfo{pi}, patterns, time.Now())
-			for _, r := range resps {
-				r.Provider = cfg.JudgeProvider + " (judge)"
-				return &r
-			}
-			return nil
-		}
-	}
-
-	// Judge is not a participant — run as process.
+	// Run judge as non-interactive process for reliable result collection.
 	resp, err := runProvider(ctx, judgeCfg, judgment)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "[Judge] 프로세스 실행 실패: %v\n", err)
 		return nil
 	}
 	resp.Provider = cfg.JudgeProvider + " (judge)"

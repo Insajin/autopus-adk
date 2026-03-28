@@ -32,9 +32,12 @@ func buildInteractiveLaunchCmd(p ProviderConfig, prompt string) string {
 			cmd += " --dangerously-skip-permissions"
 		}
 	}
-	// For args-based providers, append the prompt as the final CLI argument
+	// For args-based providers, append the prompt as the final CLI argument.
+	// Normalize newlines to spaces to prevent shell quote> continuation prompts
+	// when the command is pasted via PTY (set-buffer/paste-buffer).
 	if p.InteractiveInput == "args" && prompt != "" {
-		cmd += " " + shellQuote(prompt)
+		normalized := strings.ReplaceAll(prompt, "\n", " ")
+		cmd += " " + shellQuote(normalized)
 	}
 	return cmd
 }
