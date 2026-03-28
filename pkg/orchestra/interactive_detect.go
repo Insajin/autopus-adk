@@ -18,7 +18,7 @@ func stripANSI(s string) string {
 // defaultPromptPatterns matches common shell and CLI prompts.
 // @AX:NOTE [AUTO] hardcoded prompt regexes — must stay in sync with DefaultCompletionPatterns
 var defaultPromptPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)^>\s*$`),              // opencode default prompt
+	regexp.MustCompile(`(?m)Ask anything`),        // opencode TUI input placeholder
 	regexp.MustCompile(`(?m)^❯\s*$`),              // claude code prompt (unicode heavy right-pointing angle)
 	regexp.MustCompile(`(?m)^\s*>\s+(Type your|@)`), // gemini TUI prompt (> Type your message...)
 	regexp.MustCompile(`(?m)^codex>\s*$`),         // codex prompt (legacy)
