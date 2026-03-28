@@ -25,16 +25,14 @@ var defaultPromptPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?m)^>\s*claude:\s*`), // claude: ready variant
 }
 
-// cliNoisePatterns matches provider CLI informational messages that pollute brainstorm output.
+// cliNoisePatterns matches provider CLI lines that are pure noise (used for line-level filtering).
 var cliNoisePatterns = []*regexp.Regexp{
-	// gemini CLI noise
-	regexp.MustCompile(`(?i)MCP issues detected`),
+	// gemini CLI noise (line-level)
 	regexp.MustCompile(`(?i)We're making changes to Gemini CLI`),
 	regexp.MustCompile(`(?i)Update successful`),
 	regexp.MustCompile(`(?i)What's\s+Changing:`),
 	regexp.MustCompile(`(?i)How it\s+affects`),
 	regexp.MustCompile(`(?i)Read more:\s*https://`),
-	regexp.MustCompile(`(?i)/mcp list for status`),
 	regexp.MustCompile(`(?i)/auth\s*$`),
 	regexp.MustCompile(`(?i)/upgrade\s*$`),
 	regexp.MustCompile(`(?i)Signed in with`),
@@ -48,6 +46,14 @@ var cliNoisePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)ctrl\+[a-z]\s`),
 	// cmux status bar fragments
 	regexp.MustCompile(`🐙\s+v?\d+\.\d+`),
+}
+
+// inlineNoisePatterns are stripped via regex replace (not line-level) to handle noise
+// concatenated with content on the same line (e.g., "MCP issues detected.I will begin...").
+var inlineNoisePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)MCP issues detected\.\s*Run /mcp list for status\.?`),
+	regexp.MustCompile(`(?i)ℹ\s*MCP issues detected\.\s*Run\s+/mcp list\s+for\s+status\.?`),
+	regexp.MustCompile(`(?i)ℹ\s*Update\s+successful!\s*The new\s+version will be used on your next run\.?`),
 }
 
 // filterPromptLines removes lines matching known CLI prompt patterns from output.
@@ -112,9 +118,18 @@ func isOutputIdle(outputFile string, threshold time.Duration) bool {
 	return time.Since(info.ModTime()) >= threshold
 }
 
-// cleanScreenOutput strips ANSI codes and filters prompt lines from raw screen content.
+// stripInlineNoise removes noise fragments that may be concatenated with content on the same line.
+func stripInlineNoise(s string) string {
+	for _, p := range inlineNoisePatterns {
+		s = p.ReplaceAllString(s, "")
+	}
+	return s
+}
+
+// cleanScreenOutput strips ANSI codes, inline noise, and prompt lines from raw screen content.
 // Used to produce clean text for merge logic (R10).
 func cleanScreenOutput(raw string) string {
 	cleaned := SanitizeScreenOutput(raw)
+	cleaned = stripInlineNoise(cleaned)
 	return filterPromptLines(cleaned)
 }
