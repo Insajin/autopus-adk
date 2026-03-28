@@ -65,7 +65,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Providers: map[string]ProviderEntry{
 				"claude":   {Binary: "claude", Args: []string{"--print"}, PaneArgs: []string{"--print"}},
 				"gemini":   {Binary: "gemini", Args: []string{}, PaneArgs: []string{}, PromptViaArgs: true},
-				"opencode": {Binary: "opencode", Args: []string{"run", "-m", "openai/gpt-5.4"}, PaneArgs: []string{"-m", "openai/gpt-5.4"}, PromptViaArgs: true},
+				"opencode": {Binary: "opencode", Args: []string{"run", "-m", "openai/gpt-5.4"}, PaneArgs: []string{"-m", "openai/gpt-5.4"}, PromptViaArgs: false},
 			},
 			Commands: map[string]CommandEntry{
 				"review":     {Strategy: "debate", Providers: []string{"claude", "opencode", "gemini"}},

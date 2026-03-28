@@ -236,7 +236,11 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 				baseline = baselines[pi.provider.Name]
 			}
 			timedOut := !waitForCompletion(ctx, cfg.Terminal, pi, patterns, baseline)
-			screen, _ := cfg.Terminal.ReadScreen(ctx, pi.paneID, terminal.ReadScreenOpts{Scrollback: true})
+			// Use a fresh context for the final screen read — the original ctx may be
+			// cancelled after timeout, which would cause ReadScreen to fail.
+			readCtx, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer readCancel()
+			screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{Scrollback: true})
 			output := cleanScreenOutput(screen)
 
 			mu.Lock()

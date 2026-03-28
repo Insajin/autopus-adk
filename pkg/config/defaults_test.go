@@ -78,8 +78,8 @@ func TestDefaultFullConfig_QualityUltraAllOpus(t *testing.T) {
 	}
 }
 
-// TestDefaultFullConfig_OpencodePromptViaArgs verifies R1:
-// opencode provider must have PromptViaArgs=true in DefaultFullConfig.
+// TestDefaultFullConfig_OpencodePromptViaArgs verifies opencode uses stdin pipe
+// instead of CLI args to avoid ENAMETOOLONG on long prompts.
 func TestDefaultFullConfig_OpencodePromptViaArgs(t *testing.T) {
 	t.Parallel()
 	cfg := DefaultFullConfig("test-project")
@@ -87,7 +87,7 @@ func TestDefaultFullConfig_OpencodePromptViaArgs(t *testing.T) {
 
 	opencode, ok := cfg.Orchestra.Providers["opencode"]
 	require.True(t, ok, "opencode provider must exist in default full config")
-	assert.True(t, opencode.PromptViaArgs, "opencode provider must have PromptViaArgs=true (R1)")
+	assert.False(t, opencode.PromptViaArgs, "opencode provider must have PromptViaArgs=false (stdin pipe mode)")
 	assert.Equal(t, []string{"run", "-m", "openai/gpt-5.4"}, opencode.Args,
 		"opencode provider must have correct default args")
 }

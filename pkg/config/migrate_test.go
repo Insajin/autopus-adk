@@ -261,7 +261,7 @@ func TestMigrateOrchestraConfig_AlreadyCorrectConfigNoChange(t *testing.T) {
 			Providers: map[string]ProviderEntry{
 				// opencode already present with correct args (post-migration state).
 				"claude":   {Binary: "claude", Args: []string{"--print"}},
-				"opencode": {Binary: "opencode", Args: []string{"run", "-m", "openai/gpt-5.4"}, PromptViaArgs: true},
+				"opencode": {Binary: "opencode", Args: []string{"run", "-m", "openai/gpt-5.4"}, PromptViaArgs: false},
 			},
 			Commands: map[string]CommandEntry{
 				// Both providers already listed in every command.

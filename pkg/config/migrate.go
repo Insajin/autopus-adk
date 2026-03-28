@@ -7,7 +7,7 @@ var defaultProviderEntries = map[string]ProviderEntry{
 	"claude":   {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}},
 	"codex":    {Binary: "codex", Args: []string{"--quiet"}, PaneArgs: []string{"--quiet"}, PromptViaArgs: true},
 	"gemini":   {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview"}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: true},
-	"opencode": {Binary: "opencode", Args: []string{"run", "-m", "openai/gpt-5.4"}, PaneArgs: []string{"-m", "openai/gpt-5.4"}, PromptViaArgs: true},
+	"opencode": {Binary: "opencode", Args: []string{"run", "-m", "openai/gpt-5.4"}, PaneArgs: []string{"-m", "openai/gpt-5.4"}, PromptViaArgs: false},
 }
 
 // MigrateOrchestraConfig performs all orchestra config migrations.
@@ -191,6 +191,13 @@ func MigrateOpencodeToTUI(cfg *HarnessConfig) bool {
 	// Clear args-based interactive input mode.
 	if oc.InteractiveInput == "args" {
 		oc.InteractiveInput = ""
+		migrated = true
+	}
+
+	// Disable PromptViaArgs to prevent ENAMETOOLONG on long prompts.
+	// Prompts are now delivered via stdin pipe instead of CLI args.
+	if oc.PromptViaArgs {
+		oc.PromptViaArgs = false
 		migrated = true
 	}
 

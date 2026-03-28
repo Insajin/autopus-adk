@@ -96,7 +96,7 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 		"claude":   {Name: "claude", Binary: "claude", Args: []string{"-p", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"-p", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
 		"codex":    {Name: "codex", Binary: "codex", Args: []string{"-q"}, PaneArgs: []string{"-q"}, PromptViaArgs: false},
 		"gemini":   {Name: "gemini", Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview"}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: true},
-		"opencode": {Name: "opencode", Binary: "opencode", Args: []string{"run", "-m", "openai/gpt-5.4"}, PaneArgs: []string{"-m", "openai/gpt-5.4"}, PromptViaArgs: true},
+		"opencode": {Name: "opencode", Binary: "opencode", Args: []string{"run", "-m", "openai/gpt-5.4"}, PaneArgs: []string{"-m", "openai/gpt-5.4"}, PromptViaArgs: false},
 	}
 
 	var result []orchestra.ProviderConfig
