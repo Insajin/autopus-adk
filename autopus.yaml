@@ -68,16 +68,18 @@ orchestra:
         claude:
             binary: claude
             args: [--print, --model, opus, --effort, high]
-        opencode:
-            binary: opencode
-            args: [run, -m, "openai/gpt-5.4"]
-            pane_args: [-m, "openai/gpt-5.4"]
-            prompt_via_args: true
         gemini:
             binary: gemini
             args: [-m, gemini-3.1-pro-preview]
             prompt_via_args: true
+        opencode:
+            binary: opencode
+            args: [run, -m, openai/gpt-5.4]
+            pane_args: [-m, openai/gpt-5.4]
     commands:
+        brainstorm:
+            strategy: debate
+            providers: [claude, opencode, gemini]
         plan:
             strategy: consensus
             providers: [claude, opencode, gemini]
@@ -87,37 +89,34 @@ orchestra:
         secure:
             strategy: consensus
             providers: [claude, opencode, gemini]
-        brainstorm:
-            strategy: debate
-            providers: [claude, opencode, gemini]
 quality:
     default: balanced
     presets:
-        ultra:
-            description: "모든 에이전트를 Opus로 실행. 최고 품질."
-            agents:
-                planner: opus
-                executor: opus
-                validator: opus
-                tester: opus
-                reviewer: opus
-                architect: opus
-                spec-writer: opus
-                security-auditor: opus
-                debugger: opus
-                explorer: opus
-                devops: opus
         balanced:
-            description: "핵심 분석은 Opus, 구현은 Sonnet, 검증은 Haiku. 가성비 최적."
+            description: 핵심 분석은 Opus, 구현은 Sonnet, 검증은 Haiku. 가성비 최적.
             agents:
-                planner: opus
                 architect: opus
-                spec-writer: opus
-                security-auditor: opus
-                executor: sonnet
-                tester: sonnet
-                reviewer: sonnet
                 debugger: sonnet
                 devops: sonnet
-                validator: haiku
+                executor: sonnet
                 explorer: haiku
+                planner: opus
+                reviewer: sonnet
+                security-auditor: opus
+                spec-writer: opus
+                tester: sonnet
+                validator: haiku
+        ultra:
+            description: 모든 에이전트를 Opus로 실행. 최고 품질.
+            agents:
+                architect: opus
+                debugger: opus
+                devops: opus
+                executor: opus
+                explorer: opus
+                planner: opus
+                reviewer: opus
+                security-auditor: opus
+                spec-writer: opus
+                tester: opus
+                validator: opus

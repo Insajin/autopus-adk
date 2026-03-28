@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "platform": "claude-code",
-  "generated_at": "2026-03-27T21:12:32+09:00",
+  "generated_at": "2026-03-28T21:59:01+09:00",
   "files": {
     ".claude/agents/autopus/annotator.md": {
       "checksum": "536af8a34ac0ca0e8f6f56d18cb671d2805640f10fc0eb02922809fdd6e73796",
@@ -68,7 +68,7 @@
       "policy": "always"
     },
     ".claude/commands/auto.md": {
-      "checksum": "ee367fac5e5fa2f27540b9c0ee839384a5b6ddb24488478ff4ec819abda6a95e",
+      "checksum": "41016fe0b57aee70df589290334428abac3fdccdbcee4381953f44667d8375cc",
       "policy": "always"
     },
     ".claude/hooks/autopus/hook-claude-stop.sh": {
@@ -104,7 +104,7 @@
       "policy": "always"
     },
     ".claude/rules/autopus/file-size-limit.md": {
-      "checksum": "05bcf8ef53a9b149ea0857aa0efe05cdc2f79b5e347353a092b96b5142d97d16",
+      "checksum": "9c17ace7aa71bb3bb94b89fe45146b946d9622e6c9ae007e23d3a966688ab0f5",
       "policy": "always"
     },
     ".claude/rules/autopus/lore-commit.md": {
@@ -124,7 +124,7 @@
       "policy": "always"
     },
     ".claude/skills/autopus/agent-pipeline.md": {
-      "checksum": "311dc98634cc32d1e10cabb20c8db4fc6ea6401a47c6e7a9c641926f960e62c1",
+      "checksum": "e1e8afb183387a8c200754c12b20dfc79d9448c328e3790d47bc60e98b471233",
       "policy": "always"
     },
     ".claude/skills/autopus/agent-presets.md": {
