@@ -102,6 +102,10 @@ func isPromptLine(line string) bool {
 // This is the PRIMARY completion detection method (R7).
 // @AX:NOTE [AUTO] called by pollUntilPrompt and waitForCompletion — central prompt detection logic
 func isPromptVisible(screen string, patterns []CompletionPattern) bool {
+	// Strip ANSI escape codes before matching — providers like claude/opencode
+	// render the ">" prompt with color codes (e.g. \x1b[32m>\x1b[0m) that break
+	// the ^>\s*$ pattern when matching raw ReadScreen output.
+	screen = stripANSI(screen)
 	// Check provider-specific patterns first
 	for _, cp := range patterns {
 		if cp.Pattern.MatchString(screen) {
