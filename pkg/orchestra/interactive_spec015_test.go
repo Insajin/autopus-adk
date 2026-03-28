@@ -115,7 +115,7 @@ func TestStartupTimeoutFor_ProviderSpecific(t *testing.T) {
 	}{
 		{"claude 15s", ProviderConfig{Name: "claude"}, 15 * time.Second},
 		{"gemini 10s", ProviderConfig{Name: "gemini"}, 10 * time.Second},
-		{"opencode 5s", ProviderConfig{Name: "opencode"}, 5 * time.Second},
+		{"opencode 15s", ProviderConfig{Name: "opencode"}, 15 * time.Second},
 		{"unknown default 30s", ProviderConfig{Name: "unknown"}, 30 * time.Second},
 		{"custom override", ProviderConfig{Name: "claude", StartupTimeout: 60 * time.Second}, 60 * time.Second},
 	}
@@ -134,4 +134,79 @@ func TestStartupTimeoutFor_DefaultFallback(t *testing.T) {
 	t.Parallel()
 	got := startupTimeoutFor(ProviderConfig{Name: "brand-new-provider"})
 	assert.Equal(t, 30*time.Second, got, "unknown provider must get 30s default")
+}
+
+// --- R7: Round env skipped for TUI providers ---
+
+// TestSendRoundEnv_SkippedForTUIProvider verifies that SendRoundEnvToPane is NOT called
+// for TUI-based providers (InteractiveInput != "args"). The round env export command
+// would otherwise be injected as chat text in the TUI input field.
+func TestSendRoundEnv_SkippedForTUIProvider(t *testing.T) {
+	t.Parallel()
+
+	mock := newCmuxMock()
+	// TUI provider: InteractiveInput is empty (not "args").
+	tuiProvider := ProviderConfig{Name: "opencode", InteractiveInput: ""}
+	panes := []paneInfo{
+		{provider: tuiProvider, paneID: "pane-1"},
+	}
+
+	cfg := OrchestraConfig{
+		Terminal:    mock,
+		Prompt:      "discuss topic",
+		InitialDelay: 1 * time.Millisecond,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	prevResponses := []ProviderResponse{
+		{Provider: "claude", Output: "claude response"},
+	}
+	_ = executeRound(ctx, cfg, panes, nil, 2, prevResponses)
+
+	// Verify that no "export AUTOPUS_ROUND" command was sent via SendCommand.
+	for _, call := range mock.sendCommandCalls {
+		assert.NotContains(t, call.Cmd, "AUTOPUS_ROUND",
+			"TUI provider must not receive export AUTOPUS_ROUND via SendCommand")
+	}
+}
+
+// TestSendRoundEnv_SentForArgsProvider verifies that SendRoundEnvToPane IS called
+// for args-based providers (InteractiveInput == "args").
+func TestSendRoundEnv_SentForArgsProvider(t *testing.T) {
+	t.Parallel()
+
+	mock := newCmuxMock()
+	// Return a claude prompt so pollUntilPrompt exits immediately.
+	mock.readScreenOutput = "❯"
+	// args provider: InteractiveInput is "args". skipWait=false so the round-env path is reached.
+	argsProvider := ProviderConfig{Name: "claude", InteractiveInput: "args"}
+	panes := []paneInfo{
+		{provider: argsProvider, paneID: "pane-2"},
+	}
+
+	cfg := OrchestraConfig{
+		Terminal:     mock,
+		Prompt:       "discuss topic",
+		InitialDelay: 1 * time.Millisecond,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	prevResponses := []ProviderResponse{
+		{Provider: "opencode", Output: "opencode response"},
+	}
+	_ = executeRound(ctx, cfg, panes, nil, 2, prevResponses)
+
+	// Verify that "export AUTOPUS_ROUND=2" was sent via SendCommand for args-based provider.
+	found := false
+	for _, call := range mock.sendCommandCalls {
+		if call.Cmd == "export AUTOPUS_ROUND=2" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "args provider must receive export AUTOPUS_ROUND via SendCommand")
 }

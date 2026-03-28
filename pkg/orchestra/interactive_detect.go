@@ -69,7 +69,7 @@ func isSessionReady(screen string, patterns []CompletionPattern) bool {
 }
 
 // startupTimeoutFor returns the per-provider startup timeout.
-// Providers with faster startup (opencode) get shorter timeouts.
+// opencode loads plugins/MCP on startup similarly to claude, requiring a longer timeout.
 func startupTimeoutFor(provider ProviderConfig) time.Duration {
 	if provider.StartupTimeout > 0 {
 		return provider.StartupTimeout
@@ -80,7 +80,7 @@ func startupTimeoutFor(provider ProviderConfig) time.Duration {
 	case "gemini":
 		return 10 * time.Second
 	case "opencode":
-		return 5 * time.Second
+		return 15 * time.Second
 	default:
 		return 30 * time.Second
 	}

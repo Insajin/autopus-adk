@@ -194,7 +194,11 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		}
 
 		if round > 1 {
-			_ = SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round)
+			// Only send round env to shell-based providers (args mode).
+			// TUI providers (opencode, gemini) would receive this as chat input text.
+			if pi.provider.InteractiveInput == "args" {
+				_ = SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round)
+			}
 			pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, 10*time.Second)
 		}
 
