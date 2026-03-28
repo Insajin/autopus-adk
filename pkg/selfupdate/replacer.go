@@ -34,9 +34,11 @@ func (r *Replacer) Replace(newBinaryPath, targetPath string) error {
 		return err
 	}
 
-	// macOS: remove quarantine attribute to prevent Gatekeeper from killing the binary
+	// macOS: clear extended attributes and ad-hoc codesign to prevent Gatekeeper from killing the binary.
+	// com.apple.quarantine and com.apple.provenance both trigger SIGKILL on macOS Sequoia+.
 	if runtime.GOOS == "darwin" {
-		_ = exec.Command("xattr", "-d", "com.apple.quarantine", targetPath).Run()
+		_ = exec.Command("xattr", "-cr", targetPath).Run()
+		_ = exec.Command("codesign", "--force", "--sign", "-", targetPath).Run()
 	}
 
 	return nil
