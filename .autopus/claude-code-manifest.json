@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "platform": "claude-code",
-  "generated_at": "2026-03-28T21:59:01+09:00",
+  "generated_at": "2026-03-29T07:34:08+09:00",
   "files": {
     ".claude/agents/autopus/annotator.md": {
       "checksum": "536af8a34ac0ca0e8f6f56d18cb671d2805640f10fc0eb02922809fdd6e73796",
