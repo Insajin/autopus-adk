@@ -15,7 +15,7 @@ import (
 // TestRunPaneDebate_SingleRound verifies single-round pane debate flow.
 func TestRunPaneDebate_SingleRound(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = "new AI output\n>\n"
+	mock.readScreenOutput = "new AI output\n❯\n"
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			echoProvider("claude"),
@@ -44,12 +44,12 @@ func TestRunPaneDebate_MultiRound(t *testing.T) {
 	mock := &countingScreenMock{
 		mockTerminal: mockTerminal{name: "cmux"},
 		outputs: []string{
-			"baseline output\n>\n",     // baseline capture
-			"round 1 response\n>\n",    // round 1 first match
-			"round 1 response\n>\n",    // round 1 second match (confirm)
-			"new baseline\n>\n",        // round 2 baseline
-			"round 2 response\n>\n",    // round 2 first match
-			"round 2 response\n>\n",    // round 2 second match (confirm)
+			"baseline output\n❯\n",     // baseline capture
+			"round 1 response\n❯\n",    // round 1 first match
+			"round 1 response\n❯\n",    // round 1 second match (confirm)
+			"new baseline\n❯\n",        // round 2 baseline
+			"round 2 response\n❯\n",    // round 2 first match
+			"round 2 response\n❯\n",    // round 2 second match (confirm)
 		},
 	}
 	cfg := OrchestraConfig{
@@ -75,7 +75,7 @@ func TestRunPaneDebate_MultiRound(t *testing.T) {
 // TestRunPaneDebate_WithJudge verifies judge round is invoked in pane debate.
 func TestRunPaneDebate_WithJudge(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = "debate output\n>\n"
+	mock.readScreenOutput = "debate output\n❯\n"
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			{Name: "claude", Binary: "echo"},
@@ -139,7 +139,7 @@ func TestRunPaneDebate_SplitFails_FallsBack(t *testing.T) {
 
 // TestRunPaneDebate_PipeCaptureFails_FallsBack verifies fallback on pipe-pane error.
 func TestRunPaneDebate_PipeCaptureFails_FallsBack(t *testing.T) {
-	pipeMock := &pipePaneErrorMock{mockTerminal: mockTerminal{name: "cmux", readScreenOutput: ">\n"}}
+	pipeMock := &pipePaneErrorMock{mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "❯\n"}}
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("claude")},
 		Strategy:       StrategyDebate,
@@ -158,7 +158,7 @@ func TestRunPaneDebate_PipeCaptureFails_FallsBack(t *testing.T) {
 // TestRunPaneDebate_HookMode verifies hook mode session creation in pane debate.
 func TestRunPaneDebate_HookMode(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = "hook output\n>\n"
+	mock.readScreenOutput = "hook output\n❯\n"
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("claude")},
 		Strategy:       StrategyDebate,

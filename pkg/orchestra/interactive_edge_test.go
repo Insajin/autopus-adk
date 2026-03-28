@@ -15,9 +15,9 @@ import (
 // TestInteractive_StartPipeCapture_Error verifies fallback when PipePaneStart fails.
 func TestInteractive_StartPipeCapture_Error(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	// Make PipePaneStart fail by using a mock that returns error
-	pipeMock := &pipePaneErrorMock{mockTerminal: mockTerminal{name: "cmux", readScreenOutput: ">\n"}}
+	pipeMock := &pipePaneErrorMock{mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "❯\n"}}
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("p1")},
 		Strategy:       StrategyConsensus,
@@ -36,7 +36,7 @@ func TestInteractive_StartPipeCapture_Error(t *testing.T) {
 // TestInteractive_LaunchSession_SendCommandError verifies failed launch is recorded.
 func TestInteractive_LaunchSession_SendCommandError(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	mock.sendCommandErr = fmt.Errorf("send failed")
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("p1")},
@@ -74,7 +74,7 @@ func TestInteractive_NilTerminal_FallsBack(t *testing.T) {
 // TestInteractive_ZeroTimeout_UsesDefault verifies 0 timeout falls back to default 120s.
 func TestInteractive_ZeroTimeout_UsesDefault(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("p1")},
 		Strategy:       StrategyConsensus,
@@ -97,7 +97,7 @@ func TestInteractive_ZeroTimeout_UsesDefault(t *testing.T) {
 // detects prompt pattern as primary completion signal.
 func TestInteractive_CompletionDetection_PromptPatternPrimary(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n" // prompt pattern
+	mock.readScreenOutput = "❯\n" // prompt pattern
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("p1")},
 		Strategy:       StrategyConsensus,
@@ -147,7 +147,7 @@ func TestInteractive_CompletionDetection_IdleSecondary(t *testing.T) {
 // TestInteractive_SendPrompt_Error verifies that prompt send failures are recorded.
 func TestInteractive_SendPrompt_Error(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	// Succeed on launch (1st call per provider) but fail on prompt send (2nd call)
 	mock.sendCommandErr = fmt.Errorf("prompt send failed")
 	mock.sendCommandErrAfter = 1 // first call succeeds, second fails
@@ -171,7 +171,7 @@ func TestInteractive_SendPrompt_Error(t *testing.T) {
 // TestInteractive_LaunchWithBareBinary verifies interactive mode launches binary alone without flags.
 func TestInteractive_LaunchWithBareBinary(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			{Name: "claude", Binary: "claude", Args: []string{"-p", "--json"}, PaneArgs: []string{"--json"}},
@@ -218,7 +218,7 @@ func TestInteractive_ReadScreenError_ContinuesPolling(t *testing.T) {
 // TestInteractive_MultipleProviders_ParallelCompletion verifies multiple providers complete.
 func TestInteractive_MultipleProviders_ParallelCompletion(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			echoProvider("p1"),

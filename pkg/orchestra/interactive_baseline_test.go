@@ -18,7 +18,7 @@ func TestWaitForCompletion_Baseline_PrevRoundPromptIgnored(t *testing.T) {
 	t.Parallel()
 	mock := newCmuxMock()
 	// Screen shows prompt from previous round — identical to baseline
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	patterns := DefaultCompletionPatterns()
 	pi := paneInfo{provider: ProviderConfig{Name: "claude"}, paneID: "pane-1"}
 
@@ -26,7 +26,7 @@ func TestWaitForCompletion_Baseline_PrevRoundPromptIgnored(t *testing.T) {
 	defer cancel()
 
 	// R2: pass baseline matching current screen — completion should NOT be detected
-	baseline := ">\n"
+	baseline := "❯\n"
 	result := waitForCompletion(ctx, mock, pi, patterns, baseline)
 	assert.False(t, result,
 		"must not false-positive when screen matches previous round baseline")
@@ -39,7 +39,7 @@ func TestWaitForCompletion_Baseline_ScreenChangeDetectsCompletion(t *testing.T) 
 	t.Parallel()
 	mock := newCmuxMock()
 	// Screen shows new content + prompt — different from baseline
-	mock.readScreenOutput = "new output from AI\n>\n"
+	mock.readScreenOutput = "new output from AI\n❯\n"
 	patterns := DefaultCompletionPatterns()
 	pi := paneInfo{provider: ProviderConfig{Name: "claude"}, paneID: "pane-1"}
 
@@ -47,7 +47,7 @@ func TestWaitForCompletion_Baseline_ScreenChangeDetectsCompletion(t *testing.T) 
 	defer cancel()
 
 	// R2: baseline differs from current screen — completion should be detected
-	baseline := "old prompt from last round\n>\n"
+	baseline := "old prompt from last round\n❯\n"
 	result := waitForCompletion(ctx, mock, pi, patterns, baseline)
 	assert.True(t, result,
 		"must detect completion when screen changes from baseline and shows prompt")
@@ -58,7 +58,7 @@ func TestWaitForCompletion_Baseline_ScreenChangeDetectsCompletion(t *testing.T) 
 func TestWaitForCompletion_Baseline_EmptyBaseline(t *testing.T) {
 	t.Parallel()
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	patterns := DefaultCompletionPatterns()
 	pi := paneInfo{provider: ProviderConfig{Name: "claude"}, paneID: "pane-1"}
 
@@ -76,14 +76,14 @@ func TestWaitForCompletion_Baseline_SpecialChars(t *testing.T) {
 	t.Parallel()
 	mock := newCmuxMock()
 	// Screen changed from baseline with special chars
-	mock.readScreenOutput = "new response\n>\n"
+	mock.readScreenOutput = "new response\n❯\n"
 	patterns := DefaultCompletionPatterns()
 	pi := paneInfo{provider: ProviderConfig{Name: "claude"}, paneID: "pane-1"}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	baseline := "previous\x1b[31m output\x1b[0m with ANSI\n>\n"
+	baseline := "previous\x1b[31m output\x1b[0m with ANSI\n❯\n"
 	result := waitForCompletion(ctx, mock, pi, patterns, baseline)
 	assert.True(t, result,
 		"baseline with special chars must be compared correctly")

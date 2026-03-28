@@ -15,7 +15,7 @@ import (
 // TestInteractive_FullFlow verifies the complete interactive pane orchestration flow.
 func TestInteractive_FullFlow_SplitPipelaunchWaitCollectMergeCleanup(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n" // prompt pattern triggers immediate completion
+	mock.readScreenOutput = "❯\n" // prompt pattern triggers immediate completion
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("p1"), echoProvider("p2")},
 		Strategy:       StrategyConsensus,
@@ -36,7 +36,7 @@ func TestInteractive_FullFlow_SplitPipelaunchWaitCollectMergeCleanup(t *testing.
 // TestInteractive_Flow_PipePaneStartCalledPerProvider verifies each provider gets pipe capture.
 func TestInteractive_Flow_PipePaneStartCalledPerProvider(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("p1"), echoProvider("p2"), echoProvider("p3")},
 		Strategy:       StrategyConsensus,
@@ -54,7 +54,7 @@ func TestInteractive_Flow_PipePaneStartCalledPerProvider(t *testing.T) {
 // TestInteractive_Flow_PipePaneStopCalledOnCleanup verifies pipe-pane stop on cleanup.
 func TestInteractive_Flow_PipePaneStopCalledOnCleanup(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("p1")},
 		Strategy:       StrategyConsensus,
@@ -233,7 +233,7 @@ func TestBuildInteractiveLaunchCmd_PermissionBypass(t *testing.T) {
 func TestWaitForCompletion_TwoPhase_ConsecutiveMatch(t *testing.T) {
 	t.Parallel()
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n" // always returns prompt — two consecutive matches
+	mock.readScreenOutput = "❯\n" // always returns prompt — two consecutive matches
 	patterns := DefaultCompletionPatterns()
 	pi := paneInfo{provider: ProviderConfig{Name: "claude"}, paneID: "pane-1"}
 

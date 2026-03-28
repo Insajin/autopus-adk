@@ -140,14 +140,16 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 	return failed
 }
 
-// waitForSessionReady polls ReadScreen until a prompt is visible or timeout.
+// waitForSessionReady polls ReadScreen until a CLI-specific prompt is visible or timeout.
+// Uses SessionReadyPatterns (no shell $ / # patterns) to avoid false positives.
 func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []paneInfo) {
-	patterns := DefaultCompletionPatterns()
+	patterns := SessionReadyPatterns()
 	for _, pi := range panes {
 		if pi.skipWait {
 			continue
 		}
-		pollUntilPrompt(ctx, term, pi.paneID, patterns, 30*time.Second)
+		timeout := startupTimeoutFor(pi.provider)
+		pollUntilSessionReady(ctx, term, pi.paneID, patterns, timeout)
 	}
 }
 
@@ -169,6 +171,32 @@ func pollUntilPrompt(ctx context.Context, term terminal.Terminal, paneID termina
 				continue
 			}
 			if isPromptVisible(screen, patterns) {
+				return true
+			}
+		}
+	}
+}
+
+// pollUntilSessionReady polls ReadScreen at 500ms intervals until a session-ready
+// pattern is detected or timeout. Unlike pollUntilPrompt, this uses isSessionReady
+// which excludes shell prompts to prevent false session-ready detection.
+func pollUntilSessionReady(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, patterns []CompletionPattern, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-deadline:
+			return false
+		case <-ticker.C:
+			screen, err := term.ReadScreen(ctx, paneID, terminal.ReadScreenOpts{})
+			if err != nil {
+				continue
+			}
+			if isSessionReady(screen, patterns) {
 				return true
 			}
 		}

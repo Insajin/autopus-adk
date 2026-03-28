@@ -26,6 +26,66 @@ var defaultPromptPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?m)^#\s*$`),              // root # prompt
 }
 
+// sessionReadyPromptPatterns matches CLI-specific prompts WITHOUT shell patterns ($ and #).
+// Used by waitForSessionReady to avoid premature detection on bare shell prompts.
+var sessionReadyPromptPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?m)Ask anything`),          // opencode TUI input placeholder
+	regexp.MustCompile(`(?m)^❯\s*$`),                // claude code prompt (unicode heavy right-pointing angle)
+	regexp.MustCompile(`(?m)^\s*>\s+(Type your|@)`),  // gemini TUI prompt
+	regexp.MustCompile(`(?m)^codex>\s*$`),           // codex prompt (legacy)
+	// NOTE: no shell $ or # patterns — this is the key difference from defaultPromptPatterns
+}
+
+// SessionReadyPatterns returns completion patterns for CLI session readiness detection.
+// Unlike DefaultCompletionPatterns, this excludes shell prompts ($ and #) to prevent
+// false positives when detecting whether a CLI tool has finished launching.
+func SessionReadyPatterns() []CompletionPattern {
+	return []CompletionPattern{
+		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯\s*$`)},
+		{Provider: "codex", Pattern: regexp.MustCompile(`(?m)^codex>\s*$`)},
+		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s+(Type your|@)`)},
+		{Provider: "opencode", Pattern: regexp.MustCompile(`(?m)Ask anything`)},
+	}
+}
+
+// isSessionReady checks if the screen content contains a CLI-specific prompt pattern,
+// indicating the provider session has fully launched. Unlike isPromptVisible, this does
+// NOT match shell prompts ($ and #) to avoid false positives during startup.
+func isSessionReady(screen string, patterns []CompletionPattern) bool {
+	screen = stripANSI(screen)
+	// Check provider-specific session-ready patterns
+	for _, cp := range patterns {
+		if cp.Pattern.MatchString(screen) {
+			return true
+		}
+	}
+	// Fallback to sessionReadyPromptPatterns (no shell patterns)
+	for _, p := range sessionReadyPromptPatterns {
+		if p.MatchString(screen) {
+			return true
+		}
+	}
+	return false
+}
+
+// startupTimeoutFor returns the per-provider startup timeout.
+// Providers with faster startup (opencode) get shorter timeouts.
+func startupTimeoutFor(provider ProviderConfig) time.Duration {
+	if provider.StartupTimeout > 0 {
+		return provider.StartupTimeout
+	}
+	switch provider.Name {
+	case "claude":
+		return 15 * time.Second
+	case "gemini":
+		return 10 * time.Second
+	case "opencode":
+		return 5 * time.Second
+	default:
+		return 30 * time.Second
+	}
+}
+
 // cliNoisePatterns matches provider CLI lines that are pure noise (used for line-level filtering).
 var cliNoisePatterns = []*regexp.Regexp{
 	// gemini CLI noise (line-level)

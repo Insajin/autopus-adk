@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -172,7 +173,7 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		baselines[pi.provider.Name] = screen
 	}
 
-	for _, pi := range panes {
+	for i, pi := range panes {
 		if pi.skipWait {
 			continue
 		}
@@ -201,9 +202,27 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		if pi.provider.InteractiveInput == "args" && round == 1 {
 			continue
 		}
-		_ = cfg.Terminal.SendLongText(ctx, pi.paneID, prompt)
+		// R8: Retry once on SendLongText failure
+		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, prompt); err != nil {
+			log.Printf("[Round %d] %s SendLongText failed: %v — retrying", round, pi.provider.Name, err)
+			time.Sleep(1 * time.Second)
+			if retryErr := cfg.Terminal.SendLongText(ctx, pi.paneID, prompt); retryErr != nil {
+				log.Printf("[Round %d] %s SendLongText retry failed: %v — skipping", round, pi.provider.Name, retryErr)
+				panes[i].skipWait = true
+				continue
+			}
+		}
 		time.Sleep(500 * time.Millisecond)
-		_ = cfg.Terminal.SendCommand(ctx, pi.paneID, "\n")
+		// R8: Retry once on SendCommand (Enter) failure
+		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
+			log.Printf("[Round %d] %s SendCommand failed: %v — retrying", round, pi.provider.Name, err)
+			time.Sleep(1 * time.Second)
+			if retryErr := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); retryErr != nil {
+				log.Printf("[Round %d] %s SendCommand retry failed: %v — skipping", round, pi.provider.Name, retryErr)
+				panes[i].skipWait = true
+				continue
+			}
+		}
 	}
 
 	// @AX:NOTE: [AUTO] REQ-3 configurable initial delay — AI processing head start before polling
@@ -214,10 +233,19 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 	time.Sleep(debateDelay)
 
 	// Collect results via hook or screen polling.
+	var responses []ProviderResponse
 	if cfg.HookMode && hookSession != nil {
-		return collectRoundHookResults(ctx, cfg, hookSession, round)
+		responses = collectRoundHookResults(ctx, cfg, hookSession, round)
+	} else {
+		responses = waitAndCollectResults(ctx, cfg, panes, patterns, time.Now(), baselines)
 	}
-	return waitAndCollectResults(ctx, cfg, panes, patterns, time.Now(), baselines)
+	// R8: Mark providers with empty output for partial merge
+	for i := range responses {
+		if responses[i].Output == "" && !responses[i].TimedOut {
+			responses[i].EmptyOutput = true
+		}
+	}
+	return responses
 }
 
 // Helper functions (collectRoundHookResults, runJudgeRound, consensusReached,

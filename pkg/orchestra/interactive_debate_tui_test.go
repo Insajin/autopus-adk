@@ -21,7 +21,7 @@ func TestExecuteRound_OpencodeTUI_SendLongTextRound1(t *testing.T) {
 	t.Parallel()
 
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 
 	opencodeProvider := ProviderConfig{
 		Name:             "opencode",
@@ -60,7 +60,7 @@ func TestExecuteRound_OpencodeTUI_SendLongTextRound2(t *testing.T) {
 	t.Parallel()
 
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 
 	opencodeProvider := ProviderConfig{
 		Name:             "opencode",
@@ -121,7 +121,7 @@ func TestExecuteRound_OpencodeTUI_NoSkipVsArgsMode(t *testing.T) {
 			t.Parallel()
 
 			mock := newCmuxMock()
-			mock.readScreenOutput = ">\n"
+			mock.readScreenOutput = "❯\n"
 
 			provider := ProviderConfig{
 				Name:             "opencode",

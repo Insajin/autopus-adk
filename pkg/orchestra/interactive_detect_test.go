@@ -75,7 +75,7 @@ func TestInteractive_FilterPromptLines_RemovesProviderPrompts(t *testing.T) {
 	}{
 		{
 			name:     "claude prompt filtered",
-			input:    "some output\n> claude: ready\nactual content",
+			input:    "some output\n❯\nactual content",
 			expected: "some output\nactual content",
 		},
 		{
@@ -181,7 +181,7 @@ func TestCleanScreenOutput(t *testing.T) {
 	}{
 		{
 			name:     "strips ANSI and prompts together",
-			input:    "\x1b[31mcolored\x1b[0m output\n> \nreal content",
+			input:    "\x1b[31mcolored\x1b[0m output\n$ \nreal content",
 			expected: "colored output\nreal content",
 		},
 		{
@@ -242,7 +242,7 @@ func TestIsPromptVisible_WithCustomPatterns(t *testing.T) {
 		},
 		{
 			name:     "empty patterns nil falls through to default only",
-			screen:   "> ",
+			screen:   "$ ",
 			patterns: nil,
 			expected: true,
 		},

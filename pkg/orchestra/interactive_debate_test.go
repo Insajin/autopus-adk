@@ -123,7 +123,7 @@ func TestRunInteractiveDebate_NonExistentBinary(t *testing.T) {
 func TestExecuteRound_TopicIsolation(t *testing.T) {
 	t.Parallel()
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			{Name: "claude", Binary: "echo"},
@@ -153,6 +153,8 @@ func TestExecuteRound_TopicIsolation(t *testing.T) {
 	}
 	assert.True(t, found, "round 1 prompt must include topic isolation instruction")
 }
+
+// R8 tests are in interactive_debate_r8_test.go.
 
 // Helper function tests (consensusReached, countNonEmpty, perRoundTimeout,
 // buildDebateResult, mergeByStrategyWithRoundHistory) are in
@@ -194,7 +196,7 @@ func TestRunInteractiveDebate_WithJudge_NoTerminal(t *testing.T) {
 func TestExecuteRound_ArgsProviderSkipsSendRound1(t *testing.T) {
 	t.Parallel()
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	argsProvider := ProviderConfig{
 		Name: "opencode", Binary: "opencode",
 		InteractiveInput: "args",
@@ -224,7 +226,7 @@ func TestExecuteRound_ArgsProviderSkipsSendRound1(t *testing.T) {
 func TestExecuteRound_Round2_RebuttalPrompt(t *testing.T) {
 	t.Parallel()
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			{Name: "claude", Binary: "echo"},
@@ -256,7 +258,7 @@ func TestExecuteRound_Round2_RebuttalPrompt(t *testing.T) {
 func TestExecuteRound_SkipWaitProviders(t *testing.T) {
 	t.Parallel()
 	mock := newCmuxMock()
-	mock.readScreenOutput = ">\n"
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{{Name: "p1", Binary: "echo"}},
 		Strategy:       StrategyDebate,

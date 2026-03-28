@@ -28,14 +28,15 @@ func (s Strategy) IsValid() bool {
 	return slices.Contains(ValidStrategies, s)
 }
 
-// ProviderConfig는 프로바이더 실행 설정이다.
+// ProviderConfig는 ��로바이더 실행 설정이다.
 type ProviderConfig struct {
-	Name          string   // provider name (claude, codex, gemini)
-	Binary        string   // executable binary path
-	Args          []string // args for non-interactive mode
-	PaneArgs      []string // args for pane mode (overrides Args when set)
-	PromptViaArgs    bool     // true: pass prompt as last arg (gemini), false: pass via stdin (claude, codex)
-	InteractiveInput string   // interactive prompt delivery: "args" = via CLI arg at launch, "" = via sendkeys (default)
+	Name             string        // provider name (claude, codex, gemini)
+	Binary           string        // executable binary path
+	Args             []string      // args for non-interactive mode
+	PaneArgs         []string      // args for pane mode (overrides Args when set)
+	PromptViaArgs    bool          // true: pass prompt as last arg (gemini), false: pass via stdin (claude, codex)
+	InteractiveInput string        // interactive prompt delivery: "args" = via CLI arg at launch, "" = via sendkeys (default)
+	StartupTimeout   time.Duration // per-provider startup timeout; 0 uses name-based default
 }
 
 // ProviderResponse는 프로바이더 실행 결과이다.
