@@ -94,9 +94,9 @@ type CompletionPattern struct {
 // @AX:NOTE [AUTO] hardcoded provider prompt patterns — update when adding new providers
 func DefaultCompletionPatterns() []CompletionPattern {
 	return []CompletionPattern{
-		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^>\s*$`)},
+		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯\s*$`)},
 		{Provider: "codex", Pattern: regexp.MustCompile(`(?m)^codex>\s*$`)},
-		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^>\s*$`)},
+		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s+(Type your|@)`)},
 		{Provider: "opencode", Pattern: regexp.MustCompile(`(?m)^>\s*$`)},
 	}
 }
