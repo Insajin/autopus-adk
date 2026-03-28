@@ -60,6 +60,8 @@ type HarnessConfig struct {
 	ProjectName   string            `yaml:"project_name"`
 	Platforms     []string          `yaml:"platforms"`
 	IsolateRules  bool              `yaml:"isolate_rules,omitempty"`
+	Stack         string            `yaml:"stack,omitempty"`     // detected stack: go, typescript, python, rust
+	Framework     string            `yaml:"framework,omitempty"` // detected framework: nextjs, django, gin, etc.
 	Language      LanguageConf      `yaml:"language,omitempty"`
 	Architecture  ArchitectureConf  `yaml:"architecture"`
 	Lore          LoreConf          `yaml:"lore"`

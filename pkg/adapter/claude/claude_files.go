@@ -73,6 +73,13 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, ruleFiles...)
 
+	// Render file-size-limit.md from template (stack/framework-aware)
+	fileSizeRule, err := a.prepareFileSizeLimitRule(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("file-size-limit 룰 준비 실패: %w", err)
+	}
+	files = append(files, fileSizeRule)
+
 	// Full mode: skills/agents
 	if cfg.IsFullMode() {
 		skillFiles, err := a.prepareContentFiles("skills", ".claude/skills/autopus")
@@ -92,6 +99,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 }
 
 // prepareContentFiles는 컨텐츠 파일을 읽어 FileMapping 슬라이스로 반환한다 (디스크 쓰기 없음).
+// file-size-limit.md is skipped here; it is rendered dynamically via prepareFileSizeLimitRule.
 func (a *Adapter) prepareContentFiles(subDir string, targetRelDir string) ([]adapter.FileMapping, error) {
 	var files []adapter.FileMapping
 
@@ -102,6 +110,10 @@ func (a *Adapter) prepareContentFiles(subDir string, targetRelDir string) ([]ada
 
 	for _, entry := range entries {
 		if entry.IsDir() {
+			continue
+		}
+		// file-size-limit.md is rendered from template — skip the static copy.
+		if subDir == "rules" && entry.Name() == "file-size-limit.md" {
 			continue
 		}
 		srcPath := subDir + "/" + entry.Name()
@@ -229,9 +241,8 @@ func (a *Adapter) renderRouterCommand(cfg *config.HarnessConfig) ([]adapter.File
 // copyContentFiles는 embedded content FS에서 파일을 읽어 대상 디렉터리에 복사한다.
 // subDir: "skills" or "agents"
 // targetRelDir: relative destination path (e.g. ".claude/skills/autopus")
+// file-size-limit.md in "rules" is skipped here and rendered dynamically instead.
 func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, targetRelDir string) ([]adapter.FileMapping, error) {
-	_ = cfg // reserved for future use
-
 	var files []adapter.FileMapping
 
 	entries, err := contentfs.FS.ReadDir(subDir)
@@ -247,6 +258,10 @@ func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, tar
 
 	for _, entry := range entries {
 		if entry.IsDir() {
+			continue
+		}
+		// file-size-limit.md is rendered from template — skip the static copy.
+		if subDir == "rules" && entry.Name() == "file-size-limit.md" {
 			continue
 		}
 

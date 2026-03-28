@@ -75,6 +75,14 @@ func newInitCmd() *cobra.Command {
 			cfg := config.DefaultFullConfig(project)
 			cfg.Platforms = platformList
 
+			// Detect and set stack and framework for stack-aware rule generation.
+			if stack, err := detect.DetectStack(dir); err == nil && stack != "" {
+				cfg.Stack = stack
+			}
+			if fw, err := detect.DetectFramework(dir); err == nil && fw != nil {
+				cfg.Framework = fw.Name
+			}
+
 			out := cmd.OutOrStdout()
 			tui.BannerWithInfo(out, project, "init")
 

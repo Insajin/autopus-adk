@@ -132,6 +132,17 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 	}
 	files = append(files, ruleFiles...)
 
+	// Render and write file-size-limit.md from template (stack/framework-aware)
+	fileSizeRule, err := a.prepareFileSizeLimitRule(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("file-size-limit 룰 생성 실패: %w", err)
+	}
+	destPath := filepath.Join(a.root, fileSizeRule.TargetPath)
+	if err := os.WriteFile(destPath, fileSizeRule.Content, 0644); err != nil {
+		return nil, fmt.Errorf("file-size-limit.md 쓰기 실패: %w", err)
+	}
+	files = append(files, fileSizeRule)
+
 	// Copy statusline script
 	statusFiles, err := a.copyStatusline()
 	if err != nil {

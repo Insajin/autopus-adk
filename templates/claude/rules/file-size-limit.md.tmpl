@@ -23,11 +23,8 @@ IMPORTANT: No single file may exceed 300 lines. This is a HARD limit.
 ## Exclusions
 
 This limit applies to source code files only. The following are excluded:
-- Generated files: `*_generated.go`, `*.pb.go`, `*_gen.go`
-- Documentation files: `*.md`, `*.txt`, `*.rst`
-- Configuration files: `*.yaml`, `*.yml`, `*.json`, `*.toml`
-- Lock files: `go.sum`, `package-lock.json`
-
+{{range .Exclusions}}- {{.Description}}: `{{.Pattern}}`
+{{end}}
 ## Counting
 
 Count ALL lines including comments, blank lines, and imports.
