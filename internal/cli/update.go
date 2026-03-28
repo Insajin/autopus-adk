@@ -109,7 +109,7 @@ func newUpdateCmd() *cobra.Command {
 // targetVersion is accepted for future P2 use (pinned version install); currently unused — checker always fetches latest.
 func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion string) error {
 	_ = targetVersion // P2: reserved for pinned version install via --version flag
-	currentVer := version.Version()
+	currentVer := strings.TrimPrefix(version.Version(), "v")
 	currentCommit := version.Commit()
 
 	// R12: Dev build guard
