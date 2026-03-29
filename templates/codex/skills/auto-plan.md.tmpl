@@ -54,8 +54,10 @@
 
 `--skip-prd`가 설정되지 않은 경우, SPEC 작성 전에 PRD를 생성합니다.
 
-- **Standard 모드** (10섹션): 새 기능, cross-team, 공개 API — `templates/shared/prd-standard.md.tmpl`
-- **Minimal 모드** (5섹션): 소규모 변경, 내부 도구 — `templates/shared/prd-minimal.md.tmpl`
+- **Standard 모드** (11섹션): 새 기능, cross-team, 공개 API — `templates/shared/prd-standard.md.tmpl`
+  - Discovery Q&A 체크리스트, Job Stories/User Stories 듀얼 포맷, Pre-mortem 포함
+- **Minimal 모드** (6섹션): 소규모 변경, 내부 도구 — `templates/shared/prd-minimal.md.tmpl`
+  - Quick Discovery Check, Pre-mortem (Quick) 포함
 
 PRD는 `.autopus/specs/SPEC-{ID}/prd.md`에 저장되며, 이후 SPEC 작성 시 컨텍스트로 활용됩니다.
 

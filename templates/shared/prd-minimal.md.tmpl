@@ -5,6 +5,17 @@
 
 ---
 
+## Quick Discovery Check
+
+> Answer briefly before writing. Mark TBD if unknown.
+
+- **Problem**: [1-sentence core problem]
+- **Who**: [Primary user group]
+- **Success metric**: [1 quantitative measure]
+- **Not doing**: [1 explicit exclusion]
+
+---
+
 ## 1. Problem
 
 <!--
@@ -68,7 +79,21 @@ At least one item is required. This prevents scope creep and sets clear expectat
 
 ---
 
-## 5. Key Q&A
+## 5. Pre-mortem (Quick)
+
+<!--
+Think: "If this change fails or causes problems, what would the reason be?"
+List 1-3 failure risks with a one-line mitigation.
+-->
+
+| Risk | Mitigation |
+|------|-----------|
+| [e.g., Migration breaks existing data] | [e.g., Add rollback migration and test with prod snapshot] |
+| [e.g., Edge case not covered in requirements] | [e.g., Add table-driven tests for boundary values] |
+
+---
+
+## 6. Key Q&A
 
 <!--
 List 3-5 open questions that must be answered or decided before implementation begins.

@@ -133,6 +133,20 @@ After `sync` completes (from idea):
   ✓ idea  →  ✓ plan  →  ✓ go  →  ● sync
 ```
 
+**With discover stage** (when `/auto discover` is used):
+
+After `discover` completes:
+```
+🐙 Workflow: BS-{ID}
+  ● discover  →  ○ plan  →  ○ go  →  ○ sync
+```
+
+After `plan` completes (from discover):
+```
+🐙 Workflow: BS-{ID} → {SPEC-ID}
+  ✓ discover  →  ● plan  →  ○ go  →  ○ sync
+```
+
 ---
 
 ## A3: Agent Result Format

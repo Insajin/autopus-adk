@@ -1,12 +1,26 @@
 # PRD: [Product/Feature Title]
 
-> Product Requirements Document — Standard (10-section format).
+> Product Requirements Document — Standard (11-section format).
 > Fill in each section using the placeholder guidance below.
+> Start with the Discovery Q&A checklist before writing sections.
 
 - **SPEC-ID**: [e.g., SPEC-PRD-001]
 - **Author**: [Name or team]
 - **Status**: Draft | Review | Approved
 - **Date**: [YYYY-MM-DD]
+
+---
+
+## Discovery Q&A Checklist
+
+> Answer these 6 questions before writing the PRD sections. Mark each as answered or TBD.
+
+- [ ] **Problem**: What is the core problem being solved? (root cause, not symptom)
+- [ ] **Target Users**: Who will use this and how often?
+- [ ] **Success Metrics**: How will success be measured? (at least 1 quantitative metric)
+- [ ] **Constraints**: What are the technical/business constraints? (timeline, compatibility, budget)
+- [ ] **Prior Art**: Have similar approaches been tried before?
+- [ ] **Scope Boundary**: What is explicitly excluded from this initiative?
 
 ---
 
@@ -63,38 +77,45 @@
 
 ---
 
-## 4. User Stories
+## 4. User Stories / Job Stories
 
-> Write stories from the user's perspective. Include acceptance criteria in Given-When-Then format.
+> Choose the format that best captures user intent. Use User Stories when role matters; Job Stories (JTBD) when context/situation matters more.
+
+### Format A: User Stories
+
+**As a** [role],
+**I want** [action or capability],
+**so that** [benefit or outcome].
+
+**Acceptance Criteria**
+
+- Given [precondition], when [action], then [expected result].
+
+**INVEST Check**: Independent / Negotiable / Valuable / Estimable / Small / Testable
+
+### Format B: Job Stories (JTBD)
+
+**When** [situation or trigger],
+**I want to** [motivation or action],
+**so I can** [expected outcome].
+
+**Acceptance Criteria**
+
+- Given [precondition], when [action], then [expected result].
+
+---
 
 ### Story 1: [Short descriptive title]
 
-**As a** [role],
-**I want** [action or capability],
-**so that** [benefit or outcome].
-
-**Acceptance Criteria**
-
-- Given [precondition], when [action], then [expected result].
-- Given [precondition], when [action], then [expected result].
-
----
+[Use Format A or B above. Add 4-6 acceptance criteria per story.]
 
 ### Story 2: [Short descriptive title]
 
-**As a** [role],
-**I want** [action or capability],
-**so that** [benefit or outcome].
-
-**Acceptance Criteria**
-
-- Given [precondition], when [action], then [expected result].
-
----
+[Use the same format.]
 
 ### Story 3: [Add more stories as needed]
 
-[Use the same format above.]
+[Use the same format.]
 
 ---
 
@@ -204,7 +225,24 @@ The following are out of scope for this release:
 
 ---
 
-## 10. Practitioner Q&A
+## 10. Pre-mortem
+
+> Imagine this feature has failed 6 months after launch. What went wrong?
+> Identify 3-5 failure scenarios, assess probability, and define preventive actions.
+
+| # | Failure Scenario | Probability | Impact | Preventive Action |
+|---|-----------------|-------------|--------|-------------------|
+| 1 | [e.g., Users don't adopt because the UX is too complex] | High / Medium / Low | High / Medium / Low | [e.g., Run usability test with 5 users before launch] |
+| 2 | [e.g., Performance degrades under production load] | [Probability] | [Impact] | [Preventive action] |
+| 3 | [e.g., Integration with external service becomes unreliable] | [Probability] | [Impact] | [Preventive action] |
+
+**Connection to Risks (Section 9)**
+
+[Link each failure scenario to a risk in Section 9, or note if it reveals a new risk not previously identified.]
+
+---
+
+## 11. Practitioner Q&A
 
 > Key questions an implementer must answer before or during development.
 > Target 5-10 questions. Mark each with the answer once resolved.
