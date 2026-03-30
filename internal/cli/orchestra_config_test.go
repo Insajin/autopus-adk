@@ -258,3 +258,32 @@ func TestResolveJudge_CommandWithoutJudge(t *testing.T) {
 	j := resolveJudge(conf, "review", "")
 	assert.Equal(t, "", j)
 }
+
+func TestResolveJudge_GlobalFallback(t *testing.T) {
+	t.Parallel()
+
+	conf := &config.OrchestraConf{
+		Judge: "claude",
+		Commands: map[string]config.CommandEntry{
+			"brainstorm": {Strategy: "debate"}, // no per-command judge
+		},
+	}
+
+	// No flag, no command judge → falls back to global judge
+	j := resolveJudge(conf, "brainstorm", "")
+	assert.Equal(t, "claude", j)
+}
+
+func TestResolveJudge_CommandOverridesGlobal(t *testing.T) {
+	t.Parallel()
+
+	conf := &config.OrchestraConf{
+		Judge: "claude",
+		Commands: map[string]config.CommandEntry{
+			"review": {Judge: "gemini"}, // per-command judge overrides global
+		},
+	}
+
+	j := resolveJudge(conf, "review", "")
+	assert.Equal(t, "gemini", j)
+}

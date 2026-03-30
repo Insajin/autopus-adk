@@ -63,6 +63,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Enabled:         true,
 			DefaultStrategy: "consensus",
 			TimeoutSeconds:  120,
+			Judge:           "claude",
 			Providers: map[string]ProviderEntry{
 				"claude":   {Binary: "claude", Args: []string{"--print"}, PaneArgs: []string{"--print"}},
 				"gemini":   {Binary: "gemini", Args: []string{}, PaneArgs: []string{}, PromptViaArgs: true},

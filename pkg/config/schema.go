@@ -98,6 +98,7 @@ type OrchestraConf struct {
 	Enabled            bool                     `yaml:"enabled"`
 	DefaultStrategy    string                   `yaml:"default_strategy"`
 	TimeoutSeconds     int                      `yaml:"timeout_seconds"`
+	Judge              string                   `yaml:"judge,omitempty"`               // global default judge provider for debate
 	ConsensusThreshold float64                  `yaml:"consensus_threshold,omitempty"` // global consensus threshold
 	Providers          map[string]ProviderEntry `yaml:"providers,omitempty"`
 	Commands           map[string]CommandEntry  `yaml:"commands,omitempty"`

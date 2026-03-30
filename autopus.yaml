@@ -64,6 +64,7 @@ orchestra:
     enabled: true
     default_strategy: consensus
     timeout_seconds: 120
+    judge: claude
     providers:
         claude:
             binary: claude
