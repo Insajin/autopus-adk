@@ -52,11 +52,20 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	}
 	tmpFile.Close()
 
-	// Start pipe capture on new pane.
-	if err := cfg.Terminal.PipePaneStart(ctx, newPaneID, tmpFile.Name()); err != nil {
+	// Start pipe capture on new pane with retry — cmux surfaces need time to initialize.
+	var pipeErr error
+	for attempt := range 3 {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * time.Second)
+		}
+		if pipeErr = cfg.Terminal.PipePaneStart(ctx, newPaneID, tmpFile.Name()); pipeErr == nil {
+			break
+		}
+	}
+	if pipeErr != nil {
 		_ = cfg.Terminal.Close(ctx, string(newPaneID))
 		_ = os.Remove(tmpFile.Name())
-		return pi, fmt.Errorf("recreatePane PipePaneStart for %s: %w", pi.provider.Name, err)
+		return pi, fmt.Errorf("recreatePane PipePaneStart for %s: %w", pi.provider.Name, pipeErr)
 	}
 
 	// Set round env on new pane before launching CLI.
