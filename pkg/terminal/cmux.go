@@ -91,10 +91,15 @@ func (a *CmuxAdapter) SendLongText(ctx context.Context, paneID PaneID, text stri
 		// FR-10: fallback to SendCommand on set-buffer failure
 		return a.SendCommand(ctx, paneID, text)
 	}
-	// paste-buffer
+	// paste-buffer — fall back to SendCommand if paste fails (e.g., on recreated surfaces)
 	pasteCmd := execCommand("cmux", "paste-buffer", "--name", bufName, "--surface", string(paneID))
 	if err := pasteCmd.Run(); err != nil {
-		return fmt.Errorf("cmux: paste-buffer %s: %w", paneID, err)
+		// Clean up buffer before fallback
+		delFallback := execCommand("cmux", "delete-buffer", "--name", bufName)
+		_ = delFallback.Run()
+		// Fallback to SendCommand — text may be truncated for very long prompts
+		// but a partial prompt is better than skipping the provider entirely.
+		return a.SendCommand(ctx, paneID, text)
 	}
 	// delete-buffer (best-effort, FR-11)
 	delCmd := execCommand("cmux", "delete-buffer", "--name", bufName)
