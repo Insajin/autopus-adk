@@ -288,6 +288,18 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		}
 	}
 
+	// Re-capture baselines AFTER prompts are sent. The screen now shows the submitted
+	// prompt text, so baseline must reflect this to avoid false completion detection
+	// when the prompt pattern (❯) is still visible from the input echo.
+	for _, pi := range panes {
+		if pi.skipWait {
+			continue
+		}
+		if screen, err := cfg.Terminal.ReadScreen(ctx, pi.paneID, terminal.ReadScreenOpts{}); err == nil {
+			baselines[pi.provider.Name] = screen
+		}
+	}
+
 	// @AX:NOTE: [AUTO] REQ-3 configurable initial delay — AI processing head start before polling
 	debateDelay := cfg.InitialDelay
 	if debateDelay <= 0 {
