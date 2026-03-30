@@ -32,9 +32,9 @@ func TestNeedsSurfaceCheck(t *testing.T) {
 		want     bool
 	}{
 		{
-			name:     "claude skips check",
+			name:     "claude needs check",
 			provider: ProviderConfig{Name: "claude", Binary: "claude"},
-			want:     false,
+			want:     true,
 		},
 		{
 			name:     "opencode needs check",
@@ -47,9 +47,9 @@ func TestNeedsSurfaceCheck(t *testing.T) {
 			want:     true,
 		},
 		{
-			name:     "case insensitive claude",
-			provider: ProviderConfig{Name: "Claude", Binary: "Claude"},
-			want:     false,
+			name:     "codex needs check",
+			provider: ProviderConfig{Name: "codex", Binary: "codex"},
+			want:     true,
 		},
 	}
 

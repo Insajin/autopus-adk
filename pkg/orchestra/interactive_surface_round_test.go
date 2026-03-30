@@ -44,9 +44,9 @@ func TestExecuteRound_Round2_SurfaceValidation(t *testing.T) {
 	}
 }
 
-// TestExecuteRound_Round2_ClaudeSkipsSurfaceCheck verifies that claude providers
-// skip surface validation even in round > 1 (R5).
-func TestExecuteRound_Round2_ClaudeSkipsSurfaceCheck(t *testing.T) {
+// TestExecuteRound_Round2_ClaudeSurfaceCheck verifies that claude providers
+// also get surface validation in round > 1 (cmux surfaces can go stale).
+func TestExecuteRound_Round2_ClaudeSurfaceCheck(t *testing.T) {
 	mock := &surfaceMock{
 		mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "❯\n"},
 		stalePane:    map[terminal.PaneID]bool{"claude-pane": true},
@@ -69,13 +69,13 @@ func TestExecuteRound_Round2_ClaudeSkipsSurfaceCheck(t *testing.T) {
 	}}
 	prevResponses := []ProviderResponse{{Provider: "opencode", Output: "round 1 answer"}}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	_ = executeRound(ctx, cfg, panes, nil, 2, prevResponses)
 
-	// Claude should NOT have been recreated despite stale surface.
-	if panes[0].paneID != "claude-pane" {
-		t.Error("claude should skip surface check — paneID should be unchanged")
+	// Claude should be recreated when surface is stale (no persistent skip).
+	if panes[0].paneID == "claude-pane" {
+		t.Error("claude pane should be recreated after stale surface detection")
 	}
 }

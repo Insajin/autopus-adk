@@ -5,25 +5,15 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
-// persistentSessionBinaries lists CLI binaries that maintain persistent sessions
-// across rounds and do not need surface validation.
-var persistentSessionBinaries = []string{"claude"}
-
 // needsSurfaceCheck returns true if the provider's surface should be validated
-// before sending prompts in Round 2+. Providers with persistent sessions
-// (e.g., claude) are skipped to avoid unnecessary overhead. (R5)
-func needsSurfaceCheck(provider ProviderConfig) bool {
-	for _, b := range persistentSessionBinaries {
-		if strings.EqualFold(provider.Binary, b) {
-			return false
-		}
-	}
+// before sending prompts in Round 2+. All providers are checked because cmux
+// surfaces can become stale after long rounds regardless of CLI persistence.
+func needsSurfaceCheck(_ ProviderConfig) bool {
 	return true
 }
 

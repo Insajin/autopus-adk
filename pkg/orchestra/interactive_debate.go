@@ -181,8 +181,8 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		}
 	}
 
-	// R2: Capture screen baselines BEFORE sending prompts to prevent false-positive
-	// completion detection from previous round's leftover prompt.
+	// R2: Capture screen baselines AFTER surface validation/recreation to prevent
+	// false-positive completion detection. Must use current (possibly new) pane IDs.
 	baselines := make(map[string]string)
 	for _, pi := range panes {
 		if pi.skipWait {
@@ -245,6 +245,10 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 				continue
 			}
 			panes[i] = newPI
+			// Refresh baseline for the new pane to prevent false completion detection
+			if screen, err := cfg.Terminal.ReadScreen(ctx, newPI.paneID, terminal.ReadScreenOpts{}); err == nil {
+				baselines[pi.provider.Name] = screen
+			}
 
 			retryOK := false
 			for attempt := 1; attempt <= 3; attempt++ {
