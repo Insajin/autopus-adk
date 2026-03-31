@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+// round2PollTimeout is the timeout for pollUntilPrompt in Round 2+.
+// Increased from 10s to 30s to allow providers time to restart after pane recreation.
+const round2PollTimeout = 30 * time.Second
+
 // runInteractiveDebate executes a multi-turn debate loop using interactive panes.
 // Round 1 sends the original prompt to all providers. Rounds 2..N send rebuttal
 // prompts built from other providers' previous-round responses. Falls back to
@@ -227,7 +231,7 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			if pi.provider.InteractiveInput == "args" {
 				_ = SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round)
 			}
-			pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, 10*time.Second)
+			pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, round2PollTimeout)
 		}
 
 		// Skip sendPrompts for providers that received the prompt via CLI args at launch (round 1 only)

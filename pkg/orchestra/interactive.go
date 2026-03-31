@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -153,12 +154,15 @@ func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []pa
 	}
 }
 
-// pollUntilPrompt polls ReadScreen at 500ms intervals until a prompt pattern is detected or timeout.
+// pollUntilPrompt polls ReadScreen at 3s intervals until a prompt pattern is detected or timeout.
+// R2: 3s polling interval (was 500ms), warns if exceeding 20s threshold.
 func pollUntilPrompt(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, patterns []CompletionPattern, timeout time.Duration) bool {
+	startTime := time.Now()
 	deadline := time.After(timeout)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(3 * time.Second) // R2: 3s polling interval
 	defer ticker.Stop()
 
+	warned := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -166,6 +170,10 @@ func pollUntilPrompt(ctx context.Context, term terminal.Terminal, paneID termina
 		case <-deadline:
 			return false
 		case <-ticker.C:
+			if !warned && time.Since(startTime) > 20*time.Second {
+				log.Printf("[pollUntilPrompt] %s exceeding 20s threshold, still waiting...", paneID)
+				warned = true
+			}
 			screen, err := term.ReadScreen(ctx, paneID, terminal.ReadScreenOpts{})
 			if err != nil {
 				continue
