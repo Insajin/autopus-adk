@@ -30,6 +30,8 @@ func newOrchestraCmd() *cobra.Command {
 	cmd.AddCommand(newOrchestraJobStatusCmd())
 	cmd.AddCommand(newOrchestraJobWaitCmd())
 	cmd.AddCommand(newOrchestraJobResultCmd())
+	cmd.AddCommand(newOrchestraCollectCmd())
+	cmd.AddCommand(newOrchestraCleanupCmd())
 
 	return cmd
 }
@@ -218,7 +220,7 @@ func runOrchestraCommand(
 		return fmt.Errorf("--rounds 값은 1-10 범위여야 합니다 (입력: %d)", rounds)
 	}
 
-	// @AX:WARN: [AUTO] positional variadic extraction — flags[0..2]=bool(noDetach,keepRelay,noJudge), flags[3]=int(yieldRounds); order must match all callers
+	// @AX:WARN: [AUTO] positional variadic extraction — flags[0..3]=bool(noDetach,keepRelay,noJudge,yieldRounds); order must match all callers
 	nd, keepRelay, noJudge, yieldRounds := extractOrchestraFlags(flags)
 	term := terminal.DetectTerminal()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
