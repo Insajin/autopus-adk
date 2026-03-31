@@ -50,10 +50,10 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		if pi.skipWait {
 			continue
 		}
-		// Build prompt with optional topic isolation (skipped when --context is set).
+		// Build prompt with topic isolation or context-aware instruction.
 		isolation := topicIsolationInstruction
 		if cfg.ContextAware {
-			isolation = ""
+			isolation = contextAwareInstruction
 		}
 		var prompt string
 		if prevResponses == nil {

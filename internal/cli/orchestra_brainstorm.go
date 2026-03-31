@@ -2,6 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -33,6 +36,9 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
 			prompt := buildBrainstormPrompt(args[0])
+			if contextAware {
+				prompt = prependProjectContext(prompt)
+			}
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
 			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, noDetach, keepRelay, noJudge, yieldRounds, contextAware)
 		},
@@ -82,4 +88,28 @@ Generate 5 "How Might We..." questions that reframe constraints as opportunities
 - List HMW questions
 - If you are the judge: INTEGRATE all provider ideas into a merged list, then apply ICE scoring (Impact 1-10, Confidence 1-10, Ease 1-10) to the top 5 merged ideas. Do NOT discard divergent ideas — include them in an appendix.
 `, feature)
+}
+
+// contextFiles lists project files to load when --context is set.
+var contextFiles = []string{
+	"ARCHITECTURE.md",
+	".autopus/project/product.md",
+	".autopus/project/structure.md",
+}
+
+// prependProjectContext loads project context files and prepends them to the prompt.
+func prependProjectContext(prompt string) string {
+	var parts []string
+	for _, f := range contextFiles {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			log.Printf("[context] skipping %s: %v", f, err)
+			continue
+		}
+		parts = append(parts, string(data))
+	}
+	if len(parts) == 0 {
+		return prompt
+	}
+	return "## Project Context\n\n" + strings.Join(parts, "\n\n---\n\n") + "\n\n---\n\n" + prompt
 }
