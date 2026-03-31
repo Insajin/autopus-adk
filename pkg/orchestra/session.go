@@ -8,85 +8,72 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
-// sessionsDir is the directory where session persistence files are stored.
-const sessionsDir = "autopus-sessions"
-
-// OrchestraSession represents a persisted orchestra session state.
-// Used by --yield-rounds to keep panes alive across commands, and by
-// collect/cleanup commands to reference existing sessions.
+// OrchestraSession holds state for a yield-rounds orchestra session.
+// Persisted to /tmp/autopus-orch-session-{ID}.json for collect/cleanup commands.
 type OrchestraSession struct {
-	SessionID  string          `json:"session_id"`
-	Strategy   Strategy        `json:"strategy"`
-	Round      int             `json:"round"`
-	TotalRounds int            `json:"total_rounds"`
-	Panes      []SessionPane   `json:"panes"`
-	CreatedAt  time.Time       `json:"created_at"`
+	ID        string                      `json:"id"`
+	Panes     map[string]string           `json:"panes"`     // provider name -> pane ID
+	Providers []SessionProviderConfig     `json:"providers"`
+	Rounds    [][]SessionProviderResponse `json:"rounds"`
+	CreatedAt time.Time                   `json:"created_at"`
 }
 
-// SessionPane stores per-provider pane state within a session.
-type SessionPane struct {
-	Provider   string          `json:"provider"`
-	PaneID     terminal.PaneID `json:"pane_id"`
-	OutputFile string          `json:"output_file,omitempty"`
+// SessionProviderConfig is a serializable subset of ProviderConfig.
+type SessionProviderConfig struct {
+	Name   string `json:"name"`
+	Binary string `json:"binary"`
 }
 
-// NewSessionID generates a unique session ID using timestamp and random suffix.
-// Format: orch-{unix_ms}-{random_hex}
+// SessionProviderResponse is a serializable subset of ProviderResponse.
+type SessionProviderResponse struct {
+	Provider   string `json:"provider"`
+	Output     string `json:"output"`
+	DurationMs int64  `json:"duration_ms"`
+	TimedOut   bool   `json:"timed_out"`
+}
+
+// NewSessionID generates a unique session ID: orch-{timestamp}-{random hex}.
 func NewSessionID() string {
 	b := make([]byte, 4)
 	_, _ = rand.Read(b)
 	return fmt.Sprintf("orch-%d-%s", time.Now().UnixMilli(), hex.EncodeToString(b))
 }
 
-// sessionFilePath returns the full path for a session persistence file.
-func sessionFilePath(sessionID string) string {
-	return filepath.Join(os.TempDir(), sessionsDir, sanitizeProviderName(sessionID)+".json")
+// sessionFilePath returns the path for a session persistence file.
+func sessionFilePath(id string) string {
+	return filepath.Join(os.TempDir(), fmt.Sprintf("autopus-orch-session-%s.json", id))
 }
 
-// SaveSession persists an OrchestraSession to disk as JSON.
-// Creates the sessions directory if it does not exist.
-func SaveSession(session *OrchestraSession) error {
-	dir := filepath.Join(os.TempDir(), sessionsDir)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return fmt.Errorf("create sessions dir: %w", err)
-	}
-
+// SaveSession writes session metadata to a temp file with 0600 permissions.
+func SaveSession(session OrchestraSession) error {
 	data, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal session: %w", err)
 	}
-
-	path := sessionFilePath(session.SessionID)
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return fmt.Errorf("write session file: %w", err)
-	}
-	return nil
+	return os.WriteFile(sessionFilePath(session.ID), data, 0o600)
 }
 
-// LoadSession reads an OrchestraSession from disk by session ID.
-func LoadSession(sessionID string) (*OrchestraSession, error) {
-	path := sessionFilePath(sessionID)
-	data, err := os.ReadFile(path)
+// LoadSession reads and parses a session file by ID.
+func LoadSession(id string) (*OrchestraSession, error) {
+	data, err := os.ReadFile(sessionFilePath(id))
 	if err != nil {
-		return nil, fmt.Errorf("read session file: %w", err)
+		return nil, fmt.Errorf("read session %s: %w", id, err)
 	}
-
 	var session OrchestraSession
 	if err := json.Unmarshal(data, &session); err != nil {
-		return nil, fmt.Errorf("parse session file: %w", err)
+		return nil, fmt.Errorf("parse session %s: %w", id, err)
 	}
 	return &session, nil
 }
 
-// RemoveSession deletes the session persistence file for the given session ID.
-func RemoveSession(sessionID string) error {
-	path := sessionFilePath(sessionID)
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove session file: %w", err)
+// RemoveSession deletes the session persistence file.
+// Returns nil if the file doesn't exist (idempotent).
+func RemoveSession(id string) error {
+	err := os.Remove(sessionFilePath(id))
+	if os.IsNotExist(err) {
+		return nil
 	}
-	return nil
+	return err
 }
