@@ -35,34 +35,36 @@ func newOrchestraCleanupCmd() *cobra.Command {
 }
 
 // runOrchestraCleanup loads the session, kills panes, and removes the session file.
+// Idempotent: returns nil if session file is already missing.
 func runOrchestraCleanup(ctx context.Context, sessionID string) error {
 	session, err := orchestra.LoadSession(sessionID)
 	if err != nil {
-		return fmt.Errorf("load session: %w", err)
+		// Session file missing — already cleaned or never created.
+		fmt.Fprintf(os.Stderr, "[cleanup] session %s: %v (may already be cleaned)\n", sessionID, err)
+		return nil
 	}
 
+	// Detect terminal for pane cleanup.
 	term := terminal.DetectTerminal()
-	if term == nil {
-		return fmt.Errorf("no terminal multiplexer detected")
-	}
 
 	// Kill each pane referenced by the session.
 	killed := 0
 	for provider, paneID := range session.Panes {
-		if err := term.Close(ctx, paneID); err != nil {
-			fmt.Fprintf(os.Stderr, "[cleanup] %s (pane %s) close failed: %v\n", provider, paneID, err)
-			continue
+		if term != nil {
+			if killErr := term.Close(ctx, paneID); killErr != nil {
+				fmt.Fprintf(os.Stderr, "[cleanup] %s pane %s kill failed: %v\n", provider, paneID, killErr)
+			} else {
+				killed++
+			}
 		}
-		killed++
-		fmt.Fprintf(os.Stderr, "[cleanup] %s (pane %s) closed\n", provider, paneID)
 	}
 
 	// Remove the session persistence file.
-	if err := orchestra.RemoveSession(sessionID); err != nil {
-		return fmt.Errorf("remove session file: %w", err)
+	if removeErr := orchestra.RemoveSession(sessionID); removeErr != nil {
+		fmt.Fprintf(os.Stderr, "[cleanup] session file removal failed: %v\n", removeErr)
 	}
 
-	fmt.Fprintf(os.Stderr, "[cleanup] session %s removed (%d/%d panes closed)\n",
-		sessionID, killed, len(session.Panes))
+	fmt.Fprintf(os.Stderr, "[cleanup] session %s: %d panes killed, session file removed\n",
+		sessionID, killed)
 	return nil
 }
