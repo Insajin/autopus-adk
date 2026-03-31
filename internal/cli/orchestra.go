@@ -162,7 +162,7 @@ func runOrchestraCommand(
 	prompt string,
 	rounds int,
 	threshold float64,
-	boolFlags ...bool,
+	flags ...any,
 ) error {
 	// @AX:NOTE [AUTO] REQ-11 opportunistic GC — fires on every orchestra invocation; 1h TTL
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
@@ -196,24 +196,9 @@ func runOrchestraCommand(
 		}
 	}
 
-	// Validate and resolve consensus threshold
-	if err := validateThreshold(threshold); err != nil {
+	resolvedThreshold, err := resolveAndValidateThreshold(orchConf, configErr, commandName, threshold)
+	if err != nil {
 		return err
-	}
-	var resolvedThreshold float64
-	if configErr != nil || orchConf == nil {
-		// No config: use flag or default
-		if threshold > 0 {
-			resolvedThreshold = threshold
-		} else {
-			resolvedThreshold = 0.66
-		}
-	} else {
-		resolvedThreshold = resolveThreshold(orchConf, commandName, threshold)
-	}
-	// Validate resolved value (guards against invalid config file values)
-	if err := validateThreshold(resolvedThreshold); err != nil {
-		return fmt.Errorf("resolved threshold invalid: %w", err)
 	}
 
 	s := orchestra.Strategy(strategyStr)
@@ -233,10 +218,8 @@ func runOrchestraCommand(
 		return fmt.Errorf("--rounds 값은 1-10 범위여야 합니다 (입력: %d)", rounds)
 	}
 
-	// @AX:WARN: [AUTO] positional variadic bool extraction — boolFlags[0]=noDetach, boolFlags[1]=keepRelay, boolFlags[2]=noJudge; order must match all callers
-	nd := len(boolFlags) > 0 && boolFlags[0]
-	keepRelay := len(boolFlags) > 1 && boolFlags[1]
-	noJudge := len(boolFlags) > 2 && boolFlags[2]
+	// @AX:WARN: [AUTO] positional variadic extraction — flags[0..2]=bool(noDetach,keepRelay,noJudge), flags[3]=int(yieldRounds); order must match all callers
+	nd, keepRelay, noJudge, yieldRounds := extractOrchestraFlags(flags)
 	term := terminal.DetectTerminal()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"
@@ -268,6 +251,7 @@ func runOrchestraCommand(
 		HookMode:           hookMode,
 		SessionID:          sessionID,
 		NoJudge:            noJudge,
+		YieldRounds:        yieldRounds,
 	}
 
 	providerNames := make([]string, len(providers))

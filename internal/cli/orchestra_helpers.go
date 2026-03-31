@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
@@ -117,6 +118,49 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 // defaultProviders returns the hardcoded default provider list.
 func defaultProviders() []string {
 	return []string{"claude", "codex", "gemini"}
+}
+
+// resolveAndValidateThreshold validates the threshold flag and resolves the final value.
+func resolveAndValidateThreshold(orchConf *config.OrchestraConf, configErr error, commandName string, threshold float64) (float64, error) {
+	if err := validateThreshold(threshold); err != nil {
+		return 0, err
+	}
+	var resolved float64
+	if configErr != nil || orchConf == nil {
+		if threshold > 0 {
+			resolved = threshold
+		} else {
+			resolved = 0.66
+		}
+	} else {
+		resolved = resolveThreshold(orchConf, commandName, threshold)
+	}
+	if err := validateThreshold(resolved); err != nil {
+		return 0, fmt.Errorf("resolved threshold invalid: %w", err)
+	}
+	return resolved, nil
+}
+
+// extractOrchestraFlags extracts positional variadic flags passed to runOrchestraCommand.
+// Order: [0]=noDetach(bool), [1]=keepRelay(bool), [2]=noJudge(bool), [3]=yieldRounds(int).
+func extractOrchestraFlags(flags []any) (noDetach, keepRelay, noJudge bool, yieldRounds int) {
+	boolAt := func(i int) bool {
+		if i < len(flags) {
+			if v, ok := flags[i].(bool); ok {
+				return v
+			}
+		}
+		return false
+	}
+	noDetach = boolAt(0)
+	keepRelay = boolAt(1)
+	noJudge = boolAt(2)
+	if len(flags) > 3 {
+		if v, ok := flags[3].(int); ok {
+			yieldRounds = v
+		}
+	}
+	return
 }
 
 // isHookModeAvailable checks whether hook-based result collection can be used.
