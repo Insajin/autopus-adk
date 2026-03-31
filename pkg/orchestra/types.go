@@ -86,6 +86,7 @@ type OrchestraConfig struct {
 	InitialDelay       time.Duration    // delay before completion polling starts (0 uses default 20s)
 	CompletionDetector CompletionDetector // completion detection strategy (nil = auto-detect from Terminal)
 	ScrollbackLines    int                  // R3: ReadScreen scrollback depth (default 500, 0 = use terminal default)
+	NoJudge            bool                 // R4: skip judge verdict phase when true
 	// SurfaceMgr is set during interactive debate setup.
 	// Not part of initial config -- populated by runPaneDebate().
 	SurfaceMgr *SurfaceManager

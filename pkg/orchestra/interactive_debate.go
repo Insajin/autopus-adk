@@ -159,8 +159,8 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 	finalResponses := roundHistory[len(roundHistory)-1]
 
-	// Judge round if configured.
-	if cfg.JudgeProvider != "" {
+	// Judge round if configured and not skipped by --no-judge.
+	if cfg.JudgeProvider != "" && !cfg.NoJudge {
 		judgeResp := runJudgeRound(ctx, cfg, panes, hookSession, finalResponses, rounds)
 		if judgeResp != nil {
 			finalResponses = append(finalResponses, *judgeResp)

@@ -43,6 +43,7 @@ func newOrchestraReviewCmd() *cobra.Command {
 		judge     string
 		rounds    int
 		noDetach  bool
+		noJudge   bool
 	)
 
 	cmd := &cobra.Command{
@@ -57,7 +58,7 @@ func newOrchestraReviewCmd() *cobra.Command {
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
 			prompt := buildReviewPrompt(args)
-			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, noDetach, keepRelay)
+			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, noDetach, keepRelay, noJudge)
 		},
 	}
 
@@ -69,6 +70,7 @@ func newOrchestraReviewCmd() *cobra.Command {
 	cmd.Flags().IntVar(&rounds, "rounds", 0, "debate 라운드 수 (1-10, debate 전략 전용)")
 	cmd.Flags().BoolVar(&noDetach, "no-detach", false, "Disable auto-detach mode")
 	cmd.Flags().Bool("keep-relay-output", false, "relay 전략 실행 후 임시 파일 보존")
+	cmd.Flags().BoolVar(&noJudge, "no-judge", false, "Skip judge verdict phase in debate strategy")
 
 	return cmd
 }
@@ -231,9 +233,10 @@ func runOrchestraCommand(
 		return fmt.Errorf("--rounds 값은 1-10 범위여야 합니다 (입력: %d)", rounds)
 	}
 
-	// @AX:WARN: [AUTO] positional variadic bool extraction — boolFlags[0]=noDetach, boolFlags[1]=keepRelay; order must match all callers
+	// @AX:WARN: [AUTO] positional variadic bool extraction — boolFlags[0]=noDetach, boolFlags[1]=keepRelay, boolFlags[2]=noJudge; order must match all callers
 	nd := len(boolFlags) > 0 && boolFlags[0]
 	keepRelay := len(boolFlags) > 1 && boolFlags[1]
+	noJudge := len(boolFlags) > 2 && boolFlags[2]
 	term := terminal.DetectTerminal()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"
@@ -264,6 +267,7 @@ func runOrchestraCommand(
 		Interactive:        interactive,
 		HookMode:           hookMode,
 		SessionID:          sessionID,
+		NoJudge:            noJudge,
 	}
 
 	providerNames := make([]string, len(providers))

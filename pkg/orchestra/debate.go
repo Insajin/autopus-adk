@@ -30,9 +30,9 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, er
 		}
 	}
 
-	// Phase 3 (optional): judge verdict when JudgeProvider is set and its binary is installed.
+	// Phase 3 (optional): judge verdict when JudgeProvider is set, not skipped, and its binary is installed.
 	// Resolve the judge's binary first (may differ from JudgeProvider name).
-	if cfg.JudgeProvider != "" {
+	if cfg.JudgeProvider != "" && !cfg.NoJudge {
 		judgeCfg := findOrBuildJudgeConfig(cfg)
 		if detect.IsInstalled(judgeCfg.Binary) {
 			judgment := buildJudgmentPrompt(cfg.Prompt, responses)
