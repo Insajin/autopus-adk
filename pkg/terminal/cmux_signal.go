@@ -2,6 +2,7 @@
 package terminal
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"regexp"
@@ -70,8 +71,17 @@ func (a *CmuxAdapter) WaitForSignal(ctx context.Context, name string, timeout ti
 	}
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	cmd := execCommandContext(timeoutCtx, "cmux", "wait-for", name)
+	// Pass --timeout to cmux wait-for so its internal timeout matches ours.
+	// cmux defaults to 30s which is too short for AI provider responses.
+	timeoutSec := fmt.Sprintf("%d", max(int(timeout.Seconds()), 30))
+	cmd := execCommandContext(timeoutCtx, "cmux", "wait-for", name, "--timeout", timeoutSec)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		detail := strings.TrimSpace(stderr.String())
+		if detail != "" {
+			return fmt.Errorf("cmux: wait-for signal %q: %w (%s)", name, err, detail)
+		}
 		return fmt.Errorf("cmux: wait-for signal %q: %w", name, err)
 	}
 	return nil

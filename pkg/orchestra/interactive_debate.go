@@ -90,11 +90,13 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 	// Split panes for each provider.
 	panes, _, err := splitProviderPanes(ctx, cfg)
 	if err != nil {
+		log.Printf("[debate] splitProviderPanes failed: %v -- falling back to non-interactive", err)
 		return runNonInteractiveDebate(ctx, cfg, rounds, start)
 	}
 	defer cleanupInteractivePanes(cfg.Terminal, panes)
 
 	if err := startPipeCapture(ctx, cfg.Terminal, panes); err != nil {
+		log.Printf("[debate] startPipeCapture failed: %v -- falling back to non-interactive", err)
 		return runNonInteractiveDebate(ctx, cfg, rounds, start)
 	}
 
