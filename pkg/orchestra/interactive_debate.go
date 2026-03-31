@@ -96,7 +96,10 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 		log.Printf("[debate] splitProviderPanes failed: %v -- falling back to non-interactive", err)
 		return runNonInteractiveDebate(ctx, cfg, rounds, start)
 	}
-	defer cleanupInteractivePanes(cfg.Terminal, panes)
+	// R5: Skip pane cleanup when yield mode is active — keep panes alive.
+	if !cfg.YieldRounds {
+		defer cleanupInteractivePanes(cfg.Terminal, panes)
+	}
 
 	if err := startPipeCapture(ctx, cfg.Terminal, panes); err != nil {
 		log.Printf("[debate] startPipeCapture failed: %v -- falling back to non-interactive", err)
@@ -144,20 +147,28 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 		roundHistory = append(roundHistory, roundResponses)
 
-		// R5: Yield exit point — return partial results after N rounds.
-		if cfg.YieldRounds > 0 && round >= cfg.YieldRounds {
-			fmt.Fprintf(os.Stderr, "[Debate] yield after round %d/%d\n", round, rounds)
-			yieldOut := YieldOutput{
-				Status:       "yielded",
-				RoundsTotal:  rounds,
-				RoundsRan:    round,
-				RoundHistory: roundHistory,
-				Duration:     time.Since(start),
-				SessionID:    cfg.SessionID,
+		// R5: Yield mode — output JSON after Round 1 and keep panes alive.
+		if cfg.YieldRounds && round == 1 {
+			fmt.Fprintf(os.Stderr, "[Debate] yield after round 1/%d\n", rounds)
+			sessionID := NewSessionID()
+			session := OrchestraSession{
+				ID:        sessionID,
+				Panes:     make(map[string]string),
+				CreatedAt: time.Now(),
 			}
-			if err := WriteYieldOutput(os.Stdout, yieldOut); err != nil {
-				log.Printf("[yield] write output failed: %v", err)
+			for _, pi := range panes {
+				session.Panes[pi.provider.Name] = string(pi.paneID)
 			}
+			for _, r := range roundResponses {
+				session.Rounds = append(session.Rounds, []SessionProviderResponse{{
+					Provider: r.Provider, Output: r.Output,
+					DurationMs: r.Duration.Milliseconds(), TimedOut: r.TimedOut,
+				}})
+			}
+			_ = SaveSession(session)
+			output := BuildYieldOutput(cfg, panes, roundHistory, sessionID)
+			_ = WriteYieldOutput(os.Stdout, output)
+			surfMgr.Stop()
 			return buildDebateResult(cfg, roundResponses, roundHistory, start), nil
 		}
 
