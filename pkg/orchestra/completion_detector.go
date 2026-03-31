@@ -17,11 +17,21 @@ type CompletionDetector interface {
 // NewCompletionDetector creates the best CompletionDetector for the given terminal.
 // If the terminal supports signals (SignalCapable), returns SignalDetector.
 // Otherwise, returns ScreenPollDetector.
+// For hook-mode support, use NewCompletionDetectorWithConfig instead.
 // @AX:ANCHOR [AUTO] factory — fan-in point; callers: waitForCompletion, OrchestraConfig.CompletionDetector
 func NewCompletionDetector(term terminal.Terminal) CompletionDetector {
+	return NewCompletionDetectorWithConfig(term, false, nil)
+}
+
+// NewCompletionDetectorWithConfig creates the best CompletionDetector considering hook mode.
+// Priority: SignalDetector > FileIPCDetector > ScreenPollDetector.
+// @AX:ANCHOR [AUTO] factory with config — enables FileIPCDetector when hookMode=true and session is available
+func NewCompletionDetectorWithConfig(term terminal.Terminal, hookMode bool, session *HookSession) CompletionDetector {
 	if sc, ok := term.(terminal.SignalCapable); ok {
 		return &SignalDetector{term: term, signal: sc}
 	}
-	// @AX:TODO @AX:CYCLE:1 [AUTO] P1 FileIPCDetector (R12) — add file-based IPC detector as third strategy
+	if hookMode && session != nil {
+		return &FileIPCDetector{session: session}
+	}
 	return &ScreenPollDetector{term: term}
 }

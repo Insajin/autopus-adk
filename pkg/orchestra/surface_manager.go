@@ -12,7 +12,7 @@ import (
 
 // SurfaceManager monitors surface health in the background and provides
 // proactive stale detection. Replaces the reactive validateSurface() approach.
-// @AX:ANCHOR [AUTO] coordinator — owns background goroutine, health cache, and pane recovery; used by runPaneDebate and executeRound
+// @AX:ANCHOR [AUTO] coordinator — owns background goroutine, health cache, warm pool, and pane recovery; used by runPaneDebate and executeRound
 type SurfaceManager struct {
 	term     terminal.Terminal
 	signal   terminal.SignalCapable // nil if terminal doesn't support signals
@@ -21,6 +21,8 @@ type SurfaceManager struct {
 	mu     sync.RWMutex
 	health map[string]terminal.SurfaceStatus // paneID -> last known health
 	cancel context.CancelFunc
+
+	warmPool *WarmPool // pre-created spare panes for instant recovery
 }
 
 // NewSurfaceManager creates a SurfaceManager. If the terminal supports
@@ -37,8 +39,9 @@ func NewSurfaceManager(term terminal.Terminal) *SurfaceManager {
 	return sm
 }
 
-// Start begins background health monitoring for the given panes.
-// Call Stop() when the debate ends to clean up the goroutine.
+// Start begins background health monitoring for the given panes and
+// initializes the warm pool with one spare pane for instant recovery.
+// Call Stop() when the debate ends to clean up the goroutine and pool.
 func (sm *SurfaceManager) Start(ctx context.Context, panes []paneInfo) {
 	if sm.signal == nil {
 		return // No signal support -- skip monitoring
@@ -47,16 +50,22 @@ func (sm *SurfaceManager) Start(ctx context.Context, panes []paneInfo) {
 	sm.cancel = cancel
 
 	go sm.monitorLoop(monCtx, panes)
+
+	// Initialize warm pool with 1 spare pane for instant recovery.
+	sm.warmPool = NewWarmPool(sm.term, 1)
+	go sm.warmPool.Init(monCtx)
 }
 
-// Stop stops the background monitoring goroutine.
+// Stop stops the background monitoring goroutine and cleans up the warm pool.
 func (sm *SurfaceManager) Stop() {
 	if sm.cancel != nil {
 		sm.cancel()
 	}
+	if sm.warmPool != nil {
+		sm.warmPool.Close(context.Background())
+	}
 }
 
-// @AX:TODO @AX:CYCLE:1 [AUTO] P1 warm pool (R9) — pre-create spare panes for instant recovery instead of on-demand recreatePane
 // IsHealthy returns true if the pane's last known health status is valid.
 // Returns true by default (optimistic) if no health data is available yet.
 func (sm *SurfaceManager) IsHealthy(paneID terminal.PaneID) bool {
@@ -116,8 +125,45 @@ func (sm *SurfaceManager) ValidateAndRecover(ctx context.Context, cfg OrchestraC
 		return pi, false, nil // No recovery needed
 	}
 
-	// Surface is stale -- recreate
-	log.Printf("[SurfaceManager] %s surface stale, recreating", pi.provider.Name)
+	// Surface is stale — try warm pool first for instant recovery.
+	if w := sm.acquireWarm(); w != nil {
+		log.Printf("[SurfaceManager] using warm spare pane for %s (%s -> %s)", pi.provider.Name, pi.paneID, w.paneID)
+
+		// Clean up old stale pane
+		_ = cfg.Terminal.PipePaneStop(ctx, pi.paneID)
+		_ = cfg.Terminal.Close(ctx, string(pi.paneID))
+
+		newPI := paneInfo{
+			paneID:     w.paneID,
+			outputFile: w.outputFile,
+			provider:   pi.provider,
+			skipWait:   false,
+		}
+
+		// Launch CLI session on the warm pane
+		cmd := buildInteractiveLaunchCmd(pi.provider, "")
+		if sendErr := cfg.Terminal.SendLongText(ctx, w.paneID, cmd); sendErr != nil {
+			log.Printf("[SurfaceManager] warm pane CLI launch failed, falling back to recreatePane: %v", sendErr)
+			_ = cfg.Terminal.Close(ctx, string(w.paneID))
+			goto coldRecovery
+		}
+		_ = cfg.Terminal.SendCommand(ctx, w.paneID, "\n")
+
+		// Update health cache
+		sm.mu.Lock()
+		delete(sm.health, string(pi.paneID))
+		sm.health[string(w.paneID)] = terminal.SurfaceStatus{Valid: true}
+		sm.mu.Unlock()
+
+		// Replenish pool in background
+		go sm.replenish(ctx)
+
+		return newPI, true, nil
+	}
+
+coldRecovery:
+	// No warm pane available — fall back to full recreatePane
+	log.Printf("[SurfaceManager] %s surface stale, recreating (no warm spare)", pi.provider.Name)
 	newPI, err := recreatePane(ctx, cfg, pi, round)
 	if err != nil {
 		return pi, false, err
@@ -130,6 +176,23 @@ func (sm *SurfaceManager) ValidateAndRecover(ctx context.Context, cfg OrchestraC
 	sm.mu.Unlock()
 
 	return newPI, true, nil
+}
+
+// acquireWarm takes a spare pane from the warm pool.
+// Returns nil if the pool is empty or not initialized.
+func (sm *SurfaceManager) acquireWarm() *warmPane {
+	if sm.warmPool == nil {
+		return nil
+	}
+	return sm.warmPool.Acquire()
+}
+
+// replenish triggers warm pool refill in the current goroutine.
+func (sm *SurfaceManager) replenish(ctx context.Context) {
+	if sm.warmPool == nil {
+		return
+	}
+	sm.warmPool.Replenish(ctx)
 }
 
 // captureBaselines reads the current screen content for all active panes.
