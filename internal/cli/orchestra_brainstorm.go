@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -97,19 +96,24 @@ var contextFiles = []string{
 	".autopus/project/structure.md",
 }
 
-// prependProjectContext loads project context files and prepends them to the prompt.
+// prependProjectContext adds file path references so providers can read project
+// context themselves, instead of injecting full file contents into the prompt.
 func prependProjectContext(prompt string) string {
-	var parts []string
+	var existing []string
 	for _, f := range contextFiles {
-		data, err := os.ReadFile(f)
-		if err != nil {
+		if _, err := os.Stat(f); err == nil {
+			existing = append(existing, f)
+		} else {
 			log.Printf("[context] skipping %s: %v", f, err)
-			continue
 		}
-		parts = append(parts, string(data))
 	}
-	if len(parts) == 0 {
+	if len(existing) == 0 {
 		return prompt
 	}
-	return "## Project Context\n\n" + strings.Join(parts, "\n\n---\n\n") + "\n\n---\n\n" + prompt
+	header := "## Project Context\n\nRead the following project files for context before responding:\n"
+	for _, f := range existing {
+		header += "- " + f + "\n"
+	}
+	header += "\nUse these files to understand the project architecture, features, and structure.\n\n---\n\n"
+	return header + prompt
 }

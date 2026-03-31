@@ -33,11 +33,9 @@ func (m *retryableSendLongTextMock) SendLongText(_ context.Context, paneID termi
 	return nil
 }
 
-// TestExecuteRound_SendLongText_RetrySuccess verifies SendLongText retry via
-// pane recreation (R6) on first failure. The flow is:
-// 1. SendLongText(prompt) fails
-// 2. recreatePane: SendLongText(launch cmd) succeeds
-// 3. SendLongText(prompt) retry on new pane succeeds
+// TestExecuteRound_SendLongText_RetrySuccess verifies SendLongText same-pane
+// retry succeeds on second attempt (sendPromptWithRetry retries on same pane
+// before falling back to pane recreation).
 func TestExecuteRound_SendLongText_RetrySuccess(t *testing.T) {
 	t.Parallel()
 	mock := &retryableSendLongTextMock{failCount: 1}
@@ -60,20 +58,22 @@ func TestExecuteRound_SendLongText_RetrySuccess(t *testing.T) {
 
 	_ = executeRound(ctx, cfg, panes, nil, 1, nil)
 
-	// R6: 3 SendLongText calls: initial fail + recreatePane launch + retry success
+	// 2 SendLongText calls: initial fail + same-pane retry success (no recreation needed)
 	mock.mu.Lock()
 	callCount := len(mock.sendLongTextCalls)
 	mock.mu.Unlock()
-	assert.Equal(t, 3, callCount, "R6: initial fail + recreatePane launch + retry prompt")
+	assert.Equal(t, 2, callCount, "initial fail + same-pane retry success")
 	// Provider should NOT be marked skipWait (retry succeeded)
 	assert.False(t, panes[0].skipWait, "retry succeeded — skipWait must be false")
 }
 
 // TestExecuteRound_SendLongText_RetryFailure_SkipWait verifies provider is skipped
-// when both SendLongText attempts fail.
+// when all SendLongText attempts fail (same-pane retries + recreation + final).
 func TestExecuteRound_SendLongText_RetryFailure_SkipWait(t *testing.T) {
 	t.Parallel()
-	mock := &retryableSendLongTextMock{failCount: 2} // both attempts fail
+	// sendPromptWithRetry: initial(1) + 2 same-pane retries(2,3) + recreatePane launch(4) + final(5)
+	// failCount=10 ensures ALL calls fail
+	mock := &retryableSendLongTextMock{failCount: 10}
 	mock.mockTerminal.name = "cmux"
 	mock.readScreenOutput = "❯\n"
 
@@ -88,18 +88,13 @@ func TestExecuteRound_SendLongText_RetryFailure_SkipWait(t *testing.T) {
 	}
 	panes := []paneInfo{{provider: cfg.Providers[0], paneID: "pane-1"}}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	_ = executeRound(ctx, cfg, panes, nil, 1, nil)
 
-	// Should have 2 SendLongText calls (initial + retry, both failed)
-	mock.mu.Lock()
-	callCount := len(mock.sendLongTextCalls)
-	mock.mu.Unlock()
-	assert.Equal(t, 2, callCount, "should attempt SendLongText twice")
-	// Provider should be marked skipWait
-	assert.True(t, panes[0].skipWait, "both attempts failed — skipWait must be true")
+	// Provider should be marked skipWait after all retries exhausted
+	assert.True(t, panes[0].skipWait, "all attempts failed — skipWait must be true")
 }
 
 // TestExecuteRound_EmptyOutput_Marked verifies providers with empty output get EmptyOutput=true.

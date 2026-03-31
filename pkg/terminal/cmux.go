@@ -38,6 +38,21 @@ func (a *CmuxAdapter) CreateWorkspace(_ context.Context, name string) error {
 	return nil
 }
 
+// CreateSurface creates a new independent surface (tab) via cmux new-surface.
+// Each surface gets the full terminal width, avoiding pane width starvation.
+func (a *CmuxAdapter) CreateSurface(_ context.Context) (PaneID, error) {
+	cmd := execCommand("cmux", "new-surface")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("cmux: new-surface: %w", err)
+	}
+	ref := parseCmuxRef(string(out), "surface")
+	if ref == "" {
+		return "", fmt.Errorf("cmux: new-surface: failed to parse surface ref from output %q", string(out))
+	}
+	return PaneID(ref), nil
+}
+
 // SplitPane creates a new split pane in the given direction and returns its surface ref.
 func (a *CmuxAdapter) SplitPane(_ context.Context, dir Direction) (PaneID, error) {
 	direction := "right"

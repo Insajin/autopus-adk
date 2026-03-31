@@ -26,6 +26,10 @@ var (
 	// statusBarRe matches tmux-style status bar lines.
 	statusBarRe = regexp.MustCompile(`(?m)^\[\d+\]\s+\d+:.*$`)
 
+	// cliBannerRe matches CLI banner lines containing Unicode block characters
+	// (e.g., ▐▛███▜▌ Claude Code, ▝▜▄ Gemini CLI, etc.).
+	cliBannerRe = regexp.MustCompile(`(?m)^[^\n]*[▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕▖▗▘▙▚▛▜▝▞▟]+[^\n]*$`)
+
 	// multiBlankRe matches 3+ consecutive newlines.
 	multiBlankRe = regexp.MustCompile(`\n{3,}`)
 )
@@ -41,6 +45,7 @@ func SanitizeScreenOutput(raw string) string {
 	}
 	s := stripANSIExtended(raw)
 	s = stripStatusBar(s)
+	s = stripCLIBanners(s)
 	s = trimTrailingWhitespace(s)
 	s = collapseBlankLines(s)
 	return s
@@ -63,6 +68,20 @@ func stripStatusBar(s string) string {
 	filtered := make([]string, 0, len(lines))
 	for _, line := range lines {
 		if statusBarRe.MatchString(line) {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	return strings.Join(filtered, "\n")
+}
+
+// stripCLIBanners removes lines containing Unicode block characters used in
+// CLI tool banners (Claude Code, Gemini CLI, etc.).
+func stripCLIBanners(s string) string {
+	lines := strings.Split(s, "\n")
+	filtered := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if cliBannerRe.MatchString(line) {
 			continue
 		}
 		filtered = append(filtered, line)

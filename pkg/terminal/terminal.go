@@ -23,6 +23,14 @@ type ReadScreenOpts struct {
 	ScrollbackLines int  // scrollback buffer depth in lines (0 = use terminal default)
 }
 
+// SurfaceCreator is an optional interface for terminals that support independent
+// surfaces (tabs) instead of splits. Prevents pane width starvation when
+// multiple providers run in parallel.
+type SurfaceCreator interface {
+	// CreateSurface creates a new independent surface (tab) and returns its ID.
+	CreateSurface(ctx context.Context) (PaneID, error)
+}
+
 // Terminal is the unified interface for terminal multiplexer adapters.
 // @AX:ANCHOR [AUTO] core public API contract — all adapters (cmux, tmux, plain) implement this interface
 // @AX:REASON: any method signature change here breaks all three adapters and every CLI handler that calls them; treat as a stable boundary

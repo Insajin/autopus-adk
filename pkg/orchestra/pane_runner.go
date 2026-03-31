@@ -85,11 +85,21 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 }
 
 // splitProviderPanes creates a pane and temp file for each provider.
-// Returns early with error if SplitPane fails (caller should fallback).
+// Uses independent surfaces (tabs) when the terminal supports SurfaceCreator,
+// falling back to horizontal splits otherwise. Independent surfaces prevent
+// pane width starvation when 3+ providers run in parallel.
+// Returns early with error if pane creation fails (caller should fallback).
 func splitProviderPanes(ctx context.Context, cfg OrchestraConfig) ([]paneInfo, []FailedProvider, error) {
+	surfCreator, hasSurface := cfg.Terminal.(terminal.SurfaceCreator)
 	panes := make([]paneInfo, 0, len(cfg.Providers))
 	for _, p := range cfg.Providers {
-		paneID, err := cfg.Terminal.SplitPane(ctx, terminal.Horizontal)
+		var paneID terminal.PaneID
+		var err error
+		if hasSurface {
+			paneID, err = surfCreator.CreateSurface(ctx)
+		} else {
+			paneID, err = cfg.Terminal.SplitPane(ctx, terminal.Horizontal)
+		}
 		if err != nil {
 			cleanupPanes(cfg.Terminal, panes)
 			return nil, nil, err

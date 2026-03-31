@@ -13,9 +13,18 @@ import (
 // --- runPaneDebate coverage tests ---
 
 // TestRunPaneDebate_SingleRound verifies single-round pane debate flow.
+// Uses countingScreenMock so baseline captures differ from completion polls.
 func TestRunPaneDebate_SingleRound(t *testing.T) {
-	mock := newCmuxMock()
-	mock.readScreenOutput = "new AI output\n❯\n"
+	mock := &countingScreenMock{
+		mockTerminal: mockTerminal{name: "cmux"},
+		outputs: []string{
+			"loading...\n",              // baseline captures (before prompt)
+			"loading...\n",              // baseline re-capture after prompt send
+			"loading...\n",              // baseline re-capture after delay
+			"AI response here\n❯\n",     // first completion match
+			"AI response here\n❯\n",     // second consecutive match (confirm)
+		},
+	}
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			echoProvider("claude"),
@@ -74,8 +83,17 @@ func TestRunPaneDebate_MultiRound(t *testing.T) {
 
 // TestRunPaneDebate_WithJudge verifies judge round is invoked in pane debate.
 func TestRunPaneDebate_WithJudge(t *testing.T) {
-	mock := newCmuxMock()
-	mock.readScreenOutput = "debate output\n❯\n"
+	// 2 providers × (3 baseline captures + 2 completion matches) + extra for safety
+	mock := &countingScreenMock{
+		mockTerminal: mockTerminal{name: "cmux"},
+		outputs: []string{
+			"loading...\n", "loading...\n", "loading...\n",
+			"loading...\n", "loading...\n", "loading...\n",
+			"loading...\n", "loading...\n", "loading...\n",
+			"debate output\n❯\n", "debate output\n❯\n",
+			"debate output\n❯\n", "debate output\n❯\n",
+		},
+	}
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			{Name: "claude", Binary: "echo"},
@@ -156,24 +174,34 @@ func TestRunPaneDebate_PipeCaptureFails_FallsBack(t *testing.T) {
 }
 
 // TestRunPaneDebate_HookMode verifies hook mode session creation in pane debate.
+// HookMode requires real hook result files; with mock terminal, collectRoundHookResults
+// times out gracefully. This test verifies the session is created and the flow
+// degrades correctly when no hook files appear.
 func TestRunPaneDebate_HookMode(t *testing.T) {
-	mock := newCmuxMock()
-	mock.readScreenOutput = "hook output\n❯\n"
+	mock := &countingScreenMock{
+		mockTerminal: mockTerminal{name: "cmux"},
+		outputs: []string{
+			"loading...\n", "loading...\n", "loading...\n",
+			"hook output\n❯\n", "hook output\n❯\n",
+		},
+	}
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("claude")},
 		Strategy:       StrategyDebate,
 		Prompt:         "hook test",
-		TimeoutSeconds: 30,
+		TimeoutSeconds: 3, // Short timeout — no real hook files will appear
 		Terminal:       mock,
 		Interactive:    true,
 		HookMode:       true,
 		SessionID:      "test-pane-debate-hook",
 		InitialDelay:   time.Millisecond,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := runPaneDebate(ctx, cfg, 1, 45*time.Second, time.Now())
+	result, err := runPaneDebate(ctx, cfg, 1, 8*time.Second, time.Now())
 	require.NoError(t, err)
 	require.NotNil(t, result)
+	// Hook mode with no result files → providers report as timed out
+	assert.NotEmpty(t, result.RoundHistory)
 }
