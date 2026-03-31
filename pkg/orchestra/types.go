@@ -85,6 +85,7 @@ type OrchestraConfig struct {
 	ConsensusThreshold float64          // consensus threshold (0 uses default 0.66)
 	InitialDelay       time.Duration    // delay before completion polling starts (0 uses default 20s)
 	CompletionDetector CompletionDetector // completion detection strategy (nil = auto-detect from Terminal)
+	ScrollbackLines    int                  // R3: ReadScreen scrollback depth (default 500, 0 = use terminal default)
 	// SurfaceMgr is set during interactive debate setup.
 	// Not part of initial config -- populated by runPaneDebate().
 	SurfaceMgr *SurfaceManager
@@ -110,3 +111,11 @@ func DefaultCompletionPatterns() []CompletionPattern {
 // IdleThreshold is the default duration for idle detection (no new output).
 // Set to 30s to allow for AI model thinking time before triggering completion.
 const IdleThreshold = 30 * time.Second
+
+// scrollbackDepth returns the scrollback depth to use, defaulting to 500 if unset.
+func scrollbackDepth(configured int) int {
+	if configured == 0 {
+		return 500
+	}
+	return configured
+}

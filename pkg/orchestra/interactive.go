@@ -246,9 +246,8 @@ func sendPrompts(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []F
 	return failed
 }
 
-// waitAndCollectResults waits for each provider to complete and collects cleaned results.
-// The round parameter is forwarded to waitForCompletion for round-scoped signal names.
-// Pass 0 for non-debate strategies (consensus, pipeline, fastest).
+// waitAndCollectResults waits for completion and collects cleaned results.
+// Round is forwarded to waitForCompletion; pass 0 for non-debate strategies.
 // @AX:WARN [AUTO] concurrent goroutine writes to shared responses slice — guarded by mu sync.Mutex
 func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, patterns []CompletionPattern, start time.Time, baselines map[string]string, round int) []ProviderResponse {
 	var (
@@ -274,11 +273,13 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 				baseline = baselines[pi.provider.Name]
 			}
 			timedOut := !waitForCompletion(ctx, cfg.Terminal, pi, patterns, baseline, round)
-			// Use a fresh context for the final screen read — the original ctx may be
-			// cancelled after timeout, which would cause ReadScreen to fail.
+			// Fresh context for final read — original ctx may be cancelled after timeout.
 			readCtx, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer readCancel()
-			screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{Scrollback: true})
+			screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{
+				Scrollback:      true,
+				ScrollbackLines: scrollbackDepth(cfg.ScrollbackLines),
+			})
 			output := cleanScreenOutput(screen)
 
 			mu.Lock()

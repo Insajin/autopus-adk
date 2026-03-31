@@ -18,8 +18,9 @@ type PaneID string
 
 // ReadScreenOpts configures ReadScreen behavior.
 type ReadScreenOpts struct {
-	Scrollback bool // include scrollback buffer
-	Lines      int  // limit to N lines (0 = all)
+	Scrollback      bool // include scrollback buffer
+	Lines           int  // limit to N lines (0 = all)
+	ScrollbackLines int  // scrollback buffer depth in lines (0 = use terminal default)
 }
 
 // Terminal is the unified interface for terminal multiplexer adapters.

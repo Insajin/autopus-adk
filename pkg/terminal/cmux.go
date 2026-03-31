@@ -156,6 +156,9 @@ func (a *CmuxAdapter) ReadScreen(_ context.Context, paneID PaneID, opts ReadScre
 	if opts.Scrollback {
 		args = append(args, "--scrollback")
 	}
+	if opts.ScrollbackLines > 0 {
+		args = append(args, "--scrollback-lines", fmt.Sprintf("%d", opts.ScrollbackLines))
+	}
 	if opts.Lines > 0 {
 		args = append(args, "--lines", fmt.Sprintf("%d", opts.Lines))
 	}

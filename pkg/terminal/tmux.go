@@ -83,7 +83,11 @@ func (a *TmuxAdapter) ReadScreen(_ context.Context, paneID PaneID, opts ReadScre
 		return "", fmt.Errorf("tmux: %w", err)
 	}
 	target := a.session + ":" + string(paneID)
-	cmd := execCommand("tmux", "capture-pane", "-t", target, "-p")
+	args := []string{"capture-pane", "-t", target, "-p"}
+	if opts.ScrollbackLines > 0 {
+		args = append(args, "-S", fmt.Sprintf("-%d", opts.ScrollbackLines))
+	}
+	cmd := execCommand("tmux", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("tmux: capture-pane %s: %w", paneID, err)
