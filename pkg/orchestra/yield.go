@@ -39,6 +39,31 @@ func WriteYieldOutput(w io.Writer, output YieldOutput) error {
 	return err
 }
 
+// BuildYieldOutputFromResult creates a YieldOutput from an OrchestraResult.
+// Used by --no-judge to output structured JSON without requiring pane references.
+func BuildYieldOutputFromResult(result *OrchestraResult, sessionID string) YieldOutput {
+	var yieldRounds []YieldRound
+	for i, responses := range result.RoundHistory {
+		yr := YieldRound{Round: i + 1}
+		for _, r := range responses {
+			yr.Responses = append(yr.Responses, YieldResponse{
+				Provider:   r.Provider,
+				Output:     r.Output,
+				DurationMs: r.Duration.Milliseconds(),
+				TimedOut:   r.TimedOut,
+			})
+		}
+		yieldRounds = append(yieldRounds, yr)
+	}
+
+	return YieldOutput{
+		Strategy:     string(result.Strategy),
+		Rounds:       len(result.RoundHistory),
+		RoundHistory: yieldRounds,
+		SessionID:    sessionID,
+	}
+}
+
 // BuildYieldOutput creates a YieldOutput from debate state.
 func BuildYieldOutput(cfg OrchestraConfig, panes []paneInfo, roundHistory [][]ProviderResponse, sessionID string) YieldOutput {
 	paneMap := make(map[string]string)
