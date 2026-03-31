@@ -22,6 +22,6 @@ func NewCompletionDetector(term terminal.Terminal) CompletionDetector {
 	if sc, ok := term.(terminal.SignalCapable); ok {
 		return &SignalDetector{term: term, signal: sc}
 	}
-	// @AX:TODO [AUTO] P1 FileIPCDetector (R12) — add file-based IPC detector as third strategy
+	// @AX:TODO @AX:CYCLE:1 [AUTO] P1 FileIPCDetector (R12) — add file-based IPC detector as third strategy
 	return &ScreenPollDetector{term: term}
 }

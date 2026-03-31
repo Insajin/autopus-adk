@@ -56,7 +56,7 @@ func (sm *SurfaceManager) Stop() {
 	}
 }
 
-// @AX:TODO [AUTO] P1 warm pool (R9) — pre-create spare panes for instant recovery instead of on-demand recreatePane
+// @AX:TODO @AX:CYCLE:1 [AUTO] P1 warm pool (R9) — pre-create spare panes for instant recovery instead of on-demand recreatePane
 // IsHealthy returns true if the pane's last known health status is valid.
 // Returns true by default (optimistic) if no health data is available yet.
 func (sm *SurfaceManager) IsHealthy(paneID terminal.PaneID) bool {
