@@ -38,6 +38,7 @@ type ProviderConfig struct {
 	InteractiveInput string        // interactive prompt delivery: "args" = via CLI arg at launch, "" = via sendkeys (default)
 	StartupTimeout   time.Duration // per-provider startup timeout; 0 uses name-based default
 	IdleThreshold    time.Duration // per-provider idle fallback threshold; 0 uses default (R10 P1)
+	WorkingPatterns  []string      // per-provider "still working" screen patterns; if any matches, completion is deferred
 }
 
 // ProviderResponse는 프로바이더 실행 결과이다.

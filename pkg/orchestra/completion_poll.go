@@ -66,6 +66,12 @@ func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo,
 				candidateDetected = false
 			}
 			if !baselineMatch && isPromptVisible(screen, patterns) {
+				// Per-provider working check: if provider has working patterns
+				// and any match, defer completion even though prompt is visible.
+				if isProviderStillWorking(screen, pi.provider.WorkingPatterns) {
+					candidateDetected = false
+					continue
+				}
 				if candidateDetected {
 					return true, nil // Two consecutive matches -- confirmed completion
 				}

@@ -111,6 +111,7 @@ type ProviderEntry struct {
 	PaneArgs         []string `yaml:"pane_args,flow,omitempty"`
 	PromptViaArgs    bool     `yaml:"prompt_via_args,omitempty"`
 	InteractiveInput string   `yaml:"interactive_input,omitempty"`
+	WorkingPatterns  []string `yaml:"working_patterns,flow,omitempty"`
 }
 
 // CommandEntry는 커맨드별 오케스트레이션 설정이다.

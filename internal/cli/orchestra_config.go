@@ -56,6 +56,7 @@ func resolveProviders(conf *config.OrchestraConf, commandName string, flagProvid
 			PaneArgs:         entry.PaneArgs,
 			PromptViaArgs:    entry.PromptViaArgs,
 			InteractiveInput: interactiveInput,
+			WorkingPatterns:  resolveWorkingPatterns(name, entry.WorkingPatterns),
 		})
 	}
 	return result
@@ -131,6 +132,21 @@ func resolveThreshold(conf *config.OrchestraConf, commandName string, flagValue 
 	}
 
 	return 0.66
+}
+
+// resolveWorkingPatterns returns per-provider working patterns.
+// Uses explicit YAML config if provided, otherwise falls back to built-in defaults.
+func resolveWorkingPatterns(providerName string, configured []string) []string {
+	if len(configured) > 0 {
+		return configured
+	}
+	// Built-in defaults for known providers whose TUI shows the prompt while still generating.
+	switch providerName {
+	case "gemini":
+		return []string{"⠴", "⠧", "⠋", "⠙", "⠹", "⠸", "⠼", "Generating", "Thinking"}
+	default:
+		return nil
+	}
 }
 
 // validateThreshold checks that a threshold value is a valid number within [0.0, 1.0].

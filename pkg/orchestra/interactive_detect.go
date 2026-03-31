@@ -225,6 +225,23 @@ func isProviderWorking(screen string) bool {
 	return false
 }
 
+// isProviderStillWorking checks per-provider working patterns on screen.
+// Returns true if any pattern matches, meaning the provider is still generating
+// and completion should be deferred even if the idle prompt is visible.
+// Returns false if patterns is nil/empty (provider has no working patterns).
+func isProviderStillWorking(screen string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+	cleaned := stripANSI(screen)
+	for _, pat := range patterns {
+		if strings.Contains(cleaned, pat) {
+			return true
+		}
+	}
+	return false
+}
+
 // isOutputIdle checks if the output file has not been modified for the given threshold.
 // This is the SECONDARY completion detection method (R7).
 func isOutputIdle(outputFile string, threshold time.Duration) bool {

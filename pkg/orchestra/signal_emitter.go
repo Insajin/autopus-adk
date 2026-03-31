@@ -100,6 +100,11 @@ func (e *SignalEmitter) pollAndEmit(ctx context.Context, pi paneInfo, patterns [
 				continue
 			}
 			if isPromptVisible(screen, patterns) {
+				// Per-provider working check: defer completion if still working.
+				if isProviderStillWorking(screen, pi.provider.WorkingPatterns) {
+					candidateDetected = false
+					continue
+				}
 				if candidateDetected {
 					// Two consecutive matches — emit signal.
 					if sendErr := e.signal.SendSignal(ctx, signalName); sendErr != nil {
