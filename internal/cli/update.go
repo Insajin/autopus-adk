@@ -35,11 +35,11 @@ func newUpdateCmd() *cobra.Command {
 			}
 
 			if dir == "" {
-				var err error
-				dir, err = os.Getwd()
+				cwd, err := os.Getwd()
 				if err != nil {
 					return fmt.Errorf("현재 디렉터리를 가져올 수 없음: %w", err)
 				}
+				dir = cwd
 			}
 
 			// 설정 로드
