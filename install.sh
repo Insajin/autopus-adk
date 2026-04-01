@@ -123,7 +123,19 @@ main() {
 
     ok "autopus-adk v${VERSION} 설치 완료!"
     echo ""
-    echo "  ${BINARY} version"
+
+    # Post-install: check and install dependencies (skip already installed)
+    info "의존성 확인 중..."
+    if "${INSTALL_DIR}/${BINARY}" doctor --fix --yes 2>/dev/null; then
+        ok "의존성 설치 완료!"
+    else
+        echo "  일부 의존성을 자동 설치하지 못했습니다."
+        echo "  수동 확인: ${BINARY} doctor"
+    fi
+    echo ""
+    echo "  다음 단계:"
+    echo "    ${BINARY} version     # 설치 확인"
+    echo "    ${BINARY} init        # 프로젝트 초기화"
     echo ""
 }
 

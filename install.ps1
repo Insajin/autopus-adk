@@ -88,11 +88,23 @@ function Main {
             Info "Added $InstallDir to user PATH"
         }
 
-        Ok ""
         Ok "autopus-adk v$Version installed!"
         Ok ""
+
+        # Post-install: check and install dependencies (skip already installed)
+        Info "Checking dependencies..."
+        try {
+            & "$InstallDir\$Binary" doctor --fix --yes 2>$null
+            Ok "Dependencies installed!"
+        } catch {
+            Write-Host "  Some dependencies could not be auto-installed." -ForegroundColor Yellow
+            Write-Host "  Run manually: auto doctor" -ForegroundColor Yellow
+        }
+
+        Ok ""
         Ok "  Restart your terminal, then run:"
-        Ok "    auto version"
+        Ok "    auto version     # verify install"
+        Ok "    auto init        # initialize project"
         Ok ""
     }
     finally {
