@@ -2,11 +2,13 @@
 package detect
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // Platform은 감지된 코딩 CLI 정보이다.
@@ -58,7 +60,11 @@ func detectBinary(binary, versionArg string) (string, bool) {
 		return "", false
 	}
 	_ = path
-	out, err := exec.Command(binary, versionArg).Output()
+	// Timeout prevents hang when a CLI doesn't respond to --version
+	// (e.g., opens GUI or waits for input on Windows).
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binary, versionArg).Output()
 	if err != nil {
 		return "unknown", true
 	}
