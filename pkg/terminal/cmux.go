@@ -103,22 +103,39 @@ func (a *CmuxAdapter) SendLongText(ctx context.Context, paneID PaneID, text stri
 	// set-buffer
 	setCmd := execCommand("cmux", "set-buffer", "--name", bufName, text)
 	if err := setCmd.Run(); err != nil {
-		// FR-10: fallback to SendCommand on set-buffer failure
-		return a.SendCommand(ctx, paneID, text)
+		// FR-10: fallback to chunked send on set-buffer failure
+		return a.sendChunked(ctx, paneID, text)
 	}
-	// paste-buffer — fall back to SendCommand if paste fails (e.g., on recreated surfaces)
+	// paste-buffer — fall back to chunked send if paste fails (e.g., on recreated surfaces)
 	pasteCmd := execCommand("cmux", "paste-buffer", "--name", bufName, "--surface", string(paneID))
 	if err := pasteCmd.Run(); err != nil {
 		// Clean up buffer before fallback
 		delFallback := execCommand("cmux", "delete-buffer", "--name", bufName)
 		_ = delFallback.Run()
-		// Fallback to SendCommand — text may be truncated for very long prompts
-		// but a partial prompt is better than skipping the provider entirely.
-		return a.SendCommand(ctx, paneID, text)
+		return a.sendChunked(ctx, paneID, text)
 	}
 	// delete-buffer (best-effort, FR-11)
 	delCmd := execCommand("cmux", "delete-buffer", "--name", bufName)
 	_ = delCmd.Run()
+	return nil
+}
+
+// sendChunked sends long text in chunks to avoid PTY 4KB truncation.
+// Each chunk is sent via SendCommand without a trailing newline, so the
+// target TUI accumulates the text in its input buffer. The caller is
+// responsible for sending Enter after SendLongText returns.
+func (a *CmuxAdapter) sendChunked(ctx context.Context, paneID PaneID, text string) error {
+	const chunkSize = 3500 // well under 4096 PTY limit
+	for i := 0; i < len(text); i += chunkSize {
+		end := min(i+chunkSize, len(text))
+		if err := a.SendCommand(ctx, paneID, text[i:end]); err != nil {
+			return fmt.Errorf("cmux: chunked send at offset %d: %w", i, err)
+		}
+		// Brief pause between chunks to let PTY flush.
+		if end < len(text) {
+			time.Sleep(150 * time.Millisecond)
+		}
+	}
 	return nil
 }
 

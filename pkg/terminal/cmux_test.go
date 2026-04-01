@@ -205,9 +205,9 @@ func TestCmuxAdapter_SendLongText_ShortText_SendCommandPath(t *testing.T) {
 	assert.Contains(t, combined, "surface:7")
 }
 
-// TestCmuxAdapter_SendLongText_SetBufferFails_Fallback verifies fallback to send
-// when set-buffer fails.
-func TestCmuxAdapter_SendLongText_SetBufferFails_Fallback(t *testing.T) {
+// TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback verifies fallback
+// to chunked send when set-buffer fails.
+func TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback(t *testing.T) {
 	orig := execCommand
 	var calls []string
 	execCommand = func(name string, args ...string) *exec.Cmd {
@@ -224,11 +224,68 @@ func TestCmuxAdapter_SendLongText_SetBufferFails_Fallback(t *testing.T) {
 	a := &CmuxAdapter{}
 	longText := strings.Repeat("C", 2000)
 	err := a.SendLongText(context.Background(), "surface:7", longText)
-	// Should not return error — falls back to send
 	assert.NoError(t, err)
-	// Should have called set-buffer (failed) then fallback send
-	require.True(t, len(calls) >= 2, "should attempt set-buffer then fallback")
-	assert.Contains(t, calls[len(calls)-1], "send", "last call should be fallback send")
+	// Should have called set-buffer (failed) then chunked send(s)
+	require.True(t, len(calls) >= 2, "should attempt set-buffer then chunked fallback")
+	// All fallback calls should be "send" commands
+	for _, call := range calls[1:] {
+		assert.Contains(t, call, "send", "fallback calls should use send")
+	}
+}
+
+// TestCmuxAdapter_SendLongText_PasteBufferFails_ChunkedFallback verifies fallback
+// to chunked send when paste-buffer fails (e.g., Codex ink TUI).
+func TestCmuxAdapter_SendLongText_PasteBufferFails_ChunkedFallback(t *testing.T) {
+	orig := execCommand
+	var calls []string
+	execCommand = func(name string, args ...string) *exec.Cmd {
+		combined := strings.Join(args, " ")
+		calls = append(calls, combined)
+		if strings.Contains(combined, "paste-buffer") {
+			return exec.Command("false")
+		}
+		return exec.Command("true")
+	}
+	defer func() { execCommand = orig }()
+
+	a := &CmuxAdapter{}
+	longText := strings.Repeat("P", 5000)
+	err := a.SendLongText(context.Background(), "surface:7", longText)
+	assert.NoError(t, err)
+	// Calls: set-buffer (ok) → paste-buffer (fail) → delete-buffer (cleanup) → chunked sends
+	sendCalls := 0
+	for _, call := range calls {
+		if strings.Contains(call, "send") && !strings.Contains(call, "buffer") {
+			sendCalls++
+		}
+	}
+	assert.GreaterOrEqual(t, sendCalls, 2, "5000 bytes should need at least 2 chunked sends (3500 chunk size)")
+}
+
+// TestCmuxAdapter_sendChunked_SplitsCorrectly verifies chunked send splits
+// text at 3500-byte boundaries.
+func TestCmuxAdapter_sendChunked_SplitsCorrectly(t *testing.T) {
+	orig := execCommand
+	var sendPayloads []string
+	execCommand = func(name string, args ...string) *exec.Cmd {
+		if len(args) >= 4 && args[0] == "send" {
+			sendPayloads = append(sendPayloads, args[3])
+		}
+		return exec.Command("true")
+	}
+	defer func() { execCommand = orig }()
+
+	a := &CmuxAdapter{}
+	// 8000 bytes → 3 chunks: 3500 + 3500 + 1000
+	text := strings.Repeat("X", 8000)
+	err := a.sendChunked(context.Background(), "surface:7", text)
+	require.NoError(t, err)
+	require.Len(t, sendPayloads, 3, "8000 bytes / 3500 chunk = 3 chunks")
+	assert.Len(t, sendPayloads[0], 3500)
+	assert.Len(t, sendPayloads[1], 3500)
+	assert.Len(t, sendPayloads[2], 1000)
+	// Reassembled content matches original
+	assert.Equal(t, text, sendPayloads[0]+sendPayloads[1]+sendPayloads[2])
 }
 
 // TestCmuxAdapter_SendLongText_UniqueBufferNames verifies different pane IDs produce
