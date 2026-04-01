@@ -138,7 +138,7 @@ func extractBinaryTarGz(data []byte, destDir string) (string, error) {
 		}
 
 		baseName := filepath.Base(header.Name)
-		if header.Typeflag != tar.TypeReg || baseName != binaryName {
+		if header.Typeflag != tar.TypeReg || (baseName != binaryName && baseName != binaryName+".exe") {
 			continue
 		}
 
