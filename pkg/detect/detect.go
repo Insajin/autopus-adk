@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -125,11 +126,61 @@ func (d Dependency) IsNpmBased() bool {
 
 // FullModeDeps는 Full 모드의 의존성 목록이다.
 var FullModeDeps = []Dependency{
-	{Name: "ast-grep", Binary: "sg", InstallCmd: "npm i -g @ast-grep/cli", Required: true, Description: "Structural code search"},
-	{Name: "node", Binary: "node", InstallCmd: "https://nodejs.org", Required: false, Description: "Node.js runtime (required for Playwright)"},
+	{Name: "git", Binary: "git", InstallCmd: platformInstallCmd("git"), Required: true, Description: "Version control"},
+	{Name: "node", Binary: "node", InstallCmd: platformInstallCmd("node"), Required: true, Description: "Node.js runtime (npm packages, Playwright)"},
+	{Name: "go", Binary: "go", InstallCmd: platformInstallCmd("go"), Required: false, Description: "Go toolchain (for Go projects)"},
+	{Name: "python", Binary: "python3", InstallCmd: platformInstallCmd("python"), Required: false, Description: "Python runtime (for Python projects)"},
+	{Name: "ast-grep", Binary: "sg", InstallCmd: "npm i -g @ast-grep/cli", Required: true, Description: "Structural code search", DependsOn: "node"},
 	{Name: "playwright", Binary: "playwright", InstallCmd: "npm i -g playwright", Required: false, Description: "E2E testing + screenshots", DependsOn: "node", PostInstallCmd: "npx playwright install chromium"},
-	{Name: "agent-browser", Binary: "agent-browser", InstallCmd: "npm i -g agent-browser", Required: true, Description: "Web browsing"},
-	{Name: "gh", Binary: "gh", InstallCmd: "", Required: false, Description: "GitHub CLI"},
+	{Name: "agent-browser", Binary: "agent-browser", InstallCmd: "npm i -g agent-browser", Required: true, Description: "Web browsing", DependsOn: "node"},
+	{Name: "gh", Binary: "gh", InstallCmd: platformInstallCmd("gh"), Required: false, Description: "GitHub CLI"},
+}
+
+// platformInstallCmd returns the install command appropriate for the current OS.
+func platformInstallCmd(name string) string {
+	switch runtime.GOOS {
+	case "darwin":
+		return darwinInstallCmd(name)
+	case "linux":
+		return linuxInstallCmd(name)
+	case "windows":
+		return windowsInstallCmd(name)
+	default:
+		return ""
+	}
+}
+
+func darwinInstallCmd(name string) string {
+	cmds := map[string]string{
+		"git":    "brew install git",
+		"node":   "brew install node",
+		"go":     "brew install go",
+		"python": "brew install python",
+		"gh":     "brew install gh",
+	}
+	return cmds[name]
+}
+
+func linuxInstallCmd(name string) string {
+	cmds := map[string]string{
+		"git":    "sudo apt-get install -y git",
+		"node":   "sudo apt-get install -y nodejs npm",
+		"go":     "sudo snap install go --classic",
+		"python": "sudo apt-get install -y python3 python3-pip",
+		"gh":     "sudo apt-get install -y gh",
+	}
+	return cmds[name]
+}
+
+func windowsInstallCmd(name string) string {
+	cmds := map[string]string{
+		"git":    "winget install Git.Git",
+		"node":   "winget install OpenJS.NodeJS.LTS",
+		"go":     "winget install GoLang.Go",
+		"python": "winget install Python.Python.3.12",
+		"gh":     "winget install GitHub.cli",
+	}
+	return cmds[name]
 }
 
 // CheckDependencies는 의존성 상태를 확인한다.
