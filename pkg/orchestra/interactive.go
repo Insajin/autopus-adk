@@ -275,12 +275,27 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 			timedOut := !waitForCompletion(ctx, cfg.Terminal, pi, patterns, baseline, round)
 			// Fresh context for final read — original ctx may be cancelled after timeout.
 			readCtx, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer readCancel()
 			screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{
 				Scrollback:      true,
 				ScrollbackLines: scrollbackDepth(cfg.ScrollbackLines),
 			})
+			readCancel()
 			output := cleanScreenOutput(screen)
+
+			// Retry once if output is empty after timeout — pane may still be rendering.
+			if output == "" && timedOut {
+				time.Sleep(2 * time.Second)
+				retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				screen2, _ := cfg.Terminal.ReadScreen(retryCtx, pi.paneID, terminal.ReadScreenOpts{
+					Scrollback:      true,
+					ScrollbackLines: scrollbackDepth(cfg.ScrollbackLines),
+				})
+				retryCancel()
+				if retried := cleanScreenOutput(screen2); retried != "" {
+					output = retried
+					log.Printf("[ReadScreen] retry succeeded for %s (pane %s)", pi.provider.Name, pi.paneID)
+				}
+			}
 
 			mu.Lock()
 			defer mu.Unlock()

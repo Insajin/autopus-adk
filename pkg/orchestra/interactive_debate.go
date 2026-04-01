@@ -168,7 +168,8 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 			_ = SaveSession(session)
 			output := BuildYieldOutput(cfg, panes, roundHistory, sessionID)
 			_ = WriteYieldOutput(os.Stdout, output)
-			surfMgr.Stop()
+			// surfMgr.Stop() removed — defer at line 115 handles cleanup.
+			// Explicit Stop here caused duplicate WarmPool.Close() calls.
 			return buildDebateResult(cfg, roundResponses, roundHistory, start), nil
 		}
 
