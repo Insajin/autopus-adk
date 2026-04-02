@@ -147,6 +147,78 @@ func TestHarnessConfig_Validate_QualityInvalidModelTier(t *testing.T) {
 	assert.Contains(t, err.Error(), "unknown model tier")
 }
 
+func TestUsageProfile_IsValid(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		profile UsageProfile
+		want    bool
+	}{
+		{"", true},
+		{ProfileDeveloper, true},
+		{ProfileFullstack, true},
+		{"invalid", false},
+		{"DEVELOPER", false},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.profile), func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.profile.IsValid())
+		})
+	}
+}
+
+func TestUsageProfile_Effective(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		profile UsageProfile
+		want    UsageProfile
+	}{
+		{"", ProfileDeveloper},
+		{ProfileDeveloper, ProfileDeveloper},
+		{ProfileFullstack, ProfileFullstack},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.profile), func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.profile.Effective())
+		})
+	}
+}
+
+func TestHintsConf_IsPlatformHintEnabled(t *testing.T) {
+	t.Parallel()
+	boolPtr := func(v bool) *bool { return &v }
+
+	tests := []struct {
+		name string
+		conf HintsConf
+		want bool
+	}{
+		{"nil (default enabled)", HintsConf{Platform: nil}, true},
+		{"explicit true", HintsConf{Platform: boolPtr(true)}, true},
+		{"explicit false", HintsConf{Platform: boolPtr(false)}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.conf.IsPlatformHintEnabled())
+		})
+	}
+}
+
+func TestHarnessConfig_Validate_UsageProfile(t *testing.T) {
+	t.Parallel()
+	cfg := HarnessConfig{
+		Mode:         ModeFull,
+		ProjectName:  "test",
+		Platforms:    []string{"claude-code"},
+		UsageProfile: "invalid-profile",
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid usage_profile")
+}
+
 func TestProviderEntry_PromptViaArgs(t *testing.T) {
 	t.Parallel()
 

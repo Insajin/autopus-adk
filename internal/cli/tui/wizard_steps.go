@@ -16,11 +16,12 @@ var (
 
 // InitWizardOpts holds options for the init wizard.
 type InitWizardOpts struct {
-	Quality      string   // pre-set from --quality flag
-	NoReviewGate bool     // pre-set from --no-review-gate flag
-	Platforms    []string // pre-set from --platforms flag
-	Accessible   bool     // true for non-TTY / --yes mode
-	Providers    []string // detected orchestra providers
+	Quality         string   // pre-set from --quality flag
+	NoReviewGate    bool     // pre-set from --no-review-gate flag
+	Platforms       []string // pre-set from --platforms flag
+	Accessible      bool     // true for non-TTY / --yes mode
+	Providers       []string // detected orchestra providers
+	ExistingProfile string   // pre-set profile; non-empty skips the profile step
 }
 
 // InitWizardResult holds all wizard selections.
@@ -31,6 +32,7 @@ type InitWizardResult struct {
 	Quality      string
 	ReviewGate   bool
 	Methodology  string
+	UsageProfile string
 	Cancelled    bool
 }
 
@@ -79,62 +81,49 @@ type stepBuilder func(r *InitWizardResult) *huh.Form
 // is set so all closures share the correct total when invoked.
 // buildStepList assembles the wizard steps, skipping pre-configured ones.
 func buildStepList(opts InitWizardOpts) []stepBuilder {
-	var steps []stepBuilder
-	totalRef := new(int) // shared reference updated after building
+	// Collect step factories, then rebind with correct indices.
+	type entry struct {
+		name string
+		fn   func(idx, total int, r *InitWizardResult) *huh.Form
+	}
+	var entries []entry
 
-	steps = append(steps, func(r *InitWizardResult) *huh.Form {
-		return buildLangStep(len(steps), *totalRef, r)
-	})
+	// R2: skip profile step when ExistingProfile is already set.
+	if opts.ExistingProfile == "" {
+		entries = append(entries, entry{"profile", func(idx, total int, r *InitWizardResult) *huh.Form {
+			return buildProfileStep(idx, total, r)
+		}})
+	}
+
+	entries = append(entries, entry{"lang", func(idx, total int, r *InitWizardResult) *huh.Form {
+		return buildLangStep(idx, total, r)
+	}})
 
 	if opts.Quality == "" {
-		steps = append(steps, func(r *InitWizardResult) *huh.Form {
-			return buildQualityStep(len(steps), *totalRef, r)
-		})
+		entries = append(entries, entry{"quality", func(idx, total int, r *InitWizardResult) *huh.Form {
+			return buildQualityStep(idx, total, r)
+		}})
 	}
 
 	if !opts.NoReviewGate {
-		steps = append(steps, func(r *InitWizardResult) *huh.Form {
-			return buildReviewGateStep(len(steps), *totalRef, r, opts)
-		})
+		entries = append(entries, entry{"reviewgate", func(idx, total int, r *InitWizardResult) *huh.Form {
+			return buildReviewGateStep(idx, total, r, opts)
+		}})
 	}
 
-	steps = append(steps, func(r *InitWizardResult) *huh.Form {
-		return buildMethodologyStep(len(steps), *totalRef, r)
-	})
+	entries = append(entries, entry{"methodology", func(idx, total int, r *InitWizardResult) *huh.Form {
+		return buildMethodologyStep(idx, total, r)
+	}})
 
-	*totalRef = len(steps)
-
-	// Rebind closures with correct indices now that total is known.
-	total := len(steps)
+	total := len(entries)
 	rebuilt := make([]stepBuilder, total)
-	idx := 0
-
-	rebuilt[idx] = func(r *InitWizardResult) *huh.Form {
-		return buildLangStep(idx+1, total, r)
-	}
-	idx++
-
-	if opts.Quality == "" {
-		i := idx
-		rebuilt[idx] = func(r *InitWizardResult) *huh.Form {
-			return buildQualityStep(i+1, total, r)
+	for i, e := range entries {
+		idx := i + 1
+		fn := e.fn
+		rebuilt[i] = func(r *InitWizardResult) *huh.Form {
+			return fn(idx, total, r)
 		}
-		idx++
 	}
-
-	if !opts.NoReviewGate {
-		i := idx
-		rebuilt[idx] = func(r *InitWizardResult) *huh.Form {
-			return buildReviewGateStep(i+1, total, r, opts)
-		}
-		idx++
-	}
-
-	i := idx
-	rebuilt[idx] = func(r *InitWizardResult) *huh.Form {
-		return buildMethodologyStep(i+1, total, r)
-	}
-
 	return rebuilt
 }
 
@@ -235,14 +224,18 @@ func defaultResult(opts InitWizardOpts) *InitWizardResult {
 		Quality:      "balanced",
 		ReviewGate:   len(opts.Providers) >= 2,
 		Methodology:  "tdd",
+		UsageProfile: "developer",
 	}
 
-	// Apply pre-configured values (R9, R13)
+	// Apply pre-configured values (R9, R10, R13)
 	if opts.Quality != "" {
 		r.Quality = opts.Quality
 	}
 	if opts.NoReviewGate {
 		r.ReviewGate = false
+	}
+	if opts.ExistingProfile != "" {
+		r.UsageProfile = opts.ExistingProfile
 	}
 
 	return r

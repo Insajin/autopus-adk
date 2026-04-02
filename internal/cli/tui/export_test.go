@@ -9,4 +9,5 @@ var (
 	TestBuildQualityStep    = buildQualityStep
 	TestBuildReviewGateStep = buildReviewGateStep
 	TestBuildMethodologyStep = buildMethodologyStep
+	TestBuildProfileStep     = buildProfileStep
 )

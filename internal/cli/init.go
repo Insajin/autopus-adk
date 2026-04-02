@@ -95,15 +95,22 @@ func newInitCmd() *cobra.Command {
 				}
 			}
 
+			// R9: detect existing profile from prior autopus.yaml for pre-selection.
+			var existingProfile string
+			if existing, err := config.Load(dir); err == nil && existing.UsageProfile != "" {
+				existingProfile = string(existing.UsageProfile)
+			}
+
 			// Step 1: Configuration Wizard
 			tui.Step(out, 1, 4, "Configuration Wizard")
 			if !yes && isStdinTTY() {
 				result, err := tui.RunInitWizard(tui.InitWizardOpts{
-					Quality:      quality,
-					NoReviewGate: noReviewGate,
-					Platforms:    platformList,
-					Accessible:   false,
-					Providers:    providerNames,
+					Quality:         quality,
+					NoReviewGate:    noReviewGate,
+					Platforms:       platformList,
+					Accessible:      false,
+					Providers:       providerNames,
+					ExistingProfile: existingProfile,
 				})
 				if err != nil {
 					return fmt.Errorf("wizard failed: %w", err)
@@ -113,6 +120,7 @@ func newInitCmd() *cobra.Command {
 					return nil
 				}
 				// Apply wizard results to config.
+				cfg.UsageProfile = config.UsageProfile(result.UsageProfile)
 				cfg.Language.Comments = result.CommentsLang
 				cfg.Language.Commits = result.CommitsLang
 				cfg.Language.AIResponses = result.AILang
@@ -130,6 +138,7 @@ func newInitCmd() *cobra.Command {
 				}
 			} else {
 				// Non-interactive: apply flags or defaults.
+				cfg.UsageProfile = config.DefaultUsageProfile()
 				if quality != "" {
 					cfg.Quality.Default = quality
 				}
@@ -170,6 +179,7 @@ func newInitCmd() *cobra.Command {
 			// Step 4: Summary
 			tui.Step(out, 4, 4, "Summary")
 			tui.SummaryTable(out, []tui.SummaryRow{
+				{Key: "Profile", Value: string(cfg.UsageProfile.Effective())},
 				{Key: "Quality", Value: cfg.Quality.Default},
 				{Key: "Review Gate", Value: fmt.Sprintf("%v (%d providers)", cfg.Spec.ReviewGate.Enabled, len(cfg.Spec.ReviewGate.Providers))},
 				{Key: "Methodology", Value: cfg.Methodology.Mode},

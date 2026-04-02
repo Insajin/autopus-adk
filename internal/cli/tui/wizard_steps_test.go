@@ -11,11 +11,7 @@ import (
 // TestRunInitWizard_ReturnsResult verifies R1: wizard returns a valid result struct.
 func TestRunInitWizard_ReturnsResult(t *testing.T) {
 	t.Parallel()
-
-	opts := tui.InitWizardOpts{
-		Accessible: true,
-	}
-	result, err := tui.RunInitWizard(opts)
+	result, err := tui.RunInitWizard(tui.InitWizardOpts{Accessible: true})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.False(t, result.Cancelled)
@@ -44,30 +40,18 @@ func TestRunInitWizard_FlagSkipsStep(t *testing.T) {
 // TestRunInitWizard_PreConfiguredDefaults verifies R9: pre-set values appear in result.
 func TestRunInitWizard_PreConfiguredDefaults(t *testing.T) {
 	t.Parallel()
-
-	opts := tui.InitWizardOpts{
-		Quality:    "balanced",
-		Accessible: true,
-	}
-	result, err := tui.RunInitWizard(opts)
+	result, err := tui.RunInitWizard(tui.InitWizardOpts{Quality: "balanced", Accessible: true})
 	require.NoError(t, err)
 	require.NotNil(t, result)
-
 	assert.Equal(t, "balanced", result.Quality)
 }
 
 // TestRunInitWizard_CompletionSummary verifies R10: result contains all expected fields.
 func TestRunInitWizard_CompletionSummary(t *testing.T) {
 	t.Parallel()
-
-	opts := tui.InitWizardOpts{
-		Accessible: true,
-	}
-	result, err := tui.RunInitWizard(opts)
+	result, err := tui.RunInitWizard(tui.InitWizardOpts{Accessible: true})
 	require.NoError(t, err)
 	require.NotNil(t, result)
-
-	// All fields must be populated after wizard completion
 	fields := map[string]string{
 		"CommentsLang": result.CommentsLang,
 		"CommitsLang":  result.CommitsLang,
@@ -217,22 +201,22 @@ func TestBuildStepList_StepCounts(t *testing.T) {
 		{
 			name:      "all steps — no flags",
 			opts:      tui.InitWizardOpts{},
-			wantSteps: 4, // lang + quality + review-gate + methodology
+			wantSteps: 5, // profile + lang + quality + review-gate + methodology
 		},
 		{
 			name:      "quality pre-set — skip quality step",
 			opts:      tui.InitWizardOpts{Quality: "ultra"},
-			wantSteps: 3, // lang + review-gate + methodology
+			wantSteps: 4, // profile + lang + review-gate + methodology
 		},
 		{
 			name:      "no-review-gate — skip gate step",
 			opts:      tui.InitWizardOpts{NoReviewGate: true},
-			wantSteps: 3, // lang + quality + methodology
+			wantSteps: 4, // profile + lang + quality + methodology
 		},
 		{
 			name:      "both flags — skip quality and gate",
 			opts:      tui.InitWizardOpts{Quality: "ultra", NoReviewGate: true},
-			wantSteps: 2, // lang + methodology
+			wantSteps: 3, // profile + lang + methodology
 		},
 	}
 
@@ -270,4 +254,37 @@ func TestBuildStepList_FormsCallable(t *testing.T) {
 	for i, step := range steps {
 		assert.NotNilf(t, step(result), "step %d should produce a non-nil form", i)
 	}
+}
+
+// TestDefaultResult_UsageProfile verifies the default usage profile is "developer".
+func TestDefaultResult_UsageProfile(t *testing.T) {
+	t.Parallel()
+	result := tui.TestDefaultResult(tui.InitWizardOpts{})
+	assert.Equal(t, "developer", result.UsageProfile)
+}
+
+// TestDefaultResult_ExistingProfile verifies ExistingProfile propagates to result.
+func TestDefaultResult_ExistingProfile(t *testing.T) {
+	t.Parallel()
+	result := tui.TestDefaultResult(tui.InitWizardOpts{ExistingProfile: "fullstack"})
+	assert.Equal(t, "fullstack", result.UsageProfile)
+}
+
+// TestBuildStepList_IncludesProfileStep verifies the profile step is first when no ExistingProfile.
+func TestBuildStepList_IncludesProfileStep(t *testing.T) {
+	t.Parallel()
+	steps := tui.TestBuildStepList(tui.InitWizardOpts{})
+	require.NotEmpty(t, steps)
+	result := &tui.InitWizardResult{}
+	assert.NotNil(t, steps[0](result), "first step (profile) must return a non-nil form")
+	// ExistingProfile set → one fewer step
+	skipped := tui.TestBuildStepList(tui.InitWizardOpts{ExistingProfile: "developer"})
+	assert.Len(t, skipped, len(steps)-1, "ExistingProfile should skip the profile step")
+}
+
+// TestBuildProfileStep verifies buildProfileStep returns a valid huh.Form.
+func TestBuildProfileStep(t *testing.T) {
+	t.Parallel()
+	result := &tui.InitWizardResult{}
+	assert.NotNil(t, tui.TestBuildProfileStep(1, 5, result))
 }

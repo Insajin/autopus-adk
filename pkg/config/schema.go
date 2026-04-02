@@ -79,6 +79,8 @@ type HarnessConfig struct {
 	Telemetry    TelemetryConf    `yaml:"telemetry,omitempty"`
 	IssueReport  IssueReportConf  `yaml:"issue_report,omitempty"`
 	Profiles     ProfilesConf     `yaml:"profiles,omitempty"`
+	UsageProfile UsageProfile     `yaml:"usage_profile,omitempty"` // developer (default) or fullstack
+	Hints        HintsConf        `yaml:"hints,omitempty"`
 }
 
 // ProfilesConf holds profile configuration for agents.
@@ -263,6 +265,9 @@ func (c *HarnessConfig) Validate() error {
 	}
 	if c.Skills.MaxActiveSkills < 0 {
 		return fmt.Errorf("skills.max_active_skills must be non-negative, got %d", c.Skills.MaxActiveSkills)
+	}
+	if !c.UsageProfile.IsValid() {
+		return fmt.Errorf("invalid usage_profile %q: must be 'developer' or 'fullstack'", c.UsageProfile)
 	}
 	return nil
 }
