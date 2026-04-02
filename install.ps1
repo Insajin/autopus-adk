@@ -13,11 +13,19 @@ function Err($msg)   { Write-Host $msg -ForegroundColor Red; exit 1 }
 
 # Detect architecture
 function Get-Arch {
-    $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    $arch = "$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)"
     switch ($arch) {
         "X64"   { return "amd64" }
         "Arm64" { return "arm64" }
-        default { Err "Unsupported architecture: $arch" }
+        default {
+            # Fallback: use PROCESSOR_ARCHITECTURE env var
+            $envArch = $env:PROCESSOR_ARCHITECTURE
+            switch ($envArch) {
+                "AMD64" { return "amd64" }
+                "ARM64" { return "arm64" }
+                default { Err "Unsupported architecture: $arch (env: $envArch)" }
+            }
+        }
     }
 }
 
