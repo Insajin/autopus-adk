@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,52 +12,150 @@ import (
 	"github.com/insajin/autopus-adk/templates"
 )
 
-// generateHooks renders hooks.json template and writes to .codex/hooks.json.
+// generateHooks renders hooks.json template and merges with existing user hooks.
+// Autopus-managed hooks are identified by the "__autopus__" marker key.
+// User hooks (without the marker) are preserved during merge.
 func (a *Adapter) generateHooks(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	tmplContent, err := templates.FS.ReadFile("codex/hooks.json.tmpl")
+	rendered, err := a.renderHooksTemplate(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("codex hooks 템플릿 읽기 실패: %w", err)
-	}
-
-	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
-	if err != nil {
-		return nil, fmt.Errorf("codex hooks 템플릿 렌더링 실패: %w", err)
+		return nil, err
 	}
 
 	targetPath := filepath.Join(a.root, ".codex", "hooks.json")
+	merged, err := mergeHooks(targetPath, rendered)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return nil, fmt.Errorf(".codex 디렉터리 생성 실패: %w", err)
 	}
-	if err := os.WriteFile(targetPath, []byte(rendered), 0644); err != nil {
+	if err := os.WriteFile(targetPath, merged, 0644); err != nil {
 		return nil, fmt.Errorf("codex hooks.json 쓰기 실패: %w", err)
 	}
 
 	return []adapter.FileMapping{{
 		TargetPath:      filepath.Join(".codex", "hooks.json"),
-		OverwritePolicy: adapter.OverwriteAlways,
-		Checksum:        checksum(rendered),
-		Content:         []byte(rendered),
+		OverwritePolicy: adapter.OverwriteMerge,
+		Checksum:        checksum(string(merged)),
+		Content:         merged,
 	}}, nil
 }
 
 // prepareHooksFile returns hooks.json file mapping without writing to disk.
+// Uses merge policy to preserve user hooks on application.
 func (a *Adapter) prepareHooksFile(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	tmplContent, err := templates.FS.ReadFile("codex/hooks.json.tmpl")
+	rendered, err := a.renderHooksTemplate(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("codex hooks 템플릿 읽기 실패: %w", err)
+		return nil, err
 	}
 
-	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+	targetPath := filepath.Join(a.root, ".codex", "hooks.json")
+	merged, err := mergeHooks(targetPath, rendered)
 	if err != nil {
-		return nil, fmt.Errorf("codex hooks 템플릿 렌더링 실패: %w", err)
+		return nil, err
 	}
 
 	return []adapter.FileMapping{{
 		TargetPath:      filepath.Join(".codex", "hooks.json"),
-		OverwritePolicy: adapter.OverwriteAlways,
-		Checksum:        checksum(rendered),
-		Content:         []byte(rendered),
+		OverwritePolicy: adapter.OverwriteMerge,
+		Checksum:        checksum(string(merged)),
+		Content:         merged,
 	}}, nil
+}
+
+// renderHooksTemplate renders the codex hooks.json template.
+func (a *Adapter) renderHooksTemplate(cfg *config.HarnessConfig) (string, error) {
+	tmplContent, err := templates.FS.ReadFile("codex/hooks.json.tmpl")
+	if err != nil {
+		return "", fmt.Errorf("codex hooks 템플릿 읽기 실패: %w", err)
+	}
+
+	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+	if err != nil {
+		return "", fmt.Errorf("codex hooks 템플릿 렌더링 실패: %w", err)
+	}
+	return rendered, nil
+}
+
+// mergeHooks reads existing hooks.json from disk, preserves user hooks (no __autopus__ marker),
+// and upserts Autopus-managed hooks from the rendered template.
+func mergeHooks(existingPath, rendered string) ([]byte, error) {
+	// Parse rendered autopus hooks and stamp them with marker
+	var autopusDoc hooksDoc
+	if err := json.Unmarshal([]byte(rendered), &autopusDoc); err != nil {
+		return nil, fmt.Errorf("rendered hooks JSON 파싱 실패: %w", err)
+	}
+	stampAutopusMarker(&autopusDoc)
+
+	// Read existing file — if missing or invalid, use autopus-only result
+	existingData, err := os.ReadFile(existingPath)
+	if err != nil {
+		return json.MarshalIndent(autopusDoc, "", "  ")
+	}
+
+	var existingDoc hooksDoc
+	if err := json.Unmarshal(existingData, &existingDoc); err != nil {
+		return json.MarshalIndent(autopusDoc, "", "  ")
+	}
+
+	// Merge each hook category: keep user hooks, upsert autopus hooks
+	merged := mergeHookCategories(existingDoc, autopusDoc)
+	return json.MarshalIndent(merged, "", "  ")
+}
+
+// hooksDoc represents the top-level hooks.json structure.
+type hooksDoc struct {
+	Hooks map[string][]hookEntry `json:"hooks"`
+}
+
+// hookEntry represents a single hook entry in hooks.json.
+type hookEntry struct {
+	Type     string `json:"type,omitempty"`
+	Command  string `json:"command"`
+	Matcher  string `json:"matcher,omitempty"`
+	Timeout  int    `json:"timeout,omitempty"`
+	Autopus  bool   `json:"__autopus__,omitempty"`
+}
+
+// stampAutopusMarker marks all hooks in the document as Autopus-managed.
+func stampAutopusMarker(doc *hooksDoc) {
+	for cat, entries := range doc.Hooks {
+		for i := range entries {
+			entries[i].Autopus = true
+		}
+		doc.Hooks[cat] = entries
+	}
+}
+
+// mergeHookCategories merges existing and autopus hook documents.
+// User hooks (Autopus==false) are preserved; autopus hooks are replaced.
+func mergeHookCategories(existing, autopus hooksDoc) hooksDoc {
+	result := hooksDoc{Hooks: make(map[string][]hookEntry)}
+
+	// Collect all category names
+	cats := make(map[string]bool)
+	for c := range existing.Hooks {
+		cats[c] = true
+	}
+	for c := range autopus.Hooks {
+		cats[c] = true
+	}
+
+	for cat := range cats {
+		// Keep user hooks from existing
+		var merged []hookEntry
+		for _, e := range existing.Hooks[cat] {
+			if !e.Autopus {
+				merged = append(merged, e)
+			}
+		}
+		// Append all autopus hooks for this category
+		merged = append(merged, autopus.Hooks[cat]...)
+		result.Hooks[cat] = merged
+	}
+
+	return result
 }
 
 // installGitHooks generates and writes git hooks as fallback.

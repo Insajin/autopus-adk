@@ -97,6 +97,13 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, agentFiles...)
 
+	// Rules (separate files)
+	ruleFiles, err := a.generateRuleFiles(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("rule 파일 생성 실패: %w", err)
+	}
+	files = append(files, ruleFiles...)
+
 	// Hooks (hooks.json)
 	hookFiles, err := a.generateHooks(cfg)
 	if err != nil {
@@ -233,11 +240,25 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		})
 	}
 
+	// Extended skills from content/skills/ via transformer
+	extSkillFiles, err := a.renderExtendedSkills()
+	if err != nil {
+		return nil, fmt.Errorf("extended skill 준비 실패: %w", err)
+	}
+	files = append(files, extSkillFiles...)
+
 	promptFiles, err := a.preparePromptFiles(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("codex prompt 템플릿 준비 실패: %w", err)
 	}
 	files = append(files, promptFiles...)
+
+	// Rules (separate files)
+	rulePrepFiles, err := a.prepareRuleMappings(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("codex rule 준비 실패: %w", err)
+	}
+	files = append(files, rulePrepFiles...)
 
 	// Agents (TOML files)
 	agentPrepFiles, err := a.prepareAgentFiles(cfg)

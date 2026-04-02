@@ -6,5 +6,5 @@ import "embed"
 // FS는 임베딩된 템플릿 파일시스템이다.
 // claude/commands, claude/skills, codex/skills, gemini/skills, shared 하위의 모든 .tmpl 파일이 포함된다.
 //
-//go:embed claude/commands/*.tmpl claude/skills/*.tmpl claude/*.tmpl claude/rules/*.tmpl codex/skills/*.tmpl codex/prompts/*.tmpl codex/agents/*.tmpl codex/*.tmpl gemini/skills/*/*.tmpl gemini/commands/auto/*.tmpl gemini/rules/autopus/*.tmpl gemini/settings/*.tmpl hooks/*.tmpl shared/*.tmpl
+//go:embed claude/commands/*.tmpl claude/skills/*.tmpl claude/*.tmpl claude/rules/*.tmpl codex/skills/*.tmpl codex/prompts/*.tmpl codex/agents/*.tmpl codex/rules/autopus/*.tmpl codex/*.tmpl gemini/skills/*/*.tmpl gemini/commands/auto/*.tmpl gemini/rules/autopus/*.tmpl gemini/settings/*.tmpl hooks/*.tmpl shared/*.tmpl
 var FS embed.FS

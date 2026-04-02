@@ -224,6 +224,13 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, skillMappings...)
 
+	// Extended skills from content/skills/ via transformer
+	extSkillMappings, err := a.renderExtendedSkills()
+	if err != nil {
+		return nil, fmt.Errorf("extended skill 준비 실패: %w", err)
+	}
+	files = append(files, extSkillMappings...)
+
 	cmdMappings, err := a.prepareCommandMappings(cfg)
 	if err != nil {
 		return nil, err

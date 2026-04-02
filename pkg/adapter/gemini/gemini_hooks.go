@@ -10,7 +10,7 @@ import (
 // InjectOrchestraAfterAgentHook adds the autopus orchestra result collector
 // AfterAgent hook to .gemini/settings.json, preserving existing user hooks.
 // This is session-specific and injected separately from harness-managed hooks.
-// @AX:WARN [AUTO] appends to AfterAgent slice without dedup — repeated calls create duplicate hook entries
+// Duplicate entries with the same command are skipped.
 func (a *Adapter) InjectOrchestraAfterAgentHook(scriptPath string) error {
 	settingsDir := filepath.Join(a.root, ".gemini")
 	if err := os.MkdirAll(settingsDir, 0755); err != nil {
@@ -39,8 +39,14 @@ func (a *Adapter) InjectOrchestraAfterAgentHook(scriptPath string) error {
 		"command": scriptPath,
 	}
 
-	// Append to existing AfterAgent entries (preserve user hooks)
+	// Check for duplicate command before appending
 	existing, _ := hooksMap["AfterAgent"].([]any)
+	for _, e := range existing {
+		if m, ok := e.(map[string]any); ok && m["command"] == scriptPath {
+			// Already present — skip to avoid duplicate
+			return nil
+		}
+	}
 	hooksMap["AfterAgent"] = append(existing, entry)
 	settings["hooks"] = hooksMap
 

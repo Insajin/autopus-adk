@@ -75,28 +75,37 @@ func TestPrepareConfigFile_NoDiskWrite(t *testing.T) {
 
 // --- Rules tests ---
 
-func TestRenderRulesSection(t *testing.T) {
+func TestGenerateRuleFiles_Internal(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 
-	section, err := a.renderRulesSection(cfg)
+	files, err := a.generateRuleFiles(cfg)
 	require.NoError(t, err)
-	assert.Contains(t, section, "## Rules")
-	// Should include known rules.
-	assert.Contains(t, section, "File Size Limit")
+	assert.Len(t, files, 7, "should produce 7 rule files")
+
+	// Verify file-size-limit content
+	for _, f := range files {
+		if filepath.Base(f.TargetPath) == "file-size-limit.md" {
+			assert.Contains(t, string(f.Content), "300 lines")
+		}
+	}
 }
 
-func TestRenderFileSizeRule(t *testing.T) {
+func TestPrepareRuleMappings_NoDiskWrite(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 
-	rendered, err := a.renderFileSizeRule(cfg)
+	files, err := a.prepareRuleMappings(cfg)
 	require.NoError(t, err)
-	assert.Contains(t, rendered, "300 lines")
+	assert.Len(t, files, 7)
+
+	// Should not write to disk
+	_, err = os.Stat(filepath.Join(dir, ".codex", "rules", "autopus"))
+	assert.True(t, os.IsNotExist(err))
 }
 
 func TestStripFrontmatter(t *testing.T) {
@@ -227,9 +236,9 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	assert.Contains(t, content, "[mcp_servers.context7]")
 }
 
-// --- Rules inline in AGENTS.md ---
+// --- Rules reference in AGENTS.md ---
 
-func TestRulesInlineInAgentsMD(t *testing.T) {
+func TestRulesReferenceInAgentsMD(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -243,7 +252,9 @@ func TestRulesInlineInAgentsMD(t *testing.T) {
 	content := string(data)
 
 	assert.Contains(t, content, "## Rules")
-	assert.Contains(t, content, "File Size Limit")
+	assert.Contains(t, content, "See .codex/rules/autopus/ for detailed guidelines")
+	// Should NOT contain inline rule content
+	assert.NotContains(t, content, "IMPORTANT: No single file may exceed 300 lines")
 }
 
 func TestMarkerSection_Under32KB(t *testing.T) {

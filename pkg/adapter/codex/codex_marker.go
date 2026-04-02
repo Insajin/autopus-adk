@@ -38,12 +38,8 @@ func (a *Adapter) injectMarkerSection(cfg *config.HarnessConfig) (string, error)
 	}
 	sectionContent += agentsSection
 
-	// Append inline rules section.
-	rulesSection, err := a.renderRulesSection(cfg)
-	if err != nil {
-		return "", fmt.Errorf("rules 섹션 렌더링 실패: %w", err)
-	}
-	sectionContent += rulesSection
+	// Reference separate rule files instead of inlining.
+	sectionContent += "\n## Rules\n\nSee .codex/rules/autopus/ for detailed guidelines.\n"
 
 	newSection := markerBegin + "\n" + sectionContent + "\n" + markerEnd
 

@@ -43,8 +43,8 @@ func TestE2EInitCodex(t *testing.T) {
 	// .codex/prompts/ directory must exist with 6 prompts.
 	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "prompts"), 6)
 
-	// .codex/agents/ directory must exist with 5 TOML agents.
-	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "agents"), 5)
+	// .codex/agents/ directory must exist with 16 TOML agents (SPEC-PARITY-001: all agents).
+	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "agents"), 16)
 
 	// .codex/hooks.json must exist.
 	assertFileExists(t, filepath.Join(dir, ".codex", "hooks.json"))
@@ -55,9 +55,9 @@ func TestE2EInitCodex(t *testing.T) {
 	// Manifest must be saved.
 	assertFileExists(t, filepath.Join(dir, ".autopus", "codex-manifest.json"))
 
-	// Manifest file count: skills(6) + prompts(6) + agents(5) + AGENTS.md + hooks.json + config.toml = 20+
-	assert.GreaterOrEqual(t, len(pf.Files), 20,
-		"Codex should produce at least 20 file mappings, got %d", len(pf.Files))
+	// Manifest file count: skills(46) + prompts(6) + agents(16) + rules(7) + AGENTS.md + hooks.json + config.toml = 78+
+	assert.GreaterOrEqual(t, len(pf.Files), 70,
+		"Codex should produce at least 70 file mappings, got %d", len(pf.Files))
 
 	// Validate should pass after Generate.
 	errs, err := a.Validate(context.Background())
@@ -197,9 +197,9 @@ func TestE2ECodex_FileCount(t *testing.T) {
 		}
 	}
 
-	assert.Equal(t, 6, skills, "should have 6 skill files")
+	assert.GreaterOrEqual(t, skills, 6, "should have at least 6 skill files (6 template + extended)")
 	assert.Equal(t, 6, prompts, "should have 6 prompt files")
-	assert.Equal(t, 5, agents, "should have 5 agent files")
+	assert.Equal(t, 16, agents, "should have 16 agent files (SPEC-PARITY-001)")
 	assert.GreaterOrEqual(t, other, 3, "should have AGENTS.md + hooks.json + config.toml")
 }
 

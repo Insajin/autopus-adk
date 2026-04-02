@@ -30,6 +30,22 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig, geminiSkillBas
 		}
 	}
 
+	// Extended skills from content/skills/ via transformer
+	extFiles, err := a.renderExtendedSkills()
+	if err != nil {
+		return nil, fmt.Errorf("extended skill rendering failed: %w", err)
+	}
+	for _, ef := range extFiles {
+		destPath := filepath.Join(a.root, ef.TargetPath)
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return nil, fmt.Errorf("extended skill dir creation failed %s: %w", filepath.Dir(destPath), err)
+		}
+		if err := os.WriteFile(destPath, ef.Content, 0644); err != nil {
+			return nil, fmt.Errorf("extended skill write failed %s: %w", destPath, err)
+		}
+	}
+	mappings = append(mappings, extFiles...)
+
 	return mappings, nil
 }
 
