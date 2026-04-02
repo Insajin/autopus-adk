@@ -1,0 +1,41 @@
+{{/* orchestra-context.md.tmpl — Common context block injected into all orchestra prompts */}}
+{{/* This partial provides 3-layer project understanding for --bare subprocess providers */}}
+
+## Project Context
+
+**Project**: {{.ProjectName}}
+**Summary**: {{.ProjectSummary}}
+**Stack**: {{.TechStack}}
+**Components**:
+{{range .Components}}- {{.}}
+{{end}}
+## Step 1: Understand the Project (REQUIRED — do this first)
+
+Read these files before analyzing the topic. They provide the foundation
+for understanding this codebase:
+
+{{range .MustReadFiles}}- Read `{{.}}`
+{{end}}
+Do NOT skip this step. Without reading these files, your analysis will be
+generic and disconnected from the actual codebase.
+
+## Step 2: Explore Relevant Code
+
+The topic relates to these areas. Read the key files to ground your analysis:
+
+{{range .RelevantPaths}}- `{{.Path}}` — {{.Description}}
+{{end}}
+{{if .RelevantPaths}}After reading these files, you will have specific knowledge of the code
+that the topic is about. Reference concrete function names, struct types,
+and package patterns in your response.
+{{end}}
+## Step 3: Deep Dive (if needed)
+
+If the above files don't provide enough context, you may explore further:
+- Use `Glob("{{.TargetModule}}/**/*.go")` to discover related files
+- Use `Grep("keyword")` to trace call chains or find implementations
+- Read `*_test.go` files to understand expected behavior and edge cases
+
+Stay within {{.MaxTurns}} total tool calls to manage your token budget.
+Prioritize reading over searching — targeted Read calls are more efficient
+than broad Grep scans.

@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"math"
+	"os/exec"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
@@ -57,6 +59,9 @@ func resolveProviders(conf *config.OrchestraConf, commandName string, flagProvid
 			PromptViaArgs:    entry.PromptViaArgs,
 			InteractiveInput: interactiveInput,
 			WorkingPatterns:  resolveWorkingPatterns(name, entry.WorkingPatterns),
+			SchemaFlag:       entry.Subprocess.SchemaFlag,
+			StdinMode:        entry.Subprocess.StdinMode,
+			OutputFormat:     entry.Subprocess.OutputFormat,
 		})
 	}
 	return result
@@ -147,6 +152,50 @@ func resolveWorkingPatterns(providerName string, configured []string) []string {
 	default:
 		return nil
 	}
+}
+
+// resolveSubprocessTimeout returns the per-provider subprocess timeout.
+// Priority: per-provider override > global orchestra timeout > 120s default.
+func resolveSubprocessTimeout(conf *config.OrchestraConf, entry config.ProviderEntry) time.Duration {
+	if entry.Subprocess.Timeout > 0 {
+		return time.Duration(entry.Subprocess.Timeout) * time.Second
+	}
+	if conf.TimeoutSeconds > 0 {
+		return time.Duration(conf.TimeoutSeconds) * time.Second
+	}
+	return 120 * time.Second
+}
+
+// autoDetectBinary resolves a provider binary by looking it up in PATH.
+// Returns the input name unchanged — exec.LookPath is used only to verify availability.
+func autoDetectBinary(name string) string {
+	if _, err := exec.LookPath(name); err == nil {
+		return name
+	}
+	return name
+}
+
+// resolveSubprocessMode returns whether subprocess mode is enabled via config.
+func resolveSubprocessMode(conf *config.OrchestraConf) bool {
+	return conf.Subprocess.Enabled
+}
+
+// resolveSubprocessRounds returns the configured debate rounds for subprocess mode.
+// Falls back to 1 if unset.
+func resolveSubprocessRounds(conf *config.OrchestraConf) int {
+	if conf.Subprocess.Rounds > 0 {
+		return conf.Subprocess.Rounds
+	}
+	return 1
+}
+
+// resolveMaxConcurrent returns the max concurrent subprocess limit.
+// Falls back to 3 if unset.
+func resolveMaxConcurrent(conf *config.OrchestraConf) int {
+	if conf.Subprocess.MaxConcurrent > 0 {
+		return conf.Subprocess.MaxConcurrent
+	}
+	return 3
 }
 
 // validateThreshold checks that a threshold value is a valid number within [0.0, 1.0].

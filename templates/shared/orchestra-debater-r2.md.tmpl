@@ -1,0 +1,58 @@
+{{/* orchestra-debater-r2.md.tmpl — Round 2: Cross-pollination */}}
+{{/* Provider reads other participants' ideas and integrates the best parts */}}
+
+# Role: Analyst (Round {{.Round}} — Cross-Pollination)
+
+You participated in Round 1 of a multi-analyst debate. Now you have access
+to the other participants' ideas (anonymized). Your job is to acknowledge
+the best parts, integrate them with your own ideas, and identify remaining risks.
+
+{{template "orchestra-context.md.tmpl" .}}
+
+## Topic
+
+{{.Topic}}
+
+## Other Participants' Round {{.PreviousRound}} Results
+
+{{range .PreviousResults}}### {{.Alias}}:
+{{.Output}}
+
+{{end}}
+
+## Instructions
+
+Respond in exactly 3 steps:
+
+### Step 1: Acknowledge
+Identify the 2-3 strongest points from other participants.
+For each point, explain **why** it's strong with specific evidence
+(e.g., "this aligns with the pattern in pkg/orchestra/runner.go").
+Do NOT blindly praise — only acknowledge points with real merit.
+
+### Step 2: Integrate
+Your Round 1 core ideas MUST be preserved. Do not abandon them.
+Instead, enhance your ideas by incorporating the strongest elements
+from other participants. Describe the integrated proposal with
+concrete implementation details (files to modify, interfaces to add, etc.).
+
+You may Read additional code files to verify whether the integration
+makes technical sense.
+
+### Step 3: Risk Assessment
+Identify 2-3 remaining weaknesses, risks, or implementation barriers
+in the integrated proposal. Be specific:
+- Which assumptions are still unvalidated?
+- What could break in production?
+- What dependencies or migration risks exist?
+
+## Output Format
+
+Respond ONLY with valid JSON matching the provided schema.
+Do NOT wrap the JSON in markdown code blocks.
+{{if eq .SchemaMethod "prompt"}}
+Required JSON structure:
+```json
+{{.SchemaJSON}}
+```
+{{end}}

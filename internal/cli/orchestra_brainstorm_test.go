@@ -58,7 +58,8 @@ func TestBuildBrainstormPrompt_ContainsHMW(t *testing.T) {
 }
 
 // TestNewOrchestraBrainstormCmd_DefaultTimeout verifies that the brainstorm
-// cmd has the default timeout of 120 seconds.
+// cmd has the default timeout of 300 seconds (higher than other orchestra
+// commands due to SCAMPER+HMW+ICE complexity and extended thinking).
 func TestNewOrchestraBrainstormCmd_DefaultTimeout(t *testing.T) {
 	t.Parallel()
 
@@ -67,7 +68,7 @@ func TestNewOrchestraBrainstormCmd_DefaultTimeout(t *testing.T) {
 
 	flag := cmd.Flags().Lookup("timeout")
 	require.NotNil(t, flag, "timeout flag must exist")
-	assert.Equal(t, "120", flag.DefValue, "default timeout must be 120 seconds")
+	assert.Equal(t, "300", flag.DefValue, "default timeout must be 300 seconds for brainstorm")
 }
 
 // TestNewOrchestraBrainstormCmd_UseAndShort verifies the command Use and Short fields.

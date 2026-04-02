@@ -39,6 +39,9 @@ type ProviderConfig struct {
 	StartupTimeout   time.Duration // per-provider startup timeout; 0 uses name-based default
 	IdleThreshold    time.Duration // per-provider idle fallback threshold; 0 uses default (R10 P1)
 	WorkingPatterns  []string      // per-provider "still working" screen patterns; if any matches, completion is deferred
+	SchemaFlag       string        // subprocess: CLI flag for JSON schema (e.g., "--schema")
+	StdinMode        string        // subprocess: prompt delivery — "pipe" (default) or "file"
+	OutputFormat     string        // subprocess: expected output — "json" (default) or "text"
 }
 
 // ProviderResponse는 프로바이더 실행 결과이다.
@@ -90,6 +93,8 @@ type OrchestraConfig struct {
 	NoJudge            bool                 // R4: skip judge verdict phase when true
 	YieldRounds        bool                 // R5: yield after round 1 with JSON output, keep panes alive
 	ContextAware       bool                 // R8: when true, skip topic isolation so providers can read project files
+	SubprocessMode     bool                 // when true, use SubprocessBackend instead of PaneBackend
+	RoundPreset        string               // round preset: "fast", "standard", "deep" (for T8)
 	// SurfaceMgr is set during interactive debate setup.
 	// Not part of initial config -- populated by runPaneDebate().
 	SurfaceMgr *SurfaceManager
