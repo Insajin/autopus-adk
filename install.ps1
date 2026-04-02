@@ -78,7 +78,19 @@ function Main {
         }
 
         Info "Installing to $InstallDir\$Binary..."
-        Copy-Item "$TmpDir\auto.exe" "$InstallDir\$Binary" -Force
+        $TargetPath = "$InstallDir\$Binary"
+        $OldPath = "$TargetPath.old"
+        if (Test-Path $TargetPath) {
+            # Running exe cannot be overwritten but CAN be renamed.
+            Remove-Item $OldPath -Force -ErrorAction SilentlyContinue
+            try {
+                Rename-Item $TargetPath $OldPath -Force
+            } catch {
+                # Rename failed — try direct copy as last resort.
+            }
+        }
+        Copy-Item "$TmpDir\auto.exe" $TargetPath -Force
+        Remove-Item $OldPath -Force -ErrorAction SilentlyContinue
 
         # Add to PATH if not already present
         $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
