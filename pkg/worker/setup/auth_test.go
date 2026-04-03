@@ -136,6 +136,28 @@ func TestRefreshToken_InvalidJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "decode")
 }
 
+func TestRefreshToken_WrappedResponse(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"success":true,"data":{"access_token":"wrapped-tok","refresh_token":"ref","expires_in":3600,"token_type":"Bearer"}}`))
+	}))
+	defer srv.Close()
+
+	token, err := RefreshToken(context.Background(), srv.URL, "old-token")
+	require.NoError(t, err)
+	assert.Equal(t, "wrapped-tok", token.AccessToken)
+}
+
+func TestRefreshToken_ConnectionRefused(t *testing.T) {
+	t.Parallel()
+
+	_, err := RefreshToken(context.Background(), "http://127.0.0.1:1", "token")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refresh request")
+}
+
 func TestSaveCredentials_WritesFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
@@ -147,7 +169,6 @@ func TestSaveCredentials_WritesFile(t *testing.T) {
 	err := SaveCredentials(creds)
 	require.NoError(t, err)
 
-	// Verify the file was created.
 	path := filepath.Join(tmp, ".config", "autopus", "credentials.json")
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -168,6 +189,76 @@ func TestSaveCredentials_Permissions(t *testing.T) {
 	path := filepath.Join(tmp, ".config", "autopus", "credentials.json")
 	info, err := os.Stat(path)
 	require.NoError(t, err)
-	// Verify file permissions are 0600 (owner read/write only).
 	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
+}
+
+func TestSaveCredentials_ReadOnlyDir(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	dir := filepath.Join(tmp, ".config", "autopus")
+	require.NoError(t, os.MkdirAll(dir, 0700))
+
+	// Make the credentials.json path a directory to force write failure
+	credPath := filepath.Join(dir, "credentials.json")
+	require.NoError(t, os.MkdirAll(credPath, 0700))
+
+	err := SaveCredentials(map[string]any{"key": "val"})
+	require.Error(t, err)
+}
+
+func TestOpenBrowser_RunsOnDarwin(t *testing.T) {
+	t.Parallel()
+
+	// OpenBrowser uses "open" on darwin — covers the switch statement.
+	_ = OpenBrowser("https://example.com")
+}
+
+func TestExtractErrorCode_PlainFormat(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		body     string
+		expected string
+	}{
+		{"authorization_pending", `{"error":"authorization_pending"}`, "authorization_pending"},
+		{"slow_down", `{"error":"slow_down"}`, "slow_down"},
+		{"wrapped format", `{"error":{"code":"authorization_pending"}}`, "authorization_pending"},
+		{"empty error", `{"error":""}`, ""},
+		{"no error field", `{"data":"ok"}`, ""},
+		{"invalid json", `not-json`, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := extractErrorCode([]byte(tt.body))
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestUnwrap_WrappedResponse(t *testing.T) {
+	t.Parallel()
+
+	body := `{"success":true,"data":{"access_token":"tok","refresh_token":"ref","expires_in":3600,"token_type":"Bearer"}}`
+	result, err := unwrap[TokenResponse]([]byte(body))
+	require.NoError(t, err)
+	assert.Equal(t, "tok", result.AccessToken)
+}
+
+func TestUnwrap_DirectResponse(t *testing.T) {
+	t.Parallel()
+
+	body := `{"access_token":"direct","refresh_token":"ref","expires_in":3600,"token_type":"Bearer"}`
+	result, err := unwrap[TokenResponse]([]byte(body))
+	require.NoError(t, err)
+	assert.Equal(t, "direct", result.AccessToken)
+}
+
+func TestUnwrap_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	_, err := unwrap[TokenResponse]([]byte("not-json"))
+	require.Error(t, err)
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDetectProviders_ReturnsKnownNames(t *testing.T) {
@@ -59,6 +60,39 @@ func TestCheckNodeJS(t *testing.T) {
 
 	// Just ensure it doesn't panic; actual result depends on environment
 	_ = CheckNodeJS()
+}
+
+func TestInstallProvider_UnknownProvider(t *testing.T) {
+	t.Parallel()
+
+	err := InstallProvider("nonexistent-provider")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown provider")
+}
+
+func TestCheckNPM(t *testing.T) {
+	t.Parallel()
+
+	// Just ensure it doesn't panic; actual result depends on environment
+	_ = checkNPM()
+}
+
+func TestInstallProvider_NpmNotInstalled(t *testing.T) {
+	// Cannot use t.Parallel() with t.Setenv()
+	t.Setenv("PATH", t.TempDir())
+
+	err := InstallProvider("claude")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "npm is not installed")
+}
+
+func TestInstallNodeJS_NoBrew(t *testing.T) {
+	// Cannot use t.Parallel() with t.Setenv()
+	t.Setenv("PATH", t.TempDir())
+
+	err := InstallNodeJS()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "brew not found")
 }
 
 func TestProviderPackages_AllBinariesMapped(t *testing.T) {

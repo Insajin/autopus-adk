@@ -12,6 +12,11 @@ import (
 
 const defaultBackendURL = "https://api.autopus.co"
 
+// userError wraps a technical error with a Korean context label and friendly message.
+func userError(context string, err error) error {
+	return fmt.Errorf("%s: %s", context, setup.HumanError(err))
+}
+
 // runWorkerSetup executes the 3-step setup wizard:
 //
 //	Step 1: Device Auth OAuth (PKCE) → Autopus server login
@@ -26,22 +31,25 @@ func runWorkerSetup(cmd *cobra.Command, backendURL string) error {
 	fmt.Fprintln(out, "🐙 Autopus Worker Setup")
 	fmt.Fprintln(out, "───────────────────────────────")
 	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Worker는 Autopus 서버에서 작업을 받아 자동으로 실행하는")
+	fmt.Fprintln(out, "백그라운드 서비스입니다. 설정은 약 2분 정도 소요됩니다.")
+	fmt.Fprintln(out)
 
 	// Step 1: Device Auth
 	token, err := stepDeviceAuth(cmd, backendURL)
 	if err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
+		return userError("인증", err)
 	}
 
 	// Step 2: Workspace selection
 	workspace, err := stepSelectWorkspace(cmd, backendURL, token)
 	if err != nil {
-		return fmt.Errorf("workspace selection failed: %w", err)
+		return userError("워크스페이스 선택", err)
 	}
 
 	// Step 3: Save config and check providers
 	if err := stepSaveAndCheckProviders(cmd, backendURL, token, workspace); err != nil {
-		return fmt.Errorf("config save failed: %w", err)
+		return userError("설정 저장", err)
 	}
 
 	fmt.Fprintln(out)
@@ -62,7 +70,7 @@ func stepDeviceAuth(cmd *cobra.Command, backendURL string) (string, error) {
 
 	verifier, _, err := setup.GeneratePKCE()
 	if err != nil {
-		return "", fmt.Errorf("generate PKCE: %w", err)
+		return "", fmt.Errorf("%s", setup.HumanError(err))
 	}
 
 	dc, err := setup.RequestDeviceCode(backendURL, verifier)
@@ -88,19 +96,43 @@ func stepDeviceAuth(cmd *cobra.Command, backendURL string) (string, error) {
 		return "", fmt.Errorf("empty verification URI from backend")
 	}
 	if err := setup.OpenBrowser(verifyURL); err != nil {
-		fmt.Fprintf(out, "  브라우저를 수동으로 열어주세요.\n")
+		fmt.Fprintf(out, "  브라우저를 자동으로 열 수 없습니다. 위 URL을 복사하여 브라우저에 붙여넣으세요.\n")
 	} else {
 		fmt.Fprintf(out, "  브라우저가 열렸습니다. 인증을 완료해주세요.\n")
 	}
 
-	fmt.Fprintln(out, "  인증 대기 중...")
+	fmt.Fprintf(out, "  인증 대기 중...")
+
+	// Start countdown display goroutine
+	done := make(chan struct{})
+	go func() {
+		deadline := time.Now().Add(time.Duration(dc.ExpiresIn) * time.Second)
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				remaining := time.Until(deadline)
+				if remaining < 0 {
+					remaining = 0
+				}
+				mins := int(remaining.Minutes())
+				secs := int(remaining.Seconds()) % 60
+				fmt.Fprintf(out, "\r  인증 대기 중... (남은 시간: %d분 %02d초)", mins, secs)
+			}
+		}
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(dc.ExpiresIn)*time.Second)
 	defer cancel()
 
 	tokenResp, err := setup.PollForToken(ctx, backendURL, dc.DeviceCode, verifier, dc.Interval)
+	close(done)
+	fmt.Fprintln(out) // newline after countdown
 	if err != nil {
-		return "", fmt.Errorf("token polling: %w", err)
+		return "", fmt.Errorf("%s", setup.HumanError(err))
 	}
 
 	// Save credentials.

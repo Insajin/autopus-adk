@@ -32,7 +32,7 @@ func checkClaude(home string) (bool, string) {
 	if fileExists(credPath) {
 		return true, ""
 	}
-	return false, "Run `claude login` to authenticate"
+	return false, "1. https://claude.ai 에서 가입\n      2. npm install -g @anthropic-ai/claude-code\n      3. claude login 실행"
 }
 
 func checkCodex(home string) (bool, string) {
@@ -43,7 +43,7 @@ func checkCodex(home string) (bool, string) {
 	if dirExists(codexDir) {
 		return true, ""
 	}
-	return false, "Set OPENAI_API_KEY or run `codex login` to authenticate"
+	return false, "1. https://platform.openai.com 에서 API 키 발급\n      2. 터미널에 다음 명령어를 입력하세요:\n         export OPENAI_API_KEY=여기에_키_입력\n      3. 또는 codex login 실행"
 }
 
 func checkGemini(home string) (bool, string) {
@@ -54,7 +54,7 @@ func checkGemini(home string) (bool, string) {
 	if dirExists(geminiDir) {
 		return true, ""
 	}
-	return false, "Set GOOGLE_API_KEY or run `gemini login` to authenticate"
+	return false, "1. https://aistudio.google.com 에서 API 키 발급\n      2. 터미널에 다음 명령어를 입력하세요:\n         export GOOGLE_API_KEY=여기에_키_입력\n      3. 또는 gemini login 실행"
 }
 
 func checkOpencode() (bool, string) {
@@ -62,7 +62,7 @@ func checkOpencode() (bool, string) {
 	if os.Getenv("OPENAI_API_KEY") != "" {
 		return true, ""
 	}
-	return false, "Set OPENAI_API_KEY to authenticate opencode"
+	return false, "1. https://platform.openai.com 에서 API 키 발급\n      2. 터미널에 다음 명령어를 입력하세요:\n         export OPENAI_API_KEY=여기에_키_입력"
 }
 
 func fileExists(path string) bool {

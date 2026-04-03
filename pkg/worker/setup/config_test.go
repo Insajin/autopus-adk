@@ -69,6 +69,51 @@ func TestDefaultWorkerConfigPath(t *testing.T) {
 	assert.Contains(t, path, "autopus")
 }
 
+func TestSaveWorkerConfig_WritesToDisk(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	cfg := WorkerConfig{
+		BackendURL:  "https://api.autopus.co",
+		WorkspaceID: "ws-test",
+		Providers:   []string{"claude"},
+		WorkDir:     "/tmp/work",
+		A2AURL:      "https://a2a.autopus.co",
+		Concurrency: 2,
+	}
+	err := SaveWorkerConfig(cfg)
+	require.NoError(t, err)
+
+	loaded, err := LoadWorkerConfig()
+	require.NoError(t, err)
+	assert.Equal(t, cfg.BackendURL, loaded.BackendURL)
+	assert.Equal(t, cfg.WorkspaceID, loaded.WorkspaceID)
+	assert.Equal(t, cfg.Providers, loaded.Providers)
+}
+
+func TestLoadWorkerConfig_NoFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	_, err := LoadWorkerConfig()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "read worker config")
+}
+
+func TestSaveWorkerConfig_ReadOnlyDir(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Create config dir then make a file where worker.yaml should go
+	dir := filepath.Join(tmp, ".config", "autopus")
+	require.NoError(t, os.MkdirAll(dir, 0700))
+	// Create worker.yaml as a directory to force write failure
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "worker.yaml"), 0700))
+
+	err := SaveWorkerConfig(WorkerConfig{BackendURL: "https://test.co"})
+	require.Error(t, err)
+}
+
 func TestLoadWorkerConfigFrom_EmptyProviders(t *testing.T) {
 	t.Parallel()
 

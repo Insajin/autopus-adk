@@ -107,3 +107,114 @@ func TestLoadProgress_FileNotExist(t *testing.T) {
 	_, err := os.ReadFile(path)
 	assert.True(t, os.IsNotExist(err))
 }
+
+func TestSaveProgress_WritesToDisk(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	err := SaveProgress(2)
+	require.NoError(t, err)
+
+	p, err := LoadProgress()
+	require.NoError(t, err)
+	require.NotNil(t, p)
+	assert.Equal(t, 2, p.Step)
+	assert.False(t, p.IsExpired())
+}
+
+func TestLoadProgress_NoFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	p, err := LoadProgress()
+	require.NoError(t, err)
+	assert.Nil(t, p)
+}
+
+func TestLoadProgress_InvalidJSON(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Create the config dir and write invalid JSON
+	dir := filepath.Join(tmp, ".config", "autopus")
+	require.NoError(t, os.MkdirAll(dir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".worker-progress.json"), []byte("{{bad"), 0600))
+
+	_, err := LoadProgress()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unmarshal progress")
+}
+
+func TestClearProgress_Actual(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Save and then clear
+	require.NoError(t, SaveProgress(1))
+	p, err := LoadProgress()
+	require.NoError(t, err)
+	require.NotNil(t, p)
+
+	require.NoError(t, ClearProgress())
+	p, err = LoadProgress()
+	require.NoError(t, err)
+	assert.Nil(t, p)
+}
+
+func TestClearProgress_NoFile(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// ClearProgress on nonexistent file should not error
+	err := ClearProgress()
+	require.NoError(t, err)
+}
+
+func TestSaveProgress_ErrorOnReadOnlyDir(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Create config dir then make it read-only
+	dir := filepath.Join(tmp, ".config", "autopus")
+	require.NoError(t, os.MkdirAll(dir, 0700))
+	// Put a directory where the progress file should go
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".worker-progress.json"), 0700))
+
+	err := SaveProgress(1)
+	require.Error(t, err)
+}
+
+func TestSaveAndLoadProgress_Functional(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Save step 5
+	require.NoError(t, SaveProgress(5))
+
+	// Load and verify
+	p, err := LoadProgress()
+	require.NoError(t, err)
+	require.NotNil(t, p)
+	assert.Equal(t, 5, p.Step)
+
+	// Overwrite with step 10
+	require.NoError(t, SaveProgress(10))
+	p, err = LoadProgress()
+	require.NoError(t, err)
+	assert.Equal(t, 10, p.Step)
+}
+
+func TestLoadProgress_ReadError(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	// Create a directory where the file should be (causes read error)
+	dir := filepath.Join(tmp, ".config", "autopus")
+	require.NoError(t, os.MkdirAll(dir, 0700))
+	progDir := filepath.Join(dir, ".worker-progress.json")
+	require.NoError(t, os.MkdirAll(progDir, 0700))
+
+	_, err := LoadProgress()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "read progress")
+}

@@ -184,6 +184,18 @@ func TestWriteMCPConfig_RenameConflict(t *testing.T) {
 	assert.Contains(t, err.Error(), "rename mcp config")
 }
 
+func TestLoadMCPConfig_InvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.json")
+	require.NoError(t, os.WriteFile(path, []byte("not-json"), 0600))
+
+	_, err := LoadMCPConfig(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unmarshal mcp config")
+}
+
 func TestDefaultMCPConfigPath(t *testing.T) {
 	t.Parallel()
 

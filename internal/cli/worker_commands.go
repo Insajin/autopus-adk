@@ -176,7 +176,12 @@ func newWorkerSetupCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Run worker setup wizard",
-		Long:  "3-step setup: Autopus server auth → workspace selection → provider check",
+		Long: `Worker는 Autopus 서버에서 작업을 받아 자동으로 실행하는 백그라운드 서비스입니다.
+
+이 명령어는 3단계 설정 과정을 안내합니다:
+  1. Autopus 서버 인증 (브라우저에서 로그인)
+  2. 워크스페이스 선택
+  3. AI 프로바이더 확인 (Claude, Codex, Gemini)`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runWorkerSetup(cmd, backendURL)
 		},
