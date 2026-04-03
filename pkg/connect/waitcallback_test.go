@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,6 +13,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// freePort returns an available TCP port for testing.
+func freePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+	return port
+}
 
 func TestWaitForCallback_SuccessPath(t *testing.T) {
 	t.Parallel()
@@ -26,7 +37,7 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 	}))
 	defer tokenSrv.Close()
 
-	cfg := OAuthConfig{
+	cfg := OAuthConfig{Port: freePort(t),
 		ClientID: "test-client",
 		TokenURL: tokenSrv.URL,
 		AuthURL:  "https://auth.example.com/authorize",
@@ -91,7 +102,7 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 func TestWaitForCallback_ErrorPath(t *testing.T) {
 	t.Parallel()
 
-	cfg := OAuthConfig{
+	cfg := OAuthConfig{Port: freePort(t),
 		ClientID: "test-client",
 		AuthURL:  "https://auth.example.com/authorize",
 	}
@@ -141,7 +152,7 @@ func TestWaitForCallback_ErrorPath(t *testing.T) {
 func TestWaitForCallback_ContextCancelled(t *testing.T) {
 	t.Parallel()
 
-	cfg := OAuthConfig{
+	cfg := OAuthConfig{Port: freePort(t),
 		ClientID: "test-client",
 		AuthURL:  "https://auth.example.com/authorize",
 	}
@@ -176,7 +187,7 @@ func TestExchangeAuthCode_DefaultsUsed(t *testing.T) {
 func TestStartOAuthFlow_PortIsValid(t *testing.T) {
 	t.Parallel()
 
-	cfg := OAuthConfig{ClientID: "test"}
+	cfg := OAuthConfig{Port: freePort(t),ClientID: "test"}
 
 	results := make([]*OAuthFlowResult, 3)
 	for i := range results {

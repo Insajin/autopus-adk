@@ -36,6 +36,7 @@ type OAuthConfig struct {
 	Scopes   string
 	AuthURL  string
 	TokenURL string
+	Port     int // Callback port. 0 = use default (1455).
 }
 
 // OAuthFlowResult contains the PKCE pair and local server info from StartOAuthFlow.
@@ -93,6 +94,13 @@ func (c OAuthConfig) tokenURL() string {
 	return openAITokenURL
 }
 
+func (c OAuthConfig) port() int {
+	if c.Port > 0 {
+		return c.Port
+	}
+	return openAIPort
+}
+
 // StartOAuthFlow generates PKCE credentials and starts a local callback server.
 // It does NOT open the browser or wait for callback — use WaitForCallback for that.
 func StartOAuthFlow(ctx context.Context, cfg OAuthConfig) (*OAuthFlowResult, error) {
@@ -108,8 +116,8 @@ func StartOAuthFlow(ctx context.Context, cfg OAuthConfig) (*OAuthFlowResult, err
 	}
 	state := base64.RawURLEncoding.EncodeToString(stateBuf)
 
-	// Use fixed port 1455 matching Codex CLI's registered redirect_uri.
-	port := openAIPort
+	// Use configured port, defaulting to 1455 (Codex CLI's registered redirect_uri).
+	port := cfg.port()
 	redirectURI := fmt.Sprintf("http://localhost:%d/auth/callback", port)
 	return &OAuthFlowResult{
 		Verifier:    verifier,
