@@ -11,6 +11,29 @@ import (
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
 )
 
+// apiEnvelope is the standard backend response wrapper: { success, data }.
+type apiEnvelope struct {
+	Success bool            `json:"success"`
+	Data    json.RawMessage `json:"data"`
+}
+
+// unwrapJSON extracts the data field from the standard backend response.
+func unwrapJSON[T any](body []byte) (*T, error) {
+	var env apiEnvelope
+	if err := json.Unmarshal(body, &env); err == nil && env.Data != nil {
+		var result T
+		if err := json.Unmarshal(env.Data, &result); err != nil {
+			return nil, fmt.Errorf("decode data: %w", err)
+		}
+		return &result, nil
+	}
+	var result T
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
 // Workspace represents an Autopus workspace returned by the server.
 type Workspace struct {
 	ID          string `json:"id"`
@@ -141,14 +164,14 @@ func (c *Client) ListWorkspaces(ctx context.Context) ([]Workspace, error) {
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("unauthorized: invalid or expired token")
 	}
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("list workspaces failed (%d): %s", resp.StatusCode, body)
 	}
 
-	var workspaces []Workspace
-	if err := json.NewDecoder(resp.Body).Decode(&workspaces); err != nil {
+	result, err := unwrapJSON[[]Workspace](body)
+	if err != nil {
 		return nil, fmt.Errorf("decode workspaces: %w", err)
 	}
-	return workspaces, nil
+	return *result, nil
 }

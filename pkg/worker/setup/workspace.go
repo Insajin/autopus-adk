@@ -1,7 +1,6 @@
 package setup
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -30,16 +29,16 @@ func FetchWorkspaces(backendURL, token string) ([]Workspace, error) {
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("fetch workspaces failed (%d): %s", resp.StatusCode, body)
 	}
 
-	var workspaces []Workspace
-	if err := json.NewDecoder(resp.Body).Decode(&workspaces); err != nil {
+	result, err := unwrap[[]Workspace](body)
+	if err != nil {
 		return nil, fmt.Errorf("decode workspaces: %w", err)
 	}
-	return workspaces, nil
+	return *result, nil
 }
 
 // SelectWorkspace picks the workspace to use. Auto-selects if only one is available.

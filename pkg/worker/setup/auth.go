@@ -241,15 +241,16 @@ func RefreshToken(ctx context.Context, backendURL, refreshToken string) (*TokenR
 	}
 	defer resp.Body.Close()
 
+	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("refresh failed: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("refresh failed (%d): %s", resp.StatusCode, respBody)
 	}
 
-	var token TokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
+	token, err := unwrap[TokenResponse](respBody)
+	if err != nil {
 		return nil, fmt.Errorf("decode refresh response: %w", err)
 	}
-	return &token, nil
+	return token, nil
 }
 
 // OpenBrowser opens the given URL in the default browser.
