@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
+	"github.com/insajin/autopus-adk/pkg/worker/budget"
+	"github.com/insajin/autopus-adk/pkg/worker/compress"
 	"github.com/insajin/autopus-adk/pkg/worker/stream"
 )
 
@@ -28,15 +30,18 @@ type PhaseResult struct {
 	CostUSD    float64
 	DurationMS int64
 	SessionID  string
+	ToolCalls  int // number of tool calls made during this phase
 }
 
 // PipelineExecutor spawns separate subprocesses for each phase:
 // planner -> executor(s) -> tester -> reviewer.
 // Triggered when a single --print execution exceeds the context window.
 type PipelineExecutor struct {
-	provider  adapter.ProviderAdapter
-	mcpConfig string
-	workDir   string
+	provider   adapter.ProviderAdapter
+	mcpConfig  string
+	workDir    string
+	allocator  *budget.PhaseAllocator    // nil if budget not configured
+	compressor compress.ContextCompressor // nil if compression not configured
 }
 
 // NewPipelineExecutor creates a new PipelineExecutor.
@@ -46,6 +51,16 @@ func NewPipelineExecutor(provider adapter.ProviderAdapter, mcpConfig, workDir st
 		mcpConfig: mcpConfig,
 		workDir:   workDir,
 	}
+}
+
+// SetBudget configures per-phase budget allocation for the pipeline.
+func (pe *PipelineExecutor) SetBudget(total int, alloc budget.PhaseAllocation) {
+	pe.allocator = budget.NewPhaseAllocator(total, alloc)
+}
+
+// SetCompressor configures context compression for phase transitions.
+func (pe *PipelineExecutor) SetCompressor(c compress.ContextCompressor) {
+	pe.compressor = c
 }
 
 // Execute runs the full pipeline: planner → executor(s) → tester → reviewer.
@@ -76,6 +91,12 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, taskID, prompt string) 
 		default:
 		}
 
+		// Log phase budget if allocator is configured (REQ-BUDGET-09).
+		if pe.allocator != nil {
+			limit := pe.allocator.PhaseLimit(string(p.phase))
+			log.Printf("[pipeline] phase %s budget: %d tool calls", p.phase, limit)
+		}
+
 		phasePrompt := p.promptFunc(prevOutput)
 		pr, err := pe.runPhase(ctx, taskID, p.phase, phasePrompt)
 		if err != nil {
@@ -83,10 +104,23 @@ func (pe *PipelineExecutor) Execute(ctx context.Context, taskID, prompt string) 
 			return adapter.TaskResult{}, fmt.Errorf("phase %s: %w", p.phase, err)
 		}
 
+		// Record phase completion for budget carry-over (REQ-BUDGET-10).
+		if pe.allocator != nil {
+			pe.allocator.CompletePhase(string(p.phase), pr.ToolCalls)
+			log.Printf("[pipeline] phase %s used %d tool calls, remaining total: %d",
+				p.phase, pr.ToolCalls, pe.allocator.TotalRemaining())
+		}
+
 		results = append(results, pr)
 		totalCost += pr.CostUSD
 		totalDuration += pr.DurationMS
-		prevOutput = pr.Output
+
+		// Compress phase output before passing to next phase (REQ-COMP-001).
+		if pe.compressor != nil {
+			prevOutput = pe.compressor.Compress(string(p.phase), pr.Output, pe.provider.Name())
+		} else {
+			prevOutput = pr.Output
+		}
 
 		log.Printf("[pipeline] phase %s completed: cost=$%.4f duration=%dms", p.phase, pr.CostUSD, pr.DurationMS)
 	}
@@ -143,6 +177,7 @@ func (pe *PipelineExecutor) runPhase(ctx context.Context, taskID string, phase P
 }
 
 // parsePhaseStream reads subprocess stdout and extracts the phase result.
+// Counts tool_call and tool_use events for budget tracking.
 func (pe *PipelineExecutor) parsePhaseStream(r io.Reader, phase Phase) (PhaseResult, error) {
 	parser := stream.NewParser(r)
 	var result PhaseResult
@@ -156,6 +191,11 @@ func (pe *PipelineExecutor) parsePhaseStream(r io.Reader, phase Phase) (PhaseRes
 		}
 		if err != nil {
 			return PhaseResult{}, err
+		}
+
+		// Count tool calls for budget tracking (REQ-BUDGET-05).
+		if evt.Type == stream.EventToolCall || evt.Type == "tool_use" {
+			result.ToolCalls++
 		}
 
 		if evt.Type == "result" {
