@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -22,7 +21,8 @@ const (
 	openAIAuthURL  = "https://auth.openai.com/oauth/authorize"
 	openAITokenURL = "https://auth.openai.com/oauth/token"
 	openAIClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
-	openAIScopes   = "openid profile email offline_access"
+	openAIScopes   = "openid profile email offline_access api.connectors.read api.connectors.invoke"
+	openAIPort     = 1455
 	// @AX:NOTE [AUTO] @AX:REASON: 5-minute timeout for OAuth flow — user must complete browser auth within this window
 	oauthTimeout = 5 * time.Minute
 )
@@ -108,14 +108,8 @@ func StartOAuthFlow(ctx context.Context, cfg OAuthConfig) (*OAuthFlowResult, err
 	}
 	state := base64.RawURLEncoding.EncodeToString(stateBuf)
 
-	// Bind to loopback only to prevent external network access.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return nil, fmt.Errorf("listen on random port: %w", err)
-	}
-	port := ln.Addr().(*net.TCPAddr).Port
-	_ = ln.Close()
-
+	// Use fixed port 1455 matching Codex CLI's registered redirect_uri.
+	port := openAIPort
 	redirectURI := fmt.Sprintf("http://localhost:%d/auth/callback", port)
 	return &OAuthFlowResult{
 		Verifier:    verifier,
@@ -231,13 +225,14 @@ func ExchangeAuthCode(ctx context.Context, req CallbackRequest) (*OAuthResult, e
 
 func buildAuthorizeURL(cfg OAuthConfig, flow *OAuthFlowResult) string {
 	params := url.Values{
-		"client_id":             {cfg.clientID()},
-		"redirect_uri":          {flow.RedirectURI},
-		"response_type":         {"code"},
-		"code_challenge":        {flow.Challenge},
-		"code_challenge_method": {"S256"},
-		"scope":                 {cfg.scopes()},
-		"state":                 {flow.State},
+		"client_id":                  {cfg.clientID()},
+		"redirect_uri":              {flow.RedirectURI},
+		"response_type":             {"code"},
+		"code_challenge":            {flow.Challenge},
+		"code_challenge_method":     {"S256"},
+		"scope":                     {cfg.scopes()},
+		"state":                     {flow.State},
+		"codex_cli_simplified_flow": {"true"},
 	}
 	return cfg.authURL() + "?" + params.Encode()
 }
