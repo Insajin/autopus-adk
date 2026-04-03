@@ -126,73 +126,100 @@ func PollForToken(ctx context.Context, backendURL, deviceCode, codeVerifier stri
 	if interval <= 0 {
 		interval = 5
 	}
-	ticker := time.NewTicker(time.Duration(interval) * time.Second)
-	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-ticker.C:
-			token, pending, err := tryTokenExchange(endpoint, deviceCode, codeVerifier)
-			if err != nil {
-				return nil, err
-			}
-			if pending {
-				continue
-			}
+		default:
+		}
+
+		time.Sleep(time.Duration(interval) * time.Second)
+
+		token, status, err := tryTokenExchange(endpoint, deviceCode, codeVerifier)
+		if err != nil {
+			return nil, err
+		}
+		switch status {
+		case pollPending:
+			continue
+		case pollSlowDown:
+			interval += 5 // RFC 8628: increase interval by 5 seconds
+			continue
+		case pollDone:
 			return token, nil
 		}
 	}
 }
 
+type pollStatus int
+
+const (
+	pollDone     pollStatus = iota
+	pollPending             // authorization_pending — keep polling
+	pollSlowDown            // slow_down — increase interval (RFC 8628 §3.5)
+)
+
 // tryTokenExchange attempts a single token exchange request.
-func tryTokenExchange(endpoint, deviceCode, codeVerifier string) (*TokenResponse, bool, error) {
+func tryTokenExchange(endpoint, deviceCode, codeVerifier string) (*TokenResponse, pollStatus, error) {
 	payload := map[string]string{
 		"device_code":   deviceCode,
 		"code_verifier": codeVerifier,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, false, fmt.Errorf("marshal token request: %w", err)
+		return nil, pollDone, fmt.Errorf("marshal token request: %w", err)
 	}
 
 	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(body))
 	if err != nil {
-		return nil, false, fmt.Errorf("poll token: %w", err)
+		return nil, pollDone, fmt.Errorf("poll token: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
 
-	if resp.StatusCode == http.StatusBadRequest {
-		// Check both wrapped and unwrapped error formats.
-		var errResp struct {
-			Error string `json:"error"`
-		}
-		if json.Unmarshal(respBody, &errResp) == nil && errResp.Error == "authorization_pending" {
-			return nil, true, nil
-		}
-		// Check wrapped error: { success: false, error: { code: "authorization_pending" } }
-		var wrappedErr struct {
-			Error struct {
-				Code string `json:"code"`
-			} `json:"error"`
-		}
-		if json.Unmarshal(respBody, &wrappedErr) == nil && wrappedErr.Error.Code == "authorization_pending" {
-			return nil, true, nil
+	if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusTooManyRequests {
+		code := extractErrorCode(respBody)
+		switch code {
+		case "authorization_pending":
+			return nil, pollPending, nil
+		case "slow_down":
+			return nil, pollSlowDown, nil
 		}
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, false, fmt.Errorf("token request failed (%d): %s", resp.StatusCode, respBody)
+		return nil, pollDone, fmt.Errorf("token request failed (%d): %s", resp.StatusCode, respBody)
 	}
 
 	token, err := unwrap[TokenResponse](respBody)
 	if err != nil {
-		return nil, false, fmt.Errorf("decode token response: %w", err)
+		return nil, pollDone, fmt.Errorf("decode token response: %w", err)
 	}
-	return token, false, nil
+	return token, pollDone, nil
+}
+
+// extractErrorCode tries both unwrapped { "error": "code" } and
+// wrapped { "error": { "code": "code" } } formats.
+func extractErrorCode(body []byte) string {
+	// Unwrapped: { "error": "authorization_pending" }
+	var plain struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(body, &plain) == nil && plain.Error != "" {
+		return plain.Error
+	}
+	// Wrapped: { "error": { "code": "authorization_pending" } }
+	var wrapped struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(body, &wrapped) == nil && wrapped.Error.Code != "" {
+		return wrapped.Error.Code
+	}
+	return ""
 }
 
 // RefreshToken exchanges a refresh token for a new access token via the backend.
