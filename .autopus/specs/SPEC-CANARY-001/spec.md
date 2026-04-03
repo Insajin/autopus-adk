@@ -1,6 +1,6 @@
 # SPEC-CANARY-001: Post-deploy Health Check (canary 서브커맨드)
 
-**Status**: draft
+**Status**: completed
 **Created**: 2026-04-03
 **Domain**: CANARY
 **Target Version**: v0.15
@@ -45,6 +45,12 @@ WHEN the `/auto` router processes the `canary` subcommand, THE SYSTEM SHALL rout
 
 ### R9: sync 이후 안내
 WHEN `/auto sync` completes successfully, THE SYSTEM SHALL suggest `/auto canary` as the next step in the workflow.
+
+### R10: canary.md 자동 생성 (setup)
+WHEN `/auto setup` runs, THE SYSTEM SHALL analyze the project to auto-generate `.autopus/project/canary.md` containing: build command, health check endpoints, browser targets, deploy platform. Detection sources: Dockerfile, railway.json/vercel.json/fly.toml, HTTP handler patterns, k8s manifests, CI/CD workflows, package.json scripts.
+
+### R11: canary.md 자동 갱신 (sync)
+WHEN `/auto sync` runs, THE SYSTEM SHALL update `.autopus/project/canary.md` to reflect new handlers, pages, deploy config changes detected since the last sync.
 
 ## 생성 파일 상세
 

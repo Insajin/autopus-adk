@@ -1,0 +1,37 @@
+---
+description: "배포 후 건강 검진 — 빌드 검증, E2E 시나리오, 브라우저 건강 검사를 자동 실행합니다"
+---
+
+# auto-canary — Post-deploy Health Check
+
+**프로젝트**: {{.ProjectName}} | **모드**: {{.Mode}}
+
+## 사용법
+
+배포 후 건강 검진을 실행합니다. 빌드, E2E, 브라우저 검사를 순서대로 수행하고 PASS/WARN/FAIL 판정을 내립니다.
+
+## 절차
+
+1. 빌드 검증 (tech.md 또는 scenarios.md의 Build 커맨드)
+2. E2E 시나리오 실행 (scenarios.md의 active 시나리오)
+3. 브라우저 건강 검진 (--url 또는 프론트엔드 프로젝트 감지)
+4. PASS/WARN/FAIL 판정
+5. 결과 저장 (.autopus/canary/latest.json)
+
+## 플래그
+
+- `--url <url>`: 브라우저 검진 대상 URL
+- `--watch <interval>`: 주기적 반복 (기본 5m, 최대 30m)
+- `--compare <commit>`: 이전 커밋 결과와 비교
+
+## 판정 기준
+
+- **PASS**: 빌드 OK + 전체 E2E 통과 + 콘솔 에러 없음
+- **WARN**: 빌드 OK + 일부 E2E 실패 또는 비치명적 콘솔 경고
+- **FAIL**: 빌드 실패 또는 치명적 E2E 실패 또는 치명적 콘솔 에러
+
+## 규칙
+
+- 빌드 실패 시 나머지 단계 스킵
+- scenarios.md 없으면 E2E 스킵 + `/auto setup` 안내
+- 파일 크기 제한: 소스 파일 300줄 이하
