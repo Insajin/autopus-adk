@@ -109,7 +109,7 @@ This step is OPTIONAL if the text-based signals are unambiguous. Skip if `--auto
 | **IDEA** | Exploratory question; "고민", "어떻게 하면", "가능할까"; feasibility check; brainstorm; no clear implementation target | `/auto idea "{desc}"` — brainstorm and evaluate |
 | **LOW** | Single file change; bug fix with known location; config/doc edit; ≤ 1 package affected | `/auto fix "{desc}"` — direct fix, no SPEC |
 | **MEDIUM** | 2-3 files; existing feature extension; single-package refactor; test additions | `/auto plan "{desc}" --skip-prd` — SPEC only, no PRD |
-| **HIGH** | 3+ files across packages; new feature/module; API design; architecture change; multi-domain impact | `/auto plan "{desc}"` — full PRD + SPEC pipeline |
+| **HIGH** | 3+ files across packages; new feature/module; API design; architecture change; multi-domain impact | `/auto idea "{desc}" --multi` — multi-provider brainstorm → ICE 검증 → plan 체이닝 |
 | **CRITICAL** | Security vulnerability; urgent production fix | `/auto fix "{desc}"` + recommend `/auto secure` after |
 
 #### Step 4: Triage Display and Confirmation
@@ -139,7 +139,7 @@ AskUserQuestion(
     header: "Triage",
     multiSelect: false,
     options: [
-      { label: "아이디어 탐색", description: "/auto idea — 브레인스토밍 및 타당성 분석" },
+      { label: "아이디어 탐색", description: "/auto idea --multi — 멀티 프로바이더 브레인스토밍 + ICE 검증" },
       { label: "바로 수정", description: "/auto fix — SPEC 없이 직접 수정" },
       { label: "SPEC만 생성", description: "/auto plan --skip-prd — PRD 생략, SPEC만 작성" },
       { label: "PRD + SPEC 전체", description: "/auto plan — PRD 작성 후 SPEC 생성" }
@@ -150,6 +150,8 @@ AskUserQuestion(
 
 Adjust the recommended option (add "(Recommended)" suffix) based on the difficulty classification. Place the recommended option FIRST in the options list.
 
+**HIGH difficulty routing**: WHEN difficulty is HIGH, THE SYSTEM SHALL place "아이디어 탐색" as the FIRST option with "(Recommended)" suffix. The rationale: HIGH-impact features should pass through multi-provider brainstorm and ICE validation before committing to a SPEC. This serves as an upstream decision gate — "이게 정말 만들 가치가 있는가?" — preventing premature SPEC creation for ideas that haven't been validated.
+
 WHEN `--auto` IS set, display triage result and auto-proceed:
 
 ```
@@ -157,6 +159,8 @@ WHEN `--auto` IS set, display triage result and auto-proceed:
   요청: "{request}"
   난이도: {level} → {flow} (자동 진행)
 ```
+
+**`--auto` HIGH routing**: WHEN `--auto` AND difficulty is HIGH, THE SYSTEM SHALL auto-proceed with `/auto idea "{desc}" --multi --auto` (which auto-chains to `/auto plan --from-idea BS-{ID}` via idea's `--auto` flag). This ensures HIGH-impact features always pass through the upstream decision gate even in autonomous mode.
 
 #### Triage Override
 
@@ -176,44 +180,45 @@ When displaying the subcommand list (empty `/auto` invocation), use the categori
 
 | Subcommand | Description |
 |-----------|-------------|
-| idea | Brainstorm and evaluate ideas |
+| idea ⚡ | Brainstorm and evaluate ideas |
 | plan | Write a SPEC |
 | go | Implement a SPEC |
 | sync | Synchronize documentation |
-| fix | Fix a bug |
+| fix ⚡ | Fix a bug (no SPEC needed) |
 | dev | Full cycle: plan → go → sync |
 
-**품질 & 리뷰**
+**품질 & 리뷰** ⚡ = SPEC 없이 독립 실행 가능
 
 | Subcommand | Description |
 |-----------|-------------|
-| review | Code review |
+| review ⚡ | Code review (TRUST 5 criteria) |
 | spec review | SPEC multi-provider review |
-| secure | Security audit |
-| stale | Detect stale decisions |
-| verify | Frontend UX verification |
-| browse | Browser automation (cmux/agent-browser auto-detect) |
+| secure ⚡ | Security audit (OWASP Top 10) |
+| stale ⚡ | Detect stale decisions |
+| verify ⚡ | Frontend UX verification |
+| browse ⚡ | Browser automation (cmux/agent-browser auto-detect) |
 | test | Run E2E scenarios |
 
-**탐색 & 분석**
+**탐색 & 분석** ⚡ = 독립 실행 가능
 
 | Subcommand | Description |
 |-----------|-------------|
-| map | Analyze codebase structure |
-| why | Query decision rationale |
-| status | SPEC dashboard |
+| map ⚡ | Analyze codebase structure |
+| why ⚡ | Query decision rationale |
+| status ⚡ | SPEC dashboard |
 
 **관리**
 
 | Subcommand | Description |
 |-----------|-------------|
-| setup | Generate project context |
+| setup ⚡ | Generate project context — **첫 사용 시 추천** |
 | init | Initialize harness |
 | update | Update harness |
-| doctor | Health diagnostics |
+| doctor ⚡ | Health diagnostics |
 | platform | Platform management |
 
 > 자연어로 작업을 설명하면 난이도를 자동 분석하여 적절한 플로우를 추천합니다.
+> ⚡ 표시된 커맨드는 SPEC이나 파이프라인 없이 바로 사용할 수 있습니다.
 
 ---
 
@@ -387,6 +392,36 @@ Project context documents have been generated/updated.
 - .autopus/project/scenarios.md (E2E test scenarios)
 Context will be loaded automatically on the next session.
 ```
+
+### [REQUIRED] First Win Guidance (Post-Completion)
+
+AFTER the completion message, THE SYSTEM SHALL display project-state-aware "next action" recommendations to help the user experience immediate value. Analyze the generated context docs and current project state:
+
+```
+🐙 바로 해볼 수 있는 것 ──────────────
+```
+
+**Recommendation logic:**
+
+1. **Always show** (파이프라인 불필요, 독립 실행):
+   - `/auto review` — "현재 코드의 품질을 TRUST 5 기준으로 검토"
+   - `/auto secure` — "보안 취약점 스캔 (OWASP Top 10)"
+   - `/auto map` — "코드베이스 구조 및 의존성 시각화"
+
+2. **Show if issues detected** (setup 분석 중 발견된 경우):
+   - Test coverage gaps → `/auto fix "테스트 커버리지 개선"`
+   - Stale patterns → `/auto stale`
+
+3. **Show if idea-stage** (새 프로젝트 or 빈 SPEC):
+   - `/auto idea "..." --multi` — "새 기능 아이디어를 멀티 프로바이더로 브레인스토밍"
+
+4. **Show if SPECs exist** (기존 프로젝트):
+   - `/auto status` — "SPEC 현황 대시보드"
+   - `/auto go {SPEC-ID}` — "대기 중인 SPEC 구현 시작"
+
+Display max 3 recommendations, most relevant first. Each with a one-line description of what the user will get.
+
+**Rationale**: Setup alone produces documents (indirect value). The First Win guidance bridges to actions that deliver direct value — a reviewed codebase, a discovered vulnerability, a visualized architecture. This turns "문서가 생겼다" into "이걸로 바로 뭔가 할 수 있구나".
 
 ---
 
