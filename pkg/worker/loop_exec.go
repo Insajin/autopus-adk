@@ -58,7 +58,9 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 	startTime := time.Now()
 
 	// Record task start in the audit log.
-	_ = writeAuditEvent(wl.auditWriter, newAuditStartedEvent(taskID))
+	if wl.auditWriter != nil {
+		writeResilientAuditEvent(wl.auditWriter, newAuditStartedEvent(taskID, taskCfg.ComputerUse), wl.auditLogger)
+	}
 
 	// Acquire a semaphore slot when parallel execution is configured.
 	// This blocks until a slot is available or ctx is cancelled.
@@ -91,10 +93,14 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 
 	// Record completion or failure in the audit log.
 	if err != nil {
-		_ = writeAuditEvent(wl.auditWriter, newAuditFailedEvent(taskID, durationMS))
+		if wl.auditWriter != nil {
+			writeResilientAuditEvent(wl.auditWriter, newAuditFailedEvent(taskID, durationMS, taskCfg.ComputerUse), wl.auditLogger)
+		}
 		return result, err
 	}
-	_ = writeAuditEvent(wl.auditWriter, newAuditCompletedEvent(taskID, durationMS, result.CostUSD))
+	if wl.auditWriter != nil {
+		writeResilientAuditEvent(wl.auditWriter, newAuditCompletedEvent(taskID, durationMS, result.CostUSD, taskCfg.ComputerUse), wl.auditLogger)
+	}
 
 	return result, nil
 }

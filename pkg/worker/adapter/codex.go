@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os/exec"
 )
 
@@ -33,6 +34,11 @@ func (a *CodexAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.
 
 	if task.Model != "" {
 		args = append(args, "-m", task.Model)
+	}
+
+	if task.ComputerUse {
+		slog.Warn("computer_use not supported by codex provider, ignoring",
+			"task_id", task.TaskID)
 	}
 
 	cmd := exec.CommandContext(ctx, "codex", args...)

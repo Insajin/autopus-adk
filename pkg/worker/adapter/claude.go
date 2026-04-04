@@ -42,6 +42,10 @@ func (a *ClaudeAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 		args = append(args, "--model", task.Model)
 	}
 
+	if task.ComputerUse {
+		args = append(args, "--computer-use")
+	}
+
 	cmd := exec.CommandContext(ctx, "claude", args...)
 	cmd.Dir = task.WorkDir
 

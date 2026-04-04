@@ -26,7 +26,8 @@ type TaskConfig struct {
 	MCPConfig string            // path to worker-mcp.json
 	WorkDir   string            // working directory for subprocess
 	EnvVars   map[string]string // additional env vars
-	Model     string            // provider-specific model override
+	Model       string            // provider-specific model override
+	ComputerUse bool              // enable computer use for this task
 }
 
 // StreamEvent represents a parsed event from subprocess output.

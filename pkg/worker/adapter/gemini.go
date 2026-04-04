@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os/exec"
 )
 
@@ -36,6 +37,11 @@ func (a *GeminiAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 
 	if task.Model != "" {
 		args = append(args, "--model", task.Model)
+	}
+
+	if task.ComputerUse {
+		slog.Warn("computer_use not supported by gemini provider, ignoring",
+			"task_id", task.TaskID)
 	}
 
 	cmd := exec.CommandContext(ctx, "gemini", args...)

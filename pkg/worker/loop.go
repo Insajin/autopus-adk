@@ -60,12 +60,14 @@ type WorkerLoop struct {
 	knowledgeWatcher  *knowledge.FileWatcher
 	semaphore         *parallel.TaskSemaphore
 	worktreeManager   *parallel.WorktreeManager
+	auditLogger       *slogAuditLogger
 }
 
 // NewWorkerLoop creates a WorkerLoop with the given configuration.
 func NewWorkerLoop(config LoopConfig) *WorkerLoop {
 	wl := &WorkerLoop{
-		config: config,
+		config:      config,
+		auditLogger: newSlogAuditLogger(3),
 	}
 
 	serverCfg := a2a.ServerConfig{
