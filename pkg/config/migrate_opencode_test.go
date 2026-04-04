@@ -40,7 +40,7 @@ func TestMigrateOrchestraConfig_OpencodeToCodex(t *testing.T) {
 	codex, hasCodex := cfg.Orchestra.Providers["codex"]
 	require.True(t, hasCodex, "codex provider must exist after migration")
 	assert.Equal(t, "codex", codex.Binary, "codex binary must be 'codex'")
-	assert.Equal(t, []string{"exec", "--approval-mode", "full-auto", "--quiet", "-m", "gpt-5.4"}, codex.Args)
+	assert.Equal(t, []string{"exec", "--full-auto", "-m", "gpt-5.4"}, codex.Args)
 	assert.False(t, codex.PromptViaArgs, "codex PromptViaArgs must be false")
 
 	// Commands must reference codex instead of opencode.

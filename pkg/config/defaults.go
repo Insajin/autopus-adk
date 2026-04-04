@@ -67,7 +67,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Providers: map[string]ProviderEntry{
 				"claude":   {Binary: "claude", Args: []string{"--print"}, PaneArgs: []string{"--print"}},
 				"gemini":   {Binary: "gemini", Args: []string{}, PaneArgs: []string{}, PromptViaArgs: true},
-				"codex": {Binary: "codex", Args: []string{"exec", "--approval-mode", "full-auto", "--quiet", "-m", "gpt-5.4"}, PaneArgs: []string{"-m", "gpt-5.4"}, PromptViaArgs: false},
+				"codex": {Binary: "codex", Args: []string{"exec", "--full-auto", "-m", "gpt-5.4"}, PaneArgs: []string{"-m", "gpt-5.4"}, PromptViaArgs: false},
 			},
 			Commands: map[string]CommandEntry{
 				"review":     {Strategy: "debate", Providers: []string{"claude", "codex", "gemini"}},

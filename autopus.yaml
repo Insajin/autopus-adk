@@ -72,9 +72,10 @@ orchestra:
         gemini:
             binary: gemini
             args: [-m, gemini-3.1-pro-preview]
+            prompt_via_args: true
         codex:
             binary: codex
-            args: [exec, --approval-mode, full-auto, --quiet, -m, gpt-5.4]
+            args: [exec, --full-auto, -m, gpt-5.4]
             pane_args: [-m, gpt-5.4]
             interactive_input: sendkeys
     commands:

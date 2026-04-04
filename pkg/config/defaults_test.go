@@ -88,7 +88,7 @@ func TestDefaultFullConfig_CodexPromptViaArgs(t *testing.T) {
 	codex, ok := cfg.Orchestra.Providers["codex"]
 	require.True(t, ok, "codex provider must exist in default full config")
 	assert.False(t, codex.PromptViaArgs, "codex provider must have PromptViaArgs=false")
-	assert.Equal(t, []string{"exec", "--approval-mode", "full-auto", "--quiet", "-m", "gpt-5.4"}, codex.Args,
+	assert.Equal(t, []string{"exec", "--full-auto", "-m", "gpt-5.4"}, codex.Args,
 		"codex provider must have correct exec-mode args")
 }
 
