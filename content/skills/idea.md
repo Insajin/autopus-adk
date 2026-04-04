@@ -91,6 +91,23 @@ Outcome (목표)
 
 가장 위험한 가정(높은 Impact × 높은 Uncertainty)을 상위 3개 식별합니다.
 
+### ⛔ 2-Round Debate Enforcement (HARD REQUIREMENT)
+
+IMPORTANT: 멀티 프로바이더 아이디어 토론은 **반드시 2라운드**를 완료해야 합니다. 이 규칙은 절대 위반할 수 없습니다.
+
+**위반 탐지 체크리스트** (Step 4 진입 전 메인 세션이 반드시 확인):
+
+- [ ] Round 1 실행됨: 각 프로바이더/분석자가 독립적으로 발산 (Step 3 완료)
+- [ ] Round 2 실행됨: 각 프로바이더/분석자가 다른 참가자의 Round 1 결과를 읽고 인정/통합/리스크 3단계로 응답 (Step 3.5-3.6 완료)
+- [ ] Round 2 결과 수집됨: 모든 프로바이더의 Round 2 응답이 수집됨 (Step 3.6 완료)
+
+WHEN 위 체크리스트의 어느 항목이라도 미완료 상태에서 Step 4(Judge)로 진행하려 하면:
+- **HARD BLOCK**: Step 4 진입을 차단하고, 누락된 단계로 되돌아감
+- Round 1만 완료하고 Round 2를 건너뛰는 것은 **명시적으로 금지**됨
+- Fallback 모드(orchestra 실패 시 Agent 기반 토론)에서도 2라운드 의무는 동일하게 적용
+
+**Why**: Round 1만으로는 각 분석자가 자기 관점에만 갇힘. Round 2 교차 수분(cross-pollination)이 품질 향상의 핵심 — MAD 연구에서 one-shot revision이 대부분의 품질 향상을 가져옴.
+
 ### [REQUIRED] Step 3: Orchestra Round 1 (MUST call Bash tool)
 
 IMPORTANT: 이 단계는 반드시 Bash 툴로 CLI를 실행해야 합니다. Sequential Thinking이나 단일 모델 시뮬레이션으로 대체 금지.
@@ -212,6 +229,26 @@ cmux close-surface --surface "{surface_id}"
 모든 프로바이더 pane을 닫습니다.
 
 > **⏭ POST-STEP**: Pane 정리 후 Step 4로 진행.
+
+### ⛔ Pre-Step 4 Gate: 2-Round Completion Verification
+
+BEFORE proceeding to Step 4, THE SYSTEM SHALL verify the 2-Round Debate Enforcement checklist:
+
+```
+IF Round_1_completed == false:
+  → HARD BLOCK: "Step 3 미완료. Round 1을 먼저 실행하세요."
+  → Return to Step 3
+
+IF Round_2_completed == false:
+  → HARD BLOCK: "Step 3.5-3.6 미완료. Round 2 교차 수분을 먼저 실행하세요."
+  → Return to Step 3.5
+
+IF Round_2_results_collected == false:
+  → HARD BLOCK: "Round 2 결과 미수집. Step 3.6을 완료하세요."
+  → Return to Step 3.6
+```
+
+이 게이트를 통과하지 못하면 Step 4로 진입할 수 없습니다. `--auto` 모드에서도 예외 없음.
 
 ### [REQUIRED] Step 4: Blind Synthesis Judge (MUST call Agent tool)
 
