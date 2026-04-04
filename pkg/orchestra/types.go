@@ -111,8 +111,8 @@ type CompletionPattern struct {
 func DefaultCompletionPatterns() []CompletionPattern {
 	return []CompletionPattern{
 		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯\s*$`)},
-		{Provider: "codex", Pattern: regexp.MustCompile(`(?m)^codex>\s*$`)},
-		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s+(Type your|@)`)},
+		{Provider: "codex", Pattern: regexp.MustCompile(`(?im)^codex>\s*$`)},
+		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`)},
 		{Provider: "opencode", Pattern: regexp.MustCompile(`(?m)Ask anything`)},
 	}
 }

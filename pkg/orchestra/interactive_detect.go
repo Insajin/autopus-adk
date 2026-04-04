@@ -24,21 +24,21 @@ func stripANSI(s string) string {
 // defaultPromptPatterns matches common shell and CLI prompts.
 // @AX:NOTE [AUTO] hardcoded prompt regexes — must stay in sync with DefaultCompletionPatterns
 var defaultPromptPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)Ask anything`),        // opencode TUI input placeholder
-	regexp.MustCompile(`(?m)^❯\s*$`),              // claude code prompt (unicode heavy right-pointing angle)
-	regexp.MustCompile(`(?m)^\s*>\s+(Type your|@)`), // gemini TUI prompt (> Type your message...)
-	regexp.MustCompile(`(?m)^codex>\s*$`),         // codex prompt (legacy)
-	regexp.MustCompile(`(?m)^\$\s*$`),             // shell $ prompt
-	regexp.MustCompile(`(?m)^#\s*$`),              // root # prompt
+	regexp.MustCompile(`(?m)Ask anything`),              // opencode TUI input placeholder
+	regexp.MustCompile(`(?m)^❯\s*$`),                    // claude code prompt (unicode heavy right-pointing angle)
+	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`), // gemini TUI prompt (> Type your..., > @, bare >)
+	regexp.MustCompile(`(?im)^codex>\s*$`),              // codex prompt (case-insensitive)
+	regexp.MustCompile(`(?m)^\$\s*$`),                   // shell $ prompt
+	regexp.MustCompile(`(?m)^#\s*$`),                    // root # prompt
 }
 
 // sessionReadyPromptPatterns matches CLI-specific prompts WITHOUT shell patterns ($ and #).
 // Used by waitForSessionReady to avoid premature detection on bare shell prompts.
 var sessionReadyPromptPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)Ask anything`),          // opencode TUI input placeholder
-	regexp.MustCompile(`(?m)^❯\s*$`),                // claude code prompt (unicode heavy right-pointing angle)
-	regexp.MustCompile(`(?m)^\s*>\s+(Type your|@)`),  // gemini TUI prompt
-	regexp.MustCompile(`(?m)^codex>\s*$`),           // codex prompt (legacy)
+	regexp.MustCompile(`(?m)Ask anything`),              // opencode TUI input placeholder
+	regexp.MustCompile(`(?m)^❯\s*$`),                    // claude code prompt (unicode heavy right-pointing angle)
+	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`), // gemini TUI prompt (> Type your..., > @, bare >)
+	regexp.MustCompile(`(?im)^codex>\s*$`),              // codex prompt (case-insensitive)
 	// NOTE: no shell $ or # patterns — this is the key difference from defaultPromptPatterns
 }
 
@@ -48,8 +48,8 @@ var sessionReadyPromptPatterns = []*regexp.Regexp{
 func SessionReadyPatterns() []CompletionPattern {
 	return []CompletionPattern{
 		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯\s*$`)},
-		{Provider: "codex", Pattern: regexp.MustCompile(`(?m)^codex>\s*$`)},
-		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s+(Type your|@)`)},
+		{Provider: "codex", Pattern: regexp.MustCompile(`(?im)^codex>\s*$`)},
+		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`)},
 		{Provider: "opencode", Pattern: regexp.MustCompile(`(?m)Ask anything`)},
 	}
 }

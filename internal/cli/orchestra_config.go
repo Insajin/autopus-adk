@@ -149,6 +149,8 @@ func resolveWorkingPatterns(providerName string, configured []string) []string {
 	switch providerName {
 	case "gemini":
 		return []string{"⠴", "⠧", "⠋", "⠙", "⠹", "⠸", "⠼", "Generating", "Thinking"}
+	case "codex":
+		return []string{"Thinking", "Generating", "Running", "Executing"}
 	default:
 		return nil
 	}

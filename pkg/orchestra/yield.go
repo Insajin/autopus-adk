@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 )
 
 // YieldOutput is the JSON structure output by --yield-rounds mode.
@@ -75,6 +76,9 @@ func BuildYieldOutput(cfg OrchestraConfig, panes []paneInfo, roundHistory [][]Pr
 	for i, responses := range roundHistory {
 		yr := YieldRound{Round: i + 1}
 		for _, r := range responses {
+			if r.Output == "" && !r.TimedOut {
+				log.Printf("[yield] WARNING: provider %s returned empty output (not timed out) — completion detection may have fired prematurely", r.Provider)
+			}
 			yr.Responses = append(yr.Responses, YieldResponse{
 				Provider:   r.Provider,
 				Output:     r.Output,
