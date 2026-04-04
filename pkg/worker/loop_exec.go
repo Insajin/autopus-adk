@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/budget"
@@ -47,6 +48,55 @@ func (sw *StdinWriter) Close() error {
 type BudgetConfig struct {
 	Budget        budget.IterationBudget
 	EmergencyStop *security.EmergencyStop
+}
+
+// executeWithParallel wraps executeSubprocess with semaphore gating, worktree
+// isolation, and audit event recording. It is the primary execution entry point
+// called from handleTask.
+func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.TaskConfig) (adapter.TaskResult, error) {
+	taskID := taskCfg.TaskID
+	startTime := time.Now()
+
+	// Record task start in the audit log.
+	_ = writeAuditEvent(wl.auditWriter, newAuditStartedEvent(taskID))
+
+	// Acquire a semaphore slot when parallel execution is configured.
+	// This blocks until a slot is available or ctx is cancelled.
+	if wl.semaphore != nil {
+		if err := wl.semaphore.Acquire(ctx); err != nil {
+			return adapter.TaskResult{}, fmt.Errorf("acquire semaphore: %w", err)
+		}
+		defer wl.semaphore.Release()
+	}
+
+	// Create an isolated worktree when worktree isolation is enabled.
+	// Falls back to the configured WorkDir on creation failure.
+	if wl.worktreeManager != nil && wl.config.WorktreeIsolation {
+		wtPath, err := wl.worktreeManager.Create(taskID)
+		if err != nil {
+			log.Printf("[worker] worktree create failed for %s, falling back to in-place: %v", taskID, err)
+		} else {
+			taskCfg.WorkDir = wtPath
+			defer func() {
+				if rmErr := wl.worktreeManager.Remove(wtPath, false); rmErr != nil {
+					log.Printf("[worker] worktree remove failed: %v", rmErr)
+				}
+			}()
+		}
+	}
+
+	// Delegate to the core subprocess executor.
+	result, err := wl.executeSubprocess(ctx, taskCfg)
+	durationMS := time.Since(startTime).Milliseconds()
+
+	// Record completion or failure in the audit log.
+	if err != nil {
+		_ = writeAuditEvent(wl.auditWriter, newAuditFailedEvent(taskID, durationMS))
+		return result, err
+	}
+	_ = writeAuditEvent(wl.auditWriter, newAuditCompletedEvent(taskID, durationMS, result.CostUSD))
+
+	return result, nil
 }
 
 // executeSubprocess spawns the provider CLI, pipes the prompt via stdin,

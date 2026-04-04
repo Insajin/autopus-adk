@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -27,7 +28,6 @@ func newPipelineDashboardCmd() *cobra.Command {
 		Use:   "dashboard <spec-id>",
 		Short: "Render pipeline dashboard for a spec",
 		Args:  cobra.ExactArgs(1),
-		// @AX:WARN @AX:CYCLE:3 [AUTO] @AX:REASON: escalated from TODO after 3 cycles — stub implementation; dashboard data is hardcoded to all-pending; must read actual pipeline state from checkpoint file
 		RunE: func(cmd *cobra.Command, args []string) error {
 			specID := args[0]
 
@@ -35,17 +35,31 @@ func newPipelineDashboardCmd() *cobra.Command {
 				return err
 			}
 
-			data := pipeline.DashboardData{
-				Phases: map[string]pipeline.PhaseStatus{
-					"phase1":   pipeline.PhasePending,
-					"phase1.5": pipeline.PhasePending,
-					"phase2":   pipeline.PhasePending,
-					"phase3":   pipeline.PhasePending,
-					"phase4":   pipeline.PhasePending,
-				},
-				Agents: map[string]string{},
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
 			}
 
+			cp, err := pipeline.Load(cwd)
+			if err != nil {
+				// Fallback to all-pending when checkpoint file does not exist.
+				cmd.PrintErrln("Warning: no checkpoint file found, showing default state")
+				data := pipeline.DashboardData{
+					Phases: map[string]pipeline.PhaseStatus{
+						"phase1":   pipeline.PhasePending,
+						"phase1.5": pipeline.PhasePending,
+						"phase2":   pipeline.PhasePending,
+						"phase3":   pipeline.PhasePending,
+						"phase4":   pipeline.PhasePending,
+					},
+					Agents: map[string]string{},
+				}
+				output := pipeline.RenderDashboard(data)
+				fmt.Fprintf(cmd.OutOrStdout(), "SPEC: %s\n%s", specID, output)
+				return nil
+			}
+
+			data := pipeline.MapCheckpointToPhases(cp)
 			output := pipeline.RenderDashboard(data)
 			fmt.Fprintf(cmd.OutOrStdout(), "SPEC: %s\n%s", specID, output)
 			return nil

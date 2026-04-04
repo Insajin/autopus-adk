@@ -66,6 +66,22 @@ func CheckAndShowWithStore(store *StateStore, projectPath string, profile config
 	return checkAndShowWithStore(store, projectPath, w)
 }
 
+// CheckAndShowWithConfig evaluates hint conditions using a HintsConf directly.
+// This is the preferred call path for production callers; it reads hint policy from config
+// instead of requiring callers to extract and pass a raw bool.
+func CheckAndShowWithConfig(projectPath string, profile config.UsageProfile, hints config.HintsConf, w io.Writer) bool {
+	if profile != config.ProfileDeveloper || !hints.IsPlatformHintEnabled() {
+		return false
+	}
+
+	store, err := NewStateStore()
+	if err != nil {
+		return false
+	}
+
+	return checkAndShowWithStore(store, projectPath, w)
+}
+
 // checkAndShowWithStore contains the core hint evaluation logic.
 func checkAndShowWithStore(store *StateStore, projectPath string, w io.Writer) bool {
 	state, err := store.Load(projectPath)

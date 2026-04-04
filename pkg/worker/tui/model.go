@@ -72,11 +72,14 @@ type WorkerModel struct {
 	currentTask        *CurrentTask
 	costTracker        CostTracker
 	showDetail         bool
+	paused             bool
 	approval           *ApprovalRequest
 	width              int
 	height             int
 	OnApprovalDecision func(taskID, decision string)
 	OnViewDiff         func(taskID string)
+	OnPauseToggle      func()
+	OnCancelTask       func(taskID string)
 }
 
 // NewWorkerModel creates a fresh dashboard model with default state.
@@ -157,9 +160,14 @@ func (m WorkerModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "p":
-		// Toggle pause (placeholder for daemon integration)
+		m.paused = !m.paused
+		if m.OnPauseToggle != nil {
+			m.OnPauseToggle()
+		}
 	case "c":
-		// Cancel current task (placeholder)
+		if m.currentTask != nil && m.OnCancelTask != nil {
+			m.OnCancelTask(m.currentTask.ID)
+		}
 		m.currentTask = nil
 	case "D":
 		m.showDetail = !m.showDetail
@@ -189,8 +197,11 @@ func (m WorkerModel) View() string {
 	b.WriteString(renderCostFooter(m.costTracker, m.width))
 	b.WriteString("\n")
 
-	helpLine := fmt.Sprintf(" [q]uit  [p]ause  [c]ancel  [D]etail  %s",
-		"│ autopus worker")
+	pauseLabel := "[p]ause"
+	if m.paused {
+		pauseLabel = "[p] PAUSED"
+	}
+	helpLine := fmt.Sprintf(" [q]uit  %s  [c]ancel  [D]etail  │ autopus worker", pauseLabel)
 	b.WriteString(helpLine)
 
 	return b.String()

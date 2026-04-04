@@ -62,6 +62,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newWorkerCmd())
 	root.AddCommand(newConfigCmd())
 	root.AddCommand(newConnectCmd())
+	root.AddCommand(newLearnCmd())
 
 	return root
 }

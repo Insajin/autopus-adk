@@ -7,33 +7,59 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/insajin/autopus-adk/pkg/worker/a2a"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
+	"github.com/insajin/autopus-adk/pkg/worker/audit"
+	"github.com/insajin/autopus-adk/pkg/worker/auth"
+	"github.com/insajin/autopus-adk/pkg/worker/knowledge"
+	workerNet "github.com/insajin/autopus-adk/pkg/worker/net"
+	"github.com/insajin/autopus-adk/pkg/worker/parallel"
+	"github.com/insajin/autopus-adk/pkg/worker/poll"
 	"github.com/insajin/autopus-adk/pkg/worker/routing"
 	"github.com/insajin/autopus-adk/pkg/worker/tui"
 )
 
 // LoopConfig holds configuration for the WorkerLoop.
 type LoopConfig struct {
-	BackendURL string
-	WorkerName string
-	Skills     []string
-	Provider   adapter.ProviderAdapter
-	MCPConfig  string // path to worker-mcp.json
-	WorkDir    string // working directory for subprocesses
-	AuthToken  string          // bearer token for backend auth
-	Router     *routing.Router // optional model router (nil = no routing)
+	BackendURL      string
+	WorkerName      string
+	Skills          []string
+	Provider        adapter.ProviderAdapter
+	MCPConfig       string // path to worker-mcp.json
+	WorkDir         string // working directory for subprocesses
+	AuthToken       string          // bearer token for backend auth
+	Router          *routing.Router // optional model router (nil = no routing)
+	CredentialsPath string          // path to credentials.json for token refresh
+	AuditLogPath      string        // audit log file path (default: {WorkDir}/.autopus/audit.jsonl)
+	AuditMaxSize      int64         // max log size before rotation (default: 10MB)
+	AuditMaxAge       time.Duration // max age of rotated files (default: 7 days)
+	WorkspaceID       string        // workspace identifier for scheduler
+	MaxConcurrency    int           // max parallel tasks (0 or 1 = sequential)
+	WorktreeIsolation bool          // enable worktree isolation for parallel tasks
+	KnowledgeSync     bool          // enable knowledge file sync
 }
 
 // WorkerLoop integrates A2A Server, ProviderAdapter, ContextBuilder, and StreamParser.
 // It receives tasks via A2A, builds prompts, spawns CLI subprocesses, and reports results.
 type WorkerLoop struct {
-	config     LoopConfig
-	server     *a2a.Server
-	builder    ContextBuilder
-	tuiProgram *tea.Program
+	config          LoopConfig
+	server          *a2a.Server
+	builder         ContextBuilder
+	tuiProgram      *tea.Program
+	authRefresher   *auth.TokenRefresher
+	netMonitor      *workerNet.NetMonitor
+	pollFallback    *poll.TaskPoller
+	lifecycleCtx    context.Context
+	lifecycleCancel context.CancelFunc
+	auditWriter       *audit.RotatingWriter
+	knowledgeSearcher *knowledge.KnowledgeSearcher
+	knowledgeSyncer   *knowledge.Syncer
+	knowledgeWatcher  *knowledge.FileWatcher
+	semaphore         *parallel.TaskSemaphore
+	worktreeManager   *parallel.WorktreeManager
 }
 
 // NewWorkerLoop creates a WorkerLoop with the given configuration.
@@ -58,11 +84,25 @@ func NewWorkerLoop(config LoopConfig) *WorkerLoop {
 // Start connects to the backend and begins processing tasks.
 func (wl *WorkerLoop) Start(ctx context.Context) error {
 	log.Printf("[worker] starting loop: provider=%s backend=%s", wl.config.Provider.Name(), wl.config.BackendURL)
-	return wl.server.Start(ctx)
+	if err := wl.server.Start(ctx); err != nil {
+		return err
+	}
+	wl.startServices(ctx)
+
+	// Initialize parallel execution components if concurrency limit is configured.
+	if wl.config.MaxConcurrency > 1 {
+		wl.semaphore = parallel.NewTaskSemaphore(wl.config.MaxConcurrency)
+		if wl.config.WorktreeIsolation {
+			wl.worktreeManager = parallel.NewWorktreeManager(wl.config.WorkDir)
+		}
+	}
+
+	return nil
 }
 
 // Close shuts down the worker loop and its A2A server.
 func (wl *WorkerLoop) Close() error {
+	wl.stopServices()
 	return wl.server.Close()
 }
 
@@ -114,8 +154,8 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 		Model:     model,
 	}
 
-	// Execute subprocess and parse stream output.
-	result, err := wl.executeSubprocess(ctx, taskCfg)
+	// Execute subprocess with semaphore gating, worktree isolation, and audit recording.
+	result, err := wl.executeWithParallel(ctx, taskCfg)
 	if err != nil {
 		log.Printf("[worker] task %s failed: %v", taskID, err)
 		return nil, err

@@ -39,13 +39,6 @@ type SkillsConf struct {
 	CategoryWeights map[string]int `yaml:"category_weights,omitempty"`
 }
 
-// TelemetryConf is the pipeline telemetry configuration.
-type TelemetryConf struct {
-	Enabled       bool `yaml:"enabled"`
-	RetentionDays int  `yaml:"retention_days"`
-	CostTracking  bool `yaml:"cost_tracking"`
-}
-
 // IssueReportConf is the auto issue reporter configuration.
 type IssueReportConf struct {
 	Repo             string   `yaml:"repo,omitempty"`
@@ -76,7 +69,6 @@ type HarnessConfig struct {
 	Verify       VerifyConf       `yaml:"verify,omitempty"`
 	Constraints  ConstraintConf   `yaml:"constraints,omitempty"`
 	Context      ContextConf      `yaml:"context,omitempty"`
-	Telemetry    TelemetryConf    `yaml:"telemetry,omitempty"`
 	IssueReport  IssueReportConf  `yaml:"issue_report,omitempty"`
 	Profiles     ProfilesConf     `yaml:"profiles,omitempty"`
 	UsageProfile UsageProfile     `yaml:"usage_profile,omitempty"` // developer (default) or fullstack

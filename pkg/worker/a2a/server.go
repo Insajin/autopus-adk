@@ -113,6 +113,21 @@ func (s *Server) UpdateTaskStatus(taskID string, status TaskStatus, result *Task
 	return s.sendJSON(notif)
 }
 
+// SetAuthToken updates the auth token used for backend communication.
+func (s *Server) SetAuthToken(token string) {
+	s.mu.Lock()
+	s.config.AuthToken = token
+	s.mu.Unlock()
+}
+
+// ReconnectTransport attempts to reconnect the WebSocket transport.
+func (s *Server) ReconnectTransport(ctx context.Context) error {
+	if s.transport == nil {
+		return fmt.Errorf("transport not initialized")
+	}
+	return s.transport.Reconnect(ctx)
+}
+
 // Close shuts down the server and its transport.
 func (s *Server) Close() error {
 	if s.cancel != nil {

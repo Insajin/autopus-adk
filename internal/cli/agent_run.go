@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -22,9 +24,12 @@ type taskContext struct {
 
 // taskResult represents the output result of an agent task.
 type taskResult struct {
-	TaskID    string `yaml:"task_id"`
-	Status    string `yaml:"status"`
-	Timestamp string `yaml:"timestamp"`
+	TaskID     string  `yaml:"task_id"`
+	Status     string  `yaml:"status"`
+	Timestamp  string  `yaml:"timestamp"`
+	CostUSD    float64 `yaml:"cost_usd,omitempty"`
+	DurationMS int64   `yaml:"duration_ms,omitempty"`
+	SessionID  string  `yaml:"session_id,omitempty"`
 }
 
 // newAgentRunSubCmd creates the `auto agent run <task-id>` subcommand.
@@ -64,14 +69,30 @@ func runAgentTask(taskID string) error {
 		return fmt.Errorf("parse context for %s: %w", taskID, err)
 	}
 
-	// Execute the task (placeholder — real execution will be added in T8).
-	_ = ctx
+	// Resolve provider — default to "claude" if not specified in context.
+	providerName := "claude"
+	reg := buildDefaultRegistry()
 
-	// Write result.yaml.
+	taskCfg := adapter.TaskConfig{
+		TaskID:  taskID,
+		Prompt:  ctx.Description,
+		WorkDir: runsDir,
+	}
+
+	res, execErr := executeAgentTask(context.Background(), reg, providerName, taskCfg)
+
+	// Build result based on execution outcome.
 	result := taskResult{
 		TaskID:    taskID,
-		Status:    "success",
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+	if execErr != nil {
+		result.Status = "failed"
+	} else {
+		result.Status = res.Status
+		result.CostUSD = res.CostUSD
+		result.DurationMS = res.DurationMS
+		result.SessionID = res.SessionID
 	}
 	resultData, err := yaml.Marshal(result)
 	if err != nil {
