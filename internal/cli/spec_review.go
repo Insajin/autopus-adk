@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -40,7 +39,12 @@ func newSpecReviewCmd() *cobra.Command {
 
 // runSpecReview executes the full SPEC review pipeline.
 func runSpecReview(ctx context.Context, specID, strategy string, timeout int) error {
-	specDir := filepath.Join(".autopus", "specs", specID)
+	resolved, err := spec.ResolveSpecDir(".", specID)
+	if err != nil {
+		return fmt.Errorf("SPEC 로드 실패: %w", err)
+	}
+	specDir := resolved.SpecDir
+
 	doc, err := spec.Load(specDir)
 	if err != nil {
 		return fmt.Errorf("SPEC 로드 실패: %w", err)

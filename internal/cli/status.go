@@ -114,6 +114,34 @@ func scanSpecs(specsDir string) ([]specEntry, error) {
 	return specs, nil
 }
 
+// scanAllSpecs scans top-level and submodule depth-1 SPEC directories.
+func scanAllSpecs(baseDir string) []specEntry {
+	var all []specEntry
+
+	// Top-level: {baseDir}/.autopus/specs/
+	topSpecs, _ := scanSpecs(filepath.Join(baseDir, ".autopus", "specs"))
+	all = append(all, topSpecs...)
+
+	// Submodules depth 1: {baseDir}/*/.autopus/specs/
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return all
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		subSpecsDir := filepath.Join(baseDir, entry.Name(), ".autopus", "specs")
+		subSpecs, _ := scanSpecs(subSpecsDir)
+		for i := range subSpecs {
+			subSpecs[i].id = fmt.Sprintf("[%s] %s", entry.Name(), subSpecs[i].id)
+		}
+		all = append(all, subSpecs...)
+	}
+
+	return all
+}
+
 func newStatusCmd() *cobra.Command {
 	var dir string
 
@@ -131,10 +159,10 @@ func newStatusCmd() *cobra.Command {
 			}
 
 			out := cmd.OutOrStdout()
-			specsDir := filepath.Join(dir, ".autopus", "specs")
 
-			specs, err := scanSpecs(specsDir)
-			if err != nil || len(specs) == 0 {
+			// Scan top-level and submodule specs
+			specs := scanAllSpecs(dir)
+			if len(specs) == 0 {
 				_, _ = fmt.Fprintln(out, "SPEC이 없습니다. `/auto plan`으로 시작하세요.")
 				return nil
 			}
