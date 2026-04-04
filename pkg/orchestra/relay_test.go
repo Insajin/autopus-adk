@@ -25,7 +25,8 @@ func TestAgenticArgs(t *testing.T) {
 		wantArgs []string
 	}{
 		{"claude", []string{"--allowedTools", "Read,Grep,Bash,Glob"}},
-		{"codex", []string{"--full-auto"}},
+		{"codex", []string{"--approval-mode", "full-auto", "--quiet"}},
+		{"opencode", []string{"--auto"}},
 		{"gemini", nil},
 		{"unknown", nil},
 	}
