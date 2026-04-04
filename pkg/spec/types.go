@@ -21,11 +21,19 @@ type Requirement struct {
 	TracesTo    string   // 추적 대상 (예: SPEC-001, UC-001)
 }
 
+// GherkinStep is a single step in a Gherkin scenario (Given/When/Then).
+type GherkinStep struct {
+	Keyword string // "Given", "When", "Then", "And", "But"
+	Text    string // step description
+}
+
 // Criterion은 인수 기준이다.
 type Criterion struct {
-	ID          string // 기준 ID
-	Description string // 기준 설명
-	TracesTo    string // 추적 대상
+	ID          string        // 기준 ID
+	Description string        // 기준 설명
+	TracesTo    string        // 추적 대상
+	Priority    string        // "Must", "Should", "Nice" (default: "Must")
+	Steps       []GherkinStep // Gherkin steps (Given/When/Then)
 }
 
 // SpecDocument는 SPEC 문서이다.

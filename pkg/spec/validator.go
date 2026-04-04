@@ -43,7 +43,7 @@ func ValidateSpec(doc *SpecDocument) []ValidationError {
 		errs = append(errs, ValidationError{
 			Field:   "acceptance_criteria",
 			Message: "인수 기준이 없습니다",
-			Level:   "warning",
+			Level:   "error",
 		})
 	}
 

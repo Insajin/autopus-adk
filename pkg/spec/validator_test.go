@@ -91,6 +91,29 @@ func TestValidateSpec_AmbiguousLanguageWarning(t *testing.T) {
 	assert.Greater(t, warnings, 0, "모호한 언어에 대한 경고가 있어야 합니다")
 }
 
+func TestValidateSpec_EmptyAcceptanceCriteria_Error(t *testing.T) {
+	t.Parallel()
+
+	doc := &spec.SpecDocument{
+		ID:    "SPEC-GATE-001",
+		Title: "Acceptance Gate",
+		Requirements: []spec.Requirement{
+			{ID: "REQ-001", Type: spec.EARSUbiquitous, Description: "시스템은 SHALL 게이트를 검증합니다."},
+		},
+		// AcceptanceCriteria intentionally empty
+	}
+
+	errs := spec.ValidateSpec(doc)
+
+	found := false
+	for _, e := range errs {
+		if e.Field == "acceptance_criteria" && e.Level == "error" {
+			found = true
+		}
+	}
+	assert.True(t, found, "empty acceptance criteria must produce Level='error'")
+}
+
 func TestValidateSpec_EmptyRequirements(t *testing.T) {
 	t.Parallel()
 
