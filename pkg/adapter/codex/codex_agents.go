@@ -125,7 +125,7 @@ func renderAgentsSection() (string, error) {
 		if name == "" {
 			name = strings.TrimSuffix(entry.Name(), ".md")
 		}
-		sb.WriteString(fmt.Sprintf("### %s\n\n", name))
+		fmt.Fprintf(&sb, "### %s\n\n", name)
 		if desc != "" {
 			sb.WriteString(desc)
 			sb.WriteString("\n\n")

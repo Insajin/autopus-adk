@@ -83,7 +83,7 @@ func TestGenerateRuleFiles_Internal(t *testing.T) {
 
 	files, err := a.generateRuleFiles(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 7, "should produce 7 rule files")
+	assert.Len(t, files, 8, "should produce 8 rule files")
 
 	// Verify file-size-limit content
 	for _, f := range files {
@@ -101,7 +101,7 @@ func TestPrepareRuleMappings_NoDiskWrite(t *testing.T) {
 
 	files, err := a.prepareRuleMappings(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 7)
+	assert.Len(t, files, 8)
 
 	// Should not write to disk
 	_, err = os.Stat(filepath.Join(dir, ".codex", "rules", "autopus"))

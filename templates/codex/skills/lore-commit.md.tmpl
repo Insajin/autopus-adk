@@ -1,0 +1,77 @@
+# auto-lore-commit
+
+# Lore Commit Skill
+
+Lore 형식으로 의사결정을 커밋 메시지에 기록하는 스킬입니다.
+
+## Lore 커밋 형식
+
+### 기본 구조
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<lore-trailers>
+🗿 <author>
+```
+
+### 타입 분류
+| 타입 | 설명 |
+|------|------|
+| `feat` | 새로운 기능 추가 |
+| `fix` | 버그 수정 |
+| `refactor` | 기능 변경 없는 코드 개선 |
+| `test` | 테스트 추가/수정 |
+| `docs` | 문서 수정 |
+| `chore` | 빌드, 설정 변경 |
+| `perf` | 성능 개선 |
+
+## Lore 트레일러 태그
+
+### 필수 태그 (의사결정 시)
+```
+Why: [이 변경을 한 이유]
+Decision: [내린 결정]
+Alternatives: [고려한 대안]
+```
+
+### 선택 태그
+```
+Impact: [영향 범위]
+Risk: [잠재적 위험]
+Ref: [관련 이슈/PR/SPEC]
+```
+
+## 예시
+
+```
+feat(auth): JWT 기반 인증 구현
+
+사용자 세션 관리를 위해 JWT 토큰 방식을 도입합니다.
+기존 세션 쿠키 방식에서 마이크로서비스 환경에 적합한
+Stateless 인증으로 전환합니다.
+
+Why: 마이크로서비스 아키텍처에서 세션 공유의 복잡성 제거
+Decision: HS256 알고리즘, 24시간 만료, Refresh 토큰 없음
+Alternatives: OAuth2.0 (과도한 복잡성), 세션 DB (상태 관리 부담)
+Impact: 인증 관련 모든 서비스에 영향
+Risk: 토큰 탈취 시 만료 전까지 무효화 불가
+Ref: SPEC-AUTH-001
+
+🐙 Autopus <noreply@autopus.co>
+```
+
+## 작성 지침
+
+1. Subject는 50자 이내, 현재형 동사로 시작
+2. Body는 무엇보다 **왜**에 집중
+3. 의사결정이 포함된 경우 `Why`, `Decision` 트레일러 필수
+4. 영향 범위가 큰 변경은 `Impact`, `Risk` 태그 추가
+
+## 자동 검사
+
+`auto check --lore` 실행 시 다음을 검사합니다:
+- 커밋 메시지 형식 준수 여부
+- 필수 트레일러 존재 여부
+- Subject 길이 제한

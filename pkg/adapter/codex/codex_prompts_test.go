@@ -20,8 +20,8 @@ func TestRenderPromptTemplates(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, files, "should produce prompt file mappings")
 
-	// All 6 prompts should be generated.
-	assert.Len(t, files, 6)
+	// All 7 prompts should be generated.
+	assert.Len(t, files, 7)
 
 	// Verify files written to disk.
 	for _, f := range files {
@@ -59,7 +59,7 @@ func TestPreparePromptFiles_NoDiskWrite(t *testing.T) {
 
 	files, err := a.preparePromptFiles(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 6)
+	assert.Len(t, files, 7)
 
 	// preparePromptFiles should NOT write to disk.
 	promptsDir := filepath.Join(dir, ".codex", "prompts")

@@ -1,0 +1,115 @@
+---
+name: auto-using-autopus
+---
+
+# Using Autopus-ADK Skill
+
+Autopus-ADK를 사용하여 코딩 CLI에 하네스를 설치하는 방법입니다.
+
+## 설치 모드
+
+### Full Mode
+모든 기능을 포함하는 완전한 하네스:
+- 방법론 (TDD/DDD/Double Diamond)
+- 모델 라우터
+- 인텐트 게이트
+- 세션 연속성
+- 훅 시스템
+
+### Lite Mode
+핵심 기능만 포함하는 경량 하네스:
+- 아키텍처 문서
+- Lore 커밋 시스템
+- SPEC 엔진
+- 기본 훅
+
+## CLI 명령어
+
+```bash
+# 하네스 설치 (인터랙티브)
+auto init
+
+# 특정 모드로 설치
+auto init --mode full
+auto init --mode lite
+
+# 특정 플랫폼에 설치
+auto init --platform claude-code
+auto init --platform codex,gemini-cli
+
+# 설치 상태 확인
+auto doctor
+
+# 하네스 업데이트
+auto update
+
+# 설치 제거
+auto clean
+```
+
+## 설정 파일 (autopus.yaml)
+
+```yaml
+mode: full
+project_name: my-project
+platforms:
+  - claude-code
+  - codex
+
+methodology:
+  mode: tdd
+  enforce: true
+  review_gate: true
+
+router:
+  strategy: category
+  tiers:
+    fast: gemini-flash
+    smart: claude-sonnet
+    ultra: claude-opus
+  categories:
+    visual: fast
+    deep: ultra
+    quick: fast
+  intent_gate: true
+
+hooks:
+  pre_commit_arch: true
+  pre_commit_lore: true
+  react_ci_failure: false
+  react_review: false
+```
+
+## 플랫폼별 설치 위치
+
+| 플랫폼 | 설치 경로 |
+|--------|----------|
+| claude-code | `.gemini/` |
+| codex | `AGENTS.md`, `.codex/` |
+| gemini-cli | `.gemini/` |
+
+## 스킬 관리
+
+```bash
+# 스킬 목록 보기
+auto skill list
+
+# 특정 스킬 상세 정보
+auto skill info tdd
+
+# 카테고리별 스킬 목록
+auto skill list --category methodology
+```
+
+## 트러블슈팅
+
+```bash
+# 설치 상태 진단
+auto doctor --verbose
+
+# 설정 유효성 검증
+auto doctor --check config
+
+# 재설치 (사용자 수정 보존)
+auto update --preserve-user-edits
+```

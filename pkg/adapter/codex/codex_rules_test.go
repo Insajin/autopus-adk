@@ -23,13 +23,14 @@ func TestGenerateRuleFiles_ProducesSeven(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedRules := []string{
+		"context7-docs.md",
+		"doc-storage.md",
 		"file-size-limit.md",
 		"language-policy.md",
 		"lore-commit.md",
+		"objective-reasoning.md",
 		"subagent-delegation.md",
 		"worktree-safety.md",
-		"context7-docs.md",
-		"doc-storage.md",
 	}
 
 	rulesDir := filepath.Join(dir, ".codex", "rules", "autopus")

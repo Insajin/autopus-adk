@@ -4,7 +4,7 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE    ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -ldflags "-s -w -X github.com/insajin/autopus-adk/pkg/version.version=$(VERSION) -X github.com/insajin/autopus-adk/pkg/version.commit=$(COMMIT) -X github.com/insajin/autopus-adk/pkg/version.date=$(DATE)"
 
-.PHONY: build test test-unit test-integration test-e2e test-all update-golden lint clean install
+.PHONY: build test test-unit test-integration test-e2e test-all update-golden lint clean install generate-templates
 
 build:
 	go build $(LDFLAGS) -o bin/$(BINARY) ./cmd/auto
@@ -33,6 +33,9 @@ lint:
 coverage:
 	go test -race -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out
+
+generate-templates:
+	go run ./cmd/generate-templates
 
 clean:
 	rm -rf bin/ coverage.out

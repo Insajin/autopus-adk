@@ -48,7 +48,7 @@ func TestGeminiAgentContent(t *testing.T) {
 	content := string(data)
 
 	assert.Contains(t, content, "---", "should have YAML frontmatter")
-	assert.Contains(t, content, "name: executor", "should have name field")
+	assert.Contains(t, content, "name: auto-agent-executor", "should have name field")
 	assert.Contains(t, content, "description:", "should have description field")
 
 	// Check reviewer.md has TRUST 5 content
