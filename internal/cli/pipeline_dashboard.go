@@ -17,6 +17,7 @@ func newPipelineCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newPipelineDashboardCmd())
+	cmd.AddCommand(newPipelineRunCmd())
 
 	return cmd
 }
