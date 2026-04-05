@@ -62,7 +62,7 @@ func newOrchestraReviewCmd() *cobra.Command {
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
 			prompt := buildReviewPrompt(args)
-			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, noDetach, keepRelay, noJudge)
+			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge})
 		},
 	}
 
@@ -101,7 +101,7 @@ func newOrchestraPlanCmd() *cobra.Command {
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
 			prompt := args[0]
-			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, noDetach, keepRelay)
+			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay})
 		},
 	}
 
@@ -137,7 +137,7 @@ func newOrchestraSecureCmd() *cobra.Command {
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
 			prompt := buildSecurePrompt(args)
-			return runOrchestraCommand(cmd.Context(), "secure", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, noDetach, keepRelay)
+			return runOrchestraCommand(cmd.Context(), "secure", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay})
 		},
 	}
 
@@ -166,7 +166,7 @@ func runOrchestraCommand(
 	prompt string,
 	rounds int,
 	threshold float64,
-	flags ...any,
+	flags OrchestraFlags,
 ) error {
 	// @AX:NOTE [AUTO] REQ-11 opportunistic GC — fires on every orchestra invocation; 1h TTL
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
@@ -222,8 +222,12 @@ func runOrchestraCommand(
 		return fmt.Errorf("--rounds 값은 1-10 범위여야 합니다 (입력: %d)", rounds)
 	}
 
-	// @AX:WARN: [AUTO] positional variadic extraction — flags[0..5]=bool(noDetach,keepRelay,noJudge,yieldRounds,contextAware,subprocessMode); order must match all callers
-	nd, keepRelay, noJudge, yieldRounds, contextAware, subprocessMode := extractOrchestraFlags(flags)
+	nd := flags.NoDetach
+	keepRelay := flags.KeepRelay
+	noJudge := flags.NoJudge
+	yieldRounds := flags.YieldRounds
+	contextAware := flags.ContextAware
+	subprocessMode := flags.SubprocessMode
 	term := terminal.DetectTerminal()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"

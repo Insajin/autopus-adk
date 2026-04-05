@@ -40,7 +40,7 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 				prompt = prependProjectContext(prompt)
 			}
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
-			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, noDetach, keepRelay, noJudge, yieldRounds, contextAware, subprocess)
+			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge, YieldRounds: yieldRounds, ContextAware: contextAware, SubprocessMode: subprocess})
 		},
 	}
 

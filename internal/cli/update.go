@@ -104,8 +104,7 @@ func newUpdateCmd() *cobra.Command {
 	return cmd
 }
 
-// @AX:WARN: [AUTO] high branch complexity — orchestrates check/download/verify/replace with 7+ conditional paths
-// @AX:REASON: consolidates R2–R12 self-update requirements; refactor into sub-steps if complexity grows further
+// @AX:NOTE: [AUTO] linear guard-clause pattern with 7 steps (R2-R12) — complexity is managed via early returns; no refactor needed unless new steps are added
 // targetVersion is accepted for future P2 use (pinned version install); currently unused — checker always fetches latest.
 func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion string) error {
 	_ = targetVersion // P2: reserved for pinned version install via --version flag

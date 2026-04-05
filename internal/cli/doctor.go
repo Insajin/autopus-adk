@@ -3,10 +3,8 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -148,83 +146,17 @@ func newDoctorCmd() *cobra.Command {
 				}
 			}
 
-			// @AX:WARN [AUTO]: Quality Gate section has 8+ conditional branches — cyclomatic complexity risk
-			// @AX:REASON: Accumulated from preset check + review gate check + provider loop; refactor to helpers if complexity grows
+			// @AX:NOTE [AUTO]: Quality Gate complexity addressed — extracted to checkQualityGate() in doctor_checks.go
 			// 6. Quality Gate diagnostics
 			tui.SectionHeader(out, "Quality Gate")
-
-			// Check quality preset
-			if cfg.Quality.Default != "" {
-				if _, ok := cfg.Quality.Presets[cfg.Quality.Default]; ok {
-					tui.OK(out, fmt.Sprintf("quality preset: %s", cfg.Quality.Default))
-				} else {
-					tui.FAIL(out, fmt.Sprintf("quality preset %q not found in presets", cfg.Quality.Default))
-					allOK = false
-				}
-			} else {
-				tui.SKIP(out, "quality preset: not configured")
+			if !checkQualityGate(out, cfg) {
+				allOK = false
 			}
-
-			// Check review gate
-			if cfg.Spec.ReviewGate.Enabled {
-				tui.OK(out, "review gate: enabled")
-
-				// Check each configured provider
-				installedCount := 0
-				for _, provName := range cfg.Spec.ReviewGate.Providers {
-					if detect.IsInstalled(provName) {
-						tui.OK(out, fmt.Sprintf("  provider: %s", provName))
-						installedCount++
-					} else {
-						tui.FAIL(out, fmt.Sprintf("  provider: %s not installed", provName))
-						allOK = false
-					}
-				}
-				if installedCount < 2 {
-					tui.SKIP(out, "review gate: fewer than 2 providers available")
-				}
-			} else {
-				tui.SKIP(out, "review gate: disabled")
-			}
-
-			// Show methodology
-			tui.OK(out, fmt.Sprintf("methodology: %s (enforce: %v)", cfg.Methodology.Mode, cfg.Methodology.Enforce))
 
 			// 7. Hooks & Permissions validation
 			tui.SectionHeader(out, "Hooks & Permissions")
-			settingsPath := filepath.Join(dir, ".claude", "settings.json")
-			if settingsData, err := os.ReadFile(settingsPath); err == nil {
-				var settings map[string]interface{}
-				if err := json.Unmarshal(settingsData, &settings); err != nil {
-					tui.FAIL(out, "settings.json 파싱 실패")
-					allOK = false
-				} else {
-					// Check hooks
-					if hooksVal, ok := settings["hooks"]; ok {
-						if hooksMap, ok := hooksVal.(map[string]interface{}); ok && len(hooksMap) > 0 {
-							tui.OK(out, fmt.Sprintf("hooks: %d event(s) configured", len(hooksMap)))
-						} else {
-							tui.SKIP(out, "hooks: empty or invalid format")
-						}
-					} else {
-						tui.SKIP(out, "hooks: not configured (run 'auto update' to install)")
-					}
-
-					// Check permissions
-					if permsVal, ok := settings["permissions"]; ok {
-						if permsMap, ok := permsVal.(map[string]interface{}); ok {
-							if allowList, ok := permsMap["allow"].([]interface{}); ok && len(allowList) > 0 {
-								tui.OK(out, fmt.Sprintf("permissions: %d allow rule(s)", len(allowList)))
-							} else {
-								tui.SKIP(out, "permissions.allow: empty")
-							}
-						}
-					} else {
-						tui.SKIP(out, "permissions: not configured (run 'auto update' to install)")
-					}
-				}
-			} else {
-				tui.SKIP(out, ".claude/settings.json not found (run 'auto init' to generate)")
+			if !checkHooksPermissions(out, dir) {
+				allOK = false
 			}
 
 			fmt.Fprintln(out)

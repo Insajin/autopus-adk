@@ -128,7 +128,7 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 // collection in .claude/settings.json. The hook runs hook-claude-stop.sh
 // which writes result.json and a done signal to the session directory.
 // Existing user Stop hooks are preserved (autopus entry is appended).
-// @AX:WARN [AUTO] appends to Stop slice without dedup — repeated calls create duplicate hook entries
+// Duplicate entries are skipped — safe to call multiple times.
 // @AX:NOTE [AUTO] hardcoded hook path .claude/hooks/autopus/hook-claude-stop.sh — must exist at runtime
 func (a *Adapter) InjectStopHook() error {
 	settingsDir := filepath.Join(a.root, ".claude")
@@ -166,8 +166,12 @@ func (a *Adapter) InjectStopHook() error {
 	}
 
 	// Append to existing Stop entries rather than replacing.
+	// Skip if an entry with the same command path already exists (dedup guard).
 	existing, _ := hooksMap["Stop"].([]any)
-	hooksMap["Stop"] = append(existing, autopusEntry)
+	if !containsHookCommand(existing, hookCmd) {
+		existing = append(existing, autopusEntry)
+	}
+	hooksMap["Stop"] = existing
 	settings["hooks"] = hooksMap
 
 	out, err := json.MarshalIndent(settings, "", "  ")
@@ -181,7 +185,7 @@ func (a *Adapter) InjectStopHook() error {
 // to .claude/settings.json, preserving existing user hooks.
 // Unlike InjectStopHook which uses a hardcoded path, this accepts an explicit
 // script path for session-specific orchestra hook injection.
-// @AX:WARN [AUTO] appends to Stop slice without dedup — same concern as InjectStopHook; repeated calls stack entries
+// Duplicate entries for the same scriptPath are skipped — safe to call multiple times.
 func (a *Adapter) InjectOrchestraStopHook(scriptPath string) error {
 	settingsDir := filepath.Join(a.root, ".claude")
 	if err := os.MkdirAll(settingsDir, 0755); err != nil {
@@ -215,9 +219,13 @@ func (a *Adapter) InjectOrchestraStopHook(scriptPath string) error {
 		},
 	}
 
-	// Append to existing Stop entries (preserve user hooks)
+	// Append to existing Stop entries (preserve user hooks).
+	// Skip if an entry with the same scriptPath already exists (dedup guard).
 	existing, _ := hooksMap["Stop"].([]any)
-	hooksMap["Stop"] = append(existing, entry)
+	if !containsHookCommand(existing, scriptPath) {
+		existing = append(existing, entry)
+	}
+	hooksMap["Stop"] = existing
 	settings["hooks"] = hooksMap
 
 	out, err := json.MarshalIndent(settings, "", "  ")

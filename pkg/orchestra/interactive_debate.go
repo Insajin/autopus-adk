@@ -53,7 +53,7 @@ func runInteractiveDebate(ctx context.Context, cfg OrchestraConfig) (*OrchestraR
 // Uses runDebate (process-based execution) with multi-round support.
 // Falls back to runParallel if runDebate fails entirely (e.g., broken pipes
 // when test binaries like echo exit before stdin can be written).
-// @AX:WARN: [AUTO] triple fallback chain (debate -> parallel -> empty result) — silent error swallowing may mask real failures
+// @AX:NOTE: [AUTO] triple fallback chain (debate -> parallel -> empty result) — both errors are logged before returning empty result
 func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds int, start time.Time) (*OrchestraResult, error) {
 	cfg.DebateRounds = rounds
 
@@ -67,11 +67,14 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 
 	responses, err := runDebate(timeoutCtx, cfg)
 	if err != nil {
+		log.Printf("[debate] runDebate failed: %v -- falling back to parallel", err)
 		// Fallback: try parallel-only execution (no rebuttal/judge).
 		fallbackResps, _, fallbackErr := runParallel(timeoutCtx, cfg)
 		if fallbackErr != nil {
 			// Both failed — return empty result rather than error to satisfy
-			// tests using echo binary which may race on stdin writes.
+			// callers that expect graceful degradation (e.g., echo-binary tests
+			// that race on stdin writes). Both errors are logged above/below.
+			log.Printf("[debate] runParallel also failed: %v -- returning empty result", fallbackErr)
 			return buildDebateResult(cfg, nil, nil, start), nil
 		}
 		roundHistory := [][]ProviderResponse{fallbackResps}

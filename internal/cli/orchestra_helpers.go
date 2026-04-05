@@ -141,24 +141,15 @@ func resolveAndValidateThreshold(orchConf *config.OrchestraConf, configErr error
 	return resolved, nil
 }
 
-// extractOrchestraFlags extracts positional variadic flags passed to runOrchestraCommand.
-// Order: [0]=noDetach, [1]=keepRelay, [2]=noJudge, [3]=yieldRounds, [4]=contextAware, [5]=subprocessMode (all bool).
-func extractOrchestraFlags(flags []any) (noDetach, keepRelay, noJudge, yieldRounds, contextAware, subprocessMode bool) {
-	boolAt := func(i int) bool {
-		if i < len(flags) {
-			if v, ok := flags[i].(bool); ok {
-				return v
-			}
-		}
-		return false
-	}
-	noDetach = boolAt(0)
-	keepRelay = boolAt(1)
-	noJudge = boolAt(2)
-	yieldRounds = boolAt(3)
-	contextAware = boolAt(4)
-	subprocessMode = boolAt(5)
-	return
+// OrchestraFlags holds optional boolean flags for runOrchestraCommand.
+// Using a struct instead of variadic any prevents silent breakage when flags are added or reordered.
+type OrchestraFlags struct {
+	NoDetach       bool
+	KeepRelay      bool
+	NoJudge        bool
+	YieldRounds    bool
+	ContextAware   bool
+	SubprocessMode bool
 }
 
 // isHookModeAvailable checks whether hook-based result collection can be used.

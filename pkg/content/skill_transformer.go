@@ -98,7 +98,7 @@ func (t *SkillTransformer) TransformForPlatform(platform string) ([]TransformedS
 		}
 
 		report.Compatible = append(report.Compatible, s.meta.Name)
-		filtered := FilterPlatformReferences(s.body, platform)
+		filtered := ReplacePlatformReferences(s.body, platform)
 		result = append(result, TransformedSkill{
 			Name:    s.meta.Name,
 			Content: filtered,
