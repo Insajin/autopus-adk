@@ -112,7 +112,13 @@ func buildSubprocessArgs(req ProviderRequest) []string {
 // path is appended to args via --prompt-file.
 func setupStdin(cmd command, req ProviderRequest) error {
 	if req.Config.PromptViaArgs {
-		cmd.SetStdin(nil)
+		// Close stdin explicitly to prevent provider from waiting for input.
+		// nil means inherit parent stdin which can hang subprocess providers.
+		devNull, err := os.Open(os.DevNull)
+		if err != nil {
+			return fmt.Errorf("subprocess %s: open devnull: %w", req.Provider, err)
+		}
+		cmd.SetStdin(devNull)
 		return cmd.Start()
 	}
 

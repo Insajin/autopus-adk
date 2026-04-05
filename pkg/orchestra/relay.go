@@ -107,7 +107,7 @@ func agenticArgs(providerName string) []string {
 	case "claude":
 		return []string{"--allowedTools", "Read,Grep,Bash,Glob"}
 	case "codex":
-		return []string{"--approval-mode", "full-auto", "--quiet"}
+		return []string{"--full-auto"}
 	case "opencode":
 		return []string{"--auto"}
 	default:
