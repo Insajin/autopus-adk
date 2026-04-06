@@ -136,7 +136,9 @@ func (r *TokenRefresher) doRefresh(ctx context.Context, creds *Credentials) bool
 	body, _ := json.Marshal(map[string]string{
 		"refresh_token": creds.RefreshToken,
 	})
-	url := r.backendURL + "/api/v1/auth/refresh"
+	// Use cli-refresh endpoint — it accepts refresh_token in the body
+	// (standard /auth/refresh reads from httpOnly cookies, which CLI clients cannot use).
+	url := r.backendURL + "/api/v1/auth/cli-refresh"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return false
@@ -152,18 +154,30 @@ func (r *TokenRefresher) doRefresh(ctx context.Context, creds *Credentials) bool
 	if resp.StatusCode != http.StatusOK {
 		return false
 	}
-	var newCreds Credentials
-	if err := json.NewDecoder(resp.Body).Decode(&newCreds); err != nil {
+
+	// cli-refresh returns { success, data: { access_token, refresh_token, expires_in } }.
+	var wrapper struct {
+		Success bool `json:"success"`
+		Data    struct {
+			AccessToken  string `json:"access_token"`
+			RefreshToken string `json:"refresh_token"`
+			ExpiresIn    int64  `json:"expires_in"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil || !wrapper.Success {
 		return false
 	}
-	// Preserve fields the server may not return.
-	if newCreds.Email == "" {
-		newCreds.Email = creds.Email
+
+	newCreds := &Credentials{
+		AccessToken:  wrapper.Data.AccessToken,
+		RefreshToken: wrapper.Data.RefreshToken,
+		Email:        creds.Email,
+		Workspace:    creds.Workspace,
 	}
-	if newCreds.Workspace == "" {
-		newCreds.Workspace = creds.Workspace
+	if wrapper.Data.ExpiresIn > 0 {
+		newCreds.ExpiresAt = time.Now().Add(time.Duration(wrapper.Data.ExpiresIn) * time.Second)
 	}
-	if err := r.SaveCredentials(&newCreds); err != nil {
+	if err := r.SaveCredentials(newCreds); err != nil {
 		return false
 	}
 	if r.onTokenRefresh != nil {
