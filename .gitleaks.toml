@@ -1,0 +1,10 @@
+title = "autopus-adk gitleaks config"
+
+[allowlist]
+  description = "Allow test fixtures and examples"
+  paths = [
+    '''_test\.go$''',
+    '''testdata/''',
+    '''\.md$''',
+  ]
+  regexTarget = "line"

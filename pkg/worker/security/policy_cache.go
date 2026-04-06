@@ -21,7 +21,26 @@ func NewPolicyCache() *PolicyCache {
 
 // Write atomically writes a SecurityPolicy to disk with mode 0600.
 // Uses temp file + rename to prevent partial reads.
+// Rejects writes to symlink targets (symlink defense).
 func (c *PolicyCache) Write(taskID string, policy SecurityPolicy) error {
+	return c.WriteWithLstatGuard(taskID, policy)
+}
+
+// WriteWithLstatGuard writes a SecurityPolicy after verifying the target
+// path is not a symlink. Uses Lstat to detect symlinks before writing.
+func (c *PolicyCache) WriteWithLstatGuard(taskID string, policy SecurityPolicy) error {
+	target := c.PolicyPath(taskID)
+
+	// Check directory for symlinks
+	if err := checkSymlink(c.dir); err != nil {
+		return err
+	}
+
+	// Check target path for symlinks (only if file already exists)
+	if err := checkSymlink(target); err != nil {
+		return err
+	}
+
 	data, err := json.MarshalIndent(policy, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal policy: %w", err)
@@ -54,10 +73,24 @@ func (c *PolicyCache) Write(taskID string, policy SecurityPolicy) error {
 		return fmt.Errorf("close policy file: %w", err)
 	}
 
-	target := c.PolicyPath(taskID)
 	if err := os.Rename(tmpPath, target); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("rename policy file: %w", err)
+	}
+	return nil
+}
+
+// checkSymlink uses Lstat to detect if a path is a symlink.
+// Returns error only if the path is confirmed to be a symlink.
+// Non-existent paths or other errors are treated as safe (non-symlink).
+func checkSymlink(path string) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		// Path doesn't exist or can't be stat'd — not a symlink concern
+		return nil
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("symlink detected at policy path: refusing to write")
 	}
 	return nil
 }
@@ -84,6 +117,8 @@ func (c *PolicyCache) Delete(taskID string) {
 }
 
 // PolicyPath returns the file path for the given task ID's policy.
+// Uses filepath.Base to prevent path traversal via malicious task IDs.
 func (c *PolicyCache) PolicyPath(taskID string) string {
-	return filepath.Join(c.dir, fmt.Sprintf("autopus-policy-%s.json", taskID))
+	safe := filepath.Base(taskID)
+	return filepath.Join(c.dir, fmt.Sprintf("autopus-policy-%s.json", safe))
 }

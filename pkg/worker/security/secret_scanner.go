@@ -30,6 +30,14 @@ func defaultPatterns() []*regexp.Regexp {
 		`(?i)(password|secret|api_key|apikey|token)\s*[=:]\s*\S+`,
 		// AWS secret keys (40-char base64 near "aws" or "secret")
 		`(?i)(aws|secret).{0,20}[a-zA-Z0-9/+=]{40}`,
+		// GCP service account JSON key
+		`"private_key[_a-z]*"\s*:\s*"[^"]+`,
+		// Azure client secrets
+		`(?i)azure.{0,20}(client.?secret|tenant.?id)\s*[=:]\s*\S+`,
+		// SSH private key headers
+		`-----BEGIN[A-Z ]*PRIVATE KEY-----`,
+		// Autopus JWT (apjwt_ prefix with base64url segments)
+		`apjwt_[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+\.[a-zA-Z0-9_\-]+`,
 	}
 
 	patterns := make([]*regexp.Regexp, 0, len(raw))

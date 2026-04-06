@@ -18,6 +18,12 @@ type SecurityPolicy struct {
 	TimeoutSec      int      `json:"timeout_sec,omitempty"`
 }
 
+// normalizeForValidation strips null bytes and trims whitespace from a command.
+func normalizeForValidation(cmd string) string {
+	cmd = strings.ReplaceAll(cmd, "\x00", "")
+	return strings.TrimSpace(cmd)
+}
+
 // ValidateCommand checks whether a command is permitted under this policy.
 // Returns (true, "") if allowed, or (false, reason) if denied.
 // Fail-closed: empty AllowedCommands means deny all.
@@ -26,6 +32,9 @@ func (p *SecurityPolicy) ValidateCommand(command, workDir string) (bool, string)
 	if len(p.AllowedCommands) == 0 {
 		return false, "no allowed commands configured (fail-closed)"
 	}
+
+	// Normalize command BEFORE any pattern matching to prevent bypass via null bytes or encoding tricks.
+	command = normalizeForValidation(command)
 
 	// Check against denied patterns first (deny takes precedence).
 	for _, pattern := range p.DeniedPatterns {
@@ -38,10 +47,12 @@ func (p *SecurityPolicy) ValidateCommand(command, workDir string) (bool, string)
 		}
 	}
 
-	// Check command against allowed commands (prefix match).
+	// Check command against allowed commands (word-boundary match).
+	// Supports both "go " (trailing space) and "go" (no trailing space) conventions.
 	commandAllowed := false
 	for _, allowed := range p.AllowedCommands {
-		if strings.HasPrefix(command, allowed) {
+		trimmed := strings.TrimRight(allowed, " ")
+		if command == trimmed || strings.HasPrefix(command, trimmed+" ") {
 			commandAllowed = true
 			break
 		}
@@ -50,11 +61,11 @@ func (p *SecurityPolicy) ValidateCommand(command, workDir string) (bool, string)
 		return false, "command not in allowed list"
 	}
 
-	// Check workDir against allowed directories (prefix match).
+	// Check workDir against allowed directories (with trailing slash).
 	if len(p.AllowedDirs) > 0 && workDir != "" {
 		dirAllowed := false
 		for _, dir := range p.AllowedDirs {
-			if strings.HasPrefix(workDir, dir) {
+			if strings.HasPrefix(workDir, dir+"/") || workDir == dir {
 				dirAllowed = true
 				break
 			}

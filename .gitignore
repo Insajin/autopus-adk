@@ -36,3 +36,12 @@ internal/cli/test-results/
 .claude/statusline.sh
 .autopus/orchestra/
 .autopus/cache/docs/
+
+# Security-sensitive files
+credentials.json
+credentials.enc
+*.pem
+*.key
+.env
+.env.*
+/tmp/autopus-*/
