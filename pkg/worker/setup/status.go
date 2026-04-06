@@ -33,8 +33,8 @@ type rawCredentials struct {
 	Workspace string `json:"workspace"`
 }
 
-// defaultCredentialsPath returns the path to ~/.config/autopus/credentials.json.
-func defaultCredentialsPath() string {
+// DefaultCredentialsPath returns the path to ~/.config/autopus/credentials.json.
+func DefaultCredentialsPath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return filepath.Join(".", "credentials.json")
@@ -44,7 +44,7 @@ func defaultCredentialsPath() string {
 
 // loadRawCredentials reads and parses credentials.json without strict type constraints.
 func loadRawCredentials() (*rawCredentials, error) {
-	data, err := os.ReadFile(defaultCredentialsPath())
+	data, err := os.ReadFile(DefaultCredentialsPath())
 	if err != nil {
 		return nil, err
 	}

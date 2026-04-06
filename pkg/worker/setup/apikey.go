@@ -30,3 +30,23 @@ func LoadAPIKey() (string, error) {
 	}
 	return creds.APIKey, nil
 }
+
+// LoadAuthToken returns the bearer token for A2A WebSocket authentication.
+// It reads credentials.json and returns the appropriate token based on auth_type:
+//   - auth_type="api_key" → returns the api_key field (Worker API Key)
+//   - otherwise → returns the access_token field (JWT)
+//
+// Returns ("", nil) if no credentials are configured.
+func LoadAuthToken() (string, error) {
+	creds, err := loadRawCredentials()
+	if err != nil {
+		return "", nil
+	}
+	if creds.AuthType == "api_key" && creds.APIKey != "" {
+		return creds.APIKey, nil
+	}
+	if creds.AccessToken != "" {
+		return creds.AccessToken, nil
+	}
+	return "", nil
+}

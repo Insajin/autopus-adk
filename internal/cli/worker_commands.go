@@ -39,10 +39,7 @@ func newWorkerStartCmd() *cobra.Command {
 			if daemonFlag {
 				return installDaemon()
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), "Starting worker in foreground mode...")
-			fmt.Fprintln(cmd.OutOrStdout(), "Use --daemon to install as a system service.")
-			// Foreground mode delegates to WorkerLoop via the caller.
-			return nil
+			return runWorkerForeground()
 		},
 	}
 	cmd.Flags().BoolVar(&daemonFlag, "daemon", false, "Install and start as system daemon")
