@@ -41,6 +41,21 @@ func FetchWorkspaces(backendURL, token string) ([]Workspace, error) {
 	return *result, nil
 }
 
+// FindWorkspaceByID fetches all workspaces and returns the one matching id.
+// Used by non-interactive setup (--workspace flag) to validate the ID and get the name.
+func FindWorkspaceByID(backendURL, token, id string) (*Workspace, error) {
+	workspaces, err := FetchWorkspaces(backendURL, token)
+	if err != nil {
+		return nil, err
+	}
+	for _, ws := range workspaces {
+		if ws.ID == id {
+			return &ws, nil
+		}
+	}
+	return nil, fmt.Errorf("workspace %q not found", id)
+}
+
 // SelectWorkspace picks the workspace to use. Auto-selects if only one is available.
 // For multiple workspaces, prompts the user to select.
 func SelectWorkspace(workspaces []Workspace) (*Workspace, error) {

@@ -173,6 +173,8 @@ func newWorkerCostCmd() *cobra.Command {
 
 func newWorkerSetupCmd() *cobra.Command {
 	var backendURL string
+	var token string
+	var workspaceID string
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Run worker setup wizard",
@@ -181,12 +183,17 @@ func newWorkerSetupCmd() *cobra.Command {
 이 명령어는 3단계 설정 과정을 안내합니다:
   1. Autopus 서버 인증 (브라우저에서 로그인)
   2. 워크스페이스 선택
-  3. AI 프로바이더 확인 (Claude, Codex, Gemini)`,
+  3. AI 프로바이더 확인 (Claude, Codex, Gemini)
+
+비대화형 모드 (에이전트/CI 환경):
+  auto worker setup --token <jwt> --workspace <workspace-id>`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runWorkerSetup(cmd, backendURL)
+			return runWorkerSetup(cmd, backendURL, token, workspaceID)
 		},
 	}
 	cmd.Flags().StringVar(&backendURL, "backend", "https://api.autopus.co", "Backend API URL")
+	cmd.Flags().StringVar(&token, "token", "", "Pre-obtained auth token — skips browser OAuth (for agents/CI)")
+	cmd.Flags().StringVar(&workspaceID, "workspace", "", "Workspace ID — skips interactive selection")
 	return cmd
 }
 

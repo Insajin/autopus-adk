@@ -17,12 +17,14 @@ func userError(context string, err error) error {
 	return fmt.Errorf("%s: %s", context, setup.HumanError(err))
 }
 
-// runWorkerSetup executes the 3-step setup wizard:
+// runWorkerSetup executes the 3-step setup wizard.
+// If preToken and preWorkspaceID are both non-empty, runs in non-interactive mode
+// (skips browser OAuth and workspace selection prompt). Suitable for agents and CI.
 //
-//	Step 1: Device Auth OAuth (PKCE) → Autopus server login
-//	Step 2: Workspace selection
+//	Step 1: Device Auth OAuth (PKCE) → Autopus server login  [skipped if preToken != ""]
+//	Step 2: Workspace selection                              [skipped if preWorkspaceID != ""]
 //	Step 3: Provider auth check (claude/codex/gemini)
-func runWorkerSetup(cmd *cobra.Command, backendURL string) error {
+func runWorkerSetup(cmd *cobra.Command, backendURL, preToken, preWorkspaceID string) error {
 	out := cmd.OutOrStdout()
 	if backendURL == "" {
 		backendURL = defaultBackendURL
@@ -31,20 +33,47 @@ func runWorkerSetup(cmd *cobra.Command, backendURL string) error {
 	fmt.Fprintln(out, "🐙 Autopus Worker Setup")
 	fmt.Fprintln(out, "───────────────────────────────")
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Worker는 Autopus 서버에서 작업을 받아 자동으로 실행하는")
-	fmt.Fprintln(out, "백그라운드 서비스입니다. 설정은 약 2분 정도 소요됩니다.")
-	fmt.Fprintln(out)
 
-	// Step 1: Device Auth
-	token, err := stepDeviceAuth(cmd, backendURL)
-	if err != nil {
-		return userError("인증", err)
+	// Step 1: Auth — bypass if token provided.
+	var token string
+	if preToken != "" {
+		fmt.Fprintln(out, "Step 1/3: Autopus 서버 인증 (토큰 사용 — 비대화형)")
+		if err := setup.SaveCredentials(map[string]any{
+			"access_token": preToken,
+			"backend_url":  backendURL,
+		}); err != nil {
+			return userError("토큰 저장", err)
+		}
+		fmt.Fprintln(out, "  ✓ 인증 토큰 저장 완료")
+		token = preToken
+	} else {
+		fmt.Fprintln(out, "Worker는 Autopus 서버에서 작업을 받아 자동으로 실행하는")
+		fmt.Fprintln(out, "백그라운드 서비스입니다. 설정은 약 2분 정도 소요됩니다.")
+		fmt.Fprintln(out)
+		var err error
+		token, err = stepDeviceAuth(cmd, backendURL)
+		if err != nil {
+			return userError("인증", err)
+		}
 	}
 
-	// Step 2: Workspace selection
-	workspace, err := stepSelectWorkspace(cmd, backendURL, token)
-	if err != nil {
-		return userError("워크스페이스 선택", err)
+	// Step 2: Workspace — bypass if ID provided.
+	var workspace *setup.Workspace
+	if preWorkspaceID != "" {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, "Step 2/3: 워크스페이스 선택 (ID 직접 사용)")
+		ws, err := setup.FindWorkspaceByID(backendURL, token, preWorkspaceID)
+		if err != nil {
+			return userError("워크스페이스 조회", err)
+		}
+		fmt.Fprintf(out, "  ✓ 워크스페이스: %s (%s)\n", ws.Name, ws.ID)
+		workspace = ws
+	} else {
+		var err error
+		workspace, err = stepSelectWorkspace(cmd, backendURL, token)
+		if err != nil {
+			return userError("워크스페이스 선택", err)
+		}
 	}
 
 	// Step 3: Save config and check providers
