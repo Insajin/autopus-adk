@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/pkg/worker/daemon"
+	"github.com/insajin/autopus-adk/pkg/worker/setup"
 )
 
 // addWorkerSubcommands registers all worker subcommands on the parent command.
@@ -24,6 +26,7 @@ func addWorkerSubcommands(parent *cobra.Command) {
 		newWorkerHistoryCmd(),
 		newWorkerCostCmd(),
 		newWorkerSetupCmd(),
+		newWorkerEnsureCmd(),
 	)
 }
 
@@ -68,10 +71,19 @@ func newWorkerStopCmd() *cobra.Command {
 }
 
 func newWorkerStatusCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonOutput bool
+	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show worker daemon status",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if jsonOutput {
+				// Machine-readable JSON output — no other output.
+				s := setup.CollectStatus()
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(s)
+			}
+			// Human-readable output (existing behavior).
 			out := cmd.OutOrStdout()
 			installed := isDaemonInstalled()
 			fmt.Fprintf(out, "Daemon installed: %v\n", installed)
@@ -82,6 +94,8 @@ func newWorkerStatusCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output status as JSON")
+	return cmd
 }
 
 func newWorkerLogsCmd() *cobra.Command {
