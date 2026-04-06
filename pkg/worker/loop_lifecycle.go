@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/worker/audit"
@@ -32,8 +33,9 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 		go wl.auditWriter.StartCleanup(wl.lifecycleCtx)
 	}
 
-	// 2. TokenRefresher: only if credentials path is configured.
-	if wl.config.CredentialsPath != "" {
+	// 2. TokenRefresher: only for JWT mode — API Key mode does not need token refresh.
+	isAPIKeyMode := strings.HasPrefix(wl.config.AuthToken, "acos_worker_")
+	if wl.config.CredentialsPath != "" && !isAPIKeyMode {
 		wl.authRefresher = auth.NewTokenRefresher(
 			wl.config.BackendURL,
 			wl.config.CredentialsPath,
