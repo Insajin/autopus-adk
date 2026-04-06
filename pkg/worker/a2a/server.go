@@ -15,10 +15,11 @@ type TaskHandler func(ctx context.Context, taskID string, payload json.RawMessag
 
 // ServerConfig holds configuration for the A2A server.
 type ServerConfig struct {
-	BackendURL string
-	WorkerName string
-	Skills     []string
-	Handler    TaskHandler
+	BackendURL  string
+	WorkerName  string
+	WorkspaceID string
+	Skills      []string
+	Handler     TaskHandler
 	AuthToken            string // Bearer token for backend auth (SEC-005)
 	ApprovalCallback     func(ApprovalRequestParams)
 	OnConnectionExhausted func() // called once when reconnect backoff reaches maxBackoff
@@ -80,6 +81,7 @@ func (s *Server) Start(ctx context.Context) error {
 		Name:                s.config.WorkerName,
 		Description:         "Autopus ADK Worker",
 		URL:                 s.config.BackendURL,
+		WorkspaceID:         s.config.WorkspaceID,
 		Skills:              s.config.Skills,
 		SupportedInputModes: []string{"text"},
 	}

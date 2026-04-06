@@ -73,6 +73,7 @@ func NewWorkerLoop(config LoopConfig) *WorkerLoop {
 	serverCfg := a2a.ServerConfig{
 		BackendURL:            config.BackendURL,
 		WorkerName:            config.WorkerName,
+		WorkspaceID:           config.WorkspaceID,
 		Skills:                config.Skills,
 		Handler:               wl.handleTask,
 		AuthToken:             config.AuthToken,

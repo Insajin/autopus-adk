@@ -61,6 +61,7 @@ type AgentCard struct {
 	Name                string   `json:"name"`
 	Description         string   `json:"description"`
 	URL                 string   `json:"url"`
+	WorkspaceID         string   `json:"workspace_id,omitempty"`
 	Skills              []string `json:"skills"`
 	SupportedInputModes []string `json:"supported_input_modes"`
 }
