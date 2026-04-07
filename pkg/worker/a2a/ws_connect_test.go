@@ -13,11 +13,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// toWSSURL converts an https:// test server URL to a wss:// WebSocket URL.
+func toWSSURL(httpsURL string) string {
+	return "wss" + strings.TrimPrefix(httpsURL, "https")
+}
+
 func TestTransport_Connect_AuthToken(t *testing.T) {
 	var receivedAuth string
 	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Use TLS server so that auth tokens can be sent over wss:// without being
+	// blocked by the SEC-003 plaintext credential guard.
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedAuth = r.Header.Get("Authorization")
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -28,10 +35,16 @@ func TestTransport_Connect_AuthToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Build a dialer that trusts the self-signed test certificate.
+	tlsDialer := websocket.Dialer{
+		TLSClientConfig: srv.Client().Transport.(*http.Transport).TLSClientConfig,
+	}
+
 	tr := NewTransport(TransportConfig{
-		URL:          toWSURL(srv.URL),
+		URL:          toWSSURL(srv.URL),
 		AuthToken:    "test-secret-token",
 		HeartbeatSec: 60,
+		Dialer:       &tlsDialer,
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -54,15 +54,17 @@ func TestRefresh_FiresBeforeExpiry(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "creds.json")
 
-	newCreds := Credentials{
-		AccessToken:  "new-access",
-		RefreshToken: "new-refresh",
-		ExpiresAt:    time.Now().Add(1 * time.Hour),
-	}
-
+	// Mock response matches the cli-refresh wrapper format the refresher decodes.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(newCreds)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data": map[string]any{
+				"access_token":  "new-access",
+				"refresh_token": "new-refresh",
+				"expires_in":    3600,
+			},
+		})
 	}))
 	defer srv.Close()
 

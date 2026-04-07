@@ -24,6 +24,8 @@ type TransportConfig struct {
 	ReconnectBaseSec int
 	ReconnectFactor  int
 	MaxRetries       int
+	// Dialer overrides the default WebSocket dialer (used in tests for TLS certs).
+	Dialer *websocket.Dialer
 }
 
 // Transport wraps a gorilla/websocket connection with heartbeat and reconnect.
@@ -69,7 +71,11 @@ func (t *Transport) Connect(ctx context.Context) error {
 		header = http.Header{"Authorization": []string{"Bearer " + t.config.AuthToken}}
 	}
 
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, t.config.URL, header)
+	dialer := websocket.DefaultDialer
+	if t.config.Dialer != nil {
+		dialer = t.config.Dialer
+	}
+	conn, _, err := dialer.DialContext(ctx, t.config.URL, header)
 	if err != nil {
 		return fmt.Errorf("ws dial %s: %w", t.config.URL, err)
 	}

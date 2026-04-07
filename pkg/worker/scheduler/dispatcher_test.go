@@ -25,7 +25,11 @@ func TestDispatcher_FetchesSchedules(t *testing.T) {
 		gotAuth = r.Header.Get("Authorization")
 		mu.Unlock()
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode([]schedule{})
+		// Backend returns wrapped response: { success: true, data: [...] }
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data":    []schedule{},
+		})
 	}))
 	defer srv.Close()
 
@@ -49,8 +53,10 @@ func TestDispatcher_TriggersMatchingSchedule(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode([]schedule{
-			{ID: "s1", CronExpr: cronExpr, TaskPayload: "payload1"},
+		// Backend returns wrapped response: { success: true, data: [...] }
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data":    []schedule{{ID: "s1", CronExpr: cronExpr, TaskPayload: "payload1"}},
 		})
 	}))
 	defer srv.Close()
@@ -77,8 +83,10 @@ func TestDispatcher_Deduplication(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode([]schedule{
-			{ID: "s1", CronExpr: cronExpr, TaskPayload: "p"},
+		// Backend returns wrapped response: { success: true, data: [...] }
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data":    []schedule{{ID: "s1", CronExpr: cronExpr, TaskPayload: "p"}},
 		})
 	}))
 	defer srv.Close()
@@ -111,8 +119,10 @@ func TestDispatcher_TimezoneHandling(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode([]schedule{
-			{ID: "tz1", CronExpr: cronExpr, TaskPayload: "tz-payload"},
+		// Backend returns wrapped response: { success: true, data: [...] }
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data":    []schedule{{ID: "tz1", CronExpr: cronExpr, TaskPayload: "tz-payload"}},
 		})
 	}))
 	defer srv.Close()
