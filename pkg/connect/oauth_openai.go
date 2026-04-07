@@ -241,6 +241,8 @@ func buildAuthorizeURL(cfg OAuthConfig, flow *OAuthFlowResult) string {
 		"scope":                     {cfg.scopes()},
 		"state":                     {flow.State},
 		"codex_cli_simplified_flow": {"true"},
+		"prompt":                    {"consent"},
+		"access_type":               {"offline"},
 	}
 	return cfg.authURL() + "?" + params.Encode()
 }
