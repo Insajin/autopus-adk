@@ -18,6 +18,7 @@ type mockAuthDeps struct {
 	pollForToken      func(context.Context, string, string, string, int) (*setup.TokenResponse, error)
 	openBrowser       func(string) error
 	saveCredentials   func(map[string]any) error
+	printLoginPrompt  func(uri, code string)
 }
 
 func (m *mockAuthDeps) GeneratePKCE() (string, string, error) {
@@ -38,6 +39,13 @@ func (m *mockAuthDeps) OpenBrowser(url string) error {
 
 func (m *mockAuthDeps) SaveCredentials(creds map[string]any) error {
 	return m.saveCredentials(creds)
+}
+
+// PrintLoginPrompt is a no-op in the mock unless overridden.
+func (m *mockAuthDeps) PrintLoginPrompt(uri, code string) {
+	if m.printLoginPrompt != nil {
+		m.printLoginPrompt(uri, code)
+	}
 }
 
 func newSuccessDeps() *mockAuthDeps {

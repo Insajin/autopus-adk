@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/huh"
@@ -23,6 +24,8 @@ func newConnectCmd() *cobra.Command {
 	var (
 		serverURL   string
 		workspaceID string
+		headless    bool
+		timeout     time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -30,6 +33,21 @@ func newConnectCmd() *cobra.Command {
 		Short: "Connect an AI provider via local OAuth flow",
 		Long:  "3-step wizard: (1) Autopus server auth, (2) workspace selection, (3) OpenAI PKCE OAuth.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Headless mode: non-interactive, NDJSON output, no browser.
+			if headless {
+				if workspaceID == "" {
+					connect.EmitEvent(connect.HeadlessEvent{Error: "headless mode requires --workspace flag"})
+					return fmt.Errorf("headless mode requires --workspace flag")
+				}
+				return runHeadlessConnect(cmd, serverURL, workspaceID, timeout)
+			}
+
+			// REQ-HL-51: non-TTY without --headless → hint and exit.
+			if !isStdinTTY() {
+				fmt.Fprintln(os.Stderr, "Hint: use --headless flag for non-interactive mode")
+				return fmt.Errorf("interactive mode requires a TTY; use --headless")
+			}
+
 			ctx, cancel := context.WithTimeout(cmd.Context(), connectTimeout)
 			defer cancel()
 
@@ -70,6 +88,8 @@ func newConnectCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&serverURL, "server", defaultServerURL, "Autopus server URL")
 	cmd.Flags().StringVar(&workspaceID, "workspace", "", "Skip workspace selection and use this ID")
+	cmd.Flags().BoolVar(&headless, "headless", false, "Non-interactive mode for agent-driven OAuth connection")
+	cmd.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "Overall flow timeout for headless mode")
 	return cmd
 }
 

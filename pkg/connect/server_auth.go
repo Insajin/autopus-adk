@@ -81,6 +81,9 @@ type AuthDeps interface {
 	PollForToken(ctx context.Context, backendURL, deviceCode, codeVerifier string, interval int) (*setup.TokenResponse, error)
 	OpenBrowser(url string) error
 	SaveCredentials(creds map[string]any) error
+	// PrintLoginPrompt displays the device auth URL and code to the user.
+	// Implementations may suppress output (e.g., headless mode emits NDJSON instead).
+	PrintLoginPrompt(uri, code string)
 }
 
 // defaultAuthDeps delegates to the real setup package functions.
@@ -106,6 +109,11 @@ func (d defaultAuthDeps) SaveCredentials(creds map[string]any) error {
 	return setup.SaveCredentials(creds)
 }
 
+// PrintLoginPrompt prints the device auth URL and user code to stdout.
+func (d defaultAuthDeps) PrintLoginPrompt(uri, code string) {
+	fmt.Printf("Visit %s and enter code: %s\n", uri, code)
+}
+
 // AuthenticateServer runs the device code auth flow against the Autopus backend.
 // If deps is nil, real setup package implementations are used.
 func AuthenticateServer(ctx context.Context, cfg ServerAuthConfig, deps AuthDeps) (*AuthResult, error) {
@@ -123,7 +131,7 @@ func AuthenticateServer(ctx context.Context, cfg ServerAuthConfig, deps AuthDeps
 		return nil, fmt.Errorf("request device code: %w", err)
 	}
 
-	fmt.Printf("Visit %s and enter code: %s\n", dc.VerificationURI, dc.UserCode)
+	deps.PrintLoginPrompt(dc.VerificationURI, dc.UserCode)
 	_ = deps.OpenBrowser(dc.VerificationURI)
 
 	tokenResp, err := deps.PollForToken(ctx, cfg.ServerURL, dc.DeviceCode, verifier, dc.Interval)
