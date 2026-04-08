@@ -6,6 +6,8 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+
+	"github.com/insajin/autopus-adk/pkg/adapter"
 )
 
 // hookEntry represents a single hook matcher and its commands.
@@ -59,7 +61,7 @@ func WriteHookConfig(dir string, policyPath string) error {
 		return fmt.Errorf("marshal settings.json: %w", err)
 	}
 
-	if err := os.WriteFile(settingsPath, out, 0644); err != nil {
+	if err := adapter.WriteFileIfChanged(settingsPath, out, 0644); err != nil {
 		return fmt.Errorf("write settings.json: %w", err)
 	}
 	return nil
@@ -95,7 +97,7 @@ func RemoveHookConfig(dir string) error {
 		return fmt.Errorf("marshal settings.json: %w", err)
 	}
 
-	if err := os.WriteFile(settingsPath, out, 0644); err != nil {
+	if err := adapter.WriteFileIfChanged(settingsPath, out, 0644); err != nil {
 		return fmt.Errorf("write settings.json: %w", err)
 	}
 	return nil

@@ -131,7 +131,7 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 	if err != nil {
 		return fmt.Errorf("gemini settings.json 직렬화 실패: %w", err)
 	}
-	return os.WriteFile(settingsPath, append(out, '\n'), 0644)
+	return adapter.WriteFileIfChanged(settingsPath, append(out, '\n'), 0644)
 }
 
 // mergeSettingsMaps merges new settings into existing, preserving user keys.
