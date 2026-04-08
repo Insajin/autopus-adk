@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -108,6 +109,7 @@ func (r *TokenRefresher) SaveCredentials(creds *Credentials) error {
 func (r *TokenRefresher) checkAndRefresh(ctx context.Context) {
 	creds, err := r.LoadCredentials()
 	if err != nil {
+		log.Printf("[auth] check: load credentials failed: %v", err)
 		return
 	}
 	// Refresh 5 minutes before expiry.
@@ -141,17 +143,20 @@ func (r *TokenRefresher) doRefresh(ctx context.Context, creds *Credentials) bool
 	url := r.backendURL + "/api/v1/auth/cli-refresh"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
+		log.Printf("[auth] refresh: create request failed: %v", err)
 		return false
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := r.client.Do(req)
 	if err != nil {
+		log.Printf("[auth] refresh: request failed: %v", err)
 		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[auth] refresh: server returned %d", resp.StatusCode)
 		return false
 	}
 
@@ -164,7 +169,12 @@ func (r *TokenRefresher) doRefresh(ctx context.Context, creds *Credentials) bool
 			ExpiresIn    int64  `json:"expires_in"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil || !wrapper.Success {
+	if err := json.NewDecoder(resp.Body).Decode(&wrapper); err != nil {
+		log.Printf("[auth] refresh: decode response failed: %v", err)
+		return false
+	}
+	if !wrapper.Success {
+		log.Printf("[auth] refresh: server returned success=false")
 		return false
 	}
 
@@ -178,6 +188,7 @@ func (r *TokenRefresher) doRefresh(ctx context.Context, creds *Credentials) bool
 		newCreds.ExpiresAt = time.Now().Add(time.Duration(wrapper.Data.ExpiresIn) * time.Second)
 	}
 	if err := r.SaveCredentials(newCreds); err != nil {
+		log.Printf("[auth] refresh: save credentials failed: %v", err)
 		return false
 	}
 	if r.onTokenRefresh != nil {

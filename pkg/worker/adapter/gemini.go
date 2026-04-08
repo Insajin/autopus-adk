@@ -44,7 +44,7 @@ func (a *GeminiAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 			"task_id", task.TaskID)
 	}
 
-	cmd := exec.CommandContext(ctx, "gemini", args...)
+	cmd := exec.CommandContext(ctx, ResolveBinary("gemini"), args...)
 	cmd.Dir = task.WorkDir
 
 	// Build environment: inherit current env plus task-specific vars.

@@ -46,7 +46,7 @@ func (a *ClaudeAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 		args = append(args, "--computer-use")
 	}
 
-	cmd := exec.CommandContext(ctx, "claude", args...)
+	cmd := exec.CommandContext(ctx, ResolveBinary("claude"), args...)
 	cmd.Dir = task.WorkDir
 
 	// Build environment: inherit current env plus task-specific vars.

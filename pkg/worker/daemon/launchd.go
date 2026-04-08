@@ -48,6 +48,11 @@ var plistTemplate = template.Must(template.New("plist").Funcs(template.FuncMap{
     <true/>
     <key>RunAtLoad</key>
     <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Applications/cmux.app/Contents/Resources/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
     <key>StandardOutPath</key>
     <string>{{ .LogDir | xmlEsc }}/autopus-worker.out.log</string>
     <key>StandardErrorPath</key>
