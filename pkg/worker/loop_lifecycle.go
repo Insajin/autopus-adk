@@ -120,10 +120,11 @@ func (wl *WorkerLoop) activateFallbackPoller() {
 	wl.pollFallback = poll.NewTaskPoller(
 		wl.config.BackendURL,
 		wl.config.AuthToken,
-		"", // workspace ID — not used in fallback mode
+		wl.config.WorkspaceID,
 		func(taskData []byte) {
-			// Forward polled task data to handleTask via the server.
-			log.Printf("[worker] fallback poller received task (%d bytes)", len(taskData))
+			// TODO: forward polled task to the A2A server's handleSendMessage path.
+			// Currently logs only — WebSocket is the primary task delivery path.
+			log.Printf("[worker] fallback poller received task (%d bytes) — processing not yet implemented", len(taskData))
 		},
 	)
 	go wl.pollFallback.Start(wl.lifecycleCtx)
