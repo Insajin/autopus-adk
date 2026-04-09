@@ -49,9 +49,12 @@ signs:
     args:
       - "sign-blob"
       - "--yes"
-      - "--output-signature=${signature}"
+      - "--bundle=${signature}"
       - "${artifact}"
+    signature: "${artifact}.bundle"
     output: true
+    env:
+      - COSIGN_EXPERIMENTAL=1
 
 changelog:
   sort: asc
