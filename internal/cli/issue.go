@@ -12,6 +12,32 @@ import (
 	"github.com/insajin/autopus-adk/pkg/issue"
 )
 
+// detectGitRepo extracts the GitHub owner/repo from git remote origin.
+func detectGitRepo() string {
+	out, err := exec.Command("git", "remote", "get-url", "origin").Output()
+	if err != nil {
+		return ""
+	}
+	url := strings.TrimSpace(string(out))
+	// Handle SSH: git@github.com:owner/repo.git
+	// Handle HTTPS: https://github.com/owner/repo.git
+	url = strings.TrimSuffix(url, ".git")
+	if strings.Contains(url, ":") && strings.Contains(url, "@") {
+		// SSH format
+		parts := strings.SplitN(url, ":", 2)
+		if len(parts) == 2 {
+			return parts[1]
+		}
+	}
+	// HTTPS format
+	for _, prefix := range []string{"https://github.com/", "http://github.com/"} {
+		if strings.HasPrefix(url, prefix) {
+			return strings.TrimPrefix(url, prefix)
+		}
+	}
+	return ""
+}
+
 // newIssueCmd creates the `auto issue` command group.
 func newIssueCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -33,13 +59,14 @@ func newIssueReportCmd() *cobra.Command {
 		errMsg     string
 		command    string
 		exitCode   int
+		repo       string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "report",
 		Short: "Create an issue report from an error",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runIssueReport(cmd, dryRun, autoSubmit, errMsg, command, exitCode)
+			return runIssueReport(cmd, dryRun, autoSubmit, errMsg, command, exitCode, repo)
 		},
 	}
 
@@ -48,12 +75,13 @@ func newIssueReportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&errMsg, "error", "", "Error message to report")
 	cmd.Flags().StringVar(&command, "command", "", "Command that produced the error")
 	cmd.Flags().IntVar(&exitCode, "exit-code", 1, "Exit code of the failed command")
+	cmd.Flags().StringVar(&repo, "repo", "", "GitHub repository (owner/repo); auto-detected from git remote when omitted")
 
 	return cmd
 }
 
 // runIssueReport implements the core logic of `auto issue report`.
-func runIssueReport(cmd *cobra.Command, dryRun, autoSubmit bool, errMsg, command string, exitCode int) error {
+func runIssueReport(cmd *cobra.Command, dryRun, autoSubmit bool, errMsg, command string, exitCode int, repo string) error {
 	out := cmd.OutOrStdout()
 
 	ctx := issue.CollectContext(errMsg, command, exitCode)
@@ -62,6 +90,16 @@ func runIssueReport(cmd *cobra.Command, dryRun, autoSubmit bool, errMsg, command
 		Title:   buildIssueTitle(errMsg, command),
 		Context: ctx,
 		Labels:  []string{"auto-report"},
+	}
+
+	// Resolve target repository: flag takes precedence, then auto-detect from git remote.
+	if repo != "" {
+		report.Repo = repo
+	} else {
+		report.Repo = detectGitRepo()
+	}
+	if report.Repo == "" {
+		return fmt.Errorf("cannot detect GitHub repository from git remote. Use --repo flag or run inside a git repo")
 	}
 
 	submitter := issue.NewSubmitter(nil)

@@ -3,10 +3,20 @@ package spec
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+// walkSkipDirs are directories excluded from recursive SPEC resolution.
+var walkSkipDirs = map[string]bool{
+	".git":        true,
+	"node_modules": true,
+	"vendor":      true,
+	".cache":      true,
+	"dist":        true,
+}
 
 // ResolveResult holds the resolved SPEC path information.
 type ResolveResult struct {
@@ -15,17 +25,17 @@ type ResolveResult struct {
 	TargetModule string // Submodule path, or "." for top-level
 }
 
-// ResolveSpecDir finds a SPEC directory by ID, searching top-level and submodules.
+// ResolveSpecDir finds a SPEC directory by ID, searching top-level and all submodule depths.
 //
 // Search order:
-//  1. {baseDir}/.autopus/specs/{specID}/spec.md  (top-level)
-//  2. {baseDir}/*/.autopus/specs/{specID}/spec.md (submodule depth 1)
+//  1. {baseDir}/.autopus/specs/{specID}/spec.md  (top-level, fast path)
+//  2. {baseDir}/**/.autopus/specs/{specID}/spec.md (recursive walk, any depth)
 //
 // Returns an error if zero or multiple matches are found.
 func ResolveSpecDir(baseDir, specID string) (*ResolveResult, error) {
 	var matches []ResolveResult
 
-	// Search 1: top-level
+	// Search 1: top-level fast path
 	topDir := filepath.Join(baseDir, ".autopus", "specs", specID)
 	topSpec := filepath.Join(topDir, "spec.md")
 	if _, err := os.Stat(topSpec); err == nil {
@@ -36,29 +46,48 @@ func ResolveSpecDir(baseDir, specID string) (*ResolveResult, error) {
 		})
 	}
 
-	// Search 2: submodule depth 1
-	entries, err := os.ReadDir(baseDir)
-	if err == nil {
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-			name := entry.Name()
-			// Skip hidden directories and common non-module dirs
-			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" {
-				continue
-			}
-			subDir := filepath.Join(baseDir, name, ".autopus", "specs", specID)
-			subSpec := filepath.Join(subDir, "spec.md")
-			if _, err := os.Stat(subSpec); err == nil {
-				matches = append(matches, ResolveResult{
-					SpecDir:      subDir,
-					SpecPath:     subSpec,
-					TargetModule: name,
-				})
-			}
+	// Search 2: recursive walk to find .autopus/specs/{specID}/spec.md at any depth
+	_ = filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip unreadable paths
 		}
-	}
+		if !d.IsDir() {
+			return nil
+		}
+		name := d.Name()
+		// Skip directories that should not be searched
+		if walkSkipDirs[name] || (strings.HasPrefix(name, ".") && name != ".autopus") {
+			return filepath.SkipDir
+		}
+		// Detect pattern: <anything>/.autopus/specs/{specID}
+		if name != specID {
+			return nil
+		}
+		parent := filepath.Dir(path)
+		if filepath.Base(parent) != "specs" {
+			return nil
+		}
+		grandparent := filepath.Dir(parent)
+		if filepath.Base(grandparent) != ".autopus" {
+			return nil
+		}
+		specMd := filepath.Join(path, "spec.md")
+		if _, err := os.Stat(specMd); err != nil {
+			return nil
+		}
+		// Determine target module relative to baseDir
+		module, err := filepath.Rel(baseDir, filepath.Dir(grandparent))
+		if err != nil || module == "." {
+			// Already captured by top-level fast path
+			return nil
+		}
+		matches = append(matches, ResolveResult{
+			SpecDir:      path,
+			SpecPath:     specMd,
+			TargetModule: module,
+		})
+		return filepath.SkipDir
+	})
 
 	switch len(matches) {
 	case 0:
@@ -78,43 +107,51 @@ func ResolveSpecDir(baseDir, specID string) (*ResolveResult, error) {
 	}
 }
 
-// listAvailableSpecs scans top-level and submodule SPEC directories.
+// listAvailableSpecs recursively scans SPEC directories at any depth.
 func listAvailableSpecs(baseDir string) []string {
 	var ids []string
 
-	// Top-level
-	ids = append(ids, scanSpecIDs(filepath.Join(baseDir, ".autopus", "specs"))...)
-
-	// Submodules depth 1
-	entries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return ids
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
+	_ = filepath.WalkDir(baseDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
 		}
-		subIDs := scanSpecIDs(filepath.Join(baseDir, entry.Name(), ".autopus", "specs"))
-		for _, id := range subIDs {
-			ids = append(ids, fmt.Sprintf("%s (%s)", id, entry.Name()))
+		if !d.IsDir() {
+			return nil
 		}
-	}
-
-	return ids
-}
-
-// scanSpecIDs reads SPEC-* directories from a specs directory.
-func scanSpecIDs(specsDir string) []string {
-	entries, err := os.ReadDir(specsDir)
-	if err != nil {
-		return nil
-	}
-
-	var ids []string
-	for _, e := range entries {
-		if e.IsDir() && strings.HasPrefix(e.Name(), "SPEC-") {
-			ids = append(ids, e.Name())
+		name := d.Name()
+		// Skip non-relevant directories
+		if walkSkipDirs[name] || (strings.HasPrefix(name, ".") && name != ".autopus") {
+			return filepath.SkipDir
 		}
-	}
+		// Detect .autopus/specs directories
+		if name != "specs" {
+			return nil
+		}
+		if filepath.Base(filepath.Dir(path)) != ".autopus" {
+			return nil
+		}
+		// Compute label: module path relative to baseDir
+		module, err := filepath.Rel(baseDir, filepath.Dir(filepath.Dir(path)))
+		if err != nil {
+			module = "."
+		}
+
+		specEntries, err := os.ReadDir(path)
+		if err != nil {
+			return filepath.SkipDir
+		}
+		for _, e := range specEntries {
+			if !e.IsDir() || !strings.HasPrefix(e.Name(), "SPEC-") {
+				continue
+			}
+			if module == "." {
+				ids = append(ids, e.Name())
+			} else {
+				ids = append(ids, fmt.Sprintf("%s (%s)", e.Name(), module))
+			}
+		}
+		return filepath.SkipDir
+	})
+
 	return ids
 }

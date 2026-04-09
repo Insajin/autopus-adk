@@ -87,6 +87,24 @@ func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFindi
 	sb.WriteString("3. Provide reasoning for your verdict.\n")
 }
 
+// skipDirs are directories excluded from context collection.
+var skipDirs = map[string]bool{
+	".git":         true,
+	".cache":       true,
+	"node_modules": true,
+	"vendor":       true,
+	"dist":         true,
+	".autopus":     true,
+	".claude":      true,
+	"templates":    true,
+	"__pycache__":  true,
+	".next":        true,
+	".nuxt":        true,
+	"build":        true,
+	"coverage":     true,
+	".svelte-kit":  true,
+}
+
 // CollectContext recursively reads source files from a directory up to maxLines total.
 func CollectContext(dir string, maxLines int) (string, error) {
 	var sb strings.Builder
@@ -97,6 +115,9 @@ func CollectContext(dir string, maxLines int) (string, error) {
 			return nil // skip unreadable entries
 		}
 		if d.IsDir() {
+			if skipDirs[d.Name()] {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if lineCount >= maxLines {

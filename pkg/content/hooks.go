@@ -55,7 +55,7 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 			Event:   "PostToolUse",
 			Matcher: "Bash",
 			Type:    "command",
-			Command: "auto react --ci-failure --quiet",
+			Command: "auto react check --quiet",
 			Timeout: 60,
 		})
 	}
@@ -65,7 +65,7 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 			Event:   "PostToolUse",
 			Matcher: "Bash",
 			Type:    "command",
-			Command: "auto react --review --quiet",
+			Command: "auto react check --quiet",
 			Timeout: 60,
 		})
 	}

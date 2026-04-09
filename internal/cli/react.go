@@ -39,11 +39,18 @@ func newReactCmd() *cobra.Command {
 
 // newReactCheckCmd creates `auto react check`.
 func newReactCheckCmd() *cobra.Command {
-	return &cobra.Command{
+	var quiet bool
+
+	cmd := &cobra.Command{
 		Use:   "check",
 		Short: "최근 CI 실패 감지 및 분석 보고서 생성",
-		RunE:  runReactCheck,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runReactCheck(cmd, args, quiet)
+		},
 	}
+
+	cmd.Flags().BoolVar(&quiet, "quiet", false, "Suppress output when no failures are found; print only summary when failures exist")
+	return cmd
 }
 
 // newReactApplyCmd creates `auto react apply {run-id}`.
@@ -63,14 +70,16 @@ func newReactApplyCmd() *cobra.Command {
 	return cmd
 }
 
-func runReactCheck(cmd *cobra.Command, _ []string) error {
+func runReactCheck(cmd *cobra.Command, _ []string, quiet bool) error {
 	// Verify gh CLI is installed
 	if _, err := exec.LookPath("gh"); err != nil {
 		return fmt.Errorf("gh CLI not found. Install it from: https://cli.github.com/")
 	}
 
 	out := cmd.OutOrStdout()
-	fmt.Fprintln(out, "Checking for CI failures...")
+	if !quiet {
+		fmt.Fprintln(out, "Checking for CI failures...")
+	}
 
 	// Fetch failed runs
 	result, err := exec.Command("gh", "run", "list",
@@ -88,11 +97,20 @@ func runReactCheck(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(runs) == 0 {
-		fmt.Fprintln(out, "No recent CI failures found.")
+		// When quiet is set and no failures found, exit silently.
+		if !quiet {
+			fmt.Fprintln(out, "No recent CI failures found.")
+		}
 		return nil
 	}
 
-	fmt.Fprintf(out, "Found %d failed run(s):\n\n", len(runs))
+	// Print summary line when quiet; full output otherwise.
+	fmt.Fprintf(out, "Found %d failed run(s):\n", len(runs))
+	if quiet {
+		// In quiet mode, only the summary line above is printed.
+		return nil
+	}
+	fmt.Fprintln(out)
 
 	// @AX:NOTE [AUTO] @AX:REASON: magic constant for react report storage path
 	reactDir := ".autopus/react"
