@@ -1,4 +1,7 @@
 // Package pidlock tests internal error paths via white-box testing.
+
+//go:build !windows
+
 package pidlock
 
 import (
@@ -18,7 +21,7 @@ func TestAcquire_FlockError(t *testing.T) {
 
 	// Override flockFunc to return an error on LOCK_EX attempts.
 	flockFunc = func(fd, how int) error {
-		if how == syscall.LOCK_EX|syscall.LOCK_NB {
+		if how == lockEX|lockNB {
 			return syscall.EWOULDBLOCK
 		}
 		return orig(fd, how)

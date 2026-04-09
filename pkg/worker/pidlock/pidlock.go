@@ -10,12 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
-
-// flockFunc is the advisory lock function used by Acquire and Release.
-// It can be overridden in tests to simulate flock failures.
-var flockFunc = syscall.Flock
 
 // Lock represents a PID lock file handle.
 type Lock struct {
@@ -69,8 +64,7 @@ func (l *Lock) Acquire() error {
 	}
 
 	// Apply advisory flock (non-blocking)
-	// @AX:WARN[AUTO]: syscall.Flock is Unix-only advisory lock — not portable; Windows builds will fail at compile time
-	if err := flockFunc(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := flockFunc(int(f.Fd()), lockEX|lockNB); err != nil {
 		_ = f.Close()
 		_ = os.Remove(l.path)
 		return fmt.Errorf("pidlock: flock %s: %w", l.path, err)
@@ -78,7 +72,7 @@ func (l *Lock) Acquire() error {
 
 	pid := os.Getpid()
 	if _, err := fmt.Fprintf(f, "%d", pid); err != nil {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		_ = flockFunc(int(f.Fd()), lockUN)
 		_ = f.Close()
 		_ = os.Remove(l.path)
 		return fmt.Errorf("pidlock: write PID: %w", err)
@@ -91,7 +85,7 @@ func (l *Lock) Acquire() error {
 // Release releases the PID lock by closing the file handle and deleting the lock file.
 func (l *Lock) Release() error {
 	if l.file != nil {
-		_ = flockFunc(int(l.file.Fd()), syscall.LOCK_UN)
+		_ = flockFunc(int(l.file.Fd()), lockUN)
 		_ = l.file.Close()
 		l.file = nil
 	}
@@ -119,13 +113,3 @@ func readPIDFromFile(path string) (int, error) {
 	return pid, nil
 }
 
-// isProcessAlive returns true if a process with the given PID is running.
-func isProcessAlive(pid int) bool {
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-	// Signal 0 checks process existence without sending an actual signal
-	err = proc.Signal(syscall.Signal(0))
-	return err == nil
-}
