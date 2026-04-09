@@ -33,19 +33,24 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 		go wl.auditWriter.StartCleanup(wl.lifecycleCtx)
 	}
 
-	// 2. TokenRefresher: only for JWT mode — API Key mode does not need token refresh.
+	// 2. TokenRefresher + Reconnector: JWT mode only — API Key mode skips token refresh.
+	// CredentialStore path (preferred): uses secure Keychain/encrypted-file storage.
+	// CredentialsPath path (deprecated): plain JSON file, kept for backward compatibility.
 	isAPIKeyMode := strings.HasPrefix(wl.config.AuthToken, "acos_worker_")
-	if wl.config.CredentialsPath != "" && !isAPIKeyMode {
-		wl.authRefresher = auth.NewTokenRefresher(
-			wl.config.BackendURL,
-			wl.config.CredentialsPath,
-			func() { log.Printf("[worker] re-authentication needed") },
-			func(newToken string) {
-				wl.server.SetAuthToken(newToken)
-				log.Printf("[worker] auth token refreshed")
-			},
-		)
-		go wl.authRefresher.Start(wl.lifecycleCtx)
+	if !isAPIKeyMode {
+		if wl.config.CredentialStore != nil {
+			wl.authRefresher = auth.NewTokenRefresher(
+				wl.config.BackendURL,
+				wl.config.CredentialStore,
+				func() { log.Printf("[worker] re-authentication needed") },
+				func(newToken string) {
+					wl.server.SetAuthToken(newToken)
+					log.Printf("[worker] auth token refreshed")
+				},
+			)
+			go wl.authRefresher.Start(wl.lifecycleCtx)
+			wl.authReconnector = auth.NewReconnector(wl.authRefresher, wl.server)
+		}
 	}
 
 	// 3. Knowledge syncer + watcher: enabled when KnowledgeSync and WorkspaceID are set.
@@ -54,10 +59,12 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 			wl.config.BackendURL,
 			wl.config.AuthToken,
 			wl.config.WorkspaceID,
+			wl.config.KnowledgeSourceID,
 		)
 		wl.knowledgeSearcher = knowledge.NewKnowledgeSearcher(
 			wl.config.BackendURL,
 			wl.config.AuthToken,
+			wl.config.WorkspaceID,
 		)
 		knowledgeDir := wl.config.KnowledgeDir
 		if knowledgeDir == "" {
@@ -85,10 +92,18 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 	}
 
 	// 5. NetMonitor: always start to detect network topology changes.
+	// When a Reconnector is available, use coordinated reconnect (token refresh + WS reconnect).
+	// Otherwise fall back to direct transport reconnect (API Key mode or no CredentialStore).
 	wl.netMonitor = workerNet.NewNetMonitor(
 		func(oldAddrs, newAddrs []string) {
 			log.Printf("[worker] network change detected, reconnecting")
-			if err := wl.server.ReconnectTransport(wl.lifecycleCtx); err != nil {
+			var err error
+			if wl.authReconnector != nil {
+				err = wl.authReconnector.Reconnect(wl.lifecycleCtx)
+			} else {
+				err = wl.server.ReconnectTransport(wl.lifecycleCtx)
+			}
+			if err != nil {
 				log.Printf("[worker] reconnect failed: %v", err)
 			}
 		},

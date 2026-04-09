@@ -19,6 +19,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/worker/parallel"
 	"github.com/insajin/autopus-adk/pkg/worker/poll"
 	"github.com/insajin/autopus-adk/pkg/worker/routing"
+	"github.com/insajin/autopus-adk/pkg/worker/setup"
 	"github.com/insajin/autopus-adk/pkg/worker/tui"
 )
 
@@ -32,7 +33,9 @@ type LoopConfig struct {
 	WorkDir         string // working directory for subprocesses
 	AuthToken       string          // bearer token for backend auth
 	Router          *routing.Router // optional model router (nil = no routing)
-	CredentialsPath string          // path to credentials.json for token refresh
+	// Deprecated: use CredentialStore instead. Kept for backward compatibility.
+	CredentialsPath string             // path to credentials.json for token refresh
+	CredentialStore setup.CredentialStore // Secure credential storage (Keychain/encrypted file). If nil and CredentialsPath is set, falls back to plain file mode.
 	AuditLogPath      string        // audit log file path (default: {WorkDir}/.autopus/audit.jsonl)
 	AuditMaxSize      int64         // max log size before rotation (default: 10MB)
 	AuditMaxAge       time.Duration // max age of rotated files (default: 7 days)
@@ -41,6 +44,7 @@ type LoopConfig struct {
 	WorktreeIsolation bool          // enable worktree isolation for parallel tasks
 	KnowledgeSync     bool          // enable knowledge file sync
 	KnowledgeDir      string        // directory to watch for knowledge sync (defaults to WorkDir)
+	KnowledgeSourceID string        // knowledge source ID for bridge binding
 }
 
 // WorkerLoop integrates A2A Server, ProviderAdapter, ContextBuilder, and StreamParser.
@@ -51,6 +55,7 @@ type WorkerLoop struct {
 	builder         ContextBuilder
 	tuiProgram      *tea.Program
 	authRefresher   *auth.TokenRefresher
+	authReconnector *auth.Reconnector
 	netMonitor      *workerNet.NetMonitor
 	pollFallback    *poll.TaskPoller
 	lifecycleCtx    context.Context

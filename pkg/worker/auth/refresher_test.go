@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,12 +13,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// fileCredStore wraps a file path as a CredentialStore for legacy tests.
+// Credentials are stored as JSON under the "autopus-worker" key in-memory.
+type fileCredStore struct {
+	path string
+	data map[string]string
+}
+
+func newFileCredStore(path string) *fileCredStore {
+	return &fileCredStore{path: path, data: make(map[string]string)}
+}
+
+func (f *fileCredStore) Save(service, value string) error {
+	f.data[service] = value
+	return nil
+}
+
+func (f *fileCredStore) Load(service string) (string, error) {
+	v, ok := f.data[service]
+	if !ok {
+		return "", &credNotFoundError{service: service}
+	}
+	return v, nil
+}
+
+func (f *fileCredStore) Delete(service string) error {
+	delete(f.data, service)
+	return nil
+}
+
+type credNotFoundError struct{ service string }
+
+func (e *credNotFoundError) Error() string { return "credential not found: " + e.service }
+
 func TestLoadSaveCredentials_Roundtrip(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "creds.json")
+	store := newFileCredStore("/unused")
 
-	r := NewTokenRefresher("http://unused", path, func() {}, nil)
+	r := NewTokenRefresher("http://unused", store, func() {}, nil)
 
 	original := &Credentials{
 		AccessToken:  "access-1",
@@ -44,15 +75,15 @@ func TestLoadSaveCredentials_Roundtrip(t *testing.T) {
 
 func TestLoadCredentials_FileNotFound(t *testing.T) {
 	t.Parallel()
-	r := NewTokenRefresher("http://unused", "/nonexistent/creds.json", func() {}, nil)
+	// Empty store → Load returns error.
+	store := newFileCredStore("/nonexistent")
+	r := NewTokenRefresher("http://unused", store, func() {}, nil)
 	_, err := r.LoadCredentials()
 	assert.Error(t, err)
 }
 
 func TestRefresh_FiresBeforeExpiry(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "creds.json")
 
 	// Mock response matches the cli-refresh wrapper format the refresher decodes.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,8 +99,9 @@ func TestRefresh_FiresBeforeExpiry(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	store := newFileCredStore("/unused")
 	var refreshedToken atomic.Value
-	r := NewTokenRefresher(srv.URL, path, func() {}, func(token string) {
+	r := NewTokenRefresher(srv.URL, store, func() {}, func(token string) {
 		refreshedToken.Store(token)
 	})
 
@@ -96,8 +128,6 @@ func TestRefresh_FiresBeforeExpiry(t *testing.T) {
 
 func TestRefresh_OnReauthNeeded(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "creds.json")
 
 	// Server always returns 401 to simulate refresh failure.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -105,8 +135,9 @@ func TestRefresh_OnReauthNeeded(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	store := newFileCredStore("/unused")
 	var reauthCalled atomic.Bool
-	r := NewTokenRefresher(srv.URL, path, func() {
+	r := NewTokenRefresher(srv.URL, store, func() {
 		reauthCalled.Store(true)
 	}, nil)
 
@@ -123,12 +154,11 @@ func TestRefresh_OnReauthNeeded(t *testing.T) {
 	assert.True(t, reauthCalled.Load(), "onReauthNeeded should be called on refresh failure")
 }
 
-func TestSaveCredentials_CreatesDirectory(t *testing.T) {
+func TestSaveCredentials_StoreRoundtrip(t *testing.T) {
 	t.Parallel()
-	dir := t.TempDir()
-	path := filepath.Join(dir, "sub", "dir", "creds.json")
+	store := newFileCredStore("/unused")
 
-	r := NewTokenRefresher("http://unused", path, func() {}, nil)
+	r := NewTokenRefresher("http://unused", store, func() {}, nil)
 	err := r.SaveCredentials(&Credentials{AccessToken: "tok"})
 	require.NoError(t, err)
 
