@@ -15,31 +15,34 @@ import (
 )
 
 // Syncer uploads changed files to the Knowledge Hub backend using SHA256-based
-// incremental diffing. Conflict resolution is Last-Write-Wins.
+// incremental diffing via the workspace-scoped bridge sync endpoint.
+// Conflict resolution is Last-Write-Wins.
 type Syncer struct {
 	backendURL  string
 	authToken   string
 	workspaceID string
+	sourceID    string // knowledge source ID for bridge binding
 	client      *http.Client
 
 	mu     sync.Mutex
 	hashes map[string]string // path -> sha256 hex
 }
 
-// syncPayload is the JSON body sent to the sync endpoint.
+// syncPayload is the JSON body sent to the bridge push endpoint.
 type syncPayload struct {
-	WorkspaceID string `json:"workspace_id"`
-	Path        string `json:"path"`
-	Hash        string `json:"hash"`
-	Content     string `json:"content"`
+	Path    string `json:"path"`
+	Hash    string `json:"hash"`
+	Content string `json:"content"`
 }
 
-// NewSyncer creates a Syncer for the given backend and workspace.
-func NewSyncer(backendURL, authToken, workspaceID string) *Syncer {
+// NewSyncer creates a Syncer for the given backend, workspace, and source.
+// sourceID identifies the knowledge source bound to this bridge connection.
+func NewSyncer(backendURL, authToken, workspaceID, sourceID string) *Syncer {
 	return &Syncer{
 		backendURL:  backendURL,
 		authToken:   authToken,
 		workspaceID: workspaceID,
+		sourceID:    sourceID,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -70,10 +73,9 @@ func (s *Syncer) SyncFile(ctx context.Context, path string) error {
 	}
 
 	payload := syncPayload{
-		WorkspaceID: s.workspaceID,
-		Path:        path,
-		Hash:        hash,
-		Content:     string(content),
+		Path:    path,
+		Hash:    hash,
+		Content: string(content),
 	}
 
 	body, err := json.Marshal(payload)
@@ -81,7 +83,8 @@ func (s *Syncer) SyncFile(ctx context.Context, path string) error {
 		return fmt.Errorf("sync file: marshal: %w", err)
 	}
 
-	endpoint := fmt.Sprintf("%s/api/v1/knowledge/sync", s.backendURL)
+	endpoint := fmt.Sprintf("%s/api/v1/workspaces/%s/knowledge/sources/%s/bridge/push",
+		s.backendURL, s.workspaceID, s.sourceID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("sync file: create request: %w", err)

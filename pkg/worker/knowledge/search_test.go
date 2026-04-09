@@ -26,17 +26,17 @@ func TestKnowledgeSearcher_Search(t *testing.T) {
 			name:       "successful search with results",
 			query:      "deployment guide",
 			statusCode: http.StatusOK,
-			response: []SearchResult{
-				{ID: "1", Title: "Deploy Guide", Content: "How to deploy", Score: 0.95},
-				{ID: "2", Title: "CI/CD", Content: "Pipeline setup", Score: 0.80},
-			},
+			response: searchResponse{Data: []SearchResult{
+				{ID: "1", Title: "Deploy Guide", Content: "How to deploy", RelevanceScore: 0.95},
+				{ID: "2", Title: "CI/CD", Content: "Pipeline setup", RelevanceScore: 0.80},
+			}},
 			wantCount: 2,
 		},
 		{
 			name:       "empty results",
 			query:      "nonexistent topic",
 			statusCode: http.StatusOK,
-			response:   []SearchResult{},
+			response:   searchResponse{Data: []SearchResult{}},
 			wantCount:  0,
 		},
 		{
@@ -61,16 +61,16 @@ func TestKnowledgeSearcher_Search(t *testing.T) {
 
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Verify request properties.
-				assert.Equal(t, http.MethodGet, r.Method)
+				assert.Equal(t, http.MethodPost, r.Method)
 				assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
-				assert.Contains(t, r.URL.Path, "/api/v1/knowledge/search")
+				assert.Contains(t, r.URL.Path, "/api/v1/workspaces/ws-123/knowledge/search")
 
 				w.WriteHeader(tt.statusCode)
 				json.NewEncoder(w).Encode(tt.response)
 			}))
 			defer srv.Close()
 
-			ks := NewKnowledgeSearcher(srv.URL, "test-token")
+			ks := NewKnowledgeSearcher(srv.URL, "test-token", "ws-123")
 			results, err := ks.Search(context.Background(), tt.query)
 
 			if tt.wantErr != "" {
@@ -81,22 +81,30 @@ func TestKnowledgeSearcher_Search(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Len(t, results, tt.wantCount)
+			// Verify Score convenience field is populated.
+			for _, r := range results {
+				assert.Equal(t, r.RelevanceScore, r.Score)
+			}
 		})
 	}
 }
 
-func TestKnowledgeSearcher_QueryParams(t *testing.T) {
+func TestKnowledgeSearcher_RequestBody(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify query parameter is URL-encoded.
-		assert.Equal(t, "hello world", r.URL.Query().Get("q"))
+		// Verify the POST body contains the query.
+		var req searchRequest
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		assert.Equal(t, "hello world", req.Query)
+		assert.Equal(t, 10, req.Limit)
+
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]SearchResult{})
+		json.NewEncoder(w).Encode(searchResponse{Data: []SearchResult{}})
 	}))
 	defer srv.Close()
 
-	ks := NewKnowledgeSearcher(srv.URL, "tok")
+	ks := NewKnowledgeSearcher(srv.URL, "tok", "ws-1")
 	_, err := ks.Search(context.Background(), "hello world")
 	require.NoError(t, err)
 }
@@ -106,11 +114,11 @@ func TestKnowledgeSearcher_ContextCancelled(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]SearchResult{})
+		json.NewEncoder(w).Encode(searchResponse{Data: []SearchResult{}})
 	}))
 	defer srv.Close()
 
-	ks := NewKnowledgeSearcher(srv.URL, "tok")
+	ks := NewKnowledgeSearcher(srv.URL, "tok", "ws-1")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -128,7 +136,7 @@ func TestKnowledgeSearcher_InvalidJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ks := NewKnowledgeSearcher(srv.URL, "tok")
+	ks := NewKnowledgeSearcher(srv.URL, "tok", "ws-1")
 	_, err := ks.Search(context.Background(), "test")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "decode response")

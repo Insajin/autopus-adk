@@ -23,7 +23,7 @@ func TestSyncer_ComputeHash(t *testing.T) {
 	content := []byte("hello world")
 	require.NoError(t, os.WriteFile(filePath, content, 0644))
 
-	s := NewSyncer("http://unused", "tok", "ws1")
+	s := NewSyncer("http://unused", "tok", "ws1", "src1")
 	hash, err := s.ComputeHash(filePath)
 	require.NoError(t, err)
 
@@ -34,7 +34,7 @@ func TestSyncer_ComputeHash(t *testing.T) {
 func TestSyncer_ComputeHash_FileNotFound(t *testing.T) {
 	t.Parallel()
 
-	s := NewSyncer("http://unused", "tok", "ws1")
+	s := NewSyncer("http://unused", "tok", "ws1", "src1")
 	_, err := s.ComputeHash("/nonexistent/file.txt")
 	require.Error(t, err)
 }
@@ -51,6 +51,7 @@ func TestSyncer_SyncFile_UploadsChangedFile(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "Bearer my-token", r.Header.Get("Authorization"))
 		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Contains(t, r.URL.Path, "/api/v1/workspaces/ws-123/knowledge/sources/src-1/bridge/push")
 
 		err := json.NewDecoder(r.Body).Decode(&received)
 		require.NoError(t, err)
@@ -59,11 +60,10 @@ func TestSyncer_SyncFile_UploadsChangedFile(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := NewSyncer(srv.URL, "my-token", "ws-123")
+	s := NewSyncer(srv.URL, "my-token", "ws-123", "src-1")
 	err := s.SyncFile(context.Background(), filePath)
 	require.NoError(t, err)
 
-	assert.Equal(t, "ws-123", received.WorkspaceID)
 	assert.Equal(t, filePath, received.Path)
 	assert.Equal(t, "content v1", received.Content)
 	assert.NotEmpty(t, received.Hash)
@@ -83,7 +83,7 @@ func TestSyncer_SyncFile_SkipsUnchanged(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := NewSyncer(srv.URL, "tok", "ws1")
+	s := NewSyncer(srv.URL, "tok", "ws1", "src1")
 	ctx := context.Background()
 
 	// First sync uploads.
@@ -109,7 +109,7 @@ func TestSyncer_SyncFile_UploadsAfterChange(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := NewSyncer(srv.URL, "tok", "ws1")
+	s := NewSyncer(srv.URL, "tok", "ws1", "src1")
 	ctx := context.Background()
 
 	require.NoError(t, s.SyncFile(ctx, filePath))
@@ -133,7 +133,7 @@ func TestSyncer_SyncFile_ServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	s := NewSyncer(srv.URL, "tok", "ws1")
+	s := NewSyncer(srv.URL, "tok", "ws1", "src1")
 	err := s.SyncFile(context.Background(), filePath)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unexpected status 500")

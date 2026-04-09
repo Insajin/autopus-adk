@@ -14,8 +14,9 @@ type WorkerConfig struct {
 	WorkspaceID  string   `yaml:"workspace_id"`
 	Providers    []string `yaml:"providers"`
 	WorkDir      string   `yaml:"work_dir"`
-	KnowledgeDir string   `yaml:"knowledge_dir"` // directory to watch for knowledge sync (defaults to work_dir)
-	A2AURL       string   `yaml:"a2a_url"`
+	KnowledgeDir      string `yaml:"knowledge_dir"`       // directory to watch for knowledge sync (defaults to work_dir)
+	KnowledgeSourceID string `yaml:"knowledge_source_id"` // knowledge source ID for bridge binding
+	A2AURL            string `yaml:"a2a_url"`
 	Concurrency  int      `yaml:"concurrency"`
 }
 

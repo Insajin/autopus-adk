@@ -17,7 +17,9 @@ import (
 	"github.com/insajin/autopus-adk/pkg/worker/knowledge"
 	workerNet "github.com/insajin/autopus-adk/pkg/worker/net"
 	"github.com/insajin/autopus-adk/pkg/worker/parallel"
+	"github.com/insajin/autopus-adk/pkg/worker/pidlock"
 	"github.com/insajin/autopus-adk/pkg/worker/poll"
+	"github.com/insajin/autopus-adk/pkg/worker/reaper"
 	"github.com/insajin/autopus-adk/pkg/worker/routing"
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
 	"github.com/insajin/autopus-adk/pkg/worker/tui"
@@ -62,11 +64,14 @@ type WorkerLoop struct {
 	lifecycleCancel context.CancelFunc
 	auditWriter       *audit.RotatingWriter
 	knowledgeSearcher *knowledge.KnowledgeSearcher
+	memorySearcher    *knowledge.MemorySearcher
 	knowledgeSyncer   *knowledge.Syncer
 	knowledgeWatcher  *knowledge.FileWatcher
 	semaphore         *parallel.TaskSemaphore
 	worktreeManager   *parallel.WorktreeManager
 	auditLogger       *slogAuditLogger
+	pidLock           *pidlock.Lock
+	zombieReaper      *reaper.Reaper
 }
 
 // NewWorkerLoop creates a WorkerLoop with the given configuration.
@@ -92,14 +97,25 @@ func NewWorkerLoop(config LoopConfig) *WorkerLoop {
 }
 
 // Start connects to the backend and begins processing tasks.
+// @AX:ANCHOR[AUTO]: public lifecycle entry point — Start/Close are the primary WorkerLoop API; callers (CLI, tests) depend on error contract
 func (wl *WorkerLoop) Start(ctx context.Context) error {
+	// Acquire PID lock before starting to enforce single-instance constraint.
+	wl.pidLock = pidlock.New(pidlock.DefaultPath())
+	if err := wl.pidLock.Acquire(); err != nil {
+		return fmt.Errorf("acquire PID lock: %w", err)
+	}
+
 	log.Printf("[worker] starting loop: provider=%s backend=%s", wl.config.Provider.Name(), wl.config.BackendURL)
 	if err := wl.server.Start(ctx); err != nil {
+		if releaseErr := wl.pidLock.Release(); releaseErr != nil {
+			log.Printf("[worker] PID lock release failed on start error: %v", releaseErr)
+		}
 		return err
 	}
 	wl.startServices(ctx)
 
 	// Initialize parallel execution components if concurrency limit is configured.
+	// @AX:NOTE[AUTO]: magic constant — MaxConcurrency threshold 1 means sequential; 0 is treated same as 1 (no semaphore)
 	if wl.config.MaxConcurrency > 1 {
 		wl.semaphore = parallel.NewTaskSemaphore(wl.config.MaxConcurrency)
 		if wl.config.WorktreeIsolation {
@@ -113,6 +129,11 @@ func (wl *WorkerLoop) Start(ctx context.Context) error {
 // Close shuts down the worker loop and its A2A server.
 func (wl *WorkerLoop) Close() error {
 	wl.stopServices()
+	if wl.pidLock != nil {
+		if err := wl.pidLock.Release(); err != nil {
+			log.Printf("[worker] PID lock release failed: %v", err)
+		}
+	}
 	return wl.server.Close()
 }
 
@@ -144,6 +165,9 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 		knowledgeCtx = populateKnowledge(ctx, wl.knowledgeSearcher, msg.Description)
 	}
 
+	// Populate memory context (SPEC-KHINT-001 REQ-003).
+	memoryCtx := populateMemory(ctx, wl.memorySearcher, wl.config.WorkerName, msg.Description)
+
 	// Build Layer 4 prompt via ContextBuilder.
 	prompt := wl.builder.Build(TaskPayload{
 		TaskID:        taskID,
@@ -151,6 +175,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 		PMNotes:       msg.PMNotes,
 		PolicySummary: msg.PolicySummary,
 		KnowledgeCtx:  knowledgeCtx,
+		MemoryCtx:     memoryCtx,
 		SpecID:        msg.SpecID,
 	})
 
@@ -178,6 +203,23 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	}
 
 	log.Printf("[worker] task %s completed: cost=$%.4f duration=%dms", taskID, result.CostUSD, result.DurationMS)
+
+	// Memory write-back: record task learnings (SPEC-KHINT-001 REQ-005).
+	if wl.memorySearcher != nil && result.Output != "" {
+		go func() {
+			writeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err := wl.memorySearcher.CreateMemory(writeCtx, knowledge.CreateMemoryRequest{
+				AgentID: wl.config.WorkerName,
+				Title:   fmt.Sprintf("Task learning: %s", taskID),
+				Content: truncateForMemory(msg.Description, result.Output),
+				Source:  "agent_learning",
+			})
+			if err != nil {
+				log.Printf("[worker] memory write-back failed: %v", err)
+			}
+		}()
+	}
 
 	return &a2a.TaskResult{
 		Status:    a2a.StatusCompleted,

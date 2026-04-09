@@ -12,6 +12,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/worker/knowledge"
 	workerNet "github.com/insajin/autopus-adk/pkg/worker/net"
 	"github.com/insajin/autopus-adk/pkg/worker/poll"
+	"github.com/insajin/autopus-adk/pkg/worker/reaper"
 	"github.com/insajin/autopus-adk/pkg/worker/scheduler"
 )
 
@@ -77,6 +78,15 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 		)
 	}
 
+	// 3b. Memory searcher: enabled alongside knowledge (SPEC-KHINT-001 REQ-003).
+	if wl.config.WorkspaceID != "" {
+		wl.memorySearcher = knowledge.NewMemorySearcher(
+			wl.config.BackendURL,
+			wl.config.AuthToken,
+			wl.config.WorkspaceID,
+		)
+	}
+
 	// 4. Scheduler dispatcher: enabled when WorkspaceID is set.
 	if wl.config.WorkspaceID != "" {
 		d := scheduler.NewDispatcher(
@@ -113,6 +123,11 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 		},
 	)
 	wl.netMonitor.Start(wl.lifecycleCtx)
+
+	// 6. Zombie reaper: detect and reap zombie child processes (FR-PROC-04).
+	// @AX:NOTE[AUTO]: magic constant — 30s reaper interval matches reaper.go default; keep in sync if default changes
+	wl.zombieReaper = reaper.New(reaper.Config{Interval: 30 * time.Second})
+	wl.zombieReaper.Start(wl.lifecycleCtx) //nolint:errcheck
 }
 
 // stopServices gracefully stops all lifecycle services.
@@ -128,10 +143,15 @@ func (wl *WorkerLoop) stopServices() {
 			log.Printf("[worker] audit writer close failed: %v", err)
 		}
 	}
+	// Wait for zombie reaper goroutine to exit cleanly.
+	if wl.zombieReaper != nil {
+		wl.zombieReaper.Wait() //nolint:errcheck
+	}
 }
 
 // activateFallbackPoller starts REST polling when WebSocket reconnect fails.
 // It is a no-op if the fallback poller is already active.
+// @AX:WARN[AUTO]: goroutine without bounded lifetime — fallback poller goroutine runs until lifecycleCtx; no mechanism to stop it independently once activated
 func (wl *WorkerLoop) activateFallbackPoller() {
 	if wl.pollFallback != nil {
 		return // already active
@@ -141,6 +161,7 @@ func (wl *WorkerLoop) activateFallbackPoller() {
 		wl.config.AuthToken,
 		wl.config.WorkspaceID,
 		func(taskData []byte) {
+			// @AX:TODO[AUTO]: forward polled task to the A2A server's handleSendMessage path — currently logs only, no task processing
 			// TODO: forward polled task to the A2A server's handleSendMessage path.
 			// Currently logs only — WebSocket is the primary task delivery path.
 			log.Printf("[worker] fallback poller received task (%d bytes) — processing not yet implemented", len(taskData))

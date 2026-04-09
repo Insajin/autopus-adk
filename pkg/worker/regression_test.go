@@ -190,10 +190,10 @@ func verifySemaphore(t *testing.T) {
 
 // verifyKnowledge confirms knowledge syncer and searcher instantiation.
 func verifyKnowledge(t *testing.T) {
-	syncer := knowledge.NewSyncer("http://localhost:0", "token", "ws-1")
+	syncer := knowledge.NewSyncer("http://localhost:0", "token", "ws-1", "src-1")
 	require.NotNil(t, syncer, "NewSyncer must return non-nil")
 
-	searcher := knowledge.NewKnowledgeSearcher("http://localhost:0", "token")
+	searcher := knowledge.NewKnowledgeSearcher("http://localhost:0", "token", "ws-1")
 	require.NotNil(t, searcher, "NewKnowledgeSearcher must return non-nil")
 
 	watcher := knowledge.NewFileWatcher(t.TempDir(), 0, func(string) {}, nil)
