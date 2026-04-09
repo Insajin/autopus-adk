@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/insajin/autopus-adk/pkg/worker/audit"
 	"github.com/insajin/autopus-adk/pkg/worker/auth"
 	"github.com/insajin/autopus-adk/pkg/worker/knowledge"
@@ -161,7 +163,7 @@ func (wl *WorkerLoop) activateFallbackPoller() {
 		wl.config.AuthToken,
 		wl.config.WorkspaceID,
 		func(taskData []byte) {
-			// @AX:TODO[AUTO]: forward polled task to the A2A server's handleSendMessage path — currently logs only, no task processing
+			// @AX:TODO[AUTO]:CYCLE:1 forward polled task to the A2A server's handleSendMessage path — currently logs only, no task processing
 			// TODO: forward polled task to the A2A server's handleSendMessage path.
 			// Currently logs only — WebSocket is the primary task delivery path.
 			log.Printf("[worker] fallback poller received task (%d bytes) — processing not yet implemented", len(taskData))

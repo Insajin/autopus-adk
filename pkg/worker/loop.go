@@ -210,7 +210,10 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 			writeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			err := wl.memorySearcher.CreateMemory(writeCtx, knowledge.CreateMemoryRequest{
-				AgentID: wl.config.WorkerName,
+				// TODO: use a stable UUID agent_id once A2A server exposes one.
+			// WorkerName may not be UUID-formatted; backend returns 400 which is
+			// logged and discarded per REQ-006 graceful degradation.
+			AgentID: wl.config.WorkerName,
 				Title:   fmt.Sprintf("Task learning: %s", taskID),
 				Content: truncateForMemory(msg.Description, result.Output),
 				Source:  "agent_learning",

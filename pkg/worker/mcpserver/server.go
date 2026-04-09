@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"sync"
 )
@@ -53,7 +54,22 @@ type toolDescriptor struct {
 	Description string `json:"description"`
 }
 
+// New creates a new MCP server connected to the given backend.
+// It is an alias for NewMCPServer for convenience.
+func New(backendURL, authToken, workspaceID string) *MCPServer {
+	return NewMCPServer(backendURL, authToken, workspaceID)
+}
+
+// NewMCPServerFromConfig creates an MCP server from a validated config.
+func NewMCPServerFromConfig(cfg Config) (*MCPServer, error) {
+	if err := ValidateConfig(cfg); err != nil {
+		return nil, fmt.Errorf("invalid MCP config: %w", err)
+	}
+	return NewMCPServer(cfg.BackendURL, cfg.AuthToken, cfg.WorkspaceID), nil
+}
+
 // NewMCPServer creates a new MCP server connected to the given backend.
+// @AX:ANCHOR[AUTO]: public constructor — NewMCPServer/New are the primary entry points; signature is referenced by worker setup and CLI
 func NewMCPServer(backendURL, authToken, workspaceID string) *MCPServer {
 	s := &MCPServer{
 		backendURL:  backendURL,
@@ -67,10 +83,23 @@ func NewMCPServer(backendURL, authToken, workspaceID string) *MCPServer {
 	return s
 }
 
+// StartSSE starts the SSE transport on the given addr (host:port).
+func (s *MCPServer) StartSSE(ctx context.Context, addr string) error {
+	mux := http.NewServeMux()
+	mux.Handle("/mcp/sse", s.SSEHandler())
+	srv := &http.Server{Addr: addr, Handler: mux}
+	go func() {
+		<-ctx.Done()
+		srv.Shutdown(context.Background()) //nolint:errcheck
+	}()
+	return srv.ListenAndServe()
+}
+
 // Start reads line-delimited JSON-RPC requests from stdin and dispatches them.
 func (s *MCPServer) Start(ctx context.Context) error {
 	scanner := bufio.NewScanner(os.Stdin)
 	// Allow large messages up to 1MB.
+	// @AX:NOTE[AUTO]: magic constant — 1MB scanner buffer cap; oversized JSON-RPC messages are silently truncated without error
 	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 
 	for scanner.Scan() {
@@ -98,6 +127,7 @@ func (s *MCPServer) Start(ctx context.Context) error {
 func (s *MCPServer) dispatch(ctx context.Context, req *jsonRPCRequest) {
 	switch req.Method {
 	case "initialize":
+		// @AX:NOTE[AUTO]: magic constant — protocolVersion "2024-11-05" is MCP spec version; update when upgrading MCP protocol
 		s.sendResult(req.ID, map[string]any{
 			"protocolVersion": "2024-11-05",
 			"serverInfo":      map[string]string{"name": "autopus-adk", "version": "0.1.0"},

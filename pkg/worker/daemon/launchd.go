@@ -10,6 +10,7 @@ import (
 	"text/template"
 )
 
+// @AX:NOTE[AUTO]: magic constant — launchdLabel is the macOS launchd service identifier; changing this orphans existing installed agents
 const (
 	launchdLabel = "co.autopus.worker"
 )
@@ -51,8 +52,13 @@ var plistTemplate = template.Must(template.New("plist").Funcs(template.FuncMap{
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
+        {{/* @AX:WARN[AUTO]: hardcoded PATH includes cmux-specific path — breaks on machines without cmux installed; should be configurable */}}
         <string>/Applications/cmux.app/Contents/Resources/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
     <key>StandardOutPath</key>
     <string>{{ .LogDir | xmlEsc }}/autopus-worker.out.log</string>
     <key>StandardErrorPath</key>

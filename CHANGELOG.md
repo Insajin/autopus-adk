@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Worker 프로세스 안정화** (SPEC-WKPROC-001):
+  - `pkg/worker/pidlock/` — PID lock 패키지 (advisory flock, stale detection, auto-reclaim)
+  - `pkg/worker/reaper/` — Zombie 프로세스 reaper (30초 주기, Unix Wait4, build-tag 분리)
+  - `pkg/worker/mcpserver/sse.go` — MCP SSE transport (/mcp/sse 엔드포인트)
+  - `pkg/worker/mcpserver/config.go` — MCP config 구조체 + JSON 검증
+  - `pkg/worker/mcpserver/server.go` — NewMCPServerFromConfig, StartSSE 메서드
+  - `pkg/worker/loop.go` — Start/Close에 PID lock 획득/해제 통합
+  - `pkg/worker/loop_lifecycle.go` — startServices에 reaper goroutine 추가
+  - `pkg/worker/daemon/launchd.go` — ProcessType=Background, ThrottleInterval=10
+  - `pkg/worker/daemon/systemd.go` — StandardOutput/StandardError 로그 경로
+  - `internal/cli/worker_commands.go` — worker status에 PID 표시
+
 ## [v0.37.0] — 2026-04-07
 
 ### Added

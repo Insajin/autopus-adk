@@ -22,6 +22,8 @@ ExecStart={{ .ExecStart }}
 Restart=always
 RestartSec=5
 Environment=HOME=%h
+StandardOutput=append:{{ .LogDir }}/autopus-worker.out.log
+StandardError=append:{{ .LogDir }}/autopus-worker.err.log
 
 [Install]
 WantedBy=default.target
@@ -30,8 +32,10 @@ WantedBy=default.target
 // unitData holds template rendering data for systemd unit.
 type unitData struct {
 	ExecStart string
+	LogDir    string
 }
 
+// @AX:NOTE[AUTO]: magic constant — systemdUnitName is the systemd service identifier; changing this orphans existing installed units
 const systemdUnitName = "autopus-worker.service"
 
 // systemdUnitPath returns the user unit file path.
@@ -49,7 +53,13 @@ func GenerateUnit(cfg LaunchdConfig) (string, error) {
 	parts = append(parts, cfg.Args...)
 	execStart := strings.Join(parts, " ")
 
-	data := unitData{ExecStart: execStart}
+	logDir := cfg.LogDir
+	if logDir == "" {
+		home, _ := os.UserHomeDir()
+		logDir = filepath.Join(home, ".config", "autopus", "logs")
+	}
+
+	data := unitData{ExecStart: execStart, LogDir: logDir}
 
 	var buf []byte
 	w := &byteWriter{buf: &buf}

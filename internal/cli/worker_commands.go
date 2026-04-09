@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,10 +13,12 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/pkg/worker/daemon"
+	"github.com/insajin/autopus-adk/pkg/worker/pidlock"
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
 )
 
 // addWorkerSubcommands registers all worker subcommands on the parent command.
+// @AX:ANCHOR[AUTO]: CLI command registration boundary — all worker subcommands are wired here; adding/removing commands requires updating this function
 func addWorkerSubcommands(parent *cobra.Command) {
 	parent.AddCommand(
 		newWorkerStartCmd(),
@@ -85,6 +88,7 @@ func newWorkerStatusCmd() *cobra.Command {
 			installed := isDaemonInstalled()
 			fmt.Fprintf(out, "Daemon installed: %v\n", installed)
 			fmt.Fprintf(out, "Platform: %s\n", runtime.GOOS)
+			printPIDStatus(out)
 			if installed {
 				printDaemonStatus(cmd)
 			}
@@ -204,6 +208,7 @@ func newWorkerSetupCmd() *cobra.Command {
 			return runWorkerSetup(cmd, backendURL, token, workspaceID, apiKey)
 		},
 	}
+	// @AX:NOTE[AUTO]: magic constant — default backend URL "https://api.autopus.co" is hardcoded; must match production endpoint
 	cmd.Flags().StringVar(&backendURL, "backend", "https://api.autopus.co", "Backend API URL")
 	cmd.Flags().StringVar(&token, "token", "", "Pre-obtained JWT — skips browser OAuth (for agents/CI)")
 	cmd.Flags().StringVar(&workspaceID, "workspace", "", "Workspace ID — skips interactive selection")
@@ -263,4 +268,16 @@ func workerLogPath() string {
 func workerDataPath(name string) string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "autopus", name)
+}
+
+// printPIDStatus writes PID information to out using the default PID lock file.
+func printPIDStatus(out io.Writer) {
+	pidPath := pidlock.DefaultPath()
+	lk := pidlock.New(pidPath)
+	pid, err := lk.ReadPID()
+	if err != nil {
+		fmt.Fprintf(out, "PID: not running\n")
+		return
+	}
+	fmt.Fprintf(out, "PID: %d\n", pid)
 }
