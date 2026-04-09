@@ -32,6 +32,7 @@ func (a *ClaudeAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 		"--output-format", "stream-json",
 		"--verbose",
 		"--dangerously-skip-permissions",
+		"--bare",
 	}
 
 	// Only add --resume if sessionID is a valid UUID (claude requires UUID format).
