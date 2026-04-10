@@ -74,7 +74,7 @@ func newInitCmd() *cobra.Command {
 				}
 			}
 			if len(platformList) == 0 {
-				platformList = []string{"claude-code"}
+				platformList = detectDefaultPlatforms()
 			}
 
 			cfg := config.DefaultFullConfig(project)

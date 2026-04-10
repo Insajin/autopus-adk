@@ -6,6 +6,14 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Init Platform Auto-Detection**: `auto init` without `--platforms` now scans PATH for supported installed coding CLIs and installs all detected supported platforms
+  - `internal/cli/init.go` — default platform selection now delegates to PATH-based detection when `--platforms` is omitted
+  - `internal/cli/init_helpers.go` — `detectDefaultPlatforms()` filters detected CLIs to ADK-supported init targets (`claude-code`, `codex`, `gemini-cli`) with Claude fallback
+  - `internal/cli/init_test.go` — auto-detect and no-CLI fallback regression tests
+  - `pkg/detect/detect.go` — orchestra provider detection now tracks `codex` instead of stale `opencode`
+  - `pkg/detect/detect_test.go` — provider detection expectations updated to Codex
+  - `README.md`, `docs/README.ko.md` — docs aligned to 3 auto-generated platforms and supported-CLI wording
+
 - **Worker 프로세스 안정화** (SPEC-WKPROC-001):
   - `pkg/worker/pidlock/` — PID lock 패키지 (advisory flock, stale detection, auto-reclaim)
   - `pkg/worker/reaper/` — Zombie 프로세스 reaper (30초 주기, Unix Wait4, build-tag 분리)

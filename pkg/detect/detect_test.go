@@ -206,7 +206,7 @@ func TestDetectOrchestraProviders_ReturnsAllThree(t *testing.T) {
 		assert.NotEmpty(t, p.Binary, "OrchestraProvider.Binary must not be empty")
 	}
 	assert.True(t, names["claude"], "claude provider must be present")
-	assert.True(t, names["opencode"], "opencode provider must be present")
+	assert.True(t, names["codex"], "codex provider must be present")
 	assert.True(t, names["gemini"], "gemini provider must be present")
 }
 

@@ -85,7 +85,7 @@ var knownOrchestraProviders = []struct {
 	binary string
 }{
 	{"claude", "claude"},
-	{"opencode", "opencode"},
+	{"codex", "codex"},
 	{"gemini", "gemini"},
 }
 
@@ -118,7 +118,7 @@ type Dependency struct {
 	Name           string
 	Binary         string
 	InstallCmd     string
-	Required       bool   // true이면 필수, false이면 권장
+	Required       bool // true이면 필수, false이면 권장
 	Description    string
 	DependsOn      string // dependency name that must be installed first
 	PostInstallCmd string // command to run after install (e.g., browser download)

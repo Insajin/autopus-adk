@@ -8,7 +8,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/insajin/autopus-adk/pkg/config"
 )
+
+func makeDummyBinary(t *testing.T, tmpDir, name string) {
+	t.Helper()
+	path := filepath.Join(tmpDir, name)
+	require.NoError(t, os.WriteFile(path, []byte{}, 0o755))
+}
 
 func TestInitCmd_Default(t *testing.T) {
 	t.Parallel()
@@ -152,4 +160,36 @@ func TestInitCmd_NoReviewGateFlag(t *testing.T) {
 	require.NoError(t, err)
 	// review_gate section must have enabled: false
 	assert.Contains(t, string(data), "enabled: false", "review gate must be disabled")
+}
+
+func TestInitCmd_AutoDetectsSupportedPlatforms(t *testing.T) {
+	dir := t.TempDir()
+	binDir := t.TempDir()
+	for _, binary := range []string{"claude", "codex", "gemini", "cursor"} {
+		makeDummyBinary(t, binDir, binary)
+	}
+	t.Setenv("PATH", binDir)
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--yes"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	cfg, err := config.Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"claude-code", "codex", "gemini-cli"}, cfg.Platforms)
+}
+
+func TestInitCmd_AutoDetectFallbacksToClaude(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("PATH", t.TempDir())
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--yes"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	cfg, err := config.Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"claude-code"}, cfg.Platforms)
 }

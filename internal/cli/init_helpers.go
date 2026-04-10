@@ -15,7 +15,14 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/detect"
 )
+
+var initSupportedPlatforms = map[string]bool{
+	"claude-code": true,
+	"codex":       true,
+	"gemini-cli":  true,
+}
 
 // generatePlatformFiles는 플랫폼별 파일을 생성한다.
 func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessConfig, cmd *cobra.Command) error {
@@ -41,6 +48,27 @@ func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessC
 		tui.Success(cmd.OutOrStdout(), p)
 	}
 	return nil
+}
+
+// detectDefaultPlatforms returns installed, ADK-supported platforms in a stable order.
+// Falls back to Claude Code when no supported CLI is found in PATH.
+func detectDefaultPlatforms() []string {
+	detected := detect.DetectPlatforms()
+	platforms := make([]string, 0, len(detected))
+	seen := make(map[string]bool, len(detected))
+
+	for _, p := range detected {
+		if !initSupportedPlatforms[p.Name] || seen[p.Name] {
+			continue
+		}
+		platforms = append(platforms, p.Name)
+		seen[p.Name] = true
+	}
+
+	if len(platforms) == 0 {
+		return []string{"claude-code"}
+	}
+	return platforms
 }
 
 // updateGitignore는 .gitignore에 autopus 패턴을 추가한다.

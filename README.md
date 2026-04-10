@@ -11,7 +11,7 @@ Make your AI coding tools (Claude Code, Codex, Gemini CLI) work like a real engi
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://golang.org)
-[![Platforms](https://img.shields.io/badge/Platforms-4-orange)](#-one-config-four-platforms)
+[![Platforms](https://img.shields.io/badge/Platforms-3-orange)](#-one-config-three-platforms)
 [![Agents](https://img.shields.io/badge/Agents-16-blueviolet)](#-16-specialized-agents)
 [![Skills](https://img.shields.io/badge/Skills-40-ff69b4)](#-all-commands)
 
@@ -471,21 +471,19 @@ Fallback: providers without hooks use ReadScreen + idle detection (SPEC-ORCH-006
 | **Signature Map** | `auto setup` | Extract exported API signatures (Go + TypeScript) via AST analysis |
 | **Test Runner Detection** | `auto init` | Auto-detect jest, vitest, pytest, cargo test frameworks |
 
-### 🌐 One Config, Four Platforms
+### 🌐 One Config, Three Platforms
 
 ```bash
-auto init   # auto-detects all installed AI coding CLIs
+auto init   # auto-detects supported installed AI coding CLIs
 ```
 
-One `autopus.yaml` generates **native configuration** for every detected platform.
+One `autopus.yaml` generates **native configuration** for every detected supported platform.
 
 | Platform | What Gets Generated |
 |----------|-------------------|
 | **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
 | **Codex** | `.codex/`, `AGENTS.md` |
 | **Gemini CLI** | `.gemini/`, `GEMINI.md` |
-| **OpenCode** | `opencode.json`, plugins |
-
 Same 16 agents. Same 40 skills. Same rules. **Every platform.**
 
 ---
@@ -543,13 +541,13 @@ cd your-project && auto init
 
 </details>
 
-The installer scans your machine for installed AI coding CLIs (Claude Code, Codex, Gemini CLI, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
+The installer scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Gemini CLI) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
 
 ```
-✓ Detected: claude-code, gemini-cli, opencode
+✓ Detected: claude-code, codex, gemini-cli
 ✓ Generated: .claude/rules/, .claude/skills/, .claude/agents/, CLAUDE.md
+✓ Generated: .codex/, AGENTS.md
 ✓ Generated: .gemini/, GEMINI.md
-✓ Generated: opencode.json
 ✓ Created: autopus.yaml
 ```
 
