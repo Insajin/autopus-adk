@@ -506,7 +506,9 @@ cd your-project
 powershell -c "irm https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.ps1 | iex"
 ```
 
-**That's it.** The installer detects your platforms (Claude Code, Codex, Gemini CLI), installs the `auto` binary, and auto-initializes your project. From now on, type `/auto` commands inside your AI coding tool to use Autopus.
+**That's it.** The installer detects your platforms (Claude Code, Codex, Gemini CLI), installs the `auto` CLI plus an `autopus` alias, and auto-initializes your project. From now on, type `/auto` commands inside your AI coding tool to use Autopus.
+
+> Note: If you run the Windows installer from Git Bash via `powershell -c ...`, restart Git Bash after install so it reloads the updated user `PATH`. The installer prints the exact install directory and a one-line `export PATH=...` fallback for that case.
 
 <details>
 <summary>Other install methods</summary>

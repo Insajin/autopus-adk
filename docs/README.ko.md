@@ -453,6 +453,8 @@ cd your-project
 auto init
 ```
 
+설치 스크립트는 `auto` CLI와 `autopus` alias를 함께 설치합니다. Windows에서 `powershell -c ...`를 Git Bash 안에서 실행한 경우에는, 부모 Bash 프로세스의 `PATH`가 즉시 갱신되지 않으므로 설치 후 Git Bash를 다시 열어야 합니다. 이 경우 설치 스크립트가 실제 설치 경로와 `export PATH=...` 안내를 함께 출력합니다.
+
 `auto init`은 설치된 AI 코딩 CLI(Claude Code, Codex, Gemini CLI)를 자동 감지하고, 각 플랫폼에 맞는 **네이티브 설정** — 규칙, 스킬, 에이전트 — 을 하나의 `autopus.yaml`에서 생성합니다.
 
 ```

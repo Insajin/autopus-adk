@@ -14,11 +14,45 @@ set -e
 REPO="Insajin/autopus-adk"
 BINARY="auto"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+ALIAS="autopus"
 
 # 색상 출력
 info()  { printf '\033[1;34m%s\033[0m\n' "$1"; }
 ok()    { printf '\033[1;32m%s\033[0m\n' "$1"; }
 err()   { printf '\033[1;31m%s\033[0m\n' "$1" >&2; exit 1; }
+
+path_contains_dir() {
+    target="$1"
+    case ":$PATH:" in
+        *":$target:"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+shell_rc_file() {
+    case "${SHELL##*/}" in
+        zsh) echo "~/.zshrc" ;;
+        bash) echo "~/.bashrc" ;;
+        *) echo "~/.profile" ;;
+    esac
+}
+
+print_path_hint() {
+    rc_file="$(shell_rc_file)"
+    echo "  설치된 명령어:"
+    echo "    auto"
+    echo "    ${ALIAS}  # auto alias"
+    if path_contains_dir "$INSTALL_DIR"; then
+        echo "  PATH 확인: ${INSTALL_DIR}"
+        return
+    fi
+    echo ""
+    echo "  현재 셸 PATH에 ${INSTALL_DIR} 가 없습니다."
+    echo "  새 셸에서 사용하려면 PATH에 추가하세요:"
+    echo "    export PATH=\"${INSTALL_DIR}:\$PATH\""
+    echo "  영구 적용:"
+    echo "    echo 'export PATH=\"${INSTALL_DIR}:\$PATH\"' >> ${rc_file}"
+}
 
 # OS 감지
 detect_os() {
@@ -128,14 +162,17 @@ main() {
     tar -xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
 
     info "${INSTALL_DIR}/${BINARY} 에 설치 중..."
-    if [ -w "$INSTALL_DIR" ]; then
+    if [ -w "$INSTALL_DIR" ] || { [ ! -e "$INSTALL_DIR" ] && mkdir -p "$INSTALL_DIR" 2>/dev/null; }; then
         cp "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
         chmod +x "${INSTALL_DIR}/${BINARY}"
+        ln -sf "${INSTALL_DIR}/${BINARY}" "${INSTALL_DIR}/${ALIAS}"
     else
         echo ""
         echo "  시스템 폴더(${INSTALL_DIR})에 설치하기 위해 관리자 비밀번호가 필요합니다."
+        sudo mkdir -p "$INSTALL_DIR"
         sudo cp "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
         sudo chmod +x "${INSTALL_DIR}/${BINARY}"
+        sudo ln -sf "${INSTALL_DIR}/${BINARY}" "${INSTALL_DIR}/${ALIAS}"
     fi
 
     # macOS quarantine 속성 제거
@@ -144,6 +181,8 @@ main() {
     fi
 
     ok "autopus-adk v${VERSION} 설치 완료!"
+    echo ""
+    print_path_hint
     echo ""
 
     # Post-install: check and install dependencies (skip already installed)
@@ -156,7 +195,7 @@ main() {
     fi
     echo ""
 
-    # Auto-init: detect platform and initialize harness
+    # Auto-init: initialize harness
     if [ "${SKIP_INIT}" = "1" ]; then
         echo "  SKIP_INIT=1 — 초기화를 건너뜁니다."
         echo ""
@@ -183,25 +222,21 @@ main() {
     # Detect project name from directory
     PROJ="${PROJECT_NAME:-$(basename "$(pwd)")}"
 
-    # Detect platform from running environment
-    if [ -z "$PLATFORMS" ]; then
-        PLATFORMS="claude-code"
-        # Check for other AI coding tools
-        if command -v codex > /dev/null 2>&1; then
-            PLATFORMS="${PLATFORMS},codex"
-        fi
-        if command -v gemini > /dev/null 2>&1; then
-            PLATFORMS="${PLATFORMS},gemini"
-        fi
-    fi
-
     info "  프로젝트: ${PROJ}"
-    info "  플랫폼: ${PLATFORMS}"
-
-    if "${INSTALL_DIR}/${BINARY}" init --project "$PROJ" --platforms "$PLATFORMS" --yes 2>&1; then
-        ok "프로젝트 초기화 완료!"
+    if [ -n "$PLATFORMS" ]; then
+        info "  플랫폼: ${PLATFORMS}"
+        if "${INSTALL_DIR}/${BINARY}" init --project "$PROJ" --platforms "$PLATFORMS" --yes 2>&1; then
+            ok "프로젝트 초기화 완료!"
+        else
+            echo "  초기화 실패. 수동 실행: ${BINARY} init"
+        fi
     else
-        echo "  초기화 실패. 수동 실행: ${BINARY} init"
+        info "  플랫폼: auto-detect"
+        if "${INSTALL_DIR}/${BINARY}" init --project "$PROJ" --yes 2>&1; then
+            ok "프로젝트 초기화 완료!"
+        else
+            echo "  초기화 실패. 수동 실행: ${BINARY} init"
+        fi
     fi
     echo ""
 

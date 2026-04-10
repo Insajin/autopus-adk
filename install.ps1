@@ -5,11 +5,54 @@ $ErrorActionPreference = "Stop"
 
 $Repo = "Insajin/autopus-adk"
 $Binary = "auto.exe"
+$AliasBinary = "autopus.exe"
 $InstallDir = if ($env:INSTALL_DIR) { $env:INSTALL_DIR } else { "$env:LOCALAPPDATA\autopus-adk\bin" }
 
 function Info($msg)  { Write-Host $msg -ForegroundColor Cyan }
 function Ok($msg)    { Write-Host $msg -ForegroundColor Green }
 function Err($msg)   { Write-Host $msg -ForegroundColor Red; exit 1 }
+
+function Test-PathContainsDir([string]$PathValue, [string]$Dir) {
+    if (-not $PathValue) { return $false }
+    $needle = $Dir.TrimEnd('\').ToLowerInvariant()
+    foreach ($entry in ($PathValue -split ';')) {
+        if ($entry.TrimEnd('\').ToLowerInvariant() -eq $needle) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Get-GitBashPath([string]$Dir) {
+    if ($Dir -match '^([A-Za-z]):\\(.*)$') {
+        $drive = $matches[1].ToLowerInvariant()
+        $rest = ($matches[2] -replace '\\', '/')
+        return "/$drive/$rest"
+    }
+    return $Dir -replace '\\', '/'
+}
+
+function Show-PathHint([string]$InstallDir, [bool]$PathAdded) {
+    Ok "  Installed commands:"
+    Ok "    auto"
+    Ok "    autopus    # auto alias"
+
+    if (Test-PathContainsDir $env:Path $InstallDir) {
+        Ok "  PATH ready in this PowerShell session: $InstallDir"
+    } else {
+        Write-Host "  PATH was updated for future shells, but this parent shell may need a restart." -ForegroundColor Yellow
+    }
+
+    if ($PathAdded) {
+        Write-Host "  New terminals will pick up: $InstallDir" -ForegroundColor Yellow
+    }
+
+    if ($env:MSYSTEM) {
+        $bashPath = Get-GitBashPath $InstallDir
+        Write-Host "  Git Bash에서 설치했다면 현재 창을 다시 열거나 아래를 실행하세요:" -ForegroundColor Yellow
+        Write-Host "    export PATH=""$bashPath:`$PATH""" -ForegroundColor Yellow
+    }
+}
 
 # Detect architecture
 function Get-Arch {
@@ -90,17 +133,25 @@ function Main {
             }
         }
         Copy-Item "$TmpDir\auto.exe" $TargetPath -Force
+        Copy-Item "$TmpDir\auto.exe" "$InstallDir\$AliasBinary" -Force
         Remove-Item $OldPath -Force -ErrorAction SilentlyContinue
 
         # Add to PATH if not already present
         $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-        if ($userPath -notlike "*$InstallDir*") {
-            [Environment]::SetEnvironmentVariable("Path", "$userPath;$InstallDir", "User")
-            $env:Path = "$env:Path;$InstallDir"
+        $pathAdded = $false
+        if (-not (Test-PathContainsDir $userPath $InstallDir)) {
+            $newUserPath = if ($userPath) { "$userPath;$InstallDir" } else { $InstallDir }
+            [Environment]::SetEnvironmentVariable("Path", $newUserPath, "User")
             Info "Added $InstallDir to user PATH"
+            $pathAdded = $true
+        }
+        if (-not (Test-PathContainsDir $env:Path $InstallDir)) {
+            $env:Path = if ($env:Path) { "$env:Path;$InstallDir" } else { $InstallDir }
         }
 
         Ok "autopus-adk v$Version installed!"
+        Ok ""
+        Show-PathHint $InstallDir $pathAdded
         Ok ""
 
         # Post-install: check and install dependencies (skip already installed)
@@ -113,7 +164,7 @@ function Main {
             Write-Host "  Run manually: auto doctor" -ForegroundColor Yellow
         }
 
-        # Auto-init: detect platform and initialize harness
+        # Auto-init: initialize harness
         if ($env:SKIP_INIT -eq "1") {
             Ok ""
             Ok "  SKIP_INIT=1 — skipping initialization."
@@ -132,16 +183,15 @@ function Main {
         else {
             Info "Initializing project..."
             $Proj = if ($env:PROJECT_NAME) { $env:PROJECT_NAME } else { Split-Path -Leaf (Get-Location) }
-            $Plat = if ($env:PLATFORMS) { $env:PLATFORMS } else { "claude-code" }
-            # Detect additional platforms
-            if (-not $env:PLATFORMS) {
-                if (Get-Command codex -ErrorAction SilentlyContinue) { $Plat += ",codex" }
-                if (Get-Command gemini -ErrorAction SilentlyContinue) { $Plat += ",gemini" }
-            }
             Info "  Project: $Proj"
-            Info "  Platforms: $Plat"
             try {
-                & "$InstallDir\$Binary" init --project $Proj --platforms $Plat --yes 2>&1
+                if ($env:PLATFORMS) {
+                    Info "  Platforms: $env:PLATFORMS"
+                    & "$InstallDir\$Binary" init --project $Proj --platforms $env:PLATFORMS --yes 2>&1
+                } else {
+                    Info "  Platforms: auto-detect"
+                    & "$InstallDir\$Binary" init --project $Proj --yes 2>&1
+                }
                 Ok "Project initialized!"
             } catch {
                 Write-Host "  Init failed. Run manually: auto init" -ForegroundColor Yellow
