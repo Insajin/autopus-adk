@@ -12,7 +12,7 @@ import (
 // TestDetect_GoMod verifies that Go module dependencies are parsed from go.mod.
 // Given: a go.mod file with require block
 // When: DetectFromGoMod is called
-// Then: all non-stdlib dependency names are returned
+// Then: all non-stdlib dependency module paths are returned
 func TestDetect_GoMod(t *testing.T) {
 	t.Parallel()
 
@@ -31,8 +31,8 @@ require (
 
 	libs, err := DetectFromGoMod(filepath.Join(dir, "go.mod"))
 	require.NoError(t, err)
-	assert.Contains(t, libs, "cobra")
-	assert.Contains(t, libs, "testify")
+	assert.Contains(t, libs, "github.com/spf13/cobra")
+	assert.Contains(t, libs, "github.com/stretchr/testify")
 	assert.NotContains(t, libs, "fmt", "stdlib must be excluded")
 }
 

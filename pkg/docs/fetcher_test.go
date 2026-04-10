@@ -46,6 +46,23 @@ func TestFetcher_FallbackToScraper(t *testing.T) {
 	assert.NotEmpty(t, result.Content)
 }
 
+// TestFetcher_FallbackToScraper_OnQuotaExceeded verifies that scraper fallback is used
+// when Context7 reports quota exhaustion.
+func TestFetcher_FallbackToScraper_OnQuotaExceeded(t *testing.T) {
+	t.Parallel()
+
+	c7 := &stubContext7{err: ErrQuotaExceeded}
+	scraper := &stubScraper{result: &DocResult{LibraryName: "github.com/spf13/cobra", Source: "scraper", Content: "scraped docs", Tokens: 50}}
+	cache := newInMemoryCache()
+
+	fetcher := NewFetcher(c7, scraper, cache)
+	result, err := fetcher.Fetch("github.com/spf13/cobra", "commands")
+
+	require.NoError(t, err)
+	assert.Equal(t, "scraper", result.Source)
+	assert.Equal(t, "github.com/spf13/cobra", result.LibraryName)
+}
+
 // TestFetcher_FallbackToCache verifies that cache is used when both Context7 and scraper fail.
 // Given: Context7 and scraper both return errors but cache has an entry
 // When: Fetch is called for a library

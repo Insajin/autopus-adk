@@ -45,6 +45,12 @@ type DocContent struct {
 // ErrLibraryNotFound is returned when a library cannot be resolved.
 var ErrLibraryNotFound = errors.New("library not found")
 
+// ErrRateLimited is returned when the upstream documentation source rejects requests due to rate limits.
+var ErrRateLimited = errors.New("rate limited")
+
+// ErrQuotaExceeded is returned when the upstream documentation source reports quota exhaustion.
+var ErrQuotaExceeded = errors.New("quota exceeded")
+
 // DocFetcher is the interface for documentation sources (Context7, Scraper).
 type DocFetcher interface {
 	Fetch(library, topic string) (*DocResult, error)

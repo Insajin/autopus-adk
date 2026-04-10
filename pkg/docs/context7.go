@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -46,7 +47,7 @@ func (c *Context7Client) ResolveLibrary(name string) (*LibraryInfo, error) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("resolve library API error %d: %s", resp.StatusCode, string(body))
+		return nil, wrapContext7APIError("resolve library", resp.StatusCode, body)
 	}
 
 	var raw struct {
@@ -86,7 +87,7 @@ func (c *Context7Client) GetDocs(libraryID, topic string) (*DocContent, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("get docs API error %d: %s", resp.StatusCode, string(body))
+		return nil, wrapContext7APIError("get docs", resp.StatusCode, body)
 	}
 
 	var raw struct {
@@ -126,4 +127,23 @@ func (c *Context7Client) Fetch(library, topic string) (*DocResult, error) {
 		Content:     content.Content,
 		Tokens:      content.Tokens,
 	}, nil
+}
+
+func wrapContext7APIError(op string, statusCode int, body []byte) error {
+	message := strings.TrimSpace(string(body))
+	if isContext7QuotaError(statusCode, message) {
+		return fmt.Errorf("%s API error %d: %w: %s", op, statusCode, ErrQuotaExceeded, message)
+	}
+	if statusCode == http.StatusTooManyRequests {
+		return fmt.Errorf("%s API error %d: %w: %s", op, statusCode, ErrRateLimited, message)
+	}
+	return fmt.Errorf("%s API error %d: %s", op, statusCode, message)
+}
+
+func isContext7QuotaError(statusCode int, message string) bool {
+	if statusCode == http.StatusPaymentRequired {
+		return true
+	}
+	lower := strings.ToLower(message)
+	return strings.Contains(lower, "quota") || strings.Contains(lower, "credit")
 }

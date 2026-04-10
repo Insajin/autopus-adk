@@ -91,3 +91,20 @@ func TestContext7Client_GetDocs_ServerError(t *testing.T) {
 
 	require.Error(t, err)
 }
+
+// TestContext7Client_GetDocs_QuotaExceeded verifies that quota exhaustion is classified explicitly.
+func TestContext7Client_GetDocs_QuotaExceeded(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`quota exceeded`))
+	}))
+	defer srv.Close()
+
+	client := NewContext7Client(srv.URL)
+	_, err := client.GetDocs("/spf13/cobra", "commands")
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, ErrQuotaExceeded)
+}

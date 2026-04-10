@@ -17,8 +17,8 @@ var extrasRe = regexp.MustCompile(`\[.*?\]`)
 // wordBoundaryRe splits text into tokens by whitespace and common punctuation.
 var wordBoundaryRe = regexp.MustCompile(`[\s,.:;()\[\]{}"']+`)
 
-// DetectFromGoMod parses a go.mod file and returns the last path segment of each
-// direct dependency (e.g., "github.com/spf13/cobra" → "cobra").
+// DetectFromGoMod parses a go.mod file and returns each direct dependency module path
+// as-is (e.g., "github.com/spf13/cobra").
 // Indirect dependencies (lines with "// indirect") are skipped.
 func DetectFromGoMod(path string) ([]string, error) {
 	f, err := os.Open(path)
@@ -53,11 +53,9 @@ func DetectFromGoMod(path string) ([]string, error) {
 			continue
 		}
 		modPath := fields[0]
-		segments := strings.Split(modPath, "/")
-		name := segments[len(segments)-1]
-		if !seen[name] {
-			seen[name] = true
-			libs = append(libs, name)
+		if !seen[modPath] {
+			seen[modPath] = true
+			libs = append(libs, modPath)
 		}
 	}
 	return libs, scanner.Err()
