@@ -60,8 +60,8 @@ func newUpdateCmd() *cobra.Command {
 			// 프로젝트 설정 프롬프트 (미설정 항목만, --yes 시 스킵)
 			if !yesFlag {
 				promptLanguageSettings(cmd, dir, cfg)
-				warnParentRuleConflicts(cmd, dir, cfg)
 			}
+			warnParentRuleConflicts(cmd, dir, cfg, yesFlag)
 
 			ctx := context.Background()
 			updated := 0
@@ -205,4 +205,3 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 	fmt.Fprintf(cmd.OutOrStdout(), "하네스 파일도 업데이트하려면: auto update\n")
 	return nil
 }
-

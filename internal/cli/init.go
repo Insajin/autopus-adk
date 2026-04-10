@@ -170,6 +170,8 @@ func newInitCmd() *cobra.Command {
 				return fmt.Errorf("autopus.yaml 저장 실패: %w", err)
 			}
 
+			warnParentRuleConflicts(cmd, dir, cfg, yes)
+
 			// Step 2: Platform Files
 			tui.Step(out, 2, 4, "Platform Files")
 			ctx := context.Background()
@@ -186,8 +188,6 @@ func newInitCmd() *cobra.Command {
 			if err := updateGitignore(dir); err != nil {
 				return fmt.Errorf(".gitignore 업데이트 실패: %w", err)
 			}
-
-			warnParentRuleConflicts(cmd, dir, cfg, yes)
 
 			// Step 4: Summary
 			tui.Step(out, 4, 4, "Summary")

@@ -150,22 +150,25 @@ func TestCheckParentRuleConflicts_DetectsConflict(t *testing.T) {
 	assert.True(t, found, "moai conflict must be present in results")
 }
 
-// TestCheckParentRuleConflicts_IgnoresAutopusNamespace verifies autopus namespace is not flagged.
-func TestCheckParentRuleConflicts_IgnoresAutopusNamespace(t *testing.T) {
+// TestCheckParentRuleConflicts_FlagsAutopusNamespace verifies parent autopus rules are flagged too.
+func TestCheckParentRuleConflicts_FlagsAutopusNamespace(t *testing.T) {
 	t.Parallel()
 
 	parent := t.TempDir()
 	projectDir, err := os.MkdirTemp(parent, "project")
 	require.NoError(t, err)
 
-	// Create parent/.claude/rules/autopus (should be ignored).
+	// Create parent/.claude/rules/autopus (must be detected because Claude inherits parent rules).
 	autopusDir := filepath.Join(parent, ".claude", "rules", "autopus")
 	require.NoError(t, os.MkdirAll(autopusDir, 0755))
 
 	conflicts := CheckParentRuleConflicts(projectDir)
-	for _, c := range conflicts {
-		assert.NotEqual(t, "autopus", c.Namespace, "autopus namespace must not be flagged as conflict")
-	}
+	require.NotEmpty(t, conflicts)
+	assert.Contains(t, conflicts, ParentRuleConflict{
+		ParentDir: parent,
+		RulesDir:  filepath.Join(parent, ".claude", "rules"),
+		Namespace: "autopus",
+	})
 }
 
 // TestDetectPlatforms_ReturnsSlice verifies DetectPlatforms returns a slice without panicking.

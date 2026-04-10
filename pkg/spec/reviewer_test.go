@@ -210,6 +210,56 @@ func TestCollectContext_ExceedsLimit(t *testing.T) {
 	assert.LessOrEqual(t, len(lines), 15) // some overhead for file headers
 }
 
+func TestCollectContextForSpec_TargetFilesOnly(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	specDir := filepath.Join(dir, ".autopus", "specs", "SPEC-CTX-001")
+	require.NoError(t, os.MkdirAll(specDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "keep.go"), []byte("package main\n\nfunc Keep() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "ignore.go"), []byte("package main\n\nfunc Ignore() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "research.md"), []byte("## Target Files\n| 파일 | 역할 | 변경 필요 |\n|------|------|-----------|\n| keep.go | handler | yes |\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "plan.md"), []byte("File Impact Analysis\n| 파일 | 작업 | 설명 |\n|------|------|------|\n| keep.go | 수정 | core |\n"), 0o644))
+
+	ctx, err := CollectContextForSpec(dir, specDir, 200)
+	require.NoError(t, err)
+	assert.Contains(t, ctx, "func Keep()")
+	assert.NotContains(t, ctx, "func Ignore()")
+}
+
+func TestCollectContextForSpec_ModuleRelativePaths(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	moduleRoot := filepath.Join(root, "apps", "backend")
+	specDir := filepath.Join(moduleRoot, ".autopus", "specs", "SPEC-GO-001")
+	targetFile := filepath.Join(moduleRoot, "internal", "service", "task_queue_service.go")
+	require.NoError(t, os.MkdirAll(filepath.Dir(targetFile), 0o755))
+	require.NoError(t, os.MkdirAll(specDir, 0o755))
+	require.NoError(t, os.WriteFile(targetFile, []byte("package service\n\nfunc TaskQueue() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "unrelated.go"), []byte("package main\n\nfunc Unrelated() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "research.md"), []byte("### Target Files\n| 파일 | 역할 | 변경 필요 |\n|------|------|-----------|\n| internal/service/task_queue_service.go | queue | yes |\n"), 0o644))
+
+	ctx, err := CollectContextForSpec(root, specDir, 200)
+	require.NoError(t, err)
+	assert.Contains(t, ctx, "func TaskQueue()")
+	assert.NotContains(t, ctx, "func Unrelated()")
+	assert.Contains(t, ctx, "apps/backend/internal/service/task_queue_service.go")
+}
+
+func TestCollectContextForSpec_NoTargets(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	specDir := filepath.Join(dir, ".autopus", "specs", "SPEC-EMPTY-001")
+	require.NoError(t, os.MkdirAll(specDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "research.md"), []byte("# Empty"), 0o644))
+
+	ctx, err := CollectContextForSpec(dir, specDir, 200)
+	require.NoError(t, err)
+	assert.Empty(t, ctx)
+}
+
 func TestMergeVerdicts_AllPass(t *testing.T) {
 	t.Parallel()
 

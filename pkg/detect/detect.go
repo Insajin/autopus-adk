@@ -231,9 +231,9 @@ type ParentRuleConflict struct {
 	Namespace string // 규칙 네임스페이스 (예: "moai")
 }
 
-// CheckParentRuleConflicts는 부모 디렉터리에 다른 하네스의 .claude/rules/가 있는지 탐지한다.
+// CheckParentRuleConflicts는 부모 디렉터리에 상속될 .claude/rules/ 네임스페이스가 있는지 탐지한다.
 // Claude Code는 상위 디렉터리를 탐색하며 규칙을 로드하므로,
-// 부모에 다른 하네스 규칙이 있으면 현재 프로젝트에 의도치 않게 적용된다.
+// 부모에 어떤 규칙 네임스페이스라도 있으면 현재 프로젝트에 의도치 않게 중첩 적용될 수 있다.
 func CheckParentRuleConflicts(projectDir string) []ParentRuleConflict {
 	absDir, err := filepath.Abs(projectDir)
 	if err != nil {
@@ -253,7 +253,7 @@ func CheckParentRuleConflicts(projectDir string) []ParentRuleConflict {
 		entries, err := os.ReadDir(rulesDir)
 		if err == nil {
 			for _, entry := range entries {
-				if entry.IsDir() && entry.Name() != "autopus" {
+				if entry.IsDir() {
 					conflicts = append(conflicts, ParentRuleConflict{
 						ParentDir: current,
 						RulesDir:  rulesDir,

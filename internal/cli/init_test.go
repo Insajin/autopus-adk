@@ -113,6 +113,53 @@ func TestInitCmd_YesFlag(t *testing.T) {
 	require.NoError(t, statErr, "autopus.yaml must be created with --yes flag")
 }
 
+func TestInitCmd_YesFlag_AutoIsolatesParentRules(t *testing.T) {
+	t.Parallel()
+
+	parent := t.TempDir()
+	dir, err := os.MkdirTemp(parent, "project")
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Join(parent, ".claude", "rules", "autopus"), 0o755))
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code", "--yes"})
+	require.NoError(t, cmd.Execute())
+
+	cfg, err := config.Load(dir)
+	require.NoError(t, err)
+	assert.True(t, cfg.IsolateRules)
+
+	claudeMD, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(claudeMD), "ignore any Autopus or non-Autopus rules loaded from parent directories")
+}
+
+func TestUpdateCmd_YesFlag_AutoIsolatesParentRules(t *testing.T) {
+	t.Parallel()
+
+	parent := t.TempDir()
+	dir, err := os.MkdirTemp(parent, "project")
+	require.NoError(t, err)
+
+	initCmd := newTestRootCmd()
+	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code", "--yes"})
+	require.NoError(t, initCmd.Execute())
+
+	require.NoError(t, os.MkdirAll(filepath.Join(parent, ".claude", "rules", "autopus"), 0o755))
+
+	updateCmd := newTestRootCmd()
+	updateCmd.SetArgs([]string{"update", "--dir", dir, "--yes"})
+	require.NoError(t, updateCmd.Execute())
+
+	cfg, err := config.Load(dir)
+	require.NoError(t, err)
+	assert.True(t, cfg.IsolateRules)
+
+	claudeMD, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(claudeMD), "ignore any Autopus or non-Autopus rules loaded from parent directories")
+}
+
 // TestInitCmd_QualityFlag verifies --quality flag sets quality mode preset.
 func TestInitCmd_QualityFlag(t *testing.T) {
 	t.Parallel()

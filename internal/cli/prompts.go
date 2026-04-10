@@ -125,6 +125,12 @@ func warnParentRuleConflicts(cmd *cobra.Command, dir string, cfg *config.Harness
 
 	// Non-TTY or --yes mode: don't prompt.
 	if !isStdinTTY() || (len(skipPrompt) > 0 && skipPrompt[0]) {
+		cfg.IsolateRules = true
+		if err := config.Save(dir, cfg); err != nil {
+			fmt.Fprintf(out, "  [ERROR] autopus.yaml save failed: %v\n", err)
+			return
+		}
+		fmt.Fprintln(out, "  isolate_rules: true set automatically (parent rules detected in non-interactive mode)")
 		return
 	}
 

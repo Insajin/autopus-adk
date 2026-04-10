@@ -78,7 +78,7 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	var codeContext string
 	if gate.AutoCollectContext {
 		var ctxErr error
-		codeContext, ctxErr = spec.CollectContext(".", gate.ContextMaxLines)
+		codeContext, ctxErr = spec.CollectContextForSpec(".", specDir, gate.ContextMaxLines)
 		if ctxErr != nil {
 			fmt.Fprintf(os.Stderr, "경고: 코드 컨텍스트 수집 실패: %v\n", ctxErr)
 		}

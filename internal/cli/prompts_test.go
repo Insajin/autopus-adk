@@ -2,10 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -51,6 +54,27 @@ func TestWarnParentRuleConflicts_IsolateRulesAlreadySet(t *testing.T) {
 	warnParentRuleConflicts(cmd, dir, cfg)
 	// No conflicts in temp dir → no output
 	assert.Empty(t, buf.String())
+}
+
+func TestWarnParentRuleConflicts_AutoSetsIsolateRulesWhenPromptSkipped(t *testing.T) {
+	t.Parallel()
+
+	parent := t.TempDir()
+	projectDir, err := os.MkdirTemp(parent, "project")
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Join(parent, ".claude", "rules", "autopus"), 0o755))
+
+	cfg := config.DefaultFullConfig("test-project")
+	require.NoError(t, config.Save(projectDir, cfg))
+
+	var buf bytes.Buffer
+	cmd := newTestCmd(&buf)
+	warnParentRuleConflicts(cmd, projectDir, cfg, true)
+
+	loaded, err := config.Load(projectDir)
+	require.NoError(t, err)
+	assert.True(t, loaded.IsolateRules)
+	assert.Contains(t, buf.String(), "isolate_rules: true set automatically")
 }
 
 // TestPromptLanguageSettings_AlreadyConfigured verifies skip when all language fields are set.

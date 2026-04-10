@@ -122,7 +122,7 @@ func (a *Adapter) Clean(_ context.Context) error {
 		filepath.Join(a.root, ".claude", "rules", "autopus"),
 		filepath.Join(a.root, ".claude", "skills", "autopus"),
 		filepath.Join(a.root, ".claude", "skills", "auto"),      // router skill dir
-		filepath.Join(a.root, ".claude", "commands", "autopus"),  // legacy dir cleanup
+		filepath.Join(a.root, ".claude", "commands", "autopus"), // legacy dir cleanup
 		filepath.Join(a.root, ".claude", "agents", "autopus"),
 	}
 	for _, d := range autopusDirs {
@@ -169,7 +169,7 @@ const claudeMDTemplate = `# Autopus-ADK Harness
 
 ## Rule Isolation
 
-IMPORTANT: This project uses Autopus-ADK rules ONLY. You MUST ignore any rules loaded from parent directories (any .claude/rules/ namespace other than "autopus"). Parent directory rules (e.g., moai, custom, or other harnesses) are NOT applicable to this project and MUST be disregarded entirely.
+IMPORTANT: This project uses this directory's Autopus-ADK instructions ONLY. You MUST ignore any Autopus or non-Autopus rules loaded from parent directories, and any parent Autopus-generated CLAUDE.md guidance is lower priority than this project's instructions.
 {{- end}}
 {{- if .Language.Comments}}
 
