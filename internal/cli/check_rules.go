@@ -5,10 +5,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
@@ -29,60 +27,30 @@ var loreValidTypes = []string{
 // loreSignOff is the required Lore sign-off line.
 const loreSignOff = "🐙 Autopus <noreply@autopus.co>"
 
+// skipDirs contains directory names that should be skipped during arch walk.
+// These include version control, tooling worktrees, and dependency directories.
+var skipDirs = map[string]bool{
+	"vendor":       true,
+	".git":         true,
+	"node_modules": true,
+}
+
 // checkArch verifies file size limits (300-line hard limit for .go source files).
-// Skips vendor/, *_generated.go, *_gen.go, and *.pb.go files.
+// Skips vendor/, .git/, node_modules/, submodule directories (containing a .git file),
+// .claude/worktrees/, *_generated.go, *_gen.go, and *.pb.go files.
+// When stagedOnly is true, only git-staged .go files are checked.
 // Returns false if any file exceeds the hard limit.
-func checkArch(dir string, out io.Writer, quiet bool) bool {
+func checkArch(dir string, out io.Writer, quiet, stagedOnly bool) bool {
 	if !quiet {
 		tui.SectionHeader(out, "arch: file size")
 	}
 
-	passed := true
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			if d.Name() == "vendor" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if !strings.HasSuffix(path, ".go") {
-			return nil
-		}
-		if isGeneratedGoFile(d.Name()) {
-			return nil
-		}
-
-		lines, countErr := countLines(path)
-		if countErr != nil {
-			return countErr
-		}
-
-		rel, _ := filepath.Rel(dir, path)
-		switch {
-		case lines > hardLineLimit:
-			tui.FAIL(out, fmt.Sprintf("%s (%d lines — exceeds %d hard limit)", rel, lines, hardLineLimit))
-			passed = false
-		case lines > warnLineLimit:
-			if !quiet {
-				tui.SKIP(out, fmt.Sprintf("%s (%d lines — consider splitting)", rel, lines))
-			}
-		default:
-			if !quiet {
-				tui.OK(out, fmt.Sprintf("%s (%d lines)", rel, lines))
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		tui.Error(out, fmt.Sprintf("arch check error: %v", err))
-		return false
+	if stagedOnly {
+		return checkArchStaged(dir, out, quiet)
 	}
-	return passed
+	return checkArchWalk(dir, out, quiet)
 }
+
 
 // isGeneratedGoFile reports whether a file name matches generated file patterns.
 func isGeneratedGoFile(name string) bool {
@@ -148,6 +116,44 @@ func checkLore(dir string, out io.Writer, quiet bool) bool {
 	}
 	if !hasSignOff {
 		tui.FAIL(out, fmt.Sprintf("last commit missing sign-off: %s", loreSignOff))
+	}
+	return false
+}
+
+// checkLoreFromFile validates a commit message read from the given file path.
+// This is used by the commit-msg git hook where the message file is passed as $1.
+func checkLoreFromFile(msgFile string, out io.Writer, quiet bool) bool {
+	if !quiet {
+		tui.SectionHeader(out, "lore: commit format (message file)")
+	}
+
+	data, err := os.ReadFile(msgFile)
+	if err != nil {
+		tui.Error(out, fmt.Sprintf("cannot read message file: %v", err))
+		return false
+	}
+
+	msg := strings.TrimSpace(string(data))
+	if msg == "" {
+		tui.FAIL(out, "empty commit message")
+		return false
+	}
+
+	validType := hasValidLoreType(msg)
+	hasSignOff := strings.Contains(msg, loreSignOff)
+
+	if validType && hasSignOff {
+		if !quiet {
+			tui.OK(out, "commit message follows Lore format")
+		}
+		return true
+	}
+
+	if !validType {
+		tui.FAIL(out, "commit message missing valid Lore type prefix (e.g. feat(...): ...)")
+	}
+	if !hasSignOff {
+		tui.FAIL(out, fmt.Sprintf("commit message missing sign-off: %s", loreSignOff))
 	}
 	return false
 }

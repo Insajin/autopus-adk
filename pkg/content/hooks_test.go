@@ -25,15 +25,16 @@ func TestGenerateHookConfigs_WithHooks(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
-	// CLI 훅 지원 시 HookConfig 반환
+	// CLI hooks: only arch generates PreToolUse; lore uses git commit-msg hook only.
 	assert.NotEmpty(t, hooks)
-	assert.Empty(t, gitHooks)
-	// PreCommitArch, PreCommitLore 각각 포함
-	events := make([]string, 0, len(hooks))
+	assert.Len(t, hooks, 1, "only arch check should be a CLI hook")
+	assert.Equal(t, "PreToolUse", hooks[0].Event)
+	assert.Contains(t, hooks[0].Command, "--arch")
+	// Lore is NOT a CLI hook — it runs via git commit-msg hook.
 	for _, h := range hooks {
-		events = append(events, h.Event)
+		assert.NotContains(t, h.Command, "--lore", "lore should not be a CLI hook")
 	}
-	assert.Contains(t, events, "PreToolUse")
+	assert.Empty(t, gitHooks)
 }
 
 func TestGenerateHookConfigs_WithoutHooks(t *testing.T) {
@@ -46,15 +47,16 @@ func TestGenerateHookConfigs_WithoutHooks(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateHookConfigs(cfg, "codex", false)
 	require.NoError(t, err)
-	// CLI 훅 미지원 시 git 훅 스크립트 반환
+	// CLI hooks not supported — git hook scripts returned.
 	assert.Empty(t, hooks)
 	assert.NotEmpty(t, gitHooks)
-	// .git/hooks/pre-commit 포함
+	// pre-commit (arch --staged) + commit-msg (lore --message) both present.
 	var paths []string
 	for _, g := range gitHooks {
 		paths = append(paths, g.Path)
 	}
 	assert.Contains(t, paths, ".git/hooks/pre-commit")
+	assert.Contains(t, paths, ".git/hooks/commit-msg")
 }
 
 func TestGenerateHookConfigs_AllDisabled(t *testing.T) {
@@ -98,8 +100,8 @@ func TestGitHookScript_Content(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, gitHooks)
 
-	// 스크립트에 auto check --arch --quiet 포함
-	assert.Contains(t, gitHooks[0].Content, "auto check --arch --quiet")
+	// Script uses --staged to only check staged files.
+	assert.Contains(t, gitHooks[0].Content, "auto check --arch --quiet --staged")
 }
 
 func TestDetectPermissions_DefaultOnly(t *testing.T) {

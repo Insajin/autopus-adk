@@ -17,6 +17,8 @@ func newCheckCmd() *cobra.Command {
 		loreFlag     bool
 		quietFlag    bool
 		warnOnlyFlag bool
+		stagedFlag   bool
+		messageFlag  string
 		gateFlag     string
 		dir          string
 	)
@@ -61,7 +63,7 @@ func newCheckCmd() *cobra.Command {
 				return nil
 			}
 
-			allOK := runChecks(archFlag, loreFlag, dir, out, quietFlag, warnOnlyFlag)
+			allOK := runChecks(archFlag, loreFlag, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
 			if !allOK {
 				return fmt.Errorf("check failed")
 			}
@@ -73,6 +75,8 @@ func newCheckCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&loreFlag, "lore", false, "Check Lore commit format")
 	cmd.Flags().BoolVar(&quietFlag, "quiet", false, "Suppress non-error output")
 	cmd.Flags().BoolVar(&warnOnlyFlag, "warn-only", false, "Exit 0 even if checks fail (advisory mode)")
+	cmd.Flags().BoolVar(&stagedFlag, "staged", false, "Check only git-staged files (for pre-commit hook)")
+	cmd.Flags().StringVar(&messageFlag, "message", "", "Commit message file path (for commit-msg hook)")
 	cmd.Flags().StringVar(&gateFlag, "gate", "", "Run a named gate check (e.g. phase2)")
 	cmd.Flags().StringVar(&dir, "dir", "", "Project root directory")
 
@@ -82,18 +86,26 @@ func newCheckCmd() *cobra.Command {
 // runChecks executes the selected checks and returns true if all pass.
 // If neither arch nor lore is selected, all checks run.
 // When warnOnly is true, violations are still printed but the function always returns true.
-func runChecks(archFlag, loreFlag bool, dir string, out io.Writer, quiet, warnOnly bool) bool {
+// When staged is true, arch check only examines git-staged files.
+// When messageFile is non-empty, lore check validates that file instead of the last commit.
+func runChecks(archFlag, loreFlag bool, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
 	runAll := !archFlag && !loreFlag
 	allOK := true
 
 	if archFlag || runAll {
-		if !checkArch(dir, out, quiet) {
+		if !checkArch(dir, out, quiet, staged) {
 			allOK = false
 		}
 	}
 	if loreFlag || runAll {
-		if !checkLore(dir, out, quiet) {
-			allOK = false
+		if messageFile != "" {
+			if !checkLoreFromFile(messageFile, out, quiet) {
+				allOK = false
+			}
+		} else {
+			if !checkLore(dir, out, quiet) {
+				allOK = false
+			}
 		}
 	}
 

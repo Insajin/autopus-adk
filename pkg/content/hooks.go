@@ -40,15 +40,9 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 		})
 	}
 
-	if cfg.PreCommitLore {
-		hooks = appendUniqueHook(hooks, adapter.HookConfig{
-			Event:   "PreToolUse",
-			Matcher: "Bash",
-			Type:    "command",
-			Command: "auto check --lore --quiet",
-			Timeout: 30,
-		})
-	}
+	// Lore check: not added as PreToolUse hook — it runs via git commit-msg hook only.
+	// Checking lore on every Bash call would fail because it validates the last commit,
+	// not the current action. The commit-msg hook validates the message being committed.
 
 	if cfg.ReactCIFailure {
 		hooks = appendUniqueHook(hooks, adapter.HookConfig{
@@ -83,35 +77,47 @@ func appendUniqueHook(hooks []adapter.HookConfig, hook adapter.HookConfig) []ada
 }
 
 // generateGitHooks는 .git/hooks/ 스크립트를 생성한다.
+// pre-commit: arch check with --staged (only staged files).
+// commit-msg: lore format check on the commit message being written.
 func generateGitHooks(cfg config.HooksConf) []GitHookScript {
-	// arch 또는 lore 활성화된 경우에만 pre-commit 생성
-	if !cfg.PreCommitArch && !cfg.PreCommitLore {
-		return nil
+	var hooks []GitHookScript
+
+	if cfg.PreCommitArch {
+		hooks = append(hooks, GitHookScript{
+			Path:    ".git/hooks/pre-commit",
+			Content: buildPreCommitScript(cfg),
+		})
 	}
 
-	script := buildPreCommitScript(cfg)
-	return []GitHookScript{
-		{
-			Path:    ".git/hooks/pre-commit",
-			Content: script,
-		},
+	if cfg.PreCommitLore {
+		hooks = append(hooks, GitHookScript{
+			Path:    ".git/hooks/commit-msg",
+			Content: buildCommitMsgScript(),
+		})
 	}
+
+	return hooks
 }
 
 // buildPreCommitScript는 pre-commit 스크립트를 생성한다.
+// Uses --staged to only check git-staged files, avoiding submodule/worktree scans.
 func buildPreCommitScript(cfg config.HooksConf) string {
 	s := "#!/bin/sh\n# Autopus-ADK pre-commit hook (자동 생성)\nset -e\n\n"
 
 	if cfg.PreCommitArch {
-		s += "# 아키텍처 규칙 검사\nauto check --arch --quiet\n\n"
-	}
-
-	if cfg.PreCommitLore {
-		s += "# Lore 커밋 메시지 검사\nauto check --lore --quiet\n\n"
+		s += "# 아키텍처 규칙 검사 (staged 파일만)\nauto check --arch --quiet --staged\n\n"
 	}
 
 	s += "exit 0\n"
 	return s
+}
+
+// buildCommitMsgScript는 commit-msg 스크립트를 생성한다.
+// The commit message file path is passed as $1 by git.
+func buildCommitMsgScript() string {
+	return "#!/bin/sh\n# Autopus-ADK commit-msg hook (자동 생성)\nset -e\n\n" +
+		"# Lore 커밋 메시지 검사\nauto check --lore --quiet --message \"$1\"\n\n" +
+		"exit 0\n"
 }
 
 // DetectPermissions는 프로젝트 루트를 분석하여 기본 권한을 생성한다.

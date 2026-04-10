@@ -200,7 +200,7 @@ func TestCheckArch_WarnRangeFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "warn.go"), []byte(sb.String()), 0o644))
 
 	var buf bytes.Buffer
-	result := checkArch(dir, &buf, false)
+	result := checkArch(dir, &buf, false, false)
 	assert.True(t, result, "warn-range file must not fail arch check")
 	// The output should mention "consider splitting".
 	assert.Contains(t, buf.String(), "consider splitting")
@@ -221,9 +221,136 @@ func TestCheckArch_WarnRangeQuiet(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "warn.go"), []byte(sb.String()), 0o644))
 
 	var buf bytes.Buffer
-	result := checkArch(dir, &buf, true) // quiet=true
+	result := checkArch(dir, &buf, true, false) // quiet=true
 	assert.True(t, result, "warn-range file must pass in quiet mode")
 	assert.Empty(t, buf.String(), "quiet mode must suppress warn-range output")
+}
+
+// TestCheckArchStaged_OnlyChecksStaged verifies that --staged mode only checks
+// files in the git staging area, not the entire directory.
+func TestCheckArchStaged_OnlyChecksStaged(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	// Initialize git repo.
+	for _, args := range [][]string{
+		{"init"},
+		{"config", "user.email", "test@test.com"},
+		{"config", "user.name", "Test"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v failed: %s", args, out)
+	}
+
+	// Create an oversized .go file but do NOT stage it.
+	var sb strings.Builder
+	sb.WriteString("package dummy\n")
+	for i := 0; i < 300; i++ {
+		sb.WriteString("// line\n")
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "big.go"), []byte(sb.String()), 0o644))
+
+	// Create a small staged file.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "small.go"), []byte("package dummy\n"), 0o644))
+	addCmd := exec.Command("git", "add", "small.go")
+	addCmd.Dir = dir
+	require.NoError(t, addCmd.Run())
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, true) // staged=true
+	assert.True(t, result, "staged mode should pass when only small.go is staged")
+}
+
+// TestCheckArchStaged_FailsOnOversizedStaged verifies that --staged fails
+// when a staged file exceeds the hard limit.
+func TestCheckArchStaged_FailsOnOversizedStaged(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	for _, args := range [][]string{
+		{"init"},
+		{"config", "user.email", "test@test.com"},
+		{"config", "user.name", "Test"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "git %v: %s", args, out)
+	}
+
+	// Create and stage an oversized file.
+	var sb strings.Builder
+	sb.WriteString("package dummy\n")
+	for i := 0; i < 300; i++ {
+		sb.WriteString("// line\n")
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "big.go"), []byte(sb.String()), 0o644))
+	addCmd := exec.Command("git", "add", "big.go")
+	addCmd.Dir = dir
+	require.NoError(t, addCmd.Run())
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, true) // staged=true
+	assert.False(t, result, "staged mode should fail when big.go is staged")
+	assert.Contains(t, buf.String(), "big.go")
+}
+
+// TestCheckLoreFromFile_ValidMessage verifies checkLoreFromFile passes for a
+// message file containing a valid Lore commit message.
+func TestCheckLoreFromFile_ValidMessage(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	msgPath := filepath.Join(dir, "COMMIT_EDITMSG")
+	msg := "feat(cli): add feature\n\nWhy: testing\n\n🐙 Autopus <noreply@autopus.co>"
+	require.NoError(t, os.WriteFile(msgPath, []byte(msg), 0o644))
+
+	var buf bytes.Buffer
+	result := checkLoreFromFile(msgPath, &buf, false)
+	assert.True(t, result, "valid Lore message file should pass")
+}
+
+// TestCheckLoreFromFile_InvalidMessage verifies checkLoreFromFile fails for a
+// message file missing the Lore type prefix and sign-off.
+func TestCheckLoreFromFile_InvalidMessage(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	msgPath := filepath.Join(dir, "COMMIT_EDITMSG")
+	require.NoError(t, os.WriteFile(msgPath, []byte("Update something"), 0o644))
+
+	var buf bytes.Buffer
+	result := checkLoreFromFile(msgPath, &buf, false)
+	assert.False(t, result, "invalid message file should fail")
+}
+
+// TestCheckArchWalk_SkipsSubmodule verifies that the walk mode skips directories
+// that contain a .git file (submodule marker).
+func TestCheckArchWalk_SkipsSubmodule(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	// Create a "submodule" directory with a .git file (not directory).
+	subDir := filepath.Join(dir, "mysubmodule")
+	require.NoError(t, os.MkdirAll(subDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(subDir, ".git"), []byte("gitdir: ../.git/modules/mysubmodule"), 0o644))
+
+	// Put an oversized file inside the "submodule" — should be skipped.
+	var sb strings.Builder
+	sb.WriteString("package dummy\n")
+	for i := 0; i < 300; i++ {
+		sb.WriteString("// line\n")
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(subDir, "big.go"), []byte(sb.String()), 0o644))
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, false) // walk mode
+	assert.True(t, result, "walk should skip submodule directories")
 }
 
 // TestCountLines_ReturnsCorrectCount verifies countLines returns the correct
