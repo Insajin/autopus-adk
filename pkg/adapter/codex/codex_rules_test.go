@@ -70,6 +70,18 @@ func TestGenerateRuleFiles_Content(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(loreData), "Lore Commit",
 		"should contain rule title")
+	assert.NotContains(t, string(loreData), "@import content/rules/",
+		"codex rules should inline imported rule bodies")
+	assert.NotContains(t, string(loreData), "# Lore Commit\n\n# Lore Commit",
+		"codex rules should not duplicate the title after inlining")
+
+	contextPath := filepath.Join(dir, ".codex", "rules", "autopus", "context7-docs.md")
+	contextData, err := os.ReadFile(contextPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(contextData), "Before any technology/library/framework-related work",
+		"context7-docs should include imported rule content")
+	assert.NotContains(t, string(contextData), "@import content/rules/",
+		"context7-docs should not leave unresolved imports")
 }
 
 func TestAgentsMD_NoInlineRules(t *testing.T) {

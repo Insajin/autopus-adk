@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	builtincontent "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
-	"github.com/insajin/autopus-adk/pkg/content"
+	contentutil "github.com/insajin/autopus-adk/pkg/content"
 	"github.com/insajin/autopus-adk/templates"
 )
 
@@ -16,7 +17,7 @@ const codexRulesTemplateDir = "codex/rules/autopus"
 
 // fileSizeLimitData is the template data for the file-size-limit rule.
 type fileSizeLimitData struct {
-	Exclusions []content.FileSizeExclusion
+	Exclusions []contentutil.FileSizeExclusion
 }
 
 // generateRuleFiles reads Codex rule templates from embedded FS,
@@ -66,7 +67,7 @@ func (a *Adapter) prepareRuleMappings(cfg *config.HarnessConfig) ([]adapter.File
 		// file-size-limit uses a special data struct with exclusions.
 		var rendered string
 		if outFile == "file-size-limit.md" {
-			exclusions := content.FileSizeExclusions(cfg.Stack, cfg.Framework)
+			exclusions := contentutil.FileSizeExclusions(cfg.Stack, cfg.Framework)
 			data := fileSizeLimitData{Exclusions: exclusions}
 			rendered, err = a.engine.RenderString(string(tmplContent), data)
 		} else {
@@ -74,6 +75,10 @@ func (a *Adapter) prepareRuleMappings(cfg *config.HarnessConfig) ([]adapter.File
 		}
 		if err != nil {
 			return nil, fmt.Errorf("codex rule 템플릿 렌더링 실패 %s: %w", name, err)
+		}
+		rendered, err = resolveCodexRuleImports(rendered)
+		if err != nil {
+			return nil, fmt.Errorf("codex rule import 해석 실패 %s: %w", name, err)
 		}
 
 		relPath := ruleFilePath(outFile)
@@ -86,6 +91,34 @@ func (a *Adapter) prepareRuleMappings(cfg *config.HarnessConfig) ([]adapter.File
 	}
 
 	return files, nil
+}
+
+// resolveCodexRuleImports materializes content/rules imports because Codex
+// rule files are consumed as plain markdown files rather than through an
+// import-aware rule loader.
+func resolveCodexRuleImports(rendered string) (string, error) {
+	const importPrefix = "@import content/rules/"
+
+	lines := strings.Split(rendered, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, importPrefix) {
+			continue
+		}
+
+		contentPath := strings.TrimPrefix(trimmed, "@import ")
+		embeddedPath := strings.TrimPrefix(contentPath, "content/")
+
+		imported, err := builtincontent.FS.ReadFile(embeddedPath)
+		if err != nil {
+			return "", fmt.Errorf("embedded rule 읽기 실패 %s: %w", embeddedPath, err)
+		}
+
+		body := stripFrontmatter(string(imported))
+		lines[i] = strings.TrimSpace(stripLeadingHeading(body))
+	}
+
+	return strings.Join(lines, "\n"), nil
 }
 
 // ruleFilePath returns the target path for a rule file.
@@ -126,4 +159,24 @@ func stripFrontmatter(content string) string {
 		body = body[1:]
 	}
 	return body
+}
+
+// stripLeadingHeading removes the first markdown H1 because the codex rule
+// wrapper template already defines the rule title.
+func stripLeadingHeading(content string) string {
+	lines := strings.Split(content, "\n")
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+
+	if len(lines) == 0 || !strings.HasPrefix(strings.TrimSpace(lines[0]), "# ") {
+		return content
+	}
+
+	lines = lines[1:]
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+
+	return strings.Join(lines, "\n")
 }

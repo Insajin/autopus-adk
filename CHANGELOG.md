@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Codex Rule Import Materialization**: Codex 하네스가 `@import content/rules/...` 포인터를 그대로 남기지 않고 실제 규칙 본문을 인라인하도록 수정
+  - `pkg/adapter/codex/codex_rules.go` — Codex 규칙 생성 시 embedded `content/rules/*.md`를 로드하여 import 해석
+  - `pkg/adapter/codex/codex_rules.go` — frontmatter와 중복 H1 제목 제거로 Codex 규칙 파일 형식 정규화
+  - `pkg/adapter/codex/codex_rules_test.go` — unresolved import와 duplicate heading 회귀 테스트 추가
+
 ### Added
 
 - **Init Platform Auto-Detection**: `auto init` without `--platforms` now scans PATH for supported installed coding CLIs and installs all detected supported platforms
