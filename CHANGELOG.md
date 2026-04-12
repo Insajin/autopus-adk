@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
   - `pkg/adapter/codex/codex_rules.go` — frontmatter와 중복 H1 제목 제거로 Codex 규칙 파일 형식 정규화
   - `pkg/adapter/codex/codex_rules_test.go` — unresolved import와 duplicate heading 회귀 테스트 추가
 
+- **Release Workflow Cosign Bootstrap**: GitHub Release 워크플로우가 `cosign` 부재로 실패하던 문제 수정
+  - `.github/workflows/release.yaml` — `sigstore/cosign-installer@v3` 추가로 checksum 서명 단계 선행 설치
+
 ### Added
 
 - **Init Platform Auto-Detection**: `auto init` without `--platforms` now scans PATH for supported installed coding CLIs and installs all detected supported platforms
