@@ -124,7 +124,9 @@ func TestServer_UnknownMethod(t *testing.T) {
 		JSONRPC: "2.0",
 		ID:      json.RawMessage(`13`),
 		Method:  MethodCancelTask,
-		Params:  mustMarshal(struct{ TaskID string `json:"task_id"` }{TaskID: "nonexistent"}),
+		Params: mustMarshal(struct {
+			TaskID string `json:"task_id"`
+		}{TaskID: "nonexistent"}),
 	}
 	cancelData, _ := json.Marshal(cancelReq)
 	require.NoError(t, mb.sendMessage(cancelData))
@@ -236,4 +238,32 @@ func TestServer_MessageLoop_BackoffOnReceiveError(t *testing.T) {
 
 	// Verify server can be closed without hanging.
 	require.NoError(t, srv.Close())
+}
+
+func TestServer_MessageLoop_ReconnectsAfterReceiveError(t *testing.T) {
+	mb := newMockBackend()
+	defer mb.close()
+
+	srv := NewServer(ServerConfig{
+		BackendURL: mb.wsURL(),
+		WorkerName: "test-worker",
+		Skills:     []string{"echo"},
+		Handler: func(_ context.Context, _ string, _ json.RawMessage) (*TaskResult, error) {
+			return &TaskResult{}, nil
+		},
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	defer srv.Close()
+
+	require.NoError(t, srv.Start(ctx))
+	mb.waitForMessages(t, 1, 3*time.Second) // initial registration
+
+	mb.closeConn()
+
+	msgs := mb.waitForMessages(t, 1, 5*time.Second)
+	var regReq JSONRPCRequest
+	require.NoError(t, json.Unmarshal(msgs[0], &regReq))
+	assert.Equal(t, MethodRegisterCard, regReq.Method)
 }

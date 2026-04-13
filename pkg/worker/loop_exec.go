@@ -59,6 +59,7 @@ type BudgetConfig struct {
 func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.TaskConfig, bc *BudgetConfig) (adapter.TaskResult, error) {
 	taskID := taskCfg.TaskID
 	startTime := time.Now()
+	baseline := captureExecutionBaseline(taskCfg.WorkDir)
 
 	// Record task start in the audit log.
 	if wl.auditWriter != nil {
@@ -112,6 +113,16 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 		}
 		return result, err
 	}
+	artifact, verifyErr := verifyExecutionPostconditions(taskCfg.WorkDir, taskCfg.Prompt, baseline)
+	if artifact.Name != "" {
+		result.Artifacts = append(result.Artifacts, artifact)
+	}
+	if verifyErr != nil {
+		if wl.auditWriter != nil {
+			writeResilientAuditEvent(wl.auditWriter, newAuditFailedEvent(taskID, durationMS, taskCfg.ComputerUse), wl.auditLogger)
+		}
+		return result, verifyErr
+	}
 	if wl.auditWriter != nil {
 		writeResilientAuditEvent(wl.auditWriter, newAuditCompletedEvent(taskID, durationMS, result.CostUSD, taskCfg.ComputerUse), wl.auditLogger)
 	}
@@ -164,6 +175,7 @@ func (wl *WorkerLoop) executePipelineWithParallel(ctx context.Context, taskID, p
 	}
 
 	pe := NewPipelineExecutor(wl.config.Provider, wl.config.MCPConfig, workDir)
+	baseline := captureExecutionBaseline(workDir)
 	pe.SetEnvVars(envVars)
 	pe.SetPhaseInstructions(instructions)
 	pe.SetPhasePromptTemplates(promptTemplates)
@@ -178,6 +190,16 @@ func (wl *WorkerLoop) executePipelineWithParallel(ctx context.Context, taskID, p
 			writeResilientAuditEvent(wl.auditWriter, newAuditFailedEvent(taskID, durationMS, false), wl.auditLogger)
 		}
 		return adapter.TaskResult{}, err
+	}
+	artifact, verifyErr := verifyExecutionPostconditions(workDir, prompt, baseline)
+	if artifact.Name != "" {
+		result.Artifacts = append(result.Artifacts, artifact)
+	}
+	if verifyErr != nil {
+		if wl.auditWriter != nil {
+			writeResilientAuditEvent(wl.auditWriter, newAuditFailedEvent(taskID, durationMS, false), wl.auditLogger)
+		}
+		return result, verifyErr
 	}
 	if wl.auditWriter != nil {
 		writeResilientAuditEvent(wl.auditWriter, newAuditCompletedEvent(taskID, durationMS, result.CostUSD, false), wl.auditLogger)

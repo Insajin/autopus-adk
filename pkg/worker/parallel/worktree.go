@@ -2,6 +2,7 @@ package parallel
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,9 @@ func (m *WorktreeManager) Create(taskID string) (string, error) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("worktree create %s: %s: %w", taskID, strings.TrimSpace(string(out)), err)
+	}
+	if err := m.ensureRuntimeExclude(wtPath); err != nil {
+		return "", err
 	}
 	return wtPath, nil
 }
@@ -106,4 +110,42 @@ func (m *WorktreeManager) List() ([]string, error) {
 // worktreePath returns the filesystem path for a task's worktree.
 func (m *WorktreeManager) worktreePath(taskID string) string {
 	return filepath.Join(m.baseDir, ".worktrees", fmt.Sprintf("worker-%s", taskID))
+}
+
+func (m *WorktreeManager) ensureRuntimeExclude(worktreePath string) error {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd.Dir = worktreePath
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("resolve git dir for %s: %s: %w", worktreePath, strings.TrimSpace(string(out)), err)
+	}
+
+	gitDir := strings.TrimSpace(string(out))
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(worktreePath, gitDir)
+	}
+	excludePath := filepath.Join(gitDir, "info", "exclude")
+	if err := os.MkdirAll(filepath.Dir(excludePath), 0o755); err != nil {
+		return fmt.Errorf("prepare git exclude dir: %w", err)
+	}
+
+	current, err := os.ReadFile(excludePath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read git exclude: %w", err)
+	}
+	if strings.Contains(string(current), ".symphony/") {
+		return nil
+	}
+
+	var next strings.Builder
+	next.Write(current)
+	if len(current) > 0 && !strings.HasSuffix(string(current), "\n") {
+		next.WriteByte('\n')
+	}
+	next.WriteString(".symphony/\n")
+
+	if err := os.WriteFile(excludePath, []byte(next.String()), 0o644); err != nil {
+		return fmt.Errorf("write git exclude: %w", err)
+	}
+	return nil
 }

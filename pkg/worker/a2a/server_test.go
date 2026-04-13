@@ -70,6 +70,15 @@ func (mb *mockBackend) sendMessage(msg []byte) error {
 	return mb.conn.WriteMessage(websocket.TextMessage, msg)
 }
 
+func (mb *mockBackend) closeConn() {
+	mb.mu.Lock()
+	defer mb.mu.Unlock()
+	if mb.conn != nil {
+		_ = mb.conn.Close()
+		mb.conn = nil
+	}
+}
+
 func (mb *mockBackend) wsURL() string {
 	return "ws" + strings.TrimPrefix(mb.server.URL, "http")
 }
@@ -219,6 +228,35 @@ func TestServer_SendMessage_HandlerError(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resultBytes, &result))
 	assert.Equal(t, StatusFailed, result.Status)
 	assert.Contains(t, result.Error, "handler exploded")
+}
+
+func TestServer_ReconnectTransport_ReRegistersAgentCard(t *testing.T) {
+	mb := newMockBackend()
+	defer mb.close()
+
+	srv := NewServer(ServerConfig{
+		BackendURL: mb.wsURL(),
+		WorkerName: "reconnect-worker",
+		Skills:     []string{"echo"},
+		Handler: func(_ context.Context, _ string, _ json.RawMessage) (*TaskResult, error) {
+			return &TaskResult{}, nil
+		},
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	defer srv.Close()
+
+	require.NoError(t, srv.Start(ctx))
+	mb.waitForMessages(t, 1, 3*time.Second) // initial registration
+
+	mb.closeConn()
+	require.NoError(t, srv.ReconnectTransport(ctx))
+
+	msgs := mb.waitForMessages(t, 1, 3*time.Second)
+	var regReq JSONRPCRequest
+	require.NoError(t, json.Unmarshal(msgs[0], &regReq))
+	assert.Equal(t, MethodRegisterCard, regReq.Method)
 }
 
 func TestMergeTaskPayload_InjectsModelAndPipelineMetadata(t *testing.T) {

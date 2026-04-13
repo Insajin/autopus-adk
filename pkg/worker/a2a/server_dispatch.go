@@ -32,6 +32,18 @@ func (s *Server) messageLoop(ctx context.Context) {
 			}
 			log.Printf("[a2a] receive error: %v", err)
 
+			if reconnectErr := s.ReconnectTransport(ctx); reconnectErr == nil {
+				backoff = 0
+				if exhaustedFired && s.restPoller != nil {
+					s.restPoller.Stop()
+				}
+				exhaustedFired = false
+				log.Printf("[a2a] transport recovered after receive error")
+				continue
+			} else {
+				log.Printf("[a2a] reconnect attempt after receive error failed: %v", reconnectErr)
+			}
+
 			// Exponential backoff on consecutive errors.
 			if backoff == 0 {
 				backoff = 500 * time.Millisecond

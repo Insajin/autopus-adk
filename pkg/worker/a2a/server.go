@@ -36,6 +36,7 @@ type Server struct {
 	cancel       context.CancelFunc
 	heartbeat    *Heartbeat
 	restPoller   *RESTPoller
+	reconnectMu  sync.Mutex
 }
 
 // toWebSocketURL converts an http/https URL to a ws/wss URL for WebSocket dialing.
@@ -85,10 +86,24 @@ func (s *Server) Start(ctx context.Context) error {
 		return s.transport.Send(msg)
 	}, func() {
 		log.Printf("[a2a] heartbeat timeout — connection may be lost")
+		go func() {
+			if err := s.ReconnectTransport(ctx); err != nil {
+				log.Printf("[a2a] heartbeat reconnect failed: %v", err)
+			}
+		}()
 	})
 	s.heartbeat.Start(ctx)
 
-	card := AgentCard{
+	if err := s.RegisterAgentCard(s.agentCard()); err != nil {
+		return fmt.Errorf("a2a register card: %w", err)
+	}
+
+	go s.messageLoop(ctx)
+	return nil
+}
+
+func (s *Server) agentCard() AgentCard {
+	return AgentCard{
 		Name:                s.config.WorkerName,
 		Description:         "Autopus ADK Worker",
 		URL:                 s.config.BackendURL,
@@ -97,12 +112,6 @@ func (s *Server) Start(ctx context.Context) error {
 		Capabilities:        DefaultCapabilities(),
 		SupportedInputModes: []string{"text"},
 	}
-	if err := s.RegisterAgentCard(card); err != nil {
-		return fmt.Errorf("a2a register card: %w", err)
-	}
-
-	go s.messageLoop(ctx)
-	return nil
 }
 
 // RegisterAgentCard sends the agent card to the backend.
@@ -165,10 +174,25 @@ func (s *Server) SetRESTPoller(p *RESTPoller) {
 
 // ReconnectTransport attempts to reconnect the WebSocket transport.
 func (s *Server) ReconnectTransport(ctx context.Context) error {
+	s.reconnectMu.Lock()
+	defer s.reconnectMu.Unlock()
+
 	if s.transport == nil {
 		return fmt.Errorf("transport not initialized")
 	}
-	return s.transport.Reconnect(ctx)
+	if err := s.transport.Reconnect(ctx); err != nil {
+		return err
+	}
+	if s.heartbeat != nil {
+		s.heartbeat.Ack()
+	}
+	if err := s.RegisterAgentCard(s.agentCard()); err != nil {
+		return fmt.Errorf("re-register agent card: %w", err)
+	}
+	if s.restPoller != nil {
+		s.restPoller.Stop()
+	}
+	return nil
 }
 
 // Close shuts down the server and its transport.

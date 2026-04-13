@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -75,6 +76,33 @@ func TestWorktreeManager_CreateCommandArgs(t *testing.T) {
 	assert.Equal(t, expected, wtPath)
 
 	// Cleanup the worktree.
+	require.NoError(t, m.Remove(wtPath, false))
+}
+
+func TestWorktreeManager_CreateAddsSymphonyExclude(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := realTempDir(t)
+	initGitRepo(t, tmpDir)
+
+	m := NewWorktreeManager(tmpDir)
+	wtPath, err := m.Create("exclude-task")
+	require.NoError(t, err)
+
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd.Dir = wtPath
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	gitDir := strings.TrimSpace(string(out))
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(wtPath, gitDir)
+	}
+	excludePath := filepath.Join(gitDir, "info", "exclude")
+	content, err := os.ReadFile(excludePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), ".symphony/")
+
 	require.NoError(t, m.Remove(wtPath, false))
 }
 
