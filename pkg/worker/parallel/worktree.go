@@ -113,18 +113,18 @@ func (m *WorktreeManager) worktreePath(taskID string) string {
 }
 
 func (m *WorktreeManager) ensureRuntimeExclude(worktreePath string) error {
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
 	cmd.Dir = worktreePath
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("resolve git dir for %s: %s: %w", worktreePath, strings.TrimSpace(string(out)), err)
+		return fmt.Errorf("resolve common git dir for %s: %s: %w", worktreePath, strings.TrimSpace(string(out)), err)
 	}
 
-	gitDir := strings.TrimSpace(string(out))
-	if !filepath.IsAbs(gitDir) {
-		gitDir = filepath.Join(worktreePath, gitDir)
+	commonGitDir := strings.TrimSpace(string(out))
+	if !filepath.IsAbs(commonGitDir) {
+		commonGitDir = filepath.Join(worktreePath, commonGitDir)
 	}
-	excludePath := filepath.Join(gitDir, "info", "exclude")
+	excludePath := filepath.Join(commonGitDir, "info", "exclude")
 	if err := os.MkdirAll(filepath.Dir(excludePath), 0o755); err != nil {
 		return fmt.Errorf("prepare git exclude dir: %w", err)
 	}
