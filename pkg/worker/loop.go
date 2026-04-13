@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,7 +19,6 @@ import (
 	workerNet "github.com/insajin/autopus-adk/pkg/worker/net"
 	"github.com/insajin/autopus-adk/pkg/worker/parallel"
 	"github.com/insajin/autopus-adk/pkg/worker/pidlock"
-	"github.com/insajin/autopus-adk/pkg/worker/poll"
 	"github.com/insajin/autopus-adk/pkg/worker/reaper"
 	"github.com/insajin/autopus-adk/pkg/worker/routing"
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
@@ -59,7 +59,6 @@ type WorkerLoop struct {
 	authRefresher     *auth.TokenRefresher
 	authReconnector   *auth.Reconnector
 	netMonitor        *workerNet.NetMonitor
-	pollFallback      *poll.TaskPoller
 	lifecycleCtx      context.Context
 	lifecycleCancel   context.CancelFunc
 	auditWriter       *audit.RotatingWriter
@@ -138,6 +137,7 @@ func (wl *WorkerLoop) Close() error {
 // taskPayloadMessage is the JSON structure received from the A2A backend.
 type taskPayloadMessage struct {
 	Description   string `json:"description"`
+	Prompt        string `json:"prompt,omitempty"`
 	PMNotes       string `json:"pm_notes,omitempty"`
 	PolicySummary string `json:"policy_summary,omitempty"`
 	KnowledgeCtx  string `json:"knowledge_ctx,omitempty"`
@@ -156,32 +156,40 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	if err := json.Unmarshal(payload, &msg); err != nil {
 		return nil, fmt.Errorf("parse task payload: %w", err)
 	}
+	descriptionSeed := strings.TrimSpace(msg.Description)
+	if descriptionSeed == "" {
+		descriptionSeed = strings.TrimSpace(msg.Prompt)
+	}
 	memoryAgentID := resolveMemoryAgentID(wl.config)
 
 	// Populate knowledge context from local Hub when backend did not provide one.
 	knowledgeCtx := msg.KnowledgeCtx
-	if knowledgeCtx == "" && wl.knowledgeSearcher != nil {
-		knowledgeCtx = populateKnowledge(ctx, wl.knowledgeSearcher, msg.Description)
+	if knowledgeCtx == "" && wl.knowledgeSearcher != nil && descriptionSeed != "" {
+		knowledgeCtx = populateKnowledge(ctx, wl.knowledgeSearcher, descriptionSeed)
 	}
 
 	// Populate memory context (SPEC-KHINT-001 REQ-003).
-	memoryCtx := populateMemory(ctx, wl.memorySearcher, memoryAgentID, msg.Description)
+	memoryCtx := populateMemory(ctx, wl.memorySearcher, memoryAgentID, descriptionSeed)
 
-	// Build Layer 4 prompt via ContextBuilder.
-	prompt := wl.builder.Build(TaskPayload{
-		TaskID:        taskID,
-		Description:   msg.Description,
-		PMNotes:       msg.PMNotes,
-		PolicySummary: msg.PolicySummary,
-		KnowledgeCtx:  knowledgeCtx,
-		MemoryCtx:     memoryCtx,
-		SpecID:        msg.SpecID,
-	})
+	prompt := strings.TrimSpace(msg.Prompt)
+	if prompt == "" {
+		// Legacy/task-queue payloads still send structured fields that must be
+		// assembled into the layer-4 prompt locally.
+		prompt = wl.builder.Build(TaskPayload{
+			TaskID:        taskID,
+			Description:   msg.Description,
+			PMNotes:       msg.PMNotes,
+			PolicySummary: msg.PolicySummary,
+			KnowledgeCtx:  knowledgeCtx,
+			MemoryCtx:     memoryCtx,
+			SpecID:        msg.SpecID,
+		})
+	}
 
 	// Resolve model via router if configured (REQ-ROUTE-01).
 	var model string
 	if wl.config.Router != nil {
-		model = wl.config.Router.Route(wl.config.Provider.Name(), msg.Description)
+		model = wl.config.Router.Route(wl.config.Provider.Name(), descriptionSeed)
 	}
 
 	// Configure the subprocess task.
@@ -211,7 +219,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 			err := wl.memorySearcher.CreateMemory(writeCtx, knowledge.CreateMemoryRequest{
 				AgentID: memoryAgentID,
 				Title:   fmt.Sprintf("Task learning: %s", taskID),
-				Content: truncateForMemory(msg.Description, result.Output),
+				Content: truncateForMemory(descriptionSeed, result.Output),
 				Source:  "agent_learning",
 			})
 			if err != nil {

@@ -3,7 +3,9 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/worker/a2a"
@@ -49,11 +51,13 @@ func TestNewWorkerLoop(t *testing.T) {
 type mockAdapter struct {
 	name   string
 	script string // shell script content for subprocess
+	last   adapter.TaskConfig
 }
 
 func (m *mockAdapter) Name() string { return m.name }
 
 func (m *mockAdapter) BuildCommand(ctx context.Context, task adapter.TaskConfig) *exec.Cmd {
+	m.last = task
 	return exec.CommandContext(ctx, "sh", "-c", m.script)
 }
 
@@ -219,6 +223,40 @@ func TestHandleTask_InvalidPayload(t *testing.T) {
 	_, err := wl.handleTask(context.Background(), "task-bad", []byte("not json"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parse task payload")
+}
+
+func TestHandleTask_UsesPromptPayloadWhenDescriptionMissing(t *testing.T) {
+	script := `head -c0; echo '{"type":"result","output":"done","cost_usd":0.02,"duration_ms":300}'`
+	mock := &mockAdapter{name: "mock", script: script}
+
+	wl := &WorkerLoop{
+		config: LoopConfig{Provider: mock, WorkDir: t.TempDir()},
+	}
+
+	payload := []byte(`{"prompt":"backend-built prompt"}`)
+
+	result, err := wl.handleTask(context.Background(), "task-ht-prompt", payload)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "backend-built prompt", mock.last.Prompt)
+	assert.Equal(t, "completed", string(result.Status))
+}
+
+func TestPrepareSymphonyWorkspace_CreatesPromptMarkdown(t *testing.T) {
+	workDir := t.TempDir()
+	prompt := "Please read .symphony/prompt.md before proceeding."
+
+	err := prepareSymphonyWorkspace(workDir, prompt)
+	require.NoError(t, err)
+
+	promptPath := filepath.Join(workDir, ".symphony", "prompt.md")
+	data, err := os.ReadFile(promptPath)
+	require.NoError(t, err)
+	assert.Equal(t, prompt, string(data))
+
+	info, err := os.Stat(promptPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o444), info.Mode().Perm())
 }
 
 // --- Approval wiring tests ---

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -79,6 +81,9 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 			log.Printf("[worker] worktree create failed for %s, falling back to in-place: %v", taskID, err)
 		} else {
 			taskCfg.WorkDir = wtPath
+			if prepErr := prepareSymphonyWorkspace(taskCfg.WorkDir, taskCfg.Prompt); prepErr != nil {
+				log.Printf("[worker] symphony workspace prepare failed for %s: %v", taskID, prepErr)
+			}
 			defer func() {
 				if rmErr := wl.worktreeManager.Remove(wtPath, false); rmErr != nil {
 					log.Printf("[worker] worktree remove failed: %v", rmErr)
@@ -103,6 +108,32 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 	}
 
 	return result, nil
+}
+
+func prepareSymphonyWorkspace(workDir, prompt string) error {
+	if !strings.Contains(prompt, ".symphony/prompt.md") {
+		return nil
+	}
+
+	symphonyDir := filepath.Join(workDir, ".symphony")
+	if err := os.MkdirAll(filepath.Join(symphonyDir, "artifacts"), 0o755); err != nil {
+		return fmt.Errorf("create .symphony dir: %w", err)
+	}
+
+	promptPath := filepath.Join(symphonyDir, "prompt.md")
+	if _, err := os.Stat(promptPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat prompt.md: %w", err)
+	}
+
+	if err := os.WriteFile(promptPath, []byte(prompt), 0o600); err != nil {
+		return fmt.Errorf("write prompt.md: %w", err)
+	}
+	if err := os.Chmod(promptPath, 0o444); err != nil {
+		return fmt.Errorf("chmod prompt.md: %w", err)
+	}
+	return nil
 }
 
 // executeSubprocess spawns the provider CLI, pipes the prompt via stdin,
