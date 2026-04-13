@@ -17,12 +17,13 @@ func TestSaveAndLoadWorkerConfig_RoundTrip(t *testing.T) {
 	path := filepath.Join(dir, "worker.yaml")
 
 	original := WorkerConfig{
-		BackendURL:  "https://api.autopus.co",
-		WorkspaceID: "ws-123",
-		Providers:   []string{"claude", "codex"},
-		WorkDir:     "/tmp/autopus-work",
-		A2AURL:      "https://a2a.autopus.co",
-		Concurrency: 3,
+		BackendURL:    "https://api.autopus.co",
+		WorkspaceID:   "ws-123",
+		Providers:     []string{"claude", "codex"},
+		WorkDir:       "/tmp/autopus-work",
+		MemoryAgentID: "11111111-2222-4333-8444-555555555555",
+		A2AURL:        "https://a2a.autopus.co",
+		Concurrency:   3,
 	}
 
 	data, err := yaml.Marshal(original)
@@ -36,6 +37,7 @@ func TestSaveAndLoadWorkerConfig_RoundTrip(t *testing.T) {
 	assert.Equal(t, original.WorkspaceID, loaded.WorkspaceID)
 	assert.Equal(t, original.Providers, loaded.Providers)
 	assert.Equal(t, original.WorkDir, loaded.WorkDir)
+	assert.Equal(t, original.MemoryAgentID, loaded.MemoryAgentID)
 	assert.Equal(t, original.A2AURL, loaded.A2AURL)
 	assert.Equal(t, original.Concurrency, loaded.Concurrency)
 }

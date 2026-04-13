@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/insajin/autopus-adk/pkg/worker/audit"
 	"github.com/insajin/autopus-adk/pkg/worker/auth"
 	"github.com/insajin/autopus-adk/pkg/worker/knowledge"
@@ -81,16 +79,14 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 	}
 
 	// 3b. Memory searcher: enabled alongside knowledge (SPEC-KHINT-001 REQ-003).
-	// WorkerName must be valid UUID for backend memory API (agent_id parameter).
 	if wl.config.WorkspaceID != "" {
-		if _, err := uuid.Parse(wl.config.WorkerName); err != nil {
-			log.Printf("[worker] memory searcher disabled: WorkerName %q is not a valid UUID", wl.config.WorkerName)
-		} else {
-			wl.memorySearcher = knowledge.NewMemorySearcher(
-				wl.config.BackendURL,
-				wl.config.AuthToken,
-				wl.config.WorkspaceID,
-			)
+		wl.memorySearcher = knowledge.NewMemorySearcher(
+			wl.config.BackendURL,
+			wl.config.AuthToken,
+			wl.config.WorkspaceID,
+		)
+		if resolveMemoryAgentID(wl.config) == "" {
+			log.Printf("[worker] memory context/write-back disabled: set memory_agent_id or use UUID WorkerName")
 		}
 	}
 

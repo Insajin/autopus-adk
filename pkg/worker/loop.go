@@ -27,41 +27,42 @@ import (
 
 // LoopConfig holds configuration for the WorkerLoop.
 type LoopConfig struct {
-	BackendURL      string
-	WorkerName      string
-	Skills          []string
-	Provider        adapter.ProviderAdapter
-	MCPConfig       string // path to worker-mcp.json
-	WorkDir         string // working directory for subprocesses
-	AuthToken       string          // bearer token for backend auth
-	Router          *routing.Router // optional model router (nil = no routing)
+	BackendURL    string
+	WorkerName    string
+	MemoryAgentID string
+	Skills        []string
+	Provider      adapter.ProviderAdapter
+	MCPConfig     string          // path to worker-mcp.json
+	WorkDir       string          // working directory for subprocesses
+	AuthToken     string          // bearer token for backend auth
+	Router        *routing.Router // optional model router (nil = no routing)
 	// Deprecated: use CredentialStore instead. Kept for backward compatibility.
-	CredentialsPath string             // path to credentials.json for token refresh
-	CredentialStore setup.CredentialStore // Secure credential storage (Keychain/encrypted file). If nil and CredentialsPath is set, falls back to plain file mode.
-	AuditLogPath      string        // audit log file path (default: {WorkDir}/.autopus/audit.jsonl)
-	AuditMaxSize      int64         // max log size before rotation (default: 10MB)
-	AuditMaxAge       time.Duration // max age of rotated files (default: 7 days)
-	WorkspaceID       string        // workspace identifier for scheduler
-	MaxConcurrency    int           // max parallel tasks (0 or 1 = sequential)
-	WorktreeIsolation bool          // enable worktree isolation for parallel tasks
-	KnowledgeSync     bool          // enable knowledge file sync
-	KnowledgeDir      string        // directory to watch for knowledge sync (defaults to WorkDir)
-	KnowledgeSourceID string        // knowledge source ID for bridge binding
+	CredentialsPath   string                // path to credentials.json for token refresh
+	CredentialStore   setup.CredentialStore // Secure credential storage (Keychain/encrypted file). If nil and CredentialsPath is set, falls back to plain file mode.
+	AuditLogPath      string                // audit log file path (default: {WorkDir}/.autopus/audit.jsonl)
+	AuditMaxSize      int64                 // max log size before rotation (default: 10MB)
+	AuditMaxAge       time.Duration         // max age of rotated files (default: 7 days)
+	WorkspaceID       string                // workspace identifier for scheduler
+	MaxConcurrency    int                   // max parallel tasks (0 or 1 = sequential)
+	WorktreeIsolation bool                  // enable worktree isolation for parallel tasks
+	KnowledgeSync     bool                  // enable knowledge file sync
+	KnowledgeDir      string                // directory to watch for knowledge sync (defaults to WorkDir)
+	KnowledgeSourceID string                // knowledge source ID for bridge binding
 }
 
 // WorkerLoop integrates A2A Server, ProviderAdapter, ContextBuilder, and StreamParser.
 // It receives tasks via A2A, builds prompts, spawns CLI subprocesses, and reports results.
 type WorkerLoop struct {
-	config          LoopConfig
-	server          *a2a.Server
-	builder         ContextBuilder
-	tuiProgram      *tea.Program
-	authRefresher   *auth.TokenRefresher
-	authReconnector *auth.Reconnector
-	netMonitor      *workerNet.NetMonitor
-	pollFallback    *poll.TaskPoller
-	lifecycleCtx    context.Context
-	lifecycleCancel context.CancelFunc
+	config            LoopConfig
+	server            *a2a.Server
+	builder           ContextBuilder
+	tuiProgram        *tea.Program
+	authRefresher     *auth.TokenRefresher
+	authReconnector   *auth.Reconnector
+	netMonitor        *workerNet.NetMonitor
+	pollFallback      *poll.TaskPoller
+	lifecycleCtx      context.Context
+	lifecycleCancel   context.CancelFunc
 	auditWriter       *audit.RotatingWriter
 	knowledgeSearcher *knowledge.KnowledgeSearcher
 	memorySearcher    *knowledge.MemorySearcher
@@ -158,6 +159,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	if err := json.Unmarshal(payload, &msg); err != nil {
 		return nil, fmt.Errorf("parse task payload: %w", err)
 	}
+	memoryAgentID := resolveMemoryAgentID(wl.config)
 
 	// Populate knowledge context from local Hub when backend did not provide one.
 	knowledgeCtx := msg.KnowledgeCtx
@@ -166,7 +168,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	}
 
 	// Populate memory context (SPEC-KHINT-001 REQ-003).
-	memoryCtx := populateMemory(ctx, wl.memorySearcher, wl.config.WorkerName, msg.Description)
+	memoryCtx := populateMemory(ctx, wl.memorySearcher, memoryAgentID, msg.Description)
 
 	// Build Layer 4 prompt via ContextBuilder.
 	prompt := wl.builder.Build(TaskPayload{
@@ -205,15 +207,12 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	log.Printf("[worker] task %s completed: cost=$%.4f duration=%dms", taskID, result.CostUSD, result.DurationMS)
 
 	// Memory write-back: record task learnings (SPEC-KHINT-001 REQ-005).
-	if wl.memorySearcher != nil && result.Output != "" {
+	if wl.memorySearcher != nil && memoryAgentID != "" && result.Output != "" {
 		go func() {
 			writeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			err := wl.memorySearcher.CreateMemory(writeCtx, knowledge.CreateMemoryRequest{
-				// TODO: use a stable UUID agent_id once A2A server exposes one.
-			// WorkerName may not be UUID-formatted; backend returns 400 which is
-			// logged and discarded per REQ-006 graceful degradation.
-			AgentID: wl.config.WorkerName,
+				AgentID: memoryAgentID,
 				Title:   fmt.Sprintf("Task learning: %s", taskID),
 				Content: truncateForMemory(msg.Description, result.Output),
 				Source:  "agent_learning",

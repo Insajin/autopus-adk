@@ -8,6 +8,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestResolveMemoryAgentID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  LoopConfig
+		want string
+	}{
+		{
+			name: "prefers explicit memory agent id",
+			cfg: LoopConfig{
+				WorkerName:    "adk-worker-codex",
+				MemoryAgentID: "11111111-2222-4333-8444-555555555555",
+			},
+			want: "11111111-2222-4333-8444-555555555555",
+		},
+		{
+			name: "falls back to worker name when uuid",
+			cfg: LoopConfig{
+				WorkerName: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+			},
+			want: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+		},
+		{
+			name: "returns empty when no valid uuid exists",
+			cfg: LoopConfig{
+				WorkerName: "adk-worker-claude",
+			},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, resolveMemoryAgentID(tt.cfg))
+		})
+	}
+}
+
 func TestPopulateMemory_NilSearcher(t *testing.T) {
 	t.Parallel()
 	result := populateMemory(context.Background(), nil, "agent-1", "deploy the service")

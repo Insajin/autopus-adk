@@ -19,12 +19,14 @@ func userError(context string, err error) error {
 
 // runWorkerSetup executes the 3-step setup wizard.
 // Non-interactive modes (for agents/CI):
+//
 //   - preToken + preWorkspaceID: use JWT token, skip browser OAuth and workspace prompt
+//
 //   - preAPIKey + preWorkspaceID: use Worker API Key, skip browser OAuth and workspace prompt
 //
-//	Step 1: Device Auth OAuth (PKCE) → Autopus server login  [skipped if preToken/preAPIKey != ""]
-//	Step 2: Workspace selection                              [skipped if preWorkspaceID != ""]
-//	Step 3: Provider auth check (claude/codex/gemini)
+//     Step 1: Device Auth OAuth (PKCE) → Autopus server login  [skipped if preToken/preAPIKey != ""]
+//     Step 2: Workspace selection                              [skipped if preWorkspaceID != ""]
+//     Step 3: Provider auth check (claude/codex/gemini)
 func runWorkerSetup(cmd *cobra.Command, backendURL, preToken, preWorkspaceID, preAPIKey string) error {
 	out := cmd.OutOrStdout()
 	if backendURL == "" {
@@ -224,6 +226,7 @@ func stepSaveAndCheckProviders(cmd *cobra.Command, backendURL, token string, ws 
 	fmt.Fprintln(out, "Step 3/3: 설정 저장 및 프로바이더 확인")
 
 	_ = setup.SaveProgress(3)
+	setupToken := token
 
 	// Exchange JWT for a long-lived Worker API Key for A2A WebSocket auth.
 	// JWT tokens are not accepted by the A2A endpoint — only acos_worker_ keys are.
@@ -246,6 +249,18 @@ func stepSaveAndCheckProviders(cmd *cobra.Command, backendURL, token string, ws 
 		BackendURL:  backendURL,
 		WorkspaceID: ws.ID,
 		Concurrency: 3,
+	}
+
+	if setupToken != "" {
+		agents, err := setup.FetchWorkspaceAgents(backendURL, setupToken, ws.ID)
+		if err != nil {
+			fmt.Fprintf(out, "  ⚠ memory agent 조회 실패 (수동 설정 필요): %v\n", err)
+		} else if memoryAgentID := setup.SelectMemoryAgentID(agents); memoryAgentID != "" {
+			workerCfg.MemoryAgentID = memoryAgentID
+			fmt.Fprintf(out, "  ✓ Memory agent 연결: %s\n", memoryAgentID)
+		} else {
+			fmt.Fprintln(out, "  ⚠ worker tier agent 없음 — memory_agent_id 수동 설정 필요")
+		}
 	}
 
 	// Detect installed providers and add to config.

@@ -108,6 +108,97 @@ func TestFetchWorkspaces_WrappedResponse(t *testing.T) {
 	assert.Equal(t, "ws-wrapped", got[0].ID)
 }
 
+func TestFetchWorkspaceAgents_Success(t *testing.T) {
+	t.Parallel()
+
+	agents := []WorkspaceAgent{
+		{ID: "11111111-2222-4333-8444-555555555555", Name: "Dev Worker", Type: "dev_worker", Tier: "worker", Status: "active"},
+		{ID: "66666666-7777-4888-8999-000000000000", Name: "CEO", Type: "ceo", Tier: "ceo", Status: "active"},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/workspaces/ws-1/agents", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(agents)
+	}))
+	defer srv.Close()
+
+	got, err := FetchWorkspaceAgents(srv.URL, "test-token", "ws-1")
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, agents[0].ID, got[0].ID)
+	assert.Equal(t, "dev_worker", got[0].Type)
+}
+
+func TestFetchWorkspaceAgents_WrappedResponse(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/workspaces/ws-1/agents", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"success":true,"data":[{"id":"11111111-2222-4333-8444-555555555555","name":"Dev Worker","type":"dev_worker","tier":"worker","status":"active"}]}`))
+	}))
+	defer srv.Close()
+
+	got, err := FetchWorkspaceAgents(srv.URL, "test-token", "ws-1")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "11111111-2222-4333-8444-555555555555", got[0].ID)
+}
+
+func TestFetchWorkspaceAgents_AuthHeader(t *testing.T) {
+	t.Parallel()
+
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]WorkspaceAgent{})
+	}))
+	defer srv.Close()
+
+	_, err := FetchWorkspaceAgents(srv.URL, "agent-token", "ws-1")
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer agent-token", gotAuth)
+}
+
+func TestSelectMemoryAgentID(t *testing.T) {
+	t.Parallel()
+
+	t.Run("prefers active dev worker", func(t *testing.T) {
+		agents := []WorkspaceAgent{
+			{ID: "pm-id", Type: "pm", Tier: "pm", Status: "active"},
+			{ID: "worker-id", Type: "dev_worker", Tier: "worker", Status: "active"},
+			{ID: "ops-id", Type: "ops_worker", Tier: "worker", Status: "active"},
+		}
+		assert.Equal(t, "worker-id", SelectMemoryAgentID(agents))
+	})
+
+	t.Run("falls back to any active worker", func(t *testing.T) {
+		agents := []WorkspaceAgent{
+			{ID: "disabled-dev", Type: "dev_worker", Tier: "worker", Status: "disabled"},
+			{ID: "ops-id", Type: "ops_worker", Tier: "worker", Status: "active"},
+		}
+		assert.Equal(t, "ops-id", SelectMemoryAgentID(agents))
+	})
+
+	t.Run("falls back to worker when no active worker exists", func(t *testing.T) {
+		agents := []WorkspaceAgent{
+			{ID: "disabled-dev", Type: "dev_worker", Tier: "worker", Status: "disabled"},
+			{ID: "pm-id", Type: "pm", Tier: "pm", Status: "active"},
+		}
+		assert.Equal(t, "disabled-dev", SelectMemoryAgentID(agents))
+	})
+
+	t.Run("returns empty when workspace has no worker", func(t *testing.T) {
+		agents := []WorkspaceAgent{
+			{ID: "ceo-id", Type: "ceo", Tier: "ceo", Status: "active"},
+			{ID: "pm-id", Type: "pm", Tier: "pm", Status: "active"},
+		}
+		assert.Empty(t, SelectMemoryAgentID(agents))
+	})
+}
+
 func TestSelectWorkspace_MultipleWithValidInput(t *testing.T) {
 	// Redirect os.Stdin to provide input
 	oldStdin := os.Stdin

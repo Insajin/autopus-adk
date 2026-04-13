@@ -6,13 +6,24 @@ import (
 	"log"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/insajin/autopus-adk/pkg/worker/knowledge"
 )
+
+func resolveMemoryAgentID(cfg LoopConfig) string {
+	if _, err := uuid.Parse(cfg.MemoryAgentID); err == nil {
+		return cfg.MemoryAgentID
+	}
+	if _, err := uuid.Parse(cfg.WorkerName); err == nil {
+		return cfg.WorkerName
+	}
+	return ""
+}
 
 // populateMemory queries the agent memory API and returns formatted context.
 // Returns empty string on failure or when searcher is nil (non-blocking).
 func populateMemory(ctx context.Context, searcher *knowledge.MemorySearcher, agentID, description string) string {
-	if searcher == nil || description == "" {
+	if searcher == nil || agentID == "" || description == "" {
 		return ""
 	}
 	entries, err := searcher.GetContext(ctx, agentID, description)

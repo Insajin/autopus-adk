@@ -13,6 +13,15 @@ type Workspace struct {
 	Name string `json:"name"`
 }
 
+// WorkspaceAgent is the subset of workspace agent fields needed during worker setup.
+type WorkspaceAgent struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+	Tier   string `json:"tier"`
+	Status string `json:"status"`
+}
+
 // FetchWorkspaces retrieves the list of workspaces from the backend.
 func FetchWorkspaces(backendURL, token string) ([]Workspace, error) {
 	endpoint := strings.TrimRight(backendURL, "/") + "/api/v1/workspaces"
@@ -54,6 +63,60 @@ func FindWorkspaceByID(backendURL, token, id string) (*Workspace, error) {
 		}
 	}
 	return nil, fmt.Errorf("workspace %q not found", id)
+}
+
+// FetchWorkspaceAgents retrieves all agents belonging to a workspace.
+func FetchWorkspaceAgents(backendURL, token, workspaceID string) ([]WorkspaceAgent, error) {
+	endpoint := strings.TrimRight(backendURL, "/") + "/api/v1/workspaces/" + workspaceID + "/agents"
+
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch workspace agents: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch workspace agents failed (%d): %s", resp.StatusCode, body)
+	}
+
+	result, err := unwrap[[]WorkspaceAgent](body)
+	if err != nil {
+		return nil, fmt.Errorf("decode workspace agents: %w", err)
+	}
+	return *result, nil
+}
+
+// SelectMemoryAgentID chooses the best default agent UUID for worker memory.
+// The ADK worker acts as a development worker by default, so dev_worker is preferred.
+func SelectMemoryAgentID(agents []WorkspaceAgent) string {
+	for _, agent := range agents {
+		if agent.Status == "active" && agent.Type == "dev_worker" {
+			return agent.ID
+		}
+	}
+	for _, agent := range agents {
+		if agent.Status == "active" && agent.Tier == "worker" {
+			return agent.ID
+		}
+	}
+	for _, agent := range agents {
+		if agent.Type == "dev_worker" {
+			return agent.ID
+		}
+	}
+	for _, agent := range agents {
+		if agent.Tier == "worker" {
+			return agent.ID
+		}
+	}
+	return ""
 }
 
 // SelectWorkspace picks the workspace to use. Auto-selects if only one is available.
