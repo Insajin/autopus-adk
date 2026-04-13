@@ -408,9 +408,13 @@ auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
 | 플랫폼 | 생성되는 파일 |
 |--------|-------------|
 | **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
-| **Codex** | `.codex/`, `AGENTS.md` |
+| **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Gemini CLI** | `.gemini/`, `GEMINI.md` |
 동일한 16개 에이전트. 동일한 40개 스킬. 동일한 규칙. **모든 플랫폼.**
+
+Codex 참고:
+- `auto init` 또는 `auto update` 직후에는 `$auto plan ...`, `$auto go ...`, `$auto idea ...`를 바로 사용할 수 있습니다
+- 생성된 로컬 플러그인을 `/plugins`에서 설치하면 더 자연스러운 `@auto ...` 문법을 사용할 수 있습니다
 
 ---
 
@@ -617,7 +621,7 @@ Autopus Triage가 자동으로 요청을 분석합니다:
   Complexity: HIGH → /auto idea --multi (추천)
 ```
 
-슬래시 서브커맨드 불필요 — `/auto` 뒤에 원하는 것을 설명하면 됩니다.
+Codex에서는 생성된 로컬 플러그인을 `/plugins`에서 설치한 뒤 `@auto ...`를 쓰거나, 바로 `$auto ...`를 repo skill fallback으로 사용하면 됩니다.
 </details>
 
 ### 🔄 업데이트

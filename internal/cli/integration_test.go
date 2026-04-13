@@ -58,6 +58,7 @@ func TestInit_CreatesCorrectFiles(t *testing.T) {
 	assert.Contains(t, gitignoreContent, ".claude/skills/autopus/")
 	assert.Contains(t, gitignoreContent, ".codex/skills/")
 	assert.Contains(t, gitignoreContent, ".gemini/skills/autopus/")
+	assert.Contains(t, gitignoreContent, ".agents/plugins/")
 }
 
 // TestInit_CreatesAllContent는 init이 전체 콘텐츠를 생성하는지 검증한다.
@@ -202,6 +203,7 @@ func TestMultiPlatform_Init(t *testing.T) {
 	assert.Contains(t, gitignoreStr, ".claude/rules/autopus/")
 	assert.Contains(t, gitignoreStr, ".codex/skills/")
 	assert.Contains(t, gitignoreStr, ".gemini/skills/autopus/")
+	assert.Contains(t, gitignoreStr, ".agents/plugins/")
 
 	// 컨텍스트 격리 검증: 각 플랫폼 파일은 다른 플랫폼 고유 내용을 포함하지 않아야 함
 	claudeMD, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))

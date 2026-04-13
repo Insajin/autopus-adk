@@ -27,13 +27,15 @@ type featureCounts struct {
 func classifyFile(f adapter.FileMapping) string {
 	p := strings.ToLower(f.TargetPath)
 	switch {
+	case strings.Contains(p, ".agents/plugins/") || strings.Contains(p, ".autopus/plugins/"):
+		return ""
+	case strings.Contains(p, "skills/") || strings.Contains(p, "skills\\"):
+		return "skills"
 	case strings.Contains(p, "agents/") || strings.Contains(p, "agents\\"):
 		return "agents"
 	case strings.Contains(p, "rules/") || strings.Contains(p, "rules\\") ||
 		strings.Contains(p, "rules-autopus"):
 		return "rules"
-	case strings.Contains(p, "skills/") || strings.Contains(p, "skills\\"):
-		return "skills"
 	default:
 		return ""
 	}
@@ -83,7 +85,7 @@ func TestParity_CrossPlatformFeatures(t *testing.T) {
 	}
 
 	platforms := []struct {
-		name    string
+		name     string
 		generate func(t *testing.T) *adapter.PlatformFiles
 	}{
 		{
@@ -174,6 +176,9 @@ func TestParity_ClassifyFile(t *testing.T) {
 		{".gemini/rules/branding.md", "rules"},
 		{".claude/skills/auto/SKILL.md", "skills"},
 		{".codex/skills/auto-skill.md", "skills"},
+		{".agents/skills/auto/SKILL.md", "skills"},
+		{".agents/plugins/marketplace.json", ""},
+		{".autopus/plugins/auto/skills/auto/SKILL.md", ""},
 		{"CLAUDE.md", ""},
 		{"AGENTS.md", ""},
 		{".mcp.json", ""},

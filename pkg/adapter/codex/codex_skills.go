@@ -81,6 +81,8 @@ const agentsMDTemplate = `# Autopus-ADK Harness
 
 - Rules: .codex/rules/autopus/
 - Skills: .codex/skills/
+- Agent Skills: .agents/skills/
+- Plugin Marketplace: .agents/plugins/marketplace.json
 - Agents: .codex/agents/
 
 ## Language Policy

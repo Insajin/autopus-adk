@@ -43,6 +43,24 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 		})
 	}
 
+	repoSkillPath := filepath.Join(a.root, ".agents", "skills", "auto", "SKILL.md")
+	if _, err := os.Stat(repoSkillPath); os.IsNotExist(err) {
+		errs = append(errs, adapter.ValidationError{
+			File:    ".agents/skills/auto/SKILL.md",
+			Message: "Codex 표준 router skill이 없음",
+			Level:   "warning",
+		})
+	}
+
+	marketplacePath := filepath.Join(a.root, ".agents", "plugins", "marketplace.json")
+	if _, err := os.Stat(marketplacePath); os.IsNotExist(err) {
+		errs = append(errs, adapter.ValidationError{
+			File:    ".agents/plugins/marketplace.json",
+			Message: "로컬 Codex plugin marketplace가 없음",
+			Level:   "warning",
+		})
+	}
+
 	return errs, nil
 }
 
@@ -50,6 +68,27 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 func (a *Adapter) Clean(_ context.Context) error {
 	if err := os.RemoveAll(filepath.Join(a.root, ".codex", "skills")); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf(".codex/skills 제거 실패: %w", err)
+	}
+	autoSkillDirs := []string{
+		"auto",
+		"auto-plan",
+		"auto-go",
+		"auto-fix",
+		"auto-review",
+		"auto-sync",
+		"auto-idea",
+		"auto-canary",
+	}
+	for _, dir := range autoSkillDirs {
+		if err := os.RemoveAll(filepath.Join(a.root, ".agents", "skills", dir)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf(".agents/skills/%s 제거 실패: %w", dir, err)
+		}
+	}
+	if err := os.Remove(filepath.Join(a.root, ".agents", "plugins", "marketplace.json")); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf(".agents/plugins/marketplace.json 제거 실패: %w", err)
+	}
+	if err := os.RemoveAll(filepath.Join(a.root, ".autopus", "plugins", "auto")); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf(".autopus/plugins/auto 제거 실패: %w", err)
 	}
 
 	agentsPath := filepath.Join(a.root, "AGENTS.md")

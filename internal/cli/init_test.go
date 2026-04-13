@@ -62,6 +62,7 @@ func TestInitCmd_CreatesGitignore(t *testing.T) {
 	// autopus 관련 패턴이 있어야 함
 	assert.Contains(t, content, ".claude/rules/autopus/")
 	assert.Contains(t, content, ".claude/skills/autopus/")
+	assert.Contains(t, content, ".agents/plugins/")
 }
 
 func TestInitCmd_MultiplePlatforms(t *testing.T) {

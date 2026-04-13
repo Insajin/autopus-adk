@@ -40,6 +40,13 @@ func TestE2EInitCodex(t *testing.T) {
 	// .codex/skills/ directory must exist with files.
 	assertDirNotEmpty(t, filepath.Join(dir, ".codex", "skills"))
 
+	// .agents/skills/ router must exist for Codex standard skills.
+	assertFileExists(t, filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"))
+
+	// Local plugin marketplace and plugin manifest must exist for @auto flow.
+	assertFileExists(t, filepath.Join(dir, ".agents", "plugins", "marketplace.json"))
+	assertFileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", ".codex-plugin", "plugin.json"))
+
 	// .codex/prompts/ directory must exist with 8 prompts.
 	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "prompts"), 8)
 
@@ -56,8 +63,8 @@ func TestE2EInitCodex(t *testing.T) {
 	assertFileExists(t, filepath.Join(dir, ".autopus", "codex-manifest.json"))
 
 	// Manifest file count: skills(46) + prompts(6) + agents(16) + rules(7) + AGENTS.md + hooks.json + config.toml = 78+
-	assert.GreaterOrEqual(t, len(pf.Files), 70,
-		"Codex should produce at least 70 file mappings, got %d", len(pf.Files))
+	assert.GreaterOrEqual(t, len(pf.Files), 80,
+		"Codex should produce at least 80 file mappings, got %d", len(pf.Files))
 
 	// Validate should pass after Generate.
 	errs, err := a.Validate(context.Background())
@@ -163,6 +170,9 @@ func TestE2EClean_Codex(t *testing.T) {
 
 	// .codex/skills should be removed.
 	_, err = os.Stat(filepath.Join(dir, ".codex", "skills"))
+	assert.True(t, os.IsNotExist(err))
+
+	_, err = os.Stat(filepath.Join(dir, ".agents", "skills", "auto"))
 	assert.True(t, os.IsNotExist(err))
 
 	// AGENTS.md marker section should be removed.

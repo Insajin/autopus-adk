@@ -74,6 +74,18 @@ func TestCodexAdapter_Generate_CreatesSkillsDirectory(t *testing.T) {
 	info, statErr := os.Stat(skillsDir)
 	require.NoError(t, statErr, ".codex/skills 디렉터리가 존재해야 함")
 	assert.True(t, info.IsDir())
+
+	repoSkill := filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md")
+	_, statErr = os.Stat(repoSkill)
+	require.NoError(t, statErr, ".agents/skills/auto/SKILL.md가 존재해야 함")
+
+	marketplace := filepath.Join(dir, ".agents", "plugins", "marketplace.json")
+	_, statErr = os.Stat(marketplace)
+	require.NoError(t, statErr, ".agents/plugins/marketplace.json이 존재해야 함")
+
+	pluginManifest := filepath.Join(dir, ".autopus", "plugins", "auto", ".codex-plugin", "plugin.json")
+	_, statErr = os.Stat(pluginManifest)
+	require.NoError(t, statErr, "로컬 codex plugin manifest가 존재해야 함")
 }
 
 func TestCodexAdapter_Generate_PreservesUserContent(t *testing.T) {
@@ -150,5 +162,8 @@ func TestCodexAdapter_Clean(t *testing.T) {
 
 	// .codex/skills 디렉터리가 제거되어야 함
 	_, statErr := os.Stat(filepath.Join(dir, ".codex", "skills"))
+	assert.True(t, os.IsNotExist(statErr))
+
+	_, statErr = os.Stat(filepath.Join(dir, ".agents", "skills", "auto"))
 	assert.True(t, os.IsNotExist(statErr))
 }

@@ -58,6 +58,18 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	if err := os.MkdirAll(skillsDir, 0755); err != nil {
 		return nil, fmt.Errorf(".codex/skills 디렉터리 생성 실패: %w", err)
 	}
+	agentSkillsDir := filepath.Join(a.root, ".agents", "skills")
+	if err := os.MkdirAll(agentSkillsDir, 0755); err != nil {
+		return nil, fmt.Errorf(".agents/skills 디렉터리 생성 실패: %w", err)
+	}
+	pluginDir := filepath.Join(a.root, ".autopus", "plugins", "auto")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		return nil, fmt.Errorf(".autopus/plugins/auto 디렉터리 생성 실패: %w", err)
+	}
+	marketplaceDir := filepath.Join(a.root, ".agents", "plugins")
+	if err := os.MkdirAll(marketplaceDir, 0755); err != nil {
+		return nil, fmt.Errorf(".agents/plugins 디렉터리 생성 실패: %w", err)
+	}
 
 	agentsMD, err := a.injectMarkerSection(cfg)
 	if err != nil {
@@ -84,11 +96,23 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, skillFiles...)
 
+	standardSkillFiles, err := a.renderStandardSkills(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("표준 codex skill 생성 실패: %w", err)
+	}
+	files = append(files, standardSkillFiles...)
+
 	promptFiles, err := a.renderPromptTemplates(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("프롬프트 템플릿 렌더링 실패: %w", err)
 	}
 	files = append(files, promptFiles...)
+
+	pluginFiles, err := a.renderPluginFiles(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("codex plugin 생성 실패: %w", err)
+	}
+	files = append(files, pluginFiles...)
 
 	// Agents (TOML files)
 	agentFiles, err := a.generateAgents(cfg)
@@ -247,11 +271,23 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, extSkillFiles...)
 
+	standardSkillFiles, err := a.prepareStandardSkillMappings(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("표준 codex skill 준비 실패: %w", err)
+	}
+	files = append(files, standardSkillFiles...)
+
 	promptFiles, err := a.preparePromptFiles(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("codex prompt 템플릿 준비 실패: %w", err)
 	}
 	files = append(files, promptFiles...)
+
+	pluginFiles, err := a.preparePluginMappings(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("codex plugin 준비 실패: %w", err)
+	}
+	files = append(files, pluginFiles...)
 
 	// Rules (separate files)
 	rulePrepFiles, err := a.prepareRuleMappings(cfg)

@@ -482,9 +482,13 @@ One `autopus.yaml` generates **native configuration** for every detected support
 | Platform | What Gets Generated |
 |----------|-------------------|
 | **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
-| **Codex** | `.codex/`, `AGENTS.md` |
+| **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Gemini CLI** | `.gemini/`, `GEMINI.md` |
 Same 16 agents. Same 40 skills. Same rules. **Every platform.**
+
+Codex note:
+- Use `$auto plan ...`, `$auto go ...`, `$auto idea ...` immediately after `auto init` or `auto update`
+- Install the generated local plugin from `/plugins` to unlock the friendlier `@auto ...` syntax
 
 ---
 
@@ -706,7 +710,7 @@ Autopus Triage analyzes your request automatically:
   Complexity: HIGH → /auto idea --multi (recommended)
 ```
 
-No slash subcommand needed — just describe what you want after `/auto`.
+For Codex, use `@auto ...` after installing the generated local plugin from `/plugins`, or use `$auto ...` immediately as the repo-skill fallback.
 </details>
 
 ---

@@ -25,6 +25,7 @@ var gitignorePatterns = []string{
 	".codex/skills/",
 	".gemini/skills/autopus/",
 	".agents/skills/",
+	".agents/plugins/",
 	".autopus/",
 	".mcp.json",
 }
@@ -205,7 +206,11 @@ func newInitCmd() *cobra.Command {
 				if _, err := os.Stat(workerConfigPath); os.IsNotExist(err) {
 					tui.Info(out, "Next: run 'auto worker setup' — Worker를 설정하여 Autopus 서버와 연결하세요")
 				} else {
-					tui.Info(out, "Next: /auto plan 으로 첫 기능을 기획해보세요")
+					if containsPlatform(cfg.Platforms, "codex") {
+						tui.Info(out, "Next: Codex에서 `$auto plan ...` 또는 plugin 설치 후 `@auto plan ...` 로 첫 기능을 기획해보세요")
+					} else {
+						tui.Info(out, "Next: /auto plan 으로 첫 기능을 기획해보세요")
+					}
 				}
 			} else {
 				tui.Info(out, "Next: run 'auto worker setup' to connect with Autopus server")
@@ -223,4 +228,13 @@ func newInitCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&yes, "yes", false, "Non-interactive mode (use defaults)")
 
 	return cmd
+}
+
+func containsPlatform(platforms []string, target string) bool {
+	for _, platform := range platforms {
+		if platform == target {
+			return true
+		}
+	}
+	return false
 }
