@@ -85,6 +85,42 @@ func TestMCPServer_UnknownMethod(t *testing.T) {
 	assert.Contains(t, resp.Error.Message, "method not found")
 }
 
+func TestMCPServer_InitializedNotification_IsIgnored(t *testing.T) {
+	t.Parallel()
+
+	s, buf := newTestServer("http://localhost")
+	req := &jsonRPCRequest{JSONRPC: "2.0", Method: "notifications/initialized"}
+	s.dispatch(t.Context(), req)
+
+	assert.Empty(t, buf.String(), "notifications must not produce a JSON-RPC response")
+}
+
+func TestMCPServer_UnknownNotification_IsIgnored(t *testing.T) {
+	t.Parallel()
+
+	s, buf := newTestServer("http://localhost")
+	req := &jsonRPCRequest{JSONRPC: "2.0", Method: "notifications/progress"}
+	s.dispatch(t.Context(), req)
+
+	assert.Empty(t, buf.String(), "unknown notifications must be ignored")
+}
+
+func TestMCPServer_Ping(t *testing.T) {
+	t.Parallel()
+
+	s, buf := newTestServer("http://localhost")
+	req := &jsonRPCRequest{JSONRPC: "2.0", ID: float64(8), Method: "ping"}
+	s.dispatch(t.Context(), req)
+
+	resp := parseResponse(t, buf)
+	assert.Equal(t, float64(8), resp.ID)
+	assert.Nil(t, resp.Error)
+
+	result, ok := resp.Result.(map[string]any)
+	require.True(t, ok)
+	assert.Empty(t, result)
+}
+
 func TestMCPServer_ToolsCallUnknownTool(t *testing.T) {
 	t.Parallel()
 

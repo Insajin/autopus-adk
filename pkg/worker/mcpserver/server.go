@@ -136,6 +136,10 @@ func (s *MCPServer) dispatch(ctx context.Context, req *jsonRPCRequest) {
 				"resources": map[string]any{},
 			},
 		})
+	case "ping":
+		s.sendResult(req.ID, map[string]any{})
+	case "notifications/initialized":
+		return
 	case "tools/list":
 		s.handleToolsList(req)
 	case "tools/call":
@@ -145,8 +149,15 @@ func (s *MCPServer) dispatch(ctx context.Context, req *jsonRPCRequest) {
 	case "resources/read":
 		s.handleResourcesRead(ctx, req)
 	default:
+		if req.isNotification() {
+			return
+		}
 		s.sendError(req.ID, -32601, fmt.Sprintf("method not found: %s", req.Method))
 	}
+}
+
+func (r *jsonRPCRequest) isNotification() bool {
+	return r.ID == nil
 }
 
 func (s *MCPServer) handleToolsList(req *jsonRPCRequest) {
