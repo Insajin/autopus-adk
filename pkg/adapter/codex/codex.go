@@ -146,6 +146,11 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	if err := a.installGitHooks(cfg); err != nil {
 		return nil, fmt.Errorf("git hooks 설치 실패: %w", err)
 	}
+	gitHookFiles, err := a.prepareGitHookFiles(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("git hooks 준비 실패: %w", err)
+	}
+	files = append(files, gitHookFiles...)
 
 	pf := &adapter.PlatformFiles{
 		Files:    files,
@@ -316,6 +321,12 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		return nil, fmt.Errorf("config 준비 실패: %w", err)
 	}
 	files = append(files, configPrepFiles...)
+
+	gitHookFiles, err := a.prepareGitHookFiles(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("git hooks 준비 실패: %w", err)
+	}
+	files = append(files, gitHookFiles...)
 
 	return files, nil
 }

@@ -45,6 +45,24 @@ func TestPrepareHooksFile_NoDiskWrite(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
+func TestPrepareGitHookFiles_NoDiskWrite(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	files, err := a.prepareGitHookFiles(cfg)
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+
+	paths := []string{files[0].TargetPath, files[1].TargetPath}
+	assert.Contains(t, paths, filepath.Join(".git", "hooks", "pre-commit"))
+	assert.Contains(t, paths, filepath.Join(".git", "hooks", "commit-msg"))
+
+	_, err = os.Stat(filepath.Join(dir, ".git", "hooks", "commit-msg"))
+	assert.True(t, os.IsNotExist(err))
+}
+
 // --- Settings/Config tests ---
 
 func TestGenerateConfig(t *testing.T) {

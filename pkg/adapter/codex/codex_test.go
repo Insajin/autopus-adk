@@ -86,6 +86,10 @@ func TestCodexAdapter_Generate_CreatesSkillsDirectory(t *testing.T) {
 	pluginManifest := filepath.Join(dir, ".autopus", "plugins", "auto", ".codex-plugin", "plugin.json")
 	_, statErr = os.Stat(pluginManifest)
 	require.NoError(t, statErr, "로컬 codex plugin manifest가 존재해야 함")
+
+	commitMsgHook := filepath.Join(dir, ".git", "hooks", "commit-msg")
+	_, statErr = os.Stat(commitMsgHook)
+	require.NoError(t, statErr, "lore commit-msg hook가 존재해야 함")
 }
 
 func TestCodexAdapter_Generate_PreservesUserContent(t *testing.T) {
@@ -124,6 +128,11 @@ func TestCodexAdapter_Update(t *testing.T) {
 	files, err := a.Update(context.Background(), cfg)
 	require.NoError(t, err)
 	assert.NotNil(t, files)
+
+	commitMsgHook := filepath.Join(dir, ".git", "hooks", "commit-msg")
+	data, err := os.ReadFile(commitMsgHook)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "auto check --lore --quiet --message")
 }
 
 func TestCodexAdapter_InstallHooks_NoOp(t *testing.T) {

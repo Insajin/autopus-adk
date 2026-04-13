@@ -63,6 +63,25 @@ func (a *Adapter) prepareHooksFile(cfg *config.HarnessConfig) ([]adapter.FileMap
 	}}, nil
 }
 
+func (a *Adapter) prepareGitHookFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	_, gitHooks, err := content.GenerateHookConfigs(cfg.Hooks, adapterName, false)
+	if err != nil {
+		return nil, fmt.Errorf("git hooks 생성 실패: %w", err)
+	}
+
+	files := make([]adapter.FileMapping, 0, len(gitHooks))
+	for _, gh := range gitHooks {
+		files = append(files, adapter.FileMapping{
+			TargetPath:      gh.Path,
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(gh.Content),
+			Content:         []byte(gh.Content),
+		})
+	}
+
+	return files, nil
+}
+
 // renderHooksTemplate renders the codex hooks.json template.
 func (a *Adapter) renderHooksTemplate(cfg *config.HarnessConfig) (string, error) {
 	hooks, _, err := content.GenerateHookConfigs(cfg.Hooks, adapterName, true)
@@ -169,15 +188,18 @@ func mergeHookCategories(existing, autopus hooksDoc) hooksDoc {
 
 // installGitHooks generates and writes git hooks as fallback.
 func (a *Adapter) installGitHooks(cfg *config.HarnessConfig) error {
-	_, gitHooks, _ := content.GenerateHookConfigs(cfg.Hooks, adapterName, false)
+	files, err := a.prepareGitHookFiles(cfg)
+	if err != nil {
+		return err
+	}
 
-	for _, gh := range gitHooks {
-		ghPath := filepath.Join(a.root, gh.Path)
+	for _, file := range files {
+		ghPath := filepath.Join(a.root, file.TargetPath)
 		if err := os.MkdirAll(filepath.Dir(ghPath), 0755); err != nil {
 			return fmt.Errorf("git hook 디렉터리 생성 실패: %w", err)
 		}
-		if err := os.WriteFile(ghPath, []byte(gh.Content), 0755); err != nil {
-			return fmt.Errorf("git hook 쓰기 실패 %s: %w", gh.Path, err)
+		if err := os.WriteFile(ghPath, file.Content, 0755); err != nil {
+			return fmt.Errorf("git hook 쓰기 실패 %s: %w", file.TargetPath, err)
 		}
 	}
 	return nil
