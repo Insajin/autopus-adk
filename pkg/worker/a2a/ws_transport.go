@@ -155,6 +155,13 @@ func (t *Transport) Close() error {
 	return t.conn.Close()
 }
 
+// SetAuthToken updates the bearer token used for future connects/reconnects.
+func (t *Transport) SetAuthToken(token string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.config.AuthToken = token
+}
+
 // startHeartbeat sends ping frames at the configured interval.
 func (t *Transport) startHeartbeat(ctx context.Context) {
 	ticker := time.NewTicker(time.Duration(t.config.HeartbeatSec) * time.Second)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type KnowledgeSearcher struct {
 	authToken   string
 	workspaceID string
 	client      *http.Client
+	mu          sync.RWMutex
 }
 
 // SearchResult represents a single knowledge search result.
@@ -90,7 +92,7 @@ func (ks *KnowledgeSearcher) Search(ctx context.Context, query string) ([]Search
 	if err != nil {
 		return nil, fmt.Errorf("knowledge search: create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+ks.authToken)
+	req.Header.Set("Authorization", "Bearer "+ks.getAuthToken())
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := ks.client.Do(req)
@@ -114,4 +116,17 @@ func (ks *KnowledgeSearcher) Search(ctx context.Context, query string) ([]Search
 	}
 
 	return envelope.Data, nil
+}
+
+// SetAuthToken updates the bearer token used for knowledge search requests.
+func (ks *KnowledgeSearcher) SetAuthToken(token string) {
+	ks.mu.Lock()
+	defer ks.mu.Unlock()
+	ks.authToken = token
+}
+
+func (ks *KnowledgeSearcher) getAuthToken() string {
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+	return ks.authToken
 }

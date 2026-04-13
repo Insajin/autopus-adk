@@ -28,8 +28,7 @@ func TestCodexAdapterBuildCommand(t *testing.T) {
 	assert.Contains(t, cmd.Args, "-")
 	assert.NotContains(t, cmd.Args, "fix the bug")
 	assert.Contains(t, cmd.Args, "--json")
-	assert.Contains(t, cmd.Args, "resume")
-	assert.Contains(t, cmd.Args, "worker-sess-task-c1")
+	assert.NotContains(t, cmd.Args, "resume")
 	assert.Equal(t, "/tmp/codex-work", cmd.Dir)
 
 	envContains(t, cmd.Env, "AUTOPUS_TASK_ID=task-c1")
@@ -44,7 +43,8 @@ func TestCodexAdapterBuildCommandWithSession(t *testing.T) {
 	}
 
 	cmd := a.BuildCommand(context.Background(), task)
-	assert.Contains(t, cmd.Args, "my-session")
+	assert.NotContains(t, cmd.Args, "resume")
+	assert.NotContains(t, cmd.Args, "my-session")
 }
 
 func TestCodexAdapterBuildCommandWithModel(t *testing.T) {
@@ -57,6 +57,18 @@ func TestCodexAdapterBuildCommandWithModel(t *testing.T) {
 	cmd := a.BuildCommand(context.Background(), task)
 	assert.Contains(t, cmd.Args, "-m")
 	assert.Contains(t, cmd.Args, "o3")
+}
+
+func TestCodexAdapterBuildCommand_OmitsOpenAIModelOverride(t *testing.T) {
+	a := NewCodexAdapter()
+	task := TaskConfig{
+		TaskID: "task-cm2",
+		Model:  "openai/gpt-5.4",
+	}
+
+	cmd := a.BuildCommand(context.Background(), task)
+	assert.NotContains(t, cmd.Args, "-m")
+	assert.NotContains(t, cmd.Args, "openai/gpt-5.4")
 }
 
 func TestCodexAdapterParseEvent(t *testing.T) {

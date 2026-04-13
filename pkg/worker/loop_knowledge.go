@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"regexp"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/insajin/autopus-adk/pkg/worker/knowledge"
 )
+
+var knowledgeWordCleaner = regexp.MustCompile(`[^a-zA-Z0-9._/-]+`)
 
 func resolveMemoryAgentID(cfg LoopConfig) string {
 	if _, err := uuid.Parse(cfg.MemoryAgentID); err == nil {
@@ -49,7 +52,7 @@ func populateKnowledge(ctx context.Context, searcher *knowledge.KnowledgeSearche
 		return ""
 	}
 
-	results, err := searcher.Search(ctx, description)
+	results, err := searcher.Search(ctx, buildKnowledgeQuery(description))
 	if err != nil {
 		log.Printf("[worker] knowledge search failed: %v", err)
 		return ""
@@ -82,6 +85,41 @@ func populateKnowledge(ctx context.Context, searcher *knowledge.KnowledgeSearche
 		b.WriteByte('\n')
 	}
 	return b.String()
+}
+
+func buildKnowledgeQuery(description string) string {
+	normalized := strings.TrimSpace(strings.Join(strings.Fields(description), " "))
+	if normalized == "" {
+		return ""
+	}
+	if len(normalized) <= 120 {
+		return normalized
+	}
+
+	words := strings.Fields(normalized)
+	keywords := make([]string, 0, 10)
+	seen := make(map[string]struct{}, 10)
+	for _, word := range words {
+		cleaned := strings.ToLower(knowledgeWordCleaner.ReplaceAllString(word, ""))
+		if len(cleaned) < 3 {
+			continue
+		}
+		if _, ok := seen[cleaned]; ok {
+			continue
+		}
+		seen[cleaned] = struct{}{}
+		keywords = append(keywords, cleaned)
+		if len(keywords) == 10 {
+			break
+		}
+	}
+	if len(keywords) == 0 {
+		if len(normalized) > 120 {
+			return normalized[:120]
+		}
+		return normalized
+	}
+	return strings.Join(keywords, " ")
 }
 
 // truncateForMemory extracts a brief learning summary from task output.

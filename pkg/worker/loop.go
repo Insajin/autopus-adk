@@ -22,6 +22,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/worker/pidlock"
 	"github.com/insajin/autopus-adk/pkg/worker/reaper"
 	"github.com/insajin/autopus-adk/pkg/worker/routing"
+	"github.com/insajin/autopus-adk/pkg/worker/scheduler"
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
 	"github.com/insajin/autopus-adk/pkg/worker/tui"
 )
@@ -65,6 +66,7 @@ type WorkerLoop struct {
 	auditWriter       *audit.RotatingWriter
 	knowledgeSearcher *knowledge.KnowledgeSearcher
 	memorySearcher    *knowledge.MemorySearcher
+	schedulerDisp     *scheduler.Dispatcher
 	semaphore         *parallel.TaskSemaphore
 	worktreeManager   *parallel.WorktreeManager
 	auditLogger       *slogAuditLogger

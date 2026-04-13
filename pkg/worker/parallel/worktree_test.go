@@ -1,6 +1,7 @@
 package parallel
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -127,6 +128,51 @@ func TestNewWorktreeManager(t *testing.T) {
 	m := NewWorktreeManager("/some/path")
 	assert.NotNil(t, m)
 	assert.Equal(t, "/some/path", m.baseDir)
+}
+
+func TestWorktreeManager_IsCleanAndRemoveIfClean(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := realTempDir(t)
+	initGitRepo(t, tmpDir)
+
+	m := NewWorktreeManager(tmpDir)
+	wtPath, err := m.Create("clean-check")
+	require.NoError(t, err)
+
+	clean, err := m.IsClean(wtPath)
+	require.NoError(t, err)
+	assert.True(t, clean)
+
+	removed, err := m.RemoveIfClean(wtPath)
+	require.NoError(t, err)
+	assert.True(t, removed)
+}
+
+func TestWorktreeManager_RemoveIfClean_PreservesDirtyWorktree(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := realTempDir(t)
+	initGitRepo(t, tmpDir)
+
+	m := NewWorktreeManager(tmpDir)
+	wtPath, err := m.Create("dirty-check")
+	require.NoError(t, err)
+
+	require.NoError(t, os.WriteFile(filepath.Join(wtPath, "note.txt"), []byte("dirty"), 0o644))
+
+	clean, err := m.IsClean(wtPath)
+	require.NoError(t, err)
+	assert.False(t, clean)
+
+	removed, err := m.RemoveIfClean(wtPath)
+	require.NoError(t, err)
+	assert.False(t, removed)
+
+	_, err = os.Stat(wtPath)
+	require.NoError(t, err)
+
+	require.NoError(t, m.Remove(wtPath, true))
 }
 
 // initGitRepo initializes a bare-minimum git repo with one commit

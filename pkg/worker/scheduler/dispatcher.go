@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -18,9 +19,9 @@ const (
 
 // schedule represents a single schedule entry from the backend API.
 type schedule struct {
-	ID             string `json:"id"`
-	CronExpr       string `json:"cron_expression"`
-	TaskPayload    string `json:"task_payload"`
+	ID              string `json:"id"`
+	CronExpr        string `json:"cron_expression"`
+	TaskPayload     string `json:"task_payload"`
 	TargetAgentType string `json:"target_agent_type"`
 }
 
@@ -33,6 +34,7 @@ type Dispatcher struct {
 	lastTrigger map[string]time.Time
 	onTrigger   func(scheduleID, taskPayload string)
 	client      *http.Client
+	mu          sync.RWMutex
 }
 
 // NewDispatcher creates a dispatcher that evaluates cron schedules in the given timezone.
@@ -119,7 +121,7 @@ func (d *Dispatcher) fetchSchedules(ctx context.Context) ([]schedule, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+d.authToken)
+	req.Header.Set("Authorization", "Bearer "+d.getAuthToken())
 
 	resp, err := d.client.Do(req)
 	if err != nil {
@@ -142,4 +144,17 @@ func (d *Dispatcher) fetchSchedules(ctx context.Context) ([]schedule, error) {
 		return nil, fmt.Errorf("decode schedules: %w", err)
 	}
 	return wrapper.Data, nil
+}
+
+// SetAuthToken updates the bearer token used for schedule fetches.
+func (d *Dispatcher) SetAuthToken(token string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.authToken = token
+}
+
+func (d *Dispatcher) getAuthToken() string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.authToken
 }

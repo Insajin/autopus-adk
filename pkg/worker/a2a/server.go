@@ -144,7 +144,16 @@ func (s *Server) UpdateTaskStatus(taskID string, status TaskStatus, result *Task
 func (s *Server) SetAuthToken(token string) {
 	s.mu.Lock()
 	s.config.AuthToken = token
+	transport := s.transport
+	restPoller := s.restPoller
 	s.mu.Unlock()
+
+	if transport != nil {
+		transport.SetAuthToken(token)
+	}
+	if restPoller != nil {
+		restPoller.SetAuthToken(token)
+	}
 }
 
 // SetRESTPoller attaches a REST poller that activates when WebSocket connection is exhausted.

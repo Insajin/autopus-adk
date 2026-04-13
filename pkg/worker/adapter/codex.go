@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strings"
 )
 
 // CodexAdapter implements ProviderAdapter for OpenAI Codex CLI.
@@ -21,21 +22,20 @@ func (a *CodexAdapter) Name() string { return "codex" }
 
 // BuildCommand constructs the exec.Cmd for Codex CLI.
 func (a *CodexAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.Cmd {
-	sessionID := task.SessionID
-	if sessionID == "" {
-		sessionID = fmt.Sprintf("worker-sess-%s", task.TaskID)
-	}
-
 	args := []string{"exec"}
 	if task.Prompt != "" {
 		// Read the sensitive task prompt from stdin instead of exposing it
 		// in the process argv where other local processes can inspect it.
 		args = append(args, "-")
 	}
-	args = append(args, "--json", "resume", sessionID)
+	args = append(args, "--json")
 
-	if task.Model != "" {
+	if task.Model != "" && !strings.HasPrefix(task.Model, "openai/") {
 		args = append(args, "-m", task.Model)
+	} else if strings.HasPrefix(task.Model, "openai/") {
+		slog.Warn("openai/* model not supported by codex CLI account, omitting explicit model override",
+			"task_id", task.TaskID,
+			"model", task.Model)
 	}
 
 	if task.ComputerUse {
