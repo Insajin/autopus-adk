@@ -89,7 +89,7 @@ func TestWorktreeManager_CreateAddsSymphonyExclude(t *testing.T) {
 	wtPath, err := m.Create("exclude-task")
 	require.NoError(t, err)
 
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
 	cmd.Dir = wtPath
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
