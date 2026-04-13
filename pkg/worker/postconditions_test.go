@@ -46,6 +46,13 @@ func TestVerifyExecutionPostconditions_PushBranchExistsPasses(t *testing.T) {
 	assert.Contains(t, artifact.Data, "\"status\":\"passed\"")
 }
 
+func TestDetectTaskPostconditions_IgnoresFillerWords(t *testing.T) {
+	t.Parallel()
+
+	reqs := detectTaskPostconditions("create and switch to a new branch named autopus-canary-20260414-072233 and push the branch to origin")
+	assert.Equal(t, []string{"autopus-canary-20260414-072233"}, reqs.Branches)
+}
+
 func initGitRepoWithOrigin(t *testing.T) string {
 	t.Helper()
 

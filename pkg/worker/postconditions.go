@@ -18,8 +18,8 @@ var (
 	pushIntentPattern    = regexp.MustCompile(`(?i)\bgit\s+push\b|\bpush\b`)
 	branchIntentPattern  = regexp.MustCompile(`(?i)\bbranch\b`)
 	refsHeadsPattern     = regexp.MustCompile(`refs/heads/([A-Za-z0-9._/-]+)`)
-	branchKeywordPattern = regexp.MustCompile(`(?i)\bbranch\s+([A-Za-z0-9._/-]+)`)
-	originBranchPattern  = regexp.MustCompile(`(?i)\borigin(?:/|\s+)([A-Za-z0-9._/-]+)`)
+	branchKeywordPattern = regexp.MustCompile(`(?i)\bbranch(?:\s+(?:named|called))?\s+([A-Za-z0-9._/-]*[/-][A-Za-z0-9._/-]+)\b`)
+	originBranchPattern  = regexp.MustCompile(`(?i)\borigin(?:/|\s+)([A-Za-z0-9._/-]*[/-][A-Za-z0-9._/-]+)\b`)
 	postconditionTimeout = 5 * time.Second
 )
 
