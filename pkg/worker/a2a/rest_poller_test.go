@@ -29,23 +29,23 @@ func TestRESTPoller_ActivatesWhenWebSocketExhausted(t *testing.T) {
 
 	// Given a mock backend poll endpoint
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/a2a/poll" {
+		if r.URL.Path != "/api/worker/tasks/pending" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 		pollCount.Add(1)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"tasks": []interface{}{}})
+		_ = json.NewEncoder(w).Encode([]interface{}{})
 	}))
 	defer srv.Close()
 
 	// When NewRESTPoller is created and started (type does not exist yet — compile error)
 	poller := NewRESTPoller(RESTPollerConfig{ // NewRESTPoller and RESTPollerConfig do not exist yet
-		BackendURL:    srv.URL,
-		AuthToken:     "valid-token",
-		WorkerID:      "w1",
-		PollInterval:  20 * time.Millisecond, // short for test; real is 10s
-		TaskHandler:   func(task PollResult) error { return nil }, // PollResult does not exist yet
+		BackendURL:   srv.URL,
+		AuthToken:    "valid-token",
+		WorkerID:     "w1",
+		PollInterval: 20 * time.Millisecond,                      // short for test; real is 10s
+		TaskHandler:  func(task PollResult) error { return nil }, // PollResult does not exist yet
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -72,19 +72,17 @@ func TestRESTPoller_ProcessesQueuedTasks(t *testing.T) {
 
 	// Given a backend that returns one task
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/a2a/poll" {
+		if r.URL.Path != "/api/worker/tasks/pending" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"tasks": []interface{}{
-				map[string]interface{}{
-					"id":   "poll-task-001",
-					"type": "symphony_run",
-					"payload": map[string]interface{}{
-						"step": "test",
-					},
+		_ = json.NewEncoder(w).Encode([]interface{}{
+			map[string]interface{}{
+				"id":   "poll-task-001",
+				"type": "symphony_run",
+				"payload": map[string]interface{}{
+					"step": "test",
 				},
 			},
 		})
@@ -135,7 +133,7 @@ func TestRESTPoller_StopsWhenWebSocketRecovers(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pollCount.Add(1)
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"tasks": []interface{}{}})
+		_ = json.NewEncoder(w).Encode([]interface{}{})
 	}))
 	defer srv.Close()
 
@@ -199,4 +197,44 @@ func TestRESTPoller_AuthFailure_SurfacesError(t *testing.T) {
 
 	// Then auth error is surfaced
 	assert.Greater(t, authErrors.Load(), int32(0), "401 from poll endpoint must surface auth error (S11)")
+}
+
+func TestRESTPoller_SetAuthToken(t *testing.T) {
+	t.Parallel()
+
+	poller := NewRESTPoller(RESTPollerConfig{
+		BackendURL:  "http://localhost:9999",
+		AuthToken:   "old-token",
+		WorkerID:    "w1",
+		TaskHandler: func(_ PollResult) error { return nil },
+	})
+
+	poller.SetAuthToken("new-token")
+
+	assert.Equal(t, "new-token", poller.config.AuthToken)
+}
+
+func TestRESTPoller_DecodeWrappedResponse(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"tasks": []interface{}{
+				map[string]interface{}{"id": "wrapped-1", "type": "symphony_run"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	var got string
+	poller := NewRESTPoller(RESTPollerConfig{
+		BackendURL:  srv.URL,
+		AuthToken:   "valid-token",
+		WorkerID:    "w1",
+		TaskHandler: func(task PollResult) error { got = task.ID; return nil },
+	})
+
+	require.NoError(t, poller.poll(context.Background()))
+	assert.Equal(t, "wrapped-1", got)
 }

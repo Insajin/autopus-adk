@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -16,6 +17,7 @@ type MemorySearcher struct {
 	authToken   string
 	workspaceID string
 	client      *http.Client
+	mu          sync.RWMutex
 }
 
 // MemoryEntry represents a single memory entry from the Platform.
@@ -92,7 +94,7 @@ func (ms *MemorySearcher) GetContext(ctx context.Context, agentID, description s
 	}
 	req.URL.RawQuery = q.Encode()
 
-	req.Header.Set("Authorization", "Bearer "+ms.authToken)
+	req.Header.Set("Authorization", "Bearer "+ms.getAuthToken())
 
 	resp, err := ms.client.Do(req)
 	if err != nil {
@@ -137,7 +139,7 @@ func (ms *MemorySearcher) CreateMemory(ctx context.Context, req CreateMemoryRequ
 	if err != nil {
 		return fmt.Errorf("memory write-back: create request: %w", err)
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+ms.authToken)
+	httpReq.Header.Set("Authorization", "Bearer "+ms.getAuthToken())
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := ms.client.Do(httpReq)
@@ -150,4 +152,17 @@ func (ms *MemorySearcher) CreateMemory(ctx context.Context, req CreateMemoryRequ
 		return fmt.Errorf("memory write-back: unexpected status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+// SetAuthToken updates the bearer token used for memory API requests.
+func (ms *MemorySearcher) SetAuthToken(token string) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	ms.authToken = token
+}
+
+func (ms *MemorySearcher) getAuthToken() string {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+	return ms.authToken
 }

@@ -50,6 +50,33 @@ func TestServer_SetAuthToken(t *testing.T) {
 	assert.Equal(t, "new-secret-token", got)
 }
 
+func TestServer_SetAuthToken_PropagatesToDependencies(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer(ServerConfig{
+		BackendURL: "ws://localhost:9999",
+		WorkerName: "w1",
+		Handler:    func(_ context.Context, _ string, _ json.RawMessage) (*TaskResult, error) { return nil, nil },
+	})
+	srv.transport = NewTransport(TransportConfig{URL: "wss://example.com/ws", AuthToken: "old"})
+	poller := NewRESTPoller(RESTPollerConfig{
+		BackendURL:  "http://localhost:9999",
+		AuthToken:   "old",
+		WorkerID:    "w1",
+		TaskHandler: func(_ PollResult) error { return nil },
+	})
+	srv.SetRESTPoller(poller)
+
+	srv.SetAuthToken("new-secret-token")
+
+	srv.mu.Lock()
+	gotPoller := srv.restPoller
+	srv.mu.Unlock()
+	require.NotNil(t, gotPoller)
+	assert.Equal(t, "new-secret-token", srv.transport.config.AuthToken)
+	assert.Equal(t, "new-secret-token", gotPoller.config.AuthToken)
+}
+
 func TestServer_SetRESTPoller(t *testing.T) {
 	t.Parallel()
 

@@ -141,3 +141,22 @@ func TestKnowledgeSearcher_InvalidJSON(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "decode response")
 }
+
+func TestKnowledgeSearcher_SetAuthToken(t *testing.T) {
+	t.Parallel()
+
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(searchResponse{Data: []SearchResult{}})
+	}))
+	defer srv.Close()
+
+	ks := NewKnowledgeSearcher(srv.URL, "old-token", "ws-1")
+	ks.SetAuthToken("new-token")
+
+	_, err := ks.Search(context.Background(), "test")
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer new-token", gotAuth)
+}

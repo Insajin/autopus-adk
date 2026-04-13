@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestMemorySearcher_GetContext(t *testing.T) {
 	t.Parallel()
 
@@ -183,4 +182,23 @@ func TestExtractKeywords(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestMemorySearcher_SetAuthToken(t *testing.T) {
+	t.Parallel()
+
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(MemoryContextResponse{})
+	}))
+	defer srv.Close()
+
+	ms := NewMemorySearcher(srv.URL, "old-token", "ws-1")
+	ms.SetAuthToken("new-token")
+
+	_, err := ms.GetContext(context.Background(), "agent-1", "test")
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer new-token", gotAuth)
 }

@@ -141,6 +141,28 @@ func TestDispatcher_TimezoneHandling(t *testing.T) {
 	assert.True(t, triggered, "should trigger when matching in the configured timezone")
 }
 
+func TestDispatcher_SetAuthToken_UpdatesHeader(t *testing.T) {
+	t.Parallel()
+
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"data":    []schedule{},
+		})
+	}))
+	defer srv.Close()
+
+	d := NewDispatcher(srv.URL, "old-token", "ws-42", time.UTC, func(string, string) {})
+	d.SetAuthToken("new-token")
+
+	_, err := d.fetchSchedules(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "Bearer new-token", gotAuth)
+}
+
 // minuteMatchingCron returns a cron expression that matches the given time's
 // minute, hour, dom, month, and dow.
 func minuteMatchingCron(t time.Time) string {

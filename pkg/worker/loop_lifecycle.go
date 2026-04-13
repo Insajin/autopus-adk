@@ -45,7 +45,7 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 				wl.config.CredentialStore,
 				func() { log.Printf("[worker] re-authentication needed") },
 				func(newToken string) {
-					wl.server.SetAuthToken(newToken)
+					wl.updateAuthToken(newToken)
 					log.Printf("[worker] auth token refreshed")
 				},
 			)
@@ -88,6 +88,7 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 				log.Printf("[worker] schedule triggered: %s", scheduleID)
 			},
 		)
+		wl.schedulerDisp = d
 		go d.Start(wl.lifecycleCtx)
 	}
 
@@ -137,6 +138,23 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 	// @AX:NOTE[AUTO]: magic constant — 30s reaper interval matches reaper.go default; keep in sync if default changes
 	wl.zombieReaper = reaper.New(reaper.Config{Interval: 30 * time.Second})
 	wl.zombieReaper.Start(wl.lifecycleCtx) //nolint:errcheck
+}
+
+func (wl *WorkerLoop) updateAuthToken(token string) {
+	if token == "" {
+		return
+	}
+	wl.config.AuthToken = token
+	wl.server.SetAuthToken(token)
+	if wl.knowledgeSearcher != nil {
+		wl.knowledgeSearcher.SetAuthToken(token)
+	}
+	if wl.memorySearcher != nil {
+		wl.memorySearcher.SetAuthToken(token)
+	}
+	if wl.schedulerDisp != nil {
+		wl.schedulerDisp.SetAuthToken(token)
+	}
 }
 
 // stopServices gracefully stops all lifecycle services.

@@ -89,8 +89,13 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 				log.Printf("[worker] runtime env prepare failed for %s: %v", taskID, envErr)
 			}
 			defer func() {
-				if rmErr := wl.worktreeManager.Remove(wtPath, false); rmErr != nil {
+				removed, rmErr := wl.worktreeManager.RemoveIfClean(wtPath)
+				if rmErr != nil {
 					log.Printf("[worker] worktree remove failed: %v", rmErr)
+					return
+				}
+				if !removed {
+					log.Printf("[worker] preserving dirty worktree for %s: %s", taskID, wtPath)
 				}
 			}()
 		}
@@ -146,8 +151,13 @@ func (wl *WorkerLoop) executePipelineWithParallel(ctx context.Context, taskID, p
 				envVars = runtimeCfg.EnvVars
 			}
 			defer func() {
-				if rmErr := wl.worktreeManager.Remove(wtPath, false); rmErr != nil {
+				removed, rmErr := wl.worktreeManager.RemoveIfClean(wtPath)
+				if rmErr != nil {
 					log.Printf("[worker] worktree remove failed: %v", rmErr)
+					return
+				}
+				if !removed {
+					log.Printf("[worker] preserving dirty worktree for %s: %s", taskID, wtPath)
 				}
 			}()
 		}

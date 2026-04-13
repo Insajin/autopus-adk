@@ -87,3 +87,22 @@ func TestTruncateForMemory_ExactLimit(t *testing.T) {
 	got := truncateForMemory(description, output)
 	assert.Len(t, got, 500)
 }
+
+func TestBuildKnowledgeQuery_ShortDescription(t *testing.T) {
+	t.Parallel()
+
+	description := "runtime canary"
+	assert.Equal(t, "runtime canary", buildKnowledgeQuery(description))
+}
+
+func TestBuildKnowledgeQuery_LongDescription_CompressesToKeywords(t *testing.T) {
+	t.Parallel()
+
+	description := "In the current workspace, create a file named runtime-postfix-canary-20260413-2303.md containing exactly three lines: Post-fix canary, 20260413-2303, ok. Do not modify any other files."
+	got := buildKnowledgeQuery(description)
+
+	assert.NotContains(t, got, "exactly three lines")
+	assert.LessOrEqual(t, len(got), 120)
+	assert.Contains(t, got, "runtime-postfix-canary-20260413-2303.md")
+	assert.Contains(t, got, "workspace")
+}

@@ -56,6 +56,30 @@ func (m *WorktreeManager) Remove(worktreePath string, force bool) error {
 	return nil
 }
 
+// IsClean reports whether the worktree has no modified or untracked files.
+func (m *WorktreeManager) IsClean(worktreePath string) (bool, error) {
+	cmd := exec.Command("git", "status", "--porcelain", "--untracked-files=normal")
+	cmd.Dir = worktreePath
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, fmt.Errorf("worktree status %s: %s: %w", worktreePath, strings.TrimSpace(string(out)), err)
+	}
+	return strings.TrimSpace(string(out)) == "", nil
+}
+
+// RemoveIfClean removes the worktree only when it has no local changes.
+func (m *WorktreeManager) RemoveIfClean(worktreePath string) (bool, error) {
+	clean, err := m.IsClean(worktreePath)
+	if err != nil {
+		return false, err
+	}
+	if !clean {
+		return false, nil
+	}
+	return true, m.Remove(worktreePath, false)
+}
+
 // List returns all active worktree paths (excluding the main worktree).
 func (m *WorktreeManager) List() ([]string, error) {
 	cmd := exec.Command("git", "-c", "gc.auto=0", "worktree", "list", "--porcelain")
