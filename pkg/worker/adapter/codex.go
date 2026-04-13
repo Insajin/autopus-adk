@@ -22,7 +22,10 @@ func (a *CodexAdapter) Name() string { return "codex" }
 
 // BuildCommand constructs the exec.Cmd for Codex CLI.
 func (a *CodexAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.Cmd {
-	args := []string{"exec"}
+	// Worker tasks already run inside an isolated worktree with platform-level
+	// policy enforcement. Git push requires outbound network access, which the
+	// Codex workspace sandbox blocks even in --full-auto mode.
+	args := []string{"exec", "--dangerously-bypass-approvals-and-sandbox"}
 	if task.Prompt != "" {
 		// Read the sensitive task prompt from stdin instead of exposing it
 		// in the process argv where other local processes can inspect it.
