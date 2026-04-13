@@ -35,10 +35,7 @@ func (a *ClaudeAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 		"--bare",
 	}
 
-	// Only add --resume if sessionID is a valid UUID (claude requires UUID format).
-	if len(sessionID) == 36 && sessionID[8] == '-' {
-		args = append(args, "--resume", sessionID)
-	}
+	args = append(args, "--resume", sessionID)
 
 	if task.MCPConfig != "" {
 		args = append(args, "--mcp-config", task.MCPConfig)

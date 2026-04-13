@@ -54,28 +54,33 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 		}
 	}
 
-	// 3. Knowledge syncer + watcher: enabled when KnowledgeSync and WorkspaceID are set.
+	// 3. Knowledge syncer + watcher: enabled when KnowledgeSync, WorkspaceID,
+	// and KnowledgeSourceID are all set.
 	if wl.config.KnowledgeSync && wl.config.WorkspaceID != "" {
-		wl.knowledgeSyncer = knowledge.NewSyncer(
-			wl.config.BackendURL,
-			wl.config.AuthToken,
-			wl.config.WorkspaceID,
-			wl.config.KnowledgeSourceID,
-		)
 		wl.knowledgeSearcher = knowledge.NewKnowledgeSearcher(
 			wl.config.BackendURL,
 			wl.config.AuthToken,
 			wl.config.WorkspaceID,
 		)
-		knowledgeDir := wl.config.KnowledgeDir
-		if knowledgeDir == "" {
-			knowledgeDir = wl.config.WorkDir
+		if wl.config.KnowledgeSourceID == "" {
+			log.Printf("[worker] knowledge sync disabled: knowledge_source_id is not configured")
+		} else {
+			wl.knowledgeSyncer = knowledge.NewSyncer(
+				wl.config.BackendURL,
+				wl.config.AuthToken,
+				wl.config.WorkspaceID,
+				wl.config.KnowledgeSourceID,
+			)
+			knowledgeDir := wl.config.KnowledgeDir
+			if knowledgeDir == "" {
+				knowledgeDir = wl.config.WorkDir
+			}
+			wl.knowledgeWatcher = startKnowledgeWatcher(
+				wl.lifecycleCtx,
+				wl.knowledgeSyncer,
+				knowledgeDir,
+			)
 		}
-		wl.knowledgeWatcher = startKnowledgeWatcher(
-			wl.lifecycleCtx,
-			wl.knowledgeSyncer,
-			knowledgeDir,
-		)
 	}
 
 	// 3b. Memory searcher: enabled alongside knowledge (SPEC-KHINT-001 REQ-003).

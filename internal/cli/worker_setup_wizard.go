@@ -3,10 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/connect"
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
 )
 
@@ -244,11 +246,36 @@ func stepSaveAndCheckProviders(cmd *cobra.Command, backendURL, token string, ws 
 		}
 	}
 
+	workDir, err := os.Getwd()
+	if err != nil || workDir == "" {
+		workDir = "."
+	}
+
 	// Save worker config.
 	workerCfg := setup.WorkerConfig{
-		BackendURL:  backendURL,
-		WorkspaceID: ws.ID,
-		Concurrency: 3,
+		BackendURL:        backendURL,
+		WorkspaceID:       ws.ID,
+		WorkDir:           workDir,
+		WorktreeIsolation: true,
+		KnowledgeDir:      workDir,
+		Concurrency:       3,
+	}
+
+	provisionToken := setupToken
+	if provisionToken == "" {
+		provisionToken = token
+	}
+	if provisionToken != "" {
+		client := connect.NewClient(provisionToken).WithServerURL(backendURL)
+		sourceID, provisionErr := client.ProvisionBridgeSource(cmd.Context(), ws.ID, workDir)
+		if provisionErr != nil {
+			fmt.Fprintf(out, "  ⚠ bridge_sync source 생성 실패 (knowledge sync 비활성화): %v\n", provisionErr)
+		} else {
+			workerCfg.KnowledgeSourceID = sourceID
+			fmt.Fprintf(out, "  ✓ Knowledge source 연결: %s\n", sourceID)
+		}
+	} else {
+		fmt.Fprintln(out, "  ⚠ knowledge source 생성 건너뜀 — 사용자 인증 토큰이 없어 source를 자동 생성하지 못했습니다")
 	}
 
 	if setupToken != "" {

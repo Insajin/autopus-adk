@@ -4,7 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"io"
+	"mime"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -46,15 +47,44 @@ func TestSyncer_SyncFile_UploadsChangedFile(t *testing.T) {
 	filePath := filepath.Join(dir, "data.txt")
 	require.NoError(t, os.WriteFile(filePath, []byte("content v1"), 0644))
 
-	var received syncPayload
+	var receivedPath string
+	var receivedHash string
+	var receivedContent string
+	var receivedModifiedAt string
+	var receivedMimeType string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "Bearer my-token", r.Header.Get("Authorization"))
-		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 		assert.Contains(t, r.URL.Path, "/api/v1/workspaces/ws-123/knowledge/sources/src-1/bridge/push")
+		assert.Contains(t, r.Header.Get("Content-Type"), "multipart/form-data;")
 
-		err := json.NewDecoder(r.Body).Decode(&received)
+		reader, err := r.MultipartReader()
 		require.NoError(t, err)
+
+		for {
+			part, err := reader.NextPart()
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+
+			data, readErr := io.ReadAll(part)
+			require.NoError(t, readErr)
+
+			switch part.FormName() {
+			case "path":
+				receivedPath = string(data)
+			case "file_hash":
+				receivedHash = string(data)
+			case "modified_at":
+				receivedModifiedAt = string(data)
+			case "mime_type":
+				receivedMimeType = string(data)
+			case "file":
+				receivedContent = string(data)
+				assert.Equal(t, filepath.Base(filePath), part.FileName())
+			}
+		}
 
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -64,9 +94,11 @@ func TestSyncer_SyncFile_UploadsChangedFile(t *testing.T) {
 	err := s.SyncFile(context.Background(), filePath)
 	require.NoError(t, err)
 
-	assert.Equal(t, filePath, received.Path)
-	assert.Equal(t, "content v1", received.Content)
-	assert.NotEmpty(t, received.Hash)
+	assert.Equal(t, filePath, receivedPath)
+	assert.Equal(t, "content v1", receivedContent)
+	assert.NotEmpty(t, receivedHash)
+	assert.NotEmpty(t, receivedModifiedAt)
+	assert.Equal(t, mime.TypeByExtension(filepath.Ext(filePath)), receivedMimeType)
 }
 
 func TestSyncer_SyncFile_SkipsUnchanged(t *testing.T) {

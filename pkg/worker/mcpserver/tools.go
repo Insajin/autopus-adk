@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -19,20 +18,25 @@ func (s *MCPServer) handleExecuteTask(ctx context.Context, params json.RawMessag
 	return s.doPost(ctx, "/api/v1/tasks", params)
 }
 
-// handleSearchKnowledge searches knowledge via GET /api/v1/knowledge/search.
+// handleSearchKnowledge searches knowledge via the workspace-scoped Knowledge Hub API.
 func (s *MCPServer) handleSearchKnowledge(ctx context.Context, params json.RawMessage) (any, error) {
 	var p struct {
-		Query string `json:"query"`
-		Limit int    `json:"limit,omitempty"`
+		Query      string   `json:"query"`
+		Limit      int      `json:"limit,omitempty"`
+		Categories []string `json:"categories,omitempty"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, fmt.Errorf("invalid params: %w", err)
 	}
-	query := fmt.Sprintf("?query=%s", url.QueryEscape(p.Query))
-	if p.Limit > 0 {
-		query += fmt.Sprintf("&limit=%d", p.Limit)
+	body, err := json.Marshal(map[string]any{
+		"query":      p.Query,
+		"limit":      p.Limit,
+		"categories": p.Categories,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal params: %w", err)
 	}
-	return s.doGet(ctx, "/api/v1/knowledge/search"+query)
+	return s.doPost(ctx, fmt.Sprintf("/api/v1/workspaces/%s/knowledge/search", s.workspaceID), body)
 }
 
 // handleGetExecutionStatus retrieves execution status via GET /api/v1/executions/{id}.

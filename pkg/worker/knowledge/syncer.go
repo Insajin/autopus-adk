@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -26,13 +28,6 @@ type Syncer struct {
 
 	mu     sync.Mutex
 	hashes map[string]string // path -> sha256 hex
-}
-
-// syncPayload is the JSON body sent to the bridge push endpoint.
-type syncPayload struct {
-	Path    string `json:"path"`
-	Hash    string `json:"hash"`
-	Content string `json:"content"`
 }
 
 // NewSyncer creates a Syncer for the given backend, workspace, and source.
@@ -72,25 +67,48 @@ func (s *Syncer) SyncFile(ctx context.Context, path string) error {
 		return fmt.Errorf("sync file: read: %w", err)
 	}
 
-	payload := syncPayload{
-		Path:    path,
-		Hash:    hash,
-		Content: string(content),
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	if err := writer.WriteField("path", path); err != nil {
+		return fmt.Errorf("sync file: write path field: %w", err)
+	}
+	if err := writer.WriteField("file_hash", hash); err != nil {
+		return fmt.Errorf("sync file: write hash field: %w", err)
 	}
 
-	body, err := json.Marshal(payload)
+	if info, statErr := os.Stat(path); statErr == nil {
+		if err := writer.WriteField("modified_at", info.ModTime().UTC().Format(time.RFC3339Nano)); err != nil {
+			return fmt.Errorf("sync file: write modified_at field: %w", err)
+		}
+	}
+
+	mimeType := mime.TypeByExtension(filepath.Ext(path))
+	if mimeType != "" {
+		if err := writer.WriteField("mime_type", mimeType); err != nil {
+			return fmt.Errorf("sync file: write mime_type field: %w", err)
+		}
+	}
+
+	fileWriter, err := writer.CreateFormFile("file", filepath.Base(path))
 	if err != nil {
-		return fmt.Errorf("sync file: marshal: %w", err)
+		return fmt.Errorf("sync file: create form file: %w", err)
+	}
+	if _, err := fileWriter.Write(content); err != nil {
+		return fmt.Errorf("sync file: write file content: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("sync file: close multipart writer: %w", err)
 	}
 
 	endpoint := fmt.Sprintf("%s/api/v1/workspaces/%s/knowledge/sources/%s/bridge/push",
 		s.backendURL, s.workspaceID, s.sourceID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body.Bytes()))
 	if err != nil {
 		return fmt.Errorf("sync file: create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+s.authToken)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	resp, err := s.client.Do(req)
 	if err != nil {

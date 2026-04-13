@@ -61,6 +61,7 @@ func runWorkerForeground() error {
 		CredentialsPath:   setup.DefaultCredentialsPath(),
 		WorkspaceID:       cfg.WorkspaceID,
 		MaxConcurrency:    cfg.Concurrency,
+		WorktreeIsolation: cfg.WorktreeIsolation || cfg.Concurrency > 1,
 		KnowledgeSync:     true, // enable KH file sync when WorkspaceID is set
 		KnowledgeDir:      cfg.KnowledgeDir,
 		KnowledgeSourceID: cfg.KnowledgeSourceID,

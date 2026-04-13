@@ -22,9 +22,12 @@ func setupToolTestServer(t *testing.T) (*MCPServer, *httptest.Server) {
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(map[string]string{"id": "task-1", "status": "created"})
 
-		case r.URL.Path == "/api/v1/knowledge/search" && r.Method == http.MethodGet:
+		case r.URL.Path == "/api/v1/workspaces/ws-test/knowledge/search" && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]map[string]string{{"title": "result1"}})
+			json.NewEncoder(w).Encode(map[string]any{
+				"success": true,
+				"data":    []map[string]string{{"title": "result1"}},
+			})
 
 		case r.URL.Path == "/api/v1/executions/exec-1" && r.Method == http.MethodGet:
 			w.WriteHeader(http.StatusOK)

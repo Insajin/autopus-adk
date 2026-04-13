@@ -17,13 +17,16 @@ func TestSaveAndLoadWorkerConfig_RoundTrip(t *testing.T) {
 	path := filepath.Join(dir, "worker.yaml")
 
 	original := WorkerConfig{
-		BackendURL:    "https://api.autopus.co",
-		WorkspaceID:   "ws-123",
-		Providers:     []string{"claude", "codex"},
-		WorkDir:       "/tmp/autopus-work",
-		MemoryAgentID: "11111111-2222-4333-8444-555555555555",
-		A2AURL:        "https://a2a.autopus.co",
-		Concurrency:   3,
+		BackendURL:        "https://api.autopus.co",
+		WorkspaceID:       "ws-123",
+		Providers:         []string{"claude", "codex"},
+		WorkDir:           "/tmp/autopus-work",
+		WorktreeIsolation: true,
+		KnowledgeDir:      "/tmp/autopus-work",
+		KnowledgeSourceID: "src-123",
+		MemoryAgentID:     "11111111-2222-4333-8444-555555555555",
+		A2AURL:            "https://a2a.autopus.co",
+		Concurrency:       3,
 	}
 
 	data, err := yaml.Marshal(original)
@@ -37,6 +40,9 @@ func TestSaveAndLoadWorkerConfig_RoundTrip(t *testing.T) {
 	assert.Equal(t, original.WorkspaceID, loaded.WorkspaceID)
 	assert.Equal(t, original.Providers, loaded.Providers)
 	assert.Equal(t, original.WorkDir, loaded.WorkDir)
+	assert.Equal(t, original.WorktreeIsolation, loaded.WorktreeIsolation)
+	assert.Equal(t, original.KnowledgeDir, loaded.KnowledgeDir)
+	assert.Equal(t, original.KnowledgeSourceID, loaded.KnowledgeSourceID)
 	assert.Equal(t, original.MemoryAgentID, loaded.MemoryAgentID)
 	assert.Equal(t, original.A2AURL, loaded.A2AURL)
 	assert.Equal(t, original.Concurrency, loaded.Concurrency)
@@ -76,12 +82,15 @@ func TestSaveWorkerConfig_WritesToDisk(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	cfg := WorkerConfig{
-		BackendURL:  "https://api.autopus.co",
-		WorkspaceID: "ws-test",
-		Providers:   []string{"claude"},
-		WorkDir:     "/tmp/work",
-		A2AURL:      "https://a2a.autopus.co",
-		Concurrency: 2,
+		BackendURL:        "https://api.autopus.co",
+		WorkspaceID:       "ws-test",
+		Providers:         []string{"claude"},
+		WorkDir:           "/tmp/work",
+		WorktreeIsolation: true,
+		KnowledgeDir:      "/tmp/work",
+		KnowledgeSourceID: "src-001",
+		A2AURL:            "https://a2a.autopus.co",
+		Concurrency:       2,
 	}
 	err := SaveWorkerConfig(cfg)
 	require.NoError(t, err)
@@ -91,6 +100,8 @@ func TestSaveWorkerConfig_WritesToDisk(t *testing.T) {
 	assert.Equal(t, cfg.BackendURL, loaded.BackendURL)
 	assert.Equal(t, cfg.WorkspaceID, loaded.WorkspaceID)
 	assert.Equal(t, cfg.Providers, loaded.Providers)
+	assert.Equal(t, cfg.WorktreeIsolation, loaded.WorktreeIsolation)
+	assert.Equal(t, cfg.KnowledgeSourceID, loaded.KnowledgeSourceID)
 }
 
 func TestLoadWorkerConfig_NoFile(t *testing.T) {
