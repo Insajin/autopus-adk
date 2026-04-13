@@ -41,6 +41,7 @@ func (a *Adapter) generateAgents(cfg *config.HarnessConfig) ([]adapter.FileMappi
 		if err != nil {
 			return nil, fmt.Errorf("codex agent 템플릿 렌더링 실패 %s: %w", name, err)
 		}
+		rendered = normalizeCodexHelperPaths(rendered)
 
 		targetPath := filepath.Join(a.root, ".codex", "agents", agentFile)
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
@@ -87,6 +88,7 @@ func (a *Adapter) prepareAgentFiles(cfg *config.HarnessConfig) ([]adapter.FileMa
 		if err != nil {
 			return nil, fmt.Errorf("codex agent 템플릿 렌더링 실패 %s: %w", name, err)
 		}
+		rendered = normalizeCodexHelperPaths(rendered)
 
 		files = append(files, adapter.FileMapping{
 			TargetPath:      filepath.Join(".codex", "agents", agentFile),

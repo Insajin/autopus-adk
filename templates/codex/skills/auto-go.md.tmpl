@@ -9,8 +9,28 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 ## 사용법
 
 ```
-@auto-go SPEC-ID
+@auto go SPEC-ID
+@auto go SPEC-ID --continue
+@auto go SPEC-ID --team --auto --loop
+@auto go SPEC-ID --solo --quality ultra
 ```
+
+### 플래그
+
+| Flag | Description |
+|------|-------------|
+| `--continue` | 이전 중단 지점에서 재개합니다. |
+| `--team` | Codex에서는 여러 `spawn_agent` 워커를 병렬 오케스트레이션하는 모드입니다. |
+| `--solo` | 서브에이전트 없이 메인 세션에서 직접 구현합니다. |
+| `--strategy <value>` | `--multi` 리뷰 전략을 지정합니다. |
+| `--skip-scaffold` | 초기 테스트 스캐폴딩 단계를 건너뜁니다. |
+
+### 공통 플래그
+
+- `--auto`: 승인/확인 단계 자동 진행
+- `--loop`: RALF 재시도 루프 활성화
+- `--multi`: 멀티 프로바이더 리뷰 활성화
+- `--quality <mode>`: 하위 에이전트 품질 모드 지정
 
 ## 구현 절차
 
@@ -82,6 +102,11 @@ auto orchestra run "{review topic}" --strategy consensus --rounds fast
 ```
 
 서브프로세스 모드가 자동 적용되며, 여러 AI 프로바이더의 합의 기반 리뷰를 수행합니다.
+
+## Codex Notes
+
+- `--team`은 Claude Code의 TeamCreate API가 아니라, 메인 세션이 여러 `spawn_agent` 호출을 병렬 조정하는 의미입니다.
+- 전체 파이프라인 단계, 재시도 한도, 게이트 규칙은 `@auto go ...` 라우터 본문을 우선합니다.
 
 ## Branding Formats
 

@@ -40,6 +40,8 @@ func (a *Adapter) renderPromptTemplates(cfg *config.HarnessConfig) ([]adapter.Fi
 		if err != nil {
 			return nil, fmt.Errorf("codex prompt 템플릿 렌더링 실패 %s: %w", name, err)
 		}
+		rendered = normalizeCodexInvocationBody(rendered)
+		rendered = normalizeCodexHelperPaths(rendered)
 
 		targetPath := filepath.Join(a.root, ".codex", "prompts", promptFile)
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
@@ -86,6 +88,8 @@ func (a *Adapter) preparePromptFiles(cfg *config.HarnessConfig) ([]adapter.FileM
 		if err != nil {
 			return nil, fmt.Errorf("codex prompt 템플릿 렌더링 실패 %s: %w", name, err)
 		}
+		rendered = normalizeCodexInvocationBody(rendered)
+		rendered = normalizeCodexHelperPaths(rendered)
 
 		files = append(files, adapter.FileMapping{
 			TargetPath:      filepath.Join(".codex", "prompts", promptFile),

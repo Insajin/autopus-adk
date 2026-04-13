@@ -9,9 +9,17 @@
 ## 사용법
 
 ```
-@auto-fix "버그 설명"
-@auto-fix --file path/to/file
+@auto fix "버그 설명"
+@auto fix --file path/to/file
+@auto fix "회귀 버그" --auto
 ```
+
+### 플래그
+
+| Flag | Description |
+|------|-------------|
+| `--file <path>` | 수정 범위를 특정 파일로 좁힙니다. |
+| `--auto` | 확인 단계 없이 바로 수정 흐름을 진행합니다. |
 
 ## 절차
 
@@ -25,6 +33,7 @@
 
 - 재현 테스트 없이 수정하지 않음
 - 버그 범위 외 코드 변경 금지
+- 전체 복구/후속 가이드는 `@auto fix ...` 라우터 본문을 우선합니다.
 
 ## Branding Formats
 

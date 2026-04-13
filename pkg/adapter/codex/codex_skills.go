@@ -38,6 +38,9 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig) ([]adapter.Fil
 		if err != nil {
 			return nil, fmt.Errorf("코덱스 스킬 템플릿 렌더링 실패 %s: %w", name, err)
 		}
+		rendered = normalizeCodexInvocationBody(rendered)
+		rendered = normalizeCodexHelperPaths(rendered)
+		rendered = normalizeCodexToolingBody(rendered)
 
 		targetPath := filepath.Join(a.root, ".codex", "skills", skillFile)
 		if err := os.WriteFile(targetPath, []byte(rendered), 0644); err != nil {

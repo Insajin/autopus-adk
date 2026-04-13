@@ -9,9 +9,16 @@
 ## 사용법
 
 ```
-@auto-review
-@auto-review path/to/file
+@auto review
+@auto review path/to/file
+@auto review HEAD~3..HEAD
 ```
+
+## 실행 원칙
+
+- TRUST 5 분석 전에 자동화 게이트를 먼저 실행합니다.
+- 개별 스킬 호출보다 `@auto review ...` 라우터 호출을 우선하며, 해당 라우터의 검증 순서를 그대로 따릅니다.
+- 발견 사항은 severity 순으로 정리하고 `REQUEST_CHANGES` 시 `@auto go {SPEC-ID} --continue` 를 권장합니다.
 
 ## TRUST 5 기준
 

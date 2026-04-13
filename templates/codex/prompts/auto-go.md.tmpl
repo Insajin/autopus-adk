@@ -10,6 +10,15 @@ description: "SPEC 구현 — SPEC 문서를 기반으로 코드를 구현합니
 
 SPEC-ID를 인자로 받아 구현을 실행합니다.
 
+공통 플래그 의미는 `@auto go ...` 라우터를 우선합니다:
+- `--continue`
+- `--team`
+- `--solo`
+- `--auto`
+- `--loop`
+- `--multi`
+- `--quality <mode>`
+
 ## 구현 절차
 
 {{if .IsFullMode}}{{if eq .Methodology.Mode "tdd"}}1. RED: 실패 테스트 작성
@@ -31,3 +40,4 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 
 - `--continue` 플래그로 중단점에서 재개
 - 개별 이슈는 `auto-fix`로 수정
+- Codex의 `--team`은 Claude Team API가 아니라 병렬 `spawn_agent` 오케스트레이션 의미입니다

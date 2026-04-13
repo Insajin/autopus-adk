@@ -10,17 +10,29 @@
 ## 사용법
 
 ```
-@auto-plan "기능 설명"
-@auto-plan "기능 설명" --skip-prd
-@auto-plan "기능 설명" --prd-mode minimal
+@auto plan "기능 설명"
+@auto plan "기능 설명" --skip-prd
+@auto plan "기능 설명" --prd-mode minimal
+@auto plan --from-idea BS-001 --target autopus-adk
 ```
 
 ### 플래그
 
 | Flag | Description |
 |------|-------------|
+| `--from-idea <BS-ID>` | 브레인스토밍 결과를 컨텍스트로 사용합니다. |
 | `--skip-prd` | PRD 생성 건너뛰고 바로 SPEC 작성. MEDIUM 난이도 권장. |
 | `--prd-mode <mode>` | PRD 모드: `standard` (10섹션, 기본값) 또는 `minimal` (5섹션). |
+| `--strategy <value>` | 멀티 프로바이더 리뷰 전략. `--multi`와 함께 사용합니다. |
+| `--target <module>` | SPEC 저장 대상 모듈을 강제합니다. |
+
+### 공통 플래그
+
+- `--auto`: 확인 단계 생략
+- `--multi`: SPEC 생성 후 멀티 프로바이더 리뷰 활성화
+- `--quality <mode>`: 하위 에이전트 품질 모드 지정
+
+전체 라우팅/리뷰게이트 규칙은 `@auto plan ...` 라우터를 우선합니다.
 
 ## 출력
 

@@ -26,12 +26,16 @@ func (a *Adapter) renderExtendedSkills() ([]adapter.FileMapping, error) {
 
 	var files []adapter.FileMapping
 	for _, s := range skills {
+		content := normalizeCodexInvocationBody(s.Content)
+		content = normalizeCodexHelperPaths(content)
+		content = normalizeCodexToolingBody(content)
+		content = normalizeCodexExtendedSkill(s.Name, content)
 		relPath := filepath.Join(".codex", "skills", s.Name+".md")
 		files = append(files, adapter.FileMapping{
 			TargetPath:      relPath,
 			OverwritePolicy: adapter.OverwriteAlways,
-			Checksum:        checksum(s.Content),
-			Content:         []byte(s.Content),
+			Checksum:        checksum(content),
+			Content:         []byte(content),
 		})
 	}
 

@@ -28,6 +28,29 @@ func TestRenderExtendedSkills(t *testing.T) {
 	}
 }
 
+func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
+	t.Parallel()
+
+	teams := normalizeCodexExtendedSkill("agent-teams", "placeholder")
+	assert.Contains(t, teams, "spawn_agent")
+	assert.NotContains(t, teams, "TeamCreate")
+	assert.NotContains(t, teams, "SendMessage")
+
+	pipeline := normalizeCodexExtendedSkill("agent-pipeline", "placeholder")
+	assert.Contains(t, pipeline, "@auto go")
+	assert.Contains(t, pipeline, "spawn_agent")
+	assert.NotContains(t, pipeline, "bypassPermissions")
+	assert.NotContains(t, pipeline, "auto permission detect")
+
+	worktree := normalizeCodexExtendedSkill("worktree-isolation", "placeholder")
+	assert.Contains(t, worktree, "forked workspace")
+	assert.NotContains(t, worktree, "auto pipeline worktree")
+
+	prd := normalizeCodexExtendedSkill("prd", "사용자 입력이 불충분할 경우 AskUserQuestion으로 확인:")
+	assert.NotContains(t, prd, "AskUserQuestion")
+	assert.Contains(t, prd, "plain-text")
+}
+
 func TestLogTransformReport_Nil(t *testing.T) {
 	t.Parallel()
 	logTransformReport("codex", nil)
