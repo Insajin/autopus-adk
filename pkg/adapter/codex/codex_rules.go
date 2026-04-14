@@ -51,7 +51,7 @@ func (a *Adapter) prepareRuleMappings(cfg *config.HarnessConfig) ([]adapter.File
 		}
 
 		name := entry.Name()
-		raw, err := fs.ReadFile(contentfs.FS, filepath.Join("rules", name))
+		raw, err := fs.ReadFile(contentfs.FS, pkgcontent.EmbeddedPath("rules", name))
 		if err != nil {
 			return nil, fmt.Errorf("codex rule 콘텐츠 읽기 실패 %s: %w", name, err)
 		}

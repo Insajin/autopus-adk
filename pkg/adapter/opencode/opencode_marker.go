@@ -11,6 +11,7 @@ import (
 	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
+	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 )
 
 var markerRe = regexp.MustCompile(`(?s)` + regexp.QuoteMeta(markerBegin) + `.*?` + regexp.QuoteMeta(markerEnd))
@@ -157,7 +158,7 @@ func renderAgentsSection() (string, error) {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
 			continue
 		}
-		data, readErr := fs.ReadFile(contentfs.FS, filepath.Join("agents", entry.Name()))
+		data, readErr := fs.ReadFile(contentfs.FS, pkgcontent.EmbeddedPath("agents", entry.Name()))
 		if readErr != nil {
 			return "", fmt.Errorf("agent 파일 읽기 실패 %s: %w", entry.Name(), readErr)
 		}

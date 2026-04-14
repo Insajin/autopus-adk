@@ -22,7 +22,7 @@ func (a *Adapter) prepareRuleMappings() ([]adapter.FileMapping, error) {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
 			continue
 		}
-		data, readErr := fs.ReadFile(contentfs.FS, filepath.Join("rules", entry.Name()))
+		data, readErr := fs.ReadFile(contentfs.FS, pkgcontent.EmbeddedPath("rules", entry.Name()))
 		if readErr != nil {
 			return nil, fmt.Errorf("rule 파일 읽기 실패 %s: %w", entry.Name(), readErr)
 		}
