@@ -84,4 +84,5 @@ func TestStepSaveAndCheckProviders_UsesJWTForWorkerAndMCPSkipsBridge(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, "ws-123", workerCfg.WorkspaceID)
 	assert.Equal(t, "memory-agent-1", workerCfg.MemoryAgentID)
+	assert.Equal(t, 1, workerCfg.Concurrency)
 }

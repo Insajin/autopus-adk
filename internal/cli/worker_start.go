@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	worker "github.com/insajin/autopus-adk/pkg/worker"
@@ -47,6 +48,11 @@ func runWorkerForeground() error {
 
 	log.Printf("[worker] starting: provider=%s workspace=%s backend=%s",
 		providerName, cfg.WorkspaceID, cfg.BackendURL)
+	effectiveConcurrency := effectiveWorkerConcurrency(providerName, cfg.Concurrency)
+	if effectiveConcurrency != cfg.Concurrency {
+		log.Printf("[worker] provider=%s clamps concurrency from %d to %d for stable task execution",
+			providerName, cfg.Concurrency, effectiveConcurrency)
+	}
 
 	workDir := cfg.WorkDir
 	if workDir == "" {
@@ -65,8 +71,8 @@ func runWorkerForeground() error {
 		CredentialsPath:   setup.DefaultCredentialsPath(),
 		CredentialStore:   credStore,
 		WorkspaceID:       cfg.WorkspaceID,
-		MaxConcurrency:    cfg.Concurrency,
-		WorktreeIsolation: cfg.WorktreeIsolation || cfg.Concurrency > 1,
+		MaxConcurrency:    effectiveConcurrency,
+		WorktreeIsolation: cfg.WorktreeIsolation || effectiveConcurrency > 1,
 		KnowledgeSync:     true, // enable backend knowledge context when WorkspaceID is set
 		KnowledgeDir:      cfg.KnowledgeDir,
 	}
@@ -119,4 +125,11 @@ func resolveProviderAdapter(name string) (adapter.ProviderAdapter, error) {
 	reg.Register(&adapter.CodexAdapter{})
 	reg.Register(&adapter.GeminiAdapter{})
 	return reg.Get(name)
+}
+
+func effectiveWorkerConcurrency(providerName string, requested int) int {
+	if strings.EqualFold(providerName, "codex") && requested > 1 {
+		return 1
+	}
+	return requested
 }

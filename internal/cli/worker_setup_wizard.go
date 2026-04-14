@@ -252,7 +252,7 @@ func stepSaveAndCheckProviders(cmd *cobra.Command, backendURL, token string, ws 
 		WorkDir:           workDir,
 		WorktreeIsolation: true,
 		KnowledgeDir:      workDir,
-		Concurrency:       3,
+		Concurrency:       1,
 	}
 
 	fmt.Fprintln(out, "  ✓ 자동 knowledge file sync는 더 이상 설정하지 않습니다")
