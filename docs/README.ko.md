@@ -420,6 +420,8 @@ Codex 참고:
 OpenCode 참고:
 - `/auto ...`와 `/auto-plan ...` 같은 직접 alias가 `.opencode/commands/`에 생성됩니다
 - 네이티브 규칙/에이전트/플러그인은 `.opencode/` 아래에, 재사용 스킬은 `.agents/skills/` 아래에 생성됩니다
+- `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, `/auto doctor` 같은 helper workflow도 OpenCode 명령 래퍼로 함께 생성됩니다
+- `opencode.json`이 관리형 hook plugin을 자동 등록하므로 `auto init` 또는 `auto update` 직후 `.opencode/plugins/autopus-hooks.js`가 바로 활성화됩니다
 
 ---
 

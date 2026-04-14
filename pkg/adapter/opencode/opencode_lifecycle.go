@@ -42,6 +42,21 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 		}
 	}
 
+	configDoc, err := readJSONObject(filepath.Join(a.root, configFile))
+	if err == nil {
+		plugins := jsonPluginSlice(configDoc["plugin"])
+		for _, plugin := range managedPluginPaths(nil) {
+			if containsString(plugins, plugin) {
+				continue
+			}
+			errs = append(errs, adapter.ValidationError{
+				File:    configFile,
+				Message: fmt.Sprintf("OpenCode hook plugin 등록 누락: %s", plugin),
+				Level:   "warning",
+			})
+		}
+	}
+
 	return errs, nil
 }
 

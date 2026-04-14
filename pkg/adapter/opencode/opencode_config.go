@@ -33,14 +33,20 @@ func (a *Adapter) renderConfigDocument(extraPlugins []string) (string, error) {
 	}
 	doc["$schema"] = "https://opencode.ai/config.json"
 	doc["instructions"] = uniqueStrings(jsonStringSlice(doc["instructions"]), rulePaths)
-	if len(extraPlugins) > 0 {
-		doc["plugin"] = uniqueStrings(jsonStringSlice(doc["plugin"]), extraPlugins)
+	plugins := managedPluginPaths(extraPlugins)
+	if len(plugins) > 0 {
+		doc["plugin"] = uniqueStrings(jsonPluginSlice(doc["plugin"]), plugins)
 	}
 	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("%s 직렬화 실패: %w", configFile, err)
 	}
 	return string(data) + "\n", nil
+}
+
+func managedPluginPaths(extraPlugins []string) []string {
+	base := []string{toSlash(filepath.Join(".opencode", "plugins", "autopus-hooks.js"))}
+	return uniqueStrings(base, extraPlugins)
 }
 
 // InjectOrchestraPlugin preserves legacy external callers by appending a plugin path.

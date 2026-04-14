@@ -495,6 +495,8 @@ Codex note:
 OpenCode note:
 - `/auto ...` and direct aliases like `/auto-plan ...` are generated under `.opencode/commands/`
 - Native rule/agent/plugin files live under `.opencode/`, while reusable skills are published under `.agents/skills/`
+- Helper workflows like `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, and `/auto doctor` are generated as OpenCode-native command wrappers
+- `opencode.json` now registers the managed hook plugin automatically, so `.opencode/plugins/autopus-hooks.js` is live immediately after `auto init` or `auto update`
 
 ---
 

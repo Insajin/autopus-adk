@@ -10,7 +10,7 @@ type workflowSpec struct {
 var workflowSpecs = []workflowSpec{
 	{
 		Name:        "auto",
-		Description: "Autopus 명령 라우터 — setup/plan/go/fix/review/sync/canary/idea 서브커맨드를 해석합니다",
+		Description: "Autopus 명령 라우터 — OpenCode helper 및 workflow 서브커맨드를 해석합니다",
 		PromptPath:  "codex/prompts/auto.md.tmpl",
 		SkillPath:   "claude/commands/auto-router.md.tmpl",
 	},
@@ -19,6 +19,10 @@ var workflowSpecs = []workflowSpec{
 		Description: "프로젝트 컨텍스트 생성 — 코드베이스를 분석하고 ARCHITECTURE.md 및 .autopus/project 문서를 생성합니다",
 		PromptPath:  "codex/prompts/auto-setup.md.tmpl",
 		SkillPath:   "codex/skills/auto-setup.md.tmpl",
+	},
+	{
+		Name:        "auto-status",
+		Description: "SPEC 대시보드 — 현재 프로젝트와 서브모듈의 SPEC 상태를 표시합니다",
 	},
 	{
 		Name:        "auto-plan",
@@ -57,9 +61,37 @@ var workflowSpecs = []workflowSpec{
 		SkillPath:   "codex/skills/auto-idea.md.tmpl",
 	},
 	{
+		Name:        "auto-map",
+		Description: "코드베이스 분석 — 구조, 엔트리포인트, 의존성을 빠르게 요약합니다",
+	},
+	{
+		Name:        "auto-why",
+		Description: "의사결정 근거 조회 — Lore, SPEC, ARCHITECTURE에서 이유를 추적합니다",
+	},
+	{
+		Name:        "auto-verify",
+		Description: "프론트엔드 UX 검증 — Playwright 기반 비주얼 검증을 실행합니다",
+	},
+	{
+		Name:        "auto-secure",
+		Description: "보안 감사 — OWASP Top 10 관점에서 변경 범위를 점검합니다",
+	},
+	{
+		Name:        "auto-test",
+		Description: "E2E 시나리오 실행 — scenarios.md 기반 검증을 수행합니다",
+	},
+	{
+		Name:        "auto-dev",
+		Description: "풀 사이클 개발 — plan → go → sync를 순차 실행합니다",
+	},
+	{
 		Name:        "auto-canary",
 		Description: "배포 검증 — build, E2E, 브라우저 건강 검진을 실행합니다",
 		PromptPath:  "codex/prompts/auto-canary.md.tmpl",
 		SkillPath:   "codex/skills/auto-canary.md.tmpl",
+	},
+	{
+		Name:        "auto-doctor",
+		Description: "상태 진단 — 하네스 설치 상태와 플랫폼 wiring을 점검합니다",
 	},
 }

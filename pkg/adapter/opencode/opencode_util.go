@@ -193,6 +193,37 @@ func jsonStringSlice(value any) []string {
 	return result
 }
 
+func jsonPluginSlice(value any) []string {
+	items, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		switch typed := item.(type) {
+		case string:
+			result = append(result, typed)
+		case []any:
+			if len(typed) == 0 {
+				continue
+			}
+			if str, ok := typed[0].(string); ok {
+				result = append(result, str)
+			}
+		}
+	}
+	return result
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
 func toSlash(path string) string {
 	return filepath.ToSlash(path)
 }

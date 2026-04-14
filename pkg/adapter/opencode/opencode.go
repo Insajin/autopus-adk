@@ -123,7 +123,14 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, _ 
 	if err != nil {
 		return err
 	}
-	return writeMapping(a.root, mapping)
+	if err := writeMapping(a.root, mapping); err != nil {
+		return err
+	}
+	configMapping, err := a.prepareConfigMapping()
+	if err != nil {
+		return err
+	}
+	return writeMapping(a.root, configMapping)
 }
 
 func writeMappings(root string, files []adapter.FileMapping) error {
