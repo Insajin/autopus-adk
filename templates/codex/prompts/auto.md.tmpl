@@ -1,5 +1,5 @@
 ---
-description: "Autopus 명령 라우터 — setup/plan/go/fix/review/sync/canary/idea 서브커맨드를 해석합니다"
+description: "Autopus 명령 라우터 — setup/status/plan/go/fix/review/sync/idea/map/why/verify/secure/test/dev/canary/doctor 서브커맨드를 해석합니다"
 ---
 
 # auto — Autopus Command Router
@@ -8,21 +8,29 @@ description: "Autopus 명령 라우터 — setup/plan/go/fix/review/sync/canary/
 
 사용자가 `@auto <subcommand> ...` 형태로 호출했다고 가정하고 첫 토큰을 해석합니다.
 
-가능하면 `.agents/skills/auto/SKILL.md`의 최신 라우터 규칙을 우선 따르세요. 이 프롬프트는 얇은 진입점이며, 플래그 의미(`--auto`, `--loop`, `--multi`, `--quality`, `--team`, `--solo`)를 축약해서 덮어쓰면 안 됩니다.
+이 문서는 Codex용 canonical router surface 입니다. shared skill과 parity는 유지하되, 의미 해석은 Codex 규약(`spawn_agent(...)`, `@auto`, `--auto`, `--team`)을 기준으로 하세요. 이 프롬프트는 얇은 진입점이며, 플래그 의미(`--auto`, `--loop`, `--multi`, `--quality`, `--team`, `--solo`)를 축약해서 덮어쓰면 안 됩니다.
 
 지원 서브커맨드:
 - `setup`: 프로젝트 컨텍스트 생성 워크플로우
+- `status`: SPEC 상태 대시보드 워크플로우
 - `plan`: SPEC 작성 워크플로우
 - `go`: SPEC 구현 워크플로우
 - `fix`: 버그 수정 워크플로우
 - `review`: 코드 리뷰 워크플로우
 - `sync`: 문서 동기화 워크플로우
-- `canary`: 배포 후 상태 점검 워크플로우
 - `idea`: 아이디어 브레인스토밍 워크플로우
+- `map`: 코드베이스 분석 워크플로우
+- `why`: 의사결정 근거 조회 워크플로우
+- `verify`: 프론트엔드 UX 검증 워크플로우
+- `secure`: 보안 감사 워크플로우
+- `test`: E2E 시나리오 실행 워크플로우
+- `dev`: plan → go → sync 오케스트레이션 워크플로우
+- `canary`: 배포 후 상태 점검 워크플로우
+- `doctor`: 하네스 상태 진단 워크플로우
 
 규칙:
-- 첫 토큰이 없는 경우, 사용자의 의도를 위 8개 중 하나로 분류해서 진행합니다.
-- 가능하면 같은 이름의 상세 스킬/프롬프트(`auto-setup`, `auto-plan`, `auto-go`, `auto-fix`, `auto-review`, `auto-sync`, `auto-canary`, `auto-idea`) 의미를 따릅니다.
+- 첫 토큰이 없는 경우, 사용자의 의도를 위 16개 중 하나로 분류해서 진행합니다.
+- 가능하면 같은 이름의 상세 스킬/프롬프트(`auto-setup`, `auto-status`, `auto-plan`, `auto-go`, `auto-fix`, `auto-review`, `auto-sync`, `auto-idea`, `auto-map`, `auto-why`, `auto-verify`, `auto-secure`, `auto-test`, `auto-dev`, `auto-canary`, `auto-doctor`) 의미를 따릅니다.
 - 지원하지 않는 서브커맨드면 지원 목록을 짧게 안내하고 가장 가까운 워크플로우를 제안합니다.
 - Codex 하네스 기본값은 `spawn_agent(...)` 기반 subagent-first 입니다.
 - Codex에서 `--auto`가 있으면, 기본 subagent pipeline 진행에 대한 명시적 승인으로 해석합니다.

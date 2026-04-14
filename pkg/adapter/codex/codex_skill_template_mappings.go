@@ -47,5 +47,22 @@ func (a *Adapter) prepareSkillTemplateMappings(cfg *config.HarnessConfig) ([]ada
 		})
 	}
 
+	for _, spec := range workflowSpecs {
+		if spec.Name == "auto" || spec.SkillPath != "" {
+			continue
+		}
+
+		rendered, err := a.renderWorkflowSkill(cfg, spec)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, adapter.FileMapping{
+			TargetPath:      filepath.Join(".codex", "skills", spec.Name+".md"),
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(rendered),
+			Content:         []byte(rendered),
+		})
+	}
+
 	return files, nil
 }

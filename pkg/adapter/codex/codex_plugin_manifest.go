@@ -72,7 +72,7 @@ func (a *Adapter) renderPluginManifestJSON() (string, error) {
 	doc := pluginManifest{
 		Name:        "auto",
 		Version:     "1.0.0",
-		Description: "Autopus workflow router for Codex: setup, plan, go, fix, review, sync, canary, and idea.",
+		Description: "Autopus workflow router for Codex: setup, status, plan, go, fix, review, sync, idea, map, why, verify, secure, test, dev, canary, and doctor.",
 		Author:      pluginAuthor{Name: "Autopus", Email: "noreply@autopus.co", URL: "https://autopus.co"},
 		Homepage:    "https://autopus.co",
 		Repository:  "https://github.com/insajin/autopus-adk",
@@ -82,7 +82,7 @@ func (a *Adapter) renderPluginManifestJSON() (string, error) {
 		Interface: pluginInterface{
 			DisplayName:       "Auto",
 			ShortDescription:  "Autopus workflow router for Codex",
-			LongDescription:   "Run Autopus setup/plan/go/fix/review/sync/canary/idea workflows from Codex with a local plugin plus repository-managed helper docs.",
+			LongDescription:   "Run the full Autopus setup/status/plan/go/fix/review/sync/idea/map/why/verify/secure/test/dev/canary/doctor workflow set from Codex with a local plugin plus repository-managed helper docs.",
 			DeveloperName:     "Autopus",
 			Category:          "Developer Tools",
 			Capabilities:      []string{"Interactive", "Write", "Planning"},
@@ -91,8 +91,10 @@ func (a *Adapter) renderPluginManifestJSON() (string, error) {
 			TermsOfServiceURL: "https://autopus.co/terms",
 			DefaultPrompt: []string{
 				"@auto setup",
+				"@auto status",
 				"@auto plan \"새 기능 요구사항을 SPEC으로 정리해줘\"",
 				"@auto go SPEC-EXAMPLE-001",
+				"@auto verify",
 				"@auto idea \"새 워크플로우를 멀티 프로바이더로 토론해줘\" --multi",
 			},
 			BrandColor: "#0F766E",

@@ -13,7 +13,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
-func TestGenerateRuleFiles_ProducesSeven(t *testing.T) {
+func TestGenerateRuleFiles_ProducesManagedRuleSet(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := codex.NewWithRoot(dir)
@@ -23,12 +23,14 @@ func TestGenerateRuleFiles_ProducesSeven(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedRules := []string{
+		"branding.md",
 		"context7-docs.md",
 		"doc-storage.md",
 		"file-size-limit.md",
 		"language-policy.md",
 		"lore-commit.md",
 		"objective-reasoning.md",
+		"project-identity.md",
 		"subagent-delegation.md",
 		"worktree-safety.md",
 	}
@@ -40,10 +42,10 @@ func TestGenerateRuleFiles_ProducesSeven(t *testing.T) {
 		assert.NoError(t, statErr, "rule file should exist: %s", rule)
 	}
 
-	// Verify exactly 7 rule files
+	// Verify the full managed rule set is present.
 	entries, err := os.ReadDir(rulesDir)
 	require.NoError(t, err)
-	assert.Len(t, entries, len(expectedRules), "should have exactly 7 rule files")
+	assert.Len(t, entries, len(expectedRules), "should have the full managed rule set")
 }
 
 func TestGenerateRuleFiles_Content(t *testing.T) {
@@ -70,6 +72,18 @@ func TestGenerateRuleFiles_Content(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(loreData), "Lore Commit",
 		"should contain rule title")
+	assert.NotContains(t, string(loreData), "@import content/rules/",
+		"managed rules should render concrete rule bodies, not stub imports")
+
+	brandingPath := filepath.Join(dir, ".codex", "rules", "autopus", "branding.md")
+	brandingData, err := os.ReadFile(brandingPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(brandingData), "Autopus Branding")
+
+	projectIdentityPath := filepath.Join(dir, ".codex", "rules", "autopus", "project-identity.md")
+	projectIdentityData, err := os.ReadFile(projectIdentityPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(projectIdentityData), "Do NOT confuse the user's project")
 }
 
 func TestAgentsMD_IncludesCoreCodexGuidance(t *testing.T) {

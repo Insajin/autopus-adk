@@ -47,8 +47,8 @@ func TestE2EInitCodex(t *testing.T) {
 	assertFileExists(t, filepath.Join(dir, ".agents", "plugins", "marketplace.json"))
 	assertFileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", ".codex-plugin", "plugin.json"))
 
-	// .codex/prompts/ directory must exist with 9 prompts.
-	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "prompts"), 9)
+	// .codex/prompts/ directory must exist with 17 prompts.
+	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "prompts"), 17)
 
 	// .codex/agents/ directory must exist with 16 TOML agents (SPEC-PARITY-001: all agents).
 	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "agents"), 16)
@@ -208,7 +208,7 @@ func TestE2ECodex_FileCount(t *testing.T) {
 	}
 
 	assert.GreaterOrEqual(t, skills, 6, "should have at least 6 skill files (6 template + extended)")
-	assert.Equal(t, 9, prompts, "should have 9 prompt files")
+	assert.Equal(t, 17, prompts, "should have 17 prompt files")
 	assert.Equal(t, 16, agents, "should have 16 agent files (SPEC-PARITY-001)")
 	assert.GreaterOrEqual(t, other, 3, "should have AGENTS.md + hooks.json + config.toml")
 }

@@ -98,7 +98,7 @@ func TestGenerateRuleFiles_Internal(t *testing.T) {
 
 	files, err := a.generateRuleFiles(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 8, "should produce 8 rule files")
+	assert.Len(t, files, 10, "should produce the full managed rule set")
 
 	// Verify file-size-limit content
 	for _, f := range files {
@@ -116,7 +116,7 @@ func TestPrepareRuleMappings_NoDiskWrite(t *testing.T) {
 
 	files, err := a.prepareRuleMappings(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 8)
+	assert.Len(t, files, 10)
 
 	// Should not write to disk
 	_, err = os.Stat(filepath.Join(dir, ".codex", "rules", "autopus"))
@@ -154,6 +154,17 @@ func TestStripFrontmatter(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestEnsureCodexRulePlatform(t *testing.T) {
+	t.Parallel()
+
+	input := "---\nname: demo\ndescription: test\n---\n\n# Demo\n"
+	output := ensureCodexRulePlatform(input)
+	assert.Contains(t, output, "platform: codex")
+
+	alreadyTagged := "---\nname: demo\nplatform: codex\n---\n\n# Demo\n"
+	assert.Equal(t, alreadyTagged, ensureCodexRulePlatform(alreadyTagged))
 }
 
 func TestInjectMarkerSection_EmptyFile(t *testing.T) {

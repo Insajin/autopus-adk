@@ -72,13 +72,21 @@ func (a *Adapter) Clean(_ context.Context) error {
 	autoSkillDirs := []string{
 		"auto",
 		"auto-setup",
+		"auto-status",
 		"auto-plan",
 		"auto-go",
 		"auto-fix",
 		"auto-review",
 		"auto-sync",
 		"auto-idea",
+		"auto-map",
+		"auto-why",
+		"auto-verify",
+		"auto-secure",
+		"auto-test",
+		"auto-dev",
 		"auto-canary",
+		"auto-doctor",
 	}
 	for _, dir := range autoSkillDirs {
 		if err := os.RemoveAll(filepath.Join(a.root, ".agents", "skills", dir)); err != nil && !os.IsNotExist(err) {

@@ -26,6 +26,7 @@ func (a *Adapter) renderRouterSkill(cfg *config.HarnessConfig) (string, error) {
 	}
 
 	body = strings.TrimSpace(body)
+	body = rewriteCodexRouterBody(body)
 	body = normalizeCodexInvocationBody(body)
 	body = normalizeCodexHelperPaths(body)
 	invoNote := strings.TrimSpace(fmt.Sprintf(`
@@ -37,35 +38,35 @@ Use this skill through either of these surfaces:
 - %s — direct repository skill invocation
 
 Direct skill loads should treat the user's latest %s request as the arguments.
-This skill is a thin router. After resolving the subcommand, load the matching detailed skill (%s, %s, %s, %s, %s, %s, %s, %s) before executing the workflow.
+This skill is a thin router. After resolving the subcommand, load the matching detailed skill (%s) before executing the workflow.
 `,
 		"`@auto <subcommand> ...`",
 		"`/plugins`",
 		"`$auto <subcommand> ...`",
 		"`auto ...`",
-		"`auto-setup`",
-		"`auto-plan`",
-		"`auto-go`",
-		"`auto-fix`",
-		"`auto-review`",
-		"`auto-sync`",
-		"`auto-canary`",
-		"`auto-idea`",
+		routerDetailSkills(),
 	))
 	body = injectAfterFirstHeading(body, invoNote)
 
 	frontmatter := strings.TrimSpace(fmt.Sprintf(`---
 name: auto
 description: >
-  Autopus Codex router skill. Use when the user wants %s or %s workflows such as setup, plan, go, fix, review, sync, canary, and idea.
+  Autopus Codex router skill. Use when the user wants %s or %s workflows such as setup, status, plan, go, fix, review, sync, idea, map, why, verify, secure, test, dev, canary, and doctor.
 ---`, "`@auto ...`", "`$auto ...`"))
 	return frontmatter + "\n\n" + strings.TrimSpace(body) + "\n", nil
 }
 
-func (a *Adapter) renderTemplateAsSkill(cfg *config.HarnessConfig, spec standardSkillSpec) (string, error) {
-	tmplContent, err := templates.FS.ReadFile(spec.TemplatePath)
+func (a *Adapter) renderWorkflowSkill(cfg *config.HarnessConfig, spec workflowSpec) (string, error) {
+	if rendered, ok := renderCustomWorkflowSkill(spec); ok {
+		return rendered, nil
+	}
+	if spec.SkillPath == "" {
+		return "", fmt.Errorf("codex workflow skill 경로 누락: %s", spec.Name)
+	}
+
+	tmplContent, err := templates.FS.ReadFile(spec.SkillPath)
 	if err != nil {
-		return "", fmt.Errorf("codex skill 템플릿 읽기 실패 %s: %w", spec.TemplatePath, err)
+		return "", fmt.Errorf("codex skill 템플릿 읽기 실패 %s: %w", spec.SkillPath, err)
 	}
 
 	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
@@ -119,6 +120,25 @@ func normalizeCodexSkillBody(body, subcommand string) string {
 		fmt.Sprintf("$auto-%s", subcommand), fmt.Sprintf("$auto %s", subcommand),
 	)
 	return replacer.Replace(body)
+}
+
+func rewriteCodexRouterBody(body string) string {
+	body = strings.TrimSpace(body)
+	body = injectRouterSupportedFlows(body)
+	body = strings.ReplaceAll(body, "위 7개", fmt.Sprintf("위 %d개", routerSubcommandCount()))
+	body = strings.ReplaceAll(body, "위 8개", fmt.Sprintf("위 %d개", routerSubcommandCount()))
+	body = strings.ReplaceAll(body, "같은 이름의 상세 스킬/프롬프트(`auto-setup`, `auto-plan`, `auto-go`, `auto-fix`, `auto-review`, `auto-sync`, `auto-canary`, `auto-idea`)", "같은 이름의 상세 스킬/프롬프트("+routerDetailSkills()+")")
+	return body
+}
+
+func injectRouterSupportedFlows(body string) string {
+	start := strings.Index(body, "지원 서브커맨드:")
+	rules := strings.Index(body, "\n\n규칙:")
+	section := "지원 서브커맨드:\n" + routerSupportedFlows()
+	if start < 0 || rules < 0 || rules <= start {
+		return strings.TrimSpace(body) + "\n\n" + section
+	}
+	return body[:start] + section + body[rules:]
 }
 
 func normalizeCodexInvocationBody(body string) string {

@@ -2,22 +2,16 @@ package codex
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
+	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
-	"github.com/insajin/autopus-adk/pkg/content"
-	"github.com/insajin/autopus-adk/templates"
+	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 )
-
-const codexRulesTemplateDir = "codex/rules/autopus"
-
-// fileSizeLimitData is the template data for the file-size-limit rule.
-type fileSizeLimitData struct {
-	Exclusions []content.FileSizeExclusion
-}
 
 // generateRuleFiles reads Codex rule templates from embedded FS,
 // renders them, and writes to .codex/rules/autopus/.
@@ -43,40 +37,32 @@ func (a *Adapter) generateRuleFiles(cfg *config.HarnessConfig) ([]adapter.FileMa
 // prepareRuleMappings renders rule templates and returns file mappings
 // without writing to disk.
 func (a *Adapter) prepareRuleMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	_ = cfg
 	var files []adapter.FileMapping
 
-	entries, err := templates.FS.ReadDir(codexRulesTemplateDir)
+	entries, err := contentfs.FS.ReadDir("rules")
 	if err != nil {
-		return nil, fmt.Errorf("codex rule 템플릿 디렉터리 읽기 실패: %w", err)
+		return nil, fmt.Errorf("codex rule 콘텐츠 디렉터리 읽기 실패: %w", err)
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tmpl") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
 			continue
 		}
 
 		name := entry.Name()
-		outFile := strings.TrimSuffix(name, ".tmpl")
-
-		tmplContent, err := templates.FS.ReadFile(codexRulesTemplateDir + "/" + name)
+		raw, err := fs.ReadFile(contentfs.FS, filepath.Join("rules", name))
 		if err != nil {
-			return nil, fmt.Errorf("codex rule 템플릿 읽기 실패 %s: %w", name, err)
+			return nil, fmt.Errorf("codex rule 콘텐츠 읽기 실패 %s: %w", name, err)
 		}
 
-		// file-size-limit uses a special data struct with exclusions.
-		var rendered string
-		if outFile == "file-size-limit.md" {
-			exclusions := content.FileSizeExclusions(cfg.Stack, cfg.Framework)
-			data := fileSizeLimitData{Exclusions: exclusions}
-			rendered, err = a.engine.RenderString(string(tmplContent), data)
-		} else {
-			rendered, err = a.engine.RenderString(string(tmplContent), cfg)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("codex rule 템플릿 렌더링 실패 %s: %w", name, err)
-		}
+		rendered := pkgcontent.ReplacePlatformReferences(string(raw), "codex")
+		rendered = ensureCodexRulePlatform(rendered)
+		rendered = normalizeCodexInvocationBody(rendered)
+		rendered = normalizeCodexHelperPaths(rendered)
+		rendered = normalizeCodexToolingBody(rendered)
 
-		relPath := ruleFilePath(outFile)
+		relPath := ruleFilePath(name)
 		files = append(files, adapter.FileMapping{
 			TargetPath:      relPath,
 			OverwritePolicy: adapter.OverwriteAlways,
@@ -86,6 +72,26 @@ func (a *Adapter) prepareRuleMappings(cfg *config.HarnessConfig) ([]adapter.File
 	}
 
 	return files, nil
+}
+
+func ensureCodexRulePlatform(content string) string {
+	if !strings.HasPrefix(content, "---\n") {
+		return content
+	}
+
+	rest := strings.TrimPrefix(content, "---\n")
+	idx := strings.Index(rest, "\n---\n")
+	if idx < 0 {
+		return content
+	}
+
+	frontmatter := rest[:idx]
+	body := rest[idx+len("\n---\n"):]
+	if !strings.Contains(frontmatter, "\nplatform:") && !strings.HasPrefix(frontmatter, "platform:") {
+		frontmatter += "\nplatform: codex"
+	}
+
+	return "---\n" + frontmatter + "\n---\n" + body
 }
 
 // ruleFilePath returns the target path for a rule file.

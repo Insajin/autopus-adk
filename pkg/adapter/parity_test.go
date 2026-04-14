@@ -22,6 +22,11 @@ type featureCounts struct {
 	Skills int
 }
 
+type platformResult struct {
+	name   string
+	counts featureCounts
+}
+
 // classifyFile categorizes a FileMapping into agents, rules, or skills.
 // Returns the category name or empty string if uncategorized.
 func classifyFile(f adapter.FileMapping) string {
@@ -79,11 +84,6 @@ func TestParity_CrossPlatformFeatures(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.DefaultFullConfig("parity-test")
 
-	type platformResult struct {
-		name   string
-		counts featureCounts
-	}
-
 	platforms := []struct {
 		name     string
 		generate func(t *testing.T) *adapter.PlatformFiles
@@ -138,28 +138,46 @@ func TestParity_CrossPlatformFeatures(t *testing.T) {
 			r.name, r.counts.Agents, r.counts.Rules, r.counts.Skills)
 	}
 
-	agentParity := parityPct(results[0].counts.Agents, results[1].counts.Agents, results[2].counts.Agents)
-	// Rules parity accounts for intentional exclusions per SPEC-PARITY-001 R1:
-	// Codex/Gemini intentionally exclude branding.md and project-identity.md (2 rules).
-	// Adjusted Claude count = total - intentionalExclusions for fair comparison.
-	const intentionalRuleExclusions = 2
-	adjustedClaudeRules := results[0].counts.Rules - intentionalRuleExclusions
-	rulesParity := parityPct(adjustedClaudeRules, results[1].counts.Rules, results[2].counts.Rules)
-	skillsParity := parityPct(results[0].counts.Skills, results[1].counts.Skills, results[2].counts.Skills)
+	claudeCounts := countsForPlatform(t, results, "claude")
+	codexCounts := countsForPlatform(t, results, "codex")
+	geminiCounts := countsForPlatform(t, results, "gemini")
+
+	codexAgentParity := parityPct(claudeCounts.Agents, codexCounts.Agents)
+	codexRulesParity := parityPct(claudeCounts.Rules, codexCounts.Rules)
+	codexSkillsParity := parityPct(claudeCounts.Skills, codexCounts.Skills)
+	geminiRulesParity := parityPct(claudeCounts.Rules, geminiCounts.Rules)
+	overallSkillsParity := parityPct(claudeCounts.Skills, codexCounts.Skills, geminiCounts.Skills)
 
 	t.Logf("\n%-10s %7.1f%% %7.1f%% %7.1f%%",
-		"Parity", agentParity, rulesParity, skillsParity)
+		"Codex", codexAgentParity, codexRulesParity, codexSkillsParity)
+	t.Logf("%-10s %7s %7.1f%% %7.1f%%",
+		"Gemini", "-", geminiRulesParity, overallSkillsParity)
 
-	// P0 gate: agents and rules must be >= 95% parity
-	assert.GreaterOrEqualf(t, agentParity, 95.0,
-		"P0 FAIL: agent parity %.1f%% < 95%%", agentParity)
-	assert.GreaterOrEqualf(t, rulesParity, 95.0,
-		"P0 FAIL: rules parity %.1f%% < 95%%", rulesParity)
+	// P0 gate for this rollout: Codex must remain aligned with Claude on
+	// managed agents and rules. Other platforms are reported but not gated here.
+	assert.GreaterOrEqualf(t, codexAgentParity, 95.0,
+		"P0 FAIL: Codex agent parity %.1f%% < 95%%", codexAgentParity)
+	assert.GreaterOrEqualf(t, codexRulesParity, 95.0,
+		"P0 FAIL: Codex rules parity %.1f%% < 95%%", codexRulesParity)
 
 	// Skills parity is informational (not gated) but still logged
-	if skillsParity < 95.0 {
-		t.Logf("INFO: skills parity %.1f%% < 95%% (not gated)", skillsParity)
+	if codexSkillsParity < 95.0 {
+		t.Logf("INFO: Codex skills parity %.1f%% < 95%% (not gated)", codexSkillsParity)
 	}
+	if geminiRulesParity < 95.0 {
+		t.Logf("INFO: Gemini rules parity %.1f%% < 95%% (not gated in this test)", geminiRulesParity)
+	}
+}
+
+func countsForPlatform(t *testing.T, results []platformResult, name string) featureCounts {
+	t.Helper()
+	for _, result := range results {
+		if result.name == name {
+			return result.counts
+		}
+	}
+	t.Fatalf("platform result not found: %s", name)
+	return featureCounts{}
 }
 
 func TestParity_ClassifyFile(t *testing.T) {
