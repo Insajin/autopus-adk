@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -17,6 +18,63 @@ import (
 	"github.com/insajin/autopus-adk/pkg/worker/security"
 	"github.com/insajin/autopus-adk/pkg/worker/stream"
 )
+
+func (wl *WorkerLoop) detachedTaskContext(parent context.Context) (context.Context, context.CancelFunc) {
+	base := context.Background()
+	if parent != nil {
+		base = context.WithoutCancel(parent)
+	}
+	ctx, cancel := context.WithCancel(base)
+
+	if wl.lifecycleCtx != nil {
+		go func() {
+			select {
+			case <-wl.lifecycleCtx.Done():
+				cancel()
+			case <-ctx.Done():
+			}
+		}()
+	}
+	if parent != nil {
+		go func() {
+			select {
+			case <-parent.Done():
+				if errors.Is(parent.Err(), context.Canceled) {
+					cancel()
+				}
+			case <-ctx.Done():
+			}
+		}()
+	}
+
+	return ctx, cancel
+}
+
+func (wl *WorkerLoop) executionContext(parent context.Context, taskID string) (context.Context, context.CancelFunc) {
+	baseCtx, baseCancel := wl.detachedTaskContext(parent)
+	timeout := wl.taskExecutionTimeout(taskID)
+	if timeout <= 0 {
+		return baseCtx, baseCancel
+	}
+
+	execCtx, timeoutCancel := context.WithTimeout(baseCtx, timeout)
+	return execCtx, func() {
+		timeoutCancel()
+		baseCancel()
+	}
+}
+
+func (wl *WorkerLoop) taskExecutionTimeout(taskID string) time.Duration {
+	if strings.TrimSpace(taskID) == "" {
+		return 0
+	}
+
+	policy, err := security.NewPolicyCache().Read(taskID)
+	if err != nil || policy == nil || policy.TimeoutSec <= 0 {
+		return 0
+	}
+	return time.Duration(policy.TimeoutSec) * time.Second
+}
 
 // StdinWriter wraps an io.WriteCloser to keep the stdin pipe open
 // after the initial prompt is written. This enables mid-session
@@ -69,7 +127,9 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 	// Acquire a semaphore slot when parallel execution is configured.
 	// This blocks until a slot is available or ctx is cancelled.
 	if wl.semaphore != nil {
-		if err := wl.semaphore.Acquire(ctx); err != nil {
+		acquireCtx, cancelAcquire := wl.detachedTaskContext(ctx)
+		defer cancelAcquire()
+		if err := wl.semaphore.Acquire(acquireCtx); err != nil {
 			return adapter.TaskResult{}, fmt.Errorf("acquire semaphore: %w", err)
 		}
 		defer wl.semaphore.Release()
@@ -103,7 +163,9 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 	}
 
 	// Delegate to the core subprocess executor.
-	result, err := wl.executeWithBudget(ctx, taskCfg, bc)
+	execCtx, cancelExec := wl.executionContext(ctx, taskID)
+	defer cancelExec()
+	result, err := wl.executeWithBudget(execCtx, taskCfg, bc)
 	durationMS := time.Since(startTime).Milliseconds()
 
 	// Record completion or failure in the audit log.
@@ -138,7 +200,9 @@ func (wl *WorkerLoop) executePipelineWithParallel(ctx context.Context, taskID, p
 	}
 
 	if wl.semaphore != nil {
-		if err := wl.semaphore.Acquire(ctx); err != nil {
+		acquireCtx, cancelAcquire := wl.detachedTaskContext(ctx)
+		defer cancelAcquire()
+		if err := wl.semaphore.Acquire(acquireCtx); err != nil {
 			return adapter.TaskResult{}, fmt.Errorf("acquire semaphore: %w", err)
 		}
 		defer wl.semaphore.Release()
@@ -182,7 +246,9 @@ func (wl *WorkerLoop) executePipelineWithParallel(ctx context.Context, taskID, p
 	if bc != nil && bc.Budget.Limit > 0 {
 		pe.SetIterationBudget(bc.Budget)
 	}
-	result, err := pe.ExecuteWithPlan(ctx, taskID, prompt, model, phases)
+	execCtx, cancelExec := wl.executionContext(ctx, taskID)
+	defer cancelExec()
+	result, err := pe.ExecuteWithPlan(execCtx, taskID, prompt, model, phases)
 	durationMS := time.Since(startTime).Milliseconds()
 
 	if err != nil {
