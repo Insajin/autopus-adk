@@ -1,0 +1,58 @@
+package opencode
+
+import (
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+
+	"github.com/insajin/autopus-adk/pkg/adapter"
+)
+
+func (a *Adapter) prepareConfigMapping() (adapter.FileMapping, error) {
+	configDoc, err := a.renderConfigDocument(nil)
+	if err != nil {
+		return adapter.FileMapping{}, err
+	}
+	return adapter.FileMapping{
+		TargetPath:      configFile,
+		OverwritePolicy: adapter.OverwriteMerge,
+		Checksum:        adapter.Checksum(configDoc),
+		Content:         []byte(configDoc),
+	}, nil
+}
+
+func (a *Adapter) renderConfigDocument(extraPlugins []string) (string, error) {
+	path := filepath.Join(a.root, configFile)
+	doc, err := readJSONObject(path)
+	if err != nil {
+		return "", fmt.Errorf("%s 파싱 실패: %w", configFile, err)
+	}
+	rulePaths, err := managedRulePaths()
+	if err != nil {
+		return "", fmt.Errorf("rule 경로 생성 실패: %w", err)
+	}
+	doc["$schema"] = "https://opencode.ai/config.json"
+	doc["instructions"] = uniqueStrings(jsonStringSlice(doc["instructions"]), rulePaths)
+	if len(extraPlugins) > 0 {
+		doc["plugin"] = uniqueStrings(jsonStringSlice(doc["plugin"]), extraPlugins)
+	}
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("%s 직렬화 실패: %w", configFile, err)
+	}
+	return string(data) + "\n", nil
+}
+
+// InjectOrchestraPlugin preserves legacy external callers by appending a plugin path.
+func (a *Adapter) InjectOrchestraPlugin(scriptPath string) error {
+	doc, err := a.renderConfigDocument([]string{toSlash(scriptPath)})
+	if err != nil {
+		return err
+	}
+	return writeMapping(a.root, adapter.FileMapping{
+		TargetPath:      configFile,
+		OverwritePolicy: adapter.OverwriteMerge,
+		Checksum:        adapter.Checksum(doc),
+		Content:         []byte(doc),
+	})
+}

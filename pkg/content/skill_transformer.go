@@ -22,8 +22,9 @@ type SkillMeta struct {
 
 // TransformedSkill represents a skill after platform transformation.
 type TransformedSkill struct {
-	Name    string
-	Content string
+	Name        string
+	Description string
+	Content     string
 }
 
 // TransformReport summarizes which skills are compatible or not for a platform.
@@ -46,11 +47,12 @@ type parsedSkill struct {
 
 // supportedPlatforms lists the platforms the transformer can target.
 var supportedPlatforms = map[string]bool{
-	"claude":     true,
+	"claude":      true,
 	"claude-code": true,
-	"codex":      true,
-	"gemini":     true,
-	"gemini-cli": true,
+	"codex":       true,
+	"gemini":      true,
+	"gemini-cli":  true,
+	"opencode":    true,
 }
 
 // NewSkillTransformer creates a transformer by loading all .md files from dir.
@@ -100,8 +102,9 @@ func (t *SkillTransformer) TransformForPlatform(platform string) ([]TransformedS
 		report.Compatible = append(report.Compatible, s.meta.Name)
 		filtered := ReplacePlatformReferences(s.body, platform)
 		result = append(result, TransformedSkill{
-			Name:    s.meta.Name,
-			Content: filtered,
+			Name:        s.meta.Name,
+			Description: s.meta.Description,
+			Content:     filtered,
 		})
 	}
 

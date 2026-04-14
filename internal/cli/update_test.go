@@ -116,30 +116,27 @@ func TestUpdateCmd_MigratesCodexPromptViaArgs(t *testing.T) {
 	assert.False(t, codex.PromptViaArgs, "codex PromptViaArgs must remain false (migration 1 removed)")
 }
 
-// TestUpdateCmd_NoAdapterPlatformIsSkipped verifies that a valid but adapter-less
-// platform (e.g. "opencode") in config is skipped with a warning, and update
-// still completes successfully.
-func TestUpdateCmd_NoAdapterPlatformIsSkipped(t *testing.T) {
+// TestUpdateCmd_OpenCodePlatformIsUpdated verifies that opencode participates in update.
+func TestUpdateCmd_OpenCodePlatformIsUpdated(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	// Init with claude-code first.
 	initCmd := newTestRootCmd()
-	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code"})
+	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "opencode"})
 	require.NoError(t, initCmd.Execute())
 
-	// Reload config and add "opencode" — valid platform but no update adapter.
-	cfg, err := loadConfigFromDir(dir)
-	require.NoError(t, err)
-	cfg.Platforms = append(cfg.Platforms, "opencode")
-	require.NoError(t, config.Save(dir, cfg))
+	autoPath := filepath.Join(dir, ".opencode", "commands", "auto.md")
+	require.NoError(t, os.WriteFile(autoPath, []byte("user-modified"), 0644))
 
 	var out bytes.Buffer
 	updateCmd := newTestRootCmd()
 	updateCmd.SetOut(&out)
 	updateCmd.SetArgs([]string{"update", "--dir", dir})
-	require.NoError(t, updateCmd.Execute(), "update must succeed even when opencode has no adapter")
-	assert.Contains(t, out.String(), "경고", "output must warn about platform with no adapter")
+	require.NoError(t, updateCmd.Execute())
+	assert.Contains(t, out.String(), "opencode updated")
+	data, err := os.ReadFile(autoPath)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "user-modified")
 }
 
 // TestUpdateCmd_SelfFlagRecognized verifies T11: --self flag is parsed by the

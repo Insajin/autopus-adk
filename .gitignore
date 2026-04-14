@@ -49,3 +49,4 @@ credentials.enc
 .env
 .env.*
 /tmp/autopus-*/
+runtime-a2a-canary-local-probe.md

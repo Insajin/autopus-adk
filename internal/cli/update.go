@@ -14,6 +14,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/selfupdate"
 	"github.com/insajin/autopus-adk/pkg/version"
@@ -77,6 +78,9 @@ func newUpdateCmd() *cobra.Command {
 					_, updateErr = a.Update(ctx, cfg)
 				case "gemini-cli":
 					a := gemini.NewWithRoot(dir)
+					_, updateErr = a.Update(ctx, cfg)
+				case "opencode":
+					a := opencode.NewWithRoot(dir)
 					_, updateErr = a.Update(ctx, cfg)
 				default:
 					fmt.Fprintf(cmd.OutOrStdout(), "  경고: 알 수 없는 플랫폼 %q, 건너뜀\n", p)

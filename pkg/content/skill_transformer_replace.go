@@ -19,27 +19,43 @@ var mcpQueryRe = regexp.MustCompile(
 // mcpGenericRe matches any remaining mcp__ references not caught by specific patterns.
 var mcpGenericRe = regexp.MustCompile(`mcp__\w+`)
 
+var openCodeSkillPathRe = regexp.MustCompile(`\.agents/skills/([a-z0-9-]+)\.md`)
+
 // pathReplacements maps Claude-specific directory prefixes to platform equivalents.
 var pathReplacements = map[string]map[string]string{
 	"codex": {
-		".claude/skills/": ".codex/skills/",
-		".claude/agents/": ".codex/agents/",
-		".claude/rules/":  ".codex/rules/",
-		".claude/":        ".codex/",
+		".claude/commands/": ".codex/prompts/",
+		".claude/skills/":   ".codex/skills/",
+		".claude/agents/":   ".codex/agents/",
+		".claude/rules/":    ".codex/rules/",
+		".claude/":          ".codex/",
 	},
 	"gemini": {
-		".claude/skills/": ".gemini/skills/",
-		".claude/agents/": ".gemini/agents/",
-		".claude/rules/":  ".gemini/rules/",
-		".claude/":        ".gemini/",
+		".claude/commands/": ".gemini/commands/",
+		".claude/skills/":   ".gemini/skills/",
+		".claude/agents/":   ".gemini/agents/",
+		".claude/rules/":    ".gemini/rules/",
+		".claude/":          ".gemini/",
+	},
+	"opencode": {
+		".claude/skills/autopus/": ".agents/skills/",
+		".claude/commands/":       ".opencode/commands/",
+		".claude/skills/":         ".agents/skills/",
+		".claude/agents/":         ".opencode/agents/",
+		".claude/rules/":          ".opencode/rules/",
+		".claude/hooks/":          ".opencode/plugins/",
+		".claude/":                ".opencode/",
 	},
 }
 
 // pathOrder ensures specific paths are replaced before the general .claude/ prefix.
 var pathOrder = []string{
+	".claude/commands/",
+	".claude/skills/autopus/",
 	".claude/skills/",
 	".claude/agents/",
 	".claude/rules/",
+	".claude/hooks/",
 	".claude/",
 }
 
@@ -58,7 +74,8 @@ func ReplacePlatformReferences(body string, platform string) string {
 		line = replaceMCPCalls(line, platform)
 		line = replacePaths(line, platform)
 		line = replaceWorktreeIsolation(line)
-		line = replaceTodoWrite(line)
+		line = replaceTodoWrite(line, platform)
+		line = replaceWorkflowTools(line, platform)
 		result = append(result, line)
 	}
 
@@ -90,6 +107,11 @@ func replaceAgentCalls(line string, platform string) string {
 				return `@` + name + ` ` + task
 			}
 			return `@` + name
+		case "opencode":
+			if task != "" {
+				return `task tool → subagent_type="` + name + `", prompt="` + task + `"`
+			}
+			return `task tool → subagent_type="` + name + `"`
 		default:
 			return match
 		}
@@ -136,6 +158,9 @@ func replacePaths(line string, platform string) string {
 			line = strings.ReplaceAll(line, key, repl)
 		}
 	}
+	if p == "opencode" {
+		line = openCodeSkillPathRe.ReplaceAllString(line, ".agents/skills/$1/SKILL.md")
+	}
 	return line
 }
 
@@ -146,11 +171,34 @@ func replaceWorktreeIsolation(line string) string {
 }
 
 // replaceTodoWrite removes or comments out TodoWrite tool references.
-func replaceTodoWrite(line string) string {
+func replaceTodoWrite(line string, platform string) string {
+	if normalizePlatform(platform) == "opencode" && strings.Contains(line, "TodoWrite") {
+		line = todoWriteRe.ReplaceAllString(line, "todowrite")
+	}
+	if strings.Contains(line, "todowrite") {
+		return line
+	}
 	if todoWriteRe.MatchString(line) {
 		return "// TodoWrite is not available on this platform"
 	}
 	return line
+}
+
+func replaceWorkflowTools(line string, platform string) string {
+	if normalizePlatform(platform) != "opencode" {
+		return line
+	}
+
+	replacer := strings.NewReplacer(
+		"AskUserQuestion", "question",
+		"TaskCreate", "todowrite",
+		"TaskUpdate", "todowrite",
+		"TaskList", "todowrite",
+		"TaskGet", "todowrite",
+		"TeamCreate", "task",
+		"SendMessage", "task result handoff",
+	)
+	return replacer.Replace(line)
 }
 
 // cleanArg strips quotes and whitespace from a function argument string.

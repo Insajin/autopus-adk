@@ -485,11 +485,16 @@ One `autopus.yaml` generates **native configuration** for every detected support
 | **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Gemini CLI** | `.gemini/`, `GEMINI.md` |
+| **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
 Same 16 agents. Same 40 skills. Same rules. **Every platform.**
 
 Codex note:
 - Use `$auto plan ...`, `$auto go ...`, `$auto idea ...` immediately after `auto init` or `auto update`
 - Install the generated local plugin from `/plugins` to unlock the friendlier `@auto ...` syntax
+
+OpenCode note:
+- `/auto ...` and direct aliases like `/auto-plan ...` are generated under `.opencode/commands/`
+- Native rule/agent/plugin files live under `.opencode/`, while reusable skills are published under `.agents/skills/`
 
 ---
 
@@ -544,17 +549,18 @@ cd your-project && auto init
 | `VERSION` | latest | Specific version to install |
 | `SKIP_INIT` | `0` | Set to `1` to skip auto-init |
 | `PROJECT_NAME` | directory name | Project name for `auto init` |
-| `PLATFORMS` | auto-detect | Platform list (e.g., `claude-code,codex`) |
+| `PLATFORMS` | auto-detect | Platform list (e.g., `claude-code,codex,opencode`) |
 
 </details>
 
-The installer scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Gemini CLI) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
+The installer scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Gemini CLI, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
 
 ```
-✓ Detected: claude-code, codex, gemini-cli
+✓ Detected: claude-code, codex, gemini-cli, opencode
 ✓ Generated: .claude/rules/, .claude/skills/, .claude/agents/, CLAUDE.md
 ✓ Generated: .codex/, AGENTS.md
 ✓ Generated: .gemini/, GEMINI.md
+✓ Generated: .opencode/, .agents/skills/, AGENTS.md, opencode.json
 ✓ Created: autopus.yaml
 ```
 
@@ -638,7 +644,7 @@ Downloads the latest release from GitHub, verifies SHA256 checksum, and atomical
 auto update
 ```
 
-Regenerates `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, and platform-specific files from the latest templates. Your custom edits outside `AUTOPUS:BEGIN`~`AUTOPUS:END` markers are preserved. Newly installed platforms are auto-detected.
+Regenerates `.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*`, and other platform-specific files from the latest templates. Your custom edits outside `AUTOPUS:BEGIN`~`AUTOPUS:END` markers are preserved. Newly installed platforms are auto-detected.
 
 **Both at once:**
 

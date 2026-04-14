@@ -12,6 +12,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
@@ -139,6 +140,11 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 				if _, err := a.Generate(ctx, cfg); err != nil {
 					return fmt.Errorf("gemini-cli 파일 생성 실패: %w", err)
 				}
+			case "opencode":
+				a := opencode.NewWithRoot(d)
+				if _, err := a.Generate(ctx, cfg); err != nil {
+					return fmt.Errorf("opencode 파일 생성 실패: %w", err)
+				}
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "✓ Platform %q added\n", platform)
@@ -201,6 +207,9 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 				_ = a.Clean(ctx)
 			case "gemini-cli":
 				a := gemini.NewWithRoot(d)
+				_ = a.Clean(ctx)
+			case "opencode":
+				a := opencode.NewWithRoot(d)
 				_ = a.Clean(ctx)
 			}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
@@ -22,6 +23,7 @@ var initSupportedPlatforms = map[string]bool{
 	"claude-code": true,
 	"codex":       true,
 	"gemini-cli":  true,
+	"opencode":    true,
 }
 
 // generatePlatformFiles는 플랫폼별 파일을 생성한다.
@@ -37,6 +39,9 @@ func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessC
 			_, err = a.Generate(ctx, cfg)
 		case "gemini-cli":
 			a := gemini.NewWithRoot(dir)
+			_, err = a.Generate(ctx, cfg)
+		case "opencode":
+			a := opencode.NewWithRoot(dir)
 			_, err = a.Generate(ctx, cfg)
 		default:
 			tui.Warnf(cmd.OutOrStdout(), "알 수 없는 플랫폼 %q, 건너뜀", p)

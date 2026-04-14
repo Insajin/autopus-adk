@@ -50,6 +50,25 @@ func TestPlatformAddCmd(t *testing.T) {
 	assert.Contains(t, string(data), "codex")
 }
 
+func TestPlatformAddCmd_OpenCode(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	initCmd := newTestRootCmd()
+	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code"})
+	require.NoError(t, initCmd.Execute())
+
+	addCmd := newTestRootCmd()
+	addCmd.SetArgs([]string{"platform", "add", "opencode", "--dir", dir})
+	require.NoError(t, addCmd.Execute())
+
+	cfg, err := loadConfigFromDir(dir)
+	require.NoError(t, err)
+	assert.Contains(t, cfg.Platforms, "opencode")
+	assert.FileExists(t, filepath.Join(dir, ".opencode", "commands", "auto.md"))
+	assert.FileExists(t, filepath.Join(dir, "opencode.json"))
+}
+
 func TestPlatformRemoveCmd(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
