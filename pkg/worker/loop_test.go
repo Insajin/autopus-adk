@@ -34,6 +34,26 @@ func TestConvertArtifacts_Multiple(t *testing.T) {
 	assert.Equal(t, "{}", result[1].Data)
 }
 
+func TestEnsureOutputArtifact_AddsOutputArtifactFirst(t *testing.T) {
+	artifacts := ensureOutputArtifact("worker summary", []adapter.Artifact{
+		{Name: "notes.md", MimeType: "text/markdown", Data: "# notes"},
+	})
+
+	require.Len(t, artifacts, 2)
+	assert.Equal(t, "output", artifacts[0].Name)
+	assert.Equal(t, "worker summary", artifacts[0].Data)
+	assert.Equal(t, "notes.md", artifacts[1].Name)
+}
+
+func TestEnsureOutputArtifact_DoesNotDuplicateExistingOutput(t *testing.T) {
+	artifacts := ensureOutputArtifact("worker summary", []adapter.Artifact{
+		{Name: "output", MimeType: "text/plain", Data: "existing summary"},
+	})
+
+	require.Len(t, artifacts, 1)
+	assert.Equal(t, "existing summary", artifacts[0].Data)
+}
+
 func TestNewWorkerLoop(t *testing.T) {
 	cfg := LoopConfig{
 		BackendURL: "http://localhost:8080",
@@ -247,6 +267,9 @@ func TestHandleTask_HappyPath(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, "completed", string(result.Status))
+	require.Len(t, result.Artifacts, 1)
+	assert.Equal(t, "output", result.Artifacts[0].Name)
+	assert.Equal(t, "done", result.Artifacts[0].Data)
 }
 
 func TestHandleTask_InvalidPayload(t *testing.T) {

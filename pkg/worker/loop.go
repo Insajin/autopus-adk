@@ -240,6 +240,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	}
 
 	log.Printf("[worker] task %s completed: cost=$%.4f duration=%dms", taskID, result.CostUSD, result.DurationMS)
+	result.Artifacts = ensureOutputArtifact(result.Output, result.Artifacts)
 
 	// Memory write-back: record task learnings (SPEC-KHINT-001 REQ-005).
 	if wl.memorySearcher != nil && memoryAgentID != "" && result.Output != "" {
@@ -315,4 +316,20 @@ func convertArtifacts(src []adapter.Artifact) []a2a.Artifact {
 		}
 	}
 	return out
+}
+
+func ensureOutputArtifact(output string, artifacts []adapter.Artifact) []adapter.Artifact {
+	if strings.TrimSpace(output) == "" {
+		return artifacts
+	}
+	for _, artifact := range artifacts {
+		if artifact.Name == "output" {
+			return artifacts
+		}
+	}
+	return append([]adapter.Artifact{{
+		Name:     "output",
+		MimeType: "text/plain",
+		Data:     output,
+	}}, artifacts...)
 }
