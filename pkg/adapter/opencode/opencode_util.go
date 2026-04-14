@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const openCodeDefaultModel = "openai/gpt-5.4"
+
 func splitFrontmatter(content string) (string, string) {
 	if !strings.HasPrefix(content, "---\n") {
 		return "", content
@@ -50,6 +52,7 @@ func normalizeOpenCodeSkillBody(body, subcommand string) string {
 	body = normalizeOpenCodeMarkdown(body)
 	body = normalizeOpenCodeToolingBody(body)
 	body = rewriteOpenCodeWorkflowExamples(body, subcommand)
+	body = augmentOpenCodeFlagDocs(body)
 	if subcommand == "" {
 		return body
 	}
@@ -114,17 +117,32 @@ func augmentCommandFrontmatter(frontmatter string) string {
 
 func commandArgumentNote(name string) string {
 	if name == "auto" {
-		return "## OpenCode Arguments\n\n사용자가 `/auto` 뒤에 전달한 전체 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 라우팅 규칙은 `skill` 도구로 `auto`를 로드한 뒤 따르세요. 서브커맨드를 결정하면 대응하는 상세 스킬도 추가로 로드해야 합니다.\n"
+		return "## OpenCode Arguments\n\n사용자가 `/auto` 뒤에 전달한 전체 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 라우팅 규칙은 `skill` 도구로 `auto`를 로드한 뒤 따르세요. 서브커맨드를 결정하면 대응하는 상세 스킬도 추가로 로드해야 합니다.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `" + openCodeDefaultModel + "` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n"
 	}
-	return fmt.Sprintf("## OpenCode Arguments\n\n사용자가 `/%s` 뒤에 전달한 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 워크플로우 단계는 `skill` 도구로 `%s`를 로드한 뒤 그 스킬 문서를 기준으로 실행하세요.\n", name, name)
+	return fmt.Sprintf("## OpenCode Arguments\n\n사용자가 `/%s` 뒤에 전달한 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 워크플로우 단계는 `skill` 도구로 `%s`를 로드한 뒤 그 스킬 문서를 기준으로 실행하세요.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `"+openCodeDefaultModel+"` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n", name, name)
 }
 
 func skillInvocationNote(name string) string {
 	if name == "auto" {
-		return "## OpenCode Invocation\n\n이 스킬은 다음 두 경로로 사용할 수 있습니다.\n\n- `/auto <subcommand> ...`\n- `skill` 도구로 직접 `auto` 로드\n\n직접 로드되면 사용자의 최신 요청을 `/auto` 뒤 인자로 간주하고 해석하세요.\n"
+		return "## OpenCode Invocation\n\n이 스킬은 다음 두 경로로 사용할 수 있습니다.\n\n- `/auto <subcommand> ...`\n- `skill` 도구로 직접 `auto` 로드\n\n직접 로드되면 사용자의 최신 요청을 `/auto` 뒤 인자로 간주하고 해석하세요.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `" + openCodeDefaultModel + "` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n"
 	}
 	subcommand := strings.TrimPrefix(name, "auto-")
-	return fmt.Sprintf("## OpenCode Invocation\n\n이 스킬은 다음 두 경로로 사용할 수 있습니다.\n\n- `/auto %s ...`\n- `/%s ...`\n- `skill` 도구로 직접 `%s` 로드\n\n직접 로드되면 사용자의 최신 요청을 해당 명령의 인자로 간주하세요.\n", subcommand, name, name)
+	return fmt.Sprintf("## OpenCode Invocation\n\n이 스킬은 다음 두 경로로 사용할 수 있습니다.\n\n- `/auto %s ...`\n- `/%s ...`\n- `skill` 도구로 직접 `%s` 로드\n\n직접 로드되면 사용자의 최신 요청을 해당 명령의 인자로 간주하세요.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `"+openCodeDefaultModel+"` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n", subcommand, name, name)
+}
+
+func augmentOpenCodeFlagDocs(body string) string {
+	replacer := strings.NewReplacer(
+		"- `--quality <mode>`: 하위 에이전트 품질 모드 지정", "- `--quality <mode>`: 하위 에이전트 품질 모드 지정\n- `--model <provider/model>`: OpenCode 세션/서브에이전트 모델 오버라이드\n- `--variant <value>`: provider-specific reasoning variant 오버라이드",
+		"- `--quality <mode>`", "- `--quality <mode>`\n- `--model <provider/model>`\n- `--variant <value>`",
+		"`--auto`, `--loop`, `--multi`, `--quality`, `--team`, `--solo`", "`--auto`, `--loop`, `--multi`, `--quality`, `--model`, `--variant`, `--team`, `--solo`",
+		"`--auto`, `--loop`, `--team`, `--multi`, `--quality`", "`--auto`, `--loop`, `--team`, `--multi`, `--quality`, `--model`, `--variant`",
+		"`--auto` / `--loop` / `--multi` / `--quality`", "`--auto` / `--loop` / `--multi` / `--quality` / `--model` / `--variant`",
+	)
+	body = replacer.Replace(body)
+	body = strings.ReplaceAll(body, "OpenCode currently assumes `gpt-5.4` as the default runtime model; LOW/MEDIUM/HIGH act as reasoning-profile hints until explicit model overrides are surfaced", "OpenCode defaults to `gpt-5.4` when no explicit model override is provided; LOW/MEDIUM/HIGH act as reasoning-profile hints, and users can override with `--model`")
+	body = strings.ReplaceAll(body, "OpenCode currently assumes `gpt-5.4` as the default runtime model and should vary reasoning effort rather than the model ID", "OpenCode defaults to `gpt-5.4` when no explicit model override is provided and should vary reasoning effort rather than the model ID")
+	body = strings.ReplaceAll(body, "OpenCode: keep the platform default `gpt-5.4`; treat Layer 2 / Check 7 as higher-reasoning validation passes", "OpenCode: keep the platform default `gpt-5.4` unless the user passed `--model`; treat Layer 2 / Check 7 as higher-reasoning validation passes")
+	return body
 }
 
 func injectAfterFirstHeading(body, block string) string {

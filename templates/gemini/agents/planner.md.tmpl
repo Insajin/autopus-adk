@@ -118,7 +118,12 @@ Model is selected per task based on complexity:
 |-----------|-----------------|
 | HIGH | `model: "opus"` |
 | MEDIUM | *(omit — sonnet default)* |
-| LOW | `model: "haiku"` |
+| LOW | *(omit — sonnet default)* |
+
+Platform note:
+- Claude never uses `haiku` in this workspace; LOW stays on `sonnet`
+- Codex maps both `opus` and `sonnet` tiers to `gpt-5.4`; quality differences are expressed through reasoning effort
+- OpenCode currently assumes `gpt-5.4` as the default runtime model; LOW/MEDIUM/HIGH act as reasoning-profile hints until explicit model overrides are surfaced
 
 ### Override
 

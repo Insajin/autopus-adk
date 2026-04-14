@@ -23,10 +23,10 @@ func TestRoute(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "S5: claude simple message returns haiku",
+			name:     "S5: claude simple message returns sonnet",
 			provider: "claude",
 			message:  "현재 상태 확인",
-			want:     "claude-haiku-4-5",
+			want:     "claude-sonnet-4-6",
 		},
 		{
 			name:     "claude complex message returns opus",

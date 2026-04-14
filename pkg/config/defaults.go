@@ -39,7 +39,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Tiers: map[string]string{
 				"premium":  "claude-opus-4-6",
 				"standard": "claude-sonnet-4-6",
-				"economy":  "claude-haiku-4-5",
+				"economy":  "claude-sonnet-4-6",
 			},
 			Categories: map[string]string{
 				"visual":     "standard",
@@ -68,9 +68,9 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			TimeoutSeconds:  120,
 			Judge:           "claude",
 			Providers: map[string]ProviderEntry{
-				"claude":   {Binary: "claude", Args: []string{"--print"}, PaneArgs: []string{"--print"}},
-				"gemini":   {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
-				"codex": {Binary: "codex", Args: []string{"exec", "--full-auto", "-m", "gpt-5.4"}, PaneArgs: []string{"-m", "gpt-5.4"}, PromptViaArgs: false},
+				"claude": {Binary: "claude", Args: []string{"--print"}, PaneArgs: []string{"--print"}},
+				"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
+				"codex":  {Binary: "codex", Args: []string{"exec", "--full-auto", "-m", "gpt-5.4"}, PaneArgs: []string{"-m", "gpt-5.4"}, PromptViaArgs: false},
 			},
 			Commands: map[string]CommandEntry{
 				"review":     {Strategy: "debate", Providers: []string{"claude", "codex", "gemini"}},
@@ -94,13 +94,13 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 					},
 				},
 				"balanced": {
-					Description: "핵심 분석은 Opus, 구현은 Sonnet, 검증은 Haiku. 가성비 최적.",
+					Description: "핵심 분석은 Opus, 기본 작업은 Sonnet. Haiku 미사용.",
 					Agents: map[string]string{
 						"planner": "opus", "architect": "opus",
 						"spec-writer": "opus", "security-auditor": "opus",
 						"executor": "sonnet", "tester": "sonnet",
 						"reviewer": "sonnet", "debugger": "sonnet", "devops": "sonnet",
-						"validator": "haiku", "explorer": "haiku",
+						"validator": "sonnet", "explorer": "sonnet",
 					},
 				},
 			},

@@ -63,7 +63,7 @@ Gate 1:    Approval        → skipped if --auto
 Phase 1.8: Doc Fetch       → main session (Context7 MCP) — skip if no external libs detected
 Phase 2:   Implementation  → executor×N  (sonnet, acceptEdits, parallel with worktree isolation)
 Phase 2.1: Worktree Merge  → main session (merge worktree branches into working branch)
-Gate 2:    Validation      → validator   (haiku,  plan)  — retry up to 3x on FAIL
+Gate 2:    Validation      → validator   (sonnet, plan)  — retry up to 3x on FAIL
 Phase 2.5: Annotation      → annotator   (sonnet, bypassPermissions) — @AX tags on modified files
 Phase 3:   Testing         → tester      (sonnet, acceptEdits)
 Gate 3:    Coverage        → verify 85%+ coverage
@@ -71,15 +71,17 @@ Phase 3.5: UX Verify       → frontend-specialist (sonnet, bypassPermissions) �
 Phase 4:   Review          → reviewer + security-auditor (parallel) — retry up to 2x on REQUEST_CHANGES
 ```
 
-> The model assignments above are for Balanced mode. In Ultra mode, all agents run with opus.
+> The model assignments above are for Balanced mode. In Ultra mode, all agents run with the premium path.
 
 ## Quality Mode
 
-The quality mode — determined by the `--quality` flag or interactive selection — controls the `model` parameter in Agent() calls.
+The quality mode — determined by the `--quality` flag or interactive selection — controls the execution profile for Agent() calls.
 
 ### Ultra Mode
 
-Add `model: "opus"` parameter to all Agent() calls:
+Use the premium path for all Agent() calls.
+
+On model-tiered platforms, this means adding `model: "opus"`. On fixed-model platforms such as Codex/OpenCode, this means keeping `gpt-5.4` and increasing reasoning effort.
 
 ```
 Agent(
@@ -102,15 +104,20 @@ Agent(
 
 ### Adaptive Quality (Balanced Mode Only)
 
-In Balanced mode, task complexity determines the model per Agent() call:
+In Balanced mode, task complexity determines the profile per Agent() call:
 
 | Complexity | Model Parameter |
 |-----------|----------------|
 | HIGH | `model: "opus"` |
 | MEDIUM | omit (sonnet default) |
-| LOW | `model: "haiku"` |
+| LOW | omit (sonnet default) |
 
-In Ultra mode, complexity is IGNORED — all agents use opus.
+Current workspace policy:
+- Claude never uses `haiku`; LOW stays on `sonnet`
+- Codex maps both `opus` and `sonnet` tiers to `gpt-5.4`; LOW/MEDIUM/HIGH differ by reasoning effort
+- OpenCode currently assumes `gpt-5.4` as the default runtime model and should vary reasoning effort rather than the model ID
+
+In Ultra mode, complexity is IGNORED — all agents use the premium path.
 
 Reference: `.claude/skills/autopus/adaptive-quality.md`
 
@@ -209,7 +216,9 @@ Parallel tasks use `isolation: "worktree"` so each executor works in an independ
 
 ```
 # Parallel execution example — with worktree isolation
-# Ultra: add model="opus", Balanced: omit model
+# Premium-path handling varies by platform:
+# - Claude/Gemini: add model="opus"
+# - Codex/OpenCode: keep the default model and increase reasoning effort
 Agent(subagent_type="executor", prompt="Implement T1: ...", permissionMode="bypassPermissions", isolation="worktree")  # Balanced
 Agent(subagent_type="executor", model="opus", prompt="Implement T1: ...", permissionMode="bypassPermissions", isolation="worktree")  # Ultra
 Agent(subagent_type="executor", prompt="Implement T2: ...", permissionMode="bypassPermissions", isolation="worktree")  # Balanced

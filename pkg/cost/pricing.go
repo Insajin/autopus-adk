@@ -45,14 +45,14 @@ func QualityModeToModels(qualityMode string) map[string]string {
 			"validator": "claude-opus-4",
 		}
 	case "balanced":
-		// Strategic agents use opus; execution agents use sonnet; validation uses haiku.
+		// Strategic agents use opus; execution and validation agents use sonnet.
 		return map[string]string{
 			"planner":   "claude-opus-4",
 			"architect": "claude-opus-4",
 			"executor":  "claude-sonnet-4",
 			"tester":    "claude-sonnet-4",
 			"reviewer":  "claude-sonnet-4",
-			"validator": "claude-haiku-4.5",
+			"validator": "claude-sonnet-4",
 		}
 	default:
 		return nil

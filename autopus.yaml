@@ -40,7 +40,7 @@ methodology:
 router:
     strategy: balanced
     tiers:
-        economy: claude-haiku-4-5
+        economy: claude-sonnet-4-6
         premium: claude-opus-4-6
         standard: claude-sonnet-4-6
     categories:
@@ -95,19 +95,19 @@ quality:
     default: balanced
     presets:
         balanced:
-            description: 핵심 분석은 Opus, 구현은 Sonnet, 검증은 Haiku. 가성비 최적.
+            description: 핵심 분석은 Opus, 기본 작업은 Sonnet. Haiku 미사용.
             agents:
                 architect: opus
                 debugger: sonnet
                 devops: sonnet
                 executor: sonnet
-                explorer: haiku
+                explorer: sonnet
                 planner: opus
                 reviewer: sonnet
                 security-auditor: opus
                 spec-writer: opus
                 tester: sonnet
-                validator: haiku
+                validator: sonnet
         ultra:
             description: 모든 에이전트를 Opus로 실행. 최고 품질.
             agents:

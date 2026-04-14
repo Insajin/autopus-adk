@@ -85,10 +85,14 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(autoGoSkill), `subagent_type = "executor"`)
 	assert.NotContains(t, string(autoGoSkill), "task executor \\")
+	assert.Contains(t, string(autoGoSkill), "--model <provider/model>")
+	assert.Contains(t, string(autoGoSkill), "--variant <value>")
 
 	autoCommand, err := os.ReadFile(filepath.Join(dir, ".opencode", "commands", "auto.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoCommand), "얇은 entrypoint")
+	assert.Contains(t, string(autoCommand), "--model <provider/model>")
+	assert.Contains(t, string(autoCommand), "--variant <value>")
 
 	agentsData, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
 	require.NoError(t, err)
@@ -96,6 +100,7 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	assert.Contains(t, string(agentsData), "플랫폼")
 	assert.Contains(t, string(agentsData), "## Execution Model")
 	assert.Contains(t, string(agentsData), "task(...)")
+	assert.Contains(t, string(agentsData), "openai/gpt-5.4")
 	assert.NotContains(t, string(agentsData), "Codex Rules: .codex/rules/autopus/")
 
 	configDoc := readConfigJSON(t, filepath.Join(dir, "opencode.json"))

@@ -1,27 +1,27 @@
 ---
 name: adaptive-quality
-description: Per-task model selection based on complexity in Balanced quality mode
+description: Per-task execution profile selection based on complexity in Balanced quality mode
 triggers:
   - adaptive quality
   - 적응형 품질
   - complexity
   - 복잡도
 category: agentic
-level1_metadata: "adaptive quality, complexity assessment, model selection, cost optimization, Balanced mode"
+level1_metadata: "adaptive quality, complexity assessment, execution profiles, cost optimization, Balanced mode"
 ---
 
 # Adaptive Quality Skill
 
 ## Overview
 
-Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the model used for each `Agent()` call. This allows high-complexity tasks to receive full opus capability while routine tasks use lighter, faster models — reducing cost without sacrificing quality where it matters.
+Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the execution profile used for each `Agent()` call. High-complexity tasks still receive the strongest reasoning path, while routine tasks stay on the standard path. In this workspace, Claude no longer falls back to haiku, and Codex/OpenCode keep `gpt-5.4` as the baseline model.
 
 ## Relationship to Quality Mode
 
 | Mode | Behavior |
 |------|----------|
-| **Ultra** | ALL tasks use opus. Complexity is IGNORED. |
-| **Balanced** | Complexity determines model. Adaptive Quality applies. |
+| **Ultra** | ALL tasks use the premium execution path. Complexity is IGNORED. |
+| **Balanced** | Complexity determines the execution profile. Adaptive Quality applies. |
 | **Solo** | No Agent() calls. Not applicable. |
 
 Adaptive Quality is **not** a replacement for Quality Mode — it is a refinement that operates exclusively within Balanced mode.
@@ -47,13 +47,18 @@ The planner assesses each task before spawning an agent. The assessment consider
 
 When criteria overlap (e.g., 1 file but 250 lines), use the highest matching level.
 
-## Model Mapping Table
+## Execution Profile Table
 
-| Complexity | Model (Balanced) | Model (Ultra) |
-|-----------|-----------------|---------------|
+| Complexity | Balanced | Ultra |
+|-----------|----------|-------|
 | HIGH | opus | opus |
 | MEDIUM | sonnet (default) | opus |
-| LOW | haiku | opus |
+| LOW | sonnet (default) | opus |
+
+Platform note:
+- Claude: HIGH=`opus`, MEDIUM/LOW=`sonnet`
+- Codex: all tiers resolve to `gpt-5.4`; LOW/MEDIUM/HIGH should be differentiated by reasoning effort
+- OpenCode: default runtime model is currently assumed to be `gpt-5.4`; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
 ## Agent() Call Pattern
 
@@ -80,9 +85,9 @@ Agent(
 ### LOW complexity
 
 ```python
+# Use the standard model. Lower reasoning effort only on platforms that support it.
 Agent(
     subagent_type="executor",
-    model="haiku",
     prompt=task_prompt
 )
 ```
@@ -98,7 +103,7 @@ quality:
       adaptive:
         high: opus
         medium: sonnet
-        low: haiku
+        low: sonnet
 ```
 
 To disable adaptive quality and use a fixed model in Balanced mode:
@@ -142,7 +147,7 @@ Task T1: Add user authentication
 
 Task T2: Update error message string
   → file_count: 1, estimated_lines: 3
-  → Complexity: LOW → model: haiku
+  → Complexity: LOW → standard path (sonnet / lower reasoning effort)
 ```
 
 The complexity annotation is included in the execution plan and passed to the orchestrator before Agent() calls are made.

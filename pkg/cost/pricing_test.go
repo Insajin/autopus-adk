@@ -73,7 +73,7 @@ func TestQualityModeToModels_Balanced(t *testing.T) {
 		{"executor", "claude-sonnet-4"},
 		{"tester", "claude-sonnet-4"},
 		{"reviewer", "claude-sonnet-4"},
-		{"validator", "claude-haiku-4.5"},
+		{"validator", "claude-sonnet-4"},
 	}
 
 	for _, tc := range cases {
@@ -97,7 +97,7 @@ func TestModelForAgent_Known(t *testing.T) {
 	}{
 		{"ultra", "executor", "claude-opus-4"},
 		{"balanced", "executor", "claude-sonnet-4"},
-		{"balanced", "validator", "claude-haiku-4.5"},
+		{"balanced", "validator", "claude-sonnet-4"},
 		{"balanced", "planner", "claude-opus-4"},
 	}
 

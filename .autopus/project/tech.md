@@ -119,11 +119,11 @@
 | Test Scaffold (1.5) | tester | sonnet | opus | bypassPermissions | SPEC 기반 실패 테스트 스켈레톤 작성 |
 | Implementation | executor | adaptive* | opus | bypassPermissions | TDD GREEN 전용 코드 구현 |
 | Annotation (2.5) | annotator | sonnet | opus | bypassPermissions | @AX 태그 스캔 및 적용 |
-| Validation | validator | haiku | opus | plan | 품질 검증 (빌드, 테스트, 린트) |
+| Validation | validator | sonnet | opus | plan | 품질 검증 (빌드, 테스트, 린트) |
 | Testing | tester | sonnet | opus | bypassPermissions | 커버리지 보강 |
 | Review | reviewer + security-auditor | sonnet | opus | plan | TRUST 5 코드 리뷰 + 보안 감사 (병렬) |
 
-*adaptive: Balanced 모드에서 태스크 complexity에 따라 HIGH→opus, MEDIUM→sonnet, LOW→haiku 동적 선택
+*adaptive: Balanced 모드에서 태스크 complexity에 따라 HIGH→opus, MEDIUM/LOW→sonnet 동적 선택. Codex/OpenCode는 gpt-5.4를 유지하고 reasoning만 조절
 
 ### Agent Teams Mode (`--team`)
 

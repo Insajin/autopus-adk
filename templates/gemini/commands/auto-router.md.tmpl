@@ -870,7 +870,7 @@ Team composition — each member maps 1:1 to a specialized agent definition:
 | `auditor` | `security-auditor` | security-auditor.md | Phase 4 |
 | `reviewer` | `reviewer` | reviewer.md | Phase 4 |
 
-Quality Mode applies to model selection: Ultra → all `model: "opus"`, Balanced → omit (use frontmatter defaults). Adaptive Quality overrides builder model per task complexity (HIGH→opus, MEDIUM→sonnet, LOW→haiku).
+Quality Mode applies to execution profile selection: Ultra forces the premium path for all builders. Balanced keeps per-role defaults, and Adaptive Quality only escalates HIGH-complexity tasks. LOW-complexity work stays on the standard path in this workspace.
 
 Reference: `.gemini/skills/autopus/agent-teams.md`
 
@@ -989,9 +989,9 @@ Priority order:
 
 **Reading quality.default**: Use Bash tool to extract: `grep '^quality:' -A1 autopus.yaml | grep 'default:' | awk '{print $2}'` or Read autopus.yaml directly and parse the `quality.default` field.
 
-Quality mode determines the `model` parameter in Agent() calls:
-- **Ultra**: add `model: "opus"` to ALL Agent() calls
-- **Balanced**: omit `model` parameter (use each agent's default)
+Quality mode determines the execution profile in Agent() calls:
+- **Ultra**: force the premium path for every agent
+- **Balanced**: omit explicit overrides and rely on each agent's default profile
 
 Display after determination:
 ```

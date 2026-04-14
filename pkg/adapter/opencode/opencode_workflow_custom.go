@@ -172,7 +172,7 @@ func devWorkflowBody(name, summary string) customWorkflowBody {
 		"1. 기능 설명을 기준으로 `auto-plan`을 먼저 수행합니다.",
 		"2. 생성된 SPEC-ID를 기준으로 `auto-go`를 진행합니다.",
 		"3. 구현이 끝나면 `auto-sync`를 수행합니다.",
-		"4. `--auto`, `--loop`, `--team`, `--multi`, `--quality` 플래그는 가능한 한 하위 단계로 전달합니다.",
+		"4. `--auto`, `--loop`, `--team`, `--multi`, `--quality`, `--model`, `--variant` 플래그는 가능한 한 하위 단계로 전달합니다.",
 	)
 
 	skill := compose(
@@ -185,6 +185,7 @@ func devWorkflowBody(name, summary string) customWorkflowBody {
 		"## 실행 규칙",
 		"",
 		"- `dev`는 `plan → go → sync`를 순차 실행하는 orchestration wrapper입니다.",
+		"- OpenCode 기본 모델은 `"+openCodeDefaultModel+"`로 가정합니다. 사용자가 `--model`을 주면 그 값을 우선합니다.",
 		"- `--team`은 OpenCode에서 reserved compatibility flag이며 현재는 기본 subagent pipeline을 유지합니다.",
 		"- 각 단계가 실패하면 조용히 건너뛰지 말고 실패 지점과 재개 방법을 명시합니다.",
 	)

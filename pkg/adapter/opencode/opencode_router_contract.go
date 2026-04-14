@@ -45,7 +45,7 @@ func rewriteOpenCodeRouterBody(body string) string {
 	if strings.Contains(body, "## OpenCode Helper Notes") {
 		return body
 	}
-	return body + "\n\n## OpenCode Helper Notes\n\n- `status`, `verify`, `test`, `doctor`는 대응하는 `auto` CLI thin wrapper입니다.\n- `map`, `secure`, `why`는 OpenCode native analysis workflow로 동작합니다.\n- `dev`는 `plan → go → sync` 순서를 유지하며 `--auto`, `--loop`, `--team`, `--multi`, `--quality` 플래그를 하위 단계로 전달해야 합니다."
+	return body + "\n\n## OpenCode Helper Notes\n\n- `status`, `verify`, `test`, `doctor`는 대응하는 `auto` CLI thin wrapper입니다.\n- `map`, `secure`, `why`는 OpenCode native analysis workflow로 동작합니다.\n- 기본 OpenCode 모델은 `" + openCodeDefaultModel + "`로 가정합니다.\n- 사용자 오버라이드: `--model <provider/model>` / reasoning 오버라이드: `--variant <value>`\n- `dev`는 `plan → go → sync` 순서를 유지하며 `--auto`, `--loop`, `--team`, `--multi`, `--quality`, `--model`, `--variant` 플래그를 하위 단계로 전달해야 합니다."
 }
 
 func injectRouterSupportedFlows(body string) string {

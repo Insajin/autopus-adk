@@ -1,70 +1,70 @@
 {
   "version": "1.0.0",
   "platform": "claude-code",
-  "generated_at": "2026-03-31T15:03:43+09:00",
+  "generated_at": "2026-04-14T19:59:38+09:00",
   "files": {
     ".claude/agents/autopus/annotator.md": {
-      "checksum": "536af8a34ac0ca0e8f6f56d18cb671d2805640f10fc0eb02922809fdd6e73796",
+      "checksum": "3a14e2ff6773500db368aa38aeb490005c5108881985202a076fc2a173e4fd44",
       "policy": "always"
     },
     ".claude/agents/autopus/architect.md": {
-      "checksum": "5681b95c24d5a4007e6f07372d9d8cbc283aa668d52e228d86657a6975c9f094",
+      "checksum": "860bee87de30602af7d52dc0c178367050608e87297fd743032e63433878d64e",
       "policy": "always"
     },
     ".claude/agents/autopus/debugger.md": {
-      "checksum": "56416202e211573cbc0da17db18efaaee3294cd2595d9ee166d4ee110d8bedc7",
+      "checksum": "e1477a015988d305d5d2f3cab12ebb909f7785c7c3716a4e7e55326ebf0afaf4",
       "policy": "always"
     },
     ".claude/agents/autopus/deep-worker.md": {
-      "checksum": "0e900d7a2549f1f874b180967099e805ee601f55da75bd53870088bf49678010",
+      "checksum": "27ce0fde4b34826e8fcfd548ac0f036894d7d6b2deba3a59bab2f57dbcf72dbb",
       "policy": "always"
     },
     ".claude/agents/autopus/devops.md": {
-      "checksum": "b9164e7473e17f38638187d76c593d225c32b91c14f3150e0f2d2c482c2113dd",
+      "checksum": "7def94d3425384301d48473cfa30c804e2ce4e99ade2b59e3712f8985b555e0e",
       "policy": "always"
     },
     ".claude/agents/autopus/executor.md": {
-      "checksum": "56935bca2dd7aaac25b2fbc4439701c4209d46b40365f90ca3a5275a5dba8714",
+      "checksum": "c7bcb669928c40b03102784589b0f73bea19dbb36d5e7d0166c8e3e899f8bc21",
       "policy": "always"
     },
     ".claude/agents/autopus/explorer.md": {
-      "checksum": "a8cf32dee4b23d8071e49113e4c202bdf20bb272c332c005e9485571d6cd5419",
+      "checksum": "d16cd84804bfbacc33471186265474c1367393150602563273721802c25c382c",
       "policy": "always"
     },
     ".claude/agents/autopus/frontend-specialist.md": {
-      "checksum": "14a00b62a990e532b6541e618076b42a3404b412842b8cc1a2cecfa21ffc2bab",
+      "checksum": "019175bb845b3a28beb6c3dd777e1b0bb23934b34ef0a3538f8c7df70426f4df",
       "policy": "always"
     },
     ".claude/agents/autopus/perf-engineer.md": {
-      "checksum": "c14537224c8635dcfc91c070d95d003c06d28343bf081cf66020ffb71cd0afae",
+      "checksum": "bfdc0ca3fed4b56794fb6fd9492027c242abc9f4930bf6d2edf61e9dafc479f6",
       "policy": "always"
     },
     ".claude/agents/autopus/planner.md": {
-      "checksum": "59b41ec7a47775975e7363a685fcc447577003df8383febc1aa2889bf1a5e5e4",
+      "checksum": "26792f641c243249e0e2e4a9e02e3d0ac7f2903d1191fbf75bf0be230e6a23a6",
       "policy": "always"
     },
     ".claude/agents/autopus/reviewer.md": {
-      "checksum": "7c3da6bd15dd3cbc44231869c82538138159a737eddfab53f1ee6130db1fcf81",
+      "checksum": "66a65ddbf5c4eb85def695db1762e953142c719101199e399e5b4bc891e8bc29",
       "policy": "always"
     },
     ".claude/agents/autopus/security-auditor.md": {
-      "checksum": "a28c0b2174517002b619a2566bb462312844ed9bf9b4b670a7dc82bfde6623c7",
+      "checksum": "0f1c5385b13f30cedbe212f57c171be66d5a1f68f7886680b5d13eb057cbe8e4",
       "policy": "always"
     },
     ".claude/agents/autopus/spec-writer.md": {
-      "checksum": "f14dbd4497877a1e7190065ae6f2e5ac776f3377b7b2490364e6f813ee376736",
+      "checksum": "e776a888435d28f545ba6211573c750c01183722f964664652358d9a195381df",
       "policy": "always"
     },
     ".claude/agents/autopus/tester.md": {
-      "checksum": "77496adf3d1905122eee58f28517897ca886055c88de7d4797e24cb558f9edcf",
+      "checksum": "48898c9ea9c37e404f100a95be8501263af6e83259820d17f361df8e3766167d",
       "policy": "always"
     },
     ".claude/agents/autopus/ux-validator.md": {
-      "checksum": "f9c703506d94773bb936cd800099518ae92b2dee2353a1ad994e023a8239fde1",
+      "checksum": "32055daefb68c80b50696366982c51c3c24d4d3244ca89bfa07c60322ca56316",
       "policy": "always"
     },
     ".claude/agents/autopus/validator.md": {
-      "checksum": "759ad432b61bde1706989bfa72b30a5874069352a64754330c8959b59673e842",
+      "checksum": "d47244f4942c0246a6ae9ff57aed5c6d38e2ed54d802c02aac1658a3873e2ab0",
       "policy": "always"
     },
     ".claude/hooks/autopus/hook-claude-stop.sh": {
@@ -88,11 +88,11 @@
       "policy": "always"
     },
     ".claude/hooks/autopus/react-ci-failure.sh": {
-      "checksum": "64945cd256aa7a24557e6713f23959492f5ae37865d27c547e1bee22f47674f9",
+      "checksum": "b7089428c63d3fdbdadb141ce50b89289272348b09f9da6212c9c81013946d16",
       "policy": "always"
     },
     ".claude/hooks/autopus/react-review.sh": {
-      "checksum": "afc09b81f553c6ed46fd597d3d8eeb947fe16fcf8b75926d773b02b7b73a3da0",
+      "checksum": "98fc91b3c56b8c9f49cb477163cde5cf51be34f4219821150c147cb03eb10f28",
       "policy": "always"
     },
     ".claude/rules/autopus/branding.md": {
@@ -111,8 +111,20 @@
       "checksum": "9c17ace7aa71bb3bb94b89fe45146b946d9622e6c9ae007e23d3a966688ab0f5",
       "policy": "always"
     },
+    ".claude/rules/autopus/language-policy.md": {
+      "checksum": "8ea61a09023182b20901b7df7812ba538d1d5b23fcfa4c53bf81a4f7d54a4f63",
+      "policy": "always"
+    },
     ".claude/rules/autopus/lore-commit.md": {
-      "checksum": "790e462bc16b1b88d982ce2e1656fea44c76a95795f8687ed1a660eb4138c515",
+      "checksum": "ba68d9ad2f6dc7929c5a9d1f97db3340d382c7a7c9e105d8a00b3b92663c017f",
+      "policy": "always"
+    },
+    ".claude/rules/autopus/objective-reasoning.md": {
+      "checksum": "95d318f64c1f8c7583fa0b437c294b0eb42fc70ce277a38374c773882ac43fdb",
+      "policy": "always"
+    },
+    ".claude/rules/autopus/project-identity.md": {
+      "checksum": "8b603c0818ef40468dd6459926eabfcf998fc332824dfc2c83876acf81caa7fd",
       "policy": "always"
     },
     ".claude/rules/autopus/subagent-delegation.md": {
@@ -124,15 +136,15 @@
       "policy": "always"
     },
     ".claude/skills/auto/SKILL.md": {
-      "checksum": "6772cf4580b38c4147795a7c2c779556506ca1b87dd55513f04504e0854f6875",
+      "checksum": "54fc6b5aea900e733269ffbc52aa644c886bf53956923cc89d1e9d0a7ad6567b",
       "policy": "always"
     },
     ".claude/skills/autopus/adaptive-quality.md": {
-      "checksum": "175bb456fe708e3639d4195b743730a9564337a7fbe60f993ed4a6369ef2a396",
+      "checksum": "96da307090e3c15c44d957fe30cbccd74feebd61b1fa669d5bb6e48c8afa6cc6",
       "policy": "always"
     },
     ".claude/skills/autopus/agent-pipeline.md": {
-      "checksum": "5b14660c8569d18a2a170e84e81fd590b85cd881f3edf49a1835f0c5a553b126",
+      "checksum": "d5ea94b41abfc98cfabdcac59e751d404453e98e04589897dde81247d4654214",
       "policy": "always"
     },
     ".claude/skills/autopus/agent-presets.md": {
@@ -140,7 +152,7 @@
       "policy": "always"
     },
     ".claude/skills/autopus/agent-teams.md": {
-      "checksum": "3d676588a7dc813fec004b8cdbe4eb5a044d9f6b3af71816e96e55bc73b4c33c",
+      "checksum": "55afaac5d290c1909d3e905bdebbf85040136a80c604df427fb987e5f98e5508",
       "policy": "always"
     },
     ".claude/skills/autopus/api-design.md": {
@@ -165,6 +177,10 @@
     },
     ".claude/skills/autopus/ci-cd.md": {
       "checksum": "f209fb604f5f5b8af2187ffa3b9a682818c0f7e2331a082007648c1eaf4b096a",
+      "policy": "always"
+    },
+    ".claude/skills/autopus/competitive-analysis.md": {
+      "checksum": "44e19c6b7da14dfb312775058c263ecd795f2e15d44dadb1b922f2682fdcf5fd",
       "policy": "always"
     },
     ".claude/skills/autopus/context-search.md": {
@@ -216,11 +232,15 @@
       "policy": "always"
     },
     ".claude/skills/autopus/idea.md": {
-      "checksum": "1a971551e8a8745b79c3fb49bbcd8314ba28c7df6009f124d501b17c73814f3a",
+      "checksum": "ec42d97d22dfa0f9b99d4e89304bc52df65a6ececc71a151d423c0012555c714",
       "policy": "always"
     },
     ".claude/skills/autopus/lore-commit.md": {
-      "checksum": "696622043317a86d106bb451fa342beab88463c9bca8cb7f6ac3b951538c6543",
+      "checksum": "f60c0af82ccee3b80dda3806d0446dfb1b36fdab593d9d3cb653a5f8888a4944",
+      "policy": "always"
+    },
+    ".claude/skills/autopus/metrics.md": {
+      "checksum": "a92e46854991a023f402c01316c92e878336921cbebdc8b8e0c9e69b97cf98b7",
       "policy": "always"
     },
     ".claude/skills/autopus/migration.md": {
@@ -243,12 +263,16 @@
       "checksum": "2271e30cf12853d26ea42143d93862f9951396df2f1edd277bafa08e86bc971b",
       "policy": "always"
     },
+    ".claude/skills/autopus/product-discovery.md": {
+      "checksum": "50652734992d2d002af8061af339fce3bdb20b8a12bb51e46e87765338fe3391",
+      "policy": "always"
+    },
     ".claude/skills/autopus/refactoring.md": {
       "checksum": "1696a403997d794a675a9086472f5384a6323eaede53c700e925c35c02ae4e6f",
       "policy": "always"
     },
     ".claude/skills/autopus/review.md": {
-      "checksum": "8c01c6a4c1f560c0e9d6563a8cf1638e37141008ccd3de75784e15abe369aeec",
+      "checksum": "abfe9745dbca3dfc7ab9d34aca781bf7acc4164a6421135f7e99a26520eac430",
       "policy": "always"
     },
     ".claude/skills/autopus/security-audit.md": {
@@ -296,7 +320,7 @@
       "policy": "merge"
     },
     "CLAUDE.md": {
-      "checksum": "7041b2d1ad498cafdf04c8b6e60a39730e7db39ffe835c1b08eebec08c8d0465",
+      "checksum": "4178540f32fff1b8dc42f7001bd22cf01f617c3d674e21c00b25b8668e1b0b7e",
       "policy": "marker"
     }
   }

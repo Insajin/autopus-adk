@@ -7,7 +7,7 @@ var modelMapping = map[string]map[string]string{
 	"codex": {
 		"sonnet": "gpt-5.4",
 		"opus":   "gpt-5.4",
-		"haiku":  "gpt-5-nano",
+		"haiku":  "gpt-5.4",
 	},
 	"gemini": {
 		"sonnet": "gemini-2.5-pro",

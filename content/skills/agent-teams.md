@@ -74,8 +74,8 @@ Fallback: Run without --team to use the subagent pipeline mode.
 team = TeamCreate(team_name=f"team-{spec_id}")
 
 # Spawn teammates
-lead    = Teammate(role="lead",     model="opus")
-builder = Teammate(role="builder",  model="sonnet")  # or haiku for LOW complexity
+lead     = Teammate(role="lead",     model="opus")
+builder  = Teammate(role="builder",  model="sonnet")  # keep the standard model for LOW complexity too
 guardian = Teammate(role="guardian", model="sonnet")
 ```
 

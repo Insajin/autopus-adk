@@ -107,7 +107,7 @@ cmd/auto/main.go
 | Merge Strategy | `pkg/adapter/claude/claude_settings.go` | Non-destructive hook/permission updates preserving user customizations |
 | Agent Pipeline | `.claude/skills/autopus/agent-pipeline.md` | 5-Phase multi-agent orchestration with Test Scaffold (Phase 1.5), Annotation (Phase 2.5), worktree isolation, and parallel review |
 | Agent Teams | `.claude/skills/autopus/agent-teams.md` | Role-based team composition (Lead/Builder/Guardian) for Claude Code Agent Teams mode |
-| Adaptive Quality | `.claude/skills/autopus/adaptive-quality.md` | Task complexity-based model selection (HIGH→opus, MEDIUM→sonnet, LOW→haiku) in Balanced mode |
+| Adaptive Quality | `.claude/skills/autopus/adaptive-quality.md` | Task complexity-based execution profiles (HIGH→opus, MEDIUM/LOW→sonnet; Codex/OpenCode stay on gpt-5.4 with reasoning differences) in Balanced mode |
 | Agent Presets | `.claude/skills/autopus/agent-presets.md` | Domain-specific agent preset configurations (backend-go, fullstack, cli-tool) |
 | Worktree Isolation | `.claude/skills/autopus/worktree-isolation.md` | Parallel executor worktree isolation with file ownership conflict detection |
 | Shared Templates | `templates/shared/` | Cross-platform branding & UX format fragments |

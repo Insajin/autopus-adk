@@ -40,6 +40,7 @@ func (a *Adapter) renderWorkflowCommand(spec workflowSpec, cfg *config.HarnessCo
 	}
 	frontmatter, body := splitFrontmatter(raw)
 	body = normalizeOpenCodeMarkdown(body)
+	body = augmentOpenCodeFlagDocs(body)
 	body = commandArgumentNote(spec.Name) + "\n" + body
 	return buildMarkdown(augmentCommandFrontmatter(frontmatter), body), nil
 }

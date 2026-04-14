@@ -57,10 +57,10 @@ func TestDefaultFullConfig_QualityPresets(t *testing.T) {
 		assert.True(t, exists, "balanced preset must contain agent %q defined in ultra preset", agent)
 	}
 
-	// Spot-check balanced preset: planner=opus, executor=sonnet, validator=haiku.
+	// Spot-check balanced preset: planner=opus, executor=sonnet, validator=sonnet.
 	assert.Equal(t, "opus", balanced.Agents["planner"])
 	assert.Equal(t, "sonnet", balanced.Agents["executor"])
-	assert.Equal(t, "haiku", balanced.Agents["validator"])
+	assert.Equal(t, "sonnet", balanced.Agents["validator"])
 }
 
 func TestDefaultFullConfig_QualityUltraAllOpus(t *testing.T) {

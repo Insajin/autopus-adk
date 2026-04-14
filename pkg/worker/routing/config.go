@@ -24,7 +24,7 @@ type ProviderModels struct {
 
 // RoutingConfig holds the full routing configuration.
 type RoutingConfig struct {
-	Enabled    bool                      // false by default — preserves existing behavior (REQ-ROUTE-06)
+	Enabled    bool // false by default — preserves existing behavior (REQ-ROUTE-06)
 	Thresholds ClassifierThresholds
 	Models     map[string]ProviderModels // provider name -> model mapping
 }
@@ -39,7 +39,7 @@ func DefaultConfig() RoutingConfig {
 			ComplexMinChars: 1000,
 		},
 		Models: map[string]ProviderModels{
-			"claude": {Simple: "claude-haiku-4-5", Medium: "claude-sonnet-4-6", Complex: "claude-opus-4-6"},
+			"claude": {Simple: "claude-sonnet-4-6", Medium: "claude-sonnet-4-6", Complex: "claude-opus-4-6"},
 			"codex":  {Simple: "gpt-4o-mini", Medium: "gpt-4o", Complex: "o3"},
 			"gemini": {Simple: "gemini-2.0-flash", Medium: "gemini-2.5-pro", Complex: "gemini-2.5-pro"},
 		},
