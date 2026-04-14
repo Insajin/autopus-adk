@@ -7,10 +7,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/worker/a2a"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/budget"
+	"github.com/insajin/autopus-adk/pkg/worker/security"
 	"github.com/insajin/autopus-adk/pkg/worker/routing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,6 +67,81 @@ func TestNewWorkerLoop(t *testing.T) {
 	wl := NewWorkerLoop(cfg)
 	require.NotNil(t, wl)
 	assert.Equal(t, "test-worker", wl.config.WorkerName)
+}
+
+func TestConfigureExecutionConcurrency_SequentialStillInitializesSemaphore(t *testing.T) {
+	wl := NewWorkerLoop(LoopConfig{
+		Provider:       adapter.NewClaudeAdapter(),
+		WorkDir:        t.TempDir(),
+		MaxConcurrency: 1,
+	})
+
+	wl.configureExecutionConcurrency()
+
+	require.NotNil(t, wl.semaphore)
+	assert.Equal(t, 1, wl.semaphore.Limit())
+	assert.Nil(t, wl.worktreeManager)
+}
+
+func TestConfigureExecutionConcurrency_ParallelEnablesWorktreeIsolation(t *testing.T) {
+	wl := NewWorkerLoop(LoopConfig{
+		Provider:          adapter.NewClaudeAdapter(),
+		WorkDir:           t.TempDir(),
+		MaxConcurrency:    3,
+		WorktreeIsolation: true,
+	})
+
+	wl.configureExecutionConcurrency()
+
+	require.NotNil(t, wl.semaphore)
+	assert.Equal(t, 3, wl.semaphore.Limit())
+	require.NotNil(t, wl.worktreeManager)
+}
+
+func TestDetachedTaskContext_IgnoresParentDeadline(t *testing.T) {
+	wl := NewWorkerLoop(LoopConfig{Provider: adapter.NewClaudeAdapter()})
+
+	parent, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	taskCtx, taskCancel := wl.detachedTaskContext(parent)
+	defer taskCancel()
+
+	time.Sleep(40 * time.Millisecond)
+	require.ErrorIs(t, parent.Err(), context.DeadlineExceeded)
+	select {
+	case <-taskCtx.Done():
+		t.Fatal("detached task context should ignore parent deadline")
+	default:
+	}
+}
+
+func TestDetachedTaskContext_PropagatesExplicitCancel(t *testing.T) {
+	wl := NewWorkerLoop(LoopConfig{Provider: adapter.NewClaudeAdapter()})
+
+	parent, cancel := context.WithCancel(context.Background())
+	taskCtx, taskCancel := wl.detachedTaskContext(parent)
+	defer taskCancel()
+
+	cancel()
+
+	select {
+	case <-taskCtx.Done():
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("detached task context should honor explicit cancellation")
+	}
+}
+
+func TestTaskExecutionTimeout_ReadsCachedPolicy(t *testing.T) {
+	wl := NewWorkerLoop(LoopConfig{Provider: adapter.NewClaudeAdapter()})
+	cache := security.NewPolicyCache()
+	taskID := "loop-timeout-test"
+	require.NoError(t, cache.Write(taskID, security.SecurityPolicy{TimeoutSec: 123}))
+	t.Cleanup(func() { cache.Delete(taskID) })
+
+	timeout := wl.taskExecutionTimeout(taskID)
+
+	assert.Equal(t, 123*time.Second, timeout)
 }
 
 // --- Mock adapter for integration tests ---

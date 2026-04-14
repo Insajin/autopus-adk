@@ -96,6 +96,17 @@ func NewWorkerLoop(config LoopConfig) *WorkerLoop {
 	return wl
 }
 
+func (wl *WorkerLoop) configureExecutionConcurrency() {
+	concurrencyLimit := wl.config.MaxConcurrency
+	if concurrencyLimit <= 1 {
+		concurrencyLimit = 1
+	}
+	wl.semaphore = parallel.NewTaskSemaphore(concurrencyLimit)
+	if wl.config.WorktreeIsolation && concurrencyLimit > 1 {
+		wl.worktreeManager = parallel.NewWorktreeManager(wl.config.WorkDir)
+	}
+}
+
 // Start connects to the backend and begins processing tasks.
 // @AX:ANCHOR[AUTO]: public lifecycle entry point — Start/Close are the primary WorkerLoop API; callers (CLI, tests) depend on error contract
 func (wl *WorkerLoop) Start(ctx context.Context) error {
@@ -114,14 +125,7 @@ func (wl *WorkerLoop) Start(ctx context.Context) error {
 	}
 	wl.startServices(ctx)
 
-	// Initialize parallel execution components if concurrency limit is configured.
-	// @AX:NOTE[AUTO]: magic constant — MaxConcurrency threshold 1 means sequential; 0 is treated same as 1 (no semaphore)
-	if wl.config.MaxConcurrency > 1 {
-		wl.semaphore = parallel.NewTaskSemaphore(wl.config.MaxConcurrency)
-		if wl.config.WorktreeIsolation {
-			wl.worktreeManager = parallel.NewWorktreeManager(wl.config.WorkDir)
-		}
-	}
+	wl.configureExecutionConcurrency()
 
 	return nil
 }
