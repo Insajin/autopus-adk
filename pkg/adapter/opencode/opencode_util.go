@@ -33,7 +33,9 @@ func buildMarkdown(frontmatter, body string) string {
 func normalizeOpenCodeMarkdown(content string) string {
 	replacer := strings.NewReplacer(
 		"@auto ", "/auto ",
+		"@auto-", "/auto-",
 		"## Codex Notes", "## OpenCode Notes",
+		"## Codex 기본 실행 모델", "## OpenCode 기본 실행 모델",
 		"Codex에서는", "OpenCode에서는",
 		"Codex의", "OpenCode의",
 		"Codex는", "OpenCode는",
@@ -42,6 +44,61 @@ func normalizeOpenCodeMarkdown(content string) string {
 		"`spawn_agent`", "`task`",
 	)
 	return replacer.Replace(content)
+}
+
+func normalizeOpenCodeSkillBody(body, subcommand string) string {
+	body = normalizeOpenCodeMarkdown(body)
+	body = normalizeOpenCodeToolingBody(body)
+	body = rewriteOpenCodeWorkflowExamples(body, subcommand)
+	if subcommand == "" {
+		return body
+	}
+
+	replacer := strings.NewReplacer(
+		"/auto-"+subcommand, "/auto "+subcommand,
+		"@auto-"+subcommand, "/auto "+subcommand,
+		"$auto-"+subcommand, "/auto "+subcommand,
+	)
+	return replacer.Replace(body)
+}
+
+func normalizeOpenCodeToolingBody(body string) string {
+	replacer := strings.NewReplacer(
+		"Agent(", "task(",
+		"spawn_agent(", "task(",
+		"spawn_agent ", "task ",
+		"AskUserQuestion(", "question(",
+		"TaskCreate(", "todowrite(",
+		"TaskUpdate(", "todowrite(",
+		"TaskList(", "todowrite(",
+		"TaskGet(", "todowrite(",
+		"TeamCreate(", "task(",
+		"using `spawn_agent`", "using `task`",
+		"using spawn_agent", "using task",
+		"`spawn_agent(...)`", "`task(...)`",
+		"`spawn_agent`", "`task`",
+	)
+	body = replacer.Replace(body)
+	body = strings.ReplaceAll(body, "task = ", "prompt = ")
+	body = strings.ReplaceAll(body, "task=", "prompt=")
+	body = strings.ReplaceAll(body, "Task(\n", "task(\n")
+	return body
+}
+
+func rewriteOpenCodeWorkflowExamples(body, subcommand string) string {
+	if subcommand != "go" {
+		return body
+	}
+
+	replacer := strings.NewReplacer(
+		"```\ntask executor \\\n  --task \"Implement {task description}\" \\\n  --spec \".autopus/specs/{SPEC-ID}/spec.md\" \\\n  --plan \".autopus/specs/{SPEC-ID}/plan.md\" \\\n  --constraint \"File size limit: 300 lines per source file\"\n```",
+		"```text\ntask(\n  subagent_type = \"executor\",\n  prompt = \"Implement {task description}. Use .autopus/specs/{SPEC-ID}/spec.md and .autopus/specs/{SPEC-ID}/plan.md as context. Respect the 300-line file limit.\"\n)\n```",
+		"```\ntask tester \\\n  --task \"Write tests for {scope}\" \\\n  --spec \".autopus/specs/{SPEC-ID}/acceptance.md\" \\\n  --coverage-target 85\n```",
+		"```text\ntask(\n  subagent_type = \"tester\",\n  prompt = \"Write tests for {scope}. Use .autopus/specs/{SPEC-ID}/acceptance.md as context and target 85%% coverage.\"\n)\n```",
+		"```\ntask reviewer \\\n  --task \"Review implementation for {SPEC-ID}\" \\\n  --criteria \"TRUST-5\"\n```",
+		"```text\ntask(\n  subagent_type = \"reviewer\",\n  prompt = \"Review implementation for {SPEC-ID} using TRUST-5 criteria.\"\n)\n```",
+	)
+	return replacer.Replace(body)
 }
 
 func augmentCommandFrontmatter(frontmatter string) string {
@@ -57,9 +114,9 @@ func augmentCommandFrontmatter(frontmatter string) string {
 
 func commandArgumentNote(name string) string {
 	if name == "auto" {
-		return "## OpenCode Arguments\n\n사용자가 `/auto` 뒤에 전달한 전체 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n"
+		return "## OpenCode Arguments\n\n사용자가 `/auto` 뒤에 전달한 전체 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 라우팅 규칙은 `skill` 도구로 `auto`를 로드한 뒤 따르세요. 서브커맨드를 결정하면 대응하는 상세 스킬도 추가로 로드해야 합니다.\n"
 	}
-	return fmt.Sprintf("## OpenCode Arguments\n\n사용자가 `/%s` 뒤에 전달한 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n", name)
+	return fmt.Sprintf("## OpenCode Arguments\n\n사용자가 `/%s` 뒤에 전달한 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 워크플로우 단계는 `skill` 도구로 `%s`를 로드한 뒤 그 스킬 문서를 기준으로 실행하세요.\n", name, name)
 }
 
 func skillInvocationNote(name string) string {
@@ -68,6 +125,22 @@ func skillInvocationNote(name string) string {
 	}
 	subcommand := strings.TrimPrefix(name, "auto-")
 	return fmt.Sprintf("## OpenCode Invocation\n\n이 스킬은 다음 두 경로로 사용할 수 있습니다.\n\n- `/auto %s ...`\n- `/%s ...`\n- `skill` 도구로 직접 `%s` 로드\n\n직접 로드되면 사용자의 최신 요청을 해당 명령의 인자로 간주하세요.\n", subcommand, name, name)
+}
+
+func injectAfterFirstHeading(body, block string) string {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "# ") {
+			out := make([]string, 0, len(lines)+4)
+			out = append(out, lines[:i+1]...)
+			out = append(out, "")
+			out = append(out, block)
+			out = append(out, "")
+			out = append(out, lines[i+1:]...)
+			return strings.Join(out, "\n")
+		}
+	}
+	return block + "\n\n" + body
 }
 
 func uniqueStrings(values ...[]string) []string {

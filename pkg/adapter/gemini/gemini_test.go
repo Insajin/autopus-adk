@@ -178,3 +178,34 @@ func TestGeminiAdapter_Clean(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(dir, ".gemini", "skills"))
 	assert.True(t, os.IsNotExist(statErr))
 }
+
+func TestGeminiAdapter_Generate_WorkflowSkillsAndCommandsStayAligned(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := gemini.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	routerSkill, err := os.ReadFile(filepath.Join(dir, ".gemini", "skills", "auto", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(routerSkill), "## Subcommand Routing")
+
+	for _, name := range []string{"plan", "go", "fix", "review", "sync", "idea", "canary"} {
+		skillPath := filepath.Join(dir, ".gemini", "skills", "autopus", "auto-"+name, "SKILL.md")
+		cmdPath := filepath.Join(dir, ".gemini", "commands", "auto", name+".toml")
+
+		skillData, readErr := os.ReadFile(skillPath)
+		require.NoError(t, readErr, skillPath)
+		assert.Contains(t, string(skillData), "name: auto-"+name)
+
+		cmdData, readErr := os.ReadFile(cmdPath)
+		require.NoError(t, readErr, cmdPath)
+		assert.Contains(t, string(cmdData), ".gemini/skills/autopus/auto-"+name+"/SKILL.md")
+	}
+
+	autoIdeaSkill, err := os.ReadFile(filepath.Join(dir, ".gemini", "skills", "autopus", "auto-idea", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoIdeaSkill), "auto orchestra brainstorm")
+}

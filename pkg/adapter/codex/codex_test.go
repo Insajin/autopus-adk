@@ -177,3 +177,50 @@ func TestCodexAdapter_Clean(t *testing.T) {
 	_, statErr = os.Stat(filepath.Join(dir, ".agents", "skills", "auto"))
 	assert.True(t, os.IsNotExist(statErr))
 }
+
+func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := codex.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	banned := []string{"Agent(", "mode =", "permissionMode", "bypassPermissions", "AskUserQuestion", "TeamCreate", "SendMessage", "mcp__"}
+	for _, path := range []string{
+		filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"),
+		filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"),
+		filepath.Join(dir, ".codex", "prompts", "auto.md"),
+	} {
+		data, readErr := os.ReadFile(path)
+		require.NoError(t, readErr, path)
+		content := string(data)
+		if filepath.Base(path) == "SKILL.md" {
+			assert.Contains(t, content, "## Codex Invocation", path)
+			assert.Contains(t, content, "thin router", path)
+		}
+		for _, token := range banned {
+			assert.NotContains(t, content, token, path)
+		}
+	}
+
+	for _, name := range []string{"auto-plan", "auto-go", "auto-fix", "auto-review", "auto-sync", "auto-idea", "auto-canary"} {
+		for _, path := range []string{
+			filepath.Join(dir, ".agents", "skills", name, "SKILL.md"),
+			filepath.Join(dir, ".autopus", "plugins", "auto", "skills", name, "SKILL.md"),
+			filepath.Join(dir, ".codex", "prompts", name+".md"),
+		} {
+			data, readErr := os.ReadFile(path)
+			require.NoError(t, readErr, path)
+			content := string(data)
+			for _, token := range banned {
+				assert.NotContains(t, content, token, path)
+			}
+		}
+	}
+
+	autoIdeaSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-idea", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoIdeaSkill), "auto orchestra brainstorm")
+}

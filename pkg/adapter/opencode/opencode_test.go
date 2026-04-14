@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,6 +62,26 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"))
 	assert.FileExists(t, filepath.Join(dir, ".agents", "skills", "planning", "SKILL.md"))
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "opencode-manifest.json"))
+
+	autoSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoSkill), "얇은 라우터")
+	assert.Contains(t, string(autoSkill), "상세 스킬")
+	assert.NotContains(t, string(autoSkill), "mode =")
+
+	autoIdeaSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-idea", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoIdeaSkill), "auto orchestra brainstorm")
+	assert.Contains(t, string(autoIdeaSkill), "## OpenCode Invocation")
+
+	autoGoSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-go", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoGoSkill), `subagent_type = "executor"`)
+	assert.NotContains(t, string(autoGoSkill), "task executor \\")
+
+	autoCommand, err := os.ReadFile(filepath.Join(dir, ".opencode", "commands", "auto.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoCommand), "얇은 entrypoint")
 
 	agentsData, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
 	require.NoError(t, err)
@@ -174,6 +195,56 @@ func TestInjectOrchestraPlugin_InvalidExistingJSON(t *testing.T) {
 
 	err := a.InjectOrchestraPlugin("/path/to/script.js")
 	assert.Error(t, err)
+}
+
+func TestAdapter_Generate_WorkflowSkillsUseOpenCodeSurface(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	_, err := a.Generate(context.Background(), config.DefaultFullConfig("demo"))
+	require.NoError(t, err)
+
+	bannedInSkills := []string{
+		"spawn_agent",
+		"Agent(",
+		"mode =",
+		"permissionMode",
+		"bypassPermissions",
+		"task executor \\",
+		"task tester \\",
+		"task reviewer \\",
+	}
+
+	for _, spec := range workflowSpecs {
+		skillPath := filepath.Join(dir, ".agents", "skills", spec.Name, "SKILL.md")
+		data, readErr := os.ReadFile(skillPath)
+		require.NoError(t, readErr, skillPath)
+		content := string(data)
+
+		for _, banned := range bannedInSkills {
+			assert.NotContains(t, content, banned, "%s should not contain %q", skillPath, banned)
+		}
+
+		if spec.Name == "auto" {
+			assert.Contains(t, content, "얇은 라우터", skillPath)
+			continue
+		}
+
+		assert.Contains(t, content, "## OpenCode Invocation", skillPath)
+		assert.True(t, strings.Contains(content, "/auto "+strings.TrimPrefix(spec.Name, "auto-")) || strings.Contains(content, "/auto "+spec.Name), "%s should describe /auto invocation", skillPath)
+	}
+
+	bannedInCommands := []string{"spawn_agent", "Agent(", "mode =", "permissionMode"}
+	for _, spec := range workflowSpecs {
+		cmdPath := filepath.Join(dir, ".opencode", "commands", spec.Name+".md")
+		data, readErr := os.ReadFile(cmdPath)
+		require.NoError(t, readErr, cmdPath)
+		content := string(data)
+		assert.Contains(t, content, "얇은 entrypoint", cmdPath)
+		for _, banned := range bannedInCommands {
+			assert.NotContains(t, content, banned, "%s should not contain %q", cmdPath, banned)
+		}
+	}
 }
 
 func readConfigJSON(t *testing.T, path string) map[string]any {
