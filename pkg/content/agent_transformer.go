@@ -105,9 +105,9 @@ func TransformAgentForCodex(src AgentSource) string {
 	fmt.Fprintf(&sb, "description = %q\n", src.Meta.Description)
 	fmt.Fprintf(&sb, "model = %q\n", model)
 
-	// Build rich developer_instructions from body sections
+	// Preserve the source structure so Codex keeps the phase contracts and I/O shape.
 	instructions := buildCodexInstructions(src.Meta, body)
-	fmt.Fprintf(&sb, "developer_instructions = %q\n", instructions)
+	fmt.Fprintf(&sb, "developer_instructions = \"\"\"\n%s\n\"\"\"\n", escapeTOMLMultiline(instructions))
 
 	return sb.String()
 }
@@ -159,33 +159,50 @@ func parseAgentSource(data []byte, filename string) (AgentSource, error) {
 	}, nil
 }
 
-// buildCodexInstructions creates rich developer_instructions text from agent metadata and body.
+// buildCodexInstructions creates structured developer_instructions text from agent metadata and body.
 func buildCodexInstructions(meta AgentSourceMeta, body string) string {
-	var sb strings.Builder
+	parts := []string{
+		fmt.Sprintf("You are the %s agent for project {{.ProjectName}}.", meta.Name),
+	}
 
-	fmt.Fprintf(&sb, "You are the %s agent for project {{.ProjectName}}. ", meta.Name)
 	if meta.Description != "" {
-		sb.WriteString(meta.Description)
-		sb.WriteString(" ")
+		parts = append(parts, meta.Description)
 	}
 
-	// Include condensed body content (strip code blocks and excessive formatting)
-	condensed := condenseBody(body)
-	if condensed != "" {
-		sb.WriteString(condensed)
-		sb.WriteString(" ")
+	parts = append(parts,
+		"Keep the task scoped to this role. Follow the explicit ownership and completion contract from the parent prompt when it is provided.",
+	)
+
+	if strings.TrimSpace(body) != "" {
+		parts = append(parts, strings.TrimSpace(body))
 	}
 
-	// Append skills reference
+	var ops []string
 	if len(meta.Skills) > 0 {
-		sb.WriteString("Skills: ")
-		sb.WriteString(strings.Join(meta.Skills, ", "))
-		sb.WriteString(". ")
+		ops = append(ops, fmt.Sprintf("- Skills reference: %s", strings.Join(meta.Skills, ", ")))
 	}
+	if meta.Tools != "" {
+		ops = append(ops, fmt.Sprintf("- Source tool contract: %s", meta.Tools))
+	}
+	if meta.PermissionMode != "" {
+		ops = append(ops, fmt.Sprintf("- Source permission intent: %s", meta.PermissionMode))
+	}
+	if meta.MaxTurns > 0 {
+		ops = append(ops, fmt.Sprintf("- Source max turns: %d", meta.MaxTurns))
+	}
+	ops = append(ops,
+		"- File size limit: 300 lines per source file.",
+		"- Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.",
+	)
 
-	sb.WriteString("File size limit: 300 lines per source file. ")
-	sb.WriteString("Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.")
+	parts = append(parts, "## Operational Defaults\n"+strings.Join(ops, "\n"))
 
-	return sb.String()
+	return strings.Join(parts, "\n\n")
 }
 
+func escapeTOMLMultiline(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\"\"\"", "\\\"\\\"\\\"")
+	return s
+}

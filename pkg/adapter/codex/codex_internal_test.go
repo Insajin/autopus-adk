@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- Hooks tests ---
-
 func TestGenerateHooks(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -63,8 +61,6 @@ func TestPrepareGitHookFiles_NoDiskWrite(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
-// --- Settings/Config tests ---
-
 func TestGenerateConfig(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -93,8 +89,6 @@ func TestPrepareConfigFile_NoDiskWrite(t *testing.T) {
 	_, err = os.Stat(filepath.Join(dir, "config.toml"))
 	assert.True(t, os.IsNotExist(err))
 }
-
-// --- Rules tests ---
 
 func TestGenerateRuleFiles_Internal(t *testing.T) {
 	t.Parallel()
@@ -162,8 +156,6 @@ func TestStripFrontmatter(t *testing.T) {
 	}
 }
 
-// --- Marker tests ---
-
 func TestInjectMarkerSection_EmptyFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -213,15 +205,11 @@ func TestRemoveMarkerSection(t *testing.T) {
 	assert.NotContains(t, result, markerBegin)
 }
 
-// --- SupportsHooks ---
-
 func TestSupportsHooks_ReturnsTrue(t *testing.T) {
 	t.Parallel()
 	a := New()
 	assert.True(t, a.SupportsHooks())
 }
-
-// --- Hooks JSON validity ---
 
 func TestGenerateHooks_ValidJSON(t *testing.T) {
 	t.Parallel()
@@ -245,8 +233,6 @@ func TestGenerateHooks_ValidJSON(t *testing.T) {
 	assert.NotContains(t, hooks, "Stop")
 }
 
-// --- Config mcp_servers ---
-
 func TestGenerateConfig_MCPServers(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -258,9 +244,11 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	content := string(files[0].Content)
 	assert.Contains(t, content, "[mcp_servers.autopus]")
 	assert.Contains(t, content, "[mcp_servers.context7]")
+	assert.Contains(t, content, "project_doc_max_bytes = 65536")
+	assert.Contains(t, content, "[agents]")
+	assert.Contains(t, content, "max_threads = 6")
+	assert.Contains(t, content, "max_depth = 1")
 }
-
-// --- Rules reference in AGENTS.md ---
 
 func TestRulesReferenceInAgentsMD(t *testing.T) {
 	t.Parallel()
@@ -275,10 +263,12 @@ func TestRulesReferenceInAgentsMD(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 
+	assert.Contains(t, content, "## Core Guidelines")
+	assert.Contains(t, content, "### Subagent Delegation")
+	assert.Contains(t, content, "### Review Convergence")
 	assert.Contains(t, content, "## Rules")
-	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex guidance.")
-	// Should NOT contain inline rule content
-	assert.NotContains(t, content, "IMPORTANT: No single file may exceed 300 lines")
+	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex rule definitions.")
+	assert.Contains(t, content, ".codex/skills/agent-pipeline.md")
 }
 
 func TestMarkerSection_Under32KB(t *testing.T) {

@@ -73,7 +73,10 @@ func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.Fil
 
 		rendered, err := a.engine.RenderString(string(tmplContent), cfg)
 		if err != nil {
-			return nil, fmt.Errorf("제미니 스킬 템플릿 렌더링 실패 %s: %w", skillName, err)
+			if hasAutoPrefix(skillName) {
+				return nil, fmt.Errorf("제미니 스킬 템플릿 렌더링 실패 %s: %w", skillName, err)
+			}
+			rendered = string(tmplContent)
 		}
 
 		relPath := filepath.Join(".gemini", "skills", "autopus", skillName, "SKILL.md")
@@ -86,4 +89,8 @@ func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.Fil
 	}
 
 	return files, nil
+}
+
+func hasAutoPrefix(name string) bool {
+	return len(name) >= 5 && name[:5] == "auto-"
 }

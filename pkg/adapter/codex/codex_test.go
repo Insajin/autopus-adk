@@ -62,6 +62,8 @@ func TestCodexAdapter_Generate_CreatesAgentsMD(t *testing.T) {
 	assert.Contains(t, content, "## Execution Model")
 	assert.Contains(t, content, "spawn_agent(...)")
 	assert.Contains(t, content, "Codex --auto")
+	assert.Contains(t, content, "## Core Guidelines")
+	assert.Contains(t, content, "### Worker Contracts")
 }
 
 func TestCodexAdapter_Generate_CreatesSkillsDirectory(t *testing.T) {
@@ -286,6 +288,8 @@ func TestCodexAndOpenCode_AGENTSMD_UsesSharedPlatformSection(t *testing.T) {
 	assert.Contains(t, content, "OpenCode Rules: .opencode/rules/autopus/")
 	assert.Contains(t, content, "**Codex**: 하네스 기본값은 spawn_agent(...) 기반 subagent-first 입니다.")
 	assert.Contains(t, content, "**OpenCode**: 기본 실행 모델은 task(...) 기반 subagent-first 입니다.")
-	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex guidance.")
+	assert.Contains(t, content, "## Core Guidelines")
+	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex rule definitions.")
+	assert.Contains(t, content, "See .codex/skills/agent-pipeline.md for phase and gate contracts.")
 	assert.Contains(t, content, "See .opencode/rules/autopus/ for OpenCode guidance.")
 }

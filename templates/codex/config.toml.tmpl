@@ -2,10 +2,17 @@
 # Project: {{.ProjectName}}
 
 model = "gpt-5.4"
+model_reasoning_effort = "medium"
 approval_mode = "suggest"
+project_doc_max_bytes = 65536
 
 [sandbox]
 type = "docker"
+
+[agents]
+max_threads = 6
+max_depth = 1
+job_max_runtime_seconds = 1800
 
 [mcp_servers.autopus]
 command = "auto"

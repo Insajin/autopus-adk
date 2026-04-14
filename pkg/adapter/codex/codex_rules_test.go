@@ -72,7 +72,7 @@ func TestGenerateRuleFiles_Content(t *testing.T) {
 		"should contain rule title")
 }
 
-func TestAgentsMD_NoInlineRules(t *testing.T) {
+func TestAgentsMD_IncludesCoreCodexGuidance(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := codex.NewWithRoot(dir)
@@ -86,10 +86,16 @@ func TestAgentsMD_NoInlineRules(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 
-	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex guidance.",
+	assert.Contains(t, content, "## Core Guidelines",
+		"AGENTS.md should inline the key Codex operating rules")
+	assert.Contains(t, content, "### Subagent Delegation",
+		"AGENTS.md should preserve delegation policy")
+	assert.Contains(t, content, "### Review Convergence",
+		"AGENTS.md should preserve review convergence guidance")
+	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex rule definitions.",
 		"AGENTS.md should reference rules directory")
-	assert.NotContains(t, content, "IMPORTANT: No single file may exceed 300 lines",
-		"AGENTS.md should not contain inline file-size-limit rule")
+	assert.Contains(t, content, ".codex/skills/agent-pipeline.md",
+		"AGENTS.md should point to the pipeline contract")
 }
 
 func TestRuleFilePath_Flat(t *testing.T) {

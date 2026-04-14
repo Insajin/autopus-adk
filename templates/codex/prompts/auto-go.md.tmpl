@@ -29,6 +29,15 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 2. 파일별 구현
 3. 테스트 작성{{end}}
 
+## Supervisor Checklist
+
+- Step 0: 먼저 현재 요청이 read-heavy 탐색인지, write-heavy 구현인지 분류합니다
+- 파일 소유권이 겹치지 않을 때만 병렬 executor를 사용합니다
+- worker를 스폰할 때는 owned paths, 수정 금지 범위, verification, next required step을 명시합니다
+- validation 실패 시 전체 파이프라인을 다시 돌리지 말고 실패한 slice만 좁혀서 재시도합니다
+- review는 discovery와 verification을 분리합니다. `--multi` 추가 검증은 review discovery 단계에만 집중합니다
+- 종료 전에는 다음 필수 단계가 완료됐는지, 아니면 명시적 blocker가 남았는지 확인합니다
+
 ## 품질 기준
 
 - 테스트 커버리지: {{if .IsFullMode}}85{{else}}80{{end}}%+

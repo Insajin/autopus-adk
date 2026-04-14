@@ -46,8 +46,8 @@ func TestLoadAgentSourcesFromFS_EmptyDir(t *testing.T) {
 	assert.Empty(t, sources)
 }
 
-// TestCondenseBody_CodeBlocks verifies code blocks are stripped from output.
-func TestCondenseBody_CodeBlocks(t *testing.T) {
+// TestTransformAgentForCodex_PreservesStructuredBody verifies rich markdown survives conversion.
+func TestTransformAgentForCodex_PreservesStructuredBody(t *testing.T) {
 	t.Parallel()
 
 	src := content.AgentSource{
@@ -59,15 +59,15 @@ func TestCondenseBody_CodeBlocks(t *testing.T) {
 		Body: "## Section\n\nKeep this line.\n\n```go\nfunc main() {}\n```\n\nAlso keep this.",
 	}
 
-	// TransformAgentForCodex uses condenseBody internally
 	result := content.TransformAgentForCodex(src)
 	assert.Contains(t, result, "Keep this line.")
 	assert.Contains(t, result, "Also keep this.")
-	assert.NotContains(t, result, "func main()")
+	assert.Contains(t, result, "func main()")
+	assert.Contains(t, result, `developer_instructions = """`)
 }
 
-// TestCondenseBody_H1HeaderStripped verifies H1 headers are excluded from condensed body.
-func TestCondenseBody_H1HeaderStripped(t *testing.T) {
+// TestTransformAgentForCodex_PreservesHeaders verifies section headers remain intact.
+func TestTransformAgentForCodex_PreservesHeaders(t *testing.T) {
 	t.Parallel()
 
 	src := content.AgentSource{
@@ -80,14 +80,13 @@ func TestCondenseBody_H1HeaderStripped(t *testing.T) {
 	}
 
 	result := content.TransformAgentForCodex(src)
-	// H1 "# Title Header" is stripped; H2 and content remain
-	assert.NotContains(t, result, "Title Header")
+	assert.Contains(t, result, "Title Header")
 	assert.Contains(t, result, "## Subtitle")
 	assert.Contains(t, result, "Content line.")
 }
 
-// TestCondenseBody_OnlyCodeBlock verifies a body with only code blocks produces minimal output.
-func TestCondenseBody_OnlyCodeBlock(t *testing.T) {
+// TestTransformAgentForCodex_CodeOnlyBody verifies code-heavy bodies still render valid TOML.
+func TestTransformAgentForCodex_CodeOnlyBody(t *testing.T) {
 	t.Parallel()
 
 	src := content.AgentSource{
@@ -103,7 +102,7 @@ func TestCondenseBody_OnlyCodeBlock(t *testing.T) {
 	// Should still produce valid TOML with developer_instructions
 	assert.Contains(t, result, `name = "codeonly"`)
 	assert.Contains(t, result, "developer_instructions =")
-	assert.NotContains(t, result, "some code")
+	assert.Contains(t, result, "some code")
 }
 
 // TestTransformAgentForCodex_NoSkills verifies no skills reference in output.

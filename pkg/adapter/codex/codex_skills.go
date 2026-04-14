@@ -36,7 +36,12 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig) ([]adapter.Fil
 
 		rendered, err := a.engine.RenderString(string(tmplContent), cfg)
 		if err != nil {
-			return nil, fmt.Errorf("코덱스 스킬 템플릿 렌더링 실패 %s: %w", name, err)
+			if strings.HasPrefix(skillFile, "auto-") {
+				return nil, fmt.Errorf("코덱스 스킬 템플릿 렌더링 실패 %s: %w", name, err)
+			}
+			// Non-auto skill docs can legitimately contain raw `{{ ... }}` examples
+			// such as GitHub Actions expressions. Preserve the template verbatim.
+			rendered = string(tmplContent)
 		}
 		rendered = normalizeCodexInvocationBody(rendered)
 		rendered = normalizeCodexHelperPaths(rendered)
@@ -72,7 +77,6 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig) ([]adapter.Fil
 }
 
 // agentsMDTemplate is the AGENTS.md AUTOPUS section template.
-// Kept slim — detailed rules and agent definitions live in separate files.
 const agentsMDTemplate = `# Autopus-ADK Harness
 
 > 이 섹션은 Autopus-ADK에 의해 자동 생성됩니다. 수동으로 편집하지 마세요.
@@ -116,7 +120,34 @@ IMPORTANT: Follow these language settings strictly for all work in this project.
 
 ## Core Guidelines
 
-{{if contains (join ", " .Platforms) "codex"}}See .codex/rules/autopus/ for Codex rule definitions.
+{{if contains (join ", " .Platforms) "codex"}}### Supervisor Contract
+
+IMPORTANT: 메인 세션은 얇은 라우터가 아니라 phase/gate를 관리하는 supervisor입니다. 각 단계마다 필수 단계, skip 조건, retry 한도, 다음 필수 단계를 명확히 유지하세요.
+
+### Subagent Delegation
+
+IMPORTANT: 3개 이상 파일 수정, 다중 도메인 변경, 또는 신규 코드 200줄 초과가 예상되면 기본적으로 서브에이전트를 사용하세요. 단, 읽기 위주 탐색/리서치/테스트 분석은 병렬 fan-out을 우선하고, 쓰기 위주 구현은 파일 소유권이 겹치면 순차 실행으로 전환하세요.
+
+### Worker Contracts
+
+IMPORTANT: 각 worker 프롬프트에는 반드시 소유 파일/모듈, 수정 금지 범위, 완료 기준, 반환 형식을 포함하세요. 최소 반환 필드는 ` + "`owned_paths`, `changed_files`, `verification`, `blockers`, `next_required_step`" + ` 입니다.
+
+### Review Convergence
+
+IMPORTANT: 리뷰는 discovery와 verification을 분리하세요. 첫 리뷰는 finding discovery에 집중하고, 재시도는 열린 finding 해결 여부만 diff 기준으로 확인하세요. 같은 범위를 무한 재탐색하지 마세요.
+
+### File Size Limit
+
+IMPORTANT: 생성 파일을 제외한 소스 파일은 300줄 이하를 유지하세요. 가능하면 200줄 이하를 목표로 분리하세요.
+
+### Prompting Notes
+
+IMPORTANT: 사용자가 계획만 요구한 경우를 제외하면, 긴 선행 계획만 출력하고 멈추지 마세요. 먼저 코드베이스를 확인하고, 필요한 경우 서브에이전트를 스폰한 뒤, 검증까지 이어서 진행하세요.
+
+## Rules
+
+See .codex/rules/autopus/ for Codex rule definitions.
+See .codex/skills/agent-pipeline.md for phase and gate contracts.
 See .codex/agents/ for Codex agent definitions.
 {{end}}{{if contains (join ", " .Platforms) "opencode"}}See .opencode/rules/autopus/ for OpenCode rule definitions.
 {{end}}
