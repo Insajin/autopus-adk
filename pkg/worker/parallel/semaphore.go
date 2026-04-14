@@ -23,6 +23,9 @@ func NewTaskSemaphore(limit int) *TaskSemaphore {
 
 // Acquire blocks until a slot is available or ctx is cancelled.
 func (s *TaskSemaphore) Acquire(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	select {
 	case s.sem <- struct{}{}:
 		return nil
