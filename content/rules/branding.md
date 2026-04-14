@@ -22,6 +22,9 @@ After the banner and status block, continue with the response normally.
 
 Every `/auto` subcommand response: start with the full banner, end with `🐙`.
 
+- The canonical banner header is the first line from `templates/shared/branding-formats.md.tmpl`.
+- When only the header line is rendered, prefer `🐙 Autopus ─────────────────────────` over a standalone `🐙`.
+
 ### Tier 3 — Rule Applied
 
 When a harness rule actively influenced the response (e.g., enforced Lore commit format, checked file size limit, delegated to subagent), append a footer showing which rules were applied:
