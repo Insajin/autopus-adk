@@ -45,6 +45,11 @@ func TestDefaultCompletionPatterns_ProviderSpecificMatching(t *testing.T) {
 			screen:           "codex> ",
 			expectedProvider: "codex",
 		},
+		{
+			name:             "opencode: Ask anything prompt",
+			screen:           "Ask anything",
+			expectedProvider: "opencode",
+		},
 	}
 
 	for _, tt := range tests {
@@ -163,6 +168,7 @@ func TestSessionReadyPatterns_CLIPromptsMatch(t *testing.T) {
 		{"claude prompt", "❯"},
 		{"gemini prompt", "> Type your message..."},
 		{"codex prompt", "codex> "},
+		{"opencode prompt", "Ask anything"},
 	}
 
 	for _, tt := range tests {

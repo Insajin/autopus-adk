@@ -75,6 +75,7 @@ func TestSendPromptWithRetry_AllRetriesFail_RecreatesPane(t *testing.T) {
 	mock.name = "cmux"
 	mock.failCount = 3   // initial + 2 same-pane retries fail, 4th (post-recreate) succeeds
 	mock.nextPaneID = 10 // ensure recreated pane gets a different ID
+	mock.readScreenOutput = "❯\n"
 	cfg := OrchestraConfig{Terminal: mock}
 	pi := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "claude", Binary: "echo"}}
 	baselines := map[string]string{}

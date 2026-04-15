@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/terminal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -118,7 +119,7 @@ func TestSurfaceManager_ValidateAndRecover_UsesWarmPool(t *testing.T) {
 	t.Parallel()
 	mock := &surfaceSignalMock{}
 	mock.name = "cmux"
-	mock.readScreenErr = assert.AnError // Force stale detection
+	mock.stalePanes = map[terminal.PaneID]bool{"stale-pane": true} // Force stale detection on the old pane only
 	sm := NewSurfaceManager(mock)
 
 	// Manually set up warm pool with a pre-created pane
@@ -145,7 +146,7 @@ func TestSurfaceManager_ValidateAndRecover_FallsBackToRecreate(t *testing.T) {
 	t.Parallel()
 	mock := &surfaceSignalMock{}
 	mock.name = "cmux"
-	mock.readScreenErr = assert.AnError // Force stale detection
+	mock.stalePanes = map[terminal.PaneID]bool{"stale-pane": true} // Force stale detection on the old pane only
 	mock.nextPaneID = 50
 	sm := NewSurfaceManager(mock)
 

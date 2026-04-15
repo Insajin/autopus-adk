@@ -186,6 +186,7 @@ func TestRelayPane_DefaultTimeout(t *testing.T) {
 	t.Parallel()
 
 	mock := newCmuxMock()
+	mock.autoComplete = false
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			echoProvider("p1"),
@@ -202,7 +203,7 @@ func TestRelayPane_DefaultTimeout(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Len(t, result.Responses, 1)
-	// Mock terminal doesn't execute commands, so sentinel is never written.
+	// Auto-complete disabled: sentinel is never written.
 	// Provider response will be TimedOut=true with fallback output.
 	assert.True(t, result.Responses[0].TimedOut)
 }

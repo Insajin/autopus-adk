@@ -24,66 +24,12 @@ func stripANSI(s string) string {
 // defaultPromptPatterns matches common shell and CLI prompts.
 // @AX:NOTE [AUTO] hardcoded prompt regexes — must stay in sync with DefaultCompletionPatterns
 var defaultPromptPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)^❯\s*$`),                    // claude code prompt (unicode heavy right-pointing angle)
+	regexp.MustCompile(`(?m)^❯\s*$`),                     // claude code prompt (unicode heavy right-pointing angle)
 	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`), // gemini TUI prompt (> Type your..., > @, bare >)
-	regexp.MustCompile(`(?im)^codex>\s*$`),              // codex prompt (case-insensitive)
-	regexp.MustCompile(`(?m)^\$\s*$`),                   // shell $ prompt
-	regexp.MustCompile(`(?m)^#\s*$`),                    // root # prompt
-}
-
-// sessionReadyPromptPatterns matches CLI-specific prompts WITHOUT shell patterns ($ and #).
-// Used by waitForSessionReady to avoid premature detection on bare shell prompts.
-var sessionReadyPromptPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)^❯\s*$`),                    // claude code prompt (unicode heavy right-pointing angle)
-	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`), // gemini TUI prompt (> Type your..., > @, bare >)
-	regexp.MustCompile(`(?im)^codex>\s*$`),              // codex prompt (case-insensitive)
-	// NOTE: no shell $ or # patterns — this is the key difference from defaultPromptPatterns
-}
-
-// SessionReadyPatterns returns completion patterns for CLI session readiness detection.
-// Unlike DefaultCompletionPatterns, this excludes shell prompts ($ and #) to prevent
-// false positives when detecting whether a CLI tool has finished launching.
-func SessionReadyPatterns() []CompletionPattern {
-	return []CompletionPattern{
-		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯\s*$`)},
-		{Provider: "codex", Pattern: regexp.MustCompile(`(?im)^codex>\s*$`)},
-		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`)},
-	}
-}
-
-// isSessionReady checks if the screen content contains a CLI-specific prompt pattern,
-// indicating the provider session has fully launched. Unlike isPromptVisible, this does
-// NOT match shell prompts ($ and #) to avoid false positives during startup.
-func isSessionReady(screen string, patterns []CompletionPattern) bool {
-	screen = stripANSI(screen)
-	// Check provider-specific session-ready patterns
-	for _, cp := range patterns {
-		if cp.Pattern.MatchString(screen) {
-			return true
-		}
-	}
-	// Fallback to sessionReadyPromptPatterns (no shell patterns)
-	for _, p := range sessionReadyPromptPatterns {
-		if p.MatchString(screen) {
-			return true
-		}
-	}
-	return false
-}
-
-// startupTimeoutFor returns the per-provider startup timeout.
-func startupTimeoutFor(provider ProviderConfig) time.Duration {
-	if provider.StartupTimeout > 0 {
-		return provider.StartupTimeout
-	}
-	switch provider.Name {
-	case "claude":
-		return 15 * time.Second
-	case "gemini":
-		return 10 * time.Second
-	default:
-		return 30 * time.Second
-	}
+	regexp.MustCompile(`(?im)^codex>\s*$`),               // codex prompt (case-insensitive)
+	regexp.MustCompile(`(?im)^Ask anything\s*$`),         // opencode TUI prompt
+	regexp.MustCompile(`(?m)^\$\s*$`),                    // shell $ prompt
+	regexp.MustCompile(`(?m)^#\s*$`),                     // root # prompt
 }
 
 // cliNoisePatterns matches provider CLI lines that are pure noise (used for line-level filtering).
@@ -194,10 +140,10 @@ func isPromptVisible(screen string, patterns []CompletionPattern) bool {
 // toolApprovalPatterns matches interactive tool permission prompts from providers.
 // When detected, the orchestra auto-approves by sending "1" (Allow once).
 var toolApprovalPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)Action Required`),                       // gemini tool permission
-	regexp.MustCompile(`(?i)Allow execution of`),                    // gemini sandbox prompt
-	regexp.MustCompile(`(?i)Do you want to allow`),                  // generic permission prompt
-	regexp.MustCompile(`(?i)●\s*1\.\s*Allow\s+(once|for this)`),    // gemini numbered option
+	regexp.MustCompile(`(?i)Action Required`),                   // gemini tool permission
+	regexp.MustCompile(`(?i)Allow execution of`),                // gemini sandbox prompt
+	regexp.MustCompile(`(?i)Do you want to allow`),              // generic permission prompt
+	regexp.MustCompile(`(?i)●\s*1\.\s*Allow\s+(once|for this)`), // gemini numbered option
 }
 
 // needsToolApproval checks if the screen shows an interactive tool permission prompt.
@@ -221,9 +167,9 @@ var providerWorkingPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)Executing`),
 	regexp.MustCompile(`(?i)Explored\b`),
 	regexp.MustCompile(`(?i)✳`),                        // claude thinking indicator
-	regexp.MustCompile(`[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]`),                // braille spinner (gemini "taking a bit longer")
-	regexp.MustCompile(`(?i)taking a bit longer`),       // gemini processing message
-	regexp.MustCompile(`(?i)still on it`),               // gemini processing message
+	regexp.MustCompile(`[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]`),                 // braille spinner (gemini "taking a bit longer")
+	regexp.MustCompile(`(?i)taking a bit longer`),      // gemini processing message
+	regexp.MustCompile(`(?i)still on it`),              // gemini processing message
 	regexp.MustCompile(`(?i)esc to cancel,\s*\d+[ms]`), // gemini cancel hint with elapsed time
 }
 

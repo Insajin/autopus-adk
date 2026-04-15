@@ -111,7 +111,7 @@ func TestSendPromptWithRetry_RecreateAndRetrySuccess(t *testing.T) {
 	// Fail first 3 calls (initial + 2 same-pane retries),
 	// succeed on 4th call (after recreation).
 	mock := &sendLongTextCountMock{
-		mockTerminal: mockTerminal{name: "cmux"},
+		mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "❯\n"},
 		failUntil:    3,
 	}
 	cfg := OrchestraConfig{Terminal: mock}

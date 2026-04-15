@@ -63,10 +63,10 @@ type FailedProvider struct {
 
 // OrchestraResult는 오케스트레이션 최종 결과이다.
 type OrchestraResult struct {
-	Strategy        Strategy           // 사용된 전략
-	Responses       []ProviderResponse // 개별 프로바이더 응답
-	Merged          string             // 병합된 최종 결과
-	Duration        time.Duration      // 전체 실행 시간
+	Strategy        Strategy             // 사용된 전략
+	Responses       []ProviderResponse   // 개별 프로바이더 응답
+	Merged          string               // 병합된 최종 결과
+	Duration        time.Duration        // 전체 실행 시간
 	Summary         string               // 전략별 요약 (합의율, 파이프라인 단계 등)
 	FailedProviders []FailedProvider     // Providers that failed during execution
 	RoundHistory    [][]ProviderResponse // Per-round provider responses for debate strategy
@@ -74,27 +74,27 @@ type OrchestraResult struct {
 
 // OrchestraConfig는 오케스트레이션 실행 설정이다.
 type OrchestraConfig struct {
-	Providers      []ProviderConfig  // 참여 프로바이더 목록
-	Strategy       Strategy          // 실행 전략
-	Prompt         string            // 전달할 프롬프트
-	TimeoutSeconds int               // 타임아웃 (초)
-	JudgeProvider  string            // debate 전략에서 최종 판정 프로바이더
-	DebateRounds   int               // Number of debate rounds (1=no rebuttal, 2=with rebuttal). 0 defaults to 1.
-	Terminal       terminal.Terminal // Optional terminal for pane-based execution. Nil means non-interactive mode.
-	NoDetach           bool             // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
-	KeepRelayOutput    bool             // when true, preserve temp relay output files after execution
-	Interactive        bool             // when true, use interactive pane mode instead of sentinel-based
-	HookMode           bool             // when true, use hook file signals instead of ReadScreen for result collection
-	SessionID          string           // unique session ID for hook file signal directory
-	ConsensusThreshold float64          // consensus threshold (0 uses default 0.66)
-	InitialDelay       time.Duration    // delay before completion polling starts (0 uses default 20s)
+	Providers          []ProviderConfig   // 참여 프로바이더 목록
+	Strategy           Strategy           // 실행 전략
+	Prompt             string             // 전달할 프롬프트
+	TimeoutSeconds     int                // 타임아웃 (초)
+	JudgeProvider      string             // debate 전략에서 최종 판정 프로바이더
+	DebateRounds       int                // Number of debate rounds (1=no rebuttal, 2=with rebuttal). 0 defaults to 1.
+	Terminal           terminal.Terminal  // Optional terminal for pane-based execution. Nil means non-interactive mode.
+	NoDetach           bool               // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
+	KeepRelayOutput    bool               // when true, preserve temp relay output files after execution
+	Interactive        bool               // when true, use interactive pane mode instead of sentinel-based
+	HookMode           bool               // when true, use hook file signals instead of ReadScreen for result collection
+	SessionID          string             // unique session ID for hook file signal directory
+	ConsensusThreshold float64            // consensus threshold (0 uses default 0.66)
+	InitialDelay       time.Duration      // delay before completion polling starts (0 uses default 20s)
 	CompletionDetector CompletionDetector // completion detection strategy (nil = auto-detect from Terminal)
-	ScrollbackLines    int                  // R3: ReadScreen scrollback depth (default 500, 0 = use terminal default)
-	NoJudge            bool                 // R4: skip judge verdict phase when true
-	YieldRounds        bool                 // R5: yield after round 1 with JSON output, keep panes alive
-	ContextAware       bool                 // R8: when true, skip topic isolation so providers can read project files
-	SubprocessMode     bool                 // when true, use SubprocessBackend instead of PaneBackend
-	RoundPreset        string               // round preset: "fast", "standard", "deep" (for T8)
+	ScrollbackLines    int                // R3: ReadScreen scrollback depth (default 500, 0 = use terminal default)
+	NoJudge            bool               // R4: skip judge verdict phase when true
+	YieldRounds        bool               // R5: yield after round 1 with JSON output, keep panes alive
+	ContextAware       bool               // R8: when true, skip topic isolation so providers can read project files
+	SubprocessMode     bool               // when true, use SubprocessBackend instead of PaneBackend
+	RoundPreset        string             // round preset: "fast", "standard", "deep" (for T8)
 	// SurfaceMgr is set during interactive debate setup.
 	// Not part of initial config -- populated by runPaneDebate().
 	SurfaceMgr *SurfaceManager
@@ -113,6 +113,7 @@ func DefaultCompletionPatterns() []CompletionPattern {
 		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯\s*$`)},
 		{Provider: "codex", Pattern: regexp.MustCompile(`(?im)^codex>\s*$`)},
 		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`)},
+		{Provider: "opencode", Pattern: regexp.MustCompile(`(?im)^Ask anything\s*$`)},
 	}
 }
 

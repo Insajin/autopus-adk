@@ -182,6 +182,7 @@ func TestPaneRunner_Timeout_ForceClosesPane(t *testing.T) {
 
 	// Given: a cmux terminal and a slow provider with short timeout
 	mock := newCmuxMock()
+	mock.autoComplete = false
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{sleepProvider("slow")},
 		Strategy:       StrategyConsensus,

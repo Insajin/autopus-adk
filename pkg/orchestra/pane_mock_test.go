@@ -3,6 +3,9 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"os"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
@@ -10,14 +13,14 @@ import (
 
 // mockTerminal implements terminal.Terminal for testing pane runner logic.
 type mockTerminal struct {
-	mu               sync.Mutex
-	name             string
-	splitPaneErr     error
+	mu                  sync.Mutex
+	name                string
+	splitPaneErr        error
 	sendCommandErr      error
 	sendCommandErrAfter int // error only after N successful calls (0 = always error)
-	closeErr         error
-	splitPaneCalls   []terminal.Direction
-	sendCommandCalls []struct {
+	closeErr            error
+	splitPaneCalls      []terminal.Direction
+	sendCommandCalls    []struct {
 		PaneID terminal.PaneID
 		Cmd    string
 	}
@@ -34,6 +37,8 @@ type mockTerminal struct {
 		PaneID terminal.PaneID
 		Text   string
 	}
+	autoComplete bool
+	mockOutput   string
 }
 
 func (m *mockTerminal) Name() string { return m.name }
@@ -66,7 +71,13 @@ func (m *mockTerminal) SendCommand(_ context.Context, paneID terminal.PaneID, cm
 	if m.sendCommandErrAfter > 0 && len(m.sendCommandCalls) <= m.sendCommandErrAfter {
 		return nil
 	}
-	return m.sendCommandErr
+	if m.sendCommandErr != nil {
+		return m.sendCommandErr
+	}
+	if m.autoComplete {
+		m.writeSentinelOutput(cmd)
+	}
+	return nil
 }
 
 func (m *mockTerminal) SendLongText(_ context.Context, paneID terminal.PaneID, text string) error {
@@ -151,9 +162,37 @@ func (m *countingScreenMock) ReadScreen(_ context.Context, _ terminal.PaneID, _ 
 }
 
 func newCmuxMock() *mockTerminal {
-	return &mockTerminal{name: "cmux"}
+	return &mockTerminal{name: "cmux", autoComplete: true, mockOutput: "mock output"}
 }
 
 func newPlainMock() *mockTerminal {
 	return &mockTerminal{name: "plain"}
+}
+
+var outputFilePattern = regexp.MustCompile(`tee\s+([^;]+?)\s*;\s*echo\s+__AUTOPUS_DONE__\s*>>\s*(\S+)`)
+
+func (m *mockTerminal) writeSentinelOutput(cmd string) {
+	matches := outputFilePattern.FindStringSubmatch(cmd)
+	if len(matches) != 3 {
+		return
+	}
+
+	path := shellUnquote(matches[1])
+	if path == "" {
+		return
+	}
+	output := m.mockOutput
+	if output == "" {
+		output = "mock output"
+	}
+	_ = os.WriteFile(path, []byte(output+"\n"+sentinel+"\n"), 0o600)
+}
+
+func shellUnquote(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
+		s = s[1 : len(s)-1]
+		s = strings.ReplaceAll(s, `'\''`, `'`)
+	}
+	return s
 }

@@ -15,6 +15,7 @@ type surfaceSignalMock struct {
 	mockTerminal
 	healthResults map[string]terminal.SurfaceStatus
 	healthErr     error
+	stalePanes    map[terminal.PaneID]bool
 }
 
 func (m *surfaceSignalMock) SurfaceHealth(_ context.Context, paneID terminal.PaneID) (terminal.SurfaceStatus, error) {
@@ -33,6 +34,13 @@ func (m *surfaceSignalMock) WaitForSignal(_ context.Context, _ string, _ time.Du
 
 func (m *surfaceSignalMock) SendSignal(_ context.Context, _ string) error {
 	return nil
+}
+
+func (m *surfaceSignalMock) ReadScreen(ctx context.Context, paneID terminal.PaneID, opts terminal.ReadScreenOpts) (string, error) {
+	if m.stalePanes != nil && m.stalePanes[paneID] {
+		return "", assert.AnError
+	}
+	return m.mockTerminal.ReadScreen(ctx, paneID, opts)
 }
 
 // TestNewSurfaceManager_WithSignalCapable verifies signal is set for SignalCapable terminal.
@@ -185,8 +193,8 @@ func TestSurfaceManager_ValidateAndRecover_StaleReadScreen(t *testing.T) {
 	t.Parallel()
 	mock := &surfaceSignalMock{}
 	mock.name = "cmux"
-	mock.readScreenErr = assert.AnError // ReadScreen fails -- validateSurface returns false
-	mock.nextPaneID = 10               // Ensure new pane gets a different ID
+	mock.stalePanes = map[terminal.PaneID]bool{"pane-1": true} // old pane fails -- new pane succeeds
+	mock.nextPaneID = 10                                       // Ensure new pane gets a different ID
 	sm := NewSurfaceManager(mock)
 
 	pi := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "claude", Binary: "echo"}}
@@ -220,4 +228,3 @@ func TestSurfaceManager_ValidateAndRecover_CachedUnhealthy(t *testing.T) {
 	_, _, err := sm.ValidateAndRecover(context.Background(), cfg, pi, 1)
 	assert.Error(t, err, "should return error when recreation fails")
 }
-
