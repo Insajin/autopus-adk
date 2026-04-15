@@ -58,6 +58,7 @@ Call mcp__context7__query-docs(libraryId)
 Normal line here.`
 
 	result := content.ReplacePlatformReferences(input, "codex")
+	assert.Contains(t, result, "Context7 MCP first")
 	assert.Contains(t, result, `WebSearch "libraryName docs"`)
 	assert.Contains(t, result, `WebSearch "libraryId docs"`)
 	assert.NotContains(t, result, "mcp__context7__")
@@ -69,6 +70,7 @@ func TestReplacePlatformReferences_MCPGemini(t *testing.T) {
 
 	input := `mcp__context7__resolve-library-id("cobra")`
 	result := content.ReplacePlatformReferences(input, "gemini")
+	assert.Contains(t, result, "Context7 MCP first")
 	assert.Contains(t, result, `WebSearch "cobra docs"`)
 	assert.NotContains(t, result, "mcp__")
 }
@@ -186,6 +188,7 @@ See .claude/skills/tdd.md`
 	assert.Contains(t, result, "Normal line 1.")
 	assert.Contains(t, result, `spawn_agent executor --task "build"`)
 	assert.Contains(t, result, "Normal line 2.")
+	assert.Contains(t, result, "Context7 MCP first")
 	assert.Contains(t, result, `WebSearch "cobra docs"`)
 	assert.Contains(t, result, "Normal line 3.")
 	assert.Contains(t, result, ".codex/skills/tdd.md")

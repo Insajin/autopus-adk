@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 )
+
+const minProjectDocMaxBytes = 262144
 
 // Validate checks the validity of installed files.
 func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error) {
@@ -65,6 +68,10 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 			Level:   "warning",
 		})
 	}
+
+	a.validateRouterPrompt(&errs)
+	a.validateConfig(&errs)
+	a.validateContext7Rule(&errs)
 
 	return errs, nil
 }
@@ -149,4 +156,142 @@ func isSharedSurfacePath(targetPath string) bool {
 		return true
 	}
 	return strings.HasPrefix(targetPath, filepath.Join(".agents", "skills")+string(os.PathSeparator))
+}
+
+func (a *Adapter) validateRouterPrompt(errs *[]adapter.ValidationError) {
+	routerPromptRel := filepath.Join(".codex", "prompts", "auto.md")
+	if !a.managesFile(routerPromptRel) {
+		return
+	}
+
+	data, err := os.ReadFile(filepath.Join(a.root, routerPromptRel))
+	if err != nil {
+		if os.IsNotExist(err) {
+			*errs = append(*errs, adapter.ValidationError{
+				File:    routerPromptRel,
+				Message: "Codex router prompt가 없음",
+				Level:   "warning",
+			})
+			return
+		}
+		*errs = append(*errs, adapter.ValidationError{
+			File:    routerPromptRel,
+			Message: "Codex router prompt를 읽을 수 없음",
+			Level:   "warning",
+		})
+		return
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "## Autopus Branding") || !strings.Contains(content, "🐙 Autopus ─────────────────────────") {
+		*errs = append(*errs, adapter.ValidationError{
+			File:    routerPromptRel,
+			Message: "Codex router prompt에 Autopus 브랜딩 블록이 없음",
+			Level:   "warning",
+		})
+	}
+	if !strings.Contains(content, "## Router Execution Contract") || !strings.Contains(content, "ARCHITECTURE.md") || !strings.Contains(content, ".autopus/project/*") {
+		*errs = append(*errs, adapter.ValidationError{
+			File:    routerPromptRel,
+			Message: "Codex router prompt에 상세 워크플로우/프로젝트 컨텍스트 계약이 없음",
+			Level:   "warning",
+		})
+	}
+}
+
+func (a *Adapter) validateConfig(errs *[]adapter.ValidationError) {
+	if !a.managesFile("config.toml") {
+		return
+	}
+
+	data, err := os.ReadFile(filepath.Join(a.root, "config.toml"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			*errs = append(*errs, adapter.ValidationError{
+				File:    "config.toml",
+				Message: "config.toml이 없음",
+				Level:   "warning",
+			})
+			return
+		}
+		*errs = append(*errs, adapter.ValidationError{
+			File:    "config.toml",
+			Message: "config.toml을 읽을 수 없음",
+			Level:   "warning",
+		})
+		return
+	}
+
+	maxBytes, ok := parseProjectDocMaxBytes(string(data))
+	if !ok {
+		*errs = append(*errs, adapter.ValidationError{
+			File:    "config.toml",
+			Message: "project_doc_max_bytes 설정이 없음",
+			Level:   "warning",
+		})
+		return
+	}
+	if maxBytes < minProjectDocMaxBytes {
+		*errs = append(*errs, adapter.ValidationError{
+			File:    "config.toml",
+			Message: fmt.Sprintf("project_doc_max_bytes가 너무 낮음 (%d < %d): 대형 프로젝트 문서가 잘릴 수 있음", maxBytes, minProjectDocMaxBytes),
+			Level:   "warning",
+		})
+	}
+}
+
+func (a *Adapter) validateContext7Rule(errs *[]adapter.ValidationError) {
+	ruleRel := filepath.Join(".codex", "rules", "autopus", "context7-docs.md")
+	if !a.managesFile(ruleRel) {
+		return
+	}
+
+	data, err := os.ReadFile(filepath.Join(a.root, ruleRel))
+	if err != nil {
+		if os.IsNotExist(err) {
+			*errs = append(*errs, adapter.ValidationError{
+				File:    ruleRel,
+				Message: "Codex Context7 규칙 파일이 없음",
+				Level:   "warning",
+			})
+			return
+		}
+		*errs = append(*errs, adapter.ValidationError{
+			File:    ruleRel,
+			Message: "Codex Context7 규칙 파일을 읽을 수 없음",
+			Level:   "warning",
+		})
+		return
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "Context7 MCP") || !strings.Contains(content, "web search") {
+		*errs = append(*errs, adapter.ValidationError{
+			File:    ruleRel,
+			Message: "Codex Context7 규칙에 web fallback 계약이 없음",
+			Level:   "warning",
+		})
+	}
+}
+
+func parseProjectDocMaxBytes(content string) (int, bool) {
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "project_doc_max_bytes") {
+			continue
+		}
+
+		parts := strings.SplitN(trimmed, "=", 2)
+		if len(parts) != 2 {
+			return 0, false
+		}
+
+		value, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+		if err != nil {
+			return 0, false
+		}
+		return value, true
+	}
+
+	return 0, false
 }

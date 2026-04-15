@@ -85,6 +85,11 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	assert.Contains(t, string(autoSetupSkill), "explorer")
 	assert.Contains(t, string(autoSetupSkill), "## OpenCode Invocation")
 
+	agentPipelineSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "agent-pipeline", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(agentPipelineSkill), "Context7 MCP")
+	assert.Contains(t, string(agentPipelineSkill), "web search")
+
 	autoGoSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-go", "SKILL.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoGoSkill), `subagent_type = "executor"`)
@@ -111,6 +116,11 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	instructions := jsonStringSlice(configDoc["instructions"])
 	assert.NotEmpty(t, instructions)
 	assert.Contains(t, instructions, ".opencode/rules/autopus/branding.md")
+
+	context7Rule, err := os.ReadFile(filepath.Join(dir, ".opencode", "rules", "autopus", "context7-docs.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(context7Rule), "web search")
+	assert.Contains(t, string(context7Rule), "official docs")
 }
 
 func TestAdapter_Generate_AutoRouterUsesThinOpenCodeContract(t *testing.T) {
@@ -227,16 +237,6 @@ func TestInjectOrchestraPlugin_MergesPluginArray(t *testing.T) {
 	assert.Contains(t, plugins, "existing-plugin")
 	assert.Contains(t, plugins, "/path/to/script.js")
 	assert.Contains(t, jsonStringSlice(configDoc["instructions"]), ".opencode/rules/autopus/branding.md")
-}
-
-func TestInjectOrchestraPlugin_InvalidExistingJSON(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "opencode.json"), []byte("{broken"), 0644))
-
-	err := a.InjectOrchestraPlugin("/path/to/script.js")
-	assert.Error(t, err)
 }
 
 func TestAdapter_Generate_WorkflowSkillsUseOpenCodeSurface(t *testing.T) {

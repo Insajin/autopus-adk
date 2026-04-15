@@ -145,6 +145,7 @@ Claude-only content.`)
 	assert.Equal(t, "tdd", skills[0].Name)
 	// ReplacePlatformReferences replaces instead of removing
 	assert.NotContains(t, skills[0].Content, "mcp__context7__")
+	assert.Contains(t, skills[0].Content, "Context7 MCP first")
 	assert.Contains(t, skills[0].Content, "WebSearch")
 	assert.NotContains(t, skills[0].Content, "Agent(subagent_type=")
 	assert.Contains(t, skills[0].Content, "spawn_agent executor")

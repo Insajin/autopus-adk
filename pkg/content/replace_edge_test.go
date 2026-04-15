@@ -54,7 +54,9 @@ func TestReplacePlatformReferences_MCPWithQuotedArgs(t *testing.T) {
 mcp__context7__query-docs("cobra", topic="routing")`
 	result := content.ReplacePlatformReferences(input, "codex")
 
+	assert.Contains(t, result, "Context7 MCP first")
 	assert.Contains(t, result, `WebSearch "cobra docs"`)
+	assert.Contains(t, result, `WebSearch "cobra routing docs"`)
 	assert.NotContains(t, result, "mcp__context7__")
 }
 
@@ -80,6 +82,7 @@ func TestReplacePlatformReferences_AllSubstitutionsAcrossLines(t *testing.T) {
 
 	assert.Contains(t, result, `spawn_agent e --task "t"`)
 	assert.Contains(t, result, ".codex/rules/")
+	assert.Contains(t, result, "Context7 MCP first")
 	assert.Contains(t, result, `WebSearch "x docs"`)
 	assert.Contains(t, result, "// TodoWrite is not available")
 	assert.Contains(t, result, "auto pipeline worktree")

@@ -1,6 +1,6 @@
 # Context7 Documentation Auto-Fetch
 
-IMPORTANT: Before any technology/library/framework-related work, fetch the latest documentation via Context7 MCP. Subagents cannot call MCP tools — the main session MUST fetch and inject docs into subagent prompts.
+IMPORTANT: Before any technology/library/framework-related work, fetch the latest documentation via Context7 MCP. If Context7 MCP is unavailable, returns no match, or the docs query fails, fall back to targeted web search. Subagents cannot call MCP tools — the main session MUST fetch and inject docs into subagent prompts.
 
 ## When to Fetch
 
@@ -32,13 +32,19 @@ For each detected technology (up to **5 per pipeline run**):
 ```
 Step 1: resolve-library-id
   → Call `mcp__context7__resolve-library-id` with the library name
-  → If no match found: log "[CTX7] No match: {name}" and skip to next library
+  → If no match found: go to Step 3 (web fallback)
   → If match found: extract the library ID
 
 Step 2: query-docs
   → Call `mcp__context7__query-docs` with the resolved library ID
   → Specify topic relevant to the task context (e.g., API usage, configuration, migration)
+  → If the query returns empty or error: go to Step 3 (web fallback)
   → Cache the result for this pipeline run
+
+Step 3: web-fallback
+  → Use the session web search capability with a task-specific query
+  → Prefer official docs, release notes, migration guides, and API references
+  → Cache the result for this pipeline run and mark it as a web fallback source
 ```
 
 ## Prompt Injection Format
@@ -114,9 +120,10 @@ Per-executor refinement queries count toward the pipeline's 5-library limit. A r
 
 ## Error Handling
 
-- `resolve-library-id` returns no match → log and skip, do NOT block the pipeline
-- `query-docs` returns empty or error → log and skip, do NOT block the pipeline
-- MCP server unavailable → log warning and proceed without docs
+- `resolve-library-id` returns no match → log and continue with web fallback
+- `query-docs` returns empty or error → log and continue with web fallback
+- MCP server unavailable → log warning and continue with web fallback
+- Web search also fails → log and skip, do NOT block the pipeline
 - Never retry MCP calls more than once per library
 
 ## Anti-Patterns
@@ -125,6 +132,7 @@ Per-executor refinement queries count toward the pipeline's 5-library limit. A r
 - Do NOT fetch documentation for standard library modules
 - Do NOT fetch more than 5 libraries per pipeline run
 - Do NOT inject full documentation without trimming — always respect token budgets
+- Do NOT skip directly to web search when Context7 MCP is available and applicable
 - Do NOT block the pipeline on Context7 failures — documentation is supplementary, not critical
 
 ## Ref

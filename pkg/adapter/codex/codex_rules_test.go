@@ -80,6 +80,12 @@ func TestGenerateRuleFiles_Content(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(brandingData), "Autopus Branding")
 
+	context7Path := filepath.Join(dir, ".codex", "rules", "autopus", "context7-docs.md")
+	context7Data, err := os.ReadFile(context7Path)
+	require.NoError(t, err)
+	assert.Contains(t, string(context7Data), "web search")
+	assert.Contains(t, string(context7Data), "official docs")
+
 	projectIdentityPath := filepath.Join(dir, ".codex", "rules", "autopus", "project-identity.md")
 	projectIdentityData, err := os.ReadFile(projectIdentityPath)
 	require.NoError(t, err)

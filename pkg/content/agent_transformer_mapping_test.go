@@ -30,10 +30,12 @@ func TestReplaceToolReferences_MCPToWebSearch(t *testing.T) {
 	body := `Call mcp__context7__resolve-library-id(cobra) to find docs.`
 
 	codex := content.ReplaceToolReferences(body, "codex")
+	assert.Contains(t, codex, "Context7 MCP first")
 	assert.Contains(t, codex, `WebSearch "cobra docs"`)
 	assert.NotContains(t, codex, "mcp__context7__")
 
 	gemini := content.ReplaceToolReferences(body, "gemini")
+	assert.Contains(t, gemini, "Context7 MCP first")
 	assert.Contains(t, gemini, `WebSearch "cobra docs"`)
 
 	// Bare mcp__ reference without arguments: generic replacement

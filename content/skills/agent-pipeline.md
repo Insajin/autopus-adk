@@ -172,7 +172,7 @@ Executor constraint: Phase 2 executors MUST NOT modify test files generated in P
 
 ### Phase 1.8: Doc Fetch (Context7 MCP)
 
-WHEN Phase 1.5 (or Gate 1) completes, THE SYSTEM SHALL fetch latest documentation for external libraries referenced in the SPEC, using the Context7 MCP tools. This phase runs in the **main session** (subagents cannot access MCP tools).
+WHEN Phase 1.5 (or Gate 1) completes, THE SYSTEM SHALL fetch latest documentation for external libraries referenced in the SPEC, using the Context7 MCP tools first and falling back to targeted web search when Context7 is unavailable or insufficient. This phase runs in the **main session** (subagents cannot access MCP tools).
 
 **Skip condition**: If no external libraries are detected in the SPEC, plan.md, or affected file imports, skip Phase 1.8 entirely.
 
@@ -184,9 +184,15 @@ Step 1: Detect Technologies
 
 Step 2: Fetch Documentation (for each detected library, max 5)
   → Call mcp__context7__resolve-library-id(libraryName)
-  → If no match: log "[CTX7] No match: {name}", skip to next
+  → If no match: log "[CTX7] No match: {name}", continue with web fallback
   → Call mcp__context7__query-docs(libraryId, topic="{task-relevant topic}")
+  → If query-docs fails or returns empty: continue with web fallback
   → Cache result keyed by library-id + topic
+
+Step 2.5: Web Fallback (when needed)
+  → Use the session web search capability with a focused query for the same library/topic
+  → Prefer official docs, release notes, migration notes, and API references
+  → Cache fallback results and label them as web-fallback sources
 
 Step 3: Prepare Injection Payload (Adaptive Token Budget)
   → Apply adaptive token budget based on library count:
@@ -204,7 +210,7 @@ Step 4 (optional): Per-Executor Refinement
 
 **Injection into subsequent phases**: The cached documentation is injected into Phase 2 executor and Phase 3 tester prompts as a `## Reference Documentation` section, following the same pattern as Phase 2 Profile Injection.
 
-**Error handling**: Context7 failures (MCP unavailable, no match, empty response) are logged and skipped — documentation is supplementary, never blocks the pipeline.
+**Error handling**: Context7 failures (MCP unavailable, no match, empty response) first trigger web fallback. Only when both Context7 and web fallback fail does the pipeline log and skip — documentation is supplementary, never blocks the pipeline.
 
 Ref: `.claude/rules/autopus/context7-docs.md` for detection heuristics, token limits, and anti-patterns.
 

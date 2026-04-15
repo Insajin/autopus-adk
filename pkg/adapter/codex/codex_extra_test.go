@@ -116,3 +116,78 @@ func TestCodexAdapter_Generate_CreatesAgentMd(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(dir, "AGENTS.md"))
 	require.NoError(t, statErr, "AGENTS.md가 생성되어야 함")
 }
+
+func TestCodexAdapter_Validate_WarnsWhenRouterPromptBrandingMissing(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := codex.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	routerPrompt := filepath.Join(dir, ".codex", "prompts", "auto.md")
+	require.NoError(t, os.WriteFile(routerPrompt, []byte("---\ndescription: test\n---\n\n# auto\n"), 0644))
+
+	errs, err := a.Validate(context.Background())
+	require.NoError(t, err)
+
+	found := false
+	for _, e := range errs {
+		if e.File == filepath.Join(".codex", "prompts", "auto.md") && e.Message == "Codex router prompt에 Autopus 브랜딩 블록이 없음" {
+			found = true
+		}
+	}
+	assert.True(t, found, "router prompt branding warning should be reported")
+}
+
+func TestCodexAdapter_Validate_WarnsWhenProjectDocBudgetTooLow(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := codex.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	configPath := filepath.Join(dir, "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte("project_doc_max_bytes = 65536\n"), 0644))
+
+	errs, err := a.Validate(context.Background())
+	require.NoError(t, err)
+
+	found := false
+	for _, e := range errs {
+		if e.File == "config.toml" && e.Message == "project_doc_max_bytes가 너무 낮음 (65536 < 262144): 대형 프로젝트 문서가 잘릴 수 있음" {
+			found = true
+		}
+	}
+	assert.True(t, found, "project doc budget warning should be reported")
+}
+
+func TestCodexAdapter_Validate_WarnsWhenContext7FallbackMissing(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := codex.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	rulePath := filepath.Join(dir, ".codex", "rules", "autopus", "context7-docs.md")
+	require.NoError(t, os.WriteFile(rulePath, []byte("# Context7\n"), 0644))
+
+	errs, err := a.Validate(context.Background())
+	require.NoError(t, err)
+
+	found := false
+	for _, e := range errs {
+		if e.File == filepath.Join(".codex", "rules", "autopus", "context7-docs.md") && e.Message == "Codex Context7 규칙에 web fallback 계약이 없음" {
+			found = true
+		}
+	}
+	assert.True(t, found, "context7 fallback warning should be reported")
+}

@@ -66,9 +66,7 @@ func (a *Adapter) renderWorkflowPrompt(spec workflowSpec, cfg *config.HarnessCon
 	if err != nil {
 		return "", fmt.Errorf("codex prompt 템플릿 렌더링 실패 %s: %w", spec.Name, err)
 	}
-	if spec.Name == "auto" {
-		rendered = rewriteCodexRouterBody(rendered)
-	}
+	rendered = decorateCodexWorkflowPrompt(rendered, spec.Name == "auto")
 
 	return normalizeWorkflowPrompt(rendered), nil
 }

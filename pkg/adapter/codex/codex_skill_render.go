@@ -146,6 +146,36 @@ func injectCodexBrandingBlock(body string, router bool) string {
 	return injectAfterFirstHeading(body, block)
 }
 
+func decorateCodexWorkflowPrompt(rendered string, router bool) string {
+	frontmatter, body := splitSkillFrontmatter(rendered)
+	if strings.TrimSpace(body) == "" {
+		frontmatter = ""
+		body = rendered
+	}
+
+	body = strings.TrimSpace(body)
+	if router {
+		body = rewriteCodexRouterBody(body)
+		body = injectAfterFirstHeading(body, codexRouterExecutionContract())
+	}
+	body = injectCodexBrandingBlock(body, router)
+
+	if strings.TrimSpace(frontmatter) == "" {
+		return strings.TrimSpace(body) + "\n"
+	}
+	return frontmatter + "\n\n" + strings.TrimSpace(body) + "\n"
+}
+
+func codexRouterExecutionContract() string {
+	return fmt.Sprintf("## Router Execution Contract\n\n"+
+		"- Treat this file as a thin entrypoint only.\n"+
+		"- After resolving the subcommand, immediately load the matching detailed workflow surface (%s) before answering or acting.\n"+
+		"- Do not stay at the router layer when a detailed workflow exists for the request.\n"+
+		"- If project context is stale or ambiguous, read `ARCHITECTURE.md`, `.autopus/project/*`, and the relevant source directories before proceeding.\n",
+		routerDetailSkills(),
+	)
+}
+
 func rewriteCodexRouterBody(body string) string {
 	body = strings.TrimSpace(body)
 	body = injectRouterSupportedFlows(body)

@@ -127,4 +127,23 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-test.md"], "auto test run")
 	assert.Contains(t, byName["auto-dev.md"], "`auto-plan`")
 	assert.Contains(t, byName["auto-doctor.md"], "auto doctor")
+	assert.Contains(t, byName["auto.md"], "## Autopus Branding")
+	assert.Contains(t, byName["auto.md"], "## Router Execution Contract")
+	assert.Contains(t, byName["auto.md"], "ARCHITECTURE.md")
+}
+
+func TestRenderPromptTemplates_AllPromptsIncludeBranding(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	files, err := a.renderPromptTemplates(cfg)
+	require.NoError(t, err)
+
+	for _, f := range files {
+		content := string(f.Content)
+		assert.Contains(t, content, "## Autopus Branding", f.TargetPath)
+		assert.Contains(t, content, "🐙 Autopus ─────────────────────────", f.TargetPath)
+	}
 }

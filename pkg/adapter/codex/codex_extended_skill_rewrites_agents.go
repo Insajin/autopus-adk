@@ -178,7 +178,15 @@ When enabled, spawn a tester to write failing tests before implementation. Gener
 
 ### Phase 1.8: Doc Fetch
 
-This phase stays in the main session. Use current documentation tools available in the session and inject only the relevant excerpts into later worker prompts.
+This phase stays in the main session. Try Context7 MCP first for external libraries, then fall back to targeted web search when Context7 is unavailable, returns no match, or the docs query is incomplete. Inject only the relevant excerpts into later worker prompts.
+
+Doc-fetch rules:
+
+- detect external libraries from the task, affected imports, and config files
+- prefer Context7 MCP as the first source for current API and migration guidance
+- if Context7 fails, use web search with official docs, release notes, and API references first
+- cache only the minimum relevant excerpts under a ` + "`## Reference Documentation`" + ` section
+- do not block implementation when both Context7 and web fallback fail
 
 ### Phase 2: Implementation
 

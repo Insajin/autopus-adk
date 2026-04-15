@@ -33,10 +33,10 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 		data, readErr := os.ReadFile(path)
 		require.NoError(t, readErr, path)
 		content := string(data)
+		assert.Contains(t, content, "## Autopus Branding", path)
+		assert.Contains(t, content, "🐙 Autopus ─────────────────────────", path)
 		if filepath.Base(path) == "SKILL.md" {
 			assert.Contains(t, content, "## Codex Invocation", path)
-			assert.Contains(t, content, "## Autopus Branding", path)
-			assert.Contains(t, content, "🐙 Autopus ─────────────────────────", path)
 			assert.Contains(t, content, "thin router", path)
 		}
 		for _, token := range banned {
@@ -70,10 +70,8 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 			data, readErr := os.ReadFile(path)
 			require.NoError(t, readErr, path)
 			content := string(data)
-			if filepath.Base(path) == "SKILL.md" {
-				assert.Contains(t, content, "## Autopus Branding", path)
-				assert.Contains(t, content, "🐙 Autopus ─────────────────────────", path)
-			}
+			assert.Contains(t, content, "## Autopus Branding", path)
+			assert.Contains(t, content, "🐙 Autopus ─────────────────────────", path)
 			for _, token := range banned {
 				assert.NotContains(t, content, token, path)
 			}
@@ -112,6 +110,8 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	autoPrompt, err := os.ReadFile(filepath.Join(dir, ".codex", "prompts", "auto.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoPrompt), "하네스 기본값과 제약을 명시적으로 설명")
+	assert.Contains(t, string(autoPrompt), "## Router Execution Contract")
+	assert.Contains(t, string(autoPrompt), "ARCHITECTURE.md")
 	assert.Contains(t, string(autoPrompt), "`setup`")
 	assert.Contains(t, string(autoPrompt), "`doctor`")
 	assert.NotContains(t, string(autoPrompt), "`.agents/skills/auto/SKILL.md`의 최신 라우터 규칙을 우선")
@@ -131,6 +131,11 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	agentTeamsSkill, err := os.ReadFile(filepath.Join(dir, ".codex", "skills", "agent-teams.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(agentTeamsSkill), "@auto go --auto")
+
+	agentPipelineSkill, err := os.ReadFile(filepath.Join(dir, ".codex", "skills", "agent-pipeline.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(agentPipelineSkill), "Context7 MCP")
+	assert.Contains(t, string(agentPipelineSkill), "web search")
 }
 
 func TestCodexAndOpenCode_AGENTSMD_UsesSharedPlatformSection(t *testing.T) {
