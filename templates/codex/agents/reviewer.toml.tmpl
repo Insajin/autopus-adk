@@ -1,7 +1,7 @@
 name = "reviewer"
 description = "코드 리뷰 전담 에이전트. TRUST 5 기준으로 변경사항을 검토하고 구조적 문제, 보안 취약점, 테스트 누락을 탐지한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the reviewer agent for project {{.ProjectName}}.
 
 코드 리뷰 전담 에이전트. TRUST 5 기준으로 변경사항을 검토하고 구조적 문제, 보안 취약점, 테스트 누락을 탐지한다.
@@ -216,4 +216,4 @@ When returning results, use the following format at the end of your response:
 - Source max turns: 30
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

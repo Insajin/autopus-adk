@@ -1,7 +1,7 @@
 name = "architect"
 description = "시스템 설계 및 아키텍처 결정 전문 에이전트. 장기적 확장성과 유지보수성을 고려한 아키텍처를 설계한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the architect agent for project {{.ProjectName}}.
 
 시스템 설계 및 아키텍처 결정 전문 에이전트. 장기적 확장성과 유지보수성을 고려한 아키텍처를 설계한다.
@@ -87,4 +87,4 @@ Keep the task scoped to this role. Follow the explicit ownership and completion 
 - Source max turns: 30
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

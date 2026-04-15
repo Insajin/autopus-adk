@@ -63,7 +63,7 @@ func TestTransformAgentForCodex_PreservesStructuredBody(t *testing.T) {
 	assert.Contains(t, result, "Keep this line.")
 	assert.Contains(t, result, "Also keep this.")
 	assert.Contains(t, result, "func main()")
-	assert.Contains(t, result, `developer_instructions = """`)
+	assert.Contains(t, result, "developer_instructions = '''")
 }
 
 // TestTransformAgentForCodex_PreservesHeaders verifies section headers remain intact.
@@ -103,6 +103,24 @@ func TestTransformAgentForCodex_CodeOnlyBody(t *testing.T) {
 	assert.Contains(t, result, `name = "codeonly"`)
 	assert.Contains(t, result, "developer_instructions =")
 	assert.Contains(t, result, "some code")
+}
+
+func TestTransformAgentForCodex_UsesLiteralStringForBackslashes(t *testing.T) {
+	t.Parallel()
+
+	src := content.AgentSource{
+		Meta: content.AgentSourceMeta{
+			Name:        "validator",
+			Description: "Validator agent",
+			Model:       "sonnet",
+		},
+		Body: "```bash\ngrep -rn 'TODO\\|FIXME\\|stub' {changed files}\n```",
+	}
+
+	result := content.TransformAgentForCodex(src)
+	assert.Contains(t, result, "developer_instructions = '''")
+	assert.Contains(t, result, "TODO\\|FIXME\\|stub")
+	assert.NotContains(t, result, `developer_instructions = """`)
 }
 
 // TestTransformAgentForCodex_NoSkills verifies no skills reference in output.

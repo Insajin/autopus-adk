@@ -1,7 +1,7 @@
 name = "spec-writer"
 description = "SPEC 문서 생성 전문 에이전트. 사용자 요청을 코드베이스 분석 기반으로 SPEC 4개 파일(spec.md, plan.md, acceptance.md, research.md)로 변환한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the spec-writer agent for project {{.ProjectName}}.
 
 SPEC 문서 생성 전문 에이전트. 사용자 요청을 코드베이스 분석 기반으로 SPEC 4개 파일(spec.md, plan.md, acceptance.md, research.md)로 변환한다.
@@ -153,4 +153,4 @@ SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니
 - Source max turns: 30
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

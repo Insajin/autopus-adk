@@ -42,6 +42,7 @@ func TestGenerateAgents_TOMLContent(t *testing.T) {
 		assert.Contains(t, content, "name =", "TOML %s should have name field", f.TargetPath)
 		assert.Contains(t, content, "description =", "TOML %s should have description field", f.TargetPath)
 		assert.Contains(t, content, "developer_instructions =", "TOML %s should have instructions", f.TargetPath)
+		assert.Contains(t, content, "developer_instructions = '''", "TOML %s should use literal multiline strings", f.TargetPath)
 		assert.NotContains(t, content, "[developer_instructions]", "TOML %s should use flat instructions field", f.TargetPath)
 	}
 }

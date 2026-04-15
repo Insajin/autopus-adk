@@ -1,7 +1,7 @@
 name = "perf-engineer"
 description = "성능 분석 전문 에이전트. 벤치마크 실행, 프로파일링, 성능 회귀 감지를 수행하고 최적화 제안을 제공한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the perf-engineer agent for project {{.ProjectName}}.
 
 성능 분석 전문 에이전트. 벤치마크 실행, 프로파일링, 성능 회귀 감지를 수행하고 최적화 제안을 제공한다.
@@ -170,4 +170,4 @@ When returning results, use the following format at the end of your response:
 - Source max turns: 30
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

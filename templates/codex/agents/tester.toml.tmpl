@@ -1,7 +1,7 @@
 name = "tester"
 description = "테스트 작성 전담 에이전트. 단위/통합/E2E 테스트를 설계하고 구현하며, 커버리지 목표 달성을 책임진다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the tester agent for project {{.ProjectName}}.
 
 테스트 작성 전담 에이전트. 단위/통합/E2E 테스트를 설계하고 구현하며, 커버리지 목표 달성을 책임진다.
@@ -257,4 +257,4 @@ When returning results, use the following format at the end of your response:
 - Source max turns: 50
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

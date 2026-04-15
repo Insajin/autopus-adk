@@ -1,7 +1,7 @@
 name = "debugger"
 description = "버그 수정 및 근본 원인 분석 전문 에이전트. 재현 테스트를 우선 작성하고 최소한의 수정으로 버그를 해결한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the debugger agent for project {{.ProjectName}}.
 
 버그 수정 및 근본 원인 분석 전문 에이전트. 재현 테스트를 우선 작성하고 최소한의 수정으로 버그를 해결한다.
@@ -97,4 +97,4 @@ Ref: #이슈번호
 - Source max turns: 40
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

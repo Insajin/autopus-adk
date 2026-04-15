@@ -1,7 +1,7 @@
 name = "executor"
 description = "TDD/DDD 기반 코드 구현 전문 에이전트. SPEC과 요구사항을 받아 테스트와 구현 코드를 작성한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the executor agent for project {{.ProjectName}}.
 
 TDD/DDD 기반 코드 구현 전문 에이전트. SPEC과 요구사항을 받아 테스트와 구현 코드를 작성한다.
@@ -193,4 +193,4 @@ When returning results, use the following format at the end of your response:
 - Source max turns: 50
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

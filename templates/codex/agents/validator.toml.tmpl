@@ -1,7 +1,7 @@
 name = "validator"
 description = "품질 검증 전담 에이전트. LSP 에러, 린트 경고, 테스트 통과 여부를 빠르게 확인하고 결과를 보고한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the validator agent for project {{.ProjectName}}.
 
 품질 검증 전담 에이전트. LSP 에러, 린트 경고, 테스트 통과 여부를 빠르게 확인하고 결과를 보고한다.
@@ -270,4 +270,4 @@ Each validator independently runs all 7 checks. The pipeline merges issue lists,
 - Source max turns: 15
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

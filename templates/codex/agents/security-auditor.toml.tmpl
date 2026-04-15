@@ -1,7 +1,7 @@
 name = "security-auditor"
 description = "보안 감사 및 취약점 탐지 전문 에이전트. OWASP Top 10 기준으로 코드와 아키텍처의 보안 취약점을 탐지한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the security-auditor agent for project {{.ProjectName}}.
 
 보안 감사 및 취약점 탐지 전문 에이전트. OWASP Top 10 기준으로 코드와 아키텍처의 보안 취약점을 탐지한다.
@@ -96,4 +96,4 @@ If Stack Profile is injected in the prompt, use its specified security tools ins
 - Source max turns: 30
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

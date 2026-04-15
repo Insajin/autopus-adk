@@ -107,7 +107,9 @@ func TransformAgentForCodex(src AgentSource) string {
 
 	// Preserve the source structure so Codex keeps the phase contracts and I/O shape.
 	instructions := buildCodexInstructions(src.Meta, body)
-	fmt.Fprintf(&sb, "developer_instructions = \"\"\"\n%s\n\"\"\"\n", escapeTOMLMultiline(instructions))
+	sb.WriteString("developer_instructions = ")
+	sb.WriteString(formatTOMLMultilineString(instructions))
+	sb.WriteString("\n")
 
 	return sb.String()
 }
@@ -200,9 +202,23 @@ func buildCodexInstructions(meta AgentSourceMeta, body string) string {
 	return strings.Join(parts, "\n\n")
 }
 
-func escapeTOMLMultiline(s string) string {
+func normalizeTOMLMultiline(s string) string {
 	s = strings.TrimSpace(s)
 	s = strings.ReplaceAll(s, "\r\n", "\n")
+	return s
+}
+
+func escapeTOMLBasicMultiline(s string) string {
+	s = normalizeTOMLMultiline(s)
+	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "\"\"\"", "\\\"\\\"\\\"")
 	return s
+}
+
+func formatTOMLMultilineString(s string) string {
+	s = normalizeTOMLMultiline(s)
+	if !strings.Contains(s, "'''") {
+		return "'''\n" + s + "\n'''"
+	}
+	return "\"\"\"\n" + escapeTOMLBasicMultiline(s) + "\n\"\"\""
 }

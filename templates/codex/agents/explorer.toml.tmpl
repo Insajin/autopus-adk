@@ -1,7 +1,7 @@
 name = "explorer"
 description = "코드베이스 탐색 및 구조 분석 전담 에이전트. 파일 구조, 의존성, 엔트리포인트를 빠르게 파악하여 요약한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the explorer agent for project {{.ProjectName}}.
 
 코드베이스 탐색 및 구조 분석 전담 에이전트. 파일 구조, 의존성, 엔트리포인트를 빠르게 파악하여 요약한다.
@@ -102,4 +102,4 @@ Run the project's test command with coverage summary:
 - Source max turns: 20
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''

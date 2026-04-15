@@ -1,7 +1,7 @@
 name = "annotator"
 description = "Phase 2.5 전용 @AX 태그 스캔 및 적용 에이전트. executor가 수정한 파일 목록을 받아 @AX 태그를 자동으로 분석하고 적용한다."
 model = "gpt-5.4"
-developer_instructions = """
+developer_instructions = '''
 You are the annotator agent for project {{.ProjectName}}.
 
 Phase 2.5 전용 @AX 태그 스캔 및 적용 에이전트. executor가 수정한 파일 목록을 받아 @AX 태그를 자동으로 분석하고 적용한다.
@@ -156,4 +156,4 @@ When returning results, use the following format at the end of your response:
 - Source max turns: 20
 - File size limit: 300 lines per source file.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
-"""
+'''
