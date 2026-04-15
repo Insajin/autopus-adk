@@ -18,7 +18,8 @@ func TestRunInteractiveDebate_DefaultRound(t *testing.T) {
 	t.Parallel()
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 0,
-		Prompt: "default round", Providers: []ProviderConfig{{Name: "claude", Binary: "echo"}},
+		Prompt:         "default round",
+		Providers:      []ProviderConfig{echoProvider("claude")},
 		TimeoutSeconds: 10, Interactive: true, HookMode: true, SessionID: "test-debate-default", InitialDelay: time.Millisecond,
 	}
 	result, err := runInteractiveDebate(context.Background(), cfg)
@@ -45,7 +46,8 @@ func TestRunInteractiveDebate_RoundsFlag_Range(t *testing.T) {
 			t.Parallel()
 			cfg := OrchestraConfig{
 				Strategy: StrategyDebate, DebateRounds: tt.rounds,
-				Prompt: "range test", Providers: []ProviderConfig{{Name: "claude", Binary: "echo"}},
+				Prompt:         "range test",
+				Providers:      []ProviderConfig{echoProvider("claude")},
 				TimeoutSeconds: 5, Interactive: true, HookMode: true, SessionID: "test-range", InitialDelay: time.Millisecond,
 			}
 			_, err := runInteractiveDebate(context.Background(), cfg)
@@ -64,7 +66,7 @@ func TestRunInteractiveDebate_ContextCancellation(t *testing.T) {
 	cancel()
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 3, Prompt: "cancel test",
-		Providers: []ProviderConfig{{Name: "claude", Binary: "echo"}},
+		Providers:      []ProviderConfig{{Name: "claude", Binary: "echo"}},
 		TimeoutSeconds: 10, Interactive: true, HookMode: true, SessionID: "test-cancel", InitialDelay: time.Millisecond,
 	}
 	_, err := runInteractiveDebate(ctx, cfg)
@@ -77,7 +79,7 @@ func TestRunInteractiveDebate_NoTerminal_Fallback(t *testing.T) {
 	t.Parallel()
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 1, Prompt: "no terminal test",
-		Providers: []ProviderConfig{{Name: "claude", Binary: "echo"}},
+		Providers:      []ProviderConfig{echoProvider("claude")},
 		TimeoutSeconds: 10, Terminal: nil,
 	}
 	result, err := runInteractiveDebate(context.Background(), cfg)
@@ -93,8 +95,8 @@ func TestRunInteractiveDebate_MultiRound_NoTerminal(t *testing.T) {
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 2, Prompt: "multi round",
 		Providers: []ProviderConfig{
-			{Name: "claude", Binary: "echo"},
-			{Name: "gemini", Binary: "echo"},
+			echoProvider("claude"),
+			echoProvider("gemini"),
 		},
 		TimeoutSeconds: 10, Terminal: nil,
 	}
@@ -103,18 +105,19 @@ func TestRunInteractiveDebate_MultiRound_NoTerminal(t *testing.T) {
 	assert.NotNil(t, result)
 }
 
-// TestRunInteractiveDebate_NonExistentBinary verifies fallback path when
-// binary does not exist (runDebate fails, falls through to parallel/empty).
+// TestRunInteractiveDebate_NonExistentBinary verifies fallback path returns an
+// error when debate and fallback execution both fail.
 func TestRunInteractiveDebate_NonExistentBinary(t *testing.T) {
 	t.Parallel()
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 1, Prompt: "bad binary test",
-		Providers: []ProviderConfig{{Name: "test", Binary: "nonexistent-binary-xyz"}},
+		Providers:      []ProviderConfig{{Name: "test", Binary: "nonexistent-binary-xyz"}},
 		TimeoutSeconds: 5, Terminal: nil,
 	}
 	result, err := runInteractiveDebate(context.Background(), cfg)
-	require.NoError(t, err)
-	assert.NotNil(t, result)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "fallback failed")
 }
 
 // --- REQ-2: Topic isolation ---
@@ -133,7 +136,7 @@ func TestExecuteRound_TopicIsolation(t *testing.T) {
 		TimeoutSeconds: 5,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	panes := []paneInfo{{provider: cfg.Providers[0], paneID: "pane-1"}}
 
@@ -165,7 +168,7 @@ func TestRunInteractiveDebate_SingleProvider(t *testing.T) {
 	t.Parallel()
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 2, Prompt: "single provider debate",
-		Providers:      []ProviderConfig{{Name: "claude", Binary: "echo"}},
+		Providers:      []ProviderConfig{echoProvider("claude")},
 		TimeoutSeconds: 10, Terminal: nil,
 	}
 	result, err := runInteractiveDebate(context.Background(), cfg)
@@ -179,10 +182,10 @@ func TestRunInteractiveDebate_WithJudge_NoTerminal(t *testing.T) {
 	t.Parallel()
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 1, Prompt: "judge test",
-		JudgeProvider: "echo",
+		JudgeProvider: "claude",
 		Providers: []ProviderConfig{
-			{Name: "claude", Binary: "echo"},
-			{Name: "gemini", Binary: "echo"},
+			echoProvider("claude"),
+			echoProvider("gemini"),
 		},
 		TimeoutSeconds: 10, Terminal: nil,
 	}

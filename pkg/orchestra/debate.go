@@ -37,7 +37,7 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, er
 		if detect.IsInstalled(judgeCfg.Binary) {
 			judgment := buildJudgmentPrompt(cfg.Prompt, responses)
 			judgeResp, judgeErr := runProvider(ctx, judgeCfg, judgment)
-			if judgeErr == nil && judgeResp != nil {
+			if judgeErr == nil && judgeResp != nil && !judgeResp.TimedOut && !judgeResp.EmptyOutput {
 				judgeResp.Provider = cfg.JudgeProvider + " (judge)"
 				responses = append(responses, *judgeResp)
 			}

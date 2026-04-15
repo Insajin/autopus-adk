@@ -87,11 +87,11 @@ func TestPerRoundTimeout(t *testing.T) {
 		rounds   int
 		expected time.Duration
 	}{
-		{"120s / 3 rounds", 120, 3, 45 * time.Second},       // debate=60, 60/3=20 < 45 -> floor
-		{"60s / 1 round", 60, 1, 45 * time.Second},          // debate=0, 0/1=0 < 45 -> floor
-		{"zero total defaults", 0, 2, 45 * time.Second},     // total=120, debate=60, 60/2=30 < 45 -> floor
+		{"120s / 3 rounds", 120, 3, 45 * time.Second},        // debate=60, 60/3=20 < 45 -> floor
+		{"60s / 1 round", 60, 1, 45 * time.Second},           // debate=0, 0/1=0 < 45 -> floor
+		{"zero total defaults", 0, 2, 45 * time.Second},      // total=120, debate=60, 60/2=30 < 45 -> floor
 		{"negative total defaults", -1, 4, 45 * time.Second}, // total=120, debate=60, 60/4=15 < 45 -> floor
-		{"zero rounds defaults", 60, 0, 45 * time.Second},   // debate=0, 0/1=0 < 45 -> floor
+		{"zero rounds defaults", 60, 0, 45 * time.Second},    // debate=0, 0/1=0 < 45 -> floor
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -111,8 +111,8 @@ func TestPerRoundTimeout_MinimumFloor(t *testing.T) {
 		expected time.Duration
 	}{
 		{"floor applied", 60, 3, 45 * time.Second},    // debate=0, 0/3=0 < 45 -> floor
-		{"no floor needed", 120, 2, 45 * time.Second},  // debate=60, 60/2=30 < 45 -> floor
-		{"default total", 0, 1, 60 * time.Second},      // total=120, debate=60, 60/1=60 > 45
+		{"no floor needed", 120, 2, 45 * time.Second}, // debate=60, 60/2=30 < 45 -> floor
+		{"default total", 0, 1, 60 * time.Second},     // total=120, debate=60, 60/1=60 > 45
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -270,29 +270,20 @@ func TestPerRoundTimeout_NoJudge(t *testing.T) {
 	}
 }
 
-// TestJudgeTimeout_IndependentContext verifies judge uses context.Background()
-// with independent timeout, not the debate context.
-// S1: Judge should execute normally even after debate timeout (parent ctx expired).
-func TestJudgeTimeout_IndependentContext(t *testing.T) {
+// TestJudgeTimeout_UsesParentContext verifies judge respects parent context
+// cancellation and does not keep running independently.
+func TestJudgeTimeout_UsesParentContext(t *testing.T) {
 	t.Parallel()
-	// Create an already-cancelled parent context to simulate debate timeout exhaustion.
 	parentCtx, cancel := context.WithCancel(context.Background())
-	cancel() // Parent context is expired.
+	cancel()
 
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{{Name: "claude", Binary: "echo"}},
 		JudgeProvider:  "claude",
 		TimeoutSeconds: 60,
 	}
-	// runJudgeRound ignores the parent ctx and creates its own context.Background()
-	// timeout. It should not return nil just because parentCtx is cancelled.
-	// Since echo binary is used, the judge will produce some output.
 	resp := runJudgeRound(parentCtx, cfg, nil, nil, []ProviderResponse{
 		{Provider: "claude", Output: "test output"},
 	}, 1)
-	// The judge should have run successfully despite expired parent context.
-	// With echo binary, it may succeed or fail based on environment, but the key
-	// assertion is that runJudgeRound doesn't bail out due to parent ctx cancellation.
-	// We verify it at least attempts execution (doesn't immediately return nil).
-	_ = resp // Success: function didn't panic or skip due to cancelled parent ctx.
+	assert.Nil(t, resp, "judge must stop when parent context is already cancelled")
 }

@@ -181,11 +181,11 @@ func TestNoJudge_SkipsJudgeInDebate(t *testing.T) {
 	t.Parallel()
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 1, Prompt: "no-judge test",
-		JudgeProvider: "echo",
+		JudgeProvider: "claude",
 		NoJudge:       true,
 		Providers: []ProviderConfig{
-			{Name: "claude", Binary: "echo"},
-			{Name: "gemini", Binary: "echo"},
+			echoProvider("claude"),
+			echoProvider("gemini"),
 		},
 		TimeoutSeconds: 10, Terminal: nil,
 	}
@@ -204,10 +204,10 @@ func TestNoJudge_False_IncludesJudge(t *testing.T) {
 	t.Parallel()
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 1, Prompt: "with-judge test",
-		JudgeProvider: "echo",
+		JudgeProvider: "claude",
 		NoJudge:       false,
 		Providers: []ProviderConfig{
-			{Name: "claude", Binary: "echo"},
+			echoProvider("claude"),
 		},
 		TimeoutSeconds: 10, Terminal: nil,
 	}

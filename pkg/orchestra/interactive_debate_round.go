@@ -145,7 +145,7 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 	if pollTimeout <= 0 {
 		pollTimeout = 60 * time.Second
 	}
-	pollCtx, pollCancel := context.WithTimeout(context.Background(), pollTimeout)
+	pollCtx, pollCancel := context.WithTimeout(ctx, pollTimeout)
 	defer pollCancel()
 
 	var responses []ProviderResponse

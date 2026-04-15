@@ -48,7 +48,6 @@ func runInteractiveDebate(ctx context.Context, cfg OrchestraConfig) (*OrchestraR
 	return runPaneDebate(ctx, cfg, rounds, perRound, start)
 }
 
-
 // runNonInteractiveDebate executes the debate without terminal panes.
 // Uses runDebate (process-based execution) with multi-round support.
 // Falls back to runParallel if runDebate fails entirely (e.g., broken pipes
@@ -71,11 +70,8 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 		// Fallback: try parallel-only execution (no rebuttal/judge).
 		fallbackResps, _, fallbackErr := runParallel(timeoutCtx, cfg)
 		if fallbackErr != nil {
-			// Both failed — return empty result rather than error to satisfy
-			// callers that expect graceful degradation (e.g., echo-binary tests
-			// that race on stdin writes). Both errors are logged above/below.
-			log.Printf("[debate] runParallel also failed: %v -- returning empty result", fallbackErr)
-			return buildDebateResult(cfg, nil, nil, start), nil
+			log.Printf("[debate] runParallel also failed: %v -- returning error", fallbackErr)
+			return nil, fmt.Errorf("debate failed: %v; fallback failed: %w", err, fallbackErr)
 		}
 		roundHistory := [][]ProviderResponse{fallbackResps}
 		return buildDebateResult(cfg, fallbackResps, roundHistory, start), nil

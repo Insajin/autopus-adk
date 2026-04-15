@@ -80,7 +80,7 @@ func TestRunParallel_EmptyOutputProviders_AreReportedAsFailed(t *testing.T) {
 
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
-			echoProvider("gemini"),      // good: returns output
+			echoProvider("gemini"),        // good: returns output
 			emptyOutputProvider("claude"), // bug: empty output, exit 0
 			badArgsProvider("codex"),      // bug: invalid flags, exit non-zero
 		},
@@ -102,6 +102,31 @@ func TestRunParallel_EmptyOutputProviders_AreReportedAsFailed(t *testing.T) {
 	}
 	assert.Contains(t, failedNames, "claude")
 	assert.Contains(t, failedNames, "codex")
+}
+
+func TestRunParallel_AllEmptyOutputProviders_ReturnsError(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping on Windows")
+	}
+
+	cfg := OrchestraConfig{
+		Providers: []ProviderConfig{
+			emptyOutputProvider("claude"),
+			emptyOutputProvider("codex"),
+		},
+		Strategy:       StrategyDebate,
+		Prompt:         "brainstorm topic",
+		TimeoutSeconds: 10,
+	}
+
+	responses, failed, err := runParallel(context.Background(), cfg)
+
+	require.Error(t, err, "all-empty providers must fail loudly")
+	assert.Nil(t, responses)
+	assert.Len(t, failed, 2)
+	assert.Contains(t, err.Error(), "모든 프로바이더가 실패했습니다")
+	assert.Contains(t, err.Error(), "empty output")
 }
 
 // TestRunDebate_JudgeRunsWithPartialResponses verifies that the judge runs

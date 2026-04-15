@@ -51,23 +51,30 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 // after debate rounds consumed most of the allotted time.
 // R1: cmd.Run() return (process exit event) is the primary completion signal;
 // the context timeout is a safety net only — judge completion is event-based, not poll-based.
-func runJudgeRound(_ context.Context, cfg OrchestraConfig, _ []paneInfo, _ *HookSession, responses []ProviderResponse, _ int) *ProviderResponse {
+func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *HookSession, responses []ProviderResponse, _ int) *ProviderResponse {
 	judgment := buildJudgmentPrompt(cfg.Prompt, responses)
 	judgeCfg := findOrBuildJudgeConfig(cfg)
 
-	// Use a fresh context for the judge — the parent ctx may be expired after debate rounds.
-	// Timeout scales with cfg.TimeoutSeconds (floor: 60s) since judgment prompt length is proportional to debate output.
+	// Bound the judge with both the parent context and a local timeout.
 	judgeTimeout := time.Duration(cfg.TimeoutSeconds) * time.Second
 	if judgeTimeout < 60*time.Second {
 		judgeTimeout = 60 * time.Second
 	}
-	judgeCtx, cancel := context.WithTimeout(context.Background(), judgeTimeout)
+	judgeCtx, cancel := context.WithTimeout(ctx, judgeTimeout)
 	defer cancel()
 
 	fmt.Fprintf(os.Stderr, "[Judge] subprocess 실행 중 (provider: %s, timeout: %s)...\n", cfg.JudgeProvider, judgeTimeout)
 	resp, err := runProvider(judgeCtx, judgeCfg, judgment)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[Judge] 프로세스 실행 실패: %v\n", err)
+		return nil
+	}
+	if resp == nil || resp.TimedOut {
+		fmt.Fprintf(os.Stderr, "[Judge] timeout 또는 취소로 판정 생략\n")
+		return nil
+	}
+	if resp.EmptyOutput {
+		fmt.Fprintf(os.Stderr, "[Judge] 빈 출력으로 판정 생략\n")
 		return nil
 	}
 	fmt.Fprintf(os.Stderr, "[Judge] 판정 완료 (%s)\n", resp.Duration.Round(time.Millisecond))
