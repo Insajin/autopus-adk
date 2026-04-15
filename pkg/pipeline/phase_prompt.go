@@ -54,16 +54,20 @@ func (b *PhasePromptBuilder) BuildPrompt(phaseID PhaseID, ctx PhaseContext) (str
 		}
 
 	case PhaseTestScaffold:
+		b.appendFileSectionIfPresent(&sb, "acceptance.md", "Acceptance")
 		b.injectPrior(&sb, ctx, PhasePlan, "Plan Output")
 
 	case PhaseImplement:
+		b.appendFileSectionIfPresent(&sb, "acceptance.md", "Acceptance")
 		b.injectPrior(&sb, ctx, PhasePlan, "Plan Output")
 		b.injectPrior(&sb, ctx, PhaseTestScaffold, "Test Scaffold Output")
 
 	case PhaseValidate:
+		b.appendFileSectionIfPresent(&sb, "acceptance.md", "Acceptance")
 		b.injectPrior(&sb, ctx, PhaseImplement, "Implementation Output")
 
 	case PhaseReview:
+		b.appendFileSectionIfPresent(&sb, "acceptance.md", "Acceptance")
 		b.injectPrior(&sb, ctx, PhaseValidate, "Validation Output")
 	}
 
@@ -78,6 +82,14 @@ func (b *PhasePromptBuilder) injectPrior(sb *strings.Builder, ctx PhaseContext, 
 	if result, ok := ctx.PreviousResults[id]; ok && result != "" {
 		sb.WriteString(fmt.Sprintf("## %s\n%s\n\n", label, result))
 	}
+}
+
+func (b *PhasePromptBuilder) appendFileSectionIfPresent(sb *strings.Builder, name, label string) {
+	content, err := b.readFile(name)
+	if err != nil || content == "" {
+		return
+	}
+	sb.WriteString(fmt.Sprintf("## %s\n%s\n\n", label, content))
 }
 
 // readFile reads a file relative to the spec directory and returns its contents.

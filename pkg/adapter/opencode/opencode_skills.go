@@ -91,7 +91,7 @@ func (a *Adapter) renderWorkflowPrompt(templatePath string, cfg *config.HarnessC
 
 func (a *Adapter) renderRouterSkill(cfg *config.HarnessConfig) (string, error) {
 	_ = cfg
-	body := thinRouterSkillBody()
+	body := injectOpenCodeBrandingBlock(thinRouterSkillBody())
 	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", "auto", routerDescription())
 	return buildMarkdown(frontmatter, body), nil
 }
@@ -113,6 +113,7 @@ func (a *Adapter) renderTemplateAsSkill(cfg *config.HarnessConfig, spec workflow
 	if !strings.Contains(body, "## OpenCode Invocation") {
 		body = injectAfterFirstHeading(body, strings.TrimSpace(skillInvocationNote(spec.Name)))
 	}
+	body = injectOpenCodeBrandingBlock(body)
 
 	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", spec.Name, spec.Description)
 	return buildMarkdown(frontmatter, body), nil

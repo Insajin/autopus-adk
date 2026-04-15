@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	// Gherkin scenario header: "### S1: ..." or "### Scenario: ..."
-	reScenarioHeader = regexp.MustCompile(`^###\s+(?:S\d+:\s*|Scenario:\s*)(.+)`)
+	// Gherkin scenario header: "### S1: ...", "### Scenario: ...",
+	// scaffolded "### Scenario 1: ...", and "### Edge Case 1: ..."
+	reScenarioHeader = regexp.MustCompile(`^###\s+(?:S\d+|Scenario(?:\s+\d+)?|Edge Case(?:\s+\d+)?)\s*:\s*(.+)$`)
 
 	// Gherkin step keywords
 	reGherkinStep = regexp.MustCompile(`(?i)^\s*(Given|When|Then|And|But)\s+(.+)`)

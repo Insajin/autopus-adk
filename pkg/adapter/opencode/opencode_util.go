@@ -138,6 +138,20 @@ func skillInvocationNote(name string) string {
 	return fmt.Sprintf("## OpenCode Invocation\n\n이 스킬은 다음 두 경로로 사용할 수 있습니다.\n\n- `/auto %s ...`\n- `/%s ...`\n- `skill` 도구로 직접 `%s` 로드\n\n직접 로드되면 사용자의 최신 요청을 해당 명령의 인자로 간주하세요.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `"+openCodeDefaultModel+"` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n", subcommand, name, name)
 }
 
+func injectOpenCodeBrandingBlock(body string) string {
+	if strings.Contains(body, "## Autopus Branding") {
+		return body
+	}
+
+	block := strings.TrimSpace("## Autopus Branding\n\n" +
+		"When handling this workflow, start the response with the canonical banner from `templates/shared/branding-formats.md.tmpl`:\n\n" +
+		"```text\n" +
+		"🐙 Autopus ─────────────────────────\n" +
+		"```\n\n" +
+		"End the completed response with `🐙`.")
+	return injectAfterFirstHeading(body, block)
+}
+
 func augmentOpenCodeFlagDocs(body string) string {
 	replacer := strings.NewReplacer(
 		"- `--quality <mode>`: 하위 에이전트 품질 모드 지정", "- `--quality <mode>`: 하위 에이전트 품질 모드 지정\n- `--model <provider/model>`: OpenCode 세션/서브에이전트 모델 오버라이드\n- `--variant <value>`: provider-specific reasoning variant 오버라이드",

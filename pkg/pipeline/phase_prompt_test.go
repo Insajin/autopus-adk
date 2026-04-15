@@ -39,6 +39,7 @@ func TestPhasePromptBuilder_BuildPrompt_Implement_IncludesPlanResult(t *testing.
 	// Given: a temp dir with spec.md
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "spec.md"), []byte("# SPEC"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "acceptance.md"), []byte("### Scenario: Login\nGiven a user\nWhen login\nThen access is granted"), 0o644))
 
 	builder := pipeline.NewPhasePromptBuilder(dir)
 	ctx := pipeline.PhaseContext{
@@ -53,6 +54,23 @@ func TestPhasePromptBuilder_BuildPrompt_Implement_IncludesPlanResult(t *testing.
 	// Then: the prompt contains the Plan phase output
 	require.NoError(t, err)
 	assert.Contains(t, prompt, "plan phase output here")
+	assert.Contains(t, prompt, "## Acceptance")
+	assert.Contains(t, prompt, "Scenario: Login")
+}
+
+func TestPhasePromptBuilder_BuildPrompt_TestScaffold_IncludesAcceptance(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "spec.md"), []byte("# SPEC"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "acceptance.md"), []byte("### Scenario 1: Login\nGiven a user\nWhen login\nThen access is granted"), 0o644))
+
+	builder := pipeline.NewPhasePromptBuilder(dir)
+	prompt, err := builder.BuildPrompt(pipeline.PhaseTestScaffold, pipeline.PhaseContext{})
+
+	require.NoError(t, err)
+	assert.Contains(t, prompt, "## Acceptance")
+	assert.Contains(t, prompt, "Scenario 1: Login")
 }
 
 // TestPhasePromptBuilder_BuildPrompt_Validate_IncludesImplResult verifies
@@ -63,6 +81,7 @@ func TestPhasePromptBuilder_BuildPrompt_Validate_IncludesImplResult(t *testing.T
 	// Given: a temp dir with spec.md
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "spec.md"), []byte("# SPEC"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "acceptance.md"), []byte("### Edge Case 1: Failure\nGiven a failure\nWhen retrying\nThen the system recovers"), 0o644))
 
 	builder := pipeline.NewPhasePromptBuilder(dir)
 	ctx := pipeline.PhaseContext{
@@ -77,4 +96,6 @@ func TestPhasePromptBuilder_BuildPrompt_Validate_IncludesImplResult(t *testing.T
 	// Then: the prompt contains the Implement phase output
 	require.NoError(t, err)
 	assert.Contains(t, prompt, "implementation output here")
+	assert.Contains(t, prompt, "## Acceptance")
+	assert.Contains(t, prompt, "Edge Case 1: Failure")
 }

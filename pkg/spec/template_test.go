@@ -68,6 +68,23 @@ func TestLoad_ParsesSpecDocument(t *testing.T) {
 	assert.Equal(t, "SPEC-LOAD-001", doc.ID)
 }
 
+func TestLoad_ParsesAcceptanceMdFromScaffold(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, spec.Scaffold(dir, "LOAD-ACC-001", "로드 인수 기준 테스트"))
+
+	specDir := filepath.Join(dir, ".autopus", "specs", "SPEC-LOAD-ACC-001")
+	doc, err := spec.Load(specDir)
+	require.NoError(t, err)
+	require.NotNil(t, doc)
+
+	require.Len(t, doc.AcceptanceCriteria, 3)
+	assert.Equal(t, "AC-001", doc.AcceptanceCriteria[0].ID)
+	assert.Equal(t, "[시나리오 제목]", doc.AcceptanceCriteria[0].Description)
+	assert.Equal(t, "[에지 케이스]", doc.AcceptanceCriteria[2].Description)
+}
+
 func TestLoad_NonExistentDir(t *testing.T) {
 	t.Parallel()
 

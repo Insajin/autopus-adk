@@ -46,7 +46,17 @@ func Load(specDir string) (*SpecDocument, error) {
 		return nil, fmt.Errorf("spec.md 읽기 실패: %w", err)
 	}
 
-	return parseSpecMd(string(content))
+	doc, err := parseSpecMd(string(content))
+	if err != nil {
+		return nil, err
+	}
+
+	criteria, err := loadAcceptanceCriteria(specDir)
+	if err != nil {
+		return nil, err
+	}
+	doc.AcceptanceCriteria = criteria
+	return doc, nil
 }
 
 // parseSpecMd는 spec.md 내용을 SpecDocument로 파싱한다.
@@ -83,6 +93,20 @@ func parseSpecMd(content string) (*SpecDocument, error) {
 	doc.Requirements = reqs
 
 	return doc, nil
+}
+
+func loadAcceptanceCriteria(specDir string) ([]Criterion, error) {
+	path := filepath.Join(specDir, "acceptance.md")
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("acceptance.md 읽기 실패: %w", err)
+	}
+
+	criteria, _ := ParseGherkin(string(content))
+	return criteria, nil
 }
 
 // generateSpecMd는 구조화된 섹션을 포함한 spec.md 내용을 생성한다.

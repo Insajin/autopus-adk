@@ -25,7 +25,8 @@ func renderCustomWorkflowSkill(spec workflowSpec) (string, bool) {
 		return "", false
 	}
 	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", spec.Name, spec.Description)
-	return buildMarkdown(frontmatter, skillInvocationNote(spec.Name)+"\n"+body.skill), true
+	content := skillInvocationNote(spec.Name) + "\n" + body.skill
+	return buildMarkdown(frontmatter, injectOpenCodeBrandingBlock(content)), true
 }
 
 func customWorkflowBodies(spec workflowSpec) (customWorkflowBody, bool) {
