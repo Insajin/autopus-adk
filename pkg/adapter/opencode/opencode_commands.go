@@ -50,11 +50,15 @@ func (a *Adapter) renderRouterCommand(cfg *config.HarnessConfig) (string, error)
 	if err != nil {
 		return "", err
 	}
+	contractBody, err := a.renderRouterContractBody(cfg)
+	if err != nil {
+		return "", err
+	}
 	_, body := splitFrontmatter(raw)
 	if strings.TrimSpace(body) == "" {
 		body = raw
 	}
-	body = commandArgumentNote("auto") + "\n" + rewriteOpenCodeRouterBody(body)
+	body = commandArgumentNote("auto") + "\n" + rewriteOpenCodeRouterBody(body, contractBody)
 	frontmatter := fmt.Sprintf("description: %q\nagent: build", routerDescription())
 	return buildMarkdown(frontmatter, body), nil
 }

@@ -94,6 +94,10 @@ func (a *Adapter) renderRouterSkill(cfg *config.HarnessConfig) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	contractBody, err := a.renderRouterContractBody(cfg)
+	if err != nil {
+		return "", err
+	}
 
 	_, body := splitFrontmatter(rendered)
 	if strings.TrimSpace(body) == "" {
@@ -101,7 +105,7 @@ func (a *Adapter) renderRouterSkill(cfg *config.HarnessConfig) (string, error) {
 	}
 
 	body = strings.TrimSpace(body)
-	body = rewriteOpenCodeRouterBody(body)
+	body = rewriteOpenCodeRouterBody(body, contractBody)
 	body = skillInvocationNote("auto") + "\n" + body
 	body = body + "\n\n이 스킬은 얇은 라우터입니다. 서브커맨드를 해석한 뒤에는 반드시 대응하는 상세 스킬(" + routerDetailSkills() + ")을 추가로 로드해 실제 단계를 따르세요."
 

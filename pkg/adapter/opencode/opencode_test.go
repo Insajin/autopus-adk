@@ -109,6 +109,31 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	assert.Contains(t, instructions, ".opencode/rules/autopus/branding.md")
 }
 
+func TestAdapter_Generate_AutoRouterPreservesSpecPathResolutionContract(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+
+	_, err := a.Generate(context.Background(), config.DefaultFullConfig("demo"))
+	require.NoError(t, err)
+
+	for _, path := range []string{
+		filepath.Join(dir, ".opencode", "commands", "auto.md"),
+		filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"),
+	} {
+		data, readErr := os.ReadFile(path)
+		require.NoError(t, readErr, path)
+		content := string(data)
+
+		assert.Contains(t, content, "## SPEC Path Resolution", path)
+		assert.Contains(t, content, "Available SPECs", path)
+		assert.Contains(t, content, "TARGET_MODULE", path)
+		assert.Contains(t, content, "WORKING_DIR", path)
+		assert.NotContains(t, content, "Codex용 canonical router surface", path)
+		assert.NotContains(t, content, "Codex 하네스 기본값", path)
+	}
+}
+
 func TestAdapter_Generate_NilConfig(t *testing.T) {
 	t.Parallel()
 	a := NewWithRoot(t.TempDir())

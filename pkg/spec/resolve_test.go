@@ -39,6 +39,20 @@ func TestResolveSpecDir_Submodule(t *testing.T) {
 	assert.Equal(t, "autopus-adk", result.TargetModule)
 }
 
+func TestResolveSpecDir_WorkspaceRootFindsAutopusSubmoduleSpec(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	specDir := filepath.Join(dir, "Autopus", ".autopus", "specs", "SPEC-OPCOCK-001")
+	require.NoError(t, os.MkdirAll(specDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "spec.md"), []byte("# SPEC-OPCOCK-001: OpenCode Cockpit"), 0o644))
+
+	result, err := spec.ResolveSpecDir(dir, "SPEC-OPCOCK-001")
+	require.NoError(t, err)
+	assert.Equal(t, specDir, result.SpecDir)
+	assert.Equal(t, "Autopus", result.TargetModule)
+}
+
 func TestResolveSpecDir_NestedSubmoduleDepth2(t *testing.T) {
 	t.Parallel()
 
