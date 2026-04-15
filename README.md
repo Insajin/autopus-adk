@@ -69,6 +69,20 @@ Or if you prefer step-by-step control:
 
 ---
 
+## ⭐ Star History
+
+<p align="center">
+  <a href="https://www.star-history.com/#Insajin/autopus-adk&Date">
+    <img
+      src="https://api.star-history.com/svg?repos=Insajin/autopus-adk&type=Date"
+      width="720"
+      alt="Star history chart for Insajin/autopus-adk"
+    />
+  </a>
+</p>
+
+---
+
 ## 😤 The Problem
 
 You're using AI coding tools. They're powerful. But...
