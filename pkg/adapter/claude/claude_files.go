@@ -121,6 +121,7 @@ func (a *Adapter) prepareContentFiles(subDir string, targetRelDir string) ([]ada
 		if err != nil {
 			return nil, fmt.Errorf("컨텐츠 파일 읽기 실패 %s: %w", srcPath, err)
 		}
+		data = normalizeClaudeContent(subDir, data)
 		files = append(files, adapter.FileMapping{
 			TargetPath:      filepath.Join(targetRelDir, entry.Name()),
 			OverwritePolicy: adapter.OverwriteAlways,
@@ -275,6 +276,7 @@ func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, tar
 		if err != nil {
 			return nil, fmt.Errorf("컨텐츠 파일 읽기 실패 %s: %w", srcPath, err)
 		}
+		data = normalizeClaudeContent(subDir, data)
 
 		destPath := filepath.Join(absTargetDir, entry.Name())
 		if err := os.WriteFile(destPath, data, 0644); err != nil {

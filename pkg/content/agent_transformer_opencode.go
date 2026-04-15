@@ -23,7 +23,7 @@ var openCodeToolMap = map[string]string{
 
 // TransformAgentForOpenCode produces an OpenCode markdown agent definition.
 func TransformAgentForOpenCode(src AgentSource) string {
-	body := ReplaceToolReferences(src.Body, "opencode")
+	body := NormalizeAgentReferences(src.Body, "opencode")
 	permissions := buildOpenCodePermissions(src)
 
 	var sb strings.Builder

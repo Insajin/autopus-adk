@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -69,23 +70,24 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 		return nil, fmt.Errorf(".agents/plugins 디렉터리 생성 실패: %w", err)
 	}
 
-	agentsMD, err := a.injectMarkerSection(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("AGENTS.md 마커 주입 실패: %w", err)
-	}
+	files := make([]adapter.FileMapping, 0)
+	if codexOwnsSharedSurface(cfg) {
+		agentsMD, err := a.injectMarkerSection(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("AGENTS.md 마커 주입 실패: %w", err)
+		}
 
-	agentsPath := filepath.Join(a.root, "AGENTS.md")
-	if err := os.WriteFile(agentsPath, []byte(agentsMD), 0644); err != nil {
-		return nil, fmt.Errorf("AGENTS.md 쓰기 실패: %w", err)
-	}
+		agentsPath := filepath.Join(a.root, "AGENTS.md")
+		if err := os.WriteFile(agentsPath, []byte(agentsMD), 0644); err != nil {
+			return nil, fmt.Errorf("AGENTS.md 쓰기 실패: %w", err)
+		}
 
-	files := []adapter.FileMapping{
-		{
+		files = append(files, adapter.FileMapping{
 			TargetPath:      "AGENTS.md",
 			OverwritePolicy: adapter.OverwriteMarker,
 			Checksum:        checksum(agentsMD),
 			Content:         []byte(agentsMD),
-		},
+		})
 	}
 
 	skillFiles, err := a.renderSkillTemplates(cfg)
@@ -94,11 +96,13 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, skillFiles...)
 
-	standardSkillFiles, err := a.renderStandardSkills(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("표준 codex skill 생성 실패: %w", err)
+	if codexOwnsSharedSurface(cfg) {
+		standardSkillFiles, err := a.renderStandardSkills(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("표준 codex skill 생성 실패: %w", err)
+		}
+		files = append(files, standardSkillFiles...)
 	}
-	files = append(files, standardSkillFiles...)
 
 	promptFiles, err := a.renderPromptTemplates(cfg)
 	if err != nil {
@@ -152,10 +156,10 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 
 	pf := &adapter.PlatformFiles{
 		Files:    files,
-		Checksum: checksum(agentsMD),
+		Checksum: checksum(fmt.Sprintf("%d", len(files))),
 	}
 
-	m := adapter.ManifestFromFiles(adapterName, pf)
+	m := adapter.ManifestFromFiles(adapterName, filterCodexManifestFiles(cfg, pf))
 	if err := m.Save(a.root); err != nil {
 		return nil, fmt.Errorf("매니페스트 저장 실패: %w", err)
 	}
@@ -215,7 +219,7 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
 	}
 
-	m := adapter.ManifestFromFiles(adapterName, pf)
+	m := adapter.ManifestFromFiles(adapterName, filterCodexManifestFiles(cfg, pf))
 	if saveErr := m.Save(a.root); saveErr != nil {
 		return nil, fmt.Errorf("매니페스트 저장 실패: %w", saveErr)
 	}
@@ -230,4 +234,33 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 func checksum(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:])
+}
+
+func codexOwnsSharedSurface(cfg *config.HarnessConfig) bool {
+	return cfg == nil || !containsPlatform(cfg.Platforms, "opencode")
+}
+
+func filterCodexManifestFiles(cfg *config.HarnessConfig, pf *adapter.PlatformFiles) *adapter.PlatformFiles {
+	if pf == nil || cfg == nil {
+		return pf
+	}
+	if !containsPlatform(cfg.Platforms, "opencode") {
+		return pf
+	}
+
+	filtered := make([]adapter.FileMapping, 0, len(pf.Files))
+	for _, f := range pf.Files {
+		if f.TargetPath == "AGENTS.md" {
+			continue
+		}
+		if strings.HasPrefix(f.TargetPath, filepath.Join(".agents", "skills")+string(os.PathSeparator)) {
+			continue
+		}
+		filtered = append(filtered, f)
+	}
+
+	return &adapter.PlatformFiles{
+		Files:    filtered,
+		Checksum: pf.Checksum,
+	}
 }

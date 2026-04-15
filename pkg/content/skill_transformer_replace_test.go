@@ -190,3 +190,16 @@ See .claude/skills/tdd.md`
 	assert.Contains(t, result, "Normal line 3.")
 	assert.Contains(t, result, ".codex/skills/tdd.md")
 }
+
+func TestNormalizeAgentReferences_BrandingPaths(t *testing.T) {
+	t.Parallel()
+
+	input := "- **브랜딩**: `content/rules/branding.md` 준수\n- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조"
+
+	assert.Contains(t, content.NormalizeAgentReferences(input, "claude-code"), ".claude/rules/autopus/branding.md")
+	assert.Contains(t, content.NormalizeAgentReferences(input, "codex"), ".codex/rules/autopus/branding.md")
+	assert.Contains(t, content.NormalizeAgentReferences(input, "gemini"), ".gemini/rules/autopus/branding.md")
+	assert.Contains(t, content.NormalizeAgentReferences(input, "opencode"), ".opencode/rules/autopus/branding.md")
+	assert.NotContains(t, content.NormalizeAgentReferences(input, "codex"), "content/rules/branding.md")
+	assert.Contains(t, content.NormalizeAgentReferences(input, "codex"), "templates/shared/branding-formats.md.tmpl")
+}

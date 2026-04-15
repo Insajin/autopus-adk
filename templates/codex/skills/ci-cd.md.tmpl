@@ -28,7 +28,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/go/pkg/mod
-          key: ${{"{{"}} runner.os {{"}}"}}-go-${{"{{"}} hashFiles('go.sum') {{"}}"}}
+          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
 
       - name: 테스트
         run: go test -race -coverprofile=coverage.out ./...
@@ -87,7 +87,7 @@ jobs:
         with:
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{"{{"}} secrets.GITHUB_TOKEN {{"}}"}}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ## GoReleaser 설정
@@ -104,7 +104,7 @@ builds:
     goarch: [amd64, arm64]
     ldflags:
       - -s -w
-      - -X main.version={{"{{"}} .Version {{"}}"}}
+      - -X main.version={{.Version}}
 
 archives:
   - format: tar.gz

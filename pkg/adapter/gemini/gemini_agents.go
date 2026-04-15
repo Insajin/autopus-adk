@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 	"github.com/insajin/autopus-adk/templates"
 )
 
@@ -58,6 +59,7 @@ func (a *Adapter) prepareAgentMappings() ([]adapter.FileMapping, error) {
 		if err != nil {
 			return nil, fmt.Errorf("gemini agent template read failed %s: %w", entry.Name(), err)
 		}
+		rendered := pkgcontent.NormalizeAgentReferences(string(data), "gemini")
 
 		// Strip .tmpl extension for the output filename
 		outputName := strings.TrimSuffix(entry.Name(), ".tmpl")
@@ -65,8 +67,8 @@ func (a *Adapter) prepareAgentMappings() ([]adapter.FileMapping, error) {
 		files = append(files, adapter.FileMapping{
 			TargetPath:      relPath,
 			OverwritePolicy: adapter.OverwriteAlways,
-			Checksum:        checksum(string(data)),
-			Content:         data,
+			Checksum:        checksum(rendered),
+			Content:         []byte(rendered),
 		})
 	}
 

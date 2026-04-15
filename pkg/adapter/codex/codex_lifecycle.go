@@ -14,24 +14,26 @@ import (
 func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error) {
 	var errs []adapter.ValidationError
 
-	agentsPath := filepath.Join(a.root, "AGENTS.md")
-	data, err := os.ReadFile(agentsPath)
-	if err != nil {
-		errs = append(errs, adapter.ValidationError{
-			File:    "AGENTS.md",
-			Message: "AGENTS.md를 읽을 수 없음",
-			Level:   "error",
-		})
-		return errs, nil
-	}
+	if a.managesFile("AGENTS.md") {
+		agentsPath := filepath.Join(a.root, "AGENTS.md")
+		data, err := os.ReadFile(agentsPath)
+		if err != nil {
+			errs = append(errs, adapter.ValidationError{
+				File:    "AGENTS.md",
+				Message: "AGENTS.md를 읽을 수 없음",
+				Level:   "error",
+			})
+			return errs, nil
+		}
 
-	content := string(data)
-	if !strings.Contains(content, markerBegin) || !strings.Contains(content, markerEnd) {
-		errs = append(errs, adapter.ValidationError{
-			File:    "AGENTS.md",
-			Message: "AUTOPUS 마커 섹션이 없음",
-			Level:   "warning",
-		})
+		content := string(data)
+		if !strings.Contains(content, markerBegin) || !strings.Contains(content, markerEnd) {
+			errs = append(errs, adapter.ValidationError{
+				File:    "AGENTS.md",
+				Message: "AUTOPUS 마커 섹션이 없음",
+				Level:   "warning",
+			})
+		}
 	}
 
 	skillsDir := filepath.Join(a.root, ".codex", "skills")
@@ -43,13 +45,16 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 		})
 	}
 
-	repoSkillPath := filepath.Join(a.root, ".agents", "skills", "auto", "SKILL.md")
-	if _, err := os.Stat(repoSkillPath); os.IsNotExist(err) {
-		errs = append(errs, adapter.ValidationError{
-			File:    ".agents/skills/auto/SKILL.md",
-			Message: "Codex 표준 router skill이 없음",
-			Level:   "warning",
-		})
+	repoSkillRel := filepath.Join(".agents", "skills", "auto", "SKILL.md")
+	if a.managesFile(repoSkillRel) {
+		repoSkillPath := filepath.Join(a.root, repoSkillRel)
+		if _, err := os.Stat(repoSkillPath); os.IsNotExist(err) {
+			errs = append(errs, adapter.ValidationError{
+				File:    repoSkillRel,
+				Message: "Codex 표준 router skill이 없음",
+				Level:   "warning",
+			})
+		}
 	}
 
 	marketplacePath := filepath.Join(a.root, ".agents", "plugins", "marketplace.json")
@@ -69,28 +74,30 @@ func (a *Adapter) Clean(_ context.Context) error {
 	if err := os.RemoveAll(filepath.Join(a.root, ".codex", "skills")); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf(".codex/skills 제거 실패: %w", err)
 	}
-	autoSkillDirs := []string{
-		"auto",
-		"auto-setup",
-		"auto-status",
-		"auto-plan",
-		"auto-go",
-		"auto-fix",
-		"auto-review",
-		"auto-sync",
-		"auto-idea",
-		"auto-map",
-		"auto-why",
-		"auto-verify",
-		"auto-secure",
-		"auto-test",
-		"auto-dev",
-		"auto-canary",
-		"auto-doctor",
-	}
-	for _, dir := range autoSkillDirs {
-		if err := os.RemoveAll(filepath.Join(a.root, ".agents", "skills", dir)); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf(".agents/skills/%s 제거 실패: %w", dir, err)
+	if a.managesFile(filepath.Join(".agents", "skills", "auto", "SKILL.md")) {
+		autoSkillDirs := []string{
+			"auto",
+			"auto-setup",
+			"auto-status",
+			"auto-plan",
+			"auto-go",
+			"auto-fix",
+			"auto-review",
+			"auto-sync",
+			"auto-idea",
+			"auto-map",
+			"auto-why",
+			"auto-verify",
+			"auto-secure",
+			"auto-test",
+			"auto-dev",
+			"auto-canary",
+			"auto-doctor",
+		}
+		for _, dir := range autoSkillDirs {
+			if err := os.RemoveAll(filepath.Join(a.root, ".agents", "skills", dir)); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf(".agents/skills/%s 제거 실패: %w", dir, err)
+			}
 		}
 	}
 	if err := os.Remove(filepath.Join(a.root, ".agents", "plugins", "marketplace.json")); err != nil && !os.IsNotExist(err) {
@@ -100,19 +107,46 @@ func (a *Adapter) Clean(_ context.Context) error {
 		return fmt.Errorf(".autopus/plugins/auto 제거 실패: %w", err)
 	}
 
-	agentsPath := filepath.Join(a.root, "AGENTS.md")
-	data, err := os.ReadFile(agentsPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+	if a.managesFile("AGENTS.md") {
+		agentsPath := filepath.Join(a.root, "AGENTS.md")
+		data, err := os.ReadFile(agentsPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return fmt.Errorf("AGENTS.md 읽기 실패: %w", err)
 		}
-		return fmt.Errorf("AGENTS.md 읽기 실패: %w", err)
+		cleaned := removeMarkerSection(string(data))
+		return os.WriteFile(agentsPath, []byte(cleaned), 0644)
 	}
-	cleaned := removeMarkerSection(string(data))
-	return os.WriteFile(agentsPath, []byte(cleaned), 0644)
+	return nil
 }
 
 // InstallHooks is a no-op — hooks are managed via .codex/hooks.json template.
 func (a *Adapter) InstallHooks(_ context.Context, _ []adapter.HookConfig, _ *adapter.PermissionSet) error {
 	return nil
+}
+
+func (a *Adapter) managesFile(targetPath string) bool {
+	manifest, err := adapter.LoadManifest(a.root, adapterName)
+	if err == nil && manifest != nil {
+		_, ok := manifest.Files[targetPath]
+		return ok
+	}
+
+	if isSharedSurfacePath(targetPath) {
+		opencodeManifest, loadErr := adapter.LoadManifest(a.root, "opencode")
+		if loadErr == nil && opencodeManifest != nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isSharedSurfacePath(targetPath string) bool {
+	if targetPath == "AGENTS.md" {
+		return true
+	}
+	return strings.HasPrefix(targetPath, filepath.Join(".agents", "skills")+string(os.PathSeparator))
 }

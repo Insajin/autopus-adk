@@ -183,6 +183,8 @@ func normalizeCodexHelperPaths(body string) string {
 		".codex/agents/autopus/", ".codex/agents/",
 		".claude/agents/autopus/", ".codex/agents/",
 		".claude/rules/autopus/", ".codex/rules/autopus/",
+		"`content/rules/branding.md`", "`.codex/rules/autopus/branding.md`",
+		"`branding-formats.md.tmpl`", "`templates/shared/branding-formats.md.tmpl`",
 	)
 	return replacer.Replace(body)
 }

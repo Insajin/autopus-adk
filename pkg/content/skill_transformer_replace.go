@@ -82,6 +82,32 @@ func ReplacePlatformReferences(body string, platform string) string {
 	return strings.Join(result, "\n")
 }
 
+// NormalizeAgentReferences applies platform-specific path fixes that should be
+// preserved across generated agent surfaces.
+func NormalizeAgentReferences(body, platform string) string {
+	p := normalizePlatform(platform)
+	normalized := body
+	if p != "claude" {
+		normalized = ReplacePlatformReferences(normalized, p)
+	}
+
+	brandingRule := map[string]string{
+		"claude":   "`.claude/rules/autopus/branding.md`",
+		"codex":    "`.codex/rules/autopus/branding.md`",
+		"gemini":   "`.gemini/rules/autopus/branding.md`",
+		"opencode": "`.opencode/rules/autopus/branding.md`",
+	}[p]
+	if brandingRule == "" {
+		brandingRule = "`content/rules/branding.md`"
+	}
+
+	replacer := strings.NewReplacer(
+		"`content/rules/branding.md`", brandingRule,
+		"`branding-formats.md.tmpl`", "`templates/shared/branding-formats.md.tmpl`",
+	)
+	return replacer.Replace(normalized)
+}
+
 // replaceAgentCalls converts Agent(subagent_type="X", task="Y") to platform syntax.
 // Reuses agentMappingRe from agent_transformer_mapping.go.
 func replaceAgentCalls(line string, platform string) string {

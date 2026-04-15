@@ -99,7 +99,7 @@ func TransformAgentForCodex(src AgentSource) string {
 	var sb strings.Builder
 
 	model := MapModel(src.Meta.Model, "codex")
-	body := ReplaceToolReferences(src.Body, "codex")
+	body := NormalizeAgentReferences(src.Body, "codex")
 
 	fmt.Fprintf(&sb, "name = %q\n", src.Meta.Name)
 	fmt.Fprintf(&sb, "description = %q\n", src.Meta.Description)
@@ -118,7 +118,7 @@ func TransformAgentForCodex(src AgentSource) string {
 func TransformAgentForGemini(src AgentSource) string {
 	var sb strings.Builder
 
-	body := ReplaceToolReferences(src.Body, "gemini")
+	body := NormalizeAgentReferences(src.Body, "gemini")
 
 	sb.WriteString("---\n")
 	fmt.Fprintf(&sb, "name: auto-agent-%s\n", src.Meta.Name)

@@ -20,7 +20,7 @@ name: auto-entropy-scan
 ### 결합도 (Coupling)
 ```bash
 # Go 의존성 분석
-go list -f '{{"{{"}} .ImportPath {{"}}"}} {{"{{"}} .Imports {{"}}"}}' ./... | sort
+go list -f '{{.ImportPath}} {{.Imports}}' ./... | sort
 
 # 순환 의존성 탐지
 go build ./... 2>&1 | grep "import cycle"

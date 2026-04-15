@@ -11,16 +11,18 @@ import (
 func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	var files []adapter.FileMapping
 
-	agentsMD, err := a.injectMarkerSection(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("AGENTS.md 마커 주입 실패: %w", err)
+	if codexOwnsSharedSurface(cfg) {
+		agentsMD, err := a.injectMarkerSection(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("AGENTS.md 마커 주입 실패: %w", err)
+		}
+		files = append(files, adapter.FileMapping{
+			TargetPath:      "AGENTS.md",
+			OverwritePolicy: adapter.OverwriteMarker,
+			Checksum:        checksum(agentsMD),
+			Content:         []byte(agentsMD),
+		})
 	}
-	files = append(files, adapter.FileMapping{
-		TargetPath:      "AGENTS.md",
-		OverwritePolicy: adapter.OverwriteMarker,
-		Checksum:        checksum(agentsMD),
-		Content:         []byte(agentsMD),
-	})
 
 	skillMappings, err := a.prepareSkillTemplateMappings(cfg)
 	if err != nil {
@@ -34,11 +36,13 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, extSkillFiles...)
 
-	standardSkillFiles, err := a.prepareStandardSkillMappings(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("표준 codex skill 준비 실패: %w", err)
+	if codexOwnsSharedSurface(cfg) {
+		standardSkillFiles, err := a.prepareStandardSkillMappings(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("표준 codex skill 준비 실패: %w", err)
+		}
+		files = append(files, standardSkillFiles...)
 	}
-	files = append(files, standardSkillFiles...)
 
 	promptFiles, err := a.preparePromptFiles(cfg)
 	if err != nil {
