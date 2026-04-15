@@ -28,6 +28,11 @@ func TestAdapter_Generate_RegistersManagedPlugin(t *testing.T) {
 	autoCommand, readErr := os.ReadFile(filepath.Join(dir, ".opencode", "commands", "auto.md"))
 	require.NoError(t, readErr)
 	content := string(autoCommand)
+	assert.Contains(t, content, "Immediately load skill `auto`")
+
+	autoSkill, readErr := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"))
+	require.NoError(t, readErr)
+	content = string(autoSkill)
 	assert.Contains(t, content, "`status`")
 	assert.Contains(t, content, "`map`")
 	assert.Contains(t, content, "`why`")

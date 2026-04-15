@@ -68,6 +68,7 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(autoSkill), "얇은 라우터")
 	assert.Contains(t, string(autoSkill), "상세 스킬")
+	assert.Contains(t, string(autoSkill), "## Router Contract")
 	assert.NotContains(t, string(autoSkill), "mode =")
 
 	autoIdeaSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-idea", "SKILL.md"))
@@ -90,9 +91,9 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 
 	autoCommand, err := os.ReadFile(filepath.Join(dir, ".opencode", "commands", "auto.md"))
 	require.NoError(t, err)
-	assert.Contains(t, string(autoCommand), "얇은 entrypoint")
-	assert.Contains(t, string(autoCommand), "--model <provider/model>")
-	assert.Contains(t, string(autoCommand), "--variant <value>")
+	assert.Contains(t, string(autoCommand), "Immediately load skill `auto`")
+	assert.Contains(t, string(autoCommand), "Preserve `--model <provider/model>`")
+	assert.Contains(t, string(autoCommand), "Do not restate or expand the arguments")
 
 	agentsData, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
 	require.NoError(t, err)
@@ -109,7 +110,7 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	assert.Contains(t, instructions, ".opencode/rules/autopus/branding.md")
 }
 
-func TestAdapter_Generate_AutoRouterPreservesSpecPathResolutionContract(t *testing.T) {
+func TestAdapter_Generate_AutoRouterUsesThinOpenCodeContract(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -117,21 +118,19 @@ func TestAdapter_Generate_AutoRouterPreservesSpecPathResolutionContract(t *testi
 	_, err := a.Generate(context.Background(), config.DefaultFullConfig("demo"))
 	require.NoError(t, err)
 
-	for _, path := range []string{
-		filepath.Join(dir, ".opencode", "commands", "auto.md"),
-		filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"),
-	} {
-		data, readErr := os.ReadFile(path)
-		require.NoError(t, readErr, path)
-		content := string(data)
+	autoCommand, readErr := os.ReadFile(filepath.Join(dir, ".opencode", "commands", "auto.md"))
+	require.NoError(t, readErr)
+	assert.Contains(t, string(autoCommand), "Immediately load skill `auto`")
+	assert.NotContains(t, string(autoCommand), "## SPEC Path Resolution")
+	assert.NotContains(t, string(autoCommand), "Codex용 canonical router surface")
 
-		assert.Contains(t, content, "## SPEC Path Resolution", path)
-		assert.Contains(t, content, "Available SPECs", path)
-		assert.Contains(t, content, "TARGET_MODULE", path)
-		assert.Contains(t, content, "WORKING_DIR", path)
-		assert.NotContains(t, content, "Codex용 canonical router surface", path)
-		assert.NotContains(t, content, "Codex 하네스 기본값", path)
-	}
+	autoSkill, readErr := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"))
+	require.NoError(t, readErr)
+	assert.Contains(t, string(autoSkill), "## Router Contract")
+	assert.Contains(t, string(autoSkill), "지원 서브커맨드")
+	assert.Contains(t, string(autoSkill), "/auto-canary")
+	assert.NotContains(t, string(autoSkill), "## SPEC Path Resolution")
+	assert.NotContains(t, string(autoSkill), "Codex용 canonical router surface")
 }
 
 func TestAdapter_Generate_NilConfig(t *testing.T) {
@@ -280,7 +279,8 @@ func TestAdapter_Generate_WorkflowSkillsUseOpenCodeSurface(t *testing.T) {
 		data, readErr := os.ReadFile(cmdPath)
 		require.NoError(t, readErr, cmdPath)
 		content := string(data)
-		assert.Contains(t, content, "얇은 entrypoint", cmdPath)
+		assert.Contains(t, content, "`$ARGUMENTS`", cmdPath)
+		assert.Contains(t, content, "Do not restate or expand the arguments", cmdPath)
 		for _, banned := range bannedInCommands {
 			assert.NotContains(t, content, banned, "%s should not contain %q", cmdPath, banned)
 		}

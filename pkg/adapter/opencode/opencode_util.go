@@ -122,6 +122,14 @@ func commandArgumentNote(name string) string {
 	return fmt.Sprintf("## OpenCode Arguments\n\n사용자가 `/%s` 뒤에 전달한 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 워크플로우 단계는 `skill` 도구로 `%s`를 로드한 뒤 그 스킬 문서를 기준으로 실행하세요.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `"+openCodeDefaultModel+"` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n", name, name)
 }
 
+func thinRouterCommandBody() string {
+	return strings.TrimSpace("`$ARGUMENTS`\n\nTreat the text above as the full payload passed after `/auto`.\nImmediately load skill `auto` and use it as the canonical router.\nStrip global flags first, resolve the first remaining token as the subcommand, then load the matching `auto-*` skill.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.")
+}
+
+func thinWorkflowCommandBody(name string) string {
+	return strings.TrimSpace(fmt.Sprintf("`$ARGUMENTS`\n\nTreat the text above as the full argument payload for `/%s`.\nImmediately load skill `%s` and execute it as the canonical workflow.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.", name, name))
+}
+
 func skillInvocationNote(name string) string {
 	if name == "auto" {
 		return "## OpenCode Invocation\n\n이 스킬은 다음 두 경로로 사용할 수 있습니다.\n\n- `/auto <subcommand> ...`\n- `skill` 도구로 직접 `auto` 로드\n\n직접 로드되면 사용자의 최신 요청을 `/auto` 뒤 인자로 간주하고 해석하세요.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `" + openCodeDefaultModel + "` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n"

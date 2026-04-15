@@ -3,7 +3,6 @@ package opencode
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -26,39 +25,15 @@ func (a *Adapter) prepareCommandMappings(cfg *config.HarnessConfig) ([]adapter.F
 	return files, nil
 }
 
-func (a *Adapter) renderWorkflowCommand(spec workflowSpec, cfg *config.HarnessConfig) (string, error) {
+func (a *Adapter) renderWorkflowCommand(spec workflowSpec, _ *config.HarnessConfig) (string, error) {
 	if spec.Name == "auto" {
-		return a.renderRouterCommand(cfg)
+		return a.renderRouterCommand()
 	}
-	if rendered, ok := renderCustomWorkflowCommand(spec); ok {
-		return rendered, nil
-	}
-
-	raw, err := a.renderWorkflowPrompt(spec.PromptPath, cfg)
-	if err != nil {
-		return "", err
-	}
-	frontmatter, body := splitFrontmatter(raw)
-	body = normalizeOpenCodeMarkdown(body)
-	body = augmentOpenCodeFlagDocs(body)
-	body = commandArgumentNote(spec.Name) + "\n" + body
-	return buildMarkdown(augmentCommandFrontmatter(frontmatter), body), nil
+	frontmatter := fmt.Sprintf("description: %q\nagent: build", spec.Description)
+	return buildMarkdown(frontmatter, thinWorkflowCommandBody(spec.Name)), nil
 }
 
-func (a *Adapter) renderRouterCommand(cfg *config.HarnessConfig) (string, error) {
-	raw, err := a.renderWorkflowPrompt("codex/prompts/auto.md.tmpl", cfg)
-	if err != nil {
-		return "", err
-	}
-	contractBody, err := a.renderRouterContractBody(cfg)
-	if err != nil {
-		return "", err
-	}
-	_, body := splitFrontmatter(raw)
-	if strings.TrimSpace(body) == "" {
-		body = raw
-	}
-	body = commandArgumentNote("auto") + "\n" + rewriteOpenCodeRouterBody(body, contractBody)
+func (a *Adapter) renderRouterCommand() (string, error) {
 	frontmatter := fmt.Sprintf("description: %q\nagent: build", routerDescription())
-	return buildMarkdown(frontmatter, body), nil
+	return buildMarkdown(frontmatter, thinRouterCommandBody()), nil
 }
