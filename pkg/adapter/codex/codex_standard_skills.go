@@ -85,7 +85,7 @@ func (a *Adapter) preparePluginMappings(cfg *config.HarnessConfig) ([]adapter.Fi
 			continue
 		}
 
-		content, err := a.renderWorkflowSkill(cfg, spec)
+		content, err := a.renderPluginWorkflowShim(cfg, spec)
 		if err != nil {
 			return nil, err
 		}
