@@ -128,7 +128,8 @@ func thinRouterCommandBody() string {
 }
 
 func thinWorkflowCommandBody(name string) string {
-	return strings.TrimSpace(fmt.Sprintf("`$ARGUMENTS`\n\nTreat the text above as the full argument payload for `/%s`.\nImmediately load skill `%s` and execute it as the canonical workflow.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.", name, name))
+	subcommand := strings.TrimPrefix(name, "auto-")
+	return strings.TrimSpace(fmt.Sprintf("`$ARGUMENTS`\n\nTreat the text above as the full argument payload for `/%s`.\nReinterpret it as `/auto %s ...` payload로 다시 해석하고, `skill` 도구로 `auto`를 로드한 뒤 canonical router 규칙을 따르세요.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.", name, subcommand))
 }
 
 func skillInvocationNote(name string) string {
