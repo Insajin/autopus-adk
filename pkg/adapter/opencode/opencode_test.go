@@ -69,6 +69,8 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	assert.Contains(t, string(autoSkill), "얇은 라우터")
 	assert.Contains(t, string(autoSkill), "상세 스킬")
 	assert.Contains(t, string(autoSkill), "## Router Contract")
+	assert.Contains(t, string(autoSkill), "## Context Load")
+	assert.Contains(t, string(autoSkill), "## SPEC Path Resolution")
 	assert.Contains(t, string(autoSkill), "## Autopus Branding")
 	assert.Contains(t, string(autoSkill), "🐙 Autopus ─────────────────────────")
 	assert.NotContains(t, string(autoSkill), "mode =")
@@ -92,11 +94,11 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 
 	autoGoSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-go", "SKILL.md"))
 	require.NoError(t, err)
-	assert.Contains(t, string(autoGoSkill), `subagent_type = "executor"`)
-	assert.NotContains(t, string(autoGoSkill), "task executor \\")
+	assert.Contains(t, string(autoGoSkill), "SPEC Path Resolution")
+	assert.Contains(t, string(autoGoSkill), "{SPEC_PATH}")
+	assert.Contains(t, string(autoGoSkill), "WORKING_DIR")
 	assert.Contains(t, string(autoGoSkill), "--model <provider/model>")
 	assert.Contains(t, string(autoGoSkill), "--variant <value>")
-
 	autoCommand, err := os.ReadFile(filepath.Join(dir, ".opencode", "commands", "auto.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoCommand), "Immediately load skill `auto`")
@@ -140,9 +142,10 @@ func TestAdapter_Generate_AutoRouterUsesThinOpenCodeContract(t *testing.T) {
 	autoSkill, readErr := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"))
 	require.NoError(t, readErr)
 	assert.Contains(t, string(autoSkill), "## Router Contract")
+	assert.Contains(t, string(autoSkill), "## Context Load")
+	assert.Contains(t, string(autoSkill), "## SPEC Path Resolution")
 	assert.Contains(t, string(autoSkill), "지원 서브커맨드")
 	assert.Contains(t, string(autoSkill), "/auto-canary")
-	assert.NotContains(t, string(autoSkill), "## SPEC Path Resolution")
 	assert.NotContains(t, string(autoSkill), "Codex용 canonical router surface")
 }
 
@@ -252,9 +255,6 @@ func TestAdapter_Generate_WorkflowSkillsUseOpenCodeSurface(t *testing.T) {
 		"mode =",
 		"permissionMode",
 		"bypassPermissions",
-		"task executor \\",
-		"task tester \\",
-		"task reviewer \\",
 	}
 
 	for _, spec := range workflowSpecs {

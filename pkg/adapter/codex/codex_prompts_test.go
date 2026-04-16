@@ -119,6 +119,8 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-setup.md"], "ARCHITECTURE.md")
 	assert.Contains(t, byName["auto-plan.md"], "auto spec review {SPEC-ID}")
 	assert.Contains(t, byName["auto-go.md"], "draft")
+	assert.Contains(t, byName["auto-go.md"], "## SPEC Path Resolution")
+	assert.Contains(t, byName["auto-go.md"], "WORKING_DIR")
 	assert.Contains(t, byName["auto-sync.md"], "@AX lifecycle")
 	assert.Contains(t, byName["auto-map.md"], "spawn_agent")
 	assert.Contains(t, byName["auto-why.md"], "auto lore context <path>")
@@ -129,6 +131,8 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-doctor.md"], "auto doctor")
 	assert.Contains(t, byName["auto.md"], "## Autopus Branding")
 	assert.Contains(t, byName["auto.md"], "## Router Execution Contract")
+	assert.Contains(t, byName["auto.md"], "## Context Load")
+	assert.Contains(t, byName["auto.md"], "## SPEC Path Resolution")
 	assert.Contains(t, byName["auto.md"], "ARCHITECTURE.md")
 }
 

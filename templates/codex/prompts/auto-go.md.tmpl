@@ -19,6 +19,20 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 - `--multi`
 - `--quality <mode>`
 
+## Context Load
+
+- 구현 전에 `ARCHITECTURE.md`, `.autopus/project/product.md`, `structure.md`, `tech.md`, `scenarios.md`, `canary.md`를 우선 읽어 현재 프로젝트 컨텍스트를 복원합니다.
+- 위 문서가 없으면 컨텍스트 부재를 명시하고 필요 시 `@auto setup`을 권장하되, 현재 구현 작업 자체는 계속 진행할 수 있습니다.
+
+## SPEC Path Resolution
+
+- SPEC-ID를 받으면 먼저 실제 `SPEC_PATH`, `SPEC_DIR`, `TARGET_MODULE`, `WORKING_DIR`를 해석합니다.
+- 해석 순서:
+  1. `.autopus/specs/{SPEC-ID}/spec.md`
+  2. `**/.autopus/specs/{SPEC-ID}/spec.md` 재귀 탐색 (`.git`, `node_modules`, `vendor`, `.cache`, `dist` 제외)
+- 이후 SPEC 로드, 관련 문서 열기, 테스트/빌드 실행, 서브에이전트 프롬프트 주입에는 해석된 값을 사용합니다.
+- `.autopus/specs/{SPEC-ID}` 상대 경로를 현재 작업 디렉터리 기준으로 고정 가정하지 않습니다.
+
 ## 구현 절차
 
 {{if .IsFullMode}}{{if eq .Methodology.Mode "tdd"}}1. RED: 실패 테스트 작성

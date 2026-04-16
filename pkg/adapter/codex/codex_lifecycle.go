@@ -190,7 +190,9 @@ func (a *Adapter) validateRouterPrompt(errs *[]adapter.ValidationError) {
 			Level:   "warning",
 		})
 	}
-	if !strings.Contains(content, "## Router Execution Contract") || !strings.Contains(content, "ARCHITECTURE.md") || !strings.Contains(content, ".autopus/project/*") {
+	hasProjectContextContract := strings.Contains(content, "ARCHITECTURE.md") &&
+		(strings.Contains(content, ".autopus/project/*") || strings.Contains(content, ".autopus/project/product.md"))
+	if !strings.Contains(content, "## Router Execution Contract") || !hasProjectContextContract || !strings.Contains(content, "## SPEC Path Resolution") {
 		*errs = append(*errs, adapter.ValidationError{
 			File:    routerPromptRel,
 			Message: "Codex router prompt에 상세 워크플로우/프로젝트 컨텍스트 계약이 없음",
