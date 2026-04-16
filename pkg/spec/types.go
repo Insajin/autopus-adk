@@ -44,6 +44,7 @@ type SpecDocument struct {
 	Status             string        // 상태 (draft, review, approved, done)
 	Requirements       []Requirement // 요구사항 목록
 	AcceptanceCriteria []Criterion   // 인수 기준 목록
+	RawContent         string        // spec.md 원문 (review prompt에 전문 포함용)
 }
 
 // ValidationError는 검증 오류이다.

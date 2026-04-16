@@ -68,6 +68,7 @@ func parseSpecMd(content string) (*SpecDocument, error) {
 	// 요구사항 파싱
 	reqs, _ := ParseEARS(content)
 	doc.Requirements = reqs
+	doc.RawContent = content
 
 	return &doc, nil
 }
