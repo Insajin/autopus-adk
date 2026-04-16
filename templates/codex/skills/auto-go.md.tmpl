@@ -116,6 +116,31 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 
 하나라도 비어 있으면 sync 단계 안내로 넘어가지 않습니다.
 
+### Completion Handoff Gates
+
+성공 응답으로 종료하기 전에 아래 handoff 필드를 모두 확정합니다.
+
+- `current_gate`: 현재 완료 상태 또는 아직 남아 있는 gate 이름
+- `phase_4_review_verdict`: `APPROVE` 또는 completion을 막는 blocker 요약
+- `next_required_step`: supervisor가 다음에 반드시 진행해야 하는 단계
+- `next_command`: surface-native 다음 명령 (`@auto sync {SPEC-ID}` 또는 동등 alias)
+- `auto_progression_state`: `--loop` 여부와 무관하게 handoff를 생략하지 않는다는 상태 설명
+
+하나라도 비어 있으면 완료처럼 닫지 않습니다. 구현/검증 요약만으로 종료하지 말고, 미충족 gate와 blocker를 먼저 명시합니다.
+
+### Final Output Contract
+
+`go` 성공 경로의 최종 응답은 아래 순서를 유지합니다.
+
+1. workflow lifecycle bar
+2. `current_gate`
+3. `phase_4_review_verdict`
+4. `next_required_step`
+5. `next_command`
+6. 필요한 경우 `auto_progression_state`
+
+`--loop`여도 handoff를 생략하지 않습니다. handoff gate를 채우지 못하면 success-style completion summary로 종료하지 않습니다.
+
 ## 품질 기준
 
 - 테스트 커버리지: {{if .IsFullMode}}85{{else}}80{{end}}%+
@@ -201,6 +226,12 @@ Status symbols: `✓` completed, `→` active, `○` pending. Replace `[N/M task
 🐙 Workflow: {SPEC-ID}
   ✓ plan  →  ● go  →  ○ sync
 ```
+
+current_gate: go completed, sync pending
+phase_4_review_verdict: APPROVE
+next_required_step: sync 단계로 이동
+next_command: @auto sync {SPEC-ID}
+auto_progression_state: --loop enabled; handoff still required before autonomous continuation
 
 다음 단계: `/auto sync {SPEC-ID}`
 

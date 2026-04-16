@@ -52,6 +52,22 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 - review는 discovery와 verification을 분리합니다. `--multi` 추가 검증은 review discovery 단계에만 집중합니다
 - 종료 전에는 다음 필수 단계가 완료됐는지, 아니면 명시적 blocker가 남았는지 확인합니다
 
+## Completion Handoff Gates
+
+최종 응답을 성공처럼 닫기 전에 아래 항목을 모두 확정합니다.
+
+- `current_gate`
+- `phase_4_review_verdict` 또는 blocker
+- `next_required_step`
+- `next_command`
+- `auto_progression_state`
+
+규칙:
+- `--loop`여도 handoff를 생략하지 않습니다.
+- 하나라도 비어 있으면 workflow lifecycle bar와 다음 명령을 포함한 handoff를 먼저 채웁니다.
+- Gate가 미충족이면 success-style completion summary로 종료하지 말고 pending gate와 blocker를 명시합니다.
+- 성공 경로에서는 workflow lifecycle bar를 먼저 보여준 뒤 `next_required_step` 과 `next_command` 를 출력합니다.
+
 ## 품질 기준
 
 - 테스트 커버리지: {{if .IsFullMode}}85{{else}}80{{end}}%+
