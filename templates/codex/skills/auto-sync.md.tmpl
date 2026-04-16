@@ -18,7 +18,7 @@
 - Codex에서는 `sync`도 기본적으로 `spawn_agent(...)` 기반 subagent-first를 따릅니다.
 - 메인 세션은 동기화 범위 결정, 최종 상태 갱신, 커밋 판단을 담당합니다.
 - 변경점 검토, 문서 영향 분석, 검증 로그 정리는 필요 시 서브에이전트로 위임합니다.
-- 현재 Codex 런타임 정책이 암묵적 `spawn_agent(...)` 호출을 제한하면, 하네스 기본값과 제약을 명시적으로 알린 뒤 사용자에게 서브에이전트 진행 여부 또는 단일 세션 진행을 확인받습니다.
+- 사용자가 `--auto` 또는 `--solo`를 명시하지 않았고 현재 Codex 런타임 정책이 암묵적 `spawn_agent(...)` 호출을 제한하면, 진행을 멈추고 하네스 기본값과 제약을 명시한 뒤 서브에이전트 opt-in 또는 `--solo` 확인을 먼저 받아야 합니다.
 - 변경 범위가 작으면 메인 세션에서 직접 마무리할 수 있습니다.
 
 ## 동기화 항목
@@ -84,6 +84,24 @@
 - 구현 코드가 포함되면 SPEC의 주요 타입(feat/fix/refactor 등) 사용
 - 문서만 바뀌면 `docs` 사용
 {{end}}
+
+## Completion Gates
+
+sync 완료를 선언하거나 workflow lifecycle bar를 표시하기 전에 아래 gate를 모두 기록해야 합니다.
+
+1. `Context Load` 결과
+   - 읽은 프로젝트 컨텍스트 파일 목록 또는 missing/no-op 사유를 남깁니다.
+2. `SPEC Path Resolution` 결과
+   - `SPEC_PATH`, `TARGET_MODULE`, `WORKING_DIR`를 명시합니다.
+3. `@AX Lifecycle Management` 결과
+   - TODO/ANCHOR/NOTE 처리 결과를 남기고, 대상 태그가 없으면 반드시 `@AX: no-op`로 기록합니다.
+4. Lore 커밋 결과
+   - 변경 사항이 있으면 Lore 커밋을 시도하고 commit hash를 남깁니다.
+   - 커밋이 실패했거나 보류되면 blocked reason을 남기고 sync를 completed로 선언하지 않습니다.
+5. 2-Phase Commit 판단 결과
+   - module commit / meta commit / skip 중 무엇을 했는지와 이유를 남깁니다.
+6. 완료 출력 순서
+   - 완료 배너, workflow lifecycle bar, 다음 단계 추천은 위 gate가 모두 기록된 뒤에만 표시합니다.
 
 ## Branding Formats
 

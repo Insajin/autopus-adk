@@ -42,6 +42,8 @@ func normalizeOpenCodeMarkdown(content string) string {
 		"Codex의", "OpenCode의",
 		"Codex는", "OpenCode는",
 		"Codex에서", "OpenCode에서",
+		"Codex 런타임 정책", "OpenCode 런타임 정책",
+		"Codex 런타임이", "OpenCode 런타임이",
 		"spawn_agent(...)", "task(...)",
 		"`spawn_agent`", "`task`",
 	)
