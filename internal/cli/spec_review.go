@@ -75,7 +75,7 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	}
 
 	providerNames := resolveSpecReviewProviderNames(cfg, flags.MultiMode)
-	providers := buildReviewProviders(providerNames)
+	providers := specReviewBuildProviders(providerNames)
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다. 설치를 확인하세요: %v", providerNames)
 	}
@@ -112,7 +112,7 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 
 		fmt.Fprintf(os.Stderr, "SPEC 리뷰 시작: %s (전략: %s, 리비전: %d)\n", specID, strategy, revision)
 
-		result, err := orchestra.RunOrchestra(ctx, orchCfg)
+		result, err := specReviewRunOrchestra(ctx, orchCfg)
 		if err != nil {
 			return fmt.Errorf("리뷰 실행 실패: %w", err)
 		}
@@ -174,6 +174,9 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 
 	// Output final result
 	if finalResult != nil {
+		if persistErr := syncReviewedSpecStatus(specDir, finalResult); persistErr != nil {
+			fmt.Fprintf(os.Stderr, "SPEC 상태 업데이트 실패: %v\n", persistErr)
+		}
 		fmt.Printf("SPEC 리뷰 완료: %s\n", specID)
 		fmt.Printf("판정: %s\n", finalResult.Verdict)
 		if len(finalResult.Findings) > 0 {

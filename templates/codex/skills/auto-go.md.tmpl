@@ -82,7 +82,12 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 ### Step 2: SPEC 로드
 
 - 해석된 `SPEC_PATH`와 `SPEC_DIR`를 기준으로 `spec.md`, `plan.md`, `acceptance.md`를 읽습니다.
-- SPEC 상태가 `draft`이고 `review_gate`가 활성화돼 있으면 구현을 진행하지 않고 `/auto spec review {SPEC-ID}` 를 먼저 안내합니다.
+- SPEC 상태가 `draft`이고 `review_gate`가 활성화돼 있으면 다음 규칙을 적용합니다.
+  - `--auto` 없음: 구현을 진행하지 않고 `/auto spec review {SPEC-ID}` 를 먼저 안내한 뒤 중단합니다.
+  - `--auto` 있음: `auto spec review {SPEC-ID}` 를 한 번 트리거하고 `spec.md` 상태를 다시 읽습니다.
+  - review gate 내부의 REVISE 반복은 `auto spec review`의 `max_revisions` 루프에 맡기고, `go`가 이를 단발성으로 잘라내지 않습니다.
+  - review 결과가 `approved`가 아니면 그 verdict/findings를 보고하고 구현 단계로 넘어가지 않습니다.
+  - `/auto go --auto` → review → 다시 `/auto go --auto` 같은 재귀 auto-chain은 금지합니다. 현재 `go` invocation 당 review command 진입 1회가 loop guard입니다.
 
 ### Step 3: 파이프라인 라우팅
 

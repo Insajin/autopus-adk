@@ -3,12 +3,15 @@ package cli
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/orchestra"
+	"github.com/insajin/autopus-adk/pkg/spec"
 )
 
 // TestNewSpecReviewCmd_Structure verifies that the spec review command
@@ -118,4 +121,71 @@ func TestRunSpecReview_SpecLoadError(t *testing.T) {
 
 	execErr := runSpecReview(context.Background(), "SPEC-NONEXISTENT-999", "", 0)
 	assert.Error(t, execErr, "runSpecReview should fail when SPEC dir is missing")
+}
+
+func TestRunSpecReview_PassApprovesSpec(t *testing.T) {
+	dir := t.TempDir()
+	specDir := scaffoldReviewSpec(t, dir, "SPEC-REVIEW-001")
+	setFakeProviderOnPath(t, dir, "claude")
+
+	origWD, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() { _ = os.Chdir(origWD) }()
+	require.NoError(t, os.Chdir(dir))
+
+	origRunner := specReviewRunOrchestra
+	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{{Provider: "claude", Output: "VERDICT: PASS"}}}, nil
+	}
+	defer func() { specReviewRunOrchestra = origRunner }()
+
+	require.NoError(t, runSpecReview(context.Background(), "SPEC-REVIEW-001", "consensus", 10))
+
+	doc, err := spec.Load(specDir)
+	require.NoError(t, err)
+	assert.Equal(t, "approved", doc.Status)
+}
+
+func TestRunSpecReview_ReviseDoesNotApproveSpec(t *testing.T) {
+	dir := t.TempDir()
+	specDir := scaffoldReviewSpec(t, dir, "SPEC-REVIEW-002")
+	setFakeProviderOnPath(t, dir, "claude")
+
+	origWD, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() { _ = os.Chdir(origWD) }()
+	require.NoError(t, os.Chdir(dir))
+
+	callCount := 0
+	origRunner := specReviewRunOrchestra
+	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		callCount++
+		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{{
+			Provider: "claude",
+			Output:   "VERDICT: REVISE\nFINDING: [major] [correctness] REQ-001 Needs revision",
+		}}}, nil
+	}
+	defer func() { specReviewRunOrchestra = origRunner }()
+
+	require.NoError(t, runSpecReview(context.Background(), "SPEC-REVIEW-002", "consensus", 10))
+
+	doc, err := spec.Load(specDir)
+	require.NoError(t, err)
+	assert.Equal(t, "draft", doc.Status)
+	assert.GreaterOrEqual(t, callCount, 1)
+}
+
+func scaffoldReviewSpec(t *testing.T, dir, specID string) string {
+	t.Helper()
+	require.NoError(t, spec.Scaffold(dir, specID[len("SPEC-"):], "리뷰 테스트"))
+	return filepath.Join(dir, ".autopus", "specs", specID)
+}
+
+func setFakeProviderOnPath(t *testing.T, dir, binary string) {
+	t.Helper()
+	binDir := filepath.Join(dir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o755))
+	path := filepath.Join(binDir, binary)
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
+	"github.com/insajin/autopus-adk/pkg/spec"
 )
 
 // specEntry holds parsed data for a single SPEC.
@@ -35,6 +36,14 @@ func statusIcon(status string) string {
 // parseSpecFile reads a spec.md file and extracts status and title.
 // Returns empty strings on parse failure (graceful degradation).
 func parseSpecFile(path string) (status, title string) {
+	content, err := os.ReadFile(path)
+	if err == nil {
+		meta := spec.ParseSpecMetadata(string(content))
+		if meta.Status != "" || meta.Title != "" {
+			return meta.Status, meta.Title
+		}
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return "", ""

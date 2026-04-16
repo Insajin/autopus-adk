@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 )
 
 // Scaffold는 SPEC 디렉터리와 기본 파일들을 생성한다.
@@ -61,28 +59,7 @@ func Load(specDir string) (*SpecDocument, error) {
 
 // parseSpecMd는 spec.md 내용을 SpecDocument로 파싱한다.
 func parseSpecMd(content string) (*SpecDocument, error) {
-	doc := &SpecDocument{
-		Status:  "draft",
-		Version: "0.1.0",
-	}
-
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		// 제목: # SPEC-XXX: 타이틀
-		if strings.HasPrefix(line, "# ") {
-			titleLine := strings.TrimPrefix(line, "# ")
-			// SPEC-ID 추출
-			re := regexp.MustCompile(`^(SPEC-[\w-]+)(?::\s*(.+))?$`)
-			if m := re.FindStringSubmatch(titleLine); len(m) >= 2 {
-				doc.ID = m[1]
-				if len(m) >= 3 {
-					doc.Title = strings.TrimSpace(m[2])
-				}
-			}
-		}
-	}
+	doc := ParseSpecMetadata(content)
 
 	if doc.ID == "" {
 		return nil, fmt.Errorf("spec.md에서 SPEC ID를 찾을 수 없습니다")
@@ -92,7 +69,7 @@ func parseSpecMd(content string) (*SpecDocument, error) {
 	reqs, _ := ParseEARS(content)
 	doc.Requirements = reqs
 
-	return doc, nil
+	return &doc, nil
 }
 
 func loadAcceptanceCriteria(specDir string) ([]Criterion, error) {

@@ -68,6 +68,36 @@ func TestLoad_ParsesSpecDocument(t *testing.T) {
 	assert.Equal(t, "SPEC-LOAD-001", doc.ID)
 }
 
+func TestLoad_ParsesStatusFromFrontmatter(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, spec.Scaffold(dir, "STATUS-001", "상태 파싱 테스트"))
+
+	specDir := filepath.Join(dir, ".autopus", "specs", "SPEC-STATUS-001")
+	require.NoError(t, spec.UpdateStatus(specDir, "approved"))
+
+	doc, err := spec.Load(specDir)
+	require.NoError(t, err)
+	assert.Equal(t, "approved", doc.Status)
+}
+
+func TestUpdateStatus_RewritesFrontmatterStatus(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, spec.Scaffold(dir, "STATUS-002", "상태 업데이트 테스트"))
+
+	specDir := filepath.Join(dir, ".autopus", "specs", "SPEC-STATUS-002")
+	require.NoError(t, spec.UpdateStatus(specDir, "approved"))
+
+	content, err := os.ReadFile(filepath.Join(specDir, "spec.md"))
+	require.NoError(t, err)
+	body := string(content)
+	assert.Contains(t, body, "status: approved")
+	assert.Contains(t, body, "version: 0.1.0")
+}
+
 func TestLoad_ParsesAcceptanceMdFromScaffold(t *testing.T) {
 	t.Parallel()
 
