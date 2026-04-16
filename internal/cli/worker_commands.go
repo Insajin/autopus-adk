@@ -219,13 +219,13 @@ func newWorkerSetupCmd() *cobra.Command {
 
 // installDaemon installs the worker as a system daemon based on OS.
 func installDaemon() error {
-	binPath, err := os.Executable()
+	pathInfo, err := resolveCurrentBinaryPath()
 	if err != nil {
-		return fmt.Errorf("resolve binary path: %w", err)
+		return err
 	}
 
 	cfg := daemon.LaunchdConfig{
-		BinaryPath: binPath,
+		BinaryPath: pathInfo.ManagedPath(),
 		Args:       []string{"worker", "start"},
 	}
 

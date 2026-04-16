@@ -3,7 +3,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
@@ -16,11 +15,11 @@ func isWritable(dir string) bool {
 
 // reExecWithSudo re-executes the current command with sudo, inheriting stdin/stdout/stderr.
 func reExecWithSudo() error {
-	exe, err := os.Executable()
+	pathInfo, err := resolveCurrentBinaryPath()
 	if err != nil {
-		return fmt.Errorf("현재 바이너리 경로를 가져올 수 없음: %w", err)
+		return err
 	}
-	args := append([]string{exe}, os.Args[1:]...)
+	args := append([]string{pathInfo.ManagedPath()}, os.Args[1:]...)
 	cmd := exec.Command("sudo", args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

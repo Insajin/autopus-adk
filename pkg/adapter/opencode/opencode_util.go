@@ -119,7 +119,8 @@ func commandArgumentNote(name string) string {
 	if name == "auto" {
 		return "## OpenCode Arguments\n\n사용자가 `/auto` 뒤에 전달한 전체 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 라우팅 규칙은 `skill` 도구로 `auto`를 로드한 뒤 따르세요. 서브커맨드를 결정하면 대응하는 상세 스킬도 추가로 로드해야 합니다.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `" + openCodeDefaultModel + "` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n"
 	}
-	return fmt.Sprintf("## OpenCode Arguments\n\n사용자가 `/%s` 뒤에 전달한 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 워크플로우 단계는 `skill` 도구로 `%s`를 로드한 뒤 그 스킬 문서를 기준으로 실행하세요.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `"+openCodeDefaultModel+"` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n", name, name)
+	subcommand := strings.TrimPrefix(name, "auto-")
+	return fmt.Sprintf("## OpenCode Arguments\n\n사용자가 `/%s` 뒤에 전달한 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 전달된 인자를 `/auto %s ...` payload로 다시 해석하고, `skill` 도구로 `auto`를 로드한 뒤 canonical router 규칙을 따르세요. 실제 상세 스킬은 라우터가 결정합니다.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `"+openCodeDefaultModel+"` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n", name, subcommand)
 }
 
 func thinRouterCommandBody() string {

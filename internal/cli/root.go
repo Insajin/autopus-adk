@@ -92,20 +92,37 @@ func NewRootCmd() *cobra.Command {
 
 func newVersionCmd() *cobra.Command {
 	var short bool
+	var showPath bool
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print version information",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			out := cmd.OutOrStdout()
 			if short {
 				fmt.Fprintln(out, version.Version())
-				return
+				return nil
 			}
+
+			pathInfo, err := resolveCurrentBinaryPath()
+			if err != nil {
+				return err
+			}
+			if showPath {
+				fmt.Fprintln(out, pathInfo.ManagedPath())
+				return nil
+			}
+
 			tui.Banner(out)
 			fmt.Fprintln(out, version.String())
+			fmt.Fprintf(out, "path: %s\n", pathInfo.ManagedPath())
+			if pathInfo.IsSymlinked() {
+				fmt.Fprintf(out, "invoked via: %s\n", pathInfo.ExecutablePath)
+			}
+			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&short, "short", false, "Print version number only (no banner)")
+	cmd.Flags().BoolVar(&showPath, "path", false, "Print the canonical binary path only")
 	return cmd
 }
 

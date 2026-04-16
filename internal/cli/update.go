@@ -174,15 +174,11 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 		return nil
 	}
 
-	// Get current binary path
-	execPath, err := os.Executable()
+	pathInfo, err := resolveCurrentBinaryPath()
 	if err != nil {
-		return fmt.Errorf("현재 바이너리 경로를 가져올 수 없음: %w", err)
+		return err
 	}
-	execPath, err = filepath.EvalSymlinks(execPath)
-	if err != nil {
-		return fmt.Errorf("심볼릭 링크 해결 실패: %w", err)
-	}
+	execPath := pathInfo.ManagedPath()
 
 	// R13: Check write permission — re-exec with sudo if needed
 	if !isWritable(filepath.Dir(execPath)) {
