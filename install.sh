@@ -166,6 +166,7 @@ main() {
         cp "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
         chmod +x "${INSTALL_DIR}/${BINARY}"
         ln -sf "${INSTALL_DIR}/${BINARY}" "${INSTALL_DIR}/${ALIAS}"
+        USED_SUDO=""
     else
         echo ""
         echo "  시스템 폴더(${INSTALL_DIR})에 설치하기 위해 관리자 비밀번호가 필요합니다."
@@ -173,11 +174,13 @@ main() {
         sudo cp "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
         sudo chmod +x "${INSTALL_DIR}/${BINARY}"
         sudo ln -sf "${INSTALL_DIR}/${BINARY}" "${INSTALL_DIR}/${ALIAS}"
+        USED_SUDO="sudo"
     fi
 
-    # macOS quarantine 속성 제거
+    # macOS: clear Gatekeeper quarantine/provenance so unsigned binary can run
     if [ "$OS" = "darwin" ]; then
-        xattr -dr com.apple.quarantine "${INSTALL_DIR}/${BINARY}" 2>/dev/null || true
+        $USED_SUDO xattr -c "${INSTALL_DIR}/${BINARY}" 2>/dev/null || true
+        $USED_SUDO xattr -c "${INSTALL_DIR}/${ALIAS}" 2>/dev/null || true
     fi
 
     ok "autopus-adk v${VERSION} 설치 완료!"
