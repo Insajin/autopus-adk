@@ -25,10 +25,11 @@ Before processing any subcommand, load project context by reading these files if
 2. `.autopus/project/product.md` — project overview, core features
 3. `.autopus/project/structure.md` — directory structure, package roles
 4. `.autopus/project/tech.md` — tech stack, build, testing
-5. `.autopus/project/scenarios.md` — E2E test scenarios (if exists)
-6. `.autopus/project/canary.md` — health check configuration (if exists)
-7. `.autopus/context/signatures.md` — exported API signatures (if exists)
-7. `.autopus/learnings/pipeline.jsonl` — pipeline learning patterns (if exists)
+5. `.autopus/project/workspace.md` — root repo role, nested repo boundaries, tracking policy
+6. `.autopus/project/scenarios.md` — E2E test scenarios (if exists)
+7. `.autopus/project/canary.md` — health check configuration (if exists)
+8. `.autopus/context/signatures.md` — exported API signatures (if exists)
+9. `.autopus/learnings/pipeline.jsonl` — pipeline learning patterns (if exists)
 
 WHEN `.autopus/learnings/pipeline.jsonl` exists AND contains 5+ entries, display a non-intrusive notification after loading context:
 
@@ -252,6 +253,8 @@ Agent(
     - Tech stack (languages, frameworks, build tools)
     - Entry points and exported APIs
     - Architecture patterns and domain boundaries
+    - Root repo role (product repo / monorepo root / meta workspace) and nested git repo boundaries
+    - Generated surface / runtime artifact paths and source-of-truth repo locations
   """
 )
 ```
@@ -270,6 +273,7 @@ Create or update the 4 files under `.autopus/project/` using the explorer's outp
 - `product.md` — project name, description, core features, use cases, mode
 - `structure.md` — directory structure, package roles, entry points, file stats
 - `tech.md` — tech stack, build, testing, architecture patterns
+- `workspace.md` — root repo role, nested repo boundaries, generated/runtime paths, tracking/commit policy, source-of-truth locations
 
 > **⏭ POST-STEP**: Project docs written. NEXT REQUIRED STEP: Step 4: Generate scenarios.md. Do NOT skip to Completion.
 
@@ -285,6 +289,7 @@ Analyze codebase to extract user-facing E2E test scenarios (SPEC-E2E-001 R1).
 | `.autopus/project/product.md` | Project name, description, core features, use cases, mode |
 | `.autopus/project/structure.md` | Directory structure, package roles, entry points, file stats |
 | `.autopus/project/tech.md` | Tech stack, build, testing, architecture patterns |
+| `.autopus/project/workspace.md` | Root repo role, nested repo boundaries, generated/runtime paths, tracking policy |
 | `.autopus/project/scenarios.md` | User-facing E2E test scenarios extracted from the codebase |
 | `.autopus/project/canary.md` | Health check configuration: build, endpoints, browser targets, deploy platform |
 
@@ -435,7 +440,7 @@ Before displaying the completion message, verify ALL steps were executed:
 
 - [ ] Step 1: Explore agent called — codebase analyzed
 - [ ] Step 2: ARCHITECTURE.md written/updated
-- [ ] Step 3: `.autopus/project/` docs written (product.md, structure.md, tech.md)
+- [ ] Step 3: `.autopus/project/` docs written (product.md, structure.md, tech.md, workspace.md)
 - [ ] Step 4: scenarios.md written
 - [ ] Step 5: canary.md written
 
@@ -449,6 +454,7 @@ Project context documents have been generated/updated.
 - .autopus/project/product.md
 - .autopus/project/structure.md
 - .autopus/project/tech.md
+- .autopus/project/workspace.md
 - .autopus/project/scenarios.md (E2E test scenarios)
 - .autopus/project/canary.md (health check configuration)
 Context will be loaded automatically on the next session.
@@ -2057,6 +2063,7 @@ Detect structural changes in the codebase and update:
 - `.autopus/project/structure.md` — reflect directory/file changes
 - `.autopus/project/tech.md` — reflect dependency/build changes
 - `.autopus/project/product.md` — reflect new features/commands
+- `.autopus/project/workspace.md` — reflect root repo role, nested repo boundaries, generated/runtime paths, tracking/commit policy changes
 - `.autopus/project/canary.md` — reflect new health endpoints, pages, deploy config changes
 
 > **⏭ POST-TARGET**: Project docs updated. NEXT REQUIRED TARGET: Sync Target 3: @AX Lifecycle. Do NOT skip to Lore Commit.
@@ -2183,6 +2190,7 @@ On sync, detect structural changes in the codebase and update:
 - `.autopus/project/structure.md` — reflect directory/file changes
 - `.autopus/project/tech.md` — reflect dependency/build changes
 - `.autopus/project/product.md` — reflect new features/commands
+- `.autopus/project/workspace.md` — reflect root repo role, nested repo boundaries, generated/runtime paths, tracking/commit policy changes
 
 Usage: `/auto sync SPEC-ID`, `/auto sync`
 

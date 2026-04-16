@@ -72,7 +72,7 @@ func thinRouterSkillBody() string {
 		"",
 		"## Context Load",
 		"",
-		"- 서브커맨드를 처리하기 전에 `ARCHITECTURE.md`, `.autopus/project/product.md`, `.autopus/project/structure.md`, `.autopus/project/tech.md`, `.autopus/project/scenarios.md`, `.autopus/project/canary.md`, `.autopus/context/signatures.md`, `.autopus/learnings/pipeline.jsonl`을 읽어 현재 프로젝트 컨텍스트를 복원합니다.",
+		"- 서브커맨드를 처리하기 전에 `ARCHITECTURE.md`, `.autopus/project/product.md`, `.autopus/project/structure.md`, `.autopus/project/tech.md`, `.autopus/project/workspace.md`, `.autopus/project/scenarios.md`, `.autopus/project/canary.md`, `.autopus/context/signatures.md`, `.autopus/learnings/pipeline.jsonl`을 읽어 현재 프로젝트 컨텍스트를 복원합니다.",
 		"- 위 문서가 모두 없으면 컨텍스트 부재를 명시하고 `/auto setup`을 권장합니다.",
 		"- 서브커맨드가 명확해 보여도 이 로드 단계를 생략하지 않습니다.",
 		"",

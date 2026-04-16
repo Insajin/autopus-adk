@@ -16,7 +16,7 @@ SPEC-ID를 인자로 받아 문서를 동기화합니다.
 - 기본 운영 원칙은 `spawn_agent(...)` 기반 subagent-first 입니다.
 - 메인 세션은 동기화 범위 결정, 상태 갱신, 최종 커밋 판단을 담당합니다.
 - 문서 영향 분석과 검증 정리는 필요 시 서브에이전트에 위임합니다.
-- 구조 변경이 감지되면 `ARCHITECTURE.md` 와 `.autopus/project/*` 문서를 함께 갱신해야 합니다.
+- 구조 변경이 감지되면 `ARCHITECTURE.md`, `.autopus/project/workspace.md`, 그리고 나머지 `.autopus/project/*` 문서를 함께 갱신해야 합니다.
 - sync 단계에서 @AX lifecycle 관리(TODO cycle, ANCHOR fan-in, orphan NOTE cleanup)를 수행해야 합니다.
 - full 모드에서는 Lore 2-phase commit 규칙을 적용합니다.
 

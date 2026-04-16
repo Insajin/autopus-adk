@@ -26,7 +26,6 @@ func (a *Adapter) renderRouterSkill(cfg *config.HarnessConfig) (string, error) {
 	body = rewriteCodexRouterBody(body)
 	body = normalizeCodexInvocationBody(body)
 	body = normalizeCodexHelperPaths(body)
-	body = injectCodexBrandingBlock(body, true)
 	invoNote := strings.TrimSpace(fmt.Sprintf(`
 ## Codex Invocation
 
@@ -45,6 +44,8 @@ This skill is a thin router. After resolving the subcommand, load the matching d
 		routerDetailSkills(),
 	))
 	body = injectAfterFirstHeading(body, invoNote)
+	body = injectAfterFirstHeading(body, codexRouterExecutionContract())
+	body = injectCodexBrandingBlock(body, true)
 	frontmatter := strings.TrimSpace(fmt.Sprintf(`---
 name: auto
 description: >
@@ -164,14 +165,7 @@ func codexRouterExecutionContract() string {
 		"- Always load the project context documents before routing or executing the workflow.\n\n"+
 		"## Context Load\n\n"+
 		"Before processing any `@auto` subcommand, read these files if they exist:\n\n"+
-		"1. `ARCHITECTURE.md`\n"+
-		"2. `.autopus/project/product.md`\n"+
-		"3. `.autopus/project/structure.md`\n"+
-		"4. `.autopus/project/tech.md`\n"+
-		"5. `.autopus/project/scenarios.md`\n"+
-		"6. `.autopus/project/canary.md`\n"+
-		"7. `.autopus/context/signatures.md`\n"+
-		"8. `.autopus/learnings/pipeline.jsonl`\n\n"+
+		codexProjectContextLoadList()+"\n"+
 		"- If none of these files exist, explicitly note that project context is missing and recommend `@auto setup`.\n"+
 		"- Do not skip this load step just because the subcommand looks obvious.\n\n"+
 		"## SPEC Path Resolution\n\n"+
