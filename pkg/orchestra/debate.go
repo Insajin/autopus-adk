@@ -11,12 +11,16 @@ import (
 
 // runDebate executes the full debate flow:
 // Phase 1 (parallel arguments) → optional Phase 2 (rebuttal) → optional judgment.
-func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, error) {
+// Returns final responses and per-round history for yield/JSON output.
+func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, [][]ProviderResponse, error) {
 	// Phase 1: all debaters respond to original prompt in parallel
-	responses, _, err := runParallel(ctx, cfg)
+	round1Responses, _, err := runParallel(ctx, cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	roundHistory := [][]ProviderResponse{round1Responses}
+	responses := round1Responses
 
 	// Phase 2 (optional): rebuttal round when DebateRounds >= 2
 	rounds := cfg.DebateRounds
@@ -26,6 +30,7 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, er
 	if rounds >= 2 && len(responses) >= 2 {
 		rebuttalResps, rebuttalErr := runRebuttalRound(ctx, cfg, responses)
 		if rebuttalErr == nil && len(rebuttalResps) > 0 {
+			roundHistory = append(roundHistory, rebuttalResps)
 			responses = rebuttalResps
 		}
 	}
@@ -44,7 +49,7 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, er
 		}
 	}
 
-	return responses, nil
+	return responses, roundHistory, nil
 }
 
 // runRebuttalRound executes one rebuttal round for each debater.

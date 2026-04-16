@@ -150,7 +150,7 @@ func TestRunDebate_TimeoutProviderDoesNotHangCollection(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	responses, err := runDebate(ctx, OrchestraConfig{
+	responses, _, err := runDebate(ctx, OrchestraConfig{
 		Providers: []ProviderConfig{
 			{Name: "fast", Binary: "fast", PromptViaArgs: true},
 			{Name: "stuck", Binary: "stuck", PromptViaArgs: true},

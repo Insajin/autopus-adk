@@ -40,6 +40,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 
 	start := time.Now()
 	var responses []ProviderResponse
+	var roundHistory [][]ProviderResponse
 	var failed []FailedProvider
 	var err error
 
@@ -49,7 +50,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	case StrategyFastest:
 		responses, err = runFastest(timeoutCtx, cfg)
 	case StrategyDebate:
-		responses, err = runDebate(timeoutCtx, cfg)
+		responses, roundHistory, err = runDebate(timeoutCtx, cfg)
 	case StrategyRelay:
 		responses, err = runRelay(timeoutCtx, &cfg)
 	default:
@@ -95,6 +96,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	return &OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
+		RoundHistory:    roundHistory,
 		Merged:          merged,
 		Duration:        total,
 		Summary:         summary,

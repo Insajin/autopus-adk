@@ -161,7 +161,7 @@ func TestRunDebate_JudgeRunsWithPartialResponses(t *testing.T) {
 		PromptViaArgs: false,
 	})
 
-	responses, err := runDebate(context.Background(), cfg)
+	responses, _, err := runDebate(context.Background(), cfg)
 	require.NoError(t, err)
 
 	// Judge response should be present even with partial debater success.

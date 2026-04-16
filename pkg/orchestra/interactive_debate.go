@@ -64,7 +64,7 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	responses, err := runDebate(timeoutCtx, cfg)
+	responses, roundHistory, err := runDebate(timeoutCtx, cfg)
 	if err != nil {
 		log.Printf("[debate] runDebate failed: %v -- falling back to parallel", err)
 		// Fallback: try parallel-only execution (no rebuttal/judge).
@@ -73,11 +73,10 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 			log.Printf("[debate] runParallel also failed: %v -- returning error", fallbackErr)
 			return nil, fmt.Errorf("debate failed: %v; fallback failed: %w", err, fallbackErr)
 		}
-		roundHistory := [][]ProviderResponse{fallbackResps}
+		roundHistory = [][]ProviderResponse{fallbackResps}
 		return buildDebateResult(cfg, fallbackResps, roundHistory, start), nil
 	}
 
-	roundHistory := [][]ProviderResponse{responses}
 	return buildDebateResult(cfg, responses, roundHistory, start), nil
 }
 

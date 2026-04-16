@@ -121,10 +121,12 @@ func DefaultCompletionPatterns() []CompletionPattern {
 // Set to 30s to allow for AI model thinking time before triggering completion.
 const IdleThreshold = 30 * time.Second
 
-// scrollbackDepth returns the scrollback depth to use, defaulting to 500 if unset.
+// scrollbackDepth returns the scrollback depth to use, defaulting to 3000 if unset.
+// Increased from 500 to 3000 to capture full AI brainstorm responses
+// (SCAMPER + HMW + ICE scoring can easily exceed 500 lines).
 func scrollbackDepth(configured int) int {
 	if configured == 0 {
-		return 500
+		return 3000
 	}
 	return configured
 }

@@ -27,9 +27,11 @@ func TestRunDebate_WithRebuttalRound(t *testing.T) {
 		DebateRounds:   2,
 	}
 
-	responses, err := runDebate(context.Background(), cfg)
+	responses, roundHistory, err := runDebate(context.Background(), cfg)
 	require.NoError(t, err)
 	// After rebuttal, responses should contain updated responses from both debaters.
+	// Round history should have Round 1 + Round 2 entries.
+	assert.Len(t, roundHistory, 2, "debate with 2 rounds should produce 2 round history entries")
 	assert.NotEmpty(t, responses)
 }
 

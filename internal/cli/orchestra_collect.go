@@ -69,7 +69,7 @@ func newOrchestraCollectCmd() *cobra.Command {
 
 				screen, err := term.ReadScreen(ctx, terminal.PaneID(paneID), terminal.ReadScreenOpts{
 					Scrollback:      true,
-					ScrollbackLines: 500,
+					ScrollbackLines: 3000,
 				})
 				if err != nil {
 					responses = append(responses, CollectProviderResult{

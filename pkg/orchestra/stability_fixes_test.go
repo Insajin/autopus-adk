@@ -151,10 +151,10 @@ func TestPollUntilPrompt_RespectsContextCancel(t *testing.T) {
 
 // --- T3: ReadScreen scrollback depth ---
 
-// TestScrollbackDepth_Default verifies default scrollback of 500.
+// TestScrollbackDepth_Default verifies default scrollback of 3000.
 func TestScrollbackDepth_Default(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, 500, scrollbackDepth(0))
+	assert.Equal(t, 3000, scrollbackDepth(0))
 }
 
 // TestScrollbackDepth_Configured verifies custom scrollback value is used.
@@ -170,9 +170,9 @@ func TestScrollbackLines_ConfigField(t *testing.T) {
 	cfg := OrchestraConfig{ScrollbackLines: 750}
 	assert.Equal(t, 750, cfg.ScrollbackLines)
 
-	// Default zero uses 500
+	// Default zero uses 3000
 	cfg2 := OrchestraConfig{}
-	assert.Equal(t, 500, scrollbackDepth(cfg2.ScrollbackLines))
+	assert.Equal(t, 3000, scrollbackDepth(cfg2.ScrollbackLines))
 }
 
 // --- T4: NoJudge skips judge phase ---
