@@ -9,7 +9,7 @@ import (
 func TestDefaultPricingTable_ContainsAllModels(t *testing.T) {
 	table := cost.DefaultPricingTable()
 
-	required := []string{"claude-opus-4", "claude-sonnet-4", "claude-haiku-4.5"}
+	required := []string{"claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"}
 	for _, model := range required {
 		if _, ok := table[model]; !ok {
 			t.Errorf("pricing table missing model: %s", model)
@@ -25,9 +25,9 @@ func TestDefaultPricingTable_Prices(t *testing.T) {
 		input  float64
 		output float64
 	}{
-		{"claude-opus-4", 15.0, 75.0},
-		{"claude-sonnet-4", 3.0, 15.0},
-		{"claude-haiku-4.5", 0.80, 4.0},
+		{"claude-opus-4-7", 5.0, 25.0},
+		{"claude-sonnet-4-6", 3.0, 15.0},
+		{"claude-haiku-4-5", 1.0, 5.0},
 	}
 
 	for _, tc := range cases {
@@ -52,8 +52,8 @@ func TestQualityModeToModels_Ultra(t *testing.T) {
 
 	expected := []string{"planner", "architect", "executor", "tester", "reviewer", "validator"}
 	for _, agent := range expected {
-		if model, ok := agents[agent]; !ok || model != "claude-opus-4" {
-			t.Errorf("ultra/%s: want claude-opus-4, got %q", agent, model)
+		if model, ok := agents[agent]; !ok || model != "claude-opus-4-7" {
+			t.Errorf("ultra/%s: want claude-opus-4-7, got %q", agent, model)
 		}
 	}
 }
@@ -68,12 +68,12 @@ func TestQualityModeToModels_Balanced(t *testing.T) {
 		agent string
 		model string
 	}{
-		{"planner", "claude-opus-4"},
-		{"architect", "claude-opus-4"},
-		{"executor", "claude-sonnet-4"},
-		{"tester", "claude-sonnet-4"},
-		{"reviewer", "claude-sonnet-4"},
-		{"validator", "claude-sonnet-4"},
+		{"planner", "claude-opus-4-7"},
+		{"architect", "claude-opus-4-7"},
+		{"executor", "claude-sonnet-4-6"},
+		{"tester", "claude-sonnet-4-6"},
+		{"reviewer", "claude-sonnet-4-6"},
+		{"validator", "claude-sonnet-4-6"},
 	}
 
 	for _, tc := range cases {
@@ -95,10 +95,10 @@ func TestModelForAgent_Known(t *testing.T) {
 		agent string
 		want  string
 	}{
-		{"ultra", "executor", "claude-opus-4"},
-		{"balanced", "executor", "claude-sonnet-4"},
-		{"balanced", "validator", "claude-sonnet-4"},
-		{"balanced", "planner", "claude-opus-4"},
+		{"ultra", "executor", "claude-opus-4-7"},
+		{"balanced", "executor", "claude-sonnet-4-6"},
+		{"balanced", "validator", "claude-sonnet-4-6"},
+		{"balanced", "planner", "claude-opus-4-7"},
 	}
 
 	for _, tc := range cases {

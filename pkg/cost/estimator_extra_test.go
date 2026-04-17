@@ -12,12 +12,12 @@ import (
 // 0.0 when a model is mapped by QualityModeToModels but is absent from the
 // custom pricing table passed to NewEstimatorWithPricing.
 func TestEstimateCost_ModelNotInCustomPricing_ReturnsZero(t *testing.T) {
-	// Build a pricing table that intentionally omits "claude-opus-4".
+	// Build a pricing table that intentionally omits "claude-opus-4-7".
 	partialPricing := map[string]cost.ModelPricing{
-		"claude-sonnet-4": {InputPricePerMillion: 3.0, OutputPricePerMillion: 15.0},
-		"claude-haiku-4.5": {InputPricePerMillion: 0.80, OutputPricePerMillion: 4.0},
+		"claude-sonnet-4-6": {InputPricePerMillion: 3.0, OutputPricePerMillion: 15.0},
+		"claude-haiku-4-5":  {InputPricePerMillion: 1.0, OutputPricePerMillion: 5.0},
 	}
-	// ultra/executor → claude-opus-4, which is not in partialPricing.
+	// ultra/executor → claude-opus-4-7, which is not in partialPricing.
 	e := cost.NewEstimatorWithPricing("ultra", partialPricing)
 	run := telemetry.AgentRun{AgentName: "executor", EstimatedTokens: 5_000}
 

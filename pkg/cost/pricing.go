@@ -11,20 +11,21 @@ type ModelPricing struct {
 }
 
 // DefaultPricingTable returns the canonical pricing table for supported models.
-// Prices are in USD per 1M tokens as of March 2026.
+// Prices are in USD per 1M tokens as of April 2026 (Opus 4.7 launch).
+// Source: https://www.anthropic.com/news/claude-opus-4-7
 func DefaultPricingTable() map[string]ModelPricing {
 	return map[string]ModelPricing{
-		"claude-opus-4": {
-			InputPricePerMillion:  15.0,
-			OutputPricePerMillion: 75.0,
+		"claude-opus-4-7": {
+			InputPricePerMillion:  5.0,
+			OutputPricePerMillion: 25.0,
 		},
-		"claude-sonnet-4": {
+		"claude-sonnet-4-6": {
 			InputPricePerMillion:  3.0,
 			OutputPricePerMillion: 15.0,
 		},
-		"claude-haiku-4.5": {
-			InputPricePerMillion:  0.80,
-			OutputPricePerMillion: 4.0,
+		"claude-haiku-4-5": {
+			InputPricePerMillion:  1.0,
+			OutputPricePerMillion: 5.0,
 		},
 	}
 }
@@ -37,22 +38,22 @@ func QualityModeToModels(qualityMode string) map[string]string {
 	case "ultra":
 		// All agents use the highest-capability model.
 		return map[string]string{
-			"planner":   "claude-opus-4",
-			"architect": "claude-opus-4",
-			"executor":  "claude-opus-4",
-			"tester":    "claude-opus-4",
-			"reviewer":  "claude-opus-4",
-			"validator": "claude-opus-4",
+			"planner":   "claude-opus-4-7",
+			"architect": "claude-opus-4-7",
+			"executor":  "claude-opus-4-7",
+			"tester":    "claude-opus-4-7",
+			"reviewer":  "claude-opus-4-7",
+			"validator": "claude-opus-4-7",
 		}
 	case "balanced":
 		// Strategic agents use opus; execution and validation agents use sonnet.
 		return map[string]string{
-			"planner":   "claude-opus-4",
-			"architect": "claude-opus-4",
-			"executor":  "claude-sonnet-4",
-			"tester":    "claude-sonnet-4",
-			"reviewer":  "claude-sonnet-4",
-			"validator": "claude-sonnet-4",
+			"planner":   "claude-opus-4-7",
+			"architect": "claude-opus-4-7",
+			"executor":  "claude-sonnet-4-6",
+			"tester":    "claude-sonnet-4-6",
+			"reviewer":  "claude-sonnet-4-6",
+			"validator": "claude-sonnet-4-6",
 		}
 	default:
 		return nil

@@ -22,7 +22,7 @@ func TestNewEstimator_DefaultPricing(t *testing.T) {
 
 func TestNewEstimatorWithPricing_CustomTable(t *testing.T) {
 	custom := map[string]cost.ModelPricing{
-		"claude-opus-4": {InputPricePerMillion: 10.0, OutputPricePerMillion: 50.0},
+		"claude-opus-4-7": {InputPricePerMillion: 10.0, OutputPricePerMillion: 50.0},
 	}
 	e := cost.NewEstimatorWithPricing("ultra", custom)
 	if e == nil {
@@ -31,21 +31,21 @@ func TestNewEstimatorWithPricing_CustomTable(t *testing.T) {
 }
 
 func TestEstimateCost_UltraExecutor(t *testing.T) {
-	// ultra/executor → claude-opus-4: input=$15/M, output=$75/M
+	// ultra/executor → claude-opus-4-7: input=$5/M, output=$25/M
 	// total=4000 → input=3000, output=1000
-	// cost = (3000/1_000_000 * 15) + (1000/1_000_000 * 75) = 0.045 + 0.075 = 0.12
+	// cost = (3000/1_000_000 * 5) + (1000/1_000_000 * 25) = 0.015 + 0.025 = 0.04
 	e := cost.NewEstimator("ultra")
 	run := telemetry.AgentRun{AgentName: "executor", EstimatedTokens: 4_000}
 
 	got := roundTo6(e.EstimateCost(run))
-	want := roundTo6(0.12)
+	want := roundTo6(0.04)
 	if got != want {
 		t.Errorf("EstimateCost ultra/executor: want %f, got %f", want, got)
 	}
 }
 
 func TestEstimateCost_BalancedExecutor(t *testing.T) {
-	// balanced/executor → claude-sonnet-4: input=$3/M, output=$15/M
+	// balanced/executor → claude-sonnet-4-6: input=$3/M, output=$15/M
 	// total=4000 → input=3000, output=1000
 	// cost = (3000/1_000_000 * 3) + (1000/1_000_000 * 15) = 0.009 + 0.015 = 0.024
 	e := cost.NewEstimator("balanced")
@@ -59,7 +59,7 @@ func TestEstimateCost_BalancedExecutor(t *testing.T) {
 }
 
 func TestEstimateCost_BalancedValidator(t *testing.T) {
-	// balanced/validator → claude-sonnet-4: input=$3/M, output=$15/M
+	// balanced/validator → claude-sonnet-4-6: input=$3/M, output=$15/M
 	// total=1_000_000 → input=750_000, output=250_000
 	// cost = (750_000/1_000_000 * 3.0) + (250_000/1_000_000 * 15.0) = 2.25 + 3.75 = 6.00
 	e := cost.NewEstimator("balanced")
@@ -111,9 +111,9 @@ func TestEstimatePipelineCost_MultiplePhases(t *testing.T) {
 	// pipeline QualityMode="balanced"
 	// phase1: executor(4000 tokens) + validator(1000 tokens)
 	// phase2: planner(2000 tokens)
-	// balanced/executor (sonnet): (3000/1M*3)+(1000/1M*15) = 0.000009+0.000015 = 0.000024
-	// balanced/validator (sonnet): (750/1M*3)+(250/1M*15) = 0.00000225+0.00000375 = 0.000006
-	// balanced/planner (opus):   (1500/1M*15)+(500/1M*75) = 0.0000225+0.0000375 = 0.00006
+	// balanced/executor (sonnet-4-6): (3000/1M*3)+(1000/1M*15) = 0.000009+0.000015 = 0.000024
+	// balanced/validator (sonnet-4-6): (750/1M*3)+(250/1M*15) = 0.00000225+0.00000375 = 0.000006
+	// balanced/planner (opus-4-7):    (1500/1M*5)+(500/1M*25) = 0.0000075+0.0000125 = 0.00002
 	e := cost.NewEstimator("ultra") // estimator mode doesn't matter; pipeline overrides it
 
 	pipeline := telemetry.PipelineRun{

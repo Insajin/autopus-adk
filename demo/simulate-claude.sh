@@ -61,7 +61,7 @@ divider() {
 clear
 echo ""
 printf "${ORANGE}${BOLD}╭─────────────────────────────────────────────╮${RESET}\n"
-printf "${ORANGE}${BOLD}│${RESET}  ${ORANGE}${BOLD}Claude Code${RESET}  ${DIM}v2.1  •  claude-opus-4-6${RESET}       ${ORANGE}${BOLD}│${RESET}\n"
+printf "${ORANGE}${BOLD}│${RESET}  ${ORANGE}${BOLD}Claude Code${RESET}  ${DIM}v2.1  •  claude-opus-4-7${RESET}       ${ORANGE}${BOLD}│${RESET}\n"
 printf "${ORANGE}${BOLD}│${RESET}  ${DIM}cwd: ~/my-project${RESET}                         ${ORANGE}${BOLD}│${RESET}\n"
 printf "${ORANGE}${BOLD}╰─────────────────────────────────────────────╯${RESET}\n"
 echo ""

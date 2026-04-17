@@ -39,7 +39,7 @@ func DefaultConfig() RoutingConfig {
 			ComplexMinChars: 1000,
 		},
 		Models: map[string]ProviderModels{
-			"claude": {Simple: "claude-sonnet-4-6", Medium: "claude-sonnet-4-6", Complex: "claude-opus-4-6"},
+			"claude": {Simple: "claude-sonnet-4-6", Medium: "claude-sonnet-4-6", Complex: "claude-opus-4-7"},
 			"codex":  {Simple: "gpt-4o-mini", Medium: "gpt-4o", Complex: "o3"},
 			"gemini": {Simple: "gemini-2.0-flash", Medium: "gemini-2.5-pro", Complex: "gemini-2.5-pro"},
 		},

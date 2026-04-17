@@ -32,7 +32,7 @@ func TestRoute(t *testing.T) {
 			name:     "claude complex message returns opus",
 			provider: "claude",
 			message:  strings.Repeat("x", 1200) + " 리팩토링 아키텍처",
-			want:     "claude-opus-4-6",
+			want:     "claude-opus-4-7",
 		},
 		{
 			name:     "claude medium message returns sonnet",

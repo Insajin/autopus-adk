@@ -36,7 +36,7 @@ func TestDefaultConfig(t *testing.T) {
 		m := cfg.Models["claude"]
 		assert.Equal(t, "claude-sonnet-4-6", m.Simple)
 		assert.Equal(t, "claude-sonnet-4-6", m.Medium)
-		assert.Equal(t, "claude-opus-4-6", m.Complex)
+		assert.Equal(t, "claude-opus-4-7", m.Complex)
 	})
 
 	t.Run("codex models", func(t *testing.T) {
