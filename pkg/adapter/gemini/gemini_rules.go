@@ -2,11 +2,14 @@
 package gemini
 
 import (
+	"bufio"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
+	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/content"
@@ -77,14 +80,77 @@ func (a *Adapter) prepareRuleMappings(cfg *config.HarnessConfig) ([]adapter.File
 			return nil, fmt.Errorf("gemini rule 템플릿 렌더링 실패 %s: %w", name, err)
 		}
 
+		// Expand `@import content/rules/X.md` directives inline.
+		// Gemini's `@<path>` directive only accepts a bare path; the `@import`
+		// keyword is not recognized and causes "no such file or directory" errors
+		// (tries to open a file literally named "import").
+		expanded, err := expandContentImports(rendered)
+		if err != nil {
+			return nil, fmt.Errorf("gemini rule @import 전개 실패 %s: %w", name, err)
+		}
+
 		relPath := filepath.Join(".gemini", "rules", "autopus", outFile)
 		files = append(files, adapter.FileMapping{
 			TargetPath:      relPath,
 			OverwritePolicy: adapter.OverwriteAlways,
-			Checksum:        checksum(rendered),
-			Content:         []byte(rendered),
+			Checksum:        checksum(expanded),
+			Content:         []byte(expanded),
 		})
 	}
 
 	return files, nil
+}
+
+// expandContentImports replaces `@import content/rules/<name>.md` lines with
+// the body of the referenced embedded content file (frontmatter stripped).
+// Lines that do not match the directive pass through unchanged.
+func expandContentImports(rendered string) (string, error) {
+	const prefix = "@import content/rules/"
+	if !strings.Contains(rendered, prefix) {
+		return rendered, nil
+	}
+
+	var out strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(rendered))
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, prefix) {
+			target := strings.TrimSpace(strings.TrimPrefix(trimmed, prefix))
+			body, err := fs.ReadFile(contentfs.FS, "rules/"+target)
+			if err != nil {
+				return "", fmt.Errorf("read embedded %s: %w", target, err)
+			}
+			out.WriteString(stripFrontmatter(string(body)))
+			if !strings.HasSuffix(out.String(), "\n") {
+				out.WriteString("\n")
+			}
+			continue
+		}
+		out.WriteString(line)
+		out.WriteString("\n")
+	}
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+	return out.String(), nil
+}
+
+// stripFrontmatter removes YAML frontmatter (--- ... ---) so the imported body
+// does not re-open a frontmatter block inside the Gemini rule file.
+func stripFrontmatter(content string) string {
+	if !strings.HasPrefix(content, "---") {
+		return content
+	}
+	rest := content[3:]
+	idx := strings.Index(rest, "\n---")
+	if idx < 0 {
+		return content
+	}
+	body := rest[idx+4:]
+	if len(body) > 0 && body[0] == '\n' {
+		body = body[1:]
+	}
+	return body
 }

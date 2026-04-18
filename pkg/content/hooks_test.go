@@ -81,6 +81,56 @@ func TestGenerateHookConfigs_AllDisabled(t *testing.T) {
 	assert.Empty(t, gitHooks)
 }
 
+// TestGenerateHookConfigs_GeminiTranslatesEventNames verifies that gemini-cli
+// receives BeforeTool/AfterTool (gemini's native event names) instead of
+// Claude Code's PreToolUse/PostToolUse, which gemini CLI rejects as
+// "Invalid hook event name".
+func TestGenerateHookConfigs_GeminiTranslatesEventNames(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.HooksConf{
+		PreCommitArch:  true,
+		ReactCIFailure: true,
+	}
+
+	hooks, _, err := content.GenerateHookConfigs(cfg, "gemini", true)
+	require.NoError(t, err)
+
+	eventNames := make([]string, len(hooks))
+	for i, h := range hooks {
+		eventNames[i] = h.Event
+	}
+
+	assert.Contains(t, eventNames, "BeforeTool", "PreToolUse must be translated to BeforeTool for gemini")
+	assert.Contains(t, eventNames, "AfterTool", "PostToolUse must be translated to AfterTool for gemini")
+	assert.NotContains(t, eventNames, "PreToolUse", "gemini hooks must not use Claude Code event names")
+	assert.NotContains(t, eventNames, "PostToolUse", "gemini hooks must not use Claude Code event names")
+}
+
+// TestGenerateHookConfigs_ClaudeKeepsEventNames verifies claude-code still
+// receives PreToolUse/PostToolUse (its native event names).
+func TestGenerateHookConfigs_ClaudeKeepsEventNames(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.HooksConf{
+		PreCommitArch:  true,
+		ReactCIFailure: true,
+	}
+
+	hooks, _, err := content.GenerateHookConfigs(cfg, "claude", true)
+	require.NoError(t, err)
+
+	eventNames := make([]string, len(hooks))
+	for i, h := range hooks {
+		eventNames[i] = h.Event
+	}
+
+	assert.Contains(t, eventNames, "PreToolUse")
+	assert.Contains(t, eventNames, "PostToolUse")
+	assert.NotContains(t, eventNames, "BeforeTool")
+	assert.NotContains(t, eventNames, "AfterTool")
+}
+
 func TestGenerateHookConfigs_DeduplicatesReactHooks(t *testing.T) {
 	t.Parallel()
 

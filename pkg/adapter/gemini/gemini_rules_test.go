@@ -87,3 +87,47 @@ func TestGeminiRulesContent(t *testing.T) {
 	assert.Contains(t, string(fsData), "300 lines",
 		"file-size-limit should reference 300 lines")
 }
+
+// TestGeminiRulesDoNotContainBrokenImport verifies that the generated rule
+// files do not contain the `@import content/rules/...` directive, which
+// gemini CLI misparses as a request to open a file literally named "import".
+func TestGeminiRulesDoNotContainBrokenImport(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := gemini.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	rules := []string{
+		"lore-commit.md",
+		"file-size-limit.md",
+		"subagent-delegation.md",
+		"language-policy.md",
+		"branding.md",
+		"context7-docs.md",
+		"doc-storage.md",
+		"objective-reasoning.md",
+		"worktree-safety.md",
+	}
+	rulesDir := filepath.Join(dir, ".gemini", "rules", "autopus")
+	for _, rule := range rules {
+		rulePath := filepath.Join(rulesDir, rule)
+		data, readErr := os.ReadFile(rulePath)
+		if os.IsNotExist(readErr) {
+			continue // not every platform emits every rule — skip missing
+		}
+		require.NoError(t, readErr)
+		assert.NotContains(t, string(data), "@import content/rules/",
+			"%s must have @import directive expanded inline, not left as raw text", rule)
+	}
+
+	// Additional content check: lore-commit must contain the expanded body from
+	// content/rules/lore-commit.md (which references structured trailers).
+	lorePath := filepath.Join(rulesDir, "lore-commit.md")
+	loreData, err := os.ReadFile(lorePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(loreData), "Constraint:",
+		"lore-commit should include the imported structured trailer spec")
+}

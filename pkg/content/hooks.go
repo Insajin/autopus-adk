@@ -27,12 +27,16 @@ func GenerateHookConfigs(cfg config.HooksConf, platform string, supportsHooks bo
 }
 
 // generateCLIHooks는 CLI 훅 설정을 생성한다.
-func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
+// Event names are translated per-platform (Claude uses PreToolUse/PostToolUse,
+// Gemini uses BeforeTool/AfterTool). Claude is the canonical source.
+func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfig {
 	var hooks []adapter.HookConfig
+	pre := translateHookEvent("PreToolUse", platform)
+	post := translateHookEvent("PostToolUse", platform)
 
 	if cfg.PreCommitArch {
 		hooks = appendUniqueHook(hooks, adapter.HookConfig{
-			Event:   "PreToolUse",
+			Event:   pre,
 			Matcher: "Bash",
 			Type:    "command",
 			Command: "auto check --arch --quiet --warn-only",
@@ -46,7 +50,7 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 
 	if cfg.ReactCIFailure {
 		hooks = appendUniqueHook(hooks, adapter.HookConfig{
-			Event:   "PostToolUse",
+			Event:   post,
 			Matcher: "Bash",
 			Type:    "command",
 			Command: "auto react check --quiet",
@@ -56,7 +60,7 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 
 	if cfg.ReactReview {
 		hooks = appendUniqueHook(hooks, adapter.HookConfig{
-			Event:   "PostToolUse",
+			Event:   post,
 			Matcher: "Bash",
 			Type:    "command",
 			Command: "auto react check --quiet",
@@ -65,6 +69,23 @@ func generateCLIHooks(cfg config.HooksConf, _ string) []adapter.HookConfig {
 	}
 
 	return hooks
+}
+
+// translateHookEvent maps Claude Code event names to the platform's native
+// event names. Unknown platforms pass through the Claude Code name unchanged
+// (safe default — most adapters will reject unknown names and log a warning).
+func translateHookEvent(claudeEvent, platform string) string {
+	if platform != "gemini" && platform != "gemini-cli" {
+		return claudeEvent
+	}
+	switch claudeEvent {
+	case "PreToolUse":
+		return "BeforeTool"
+	case "PostToolUse":
+		return "AfterTool"
+	default:
+		return claudeEvent
+	}
 }
 
 func appendUniqueHook(hooks []adapter.HookConfig, hook adapter.HookConfig) []adapter.HookConfig {

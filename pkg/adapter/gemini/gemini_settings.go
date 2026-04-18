@@ -84,7 +84,15 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 		existingHooks, _ := settings["hooks"].(map[string]any)
 		hooksMap := make(map[string]any)
 
-		managedEvents := make(map[string]bool)
+		// Purge both the new (gemini-native) and legacy (Claude Code) event
+		// names so stale PreToolUse/PostToolUse entries from prior installs
+		// are removed when regenerating with gemini-translated names.
+		managedEvents := map[string]bool{
+			"PreToolUse":  true,
+			"PostToolUse": true,
+			"BeforeTool":  true,
+			"AfterTool":   true,
+		}
 		for _, h := range hooks {
 			managedEvents[h.Event] = true
 		}
