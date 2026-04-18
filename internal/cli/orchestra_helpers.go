@@ -11,42 +11,53 @@ import (
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
-// buildFileContents reads each file and returns formatted content string.
-func buildFileContents(files []string) string {
+// buildFileContents reads each file and returns the formatted contents. A
+// single unreadable entry aborts the whole batch (GitHub issue #37): silently
+// embedding a "읽기 실패" marker produced prompts that paired missing content
+// with the topic-isolation instruction, so providers could neither read the
+// file nor fall back to disk — every run ended in "리뷰 불가".
+func buildFileContents(files []string) (string, error) {
 	var sb strings.Builder
 	for _, f := range files {
 		content, err := os.ReadFile(f)
 		if err != nil {
-			fmt.Fprintf(&sb, "--- %s (읽기 실패: %v) ---\n\n", f, err)
-			continue
+			return "", fmt.Errorf("파일 읽기 실패: %s: %w", f, err)
 		}
 		fmt.Fprintf(&sb, "--- %s ---\n```\n%s\n```\n\n", f, string(content))
 	}
-	return sb.String()
+	return sb.String(), nil
 }
 
 // buildReviewPrompt builds the review prompt, including file contents if provided.
-func buildReviewPrompt(files []string) string {
+func buildReviewPrompt(files []string) (string, error) {
 	if len(files) == 0 {
-		return "현재 프로젝트의 코드를 리뷰해주세요. 품질, 가독성, 잠재적 버그를 중심으로 분석하세요."
+		return "현재 프로젝트의 코드를 리뷰해주세요. 품질, 가독성, 잠재적 버그를 중심으로 분석하세요.", nil
+	}
+	contents, err := buildFileContents(files)
+	if err != nil {
+		return "", err
 	}
 	var sb strings.Builder
 	sb.WriteString("다음 파일들을 코드 리뷰해주세요:\n\n")
-	sb.WriteString(buildFileContents(files))
+	sb.WriteString(contents)
 	sb.WriteString("품질, 가독성, 잠재적 버그를 중심으로 분석하세요.")
-	return sb.String()
+	return sb.String(), nil
 }
 
 // buildSecurePrompt builds the security analysis prompt, including file contents if provided.
-func buildSecurePrompt(files []string) string {
+func buildSecurePrompt(files []string) (string, error) {
 	if len(files) == 0 {
-		return "현재 프로젝트의 보안 취약점을 분석해주세요. OWASP Top 10을 기준으로 검토하세요."
+		return "현재 프로젝트의 보안 취약점을 분석해주세요. OWASP Top 10을 기준으로 검토하세요.", nil
+	}
+	contents, err := buildFileContents(files)
+	if err != nil {
+		return "", err
 	}
 	var sb strings.Builder
 	sb.WriteString("다음 파일들의 보안 취약점을 분석해주세요:\n\n")
-	sb.WriteString(buildFileContents(files))
+	sb.WriteString(contents)
 	sb.WriteString("OWASP Top 10을 기준으로 검토하세요.")
-	return sb.String()
+	return sb.String(), nil
 }
 
 // flagStringIfChanged returns the flag value only if the flag was explicitly set.

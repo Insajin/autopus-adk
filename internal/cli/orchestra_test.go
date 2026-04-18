@@ -209,43 +209,46 @@ func TestFlagStringSliceIfChanged(t *testing.T) {
 func TestBuildReviewPrompt_NoFiles(t *testing.T) {
 	t.Parallel()
 
-	prompt := buildReviewPrompt(nil)
+	prompt, err := buildReviewPrompt(nil)
+	require.NoError(t, err)
 	assert.NotEmpty(t, prompt)
 	assert.Contains(t, prompt, "리뷰")
 }
 
-// TestBuildReviewPrompt_WithFiles verifies that file-based prompt includes filenames.
-func TestBuildReviewPrompt_WithFiles(t *testing.T) {
+// TestBuildReviewPrompt_MissingFileAborts verifies that any missing file now
+// aborts the build instead of silently embedding an ENOENT marker.
+func TestBuildReviewPrompt_MissingFileAborts(t *testing.T) {
 	t.Parallel()
 
-	// Non-existent files are handled gracefully with error message embedded.
-	prompt := buildReviewPrompt([]string{"/nonexistent/file.go"})
-	assert.Contains(t, prompt, "file.go")
+	_, err := buildReviewPrompt([]string{"/nonexistent/file.go"})
+	require.Error(t, err)
 }
 
 // TestBuildSecurePrompt_NoFiles verifies default security prompt.
 func TestBuildSecurePrompt_NoFiles(t *testing.T) {
 	t.Parallel()
 
-	prompt := buildSecurePrompt(nil)
+	prompt, err := buildSecurePrompt(nil)
+	require.NoError(t, err)
 	assert.NotEmpty(t, prompt)
 	assert.Contains(t, prompt, "보안")
 }
 
-// TestBuildSecurePrompt_WithFiles verifies that security prompt includes filenames.
-func TestBuildSecurePrompt_WithFiles(t *testing.T) {
+// TestBuildSecurePrompt_MissingFileAborts confirms the same abort-on-missing
+// behavior for the secure command (GitHub issue #37).
+func TestBuildSecurePrompt_MissingFileAborts(t *testing.T) {
 	t.Parallel()
 
-	prompt := buildSecurePrompt([]string{"/nonexistent/auth.go"})
-	assert.Contains(t, prompt, "auth.go")
+	_, err := buildSecurePrompt([]string{"/nonexistent/auth.go"})
+	require.Error(t, err)
 }
 
-// TestBuildFileContents_MissingFile verifies graceful error message for missing files.
+// TestBuildFileContents_MissingFile verifies abort on first missing file.
 func TestBuildFileContents_MissingFile(t *testing.T) {
 	t.Parallel()
 
-	result := buildFileContents([]string{"/this/does/not/exist.go"})
-	assert.Contains(t, result, "읽기 실패")
+	_, err := buildFileContents([]string{"/this/does/not/exist.go"})
+	require.Error(t, err)
 }
 
 // TestBuildFileContents_ExistingFile verifies that file content is embedded.
@@ -256,7 +259,8 @@ func TestBuildFileContents_ExistingFile(t *testing.T) {
 	f := t.TempDir() + "/sample.go"
 	require.NoError(t, os.WriteFile(f, []byte("package main\n"), 0o644))
 
-	result := buildFileContents([]string{f})
+	result, err := buildFileContents([]string{f})
+	require.NoError(t, err)
 	assert.Contains(t, result, "package main")
 	assert.Contains(t, result, "sample.go")
 }

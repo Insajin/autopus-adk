@@ -12,40 +12,86 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
-// TestBuildReviewPrompt_MissingFile verifies that a missing file is handled
-// gracefully without panicking and includes an error indication.
+// TestBuildReviewPrompt_MissingFile verifies that a missing file aborts the
+// prompt build instead of silently degrading the prompt with a "읽기 실패"
+// marker (GitHub issue #37). Degrading produced prompts that sent providers
+// the file path string plus an ENOENT, causing every provider to respond
+// "리뷰 불가".
 func TestBuildReviewPrompt_MissingFile(t *testing.T) {
 	t.Parallel()
 
-	prompt := buildReviewPrompt([]string{"/nonexistent/file.go"})
-	assert.Contains(t, prompt, "읽기 실패", "prompt must indicate read failure for missing file")
+	_, err := buildReviewPrompt([]string{"/nonexistent/file.go"})
+	require.Error(t, err, "missing file must abort prompt build")
+	assert.Contains(t, err.Error(), "/nonexistent/file.go",
+		"error must cite the offending path so users can diagnose")
+}
+
+// TestBuildReviewPrompt_EmptyFilesReturnsFallback confirms empty input still
+// produces the project-level review prompt without error.
+func TestBuildReviewPrompt_EmptyFilesReturnsFallback(t *testing.T) {
+	t.Parallel()
+
+	prompt, err := buildReviewPrompt(nil)
+	require.NoError(t, err)
+	assert.Contains(t, prompt, "현재 프로젝트의 코드를 리뷰")
+}
+
+// TestBuildSecurePrompt_MissingFile_Aborts parallels the review test for the
+// secure command (same bug surface, same root cause).
+func TestBuildSecurePrompt_MissingFile_Aborts(t *testing.T) {
+	t.Parallel()
+
+	_, err := buildSecurePrompt([]string{"/nonexistent/file.go"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "/nonexistent/file.go")
 }
 
 // TestBuildFileContents_EmptySlice verifies buildFileContents returns empty
-// string for a nil/empty file list.
+// string (and no error) for a nil/empty file list.
 func TestBuildFileContents_EmptySlice(t *testing.T) {
 	t.Parallel()
 
-	result := buildFileContents(nil)
+	result, err := buildFileContents(nil)
+	require.NoError(t, err)
 	assert.Empty(t, result)
 
-	result2 := buildFileContents([]string{})
+	result2, err := buildFileContents([]string{})
+	require.NoError(t, err)
 	assert.Empty(t, result2)
 }
 
-// TestBuildFileContents_ExistingAndMissing verifies mixed existing/missing files
-// produce both content and error entries.
-func TestBuildFileContents_ExistingAndMissing(t *testing.T) {
+// TestBuildFileContents_AllExistingInlined verifies all-readable files are
+// inlined with the expected delimiter format.
+func TestBuildFileContents_AllExistingInlined(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a.go")
+	b := filepath.Join(dir, "b.go")
+	require.NoError(t, os.WriteFile(a, []byte("package a\n"), 0o644))
+	require.NoError(t, os.WriteFile(b, []byte("package b\n"), 0o644))
+
+	result, err := buildFileContents([]string{a, b})
+	require.NoError(t, err)
+	assert.Contains(t, result, "package a")
+	assert.Contains(t, result, "package b")
+	assert.NotContains(t, result, "읽기 실패")
+}
+
+// TestBuildFileContents_MissingFileReturnsError guarantees a single missing
+// entry forces the whole batch to abort — callers must not proceed with
+// partial content (GitHub issue #37).
+func TestBuildFileContents_MissingFileReturnsError(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	existing := filepath.Join(dir, "real.go")
 	require.NoError(t, os.WriteFile(existing, []byte("package real\n"), 0o644))
 
-	result := buildFileContents([]string{existing, "/nonexistent/missing.go"})
-	assert.Contains(t, result, "real.go")
-	assert.Contains(t, result, "package real")
-	assert.Contains(t, result, "읽기 실패")
+	result, err := buildFileContents([]string{existing, "/nonexistent/missing.go"})
+	require.Error(t, err)
+	assert.Empty(t, result, "callers must not receive partial content when any read fails")
+	assert.Contains(t, err.Error(), "/nonexistent/missing.go")
 }
 
 // TestResolveStrategy_EmptyCommandStrategy verifies the global default is used
