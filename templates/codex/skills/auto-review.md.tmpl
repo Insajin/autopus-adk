@@ -18,7 +18,10 @@
 
 - TRUST 5 분석 전에 자동화 게이트를 먼저 실행합니다.
 - 개별 스킬 호출보다 `@auto review ...` 라우터 호출을 우선하며, 해당 라우터의 검증 순서를 그대로 따릅니다.
-- 발견 사항은 severity 순으로 정리하고 `REQUEST_CHANGES` 시 `@auto go {SPEC-ID} --continue` 를 권장합니다.
+- 발견 사항은 severity 순으로 정리합니다.
+- 이 리뷰가 `@auto go --auto --loop` 내부에서 실행 중이면, `REQUEST_CHANGES`는 terminal handoff가 아니라 같은 invocation 안의 repair loop 입력입니다.
+- 위 경우 retry budget이 남아 있으면 `@auto go --continue` 를 권장하지 말고, 열린 findings checklist를 executor/fixer로 되돌려 자동 수렴을 계속합니다.
+- standalone `@auto review`에서만, loop 문맥이 없고 사용자가 다음 복구 명령을 원할 때 `@auto fix ...` 또는 `@auto go {SPEC-ID} --continue` 같은 후속 명령을 제안합니다.
 
 ## TRUST 5 기준
 
@@ -46,5 +49,6 @@
 
 Detection order:
 1. Verdict `APPROVE` + SPEC status `implemented` → `✓ 구현 완료 → /auto sync {SPEC-ID}`
-2. Verdict `REQUEST_CHANGES` → recommend `/auto go {SPEC-ID} --continue` to address issues
-3. SPEC status `completed` → `🐙 {SPEC-ID} 완료. 다음 기능: /auto plan "기능 설명"`
+2. Verdict `REQUEST_CHANGES` + current workflow is `@auto go --auto --loop` → keep the frozen findings checklist inside the same invocation and return it to the fixer/executor
+3. Verdict `REQUEST_CHANGES` outside the autonomous go loop → recommend `@auto fix "{specific issue}"` or `@auto go {SPEC-ID} --continue`
+4. SPEC status `completed` → `🐙 {SPEC-ID} 완료. 다음 기능: @auto plan "기능 설명"`

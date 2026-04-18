@@ -141,6 +141,14 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 
 `--loop`여도 handoff를 생략하지 않습니다. handoff gate를 채우지 못하면 success-style completion summary로 종료하지 않습니다.
 
+### Autonomous Review Loop Contract
+
+- `--auto --loop`에서 review가 actionable finding을 반환하면, 같은 invocation 안에서 즉시 `fix -> validate -> test -> review verify` 루프로 이어갑니다.
+- review retry budget이 남아 있는 동안에는 사용자에게 수동 수정, 재실행, 확인을 요청하지 않습니다.
+- 수동 개입은 요구사항 충돌, 외부 credential/승인 필요, retry budget 소진, circuit break 같은 실제 blocker일 때만 허용합니다.
+- `Completion Handoff Gates`와 `Final Output Contract`는 terminal state에서만 사용합니다. review finding이 아직 fixable한데 `@auto go --continue` 또는 수동 review를 next step으로 제시하면 안 됩니다.
+- `go` 성공의 terminal handoff는 `@auto sync {SPEC-ID}` 까지입니다. `go`가 `sync`를 자동 호출하지는 않지만, review 수렴 전에는 sync handoff도 출력하지 않습니다.
+
 ## 품질 기준
 
 - 테스트 커버리지: {{if .IsFullMode}}85{{else}}80{{end}}%+
@@ -233,7 +241,7 @@ next_required_step: sync 단계로 이동
 next_command: @auto sync {SPEC-ID}
 auto_progression_state: --loop enabled; handoff still required before autonomous continuation
 
-다음 단계: `/auto sync {SPEC-ID}`
+다음 단계: `@auto sync {SPEC-ID}`
 
 ### Agent Result Format (use for executor/tester subagent results)
 
@@ -251,20 +259,20 @@ tester:
   다음: 리뷰 단계로 진행
 ```
 
-### Error Recovery (show on failures)
+### Error Recovery (terminal only; use after retry budget exhaustion or circuit break)
 
 Validation failure:
 ```
 ✗ Validation 실패: {N}개 이슈 발견
   복구 옵션:
-  1. /auto go {SPEC-ID} --continue  (중단점에서 재개)
-  2. /auto fix "{specific issue}"   (개별 이슈 수정)
+  1. @auto go {SPEC-ID} --continue  (retry budget 소진 또는 circuit break 후 재개)
+  2. @auto fix "{specific issue}"   (개별 이슈를 별도 복구)
 ```
 
 Subagent failure:
 ```
 ✗ {agent-name} 실패: {error description}
   복구 옵션:
-  1. /auto go {SPEC-ID} --continue  (파이프라인 재개)
-  2. {manual fallback instruction}  (수동 처리)
+  1. @auto go {SPEC-ID} --continue  (worker crash/timeout 이후 파이프라인 재개)
+  2. {manual fallback instruction}  (자동 재시도 범위를 벗어난 경우만 수동 처리)
 ```

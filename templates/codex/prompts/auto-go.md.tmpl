@@ -52,6 +52,14 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 - review는 discovery와 verification을 분리합니다. `--multi` 추가 검증은 review discovery 단계에만 집중합니다
 - 종료 전에는 다음 필수 단계가 완료됐는지, 아니면 명시적 blocker가 남았는지 확인합니다
 
+## Autonomous Review Loop Contract
+
+- `--auto --loop`에서 review가 actionable finding을 반환하면, 같은 invocation 안에서 즉시 `fix -> validate -> test -> review verify` 루프로 이어갑니다.
+- review retry budget이 남아 있는 동안에는 사용자에게 수동 수정, 재실행, 확인을 요청하지 않습니다.
+- 수동 개입은 요구사항 충돌, 외부 credential/승인 필요, retry budget 소진, circuit break 같은 실제 blocker일 때만 허용합니다.
+- `Completion Handoff Gates`는 terminal state에서만 출력합니다. review finding이 아직 fixable한데 `@auto go --continue` 또는 수동 review를 next step으로 제시하면 안 됩니다.
+- `go` 성공의 terminal handoff는 `@auto sync {SPEC-ID}` 까지입니다. `go`가 `sync`를 자동 호출하지는 않지만, review 수렴 전에는 sync handoff도 출력하지 않습니다.
+
 ## Completion Handoff Gates
 
 최종 응답을 성공처럼 닫기 전에 아래 항목을 모두 확정합니다.
@@ -64,6 +72,7 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 
 규칙:
 - `--loop`여도 handoff를 생략하지 않습니다.
+- handoff는 terminal state에서만 사용합니다. retry budget이 남은 in-progress review loop에는 적용하지 않습니다.
 - 하나라도 비어 있으면 workflow lifecycle bar와 다음 명령을 포함한 handoff를 먼저 채웁니다.
 - Gate가 미충족이면 success-style completion summary로 종료하지 말고 pending gate와 blocker를 명시합니다.
 - 성공 경로에서는 workflow lifecycle bar를 먼저 보여준 뒤 `next_required_step` 과 `next_command` 를 출력합니다.

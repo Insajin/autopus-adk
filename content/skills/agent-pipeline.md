@@ -439,12 +439,20 @@ PASS  → Proceed to next Phase
 FAIL  → Delegate fix to the Recommended Agent from Gate Verdict → re-validate
 ```
 
+Freeze the review output into a checklist of open findings.
+
+- If the checklist still contains actionable findings and the retry budget remains, immediately delegate a focused fixer/executor task inside the same invocation.
+- Keep the checklist stable across retries unless the patch meaningfully changes scope.
+- Do not ask the user to manually fix, rerun, or confirm while the next repair step is still actionable within the current `/auto go` invocation.
+
 Retry limits:
 
 - Gate 2 (Validation): maximum 3 retries
 - Phase 4 (Review): maximum 2 retries
 
-If the limit is exceeded, abort the pipeline and notify the user:
+While the review retry budget remains, keep the repair -> validate -> verify cycle inside the same invocation.
+
+Only when the retry limit is exhausted or the pipeline hits a real blocker/circuit break should it abort and notify the user:
 
 ```
 Pipeline aborted: failed to resolve [Gate name] after [N] retries.

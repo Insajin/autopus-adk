@@ -242,6 +242,12 @@ Discovery output should be frozen into a checklist of open findings with:
 - file references
 - required fix or proof of non-issue
 
+If discovery returns actionable findings and the review retry budget is not exhausted yet:
+
+- convert the frozen checklist into the next focused executor task immediately
+- do not ask the user to manually fix, rerun, or confirm while the next repair step is still actionable inside the current ` + "`@auto go`" + ` invocation
+- keep the checklist stable unless the patch meaningfully changes scope
+
 ### Phase 4B: Review Verification
 
 After fixes land, do a diff-only verification pass against the frozen checklist.
@@ -249,6 +255,8 @@ After fixes land, do a diff-only verification pass against the frozen checklist.
 - Verify whether each open finding is resolved.
 - Do not restart full discovery unless the patch meaningfully changed scope.
 - Stop review retries when the same unresolved finding repeats without material code change.
+- If findings remain actionable and retry budget remains, loop back to a focused fixer, then re-run validation/testing only for the touched scope before returning here.
+- Under ` + "`--auto --loop`" + `, keep this repair -> validate -> verify cycle inside the same session. Only stop for a real blocker, exhausted retry budget, or circuit break.
 
 ## Parallelism Rules
 
@@ -265,6 +273,7 @@ After fixes land, do a diff-only verification pass against the frozen checklist.
 - Review verification: up to 2 retries, or 3 with ` + "`--loop`" + `
 - Repeated worker failure: shrink scope or fall back to the main session
 - Repeated unchanged review finding: stop and surface the blocker instead of rediscovering the whole patch
+- While review retries remain, unresolved findings are not a terminal handoff. Do not suggest ` + "`@auto go --continue`" + ` or manual review yet.
 
 ## Result Integration
 
@@ -285,6 +294,7 @@ Before you stop, ensure:
 - the next required step is either complete or explicitly blocked
 - validation status is known
 - open review findings are either resolved or explicitly carried forward
+- terminal handoff is used only after the final review outcome is known
 - the final response names the changed scope, verification, and any unresolved blockers
 `
 }

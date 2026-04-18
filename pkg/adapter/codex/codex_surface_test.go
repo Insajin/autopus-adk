@@ -127,6 +127,36 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	assert.Contains(t, string(autoGoSkill), "`next_command`")
 	assert.Contains(t, string(autoGoSkill), "`auto_progression_state`")
 	assert.Contains(t, string(autoGoSkill), "`--loop`여도 handoff를 생략하지 않습니다")
+	assert.Contains(t, string(autoGoSkill), "Autonomous Review Loop Contract")
+	assert.Contains(t, string(autoGoSkill), "fix -> validate -> test -> review verify")
+	assert.Contains(t, string(autoGoSkill), "terminal handoff는 `@auto sync {SPEC-ID}` 까지입니다")
+
+	autoGoPrompt, err := os.ReadFile(filepath.Join(dir, ".codex", "prompts", "auto-go.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoGoPrompt), "Autonomous Review Loop Contract")
+	assert.Contains(t, string(autoGoPrompt), "review retry budget이 남아 있는 동안에는 사용자에게 수동 수정")
+	assert.Contains(t, string(autoGoPrompt), "handoff는 terminal state에서만 사용합니다")
+
+	autoGoCodexSkill, err := os.ReadFile(filepath.Join(dir, ".codex", "skills", "auto-go.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoGoCodexSkill), "Autonomous Review Loop Contract")
+	assert.Contains(t, string(autoGoCodexSkill), "retry budget 소진 또는 circuit break 후 재개")
+	assert.Contains(t, string(autoGoCodexSkill), "다음 단계: `@auto sync {SPEC-ID}`")
+
+	autoReviewSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-review", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoReviewSkill), "repair loop 입력입니다")
+	assert.Contains(t, string(autoReviewSkill), "standalone `@auto review`")
+
+	autoReviewPrompt, err := os.ReadFile(filepath.Join(dir, ".codex", "prompts", "auto-review.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoReviewPrompt), "`@auto go --auto --loop` 내부 review라면")
+	assert.Contains(t, string(autoReviewPrompt), "같은 invocation 안의 fixer/executor 단계로 되돌리세요")
+
+	autoReviewCodexSkill, err := os.ReadFile(filepath.Join(dir, ".codex", "skills", "auto-review.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoReviewCodexSkill), "repair loop 입력입니다")
+	assert.Contains(t, string(autoReviewCodexSkill), "recommend `@auto fix \"{specific issue}\"` or `@auto go {SPEC-ID} --continue`")
 
 	autoSyncSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-sync", "SKILL.md"))
 	require.NoError(t, err)
@@ -169,6 +199,9 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	require.NoError(t, err)
 	assert.Contains(t, string(agentPipelineSkill), "Context7 MCP")
 	assert.Contains(t, string(agentPipelineSkill), "web search")
+	assert.Contains(t, string(agentPipelineSkill), "do not ask the user to manually fix")
+	assert.Contains(t, string(agentPipelineSkill), "Under `--auto --loop`, keep this repair -> validate -> verify cycle inside the same session")
+	assert.Contains(t, string(agentPipelineSkill), "While review retries remain, unresolved findings are not a terminal handoff")
 }
 
 func TestCodexAndOpenCode_AGENTSMD_UsesSharedPlatformSection(t *testing.T) {
