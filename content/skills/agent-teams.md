@@ -64,12 +64,12 @@ Agent Teams enforces these rules at the Claude Code layer — violating them fai
 
 **Responsibilities**: planner + reviewer
 
-- Creates the team and assigns tasks via `SendMessage`
+- Joins the team as a teammate — the **top-level session** creates the team and spawns Lead via `TeamCreate` + `Agent(..., team_name=..., name="lead")`. Lead MUST NOT call `TeamCreate` itself (Claude Code rejects nested team creation at runtime).
 - Runs Phase 1 (Planning) to produce the execution plan
-- Assigns tasks to Builder(s) and Guardian
+- Coordinates tasks with Builder(s) and Guardian via `SendMessage`
 - Monitors task list and consolidates results
 - Runs Phase 4 (Review) and finalizes output
-- Re-assigns or falls back to subagent if a teammate fails
+- Re-assigns or requests fallback from the top-level session if a teammate fails
 
 ### Builder (1–2 agents)
 
@@ -94,19 +94,44 @@ Agent Teams enforces these rules at the Claude Code layer — violating them fai
 
 ## Team Creation Pattern
 
-Teammates are spawned with the standard `Agent()` tool plus `team_name` and `name` parameters. Each teammate loads its agent definition from `.claude/agents/autopus/` and inherits its frontmatter (tools, model, skills, permissionMode).
+All team lifecycle operations (create, spawn, delete) are owned by the **top-level session** — the Claude Code main session that receives the user's `/auto go --team` invocation. Teammates MUST NOT call `TeamCreate`; this is enforced by Claude Code at runtime.
 
-```python
-# Lead creates the team at pipeline start
-TeamCreate(team_name=f"team-{spec_id}")
+### Prerequisite — Load deferred tool schemas
 
-# Spawn teammates via Agent() with team_name + name
-Agent(subagent_type="planner",   team_name=f"team-{spec_id}", name="lead",     model="opus")
-Agent(subagent_type="executor",  team_name=f"team-{spec_id}", name="builder-1")  # LOW complexity stays on sonnet
-Agent(subagent_type="validator", team_name=f"team-{spec_id}", name="guardian")
+`TeamCreate` and `SendMessage` are deferred tools. Load their schemas once before first use:
+
+```
+ToolSearch(query="select:TeamCreate,SendMessage")
 ```
 
-The `name` field becomes the addressable handle for `SendMessage({to: "<name>"})`.
+### Spawn sequence (top-level session only)
+
+```python
+TEAM_NAME = f"team-{spec_id.lower()}"         # e.g., "team-auth-001"
+
+# Step 1: Top-level session creates the team (teammates cannot)
+TeamCreate(name=TEAM_NAME, description="<SPEC title>")
+
+# Step 2: Top-level session spawns ALL 4 core teammates in a SINGLE message
+# (Agent() calls must be emitted together to spawn in parallel)
+Agent(subagent_type="planner",   team_name=TEAM_NAME, name="lead",      model="opus")
+Agent(subagent_type="executor",  team_name=TEAM_NAME, name="builder-1", isolation="worktree")
+Agent(subagent_type="tester",    team_name=TEAM_NAME, name="tester")
+Agent(subagent_type="validator", team_name=TEAM_NAME, name="guardian")
+```
+
+Each teammate loads its agent definition from `.claude/agents/autopus/` and inherits its frontmatter (tools, model, skills, permissionMode). The `name` field becomes the addressable handle for `SendMessage({to: "<name>"})`.
+
+### Verification gate
+
+After spawn, the top-level session MUST verify all core teammates are registered:
+
+```bash
+jq '.members | length' ~/.claude/teams/{TEAM_NAME}/config.json
+# expected: 4 (lead + builder-1 + tester + guardian)
+```
+
+If `.members | length < 4`, the team is **not** viable for multi-agent collaboration. Abort Route B and fall back to Route A (subagent pipeline).
 
 Task assignment via `SendMessage`:
 

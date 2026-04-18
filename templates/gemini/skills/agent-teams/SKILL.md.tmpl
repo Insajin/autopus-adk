@@ -37,12 +37,12 @@ Fallback: Run without --team to use the subagent pipeline mode.
 
 **Responsibilities**: planner + reviewer
 
-- Creates the team and assigns tasks via `SendMessage`
+- Joins the team as a teammate — the **top-level session** creates the team and spawns Lead; Lead MUST NOT call `TeamCreate` itself (nested team creation is rejected on Claude Code, and unsupported on Gemini CLI).
 - Runs Phase 1 (Planning) to produce the execution plan
-- Assigns tasks to Builder(s) and Guardian
+- Coordinates tasks with Builder(s) and Guardian via `SendMessage` (Claude Code only)
 - Monitors task list and consolidates results
 - Runs Phase 4 (Review) and finalizes output
-- Re-assigns or falls back to subagent if a teammate fails
+- Re-assigns or requests fallback from the top-level session if a teammate fails
 
 ### Builder (1–2 agents)
 
@@ -68,8 +68,8 @@ Fallback: Run without --team to use the subagent pipeline mode.
 ## Team Creation Pattern
 
 ```python
-# Lead creates the team at pipeline start
-team = TeamCreate(team_name=f"team-{spec_id}")
+# Top-level session creates the team at pipeline start (Claude Code only — teammates cannot call TeamCreate)
+team = TeamCreate(name=f"team-{spec_id.lower()}")
 
 # Spawn teammates
 lead     = Teammate(role="lead",     model="opus")

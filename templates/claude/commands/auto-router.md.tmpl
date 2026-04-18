@@ -863,8 +863,6 @@ Fallback: /auto go SPEC-ID (subagent pipeline mode, no --team flag)
 
 Team composition stays within the official 3–5 member guidance (see agent-teams.md "Team Constraints"). Default 4-member core fits; phase-dependent members (below) should replace core members, not stack on top, to respect the size limit.
 
-Use TeamCreate to create a team, then spawn specialized teammates using `Agent(subagent_type=..., team_name=..., name=...)`. Each teammate loads its agent definition from `.claude/agents/autopus/`, inheriting tools, skills, model, and domain expertise. Teammates communicate directly via SendMessage.
-
 Team composition — each member maps 1:1 to a specialized agent definition:
 
 **Core members (always spawned):**
@@ -887,7 +885,98 @@ Quality Mode applies to execution profile selection: Ultra forces the premium pa
 
 Reference: `.claude/skills/autopus/agent-teams.md`
 
-The pipeline phases are the same as Route A, but orchestrated through Agent Teams instead of individual Agent() calls. Worktree safety rules R1-R5 apply equally — each builder teammate works in an independent worktree. See @.claude/skills/autopus/worktree-isolation.md and `.claude/rules/autopus/worktree-safety.md`.
+##### [REQUIRED] Team Orchestration Procedure
+
+IMPORTANT: The main (top-level) session owns ALL team lifecycle operations. Teammates — including `lead` — are forbidden from calling `TeamCreate` (enforced by Claude Code at runtime). Lead coordinates *after* it is spawned; it does not create the team.
+
+**Step B1: Load deferred tool schemas (once per pipeline)**
+
+`TeamCreate` and `SendMessage` are deferred tools — their JSON schemas must be loaded before first call:
+
+```
+ToolSearch(query="select:TeamCreate,SendMessage")
+```
+
+Skip only if schemas were loaded in the current session already.
+
+**Step B2: Create the team (main session, single call)**
+
+```
+TEAM_NAME = "team-{spec-id-lowercase}"       # e.g., "team-auth-001"
+TeamCreate(name=TEAM_NAME, description="<SPEC title>")
+```
+
+**Step B3: Spawn all 4 core teammates (main session, parallel Agent() calls in ONE message)**
+
+```
+Agent(
+  subagent_type = "planner",
+  team_name     = TEAM_NAME,
+  name          = "lead",
+  model         = "opus",                      # Ultra only; omit for Balanced
+  mode          = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
+  prompt        = "Role: Lead. SPEC: {SPEC_PATH}. Coordinate Phase 1/4 via SendMessage to builder-1, tester, guardian."
+)
+Agent(
+  subagent_type = "executor",
+  team_name     = TEAM_NAME,
+  name          = "builder-1",
+  mode          = "bypassPermissions",
+  isolation     = "worktree",
+  prompt        = "Role: Builder. Await Phase 2 tasks via SendMessage from lead."
+)
+Agent(
+  subagent_type = "tester",
+  team_name     = TEAM_NAME,
+  name          = "tester",
+  mode          = "bypassPermissions",
+  prompt        = "Role: Tester. Await Phase 1.5/3 tasks via SendMessage from lead."
+)
+Agent(
+  subagent_type = "validator",
+  team_name     = TEAM_NAME,
+  name          = "guardian",
+  mode          = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
+  prompt        = "Role: Guardian. Await Gate 2 validation via SendMessage from lead or builder-1."
+)
+```
+
+All 4 Agent() calls MUST be emitted in a **single** assistant message to spawn in parallel. Sequential spawning will throttle and may leave the team with missing members.
+
+**Step B4: Verify team membership (HARD GATE)**
+
+After spawn, verify the team config has all 4 core members. If any are missing, abort Route B and fall back to Route A with a warning:
+
+```bash
+test -f ~/.claude/teams/{TEAM_NAME}/config.json || echo "MISSING"
+jq '.members | length' ~/.claude/teams/{TEAM_NAME}/config.json
+# expected: 4 (lead + builder-1 + tester + guardian)
+```
+
+If `.members | length < 4` → abort Route B:
+
+```
+[TEAM ERROR] Core teammate spawn incomplete ({N}/4). Falling back to Route A (subagent pipeline).
+```
+
+Then re-run the SPEC without `--team`.
+
+**Step B5: Phase orchestration via SendMessage**
+
+Route A's Phase 1–4 blocks apply, with one substitution: instead of spawning a fresh Agent() per phase, dispatch work to the already-spawned teammate via SendMessage.
+
+| Phase / Gate | Teammate | Dispatch |
+|--------------|----------|----------|
+| Phase 1: Planning | `lead` | `SendMessage(to="lead", message={phase:"Phase 1", spec:SPEC_PATH})` |
+| Phase 1.5: Test Scaffold | `tester` | `SendMessage(to="tester", message={phase:"Phase 1.5", requirements:[...]})` |
+| Phase 2: Implementation | `builder-1` (+ `builder-2` if parallel) | `SendMessage(to="builder-1", message={phase:"Phase 2", tasks:[...]})` |
+| Gate 2: Validation | `guardian` | `SendMessage(to="guardian", message={phase:"Gate 2", target_branch:"..."})` |
+| Phase 2.5: Annotation | `annotator` (phase-dependent) | new Agent() with `team_name=TEAM_NAME, name="annotator"` |
+| Phase 4: Review | `reviewer` + `auditor` (phase-dependent) | new Agent() calls with `team_name=TEAM_NAME` |
+
+Teammate replies arrive via the team task list and are surfaced back to the main session. Main session consolidates Gate results and decides retry/abort per the Retry Limits Reference below.
+
+Worktree safety rules R1-R5 apply equally — each builder teammate works in an independent worktree. See @.claude/skills/autopus/worktree-isolation.md and `.claude/rules/autopus/worktree-safety.md`.
 
 #### Route C: Single Session (`--solo`)
 
