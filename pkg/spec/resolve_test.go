@@ -3,6 +3,7 @@ package spec_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -120,4 +121,42 @@ func TestResolveSpecDir_SkipsHiddenDirs(t *testing.T) {
 	_, err := spec.ResolveSpecDir(dir, "SPEC-HIDE-001")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
+}
+
+// Regression test for GitHub issue #36: invoking the resolver with baseDir="."
+// used to skip the root entry because filepath.WalkDir reports d.Name()=="."
+// which matched the hidden-directory filter, halting the walk before any
+// submodule could be visited.
+func TestResolveSpecDir_RelativeBaseDirDotFindsSubmodule(t *testing.T) {
+	dir := t.TempDir()
+	specDir := filepath.Join(dir, "Autopus", ".autopus", "specs", "SPEC-REL-001")
+	require.NoError(t, os.MkdirAll(specDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "spec.md"), []byte("# SPEC-REL-001"), 0o644))
+
+	origWd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Chdir(origWd) })
+	require.NoError(t, os.Chdir(dir))
+
+	result, err := spec.ResolveSpecDir(".", "SPEC-REL-001")
+	require.NoError(t, err)
+	assert.Equal(t, "Autopus", result.TargetModule)
+	assert.True(t, strings.HasSuffix(result.SpecDir, filepath.Join("Autopus", ".autopus", "specs", "SPEC-REL-001")))
+}
+
+// Listing available SPECs must also cope with baseDir=".".
+func TestResolveSpecDir_RelativeBaseDirDotListsAvailable(t *testing.T) {
+	dir := t.TempDir()
+	specDir := filepath.Join(dir, "Autopus", ".autopus", "specs", "SPEC-EXIST-002")
+	require.NoError(t, os.MkdirAll(specDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "spec.md"), []byte("# SPEC-EXIST-002"), 0o644))
+
+	origWd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Chdir(origWd) })
+	require.NoError(t, os.Chdir(dir))
+
+	_, err = spec.ResolveSpecDir(".", "SPEC-OTHER-999")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SPEC-EXIST-002")
 }

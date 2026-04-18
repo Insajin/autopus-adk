@@ -54,6 +54,12 @@ func ResolveSpecDir(baseDir, specID string) (*ResolveResult, error) {
 		if !d.IsDir() {
 			return nil
 		}
+		// The walk root must always be entered. When baseDir is "." the
+		// root's d.Name() is "." which would otherwise match the hidden
+		// directory filter and abort the traversal (GitHub issue #36).
+		if path == baseDir {
+			return nil
+		}
 		name := d.Name()
 		// Skip directories that should not be searched
 		if walkSkipDirs[name] || (strings.HasPrefix(name, ".") && name != ".autopus") {
@@ -116,6 +122,10 @@ func listAvailableSpecs(baseDir string) []string {
 			return nil
 		}
 		if !d.IsDir() {
+			return nil
+		}
+		// Same baseDir=="." fix as in ResolveSpecDir: never skip the walk root.
+		if path == baseDir {
 			return nil
 		}
 		name := d.Name()
