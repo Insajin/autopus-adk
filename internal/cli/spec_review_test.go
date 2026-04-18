@@ -175,6 +175,69 @@ func TestRunSpecReview_ReviseDoesNotApproveSpec(t *testing.T) {
 	assert.GreaterOrEqual(t, callCount, 1)
 }
 
+// Regression guard for GitHub issue #38.
+// A subsequent review on a SPEC that is already `completed` (or `implemented`)
+// MUST NOT silently downgrade its status to `approved`. Re-review of shipped
+// work must be an explicit user action, not a side effect of an exploratory
+// review pass.
+func TestRunSpecReview_RefusesToRegressCompletedStatus(t *testing.T) {
+	dir := t.TempDir()
+	specDir := scaffoldReviewSpec(t, dir, "SPEC-REVIEW-REGRESS-001")
+	require.NoError(t, spec.UpdateStatus(specDir, "completed"))
+	setFakeProviderOnPath(t, dir, "claude")
+
+	origWD, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() { _ = os.Chdir(origWD) }()
+	require.NoError(t, os.Chdir(dir))
+
+	origRunner := specReviewRunOrchestra
+	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{{Provider: "claude", Output: "VERDICT: PASS"}}}, nil
+	}
+	defer func() { specReviewRunOrchestra = origRunner }()
+
+	require.NoError(t, runSpecReview(context.Background(), "SPEC-REVIEW-REGRESS-001", "consensus", 10))
+
+	doc, err := spec.Load(specDir)
+	require.NoError(t, err)
+	assert.Equal(t, "completed", doc.Status, "completed SPEC must not be silently regressed to approved")
+}
+
+// Regression guard for GitHub issue #38.
+// When PersistFindings or PersistReview fails mid-pipeline (e.g. the SPEC
+// directory disappeared between resolution and persistence), the CLI must
+// fail fast instead of continuing through syncReviewedSpecStatus. Silent
+// continuation was the enabling condition for the observed data corruption.
+func TestRunSpecReview_PersistFailureAbortsPipeline(t *testing.T) {
+	dir := t.TempDir()
+	specDir := scaffoldReviewSpec(t, dir, "SPEC-REVIEW-ABORT-001")
+	setFakeProviderOnPath(t, dir, "claude")
+
+	origWD, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() { _ = os.Chdir(origWD) }()
+	require.NoError(t, os.Chdir(dir))
+
+	origRunner := specReviewRunOrchestra
+	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		// Simulate the SPEC dir vanishing between resolve and persist.
+		if err := os.RemoveAll(specDir); err != nil {
+			return nil, err
+		}
+		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{{Provider: "claude", Output: "VERDICT: PASS"}}}, nil
+	}
+	defer func() { specReviewRunOrchestra = origRunner }()
+
+	err = runSpecReview(context.Background(), "SPEC-REVIEW-ABORT-001", "consensus", 10)
+	require.Error(t, err, "persist failure must abort the pipeline")
+	assert.Contains(t, err.Error(), "review")
+
+	// The SPEC directory must remain absent — we did not recreate it.
+	_, statErr := os.Stat(specDir)
+	assert.True(t, os.IsNotExist(statErr), "pipeline must not recreate a vanished SPEC dir")
+}
+
 func scaffoldReviewSpec(t *testing.T, dir, specID string) string {
 	t.Helper()
 	require.NoError(t, spec.Scaffold(dir, specID[len("SPEC-"):], "리뷰 테스트"))

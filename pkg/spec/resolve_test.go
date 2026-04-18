@@ -144,6 +144,30 @@ func TestResolveSpecDir_RelativeBaseDirDotFindsSubmodule(t *testing.T) {
 	assert.True(t, strings.HasSuffix(result.SpecDir, filepath.Join("Autopus", ".autopus", "specs", "SPEC-REL-001")))
 }
 
+// Regression guard for GitHub issue #38.
+// A resolver must never treat a caller's SPEC-ID as a substring or prefix match
+// against existing SPEC directories. Silent fuzzy matching caused writes to
+// land on unrelated SPECs (completed/approved status regression, review.md
+// overwrite). This test locks down the exact-match contract explicitly.
+func TestResolveSpecDir_SubstringInputDoesNotMatch(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	// Seed two SPECs that share a common infix: "WAITERASE".
+	for _, id := range []string{"SPEC-WAITERASE-001", "SPEC-WAITERASE-002"} {
+		d := filepath.Join(dir, ".autopus", "specs", id)
+		require.NoError(t, os.MkdirAll(d, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(d, "spec.md"), []byte("# "+id), 0o644))
+	}
+
+	// Caller asks for SPEC-OBS-WAITERASE-001 (does not exist on disk).
+	// Must NOT resolve to either of the WAITERASE-* directories.
+	_, err := spec.ResolveSpecDir(dir, "SPEC-OBS-WAITERASE-001")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
 // Listing available SPECs must also cope with baseDir=".".
 func TestResolveSpecDir_RelativeBaseDirDotListsAvailable(t *testing.T) {
 	dir := t.TempDir()
