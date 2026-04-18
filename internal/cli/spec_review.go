@@ -50,7 +50,13 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 
 	doc, err := spec.Load(specDir)
 	if err != nil {
-		return fmt.Errorf("SPEC 로드 실패: %w", err)
+		// A load failure often means the spec.md has no parseable ID or is structurally empty.
+		return fmt.Errorf("SPEC 본문이 비어있습니다: %s (%w)", specID, err)
+	}
+
+	// REQ-05b: guard against empty spec body before entering the loop.
+	if doc.RawContent == "" {
+		return fmt.Errorf("SPEC 본문이 비어있습니다: %s", specID)
 	}
 
 	cfg, err := config.Load(".")
@@ -72,6 +78,11 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	maxRevisions := gate.MaxRevisions
 	if maxRevisions <= 0 {
 		maxRevisions = defaultMaxRevisions
+	}
+
+	threshold := gate.VerdictThreshold
+	if threshold <= 0 {
+		threshold = 0.67
 	}
 
 	providerNames := resolveSpecReviewProviderNames(cfg, flags.MultiMode)
@@ -96,84 +107,22 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	// Load any prior findings (from a previous interrupted run)
 	priorFindings, _ := spec.LoadFindings(specDir)
 
-	var finalResult *spec.ReviewResult
+	loopParams := specReviewLoopParams{
+		ctx:          ctx,
+		specID:       specID,
+		specDir:      specDir,
+		strategy:     strategy,
+		timeout:      timeout,
+		maxRevisions: maxRevisions,
+		threshold:    threshold,
+		gate:         gate,
+		providers:    providers,
+		codeContext:  codeContext,
+	}
 
-	for revision := 0; revision <= maxRevisions; revision++ {
-		opts := buildPromptOpts(priorFindings, revision)
-		prompt := spec.BuildReviewPrompt(doc, codeContext, opts)
-
-		orchCfg := orchestra.OrchestraConfig{
-			Providers:      providers,
-			Strategy:       orchestra.Strategy(strategy),
-			Prompt:         prompt,
-			TimeoutSeconds: timeout,
-			JudgeProvider:  gate.Judge,
-		}
-
-		fmt.Fprintf(os.Stderr, "SPEC 리뷰 시작: %s (전략: %s, 리비전: %d)\n", specID, strategy, revision)
-
-		result, err := specReviewRunOrchestra(ctx, orchCfg)
-		if err != nil {
-			return fmt.Errorf("리뷰 실행 실패: %w", err)
-		}
-
-		// Parse verdicts from each provider
-		var reviews []spec.ReviewResult
-		for _, resp := range result.Responses {
-			r := spec.ParseVerdict(specID, resp.Output, resp.Provider, revision, nilIfEmpty(priorFindings))
-			reviews = append(reviews, r)
-		}
-
-		finalVerdict := spec.MergeVerdicts(reviews)
-
-		// Aggregate findings across providers
-		merged := &spec.ReviewResult{
-			SpecID:   specID,
-			Verdict:  finalVerdict,
-			Revision: revision,
-		}
-		for _, r := range reviews {
-			merged.Findings = append(merged.Findings, r.Findings...)
-			merged.Responses = append(merged.Responses, r.Responses...)
-		}
-
-		// Apply scope lock in verify mode
-		if revision > 0 {
-			merged.Findings = spec.ApplyScopeLock(merged.Findings, priorFindings, spec.ReviewModeVerify)
-		}
-
-		// Persist findings and review. A mid-pipeline write failure (e.g. the
-		// SPEC directory vanished between resolve and persist) must abort.
-		// Silent continuation was the enabling condition for issue #38 —
-		// the CLI printed "판정: PASS" while leaving the on-disk state
-		// inconsistent and allowing a subsequent run to corrupt unrelated SPECs.
-		if persistErr := spec.PersistFindings(specDir, merged.Findings); persistErr != nil {
-			return fmt.Errorf("review findings 저장 실패 (SPEC: %s, revision: %d): %w", specID, revision, persistErr)
-		}
-		if persistErr := spec.PersistReview(specDir, merged); persistErr != nil {
-			return fmt.Errorf("review.md 저장 실패 (SPEC: %s, revision: %d): %w", specID, revision, persistErr)
-		}
-
-		finalResult = merged
-
-		// PASS: no open or regressed findings
-		if finalVerdict == spec.VerdictPass && !hasActiveFindings(merged.Findings) {
-			break
-		}
-
-		// Circuit breaker: halt if no progress
-		if revision > 0 && spec.ShouldTripCircuitBreaker(priorFindings, merged.Findings) {
-			fmt.Fprintf(os.Stderr, "경고: 서킷 브레이커 작동 — 진행 없음, 리뷰 중단\n")
-			break
-		}
-
-		// Max revisions reached
-		if revision >= maxRevisions {
-			fmt.Fprintf(os.Stderr, "경고: 최대 리비전 (%d) 도달\n", maxRevisions)
-			break
-		}
-
-		priorFindings = merged.Findings
+	finalResult, err := runSpecReviewLoop(loopParams, doc, priorFindings)
+	if err != nil {
+		return err
 	}
 
 	// Output final result
@@ -189,17 +138,6 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	}
 
 	return nil
-}
-
-// buildPromptOpts builds ReviewPromptOptions based on the current revision.
-func buildPromptOpts(priorFindings []spec.ReviewFinding, revision int) spec.ReviewPromptOptions {
-	if revision == 0 || len(priorFindings) == 0 {
-		return spec.ReviewPromptOptions{Mode: spec.ReviewModeDiscover}
-	}
-	return spec.ReviewPromptOptions{
-		Mode:          spec.ReviewModeVerify,
-		PriorFindings: priorFindings,
-	}
 }
 
 // nilIfEmpty returns nil if the slice is empty, otherwise returns the slice.

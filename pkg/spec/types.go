@@ -99,9 +99,12 @@ const (
 
 // ReviewPromptOptions configures mode-aware review prompt generation.
 type ReviewPromptOptions struct {
-	Mode           ReviewMode      // discover or verify
-	PriorFindings  []ReviewFinding // unresolved findings from previous round (verify mode)
-	StaticFindings []ReviewFinding // pre-seeded findings from static analysis (discover mode)
+	Mode               ReviewMode      // discover or verify
+	PriorFindings      []ReviewFinding // unresolved findings from previous round (verify mode)
+	StaticFindings     []ReviewFinding // pre-seeded findings from static analysis (discover mode)
+	SpecDir            string          // path to spec directory for loading auxiliary docs
+	PassCriteria       string          // overrides default verdict decision rules in prompt
+	DocContextMaxLines int             // max lines per auxiliary doc (0 = use default 200)
 }
 
 // ReviewFinding is a single issue found during review.

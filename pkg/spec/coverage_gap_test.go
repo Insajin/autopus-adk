@@ -186,3 +186,19 @@ FINDING_STATUS: F-001 | open | unchanged`
 	require.Len(t, result.Findings, 1)
 	assert.Equal(t, 3, result.Findings[0].LastSeenRev, "LastSeenRev must be updated to current revision")
 }
+
+func TestParseVerdict_VerifyMode_PassWithoutStatusesResolvesPriorFindings(t *testing.T) {
+	t.Parallel()
+
+	prior := []ReviewFinding{
+		{ID: "F-001", Status: FindingStatusOpen, Description: "Existing"},
+		{ID: "F-002", Status: FindingStatusRegressed, Description: "Regressed"},
+	}
+	output := `VERDICT: PASS`
+
+	result := ParseVerdict("SPEC-X-001", output, "claude", 2, prior)
+
+	require.Len(t, result.Findings, 2)
+	assert.Equal(t, FindingStatusResolved, result.Findings[0].Status)
+	assert.Equal(t, FindingStatusResolved, result.Findings[1].Status)
+}

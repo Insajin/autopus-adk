@@ -36,6 +36,9 @@ spec:
         max_revisions: 2
         auto_collect_context: true
         context_max_lines: 500
+        # verdict_threshold: 0.67       # supermajority fraction (default 0.67)
+        # pass_criteria: ""              # override verdict decision rules (empty = default)
+        # doc_context_max_lines: 200     # max lines of plan/research/acceptance.md to inject (default 200)
 methodology:
     mode: tdd
     enforce: true

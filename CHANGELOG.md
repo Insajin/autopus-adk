@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **SPEC 리뷰 수렴성 재구축 (SPEC-REVFIX-001)** (2026-04-19): `auto spec review --multi`가 대부분의 SPEC에서 PASS에 도달하지 못하고 REVISE 루프를 소진한 뒤 circuit breaker로 종료되던 7개 복합 결함 제거.
+  - **REQ-01 Supermajority verdict**: `MergeVerdicts`가 `spec.review_gate.verdict_threshold`(기본 0.67) 기준 supermajority를 적용. 1 REJECT 단독 override는 유지(security gate). `pkg/spec/reviewer.go`
+  - **REQ-02 Revision 루프 내 재로드**: `runSpecReview`가 iteration마다 `spec.Load(specDir)` 재호출. 외부 수정이 다음 round에 반영됨. `internal/cli/spec_review_loop.go`
+  - **REQ-03 다중 문서 주입**: `BuildReviewPrompt`가 plan.md / research.md / acceptance.md 본문을 별도 섹션으로 주입. `doc_context_max_lines`(기본 200)로 trim. `pkg/spec/prompt.go`
+  - **REQ-04 Verdict 판정 기준 명문화**: 프롬프트에 `critical==0 && security==0 && major<=2 → PASS` 규칙 포함. `pass_criteria` override 지원.
+  - **REQ-05 FINDING 포맷 강제 + empty RawContent guard**: structured FINDING few-shot(positive 2 + negative 1), `doc.RawContent == ""` 시 early error.
+  - **REQ-06 DeduplicateFindings / MergeSupermajority 프로덕션 통합**: REVCONV-001이 구현했으나 호출되지 않던 dead code를 `runSpecReview` 경로에 연결. critical/security는 supermajority 우회.
+  - **REQ-07 Finding ID 전역 유니크**: `parseDiscoverFindings`가 ID 비어있게 두고 `DeduplicateFindings`가 global `F-001..` 재발급. `ApplyScopeLock` 오동작 해결.
+  - 신규: `pkg/spec/merge.go`, `pkg/config/schema_spec.go`, `internal/cli/spec_review_loop.go`, `pkg/spec/prompt_test.go`, `pkg/spec/reviewer_supermajority_test.go`, `internal/cli/spec_review_scaffold_test.go`
+  - `autopus.yaml` 샘플에 `verdict_threshold`, `pass_criteria`, `doc_context_max_lines` 주석 예시 추가
+
 ### Changed
 
 - **Claude Code Agent Teams + mode 파라미터 동기화** (2026-04-18): Agent Teams 공식 스펙(https://code.claude.com/docs/en/agent-teams)을 반영하고, Agent() 호출 파라미터 이름을 `permissionMode` → `mode` 로 통일. 플랫폼별 `--team` 플래그 동작 명시.

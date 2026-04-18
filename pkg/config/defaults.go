@@ -27,6 +27,8 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				MaxRevisions:       2,
 				AutoCollectContext: true,
 				ContextMaxLines:    500,
+				VerdictThreshold:   0.67,
+				DocContextMaxLines: 200,
 			},
 		},
 		Methodology: MethodologyConf{

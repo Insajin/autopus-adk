@@ -2,14 +2,19 @@ package spec
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
+const defaultDocContextMaxLines = 200
+
 // BuildReviewPrompt constructs a review prompt from a SPEC document and code context.
+// specDir (optional variadic): path to the spec directory for loading plan.md/research.md/acceptance.md.
 // opts.Mode controls whether a discover (open-ended) or verify (checklist) prompt is generated.
 // The full spec.md content is included to prevent false positives from parser truncation
 // (e.g., multi-line requirements with SQL schemas or itemized lists after the EARS header).
-func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptOptions) string {
+func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptOptions, specDir ...string) string {
 	var sb strings.Builder
 
 	sb.WriteString("You are reviewing a SPEC document for correctness, completeness, and feasibility.\n\n")
@@ -41,6 +46,19 @@ func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptO
 		sb.WriteString("\n")
 	}
 
+	// Inject auxiliary documentation context (plan.md, research.md, acceptance.md).
+	dir := opts.SpecDir
+	if len(specDir) > 0 && specDir[0] != "" {
+		dir = specDir[0]
+	}
+	if dir != "" {
+		maxLines := opts.DocContextMaxLines
+		if maxLines <= 0 {
+			maxLines = defaultDocContextMaxLines
+		}
+		injectAuxDocs(&sb, dir, maxLines)
+	}
+
 	if codeContext != "" {
 		sb.WriteString("### Existing Code Context\n\n")
 		sb.WriteString("```\n")
@@ -49,16 +67,67 @@ func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptO
 	}
 
 	if opts.Mode == ReviewModeVerify || len(opts.PriorFindings) > 0 {
-		buildVerifyInstructions(&sb, opts.PriorFindings)
+		buildVerifyInstructions(&sb, opts.PriorFindings, opts.PassCriteria)
 	} else {
-		buildDiscoverInstructions(&sb, opts.StaticFindings)
+		buildDiscoverInstructions(&sb, opts.StaticFindings, opts.PassCriteria)
 	}
 
 	return sb.String()
 }
 
+// injectAuxDocs injects plan.md, research.md, and acceptance.md into the prompt.
+// Missing files are silently skipped. Each file is trimmed to maxLines.
+func injectAuxDocs(sb *strings.Builder, specDir string, maxLines int) {
+	docs := []struct {
+		name string
+	}{
+		{"plan.md"},
+		{"research.md"},
+		{"acceptance.md"},
+	}
+
+	sectionNames := map[string]string{
+		"plan.md":       "### Plan Document",
+		"research.md":   "### Research Document",
+		"acceptance.md": "### Acceptance Criteria Document",
+	}
+	for _, d := range docs {
+		path := filepath.Join(specDir, d.name)
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue // file does not exist — not an error
+		}
+		content := trimToLines(string(data), maxLines)
+		header := sectionNames[d.name]
+		sb.WriteString(header)
+		sb.WriteString("\n\n")
+		sb.WriteString(content)
+		sb.WriteString("\n\n")
+	}
+}
+
+// trimToLines truncates content to maxLines lines.
+// Appends a trim notice when truncation occurs.
+func trimToLines(content string, maxLines int) string {
+	lines := strings.Split(content, "\n")
+	if len(lines) <= maxLines {
+		return content
+	}
+	trimmed := strings.Join(lines[:maxLines], "\n")
+	extra := len(lines) - maxLines
+	return fmt.Sprintf("%s\n... (trimmed %d more lines)", trimmed, extra)
+}
+
 // buildVerifyInstructions writes checklist-based instructions for verify mode.
-func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding) {
+func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding, passCriteria string) {
+	sb.WriteString("### Verdict Decision Rules\n\n")
+	writeVerdictRules(sb, passCriteria)
+	sb.WriteString("\n")
+
+	sb.WriteString("### Finding Format Examples\n\n")
+	writeFindingExamples(sb)
+	sb.WriteString("\n")
+
 	sb.WriteString("### Instructions (Verify Mode)\n\n")
 	sb.WriteString("For each finding below, report its current status.\n\n")
 
@@ -78,7 +147,15 @@ func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding)
 }
 
 // buildDiscoverInstructions writes open-ended instructions for discover mode.
-func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFinding) {
+func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFinding, passCriteria string) {
+	sb.WriteString("### Verdict Decision Rules\n\n")
+	writeVerdictRules(sb, passCriteria)
+	sb.WriteString("\n")
+
+	sb.WriteString("### Finding Format Examples\n\n")
+	writeFindingExamples(sb)
+	sb.WriteString("\n")
+
 	sb.WriteString("### Instructions\n\n")
 
 	if len(staticFindings) > 0 {
@@ -95,6 +172,29 @@ func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFindi
 	sb.WriteString("   Severity levels: critical, major, minor, suggestion\n")
 	sb.WriteString("   Category: correctness, completeness, feasibility, style, security\n")
 	sb.WriteString("3. Provide reasoning for your verdict.\n")
+}
+
+// writeVerdictRules writes the default or custom verdict decision rules.
+func writeVerdictRules(sb *strings.Builder, passCriteria string) {
+	if passCriteria != "" {
+		sb.WriteString(passCriteria)
+		sb.WriteString("\n")
+		return
+	}
+	sb.WriteString("Apply the following rules to determine your VERDICT:\n")
+	sb.WriteString("- PASS: critical == 0 AND security == 0 AND major <= 2\n")
+	sb.WriteString("- REJECT: critical > 0 OR security > 0\n")
+	sb.WriteString("- REVISE: otherwise (major > 2, or unresolved issues requiring author attention)\n")
+}
+
+// writeFindingExamples writes positive and negative few-shot examples for the FINDING format.
+func writeFindingExamples(sb *strings.Builder) {
+	sb.WriteString("Use the structured FINDING format exactly as shown:\n\n")
+	sb.WriteString("GOOD (structured format — use this):\n")
+	sb.WriteString("  FINDING: [major] [correctness] pkg/foo/bar.go:42 The retry logic does not handle timeout errors.\n")
+	sb.WriteString("  FINDING: [critical] [security] pkg/auth/handler.go:88 JWT secret is logged in plaintext.\n\n")
+	sb.WriteString("AVOID (legacy format — do NOT use this):\n")
+	sb.WriteString("  FINDING: [major] The retry logic is broken.\n")
 }
 
 // Context collection functions are in context_collect.go.

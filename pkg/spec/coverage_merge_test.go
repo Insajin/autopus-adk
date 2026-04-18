@@ -166,9 +166,11 @@ FINDING: [minor] Could improve naming`
 	require.Len(t, result.Findings, 2)
 	assert.Equal(t, "major", result.Findings[0].Severity)
 	assert.Equal(t, "minor", result.Findings[1].Severity)
-	// IDs must be assigned sequentially
-	assert.Equal(t, "F-001", result.Findings[0].ID)
-	assert.Equal(t, "F-002", result.Findings[1].ID)
+	// REQ-07: discover-mode findings leave IDs empty; global sequential IDs
+	// are assigned later by DeduplicateFindings in the merge pipeline so that
+	// providers do not collide on F-001/F-002.
+	assert.Equal(t, "", result.Findings[0].ID)
+	assert.Equal(t, "", result.Findings[1].ID)
 }
 
 func TestParseVerdict_DiscoverMode_StructuredFindingFormat(t *testing.T) {

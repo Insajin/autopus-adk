@@ -267,7 +267,7 @@ func TestMergeVerdicts_AllPass(t *testing.T) {
 		{Verdict: VerdictPass},
 		{Verdict: VerdictPass},
 	}
-	assert.Equal(t, VerdictPass, MergeVerdicts(results))
+	assert.Equal(t, VerdictPass, MergeVerdicts(results, 1.0, 2))
 }
 
 func TestMergeVerdicts_AnyReject(t *testing.T) {
@@ -277,7 +277,7 @@ func TestMergeVerdicts_AnyReject(t *testing.T) {
 		{Verdict: VerdictPass},
 		{Verdict: VerdictReject},
 	}
-	assert.Equal(t, VerdictReject, MergeVerdicts(results))
+	assert.Equal(t, VerdictReject, MergeVerdicts(results, 1.0, 2))
 }
 
 func TestMergeVerdicts_AnyRevise(t *testing.T) {
@@ -287,11 +287,11 @@ func TestMergeVerdicts_AnyRevise(t *testing.T) {
 		{Verdict: VerdictPass},
 		{Verdict: VerdictRevise},
 	}
-	assert.Equal(t, VerdictRevise, MergeVerdicts(results))
+	assert.Equal(t, VerdictRevise, MergeVerdicts(results, 0.5, 2))
 }
 
 func TestMergeVerdicts_Empty(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, VerdictPass, MergeVerdicts(nil))
+	assert.Equal(t, VerdictPass, MergeVerdicts(nil, 0.67, 0))
 }

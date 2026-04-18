@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	verdictRe        = regexp.MustCompile(`(?i)VERDICT:\s*(PASS|REVISE|REJECT)`)
-	findingRe        = regexp.MustCompile(`(?i)FINDING:\s*\[(\w+)]\s*(.+)`)
-	structFindingRe  = regexp.MustCompile(`(?i)FINDING:\s*\[(\w+)]\s*\[(\w+)]\s*(\S+)\s+(.+)`)
-	findingStatusRe  = regexp.MustCompile(`(?i)FINDING_STATUS:\s*F-(\d+)\s*\|\s*(\w+)\s*\|\s*(.+)`)
+	verdictRe       = regexp.MustCompile(`(?i)VERDICT:\s*(PASS|REVISE|REJECT)`)
+	findingRe       = regexp.MustCompile(`(?i)FINDING:\s*\[(\w+)]\s*(.+)`)
+	structFindingRe = regexp.MustCompile(`(?i)FINDING:\s*\[(\w+)]\s*\[(\w+)]\s*(\S+)\s+(.+)`)
+	findingStatusRe = regexp.MustCompile(`(?i)FINDING_STATUS:\s*F-(\d+)\s*\|\s*(\w+)\s*\|\s*(.+)`)
 )
 
 // ParseVerdict extracts a ReviewResult from raw provider output.
@@ -36,11 +36,17 @@ func ParseVerdict(specID, output, provider string, revision int, priorFindings [
 	}
 
 	if priorFindings == nil {
-		// Discover mode: parse structured FINDING lines
+		// Discover mode: parse FINDING lines with empty IDs (REQ-07 ownership rule).
+		// Global sequential ID assignment happens later in the merge pipeline
+		// (MergeSupermajority → DeduplicateFindings in runSpecReviewLoop), so that
+		// IDs remain unique across providers instead of restarting per ParseVerdict call.
 		result.Findings = parseDiscoverFindings(output, provider, revision)
 	} else {
 		// Verify mode: apply status updates from FINDING_STATUS lines
 		result.Findings = parseVerifyFindings(output, provider, revision, priorFindings)
+		if result.Verdict == VerdictPass && !hasExplicitVerifyFindings(output) {
+			result.Findings = markVerifyFindingsResolved(result.Findings)
+		}
 	}
 
 	return result
@@ -49,14 +55,14 @@ func ParseVerdict(specID, output, provider string, revision int, priorFindings [
 // parseDiscoverFindings parses FINDING lines from discover mode output.
 // Tries structured format first: FINDING: [severity] [category] [scope_ref] description
 // Falls back to legacy: FINDING: [severity] description
+// IDs are intentionally left empty; DeduplicateFindings assigns global sequential IDs.
 func parseDiscoverFindings(output, provider string, revision int) []ReviewFinding {
 	var findings []ReviewFinding
-	seq := 1
 
 	for _, m := range structFindingRe.FindAllStringSubmatch(output, -1) {
 		if len(m) >= 5 {
 			findings = append(findings, ReviewFinding{
-				ID:           fmt.Sprintf("F-%03d", seq),
+				ID:           "",
 				Provider:     provider,
 				Severity:     strings.ToLower(m[1]),
 				Category:     FindingCategory(strings.ToLower(m[2])),
@@ -66,7 +72,6 @@ func parseDiscoverFindings(output, provider string, revision int) []ReviewFindin
 				FirstSeenRev: revision,
 				LastSeenRev:  revision,
 			})
-			seq++
 		}
 	}
 
@@ -75,7 +80,7 @@ func parseDiscoverFindings(output, provider string, revision int) []ReviewFindin
 		for _, m := range findingRe.FindAllStringSubmatch(output, -1) {
 			if len(m) >= 3 {
 				findings = append(findings, ReviewFinding{
-					ID:           fmt.Sprintf("F-%03d", seq),
+					ID:           "",
 					Provider:     provider,
 					Severity:     strings.ToLower(m[1]),
 					Description:  strings.TrimSpace(m[2]),
@@ -83,7 +88,6 @@ func parseDiscoverFindings(output, provider string, revision int) []ReviewFindin
 					FirstSeenRev: revision,
 					LastSeenRev:  revision,
 				})
-				seq++
 			}
 		}
 	}
@@ -156,112 +160,20 @@ func parseVerifyFindings(output, provider string, revision int, priorFindings []
 	return updated
 }
 
-// MergeFindingStatuses applies supermajority merge across providers (REQ-011).
-// threshold: fraction of providers that must agree (e.g., 0.67 for 2/3).
-// resolved requires >= threshold agreement; regressed > open in priority.
-func MergeFindingStatuses(providerResults [][]ReviewFinding, threshold float64) []ReviewFinding {
-	if len(providerResults) == 0 {
-		return nil
-	}
-
-	// Flatten and group by finding ID
-	byID := make(map[string][]ReviewFinding)
-	for _, findings := range providerResults {
-		for _, f := range findings {
-			byID[f.ID] = append(byID[f.ID], f)
-		}
-	}
-
-	total := float64(len(providerResults))
-	var merged []ReviewFinding
-
-	for id, group := range byID {
-		if len(group) == 0 {
-			continue
-		}
-		base := group[0]
-
-		resolvedCount := 0
-		regressedCount := 0
-		for _, f := range group {
-			if f.Status == FindingStatusResolved {
-				resolvedCount++
-			}
-			if f.Status == FindingStatusRegressed {
-				regressedCount++
-			}
-		}
-
-		if float64(resolvedCount)/total >= threshold {
-			base.Status = FindingStatusResolved
-		} else if regressedCount > 0 {
-			base.Status = FindingStatusRegressed
-		} else {
-			base.Status = FindingStatusOpen
-		}
-
-		_ = id
-		merged = append(merged, base)
-	}
-
-	return merged
+func hasExplicitVerifyFindings(output string) bool {
+	return findingStatusRe.MatchString(output) || structFindingRe.MatchString(output) || findingRe.MatchString(output)
 }
 
-// ShouldTripCircuitBreaker returns true if the review loop should halt.
-// Compares open+regressed counts (excluding escape hatch and out_of_scope/deferred).
-// If new escape hatch findings were introduced in curr, the breaker does NOT trip —
-// a newly discovered critical/security issue is considered progress.
-func ShouldTripCircuitBreaker(prev, curr []ReviewFinding) bool {
-	prevCount := countActiveFindings(prev, true)
-	currCount := countActiveFindings(curr, true)
-
-	// New escape hatch findings indicate newly discovered critical issues — not stalling.
-	if countEscapeHatch(curr) > countEscapeHatch(prev) {
-		return false
-	}
-
-	return currCount >= prevCount
-}
-
-// countActiveFindings counts open+regressed findings, always excluding escape hatch.
-func countActiveFindings(findings []ReviewFinding, excludeEscapeHatch bool) int {
-	count := 0
-	for _, f := range findings {
-		if f.Status == FindingStatusOutOfScope || f.Status == FindingStatusDeferred {
-			continue
-		}
-		if excludeEscapeHatch && f.EscapeHatch {
-			continue
-		}
+func markVerifyFindingsResolved(findings []ReviewFinding) []ReviewFinding {
+	updated := make([]ReviewFinding, len(findings))
+	for i, f := range findings {
+		updated[i] = f
 		if f.Status == FindingStatusOpen || f.Status == FindingStatusRegressed {
-			count++
+			updated[i].Status = FindingStatusResolved
 		}
 	}
-	return count
+	return updated
 }
 
-// countEscapeHatch returns the number of escape hatch findings.
-func countEscapeHatch(findings []ReviewFinding) int {
-	count := 0
-	for _, f := range findings {
-		if f.EscapeHatch {
-			count++
-		}
-	}
-	return count
-}
-
-// MergeVerdicts combines multiple review results into a single verdict.
-// REJECT wins over REVISE, REVISE wins over PASS.
-func MergeVerdicts(results []ReviewResult) ReviewVerdict {
-	verdict := VerdictPass
-	for _, r := range results {
-		switch r.Verdict {
-		case VerdictReject:
-			return VerdictReject
-		case VerdictRevise:
-			verdict = VerdictRevise
-		}
-	}
-	return verdict
-}
+// merge.go contains MergeVerdicts, MergeFindingStatuses, ShouldTripCircuitBreaker,
+// countActiveFindings, and countEscapeHatch.
