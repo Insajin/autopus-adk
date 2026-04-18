@@ -142,12 +142,16 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 			merged.Findings = spec.ApplyScopeLock(merged.Findings, priorFindings, spec.ReviewModeVerify)
 		}
 
-		// Persist findings and review
+		// Persist findings and review. A mid-pipeline write failure (e.g. the
+		// SPEC directory vanished between resolve and persist) must abort.
+		// Silent continuation was the enabling condition for issue #38 —
+		// the CLI printed "판정: PASS" while leaving the on-disk state
+		// inconsistent and allowing a subsequent run to corrupt unrelated SPECs.
 		if persistErr := spec.PersistFindings(specDir, merged.Findings); persistErr != nil {
-			fmt.Fprintf(os.Stderr, "findings 저장 실패: %v\n", persistErr)
+			return fmt.Errorf("review findings 저장 실패 (SPEC: %s, revision: %d): %w", specID, revision, persistErr)
 		}
 		if persistErr := spec.PersistReview(specDir, merged); persistErr != nil {
-			fmt.Fprintf(os.Stderr, "review.md 저장 실패: %v\n", persistErr)
+			return fmt.Errorf("review.md 저장 실패 (SPEC: %s, revision: %d): %w", specID, revision, persistErr)
 		}
 
 		finalResult = merged
@@ -175,7 +179,7 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	// Output final result
 	if finalResult != nil {
 		if persistErr := syncReviewedSpecStatus(specDir, finalResult); persistErr != nil {
-			fmt.Fprintf(os.Stderr, "SPEC 상태 업데이트 실패: %v\n", persistErr)
+			return fmt.Errorf("SPEC 상태 업데이트 실패 (SPEC: %s): %w", specID, persistErr)
 		}
 		fmt.Printf("SPEC 리뷰 완료: %s\n", specID)
 		fmt.Printf("판정: %s\n", finalResult.Verdict)
