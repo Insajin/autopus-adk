@@ -1,70 +1,70 @@
 {
   "version": "1.0.0",
   "platform": "claude-code",
-  "generated_at": "2026-04-14T19:59:38+09:00",
+  "generated_at": "2026-04-18T16:35:16+09:00",
   "files": {
     ".claude/agents/autopus/annotator.md": {
-      "checksum": "3a14e2ff6773500db368aa38aeb490005c5108881985202a076fc2a173e4fd44",
+      "checksum": "96adc4d240139885d3ec150b2034c47d7f0448fdd8e1054a4e4acf1fef062005",
       "policy": "always"
     },
     ".claude/agents/autopus/architect.md": {
-      "checksum": "860bee87de30602af7d52dc0c178367050608e87297fd743032e63433878d64e",
+      "checksum": "c915c56acac326cfe4a9b7d0a98d56f877bd165002ca9ed5f1ca395f4a7fd513",
       "policy": "always"
     },
     ".claude/agents/autopus/debugger.md": {
-      "checksum": "e1477a015988d305d5d2f3cab12ebb909f7785c7c3716a4e7e55326ebf0afaf4",
+      "checksum": "58601ba292909077a7cd6701a8eac0523df0bfb41fb41d590b30fd04f2b3eb31",
       "policy": "always"
     },
     ".claude/agents/autopus/deep-worker.md": {
-      "checksum": "27ce0fde4b34826e8fcfd548ac0f036894d7d6b2deba3a59bab2f57dbcf72dbb",
+      "checksum": "47207a5f632ddd1bc0b986f2f402ef1fee4da831a5b85d56c5f1b2e8037e3641",
       "policy": "always"
     },
     ".claude/agents/autopus/devops.md": {
-      "checksum": "7def94d3425384301d48473cfa30c804e2ce4e99ade2b59e3712f8985b555e0e",
+      "checksum": "a11ff2a65005a515e9c5443cdfac1a5fd443b7eca66e5a6539419672c3c8849f",
       "policy": "always"
     },
     ".claude/agents/autopus/executor.md": {
-      "checksum": "c7bcb669928c40b03102784589b0f73bea19dbb36d5e7d0166c8e3e899f8bc21",
+      "checksum": "841f9c77258ac3f63740564fba91259d96a947ecbd0c560f6939befa059ecd3d",
       "policy": "always"
     },
     ".claude/agents/autopus/explorer.md": {
-      "checksum": "d16cd84804bfbacc33471186265474c1367393150602563273721802c25c382c",
+      "checksum": "4d76444ed0e1a305ee4e216ff2dc2fcb23538153c69bf87d15378395b92574f5",
       "policy": "always"
     },
     ".claude/agents/autopus/frontend-specialist.md": {
-      "checksum": "019175bb845b3a28beb6c3dd777e1b0bb23934b34ef0a3538f8c7df70426f4df",
+      "checksum": "bb8c9bf6aa5d7e8d368e977dba56e6c3ede7e1498c5437fa873a1ecde8f8747a",
       "policy": "always"
     },
     ".claude/agents/autopus/perf-engineer.md": {
-      "checksum": "bfdc0ca3fed4b56794fb6fd9492027c242abc9f4930bf6d2edf61e9dafc479f6",
+      "checksum": "111e5f0f121c6d92b19a1bc247e6106db381d0904182811be47d8f10ffb3ce94",
       "policy": "always"
     },
     ".claude/agents/autopus/planner.md": {
-      "checksum": "26792f641c243249e0e2e4a9e02e3d0ac7f2903d1191fbf75bf0be230e6a23a6",
+      "checksum": "18392b1dec97438c8c2720a6a762b34ece0fe5d2de91085c51f761b6b53fd004",
       "policy": "always"
     },
     ".claude/agents/autopus/reviewer.md": {
-      "checksum": "66a65ddbf5c4eb85def695db1762e953142c719101199e399e5b4bc891e8bc29",
+      "checksum": "e94c3c58da6a58a80bf86a7c575baee0e046404b00ad48405837dceb33f2840b",
       "policy": "always"
     },
     ".claude/agents/autopus/security-auditor.md": {
-      "checksum": "0f1c5385b13f30cedbe212f57c171be66d5a1f68f7886680b5d13eb057cbe8e4",
+      "checksum": "978415a51999a6b2debfe453d552e98393b0584e45dcab19506fc941e973ca76",
       "policy": "always"
     },
     ".claude/agents/autopus/spec-writer.md": {
-      "checksum": "e776a888435d28f545ba6211573c750c01183722f964664652358d9a195381df",
+      "checksum": "72cf65095167a830a4bacb05025257d291107aad2d39bc380210a77711a3217e",
       "policy": "always"
     },
     ".claude/agents/autopus/tester.md": {
-      "checksum": "48898c9ea9c37e404f100a95be8501263af6e83259820d17f361df8e3766167d",
+      "checksum": "9bc8e740c63b471b8452af48448b5a3bc6b3fa9d7ee98a70d23b2a752ca67e01",
       "policy": "always"
     },
     ".claude/agents/autopus/ux-validator.md": {
-      "checksum": "32055daefb68c80b50696366982c51c3c24d4d3244ca89bfa07c60322ca56316",
+      "checksum": "5c6f77abd46573f8b536bad4b097339397e430936f5dc6ffb66ff7817bc6d0b9",
       "policy": "always"
     },
     ".claude/agents/autopus/validator.md": {
-      "checksum": "d47244f4942c0246a6ae9ff57aed5c6d38e2ed54d802c02aac1658a3873e2ab0",
+      "checksum": "2a2378ce5c50f163526d9d2fa1566232035d9765fdaf9af297e9b2e1b8428d1c",
       "policy": "always"
     },
     ".claude/hooks/autopus/hook-claude-stop.sh": {
@@ -96,11 +96,11 @@
       "policy": "always"
     },
     ".claude/rules/autopus/branding.md": {
-      "checksum": "c179bf1fecd394bf7bf1da97666c5a9f5d8ece371ebd65fba6013986e9401470",
+      "checksum": "f7162fdd9787ada00e3b5dc3552b3394907783b2af32d1008018ce340f9ef178",
       "policy": "always"
     },
     ".claude/rules/autopus/context7-docs.md": {
-      "checksum": "2f2018f9d4a902c311e0f8862a779165c1418a7f8dad36a787179088fae1eeb9",
+      "checksum": "8937376726bd752bfb7c1e13370738f32e103f5088224f64dfe548ecca754f4c",
       "policy": "always"
     },
     ".claude/rules/autopus/doc-storage.md": {
@@ -136,7 +136,7 @@
       "policy": "always"
     },
     ".claude/skills/auto/SKILL.md": {
-      "checksum": "54fc6b5aea900e733269ffbc52aa644c886bf53956923cc89d1e9d0a7ad6567b",
+      "checksum": "f42ddcd353141bff2f1d1b0a88b4eee4ceb72d6b691a1150701b50de3a7debed",
       "policy": "always"
     },
     ".claude/skills/autopus/adaptive-quality.md": {
@@ -144,7 +144,7 @@
       "policy": "always"
     },
     ".claude/skills/autopus/agent-pipeline.md": {
-      "checksum": "d5ea94b41abfc98cfabdcac59e751d404453e98e04589897dde81247d4654214",
+      "checksum": "69e9307621d3c26d8eac5e9828f4dce3b4672afb4fb2a7ff82035b5fb002d856",
       "policy": "always"
     },
     ".claude/skills/autopus/agent-presets.md": {
@@ -296,7 +296,7 @@
       "policy": "always"
     },
     ".claude/skills/autopus/using-autopus.md": {
-      "checksum": "7cdda37550286668236a4f6007ff4850d47c45759b8c235897c5fdabda68adcb",
+      "checksum": "b6cff2ddb5e13cd82197ba235f2f08a9ab9cffefdcb34fb772fb3a4600422ec3",
       "policy": "always"
     },
     ".claude/skills/autopus/verification.md": {
@@ -320,7 +320,7 @@
       "policy": "merge"
     },
     "CLAUDE.md": {
-      "checksum": "4178540f32fff1b8dc42f7001bd22cf01f617c3d674e21c00b25b8668e1b0b7e",
+      "checksum": "448b7152a8c2701291ea29ecc98ad1aa9abe5246400ba8f71300812e98a48582",
       "policy": "marker"
     }
   }

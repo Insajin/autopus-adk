@@ -5,7 +5,7 @@
 
 - **프로젝트**: autopus-adk
 - **모드**: full
-- **플랫폼**: claude-code
+- **플랫폼**: claude-code, codex, gemini-cli, opencode
 
 ## 설치된 구성 요소
 

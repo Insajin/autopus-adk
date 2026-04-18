@@ -2,6 +2,9 @@ mode: full
 project_name: autopus-adk
 platforms:
     - claude-code
+    - codex
+    - gemini-cli
+    - opencode
 isolate_rules: true
 language:
     comments: en
@@ -69,16 +72,16 @@ orchestra:
         claude:
             binary: claude
             args: [--print, --model, opus, --effort, high]
-        gemini:
-            binary: gemini
-            args: [-m, gemini-3.1-pro-preview]
-            pane_args: [-m, gemini-3.1-pro-preview]
-            prompt_via_args: true
         codex:
             binary: codex
             args: [exec, --full-auto, -m, gpt-5.4]
             pane_args: [-m, gpt-5.4]
             interactive_input: sendkeys
+        gemini:
+            binary: gemini
+            args: [-m, gemini-3.1-pro-preview]
+            pane_args: [-m, gemini-3.1-pro-preview]
+            prompt_via_args: true
     commands:
         brainstorm:
             strategy: debate

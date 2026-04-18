@@ -1,0 +1,38 @@
+---
+description: "코드 리뷰 — TRUST 5 기준으로 변경된 코드를 리뷰합니다"
+---
+
+# auto-review — 코드 리뷰
+
+## Autopus Branding
+
+When handling this workflow, start the response with the canonical banner from `templates/shared/branding-formats.md.tmpl`:
+
+```text
+🐙 Autopus ─────────────────────────
+```
+
+End the completed response with `🐙`.
+
+
+**프로젝트**: autopus-adk | **모드**: full
+
+## 사용법
+
+변경된 파일 또는 경로를 인자로 받아 리뷰합니다.
+인자 없이 실행 시 현재 변경 사항 전체를 리뷰합니다.
+
+가능하면 `.agents/skills/auto-review/SKILL.md` 또는 `@auto review ...` 라우터의 상세 검증 순서를 따르세요.
+
+## TRUST 5 기준
+
+- **T**ested: 커버리지 85%+
+- **R**eadable: 명확한 네이밍, 린트 클린
+- **U**nderstandable: 문서화, 복잡도 수용
+- **S**ecured: OWASP 준수, 입력 검증
+- **T**rackable: Conventional Commits, 이슈 참조
+
+## 추가 검증
+
+- 파일 크기 제한: 소스 파일 300줄 이하
+- 복잡한 변경은 서브에이전트 위임 여부 확인

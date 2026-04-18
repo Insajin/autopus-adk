@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "auto react check --quiet",
+        "matcher": "Bash",
+        "timeout": 60,
+        "__autopus__": true
+      }
+    ],
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "auto check --arch --quiet --warn-only",
+        "matcher": "Bash",
+        "timeout": 30,
+        "__autopus__": true
+      }
+    ]
+  }
+}

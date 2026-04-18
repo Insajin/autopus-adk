@@ -1,0 +1,439 @@
+{
+  "version": "1.0.0",
+  "platform": "opencode",
+  "generated_at": "2026-04-18T16:35:16+09:00",
+  "files": {
+    ".agents/skills/adaptive-quality/SKILL.md": {
+      "checksum": "16471561aeedb2eff2843fcca425371af6934c500750e0816cf2517a801e55df",
+      "policy": "always"
+    },
+    ".agents/skills/agent-pipeline/SKILL.md": {
+      "checksum": "f297019c01dd8829a92a2aad65ded88892a4a984f1bb58f7e19a46cab3efc92a",
+      "policy": "always"
+    },
+    ".agents/skills/agent-presets/SKILL.md": {
+      "checksum": "5a8e70271692c66c29ed753168dca0a5a66dabc4677f0f115bd6a44cffc95d15",
+      "policy": "always"
+    },
+    ".agents/skills/agent-teams/SKILL.md": {
+      "checksum": "80b6eff878c68a85957e03693626b6c4a017d0a2638c29d3c439ea966b76928e",
+      "policy": "always"
+    },
+    ".agents/skills/api-design/SKILL.md": {
+      "checksum": "91609ed44a5ea59934a7a2d420ba77b350d9af7e8a9da9172028c557359516ab",
+      "policy": "always"
+    },
+    ".agents/skills/ast-refactoring/SKILL.md": {
+      "checksum": "5d34b0c239a2b04ccfb052fe6d6aea038dcb31acc1bd33ffba6c283106aa7a8e",
+      "policy": "always"
+    },
+    ".agents/skills/auto-canary/SKILL.md": {
+      "checksum": "89f2bd459205f69b0b1676b95174bf8051b8929900aa1c0ac1d9196ab89eb7cf",
+      "policy": "always"
+    },
+    ".agents/skills/auto-dev/SKILL.md": {
+      "checksum": "ce7ade6e0379e6e68eec8664d01477f57f550438a819e6c2d09227dca714b81c",
+      "policy": "always"
+    },
+    ".agents/skills/auto-doctor/SKILL.md": {
+      "checksum": "1582c90f65d3e9a2bf4f0750c7087fe6c6c838b2d9c419a546115b138788b471",
+      "policy": "always"
+    },
+    ".agents/skills/auto-fix/SKILL.md": {
+      "checksum": "d352a0343ea30a2333029d29af9a72d77dbd99913aac28a3255a08a4f6c56cd4",
+      "policy": "always"
+    },
+    ".agents/skills/auto-go/SKILL.md": {
+      "checksum": "e0959fb1311a91548cd66f14248e7df31b3b36d3c360d7995b7f7b1815b46086",
+      "policy": "always"
+    },
+    ".agents/skills/auto-idea/SKILL.md": {
+      "checksum": "2a3398f57ddc7d9a7d8b152ffbeb3e8702ee498723d1310a6b0dfea26e55d426",
+      "policy": "always"
+    },
+    ".agents/skills/auto-map/SKILL.md": {
+      "checksum": "cf2fec084b61917fcefc7119652a69479fce0e2c339a59d77d40906eb6d0e808",
+      "policy": "always"
+    },
+    ".agents/skills/auto-plan/SKILL.md": {
+      "checksum": "e47ffc42e6e089ebd68c00e8dc7a68ebad487770ca836bf5994d16098e9acdad",
+      "policy": "always"
+    },
+    ".agents/skills/auto-review/SKILL.md": {
+      "checksum": "e0540477d8d4118bd85f6356ab281c6d063e40e4a0d442be1f899bee53d9f59d",
+      "policy": "always"
+    },
+    ".agents/skills/auto-secure/SKILL.md": {
+      "checksum": "be52ef85f2545f408ba5fe8cc11d313f19dcec81664b0cc97bdf0fbd1ca060e2",
+      "policy": "always"
+    },
+    ".agents/skills/auto-setup/SKILL.md": {
+      "checksum": "c413481170bf6b4c26f4ae68c08b74656c44b12612a73a33d649282f25c59cd6",
+      "policy": "always"
+    },
+    ".agents/skills/auto-status/SKILL.md": {
+      "checksum": "79858eed2fa4db023b8e54dd4264d28cd6b04aed523f4cecdf46c215a33dbf52",
+      "policy": "always"
+    },
+    ".agents/skills/auto-sync/SKILL.md": {
+      "checksum": "38d1cba34c837f2bd5a85f2dba3dc328276a0596564b6e8e5ca206053ad6717a",
+      "policy": "always"
+    },
+    ".agents/skills/auto-test/SKILL.md": {
+      "checksum": "f255f312f1e19f8f578f876a78a852e3908968c4e18f319ac465bd7959e365f1",
+      "policy": "always"
+    },
+    ".agents/skills/auto-verify/SKILL.md": {
+      "checksum": "5f34aadb7fde78de7d455d18010d071bcf4502128db7fd6829500348b29a8fdc",
+      "policy": "always"
+    },
+    ".agents/skills/auto-why/SKILL.md": {
+      "checksum": "51dc312708806273fc8dbff1a056b1cdeadfbe7fc449f3f73c27c67bb637616d",
+      "policy": "always"
+    },
+    ".agents/skills/auto/SKILL.md": {
+      "checksum": "33c21f1c24d3196fa6bcc79f50afa5145400f927bb807124f8a083aa5e06aad8",
+      "policy": "always"
+    },
+    ".agents/skills/ax-annotation/SKILL.md": {
+      "checksum": "f6eb44ddddc01973d81bf4c2925aeb6808053501c9a354222cda87c6827c800f",
+      "policy": "always"
+    },
+    ".agents/skills/brainstorming/SKILL.md": {
+      "checksum": "07ea2a4e5b6cd2e45cceea90566b2296ed34350f01164a6a907a1a29221287fe",
+      "policy": "always"
+    },
+    ".agents/skills/browser-automation/SKILL.md": {
+      "checksum": "4d71c4ee2e58f3a4e2bc2cd728eafa6db5a43c56f5f8f9b3f9ef33d2b9052475",
+      "policy": "always"
+    },
+    ".agents/skills/ci-cd/SKILL.md": {
+      "checksum": "2ee38c212137876b52b4cb3c17bcb5fec03246fe084ed0551a1ecacf0bf48d19",
+      "policy": "always"
+    },
+    ".agents/skills/competitive-analysis/SKILL.md": {
+      "checksum": "4537b725b0b111ef55c10ccfeb0911a03e2cd2e51bc3ce8f49c1620f5bf35c21",
+      "policy": "always"
+    },
+    ".agents/skills/context-search/SKILL.md": {
+      "checksum": "1603fd80cf9cbb05e5d431f2077592dafc3004024734f559d8c0e6473d6a0ac6",
+      "policy": "always"
+    },
+    ".agents/skills/database/SKILL.md": {
+      "checksum": "26e21e3e9f4863e1d0ca2f73dc9e98a999c052c293a10edd7cfe2d6b58ab84e8",
+      "policy": "always"
+    },
+    ".agents/skills/ddd/SKILL.md": {
+      "checksum": "b39d209cfe54b5a1c99f288df1bca88fd1974ca2eea08eacef80a60faf1459e1",
+      "policy": "always"
+    },
+    ".agents/skills/debugging/SKILL.md": {
+      "checksum": "2d83bcae4d92cf67536710843caa55b92f03a511aa9e9130ca523d5ebada52dc",
+      "policy": "always"
+    },
+    ".agents/skills/docker/SKILL.md": {
+      "checksum": "d895cf9363ab62715328f99f69a927fd629b839b56784b1d7d9fd0bf0f3e870b",
+      "policy": "always"
+    },
+    ".agents/skills/double-diamond/SKILL.md": {
+      "checksum": "ebfb0198d6674bc129aa12ceb2dd6566ffd466cdc8d7727dfcdb81d02b8d8165",
+      "policy": "always"
+    },
+    ".agents/skills/entropy-scan/SKILL.md": {
+      "checksum": "057f6b9bead5f6b7da5787412b9fea61cb00019750a004d3298b3b74cec33da6",
+      "policy": "always"
+    },
+    ".agents/skills/experiment/SKILL.md": {
+      "checksum": "e0a2ca29f3cc8e2d3e8a723f07322470fe30eb94dfc4325fcc7b935d649c576d",
+      "policy": "always"
+    },
+    ".agents/skills/frontend-skill/SKILL.md": {
+      "checksum": "47c1fff09e39e5448326fe553a3010b82029285b7b79948021c8dd6787e3335d",
+      "policy": "always"
+    },
+    ".agents/skills/frontend-verify/SKILL.md": {
+      "checksum": "646718253ec3c6d2b1d3e782f81f5e7f46618754fad07d4435a1ec2ba394b884",
+      "policy": "always"
+    },
+    ".agents/skills/git-worktrees/SKILL.md": {
+      "checksum": "6bcad150f74459ed58c40af9cbf46368725bf738548f2619055173de2006437b",
+      "policy": "always"
+    },
+    ".agents/skills/hash-anchored-edit/SKILL.md": {
+      "checksum": "52005d4a124b90f823d7b21aaab70df0fd370d01f7de38783caa3a0375271a12",
+      "policy": "always"
+    },
+    ".agents/skills/idea/SKILL.md": {
+      "checksum": "1ec32cbd8e8c2faa23d737a4e64d72dbd9eb0459bbad91245917100f50776ae6",
+      "policy": "always"
+    },
+    ".agents/skills/lore-commit/SKILL.md": {
+      "checksum": "c575dab701b1b09f3b576bae5fdd12bbed4b9373b0d3c9b2fd8b2147a6228298",
+      "policy": "always"
+    },
+    ".agents/skills/metrics/SKILL.md": {
+      "checksum": "6b7f26751ddccf0af26d2fd8da31b8fa7776636b652559b49291c1a96986f311",
+      "policy": "always"
+    },
+    ".agents/skills/migration/SKILL.md": {
+      "checksum": "cde84d147222966e0e4238f304ebd1ea1ae0fe00fa2a751f9031e249c3a5cb51",
+      "policy": "always"
+    },
+    ".agents/skills/performance/SKILL.md": {
+      "checksum": "f7d68b955dcdc30e31f526c096a1f72b3e8a84fe28265a4eccc3941100562fe9",
+      "policy": "always"
+    },
+    ".agents/skills/planning/SKILL.md": {
+      "checksum": "3a24e030754371870b6539e2ed8eb0440127f51d76f8d69fa11b3a5b7af70f10",
+      "policy": "always"
+    },
+    ".agents/skills/playwright-cli/SKILL.md": {
+      "checksum": "2629021d1e5e4fba48d374bc8d25b57c708f6bda2f4c19784fc3a00855522d12",
+      "policy": "always"
+    },
+    ".agents/skills/prd/SKILL.md": {
+      "checksum": "9bc692f2a167e6eed8371eb488f2d589b9e27bbb7fd4130da921cd799360bbad",
+      "policy": "always"
+    },
+    ".agents/skills/product-discovery/SKILL.md": {
+      "checksum": "bd5e0ba2c12425d7edf51dd031539ac9bb41d63b522d7f9faf2d9c65850bd647",
+      "policy": "always"
+    },
+    ".agents/skills/refactoring/SKILL.md": {
+      "checksum": "5a60f19837328e45e8834a53c504891d1bd7b6f933908878fd370c842ec64fe6",
+      "policy": "always"
+    },
+    ".agents/skills/review/SKILL.md": {
+      "checksum": "66cdec57fd035b67b06df9bae6dd2359df3a7bacb420f7f461e2db6e68ff777b",
+      "policy": "always"
+    },
+    ".agents/skills/security-audit/SKILL.md": {
+      "checksum": "8476de3c3101387be036663b06bdd563fa973d4a7463a29d076e60e2147b8c28",
+      "policy": "always"
+    },
+    ".agents/skills/spec-review/SKILL.md": {
+      "checksum": "0fbbe54651250c36fbf9f90a0d74763102fe7892c08f929c0a5b791527718c6d",
+      "policy": "always"
+    },
+    ".agents/skills/subagent-dev/SKILL.md": {
+      "checksum": "b0661d58db9dc934f2be8a8eadc79bea3f90f6f5c85774c774a1544a04633405",
+      "policy": "always"
+    },
+    ".agents/skills/tdd/SKILL.md": {
+      "checksum": "96d1875c3cc909864466416182b44e289427313b3509d134aa6191c1d50fb41d",
+      "policy": "always"
+    },
+    ".agents/skills/testing-strategy/SKILL.md": {
+      "checksum": "50190f3ddff8dd40e68dd542df1aadae41c23934863331b1d243d5b1cbcb745c",
+      "policy": "always"
+    },
+    ".agents/skills/using-autopus/SKILL.md": {
+      "checksum": "00f995a1eb766b0ce76db453dc33f3178b9acafc8e14a9dd4bd3fb11db8fb0fa",
+      "policy": "always"
+    },
+    ".agents/skills/verification/SKILL.md": {
+      "checksum": "3aa27e807247710e7669b242234f9fb7ca6e467dd4c1dfb1ede65296b175fde7",
+      "policy": "always"
+    },
+    ".agents/skills/worktree-isolation/SKILL.md": {
+      "checksum": "17195661c3ad17f30182bed0e1ea4df0a37fe949aa8dd98034d4e198dcab61bb",
+      "policy": "always"
+    },
+    ".agents/skills/writing-skills/SKILL.md": {
+      "checksum": "c1fe979d18ed517c9a89dab14ef3dda69acb9672c948060a4a569341c740b96f",
+      "policy": "always"
+    },
+    ".git/hooks/commit-msg": {
+      "checksum": "1c541bfbb99a41ba1e11ac86ef19bad1a5ebec88603bd04c97c7db1b7ff2e72b",
+      "policy": "always"
+    },
+    ".git/hooks/pre-commit": {
+      "checksum": "91905dea410abed9077537acc2b88bc2fe13a9e1e9d1bf80967569e9c2b73a3e",
+      "policy": "always"
+    },
+    ".opencode/agents/annotator.md": {
+      "checksum": "eb5ce29f95ea696707d4d5d1b6d2da91e7d88774e050f34e28c78a3e2213496a",
+      "policy": "always"
+    },
+    ".opencode/agents/architect.md": {
+      "checksum": "316b6ae1c2f96e48cef52c7e9759fad43fbb348a55d0b196c47ef3f4c0c43513",
+      "policy": "always"
+    },
+    ".opencode/agents/debugger.md": {
+      "checksum": "fc31465dbb5e41c5c6457d26ccd28fc815acc10b7715fcb574b1f05c31d93e8e",
+      "policy": "always"
+    },
+    ".opencode/agents/deep-worker.md": {
+      "checksum": "d102d6b24062bb7c53469f73db9b83913326a60135bf9db7e2978cba289e527b",
+      "policy": "always"
+    },
+    ".opencode/agents/devops.md": {
+      "checksum": "67eac31e66a134f6bc49d815e7caf70443abdca4ad90e48fecd173bb71ddc7a9",
+      "policy": "always"
+    },
+    ".opencode/agents/executor.md": {
+      "checksum": "92c905ec0cc21844b949209edf5920ff55a1d5f23178411085e9bb49404ee6fa",
+      "policy": "always"
+    },
+    ".opencode/agents/explorer.md": {
+      "checksum": "b5b9dba198e7ade9627993273941f647e307e4223f6956438e9b2f5d829f6bce",
+      "policy": "always"
+    },
+    ".opencode/agents/frontend-specialist.md": {
+      "checksum": "b59f8032a2874b5f44417ec2e102667f8ee4acd8bfce596cf2887e44d0fffe84",
+      "policy": "always"
+    },
+    ".opencode/agents/perf-engineer.md": {
+      "checksum": "811c954074bbfde68f6eb84a28b42d963644dbc28a562f19df80a355927181bf",
+      "policy": "always"
+    },
+    ".opencode/agents/planner.md": {
+      "checksum": "b9843cbb06d405b98df4e11eeb4b944b322fa9e3ec6d5242b5b998e4eedbb688",
+      "policy": "always"
+    },
+    ".opencode/agents/reviewer.md": {
+      "checksum": "ca667ae4e4f1eb190f174a9597cfa81a67a5fa49823bfce46698c7082d1765fe",
+      "policy": "always"
+    },
+    ".opencode/agents/security-auditor.md": {
+      "checksum": "e6f880aec06f02a3ef4441f8199ccf3d33550788129c05857039e6c1c187eb22",
+      "policy": "always"
+    },
+    ".opencode/agents/spec-writer.md": {
+      "checksum": "fa8ac057bc9286e1ae13e07630b8ce002dbca13af4e1f474b93f0ec686ed23e4",
+      "policy": "always"
+    },
+    ".opencode/agents/tester.md": {
+      "checksum": "74df3a34b03b8a98a9a87a2133fcf810329a44e730f6999d3bed6e15133a8e5a",
+      "policy": "always"
+    },
+    ".opencode/agents/ux-validator.md": {
+      "checksum": "a8bf37f8bd3e18bec029f4a2eb97ad79b2b6e3f59be46850c75a13704f8e0b0e",
+      "policy": "always"
+    },
+    ".opencode/agents/validator.md": {
+      "checksum": "0c028a5ef79c53c897d7a9c33e6ba4747b5ce07b92103e1331a2a0f7c82f7989",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-canary.md": {
+      "checksum": "cb25368ca185fd12e8adaa7d98567be60f0ce9b1c9629a7ef37c4675e393ed09",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-dev.md": {
+      "checksum": "f159df574a7efbf95fffba3ad87dcdea35525374791d98134346df02f1e1ef5c",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-doctor.md": {
+      "checksum": "b891bba836c232d46b75f75c93442ec4d619816f4f96739d18dd894ae745f1d1",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-fix.md": {
+      "checksum": "0731679660ce4b99fcf70ec9dd876ce93eaa50baedbf887eacc9863b14a3ea62",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-go.md": {
+      "checksum": "46a6d08e1fc3182ed3d89285f130db5cf7c948b7fedc7f676d281a9e3aade435",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-idea.md": {
+      "checksum": "8b9a222c1948ba5d2623fa5785f5292bd3ca9c4d824aa0aefb631fc4e1c1bacc",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-map.md": {
+      "checksum": "df2656285011660b03ef39aaab25e29db52bf3ceecc516808dfedd8704f0a55d",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-plan.md": {
+      "checksum": "66f8bb4f57a2fafcb95dc749d704a4ca28a073bf63f6362e8cb7311bcb679369",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-review.md": {
+      "checksum": "e4bd46f3457ce58c2fb47049343a26f549d340c78d214ab80a715739f460001b",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-secure.md": {
+      "checksum": "8f47d3e9a0cc2a36953a7ea8741e025fc9088d016c823e21aa3f769f13a047f2",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-setup.md": {
+      "checksum": "b994ef1879bb4c553bfc5b416007593bc47f4901c8b0cd8ec2faccf85e84d05e",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-status.md": {
+      "checksum": "815bdf277fc152d2b5807a06f6069ad7db74f0fc6aaf1a0ab5338db8310a431c",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-sync.md": {
+      "checksum": "19bf979bbe828f81faaefe06bd78b8383cf40eabb89f961f2a7c14511f560cf3",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-test.md": {
+      "checksum": "7aa2857047bee72f0eb71af6d118bac29c3bf9afe39d736002e45a979977593f",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-verify.md": {
+      "checksum": "7095e17ec01914e2e8df4ba5f7179b838e591507f3ec8332422fecdd22221cbe",
+      "policy": "always"
+    },
+    ".opencode/commands/auto-why.md": {
+      "checksum": "06ac99276a67b2999233fb1c7b34035a07e9ca458c127b490ee51e17ba66bf38",
+      "policy": "always"
+    },
+    ".opencode/commands/auto.md": {
+      "checksum": "33aa96ee8ea271020fad3d7830d5942854fed38b52b6e429b66c4b1b7ff7464d",
+      "policy": "always"
+    },
+    ".opencode/plugins/autopus-hooks.js": {
+      "checksum": "98efc6610651c75dcc067239c305c0254c11444707e601b56ce4a9fa8655c107",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/branding.md": {
+      "checksum": "f7162fdd9787ada00e3b5dc3552b3394907783b2af32d1008018ce340f9ef178",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/context7-docs.md": {
+      "checksum": "54c7bb62434ddcd67fd2e54367d50a352f18f3fb343e9e0869ef22b81fbc80c3",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/doc-storage.md": {
+      "checksum": "b905caa47ed626ed59396b53e0db08c4f29fd9da5f1b1fb3e64979a4db3bddb7",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/file-size-limit.md": {
+      "checksum": "9c17ace7aa71bb3bb94b89fe45146b946d9622e6c9ae007e23d3a966688ab0f5",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/language-policy.md": {
+      "checksum": "8ea61a09023182b20901b7df7812ba538d1d5b23fcfa4c53bf81a4f7d54a4f63",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/lore-commit.md": {
+      "checksum": "ba68d9ad2f6dc7929c5a9d1f97db3340d382c7a7c9e105d8a00b3b92663c017f",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/objective-reasoning.md": {
+      "checksum": "95d318f64c1f8c7583fa0b437c294b0eb42fc70ce277a38374c773882ac43fdb",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/project-identity.md": {
+      "checksum": "8b603c0818ef40468dd6459926eabfcf998fc332824dfc2c83876acf81caa7fd",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/subagent-delegation.md": {
+      "checksum": "23f9f2cb862f2eead1e5165a52c9543e56aea723fccff6fd4dc27066c5ad1bb8",
+      "policy": "always"
+    },
+    ".opencode/rules/autopus/worktree-safety.md": {
+      "checksum": "e4d2909fb5ee54688d29de59bfd2c7720ffdfe8fdf8cd9bf3114f2350271895a",
+      "policy": "always"
+    },
+    "AGENTS.md": {
+      "checksum": "c561fa9f27ee629c4abe303ea9e25175bef197174ba7840e01402440d3e8df5c",
+      "policy": "marker"
+    },
+    "opencode.json": {
+      "checksum": "1f19d873dbf54ff24c16dbee26c4d58a2c5d1068dd1c86ef4a92de706fe94275",
+      "policy": "merge"
+    }
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "hooks": {
+    "AfterTool": [
+      {
+        "hooks": [
+          {
+            "command": "auto react check --quiet",
+            "timeout": 60,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "command": "auto check --arch --quiet --warn-only",
+            "timeout": 30,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      }
+    ]
+  },
+  "mcpServers": {
+    "context7": {
+      "args": [
+        "-l",
+        "-c",
+        "exec npx -y @upstash/context7-mcp@latest"
+      ],
+      "command": "/bin/bash"
+    },
+    "sequential-thinking": {
+      "args": [
+        "-l",
+        "-c",
+        "exec npx -y @modelcontextprotocol/server-sequential-thinking"
+      ],
+      "command": "/bin/bash"
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(auto *)",
+      "Bash(auto:*)",
+      "Bash(git *)",
+      "Bash(git:*)",
+      "Bash(make:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(sort:*)",
+      "Bash(mkdir:*)",
+      "Bash(echo:*)",
+      "Bash(gh:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "WebSearch",
+      "Agent",
+      "AskUserQuestion",
+      "TaskCreate",
+      "TaskUpdate",
+      "TeamCreate",
+      "SendMessage",
+      "ToolSearch",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(go run:*)",
+      "Bash(go mod:*)",
+      "Bash(go tool:*)",
+      "Bash(go get:*)",
+      "Bash(go install:*)",
+      "Bash(go version:*)",
+      "Bash(go env:*)",
+      "Bash(go clean:*)",
+      "Bash(golangci-lint:*)",
+      "Bash(gofmt:*)"
+    ]
+  }
+}

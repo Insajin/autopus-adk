@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    ".opencode/rules/autopus/branding.md",
+    ".opencode/rules/autopus/context7-docs.md",
+    ".opencode/rules/autopus/doc-storage.md",
+    ".opencode/rules/autopus/file-size-limit.md",
+    ".opencode/rules/autopus/language-policy.md",
+    ".opencode/rules/autopus/lore-commit.md",
+    ".opencode/rules/autopus/objective-reasoning.md",
+    ".opencode/rules/autopus/project-identity.md",
+    ".opencode/rules/autopus/subagent-delegation.md",
+    ".opencode/rules/autopus/worktree-safety.md"
+  ],
+  "plugin": [
+    ".opencode/plugins/autopus-hooks.js"
+  ]
+}

@@ -1,0 +1,38 @@
+---
+description: "버그 수정 — 재현 테스트를 먼저 작성한 뒤 최소 변경으로 수정합니다"
+---
+
+# auto-fix — 버그 수정
+
+## Autopus Branding
+
+When handling this workflow, start the response with the canonical banner from `templates/shared/branding-formats.md.tmpl`:
+
+```text
+🐙 Autopus ─────────────────────────
+```
+
+End the completed response with `🐙`.
+
+
+**프로젝트**: autopus-adk | **모드**: full
+
+## 사용법
+
+버그 설명이나 파일 경로를 인자로 받아 수정합니다.
+
+가능하면 `.agents/skills/auto-fix/SKILL.md` 또는 `@auto fix ...` 라우터의 복구 규칙을 우선합니다.
+
+## 절차
+
+1. 버그 재현 테스트 작성
+2. 테스트 실패 확인
+3. 최소 코드 변경으로 수정
+4. 테스트 통과 확인
+5. 전체 테스트 스위트 실행
+
+## 규칙
+
+- 재현 테스트 없이 수정하지 않음
+- 버그 범위 외 코드 변경 금지
+- 파일 크기 제한: 소스 파일 300줄 이하

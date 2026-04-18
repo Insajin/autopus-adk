@@ -1,0 +1,72 @@
+---
+description: "문서 동기화 — 구현 완료 후 코드와 문서를 동기화합니다"
+---
+
+# auto-sync — 문서 동기화
+
+## Autopus Branding
+
+When handling this workflow, start the response with the canonical banner from `templates/shared/branding-formats.md.tmpl`:
+
+```text
+🐙 Autopus ─────────────────────────
+```
+
+End the completed response with `🐙`.
+
+
+**프로젝트**: autopus-adk | **모드**: full
+
+## 사용법
+
+SPEC-ID를 인자로 받아 문서를 동기화합니다.
+인자 없이 실행 시 전체 프로젝트를 동기화합니다.
+
+## Codex Notes
+
+- 기본 운영 원칙은 `spawn_agent(...)` 기반 subagent-first 입니다.
+- 메인 세션은 동기화 범위 결정, 상태 갱신, 최종 커밋 판단을 담당합니다.
+- 문서 영향 분석과 검증 정리는 필요 시 서브에이전트에 위임합니다.
+- 사용자가 `--auto` 또는 `--solo`를 명시하지 않았고 현재 Codex 런타임 정책이 암묵적 `spawn_agent(...)` 호출을 제한하면, 진행을 멈추고 하네스 기본값과 제약을 설명한 뒤 서브에이전트 opt-in 또는 `--solo` 확인을 먼저 받아야 합니다.
+- 구조 변경이 감지되면 `ARCHITECTURE.md`, `.autopus/project/workspace.md`, 그리고 나머지 `.autopus/project/*` 문서를 함께 갱신해야 합니다.
+- sync 단계에서 @AX lifecycle 관리(TODO cycle, ANCHOR fan-in, orphan NOTE cleanup)를 수행해야 합니다.
+- full 모드에서는 Lore 2-phase commit 규칙을 적용합니다.
+
+## 동기화 항목
+
+1. SPEC 상태 → completed
+2. API 문서 갱신
+3. 아키텍처 다이어그램 업데이트
+4. Lore 의사결정 기록
+5. CHANGELOG 갱신
+6. Lore 형식 자동 커밋
+
+## 품질 게이트
+
+- 에러: 0
+- 경고: 최대 10
+
+## Lore 커밋
+
+동기화 완료 후 Lore 형식으로 자동 커밋합니다.
+- SPEC-ID 있으면: `docs(<scope>): sync SPEC-{ID} 문서 갱신`
+- SPEC-ID 없으면: `docs(sync): 프로젝트 문서 동기화`
+
+
+## Completion Gates
+
+sync 완료를 선언하거나 workflow lifecycle bar를 표시하기 전에 아래 gate를 모두 기록합니다.
+
+1. `Context Load` 수행 결과
+2. `SPEC Path Resolution` 결과 (`SPEC_PATH`, `TARGET_MODULE`, `WORKING_DIR`)
+3. `@AX Lifecycle Management` 결과
+   - 대상 태그가 없으면 반드시 `@AX: no-op`로 남깁니다.
+4. Lore 커밋 결과
+   - 변경 사항이 있으면 commit hash를 남깁니다.
+   - 커밋 실패/보류 시 blocked reason을 남기고 sync completed 선언을 금지합니다.
+5. 2-Phase Commit 판단 결과
+6. 완료 배너/다음 단계 출력은 위 gate를 기록한 뒤에만 수행합니다.
+
+## 다음 단계
+
+동기화 완료 후 배포 검증을 권장합니다: `@auto canary`

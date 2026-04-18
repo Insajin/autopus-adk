@@ -1,0 +1,4 @@
+prompt = """
+Load the autopus skill from .gemini/skills/autopus/auto-fix/SKILL.md and follow its instructions.
+Project: autopus-adk | Mode: full
+"""

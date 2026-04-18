@@ -1,0 +1,2402 @@
+---
+name: auto
+description: Autopus-ADK 메인 명령어 — 개발 워크플로우, 품질 검증, 탐색, 관리 서브커맨드 라우터
+---
+
+# /auto — Autopus-ADK
+
+> 🐙 Autopus v0.4 | autopus-adk | full
+
+At the start of every response, output the following banner:
+
+```
+🐙 Autopus ─────────────────────────
+```
+
+Then continue with the task output. End each subcommand response with `🐙`.
+
+ARGUMENTS: $ARGUMENTS
+
+## Context Load (on every session start)
+
+Before processing any subcommand, load project context by reading these files if they exist:
+
+1. `ARCHITECTURE.md` — architecture map (domains, layers, dependencies)
+2. `.autopus/project/product.md` — project overview, core features
+3. `.autopus/project/structure.md` — directory structure, package roles
+4. `.autopus/project/tech.md` — tech stack, build, testing
+5. `.autopus/project/scenarios.md` — E2E test scenarios (if exists)
+6. `.autopus/project/canary.md` — health check configuration (if exists)
+7. `.autopus/context/signatures.md` — exported API signatures (if exists)
+7. `.autopus/learnings/pipeline.jsonl` — pipeline learning patterns (if exists)
+
+WHEN `.autopus/learnings/pipeline.jsonl` exists AND contains 5+ entries, display a non-intrusive notification after loading context:
+
+```
+💡 학습 패턴 {N}개 — 다음 파이프라인에 자동 반영됩니다
+```
+
+If none of these files exist, display:
+
+```
+No project context documents found. Run `/auto setup` to initialize.
+```
+
+## SPEC Path Resolution
+
+WHEN any subcommand receives a SPEC-ID, resolve the actual file path using this standard procedure:
+
+1. Check `.autopus/specs/{SPEC-ID}/spec.md` (top-level — legacy and cross-module SPECs)
+2. Glob `*/.autopus/specs/{SPEC-ID}/spec.md` (submodule depth 1)
+
+From the resolved path, extract:
+- `SPEC_PATH`: full relative path to spec.md
+- `SPEC_DIR`: SPEC directory path
+- `TARGET_MODULE`: submodule path (or "." if top-level)
+- `WORKING_DIR`: same as TARGET_MODULE — the directory where build/test commands run
+
+Error handling:
+- 0 results → error: "SPEC-{ID} not found. Available SPECs:" then list all found via `*/.autopus/specs/*/spec.md`
+- 2+ results → error: "Duplicate SPEC-{ID} found:" then list each path
+
+All subcommands that reference a SPEC-ID MUST use this resolution procedure instead of hardcoded paths.
+
+## Subcommand Routing
+
+**Strip global flags first** from $ARGUMENTS, then determine the subcommand from the first remaining word.
+
+### Global Flags
+
+| Flag | Description |
+|------|-------------|
+| `--think` | Activate Sequential Thinking MCP for deep analysis mode. Load the `mcp__sequential-thinking__sequentialthinking` tool via ToolSearch, then perform step-by-step reasoning. |
+| `--ultrathink` | Same as `--think` but with higher reasoning effort. |
+| `--auto` | Autonomous mode: skip user confirmations and approval gates. Quality defaults to `autopus.yaml → quality.default` (not hardcoded). |
+| `--loop` | RALF loop mode: auto-retry failed quality gates with extended iteration limits until PASS or circuit break. |
+| `--multi` | Multi-provider mode: activate orchestra engine for reviews and decisions. |
+| `--quality <value>` | Agent quality mode: `ultra` (all agents Opus) or `balanced` (mixed). Overrides `autopus.yaml → quality.default`. |
+
+### Routing Rules
+
+1. **Strip global flags**: Separate `--think`, `--ultrathink`, `--auto`, `--loop`, `--multi`, `--quality <value>`, and other global flags from $ARGUMENTS
+2. **Match subcommand**: Use the first remaining word to determine the subcommand
+3. **Triage-based Smart Routing (natural language → difficulty-aware flow)**:
+   - If the first word does not match a known subcommand and the remaining text has 2+ words:
+   - Execute the **Triage Process** (see below) to assess difficulty and recommend a flow
+   - Route to the recommended flow after user confirmation (or auto-proceed with `--auto`)
+4. **Empty arguments**: Show the subcommand list
+
+### Triage Process
+
+WHEN a natural language request is detected (rule 3 above), THE SYSTEM SHALL assess task difficulty before routing.
+
+#### Step 1: Signal Extraction
+
+Analyze the request text for the following signals:
+
+| Signal | IDEA indicators | LOW indicators | MEDIUM indicators | HIGH indicators |
+|--------|----------------|---------------|-------------------|-----------------|
+| **Change type** | 고민, 생각, idea, brainstorm, 가능할까, 어떻게, 테스트해보고싶어, 탐색, explore | fix, 수정, 고쳐, typo, rename, 오타, 삭제, 로그추가, config | 리팩토링, refactor, 개선, improve, 옵션추가, 확장, extend | 새로운, new, feature, 기능, 모듈, 시스템, 아키텍처, API설계 |
+| **Scope** | unclear or exploratory; no specific file/package | specific file/function mentioned | package/module mentioned | "전체", "모든", multi-domain, cross-cutting |
+| **Verb intensity** | think, consider, wonder, explore, 고민, 검토 | change, update, move, remove | add, enhance, restructure | design, build, create, implement (large scope) |
+
+#### Step 2: Impact Scan (fast, ≤ 5 seconds)
+
+Run a quick codebase scan to validate the heuristic:
+
+1. **Grep** for keywords from the request to estimate affected files
+2. **Glob** for patterns matching the described scope
+3. Count: affected files, affected packages
+
+This step is OPTIONAL if the text-based signals are unambiguous. Skip if `--auto` flag is set.
+
+#### Step 3: Difficulty Classification
+
+| Difficulty | Criteria (ANY of) | Recommended Flow |
+|-----------|-------------------|------------------|
+| **IDEA** | Exploratory question; "고민", "어떻게 하면", "가능할까"; feasibility check; brainstorm; no clear implementation target | `/auto idea "{desc}"` — brainstorm and evaluate |
+| **LOW** | Single file change; bug fix with known location; config/doc edit; ≤ 1 package affected | `/auto fix "{desc}"` — direct fix, no SPEC |
+| **MEDIUM** | 2-3 files; existing feature extension; single-package refactor; test additions | `/auto plan "{desc}" --skip-prd` — SPEC only, no PRD |
+| **HIGH** | 3+ files across packages; new feature/module; API design; architecture change; multi-domain impact | `/auto idea "{desc}" --multi` — multi-provider brainstorm → ICE 검증 → plan 체이닝 |
+| **CRITICAL** | Security vulnerability; urgent production fix | `/auto fix "{desc}"` + recommend `/auto secure` after |
+
+#### Step 4: Triage Display and Confirmation
+
+WHEN `--auto` is NOT set:
+
+1. Display the triage analysis as text:
+
+```
+🐙 Triage ───────────────────────────
+  요청: "{natural language request}"
+
+  분석:
+  - 변경 유형: {bug fix | enhancement | new feature | refactor | config}
+  - 예상 영향: ~{N}개 파일 / {N}개 패키지
+  - 난이도: {LOW | MEDIUM | HIGH | CRITICAL}
+
+  추천: {recommended flow description}
+```
+
+2. Use the `AskUserQuestion` tool to present the selection (do NOT use text-based numbered options):
+
+```
+AskUserQuestion(
+  questions = [{
+    question: "어떤 플로우로 진행할까요?",
+    header: "Triage",
+    multiSelect: false,
+    options: [
+      { label: "아이디어 탐색", description: "/auto idea --multi — 멀티 프로바이더 브레인스토밍 + ICE 검증" },
+      { label: "바로 수정", description: "/auto fix — SPEC 없이 직접 수정" },
+      { label: "SPEC만 생성", description: "/auto plan --skip-prd — PRD 생략, SPEC만 작성" },
+      { label: "PRD + SPEC 전체", description: "/auto plan — PRD 작성 후 SPEC 생성" }
+    ]
+  }]
+)
+```
+
+Adjust the recommended option (add "(Recommended)" suffix) based on the difficulty classification. Place the recommended option FIRST in the options list.
+
+**HIGH difficulty routing**: WHEN difficulty is HIGH, THE SYSTEM SHALL place "아이디어 탐색" as the FIRST option with "(Recommended)" suffix. The rationale: HIGH-impact features should pass through multi-provider brainstorm and ICE validation before committing to a SPEC. This serves as an upstream decision gate — "이게 정말 만들 가치가 있는가?" — preventing premature SPEC creation for ideas that haven't been validated.
+
+WHEN `--auto` IS set, display triage result and auto-proceed:
+
+```
+🐙 Triage ───────────────────────────
+  요청: "{request}"
+  난이도: {level} → {flow} (자동 진행)
+```
+
+**`--auto` HIGH routing**: WHEN `--auto` AND difficulty is HIGH, THE SYSTEM SHALL auto-proceed with `/auto idea "{desc}" --multi --auto` (which auto-chains to `/auto plan --from-idea BS-{ID}` via idea's `--auto` flag). This ensures HIGH-impact features always pass through the upstream decision gate even in autonomous mode.
+
+#### Triage Override
+
+The user can always force a specific flow by using the subcommand directly:
+- `/auto idea "..."` — skip triage, go directly to idea brainstorm
+- `/auto fix "..."` — skip triage, go directly to fix
+- `/auto plan "..."` — skip triage, go directly to plan
+- `/auto plan "..." --skip-prd` — skip triage, plan without PRD
+
+Triage ONLY activates for bare natural language input without a recognized subcommand.
+
+### Subcommand List
+
+When displaying the subcommand list (empty `/auto` invocation), use the categorized format below.
+
+**개발 워크플로우**
+
+| Subcommand | Description |
+|-----------|-------------|
+| idea ⚡ | Brainstorm and evaluate ideas |
+| plan | Write a SPEC |
+| go | Implement a SPEC |
+| sync | Synchronize documentation |
+| fix ⚡ | Fix a bug (no SPEC needed) |
+| dev | Full cycle: plan → go → sync |
+
+**품질 & 리뷰** ⚡ = SPEC 없이 독립 실행 가능
+
+| Subcommand | Description |
+|-----------|-------------|
+| review ⚡ | Code review (TRUST 5 criteria) |
+| spec review | SPEC multi-provider review |
+| secure ⚡ | Security audit (OWASP Top 10) |
+| stale ⚡ | Detect stale decisions |
+| verify ⚡ | Frontend UX verification |
+| browse ⚡ | Browser automation (cmux/agent-browser auto-detect) |
+| test | Run E2E scenarios |
+| canary ⚡ | Post-deploy health check (build + E2E + browser) |
+
+**탐색 & 분석** ⚡ = 독립 실행 가능
+
+| Subcommand | Description |
+|-----------|-------------|
+| map ⚡ | Analyze codebase structure |
+| why ⚡ | Query decision rationale |
+| status ⚡ | SPEC dashboard |
+
+**관리**
+
+| Subcommand | Description |
+|-----------|-------------|
+| setup ⚡ | Generate project context — **첫 사용 시 추천** |
+| init | Initialize harness |
+| update | Update harness |
+| doctor ⚡ | Health diagnostics |
+| platform | Platform management |
+
+> 자연어로 작업을 설명하면 난이도를 자동 분석하여 적절한 플로우를 추천합니다.
+> ⚡ 표시된 커맨드는 SPEC이나 파이프라인 없이 바로 사용할 수 있습니다.
+
+---
+
+## setup — Generate/Update Project Context Documents
+
+Analyze the project's architecture, structure, and tech stack to produce context documents.
+Agents are re-initialized on every session, so these documents provide continuity across sessions.
+
+### Pipeline
+
+#### [REQUIRED] Step 1: Analyze Codebase (MUST call Agent tool)
+
+IMPORTANT: You MUST spawn an Explore agent to analyze the project. Do NOT skip to Step 2 without calling Agent tool.
+
+```
+Agent(
+  subagent_type = "explorer",
+  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
+  prompt = """
+    Explore the full project structure. Return:
+    - Directory layout and package roles
+    - Tech stack (languages, frameworks, build tools)
+    - Entry points and exported APIs
+    - Architecture patterns and domain boundaries
+  """
+)
+```
+
+> **⏭ POST-STEP**: Explorer returned. NEXT REQUIRED STEP: Step 2: Generate ARCHITECTURE.md. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 2: Generate/Update ARCHITECTURE.md
+
+Write or overwrite `ARCHITECTURE.md` based on the explorer's analysis. Include domains, layers, dependency map, and rule violations.
+
+> **⏭ POST-STEP**: ARCHITECTURE.md written. NEXT REQUIRED STEP: Step 3: Generate project docs. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 3: Generate/Update Project Docs
+
+Create or update the 4 files under `.autopus/project/` using the explorer's output:
+- `product.md` — project name, description, core features, use cases, mode
+- `structure.md` — directory structure, package roles, entry points, file stats
+- `tech.md` — tech stack, build, testing, architecture patterns
+
+> **⏭ POST-STEP**: Project docs written. NEXT REQUIRED STEP: Step 4: Generate scenarios.md. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 4: Generate/Update scenarios.md
+
+Analyze codebase to extract user-facing E2E test scenarios (SPEC-E2E-001 R1).
+
+### Output Files
+
+| File | Content |
+|------|---------|
+| `ARCHITECTURE.md` | Domains, layers, dependency map, rule violations |
+| `.autopus/project/product.md` | Project name, description, core features, use cases, mode |
+| `.autopus/project/structure.md` | Directory structure, package roles, entry points, file stats |
+| `.autopus/project/tech.md` | Tech stack, build, testing, architecture patterns |
+| `.autopus/project/scenarios.md` | User-facing E2E test scenarios extracted from the codebase |
+| `.autopus/project/canary.md` | Health check configuration: build, endpoints, browser targets, deploy platform |
+
+### Scenario Generation (Step 4)
+
+Analyze the project codebase to generate `.autopus/project/scenarios.md`.
+
+#### Step 4.1: Detect Project Type
+
+Scan the project root to determine the primary stack. Multiple types can coexist (e.g., Go CLI + API).
+
+| Project Type | Detection Signals | Extraction Target |
+|---|---|---|
+| **Go CLI** | `go.mod` + Cobra imports (`github.com/spf13/cobra`) | Command tree: subcommands, flags, args |
+| **Go API** | `go.mod` + HTTP handler patterns (`http.HandleFunc`, `gin.Engine`, `chi.Router`, `echo.New`) | Routes: method, path, handler name |
+| **Python CLI** | `setup.py`/`pyproject.toml` + `argparse`/`click`/`typer` imports | CLI commands, arguments, options |
+| **Python API** | `requirements.txt`/`pyproject.toml` + `flask`/`fastapi`/`django` imports | Routes: method, path, handler |
+| **Node.js API** | `package.json` + `express`/`fastify`/`nestjs`/`hono` imports | Routes: method, path, handler |
+| **Frontend** | `package.json` + `react`/`vue`/`svelte`/`next`/`nuxt` deps | Pages/routes, key user interactions |
+| **Library** | No CLI/API/Frontend signals detected | Exported public API functions |
+
+If no signals match, default to **Library** type with minimal scenarios.
+
+#### Template Selection
+
+| Project Type | Template |
+|---|---|
+| Go CLI, Python CLI, Node CLI | `templates/shared/scenarios-cli.md.tmpl` |
+| Go API, Python API, Node.js API | `templates/shared/scenarios-api.md.tmpl` |
+| Frontend | `templates/shared/scenarios-frontend.md.tmpl` |
+| Library | `templates/shared/scenarios-library.md.tmpl` |
+
+For mixed types (e.g., CLI + API), use the primary type's template and append scenarios from the secondary type below.
+
+#### Step 4.2: Extract Scenarios
+
+For each detected project type, the agent analyzes the codebase directly to extract user-facing scenarios.
+
+**Go CLI** (has Go extractor: `pkg/e2e/extract_cobra.go` → `ExtractCobra()`):
+- Parse Cobra command tree to extract subcommands, flags, and expected behavior
+- Generate one scenario per subcommand (happy path + error case)
+
+**All other types** (agent-driven extraction):
+- Read entry point files (routes, handlers, pages, CLI definitions)
+- For each entry point, generate a scenario with:
+  - **Command/Action**: What the user does (CLI command, HTTP request, page navigation)
+  - **Precondition**: Required state, env vars, auth tokens, seed data
+  - **Expected result**: Status code, output, page state
+  - **Verify**: Appropriate verification primitives
+
+**Verification primitives by type:**
+
+| Type | Primitives |
+|---|---|
+| CLI | `exit_code(N)`, `stdout_contains(str)`, `stderr_empty()`, `file_exists(path)`, `file_contains(path, str)` |
+| API | `status_code(N)`, `json_path(path, value)`, `header_contains(key, str)`, `response_time_ms(N)` |
+| Frontend | `page_title(str)`, `element_visible(selector)`, `element_text(selector, str)`, `url_matches(pattern)` |
+
+#### Step 4.3: Render scenarios.md
+
+Use the structured format:
+
+```markdown
+# E2E Scenarios — {ProjectName}
+
+> Auto-generated by `/auto setup`. Updated by `/auto sync`.
+
+## Project Type: {CLI | API | Frontend | Library | CLI+API | ...}
+## Binary: {binary name or N/A}
+## Build: {build command or N/A}
+
+### S1: {id} — {description}
+- **Command**: {command or action}
+- **Precondition**: {required state}
+- **Env**: {KEY=value or N/A}
+- **Expect**: {expected result}
+- **Verify**: {primitive1}, {primitive2}
+- **Depends**: {S{N} or N/A}
+- **Status**: active
+```
+
+Reference implementation: `pkg/setup/scenarios.go` → `generateScenarios()`, `pkg/e2e/scenario.go` → `RenderScenarios()`
+
+### Execution
+
+The agent explores and analyzes the codebase directly:
+
+1. Read and analyze project manifest (`go.mod`, `package.json`, `pyproject.toml`, etc.) and source files
+2. Detect project type(s) using Step 4.1 signals
+3. Overwrite existing files to reflect the current code state
+4. Auto-create `.autopus/project/` directory if it does not exist
+5. Extract E2E scenarios per detected project type (Step 4.2) and write `scenarios.md` (Step 4.3)
+
+> **⏭ POST-STEP**: scenarios.md written. NEXT REQUIRED STEP: Step 5: Generate canary.md. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 5: Generate/Update canary.md
+
+Analyze the project to auto-generate `.autopus/project/canary.md` — the canary health check configuration.
+
+##### Step 5.1: Detect Deploy & Health Signals
+
+Scan the project for deployment and health check signals:
+
+| Signal Source | What to Extract |
+|---------------|-----------------|
+| `Dockerfile`, `docker-compose.yml` | Exposed ports, HEALTHCHECK directive, service names |
+| `railway.json`, `vercel.json`, `fly.toml`, `render.yaml` | Deploy platform, build command, start command |
+| `k8s/`, `helm/` directories | readinessProbe/livenessProbe paths and ports |
+| `.github/workflows/`, `.gitlab-ci.yml` | CI/CD pipeline, deploy targets, environment URLs |
+| HTTP handler patterns in source code | Health/status endpoints (e.g., `/health`, `/api/status`, `/readyz`) |
+| `package.json` scripts | `start`, `build`, `dev` commands, port configuration |
+| `nginx.conf`, `Caddyfile` | Reverse proxy config, served paths |
+| Frontend router (`app/`, `pages/`) | Key user-facing pages for browser health checks |
+
+##### Step 5.2: Render canary.md
+
+```markdown
+# Canary Configuration — {ProjectName}
+
+> Auto-generated by `/auto setup`. Updated by `/auto sync`.
+
+## Project Type: {detected type}
+## Build: {build command}
+## Deploy Platform: {platform or "unknown"}
+
+### Health Checks
+
+| ID | Type | Target | Expect | Timeout |
+|----|------|--------|--------|---------|
+| H1 | build | `{build command}` | exit 0 | 60s |
+| H2 | endpoint | `GET {health path}` | status 200 | 5s |
+| ... | browser | `{page path}` | no console errors | 10s |
+
+### Detection Sources
+- Build: {source}
+- Health endpoint: {source}
+- Browser targets: {source}
+- Deploy platform: {source}
+```
+
+If no deploy signals are detected, generate a minimal canary.md with build-only health check.
+
+Usage: `/auto setup`
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying the completion message, verify ALL steps were executed:
+
+- [ ] Step 1: Explore agent called — codebase analyzed
+- [ ] Step 2: ARCHITECTURE.md written/updated
+- [ ] Step 3: `.autopus/project/` docs written (product.md, structure.md, tech.md)
+- [ ] Step 4: scenarios.md written
+- [ ] Step 5: canary.md written
+
+IF any item is unchecked → return to that step. Do NOT display Completion Message.
+
+### Completion Message
+
+```
+Project context documents have been generated/updated.
+- ARCHITECTURE.md
+- .autopus/project/product.md
+- .autopus/project/structure.md
+- .autopus/project/tech.md
+- .autopus/project/scenarios.md (E2E test scenarios)
+- .autopus/project/canary.md (health check configuration)
+Context will be loaded automatically on the next session.
+```
+
+### [REQUIRED] First Win Guidance (Post-Completion)
+
+AFTER the completion message, THE SYSTEM SHALL display project-state-aware "next action" recommendations to help the user experience immediate value. Analyze the generated context docs and current project state:
+
+```
+🐙 바로 해볼 수 있는 것 ──────────────
+```
+
+**Recommendation logic:**
+
+1. **Always show** (파이프라인 불필요, 독립 실행):
+   - `/auto review` — "현재 코드의 품질을 TRUST 5 기준으로 검토"
+   - `/auto secure` — "보안 취약점 스캔 (OWASP Top 10)"
+   - `/auto map` — "코드베이스 구조 및 의존성 시각화"
+
+2. **Show if issues detected** (setup 분석 중 발견된 경우):
+   - Test coverage gaps → `/auto fix "테스트 커버리지 개선"`
+   - Stale patterns → `/auto stale`
+
+3. **Show if idea-stage** (새 프로젝트 or 빈 SPEC):
+   - `/auto idea "..." --multi` — "새 기능 아이디어를 멀티 프로바이더로 브레인스토밍"
+
+4. **Show if SPECs exist** (기존 프로젝트):
+   - `/auto status` — "SPEC 현황 대시보드"
+   - `/auto go {SPEC-ID}` — "대기 중인 SPEC 구현 시작"
+
+Display max 3 recommendations, most relevant first. Each with a one-line description of what the user will get.
+
+**Rationale**: Setup alone produces documents (indirect value). The First Win guidance bridges to actions that deliver direct value — a reviewed codebase, a discovered vulnerability, a visualized architecture. This turns "문서가 생겼다" into "이걸로 바로 뭔가 할 수 있구나".
+
+---
+
+## idea — Brainstorm and Evaluate Ideas
+
+@.gemini/skills/autopus/idea.md
+
+Brainstorm ideas using multi-provider orchestra, evaluate with ICE scoring, and save as BS file.
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--strategy` | Orchestra strategy: debate (default), consensus, pipeline, fastest |
+| `--providers` | Provider list override (default: all configured) |
+
+Global flags `--auto` and `--multi` also apply:
+- `--auto` → auto-chain to `/auto plan --from-idea BS-{ID}` after completion
+- `--multi` → always active for idea (orchestra is the default engine)
+
+Usage: `/auto idea "description"`, `/auto idea "description" --strategy consensus`, `/auto idea "description" --auto`
+
+### Pipeline
+
+#### [REQUIRED] Step 1: Parse Input
+
+Extract from remaining arguments (after global flag stripping):
+- First quoted or remaining text → `IDEA_DESC`
+- `--strategy <value>` → `STRATEGY` (default: debate)
+- `--providers <list>` → `PROVIDERS` (default: all)
+- `AUTO_MODE` inherited from global `--auto`
+
+#### [REQUIRED] Step 2: Structure as What/Why/Who/When
+
+Analyze the idea description and structure it:
+- **What**: What to build?
+- **Why**: Why is it needed? (problem/opportunity)
+- **Who**: Who is it for?
+- **When**: When is it needed? (timeline/context)
+
+#### [REQUIRED] Step 3: Call Orchestra Brainstorm (MUST call Bash tool)
+
+IMPORTANT: You MUST execute this step via the Bash tool. Do NOT skip to Step 4 or fall back without attempting.
+
+```bash
+auto orchestra brainstorm "{structured idea}" --strategy {STRATEGY}
+```
+
+- `--multi` flag is ALWAYS active for idea — orchestra is the default engine
+- `--ultrathink` combines with orchestra: run orchestra first, then use Sequential Thinking to deepen the judge's analysis
+
+**Fallback rule**: Only if the Bash call returns an error (binary not found, provider config missing, etc.):
+1. Display the exact error message to the user
+2. Ask: "Orchestra 실행 실패. Sequential Thinking으로 fallback할까요?"
+3. If user approves (or `--auto` mode), proceed with Sequential Thinking as fallback
+4. Mark the BS file with `**Providers**: fallback (orchestra unavailable)`
+
+> **⏭ POST-STEP**: Orchestra returned. NEXT REQUIRED STEP: Step 4: ICE Scoring. Do NOT skip to Step 5.
+
+#### [REQUIRED] Step 4: ICE Scoring
+
+Score each idea from the brainstorm output:
+- **Impact** (1-10): How much value does it deliver?
+- **Confidence** (1-10): How certain are we it will work?
+- **Ease** (1-10): How easy is it to implement?
+
+`Score = (Impact × Confidence × Ease) / 100`
+
+Select top N ideas by score.
+
+#### [REQUIRED] Pre-Completion Verification
+
+Before saving BS file, verify ALL steps were executed:
+
+- [ ] Step 1: Parse Input — completed
+- [ ] Step 2: Structure as What/Why/Who/When — completed
+- [ ] Step 3: Orchestra Brainstorm — Bash tool called (or fallback approved by user)
+- [ ] Step 4: ICE Scoring — completed with orchestra output (not self-generated)
+
+IF any item is unchecked → return to that step. Do NOT proceed to Step 5.
+
+#### [REQUIRED] Step 5: Save BS File and Guide Next Steps
+
+Save to `.autopus/brainstorms/BS-{ID}.md` (auto-increment ID if exists).
+
+Display workflow lifecycle bar:
+
+```
+🐙 Workflow: BS-{ID}
+  ● idea  →  ○ plan  →  ○ go  →  ○ sync
+```
+
+If `AUTO_MODE = true`, auto-chain:
+```
+다음 단계: /auto plan --from-idea BS-{ID} (자동 진행)
+```
+
+Otherwise:
+```
+다음 단계: /auto plan --from-idea BS-{ID} "feature description"
+```
+
+---
+
+## plan — Write a SPEC
+
+@.gemini/skills/autopus/planning.md
+
+Write a SPEC document. Delegate to the `spec-writer` agent to analyze the codebase and produce 4 SPEC files.
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--from-idea <BS-ID>` | Create SPEC from a brainstorm file. Loads `.autopus/brainstorms/BS-{ID}.md` as context for the spec-writer. |
+| `--skip-prd` | Skip PRD generation and go straight to SPEC. Recommended for MEDIUM difficulty tasks. |
+| `--prd-mode <mode>` | PRD mode: `standard` (10 sections, default for HIGH) or `minimal` (5 sections). |
+| `--strategy` | Multi-provider strategy: consensus (default), debate, pipeline, fastest (requires `--multi`) |
+| `--target <module>` | Target submodule for SPEC storage (e.g., `autopus-adk`). Auto-detected if omitted. |
+
+Global flags `--auto` and `--multi` also apply:
+- `--auto` → skip confirmations
+- `--multi` → enable multi-provider review after SPEC generation
+
+Usage: `/auto plan "feature description"`, `/auto plan --from-idea BS-001`, `/auto plan "feature" --skip-prd`, `/auto plan "feature" --prd-mode minimal`, `/auto plan "feature" --multi --strategy debate`
+
+### Pipeline (execute in this exact order)
+
+#### [REQUIRED] Step 1: Parse Flags
+
+Global flags (`--auto`, `--loop`, `--multi`, `--quality`) are already stripped. Extract plan-specific flags:
+- Extract `--from-idea <BS-ID>` → `FROM_IDEA = BS-ID` (load brainstorm context)
+- Extract `--skip-prd` → `SKIP_PRD = true/false` (default: false)
+- Extract `--prd-mode <value>` → `PRD_MODE = value` (default: standard)
+- Extract `--strategy <value>` → `STRATEGY = value` (default: consensus)
+- Extract `--target <module>` → `TARGET_MODULE` (auto-detect if omitted)
+- `MULTI_FLAG` ← inherited from global `--multi`
+- Remaining text → `FEATURE_DESC`
+
+#### [CONDITIONAL] Step 1.5: Generate PRD
+
+@.gemini/skills/autopus/prd.md
+
+```
+┌─────────────────────────────────────────────┐
+│ SKIP_PRD == true?                           │
+├──────────┬──────────────────────────────────┤
+│ TRUE     │ FALSE                            │
+│ ↓        │ ↓                                │
+│ Step 2   │ Generate PRD, then Step 2        │
+│ [SKIP]   │                                  │
+└──────────┴──────────────────────────────────┘
+```
+
+WHEN `SKIP_PRD = false`, THE SYSTEM SHALL generate a PRD before spawning the spec-writer:
+
+1. **Determine PRD mode**: Use `PRD_MODE` (default: `standard`). If `--prd-mode` is not set, auto-select based on scope:
+   - Single package / small change → `minimal` (5 sections)
+   - Multi-package / new feature / API design → `standard` (10 sections)
+
+2. **Spawn planner agent** to generate the PRD:
+
+```
+Agent(
+  subagent_type = "planner",
+  prompt = """
+    Phase: PRD Generation (Step 1.5)
+    Feature description: {FEATURE_DESC}
+    Target module: {TARGET_MODULE or auto-detect}
+    PRD mode: {PRD_MODE}
+    Template: templates/shared/prd-{PRD_MODE}.md.tmpl
+    Brainstorm context: {BS file content if FROM_IDEA is set, otherwise omit}
+
+    Generate a PRD following the prd skill (prd.md):
+    1. Analyze the request (What/Why/Who/When)
+    2. Collect codebase context (related files, existing patterns, prior SPECs)
+    3. Author PRD sections using the {PRD_MODE} template
+    4. Run quality validation checklist
+    5. Save to {TARGET_MODULE}/.autopus/specs/SPEC-{ID}/prd.md
+
+    Return: SPEC-ID, PRD file path, and quality checklist result.
+  """
+)
+```
+
+3. **Extract SPEC-ID** from the planner's output. This SPEC-ID will be reused by the spec-writer in Step 2.
+
+WHEN `SKIP_PRD = true` → [INTENDED SKIP: Step 1.5]. Proceed directly to Step 2.
+
+> **⏭ POST-STEP**: PRD generated (or skipped). NEXT REQUIRED STEP: Step 2: Spawn spec-writer Agent. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 2: Spawn spec-writer Agent
+
+If `FROM_IDEA` is set, search for the BS file: check `.autopus/brainstorms/BS-{FROM_IDEA}.md` (top-level) then `*/.autopus/brainstorms/BS-{FROM_IDEA}.md` (submodules). Include its content as brainstorm context.
+
+If Step 1.5 generated a PRD, include the PRD file path and SPEC-ID as context for the spec-writer.
+
+Spawn a `spec-writer` agent to generate the SPEC:
+
+```
+Agent(
+  subagent_type = "spec-writer",
+  prompt = """
+    Feature description: {FEATURE_DESC}
+    Target module: {TARGET_MODULE or auto-detect}
+    Project directory: {current directory}
+    Brainstorm context: {BS file content if FROM_IDEA is set, otherwise omit}
+    PRD context: {PRD file path and SPEC-ID if Step 1.5 was executed, otherwise omit}
+  """
+)
+```
+
+Extract the **SPEC-ID** (e.g., SPEC-UX-001) from the agent's output. If Step 1.5 already created a SPEC-ID, the spec-writer MUST reuse the same SPEC-ID.
+
+> **⏭ POST-AGENT**: spec-writer returned. NEXT REQUIRED STEP: [CONDITIONAL] Step 3: Review Gate Decision. Do NOT skip to Completion.
+
+#### [CONDITIONAL] Step 3: Review Gate Decision
+
+```
+┌─────────────────────────────────────────────┐
+│ MULTI_FLAG == true                          │
+│   OR autopus.yaml → review_gate.enabled?    │
+├──────────┬──────────────────────────────────┤
+│ TRUE     │ FALSE                            │
+│ ↓        │ ↓                                │
+│ Step 4   │ Step 5 [INTENDED SKIP: Step 4]   │
+└──────────┴──────────────────────────────────┘
+```
+
+**How to check:**
+- Run `cat autopus.yaml | grep -A2 "review_gate"` via Bash to check the enabled value
+- Or Read `autopus.yaml` directly
+
+#### [CONDITIONAL] Step 4: Run Multi-Provider Review
+
+Run the `auto spec review` CLI command via the Bash tool:
+
+```bash
+auto spec review {SPEC-ID} --strategy {STRATEGY}
+```
+
+**Handling results:**
+- **PASS** → Update Status in the resolved SPEC_PATH to `approved` (use Edit tool)
+- **REVISE** → Print finding list, apply fixes, and re-run review (up to 2 iterations)
+- **REJECT** → Print finding list and guide the user to redesign
+
+**Fallback:**
+- If `auto spec review` fails (provider not installed, etc.):
+  - Print warning: "Multi-provider review could not be executed. Please check your provider configuration."
+  - Keep Status as `draft`
+  - Proceed to Step 5
+
+#### [REQUIRED] Pre-Completion Verification
+
+Before displaying completion output, verify ALL steps were evaluated:
+
+- [ ] Step 1: Parse Flags — completed
+- [ ] Step 1.5: Generate PRD — completed OR [INTENDED SKIP: --skip-prd]
+- [ ] Step 2: Spawn spec-writer Agent — completed, SPEC-ID extracted
+- [ ] Step 3: Review Gate Decision — evaluated (result: Step 4 or INTENDED SKIP)
+- [ ] Step 4: Multi-Provider Review — completed OR [INTENDED SKIP]
+
+IF any item is unchecked → return to that step. Do NOT display Completion Guidance.
+
+#### [REQUIRED] Step 5: Completion Guidance
+
+Display the workflow lifecycle bar:
+
+```
+🐙 Workflow: {SPEC-ID}
+  ● plan  →  ○ go  →  ○ sync
+```
+
+Then show state-aware next step guidance:
+
+- If Status is `approved`:
+  ```
+  ✓ SPEC {SPEC-ID} approved
+  다음 단계: /auto go {SPEC-ID}
+  ```
+- If Status is `draft` (review skipped or not run):
+  ```
+  SPEC {SPEC-ID} 생성됨 (status: draft)
+  다음 단계: /auto go {SPEC-ID}
+  리뷰 실행: /auto spec review {SPEC-ID}
+  ```
+
+After displaying, also show agent result summary:
+
+```
+🐙 spec-writer ──────────────────────
+  SPEC: {SPEC-ID} | 파일: 4개 | 요구사항: {N}개
+  다음: /auto go {SPEC-ID}
+```
+
+---
+
+## go — Implement a SPEC
+
+@.gemini/skills/autopus/tdd.md
+@.gemini/skills/autopus/agent-pipeline.md
+@.gemini/skills/autopus/worktree-isolation.md
+
+Implement code based on a SPEC document. Follows TDD methodology.
+
+### Step 0: Parse Flags (REQUIRED — do this FIRST)
+
+IMPORTANT: You MUST parse these flags from $ARGUMENTS before any other action.
+
+Global flags (`--auto`, `--loop`, `--multi`, `--quality`) are already stripped. Extract the remaining go-specific flags:
+- `--team` → `TEAMS_MODE = true/false` (Agent Teams)
+- `--solo` → `SOLO_MODE = true/false` (single session, no subagents)
+- `--strategy <value>` → `STRATEGY = value`
+- `--continue` → `CONTINUE_MODE = true/false`
+- `--skip-scaffold` → `SKIP_SCAFFOLD = true/false`
+- Remaining text (non-flag word) → `SPEC_ID`
+
+Inherit from global flags:
+- `AUTO_MODE` ← `--auto`
+- `LOOP_MODE` ← `--loop`
+- `MULTI_MODE` ← `--multi`
+- `QUALITY` ← `--quality`
+
+Determine execution mode:
+- `TEAMS_MODE = true` → Agent Teams mode
+- `SOLO_MODE = true` → Single session mode
+- Otherwise → **Subagent pipeline** (default)
+
+After parsing, display the detected configuration:
+
+```
+Mode: {subagent | teams | teams+multi | solo}
+SPEC: {SPEC_ID}
+Target: {TARGET_MODULE}
+Quality: {ultra | balanced | pending selection}
+```
+
+### Step 1: Load SPEC
+
+Run SPEC Path Resolution for {SPEC_ID}. Load the resolved SPEC_PATH and check status. Extract TARGET_MODULE and WORKING_DIR for subsequent phases.
+
+**Draft Guard**: If status is "draft" and review_gate is enabled, refuse implementation and prompt:
+```
+SPEC {SPEC_ID} is in draft status. Run review first: /auto spec review {SPEC_ID}
+```
+
+### Step 2: Route to Pipeline
+
+Route based on the execution mode determined in Step 0.
+
+#### Route A: Subagent Pipeline (default, no --team, no --solo)
+
+IMPORTANT: This is the DEFAULT route. It REQUIRES spawning subagents using the Agent tool. Each Phase below MUST use an Agent() call — do NOT implement these phases yourself in the main session.
+
+For parallel tasks, include `isolation: "worktree"` in Agent() calls to enable worktree isolation.
+
+#### Route B: Agent Teams (`--team`)
+
+IMPORTANT: This route uses Gemini CLI Agent Teams (experimental). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+
+If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is not set, abort with:
+```
+Agent Teams requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1. Use default mode (subagent) instead.
+```
+
+Use TeamCreate to create a team, then spawn specialized teammates using `Agent(subagent_type=..., team_name=..., name=...)`. Each teammate loads its agent definition from `.gemini/agents/autopus/`, inheriting tools, skills, model, and domain expertise. Teammates communicate directly via SendMessage.
+
+Team composition — each member maps 1:1 to a specialized agent definition:
+
+**Core members (always spawned):**
+| Name | subagent_type | Agent Definition | Phase |
+|------|---------------|------------------|-------|
+| `lead` | `planner` | planner.md | Phase 1, coordination |
+| `builder-1` | `executor` | executor.md | Phase 2 |
+| `tester` | `tester` | tester.md | Phase 1.5, Phase 3 |
+| `guardian` | `validator` | validator.md | Gate 2 |
+
+**Phase-dependent members (spawned when needed):**
+| Name | subagent_type | Agent Definition | Condition |
+|------|---------------|------------------|-----------|
+| `builder-2` | `executor` | executor.md | 2+ parallel tasks |
+| `annotator` | `annotator` | annotator.md | Phase 2.5 |
+| `auditor` | `security-auditor` | security-auditor.md | Phase 4 |
+| `reviewer` | `reviewer` | reviewer.md | Phase 4 |
+
+Quality Mode applies to execution profile selection: Ultra forces the premium path for all builders. Balanced keeps per-role defaults, and Adaptive Quality only escalates HIGH-complexity tasks. LOW-complexity work stays on the standard path in this workspace.
+
+Reference: `.gemini/skills/autopus/agent-teams.md`
+
+The pipeline phases are the same as Route A, but orchestrated through Agent Teams instead of individual Agent() calls. Worktree safety rules R1-R5 apply equally — each builder teammate works in an independent worktree. See @.gemini/skills/autopus/worktree-isolation.md and `.gemini/rules/autopus/worktree-safety.md`.
+
+#### Route C: Single Session (`--solo`)
+
+1. **TDD Implementation**: Execute RED → GREEN → REFACTOR based on tasks in plan.md
+2. **Post-Implementation**: Validate against acceptance.md criteria and update status to done
+
+#### Subagent Pipeline Phases (Route A)
+
+```
+Phase 0.5: Permission    → detect      (auto permission detect)
+Phase 1: Planning        → planner     (mode: plan)
+Phase 1.5: Test Scaffold → tester      (mode: bypassPermissions) — skip if --skip-scaffold
+Gate 1:  Approval        → skip if AUTO_MODE
+Phase 1.8: Doc Fetch     → main session (Context7 MCP) — skip if no external libs detected
+Phase 2: Implementation  → executor×N  (mode: bypassPermissions, parallel with worktree isolation)
+Phase 2.1: Worktree Merge → main session (merge worktree branches into working branch)
+Gate 2:  Validation      → validator   (mode: plan)  — retry up to 3× on FAIL
+Phase 2.5: Annotation    → annotator   (mode: bypassPermissions) — @AX tags on modified files
+Phase 3: Testing         → tester      (mode: bypassPermissions)
+Gate 3:  Coverage        → verify 85%+ coverage
+Phase 4: Review          → reviewer + security-auditor (parallel, mode: plan)  — retry up to 2× on REQUEST_CHANGES
+```
+
+### Retry Limits Reference
+
+| Gate / Phase | Max Retries | With --loop | On Exceeded |
+|-------------|-------------|-------------|-------------|
+| Gate 1: Approval | skip if AUTO_MODE | skip if AUTO_MODE | N/A |
+| Gate 2: Validation | 3 | 5 | Abort, guide: `--continue` |
+| Gate 3: Coverage | re-spawn tester | 3 retries | Until 85%+ / circuit break |
+| Phase 4: Review | 2 | 3 | Abort, request user intervention |
+
+### RALF Loop Protocol
+
+WHEN `LOOP_MODE = true`, the pipeline applies the RALF (RED-GREEN-REFACTOR-LOOP) cycle at each quality gate:
+
+```
+RALF Loop (per Phase):
+  ┌─→ RED    : Phase 실행 (구현/테스트/리뷰)
+  │   GREEN  : Gate 검증 (PASS/FAIL 판정)
+  │   REFACTOR: FAIL 시 이슈 수정 에이전트 스폰
+  └── LOOP   : Gate PASS까지 반복 (circuit breaker 적용)
+```
+
+#### Iteration Limits
+
+| Gate / Phase | Without --loop | With --loop |
+|-------------|---------------|-------------|
+| Gate 2 (Validation) | 3 retries | 5 retries |
+| Gate 3 (Coverage) | 1 retry | 3 retries |
+| Phase 4 (Review) | 2 retries | 3 retries |
+
+WHERE `LOOP_MODE = false`, existing retry limits apply with no behavioral change (R8 backward compatibility).
+
+#### Circuit Breaker
+
+WHILE `LOOP_MODE = true`, THE SYSTEM SHALL track consecutive no-progress iterations per Phase:
+- Progress is measured by: issue count, coverage %, review issue count
+- WHERE 3 consecutive iterations produce no new commits or file changes, THE SYSTEM SHALL break the loop
+- On circuit break: log stuck state, display remaining issues, suggest recovery options
+
+#### Progress Detection
+
+WHEN each RALF iteration completes, THE SYSTEM SHALL compare current state against previous iteration:
+- Issue count: decreased = progress
+- Coverage %: increased = progress
+- Review issues: decreased = progress
+- WHERE no measurable improvement for 3 consecutive iterations → circuit breaker triggers
+
+#### Escalation on Circuit Break
+
+WHEN circuit breaker triggers, THE SYSTEM SHALL display:
+
+```
+🐙 RALF [CIRCUIT BREAK] ──────────────
+  Phase: {phase} | Iteration: {N}/{max}
+  Stuck: 3 consecutive iterations with no progress
+  Remaining Issues:
+  - {issue list}
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (수정 후 재개)
+  2. /auto fix "{specific issue}"   (개별 이슈 수정)
+```
+
+#### Flag Combination Matrix
+
+| Flags | Gate 1 (Approval) | Gates 2-4 |
+|-------|-------------------|-----------|
+| (none) | User approval | Retry with default limits, stop |
+| --auto | Skip | Retry with default limits, stop |
+| --loop | User approval | RALF loop with extended limits |
+| --auto --loop | Skip | RALF loop with extended limits (완전 자율) |
+
+#### RALF Iteration Display
+
+WHEN `LOOP_MODE = true` AND a retry iteration occurs, THE SYSTEM SHALL display:
+
+```
+🐙 RALF [{phase}] ──────────────────
+  Iteration: {N}/{max} | Issues: {before} → {after}
+  Progress: {description}
+  Status: {RETRY | PASS | CIRCUIT_BREAK}
+```
+
+**Step 2.1: Determine Quality Mode**
+
+Priority order:
+1. If `QUALITY` is set via `--quality` flag → use it. If invalid value, print error and stop.
+2. Read `autopus.yaml` → `quality.default` → use as default (applies to both `--auto` and interactive modes)
+3. If `AUTO_MODE = true` and no default found → fallback to "balanced"
+4. Otherwise → show interactive selection UI with `quality.default` pre-selected
+
+**Reading quality.default**: Use Bash tool to extract: `grep '^quality:' -A1 autopus.yaml | grep 'default:' | awk '{print $2}'` or Read autopus.yaml directly and parse the `quality.default` field.
+
+Quality mode determines the execution profile in Agent() calls:
+- **Ultra**: force the premium path for every agent
+- **Balanced**: omit explicit overrides and rely on each agent's default profile
+
+Display after determination:
+```
+품질 모드: {Ultra | Balanced} — {description}
+```
+
+**[REQUIRED] Step 0.5: Detect Permission Mode**
+
+```bash
+PERMISSION_MODE=$(auto permission detect)
+```
+
+If the command fails or is unavailable, default to `PERMISSION_MODE="safe"`.
+
+Display: `권한 모드: {bypass | safe}`
+
+**[REQUIRED] Phase 0.8 — Learning Injection (R6)**
+
+WHEN `.autopus/learnings/pipeline.jsonl` exists, THE SYSTEM SHALL query for entries matching the current SPEC's file paths, packages, or domain keywords:
+
+```bash
+auto learn query --spec {SPEC_ID} --limit 5 --format prompt
+```
+
+If the command fails or is unavailable, read `.autopus/learnings/pipeline.jsonl` directly, parse JSON entries, and match by:
+1. File paths referenced in plan.md tasks
+2. Package names from SPEC requirements
+3. Domain keywords from SPEC title
+
+Inject the top 5 matching entries (max 2000 tokens) into the planner prompt as a `## Previous Learnings` section. Display:
+
+```
+💡 관련 학습 패턴 {N}개 주입됨
+```
+
+Skip silently if no matching entries or file doesn't exist.
+
+**[REQUIRED] Phase 1 — Planning (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "planner",
+  model = "opus",          ← Ultra only; omit for Balanced
+  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
+  prompt = """
+    SPEC file: {SPEC_PATH}
+    Plan file: {SPEC_DIR}/plan.md
+    Working directory: {WORKING_DIR}
+
+    Decompose the SPEC into implementation tasks.
+    Return an agent assignment table:
+    | Task ID | Description | Agent    | Mode       | File Ownership  |
+    |---------|-------------|----------|------------|-----------------|
+    | T1      | ...         | executor | parallel   | pkg/foo/*.go    |
+    | T2      | ...         | executor | sequential | pkg/foo/*.go    |
+  """
+)
+```
+
+Display progress after completion:
+```
+🐙 Pipeline ─────────────────────────
+  ✓ Phase 1: Planning
+  → Phase 2: Implementation [0/N tasks]
+  ○ Phase 3: Testing
+  ○ Phase 4: Review
+```
+
+> **⏭ POST-AGENT**: planner returned. NEXT REQUIRED STEP: Phase 1.5: Test Scaffold. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 1.5 — Test Scaffold (MUST call Agent tool)**
+
+WHEN `SKIP_SCAFFOLD = false`:
+```
+Agent(
+  subagent_type = "tester",
+  mode = "bypassPermissions",
+  prompt = """
+    Phase: Test Scaffold (Phase 1.5)
+    SPEC file: {SPEC_PATH}
+    Create failing test skeletons for P0/P1 requirements.
+    All tests MUST FAIL. Report any passing tests.
+  """
+)
+```
+
+WHEN `SKIP_SCAFFOLD = true` → [INTENDED SKIP: Phase 1.5]
+
+> **⏭ POST-AGENT**: tester (scaffold) returned. NEXT REQUIRED STEP: Gate 1: Approval. Do NOT skip to Completion.
+
+**[GATE] Gate 1: Approval** — If `AUTO_MODE = false`, show the planner's assignment table and ask user to approve before proceeding. If `AUTO_MODE = true` → [INTENDED SKIP: Gate 1]
+
+**[REQUIRED] Phase 1.8 — Doc Fetch (Context7 MCP)**
+
+WHEN Gate 1 completes (or is skipped), THE SYSTEM SHALL fetch latest documentation for external libraries referenced in the SPEC using Context7 MCP. This phase runs in the **main session** — subagents cannot access MCP tools.
+
+1. **Detect technologies**: Scan SPEC requirements, plan.md tasks, and file imports for external library names (skip standard library modules)
+2. **Fetch docs** (up to 5 libraries): Call `mcp__context7__resolve-library-id` → `mcp__context7__query-docs` for each detected library
+3. **Cache and prepare**: Adaptive token budget (1 lib→~5000, 2→~3000, 3→~2500, 4-5→~2000 tokens/lib), format as `## Reference Documentation` section
+4. **Skip condition**: If no external libraries detected, skip Phase 1.8 entirely
+
+Error handling: Log and skip on any Context7 failure — documentation is supplementary, never blocks the pipeline.
+
+Ref: `.gemini/rules/autopus/context7-docs.md` for full detection heuristics, token limits, and anti-patterns.
+
+> **⏭ POST-PHASE**: Doc Fetch complete (or skipped). NEXT REQUIRED STEP: Phase 2: Implementation. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 2 — Implementation (MUST call Agent tool)**
+
+For each task in the planner's assignment table, spawn executor agents:
+
+**GC Suppression**: During parallel worktree execution, all git commands MUST use `git -c gc.auto=0` to prevent garbage collection interference. See `.gemini/rules/autopus/worktree-safety.md`.
+
+Parallel tasks (Mode = "parallel" AND no file ownership conflict):
+```
+# Call MULTIPLE Agent() in a SINGLE message for parallel execution
+# Each parallel executor runs in an isolated git worktree (R1)
+# Use git -c gc.auto=0 for all git commands during parallel execution (R5)
+# Include {ctx7_docs} from Phase 1.8 in each executor prompt
+Agent(
+  subagent_type = "executor",
+  model = "opus",          ← Ultra only; omit for Balanced
+  mode = "bypassPermissions",
+  isolation = "worktree",  ← R1: worktree isolation for parallel tasks
+  prompt = "## Reference Documentation\n{ctx7_docs}\n\nImplement T1: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}. Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./..."
+)
+Agent(
+  subagent_type = "executor",
+  model = "opus",          ← Ultra only; omit for Balanced
+  mode = "bypassPermissions",
+  isolation = "worktree",  ← R1: worktree isolation for parallel tasks
+  prompt = "## Reference Documentation\n{ctx7_docs}\n\nImplement T2: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}. Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./..."
+)
+```
+
+Max concurrent worktrees: **5**. Queue overflow tasks and spawn as slots free.
+
+Sequential tasks (Mode = "sequential" OR file ownership conflict) do NOT use worktree isolation:
+```
+# Call Agent() one at a time, passing previous result to next
+# Sequential: merge worktree branch immediately after each task before spawning next
+#   git -c gc.auto=0 merge <branch_T1> && git worktree remove <path_T1>
+result_t1 = Agent(subagent_type = "executor", prompt = "Implement T1: ... Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./...")
+Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ... Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./...")
+```
+
+> **⏭ POST-AGENT**: executor(s) returned. NEXT REQUIRED STEP: [REQUIRED] Phase 2.1: Worktree Merge. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 2.1 — Worktree Merge (parallel tasks only)**
+
+WHEN all parallel executors complete, merge their worktree branches into the working branch before Gate 2:
+
+```bash
+# Merge in task-ID order (R3)
+git -c gc.auto=0 merge <branch_T1>   # R5: gc.auto=0 suppresses auto GC
+git worktree remove <path_T1>
+git -c gc.auto=0 merge <branch_T2>
+git worktree remove <path_T2>
+```
+
+On lock error (`.git/refs.lock`, etc.), retry with exponential backoff: 3s → 6s → 12s (max 3 retries). See `.gemini/rules/autopus/worktree-safety.md`.
+
+After merge, display:
+```
+🐙 merge ────────────────────────────
+  브랜치: {N}개 머지 | 충돌: 0 | 정리: {N}개 워크트리 제거
+  다음: 검증 단계로 진행
+```
+
+**[CHECKPOINT] Phase 2.1 Complete** — All worktree branches merged. Proceed to Gate 2.
+
+**Merge conflict handling** (R4):
+- `git merge --abort` to restore clean state
+- Log: `[MERGE ERROR] T{id} merge failed: ownership validation gap detected. Files: {list}`
+- Abort pipeline even in `--auto` mode (never auto-resolve to prevent data loss)
+
+**Worktree merge failure recovery:**
+```
+✗ Worktree 머지 실패: {file list}
+  원인: 파일 소유권 검증 갭 (ownership validation gap)
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (수정 후 재개)
+  2. git worktree list              (워크트리 상태 확인)
+  3. git worktree remove --force    (수동 정리)
+```
+
+After each executor, display:
+```
+🐙 executor ─────────────────────────
+  파일: {N}개 수정 | 테스트: {N}개 추가 | 커버리지: {N}%
+  다음: Phase 2.1 Worktree Merge (병합 필수)
+```
+
+**[GATE] Gate 2 — Validation (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "validator",
+  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
+  prompt = """
+    Validate the implementation. Check:
+    - go build ./... passes
+    - go vet ./... passes
+    - golangci-lint run passes
+    - No file exceeds 300 lines
+
+    Return format:
+    Verdict: PASS | FAIL
+    Issues: <list>
+    Recommended Agent: executor | tester | planner
+  """
+)
+```
+
+- **PASS** → proceed to Phase 3
+- **FAIL** → spawn the Recommended Agent to fix issues, then re-validate (up to 3 retries)
+
+WHEN `LOOP_MODE = true`: extend retry limit to 5. Display RALF iteration status after each retry. Apply circuit breaker if 3 consecutive no-progress iterations.
+
+**Validation failure recovery (Gate 2):**
+```
+✗ Validation 실패: {N}개 이슈 발견
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (중단점에서 재개)
+  2. /auto fix "{specific issue}"   (개별 이슈 수정)
+```
+
+After validation, display:
+```
+🐙 validator ────────────────────────
+  Verdict: {PASS|FAIL} | 검사 항목: {N}개 | 이슈: {N}개
+  다음: {pass → 테스트 단계 | fail → 수정 후 재검증}
+```
+
+> **⏭ POST-AGENT**: validator returned. NEXT REQUIRED STEP: Phase 2.5: Annotation. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 2.5 — Annotation (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "annotator",
+  mode = "bypassPermissions",
+  prompt = """
+    Apply @AX tags to all files modified during Phase 2.
+    Follow ax-annotation skill rules.
+    Validate per-file limits: ANCHOR ≤ 3, WARN ≤ 5.
+  """
+)
+```
+
+> **⏭ POST-AGENT**: annotator returned. NEXT REQUIRED STEP: Phase 3: Testing. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 3 — Testing (MUST call Agent tool)**
+
+```
+Agent(
+  subagent_type = "tester",
+  mode = "bypassPermissions",
+  prompt = """
+    Raise test coverage to 85%+.
+    Add missing edge case tests.
+    Run: go test -race -cover ./...
+    Ensure all tests pass.
+  """
+)
+```
+
+After tester, display:
+```
+🐙 tester ───────────────────────────
+  테스트: {N}개 추가 | 커버리지: {before}% → {after}% | 통과: {N}/{N}
+  다음: 리뷰 단계로 진행
+```
+
+> **⏭ POST-AGENT**: tester returned. NEXT REQUIRED STEP: Gate 3: Coverage Check. Do NOT skip to Completion.
+
+**[GATE] Gate 3: Coverage** — verify 85%+ coverage from tester output. If below, re-spawn tester. For harness-only tasks → [INTENDED SKIP: Gate 3]
+
+WHEN `LOOP_MODE = true`: extend coverage retry limit to 3 (default: 1). Display RALF iteration status after each retry.
+
+**[REQUIRED] Phase 4 — Review (MUST call Agent tool)**
+
+Run reviewer and security-auditor in **parallel**:
+
+```
+# Call BOTH in a SINGLE message for parallel execution
+Agent(
+  subagent_type = "reviewer",
+  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
+  prompt = """
+    Review all changes using TRUST 5 criteria.
+    Return format:
+    Verdict: APPROVE | REQUEST_CHANGES
+    Issues: <list with file:line references>
+  """
+)
+Agent(
+  subagent_type = "security-auditor",
+  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
+  prompt = """
+    Audit all changed files for security vulnerabilities.
+    Return format:
+    Verdict: PASS | FAIL
+    Issues: <list with file:line references and severity>
+  """
+)
+```
+
+Both must return APPROVE/PASS for the gate to pass. If results conflict, Lead consolidates issue lists with priority: security issues > code quality issues. Consolidated issue list sent to executor for remediation.
+
+- **Both APPROVE/PASS** → pipeline complete
+- **Either REQUEST_CHANGES/FAIL** → spawn executor to fix consolidated issues, then re-review (up to 2 retries)
+
+WHEN `LOOP_MODE = true`: extend review retry limit to 3. Display RALF iteration status after each retry. Apply circuit breaker if 3 consecutive identical issues.
+
+**Review failure recovery (retries exceeded):**
+```
+✗ Review 실패: {N}개 변경 요청 (재시도 초과)
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (수정 후 재개)
+  2. /auto review                   (변경사항 직접 검토)
+```
+
+After reviewer, display:
+```
+🐙 reviewer ─────────────────────────
+  Verdict: {APPROVE|REQUEST_CHANGES} | Issues: {N}개 | 심각도: {low|medium|high}
+  다음: {verdict-based guidance}
+```
+
+> **⏭ POST-AGENT**: reviewer returned. NEXT REQUIRED STEP: Gate 4: Review Result Handling. Do NOT skip to Completion.
+
+**[GATE] Gate 4: Review Result Handling**
+
+- **APPROVE** → pipeline complete, proceed to Pre-Completion Verification
+- **REQUEST_CHANGES** → spawn executor to fix issues, then re-review (max 2 retries, see **Retry Limits Reference**)
+
+**Review failure recovery (retries exceeded):**
+```
+✗ Review 실패: {N}개 변경 요청 (재시도 초과)
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (수정 후 재개)
+  2. /auto review                   (변경사항 직접 검토)
+```
+
+**Parallel execution rules:**
+- Only parallelize tasks whose Mode is "parallel" in the planner's assignment table
+- File ownership conflict (same path pattern) → force sequential
+- Pass SPEC requirements, task description, and relevant file context to each subagent
+
+**Retry limits:** See **Retry Limits Reference** table above.
+
+**Fallback:** If a subagent fails 2 consecutive times, handle in the main session directly.
+
+**Subagent failure recovery:**
+```
+✗ {agent-name} 실패: {error description}
+  복구 옵션:
+  1. /auto go {SPEC-ID} --continue  (파이프라인 재개)
+  2. {manual fallback instruction}  (수동 처리)
+```
+
+### Pipeline (--multi mode: multi-provider)
+
+When `--multi` flag is set, activate multi-provider orchestration:
+
+- Use the `auto orchestra review` engine to review with multiple AI providers (claude, gemini, codex)
+- Validate with multi-provider consensus at the review gate
+- Can be combined with `--strategy`: consensus (default), debate, pipeline, fastest
+
+`--team --multi` combination: Agent Teams + multi-provider review activated in the Review Phase.
+
+Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent Teams), `/auto go SPEC-ID --solo` (single session), `/auto go SPEC-ID --quality ultra`, `/auto go SPEC-ID --auto --loop`
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--auto` | Autonomous mode: run the full pipeline without user confirmation |
+| `--loop` | RALF loop mode: auto-retry failed gates with extended iteration limits until PASS or circuit break |
+| `--continue` | Resume an interrupted implementation from a previous session |
+| `--team` | Agent Teams mode: use Gemini CLI Agent Teams (experimental) for multi-agent collaboration |
+| `--solo` | Single session mode: no subagents, main session implements directly |
+| `--multi` | Multi-provider mode: activate orchestra engine-based review |
+| `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |
+| `--quality` | Quality mode: ultra (all agents Opus), balanced (mixed) |
+| `--skip-scaffold` | Skip Phase 1.5 Test Scaffold |
+
+### Harness-Only Tasks
+
+If all tasks modify only `.md` files:
+- Skip Go build/test validation
+- Validator performs format-only checks (frontmatter validity, 300-line limit)
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying completion output, verify ALL phases were evaluated:
+
+- [ ] Phase 1: Planning — completed
+- [ ] Phase 1.5: Test Scaffold — completed OR skipped (--skip-scaffold)
+- [ ] Gate 1: Approval — completed OR skipped (AUTO_MODE)
+- [ ] Phase 1.8: Doc Fetch — completed OR skipped (no external libs)
+- [ ] Phase 2: Implementation — all tasks completed
+- [ ] Phase 2.1: Worktree Merge — completed (if parallel tasks existed) OR N/A
+- [ ] Gate 2: Validation — PASS
+- [ ] Phase 2.5: Annotation — completed
+- [ ] Phase 3: Testing — completed (or skipped for harness-only)
+- [ ] Gate 3: Coverage — 85%+ verified (or N/A for harness-only)
+- [ ] Phase 4: Review — APPROVE
+
+IF any item is unchecked → return to that phase/gate. Do NOT display Completion Guidance.
+
+### Completion Guidance
+
+After go completes, display the workflow lifecycle bar:
+
+```
+🐙 Workflow: {SPEC-ID}
+  ✓ plan  →  ● go  →  ○ sync
+```
+
+Then show state-aware next step guidance:
+
+```
+다음 단계: /auto sync {SPEC-ID}
+```
+
+If the SPEC status is now `implemented`, also check project state:
+- SPEC status `implemented` → suggest `/auto sync {SPEC-ID}`
+- No project docs found → suggest `/auto setup` before sync
+
+
+---
+
+## verify — Frontend UX Verification
+
+@.gemini/skills/autopus/frontend-verify.md
+
+Verify frontend UX changes using VLM-powered visual analysis and Playwright E2E tests.
+
+### Pipeline
+
+#### [REQUIRED] Phase 0: Change Analysis
+
+Run `git diff` to determine impact scope. Identify which UI components and pages were modified.
+
+> **⏭ POST-PHASE**: Change scope identified. NEXT REQUIRED STEP: Phase 1: Test Gen/Heal. Do NOT skip to Completion.
+
+#### [REQUIRED] Phase 1: Test Gen/Heal
+
+Generate new Playwright tests or repair existing ones based on the change scope from Phase 0.
+
+> **⏭ POST-PHASE**: Tests generated/repaired. NEXT REQUIRED STEP: Phase 2: Test Runner. Do NOT skip to Completion.
+
+#### [REQUIRED] Phase 2: Test Runner (MUST call Bash tool)
+
+IMPORTANT: You MUST execute Playwright tests via the Bash tool. Do NOT simulate test results.
+
+```bash
+npx playwright test
+```
+
+**Fallback rule**: Only if the Bash call returns an error, display the exact error to the user and ask for fallback approval.
+
+> **⏭ POST-PHASE**: Tests executed, screenshots captured. NEXT REQUIRED STEP: Phase 3: VLM Verifier. Do NOT skip to Completion.
+
+#### [REQUIRED] Phase 3: VLM Verifier
+
+Perform semantic visual analysis on captured screenshots. Return PASS/WARN/FAIL per component.
+
+> **⏭ POST-PHASE**: Visual verification complete. NEXT REQUIRED STEP: Phase 4: Reporter. Do NOT skip to Completion.
+
+#### [REQUIRED] Phase 4: Reporter
+
+Apply fixes (unless `--report-only`) and produce the verification report.
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying the final report, verify ALL phases were executed:
+
+- [ ] Phase 0: Change Analysis — git diff run, scope identified
+- [ ] Phase 1: Test Gen/Heal — Playwright tests generated/repaired
+- [ ] Phase 2: Test Runner — Bash tool called with `npx playwright test` (not simulated)
+- [ ] Phase 3: VLM Verifier — visual analysis completed
+- [ ] Phase 4: Reporter — report produced
+
+IF any item is unchecked → return to that phase. Do NOT display completion output.
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--fix` | Enable auto-fix mode (default: enabled) |
+| `--report-only` | Skip auto-fix, output findings only |
+| `--viewport <size>` | Viewport size: desktop, mobile, or WxH (default: desktop) |
+
+Usage: `/auto verify`, `/auto verify --report-only`, `/auto verify --viewport mobile`
+
+---
+
+## browse — Browser Automation
+
+@.gemini/skills/autopus/browser-automation.md
+
+Open a browser and interact with web pages. Automatically selects cmux browser (in cmux terminal) or agent-browser (fallback) based on terminal detection.
+
+### Prerequisites
+
+**cmux**: Built-in — no installation needed.
+**agent-browser** (fallback): `npm install -g agent-browser && agent-browser install`
+
+### Pipeline
+
+#### [REQUIRED] Step 0: Detect Browser Backend
+
+```bash
+BACKEND=$(auto terminal detect)
+```
+
+- `cmux` → Use `cmux browser` commands
+- `tmux` or `plain` → Use `agent-browser` commands
+
+All subsequent steps MUST use the detected backend's command syntax. See browser-automation.md skill for the command mapping table.
+
+#### [REQUIRED] Step 1: Open URL (MUST call Bash tool)
+
+**cmux:**
+```bash
+cmux browser open <url>
+```
+
+**agent-browser:**
+```bash
+agent-browser open <url>
+```
+
+If no URL is provided, use the project's production URL from project context or ask the user.
+
+WHEN `--headed` flag is set AND backend is agent-browser, add `--headed` to the open command. (cmux always shows in terminal panel — `--headed` is ignored.)
+
+#### [REQUIRED] Step 2: Snapshot — Get Accessibility Tree
+
+**cmux:**
+```bash
+cmux browser --surface <ref> snapshot
+```
+
+**agent-browser:**
+```bash
+agent-browser snapshot
+```
+
+Parse the snapshot output to identify interactive elements and their roles.
+
+#### [REQUIRED] Step 3: Act & Verify
+
+Based on the user's intent, interact with elements and verify results using the detected backend's command syntax. See browser-automation.md skill for the full command mapping.
+
+**cmux example:**
+```bash
+cmux browser --surface <ref> click --selector "@e3"
+cmux browser --surface <ref> wait --text "Updated"
+cmux browser --surface <ref> snapshot
+cmux browser --surface <ref> screenshot --out /tmp/result.png
+```
+
+**agent-browser example:**
+```bash
+agent-browser click @e3
+agent-browser wait --text "Updated"
+agent-browser snapshot
+agent-browser screenshot /tmp/result.png
+```
+
+Use the Read tool to view captured screenshots and analyze them visually.
+
+#### [OPTIONAL] Step 4: Report
+
+Summarize findings:
+
+```
+🐙 Browse ───────────────────────────
+  URL: {url}
+  검증 항목: {N}개
+  결과: {PASS | WARN | FAIL}
+
+  상세:
+  - {component}: {status} — {description}
+```
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--url <url>` | Target URL (default: production URL from project context) |
+| `--headed` | Show browser window (agent-browser only; cmux always shows in terminal) |
+| `--login` | Perform login flow before testing |
+| `--screenshot` | Capture screenshots at each step |
+| `--viewport <size>` | Viewport size: desktop (default), mobile, or WxH |
+
+### Safety Rules
+
+- **Read-only by default**: Do not click destructive actions (delete, remove, reset) unless explicitly requested
+- **Production caution**: Warn before performing write operations on production environments
+- **Screenshot evidence**: Capture screenshots before and after state-changing actions
+- **Backend consistency**: Once detected, use the same backend throughout the session. Do not mix cmux browser and agent-browser commands.
+
+Usage: `/auto browse`, `/auto browse --url https://example.com/settings`, `/auto browse --headed --login`
+
+---
+
+## test — Run E2E Scenarios
+
+Execute E2E test scenarios defined in `.autopus/project/scenarios.md` against the project.
+
+Runs the CLI command `auto test run` with appropriate flags. This is a thin wrapper around the Go binary.
+
+### [REQUIRED] Execution (MUST call Bash tool)
+
+IMPORTANT: You MUST call the Bash tool to run `auto test run`. Do NOT simulate test results. Do NOT display mock output without executing the actual CLI command.
+
+```bash
+auto test run [flags]
+```
+
+**Fallback rule**: Only if the Bash call returns an error (binary not found, scenarios.md missing, etc.), display the exact error to the user and ask for fallback approval.
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `-s, --scenario <ID>` | Run only a specific scenario by ID |
+| `--json` | Output results as JSON |
+| `--timeout <duration>` | Per-scenario timeout (default: 30s) |
+| `-v, --verbose` | Show stdout/stderr for each scenario |
+| `--project-dir <path>` | Project root directory (default: current) |
+
+### Output
+
+```
+S1: init              PASS  (0.42s)
+S2: update            PASS  (0.38s)
+S3: doctor            FAIL  exit code 1 (expected 0)
+
+Results: 2/3 passed
+```
+
+Usage: `/auto test`, `/auto test -s init`, `/auto test --json`, `/auto test -v`
+
+---
+
+## canary — Post-deploy Health Check
+
+Run post-deploy health checks: build verification, E2E scenario execution, and browser health inspection.
+
+### Pipeline
+
+#### [REQUIRED] Step 1: Build Verification (MUST call Bash tool)
+
+IMPORTANT: You MUST execute the project build command via the Bash tool.
+
+Load health check configuration from `.autopus/project/canary.md` (auto-generated by `/auto setup`, updated by `/auto sync`). If `canary.md` does not exist, fall back to detecting the build command from `.autopus/project/tech.md` or `scenarios.md` Build field:
+- Go project: `go build ./...`
+- Node.js: `npm run build`
+- Other: as specified in tech.md
+
+If the build fails → report FAIL immediately and skip remaining steps.
+
+#### [REQUIRED] Step 2: E2E Scenario Execution
+
+WHEN the build succeeds, THE SYSTEM SHALL run E2E scenarios:
+
+```bash
+auto test run --json
+```
+
+If `.autopus/project/scenarios.md` does not exist:
+- Skip E2E execution
+- Display: "E2E 시나리오가 없습니다. `/auto setup`으로 생성하세요."
+- Proceed to Step 3
+
+Collect pass/fail results per scenario.
+
+#### [CONDITIONAL] Step 3: Browser Health Check
+
+WHEN `--url` flag is provided OR `canary.md` contains browser-type health checks OR the project is detected as a frontend project (via `tech.md`):
+
+Use health check targets from `canary.md` when available. If `--url` is provided, it overrides canary.md targets.
+
+**URL validation**: MUST validate that the URL scheme is `http` or `https`. SHOULD warn if the URL targets localhost, 127.0.0.1, 169.254.x.x, or private IP ranges (10.x, 172.16-31.x, 192.168.x).
+
+Step 3.1: Detect browser backend
+```bash
+auto terminal detect
+```
+
+Step 3.2: Open target URL and take accessibility snapshot
+
+Step 3.3: Collect console errors
+
+Step 3.4: Compare snapshot against previous run if `.autopus/canary/latest.json` exists
+
+WHEN the project has no frontend AND no `--url` is given → [INTENDED SKIP: Step 3]
+
+#### [REQUIRED] Step 4: Verdict
+
+Produce a summary verdict:
+
+```
+🐙 Canary ───────────────────────────
+  빌드: {PASS|FAIL}
+  E2E: {N}/{M} passed ({PASS|WARN|FAIL})
+  브라우저: {PASS|WARN|FAIL|SKIP}
+  ────────────────────────────────────
+  판정: {PASS|WARN|FAIL}
+```
+
+Verdict rules:
+- **PASS**: build OK + all E2E pass + no console errors
+- **WARN**: build OK + some E2E failures or non-critical console warnings
+- **FAIL**: build failure or critical E2E failures or critical console errors
+
+#### [REQUIRED] Step 5: Save Results
+
+Save results to `.autopus/canary/latest.json`:
+
+```json
+{
+  "timestamp": "ISO-8601",
+  "commit": "current HEAD SHA",
+  "build": {"status": "pass|fail", "command": "go build ./...", "duration_ms": 1234},
+  "e2e": {"total": 5, "passed": 4, "failed": 1, "scenarios": [...]},
+  "browser": {"status": "pass|warn|fail|skip", "console_errors": [], "snapshot_diff": null},
+  "verdict": "pass|warn|fail"
+}
+```
+
+If `--compare` flag is provided, MUST validate that the commit value matches `^[0-9a-f]{7,40}$` before constructing the file path. Then load `.autopus/canary/{commit}.json` and show diff.
+
+### [REQUIRED] Pre-Completion Verification
+
+- [ ] Step 1: Build verification — Bash tool called
+- [ ] Step 2: E2E scenarios — executed or skip noted
+- [ ] Step 3: Browser health — executed or intentionally skipped
+- [ ] Step 4: Verdict — displayed
+- [ ] Step 5: Results — saved to .autopus/canary/
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--url <url>` | Target URL for browser health check |
+| `--watch <interval>` | Repeat at interval (default 5m, max 30m) until interrupted or FAIL |
+| `--compare <commit>` | Compare against stored results from specified commit |
+
+### Watch Mode
+
+WHEN `--watch <interval>` is set:
+1. Execute Steps 1-5
+2. If verdict is FAIL → stop and report
+3. If verdict is PASS or WARN → wait for interval, then repeat
+4. Display iteration counter: `[Iteration N] ...`
+
+Usage: `/auto canary`, `/auto canary --url https://example.com`, `/auto canary --watch 5m`, `/auto canary --compare abc123`
+
+---
+
+## fix — Fix a Bug
+
+@.gemini/skills/autopus/debugging.md
+
+Reproduce the bug and fix it with minimal changes. Uses a Reproduction-First approach.
+
+### Pipeline
+
+#### [OPTIONAL] Step 0: Learning Reference (R7)
+
+WHEN `.autopus/learnings/pipeline.jsonl` exists, THE SYSTEM SHALL query for entries matching the error context (file path, package, error pattern):
+
+```bash
+auto learn query --files {affected_files} --pattern "{error_description}" --limit 3 --format prompt
+```
+
+If matching entries found, display:
+```
+💡 관련 학습 {N}개 참조:
+  - {pattern_1}
+  - {pattern_2}
+```
+
+Inject matching entries into the debugging context. Skip silently if none found.
+
+#### [REQUIRED] Step 1: Reproduce — Write a Failing Test
+
+IMPORTANT: You MUST write a failing test that reproduces the bug before making any code changes. Do NOT skip to the fix.
+
+- Write the minimal test case that demonstrates the failure
+- Confirm it fails: `go test ./... -run TestXxx`
+- If no test is possible (e.g., CLI-only), document the reproduction steps explicitly
+
+> **⏭ POST-STEP**: Failing test written. NEXT REQUIRED STEP: Step 2: Root Cause Analysis. Do NOT skip to Step 3.
+
+#### [REQUIRED] Step 2: Root Cause Analysis
+
+- Trace the failure path through the code
+- Identify the root cause (not just the symptom)
+- Document the cause in one sentence before proceeding
+
+> **⏭ POST-STEP**: Root cause identified. NEXT REQUIRED STEP: Step 3: Minimal Fix. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 3: Minimal Fix
+
+Apply the smallest change that fixes the root cause. Avoid scope creep.
+
+> **⏭ POST-STEP**: Fix applied. NEXT REQUIRED STEP: Step 4: Verify. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 4: Verify (MUST call Bash tool)
+
+IMPORTANT: You MUST run the test suite via the Bash tool. Do NOT assume the fix works without running tests.
+
+```bash
+go test -race ./...
+```
+
+**Fallback rule**: Only if the Bash call returns an error, display the exact error to the user and ask for fallback approval.
+
+### [REQUIRED] Pre-Completion Verification
+
+Before reporting the fix as complete, verify ALL steps were executed:
+
+- [ ] Step 1: Failing test written (or reproduction steps documented)
+- [ ] Step 2: Root cause identified and documented
+- [ ] Step 3: Minimal fix applied
+- [ ] Step 4: Bash tool called — `go test -race ./...` passed
+
+IF any item is unchecked → return to that step. Do NOT report completion.
+
+#### [OPTIONAL] Step 5: Learning Capture (R11)
+
+WHEN the fix is successfully verified (Step 4 passed), THE SYSTEM SHALL record the fix pattern:
+
+```bash
+auto learn record --type fix_pattern --files {changed_files} --pattern "{error → root cause → resolution}" --spec {SPEC_ID_if_available}
+```
+
+If the command fails, append directly to `.autopus/learnings/pipeline.jsonl`:
+```json
+{"id":"L-{next}","timestamp":"{now}","type":"fix_pattern","phase":"fix","files":[...],"packages":[...],"pattern":"{error description}","resolution":"{how it was fixed}","severity":"low","reuse_count":0}
+```
+
+Display:
+```
+💡 수정 패턴 학습됨: "{one-line pattern summary}"
+```
+
+Usage: `/auto fix "bug description"`, `/auto fix --file path/to/file.go`
+
+---
+
+## map — Analyze Codebase Structure
+
+Analyze and visualize the codebase structure, dependencies, and key patterns.
+
+Analysis includes:
+- Directory structure and package hierarchy
+- Core entry points (main, handlers)
+- Dependency flow (inter-module imports)
+- @AX ANCHOR points (high fan-in functions)
+- Complexity hotspots
+
+Usage: `/auto map`, `/auto map path/to/package`
+
+---
+
+## review — Code Review
+
+@.gemini/skills/autopus/review.md
+
+Review changed code against TRUST 5 criteria (Tested, Readable, Unified, Secured, Trackable).
+
+### Pipeline
+
+#### [REQUIRED] Step 1: Run Automated Gates (MUST call Bash tool)
+
+IMPORTANT: You MUST run automated quality checks via the Bash tool before the TRUST 5 analysis.
+
+```bash
+go test -race ./... && golangci-lint run
+```
+
+**Fallback rule**: Only if the Bash call returns an error, display the exact error to the user and ask for fallback approval.
+
+> **⏭ POST-STEP**: Automated gates complete. NEXT REQUIRED STEP: Step 2: TRUST 5 Analysis. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 2: TRUST 5 Analysis
+
+Analyze all changed files against each TRUST dimension:
+- **T**ested: test coverage, edge cases
+- **R**eadable: naming, complexity, comments
+- **U**nified: style consistency, patterns
+- **S**ecured: input validation, secrets, OWASP
+- **T**rackable: @AX tags, Lore entries, SPEC refs
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying the review verdict, verify ALL steps were executed:
+
+- [ ] Step 1: Bash tool called — `go test -race ./...` and `golangci-lint run` ran (not skipped)
+- [ ] Step 2: TRUST 5 analysis completed for all changed files
+
+IF any item is unchecked → return to that step. Do NOT display the verdict.
+
+Usage: `/auto review`, `/auto review HEAD~3..HEAD`, `/auto review --pr 123`
+
+
+---
+
+## spec review — SPEC Multi-Provider Review
+
+@.gemini/skills/autopus/spec-review.md
+
+Review a SPEC document using multiple providers (claude, gemini, etc.) to validate quality. Delivers a PASS/REVISE/REJECT verdict via the Orchestra engine.
+
+### Pipeline
+
+#### [REQUIRED] Step 1: Load SPEC
+
+Run SPEC Path Resolution for {SPEC-ID}. Load the resolved SPEC_PATH and extract requirements. Verify the file exists before proceeding.
+
+> **⏭ POST-STEP**: SPEC loaded. NEXT REQUIRED STEP: Step 2: Collect Code Context. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 2: Collect Code Context
+
+If `auto_collect_context: true` in `autopus.yaml`, gather relevant source code files referenced by the SPEC.
+
+> **⏭ POST-STEP**: Context collected. NEXT REQUIRED STEP: Step 3: Run Multi-Provider Review. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 3: Run Multi-Provider Review (MUST call Bash tool)
+
+IMPORTANT: You MUST execute the multi-provider review via the Bash tool. Do NOT simulate review results.
+
+```bash
+auto spec review {SPEC-ID} --strategy {STRATEGY}
+```
+
+**Fallback rule**: Only if the Bash call returns an error (binary not found, provider config missing, etc.), display the exact error to the user and ask for fallback approval.
+
+> **⏭ POST-STEP**: Multi-provider review returned. NEXT REQUIRED STEP: Step 4: Merge Verdicts. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 4: Merge Verdicts
+
+Determine final verdict according to the configured strategy (debate, consensus):
+- **PASS** → proceed to Step 5
+- **REVISE** → return finding list to user, apply fixes, re-run (up to 2 iterations)
+- **REJECT** → return finding list, guide user to redesign
+
+#### [REQUIRED] Step 5: Save Results
+
+Write `review.md` to {SPEC_DIR} with the full verdict and findings. Update SPEC status if PASS.
+
+### Verdict Criteria
+
+- **PASS**: SPEC approved, update status to "approved"
+- **REVISE**: Revision needed, return with finding list
+- **REJECT**: Fundamental redesign required
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying final output, verify ALL steps were executed:
+
+- [ ] Step 1: SPEC loaded
+- [ ] Step 2: Code context collected (or skipped if `auto_collect_context: false`)
+- [ ] Step 3: Bash tool called — `auto spec review` ran (not simulated)
+- [ ] Step 4: Verdicts merged, final verdict determined
+- [ ] Step 5: `review.md` written, SPEC status updated
+
+IF any item is unchecked → return to that step. Do NOT display completion output.
+
+Usage: `/auto spec review SPEC-ID`, `/auto spec review SPEC-ID --strategy debate --timeout 180`
+
+
+---
+
+## secure — Security Audit
+
+@.gemini/skills/autopus/security-audit.md
+
+Detect security vulnerabilities in the codebase and suggest fixes. Includes OWASP Top 10 coverage.
+
+### Pipeline
+
+#### [REQUIRED] Step 1: Run govulncheck (MUST call Bash tool)
+
+IMPORTANT: You MUST run `govulncheck` via the Bash tool. Do NOT skip static analysis.
+
+```bash
+govulncheck ./...
+```
+
+**Fallback rule**: Only if the Bash call returns an error (tool not installed, etc.), display the exact error to the user and ask for fallback approval. If user approves fallback, proceed with manual analysis only and note the gap.
+
+> **⏭ POST-STEP**: govulncheck complete. NEXT REQUIRED STEP: Step 2: OWASP Analysis. Do NOT skip to Completion.
+
+#### [REQUIRED] Step 2: OWASP Analysis
+
+Analyze the codebase for OWASP Top 10 vulnerabilities relevant to the detected tech stack:
+- A01: Broken Access Control
+- A02: Cryptographic Failures
+- A03: Injection
+- A04: Insecure Design
+- A05: Security Misconfiguration
+- Others as applicable
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying the security report, verify ALL steps were executed:
+
+- [ ] Step 1: Bash tool called — `govulncheck ./...` ran (not skipped)
+- [ ] Step 2: OWASP analysis completed for the detected tech stack
+
+IF any item is unchecked → return to that step. Do NOT display the report.
+
+Usage: `/auto secure`, `/auto secure --owasp`, `/auto secure --secrets`
+
+
+---
+
+## stale — Detect Stale Decisions
+
+Detect outdated decisions, expired TODOs, and obsolete architecture patterns.
+
+Detects:
+- Lore entries older than 90 days
+- Stale @AX:TODO tags
+- Unused interfaces and redundant abstractions
+
+Usage: `/auto stale`, `/auto stale --lore`, `/auto stale --ax`
+
+---
+
+## sync — Synchronize Documentation
+
+Synchronize code and documentation after implementation is complete. Updates SPEC status and related documents.
+
+### [REQUIRED] Sync Target 1: Update SPEC Status
+
+If a SPEC-ID is provided, run SPEC Path Resolution for {SPEC-ID}. Update the resolved SPEC_PATH status to `completed`. Use TARGET_MODULE for git operations.
+
+> **⏭ POST-TARGET**: SPEC status updated. NEXT REQUIRED TARGET: Sync Target 2: Project Docs. Do NOT skip to Lore Commit.
+
+### [REQUIRED] Sync Target 2: Update Project Context Documents
+
+Detect structural changes in the codebase and update:
+- `ARCHITECTURE.md` — reflect new packages/dependencies
+- `.autopus/project/structure.md` — reflect directory/file changes
+- `.autopus/project/tech.md` — reflect dependency/build changes
+- `.autopus/project/product.md` — reflect new features/commands
+- `.autopus/project/canary.md` — reflect new health endpoints, pages, deploy config changes
+
+> **⏭ POST-TARGET**: Project docs updated. NEXT REQUIRED TARGET: Sync Target 3: @AX Lifecycle. Do NOT skip to Lore Commit.
+
+### [REQUIRED] Sync Target 3: @AX Tag Lifecycle Management
+
+Manage @AX tag lifecycle (CYCLE tracking, TODO escalation, ANCHOR verification) — see rules below.
+
+> **⏭ POST-TARGET**: @AX lifecycle managed. NEXT REQUIRED TARGET: Sync Target 4: CHANGELOG. Do NOT skip to Lore Commit.
+
+### [REQUIRED] Sync Target 4: Update CHANGELOG.md
+
+Append the change summary to `CHANGELOG.md` (create if absent).
+
+### [REQUIRED] Sync Target 4.5: Learning Summary and Prune (R8, R9)
+
+WHEN `.autopus/learnings/pipeline.jsonl` exists, THE SYSTEM SHALL:
+
+**Step 1: Auto-Prune (R9)**
+
+```bash
+auto learn prune --max-age 90d
+```
+
+If the command fails, read the file directly and remove entries older than 90 days. Display only if entries were pruned:
+```
+정리: {N}개 학습 항목 만료 삭제 (90일 초과)
+```
+
+**Step 2: Learning Summary (R8)**
+
+Display a learning summary BEFORE the completion bar:
+
+```bash
+auto learn summary --since-last-sync
+```
+
+If the command fails, generate from the JSONL file directly:
+```
+🐙 학습 요약 ────────────────────────
+  신규 기록: {N}개 (gate_fail: {n}, review_issue: {n}, ...)
+  반복 패턴 Top 3:
+    1. "{pattern}" — {reuse_count}회 주입됨
+    2. "{pattern}" — {reuse_count}회
+    3. "{pattern}" — {reuse_count}회
+  개선 영역: {이전 sync 대비 줄어든 실패 유형}
+```
+
+WHERE no learning entries exist, display: `학습 요약: 신규 항목 없음 ✓`
+
+> **⏭ POST-TARGET**: Learning summary displayed. NEXT REQUIRED TARGET: Sync Target 5. Do NOT skip to Completion.
+
+### [REQUIRED] Sync Target 5: 2-Phase Lore Commit (MUST call Bash tool)
+
+IMPORTANT: You MUST run git operations via the Bash tool. Do NOT skip the commit step.
+
+The workspace may use a **meta repo** pattern: the root project directory is a git repo that tracks project-level documents, while each subdirectory can be an independent git repo. Sync commits MUST be split into two phases when this pattern is detected.
+
+**Detection**: Run `git rev-parse --show-toplevel` at root AND at `{TARGET_MODULE}`. If they differ, this is a multi-repo workspace — use 2-Phase Commit. If they are the same (or TARGET_MODULE is '.'), use single-phase commit.
+
+#### Phase A: Module Commit (submodule changes)
+
+WHEN TARGET_MODULE is not '.', commit SPEC and module-specific files to the submodule repo:
+
+```bash
+git -C {TARGET_MODULE} status
+git -C {TARGET_MODULE} add {SPEC_DIR relative to TARGET_MODULE} {module-specific changed files}
+git -C {TARGET_MODULE} diff --cached --quiet || git -C {TARGET_MODULE} commit -m "$(cat <<'EOF'
+docs(<scope>): sync SPEC-{ID} 문서 및 상태 갱신
+
+SPEC 구현 완료에 따른 모듈 내 문서 동기화.
+
+Why: SPEC 구현 완료 후 모듈 문서 일관성 유지
+Decision: 모듈 repo에 SPEC 관련 파일만 커밋
+Ref: SPEC-{ID}
+
+🐙 Autopus <noreply@autopus.co>
+EOF
+)"
+```
+
+#### Phase B: Meta Commit (root-level documents)
+
+WHEN multi-repo workspace is detected, ALWAYS check and commit root-level document changes to the meta repo:
+
+```bash
+git status
+git add ARCHITECTURE.md .autopus/project/ CHANGELOG.md
+git diff --cached --quiet || git commit -m "$(cat <<'EOF'
+docs(meta): sync 루트 프로젝트 문서 갱신
+
+프로젝트 컨텍스트 문서를 최신 코드 상태에 맞게 동기화.
+
+Why: 서브모듈 변경에 따른 루트 문서 일관성 유지
+Decision: meta repo에 프로젝트 전체 문서만 커밋
+
+🐙 Autopus <noreply@autopus.co>
+EOF
+)"
+```
+
+**Phase skip rules:**
+- Phase A: skip when TARGET_MODULE is '.' (root-only sync) or no module files changed
+- Phase B: skip when not a multi-repo workspace, or `git diff --cached --quiet` (no root files changed)
+- Both phases: skip when `git status` reports no changes — print a notice only
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying the completion bar, verify ALL sync targets were completed:
+
+- [ ] Sync Target 1: SPEC status updated (or N/A — no SPEC-ID provided)
+- [ ] Sync Target 2: Project context docs updated
+- [ ] Sync Target 3: @AX lifecycle managed
+- [ ] Sync Target 4: CHANGELOG.md updated
+- [ ] Sync Target 4.5: Learning summary and prune — completed (or N/A — no pipeline.jsonl)
+- [ ] Sync Target 5: 2-Phase Lore Commit — Phase A (module) + Phase B (meta) ran (or skipped due to no changes)
+
+IF any item is unchecked → return to that target. Do NOT display Completion Guidance.
+
+### Project Document Update
+
+On sync, detect structural changes in the codebase and update:
+- `ARCHITECTURE.md` — reflect new packages/dependencies
+- `.autopus/project/structure.md` — reflect directory/file changes
+- `.autopus/project/tech.md` — reflect dependency/build changes
+- `.autopus/project/product.md` — reflect new features/commands
+
+Usage: `/auto sync SPEC-ID`, `/auto sync`
+
+### @AX Lifecycle Management
+
+On sync, manage @AX tag lifecycle across the codebase:
+
+#### TODO Cycle Tracking
+1. Find all `@AX:TODO` tags in source files
+2. Increment `@AX:CYCLE:N` counter (or add `@AX:CYCLE:1` if absent)
+3. Escalate to `@AX:WARN` if CYCLE >= 3, adding `@AX:REASON: escalated from TODO after N cycles`
+
+#### ANCHOR Fan-In Verification
+1. Find all `@AX:ANCHOR` tags
+2. Grep for function name references to count callers
+3. If caller count < 3, downgrade to `@AX:NOTE` with updated reason
+
+#### NOTE Cleanup
+1. Find all `@AX:NOTE` tags referencing specific functions
+2. Verify the referenced function still exists in the codebase
+3. Remove orphaned NOTE tags
+
+
+### Lore Commit (2-Phase)
+
+Sync Target 5 handles the actual commits. This section provides additional commit guidelines.
+
+**2-Phase Commit flow:**
+1. **Phase A** — Module repo: SPEC files and module-specific changes → `git -C {TARGET_MODULE} commit`
+2. **Phase B** — Meta repo: root-level project docs → `git commit` (at workspace root)
+
+**Determining which files go where:**
+- Files inside `{TARGET_MODULE}/` → Phase A (module commit)
+- Files at root (`ARCHITECTURE.md`, `.autopus/project/`, `CHANGELOG.md`) → Phase B (meta commit)
+- If implementation code (`.go`, etc.) is included in Phase A: use the primary type from the SPEC (feat, fix, refactor)
+- If only docs changed: use `docs` type for both phases
+
+**Skip commit when:**
+- No changes reported by `git status` in that repo — skip and print a notice only
+
+### Completion Guidance
+
+After sync completes, display the workflow lifecycle bar:
+
+```
+🐙 Workflow: {SPEC-ID}
+  ✓ plan  →  ✓ go  →  ● sync
+```
+
+Then display the milestone celebration ResultBox for a completed full cycle:
+
+```
+╭────────────────────────────────────╮
+│ 🐙 파이프라인 완료!                 │
+│ {SPEC-ID}: {title}                 │
+│ 태스크: N/N | 커버리지: N%          │
+│ 리뷰: {verdict}                    │
+╰────────────────────────────────────╯
+```
+
+**Field mappings:**
+- `{SPEC-ID}` — e.g., `SPEC-UX-001`
+- `{title}` — SPEC title from spec.md
+- `N/N` — completed tasks / total tasks from plan.md
+- `N%` — final test coverage (use `N/A` if not applicable or harness-only)
+- `{verdict}` — reviewer verdict (`APPROVE` or `N/A` if review was skipped)
+
+Then show state-aware next step guidance:
+
+```
+다음 단계: 다음 기능을 시작하려면 /auto plan "기능 설명" 을 실행하세요.
+배포 후 검증: /auto canary
+```
+
+---
+
+## why — Query Decision Rationale
+
+Look up the rationale behind code or architecture decisions.
+
+Query methods:
+- Keyword search across Lore entries
+- Extract decision context from commit history
+- Look up NOTE/ANCHOR in @AX tags
+- Link to related SPEC documents
+
+Usage: `/auto why "why was this pattern used?"`, `/auto why path/to/file.go`
+
+---
+
+## status — SPEC Dashboard
+
+Display the current status of all SPECs in the project.
+
+### Output
+
+Scan for all SPECs across the project:
+1. `.autopus/specs/*/spec.md` (top-level — legacy and cross-module)
+2. `*/.autopus/specs/*/spec.md` (submodules, depth 1)
+
+Group by module and display:
+
+```
+🐙 SPEC Dashboard ───────────────────
+  [autopus-adk]
+    SPEC-ORCH-003  [draft]       Orchestra Provider
+    SPEC-GAP-001   [approved]    Gap Analysis
+
+  [Autopus]
+    SPEC-AUTOTEST-001 [draft]    Auto Test
+
+  [cross-module]
+    SPEC-AI-001    [approved]    AI Integration
+```
+
+Top-level SPECs (`.autopus/specs/`) are grouped under `[cross-module]`.
+
+Show a summary line at the bottom:
+
+```
+총 {N}개 | draft: {N} | approved: {N} | implemented: {N} | completed: {N}
+```
+
+Usage: `/auto status`
+
+---
+
+## dev — Full Development Cycle
+
+Execute the complete plan → go → sync cycle in one command. The power-user workflow in a single invocation.
+
+### Flag Inheritance
+
+`/auto dev` automatically applies optimal flags to each stage:
+
+| Stage | Inherited Flags |
+|-------|----------------|
+| plan | `--auto --multi --ultrathink` (deep analysis + multi-provider review) |
+| go | `--auto --loop --team` (Agent Teams + RALF self-healing) |
+| sync | (no special flags) |
+
+User-provided flags **override** these defaults. For example, `--solo` overrides `--team` in the go stage.
+
+### Pipeline
+
+#### [REQUIRED] Stage 1: Plan (MUST call plan subcommand)
+
+Run the `plan` pipeline with `--auto --multi --ultrathink` flags and the feature description. Extract the SPEC-ID from the output.
+
+Display after completion:
+```
+🐙 Workflow: {SPEC-ID}
+  ● plan  →  ○ go  →  ○ sync
+```
+
+> **⏭ POST-STAGE**: plan complete, SPEC-ID extracted. NEXT REQUIRED STAGE: Stage 2: Go. Do NOT skip to Completion.
+
+#### [REQUIRED] Stage 2: Go (MUST call go subcommand)
+
+Run the `go` pipeline with `--auto --loop --team` flags using the SPEC-ID from Stage 1.
+
+Display after completion:
+```
+🐙 Workflow: {SPEC-ID}
+  ✓ plan  →  ● go  →  ○ sync
+```
+
+> **⏭ POST-STAGE**: go complete. NEXT REQUIRED STAGE: Stage 3: Sync. Do NOT skip to Completion.
+
+#### [REQUIRED] Stage 3: Sync (MUST call sync subcommand)
+
+Run the `sync` pipeline with the SPEC-ID.
+
+Display after completion:
+```
+🐙 Workflow: {SPEC-ID}
+  ✓ plan  →  ✓ go  →  ● sync
+```
+
+### [REQUIRED] Pre-Completion Verification
+
+Before displaying the final milestone output, verify ALL stages were completed:
+
+- [ ] Stage 1: plan — SPEC-ID created
+- [ ] Stage 2: go — implementation pipeline completed
+- [ ] Stage 3: sync — documentation synchronized, Lore commit made
+
+IF any item is unchecked → return to that stage. Do NOT display the milestone box.
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--team` | Run `go` with Agent Teams — **default ON** in dev |
+| `--solo` | Run `go` in single session mode (overrides --team) |
+| `--quality` | Quality mode: ultra or balanced |
+| `--multi` | Enable multi-provider review — **default ON** in dev |
+| `--ultrathink` | Deep analysis in plan stage — **default ON** in dev |
+| `--no-team` | Disable Agent Teams (use subagent pipeline instead) |
+| `--no-multi` | Disable multi-provider review |
+| `--no-ultrathink` | Disable deep analysis |
+
+Usage: `/auto dev "feature description"`, `/auto dev "feature description" --solo`, `/auto dev "feature description" --no-multi`
+
+**Default behavior**: `/auto dev "feature"` = `/auto plan --auto --multi --ultrathink` → `/auto go --auto --loop --team` → `/auto sync`
+
+
+---
+
+## ADK Management — init, update, doctor, platform
+
+Manage the Autopus-ADK harness itself.
+
+### Current Configuration
+
+- **Project**: autopus-adk
+- **Mode**: full
+- **Platform**: claude-code, codex, gemini-cli, opencode
+
+### Usage
+
+- `/auto init` — initialize harness
+- `/auto update` — update harness files
+- `/auto doctor` — run health diagnostics
+- `/auto platform list` — list platforms
+- `/auto platform add <name>` — add a platform
+- `/auto platform remove <name>` — remove a platform
