@@ -69,7 +69,8 @@ Fallback: Run without --team to use the subagent pipeline mode.
 
 ```python
 # Top-level session creates the team at pipeline start (Claude Code only — teammates cannot call TeamCreate)
-team = TeamCreate(name=f"team-{spec_id.lower()}")
+# The main session is auto-registered as name="team-lead"; spawn only the 3 non-lead teammates below.
+team = TeamCreate(team_name=f"team-{spec_id.lower()}", agent_type="planner")
 
 # Spawn teammates
 lead     = Teammate(role="lead",     model="opus")

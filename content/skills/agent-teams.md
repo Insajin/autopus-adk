@@ -98,10 +98,10 @@ All team lifecycle operations (create, spawn, delete) are owned by the **top-lev
 
 ### Prerequisite — Load deferred tool schemas
 
-`TeamCreate` and `SendMessage` are deferred tools. Load their schemas once before first use:
+`TeamCreate`, `SendMessage`, and `TeamDelete` are deferred tools. Load their schemas once before first use:
 
 ```
-ToolSearch(query="select:TeamCreate,SendMessage")
+ToolSearch(query="select:TeamCreate,SendMessage,TeamDelete")
 ```
 
 ### Spawn sequence (top-level session only)
@@ -109,29 +109,48 @@ ToolSearch(query="select:TeamCreate,SendMessage")
 ```python
 TEAM_NAME = f"team-{spec_id.lower()}"         # e.g., "team-auth-001"
 
-# Step 1: Top-level session creates the team (teammates cannot)
-TeamCreate(name=TEAM_NAME, description="<SPEC title>")
+# Step 1: Top-level session creates the team.
+# Side effect: the main session is AUTOMATICALLY registered as a member with
+# name="team-lead" and agentType=<agent_type>. Do NOT spawn a separate lead Agent().
+TeamCreate(
+    team_name   = TEAM_NAME,                  # NOTE: parameter is team_name, NOT name
+    description = "<SPEC title>",
+    agent_type  = "planner",
+)
 
-# Step 2: Top-level session spawns ALL 4 core teammates in a SINGLE message
+# Step 2: Top-level session spawns the 3 non-lead teammates in a SINGLE message
 # (Agent() calls must be emitted together to spawn in parallel)
-Agent(subagent_type="planner",   team_name=TEAM_NAME, name="lead",      model="opus")
 Agent(subagent_type="executor",  team_name=TEAM_NAME, name="builder-1", isolation="worktree")
 Agent(subagent_type="tester",    team_name=TEAM_NAME, name="tester")
 Agent(subagent_type="validator", team_name=TEAM_NAME, name="guardian")
 ```
 
-Each teammate loads its agent definition from `.claude/agents/autopus/` and inherits its frontmatter (tools, model, skills, permissionMode). The `name` field becomes the addressable handle for `SendMessage({to: "<name>"})`.
+Each teammate loads its agent definition from `.claude/agents/autopus/` and inherits its frontmatter (tools, model, skills, permissionMode). The `name` field becomes the addressable handle for `SendMessage({to: "<name>"})`. The main session is addressable as `team-lead`.
 
 ### Verification gate
 
-After spawn, the top-level session MUST verify all core teammates are registered:
+After spawn, the top-level session MUST verify all 4 core members are registered (team-lead + 3 teammates):
 
 ```bash
 jq '.members | length' ~/.claude/teams/{TEAM_NAME}/config.json
-# expected: 4 (lead + builder-1 + tester + guardian)
+# expected: 4 (team-lead + builder-1 + tester + guardian)
+jq -r '.members[].name' ~/.claude/teams/{TEAM_NAME}/config.json
+# expected lines: team-lead, builder-1, tester, guardian
 ```
 
 If `.members | length < 4`, the team is **not** viable for multi-agent collaboration. Abort Route B and fall back to Route A (subagent pipeline).
+
+### Teardown
+
+WHEN the pipeline terminates (success, abort, or circuit break), shut down teammates per-teammate (broadcast `to:"*"` accepts plain text only, not structured shutdown messages), then call `TeamDelete()`:
+
+```python
+for name in ("builder-1", "tester", "guardian"):
+    SendMessage(to=name, message={"type": "shutdown_request", "reason": "pipeline complete"})
+
+# After teammates respond and exit (typically <10s)
+TeamDelete()     # fails if any active teammate remains
+```
 
 Task assignment via `SendMessage`:
 
