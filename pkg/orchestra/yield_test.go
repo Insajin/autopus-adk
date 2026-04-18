@@ -94,6 +94,10 @@ func TestBuildYieldOutput_RoundHistory(t *testing.T) {
 	assert.Equal(t, 1, result.RoundHistory[0].Round)
 	assert.Equal(t, int64(2000), result.RoundHistory[0].Responses[0].DurationMs)
 	assert.True(t, result.RoundHistory[0].Responses[1].TimedOut)
+	// gemini round 1 timed out — must be captured in FailedProviders derived from history.
+	require.Len(t, result.FailedProviders, 1)
+	assert.Equal(t, "gemini", result.FailedProviders[0].Provider)
+	assert.Contains(t, result.FailedProviders[0].Error, "round 1 timeout")
 }
 
 func TestBuildYieldOutputFromResult_MultiRound(t *testing.T) {

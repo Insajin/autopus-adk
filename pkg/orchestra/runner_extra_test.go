@@ -27,7 +27,7 @@ func TestRunDebate_WithRebuttalRound(t *testing.T) {
 		DebateRounds:   2,
 	}
 
-	responses, roundHistory, err := runDebate(context.Background(), cfg)
+	responses, roundHistory, _, err := runDebate(context.Background(), cfg)
 	require.NoError(t, err)
 	// After rebuttal, responses should contain updated responses from both debaters.
 	// Round history should have Round 1 + Round 2 entries.
@@ -56,7 +56,7 @@ func TestRunRebuttalRound_Basic(t *testing.T) {
 		{Provider: "b", Output: "response from b"},
 	}
 
-	responses, err := runRebuttalRound(context.Background(), cfg, prevResponses)
+	responses, _, err := runRebuttalRound(context.Background(), cfg, prevResponses)
 	require.NoError(t, err)
 	assert.Len(t, responses, 2)
 }
@@ -81,7 +81,7 @@ func TestRunRebuttalRound_AllFail(t *testing.T) {
 		{Provider: "bad2", Output: "previous"},
 	}
 
-	_, err := runRebuttalRound(context.Background(), cfg, prevResponses)
+	_, _, err := runRebuttalRound(context.Background(), cfg, prevResponses)
 	assert.Error(t, err)
 }
 

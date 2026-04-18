@@ -64,20 +64,24 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	responses, roundHistory, err := runDebate(timeoutCtx, cfg)
+	responses, roundHistory, failed, err := runDebate(timeoutCtx, cfg)
 	if err != nil {
 		log.Printf("[debate] runDebate failed: %v -- falling back to parallel", err)
 		// Fallback: try parallel-only execution (no rebuttal/judge).
-		fallbackResps, _, fallbackErr := runParallel(timeoutCtx, cfg)
+		fallbackResps, fallbackFailed, fallbackErr := runParallel(timeoutCtx, cfg)
 		if fallbackErr != nil {
 			log.Printf("[debate] runParallel also failed: %v -- returning error", fallbackErr)
 			return nil, fmt.Errorf("debate failed: %v; fallback failed: %w", err, fallbackErr)
 		}
 		roundHistory = [][]ProviderResponse{fallbackResps}
-		return buildDebateResult(cfg, fallbackResps, roundHistory, start), nil
+		result := buildDebateResult(cfg, fallbackResps, roundHistory, start)
+		result.FailedProviders = fallbackFailed
+		return result, nil
 	}
 
-	return buildDebateResult(cfg, responses, roundHistory, start), nil
+	result := buildDebateResult(cfg, responses, roundHistory, start)
+	result.FailedProviders = failed
+	return result, nil
 }
 
 // runPaneDebate executes the multi-turn debate loop using terminal panes.

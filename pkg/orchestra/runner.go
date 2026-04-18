@@ -50,7 +50,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	case StrategyFastest:
 		responses, err = runFastest(timeoutCtx, cfg)
 	case StrategyDebate:
-		responses, roundHistory, err = runDebate(timeoutCtx, cfg)
+		responses, roundHistory, failed, err = runDebate(timeoutCtx, cfg)
 	case StrategyRelay:
 		responses, err = runRelay(timeoutCtx, &cfg)
 	default:

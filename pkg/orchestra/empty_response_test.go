@@ -161,7 +161,7 @@ func TestRunDebate_JudgeRunsWithPartialResponses(t *testing.T) {
 		PromptViaArgs: false,
 	})
 
-	responses, _, err := runDebate(context.Background(), cfg)
+	responses, _, _, err := runDebate(context.Background(), cfg)
 	require.NoError(t, err)
 
 	// Judge response should be present even with partial debater success.
@@ -174,3 +174,6 @@ func TestRunDebate_JudgeRunsWithPartialResponses(t *testing.T) {
 	}
 	assert.True(t, judgeFound, "judge must run and append its response even with partial debaters")
 }
+
+// Tests for debate/rebuttal failed-provider surfacing live in
+// debate_failed_providers_test.go to keep this file under the 300-line limit.

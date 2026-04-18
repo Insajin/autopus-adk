@@ -9,11 +9,19 @@ import (
 
 // YieldOutput is the JSON structure output by --yield-rounds mode.
 type YieldOutput struct {
-	Strategy     string            `json:"strategy"`
-	Rounds       int               `json:"rounds"`
-	RoundHistory []YieldRound      `json:"round_history"`
-	Panes        map[string]string `json:"panes"`      // provider -> pane ID
-	SessionID    string            `json:"session_id"`
+	Strategy        string            `json:"strategy"`
+	Rounds          int               `json:"rounds"`
+	RoundHistory    []YieldRound      `json:"round_history"`
+	Panes           map[string]string `json:"panes"`            // provider -> pane ID
+	SessionID       string            `json:"session_id"`
+	FailedProviders []YieldFailure    `json:"failed_providers,omitempty"` // Providers dropped from round history
+}
+
+// YieldFailure reports a provider that failed during execution so main-session
+// orchestrators can distinguish "missing" from "silently dropped".
+type YieldFailure struct {
+	Provider string `json:"provider"`
+	Error    string `json:"error"`
 }
 
 // YieldRound holds per-round provider responses.
@@ -57,15 +65,24 @@ func BuildYieldOutputFromResult(result *OrchestraResult, sessionID string) Yield
 		yieldRounds = append(yieldRounds, yr)
 	}
 
+	failures := make([]YieldFailure, 0, len(result.FailedProviders))
+	for _, fp := range result.FailedProviders {
+		failures = append(failures, YieldFailure{Provider: fp.Name, Error: fp.Error})
+	}
+
 	return YieldOutput{
-		Strategy:     string(result.Strategy),
-		Rounds:       len(result.RoundHistory),
-		RoundHistory: yieldRounds,
-		SessionID:    sessionID,
+		Strategy:        string(result.Strategy),
+		Rounds:          len(result.RoundHistory),
+		RoundHistory:    yieldRounds,
+		SessionID:       sessionID,
+		FailedProviders: failures,
 	}
 }
 
 // BuildYieldOutput creates a YieldOutput from debate state.
+// Derives failed_providers from roundHistory entries with TimedOut=true or
+// empty output so pane-mode consumers see the same failure signals as
+// subprocess-mode (BuildYieldOutputFromResult).
 func BuildYieldOutput(cfg OrchestraConfig, panes []paneInfo, roundHistory [][]ProviderResponse, sessionID string) YieldOutput {
 	paneMap := make(map[string]string)
 	for _, pi := range panes {
@@ -73,11 +90,24 @@ func BuildYieldOutput(cfg OrchestraConfig, panes []paneInfo, roundHistory [][]Pr
 	}
 
 	var yieldRounds []YieldRound
+	var failures []YieldFailure
 	for i, responses := range roundHistory {
 		yr := YieldRound{Round: i + 1}
 		for _, r := range responses {
 			if r.Output == "" && !r.TimedOut {
 				log.Printf("[yield] WARNING: provider %s returned empty output (not timed out) — completion detection may have fired prematurely", r.Provider)
+			}
+			switch {
+			case r.TimedOut:
+				failures = append(failures, YieldFailure{
+					Provider: r.Provider,
+					Error:    fmt.Sprintf("round %d timeout", i+1),
+				})
+			case r.Output == "":
+				failures = append(failures, YieldFailure{
+					Provider: r.Provider,
+					Error:    fmt.Sprintf("round %d empty output", i+1),
+				})
 			}
 			yr.Responses = append(yr.Responses, YieldResponse{
 				Provider:   r.Provider,
@@ -90,10 +120,11 @@ func BuildYieldOutput(cfg OrchestraConfig, panes []paneInfo, roundHistory [][]Pr
 	}
 
 	return YieldOutput{
-		Strategy:     string(cfg.Strategy),
-		Rounds:       len(roundHistory),
-		RoundHistory: yieldRounds,
-		Panes:        paneMap,
-		SessionID:    sessionID,
+		Strategy:        string(cfg.Strategy),
+		Rounds:          len(roundHistory),
+		RoundHistory:    yieldRounds,
+		Panes:           paneMap,
+		SessionID:       sessionID,
+		FailedProviders: failures,
 	}
 }

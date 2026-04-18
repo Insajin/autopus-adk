@@ -11,12 +11,13 @@ import (
 
 // runDebate executes the full debate flow:
 // Phase 1 (parallel arguments) → optional Phase 2 (rebuttal) → optional judgment.
-// Returns final responses and per-round history for yield/JSON output.
-func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, [][]ProviderResponse, error) {
+// Returns final responses, per-round history, and Round 1 failed providers so
+// callers can surface failures (OrchestraResult.FailedProviders, yield JSON).
+func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, [][]ProviderResponse, []FailedProvider, error) {
 	// Phase 1: all debaters respond to original prompt in parallel
-	round1Responses, _, err := runParallel(ctx, cfg)
+	round1Responses, round1Failed, err := runParallel(ctx, cfg)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, round1Failed, err
 	}
 
 	roundHistory := [][]ProviderResponse{round1Responses}
@@ -28,7 +29,10 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, []
 		rounds = 1
 	}
 	if rounds >= 2 && len(responses) >= 2 {
-		rebuttalResps, rebuttalErr := runRebuttalRound(ctx, cfg, responses)
+		rebuttalResps, rebuttalFailed, rebuttalErr := runRebuttalRound(ctx, cfg, responses)
+		// Always merge rebuttal failures even if rebuttal partially succeeded so
+		// callers (OrchestraResult.FailedProviders, yield JSON) see the full picture.
+		round1Failed = append(round1Failed, rebuttalFailed...)
 		if rebuttalErr == nil && len(rebuttalResps) > 0 {
 			roundHistory = append(roundHistory, rebuttalResps)
 			responses = rebuttalResps
@@ -49,12 +53,14 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, []
 		}
 	}
 
-	return responses, roundHistory, nil
+	return responses, roundHistory, round1Failed, nil
 }
 
 // runRebuttalRound executes one rebuttal round for each debater.
 // Each debater receives the original prompt plus all other debaters' responses.
-func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []ProviderResponse) ([]ProviderResponse, error) {
+// Returns successful responses and failed providers so callers can surface
+// rebuttal-phase failures alongside Round 1 failures.
+func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []ProviderResponse) ([]ProviderResponse, []FailedProvider, error) {
 	rebuttalResults := make([]providerResult, len(cfg.Providers))
 	var wg sync.WaitGroup
 
@@ -81,18 +87,27 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 	wg.Wait()
 
 	var responses []ProviderResponse
-	for _, r := range rebuttalResults {
-		if r.err == nil {
+	var failed []FailedProvider
+	for i, r := range rebuttalResults {
+		name := cfg.Providers[i].Name
+		switch {
+		case r.err != nil:
+			failed = append(failed, FailedProvider{Name: name, Error: fmt.Sprintf("rebuttal: %s", r.err.Error())})
+		case r.resp.TimedOut:
+			failed = append(failed, FailedProvider{Name: r.resp.Provider, Error: "rebuttal timeout: provider exceeded deadline"})
+		case r.resp.EmptyOutput:
+			failed = append(failed, FailedProvider{Name: r.resp.Provider, Error: "rebuttal empty output: provider returned no content"})
+		default:
 			responses = append(responses, r.resp)
 		}
 	}
 	if len(responses) == 0 {
-		if len(rebuttalResults) > 0 {
-			return nil, rebuttalResults[0].err
+		if len(rebuttalResults) > 0 && rebuttalResults[0].err != nil {
+			return nil, failed, rebuttalResults[0].err
 		}
-		return nil, fmt.Errorf("rebuttal round: no providers configured")
+		return nil, failed, fmt.Errorf("rebuttal round: no providers produced output")
 	}
-	return responses, nil
+	return responses, failed, nil
 }
 
 // topicIsolationInstruction prevents providers from reading project files during debate.
