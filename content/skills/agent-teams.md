@@ -20,18 +20,43 @@ Agent Teams mode (`--team`) enables role-based team collaboration via Claude Cod
 
 ## Activation
 
-Requires the experimental environment variable:
+### Prerequisites
+
+| Requirement | Value | How to verify |
+|-------------|-------|---------------|
+| Claude Code version | v2.1.32 or later | `claude --version` |
+| Environment variable | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | `echo $CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` |
+| Feature status | **Experimental** — disabled by default | Official: https://code.claude.com/docs/en/agent-teams |
+
+### Environment Setup
 
 ```bash
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 ```
 
-If this variable is not set, the pipeline MUST error with:
+The Autopus harness injects this variable via `.claude/settings.json` automatically.
+
+### Failure Modes
+
+If the variable is not set OR Claude Code is below v2.1.32, the pipeline MUST error with:
 
 ```
-Error: Agent Teams mode requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+Error: Agent Teams mode unavailable
+  Claude Code version: {detected} (required: v2.1.32+)
+  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: {set|not set}
 Fallback: Run without --team to use the subagent pipeline mode.
 ```
+
+## Team Constraints (Official)
+
+Agent Teams enforces these rules at the Claude Code layer — violating them fails at runtime:
+
+| Constraint | Rule |
+|-----------|------|
+| Nested teams | Teammates MUST NOT call `TeamCreate` — only the top-level session can create a team |
+| Cleanup authority | Only the Lead (team creator) may delete the team; teammates request cleanup via `SendMessage` |
+| Recommended size | **3–5 teammates** per team (official guidance). Autopus default (Lead + 1–2 Builders + Guardian) fits this range |
+| Persistence | Team config persists in `~/.claude/teams/{team-name}/config.json`; task list in `~/.claude/tasks/{team-name}/` |
 
 ## Team Roles
 
@@ -69,15 +94,19 @@ Fallback: Run without --team to use the subagent pipeline mode.
 
 ## Team Creation Pattern
 
+Teammates are spawned with the standard `Agent()` tool plus `team_name` and `name` parameters. Each teammate loads its agent definition from `.claude/agents/autopus/` and inherits its frontmatter (tools, model, skills, permissionMode).
+
 ```python
 # Lead creates the team at pipeline start
-team = TeamCreate(team_name=f"team-{spec_id}")
+TeamCreate(team_name=f"team-{spec_id}")
 
-# Spawn teammates
-lead     = Teammate(role="lead",     model="opus")
-builder  = Teammate(role="builder",  model="sonnet")  # keep the standard model for LOW complexity too
-guardian = Teammate(role="guardian", model="sonnet")
+# Spawn teammates via Agent() with team_name + name
+Agent(subagent_type="planner",   team_name=f"team-{spec_id}", name="lead",     model="opus")
+Agent(subagent_type="executor",  team_name=f"team-{spec_id}", name="builder-1")  # LOW complexity stays on sonnet
+Agent(subagent_type="validator", team_name=f"team-{spec_id}", name="guardian")
 ```
+
+The `name` field becomes the addressable handle for `SendMessage({to: "<name>"})`.
 
 Task assignment via `SendMessage`:
 

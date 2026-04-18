@@ -843,38 +843,15 @@ For parallel tasks, include `isolation: "worktree"` in Agent() calls to enable w
 
 #### Route B: Agent Teams (`--team`)
 
-IMPORTANT: This route uses Gemini CLI Agent Teams (experimental). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+IMPORTANT: Agent Teams is a **Claude Code-exclusive** feature (TeamCreate/SendMessage/Agent team_name API). Gemini CLI does not have an equivalent runtime.
 
-If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is not set, abort with:
+On Gemini CLI, `--team` flag is accepted for cross-platform harness compatibility but always falls back to Route A (subagent pipeline). Display a one-line warning and proceed:
+
 ```
-Agent Teams requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1. Use default mode (subagent) instead.
+Note: --team flag ignored on Gemini CLI (Claude Code only). Running subagent pipeline instead.
 ```
 
-Use TeamCreate to create a team, then spawn specialized teammates using `Agent(subagent_type=..., team_name=..., name=...)`. Each teammate loads its agent definition from `.gemini/agents/autopus/`, inheriting tools, skills, model, and domain expertise. Teammates communicate directly via SendMessage.
-
-Team composition — each member maps 1:1 to a specialized agent definition:
-
-**Core members (always spawned):**
-| Name | subagent_type | Agent Definition | Phase |
-|------|---------------|------------------|-------|
-| `lead` | `planner` | planner.md | Phase 1, coordination |
-| `builder-1` | `executor` | executor.md | Phase 2 |
-| `tester` | `tester` | tester.md | Phase 1.5, Phase 3 |
-| `guardian` | `validator` | validator.md | Gate 2 |
-
-**Phase-dependent members (spawned when needed):**
-| Name | subagent_type | Agent Definition | Condition |
-|------|---------------|------------------|-----------|
-| `builder-2` | `executor` | executor.md | 2+ parallel tasks |
-| `annotator` | `annotator` | annotator.md | Phase 2.5 |
-| `auditor` | `security-auditor` | security-auditor.md | Phase 4 |
-| `reviewer` | `reviewer` | reviewer.md | Phase 4 |
-
-Quality Mode applies to execution profile selection: Ultra forces the premium path for all builders. Balanced keeps per-role defaults, and Adaptive Quality only escalates HIGH-complexity tasks. LOW-complexity work stays on the standard path in this workspace.
-
-Reference: `.gemini/skills/autopus/agent-teams.md`
-
-The pipeline phases are the same as Route A, but orchestrated through Agent Teams instead of individual Agent() calls. Worktree safety rules R1-R5 apply equally — each builder teammate works in an independent worktree. See @.gemini/skills/autopus/worktree-isolation.md and `.gemini/rules/autopus/worktree-safety.md`.
+Then continue with Route A phases unchanged. Do NOT attempt `TeamCreate`, `SendMessage`, or any team-scoped API calls — they do not exist in this runtime.
 
 #### Route C: Single Session (`--solo`)
 
@@ -1373,7 +1350,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--auto` | Autonomous mode: run the full pipeline without user confirmation |
 | `--loop` | RALF loop mode: auto-retry failed gates with extended iteration limits until PASS or circuit break |
 | `--continue` | Resume an interrupted implementation from a previous session |
-| `--team` | Agent Teams mode: use Gemini CLI Agent Teams (experimental) for multi-agent collaboration |
+| `--team` | Reserved compatibility flag (Claude Code only — on Gemini CLI falls back to subagent pipeline with a warning) |
 | `--solo` | Single session mode: no subagents, main session implements directly |
 | `--multi` | Multi-provider mode: activate orchestra engine-based review |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |

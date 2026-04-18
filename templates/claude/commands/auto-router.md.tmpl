@@ -849,12 +849,19 @@ For parallel tasks, include `isolation: "worktree"` in Agent() calls to enable w
 
 #### Route B: Agent Teams (`--team`)
 
-IMPORTANT: This route uses Claude Code Agent Teams (experimental). Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+IMPORTANT: This route uses Claude Code Agent Teams (experimental, disabled by default). Requires Claude Code v2.1.32+ AND `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 
-If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is not set, abort with:
+Preflight check (run before TeamCreate):
+1. `claude --version` — must be ≥ v2.1.32
+2. `$CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — must be `1`
+
+If either check fails, abort with:
 ```
-Agent Teams requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1. Use default mode (subagent) instead.
+Agent Teams unavailable: Claude Code v2.1.32+ and CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 required.
+Fallback: /auto go SPEC-ID (subagent pipeline mode, no --team flag)
 ```
+
+Team composition stays within the official 3–5 member guidance (see agent-teams.md "Team Constraints"). Default 4-member core fits; phase-dependent members (below) should replace core members, not stack on top, to respect the size limit.
 
 Use TeamCreate to create a team, then spawn specialized teammates using `Agent(subagent_type=..., team_name=..., name=...)`. Each teammate loads its agent definition from `.claude/agents/autopus/`, inheriting tools, skills, model, and domain expertise. Teammates communicate directly via SendMessage.
 

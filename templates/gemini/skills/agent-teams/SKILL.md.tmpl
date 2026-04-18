@@ -4,21 +4,27 @@ name: auto-agent-teams
 
 # Agent Teams Skill
 
-## Overview
+> ⚠️ **Platform Note**: Agent Teams is a **Claude Code-exclusive** runtime feature. Gemini CLI does not implement `TeamCreate`, `SendMessage`, or team-scoped spawning APIs. This skill is kept for **cross-platform documentation parity only** — do not attempt to execute its patterns on Gemini CLI.
+>
+> On Gemini CLI, `--team` flag is ignored with a warning and the pipeline falls back to the standard subagent mode (Route A). Refer to Claude Code's agent-teams skill for the authoritative specification: https://code.claude.com/docs/en/agent-teams
+>
+> The sections below describe the **Claude Code** feature and are non-authoritative for Gemini CLI operators.
+
+## Overview (Claude Code reference)
 
 Agent Teams mode (`--team`) enables role-based team collaboration via Claude Code Agent Teams. Instead of spawning ephemeral subagents per task, this mode creates persistent teammates that communicate directly, share a task list, and self-coordinate through the pipeline.
 
-**Activation flag**: `/auto go SPEC-ID --team`
+**Activation flag (Claude Code only)**: `/auto go SPEC-ID --team`
 
-## Activation
+## Activation (Claude Code only)
 
-Requires the experimental environment variable:
+Requires Claude Code v2.1.32+ AND the experimental environment variable:
 
 ```bash
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 ```
 
-If this variable is not set, the pipeline MUST error with:
+If this variable is not set (on Claude Code), the pipeline MUST error with:
 
 ```
 Error: Agent Teams mode requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1

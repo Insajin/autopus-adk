@@ -41,13 +41,13 @@ For parallel tasks in Phase 2, add `isolation: "worktree"` to Agent() calls:
 result_t1 = Agent(
     subagent_type = "executor",
     prompt = "Implement T1: ...",
-    permissionMode = "bypassPermissions",
+    mode = "bypassPermissions",
     isolation = "worktree"   # R1: each executor gets an independent worktree
 )
 result_t2 = Agent(
     subagent_type = "executor",
     prompt = "Implement T2: ...",
-    permissionMode = "bypassPermissions",
+    mode = "bypassPermissions",
     isolation = "worktree"
 )
 ```

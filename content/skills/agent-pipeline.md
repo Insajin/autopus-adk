@@ -160,7 +160,7 @@ Agent(
 
     Return: list of generated test files and FAIL verification result.
   """,
-  permissionMode = "bypassPermissions"
+  mode = "bypassPermissions"
 )
 ```
 
@@ -225,10 +225,10 @@ Parallel tasks use `isolation: "worktree"` so each executor works in an independ
 # Premium-path handling varies by platform:
 # - Claude/Gemini: add model="opus"
 # - Codex/OpenCode: keep the default model and increase reasoning effort
-Agent(subagent_type="executor", prompt="Implement T1: ...", permissionMode="bypassPermissions", isolation="worktree")  # Balanced
-Agent(subagent_type="executor", model="opus", prompt="Implement T1: ...", permissionMode="bypassPermissions", isolation="worktree")  # Ultra
-Agent(subagent_type="executor", prompt="Implement T2: ...", permissionMode="bypassPermissions", isolation="worktree")  # Balanced
-Agent(subagent_type="executor", model="opus", prompt="Implement T2: ...", permissionMode="bypassPermissions", isolation="worktree")  # Ultra
+Agent(subagent_type="executor", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Balanced
+Agent(subagent_type="executor", model="opus", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Ultra
+Agent(subagent_type="executor", prompt="Implement T2: ...", mode="bypassPermissions", isolation="worktree")  # Balanced
+Agent(subagent_type="executor", model="opus", prompt="Implement T2: ...", mode="bypassPermissions", isolation="worktree")  # Ultra
 ```
 
 Collect `worktree_path` and `branch` from each return value for Phase 2.1 merge.
@@ -346,7 +346,7 @@ Agent(
 
     All tags MUST include the [AUTO] prefix.
   """,
-  permissionMode = "bypassPermissions"
+  mode = "bypassPermissions"
 )
 ```
 
@@ -375,7 +375,7 @@ Agent(
     Issues: <list of issues with file references>
     Fixes: <list of auto-applied fixes>
   """,
-  permissionMode = "bypassPermissions"
+  mode = "bypassPermissions"
 )
 ```
 
@@ -397,7 +397,7 @@ Agent(
     Raise coverage to 85%+.
     Add missing edge case tests.
   """,
-  permissionMode = "bypassPermissions"
+  mode = "bypassPermissions"
 )
 ```
 
