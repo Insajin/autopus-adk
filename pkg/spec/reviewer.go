@@ -11,6 +11,7 @@ var (
 	findingRe       = regexp.MustCompile(`(?i)FINDING:\s*\[(\w+)]\s*(.+)`)
 	structFindingRe = regexp.MustCompile(`(?i)FINDING:\s*\[(\w+)]\s*\[(\w+)]\s*(\S+)\s+(.+)`)
 	findingStatusRe = regexp.MustCompile(`(?i)FINDING_STATUS:\s*F-(\d+)\s*\|\s*(\w+)\s*\|\s*(.+)`)
+	reChecklist     = regexp.MustCompile(`(?i)CHECKLIST:\s*([A-Z0-9-]+)\s*\|\s*(PASS|FAIL)(?:\s*\|\s*(.+))?`)
 )
 
 // ParseVerdict extracts a ReviewResult from raw provider output.
@@ -34,6 +35,8 @@ func ParseVerdict(specID, output, provider string, revision int, priorFindings [
 			result.Verdict = VerdictReject
 		}
 	}
+
+	result.ChecklistOutcomes = parseChecklistOutcomes(output, provider, revision)
 
 	if priorFindings == nil {
 		// Discover mode: parse FINDING lines with empty IDs (REQ-07 ownership rule).
@@ -158,6 +161,35 @@ func parseVerifyFindings(output, provider string, revision int, priorFindings []
 	}
 
 	return updated
+}
+
+func parseChecklistOutcomes(output, provider string, revision int) []ChecklistOutcome {
+	matches := reChecklist.FindAllStringSubmatch(output, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	outcomes := make([]ChecklistOutcome, 0, len(matches))
+	for _, m := range matches {
+		if len(m) < 3 {
+			continue
+		}
+
+		reason := ""
+		if len(m) >= 4 {
+			reason = strings.Trim(strings.TrimSpace(m[3]), `"'`)
+		}
+
+		outcomes = append(outcomes, ChecklistOutcome{
+			ID:       strings.TrimSpace(m[1]),
+			Status:   ChecklistStatus(strings.ToUpper(strings.TrimSpace(m[2]))),
+			Reason:   reason,
+			Provider: provider,
+			Revision: revision,
+		})
+	}
+
+	return outcomes
 }
 
 func hasExplicitVerifyFindings(output string) bool {

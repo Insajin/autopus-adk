@@ -69,9 +69,11 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 
 		// Flatten all provider findings.
 		var allFindings []spec.ReviewFinding
+		var allChecklistOutcomes []spec.ChecklistOutcome
 		var allResponses []string
 		for _, r := range reviews {
 			allFindings = append(allFindings, r.Findings...)
+			allChecklistOutcomes = append(allChecklistOutcomes, r.ChecklistOutcomes...)
 			allResponses = append(allResponses, r.Responses...)
 		}
 
@@ -80,11 +82,12 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		allFindings = spec.DeduplicateFindings(allFindings)
 
 		merged := &spec.ReviewResult{
-			SpecID:    p.specID,
-			Verdict:   finalVerdict,
-			Findings:  allFindings,
-			Responses: allResponses,
-			Revision:  revision,
+			SpecID:            p.specID,
+			Verdict:           finalVerdict,
+			Findings:          allFindings,
+			ChecklistOutcomes: allChecklistOutcomes,
+			Responses:         allResponses,
+			Revision:          revision,
 		}
 
 		// Apply scope lock in verify mode

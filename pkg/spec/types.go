@@ -2,6 +2,8 @@
 // EARS: Easy Approach to Requirements Syntax (Mavin et al., 2009, IEEE RE Conference)
 package spec
 
+import "io/fs"
+
 // EARSType은 EARS 패턴 유형이다.
 type EARSType string
 
@@ -105,6 +107,25 @@ type ReviewPromptOptions struct {
 	SpecDir            string          // path to spec directory for loading auxiliary docs
 	PassCriteria       string          // overrides default verdict decision rules in prompt
 	DocContextMaxLines int             // max lines per auxiliary doc (0 = use default 200)
+	checklistFS        fs.FS
+	checklistDiskPaths []string
+}
+
+// ChecklistStatus represents the status of a checklist item.
+type ChecklistStatus string
+
+const (
+	ChecklistStatusPass ChecklistStatus = "PASS"
+	ChecklistStatusFail ChecklistStatus = "FAIL"
+)
+
+// ChecklistOutcome is a structured checklist result emitted by a provider.
+type ChecklistOutcome struct {
+	ID       string          // checklist item ID (for example, Q-CORR-01)
+	Status   ChecklistStatus // PASS or FAIL
+	Reason   string          // optional reason, required for FAIL in reviewer guidance
+	Provider string          // provider that emitted the outcome
+	Revision int             // revision iteration (0 = first review)
 }
 
 // ReviewFinding is a single issue found during review.
@@ -123,9 +144,10 @@ type ReviewFinding struct {
 
 // ReviewResult is the aggregated result of a multi-provider review.
 type ReviewResult struct {
-	SpecID    string          // target SPEC ID
-	Verdict   ReviewVerdict   // final verdict
-	Findings  []ReviewFinding // all findings from all providers
-	Responses []string        // raw provider responses
-	Revision  int             // revision iteration (0 = first review)
+	SpecID            string             // target SPEC ID
+	Verdict           ReviewVerdict      // final verdict
+	Findings          []ReviewFinding    // all findings from all providers
+	ChecklistOutcomes []ChecklistOutcome // structured checklist outcomes from provider responses
+	Responses         []string           // raw provider responses
+	Revision          int                // revision iteration (0 = first review)
 }

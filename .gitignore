@@ -38,6 +38,7 @@ internal/cli/test-results/
 .autopus/orchestra/
 .autopus/cache/docs/
 .autopus/audit.jsonl
+**/.autopus/specs/**/.self-verify.log
 .worktrees/
 setup.test
 

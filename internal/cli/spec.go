@@ -17,6 +17,7 @@ func newSpecCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newSpecNewCmd())
+	cmd.AddCommand(newSpecSelfVerifyCmd())
 	cmd.AddCommand(newSpecValidateCmd())
 	cmd.AddCommand(newSpecReviewCmd())
 	return cmd

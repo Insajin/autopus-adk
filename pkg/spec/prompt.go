@@ -66,10 +66,22 @@ func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptO
 		sb.WriteString("\n```\n\n")
 	}
 
-	if opts.Mode == ReviewModeVerify || len(opts.PriorFindings) > 0 {
-		buildVerifyInstructions(&sb, opts.PriorFindings, opts.PassCriteria)
+	checklistIncluded := false
+	maxLines := opts.DocContextMaxLines
+	if maxLines <= 0 {
+		maxLines = defaultDocContextMaxLines
+	}
+	if checklistBody, checklistPath, err := loadChecklistForPrompt(opts); err != nil {
+		fmt.Fprintf(os.Stderr, "경고: 체크리스트 로드 실패 (%s): %v\n", checklistPath, err)
 	} else {
-		buildDiscoverInstructions(&sb, opts.StaticFindings, opts.PassCriteria)
+		InjectChecklistSection(&sb, checklistBody, maxLines)
+		checklistIncluded = true
+	}
+
+	if opts.Mode == ReviewModeVerify || len(opts.PriorFindings) > 0 {
+		buildVerifyInstructions(&sb, opts.PriorFindings, opts.PassCriteria, checklistIncluded)
+	} else {
+		buildDiscoverInstructions(&sb, opts.StaticFindings, opts.PassCriteria, checklistIncluded)
 	}
 
 	return sb.String()
@@ -119,10 +131,16 @@ func trimToLines(content string, maxLines int) string {
 }
 
 // buildVerifyInstructions writes checklist-based instructions for verify mode.
-func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding, passCriteria string) {
+func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding, passCriteria string, checklistIncluded bool) {
 	sb.WriteString("### Verdict Decision Rules\n\n")
 	writeVerdictRules(sb, passCriteria)
 	sb.WriteString("\n")
+
+	if checklistIncluded {
+		sb.WriteString("### Checklist Response Format\n\n")
+		writeChecklistExamples(sb)
+		sb.WriteString("\n")
+	}
 
 	sb.WriteString("### Finding Format Examples\n\n")
 	writeFindingExamples(sb)
@@ -141,16 +159,28 @@ func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding,
 
 	sb.WriteString("Respond with:\n")
 	sb.WriteString("1. VERDICT: PASS, REVISE, or REJECT\n")
-	sb.WriteString("2. For each prior finding, write: FINDING_STATUS: F-{id} | {open|resolved|regressed} | {reason}\n")
-	sb.WriteString("3. Report any regression or newly broken behavior caused by fixes, even if not in the checklist.\n")
+	if checklistIncluded {
+		sb.WriteString("2. For each quality checklist item, write: CHECKLIST: <항목 ID> | PASS or CHECKLIST: <항목 ID> | FAIL | <reason>\n")
+		sb.WriteString("3. For each prior finding, write: FINDING_STATUS: F-{id} | {open|resolved|regressed} | {reason}\n")
+		sb.WriteString("4. Report any regression or newly broken behavior caused by fixes, even if not in the checklist.\n")
+	} else {
+		sb.WriteString("2. For each prior finding, write: FINDING_STATUS: F-{id} | {open|resolved|regressed} | {reason}\n")
+		sb.WriteString("3. Report any regression or newly broken behavior caused by fixes, even if not in the checklist.\n")
+	}
 	sb.WriteString("   For new critical/security issues: FINDING: [severity] [category] [scope_ref] description\n")
 }
 
 // buildDiscoverInstructions writes open-ended instructions for discover mode.
-func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFinding, passCriteria string) {
+func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFinding, passCriteria string, checklistIncluded bool) {
 	sb.WriteString("### Verdict Decision Rules\n\n")
 	writeVerdictRules(sb, passCriteria)
 	sb.WriteString("\n")
+
+	if checklistIncluded {
+		sb.WriteString("### Checklist Response Format\n\n")
+		writeChecklistExamples(sb)
+		sb.WriteString("\n")
+	}
 
 	sb.WriteString("### Finding Format Examples\n\n")
 	writeFindingExamples(sb)
@@ -168,10 +198,16 @@ func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFindi
 
 	sb.WriteString("Review the SPEC and respond with:\n")
 	sb.WriteString("1. VERDICT: PASS, REVISE, or REJECT\n")
-	sb.WriteString("2. For each issue found, write: FINDING: [severity] [category] [scope_ref] description\n")
+	if checklistIncluded {
+		sb.WriteString("2. For each quality checklist item, write: CHECKLIST: <항목 ID> | PASS or CHECKLIST: <항목 ID> | FAIL | <reason>\n")
+		sb.WriteString("3. For each issue found, write: FINDING: [severity] [category] [scope_ref] description\n")
+		sb.WriteString("4. Provide reasoning for your verdict.\n")
+	} else {
+		sb.WriteString("2. For each issue found, write: FINDING: [severity] [category] [scope_ref] description\n")
+		sb.WriteString("3. Provide reasoning for your verdict.\n")
+	}
 	sb.WriteString("   Severity levels: critical, major, minor, suggestion\n")
 	sb.WriteString("   Category: correctness, completeness, feasibility, style, security\n")
-	sb.WriteString("3. Provide reasoning for your verdict.\n")
 }
 
 // writeVerdictRules writes the default or custom verdict decision rules.

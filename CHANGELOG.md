@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **SPEC 리뷰 체크리스트 런타임 주입 및 self-verify 기록 경로 복구 (SPEC-SPECWR-002)** (2026-04-19): `auto spec review`가 `content/rules/spec-quality.md`를 실제 런타임 프롬프트에 주입하고, `CHECKLIST:` 응답을 구조화 파싱하며, `auto spec self-verify`로 결정적 JSONL 기록을 남길 수 있도록 동기화.
+  - `pkg/spec/checklist.go`, `pkg/spec/prompt.go` — embed 우선 + 디스크 fallback 체크리스트 로더, `## Quality Checklist` 주입, checklist response examples 추가
+  - `pkg/spec/types.go`, `pkg/spec/reviewer.go`, `internal/cli/spec_review_loop.go`, `internal/cli/spec_review.go` — `ChecklistOutcome` 타입, `CHECKLIST:` 파싱, provider outcome 집계, 최종 요약 출력 연결
+  - `pkg/spec/selfverify.go`, `internal/cli/spec.go`, `internal/cli/spec_self_verify.go`, `.gitignore` — `auto spec self-verify` 서브커맨드, 100라인 retention, `.self-verify.log` ignore 규칙 추가
+  - `pkg/spec/checklist_test.go`, `pkg/spec/reviewer_checklist_test.go`, `pkg/spec/selfverify_test.go`, `internal/cli/spec_review_checklist_test.go`, `internal/cli/spec_self_verify_test.go` — checklist injection/parser/CLI/self-verify 회귀 테스트 추가
+
 - **SPEC 리뷰 수렴성 재구축 (SPEC-REVFIX-001)** (2026-04-19): `auto spec review --multi`가 대부분의 SPEC에서 PASS에 도달하지 못하고 REVISE 루프를 소진한 뒤 circuit breaker로 종료되던 7개 복합 결함 제거.
   - **REQ-01 Supermajority verdict**: `MergeVerdicts`가 `spec.review_gate.verdict_threshold`(기본 0.67) 기준 supermajority를 적용. 1 REJECT 단독 override는 유지(security gate). `pkg/spec/reviewer.go`
   - **REQ-02 Revision 루프 내 재로드**: `runSpecReview`가 iteration마다 `spec.Load(specDir)` 재호출. 외부 수정이 다음 round에 반영됨. `internal/cli/spec_review_loop.go`
