@@ -8,6 +8,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// stubProcessTreeCheck swaps the package-level process tree checker for the
+// duration of a test, so DetectPermissionMode() does not consult the real
+// parent process. Required when tests run inside a Claude Code session
+// launched with --dangerously-skip-permissions — the real checker would
+// report bypass regardless of the scenario under test.
+func stubProcessTreeCheck(t *testing.T, fn func() (bool, int, error)) {
+	t.Helper()
+	original := checkProcessTreeFn
+	checkProcessTreeFn = fn
+	t.Cleanup(func() { checkProcessTreeFn = original })
+}
+
 // TestDetectPermissionMode_EnvOverride_ReturnsBypass verifies that
 // AUTOPUS_PERMISSION_MODE=bypass skips process check and returns bypass.
 func TestDetectPermissionMode_EnvOverride_ReturnsBypass(t *testing.T) {
@@ -46,11 +58,15 @@ func TestDetectPermissionMode_InvalidEnv_FallsBackToProcessCheck(t *testing.T) {
 			t.Setenv("AUTOPUS_PERMISSION_MODE", tt.envVal)
 			// Clear cmux env to prevent cmux heuristic from returning bypass
 			t.Setenv("CMUX_CLAUDE_PID", "")
+			// Stub out the real process tree walker so the assertion is
+			// deterministic even when the host session has the flag set.
+			stubProcessTreeCheck(t, func() (bool, int, error) {
+				return false, 0, nil
+			})
 
 			result := DetectPermissionMode()
 			// When env is invalid, falls back to process check.
-			// In test environment (no --dangerously-skip-permissions in parent),
-			// expect "safe" as fail-safe.
+			// Stubbed checker reports no flag → expect "safe" as fail-safe.
 			assert.Equal(t, "safe", result.Mode)
 		})
 	}
@@ -63,10 +79,13 @@ func TestDetectPermissionMode_ProcessCheckFails_ReturnsSafe(t *testing.T) {
 	t.Setenv("AUTOPUS_PERMISSION_MODE", "")
 	// Clear cmux env to prevent cmux heuristic from returning bypass
 	t.Setenv("CMUX_CLAUDE_PID", "")
+	// Simulate process tree inspection error — detectPermissionModeWith
+	// should fall back to safe when the checker returns err.
+	stubProcessTreeCheck(t, func() (bool, int, error) {
+		return false, 0, assert.AnError
+	})
 
 	result := DetectPermissionMode()
-	// In test environment, no parent has --dangerously-skip-permissions,
-	// and even if process inspection fails, fail-safe returns "safe".
 	assert.Equal(t, "safe", result.Mode)
 }
 
@@ -159,6 +178,11 @@ func TestDetectPermissionMode_CmuxHeuristic_ReturnsBypass(t *testing.T) {
 func TestDetectPermissionMode_NoCmux_ReturnsSafe(t *testing.T) {
 	t.Setenv("AUTOPUS_PERMISSION_MODE", "")
 	t.Setenv("CMUX_CLAUDE_PID", "")
+	// Stub the process tree walker to simulate a clean environment
+	// where no ancestor carries --dangerously-skip-permissions.
+	stubProcessTreeCheck(t, func() (bool, int, error) {
+		return false, 0, nil
+	})
 
 	result := DetectPermissionMode()
 	assert.Equal(t, "safe", result.Mode)

@@ -25,6 +25,13 @@ const (
 	maxTreeDepth = 20
 )
 
+// checkProcessTreeFn is the process tree checker used by DetectPermissionMode.
+// Package-level indirection so tests can swap in a deterministic stub — the
+// default checker walks the real parent process tree, which is unpredictable
+// when tests run inside a Claude Code session launched with
+// --dangerously-skip-permissions.
+var checkProcessTreeFn = checkParentProcessTree
+
 // DetectPermissionMode checks the parent process tree for the
 // --dangerously-skip-permissions flag and returns the permission mode.
 // Priority: AUTOPUS_PERMISSION_MODE env > process tree scan > cmux heuristic.
@@ -34,7 +41,7 @@ func DetectPermissionMode() PermissionResult {
 	if env := os.Getenv(envKey); env == modeBypass || env == modeSafe {
 		return PermissionResult{Mode: env}
 	}
-	result := detectPermissionModeWith(checkParentProcessTree)
+	result := detectPermissionModeWith(checkProcessTreeFn)
 	if result.FlagFound {
 		return result
 	}
