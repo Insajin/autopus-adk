@@ -274,4 +274,3 @@ func TestRender_EmptyPackages(t *testing.T) {
 	assert.Contains(t, result, "# Signature Map")
 	assert.Contains(t, result, "Module: `github.com/example/app`")
 }
-

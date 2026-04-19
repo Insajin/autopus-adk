@@ -62,7 +62,9 @@ func TestWriteAuditEvent_ValidWriter(t *testing.T) {
 	dir := t.TempDir()
 	w, err := audit.NewRotatingWriter(dir+"/audit.log", 1024*1024, 0)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() {
+		require.NoError(t, w.Close())
+	}()
 
 	evt := AuditEvent{
 		TaskID:      "task-write",

@@ -17,7 +17,7 @@ type PermissionResult struct {
 
 const (
 	modeBypass = "bypass"
-	modeSafe  = "safe"
+	modeSafe   = "safe"
 
 	permissionFlag = "--dangerously-skip-permissions"
 	envKey         = "AUTOPUS_PERMISSION_MODE"

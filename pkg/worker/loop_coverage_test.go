@@ -120,7 +120,6 @@ func TestHandleApproval_NilTUI(t *testing.T) {
 	// No panic = pass.
 }
 
-
 // --- stopServices ---
 
 func TestStopServices_NilCancel(t *testing.T) {

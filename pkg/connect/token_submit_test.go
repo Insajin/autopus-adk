@@ -105,7 +105,7 @@ func TestSubmitToken_ServerError(t *testing.T) {
 			// Given: a server that returns an error status
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.body))
+				_, _ = w.Write([]byte(tt.body))
 			}))
 			defer srv.Close()
 

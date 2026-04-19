@@ -23,7 +23,7 @@ type DeviceCodeResponse struct {
 
 // DeviceTokenResponse is the result of polling the device-token endpoint.
 type DeviceTokenResponse struct {
-	Status       string `json:"status"`                  // "pending", "completed", "expired"
+	Status       string `json:"status"` // "pending", "completed", "expired"
 	AccessToken  string `json:"access_token,omitempty"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 	ExpiresIn    int    `json:"expires_in,omitempty"`

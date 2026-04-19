@@ -50,10 +50,10 @@ func TestSummaryBudget(t *testing.T) {
 		provider string
 		want     int
 	}{
-		{"claude", 10000},   // 200000 * 0.05 = 10000
-		{"codex", 6400},     // 128000 * 0.05 = 6400
-		{"gemini", 12288},   // 1000000 * 0.05 = 50000 → capped at 12288
-		{"unknown", 6400},   // default 128000 * 0.05 = 6400
+		{"claude", 10000}, // 200000 * 0.05 = 10000
+		{"codex", 6400},   // 128000 * 0.05 = 6400
+		{"gemini", 12288}, // 1000000 * 0.05 = 50000 → capped at 12288
+		{"unknown", 6400}, // default 128000 * 0.05 = 6400
 	}
 	for _, tt := range tests {
 		t.Run(tt.provider, func(t *testing.T) {

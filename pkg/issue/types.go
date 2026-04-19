@@ -18,9 +18,9 @@ type IssueContext struct {
 type IssueReport struct {
 	Title   string
 	Context IssueContext
-	Hash    string   // xxhash hex string for dedup
+	Hash    string // xxhash hex string for dedup
 	Labels  []string
-	Repo    string   // target GitHub repo (owner/repo)
+	Repo    string // target GitHub repo (owner/repo)
 }
 
 // SubmitResult holds the outcome of a GitHub issue submission.

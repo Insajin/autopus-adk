@@ -86,7 +86,7 @@ func (c *Client) Initialize(rootURI string) error {
 		"id":      c.seq,
 		"method":  "initialize",
 		"params": map[string]interface{}{
-			"rootUri":    rootURI,
+			"rootUri":      rootURI,
 			"capabilities": map[string]interface{}{},
 		},
 	}

@@ -149,6 +149,7 @@ func Update(projectDir string, outputDir string) ([]string, error) {
 
 	return updated, nil
 }
+
 // Status returns the documentation status.
 type Status struct {
 	Exists       bool

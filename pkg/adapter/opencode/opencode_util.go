@@ -106,25 +106,6 @@ func rewriteOpenCodeWorkflowExamples(body, subcommand string) string {
 	return replacer.Replace(body)
 }
 
-func augmentCommandFrontmatter(frontmatter string) string {
-	frontmatter = strings.TrimSpace(frontmatter)
-	if frontmatter == "" {
-		return "description: \"Autopus command\"\nagent: build"
-	}
-	if strings.Contains(frontmatter, "\nagent:") || strings.HasPrefix(frontmatter, "agent:") {
-		return frontmatter
-	}
-	return frontmatter + "\nagent: build"
-}
-
-func commandArgumentNote(name string) string {
-	if name == "auto" {
-		return "## OpenCode Arguments\n\n사용자가 `/auto` 뒤에 전달한 전체 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 실제 라우팅 규칙은 `skill` 도구로 `auto`를 로드한 뒤 따르세요. 서브커맨드를 결정하면 대응하는 상세 스킬도 추가로 로드해야 합니다.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `" + openCodeDefaultModel + "` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n"
-	}
-	subcommand := strings.TrimPrefix(name, "auto-")
-	return fmt.Sprintf("## OpenCode Arguments\n\n사용자가 `/%s` 뒤에 전달한 인자는 다음과 같습니다.\n\n`$ARGUMENTS`\n\n이 command는 얇은 entrypoint입니다. 전달된 인자를 `/auto %s ...` payload로 다시 해석하고, `skill` 도구로 `auto`를 로드한 뒤 canonical router 규칙을 따르세요. 실제 상세 스킬은 라우터가 결정합니다.\n\n## OpenCode Model Override\n\n- 기본 세션 모델은 `"+openCodeDefaultModel+"` 입니다.\n- 사용자 오버라이드: `--model <provider/model>`\n- reasoning 오버라이드: `--variant <value>`\n- `--model` / `--variant`가 주어지면 이후 단계로 그대로 전달하고 자동으로 덮어쓰지 않습니다.\n", name, subcommand)
-}
-
 func thinRouterCommandBody() string {
 	return strings.TrimSpace("`$ARGUMENTS`\n\nTreat the text above as the full payload passed after `/auto`.\nImmediately load skill `auto` and use it as the canonical router.\nStrip global flags first, resolve the first remaining token as the subcommand, then load the matching `auto-*` skill.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.")
 }

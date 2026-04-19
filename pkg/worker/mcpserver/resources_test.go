@@ -48,7 +48,7 @@ func TestResourceRegistry_Get_FreshCache(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fetchCount.Add(1)
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}))
 	defer srv.Close()
 
@@ -75,7 +75,7 @@ func TestResourceRegistry_Get_ExpiredCache(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fetchCount.Add(1)
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"v": fmt.Sprintf("%d", fetchCount.Load())})
+		_ = json.NewEncoder(w).Encode(map[string]string{"v": fmt.Sprintf("%d", fetchCount.Load())})
 	}))
 	defer srv.Close()
 
@@ -107,7 +107,7 @@ func TestResourceRegistry_Get_StaleFallbackOnError(t *testing.T) {
 		n := callNum.Add(1)
 		if n == 1 {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"data": "cached"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"data": "cached"})
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
@@ -147,7 +147,7 @@ func TestResourceRegistry_Get_DynamicExecution(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v1/executions/exec-42", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"id": "exec-42"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": "exec-42"})
 	}))
 	defer srv.Close()
 

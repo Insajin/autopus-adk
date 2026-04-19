@@ -59,7 +59,7 @@ func TestGenerateAllTemplates_ReadOnlyTemplateDir(t *testing.T) {
 
 	// Make codex dir non-writable to force MkdirAll failure on agents subdir
 	require.NoError(t, os.Chmod(readOnlyDir, 0444))
-	t.Cleanup(func() { os.Chmod(readOnlyDir, 0755) })
+	t.Cleanup(func() { _ = os.Chmod(readOnlyDir, 0755) })
 
 	err := content.GenerateAllTemplates(contentDir, templateDir)
 	assert.Error(t, err)

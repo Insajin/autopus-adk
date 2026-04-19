@@ -121,7 +121,7 @@ func TestMigratePlaintextCredentials_ValidJSON(t *testing.T) {
 	// Only write if file doesn't exist (avoid overwriting real creds).
 	if _, err := os.Stat(credPath); os.IsNotExist(err) {
 		require.NoError(t, os.WriteFile(credPath, data, 0600))
-		defer os.Remove(credPath)
+		defer func() { _ = os.Remove(credPath) }()
 
 		var warned []string
 		warn := func(msg string) { warned = append(warned, msg) }
@@ -155,7 +155,7 @@ func TestMigratePlaintextCredentials_InvalidJSON(t *testing.T) {
 
 	// Write invalid JSON.
 	require.NoError(t, os.WriteFile(credPath, []byte("{not valid json"), 0600))
-	defer os.Remove(credPath)
+	defer func() { _ = os.Remove(credPath) }()
 
 	store := newEncryptedFileStore(t.TempDir())
 	var warned []string

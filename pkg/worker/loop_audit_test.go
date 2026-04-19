@@ -128,8 +128,8 @@ type testLogBuffer struct {
 	errors   []string
 }
 
-func (b *testLogBuffer) hasWarning() bool    { return len(b.warnings) > 0 }
-func (b *testLogBuffer) hasError() bool      { return len(b.errors) > 0 }
+func (b *testLogBuffer) hasWarning() bool { return len(b.warnings) > 0 }
+func (b *testLogBuffer) hasError() bool   { return len(b.errors) > 0 }
 func (b *testLogBuffer) lastWarning() string {
 	if len(b.warnings) == 0 {
 		return ""

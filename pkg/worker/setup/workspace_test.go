@@ -21,7 +21,7 @@ func TestFetchWorkspaces_Success(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(workspaces)
+		_ = json.NewEncoder(w).Encode(workspaces)
 	}))
 	defer srv.Close()
 
@@ -37,7 +37,7 @@ func TestFetchWorkspaces_ServerError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal error"))
+		_, _ = w.Write([]byte("internal error"))
 	}))
 	defer srv.Close()
 
@@ -51,7 +51,7 @@ func TestFetchWorkspaces_InvalidJSON(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("not-json"))
+		_, _ = w.Write([]byte("not-json"))
 	}))
 	defer srv.Close()
 
@@ -67,7 +67,7 @@ func TestFetchWorkspaces_AuthHeader(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]Workspace{})
+		_ = json.NewEncoder(w).Encode([]Workspace{})
 	}))
 	defer srv.Close()
 
@@ -98,7 +98,7 @@ func TestFetchWorkspaces_WrappedResponse(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"success":true,"data":[{"id":"ws-wrapped","name":"Wrapped"}]}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":[{"id":"ws-wrapped","name":"Wrapped"}]}`))
 	}))
 	defer srv.Close()
 
@@ -119,7 +119,7 @@ func TestFetchWorkspaceAgents_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v1/workspaces/ws-1/agents", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(agents)
+		_ = json.NewEncoder(w).Encode(agents)
 	}))
 	defer srv.Close()
 
@@ -136,7 +136,7 @@ func TestFetchWorkspaceAgents_WrappedResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v1/workspaces/ws-1/agents", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"success":true,"data":[{"id":"11111111-2222-4333-8444-555555555555","name":"Dev Worker","type":"dev_worker","tier":"worker","status":"active"}]}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":[{"id":"11111111-2222-4333-8444-555555555555","name":"Dev Worker","type":"dev_worker","tier":"worker","status":"active"}]}`))
 	}))
 	defer srv.Close()
 
@@ -153,7 +153,7 @@ func TestFetchWorkspaceAgents_AuthHeader(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]WorkspaceAgent{})
+		_ = json.NewEncoder(w).Encode([]WorkspaceAgent{})
 	}))
 	defer srv.Close()
 
@@ -209,7 +209,7 @@ func TestSelectWorkspace_MultipleWithValidInput(t *testing.T) {
 
 	// Write "2\n" to select workspace 2
 	go func() {
-		w.Write([]byte("2\n"))
+		_, _ = w.Write([]byte("2\n"))
 		w.Close()
 	}()
 
@@ -234,7 +234,7 @@ func TestSelectWorkspace_OutOfRangeThenValid(t *testing.T) {
 
 	// First "5" is out of range, then "1" is valid
 	go func() {
-		w.Write([]byte("5\n1\n"))
+		_, _ = w.Write([]byte("5\n1\n"))
 		w.Close()
 	}()
 
@@ -256,7 +256,7 @@ func TestSelectWorkspace_InvalidThenValid(t *testing.T) {
 	t.Cleanup(func() { os.Stdin = oldStdin })
 
 	go func() {
-		w.Write([]byte("abc\n1\n"))
+		_, _ = w.Write([]byte("abc\n1\n"))
 		w.Close()
 	}()
 
@@ -275,7 +275,7 @@ func TestFetchWorkspaces_TrailingSlashURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v1/workspaces", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]Workspace{{ID: "ws-1", Name: "One"}})
+		_ = json.NewEncoder(w).Encode([]Workspace{{ID: "ws-1", Name: "One"}})
 	}))
 	defer srv.Close()
 

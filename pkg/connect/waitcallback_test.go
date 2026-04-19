@@ -20,7 +20,7 @@ func freePort(t *testing.T) int {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	port := ln.Addr().(*net.TCPAddr).Port
-	ln.Close()
+	_ = ln.Close()
 	return port
 }
 
@@ -30,7 +30,7 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 	// Given: a mock token server
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "at-waitcb-success",
 			"expires_in":   3600,
 		})
@@ -66,7 +66,7 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 			errCh <- fmt.Errorf("callback server: %w", sErr)
 		}
 	}()
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	// Give server time to start
 	time.Sleep(100 * time.Millisecond)
@@ -130,7 +130,7 @@ func TestWaitForCallback_ErrorPath(t *testing.T) {
 			errCh <- fmt.Errorf("callback server: %w", sErr)
 		}
 	}()
-	defer server.Close()
+	defer func() { _ = server.Close() }()
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -187,7 +187,7 @@ func TestExchangeAuthCode_DefaultsUsed(t *testing.T) {
 func TestStartOAuthFlow_PortIsValid(t *testing.T) {
 	t.Parallel()
 
-	cfg := OAuthConfig{Port: freePort(t),ClientID: "test"}
+	cfg := OAuthConfig{Port: freePort(t), ClientID: "test"}
 
 	results := make([]*OAuthFlowResult, 3)
 	for i := range results {

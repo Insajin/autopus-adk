@@ -182,7 +182,7 @@ func TestLoadAgentsFromFS_SkipsNonMD(t *testing.T) {
 
 	fsys := fstest.MapFS{
 		"agents/readme.txt": &fstest.MapFile{Data: []byte("ignore me")},
-		"agents/notes.json":  &fstest.MapFile{Data: []byte("{}")},
+		"agents/notes.json": &fstest.MapFile{Data: []byte("{}")},
 		"agents/valid.md": &fstest.MapFile{
 			Data: []byte("---\nname: valid\nrole: test\n---\n\nbody"),
 		},

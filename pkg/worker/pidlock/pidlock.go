@@ -112,4 +112,3 @@ func readPIDFromFile(path string) (int, error) {
 	}
 	return pid, nil
 }
-

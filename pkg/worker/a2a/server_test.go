@@ -86,7 +86,7 @@ func (mb *mockBackend) wsURL() string {
 func (mb *mockBackend) close() {
 	mb.mu.Lock()
 	if mb.conn != nil {
-		mb.conn.Close()
+		_ = mb.conn.Close()
 	}
 	mb.mu.Unlock()
 	mb.server.Close()
@@ -127,7 +127,9 @@ func TestServer_SendMessage_Success(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	// Patch the backend URL — server.Start builds /ws/a2a path from BackendURL.
 	// Our mock already handles /ws/a2a, and wsURL returns the raw ws:// URL.
@@ -197,7 +199,9 @@ func TestServer_SendMessage_HandlerError(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -245,7 +249,9 @@ func TestServer_ReconnectTransport_ReRegistersAgentCard(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	require.NoError(t, srv.Start(ctx))
 	mb.waitForMessages(t, 1, 3*time.Second) // initial registration
@@ -296,7 +302,9 @@ func TestServer_SendMessage_MissingPolicySignatureRejectedWhenSecretConfigured(t
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -340,7 +348,9 @@ func TestServer_SendMessage_MissingControlPlaneSignatureRejectedWhenSecretConfig
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -404,7 +414,9 @@ func TestServer_SendMessage_ControlPlaneCapabilitiesFilterMetadata(t *testing.T)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -461,7 +473,9 @@ func TestServer_CancelTask(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -530,7 +544,9 @@ func TestServer_HandlePolledTask(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -579,7 +595,9 @@ func TestServer_HandlePolledTask_InjectsModelIntoPayload(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))

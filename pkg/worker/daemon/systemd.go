@@ -112,7 +112,9 @@ func UninstallSystemd() error {
 	}
 
 	// Reload after removal.
-	exec.Command("systemctl", "--user", "daemon-reload").Run()
+	if out, err := exec.Command("systemctl", "--user", "daemon-reload").CombinedOutput(); err != nil {
+		log.Printf("[daemon] systemctl daemon-reload warning: %s: %v", string(out), err)
+	}
 
 	log.Printf("[daemon] systemd service uninstalled")
 	return nil

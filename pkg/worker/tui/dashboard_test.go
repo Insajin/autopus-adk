@@ -117,7 +117,7 @@ func TestRenderTaskQueue_OverflowTruncation(t *testing.T) {
 func TestClampWidth(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, 40, clampWidth(10))  // below minimum
-	assert.Equal(t, 76, clampWidth(80))  // normal
+	assert.Equal(t, 40, clampWidth(10))   // below minimum
+	assert.Equal(t, 76, clampWidth(80))   // normal
 	assert.Equal(t, 120, clampWidth(200)) // above maximum
 }

@@ -54,7 +54,9 @@ func (m *pipelineMockAdapter) ExtractResult(event adapter.StreamEvent) adapter.T
 		DurationMS int64   `json:"duration_ms"`
 		SessionID  string  `json:"session_id"`
 	}
-	json.Unmarshal(event.Data, &data)
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		panic(err)
+	}
 	return adapter.TaskResult{
 		Output:     data.Output,
 		CostUSD:    data.CostUSD,

@@ -143,9 +143,9 @@ func TestCompareSemver(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		current  string
-		latest   string
+		name      string
+		current   string
+		latest    string
 		wantNewer bool
 	}{
 		{"newer minor version", "0.6.0", "0.7.0", true},

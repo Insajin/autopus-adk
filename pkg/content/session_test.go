@@ -18,10 +18,10 @@ func TestSaveAndLoadState(t *testing.T) {
 	path := filepath.Join(dir, ".auto-continue.md")
 
 	state := &content.SessionState{
-		WorkflowPhase:     "implementation",
-		CompletedTasks:    []string{"task-1", "task-2"},
-		PendingDecisions:  []string{"결제 모듈 선택"},
-		ContextSummary:    "현재 인증 모듈 구현 중. JWT 토큰 방식 결정됨.",
+		WorkflowPhase:    "implementation",
+		CompletedTasks:   []string{"task-1", "task-2"},
+		PendingDecisions: []string{"결제 모듈 선택"},
+		ContextSummary:   "현재 인증 모듈 구현 중. JWT 토큰 방식 결정됨.",
 	}
 
 	err := content.SaveState(path, state)

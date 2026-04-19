@@ -20,38 +20,38 @@ func setupToolTestServer(t *testing.T) (*MCPServer, *httptest.Server) {
 		switch {
 		case r.URL.Path == "/api/v1/tasks" && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"id": "task-1", "status": "created"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"id": "task-1", "status": "created"})
 
 		case r.URL.Path == "/api/v1/workspaces/ws-test/knowledge/search" && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"success": true,
 				"data":    []map[string]string{{"title": "result1"}},
 			})
 
 		case r.URL.Path == "/api/v1/executions/exec-1" && r.Method == http.MethodGet:
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"id": "exec-1", "status": "running"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"id": "exec-1", "status": "running"})
 
 		case r.URL.Path == "/api/v1/agents" && r.Method == http.MethodGet:
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode([]map[string]string{{"name": "agent1"}})
+			_ = json.NewEncoder(w).Encode([]map[string]string{{"name": "agent1"}})
 
 		case r.URL.Path == "/api/v1/executions/exec-1/approve" && r.Method == http.MethodPost:
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"status": "approved"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"status": "approved"})
 
 		case r.URL.Path == "/api/v1/workspaces/ws-test" && r.Method == http.MethodGet:
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"id": "ws-test"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"id": "ws-test"})
 
 		case r.URL.Path == "/api/v1/workspaces/ws-test" && r.Method == http.MethodPut:
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"id": "ws-test", "updated": "true"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"id": "ws-test", "updated": "true"})
 
 		default:
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(`{"error":"not found"}`))
+			_, _ = w.Write([]byte(`{"error":"not found"}`))
 		}
 	}))
 
@@ -190,7 +190,7 @@ func TestExecuteRequest_BackendError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte("service down"))
+		_, _ = w.Write([]byte("service down"))
 	}))
 	defer srv.Close()
 

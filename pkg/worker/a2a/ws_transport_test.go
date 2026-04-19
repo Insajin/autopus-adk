@@ -23,7 +23,7 @@ func wsEchoServer(t *testing.T) *httptest.Server {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		for {
 			mt, msg, err := conn.ReadMessage()
 			if err != nil {
@@ -78,7 +78,9 @@ func TestTransport_ConnectAndSendReceive(t *testing.T) {
 	defer cancel()
 
 	require.NoError(t, tr.Connect(ctx))
-	defer tr.Close()
+	defer func() {
+		require.NoError(t, tr.Close())
+	}()
 
 	// Send and receive echo.
 	require.NoError(t, tr.Send([]byte("hello")))
@@ -134,7 +136,9 @@ func TestTransport_Reconnect_Success(t *testing.T) {
 
 	// Reconnect should close old connection and establish a new one.
 	require.NoError(t, tr.Reconnect(ctx))
-	defer tr.Close()
+	defer func() {
+		require.NoError(t, tr.Close())
+	}()
 
 	// Verify the new connection works.
 	require.NoError(t, tr.Send([]byte("after-reconnect")))
@@ -187,7 +191,7 @@ func TestTransport_Heartbeat_SendsPing(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 		conn.SetPingHandler(func(string) error {
 			pingCount.Add(1)
 			return conn.WriteControl(websocket.PongMessage, nil, time.Now().Add(time.Second))
@@ -210,7 +214,9 @@ func TestTransport_Heartbeat_SendsPing(t *testing.T) {
 	defer cancel()
 
 	require.NoError(t, tr.Connect(ctx))
-	defer tr.Close()
+	defer func() {
+		require.NoError(t, tr.Close())
+	}()
 
 	// Wait enough time for at least 2 pings.
 	time.Sleep(2500 * time.Millisecond)

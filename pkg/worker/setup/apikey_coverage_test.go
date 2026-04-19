@@ -111,7 +111,7 @@ func TestSaveAPIKeyCredentials_WritesFile(t *testing.T) {
 	defer cleanup()
 
 	credPath := DefaultCredentialsPath()
-	defer os.Remove(credPath)
+	defer func() { _ = os.Remove(credPath) }()
 
 	err := SaveAPIKeyCredentials("wrk-mytestkey", "https://api.autopus.co")
 	require.NoError(t, err)

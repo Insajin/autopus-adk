@@ -16,7 +16,7 @@ var (
 	reStateDriven = regexp.MustCompile(`(?i)WHERE\s+.+\s+THEN\s+.+`)
 	reUnwanted    = regexp.MustCompile(`(?i)IF\s+.+\s+THEN\s+.+`)
 	// Ubiquitous: 한국어 (시스템은/시스템이/시스템) + 영어 패턴 모두 지원
-	reUbiquitous  = regexp.MustCompile(`(?i)(시스템[은이]?|system|The system)\s+SHALL\s+.+`)
+	reUbiquitous = regexp.MustCompile(`(?i)(시스템[은이]?|system|The system)\s+SHALL\s+.+`)
 )
 
 // ParseEARS는 텍스트에서 EARS 패턴 요구사항을 파싱한다.

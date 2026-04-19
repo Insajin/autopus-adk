@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	defaultGoDocsBaseURL    = "https://pkg.go.dev"
-	defaultNpmRegistryURL   = "https://registry.npmjs.org"
-	defaultPyPIBaseURL      = "https://pypi.org"
+	defaultGoDocsBaseURL  = "https://pkg.go.dev"
+	defaultNpmRegistryURL = "https://registry.npmjs.org"
+	defaultPyPIBaseURL    = "https://pypi.org"
 )
 
 // Scraper fetches documentation from public package registries.

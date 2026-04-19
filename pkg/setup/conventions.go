@@ -130,10 +130,10 @@ func analyzePythonConventions(dir string) ConventionSample {
 
 	// Detect linter
 	linters := map[string]string{
-		"ruff.toml":      "Ruff",
-		".flake8":        "Flake8",
-		"setup.cfg":      "Flake8",
-		"tox.ini":        "Flake8",
+		"ruff.toml": "Ruff",
+		".flake8":   "Flake8",
+		"setup.cfg": "Flake8",
+		"tox.ini":   "Flake8",
 	}
 	for file, name := range linters {
 		if fileExists(filepath.Join(dir, file)) {
@@ -218,10 +218,10 @@ func collectSourceFiles(dir, ext string, maxCount int) []string {
 // detectFileNaming analyzes file names to determine the dominant naming convention.
 func detectFileNaming(files []string) string {
 	counts := map[string]int{
-		"snake_case":  0,
-		"kebab-case":  0,
-		"camelCase":   0,
-		"PascalCase":  0,
+		"snake_case": 0,
+		"kebab-case": 0,
+		"camelCase":  0,
+		"PascalCase": 0,
 	}
 
 	for _, f := range files {

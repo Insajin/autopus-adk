@@ -130,7 +130,7 @@ func TestClean_UnreadableAgentsMD(t *testing.T) {
 	agentsPath := filepath.Join(dir, "AGENTS.md")
 
 	require.NoError(t, os.WriteFile(agentsPath, []byte("content"), 0000))
-	t.Cleanup(func() { os.Chmod(agentsPath, 0644) })
+	t.Cleanup(func() { _ = os.Chmod(agentsPath, 0644) })
 
 	err := a.Clean(context.Background())
 	if err != nil {

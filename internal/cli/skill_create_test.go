@@ -112,10 +112,10 @@ func TestParseTriggers_CommaSeparated(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		input    string
+		name      string
+		input     string
 		skillName string
-		expected []string
+		expected  []string
 	}{
 		{
 			name:      "single trigger",

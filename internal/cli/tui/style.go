@@ -22,7 +22,7 @@ var envOnce sync.Once
 func EnsureSafeEnv() {
 	envOnce.Do(func() {
 		if !term.IsTerminal(int(os.Stdout.Fd())) {
-			os.Setenv("NO_COLOR", "1")
+			_ = os.Setenv("NO_COLOR", "1")
 			// Force an ASCII-only renderer so lipgloss/termenv never sends
 			// OSC 11 terminal queries that block in non-TTY environments.
 			lipgloss.SetDefaultRenderer(

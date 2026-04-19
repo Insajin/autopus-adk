@@ -27,3 +27,8 @@ linters:
         - "all"
         - "-QF*"    # disable quickfix suggestions — style, not correctness
         - "-ST1*"   # style checks — not enforced (Korean doc comments)
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

@@ -28,7 +28,8 @@ func sanitizeProviderName(name string) string {
 }
 
 // shellEscapeArg wraps a string in single quotes for safe shell interpolation.
-// Any embedded single quotes are escaped as '\'' (end quote, escaped quote, start quote).
+// Any embedded single quotes use the standard POSIX quote-break pattern:
+// close quote, emit an escaped quote, then reopen the quote.
 func shellEscapeArg(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

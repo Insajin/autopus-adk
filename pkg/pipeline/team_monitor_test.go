@@ -31,7 +31,7 @@ func TestTeamMonitorSession_Start_Cmux_ThreeMembers(t *testing.T) {
 		assert.Equal(t, "pending", state.Agents[role])
 	}
 
-	session.Close(context.Background())
+	_ = session.Close(context.Background())
 }
 
 // S2: cmux terminal with 4-person team
@@ -45,7 +45,7 @@ func TestTeamMonitorSession_Start_Cmux_FourMembers(t *testing.T) {
 	assert.Equal(t, 4, term.splitCount)
 	assert.Len(t, session.Panes(), 4)
 
-	session.Close(context.Background())
+	_ = session.Close(context.Background())
 }
 
 // S4: plain terminal graceful degradation
@@ -63,7 +63,7 @@ func TestTeamMonitorSession_Start_PlainTerminal(t *testing.T) {
 	session.UpdateAgent("lead", "running")
 	assert.Equal(t, "running", session.State().Agents["lead"])
 
-	session.Close(context.Background())
+	_ = session.Close(context.Background())
 }
 
 // S5: teammate status update
@@ -79,7 +79,7 @@ func TestTeamMonitorSession_UpdateAgent(t *testing.T) {
 	session.UpdateAgent("lead", "done")
 	assert.Equal(t, "done", session.State().Agents["lead"])
 
-	session.Close(context.Background())
+	_ = session.Close(context.Background())
 }
 
 // S6: pipeline completion cleanup
@@ -120,7 +120,7 @@ func TestTeamMonitorSession_FailedTeammate_Cmux(t *testing.T) {
 	}
 	assert.True(t, found, "failure message should be sent to builder's pane")
 
-	session.Close(context.Background())
+	_ = session.Close(context.Background())
 }
 
 // S8: existing MonitorSession non-interference
@@ -236,7 +236,7 @@ func TestTeamMonitorSession_Panes_AfterStart(t *testing.T) {
 	assert.Equal(t, "a", panes[0].Role)
 	assert.Equal(t, "b", panes[1].Role)
 
-	session.Close(context.Background())
+	_ = session.Close(context.Background())
 }
 
 func TestTeamMonitorSession_FailTeammate_NonExistentRole(t *testing.T) {
@@ -249,7 +249,7 @@ func TestTeamMonitorSession_FailTeammate_NonExistentRole(t *testing.T) {
 	session.FailTeammate(context.Background(), "unknown-role", "error")
 	assert.Equal(t, "failed", session.State().Agents["unknown-role"])
 
-	session.Close(context.Background())
+	_ = session.Close(context.Background())
 }
 
 // contains checks if a string contains a substring.

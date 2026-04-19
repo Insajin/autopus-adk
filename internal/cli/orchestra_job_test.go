@@ -190,4 +190,3 @@ func TestOrchestraReviewCmd_NoDetachFlag(t *testing.T) {
 	// Then: flag should exist
 	assert.NotNil(t, flag, "--no-detach flag must be registered on review command")
 }
-

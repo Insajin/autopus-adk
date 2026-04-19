@@ -167,7 +167,7 @@ func TestMultiWorkspace_ConcurrentAccess(t *testing.T) {
 			}
 			mw.Add(conn)
 			mw.Get(wsID)
-			mw.RouteTask(wsID)
+			_, _ = mw.RouteTask(wsID)
 			mw.List()
 		}(i)
 	}

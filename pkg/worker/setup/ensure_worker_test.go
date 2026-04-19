@@ -65,7 +65,7 @@ func TestEnsureWorker_NotConfigured_DeviceAuthSucceeds_ContextCancelled(t *testi
 				Interval:                1,
 			}
 			resp, _ := json.Marshal(map[string]any{"data": dc})
-			w.Write(resp)
+			_, _ = w.Write(resp)
 			return
 		}
 		// Token poll: return authorization_pending
@@ -74,7 +74,7 @@ func TestEnsureWorker_NotConfigured_DeviceAuthSucceeds_ContextCancelled(t *testi
 		resp, _ := json.Marshal(map[string]any{
 			"error": "authorization_pending",
 		})
-		w.Write(resp)
+		_, _ = w.Write(resp)
 	}))
 	defer srv.Close()
 

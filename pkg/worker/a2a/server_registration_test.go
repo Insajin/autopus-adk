@@ -40,7 +40,7 @@ func TestCacheSecurityPolicy_AtomicWrite(t *testing.T) {
 
 	dir, _ := policyDir()
 	target := filepath.Join(dir, fmt.Sprintf("autopus-policy-%s.json", taskID))
-	defer os.Remove(target)
+	defer func() { _ = os.Remove(target) }()
 
 	// Overwrite with a different policy — should be atomic (no partial reads).
 	policy2 := SecurityPolicy{AllowNetwork: true, AllowFS: false, TimeoutSec: 60}
@@ -68,7 +68,7 @@ func TestCacheSecurityPolicy_WritesFile(t *testing.T) {
 	require.NoError(t, cacheSecurityPolicy(taskID, policy, ""))
 
 	path := filepath.Join(os.TempDir(), fmt.Sprintf("autopus-%d", os.Getuid()), fmt.Sprintf("autopus-policy-%s.json", taskID))
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -97,7 +97,9 @@ func TestRegisterAgentCard_CorrectJSONRPC(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))

@@ -23,7 +23,7 @@ func TestSaveTokenCredentials_WritesExpiry(t *testing.T) {
 	withLegacyCredentialStore(t)
 
 	credPath := DefaultCredentialsPath()
-	defer os.Remove(credPath)
+	defer func() { _ = os.Remove(credPath) }()
 
 	tokenResp := &TokenResponse{
 		AccessToken:  "test-access",
@@ -52,7 +52,7 @@ func TestSaveTokenCredentials_NoExpiry(t *testing.T) {
 	withLegacyCredentialStore(t)
 
 	credPath := DefaultCredentialsPath()
-	defer os.Remove(credPath)
+	defer func() { _ = os.Remove(credPath) }()
 
 	tokenResp := &TokenResponse{
 		AccessToken:  "access-no-expiry",
@@ -90,7 +90,7 @@ func TestTryRefreshCredentials_NoRefreshToken(t *testing.T) {
 	withLegacyCredentialStore(t)
 
 	credPath := DefaultCredentialsPath()
-	defer os.Remove(credPath)
+	defer func() { _ = os.Remove(credPath) }()
 
 	// Write creds without refresh_token.
 	creds := map[string]any{"access_token": "test", "auth_type": "jwt"}
@@ -109,7 +109,7 @@ func TestTryRefreshCredentials_ServerError(t *testing.T) {
 	withLegacyCredentialStore(t)
 
 	credPath := DefaultCredentialsPath()
-	defer os.Remove(credPath)
+	defer func() { _ = os.Remove(credPath) }()
 
 	// Server that fails token refresh.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

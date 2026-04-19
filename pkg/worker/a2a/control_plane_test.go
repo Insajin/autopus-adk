@@ -50,8 +50,8 @@ func TestCacheSecurityPolicy_WritesSignatureSidecar(t *testing.T) {
 	dir, err := policyDir()
 	require.NoError(t, err)
 	policyPath := filepath.Join(dir, "autopus-policy-"+taskID+".json")
-	defer os.Remove(policyPath)
-	defer os.Remove(policySignaturePath(policyPath))
+	defer func() { _ = os.Remove(policyPath) }()
+	defer func() { _ = os.Remove(policySignaturePath(policyPath)) }()
 
 	gotSignature, err := readPolicySignature(policyPath)
 	require.NoError(t, err)
@@ -78,8 +78,8 @@ func TestVerifyCachedPolicyFile(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(policyPath, data, 0o600))
 	require.NoError(t, writePolicySignature(policyPath, signature))
-	defer os.Remove(policyPath)
-	defer os.Remove(policySignaturePath(policyPath))
+	defer func() { _ = os.Remove(policyPath) }()
+	defer func() { _ = os.Remove(policySignaturePath(policyPath)) }()
 
 	require.NoError(t, VerifyCachedPolicyFile(policyPath, policy))
 }

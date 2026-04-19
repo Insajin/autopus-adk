@@ -37,24 +37,28 @@ func cacheSecurityPolicy(taskID string, policy SecurityPolicy, signature string)
 	tmpPath := tmp.Name()
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
+		_ = tmp.Close()
+		removeIfExists(tmpPath)
 		return fmt.Errorf("write policy: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
+		removeIfExists(tmpPath)
 		return fmt.Errorf("close policy file: %w", err)
 	}
 
 	target := filepath.Join(dir, fmt.Sprintf("autopus-policy-%s.json", taskID))
 	if err := os.Rename(tmpPath, target); err != nil {
-		os.Remove(tmpPath)
+		removeIfExists(tmpPath)
 		return fmt.Errorf("rename policy file: %w", err)
 	}
 	if err := writePolicySignature(target, signature); err != nil {
 		return err
 	}
 	return nil
+}
+
+func removeIfExists(path string) {
+	_ = os.Remove(path)
 }
 
 // marshalJSON marshals v to JSON, returning an error instead of panicking (SEC-002).

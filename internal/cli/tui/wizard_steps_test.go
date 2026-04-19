@@ -106,10 +106,10 @@ func TestRunInitWizard_FlagCombinations(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		opts         tui.InitWizardOpts
-		wantQuality  string
-		wantGate     bool
+		name        string
+		opts        tui.InitWizardOpts
+		wantQuality string
+		wantGate    bool
 	}{
 		{
 			name:        "quality flag only",

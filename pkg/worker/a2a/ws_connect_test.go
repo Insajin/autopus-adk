@@ -30,8 +30,10 @@ func TestTransport_Connect_AuthToken(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
-		conn.ReadMessage()
+		defer func() { _ = conn.Close() }()
+		if _, _, err = conn.ReadMessage(); err != nil {
+			return
+		}
 	}))
 	defer srv.Close()
 
@@ -51,7 +53,9 @@ func TestTransport_Connect_AuthToken(t *testing.T) {
 	defer cancel()
 
 	require.NoError(t, tr.Connect(ctx))
-	defer tr.Close()
+	defer func() {
+		require.NoError(t, tr.Close())
+	}()
 
 	assert.Equal(t, "Bearer test-secret-token", receivedAuth)
 }
@@ -66,8 +70,10 @@ func TestTransport_Connect_NoAuthToken(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer conn.Close()
-		conn.ReadMessage()
+		defer func() { _ = conn.Close() }()
+		if _, _, err = conn.ReadMessage(); err != nil {
+			return
+		}
 	}))
 	defer srv.Close()
 
@@ -80,7 +86,9 @@ func TestTransport_Connect_NoAuthToken(t *testing.T) {
 	defer cancel()
 
 	require.NoError(t, tr.Connect(ctx))
-	defer tr.Close()
+	defer func() {
+		require.NoError(t, tr.Close())
+	}()
 
 	assert.Empty(t, receivedAuth, "no auth header should be sent without token")
 }
@@ -102,7 +110,9 @@ func TestTransport_Connect_WSProtocolLogsWarning(t *testing.T) {
 
 	// Should connect successfully even with ws:// (warning is logged).
 	require.NoError(t, tr.Connect(ctx))
-	defer tr.Close()
+	defer func() {
+		require.NoError(t, tr.Close())
+	}()
 
 	require.NoError(t, tr.Send([]byte("tls-test")))
 	data, err := tr.Receive()

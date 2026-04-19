@@ -18,7 +18,9 @@ func TestRotatingWriter_WriteAppends(t *testing.T) {
 
 	w, err := NewRotatingWriter(path, 1024, time.Hour)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() {
+		require.NoError(t, w.Close())
+	}()
 
 	_, err = w.Write([]byte("line1\n"))
 	require.NoError(t, err)
@@ -38,7 +40,9 @@ func TestRotatingWriter_RotatesAtMaxSize(t *testing.T) {
 	// maxSize of 20 bytes.
 	w, err := NewRotatingWriter(path, 20, time.Hour)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() {
+		require.NoError(t, w.Close())
+	}()
 
 	// Write 15 bytes.
 	_, err = w.Write([]byte("123456789012345"))
@@ -66,7 +70,9 @@ func TestRotatingWriter_RotatedFileNaming(t *testing.T) {
 
 	w, err := NewRotatingWriter(path, 10, time.Hour)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() {
+		require.NoError(t, w.Close())
+	}()
 
 	// Trigger multiple rotations.
 	for i := 0; i < 3; i++ {
@@ -86,7 +92,9 @@ func TestRotatingWriter_MaxAgeCleanup(t *testing.T) {
 
 	w, err := NewRotatingWriter(path, 1024, 1*time.Millisecond)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() {
+		require.NoError(t, w.Close())
+	}()
 
 	// Create fake rotated files with old timestamps.
 	oldFile := path + ".1"
@@ -107,7 +115,9 @@ func TestRotatingWriter_ConcurrentWrites(t *testing.T) {
 
 	w, err := NewRotatingWriter(path, 10*1024, time.Hour)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() {
+		require.NoError(t, w.Close())
+	}()
 
 	var wg sync.WaitGroup
 	for i := 0; i < 50; i++ {
@@ -130,7 +140,9 @@ func TestRotatingWriter_DefaultValues(t *testing.T) {
 	// Pass zero values for maxSize and maxAge.
 	w, err := NewRotatingWriter(path, 0, 0)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() {
+		require.NoError(t, w.Close())
+	}()
 
 	assert.Equal(t, int64(10*1024*1024), w.maxSize)
 	assert.Equal(t, 7*24*time.Hour, w.maxAge)

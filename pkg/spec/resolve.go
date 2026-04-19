@@ -11,11 +11,11 @@ import (
 
 // walkSkipDirs are directories excluded from recursive SPEC resolution.
 var walkSkipDirs = map[string]bool{
-	".git":        true,
+	".git":         true,
 	"node_modules": true,
-	"vendor":      true,
-	".cache":      true,
-	"dist":        true,
+	"vendor":       true,
+	".cache":       true,
+	"dist":         true,
 }
 
 // ResolveResult holds the resolved SPEC path information.

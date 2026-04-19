@@ -16,7 +16,6 @@ type emitterSignalMock struct {
 	mockTerminal
 	sentSignals []string
 	sentMu      sync.Mutex
-	waitErr     error
 	waitName    string
 	waitCh      chan struct{} // closed when signal is received
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -132,9 +133,11 @@ func IsNewerVersion(latest, current string) bool {
 	currentParts := strings.Split(stripPreRelease(current), ".")
 
 	for i := 0; i < len(latestParts) && i < len(currentParts); i++ {
-		var lv, cv int
-		fmt.Sscanf(latestParts[i], "%d", &lv)
-		fmt.Sscanf(currentParts[i], "%d", &cv)
+		lv, latestErr := strconv.Atoi(latestParts[i])
+		cv, currentErr := strconv.Atoi(currentParts[i])
+		if latestErr != nil || currentErr != nil {
+			return latest > current
+		}
 
 		if lv > cv {
 			return true

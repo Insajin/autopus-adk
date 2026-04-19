@@ -34,10 +34,10 @@ type ManifestFile struct {
 type UpdateAction string
 
 const (
-	ActionOverwrite UpdateAction = "overwrite"  // 사용자 미수정 → 덮어쓰기
-	ActionBackup    UpdateAction = "backup"     // 사용자 수정 → 백업 후 덮어쓰기
-	ActionSkip      UpdateAction = "skip"       // 사용자 삭제 → 스킵
-	ActionCreate    UpdateAction = "create"     // 새 파일 → 생성
+	ActionOverwrite UpdateAction = "overwrite" // 사용자 미수정 → 덮어쓰기
+	ActionBackup    UpdateAction = "backup"    // 사용자 수정 → 백업 후 덮어쓰기
+	ActionSkip      UpdateAction = "skip"      // 사용자 삭제 → 스킵
+	ActionCreate    UpdateAction = "create"    // 새 파일 → 생성
 )
 
 // UpdateResult는 단일 파일의 업데이트 결과이다.

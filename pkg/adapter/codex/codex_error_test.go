@@ -239,7 +239,7 @@ func TestGenerateHooks_MkdirBlocked(t *testing.T) {
 	dir := t.TempDir()
 	codexParent := filepath.Join(dir, ".codex")
 	require.NoError(t, os.WriteFile(codexParent, []byte("blocker"), 0444))
-	t.Cleanup(func() { os.Remove(codexParent) })
+	t.Cleanup(func() { _ = os.Remove(codexParent) })
 
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")

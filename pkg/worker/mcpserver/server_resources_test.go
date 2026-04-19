@@ -70,7 +70,7 @@ func TestMCPServer_ResourcesReadSuccess(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
 	}))
 	defer srv.Close()
 

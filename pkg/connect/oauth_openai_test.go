@@ -77,7 +77,7 @@ func TestExchangeAuthCode_Success(t *testing.T) {
 		assert.NotEmpty(t, r.FormValue("code_verifier"))
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  "at-12345",
 			"refresh_token": "rt-67890",
 			"expires_in":    3600,

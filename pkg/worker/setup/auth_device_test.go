@@ -19,7 +19,7 @@ func TestRequestDeviceCode_Success(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "/api/v1/auth/device/code", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(DeviceCode{
+		_ = json.NewEncoder(w).Encode(DeviceCode{
 			DeviceCode:      "dev-123",
 			UserCode:        "ABCD-EFGH",
 			VerificationURI: "https://auth.example.com/device",
@@ -40,7 +40,7 @@ func TestRequestDeviceCode_ServerError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("server error"))
+		_, _ = w.Write([]byte("server error"))
 	}))
 	defer srv.Close()
 
@@ -54,7 +54,7 @@ func TestRequestDeviceCode_InvalidJSON(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("not-json"))
+		_, _ = w.Write([]byte("not-json"))
 	}))
 	defer srv.Close()
 
@@ -68,7 +68,7 @@ func TestRequestDeviceCode_WrappedResponse(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"success":true,"data":{"device_code":"wrapped-dc","user_code":"WRAP-CODE","verification_uri":"https://auth.example.com","expires_in":600,"interval":5}}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":{"device_code":"wrapped-dc","user_code":"WRAP-CODE","verification_uri":"https://auth.example.com","expires_in":600,"interval":5}}`))
 	}))
 	defer srv.Close()
 
@@ -83,7 +83,7 @@ func TestRequestDeviceCode_TrailingSlashURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/v1/auth/device/code", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(DeviceCode{DeviceCode: "dc-slash"})
+		_ = json.NewEncoder(w).Encode(DeviceCode{DeviceCode: "dc-slash"})
 	}))
 	defer srv.Close()
 
@@ -97,7 +97,7 @@ func TestTryTokenExchange_Success(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(TokenResponse{
+		_ = json.NewEncoder(w).Encode(TokenResponse{
 			AccessToken:  "new-tok",
 			RefreshToken: "new-ref",
 			ExpiresIn:    3600,
@@ -117,7 +117,7 @@ func TestTryTokenExchange_Pending(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"authorization_pending"}`))
+		_, _ = w.Write([]byte(`{"error":"authorization_pending"}`))
 	}))
 	defer srv.Close()
 
@@ -132,7 +132,7 @@ func TestTryTokenExchange_SlowDown(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error":"slow_down"}`))
+		_, _ = w.Write([]byte(`{"error":"slow_down"}`))
 	}))
 	defer srv.Close()
 
@@ -147,7 +147,7 @@ func TestTryTokenExchange_ServerError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("server error"))
+		_, _ = w.Write([]byte("server error"))
 	}))
 	defer srv.Close()
 
@@ -161,7 +161,7 @@ func TestTryTokenExchange_WrappedResponse(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"success":true,"data":{"access_token":"wrapped-tok","refresh_token":"ref","expires_in":3600,"token_type":"Bearer"}}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":{"access_token":"wrapped-tok","refresh_token":"ref","expires_in":3600,"token_type":"Bearer"}}`))
 	}))
 	defer srv.Close()
 
@@ -176,7 +176,7 @@ func TestTryTokenExchange_BadRequestUnknownError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"expired_token"}`))
+		_, _ = w.Write([]byte(`{"error":"expired_token"}`))
 	}))
 	defer srv.Close()
 
@@ -204,11 +204,11 @@ func TestPollForToken_SuccessAfterPending(t *testing.T) {
 		callCount++
 		if callCount <= 1 {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(`{"error":"authorization_pending"}`))
+			_, _ = w.Write([]byte(`{"error":"authorization_pending"}`))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(TokenResponse{
+		_ = json.NewEncoder(w).Encode(TokenResponse{
 			AccessToken:  "polled-tok",
 			RefreshToken: "polled-ref",
 			ExpiresIn:    3600,
@@ -245,11 +245,11 @@ func TestPollForToken_SlowDownThenSuccess(t *testing.T) {
 		callCount++
 		if callCount == 1 {
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"slow_down"}`))
+			_, _ = w.Write([]byte(`{"error":"slow_down"}`))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(TokenResponse{
+		_ = json.NewEncoder(w).Encode(TokenResponse{
 			AccessToken: "slow-tok",
 			ExpiresIn:   3600,
 			TokenType:   "Bearer",
@@ -270,7 +270,7 @@ func TestPollForToken_ServerError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("error"))
+		_, _ = w.Write([]byte("error"))
 	}))
 	defer srv.Close()
 

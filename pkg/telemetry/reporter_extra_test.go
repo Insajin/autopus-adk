@@ -64,9 +64,9 @@ func TestFormatSummary_DurationExactlyMinutes(t *testing.T) {
 func TestFormatSummary_LongAgentName(t *testing.T) {
 	longName := "a-very-long-agent-name-that-exceeds-normal-length"
 	run := telemetry.PipelineRun{
-		SpecID:      "SPEC-LONG",
-		FinalStatus: telemetry.StatusPass,
-		QualityMode: "balanced",
+		SpecID:        "SPEC-LONG",
+		FinalStatus:   telemetry.StatusPass,
+		QualityMode:   "balanced",
 		TotalDuration: time.Minute,
 		Phases: []telemetry.PhaseRecord{
 			{
@@ -88,9 +88,9 @@ func TestFormatSummary_LongAgentName(t *testing.T) {
 // renders a dash in the agents column.
 func TestFormatSummary_EmptyPhaseAgents(t *testing.T) {
 	run := telemetry.PipelineRun{
-		SpecID:      "SPEC-NOAG",
-		FinalStatus: telemetry.StatusPass,
-		QualityMode: "balanced",
+		SpecID:        "SPEC-NOAG",
+		FinalStatus:   telemetry.StatusPass,
+		QualityMode:   "balanced",
 		TotalDuration: 30 * time.Second,
 		Phases: []telemetry.PhaseRecord{
 			{

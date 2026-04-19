@@ -187,5 +187,3 @@ func (a *Adapter) copyStatusline() ([]adapter.FileMapping, error) {
 		Content:         data,
 	}}, nil
 }
-
-

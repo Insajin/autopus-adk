@@ -210,4 +210,3 @@ func newExperimentResetCmd() *cobra.Command {
 	cmd.Flags().StringVar(&commitHash, "commit", "", "Commit hash to reset to")
 	return cmd
 }
-

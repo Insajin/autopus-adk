@@ -105,9 +105,9 @@ func isStdoutTTY() bool {
 // @AX:NOTE: [AUTO] hardcoded provider registry — add new providers here and in agenticArgs when expanding provider support
 func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	knownProviders := map[string]orchestra.ProviderConfig{
-		"claude":   {Name: "claude", Binary: "claude", Args: []string{"-p", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"-p", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
-		"codex":    {Name: "codex", Binary: "codex", Args: []string{"exec", "--full-auto", "-m", "gpt-5.4"}, PaneArgs: []string{"-m", "gpt-5.4"}, PromptViaArgs: false},
-		"gemini":   {Name: "gemini", Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
+		"claude": {Name: "claude", Binary: "claude", Args: []string{"-p", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"-p", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
+		"codex":  {Name: "codex", Binary: "codex", Args: []string{"exec", "--full-auto", "-m", "gpt-5.4"}, PaneArgs: []string{"-m", "gpt-5.4"}, PromptViaArgs: false},
+		"gemini": {Name: "gemini", Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
 	}
 
 	var result []orchestra.ProviderConfig

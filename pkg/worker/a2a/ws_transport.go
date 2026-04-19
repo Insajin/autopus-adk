@@ -90,10 +90,12 @@ func (t *Transport) Connect(ctx context.Context) error {
 
 	// Set pong handler to extend read deadline.
 	pongWait := time.Duration(t.config.HeartbeatSec*2) * time.Second
-	conn.SetReadDeadline(time.Now().Add(pongWait))
+	if err := conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		_ = conn.Close()
+		return fmt.Errorf("set initial read deadline: %w", err)
+	}
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(pongWait))
-		return nil
+		return conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 
 	var hbCtx context.Context

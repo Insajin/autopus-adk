@@ -30,10 +30,10 @@ func TestEvaluatePrimitive_ExitCodeTwoDigit(t *testing.T) {
 		exitCode   int
 		expectPass bool // true because these all fall to the default PASS branch
 	}{
-		{"exit_code(10)", 0, true},   // default: PASS (len>12 branch prefix mismatch)
-		{"exit_code(10)", 10, true},  // default: PASS
-		{"exit_code(42)", 0, true},   // default: PASS
-		{"exit_code(127)", 0, true},  // default: PASS
+		{"exit_code(10)", 0, true},  // default: PASS (len>12 branch prefix mismatch)
+		{"exit_code(10)", 10, true}, // default: PASS
+		{"exit_code(42)", 0, true},  // default: PASS
+		{"exit_code(127)", 0, true}, // default: PASS
 	}
 
 	for _, tt := range tests {

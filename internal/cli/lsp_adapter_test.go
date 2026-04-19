@@ -75,8 +75,10 @@ func TestNewLSPSubcmds_ArgValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		cmdFn    func() interface{ Args(cmd interface{}, args []string) error }
+		name  string
+		cmdFn func() interface {
+			Args(cmd interface{}, args []string) error
+		}
 		goodArgs []string
 		badArgs  []string
 	}{}

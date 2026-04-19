@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -42,5 +41,3 @@ func syncReviewedSpecStatus(specDir string, result *spec.ReviewResult) error {
 
 	return spec.UpdateStatus(specDir, "approved")
 }
-
-type specReviewRunner func(context.Context, orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error)

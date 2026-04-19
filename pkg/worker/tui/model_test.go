@@ -178,11 +178,11 @@ func TestHandleKey_ApprovalMode(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name             string
-		key              rune
-		clearsAppr       bool
-		expectDecision   string
-		expectViewDiff   bool
+		name           string
+		key            rune
+		clearsAppr     bool
+		expectDecision string
+		expectViewDiff bool
 	}{
 		{"approve", 'a', true, "approve", false},
 		{"deny", 'd', true, "deny", false},

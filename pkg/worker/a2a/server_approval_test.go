@@ -38,7 +38,9 @@ func TestServer_HandleApproval_CallsCallbackAndUpdatesStatus(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -107,7 +109,9 @@ func TestServer_SendApprovalResponse_SendsCorrectNotification(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))

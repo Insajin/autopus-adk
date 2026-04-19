@@ -113,8 +113,8 @@ func TestJob_CollectResults(t *testing.T) {
 
 	// Given: a completed job with results from all providers
 	job := &Job{
-		ID:       "collect-001",
-		Strategy: StrategyConsensus,
+		ID:        "collect-001",
+		Strategy:  StrategyConsensus,
 		Providers: []string{"claude", "codex"},
 		Results: map[string]*ProviderResponse{
 			"claude": {Provider: "claude", Output: "refactored auth"},

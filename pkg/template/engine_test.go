@@ -18,10 +18,10 @@ func TestRenderString(t *testing.T) {
 func TestRenderString_FuncMap(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name   string
-		tmpl   string
-		data   any
-		want   string
+		name string
+		tmpl string
+		data any
+		want string
 	}{
 		{
 			name: "upper",

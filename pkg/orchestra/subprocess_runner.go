@@ -156,13 +156,15 @@ func startWithFileInput(cmd command, req ProviderRequest) error {
 	if err != nil {
 		return fmt.Errorf("subprocess %s: create temp prompt file: %w", req.Provider, err)
 	}
-	defer os.Remove(f.Name())
+	defer removePromptFile(f.Name())
 
 	if _, err := f.WriteString(req.Prompt); err != nil {
-		f.Close()
+		_ = f.Close()
 		return fmt.Errorf("subprocess %s: write prompt file: %w", req.Provider, err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("subprocess %s: close prompt file: %w", req.Provider, err)
+	}
 
 	// Reopen as reader for stdin
 	reader, err := os.Open(f.Name())
@@ -176,6 +178,10 @@ func startWithFileInput(cmd command, req ProviderRequest) error {
 		return fmt.Errorf("subprocess %s: start: %w", req.Provider, err)
 	}
 	return nil
+}
+
+func removePromptFile(path string) {
+	_ = os.Remove(path)
 }
 
 // validateJSONOutput checks that the output is valid JSON.

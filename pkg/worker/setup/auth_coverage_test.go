@@ -61,7 +61,7 @@ func TestRequestDeviceCode_UnwrappedResponse(t *testing.T) {
 			VerificationURIComplete: "",
 		}
 		// Return direct (unwrapped) JSON.
-		json.NewEncoder(w).Encode(dc)
+		_ = json.NewEncoder(w).Encode(dc)
 	}))
 	defer srv.Close()
 
@@ -120,8 +120,8 @@ func TestCredstoreFileDelete_ReadOnlyDir(t *testing.T) {
 
 	// Save first then make dir read-only.
 	require.NoError(t, store.Save("test-del", "val"))
-	require.NoError(t, os.Chmod(dir, 0500)) // remove write permission
-	defer os.Chmod(dir, 0700)               // restore for cleanup
+	require.NoError(t, os.Chmod(dir, 0500))    // remove write permission
+	defer func() { _ = os.Chmod(dir, 0700) }() // restore for cleanup
 
 	err := store.Delete("test-del")
 	// Error depends on OS — we just verify it is non-nil OR the file is gone.

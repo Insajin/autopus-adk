@@ -150,7 +150,7 @@ func TestExchangeAuthCode_ReadBodyError(t *testing.T) {
 	// We test the non-200 path with body content
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("bad request details"))
+		_, _ = w.Write([]byte("bad request details"))
 	}))
 	defer srv.Close()
 

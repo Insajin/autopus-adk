@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"math"
-	"os/exec"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -174,15 +173,6 @@ func resolveSubprocessTimeout(conf *config.OrchestraConf, entry config.ProviderE
 		return time.Duration(conf.TimeoutSeconds) * time.Second
 	}
 	return 120 * time.Second
-}
-
-// autoDetectBinary resolves a provider binary by looking it up in PATH.
-// Returns the input name unchanged — exec.LookPath is used only to verify availability.
-func autoDetectBinary(name string) string {
-	if _, err := exec.LookPath(name); err == nil {
-		return name
-	}
-	return name
 }
 
 // resolveSubprocessMode returns whether subprocess mode is enabled via config.

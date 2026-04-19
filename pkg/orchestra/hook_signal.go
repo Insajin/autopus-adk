@@ -25,9 +25,9 @@ type HookSession struct {
 // defaultHookProviders lists providers that have hooks by default.
 // @AX:NOTE [AUTO] hardcoded provider set — update when adding new hook-capable providers
 var defaultHookProviders = map[string]bool{
-	"claude":   true,
-	"gemini":   true,
-	"codex":    true,
+	"claude": true,
+	"gemini": true,
+	"codex":  true,
 }
 
 // NewHookSession creates a new hook session with the given session ID.

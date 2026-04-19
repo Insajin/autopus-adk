@@ -19,7 +19,7 @@ type TeammatePaneInfo struct {
 
 // @AX:NOTE [AUTO] @AX:REASON: security — shell escaping prevents injection when constructing commands for terminal panes; do not simplify without security review
 // teamShellEscape wraps a string in single quotes for safe shell interpolation.
-// Embedded single quotes are escaped as '\''.
+// Embedded single quotes use the standard POSIX quote-break pattern.
 func teamShellEscape(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

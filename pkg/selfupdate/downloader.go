@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	maxChecksumSize = 1 << 20       // 1 MB
-	maxArchiveSize  = 100 << 20     // 100 MB
-	maxExtractSize  = 100 << 20     // 100 MB per file
-	downloadRetries = 3             // retry count for transient HTTP errors
+	maxChecksumSize = 1 << 20   // 1 MB
+	maxArchiveSize  = 100 << 20 // 100 MB
+	maxExtractSize  = 100 << 20 // 100 MB per file
+	downloadRetries = 3         // retry count for transient HTTP errors
 )
 
 // Downloader downloads and verifies release archives.
@@ -125,7 +125,9 @@ func extractBinaryTarGz(data []byte, destDir string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer gzr.Close()
+	defer func() {
+		_ = gzr.Close()
+	}()
 
 	tr := tar.NewReader(gzr)
 	for {

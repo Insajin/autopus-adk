@@ -62,9 +62,7 @@ func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessC
 func detectDefaultPlatforms() []string {
 	detected := detectInstalledPlatforms()
 	platforms := make([]string, 0, len(detected))
-	for _, p := range detected {
-		platforms = append(platforms, p)
-	}
+	platforms = append(platforms, detected...)
 
 	if len(platforms) == 0 {
 		return []string{"claude-code"}

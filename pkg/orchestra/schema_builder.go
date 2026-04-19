@@ -45,12 +45,15 @@ func (sb *SchemaBuilder) WriteToFile(role string) (path string, cleanup func(), 
 	}
 	fpath := f.Name()
 	if _, err := f.WriteString(schema); err != nil {
-		f.Close()
-		os.Remove(fpath)
+		_ = f.Close()
+		removeIfExists(fpath)
 		return "", nil, fmt.Errorf("write schema: %w", err)
 	}
-	f.Close()
-	return fpath, func() { os.Remove(fpath) }, nil
+	if err := f.Close(); err != nil {
+		removeIfExists(fpath)
+		return "", nil, fmt.Errorf("close schema file: %w", err)
+	}
+	return fpath, func() { removeIfExists(fpath) }, nil
 }
 
 // EmbedInPrompt returns the schema as a compact JSON string for prompt embedding.
@@ -125,4 +128,8 @@ func fieldSchema(t reflect.Type) map[string]any {
 	default:
 		return map[string]any{"type": "string"}
 	}
+}
+
+func removeIfExists(path string) {
+	_ = os.Remove(path)
 }

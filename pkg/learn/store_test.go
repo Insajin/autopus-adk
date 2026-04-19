@@ -216,4 +216,3 @@ func TestStore_UpdateReuseCount_NotFound(t *testing.T) {
 	// Then: error
 	assert.Error(t, err)
 }
-

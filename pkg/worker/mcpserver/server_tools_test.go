@@ -69,7 +69,7 @@ func TestMCPServer_ToolsCallSuccess(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode([]map[string]string{{"name": "agent1"}})
+		_ = json.NewEncoder(w).Encode([]map[string]string{{"name": "agent1"}})
 	}))
 	defer srv.Close()
 
@@ -95,7 +95,7 @@ func TestMCPServer_ToolsCallHandlerError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("fail"))
+		_, _ = w.Write([]byte("fail"))
 	}))
 	defer srv.Close()
 

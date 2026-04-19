@@ -14,7 +14,7 @@ import (
 // Persisted to /tmp/autopus-orch-session-{ID}.json for collect/cleanup commands.
 type OrchestraSession struct {
 	ID        string                      `json:"id"`
-	Panes     map[string]string           `json:"panes"`     // provider name -> pane ID
+	Panes     map[string]string           `json:"panes"` // provider name -> pane ID
 	Providers []SessionProviderConfig     `json:"providers"`
 	Rounds    [][]SessionProviderResponse `json:"rounds"`
 	CreatedAt time.Time                   `json:"created_at"`

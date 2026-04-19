@@ -36,7 +36,7 @@ func TestClient_Connect_Success(t *testing.T) {
 	defer cancel()
 
 	require.NoError(t, client.Connect(ctx))
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	assert.Equal(t, StateConnected, client.State())
 
@@ -80,7 +80,7 @@ func TestClient_OnConnected_Fires(t *testing.T) {
 	defer cancel()
 
 	require.NoError(t, client.Connect(ctx))
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	assert.True(t, called.Load(), "OnConnected should have been called")
 }
@@ -107,7 +107,7 @@ func TestClient_OnDisconnected_Fires(t *testing.T) {
 	defer cancel()
 
 	require.NoError(t, client.Connect(ctx))
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Close the backend to simulate connection loss, then handle it.
 	mb.close()
@@ -196,7 +196,7 @@ func TestClient_StateRecovery_OnReconnect(t *testing.T) {
 	defer cancel()
 
 	require.NoError(t, client.Connect(ctx))
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Consume registration message.
 	mb.waitForMessages(t, 1, 3*time.Second)

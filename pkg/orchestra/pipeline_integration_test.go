@@ -31,7 +31,7 @@ func TestIntegration_SubprocessPipeline_FullDebate(t *testing.T) {
 	t.Parallel()
 	backend := &mockBackend{name: "integration"}
 	cfg := SubprocessPipelineConfig{
-		Backend:   backend,
+		Backend: backend,
 		Providers: []ProviderConfig{
 			{Name: "claude", Binary: "echo"},
 			{Name: "codex", Binary: "echo"},
@@ -62,7 +62,7 @@ func TestIntegration_GracefulDegradation(t *testing.T) {
 	t.Parallel()
 	backend := &mockFailBackend{failProvider: "gemini"}
 	cfg := SubprocessPipelineConfig{
-		Backend:   backend,
+		Backend: backend,
 		Providers: []ProviderConfig{
 			{Name: "claude", Binary: "echo"},
 			{Name: "codex", Binary: "echo"},

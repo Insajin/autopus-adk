@@ -136,7 +136,7 @@ func tryRefreshCredentials(ctx context.Context, backendURL string) bool {
 // saveTokenCredentials persists a TokenResponse to credentials.json.
 func saveTokenCredentials(tokenResp *TokenResponse, backendURL string) error {
 	creds := map[string]any{
-		"auth_type":    "jwt",
+		"auth_type":     "jwt",
 		"access_token":  tokenResp.AccessToken,
 		"refresh_token": tokenResp.RefreshToken,
 		"backend_url":   backendURL,

@@ -21,7 +21,7 @@ func TestMemorySearcher_GetContext(t *testing.T) {
 		assert.Equal(t, "agent-1", r.URL.Query().Get("agent_id"))
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(MemoryContextResponse{
+		_ = json.NewEncoder(w).Encode(MemoryContextResponse{
 			Entries: []MemoryEntry{
 				{ID: "m1", Title: "Deploy steps", Content: "Step 1...", Layer: "L1"},
 				{ID: "m2", Title: "Rollback", Content: "How to rollback", Layer: "L2"},
@@ -46,7 +46,7 @@ func TestMemorySearcher_GetContext_EmptyEntries(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(MemoryContextResponse{Entries: []MemoryEntry{}})
+		_ = json.NewEncoder(w).Encode(MemoryContextResponse{Entries: []MemoryEntry{}})
 	}))
 	defer srv.Close()
 
@@ -77,7 +77,7 @@ func TestMemorySearcher_GetContext_ContextCancelled(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(MemoryContextResponse{})
+		_ = json.NewEncoder(w).Encode(MemoryContextResponse{})
 	}))
 	defer srv.Close()
 

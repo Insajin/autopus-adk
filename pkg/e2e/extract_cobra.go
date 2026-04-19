@@ -12,8 +12,8 @@ import (
 
 // cobraCommand holds extracted Cobra command information.
 type cobraCommand struct {
-	Use   string
-	Short string
+	Use    string
+	Short  string
 	HasRun bool // true if the command has a Run or RunE handler (leaf command)
 }
 

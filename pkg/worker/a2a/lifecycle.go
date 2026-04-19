@@ -135,9 +135,7 @@ func (m *LifecycleManager) Track(task *Task) *TaskLifecycle {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, fn := range m.listeners {
-		lc.listeners = append(lc.listeners, fn)
-	}
+	lc.listeners = append(lc.listeners, m.listeners...)
 	m.tasks[task.ID] = lc
 	return lc
 }

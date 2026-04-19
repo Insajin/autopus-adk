@@ -234,5 +234,3 @@ func TestCheckAndShow_SecondHintBoundary(t *testing.T) {
 		t.Error("second hint shown at count=2, want no hint until count>=3")
 	}
 }
-
-

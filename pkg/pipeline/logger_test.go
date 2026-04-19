@@ -19,7 +19,7 @@ func TestPipelineLogger_LogEvent_WritesJSONL(t *testing.T) {
 	dir := t.TempDir()
 	logger, err := NewPipelineLogger(dir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	event := Event{
 		Type:      EventPhaseStart,
@@ -47,7 +47,7 @@ func TestPipelineLogger_LogEvent_WritesText(t *testing.T) {
 	dir := t.TempDir()
 	logger, err := NewPipelineLogger(dir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	event := Event{
 		Type:    EventAgentSpawn,
@@ -75,7 +75,7 @@ func TestPipelineLogger_RoleColor(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		role          string
+		role           string
 		expectNonEmpty bool
 	}{
 		{"planner", true},
@@ -107,7 +107,7 @@ func TestPipelineLogger_PromptInjection(t *testing.T) {
 	dir := t.TempDir()
 	logger, err := NewPipelineLogger(dir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	prompt := logger.PromptInjection()
 	assert.NotEmpty(t, prompt,
@@ -143,7 +143,7 @@ func TestPipelineLogger_WriteFailure_NoError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close file handles to force write failures.
-	logger.Close()
+	_ = logger.Close()
 
 	event := Event{Type: EventError, Message: "test write failure"}
 	logErr := logger.LogEvent(event)
@@ -235,7 +235,7 @@ func TestNewPipelineLogger_CreatesFiles(t *testing.T) {
 	dir := t.TempDir()
 	logger, err := NewPipelineLogger(dir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	_, err = os.Stat(filepath.Join(dir, "pipeline.jsonl"))
 	assert.NoError(t, err, "pipeline.jsonl should be created")
@@ -264,7 +264,7 @@ func TestPipelineLogger_LogEvent_MultipleEvents(t *testing.T) {
 	dir := t.TempDir()
 	logger, err := NewPipelineLogger(dir)
 	require.NoError(t, err)
-	defer logger.Close()
+	defer func() { _ = logger.Close() }()
 
 	events := []Event{
 		{Type: EventPhaseStart, Phase: "phase1", Message: "start"},

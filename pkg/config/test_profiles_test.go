@@ -34,7 +34,7 @@ func TestHarnessConfig_AvailableTestCapabilities_MergesConfigAdditions(t *testin
 		Profiles: ProfilesConf{
 			Test: TestProfileConf{
 				Capabilities: map[string][]string{
-					"standalone": []string{"docker", "standalone"},
+					"standalone": {"docker", "standalone"},
 				},
 			},
 		},

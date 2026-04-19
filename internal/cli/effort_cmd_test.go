@@ -36,7 +36,7 @@ func TestResolveModel_EnvFallback(t *testing.T) {
 }
 
 func TestResolveModel_DefaultFallback(t *testing.T) {
-	os.Unsetenv(modelEnvKey)
+	_ = os.Unsetenv(modelEnvKey)
 	got := resolveModel("")
 	if got != defaultModel {
 		t.Errorf("resolveModel() = %q, want %q", got, defaultModel)
@@ -163,7 +163,7 @@ func TestEffortDetectCmd_Balanced_Complexity_High(t *testing.T) {
 
 func TestEffortDetectCmd_EnvOverride(t *testing.T) {
 	t.Setenv(envEffortKey, "low")
-	defer os.Unsetenv(envEffortKey)
+	defer func() { _ = os.Unsetenv(envEffortKey) }()
 
 	cmd := newEffortDetectCmd()
 	buf := &bytes.Buffer{}
@@ -181,7 +181,7 @@ func TestEffortDetectCmd_EnvOverride(t *testing.T) {
 
 func TestEffortDetectCmd_InvalidEnvWarnsAndFallsBack(t *testing.T) {
 	t.Setenv(envEffortKey, "max")
-	defer os.Unsetenv(envEffortKey)
+	defer func() { _ = os.Unsetenv(envEffortKey) }()
 
 	cmd := newEffortDetectCmd()
 	buf := &bytes.Buffer{}

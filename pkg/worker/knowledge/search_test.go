@@ -66,7 +66,7 @@ func TestKnowledgeSearcher_Search(t *testing.T) {
 				assert.Contains(t, r.URL.Path, "/api/v1/workspaces/ws-123/knowledge/search")
 
 				w.WriteHeader(tt.statusCode)
-				json.NewEncoder(w).Encode(tt.response)
+				_ = json.NewEncoder(w).Encode(tt.response)
 			}))
 			defer srv.Close()
 
@@ -100,7 +100,7 @@ func TestKnowledgeSearcher_RequestBody(t *testing.T) {
 		assert.Equal(t, 10, req.Limit)
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(searchResponse{Data: []SearchResult{}})
+		_ = json.NewEncoder(w).Encode(searchResponse{Data: []SearchResult{}})
 	}))
 	defer srv.Close()
 
@@ -114,7 +114,7 @@ func TestKnowledgeSearcher_ContextCancelled(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(searchResponse{Data: []SearchResult{}})
+		_ = json.NewEncoder(w).Encode(searchResponse{Data: []SearchResult{}})
 	}))
 	defer srv.Close()
 
@@ -132,7 +132,7 @@ func TestKnowledgeSearcher_InvalidJSON(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("not json"))
+		_, _ = w.Write([]byte("not json"))
 	}))
 	defer srv.Close()
 

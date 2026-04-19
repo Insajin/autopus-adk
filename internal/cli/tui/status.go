@@ -100,4 +100,3 @@ func SKIP(w io.Writer, msg string) {
 	text := WarningStyle.Render(msg)
 	fmt.Fprintf(w, "  [%s] %s\n", label, text)
 }
-

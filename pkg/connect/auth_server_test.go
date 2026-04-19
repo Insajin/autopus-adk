@@ -70,7 +70,7 @@ func newSuccessDeps() *mockAuthDeps {
 				TokenType:    "Bearer",
 			}, nil
 		},
-		openBrowser: func(url string) error { return nil },
+		openBrowser:     func(url string) error { return nil },
 		saveCredentials: func(creds map[string]any) error { return nil },
 	}
 }

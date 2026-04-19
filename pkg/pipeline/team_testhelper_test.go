@@ -16,7 +16,6 @@ type teamMockTerminal struct {
 	splitDirs      []terminal.Direction
 	sentCommands   []sentCmd
 	closedSessions []string
-	closedPanes    []string
 
 	// Configuration for error simulation.
 	failSplitAfter int // -1 means never fail

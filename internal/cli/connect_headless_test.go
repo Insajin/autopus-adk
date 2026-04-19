@@ -54,7 +54,7 @@ func headlessTestServer(t *testing.T, workspaceID, workspaceName string) *httpte
 		switch {
 		// Step 1: device code
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/auth/device/code"):
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"device_code":      "dc_test",
 				"user_code":        "TEST-CODE",
 				"verification_uri": "https://verify.example.com",
@@ -64,7 +64,7 @@ func headlessTestServer(t *testing.T, workspaceID, workspaceName string) *httpte
 
 		// Step 1: token poll
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/auth/device/token"):
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"access_token":  "server-tok-abc",
 				"refresh_token": "refresh-abc",
 				"token_type":    "Bearer",
@@ -73,13 +73,13 @@ func headlessTestServer(t *testing.T, workspaceID, workspaceName string) *httpte
 
 		// Step 2: workspace list
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/workspaces"):
-			json.NewEncoder(w).Encode([]connect.Workspace{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode([]connect.Workspace{ //nolint:errcheck
 				{ID: workspaceID, Name: workspaceName},
 			})
 
 		// Step 3: OpenAI device code
 		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "ai-oauth/device-code"):
-			json.NewEncoder(w).Encode(connect.DeviceCodeResponse{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(connect.DeviceCodeResponse{ //nolint:errcheck
 				DeviceCode:      "openai-dc",
 				UserCode:        "OPEN-CODE",
 				VerificationURI: "https://openai.example.com/device",
@@ -94,7 +94,7 @@ func headlessTestServer(t *testing.T, workspaceID, workspaceName string) *httpte
 			if callCount >= 2 {
 				status = "completed"
 			}
-			json.NewEncoder(w).Encode(connect.DeviceTokenResponse{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(connect.DeviceTokenResponse{ //nolint:errcheck
 				Status:      status,
 				AccessToken: "openai-access-tok",
 			})
@@ -157,17 +157,17 @@ func TestRunHeadlessConnect_WorkspaceNotFound(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/auth/device/code"):
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"device_code": "dc_x", "user_code": "XX-00",
 				"verification_uri": "https://v.example.com", "expires_in": 300, "interval": 1,
 			})
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/auth/device/token"):
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"access_token": "tok", "token_type": "Bearer",
 			})
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/workspaces"):
 			// Return a workspace with a different ID.
-			json.NewEncoder(w).Encode([]connect.Workspace{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode([]connect.Workspace{ //nolint:errcheck
 				{ID: "ws-other", Name: "Other"},
 			})
 		}
@@ -196,20 +196,20 @@ func TestRunHeadlessConnect_OpenAIDeviceCodeFails(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/auth/device/code"):
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"device_code": "dc_x", "user_code": "AB-00",
 				"verification_uri": "https://v.example.com", "expires_in": 300, "interval": 1,
 			})
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/auth/device/token"):
-			json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
 				"access_token": "tok", "token_type": "Bearer",
 			})
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/workspaces"):
-			json.NewEncoder(w).Encode([]connect.Workspace{{ID: wsID, Name: "My WS"}}) //nolint:errcheck
+			_ = json.NewEncoder(w).Encode([]connect.Workspace{{ID: wsID, Name: "My WS"}}) //nolint:errcheck
 		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "ai-oauth/device-code"):
 			// Simulate server not supporting device code flow.
 			w.WriteHeader(http.StatusNotImplemented)
-			w.Write([]byte("not supported")) //nolint:errcheck
+			_, _ = w.Write([]byte("not supported")) //nolint:errcheck
 		}
 	}))
 	defer srv.Close()

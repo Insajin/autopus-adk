@@ -18,11 +18,11 @@ func TestRunPaneDebate_SingleRound(t *testing.T) {
 	mock := &countingScreenMock{
 		mockTerminal: mockTerminal{name: "cmux"},
 		outputs: []string{
-			"loading...\n",              // baseline captures (before prompt)
-			"loading...\n",              // baseline re-capture after prompt send
-			"loading...\n",              // baseline re-capture after delay
-			"AI response here\n❯\n",     // first completion match
-			"AI response here\n❯\n",     // second consecutive match (confirm)
+			"loading...\n",          // baseline captures (before prompt)
+			"loading...\n",          // baseline re-capture after prompt send
+			"loading...\n",          // baseline re-capture after delay
+			"AI response here\n❯\n", // first completion match
+			"AI response here\n❯\n", // second consecutive match (confirm)
 		},
 	}
 	cfg := OrchestraConfig{
@@ -53,12 +53,12 @@ func TestRunPaneDebate_MultiRound(t *testing.T) {
 	mock := &countingScreenMock{
 		mockTerminal: mockTerminal{name: "cmux"},
 		outputs: []string{
-			"baseline output\n❯\n",     // baseline capture
-			"round 1 response\n❯\n",    // round 1 first match
-			"round 1 response\n❯\n",    // round 1 second match (confirm)
-			"new baseline\n❯\n",        // round 2 baseline
-			"round 2 response\n❯\n",    // round 2 first match
-			"round 2 response\n❯\n",    // round 2 second match (confirm)
+			"baseline output\n❯\n",  // baseline capture
+			"round 1 response\n❯\n", // round 1 first match
+			"round 1 response\n❯\n", // round 1 second match (confirm)
+			"new baseline\n❯\n",     // round 2 baseline
+			"round 2 response\n❯\n", // round 2 first match
+			"round 2 response\n❯\n", // round 2 second match (confirm)
 		},
 	}
 	cfg := OrchestraConfig{

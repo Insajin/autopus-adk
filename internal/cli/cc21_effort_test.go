@@ -26,10 +26,10 @@ func agentsDir() string {
 	_, thisFile, _, _ := runtime.Caller(0)
 	// thisFile is .../autopus-adk/internal/cli/cc21_effort_test.go
 	// workspace root is three directories up.
-	dir := filepath.Dir(thisFile)                     // .../autopus-adk/internal/cli
-	dir = filepath.Dir(dir)                           // .../autopus-adk/internal
-	dir = filepath.Dir(dir)                           // .../autopus-adk
-	root := filepath.Dir(dir)                         // workspace root (autopus-co)
+	dir := filepath.Dir(thisFile) // .../autopus-adk/internal/cli
+	dir = filepath.Dir(dir)       // .../autopus-adk/internal
+	dir = filepath.Dir(dir)       // .../autopus-adk
+	root := filepath.Dir(dir)     // workspace root (autopus-co)
 	return filepath.Join(root, ".claude", "agents", "autopus")
 }
 

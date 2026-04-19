@@ -25,7 +25,7 @@ func TestInteractive_StartPipeCapture_Error(t *testing.T) {
 		TimeoutSeconds: 10,
 		Terminal:       pipeMock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	// Should fall back to sentinel mode (R8)
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
@@ -45,7 +45,7 @@ func TestInteractive_LaunchSession_SendCommandError(t *testing.T) {
 		TimeoutSeconds: 5,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestInteractive_NilTerminal_FallsBack(t *testing.T) {
 		TimeoutSeconds: 10,
 		Terminal:       nil,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -82,7 +82,7 @@ func TestInteractive_ZeroTimeout_UsesDefault(t *testing.T) {
 		TimeoutSeconds: 0, // should use default 120
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -105,7 +105,7 @@ func TestInteractive_CompletionDetection_PromptPatternPrimary(t *testing.T) {
 		TimeoutSeconds: 30,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestInteractive_CompletionDetection_IdleSecondary(t *testing.T) {
 		TimeoutSeconds: 30,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -158,7 +158,7 @@ func TestInteractive_SendPrompt_Error(t *testing.T) {
 		TimeoutSeconds: 5,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestInteractive_LaunchWithBareBinary(t *testing.T) {
 		TimeoutSeconds: 5,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -204,7 +204,7 @@ func TestInteractive_ReadScreenError_ContinuesPolling(t *testing.T) {
 		TimeoutSeconds: 2,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -230,7 +230,7 @@ func TestInteractive_MultipleProviders_ParallelCompletion(t *testing.T) {
 		TimeoutSeconds: 10,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)

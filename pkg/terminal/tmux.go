@@ -145,13 +145,17 @@ func (a *TmuxAdapter) SendLongText(_ context.Context, paneID PaneID, text string
 		return fmt.Errorf("tmux: create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() {
+		_ = os.Remove(tmpPath)
+	}()
 
 	if _, err := tmpFile.WriteString(text); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return fmt.Errorf("tmux: write temp file: %w", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("tmux: close temp file: %w", err)
+	}
 
 	loadCmd := execCommand("tmux", "load-buffer", tmpPath)
 	if err := loadCmd.Run(); err != nil {

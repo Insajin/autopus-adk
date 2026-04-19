@@ -24,7 +24,7 @@ func isolatedHome(t *testing.T) (homeDir string, cleanup func()) {
 	oldHome := os.Getenv("HOME")
 	require.NoError(t, os.Setenv("HOME", dir))
 	return dir, func() {
-		os.Setenv("HOME", oldHome)
+		require.NoError(t, os.Setenv("HOME", oldHome))
 	}
 }
 
@@ -67,13 +67,13 @@ func TestEnsureWorker_NoConfig_DeviceAuthContextCancelled(t *testing.T) {
 				Interval:                1,
 			}
 			resp, _ := json.Marshal(map[string]any{"data": dc})
-			w.Write(resp)
+			_, _ = w.Write(resp)
 			return
 		}
 		// Poll endpoint: return authorization_pending
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]any{"error": "authorization_pending"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "authorization_pending"})
 	}))
 	defer srv.Close()
 

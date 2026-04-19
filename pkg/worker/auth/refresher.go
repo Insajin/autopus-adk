@@ -32,7 +32,7 @@ type TokenRefresher struct {
 	onPermanentFailureFn func(event string)
 	client               *http.Client
 	mu                   sync.RWMutex
-	creds *Credentials
+	creds                *Credentials
 }
 
 // NewTokenRefresher creates a refresher backed by a CredentialStore.

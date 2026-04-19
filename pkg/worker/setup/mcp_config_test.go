@@ -157,7 +157,7 @@ func TestWriteMCPConfig_ReadOnlyDir(t *testing.T) {
 	dir := t.TempDir()
 	readOnly := filepath.Join(dir, "readonly")
 	require.NoError(t, os.MkdirAll(readOnly, 0500))
-	t.Cleanup(func() { os.Chmod(readOnly, 0700) })
+	t.Cleanup(func() { _ = os.Chmod(readOnly, 0700) })
 
 	err = WriteMCPConfig(config, filepath.Join(readOnly, "worker-mcp.json"))
 	require.Error(t, err)

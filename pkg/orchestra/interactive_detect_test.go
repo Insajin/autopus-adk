@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- R10: ANSI escape sequence stripping ---
@@ -146,10 +147,10 @@ func TestInteractive_PromptPatternDetection_MatchesShellPrompt(t *testing.T) {
 func TestInteractive_IdleDetection_NoOutputTimeout(t *testing.T) {
 	t.Parallel()
 	tmpFile := filepath.Join(t.TempDir(), "output.txt")
-	os.WriteFile(tmpFile, []byte("data"), 0o644)
+	require.NoError(t, os.WriteFile(tmpFile, []byte("data"), 0o644))
 	// Set modtime to 15 seconds ago
 	past := time.Now().Add(-15 * time.Second)
-	os.Chtimes(tmpFile, past, past)
+	require.NoError(t, os.Chtimes(tmpFile, past, past))
 	assert.True(t, isOutputIdle(tmpFile, 10*time.Second))
 }
 
@@ -157,7 +158,7 @@ func TestInteractive_IdleDetection_NoOutputTimeout(t *testing.T) {
 func TestInteractive_IdleDetection_ActiveOutput(t *testing.T) {
 	t.Parallel()
 	tmpFile := filepath.Join(t.TempDir(), "output.txt")
-	os.WriteFile(tmpFile, []byte("data"), 0o644)
+	require.NoError(t, os.WriteFile(tmpFile, []byte("data"), 0o644))
 	// File was just written, modtime is now
 	assert.False(t, isOutputIdle(tmpFile, 10*time.Second))
 }

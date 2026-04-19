@@ -12,8 +12,8 @@ import (
 	"github.com/insajin/autopus-adk/pkg/worker/a2a"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/budget"
-	"github.com/insajin/autopus-adk/pkg/worker/security"
 	"github.com/insajin/autopus-adk/pkg/worker/routing"
+	"github.com/insajin/autopus-adk/pkg/worker/security"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -190,7 +190,9 @@ func (m *mockAdapter) ExtractResult(event adapter.StreamEvent) adapter.TaskResul
 		DurationMS int64   `json:"duration_ms"`
 		SessionID  string  `json:"session_id"`
 	}
-	json.Unmarshal(event.Data, &data)
+	if err := json.Unmarshal(event.Data, &data); err != nil {
+		panic(err)
+	}
 	return adapter.TaskResult{
 		Output:     data.Output,
 		CostUSD:    data.CostUSD,

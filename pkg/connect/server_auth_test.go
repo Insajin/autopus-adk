@@ -16,9 +16,9 @@ func TestListWorkspaces_Success(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		response   []connect.Workspace
-		wantCount  int
+		name      string
+		response  []connect.Workspace
+		wantCount int
 	}{
 		{
 			name: "single workspace",
@@ -47,7 +47,7 @@ func TestListWorkspaces_Success(t *testing.T) {
 				assert.Equal(t, "/api/v1/workspaces", r.URL.Path)
 				assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(tt.response)
+				_ = json.NewEncoder(w).Encode(tt.response)
 			}))
 			defer srv.Close()
 
@@ -90,7 +90,7 @@ func TestListWorkspaces_EmptyResponse(t *testing.T) {
 	// Given: a server that returns empty array
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]connect.Workspace{})
+		_ = json.NewEncoder(w).Encode([]connect.Workspace{})
 	}))
 	defer srv.Close()
 
@@ -110,7 +110,7 @@ func TestListWorkspaces_ServerError(t *testing.T) {
 	// Given: a server that returns 500
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal error"))
+		_, _ = w.Write([]byte("internal error"))
 	}))
 	defer srv.Close()
 
@@ -152,7 +152,7 @@ func TestListWorkspaces_InvalidJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("not valid json"))
+		_, _ = w.Write([]byte("not valid json"))
 	}))
 	defer srv.Close()
 
@@ -173,7 +173,7 @@ func TestNewClient_SetsAuthToken(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "Bearer my-secret-token", r.Header.Get("Authorization"))
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]connect.Workspace{})
+		_ = json.NewEncoder(w).Encode([]connect.Workspace{})
 	}))
 	defer srv.Close()
 

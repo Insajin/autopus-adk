@@ -14,11 +14,11 @@ func TestTokenBudget_Calculate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		libCount   int
-		minPerLib  int
-		maxPerLib  int
-		maxTotal   int
+		name      string
+		libCount  int
+		minPerLib int
+		maxPerLib int
+		maxTotal  int
 	}{
 		{"1 library gets ~5000", 1, 4000, 6000, 10000},
 		{"2 libraries get ~3000 each", 2, 2500, 3500, 10000},

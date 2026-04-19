@@ -119,7 +119,7 @@ func TestRefreshToken_Success(t *testing.T) {
 		assert.Equal(t, "old-refresh-token", body["refresh_token"])
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(TokenResponse{
+		_ = json.NewEncoder(w).Encode(TokenResponse{
 			AccessToken:  "new-access-token",
 			RefreshToken: "new-refresh-token",
 			ExpiresIn:    3600,
@@ -153,7 +153,7 @@ func TestRefreshToken_InvalidJSON(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("{invalid-json"))
+		_, _ = w.Write([]byte("{invalid-json"))
 	}))
 	defer srv.Close()
 
@@ -167,7 +167,7 @@ func TestRefreshToken_WrappedResponse(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"success":true,"data":{"access_token":"wrapped-tok","refresh_token":"ref","expires_in":3600,"token_type":"Bearer"}}`))
+		_, _ = w.Write([]byte(`{"success":true,"data":{"access_token":"wrapped-tok","refresh_token":"ref","expires_in":3600,"token_type":"Bearer"}}`))
 	}))
 	defer srv.Close()
 

@@ -15,13 +15,13 @@ import (
 // This is the entry point for the subprocess-based orchestration pipeline.
 func newOrchestraRunCmd() *cobra.Command {
 	var (
-		strategy    string
-		providers   []string
-		rounds      string
-		timeout     int
-		judge       string
-		subprocess  bool
-		dryRun      bool
+		strategy   string
+		providers  []string
+		rounds     string
+		timeout    int
+		judge      string
+		subprocess bool
+		dryRun     bool
 	)
 
 	cmd := &cobra.Command{

@@ -3,10 +3,10 @@ package arch
 
 // ArchitectureMap는 프로젝트 아키텍처 전체 구조이다.
 type ArchitectureMap struct {
-	Domains      []Domain    // 도메인 목록
-	Layers       []Layer     // 레이어 목록
+	Domains      []Domain     // 도메인 목록
+	Layers       []Layer      // 레이어 목록
 	Dependencies []Dependency // 의존성 목록
-	Violations   []Violation // 위반 목록
+	Violations   []Violation  // 위반 목록
 }
 
 // Domain은 프로젝트 내 논리적 도메인이다.

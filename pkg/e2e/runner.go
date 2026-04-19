@@ -44,10 +44,10 @@ func (r *RunnerResult) WorkDirExists() (bool, error) {
 
 // Runner executes E2E scenarios.
 type Runner struct {
-	opts        RunnerOptions
-	buildOnce   sync.Once            // legacy single-build once guard
-	buildErr    error                // legacy single-build error
-	buildOnceMu sync.Mutex           // protects buildOnceMap and buildErrMap
+	opts         RunnerOptions
+	buildOnce    sync.Once             // legacy single-build once guard
+	buildErr     error                 // legacy single-build error
+	buildOnceMu  sync.Mutex            // protects buildOnceMap and buildErrMap
 	buildOnceMap map[string]*sync.Once // per-label build once guards
 	buildErrMap  map[string]error      // per-label build errors
 }

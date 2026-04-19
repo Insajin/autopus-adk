@@ -1,7 +1,6 @@
 package setup
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,17 +49,4 @@ func saveCredentialBytes(data []byte) error {
 		return fmt.Errorf("write credentials: %w", err)
 	}
 	return nil
-}
-
-func loadCredentialsMap() (map[string]any, error) {
-	data, err := loadCredentialBytes()
-	if err != nil {
-		return nil, err
-	}
-
-	var creds map[string]any
-	if err := json.Unmarshal(data, &creds); err != nil {
-		return nil, err
-	}
-	return creds, nil
 }

@@ -15,7 +15,7 @@ const (
 
 // RenderOptions holds optional data for rendering.
 type RenderOptions struct {
-	ArchMap    *arch.ArchitectureMap
+	ArchMap   *arch.ArchitectureMap
 	LoreItems []lore.LoreEntry
 }
 

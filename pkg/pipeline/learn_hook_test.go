@@ -123,12 +123,12 @@ func TestLearnHookReviewIssue(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name       string
-		output     string
-		specID     string
-		wantCount  int
-		wantSev    learn.Severity
-		wantPat    string
+		name      string
+		output    string
+		specID    string
+		wantCount int
+		wantSev   learn.Severity
+		wantPat   string
 	}{
 		{
 			name:      "single finding parsed",

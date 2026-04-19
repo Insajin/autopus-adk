@@ -270,5 +270,3 @@ func TestMigrateOrchestraConfig_AlreadyCorrectConfigNoChange(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, changed, "already-correct config must return changed=false")
 }
-
-

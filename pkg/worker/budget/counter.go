@@ -21,10 +21,10 @@ func NewCounter(b IterationBudget) *Counter {
 
 // IncrementResult holds the outcome of a single tool call increment.
 type IncrementResult struct {
-	Count    int
-	Level    ThresholdLevel
-	Changed  bool // true when the threshold level changed
-	Budget   IterationBudget
+	Count   int
+	Level   ThresholdLevel
+	Changed bool // true when the threshold level changed
+	Budget  IterationBudget
 }
 
 // Increment records one tool call and returns the updated state.

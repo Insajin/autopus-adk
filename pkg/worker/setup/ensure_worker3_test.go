@@ -31,13 +31,13 @@ func TestEnsureDeviceAuth_VerificationURIFallback(t *testing.T) {
 				Interval:                1,
 			}
 			resp, _ := json.Marshal(map[string]any{"data": dc})
-			w.Write(resp)
+			_, _ = w.Write(resp)
 			return
 		}
 		// Poll endpoint: return authorization_pending.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]any{"error": "authorization_pending"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"error": "authorization_pending"})
 	}))
 	defer srv.Close()
 
@@ -73,7 +73,7 @@ func TestEnsureDeviceAuth_PollSucceeds_SavesCredentials(t *testing.T) {
 				Interval:                1,
 			}
 			resp, _ := json.Marshal(map[string]any{"data": dc})
-			w.Write(resp)
+			_, _ = w.Write(resp)
 
 		case "/api/v1/auth/device/token":
 			// Return a successful token response immediately.
@@ -84,7 +84,7 @@ func TestEnsureDeviceAuth_PollSucceeds_SavesCredentials(t *testing.T) {
 				ExpiresIn:    3600,
 			}
 			resp, _ := json.Marshal(map[string]any{"data": token})
-			w.Write(resp)
+			_, _ = w.Write(resp)
 
 		default:
 			http.NotFound(w, r)

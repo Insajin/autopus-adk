@@ -173,30 +173,30 @@ func TestFileExists(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		setup    func(dir string) string
+		setup    func(t *testing.T, dir string) string
 		expected bool
 	}{
 		{
 			name: "existing file",
-			setup: func(dir string) string {
+			setup: func(t *testing.T, dir string) string {
 				p := filepath.Join(dir, "test.txt")
-				os.WriteFile(p, []byte("content"), 0600)
+				require.NoError(t, os.WriteFile(p, []byte("content"), 0600))
 				return p
 			},
 			expected: true,
 		},
 		{
 			name: "nonexistent path",
-			setup: func(dir string) string {
+			setup: func(t *testing.T, dir string) string {
 				return filepath.Join(dir, "nope.txt")
 			},
 			expected: false,
 		},
 		{
 			name: "directory instead of file",
-			setup: func(dir string) string {
+			setup: func(t *testing.T, dir string) string {
 				p := filepath.Join(dir, "subdir")
-				os.MkdirAll(p, 0755)
+				require.NoError(t, os.MkdirAll(p, 0755))
 				return p
 			},
 			expected: false,
@@ -206,7 +206,7 @@ func TestFileExists(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
-			path := tt.setup(dir)
+			path := tt.setup(t, dir)
 			assert.Equal(t, tt.expected, fileExists(path))
 		})
 	}
@@ -217,30 +217,30 @@ func TestDirExists(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		setup    func(dir string) string
+		setup    func(t *testing.T, dir string) string
 		expected bool
 	}{
 		{
 			name: "existing directory",
-			setup: func(dir string) string {
+			setup: func(t *testing.T, dir string) string {
 				p := filepath.Join(dir, "subdir")
-				os.MkdirAll(p, 0755)
+				require.NoError(t, os.MkdirAll(p, 0755))
 				return p
 			},
 			expected: true,
 		},
 		{
 			name: "nonexistent path",
-			setup: func(dir string) string {
+			setup: func(t *testing.T, dir string) string {
 				return filepath.Join(dir, "nope")
 			},
 			expected: false,
 		},
 		{
 			name: "file instead of directory",
-			setup: func(dir string) string {
+			setup: func(t *testing.T, dir string) string {
 				p := filepath.Join(dir, "file.txt")
-				os.WriteFile(p, []byte("content"), 0600)
+				require.NoError(t, os.WriteFile(p, []byte("content"), 0600))
 				return p
 			},
 			expected: false,
@@ -250,7 +250,7 @@ func TestDirExists(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			dir := t.TempDir()
-			path := tt.setup(dir)
+			path := tt.setup(t, dir)
 			assert.Equal(t, tt.expected, dirExists(path))
 		})
 	}

@@ -173,15 +173,15 @@ func ValidateCommands(docsDir, projectDir string) []ValidationWarning {
 
 func isBuildFileName(name string) bool {
 	buildFiles := map[string]bool{
-		"Makefile":           true,
-		"package.json":       true,
-		"go.mod":             true,
-		"Cargo.toml":         true,
-		"pyproject.toml":     true,
-		"docker-compose.yml": true,
+		"Makefile":            true,
+		"package.json":        true,
+		"go.mod":              true,
+		"Cargo.toml":          true,
+		"pyproject.toml":      true,
+		"docker-compose.yml":  true,
 		"docker-compose.yaml": true,
-		"compose.yml":        true,
-		"compose.yaml":       true,
+		"compose.yml":         true,
+		"compose.yaml":        true,
 	}
 	return buildFiles[filepath.Base(name)]
 }

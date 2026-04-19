@@ -11,10 +11,10 @@ func TestCalculateSimplicity_AutoDiscard(t *testing.T) {
 
 	// Improvement is negative (metric got worse for minimize direction)
 	score := CalculateSimplicity(
-		100.0,  // baseline
-		105.0,  // current (worse for minimize)
-		10,     // linesAdded
-		0,      // linesRemoved
+		100.0, // baseline
+		105.0, // current (worse for minimize)
+		10,    // linesAdded
+		0,     // linesRemoved
 		Minimize,
 	)
 

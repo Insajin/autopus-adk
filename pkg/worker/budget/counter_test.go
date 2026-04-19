@@ -35,7 +35,7 @@ func TestCounter_ThresholdTransitions(t *testing.T) {
 	}
 
 	// Increment to 9 (90% of 10) — should transition to LevelDanger.
-	c.Increment() // 8
+	c.Increment()     // 8
 	r = c.Increment() // 9
 	if r.Level != LevelDanger {
 		t.Errorf("at count 9: Level = %d, want LevelDanger", r.Level)
@@ -57,7 +57,7 @@ func TestCounter_ThresholdTransitions(t *testing.T) {
 func TestCounter_NoChangeFalse(t *testing.T) {
 	c := NewCounter(DefaultBudget(100))
 
-	c.Increment() // 1 -> OK
+	c.Increment()      // 1 -> OK
 	r := c.Increment() // 2 -> still OK
 	if r.Changed {
 		t.Error("expected Changed=false when level stays the same")

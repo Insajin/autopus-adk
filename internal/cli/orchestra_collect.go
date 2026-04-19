@@ -12,9 +12,9 @@ import (
 
 // CollectResult is the JSON output structure for the collect command.
 type CollectResult struct {
-	SessionID string                   `json:"session_id"`
-	Round     int                      `json:"round"`
-	Responses []CollectProviderResult  `json:"responses"`
+	SessionID string                  `json:"session_id"`
+	Round     int                     `json:"round"`
+	Responses []CollectProviderResult `json:"responses"`
 }
 
 // CollectProviderResult holds one provider's collected screen output.

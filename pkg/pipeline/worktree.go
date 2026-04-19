@@ -250,9 +250,3 @@ func isLockError(output string) bool {
 func isNotWorktreeError(output string) bool {
 	return strings.Contains(strings.ToLower(output), "not a working tree")
 }
-
-// worktreePath returns the absolute path that would be used for a worktree.
-// Exported for testing convenience.
-func worktreePath(base, suffix string) string {
-	return filepath.Join(base, suffix)
-}

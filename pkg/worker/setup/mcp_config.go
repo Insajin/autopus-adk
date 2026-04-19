@@ -80,23 +80,23 @@ func WriteMCPConfig(config *MCPConfig, path string) error {
 	tmpPath := tmp.Name()
 
 	if err := tmp.Chmod(0600); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
+		_ = tmp.Close()
+		removeIfExists(tmpPath)
 		return fmt.Errorf("chmod temp file: %w", err)
 	}
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		os.Remove(tmpPath)
+		_ = tmp.Close()
+		removeIfExists(tmpPath)
 		return fmt.Errorf("write mcp config: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpPath)
+		removeIfExists(tmpPath)
 		return fmt.Errorf("close temp file: %w", err)
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
+		removeIfExists(tmpPath)
 		return fmt.Errorf("rename mcp config: %w", err)
 	}
 
@@ -125,4 +125,8 @@ func LoadMCPConfig(path string) (*MCPConfig, error) {
 		return nil, fmt.Errorf("unmarshal mcp config: %w", err)
 	}
 	return &config, nil
+}
+
+func removeIfExists(path string) {
+	_ = os.Remove(path)
 }

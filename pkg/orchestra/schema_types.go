@@ -19,7 +19,7 @@ type IdeaOutput struct {
 
 // AssumptionOut represents a single assumption in debate output.
 type AssumptionOut struct {
-	Type        string `json:"type"`       // value, feasibility, usability
+	Type        string `json:"type"` // value, feasibility, usability
 	Description string `json:"description"`
 	RiskLevel   string `json:"risk_level"` // high, medium, low
 }
@@ -33,7 +33,7 @@ type DebaterR2Output struct {
 
 // AckOutput represents an acknowledgment of another debater's point.
 type AckOutput struct {
-	Source string `json:"source"`     // "Debater A", "Debater B"
+	Source string `json:"source"` // "Debater A", "Debater B"
 	Point  string `json:"point"`
 	Why    string `json:"why_strong"`
 }

@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-
 var (
 	// reToken matches common API token patterns.
 	reToken = regexp.MustCompile(`(?i)(ghp_|gho_|github_pat_|sk-|AKIA)[a-zA-Z0-9_-]+`)

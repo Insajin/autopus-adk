@@ -25,7 +25,9 @@ func TestServer_SendMessage_InvalidParams(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -65,7 +67,9 @@ func TestServer_CancelTask_InvalidParams(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -103,7 +107,9 @@ func TestServer_UnknownMethod(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -157,7 +163,9 @@ func TestServer_SendMessage_DuplicateTaskID(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -217,7 +225,9 @@ func TestServer_MessageLoop_BackoffOnReceiveError(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -255,7 +265,9 @@ func TestServer_MessageLoop_ReconnectsAfterReceiveError(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	require.NoError(t, srv.Start(ctx))
 	mb.waitForMessages(t, 1, 3*time.Second) // initial registration

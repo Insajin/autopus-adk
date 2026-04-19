@@ -267,4 +267,3 @@ func TestRelayPane_HeredocPromptInjection(t *testing.T) {
 	assert.True(t, strings.Contains(cmd, "multi") && strings.Contains(cmd, "prompt"),
 		"command should contain the full prompt")
 }
-

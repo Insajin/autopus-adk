@@ -190,4 +190,3 @@ effort: medium
 	_, _, found := parseFrontmatterInitialPrompt(content)
 	assert.False(t, found)
 }
-

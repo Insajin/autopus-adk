@@ -56,20 +56,20 @@ func TestTruncateToBytes(t *testing.T) {
 		},
 		{
 			name:     "truncate mid utf8 2-byte",
-			content:  "café",       // é is 2 bytes (0xC3 0xA9)
-			maxBytes: 4,            // "caf" = 3 bytes, é starts at byte 3
-			want:     "caf",        // can't fit é, so truncate before it
+			content:  "café", // é is 2 bytes (0xC3 0xA9)
+			maxBytes: 4,      // "caf" = 3 bytes, é starts at byte 3
+			want:     "caf",  // can't fit é, so truncate before it
 		},
 		{
 			name:     "truncate mid utf8 3-byte",
-			content:  "ab한글",       // 한 is 3 bytes
-			maxBytes: 3,            // "ab" = 2 bytes, 한 starts at byte 2
+			content:  "ab한글", // 한 is 3 bytes
+			maxBytes: 3,      // "ab" = 2 bytes, 한 starts at byte 2
 			want:     "ab",
 		},
 		{
 			name:     "truncate mid utf8 4-byte emoji",
-			content:  "hi🐙x",       // 🐙 is 4 bytes
-			maxBytes: 4,            // "hi" = 2 bytes, 🐙 starts at byte 2
+			content:  "hi🐙x", // 🐙 is 4 bytes
+			maxBytes: 4,      // "hi" = 2 bytes, 🐙 starts at byte 2
 			want:     "hi",
 		},
 		{

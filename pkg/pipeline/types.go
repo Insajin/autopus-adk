@@ -25,8 +25,8 @@ func (s CheckpointStatus) String() string {
 
 // Checkpoint holds the persisted state of a pipeline execution.
 type Checkpoint struct {
-	Phase         string                     `yaml:"phase"`
-	GitCommitHash string                     `yaml:"git_commit_hash"`
+	Phase         string                      `yaml:"phase"`
+	GitCommitHash string                      `yaml:"git_commit_hash"`
 	TaskStatus    map[string]CheckpointStatus `yaml:"task_status"`
 	// Stale is set to true when the saved hash differs from the current HEAD.
 	// It is not persisted to disk.
@@ -35,9 +35,9 @@ type Checkpoint struct {
 
 // checkpointYAML is the on-disk representation used for marshalling.
 type checkpointYAML struct {
-	Phase         string                     `yaml:"phase"`
-	GitCommitHash string                     `yaml:"git_commit_hash"`
-	TaskStatus    map[string]string          `yaml:"task_status"`
+	Phase         string            `yaml:"phase"`
+	GitCommitHash string            `yaml:"git_commit_hash"`
+	TaskStatus    map[string]string `yaml:"task_status"`
 }
 
 // MarshalYAML serialises the Checkpoint to YAML bytes.

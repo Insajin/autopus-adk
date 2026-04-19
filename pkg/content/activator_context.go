@@ -115,11 +115,11 @@ func collectSearchDirs(files []string) []string {
 
 // markerLanguage maps a project marker filename to the primary language it implies.
 var markerLanguage = map[string]string{
-	"go.mod":        "go",
-	"package.json":  "javascript",
-	"Cargo.toml":    "rust",
+	"go.mod":         "go",
+	"package.json":   "javascript",
+	"Cargo.toml":     "rust",
 	"pyproject.toml": "python",
-	"pom.xml":       "java",
+	"pom.xml":        "java",
 }
 
 // extLanguage maps a lower-case file extension (with dot) to a language name.

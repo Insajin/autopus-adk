@@ -368,8 +368,14 @@ func (pe *PipelineExecutor) runPhase(ctx context.Context, taskID string, phase P
 	}
 
 	go func() {
-		defer stdin.Close()
-		io.Copy(stdin, strings.NewReader(prompt))
+		defer func() {
+			if err := stdin.Close(); err != nil {
+				log.Printf("[pipeline] stdin close failed for %s: %v", phase, err)
+			}
+		}()
+		if _, err := io.Copy(stdin, strings.NewReader(prompt)); err != nil {
+			log.Printf("[pipeline] prompt write failed for %s: %v", phase, err)
+		}
 	}()
 
 	result, parseErr := pe.parsePhaseStream(stdout, phase, phaseBudget, emergencyStop)

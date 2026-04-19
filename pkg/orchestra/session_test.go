@@ -46,7 +46,7 @@ func TestSaveAndLoadSession(t *testing.T) {
 
 	err := SaveSession(session)
 	require.NoError(t, err)
-	defer RemoveSession(session.ID)
+	defer func() { _ = RemoveSession(session.ID) }()
 
 	loaded, err := LoadSession(session.ID)
 	require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestSaveSession_Permissions(t *testing.T) {
 	}
 
 	require.NoError(t, SaveSession(session))
-	defer RemoveSession(session.ID)
+	defer func() { _ = RemoveSession(session.ID) }()
 
 	info, err := os.Stat(sessionFilePath(session.ID))
 	require.NoError(t, err)

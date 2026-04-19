@@ -29,7 +29,7 @@ type PromptData struct {
 
 	// Reviewer fields.
 	SpecContent string
-	CodeContext  string
+	CodeContext string
 }
 
 // RelevantPath describes a code path relevant to the topic.

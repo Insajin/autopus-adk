@@ -4,6 +4,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -204,7 +205,11 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 	archiveName := selfupdate.ArchiveName(runtime.GOOS, runtime.GOARCH, ver)
 	dl := selfupdate.NewDownloader()
 	tmpDir, _ := os.MkdirTemp("", "autopus-update-*")
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			log.Printf("[update] cleanup tmp dir failed: %v", err)
+		}
+	}()
 
 	// R3: Download and verify checksum
 	binaryPath, err := dl.DownloadAndVerify(info.ArchiveURL, info.ChecksumURL, archiveName, tmpDir)

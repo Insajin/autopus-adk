@@ -6,17 +6,7 @@ import (
 )
 
 type customWorkflowBody struct {
-	prompt string
-	skill  string
-}
-
-func renderCustomWorkflowCommand(spec workflowSpec) (string, bool) {
-	body, ok := customWorkflowBodies(spec)
-	if !ok {
-		return "", false
-	}
-	frontmatter := fmt.Sprintf("description: %q\nagent: build", spec.Description)
-	return buildMarkdown(frontmatter, commandArgumentNote(spec.Name)+"\n"+body.prompt), true
+	skill string
 }
 
 func renderCustomWorkflowSkill(spec workflowSpec) (string, bool) {
@@ -53,24 +43,6 @@ func customWorkflowBodies(spec workflowSpec) (customWorkflowBody, bool) {
 }
 
 func cliWorkflowBody(name, title, summary, command, result string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — "+title,
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 원칙",
-		"",
-		"- 이 워크플로우는 `"+command+"` CLI thin wrapper입니다.",
-		"- 전달된 인자와 플래그를 그대로 유지합니다.",
-		"- Bash tool로 실제 명령을 실행하고 결과를 요약합니다.",
-		"",
-		"## 실행 명령",
-		"",
-		"`"+command+"`",
-	)
-
 	skill := compose(
 		"# "+name+" — "+title,
 		"",
@@ -85,32 +57,10 @@ func cliWorkflowBody(name, title, summary, command, result string) customWorkflo
 		"3. "+result,
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }
 
 func taskWorkflowBody(name, title, summary, subagent, prompt string) customWorkflowBody {
-	promptBody := compose(
-		"# "+name+" — "+title,
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 원칙",
-		"",
-		"- OpenCode에서는 `task(...)` 기반 subagent-first 로 진행합니다.",
-		"- 대상 path가 있으면 해당 범위를, 없으면 현재 프로젝트 루트를 분석합니다.",
-		"",
-		"## 권장 subagent 호출",
-		"",
-		"```text",
-		"task(",
-		"  subagent_type = \""+subagent+"\",",
-		"  prompt = \""+prompt+"\"",
-		")",
-		"```",
-	)
-
 	skillBody := compose(
 		"# "+name+" — "+title,
 		"",
@@ -125,24 +75,10 @@ func taskWorkflowBody(name, title, summary, subagent, prompt string) customWorkf
 		"3. 주요 findings와 다음 액션을 3개 이내로 정리합니다.",
 	)
 
-	return customWorkflowBody{prompt: promptBody, skill: skillBody}
+	return customWorkflowBody{skill: skillBody}
 }
 
 func whyWorkflowBody(name, summary string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — Decision Rationale Query",
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 원칙",
-		"",
-		"- path가 주어지면 `auto lore context <path>`를 우선 사용합니다.",
-		"- path가 없으면 `ARCHITECTURE.md`, 관련 SPEC, CHANGELOG, Lore context를 근거로 답합니다.",
-		"- 근거가 부족하면 한 개의 짧은 질문으로 범위를 좁힙니다.",
-	)
-
 	skill := compose(
 		"# "+name+" — Decision Rationale Query",
 		"",
@@ -157,25 +93,10 @@ func whyWorkflowBody(name, summary string) customWorkflowBody {
 		"3. 추가 근거가 필요하면 관련 SPEC / ARCHITECTURE / CHANGELOG를 읽고 이유를 요약합니다.",
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }
 
 func devWorkflowBody(name, summary string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — Full Development Cycle",
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 순서",
-		"",
-		"1. 기능 설명을 기준으로 `auto-plan`을 먼저 수행합니다.",
-		"2. 생성된 SPEC-ID를 기준으로 `auto-go`를 진행합니다.",
-		"3. 구현이 끝나면 `auto-sync`를 수행합니다.",
-		"4. `--auto`, `--loop`, `--team`, `--multi`, `--quality`, `--model`, `--variant` 플래그는 가능한 한 하위 단계로 전달합니다.",
-	)
-
 	skill := compose(
 		"# "+name+" — Full Development Cycle",
 		"",
@@ -191,7 +112,7 @@ func devWorkflowBody(name, summary string) customWorkflowBody {
 		"- 각 단계가 실패하면 조용히 건너뛰지 말고 실패 지점과 재개 방법을 명시합니다.",
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }
 
 func compose(lines ...string) string {

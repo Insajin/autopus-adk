@@ -102,18 +102,22 @@ func (w *RotatingWriter) StartCleanup(ctx context.Context) {
 
 // rotate shifts existing rotated files and renames the current file.
 func (w *RotatingWriter) rotate() error {
-	w.file.Close()
+	if err := w.file.Close(); err != nil {
+		return fmt.Errorf("close current log: %w", err)
+	}
 
 	// Shift .4→delete, .3→.4, .2→.3, .1→.2, current→.1
 	for i := maxRotatedFiles; i >= 1; i-- {
 		src := w.rotatedName(i)
 		if i == maxRotatedFiles {
-			os.Remove(src)
+			removeIfExists(src)
 			continue
 		}
 		dst := w.rotatedName(i + 1)
 		// Ignore errors — file may not exist yet.
-		os.Rename(src, dst)
+		if err := os.Rename(src, dst); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("rotate log %s -> %s: %w", src, dst, err)
+		}
 	}
 	if err := os.Rename(w.path, w.rotatedName(1)); err != nil && !os.IsNotExist(err) {
 		// Best-effort: if rename fails, truncate instead.
@@ -145,11 +149,15 @@ func (w *RotatingWriter) cleanup() {
 			continue
 		}
 		if info.ModTime().Before(cutoff) {
-			os.Remove(name)
+			removeIfExists(name)
 		}
 	}
 }
 
 func (w *RotatingWriter) rotatedName(index int) string {
 	return fmt.Sprintf("%s.%d", w.path, index)
+}
+
+func removeIfExists(path string) {
+	_ = os.Remove(path)
 }

@@ -111,9 +111,9 @@ func TestValidateCommand_ExactMatch_GoOnly(t *testing.T) {
 	}
 
 	tests := []struct {
-		cmd     string
-		wantOK  bool
-		desc    string
+		cmd    string
+		wantOK bool
+		desc   string
 	}{
 		{"go", true, "bare 'go' must match"},
 		{"gobuster scan", false, "'gobuster' must NOT match exact 'go'"},

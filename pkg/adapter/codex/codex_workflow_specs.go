@@ -100,10 +100,6 @@ var workflowSpecs = []workflowSpec{
 	},
 }
 
-func routerDescription() string {
-	return workflowSpecs[0].Description
-}
-
 func routerSubcommandCount() int {
 	return len(workflowSpecs) - 1
 }

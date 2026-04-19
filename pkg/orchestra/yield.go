@@ -12,7 +12,7 @@ type YieldOutput struct {
 	Strategy        string            `json:"strategy"`
 	Rounds          int               `json:"rounds"`
 	RoundHistory    []YieldRound      `json:"round_history"`
-	Panes           map[string]string `json:"panes"`            // provider -> pane ID
+	Panes           map[string]string `json:"panes"` // provider -> pane ID
 	SessionID       string            `json:"session_id"`
 	FailedProviders []YieldFailure    `json:"failed_providers,omitempty"` // Providers dropped from round history
 }

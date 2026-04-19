@@ -61,8 +61,8 @@ func TestResolveEnv_PerScenarioOverride_TakesPrecedence(t *testing.T) {
 
 	// Given: a scenario that overrides DATABASE_URL
 	opts := EnvResolveOptions{
-		ProjectDir:  t.TempDir(),
-		ScenarioEnv: map[string]string{"DATABASE_URL": "postgres://custom:5432/testdb"},
+		ProjectDir:     t.TempDir(),
+		ScenarioEnv:    map[string]string{"DATABASE_URL": "postgres://custom:5432/testdb"},
 		NonInteractive: true,
 	}
 

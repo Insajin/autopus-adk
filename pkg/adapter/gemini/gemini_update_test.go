@@ -74,7 +74,7 @@ func TestUpdate_DeletedManagedFile(t *testing.T) {
 	skillsDir := filepath.Join(dir, ".gemini", "skills", "autopus")
 	entries, _ := os.ReadDir(skillsDir)
 	if len(entries) > 0 {
-		os.RemoveAll(filepath.Join(skillsDir, entries[0].Name()))
+		require.NoError(t, os.RemoveAll(filepath.Join(skillsDir, entries[0].Name())))
 	}
 
 	pf, err := a.Update(context.Background(), cfg)

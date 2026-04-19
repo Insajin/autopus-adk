@@ -133,7 +133,9 @@ func TestServer_HandleResponse_HeartbeatAck_CallsHeartbeatAck(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -169,7 +171,9 @@ func TestServer_HandleResponse_NonOKResult_NoAck(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))
@@ -200,7 +204,9 @@ func TestServer_HandleApproval_InvalidParams(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	defer srv.Close()
+	defer func() {
+		require.NoError(t, srv.Close())
+	}()
 
 	srv.config.BackendURL = mb.wsURL()
 	require.NoError(t, srv.Start(ctx))

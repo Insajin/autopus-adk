@@ -23,8 +23,6 @@ const (
 	openAIClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
 	openAIScopes   = "openid profile email offline_access api.connectors.read api.connectors.invoke"
 	openAIPort     = 1455
-	// @AX:NOTE [AUTO] @AX:REASON: 5-minute timeout for OAuth flow — user must complete browser auth within this window
-	oauthTimeout = 5 * time.Minute
 )
 
 // DefaultClientID returns the OpenAI PKCE client ID.
@@ -153,7 +151,11 @@ func WaitForCallback(ctx context.Context, cfg OAuthConfig) (*OAuthResult, error)
 			errCh <- fmt.Errorf("callback server: %w", sErr)
 		}
 	}()
-	defer server.Close()
+	defer func() {
+		if closeErr := server.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
+			fmt.Printf("[connect] callback server close failed: %v\n", closeErr)
+		}
+	}()
 
 	authorizeURL := buildAuthorizeURL(cfg, flow)
 	_ = setup.OpenBrowser(authorizeURL)
@@ -233,7 +235,7 @@ func ExchangeAuthCode(ctx context.Context, req CallbackRequest) (*OAuthResult, e
 
 func buildAuthorizeURL(cfg OAuthConfig, flow *OAuthFlowResult) string {
 	params := url.Values{
-		"client_id":                  {cfg.clientID()},
+		"client_id":                 {cfg.clientID()},
 		"redirect_uri":              {flow.RedirectURI},
 		"response_type":             {"code"},
 		"code_challenge":            {flow.Challenge},

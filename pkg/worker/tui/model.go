@@ -12,7 +12,7 @@ import (
 type ConnStatus int
 
 const (
-	ConnConnected    ConnStatus = iota
+	ConnConnected ConnStatus = iota
 	ConnDisconnected
 	ConnReconnecting
 )

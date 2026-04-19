@@ -25,7 +25,7 @@ func TestFindWorkspaceByID_Found(t *testing.T) {
 				{ID: "ws-002", Name: "Beta"},
 			},
 		})
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer srv.Close()
 
@@ -48,7 +48,7 @@ func TestFindWorkspaceByID_NotFound(t *testing.T) {
 		data, _ := json.Marshal(map[string]any{
 			"data": []Workspace{{ID: "ws-001", Name: "Alpha"}},
 		})
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer srv.Close()
 
@@ -87,7 +87,7 @@ func TestCreateWorkerAPIKey_Success(t *testing.T) {
 				Key:  "acos_worker_testkey123",
 			},
 		})
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer srv.Close()
 
@@ -120,7 +120,7 @@ func TestCreateWorkerAPIKey_EmptyKey(t *testing.T) {
 		data, _ := json.Marshal(map[string]any{
 			"data": workerKeyResponse{ID: "key-001", Name: "adk-worker", Key: ""},
 		})
-		w.Write(data)
+		_, _ = w.Write(data)
 	}))
 	defer srv.Close()
 

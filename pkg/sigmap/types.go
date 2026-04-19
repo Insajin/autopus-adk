@@ -15,16 +15,16 @@ type Signature struct {
 
 // Package groups signatures by package path.
 type Package struct {
-	Path       string      // e.g. "pkg/adapter"
-	Name       string      // e.g. "adapter"
-	FanIn      int         // number of files importing this package
-	Depth      int         // path depth (number of "/" in path)
+	Path       string // e.g. "pkg/adapter"
+	Name       string // e.g. "adapter"
+	FanIn      int    // number of files importing this package
+	Depth      int    // path depth (number of "/" in path)
 	Signatures []Signature
 }
 
 // SignatureMap is the complete API inventory of a Go module.
 type SignatureMap struct {
-	ModulePath string    // go.mod module path
+	ModulePath string // go.mod module path
 	Packages   []Package
 	Warnings   []string // parse error warnings
 }

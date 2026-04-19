@@ -16,9 +16,9 @@ type mockAdapter struct {
 	detected bool
 }
 
-func (m *mockAdapter) Name() string    { return m.name }
-func (m *mockAdapter) Version() string { return "1.0.0" }
-func (m *mockAdapter) CLIBinary() string { return m.name }
+func (m *mockAdapter) Name() string                           { return m.name }
+func (m *mockAdapter) Version() string                        { return "1.0.0" }
+func (m *mockAdapter) CLIBinary() string                      { return m.name }
 func (m *mockAdapter) Detect(_ context.Context) (bool, error) { return m.detected, nil }
 func (m *mockAdapter) Generate(_ context.Context, _ *config.HarnessConfig) (*PlatformFiles, error) {
 	return &PlatformFiles{}, nil

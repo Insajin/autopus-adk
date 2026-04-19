@@ -47,14 +47,14 @@ type DirEntry struct {
 
 // ConventionSample holds detected code conventions from actual project files.
 type ConventionSample struct {
-	FileNaming     string   // Detected file naming pattern: snake_case, kebab-case, camelCase, PascalCase
-	ErrorPatterns  []string // Sampled error handling patterns from real code
-	ImportStyle    string   // Grouped, ungrouped, aliased
-	HasLinter      bool     // Whether a linter config exists
-	LinterName     string   // Detected linter name
-	HasFormatter   bool     // Whether a formatter config exists
-	FormatterName  string   // Detected formatter name
-	ExampleFiles   []string // Paths of representative source files
+	FileNaming    string   // Detected file naming pattern: snake_case, kebab-case, camelCase, PascalCase
+	ErrorPatterns []string // Sampled error handling patterns from real code
+	ImportStyle   string   // Grouped, ungrouped, aliased
+	HasLinter     bool     // Whether a linter config exists
+	LinterName    string   // Detected linter name
+	HasFormatter  bool     // Whether a formatter config exists
+	FormatterName string   // Detected formatter name
+	ExampleFiles  []string // Paths of representative source files
 }
 
 // Workspace represents a monorepo workspace/module.
@@ -73,9 +73,9 @@ type ProjectInfo struct {
 	EntryPoints []EntryPoint
 	BuildFiles  []BuildFile
 	TestConfig  TestConfiguration
-	Structure   []DirEntry           // Top-level directory tree (max 3 levels)
+	Structure   []DirEntry                  // Top-level directory tree (max 3 levels)
 	Conventions map[string]ConventionSample // Per-language convention samples
-	Workspaces  []Workspace          // Detected monorepo workspaces
+	Workspaces  []Workspace                 // Detected monorepo workspaces
 }
 
 // DocSet holds all rendered documentation content.
@@ -103,9 +103,9 @@ var DocFiles = map[string]string{
 
 // Meta holds generation metadata for .meta.yaml.
 type Meta struct {
-	GeneratedAt    time.Time         `yaml:"generated_at"`
-	AutopusVersion string            `yaml:"autopus_version"`
-	ProjectHash    string            `yaml:"project_hash"`
+	GeneratedAt    time.Time           `yaml:"generated_at"`
+	AutopusVersion string              `yaml:"autopus_version"`
+	ProjectHash    string              `yaml:"project_hash"`
 	Files          map[string]FileMeta `yaml:"files"`
 }
 
@@ -118,7 +118,7 @@ type FileMeta struct {
 // ValidationReport holds the result of document-code validation.
 type ValidationReport struct {
 	Valid      bool
-	Warnings  []ValidationWarning
+	Warnings   []ValidationWarning
 	DriftScore float64 // 0.0 = no drift, 1.0 = fully drifted
 }
 

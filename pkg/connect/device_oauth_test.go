@@ -28,7 +28,7 @@ func TestRequestOpenAIDeviceCode_Success(t *testing.T) {
 			Interval:        5,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp) //nolint:errcheck
+		_ = json.NewEncoder(w).Encode(resp) //nolint:errcheck
 	}))
 	defer srv.Close()
 
@@ -46,7 +46,7 @@ func TestRequestOpenAIDeviceCode_Success(t *testing.T) {
 func TestRequestOpenAIDeviceCode_ServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)
-		w.Write([]byte("not implemented")) //nolint:errcheck
+		_, _ = w.Write([]byte("not implemented")) //nolint:errcheck
 	}))
 	defer srv.Close()
 
@@ -74,7 +74,7 @@ func TestRequestOpenAIDeviceCode_WrappedResponse(t *testing.T) {
 			"data":    json.RawMessage(innerJSON),
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(envelope) //nolint:errcheck
+		_ = json.NewEncoder(w).Encode(envelope) //nolint:errcheck
 	}))
 	defer srv.Close()
 
@@ -102,7 +102,7 @@ func TestPollOpenAIDeviceToken_CompletesOnSecondPoll(t *testing.T) {
 			AccessToken: token,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp) //nolint:errcheck
+		_ = json.NewEncoder(w).Encode(resp) //nolint:errcheck
 	}))
 	defer srv.Close()
 
@@ -122,7 +122,7 @@ func TestPollOpenAIDeviceToken_Expired(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := connect.DeviceTokenResponse{Status: "expired"}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp) //nolint:errcheck
+		_ = json.NewEncoder(w).Encode(resp) //nolint:errcheck
 	}))
 	defer srv.Close()
 
@@ -139,7 +139,7 @@ func TestPollOpenAIDeviceToken_ContextCancelled(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := connect.DeviceTokenResponse{Status: "pending"}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp) //nolint:errcheck
+		_ = json.NewEncoder(w).Encode(resp) //nolint:errcheck
 	}))
 	defer srv.Close()
 
