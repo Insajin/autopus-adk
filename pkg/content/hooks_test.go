@@ -145,6 +145,47 @@ func TestGenerateHookConfigs_DeduplicatesReactHooks(t *testing.T) {
 	assert.Equal(t, "auto react check --quiet", hooks[0].Command)
 }
 
+func TestGenerateProjectHookConfigs_ClaudeTaskCreatedEnabled(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.DefaultFullConfig("demo")
+	cfg.Hooks = config.HooksConf{}
+	cfg.Features.CC21 = config.CC21FeaturesConf{
+		Enabled:                 true,
+		EffortEnabled:           true,
+		MonitorEnabled:          true,
+		TaskCreatedEnabled:      true,
+		InitialPromptEnabled:    true,
+		TaskCreatedMode:         "warn",
+		MonitorPatternTimeoutMS: 30000,
+	}
+
+	hooks, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "claude-code", true)
+	require.NoError(t, err)
+	require.Len(t, hooks, 1)
+	assert.Empty(t, gitHooks)
+	assert.Equal(t, "TaskCreated", hooks[0].Event)
+	assert.Equal(t, ".claude/hooks/task-created-validate.sh", hooks[0].Command)
+	assert.Equal(t, "warn", hooks[0].Env["AUTOPUS_TASKCREATED_DEFAULT_MODE"])
+}
+
+func TestGenerateProjectHookConfigs_TaskCreatedDisabledOutsideClaude(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.DefaultFullConfig("demo")
+	cfg.Hooks = config.HooksConf{}
+	cfg.Features.CC21 = config.CC21FeaturesConf{
+		Enabled:            true,
+		TaskCreatedEnabled: true,
+		TaskCreatedMode:    "enforce",
+	}
+
+	hooks, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "codex", true)
+	require.NoError(t, err)
+	assert.Empty(t, hooks)
+	assert.Empty(t, gitHooks)
+}
+
 func TestGitHookScript_Content(t *testing.T) {
 	t.Parallel()
 

@@ -21,7 +21,7 @@ func TestRootCmd_GlobalFlagsFlowIntoContext(t *testing.T) {
 		},
 	})
 
-	root.SetArgs([]string{"--auto", "--loop", "--multi", "--think", "--quality", "balanced", "capture"})
+	root.SetArgs([]string{"--auto", "--loop", "--multi", "--think", "--quality", "balanced", "--effort", "xhigh", "--task-created-mode", "enforce", "capture"})
 
 	err := root.Execute()
 	require.NoError(t, err)
@@ -30,6 +30,8 @@ func TestRootCmd_GlobalFlagsFlowIntoContext(t *testing.T) {
 	assert.True(t, captured.MultiMode)
 	assert.True(t, captured.Think)
 	assert.Equal(t, "balanced", captured.Quality)
+	assert.Equal(t, "xhigh", captured.Effort)
+	assert.Equal(t, "enforce", captured.TaskMode)
 }
 
 func TestRootCmd_UltrathinkImpliesThink(t *testing.T) {
@@ -70,6 +72,8 @@ func TestRootCmd_HelpShowsGlobalFlags(t *testing.T) {
 	assert.Contains(t, output, "--think")
 	assert.Contains(t, output, "--ultrathink")
 	assert.Contains(t, output, "--quality")
+	assert.Contains(t, output, "--effort")
+	assert.Contains(t, output, "--task-created-mode")
 }
 
 func TestRootCmd_InvalidQualityFlagFails(t *testing.T) {
@@ -81,4 +85,15 @@ func TestRootCmd_InvalidQualityFlagFails(t *testing.T) {
 	err := root.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `unknown quality preset "invalid"`)
+}
+
+func TestRootCmd_InvalidTaskCreatedModeFails(t *testing.T) {
+	t.Parallel()
+
+	root := NewRootCmd()
+	root.SetArgs([]string{"--task-created-mode", "block", "version", "--short"})
+
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `invalid --task-created-mode "block"`)
 }

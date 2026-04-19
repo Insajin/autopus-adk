@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 // TestCheckCmd_NoFlags verifies that running `check` with no flags exits cleanly
@@ -209,5 +211,46 @@ func TestCheckCmd_LoreSkipsWhenNoCommits(t *testing.T) {
 
 	if err := root.Execute(); err != nil {
 		t.Fatalf("lore check should pass when there are no commits, got: %v", err)
+	}
+}
+
+func TestCheckCmd_CC21_EffortFlagOverridesEnv(t *testing.T) {
+	t.Setenv("CLAUDE_CODE_EFFORT_LEVEL", "low")
+
+	root := newTestRootCmd()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs([]string{"--effort", "xhigh", "check", "--cc21", "--dir", t.TempDir()})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("cc21 check should pass with explicit --effort override, got: %v", err)
+	}
+	if !strings.Contains(buf.String(), "effective effort=xhigh (source=flag)") {
+		t.Fatalf("expected effort override output, got: %s", buf.String())
+	}
+}
+
+func TestCheckCmd_CC21_TaskCreatedModeFlagOverridesEnvAndConfig(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.DefaultFullConfig("demo")
+	cfg.Features.CC21.TaskCreatedMode = "warn"
+	if err := config.Save(dir, cfg); err != nil {
+		t.Fatalf("config save failed: %v", err)
+	}
+
+	t.Setenv("TASKCREATED_MODE", "warn")
+
+	root := newTestRootCmd()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs([]string{"--task-created-mode", "enforce", "check", "--cc21", "--dir", dir})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("cc21 check should pass with explicit --task-created-mode override, got: %v", err)
+	}
+	if !strings.Contains(buf.String(), "effective mode=enforce (source=flag)") {
+		t.Fatalf("expected task-created override output, got: %s", buf.String())
 	}
 }

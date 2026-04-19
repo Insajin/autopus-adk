@@ -20,6 +20,8 @@ type globalFlags struct {
 	LoopMode   bool
 	MultiMode  bool
 	Quality    string
+	Effort     string
+	TaskMode   string
 }
 
 type globalFlagsContextKey struct{}
@@ -66,6 +68,14 @@ func collectGlobalFlags(cmd *cobra.Command, configPath string) (globalFlags, err
 	if err != nil {
 		return flags, err
 	}
+	effort, err := cmd.Flags().GetString("effort")
+	if err != nil {
+		return flags, err
+	}
+	taskMode, err := cmd.Flags().GetString("task-created-mode")
+	if err != nil {
+		return flags, err
+	}
 
 	flags = globalFlags{
 		Think:      think,
@@ -74,6 +84,8 @@ func collectGlobalFlags(cmd *cobra.Command, configPath string) (globalFlags, err
 		LoopMode:   loopMode,
 		MultiMode:  multiMode,
 		Quality:    strings.TrimSpace(quality),
+		Effort:     strings.TrimSpace(effort),
+		TaskMode:   normalizeTaskCreatedMode(taskMode),
 	}
 	if flags.UltraThink {
 		flags.Think = true
@@ -82,6 +94,9 @@ func collectGlobalFlags(cmd *cobra.Command, configPath string) (globalFlags, err
 		if err := validateQualityPreset(cmd, configPath, flags.Quality); err != nil {
 			return globalFlags{}, err
 		}
+	}
+	if err := validateTaskCreatedModeFlag(flags.TaskMode); err != nil {
+		return globalFlags{}, err
 	}
 
 	return flags, nil

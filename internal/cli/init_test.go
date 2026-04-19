@@ -2,6 +2,7 @@
 package cli_test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -174,6 +175,54 @@ func TestInitCmd_QualityFlag(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "ultra", "autopus.yaml must contain quality preset 'ultra'")
+}
+
+func TestUpdateCmd_TaskCreatedModeFlagOverridesGeneratedSettings(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	cmd := newTestRootCmd()
+	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code", "--yes"})
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	cfg, err := config.Load(dir)
+	require.NoError(t, err)
+	cfg.Features.CC21 = config.CC21FeaturesConf{
+		Enabled:            true,
+		TaskCreatedEnabled: true,
+		TaskCreatedMode:    "warn",
+	}
+	require.NoError(t, config.Save(dir, cfg))
+
+	updateCmd := newTestRootCmd()
+	updateCmd.SetArgs([]string{"--task-created-mode", "enforce", "update", "--dir", dir, "--yes"})
+	err = updateCmd.Execute()
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(dir, ".claude", "settings.json"))
+	require.NoError(t, err)
+
+	var settings map[string]any
+	require.NoError(t, json.Unmarshal(data, &settings))
+
+	hooksMap, ok := settings["hooks"].(map[string]any)
+	require.True(t, ok)
+	entries, ok := hooksMap["TaskCreated"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, entries)
+
+	entry, ok := entries[0].(map[string]any)
+	require.True(t, ok)
+	hooks, ok := entry["hooks"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, hooks)
+
+	hookEntry, ok := hooks[0].(map[string]any)
+	require.True(t, ok)
+	env, ok := hookEntry["env"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "enforce", env["AUTOPUS_TASKCREATED_DEFAULT_MODE"])
 }
 
 // TestInitCmd_PlatformNormalization verifies provider names are normalized to platform names.

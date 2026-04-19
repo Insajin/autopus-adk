@@ -13,14 +13,17 @@ import (
 
 func newCheckCmd() *cobra.Command {
 	var (
-		archFlag     bool
-		loreFlag     bool
-		quietFlag    bool
-		warnOnlyFlag bool
-		stagedFlag   bool
-		messageFlag  string
-		gateFlag     string
-		dir          string
+		archFlag            bool
+		cc21Flag            bool
+		loreFlag            bool
+		initialPromptFlag   bool
+		monitorCommandsFlag bool
+		quietFlag           bool
+		warnOnlyFlag        bool
+		stagedFlag          bool
+		messageFlag         string
+		gateFlag            string
+		dir                 string
 	)
 
 	cmd := &cobra.Command{
@@ -63,7 +66,8 @@ func newCheckCmd() *cobra.Command {
 				return nil
 			}
 
-			allOK := runChecks(archFlag, loreFlag, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
+			flags := globalFlagsFromContext(cmd.Context())
+			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, initialPromptFlag, monitorCommandsFlag, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
 			if !allOK {
 				return fmt.Errorf("check failed")
 			}
@@ -72,7 +76,10 @@ func newCheckCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&archFlag, "arch", false, "Check architecture rules (file size limit)")
+	cmd.Flags().BoolVar(&cc21Flag, "cc21", false, "Run SPEC-CC21-001 checks (effort frontmatter + initialPrompt guard)")
 	cmd.Flags().BoolVar(&loreFlag, "lore", false, "Check Lore commit format")
+	cmd.Flags().BoolVar(&initialPromptFlag, "initial-prompt-guard", false, "Check subagent files for forbidden initialPrompt field (SPEC-CC21-001 R11b)")
+	cmd.Flags().BoolVar(&monitorCommandsFlag, "monitor-commands", false, "Lint Monitor commands for line-buffered grep guards")
 	cmd.Flags().BoolVar(&quietFlag, "quiet", false, "Suppress non-error output")
 	cmd.Flags().BoolVar(&warnOnlyFlag, "warn-only", false, "Exit 0 even if checks fail (advisory mode)")
 	cmd.Flags().BoolVar(&stagedFlag, "staged", false, "Check only git-staged files (for pre-commit hook)")
@@ -84,12 +91,12 @@ func newCheckCmd() *cobra.Command {
 }
 
 // runChecks executes the selected checks and returns true if all pass.
-// If neither arch nor lore is selected, all checks run.
+// If no specific check flag is set, all checks run.
 // When warnOnly is true, violations are still printed but the function always returns true.
 // When staged is true, arch check only examines git-staged files.
 // When messageFile is non-empty, lore check validates that file instead of the last commit.
-func runChecks(archFlag, loreFlag bool, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
-	runAll := !archFlag && !loreFlag
+func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, initialPromptFlag, monitorCommandsFlag bool, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
+	runAll := !archFlag && !cc21Flag && !loreFlag && !initialPromptFlag && !monitorCommandsFlag
 	allOK := true
 
 	if archFlag || runAll {
@@ -106,6 +113,33 @@ func runChecks(archFlag, loreFlag bool, dir string, out io.Writer, quiet, warnOn
 			if !checkLore(dir, out, quiet) {
 				allOK = false
 			}
+		}
+	}
+	if cc21Flag {
+		if !checkAgentEffort(dir, out, quiet) {
+			allOK = false
+		}
+		if !checkEffortRuntime(flags, out, quiet) {
+			allOK = false
+		}
+		if !checkTaskCreatedModePrecedence(dir, flags, out, quiet) {
+			allOK = false
+		}
+		if !checkInitialPrompt(dir, out, quiet) {
+			allOK = false
+		}
+		if !checkMonitorCommands(dir, out, quiet) {
+			allOK = false
+		}
+	}
+	if initialPromptFlag || runAll {
+		if !checkInitialPrompt(dir, out, quiet) {
+			allOK = false
+		}
+	}
+	if monitorCommandsFlag {
+		if !checkMonitorCommands(dir, out, quiet) {
+			allOK = false
 		}
 	}
 

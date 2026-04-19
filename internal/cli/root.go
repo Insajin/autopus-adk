@@ -24,6 +24,8 @@ func NewRootCmd() *cobra.Command {
 		loopMode   bool
 		multiMode  bool
 		quality    string
+		effort     string
+		taskMode   string
 	)
 
 	root := &cobra.Command{
@@ -53,6 +55,8 @@ func NewRootCmd() *cobra.Command {
 	root.PersistentFlags().BoolVar(&loopMode, "loop", false, "Retry quality gates until pass or circuit break")
 	root.PersistentFlags().BoolVar(&multiMode, "multi", false, "Enable multi-provider review/orchestration mode")
 	root.PersistentFlags().StringVar(&quality, "quality", "", "Quality mode preset (ultra/balanced)")
+	root.PersistentFlags().StringVar(&effort, "effort", "", "Explicit effort value (overrides quality-mode mapping)")
+	root.PersistentFlags().StringVar(&taskMode, "task-created-mode", "", "Override TaskCreated mode for this invocation (warn|enforce)")
 
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newInitCmd())
@@ -82,6 +86,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newTerminalCmd())
 	root.AddCommand(newPipelineCmd())
 	root.AddCommand(newPermissionCmd())
+	root.AddCommand(newEffortCmd())
 	root.AddCommand(newWorkerCmd())
 	root.AddCommand(newConfigCmd())
 	root.AddCommand(newConnectCmd())

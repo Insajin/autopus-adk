@@ -16,6 +16,19 @@ type GitHookScript struct {
 	Content string
 }
 
+// GenerateProjectHookConfigs generates hooks with access to feature flags.
+func GenerateProjectHookConfigs(cfg *config.HarnessConfig, platform string, supportsHooks bool) ([]adapter.HookConfig, []GitHookScript, error) {
+	if cfg == nil {
+		return GenerateHookConfigs(config.HooksConf{}, platform, supportsHooks)
+	}
+	if supportsHooks {
+		hooks := generateCLIHooks(cfg.Hooks, platform)
+		hooks = append(hooks, generateCC21Hooks(cfg.Features.CC21, platform)...)
+		return hooks, nil, nil
+	}
+	return nil, generateGitHooks(cfg.Hooks), nil
+}
+
 // GenerateHookConfigs는 설정에 따라 훅 설정을 생성한다.
 // supportsHooks가 true이면 CLI 훅 설정을 반환하고,
 // false이면 .git/hooks/ 스크립트를 반환한다.
@@ -71,6 +84,31 @@ func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfi
 	return hooks
 }
 
+func generateCC21Hooks(cfg config.CC21FeaturesConf, platform string) []adapter.HookConfig {
+	if platform != "claude" && platform != "claude-code" {
+		return nil
+	}
+	if !cfg.Enabled || !cfg.TaskCreatedEnabled {
+		return nil
+	}
+
+	mode := cfg.TaskCreatedMode
+	if mode == "" {
+		mode = "warn"
+	}
+
+	return []adapter.HookConfig{{
+		Event:   "TaskCreated",
+		Matcher: "",
+		Type:    "command",
+		Command: ".claude/hooks/task-created-validate.sh",
+		Timeout: 5,
+		Env: map[string]string{
+			"AUTOPUS_TASKCREATED_DEFAULT_MODE": mode,
+		},
+	}}
+}
+
 // translateHookEvent maps Claude Code event names to the platform's native
 // event names. Unknown platforms pass through the Claude Code name unchanged
 // (safe default — most adapters will reject unknown names and log a warning).
@@ -90,11 +128,30 @@ func translateHookEvent(claudeEvent, platform string) string {
 
 func appendUniqueHook(hooks []adapter.HookConfig, hook adapter.HookConfig) []adapter.HookConfig {
 	for _, existing := range hooks {
-		if existing == hook {
+		if sameHookConfig(existing, hook) {
 			return hooks
 		}
 	}
 	return append(hooks, hook)
+}
+
+func sameHookConfig(a, b adapter.HookConfig) bool {
+	if a.Event != b.Event ||
+		a.Matcher != b.Matcher ||
+		a.Type != b.Type ||
+		a.Command != b.Command ||
+		a.Timeout != b.Timeout {
+		return false
+	}
+	if len(a.Env) != len(b.Env) {
+		return false
+	}
+	for k, v := range a.Env {
+		if b.Env[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // generateGitHooks는 .git/hooks/ 스크립트를 생성한다.

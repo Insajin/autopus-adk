@@ -28,21 +28,23 @@ var initSupportedPlatforms = map[string]bool{
 
 // generatePlatformFiles는 플랫폼별 파일을 생성한다.
 func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessConfig, cmd *cobra.Command) error {
+	effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
+
 	for _, p := range cfg.Platforms {
 		var err error
 		switch p {
 		case "claude-code":
 			a := claude.NewWithRoot(dir)
-			_, err = a.Generate(ctx, cfg)
+			_, err = a.Generate(ctx, effectiveCfg)
 		case "codex":
 			a := codex.NewWithRoot(dir)
-			_, err = a.Generate(ctx, cfg)
+			_, err = a.Generate(ctx, effectiveCfg)
 		case "gemini-cli":
 			a := gemini.NewWithRoot(dir)
-			_, err = a.Generate(ctx, cfg)
+			_, err = a.Generate(ctx, effectiveCfg)
 		case "opencode":
 			a := opencode.NewWithRoot(dir)
-			_, err = a.Generate(ctx, cfg)
+			_, err = a.Generate(ctx, effectiveCfg)
 		default:
 			tui.Warnf(cmd.OutOrStdout(), "알 수 없는 플랫폼 %q, 건너뜀", p)
 			continue

@@ -70,6 +70,7 @@ func newUpdateCmd() *cobra.Command {
 			warnParentRuleConflicts(cmd, dir, cfg, yesFlag)
 
 			ctx := context.Background()
+			effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
 			updated := 0
 
 			for _, p := range cfg.Platforms {
@@ -77,16 +78,16 @@ func newUpdateCmd() *cobra.Command {
 				switch p {
 				case "claude-code":
 					a := claude.NewWithRoot(dir)
-					_, updateErr = a.Update(ctx, cfg)
+					_, updateErr = a.Update(ctx, effectiveCfg)
 				case "codex":
 					a := codex.NewWithRoot(dir)
-					_, updateErr = a.Update(ctx, cfg)
+					_, updateErr = a.Update(ctx, effectiveCfg)
 				case "gemini-cli":
 					a := gemini.NewWithRoot(dir)
-					_, updateErr = a.Update(ctx, cfg)
+					_, updateErr = a.Update(ctx, effectiveCfg)
 				case "opencode":
 					a := opencode.NewWithRoot(dir)
-					_, updateErr = a.Update(ctx, cfg)
+					_, updateErr = a.Update(ctx, effectiveCfg)
 				default:
 					fmt.Fprintf(cmd.OutOrStdout(), "  경고: 알 수 없는 플랫폼 %q, 건너뜀\n", p)
 					continue

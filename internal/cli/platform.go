@@ -124,25 +124,26 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 
 			// 플랫폼 파일 생성
 			ctx := context.Background()
+			effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
 			switch platform {
 			case "claude-code":
 				a := claude.NewWithRoot(d)
-				if _, err := a.Generate(ctx, cfg); err != nil {
+				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
 					return fmt.Errorf("claude-code 파일 생성 실패: %w", err)
 				}
 			case "codex":
 				a := codex.NewWithRoot(d)
-				if _, err := a.Generate(ctx, cfg); err != nil {
+				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
 					return fmt.Errorf("codex 파일 생성 실패: %w", err)
 				}
 			case "gemini-cli":
 				a := gemini.NewWithRoot(d)
-				if _, err := a.Generate(ctx, cfg); err != nil {
+				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
 					return fmt.Errorf("gemini-cli 파일 생성 실패: %w", err)
 				}
 			case "opencode":
 				a := opencode.NewWithRoot(d)
-				if _, err := a.Generate(ctx, cfg); err != nil {
+				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
 					return fmt.Errorf("opencode 파일 생성 실패: %w", err)
 				}
 			}
