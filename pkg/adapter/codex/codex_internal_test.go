@@ -254,11 +254,14 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	require.NoError(t, err)
 	content := string(files[0].Content)
 	assert.Contains(t, content, "[mcp_servers.autopus]")
+	assert.Contains(t, content, `command = "auto"`)
+	assert.Contains(t, content, `args = ["worker", "mcp-serve"]`)
 	assert.Contains(t, content, "[mcp_servers.context7]")
 	assert.Contains(t, content, "project_doc_max_bytes = 262144")
 	assert.Contains(t, content, "[agents]")
 	assert.Contains(t, content, "max_threads = 6")
 	assert.Contains(t, content, "max_depth = 1")
+	assert.NotContains(t, content, "features.collab")
 }
 
 func TestRulesReferenceInAgentsMD(t *testing.T) {
