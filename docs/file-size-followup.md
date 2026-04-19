@@ -56,14 +56,28 @@ Verification completed in this batch:
 | `pkg/orchestra/pane_runner.go` | 303 | `pane_runner.go` 257 + `pane_output.go` 53 |
 | `pkg/terminal/cmux_test.go` | 339 | `cmux_test.go` 185 + `cmux_long_text_test.go` 155 |
 
+## Completed In Final Batch
+
+Verification completed in this batch:
+
+- `go test ./internal/cli`
+- `go test ./pkg/lsp`
+- `go test ./pkg/selfupdate`
+- `go test ./pkg/orchestra -run '^$'`
+- `go test ./pkg/orchestra -run 'TestRunPaneOrchestra|TestRunPaneOrchestraDetached|TestRelay' -timeout 20s`
+
+| Original file | Previous lines | Result |
+|---|---:|---|
+| `internal/cli/doctor_test.go` | 319 | `doctor_test.go` 83 + `doctor_quality_gate_test.go` 140 + `doctor_settings_test.go` 102 |
+| `internal/cli/worker_setup_wizard.go` | 319 | `worker_setup_wizard.go` 228 + `worker_setup_finalize.go` 96 |
+| `pkg/lsp/lsp_extra_test.go` | 326 | `lsp_extra_client_test.go` 49 + `lsp_extra_mock_test.go` 179 + `lsp_extra_detect_test.go` 56 + `lsp_extra_types_test.go` 67 |
+| `pkg/selfupdate/downloader_test.go` | 318 | `downloader_test.go` 50 + `downloader_download_test.go` 117 + `downloader_checksum_test.go` 90 + `downloader_archive_test.go` 81 |
+
 ## Remaining Repo-Wide >300 After This Pass
 
-These are outside the original memo batch and still fail a full repo-wide line-count scan:
+Repo-wide line-count scan is now clean for tracked Go source files in this follow-up:
 
-1. `pkg/lsp/lsp_extra_test.go` (326)
-2. `internal/cli/worker_setup_wizard.go` (319)
-3. `internal/cli/doctor_test.go` (319)
-4. `pkg/selfupdate/downloader_test.go` (318)
+- No remaining `*.go` files over 300 lines.
 
 ## Guardrail
 
