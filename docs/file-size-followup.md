@@ -37,24 +37,33 @@ Related commit: `159510e` (`refactor(lint): autopus-adk 잔여 lint 정리`)
 | `pkg/worker/loop.go` | 339 | `loop.go` 89 + `loop_runtime.go` 129 + `loop_task.go` 132 |
 | `pkg/worker/pipeline_test.go` | 305 | `pipeline_executor_test.go` 187 + `pipeline_parse_test.go` 113 |
 
+## Completed In Current Batch
+
+Verification completed in this batch:
+
+- `go test ./pkg/terminal`
+- `go test ./pkg/orchestra`
+- `go test ./pkg/adapter/opencode`
+- `go test ./internal/cli`
+
+| Original file | Previous lines | Result |
+|---|---:|---|
+| `internal/cli/check_rules_test.go` | 393 | `check_rules_test.go` 52 + `check_rules_lore_test.go` 166 + `check_rules_arch_test.go` 100 |
+| `internal/cli/cli_coverage2_test.go` | 454 | `cli_coverage2_test.go` 165 + `cli_coverage2_platform_arch_test.go` 121 + `cli_coverage2_tooling_test.go` 139 |
+| `internal/cli/cli_extra_test.go` | 621 | `cli_extra_test.go` 115 + `cli_extra_lore_test.go` 127 + `cli_extra_project_test.go` 167 + `cli_extra_platform_test.go` 130 + `cli_extra_lsp_skill_test.go` 122 |
+| `internal/cli/coverage_gap_test.go` | 372 | `coverage_gap_test.go` 76 + `coverage_gap_setup_test.go` 123 + `coverage_gap_telemetry_test.go` 183 |
+| `pkg/adapter/opencode/opencode_test.go` | 310 | `opencode_test.go` 230 + `opencode_plugins_test.go` 93 |
+| `pkg/orchestra/pane_runner.go` | 303 | `pane_runner.go` 257 + `pane_output.go` 53 |
+| `pkg/terminal/cmux_test.go` | 339 | `cmux_test.go` 185 + `cmux_long_text_test.go` 155 |
+
 ## Remaining Repo-Wide >300 After This Pass
 
 These are outside the original memo batch and still fail a full repo-wide line-count scan:
 
-1. `internal/cli/cli_extra_test.go` (621)
-2. `internal/cli/cli_coverage2_test.go` (454)
-3. `pkg/worker/a2a/server_dispatch.go` (402)
-4. `internal/cli/check_rules_test.go` (393)
-5. `pkg/worker/auth/refresher_coverage_test.go` (384)
-6. `pkg/arch/analyzer.go` (381)
-7. `internal/cli/coverage_gap_test.go` (372)
-8. `pkg/terminal/cmux_test.go` (339)
-9. `pkg/lsp/lsp_extra_test.go` (326)
-10. `internal/cli/worker_setup_wizard.go` (319)
-11. `internal/cli/doctor_test.go` (319)
-12. `pkg/selfupdate/downloader_test.go` (318)
-13. `pkg/adapter/opencode/opencode_test.go` (310)
-14. `pkg/orchestra/pane_runner.go` (303)
+1. `pkg/lsp/lsp_extra_test.go` (326)
+2. `internal/cli/worker_setup_wizard.go` (319)
+3. `internal/cli/doctor_test.go` (319)
+4. `pkg/selfupdate/downloader_test.go` (318)
 
 ## Guardrail
 
