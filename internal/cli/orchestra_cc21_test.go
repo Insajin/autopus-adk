@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/platform"
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
@@ -58,6 +59,9 @@ func TestResolveCC21MonitorRuntime_Enabled(t *testing.T) {
 	}
 	require.NoError(t, config.Save(projectDir, cfg))
 
+	// Touch the fake `claude` binary for exec.LookPath; the actual subprocess
+	// call is bypassed via SetClaudeVersionForTest below to avoid flakes
+	// under `go test -race ./...` CPU contention.
 	claudePath := filepath.Join(binDir, "claude")
 	require.NoError(t, os.WriteFile(claudePath, []byte("#!/bin/sh\necho 2.1.113\n"), 0o755))
 	require.NoError(t, os.WriteFile(
@@ -70,6 +74,10 @@ func TestResolveCC21MonitorRuntime_Enabled(t *testing.T) {
 	t.Setenv("HOME", homeDir)
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Chdir(projectDir)
+
+	t.Cleanup(platform.SetClaudeVersionForTest(func() (string, error) {
+		return "2.1.113", nil
+	}))
 
 	harnessCfg, err := loadHarnessConfig()
 	require.NoError(t, err)

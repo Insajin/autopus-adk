@@ -58,6 +58,20 @@ var execCommandFunc = func(ctx context.Context, name string, args ...string) *ex
 	return exec.CommandContext(ctx, name, args...)
 }
 
+// claudeVersionFn resolves the Claude Code version string. Tests can swap this
+// via SetClaudeVersionForTest to avoid the fork/exec overhead of `claude --version`,
+// which becomes a flake source under CPU-contended test runs (e.g. `go test -race ./...`).
+var claudeVersionFn = claudeVersion
+
+// SetClaudeVersionForTest overrides the Claude version resolver. Returns a cleanup
+// function that restores the original resolver. Test-only: production callers must
+// not invoke this.
+func SetClaudeVersionForTest(fn func() (string, error)) func() {
+	original := claudeVersionFn
+	claudeVersionFn = fn
+	return func() { claudeVersionFn = original }
+}
+
 // validRuntimes maps the allowed AUTOPUS_PLATFORM values to Runtime constants.
 var validRuntimes = map[string]Runtime{
 	"claude-code": RuntimeClaudeCode,
@@ -94,7 +108,7 @@ func DetectFeatures() Features {
 		return Features{}
 	}
 
-	ver, err := claudeVersion()
+	ver, err := claudeVersionFn()
 	if err != nil || !VersionSupportsCC21(ver) {
 		return Features{ClaudeVersion: ver}
 	}
