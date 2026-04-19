@@ -18,7 +18,7 @@ type BuildEntry struct {
 // defaultSubmoduleMap maps known labels to their submodule directory paths.
 var defaultSubmoduleMap = map[string]string{
 	"ADK":      "autopus-adk",
-	"Backend":  "Autopus",
+	"Backend":  "Autopus/backend",
 	"Frontend": "Autopus/frontend",
 }
 

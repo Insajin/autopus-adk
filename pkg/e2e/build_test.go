@@ -18,7 +18,7 @@ func TestParseBuildLine(t *testing.T) {
 			line: "go build ./cmd/auto/ (ADK), go build ./cmd/server/ (Backend), npm run build (Frontend)",
 			expected: []BuildEntry{
 				{Command: "go build ./cmd/auto/", Label: "ADK", SubmodulePath: "autopus-adk"},
-				{Command: "go build ./cmd/server/", Label: "Backend", SubmodulePath: "Autopus"},
+				{Command: "go build ./cmd/server/", Label: "Backend", SubmodulePath: "Autopus/backend"},
 				{Command: "npm run build", Label: "Frontend", SubmodulePath: "Autopus/frontend"},
 			},
 		},
@@ -44,7 +44,7 @@ func TestParseBuildLine(t *testing.T) {
 			line: "  go build ./cmd/auto/ (ADK) ,  go build ./cmd/server/ (Backend)  ",
 			expected: []BuildEntry{
 				{Command: "go build ./cmd/auto/", Label: "ADK", SubmodulePath: "autopus-adk"},
-				{Command: "go build ./cmd/server/", Label: "Backend", SubmodulePath: "Autopus"},
+				{Command: "go build ./cmd/server/", Label: "Backend", SubmodulePath: "Autopus/backend"},
 			},
 		},
 		{
@@ -113,6 +113,15 @@ func TestResolveBuildDir(t *testing.T) {
 			entry:      BuildEntry{Label: "Frontend", SubmodulePath: "Autopus/frontend"},
 			expected:   filepath.Join("/home/user/project", "Autopus/frontend"),
 		},
+		{
+			// Regression guard: Backend must resolve to Autopus/backend (submodule containing cmd/server),
+			// not Autopus root. Canary H2 runs `cd Autopus/backend && go build ./cmd/server/`;
+			// the scenario runner MUST match that working directory to reach the same source tree.
+			name:       "Backend label resolves to Autopus/backend (not Autopus root)",
+			projectDir: "/home/user/project",
+			entry:      BuildEntry{Label: "Backend", SubmodulePath: "Autopus/backend"},
+			expected:   filepath.Join("/home/user/project", "Autopus/backend"),
+		},
 	}
 
 	for _, tt := range tests {
@@ -131,7 +140,7 @@ func TestMatchBuild(t *testing.T) {
 
 	builds := []BuildEntry{
 		{Command: "go build ./cmd/auto/", Label: "ADK", SubmodulePath: "autopus-adk"},
-		{Command: "go build ./cmd/server/", Label: "Backend", SubmodulePath: "Autopus"},
+		{Command: "go build ./cmd/server/", Label: "Backend", SubmodulePath: "Autopus/backend"},
 		{Command: "npm run build", Label: "Frontend", SubmodulePath: "Autopus/frontend"},
 	}
 
