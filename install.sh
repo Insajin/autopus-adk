@@ -7,9 +7,6 @@ set -e
 # 옵션 (환경변수):
 #   INSTALL_DIR   — 설치 경로 (기본: /usr/local/bin)
 #   VERSION       — 특정 버전 지정 (기본: 최신)
-#   SKIP_INIT     — "1" 설정 시 auto init 건너뜀
-#   PROJECT_NAME  — auto init에 사용할 프로젝트 이름 (기본: 디렉토리 이름)
-#   PLATFORMS     — 플랫폼 목록 (기본: 자동 감지)
 
 REPO="Insajin/autopus-adk"
 BINARY="auto"
@@ -52,6 +49,24 @@ print_path_hint() {
     echo "    export PATH=\"${INSTALL_DIR}:\$PATH\""
     echo "  영구 적용:"
     echo "    echo 'export PATH=\"${INSTALL_DIR}:\$PATH\"' >> ${rc_file}"
+}
+
+print_next_steps() {
+    echo "  다음 단계:"
+    echo "    ${BINARY} init"
+    echo "      현재 프로젝트를 초기화합니다."
+    echo "      설치된 AI 코딩 CLI를 감지해 autopus.yaml과 플랫폼별 하네스 파일을 생성합니다."
+    echo ""
+    echo "    ${BINARY} update --self"
+    echo "      auto CLI 바이너리 자체를 최신 릴리즈로 업데이트합니다."
+    echo ""
+    echo "    ${BINARY} update"
+    echo "      현재 프로젝트의 규칙, 스킬, 에이전트, 설정 파일을 최신 템플릿으로 갱신합니다."
+    echo ""
+    echo "  권장 순서:"
+    echo "    1. 새 프로젝트면 ${BINARY} init"
+    echo "    2. 새 릴리즈를 받았으면 ${BINARY} update --self"
+    echo "    3. 그 다음 프로젝트 안에서 ${BINARY} update"
 }
 
 # OS 감지
@@ -188,74 +203,19 @@ main() {
     print_path_hint
     echo ""
 
-    # Post-install: check and install dependencies (skip already installed)
-    info "의존성 확인 중..."
-    if "${INSTALL_DIR}/${BINARY}" doctor --fix --yes 2>/dev/null; then
-        ok "의존성 설치 완료!"
+    # Post-install: check and auto-install required tools only.
+    info "필수 도구 확인 중... (이미 설치된 것은 건너뜀)"
+    if "${INSTALL_DIR}/${BINARY}" doctor --fix --yes --required-only 2>/dev/null; then
+        ok "필수 도구 점검 완료!"
     else
-        echo "  일부 의존성을 자동 설치하지 못했습니다."
+        echo "  일부 필수 도구를 자동 설치하지 못했습니다."
         echo "  수동 확인: ${BINARY} doctor"
-    fi
-    echo ""
-
-    # Auto-init: initialize harness
-    if [ "${SKIP_INIT}" = "1" ]; then
-        echo "  SKIP_INIT=1 — 초기화를 건너뜁니다."
-        echo ""
-        echo "  다음 단계:"
-        echo "    ${BINARY} init        # 프로젝트 초기화"
-        echo ""
-        return
-    fi
-
-    # Skip init if already initialized (CLAUDE.md or autopus.yaml exists)
-    if [ -f "CLAUDE.md" ] || [ -f "autopus.yaml" ]; then
-        ok "이미 초기화된 프로젝트입니다. 업데이트 실행 중..."
-        "${INSTALL_DIR}/${BINARY}" update --yes 2>/dev/null || true
-        echo ""
-        echo "  바로 사용 가능:"
-        echo "    /auto setup    # 프로젝트 컨텍스트 생성"
-        echo "    /auto status   # SPEC 현황"
-        echo ""
-        return
-    fi
-
-    info "프로젝트 초기화 중..."
-
-    # Detect project name from directory
-    PROJ="${PROJECT_NAME:-$(basename "$(pwd)")}"
-
-    info "  프로젝트: ${PROJ}"
-    if [ -n "$PLATFORMS" ]; then
-        info "  플랫폼: ${PLATFORMS}"
-        if "${INSTALL_DIR}/${BINARY}" init --project "$PROJ" --platforms "$PLATFORMS" --yes 2>&1; then
-            ok "프로젝트 초기화 완료!"
-        else
-            echo "  초기화 실패. 수동 실행: ${BINARY} init"
-        fi
-    else
-        info "  플랫폼: auto-detect"
-        if "${INSTALL_DIR}/${BINARY}" init --project "$PROJ" --yes 2>&1; then
-            ok "프로젝트 초기화 완료!"
-        else
-            echo "  초기화 실패. 수동 실행: ${BINARY} init"
-        fi
     fi
     echo ""
 
     ok "🐙 Autopus-ADK 준비 완료!"
     echo ""
-    echo "  다음 단계:"
-    echo "    1. auto worker setup  # Autopus 서버 연결 및 Worker 설정"
-    echo "    2. /auto setup        # 프로젝트 컨텍스트 문서 생성"
-    echo ""
-    echo "  Claude Code에서 바로 사용 가능:"
-    echo "    /auto plan     # 기능 기획 + SPEC 작성"
-    echo "    /auto fix      # 버그 수정"
-    echo "    /auto review   # 코드 리뷰"
-    echo ""
-    echo "  또는 자연어로:"
-    echo "    /auto 로그인 기능에 2FA 추가해줘"
+    print_next_steps
     echo ""
 }
 

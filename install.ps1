@@ -54,6 +54,24 @@ function Show-PathHint([string]$InstallDir, [bool]$PathAdded) {
     }
 }
 
+function Show-NextSteps {
+    Ok "  Next steps:"
+    Ok "    auto init"
+    Ok "      Initialize the current project."
+    Ok "      Detect installed AI coding CLIs and generate autopus.yaml plus platform harness files."
+    Ok ""
+    Ok "    auto update --self"
+    Ok "      Update the auto CLI binary itself to the latest release."
+    Ok ""
+    Ok "    auto update"
+    Ok "      Refresh rules, skills, agents, and generated harness files in the current project."
+    Ok ""
+    Ok "  Recommended order:"
+    Ok "    1. New project: auto init"
+    Ok "    2. New CLI release: auto update --self"
+    Ok "    3. Then inside your project: auto update"
+}
+
 # Detect architecture
 function Get-Arch {
     $envArch = $env:PROCESSOR_ARCHITECTURE
@@ -154,56 +172,19 @@ function Main {
         Show-PathHint $InstallDir $pathAdded
         Ok ""
 
-        # Post-install: check and install dependencies (skip already installed)
-        Info "Checking dependencies..."
+        # Post-install: check and auto-install required tools only.
+        Info "Checking required tools... (skips anything already installed)"
         try {
-            & "$InstallDir\$Binary" doctor --fix --yes 2>$null
-            Ok "Dependencies installed!"
+            & "$InstallDir\$Binary" doctor --fix --yes --required-only 2>$null
+            Ok "Required tools checked!"
         } catch {
-            Write-Host "  Some dependencies could not be auto-installed." -ForegroundColor Yellow
+            Write-Host "  Some required tools could not be auto-installed." -ForegroundColor Yellow
             Write-Host "  Run manually: auto doctor" -ForegroundColor Yellow
         }
-
-        # Auto-init: initialize harness
-        if ($env:SKIP_INIT -eq "1") {
-            Ok ""
-            Ok "  SKIP_INIT=1 — skipping initialization."
-            Ok "  Next: auto init"
-            Ok ""
-        }
-        elseif ((Test-Path "CLAUDE.md") -or (Test-Path "autopus.yaml")) {
-            Ok "Already initialized. Running update..."
-            try { & "$InstallDir\$Binary" update --yes 2>$null } catch {}
-            Ok ""
-            Ok "  Ready to use:"
-            Ok "    /auto setup    # generate project context"
-            Ok "    /auto status   # SPEC dashboard"
-            Ok ""
-        }
-        else {
-            Info "Initializing project..."
-            $Proj = if ($env:PROJECT_NAME) { $env:PROJECT_NAME } else { Split-Path -Leaf (Get-Location) }
-            Info "  Project: $Proj"
-            try {
-                if ($env:PLATFORMS) {
-                    Info "  Platforms: $env:PLATFORMS"
-                    & "$InstallDir\$Binary" init --project $Proj --platforms $env:PLATFORMS --yes 2>&1
-                } else {
-                    Info "  Platforms: auto-detect"
-                    & "$InstallDir\$Binary" init --project $Proj --yes 2>&1
-                }
-                Ok "Project initialized!"
-            } catch {
-                Write-Host "  Init failed. Run manually: auto init" -ForegroundColor Yellow
-            }
-            Ok ""
-            Ok "  Ready to use in Claude Code:"
-            Ok "    /auto setup    # generate project context"
-            Ok "    /auto plan     # write a SPEC"
-            Ok "    /auto fix      # fix a bug"
-            Ok "    /auto review   # code review"
-            Ok ""
-        }
+        Ok ""
+        Ok "🐙 Autopus-ADK is ready!"
+        Ok ""
+        Show-NextSteps
     }
     finally {
         Remove-Item -Path $TmpDir -Recurse -Force -ErrorAction SilentlyContinue

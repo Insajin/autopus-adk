@@ -450,12 +450,12 @@ OpenCode 참고:
 
 5분 안에 첫 AI 기반 기능을 만들어 보세요.
 
-### 1단계 · 설치 및 초기화 (한 줄)
+### 1단계 · 설치 (한 줄)
 
-> **AI 코딩 도구(Claude Code, Codex, OpenCode 등)의 채팅창에 아래 명령을 붙여넣으세요** — 에이전트가 대신 실행해서 설치부터 초기화까지 알아서 처리합니다. 터미널에서 직접 실행해도 됩니다.
+> **AI 코딩 도구(Claude Code, Codex, OpenCode 등)의 채팅창에 아래 명령을 붙여넣으세요** — 에이전트가 대신 실행해서 설치까지 처리합니다. 터미널에서 직접 실행해도 됩니다.
 
 ```bash
-# macOS / Linux — 바이너리 설치 + 프로젝트 자동 초기화
+# macOS / Linux — 바이너리 설치 + 필수 도구 점검
 cd your-project    # 프로젝트 폴더로 이동 (예: cd ~/my-app)
 curl -sSfL https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.sh | sh
 
@@ -463,6 +463,8 @@ curl -sSfL https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.sh
 cd your-project
 powershell -c "irm https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.ps1 | iex"
 ```
+
+설치 스크립트는 `auto` CLI와 `autopus` alias를 함께 설치하고, 필수 도구를 점검한 뒤 이미 있는 것은 건너뛰고 누락된 `git`, GitHub CLI 같은 핵심 도구를 자동 설치합니다. 대신 `auto init`은 자동으로 실행하지 않고 사용자에게 맡깁니다.
 
 <details>
 <summary>기타 설치 방법</summary>
@@ -478,6 +480,12 @@ cd autopus-adk && make build && make install
 
 </details>
 
+설치가 끝나면 스크립트가 아래 세 명령을 설명해줍니다.
+
+- `auto init`: 현재 프로젝트를 초기화하고 `autopus.yaml`과 플랫폼 파일을 생성
+- `auto update --self`: `auto` CLI 바이너리 자체를 최신 버전으로 업데이트
+- `auto update`: 현재 프로젝트의 규칙, 스킬, 에이전트, 생성 파일을 최신 템플릿으로 갱신
+
 ### 2단계 · 프로젝트 초기화
 
 ```bash
@@ -485,7 +493,7 @@ cd your-project
 auto init
 ```
 
-설치 스크립트는 `auto` CLI와 `autopus` alias를 함께 설치합니다. Windows에서 `powershell -c ...`를 Git Bash 안에서 실행한 경우에는, 부모 Bash 프로세스의 `PATH`가 즉시 갱신되지 않으므로 설치 후 Git Bash를 다시 열어야 합니다. 이 경우 설치 스크립트가 실제 설치 경로와 `export PATH=...` 안내를 함께 출력합니다.
+Windows에서 `powershell -c ...`를 Git Bash 안에서 실행한 경우에는, 부모 Bash 프로세스의 `PATH`가 즉시 갱신되지 않으므로 설치 후 Git Bash를 다시 열어야 합니다. 이 경우 설치 스크립트가 실제 설치 경로와 `export PATH=...` 안내를 함께 출력합니다.
 
 `auto init`은 설치된 AI 코딩 CLI(Claude Code, Codex, Gemini CLI, OpenCode)를 자동 감지하고, 각 플랫폼에 맞는 **네이티브 설정** — 규칙, 스킬, 에이전트 — 을 하나의 `autopus.yaml`에서 생성합니다.
 

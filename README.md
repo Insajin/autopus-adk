@@ -539,12 +539,12 @@ OpenCode note:
 
 Get from zero to your first AI-powered feature in under 5 minutes.
 
-### Step 1 · Install & Initialize (one line)
+### Step 1 · Install (one line)
 
 > **Paste this command into your AI coding agent's chat** (Claude Code, Codex, OpenCode, etc.) — the agent will run it for you. Or run it directly in your terminal.
 
 ```bash
-# macOS / Linux — installs binary + auto-initializes your project
+# macOS / Linux — installs the binary and checks required tools
 cd your-project    # go to your project folder (e.g., cd ~/my-app)
 curl -sSfL https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.sh | sh
 
@@ -553,7 +553,7 @@ cd your-project
 powershell -c "irm https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.ps1 | iex"
 ```
 
-**That's it.** The installer detects your platforms (Claude Code, Codex, Gemini CLI, OpenCode), installs the `auto` CLI plus an `autopus` alias, and auto-initializes your project.
+**That's it.** The installer installs the `auto` CLI plus an `autopus` alias, checks required tools, skips anything already present, and auto-installs missing essentials like `git` and GitHub CLI. It does **not** run `auto init` for you.
 
 Platform command syntax:
 - Codex: install the generated local plugin, then use `@auto ...`; until then, use `$auto ...`
@@ -589,13 +589,23 @@ cd your-project && auto init
 |----------|---------|-------------|
 | `INSTALL_DIR` | `/usr/local/bin` | Binary install path |
 | `VERSION` | latest | Specific version to install |
-| `SKIP_INIT` | `0` | Set to `1` to skip auto-init |
-| `PROJECT_NAME` | directory name | Project name for `auto init` |
-| `PLATFORMS` | auto-detect | Platform list (e.g., `claude-code,codex,opencode`) |
 
 </details>
 
-The installer scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Gemini CLI, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
+After install, the script explains these commands:
+
+- `auto init`: initialize the current project and generate `autopus.yaml` plus platform files
+- `auto update --self`: update the `auto` CLI binary itself
+- `auto update`: refresh rules, skills, agents, and other generated harness files in your project
+
+### Step 2 · Initialize the Project
+
+```bash
+cd your-project
+auto init
+```
+
+`auto init` scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Gemini CLI, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
 
 ```
 ✓ Detected: claude-code, codex, gemini-cli, opencode
@@ -606,7 +616,7 @@ The installer scans your machine for supported installed AI coding CLIs (Claude 
 ✓ Created: autopus.yaml
 ```
 
-### Step 2 · Set Up Project Context (`/auto setup`)
+### Step 3 · Set Up Project Context (`/auto setup`)
 
 This is the most important step. **AI agents lose all memory between sessions** — every conversation is their first day on the job. `/auto setup` creates the "onboarding documents" that let agents understand your project instantly.
 
@@ -628,7 +638,7 @@ ARCHITECTURE.md                    # Domains, layers, dependency map
 
 > 💡 **Why this matters:** Without these documents, an AI agent looking at your project is like a new hire with no onboarding — they'll guess at architecture, miss conventions, and reinvent patterns that already exist. With `/auto setup`, every agent session starts informed.
 
-### Step 3 · Build Your First Feature
+### Step 4 · Build Your First Feature
 
 Now you're ready. Describe what you want in plain language:
 

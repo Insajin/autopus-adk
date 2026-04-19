@@ -22,6 +22,7 @@ import (
 func newDoctorCmd() *cobra.Command {
 	var dir string
 	var fix bool
+	var requiredOnly bool
 	var yes bool
 
 	cmd := &cobra.Command{
@@ -114,6 +115,9 @@ func newDoctorCmd() *cobra.Command {
 			// Run auto-install if --fix flag is set
 			if fix {
 				missingDeps := filterMissing(statuses)
+				if requiredOnly {
+					missingDeps = filterRequired(missingDeps)
+				}
 				if len(missingDeps) > 0 {
 					if err := runDoctorFix(cmd.OutOrStdout(), missingDeps, yes); err != nil {
 						tui.FAIL(out, fmt.Sprintf("Auto-install failed: %v", err))
@@ -177,6 +181,7 @@ func newDoctorCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&dir, "dir", "", "프로젝트 루트 디렉터리 (기본값: 현재 디렉터리)")
 	cmd.Flags().BoolVar(&fix, "fix", false, "Auto-install missing dependencies")
+	cmd.Flags().BoolVar(&requiredOnly, "required-only", false, "Only auto-install required dependencies")
 	cmd.Flags().BoolVar(&yes, "yes", false, "Skip interactive prompts (use with --fix)")
 	return cmd
 }

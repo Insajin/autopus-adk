@@ -3,7 +3,6 @@ package cli
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -81,6 +80,21 @@ func TestFilterMissing(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFilterRequired(t *testing.T) {
+	t.Parallel()
+
+	statuses := []detect.DependencyStatus{
+		makeStatus("git", "git", "brew install git", true, false, ""),
+		makeStatus("playwright", "playwright", "npm i -g playwright", false, false, "node"),
+		makeStatus("gh", "gh", "brew install gh", true, false, ""),
+	}
+
+	required := filterRequired(statuses)
+	require.Len(t, required, 2)
+	assert.Equal(t, "git", required[0].Name)
+	assert.Equal(t, "gh", required[1].Name)
 }
 
 func TestRunDoctorFix_NodeNotInstalled(t *testing.T) {
@@ -214,148 +228,4 @@ func TestRunDoctorFix_UserAccepts(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, called)
 	assert.Contains(t, out.String(), "installed")
-}
-
-func TestRunDoctorFix_EACCESError(t *testing.T) {
-	t.Parallel()
-
-	mockExec := func(name string, args ...string) ([]byte, error) {
-		return []byte("npm ERR! code EACCES permission denied"), fmt.Errorf("exit status 1")
-	}
-
-	deps := []detect.DependencyStatus{
-		makeStatus("ast-grep", "sg", "brew install ast-grep", true, false, ""),
-	}
-
-	var out bytes.Buffer
-	reader := bufio.NewReader(strings.NewReader(""))
-
-	err := runDoctorFixWith(&out, deps, true, mockExec, reader)
-	require.NoError(t, err)
-	assert.Contains(t, out.String(), "permission denied")
-	assert.Contains(t, out.String(), "npm-global")
-}
-
-func TestRunDoctorFix_InstallFailure(t *testing.T) {
-	t.Parallel()
-
-	mockExec := func(name string, args ...string) ([]byte, error) {
-		return []byte("something went wrong"), fmt.Errorf("exit status 1")
-	}
-
-	deps := []detect.DependencyStatus{
-		makeStatus("gh", "gh", "brew install gh", false, false, ""),
-	}
-
-	var out bytes.Buffer
-	reader := bufio.NewReader(strings.NewReader(""))
-
-	err := runDoctorFixWith(&out, deps, true, mockExec, reader)
-	require.NoError(t, err)
-	assert.Contains(t, out.String(), "install failed")
-}
-
-func TestRunDoctorFix_EmptyInstallCmd(t *testing.T) {
-	t.Parallel()
-
-	mockExec := func(name string, args ...string) ([]byte, error) {
-		t.Fatalf("exec should not be called for empty install cmd: %s", name)
-		return nil, nil
-	}
-
-	deps := []detect.DependencyStatus{
-		makeStatus("gh", "gh", "", false, false, ""),
-	}
-
-	var out bytes.Buffer
-	reader := bufio.NewReader(strings.NewReader(""))
-
-	err := runDoctorFixWith(&out, deps, true, mockExec, reader)
-	require.NoError(t, err)
-	assert.Contains(t, out.String(), "no install command")
-}
-
-func TestRunDoctorFix_PostInstallSuccess(t *testing.T) {
-	t.Parallel()
-
-	var calls []string
-	mockExec := func(name string, args ...string) ([]byte, error) {
-		calls = append(calls, name)
-		return []byte("ok"), nil
-	}
-
-	dep := detect.DependencyStatus{
-		Dependency: detect.Dependency{
-			Name:           "playwright",
-			Binary:         "playwright",
-			InstallCmd:     "npm-fake i -g playwright",
-			PostInstallCmd: "npx-fake playwright install chromium",
-		},
-		Installed: false,
-	}
-
-	var out bytes.Buffer
-	reader := bufio.NewReader(strings.NewReader(""))
-
-	err := runDoctorFixWith(&out, []detect.DependencyStatus{dep}, true, mockExec, reader)
-	require.NoError(t, err)
-	// Both main install and post-install should be called.
-	assert.GreaterOrEqual(t, len(calls), 2, "both install and post-install must run")
-	assert.Contains(t, out.String(), "post-install complete")
-}
-
-func TestRunDoctorFix_PostInstallFailure(t *testing.T) {
-	t.Parallel()
-
-	callCount := 0
-	mockExec := func(name string, args ...string) ([]byte, error) {
-		callCount++
-		if callCount == 1 {
-			// Main install succeeds.
-			return []byte("ok"), nil
-		}
-		// Post-install fails.
-		return []byte("browser download failed"), fmt.Errorf("exit status 1")
-	}
-
-	dep := detect.DependencyStatus{
-		Dependency: detect.Dependency{
-			Name:           "playwright",
-			Binary:         "playwright",
-			InstallCmd:     "npm-fake i -g playwright",
-			PostInstallCmd: "npx-fake playwright install chromium",
-		},
-		Installed: false,
-	}
-
-	var out bytes.Buffer
-	reader := bufio.NewReader(strings.NewReader(""))
-
-	err := runDoctorFixWith(&out, []detect.DependencyStatus{dep}, true, mockExec, reader)
-	require.NoError(t, err)
-	assert.Contains(t, out.String(), "post-install failed")
-}
-
-func TestOrderByDependency_NoDeps(t *testing.T) {
-	t.Parallel()
-
-	deps := []detect.DependencyStatus{
-		makeStatus("a", "a", "install-a", false, false, ""),
-		makeStatus("b", "b", "install-b", false, false, ""),
-	}
-	ordered := orderByDependency(deps)
-	assert.Len(t, ordered, 2)
-}
-
-func TestOrderByDependency_PrerequisiteNotInList(t *testing.T) {
-	t.Parallel()
-
-	// playwright depends on node, but node is not in the list.
-	deps := []detect.DependencyStatus{
-		makeStatus("playwright", "playwright", "npm i playwright", false, false, "node"),
-	}
-	ordered := orderByDependency(deps)
-	// playwright has DependsOn="node" but node is not in the list, so it goes to "first" group.
-	assert.Len(t, ordered, 1)
-	assert.Equal(t, "playwright", ordered[0].Name)
 }

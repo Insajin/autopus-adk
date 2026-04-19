@@ -33,6 +33,17 @@ func filterMissing(statuses []detect.DependencyStatus) []detect.DependencyStatus
 	return missing
 }
 
+// filterRequired returns only required dependencies from the provided statuses.
+func filterRequired(statuses []detect.DependencyStatus) []detect.DependencyStatus {
+	var required []detect.DependencyStatus
+	for _, s := range statuses {
+		if s.Required {
+			required = append(required, s)
+		}
+	}
+	return required
+}
+
 // runDoctorFix installs each missing dependency in order, respecting DependsOn.
 // If autoYes is false, the user is prompted before each install.
 func runDoctorFix(w io.Writer, deps []detect.DependencyStatus, autoYes bool) error {
