@@ -16,6 +16,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **SPEC review finding status breakdown summary** (2026-04-19): `auto spec review` 최종 요약이 단순 unique count 대신 `open/resolved/out_of_scope` 상태별 집계를 함께 출력하도록 개선해 운영자가 `review-findings.json`을 별도로 집계하지 않아도 열린 finding 수를 바로 확인 가능
+  - `pkg/spec/findings_summary.go`, `pkg/spec/findings_test.go` — `ReviewFinding` slice를 상태별로 집계하는 `SummarizeFindings` / `FindingsSummary.Format` 로직과 회귀 테스트 추가
+  - `internal/cli/spec_review.go` — 최종 CLI 요약을 status breakdown 표면으로 교체
+
 - **Pipeline worktree remove canonical path fallback** (2026-04-19): macOS의 `/tmp` → `/private/tmp`, `/var` → `/private/var` symlink 환경에서 `git worktree remove`가 symlink path를 실제 worktree로 인식하지 못해 release gate의 `pkg/pipeline` 테스트가 실패하던 문제를 수정
   - `pkg/pipeline/worktree.go` — remove 시 원본 path와 canonical path를 순차 재시도하고, 실제 git worktree가 아닌 fallback 디렉터리는 안전하게 `os.RemoveAll`로 정리하도록 보강
   - `pkg/pipeline/worktree_internal_test.go` — symlink alias로 생성한 실제 worktree를 remove 하는 회귀 테스트 추가
