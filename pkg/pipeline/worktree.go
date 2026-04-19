@@ -21,8 +21,8 @@ const (
 
 // WorktreeManager manages isolated git worktrees for parallel pipeline execution.
 type WorktreeManager struct {
-	mu       sync.Mutex
-	paths    map[string]struct{}
+	mu        sync.Mutex
+	paths     map[string]struct{}
 	isGitRepo bool
 }
 
@@ -143,11 +143,7 @@ func (m *WorktreeManager) Remove(ctx context.Context, path string) error {
 
 	var removeErr error
 	if m.isGitRepo {
-		//nolint:gosec // path is an internally tracked value.
-		cmd := exec.CommandContext(ctx, "git", "-c", "gc.auto=0", "worktree", "remove", "--force", path)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			removeErr = fmt.Errorf("git worktree remove: %w (output: %s)", err, strings.TrimSpace(string(out)))
-		}
+		removeErr = removeGitWorktree(ctx, path)
 	} else {
 		if err := os.RemoveAll(path); err != nil {
 			removeErr = fmt.Errorf("remove dir: %w", err)
@@ -159,6 +155,50 @@ func (m *WorktreeManager) Remove(ctx context.Context, path string) error {
 	delete(m.paths, path)
 
 	return removeErr
+}
+
+func removeGitWorktree(ctx context.Context, path string) error {
+	var lastNotWorktree error
+
+	for _, candidate := range removeCandidates(path) {
+		out, err := runGitWorktreeRemove(ctx, candidate)
+		if err == nil {
+			return nil
+		}
+
+		formatted := fmt.Errorf(
+			"git worktree remove: %w (output: %s)",
+			err,
+			strings.TrimSpace(string(out)),
+		)
+		if !isNotWorktreeError(string(out)) {
+			return formatted
+		}
+		lastNotWorktree = formatted
+	}
+
+	if err := os.RemoveAll(path); err != nil {
+		if lastNotWorktree != nil {
+			return fmt.Errorf("%w; remove dir fallback: %w", lastNotWorktree, err)
+		}
+		return fmt.Errorf("remove dir fallback: %w", err)
+	}
+	return nil
+}
+
+func removeCandidates(path string) []string {
+	candidates := []string{path}
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil && resolved != "" && resolved != path {
+		candidates = append(candidates, resolved)
+	}
+	return candidates
+}
+
+func runGitWorktreeRemove(ctx context.Context, path string) ([]byte, error) {
+	//nolint:gosec // path is an internally tracked value.
+	cmd := exec.CommandContext(ctx, "git", "-c", "gc.auto=0", "worktree", "remove", "--force", path)
+	return cmd.CombinedOutput()
 }
 
 // ActiveCount returns the number of currently tracked worktrees.
@@ -205,6 +245,10 @@ func isLockError(output string) bool {
 		}
 	}
 	return false
+}
+
+func isNotWorktreeError(output string) bool {
+	return strings.Contains(strings.ToLower(output), "not a working tree")
 }
 
 // worktreePath returns the absolute path that would be used for a worktree.
