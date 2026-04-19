@@ -120,6 +120,9 @@ Then [기대 결과]
 
 ## 설계 결정
 [왜 이 접근법인지, 대안 검토]
+
+## Self-Verify Summary
+- Q-COMP-02 | status: PASS | attempt: 2 | files: spec.md, acceptance.md | reason: 추적성 누락을 보완함
 ```
 
 ### 4. 자체 검증 루프
@@ -128,16 +131,21 @@ Then [기대 결과]
 
 1. `content/rules/spec-quality.md`를 읽고 체크리스트 전체를 로드합니다.
 2. `spec.md`, `plan.md`, `acceptance.md`, `research.md`에 각 항목을 자연어로 적용하여 `PASS`, `FAIL`, `N/A`와 짧은 근거를 남깁니다.
-3. FAIL이 나온 경우, 해당 차원이 요구하는 모든 관련 파일을 수정합니다. 증상이 보인 파일만 고치지 말고 원인 차원 기준으로 수정합니다.
-4. `[NEW]` 마커가 붙은 planned addition은 코드 정합성 FAIL 대상에서 제외하고, 기존 참조만 실제 경로와 이름을 검증합니다.
-5. 전체 체크리스트를 최대 2회까지 다시 적용합니다.
-6. 2회 재시도 후에도 FAIL이 남으면 `spec.md` 말미에 `## Open Issues` 섹션을 추가하고 `Q-*` ID와 사유를 기록합니다.
+3. 판정 결과는 `research.md`의 `## Self-Verify Summary` 섹션에 `Q-* | status | attempt | files | reason` 형식으로 남깁니다. 같은 항목을 재검증하면 최신 상태가 보이도록 갱신합니다.
+4. FAIL이 나온 경우, 해당 차원이 요구하는 모든 관련 파일을 수정합니다. 증상이 보인 파일만 고치지 말고 원인 차원 기준으로 수정합니다.
+5. `[NEW]` 마커가 붙은 planned addition은 코드 정합성 FAIL 대상에서 제외하고, 기존 참조만 실제 경로와 이름을 검증합니다.
+6. 전체 체크리스트를 최대 2회까지 다시 적용합니다.
+7. 2회 재시도 후에도 FAIL이 남으면 `spec.md` 말미에 `## Open Issues` 섹션을 추가하고 `Q-* | category | scope | attempt | reason` 형식으로 기록합니다.
 
 예시:
 
 ```markdown
+## Self-Verify Summary
+- Q-COMP-02 | status: FAIL | attempt: 1 | files: spec.md, acceptance.md | reason: REQ 추적 근거가 부족함
+- Q-COMP-02 | status: PASS | attempt: 2 | files: spec.md, acceptance.md | reason: REQ↔AC 매핑을 보강함
+
 ## Open Issues
-- Q-COMP-02: acceptance.md에 REQ 추적 근거가 부족함.
+- Q-COMP-02 | category: completeness | scope: spec.md, acceptance.md | attempt: 2 | reason: REQ 추적 근거가 여전히 부족함.
 ```
 
 ### 5. 디렉토리 생성

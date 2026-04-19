@@ -6,9 +6,10 @@ Use this checklist after `spec.md`, `plan.md`, `acceptance.md`, and `research.md
 
 1. Read all four SPEC files as one document set.
 2. For every checklist item, record `PASS`, `FAIL`, or `N/A` with a short reason in natural language.
-3. If an item fails, fix every affected file required by that dimension. Do not limit edits to the file where the symptom first appeared.
-4. Retry the full checklist up to 2 times.
-5. If failures remain after the second retry, append `## Open Issues` to the end of `spec.md` and list each remaining `Q-*` ID with the reason.
+3. Keep a visible `## Self-Verify Summary` in `research.md` using `Q-* | status | attempt | files | reason` so reviewers can confirm what changed between retries.
+4. If an item fails, fix every affected file required by that dimension. Do not limit edits to the file where the symptom first appeared.
+5. Retry the full checklist up to 2 times.
+6. If failures remain after the second retry, append `## Open Issues` to the end of `spec.md` and list each remaining `Q-* | category | scope | attempt | reason`.
 
 The five primary dimensions map 1:1 to `FindingCategory` values in `pkg/spec/types.go`:
 - `correctness`
@@ -56,7 +57,7 @@ For document-only SPEC work, security items may be marked `N/A` only when the no
 
 - PASS 기준: 각 요구사항의 EARS type, 조건, 기대 결과, 관측 지점이 문서상에서 분명하다.
 - FAIL 기준: type만 적고 조건이나 기대 결과가 없거나, 검증 가능한 관측 지점 없이 행동만 선언한다.
-- Example: self-verify loop를 요구한다면 어느 문서와 어떤 흔적으로 확인하는지 함께 적는다.
+- Example: self-verify loop를 요구한다면 `research.md`의 `Self-Verify Summary`나 `spec.md`의 `Open Issues`처럼 어느 문서와 어떤 흔적으로 확인하는지 함께 적는다.
 
 ## feasibility
 

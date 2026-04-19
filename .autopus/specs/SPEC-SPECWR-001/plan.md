@@ -9,8 +9,8 @@
 - [x] **T5** — Security 차원(`Q-SEC-01` 이상)에는 프롬프트 인젝션, 파일 경로 traversal, 비밀값 노출 등 표준 위협 범주를 체크 포인트로 포함한다. 문서 편집만 하는 SPEC의 경우 "해당 없음(N/A)" 판정을 허용하는 규칙을 명기한다.
 - [x] **T6** — 부록(Appendix)에 도메인 응집도(`cohesion`) 축을 별도 절로 추가한다. 5 차원 본체와 혼동하지 않도록 "본체 5 차원과 분리된 보조 축"이라는 헤더 문구를 명시한다.
 - [x] **T7** — `autopus-adk/content/skills/spec-review.md` 상단 Overview에 self-check 참조 문단을 추가한다. 기존 "Step 1: Load SPEC" 직전에 "Step 0: spec-writer self-verify (see `content/rules/spec-quality.md`)" 노트를 삽입한다.
-- [x] **T8** — `autopus-adk/content/agents/spec-writer.md`의 "작업 절차" 섹션을 개편한다. 기존 "3. SPEC 파일 생성" 뒤에 "4. 자체 검증 루프" 단계를 추가하고, 기존 "4. 디렉토리 생성"을 "5. 디렉토리 생성"으로 재번호한다. 자체 검증 루프 본문은 체크리스트 로드 → 차원별 자연어 적용 → FAIL 수정 → 최대 2회 재시도 → Open Issues 기록 순으로 기술한다.
-- [x] **T9** — spec-writer가 `## Open Issues` 섹션을 기록할 때 사용하는 마크다운 포맷을 예시로 문서에 포함한다. 예: `- Q-COMP-02: REQ-003에 추적성 AC가 없음 (2회 수정 시도 후에도 해소 실패)`.
+- [x] **T8** — `autopus-adk/content/agents/spec-writer.md`의 "작업 절차" 섹션을 개편한다. 기존 "3. SPEC 파일 생성" 뒤에 "4. 자체 검증 루프" 단계를 추가하고, 기존 "4. 디렉토리 생성"을 "5. 디렉토리 생성"으로 재번호한다. 자체 검증 루프 본문은 체크리스트 로드 → `research.md`의 `## Self-Verify Summary` 기록 → FAIL 수정 → 최대 2회 재시도 → Open Issues 기록 순으로 기술한다.
+- [x] **T9** — spec-writer가 `## Open Issues` 섹션을 기록할 때 사용하는 구조화 포맷을 예시로 문서에 포함한다. 예: `- Q-COMP-02 | category: completeness | scope: spec.md, acceptance.md | attempt: 2 | reason: REQ-003에 추적성 AC가 없음`.
 - [x] **T10** — 작성된 3개 문서(신규 1 + 수정 2)를 spec-quality 체크리스트로 self-assess하여 dogfooding을 수행한다. 결과를 본 SPEC의 research.md "Self-Assessment 결과" 섹션에 요약 기록한다.
 
 ## 구현 전략
@@ -41,6 +41,6 @@
 
 ### 검증 전략
 
-- **정적 검증** — `auto spec validate .autopus/specs/SPEC-SPECWR-001`로 EARS 형식, 모호어 포함 여부를 점검한다. 본 SPEC의 모든 REQ description은 `ambiguousWords` 검사를 통과해야 한다 (Priority 값은 description과 분리된 메타 라인에 배치).
+- **정적 검증** — `go run ./cmd/auto spec validate .autopus/specs/SPEC-SPECWR-001`로 EARS 형식, 모호어 포함 여부를 점검한다. 본 SPEC의 모든 REQ description은 `ambiguousWords` 검사를 통과해야 한다 (Priority 값은 description과 분리된 메타 라인에 배치).
 - **체크리스트 dogfooding** — 본 SPEC 자체를 `spec-quality.md` 체크리스트로 점검한다. 결과는 research.md에 기록한다.
 - **후속 SPEC 연결** — SPEC-SPECWR-002 초안을 동시에 작성 대기 상태로 둔다. 런타임 통합 요구가 발생하면 즉시 진행 가능하도록 인터페이스만 문서 수준에서 정의한다.

@@ -48,6 +48,7 @@ Given `autopus-adk/content/agents/spec-writer.md`가 업데이트되어 "자체 
 When spec-writer 에이전트가 새 SPEC 4개 파일 작성을 완료한다.
 Then 에이전트는 즉시 `content/rules/spec-quality.md`를 읽어 체크리스트를 로드한다.
 And 에이전트는 자기 생성 문서에 대해 각 체크 항목의 PASS/FAIL을 자연어로 판정한다.
+And `research.md`에는 `## Self-Verify Summary` 섹션이 존재하며 각 항목이 `Q-* | 상태 | 시도 회차 | 관련 파일 | 사유` 형식으로 기록된다.
 
 ### S6: FAIL 발생 시 차원 단위로 필요한 모든 파일이 수정된다
 
@@ -74,7 +75,7 @@ Priority: Must
 Given 2회 재시도를 소진하고도 FAIL 항목이 남은 상태이다.
 When spec-writer가 작업을 완료한다.
 Then spec.md 말미에 `## Open Issues` 섹션이 추가된다.
-And 섹션에는 잔여 FAIL 항목 ID(예: `Q-COMP-02`)와 사유가 리스트로 기록된다.
+And 각 항목은 `Q-* | category | scope | attempt | reason` 필드를 포함한 구조화된 리스트로 기록된다.
 
 ### S9: planned addition은 코드 정합성 FAIL에서 제외된다
 

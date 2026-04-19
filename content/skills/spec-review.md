@@ -20,6 +20,7 @@ Before Step 1, treat `content/rules/spec-quality.md` as the pre-review self-chec
 ### Step 0: spec-writer self-verify
 
 Confirm that the draft went through a first-pass self-check using `content/rules/spec-quality.md`.
+Look for observable traces such as `research.md`'s `## Self-Verify Summary` or `spec.md`'s `## Open Issues`.
 If the checklist was skipped or obviously not reflected in the draft, call that out as a completeness or style finding before continuing.
 
 ### Step 1: Load SPEC

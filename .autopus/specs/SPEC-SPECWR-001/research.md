@@ -14,7 +14,7 @@
 
 - **`autopus-adk/pkg/spec/gherkin_parser.go:17-18`** — `rePriority` 정규식 `(?i)^\s*Priority:\s*(Must|Should|Nice)`이 파서가 인정하는 유일한 3값을 고정한다. 체크리스트는 이 집합과 일치해야 한다.
 
-- **`autopus-adk/pkg/spec/validator.go:9`** — `ambiguousWords = []string{"should", "might", "could", "possibly", "maybe", "perhaps"}`. 본 SPEC의 체크리스트 항목(`Q-STYLE-01` 예정)은 이 목록을 그대로 FAIL 어휘 기준으로 참조한다. 검사는 `strings.Contains(strings.ToLower(description), word)`로 수행되므로(`validator.go:52-54`) **단어 경계를 따지지 않는다**. 즉, REQ description 본문에 대문자 `Should`를 Priority 의미로 쓰더라도 `strings.ToLower`에 의해 `"should"`와 충돌한다. 본 SPEC은 Priority 값의 literal 나열을 별도 참조 블록("Priority Vocabulary Set")으로 격리하고 REQ description 본문에서는 그 블록을 지시어로만 참조하여 이 충돌을 회피한다.
+- **`autopus-adk/pkg/spec/validator.go:9`** — `ambiguousWords = []string{"should", "might", "could", "possibly", "maybe", "perhaps"}`. 본 SPEC의 체크리스트 항목(`Q-STYLE-01` 예정)은 이 목록을 그대로 FAIL 어휘 기준으로 참조한다. 검사는 `strings.Contains(strings.ToLower(description), word)`로 수행되므로(`validator.go:52-54`) **단어 경계를 따지지 않는다**. 즉, REQ description 본문에 대문자 `Should`를 Priority 의미로 쓰더라도 `strings.ToLower`에 의해 `"should"`와 충돌한다. 본 SPEC은 Priority 값의 literal 나열을 REQ description이 아니라 `Priority:` 메타 라인과 별도 참조 블록("Priority Vocabulary Set")으로 제한하여 이 충돌을 회피한다.
 
 - **`autopus-adk/pkg/spec/parser.go:22-48` (`ParseEARS`)** — 입력 텍스트를 줄 단위로 스캔한다. 빈 줄, `#`으로 시작하는 헤더 줄, `-`으로 시작하는 리스트 줄은 건너뛴다. 따라서 본 SPEC의 `- **REQ-001** — EARS type: ...` 메타 라인은 파서가 **무시**하며, 들여쓰기된 description 라인만 description으로 저장된다. 이 동작 덕에 메타 라인 내 `Should` 문자열은 `ambiguousWords` 검사 대상이 아니다.
 
@@ -33,7 +33,7 @@
 
 ### spec-writer 에이전트 문서
 
-- **`autopus-adk/content/agents/spec-writer.md`** — 실제 파일은 149줄이며 "작업 절차" 섹션이 1→2→3→4(SPEC 파일 생성 → 디렉토리 생성) 순으로 구성된다. 본 SPEC은 기존 "3" 다음에 "4. 자체 검증 루프"를 삽입하고 기존 "4"는 "5. 디렉토리 생성"으로 재번호한다.
+- **`autopus-adk/content/agents/spec-writer.md`** — 실제 파일은 "작업 절차" 섹션에 SPEC 생성 후 디렉토리 생성으로 이어지는 기본 흐름을 갖는다. 본 SPEC은 기존 "3" 다음에 "4. 자체 검증 루프"를 삽입하고 기존 "4"는 "5. 디렉토리 생성"으로 재번호한다. 추가된 단계는 `research.md`의 `## Self-Verify Summary` 기록 형식과 `spec.md`의 `## Open Issues` 스키마를 함께 안내해야 한다.
 
 ### skill 문서
 
@@ -96,7 +96,15 @@
 ### D8: Priority 어휘 literal의 REQ description 배제
 
 `validator.go:9`의 `ambiguousWords`는 `strings.Contains`로 소문자 부분 문자열 검사를 수행한다. Priority 어휘 중 `Should`는 소문자 `should`와 충돌하고, 금지 별칭 `could` 역시 마찬가지이다. 따라서 REQ description 본문에 Priority 어휘 또는 금지 별칭을 literal로 나열하면 자기 SPEC이 자기 validator의 경고를 유발한다.
-- 해소: 본 SPEC은 Priority 어휘 literal을 `## 용어 정의` 아래 별도 블록("Priority Vocabulary Set")으로 격리하고, REQ-004/005/014는 그 블록을 지시어(reference)로만 참조하도록 재작성했다. dogfooding 점검에서 이 조치 적용 전 REQ-004/005/014가 FAIL 판정을 받았고, 적용 후 16개 REQ 모두 PASS로 전환되었다.
+- 해소: 본 SPEC은 Priority 어휘 literal을 REQ description에서 제거하고, `Priority:` 메타 라인과 `## 용어 정의` 아래 별도 참조 블록("Priority Vocabulary Set")에서만 다루도록 재작성했다. dogfooding 점검에서 이 조치 적용 전 REQ-004/005/014가 FAIL 판정을 받았고, 적용 후 16개 REQ 모두 PASS로 전환되었다.
+
+### D9: Self-verify는 문서 안에 관측 가능한 흔적을 남긴다
+
+기존 문안은 self-verify가 "수행된다"고만 적고, 실제로 무엇이 검증되었는지 어디에서 확인하는지에 대한 관측 지점이 느슨했다. 문서-only 변경으로도 reviewer가 실행 사실을 확인할 수 있어야 하므로, 본 SPEC은 self-verify 결과를 문서 내부에 남기는 최소 구조를 추가한다.
+
+- 해소: `research.md`에 `## Self-Verify Summary` 섹션을 두고 `Q-* | 상태 | 시도 회차 | 관련 파일 | 사유` 형식의 요약을 기록한다. 잔여 FAIL은 `spec.md`의 `## Open Issues`에 `Q-* | category | scope | attempt | reason` 형식으로 남긴다.
+- 장점: 별도 JSONL 로그나 Go 런타임 변경 없이도 reviewer가 self-verify 수행 여부와 수정 경로를 확인할 수 있다.
+- 한계: 이 구조는 여전히 prompt-level 규약이며, 강제 저장이나 스키마 검증은 SPEC-SPECWR-002에서 런타임 레이어로 보강해야 한다.
 
 ## Self-Assessment 결과 (dogfooding)
 
@@ -124,7 +132,7 @@
 | 차원 | 판정 | 근거 |
 |------|------|------|
 | correctness | PASS | 기존 참조 5곳 모두 실제 경로/라인 번호 일치 확인. Priority 허용 집합(Must/Should/Nice)과 EARS type 5종이 Go 상수와 일치. |
-| completeness | PASS | 16개 REQ가 S1~S13 AC로 모두 커버된다: REQ-001→S1, REQ-002→S2, REQ-003→S2, REQ-004→S3, REQ-005→S4, REQ-006→S5, REQ-007→S6, REQ-008→S7, REQ-009→S8, REQ-010→S9, REQ-011→S10, REQ-012→S5, REQ-013→S11, REQ-014→S11, REQ-015→S12, REQ-016→S13. 용어 정의 섹션이 체크리스트·차원·자체 검증 루프·재생성 루프·Open Issues 섹션·planned addition·기존 참조·EARS type·Priority·dogfooding 10개 용어를 정의한다. 모든 REQ가 `다.` 또는 `.`로 종결되고, S11이 REQ/AC 종결부호와 모호어 배제를 함께 검증한다. |
+| completeness | PASS | 16개 REQ가 S1~S13 AC로 모두 커버된다: REQ-001→S1, REQ-002→S2, REQ-003→S2, REQ-004→S3, REQ-005→S4, REQ-006→S5, REQ-007→S6, REQ-008→S7, REQ-009→S8, REQ-010→S9, REQ-011→S10, REQ-012→S5, REQ-013→S11, REQ-014→S11, REQ-015→S12, REQ-016→S13. 용어 정의 섹션이 체크리스트·차원·자체 검증 루프·Open Issues 섹션·planned addition·기존 참조·EARS type·Priority·dogfooding 9개 용어를 정의한다. S5가 `Self-Verify Summary` 관측 지점을, S8이 구조화된 Open Issues 스키마를 검증한다. 모든 REQ가 `다.` 또는 `.`로 종결되고, S11이 REQ/AC 종결부호와 모호어 배제를 함께 검증한다. |
 | feasibility | PASS | 변경 대상이 `content/` 하위 3개 md 파일이며, sync 과정에서 `.autopus/specs/SPEC-SPECWR-001/` 문서를 실제 산출물에 맞게 정렬했다. Go 코드 수정 없음 → 빌드/테스트 재실행 불필요. 약 215줄 증분으로 file-size-limit(300줄) 여유. 모든 단계가 기존 에이전트 툴(Read/Grep/Write)로 수행 가능하다. 후속 SPEC-SPECWR-002로 이관된 항목은 경계 표에 명시했다. |
 | style | PASS | 본문은 한국어. 모든 REQ description이 실제 parser 기준 EARS 패턴(`THE SYSTEM SHALL ...`, `WHEN ... THEN THE SYSTEM SHALL ...`, `IF ... THEN THE SYSTEM SHALL ...`, `WHERE ... THEN THE SYSTEM SHALL ...`)을 따른다. Priority는 별도 메타 라인에만 배치. `ambiguousWords` 검사 16/16 통과(Python 재현 시뮬레이션). |
 | security | N/A | 본 SPEC은 md 파일 편집만 수행한다. 프롬프트 인젝션 경로는 spec-writer 프롬프트가 `content/rules/spec-quality.md`를 읽을 때 발생 가능하나, 해당 파일은 리포지토리 내부 신뢰 경로이며 외부 입력 통로가 아니다. 파일 경로 traversal은 `..`/절대 경로 조작 입력이 없으므로 해당 없다. 비밀값 노출 없음. 명시적 N/A 처리. |
@@ -136,6 +144,7 @@
 | 1 | 체크리스트 skill/agent md만으로는 런타임 리뷰 프롬프트 미반영 | spec.md "경계" 표, research.md D1, REQ-015 (Go 코드 배제), Out of Scope 첫 항목 |
 | 2 | EARS type과 Priority 혼합 | spec.md REQ-004, research.md D2, acceptance.md S3 |
 | 3 | Priority 어휘가 Must/Should/Nice로 제한 (Go 진실) | spec.md 용어 정의 Priority 항, Priority Vocabulary Set 섹션, REQ-005, research.md "EARS type과 Priority 어휘의 진실 원천" + D8, acceptance.md S4 |
+| 8 | self-verify 실행 사실의 관측 지점 부재 | spec.md REQ-006/REQ-012, acceptance.md S5/S8, research.md D9, content/agents/spec-writer.md 자체 검증 단계 |
 | 4 | "FAIL 파일만 수정" 제약이 교차 문서 수정 차단 | spec.md REQ-007, research.md D3, acceptance.md S6 |
 | 5 | security 차원 누락 | spec.md REQ-001, plan.md T5, research.md D6, acceptance.md S1 |
 | 6 | 신규 추가도 FAIL시키는 코드 정합성 규칙 | spec.md 용어 정의 planned addition 항, REQ-010, research.md D4, acceptance.md S9 |
