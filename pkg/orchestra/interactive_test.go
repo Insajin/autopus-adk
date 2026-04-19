@@ -23,7 +23,7 @@ func TestInteractive_FullFlow_SplitPipelaunchWaitCollectMergeCleanup(t *testing.
 		TimeoutSeconds: 90,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -44,7 +44,7 @@ func TestInteractive_Flow_PipePaneStartCalledPerProvider(t *testing.T) {
 		TimeoutSeconds: 90,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	_, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestInteractive_Flow_PipePaneStopCalledOnCleanup(t *testing.T) {
 		TimeoutSeconds: 90,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	_, _ = RunInteractivePaneOrchestra(context.Background(), cfg)
 	assert.Equal(t, 1, mock.pipePaneStopCalls, "pipe-pane stop must be called during cleanup")
@@ -79,7 +79,7 @@ func TestInteractive_Flow_ResultsCollectedFromOutputFiles(t *testing.T) {
 		TimeoutSeconds: 90,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -98,7 +98,7 @@ func TestInteractive_SentinelFallback_PlainTerminal(t *testing.T) {
 		TimeoutSeconds: 10,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
@@ -116,7 +116,7 @@ func TestInteractive_SentinelFallback_InteractiveModeFails(t *testing.T) {
 		TimeoutSeconds: 10,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	result, err := RunInteractivePaneOrchestra(context.Background(), cfg)
 	require.NoError(t, err, "should fall back, not error")
@@ -134,7 +134,7 @@ func TestInteractive_SessionTimeout_ProducesPartialResult(t *testing.T) {
 		TimeoutSeconds: 1, // very short timeout
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -163,7 +163,7 @@ func TestInteractive_SessionTimeout_PartialOutputPreserved(t *testing.T) {
 		TimeoutSeconds: 1,
 		Terminal:       mock,
 		Interactive:    true,
-		InitialDelay:  time.Millisecond,
+		InitialDelay:   time.Millisecond,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -240,7 +240,7 @@ func TestWaitForCompletion_TwoPhase_ConsecutiveMatch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result := waitForCompletion(ctx, mock, pi, patterns, "", 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, "", nil, 0)
 	assert.True(t, result, "two consecutive prompt matches should confirm completion")
 }
 
@@ -255,7 +255,7 @@ func TestWaitForCompletion_TwoPhase_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	result := waitForCompletion(ctx, mock, pi, patterns, "", 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, "", nil, 0)
 	assert.False(t, result, "context cancel should return false")
 }
 
@@ -270,7 +270,7 @@ func TestWaitForCompletion_TwoPhase_ReadScreenError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result := waitForCompletion(ctx, mock, pi, patterns, "", 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, "", nil, 0)
 	assert.False(t, result, "persistent ReadScreen errors should prevent completion")
 }
 
@@ -292,8 +292,9 @@ func TestLaunchInteractiveSessions_UsesSendLongText(t *testing.T) {
 	assert.Equal(t, terminal.PaneID("pane-1"), mock.sendLongTextCalls[0].PaneID)
 	foundEnter := false
 	for _, c := range mock.sendCommandCalls {
-		if c.Cmd == "\n" { foundEnter = true }
+		if c.Cmd == "\n" {
+			foundEnter = true
+		}
 	}
 	assert.True(t, foundEnter, "must send Enter via SendCommand after SendLongText")
 }
-

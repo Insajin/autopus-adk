@@ -2,6 +2,7 @@
 name: executor
 description: TDD/DDD 기반 코드 구현 전문 에이전트. SPEC과 요구사항을 받아 테스트와 구현 코드를 작성한다.
 model: sonnet
+effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite
 permissionMode: acceptEdits
 maxTurns: 50

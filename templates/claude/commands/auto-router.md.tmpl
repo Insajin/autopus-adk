@@ -76,10 +76,11 @@ All subcommands that reference a SPEC-ID MUST use this resolution procedure inst
 | `--loop` | RALF loop mode: auto-retry failed quality gates with extended iteration limits until PASS or circuit break. |
 | `--multi` | Multi-provider mode: activate orchestra engine for reviews and decisions. |
 | `--quality <value>` | Agent quality mode: `ultra` (all agents Opus) or `balanced` (mixed). Overrides `autopus.yaml → quality.default`. |
+| `--effort <value>` | Explicit effort override. Higher priority than `CLAUDE_CODE_EFFORT_LEVEL`, frontmatter, and `--quality` mapping. |
 {{end}}
 ### Routing Rules
 
-1. **Strip global flags**: Separate `--think`, `--ultrathink`, `--auto`, `--loop`, `--multi`, `--quality <value>`, and other global flags from $ARGUMENTS
+1. **Strip global flags**: Separate `--think`, `--ultrathink`, `--auto`, `--loop`, `--multi`, `--quality <value>`, `--effort <value>`, and other global flags from $ARGUMENTS
 2. **Match subcommand**: Use the first remaining word to determine the subcommand
 3. **Triage-based Smart Routing (natural language → difficulty-aware flow)**:
    - If the first word does not match a known subcommand and the remaining text has 2+ words:
@@ -800,7 +801,7 @@ Implement code based on a SPEC document. Follows TDD methodology.
 
 IMPORTANT: You MUST parse these flags from $ARGUMENTS before any other action.
 
-Global flags (`--auto`, `--loop`, `--multi`, `--quality`) are already stripped. Extract the remaining go-specific flags:
+Global flags (`--auto`, `--loop`, `--multi`, `--quality`, `--effort`) are already stripped. Extract the remaining go-specific flags:
 - `--team` → `TEAMS_MODE = true/false` (Agent Teams)
 - `--solo` → `SOLO_MODE = true/false` (single session, no subagents)
 - `--strategy <value>` → `STRATEGY = value`
@@ -813,6 +814,7 @@ Inherit from global flags:
 - `LOOP_MODE` ← `--loop`
 - `MULTI_MODE` ← `--multi`
 - `QUALITY` ← `--quality`
+- `EFFORT` ← `--effort`
 
 Determine execution mode:
 - `TEAMS_MODE = true` → Agent Teams mode
@@ -1106,10 +1108,11 @@ WHEN `LOOP_MODE = true` AND a retry iteration occurs, THE SYSTEM SHALL display:
 **Step 2.1: Determine Quality Mode**
 
 Priority order:
-1. If `QUALITY` is set via `--quality` flag → use it. If invalid value, print error and stop.
-2. Read `autopus.yaml` → `quality.default` → use as default (applies to both `--auto` and interactive modes)
-3. If `AUTO_MODE = true` and no default found → fallback to "balanced"
-4. Otherwise → show interactive selection UI with `quality.default` pre-selected
+1. If `EFFORT` is set via `--effort` flag → keep it as the explicit override.
+2. If `QUALITY` is set via `--quality` flag → use it. If invalid value, print error and stop.
+3. Read `autopus.yaml` → `quality.default` → use as default (applies to both `--auto` and interactive modes)
+4. If `AUTO_MODE = true` and no default found → fallback to "balanced"
+5. Otherwise → show interactive selection UI with `quality.default` pre-selected
 
 **Reading quality.default**: Use Bash tool to extract: `grep '^quality:' -A1 autopus.yaml | grep 'default:' | awk '{print $2}'` or Read autopus.yaml directly and parse the `quality.default` field.
 
@@ -1502,6 +1505,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--multi` | Multi-provider mode: activate orchestra engine-based review |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |
 | `--quality` | Quality mode: ultra (all agents Opus), balanced (mixed) |
+| `--effort` | Explicit effort override: low, medium, high, xhigh |
 | `--skip-scaffold` | Skip Phase 1.5 Test Scaffold |
 
 ### Harness-Only Tasks
@@ -2507,6 +2511,7 @@ IF any item is unchecked → return to that stage. Do NOT display the milestone 
 | `--team` | Run `go` with Agent Teams — **default ON** in dev |
 | `--solo` | Run `go` in single session mode (overrides --team) |
 | `--quality` | Quality mode: ultra or balanced |
+| `--effort` | Explicit effort override: low, medium, high, xhigh |
 | `--multi` | Enable multi-provider review — **default ON** in dev |
 | `--ultrathink` | Deep analysis in plan stage — **default ON** in dev |
 | `--no-team` | Disable Agent Teams (use subagent pipeline instead) |

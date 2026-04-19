@@ -66,10 +66,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 	failed = append(failed, promptFailed...)
 
 	// REQ-3: configurable initial delay before completion detection (default 20s)
-	initialDelay := cfg.InitialDelay
-	if initialDelay <= 0 {
-		initialDelay = 20 * time.Second
-	}
+	initialDelay := completionInitialDelay(cfg, 20*time.Second)
 	time.Sleep(initialDelay)
 
 	patterns := DefaultCompletionPatterns()
@@ -78,10 +75,10 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 		var hookErr error
 		responses, hookErr = WaitAndCollectHookResults(cfg, cfg.SessionID)
 		if hookErr != nil {
-			responses = waitAndCollectResults(timeoutCtx, cfg, panes, patterns, start, nil, 0)
+			responses = waitAndCollectResults(timeoutCtx, cfg, panes, patterns, start, nil, hookSession, 0)
 		}
 	} else {
-		responses = waitAndCollectResults(timeoutCtx, cfg, panes, patterns, start, nil, 0)
+		responses = waitAndCollectResults(timeoutCtx, cfg, panes, patterns, start, nil, hookSession, 0)
 	}
 
 	// Step 8: Merge by strategy (reuse existing mergeByStrategy)

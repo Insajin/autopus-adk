@@ -36,7 +36,7 @@ func TestWaitAndCollectResults_FreshContextOnCancel(t *testing.T) {
 		TimeoutSeconds: 1,
 	}
 	start := time.Now()
-	responses := waitAndCollectResults(ctx, cfg, panes, patterns, start, nil, 0)
+	responses := waitAndCollectResults(ctx, cfg, panes, patterns, start, nil, nil, 0)
 
 	require.Len(t, responses, 1)
 	// The response should have output even though the parent ctx was cancelled,
@@ -57,7 +57,7 @@ func TestWaitAndCollectResults_SkippedPaneTimedOut(t *testing.T) {
 
 	start := time.Now()
 	cfg := OrchestraConfig{Terminal: mock}
-	responses := waitAndCollectResults(context.Background(), cfg, panes, patterns, start, nil, 0)
+	responses := waitAndCollectResults(context.Background(), cfg, panes, patterns, start, nil, nil, 0)
 
 	require.Len(t, responses, 1)
 	assert.True(t, responses[0].TimedOut, "skipped pane must be marked as timed out")
@@ -151,8 +151,8 @@ func TestSendRoundEnv_SkippedForTUIProvider(t *testing.T) {
 	}
 
 	cfg := OrchestraConfig{
-		Terminal:    mock,
-		Prompt:      "discuss topic",
+		Terminal:     mock,
+		Prompt:       "discuss topic",
 		InitialDelay: 1 * time.Millisecond,
 	}
 

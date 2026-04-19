@@ -2,6 +2,7 @@
 name: annotator
 description: Phase 2.5 전용 @AX 태그 스캔 및 적용 에이전트. executor가 수정한 파일 목록을 받아 @AX 태그를 자동으로 분석하고 적용한다.
 model: sonnet
+effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: bypassPermissions
 maxTurns: 20

@@ -14,8 +14,6 @@ import (
 // We test this indirectly by checking that the function does not error
 // when given an invalid strategy that config would override.
 func TestRunOrchestraCommand_ConfigFallback(t *testing.T) {
-	t.Parallel()
-
 	// When autopus.yaml is absent (no config), loadOrchestraConfig fails gracefully
 	// and runOrchestraCommand falls back to buildProviderConfigs behavior.
 	//
@@ -46,8 +44,6 @@ func TestRunOrchestraCommand_ConfigFallback(t *testing.T) {
 // TestRunOrchestraCommand_CommandNamePropagation verifies that the three
 // subcommand builders pass appropriate commandName values to the config resolver.
 func TestResolveProviders_CommandNameReview(t *testing.T) {
-	t.Parallel()
-
 	// Use default full config to simulate real config behavior
 	dir := t.TempDir()
 	content := `

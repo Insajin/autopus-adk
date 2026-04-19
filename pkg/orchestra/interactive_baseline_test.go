@@ -27,7 +27,7 @@ func TestWaitForCompletion_Baseline_PrevRoundPromptIgnored(t *testing.T) {
 
 	// R2: pass baseline matching current screen — completion should NOT be detected
 	baseline := "❯\n"
-	result := waitForCompletion(ctx, mock, pi, patterns, baseline, 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, baseline, nil, 0)
 	assert.False(t, result,
 		"must not false-positive when screen matches previous round baseline")
 }
@@ -48,7 +48,7 @@ func TestWaitForCompletion_Baseline_ScreenChangeDetectsCompletion(t *testing.T) 
 
 	// R2: baseline differs from current screen — completion should be detected
 	baseline := "old prompt from last round\n❯\n"
-	result := waitForCompletion(ctx, mock, pi, patterns, baseline, 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, baseline, nil, 0)
 	assert.True(t, result,
 		"must detect completion when screen changes from baseline and shows prompt")
 }
@@ -66,7 +66,7 @@ func TestWaitForCompletion_Baseline_EmptyBaseline(t *testing.T) {
 	defer cancel()
 
 	// Empty baseline should not block completion
-	result := waitForCompletion(ctx, mock, pi, patterns, "", 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, "", nil, 0)
 	assert.True(t, result, "empty baseline must not suppress completion detection")
 }
 
@@ -84,7 +84,7 @@ func TestWaitForCompletion_Baseline_SpecialChars(t *testing.T) {
 	defer cancel()
 
 	baseline := "previous\x1b[31m output\x1b[0m with ANSI\n❯\n"
-	result := waitForCompletion(ctx, mock, pi, patterns, baseline, 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, baseline, nil, 0)
 	assert.True(t, result,
 		"baseline with special chars must be compared correctly")
 }

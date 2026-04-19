@@ -2,6 +2,7 @@
 name: ux-validator
 description: 프론트엔드 UX 비주얼 검증 전담 에이전트. Claude Vision을 활용하여 스크린샷을 분석하고 레이아웃 문제를 탐지한다.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 maxTurns: 20

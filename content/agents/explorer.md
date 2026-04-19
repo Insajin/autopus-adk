@@ -2,6 +2,7 @@
 name: explorer
 description: 코드베이스 탐색 및 구조 분석 전담 에이전트. 파일 구조, 의존성, 엔트리포인트를 빠르게 파악하여 요약한다.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 maxTurns: 20

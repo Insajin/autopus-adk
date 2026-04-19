@@ -11,7 +11,7 @@ import (
 )
 
 func (a *Adapter) preparePluginMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	hooks, _, err := content.GenerateHookConfigs(cfg.Hooks, adapterName, true)
+	hooks, _, err := content.GenerateProjectHookConfigs(cfg, adapterName, true)
 	if err != nil {
 		return nil, fmt.Errorf("hook 생성 실패: %w", err)
 	}
@@ -36,7 +36,7 @@ func (a *Adapter) prepareHookPluginMapping(hooks []adapter.HookConfig) (adapter.
 }
 
 func (a *Adapter) prepareGitHookMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	_, gitHooks, err := content.GenerateHookConfigs(cfg.Hooks, adapterName, false)
+	_, gitHooks, err := content.GenerateProjectHookConfigs(cfg, adapterName, false)
 	if err != nil {
 		return nil, fmt.Errorf("git hook 생성 실패: %w", err)
 	}

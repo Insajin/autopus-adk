@@ -25,7 +25,7 @@ func TestWaitForCompletion_TwoPhaseMatch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result := waitForCompletion(ctx, mock, pi, patterns, "", 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, "", nil, 0)
 	assert.True(t, result, "2-phase consecutive match should return true")
 }
 
@@ -44,7 +44,7 @@ func TestWaitForCompletion_BaselineFiltering(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	result := waitForCompletion(ctx, mock, pi, patterns, baseline, 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, baseline, nil, 0)
 	assert.True(t, result, "should complete after baseline changes and 2-phase match")
 }
 
@@ -60,7 +60,7 @@ func TestWaitForCompletion_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	result := waitForCompletion(ctx, mock, pi, patterns, "", 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, "", nil, 0)
 	assert.False(t, result, "cancelled context must return false")
 }
 
@@ -113,7 +113,7 @@ func TestWaitForCompletion_IdleFallback(t *testing.T) {
 	piNoOutput := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "opencode"}}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	result := waitForCompletion(ctx, mock, piNoOutput, patterns, "", 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, piNoOutput, patterns, "", nil, 0)
 	assert.False(t, result, "no outputFile means no idle fallback, should timeout")
 }
 
@@ -148,7 +148,7 @@ func TestWaitForCompletion_IdleFallbackNotBeforeThreshold(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result := waitForCompletion(ctx, mock, pi, patterns, "", 0)
+	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, "", nil, 0)
 	assert.False(t, result,
 		"idle fallback must not trigger before idleFallbackThreshold (30s)")
 }

@@ -129,10 +129,7 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 	baselines = captureBaselines(ctx, cfg.Terminal, panes)
 
 	// @AX:NOTE: [AUTO] REQ-3 configurable initial delay — AI processing head start before polling
-	debateDelay := cfg.InitialDelay
-	if debateDelay <= 0 {
-		debateDelay = 10 * time.Second
-	}
+	debateDelay := completionInitialDelay(cfg, 10*time.Second)
 	time.Sleep(debateDelay)
 
 	// Re-capture baselines AFTER debateDelay so poll fallback uses a fresh
@@ -152,7 +149,7 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 	if cfg.HookMode && hookSession != nil {
 		responses = collectRoundHookResults(pollCtx, cfg, hookSession, round)
 	} else {
-		responses = waitAndCollectResults(pollCtx, cfg, panes, patterns, time.Now(), baselines, round)
+		responses = waitAndCollectResults(pollCtx, cfg, panes, patterns, time.Now(), baselines, hookSession, round)
 	}
 	// R8: Mark providers with empty output for partial merge
 	for i := range responses {

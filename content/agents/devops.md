@@ -2,6 +2,7 @@
 name: devops
 description: CI/CD 파이프라인, Docker, 인프라 설정 전담 에이전트. GitHub Actions, 컨테이너화, 배포 자동화를 담당한다.
 model: sonnet
+effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40

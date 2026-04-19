@@ -15,7 +15,7 @@ import (
 // applyHooksAndPermissions는 hooks와 permissions를 .claude/settings.json에 설치한다.
 // Always writes settings.json — DetectPermissions always returns non-nil with common defaults.
 func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.HarnessConfig) error {
-	hookConfigs, gitHooks, _ := content.GenerateHookConfigs(cfg.Hooks, "claude-code", a.SupportsHooks())
+	hookConfigs, gitHooks, _ := content.GenerateProjectHookConfigs(cfg, "claude-code", a.SupportsHooks())
 	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
 	if err := a.InstallHooks(ctx, hookConfigs, perms); err != nil {
 		return fmt.Errorf("hooks/permissions 설치 실패: %w", err)
@@ -65,6 +65,7 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 		for _, h := range hooks {
 			managedEvents[h.Event] = true
 		}
+		managedEvents["TaskCreated"] = true
 
 		// Preserve user-defined event keys that autopus does not manage
 		for k, v := range existingHooks {
@@ -75,21 +76,26 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 
 		// Set autopus-managed events fresh (no append to existing)
 		for _, h := range hooks {
+			hookEntry := map[string]any{
+				"type":    h.Type,
+				"command": h.Command,
+				"timeout": h.Timeout,
+			}
+			if len(h.Env) > 0 {
+				hookEntry["env"] = h.Env
+			}
 			entry := map[string]any{
 				"matcher": h.Matcher,
-				"hooks": []map[string]any{
-					{
-						"type":    h.Type,
-						"command": h.Command,
-						"timeout": h.Timeout,
-					},
-				},
+				"hooks":   []map[string]any{hookEntry},
 			}
 			entries, _ := hooksMap[h.Event].([]any)
 			entries = append(entries, entry)
 			hooksMap[h.Event] = entries
 		}
 		settings["hooks"] = hooksMap
+	} else if existingHooks, ok := settings["hooks"].(map[string]any); ok {
+		delete(existingHooks, "TaskCreated")
+		settings["hooks"] = existingHooks
 	}
 
 	// Merge permissions: append autopus defaults to existing user permissions.

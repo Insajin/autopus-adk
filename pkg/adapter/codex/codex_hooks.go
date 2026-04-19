@@ -64,7 +64,7 @@ func (a *Adapter) prepareHooksFile(cfg *config.HarnessConfig) ([]adapter.FileMap
 }
 
 func (a *Adapter) prepareGitHookFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	_, gitHooks, err := content.GenerateHookConfigs(cfg.Hooks, adapterName, false)
+	_, gitHooks, err := content.GenerateProjectHookConfigs(cfg, adapterName, false)
 	if err != nil {
 		return nil, fmt.Errorf("git hooks 생성 실패: %w", err)
 	}
@@ -84,7 +84,7 @@ func (a *Adapter) prepareGitHookFiles(cfg *config.HarnessConfig) ([]adapter.File
 
 // renderHooksTemplate renders the codex hooks.json template.
 func (a *Adapter) renderHooksTemplate(cfg *config.HarnessConfig) (string, error) {
-	hooks, _, err := content.GenerateHookConfigs(cfg.Hooks, adapterName, true)
+	hooks, _, err := content.GenerateProjectHookConfigs(cfg, adapterName, true)
 	if err != nil {
 		return "", fmt.Errorf("codex hooks 생성 실패: %w", err)
 	}

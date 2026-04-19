@@ -137,6 +137,13 @@ func (a *Adapter) Clean(_ context.Context) error {
 		return fmt.Errorf("레거시 라우터 커맨드 삭제 실패: %w", err)
 	}
 
+	for _, name := range claudeRootHookFiles {
+		rootHookPath := filepath.Join(a.root, ".claude", "hooks", name)
+		if err := os.Remove(rootHookPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("루트 훅 파일 삭제 실패 %s: %w", rootHookPath, err)
+		}
+	}
+
 	// Remove marker section from CLAUDE.md
 	claudePath := filepath.Join(a.root, "CLAUDE.md")
 	data, err := os.ReadFile(claudePath)

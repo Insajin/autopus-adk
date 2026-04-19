@@ -2,6 +2,7 @@
 name: validator
 description: 품질 검증 전담 에이전트. LSP 에러, 린트 경고, 테스트 통과 여부를 빠르게 확인하고 결과를 보고한다.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 maxTurns: 15

@@ -2,6 +2,7 @@
 name: debugger
 description: 버그 수정 및 근본 원인 분석 전문 에이전트. 재현 테스트를 우선 작성하고 최소한의 수정으로 버그를 해결한다.
 model: sonnet
+effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40

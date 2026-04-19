@@ -16,6 +16,7 @@ type AgentSourceMeta struct {
 	Name           string   `yaml:"name"`
 	Description    string   `yaml:"description"`
 	Model          string   `yaml:"model"`
+	Effort         string   `yaml:"effort"`
 	Tools          string   `yaml:"tools"`
 	PermissionMode string   `yaml:"permissionMode"`
 	MaxTurns       int      `yaml:"maxTurns"`
@@ -185,6 +186,9 @@ func buildCodexInstructions(meta AgentSourceMeta, body string) string {
 	}
 	if meta.Tools != "" {
 		ops = append(ops, fmt.Sprintf("- Source tool contract: %s", meta.Tools))
+	}
+	if meta.Effort != "" {
+		ops = append(ops, fmt.Sprintf("- Source effort default: %s", meta.Effort))
 	}
 	if meta.PermissionMode != "" {
 		ops = append(ops, fmt.Sprintf("- Source permission intent: %s", meta.PermissionMode))

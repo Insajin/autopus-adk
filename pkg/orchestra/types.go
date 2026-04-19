@@ -95,6 +95,8 @@ type OrchestraConfig struct {
 	ContextAware       bool               // R8: when true, skip topic isolation so providers can read project files
 	SubprocessMode     bool               // when true, use SubprocessBackend instead of PaneBackend
 	RoundPreset        string             // round preset: "fast", "standard", "deep" (for T8)
+	MonitorEnabled     bool               // when true, prefer CC21 monitor-style completion over polling
+	MonitorTimeout     time.Duration      // max wait for monitor-style completion before polling fallback
 	// SurfaceMgr is set during interactive debate setup.
 	// Not part of initial config -- populated by runPaneDebate().
 	SurfaceMgr *SurfaceManager

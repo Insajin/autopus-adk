@@ -102,6 +102,24 @@ Agent(
 )
 ```
 
+### Effort Override
+
+CC21 adds `effort` as a separate reasoning control. Keep the model/frontmatter behavior above, then apply:
+
+- `--effort` when the supervisor needs an explicit override
+- `CLAUDE_CODE_EFFORT_LEVEL` for environment-level override
+- agent frontmatter `effort:` as the default when neither override is present
+
+Example:
+
+```python
+Agent(
+  subagent_type = "executor",
+  effort = "high",
+  prompt = "..."
+)
+```
+
 ### Adaptive Quality (Balanced Mode Only)
 
 In Balanced mode, task complexity determines the profile per Agent() call:
@@ -421,6 +439,12 @@ Agent(subagent_type = "security-auditor", prompt = """
 Both must return PASS/APPROVE. On conflict, Lead (planner) consolidates issue lists.
 Priority: security issues > code quality issues.
 
+Freeze the review output into a checklist of open findings.
+
+- If the checklist still contains actionable findings and the retry budget remains, immediately delegate a focused fixer/executor task inside the same invocation.
+- Keep the checklist stable across retries unless the patch meaningfully changes scope.
+- Do not ask the user to manually fix, rerun, or confirm while the next repair step is still actionable within the current `/auto go` invocation.
+
 ## Parallel vs Sequential Decision Criteria
 
 | Condition                                     | Execution         | Worktree Isolation |
@@ -438,12 +462,6 @@ File ownership conflict always forces sequential execution, even when worktree i
 PASS  → Proceed to next Phase
 FAIL  → Delegate fix to the Recommended Agent from Gate Verdict → re-validate
 ```
-
-Freeze the review output into a checklist of open findings.
-
-- If the checklist still contains actionable findings and the retry budget remains, immediately delegate a focused fixer/executor task inside the same invocation.
-- Keep the checklist stable across retries unless the patch meaningfully changes scope.
-- Do not ask the user to manually fix, rerun, or confirm while the next repair step is still actionable within the current `/auto go` invocation.
 
 Retry limits:
 

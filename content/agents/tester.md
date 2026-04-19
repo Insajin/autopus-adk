@@ -2,6 +2,7 @@
 name: tester
 description: 테스트 작성 전담 에이전트. 단위/통합/E2E 테스트를 설계하고 구현하며, 커버리지 목표 달성을 책임진다.
 model: sonnet
+effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite
 permissionMode: acceptEdits
 maxTurns: 50

@@ -2,6 +2,7 @@
 name: deep-worker
 description: 장시간 독립 작업 전문 에이전트. 체크포인트 연동, 자기 검증 루프, 컨텍스트 압축을 통해 복잡한 장기 태스크를 안전하게 완료한다.
 model: opus
+effort: high
 tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite
 permissionMode: acceptEdits
 maxTurns: 100

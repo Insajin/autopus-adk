@@ -2,6 +2,7 @@
 name: frontend-specialist
 description: Phase 3.5 전용 프론트엔드 UX 검증 에이전트. Playwright E2E 테스트 실행, 스크린샷 분석, 변경된 컴포넌트의 시각적 회귀를 자동으로 감지하고 수정한다.
 model: sonnet
+effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: bypassPermissions
 maxTurns: 40

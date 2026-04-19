@@ -126,5 +126,16 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 		Context: ContextConf{
 			SignatureMap: true,
 		},
+		Features: FeaturesConf{
+			CC21: CC21FeaturesConf{
+				Enabled:                 false,
+				EffortEnabled:           false,
+				MonitorEnabled:          false,
+				TaskCreatedEnabled:      false,
+				InitialPromptEnabled:    false,
+				TaskCreatedMode:         "warn",
+				MonitorPatternTimeoutMS: 30000,
+			},
+		},
 	}
 }

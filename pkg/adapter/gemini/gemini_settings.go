@@ -56,7 +56,7 @@ func (a *Adapter) generateSettings(cfg *config.HarnessConfig) ([]adapter.FileMap
 
 // applyHooksAndPermissions installs hooks and permissions to .gemini/settings.json.
 func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.HarnessConfig) error {
-	hookConfigs, _, _ := content.GenerateHookConfigs(cfg.Hooks, "gemini-cli", a.SupportsHooks())
+	hookConfigs, _, _ := content.GenerateProjectHookConfigs(cfg, "gemini-cli", a.SupportsHooks())
 	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
 	return a.InstallHooks(ctx, hookConfigs, perms)
 }

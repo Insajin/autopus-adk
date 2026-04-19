@@ -17,6 +17,7 @@ import (
 const agentTemplate = `---
 name: {{.Name}}
 description: {{.Description}}
+effort: {{.Effort}}
 tools:
 {{- range .Tools}}
   - {{.}}
@@ -43,13 +44,16 @@ TODO: 작업 처리 지침을 작성하세요.
 type agentTemplateData struct {
 	Name        string
 	Description string
-	Tools       []string
+	// Effort is the default effort tier for this agent role (e.g. "medium", "high").
+	Effort string
+	Tools  []string
 }
 
 // agentFrontmatter mirrors the required fields of an agent .md frontmatter block.
 type agentFrontmatter struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
+	Effort      string `yaml:"effort,omitempty"`
 }
 
 // newAgentCmd creates the `auto agent` parent command with subcommands.
@@ -110,7 +114,9 @@ func runAgentCreate(cmd *cobra.Command, name, description, tools string, write b
 	data := agentTemplateData{
 		Name:        name,
 		Description: description,
-		Tools:       toolList,
+		// TODO: consolidate with pkg/effort.DefaultEffortForRole after T11 lands
+		Effort: defaultEffortForRole(name),
+		Tools:  toolList,
 	}
 
 	tmpl, err := template.New("agent").Parse(agentTemplate)
@@ -179,4 +185,25 @@ func parseTools(tools string) []string {
 		}
 	}
 	return result
+}
+
+// highEffortRoles lists agent roles that require high reasoning effort by default.
+// Roles not in this set default to "medium" (safe fallback).
+// TODO: consolidate with pkg/effort.DefaultEffortForRole after T11 lands
+var highEffortRoles = map[string]bool{
+	"spec-writer":      true,
+	"planner":          true,
+	"reviewer":         true,
+	"security-auditor": true,
+	"architect":        true,
+	"deep-worker":      true,
+}
+
+// defaultEffortForRole returns the default effort tier string for a given agent role name.
+// Returns "high" for roles that require complex reasoning; "medium" for all others.
+func defaultEffortForRole(role string) string {
+	if highEffortRoles[role] {
+		return "high"
+	}
+	return "medium"
 }

@@ -12,7 +12,7 @@ import (
 // waitAndCollectResults waits for completion and collects cleaned results.
 // Round is forwarded to waitForCompletion; pass 0 for non-debate strategies.
 // @AX:WARN [AUTO] concurrent goroutine writes to shared responses slice — guarded by mu sync.Mutex
-func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, patterns []CompletionPattern, start time.Time, baselines map[string]string, round int) []ProviderResponse {
+func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, patterns []CompletionPattern, start time.Time, baselines map[string]string, hookSession *HookSession, round int) []ProviderResponse {
 	var (
 		responses []ProviderResponse
 		mu        sync.Mutex
@@ -35,7 +35,7 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 			if baselines != nil {
 				baseline = baselines[pi.provider.Name]
 			}
-			timedOut := !waitForCompletion(ctx, cfg.Terminal, pi, patterns, baseline, round)
+			timedOut := !waitForCompletion(ctx, cfg, pi, patterns, baseline, hookSession, round)
 			// Fresh context for final read — original ctx may be cancelled after timeout.
 			readCtx, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
 			screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{

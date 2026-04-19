@@ -60,6 +60,28 @@ Platform note:
 - Codex: all tiers resolve to `gpt-5.4`; LOW/MEDIUM/HIGH should be differentiated by reasoning effort
 - OpenCode: default runtime model is currently assumed to be `gpt-5.4`; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
+## Effort Mapping (SPEC-CC21-001)
+
+CC21 adds an explicit `effort` tier alongside model selection. Resolve it with this priority:
+
+1. `--effort <value>`
+2. `CLAUDE_CODE_EFFORT_LEVEL`
+3. agent frontmatter `effort:`
+4. Quality Mode mapping
+5. settings default (`medium`)
+
+Quality Mode defaults:
+
+| Mode | Model / Tier | Effort |
+|------|--------------|--------|
+| Ultra | Opus 4.7 | `xhigh` |
+| Ultra | Opus 4.6 / Sonnet 4.6 | `high` |
+| Ultra | Haiku 4.5 | strip effort |
+| Balanced | HIGH complexity | `high` |
+| Balanced | MEDIUM / LOW complexity | `medium` |
+
+Unsupported env values must fail open to Quality Mode defaults. Use `auto effort detect` when the runtime needs the resolved value explicitly.
+
 ## Agent() Call Pattern
 
 ### HIGH complexity

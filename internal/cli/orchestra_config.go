@@ -10,16 +10,24 @@ import (
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
-// loadOrchestraConfig loads the orchestra configuration from autopus.yaml
-// located in the current working directory.
-// Applies in-memory migrations (e.g., codex → opencode) before returning.
-func loadOrchestraConfig() (*config.OrchestraConf, error) {
+func loadHarnessConfig() (*config.HarnessConfig, error) {
 	cfg, err := config.Load(".")
 	if err != nil {
 		return nil, err
 	}
-	// Apply migrations in-memory so orchestra always uses current provider set
+	// Apply migrations in-memory so orchestra always uses current provider set.
 	_, _ = config.MigrateOrchestraConfig(cfg)
+	return cfg, nil
+}
+
+// loadOrchestraConfig loads the orchestra configuration from autopus.yaml
+// located in the current working directory.
+// Applies in-memory migrations (e.g., codex → opencode) before returning.
+func loadOrchestraConfig() (*config.OrchestraConf, error) {
+	cfg, err := loadHarnessConfig()
+	if err != nil {
+		return nil, err
+	}
 	return &cfg.Orchestra, nil
 }
 

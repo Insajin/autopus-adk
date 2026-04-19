@@ -69,10 +69,27 @@ type HarnessConfig struct {
 	Verify       VerifyConf       `yaml:"verify,omitempty"`
 	Constraints  ConstraintConf   `yaml:"constraints,omitempty"`
 	Context      ContextConf      `yaml:"context,omitempty"`
+	Features     FeaturesConf     `yaml:"features,omitempty"`
 	IssueReport  IssueReportConf  `yaml:"issue_report,omitempty"`
 	Profiles     ProfilesConf     `yaml:"profiles,omitempty"`
 	UsageProfile UsageProfile     `yaml:"usage_profile,omitempty"` // developer (default) or fullstack
 	Hints        HintsConf        `yaml:"hints,omitempty"`
+}
+
+// FeaturesConf holds feature-flag namespaces.
+type FeaturesConf struct {
+	CC21 CC21FeaturesConf `yaml:"cc21,omitempty"`
+}
+
+// CC21FeaturesConf holds Claude Code 2.1 integration flags.
+type CC21FeaturesConf struct {
+	Enabled                 bool   `yaml:"enabled"`
+	EffortEnabled           bool   `yaml:"effort_enabled,omitempty"`
+	MonitorEnabled          bool   `yaml:"monitor_enabled,omitempty"`
+	TaskCreatedEnabled      bool   `yaml:"task_created_enabled,omitempty"`
+	InitialPromptEnabled    bool   `yaml:"initial_prompt_enabled,omitempty"`
+	TaskCreatedMode         string `yaml:"task_created_mode,omitempty"`
+	MonitorPatternTimeoutMS int    `yaml:"monitor_pattern_timeout_ms,omitempty"`
 }
 
 // ProfilesConf holds profile configuration for agents.
@@ -226,6 +243,13 @@ func (c *HarnessConfig) Validate() error {
 	if c.Quality.Default != "" {
 		if _, ok := c.Quality.Presets[c.Quality.Default]; !ok {
 			return fmt.Errorf("quality.default %q is not defined in quality.presets", c.Quality.Default)
+		}
+	}
+	if c.Features.CC21.TaskCreatedMode != "" {
+		switch c.Features.CC21.TaskCreatedMode {
+		case "warn", "enforce":
+		default:
+			return fmt.Errorf("features.cc21.task_created_mode %q is invalid", c.Features.CC21.TaskCreatedMode)
 		}
 	}
 	// Validate that each agent model value in quality presets is a known tier.

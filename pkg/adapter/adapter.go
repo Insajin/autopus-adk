@@ -65,11 +65,12 @@ type ValidationError struct {
 
 // HookConfig는 훅 설정이다.
 type HookConfig struct {
-	Event   string `json:"event"`   // hook event name (PreToolUse, PostToolUse, etc.)
-	Matcher string `json:"matcher"` // regex matcher for tool names
-	Type    string `json:"type"`    // hook type: "command", "prompt", etc.
-	Command string `json:"command"` // shell command to execute
-	Timeout int    `json:"timeout"` // timeout in seconds
+	Event   string            `json:"event"`   // hook event name (PreToolUse, PostToolUse, etc.)
+	Matcher string            `json:"matcher"` // regex matcher for tool names
+	Type    string            `json:"type"`    // hook type: "command", "prompt", etc.
+	Command string            `json:"command"` // shell command to execute
+	Timeout int               `json:"timeout"` // timeout in seconds
+	Env     map[string]string `json:"env,omitempty"`
 }
 
 // PermissionSet는 플랫폼별 권한 설정이다.

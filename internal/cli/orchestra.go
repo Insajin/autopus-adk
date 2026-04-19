@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
@@ -96,15 +97,16 @@ func runOrchestraCommand(
 	// @AX:NOTE [AUTO] REQ-11 opportunistic GC — fires on every orchestra invocation; 1h TTL
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
 
-	// Attempt to load config; fall back to hardcoded defaults on failure
-	orchConf, configErr := loadOrchestraConfig()
+	// Attempt to load config; fall back to hardcoded defaults on failure.
+	harnessCfg, configErr := loadHarnessConfig()
 
 	var (
 		strategyStr string
+		orchConf    *config.OrchestraConf
 		providers   []orchestra.ProviderConfig
 	)
 
-	if configErr != nil || orchConf == nil {
+	if configErr != nil || harnessCfg == nil {
 		// Config load failed: use CLI flags directly or hardcoded defaults
 		strategyStr = flagStrategy
 		if strategyStr == "" {
@@ -116,6 +118,7 @@ func runOrchestraCommand(
 		}
 		providers = buildProviderConfigs(names)
 	} else {
+		orchConf = &harnessCfg.Orchestra
 		// Config loaded: resolve strategy, providers, and judge with priority
 		strategyStr = resolveStrategy(orchConf, commandName, flagStrategy)
 		providers = resolveProviders(orchConf, commandName, flagProviders)
@@ -156,15 +159,12 @@ func runOrchestraCommand(
 	term := terminal.DetectTerminal()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"
+	monitorRuntime := resolveCC21MonitorRuntime(term, harnessCfg)
 
 	// Hook mode requires `auto init` to install hooks first (SPEC-ORCH-007 R5/R6).
-	hookMode := false
 	sessionID := ""
-	if interactive {
-		hookMode = isHookModeAvailable()
-		if hookMode {
-			sessionID = fmt.Sprintf("orch-%d", time.Now().UnixMilli())
-		}
+	if interactive && monitorRuntime.HookMode {
+		sessionID = fmt.Sprintf("orch-%d", time.Now().UnixMilli())
 	}
 
 	cfg := orchestra.OrchestraConfig{
@@ -179,12 +179,14 @@ func runOrchestraCommand(
 		NoDetach:           nd,
 		KeepRelayOutput:    keepRelay,
 		Interactive:        interactive,
-		HookMode:           hookMode,
+		HookMode:           monitorRuntime.HookMode,
 		SessionID:          sessionID,
 		NoJudge:            noJudge,
 		YieldRounds:        yieldRounds,
 		ContextAware:       contextAware,
 		SubprocessMode:     subprocessMode,
+		MonitorEnabled:     monitorRuntime.Enabled,
+		MonitorTimeout:     monitorRuntime.PatternTimeout,
 	}
 
 	providerNames := make([]string, len(providers))
