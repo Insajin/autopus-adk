@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/e2e"
 )
 
@@ -29,6 +30,7 @@ func newAutoTestRunCmd() *cobra.Command {
 	var (
 		scenarioID string
 		jsonOut    bool
+		profile    string
 		timeout    time.Duration
 		verbose    bool
 		projectDir string
@@ -38,12 +40,13 @@ func newAutoTestRunCmd() *cobra.Command {
 		Use:   "run",
 		Short: "Execute E2E scenarios and report PASS/FAIL per scenario",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAutoTest(cmd, scenarioID, jsonOut, timeout, verbose, projectDir)
+			return runAutoTest(cmd, scenarioID, jsonOut, profile, timeout, verbose, projectDir)
 		},
 	}
 
 	cmd.Flags().StringVarP(&scenarioID, "scenario", "s", "", "Run only a specific scenario by ID")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output results as JSON")
+	cmd.Flags().StringVar(&profile, "profile", config.TestProfileStandalone, "Execution profile for scenario requirements (standalone|local|ci|prod)")
 	// @AX:NOTE [AUTO] @AX:REASON: magic constant — 30s default timeout mirrors NewRunner default; keep in sync with pkg/e2e/runner.go
 	cmd.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "Per-scenario timeout")
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show stdout/stderr for each scenario")
@@ -62,8 +65,18 @@ type scenarioJSONResult struct {
 
 // @AX:NOTE [AUTO] @AX:REASON: design choice — command strips markdown backticks from Command field at runtime (line 124); scenarios.md stores commands as inline code e.g. "`auto init`"
 // runAutoTest executes the test run logic.
-func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, timeout time.Duration, verbose bool, projectDir string) error {
+func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, profile string, timeout time.Duration, verbose bool, projectDir string) error {
 	out := cmd.OutOrStdout()
+	profile = strings.ToLower(strings.TrimSpace(profile))
+	if !config.IsValidTestProfile(profile) {
+		return fmt.Errorf("invalid profile %q: must be standalone, local, ci, or prod", profile)
+	}
+
+	cfg, err := config.Load(projectDir)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	availableCapabilities := cfg.AvailableTestCapabilities(profile)
 
 	// Read scenarios.md from .autopus/project/scenarios.md.
 	scenariosPath := filepath.Join(projectDir, ".autopus", "project", "scenarios.md")
@@ -109,8 +122,8 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, timeout ti
 	runner := e2e.NewRunner(runnerOpts)
 
 	var (
-		results     []scenarioJSONResult
-		passed, run int
+		results              []scenarioJSONResult
+		passed, run, skipped int
 	)
 
 	for _, s := range set.Scenarios {
@@ -123,6 +136,21 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, timeout ti
 		}
 
 		run++
+		missingRequirements := e2e.MissingScenarioRequirements(s, availableCapabilities)
+		if len(missingRequirements) > 0 {
+			skipped++
+			jr := scenarioJSONResult{
+				ID:     fmt.Sprintf("S%d", s.Number),
+				Status: "SKIP",
+				Reason: fmt.Sprintf("requires %s (profile=%s)", strings.Join(missingRequirements, ", "), profile),
+			}
+			results = append(results, jr)
+			if !jsonOut {
+				fmt.Fprintf(out, "%-24s SKIP  %s\n", fmt.Sprintf("S%d: %s", s.Number, s.ID), jr.Reason)
+			}
+			continue
+		}
+
 		// Strip surrounding backticks from command field (markdown inline code format).
 		s.Command = strings.Trim(s.Command, "`")
 		start := time.Now()
@@ -171,10 +199,15 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, timeout ti
 		return enc.Encode(map[string]interface{}{"results": results})
 	}
 
-	fmt.Fprintf(out, "\nResults: %d/%d passed\n", passed, run)
+	failed := run - passed - skipped
+	if skipped == 0 {
+		fmt.Fprintf(out, "\nResults: %d/%d passed\n", passed, run)
+	} else {
+		fmt.Fprintf(out, "\nResults: %d passed, %d skipped, %d failed\n", passed, skipped, failed)
+	}
 
-	if passed < run {
-		return fmt.Errorf("%d scenario(s) failed", run-passed)
+	if failed > 0 {
+		return fmt.Errorf("%d scenario(s) failed", failed)
 	}
 	return nil
 }

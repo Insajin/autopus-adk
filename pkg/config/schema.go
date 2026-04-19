@@ -95,6 +95,7 @@ type CC21FeaturesConf struct {
 // ProfilesConf holds profile configuration for agents.
 type ProfilesConf struct {
 	Executor ExecutorProfileConf `yaml:"executor,omitempty"`
+	Test     TestProfileConf     `yaml:"test,omitempty"`
 }
 
 // ExecutorProfileConf holds executor profile settings.
@@ -126,12 +127,12 @@ type SubprocessConf struct {
 
 // ProviderEntry는 프로바이더 실행 설정이다.
 type ProviderEntry struct {
-	Binary           string            `yaml:"binary"`
-	Args             []string          `yaml:"args,flow"`
-	PaneArgs         []string          `yaml:"pane_args,flow,omitempty"`
-	PromptViaArgs    bool              `yaml:"prompt_via_args,omitempty"`
-	InteractiveInput string            `yaml:"interactive_input,omitempty"`
-	WorkingPatterns  []string          `yaml:"working_patterns,flow,omitempty"`
+	Binary           string             `yaml:"binary"`
+	Args             []string           `yaml:"args,flow"`
+	PaneArgs         []string           `yaml:"pane_args,flow,omitempty"`
+	PromptViaArgs    bool               `yaml:"prompt_via_args,omitempty"`
+	InteractiveInput string             `yaml:"interactive_input,omitempty"`
+	WorkingPatterns  []string           `yaml:"working_patterns,flow,omitempty"`
 	Subprocess       SubprocessProvConf `yaml:"subprocess,omitempty"` // per-provider subprocess overrides
 }
 

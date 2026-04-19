@@ -10,6 +10,8 @@
 <!--
 Each scenario represents a single API endpoint interaction.
 Scenario ID format: {method}-{resource} or {method}-{resource}-{variant}
+Requires format: comma-separated capabilities such as db, redis, backend-server,
+frontend-server, providers:claude, providers:gemini, providers:codex, network
 Verification primitives available:
   status_code(N), json_path(path, value), header_contains(key, str),
   response_time_ms(N), exit_code(N), stdout_contains(str)
@@ -26,6 +28,7 @@ Detection signals (Node): package.json + express, fastify, nestjs, hono
 - **Expect**: [e.g., "200 OK, JSON array of users"]
 - **Verify**: status_code(200), json_path($.length, >0)
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 ### S2: [method]-[resource]-auth — [auth error scenario]
@@ -35,6 +38,7 @@ Detection signals (Node): package.json + express, fastify, nestjs, hono
 - **Expect**: [e.g., "401 Unauthorized"]
 - **Verify**: status_code(401), json_path($.error, Unauthorized)
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 ### S3: [method]-[resource]-create — [creation scenario]
@@ -44,6 +48,7 @@ Detection signals (Node): package.json + express, fastify, nestjs, hono
 - **Expect**: [e.g., "201 Created, returns created resource"]
 - **Verify**: status_code(201), json_path($.id, exists)
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 <!--

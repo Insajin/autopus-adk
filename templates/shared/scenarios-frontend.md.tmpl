@@ -10,6 +10,8 @@
 <!--
 Each scenario represents a user-facing page interaction.
 Scenario ID format: {page}-{action} or {page}-{variant}
+Requires format: comma-separated capabilities such as db, redis, backend-server,
+frontend-server, providers:claude, providers:gemini, providers:codex, network
 Verification primitives available:
   page_title(str), element_visible(selector), element_text(selector, str),
   url_matches(pattern), exit_code(N), stdout_contains(str)
@@ -24,6 +26,7 @@ Detection signals: package.json + react/vue/svelte/next/nuxt/angular deps
 - **Expect**: [e.g., "page loads, main heading visible"]
 - **Verify**: page_title([expected title]), element_visible([main selector])
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 ### S2: [page]-interaction — [user interaction scenario]
@@ -33,6 +36,7 @@ Detection signals: package.json + react/vue/svelte/next/nuxt/angular deps
 - **Expect**: [e.g., "navigation to /dashboard, dashboard content visible"]
 - **Verify**: url_matches(/dashboard), element_visible([dashboard selector])
 - **Depends**: S1
+- **Requires**: N/A
 - **Status**: active
 
 ### S3: [page]-form — [form submission scenario]
@@ -42,6 +46,7 @@ Detection signals: package.json + react/vue/svelte/next/nuxt/angular deps
 - **Expect**: [e.g., "form submits, redirects to dashboard"]
 - **Verify**: url_matches(/dashboard), element_text([welcome selector], [expected text])
 - **Depends**: S1
+- **Requires**: N/A
 - **Status**: active
 
 ### S4: [page]-error — [error state scenario]
@@ -51,6 +56,7 @@ Detection signals: package.json + react/vue/svelte/next/nuxt/angular deps
 - **Expect**: [e.g., "404 page displayed"]
 - **Verify**: element_visible([error selector]), element_text([error selector], [expected text])
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 <!--

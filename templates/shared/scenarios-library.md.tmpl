@@ -12,6 +12,8 @@ Each scenario represents a public API usage pattern.
 Libraries have no CLI or server entry points, so scenarios test
 the primary exported functions/classes from a consumer's perspective.
 Scenario ID format: {function}-{variant} or {usecase}
+Requires format: comma-separated capabilities such as db, redis, backend-server,
+frontend-server, providers:claude, providers:gemini, providers:codex, network
 Verification primitives available:
   exit_code(N), stdout_contains(str), stderr_empty(),
   file_exists(path), file_contains(path, str)
@@ -26,6 +28,7 @@ Detection: No CLI/API/Frontend signals detected — fallback type.
 - **Expect**: [e.g., "test passes, no errors"]
 - **Verify**: exit_code(0), stderr_empty()
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 ### S2: [function-or-usecase]-error — [error handling scenario]
@@ -35,6 +38,7 @@ Detection: No CLI/API/Frontend signals detected — fallback type.
 - **Expect**: [e.g., "returns descriptive error, no panic"]
 - **Verify**: exit_code(0), stdout_contains(PASS)
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 <!--

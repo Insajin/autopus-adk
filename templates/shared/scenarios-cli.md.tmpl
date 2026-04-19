@@ -10,6 +10,8 @@
 <!--
 Each scenario represents a single user-facing CLI interaction.
 Scenario ID format: {subcommand} or {subcommand}-{variant}
+Requires format: comma-separated capabilities such as db, redis, backend-server,
+frontend-server, providers:claude, providers:gemini, providers:codex, network
 Verification primitives available:
   exit_code(N), stdout_contains(str), stderr_empty(),
   file_exists(path), file_contains(path, str)
@@ -26,6 +28,7 @@ Detection signals (Node): package.json + commander/yargs/oclif
 - **Expect**: [expected result, e.g., "exits 0, prints version string"]
 - **Verify**: exit_code(0), stdout_contains([expected output])
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 ### S2: [command-id]-error — [error scenario description]
@@ -35,6 +38,7 @@ Detection signals (Node): package.json + commander/yargs/oclif
 - **Expect**: [expected error, e.g., "exits 1, prints usage help"]
 - **Verify**: exit_code(1), stdout_contains(Usage)
 - **Depends**: N/A
+- **Requires**: N/A
 - **Status**: active
 
 <!--

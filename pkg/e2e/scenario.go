@@ -20,6 +20,7 @@ type Scenario struct {
 	Expect       string   // expected result
 	Verify       []string // verification primitives
 	Depends      string   // dependency (e.g., "S1" or "N/A")
+	Requires     string   // comma-separated capabilities or "N/A"
 	Status       string   // active | deprecated | skip
 	Section      string   // section header (e.g., "ADK CLI Scenarios")
 }
@@ -109,6 +110,8 @@ func ParseScenarios(content []byte) (*ScenarioSet, error) {
 				current.Verify = parts
 			case "Depends":
 				current.Depends = val
+			case "Requires":
+				current.Requires = val
 			case "Status":
 				current.Status = val
 			}
@@ -142,6 +145,9 @@ func RenderScenarios(set *ScenarioSet) ([]byte, error) {
 		fmt.Fprintf(&buf, "- **Expect**: %s\n", s.Expect)
 		fmt.Fprintf(&buf, "- **Verify**: %s\n", strings.Join(s.Verify, ", "))
 		fmt.Fprintf(&buf, "- **Depends**: %s\n", s.Depends)
+		if strings.TrimSpace(s.Requires) != "" {
+			fmt.Fprintf(&buf, "- **Requires**: %s\n", s.Requires)
+		}
 		fmt.Fprintf(&buf, "- **Status**: %s\n", s.Status)
 	}
 
