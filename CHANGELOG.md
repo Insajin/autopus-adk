@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.36] — 2026-04-19
+
+### Fixed
+
+- **Install bootstrap now separates install from init** (2026-04-19): installer가 `auto init`/`auto update`를 자동 실행하지 않고, 필수 도구만 점검한 뒤 `auto init`, `auto update --self`, `auto update`의 역할을 명시적으로 안내하도록 정리
+  - `install.sh`, `install.ps1` — post-install 단계에서 required dependency만 자동 설치하고, 자동 project init/update 분기 제거
+  - `internal/cli/doctor.go`, `internal/cli/doctor_fix.go` — `--required-only` 플래그와 required dependency filter 추가
+  - `pkg/detect/detect.go` — `gh`를 필수 도구로 승격하고 Gemini CLI npm 패키지를 `@google/gemini-cli`로 정정
+  - `README.md`, `docs/README.ko.md`, `internal/cli/doctor_fix_runtime_test.go`, `internal/cli/doctor_fix_test.go`, `pkg/detect/fullmode_deps_test.go` — 설치 가이드/회귀 테스트 동기화 및 테스트 파일 분할로 300-line limit 유지
+
+- **E2E scenario runner backend submodule path correction** (2026-04-19): Backend build 시나리오가 `Autopus/`를 cwd로 잡아 존재하지 않는 `cmd/server` 경로를 참조하던 문제를 실제 backend 소스 경로인 `Autopus/backend/`로 정렬
+  - `pkg/e2e/build.go`, `pkg/e2e/build_test.go` — default submodule map을 canary H2/H3 build cwd와 일치시키고 회귀 테스트 추가
+
+- **Permission detection tests now use injected process-tree stubs** (2026-04-19): `--dangerously-skip-permissions`가 걸린 세션에서 `pkg/detect` 테스트가 실제 부모 프로세스 트리에 오염되던 문제를 제거
+  - `pkg/detect/permission.go`, `pkg/detect/permission_test.go` — `checkProcessTreeFn` 주입 지점과 결정적 stub helper 추가
+
+- **CC21 monitor runtime flake removed via Claude version injection hook** (2026-04-19): `claude --version` subprocess timeout으로 인해 `TestResolveCC21MonitorRuntime_Enabled`가 간헐적으로 실패하던 문제를 테스트 전용 version injector로 제거
+  - `pkg/platform/claude.go`, `internal/cli/orchestra_cc21_test.go` — `claudeVersionFn`/`SetClaudeVersionForTest` 추가 및 monitor runtime 회귀 테스트 보강
+
 ## [v0.40.35] — 2026-04-19
 
 ### Fixed
