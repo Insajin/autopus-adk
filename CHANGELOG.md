@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.34] — 2026-04-19
+
+### Added
+
+- **Test Profile 기반 시나리오 요구조건 스킵** (2026-04-19): `auto test run`에 `--profile` capability 집합을 도입해 시나리오의 `Requires` 조건이 충족되지 않으면 FAIL 대신 SKIP으로 처리
+  - `internal/cli/test.go`, `internal/cli/test_profile_test.go` — `--profile` 플래그, SKIP 집계, JSON 출력 회귀 테스트 추가
+  - `pkg/config/test_profiles.go`, `pkg/config/test_profiles_test.go`, `pkg/config/schema.go` — profile별 capability 기본값 및 `autopus.yaml` 확장
+  - `pkg/e2e/requires.go`, `pkg/e2e/scenario.go`, `pkg/e2e/scenario_requires_test.go` — `Requires` 파싱 및 capability mismatch 계산 로직 추가
+  - `templates/shared/scenarios-*.md.tmpl` — 시나리오 템플릿에 `Requires` 필드 추가
+
 ### Fixed
 
 - **SPEC 리뷰 체크리스트 런타임 주입 및 self-verify 기록 경로 복구 (SPEC-SPECWR-002)** (2026-04-19): `auto spec review`가 `content/rules/spec-quality.md`를 실제 런타임 프롬프트에 주입하고, `CHECKLIST:` 응답을 구조화 파싱하며, `auto spec self-verify`로 결정적 JSONL 기록을 남길 수 있도록 동기화.
@@ -25,6 +35,16 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Claude Code 2.1 CC21 경로 연결 및 precedence 정렬 (SPEC-CC21-001)** (2026-04-19): effort frontmatter, TaskCreated hook, initial prompt 검사, monitor 기반 완료 감지를 source-of-truth와 CLI/runtime 경로에 연결
+  - `internal/cli/effort*.go`, `internal/cli/check_initial_prompt*.go`, `internal/cli/orchestra_cc21.go`, `internal/cli/check_cc21.go`, `internal/cli/cc21_runtime.go` — CC21 전역 플래그, runtime precedence, check 명령, orchestra wiring 추가
+  - `pkg/orchestra/cc21_monitor.go`, `pkg/platform/claude.go`, `pkg/platform/claude_test*.go` — Claude Code 2.1 capability 감지와 monitor contract 연결
+  - `content/hooks/task-created-validate.sh`, `content/hooks/README.md`, `pkg/content/hooks.go`, `pkg/adapter/claude/claude_task_created_test.go` — TaskCreated generated default와 runtime override precedence 정렬
+  - `content/skills/monitor-patterns.md`, `content/embed.go`, `content/skills/adaptive-quality.md`, `content/skills/idea.md`, `content/skills/agent-pipeline.md` — CC21 monitor/effort 규칙과 문서 표면 동기화
+  - `pkg/adapter/claude/claude_generate.go`, `pkg/adapter/claude/claude_prepare_files.go`, `pkg/adapter/claude/claude_update.go` — Claude adapter 파일 생성/업데이트 경로를 300줄 제한에 맞게 분리 정리
+
+- **Claude deferred-tools 선로딩 규칙 추가** (2026-04-18): Claude Code의 지연 로드 도구(`AskUserQuestion`, `TaskCreate`, `TeamCreate` 등)가 스키마 미로드 상태로 호출될 때 생기던 평문 downgrade / validation error를 줄이기 위해 전역 규칙을 추가
+  - `content/rules/deferred-tools.md` — `/auto triage`, Gate 1 승인, `--team` 진입 시 `ToolSearch`로 스키마를 먼저 로드하도록 trigger point 규칙 추가
+
 - **Claude Code Agent Teams + mode 파라미터 동기화** (2026-04-18): Agent Teams 공식 스펙(https://code.claude.com/docs/en/agent-teams)을 반영하고, Agent() 호출 파라미터 이름을 `permissionMode` → `mode` 로 통일. 플랫폼별 `--team` 플래그 동작 명시.
   - `content/skills/agent-pipeline.md`, `content/skills/worktree-isolation.md` — 본문 `Agent(... permissionMode=)` 10건 → `mode=`
   - `templates/codex/skills/agent-pipeline.md.tmpl`, `templates/codex/skills/worktree-isolation.md.tmpl`, `templates/gemini/skills/agent-pipeline/SKILL.md.tmpl`, `templates/gemini/skills/worktree-isolation/SKILL.md.tmpl` — 동일 변경 (각 4-6건)
@@ -37,6 +57,9 @@ All notable changes to this project will be documented in this file.
 ### Docs
 
 - **spec-writer 자체 품질 체크리스트 도입 문서 동기화 (SPEC-SPECWR-001)** (2026-04-19): `content/rules/spec-quality.md` 신규 체크리스트, `content/skills/spec-review.md`의 pre-review self-check, `content/agents/spec-writer.md`의 자체 검증 루프를 실제 산출물 기준으로 정렬하고 SPEC 문서를 completed 상태로 동기화
+  - `content/rules/spec-quality.md`, `content/skills/spec-review.md`, `content/agents/spec-writer.md` — 체크리스트, pre-review self-check, 자체 검증 루프 source-of-truth 반영
+  - `.autopus/specs/SPEC-SPECWR-001/{spec,plan,acceptance,research}.md` — completed 상태 동기화, validator/review 기준 정렬
+  - 후속 보강: `research.md`의 `Self-Verify Summary` 관측 지점과 구조화된 `Open Issues` 스키마를 문서 규약으로 추가해 reviewer가 retry 경로를 문서 안에서 추적 가능하도록 보강
 
 - **`/auto go --team` Route B 실행 절차 공백 수정** (2026-04-18): `--team` 플래그로 실행해도 core 4명 중 lead 1명만 spawn되어 멀티에이전트 협업이 작동하지 않던 문제를 수정. 실측 증거: `~/.claude/teams/spec-waitux-001/config.json` 의 members 배열에 team-lead 1명만 등록. 근본 원인: Route B 문서가 TeamCreate 호출 주체·시점, ToolSearch 선행 의존성, 4명 병렬 spawn 규칙, members 검증 게이트, phase별 SendMessage 디스패치를 명시하지 않음
   - `templates/claude/commands/auto-router.md.tmpl` — Route B에 **Team Orchestration Procedure (B1~B5)** 신설: ToolSearch → TeamCreate → 4명 병렬 Agent() spawn → `.members | length == 4` HARD GATE → SendMessage 오케스트레이션
@@ -49,6 +72,11 @@ All notable changes to this project will be documented in this file.
   - **SendMessage 주소 교정**: phase 오케스트레이션 매핑 표의 `to="lead"` → `to="team-lead"`. Phase 1 Planning은 메인 세션이 직접 담당하므로 SendMessage 불필요
   - **Step B6: Teardown 신설**: 구조화된 `{type:"shutdown_request"}`는 **per-teammate** 발송 필수 (broadcast `to:"*"`는 plain text 전용, structured payload rejected). `TeamDelete()`는 active members 남아 있으면 실패하므로 shutdown_request 후 `sleep 8` 대기 필수
   - 수정 파일: `templates/claude/commands/auto-router.md.tmpl`, `content/skills/agent-teams.md`, `templates/codex/skills/agent-teams.md.tmpl`, `templates/gemini/skills/agent-teams/SKILL.md.tmpl`
+
+### Chore
+
+- **SPEC review 산출물 ignore 정리** (2026-04-19): review 실행이 생성하는 `review.md`, `review-findings.json`을 runtime artifact로 간주하고 git 추적 대상에서 제외
+  - `.gitignore` — `**/.autopus/specs/**/review.md`, `**/.autopus/specs/**/review-findings.json` 패턴 추가
 
 ## [v0.40.32] — 2026-04-17
 
