@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.35] — 2026-04-19
+
+### Fixed
+
+- **Release workflow bootstrap ordering** (2026-04-19): `goreleaser-action@v7`가 `cosign`이 PATH에 있을 때 GoReleaser 다운로드 자체의 sigstore bundle을 추가 검증하는데, upstream bundle 검증 실패로 `v0.40.34` release workflow가 즉시 중단되던 문제를 우회
+  - `.github/workflows/release.yaml` — action을 `install-only`로 먼저 실행해 checksum 검증만 수행하고, 이후 `cosign` 설치와 `goreleaser release --clean` 직접 실행으로 실제 checksum signing 단계만 유지하도록 순서 조정
+
 ## [v0.40.34] — 2026-04-19
 
 ### Added
