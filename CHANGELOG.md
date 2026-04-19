@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.37] — 2026-04-19
+
+### Changed
+
+- **Residual golangci-lint cleanup sweep across ADK** (2026-04-19): 남아 있던 `staticcheck`/`ineffassign`/test-style 경고를 일괄 정리해 현재 `golangci-lint run --max-issues-per-linter=0 --max-same-issues=0` 기준 0 issue 상태로 수렴
+  - `.golangci.yml`, `internal/cli/**`, `pkg/orchestra/**`, `pkg/setup/**`, `pkg/worker/**` — 빈 에러 브랜치, 비효율 할당, 루프/append 패턴, 테스트 fixture/헬퍼 표현을 정리
+  - `pkg/adapter/opencode/opencode_router_contract.go`, `pkg/content/agent_transformer_condense.go`, `internal/cli/issue_auto.go` — 더 이상 쓰이지 않는 보조 경로와 dead code를 제거
+  - 광범위한 테스트/헬퍼 파일에서 lint 친화적 표현으로 정렬해 release gate를 통과하도록 회귀 범위를 동기화
+
 ## [v0.40.36] — 2026-04-19
 
 ### Fixed
