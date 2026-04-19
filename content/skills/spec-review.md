@@ -13,8 +13,14 @@ level1_metadata: "Multi-provider review, orchestra engine, PASS/REVISE/REJECT ve
 # SPEC Review Gate Skill
 
 A review gate that validates SPEC document quality using multiple providers.
+Before Step 1, treat `content/rules/spec-quality.md` as the pre-review self-check that spec-writer should already have applied to `spec.md`, `plan.md`, `acceptance.md`, and `research.md`.
 
 ## Review Process
+
+### Step 0: spec-writer self-verify
+
+Confirm that the draft went through a first-pass self-check using `content/rules/spec-quality.md`.
+If the checklist was skipped or obviously not reflected in the draft, call that out as a completeness or style finding before continuing.
 
 ### Step 1: Load SPEC
 

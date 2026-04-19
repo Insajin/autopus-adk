@@ -25,12 +25,14 @@ func TestGenerateRuleFiles_ProducesManagedRuleSet(t *testing.T) {
 	expectedRules := []string{
 		"branding.md",
 		"context7-docs.md",
+		"deferred-tools.md",
 		"doc-storage.md",
 		"file-size-limit.md",
 		"language-policy.md",
 		"lore-commit.md",
 		"objective-reasoning.md",
 		"project-identity.md",
+		"spec-quality.md",
 		"subagent-delegation.md",
 		"worktree-safety.md",
 	}

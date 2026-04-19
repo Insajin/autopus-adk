@@ -104,9 +104,9 @@ SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니
 
 ## 시나리오
 ### S1: [시나리오명]
-- Given: [전제 조건]
-- When: [동작]
-- Then: [기대 결과]
+Given [전제 조건]
+When [동작]
+Then [기대 결과]
 ```
 
 #### research.md
@@ -121,7 +121,25 @@ SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니
 [왜 이 접근법인지, 대안 검토]
 ```
 
-### 4. 디렉토리 생성
+### 4. 자체 검증 루프
+
+작성 직후 아래 자체 검증 루프를 수행합니다.
+
+1. `content/rules/spec-quality.md`를 읽고 체크리스트 전체를 로드합니다.
+2. `spec.md`, `plan.md`, `acceptance.md`, `research.md`에 각 항목을 자연어로 적용하여 `PASS`, `FAIL`, `N/A`와 짧은 근거를 남깁니다.
+3. FAIL이 나온 경우, 해당 차원이 요구하는 모든 관련 파일을 수정합니다. 증상이 보인 파일만 고치지 말고 원인 차원 기준으로 수정합니다.
+4. `[NEW]` 마커가 붙은 planned addition은 코드 정합성 FAIL 대상에서 제외하고, 기존 참조만 실제 경로와 이름을 검증합니다.
+5. 전체 체크리스트를 최대 2회까지 다시 적용합니다.
+6. 2회 재시도 후에도 FAIL이 남으면 `spec.md` 말미에 `## Open Issues` 섹션을 추가하고 `Q-*` ID와 사유를 기록합니다.
+
+예시:
+
+```markdown
+## Open Issues
+- Q-COMP-02: acceptance.md에 REQ 추적 근거가 부족함.
+```
+
+### 5. 디렉토리 생성
 
 `{target-module}/.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/` 디렉토리를 생성하고 4개 파일을 작성합니다. target module이 auto-detect된 경우, 결정된 모듈 경로를 출력에 포함합니다.
 
@@ -137,10 +155,11 @@ SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니
 ## 품질 기준
 
 - 요구사항은 반드시 EARS 형식
-- 수락 기준은 Given-When-Then 형식
+- 수락 기준은 bare Given/When/Then 형식
 - research.md는 실제 코드 경로와 함수명 포함
 - plan.md의 태스크는 독립적으로 실행 가능한 단위
 
+- 작성 직후 `content/rules/spec-quality.md`를 기준으로 최대 2회 자체 검증 루프 수행
 ## 협업
 
 - 상위 기획은 `planner` 에이전트가 담당
