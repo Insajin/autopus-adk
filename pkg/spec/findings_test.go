@@ -173,3 +173,73 @@ func TestDeduplicateFindings_AssignsSequentialIDs(t *testing.T) {
 	assert.Equal(t, "F-001", deduped[0].ID, "first finding must be F-001")
 	assert.Equal(t, "F-002", deduped[1].ID, "second finding must be F-002")
 }
+
+// Issue #44: SummarizeFindings returns a status breakdown so CLI output can
+// show "N unique (open: x, resolved: y, out_of_scope: z)" instead of a raw count.
+
+func TestSummarizeFindings_Empty(t *testing.T) {
+	t.Parallel()
+
+	s := SummarizeFindings(nil)
+
+	assert.Equal(t, 0, s.Total)
+	assert.Equal(t, 0, s.Open)
+	assert.Equal(t, 0, s.Resolved)
+	assert.Equal(t, 0, s.Regressed)
+	assert.Equal(t, 0, s.OutOfScope)
+}
+
+func TestSummarizeFindings_CountsEachStatus(t *testing.T) {
+	t.Parallel()
+
+	findings := []ReviewFinding{
+		{ID: "F-001", Status: FindingStatusOpen},
+		{ID: "F-002", Status: FindingStatusOpen},
+		{ID: "F-003", Status: FindingStatusResolved},
+		{ID: "F-004", Status: FindingStatusRegressed},
+		{ID: "F-005", Status: FindingStatusOutOfScope},
+	}
+
+	s := SummarizeFindings(findings)
+
+	assert.Equal(t, 5, s.Total)
+	assert.Equal(t, 2, s.Open)
+	assert.Equal(t, 1, s.Resolved)
+	assert.Equal(t, 1, s.Regressed)
+	assert.Equal(t, 1, s.OutOfScope)
+}
+
+func TestSummarizeFindings_FormatIncludesBreakdown(t *testing.T) {
+	t.Parallel()
+
+	findings := []ReviewFinding{
+		{ID: "F-001", Status: FindingStatusOpen},
+		{ID: "F-002", Status: FindingStatusResolved},
+		{ID: "F-003", Status: FindingStatusResolved},
+		{ID: "F-004", Status: FindingStatusOutOfScope},
+	}
+
+	got := SummarizeFindings(findings).Format()
+
+	assert.Contains(t, got, "4 unique")
+	assert.Contains(t, got, "open: 1")
+	assert.Contains(t, got, "resolved: 2")
+	assert.Contains(t, got, "out_of_scope: 1")
+}
+
+func TestSummarizeFindings_FormatOmitsZeroBuckets(t *testing.T) {
+	t.Parallel()
+
+	findings := []ReviewFinding{
+		{ID: "F-001", Status: FindingStatusOpen},
+		{ID: "F-002", Status: FindingStatusOpen},
+	}
+
+	got := SummarizeFindings(findings).Format()
+
+	assert.Contains(t, got, "2 unique")
+	assert.Contains(t, got, "open: 2")
+	assert.NotContains(t, got, "resolved")
+	assert.NotContains(t, got, "out_of_scope")
+	assert.NotContains(t, got, "regressed")
+}

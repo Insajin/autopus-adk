@@ -133,7 +133,9 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 		fmt.Printf("SPEC 리뷰 완료: %s\n", specID)
 		fmt.Printf("판정: %s\n", finalResult.Verdict)
 		if len(finalResult.Findings) > 0 {
-			fmt.Printf("발견 사항: %d건\n", len(finalResult.Findings))
+			// Issue #44: surface status breakdown instead of raw count so operators
+			// can tell at a glance whether any findings are still open.
+			fmt.Printf("발견 사항: %s\n", spec.SummarizeFindings(finalResult.Findings).Format())
 		}
 		printChecklistSummary(finalResult.ChecklistOutcomes)
 	}
