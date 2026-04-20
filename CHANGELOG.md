@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.38] — 2026-04-21
+
 ### Added
 
 - **Worker shared host assembly and machine-readable sidecar entrypoint (SPEC-DESKTOP-003)** (2026-04-20): desktop supervision이 launch logic를 fork하지 않도록 shared host runtime과 NDJSON sidecar surface를 추가
@@ -16,6 +18,12 @@ All notable changes to this project will be documented in this file.
 - **Legacy worker start path now reuses the shared host runtime** (2026-04-20): `auto worker start`가 duplicated assembly를 버리고 compatibility shim으로 축소되고, explicit credentials path override가 desktop sidecar용 실제 auth source로 동작
   - `internal/cli/worker_start.go`, `internal/cli/worker_start_test.go` — start command를 shared runtime shim으로 정리하고 기존 local resolver 테스트를 host package로 이동
   - `pkg/worker/setup/{apikey.go,status.go,credentials_override.go,apikey_coverage_test.go}` — `LoadAPIKeyFromPath`, `LoadAuthTokenFromPath`, path-backed CredentialStore, custom credentials path coverage 추가
+
+### Fixed
+
+- **Worker setup device auth now honors deadline boundaries** (2026-04-21): Windows에서 `auto worker setup` 승인 직후 polling deadline 경계에 걸리면 stale token 요청이 한 번 더 나가 backend의 `expired_token`을 그대로 surfacing하던 문제를 수정
+  - `pkg/worker/setup/auth.go` — poll interval 대기를 context-aware `select`로 바꾸고 token exchange HTTP request에 context를 전달해 deadline 이후 추가 poll과 hanging request를 차단
+  - `pkg/worker/setup/auth_device_test.go`, `pkg/worker/setup/auth_deadline_test.go` — 새 context-aware exchange signature 반영 및 deadline 경계 회귀 테스트 2건 추가
 
 ## [v0.40.37] — 2026-04-19
 
