@@ -119,6 +119,8 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-setup.md"], "ARCHITECTURE.md")
 	assert.Contains(t, byName["auto-plan.md"], "auto spec review {SPEC-ID}")
 	assert.Contains(t, byName["auto-go.md"], "draft")
+	assert.Contains(t, byName["auto-go.md"], "## Review Gate Resolution")
+	assert.Contains(t, byName["auto-go.md"], "spec.review_gate.enabled")
 	assert.Contains(t, byName["auto-go.md"], "max_revisions")
 	assert.Contains(t, byName["auto-go.md"], "approved")
 	assert.Contains(t, byName["auto-go.md"], "재귀 호출")

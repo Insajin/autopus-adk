@@ -95,6 +95,8 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	assert.Contains(t, string(autoGoSkill), "SPEC Path Resolution")
 	assert.Contains(t, string(autoGoSkill), "{SPEC_PATH}")
 	assert.Contains(t, string(autoGoSkill), "WORKING_DIR")
+	assert.Contains(t, string(autoGoSkill), "autopus.yaml")
+	assert.Contains(t, string(autoGoSkill), "spec.review_gate.enabled")
 	assert.Contains(t, string(autoGoSkill), "max_revisions")
 	assert.Contains(t, string(autoGoSkill), "approved")
 	assert.Contains(t, string(autoGoSkill), "재귀 auto-chain")

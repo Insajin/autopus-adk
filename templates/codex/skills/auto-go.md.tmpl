@@ -82,6 +82,10 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 ### Step 2: SPEC 로드
 
 - 해석된 `SPEC_PATH`와 `SPEC_DIR`를 기준으로 `spec.md`, `plan.md`, `acceptance.md`를 읽습니다.
+- review gate 활성화 여부는 `spec.md` 본문에서 추론하지 말고 `autopus.yaml`에서 명시적으로 판정합니다.
+  - 조회 우선순위: `WORKING_DIR/autopus.yaml` → workspace root `autopus.yaml`
+  - 판정 키: `spec.review_gate.enabled`
+  - `review-findings.json` 부재만으로 review gate 비활성으로 간주하지 않습니다.
 - SPEC 상태가 `draft`이고 `review_gate`가 활성화돼 있으면 다음 규칙을 적용합니다.
   - `--auto` 없음: 구현을 진행하지 않고 `/auto spec review {SPEC-ID}` 를 먼저 안내한 뒤 중단합니다.
   - `--auto` 있음: `auto spec review {SPEC-ID}` 를 한 번 트리거하고 `spec.md` 상태를 다시 읽습니다.
