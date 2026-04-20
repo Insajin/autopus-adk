@@ -106,7 +106,7 @@ func TestTryTokenExchange_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	token, status, err := tryTokenExchange(srv.URL, "dev-code", "verifier")
+	token, status, err := tryTokenExchange(context.Background(), srv.URL, "dev-code", "verifier")
 	require.NoError(t, err)
 	assert.Equal(t, pollDone, status)
 	assert.Equal(t, "new-tok", token.AccessToken)
@@ -121,7 +121,7 @@ func TestTryTokenExchange_Pending(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	token, status, err := tryTokenExchange(srv.URL, "dev-code", "verifier")
+	token, status, err := tryTokenExchange(context.Background(), srv.URL, "dev-code", "verifier")
 	require.NoError(t, err)
 	assert.Equal(t, pollPending, status)
 	assert.Nil(t, token)
@@ -136,7 +136,7 @@ func TestTryTokenExchange_SlowDown(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	token, status, err := tryTokenExchange(srv.URL, "dev-code", "verifier")
+	token, status, err := tryTokenExchange(context.Background(), srv.URL, "dev-code", "verifier")
 	require.NoError(t, err)
 	assert.Equal(t, pollSlowDown, status)
 	assert.Nil(t, token)
@@ -151,7 +151,7 @@ func TestTryTokenExchange_ServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := tryTokenExchange(srv.URL, "dev-code", "verifier")
+	_, _, err := tryTokenExchange(context.Background(), srv.URL, "dev-code", "verifier")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "500")
 }
@@ -165,7 +165,7 @@ func TestTryTokenExchange_WrappedResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	token, status, err := tryTokenExchange(srv.URL, "dev-code", "verifier")
+	token, status, err := tryTokenExchange(context.Background(), srv.URL, "dev-code", "verifier")
 	require.NoError(t, err)
 	assert.Equal(t, pollDone, status)
 	assert.Equal(t, "wrapped-tok", token.AccessToken)
@@ -180,7 +180,7 @@ func TestTryTokenExchange_BadRequestUnknownError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := tryTokenExchange(srv.URL, "dev-code", "verifier")
+	_, _, err := tryTokenExchange(context.Background(), srv.URL, "dev-code", "verifier")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "400")
 }

@@ -129,12 +129,10 @@ func PollForToken(ctx context.Context, backendURL, deviceCode, codeVerifier stri
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		default:
+		case <-time.After(time.Duration(interval) * time.Second):
 		}
 
-		time.Sleep(time.Duration(interval) * time.Second)
-
-		token, status, err := tryTokenExchange(endpoint, deviceCode, codeVerifier)
+		token, status, err := tryTokenExchange(ctx, endpoint, deviceCode, codeVerifier)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +157,7 @@ const (
 )
 
 // tryTokenExchange attempts a single token exchange request.
-func tryTokenExchange(endpoint, deviceCode, codeVerifier string) (*TokenResponse, pollStatus, error) {
+func tryTokenExchange(ctx context.Context, endpoint, deviceCode, codeVerifier string) (*TokenResponse, pollStatus, error) {
 	payload := map[string]string{
 		"device_code":   deviceCode,
 		"code_verifier": codeVerifier,
@@ -169,8 +167,17 @@ func tryTokenExchange(endpoint, deviceCode, codeVerifier string) (*TokenResponse
 		return nil, pollDone, fmt.Errorf("marshal token request: %w", err)
 	}
 
-	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
+		return nil, pollDone, fmt.Errorf("create token request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, pollDone, ctx.Err()
+		}
 		return nil, pollDone, fmt.Errorf("poll token: %w", err)
 	}
 	defer resp.Body.Close()
