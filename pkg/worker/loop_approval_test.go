@@ -29,6 +29,27 @@ func TestHandleApproval_NoTUIProgram(t *testing.T) {
 	})
 }
 
+func TestHandleApproval_NotifiesObserver(t *testing.T) {
+	t.Parallel()
+
+	events := make([]HostEvent, 0, 1)
+	wl := &WorkerLoop{}
+	wl.AddHostObserver(HostObserverFunc(func(event HostEvent) {
+		events = append(events, event)
+	}))
+
+	wl.handleApproval(a2a.ApprovalRequestParams{
+		TaskID:    "task-1",
+		Action:    "deploy",
+		RiskLevel: "high",
+		Context:   "prod",
+	})
+
+	require.Len(t, events, 1)
+	assert.Equal(t, HostEventApprovalRequested, events[0].Type)
+	assert.Equal(t, "task-1", events[0].TaskID)
+}
+
 func TestSetOnApprovalDecision_ReturnsCallback(t *testing.T) {
 	t.Parallel()
 	wl := &WorkerLoop{}

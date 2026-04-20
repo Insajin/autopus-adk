@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Worker shared host assembly and machine-readable sidecar entrypoint (SPEC-DESKTOP-003)** (2026-04-20): desktop supervision이 launch logic를 fork하지 않도록 shared host runtime과 NDJSON sidecar surface를 추가
+  - `internal/cli/worker_sidecar.go`, `internal/cli/worker_commands.go` — `auto worker sidecar` command 등록 및 machine-oriented help surface 추가
+  - `pkg/worker/host/{errors.go,resolve.go,runtime.go,sidecar.go,resolve_test.go}` — typed host input, resolved runtime config, structured host errors, sidecar protocol/event contract 구현
+  - `pkg/worker/host_observer.go`, `pkg/worker/{loop.go,loop_runtime.go,loop_task.go,loop_subprocess.go,loop_lifecycle.go,loop_approval_test.go}` — runtime/task/approval observer bridge와 degraded/progress/completion signal wiring 추가
+
+### Changed
+
+- **Legacy worker start path now reuses the shared host runtime** (2026-04-20): `auto worker start`가 duplicated assembly를 버리고 compatibility shim으로 축소되고, explicit credentials path override가 desktop sidecar용 실제 auth source로 동작
+  - `internal/cli/worker_start.go`, `internal/cli/worker_start_test.go` — start command를 shared runtime shim으로 정리하고 기존 local resolver 테스트를 host package로 이동
+  - `pkg/worker/setup/{apikey.go,status.go,credentials_override.go,apikey_coverage_test.go}` — `LoadAPIKeyFromPath`, `LoadAuthTokenFromPath`, path-backed CredentialStore, custom credentials path coverage 추가
+
 ## [v0.40.37] — 2026-04-19
 
 ### Changed

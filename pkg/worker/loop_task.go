@@ -35,10 +35,20 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	log.Printf("[worker] received task: %s", taskID)
 	defer cleanupPolicy(taskID)
 
+	failTask := func(err error) (*a2a.TaskResult, error) {
+		wl.emitHostEvent(HostEvent{
+			Type:    HostEventTaskFailed,
+			TaskID:  taskID,
+			Message: "task execution failed",
+		})
+		return nil, err
+	}
+
 	var msg taskPayloadMessage
 	if err := json.Unmarshal(payload, &msg); err != nil {
-		return nil, fmt.Errorf("parse task payload: %w", err)
+		return failTask(fmt.Errorf("parse task payload: %w", err))
 	}
+	wl.emitHostEvent(HostEvent{Type: HostEventTaskReceived, TaskID: taskID})
 
 	descriptionSeed := strings.TrimSpace(msg.Description)
 	if descriptionSeed == "" {
@@ -84,15 +94,15 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 
 	phasePlan, err := ParsePhasePlan(msg.PipelinePhases)
 	if err != nil {
-		return nil, fmt.Errorf("parse pipeline phases: %w", err)
+		return failTask(fmt.Errorf("parse pipeline phases: %w", err))
 	}
 	phaseInstructions, err := ParsePhaseInstructions(msg.PipelineInstructions)
 	if err != nil {
-		return nil, fmt.Errorf("parse pipeline instructions: %w", err)
+		return failTask(fmt.Errorf("parse pipeline instructions: %w", err))
 	}
 	phasePromptTemplates, err := ParsePhasePromptTemplates(msg.PipelinePromptTemplates)
 	if err != nil {
-		return nil, fmt.Errorf("parse pipeline prompt templates: %w", err)
+		return failTask(fmt.Errorf("parse pipeline prompt templates: %w", err))
 	}
 
 	var result adapter.TaskResult
@@ -103,11 +113,17 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	}
 	if err != nil {
 		log.Printf("[worker] task %s failed: %v", taskID, err)
-		return nil, err
+		return failTask(err)
 	}
 
 	log.Printf("[worker] task %s completed: cost=$%.4f duration=%dms", taskID, result.CostUSD, result.DurationMS)
 	result.Artifacts = ensureOutputArtifact(result.Output, result.Artifacts)
+	wl.emitHostEvent(HostEvent{
+		Type:       HostEventTaskCompleted,
+		TaskID:     taskID,
+		CostUSD:    result.CostUSD,
+		DurationMS: result.DurationMS,
+	})
 
 	if wl.memorySearcher != nil && memoryAgentID != "" && result.Output != "" {
 		go func() {

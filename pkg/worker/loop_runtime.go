@@ -71,20 +71,40 @@ func cleanupPolicy(taskID string) {
 // SetTUIProgram registers the bubbletea program for sending approval messages.
 func (wl *WorkerLoop) SetTUIProgram(p *tea.Program) {
 	wl.tuiProgram = p
+	if p != nil {
+		wl.AddHostObserver(newTUIObserver(p))
+	}
 }
 
-// handleApproval forwards an approval request from A2A to the TUI.
+func newTUIObserver(p *tea.Program) HostObserver {
+	return HostObserverFunc(func(event HostEvent) {
+		switch event.Type {
+		case HostEventApprovalRequested:
+			p.Send(tui.ApprovalRequestMsg{
+				TaskID:    event.TaskID,
+				Action:    event.Action,
+				RiskLevel: event.RiskLevel,
+				Context:   event.Context,
+			})
+		case HostEventTaskProgress:
+			p.Send(tui.TaskProgressMsg{Phase: event.Phase})
+		}
+	})
+}
+
+// handleApproval forwards an approval request from A2A to the host observer bridge.
 func (wl *WorkerLoop) handleApproval(params a2a.ApprovalRequestParams) {
-	if wl.tuiProgram == nil {
-		log.Printf("[worker] approval request but no TUI program registered")
-		return
-	}
-	wl.tuiProgram.Send(tui.ApprovalRequestMsg{
+	wl.emitHostEvent(HostEvent{
+		Type:      HostEventApprovalRequested,
 		TaskID:    params.TaskID,
 		Action:    params.Action,
 		RiskLevel: params.RiskLevel,
 		Context:   params.Context,
 	})
+	if !wl.hasHostObservers() {
+		log.Printf("[worker] approval request but no host observer registered")
+		return
+	}
 }
 
 // SetOnApprovalDecision returns a callback that sends approval decisions to the backend.
@@ -92,7 +112,13 @@ func (wl *WorkerLoop) SetOnApprovalDecision() func(taskID, decision string) {
 	return func(taskID, decision string) {
 		if err := wl.server.SendApprovalResponse(taskID, decision); err != nil {
 			log.Printf("[worker] send approval response error: %v", err)
+			return
 		}
+		wl.emitHostEvent(HostEvent{
+			Type:    HostEventApprovalResolved,
+			TaskID:  taskID,
+			Message: decision,
+		})
 	}
 }
 

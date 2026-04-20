@@ -18,10 +18,11 @@ import (
 )
 
 // addWorkerSubcommands registers all worker subcommands on the parent command.
-// @AX:ANCHOR[AUTO]: CLI command registration boundary — all worker subcommands are wired here; adding/removing commands requires updating this function
+// @AX:NOTE[AUTO]: [downgraded from ANCHOR — fan_in < 3] CLI command registration boundary — worker_validate.go is the sole production caller; update this function when worker commands change
 func addWorkerSubcommands(parent *cobra.Command) {
 	parent.AddCommand(
 		newWorkerStartCmd(),
+		newWorkerSidecarCmd(),
 		newWorkerStopCmd(),
 		newWorkerStatusCmd(),
 		newWorkerLogsCmd(),

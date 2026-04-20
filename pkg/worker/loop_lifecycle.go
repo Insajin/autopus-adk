@@ -180,4 +180,8 @@ func (wl *WorkerLoop) stopServices() {
 // The actual poller lifecycle is managed by a2a.Server.messageLoop.
 func (wl *WorkerLoop) activateFallbackPoller() {
 	log.Printf("[worker] activating A2A REST fallback poller")
+	wl.emitHostEvent(HostEvent{
+		Type:    HostEventRuntimeDegraded,
+		Message: "A2A REST fallback poller activated",
+	})
 }

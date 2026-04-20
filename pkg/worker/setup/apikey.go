@@ -21,7 +21,13 @@ func SaveAPIKeyCredentials(apiKey, backendURL string) error {
 // LoadAPIKey reads the stored Worker API Key from credentials.json.
 // Returns ("", nil) if no API key is configured.
 func LoadAPIKey() (string, error) {
-	creds, err := loadRawCredentials()
+	return LoadAPIKeyFromPath("")
+}
+
+// LoadAPIKeyFromPath reads the stored Worker API Key from an explicit credentials path.
+// Returns ("", nil) if no API key is configured.
+func LoadAPIKeyFromPath(path string) (string, error) {
+	creds, err := loadRawCredentialsFromPath(path)
 	if err != nil {
 		return "", nil // missing file → no key configured
 	}
@@ -38,7 +44,13 @@ func LoadAPIKey() (string, error) {
 //
 // Returns ("", nil) if no credentials are configured.
 func LoadAuthToken() (string, error) {
-	creds, err := loadRawCredentials()
+	return LoadAuthTokenFromPath("")
+}
+
+// LoadAuthTokenFromPath returns the bearer token from an explicit credentials path.
+// When path is empty, it uses the default secure/default-path lookup chain.
+func LoadAuthTokenFromPath(path string) (string, error) {
+	creds, err := loadRawCredentialsFromPath(path)
 	if err != nil {
 		return "", nil
 	}

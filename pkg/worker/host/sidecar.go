@@ -1,0 +1,209 @@
+package host
+
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"sync"
+	"time"
+
+	worker "github.com/insajin/autopus-adk/pkg/worker"
+)
+
+const (
+	SidecarProtocolName    = "autopus-worker-sidecar"
+	SidecarProtocolVersion = "v1"
+	ContractName           = "desktop-worker-runtime-contract"
+	ContractMajor          = "v1"
+)
+
+// Event is a machine-readable sidecar NDJSON envelope.
+type Event struct {
+	Protocol        string         `json:"protocol"`
+	ProtocolVersion string         `json:"protocol_version"`
+	Contract        string         `json:"contract"`
+	ContractMajor   string         `json:"contract_major"`
+	Event           string         `json:"event"`
+	Timestamp       time.Time      `json:"timestamp"`
+	RuntimeID       string         `json:"runtime_id,omitempty"`
+	WorkspaceID     string         `json:"workspace_id,omitempty"`
+	Provider        string         `json:"provider,omitempty"`
+	TaskID          string         `json:"task_id,omitempty"`
+	Phase           string         `json:"phase,omitempty"`
+	Message         string         `json:"message,omitempty"`
+	Metrics         *EventMetrics  `json:"metrics,omitempty"`
+	Approval        *ApprovalState `json:"approval,omitempty"`
+	Error           *ErrorPayload  `json:"error,omitempty"`
+}
+
+// EventMetrics carries non-sensitive task metrics.
+type EventMetrics struct {
+	CostUSD    float64 `json:"cost_usd,omitempty"`
+	DurationMS int64   `json:"duration_ms,omitempty"`
+}
+
+// ApprovalState carries approval gate metadata without secrets.
+type ApprovalState struct {
+	Action     string `json:"action,omitempty"`
+	RiskLevel  string `json:"risk_level,omitempty"`
+	Context    string `json:"context,omitempty"`
+	Resolution string `json:"resolution,omitempty"`
+}
+
+// ErrorPayload is the machine-readable error contract for sidecar events.
+type ErrorPayload struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// NDJSONEmitter writes contract events to a line-delimited JSON stream.
+type NDJSONEmitter struct {
+	mu  sync.Mutex
+	enc *json.Encoder
+}
+
+// NewNDJSONEmitter creates a new sidecar NDJSON emitter.
+func NewNDJSONEmitter(w io.Writer) *NDJSONEmitter {
+	return &NDJSONEmitter{enc: json.NewEncoder(w)}
+}
+
+// Emit writes a single sidecar event envelope.
+func (e *NDJSONEmitter) Emit(event Event) error {
+	event.Protocol = SidecarProtocolName
+	event.ProtocolVersion = SidecarProtocolVersion
+	event.Contract = ContractName
+	event.ContractMajor = ContractMajor
+	if event.Timestamp.IsZero() {
+		event.Timestamp = time.Now().UTC()
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.enc.Encode(event)
+}
+
+// Observer adapts worker host events into contract events.
+func (e *NDJSONEmitter) Observer(cfg RuntimeConfig) worker.HostObserver {
+	return worker.HostObserverFunc(func(hostEvent worker.HostEvent) {
+		_ = e.Emit(eventFromHostEvent(cfg, hostEvent))
+	})
+}
+
+// RunSidecar launches the shared host assembly and exposes runtime events as NDJSON.
+func RunSidecar(ctx context.Context, input Input, output io.Writer) error {
+	emitter := NewNDJSONEmitter(output)
+	_ = emitter.Emit(Event{
+		Event:   "runtime.starting",
+		Message: "resolving shared worker host assembly",
+	})
+
+	runtime, err := NewRuntime(input)
+	if err != nil {
+		_ = emitter.Emit(Event{
+			Event:   "runtime.stopped",
+			Message: "worker host assembly failed before startup",
+			Error:   errorPayload(err, "runtime_start_failed", "worker host assembly failed"),
+		})
+		return err
+	}
+
+	cfg := runtime.Config()
+	runtime.AddObserver(emitter.Observer(cfg))
+	if err := runtime.Start(ctx); err != nil {
+		_ = emitter.Emit(Event{
+			Event:       "runtime.stopped",
+			RuntimeID:   cfg.WorkerName,
+			WorkspaceID: cfg.WorkspaceID,
+			Provider:    cfg.ProviderName,
+			Message:     "worker loop failed to start",
+			Error:       errorPayload(err, "runtime_start_failed", "worker loop failed to start"),
+		})
+		return err
+	}
+
+	_ = emitter.Emit(Event{
+		Event:       "runtime.ready",
+		RuntimeID:   cfg.WorkerName,
+		WorkspaceID: cfg.WorkspaceID,
+		Provider:    cfg.ProviderName,
+		Message:     "worker loop is ready for supervision",
+	})
+
+	<-ctx.Done()
+	stopErr := runtime.Close()
+	stoppedEvent := Event{
+		Event:       "runtime.stopped",
+		RuntimeID:   cfg.WorkerName,
+		WorkspaceID: cfg.WorkspaceID,
+		Provider:    cfg.ProviderName,
+		Message:     "worker loop stopped",
+	}
+	if stopErr != nil {
+		stoppedEvent.Message = "worker loop stopped with error"
+		stoppedEvent.Error = errorPayload(stopErr, "runtime_stop_failed", "worker loop failed to stop cleanly")
+	}
+	_ = emitter.Emit(stoppedEvent)
+	return stopErr
+}
+
+func eventFromHostEvent(cfg RuntimeConfig, hostEvent worker.HostEvent) Event {
+	event := Event{
+		RuntimeID:   cfg.WorkerName,
+		WorkspaceID: cfg.WorkspaceID,
+		Provider:    cfg.ProviderName,
+		TaskID:      hostEvent.TaskID,
+		Phase:       hostEvent.Phase,
+		Message:     hostEvent.Message,
+	}
+
+	switch hostEvent.Type {
+	case worker.HostEventRuntimeDegraded:
+		event.Event = "runtime.degraded"
+	case worker.HostEventTaskReceived:
+		event.Event = "task.accepted"
+	case worker.HostEventTaskProgress:
+		event.Event = "task.progress"
+	case worker.HostEventApprovalRequested:
+		event.Event = "task.approval_requested"
+		event.Approval = &ApprovalState{
+			Action:    hostEvent.Action,
+			RiskLevel: hostEvent.RiskLevel,
+			Context:   hostEvent.Context,
+		}
+	case worker.HostEventApprovalResolved:
+		event.Event = "task.approval_resolved"
+		event.Approval = &ApprovalState{Resolution: hostEvent.Message}
+	case worker.HostEventTaskCompleted:
+		event.Event = "task.completed"
+		event.Metrics = &EventMetrics{
+			CostUSD:    hostEvent.CostUSD,
+			DurationMS: hostEvent.DurationMS,
+		}
+	case worker.HostEventTaskFailed:
+		event.Event = "task.failed"
+		event.Error = &ErrorPayload{
+			Code:    "task_failed",
+			Message: coalesceMessage(hostEvent.Message, "task execution failed"),
+		}
+	default:
+		event.Event = "task.progress"
+	}
+
+	return event
+}
+
+func errorPayload(err error, fallbackCode, fallbackMessage string) *ErrorPayload {
+	if hostErr := AsError(err); hostErr != nil {
+		return &ErrorPayload{
+			Code:    string(hostErr.Code),
+			Message: hostErr.Message,
+		}
+	}
+	return &ErrorPayload{Code: fallbackCode, Message: fallbackMessage}
+}
+
+func coalesceMessage(message, fallback string) string {
+	if message != "" {
+		return message
+	}
+	return fallback
+}

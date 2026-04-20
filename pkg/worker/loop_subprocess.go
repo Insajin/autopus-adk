@@ -183,16 +183,46 @@ func (wl *WorkerLoop) parseStreamWithBudget(r io.Reader, taskID string, sw *Stdi
 		switch {
 		case adapterEvt.Type == "system" && adapterEvt.Subtype == "init":
 			log.Printf("[worker] task %s: subprocess initialized", taskID)
+			wl.emitHostEvent(HostEvent{
+				Type:    HostEventTaskProgress,
+				TaskID:  taskID,
+				Phase:   "init",
+				Message: "subprocess initialized",
+			})
 		case adapterEvt.Type == "system" && adapterEvt.Subtype == "task_started":
 			log.Printf("[worker] task %s: subagent started", taskID)
+			wl.emitHostEvent(HostEvent{
+				Type:    HostEventTaskProgress,
+				TaskID:  taskID,
+				Phase:   "execute",
+				Message: "subagent started",
+			})
 		case adapterEvt.Type == "system" && adapterEvt.Subtype == "task_progress":
 			log.Printf("[worker] task %s: progress update", taskID)
+			wl.emitHostEvent(HostEvent{
+				Type:    HostEventTaskProgress,
+				TaskID:  taskID,
+				Phase:   "execute",
+				Message: "progress update",
+			})
 		case adapterEvt.Type == "system" && adapterEvt.Subtype == "task_notification":
 			log.Printf("[worker] task %s: subagent notification", taskID)
+			wl.emitHostEvent(HostEvent{
+				Type:    HostEventTaskProgress,
+				TaskID:  taskID,
+				Phase:   "execute",
+				Message: "task notification",
+			})
 		case adapterEvt.Type == stream.EventToolCall || adapterEvt.Type == "tool_use":
 			if counter != nil {
 				r := counter.Increment()
 				log.Printf("[worker] task %s: tool call %d/%d", taskID, r.Count, r.Budget.Limit)
+				wl.emitHostEvent(HostEvent{
+					Type:    HostEventTaskProgress,
+					TaskID:  taskID,
+					Phase:   "budget",
+					Message: "tool call",
+				})
 				if injector != nil {
 					injector.Inject(r)
 				}

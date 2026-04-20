@@ -104,6 +104,30 @@ func TestLoadAuthToken_Empty(t *testing.T) {
 	assert.Empty(t, token)
 }
 
+func TestLoadAuthTokenFromPath_CustomFile(t *testing.T) {
+	t.Parallel()
+
+	customPath := filepath.Join(t.TempDir(), "desktop", "credentials.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(customPath), 0o700))
+	require.NoError(t, os.WriteFile(customPath, []byte(`{"auth_type":"jwt","access_token":"desktop-token"}`), 0o600))
+
+	token, err := LoadAuthTokenFromPath(customPath)
+	require.NoError(t, err)
+	assert.Equal(t, "desktop-token", token)
+}
+
+func TestLoadAPIKeyFromPath_CustomFile(t *testing.T) {
+	t.Parallel()
+
+	customPath := filepath.Join(t.TempDir(), "desktop", "credentials.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(customPath), 0o700))
+	require.NoError(t, os.WriteFile(customPath, []byte(`{"auth_type":"api_key","api_key":"desktop-api-key"}`), 0o600))
+
+	key, err := LoadAPIKeyFromPath(customPath)
+	require.NoError(t, err)
+	assert.Equal(t, "desktop-api-key", key)
+}
+
 // TestSaveAPIKeyCredentials_WritesFile verifies SaveAPIKeyCredentials writes creds.
 func TestSaveAPIKeyCredentials_WritesFile(t *testing.T) {
 	withLegacyCredentialStore(t)

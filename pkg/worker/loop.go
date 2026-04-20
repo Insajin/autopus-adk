@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -50,6 +51,8 @@ type WorkerLoop struct {
 	server            *a2a.Server
 	builder           ContextBuilder
 	tuiProgram        *tea.Program
+	observerMu        sync.RWMutex
+	hostObservers     []HostObserver
 	authRefresher     *auth.TokenRefresher
 	authReconnector   *auth.Reconnector
 	netMonitor        *workerNet.NetMonitor

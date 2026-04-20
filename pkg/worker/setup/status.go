@@ -2,7 +2,6 @@ package setup
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,15 +43,7 @@ func DefaultCredentialsPath() string {
 
 // loadRawCredentials reads and parses credentials.json without strict type constraints.
 func loadRawCredentials() (*rawCredentials, error) {
-	data, err := loadCredentialBytes()
-	if err != nil {
-		return nil, err
-	}
-	var creds rawCredentials
-	if err := json.Unmarshal(data, &creds); err != nil {
-		return nil, err
-	}
-	return &creds, nil
+	return loadRawCredentialsFromPath("")
 }
 
 // checkAuthValidity determines auth_valid and auth_type from credentials.

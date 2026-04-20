@@ -6,130 +6,38 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
-	worker "github.com/insajin/autopus-adk/pkg/worker"
-	"github.com/insajin/autopus-adk/pkg/worker/adapter"
-	"github.com/insajin/autopus-adk/pkg/worker/setup"
+	"github.com/insajin/autopus-adk/pkg/worker/host"
 )
 
-// runWorkerForeground loads config and credentials, then starts the WorkerLoop.
-// It blocks until SIGINT/SIGTERM or the context is cancelled.
+// runWorkerForeground resolves the shared host assembly and blocks until shutdown.
 func runWorkerForeground() error {
-	cfg, err := setup.LoadWorkerConfig()
+	runtime, err := host.NewRuntime(host.Input{})
 	if err != nil {
-		return fmt.Errorf("load worker config: %w (run 'auto worker setup' first)", err)
-	}
-	credStore, warn := setup.NewCredentialStore()
-	if warn != "" {
-		log.Printf("[worker] credential store warning: %s", warn)
+		return err
 	}
 
-	// LoadAuthToken reads the correct token based on auth_type
-	// (legacy api_key → Worker API Key, jwt → access_token).
-	authToken, err := setup.LoadAuthToken()
-	if err != nil {
-		return fmt.Errorf("load auth token: %w", err)
+	cfg := runtime.Config()
+	for _, warning := range cfg.Warnings {
+		log.Printf("[worker] credential store warning: %s", warning)
 	}
-	if authToken == "" {
-		return fmt.Errorf("no auth credentials found (run 'auto worker setup' first)")
-	}
-
-	// Resolve provider adapter from config.
-	providerName := resolveProvider(cfg.Providers)
-	if providerName == "" {
-		return fmt.Errorf("no provider configured (run 'auto worker setup' to detect providers)")
-	}
-	provider, err := resolveProviderAdapter(providerName)
-	if err != nil {
-		return fmt.Errorf("provider %q: %w", providerName, err)
-	}
-
 	log.Printf("[worker] starting: provider=%s workspace=%s backend=%s",
-		providerName, cfg.WorkspaceID, cfg.BackendURL)
-	effectiveConcurrency := effectiveWorkerConcurrency(providerName, cfg.Concurrency)
-	if effectiveConcurrency != cfg.Concurrency {
+		cfg.ProviderName, cfg.WorkspaceID, cfg.BackendURL)
+	if cfg.MaxConcurrency != cfg.RequestedConcurrency {
 		log.Printf("[worker] provider=%s clamps concurrency from %d to %d for stable task execution",
-			providerName, cfg.Concurrency, effectiveConcurrency)
+			cfg.ProviderName, cfg.RequestedConcurrency, cfg.MaxConcurrency)
 	}
-
-	workDir := cfg.WorkDir
-	if workDir == "" {
-		workDir = "."
-	}
-
-	loopCfg := worker.LoopConfig{
-		BackendURL:        cfg.BackendURL,
-		WorkerName:        fmt.Sprintf("adk-worker-%s", providerName),
-		MemoryAgentID:     cfg.MemoryAgentID,
-		Skills:            []string{"coding", "review"},
-		Provider:          provider,
-		MCPConfig:         setup.DefaultMCPConfigPath(),
-		WorkDir:           workDir,
-		AuthToken:         authToken,
-		CredentialsPath:   setup.DefaultCredentialsPath(),
-		CredentialStore:   credStore,
-		WorkspaceID:       cfg.WorkspaceID,
-		MaxConcurrency:    effectiveConcurrency,
-		WorktreeIsolation: cfg.WorktreeIsolation || effectiveConcurrency > 1,
-		KnowledgeSync:     true, // enable backend knowledge context when WorkspaceID is set
-		KnowledgeDir:      cfg.KnowledgeDir,
-	}
-
-	wl := worker.NewWorkerLoop(loopCfg)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	if err := wl.Start(ctx); err != nil {
+	if err := runtime.Start(ctx); err != nil {
 		return fmt.Errorf("worker start: %w", err)
 	}
 
 	<-ctx.Done()
 	log.Println("[worker] shutting down...")
-	_ = wl.Close()
+	_ = runtime.Close()
 	return nil
-}
-
-// resolveProvider picks the first available provider from config.
-func resolveProvider(providers []string) string {
-	for _, name := range providers {
-		if authenticated, _ := setup.CheckProviderAuth(name); authenticated {
-			return name
-		}
-	}
-	if len(providers) > 0 {
-		return providers[0]
-	}
-	// Fallback: detect installed providers.
-	for _, p := range setup.DetectProviders() {
-		if p.Installed {
-			if authenticated, _ := setup.CheckProviderAuth(p.Name); authenticated {
-				return p.Name
-			}
-		}
-	}
-	for _, p := range setup.DetectProviders() {
-		if p.Installed {
-			return p.Name
-		}
-	}
-	return ""
-}
-
-// resolveProviderAdapter creates a ProviderAdapter for the given name.
-func resolveProviderAdapter(name string) (adapter.ProviderAdapter, error) {
-	reg := adapter.NewRegistry()
-	reg.Register(&adapter.ClaudeAdapter{})
-	reg.Register(&adapter.CodexAdapter{})
-	reg.Register(&adapter.GeminiAdapter{})
-	return reg.Get(name)
-}
-
-func effectiveWorkerConcurrency(providerName string, requested int) int {
-	if strings.EqualFold(providerName, "codex") && requested > 1 {
-		return 1
-	}
-	return requested
 }
