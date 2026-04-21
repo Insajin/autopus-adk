@@ -46,6 +46,15 @@ func renderIndex(info *ProjectInfo) string {
 		b.WriteString("\n")
 	}
 
+	if info.MultiRepo != nil && info.MultiRepo.IsMultiRepo {
+		b.WriteString("## Repositories\n\n")
+		fmt.Fprintf(&b, "This is a **multi-repo** workspace with %d repositories:\n\n", len(info.MultiRepo.Components))
+		for _, component := range info.MultiRepo.Components {
+			fmt.Fprintf(&b, "- `%s/` — %s (%s)\n", component.Path, component.Name, component.Role)
+		}
+		b.WriteString("\n")
+	}
+
 	b.WriteString("## Documentation\n\n")
 	b.WriteString("- [Commands](commands.md) — Build, test, lint commands\n")
 	b.WriteString("- [Structure](structure.md) — Directory structure and roles\n")
@@ -145,6 +154,11 @@ func renderStructure(info *ProjectInfo) string {
 				b.WriteString(fmt.Sprintf("  - **%s/** — %s\n", child.Name, child.Description))
 			}
 		}
+	}
+
+	if info.MultiRepo != nil && info.MultiRepo.IsMultiRepo {
+		b.WriteString("\n")
+		b.WriteString(renderRepoBoundaries(info.MultiRepo))
 	}
 
 	return truncateLines(b.String(), maxDocLines)

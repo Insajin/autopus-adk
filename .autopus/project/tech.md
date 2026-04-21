@@ -77,6 +77,7 @@
 | Marker Update | `pkg/adapter/manifest.go` | AUTOPUS:BEGIN/END 부분 업데이트 |
 | Modular Adapter | `pkg/adapter/claude/claude_*.go` | 관심사별 4파일 분리 (orchestration/files/markers/settings) |
 | Auto-Detection | `pkg/content/hooks.go` | 프로젝트 타입 기반 permissions 자동 감지 (go.mod/package.json) |
+| Workspace Topology | `pkg/setup/{workspace.go,multirepo*.go}` | 모노레포/멀티레포 topology 감지, repo boundary/의존성 그래프 구성 |
 | Skill Activator | `pkg/content/activator.go` | 트리거 기반 스킬 자동 활성화 (키워드/정규식 매칭) |
 | SigMap | `pkg/sigmap/extractor.go` | go/ast 기반 exported API 시그니처 추출 |
 | Constraint | `pkg/constraint/checker.go` | 안티패턴 레지스트리 기반 위반 스캔 |
@@ -84,7 +85,7 @@
 | Cost Estimator | `pkg/cost/estimator.go` | 토큰 기반 비용 추정 (3:1 분할) |
 | Experiment Loop | `pkg/experiment/` | 스킬 오케스트레이션 + CLI 유틸리티 분리 (메트릭 실행, git 상태 관리, circuit breaker) |
 | Worktree Isolation | `content/skills/worktree-isolation.md` | 병렬 executor 워크트리 격리, Phase 2.1 배치 머지 |
-| E2E Scenarios | `pkg/e2e/` | 시나리오 기반 E2E 테스트 생성/실행/검증 (Cobra 추출, 검증 프리미티브, 증분 동기화) |
+| E2E Scenarios | `pkg/e2e/` + `pkg/setup/scenarios.go` | 시나리오 기반 E2E 테스트 생성/실행/검증 (Cobra 추출, cross-repo synthetic scenario, 증분 동기화) |
 | Self-Update | `pkg/selfupdate/` | GitHub Releases 체크, SHA256 검증, atomic replace (stdlib only: net/http, crypto/sha256, archive/tar) |
 | Pipeline Checkpoint | `pkg/pipeline/checkpoint.go` | YAML 기반 파이프라인 상태 체크포인트, stale 감지 |
 | Multi-Language SigMap | `pkg/sigmap/iface.go` | Extractor 인터페이스로 언어별 플러그인 지원 (Go + TypeScript) |

@@ -14,7 +14,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 | Adapter | `pkg/adapter` | Platform abstraction layer (Claude, Codex, Gemini; OpenCode and Cursor planned) |
 | Config | `pkg/config` | Configuration schema, YAML loading, defaults, quality presets, orchestra migration |
 | Content | `pkg/content` | Content generation: agents, skills, hooks, methodology, routing, skill auto-activation |
-| Setup | `pkg/setup` | Project documentation scanning, generation, validation |
+| Setup | `pkg/setup` | Project documentation scanning, single-repo/monorepo/multi-repo topology detection, generation, validation |
 | Architecture | `pkg/arch` | Code structure analysis, ARCHITECTURE.md generation, rule linting |
 | SPEC | `pkg/spec` | EARS requirement parsing, SPEC validation, multi-provider review |
 | Lore | `pkg/lore` | 9-trailer decision protocol, query, validation |
@@ -129,7 +129,8 @@ cmd/auto/main.go
 | Reliability Store | `pkg/orchestra/reliability_*.go` | Structured preflight/prompt/collection receipts, sanitized failure bundles, runtime artifact retention |
 | Idea Workflow | `.claude/skills/autopus/idea.md` | Independent idea brainstorming subccommand (`/auto idea`) with BS file output and plan chaining |
 | Experiment Loop | `pkg/experiment/` + `.claude/skills/autopus/experiment.md` | Skill-orchestrated autonomous iteration loop with CLI utility commands for metric execution, git state management, circuit breaking, and simplicity scoring |
-| E2E Scenarios | `pkg/e2e/` + `pkg/setup/scenarios.go` | User-facing E2E scenario generation (Cobra extraction), execution engine, verification primitives, incremental sync |
+| Workspace Topology | `pkg/setup/{workspace.go,multirepo*.go}` | Single-repo, monorepo, multi-repo workspace detection and cross-repo dependency mapping |
+| E2E Scenarios | `pkg/e2e/` + `pkg/setup/scenarios.go` | User-facing E2E scenario generation (Cobra extraction + cross-repo synthesis), execution engine, verification primitives, incremental sync |
 | Self-Update | `pkg/selfupdate/` + `internal/cli/update.go` | GitHub Releases API check, SHA256 checksum verification, atomic binary replacement via os.Rename |
 | Executor Profile | `pkg/content/profiles.go` + `content/profiles/executor/*.md` | 3-tier profile system (builtin/generated/custom) with extends composition, stack-specific executor configuration |
 | Framework Detection | `pkg/detect/framework.go` | Signal-based framework detection (14 frameworks) for auto-generated profile creation |

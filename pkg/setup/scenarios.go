@@ -18,6 +18,7 @@ func generateScenarios(projectDir string, info *ProjectInfo) error {
 		// Non-fatal: if extraction fails, write a minimal file.
 		scenarios = []e2e.Scenario{}
 	}
+	scenarios = append(scenarios, generateCrossRepoScenarios(info, len(scenarios))...)
 
 	set := &e2e.ScenarioSet{
 		ProjectName: info.Name,
@@ -36,4 +37,66 @@ func generateScenarios(projectDir string, info *ProjectInfo) error {
 	}
 
 	return os.WriteFile(filepath.Join(scenariosDir, "scenarios.md"), content, 0644)
+}
+
+func generateCrossRepoScenarios(info *ProjectInfo, offset int) []e2e.Scenario {
+	if info == nil || info.MultiRepo == nil || !info.MultiRepo.IsMultiRepo {
+		return nil
+	}
+
+	components := make(map[string]RepoComponent, len(info.MultiRepo.Components))
+	for _, component := range info.MultiRepo.Components {
+		components[component.Name] = component
+	}
+
+	seen := make(map[string]bool)
+	var scenarios []e2e.Scenario
+	for _, dep := range info.MultiRepo.Dependencies {
+		key := dep.Source + "->" + dep.Target
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+
+		source := components[dep.Source]
+		target := components[dep.Target]
+		scenarios = append(scenarios, e2e.Scenario{
+			Number:       offset + len(scenarios) + 1,
+			ID:           dep.Source + "-" + dep.Target,
+			Description:  dep.Source + " integrates with " + dep.Target,
+			Command:      buildCrossRepoCommand(source, target),
+			Precondition: dep.Source + " and " + dep.Target + " repositories are available in the workspace",
+			Env:          "N/A",
+			Expect:       "Cross-repo dependency remains compatible",
+			Verify: []string{
+				"exit_code(0)",
+				"stdout_contains(\"PASS\")",
+			},
+			Depends:  "N/A",
+			Requires: "workspace",
+			Status:   "active",
+		})
+	}
+	return scenarios
+}
+
+func buildCrossRepoCommand(source, target RepoComponent) string {
+	return "`" + buildRepoCheck(source) + " && " + buildRepoCheck(target) + "`"
+}
+
+func buildRepoCheck(component RepoComponent) string {
+	return "(cd " + component.Path + " && " + repoVerificationCommand(component) + ")"
+}
+
+func repoVerificationCommand(component RepoComponent) string {
+	switch component.PrimaryLanguage {
+	case "TypeScript", "JavaScript":
+		return "npm test"
+	case "Rust":
+		return "cargo test"
+	case "Python":
+		return "pytest"
+	default:
+		return "go test ./..."
+	}
 }

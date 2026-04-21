@@ -76,6 +76,7 @@ type ProjectInfo struct {
 	Structure   []DirEntry                  // Top-level directory tree (max 3 levels)
 	Conventions map[string]ConventionSample // Per-language convention samples
 	Workspaces  []Workspace                 // Detected monorepo workspaces
+	MultiRepo   *MultiRepoInfo              // Detected multi-repo workspace metadata
 }
 
 // DocSet holds all rendered documentation content.

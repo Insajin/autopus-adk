@@ -46,3 +46,21 @@
 - Given: 모든 신규/수정 파일
 - When: 구현 완료 후 라인 수 측정
 - Then: 모든 소스 파일이 300줄 이하
+
+## Sync Verification (2026-04-21)
+
+- S1 PASS — `TestDetectMultiRepo_NestedReposWithoutRootRepo`, `TestScan_MultiRepoAggregatesComponentSignals`
+- S2 PASS — `TestScan_SingleRepoDoesNotSetMultiRepo`
+- S3 PASS — `TestMapCrossRepoDeps_GoAndNPMReferences`
+- S4 PASS — `TestRender_MultiRepoSections`
+- S5 PASS — `TestRender_MultiRepoSections`
+- S6 PASS — `TestRender_MultiRepoSections`
+- S7 PASS — `TestGenerateScenarios_AddsCrossRepoScenario`, `TestGenerateScenarios_CrossRepoScenarioNumbersFollowCobraScenarios`, `TestGenerateScenarios_UsesLanguageSpecificCommandsAndPaths`
+- S8 PASS — `TestScan_EmptyWorkspaceDoesNotSetMultiRepo`
+- S9 PASS — `wc -l` 확인 결과 신규/수정 소스 파일 최대 길이는 `pkg/setup/multirepo.go` 225줄
+
+## Command Verification
+
+- `go test ./pkg/setup/...`
+- `go test -cover ./pkg/setup/...` → 86.9%
+- `go vet ./pkg/setup/...`

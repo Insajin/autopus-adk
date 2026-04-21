@@ -81,13 +81,17 @@ autopus-adk/
 │   │   ├── activator_context.go    #     활성화 컨텍스트 빌더
 │   │   ├── profiles.go             #     프로파일 로딩/파싱/합성/머지 (3-tier)
 │   │   └── profiles_test.go        #     프로파일 로직 테스트
-│   ├── setup/                   #   프로젝트 문서화
+│   ├── setup/                   #   프로젝트 문서화 + workspace topology detection
 │   │   ├── engine.go            #     Generate/Update/Validate
-│   │   ├── scenarios.go         #     E2E 시나리오 생성 헬퍼 (setup 통합)
-│   │   ├── scanner.go           #     프로젝트 스캔
-│   │   ├── renderer.go          #     문서 렌더링
+│   │   ├── scanner.go           #     single-repo / multi-repo 스캔 오케스트레이션
+│   │   ├── multirepo.go         #     multi-repo 감지 + RepoComponent 스캔
+│   │   ├── multirepo_deps.go    #     Go/NPM cross-repo dependency mapping
+│   │   ├── multirepo_render.go  #     Workspace / Development Workflow / Repo Boundaries 렌더링
+│   │   ├── multirepo_types.go   #     MultiRepoInfo, RepoComponent, RepoDependency
+│   │   ├── scenarios.go         #     Cobra + cross-repo E2E 시나리오 생성
+│   │   ├── renderer_arch.go     #     architecture 문서 렌더링
+│   │   ├── renderer_docs.go     #     index / structure 문서 렌더링
 │   │   ├── types.go             #     ProjectInfo, DocSet
-│   │   ├── conventions.go       #     코드 컨벤션 감지
 │   │   ├── validator.go         #     문서 검증
 │   │   ├── workspace.go         #     모노레포 감지
 │   │   └── meta.go              #     메타데이터 추적

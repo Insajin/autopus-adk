@@ -90,3 +90,29 @@ autopus-bridge --> autopus-codex-rpc (replace + require)
 **결정**: `.git` 없는 루트 + 서브디렉토리 2개 이상에 `.git` 존재 시 멀티레포로 분류
 **이유**: 서브디렉토리 1개만 .git이면 단순히 git 서브모듈이거나 우연한 구조일 수 있음. 2개 이상이어야 의미 있는 멀티레포 워크스페이스.
 **대안**: 1개부터 감지 — 오탐 위험이 있으므로 기각.
+
+## Implementation Outcome (2026-04-21)
+
+### 최종 파일 구성
+
+| 파일 | 역할 | 라인수 |
+|------|------|--------|
+| `pkg/setup/multirepo.go` | root + immediate child repo 감지, component metadata 추출 | 225 |
+| `pkg/setup/multirepo_deps.go` | Go `require`/`replace`, npm `package`/`file:` edge 파싱 | 208 |
+| `pkg/setup/multirepo_types.go` | `MultiRepoInfo`, `RepoComponent`, `RepoDependency` | 29 |
+| `pkg/setup/multirepo_render.go` | Workspace / Development Workflow / Repository Boundaries 렌더링 | 95 |
+| `pkg/setup/scanner.go` | single-repo vs multi-repo 오케스트레이션, aggregate merge | 180 |
+| `pkg/setup/scenarios.go` | cross-repo synthetic scenario + language-specific verification command | 102 |
+
+### 구현 중 확정된 사항
+
+- `DetectWorkspaces()` 는 그대로 두고, `DetectMultiRepo()` 를 별도 축으로 추가했다.
+- multi-repo discovery 범위는 SPEC `R1`에 맞춰 **immediate child repositories only** 로 고정했다.
+- `MapCrossRepoDeps()` 는 300줄 제한 준수를 위해 `multirepo_deps.go` 로 분리했다.
+- cross-repo scenario는 repo 이름이 아니라 `RepoComponent.Path` 를 사용하고, `Go` / `JavaScript|TypeScript` / `Rust` / `Python` 별 검증 명령을 분기한다.
+
+### 최종 검증
+
+- `go test ./pkg/setup/...`
+- `go test -cover ./pkg/setup/...` → 86.9%
+- `go vet ./pkg/setup/...`

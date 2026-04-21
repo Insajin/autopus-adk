@@ -41,6 +41,11 @@ func renderArchitecture(info *ProjectInfo, opts *RenderOptions) string {
 		}
 	}
 
+	if info.MultiRepo != nil && info.MultiRepo.IsMultiRepo {
+		b.WriteString(renderWorkspaceSection(info.MultiRepo))
+		b.WriteString(renderDevWorkflow(info.MultiRepo))
+	}
+
 	if len(opts.LoreItems) > 0 {
 		b.WriteString("## Recent Decisions\n\n")
 		for _, entry := range opts.LoreItems {

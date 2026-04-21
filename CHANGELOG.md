@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Multi-repo workspace detection and cross-repo setup rendering (SPEC-SETUP-002)** (2026-04-21): `auto setup` / `auto arch` 가 root+nested repo topology를 1급 모델로 인식하고 repo boundary/workflow/scenario 문서를 생성하도록 확장
+  - `pkg/setup/{multirepo.go,multirepo_deps.go,multirepo_types.go,multirepo_render.go,scanner.go,types.go}` — `MultiRepoInfo` 모델, immediate-child repo discovery, Go/NPM cross-repo dependency mapping, aggregate scan wiring 추가
+  - `pkg/setup/{renderer_arch.go,renderer_docs.go,scenarios.go}` — Workspace / Development Workflow / Repository Boundaries 섹션과 path-aware language-specific cross-repo scenario 생성 추가
+  - `pkg/setup/{multirepo_test.go,multirepo_render_test.go,multirepo_scenarios_test.go}` — topology, rendering, scenario synthesis acceptance 회귀 테스트 추가
+
 - **Desktop bootstrap session surface for the approval-only shell (SPEC-DESKTOP-004)** (2026-04-21): desktop handoff/session restore가 ADK source of truth를 재사용하도록 `auto worker session` 과 status readiness contract를 추가
   - `internal/cli/{worker_commands.go,worker_session.go}` — `worker session` command 등록, desktop-oriented machine-readable help/command boundary 정리
   - `pkg/worker/setup/{status.go,desktop_session.go}` — `credential_backend`, `secure_storage_ready`, `desktop_session_ready` 를 `worker status --json` 에 노출하고 fail-closed desktop session payload 구현
