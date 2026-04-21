@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -14,34 +16,75 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 	if cfg.TimeoutSeconds > 0 {
 		timeout = time.Duration(cfg.TimeoutSeconds) * time.Second
 	}
-
-	var responses []ProviderResponse
-	for _, p := range cfg.Providers {
-		// Respect context cancellation between provider iterations.
-		if ctx.Err() != nil {
-			break
+	if cfg.ReliabilityStore == nil && cfg.RunID != "" {
+		if store, err := newReliabilityStore(cfg.RunID); err == nil {
+			cfg.ReliabilityStore = store
 		}
-		start := time.Now()
-		err := session.WaitForDoneRoundCtx(ctx, timeout, p.Name, round)
-		if err != nil {
-			responses = append(responses, ProviderResponse{
-				Provider: p.Name,
-				Duration: time.Since(start),
-				TimedOut: true,
-			})
+	}
+
+	var (
+		mu        sync.Mutex
+		responses []ProviderResponse
+		wg        sync.WaitGroup
+	)
+	for _, p := range cfg.Providers {
+		if ctx.Err() != nil {
 			continue
 		}
-		result, readErr := session.ReadResultRound(p.Name, round)
-		output := ""
-		if readErr == nil && result != nil {
-			output = result.Output
-		}
-		responses = append(responses, ProviderResponse{
-			Provider: p.Name,
-			Output:   output,
-			Duration: time.Since(start),
-		})
+		wg.Add(1)
+		go func(provider ProviderConfig) {
+			defer wg.Done()
+
+			start := time.Now()
+			err := session.WaitForDoneRoundCtx(ctx, timeout, provider.Name, round)
+			if err != nil {
+				receiptPath := ""
+				if cfg.ReliabilityStore != nil {
+					receipt := collectionReceipt(cfg.RunID, provider.Name, "hook", "hook", "timeout", err.Error(), "", round, true)
+					receiptPath = cfg.ReliabilityStore.recordCollection(receipt)
+					event := timeoutEvent(cfg.RunID, provider.Name, round, "retry with subprocess fallback")
+					_ = cfg.ReliabilityStore.recordEvent(event)
+					_ = cfg.ReliabilityStore.writeFailureBundle("hook collection timed out", "retry with subprocess fallback", true)
+				}
+				mu.Lock()
+				responses = append(responses, ProviderResponse{
+					Provider: provider.Name,
+					Duration: time.Since(start),
+					TimedOut: true,
+					Receipt:  receiptPath,
+				})
+				mu.Unlock()
+				return
+			}
+
+			result, readErr := session.ReadResultRound(provider.Name, round)
+			output := ""
+			status := "pass"
+			errMsg := ""
+			partial := false
+			if readErr == nil && result != nil {
+				output = result.Output
+			} else if readErr != nil {
+				status = "read_failed"
+				errMsg = readErr.Error()
+				partial = true
+			}
+			receiptPath := ""
+			if cfg.ReliabilityStore != nil {
+				receipt := collectionReceipt(cfg.RunID, provider.Name, "hook", "hook", status, errMsg, output, round, partial)
+				receiptPath = cfg.ReliabilityStore.recordCollection(receipt)
+			}
+			mu.Lock()
+			responses = append(responses, ProviderResponse{
+				Provider: provider.Name,
+				Output:   output,
+				Duration: time.Since(start),
+				Receipt:  receiptPath,
+			})
+			mu.Unlock()
+		}(p)
 	}
+	wg.Wait()
 	return responses
 }
 
@@ -144,7 +187,7 @@ func buildDebateResult(cfg OrchestraConfig, responses []ProviderResponse, roundH
 	if merged == "" {
 		merged = fmt.Sprintf("[interactive debate] %d rounds completed", len(roundHistory))
 	}
-	return &OrchestraResult{
+	result := &OrchestraResult{
 		Strategy:     cfg.Strategy,
 		Responses:    responses,
 		Merged:       merged,
@@ -152,6 +195,67 @@ func buildDebateResult(cfg OrchestraConfig, responses []ProviderResponse, roundH
 		Summary:      summary,
 		RoundHistory: roundHistory,
 	}
+	result.FailedProviders = deriveFailedProviders(roundHistory)
+	result.Degraded = len(result.FailedProviders) > 0
+	result.RunID = cfg.RunID
+	if cfg.ReliabilityStore != nil {
+		bundleSummary := result.Summary
+		nextStep := "inspect reliability receipts"
+		if result.Degraded {
+			bundleSummary = fmt.Sprintf("%s | degraded providers: %s", result.Summary, joinFailedProviderNames(result.FailedProviders))
+			nextStep = "retry failed providers with subprocess fallback"
+		}
+		bundlePath := cfg.ReliabilityStore.writeFailureBundle(bundleSummary, nextStep, result.Degraded)
+		result.Reliability = cfg.ReliabilityStore.summary(bundlePath)
+	}
+	if result.Degraded && !strings.Contains(result.Summary, "degraded") {
+		result.Summary = fmt.Sprintf("%s (degraded: %s)", result.Summary, joinFailedProviderNames(result.FailedProviders))
+	}
+	return result
+}
+
+func deriveFailedProviders(roundHistory [][]ProviderResponse) []FailedProvider {
+	seen := map[string]FailedProvider{}
+	for roundIndex, responses := range roundHistory {
+		for _, response := range responses {
+			switch {
+			case response.TimedOut:
+				seen[response.Provider] = FailedProvider{
+					Name:             response.Provider,
+					Error:            fmt.Sprintf("round %d timeout", roundIndex+1),
+					CollectionMode:   "hook",
+					Receipt:          response.Receipt,
+					CorrelationRunID: "",
+					NextRemediation:  "retry with subprocess fallback",
+				}
+			case response.EmptyOutput || response.Output == "":
+				seen[response.Provider] = FailedProvider{
+					Name:             response.Provider,
+					Error:            fmt.Sprintf("round %d empty output", roundIndex+1),
+					CollectionMode:   "hook",
+					Receipt:          response.Receipt,
+					CorrelationRunID: "",
+					NextRemediation:  "inspect collection receipt and retry",
+				}
+			}
+		}
+	}
+	failed := make([]FailedProvider, 0, len(seen))
+	for _, entry := range seen {
+		failed = append(failed, entry)
+	}
+	return failed
+}
+
+func joinFailedProviderNames(failed []FailedProvider) string {
+	if len(failed) == 0 {
+		return ""
+	}
+	names := make([]string, 0, len(failed))
+	for _, entry := range failed {
+		names = append(names, entry.Name)
+	}
+	return strings.Join(names, ", ")
 }
 
 // mergeByStrategyWithRoundHistory creates an OrchestraResult from round history.

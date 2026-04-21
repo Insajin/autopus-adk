@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Orchestra reliability receipts, failure bundles, and run correlation (SPEC-ORCH-020)** (2026-04-21): pane/hook/detach orchestration에 provider preflight, prompt transport, collection receipt와 compact failure bundle contract를 추가
+  - `pkg/orchestra/reliability_{receipt,preflight,bundle}.go`, `pkg/orchestra/{types.go,detach.go,job.go}` — schema v1, `run_id`, fallback mode, sanitized artifact, runtime artifact root/retention wiring 추가
+  - `pkg/orchestra/{interactive_debate.go,interactive_debate_helpers.go,interactive_debate_round.go,interactive_collect.go}` — hook timeout structured event, partial collection receipt, degraded summary, remediation hint 연결
+  - `internal/cli/{orchestra.go,orchestra_output.go}` — degraded 상태, run id, artifact dir를 CLI 결과물에 표면화
+  - `pkg/orchestra/reliability_{core,collection}_test.go` — secret redaction, preflight receipt, retention, timeout bundle 회귀 테스트 추가
+
+### Fixed
+
+- **pkg/orchestra full-suite timeout regression** (2026-04-21): reliability work 이후에도 `go test -timeout 120s ./pkg/orchestra`가 다시 통과하도록 interactive polling/backoff와 fixture sequencing을 결정적으로 정리
+  - `pkg/orchestra/{completion_poll.go,interactive.go,interactive_collect.go,interactive_surface.go,surface_manager.go,interactive_debate_round.go}` — polling interval, retry/backoff, submit/empty-output wait를 짧고 결정적으로 조정
+  - `pkg/orchestra/{pane_mock_test.go,interactive_pane_debate_test.go,interactive_surface_test.go,interactive_surface_round_test.go,interactive_edge_test.go,surface_manager_test.go,warm_pool_test.go,cc21_monitor_test.go}` — pane-aware mock sequencing과 stale/idle recovery fixture를 정리하고 runtime expectation을 현재 detector contract에 맞춤
+
 ## [v0.40.38] — 2026-04-21
 
 ### Added

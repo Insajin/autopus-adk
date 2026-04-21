@@ -10,6 +10,8 @@ import (
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
+var samePaneRetryBackoffs = []time.Duration{200 * time.Millisecond, 400 * time.Millisecond}
+
 // SurfaceManager monitors surface health in the background and provides
 // proactive stale detection. Replaces the reactive validateSurface() approach.
 // @AX:ANCHOR [AUTO] coordinator — owns background goroutine, health cache, warm pool, and pane recovery; used by runPaneDebate and executeRound
@@ -141,7 +143,7 @@ func (sm *SurfaceManager) ValidateAndRecover(ctx context.Context, cfg OrchestraC
 		}
 
 		// Launch CLI session on the warm pane
-		cmd := buildInteractiveLaunchCmd(pi.provider, "")
+		cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, "", cfg.WorkingDir)
 		if sendErr := cfg.Terminal.SendLongText(ctx, w.paneID, cmd); sendErr != nil {
 			log.Printf("[SurfaceManager] warm pane CLI launch failed, falling back to recreatePane: %v", sendErr)
 			_ = cfg.Terminal.Close(ctx, string(w.paneID))
@@ -218,11 +220,10 @@ func sendPromptWithRetry(ctx context.Context, cfg OrchestraConfig, pi paneInfo, 
 		return pi, false, nil
 	}
 
-	// Same-pane retries with exponential backoff (2s, 4s) before recreation
-	samePaneBackoffs := []time.Duration{2 * time.Second, 4 * time.Second}
-	for i, wait := range samePaneBackoffs {
+	// Same-pane retries with short exponential backoff before recreation.
+	for i, wait := range samePaneRetryBackoffs {
 		log.Printf("[Round %d] %s same-pane retry %d/%d, waiting %v...",
-			round, pi.provider.Name, i+1, len(samePaneBackoffs), wait)
+			round, pi.provider.Name, i+1, len(samePaneRetryBackoffs), wait)
 		time.Sleep(wait)
 		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, prompt); err == nil {
 			return pi, false, nil

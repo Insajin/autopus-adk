@@ -12,8 +12,18 @@ import (
 // checks surface validity and recreates stale panes.
 func TestExecuteRound_Round2_SurfaceValidation(t *testing.T) {
 	mock := &surfaceMock{
-		mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "Ask anything"},
-		stalePane:    map[terminal.PaneID]bool{"stale-pane": true},
+		mockTerminal: mockTerminal{
+			name: "cmux",
+			readScreenOutputs: []string{
+				"Ask anything",
+				"Ask anything",
+				"Ask anything",
+				"round 2 response\nAsk anything",
+				"round 2 response\nAsk anything",
+				"round 2 response\nAsk anything",
+			},
+		},
+		stalePane: map[terminal.PaneID]bool{"stale-pane": true},
 	}
 
 	cfg := OrchestraConfig{
@@ -48,8 +58,18 @@ func TestExecuteRound_Round2_SurfaceValidation(t *testing.T) {
 // also get surface validation in round > 1 (cmux surfaces can go stale).
 func TestExecuteRound_Round2_ClaudeSurfaceCheck(t *testing.T) {
 	mock := &surfaceMock{
-		mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "❯\n"},
-		stalePane:    map[terminal.PaneID]bool{"claude-pane": true},
+		mockTerminal: mockTerminal{
+			name: "cmux",
+			readScreenOutputs: []string{
+				"❯\n",
+				"❯\n",
+				"❯\n",
+				"round 2 claude response\n❯\n",
+				"round 2 claude response\n❯\n",
+				"round 2 claude response\n❯\n",
+			},
+		},
+		stalePane: map[terminal.PaneID]bool{"claude-pane": true},
 	}
 
 	cfg := OrchestraConfig{

@@ -1,0 +1,238 @@
+package orchestra
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+const (
+	defaultReliabilityRetentionRuns = 20
+	defaultReliabilityRetentionAge  = 7 * 24 * time.Hour
+)
+
+var sensitivePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)(authorization\s*:\s*bearer\s+)[^\s]+`),
+	regexp.MustCompile(`(?i)([A-Z0-9_]*API[_-]?KEY\s*=\s*)[^\s]+`),
+	regexp.MustCompile(`(?i)(authorization|token|secret|password|cookie)\s*[:=]\s*[^\s]+`),
+	regexp.MustCompile(`(?i)bearer\s+[a-z0-9._-]+`),
+	regexp.MustCompile(`sk-[A-Za-z0-9_-]+`),
+	regexp.MustCompile(`eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`),
+}
+
+type reliabilityStore struct {
+	runID      string
+	dir        string
+	mu         sync.Mutex
+	preflight  []ProviderPreflightReceipt
+	prompt     []PromptTransportReceipt
+	collection []CollectionReceipt
+	events     []ReliabilityEvent
+}
+
+func newReliabilityStore(runID string) (*reliabilityStore, error) {
+	root, err := reliabilityRuntimeRoot()
+	if err != nil {
+		return nil, err
+	}
+	runDir := filepath.Join(root, "runs", sanitizeProviderName(runID))
+	if err := os.MkdirAll(runDir, 0o700); err != nil {
+		return nil, fmt.Errorf("create reliability run dir: %w", err)
+	}
+	_ = pruneReliabilityArtifacts(filepath.Join(root, "runs"), defaultReliabilityRetentionRuns, defaultReliabilityRetentionAge)
+	return &reliabilityStore{runID: runID, dir: runDir}, nil
+}
+
+func reliabilityRuntimeRoot() (string, error) {
+	home, err := os.UserHomeDir()
+	if err == nil && home != "" {
+		root := filepath.Join(home, ".autopus", "runtime", "orchestra")
+		if mkErr := os.MkdirAll(root, 0o700); mkErr == nil {
+			return root, nil
+		}
+	}
+	root := filepath.Join(os.TempDir(), "autopus-runtime", "orchestra")
+	if err := os.MkdirAll(root, 0o700); err != nil {
+		return "", fmt.Errorf("create reliability root: %w", err)
+	}
+	return root, nil
+}
+
+func pruneReliabilityArtifacts(baseDir string, keepRuns int, maxAge time.Duration) error {
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	type dirInfo struct {
+		name string
+		mod  time.Time
+	}
+	var dirs []dirInfo
+	now := time.Now()
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			continue
+		}
+		path := filepath.Join(baseDir, entry.Name())
+		if maxAge > 0 && now.Sub(info.ModTime()) > maxAge {
+			_ = os.RemoveAll(path)
+			continue
+		}
+		dirs = append(dirs, dirInfo{name: entry.Name(), mod: info.ModTime()})
+	}
+	sort.Slice(dirs, func(i, j int) bool { return dirs[i].mod.After(dirs[j].mod) })
+	for i := keepRuns; i < len(dirs); i++ {
+		_ = os.RemoveAll(filepath.Join(baseDir, dirs[i].name))
+	}
+	return nil
+}
+
+func (s *reliabilityStore) artifactDir() string {
+	return s.dir
+}
+
+func (s *reliabilityStore) recordPreflight(receipt ProviderPreflightReceipt) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.preflight = append(s.preflight, receipt)
+	return s.writeJSON(fmt.Sprintf("preflight-%s.json", sanitizeProviderName(receipt.Provider)), receipt)
+}
+
+func (s *reliabilityStore) recordPrompt(receipt PromptTransportReceipt) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.prompt = append(s.prompt, receipt)
+	return s.writeJSON(fmt.Sprintf("prompt-%s-%s.json", sanitizeProviderName(receipt.Provider), sanitizeProviderName(receipt.Correlation.RoundID)), receipt)
+}
+
+func (s *reliabilityStore) recordCollection(receipt CollectionReceipt) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.collection = append(s.collection, receipt)
+	return s.writeJSON(fmt.Sprintf("collection-%s-%s.json", sanitizeProviderName(receipt.Provider), sanitizeProviderName(receipt.Correlation.RoundID)), receipt)
+}
+
+func (s *reliabilityStore) recordEvent(event ReliabilityEvent) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append(s.events, event)
+	return s.writeJSON(fmt.Sprintf("event-%s-%s.json", sanitizeProviderName(event.Kind), sanitizeProviderName(event.Correlation.ProviderID)), event)
+}
+
+func (s *reliabilityStore) writeFailureBundle(summary, nextStep string, degraded bool) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bundle := FailureBundle{
+		SchemaVersion:      reliabilitySchemaVersion,
+		Timestamp:          time.Now().UTC(),
+		RunID:              s.runID,
+		Degraded:           degraded,
+		Summary:            summary,
+		NextStep:           nextStep,
+		PreflightReceipts:  append([]ProviderPreflightReceipt(nil), s.preflight...),
+		PromptReceipts:     append([]PromptTransportReceipt(nil), s.prompt...),
+		CollectionReceipts: append([]CollectionReceipt(nil), s.collection...),
+		Events:             append([]ReliabilityEvent(nil), s.events...),
+	}
+	return s.writeJSON("failure-bundle.json", bundle)
+}
+
+func (s *reliabilityStore) summary(bundlePath string) *ReliabilitySummary {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	summary := &ReliabilitySummary{
+		RunID:         s.runID,
+		ArtifactDir:   s.dir,
+		FailureBundle: bundlePath,
+		OpenEvents:    len(s.events),
+	}
+	for _, receipt := range s.preflight {
+		if receipt.Status != "pass" {
+			summary.PreflightFailures++
+		}
+	}
+	for _, receipt := range s.prompt {
+		if receipt.Status == "mismatch" || receipt.Status == "failed" {
+			summary.PromptMismatches++
+		}
+	}
+	for _, receipt := range s.collection {
+		if receipt.Status != "pass" {
+			summary.CollectionFailures++
+		}
+	}
+	return summary
+}
+
+func (s *reliabilityStore) writeJSON(name string, payload any) string {
+	path := filepath.Join(s.dir, name)
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return ""
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return ""
+	}
+	return path
+}
+
+func sanitizeArtifact(text string) SanitizedArtifact {
+	redacted := redactSensitiveText(text)
+	return SanitizedArtifact{
+		ByteLength: len(text),
+		Hash:       hashString(text),
+		Preview:    safePreview(redacted, 120),
+	}
+}
+
+func redactSensitiveText(text string) string {
+	redacted := text
+	for _, pattern := range sensitivePatterns {
+		redacted = pattern.ReplaceAllStringFunc(redacted, func(s string) string {
+			if groups := pattern.FindStringSubmatch(s); len(groups) == 2 {
+				return groups[1] + "***"
+			}
+			parts := strings.SplitN(s, "=", 2)
+			if len(parts) == 2 {
+				return parts[0] + "=***"
+			}
+			parts = strings.SplitN(s, ":", 2)
+			if len(parts) == 2 {
+				return parts[0] + ": ***"
+			}
+			if strings.HasPrefix(strings.ToLower(s), "bearer ") {
+				return "Bearer ***"
+			}
+			return "***"
+		})
+	}
+	return redacted
+}
+
+func safePreview(text string, max int) string {
+	normalized := strings.Join(strings.Fields(strings.TrimSpace(text)), " ")
+	if len(normalized) <= max {
+		return normalized
+	}
+	return normalized[:max] + "..."
+}
+
+func hashString(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:])
+}

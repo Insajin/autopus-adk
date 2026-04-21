@@ -146,6 +146,7 @@ func TestSurfaceManager_ValidateAndRecover_FallsBackToRecreate(t *testing.T) {
 	t.Parallel()
 	mock := &surfaceSignalMock{}
 	mock.name = "cmux"
+	mock.readScreenOutput = "❯\n"
 	mock.stalePanes = map[terminal.PaneID]bool{"stale-pane": true} // Force stale detection on the old pane only
 	mock.nextPaneID = 50
 	sm := NewSurfaceManager(mock)

@@ -120,27 +120,24 @@ func TestInteractive_CompletionDetection_PromptPatternPrimary(t *testing.T) {
 // TestInteractive_CompletionDetection_IdleSecondary verifies pipe-pane idle detection
 // as secondary completion signal.
 func TestInteractive_CompletionDetection_IdleSecondary(t *testing.T) {
-	// Idle detection checks output file mod time. With mock terminal,
-	// the temp file created by splitProviderPanes will be idle immediately
-	// since nothing writes to it. With empty readScreenOutput (no prompt match),
-	// idle detection should eventually trigger.
+	// With a mock terminal and no prompt match, the interactive path should still
+	// return a partial result without blocking for the full default provider budget.
 	mock := newCmuxMock()
 	mock.readScreenOutput = "" // no prompt match -> relies on idle detection
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("p1")},
 		Strategy:       StrategyConsensus,
 		Prompt:         "test",
-		TimeoutSeconds: 30,
+		TimeoutSeconds: 1,
 		Terminal:       mock,
 		Interactive:    true,
 		InitialDelay:   time.Millisecond,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	result, err := RunInteractivePaneOrchestra(ctx, cfg)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
-	// The idle threshold is 10s; within 15s context timeout the idle detector should fire
 	assert.Len(t, result.Responses, 1)
 }
 

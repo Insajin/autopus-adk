@@ -193,6 +193,7 @@ func TestSurfaceManager_ValidateAndRecover_StaleReadScreen(t *testing.T) {
 	t.Parallel()
 	mock := &surfaceSignalMock{}
 	mock.name = "cmux"
+	mock.readScreenOutput = "❯\n"
 	mock.stalePanes = map[terminal.PaneID]bool{"pane-1": true} // old pane fails -- new pane succeeds
 	mock.nextPaneID = 10                                       // Ensure new pane gets a different ID
 	sm := NewSurfaceManager(mock)
@@ -214,6 +215,7 @@ func TestSurfaceManager_ValidateAndRecover_CachedUnhealthy(t *testing.T) {
 	t.Parallel()
 	mock := &surfaceSignalMock{}
 	mock.name = "cmux"
+	mock.readScreenOutput = "❯\n"
 	mock.splitPaneErr = assert.AnError // Make recreation fail
 	sm := NewSurfaceManager(mock)
 

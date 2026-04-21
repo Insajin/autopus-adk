@@ -77,13 +77,25 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 
 		// Skip sendPrompts for providers that received the prompt via CLI args at launch (round 1 only)
 		if pi.provider.InteractiveInput == "args" && round == 1 {
+			if cfg.ReliabilityStore != nil {
+				receipt := promptReceipt(cfg.RunID, pi.provider.Name, "cli_args", prompt, round, "pass", "")
+				_ = cfg.ReliabilityStore.recordPrompt(receipt)
+			}
 			continue
 		}
 
 		// File IPC for Round 2+ when hook is available (SPEC-ORCH-017 R4)
 		if round > 1 && hookSession != nil && hookSession.HasHook(pi.provider.Name) {
 			if tryFileIPC(ctx, hookSession, pi.provider.Name, round, prompt) {
+				if cfg.ReliabilityStore != nil {
+					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "file_ipc", prompt, round, "pass", "")
+					_ = cfg.ReliabilityStore.recordPrompt(receipt)
+				}
 				continue
+			}
+			if cfg.ReliabilityStore != nil {
+				receipt := promptReceipt(cfg.RunID, pi.provider.Name, "file_ipc", prompt, round, "failed", "file IPC fallback activated before completion wait")
+				_ = cfg.ReliabilityStore.recordPrompt(receipt)
 			}
 		}
 
@@ -107,12 +119,32 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		if sendErr != nil {
 			log.Printf("[Round %d] %s send failed: %v -- skipping", round, pi.provider.Name, sendErr)
 			panes[i].skipWait = true
+			if cfg.ReliabilityStore != nil {
+				mode := "send_long_text"
+				if pi.provider.InteractiveInput == "sendkeys" {
+					mode = "sendkeys"
+				}
+				receipt := promptReceipt(cfg.RunID, pi.provider.Name, mode, sendPrompt, round, "failed", sendErr.Error())
+				_ = cfg.ReliabilityStore.recordPrompt(receipt)
+			}
 			continue
+		}
+		if cfg.ReliabilityStore != nil {
+			mode := "send_long_text"
+			if pi.provider.InteractiveInput == "sendkeys" {
+				mode = "sendkeys"
+			}
+			receipt := promptReceipt(cfg.RunID, pi.provider.Name, mode, sendPrompt, round, "pass", "")
+			_ = cfg.ReliabilityStore.recordPrompt(receipt)
 		}
 		if recreated {
 			panes[i] = newPI
 		}
-		time.Sleep(500 * time.Millisecond)
+		submitDelay := 100 * time.Millisecond
+		if cfg.HookMode && hookSession != nil {
+			submitDelay = 50 * time.Millisecond
+		}
+		time.Sleep(submitDelay)
 		// R8: Retry once on SendCommand (Enter) failure.
 		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
 			log.Printf("[Round %d] %s SendCommand failed: %v — retrying", round, pi.provider.Name, err)
@@ -120,6 +152,10 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			if retryErr := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); retryErr != nil {
 				log.Printf("[Round %d] %s SendCommand retry failed: %v — skipping", round, pi.provider.Name, retryErr)
 				panes[i].skipWait = true
+				if cfg.ReliabilityStore != nil {
+					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "submit_enter", sendPrompt, round, "failed", retryErr.Error())
+					_ = cfg.ReliabilityStore.recordPrompt(receipt)
+				}
 				continue
 			}
 		}

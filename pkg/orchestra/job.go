@@ -24,13 +24,16 @@ const (
 // @AX:NOTE [AUTO] public API boundary — Job is the persistence model for detach mode; LoadJob/Save form the serialization contract; fan_in=3 (detach.go, orchestra_job.go, CleanupStaleJobs)
 type Job struct {
 	ID          string                       `json:"id"`
+	RunID       string                       `json:"run_id,omitempty"`
 	Strategy    Strategy                     `json:"strategy"`
 	Providers   []string                     `json:"providers"`
 	Prompt      string                       `json:"prompt"`
+	PromptHash  string                       `json:"prompt_hash,omitempty"`
 	CreatedAt   time.Time                    `json:"created_at"`
 	TimeoutAt   time.Time                    `json:"timeout_at"`
 	Status      JobStatus                    `json:"status"`
 	Dir         string                       `json:"dir"`
+	ArtifactDir string                       `json:"artifact_dir,omitempty"`
 	Results     map[string]*ProviderResponse `json:"results,omitempty"`
 	PaneIDs     map[string]string            `json:"pane_ids,omitempty"`
 	Terminal    string                       `json:"terminal,omitempty"`
@@ -109,6 +112,11 @@ func (j *Job) CollectResults() (*OrchestraResult, error) {
 		Responses: responses,
 		Merged:    merged,
 		Summary:   summary,
+		RunID:     j.RunID,
+		Reliability: &ReliabilitySummary{
+			RunID:       j.RunID,
+			ArtifactDir: j.ArtifactDir,
+		},
 	}, nil
 }
 

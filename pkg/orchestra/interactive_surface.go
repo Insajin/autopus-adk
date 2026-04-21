@@ -10,6 +10,9 @@ import (
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
+const recreatePipeRetryBaseDelay = 200 * time.Millisecond
+const recreatePostReadyDelay = 200 * time.Millisecond
+
 // needsSurfaceCheck returns true if the provider's surface should be validated
 // before sending prompts in Round 2+. All providers are checked because cmux
 // surfaces can become stale after long rounds regardless of CLI persistence.
@@ -60,7 +63,7 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	var pipeErr error
 	for attempt := range 3 {
 		if attempt > 0 {
-			delay := time.Duration(attempt) * 2 * time.Second
+			delay := time.Duration(attempt) * recreatePipeRetryBaseDelay
 			log.Printf("[recreatePane] %s PipePaneStart attempt %d failed, waiting %v...", pi.provider.Name, attempt, delay)
 			time.Sleep(delay)
 		}
@@ -84,7 +87,7 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	// Relaunch CLI session. For args providers in round > 1, launch in REPL
 	// mode without the original prompt — the round prompt will be sent via
 	// SendLongText later by the caller.
-	cmd := buildInteractiveLaunchCmd(pi.provider, "")
+	cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, "", cfg.WorkingDir)
 	if err := cfg.Terminal.SendLongText(ctx, newPaneID, cmd); err != nil {
 		_ = cfg.Terminal.Close(ctx, string(newPaneID))
 		_ = os.Remove(tmpFile.Name())
@@ -100,7 +103,7 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	// Post-ready stabilization: allow the CLI and cmux surface to fully
 	// initialize before accepting paste-buffer input. Without this delay,
 	// paste-buffer fails with exit status 1 on newly created surfaces.
-	time.Sleep(2 * time.Second)
+	time.Sleep(recreatePostReadyDelay)
 
 	// R3: Log successful recreation.
 	log.Printf("[Surface] %s pane recreated: %s → %s", pi.provider.Name, oldPaneID, newPaneID)

@@ -15,14 +15,11 @@ type surfaceMock struct {
 	stalePane map[terminal.PaneID]bool // panes that return ReadScreen error
 }
 
-func (m *surfaceMock) ReadScreen(_ context.Context, paneID terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.readScreenCalls++
+func (m *surfaceMock) ReadScreen(ctx context.Context, paneID terminal.PaneID, opts terminal.ReadScreenOpts) (string, error) {
 	if m.stalePane != nil && m.stalePane[paneID] {
 		return "", fmt.Errorf("surface stale: %s", paneID)
 	}
-	return m.readScreenOutput, nil
+	return m.mockTerminal.ReadScreen(ctx, paneID, opts)
 }
 
 func TestNeedsSurfaceCheck(t *testing.T) {
@@ -138,7 +135,7 @@ func TestRecreatePane_SplitPaneError(t *testing.T) {
 // interactive I/O. The outputFile should be empty to disable idle fallback.
 func TestRecreatePane_PipePaneStartError(t *testing.T) {
 	ctx := context.Background()
-	mock := &pipePaneErrorMock{mockTerminal: mockTerminal{name: "cmux"}}
+	mock := &pipePaneErrorMock{mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "Ask anything"}}
 
 	pi := paneInfo{
 		paneID:     "old-pane",

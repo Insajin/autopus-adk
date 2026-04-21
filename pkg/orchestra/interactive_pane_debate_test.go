@@ -83,15 +83,14 @@ func TestRunPaneDebate_MultiRound(t *testing.T) {
 
 // TestRunPaneDebate_WithJudge verifies judge round is invoked in pane debate.
 func TestRunPaneDebate_WithJudge(t *testing.T) {
-	// 2 providers × (3 baseline captures + 2 completion matches) + extra for safety
 	mock := &countingScreenMock{
 		mockTerminal: mockTerminal{name: "cmux"},
 		outputs: []string{
-			"loading...\n", "loading...\n", "loading...\n",
-			"loading...\n", "loading...\n", "loading...\n",
-			"loading...\n", "loading...\n", "loading...\n",
-			"debate output\n❯\n", "debate output\n❯\n",
-			"debate output\n❯\n", "debate output\n❯\n",
+			"loading...\n",
+			"loading...\n",
+			"loading...\n",
+			"debate output\n❯\n",
+			"debate output\n❯\n",
 		},
 	}
 	cfg := OrchestraConfig{
@@ -157,7 +156,15 @@ func TestRunPaneDebate_SplitFails_FallsBack(t *testing.T) {
 
 // TestRunPaneDebate_PipeCaptureFails_FallsBack verifies fallback on pipe-pane error.
 func TestRunPaneDebate_PipeCaptureFails_FallsBack(t *testing.T) {
-	pipeMock := &pipePaneErrorMock{mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "❯\n"}}
+	pipeMock := &pipePaneErrorMock{mockTerminal: mockTerminal{
+		name: "cmux",
+		readScreenOutputs: []string{
+			"loading...\n",
+			"loading...\n",
+			"pipe fallback output\n❯\n",
+			"pipe fallback output\n❯\n",
+		},
+	}}
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("claude")},
 		Strategy:       StrategyDebate,

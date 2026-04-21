@@ -14,6 +14,10 @@ import (
 // last CLI argument (non-interactive run mode, e.g., opencode run -m model "prompt").
 // @AX:NOTE [AUTO] REQ-1 hardcoded provider check (p.Binary == "claude") — update when adding new providers needing permission bypass
 func buildInteractiveLaunchCmd(p ProviderConfig, prompt string) string {
+	return buildInteractiveLaunchCmdWithCWD(p, prompt, "")
+}
+
+func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir string) string {
 	cmd := p.Binary
 	for _, arg := range paneArgs(p) {
 		// Skip non-interactive flags that conflict with TUI mode.
@@ -38,6 +42,9 @@ func buildInteractiveLaunchCmd(p ProviderConfig, prompt string) string {
 	if p.InteractiveInput == "args" && prompt != "" {
 		normalized := strings.ReplaceAll(prompt, "\n", " ")
 		cmd += " " + shellQuote(normalized)
+	}
+	if workingDir != "" {
+		return "cd " + shellQuote(workingDir) + " && " + cmd
 	}
 	return cmd
 }

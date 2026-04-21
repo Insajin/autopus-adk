@@ -54,6 +54,7 @@ func runInteractiveDebate(ctx context.Context, cfg OrchestraConfig) (*OrchestraR
 // when test binaries like echo exit before stdin can be written).
 // @AX:NOTE: [AUTO] triple fallback chain (debate -> parallel -> empty result) — both errors are logged before returning empty result
 func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds int, start time.Time) (*OrchestraResult, error) {
+	cfg.RunID = ensureRunID(&cfg)
 	cfg.DebateRounds = rounds
 
 	// Apply timeout from config if not already set on context.
@@ -76,16 +77,30 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 		roundHistory = [][]ProviderResponse{fallbackResps}
 		result := buildDebateResult(cfg, fallbackResps, roundHistory, start)
 		result.FailedProviders = fallbackFailed
+		for i := range result.FailedProviders {
+			result.FailedProviders[i].CorrelationRunID = cfg.RunID
+		}
 		return result, nil
 	}
 
 	result := buildDebateResult(cfg, responses, roundHistory, start)
 	result.FailedProviders = failed
+	for i := range result.FailedProviders {
+		result.FailedProviders[i].CorrelationRunID = cfg.RunID
+	}
 	return result, nil
 }
 
 // runPaneDebate executes the multi-turn debate loop using terminal panes.
 func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRound time.Duration, start time.Time) (*OrchestraResult, error) {
+	cfg.RunID = ensureRunID(&cfg)
+	if cfg.ReliabilityStore == nil {
+		store, err := newReliabilityStore(cfg.RunID)
+		if err == nil {
+			cfg.ReliabilityStore = store
+		}
+	}
+
 	// Create hook session for signal-based result collection.
 	var hookSession *HookSession
 	if cfg.HookMode {
@@ -101,6 +116,18 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 	// Split panes for each provider.
 	panes, _, err := splitProviderPanes(ctx, cfg)
 	if err != nil {
+		if cfg.ReliabilityStore != nil {
+			event := ReliabilityEvent{
+				SchemaVersion: reliabilitySchemaVersion,
+				Timestamp:     time.Now().UTC(),
+				Correlation:   roundCorrelation(cfg.RunID, "", 0, 1),
+				Kind:          "pane_split_failed",
+				Severity:      "error",
+				Message:       err.Error(),
+				NextStep:      "retry with subprocess fallback",
+			}
+			_ = cfg.ReliabilityStore.recordEvent(event)
+		}
 		log.Printf("[debate] splitProviderPanes failed: %v -- falling back to non-interactive", err)
 		return runNonInteractiveDebate(ctx, cfg, rounds, start)
 	}
@@ -115,8 +142,15 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 		log.Printf("[debate] startPipeCapture failed: %v -- continuing without idle detection", err)
 	}
 
-	launchInteractiveSessions(ctx, cfg, panes)
-	waitForSessionReady(ctx, cfg.Terminal, panes)
+	launchFailed := launchInteractiveSessions(ctx, cfg, panes)
+	if !cfg.HookMode || hookSession == nil {
+		waitForSessionReady(ctx, cfg.Terminal, panes)
+	}
+	if cfg.ReliabilityStore != nil {
+		for _, provider := range cfg.Providers {
+			_ = cfg.ReliabilityStore.recordPreflight(preflightReceipt(cfg.RunID, cfg, provider))
+		}
+	}
 
 	// Create SurfaceManager for proactive health monitoring (R1).
 	surfMgr := NewSurfaceManager(cfg.Terminal)
@@ -179,7 +213,15 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 			_ = WriteYieldOutput(os.Stdout, output)
 			// surfMgr.Stop() removed — defer at line 115 handles cleanup.
 			// Explicit Stop here caused duplicate WarmPool.Close() calls.
-			return buildDebateResult(cfg, roundResponses, roundHistory, start), nil
+			result := buildDebateResult(cfg, roundResponses, roundHistory, start)
+			result.FailedProviders = append(result.FailedProviders, launchFailed...)
+			if len(result.FailedProviders) > 0 {
+				result.Degraded = true
+			}
+			for i := range result.FailedProviders {
+				result.FailedProviders[i].CorrelationRunID = cfg.RunID
+			}
+			return result, nil
 		}
 
 		// Early consensus detection: check if all responses are substantially similar.
@@ -204,7 +246,15 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 		}
 	}
 
-	return buildDebateResult(cfg, finalResponses, roundHistory, start), nil
+	result := buildDebateResult(cfg, finalResponses, roundHistory, start)
+	result.FailedProviders = append(result.FailedProviders, launchFailed...)
+	if len(result.FailedProviders) > 0 {
+		result.Degraded = true
+	}
+	for i := range result.FailedProviders {
+		result.FailedProviders[i].CorrelationRunID = cfg.RunID
+	}
+	return result, nil
 }
 
 // executeRound is in interactive_debate_round.go.

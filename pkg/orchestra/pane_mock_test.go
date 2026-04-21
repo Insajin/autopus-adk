@@ -28,6 +28,7 @@ type mockTerminal struct {
 	nextPaneID         int
 	createdPanes       []terminal.PaneID
 	readScreenOutput   string   // configurable ReadScreen return value
+	readScreenOutputs  []string // optional per-pane sequence for ReadScreen
 	readScreenCalls    int      // count ReadScreen calls
 	readScreenErr      error    // configurable ReadScreen error
 	pipePaneStartCalls int      // count PipePaneStart calls
@@ -37,8 +38,9 @@ type mockTerminal struct {
 		PaneID terminal.PaneID
 		Text   string
 	}
-	autoComplete bool
-	mockOutput   string
+	autoComplete    bool
+	mockOutput      string
+	readIndexByPane map[terminal.PaneID]int
 }
 
 func (m *mockTerminal) Name() string { return m.name }
@@ -94,10 +96,18 @@ func (m *mockTerminal) Notify(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockTerminal) ReadScreen(_ context.Context, _ terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
+func (m *mockTerminal) ReadScreen(_ context.Context, paneID terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.readScreenCalls++
+	if len(m.readScreenOutputs) > 0 {
+		if m.readIndexByPane == nil {
+			m.readIndexByPane = make(map[terminal.PaneID]int)
+		}
+		m.readIndexByPane[paneID]++
+		idx := (m.readIndexByPane[paneID] - 1) % len(m.readScreenOutputs)
+		return m.readScreenOutputs[idx], m.readScreenErr
+	}
 	return m.readScreenOutput, m.readScreenErr
 }
 
@@ -145,19 +155,22 @@ func (m *sendLongTextErrorMock) SendLongText(_ context.Context, _ terminal.PaneI
 // based on call count to simulate screen changes between rounds.
 type countingScreenMock struct {
 	mockTerminal
-	callCount int
-	outputs   []string
+	callCountByPane map[terminal.PaneID]int
+	outputs         []string
 }
 
-func (m *countingScreenMock) ReadScreen(_ context.Context, _ terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
+func (m *countingScreenMock) ReadScreen(_ context.Context, paneID terminal.PaneID, _ terminal.ReadScreenOpts) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.readScreenCalls++
-	m.callCount++
+	if m.callCountByPane == nil {
+		m.callCountByPane = make(map[terminal.PaneID]int)
+	}
+	m.callCountByPane[paneID]++
 	if len(m.outputs) == 0 {
 		return m.readScreenOutput, m.readScreenErr
 	}
-	idx := (m.callCount - 1) % len(m.outputs)
+	idx := (m.callCountByPane[paneID] - 1) % len(m.outputs)
 	return m.outputs[idx], nil
 }
 

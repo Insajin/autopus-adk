@@ -100,5 +100,5 @@ func TestWaitForCompletion_MonitorTimeoutFallsBackToPolling(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 1, detector.calls)
 	assert.Greater(t, mock.readScreenCalls, 0)
-	assert.GreaterOrEqual(t, time.Since(start), 4*time.Second)
+	assert.GreaterOrEqual(t, time.Since(start), 2*screenPollInterval)
 }

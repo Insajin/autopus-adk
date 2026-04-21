@@ -160,6 +160,7 @@ func runOrchestraCommand(
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"
 	monitorRuntime := resolveCC21MonitorRuntime(term, harnessCfg)
+	workingDir, _ := os.Getwd()
 
 	// Hook mode requires `auto init` to install hooks first (SPEC-ORCH-007 R5/R6).
 	sessionID := ""
@@ -187,6 +188,8 @@ func runOrchestraCommand(
 		SubprocessMode:     subprocessMode,
 		MonitorEnabled:     monitorRuntime.Enabled,
 		MonitorTimeout:     monitorRuntime.PatternTimeout,
+		WorkingDir:         workingDir,
+		FallbackMode:       orchestra.FallbackModeSkip,
 	}
 
 	providerNames := make([]string, len(providers))
@@ -226,6 +229,12 @@ func runOrchestraCommand(
 		if path, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, result); saveErr == nil {
 			fmt.Fprintf(os.Stderr, "결과 저장: %s\n", path)
 		}
+	}
+	if result.Degraded {
+		fmt.Fprintf(os.Stderr, "상태: degraded\n")
+	}
+	if result.Reliability != nil && result.Reliability.ArtifactDir != "" {
+		fmt.Fprintf(os.Stderr, "아티팩트: %s\n", result.Reliability.ArtifactDir)
 	}
 	fmt.Fprintf(os.Stderr, "\n요약: %s (총 %s)\n", result.Summary, result.Duration.Round(1e6))
 	return nil

@@ -16,6 +16,12 @@ func RunPaneOrchestraDetached(ctx context.Context, cfg OrchestraConfig) (string,
 	}
 
 	jobID := randomHex() + randomHex() // 16 hex chars
+	runID := ensureRunID(&cfg)
+	promptArtifact := sanitizeArtifact(cfg.Prompt)
+	store, err := newReliabilityStore(runID)
+	if err != nil {
+		return "", fmt.Errorf("create reliability store: %w", err)
+	}
 
 	tmpDir, err := os.MkdirTemp("", "autopus-orch-")
 	if err != nil {
@@ -46,13 +52,16 @@ func RunPaneOrchestraDetached(ctx context.Context, cfg OrchestraConfig) (string,
 
 	job := &Job{
 		ID:          jobID,
+		RunID:       runID,
 		Strategy:    cfg.Strategy,
 		Providers:   providerNames,
-		Prompt:      cfg.Prompt,
+		Prompt:      promptArtifact.Preview,
+		PromptHash:  promptArtifact.Hash,
 		CreatedAt:   time.Now(),
 		TimeoutAt:   time.Now().Add(time.Duration(timeout) * time.Second),
 		Status:      JobStatusRunning,
 		Dir:         tmpDir,
+		ArtifactDir: store.artifactDir(),
 		Results:     map[string]*ProviderResponse{},
 		PaneIDs:     paneIDs,
 		Terminal:    cfg.Terminal.Name(),

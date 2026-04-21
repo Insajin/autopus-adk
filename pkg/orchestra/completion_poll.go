@@ -14,6 +14,8 @@ const (
 	idleFallbackThreshold = 60 * time.Second
 	// outputIdleThreshold is how long the output file must be unchanged to trigger idle completion (R7).
 	outputIdleThreshold = 30 * time.Second
+	// screenPollInterval keeps prompt detection responsive without waiting multi-second gaps.
+	screenPollInterval = 500 * time.Millisecond
 )
 
 // defaultSafetyDeadline is the fallback deadline for WaitForCompletion when
@@ -28,7 +30,7 @@ type ScreenPollDetector struct {
 	safetyDeadline time.Duration
 }
 
-// WaitForCompletion polls ReadScreen at 2s intervals using 2-phase consecutive match.
+// WaitForCompletion polls ReadScreen at short intervals using 2-phase consecutive match.
 // Phase 1: First prompt pattern match detected.
 // Phase 2: Second consecutive match confirms completion.
 // Idle fallback: After 60s without 2-phase match, checks pipe-pane output file idle.
@@ -47,7 +49,7 @@ func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo,
 		log.Printf("[WARN] WaitForCompletion called without deadline; using %v safety fallback", deadline)
 	}
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(screenPollInterval)
 	defer ticker.Stop()
 
 	candidateDetected := false

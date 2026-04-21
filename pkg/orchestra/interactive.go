@@ -10,6 +10,10 @@ import (
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
+const sessionReadyPollInterval = 200 * time.Millisecond
+const promptPollInterval = 200 * time.Millisecond
+const promptSubmitDelay = 100 * time.Millisecond
+
 // RunInteractivePaneOrchestra runs interactive CLI orchestration with ReadScreen polling.
 // @AX:NOTE [AUTO] interactive orchestration entry point — fan_in=1 (pane_runner.go only); downgraded from ANCHOR
 func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, error) {
@@ -116,7 +120,7 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 		if pi.provider.InteractiveInput == "args" {
 			launchPrompt = cfg.Prompt
 		}
-		cmd := buildInteractiveLaunchCmd(pi.provider, launchPrompt)
+		cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, launchPrompt, cfg.WorkingDir)
 		// FR-02: Use SendLongText for launch command body (handles long args-based prompts)
 		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, cmd); err != nil {
 			failed = append(failed, FailedProvider{
@@ -151,12 +155,11 @@ func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []pa
 	}
 }
 
-// pollUntilPrompt polls ReadScreen at 3s intervals until a prompt pattern is detected or timeout.
-// R2: 3s polling interval (was 500ms), warns if exceeding 20s threshold.
+// pollUntilPrompt polls ReadScreen at short intervals until a prompt pattern is detected or timeout.
 func pollUntilPrompt(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, patterns []CompletionPattern, timeout time.Duration) bool {
 	startTime := time.Now()
 	deadline := time.After(timeout)
-	ticker := time.NewTicker(3 * time.Second) // R2: 3s polling interval
+	ticker := time.NewTicker(promptPollInterval)
 	defer ticker.Stop()
 
 	warned := false
@@ -182,12 +185,12 @@ func pollUntilPrompt(ctx context.Context, term terminal.Terminal, paneID termina
 	}
 }
 
-// pollUntilSessionReady polls ReadScreen at 500ms intervals until a session-ready
+// pollUntilSessionReady polls ReadScreen at short intervals until a session-ready
 // pattern is detected or timeout. Unlike pollUntilPrompt, this uses isSessionReady
 // which excludes shell prompts to prevent false session-ready detection.
 func pollUntilSessionReady(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, patterns []CompletionPattern, timeout time.Duration) bool {
 	deadline := time.After(timeout)
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(sessionReadyPollInterval)
 	defer ticker.Stop()
 
 	for {
@@ -230,7 +233,7 @@ func sendPrompts(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []F
 			continue
 		}
 		// Small delay to let the CLI register the pasted text
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(promptSubmitDelay)
 		// Send Enter separately to submit the prompt
 		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
 			failed = append(failed, FailedProvider{
