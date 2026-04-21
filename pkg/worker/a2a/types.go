@@ -129,16 +129,20 @@ type TaskResult struct {
 
 // ApprovalRequestParams holds approval request payload from the backend.
 type ApprovalRequestParams struct {
-	TaskID    string `json:"task_id"`
-	Action    string `json:"action"`
-	RiskLevel string `json:"risk_level"`
-	Context   string `json:"context"`
+	TaskID     string `json:"task_id"`
+	ApprovalID string `json:"approval_id,omitempty"`
+	TraceID    string `json:"trace_id,omitempty"`
+	Action     string `json:"action"`
+	RiskLevel  string `json:"risk_level"`
+	Context    string `json:"context"`
 }
 
 // ApprovalResponseParams holds the user's approval decision.
 type ApprovalResponseParams struct {
-	TaskID   string `json:"task_id"`
-	Decision string `json:"decision"` // "approve", "deny", "skip"
+	TaskID     string `json:"task_id"`
+	ApprovalID string `json:"approval_id,omitempty"`
+	TraceID    string `json:"trace_id,omitempty"`
+	Decision   string `json:"decision"` // "approve", "deny", "skip"
 }
 
 // StatusUpdateParams is sent to the backend to update task state.

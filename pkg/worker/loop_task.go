@@ -36,6 +36,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	defer cleanupPolicy(taskID)
 
 	failTask := func(err error) (*a2a.TaskResult, error) {
+		wl.clearPendingApproval(taskID)
 		wl.emitHostEvent(HostEvent{
 			Type:    HostEventTaskFailed,
 			TaskID:  taskID,
@@ -118,6 +119,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 
 	log.Printf("[worker] task %s completed: cost=$%.4f duration=%dms", taskID, result.CostUSD, result.DurationMS)
 	result.Artifacts = ensureOutputArtifact(result.Output, result.Artifacts)
+	wl.clearPendingApproval(taskID)
 	wl.emitHostEvent(HostEvent{
 		Type:       HostEventTaskCompleted,
 		TaskID:     taskID,

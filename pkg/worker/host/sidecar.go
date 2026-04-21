@@ -3,6 +3,7 @@ package host
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -45,6 +46,8 @@ type EventMetrics struct {
 
 // ApprovalState carries approval gate metadata without secrets.
 type ApprovalState struct {
+	ApprovalID string `json:"approval_id,omitempty"`
+	TraceID    string `json:"trace_id,omitempty"`
 	Action     string `json:"action,omitempty"`
 	RiskLevel  string `json:"risk_level,omitempty"`
 	Context    string `json:"context,omitempty"`
@@ -166,13 +169,19 @@ func eventFromHostEvent(cfg RuntimeConfig, hostEvent worker.HostEvent) Event {
 	case worker.HostEventApprovalRequested:
 		event.Event = "task.approval_requested"
 		event.Approval = &ApprovalState{
-			Action:    hostEvent.Action,
-			RiskLevel: hostEvent.RiskLevel,
-			Context:   hostEvent.Context,
+			ApprovalID: hostEvent.ApprovalID,
+			TraceID:    hostEvent.TraceID,
+			Action:     hostEvent.Action,
+			RiskLevel:  hostEvent.RiskLevel,
+			Context:    hostEvent.Context,
 		}
 	case worker.HostEventApprovalResolved:
 		event.Event = "task.approval_resolved"
-		event.Approval = &ApprovalState{Resolution: hostEvent.Message}
+		event.Approval = &ApprovalState{
+			ApprovalID: hostEvent.ApprovalID,
+			TraceID:    hostEvent.TraceID,
+			Resolution: hostEvent.Message,
+		}
 	case worker.HostEventTaskCompleted:
 		event.Event = "task.completed"
 		event.Metrics = &EventMetrics{
@@ -186,7 +195,15 @@ func eventFromHostEvent(cfg RuntimeConfig, hostEvent worker.HostEvent) Event {
 			Message: coalesceMessage(hostEvent.Message, "task execution failed"),
 		}
 	default:
-		event.Event = "task.progress"
+		event.Event = "runtime.degraded"
+		event.Message = coalesceMessage(
+			hostEvent.Message,
+			fmt.Sprintf("unknown host event type `%s` requires desktop/adk update", hostEvent.Type),
+		)
+		event.Error = &ErrorPayload{
+			Code:    "unknown_host_event",
+			Message: fmt.Sprintf("unknown host event type `%s` requires desktop/adk update", hostEvent.Type),
+		}
 	}
 
 	return event

@@ -128,11 +128,13 @@ func TestNDJSONEmitter_MapsHostEvents(t *testing.T) {
 		Message: "fallback active",
 	})
 	observer.OnHostEvent(worker.HostEvent{
-		Type:      worker.HostEventApprovalRequested,
-		TaskID:    "task-1",
-		Action:    "deploy",
-		RiskLevel: "high",
-		Context:   "prod",
+		Type:       worker.HostEventApprovalRequested,
+		TaskID:     "task-1",
+		ApprovalID: "approval-1",
+		TraceID:    "trace-1",
+		Action:     "deploy",
+		RiskLevel:  "high",
+		Context:    "prod",
 	})
 	observer.OnHostEvent(worker.HostEvent{
 		Type:       worker.HostEventTaskCompleted,
@@ -146,10 +148,36 @@ func TestNDJSONEmitter_MapsHostEvents(t *testing.T) {
 	assert.Equal(t, "runtime.degraded", events[0].Event)
 	assert.Equal(t, "task.approval_requested", events[1].Event)
 	require.NotNil(t, events[1].Approval)
+	assert.Equal(t, "approval-1", events[1].Approval.ApprovalID)
+	assert.Equal(t, "trace-1", events[1].Approval.TraceID)
 	assert.Equal(t, "deploy", events[1].Approval.Action)
 	assert.Equal(t, "task.completed", events[2].Event)
 	require.NotNil(t, events[2].Metrics)
 	assert.Equal(t, int64(1500), events[2].Metrics.DurationMS)
+}
+
+func TestNDJSONEmitter_DegradesUnknownHostEvents(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	emitter := NewNDJSONEmitter(&buf)
+	cfg := RuntimeConfig{
+		WorkerName:   "adk-worker-codex",
+		WorkspaceID:  "ws-test",
+		ProviderName: "codex",
+	}
+	observer := emitter.Observer(cfg)
+
+	observer.OnHostEvent(worker.HostEvent{
+		Type: worker.HostEventType("mystery"),
+	})
+
+	events := decodeEvents(t, &buf)
+	require.Len(t, events, 1)
+	assert.Equal(t, "runtime.degraded", events[0].Event)
+	require.NotNil(t, events[0].Error)
+	assert.Equal(t, "unknown_host_event", events[0].Error.Code)
+	assert.Contains(t, events[0].Error.Message, "mystery")
 }
 
 func decodeEvents(t *testing.T, buf *bytes.Buffer) []Event {

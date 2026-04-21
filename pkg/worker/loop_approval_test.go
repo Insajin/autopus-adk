@@ -22,10 +22,12 @@ func TestHandleApproval_NoTUIProgram(t *testing.T) {
 	t.Parallel()
 	wl := &WorkerLoop{}
 	wl.handleApproval(a2a.ApprovalRequestParams{
-		TaskID:    "task-1",
-		Action:    "deploy",
-		RiskLevel: "high",
-		Context:   "prod",
+		TaskID:     "task-1",
+		ApprovalID: "approval-1",
+		TraceID:    "trace-1",
+		Action:     "deploy",
+		RiskLevel:  "high",
+		Context:    "prod",
 	})
 }
 
@@ -39,15 +41,19 @@ func TestHandleApproval_NotifiesObserver(t *testing.T) {
 	}))
 
 	wl.handleApproval(a2a.ApprovalRequestParams{
-		TaskID:    "task-1",
-		Action:    "deploy",
-		RiskLevel: "high",
-		Context:   "prod",
+		TaskID:     "task-1",
+		ApprovalID: "approval-1",
+		TraceID:    "trace-1",
+		Action:     "deploy",
+		RiskLevel:  "high",
+		Context:    "prod",
 	})
 
 	require.Len(t, events, 1)
 	assert.Equal(t, HostEventApprovalRequested, events[0].Type)
 	assert.Equal(t, "task-1", events[0].TaskID)
+	assert.Equal(t, "approval-1", events[0].ApprovalID)
+	assert.Equal(t, "trace-1", events[0].TraceID)
 }
 
 func TestSetOnApprovalDecision_ReturnsCallback(t *testing.T) {

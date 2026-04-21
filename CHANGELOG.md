@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.40] — 2026-04-21
+
+### Changed
+
+- **Desktop supervision approval correlation and launch parity (SPEC-DESKTOP-005)** (2026-04-21): `auto worker sidecar` 가 desktop launch nonce 플래그를 수용하고, approval request/response 경로가 `approval_id` / `trace_id` correlation metadata를 A2A → worker loop → sidecar NDJSON까지 유지하도록 정리
+  - `internal/cli/worker_sidecar.go` — `--desktop-launch-nonce` 플래그를 sidecar entrypoint에 추가해 desktop supervision launch command parity를 맞춤
+  - `pkg/worker/a2a/{types.go,server_approval.go,server_approval_test.go}` — approval payload/request-response에 correlation metadata를 추가하고 A2A round-trip 회귀 테스트를 보강
+  - `pkg/worker/{loop.go,loop_runtime.go,loop_task.go,loop_approval_state.go,loop_approval_test.go,host_observer.go}` — pending approval state를 task별로 보존하고 response/resolution/task cleanup 시 correlation metadata를 유지
+  - `pkg/worker/host/{sidecar.go,resolve_test.go}` — sidecar NDJSON approval payload에 `approval_id` / `trace_id`를 노출하고 unknown host event를 explicit degraded signal로 처리
+
 ## [v0.40.39] — 2026-04-21
 
 ### Added

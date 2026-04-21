@@ -51,6 +51,8 @@ type WorkerLoop struct {
 	server            *a2a.Server
 	builder           ContextBuilder
 	tuiProgram        *tea.Program
+	approvalMu        sync.Mutex
+	pendingApprovals  map[string]a2a.ApprovalRequestParams
 	observerMu        sync.RWMutex
 	hostObservers     []HostObserver
 	authRefresher     *auth.TokenRefresher
@@ -72,8 +74,9 @@ type WorkerLoop struct {
 // NewWorkerLoop creates a WorkerLoop with the given configuration.
 func NewWorkerLoop(config LoopConfig) *WorkerLoop {
 	wl := &WorkerLoop{
-		config:      config,
-		auditLogger: newSlogAuditLogger(3),
+		config:           config,
+		pendingApprovals: make(map[string]a2a.ApprovalRequestParams),
+		auditLogger:      newSlogAuditLogger(3),
 	}
 
 	serverCfg := a2a.ServerConfig{

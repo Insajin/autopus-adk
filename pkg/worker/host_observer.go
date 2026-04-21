@@ -17,6 +17,8 @@ const (
 type HostEvent struct {
 	Type       HostEventType
 	TaskID     string
+	ApprovalID string
+	TraceID    string
 	Phase      string
 	Message    string
 	Action     string

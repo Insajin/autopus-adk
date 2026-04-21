@@ -12,6 +12,7 @@ import (
 
 func newWorkerSidecarCmd() *cobra.Command {
 	input := host.Input{}
+	var desktopLaunchNonce string
 	cmd := &cobra.Command{
 		Use:   "sidecar",
 		Short: "Start the worker sidecar (machine-readable NDJSON)",
@@ -26,5 +27,6 @@ All stdout output is line-delimited NDJSON runtime events.`,
 	cmd.Flags().StringVar(&input.ConfigPath, "config", "", "Worker config path override")
 	cmd.Flags().StringVar(&input.MCPConfigPath, "mcp-config", "", "MCP config path override")
 	cmd.Flags().StringVar(&input.CredentialsPath, "credentials", "", "Credentials file path override")
+	cmd.Flags().StringVar(&desktopLaunchNonce, "desktop-launch-nonce", "", "Desktop launch correlation nonce")
 	return cmd
 }

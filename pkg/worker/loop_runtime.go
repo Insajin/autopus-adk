@@ -94,12 +94,15 @@ func newTUIObserver(p *tea.Program) HostObserver {
 
 // handleApproval forwards an approval request from A2A to the host observer bridge.
 func (wl *WorkerLoop) handleApproval(params a2a.ApprovalRequestParams) {
+	wl.storePendingApproval(params)
 	wl.emitHostEvent(HostEvent{
-		Type:      HostEventApprovalRequested,
-		TaskID:    params.TaskID,
-		Action:    params.Action,
-		RiskLevel: params.RiskLevel,
-		Context:   params.Context,
+		Type:       HostEventApprovalRequested,
+		TaskID:     params.TaskID,
+		ApprovalID: params.ApprovalID,
+		TraceID:    params.TraceID,
+		Action:     params.Action,
+		RiskLevel:  params.RiskLevel,
+		Context:    params.Context,
 	})
 	if !wl.hasHostObservers() {
 		log.Printf("[worker] approval request but no host observer registered")
@@ -110,14 +113,23 @@ func (wl *WorkerLoop) handleApproval(params a2a.ApprovalRequestParams) {
 // SetOnApprovalDecision returns a callback that sends approval decisions to the backend.
 func (wl *WorkerLoop) SetOnApprovalDecision() func(taskID, decision string) {
 	return func(taskID, decision string) {
-		if err := wl.server.SendApprovalResponse(taskID, decision); err != nil {
+		pending, _ := wl.pendingApproval(taskID)
+		if err := wl.server.SendApprovalResponse(a2a.ApprovalResponseParams{
+			TaskID:     taskID,
+			ApprovalID: pending.ApprovalID,
+			TraceID:    pending.TraceID,
+			Decision:   decision,
+		}); err != nil {
 			log.Printf("[worker] send approval response error: %v", err)
 			return
 		}
+		wl.clearPendingApproval(taskID)
 		wl.emitHostEvent(HostEvent{
-			Type:    HostEventApprovalResolved,
-			TaskID:  taskID,
-			Message: decision,
+			Type:       HostEventApprovalResolved,
+			TaskID:     taskID,
+			ApprovalID: pending.ApprovalID,
+			TraceID:    pending.TraceID,
+			Message:    decision,
 		})
 	}
 }

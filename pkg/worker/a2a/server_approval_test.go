@@ -59,10 +59,12 @@ func TestServer_HandleApproval_CallsCallbackAndUpdatesStatus(t *testing.T) {
 		ID:      json.RawMessage(`10`),
 		Method:  MethodApproval,
 		Params: mustMarshal(ApprovalRequestParams{
-			TaskID:    "task-approval-001",
-			Action:    "rm -rf /tmp/build",
-			RiskLevel: "high",
-			Context:   "Deleting build directory",
+			TaskID:     "task-approval-001",
+			ApprovalID: "approval-001",
+			TraceID:    "trace-001",
+			Action:     "rm -rf /tmp/build",
+			RiskLevel:  "high",
+			Context:    "Deleting build directory",
 		}),
 	}
 	data, err := json.Marshal(approvalReq)
@@ -89,6 +91,8 @@ func TestServer_HandleApproval_CallsCallbackAndUpdatesStatus(t *testing.T) {
 	defer callbackMu.Unlock()
 	assert.True(t, callbackCalled)
 	assert.Equal(t, "task-approval-001", callbackParams.TaskID)
+	assert.Equal(t, "approval-001", callbackParams.ApprovalID)
+	assert.Equal(t, "trace-001", callbackParams.TraceID)
 	assert.Equal(t, "rm -rf /tmp/build", callbackParams.Action)
 	assert.Equal(t, "high", callbackParams.RiskLevel)
 	assert.Equal(t, "Deleting build directory", callbackParams.Context)
@@ -125,7 +129,12 @@ func TestServer_SendApprovalResponse_SendsCorrectNotification(t *testing.T) {
 	srv.mu.Unlock()
 
 	// Send approval response.
-	err := srv.SendApprovalResponse("task-resp-001", "approve")
+	err := srv.SendApprovalResponse(ApprovalResponseParams{
+		TaskID:     "task-resp-001",
+		ApprovalID: "approval-002",
+		TraceID:    "trace-002",
+		Decision:   "approve",
+	})
 	require.NoError(t, err)
 
 	// Expect: working status update + approval response notification = 2 messages.
@@ -146,5 +155,7 @@ func TestServer_SendApprovalResponse_SendsCorrectNotification(t *testing.T) {
 	var respParams ApprovalResponseParams
 	require.NoError(t, json.Unmarshal(respBytes, &respParams))
 	assert.Equal(t, "task-resp-001", respParams.TaskID)
+	assert.Equal(t, "approval-002", respParams.ApprovalID)
+	assert.Equal(t, "trace-002", respParams.TraceID)
 	assert.Equal(t, "approve", respParams.Decision)
 }

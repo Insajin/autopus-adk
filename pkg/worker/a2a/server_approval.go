@@ -22,13 +22,13 @@ func (s *Server) handleApproval(req JSONRPCRequest) {
 }
 
 // SendApprovalResponse sends the user's approval decision back to the backend.
-func (s *Server) SendApprovalResponse(taskID, decision string) error {
+func (s *Server) SendApprovalResponse(params ApprovalResponseParams) error {
 	// Restore task status to working.
-	_ = s.UpdateTaskStatus(taskID, StatusWorking, nil)
+	_ = s.UpdateTaskStatus(params.TaskID, StatusWorking, nil)
 	notif := JSONRPCNotification{
 		JSONRPC: "2.0",
 		Method:  MethodApprovalResponse,
-		Params:  ApprovalResponseParams{TaskID: taskID, Decision: decision},
+		Params:  params,
 	}
 	return s.sendJSON(notif)
 }
