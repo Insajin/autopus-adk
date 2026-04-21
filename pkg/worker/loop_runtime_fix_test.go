@@ -52,7 +52,7 @@ func TestExecuteWithParallel_DoesNotStartExpiredQueuedTask(t *testing.T) {
 		TaskID:  taskID,
 		Prompt:  "do work",
 		WorkDir: t.TempDir(),
-	}, nil)
+	}, nil, newTaskRunMeta(taskID, ""))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "acquire semaphore")

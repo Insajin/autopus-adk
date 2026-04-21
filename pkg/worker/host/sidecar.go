@@ -3,7 +3,6 @@ package host
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -21,21 +20,25 @@ const (
 
 // Event is a machine-readable sidecar NDJSON envelope.
 type Event struct {
-	Protocol        string         `json:"protocol"`
-	ProtocolVersion string         `json:"protocol_version"`
-	Contract        string         `json:"contract"`
-	ContractMajor   string         `json:"contract_major"`
-	Event           string         `json:"event"`
-	Timestamp       time.Time      `json:"timestamp"`
-	RuntimeID       string         `json:"runtime_id,omitempty"`
-	WorkspaceID     string         `json:"workspace_id,omitempty"`
-	Provider        string         `json:"provider,omitempty"`
-	TaskID          string         `json:"task_id,omitempty"`
-	Phase           string         `json:"phase,omitempty"`
-	Message         string         `json:"message,omitempty"`
-	Metrics         *EventMetrics  `json:"metrics,omitempty"`
-	Approval        *ApprovalState `json:"approval,omitempty"`
-	Error           *ErrorPayload  `json:"error,omitempty"`
+	Protocol        string             `json:"protocol"`
+	ProtocolVersion string             `json:"protocol_version"`
+	Contract        string             `json:"contract"`
+	ContractMajor   string             `json:"contract_major"`
+	Event           string             `json:"event"`
+	Timestamp       time.Time          `json:"timestamp"`
+	RuntimeID       string             `json:"runtime_id,omitempty"`
+	WorkspaceID     string             `json:"workspace_id,omitempty"`
+	Provider        string             `json:"provider,omitempty"`
+	TaskID          string             `json:"task_id,omitempty"`
+	TraceID         string             `json:"trace_id,omitempty"`
+	CorrelationID   string             `json:"correlation_id,omitempty"`
+	Phase           string             `json:"phase,omitempty"`
+	Message         string             `json:"message,omitempty"`
+	Metrics         *EventMetrics      `json:"metrics,omitempty"`
+	Execution       *ExecutionContext  `json:"execution,omitempty"`
+	Result          *TaskResultSummary `json:"result,omitempty"`
+	Approval        *ApprovalState     `json:"approval,omitempty"`
+	Error           *ErrorPayload      `json:"error,omitempty"`
 }
 
 // EventMetrics carries non-sensitive task metrics.
@@ -52,6 +55,35 @@ type ApprovalState struct {
 	RiskLevel  string `json:"risk_level,omitempty"`
 	Context    string `json:"context,omitempty"`
 	Resolution string `json:"resolution,omitempty"`
+}
+
+// ExecutionContext describes the retained worker execution boundary for desktop.
+type ExecutionContext struct {
+	WorkspaceID   string `json:"workspace_id,omitempty"`
+	RootWorkDir   string `json:"root_workdir,omitempty"`
+	ActiveWorkDir string `json:"active_workdir,omitempty"`
+	WorktreePath  string `json:"worktree_path,omitempty"`
+	Mode          string `json:"mode,omitempty"`
+	BoundaryHint  string `json:"boundary_hint,omitempty"`
+}
+
+// TaskResultSummary captures the retained terminal task outcome for desktop.
+type TaskResultSummary struct {
+	Status       string        `json:"status,omitempty"`
+	Summary      string        `json:"summary,omitempty"`
+	ErrorMessage string        `json:"error_message,omitempty"`
+	CostLabel    string        `json:"cost_label,omitempty"`
+	DurationMS   int64         `json:"duration_ms,omitempty"`
+	SessionID    string        `json:"session_id,omitempty"`
+	Artifacts    []ArtifactRef `json:"artifacts,omitempty"`
+}
+
+// ArtifactRef is a desktop-safe reference to a worker artifact.
+type ArtifactRef struct {
+	Name     string `json:"name,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+	Preview  string `json:"preview,omitempty"`
+	Source   string `json:"source,omitempty"`
 }
 
 // ErrorPayload is the machine-readable error contract for sidecar events.
@@ -147,81 +179,4 @@ func RunSidecar(ctx context.Context, input Input, output io.Writer) error {
 	}
 	_ = emitter.Emit(stoppedEvent)
 	return stopErr
-}
-
-func eventFromHostEvent(cfg RuntimeConfig, hostEvent worker.HostEvent) Event {
-	event := Event{
-		RuntimeID:   cfg.WorkerName,
-		WorkspaceID: cfg.WorkspaceID,
-		Provider:    cfg.ProviderName,
-		TaskID:      hostEvent.TaskID,
-		Phase:       hostEvent.Phase,
-		Message:     hostEvent.Message,
-	}
-
-	switch hostEvent.Type {
-	case worker.HostEventRuntimeDegraded:
-		event.Event = "runtime.degraded"
-	case worker.HostEventTaskReceived:
-		event.Event = "task.accepted"
-	case worker.HostEventTaskProgress:
-		event.Event = "task.progress"
-	case worker.HostEventApprovalRequested:
-		event.Event = "task.approval_requested"
-		event.Approval = &ApprovalState{
-			ApprovalID: hostEvent.ApprovalID,
-			TraceID:    hostEvent.TraceID,
-			Action:     hostEvent.Action,
-			RiskLevel:  hostEvent.RiskLevel,
-			Context:    hostEvent.Context,
-		}
-	case worker.HostEventApprovalResolved:
-		event.Event = "task.approval_resolved"
-		event.Approval = &ApprovalState{
-			ApprovalID: hostEvent.ApprovalID,
-			TraceID:    hostEvent.TraceID,
-			Resolution: hostEvent.Message,
-		}
-	case worker.HostEventTaskCompleted:
-		event.Event = "task.completed"
-		event.Metrics = &EventMetrics{
-			CostUSD:    hostEvent.CostUSD,
-			DurationMS: hostEvent.DurationMS,
-		}
-	case worker.HostEventTaskFailed:
-		event.Event = "task.failed"
-		event.Error = &ErrorPayload{
-			Code:    "task_failed",
-			Message: coalesceMessage(hostEvent.Message, "task execution failed"),
-		}
-	default:
-		event.Event = "runtime.degraded"
-		event.Message = coalesceMessage(
-			hostEvent.Message,
-			fmt.Sprintf("unknown host event type `%s` requires desktop/adk update", hostEvent.Type),
-		)
-		event.Error = &ErrorPayload{
-			Code:    "unknown_host_event",
-			Message: fmt.Sprintf("unknown host event type `%s` requires desktop/adk update", hostEvent.Type),
-		}
-	}
-
-	return event
-}
-
-func errorPayload(err error, fallbackCode, fallbackMessage string) *ErrorPayload {
-	if hostErr := AsError(err); hostErr != nil {
-		return &ErrorPayload{
-			Code:    string(hostErr.Code),
-			Message: hostErr.Message,
-		}
-	}
-	return &ErrorPayload{Code: fallbackCode, Message: fallbackMessage}
-}
-
-func coalesceMessage(message, fallback string) string {
-	if message != "" {
-		return message
-	}
-	return fallback
 }

@@ -15,17 +15,49 @@ const (
 
 // HostEvent carries host-neutral task, progress, and approval signals.
 type HostEvent struct {
-	Type       HostEventType
-	TaskID     string
-	ApprovalID string
-	TraceID    string
-	Phase      string
-	Message    string
-	Action     string
-	RiskLevel  string
-	Context    string
-	CostUSD    float64
-	DurationMS int64
+	Type          HostEventType
+	TaskID        string
+	ApprovalID    string
+	TraceID       string
+	CorrelationID string
+	Phase         string
+	Message       string
+	Action        string
+	RiskLevel     string
+	Context       string
+	CostUSD       float64
+	DurationMS    int64
+	Execution     *HostExecutionContext
+	Result        *HostResult
+}
+
+// HostExecutionContext describes the retained worker filesystem boundary.
+type HostExecutionContext struct {
+	WorkspaceID   string
+	RootWorkDir   string
+	ActiveWorkDir string
+	WorktreePath  string
+	Mode          string
+	BoundaryHint  string
+}
+
+// HostArtifact is a desktop-safe projection of a worker artifact.
+type HostArtifact struct {
+	Name     string
+	MimeType string
+	Preview  string
+	Source   string
+}
+
+// HostResult summarizes the retained terminal outcome for desktop.
+type HostResult struct {
+	Status       string
+	Summary      string
+	ErrorMessage string
+	CostLabel    string
+	DurationMS   int64
+	SessionID    string
+	Artifacts    []HostArtifact
 }
 
 // HostObserver receives host-neutral worker events.

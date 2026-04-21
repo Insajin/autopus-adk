@@ -122,9 +122,12 @@ type SendMessageParams struct {
 
 // TaskResult holds the outcome of a completed or failed task.
 type TaskResult struct {
-	Status    TaskStatus `json:"status"`
-	Artifacts []Artifact `json:"artifacts,omitempty"`
-	Error     string     `json:"error,omitempty"`
+	Status        TaskStatus `json:"status"`
+	Artifacts     []Artifact `json:"artifacts,omitempty"`
+	Error         string     `json:"error,omitempty"`
+	SessionID     string     `json:"session_id,omitempty"`
+	TraceID       string     `json:"trace_id,omitempty"`
+	CorrelationID string     `json:"correlation_id,omitempty"`
 }
 
 // ApprovalRequestParams holds approval request payload from the backend.

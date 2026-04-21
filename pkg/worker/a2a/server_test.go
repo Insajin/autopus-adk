@@ -187,7 +187,11 @@ func TestServer_SendMessage_HandlerError(t *testing.T) {
 	defer mb.close()
 
 	handler := func(_ context.Context, _ string, _ json.RawMessage) (*TaskResult, error) {
-		return nil, fmt.Errorf("handler exploded")
+		return &TaskResult{
+			SessionID:     "session-err",
+			TraceID:       "trace-err",
+			CorrelationID: "corr-err",
+		}, fmt.Errorf("handler exploded")
 	}
 
 	srv := NewServer(ServerConfig{
@@ -232,4 +236,7 @@ func TestServer_SendMessage_HandlerError(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resultBytes, &result))
 	assert.Equal(t, StatusFailed, result.Status)
 	assert.Contains(t, result.Error, "handler exploded")
+	assert.Equal(t, "session-err", result.SessionID)
+	assert.Equal(t, "trace-err", result.TraceID)
+	assert.Equal(t, "corr-err", result.CorrelationID)
 }

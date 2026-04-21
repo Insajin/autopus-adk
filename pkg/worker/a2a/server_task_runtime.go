@@ -91,19 +91,19 @@ func (s *Server) dispatchTask(ctx context.Context, reqID json.RawMessage, params
 		params.IterationBudget,
 	)
 	if err != nil {
-		s.failTaskDispatch(params.TaskID, reqID, err)
+		s.failTaskDispatch(params.TaskID, reqID, nil, err)
 		return
 	}
 
 	result, err := s.handler(taskCtx, params.TaskID, payload)
 	if err != nil {
-		s.failTaskDispatch(params.TaskID, reqID, err)
+		s.failTaskDispatch(params.TaskID, reqID, result, err)
 		return
 	}
 	result.Status = StatusCompleted
 	_ = s.UpdateTaskStatus(params.TaskID, StatusCompleted, result)
 	if len(reqID) > 0 {
-		s.sendResult(reqID, result)
+		s.sendResult(params.TaskID, reqID, result)
 	}
 }
 
@@ -130,11 +130,18 @@ func (s *Server) releaseTaskContext(taskID string, cancel context.CancelFunc) {
 	s.mu.Unlock()
 }
 
-func (s *Server) failTaskDispatch(taskID string, reqID json.RawMessage, err error) {
-	failResult := &TaskResult{Status: StatusFailed, Error: err.Error()}
+func (s *Server) failTaskDispatch(taskID string, reqID json.RawMessage, result *TaskResult, err error) {
+	failResult := &TaskResult{Status: StatusFailed}
+	if result != nil {
+		failResult = result
+		failResult.Status = StatusFailed
+	}
+	if err != nil {
+		failResult.Error = err.Error()
+	}
 	_ = s.UpdateTaskStatus(taskID, StatusFailed, failResult)
 	if len(reqID) > 0 {
-		s.sendResult(reqID, failResult)
+		s.sendResult(taskID, reqID, failResult)
 	}
 }
 

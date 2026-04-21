@@ -21,22 +21,31 @@ type ServerConfig struct {
 	Handler               TaskHandler
 	AuthToken             string // Bearer token for backend auth (SEC-005)
 	ApprovalCallback      func(ApprovalRequestParams)
+	DispatchIssueCallback func(DispatchIssue)
 	OnConnectionExhausted func() // called once when reconnect backoff reaches maxBackoff
+}
+
+// DispatchIssue captures a transport failure during platform-facing task reconciliation.
+type DispatchIssue struct {
+	TaskID  string
+	Stage   string
+	Message string
 }
 
 // Server manages the A2A JSON-RPC protocol over WebSocket transport.
 type Server struct {
-	config       ServerConfig
-	transport    *Transport
-	handler      TaskHandler
-	tasks        map[string]*Task
-	taskContexts map[string]context.CancelFunc // per-task cancellable contexts (REQ-A2A-H02)
-	approvalCB   func(ApprovalRequestParams)
-	mu           sync.Mutex
-	cancel       context.CancelFunc
-	heartbeat    *Heartbeat
-	restPoller   *RESTPoller
-	reconnectMu  sync.Mutex
+	config          ServerConfig
+	transport       *Transport
+	handler         TaskHandler
+	tasks           map[string]*Task
+	taskContexts    map[string]context.CancelFunc // per-task cancellable contexts (REQ-A2A-H02)
+	approvalCB      func(ApprovalRequestParams)
+	dispatchIssueCB func(DispatchIssue)
+	mu              sync.Mutex
+	cancel          context.CancelFunc
+	heartbeat       *Heartbeat
+	restPoller      *RESTPoller
+	reconnectMu     sync.Mutex
 }
 
 // toWebSocketURL converts an http/https URL to a ws/wss URL for WebSocket dialing.
@@ -53,11 +62,12 @@ func toWebSocketURL(u string) string {
 // NewServer creates a new A2A server with the given configuration.
 func NewServer(config ServerConfig) *Server {
 	return &Server{
-		config:       config,
-		handler:      config.Handler,
-		tasks:        make(map[string]*Task),
-		taskContexts: make(map[string]context.CancelFunc),
-		approvalCB:   config.ApprovalCallback,
+		config:          config,
+		handler:         config.Handler,
+		tasks:           make(map[string]*Task),
+		taskContexts:    make(map[string]context.CancelFunc),
+		approvalCB:      config.ApprovalCallback,
+		dispatchIssueCB: config.DispatchIssueCallback,
 	}
 }
 
@@ -146,7 +156,11 @@ func (s *Server) UpdateTaskStatus(taskID string, status TaskStatus, result *Task
 		Method:  MethodStatusUpdate,
 		Params:  params,
 	}
-	return s.sendJSON(notif)
+	if err := s.sendJSON(notif); err != nil {
+		s.notifyDispatchIssue(taskID, "status_update", err)
+		return err
+	}
+	return nil
 }
 
 // SetAuthToken updates the auth token used for backend communication.
@@ -207,4 +221,15 @@ func (s *Server) Close() error {
 		return s.transport.Close()
 	}
 	return nil
+}
+
+func (s *Server) notifyDispatchIssue(taskID, stage string, err error) {
+	if s.dispatchIssueCB == nil || err == nil {
+		return
+	}
+	s.dispatchIssueCB(DispatchIssue{
+		TaskID:  taskID,
+		Stage:   stage,
+		Message: err.Error(),
+	})
 }

@@ -40,5 +40,5 @@ func (s *Server) handleCancelTask(req JSONRPCRequest) {
 	s.mu.Unlock()
 
 	_ = s.UpdateTaskStatus(p.TaskID, StatusCanceled, nil)
-	s.sendResult(req.ID, map[string]string{"status": "canceled"})
+	s.sendResult(p.TaskID, req.ID, map[string]string{"status": "canceled"})
 }

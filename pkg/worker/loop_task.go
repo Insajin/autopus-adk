@@ -27,6 +27,7 @@ type taskPayloadMessage struct {
 	IterationBudget         *budget.IterationBudget `json:"iteration_budget,omitempty"`
 	SpecID                  string                  `json:"spec_id,omitempty"`
 	Model                   string                  `json:"model,omitempty"`
+	CorrelationID           string                  `json:"correlation_id,omitempty"`
 	SessionID               string                  `json:"session_id,omitempty"`
 }
 
@@ -35,21 +36,46 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	log.Printf("[worker] received task: %s", taskID)
 	defer cleanupPolicy(taskID)
 
-	failTask := func(err error) (*a2a.TaskResult, error) {
+	taskMeta := taskRunMeta{TraceID: taskID}
+	failTask := func(err error, result adapter.TaskResult, sessionID string) (*a2a.TaskResult, error) {
+		pending, _ := wl.pendingApproval(taskID)
+		if result.SessionID == "" {
+			result.SessionID = strings.TrimSpace(sessionID)
+		}
+		result.Artifacts = ensureOutputArtifact(result.Output, result.Artifacts)
+		traceID := resolveTaskTraceID(taskID, pending, taskMeta)
+		failureResult := &a2a.TaskResult{
+			Status:        a2a.StatusFailed,
+			Artifacts:     convertArtifacts(result.Artifacts),
+			Error:         err.Error(),
+			SessionID:     result.SessionID,
+			TraceID:       traceID,
+			CorrelationID: taskMeta.CorrelationID,
+		}
 		wl.clearPendingApproval(taskID)
 		wl.emitHostEvent(HostEvent{
-			Type:    HostEventTaskFailed,
-			TaskID:  taskID,
-			Message: "task execution failed",
+			Type:          HostEventTaskFailed,
+			TaskID:        taskID,
+			TraceID:       traceID,
+			CorrelationID: taskMeta.CorrelationID,
+			Message:       err.Error(),
+			Result:        buildHostResult("failed", "", err.Error(), result),
 		})
-		return nil, err
+		return failureResult, err
 	}
 
 	var msg taskPayloadMessage
 	if err := json.Unmarshal(payload, &msg); err != nil {
-		return failTask(fmt.Errorf("parse task payload: %w", err))
+		return failTask(fmt.Errorf("parse task payload: %w", err), adapter.TaskResult{}, "")
 	}
-	wl.emitHostEvent(HostEvent{Type: HostEventTaskReceived, TaskID: taskID})
+	taskMeta = newTaskRunMeta(taskID, msg.CorrelationID)
+	wl.emitHostEvent(HostEvent{
+		Type:          HostEventTaskReceived,
+		TaskID:        taskID,
+		TraceID:       taskMeta.TraceID,
+		CorrelationID: taskMeta.CorrelationID,
+		Message:       "dispatch admitted into the retained worker loop",
+	})
 
 	descriptionSeed := strings.TrimSpace(msg.Description)
 	if descriptionSeed == "" {
@@ -95,36 +121,50 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 
 	phasePlan, err := ParsePhasePlan(msg.PipelinePhases)
 	if err != nil {
-		return failTask(fmt.Errorf("parse pipeline phases: %w", err))
+		return failTask(fmt.Errorf("parse pipeline phases: %w", err), adapter.TaskResult{}, msg.SessionID)
 	}
 	phaseInstructions, err := ParsePhaseInstructions(msg.PipelineInstructions)
 	if err != nil {
-		return failTask(fmt.Errorf("parse pipeline instructions: %w", err))
+		return failTask(fmt.Errorf("parse pipeline instructions: %w", err), adapter.TaskResult{}, msg.SessionID)
 	}
 	phasePromptTemplates, err := ParsePhasePromptTemplates(msg.PipelinePromptTemplates)
 	if err != nil {
-		return failTask(fmt.Errorf("parse pipeline prompt templates: %w", err))
+		return failTask(fmt.Errorf("parse pipeline prompt templates: %w", err), adapter.TaskResult{}, msg.SessionID)
 	}
 
 	var result adapter.TaskResult
 	if len(phasePlan) > 0 || len(phaseInstructions) > 0 || len(phasePromptTemplates) > 0 {
-		result, err = wl.executePipelineWithParallel(ctx, taskID, prompt, model, phasePlan, phaseInstructions, phasePromptTemplates, budgetCfg)
+		result, err = wl.executePipelineWithParallel(
+			ctx,
+			taskID,
+			prompt,
+			model,
+			phasePlan,
+			phaseInstructions,
+			phasePromptTemplates,
+			budgetCfg,
+			taskMeta,
+		)
 	} else {
-		result, err = wl.executeWithParallel(ctx, taskCfg, budgetCfg)
+		result, err = wl.executeWithParallel(ctx, taskCfg, budgetCfg, taskMeta)
 	}
 	if err != nil {
 		log.Printf("[worker] task %s failed: %v", taskID, err)
-		return failTask(err)
+		return failTask(err, result, taskCfg.SessionID)
 	}
 
 	log.Printf("[worker] task %s completed: cost=$%.4f duration=%dms", taskID, result.CostUSD, result.DurationMS)
 	result.Artifacts = ensureOutputArtifact(result.Output, result.Artifacts)
+	pending, _ := wl.pendingApproval(taskID)
 	wl.clearPendingApproval(taskID)
 	wl.emitHostEvent(HostEvent{
-		Type:       HostEventTaskCompleted,
-		TaskID:     taskID,
-		CostUSD:    result.CostUSD,
-		DurationMS: result.DurationMS,
+		Type:          HostEventTaskCompleted,
+		TaskID:        taskID,
+		TraceID:       resolveTaskTraceID(taskID, pending, taskMeta),
+		CorrelationID: taskMeta.CorrelationID,
+		CostUSD:       result.CostUSD,
+		DurationMS:    result.DurationMS,
+		Result:        buildHostResult("completed", "", "", result),
 	})
 
 	if wl.memorySearcher != nil && memoryAgentID != "" && result.Output != "" {
@@ -144,7 +184,10 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	}
 
 	return &a2a.TaskResult{
-		Status:    a2a.StatusCompleted,
-		Artifacts: convertArtifacts(result.Artifacts),
+		Status:        a2a.StatusCompleted,
+		Artifacts:     convertArtifacts(result.Artifacts),
+		SessionID:     result.SessionID,
+		TraceID:       resolveTaskTraceID(taskID, pending, taskMeta),
+		CorrelationID: taskMeta.CorrelationID,
 	}, nil
 }

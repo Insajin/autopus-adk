@@ -87,6 +87,7 @@ func NewWorkerLoop(config LoopConfig) *WorkerLoop {
 		Handler:               wl.handleTask,
 		AuthToken:             config.AuthToken,
 		ApprovalCallback:      wl.handleApproval,
+		DispatchIssueCallback: wl.handleDispatchIssue,
 		OnConnectionExhausted: wl.activateFallbackPoller,
 	}
 	wl.server = a2a.NewServer(serverCfg)

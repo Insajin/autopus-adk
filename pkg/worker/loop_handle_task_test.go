@@ -29,9 +29,65 @@ func TestHandleTask_InvalidPayload(t *testing.T) {
 	mock := &mockAdapter{name: "mock", script: "true"}
 	wl := &WorkerLoop{config: LoopConfig{Provider: mock}}
 
-	_, err := wl.handleTask(context.Background(), "task-bad", []byte("not json"))
+	result, err := wl.handleTask(context.Background(), "task-bad", []byte("not json"))
 	require.Error(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, a2a.StatusFailed, result.Status)
+	assert.Equal(t, "task-bad", result.TraceID)
 	assert.Contains(t, err.Error(), "parse task payload")
+}
+
+func TestHandleTask_PreservesFailureMetadata(t *testing.T) {
+	mock := &mockAdapter{name: "mock", script: "true"}
+	wl := &WorkerLoop{config: LoopConfig{Provider: mock, WorkDir: t.TempDir()}}
+
+	payload, _ := json.Marshal(taskPayloadMessage{
+		Prompt:         "backend-built prompt",
+		PipelinePhases: []string{"bogus"},
+		CorrelationID:  "corr-1",
+		SessionID:      "session-1",
+	})
+
+	result, err := wl.handleTask(context.Background(), "task-failed-metadata", payload)
+	require.Error(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, a2a.StatusFailed, result.Status)
+	assert.Equal(t, "session-1", result.SessionID)
+	assert.Equal(t, "corr-1", result.CorrelationID)
+	assert.Equal(t, "corr-1", result.TraceID)
+	assert.Contains(t, result.Error, "parse pipeline phases")
+}
+
+func TestHandleTask_FailedEventRetainsResultSummary(t *testing.T) {
+	repo := initGitRepoWithOrigin(t)
+	mock := &mockAdapter{name: "mock", script: `head -c0; echo '{"type":"result","output":"partial summary","cost_usd":0.02,"duration_ms":12,"session_id":"session-1"}'`}
+	wl := &WorkerLoop{config: LoopConfig{Provider: mock, WorkDir: repo}}
+
+	var events []HostEvent
+	wl.AddHostObserver(HostObserverFunc(func(event HostEvent) {
+		events = append(events, event)
+	}))
+
+	payload, _ := json.Marshal(taskPayloadMessage{
+		Prompt:        "commit the changes you made",
+		CorrelationID: "corr-1",
+	})
+
+	result, err := wl.handleTask(context.Background(), "task-failed-summary", payload)
+	require.Error(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, a2a.StatusFailed, result.Status)
+
+	require.NotEmpty(t, events)
+	failed := events[len(events)-1]
+	assert.Equal(t, HostEventTaskFailed, failed.Type)
+	require.NotNil(t, failed.Result)
+	assert.Equal(t, "failed", failed.Result.Status)
+	assert.Equal(t, "session-1", failed.Result.SessionID)
+	assert.Equal(t, int64(12), failed.Result.DurationMS)
+	assert.Equal(t, "partial summary", failed.Result.Summary)
+	require.NotEmpty(t, failed.Result.Artifacts)
+	assert.Equal(t, "output", failed.Result.Artifacts[0].Name)
 }
 
 func TestHandleTask_UsesPromptPayloadWhenDescriptionMissing(t *testing.T) {

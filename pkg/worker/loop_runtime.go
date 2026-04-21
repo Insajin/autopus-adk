@@ -110,6 +110,16 @@ func (wl *WorkerLoop) handleApproval(params a2a.ApprovalRequestParams) {
 	}
 }
 
+func (wl *WorkerLoop) handleDispatchIssue(issue a2a.DispatchIssue) {
+	stage := strings.ReplaceAll(issue.Stage, "_", " ")
+	wl.emitHostEvent(HostEvent{
+		Type:    HostEventRuntimeDegraded,
+		TaskID:  issue.TaskID,
+		Phase:   issue.Stage,
+		Message: fmt.Sprintf("platform reconciliation degraded during %s: %s", stage, issue.Message),
+	})
+}
+
 // SetOnApprovalDecision returns a callback that sends approval decisions to the backend.
 func (wl *WorkerLoop) SetOnApprovalDecision() func(taskID, decision string) {
 	return func(taskID, decision string) {

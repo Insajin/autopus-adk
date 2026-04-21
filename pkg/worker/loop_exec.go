@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"strings"
 	"time"
@@ -71,41 +70,6 @@ func (wl *WorkerLoop) taskExecutionTimeout(taskID string) time.Duration {
 	return time.Duration(policy.TimeoutSec) * time.Second
 }
 
-// StdinWriter wraps an io.WriteCloser to keep the stdin pipe open
-// after the initial prompt is written. This enables mid-session
-// message injection (e.g., budget warnings).
-type StdinWriter struct {
-	pipe io.WriteCloser
-}
-
-// NewStdinWriter creates a StdinWriter wrapping the given pipe.
-func NewStdinWriter(pipe io.WriteCloser) *StdinWriter {
-	return &StdinWriter{pipe: pipe}
-}
-
-// WritePrompt sends the initial prompt to the subprocess stdin.
-// Unlike the previous implementation, the pipe is NOT closed after writing.
-func (sw *StdinWriter) WritePrompt(prompt string) error {
-	_, err := io.Copy(sw.pipe, strings.NewReader(prompt))
-	return err
-}
-
-// Write implements io.Writer for injecting messages into stdin.
-func (sw *StdinWriter) Write(p []byte) (int, error) {
-	return sw.pipe.Write(p)
-}
-
-// Close closes the underlying pipe.
-func (sw *StdinWriter) Close() error {
-	return sw.pipe.Close()
-}
-
-func recordAuditEvent(w io.Writer, evt AuditEvent, logger LogBuffer) {
-	if err := writeResilientAuditEvent(w, evt, logger); err != nil {
-		log.Printf("[worker] audit event write failed: %v", err)
-	}
-}
-
 // BudgetConfig holds optional budget configuration for subprocess execution.
 type BudgetConfig struct {
 	Budget        budget.IterationBudget
@@ -115,10 +79,16 @@ type BudgetConfig struct {
 // executeWithParallel wraps executeSubprocess with semaphore gating, worktree
 // isolation, and audit event recording. It is the primary execution entry point
 // called from handleTask.
-func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.TaskConfig, bc *BudgetConfig) (adapter.TaskResult, error) {
+func (wl *WorkerLoop) executeWithParallel(
+	ctx context.Context,
+	taskCfg adapter.TaskConfig,
+	bc *BudgetConfig,
+	meta taskRunMeta,
+) (adapter.TaskResult, error) {
 	taskID := taskCfg.TaskID
 	startTime := time.Now()
 	baseline := captureExecutionBaseline(taskCfg.WorkDir)
+	requestedWorkDir := taskCfg.WorkDir
 
 	// Record task start in the audit log.
 	if wl.auditWriter != nil {
@@ -162,6 +132,21 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 			}()
 		}
 	}
+	execution := buildExecutionContextSnapshot(
+		wl.config,
+		requestedWorkDir,
+		taskCfg.WorkDir,
+		worktreePath(taskCfg.WorkDir, requestedWorkDir),
+	)
+	wl.emitHostEvent(HostEvent{
+		Type:          HostEventTaskProgress,
+		TaskID:        taskID,
+		TraceID:       meta.TraceID,
+		CorrelationID: meta.CorrelationID,
+		Phase:         "execution_context",
+		Message:       describeExecutionContext(execution),
+		Execution:     execution,
+	})
 
 	// Delegate to the core subprocess executor.
 	execCtx, cancelExec := wl.executionContext(ctx, taskID)
@@ -193,7 +178,15 @@ func (wl *WorkerLoop) executeWithParallel(ctx context.Context, taskCfg adapter.T
 	return result, nil
 }
 
-func (wl *WorkerLoop) executePipelineWithParallel(ctx context.Context, taskID, prompt, model string, phases []Phase, instructions map[Phase]string, promptTemplates map[Phase]string, bc *BudgetConfig) (adapter.TaskResult, error) {
+func (wl *WorkerLoop) executePipelineWithParallel(
+	ctx context.Context,
+	taskID, prompt, model string,
+	phases []Phase,
+	instructions map[Phase]string,
+	promptTemplates map[Phase]string,
+	bc *BudgetConfig,
+	meta taskRunMeta,
+) (adapter.TaskResult, error) {
 	startTime := time.Now()
 
 	if wl.auditWriter != nil {
@@ -210,6 +203,7 @@ func (wl *WorkerLoop) executePipelineWithParallel(ctx context.Context, taskID, p
 	}
 
 	workDir := wl.config.WorkDir
+	requestedWorkDir := workDir
 	var envVars map[string]string
 	if wl.worktreeManager != nil && wl.config.WorktreeIsolation {
 		wtPath, err := wl.worktreeManager.Create(taskID)
@@ -238,6 +232,21 @@ func (wl *WorkerLoop) executePipelineWithParallel(ctx context.Context, taskID, p
 			}()
 		}
 	}
+	execution := buildExecutionContextSnapshot(
+		wl.config,
+		requestedWorkDir,
+		workDir,
+		worktreePath(workDir, requestedWorkDir),
+	)
+	wl.emitHostEvent(HostEvent{
+		Type:          HostEventTaskProgress,
+		TaskID:        taskID,
+		TraceID:       meta.TraceID,
+		CorrelationID: meta.CorrelationID,
+		Phase:         "execution_context",
+		Message:       describeExecutionContext(execution),
+		Execution:     execution,
+	})
 
 	pe := NewPipelineExecutor(wl.config.Provider, wl.config.MCPConfig, workDir)
 	baseline := captureExecutionBaseline(workDir)
