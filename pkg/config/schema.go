@@ -35,6 +35,12 @@ type SkillsConf struct {
 	AutoActivate bool `yaml:"auto_activate"`
 	// MaxActiveSkills limits the number of concurrently active skills (default 5).
 	MaxActiveSkills int `yaml:"max_active_skills"`
+	// SharedSurface controls how much of the reusable skill library is published to shared surfaces.
+	// full (default): always publish the full shared skill library.
+	// auto: full on single-platform installs, core on mixed Codex+OpenCode installs.
+	// full: always publish the full shared skill library.
+	// core: always publish only the core shared skill set.
+	SharedSurface string `yaml:"shared_surface,omitempty"`
 	// CategoryWeights maps category names to priority weights for skill selection.
 	CategoryWeights map[string]int `yaml:"category_weights,omitempty"`
 }
@@ -264,6 +270,11 @@ func (c *HarnessConfig) Validate() error {
 	}
 	if c.Skills.MaxActiveSkills < 0 {
 		return fmt.Errorf("skills.max_active_skills must be non-negative, got %d", c.Skills.MaxActiveSkills)
+	}
+	switch c.Skills.EffectiveSharedSurface() {
+	case SharedSurfaceAuto, SharedSurfaceFull, SharedSurfaceCore:
+	default:
+		return fmt.Errorf("skills.shared_surface %q is invalid: must be 'auto', 'full', or 'core'", c.Skills.SharedSurface)
 	}
 	if !c.UsageProfile.IsValid() {
 		return fmt.Errorf("invalid usage_profile %q: must be 'developer' or 'fullstack'", c.UsageProfile)

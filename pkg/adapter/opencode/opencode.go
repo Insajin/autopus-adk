@@ -81,6 +81,9 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 	if err != nil {
 		return nil, err
 	}
+	if err := a.cleanupStaleSharedSkillDirs(oldManifest, files); err != nil {
+		return nil, err
+	}
 
 	var backupDir string
 	var finalFiles []adapter.FileMapping

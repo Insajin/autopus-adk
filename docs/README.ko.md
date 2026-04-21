@@ -350,7 +350,7 @@ auto connect         # 대화형 마법사: server auth → workspace → OpenAI
 auto connect status  # 저장된 연결 상태를 로컬에서 결정적으로 검증
 ```
 
-현재 릴리스는 Autopus 서버 인증, 워크스페이스 선택, OpenAI OAuth handoff까지를 수행합니다. 저장된 로컬 상태 검증은 `auto connect status` 또는 `auto worker status --json`으로 확인합니다.
+현재 릴리스는 Autopus 서버 인증, 워크스페이스 선택, OpenAI OAuth handoff까지를 수행합니다. 저장된 로컬 상태 검증은 `auto connect status` 또는 `auto desktop status --json`으로 확인합니다.
 
 ### 🤖 ADK Worker — 로컬 에이전트 실행
 
@@ -421,7 +421,7 @@ auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Gemini CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
-동일한 16개 에이전트. 동일한 40개 스킬. 동일한 규칙. **모든 플랫폼.**
+동일한 16개 에이전트. 동일한 규칙. 공유 스킬은 기본적으로 전체가 생성되며, Codex + OpenCode 혼합 워크스페이스에서 더 작은 표면이 필요하면 `skills.shared_surface: auto` 또는 `core`를 설정합니다.
 
 Codex 참고:
 - `auto init` 또는 `auto update` 직후에는 `$auto plan ...`, `$auto go ...`, `$auto idea ...`를 바로 사용할 수 있습니다
@@ -432,6 +432,7 @@ Codex 참고:
 OpenCode 참고:
 - `/auto ...`와 `/auto-plan ...` 같은 직접 alias가 `.opencode/commands/`에 생성됩니다
 - 네이티브 규칙/에이전트/플러그인은 `.opencode/` 아래에, 재사용 스킬은 `.agents/skills/` 아래에 생성됩니다
+- Codex + OpenCode 혼합 워크스페이스에서는 `skills.shared_surface: auto` 또는 `core`로 `.agents/skills/`를 축소해 Codex 노이즈를 줄일 수 있습니다
 - `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, `/auto doctor` 같은 helper workflow도 OpenCode 명령 래퍼로 함께 생성됩니다
 - `opencode.json`이 관리형 hook plugin을 자동 등록하므로 `auto init` 또는 `auto update` 직후 `.opencode/plugins/autopus-hooks.js`가 바로 활성화됩니다
 

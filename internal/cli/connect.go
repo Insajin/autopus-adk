@@ -85,7 +85,7 @@ func newConnectCmd() *cobra.Command {
 			}
 
 			tui.Successf(out, "Connected OpenAI to workspace %q", wsName)
-			tui.Info(out, "Verify next: `auto connect status` (or `auto worker status --json` for the underlying machine-readable surface)")
+			tui.Info(out, "Verify next: `auto connect status` (or `auto desktop status --json` for the desktop runtime surface)")
 
 			// Save workspace ID to worker config for subsequent starts.
 			if err := saveConnectConfig(wsID, serverURL); err != nil {

@@ -16,7 +16,7 @@ job_max_runtime_seconds = 1800
 
 [mcp_servers.autopus]
 command = "auto"
-args = ["worker", "mcp-serve"]
+args = ["mcp", "server"]
 
 [mcp_servers.context7]
 command = "npx"

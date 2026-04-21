@@ -68,7 +68,7 @@ func collectConnectStatusPayload() connectStatusPayload {
 func nextConnectAction(status workerSetup.WorkerStatus, ready bool) string {
 	switch {
 	case ready:
-		return "Use `auto worker status --json` or start the worker when you need platform-connected execution."
+		return "Use `auto desktop status --json` or start the worker when you need platform-connected execution."
 	case !status.Configured:
 		return "Run `auto connect` to authenticate with the server and select a workspace."
 	case !status.AuthValid:
@@ -78,7 +78,7 @@ func nextConnectAction(status workerSetup.WorkerStatus, ready bool) string {
 	case status.BackendURL == "":
 		return "Re-run `auto connect --server <url>` to persist the backend URL."
 	default:
-		return "Use `auto worker status --json` to inspect the underlying worker readiness state."
+		return "Use `auto desktop status --json` to inspect the desktop runtime readiness state."
 	}
 }
 

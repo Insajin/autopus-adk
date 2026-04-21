@@ -380,7 +380,7 @@ auto connect         # Interactive wizard: server auth → workspace → OpenAI 
 auto connect status  # Deterministic local verify/readiness summary
 ```
 
-The current release authenticates with the Autopus server, saves the selected workspace, and completes the OpenAI OAuth handoff. Use `auto connect status` or `auto worker status --json` to verify the saved local state.
+The current release authenticates with the Autopus server, saves the selected workspace, and completes the OpenAI OAuth handoff. Use `auto connect status` or `auto desktop status --json` to verify the saved local state.
 
 ### 🤖 ADK Worker — Local Agent Execution
 
@@ -510,7 +510,7 @@ One `autopus.yaml` generates **native configuration** for every detected support
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Gemini CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
-Same 16 agents. Same 40 skills. Same rules. **Every platform.**
+Same 16 agents. Same rules. Shared skills stay full by default; if you want a smaller mixed Codex + OpenCode surface, set `skills.shared_surface: auto` or `core`.
 
 Codex note:
 - Use `$auto plan ...`, `$auto go ...`, `$auto idea ...` immediately after `auto init` or `auto update`
@@ -521,6 +521,7 @@ Codex note:
 OpenCode note:
 - `/auto ...` and direct aliases like `/auto-plan ...` are generated under `.opencode/commands/`
 - Native rule/agent/plugin files live under `.opencode/`, while reusable skills are published under `.agents/skills/`
+- In mixed Codex + OpenCode workspaces, you can set `skills.shared_surface: auto` or `core` to reduce `.agents/skills/` so Codex does not inherit the entire OpenCode skill surface
 - Helper workflows like `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, and `/auto doctor` are generated as OpenCode-native command wrappers
 - `opencode.json` now registers the managed hook plugin automatically, so `.opencode/plugins/autopus-hooks.js` is live immediately after `auto init` or `auto update`
 
