@@ -13,22 +13,11 @@ var newCredentialStoreFunc = func() (CredentialStore, string) {
 }
 
 func loadCredentialBytes() ([]byte, error) {
-	store, _ := newCredentialStoreFunc()
-	if store != nil {
-		raw, err := store.Load(workerCredentialService)
-		if err == nil && raw != "" {
-			return []byte(raw), nil
-		}
+	payload, err := loadCredentialPayload()
+	if err != nil {
+		return nil, err
 	}
-
-	// Fallback to the encrypted file store so previously migrated credentials
-	// remain readable even when the preferred backend changes (for example,
-	// keychain becomes available after an earlier file-backed save).
-	if raw, err := newEncryptedFileStore(defaultCredentialDir()).Load(workerCredentialService); err == nil && raw != "" {
-		return []byte(raw), nil
-	}
-
-	return os.ReadFile(DefaultCredentialsPath())
+	return payload.data, nil
 }
 
 func saveCredentialBytes(data []byte) error {

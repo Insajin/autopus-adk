@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Desktop bootstrap session surface for the approval-only shell (SPEC-DESKTOP-004)** (2026-04-21): desktop handoff/session restore가 ADK source of truth를 재사용하도록 `auto worker session` 과 status readiness contract를 추가
+  - `internal/cli/{worker_commands.go,worker_session.go}` — `worker session` command 등록, desktop-oriented machine-readable help/command boundary 정리
+  - `pkg/worker/setup/{status.go,desktop_session.go}` — `credential_backend`, `secure_storage_ready`, `desktop_session_ready` 를 `worker status --json` 에 노출하고 fail-closed desktop session payload 구현
+  - `pkg/worker/setup/desktop_session_test.go` — desktop bootstrap readiness/reason contract 회귀 테스트 추가
+
 - **Orchestra reliability receipts, failure bundles, and run correlation (SPEC-ORCH-020)** (2026-04-21): pane/hook/detach orchestration에 provider preflight, prompt transport, collection receipt와 compact failure bundle contract를 추가
   - `pkg/orchestra/reliability_{receipt,preflight,bundle}.go`, `pkg/orchestra/{types.go,detach.go,job.go}` — schema v1, `run_id`, fallback mode, sanitized artifact, runtime artifact root/retention wiring 추가
   - `pkg/orchestra/{interactive_debate.go,interactive_debate_helpers.go,interactive_debate_round.go,interactive_collect.go}` — hook timeout structured event, partial collection receipt, degraded summary, remediation hint 연결
@@ -13,6 +18,10 @@ All notable changes to this project will be documented in this file.
   - `pkg/orchestra/reliability_{core,collection}_test.go` — secret redaction, preflight receipt, retention, timeout bundle 회귀 테스트 추가
 
 ### Fixed
+
+- **Worker status/session credential source mismatch** (2026-04-21): secure storage backend와 auth validity 판정이 command마다 달라질 수 있던 문제를 단일 credential snapshot 경로로 정리
+  - `pkg/worker/setup/{credential_snapshot.go,credentials_store.go}` — keychain/encrypted/plaintext credential payload를 하나의 snapshot loader로 통합
+  - `pkg/worker/setup/{auth_test.go,status_coverage_test.go,desktop_session_test.go}` — status/session이 같은 credential backend와 readiness를 반환하는지 회귀 검증 추가
 
 - **pkg/orchestra full-suite timeout regression** (2026-04-21): reliability work 이후에도 `go test -timeout 120s ./pkg/orchestra`가 다시 통과하도록 interactive polling/backoff와 fixture sequencing을 결정적으로 정리
   - `pkg/orchestra/{completion_poll.go,interactive.go,interactive_collect.go,interactive_surface.go,surface_manager.go,interactive_debate_round.go}` — polling interval, retry/backoff, submit/empty-output wait를 짧고 결정적으로 조정

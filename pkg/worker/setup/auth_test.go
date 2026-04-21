@@ -14,8 +14,13 @@ import (
 func withLegacyCredentialStore(t *testing.T) {
 	t.Helper()
 	prev := newCredentialStoreFunc
+	prevPayload := loadCredentialPayloadFunc
 	newCredentialStoreFunc = func() (CredentialStore, string) { return nil, "" }
-	t.Cleanup(func() { newCredentialStoreFunc = prev })
+	loadCredentialPayloadFunc = loadPlaintextCredentialPayload
+	t.Cleanup(func() {
+		newCredentialStoreFunc = prev
+		loadCredentialPayloadFunc = prevPayload
+	})
 }
 
 type failingCredentialStore struct{}
@@ -88,10 +93,21 @@ func TestSaveCredentials_SecureStoreRoundTrip(t *testing.T) {
 	t.Setenv("HOME", tmp)
 
 	prev := newCredentialStoreFunc
+	prevPayload := loadCredentialPayloadFunc
 	newCredentialStoreFunc = func() (CredentialStore, string) {
 		return NewCredentialStore(WithForceFileBackend(true))
 	}
-	t.Cleanup(func() { newCredentialStoreFunc = prev })
+	loadCredentialPayloadFunc = func() (credentialPayload, error) {
+		return loadCredentialPayloadFromStore(
+			newEncryptedFileStore(defaultCredentialDir()),
+			"encrypted_file",
+			true,
+		)
+	}
+	t.Cleanup(func() {
+		newCredentialStoreFunc = prev
+		loadCredentialPayloadFunc = prevPayload
+	})
 
 	err := SaveCredentials(map[string]any{
 		"access_token": "secure-token",
@@ -115,11 +131,11 @@ func TestLoadAuthToken_EncryptedFileFallbackAfterPrimaryMiss(t *testing.T) {
 	payload := `{"access_token":"fallback-token","expires_at":"2030-01-01T00:00:00Z"}`
 	require.NoError(t, fileStore.Save(workerCredentialService, payload))
 
-	prev := newCredentialStoreFunc
-	newCredentialStoreFunc = func() (CredentialStore, string) {
-		return failingCredentialStore{}, ""
+	prevPayload := loadCredentialPayloadFunc
+	loadCredentialPayloadFunc = func() (credentialPayload, error) {
+		return loadCredentialPayloadFromStore(fileStore, "encrypted_file", true)
 	}
-	t.Cleanup(func() { newCredentialStoreFunc = prev })
+	t.Cleanup(func() { loadCredentialPayloadFunc = prevPayload })
 
 	token, err := LoadAuthToken()
 	require.NoError(t, err)
