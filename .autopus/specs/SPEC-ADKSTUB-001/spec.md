@@ -1,8 +1,13 @@
 # SPEC-ADKSTUB-001: CLI/TUI Stub 해소 및 Config Schema 정리
 
-**Status**: draft
+**Status**: completed (rolled up into SPEC-ADKWIRE-003, 2026-04-21 sync)
 **Created**: 2026-04-04
 **Domain**: ADKSTUB
+**Superseded By**: `SPEC-ADKWIRE-003`
+
+**Sync Summary**:
+- 이 SPEC에서 지적한 stub/dead-code 범위는 이후 `SPEC-ADKWIRE-003`에서 통합 처리됐다.
+- `auto agent run` 실행 경로, Worker TUI pause/cancel key wiring, learn/worker lifecycle 정리는 더 이상 독립 backlog로 재개하지 않는다.
 
 ## 목적
 

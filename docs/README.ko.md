@@ -346,10 +346,11 @@ Gate 2 FAIL: golangci-lint — pkg/auth/에서 미사용 변수
 AI 프로바이더 설정에 문서를 읽을 필요 없습니다. `auto connect`가 3단계 가이드 설정을 안내합니다.
 
 ```bash
-auto connect    # 대화형 마법사: 감지 → 설정 → 검증
+auto connect         # 대화형 마법사: server auth → workspace → OpenAI OAuth
+auto connect status  # 저장된 연결 상태를 로컬에서 결정적으로 검증
 ```
 
-설치된 CLI 도구를 감지하고, API 키를 검증하고, 연결을 테스트하고, 프로바이더 설정을 작성합니다 — 모두 한 명령으로.
+현재 릴리스는 Autopus 서버 인증, 워크스페이스 선택, OpenAI OAuth handoff까지를 수행합니다. 저장된 로컬 상태 검증은 `auto connect status` 또는 `auto worker status --json`으로 확인합니다.
 
 ### 🤖 ADK Worker — 로컬 에이전트 실행
 
@@ -950,7 +951,8 @@ SPEC 상태 업데이트, 프로젝트 문서 재생성, @AX 태그 라이프사
 | `auto permission` | 권한 모드 감지 (bypass / safe) |
 | `auto browse` | 브라우저 자동화 (cmux browser / agent-browser) |
 | `auto canary` | 배포 후 헬스 체크 (빌드 + E2E + 브라우저) |
-| `auto connect` | 프로바이더 연결 마법사 (감지 → 설정 → 검증) |
+| `auto connect` | 프로바이더 연결 마법사 (server auth → workspace → OpenAI OAuth) |
+| `auto connect status` | 저장된 연결 상태 로컬 검증/ready 요약 |
 | `auto update --self` | CLI 바이너리 자동 업데이트 (GitHub Releases + SHA256) |
 
 </details>

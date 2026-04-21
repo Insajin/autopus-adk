@@ -27,6 +27,7 @@ func newSetupGenerateCmd() *cobra.Command {
 	var (
 		force     bool
 		outputDir string
+		preview   bool
 	)
 
 	cmd := &cobra.Command{
@@ -44,6 +45,15 @@ func newSetupGenerateCmd() *cobra.Command {
 				Force:     force,
 			}
 
+			if preview {
+				plan, planErr := setup.BuildGeneratePlan(dir, opts)
+				if planErr != nil {
+					return planErr
+				}
+				printPreview(cmd.OutOrStdout(), "auto setup generate", setupPreviewHint(plan), setupPreviewItems(plan))
+				return nil
+			}
+
 			_, genErr := setup.Generate(dir, opts)
 			if genErr != nil {
 				return genErr
@@ -56,11 +66,15 @@ func newSetupGenerateCmd() *cobra.Command {
 
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing documentation")
 	cmd.Flags().StringVar(&outputDir, "output", "", "Output directory (default: .autopus/docs/)")
+	cmd.Flags().BoolVar(&preview, "plan", false, "변경 예정 문서만 계산하고 쓰지 않음")
+	cmd.Flags().BoolVar(&preview, "preview", false, "변경 예정 문서만 계산하고 쓰지 않음")
+	cmd.Flags().BoolVar(&preview, "dry-run", false, "변경 예정 문서만 계산하고 쓰지 않음")
 	return cmd
 }
 
 func newSetupUpdateCmd() *cobra.Command {
 	var outputDir string
+	var preview bool
 
 	cmd := &cobra.Command{
 		Use:   "update [dir]",
@@ -70,6 +84,15 @@ func newSetupUpdateCmd() *cobra.Command {
 			dir, err := resolveDirFromArgs(args)
 			if err != nil {
 				return err
+			}
+
+			if preview {
+				plan, planErr := setup.BuildUpdatePlan(dir, outputDir)
+				if planErr != nil {
+					return planErr
+				}
+				printPreview(cmd.OutOrStdout(), "auto setup update", setupPreviewHint(plan), setupPreviewItems(plan))
+				return nil
 			}
 
 			updated, updateErr := setup.Update(dir, outputDir)
@@ -91,6 +114,9 @@ func newSetupUpdateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&outputDir, "output", "", "Documentation directory (default: .autopus/docs/)")
+	cmd.Flags().BoolVar(&preview, "plan", false, "변경 예정 문서만 계산하고 쓰지 않음")
+	cmd.Flags().BoolVar(&preview, "preview", false, "변경 예정 문서만 계산하고 쓰지 않음")
+	cmd.Flags().BoolVar(&preview, "dry-run", false, "변경 예정 문서만 계산하고 쓰지 않음")
 	return cmd
 }
 

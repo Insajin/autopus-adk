@@ -1,8 +1,12 @@
 # SPEC-PATH-001: Module-Local SPEC Path Resolution
 
-**Status**: draft
+**Status**: completed (2026-04-21)
 **Created**: 2026-03-26
 **Domain**: PATH
+
+**Sync Summary**:
+- `pkg/spec/resolve.go`의 resolution contract와 관련 테스트가 실제로 추가됐다.
+- generated router/skill surface도 `SPEC_PATH`, `TARGET_MODULE`, `WORKING_DIR` 기반으로 이동해 module-local path resolution이 canonical contract가 됐다.
 
 ## 목적
 

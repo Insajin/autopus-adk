@@ -36,6 +36,7 @@ internal/cli/test-results/
 .claude/settings.local.json
 .claude/statusline.sh
 .autopus/orchestra/
+.autopus/brainstorms/
 .autopus/cache/docs/
 .autopus/audit.jsonl
 **/.autopus/specs/**/review.md

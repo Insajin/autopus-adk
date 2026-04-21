@@ -1,10 +1,8 @@
 package setup
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
-	"time"
+	"sort"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -21,117 +19,28 @@ type GenerateOptions struct {
 
 // Generate creates all documentation files for the project.
 func Generate(projectDir string, opts *GenerateOptions) (*DocSet, error) {
-	if opts == nil {
-		opts = &GenerateOptions{}
-	}
-
-	docsDir := resolveDocsDir(projectDir, opts.OutputDir)
-
-	// Check if docs already exist
-	if !opts.Force {
-		if _, err := os.Stat(docsDir); err == nil {
-			return nil, fmt.Errorf("documentation already exists at %s. Use --force to overwrite", docsDir)
-		}
-	}
-
-	// Scan project
-	info, err := Scan(projectDir)
+	plan, err := BuildGeneratePlan(projectDir, opts)
 	if err != nil {
-		return nil, fmt.Errorf("scan project: %w", err)
+		return nil, err
 	}
-
-	// Render documents
-	docSet := Render(info, opts.Render)
-
-	// Create docs directory
-	if err := os.MkdirAll(docsDir, 0755); err != nil {
-		return nil, fmt.Errorf("create docs directory: %w", err)
+	result, err := ApplyChangePlan(plan)
+	if err != nil {
+		return nil, err
 	}
-
-	// Write all documents
-	meta := NewMeta(projectDir)
-	if err := writeDocSet(docsDir, projectDir, docSet, meta, info); err != nil {
-		return nil, fmt.Errorf("write documents: %w", err)
-	}
-
-	// Generate scenarios.md
-	if err := generateScenarios(projectDir, info); err != nil {
-		return nil, fmt.Errorf("generate scenarios: %w", err)
-	}
-
-	// Generate signature map
-	if err := generateSignatureMap(projectDir, opts.Config); err != nil {
-		return nil, fmt.Errorf("generate signature map: %w", err)
-	}
-
-	// Save meta
-	if err := SaveMeta(docsDir, meta); err != nil {
-		return nil, fmt.Errorf("save meta: %w", err)
-	}
-
-	return docSet, nil
+	return result.DocSet, nil
 }
 
 // Update regenerates only documents whose source data has changed.
 func Update(projectDir string, outputDir string) ([]string, error) {
-	docsDir := resolveDocsDir(projectDir, outputDir)
-
-	meta, err := LoadMeta(docsDir)
+	plan, err := BuildUpdatePlan(projectDir, outputDir)
 	if err != nil {
-		_, genErr := Generate(projectDir, &GenerateOptions{
-			OutputDir: outputDir,
-			Force:     true,
-		})
-		if genErr != nil {
-			return nil, genErr
-		}
-		return []string{"all (full regeneration due to missing/corrupted .meta.yaml)"}, nil
+		return nil, err
 	}
-
-	info, err := Scan(projectDir)
+	result, err := ApplyChangePlan(plan)
 	if err != nil {
-		return nil, fmt.Errorf("scan project: %w", err)
+		return nil, err
 	}
-
-	docSet := Render(info, nil)
-	docContents := renderDocContents(docSet)
-	var updated []string
-
-	if meta.Files == nil {
-		meta.Files = make(map[string]FileMeta)
-	}
-
-	for fileName, content := range docContents {
-		if meta.HasContentChanged(fileName, content) {
-			if err := os.WriteFile(filepath.Join(docsDir, fileName), []byte(content), 0644); err != nil {
-				return nil, fmt.Errorf("write %s: %w", fileName, err)
-			}
-			meta.Files[fileName] = FileMeta{
-				ContentHash: hashString(content),
-			}
-			updated = append(updated, fileName)
-		}
-	}
-
-	_ = generateScenarios(projectDir, info)
-
-	sigUpdated, sigErr := updateSignatureMap(projectDir, nil)
-	if sigErr != nil {
-		return nil, fmt.Errorf("update signature map: %w", sigErr)
-	}
-	if sigUpdated {
-		updated = append(updated, signaturesFile)
-	}
-
-	if len(updated) > 0 {
-		meta.GeneratedAt = time.Now().UTC()
-		meta.ProjectHash = hashProjectStructure(projectDir)
-		if err := SaveMeta(docsDir, meta); err != nil {
-			return nil, fmt.Errorf("save meta: %w", err)
-		}
-	}
-
-	return updated, nil
+	return legacyUpdatedFiles(plan, result), nil
 }
 
 func resolveDocsDir(projectDir, outputDir string) string {
@@ -142,4 +51,24 @@ func resolveDocsDir(projectDir, outputDir string) string {
 		return filepath.Join(projectDir, outputDir)
 	}
 	return filepath.Join(projectDir, defaultDocsDir)
+}
+
+func legacyUpdatedFiles(plan *ChangePlan, result *ApplyResult) []string {
+	if plan.FullRegeneration {
+		return []string{"all (full regeneration due to missing/corrupted .meta.yaml)"}
+	}
+	if result == nil || len(result.ChangedPaths) == 0 {
+		return nil
+	}
+
+	updated := make([]string, 0, len(result.ChangedPaths))
+	for _, path := range result.ChangedPaths {
+		base := filepath.Base(path)
+		if base == metaFileName {
+			continue
+		}
+		updated = append(updated, base)
+	}
+	sort.Strings(updated)
+	return updated
 }

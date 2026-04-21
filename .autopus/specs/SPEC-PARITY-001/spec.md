@@ -9,10 +9,11 @@ depends_on: SPEC-MULTIPLATFORM-001
 
 # SPEC-PARITY-001: 멀티플랫폼 하네스 패리티 완성
 
-**Status**: implemented
+**Status**: completed (2026-04-21 sync)
 **Created**: 2026-04-02
 **Target Module**: autopus-adk
 **Depends On**: SPEC-MULTIPLATFORM-001 (completed)
+**Follow-up**: Codex `--team` wording/tool contract hardening은 `SPEC-CODEXTEAM-001`로 분리 추적한다.
 
 ## 목적
 

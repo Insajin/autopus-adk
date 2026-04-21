@@ -1,8 +1,13 @@
 # SPEC-ADKWIRE-002: Worker 2차 패키지 Wiring — audit, scheduler, parallel, knowledge, workspace
 
-**Status**: draft
+**Status**: completed (rolled up into SPEC-ADKWIRE-003, 2026-04-21 sync)
 **Created**: 2026-04-04
 **Domain**: ADKWIRE
+**Superseded By**: `SPEC-ADKWIRE-003`
+
+**Sync Summary**:
+- audit/scheduler/parallel/knowledge wiring 정리는 `SPEC-ADKWIRE-003` 통합 구현과 현재 Worker loop lifecycle에 반영됐다.
+- multi-workspace 같은 확장 아이디어는 이 초안을 열린 backlog로 유지하지 않고, 필요 시 새 SPEC로 재정의한다.
 
 ## 목적
 

@@ -33,7 +33,7 @@ func newConnectCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "connect",
 		Short: "Connect an AI provider via local OAuth flow",
-		Long:  "3-step wizard: (1) Autopus server auth, (2) workspace selection, (3) OpenAI PKCE OAuth.",
+		Long:  "Interactive wizard: server auth → workspace → OpenAI OAuth. Concretely: (1) Autopus server auth, (2) workspace selection, (3) OpenAI PKCE OAuth. Use `auto connect status` for deterministic local verify output.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Headless mode: non-interactive, NDJSON output, no browser.
 			if headless {
@@ -85,6 +85,7 @@ func newConnectCmd() *cobra.Command {
 			}
 
 			tui.Successf(out, "Connected OpenAI to workspace %q", wsName)
+			tui.Info(out, "Verify next: `auto connect status` (or `auto worker status --json` for the underlying machine-readable surface)")
 
 			// Save workspace ID to worker config for subsequent starts.
 			if err := saveConnectConfig(wsID, serverURL); err != nil {
@@ -99,6 +100,7 @@ func newConnectCmd() *cobra.Command {
 	cmd.Flags().StringVar(&workspaceID, "workspace", "", "Skip workspace selection and use this ID")
 	cmd.Flags().BoolVar(&headless, "headless", false, "Non-interactive mode for agent-driven OAuth connection")
 	cmd.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "Overall flow timeout for headless mode")
+	cmd.AddCommand(newConnectStatusCmd())
 	return cmd
 }
 

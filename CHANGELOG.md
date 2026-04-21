@@ -4,7 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.39] — 2026-04-21
+
 ### Added
+
+- **Preview-first bootstrap planning and connect truth-sync (SPEC-SETUP-003)** (2026-04-21): `auto update` 와 `auto setup generate/update` 가 no-write preview를 먼저 계산하고, `auto connect` 는 deterministic verify surface와 실제 구현 기준 안내 문구를 제공하도록 정리
+  - `internal/cli/{setup.go,preview_output.go,setup_preview.go,setup_preview_test.go,update.go,update_preview.go,update_config_preview.go,update_preview_test.go}` — `--plan`/`--preview`/`--dry-run` preview 출력, tracked/generated/runtime/config 분류, no-write regression test 추가
+  - `pkg/config/loader.go`, `pkg/setup/{engine.go,engine_docs.go,meta.go,scenarios.go,sigmap_integration.go,types.go,change_plan.go,change_apply.go,change_plan_test.go,workspace_hints.go,sigmap_helpers_test.go}` — reusable change-plan 모델, stale preview revalidation, repo-aware workspace hint, preview/apply shared helpers 추가
+  - `internal/cli/{connect.go,connect_status.go,connect_truth_sync_test.go}`, `README.md`, `docs/README.ko.md` — `auto connect status` surface와 onboarding wording truth-sync, README/help drift regression test 추가
 
 - **Stable machine-readable CLI JSON envelopes (SPEC-CLIJSON-001)** (2026-04-21): phase-1 상태/진단 명령과 기존 JSON surface를 공통 envelope로 정렬해 CI, desktop, agent chaining이 text scraping 없이 재사용할 수 있도록 정리
   - `internal/cli/{output_json.go,doctor_json.go,doctor_json_platforms.go,doctor_json_checks.go,status_json.go,setup_json.go,telemetry_json.go,test_json.go,worker_status_json.go}` — shared envelope writer, redaction/home-path masking, command별 payload/check helper 추가

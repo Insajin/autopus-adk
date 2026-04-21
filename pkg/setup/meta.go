@@ -31,17 +31,22 @@ func LoadMeta(docsDir string) (*Meta, error) {
 
 // SaveMeta writes .meta.yaml to the docs directory.
 func SaveMeta(docsDir string, meta *Meta) error {
-	data, err := yaml.Marshal(meta)
+	data, err := marshalMeta(meta)
 	if err != nil {
-		return fmt.Errorf("marshal meta: %w", err)
+		return err
 	}
 	return os.WriteFile(filepath.Join(docsDir, metaFileName), data, 0644)
 }
 
 // NewMeta creates a Meta with current timestamp and version.
 func NewMeta(projectDir string) *Meta {
+	return NewMetaAt(projectDir, time.Now().UTC())
+}
+
+// NewMetaAt creates a Meta with a fixed timestamp for preview/apply reuse.
+func NewMetaAt(projectDir string, generatedAt time.Time) *Meta {
 	return &Meta{
-		GeneratedAt:    time.Now().UTC(),
+		GeneratedAt:    generatedAt.UTC(),
 		AutopusVersion: version.Version(),
 		ProjectHash:    hashProjectStructure(projectDir),
 		Files:          make(map[string]FileMeta),
@@ -138,4 +143,12 @@ func splitSourceHash(sh string) []string {
 		}
 	}
 	return []string{sh}
+}
+
+func marshalMeta(meta *Meta) ([]byte, error) {
+	data, err := yaml.Marshal(meta)
+	if err != nil {
+		return nil, fmt.Errorf("marshal meta: %w", err)
+	}
+	return data, nil
 }

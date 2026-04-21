@@ -10,12 +10,18 @@ import (
 // @AX:NOTE [AUTO] @AX:REASON: design choice — extraction failures are non-fatal; writes minimal empty ScenarioSet on error to avoid blocking setup flow; fan_in=2 (engine.go:Generate and engine.go:Update)
 // generateScenarios extracts and writes scenarios.md from the project codebase.
 func generateScenarios(projectDir string, info *ProjectInfo) error {
+	content, err := renderScenariosContent(projectDir, info)
+	if err != nil {
+		return err
+	}
+	return writeGeneratedFile(filepath.Join(projectDir, ".autopus", "project", "scenarios.md"), content)
+}
+
+func renderScenariosContent(projectDir string, info *ProjectInfo) ([]byte, error) {
 	absDir, _ := filepath.Abs(projectDir)
 
-	// Extract scenarios from project codebase.
 	scenarios, err := e2e.ExtractCobra(absDir)
 	if err != nil {
-		// Non-fatal: if extraction fails, write a minimal file.
 		scenarios = []e2e.Scenario{}
 	}
 	scenarios = append(scenarios, generateCrossRepoScenarios(info, len(scenarios))...)
@@ -27,16 +33,14 @@ func generateScenarios(projectDir string, info *ProjectInfo) error {
 		Build:       "N/A",
 		Scenarios:   scenarios,
 	}
+	return e2e.RenderScenarios(set)
+}
 
-	content, _ := e2e.RenderScenarios(set)
-
-	// Ensure .autopus/project directory exists.
-	scenariosDir := filepath.Join(absDir, ".autopus", "project")
-	if err := os.MkdirAll(scenariosDir, 0755); err != nil {
+func writeGeneratedFile(path string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-
-	return os.WriteFile(filepath.Join(scenariosDir, "scenarios.md"), content, 0644)
+	return os.WriteFile(path, content, 0644)
 }
 
 func generateCrossRepoScenarios(info *ProjectInfo, offset int) []e2e.Scenario {

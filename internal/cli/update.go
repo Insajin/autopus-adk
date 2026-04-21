@@ -23,7 +23,7 @@ import (
 
 func newUpdateCmd() *cobra.Command {
 	var dir string
-	var selfFlag, checkOnly, force, yesFlag bool
+	var selfFlag, checkOnly, force, yesFlag, previewMode bool
 	var targetVersion string
 
 	cmd := &cobra.Command{
@@ -44,10 +44,60 @@ func newUpdateCmd() *cobra.Command {
 				dir = cwd
 			}
 
-			// 설정 로드
-			cfg, err := config.Load(dir)
+			var (
+				cfg                   *config.HarnessConfig
+				err                   error
+				platformNamesMigrated bool
+			)
+			if previewMode {
+				cfg, platformNamesMigrated, err = loadConfigForUpdatePreview(dir)
+			} else {
+				cfg, err = config.Load(dir)
+			}
 			if err != nil {
 				return fmt.Errorf("설정 로드 실패: %w", err)
+			}
+
+			if previewMode {
+				previewCfg, configReasons, cloneErr := prepareUpdatePreviewConfig(
+					dir,
+					cfg,
+					platformNamesMigrated,
+					yesFlag,
+					isStdinTTY(),
+				)
+				if cloneErr != nil {
+					return cloneErr
+				}
+
+				addedPlatforms := appendDetectedPlatforms(previewCfg)
+				if len(addedPlatforms) > 0 {
+					configReasons = appendConfigPreviewReason(
+						configReasons,
+						"detected platforms: "+strings.Join(addedPlatforms, ", "),
+					)
+				}
+
+				migrated, migrateErr := config.MigrateOrchestraConfig(previewCfg)
+				if migrateErr != nil {
+					return fmt.Errorf("orchestra 마이그레이션 실패: %w", migrateErr)
+				}
+				if migrated {
+					configReasons = appendConfigPreviewReason(
+						configReasons,
+						"orchestra config migration would be persisted",
+					)
+				}
+
+				effectiveCfg := applyFlagCC21Overrides(previewCfg, globalFlagsFromContext(cmd.Context()))
+				preview, previewErr := buildUpdatePreview(cmd.Context(), dir, effectiveCfg)
+				if previewErr != nil {
+					return previewErr
+				}
+				preview.Items = appendConfigPreviewItem(preview.Items, dir, configReasons)
+
+				printPreview(cmd.OutOrStdout(), "auto update", preview.Hint, preview.Items)
+				return nil
 			}
 
 			addedPlatforms := appendDetectedPlatforms(cfg)
@@ -112,6 +162,9 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "같은 버전이라도 재설치 또는 개발 빌드 업데이트 강제")
 	cmd.Flags().StringVar(&targetVersion, "version", "", "특정 버전 설치 (기본값: 최신 버전)")
 	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "모든 프롬프트를 기본값으로 자동 수락")
+	cmd.Flags().BoolVar(&previewMode, "plan", false, "변경 예정 파일만 계산하고 쓰지 않음")
+	cmd.Flags().BoolVar(&previewMode, "preview", false, "변경 예정 파일만 계산하고 쓰지 않음")
+	cmd.Flags().BoolVar(&previewMode, "dry-run", false, "변경 예정 파일만 계산하고 쓰지 않음")
 	return cmd
 }
 

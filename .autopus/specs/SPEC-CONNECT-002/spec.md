@@ -1,10 +1,14 @@
 # SPEC-CONNECT-002: auto connect --headless 에이전트 모드
 
-**Status**: draft
+**Status**: completed (2026-04-21)
 **Created**: 2026-04-07
 **Domain**: CONNECT
 **Scope**: Module (autopus-adk)
 **Extends**: SPEC-CONNECT-001
+
+**Sync Summary**:
+- `auto connect --headless`, `--timeout`, NDJSON event surface, non-TTY hint path가 CLI에 반영됐다.
+- module-side scope는 완료로 닫고, 서버 endpoint readiness는 별도 backend dependency로만 남긴다.
 
 ## 목적
 

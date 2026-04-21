@@ -91,6 +91,83 @@ type DocSet struct {
 	Meta         Meta
 }
 
+// ChangePlanMode identifies the setup flow that produced a plan.
+type ChangePlanMode string
+
+const (
+	ChangePlanModeGenerate ChangePlanMode = "generate"
+	ChangePlanModeUpdate   ChangePlanMode = "update"
+)
+
+// ChangeAction describes how apply would treat a target file.
+type ChangeAction string
+
+const (
+	ChangeActionCreate   ChangeAction = "create"
+	ChangeActionUpdate   ChangeAction = "update"
+	ChangeActionPreserve ChangeAction = "preserve"
+	ChangeActionSkip     ChangeAction = "skip"
+)
+
+// ChangeClass groups changes by ownership/runtime expectations.
+type ChangeClass string
+
+const (
+	ChangeClassTrackedDocs      ChangeClass = "tracked_docs"
+	ChangeClassGeneratedSurface ChangeClass = "generated_surface"
+	ChangeClassRuntimeState     ChangeClass = "runtime_state"
+	ChangeClassConfig           ChangeClass = "config"
+)
+
+// PlannedChange is a single preview entry in a no-write change plan.
+type PlannedChange struct {
+	Path   string
+	Action ChangeAction
+	Class  ChangeClass
+	Reason string
+}
+
+// WorkspaceHintKind identifies repo-aware context for preview/apply.
+type WorkspaceHintKind string
+
+const (
+	WorkspaceHintKindSingleRepo WorkspaceHintKind = "single_repo"
+	WorkspaceHintKindWorkspace  WorkspaceHintKind = "workspace"
+	WorkspaceHintKindMultiRepo  WorkspaceHintKind = "multi_repo"
+)
+
+// WorkspaceHint exposes repo-aware context for bootstrap previews.
+type WorkspaceHint struct {
+	Kind          WorkspaceHintKind
+	Repo          string
+	SourceOfTruth string
+	Message       string
+}
+
+// ChangePlan is a reusable no-write preview for setup generate/update flows.
+type ChangePlan struct {
+	Mode                 ChangePlanMode
+	ProjectDir           string
+	DocsDir              string
+	BuiltAt              time.Time
+	Reason               string
+	FullRegeneration     bool
+	FullRegenerationNote string
+	Fingerprint          string
+	Changes              []PlannedChange
+	WorkspaceHints       []WorkspaceHint
+
+	docSet       *DocSet
+	targets      []plannedTarget
+	generateOpts GenerateOptions
+}
+
+// ApplyResult reports the files written by ApplyChangePlan.
+type ApplyResult struct {
+	ChangedPaths []string
+	DocSet       *DocSet
+}
+
 // DocFiles maps document names to file paths.
 var DocFiles = map[string]string{
 	"index":        "index.md",
@@ -135,4 +212,10 @@ type ValidationWarning struct {
 type SetupConfig struct {
 	AutoGenerate bool   `yaml:"auto_generate"`
 	OutputDir    string `yaml:"output_dir"`
+}
+
+type plannedTarget struct {
+	change  PlannedChange
+	absPath string
+	content []byte
 }

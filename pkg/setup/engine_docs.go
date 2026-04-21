@@ -1,45 +1,28 @@
 package setup
 
-import (
-	"fmt"
-	"os"
-	"path/filepath"
-)
-
-func writeDocSet(docsDir, projectDir string, docSet *DocSet, meta *Meta, info *ProjectInfo) error {
-	docs := map[string]struct {
-		content     string
-		sourceFiles []string
-	}{
-		"index.md":        {docSet.Index, docSourceFiles(info, "index")},
-		"commands.md":     {docSet.Commands, docSourceFiles(info, "commands")},
-		"structure.md":    {docSet.Structure, docSourceFiles(info, "structure")},
-		"conventions.md":  {docSet.Conventions, docSourceFiles(info, "conventions")},
-		"boundaries.md":   {docSet.Boundaries, docSourceFiles(info, "boundaries")},
-		"architecture.md": {docSet.Architecture, docSourceFiles(info, "architecture")},
-		"testing.md":      {docSet.Testing, docSourceFiles(info, "testing")},
-	}
-
-	for fileName, doc := range docs {
-		path := filepath.Join(docsDir, fileName)
-		if err := os.WriteFile(path, []byte(doc.content), 0644); err != nil {
-			return fmt.Errorf("write %s: %w", fileName, err)
-		}
-		meta.SetFileMeta(fileName, doc.content, doc.sourceFiles, projectDir)
-	}
-
-	return nil
+type renderedDoc struct {
+	Key     string
+	Name    string
+	Content string
 }
 
 func renderDocContents(docSet *DocSet) map[string]string {
-	return map[string]string{
-		"index.md":        docSet.Index,
-		"commands.md":     docSet.Commands,
-		"structure.md":    docSet.Structure,
-		"conventions.md":  docSet.Conventions,
-		"boundaries.md":   docSet.Boundaries,
-		"architecture.md": docSet.Architecture,
-		"testing.md":      docSet.Testing,
+	docs := make(map[string]string, len(renderedDocs(docSet)))
+	for _, doc := range renderedDocs(docSet) {
+		docs[doc.Name] = doc.Content
+	}
+	return docs
+}
+
+func renderedDocs(docSet *DocSet) []renderedDoc {
+	return []renderedDoc{
+		{Key: "index", Name: "index.md", Content: docSet.Index},
+		{Key: "commands", Name: "commands.md", Content: docSet.Commands},
+		{Key: "structure", Name: "structure.md", Content: docSet.Structure},
+		{Key: "conventions", Name: "conventions.md", Content: docSet.Conventions},
+		{Key: "boundaries", Name: "boundaries.md", Content: docSet.Boundaries},
+		{Key: "architecture", Name: "architecture.md", Content: docSet.Architecture},
+		{Key: "testing", Name: "testing.md", Content: docSet.Testing},
 	}
 }
 

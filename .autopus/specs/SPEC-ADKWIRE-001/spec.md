@@ -1,8 +1,13 @@
 # SPEC-ADKWIRE-001: ADK Stub Wiring — Learn CLI, Worker 핵심 패키지, Pipeline Dashboard
 
-**Status**: draft
+**Status**: completed (rolled up into SPEC-ADKWIRE-003, 2026-04-21 sync)
 **Created**: 2026-04-04
 **Domain**: ADKWIRE
+**Superseded By**: `SPEC-ADKWIRE-003`
+
+**Sync Summary**:
+- Learn CLI 등록, worker auth/net/poll lifecycle 연결, pipeline dashboard 실제 상태 로드는 `SPEC-ADKWIRE-003` 통합 구현 범위로 흡수됐다.
+- 이 문서는 역사적 분해 노트로만 남기고, 동일 범위를 standalone backlog로 다시 집행하지 않는다.
 
 ## 목적
 

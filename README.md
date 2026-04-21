@@ -376,10 +376,11 @@ No configuration needed — the router evaluates token count, code complexity, a
 Setting up AI providers shouldn't require reading docs. `auto connect` walks you through a 3-step guided setup.
 
 ```bash
-auto connect    # Interactive wizard: detect → configure → verify
+auto connect         # Interactive wizard: server auth → workspace → OpenAI OAuth
+auto connect status  # Deterministic local verify/readiness summary
 ```
 
-Detects installed CLI tools, validates API keys, tests connectivity, and writes provider config — all in one command.
+The current release authenticates with the Autopus server, saves the selected workspace, and completes the OpenAI OAuth handoff. Use `auto connect status` or `auto worker status --json` to verify the saved local state.
 
 ### 🤖 ADK Worker — Local Agent Execution
 
@@ -1033,7 +1034,8 @@ Providers: **Claude** · **Codex** · **Gemini** · **OpenCode** — with gracef
 | `auto permission` | Permission mode detection (bypass / safe) |
 | `auto browse` | Browser automation (cmux browser / agent-browser) |
 | `auto canary` | Post-deploy health check (build + E2E + browser) |
-| `auto connect` | Provider connection wizard (detect → configure → verify) |
+| `auto connect` | Provider connection wizard (server auth → workspace → OpenAI OAuth) |
+| `auto connect status` | Local verify/readiness summary for saved connect state |
 | `auto update --self` | CLI binary self-update (GitHub Releases + SHA256) |
 
 </details>
