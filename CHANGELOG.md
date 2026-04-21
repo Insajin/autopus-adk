@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ## [v0.40.40] — 2026-04-21
 
+### Added
+
+- **Desktop sidecar contract metadata surfaced for supervision preflight (SPEC-DESKTOP-005)** (2026-04-21): desktop가 retained ADK source of truth를 strict parsing으로 소비할 수 있도록 runtime contract / sidecar protocol metadata를 worker status/session과 shared contract package에 고정
+  - `pkg/worker/{setup/status.go,setup/desktop_session.go,sidecarcontract/contract.go}` — `runtime_contract_*`, `sidecar_protocol_*` metadata를 machine-readable bootstrap/session surface에 추가
+  - `pkg/worker/host/sidecar.go` — same contract metadata를 sidecar runtime stream에 맞춰 정렬
+
 ### Changed
 
 - **Desktop supervision approval correlation and launch parity (SPEC-DESKTOP-005)** (2026-04-21): `auto worker sidecar` 가 desktop launch nonce 플래그를 수용하고, approval request/response 경로가 `approval_id` / `trace_id` correlation metadata를 A2A → worker loop → sidecar NDJSON까지 유지하도록 정리
@@ -13,6 +19,17 @@ All notable changes to this project will be documented in this file.
   - `pkg/worker/a2a/{types.go,server_approval.go,server_approval_test.go}` — approval payload/request-response에 correlation metadata를 추가하고 A2A round-trip 회귀 테스트를 보강
   - `pkg/worker/{loop.go,loop_runtime.go,loop_task.go,loop_approval_state.go,loop_approval_test.go,host_observer.go}` — pending approval state를 task별로 보존하고 response/resolution/task cleanup 시 correlation metadata를 유지
   - `pkg/worker/host/{sidecar.go,resolve_test.go}` — sidecar NDJSON approval payload에 `approval_id` / `trace_id`를 노출하고 unknown host event를 explicit degraded signal로 처리
+
+### Fixed
+
+- **Codex auto skill duplicate surface cleanup** (2026-04-21): generated plugin/local skill surface가 동시에 남을 때 중복 라우팅 흔적과 README drift가 발생하던 문제를 정리
+  - `pkg/adapter/codex/{codex.go,codex_standard_skills.go,codex_surface_cleanup.go,codex_surface_test.go,codex_update_test.go}` — duplicate skill cleanup 경로와 회귀 테스트를 추가
+  - `pkg/adapter/integration_test.go`, `README.md`, `docs/README.ko.md` — surface cleanup 동작과 사용자 문서를 현재 Codex contract에 맞춤
+
+### Docs
+
+- **SPEC-SETUP-003 planning/status sync** (2026-04-21): preview-first setup/connect truth-sync 이후 SPEC 문서를 구현 상태 기준으로 갱신
+  - `.autopus/specs/SPEC-SETUP-003/{spec,plan,acceptance}.md` — 구현/검증 상태와 follow-up 범위를 실제 완료 기준에 맞춰 정리
 
 ## [v0.40.39] — 2026-04-21
 
