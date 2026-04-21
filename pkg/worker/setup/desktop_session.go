@@ -2,15 +2,19 @@ package setup
 
 // DesktopSession is a read-only bootstrap payload for desktop shells.
 type DesktopSession struct {
-	Ready               bool   `json:"ready"`
-	Reason              string `json:"reason,omitempty"`
-	WorkspaceID         string `json:"workspace_id,omitempty"`
-	BackendURL          string `json:"backend_url,omitempty"`
-	AuthType            string `json:"auth_type,omitempty"`
-	AccessToken         string `json:"access_token,omitempty"`
-	CredentialBackend   string `json:"credential_backend,omitempty"`
-	SecureStorageReady  bool   `json:"secure_storage_ready"`
-	DesktopSessionReady bool   `json:"desktop_session_ready"`
+	Ready                  bool   `json:"ready"`
+	Reason                 string `json:"reason,omitempty"`
+	WorkspaceID            string `json:"workspace_id,omitempty"`
+	BackendURL             string `json:"backend_url,omitempty"`
+	AuthType               string `json:"auth_type,omitempty"`
+	AccessToken            string `json:"access_token,omitempty"`
+	CredentialBackend      string `json:"credential_backend,omitempty"`
+	SecureStorageReady     bool   `json:"secure_storage_ready"`
+	DesktopSessionReady    bool   `json:"desktop_session_ready"`
+	RuntimeContractName    string `json:"runtime_contract_name"`
+	RuntimeContractMajor   string `json:"runtime_contract_major"`
+	SidecarProtocolName    string `json:"sidecar_protocol_name"`
+	SidecarProtocolVersion string `json:"sidecar_protocol_version"`
 }
 
 // LoadDesktopSession returns a fail-closed desktop bootstrap payload.
@@ -18,12 +22,16 @@ func LoadDesktopSession() DesktopSession {
 	snapshot, _ := loadCredentialSnapshot()
 	status := collectStatusFromSnapshot(snapshot)
 	session := DesktopSession{
-		WorkspaceID:         status.WorkspaceID,
-		BackendURL:          status.BackendURL,
-		AuthType:            status.AuthType,
-		CredentialBackend:   status.CredentialBackend,
-		SecureStorageReady:  status.SecureStorageReady,
-		DesktopSessionReady: status.DesktopSessionReady,
+		WorkspaceID:            status.WorkspaceID,
+		BackendURL:             status.BackendURL,
+		AuthType:               status.AuthType,
+		CredentialBackend:      status.CredentialBackend,
+		SecureStorageReady:     status.SecureStorageReady,
+		DesktopSessionReady:    status.DesktopSessionReady,
+		RuntimeContractName:    status.RuntimeContractName,
+		RuntimeContractMajor:   status.RuntimeContractMajor,
+		SidecarProtocolName:    status.SidecarProtocolName,
+		SidecarProtocolVersion: status.SidecarProtocolVersion,
 	}
 
 	switch {

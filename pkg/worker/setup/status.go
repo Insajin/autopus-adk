@@ -7,19 +7,25 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/insajin/autopus-adk/pkg/worker/sidecarcontract"
 )
 
 // WorkerStatus holds machine-readable worker readiness state.
 type WorkerStatus struct {
-	Configured          bool   `json:"configured"`
-	AuthValid           bool   `json:"auth_valid"`
-	DaemonRunning       bool   `json:"daemon_running"`
-	WorkspaceID         string `json:"workspace_id"`
-	BackendURL          string `json:"backend_url"`
-	AuthType            string `json:"auth_type"` // "jwt", "api_key", or "none"
-	CredentialBackend   string `json:"credential_backend"`
-	SecureStorageReady  bool   `json:"secure_storage_ready"`
-	DesktopSessionReady bool   `json:"desktop_session_ready"`
+	Configured             bool   `json:"configured"`
+	AuthValid              bool   `json:"auth_valid"`
+	DaemonRunning          bool   `json:"daemon_running"`
+	WorkspaceID            string `json:"workspace_id"`
+	BackendURL             string `json:"backend_url"`
+	AuthType               string `json:"auth_type"` // "jwt", "api_key", or "none"
+	CredentialBackend      string `json:"credential_backend"`
+	SecureStorageReady     bool   `json:"secure_storage_ready"`
+	DesktopSessionReady    bool   `json:"desktop_session_ready"`
+	RuntimeContractName    string `json:"runtime_contract_name"`
+	RuntimeContractMajor   string `json:"runtime_contract_major"`
+	SidecarProtocolName    string `json:"sidecar_protocol_name"`
+	SidecarProtocolVersion string `json:"sidecar_protocol_version"`
 }
 
 // rawCredentials is used for flexible JSON parsing of both credential formats.
@@ -122,6 +128,10 @@ func collectStatusFromSnapshot(snapshot credentialSnapshot) WorkerStatus {
 		status.WorkspaceID != "" &&
 		status.BackendURL != "" &&
 		status.SecureStorageReady
+	status.RuntimeContractName = sidecarcontract.ContractName
+	status.RuntimeContractMajor = sidecarcontract.ContractMajor
+	status.SidecarProtocolName = sidecarcontract.ProtocolName
+	status.SidecarProtocolVersion = sidecarcontract.ProtocolVersion
 
 	// Check daemon running state.
 	status.DaemonRunning = checkDaemonRunning()

@@ -8,13 +8,14 @@ import (
 	"time"
 
 	worker "github.com/insajin/autopus-adk/pkg/worker"
+	"github.com/insajin/autopus-adk/pkg/worker/sidecarcontract"
 )
 
 const (
-	SidecarProtocolName    = "autopus-worker-sidecar"
-	SidecarProtocolVersion = "v1"
-	ContractName           = "desktop-worker-runtime-contract"
-	ContractMajor          = "v1"
+	SidecarProtocolName    = sidecarcontract.ProtocolName
+	SidecarProtocolVersion = sidecarcontract.ProtocolVersion
+	ContractName           = sidecarcontract.ContractName
+	ContractMajor          = sidecarcontract.ContractMajor
 )
 
 // Event is a machine-readable sidecar NDJSON envelope.
