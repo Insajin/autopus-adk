@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Stable machine-readable CLI JSON envelopes (SPEC-CLIJSON-001)** (2026-04-21): phase-1 상태/진단 명령과 기존 JSON surface를 공통 envelope로 정렬해 CI, desktop, agent chaining이 text scraping 없이 재사용할 수 있도록 정리
+  - `internal/cli/{output_json.go,doctor_json.go,doctor_json_platforms.go,doctor_json_checks.go,status_json.go,setup_json.go,telemetry_json.go,test_json.go,worker_status_json.go}` — shared envelope writer, redaction/home-path masking, command별 payload/check helper 추가
+  - `internal/cli/{doctor.go,status.go,setup.go,telemetry.go,permission.go,test.go,worker_commands.go,root.go}` — `--json`/`--format json` rollout, warn/error payload contract, fatal JSON path cleanup 반영
+  - `pkg/connect/headless_event.go`, `internal/cli/json_contract_test.go` — `connect --headless` NDJSON compatibility metadata와 contract/redaction/fatal-path regression test 추가
+
 - **Multi-repo workspace detection and cross-repo setup rendering (SPEC-SETUP-002)** (2026-04-21): `auto setup` / `auto arch` 가 root+nested repo topology를 1급 모델로 인식하고 repo boundary/workflow/scenario 문서를 생성하도록 확장
   - `pkg/setup/{multirepo.go,multirepo_deps.go,multirepo_types.go,multirepo_render.go,scanner.go,types.go}` — `MultiRepoInfo` 모델, immediate-child repo discovery, Go/NPM cross-repo dependency mapping, aggregate scan wiring 추가
   - `pkg/setup/{renderer_arch.go,renderer_docs.go,scenarios.go}` — Workspace / Development Workflow / Repository Boundaries 섹션과 path-aware language-specific cross-repo scenario 생성 추가

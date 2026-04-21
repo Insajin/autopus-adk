@@ -36,15 +36,21 @@ func TestPermissionDetectCmd_JSONOutput(t *testing.T) {
 	cmd.SetArgs([]string{"permission", "detect", "--json"})
 	require.NoError(t, cmd.Execute())
 
-	var result map[string]interface{}
+	var result struct {
+		SchemaVersion string                 `json:"schema_version"`
+		Status        string                 `json:"status"`
+		Data          map[string]interface{} `json:"data"`
+	}
 	require.NoError(t, json.Unmarshal(out.Bytes(), &result),
 		"--json output must be valid JSON")
 
-	assert.Contains(t, result, "mode", "JSON must contain 'mode' field")
-	assert.Contains(t, result, "parent_pid", "JSON must contain 'parent_pid' field")
-	assert.Contains(t, result, "flag_found", "JSON must contain 'flag_found' field")
+	assert.Equal(t, "1.0.0", result.SchemaVersion)
+	assert.Equal(t, "ok", result.Status)
+	assert.Contains(t, result.Data, "mode", "JSON data must contain 'mode' field")
+	assert.Contains(t, result.Data, "parent_pid", "JSON data must contain 'parent_pid' field")
+	assert.Contains(t, result.Data, "flag_found", "JSON data must contain 'flag_found' field")
 
-	mode, ok := result["mode"].(string)
+	mode, ok := result.Data["mode"].(string)
 	require.True(t, ok, "mode must be a string")
 	assert.Contains(t, []string{"bypass", "safe"}, mode)
 }
@@ -59,9 +65,11 @@ func TestPermissionDetectCmd_EnvBypass(t *testing.T) {
 	cmd.SetArgs([]string{"permission", "detect", "--json"})
 	require.NoError(t, cmd.Execute())
 
-	var result map[string]interface{}
+	var result struct {
+		Data map[string]interface{} `json:"data"`
+	}
 	require.NoError(t, json.Unmarshal(out.Bytes(), &result))
-	assert.Equal(t, "bypass", result["mode"])
+	assert.Equal(t, "bypass", result.Data["mode"])
 }
 
 // TestPermissionDetectCmd_EnvSafe verifies env override produces safe in JSON.
@@ -74,9 +82,11 @@ func TestPermissionDetectCmd_EnvSafe(t *testing.T) {
 	cmd.SetArgs([]string{"permission", "detect", "--json"})
 	require.NoError(t, cmd.Execute())
 
-	var result map[string]interface{}
+	var result struct {
+		Data map[string]interface{} `json:"data"`
+	}
 	require.NoError(t, json.Unmarshal(out.Bytes(), &result))
-	assert.Equal(t, "safe", result["mode"])
+	assert.Equal(t, "safe", result.Data["mode"])
 }
 
 // TestPermissionCmd_NoSubcommand verifies "auto permission" with no subcommand

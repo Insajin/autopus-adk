@@ -65,10 +65,12 @@ func decodeScenarioResults(t *testing.T, out []byte) []scenarioJSONResult {
 	t.Helper()
 
 	var payload struct {
-		Results []scenarioJSONResult `json:"results"`
+		Data struct {
+			Results []scenarioJSONResult `json:"results"`
+		} `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(out, &payload))
-	return payload.Results
+	return payload.Data.Results
 }
 
 func TestTestRunCmd_DefaultStandalone_SkipsRequiresMismatch(t *testing.T) {
@@ -106,7 +108,8 @@ func TestTestRunCmd_ProfileFlag_RunsMatchingRequires(t *testing.T) {
 	cmd.SetArgs([]string{"run", "--project-dir", dir, "--profile", "local", "--json"})
 
 	err := cmd.Execute()
-	require.NoError(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed")
 
 	results := decodeScenarioResults(t, out.Bytes())
 	require.Len(t, results, 2)

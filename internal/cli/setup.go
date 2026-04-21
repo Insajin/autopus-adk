@@ -95,7 +95,8 @@ func newSetupUpdateCmd() *cobra.Command {
 }
 
 func newSetupValidateCmd() *cobra.Command {
-	var outputDir string
+	var outputDir, format string
+	var jsonOutput bool
 
 	cmd := &cobra.Command{
 		Use:   "validate [dir]",
@@ -107,9 +108,25 @@ func newSetupValidateCmd() *cobra.Command {
 				return err
 			}
 
+			jsonMode, err := resolveJSONMode(jsonOutput, format)
+			if err != nil {
+				return err
+			}
+
 			docsDir := resolveOutputDir(dir, outputDir)
 			report, valErr := setup.Validate(docsDir, dir)
 			if valErr != nil {
+				if jsonMode {
+					return writeJSONResultAndExit(
+						cmd,
+						jsonStatusError,
+						valErr,
+						"setup_validate_failed",
+						map[string]any{"project_dir": dir, "docs_dir": docsDir},
+						nil,
+						nil,
+					)
+				}
 				return valErr
 			}
 
@@ -118,6 +135,23 @@ func newSetupValidateCmd() *cobra.Command {
 			report.Warnings = append(report.Warnings, cmdWarnings...)
 			if len(cmdWarnings) > 0 {
 				report.Valid = false
+			}
+
+			if jsonMode {
+				payload := buildSetupValidationPayload(dir, docsDir, report)
+				warnings := buildSetupValidationWarnings(report)
+				if report.Valid && len(report.Warnings) == 0 {
+					return writeJSONResult(cmd, jsonStatusOK, payload, nil, nil)
+				}
+				return writeJSONResultAndExit(
+					cmd,
+					jsonStatusWarn,
+					fmt.Errorf("%d validation issue(s) found", len(report.Warnings)),
+					"setup_validation_issues",
+					payload,
+					warnings,
+					nil,
+				)
 			}
 
 			out := cmd.OutOrStdout()
@@ -141,11 +175,13 @@ func newSetupValidateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&outputDir, "output", "", "Documentation directory (default: .autopus/docs/)")
+	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
 }
 
 func newSetupStatusCmd() *cobra.Command {
-	var outputDir string
+	var outputDir, format string
+	var jsonOutput bool
 
 	cmd := &cobra.Command{
 		Use:   "status [dir]",
@@ -157,9 +193,34 @@ func newSetupStatusCmd() *cobra.Command {
 				return err
 			}
 
+			jsonMode, err := resolveJSONMode(jsonOutput, format)
+			if err != nil {
+				return err
+			}
+
 			status, statusErr := setup.GetStatus(dir, outputDir)
 			if statusErr != nil {
+				if jsonMode {
+					return writeJSONResultAndExit(
+						cmd,
+						jsonStatusError,
+						statusErr,
+						"setup_status_failed",
+						map[string]any{"project_dir": dir},
+						nil,
+						nil,
+					)
+				}
 				return statusErr
+			}
+
+			if jsonMode {
+				warnings := buildSetupStatusWarnings(status)
+				statusValue := jsonStatusOK
+				if len(warnings) > 0 {
+					statusValue = jsonStatusWarn
+				}
+				return writeJSONResult(cmd, statusValue, buildSetupStatusPayload(dir, outputDir, status), warnings, nil)
 			}
 
 			if !status.Exists {
@@ -194,19 +255,19 @@ func newSetupStatusCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&outputDir, "output", "", "Documentation directory (default: .autopus/docs/)")
+	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
 }
 
 func resolveDirFromArgs(args []string) (string, error) {
-	dir := ""
-	if len(args) > 0 {
-		dir = args[0]
+	if len(args) > 0 { //nolint:revive
+		return resolveDir(args[0])
 	}
-	return resolveDir(dir)
+	return resolveDir("")
 }
 
 func resolveOutputDir(projectDir, outputDir string) string {
-	if outputDir != "" {
+	if outputDir != "" { //nolint:revive
 		return outputDir
 	}
 	return projectDir + "/.autopus/docs"

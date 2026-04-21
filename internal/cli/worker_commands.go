@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -75,16 +74,24 @@ func newWorkerStopCmd() *cobra.Command {
 
 func newWorkerStatusCmd() *cobra.Command {
 	var jsonOutput bool
+	var format string
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show worker daemon status",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if jsonOutput {
-				// Machine-readable JSON output — no other output.
-				s := setup.CollectStatus()
-				enc := json.NewEncoder(cmd.OutOrStdout())
-				enc.SetIndent("", "  ")
-				return enc.Encode(s)
+			jsonMode, err := resolveJSONMode(jsonOutput, format)
+			if err != nil {
+				return err
+			}
+
+			if jsonMode {
+				statusPayload := setup.CollectStatus()
+				warnings := buildWorkerStatusWarnings(statusPayload)
+				status := jsonStatusOK
+				if len(warnings) > 0 {
+					status = jsonStatusWarn
+				}
+				return writeJSONResult(cmd, status, statusPayload, warnings, nil)
 			}
 			// Human-readable output (existing behavior).
 			out := cmd.OutOrStdout()
@@ -98,7 +105,7 @@ func newWorkerStatusCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&jsonOutput, "json", false, "Output status as JSON")
+	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
 }
 

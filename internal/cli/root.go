@@ -138,6 +138,9 @@ func Execute() {
 	tui.InitStyles()
 
 	if err := NewRootCmd().Execute(); err != nil {
+		if isJSONFatalError(err) {
+			os.Exit(1)
+		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

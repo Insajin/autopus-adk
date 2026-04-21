@@ -77,6 +77,8 @@ func newTelemetryRecordCmd() *cobra.Command {
 // recent (or spec-filtered) pipeline run summary.
 func newTelemetrySummaryCmd() *cobra.Command {
 	var specID string
+	var jsonOutput bool
+	var format string
 
 	cmd := &cobra.Command{
 		Use:   "summary",
@@ -87,9 +89,34 @@ func newTelemetrySummaryCmd() *cobra.Command {
 				return fmt.Errorf("telemetry summary: get cwd: %w", err)
 			}
 
-			run, err := resolveSingleRun(baseDir, specID)
+			jsonMode, err := resolveJSONMode(jsonOutput, format)
 			if err != nil {
 				return err
+			}
+
+			run, err := resolveSingleRun(baseDir, specID)
+			if err != nil {
+				if jsonMode {
+					return writeJSONResultAndExit(
+						cmd,
+						jsonStatusError,
+						err,
+						"telemetry_summary_unavailable",
+						map[string]any{"spec_id": specID},
+						nil,
+						nil,
+					)
+				}
+				return err
+			}
+
+			if jsonMode {
+				warnings := buildTelemetryRunWarnings(*run)
+				status := jsonStatusOK
+				if len(warnings) > 0 {
+					status = jsonStatusWarn
+				}
+				return writeJSONResult(cmd, status, buildTelemetrySummaryPayload(*run), warnings, nil)
 			}
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), telemetry.FormatSummary(*run))
 			return nil
@@ -97,6 +124,7 @@ func newTelemetrySummaryCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&specID, "spec-id", "", "Filter by SPEC identifier")
+	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
 }
 
@@ -104,6 +132,8 @@ func newTelemetrySummaryCmd() *cobra.Command {
 // the most recent (or spec-filtered) pipeline run.
 func newTelemetryCostCmd() *cobra.Command {
 	var specID string
+	var jsonOutput bool
+	var format string
 
 	cmd := &cobra.Command{
 		Use:   "cost",
@@ -114,9 +144,34 @@ func newTelemetryCostCmd() *cobra.Command {
 				return fmt.Errorf("telemetry cost: get cwd: %w", err)
 			}
 
-			run, err := resolveSingleRun(baseDir, specID)
+			jsonMode, err := resolveJSONMode(jsonOutput, format)
 			if err != nil {
 				return err
+			}
+
+			run, err := resolveSingleRun(baseDir, specID)
+			if err != nil {
+				if jsonMode {
+					return writeJSONResultAndExit(
+						cmd,
+						jsonStatusError,
+						err,
+						"telemetry_cost_unavailable",
+						map[string]any{"spec_id": specID},
+						nil,
+						nil,
+					)
+				}
+				return err
+			}
+
+			if jsonMode {
+				warnings := buildTelemetryRunWarnings(*run)
+				status := jsonStatusOK
+				if len(warnings) > 0 {
+					status = jsonStatusWarn
+				}
+				return writeJSONResult(cmd, status, buildTelemetryCostPayload(*run), warnings, nil)
 			}
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), cost.FormatCostReport(*run))
 			return nil
@@ -124,6 +179,7 @@ func newTelemetryCostCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&specID, "spec-id", "", "Filter by SPEC identifier")
+	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
 }
 
@@ -131,6 +187,8 @@ func newTelemetryCostCmd() *cobra.Command {
 // comparison of the two most recent pipeline runs (or filtered by --spec-id).
 func newTelemetryCompareCmd() *cobra.Command {
 	var specID string
+	var jsonOutput bool
+	var format string
 
 	cmd := &cobra.Command{
 		Use:   "compare",
@@ -141,9 +199,34 @@ func newTelemetryCompareCmd() *cobra.Command {
 				return fmt.Errorf("telemetry compare: get cwd: %w", err)
 			}
 
-			runs, err := resolveTwoRuns(baseDir, specID)
+			jsonMode, err := resolveJSONMode(jsonOutput, format)
 			if err != nil {
 				return err
+			}
+
+			runs, err := resolveTwoRuns(baseDir, specID)
+			if err != nil {
+				if jsonMode {
+					return writeJSONResultAndExit(
+						cmd,
+						jsonStatusError,
+						err,
+						"telemetry_compare_unavailable",
+						map[string]any{"spec_id": specID},
+						nil,
+						nil,
+					)
+				}
+				return err
+			}
+
+			if jsonMode {
+				warnings := buildTelemetryComparisonWarnings(runs)
+				status := jsonStatusOK
+				if len(warnings) > 0 {
+					status = jsonStatusWarn
+				}
+				return writeJSONResult(cmd, status, buildTelemetryComparePayload(runs), warnings, nil)
 			}
 			fmt.Fprint(cmd.OutOrStdout(), telemetry.FormatComparison(runs[0], runs[1]))
 			return nil
@@ -151,5 +234,6 @@ func newTelemetryCompareCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&specID, "spec-id", "", "Filter runs by SPEC identifier")
+	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
 }

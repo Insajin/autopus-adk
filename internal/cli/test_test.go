@@ -99,5 +99,8 @@ func TestTestRunCmd_JSONOutput_FormatsCorrectly(t *testing.T) {
 	var result map[string]interface{}
 	parseErr := json.Unmarshal(out.Bytes(), &result)
 	require.NoError(t, parseErr, "output should be valid JSON")
-	assert.Contains(t, result, "results", "JSON output should have 'results' key")
+	assert.Equal(t, "1.0.0", result["schema_version"])
+	data, ok := result["data"].(map[string]interface{})
+	require.True(t, ok, "JSON output should have envelope data")
+	assert.Contains(t, data, "results", "JSON envelope data should have 'results' key")
 }

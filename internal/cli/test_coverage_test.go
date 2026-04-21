@@ -229,5 +229,6 @@ func TestTestRunCmd_JSONNoScenarios_EmptyResults(t *testing.T) {
 
 	// Then: no error, empty JSON results
 	require.NoError(t, err)
+	assert.Contains(t, out.String(), `"data"`)
 	assert.Contains(t, out.String(), `"results"`)
 }

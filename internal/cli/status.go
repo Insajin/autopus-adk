@@ -16,17 +16,35 @@ import (
 
 // specEntry holds parsed data for a single SPEC.
 type specEntry struct {
+	module string
 	id     string
 	status string
 	title  string
+	path   string
+}
+
+func (s specEntry) displayID() string {
+	if s.module == "" {
+		return s.id
+	}
+	return fmt.Sprintf("[%s] %s", s.module, s.id)
+}
+
+func (s specEntry) isDone() bool {
+	switch normalizeSpecStatus(s.status) {
+	case "done", "completed", "implemented":
+		return true
+	default:
+		return false
+	}
 }
 
 // statusIcon returns the display icon for a given SPEC status.
 func statusIcon(status string) string {
-	switch strings.ToLower(status) {
-	case "done", "completed", "implemented":
+	switch {
+	case specEntry{status: status}.isDone():
 		return "✓"
-	case "approved", "in-progress":
+	case normalizeSpecStatus(status) == "approved", normalizeSpecStatus(status) == "in-progress":
 		return "→"
 	default:
 		return "○"
@@ -114,6 +132,7 @@ func scanSpecs(specsDir string) ([]specEntry, error) {
 		}
 
 		specs = append(specs, specEntry{
+			path:   specFile,
 			id:     name,
 			status: status,
 			title:  title,
@@ -143,7 +162,7 @@ func scanAllSpecs(baseDir string) []specEntry {
 		subSpecsDir := filepath.Join(baseDir, entry.Name(), ".autopus", "specs")
 		subSpecs, _ := scanSpecs(subSpecsDir)
 		for i := range subSpecs {
-			subSpecs[i].id = fmt.Sprintf("[%s] %s", entry.Name(), subSpecs[i].id)
+			subSpecs[i].module = entry.Name()
 		}
 		all = append(all, subSpecs...)
 	}
@@ -152,61 +171,95 @@ func scanAllSpecs(baseDir string) []specEntry {
 }
 
 func newStatusCmd() *cobra.Command {
-	var dir string
+	var (
+		dir        string
+		jsonOutput bool
+		format     string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show SPEC dashboard",
 		Long:  "SPEC 디렉터리를 스캔하여 모든 SPEC의 상태를 표시합니다.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			jsonMode, err := resolveJSONMode(jsonOutput, format)
+			if err != nil {
+				if jsonOutput {
+					return writeJSONResultAndExit(
+						cmd,
+						jsonStatusError,
+						err,
+						"invalid_format",
+						map[string]any{},
+						nil,
+						nil,
+					)
+				}
+				return err
+			}
 			if dir == "" {
-				var err error
 				dir, err = os.Getwd()
 				if err != nil {
+					if jsonMode {
+						return writeJSONResultAndExit(
+							cmd,
+							jsonStatusError,
+							fmt.Errorf("현재 디렉터리를 가져올 수 없음: %w", err),
+							"cwd_unavailable",
+							map[string]any{},
+							nil,
+							nil,
+						)
+					}
 					return fmt.Errorf("현재 디렉터리를 가져올 수 없음: %w", err)
 				}
 			}
 
-			out := cmd.OutOrStdout()
-
-			// Scan top-level and submodule specs
-			specs := scanAllSpecs(dir)
-			if len(specs) == 0 {
-				_, _ = fmt.Fprintln(out, "SPEC이 없습니다. `/auto plan`으로 시작하세요.")
-				return nil
+			if jsonMode {
+				return runStatusJSON(cmd, dir)
 			}
-
-			tui.BannerWithInfo(out, "Project Status", "specs")
-
-			doneCount := 0
-			for _, s := range specs {
-				icon := statusIcon(s.status)
-
-				// Style icon based on status
-				var iconStyled string
-				switch icon {
-				case "✓":
-					iconStyled = tui.SuccessLabelStyle.Render(icon)
-					doneCount++
-				case "→":
-					iconStyled = tui.BrandStyle.Render(icon)
-				default:
-					iconStyled = tui.MutedStyle.Render(icon)
-				}
-
-				statusStyled := tui.MutedStyle.Render(fmt.Sprintf("%-8s", s.status))
-				idStyled := tui.BoldStyle.Render(fmt.Sprintf("%-14s", s.id))
-				_, _ = fmt.Fprintf(out, "  %s %s %s  %s\n", idStyled, iconStyled, statusStyled, s.title)
-			}
-
-			_, _ = fmt.Fprintln(out)
-			summary := fmt.Sprintf("전체: %d/%d 완료", doneCount, len(specs))
-			_, _ = fmt.Fprintf(out, "  %s\n", tui.MutedStyle.Render(summary))
-
-			return nil
+			return runStatusText(cmd, dir)
 		},
 	}
 
 	cmd.Flags().StringVar(&dir, "dir", "", "프로젝트 루트 디렉터리 (기본값: 현재 디렉터리)")
+	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
+}
+
+func runStatusText(cmd *cobra.Command, dir string) error {
+	out := cmd.OutOrStdout()
+
+	specs := scanAllSpecs(dir)
+	if len(specs) == 0 {
+		_, _ = fmt.Fprintln(out, "SPEC이 없습니다. `/auto plan`으로 시작하세요.")
+		return nil
+	}
+
+	tui.BannerWithInfo(out, "Project Status", "specs")
+
+	doneCount := 0
+	for _, s := range specs {
+		icon := statusIcon(s.status)
+
+		var iconStyled string
+		switch icon {
+		case "✓":
+			iconStyled = tui.SuccessLabelStyle.Render(icon)
+			doneCount++
+		case "→":
+			iconStyled = tui.BrandStyle.Render(icon)
+		default:
+			iconStyled = tui.MutedStyle.Render(icon)
+		}
+
+		statusStyled := tui.MutedStyle.Render(fmt.Sprintf("%-8s", s.status))
+		idStyled := tui.BoldStyle.Render(fmt.Sprintf("%-14s", s.displayID()))
+		_, _ = fmt.Fprintf(out, "  %s %s %s  %s\n", idStyled, iconStyled, statusStyled, s.title)
+	}
+
+	_, _ = fmt.Fprintln(out)
+	summary := fmt.Sprintf("전체: %d/%d 완료", doneCount, len(specs))
+	_, _ = fmt.Fprintf(out, "  %s\n", tui.MutedStyle.Render(summary))
+	return nil
 }
