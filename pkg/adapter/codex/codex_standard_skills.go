@@ -72,25 +72,13 @@ func (a *Adapter) renderPluginFiles(cfg *config.HarnessConfig) ([]adapter.FileMa
 }
 
 func (a *Adapter) preparePluginMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	files := make([]adapter.FileMapping, 0, len(workflowSpecs)*2+2)
+	files := make([]adapter.FileMapping, 0, 3)
 
 	routerContent, err := a.renderRouterSkill(cfg)
 	if err != nil {
 		return nil, err
 	}
 	files = append(files, newSkillMapping(filepath.Join(".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"), routerContent))
-
-	for _, spec := range workflowSpecs {
-		if spec.Name == "auto" {
-			continue
-		}
-
-		content, err := a.renderPluginWorkflowShim(cfg, spec)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, newSkillMapping(filepath.Join(".autopus", "plugins", "auto", "skills", spec.Name, "SKILL.md"), content))
-	}
 
 	pluginJSON, err := a.renderPluginManifestJSON()
 	if err != nil {

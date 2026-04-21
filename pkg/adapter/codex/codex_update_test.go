@@ -88,3 +88,23 @@ func TestUpdate_DeletedManagedFile_Skipped(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, pf)
 }
+
+func TestUpdate_RemovesDeprecatedPluginWorkflowShims(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	staleDir := filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto-plan")
+	require.NoError(t, os.MkdirAll(staleDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(staleDir, "SKILL.md"), []byte("stale shim"), 0644))
+
+	_, err = a.Update(context.Background(), cfg)
+	require.NoError(t, err)
+
+	_, statErr := os.Stat(filepath.Join(staleDir, "SKILL.md"))
+	assert.True(t, os.IsNotExist(statErr), "deprecated plugin workflow shims should be pruned on update")
+}

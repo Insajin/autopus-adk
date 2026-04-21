@@ -75,24 +75,8 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 				assert.NotContains(t, content, token, path)
 			}
 		}
-
-		pluginPath := filepath.Join(dir, ".autopus", "plugins", "auto", "skills", name, "SKILL.md")
-		pluginData, readErr := os.ReadFile(pluginPath)
-		require.NoError(t, readErr, pluginPath)
-		pluginContent := string(pluginData)
-		assert.Contains(t, pluginContent, "## Autopus Branding", pluginPath)
-		assert.Contains(t, pluginContent, "🐙 Autopus ─────────────────────────", pluginPath)
-		assert.Contains(t, pluginContent, "thin alias shim", pluginPath)
-		assert.Contains(t, pluginContent, "Immediately load skill `auto` and use it as the canonical router.", pluginPath)
-		assert.Contains(t, pluginContent, "## Alias Shim Contract", pluginPath)
-		assert.Contains(t, pluginContent, "## Detailed Workflow Source", pluginPath)
-		assert.Contains(t, pluginContent, ".agents/skills/"+name+"/SKILL.md", pluginPath)
-		assert.Contains(t, pluginContent, ".codex/prompts/"+name+".md", pluginPath)
-		assert.NotContains(t, pluginContent, "Pre-Completion Verification", pluginPath)
-		assert.NotContains(t, pluginContent, ".codex/skills/agent-pipeline.md", pluginPath)
-		for _, token := range banned {
-			assert.NotContains(t, pluginContent, token, pluginPath)
-		}
+		_, statErr := os.Stat(filepath.Join(dir, ".autopus", "plugins", "auto", "skills", name, "SKILL.md"))
+		assert.True(t, os.IsNotExist(statErr), "plugin-local workflow shim should not exist for %s", name)
 	}
 
 	autoIdeaSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-idea", "SKILL.md"))

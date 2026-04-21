@@ -426,6 +426,8 @@ auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
 Codex 참고:
 - `auto init` 또는 `auto update` 직후에는 `$auto plan ...`, `$auto go ...`, `$auto idea ...`를 바로 사용할 수 있습니다
 - `.agents/plugins/marketplace.json`에 등록된 로컬 플러그인(`.autopus/plugins/auto`)을 설치하면 더 자연스러운 `@auto ...` 문법을 사용할 수 있습니다
+- 로컬 플러그인은 `@auto ...` 라우터 표면만 제공합니다. 상세 workflow 지침은 repo skill과 `.codex/prompts/`에 남겨 Codex에서 중복 `auto*` skill이 보이지 않게 합니다
+- `.codex/hooks.json`은 기본 생성됩니다. Codex 세션에 `Under-development features enabled: codex_hooks` 경고가 보이면, 그 경고는 프로젝트 로컬 `config.toml`이 아니라 현재 Codex CLI의 experimental feature gate에서 오는 것입니다
 
 OpenCode 참고:
 - `/auto ...`와 `/auto-plan ...` 같은 직접 alias가 `.opencode/commands/`에 생성됩니다
@@ -667,7 +669,7 @@ Autopus Triage가 자동으로 요청을 분석합니다:
   Complexity: HIGH → /auto idea --multi (추천)
 ```
 
-Codex에서는 `.agents/plugins/marketplace.json`에 등록된 로컬 플러그인을 설치한 뒤 `@auto ...`를 쓰거나, 바로 `$auto ...`를 repo skill fallback으로 사용하면 됩니다.
+Codex에서는 `.agents/plugins/marketplace.json`에 등록된 로컬 플러그인을 설치한 뒤 `@auto ...`를 쓰거나, 바로 `$auto ...`를 repo skill fallback으로 사용하면 됩니다. 플러그인은 라우터 표면만 추가하고, 상세 workflow 지침은 repo skill과 `.codex/prompts/`에 계속 유지됩니다.
 </details>
 
 ### 🔄 업데이트

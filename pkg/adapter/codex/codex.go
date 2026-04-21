@@ -154,6 +154,10 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, gitHookFiles...)
 
+	if err := a.cleanupDeprecatedSurface(); err != nil {
+		return nil, err
+	}
+
 	pf := &adapter.PlatformFiles{
 		Files:    files,
 		Checksum: checksum(fmt.Sprintf("%d", len(files))),
@@ -212,6 +216,10 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 			return nil, fmt.Errorf("파일 쓰기 실패 %s: %w", f.TargetPath, err)
 		}
 		finalFiles = append(finalFiles, f)
+	}
+
+	if err := a.cleanupDeprecatedSurface(); err != nil {
+		return nil, err
 	}
 
 	pf := &adapter.PlatformFiles{

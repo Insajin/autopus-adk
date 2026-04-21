@@ -46,6 +46,8 @@ func TestE2EInitCodex(t *testing.T) {
 	// Local plugin marketplace and plugin manifest must exist for @auto flow.
 	assertFileExists(t, filepath.Join(dir, ".agents", "plugins", "marketplace.json"))
 	assertFileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", ".codex-plugin", "plugin.json"))
+	assertFileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"))
+	assertNoFileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto-plan", "SKILL.md"))
 
 	// .codex/prompts/ directory must exist with 17 prompts.
 	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "prompts"), 17)
@@ -62,9 +64,10 @@ func TestE2EInitCodex(t *testing.T) {
 	// Manifest must be saved.
 	assertFileExists(t, filepath.Join(dir, ".autopus", "codex-manifest.json"))
 
-	// Manifest file count: skills(46) + prompts(6) + agents(16) + rules(7) + AGENTS.md + hooks.json + config.toml = 78+
-	assert.GreaterOrEqual(t, len(pf.Files), 80,
-		"Codex should produce at least 80 file mappings, got %d", len(pf.Files))
+	// Manifest file count stays high because Codex still emits repo skills,
+	// prompts, agents, hooks, config, git hooks, and the local plugin router.
+	assert.GreaterOrEqual(t, len(pf.Files), 65,
+		"Codex should produce at least 65 file mappings, got %d", len(pf.Files))
 
 	// Validate should pass after Generate.
 	errs, err := a.Validate(context.Background())
@@ -268,6 +271,12 @@ func assertFileExists(t *testing.T, path string) {
 	t.Helper()
 	_, err := os.Stat(path)
 	assert.NoError(t, err, "expected file to exist: %s", path)
+}
+
+func assertNoFileExists(t *testing.T, path string) {
+	t.Helper()
+	_, err := os.Stat(path)
+	assert.True(t, os.IsNotExist(err), "expected file to be absent: %s", path)
 }
 
 func assertDirNotEmpty(t *testing.T, dir string) {
