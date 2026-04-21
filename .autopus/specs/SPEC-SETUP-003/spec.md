@@ -1,12 +1,16 @@
 # SPEC-SETUP-003: Preview-First Bootstrap and Onboarding Truth Sync
 
----
-id: SPEC-SETUP-003
-title: Preview-First Bootstrap and Onboarding Truth Sync
-version: 0.1.0
-status: completed
-priority: Must
----
+**Status**: completed (2026-04-21)
+**Created**: 2026-04-21
+**Domain**: SETUP
+**Scope**: Module (autopus-adk)
+
+**Sync Summary (2026-04-21)**:
+- `auto setup generate/update` 와 `auto update` 는 `--plan`, `--preview`, `--dry-run` 에서 no-write preview를 출력하고, tracked docs / generated surface / runtime state / config 분류를 함께 보여준다.
+- `pkg/setup` 은 `ChangePlan`, `PlannedChange`, `WorkspaceHint`, `BuildGeneratePlan`, `BuildUpdatePlan`, `ApplyChangePlan` 기반 reusable change-set contract를 사용하고, preview 이후 filesystem drift가 생기면 stale plan으로 재검증한다.
+- repo-aware bootstrap hints 는 multi-repo/workspace 감지 결과를 재사용해 owning repo와 source-of-truth 문맥을 preview 출력에 포함한다.
+- `auto connect status` 가 local readiness, next action, provider detect 결과를 deterministic하게 보여주고, `auto connect` help/README 문구는 실제 state machine(server auth → workspace → OpenAI OAuth)에 맞게 동기화됐다.
+- `internal/cli/connect_truth_sync_test.go` 가 CLI help, `README.md`, `docs/README.ko.md` 사이의 truth drift를 회귀 테스트로 고정한다.
 
 ## Purpose
 
@@ -27,15 +31,6 @@ priority: Must
 - `SPEC-INITUX-001`
 - `SPEC-SETUP-002`
 - `SPEC-OSSUX-001`
-
-## Implementation Snapshot
-
-2026-04-21 sync 기준 실제 반영 범위:
-
-- `auto setup generate/update` 와 `auto update` 는 `--plan`, `--preview`, `--dry-run` 에서 no-write preview를 출력하고, tracked docs / generated surface / runtime state / config 분류를 함께 보여준다.
-- `pkg/setup` 은 `BuildGeneratePlan`, `BuildUpdatePlan`, `ApplyChangePlan` 기반 reusable change-set contract를 사용하고, preview 이후 filesystem drift가 생기면 stale plan으로 재검증한다.
-- repo-aware bootstrap hints 는 multi-repo/workspace 감지 결과를 재사용해 owning repo와 source-of-truth 문맥을 preview 출력에 포함한다.
-- `auto connect status` 가 local readiness, next action, provider detect 결과를 deterministic하게 보여주고, `auto connect` help/README 문구는 실제 state machine(server auth → workspace → OpenAI OAuth)에 맞게 동기화됐다.
 
 ## Requirements
 
@@ -89,6 +84,7 @@ priority: Must
 - [x] `AC-004` meta workspace context is surfaced before risky bootstrap changes
 - [x] `AC-005` preview/apply drift is detected and revalidated before writes
 - [x] `AC-006` preview remains deterministic in non-interactive and CI contexts
+- [x] `AC-007` README/help truth-sync is regression-tested
 
 ## Out of Scope
 
@@ -100,17 +96,17 @@ priority: Must
 
 ## Traceability
 
-| Requirement | Test | Status |
-|-------------|------|--------|
-| R1 | AC-001 | implemented |
-| R2 | AC-001 | implemented |
-| R3 | AC-001 | implemented |
-| R4 | AC-002 | implemented |
-| R5 | AC-003 | implemented |
-| R6 | AC-003 | implemented |
-| R7 | AC-004 | implemented |
-| R8 | AC-005 | implemented |
-| R9 | AC-004 | implemented |
-| R10 | AC-003 | implemented |
-| R11 | AC-006 | implemented |
-| R12 | AC-003 | implemented |
+| Requirement | Acceptance | Evidence | Status |
+|-------------|------------|----------|--------|
+| R1 | AC-001 | `internal/cli/update_preview_test.go`, `internal/cli/setup_preview_test.go`, `pkg/setup/change_plan_test.go` | implemented |
+| R2 | AC-001 | `pkg/setup/change_plan_test.go`, `internal/cli/update_preview_test.go` | implemented |
+| R3 | AC-001 | `internal/cli/update_preview_test.go` | implemented |
+| R4 | AC-002 | `internal/cli/setup_preview_test.go` | implemented |
+| R5 | AC-003 | `internal/cli/connect_truth_sync_test.go` | implemented |
+| R6 | AC-003 | `internal/cli/connect.go`, `internal/cli/connect_status.go`, `internal/cli/connect_truth_sync_test.go` | implemented |
+| R7 | AC-004 | `internal/cli/setup_preview_test.go`, `pkg/setup/change_plan_test.go` | implemented |
+| R8 | AC-005 | `pkg/setup/change_plan_test.go` | implemented |
+| R9 | AC-004 | `pkg/setup/workspace_hints.go`, `internal/cli/setup_preview_test.go` | implemented |
+| R10 | AC-007 | `internal/cli/connect_truth_sync_test.go` | implemented |
+| R11 | AC-006 | `internal/cli/setup_preview_test.go`, `internal/cli/update_preview_test.go` | implemented |
+| R12 | AC-003 | `internal/cli/connect.go`, `internal/cli/connect_truth_sync_test.go` | implemented |

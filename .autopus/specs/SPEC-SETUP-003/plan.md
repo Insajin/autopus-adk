@@ -17,32 +17,38 @@
 
 | 파일 | 작업 (생성/수정/삭제) | 설명 |
 |------|---------------------|------|
-| `internal/cli/update.go` | 수정 | `--plan`/preview surface |
-| `internal/cli/setup.go` | 수정 | generate/update preview and diff explanation |
-| `internal/cli/connect.go` | 수정 | help/flow wording truth-sync |
+| `internal/cli/update.go` | 수정 | `--plan`/preview surface 진입점과 apply/preview 분기 |
+| `internal/cli/update_preview.go` | 생성 | update preview 항목 계산과 분류 출력 |
+| `internal/cli/update_config_preview.go` | 생성 | config no-write preview와 change reason 계산 |
+| `internal/cli/setup.go` | 수정 | generate/update preview entrypoint와 change-plan 연결 |
+| `internal/cli/setup_preview.go` | 생성 | `ChangePlan` 을 CLI preview item으로 변환 |
+| `internal/cli/connect.go` | 수정 | help wording truth-sync와 `status` 진입점 연결 |
+| `internal/cli/connect_status.go` | 생성 | deterministic local verify/status surface |
 | `internal/cli/init.go` | 수정 | preview-aware next-step messaging |
-| `pkg/setup/engine.go` | 수정 | preview/apply separation |
-| `pkg/setup/engine_status.go` | 수정 | status/verify surface enrichment |
-| `pkg/setup/workspace.go` | 수정 | repo-aware hint input reuse |
-| `pkg/connect/*` | 수정 가능 | connect verify/status helpers |
+| `pkg/setup/change_plan.go` | 생성 | `BuildGeneratePlan` / `BuildUpdatePlan` no-write change-set builder |
+| `pkg/setup/change_apply.go` | 생성 | `ApplyChangePlan` stale preview revalidation + write path |
+| `pkg/setup/types.go` | 수정 | `ChangePlan`, `PlannedChange`, `WorkspaceHint` 계약 추가 |
+| `pkg/setup/workspace_hints.go` | 생성 | repo-aware hint 생성 |
 | `README.md` | 수정 | onboarding truth-sync |
 | `docs/README.ko.md` | 수정 | onboarding truth-sync |
+| `internal/cli/connect_truth_sync_test.go` | 생성 | CLI/README truth drift regression guard |
 
 ## Architecture Considerations
 
-- preview-only computation은 write path와 분리되어야 하며, file generation logic는 reusable change-set 형태로 노출되는 편이 좋다.
+- preview-only computation은 write path와 분리되어야 하며, file generation logic는 `ChangePlan{Changes []PlannedChange, WorkspaceHints []WorkspaceHint, Fingerprint}` 형태의 reusable change-set 으로 노출되는 편이 좋다.
+- apply 경로는 preview 결과를 재사용하되 `ApplyChangePlan(plan)` 한 곳에서만 쓰기를 허용하고, stale fingerprint는 `ErrStaleChangePlan` 으로 막아야 한다.
 - workspace detection 결과를 다시 파싱하지 말고 existing `pkg/setup/workspace.go`를 재사용한다.
 - docs truth-sync는 implementation-driven이어야 하고, release gate나 tests로 방어해야 한다.
 - `auto arch enforce` 기준 현재 아키텍처 규칙 위반은 없다.
 
 ## Tasks
 
-- [x] `update` preview/apply change-set 모델을 정의한다.
+- [x] `update` preview/apply change-set 모델(`ChangePlan`, `PlannedChange`, `WorkspaceHint`, `ApplyChangePlan`)을 정의한다.
 - [x] `setup generate/update` preview mode와 file classification을 추가한다.
 - [x] connect help/README 실제 state machine을 정리한다.
 - [x] onboarding verification/status surface를 설계한다.
 - [x] workspace detection을 repo-aware hints에 연결한다.
-- [x] no-write preview와 truth-sync regression tests를 추가한다.
+- [x] no-write preview와 `connect_truth_sync_test.go` 기반 truth-sync regression tests를 추가한다.
 
 ## Risks & Mitigations
 
@@ -57,11 +63,19 @@
 
 - 내부:
   - `internal/cli/update.go`
+  - `internal/cli/update_preview.go`
+  - `internal/cli/update_config_preview.go`
   - `internal/cli/setup.go`
+  - `internal/cli/setup_preview.go`
   - `internal/cli/connect.go`
+  - `internal/cli/connect_status.go`
   - `internal/cli/init.go`
-  - `pkg/setup/*`
-  - `pkg/connect/*`
+  - `pkg/setup/change_plan.go`
+  - `pkg/setup/change_apply.go`
+  - `pkg/setup/types.go`
+  - `pkg/setup/workspace_hints.go`
+  - `README.md`
+  - `docs/README.ko.md`
 - 관련 기존 SPEC:
   - `SPEC-CONNECT-002`
   - `SPEC-INITUX-001`
