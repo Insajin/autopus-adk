@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.43] — 2026-04-23
+
+### Added
+
+- **Claude statusLine 선택 UX** (2026-04-23): 설치/업데이트 시 statusLine 동작을 명시적으로 선택할 수 있도록 CLI surface와 adapter wiring을 확장
+  - `internal/cli/{init.go,statusline_mode.go,update.go,update_preview.go,update_preview_test.go,update_statusline_test.go}` — statusLine mode 선택, preview, 회귀 테스트 추가
+  - `pkg/adapter/claude/{claude.go,claude_generate.go,claude_settings.go,claude_statusline.go,claude_hooks_test.go}` — 선택된 mode를 실제 Claude settings/statusline surface에 반영
+  - `pkg/config/{runtime.go,schema.go}` — runtime 설정 스키마와 adapter 전달 경로 보강
+
+### Fixed
+
+- **기존 사용자 관리 Claude `statusLine` 설정 보존** (2026-04-23): workspace가 이미 사용자 정의 `statusLine`을 가지고 있을 때 하네스 업데이트가 이를 덮어쓰지 않고, Autopus statusline을 쓰는 경우에만 안전하게 갱신하도록 정리
+  - `pkg/adapter/claude/{claude.go,claude_files.go,claude_prepare_files.go,claude_settings.go,claude_statusline.go}` — 기존 `statusLine` 감지/보존과 Autopus-managed 갱신 경계 추가
+  - `pkg/adapter/claude/claude_hooks_test.go`, `internal/cli/update_statusline_test.go` — preserve/update 분기 회귀 테스트 추가
+
+### Changed
+
+- **Self-hosted generated/runtime artifact ignore 정리** (2026-04-23): self-hosting 과정에서 생기는 backup/context/docs/telemetry, split-mode `.opencode/skills`, demo/internal CLI 하위 `.autopus` 산출물이 작업트리를 오염시키지 않도록 ignore 규칙을 보강
+  - `.gitignore` — self-host generated/runtime 경로를 release 이전 기본 ignore set에 포함
+
 ## [v0.40.42] — 2026-04-22
 
 ### Fixed

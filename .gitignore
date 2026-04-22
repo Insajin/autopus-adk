@@ -37,11 +37,18 @@ internal/cli/test-results/
 .claude/statusline.sh
 .autopus/orchestra/
 .autopus/brainstorms/
+.autopus/backup/
 .autopus/cache/docs/
+.autopus/context/
+.autopus/docs/
+.autopus/telemetry/
 .autopus/audit.jsonl
 **/.autopus/specs/**/review.md
 **/.autopus/specs/**/review-findings.json
 **/.autopus/specs/**/.self-verify.log
+.opencode/skills/
+demo/.autopus/
+internal/cli/.autopus/
 .worktrees/
 setup.test
 
