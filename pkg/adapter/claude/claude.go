@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"os/exec"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	tmpl "github.com/insajin/autopus-adk/pkg/template"
 )
 
@@ -22,8 +23,9 @@ const (
 // @AX:ANCHOR: PlatformAdapter 인터페이스의 claude-code 구현체 — 다수의 CLI 커맨드에서 사용됨
 // @AX:REASON: [AUTO] init/update/doctor/platform 커맨드에서 참조
 type Adapter struct {
-	root   string       // project root path
-	engine *tmpl.Engine // template rendering engine
+	root           string                // project root path
+	engine         *tmpl.Engine          // template rendering engine
+	statusLineMode config.StatusLineMode // runtime-only statusline override
 }
 
 // New는 현재 디렉터리를 루트로 하는 어댑터를 생성한다.

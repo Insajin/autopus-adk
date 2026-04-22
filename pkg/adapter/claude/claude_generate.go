@@ -74,6 +74,12 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 	}
 	files = append(files, mcpFiles...)
 
+	statusFiles, err := a.copyStatuslineFiles(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("statusline 복사 실패: %w", err)
+	}
+	files = append(files, statusFiles...)
+
 	if err := a.applyHooksAndPermissions(ctx, cfg); err != nil {
 		return nil, err
 	}
@@ -93,12 +99,6 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 		return nil, fmt.Errorf("file-size-limit.md 쓰기 실패: %w", err)
 	}
 	files = append(files, fileSizeRule)
-
-	statusFiles, err := a.copyStatusline()
-	if err != nil {
-		return nil, fmt.Errorf("statusline 복사 실패: %w", err)
-	}
-	files = append(files, statusFiles...)
 
 	// Managed hook assets are split between autopus/ and root hook files.
 	hookFiles, err := a.copyContentFiles(cfg, "hooks", filepath.Join(".claude", "hooks", "autopus"))

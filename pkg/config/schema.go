@@ -82,6 +82,7 @@ type HarnessConfig struct {
 	Profiles     ProfilesConf     `yaml:"profiles,omitempty"`
 	UsageProfile UsageProfile     `yaml:"usage_profile,omitempty"` // developer (default) or fullstack
 	Hints        HintsConf        `yaml:"hints,omitempty"`
+	Runtime      RuntimeConf      `yaml:"-"`
 }
 
 // FeaturesConf holds feature-flag namespaces.

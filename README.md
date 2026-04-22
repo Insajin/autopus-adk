@@ -616,6 +616,10 @@ auto init
 
 `auto init` scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Gemini CLI, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
 
+Claude Code statusline note:
+- If `.claude/settings.json` already has a `statusLine.command`, `auto init` / `auto update` now lets you choose `keep`, `merge`, or `replace` in interactive mode.
+- You can force the same behavior non-interactively with `--statusline-mode keep|merge|replace`.
+
 ```
 ✓ Detected: claude-code, codex, gemini-cli, opencode
 ✓ Generated: .claude/rules/, .claude/skills/, .claude/agents/, CLAUDE.md
@@ -708,6 +712,8 @@ auto update
 ```
 
 Regenerates `.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*`, and other platform-specific files from the latest templates. With `skills.compiler.mode: split`, the update preview/apply flow also manages `.opencode/skills/*` and `.autopus/plugins/auto/skills/*`, including stale artifact pruning. Your custom edits outside `AUTOPUS:BEGIN`~`AUTOPUS:END` markers are preserved. Newly installed platforms are auto-detected.
+
+If Claude Code already has a user-managed `statusLine.command`, the update flow defaults to preserving it, can merge it with the managed Autopus statusline, or replace it entirely via `--statusline-mode keep|merge|replace`.
 
 **Both at once:**
 

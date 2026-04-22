@@ -107,6 +107,37 @@ func TestUpdateCmd_PlanShowsLegacyConfigNormalizationWithoutWriting(t *testing.T
 	assert.Contains(t, out.String(), "legacy platform names would be normalized")
 }
 
+func TestUpdateCmd_PlanShowsStatusLineKeepHint(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	initCmd := newTestRootCmd()
+	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "preview-proj", "--platforms", "claude-code", "--yes"})
+	require.NoError(t, initCmd.Execute())
+
+	settingsPath := filepath.Join(dir, ".claude", "settings.json")
+	require.NoError(t, os.WriteFile(settingsPath, []byte(`{
+  "statusLine": {
+    "type": "command",
+    "command": "node ~/.claude/hud/omc-hud.mjs",
+    "padding": 2
+  }
+}`), 0o644))
+
+	var out bytes.Buffer
+	updateCmd := newTestRootCmd()
+	updateCmd.SetOut(&out)
+	updateCmd.SetErr(&out)
+	updateCmd.SetArgs([]string{"update", "--dir", dir, "--plan", "--yes"})
+	require.NoError(t, updateCmd.Execute())
+
+	output := out.String()
+	assert.Contains(t, output, ".claude/settings.json")
+	assert.Contains(t, output, "statusLine would be preserved")
+	assert.Contains(t, output, "--statusline-mode merge or replace")
+}
+
 func TestUpdateCmd_PlanShowsSplitCompilerEmitRetainPruneAndChecksumDiff(t *testing.T) {
 	dir := t.TempDir()
 	configurePreviewBinaries(t, "codex", "opencode")

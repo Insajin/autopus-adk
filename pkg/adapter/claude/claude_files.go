@@ -67,38 +67,6 @@ func (a *Adapter) prepareMCPConfig(cfg *config.HarnessConfig) ([]adapter.FileMap
 	}}, nil
 }
 
-// prepareStatusline reads statusline.sh from embedded FS and returns a FileMapping.
-func (a *Adapter) prepareStatusline() ([]adapter.FileMapping, error) {
-	data, err := contentfs.FS.ReadFile("statusline.sh")
-	if err != nil {
-		return nil, fmt.Errorf("statusline.sh 읽기 실패: %w", err)
-	}
-	return []adapter.FileMapping{{
-		TargetPath:      filepath.Join(".claude", "statusline.sh"),
-		OverwritePolicy: adapter.OverwriteAlways,
-		Checksum:        checksum(string(data)),
-		Content:         data,
-	}}, nil
-}
-
-// copyStatusline copies statusline.sh to the target project.
-func (a *Adapter) copyStatusline() ([]adapter.FileMapping, error) {
-	data, err := contentfs.FS.ReadFile("statusline.sh")
-	if err != nil {
-		return nil, fmt.Errorf("statusline.sh 읽기 실패: %w", err)
-	}
-	destPath := filepath.Join(a.root, ".claude", "statusline.sh")
-	if err := os.WriteFile(destPath, data, 0755); err != nil {
-		return nil, fmt.Errorf("statusline.sh 쓰기 실패: %w", err)
-	}
-	return []adapter.FileMapping{{
-		TargetPath:      filepath.Join(".claude", "statusline.sh"),
-		OverwritePolicy: adapter.OverwriteAlways,
-		Checksum:        checksum(string(data)),
-		Content:         data,
-	}}, nil
-}
-
 // renderRouterCommand는 단일 라우터 템플릿(auto-router.md.tmpl)을 렌더링하여
 // .claude/skills/auto/SKILL.md 파일을 생성한다.
 func (a *Adapter) renderRouterCommand(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {

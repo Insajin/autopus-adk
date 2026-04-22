@@ -51,6 +51,8 @@ func buildUpdatePreview(ctx context.Context, dir string, cfg *config.HarnessConf
 		backupNeeded = backupNeeded || needsBackup
 	}
 
+	result.Items = append(result.Items, buildStatusLinePreviewItems(dir, cfg)...)
+
 	if backupNeeded {
 		result.Items = append(result.Items, previewItem{
 			Path:     ".autopus/backup/<timestamp>/",
