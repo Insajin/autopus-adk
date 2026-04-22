@@ -89,7 +89,7 @@ func (a *Adapter) renderHooksTemplate(cfg *config.HarnessConfig) (string, error)
 		return "", fmt.Errorf("codex hooks 생성 실패: %w", err)
 	}
 
-	doc := hooksDoc{Hooks: make(map[string][]hookEntry)}
+	doc := hooksDoc{Hooks: make(map[string]hookEntries)}
 	for _, hook := range hooks {
 		doc.Hooks[hook.Event] = append(doc.Hooks[hook.Event], hookEntry{
 			Type:    hook.Type,
@@ -134,7 +134,7 @@ func mergeHooks(existingPath, rendered string) ([]byte, error) {
 
 // hooksDoc represents the top-level hooks.json structure.
 type hooksDoc struct {
-	Hooks map[string][]hookEntry `json:"hooks"`
+	Hooks map[string]hookEntries `json:"hooks"`
 }
 
 // hookEntry represents a single hook entry in hooks.json.
@@ -144,6 +144,18 @@ type hookEntry struct {
 	Matcher string `json:"matcher,omitempty"`
 	Timeout int    `json:"timeout,omitempty"`
 	Autopus bool   `json:"__autopus__,omitempty"`
+}
+
+// hookEntries ensures nil hook slices serialize as [] rather than null.
+type hookEntries []hookEntry
+
+func (e hookEntries) MarshalJSON() ([]byte, error) {
+	if e == nil {
+		return []byte("[]"), nil
+	}
+
+	type alias hookEntries
+	return json.Marshal(alias(e))
 }
 
 // stampAutopusMarker marks all hooks in the document as Autopus-managed.
@@ -159,7 +171,7 @@ func stampAutopusMarker(doc *hooksDoc) {
 // mergeHookCategories merges existing and autopus hook documents.
 // User hooks (Autopus==false) are preserved; autopus hooks are replaced.
 func mergeHookCategories(existing, autopus hooksDoc) hooksDoc {
-	result := hooksDoc{Hooks: make(map[string][]hookEntry)}
+	result := hooksDoc{Hooks: make(map[string]hookEntries)}
 
 	// Collect all category names
 	cats := make(map[string]bool)
@@ -172,7 +184,7 @@ func mergeHookCategories(existing, autopus hooksDoc) hooksDoc {
 
 	for cat := range cats {
 		// Keep user hooks from existing
-		var merged []hookEntry
+		merged := make(hookEntries, 0, len(existing.Hooks[cat])+len(autopus.Hooks[cat]))
 		for _, e := range existing.Hooks[cat] {
 			if !e.Autopus {
 				merged = append(merged, e)

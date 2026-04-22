@@ -33,7 +33,7 @@ func TestMergeHooks_PreservesUserHooks(t *testing.T) {
 
 	// Existing file with a user hook (no __autopus__ marker) and an old autopus hook
 	existing := hooksDoc{
-		Hooks: map[string][]hookEntry{
+		Hooks: map[string]hookEntries{
 			"SessionStart": {
 				{Command: "user-custom.sh"},
 				{Command: "auto check", Autopus: true},
@@ -85,7 +85,7 @@ func TestMergeHooks_MultipleCategories(t *testing.T) {
 	existingPath := filepath.Join(dir, "hooks.json")
 
 	existing := hooksDoc{
-		Hooks: map[string][]hookEntry{
+		Hooks: map[string]hookEntries{
 			"SessionStart": {{Command: "user-start.sh"}},
 			"CustomHook":   {{Command: "my-hook.sh"}},
 		},
@@ -110,10 +110,36 @@ func TestMergeHooks_MultipleCategories(t *testing.T) {
 	assert.True(t, doc.Hooks["Stop"][0].Autopus)
 }
 
+func TestMergeHooks_NormalizesNullCategoriesToArrays(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	existingPath := filepath.Join(dir, "hooks.json")
+
+	require.NoError(t, os.WriteFile(
+		existingPath,
+		[]byte(`{"hooks":{"SessionStart":null,"Stop":null}}`),
+		0644,
+	))
+
+	rendered := `{"hooks":{"PreToolUse":[{"command":"auto check"}]}}`
+	result, err := mergeHooks(existingPath, rendered)
+	require.NoError(t, err)
+
+	assert.NotContains(t, string(result), `"SessionStart": null`)
+	assert.NotContains(t, string(result), `"Stop": null`)
+
+	var raw struct {
+		Hooks map[string]json.RawMessage `json:"hooks"`
+	}
+	require.NoError(t, json.Unmarshal(result, &raw))
+	assert.JSONEq(t, "[]", string(raw.Hooks["SessionStart"]))
+	assert.JSONEq(t, "[]", string(raw.Hooks["Stop"]))
+}
+
 func TestStampAutopusMarker(t *testing.T) {
 	t.Parallel()
 	doc := hooksDoc{
-		Hooks: map[string][]hookEntry{
+		Hooks: map[string]hookEntries{
 			"SessionStart": {{Command: "a"}, {Command: "b"}},
 		},
 	}
@@ -121,4 +147,14 @@ func TestStampAutopusMarker(t *testing.T) {
 	for _, e := range doc.Hooks["SessionStart"] {
 		assert.True(t, e.Autopus)
 	}
+}
+
+func TestHookEntries_MarshalNilAsEmptyArray(t *testing.T) {
+	t.Parallel()
+
+	data, err := json.Marshal(struct {
+		Entries hookEntries `json:"entries"`
+	}{})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"entries":[]}`, string(data))
 }

@@ -133,7 +133,7 @@ func TestMergeHooks_InvalidRenderedJSON(t *testing.T) {
 
 func TestMergeHookCategories_EmptyDocs(t *testing.T) {
 	t.Parallel()
-	empty := hooksDoc{Hooks: map[string][]hookEntry{}}
+	empty := hooksDoc{Hooks: map[string]hookEntries{}}
 	result := mergeHookCategories(empty, empty)
 	assert.NotNil(t, result.Hooks)
 	assert.Empty(t, result.Hooks)
