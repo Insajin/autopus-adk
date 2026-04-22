@@ -52,22 +52,35 @@ func (a *Adapter) renderWorkflowSkill(spec workflowSpec, cfg *config.HarnessConf
 }
 
 func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	catalog, err := pkgcontent.LoadSkillCatalogFromFS(contentfs.FS, "skills")
+	if err != nil {
+		return nil, fmt.Errorf("skill catalog init 실패: %w", err)
+	}
 	transformer, err := pkgcontent.NewSkillTransformerFromFS(contentfs.FS, "skills")
 	if err != nil {
 		return nil, fmt.Errorf("skill transformer init 실패: %w", err)
 	}
-	skills, _, err := transformer.TransformForPlatform("opencode")
+	skills, _, err := transformer.TransformForPlatformWithOptions("opencode", pkgcontent.SkillTransformOptions{
+		ResolveSkillRef: func(name string) string {
+			return pkgcontent.ResolveCatalogSkillRefPath(catalog, name, "opencode", cfg)
+		},
+		AllowSkill: func(meta pkgcontent.SkillMeta) bool {
+			return meta.Visibility != pkgcontent.SkillVisibilityExplicitOnly ||
+				skillCompilerExplicitlySelects(cfg, meta.Name)
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("opencode skill transform 실패: %w", err)
-	}
-	allowlist, err := opencodeSharedSkillAllowlist(cfg)
-	if err != nil {
-		return nil, err
 	}
 
 	files := make([]adapter.FileMapping, 0, len(skills))
 	for _, skill := range skills {
-		if len(allowlist) > 0 && !allowlist[skill.Name] {
+		entry, ok := catalog.Get(skill.Name)
+		if !ok {
+			continue
+		}
+		state := pkgcontent.ResolveCatalogSkillState(entry, "opencode", cfg)
+		if !state.Compiled || state.TargetPath == "" {
 			continue
 		}
 		content := buildMarkdown(
@@ -75,7 +88,7 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 			skill.Content,
 		)
 		files = append(files, adapter.FileMapping{
-			TargetPath:      filepath.Join(".agents", "skills", skill.Name, "SKILL.md"),
+			TargetPath:      filepath.FromSlash(state.TargetPath),
 			OverwritePolicy: adapter.OverwriteAlways,
 			Checksum:        adapter.Checksum(content),
 			Content:         []byte(content),
@@ -84,47 +97,11 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 	return files, nil
 }
 
-func opencodeSharedSkillAllowlist(cfg *config.HarnessConfig) (map[string]bool, error) {
-	if !opencodePublishesCoreSharedSurface(cfg) {
-		return nil, nil
-	}
-
-	sources, err := pkgcontent.LoadAgentSourcesFromFS(contentfs.FS, "agents")
-	if err != nil {
-		return nil, fmt.Errorf("OpenCode core shared skill 목록 로드 실패: %w", err)
-	}
-
-	allowlist := map[string]bool{
-		"adaptive-quality":   true,
-		"agent-pipeline":     true,
-		"agent-teams":        true,
-		"frontend-verify":    true,
-		"worktree-isolation": true,
-	}
-	for _, src := range sources {
-		for _, skill := range src.Meta.Skills {
-			if strings.TrimSpace(skill) == "" {
-				continue
-			}
-			allowlist[skill] = true
-		}
-	}
-	return allowlist, nil
-}
-
-func opencodePublishesCoreSharedSurface(cfg *config.HarnessConfig) bool {
+func skillCompilerExplicitlySelects(cfg *config.HarnessConfig, name string) bool {
 	if cfg == nil {
 		return false
 	}
-
-	switch cfg.Skills.EffectiveSharedSurface() {
-	case config.SharedSurfaceCore:
-		return true
-	case config.SharedSurfaceFull:
-		return false
-	default:
-		return containsPlatform(cfg.Platforms, "codex")
-	}
+	return containsString(cfg.Skills.Compiler.ExplicitSkills, name)
 }
 
 func (a *Adapter) renderWorkflowPrompt(templatePath string, cfg *config.HarnessConfig) (string, error) {

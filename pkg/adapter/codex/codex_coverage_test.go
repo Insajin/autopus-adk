@@ -18,7 +18,7 @@ import (
 func TestRenderExtendedSkills(t *testing.T) {
 	t.Parallel()
 	a := NewWithRoot(t.TempDir())
-	files, err := a.renderExtendedSkills()
+	files, err := a.renderExtendedSkills(config.DefaultFullConfig("test"))
 	require.NoError(t, err)
 	assert.NotEmpty(t, files)
 	for _, f := range files {

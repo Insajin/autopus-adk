@@ -30,7 +30,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, skillMappings...)
 
-	extSkillFiles, err := a.renderExtendedSkills()
+	extSkillFiles, err := a.renderExtendedSkills(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("extended skill 준비 실패: %w", err)
 	}

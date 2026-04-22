@@ -1,41 +1,22 @@
 package opencode
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 )
 
-func (a *Adapter) cleanupStaleSharedSkillDirs(oldManifest *adapter.Manifest, files []adapter.FileMapping) error {
+func (a *Adapter) cleanupStaleManagedSurfaces(oldManifest *adapter.Manifest, files []adapter.FileMapping, backupDir *string) error {
 	if oldManifest == nil {
 		return nil
 	}
-
-	next := make(map[string]bool, len(files))
-	for _, file := range files {
-		next[file.TargetPath] = true
-	}
-
-	for path := range oldManifest.Files {
-		if !isManagedOpenCodeSharedSkill(path) || next[path] {
-			continue
-		}
-		target := filepath.Join(a.root, filepath.Dir(path))
-		if err := os.RemoveAll(target); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("stale OpenCode shared skill 제거 실패 %s: %w", target, err)
-		}
-	}
-
-	return nil
+	diff := adapter.BuildManifestDiff(oldManifest, files, opencodePruneRoots())
+	return adapter.PruneManagedPaths(a.root, diff.Prune, backupDir)
 }
 
-func isManagedOpenCodeSharedSkill(path string) bool {
-	prefix := filepath.Join(".agents", "skills") + string(os.PathSeparator)
-	if !strings.HasPrefix(path, prefix) {
-		return false
+func opencodePruneRoots() []string {
+	return []string{
+		filepath.ToSlash(filepath.Join(".agents", "skills")),
+		filepath.ToSlash(filepath.Join(".opencode", "skills")),
 	}
-	return filepath.Base(path) == "SKILL.md"
 }

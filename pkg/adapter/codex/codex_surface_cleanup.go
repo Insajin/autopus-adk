@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/insajin/autopus-adk/pkg/adapter"
 )
 
 func (a *Adapter) cleanupDeprecatedSurface() error {
@@ -21,4 +23,19 @@ func (a *Adapter) cleanupPluginWorkflowShims() error {
 		}
 	}
 	return nil
+}
+
+func (a *Adapter) cleanupStaleManagedSurfaces(oldManifest *adapter.Manifest, files []adapter.FileMapping, backupDir *string) error {
+	if oldManifest == nil {
+		return nil
+	}
+	diff := adapter.BuildManifestDiff(oldManifest, files, codexPruneRoots())
+	return adapter.PruneManagedPaths(a.root, diff.Prune, backupDir)
+}
+
+func codexPruneRoots() []string {
+	return []string{
+		filepath.ToSlash(filepath.Join(".codex", "skills")),
+		filepath.ToSlash(filepath.Join(".autopus", "plugins", "auto", "skills")),
+	}
 }

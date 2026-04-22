@@ -18,6 +18,8 @@ type SkillMeta struct {
 	Platforms   []string `yaml:"platforms"`
 	Triggers    []string `yaml:"triggers"`
 	Category    string   `yaml:"category"`
+	Bundles     []string `yaml:"bundles"`
+	Visibility  string   `yaml:"visibility"`
 }
 
 // TransformedSkill represents a skill after platform transformation.
@@ -32,6 +34,12 @@ type TransformReport struct {
 	Platform     string
 	Compatible   []string
 	Incompatible []string
+}
+
+// SkillTransformOptions controls optional canonical reference rewrites.
+type SkillTransformOptions struct {
+	ResolveSkillRef func(name string) string
+	AllowSkill      func(meta SkillMeta) bool
 }
 
 // SkillTransformer loads skill files and transforms them for target platforms.
@@ -86,6 +94,11 @@ func NewSkillTransformer(dir string) (*SkillTransformer, error) {
 
 // TransformForPlatform returns transformed skills and a report for the target platform.
 func (t *SkillTransformer) TransformForPlatform(platform string) ([]TransformedSkill, *TransformReport, error) {
+	return t.TransformForPlatformWithOptions(platform, SkillTransformOptions{})
+}
+
+// TransformForPlatformWithOptions returns transformed skills and a report for the target platform.
+func (t *SkillTransformer) TransformForPlatformWithOptions(platform string, opts SkillTransformOptions) ([]TransformedSkill, *TransformReport, error) {
 	if !supportedPlatforms[platform] {
 		return nil, nil, fmt.Errorf("unsupported platform: %q", platform)
 	}
@@ -98,9 +111,14 @@ func (t *SkillTransformer) TransformForPlatform(platform string) ([]TransformedS
 			report.Incompatible = append(report.Incompatible, s.meta.Name)
 			continue
 		}
+		if s.meta.Visibility == SkillVisibilityExplicitOnly && (opts.AllowSkill == nil || !opts.AllowSkill(s.meta)) {
+			report.Incompatible = append(report.Incompatible, s.meta.Name)
+			continue
+		}
 
 		report.Compatible = append(report.Compatible, s.meta.Name)
-		filtered := ReplacePlatformReferences(s.body, platform)
+		filtered := rewriteCanonicalSkillReferences(s.body, opts.ResolveSkillRef)
+		filtered = ReplacePlatformReferences(filtered, platform)
 		result = append(result, TransformedSkill{
 			Name:        s.meta.Name,
 			Description: s.meta.Description,

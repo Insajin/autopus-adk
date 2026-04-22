@@ -421,18 +421,19 @@ auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Gemini CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
-동일한 16개 에이전트. 동일한 규칙. 공유 스킬은 기본적으로 전체가 생성되며, Codex + OpenCode 혼합 워크스페이스에서 더 작은 표면이 필요하면 `skills.shared_surface: auto` 또는 `core`를 설정합니다.
+동일한 16개 에이전트. 동일한 규칙. 공유 스킬은 기본적으로 전체가 생성됩니다. 기존 호환성을 유지하면서 mixed Codex + OpenCode 표면을 더 작게 만들고 싶다면 `skills.shared_surface`를 건드리는 대신 `skills.compiler.mode: split`을 opt-in 하세요.
 
 Codex 참고:
 - `auto init` 또는 `auto update` 직후에는 `$auto plan ...`, `$auto go ...`, `$auto idea ...`를 바로 사용할 수 있습니다
 - `.agents/plugins/marketplace.json`에 등록된 로컬 플러그인(`.autopus/plugins/auto`)을 설치하면 더 자연스러운 `@auto ...` 문법을 사용할 수 있습니다
 - 로컬 플러그인은 `@auto ...` 라우터 표면만 제공합니다. 상세 workflow 지침은 repo skill과 `.codex/prompts/`에 남겨 Codex에서 중복 `auto*` skill이 보이지 않게 합니다
+- `skills.compiler.mode: split`을 켜면 long-tail Codex skill은 `.autopus/plugins/auto/skills/`로 이동하고, repo-visible helper skill만 `.codex/skills/`에 남습니다
 - `.codex/hooks.json`은 기본 생성됩니다. Codex 세션에 `Under-development features enabled: codex_hooks` 경고가 보이면, 그 경고는 프로젝트 로컬 `config.toml`이 아니라 현재 Codex CLI의 experimental feature gate에서 오는 것입니다
 
 OpenCode 참고:
 - `/auto ...`와 `/auto-plan ...` 같은 직접 alias가 `.opencode/commands/`에 생성됩니다
 - 네이티브 규칙/에이전트/플러그인은 `.opencode/` 아래에, 재사용 스킬은 `.agents/skills/` 아래에 생성됩니다
-- Codex + OpenCode 혼합 워크스페이스에서는 `skills.shared_surface: auto` 또는 `core`로 `.agents/skills/`를 축소해 Codex 노이즈를 줄일 수 있습니다
+- `skills.compiler.mode: split`을 켜면 shared/core skill은 `.agents/skills/`에 남고, OpenCode long-tail skill은 `.opencode/skills/`로 이동합니다
 - `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, `/auto doctor` 같은 helper workflow도 OpenCode 명령 래퍼로 함께 생성됩니다
 - `opencode.json`이 관리형 hook plugin을 자동 등록하므로 `auto init` 또는 `auto update` 직후 `.opencode/plugins/autopus-hooks.js`가 바로 활성화됩니다
 
@@ -447,6 +448,10 @@ OpenCode 참고:
 | 지금 잘 되는 것 | 핵심 `auto` 워크플로우, repo skill, 로컬 플러그인 기반 `@auto` 라우팅 | 핵심 `auto` 워크플로우, 네이티브 명령 래퍼, 관리형 hook plugin wiring |
 | 현재 경계 | `@auto ...`는 로컬 플러그인 설치가 전제이며, 설치 전에는 `$auto ...`를 사용 | 현재 패리티 목표는 핵심 워크플로우 표면입니다. Claude식 native settings/statusline 폭까지 주장하지 않습니다 |
 | Worker 표면 | 지금은 선택 사항입니다. 플랫폼 연결 worker 실행이 필요하지 않다면 무시해도 됩니다 | 지금은 선택 사항입니다. 플랫폼 연결 worker 실행이 필요하지 않다면 무시해도 됩니다 |
+
+split compiler 참고:
+- `skills.compiler.mode: split`은 opt-in 입니다. 기본 `full`은 현재의 backward-compatible surface layout을 유지합니다.
+- split mode에서는 `.agents/skills/`를 shared/core skill 전용으로 예약하고, `.opencode/skills/`에는 OpenCode long-tail, `.autopus/plugins/auto/skills/`에는 Codex plugin-scoped long-tail을 배치합니다.
 
 ---
 
@@ -597,7 +602,7 @@ GitHub Releases에서 최신 버전을 확인하고, SHA256 체크섬 검증 후
 auto update
 ```
 
-`.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*` 등의 하네스 파일을 갱신합니다. `AUTOPUS:BEGIN`~`AUTOPUS:END` 마커 바깥의 사용자 편집은 보존됩니다. 새로 설치된 플랫폼이 있으면 자동 감지하여 해당 파일도 생성합니다.
+`.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*` 등의 하네스 파일을 갱신합니다. `skills.compiler.mode: split`이 켜져 있으면 `.opencode/skills/*`와 `.autopus/plugins/auto/skills/*`도 preview/apply 대상이 되며 stale artifact prune까지 함께 처리합니다. `AUTOPUS:BEGIN`~`AUTOPUS:END` 마커 바깥의 사용자 편집은 보존됩니다. 새로 설치된 플랫폼이 있으면 자동 감지하여 해당 파일도 생성합니다.
 
 **한 줄로 둘 다:**
 

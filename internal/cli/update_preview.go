@@ -83,13 +83,23 @@ func buildPlatformPreview(ctx context.Context, dir string, cfg *config.HarnessCo
 	items := make([]previewItem, 0, len(files)+1)
 	needsBackup := false
 	willWrite := false
-	for _, file := range files {
+	diff := adapter.BuildManifestDiff(manifest, files, previewPruneRoots(platform))
+	for _, entry := range diff.Emit {
+		file, ok := lookupPreviewFile(files, entry.Path)
+		if !ok {
+			continue
+		}
 		action := adapter.ResolveAction(dir, file.TargetPath, file.OverwritePolicy, manifest)
+		kind := adapter.ManifestActionEmit
+		reason := reasonForManifestEntry(entry, action)
+		if action == adapter.ActionSkip {
+			kind = adapter.ManifestActionRetain
+		}
 		items = append(items, previewItem{
-			Path:     file.TargetPath,
-			Kind:     previewKindForAction(action),
-			Category: previewCategoryForPath(file.TargetPath),
-			Reason:   reasonForUpdateAction(action),
+			Path:     entry.Path,
+			Kind:     kind,
+			Category: previewCategoryForPath(entry.Path),
+			Reason:   reason,
 			Scope:    platform,
 		})
 		if action == adapter.ActionBackup {
@@ -98,6 +108,34 @@ func buildPlatformPreview(ctx context.Context, dir string, cfg *config.HarnessCo
 		if action != adapter.ActionSkip {
 			willWrite = true
 		}
+	}
+	for _, entry := range diff.Retain {
+		file, ok := lookupPreviewFile(files, entry.Path)
+		if !ok {
+			continue
+		}
+		action := adapter.ResolveAction(dir, file.TargetPath, file.OverwritePolicy, manifest)
+		if action == adapter.ActionBackup {
+			needsBackup = true
+			willWrite = true
+		}
+		items = append(items, previewItem{
+			Path:     entry.Path,
+			Kind:     adapter.ManifestActionRetain,
+			Category: previewCategoryForPath(entry.Path),
+			Reason:   reasonForManifestEntry(entry, action),
+			Scope:    platform,
+		})
+	}
+	for _, entry := range diff.Prune {
+		items = append(items, previewItem{
+			Path:     entry.Path,
+			Kind:     adapter.ManifestActionPrune,
+			Category: previewCategoryForPath(entry.Path),
+			Reason:   reasonForManifestEntry(entry, adapter.ActionOverwrite),
+			Scope:    platform,
+		})
+		willWrite = true
 	}
 
 	if willWrite {
@@ -109,7 +147,7 @@ func buildPlatformPreview(ctx context.Context, dir string, cfg *config.HarnessCo
 			Path:     filepath.ToSlash(filepath.Join(".autopus", platform+"-manifest.json")),
 			Kind:     kind,
 			Category: "runtime_state",
-			Reason:   "managed file manifest would be refreshed after apply",
+			Reason:   manifestDiffSummary(diff),
 			Scope:    platform,
 		})
 	}
@@ -146,28 +184,57 @@ func previewMappings(platform string, pf *adapter.PlatformFiles, err error) ([]a
 	return pf.Files, nil
 }
 
-func previewKindForAction(action adapter.UpdateAction) string {
-	switch action {
-	case adapter.ActionCreate:
-		return "create"
-	case adapter.ActionSkip:
-		return "skip"
-	case adapter.ActionBackup:
-		return "preserve"
+func lookupPreviewFile(files []adapter.FileMapping, path string) (adapter.FileMapping, bool) {
+	for _, file := range files {
+		if filepath.ToSlash(file.TargetPath) == path {
+			return file, true
+		}
+	}
+	return adapter.FileMapping{}, false
+}
+
+func previewPruneRoots(platform string) []string {
+	switch platform {
+	case "codex":
+		return []string{".codex/skills", filepath.ToSlash(filepath.Join(".autopus", "plugins", "auto", "skills"))}
+	case "opencode":
+		return []string{".agents/skills", ".opencode/skills"}
 	default:
-		return "update"
+		return nil
 	}
 }
 
-func reasonForUpdateAction(action adapter.UpdateAction) string {
-	switch action {
-	case adapter.ActionCreate:
-		return "new managed file would be created"
-	case adapter.ActionSkip:
-		return "locally deleted managed file would remain untouched"
-	case adapter.ActionBackup:
-		return "existing file would be preserved via backup before overwrite"
+func manifestDiffSummary(diff adapter.ManifestDiff) string {
+	return fmt.Sprintf(
+		"manifest diff would record %d emit, %d retain, %d prune actions",
+		len(diff.Emit),
+		len(diff.Retain),
+		len(diff.Prune),
+	)
+}
+
+func reasonForManifestEntry(entry adapter.ManifestDiffEntry, action adapter.UpdateAction) string {
+	switch entry.Action {
+	case adapter.ManifestActionRetain:
+		if action == adapter.ActionBackup {
+			return "managed checksum is unchanged, but local edits would be backed up before the file is refreshed"
+		}
+		if action == adapter.ActionSkip {
+			return "managed checksum is unchanged and the locally deleted file would remain untouched"
+		}
+		return "managed checksum is unchanged and would be retained"
+	case adapter.ManifestActionPrune:
+		return "stale managed artifact would be pruned from the compiler-owned surface"
 	default:
-		return "managed file can be refreshed in place"
+		if action == adapter.ActionSkip {
+			return "locally deleted managed file would remain untouched"
+		}
+		if action == adapter.ActionBackup {
+			return "managed output would emit with checksum diff after backing up local edits"
+		}
+		if entry.OldChecksum == "" {
+			return "new managed output would emit into the target surface"
+		}
+		return "managed output would emit with checksum diff"
 	}
 }

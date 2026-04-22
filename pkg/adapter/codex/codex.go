@@ -186,8 +186,11 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 	if err != nil {
 		return nil, err
 	}
-
 	var backupDir string
+	if err := a.cleanupStaleManagedSurfaces(oldManifest, newFiles, &backupDir); err != nil {
+		return nil, err
+	}
+
 	var finalFiles []adapter.FileMapping
 
 	for _, f := range newFiles {

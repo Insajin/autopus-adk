@@ -43,6 +43,8 @@ type SkillsConf struct {
 	SharedSurface string `yaml:"shared_surface,omitempty"`
 	// CategoryWeights maps category names to priority weights for skill selection.
 	CategoryWeights map[string]int `yaml:"category_weights,omitempty"`
+	// Compiler controls the opt-in registry/compiler surface split behavior.
+	Compiler SkillCompilerConf `yaml:"compiler,omitempty"`
 }
 
 // IssueReportConf is the auto issue reporter configuration.
@@ -268,13 +270,8 @@ func (c *HarnessConfig) Validate() error {
 			}
 		}
 	}
-	if c.Skills.MaxActiveSkills < 0 {
-		return fmt.Errorf("skills.max_active_skills must be non-negative, got %d", c.Skills.MaxActiveSkills)
-	}
-	switch c.Skills.EffectiveSharedSurface() {
-	case SharedSurfaceAuto, SharedSurfaceFull, SharedSurfaceCore:
-	default:
-		return fmt.Errorf("skills.shared_surface %q is invalid: must be 'auto', 'full', or 'core'", c.Skills.SharedSurface)
+	if err := c.validateSkillsConfig(); err != nil {
+		return err
 	}
 	if !c.UsageProfile.IsValid() {
 		return fmt.Errorf("invalid usage_profile %q: must be 'developer' or 'fullstack'", c.UsageProfile)

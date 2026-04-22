@@ -81,11 +81,11 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 	if err != nil {
 		return nil, err
 	}
-	if err := a.cleanupStaleSharedSkillDirs(oldManifest, files); err != nil {
+	var backupDir string
+	if err := a.cleanupStaleManagedSurfaces(oldManifest, files, &backupDir); err != nil {
 		return nil, err
 	}
 
-	var backupDir string
 	var finalFiles []adapter.FileMapping
 	for _, file := range files {
 		action := adapter.ResolveAction(a.root, file.TargetPath, file.OverwritePolicy, oldManifest)

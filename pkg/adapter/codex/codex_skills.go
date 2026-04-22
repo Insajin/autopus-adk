@@ -61,12 +61,15 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig) ([]adapter.Fil
 	}
 
 	// Extended skills from content/skills/ via transformer
-	extFiles, err := a.renderExtendedSkills()
+	extFiles, err := a.renderExtendedSkills(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("extended skill rendering failed: %w", err)
 	}
 	for _, ef := range extFiles {
 		targetPath := filepath.Join(a.root, ef.TargetPath)
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			return nil, fmt.Errorf("extended skill dir 생성 실패 %s: %w", filepath.Dir(targetPath), err)
+		}
 		if err := os.WriteFile(targetPath, ef.Content, 0644); err != nil {
 			return nil, fmt.Errorf("extended skill write failed %s: %w", targetPath, err)
 		}
