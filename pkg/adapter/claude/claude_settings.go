@@ -12,11 +12,10 @@ import (
 	"github.com/insajin/autopus-adk/pkg/content"
 )
 
-const autopusClaudeStatusLineCommand = ".claude/statusline.sh"
-
 // applyHooksAndPermissions는 hooks와 permissions를 .claude/settings.json에 설치한다.
 // Always writes settings.json — DetectPermissions always returns non-nil with common defaults.
 func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.HarnessConfig) error {
+	a.statusLineMode = resolveStatusLineMode(cfg, InspectStatusLine(a.root))
 	hookConfigs, gitHooks, _ := content.GenerateProjectHookConfigs(cfg, "claude-code", a.SupportsHooks())
 	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
 	if err := a.InstallHooks(ctx, hookConfigs, perms); err != nil {
@@ -118,9 +117,14 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 		settings["permissions"] = permMap
 	}
 
-	// Preserve an existing user-managed statusLine instead of clobbering it.
-	// If the workspace already points to the Autopus statusline, refresh it.
-	if shouldInstallAutopusStatusLine(settings["statusLine"]) {
+	mode := a.statusLineMode
+	if !mode.IsValid() {
+		mode = resolveStatusLineMode(nil, statusLineStateFromValue(settings["statusLine"]))
+	}
+	switch mode {
+	case config.StatusLineModeMerge:
+		settings["statusLine"] = defaultClaudeCombinedStatusLine()
+	case config.StatusLineModeReplace:
 		settings["statusLine"] = defaultClaudeStatusLine()
 	}
 
@@ -170,16 +174,10 @@ func defaultClaudeStatusLine() map[string]any {
 	}
 }
 
-func shouldInstallAutopusStatusLine(existing any) bool {
-	statusLine, ok := existing.(map[string]any)
-	if !ok || len(statusLine) == 0 {
-		return true
+func defaultClaudeCombinedStatusLine() map[string]any {
+	return map[string]any{
+		"type":    "command",
+		"command": autopusClaudeCombinedStatusLineCommand,
+		"padding": 1,
 	}
-
-	command, ok := statusLine["command"].(string)
-	if !ok || command == "" {
-		return false
-	}
-
-	return command == autopusClaudeStatusLineCommand
 }

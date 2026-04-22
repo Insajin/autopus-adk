@@ -24,7 +24,7 @@ import (
 func newUpdateCmd() *cobra.Command {
 	var dir string
 	var selfFlag, checkOnly, force, yesFlag, previewMode bool
-	var targetVersion string
+	var targetVersion, statusLine string
 
 	cmd := &cobra.Command{
 		Use:   "update",
@@ -56,6 +56,10 @@ func newUpdateCmd() *cobra.Command {
 			}
 			if err != nil {
 				return fmt.Errorf("설정 로드 실패: %w", err)
+			}
+
+			if err := validateStatusLineMode(statusLine); err != nil {
+				return err
 			}
 
 			if previewMode {
@@ -90,6 +94,9 @@ func newUpdateCmd() *cobra.Command {
 				}
 
 				effectiveCfg := applyFlagCC21Overrides(previewCfg, globalFlagsFromContext(cmd.Context()))
+				if _, modeErr := applyStatusLineMode(cmd, dir, effectiveCfg, statusLine, false); modeErr != nil {
+					return modeErr
+				}
 				preview, previewErr := buildUpdatePreview(cmd.Context(), dir, effectiveCfg)
 				if previewErr != nil {
 					return previewErr
@@ -117,6 +124,10 @@ func newUpdateCmd() *cobra.Command {
 			// 프로젝트 설정 프롬프트 (미설정 항목만, --yes 시 스킵)
 			if !yesFlag {
 				promptLanguageSettings(cmd, dir, cfg)
+			}
+			statusLineSummary, statusLineErr := applyStatusLineMode(cmd, dir, cfg, statusLine, isStdinTTY() && !yesFlag)
+			if statusLineErr != nil {
+				return statusLineErr
 			}
 			warnParentRuleConflicts(cmd, dir, cfg, yesFlag)
 
@@ -151,6 +162,9 @@ func newUpdateCmd() *cobra.Command {
 				}
 			}
 
+			if statusLineSummary != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", statusLineSummary)
+			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Update complete: %d platform(s) updated\n", updated)
 			return nil
 		},
@@ -162,6 +176,7 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "같은 버전이라도 재설치 또는 개발 빌드 업데이트 강제")
 	cmd.Flags().StringVar(&targetVersion, "version", "", "특정 버전 설치 (기본값: 최신 버전)")
 	cmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "모든 프롬프트를 기본값으로 자동 수락")
+	cmd.Flags().StringVar(&statusLine, "statusline-mode", "", "Claude statusLine handling: keep, merge, replace")
 	cmd.Flags().BoolVar(&previewMode, "plan", false, "변경 예정 파일만 계산하고 쓰지 않음")
 	cmd.Flags().BoolVar(&previewMode, "preview", false, "변경 예정 파일만 계산하고 쓰지 않음")
 	cmd.Flags().BoolVar(&previewMode, "dry-run", false, "변경 예정 파일만 계산하고 쓰지 않음")

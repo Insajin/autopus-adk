@@ -506,6 +506,10 @@ Windows에서 `powershell -c ...`를 Git Bash 안에서 실행한 경우에는, 
 
 `auto init`은 설치된 AI 코딩 CLI(Claude Code, Codex, Gemini CLI, OpenCode)를 자동 감지하고, 각 플랫폼에 맞는 **네이티브 설정** — 규칙, 스킬, 에이전트 — 을 하나의 `autopus.yaml`에서 생성합니다.
 
+Claude Code statusline 참고:
+- `.claude/settings.json`에 기존 `statusLine.command`가 있으면, `auto init` / `auto update` 인터랙티브 실행 시 `keep`, `merge`, `replace` 중 하나를 고를 수 있습니다.
+- 비대화형에서는 `--statusline-mode keep|merge|replace`로 같은 동작을 명시할 수 있습니다.
+
 플랫폼별 명령 문법:
 - Codex: 생성된 로컬 플러그인을 설치한 뒤 `@auto ...`를 사용하고, 그 전에는 `$auto ...`를 사용합니다
 - OpenCode: `/auto ...` 또는 `/auto-<subcommand> ...`를 사용합니다
@@ -603,6 +607,8 @@ auto update
 ```
 
 `.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*` 등의 하네스 파일을 갱신합니다. `skills.compiler.mode: split`이 켜져 있으면 `.opencode/skills/*`와 `.autopus/plugins/auto/skills/*`도 preview/apply 대상이 되며 stale artifact prune까지 함께 처리합니다. `AUTOPUS:BEGIN`~`AUTOPUS:END` 마커 바깥의 사용자 편집은 보존됩니다. 새로 설치된 플랫폼이 있으면 자동 감지하여 해당 파일도 생성합니다.
+
+Claude Code에 기존 user-managed `statusLine.command`가 있으면, update는 기본적으로 이를 보존합니다. 필요하면 `--statusline-mode keep|merge|replace`로 기존 statusline 유지, Autopus와 2줄 병합, 완전 교체를 명시할 수 있습니다.
 
 **한 줄로 둘 다:**
 

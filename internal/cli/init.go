@@ -37,6 +37,7 @@ func newInitCmd() *cobra.Command {
 		project      string
 		platforms    string
 		noReviewGate bool
+		statusLine   string
 		yes          bool
 	)
 
@@ -172,6 +173,14 @@ func newInitCmd() *cobra.Command {
 			if err := config.Save(dir, cfg); err != nil {
 				return fmt.Errorf("autopus.yaml 저장 실패: %w", err)
 			}
+			if err := validateStatusLineMode(statusLine); err != nil {
+				return err
+			}
+
+			statusLineSummary, err := applyStatusLineMode(cmd, dir, cfg, statusLine, isStdinTTY() && !yes)
+			if err != nil {
+				return err
+			}
 
 			warnParentRuleConflicts(cmd, dir, cfg, yes)
 
@@ -202,6 +211,9 @@ func newInitCmd() *cobra.Command {
 				{Key: "Platforms", Value: strings.Join(cfg.Platforms, ", ")},
 				{Key: "Language", Value: fmt.Sprintf("comments=%s, commits=%s, ai=%s", cfg.Language.Comments, cfg.Language.Commits, cfg.Language.AIResponses)},
 			})
+			if statusLineSummary != "" {
+				tui.Info(out, statusLineSummary)
+			}
 			// Context-aware next step guidance (R9)
 			if home, err := os.UserHomeDir(); err == nil {
 				workerConfigPath := filepath.Join(home, ".config", "autopus", "worker.yaml")
@@ -226,6 +238,7 @@ func newInitCmd() *cobra.Command {
 	cmd.Flags().StringVar(&project, "project", "", "프로젝트 이름")
 	cmd.Flags().StringVar(&platforms, "platforms", "", "설치할 플랫폼 목록 (쉼표 구분, 예: claude-code,codex)")
 	cmd.Flags().BoolVar(&noReviewGate, "no-review-gate", false, "Disable review gate")
+	cmd.Flags().StringVar(&statusLine, "statusline-mode", "", "Claude statusLine handling: keep, merge, replace")
 	cmd.Flags().BoolVar(&yes, "yes", false, "Non-interactive mode (use defaults)")
 
 	return cmd

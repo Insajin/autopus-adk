@@ -47,7 +47,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, mcpFiles...)
 
-	statusFiles, err := a.prepareStatusline()
+	statusFiles, err := a.prepareStatuslineFiles(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("statusline 준비 실패: %w", err)
 	}
