@@ -59,13 +59,19 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 		return fmt.Errorf("SPEC 본문이 비어있습니다: %s", specID)
 	}
 
-	cfg, err := config.Load(".")
+	flags := globalFlagsFromContext(ctx)
+
+	configDir, err := resolveConfigDir(nil, flags.ConfigPath)
+	if err != nil {
+		return fmt.Errorf("설정 경로 확인 실패: %w", err)
+	}
+
+	cfg, err := config.Load(configDir)
 	if err != nil {
 		return fmt.Errorf("설정 로드 실패: %w", err)
 	}
 
 	gate := cfg.Spec.ReviewGate
-	flags := globalFlagsFromContext(ctx)
 	if strategy == "" {
 		strategy = gate.Strategy
 	}

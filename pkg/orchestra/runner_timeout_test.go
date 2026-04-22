@@ -167,3 +167,47 @@ func TestRunDebate_TimeoutProviderDoesNotHangCollection(t *testing.T) {
 	assert.Equal(t, "fast", responses[0].Provider)
 	assert.Less(t, elapsed, 250*time.Millisecond)
 }
+
+func TestRunProvider_FastFailPatternTerminatesProviderEarly(t *testing.T) {
+	origNewCommand := newCommand
+	origWaitGrace := providerWaitGracePeriod
+	defer func() {
+		newCommand = origNewCommand
+		providerWaitGracePeriod = origWaitGrace
+	}()
+
+	waitCh := make(chan error, 1)
+	fake := &fakeCommand{
+		waitCh:   waitCh,
+		exitCode: 1,
+		startFn: func(cmd *fakeCommand) error {
+			_, _ = io.WriteString(cmd.stderr, "status: RESOURCE_EXHAUSTED\nreason: MODEL_CAPACITY_EXHAUSTED\n")
+			return nil
+		},
+		terminateFn: func(_ *fakeCommand, _ string) error {
+			waitCh <- context.Canceled
+			return nil
+		},
+	}
+
+	newCommand = func(context.Context, string, ...string) command {
+		return fake
+	}
+	providerWaitGracePeriod = 20 * time.Millisecond
+
+	start := time.Now()
+	resp, err := runProvider(context.Background(), ProviderConfig{
+		Name:          "gemini",
+		Binary:        "gemini",
+		PromptViaArgs: true,
+	}, "prompt")
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, int32(1), fake.terminateCall.Load())
+	assert.Contains(t, err.Error(), "fast-fail")
+	assert.Contains(t, err.Error(), "capacity exhausted")
+	assert.Contains(t, resp.Error, "RESOURCE_EXHAUSTED")
+	assert.Less(t, elapsed, 200*time.Millisecond)
+}

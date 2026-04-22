@@ -146,6 +146,45 @@ func TestRunSpecReview_PassApprovesSpec(t *testing.T) {
 	assert.Equal(t, "approved", doc.Status)
 }
 
+func TestRunSpecReview_HonorsConfigPathFromContext(t *testing.T) {
+	dir := t.TempDir()
+	specDir := scaffoldReviewSpec(t, dir, "SPEC-REVIEW-CONFIG-001")
+	altCfgDir := t.TempDir()
+
+	cfg := config.DefaultFullConfig("test-project")
+	cfg.Spec.ReviewGate.Providers = []string{"claude"}
+	require.NoError(t, config.Save(altCfgDir, cfg))
+
+	origWD, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() { _ = os.Chdir(origWD) }()
+	require.NoError(t, os.Chdir(dir))
+
+	var capturedProviders []string
+	origBuilder := specReviewBuildProviders
+	specReviewBuildProviders = func(names []string) []orchestra.ProviderConfig {
+		capturedProviders = append([]string(nil), names...)
+		return []orchestra.ProviderConfig{{Name: "claude", Binary: "claude"}}
+	}
+	defer func() { specReviewBuildProviders = origBuilder }()
+
+	origRunner := specReviewRunOrchestra
+	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{{Provider: "claude", Output: "VERDICT: PASS"}}}, nil
+	}
+	defer func() { specReviewRunOrchestra = origRunner }()
+
+	ctx := withGlobalFlags(context.Background(), globalFlags{
+		ConfigPath: filepath.Join(altCfgDir, "autopus.yaml"),
+	})
+	require.NoError(t, runSpecReview(ctx, "SPEC-REVIEW-CONFIG-001", "consensus", 10))
+
+	doc, err := spec.Load(specDir)
+	require.NoError(t, err)
+	assert.Equal(t, "approved", doc.Status)
+	assert.Equal(t, []string{"claude"}, capturedProviders)
+}
+
 func TestRunSpecReview_ReviseDoesNotApproveSpec(t *testing.T) {
 	dir := t.TempDir()
 	specDir := scaffoldReviewSpec(t, dir, "SPEC-REVIEW-002")

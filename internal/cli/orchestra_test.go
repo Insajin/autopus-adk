@@ -122,6 +122,9 @@ func TestBuildProviderConfigs(t *testing.T) {
 			assert.Equal(t, tt.expectName, result[0].Name)
 			assert.Equal(t, tt.expectBinary, result[0].Binary)
 			assert.Equal(t, tt.expectViaArgs, result[0].PromptViaArgs)
+			if tt.expectName == "gemini" {
+				assert.Equal(t, defaultProviderStartupTimeout("gemini"), result[0].StartupTimeout)
+			}
 		})
 	}
 }

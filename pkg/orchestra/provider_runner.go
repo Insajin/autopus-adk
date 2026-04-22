@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,9 +29,15 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 
 	cmd := newCommand(ctx, provider.Binary, args...)
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.SetStdout(&stdoutBuf)
-	cmd.SetStderr(&stderrBuf)
+	detector := &fastFailDetector{}
+	stdoutBuf := newFastFailBuffer(detector, func(reason string) {
+		_ = cmd.Terminate(provider.Name + " fast-fail: " + reason)
+	})
+	stderrBuf := newFastFailBuffer(detector, func(reason string) {
+		_ = cmd.Terminate(provider.Name + " fast-fail: " + reason)
+	})
+	cmd.SetStdout(stdoutBuf)
+	cmd.SetStderr(stderrBuf)
 
 	if !provider.PromptViaArgs {
 		stdinPipe, err := cmd.StdinPipe()
@@ -51,7 +58,7 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 		_ = stdinPipe.Close()
 
 		waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh)
-		return buildProviderResponse(start, provider, &stdoutBuf, &stderrBuf, waitErr, ctx, cmd.ExitCode())
+		return buildProviderResponse(start, provider, stdoutBuf.String(), stderrBuf.String(), detector.Reason(), waitErr, ctx, cmd.ExitCode())
 	}
 
 	cmd.SetStdin(nil)
@@ -61,7 +68,7 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 
 	waitCh := startCommandWait(cmd)
 	waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh)
-	return buildProviderResponse(start, provider, &stdoutBuf, &stderrBuf, waitErr, ctx, cmd.ExitCode())
+	return buildProviderResponse(start, provider, stdoutBuf.String(), stderrBuf.String(), detector.Reason(), waitErr, ctx, cmd.ExitCode())
 }
 
 func startCommandWait(cmd command) <-chan error {
@@ -100,21 +107,24 @@ func drainCommandWait(waitCh <-chan error) {
 	}
 }
 
-func buildProviderResponse(start time.Time, provider ProviderConfig, stdoutBuf, stderrBuf *bytes.Buffer, waitErr error, ctx context.Context, exitCode int) (*ProviderResponse, error) {
+func buildProviderResponse(start time.Time, provider ProviderConfig, stdout, stderr, fastFailReason string, waitErr error, ctx context.Context, exitCode int) (*ProviderResponse, error) {
 	duration := time.Since(start)
 
-	output := stdoutBuf.String()
 	resp := &ProviderResponse{
 		Provider:    provider.Name,
-		Output:      output,
-		Error:       stderrBuf.String(),
+		Output:      stdout,
+		Error:       stderr,
 		Duration:    duration,
 		ExitCode:    exitCode,
-		EmptyOutput: strings.TrimSpace(output) == "",
+		EmptyOutput: strings.TrimSpace(stdout) == "",
 	}
 
 	if ctx.Err() != nil {
 		resp.TimedOut = true
+	}
+
+	if fastFailReason != "" {
+		return resp, fmt.Errorf("%s fast-fail: %s", provider.Name, fastFailReason)
 	}
 
 	if waitErr != nil && !resp.TimedOut && resp.ExitCode != 0 {
@@ -122,6 +132,78 @@ func buildProviderResponse(start time.Time, provider ProviderConfig, stdoutBuf, 
 	}
 
 	return resp, nil
+}
+
+type fastFailDetector struct {
+	mu     sync.Mutex
+	reason string
+	once   sync.Once
+}
+
+func (d *fastFailDetector) Trigger(reason string, terminate func(string)) {
+	if reason == "" {
+		return
+	}
+	d.once.Do(func() {
+		d.mu.Lock()
+		d.reason = reason
+		d.mu.Unlock()
+		terminate(reason)
+	})
+}
+
+func (d *fastFailDetector) Reason() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.reason
+}
+
+type fastFailBuffer struct {
+	mu       sync.Mutex
+	buf      bytes.Buffer
+	detector *fastFailDetector
+	onMatch  func(string)
+}
+
+func newFastFailBuffer(detector *fastFailDetector, onMatch func(string)) *fastFailBuffer {
+	return &fastFailBuffer{
+		detector: detector,
+		onMatch:  onMatch,
+	}
+}
+
+func (b *fastFailBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	n, err := b.buf.Write(p)
+	snapshot := b.buf.String()
+	b.mu.Unlock()
+
+	if reason := detectProviderFastFail(snapshot); reason != "" {
+		b.detector.Trigger(reason, b.onMatch)
+	}
+	return n, err
+}
+
+func (b *fastFailBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func detectProviderFastFail(output string) string {
+	lower := strings.ToLower(output)
+	switch {
+	case strings.Contains(lower, "model_capacity_exhausted"):
+		return "provider capacity exhausted"
+	case strings.Contains(lower, "resource_exhausted"):
+		return "provider resource exhausted"
+	case strings.Contains(lower, "no capacity available for model"):
+		return "provider model capacity unavailable"
+	case strings.Contains(lower, "ratelimitexceeded"):
+		return "provider rate limit exceeded"
+	default:
+		return ""
+	}
 }
 
 func buildAllProvidersFailedError(failed []FailedProvider, fallback error) error {

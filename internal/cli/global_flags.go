@@ -22,6 +22,7 @@ type globalFlags struct {
 	Quality    string
 	Effort     string
 	TaskMode   string
+	ConfigPath string
 }
 
 type globalFlagsContextKey struct{}
@@ -86,6 +87,7 @@ func collectGlobalFlags(cmd *cobra.Command, configPath string) (globalFlags, err
 		Quality:    strings.TrimSpace(quality),
 		Effort:     strings.TrimSpace(effort),
 		TaskMode:   normalizeTaskCreatedMode(taskMode),
+		ConfigPath: strings.TrimSpace(configPath),
 	}
 	if flags.UltraThink {
 		flags.Think = true

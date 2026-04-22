@@ -110,14 +110,9 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 	results := make([]providerResult, len(cfg.Providers))
 	var wg sync.WaitGroup
 
-	// R2: per-provider timeout from config (default 120s)
-	perTimeout := time.Duration(cfg.TimeoutSeconds) * time.Second
-	if perTimeout <= 0 {
-		perTimeout = 120 * time.Second
-	}
-
 	for i, p := range cfg.Providers {
 		wg.Add(1)
+		perTimeout := providerExecutionTimeout(p, cfg.TimeoutSeconds)
 		// R1: derive per-goroutine context for independent cancellation
 		childCtx, childCancel := context.WithTimeout(ctx, perTimeout)
 		go func(idx int, provider ProviderConfig, cancel context.CancelFunc) {
@@ -143,10 +138,11 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 				Error: r.err.Error(),
 			})
 		} else if r.resp.TimedOut {
+			timeoutUsed := providerExecutionTimeout(cfg.Providers[r.idx], cfg.TimeoutSeconds)
 			// R2: provider exceeded per-provider timeout — record as failed
 			failed = append(failed, FailedProvider{
 				Name:  r.resp.Provider,
-				Error: fmt.Sprintf("timeout: provider exceeded %v deadline", perTimeout),
+				Error: fmt.Sprintf("timeout: provider exceeded %v deadline", timeoutUsed),
 			})
 		} else if r.resp.EmptyOutput {
 			// Treat empty stdout (exit 0 but no content) as a failed provider.
@@ -163,6 +159,17 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 		return nil, failed, buildAllProvidersFailedError(failed, results[0].err)
 	}
 	return responses, failed, nil
+}
+
+func providerExecutionTimeout(provider ProviderConfig, fallbackSeconds int) time.Duration {
+	if provider.StartupTimeout > 0 {
+		return provider.StartupTimeout
+	}
+	timeout := time.Duration(fallbackSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 120 * time.Second
+	}
+	return timeout
 }
 
 // runPipeline은 프로바이더를 순차적으로 실행하며 이전 출력을 다음 입력에 추가한다.

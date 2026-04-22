@@ -65,6 +65,7 @@ func resolveProviders(conf *config.OrchestraConf, commandName string, flagProvid
 			PaneArgs:         entry.PaneArgs,
 			PromptViaArgs:    entry.PromptViaArgs,
 			InteractiveInput: interactiveInput,
+			StartupTimeout:   resolveProviderStartupTimeout(name, entry),
 			WorkingPatterns:  resolveWorkingPatterns(name, entry.WorkingPatterns),
 			SchemaFlag:       entry.Subprocess.SchemaFlag,
 			StdinMode:        entry.Subprocess.StdinMode,
@@ -72,6 +73,13 @@ func resolveProviders(conf *config.OrchestraConf, commandName string, flagProvid
 		})
 	}
 	return result
+}
+
+func resolveProviderStartupTimeout(name string, entry config.ProviderEntry) time.Duration {
+	if entry.Subprocess.Timeout > 0 {
+		return time.Duration(entry.Subprocess.Timeout) * time.Second
+	}
+	return defaultProviderStartupTimeout(name)
 }
 
 // resolveProviderNames returns provider names based on priority:

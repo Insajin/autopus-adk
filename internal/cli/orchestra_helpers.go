@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -107,7 +108,7 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	knownProviders := map[string]orchestra.ProviderConfig{
 		"claude": {Name: "claude", Binary: "claude", Args: []string{"-p", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"-p", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
 		"codex":  {Name: "codex", Binary: "codex", Args: []string{"exec", "--full-auto", "-m", "gpt-5.4"}, PaneArgs: []string{"-m", "gpt-5.4"}, PromptViaArgs: false},
-		"gemini": {Name: "gemini", Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
+		"gemini": {Name: "gemini", Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false, StartupTimeout: defaultProviderStartupTimeout("gemini")},
 	}
 
 	var result []orchestra.ProviderConfig
@@ -128,6 +129,15 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 // defaultProviders returns the hardcoded default provider list.
 func defaultProviders() []string {
 	return []string{"claude", "codex", "gemini"}
+}
+
+func defaultProviderStartupTimeout(name string) time.Duration {
+	switch name {
+	case "gemini":
+		return 20 * time.Second
+	default:
+		return 0
+	}
 }
 
 // resolveAndValidateThreshold validates the threshold flag and resolves the final value.
