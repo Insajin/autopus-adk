@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -50,7 +51,12 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	}
 	defer cleanup()
 
-	r1Prompt, err := buildPromptBuilder().BuildDebaterR1(pb)
+	r1Data, err := withPromptSchema(pb, schema, "debater_r1", cfg.Providers)
+	if err != nil {
+		return nil, err
+	}
+
+	r1Prompt, err := buildPromptBuilder().BuildDebaterR1(r1Data)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline: debater_r1 prompt: %w", err)
 	}
@@ -70,7 +76,12 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		pb.PreviousRound = round
 		pb.PreviousResults = prevAnon
 
-		r2Prompt, promptErr := buildPromptBuilder().BuildDebaterR2(pb)
+		r2Data, schemaErr := withPromptSchema(pb, schema, "debater_r2", cfg.Providers)
+		if schemaErr != nil {
+			return nil, schemaErr
+		}
+
+		r2Prompt, promptErr := buildPromptBuilder().BuildDebaterR2(r2Data)
 		if promptErr != nil {
 			return nil, fmt.Errorf("pipeline: debater_r2 prompt: %w", promptErr)
 		}
@@ -94,7 +105,12 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	// Phase 3: Judge synthesis
 	judgeAnon := cpb.AnonymizeForJudge(r1Results, r2Results)
 	jb := NewJudgeBuilder(buildPromptBuilder())
-	judgeReq, err := jb.Build(pb, judgeAnon)
+	judgeData, err := withPromptSchema(pb, schema, "judge", []ProviderConfig{cfg.Judge})
+	if err != nil {
+		return nil, err
+	}
+
+	judgeReq, err := jb.Build(judgeData, judgeAnon)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline: judge build: %w", err)
 	}
@@ -206,4 +222,38 @@ func buildPromptBuilder() *PromptBuilder {
 		panic(fmt.Sprintf("pipeline: failed to create prompt builder: %v", err))
 	}
 	return pb
+}
+
+func withPromptSchema(
+	base PromptData,
+	schema *SchemaBuilder,
+	role string,
+	providers []ProviderConfig,
+) (PromptData, error) {
+	data := base
+	if providersSupportCLISchema(providers) {
+		data.SchemaMethod = ""
+		data.SchemaJSON = ""
+		return data, nil
+	}
+
+	embedded, err := schema.EmbedInPrompt(role)
+	if err != nil {
+		return PromptData{}, fmt.Errorf("pipeline: embed %s schema in prompt: %w", role, err)
+	}
+	data.SchemaMethod = "prompt"
+	data.SchemaJSON = embedded
+	return data, nil
+}
+
+func providersSupportCLISchema(providers []ProviderConfig) bool {
+	if len(providers) == 0 {
+		return false
+	}
+	for _, provider := range providers {
+		if strings.TrimSpace(provider.SchemaFlag) == "" {
+			return false
+		}
+	}
+	return true
 }

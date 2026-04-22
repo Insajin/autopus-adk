@@ -79,8 +79,8 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 			req.Provider, resp.ExitCode, waitErr)
 	}
 
-	// Validate JSON output when a role is specified (structured output expected)
-	if req.Role != "" && !resp.EmptyOutput {
+	// Validate structured output only when the provider is expected to return JSON.
+	if req.Role != "" && !resp.EmptyOutput && expectsJSONOutput(req.Config) {
 		if err := validateJSONOutput(output); err != nil {
 			resp.Error = fmt.Sprintf("invalid JSON output: %v", err)
 		}
@@ -93,17 +93,30 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 func buildSubprocessArgs(req ProviderRequest) []string {
 	args := append([]string{}, req.Config.Args...)
 
-	// Append schema path if available
+	// Append a schema flag only for providers that explicitly support it.
 	if req.SchemaPath != "" {
-		args = append(args, "--schema", req.SchemaPath)
+		if schemaFlag := strings.TrimSpace(req.Config.SchemaFlag); schemaFlag != "" {
+			args = append(args, schemaFlag, req.SchemaPath)
+		}
 	}
 
-	// Pass prompt via args when configured (e.g., gemini -p "prompt")
+	// Pass prompt via args when configured.
 	if req.Config.PromptViaArgs {
-		args = append(args, "-p", req.Prompt)
+		args = injectPromptArg(args, req.Prompt)
 	}
 
 	return args
+}
+
+func injectPromptArg(args []string, prompt string) []string {
+	for i, arg := range args {
+		if arg == "" {
+			next := append([]string{}, args...)
+			next[i] = prompt
+			return next
+		}
+	}
+	return append(args, prompt)
 }
 
 // setupStdin configures stdin for the command. For PromptViaArgs providers,
@@ -122,8 +135,8 @@ func setupStdin(cmd command, req ProviderRequest) error {
 		return cmd.Start()
 	}
 
-	// For large prompts, use file-based input
-	if len(req.Prompt) > maxStdinLen {
+	// File mode is needed either explicitly or for large prompt payloads.
+	if shouldUseFileInput(req) {
 		return startWithFileInput(cmd, req)
 	}
 
@@ -132,6 +145,17 @@ func setupStdin(cmd command, req ProviderRequest) error {
 
 // maxStdinLen is the threshold above which prompts are written to a temp file.
 const maxStdinLen = 64 * 1024
+
+func shouldUseFileInput(req ProviderRequest) bool {
+	if strings.EqualFold(strings.TrimSpace(req.Config.StdinMode), "file") {
+		return true
+	}
+	return len(req.Prompt) > maxStdinLen
+}
+
+func expectsJSONOutput(cfg ProviderConfig) bool {
+	return !strings.EqualFold(strings.TrimSpace(cfg.OutputFormat), "text")
+}
 
 // startWithStdinPipe sends the prompt via stdin pipe.
 func startWithStdinPipe(cmd command, req ProviderRequest) error {
