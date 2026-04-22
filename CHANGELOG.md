@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.42] — 2026-04-22
+
+### Fixed
+
+- **Spec review non-interactive verdict completion no longer waits for lingering provider processes** (2026-04-22): provider가 `VERDICT:`를 출력한 뒤 tail output 때문에 subprocess가 더 살아 있어도, review flow가 의미 있는 결과를 idle grace 이후 성공으로 수집하고 정리하도록 수정
+  - `pkg/orchestra/{types.go,provider_runner.go,provider_result_ready.go,runner_timeout_test.go}` — semantic result-ready pattern/grace contract, non-interactive terminate monitor, regression test 추가
+  - `internal/cli/{spec_review.go,spec_review_test.go}` — spec review provider에 `VERDICT:` completion hint를 주입하고 orchestration config 회귀 테스트를 보강
+
 ## [v0.40.41] — 2026-04-22
 
 ### Added
