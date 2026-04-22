@@ -129,6 +129,29 @@ func TestRun_Timeout_ReturnsTimeout(t *testing.T) {
 	assert.False(t, result.Pass)
 }
 
+func TestRun_ProviderScenario_UsesTimeoutFloor(t *testing.T) {
+	t.Parallel()
+
+	scenario := Scenario{
+		ID:       "provider-timeout-floor",
+		Command:  "sleep 0.1",
+		Verify:   []string{"exit_code(0)"},
+		Requires: "providers",
+		Status:   "active",
+	}
+	runner := NewRunner(RunnerOptions{
+		ProjectDir: t.TempDir(),
+		Timeout:    10 * time.Millisecond,
+	})
+
+	result, err := runner.Run(scenario)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, result.TimedOut, "provider-required scenarios should use the timeout floor")
+	assert.True(t, result.Pass)
+}
+
 // TestRun_IsolatedTempDir_CleanedUp verifies that each scenario runs in its own
 // temporary directory and that directory is removed after execution.
 // NF3: clean isolated temp directory per scenario.

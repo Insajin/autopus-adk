@@ -30,6 +30,15 @@ func TestDefaultTestProfileCapabilities(t *testing.T) {
 func TestHarnessConfig_AvailableTestCapabilities_MergesConfigAdditions(t *testing.T) {
 	t.Parallel()
 
+	originalProviders := installedOrchestraProviders
+	originalInstalled := orchestraBinaryInstalled
+	installedOrchestraProviders = func() []string { return nil }
+	orchestraBinaryInstalled = func(binary string) bool { return false }
+	t.Cleanup(func() {
+		installedOrchestraProviders = originalProviders
+		orchestraBinaryInstalled = originalInstalled
+	})
+
 	cfg := &HarnessConfig{
 		Profiles: ProfilesConf{
 			Test: TestProfileConf{
@@ -41,6 +50,48 @@ func TestHarnessConfig_AvailableTestCapabilities_MergesConfigAdditions(t *testin
 	}
 
 	assert.Equal(t, []string{"standalone", "docker"}, cfg.AvailableTestCapabilities("standalone"))
+}
+
+func TestHarnessConfig_AvailableTestCapabilities_AddsProvidersWhenInstalled(t *testing.T) {
+	t.Parallel()
+
+	originalProviders := installedOrchestraProviders
+	originalInstalled := orchestraBinaryInstalled
+	installedOrchestraProviders = func() []string { return []string{"claude"} }
+	orchestraBinaryInstalled = func(binary string) bool { return binary == "claude" }
+	t.Cleanup(func() {
+		installedOrchestraProviders = originalProviders
+		orchestraBinaryInstalled = originalInstalled
+	})
+
+	cfg := &HarnessConfig{}
+
+	assert.Equal(t, []string{"standalone", "providers"}, cfg.AvailableTestCapabilities("standalone"))
+}
+
+func TestHarnessConfig_AvailableTestCapabilities_UsesConfiguredProviderBinary(t *testing.T) {
+	t.Parallel()
+
+	originalProviders := installedOrchestraProviders
+	originalInstalled := orchestraBinaryInstalled
+	installedOrchestraProviders = func() []string { return nil }
+	orchestraBinaryInstalled = func(binary string) bool { return binary == "custom-provider" }
+	t.Cleanup(func() {
+		installedOrchestraProviders = originalProviders
+		orchestraBinaryInstalled = originalInstalled
+	})
+
+	cfg := &HarnessConfig{
+		Orchestra: OrchestraConf{
+			Providers: map[string]ProviderEntry{
+				"custom": {
+					Binary: "custom-provider",
+				},
+			},
+		},
+	}
+
+	assert.Equal(t, []string{"standalone", "providers"}, cfg.AvailableTestCapabilities("standalone"))
 }
 
 func TestIsValidTestProfile(t *testing.T) {

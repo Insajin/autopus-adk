@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const providerScenarioTimeoutFloor = 150 * time.Second
+
 // RunnerOptions configures the scenario runner.
 type RunnerOptions struct {
 	ProjectDir   string        // project root directory
@@ -86,7 +88,7 @@ func (r *Runner) Run(scenario Scenario) (*RunnerResult, error) {
 	}()
 
 	// Execute command with timeout.
-	ctx, cancel := context.WithTimeout(context.Background(), r.opts.Timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), r.timeoutForScenario(scenario))
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", scenario.Command)
@@ -129,6 +131,19 @@ func (r *Runner) Run(scenario Scenario) (*RunnerResult, error) {
 	result.Pass = allPass
 
 	return result, nil
+}
+
+func (r *Runner) timeoutForScenario(scenario Scenario) time.Duration {
+	timeout := r.opts.Timeout
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+	for _, capability := range splitScenarioCapabilities(scenario.Requires) {
+		if capability == "providers" && timeout < providerScenarioTimeoutFloor {
+			return providerScenarioTimeoutFloor
+		}
+	}
+	return timeout
 }
 
 // runBuild handles build execution for a scenario.

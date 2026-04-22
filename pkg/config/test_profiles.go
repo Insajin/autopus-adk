@@ -1,6 +1,10 @@
 package config
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/detect"
+)
 
 const (
 	TestProfileStandalone = "standalone"
@@ -13,6 +17,11 @@ const (
 type TestProfileConf struct {
 	Capabilities map[string][]string `yaml:"capabilities,omitempty"`
 }
+
+var (
+	installedOrchestraProviders = detect.InstalledOrchestraProviders
+	orchestraBinaryInstalled    = detect.IsInstalled
+)
 
 // IsValidTestProfile reports whether the profile is supported by `auto test run`.
 func IsValidTestProfile(profile string) bool {
@@ -69,11 +78,32 @@ func DefaultTestProfileCapabilities(profile string) []string {
 // merging built-in defaults with any autopus.yaml additions.
 func (c *HarnessConfig) AvailableTestCapabilities(profile string) []string {
 	capabilities := append([]string{}, DefaultTestProfileCapabilities(profile)...)
+	if hasInstalledOrchestraProvider(c) {
+		capabilities = append(capabilities, "providers")
+	}
 	if c == nil {
 		return uniqueNormalizedCapabilities(capabilities)
 	}
 	capabilities = append(capabilities, c.Profiles.Test.Capabilities[normalizeTestProfile(profile)]...)
 	return uniqueNormalizedCapabilities(capabilities)
+}
+
+func hasInstalledOrchestraProvider(cfg *HarnessConfig) bool {
+	if cfg == nil || len(cfg.Orchestra.Providers) == 0 {
+		return len(installedOrchestraProviders()) > 0
+	}
+
+	for name, entry := range cfg.Orchestra.Providers {
+		binary := strings.TrimSpace(entry.Binary)
+		if binary == "" {
+			binary = strings.TrimSpace(name)
+		}
+		if binary != "" && orchestraBinaryInstalled(binary) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func normalizeTestProfile(profile string) string {
