@@ -27,8 +27,15 @@ func TestClaudeAdapter_InstallHooks_Empty(t *testing.T) {
 
 	// settings.json이 생성되어야 함
 	settingsPath := filepath.Join(dir, ".claude", "settings.json")
-	_, statErr := os.Stat(settingsPath)
-	assert.NoError(t, statErr)
+	data, readErr := os.ReadFile(settingsPath)
+	require.NoError(t, readErr)
+
+	var settings map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &settings))
+
+	statusLine, ok := settings["statusLine"].(map[string]interface{})
+	require.True(t, ok, "statusLine 필드가 있어야 함")
+	assert.Equal(t, ".claude/statusline.sh", statusLine["command"])
 }
 
 // TestClaudeAdapter_InstallHooks_WithHooks는 훅 설정을 포함한 InstallHooks를 테스트한다.
@@ -136,6 +143,42 @@ func TestClaudeAdapter_InstallHooks_MergesExisting(t *testing.T) {
 	assert.True(t, hasHooks)
 	theme, _ := result["theme"].(string)
 	assert.Equal(t, "dark", theme)
+}
+
+func TestClaudeAdapter_InstallHooks_PreservesExistingStatusLine(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	settingsDir := filepath.Join(dir, ".claude")
+	require.NoError(t, os.MkdirAll(settingsDir, 0755))
+
+	existing := map[string]interface{}{
+		"statusLine": map[string]interface{}{
+			"type":    "command",
+			"command": "node ~/.claude/hud/omc-hud.mjs",
+			"padding": 2,
+		},
+	}
+	data, err := json.Marshal(existing)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(settingsDir, "settings.json"), data, 0644))
+
+	a := claude.NewWithRoot(dir)
+	err = a.InstallHooks(context.Background(), []adapter.HookConfig{
+		{Event: "PreToolUse", Matcher: "Bash", Type: "command", Command: "auto check --arch --quiet", Timeout: 30},
+	}, nil)
+	require.NoError(t, err)
+
+	updated, readErr := os.ReadFile(filepath.Join(settingsDir, "settings.json"))
+	require.NoError(t, readErr)
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal(updated, &result))
+
+	statusLine, ok := result["statusLine"].(map[string]interface{})
+	require.True(t, ok, "기존 statusLine이 유지되어야 함")
+	assert.Equal(t, "node ~/.claude/hud/omc-hud.mjs", statusLine["command"])
+	assert.EqualValues(t, 2, statusLine["padding"])
 }
 
 // TestClaudeAdapter_InstallHooks_InvalidJSON은 잘못된 JSON settings.json이 있을 때를 테스트한다.
