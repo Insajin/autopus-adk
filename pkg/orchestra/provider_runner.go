@@ -3,6 +3,7 @@ package orchestra
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -38,6 +39,7 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 	})
 	cmd.SetStdout(stdoutBuf)
 	cmd.SetStderr(stderrBuf)
+	readyMonitor := newResultReadyMonitor(provider, stdoutBuf, stderrBuf)
 
 	if !provider.PromptViaArgs {
 		stdinPipe, err := cmd.StdinPipe()
@@ -57,7 +59,7 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 		}
 		_ = stdinPipe.Close()
 
-		waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh)
+		waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh, readyMonitor)
 		return buildProviderResponse(start, provider, stdoutBuf.String(), stderrBuf.String(), detector.Reason(), waitErr, ctx, cmd.ExitCode())
 	}
 
@@ -67,7 +69,7 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 	}
 
 	waitCh := startCommandWait(cmd)
-	waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh)
+	waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh, readyMonitor)
 	return buildProviderResponse(start, provider, stdoutBuf.String(), stderrBuf.String(), detector.Reason(), waitErr, ctx, cmd.ExitCode())
 }
 
@@ -79,23 +81,43 @@ func startCommandWait(cmd command) <-chan error {
 	return waitCh
 }
 
-func waitForCommand(ctx context.Context, cmd command, providerName string, waitCh <-chan error) error {
+func waitForCommand(ctx context.Context, cmd command, providerName string, waitCh <-chan error, readyMonitor *resultReadyMonitor) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	var readyGrace <-chan time.Time
+	resultReady := false
+
 	select {
 	case err := <-waitCh:
 		return err
 	default:
 	}
 
-	select {
-	case err := <-waitCh:
-		return err
-	case <-ctx.Done():
-		_ = cmd.Terminate(providerName + " context cancelled")
+	for {
 		select {
 		case err := <-waitCh:
+			if resultReady {
+				return errResultReady
+			}
 			return err
-		case <-time.After(providerWaitGracePeriod):
-			return ctx.Err()
+		case <-ctx.Done():
+			_ = cmd.Terminate(providerName + " context cancelled")
+			select {
+			case err := <-waitCh:
+				return err
+			case <-time.After(providerWaitGracePeriod):
+				return ctx.Err()
+			}
+		case <-ticker.C:
+			if resultReady || readyMonitor == nil || !readyMonitor.ShouldTerminate(time.Now()) {
+				continue
+			}
+			resultReady = true
+			_ = cmd.Terminate(providerName + " semantic result ready")
+			readyGrace = time.After(providerWaitGracePeriod)
+		case <-readyGrace:
+			return errResultReady
 		}
 	}
 }
@@ -109,6 +131,11 @@ func drainCommandWait(waitCh <-chan error) {
 
 func buildProviderResponse(start time.Time, provider ProviderConfig, stdout, stderr, fastFailReason string, waitErr error, ctx context.Context, exitCode int) (*ProviderResponse, error) {
 	duration := time.Since(start)
+	resultReady := errors.Is(waitErr, errResultReady)
+	if resultReady {
+		waitErr = nil
+		exitCode = 0
+	}
 
 	resp := &ProviderResponse{
 		Provider:    provider.Name,
@@ -159,10 +186,11 @@ func (d *fastFailDetector) Reason() string {
 }
 
 type fastFailBuffer struct {
-	mu       sync.Mutex
-	buf      bytes.Buffer
-	detector *fastFailDetector
-	onMatch  func(string)
+	mu        sync.Mutex
+	buf       bytes.Buffer
+	lastWrite time.Time
+	detector  *fastFailDetector
+	onMatch   func(string)
 }
 
 func newFastFailBuffer(detector *fastFailDetector, onMatch func(string)) *fastFailBuffer {
@@ -175,6 +203,7 @@ func newFastFailBuffer(detector *fastFailDetector, onMatch func(string)) *fastFa
 func (b *fastFailBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	n, err := b.buf.Write(p)
+	b.lastWrite = time.Now()
 	snapshot := b.buf.String()
 	b.mu.Unlock()
 

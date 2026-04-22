@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -14,7 +15,10 @@ import (
 	"github.com/insajin/autopus-adk/pkg/spec"
 )
 
-const defaultMaxRevisions = 3
+const (
+	defaultMaxRevisions        = 3
+	specReviewResultReadyGrace = 5 * time.Second
+)
 
 // newSpecReviewCmd creates the "spec review" subcommand.
 func newSpecReviewCmd() *cobra.Command {
@@ -92,7 +96,7 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	}
 
 	providerNames := resolveSpecReviewProviderNames(cfg, flags.MultiMode)
-	providers := specReviewBuildProviders(providerNames)
+	providers := configureSpecReviewProviders(specReviewBuildProviders(providerNames))
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다. 설치를 확인하세요: %v", providerNames)
 	}
@@ -181,6 +185,20 @@ func buildReviewProviders(names []string) []orchestra.ProviderConfig {
 	return available
 }
 
+func configureSpecReviewProviders(providers []orchestra.ProviderConfig) []orchestra.ProviderConfig {
+	configured := make([]orchestra.ProviderConfig, len(providers))
+	copy(configured, providers)
+
+	for i := range configured {
+		configured[i].ResultReadyPatterns = mergeStringValues(configured[i].ResultReadyPatterns, []string{"VERDICT:"})
+		if configured[i].ResultReadyGrace <= 0 {
+			configured[i].ResultReadyGrace = specReviewResultReadyGrace
+		}
+	}
+
+	return configured
+}
+
 func resolveSpecReviewProviderNames(cfg *config.HarnessConfig, multi bool) []string {
 	if cfg == nil {
 		return nil
@@ -212,6 +230,26 @@ func mergeProviderNames(groups ...[]string) []string {
 			}
 			seen[name] = struct{}{}
 			merged = append(merged, name)
+		}
+	}
+
+	return merged
+}
+
+func mergeStringValues(groups ...[]string) []string {
+	seen := make(map[string]struct{})
+	var merged []string
+
+	for _, group := range groups {
+		for _, value := range group {
+			if value == "" {
+				continue
+			}
+			if _, ok := seen[value]; ok {
+				continue
+			}
+			seen[value] = struct{}{}
+			merged = append(merged, value)
 		}
 	}
 

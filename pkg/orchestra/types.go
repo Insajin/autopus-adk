@@ -30,18 +30,20 @@ func (s Strategy) IsValid() bool {
 
 // ProviderConfig는 ��로바이더 실행 설정이다.
 type ProviderConfig struct {
-	Name             string        // provider name (claude, codex, gemini)
-	Binary           string        // executable binary path
-	Args             []string      // args for non-interactive mode
-	PaneArgs         []string      // args for pane mode (overrides Args when set)
-	PromptViaArgs    bool          // true: pass prompt as last arg (gemini), false: pass via stdin (claude, codex)
-	InteractiveInput string        // interactive prompt delivery: "args" = via CLI arg at launch, "" = via sendkeys (default)
-	StartupTimeout   time.Duration // per-provider startup timeout; 0 uses name-based default
-	IdleThreshold    time.Duration // per-provider idle fallback threshold; 0 uses default (R10 P1)
-	WorkingPatterns  []string      // per-provider "still working" screen patterns; if any matches, completion is deferred
-	SchemaFlag       string        // subprocess: CLI flag for JSON schema (e.g., "--schema")
-	StdinMode        string        // subprocess: prompt delivery — "pipe" (default) or "file"
-	OutputFormat     string        // subprocess: expected output — "json" (default) or "text"
+	Name                string        // provider name (claude, codex, gemini)
+	Binary              string        // executable binary path
+	Args                []string      // args for non-interactive mode
+	PaneArgs            []string      // args for pane mode (overrides Args when set)
+	PromptViaArgs       bool          // true: pass prompt as last arg (gemini), false: pass via stdin (claude, codex)
+	InteractiveInput    string        // interactive prompt delivery: "args" = via CLI arg at launch, "" = via sendkeys (default)
+	StartupTimeout      time.Duration // per-provider startup timeout; 0 uses name-based default
+	IdleThreshold       time.Duration // per-provider idle fallback threshold; 0 uses default (R10 P1)
+	WorkingPatterns     []string      // per-provider "still working" screen patterns; if any matches, completion is deferred
+	ResultReadyPatterns []string      // non-interactive: semantic output markers that indicate the useful result is complete
+	ResultReadyGrace    time.Duration // non-interactive: required output idle window after a ready marker before forced cleanup
+	SchemaFlag          string        // subprocess: CLI flag for JSON schema (e.g., "--schema")
+	StdinMode           string        // subprocess: prompt delivery — "pipe" (default) or "file"
+	OutputFormat        string        // subprocess: expected output — "json" (default) or "text"
 }
 
 // ReliabilityFallbackMode defines deterministic degradation behavior.

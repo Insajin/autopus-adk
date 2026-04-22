@@ -211,3 +211,52 @@ func TestRunProvider_FastFailPatternTerminatesProviderEarly(t *testing.T) {
 	assert.Contains(t, resp.Error, "RESOURCE_EXHAUSTED")
 	assert.Less(t, elapsed, 200*time.Millisecond)
 }
+
+func TestRunProvider_ResultReadyPatternTerminatesLingeringProcess(t *testing.T) {
+	origNewCommand := newCommand
+	origWaitGrace := providerWaitGracePeriod
+	defer func() {
+		newCommand = origNewCommand
+		providerWaitGracePeriod = origWaitGrace
+	}()
+
+	waitCh := make(chan error, 1)
+	fake := &fakeCommand{
+		waitCh:   waitCh,
+		exitCode: -1,
+		startFn: func(cmd *fakeCommand) error {
+			_, _ = io.WriteString(cmd.stdout, "VERDICT: PASS\nFINDING: [minor] [style] pkg/foo.go:1 note\n")
+			return nil
+		},
+		terminateFn: func(_ *fakeCommand, _ string) error {
+			waitCh <- nil
+			return nil
+		},
+	}
+
+	newCommand = func(context.Context, string, ...string) command {
+		return fake
+	}
+	providerWaitGracePeriod = 20 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	start := time.Now()
+	resp, err := runProvider(ctx, ProviderConfig{
+		Name:                "codex",
+		Binary:              "codex",
+		PromptViaArgs:       true,
+		ResultReadyPatterns: []string{"VERDICT:"},
+		ResultReadyGrace:    20 * time.Millisecond,
+	}, "prompt")
+	elapsed := time.Since(start)
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.False(t, resp.TimedOut)
+	assert.Equal(t, 0, resp.ExitCode)
+	assert.Contains(t, resp.Output, "VERDICT: PASS")
+	assert.Equal(t, int32(1), fake.terminateCall.Load())
+	assert.Less(t, elapsed, 250*time.Millisecond)
+}
