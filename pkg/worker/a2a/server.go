@@ -18,6 +18,7 @@ type ServerConfig struct {
 	WorkerName            string
 	WorkspaceID           string
 	Skills                []string
+	ExecutionLanes        []string
 	Handler               TaskHandler
 	AuthToken             string // Bearer token for backend auth (SEC-005)
 	ApprovalCallback      func(ApprovalRequestParams)
@@ -113,12 +114,16 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 func (s *Server) agentCard() AgentCard {
+	card := NewCardBuilder(s.config.WorkerName, s.config.BackendURL).
+		WithExecutionLanes(s.config.ExecutionLanes).
+		Build()
 	return AgentCard{
-		Name:                s.config.WorkerName,
-		Description:         "Autopus ADK Worker",
-		URL:                 s.config.BackendURL,
+		Name:                card.Name,
+		Description:         card.Description,
+		URL:                 card.URL,
 		WorkspaceID:         s.config.WorkspaceID,
 		Skills:              s.config.Skills,
+		ExecutionLanes:      card.ExecutionLanes,
 		Capabilities:        DefaultCapabilities(),
 		SupportedInputModes: []string{"text"},
 	}

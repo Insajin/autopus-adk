@@ -15,6 +15,7 @@ func TestCardBuilder_BasicBuild(t *testing.T) {
 	assert.Equal(t, "my-worker", card.Name)
 	assert.Equal(t, "https://api.example.com", card.URL)
 	assert.Equal(t, "Autopus ADK Worker", card.Description)
+	assert.Equal(t, []string{"build_change"}, card.ExecutionLanes)
 	assert.Equal(t, DefaultCapabilities(), card.Capabilities)
 	assert.Equal(t, []string{"text"}, card.SupportedInputModes)
 }
@@ -91,6 +92,16 @@ func TestCardBuilder_NoProviders(t *testing.T) {
 		Build()
 
 	assert.Empty(t, card.Skills)
+}
+
+func TestCardBuilder_WithExecutionLanes(t *testing.T) {
+	t.Parallel()
+
+	card := NewCardBuilder("w", "http://x").
+		WithExecutionLanes([]string{"prod_observe", "build_change", "prod_observe"}).
+		Build()
+
+	assert.Equal(t, []string{"build_change", "prod_observe"}, card.ExecutionLanes)
 }
 
 func TestParseRegistrationResponse_Success(t *testing.T) {

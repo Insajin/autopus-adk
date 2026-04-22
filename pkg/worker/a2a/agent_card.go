@@ -18,12 +18,17 @@ var providerSkills = map[string][]string{
 // defaultProviderSkills is used for unknown providers.
 var defaultProviderSkills = []string{"coding"}
 
+const executionLaneBuildChange = "build_change"
+
+var defaultExecutionLanes = []string{executionLaneBuildChange}
+
 // CardBuilder constructs an AgentCard from worker configuration.
 type CardBuilder struct {
-	workerName string
-	backendURL string
-	providers  []string
-	version    string
+	workerName     string
+	backendURL     string
+	providers      []string
+	version        string
+	executionLanes []string
 }
 
 // NewCardBuilder creates a CardBuilder with the given worker name and backend URL.
@@ -46,6 +51,12 @@ func (b *CardBuilder) WithVersion(version string) *CardBuilder {
 	return b
 }
 
+// WithExecutionLanes sets the explicitly advertised execution lanes.
+func (b *CardBuilder) WithExecutionLanes(lanes []string) *CardBuilder {
+	b.executionLanes = append([]string(nil), lanes...)
+	return b
+}
+
 // Build assembles an AgentCard with deduplicated skills from all providers.
 func (b *CardBuilder) Build() AgentCard {
 	skills := b.resolveSkills()
@@ -63,6 +74,7 @@ func (b *CardBuilder) Build() AgentCard {
 		Description:         description,
 		URL:                 b.backendURL,
 		Skills:              skills,
+		ExecutionLanes:      b.resolveExecutionLanes(),
 		Capabilities:        DefaultCapabilities(),
 		SupportedInputModes: []string{"text"},
 	}
@@ -90,6 +102,32 @@ func (b *CardBuilder) resolveSkills() []string {
 	// Stable output for deterministic cards.
 	sort.Strings(skills)
 	return skills
+}
+
+// resolveExecutionLanes returns a stable explicit lane list for registration.
+func (b *CardBuilder) resolveExecutionLanes() []string {
+	lanes := b.executionLanes
+	if len(lanes) == 0 {
+		lanes = defaultExecutionLanes
+	}
+
+	seen := make(map[string]struct{}, len(lanes))
+	result := make([]string, 0, len(lanes))
+	for _, lane := range lanes {
+		if lane == "" {
+			continue
+		}
+		if _, ok := seen[lane]; ok {
+			continue
+		}
+		seen[lane] = struct{}{}
+		result = append(result, lane)
+	}
+	if len(result) == 0 {
+		return append([]string(nil), defaultExecutionLanes...)
+	}
+	sort.Strings(result)
+	return result
 }
 
 // RegistrationResult holds the parsed response from agent/register.

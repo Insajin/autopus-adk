@@ -115,6 +115,7 @@ func TestRegisterAgentCard_CorrectJSONRPC(t *testing.T) {
 	require.NoError(t, json.Unmarshal(req.Params, &card))
 	assert.Equal(t, "card-test", card.Name)
 	assert.Equal(t, []string{"skill-a", "skill-b"}, card.Skills)
+	assert.Equal(t, []string{"build_change"}, card.ExecutionLanes)
 	assert.Equal(t, DefaultCapabilities(), card.Capabilities)
 	assert.Equal(t, []string{"text"}, card.SupportedInputModes)
 }
