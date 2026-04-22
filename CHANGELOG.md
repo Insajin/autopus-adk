@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.41] — 2026-04-22
+
+### Added
+
+- **Skill registry + split surface compiler contract (SPEC-SKILLSURFACE-001)** (2026-04-22): 100+ skill / mixed Codex+OpenCode workspace 를 giant shared surface 없이 수용할 수 있도록 canonical catalog, split compiler mode, manifest diff/prune contract 를 도입
+  - `pkg/content/{skill_catalog.go,skill_catalog_distribution.go,skill_catalog_policy.go,skill_catalog_test.go,skill_transformer_refs.go}` — canonical skill metadata, bundle/visibility/compile target, dependency extraction, `registered / compiled / visible` state 분리, registry-driven reference rewrite 추가
+  - `pkg/config/{schema.go,schema_skill_compiler.go}` — `skills.compiler.mode`, explicit skill, OpenCode/Codex long-tail target validation 추가
+  - `pkg/adapter/{manifest_diff.go,manifest_prune.go}`, `internal/cli/update_preview.go`, `internal/cli/update_preview_test.go` — emit/retain/prune preview, checksum diff, stale artifact prune contract 추가
+  - `pkg/adapter/codex/*`, `pkg/adapter/opencode/*`, `README.md`, `docs/README.ko.md` — shared/core vs platform-local long-tail ownership split 과 사용자 문서를 split compiler model 에 맞게 정렬
+
 ## [v0.40.40] — 2026-04-21
 
 ### Added
