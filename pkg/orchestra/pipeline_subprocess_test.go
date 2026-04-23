@@ -3,7 +3,9 @@ package orchestra
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,9 +16,14 @@ type mockBackend struct {
 	name      string
 	responses map[string]*ProviderResponse // keyed by provider name
 	err       error
+	mu        sync.Mutex
+	requests  []ProviderRequest
 }
 
 func (m *mockBackend) Execute(_ context.Context, req ProviderRequest) (*ProviderResponse, error) {
+	m.mu.Lock()
+	m.requests = append(m.requests, req)
+	m.mu.Unlock()
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -31,6 +38,15 @@ func (m *mockBackend) Execute(_ context.Context, req ProviderRequest) (*Provider
 }
 
 func (m *mockBackend) Name() string { return m.name }
+
+func (m *mockBackend) Requests() []ProviderRequest {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	out := make([]ProviderRequest, len(m.requests))
+	copy(out, m.requests)
+	return out
+}
 
 func defaultOutput(role string) string {
 	switch role {
@@ -123,4 +139,44 @@ func TestRoundPresets(t *testing.T) {
 	assert.Equal(t, 0, RoundPresets["fast"])
 	assert.Equal(t, 1, RoundPresets["standard"])
 	assert.Equal(t, 2, RoundPresets["deep"])
+}
+
+func TestRunSubprocessPipeline_ForwardsTimeoutsToRequests(t *testing.T) {
+	t.Parallel()
+	backend := &mockBackend{name: "mock"}
+	cfg := SubprocessPipelineConfig{
+		Backend: backend,
+		Providers: []ProviderConfig{
+			{Name: "p1", Binary: "echo"},
+			{Name: "p2", Binary: "echo", ExecutionTimeout: 45 * time.Second},
+		},
+		Topic: "test topic",
+		PromptData: PromptData{
+			ProjectName: "test", ProjectSummary: "s", TechStack: "Go",
+			MustReadFiles: []string{"go.mod"}, Topic: "test topic", MaxTurns: 5,
+		},
+		Rounds:         1,
+		Judge:          ProviderConfig{Name: "judge", Binary: "echo", ExecutionTimeout: 90 * time.Second},
+		TimeoutSeconds: 120,
+	}
+
+	_, err := RunSubprocessPipeline(context.Background(), cfg)
+	require.NoError(t, err)
+
+	requests := backend.Requests()
+	require.Len(t, requests, 5)
+
+	var judgeSeen bool
+	for _, req := range requests {
+		switch req.Provider {
+		case "p1":
+			assert.Equal(t, 120*time.Second, req.Timeout)
+		case "p2":
+			assert.Equal(t, 45*time.Second, req.Timeout)
+		case "judge":
+			judgeSeen = true
+			assert.Equal(t, 90*time.Second, req.Timeout)
+		}
+	}
+	assert.True(t, judgeSeen, "judge request must be recorded")
 }

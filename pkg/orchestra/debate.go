@@ -120,21 +120,23 @@ const contextAwareInstruction = "Use the project context below to ground your id
 // buildRebuttalPrompt creates a cross-pollination prompt with anonymized participant outputs.
 // Uses the Acknowledge/Integrate/Risk 3-step structure for structured revision.
 // ICE scores from Round 1 are stripped to prevent confidence cascade.
-// For round >= 3, each provider's output is truncated to 500 chars to keep prompt size manageable.
-// @AX:NOTE [AUTO] REQ-4 magic constant 500 — truncation limit for round >= 3; increase requires prompt budget review
+// Peer outputs are capped with an approximate token budget so Round 2 does not
+// re-inject full brainstorm transcripts back into every provider context.
 func buildRebuttalPrompt(original string, otherResponses []ProviderResponse, round int) string {
 	var sb strings.Builder
 	sb.WriteString(original)
 	fmt.Fprintf(&sb, "\n\n---\n\n# Round %d: Cross-Pollination\n\n", round)
 	sb.WriteString("Other participants' ideas are shown below (anonymized, ICE scores removed).\n\n")
 
+	cleanedOutputs := make([]string, len(otherResponses))
 	for i, r := range otherResponses {
-		output := stripICEScores(r.Output)
-		if round >= 3 && len(output) > 500 {
-			output = output[:500] + "[...truncated]"
-		}
+		cleanedOutputs[i] = stripICEScores(r.Output)
+	}
+	cappedOutputs := capPromptSections(cleanedOutputs, rebuttalPromptTotalTokens, rebuttalPromptPerParticipant)
+
+	for i := range otherResponses {
 		alias := fmt.Sprintf("Participant %c", 'A'+rune(i))
-		fmt.Fprintf(&sb, "## %s:\n%s\n\n", alias, output)
+		fmt.Fprintf(&sb, "## %s:\n%s\n\n", alias, cappedOutputs[i])
 	}
 
 	sb.WriteString(`Respond in exactly 3 steps:
@@ -157,15 +159,21 @@ in the integrated proposal. Be specific about assumptions and dependencies.
 }
 
 // buildJudgmentPrompt creates the judge's synthesis prompt with anonymized debate results.
-// Includes structured ICE scoring instructions for consensus-based evaluation.
+// Includes structured ICE scoring instructions for consensus-based evaluation
+// while capping per-participant context to keep judge prompts bounded.
 func buildJudgmentPrompt(topic string, arguments []ProviderResponse) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "# Role: Final Judge\n\nYou are the final judge for a multi-analyst debate on the topic below.\nParticipant identities are anonymized. Judge purely on content quality.\n\n## Topic\n\n%s\n\n## Debate Results (Anonymized)\n\n", topic)
 
+	cleanedOutputs := make([]string, len(arguments))
 	for i, r := range arguments {
+		cleanedOutputs[i] = stripICEScores(r.Output)
+	}
+	cappedOutputs := capPromptSections(cleanedOutputs, judgePromptTotalTokens, judgePromptPerParticipant)
+
+	for i := range arguments {
 		alias := fmt.Sprintf("Participant %c", 'A'+rune(i))
-		output := stripICEScores(r.Output)
-		fmt.Fprintf(&sb, "### %s:\n%s\n\n", alias, output)
+		fmt.Fprintf(&sb, "### %s:\n%s\n\n", alias, cappedOutputs[i])
 	}
 
 	sb.WriteString(`## Judging Instructions

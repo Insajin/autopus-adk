@@ -37,6 +37,7 @@ type ProviderConfig struct {
 	PromptViaArgs       bool          // true: pass prompt as last arg (gemini), false: pass via stdin (claude, codex)
 	InteractiveInput    string        // interactive prompt delivery: "args" = via CLI arg at launch, "" = via sendkeys (default)
 	StartupTimeout      time.Duration // per-provider startup timeout; 0 uses name-based default
+	ExecutionTimeout    time.Duration // per-provider execution timeout; 0 uses command/global timeout
 	IdleThreshold       time.Duration // per-provider idle fallback threshold; 0 uses default (R10 P1)
 	WorkingPatterns     []string      // per-provider "still working" screen patterns; if any matches, completion is deferred
 	ResultReadyPatterns []string      // non-interactive: semantic output markers that indicate the useful result is complete

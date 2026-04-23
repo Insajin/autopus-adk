@@ -72,7 +72,15 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			if pi.provider.InteractiveInput == "args" {
 				_ = SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round)
 			}
-			pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, round2PollTimeout)
+			if !pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, round2PollTimeout) {
+				log.Printf("[Round %d] %s prompt not ready within timeout -- skipping", round, pi.provider.Name)
+				panes[i].skipWait = true
+				if cfg.ReliabilityStore != nil {
+					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "prompt_ready", prompt, round, "failed", "prompt not ready before round submission")
+					_ = cfg.ReliabilityStore.recordPrompt(receipt)
+				}
+				continue
+			}
 		}
 
 		// Skip sendPrompts for providers that received the prompt via CLI args at launch (round 1 only)
@@ -137,8 +145,10 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			receipt := promptReceipt(cfg.RunID, pi.provider.Name, mode, sendPrompt, round, "pass", "")
 			_ = cfg.ReliabilityStore.recordPrompt(receipt)
 		}
+		targetPaneID := pi.paneID
 		if recreated {
 			panes[i] = newPI
+			targetPaneID = newPI.paneID
 		}
 		submitDelay := 100 * time.Millisecond
 		if cfg.HookMode && hookSession != nil {
@@ -146,10 +156,10 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		}
 		time.Sleep(submitDelay)
 		// R8: Retry once on SendCommand (Enter) failure.
-		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
+		if err := cfg.Terminal.SendCommand(ctx, targetPaneID, "\n"); err != nil {
 			log.Printf("[Round %d] %s SendCommand failed: %v — retrying", round, pi.provider.Name, err)
 			time.Sleep(1 * time.Second)
-			if retryErr := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); retryErr != nil {
+			if retryErr := cfg.Terminal.SendCommand(ctx, targetPaneID, "\n"); retryErr != nil {
 				log.Printf("[Round %d] %s SendCommand retry failed: %v — skipping", round, pi.provider.Name, retryErr)
 				panes[i].skipWait = true
 				if cfg.ReliabilityStore != nil {

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
@@ -21,11 +22,11 @@ func TestRunSpecReview_AddsVerdictCompletionHints(t *testing.T) {
 	defer func() { _ = os.Chdir(origWD) }()
 	require.NoError(t, os.Chdir(dir))
 
-	origBuilder := specReviewBuildProviders
-	specReviewBuildProviders = func(names []string) []orchestra.ProviderConfig {
+	origBuilder := specReviewConfigProviders
+	specReviewConfigProviders = func(_ *config.HarnessConfig, names []string) []orchestra.ProviderConfig {
 		return []orchestra.ProviderConfig{{Name: "claude", Binary: "claude"}}
 	}
-	defer func() { specReviewBuildProviders = origBuilder }()
+	defer func() { specReviewConfigProviders = origBuilder }()
 
 	var captured orchestra.OrchestraConfig
 	origRunner := specReviewRunOrchestra

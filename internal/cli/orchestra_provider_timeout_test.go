@@ -23,9 +23,10 @@ func TestResolveProviders_DefaultStartupTimeoutPropagated(t *testing.T) {
 	providers := resolveProviders(conf, "review", []string{"gemini"})
 	require.Len(t, providers, 1)
 	assert.Equal(t, defaultProviderStartupTimeout("gemini"), providers[0].StartupTimeout)
+	assert.Zero(t, providers[0].ExecutionTimeout)
 }
 
-func TestResolveProviders_SubprocessTimeoutOverridesDefaultStartupTimeout(t *testing.T) {
+func TestResolveProviders_SubprocessTimeoutMapsToExecutionTimeout(t *testing.T) {
 	t.Parallel()
 
 	conf := &config.OrchestraConf{
@@ -42,5 +43,26 @@ func TestResolveProviders_SubprocessTimeoutOverridesDefaultStartupTimeout(t *tes
 
 	providers := resolveProviders(conf, "review", []string{"gemini"})
 	require.Len(t, providers, 1)
-	assert.Equal(t, 7*time.Second, providers[0].StartupTimeout)
+	assert.Equal(t, defaultProviderStartupTimeout("gemini"), providers[0].StartupTimeout)
+	assert.Equal(t, 7*time.Second, providers[0].ExecutionTimeout)
+}
+
+func TestResolveCommandTimeout_CLIFlagBeatsConfig(t *testing.T) {
+	t.Parallel()
+
+	conf := &config.OrchestraConf{TimeoutSeconds: 240}
+	assert.Equal(t, 90, resolveCommandTimeout(conf, 90, true))
+}
+
+func TestResolveCommandTimeout_ConfigBeatsCommandDefault(t *testing.T) {
+	t.Parallel()
+
+	conf := &config.OrchestraConf{TimeoutSeconds: 240}
+	assert.Equal(t, 240, resolveCommandTimeout(conf, 120, false))
+}
+
+func TestResolveCommandTimeout_FallsBackToRequestedDefault(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, 300, resolveCommandTimeout(nil, 300, false))
 }

@@ -17,12 +17,13 @@ var RoundPresets = map[string]int{
 
 // SubprocessPipelineConfig holds configuration for the subprocess pipeline.
 type SubprocessPipelineConfig struct {
-	Backend    ExecutionBackend
-	Providers  []ProviderConfig
-	Topic      string
-	PromptData PromptData
-	Rounds     int // number of cross-pollination rounds (0=fast, 1=standard, 2=deep)
-	Judge      ProviderConfig
+	Backend        ExecutionBackend
+	Providers      []ProviderConfig
+	Topic          string
+	PromptData     PromptData
+	Rounds         int // number of cross-pollination rounds (0=fast, 1=standard, 2=deep)
+	Judge          ProviderConfig
+	TimeoutSeconds int
 }
 
 // RunSubprocessPipeline executes the full subprocess debate pipeline:
@@ -61,7 +62,7 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		return nil, fmt.Errorf("pipeline: debater_r1 prompt: %w", err)
 	}
 
-	r1Results, r1Failed, err := executeParallel(ctx, cfg.Backend, cfg.Providers, r1Prompt, schemaPath, "debater_r1", 1)
+	r1Results, r1Failed, err := executeParallel(ctx, cfg.Backend, cfg.Providers, r1Prompt, schemaPath, "debater_r1", 1, cfg.TimeoutSeconds)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline: round 1: %w", err)
 	}
@@ -92,7 +93,7 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		}
 		defer r2Cleanup()
 
-		roundResults, roundFailed, roundErr := executeParallel(ctx, cfg.Backend, cfg.Providers, r2Prompt, r2SchemaPath, "debater_r2", round+1)
+		roundResults, roundFailed, roundErr := executeParallel(ctx, cfg.Backend, cfg.Providers, r2Prompt, r2SchemaPath, "debater_r2", round+1, cfg.TimeoutSeconds)
 		if roundErr != nil {
 			return nil, fmt.Errorf("pipeline: round %d: %w", round+1, roundErr)
 		}
@@ -116,6 +117,7 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	}
 	judgeReq.Config = cfg.Judge
 	judgeReq.Provider = cfg.Judge.Name
+	judgeReq.Timeout = providerExecutionTimeout(cfg.Judge, cfg.TimeoutSeconds)
 
 	judgeSchemaPath, judgeCleanup, err := schema.WriteToFile("judge")
 	if err != nil {
@@ -164,6 +166,7 @@ func executeParallel(
 	providers []ProviderConfig,
 	prompt, schemaPath, role string,
 	round int,
+	timeoutSeconds int,
 ) ([]ProviderResult, []FailedProvider, error) {
 	type result struct {
 		pr  ProviderResult
@@ -184,6 +187,7 @@ func executeParallel(
 				SchemaPath: schemaPath,
 				Role:       role,
 				Round:      round,
+				Timeout:    providerExecutionTimeout(prov, timeoutSeconds),
 				Config:     prov,
 			}
 			resp, err := backend.Execute(ctx, req)

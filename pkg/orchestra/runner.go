@@ -162,8 +162,8 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 }
 
 func providerExecutionTimeout(provider ProviderConfig, fallbackSeconds int) time.Duration {
-	if provider.StartupTimeout > 0 {
-		return provider.StartupTimeout
+	if provider.ExecutionTimeout > 0 {
+		return provider.ExecutionTimeout
 	}
 	timeout := time.Duration(fallbackSeconds) * time.Second
 	if timeout <= 0 {

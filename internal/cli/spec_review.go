@@ -96,7 +96,7 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	}
 
 	providerNames := resolveSpecReviewProviderNames(cfg, flags.MultiMode)
-	providers := configureSpecReviewProviders(specReviewBuildProviders(providerNames))
+	providers := configureSpecReviewProviders(specReviewConfigProviders(cfg, providerNames))
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다. 설치를 확인하세요: %v", providerNames)
 	}
@@ -174,6 +174,18 @@ func hasActiveFindings(findings []spec.ReviewFinding) bool {
 // buildReviewProviders builds provider configs, skipping missing binaries.
 func buildReviewProviders(names []string) []orchestra.ProviderConfig {
 	all := buildProviderConfigs(names)
+	return filterInstalledProviders(all)
+}
+
+func buildReviewProvidersWithConfig(cfg *config.HarnessConfig, names []string) []orchestra.ProviderConfig {
+	if cfg == nil {
+		return buildReviewProviders(names)
+	}
+	all := resolveProviders(&cfg.Orchestra, "review", names)
+	return filterInstalledProviders(all)
+}
+
+func filterInstalledProviders(all []orchestra.ProviderConfig) []orchestra.ProviderConfig {
 	var available []orchestra.ProviderConfig
 	for _, p := range all {
 		if detect.IsInstalled(p.Binary) {
@@ -263,33 +275,4 @@ func sortedProviderKeys(providers map[string]config.ProviderEntry) []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-func printChecklistSummary(outcomes []spec.ChecklistOutcome) {
-	if len(outcomes) == 0 {
-		return
-	}
-
-	passCount := 0
-	failCount := 0
-	for _, outcome := range outcomes {
-		switch outcome.Status {
-		case spec.ChecklistStatusPass:
-			passCount++
-		case spec.ChecklistStatusFail:
-			failCount++
-		}
-	}
-
-	fmt.Printf("체크리스트 결과: %d건 (PASS: %d, FAIL: %d)\n", len(outcomes), passCount, failCount)
-	for _, outcome := range outcomes {
-		if outcome.Status != spec.ChecklistStatusFail {
-			continue
-		}
-		if outcome.Reason == "" {
-			fmt.Printf("- [FAIL] %s\n", outcome.ID)
-			continue
-		}
-		fmt.Printf("- [FAIL] %s: %s\n", outcome.ID, outcome.Reason)
-	}
 }

@@ -1,6 +1,7 @@
 package orchestra
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,6 +68,47 @@ func TestCrossPollinateBuilder_AnonymizeForJudge(t *testing.T) {
 		assert.Contains(t, j.Alias, "Debater")
 		assert.NotEmpty(t, j.Round1)
 		assert.NotEmpty(t, j.Round2)
+	}
+}
+
+func TestCrossPollinateBuilder_Anonymize_CapsLongOutputs(t *testing.T) {
+	t.Parallel()
+	cpb := NewCrossPollinateBuilder([]string{"claude", "codex", "gemini"})
+	longOutput := strings.Repeat("x", 5000)
+	results := []ProviderResult{
+		{Provider: "claude", Output: longOutput},
+		{Provider: "codex", Output: longOutput},
+		{Provider: "gemini", Output: longOutput},
+	}
+
+	anon := cpb.Anonymize(results)
+	require.Len(t, anon, 3)
+	for _, result := range anon {
+		assert.NotContains(t, result.Output, longOutput)
+		assert.Contains(t, result.Output, "truncated to ~")
+	}
+}
+
+func TestCrossPollinateBuilder_AnonymizeForJudge_CapsLongOutputs(t *testing.T) {
+	t.Parallel()
+	cpb := NewCrossPollinateBuilder([]string{"claude", "codex"})
+	longOutput := strings.Repeat("y", 5000)
+	r1 := []ProviderResult{
+		{Provider: "claude", Output: longOutput},
+		{Provider: "codex", Output: longOutput},
+	}
+	r2 := []ProviderResult{
+		{Provider: "claude", Output: longOutput},
+		{Provider: "codex", Output: longOutput},
+	}
+
+	judge := cpb.AnonymizeForJudge(r1, r2)
+	require.Len(t, judge, 2)
+	for _, result := range judge {
+		assert.NotContains(t, result.Round1, longOutput)
+		assert.NotContains(t, result.Round2, longOutput)
+		assert.Contains(t, result.Round1, "truncated to ~")
+		assert.Contains(t, result.Round2, "truncated to ~")
 	}
 }
 

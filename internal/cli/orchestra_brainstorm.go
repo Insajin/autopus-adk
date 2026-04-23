@@ -35,12 +35,13 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
+			timeoutChanged := cmd.Flags().Changed("timeout")
 			prompt := buildBrainstormPrompt(args[0])
 			if contextAware {
 				prompt = prependProjectContext(prompt)
 			}
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
-			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge, YieldRounds: yieldRounds, ContextAware: contextAware, SubprocessMode: subprocess})
+			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge, YieldRounds: yieldRounds, ContextAware: contextAware, SubprocessMode: subprocess, TimeoutChanged: timeoutChanged})
 		},
 	}
 

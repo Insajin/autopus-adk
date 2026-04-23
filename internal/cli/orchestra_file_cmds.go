@@ -28,12 +28,13 @@ func newOrchestraReviewCmd() *cobra.Command {
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
+			timeoutChanged := cmd.Flags().Changed("timeout")
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
 			prompt, err := buildReviewPrompt(args)
 			if err != nil {
 				return err
 			}
-			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge})
+			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge, TimeoutChanged: timeoutChanged})
 		},
 	}
 
@@ -69,12 +70,13 @@ func newOrchestraSecureCmd() *cobra.Command {
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
+			timeoutChanged := cmd.Flags().Changed("timeout")
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
 			prompt, err := buildSecurePrompt(args)
 			if err != nil {
 				return err
 			}
-			return runOrchestraCommand(cmd.Context(), "secure", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay})
+			return runOrchestraCommand(cmd.Context(), "secure", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, TimeoutChanged: timeoutChanged})
 		},
 	}
 

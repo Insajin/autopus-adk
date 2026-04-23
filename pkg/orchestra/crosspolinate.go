@@ -31,24 +31,30 @@ func NewCrossPollinateBuilder(providerNames []string) *CrossPollinateBuilder {
 }
 
 // Anonymize converts provider results to anonymized results.
-// ICE scores are stripped; full content is preserved.
+// ICE scores are stripped and outputs are capped to the Round 2 prompt budget.
 func (cpb *CrossPollinateBuilder) Anonymize(results []ProviderResult) []PreviousResult {
+	cleanedOutputs := make([]string, len(results))
+	for i, r := range results {
+		cleanedOutputs[i] = stripICEScores(r.Output)
+	}
+	cappedOutputs := capPromptSections(cleanedOutputs, rebuttalPromptTotalTokens, rebuttalPromptPerParticipant)
+
 	out := make([]PreviousResult, 0, len(results))
-	for _, r := range results {
+	for i, r := range results {
 		alias, ok := cpb.reverseMap[r.Provider]
 		if !ok {
 			alias = r.Provider // fallback: use original name
 		}
-		cleaned := stripICEScores(r.Output)
 		out = append(out, PreviousResult{
 			Alias:  alias,
-			Output: cleaned,
+			Output: cappedOutputs[i],
 		})
 	}
 	return out
 }
 
-// AnonymizeForJudge converts multi-round results to judge-ready format.
+// AnonymizeForJudge converts multi-round results to judge-ready format while
+// bounding per-participant context for the final judge prompt.
 func (cpb *CrossPollinateBuilder) AnonymizeForJudge(round1, round2 []ProviderResult) []JudgeResult {
 	r1Map := make(map[string]string, len(round1))
 	for _, r := range round1 {
@@ -67,7 +73,7 @@ func (cpb *CrossPollinateBuilder) AnonymizeForJudge(round1, round2 []ProviderRes
 			Round2: r2Map[realName],
 		})
 	}
-	return out
+	return capJudgeResults(out)
 }
 
 // IdentityMap returns alias -> real provider name mapping for de-anonymization.

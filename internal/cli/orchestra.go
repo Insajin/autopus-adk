@@ -61,9 +61,10 @@ func newOrchestraPlanCmd() *cobra.Command {
 			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
 			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
+			timeoutChanged := cmd.Flags().Changed("timeout")
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
 			prompt := args[0]
-			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay})
+			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, TimeoutChanged: timeoutChanged})
 		},
 	}
 
@@ -156,6 +157,7 @@ func runOrchestraCommand(
 	yieldRounds := flags.YieldRounds
 	contextAware := flags.ContextAware
 	subprocessMode := flags.SubprocessMode
+	timeout = resolveCommandTimeout(orchConf, timeout, flags.TimeoutChanged)
 	term := terminal.DetectTerminal()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"

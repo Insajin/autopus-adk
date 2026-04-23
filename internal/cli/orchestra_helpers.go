@@ -170,6 +170,7 @@ type OrchestraFlags struct {
 	YieldRounds    bool
 	ContextAware   bool
 	SubprocessMode bool
+	TimeoutChanged bool
 }
 
 // isHookModeAvailable checks whether hook-based result collection can be used.

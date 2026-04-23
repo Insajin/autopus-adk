@@ -38,22 +38,20 @@ func TestBuildRebuttalPrompt_TopicIsolation(t *testing.T) {
 // TestBuildRebuttalPrompt_Summarization verifies round-based truncation.
 func TestBuildRebuttalPrompt_Summarization(t *testing.T) {
 	t.Parallel()
-	longOutput := strings.Repeat("x", 2000)
+	longOutput := strings.Repeat("x", 4000)
 	others := []ProviderResponse{
 		{Provider: "alice", Output: longOutput},
 	}
 
-	// Round 2 — full output preserved
+	// Round 2 — capped by prompt budget
 	promptR2 := buildRebuttalPrompt("topic", others, 2)
-	assert.Contains(t, promptR2, longOutput, "round 2 should preserve full output")
-	assert.NotContains(t, promptR2, "[...truncated]")
+	assert.NotContains(t, promptR2, longOutput, "round 2 should cap long peer output")
+	assert.Contains(t, promptR2, "truncated to ~")
 
-	// Round 3 — truncated to 500 chars
+	// Round 3 — capped as well
 	promptR3 := buildRebuttalPrompt("topic", others, 3)
-	assert.NotContains(t, promptR3, longOutput, "round 3 should truncate long output")
-	assert.Contains(t, promptR3, "[...truncated]")
-	// Verify the truncated output is 500 chars + "[...truncated]"
-	assert.Contains(t, promptR3, longOutput[:500])
+	assert.NotContains(t, promptR3, longOutput, "round 3 should cap long peer output")
+	assert.Contains(t, promptR3, "truncated to ~")
 }
 
 func TestBuildJudgmentPrompt(t *testing.T) {
@@ -70,6 +68,20 @@ func TestBuildJudgmentPrompt(t *testing.T) {
 	assert.Contains(t, prompt, "ICE Score")
 	assert.NotContains(t, prompt, "alice", "provider names must be anonymized")
 	assert.NotContains(t, prompt, "bob", "provider names must be anonymized")
+}
+
+func TestBuildJudgmentPrompt_CapsLongArguments(t *testing.T) {
+	t.Parallel()
+	longOutput := strings.Repeat("x", 5000)
+	args := []ProviderResponse{
+		{Provider: "alice", Output: longOutput},
+		{Provider: "bob", Output: longOutput},
+		{Provider: "charlie", Output: longOutput},
+	}
+
+	prompt := buildJudgmentPrompt("test topic", args)
+	assert.NotContains(t, prompt, longOutput)
+	assert.Contains(t, prompt, "truncated to ~")
 }
 
 func TestFindOrBuildJudgeConfig_Found(t *testing.T) {

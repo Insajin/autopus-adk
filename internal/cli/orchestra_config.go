@@ -65,7 +65,8 @@ func resolveProviders(conf *config.OrchestraConf, commandName string, flagProvid
 			PaneArgs:         entry.PaneArgs,
 			PromptViaArgs:    entry.PromptViaArgs,
 			InteractiveInput: interactiveInput,
-			StartupTimeout:   resolveProviderStartupTimeout(name, entry),
+			StartupTimeout:   resolveProviderStartupTimeout(name),
+			ExecutionTimeout: resolveProviderExecutionTimeout(entry),
 			WorkingPatterns:  resolveWorkingPatterns(name, entry.WorkingPatterns),
 			SchemaFlag:       entry.Subprocess.SchemaFlag,
 			StdinMode:        entry.Subprocess.StdinMode,
@@ -75,11 +76,15 @@ func resolveProviders(conf *config.OrchestraConf, commandName string, flagProvid
 	return result
 }
 
-func resolveProviderStartupTimeout(name string, entry config.ProviderEntry) time.Duration {
+func resolveProviderStartupTimeout(name string) time.Duration {
+	return defaultProviderStartupTimeout(name)
+}
+
+func resolveProviderExecutionTimeout(entry config.ProviderEntry) time.Duration {
 	if entry.Subprocess.Timeout > 0 {
 		return time.Duration(entry.Subprocess.Timeout) * time.Second
 	}
-	return defaultProviderStartupTimeout(name)
+	return 0
 }
 
 // resolveProviderNames returns provider names based on priority:
@@ -181,6 +186,19 @@ func resolveSubprocessTimeout(conf *config.OrchestraConf, entry config.ProviderE
 		return time.Duration(conf.TimeoutSeconds) * time.Second
 	}
 	return 120 * time.Second
+}
+
+func resolveCommandTimeout(conf *config.OrchestraConf, requestedTimeout int, timeoutChanged bool) int {
+	if timeoutChanged && requestedTimeout > 0 {
+		return requestedTimeout
+	}
+	if conf != nil && conf.TimeoutSeconds > 0 {
+		return conf.TimeoutSeconds
+	}
+	if requestedTimeout > 0 {
+		return requestedTimeout
+	}
+	return 120
 }
 
 // resolveSubprocessMode returns whether subprocess mode is enabled via config.

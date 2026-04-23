@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.45] — 2026-04-23
+
+### Fixed
+
+- **Orchestra multi-provider timeout semantics and config-backed provider resolution hardened** (2026-04-23): pane startup timeout과 실제 실행 timeout을 분리하고, `spec review --multi` 및 subprocess `orchestra run` 경로가 config/CLI timeout 우선순위를 일관되게 사용하도록 정리
+  - `internal/cli/{orchestra.go,orchestra_brainstorm.go,orchestra_config.go,orchestra_file_cmds.go,orchestra_helpers.go,spec_review.go,spec_review_runtime.go,orchestra_run.go,orchestra_run_runtime.go}` — command timeout precedence, config-backed provider resolution, subprocess run timeout wiring 추가
+  - `pkg/orchestra/{types.go,runner.go,pipeline.go,runner_timeout_config_test.go,pipeline_subprocess_test.go}` — `ExecutionTimeout` 분리, subprocess debater/judge request timeout 전달, 회귀 테스트 보강
+  - `internal/cli/{orchestra_provider_timeout_test.go,spec_review_test.go,spec_review_result_ready_test.go,orchestra_run_test.go}` — CLI/config timeout precedence와 review/run wiring regression 추가
+
+- **Debate prompt growth and pane round-2 readiness failures no longer silently drop providers** (2026-04-23): Round 2 rebuttal과 judge prompt에 공통 budget cap을 적용하고, prompt-ready가 되지 않은 pane은 명시적으로 skip/timed-out 처리해 긴 3-provider debate에서 Gemini 등 일부 provider가 조용히 탈락하는 경로를 줄임
+  - `pkg/orchestra/{prompt_budget.go,debate.go,crosspolinate.go,interactive_debate_round.go}` — rebuttal/judge prompt budget cap, anonymized subprocess prompt cap, Round 2 prompt-ready guard 추가
+  - `pkg/orchestra/{debate_test.go,crosspolinate_test.go,interactive_debate_test.go}` — long-output truncation, judge cap, prompt-ready skip 회귀 테스트 추가
+
 ## [v0.40.44] — 2026-04-23
 
 ### Added

@@ -31,7 +31,8 @@ func newOrchestraRunCmd() *cobra.Command {
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			topic := strings.Join(args, " ")
-			return runSubprocessPipeline(cmd.Context(), topic, strategy, providers, rounds, timeout, judge, subprocess, dryRun)
+			timeoutChanged := cmd.Flags().Changed("timeout")
+			return runSubprocessPipeline(cmd.Context(), topic, strategy, providers, rounds, timeout, timeoutChanged, judge, subprocess, dryRun)
 		},
 	}
 
@@ -53,23 +54,29 @@ func runSubprocessPipeline(
 	providerNames []string,
 	roundsPreset string,
 	timeout int,
+	timeoutChanged bool,
 	judgeName string,
 	forceSubprocess bool,
 	dryRun bool,
 ) error {
-	orchConf, configErr := loadOrchestraConfig()
+	orchConf, configErr := orchestraRunLoadConfig()
 
 	var providerConfigs []orchestra.ProviderConfig
 	if configErr != nil || orchConf == nil {
 		if len(providerNames) == 0 {
 			providerNames = defaultProviders()
 		}
-		providerConfigs = buildProviderConfigs(providerNames)
+		providerConfigs = orchestraRunBuildProviders(providerNames)
 	} else {
 		providerConfigs = resolveProviders(orchConf, "run", providerNames)
 		if judgeName == "" {
 			judgeName = resolveJudge(orchConf, "run", "")
 		}
+		timeout = resolveCommandTimeout(orchConf, timeout, timeoutChanged)
+	}
+
+	if configErr != nil || orchConf == nil {
+		timeout = resolveCommandTimeout(nil, timeout, timeoutChanged)
 	}
 
 	if len(providerConfigs) == 0 {
@@ -122,12 +129,13 @@ func runSubprocessPipeline(
 	_ = orchestra.SelectBackend(cfg) // validate selection
 
 	pipelineCfg := orchestra.SubprocessPipelineConfig{
-		Backend:    orchestra.NewSubprocessBackendImpl(),
-		Providers:  providerConfigs,
-		Topic:      topic,
-		PromptData: promptData,
-		Rounds:     roundCount,
-		Judge:      judgeCfg,
+		Backend:        orchestraRunBackendFactory(),
+		Providers:      providerConfigs,
+		Topic:          topic,
+		PromptData:     promptData,
+		Rounds:         roundCount,
+		Judge:          judgeCfg,
+		TimeoutSeconds: timeout,
 	}
 
 	names := make([]string, len(providerConfigs))
@@ -137,7 +145,7 @@ func runSubprocessPipeline(
 	fmt.Fprintf(os.Stderr, "Strategy: %s | Providers: %s | Rounds: %s (%d)\n",
 		strategyStr, strings.Join(names, ", "), roundsPreset, roundCount+1)
 
-	result, err := orchestra.RunSubprocessPipeline(ctx, pipelineCfg)
+	result, err := orchestraRunExecutePipeline(ctx, pipelineCfg)
 	if err != nil {
 		return fmt.Errorf("subprocess pipeline failed: %w", err)
 	}
