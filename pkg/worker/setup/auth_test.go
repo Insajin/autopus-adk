@@ -23,20 +23,6 @@ func withLegacyCredentialStore(t *testing.T) {
 	})
 }
 
-type failingCredentialStore struct{}
-
-func (failingCredentialStore) Save(service, value string) error {
-	return os.ErrPermission
-}
-
-func (failingCredentialStore) Load(service string) (string, error) {
-	return "", os.ErrNotExist
-}
-
-func (failingCredentialStore) Delete(service string) error {
-	return nil
-}
-
 func TestSaveCredentials_WritesFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)

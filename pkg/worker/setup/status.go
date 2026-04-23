@@ -83,17 +83,6 @@ func checkDaemonRunning() bool {
 	return cmd.Run() == nil
 }
 
-func detectCredentialBackend() (backend string, secure bool) {
-	snapshot, err := loadCredentialSnapshot()
-	if err != nil {
-		if data, readErr := os.ReadFile(DefaultCredentialsPath()); readErr == nil && len(data) > 0 {
-			return "plaintext_file", false
-		}
-		return "none", false
-	}
-	return snapshot.backend, snapshot.secure
-}
-
 // CollectStatus reads config files and daemon state to produce a WorkerStatus.
 func CollectStatus() WorkerStatus {
 	snapshot, _ := loadCredentialSnapshot()
