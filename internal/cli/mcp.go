@@ -6,6 +6,7 @@ func newMCPCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Desktop and developer MCP integration commands",
+		Long:  "Desktop/runtime MCP command surface. Packaged runtime source/build ownership now lives in `autopus-desktop/runtime-helper`; this ADK path is retained for compatibility and harness flows.",
 	}
 
 	cmd.AddCommand(newMCPServerCmd())
@@ -18,7 +19,7 @@ func newMCPServerCmd() *cobra.Command {
 		Aliases: []string{"serve"},
 		Short:   "Run the Autopus MCP server over stdio",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runWorkerMCPServe()
+			return runRuntimeMCPServe(cmd)
 		},
 	}
 }

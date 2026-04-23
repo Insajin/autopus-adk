@@ -23,25 +23,19 @@ func newConnectStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show connect readiness and remaining manual steps",
+		Long:  "Compatibility wrapper for the desktop-owned connect status surface.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonMode, err := resolveJSONMode(jsonOutput, format)
 			if err != nil {
 				return err
 			}
-
-			payload := collectConnectStatusPayload()
-			warnings := buildConnectStatusWarnings(payload)
-			status := jsonStatusOK
-			if len(warnings) > 0 {
-				status = jsonStatusWarn
-			}
-
+			helperArgs := []string{"connect", "status"}
+			helperArgs = appendBoolFlag(helperArgs, "json", jsonMode)
+			helperArgs = appendStringFlag(helperArgs, "format", format, cmd.Flags().Changed("format"))
 			if jsonMode {
-				return writeJSONResult(cmd, status, payload, warnings, nil)
+				return delegateRuntimeHelperJSON(cmd, helperArgs)
 			}
-
-			printConnectStatus(cmd.OutOrStdout(), payload)
-			return nil
+			return delegateRuntimeHelperStream(cmd, helperArgs)
 		},
 	}
 
@@ -68,7 +62,7 @@ func collectConnectStatusPayload() connectStatusPayload {
 func nextConnectAction(status workerSetup.WorkerStatus, ready bool) string {
 	switch {
 	case ready:
-		return "Use `auto desktop status --json` or start the worker when you need platform-connected execution."
+		return "Use `auto desktop status --json` to inspect the desktop runtime readiness state. Legacy local-host diagnostics remain under `auto worker status`."
 	case !status.Configured:
 		return "Run `auto connect` to authenticate with the server and select a workspace."
 	case !status.AuthValid:

@@ -64,7 +64,7 @@ func ResolveRuntime(input Input) (RuntimeConfig, error) {
 	if err != nil {
 		return RuntimeConfig{}, &Error{
 			Code:    ErrorConfigLoad,
-			Message: "worker configuration is unavailable; run 'auto worker setup' first",
+			Message: "desktop runtime configuration is unavailable; run 'auto connect' or complete desktop auth first",
 			Err:     err,
 		}
 	}
@@ -86,7 +86,7 @@ func ResolveRuntime(input Input) (RuntimeConfig, error) {
 	if strings.TrimSpace(authToken) == "" {
 		return RuntimeConfig{}, &Error{
 			Code:    ErrorAuthMissing,
-			Message: "worker auth token is missing; run 'auto worker setup' first",
+			Message: "desktop runtime auth token is missing; run 'auto connect' or complete desktop auth first",
 		}
 	}
 
@@ -94,7 +94,7 @@ func ResolveRuntime(input Input) (RuntimeConfig, error) {
 	if providerName == "" {
 		return RuntimeConfig{}, &Error{
 			Code:    ErrorProviderMissing,
-			Message: "no worker provider is configured; run 'auto worker setup' to detect providers",
+			Message: "no worker provider is configured; run 'auto connect' first and configure a local provider (legacy local-host setup remains available via 'auto worker setup')",
 		}
 	}
 	providerAdapter, err := resolveProviderAdapter(providerName)

@@ -13,7 +13,7 @@ func TestDesktopCmd_ExposesDesktopRuntimeSurface(t *testing.T) {
 	cmd := newDesktopCmd()
 
 	assert.Equal(t, "desktop", cmd.Use)
-	assert.Len(t, cmd.Commands(), 3)
+	assert.Len(t, cmd.Commands(), 5)
 
 	status, _, err := cmd.Find([]string{"status"})
 	require.NoError(t, err)
@@ -26,6 +26,10 @@ func TestDesktopCmd_ExposesDesktopRuntimeSurface(t *testing.T) {
 	sidecar, _, err := cmd.Find([]string{"sidecar"})
 	require.NoError(t, err)
 	assert.Equal(t, "sidecar", sidecar.Use)
+
+	ensure, _, err := cmd.Find([]string{"ensure"})
+	require.NoError(t, err)
+	assert.Equal(t, "ensure", ensure.Use)
 }
 
 func TestMCPCmd_ExposesServerSurface(t *testing.T) {

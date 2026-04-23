@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -65,6 +66,14 @@ func EnsureWorker(ctx context.Context, backendURL, workspaceID string) (*EnsureR
 // ensureDeviceAuth initiates PKCE device code flow and blocks until token obtained.
 // It outputs login_required JSON immediately so callers see it before polling begins.
 func ensureDeviceAuth(ctx context.Context, backendURL string) (*EnsureResult, error) {
+	return ensureDeviceAuthMode(ctx, backendURL, true, true)
+}
+
+func ensureDesktopDeviceAuth(ctx context.Context, backendURL string) (*EnsureResult, error) {
+	return ensureDeviceAuthMode(ctx, backendURL, false, false)
+}
+
+func ensureDeviceAuthMode(ctx context.Context, backendURL string, emitImmediate, allowDaemonStart bool) (*EnsureResult, error) {
 	verifier, _, err := GeneratePKCE()
 	if err != nil {
 		return nil, fmt.Errorf("generate PKCE: %w", err)
@@ -89,9 +98,11 @@ func ensureDeviceAuth(ctx context.Context, backendURL string) (*EnsureResult, er
 		},
 	}
 
-	// Output login_required immediately before blocking on poll.
-	if out, err := json.Marshal(result); err == nil {
-		fmt.Println(string(out))
+	if emitImmediate {
+		// Output login_required immediately before blocking on poll.
+		if out, err := marshalEnsureResult(result); err == nil {
+			fmt.Println(string(out))
+		}
 	}
 
 	tokenResp, err := PollForToken(ctx, backendURL, dc.DeviceCode, verifier, dc.Interval)
@@ -104,8 +115,7 @@ func ensureDeviceAuth(ctx context.Context, backendURL string) (*EnsureResult, er
 		return nil, fmt.Errorf("save credentials: %w", err)
 	}
 
-	// After successful auth, ensure daemon is running.
-	if !checkDaemonRunning() {
+	if allowDaemonStart && !checkDaemonRunning() {
 		if err := ensureInstallDaemon(); err != nil {
 			return &EnsureResult{
 				Action: "error",
@@ -116,6 +126,59 @@ func ensureDeviceAuth(ctx context.Context, backendURL string) (*EnsureResult, er
 	}
 
 	return &EnsureResult{Action: "ready"}, nil
+}
+
+// EnsureDesktopRuntime checks desktop runtime state and brings it to ready
+// without starting the legacy local-host daemon.
+func EnsureDesktopRuntime(ctx context.Context, backendURL, workspaceID string) (*EnsureResult, error) {
+	if backendURL == "" {
+		backendURL = "https://api.autopus.co"
+	}
+	if strings.TrimSpace(workspaceID) == "" {
+		return &EnsureResult{
+			Action: "error",
+			Data:   map[string]string{"message": "workspace_id is required"},
+		}, fmt.Errorf("workspace_id is required")
+	}
+
+	if err := ensureDesktopConfig(backendURL, workspaceID); err != nil {
+		return &EnsureResult{
+			Action: "error",
+			Data:   map[string]string{"message": err.Error()},
+		}, err
+	}
+
+	status := CollectStatus()
+	if !status.AuthValid || status.AuthType != "jwt" || !status.SecureStorageReady {
+		result, err := ensureDesktopDeviceAuth(ctx, backendURL)
+		if err != nil {
+			return result, err
+		}
+		if result != nil && result.Action == "login_required" {
+			return result, nil
+		}
+	}
+
+	session := LoadDesktopSession()
+	if session.Ready {
+		wsID := session.WorkspaceID
+		if wsID == "" {
+			wsID = workspaceID
+		}
+		return &EnsureResult{
+			Action: "ready",
+			Data:   map[string]string{"workspace_id": wsID},
+		}, nil
+	}
+
+	message := session.Reason
+	if message == "" {
+		message = "desktop session is not ready"
+	}
+	return &EnsureResult{
+		Action: "error",
+		Data:   map[string]string{"message": message},
+	}, nil
 }
 
 // tryRefreshCredentials attempts JWT refresh. Returns true on success.
@@ -153,4 +216,22 @@ func saveTokenCredentials(tokenResp *TokenResponse, backendURL string) error {
 // ensureInstallDaemon resolves the current binary path and installs the daemon.
 func ensureInstallDaemon() error {
 	return installAndStartDaemon()
+}
+
+func ensureDesktopConfig(backendURL, workspaceID string) error {
+	cfg, err := LoadWorkerConfig()
+	if err != nil {
+		cfg = &WorkerConfig{}
+	}
+	if strings.TrimSpace(backendURL) != "" {
+		cfg.BackendURL = backendURL
+	}
+	if strings.TrimSpace(workspaceID) != "" {
+		cfg.WorkspaceID = workspaceID
+	}
+	return SaveWorkerConfig(*cfg)
+}
+
+func marshalEnsureResult(result *EnsureResult) ([]byte, error) {
+	return json.Marshal(result)
 }

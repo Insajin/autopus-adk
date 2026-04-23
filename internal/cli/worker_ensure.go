@@ -12,6 +12,8 @@ import (
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
 )
 
+type ensureRunner func(context.Context, string, string) (*setup.EnsureResult, error)
+
 // newWorkerEnsureCmd returns the `auto worker ensure` cobra command.
 // This is an agent-native command — all output is JSON.
 //
@@ -26,44 +28,14 @@ func newWorkerEnsureCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "ensure",
-		Short: "Ensure worker is ready (agent-native, JSON output)",
-		Long: `Checks worker state and takes action to bring it to ready.
-All output is JSON. Exit codes: 0=ready, 1=error, 2=login_required.`,
+		Short: "Ensure legacy worker is ready (compatibility JSON output)",
+		Long: "Checks worker state and takes action to bring it to ready.\n" +
+			"All output is JSON. Exit codes: 0=ready, 1=error, 2=login_required.\n\n" +
+			"Compatibility shim: prefer `auto desktop ensure` for the canonical desktop-owned readiness contract.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if workspaceID == "" {
-				return fmt.Errorf("--workspace is required")
-			}
-
-			ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Minute)
-			defer cancel()
-
-			result, err := setup.EnsureWorker(ctx, backendURL, workspaceID)
-			if err != nil && result == nil {
-				// Fatal error before any result was produced.
-				errResult := &setup.EnsureResult{
-					Action: "error",
-					Data:   map[string]string{"message": err.Error()},
-				}
-				writeJSON(cmd, errResult)
-				os.Exit(1)
-				return nil
-			}
-
-			if result != nil {
-				writeJSON(cmd, result)
-			}
-
-			switch result.Action {
-			case "ready", "starting_daemon":
-				os.Exit(0)
-			case "login_required":
-				os.Exit(2)
-			case "error":
-				os.Exit(1)
-			default:
-				os.Exit(0)
-			}
-			return nil
+			helperArgs := []string{"worker", "ensure", "--workspace", workspaceID}
+			helperArgs = appendStringFlag(helperArgs, "backend", backendURL, cmd.Flags().Changed("backend"))
+			return delegateRuntimeHelperStream(cmd, helperArgs)
 		},
 	}
 
@@ -71,6 +43,47 @@ All output is JSON. Exit codes: 0=ready, 1=error, 2=login_required.`,
 	cmd.Flags().StringVar(&backendURL, "backend", "https://api.autopus.co", "Backend API URL")
 	_ = cmd.MarkFlagRequired("workspace")
 	return cmd
+}
+
+func runEnsureCommand(cmd *cobra.Command, workspaceID, backendURL string, runner ensureRunner) error {
+	if workspaceID == "" {
+		return fmt.Errorf("--workspace is required")
+	}
+
+	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Minute)
+	defer cancel()
+
+	result, err := runner(ctx, backendURL, workspaceID)
+	if err != nil && result == nil {
+		errResult := &setup.EnsureResult{
+			Action: "error",
+			Data:   map[string]string{"message": err.Error()},
+		}
+		writeJSON(cmd, errResult)
+		os.Exit(1)
+		return nil
+	}
+
+	if result == nil {
+		result = &setup.EnsureResult{
+			Action: "error",
+			Data:   map[string]string{"message": "ensure returned no result"},
+		}
+	}
+
+	writeJSON(cmd, result)
+
+	switch result.Action {
+	case "ready", "starting_daemon":
+		os.Exit(0)
+	case "login_required":
+		os.Exit(2)
+	case "error":
+		os.Exit(1)
+	default:
+		os.Exit(0)
+	}
+	return nil
 }
 
 // writeJSON encodes result as indented JSON to the command's stdout.

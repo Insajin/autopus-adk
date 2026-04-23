@@ -382,6 +382,10 @@ auto connect status  # Deterministic local verify/readiness summary
 
 The current release authenticates with the Autopus server, saves the selected workspace, and completes the OpenAI OAuth handoff. Use `auto connect status` or `auto desktop status --json` to verify the saved local state.
 
+Desktop runtime ownership note:
+- The packaged `autopus-desktop-runtime` source/build/release provenance now lives in `autopus-desktop/runtime-helper/`.
+- ADK keeps `auto connect`, `auto desktop ...`, and `auto worker ...` as harness or compatibility surfaces, but normal desktop runtime shipping no longer depends on an `autopus-adk` checkout.
+
 ### 🤖 ADK Worker — Local Agent Execution
 
 ADK Worker runs A2A + MCP hybrid tasks locally with browser login, JWT refresh, and direct platform connectivity.

@@ -28,6 +28,11 @@ func TestConnectCmd_RegistersStatusSubcommand(t *testing.T) {
 func TestConnectStatusCmd_NotConfiguredOutput(t *testing.T) {
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
+	t.Setenv(runtimeHelperOverrideEnv, writeRuntimeHelperScript(t, "cat <<'EOF'\n"+
+		"Ready: false\n"+
+		"Configured: false\n"+
+		"Next: Run `auto connect` to authenticate with the server and select a workspace.\n"+
+		"EOF"))
 
 	cmd := NewRootCmd()
 	var out bytes.Buffer

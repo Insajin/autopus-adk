@@ -18,9 +18,11 @@ func addWorkerSubcommands(parent *cobra.Command) {
 	sidecarCmd := newWorkerSidecarCmd()
 	statusCmd := newWorkerStatusCmd()
 	sessionCmd := newWorkerSessionCmd()
+	ensureCmd := newWorkerEnsureCmd()
 	markCompatibilityShim(sidecarCmd)
 	markCompatibilityShim(statusCmd)
 	markCompatibilityShim(sessionCmd)
+	markCompatibilityShim(ensureCmd)
 
 	parent.AddCommand(
 		newWorkerStartCmd(),
@@ -34,7 +36,7 @@ func addWorkerSubcommands(parent *cobra.Command) {
 		newWorkerHistoryCmd(),
 		newWorkerCostCmd(),
 		newWorkerSetupCmd(),
-		newWorkerEnsureCmd(),
+		ensureCmd,
 	)
 }
 
@@ -84,7 +86,8 @@ func newWorkerStatusCmd() *cobra.Command {
 	var format string
 	cmd := &cobra.Command{
 		Use:   "status",
-		Short: "Show worker daemon status",
+		Short: "Show legacy local-host worker diagnostics",
+		Long:  "Compatibility surface for legacy local-host worker diagnostics. Use `auto desktop status --json` for the canonical desktop runtime readiness contract.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonMode, err := resolveJSONMode(jsonOutput, format)
 			if err != nil {
@@ -210,10 +213,17 @@ func newWorkerSetupCmd() *cobra.Command {
 	var apiKey string
 	cmd := &cobra.Command{
 		Use:   "setup",
-		Short: "Run worker setup wizard",
-		Long: `Worker는 Autopus 서버에서 작업을 받아 자동으로 실행하는 백그라운드 서비스입니다.
+		Short: "Run legacy local-host worker setup",
+		Long: `Legacy local-host worker setup for compatibility/dev-only use.
 
-이 명령어는 3단계 설정 과정을 안내합니다:
+Prefer the canonical desktop/runtime flow:
+  1. auto connect
+  2. auto desktop status --json
+  3. auto desktop session
+
+Use this command only when you explicitly need the legacy local-host worker path.
+
+Compatibility mode still guides the 3-step worker setup process:
   1. Autopus 서버 인증 (브라우저에서 로그인)
   2. 워크스페이스 선택
   3. AI 프로바이더 확인 (Claude, Codex, Gemini)

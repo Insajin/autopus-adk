@@ -3,14 +3,11 @@ package cli
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"time"
 
 	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 
-	"github.com/insajin/autopus-adk/internal/cli/tui"
 	"github.com/insajin/autopus-adk/pkg/connect"
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
 )
@@ -33,66 +30,14 @@ func newConnectCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "connect",
 		Short: "Connect an AI provider via local OAuth flow",
-		Long:  "Interactive wizard: server auth → workspace → OpenAI OAuth. Concretely: (1) Autopus server auth, (2) workspace selection, (3) OpenAI PKCE OAuth. Use `auto connect status` for deterministic local verify output.",
+		Long:  "Interactive wizard: server auth → workspace → OpenAI OAuth. Concretely: (1) Autopus server auth, (2) workspace selection, (3) OpenAI PKCE OAuth. Use `auto connect status` for deterministic local verify output.\n\nThis ADK surface now delegates to the desktop-owned runtime helper when available.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Headless mode: non-interactive, NDJSON output, no browser.
-			if headless {
-				if workspaceID == "" {
-					connect.EmitEvent(connect.HeadlessEvent{Error: "headless mode requires --workspace flag"})
-					return fmt.Errorf("headless mode requires --workspace flag")
-				}
-				return runHeadlessConnect(cmd, serverURL, workspaceID, timeout)
-			}
-
-			// REQ-HL-51: non-TTY without --headless → hint and exit.
-			if !isStdinTTY() {
-				fmt.Fprintln(os.Stderr, "Hint: use --headless flag for non-interactive mode")
-				return fmt.Errorf("interactive mode requires a TTY; use --headless")
-			}
-
-			ctx, cancel := context.WithTimeout(cmd.Context(), connectTimeout)
-			defer cancel()
-
-			out := cmd.OutOrStdout()
-			tui.SectionHeader(out, "Step 1: Autopus Server Authentication")
-
-			authResult, err := stepServerAuth(ctx, serverURL)
-			if err != nil {
-				return fmt.Errorf("server authentication failed: %w", err)
-			}
-			tui.Success(out, "Authenticated with Autopus server")
-
-			client := connect.NewClient(authResult.Token).WithServerURL(serverURL)
-
-			wsID, wsName, err := stepWorkspaceSelect(ctx, client, workspaceID)
-			if err != nil {
-				return fmt.Errorf("workspace selection failed: %w", err)
-			}
-			tui.Successf(out, "Selected workspace: %s", wsName)
-			tui.Info(out, "Local knowledge file sync is disabled in JWT-only mode")
-
-			tui.SectionHeader(out, "Step 3: OpenAI OAuth")
-
-			oauthResult, err := stepOAuth(ctx)
-			if err != nil {
-				return fmt.Errorf("OpenAI OAuth failed: %w", err)
-			}
-			tui.Success(out, "OpenAI OAuth token obtained")
-
-			err = stepSubmitToken(ctx, client, wsID, oauthResult)
-			if err != nil {
-				return fmt.Errorf("token submission failed: %w", err)
-			}
-
-			tui.Successf(out, "Connected OpenAI to workspace %q", wsName)
-			tui.Info(out, "Verify next: `auto connect status` (or `auto desktop status --json` for the desktop runtime surface)")
-
-			// Save workspace ID to worker config for subsequent starts.
-			if err := saveConnectConfig(wsID, serverURL); err != nil {
-				log.Printf("[connect] failed to save worker config: %v", err)
-			}
-
-			return nil
+			helperArgs := []string{"connect"}
+			helperArgs = appendStringFlag(helperArgs, "server", serverURL, cmd.Flags().Changed("server"))
+			helperArgs = appendStringFlag(helperArgs, "workspace", workspaceID, workspaceID != "")
+			helperArgs = appendBoolFlag(helperArgs, "headless", headless)
+			helperArgs = appendDurationFlag(helperArgs, "timeout", timeout, cmd.Flags().Changed("timeout"))
+			return delegateRuntimeHelperStream(cmd, helperArgs)
 		},
 	}
 
@@ -188,8 +133,8 @@ func stepSubmitToken(ctx context.Context, client *connect.Client, wsID string, o
 	return client.SubmitToken(ctx, req)
 }
 
-// saveConnectConfig persists workspace ID to worker.yaml
-// so that subsequent `auto worker start` picks them up automatically.
+// saveConnectConfig persists workspace/runtime state so desktop-owned commands
+// and legacy worker compatibility surfaces read the same backend/workspace config.
 func saveConnectConfig(wsID, serverURL string) error {
 	cfg, err := setup.LoadWorkerConfig()
 	if err != nil {

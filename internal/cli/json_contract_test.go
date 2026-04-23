@@ -21,7 +21,6 @@ import (
 
 func decodeJSONMap(t *testing.T, data []byte) map[string]any {
 	t.Helper()
-
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(data, &payload))
 	return payload
@@ -29,7 +28,6 @@ func decodeJSONMap(t *testing.T, data []byte) map[string]any {
 
 func assertCommonJSONEnvelope(t *testing.T, payload map[string]any, wantCommand string) {
 	t.Helper()
-
 	require.Equal(t, cliJSONSchemaVersion, payload["schema_version"])
 	require.Equal(t, wantCommand, payload["command"])
 	require.Contains(t, payload, "status")
@@ -47,6 +45,10 @@ func assertCommonJSONEnvelope(t *testing.T, payload map[string]any, wantCommand 
 }
 
 func executeRoot(t *testing.T, workdir string, args ...string) ([]byte, error) {
+	return executeRootWithEnv(t, workdir, nil, args...)
+}
+
+func executeRootWithEnv(t *testing.T, workdir string, env []string, args ...string) ([]byte, error) {
 	t.Helper()
 
 	_, currentFile, _, ok := runtime.Caller(0)
@@ -65,6 +67,7 @@ func executeRoot(t *testing.T, workdir string, args ...string) ([]byte, error) {
 	if workdir != "" {
 		execCmd.Dir = workdir
 	}
+	execCmd.Env = append(os.Environ(), env...)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -80,7 +83,6 @@ func executeRoot(t *testing.T, workdir string, args ...string) ([]byte, error) {
 
 func makeJSONContractWorkspace(t *testing.T) string {
 	t.Helper()
-
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/jsoncontract\n\ngo 1.24.0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644))
@@ -226,6 +228,24 @@ func TestJSONContract_FatalErrorPathUsesJSONEnvelope(t *testing.T) {
 
 func TestJSONContract_ExistingJSONCommandsRequireEnvelopeAlignment(t *testing.T) {
 	dir := makeJSONContractWorkspace(t)
+	helperPath := writeRuntimeHelperScript(t, `
+command="$0"
+for arg in "$@"; do
+	command="$command $arg"
+done
+timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+cat <<EOF
+{
+  "schema_version": "1.0.0",
+  "command": "$command",
+  "status": "ok",
+  "generated_at": "$timestamp",
+  "data": {
+    "helper": true
+  }
+}
+EOF
+`)
 	tests := []struct {
 		name        string
 		workdir     string
@@ -234,13 +254,17 @@ func TestJSONContract_ExistingJSONCommandsRequireEnvelopeAlignment(t *testing.T)
 	}{
 		{name: "permission detect", args: []string{"permission", "detect", "--json"}, wantCommand: "auto permission detect"},
 		{name: "test run", args: []string{"test", "run", "--project-dir", dir, "--json"}, wantCommand: "auto test run"},
+		{name: "desktop status", args: []string{"desktop", "status", "--json"}, wantCommand: "auto desktop status"},
 		{name: "worker status", args: []string{"worker", "status", "--json"}, wantCommand: "auto worker status"},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			out, err := executeRoot(t, tt.workdir, tt.args...)
+			env := []string{
+				runtimeHelperOverrideEnv + "=" + helperPath,
+			}
+			out, err := executeRootWithEnv(t, tt.workdir, env, tt.args...)
 			require.NoError(t, err)
 			assertCommonJSONEnvelope(t, decodeJSONMap(t, out), tt.wantCommand)
 		})
