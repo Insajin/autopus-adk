@@ -4,33 +4,52 @@ Usage:
   auto [command]
 
 Available Commands:
+  agent       Autopus 에이전트 관리
   arch        Architecture analysis and enforcement
   check       Run harness rule checks
   completion  Generate the autocompletion script for the specified shell
-  docs        Lookup library documentation via Context7
+  config      Manage autopus.yaml configuration
+  connect     Connect an AI provider via local OAuth flow
+  docs        Documentation utilities
   doctor      Check autopus harness health
+  effort      Manage effort level detection
   experiment  Run and manage experiment loops
   hash        Hash each line of a file using xxhash
   help        Help about any command
   init        Initialize autopus harness in the current project
   issue       Manage auto issue reports
+  learn       Manage pipeline learning entries
   lore        Decision knowledge management via git trailers
   lsp         LSP-based code intelligence
   orchestra   다중 모델 오케스트레이션으로 코드를 분석한다
+  permission  Manage permission detection
+  pipeline    Pipeline monitoring and management
   platform    Manage platforms
+  react       CI 실패 감지 및 자동 수정
   search      Search the web using Exa API (requires EXA_API_KEY)
   setup       Generate and manage project documentation for AI agents
   skill       Autopus 빌트인 스킬 관리
   spec        SPEC document management
   status      Show SPEC dashboard
   telemetry   Manage pipeline telemetry
+  terminal    Terminal multiplexer operations
+  test        Run E2E scenarios against the project
   update      Update autopus harness files
   verify      Run frontend UX verification via Playwright screenshots
   version     Print version information
+  worker      Worker management commands
 
 Flags:
-      --config string   Config file path (default: ./autopus.yaml)
-  -h, --help            help for auto
-  -v, --verbose         Enable verbose output
+      --auto                       Run without confirmation prompts
+      --config string              Config file path (default: ./autopus.yaml)
+      --effort string              Explicit effort value (overrides quality-mode mapping)
+  -h, --help                       help for auto
+      --loop                       Retry quality gates until pass or circuit break
+      --multi                      Enable multi-provider review/orchestration mode
+      --quality string             Quality mode preset (ultra/balanced)
+      --task-created-mode string   Override TaskCreated mode for this invocation (warn|enforce)
+      --think                      Enable step-by-step reasoning mode
+      --ultrathink                 Enable deeper step-by-step reasoning mode
+  -v, --verbose                    Enable verbose output
 
 Use "auto [command] --help" for more information about a command.

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,7 +45,7 @@ func TestGolden(t *testing.T) {
 			t.Parallel()
 
 			r := runBinary(t, bin, tc.args...)
-			got := r.Stdout + r.Stderr
+			got := normalizeGoldenOutput(tc.golden, r.Stdout+r.Stderr)
 
 			goldenPath := filepath.Join("testdata", tc.golden)
 
@@ -65,6 +66,21 @@ func TestGolden(t *testing.T) {
 			assert.Equal(t, string(data), got, "output does not match golden file %s", goldenPath)
 		})
 	}
+}
+
+func normalizeGoldenOutput(name, got string) string {
+	if name != "version_output.golden" {
+		return got
+	}
+
+	versionLineRe := regexp.MustCompile(`(?m)^   .+$`)
+	summaryLineRe := regexp.MustCompile(`(?m)^auto .+$`)
+	pathLineRe := regexp.MustCompile(`(?m)^path: .+$`)
+
+	got = versionLineRe.ReplaceAllString(got, "   <version>")
+	got = summaryLineRe.ReplaceAllString(got, "auto <version> (commit: <commit>, built: <date>)")
+	got = pathLineRe.ReplaceAllString(got, "path: <binary>")
+	return got
 }
 
 // compareGolden compares got against the named golden file in testdata/.

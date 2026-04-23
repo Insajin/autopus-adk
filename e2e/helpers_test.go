@@ -34,6 +34,9 @@ func buildBinary(t *testing.T) string {
 	t.Helper()
 
 	if bin := os.Getenv("AUTOPUS_TEST_BINARY"); bin != "" {
+		if !filepath.IsAbs(bin) {
+			bin = filepath.Join(projectRoot(t), bin)
+		}
 		return bin
 	}
 
