@@ -19,18 +19,17 @@ import (
 	"github.com/insajin/autopus-adk/internal/cli"
 )
 
-// agentsDir returns the absolute path to .claude/agents/autopus/ relative to
-// the autopus-adk module root, regardless of the working directory when tests run.
+// agentsDir returns the absolute path to content/agents/ relative to the
+// autopus-adk module root, regardless of the working directory when tests run.
 func agentsDir() string {
 	// Walk up from this test file's directory to find the workspace root.
 	_, thisFile, _, _ := runtime.Caller(0)
 	// thisFile is .../autopus-adk/internal/cli/cc21_effort_test.go
-	// workspace root is three directories up.
+	// repo root is two directories up.
 	dir := filepath.Dir(thisFile) // .../autopus-adk/internal/cli
 	dir = filepath.Dir(dir)       // .../autopus-adk/internal
-	dir = filepath.Dir(dir)       // .../autopus-adk
-	root := filepath.Dir(dir)     // workspace root (autopus-co)
-	return filepath.Join(root, ".claude", "agents", "autopus")
+	root := filepath.Dir(dir)     // .../autopus-adk
+	return filepath.Join(root, "content", "agents")
 }
 
 // agentFrontmatter holds the subset of agent frontmatter fields needed for CC21 validation.

@@ -20,8 +20,8 @@ import (
 	"time"
 )
 
-// hookPath resolves the absolute path to task-created-validate.sh.
-// Layout: autopus-adk/tests/hooks/ → ../../.. → repo root → .claude/hooks/
+// hookPath resolves the absolute path to the source-of-truth hook script.
+// Layout: autopus-adk/tests/hooks/ → ../.. → repo root → content/hooks/
 func hookPath(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
@@ -29,9 +29,9 @@ func hookPath(t *testing.T) string {
 		t.Fatal("runtime.Caller failed")
 	}
 	// file = .../autopus-adk/tests/hooks/task_created_test.go
-	// three dirs up = repo root
-	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(file))))
-	p := filepath.Join(repoRoot, ".claude", "hooks", "task-created-validate.sh")
+	// three filepath.Dir calls = repo root
+	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(file)))
+	p := filepath.Join(repoRoot, "content", "hooks", "task-created-validate.sh")
 	if _, err := os.Stat(p); err != nil {
 		t.Fatalf("hook not found at %s: %v", p, err)
 	}

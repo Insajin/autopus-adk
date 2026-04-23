@@ -40,8 +40,8 @@ func TestJob_SaveAndLoad(t *testing.T) {
 	assert.Equal(t, job.Strategy, loaded.Strategy)
 	assert.Equal(t, job.Providers, loaded.Providers)
 	assert.Equal(t, job.Prompt, loaded.Prompt)
-	assert.Equal(t, job.CreatedAt, loaded.CreatedAt)
-	assert.Equal(t, job.TimeoutAt, loaded.TimeoutAt)
+	assert.True(t, job.CreatedAt.Equal(loaded.CreatedAt))
+	assert.True(t, job.TimeoutAt.Equal(loaded.TimeoutAt))
 	assert.Equal(t, job.Status, loaded.Status)
 }
 
