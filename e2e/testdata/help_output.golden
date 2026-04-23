@@ -10,6 +10,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   config      Manage autopus.yaml configuration
   connect     Connect an AI provider via local OAuth flow
+  desktop     Desktop-owned runtime commands
   docs        Documentation utilities
   doctor      Check autopus harness health
   effort      Manage effort level detection
@@ -21,6 +22,7 @@ Available Commands:
   learn       Manage pipeline learning entries
   lore        Decision knowledge management via git trailers
   lsp         LSP-based code intelligence
+  mcp         Desktop and developer MCP integration commands
   orchestra   다중 모델 오케스트레이션으로 코드를 분석한다
   permission  Manage permission detection
   pipeline    Pipeline monitoring and management
