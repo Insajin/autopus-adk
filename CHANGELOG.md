@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.40.44] — 2026-04-23
+
+### Added
+
+- **Worker execution lane advertisement surfaced in runtime metadata** (2026-04-23): worker 런타임이 제공 가능한 execution lane 정보를 status/setup 경로에서 기계적으로 노출해 desktop / orchestration consumer가 lane-safe routing 가능 여부를 사전 판정할 수 있도록 확장
+  - `pkg/worker/{loop.go,setup/status.go}`, `pkg/worker/a2a/{types.go,server_runtime.go}` — worker config/runtime payload에 `execution_lanes` metadata를 연결하고 server runtime surface에 반영
+  - `pkg/worker/{setup/status_test.go,a2a/server_runtime_test.go}` — lane advertisement 회귀 테스트 추가
+
+### Fixed
+
+- **Provider capability fixtures and orchestra timeout expectations aligned with current runtime contracts** (2026-04-23): 최근 orchestration/runtime contract 변경 이후 흔들리던 테스트 기대값을 실제 provider capability / startup timeout 규칙에 맞춰 재정렬
+  - `internal/cli/{doctor_json_platforms_test.go,orchestra_provider_timeout_test.go}` — installed CLI capability surface와 provider timeout 회귀 기대값 보정
+
+- **Codex hooks empty categories now serialize as arrays instead of null** (2026-04-23): `.codex/hooks.json` 의 `SessionStart` / `Stop` 빈 카테고리가 `null`로 직렬화되어 Codex CLI가 `invalid type: null, expected a sequence`로 실패하던 문제를 복구
+  - `pkg/adapter/codex/{codex_hooks.go,codex_internal_test.go}` — empty hook slice를 `[]`로 내보내는 marshal contract와 회귀 테스트 추가
+
 ## [v0.40.43] — 2026-04-23
 
 ### Added
