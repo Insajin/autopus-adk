@@ -10,6 +10,7 @@ func newDesktopCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(
+		newDesktopAuthCmd(),
 		newWorkerStatusCmd(),
 		newWorkerSessionCmd(),
 		newWorkerSidecarCmd(),
