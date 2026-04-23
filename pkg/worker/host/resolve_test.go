@@ -47,9 +47,12 @@ func TestResolveRuntime_BuildsResolvedConfig(t *testing.T) {
 		Providers:   []string{"codex"},
 		Concurrency: 3,
 	}))
-	require.NoError(t, setup.SaveAPIKeyCredentials("acos_worker_test", "https://api.autopus.co"))
 
-	cfg, err := ResolveRuntime(Input{})
+	customPath := filepath.Join(t.TempDir(), "desktop", "credentials.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(customPath), 0o700))
+	require.NoError(t, os.WriteFile(customPath, []byte(`{"auth_type":"api_key","api_key":"acos_worker_test","backend_url":"https://api.autopus.co"}`), 0o600))
+
+	cfg, err := ResolveRuntime(Input{CredentialsPath: customPath})
 	require.NoError(t, err)
 
 	assert.Equal(t, "codex", cfg.ProviderName)
@@ -60,7 +63,7 @@ func TestResolveRuntime_BuildsResolvedConfig(t *testing.T) {
 	assert.Equal(t, 1, cfg.MaxConcurrency)
 	assert.Equal(t, ".", cfg.WorkDir)
 	assert.Equal(t, setup.DefaultMCPConfigPath(), cfg.MCPConfigPath)
-	assert.Equal(t, setup.DefaultCredentialsPath(), cfg.CredentialsPath)
+	assert.Equal(t, customPath, cfg.CredentialsPath)
 	assert.True(t, cfg.KnowledgeSync)
 	require.NotNil(t, cfg.ProviderAdapter)
 }

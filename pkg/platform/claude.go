@@ -194,10 +194,6 @@ func VersionSupportsCC21(version string) bool {
 // claudeVersion runs `claude --version` with a 2-second timeout and returns the
 // first token of the output (the bare version number, e.g. "2.1.113").
 func claudeVersion() (string, error) {
-	if _, err := exec.LookPath("claude"); err != nil {
-		return "", err
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 

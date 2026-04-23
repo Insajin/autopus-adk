@@ -78,8 +78,6 @@ func TestDeriveChallengeFromVerifier(t *testing.T) {
 }
 
 func TestRefreshToken_Success(t *testing.T) {
-	t.Parallel()
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "/api/v1/auth/cli-refresh", r.URL.Path)
@@ -106,8 +104,6 @@ func TestRefreshToken_Success(t *testing.T) {
 }
 
 func TestRefreshToken_ServerError(t *testing.T) {
-	t.Parallel()
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
@@ -119,8 +115,6 @@ func TestRefreshToken_ServerError(t *testing.T) {
 }
 
 func TestRefreshToken_InvalidJSON(t *testing.T) {
-	t.Parallel()
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte("{invalid-json"))
@@ -133,8 +127,6 @@ func TestRefreshToken_InvalidJSON(t *testing.T) {
 }
 
 func TestRefreshToken_WrappedResponse(t *testing.T) {
-	t.Parallel()
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"success":true,"data":{"access_token":"wrapped-tok","refresh_token":"ref","expires_in":3600,"token_type":"Bearer"}}`))
@@ -147,8 +139,6 @@ func TestRefreshToken_WrappedResponse(t *testing.T) {
 }
 
 func TestRefreshToken_ConnectionRefused(t *testing.T) {
-	t.Parallel()
-
 	_, err := RefreshToken(context.Background(), "http://127.0.0.1:1", "token")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "refresh request")

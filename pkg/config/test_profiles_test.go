@@ -28,8 +28,6 @@ func TestDefaultTestProfileCapabilities(t *testing.T) {
 }
 
 func TestHarnessConfig_AvailableTestCapabilities_MergesConfigAdditions(t *testing.T) {
-	t.Parallel()
-
 	originalProviders := installedOrchestraProviders
 	originalInstalled := orchestraBinaryInstalled
 	installedOrchestraProviders = func() []string { return nil }
@@ -53,8 +51,6 @@ func TestHarnessConfig_AvailableTestCapabilities_MergesConfigAdditions(t *testin
 }
 
 func TestHarnessConfig_AvailableTestCapabilities_AddsProvidersWhenInstalled(t *testing.T) {
-	t.Parallel()
-
 	originalProviders := installedOrchestraProviders
 	originalInstalled := orchestraBinaryInstalled
 	installedOrchestraProviders = func() []string { return []string{"claude"} }
@@ -70,8 +66,6 @@ func TestHarnessConfig_AvailableTestCapabilities_AddsProvidersWhenInstalled(t *t
 }
 
 func TestHarnessConfig_AvailableTestCapabilities_UsesConfiguredProviderBinary(t *testing.T) {
-	t.Parallel()
-
 	originalProviders := installedOrchestraProviders
 	originalInstalled := orchestraBinaryInstalled
 	installedOrchestraProviders = func() []string { return nil }
