@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,4 +71,32 @@ func TestLaunchdPlistPath_Format(t *testing.T) {
 	path := launchdPlistPath()
 	assert.Contains(t, path, "co.autopus.worker.plist")
 	assert.Contains(t, path, "LaunchAgents")
+}
+
+func TestInstallAndUninstallLaunchd(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	binDir := t.TempDir()
+	t.Setenv("PATH", binDir)
+	launchctlPath := filepath.Join(binDir, "launchctl")
+	require.NoError(t, os.WriteFile(launchctlPath, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+
+	cfg := LaunchdConfig{
+		BinaryPath: "/usr/local/bin/autopus",
+		Args:       []string{"worker", "start"},
+		LogDir:     filepath.Join(home, "logs"),
+	}
+
+	require.NoError(t, InstallLaunchd(cfg))
+	assert.True(t, IsLaunchdInstalled())
+
+	plistPath := launchdPlistPath()
+	require.FileExists(t, plistPath)
+	content, err := os.ReadFile(plistPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "/usr/local/bin/autopus")
+
+	require.NoError(t, UninstallLaunchd())
+	assert.False(t, IsLaunchdInstalled())
 }

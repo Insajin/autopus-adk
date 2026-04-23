@@ -1,6 +1,8 @@
 package daemon
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,4 +68,32 @@ func TestSystemdUnitPath_Format(t *testing.T) {
 	assert.Contains(t, path, "autopus-worker.service")
 	assert.Contains(t, path, "systemd")
 	assert.Contains(t, path, "user")
+}
+
+func TestInstallAndUninstallSystemd(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	binDir := t.TempDir()
+	t.Setenv("PATH", binDir)
+	systemctlPath := filepath.Join(binDir, "systemctl")
+	require.NoError(t, os.WriteFile(systemctlPath, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+
+	cfg := LaunchdConfig{
+		BinaryPath: "/usr/local/bin/autopus",
+		Args:       []string{"worker", "start"},
+		LogDir:     filepath.Join(home, "logs"),
+	}
+
+	require.NoError(t, InstallSystemd(cfg))
+	assert.True(t, IsSystemdInstalled())
+
+	unitPath := systemdUnitPath()
+	require.FileExists(t, unitPath)
+	content, err := os.ReadFile(unitPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "ExecStart=/usr/local/bin/autopus worker start")
+
+	require.NoError(t, UninstallSystemd())
+	assert.False(t, IsSystemdInstalled())
 }
