@@ -1,64 +1,65 @@
 package cli
 
 import (
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/insajin/autopus-adk/pkg/worker/setup"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestImportDesktopAuthPayload_PersistsCredentialsAndConfig(t *testing.T) {
-	prevSaveCreds := desktopAuthSaveCredentials
-	prevSaveConfig := desktopAuthSaveConfig
-	prevLoadConfig := desktopAuthLoadConfig
-	t.Cleanup(func() {
-		desktopAuthSaveCredentials = prevSaveCreds
-		desktopAuthSaveConfig = prevSaveConfig
-		desktopAuthLoadConfig = prevLoadConfig
-	})
+func TestDesktopAuthImportCmd_DelegatesToRuntimeHelper(t *testing.T) {
+	tempDir := t.TempDir()
+	argsPath := filepath.Join(tempDir, "args.txt")
+	stdinPath := filepath.Join(tempDir, "stdin.json")
+	helperBody := fmt.Sprintf(`printf '%%s\n' "$@" > %q
+cat > %q
+cat <<'EOF'
+{
+  "ok": true,
+  "backend_url": "https://api.autopus.co",
+  "workspace_id": "ws-123"
+}
+EOF`, argsPath, stdinPath)
+	t.Setenv(runtimeHelperOverrideEnv, writeRuntimeHelperScript(t, helperBody))
 
-	var savedCreds map[string]any
-	var savedConfig setup.WorkerConfig
+	cmd := NewRootCmd()
+	var out bytes.Buffer
+	payload := `{"backend_url":"https://api.autopus.co","workspace_id":"ws-123","access_token":"jwt-token"}`
+	cmd.SetIn(strings.NewReader(payload))
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"desktop", "auth", "import"})
 
-	desktopAuthSaveCredentials = func(creds map[string]any) error {
-		savedCreds = creds
-		return nil
-	}
-	desktopAuthSaveConfig = func(cfg setup.WorkerConfig) error {
-		savedConfig = cfg
-		return nil
-	}
-	desktopAuthLoadConfig = func() (*setup.WorkerConfig, error) {
-		return &setup.WorkerConfig{KnowledgeDir: "/tmp/knowledge"}, nil
-	}
+	require.NoError(t, cmd.Execute())
+	assert.Contains(t, out.String(), `"ok": true`)
+	assert.Contains(t, out.String(), `"workspace_id": "ws-123"`)
 
-	result, err := importDesktopAuthPayload(strings.NewReader(`{
-	  "backend_url":"https://api.autopus.co",
-	  "workspace_id":"ws-123",
-	  "access_token":"jwt-token",
-	  "refresh_token":"refresh-token",
-	  "expires_at":"2030-01-01T00:00:00Z"
-	}`))
+	argsData, err := os.ReadFile(argsPath)
 	require.NoError(t, err)
+	assert.Equal(t, "desktop\nauth\nimport\n", string(argsData))
 
-	require.NotNil(t, result)
-	assert.True(t, result.OK)
-	assert.Equal(t, "https://api.autopus.co", result.BackendURL)
-	assert.Equal(t, "ws-123", result.WorkspaceID)
-
-	assert.Equal(t, "jwt-token", savedCreds["access_token"])
-	assert.Equal(t, "refresh-token", savedCreds["refresh_token"])
-	assert.Equal(t, "2030-01-01T00:00:00Z", savedCreds["expires_at"])
-
-	assert.Equal(t, "https://api.autopus.co", savedConfig.BackendURL)
-	assert.Equal(t, "ws-123", savedConfig.WorkspaceID)
-	assert.Equal(t, "/tmp/knowledge", savedConfig.KnowledgeDir)
+	stdinData, err := os.ReadFile(stdinPath)
+	require.NoError(t, err)
+	assert.Equal(t, payload, string(stdinData))
 }
 
-func TestImportDesktopAuthPayload_RequiresCoreFields(t *testing.T) {
-	_, err := importDesktopAuthPayload(strings.NewReader(`{"backend_url":"","workspace_id":"ws","access_token":"tok"}`))
+func TestDesktopAuthImportCmd_PropagatesHelperFailure(t *testing.T) {
+	helperPath := writeRuntimeHelperScript(t, "echo 'helper failed' >&2\nexit 17\n")
+
+	_, err := executeRootWithEnv(
+		t,
+		"",
+		[]string{runtimeHelperOverrideEnv + "=" + helperPath},
+		"desktop",
+		"auth",
+		"import",
+	)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "backend_url is required")
+	assert.ErrorContains(t, err, "exit status 17")
+	assert.ErrorContains(t, err, "helper failed")
 }

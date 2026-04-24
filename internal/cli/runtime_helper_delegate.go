@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ const (
 
 var errRuntimeHelperNotFound = errors.New("desktop runtime helper not found")
 var resolveRuntimeHelper = resolveRuntimeHelperBinary
+var runtimeHelperPackagedPatterns = defaultRuntimeHelperPackagedPatterns
 
 func delegateRuntimeHelperStream(cmd *cobra.Command, helperArgs []string) error {
 	return runRuntimeHelper(cmd, helperArgs, "", false)
@@ -38,7 +40,11 @@ func runRuntimeHelper(cmd *cobra.Command, helperArgs []string, commandPath strin
 		return err
 	}
 
-	execCmd := exec.CommandContext(cmd.Context(), program, helperArgs...) //nolint:gosec
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	execCmd := exec.CommandContext(ctx, program, helperArgs...) //nolint:gosec
 	execCmd.Stdin = cmd.InOrStdin()
 	execCmd.Stderr = cmd.ErrOrStderr()
 
@@ -78,73 +84,76 @@ func runRuntimeHelper(cmd *cobra.Command, helperArgs []string, commandPath strin
 func resolveRuntimeHelperBinary() (string, error) {
 	override := strings.TrimSpace(os.Getenv(runtimeHelperOverrideEnv))
 	if override != "" {
-		if path, err := exec.LookPath(override); err == nil {
-			return path, nil
-		}
-		if isExecutableFile(override) {
-			return override, nil
-		}
-		return "", fmt.Errorf("%s points to a missing or non-executable helper: %s", runtimeHelperOverrideEnv, override)
+		return resolveRuntimeHelperOverride(override)
 	}
 
-	if path, err := exec.LookPath(runtimeHelperBinaryName); err == nil {
-		return path, nil
-	}
-
-	if path := findSiblingRuntimeHelper(); path != "" {
+	// @AX:NOTE [AUTO]: Avoid PATH/cwd discovery because delegated auth import streams credential JSON to the helper process.
+	if path := findPackagedRuntimeHelper(); path != "" {
 		return path, nil
 	}
 
 	return "", fmt.Errorf(
-		"%w; install/update the desktop app, stage the helper from ../autopus-desktop, or set %s",
+		"%w; install/update the desktop app, or set %s to an absolute helper path",
 		errRuntimeHelperNotFound,
 		runtimeHelperOverrideEnv,
 	)
 }
 
-func findSiblingRuntimeHelper() string {
-	searchRoots := make([]string, 0, 8)
-
-	if wd, err := os.Getwd(); err == nil {
-		searchRoots = append(searchRoots, ancestorDirs(wd)...)
+func resolveRuntimeHelperOverride(path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		return "", fmt.Errorf("%s must be an absolute helper path: %s", runtimeHelperOverrideEnv, path)
 	}
-	if exePath, err := os.Executable(); err == nil {
-		searchRoots = append(searchRoots, ancestorDirs(filepath.Dir(exePath))...)
+	if isExecutableFile(path) {
+		return filepath.Clean(path), nil
 	}
-
-	seen := make(map[string]struct{}, len(searchRoots))
-	for _, root := range searchRoots {
-		if root == "" {
-			continue
-		}
-		if _, ok := seen[root]; ok {
-			continue
-		}
-		seen[root] = struct{}{}
-
-		patterns := []string{
-			filepath.Join(root, "autopus-desktop", "src-tauri", "binaries", runtimeHelperBinaryName),
-			filepath.Join(root, "autopus-desktop", "src-tauri", "binaries", runtimeHelperBinaryName+"*"),
-		}
-		if match := firstExecutableMatch(patterns); match != "" {
-			return match
-		}
-	}
-
-	return ""
+	return "", fmt.Errorf("%s points to a missing or non-executable helper: %s", runtimeHelperOverrideEnv, path)
 }
 
-func ancestorDirs(start string) []string {
-	dirs := make([]string, 0, 8)
-	current := filepath.Clean(start)
-	for {
-		dirs = append(dirs, current)
-		parent := filepath.Dir(current)
-		if parent == current {
-			return dirs
-		}
-		current = parent
+func findPackagedRuntimeHelper() string {
+	return firstExecutableMatch(runtimeHelperPackagedPatterns())
+}
+
+func defaultRuntimeHelperPackagedPatterns() []string {
+	patterns := make([]string, 0, 24)
+
+	if exePath, err := os.Executable(); err == nil {
+		patterns = append(patterns, packagedRuntimeHelperPatternsFrom(filepath.Dir(exePath))...)
 	}
+	patterns = append(patterns, macOSRuntimeHelperPatterns()...)
+
+	return patterns
+}
+
+func packagedRuntimeHelperPatternsFrom(exeDir string) []string {
+	contentsDir := filepath.Dir(exeDir)
+	return []string{
+		filepath.Join(exeDir, runtimeHelperBinaryName),
+		filepath.Join(exeDir, runtimeHelperBinaryName+"*"),
+		filepath.Join(contentsDir, "Resources", runtimeHelperBinaryName),
+		filepath.Join(contentsDir, "Resources", runtimeHelperBinaryName+"*"),
+		filepath.Join(contentsDir, "Resources", "binaries", runtimeHelperBinaryName),
+		filepath.Join(contentsDir, "Resources", "binaries", runtimeHelperBinaryName+"*"),
+	}
+}
+
+func macOSRuntimeHelperPatterns() []string {
+	appNames := []string{"Autopus.app", "Autopus Desktop.app"}
+	patterns := make([]string, 0, len(appNames)*6)
+
+	for _, appName := range appNames {
+		contentsDir := filepath.Join(string(filepath.Separator), "Applications", appName, "Contents")
+		for _, dir := range []string{
+			filepath.Join(contentsDir, "MacOS"),
+			filepath.Join(contentsDir, "Resources"),
+			filepath.Join(contentsDir, "Resources", "binaries"),
+		} {
+			patterns = append(patterns,
+				filepath.Join(dir, runtimeHelperBinaryName),
+				filepath.Join(dir, runtimeHelperBinaryName+"*"),
+			)
+		}
+	}
+	return patterns
 }
 
 func firstExecutableMatch(patterns []string) string {

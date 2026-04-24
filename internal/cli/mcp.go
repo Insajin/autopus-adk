@@ -18,6 +18,7 @@ func newMCPServerCmd() *cobra.Command {
 		Use:     "server",
 		Aliases: []string{"serve"},
 		Short:   "Run the Autopus MCP server over stdio",
+		Long:    "Delegates stdio MCP serving to the desktop-owned runtime helper. Canonical packaged runtime ownership lives in `autopus-desktop/runtime-helper`.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runRuntimeMCPServe(cmd)
 		},

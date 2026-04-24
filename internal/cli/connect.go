@@ -30,7 +30,7 @@ func newConnectCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "connect",
 		Short: "Connect an AI provider via local OAuth flow",
-		Long:  "Interactive wizard: server auth → workspace → OpenAI OAuth. Concretely: (1) Autopus server auth, (2) workspace selection, (3) OpenAI PKCE OAuth. Use `auto connect status` for deterministic local verify output.\n\nThis ADK surface now delegates to the desktop-owned runtime helper when available.",
+		Long:  "Interactive wizard: server auth → workspace → OpenAI OAuth. Concretely: (1) Autopus server auth, (2) workspace selection, (3) OpenAI PKCE OAuth. Use `auto connect status` for deterministic local verify output.\n\nThis ADK surface delegates to the desktop-owned runtime helper.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			helperArgs := []string{"connect"}
 			helperArgs = appendStringFlag(helperArgs, "server", serverURL, cmd.Flags().Changed("server"))

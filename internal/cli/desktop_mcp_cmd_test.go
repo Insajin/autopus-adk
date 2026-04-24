@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -47,22 +48,58 @@ func TestMCPCmd_ExposesServerSurface(t *testing.T) {
 	assert.Contains(t, server.Aliases, "serve")
 }
 
-func TestRuntimeMCPServe_FallsBackToEmbeddedServerWhenHelperMissing(t *testing.T) {
+func TestMCPSurfaces_DescribeCanonicalAndLegacyOwnership(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, newMCPServerCmd().Long, "desktop-owned runtime helper")
+	assert.Contains(t, newMCPServerCmd().Long, "autopus-desktop/runtime-helper")
+
+	workerCmd := newWorkerMCPServerCmd()
+	assert.Contains(t, workerCmd.Long, "Compatibility shim")
+	assert.Contains(t, workerCmd.Long, "prefer `auto mcp server`")
+}
+
+func TestRuntimeMCPServe_RequiresDesktopHelperWhenHelperMissing(t *testing.T) {
 	originalResolver := resolveRuntimeHelper
 	resolveRuntimeHelper = func() (string, error) {
 		return "", fmt.Errorf("%w; test helper missing", errRuntimeHelperNotFound)
 	}
 	t.Cleanup(func() { resolveRuntimeHelper = originalResolver })
-	t.Setenv("HOME", t.TempDir())
+
+	cmd := newMCPServerCmd()
+
+	err := runRuntimeMCPServe(cmd)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "desktop runtime helper not found")
+	assert.ErrorContains(t, err, "test helper missing")
+}
+
+func TestRuntimeMCPServe_DelegatesStdioToDesktopHelper(t *testing.T) {
+	helperPath := writeRuntimeHelperScript(t, `if [ "$1" != "mcp" ] || [ "$2" != "server" ]; then
+  echo "unexpected args: $*" >&2
+  exit 2
+fi
+read input
+case "$input" in
+  *'"method":"initialize"'*)
+    printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","serverInfo":{"name":"autopus-desktop-runtime","version":"test"}}}'
+    ;;
+  *)
+    echo "missing initialize input" >&2
+    exit 3
+    ;;
+esac`)
+	t.Setenv(runtimeHelperOverrideEnv, helperPath)
 
 	input := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"codex","version":"test"}}}` + "\n"
 	var out bytes.Buffer
 	cmd := newMCPServerCmd()
+	cmd.SetContext(context.Background())
 	cmd.SetIn(strings.NewReader(input))
 	cmd.SetOut(&out)
 
 	require.NoError(t, runRuntimeMCPServe(cmd))
 	assert.Contains(t, out.String(), `"jsonrpc":"2.0"`)
-	assert.Contains(t, out.String(), `"serverInfo":{"name":"autopus-adk"`)
+	assert.Contains(t, out.String(), `"serverInfo":{"name":"autopus-desktop-runtime"`)
 	assert.Contains(t, out.String(), `"protocolVersion":"2024-11-05"`)
 }

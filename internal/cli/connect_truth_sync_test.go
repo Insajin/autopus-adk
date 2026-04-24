@@ -17,6 +17,8 @@ func TestConnectCmd_RegistersStatusSubcommand(t *testing.T) {
 	assertConnectStateMachineCopy(t, cmd.Long)
 
 	assert.Contains(t, cmd.Long, "auto connect status")
+	assert.Contains(t, cmd.Long, "delegates to the desktop-owned runtime helper.")
+	assert.NotContains(t, cmd.Long, "when available")
 
 	names := make([]string, 0, len(cmd.Commands()))
 	for _, subcmd := range cmd.Commands() {
