@@ -48,6 +48,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			Prompt:         prompt,
 			TimeoutSeconds: p.timeout,
 			JudgeProvider:  p.gate.Judge,
+			NoJudge:        true,
 		}
 
 		fmt.Fprintf(os.Stderr, "SPEC 리뷰 시작: %s (전략: %s, 리비전: %d)\n", p.specID, p.strategy, revision)

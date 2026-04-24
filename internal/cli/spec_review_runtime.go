@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	specReviewRunOrchestra    = orchestra.RunOrchestra
+	specReviewRunOrchestra    = runStructuredSpecReviewOrchestra
 	specReviewBuildProviders  = buildReviewProviders
 	specReviewConfigProviders = buildReviewProvidersWithConfig
+	specReviewBackendFactory  = orchestra.NewSubprocessBackendImpl
 )
 
 // shippedStatuses lists spec statuses that represent work already delivered.

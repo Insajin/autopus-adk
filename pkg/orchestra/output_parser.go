@@ -54,6 +54,25 @@ func (op *OutputParser) ParseReviewer(raw string) (*ReviewerOutput, error) {
 	default:
 		return nil, fmt.Errorf("parse reviewer: invalid verdict %q (expected PASS, REVISE, or REJECT)", out.Verdict)
 	}
+	if strings.TrimSpace(out.Summary) == "" {
+		return nil, fmt.Errorf("parse reviewer: summary required")
+	}
+	for _, item := range out.Checklist {
+		switch item.Status {
+		case "PASS", "FAIL":
+			// valid
+		default:
+			return nil, fmt.Errorf("parse reviewer: invalid checklist status %q", item.Status)
+		}
+	}
+	for _, item := range out.FindingStatus {
+		switch item.Status {
+		case "open", "resolved", "regressed":
+			// valid
+		default:
+			return nil, fmt.Errorf("parse reviewer: invalid finding status %q", item.Status)
+		}
+	}
 	return &out, nil
 }
 

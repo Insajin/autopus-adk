@@ -85,8 +85,7 @@ func TestParseVerdict_NoExplicitVerdict(t *testing.T) {
 
 	output := "The spec looks good overall. No major issues found."
 	result := ParseVerdict("SPEC-TEST-001", output, "claude", 0, nil)
-	// Default to PASS when no explicit verdict
-	assert.Equal(t, VerdictPass, result.Verdict)
+	assert.Equal(t, VerdictRevise, result.Verdict)
 }
 
 func TestParseVerdict_FindingWithoutVerdict(t *testing.T) {
@@ -96,8 +95,7 @@ func TestParseVerdict_FindingWithoutVerdict(t *testing.T) {
 FINDING: [suggestion] Consider adding more tests`
 
 	result := ParseVerdict("SPEC-TEST-001", output, "claude", 0, nil)
-	// Has findings but no REVISE/REJECT verdict → PASS with findings
-	assert.Equal(t, VerdictPass, result.Verdict)
+	assert.Equal(t, VerdictRevise, result.Verdict)
 	assert.Len(t, result.Findings, 1)
 }
 

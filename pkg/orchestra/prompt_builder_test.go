@@ -48,6 +48,7 @@ func TestPromptBuilder_BuildDebaterR1(t *testing.T) {
 	assert.Contains(t, result, "ARCHITECTURE.md")
 	assert.Contains(t, result, "pkg/core/main.go")
 	assert.Contains(t, result, `{"type":"object"}`)
+	assert.Contains(t, result, "Do NOT stop early")
 }
 
 func TestPromptBuilder_BuildDebaterR1_NoSchema(t *testing.T) {
@@ -83,6 +84,7 @@ func TestPromptBuilder_BuildDebaterR2(t *testing.T) {
 	assert.Contains(t, result, "Analyst A")
 	assert.Contains(t, result, "idea about caching")
 	assert.Contains(t, result, "Analyst B")
+	assert.Contains(t, result, "Do NOT stop early")
 }
 
 func TestPromptBuilder_BuildJudge(t *testing.T) {
@@ -104,6 +106,7 @@ func TestPromptBuilder_BuildJudge(t *testing.T) {
 	assert.Contains(t, result, "r1 analysis")
 	assert.Contains(t, result, "r2 synthesis")
 	assert.Contains(t, result, "Debater 2")
+	assert.Contains(t, result, "Do NOT stop early")
 }
 
 func TestPromptBuilder_BuildReviewer(t *testing.T) {
@@ -122,6 +125,7 @@ func TestPromptBuilder_BuildReviewer(t *testing.T) {
 	assert.Contains(t, result, "P0: Must validate input")
 	assert.Contains(t, result, "Pre-collected Code Context")
 	assert.Contains(t, result, "func Validate")
+	assert.Contains(t, result, "Do NOT stop early")
 }
 
 func TestPromptBuilder_BuildReviewer_NoCodeContext(t *testing.T) {

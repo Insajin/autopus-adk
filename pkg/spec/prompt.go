@@ -148,6 +148,8 @@ func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding,
 
 	sb.WriteString("### Instructions (Verify Mode)\n\n")
 	sb.WriteString("For each finding below, report its current status.\n\n")
+	sb.WriteString("Do NOT stop early, narrow the scope on your own, or replace the requested output with progress notes.\n")
+	sb.WriteString("Responses that omit the required VERDICT/FINDING_STATUS lines are treated as malformed review output.\n\n")
 
 	if len(priorFindings) > 0 {
 		sb.WriteString("#### Prior Findings Checklist\n\n")
@@ -187,6 +189,8 @@ func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFindi
 	sb.WriteString("\n")
 
 	sb.WriteString("### Instructions\n\n")
+	sb.WriteString("Do NOT stop early, narrow the scope on your own, or replace the requested output with progress notes.\n")
+	sb.WriteString("Responses that omit the required VERDICT/FINDING lines are treated as malformed review output.\n\n")
 
 	if len(staticFindings) > 0 {
 		sb.WriteString("#### Already Discovered Static Analysis Issues\n\n")

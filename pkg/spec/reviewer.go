@@ -17,9 +17,13 @@ var (
 // ParseVerdict extracts a ReviewResult from raw provider output.
 // priorFindings: pass nil for discover mode, pass prior findings slice for verify mode.
 func ParseVerdict(specID, output, provider string, revision int, priorFindings []ReviewFinding) ReviewResult {
+	if structured, ok := parseStructuredVerdict(specID, output, provider, revision, priorFindings); ok {
+		return structured
+	}
+
 	result := ReviewResult{
 		SpecID:    specID,
-		Verdict:   VerdictPass,
+		Verdict:   VerdictRevise,
 		Responses: []string{output},
 		Revision:  revision,
 	}

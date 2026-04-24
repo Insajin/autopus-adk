@@ -17,6 +17,8 @@ import (
 const (
 	defaultReliabilityRetentionRuns = 20
 	defaultReliabilityRetentionAge  = 7 * 24 * time.Hour
+	defaultReliabilityActiveGrace   = 6 * time.Hour
+	reliabilityActiveMarkerName     = ".active"
 )
 
 var sensitivePatterns = []*regexp.Regexp{
@@ -47,8 +49,17 @@ func newReliabilityStore(runID string) (*reliabilityStore, error) {
 	if err := os.MkdirAll(runDir, 0o700); err != nil {
 		return nil, fmt.Errorf("create reliability run dir: %w", err)
 	}
-	_ = pruneReliabilityArtifacts(filepath.Join(root, "runs"), defaultReliabilityRetentionRuns, defaultReliabilityRetentionAge)
-	return &reliabilityStore{runID: runID, dir: runDir}, nil
+	store := &reliabilityStore{runID: runID, dir: runDir}
+	if err := store.touchActiveMarker(); err != nil {
+		return nil, fmt.Errorf("touch reliability active marker: %w", err)
+	}
+	_ = pruneReliabilityArtifacts(
+		filepath.Join(root, "runs"),
+		defaultReliabilityRetentionRuns,
+		defaultReliabilityRetentionAge,
+		defaultReliabilityActiveGrace,
+	)
+	return store, nil
 }
 
 func reliabilityRuntimeRoot() (string, error) {
@@ -66,7 +77,7 @@ func reliabilityRuntimeRoot() (string, error) {
 	return root, nil
 }
 
-func pruneReliabilityArtifacts(baseDir string, keepRuns int, maxAge time.Duration) error {
+func pruneReliabilityArtifacts(baseDir string, keepRuns int, maxAge, activeGrace time.Duration) error {
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -84,11 +95,14 @@ func pruneReliabilityArtifacts(baseDir string, keepRuns int, maxAge time.Duratio
 		if !entry.IsDir() {
 			continue
 		}
+		path := filepath.Join(baseDir, entry.Name())
+		if isActiveReliabilityRun(path, now, activeGrace) {
+			continue
+		}
 		info, infoErr := entry.Info()
 		if infoErr != nil {
 			continue
 		}
-		path := filepath.Join(baseDir, entry.Name())
 		if maxAge > 0 && now.Sub(info.ModTime()) > maxAge {
 			_ = os.RemoveAll(path)
 			continue
@@ -100,6 +114,17 @@ func pruneReliabilityArtifacts(baseDir string, keepRuns int, maxAge time.Duratio
 		_ = os.RemoveAll(filepath.Join(baseDir, dirs[i].name))
 	}
 	return nil
+}
+
+func isActiveReliabilityRun(path string, now time.Time, grace time.Duration) bool {
+	if grace <= 0 {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(path, reliabilityActiveMarkerName))
+	if err != nil || info.IsDir() {
+		return false
+	}
+	return now.Sub(info.ModTime()) <= grace
 }
 
 func (s *reliabilityStore) artifactDir() string {
@@ -185,10 +210,34 @@ func (s *reliabilityStore) writeJSON(name string, payload any) string {
 	if err != nil {
 		return ""
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	if err := s.ensureWritableDir(); err != nil {
 		return ""
 	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		if retryErr := s.ensureWritableDir(); retryErr != nil {
+			return ""
+		}
+		if retryErr := os.WriteFile(path, data, 0o600); retryErr != nil {
+			return ""
+		}
+	}
+	_ = s.touchActiveMarker()
 	return path
+}
+
+func (s *reliabilityStore) ensureWritableDir() error {
+	if err := os.MkdirAll(s.dir, 0o700); err != nil {
+		return err
+	}
+	return s.touchActiveMarker()
+}
+
+func (s *reliabilityStore) touchActiveMarker() error {
+	return os.WriteFile(
+		filepath.Join(s.dir, reliabilityActiveMarkerName),
+		[]byte(time.Now().UTC().Format(time.RFC3339Nano)),
+		0o600,
+	)
 }
 
 func sanitizeArtifact(text string) SanitizedArtifact {

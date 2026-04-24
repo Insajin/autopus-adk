@@ -87,15 +87,33 @@ type RankedIdea struct {
 
 // ReviewerOutput is the SPEC review output.
 type ReviewerOutput struct {
-	Findings []Finding `json:"findings"`
-	Verdict  string    `json:"verdict"` // PASS, REVISE, REJECT
-	Summary  string    `json:"summary"`
+	Findings      []Finding                  `json:"findings"`
+	Verdict       string                     `json:"verdict"` // PASS, REVISE, REJECT
+	Summary       string                     `json:"summary"`
+	Checklist     []ReviewerChecklistOutput  `json:"checklist,omitempty"`
+	FindingStatus []ReviewerFindingStatusOut `json:"finding_statuses,omitempty"`
 }
 
 // Finding represents a single review finding.
 type Finding struct {
-	Severity    string `json:"severity"` // critical, major, minor, suggestion
+	Severity    string `json:"severity"`            // critical, major, minor, suggestion
+	Category    string `json:"category,omitempty"`  // correctness, completeness, feasibility, style, security
+	ScopeRef    string `json:"scope_ref,omitempty"` // REQ-001 or path:line
 	Location    string `json:"location"`
 	Description string `json:"description"`
 	Suggestion  string `json:"suggestion"`
+}
+
+// ReviewerChecklistOutput represents a single checklist item result.
+type ReviewerChecklistOutput struct {
+	ID     string `json:"id"`
+	Status string `json:"status"` // PASS, FAIL
+	Reason string `json:"reason,omitempty"`
+}
+
+// ReviewerFindingStatusOut represents verification status for a prior finding.
+type ReviewerFindingStatusOut struct {
+	ID     string `json:"id"`
+	Status string `json:"status"` // open, resolved, regressed
+	Reason string `json:"reason,omitempty"`
 }

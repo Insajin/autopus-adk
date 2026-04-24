@@ -1,6 +1,7 @@
 package orchestra
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,12 +62,31 @@ func TestPruneReliabilityArtifacts_RemovesOldRuns(t *testing.T) {
 	oldTime := time.Now().Add(-10 * 24 * time.Hour)
 	require.NoError(t, os.Chtimes(oldDir, oldTime, oldTime))
 
-	require.NoError(t, pruneReliabilityArtifacts(baseDir, 20, 7*24*time.Hour))
+	require.NoError(t, pruneReliabilityArtifacts(baseDir, 20, 7*24*time.Hour, time.Hour))
 
 	_, oldErr := os.Stat(oldDir)
 	_, newErr := os.Stat(newDir)
 	assert.Error(t, oldErr)
 	assert.NoError(t, newErr)
+}
+
+func TestPruneReliabilityArtifacts_SkipsActiveRuns(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	activeDir := filepath.Join(baseDir, "active")
+	require.NoError(t, os.MkdirAll(activeDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(activeDir, reliabilityActiveMarkerName), []byte("active"), 0o600))
+
+	for i := 0; i < 25; i++ {
+		runDir := filepath.Join(baseDir, fmt.Sprintf("run-%02d", i))
+		require.NoError(t, os.MkdirAll(runDir, 0o700))
+	}
+
+	require.NoError(t, pruneReliabilityArtifacts(baseDir, 5, 30*24*time.Hour, time.Hour))
+
+	_, err := os.Stat(activeDir)
+	assert.NoError(t, err)
 }
 
 func TestReliabilityStore_WritesFailureBundle(t *testing.T) {
@@ -86,4 +106,18 @@ func TestReliabilityStore_WritesFailureBundle(t *testing.T) {
 	assert.Equal(t, "run-test", summary.RunID)
 	assert.Equal(t, path, summary.FailureBundle)
 	assert.Equal(t, 1, summary.OpenEvents)
+}
+
+func TestReliabilityStore_RecreatesRunDirOnWrite(t *testing.T) {
+	t.Parallel()
+
+	store, err := newReliabilityStore("run-recreate")
+	require.NoError(t, err)
+	require.NoError(t, os.RemoveAll(store.artifactDir()))
+
+	path := store.recordCollection(collectionReceipt("run-recreate", "claude", "hook", "hook", "timeout", "boom", "", 1, true))
+
+	require.NotEmpty(t, path)
+	_, statErr := os.Stat(path)
+	assert.NoError(t, statErr)
 }

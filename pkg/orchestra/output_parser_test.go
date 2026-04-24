@@ -55,7 +55,7 @@ func TestOutputParser_ParseReviewer_AllVerdicts(t *testing.T) {
 	t.Parallel()
 	op := &OutputParser{}
 	for _, v := range []string{"PASS", "REVISE", "REJECT"} {
-		input := `{"findings":[],"verdict":"` + v + `","summary":"ok"}`
+		input := `{"findings":[],"verdict":"` + v + `","summary":"ok","checklist":[{"id":"Q-1","status":"PASS"}],"finding_statuses":[{"id":"F-001","status":"resolved"}]}`
 		out, err := op.ParseReviewer(input)
 		require.NoError(t, err, "verdict=%s", v)
 		assert.Equal(t, v, out.Verdict)
@@ -69,6 +69,24 @@ func TestOutputParser_ParseReviewer_InvalidVerdict(t *testing.T) {
 	_, err := op.ParseReviewer(input)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid verdict")
+}
+
+func TestOutputParser_ParseReviewer_RequiresSummary(t *testing.T) {
+	t.Parallel()
+	op := &OutputParser{}
+	input := `{"findings":[],"verdict":"PASS","summary":""}`
+	_, err := op.ParseReviewer(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "summary required")
+}
+
+func TestOutputParser_ParseReviewer_InvalidChecklistStatus(t *testing.T) {
+	t.Parallel()
+	op := &OutputParser{}
+	input := `{"findings":[],"verdict":"PASS","summary":"ok","checklist":[{"id":"Q-1","status":"MAYBE"}]}`
+	_, err := op.ParseReviewer(input)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid checklist status")
 }
 
 func TestOutputParser_MarkdownWrapped(t *testing.T) {
