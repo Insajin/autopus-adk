@@ -1,6 +1,6 @@
 name = "security-auditor"
 description = "보안 감사 및 취약점 탐지 전문 에이전트. OWASP Top 10 기준으로 코드와 아키텍처의 보안 취약점을 탐지한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
 developer_instructions = '''
 You are the security-auditor agent for project {{.ProjectName}}.
 
@@ -92,6 +92,7 @@ If Stack Profile is injected in the prompt, use its specified security tools ins
 ## Operational Defaults
 - Skills reference: security-audit, review
 - Source tool contract: Read, Grep, Glob, Bash
+- Source effort default: high
 - Source permission intent: plan
 - Source max turns: 30
 - File size limit: 300 lines per source file.

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
@@ -201,47 +200,6 @@ func (a *Adapter) validateRouterPrompt(errs *[]adapter.ValidationError) {
 	}
 }
 
-func (a *Adapter) validateConfig(errs *[]adapter.ValidationError) {
-	if !a.managesFile("config.toml") {
-		return
-	}
-
-	data, err := os.ReadFile(filepath.Join(a.root, "config.toml"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			*errs = append(*errs, adapter.ValidationError{
-				File:    "config.toml",
-				Message: "config.toml이 없음",
-				Level:   "warning",
-			})
-			return
-		}
-		*errs = append(*errs, adapter.ValidationError{
-			File:    "config.toml",
-			Message: "config.toml을 읽을 수 없음",
-			Level:   "warning",
-		})
-		return
-	}
-
-	maxBytes, ok := parseProjectDocMaxBytes(string(data))
-	if !ok {
-		*errs = append(*errs, adapter.ValidationError{
-			File:    "config.toml",
-			Message: "project_doc_max_bytes 설정이 없음",
-			Level:   "warning",
-		})
-		return
-	}
-	if maxBytes < minProjectDocMaxBytes {
-		*errs = append(*errs, adapter.ValidationError{
-			File:    "config.toml",
-			Message: fmt.Sprintf("project_doc_max_bytes가 너무 낮음 (%d < %d): 대형 프로젝트 문서가 잘릴 수 있음", maxBytes, minProjectDocMaxBytes),
-			Level:   "warning",
-		})
-	}
-}
-
 func (a *Adapter) validateContext7Rule(errs *[]adapter.ValidationError) {
 	ruleRel := filepath.Join(".codex", "rules", "autopus", "context7-docs.md")
 	if !a.managesFile(ruleRel) {
@@ -274,26 +232,4 @@ func (a *Adapter) validateContext7Rule(errs *[]adapter.ValidationError) {
 			Level:   "warning",
 		})
 	}
-}
-
-func parseProjectDocMaxBytes(content string) (int, bool) {
-	for _, line := range strings.Split(content, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "project_doc_max_bytes") {
-			continue
-		}
-
-		parts := strings.SplitN(trimmed, "=", 2)
-		if len(parts) != 2 {
-			return 0, false
-		}
-
-		value, err := strconv.Atoi(strings.TrimSpace(parts[1]))
-		if err != nil {
-			return 0, false
-		}
-		return value, true
-	}
-
-	return 0, false
 }

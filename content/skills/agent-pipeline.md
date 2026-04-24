@@ -81,7 +81,7 @@ The quality mode — determined by the `--quality` flag or interactive selection
 
 Use the premium path for all Agent() calls.
 
-On model-tiered platforms, this means adding `model: "opus"`. On fixed-model platforms such as Codex/OpenCode, this means keeping `gpt-5.4` and increasing reasoning effort.
+On model-tiered platforms, this means adding `model: "opus"`. On Codex, `opus` resolves to `gpt-5.5` when available and `sonnet` stays on `gpt-5.4`; OpenCode should keep its configured default model and increase reasoning effort.
 
 ```
 Agent(
@@ -132,8 +132,8 @@ In Balanced mode, task complexity determines the profile per Agent() call:
 
 Current workspace policy:
 - Claude never uses `haiku`; LOW stays on `sonnet`
-- Codex maps both `opus` and `sonnet` tiers to `gpt-5.4`; LOW/MEDIUM/HIGH differ by reasoning effort
-- OpenCode currently assumes `gpt-5.4` as the default runtime model and should vary reasoning effort rather than the model ID
+- Codex maps `opus` to `gpt-5.5`, `sonnet` to `gpt-5.4`, and `haiku`/lightweight work to `gpt-5.4-mini`; reasoning effort still differentiates LOW/MEDIUM/HIGH
+- OpenCode should keep its configured default runtime model and vary reasoning effort rather than forcing a model ID
 
 In Ultra mode, complexity is IGNORED — all agents use the premium path.
 
@@ -242,7 +242,8 @@ Parallel tasks use `isolation: "worktree"` so each executor works in an independ
 # Parallel execution example — with worktree isolation
 # Premium-path handling varies by platform:
 # - Claude/Gemini: add model="opus"
-# - Codex/OpenCode: keep the default model and increase reasoning effort
+# - Codex: use the resolved tier model and increase reasoning effort for hard checks
+# - OpenCode: keep the default model and increase reasoning effort
 Agent(subagent_type="executor", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Balanced
 Agent(subagent_type="executor", model="opus", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Ultra
 Agent(subagent_type="executor", prompt="Implement T2: ...", mode="bypassPermissions", isolation="worktree")  # Balanced

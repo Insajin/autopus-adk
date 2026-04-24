@@ -1,7 +1,26 @@
 package config
 
+const (
+	CodexFrontierModel = "gpt-5.5"
+	CodexStandardModel = "gpt-5.4"
+	CodexMiniModel     = "gpt-5.4-mini"
+	CodexCodingModel   = "gpt-5.3-codex"
+	CodexSparkModel    = "gpt-5.3-codex-spark"
+	CodexFallbackModel = "gpt-5.2"
+)
+
+// DefaultCodexProviderEntry returns the canonical Codex orchestra provider entry.
+func DefaultCodexProviderEntry() ProviderEntry {
+	return ProviderEntry{
+		Binary:        "codex",
+		Args:          []string{"exec", "--full-auto", "-m", CodexFrontierModel},
+		PaneArgs:      []string{"-m", CodexFrontierModel},
+		PromptViaArgs: false,
+	}
+}
+
 // DefaultFullConfig returns the default config for Full mode.
-// @AX:NOTE: [AUTO] magic constants — model names (opus, sonnet, haiku, gpt-5.4, gemini-3.1-pro-preview), timeouts, and tier mappings are hardcoded below
+// @AX:NOTE: [AUTO] magic constants — model names (opus, sonnet, haiku, Codex GPT-5.x, gemini-3.1-pro-preview), timeouts, and tier mappings are hardcoded below
 func DefaultFullConfig(projectName string) *HarnessConfig {
 	return &HarnessConfig{
 		Mode:        ModeFull,
@@ -72,7 +91,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Providers: map[string]ProviderEntry{
 				"claude": {Binary: "claude", Args: []string{"--print"}, PaneArgs: []string{"--print"}},
 				"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
-				"codex":  {Binary: "codex", Args: []string{"exec", "--full-auto", "-m", "gpt-5.4"}, PaneArgs: []string{"-m", "gpt-5.4"}, PromptViaArgs: false},
+				"codex":  DefaultCodexProviderEntry(),
 			},
 			Commands: map[string]CommandEntry{
 				"review":     {Strategy: "debate", Providers: []string{"claude", "codex", "gemini"}},

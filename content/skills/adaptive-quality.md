@@ -14,7 +14,7 @@ level1_metadata: "adaptive quality, complexity assessment, execution profiles, c
 
 ## Overview
 
-Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the execution profile used for each `Agent()` call. High-complexity tasks still receive the strongest reasoning path, while routine tasks stay on the standard path. In this workspace, Claude no longer falls back to haiku, and Codex/OpenCode keep `gpt-5.4` as the baseline model.
+Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the execution profile used for each `Agent()` call. High-complexity tasks still receive the strongest reasoning path, while routine tasks stay on the standard path. In this workspace, Claude no longer falls back to haiku; Codex uses the current GPT-5.x tier mapping and OpenCode keeps its configured default model.
 
 ## Relationship to Quality Mode
 
@@ -57,8 +57,8 @@ When criteria overlap (e.g., 1 file but 250 lines), use the highest matching lev
 
 Platform note:
 - Claude: HIGH=`opus`, MEDIUM/LOW=`sonnet`
-- Codex: all tiers resolve to `gpt-5.4`; LOW/MEDIUM/HIGH should be differentiated by reasoning effort
-- OpenCode: default runtime model is currently assumed to be `gpt-5.4`; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
+- Codex: `opus` resolves to `gpt-5.5`, `sonnet` to `gpt-5.4`, and lightweight work to `gpt-5.4-mini`; LOW/MEDIUM/HIGH should also be differentiated by reasoning effort
+- OpenCode: keep the configured default runtime model; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
 ## Effort Mapping (SPEC-CC21-001)
 

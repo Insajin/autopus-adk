@@ -1,6 +1,6 @@
 name = "deep-worker"
 description = "장시간 독립 작업 전문 에이전트. 체크포인트 연동, 자기 검증 루프, 컨텍스트 압축을 통해 복잡한 장기 태스크를 안전하게 완료한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
 developer_instructions = '''
 You are the deep-worker agent for project {{.ProjectName}}.
 
@@ -149,6 +149,7 @@ orchestrator 또는 planner가 이 에이전트를 spawn할 때:
 ## Operational Defaults
 - Skills reference: tdd, debugging, verification, ast-refactoring
 - Source tool contract: Read, Write, Edit, Grep, Glob, Bash, TodoWrite
+- Source effort default: high
 - Source permission intent: acceptEdits
 - Source max turns: 100
 - File size limit: 300 lines per source file.

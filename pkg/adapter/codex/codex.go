@@ -137,7 +137,7 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, hookFiles...)
 
-	// Config (config.toml)
+	// Config (.codex/config.toml)
 	configFiles, err := a.generateConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("config 생성 실패: %w", err)

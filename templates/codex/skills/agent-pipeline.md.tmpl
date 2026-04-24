@@ -71,7 +71,7 @@ The quality mode — determined by the `--quality` flag or interactive selection
 
 Use the premium path for all Agent() calls.
 
-On model-tiered platforms, this means adding `model: "opus"`. On fixed-model platforms such as Codex/OpenCode, this means keeping `gpt-5.4` and increasing reasoning effort.
+On model-tiered platforms, this means adding `model: "opus"`. On Codex, `opus` resolves to `gpt-5.5` when available and `sonnet` stays on `gpt-5.4`; OpenCode should keep its configured default model and increase reasoning effort.
 
 ```
 Agent(
@@ -92,6 +92,24 @@ Agent(
 )
 ```
 
+### Effort Override
+
+CC21 adds `effort` as a separate reasoning control. Keep the model/frontmatter behavior above, then apply:
+
+- `--effort` when the supervisor needs an explicit override
+- `CLAUDE_CODE_EFFORT_LEVEL` for environment-level override
+- agent frontmatter `effort:` as the default when neither override is present
+
+Example:
+
+```python
+Agent(
+  subagent_type = "executor",
+  effort = "high",
+  prompt = "..."
+)
+```
+
 ### Adaptive Quality (Balanced Mode Only)
 
 In Balanced mode, task complexity determines the profile per Agent() call:
@@ -104,8 +122,8 @@ In Balanced mode, task complexity determines the profile per Agent() call:
 
 Current workspace policy:
 - Claude never uses `haiku`; LOW stays on `sonnet`
-- Codex maps both `opus` and `sonnet` tiers to `gpt-5.4`; LOW/MEDIUM/HIGH differ by reasoning effort
-- OpenCode currently assumes `gpt-5.4` as the default runtime model and should vary reasoning effort rather than the model ID
+- Codex maps `opus` to `gpt-5.5`, `sonnet` to `gpt-5.4`, and `haiku`/lightweight work to `gpt-5.4-mini`; reasoning effort still differentiates LOW/MEDIUM/HIGH
+- OpenCode should keep its configured default runtime model and vary reasoning effort rather than forcing a model ID
 
 In Ultra mode, complexity is IGNORED — all agents use the premium path.
 
@@ -162,7 +180,7 @@ Executor constraint: Phase 2 executors MUST NOT modify test files generated in P
 
 ### Phase 1.8: Doc Fetch (Context7 MCP)
 
-WHEN Phase 1.5 (or Gate 1) completes, THE SYSTEM SHALL fetch latest documentation for external libraries referenced in the SPEC, using the Context7 MCP tools. This phase runs in the **main session** (subagents cannot access MCP tools).
+WHEN Phase 1.5 (or Gate 1) completes, THE SYSTEM SHALL fetch latest documentation for external libraries referenced in the SPEC, using the Context7 MCP tools first and falling back to targeted web search when Context7 is unavailable or insufficient. This phase runs in the **main session** (subagents cannot access MCP tools).
 
 **Skip condition**: If no external libraries are detected in the SPEC, plan.md, or affected file imports, skip Phase 1.8 entirely.
 
@@ -173,10 +191,16 @@ Step 1: Detect Technologies
   → Select top 5 libraries by relevance (prioritize P0 task dependencies)
 
 Step 2: Fetch Documentation (for each detected library, max 5)
-  → Call WebSearch "libraryName docs"
-  → If no match: log "[CTX7] No match: {name}", skip to next
-  → Call WebSearch "libraryId, topic="{task-relevant topic} docs"
+  → Call Context7 MCP first; fallback: WebSearch "libraryName docs"
+  → If no match: log "[CTX7] No match: {name}", continue with web fallback
+  → Call Context7 MCP first; fallback: WebSearch "libraryId {task-relevant topic} docs" (topic: {task-relevant topic})
+  → If query-docs fails or returns empty: continue with web fallback
   → Cache result keyed by library-id + topic
+
+Step 2.5: Web Fallback (when needed)
+  → Use the session web search capability with a focused query for the same library/topic
+  → Prefer official docs, release notes, migration notes, and API references
+  → Cache fallback results and label them as web-fallback sources
 
 Step 3: Prepare Injection Payload (Adaptive Token Budget)
   → Apply adaptive token budget based on library count:
@@ -194,7 +218,7 @@ Step 4 (optional): Per-Executor Refinement
 
 **Injection into subsequent phases**: The cached documentation is injected into Phase 2 executor and Phase 3 tester prompts as a `## Reference Documentation` section, following the same pattern as Phase 2 Profile Injection.
 
-**Error handling**: Context7 failures (MCP unavailable, no match, empty response) are logged and skipped — documentation is supplementary, never blocks the pipeline.
+**Error handling**: Context7 failures (MCP unavailable, no match, empty response) first trigger web fallback. Only when both Context7 and web fallback fail does the pipeline log and skip — documentation is supplementary, never blocks the pipeline.
 
 Ref: `.codex/rules/autopus/context7-docs.md` for detection heuristics, token limits, and anti-patterns.
 
@@ -208,7 +232,8 @@ Parallel tasks use `auto pipeline worktree` so each executor works in an indepen
 # Parallel execution example — with worktree isolation
 # Premium-path handling varies by platform:
 # - Claude/Gemini: add model="opus"
-# - Codex/OpenCode: keep the default model and increase reasoning effort
+# - Codex: use the resolved tier model and increase reasoning effort for hard checks
+# - OpenCode: keep the default model and increase reasoning effort
 spawn_agent executor --task "Implement T1: ..."  # Balanced
 spawn_agent executor  # Ultra
 spawn_agent executor --task "Implement T2: ..."  # Balanced
@@ -405,6 +430,12 @@ Agent(subagent_type = "security-auditor", prompt = """
 Both must return PASS/APPROVE. On conflict, Lead (planner) consolidates issue lists.
 Priority: security issues > code quality issues.
 
+Freeze the review output into a checklist of open findings.
+
+- If the checklist still contains actionable findings and the retry budget remains, immediately delegate a focused fixer/executor task inside the same invocation.
+- Keep the checklist stable across retries unless the patch meaningfully changes scope.
+- Do not ask the user to manually fix, rerun, or confirm while the next repair step is still actionable within the current `/auto go` invocation.
+
 ## Parallel vs Sequential Decision Criteria
 
 | Condition                                     | Execution         | Worktree Isolation |
@@ -428,7 +459,9 @@ Retry limits:
 - Gate 2 (Validation): maximum 3 retries
 - Phase 4 (Review): maximum 2 retries
 
-If the limit is exceeded, abort the pipeline and notify the user:
+While the review retry budget remains, keep the repair -> validate -> verify cycle inside the same invocation.
+
+Only when the retry limit is exhausted or the pipeline hits a real blocker/circuit break should it abort and notify the user:
 
 ```
 Pipeline aborted: failed to resolve [Gate name] after [N] retries.

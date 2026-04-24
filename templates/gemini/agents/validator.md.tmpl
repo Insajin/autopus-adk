@@ -241,8 +241,8 @@ WHEN checks 6a Layer 2 (behavioral stub) or 7 (acceptance coverage) are active, 
 
 Current workspace policy:
 - Claude/Gemini: stay on the standard validator model (`sonnet`-class); increase reasoning intensity rather than dropping to the cheapest tier
-- Codex: keep `gpt-5.4`; raise reasoning effort for Layer 2 / Check 7
-- OpenCode: keep the platform default `gpt-5.4`; treat Layer 2 / Check 7 as higher-reasoning validation passes
+- Codex: use the resolved tier model (`gpt-5.5` for `opus`, `gpt-5.4` for `sonnet`) and raise reasoning effort for Layer 2 / Check 7
+- OpenCode: keep the configured platform default model; treat Layer 2 / Check 7 as higher-reasoning validation passes
 
 The pipeline orchestrator controls this escalation:
 - Checks 1-5, 6a Layer 1, 6b, 6c → default reasoning profile

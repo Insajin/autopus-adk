@@ -109,7 +109,7 @@ func TestGenerate_FailsOnConfigWriteBlocked(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".codex", "skills"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "config.toml"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".codex", "config.toml"), 0755))
 
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
@@ -213,7 +213,7 @@ func TestRenderSkillTemplates_WriteFileBlocked(t *testing.T) {
 func TestGenerateConfig_WriteFileBlocked(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "config.toml"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".codex", "config.toml"), 0755))
 
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")

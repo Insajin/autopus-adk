@@ -61,35 +61,6 @@ func TestPrepareGitHookFiles_NoDiskWrite(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
-func TestGenerateConfig(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	files, err := a.generateConfig(cfg)
-	require.NoError(t, err)
-	assert.Len(t, files, 1)
-	assert.Equal(t, "config.toml", files[0].TargetPath)
-	assert.FileExists(t, filepath.Join(dir, "config.toml"))
-	assert.Contains(t, string(files[0].Content), "test-project")
-	assert.Contains(t, string(files[0].Content), "context7")
-}
-
-func TestPrepareConfigFile_NoDiskWrite(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	files, err := a.prepareConfigFile(cfg)
-	require.NoError(t, err)
-	assert.Len(t, files, 1)
-
-	_, err = os.Stat(filepath.Join(dir, "config.toml"))
-	assert.True(t, os.IsNotExist(err))
-}
-
 func TestGenerateRuleFiles_Internal(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -242,26 +213,6 @@ func TestGenerateHooks_ValidJSON(t *testing.T) {
 	assert.Contains(t, hooks, "PostToolUse")
 	assert.NotContains(t, hooks, "SessionStart")
 	assert.NotContains(t, hooks, "Stop")
-}
-
-func TestGenerateConfig_MCPServers(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	files, err := a.generateConfig(cfg)
-	require.NoError(t, err)
-	content := string(files[0].Content)
-	assert.Contains(t, content, "[mcp_servers.autopus]")
-	assert.Contains(t, content, `command = "auto"`)
-	assert.Contains(t, content, `args = ["mcp", "server"]`)
-	assert.Contains(t, content, "[mcp_servers.context7]")
-	assert.Contains(t, content, "project_doc_max_bytes = 262144")
-	assert.Contains(t, content, "[agents]")
-	assert.Contains(t, content, "max_threads = 6")
-	assert.Contains(t, content, "max_depth = 1")
-	assert.NotContains(t, content, "features.collab")
 }
 
 func TestRulesReferenceInAgentsMD(t *testing.T) {

@@ -22,6 +22,7 @@ var gitignorePatterns = []string{
 	".claude/skills/autopus/",
 	".claude/commands/auto.md",
 	".claude/agents/autopus/",
+	".codex/config.toml",
 	".codex/skills/",
 	".gemini/skills/autopus/",
 	".opencode/",

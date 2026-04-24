@@ -66,7 +66,7 @@ func printPreview(out io.Writer, title, hint string, items []previewItem) {
 func previewCategoryForPath(path string) string {
 	path = filepath.ToSlash(path)
 	switch {
-	case path == "autopus.yaml" || path == "config.toml" || path == "opencode.json" || path == ".mcp.json":
+	case path == "autopus.yaml" || path == "config.toml" || path == ".codex/config.toml" || path == "opencode.json" || path == ".mcp.json":
 		return "config"
 	case strings.HasSuffix(path, "-manifest.json") || strings.HasSuffix(path, ".meta.yaml") || strings.HasPrefix(path, ".autopus/backup/"):
 		return "runtime_state"

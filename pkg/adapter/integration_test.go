@@ -58,8 +58,8 @@ func TestE2EInitCodex(t *testing.T) {
 	// .codex/hooks.json must exist.
 	assertFileExists(t, filepath.Join(dir, ".codex", "hooks.json"))
 
-	// config.toml must exist.
-	assertFileExists(t, filepath.Join(dir, "config.toml"))
+	// Project-scoped Codex config must exist.
+	assertFileExists(t, filepath.Join(dir, ".codex", "config.toml"))
 
 	// Manifest must be saved.
 	assertFileExists(t, filepath.Join(dir, ".autopus", "codex-manifest.json"))
@@ -213,7 +213,7 @@ func TestE2ECodex_FileCount(t *testing.T) {
 	assert.GreaterOrEqual(t, skills, 6, "should have at least 6 skill files (6 template + extended)")
 	assert.Equal(t, 17, prompts, "should have 17 prompt files")
 	assert.Equal(t, 16, agents, "should have 16 agent files (SPEC-PARITY-001)")
-	assert.GreaterOrEqual(t, other, 3, "should have AGENTS.md + hooks.json + config.toml")
+	assert.GreaterOrEqual(t, other, 3, "should have AGENTS.md + hooks.json + .codex/config.toml")
 }
 
 // --- E2E: Claude regression ---

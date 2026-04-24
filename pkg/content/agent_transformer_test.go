@@ -112,7 +112,7 @@ func TestTransformAgentForCodex_EmptyBody(t *testing.T) {
 	result := content.TransformAgentForCodex(src)
 
 	assert.Contains(t, result, `name = "minimal"`)
-	assert.Contains(t, result, `model = "gpt-5.4"`)
+	assert.Contains(t, result, `model = "gpt-5.4-mini"`)
 	assert.Contains(t, result, "developer_instructions =")
 }
 

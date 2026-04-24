@@ -38,7 +38,7 @@ func TestMigrateOpencodeToCodex_Basic(t *testing.T) {
 	codex, hasCodex := cfg.Orchestra.Providers["codex"]
 	require.True(t, hasCodex, "codex provider must exist after migration")
 	assert.Equal(t, "codex", codex.Binary)
-	assert.Equal(t, []string{"exec", "--full-auto", "-m", "gpt-5.4"}, codex.Args)
+	assert.Equal(t, []string{"exec", "--full-auto", "-m", CodexFrontierModel}, codex.Args)
 	assert.False(t, codex.PromptViaArgs, "codex PromptViaArgs must be false")
 
 	// Commands must reference codex instead of opencode.
@@ -144,7 +144,7 @@ func TestDefaultProviderEntries_CodexArgs(t *testing.T) {
 	codex, ok := defaultProviderEntries["codex"]
 	require.True(t, ok, "codex must exist in defaultProviderEntries")
 
-	expectedArgs := []string{"exec", "--full-auto", "-m", "gpt-5.4"}
+	expectedArgs := []string{"exec", "--full-auto", "-m", CodexFrontierModel}
 	assert.Equal(t, expectedArgs, codex.Args, "codex args must match new exec-mode format")
 	assert.Equal(t, "codex", codex.Binary)
 }

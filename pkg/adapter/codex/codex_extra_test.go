@@ -152,15 +152,21 @@ func TestCodexAdapter_Validate_WarnsWhenProjectDocBudgetTooLow(t *testing.T) {
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	configPath := filepath.Join(dir, "config.toml")
-	require.NoError(t, os.WriteFile(configPath, []byte("project_doc_max_bytes = 65536\n"), 0644))
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte(`model = "gpt-5.5"
+model_reasoning_effort = "medium"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "cached"
+project_doc_max_bytes = 65536
+`), 0644))
 
 	errs, err := a.Validate(context.Background())
 	require.NoError(t, err)
 
 	found := false
 	for _, e := range errs {
-		if e.File == "config.toml" && e.Message == "project_doc_max_bytes가 너무 낮음 (65536 < 262144): 대형 프로젝트 문서가 잘릴 수 있음" {
+		if e.File == ".codex/config.toml" && e.Message == "project_doc_max_bytes가 너무 낮음 (65536 < 262144): 대형 프로젝트 문서가 잘릴 수 있음" {
 			found = true
 		}
 	}

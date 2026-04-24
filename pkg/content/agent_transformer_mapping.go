@@ -1,13 +1,17 @@
 package content
 
-import "regexp"
+import (
+	"regexp"
+
+	"github.com/insajin/autopus-adk/pkg/config"
+)
 
 // modelMapping maps source model tiers to platform-specific model names.
 var modelMapping = map[string]map[string]string{
 	"codex": {
-		"sonnet": "gpt-5.4",
-		"opus":   "gpt-5.4",
-		"haiku":  "gpt-5.4",
+		"sonnet": config.CodexStandardModel,
+		"opus":   config.CodexFrontierModel,
+		"haiku":  config.CodexMiniModel,
 	},
 	"gemini": {
 		"sonnet": "gemini-2.5-pro",

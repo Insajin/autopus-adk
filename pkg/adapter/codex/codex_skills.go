@@ -93,7 +93,7 @@ const agentsMDTemplate = `# Autopus-ADK Harness
 {{if contains (join ", " .Platforms) "codex"}}- Codex Rules: .codex/rules/autopus/
 - Codex Skills: .codex/skills/
 - Codex Agents: .codex/agents/
-- Codex Config: config.toml
+- Codex Config: .codex/config.toml
 {{end}}{{if contains (join ", " .Platforms) "opencode"}}- OpenCode Rules: .opencode/rules/autopus/
 - OpenCode Commands: .opencode/commands/
 - OpenCode Agents: .opencode/agents/

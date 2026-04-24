@@ -151,7 +151,7 @@ func TestGenerateConfig_WritesToDisk(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 
-	data, err := os.ReadFile(filepath.Join(dir, "config.toml"))
+	data, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, string(files[0].Content), string(data))
 }

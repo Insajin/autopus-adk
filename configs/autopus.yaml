@@ -75,8 +75,8 @@ orchestra:
       args: ["--print", "--model", "opus", "--effort", "high"]
     codex:
       binary: codex
-      args: ["exec", "--full-auto", "-m", "gpt-5.4"]
-      pane_args: ["-m", "gpt-5.4"]
+      args: ["exec", "--full-auto", "-m", "gpt-5.5"]
+      pane_args: ["-m", "gpt-5.5"]
     gemini:
       binary: gemini
       args: ["-m", "gemini-3.1-pro-preview", "-p", ""]

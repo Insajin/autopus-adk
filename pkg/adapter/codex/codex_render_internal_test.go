@@ -39,7 +39,7 @@ func TestPrepareFiles_ReturnsAllCategories(t *testing.T) {
 			hasRules = true
 		case strings.Contains(f.TargetPath, "hooks"):
 			hasHooks = true
-		case f.TargetPath == "config.toml":
+		case f.TargetPath == codexConfigRelPath:
 			hasConfig = true
 		}
 	}
