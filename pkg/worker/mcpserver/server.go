@@ -23,6 +23,7 @@ type MCPServer struct {
 	tools       map[string]ToolHandler
 	resources   *ResourceRegistry
 	mu          sync.Mutex
+	reader      io.Reader
 	writer      io.Writer
 }
 
@@ -70,11 +71,23 @@ func NewMCPServer(backendURL, authToken, workspaceID string) *MCPServer {
 		authToken:   authToken,
 		workspaceID: workspaceID,
 		tools:       make(map[string]ToolHandler),
+		reader:      os.Stdin,
 		writer:      os.Stdout,
 	}
 	s.resources = NewResourceRegistry(backendURL, authToken)
 	s.registerTools()
 	return s
+}
+
+// SetIO overrides the stdio transport streams. It is primarily used by CLI tests
+// and by wrapper commands that already own Cobra's input/output streams.
+func (s *MCPServer) SetIO(reader io.Reader, writer io.Writer) {
+	if reader != nil {
+		s.reader = reader
+	}
+	if writer != nil {
+		s.writer = writer
+	}
 }
 
 // StartSSE starts the SSE transport on the given addr (host:port).
@@ -91,7 +104,14 @@ func (s *MCPServer) StartSSE(ctx context.Context, addr string) error {
 
 // Start reads line-delimited JSON-RPC requests from stdin and dispatches them.
 func (s *MCPServer) Start(ctx context.Context) error {
-	scanner := bufio.NewScanner(os.Stdin)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	reader := s.reader
+	if reader == nil {
+		reader = os.Stdin
+	}
+	scanner := bufio.NewScanner(reader)
 	// Allow large messages up to 1MB.
 	// @AX:NOTE[AUTO]: magic constant — 1MB scanner buffer cap; oversized JSON-RPC messages are silently truncated without error
 	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)

@@ -21,6 +21,9 @@ const (
 	runtimeHelperOverrideEnv = "AUTOPUS_DESKTOP_RUNTIME_HELPER"
 )
 
+var errRuntimeHelperNotFound = errors.New("desktop runtime helper not found")
+var resolveRuntimeHelper = resolveRuntimeHelperBinary
+
 func delegateRuntimeHelperStream(cmd *cobra.Command, helperArgs []string) error {
 	return runRuntimeHelper(cmd, helperArgs, "", false)
 }
@@ -30,7 +33,7 @@ func delegateRuntimeHelperJSON(cmd *cobra.Command, helperArgs []string) error {
 }
 
 func runRuntimeHelper(cmd *cobra.Command, helperArgs []string, commandPath string, rewriteJSON bool) error {
-	program, err := resolveRuntimeHelperBinary()
+	program, err := resolveRuntimeHelper()
 	if err != nil {
 		return err
 	}
@@ -93,7 +96,8 @@ func resolveRuntimeHelperBinary() (string, error) {
 	}
 
 	return "", fmt.Errorf(
-		"desktop runtime helper not found; install/update the desktop app, stage the helper from ../autopus-desktop, or set %s",
+		"%w; install/update the desktop app, stage the helper from ../autopus-desktop, or set %s",
+		errRuntimeHelperNotFound,
 		runtimeHelperOverrideEnv,
 	)
 }
