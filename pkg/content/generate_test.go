@@ -68,6 +68,8 @@ Use .claude/rules/ for guidelines.
 	assert.Greater(t, len(data), 200, "Codex agent TOML should be >= 200 chars")
 	assert.Contains(t, string(data), `name = "test-agent"`)
 	assert.Contains(t, string(data), "developer_instructions =")
+	assert.Contains(t, string(data), "developer_instructions = '''")
+	assert.NotContains(t, string(data), "[developer_instructions]")
 
 	// Verify Gemini agent MD exists
 	geminiAgent := filepath.Join(templateDir, "gemini", "agents", "test-agent.md.tmpl")
@@ -147,4 +149,40 @@ func TestGenerateAllTemplates_EmptyContent(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = os.Stat(filepath.Join(templateDir, "gemini", "agents"))
 	assert.NoError(t, err)
+}
+
+func TestGenerateAllTemplates_CodexAgentInstructionsAreFlatString(t *testing.T) {
+	t.Parallel()
+
+	contentDir := t.TempDir()
+	templateDir := t.TempDir()
+
+	agentDir := filepath.Join(contentDir, "agents")
+	require.NoError(t, os.MkdirAll(agentDir, 0755))
+	agentMD := `---
+name: windows-agent
+description: Agent used to guard Codex TOML schema on Windows installs
+model: sonnet
+---
+
+# Windows Agent
+
+Use Windows paths like C:\Users\user\.codex\agents when explaining recovery.
+`
+	require.NoError(t, os.WriteFile(filepath.Join(agentDir, "windows-agent.md"), []byte(agentMD), 0644))
+
+	skillDir := filepath.Join(contentDir, "skills")
+	require.NoError(t, os.MkdirAll(skillDir, 0755))
+
+	err := content.GenerateAllTemplates(contentDir, templateDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(templateDir, "codex", "agents", "windows-agent.toml.tmpl"))
+	require.NoError(t, err)
+
+	got := string(data)
+	assert.Contains(t, got, `name = "windows-agent"`)
+	assert.Contains(t, got, "developer_instructions = '''")
+	assert.NotContains(t, got, "[developer_instructions]")
+	assert.NotContains(t, got, "text =")
 }
