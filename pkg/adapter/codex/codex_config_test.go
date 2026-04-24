@@ -52,6 +52,8 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	assert.Contains(t, content, `command = "auto"`)
 	assert.Contains(t, content, `args = ["mcp", "server"]`)
 	assert.Contains(t, content, "[mcp_servers.context7]")
+	assert.Contains(t, content, `args = ["-y", "@upstash/context7-mcp@latest"]`)
+	assert.NotContains(t, content, "@anthropic-ai/context7-mcp")
 	assert.Contains(t, content, `model = "gpt-5.5"`)
 	assert.Contains(t, content, `approval_policy = "on-request"`)
 	assert.Contains(t, content, `sandbox_mode = "workspace-write"`)
