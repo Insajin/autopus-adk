@@ -77,11 +77,7 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 			}
 			rebuttalPrompt := buildRebuttalPrompt(cfg.Prompt, others, 2)
 			resp, err := runProvider(ctx, provider, rebuttalPrompt)
-			if err != nil {
-				rebuttalResults[idx] = providerResult{err: err, idx: idx}
-				return
-			}
-			rebuttalResults[idx] = providerResult{resp: *resp, idx: idx}
+			rebuttalResults[idx] = providerResult{resp: resp, err: err, idx: idx}
 		}(i, p)
 	}
 	wg.Wait()
@@ -92,13 +88,20 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 		name := cfg.Providers[i].Name
 		switch {
 		case r.err != nil:
-			failed = append(failed, FailedProvider{Name: name, Error: fmt.Sprintf("rebuttal: %s", r.err.Error())})
-		case r.resp.TimedOut:
-			failed = append(failed, FailedProvider{Name: r.resp.Provider, Error: "rebuttal timeout: provider exceeded deadline"})
-		case r.resp.EmptyOutput:
-			failed = append(failed, FailedProvider{Name: r.resp.Provider, Error: "rebuttal empty output: provider returned no content"})
+			fp := buildFailedProvider(cfg.Providers[i], r.resp, r.err, cfg.TimeoutSeconds)
+			fp.Name = name
+			fp.Error = fmt.Sprintf("rebuttal: %s", fp.Error)
+			failed = append(failed, fp)
+		case r.resp != nil && r.resp.TimedOut:
+			fp := buildFailedProvider(cfg.Providers[i], r.resp, nil, cfg.TimeoutSeconds)
+			fp.Error = "rebuttal " + fp.Error
+			failed = append(failed, fp)
+		case r.resp != nil && r.resp.EmptyOutput:
+			fp := buildFailedProvider(cfg.Providers[i], r.resp, nil, cfg.TimeoutSeconds)
+			fp.Error = "rebuttal " + fp.Error
+			failed = append(failed, fp)
 		default:
-			responses = append(responses, r.resp)
+			responses = append(responses, *r.resp)
 		}
 	}
 	if len(responses) == 0 {

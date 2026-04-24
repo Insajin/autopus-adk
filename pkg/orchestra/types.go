@@ -72,11 +72,14 @@ type ProviderResponse struct {
 type FailedProvider struct {
 	Name             string // Provider name
 	Error            string // Error message
+	FailureClass     string // timeout, capacity_exhausted, rate_limited, binary_or_transport, execution_error
 	PreflightFailed  bool   // true when execution stopped before round start
 	Receipt          string // reliability receipt path, if persisted
 	NextRemediation  string // exact next step surfaced in summaries
 	CollectionMode   string // hook, poll, file_ipc, subprocess_stdout
 	CorrelationRunID string // run identifier for artifact lookup
+	StderrPreview    string // sanitized stderr excerpt for postmortem summaries
+	OutputPreview    string // sanitized stdout excerpt for postmortem summaries
 }
 
 // OrchestraResult는 오케스트레이션 최종 결과이다.

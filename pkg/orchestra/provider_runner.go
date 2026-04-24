@@ -13,7 +13,7 @@ import (
 
 // providerResult holds the result of a single provider execution.
 type providerResult struct {
-	resp ProviderResponse
+	resp *ProviderResponse
 	err  error
 	idx  int
 }

@@ -157,7 +157,8 @@ func runOrchestraCommand(
 	yieldRounds := flags.YieldRounds
 	contextAware := flags.ContextAware
 	subprocessMode := flags.SubprocessMode
-	timeout = resolveCommandTimeout(orchConf, timeout, flags.TimeoutChanged)
+	resolvedTimeout := resolveOrchestraTimeout(orchConf, timeout, flags.TimeoutChanged, providers)
+	timeout = resolvedTimeout.Seconds
 	term := terminal.DetectTerminal()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"
@@ -216,7 +217,17 @@ func runOrchestraCommand(
 	}
 
 	result, err := orchestra.RunOrchestra(ctx, cfg)
+	if err == nil && shouldTreatOrchestraResultAsFailure(result) {
+		err = synthesizeOrchestraFailureError(result)
+	}
 	if err != nil {
+		if result != nil {
+			reportPath, reportErr := saveOrchestraFailureReport(commandName, strategyStr, providerNames, resolvedTimeout, result, err)
+			if reportErr != nil {
+				fmt.Fprintf(os.Stderr, "실패 보고서 저장 실패: %v\n", reportErr)
+			}
+			fmt.Fprint(os.Stderr, renderOrchestraFailureSummary(resolvedTimeout, result, reportPath))
+		}
 		return fmt.Errorf("오케스트레이션 실패: %w", err)
 	}
 

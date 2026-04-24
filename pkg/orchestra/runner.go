@@ -60,7 +60,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		responses, failed, err = runParallel(timeoutCtx, consensusCfg)
 	}
 	if err != nil {
-		return nil, err
+		return buildFailureResult(cfg, failed, roundHistory, start, err), err
 	}
 
 	total := time.Since(start)
@@ -119,11 +119,7 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 			defer wg.Done()
 			defer cancel()
 			resp, err := runProvider(childCtx, provider, cfg.Prompt)
-			if err != nil {
-				results[idx] = providerResult{err: err, idx: idx}
-				return
-			}
-			results[idx] = providerResult{resp: *resp, idx: idx}
+			results[idx] = providerResult{resp: resp, err: err, idx: idx}
 		}(i, p, childCancel)
 	}
 	wg.Wait()
@@ -133,30 +129,22 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 
 	for _, r := range results {
 		if r.err != nil {
-			failed = append(failed, FailedProvider{
-				Name:  cfg.Providers[r.idx].Name,
-				Error: r.err.Error(),
-			})
-		} else if r.resp.TimedOut {
-			timeoutUsed := providerExecutionTimeout(cfg.Providers[r.idx], cfg.TimeoutSeconds)
-			// R2: provider exceeded per-provider timeout — record as failed
-			failed = append(failed, FailedProvider{
-				Name:  r.resp.Provider,
-				Error: fmt.Sprintf("timeout: provider exceeded %v deadline", timeoutUsed),
-			})
-		} else if r.resp.EmptyOutput {
-			// Treat empty stdout (exit 0 but no content) as a failed provider.
-			failed = append(failed, FailedProvider{
-				Name:  r.resp.Provider,
-				Error: "empty output: provider returned no content (check binary args or prompt_via_args setting)",
-			})
+			failed = append(failed, buildFailedProvider(cfg.Providers[r.idx], r.resp, r.err, cfg.TimeoutSeconds))
+		} else if r.resp != nil && (r.resp.TimedOut || r.resp.EmptyOutput) {
+			failed = append(failed, buildFailedProvider(cfg.Providers[r.idx], r.resp, nil, cfg.TimeoutSeconds))
+		} else if r.resp == nil {
+			failed = append(failed, buildFailedProvider(cfg.Providers[r.idx], nil, nil, cfg.TimeoutSeconds))
 		} else {
-			responses = append(responses, r.resp)
+			responses = append(responses, *r.resp)
 		}
 	}
 
 	if len(responses) == 0 {
-		return nil, failed, buildAllProvidersFailedError(failed, results[0].err)
+		var fallback error
+		if len(results) > 0 {
+			fallback = results[0].err
+		}
+		return nil, failed, buildAllProvidersFailedError(failed, fallback)
 	}
 	return responses, failed, nil
 }
