@@ -25,6 +25,9 @@ func (a *Adapter) generateConfig(cfg *config.HarnessConfig) ([]adapter.FileMappi
 	}
 
 	targetPath := filepath.Join(a.root, codexConfigRelPath)
+	if existing, readErr := os.ReadFile(targetPath); readErr == nil {
+		rendered = preserveUserCodexModelSettings(rendered, string(existing))
+	}
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return nil, fmt.Errorf("codex config 디렉터리 생성 실패: %w", err)
 	}
@@ -50,6 +53,9 @@ func (a *Adapter) prepareConfigFile(cfg *config.HarnessConfig) ([]adapter.FileMa
 	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
 	if err != nil {
 		return nil, fmt.Errorf("codex config 템플릿 렌더링 실패: %w", err)
+	}
+	if existing, readErr := os.ReadFile(filepath.Join(a.root, codexConfigRelPath)); readErr == nil {
+		rendered = preserveUserCodexModelSettings(rendered, string(existing))
 	}
 
 	return []adapter.FileMapping{{

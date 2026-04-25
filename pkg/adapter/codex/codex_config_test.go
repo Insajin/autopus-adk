@@ -25,6 +25,31 @@ func TestGenerateConfig(t *testing.T) {
 	assert.Contains(t, string(files[0].Content), "context7")
 }
 
+func TestGenerateConfig_PreservesExistingCodexModelSettings(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(`model = "gpt-5.4"
+model_reasoning_effort = "xhigh"
+model_reasoning_summary = "detailed"
+model_verbosity = "high"
+approval_policy = "never"
+`), 0644))
+
+	files, err := a.generateConfig(cfg)
+	require.NoError(t, err)
+	content := string(files[0].Content)
+
+	assert.Contains(t, content, `model = "gpt-5.4"`)
+	assert.Contains(t, content, `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, content, `model_reasoning_summary = "detailed"`)
+	assert.Contains(t, content, `model_verbosity = "high"`)
+	assert.Contains(t, content, `approval_policy = "on-request"`)
+}
+
 func TestPrepareConfigFile_NoDiskWrite(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
