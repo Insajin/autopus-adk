@@ -104,6 +104,25 @@ model = "gpt-5.5"
 model_reasoning_effort = "high"`)
 }
 
+func TestUpdate_ReplacesGeneratedMediumEffortWhenQualityBecomesUltra(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	cfg.Quality.Default = "ultra"
+	_, err = a.Update(context.Background(), cfg)
+	require.NoError(t, err)
+
+	updated, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
+	require.NoError(t, err)
+	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
+	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
+}
+
 func TestUpdate_DeletedManagedFile_Skipped(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

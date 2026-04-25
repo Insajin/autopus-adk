@@ -3,6 +3,7 @@ package codex
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -48,6 +49,22 @@ approval_policy = "never"
 	assert.Contains(t, content, `model_reasoning_summary = "detailed"`)
 	assert.Contains(t, content, `model_verbosity = "high"`)
 	assert.Contains(t, content, `approval_policy = "on-request"`)
+}
+
+func TestGenerateConfig_UsesUltraQualityEffort(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.Default = "ultra"
+
+	files, err := a.generateConfig(cfg)
+	require.NoError(t, err)
+	content := string(files[0].Content)
+
+	rootSection := strings.SplitN(content, "[agents]", 2)[0]
+	assert.Contains(t, rootSection, `model = "gpt-5.5"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
 }
 
 func TestPrepareConfigFile_NoDiskWrite(t *testing.T) {

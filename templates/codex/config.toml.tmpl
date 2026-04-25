@@ -2,7 +2,7 @@
 # Project: {{.ProjectName}}
 
 model = "gpt-5.5"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}medium{{end}}"
 model_reasoning_summary = "auto"
 model_verbosity = "medium"
 approval_policy = "on-request"
