@@ -6,10 +6,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/insajin/autopus-adk/pkg/worker/a2a"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/budget"
 	"github.com/insajin/autopus-adk/pkg/worker/compress"
+	"github.com/insajin/autopus-adk/pkg/worker/controlplane"
 	"github.com/insajin/autopus-adk/pkg/worker/routing"
 )
 
@@ -179,7 +179,7 @@ func (pe *PipelineExecutor) ExecuteWithPlan(ctx context.Context, taskID, prompt,
 }
 
 func (pe *PipelineExecutor) resolveModel(model, prompt string) string {
-	if model != "" || pe.router == nil || a2a.SignedControlPlaneEnforced() {
+	if model != "" || pe.router == nil || controlplane.SignedControlPlaneEnforced() {
 		return model
 	}
 	return pe.router.Route(pe.provider.Name(), prompt)

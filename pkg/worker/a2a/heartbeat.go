@@ -103,7 +103,7 @@ func NewHeartbeatWithJSONRPC(sendFn func(msg []byte) error, onTimeout func()) *H
 	}
 }
 
-// @AX:TODO [AUTO] @AX:CYCLE:1 no dedicated unit test for HandleHeartbeatResponse status != "ok" branch
+// @AX:TODO [AUTO] @AX:CYCLE:2 no dedicated unit test for HandleHeartbeatResponse status != "ok" branch
 // HandleHeartbeatResponse records an acknowledgement from a backend heartbeat response.
 // Called when the backend sends {"status":"ok"} in reply to an agent/heartbeat request.
 func (h *Heartbeat) HandleHeartbeatResponse(result map[string]string) {

@@ -9,9 +9,9 @@ import (
 	"log"
 	"strings"
 
-	"github.com/insajin/autopus-adk/pkg/worker/a2a"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/budget"
+	"github.com/insajin/autopus-adk/pkg/worker/controlplane"
 	"github.com/insajin/autopus-adk/pkg/worker/security"
 	"github.com/insajin/autopus-adk/pkg/worker/stream"
 )
@@ -23,7 +23,7 @@ func (pe *PipelineExecutor) phasePrompt(phase Phase, input string) (string, erro
 	if instruction, ok := pe.phaseInstructions[phase]; ok && strings.TrimSpace(instruction) != "" {
 		return fmt.Sprintf("%s\n\n%s", instruction, input), nil
 	}
-	if a2a.SignedControlPlaneEnforced() {
+	if controlplane.SignedControlPlaneEnforced() {
 		return input, nil
 	}
 
@@ -85,6 +85,8 @@ func (pe *PipelineExecutor) runPhase(ctx context.Context, taskID string, phase P
 		defer emergencyStop.ClearProcess()
 	}
 
+	// @AX:WARN [AUTO] helper goroutine writes prompt data without a direct ctx select; shutdown safety depends on subprocess teardown and pipe closure.
+	// @AX:REASON: This concurrent path runs alongside stream parsing, and future changes can introduce blocked writes or goroutine leaks if stdin/cmd lifecycle handling changes.
 	go func() {
 		defer func() {
 			if err := stdin.Close(); err != nil {

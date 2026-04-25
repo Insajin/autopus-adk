@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/insajin/autopus-adk/pkg/worker/a2a"
+	"github.com/insajin/autopus-adk/pkg/worker/controlplane"
 )
 
 // ParsePhasePlan validates and canonicalizes a server-provided phase plan.
@@ -72,7 +72,7 @@ func parsePhaseTextMap(values map[string]string) (map[Phase]string, error) {
 }
 
 func normalizePhasePlan(phases []Phase) []Phase {
-	if len(phases) == 0 && a2a.SignedControlPlaneEnforced() {
+	if len(phases) == 0 && controlplane.SignedControlPlaneEnforced() {
 		return nil
 	}
 	if len(phases) == 0 {
