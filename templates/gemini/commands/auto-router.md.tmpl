@@ -591,7 +591,7 @@ Otherwise:
 
 @.gemini/skills/autopus/planning.md
 
-Write a SPEC document. Delegate to the `spec-writer` agent to analyze the codebase and produce 4 SPEC files.
+Write a SPEC document. Delegate to the `spec-writer` agent to analyze the codebase and produce 4 SPEC files. If one cohesive SPEC cannot close the requested feature outcome, create a sibling SPEC set instead of stopping at scaffold-only work.
 
 ### Flags
 
@@ -659,11 +659,13 @@ Agent(
     Generate a PRD following the prd skill (prd.md):
     1. Analyze the request (What/Why/Who/When)
     2. Collect codebase context (related files, existing patterns, prior SPECs)
-    3. Author PRD sections using the {PRD_MODE} template
-    4. Run quality validation checklist
-    5. Save to {TARGET_MODULE}/.autopus/specs/SPEC-{ID}/prd.md
+    3. Define the completion outcome and Feature Coverage Map
+    4. Decide whether this needs one SPEC or a sibling SPEC set
+    5. Author PRD sections using the {PRD_MODE} template
+    6. Run quality validation checklist
+    7. Save to {TARGET_MODULE}/.autopus/specs/SPEC-{ID}/prd.md
 
-    Return: SPEC-ID, PRD file path, and quality checklist result.
+    Return: primary SPEC-ID, sibling SPEC candidates if any, PRD file path, and quality checklist result.
   """
 )
 ```
@@ -691,11 +693,19 @@ Agent(
     Project directory: {current directory}
     Brainstorm context: {BS file content if FROM_IDEA is set, otherwise omit}
     PRD context: {PRD file path and SPEC-ID if Step 1.5 was executed, otherwise omit}
+
+    Completion contract:
+    1. Define the requested feature's final user-visible or operator-visible outcome.
+    2. Build a Feature Coverage Map covering happy path, error/recovery, integration boundary, UX/API/CLI surface, verification, and docs/ops where relevant.
+    3. Use one SPEC only if that SPEC can close the full outcome as one cohesive change story.
+    4. If the full outcome needs multiple modules, domains, release gates, or implementation phases, create sibling SPEC directories for the required follow-on slices.
+    5. Cross-reference sibling SPEC IDs in Related SPECs, Feature Completion Scope, plan.md dependencies, and acceptance ownership.
+    6. Do not hide required work as vague future work or out-of-scope text.
   """
 )
 ```
 
-Extract the **SPEC-ID** (e.g., SPEC-UX-001) from the agent's output. If Step 1.5 already created a SPEC-ID, the spec-writer MUST reuse the same SPEC-ID.
+Extract the **primary SPEC-ID** (e.g., SPEC-UX-001) and any sibling SPEC IDs from the agent's output. If Step 1.5 already created a SPEC-ID, the spec-writer MUST reuse the same SPEC-ID as the primary SPEC.
 
 > **⏭ POST-AGENT**: spec-writer returned. NEXT REQUIRED STEP: [CONDITIONAL] Step 3: Review Gate Decision. Do NOT skip to Completion.
 

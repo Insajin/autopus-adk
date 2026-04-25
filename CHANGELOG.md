@@ -9,6 +9,15 @@ All notable changes to this project will be documented in this file.
 - **Desktop runtime ownership boundary synced to desktop repo (SPEC-DESKTOP-014)** (2026-04-23): packaged `autopus-desktop-runtime` 의 source/build/release provenance 가 `autopus-desktop/runtime-helper/` 로 이동했음을 문서에 반영하고, ADK의 `connect` / `desktop` / `worker` 표면을 harness 또는 compatibility 범위로 재정의
   - `README.md`, `docs/README.ko.md` — desktop runtime source-of-truth 와 ADK compatibility boundary 안내 추가
 
+## [v0.40.51] — 2026-04-25
+
+### Changed
+
+- **Plan workflow now requires complete feature coverage or sibling SPEC decomposition** (2026-04-25): `auto plan` 이 단일 스캐폴드 SPEC으로 멈추지 않도록 completion outcome, Feature Coverage Map, sibling SPEC 세트 분해 계약을 Codex/Claude/Gemini plan surface와 spec-writer/planner agent 지침에 반영
+  - `content/agents/{planner.md,spec-writer.md}` — 사용자 요청의 최종 기능 결과를 먼저 정의하고 단일 SPEC 충분성 또는 sibling SPEC 세트를 판단하도록 기획/작성 절차 보강
+  - `content/rules/spec-quality.md` — `Q-COMP-04` / `Q-COH-03` 품질 게이트를 추가해 스캐폴드-only SPEC과 vague future work를 self-verify/review 실패로 분류
+  - `templates/{codex,gemini,claude}/...` — plan workflow prompt/router/skill surface에 primary/sibling SPEC 추출, Feature Coverage Map, 필수 follow-on SPEC 교차 참조 계약 추가
+
 ## [v0.40.45] — 2026-04-23
 
 ### Fixed

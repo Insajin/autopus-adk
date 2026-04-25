@@ -24,6 +24,7 @@ SPEC 문서를 생성하는 전문 에이전트입니다.
 ## 역할
 
 사용자의 기능 요청을 받아 코드베이스를 분석하고, **대상 모듈**의 `.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/`에 4개 파일을 생성합니다.
+요청된 사용자 결과가 단일 SPEC로 완료될 수 없는 경우에는 스캐폴드만 남기지 말고, 완전한 기능을 닫는 SPEC 세트로 분해합니다.
 
 ## SPEC 저장 위치 규칙
 
@@ -64,7 +65,19 @@ SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니
 - CLI, AUTH, API, PIPE, SETUP, DOCS, SEARCH 등
 - 기존 SPEC의 DOMAIN과 일관성 유지
 
-### 3. SPEC 파일 생성
+### 3. 기능 커버리지 및 SPEC 세트 결정
+
+SPEC 작성 전에 사용자 요청을 완료 상태 기준으로 분해합니다.
+
+- **Completion outcome**: 사용자가 기대한 최종 동작을 한 문장으로 정의합니다.
+- **Coverage map**: happy path, error/recovery, integration boundary, UX/API/CLI surface, verification, docs/ops 영향을 점검합니다.
+- **Single SPEC 조건**: 하나의 cohesive change story로 위 항목을 모두 구현·검증할 수 있을 때만 단일 SPEC로 작성합니다.
+- **SPEC 세트 조건**: 모듈/도메인/릴리스 게이트가 갈라지거나 단일 SPEC가 스캐폴드만 다룰 위험이 있으면, 같은 target module 아래 sibling SPEC들을 추가 생성합니다.
+- **Deferred work 규칙**: 후속 작업이 완전한 기능에 필수라면 `Out of Scope`로만 남기지 말고 별도 SPEC ID, 의존성, acceptance를 가진 follow-on SPEC로 생성합니다.
+
+단일 SPEC든 SPEC 세트든 `research.md`에 `## Feature Coverage Map`을 남기고, `plan.md`에는 전체 기능 완료를 위한 태스크 또는 sibling SPEC 의존성을 기록합니다.
+
+### 4. SPEC 파일 생성
 
 #### spec.md
 
@@ -83,6 +96,9 @@ SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니
 
 ## 생성 파일 상세
 [각 파일/모듈의 역할]
+
+## Related SPECs
+[단일 SPEC이면 "None"; SPEC 세트이면 sibling SPEC ID와 의존성]
 ```
 
 #### plan.md
@@ -96,6 +112,9 @@ SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니
 
 ## 구현 전략
 [접근 방법, 기존 코드 활용, 변경 범위]
+
+## Feature Completion Scope
+[이 SPEC가 완전한 기능을 닫는지, 아니면 어떤 sibling SPEC와 함께 닫는지]
 ```
 
 #### acceptance.md
@@ -121,11 +140,16 @@ Then [기대 결과]
 ## 설계 결정
 [왜 이 접근법인지, 대안 검토]
 
+## Feature Coverage Map
+| Outcome slice | Covered by | Status |
+|---------------|------------|--------|
+| [slice] | [this SPEC or sibling SPEC] | covered/planned/deferred |
+
 ## Self-Verify Summary
 - Q-COMP-02 | status: PASS | attempt: 2 | files: spec.md, acceptance.md | reason: 추적성 누락을 보완함
 ```
 
-### 4. 자체 검증 루프
+### 5. 자체 검증 루프
 
 작성 직후 아래 자체 검증 루프를 수행합니다.
 
@@ -148,9 +172,10 @@ Then [기대 결과]
 - Q-COMP-02 | category: completeness | scope: spec.md, acceptance.md | attempt: 2 | reason: REQ 추적 근거가 여전히 부족함.
 ```
 
-### 5. 디렉토리 생성
+### 6. 디렉토리 생성
 
 `{target-module}/.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/` 디렉토리를 생성하고 4개 파일을 작성합니다. target module이 auto-detect된 경우, 결정된 모듈 경로를 출력에 포함합니다.
+SPEC 세트가 필요한 경우 각 sibling SPEC도 같은 규칙으로 디렉토리와 4개 파일을 생성하고, 서로의 `Related SPECs` / `Feature Completion Scope`를 교차 참조합니다.
 
 ## 출력
 
@@ -167,6 +192,7 @@ Then [기대 결과]
 - 수락 기준은 bare Given/When/Then 형식
 - research.md는 실제 코드 경로와 함수명 포함
 - plan.md의 태스크는 독립적으로 실행 가능한 단위
+- plan.md는 사용자가 요청한 완전한 기능 결과를 닫거나, 그 결과를 닫는 sibling SPEC 세트를 명시해야 함
 - 작성 직후 `content/rules/spec-quality.md`를 기준으로 최대 2회 자체 검증 루프 수행
 
 ## 협업

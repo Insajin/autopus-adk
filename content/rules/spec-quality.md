@@ -59,6 +59,12 @@ For document-only SPEC work, security items may be marked `N/A` only when the no
 - FAIL 기준: type만 적고 조건이나 기대 결과가 없거나, 검증 가능한 관측 지점 없이 행동만 선언한다.
 - Example: self-verify loop를 요구한다면 `research.md`의 `Self-Verify Summary`나 `spec.md`의 `Open Issues`처럼 어느 문서와 어떤 흔적으로 확인하는지 함께 적는다.
 
+### Q-COMP-04 — Requested feature outcome is fully covered or split
+
+- PASS 기준: 사용자가 요청한 최종 기능 결과가 현재 SPEC 하나로 닫히거나, sibling SPEC 세트로 분해되어 각 outcome slice, 의존성, acceptance 책임이 추적된다.
+- FAIL 기준: 스캐폴드, 설정, 문서, 일부 wiring만 다루고도 완전한 기능처럼 보이게 하거나, 필수 후속 작업을 별도 SPEC 없이 막연히 future work로 남긴다.
+- Example: CLI 플래그 추가만으로 backend/API/UX 동작이 필요한 기능을 닫을 수 없다면 `Related SPECs`와 `Feature Coverage Map`에 후속 SPEC을 생성하거나 참조해야 한다.
+
 ## feasibility
 
 ### Q-FEAS-01 — Scope matches the real implementation layer
@@ -131,3 +137,8 @@ This appendix is a secondary axis and remains separate from the five primary dim
 
 - PASS 기준: 현재 iteration에서 다룰 수 없는 후속 런타임/플랫폼 작업은 별도 SPEC이나 out-of-scope 항목으로 분리된다.
 - FAIL 기준: 현재 문서가 해결하지 못하는 문제를 같은 iteration 안에서 암묵적으로 해결된 것처럼 남긴다.
+
+### Q-COH-03 — SPEC set boundaries preserve implementation momentum
+
+- PASS 기준: SPEC 세트로 분해된 경우 각 SPEC가 독립적으로 구현 가능한 크기이며, 실행 순서와 handoff가 `plan.md` 또는 `research.md`에서 명확하다.
+- FAIL 기준: 너무 작게 쪼개져 실질 동작 없이 스캐폴드만 만들거나, 너무 크게 묶여 executor가 ownership과 완료 기준을 판단할 수 없다.
