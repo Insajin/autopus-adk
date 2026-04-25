@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -222,9 +221,4 @@ func rewriteRuntimeHelperEnvelope(data []byte, commandPath string) ([]byte, erro
 		return nil, err
 	}
 	return out.Bytes(), nil
-}
-
-func writeString(ioWriter io.Writer, text string) error {
-	_, err := io.WriteString(ioWriter, text)
-	return err
 }

@@ -64,10 +64,6 @@ func verifyControlPlaneSignature(taskID, model string, pipelinePhases []string, 
 	return controlplane.VerifyControlPlaneSignature(taskID, model, pipelinePhases, pipelineInstructions, pipelinePromptTemplates, iterationBudget, capabilities, signature, secret)
 }
 
-func hasControlPlaneMetadata(model string, pipelinePhases []string, pipelineInstructions map[string]string, pipelinePromptTemplates map[string]string, iterationBudget *IterationBudget) bool {
-	return strings.TrimSpace(model) != "" || len(pipelinePhases) > 0 || len(pipelineInstructions) > 0 || len(pipelinePromptTemplates) > 0 || hasIterationBudget(iterationBudget)
-}
-
 func applyControlPlaneCapabilities(model string, pipelinePhases []string, pipelineInstructions map[string]string, pipelinePromptTemplates map[string]string, iterationBudget *IterationBudget, capabilities []string) (string, []string, map[string]string, map[string]string, *IterationBudget) {
 	if len(capabilities) == 0 {
 		return strings.TrimSpace(model), append([]string(nil), pipelinePhases...), cloneStringMap(pipelineInstructions), cloneStringMap(pipelinePromptTemplates), cloneIterationBudget(iterationBudget)

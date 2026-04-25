@@ -39,7 +39,7 @@ Available Commands:
   update      Update autopus harness files
   verify      Run frontend UX verification via Playwright screenshots
   version     Print version information
-  worker      Worker management commands
+  worker      Harness worker validation and legacy local-host compatibility
 
 Flags:
       --auto                       Run without confirmation prompts

@@ -219,7 +219,7 @@ func newInitCmd() *cobra.Command {
 			if home, err := os.UserHomeDir(); err == nil {
 				workerConfigPath := filepath.Join(home, ".config", "autopus", "worker.yaml")
 				if _, err := os.Stat(workerConfigPath); os.IsNotExist(err) {
-					tui.Info(out, "Next: run 'auto connect' — Desktop runtime을 Autopus 서버와 연결하세요")
+					tui.Info(out, "Next: open Autopus Desktop Connect or run 'autopus-desktop-runtime connect' to connect with Autopus server")
 				} else {
 					if containsPlatform(cfg.Platforms, "codex") {
 						tui.Info(out, "Next: Codex에서 `$auto plan ...` 또는 plugin 설치 후 `@auto plan ...` 로 첫 기능을 기획해보세요")
@@ -228,7 +228,7 @@ func newInitCmd() *cobra.Command {
 					}
 				}
 			} else {
-				tui.Info(out, "Next: run 'auto connect' to connect with Autopus server")
+				tui.Info(out, "Next: open Autopus Desktop Connect or run 'autopus-desktop-runtime connect' to connect with Autopus server")
 			}
 			tui.Successf(out, "Autopus harness initialized (%s mode)", mode)
 			return nil

@@ -6,7 +6,7 @@ func newDesktopSidecarCmd() *cobra.Command {
 	return newRuntimeSidecarCmd(
 		"sidecar",
 		"Start the desktop runtime sidecar (machine-readable NDJSON)",
-		"Starts the shared desktop runtime host in machine-oriented sidecar mode.\nAll stdout output is line-delimited NDJSON runtime events.\nPackaged runtime source/build ownership now lives in `autopus-desktop/runtime-helper`; this ADK path is retained for compatibility and harness verification.",
+		"Starts the shared desktop runtime host in machine-oriented sidecar mode.\nAll stdout output is line-delimited NDJSON runtime events.\nFor installed desktop operation, prefer the desktop app sidecar/runtime action or `autopus-desktop-runtime desktop sidecar`; this ADK path is retained as a migration shim for compatibility and harness verification.",
 	)
 }
 

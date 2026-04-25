@@ -101,7 +101,7 @@ func newWorkerStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show legacy local-host worker diagnostics",
-		Long:  "Compatibility surface for legacy local-host worker diagnostics. Use `auto desktop status --json` for the canonical desktop runtime readiness contract.",
+		Long:  "Compatibility surface for legacy local-host worker diagnostics. For installed desktop operation, use the desktop app status action or `autopus-desktop-runtime desktop status --json` for the canonical desktop runtime readiness contract.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonMode, err := resolveJSONMode(jsonOutput, format)
 			if err != nil {
@@ -231,9 +231,9 @@ func newWorkerSetupCmd() *cobra.Command {
 		Long: `Legacy local-host worker setup for compatibility/dev-only use.
 
 Prefer the canonical desktop/runtime flow:
-  1. auto connect
-  2. auto desktop status --json
-  3. auto desktop session
+  1. Desktop app Connect action or autopus-desktop-runtime connect
+  2. Desktop app status action or autopus-desktop-runtime desktop status --json
+  3. Desktop app session/bootstrap action or autopus-desktop-runtime desktop session
 
 Use this command only when you explicitly need the legacy local-host worker path.
 

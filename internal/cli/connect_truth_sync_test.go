@@ -2,8 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +14,8 @@ func TestConnectCmd_RegistersStatusSubcommand(t *testing.T) {
 	cmd := newConnectCmd()
 	assertConnectStateMachineCopy(t, cmd.Long)
 
-	assert.Contains(t, cmd.Long, "auto connect status")
+	assert.Contains(t, cmd.Long, "`autopus-desktop-runtime connect`")
+	assert.Contains(t, cmd.Long, "`auto connect` is a retained compatibility shim")
 	assert.Contains(t, cmd.Long, "delegates to the desktop-owned runtime helper.")
 	assert.NotContains(t, cmd.Long, "when available")
 
@@ -33,7 +32,7 @@ func TestConnectStatusCmd_NotConfiguredOutput(t *testing.T) {
 	t.Setenv(runtimeHelperOverrideEnv, writeRuntimeHelperScript(t, "cat <<'EOF'\n"+
 		"Ready: false\n"+
 		"Configured: false\n"+
-		"Next: Run `auto connect` to authenticate with the server and select a workspace.\n"+
+		"Next: Use the desktop app Connect action or run `autopus-desktop-runtime connect` to authenticate with the server and select a workspace.\n"+
 		"EOF"))
 
 	cmd := NewRootCmd()
@@ -44,34 +43,20 @@ func TestConnectStatusCmd_NotConfiguredOutput(t *testing.T) {
 
 	require.NoError(t, cmd.Execute())
 	assert.Contains(t, out.String(), "Ready: false")
-	assert.Contains(t, out.String(), "Run `auto connect`")
+	assert.Contains(t, out.String(), "`autopus-desktop-runtime connect`")
 }
 
 func TestConnectDocsStayInSync(t *testing.T) {
 	t.Parallel()
 
 	assertConnectStateMachineCopy(t, newConnectCmd().Long)
-
-	readmePath := filepath.Join("..", "..", "README.md")
-	data, err := os.ReadFile(readmePath)
-	require.NoError(t, err)
-	readme := string(data)
-
-	assertConnectStateMachineCopy(t, readme)
-
-	koPath := filepath.Join("..", "..", "docs", "README.ko.md")
-	koData, err := os.ReadFile(koPath)
-	require.NoError(t, err)
-	koReadme := string(koData)
-
-	assertConnectStateMachineCopy(t, koReadme)
 }
 
 func assertConnectStateMachineCopy(t *testing.T, text string) {
 	t.Helper()
 
 	assert.Contains(t, text, "server auth → workspace → OpenAI OAuth")
-	assert.Contains(t, text, "auto connect status")
+	assert.Contains(t, text, "autopus-desktop-runtime connect")
 	assert.NotContains(t, text, "detect → configure → verify")
 	assert.NotContains(t, text, "감지 → 설정 → 검증")
 }

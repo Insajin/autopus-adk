@@ -106,7 +106,7 @@ func runWorkerSetup(cmd *cobra.Command, backendURL, preToken, preWorkspaceID, pr
 	fmt.Fprintf(out, "   Worker config: %s\n", setup.DefaultWorkerConfigPath())
 	fmt.Fprintf(out, "   MCP config:    %s\n", setup.DefaultMCPConfigPath())
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Next (canonical desktop/runtime): `auto desktop status --json`")
+	fmt.Fprintln(out, "Next (canonical desktop/runtime): use the desktop app status action or `autopus-desktop-runtime desktop status --json`")
 	fmt.Fprintln(out, "Legacy local-host mode only: `auto worker start`")
 	return nil
 }

@@ -10,7 +10,6 @@ import (
 
 var (
 	specReviewRunOrchestra    = runStructuredSpecReviewOrchestra
-	specReviewBuildProviders  = buildReviewProviders
 	specReviewConfigProviders = buildReviewProvidersWithConfig
 	specReviewBackendFactory  = orchestra.NewSubprocessBackendImpl
 )

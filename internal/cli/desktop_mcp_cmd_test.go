@@ -52,11 +52,11 @@ func TestMCPSurfaces_DescribeCanonicalAndLegacyOwnership(t *testing.T) {
 	t.Parallel()
 
 	assert.Contains(t, newMCPServerCmd().Long, "desktop-owned runtime helper")
-	assert.Contains(t, newMCPServerCmd().Long, "autopus-desktop/runtime-helper")
+	assert.Contains(t, newMCPServerCmd().Long, "`autopus-desktop-runtime mcp server`")
 
 	workerCmd := newWorkerMCPServerCmd()
 	assert.Contains(t, workerCmd.Long, "Compatibility shim")
-	assert.Contains(t, workerCmd.Long, "prefer `auto mcp server`")
+	assert.Contains(t, workerCmd.Long, "`autopus-desktop-runtime mcp server`")
 }
 
 func TestRuntimeMCPServe_RequiresDesktopHelperWhenHelperMissing(t *testing.T) {
