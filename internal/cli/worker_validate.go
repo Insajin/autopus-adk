@@ -15,7 +15,8 @@ import (
 func newWorkerCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "worker",
-		Short: "Worker management commands",
+		Short: "Harness worker validation and legacy local-host compatibility",
+		Long:  "Harness worker commands. `worker validate` remains harness-core; runtime commands under this namespace are legacy local-host compatibility surfaces. Use `auto connect` and `auto desktop ...` for canonical desktop-owned runtime flows.",
 	}
 
 	cmd.AddCommand(newWorkerValidateSubCmd())

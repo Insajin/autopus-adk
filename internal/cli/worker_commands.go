@@ -15,27 +15,41 @@ import (
 // addWorkerSubcommands registers all worker subcommands on the parent command.
 // @AX:NOTE[AUTO]: [downgraded from ANCHOR — fan_in < 3] CLI command registration boundary — worker_validate.go is the sole production caller; update this function when worker commands change
 func addWorkerSubcommands(parent *cobra.Command) {
+	startCmd := newWorkerStartCmd()
 	sidecarCmd := newWorkerSidecarCmd()
+	stopCmd := newWorkerStopCmd()
 	statusCmd := newWorkerStatusCmd()
 	sessionCmd := newWorkerSessionCmd()
+	logsCmd := newWorkerLogsCmd()
+	restartCmd := newWorkerRestartCmd()
+	historyCmd := newWorkerHistoryCmd()
+	costCmd := newWorkerCostCmd()
+	setupCmd := newWorkerSetupCmd()
 	ensureCmd := newWorkerEnsureCmd()
+	markLegacyLocalHostWorker(startCmd)
+	markLegacyLocalHostWorker(stopCmd)
+	markLegacyLocalHostWorker(statusCmd)
+	markLegacyLocalHostWorker(logsCmd)
+	markLegacyLocalHostWorker(restartCmd)
+	markLegacyLocalHostWorker(historyCmd)
+	markLegacyLocalHostWorker(costCmd)
+	markLegacyLocalHostWorker(setupCmd)
 	markCompatibilityShim(sidecarCmd)
-	markCompatibilityShim(statusCmd)
 	markCompatibilityShim(sessionCmd)
 	markCompatibilityShim(ensureCmd)
 
 	parent.AddCommand(
-		newWorkerStartCmd(),
+		startCmd,
 		sidecarCmd,
-		newWorkerStopCmd(),
+		stopCmd,
 		statusCmd,
 		sessionCmd,
-		newWorkerLogsCmd(),
+		logsCmd,
 		newWorkerMCPServerCmd(),
-		newWorkerRestartCmd(),
-		newWorkerHistoryCmd(),
-		newWorkerCostCmd(),
-		newWorkerSetupCmd(),
+		restartCmd,
+		historyCmd,
+		costCmd,
+		setupCmd,
 		ensureCmd,
 	)
 }
@@ -48,7 +62,7 @@ func newWorkerStartCmd() *cobra.Command {
 	var daemonFlag bool
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "Start the worker (foreground or daemon)",
+		Short: "Start the legacy local-host worker",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if daemonFlag {
 				return installDaemon()
@@ -63,7 +77,7 @@ func newWorkerStartCmd() *cobra.Command {
 func newWorkerStopCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "stop",
-		Short: "Stop the worker daemon",
+		Short: "Stop the legacy local-host worker daemon",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runtime.GOOS == "darwin" {
 				if err := daemon.UninstallLaunchd(); err != nil {
@@ -123,7 +137,7 @@ func newWorkerLogsCmd() *cobra.Command {
 	var taskFilter string
 	cmd := &cobra.Command{
 		Use:   "logs",
-		Short: "Tail worker log file",
+		Short: "Tail legacy local-host worker logs",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			logPath := workerLogPath()
 			if _, err := os.Stat(logPath); os.IsNotExist(err) {
@@ -149,7 +163,7 @@ func newWorkerLogsCmd() *cobra.Command {
 func newWorkerRestartCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "restart",
-		Short: "Restart the worker daemon",
+		Short: "Restart the legacy local-host worker daemon",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Stop ignoring errors (may not be running).
 			if runtime.GOOS == "darwin" {
@@ -169,7 +183,7 @@ func newWorkerRestartCmd() *cobra.Command {
 func newWorkerHistoryCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "history",
-		Short: "Show recent task history",
+		Short: "Show legacy local-host worker task history",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			histPath := workerDataPath("task-history.log")
 			if _, err := os.Stat(histPath); os.IsNotExist(err) {
@@ -189,7 +203,7 @@ func newWorkerHistoryCmd() *cobra.Command {
 func newWorkerCostCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "cost",
-		Short: "Show cost summary",
+		Short: "Show legacy local-host worker cost summary",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			costPath := workerDataPath("cost.log")
 			if _, err := os.Stat(costPath); os.IsNotExist(err) {
