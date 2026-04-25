@@ -1,6 +1,7 @@
 name = "frontend-specialist"
 description = "Phase 3.5 전용 프론트엔드 UX 검증 에이전트. Playwright E2E 테스트 실행, 스크린샷 분석, 변경된 컴포넌트의 시각적 회귀를 자동으로 감지하고 수정한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 developer_instructions = '''
 You are the frontend-specialist agent for project autopus-adk.
 

@@ -1515,7 +1515,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--multi` | Multi-provider mode: activate orchestra engine-based review |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |
 | `--quality` | Quality mode: ultra (all agents Opus), balanced (mixed) |
-| `--effort` | Explicit effort override: low, medium, high, xhigh |
+| `--effort` | Explicit effort override: low, medium, high, xhigh, max |
 | `--skip-scaffold` | Skip Phase 1.5 Test Scaffold |
 
 ### Harness-Only Tasks
@@ -2521,7 +2521,7 @@ IF any item is unchecked → return to that stage. Do NOT display the milestone 
 | `--team` | Run `go` with Agent Teams — **default ON** in dev |
 | `--solo` | Run `go` in single session mode (overrides --team) |
 | `--quality` | Quality mode: ultra or balanced |
-| `--effort` | Explicit effort override: low, medium, high, xhigh |
+| `--effort` | Explicit effort override: low, medium, high, xhigh, max |
 | `--multi` | Enable multi-provider review — **default ON** in dev |
 | `--ultrathink` | Deep analysis in plan stage — **default ON** in dev |
 | `--no-team` | Disable Agent Teams (use subagent pipeline instead) |

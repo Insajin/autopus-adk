@@ -11,8 +11,10 @@ const (
 	EffortMedium EffortValue = "medium"
 	// EffortHigh is used for high-complexity tasks and ultra mode on non-Opus-4.7 models.
 	EffortHigh EffortValue = "high"
-	// EffortXHigh is the ultra mode effort tier, Opus 4.7 only.
+	// EffortXHigh is a very high effort tier below max.
 	EffortXHigh EffortValue = "xhigh"
+	// EffortMax is the strongest Claude Code effort tier for Opus 4.7 planning/deep work.
+	EffortMax EffortValue = "max"
 	// EffortStripped signals that effort must be omitted (Haiku 4.5).
 	EffortStripped EffortValue = ""
 )
@@ -51,6 +53,7 @@ var validEffortValues = map[EffortValue]bool{
 	EffortMedium: true,
 	EffortHigh:   true,
 	EffortXHigh:  true,
+	EffortMax:    true,
 }
 
 // isValidEffort returns true if v is a recognised non-empty effort value.

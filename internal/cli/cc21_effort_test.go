@@ -82,9 +82,12 @@ func TestCC21_TC1_AllAgentsHaveEffort(t *testing.T) {
 		"G4 violation: expected exactly 16 agent .md files, got %d", len(agentFiles))
 
 	// Verify role-to-effort mapping per spec.md R9.
-	highEffortRoles := map[string]bool{
-		"spec-writer": true, "planner": true, "reviewer": true,
+	maxEffortRoles := map[string]bool{
+		"spec-writer": true, "planner": true,
 		"security-auditor": true, "architect": true, "deep-worker": true,
+	}
+	highEffortRoles := map[string]bool{
+		"reviewer": true,
 	}
 	mediumEffortRoles := map[string]bool{
 		"executor": true, "tester": true, "annotator": true, "validator": true,
@@ -100,7 +103,10 @@ func TestCC21_TC1_AllAgentsHaveEffort(t *testing.T) {
 			"R9 violation: agent %s missing name field", filepath.Base(path))
 
 		// Validate expected effort value for known roles.
-		if highEffortRoles[fm.Name] {
+		if maxEffortRoles[fm.Name] {
+			assert.Equal(t, "max", fm.Effort,
+				"R9 violation: agent %s expected effort=max, got %q", fm.Name, fm.Effort)
+		} else if highEffortRoles[fm.Name] {
 			assert.Equal(t, "high", fm.Effort,
 				"R9 violation: agent %s expected effort=high, got %q", fm.Name, fm.Effort)
 		} else if mediumEffortRoles[fm.Name] {
@@ -127,10 +133,10 @@ func TestCC21_TC2_ResolveEffort_Balanced(t *testing.T) {
 		"S3-1 violation: source should be quality_mode, got %q", result.Source)
 }
 
-// --- TC3: ResolveEffort ultra + Opus 4.7 → xhigh (S2-1) ----------------------------
+// --- TC3: ResolveEffort ultra + Opus 4.7 → max (S2-1) ----------------------------
 
 // TestCC21_TC3_ResolveEffort_Ultra_Opus47 verifies that ultra quality with Opus 4.7
-// resolves to effort=xhigh.
+// resolves to effort=max.
 // Violation → S2-1.
 func TestCC21_TC3_ResolveEffort_Ultra_Opus47(t *testing.T) {
 	result, err := cli.ResolveEffort(cli.EffortResolveInput{
@@ -138,8 +144,8 @@ func TestCC21_TC3_ResolveEffort_Ultra_Opus47(t *testing.T) {
 		Model:       "opus-4.7",
 	})
 	require.NoError(t, err, "S2-1: ResolveEffort returned unexpected error")
-	assert.Equal(t, cli.EffortXHigh, result.Effort,
-		"S2-1 violation: ultra+opus-4.7 should resolve to xhigh, got %q", result.Effort)
+	assert.Equal(t, cli.EffortMax, result.Effort,
+		"S2-1 violation: ultra+opus-4.7 should resolve to max, got %q", result.Effort)
 	assert.Equal(t, cli.EffortSourceQualityMode, result.Source,
 		"S2-1 violation: source should be quality_mode, got %q", result.Source)
 }
@@ -208,12 +214,12 @@ func TestCC21_TC9_AgentTemplateEffortField(t *testing.T) {
 		role           string
 		expectedEffort string
 	}{
-		{"spec-writer", "high"},
-		{"planner", "high"},
+		{"spec-writer", "max"},
+		{"planner", "max"},
 		{"reviewer", "high"},
-		{"security-auditor", "high"},
-		{"architect", "high"},
-		{"deep-worker", "high"},
+		{"security-auditor", "max"},
+		{"architect", "max"},
+		{"deep-worker", "max"},
 		{"executor", "medium"},
 		{"tester", "medium"},
 		{"debugger", "medium"},

@@ -6,7 +6,7 @@ import "slices"
 // defaultProviderEntries holds the canonical default settings for known orchestra providers.
 // @AX:NOTE: [AUTO] hardcoded provider defaults — update when adding new providers or changing CLI flags
 var defaultProviderEntries = map[string]ProviderEntry{
-	"claude": {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}},
+	"claude": {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "max"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "max"}},
 	"codex":  DefaultCodexProviderEntry(),
 	"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
 }

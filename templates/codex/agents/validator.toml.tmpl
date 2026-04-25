@@ -1,6 +1,7 @@
 name = "validator"
 description = "품질 검증 전담 에이전트. LSP 에러, 린트 경고, 테스트 통과 여부를 빠르게 확인하고 결과를 보고한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
+model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}medium{{end}}"
 developer_instructions = '''
 You are the validator agent for project {{.ProjectName}}.
 
@@ -244,7 +245,7 @@ WHEN checks 6a Layer 2 (behavioral stub) or 7 (acceptance coverage) are active, 
 
 Current workspace policy:
 - Claude/Gemini: stay on the standard validator model (`sonnet`-class); increase reasoning intensity rather than dropping to the cheapest tier
-- Codex: use the resolved tier model (`gpt-5.5` for `opus`, `gpt-5.4` for `sonnet`) and raise reasoning effort for Layer 2 / Check 7
+- Codex: stay on `gpt-5.5` and raise reasoning effort for Layer 2 / Check 7
 - OpenCode: keep the configured platform default model; treat Layer 2 / Check 7 as higher-reasoning validation passes
 
 The pipeline orchestrator controls this escalation:

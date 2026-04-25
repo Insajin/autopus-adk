@@ -96,7 +96,7 @@ func envEffortWarning(value string) []string {
 		return nil
 	}
 	return []string{
-		fmt.Sprintf("[warn] CLAUDE_CODE_EFFORT_LEVEL=%s is outside SPEC-CC21-001 enum (low|medium|high|xhigh); falling back to Quality Mode default.", value),
+		fmt.Sprintf("[warn] CLAUDE_CODE_EFFORT_LEVEL=%s is outside SPEC-CC21-001 enum (low|medium|high|xhigh|max); falling back to Quality Mode default.", value),
 		fmt.Sprintf("[warn] If %s is intentional, set --effort=%s explicitly to bypass this guard.", value, value),
 	}
 }
@@ -136,7 +136,7 @@ func resolveQualityMode(quality, complexity, model string) (EffortResult, error)
 }
 
 // resolveUltraMode applies Ultra-quality effort mapping per spec R2.
-// Haiku 4.5 → strip; Opus 4.7 → xhigh; others → high.
+// Haiku 4.5 → strip; Opus 4.7 → max; others → high.
 func resolveUltraMode(model string) (EffortResult, error) {
 	normalized := normalizeModelID(model)
 
@@ -151,7 +151,7 @@ func resolveUltraMode(model string) (EffortResult, error) {
 		}, nil
 	case "opus-4-7":
 		return EffortResult{
-			Effort: EffortXHigh,
+			Effort: EffortMax,
 			Source: EffortSourceQualityMode,
 			Model:  model,
 			Reason: "ultra mode with Opus 4.7",
@@ -162,7 +162,7 @@ func resolveUltraMode(model string) (EffortResult, error) {
 			Effort: EffortHigh,
 			Source: EffortSourceQualityMode,
 			Model:  model,
-			Reason: "fallback=xhigh→high, reason=model_tier_not_opus47",
+			Reason: "fallback=max→high, reason=model_tier_not_opus47",
 		}, nil
 	}
 }

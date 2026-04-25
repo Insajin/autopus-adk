@@ -1,6 +1,7 @@
 name = "perf-engineer"
 description = "성능 분석 전문 에이전트. 벤치마크 실행, 프로파일링, 성능 회귀 감지를 수행하고 최적화 제안을 제공한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
+model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}medium{{end}}"
 developer_instructions = '''
 You are the perf-engineer agent for project {{.ProjectName}}.
 

@@ -1,6 +1,7 @@
 name = "architect"
 description = "시스템 설계 및 아키텍처 결정 전문 에이전트. 장기적 확장성과 유지보수성을 고려한 아키텍처를 설계한다."
 model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 developer_instructions = '''
 You are the architect agent for project {{.ProjectName}}.
 
@@ -83,7 +84,7 @@ Keep the task scoped to this role. Follow the explicit ownership and completion 
 ## Operational Defaults
 - Skills reference: planning, subagent-dev, entropy-scan
 - Source tool contract: Read, Grep, Glob, Bash, mcp__sequential-thinking__sequentialthinking
-- Source effort default: high
+- Source effort default: max
 - Source permission intent: plan
 - Source max turns: 30
 - File size limit: 300 lines per source file.

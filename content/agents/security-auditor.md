@@ -2,7 +2,7 @@
 name: security-auditor
 description: 보안 감사 및 취약점 탐지 전문 에이전트. OWASP Top 10 기준으로 코드와 아키텍처의 보안 취약점을 탐지한다.
 model: opus
-effort: high
+effort: max
 tools: Read, Grep, Glob, Bash
 permissionMode: plan
 maxTurns: 30

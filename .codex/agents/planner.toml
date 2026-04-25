@@ -1,6 +1,7 @@
 name = "planner"
 description = "기능 기획 및 요구사항 분석 전문 에이전트. 사용자 요청을 명확한 요구사항과 구현 계획으로 변환한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 developer_instructions = '''
 You are the planner agent for project autopus-adk.
 

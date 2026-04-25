@@ -6,7 +6,7 @@ name: auto-adaptive-quality
 
 ## Overview
 
-Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the execution profile used for each `Agent()` call. High-complexity tasks still receive the strongest reasoning path, while routine tasks stay on the standard path. In this workspace, Claude no longer falls back to haiku; Codex uses the current GPT-5.x tier mapping and OpenCode keeps its configured default model.
+Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the execution profile used for each `Agent()` call. High-complexity tasks still receive the strongest reasoning path, while routine tasks stay on the standard path. In this workspace, Claude no longer falls back to haiku; Codex stays on GPT-5.5 and varies reasoning effort; OpenCode keeps its configured default model.
 
 ## Relationship to Quality Mode
 
@@ -49,7 +49,7 @@ When criteria overlap (e.g., 1 file but 250 lines), use the highest matching lev
 
 Platform note:
 - Claude: HIGH=`opus`, MEDIUM/LOW=`sonnet`
-- Codex: `opus` resolves to `gpt-5.5`, `sonnet` to `gpt-5.4`, and lightweight work to `gpt-5.4-mini`; LOW/MEDIUM/HIGH should also be differentiated by reasoning effort
+- Codex: all tiers resolve to `gpt-5.5`; Ultra renders every role as `xhigh`, while Balanced differentiates roles by `model_reasoning_effort`
 - OpenCode: keep the configured default runtime model; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
 ## Effort Mapping (SPEC-CC21-001)
@@ -66,11 +66,20 @@ Quality Mode defaults:
 
 | Mode | Model / Tier | Effort |
 |------|--------------|--------|
-| Ultra | Opus 4.7 | `xhigh` |
+| Ultra | Opus 4.7 | `max` |
 | Ultra | Opus 4.6 / Sonnet 4.6 | `high` |
 | Ultra | Haiku 4.5 | strip effort |
 | Balanced | HIGH complexity | `high` |
 | Balanced | MEDIUM / LOW complexity | `medium` |
+
+Codex-specific rendering:
+
+| Mode | Agent / Tier | `model_reasoning_effort` |
+|------|--------------|--------------------------|
+| Ultra | any role | `xhigh` |
+| Balanced | Opus-class roles | `xhigh` |
+| Balanced | reviewer | `high` |
+| Balanced | standard execution/validation roles | `medium` |
 
 Unsupported env values must fail open to Quality Mode defaults. Use `auto effort detect` when the runtime needs the resolved value explicitly.
 

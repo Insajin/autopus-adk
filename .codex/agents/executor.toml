@@ -1,6 +1,7 @@
 name = "executor"
 description = "TDD/DDD 기반 코드 구현 전문 에이전트. SPEC과 요구사항을 받아 테스트와 구현 코드를 작성한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 developer_instructions = '''
 You are the executor agent for project autopus-adk.
 

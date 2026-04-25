@@ -201,14 +201,23 @@ cmux send --surface "{surface_id}" "\n"
 
 ### [REQUIRED] Step 3.6: Round 2 결과 수집 (메인 세션)
 
-Rebuttal 주입 후 2-3분 대기한 뒤, 각 pane에서 결과를 수집합니다:
+CC21 경로에서는 고정 sleep polling 대신 provider별 `Monitor`를 먼저 사용합니다.
+명령 템플릿과 line-buffered `grep` 규칙은 `.gemini/skills/autopus/monitor-patterns.md`를 따릅니다.
 
-```bash
-# 각 pane의 idle 프롬프트(❯, codex>, > Type your) 확인 후 scrollback 읽기
-cmux read-screen --surface "{surface_id}" --scrollback --lines 500
+```python
+Monitor(
+  description="wait for claude round2 idle",
+  command='cmux read-screen --surface "{surface_id}" --follow | stdbuf -oL grep -E "^(❯|codex>|> Type your|gemini>|opencode›)"',
+  timeout_ms=180000,
+  persistent=False,
+)
 ```
 
-모든 프로바이더가 응답 완료 시 Round 2 결과를 취합합니다.
+규칙:
+
+- provider당 1개 Monitor를 띄우고, 모두 idle이 되면 즉시 scrollback을 수집합니다.
+- Monitor timeout 또는 비-Claude-Code 런타임이면 기존 `cmux read-screen --scrollback` polling fallback으로 전환합니다.
+- timeout fallback이 발생하면 로그에 `monitor_timeout=true`와 provider 이름을 남깁니다.
 
 > **⏭ POST-STEP**: Round 2 결과 수집 후 Step 3.7로 진행.
 

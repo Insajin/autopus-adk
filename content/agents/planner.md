@@ -2,7 +2,7 @@
 name: planner
 description: 기능 기획 및 요구사항 분석 전문 에이전트. 사용자 요청을 명확한 요구사항과 구현 계획으로 변환한다.
 model: opus
-effort: high
+effort: max
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, mcp__sequential-thinking__sequentialthinking
 permissionMode: plan
 maxTurns: 20
@@ -138,7 +138,7 @@ Model is selected per task based on complexity:
 
 Platform note:
 - Claude never uses `haiku` in this workspace; LOW stays on `sonnet`
-- Codex maps `opus` to `gpt-5.5`, `sonnet` to `gpt-5.4`, and lightweight work to `gpt-5.4-mini`; quality differences are also expressed through reasoning effort
+- Codex maps all source tiers to `gpt-5.5`; quality differences are expressed through reasoning effort
 - OpenCode uses its configured default runtime model; LOW/MEDIUM/HIGH act as reasoning-profile hints until explicit model overrides are surfaced
 
 ### Override

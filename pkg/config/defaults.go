@@ -2,11 +2,11 @@ package config
 
 const (
 	CodexFrontierModel = "gpt-5.5"
-	CodexStandardModel = "gpt-5.4"
-	CodexMiniModel     = "gpt-5.4-mini"
-	CodexCodingModel   = "gpt-5.3-codex"
-	CodexSparkModel    = "gpt-5.3-codex-spark"
-	CodexFallbackModel = "gpt-5.2"
+	CodexStandardModel = CodexFrontierModel
+	CodexMiniModel     = CodexFrontierModel
+	CodexCodingModel   = CodexFrontierModel
+	CodexSparkModel    = CodexFrontierModel
+	CodexFallbackModel = CodexFrontierModel
 )
 
 // DefaultCodexProviderEntry returns the canonical Codex orchestra provider entry.
@@ -89,7 +89,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			TimeoutSeconds:  120,
 			Judge:           "claude",
 			Providers: map[string]ProviderEntry{
-				"claude": {Binary: "claude", Args: []string{"--print"}, PaneArgs: []string{"--print"}},
+				"claude": {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "max"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "max"}},
 				"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
 				"codex":  DefaultCodexProviderEntry(),
 			},

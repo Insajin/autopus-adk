@@ -1,6 +1,7 @@
 name = "devops"
 description = "CI/CD 파이프라인, Docker, 인프라 설정 전담 에이전트. GitHub Actions, 컨테이너화, 배포 자동화를 담당한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 developer_instructions = '''
 You are the devops agent for project autopus-adk.
 

@@ -41,9 +41,47 @@ func TestGenerateAgents_TOMLContent(t *testing.T) {
 		content := string(f.Content)
 		assert.Contains(t, content, "name =", "TOML %s should have name field", f.TargetPath)
 		assert.Contains(t, content, "description =", "TOML %s should have description field", f.TargetPath)
+		assert.Contains(t, content, `model = "gpt-5.5"`, "TOML %s should use the Codex frontier model", f.TargetPath)
+		assert.Contains(t, content, "model_reasoning_effort =", "TOML %s should set effort explicitly", f.TargetPath)
 		assert.Contains(t, content, "developer_instructions =", "TOML %s should have instructions", f.TargetPath)
 		assert.Contains(t, content, "developer_instructions = '''", "TOML %s should use literal multiline strings", f.TargetPath)
 		assert.NotContains(t, content, "[developer_instructions]", "TOML %s should use flat instructions field", f.TargetPath)
+	}
+}
+
+func TestGenerateAgents_BalancedQualityUsesRoleEffort(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	files, err := a.generateAgents(cfg)
+	require.NoError(t, err)
+
+	byPath := make(map[string]string, len(files))
+	for _, f := range files {
+		byPath[f.TargetPath] = string(f.Content)
+	}
+
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model_reasoning_effort = "high"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model_reasoning_effort = "medium"`)
+}
+
+func TestGenerateAgents_UltraQualityUsesXHighEffort(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.Default = "ultra"
+
+	files, err := a.generateAgents(cfg)
+	require.NoError(t, err)
+
+	for _, f := range files {
+		content := string(f.Content)
+		assert.Contains(t, content, `model = "gpt-5.5"`, "TOML %s should use the Codex frontier model", f.TargetPath)
+		assert.Contains(t, content, `model_reasoning_effort = "xhigh"`, "TOML %s should use xhigh in ultra mode", f.TargetPath)
 	}
 }
 

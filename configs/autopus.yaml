@@ -72,7 +72,7 @@ orchestra:
   providers:
     claude:
       binary: claude
-      args: ["--print", "--model", "opus", "--effort", "high"]
+      args: ["--print", "--model", "opus", "--effort", "max"]
     codex:
       binary: codex
       args: ["exec", "--full-auto", "-m", "gpt-5.5"]

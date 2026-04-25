@@ -2,7 +2,7 @@
 name: spec-writer
 description: SPEC 문서 생성 전문 에이전트. 사용자 요청을 코드베이스 분석 기반으로 SPEC 4개 파일(spec.md, plan.md, acceptance.md, research.md)로 변환한다.
 model: opus
-effort: high
+effort: max
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 permissionMode: acceptEdits
 maxTurns: 30

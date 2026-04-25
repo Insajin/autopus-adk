@@ -35,7 +35,7 @@ func newEffortDetectCmd() *cobra.Command {
 		Long: `Detect the recommended effort level using the priority chain:
   --effort flag > CLAUDE_CODE_EFFORT_LEVEL env > frontmatter > quality_mode > settings_default
 
-Effort values: low | medium | high | xhigh
+Effort values: low | medium | high | xhigh | max
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			errOut := cmd.ErrOrStderr()

@@ -1,6 +1,7 @@
 name = "reviewer"
 description = "코드 리뷰 전담 에이전트. TRUST 5 기준으로 변경사항을 검토하고 구조적 문제, 보안 취약점, 테스트 누락을 탐지한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
+model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}high{{end}}"
 developer_instructions = '''
 You are the reviewer agent for project {{.ProjectName}}.
 

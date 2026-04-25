@@ -106,7 +106,7 @@ func isStdoutTTY() bool {
 // @AX:NOTE: [AUTO] hardcoded provider registry — add new providers here and in agenticArgs when expanding provider support
 func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	knownProviders := map[string]orchestra.ProviderConfig{
-		"claude": {Name: "claude", Binary: "claude", Args: []string{"-p", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"-p", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
+		"claude": {Name: "claude", Binary: "claude", Args: []string{"-p", "--model", "opus", "--effort", "max"}, PaneArgs: []string{"-p", "--model", "opus", "--effort", "max"}, PromptViaArgs: false},
 		"codex":  {Name: "codex", Binary: "codex", Args: []string{"exec", "--full-auto", "-m", config.CodexFrontierModel}, PaneArgs: []string{"-m", config.CodexFrontierModel}, PromptViaArgs: false},
 		"gemini": {Name: "gemini", Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false, StartupTimeout: defaultProviderStartupTimeout("gemini")},
 	}

@@ -46,7 +46,7 @@ func TestBuildInteractiveLaunchCmd_Claude(t *testing.T) {
 	p := ProviderConfig{
 		Name:     "claude",
 		Binary:   "claude",
-		PaneArgs: []string{"-p", "--model", "opus", "--effort", "high"},
+		PaneArgs: []string{"-p", "--model", "opus", "--effort", "max"},
 	}
 
 	cmd := buildInteractiveLaunchCmd(p, "review this code")

@@ -81,7 +81,7 @@ The quality mode — determined by the `--quality` flag or interactive selection
 
 Use the premium path for all Agent() calls.
 
-On model-tiered platforms, this means adding `model: "opus"`. On Codex, `opus` resolves to `gpt-5.5` when available and `sonnet` stays on `gpt-5.4`; OpenCode should keep its configured default model and increase reasoning effort.
+On model-tiered platforms, this means adding `model: "opus"`. On Codex, all source tiers resolve to `gpt-5.5`; use `model_reasoning_effort` to express premium versus standard paths. OpenCode should keep its configured default model and increase reasoning effort.
 
 ```
 Agent(
@@ -132,7 +132,7 @@ In Balanced mode, task complexity determines the profile per Agent() call:
 
 Current workspace policy:
 - Claude never uses `haiku`; LOW stays on `sonnet`
-- Codex maps `opus` to `gpt-5.5`, `sonnet` to `gpt-5.4`, and `haiku`/lightweight work to `gpt-5.4-mini`; reasoning effort still differentiates LOW/MEDIUM/HIGH
+- Codex maps all source tiers to `gpt-5.5`; Ultra uses `xhigh` for every role, and Balanced differentiates LOW/MEDIUM/HIGH by reasoning effort
 - OpenCode should keep its configured default runtime model and vary reasoning effort rather than forcing a model ID
 
 In Ultra mode, complexity is IGNORED — all agents use the premium path.
@@ -242,7 +242,7 @@ Parallel tasks use `isolation: "worktree"` so each executor works in an independ
 # Parallel execution example — with worktree isolation
 # Premium-path handling varies by platform:
 # - Claude/Gemini: add model="opus"
-# - Codex: use the resolved tier model and increase reasoning effort for hard checks
+# - Codex: stay on gpt-5.5 and increase reasoning effort for hard checks
 # - OpenCode: keep the default model and increase reasoning effort
 Agent(subagent_type="executor", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Balanced
 Agent(subagent_type="executor", model="opus", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Ultra

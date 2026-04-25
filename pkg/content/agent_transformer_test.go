@@ -14,6 +14,7 @@ const executorMD = `---
 name: executor
 description: TDD/DDD implementation agent
 model: sonnet
+effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite
 permissionMode: acceptEdits
 maxTurns: 50
@@ -62,6 +63,7 @@ func TestParseAgentSource_Frontmatter(t *testing.T) {
 	assert.Equal(t, "executor", src.Meta.Name)
 	assert.Equal(t, "TDD/DDD implementation agent", src.Meta.Description)
 	assert.Equal(t, "sonnet", src.Meta.Model)
+	assert.Equal(t, "medium", src.Meta.Effort)
 	assert.Equal(t, "Read, Write, Edit, Grep, Glob, Bash, TodoWrite", src.Meta.Tools)
 	assert.Equal(t, "acceptEdits", src.Meta.PermissionMode)
 	assert.Equal(t, 50, src.Meta.MaxTurns)
@@ -76,7 +78,8 @@ func TestTransformAgentForCodex_RichInstructions(t *testing.T) {
 
 	// S1: TOML with developer_instructions >= 200 chars
 	assert.Contains(t, result, `name = "executor"`)
-	assert.Contains(t, result, `model = "gpt-5.4"`)
+	assert.Contains(t, result, `model = "gpt-5.5"`)
+	assert.Contains(t, result, `model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}medium{{end}}"`)
 	assert.Contains(t, result, "developer_instructions =")
 	assert.Contains(t, result, "{{.ProjectName}}")
 	assert.Contains(t, result, "{{if .IsFullMode}}")
@@ -112,7 +115,8 @@ func TestTransformAgentForCodex_EmptyBody(t *testing.T) {
 	result := content.TransformAgentForCodex(src)
 
 	assert.Contains(t, result, `name = "minimal"`)
-	assert.Contains(t, result, `model = "gpt-5.4-mini"`)
+	assert.Contains(t, result, `model = "gpt-5.5"`)
+	assert.Contains(t, result, `model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}medium{{end}}"`)
 	assert.Contains(t, result, "developer_instructions =")
 }
 
@@ -208,6 +212,7 @@ func makeExecutorSource() content.AgentSource {
 			Name:           "executor",
 			Description:    "TDD/DDD implementation agent",
 			Model:          "sonnet",
+			Effort:         "medium",
 			Tools:          "Read, Write, Edit, Grep, Glob, Bash, TodoWrite",
 			PermissionMode: "acceptEdits",
 			MaxTurns:       50,

@@ -1,6 +1,7 @@
 name = "annotator"
 description = "Phase 2.5 전용 @AX 태그 스캔 및 적용 에이전트. executor가 수정한 파일 목록을 받아 @AX 태그를 자동으로 분석하고 적용한다."
-model = "gpt-5.4"
+model = "gpt-5.5"
+model_reasoning_effort = "xhigh"
 developer_instructions = '''
 You are the annotator agent for project autopus-adk.
 

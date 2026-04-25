@@ -22,7 +22,7 @@ fail(){ echo -e "${RED}[FAIL]${NC} $1"; }
 
 get_launch_cmd() {
   case "$1" in
-    claude)   echo "claude --model opus --effort high --dangerously-skip-permissions" ;;
+    claude)   echo "claude --model opus --effort max --dangerously-skip-permissions" ;;
     gemini)   echo "gemini -m gemini-3.1-pro-preview" ;;
     opencode) echo "opencode -m openai/gpt-5.4" ;;
   esac

@@ -55,8 +55,8 @@ func TestValidateAgentFrontmatter_NoDelimiter(t *testing.T) {
 	require.Error(t, err)
 }
 
-// TestDefaultEffortForRole verifies that known high-effort roles return "high"
-// and all other roles (including unknown ones) return "medium".
+// TestDefaultEffortForRole verifies that known Opus-class roles return "max",
+// reviewer returns "high", and all other roles return "medium".
 func TestDefaultEffortForRole(t *testing.T) {
 	t.Parallel()
 
@@ -65,18 +65,18 @@ func TestDefaultEffortForRole(t *testing.T) {
 		role     string
 		expected string
 	}{
-		// TC1: planner → high
-		{name: "planner is high effort", role: "planner", expected: "high"},
+		// TC1: planner → max
+		{name: "planner is max effort", role: "planner", expected: "max"},
 		// TC2: executor → medium
 		{name: "executor is medium effort", role: "executor", expected: "medium"},
 		// TC3: unknown role → medium (safe fallback)
 		{name: "unknown role defaults to medium", role: "new-unknown", expected: "medium"},
-		// Additional high-effort roles from spec R9
-		{name: "spec-writer is high effort", role: "spec-writer", expected: "high"},
+		// Additional max-effort roles from spec R9
+		{name: "spec-writer is max effort", role: "spec-writer", expected: "max"},
 		{name: "reviewer is high effort", role: "reviewer", expected: "high"},
-		{name: "security-auditor is high effort", role: "security-auditor", expected: "high"},
-		{name: "architect is high effort", role: "architect", expected: "high"},
-		{name: "deep-worker is high effort", role: "deep-worker", expected: "high"},
+		{name: "security-auditor is max effort", role: "security-auditor", expected: "max"},
+		{name: "architect is max effort", role: "architect", expected: "max"},
+		{name: "deep-worker is max effort", role: "deep-worker", expected: "max"},
 		// Additional medium-effort roles
 		{name: "tester is medium effort", role: "tester", expected: "medium"},
 		{name: "validator is medium effort", role: "validator", expected: "medium"},
@@ -103,8 +103,8 @@ func TestAgentTemplate_RendersEffortField(t *testing.T) {
 		description    string
 		expectedEffort string
 	}{
-		// TC1: planner → effort: high
-		{name: "planner gets high effort", agentName: "planner", description: "Plans tasks", expectedEffort: "high"},
+		// TC1: planner → effort: max
+		{name: "planner gets max effort", agentName: "planner", description: "Plans tasks", expectedEffort: "max"},
 		// TC2: executor → effort: medium
 		{name: "executor gets medium effort", agentName: "executor", description: "Executes code", expectedEffort: "medium"},
 		// TC3: unknown role → effort: medium (safe fallback)

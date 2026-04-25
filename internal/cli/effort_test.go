@@ -8,14 +8,14 @@ import (
 
 // --- ResolveEffort unit tests (TC1–TC10) ---
 
-// TC1: --quality=ultra --model=opus-4.7 → xhigh, source=quality_mode
+// TC1: --quality=ultra --model=opus-4.7 → max, source=quality_mode
 func TestEffortResolve_TC1_UltraOpus47(t *testing.T) {
 	result, err := ResolveEffort(EffortResolveInput{FlagQuality: "ultra", Model: "opus-4.7"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Effort != EffortXHigh {
-		t.Errorf("effort: got %q, want %q", result.Effort, EffortXHigh)
+	if result.Effort != EffortMax {
+		t.Errorf("effort: got %q, want %q", result.Effort, EffortMax)
 	}
 	if result.Source != EffortSourceQualityMode {
 		t.Errorf("source: got %q, want %q", result.Source, EffortSourceQualityMode)
@@ -124,7 +124,7 @@ func TestEffortResolve_TC7_FlagOverridesAll(t *testing.T) {
 // TC8: invalid env value falls through to quality-mode default (SPEC R4-2 fail-open)
 func TestEffortResolve_TC8_InvalidEnvFallsBack(t *testing.T) {
 	result, err := ResolveEffort(EffortResolveInput{
-		EnvValue:    "max",
+		EnvValue:    "extreme",
 		FlagQuality: "balanced",
 		Model:       "opus-4.6",
 	})
@@ -184,8 +184,8 @@ func TestEffortResolve_TC11_JSONFormat(t *testing.T) {
 	if err := json.Unmarshal(data, &out); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
-	if out["effort"] != "xhigh" {
-		t.Errorf("json effort: got %v, want xhigh", out["effort"])
+	if out["effort"] != "max" {
+		t.Errorf("json effort: got %v, want max", out["effort"])
 	}
 	if out["source"] != "quality_mode" {
 		t.Errorf("json source: got %v, want quality_mode", out["source"])

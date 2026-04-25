@@ -2,6 +2,7 @@ package content
 
 import (
 	"regexp"
+	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -9,14 +10,25 @@ import (
 // modelMapping maps source model tiers to platform-specific model names.
 var modelMapping = map[string]map[string]string{
 	"codex": {
-		"sonnet": config.CodexStandardModel,
+		"sonnet": config.CodexFrontierModel,
 		"opus":   config.CodexFrontierModel,
-		"haiku":  config.CodexMiniModel,
+		"haiku":  config.CodexFrontierModel,
 	},
 	"gemini": {
 		"sonnet": "gemini-2.5-pro",
 		"opus":   "gemini-2.5-pro",
 		"haiku":  "gemini-2.5-flash",
+	},
+}
+
+// effortMapping maps source effort tiers to platform-specific reasoning controls.
+var effortMapping = map[string]map[string]string{
+	"codex": {
+		"max":    "xhigh",
+		"xhigh":  "xhigh",
+		"high":   "high",
+		"medium": "medium",
+		"low":    "low",
 	},
 }
 
@@ -39,6 +51,20 @@ func MapModel(model, platform string) string {
 		}
 	}
 	return model
+}
+
+// MapEffort returns the platform-specific effort value for a source effort tier.
+func MapEffort(effort, platform string) string {
+	normalized := strings.ToLower(strings.TrimSpace(effort))
+	if pm, ok := effortMapping[platform]; ok {
+		if normalized == "" {
+			return "medium"
+		}
+		if mapped, ok := pm[normalized]; ok {
+			return mapped
+		}
+	}
+	return effort
 }
 
 // ReplaceToolReferences applies R3 tool reference mappings to body text.

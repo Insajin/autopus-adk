@@ -78,14 +78,11 @@ func TestEffortResolve_UnknownQuality(t *testing.T) {
 }
 
 func TestIsValidEffort(t *testing.T) {
-	valid := []EffortValue{EffortLow, EffortMedium, EffortHigh, EffortXHigh}
+	valid := []EffortValue{EffortLow, EffortMedium, EffortHigh, EffortXHigh, EffortMax}
 	for _, v := range valid {
 		if !isValidEffort(v) {
 			t.Errorf("isValidEffort(%q) should be true", v)
 		}
-	}
-	if isValidEffort("max") {
-		t.Error("isValidEffort(max) should be false")
 	}
 	if isValidEffort("") {
 		t.Error("isValidEffort('') should be false")
@@ -104,8 +101,8 @@ func TestEffortDetectCmd_PlainOutput(t *testing.T) {
 		t.Fatalf("command failed: %v", err)
 	}
 	out := strings.TrimSpace(buf.String())
-	if out != "effort=xhigh" {
-		t.Errorf("output: got %q, want %q", out, "effort=xhigh")
+	if out != "effort=max" {
+		t.Errorf("output: got %q, want %q", out, "effort=max")
 	}
 }
 
@@ -122,7 +119,7 @@ func TestEffortDetectCmd_JSONOutput(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &m); err != nil {
 		t.Fatalf("invalid JSON output: %v", err)
 	}
-	if m["effort"] != "xhigh" {
+	if m["effort"] != "max" {
 		t.Errorf("json effort: got %v", m["effort"])
 	}
 }
@@ -180,7 +177,7 @@ func TestEffortDetectCmd_EnvOverride(t *testing.T) {
 }
 
 func TestEffortDetectCmd_InvalidEnvWarnsAndFallsBack(t *testing.T) {
-	t.Setenv(envEffortKey, "max")
+	t.Setenv(envEffortKey, "extreme")
 	defer func() { _ = os.Unsetenv(envEffortKey) }()
 
 	cmd := newEffortDetectCmd()

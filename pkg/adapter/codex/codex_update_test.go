@@ -85,7 +85,7 @@ func TestUpdate_PreservesUserCodexModelSettings(t *testing.T) {
 	userConfig := strings.Replace(string(data), `model = "gpt-5.5"`, `model = "gpt-5.4"`, 1)
 	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "medium"`, `model_reasoning_effort = "xhigh"`, 1)
 	userConfig = strings.Replace(userConfig, `[profiles.fallback]
-model = "gpt-5.4"
+model = "gpt-5.5"
 model_reasoning_effort = "medium"`, `[profiles.fallback]
 model = "gpt-5.5"
 model_reasoning_effort = "high"`, 1)
@@ -104,7 +104,7 @@ model = "gpt-5.5"
 model_reasoning_effort = "high"`)
 }
 
-func TestUpdate_ReplacesGeneratedMediumEffortWhenQualityBecomesUltra(t *testing.T) {
+func TestUpdate_PreservesExistingMediumEffortWhenQualityBecomesUltra(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -120,7 +120,33 @@ func TestUpdate_ReplacesGeneratedMediumEffortWhenQualityBecomesUltra(t *testing.
 	updated, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "medium"`)
+}
+
+func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	userConfig := strings.Replace(string(data), `model = "gpt-5.5"`, `model = "gpt-5.4"`, 1)
+	require.NoError(t, os.WriteFile(configPath, []byte(userConfig), 0644))
+
+	cfg.Quality.Default = "ultra"
+	_, err = a.Update(context.Background(), cfg)
+	require.NoError(t, err)
+
+	updated, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
+	assert.Contains(t, rootSection, `model = "gpt-5.4"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "medium"`)
 }
 
 func TestUpdate_DeletedManagedFile_Skipped(t *testing.T) {

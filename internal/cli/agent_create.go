@@ -44,7 +44,7 @@ TODO: 작업 처리 지침을 작성하세요.
 type agentTemplateData struct {
 	Name        string
 	Description string
-	// Effort is the default effort tier for this agent role (e.g. "medium", "high").
+	// Effort is the default effort tier for this agent role (e.g. "medium", "max").
 	Effort string
 	Tools  []string
 }
@@ -187,21 +187,28 @@ func parseTools(tools string) []string {
 	return result
 }
 
-// highEffortRoles lists agent roles that require high reasoning effort by default.
-// Roles not in this set default to "medium" (safe fallback).
+// maxEffortRoles lists Opus-class roles that require max reasoning effort by default.
+// Roles not in a special set default to "medium" (safe fallback).
 // TODO: consolidate with pkg/effort.DefaultEffortForRole after T11 lands
-var highEffortRoles = map[string]bool{
+var maxEffortRoles = map[string]bool{
 	"spec-writer":      true,
 	"planner":          true,
-	"reviewer":         true,
 	"security-auditor": true,
 	"architect":        true,
 	"deep-worker":      true,
 }
 
+// highEffortRoles lists Sonnet-class roles that still need higher reasoning effort.
+var highEffortRoles = map[string]bool{
+	"reviewer": true,
+}
+
 // defaultEffortForRole returns the default effort tier string for a given agent role name.
-// Returns "high" for roles that require complex reasoning; "medium" for all others.
+// Returns "max" for Opus-class roles, "high" for review roles, and "medium" for all others.
 func defaultEffortForRole(role string) string {
+	if maxEffortRoles[role] {
+		return "max"
+	}
 	if highEffortRoles[role] {
 		return "high"
 	}
