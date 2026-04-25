@@ -87,6 +87,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newPipelineCmd())
 	root.AddCommand(newPermissionCmd())
 	root.AddCommand(newEffortCmd())
+	root.AddCommand(newQualityCmd())
 	root.AddCommand(newDesktopCmd())
 	root.AddCommand(newMCPCmd())
 	root.AddCommand(newWorkerCmd())
