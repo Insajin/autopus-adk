@@ -40,7 +40,11 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
   1. `WORKING_DIR/autopus.yaml`
   2. workspace root `autopus.yaml`
 - `spec.md` 본문이나 `review-findings.json` 유무만 보고 review gate를 추론하지 않습니다.
-- `SPEC_STATUS == draft && REVIEW_GATE_ENABLED == true` 이면 구현 전에 반드시 review gate 규칙을 적용합니다.
+- `SPEC_STATUS == draft && REVIEW_GATE_ENABLED == true` 이면 `LOOP_MODE`/`AUTO_MODE` 조합으로 분기합니다 (전체 계약은 `.codex/skills/auto-go.md` 참조):
+  - `--loop` 없음 + `--auto` 없음 → 구현 진행 금지, `/auto spec review` 안내 후 중단.
+  - `--loop` 없음 + `--auto` 있음 → review 1회 트리거 후 `approved` 일 때만 진행.
+  - `--loop` 있음 (auto 무관) → SPEC Quality Loop (max 3 iter + bootstrap) 진입. spec-writer revise → re-review → PASS/circuit break까지.
+- review gate 단일 iteration의 REVISE 반복은 `auto spec review`의 `max_revisions` 루프에 맡기고, SPEC Quality Loop는 그 위에서 verdict 단위 외부 사이클을 형성합니다.
 
 ## 구현 절차
 

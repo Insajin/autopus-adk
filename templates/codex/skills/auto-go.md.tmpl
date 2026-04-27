@@ -86,12 +86,60 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
   - 조회 우선순위: `WORKING_DIR/autopus.yaml` → workspace root `autopus.yaml`
   - 판정 키: `spec.review_gate.enabled`
   - `review-findings.json` 부재만으로 review gate 비활성으로 간주하지 않습니다.
-- SPEC 상태가 `draft`이고 `review_gate`가 활성화돼 있으면 다음 규칙을 적용합니다.
-  - `--auto` 없음: 구현을 진행하지 않고 `/auto spec review {SPEC-ID}` 를 먼저 안내한 뒤 중단합니다.
-  - `--auto` 있음: `auto spec review {SPEC-ID}` 를 한 번 트리거하고 `spec.md` 상태를 다시 읽습니다.
-  - review gate 내부의 REVISE 반복은 `auto spec review`의 `max_revisions` 루프에 맡기고, `go`가 이를 단발성으로 잘라내지 않습니다.
-  - review 결과가 `approved`가 아니면 그 verdict/findings를 보고하고 구현 단계로 넘어가지 않습니다.
-  - `/auto go --auto` → review → 다시 `/auto go --auto` 같은 재귀 auto-chain은 금지합니다. 현재 `go` invocation 당 review command 진입 1회가 loop guard입니다.
+- SPEC 상태가 `draft`이고 `review_gate`가 활성화돼 있으면 `LOOP_MODE`/`AUTO_MODE` 조합으로 분기합니다.
+
+| LOOP_MODE | AUTO_MODE | 동작 |
+|-----------|-----------|------|
+| false | false | 구현 진행 금지. `/auto spec review {SPEC-ID}` 안내 후 중단. |
+| false | true | `auto spec review {SPEC-ID}` 1회 트리거 → 상태 재로드 → `approved`이면 Step 3 진입, 아니면 verdict/findings 보고 후 중단. 재귀 auto-chain 금지. |
+| true | * | **SPEC Quality Loop** 진입. 구현 Phase 1은 loop이 PASS 또는 circuit break로 종료된 후에만 허용. |
+
+- review gate 내부의 단일 review iteration은 `auto spec review`의 `max_revisions` 루프에 맡기되, SPEC Quality Loop는 그 위에서 verdict 단위 (PASS/REVISE/REJECT) 의 외부 사이클을 형성합니다.
+
+#### SPEC Quality Loop (`LOOP_MODE = true`)
+
+리뷰 finding을 닫아 SPEC을 `approved` 로 수렴시키는 외부 루프. RALF Loop과 평행한 1급 사이클이며 수렴 타깃은 `review.md` PASS 입니다.
+
+```
+SPEC Quality Loop:
+  ┌─→ TARGET   : review-findings.json 의 Status="open" 항목 추출
+  │   REVISE   : spec-writer 서브에이전트에 finding-scoped 프롬프트 위임
+  │   VERIFY   : `auto spec review {SPEC-ID} --strategy {STRATEGY}` 재실행
+  └── LOOP     : verdict == PASS, max iter, 또는 circuit break까지
+```
+
+**Bootstrap**: `review.md` 가 아직 없으면 첫 revise 전에 `auto spec review` 1회 트리거 (iter 0, 예산 차감 안 함).
+
+**Iteration limit**: 최대 **3** quality iterations.
+
+**spec-writer 프롬프트 계약**:
+- `open_findings_json` 전체 제공 (요약 금지)
+- 명시 finding만 닫고 SPEC redesign 금지
+- 4개 SPEC 파일 (`spec.md`, `plan.md`, `acceptance.md`, `research.md`) 중 필요한 곳만 수정
+- `Status: draft → approved` 수동 전환 금지 (review verdict만 승격 가능)
+- `research.md` 에 `## Revision {N} closure` 표 추가 (`F-ID | category | one-line closure | file:line`)
+
+**Progress detection** (이전 iter 대비):
+- open finding count 감소 → 진행, 계속.
+- 같은 finding ID 가 2회 연속 그대로 → circuit break (stuck).
+- open count 증가 + 새 finding ID 가 다른 scope → circuit break (regression).
+- verdict PASS → exit loop, `Status: approved` 갱신 후 Step 3 진입.
+
+**Circuit break 출력**:
+
+```
+🐙 SPEC Quality [CIRCUIT BREAK] ──────
+  SPEC: {SPEC-ID} | Iteration: {N}/3
+  Stuck: {stuck | regression | iteration_exhausted}
+  Open findings:
+  - {F-ID} | {category}/{severity} | {desc 발췌}
+  복구:
+  1. {SPEC_DIR}/review.md 검토 후 SPEC 직접 수정 → /auto spec review {SPEC-ID}
+  2. /auto plan --from-idea {SPEC-ID} 로 SPEC 재설계
+  3. /auto go {SPEC-ID} --continue (수정 후 재개)
+```
+
+**Anti-recursion**: SPEC Quality Loop 는 단일 `go` invocation 안에서만 돕니다. PASS 후에도 자기 자신을 재귀 호출하지 않고 같은 invocation에서 Step 3 으로 순차 진행.
 
 ### Step 3: 파이프라인 라우팅
 

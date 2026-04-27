@@ -836,10 +836,63 @@ Quality: {ultra | balanced | pending selection}
 
 Run SPEC Path Resolution for {SPEC_ID}. Load the resolved SPEC_PATH and check status. Extract TARGET_MODULE and WORKING_DIR for subsequent phases.
 
-**Draft Guard**: If status is "draft" and review_gate is enabled, refuse implementation and prompt:
+#### SPEC Quality Gate (Draft Guard, mode-aware)
+
+WHEN `SPEC_STATUS == "draft"` AND `review_gate.enabled == true` (resolved from `WORKING_DIR/autopus.yaml` → workspace root `autopus.yaml`, key `spec.review_gate.enabled`), branch by mode:
+
+| LOOP_MODE | AUTO_MODE | Behavior |
+|-----------|-----------|----------|
+| false | false | Refuse and prompt: `SPEC {SPEC_ID} is draft. Run /auto spec review {SPEC_ID} first.` Stop pipeline. |
+| false | true | Trigger `auto spec review {SPEC_ID} --strategy {STRATEGY}` ONCE. Reload SPEC status. Proceed to Step 2 only if status becomes `approved`; otherwise report verdict + open findings and stop. Recursive auto-chain (`go --auto` → review → `go --auto`) is forbidden — one review entry per `go` invocation is the loop guard. |
+| true | * | Enter **SPEC Quality Loop** (see below). Implementation Phase 1 entry is allowed only after the loop terminates with PASS. Circuit break or iteration exhaustion aborts `go`. |
+
+WHEN `SPEC_STATUS == "approved"`, proceed to Step 2 directly. WHEN `review_gate.enabled == false`, the gate is bypassed regardless of status.
+
+#### SPEC Quality Loop (LOOP_MODE = true)
+
+The loop closes review findings autonomously before implementation. It is structurally parallel to the RALF Loop but the convergence target is `review.md` PASS verdict, not Phase 4 APPROVE.
+
 ```
-SPEC {SPEC_ID} is in draft status. Run review first: /auto spec review {SPEC_ID}
+SPEC Quality Loop:
+  ┌─→ TARGET   : Read review-findings.json open findings (Status == "open")
+  │   REVISE   : Spawn spec-writer with finding-scoped prompt
+  │   VERIFY   : Run `auto spec review {SPEC_ID} --strategy {STRATEGY}`
+  └── LOOP     : Until verdict == PASS, max iterations, or circuit break
 ```
+
+**Bootstrap rule**: WHEN `review.md` does not yet exist, trigger one initial `auto spec review` BEFORE the first revise iteration. The bootstrap review counts as iteration 0 and does not consume the iteration budget.
+
+**Per-iteration procedure**:
+
+1. Read `{SPEC_DIR}/review-findings.json`. Filter entries with `Status == "open"`.
+2. Spawn a `spec-writer` agent (`mode = "bypassPermissions"`) with a finding-scoped prompt that lists the full `open_findings_json` (not summarized), constrains the agent to close ONLY those findings without redesigning the SPEC, and requires a `## Revision {N} closure` table in `research.md`.
+3. Run `auto spec review {SPEC_ID} --strategy {STRATEGY}`.
+4. Reload `{SPEC_DIR}/review.md` and `{SPEC_DIR}/review-findings.json`.
+5. Apply progress detection (below).
+
+**Iteration limits**: max **3** quality iterations (excluding bootstrap). After exhaustion, abort `go`.
+
+**Progress detection**:
+- Open finding count **decreased** → progress; continue.
+- Same count AND identical finding IDs for 2 consecutive iterations → circuit break (stuck).
+- Open finding count **increased** with new IDs not derivative of the same scope → circuit break (regression).
+- Verdict transitions to PASS → exit loop; promote `Status: approved` in `spec.md`; log iteration count; proceed to Step 2.
+
+**Circuit break display**:
+
+```
+🐙 SPEC Quality [CIRCUIT BREAK] ──────
+  SPEC: {SPEC_ID} | Iteration: {N}/3
+  Stuck: {stuck | regression | iteration_exhausted}
+  Open findings:
+  - {F-ID} | {category}/{severity} | {description excerpt}
+  복구 옵션:
+  1. {SPEC_DIR}/review.md 검토 후 SPEC 직접 수정 → /auto spec review {SPEC_ID}
+  2. /auto plan --from-idea {SPEC_ID} 로 SPEC 재설계
+  3. /auto go {SPEC_ID} --continue (수정 후 재개)
+```
+
+**Anti-recursion guard**: The SPEC Quality Loop runs INSIDE a single `go` invocation. It does NOT auto-chain to `/auto go` after PASS — Step 2 entry is sequential within the same invocation.
 
 ### Step 2: Route to Pipeline
 
@@ -889,6 +942,7 @@ Phase 4: Review          → reviewer + security-auditor (parallel, mode: plan) 
 
 | Gate / Phase | Max Retries | With --loop | On Exceeded |
 |-------------|-------------|-------------|-------------|
+| Step 1: SPEC Quality | 0 (refuse) or 1 (--auto one-shot) | 3 quality iterations | Abort `go`, guide: SPEC 직접 수정 또는 `--continue` |
 | Gate 1: Approval | skip if AUTO_MODE | skip if AUTO_MODE | N/A |
 | Gate 2: Validation | 3 | 5 | Abort, guide: `--continue` |
 | Gate 3: Coverage | re-spawn tester | 3 retries | Until 85%+ / circuit break |
@@ -910,11 +964,12 @@ RALF Loop (per Phase):
 
 | Gate / Phase | Without --loop | With --loop |
 |-------------|---------------|-------------|
+| Step 1 (SPEC Quality) | 0 (refuse) or 1 (--auto one-shot) | 3 quality iterations (+ bootstrap if no prior review) |
 | Gate 2 (Validation) | 3 retries | 5 retries |
 | Gate 3 (Coverage) | 1 retry | 3 retries |
 | Phase 4 (Review) | 2 retries | 3 retries |
 
-WHERE `LOOP_MODE = false`, existing retry limits apply with no behavioral change (R8 backward compatibility).
+WHERE `LOOP_MODE = false`, existing retry limits apply with no behavioral change (R8 backward compatibility). The Step 1 SPEC Quality Loop is gated on `LOOP_MODE = true`; with `LOOP_MODE = false` the legacy refuse-or-one-shot-review behavior is preserved.
 
 #### Circuit Breaker
 
@@ -948,12 +1003,12 @@ WHEN circuit breaker triggers, THE SYSTEM SHALL display:
 
 #### Flag Combination Matrix
 
-| Flags | Gate 1 (Approval) | Gates 2-4 |
-|-------|-------------------|-----------|
-| (none) | User approval | Retry with default limits, stop |
-| --auto | Skip | Retry with default limits, stop |
-| --loop | User approval | RALF loop with extended limits |
-| --auto --loop | Skip | RALF loop with extended limits (완전 자율) |
+| Flags | Step 1 (SPEC Quality Gate) | Gate 1 (Approval) | Gates 2-4 |
+|-------|---------------------------|-------------------|-----------|
+| (none) | Refuse if `draft` + review_gate enabled | User approval | Retry with default limits, stop |
+| --auto | One-shot review, proceed only if approved | Skip | Retry with default limits, stop |
+| --loop | SPEC Quality Loop (3 iter + bootstrap) | User approval | RALF loop with extended limits |
+| --auto --loop | SPEC Quality Loop (3 iter + bootstrap) | Skip | RALF loop with extended limits (완전 자율) |
 
 #### RALF Iteration Display
 
