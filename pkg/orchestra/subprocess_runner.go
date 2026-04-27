@@ -56,7 +56,8 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 		return nil, err
 	}
 
-	waitErr := cmd.Wait()
+	waitCh := startCommandWait(cmd)
+	waitErr := waitForCommand(ctx, cmd, req.Provider, waitCh, nil)
 	duration := time.Since(start)
 
 	output := stdoutBuf.String()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,6 +81,67 @@ func TestSubprocessBackend_Execute_SkipsJSONValidationForTextOutput(t *testing.T
 	require.NotNil(t, resp)
 	assert.Empty(t, resp.Error)
 	assert.Equal(t, "plain text output", resp.Output)
+}
+
+func TestSubprocessBackend_Execute_ContextCancelTerminatesBlockedWait(t *testing.T) {
+	origNewCommand := newCommand
+	origWaitGrace := providerWaitGracePeriod
+	defer func() {
+		newCommand = origNewCommand
+		providerWaitGracePeriod = origWaitGrace
+	}()
+
+	waitCh := make(chan error, 1)
+	fake := &fakeCommand{
+		waitCh:   waitCh,
+		exitCode: -1,
+		startFn: func(cmd *fakeCommand) error {
+			_, _ = io.WriteString(cmd.stdout, "partial output")
+			return nil
+		},
+		terminateFn: func(_ *fakeCommand, _ string) error {
+			waitCh <- context.DeadlineExceeded
+			return nil
+		},
+	}
+
+	newCommand = func(context.Context, string, ...string) command {
+		return fake
+	}
+	providerWaitGracePeriod = 20 * time.Millisecond
+
+	backend := NewSubprocessBackendImpl()
+	done := make(chan struct {
+		resp *ProviderResponse
+		err  error
+	}, 1)
+
+	go func() {
+		resp, err := backend.Execute(context.Background(), ProviderRequest{
+			Provider: "codex",
+			Prompt:   "prompt",
+			Timeout:  30 * time.Millisecond,
+			Config: ProviderConfig{
+				Name:   "codex",
+				Binary: "codex",
+			},
+		})
+		done <- struct {
+			resp *ProviderResponse
+			err  error
+		}{resp: resp, err: err}
+	}()
+
+	select {
+	case result := <-done:
+		require.NoError(t, result.err)
+		require.NotNil(t, result.resp)
+		assert.True(t, result.resp.TimedOut)
+		assert.Equal(t, int32(1), fake.terminateCall.Load())
+	case <-time.After(250 * time.Millisecond):
+		waitCh <- context.DeadlineExceeded
+		t.Fatal("subprocess backend did not terminate a blocked provider wait after context timeout")
+	}
 }
 
 type recordingBackend struct {
