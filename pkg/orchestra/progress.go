@@ -1,12 +1,15 @@
 package orchestra
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"sync"
 	"time"
 )
+
+var progressHeartbeatInterval = 30 * time.Second
 
 // ProviderStatus represents a provider's execution state.
 type ProviderStatus int
@@ -42,6 +45,8 @@ type ProgressTracker struct {
 	writer    io.Writer
 	isTTY     bool
 	startTime time.Time
+	rendered  bool
+	logged    map[string]ProviderStatus
 }
 
 type providerState struct {
@@ -62,7 +67,29 @@ func NewProgressTracker(providerNames []string) *ProgressTracker {
 		writer:    os.Stderr,
 		isTTY:     isTerminal(),
 		startTime: time.Now(),
+		logged:    make(map[string]ProviderStatus, len(providerNames)),
 	}
+}
+
+// StartHeartbeat renders periodic progress while providers are still running.
+func (pt *ProgressTracker) StartHeartbeat(ctx context.Context, interval time.Duration) func() {
+	if interval <= 0 {
+		return func() {}
+	}
+	heartbeatCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-heartbeatCtx.Done():
+				return
+			case <-ticker.C:
+				pt.RenderHeartbeat()
+			}
+		}
+	}()
+	return cancel
 }
 
 // MarkRunning updates a provider to running state.
@@ -111,7 +138,7 @@ func (pt *ProgressTracker) render() {
 func (pt *ProgressTracker) renderTTY() {
 	// Move cursor up by number of providers, then overwrite.
 	lines := len(pt.order)
-	if lines > 0 {
+	if pt.rendered && lines > 0 {
 		fmt.Fprintf(pt.writer, "\033[%dA", lines)
 	}
 	for _, name := range pt.order {
@@ -123,16 +150,57 @@ func (pt *ProgressTracker) renderTTY() {
 		fmt.Fprintf(pt.writer, "\033[2K  %s %-12s %6.1fs\n",
 			s.status.String(), name, elapsed.Seconds())
 	}
+	pt.rendered = true
 }
 
 // renderLog renders as structured log lines for non-TTY environments.
 func (pt *ProgressTracker) renderLog() {
 	for _, name := range pt.order {
 		s := pt.providers[name]
-		if s.status == StatusDone || s.status == StatusFailed {
-			fmt.Fprintf(pt.writer, "[%s] %s: %.1fs\n",
-				s.status.String(), name, s.elapsed.Seconds())
+		if s.status == StatusPending {
+			continue
 		}
+		if logged, ok := pt.logged[name]; ok && logged == s.status {
+			continue
+		}
+		elapsed := s.elapsed
+		if s.status == StatusRunning {
+			elapsed = time.Since(s.started)
+		}
+		fmt.Fprintf(pt.writer, "[%s] %s: %s %.1fs\n",
+			s.status.String(), name, progressStatusLabel(s.status), elapsed.Seconds())
+		pt.logged[name] = s.status
+	}
+}
+
+// RenderHeartbeat writes elapsed time for currently running providers.
+func (pt *ProgressTracker) RenderHeartbeat() {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	if pt.isTTY {
+		pt.renderTTY()
+		return
+	}
+	for _, name := range pt.order {
+		s := pt.providers[name]
+		if s.status != StatusRunning {
+			continue
+		}
+		fmt.Fprintf(pt.writer, "[%s] %s: running %.1fs (still waiting)\n",
+			s.status.String(), name, time.Since(s.started).Seconds())
+	}
+}
+
+func progressStatusLabel(status ProviderStatus) string {
+	switch status {
+	case StatusRunning:
+		return "running"
+	case StatusDone:
+		return "done"
+	case StatusFailed:
+		return "failed"
+	default:
+		return "pending"
 	}
 }
 

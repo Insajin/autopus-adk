@@ -73,6 +73,22 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 	return buildProviderResponse(start, provider, stdoutBuf.String(), stderrBuf.String(), detector.Reason(), waitErr, ctx, cmd.ExitCode())
 }
 
+func runProviderWithProgress(ctx context.Context, provider ProviderConfig, prompt string, tracker *ProgressTracker) (*ProviderResponse, error) {
+	if tracker != nil {
+		tracker.MarkRunning(provider.Name)
+	}
+	resp, err := runProvider(ctx, provider, prompt)
+	if tracker == nil {
+		return resp, err
+	}
+	if err != nil || resp == nil || resp.TimedOut || resp.EmptyOutput {
+		tracker.MarkFailed(provider.Name)
+	} else {
+		tracker.MarkDone(provider.Name)
+	}
+	return resp, err
+}
+
 func startCommandWait(cmd command) <-chan error {
 	waitCh := make(chan error, 1)
 	go func() {

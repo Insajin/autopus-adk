@@ -44,8 +44,11 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, []
 	if cfg.JudgeProvider != "" && !cfg.NoJudge {
 		judgeCfg := findOrBuildJudgeConfig(cfg)
 		if detect.IsInstalled(judgeCfg.Binary) {
+			progress := NewProgressTracker([]string{judgeCfg.Name})
+			stopProgress := progress.StartHeartbeat(ctx, progressHeartbeatInterval)
+			defer stopProgress()
 			judgment := buildJudgmentPrompt(cfg.Prompt, responses)
-			judgeResp, judgeErr := runProvider(ctx, judgeCfg, judgment)
+			judgeResp, judgeErr := runProviderWithProgress(ctx, judgeCfg, judgment, progress)
 			if judgeErr == nil && judgeResp != nil && !judgeResp.TimedOut && !judgeResp.EmptyOutput {
 				judgeResp.Provider = cfg.JudgeProvider + " (judge)"
 				responses = append(responses, *judgeResp)
@@ -62,6 +65,14 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, []
 // rebuttal-phase failures alongside Round 1 failures.
 func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []ProviderResponse) ([]ProviderResponse, []FailedProvider, error) {
 	rebuttalResults := make([]providerResult, len(cfg.Providers))
+	providerNames := make([]string, len(cfg.Providers))
+	for i, p := range cfg.Providers {
+		providerNames[i] = p.Name
+	}
+	progress := NewProgressTracker(providerNames)
+	stopProgress := progress.StartHeartbeat(ctx, progressHeartbeatInterval)
+	defer stopProgress()
+
 	var wg sync.WaitGroup
 
 	for i, p := range cfg.Providers {
@@ -76,7 +87,7 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 				}
 			}
 			rebuttalPrompt := buildRebuttalPrompt(cfg.Prompt, others, 2)
-			resp, err := runProvider(ctx, provider, rebuttalPrompt)
+			resp, err := runProviderWithProgress(ctx, provider, rebuttalPrompt, progress)
 			rebuttalResults[idx] = providerResult{resp: resp, err: err, idx: idx}
 		}(i, p)
 	}

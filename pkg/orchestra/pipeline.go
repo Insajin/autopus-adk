@@ -3,8 +3,6 @@ package orchestra
 import (
 	"context"
 	"fmt"
-	"strings"
-	"sync"
 	"time"
 )
 
@@ -126,10 +124,28 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	defer judgeCleanup()
 	judgeReq.SchemaPath = judgeSchemaPath
 
+	judgeProgress := NewProgressTracker([]string{cfg.Judge.Name})
+	stopJudgeProgress := judgeProgress.StartHeartbeat(ctx, progressHeartbeatInterval)
+	defer stopJudgeProgress()
+	judgeProgress.MarkRunning(cfg.Judge.Name)
 	judgeResp, err := cfg.Backend.Execute(ctx, judgeReq)
 	if err != nil {
+		judgeProgress.MarkFailed(cfg.Judge.Name)
 		return nil, fmt.Errorf("pipeline: judge execute: %w", err)
 	}
+	if judgeResp == nil {
+		judgeProgress.MarkFailed(cfg.Judge.Name)
+		return nil, fmt.Errorf("pipeline: judge returned no response")
+	}
+	if judgeResp.TimedOut {
+		judgeProgress.MarkFailed(cfg.Judge.Name)
+		return nil, fmt.Errorf("pipeline: judge timed out")
+	}
+	if judgeResp.EmptyOutput {
+		judgeProgress.MarkFailed(cfg.Judge.Name)
+		return nil, fmt.Errorf("pipeline: judge returned empty output")
+	}
+	judgeProgress.MarkDone(cfg.Judge.Name)
 
 	// Phase 4: Parse and merge
 	parser := &OutputParser{}
@@ -157,66 +173,6 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		Summary:         fmt.Sprintf("subprocess pipeline: %d providers, %d rounds", len(cfg.Providers), cfg.Rounds+1),
 		FailedProviders: r1Failed,
 	}, nil
-}
-
-// executeParallel runs all providers concurrently via the backend.
-func executeParallel(
-	ctx context.Context,
-	backend ExecutionBackend,
-	providers []ProviderConfig,
-	prompt, schemaPath, role string,
-	round int,
-	timeoutSeconds int,
-) ([]ProviderResult, []FailedProvider, error) {
-	type result struct {
-		pr  ProviderResult
-		err error
-		idx int
-	}
-
-	results := make([]result, len(providers))
-	var wg sync.WaitGroup
-
-	for i, p := range providers {
-		wg.Add(1)
-		go func(idx int, prov ProviderConfig) {
-			defer wg.Done()
-			req := ProviderRequest{
-				Provider:   prov.Name,
-				Prompt:     prompt,
-				SchemaPath: schemaPath,
-				Role:       role,
-				Round:      round,
-				Timeout:    providerExecutionTimeout(prov, timeoutSeconds),
-				Config:     prov,
-			}
-			resp, err := backend.Execute(ctx, req)
-			if err != nil {
-				results[idx] = result{err: err, idx: idx}
-				return
-			}
-			results[idx] = result{
-				pr:  ProviderResult{Provider: prov.Name, Output: resp.Output},
-				idx: idx,
-			}
-		}(i, p)
-	}
-	wg.Wait()
-
-	var successes []ProviderResult
-	var failed []FailedProvider
-	for _, r := range results {
-		if r.err != nil {
-			failed = append(failed, FailedProvider{Name: providers[r.idx].Name, Error: r.err.Error()})
-		} else {
-			successes = append(successes, r.pr)
-		}
-	}
-
-	if len(successes) == 0 {
-		return nil, failed, fmt.Errorf("all %d providers failed", len(providers))
-	}
-	return successes, failed, nil
 }
 
 // buildPromptBuilder creates a PromptBuilder, panicking on error (templates are embedded).
@@ -248,16 +204,4 @@ func withPromptSchema(
 	data.SchemaMethod = "prompt"
 	data.SchemaJSON = embedded
 	return data, nil
-}
-
-func providersSupportCLISchema(providers []ProviderConfig) bool {
-	if len(providers) == 0 {
-		return false
-	}
-	for _, provider := range providers {
-		if strings.TrimSpace(provider.SchemaFlag) == "" {
-			return false
-		}
-	}
-	return true
 }

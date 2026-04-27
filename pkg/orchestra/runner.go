@@ -108,6 +108,14 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 // and per-provider timeout (R2). Error is non-nil only when ALL providers fail.
 func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, []FailedProvider, error) {
 	results := make([]providerResult, len(cfg.Providers))
+	providerNames := make([]string, len(cfg.Providers))
+	for i, p := range cfg.Providers {
+		providerNames[i] = p.Name
+	}
+	progress := NewProgressTracker(providerNames)
+	stopProgress := progress.StartHeartbeat(ctx, progressHeartbeatInterval)
+	defer stopProgress()
+
 	var wg sync.WaitGroup
 
 	for i, p := range cfg.Providers {
@@ -118,7 +126,7 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 		go func(idx int, provider ProviderConfig, cancel context.CancelFunc) {
 			defer wg.Done()
 			defer cancel()
-			resp, err := runProvider(childCtx, provider, cfg.Prompt)
+			resp, err := runProviderWithProgress(childCtx, provider, cfg.Prompt, progress)
 			results[idx] = providerResult{resp: resp, err: err, idx: idx}
 		}(i, p, childCancel)
 	}
