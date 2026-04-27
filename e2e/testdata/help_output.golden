@@ -27,6 +27,7 @@ Available Commands:
   permission  Manage permission detection
   pipeline    Pipeline monitoring and management
   platform    Manage platforms
+  quality     Show or change quality mode
   react       CI 실패 감지 및 자동 수정
   search      Search the web using Exa API (requires EXA_API_KEY)
   setup       Generate and manage project documentation for AI agents

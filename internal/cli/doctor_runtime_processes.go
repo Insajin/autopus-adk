@@ -65,12 +65,7 @@ func checkRuntimeProcessesText(w io.Writer, opts doctorOptions) bool {
 func (r *doctorJSONReport) collectRuntimeProcessChecks(opts doctorOptions) {
 	stale := findStaleLegacyWorkerMCPProcesses()
 	for _, proc := range stale {
-		r.data.Runtime = append(r.data.Runtime, doctorRuntimeProcessPayload{
-			PID:        proc.PID,
-			Executable: proc.Executable,
-			Command:    proc.Command,
-			Reason:     proc.Reason,
-		})
+		r.data.Runtime = append(r.data.Runtime, doctorRuntimeProcessPayload(proc))
 	}
 
 	if len(stale) == 0 {
