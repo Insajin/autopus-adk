@@ -68,7 +68,7 @@ session:
 orchestra:
   enabled: true
   default_strategy: consensus
-  timeout_seconds: 120
+  timeout_seconds: 240
   providers:
     claude:
       binary: claude

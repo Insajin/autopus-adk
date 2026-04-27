@@ -90,3 +90,41 @@ func TestRunStructuredSpecReviewOrchestra_DowngradesMalformedOutput(t *testing.T
 	assert.Equal(t, "completeness", out.Findings[0].Category)
 	assert.Contains(t, out.Findings[0].Description, "invalid reviewer JSON")
 }
+
+func TestRunStructuredSpecReviewOrchestra_RecordsTimeoutDiagnostics(t *testing.T) {
+	backend := &fakeStructuredReviewBackend{
+		outputs: map[string]orchestra.ProviderResponse{
+			"codex": {
+				TimedOut: true,
+				Duration: 90 * time.Second,
+				Output:   "partial stdout",
+				Error:    "partial stderr",
+			},
+		},
+	}
+
+	origFactory := specReviewBackendFactory
+	specReviewBackendFactory = func() orchestra.ExecutionBackend { return backend }
+	defer func() { specReviewBackendFactory = origFactory }()
+
+	result, err := runStructuredSpecReviewOrchestra(context.Background(), orchestra.OrchestraConfig{
+		Providers:      []orchestra.ProviderConfig{{Name: "codex", Binary: "codex"}},
+		Prompt:         "Review this SPEC",
+		TimeoutSeconds: 90,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Responses, 1)
+	require.Len(t, result.FailedProviders, 1)
+	assert.Equal(t, "timeout", result.FailedProviders[0].FailureClass)
+	assert.Contains(t, result.FailedProviders[0].Error, "provider timed out after 1m30s")
+	assert.Contains(t, result.FailedProviders[0].NextRemediation, "orchestra.providers.codex.subprocess.timeout")
+	assert.Equal(t, "partial stderr", result.FailedProviders[0].StderrPreview)
+	assert.Equal(t, "partial stdout", result.FailedProviders[0].OutputPreview)
+
+	parser := &orchestra.OutputParser{}
+	out, parseErr := parser.ParseReviewer(result.Responses[0].Output)
+	require.NoError(t, parseErr)
+	require.Len(t, out.Findings, 1)
+	assert.Contains(t, out.Findings[0].Description, "provider timed out after 1m30s")
+	assert.Contains(t, out.Findings[0].Suggestion, "orchestra.providers.codex.subprocess.timeout")
+}

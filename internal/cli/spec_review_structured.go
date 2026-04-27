@@ -56,23 +56,23 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 
 			resp, execErr := backend.Execute(ctx, req)
 			if execErr != nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr))
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), nil)
 				return
 			}
 			if resp == nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"))
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil)
 				return
 			}
 			if resp.TimedOut {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider timed out"))
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider timed out after %s", req.Timeout), resp)
 				return
 			}
 			if resp.EmptyOutput {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"))
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp)
 				return
 			}
 			if _, parseErr := parser.ParseReviewer(resp.Output); parseErr != nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr))
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp)
 				return
 			}
 
@@ -119,20 +119,28 @@ func buildStructuredSpecReviewPrompt(basePrompt, schemaJSON string, inlineSchema
 	return sb.String()
 }
 
-func malformedStructuredOutcome(provider string, err error) specReviewStructuredOutcome {
-	resp := orchestra.ProviderResponse{
+func malformedStructuredOutcome(provider string, err error, sourceResp *orchestra.ProviderResponse) specReviewStructuredOutcome {
+	description := structuredFailureDescription(err, sourceResp)
+	response := orchestra.ProviderResponse{
 		Provider: provider,
-		Output:   synthesizeMalformedReviewJSON(provider, err),
-		Error:    err.Error(),
+		Output:   synthesizeMalformedReviewJSON(provider, description),
+		Error:    description,
 	}
 	failed := &orchestra.FailedProvider{
-		Name:  provider,
-		Error: err.Error(),
+		Name:            provider,
+		Error:           description,
+		FailureClass:    structuredFailureClass(err),
+		NextRemediation: structuredFailureRemediation(err, provider),
+		CollectionMode:  "subprocess_stdout",
 	}
-	return specReviewStructuredOutcome{resp: resp, failed: failed}
+	if sourceResp != nil {
+		failed.StderrPreview = truncateStructuredReviewError(sourceResp.Error, 240)
+		failed.OutputPreview = truncateStructuredReviewError(sourceResp.Output, 240)
+	}
+	return specReviewStructuredOutcome{resp: response, failed: failed}
 }
 
-func synthesizeMalformedReviewJSON(provider string, err error) string {
+func synthesizeMalformedReviewJSON(provider, description string) string {
 	payload := orchestra.ReviewerOutput{
 		Verdict: "REVISE",
 		Summary: fmt.Sprintf("Malformed or incomplete review output from %s", provider),
@@ -141,8 +149,8 @@ func synthesizeMalformedReviewJSON(provider string, err error) string {
 			Category:    "completeness",
 			ScopeRef:    "provider:" + provider,
 			Location:    "provider:" + provider,
-			Description: truncateStructuredReviewError(err.Error(), 240),
-			Suggestion:  "Retry the provider with a shorter context or stronger schema enforcement.",
+			Description: truncateStructuredReviewError(description, 240),
+			Suggestion:  structuredFailureRemediationText(description, provider),
 		}},
 	}
 	data, marshalErr := json.Marshal(payload)
@@ -150,6 +158,61 @@ func synthesizeMalformedReviewJSON(provider string, err error) string {
 		return `{"verdict":"REVISE","summary":"Malformed review output","findings":[{"severity":"major","category":"completeness","scope_ref":"provider:unknown","location":"provider:unknown","description":"failed to serialize malformed review result","suggestion":"Retry the provider."}]}`
 	}
 	return string(data)
+}
+
+func structuredFailureDescription(err error, resp *orchestra.ProviderResponse) string {
+	if err == nil {
+		return "unknown provider failure"
+	}
+	parts := []string{err.Error()}
+	if resp == nil {
+		return strings.Join(parts, "; ")
+	}
+	if resp.Duration > 0 {
+		parts = append(parts, "duration "+resp.Duration.String())
+	}
+	if strings.TrimSpace(resp.Error) != "" {
+		parts = append(parts, "stderr: "+truncateStructuredReviewError(resp.Error, 160))
+	}
+	if strings.TrimSpace(resp.Output) != "" {
+		parts = append(parts, "stdout preview: "+truncateStructuredReviewError(resp.Output, 160))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func structuredFailureClass(err error) string {
+	if err == nil {
+		return "execution_error"
+	}
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "timed out"):
+		return "timeout"
+	case strings.Contains(msg, "empty output"):
+		return "execution_error"
+	case strings.Contains(msg, "invalid reviewer json"):
+		return "execution_error"
+	default:
+		return "execution_error"
+	}
+}
+
+func structuredFailureRemediation(err error, provider string) string {
+	if err == nil {
+		return "Retry the provider and inspect subprocess diagnostics."
+	}
+	return structuredFailureRemediationText(err.Error(), provider)
+}
+
+func structuredFailureRemediationText(description, provider string) string {
+	msg := strings.ToLower(description)
+	if strings.Contains(msg, "timed out") {
+		return fmt.Sprintf("Increase --timeout or set orchestra.providers.%s.subprocess.timeout, then retry with a smaller review context if needed.", provider)
+	}
+	if strings.Contains(msg, "invalid reviewer json") {
+		return "Retry with stricter JSON-only prompting or provider-specific structured output settings."
+	}
+	return "Retry the provider with a shorter context or stronger schema enforcement."
 }
 
 func truncateStructuredReviewError(s string, max int) string {

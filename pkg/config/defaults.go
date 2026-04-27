@@ -86,7 +86,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 		Orchestra: OrchestraConf{
 			Enabled:         true,
 			DefaultStrategy: "consensus",
-			TimeoutSeconds:  120,
+			TimeoutSeconds:  240,
 			Judge:           "claude",
 			Providers: map[string]ProviderEntry{
 				"claude": {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "max"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "max"}},

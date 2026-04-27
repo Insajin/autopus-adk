@@ -82,9 +82,7 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	if strategy == "" && flags.MultiMode {
 		strategy = string(orchestra.StrategyDebate)
 	}
-	if timeout <= 0 {
-		timeout = 120
-	}
+	timeout = resolveSpecReviewTimeout(cfg, timeout)
 	maxRevisions := gate.MaxRevisions
 	if maxRevisions <= 0 {
 		maxRevisions = defaultMaxRevisions
@@ -275,4 +273,14 @@ func sortedProviderKeys(providers map[string]config.ProviderEntry) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+func resolveSpecReviewTimeout(cfg *config.HarnessConfig, requested int) int {
+	if requested > 0 {
+		return requested
+	}
+	if cfg != nil && cfg.Orchestra.TimeoutSeconds > 0 {
+		return cfg.Orchestra.TimeoutSeconds
+	}
+	return 120
 }
