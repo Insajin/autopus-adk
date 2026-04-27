@@ -42,3 +42,7 @@ clean:
 
 install: build
 	cp bin/$(BINARY) $(GOPATH)/bin/$(BINARY)
+	@if [ "$$(uname -s)" = "Darwin" ]; then \
+		xattr -cr $(GOPATH)/bin/$(BINARY) 2>/dev/null || true; \
+		codesign --force --sign - $(GOPATH)/bin/$(BINARY) >/dev/null 2>&1 || true; \
+	fi

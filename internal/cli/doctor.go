@@ -179,6 +179,10 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 		}
 	}
 
+	if !checkRuntimeProcessesText(out, opts) {
+		allOK = false
+	}
+
 	conflicts := detect.CheckParentRuleConflicts(opts.dir)
 	if len(conflicts) > 0 {
 		tui.SectionHeader(out, "Rule Conflicts")

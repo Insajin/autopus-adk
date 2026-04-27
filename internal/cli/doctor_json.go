@@ -17,12 +17,13 @@ type doctorJSONReport struct {
 }
 
 type doctorJSONData struct {
-	OverallOK     bool                        `json:"overall_ok"`
-	Config        *doctorConfigPayload        `json:"config,omitempty"`
-	Platforms     []doctorPlatformPayload     `json:"platforms,omitempty"`
-	Dependencies  []doctorDependencyPayload   `json:"dependencies,omitempty"`
-	RuleConflicts []doctorRuleConflictPayload `json:"rule_conflicts,omitempty"`
-	InstalledCLIs []doctorCLIPayload          `json:"installed_clis,omitempty"`
+	OverallOK     bool                          `json:"overall_ok"`
+	Config        *doctorConfigPayload          `json:"config,omitempty"`
+	Platforms     []doctorPlatformPayload       `json:"platforms,omitempty"`
+	Dependencies  []doctorDependencyPayload     `json:"dependencies,omitempty"`
+	Runtime       []doctorRuntimeProcessPayload `json:"runtime_processes,omitempty"`
+	RuleConflicts []doctorRuleConflictPayload   `json:"rule_conflicts,omitempty"`
+	InstalledCLIs []doctorCLIPayload            `json:"installed_clis,omitempty"`
 }
 
 type doctorConfigPayload struct {
@@ -44,6 +45,13 @@ type doctorDependencyPayload struct {
 	Installed  bool   `json:"installed"`
 	Required   bool   `json:"required"`
 	InstallCmd string `json:"install_cmd,omitempty"`
+}
+
+type doctorRuntimeProcessPayload struct {
+	PID        int    `json:"pid"`
+	Executable string `json:"executable"`
+	Command    string `json:"command,omitempty"`
+	Reason     string `json:"reason,omitempty"`
 }
 
 type doctorRuleConflictPayload struct {
@@ -104,6 +112,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 
 	report.collectPlatformChecks(context.Background(), opts.dir, cfg)
 	report.collectDependencyChecks(cmd, opts)
+	report.collectRuntimeProcessChecks(opts)
 	report.collectRuleConflictChecks(opts.dir, cfg)
 	report.collectCLIChecks()
 	report.collectQualityGateChecks(cfg)
