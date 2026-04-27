@@ -53,6 +53,9 @@ func MigrateOrchestraConfig(cfg *HarnessConfig) (bool, error) {
 			}
 		}
 	}
+	if migrated := migrateKnownProviderDefaults(cfg); migrated {
+		changed = true
+	}
 
 	// Migration 3: ensure every provider appears in every command's Providers list.
 	if cfg.Orchestra.Commands == nil {
@@ -69,6 +72,22 @@ func MigrateOrchestraConfig(cfg *HarnessConfig) (bool, error) {
 	}
 
 	return changed, nil
+}
+
+func migrateKnownProviderDefaults(cfg *HarnessConfig) bool {
+	changed := false
+	for providerName, defaults := range defaultProviderEntries {
+		existing, exists := cfg.Orchestra.Providers[providerName]
+		if !exists {
+			continue
+		}
+		if existing.Subprocess.Timeout == 0 && defaults.Subprocess.Timeout > 0 {
+			existing.Subprocess.Timeout = defaults.Subprocess.Timeout
+			cfg.Orchestra.Providers[providerName] = existing
+			changed = true
+		}
+	}
+	return changed
 }
 
 // EnsureOrchestraProvider ensures a specific provider exists in the orchestra config.

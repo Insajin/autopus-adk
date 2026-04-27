@@ -40,6 +40,7 @@ func TestMigrateOpencodeToCodex_Basic(t *testing.T) {
 	assert.Equal(t, "codex", codex.Binary)
 	assert.Equal(t, []string{"exec", "--full-auto", "-m", CodexFrontierModel}, codex.Args)
 	assert.False(t, codex.PromptViaArgs, "codex PromptViaArgs must be false")
+	assert.Equal(t, CodexOrchestraTimeoutSeconds, codex.Subprocess.Timeout)
 
 	// Commands must reference codex instead of opencode.
 	review := cfg.Orchestra.Commands["review"]
@@ -156,6 +157,55 @@ func TestDefaultProviderEntries_CodexPromptViaArgs(t *testing.T) {
 	codex, ok := defaultProviderEntries["codex"]
 	require.True(t, ok, "codex must exist in defaultProviderEntries")
 	assert.False(t, codex.PromptViaArgs, "codex PromptViaArgs must be false")
+}
+
+func TestMigrateOrchestraConfig_FillsCodexSubprocessTimeout(t *testing.T) {
+	t.Parallel()
+
+	cfg := &HarnessConfig{
+		Platforms: []string{"codex"},
+		Orchestra: OrchestraConf{
+			Enabled: true,
+			Providers: map[string]ProviderEntry{
+				"codex": {
+					Binary:        "codex",
+					Args:          []string{"exec", "--full-auto", "-m", CodexFrontierModel},
+					PromptViaArgs: false,
+				},
+			},
+			Commands: map[string]CommandEntry{},
+		},
+	}
+
+	changed, err := MigrateOrchestraConfig(cfg)
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, CodexOrchestraTimeoutSeconds, cfg.Orchestra.Providers["codex"].Subprocess.Timeout)
+}
+
+func TestMigrateOrchestraConfig_PreservesCustomCodexSubprocessTimeout(t *testing.T) {
+	t.Parallel()
+
+	cfg := &HarnessConfig{
+		Platforms: []string{"codex"},
+		Orchestra: OrchestraConf{
+			Enabled: true,
+			Providers: map[string]ProviderEntry{
+				"codex": {
+					Binary:        "codex",
+					Args:          []string{"exec", "--full-auto", "-m", CodexFrontierModel},
+					PromptViaArgs: false,
+					Subprocess:    SubprocessProvConf{Timeout: 900},
+				},
+			},
+			Commands: map[string]CommandEntry{},
+		},
+	}
+
+	changed, err := MigrateOrchestraConfig(cfg)
+	require.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, 900, cfg.Orchestra.Providers["codex"].Subprocess.Timeout)
 }
 
 // --- R4: PlatformToProvider opencode -> codex ---

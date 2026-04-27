@@ -1,12 +1,13 @@
 package config
 
 const (
-	CodexFrontierModel = "gpt-5.5"
-	CodexStandardModel = CodexFrontierModel
-	CodexMiniModel     = CodexFrontierModel
-	CodexCodingModel   = CodexFrontierModel
-	CodexSparkModel    = CodexFrontierModel
-	CodexFallbackModel = CodexFrontierModel
+	CodexFrontierModel           = "gpt-5.5"
+	CodexStandardModel           = CodexFrontierModel
+	CodexMiniModel               = CodexFrontierModel
+	CodexCodingModel             = CodexFrontierModel
+	CodexSparkModel              = CodexFrontierModel
+	CodexFallbackModel           = CodexFrontierModel
+	CodexOrchestraTimeoutSeconds = 420
 )
 
 // DefaultCodexProviderEntry returns the canonical Codex orchestra provider entry.
@@ -16,6 +17,7 @@ func DefaultCodexProviderEntry() ProviderEntry {
 		Args:          []string{"exec", "--full-auto", "-m", CodexFrontierModel},
 		PaneArgs:      []string{"-m", CodexFrontierModel},
 		PromptViaArgs: false,
+		Subprocess:    SubprocessProvConf{Timeout: CodexOrchestraTimeoutSeconds},
 	}
 }
 

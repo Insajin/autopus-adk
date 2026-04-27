@@ -256,7 +256,12 @@ func TestMigrateOrchestraConfig_AlreadyCorrectConfigNoChange(t *testing.T) {
 			Providers: map[string]ProviderEntry{
 				// codex already present with correct args (post-migration state).
 				"claude": {Binary: "claude", Args: []string{"--print"}},
-				"codex":  {Binary: "codex", Args: []string{"exec", "--full-auto", "-m", CodexFrontierModel}, PromptViaArgs: false},
+				"codex": {
+					Binary:        "codex",
+					Args:          []string{"exec", "--full-auto", "-m", CodexFrontierModel},
+					PromptViaArgs: false,
+					Subprocess:    SubprocessProvConf{Timeout: CodexOrchestraTimeoutSeconds},
+				},
 			},
 			Commands: map[string]CommandEntry{
 				// Both providers already listed in every command.

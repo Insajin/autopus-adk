@@ -25,11 +25,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		return RunPaneOrchestra(ctx, cfg)
 	}
 
-	timeout := cfg.TimeoutSeconds
-	if timeout <= 0 {
-		timeout = 120
-	}
-	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	timeoutCtx, cancel := context.WithTimeout(ctx, orchestrationTimeout(cfg))
 	defer cancel()
 
 	for _, p := range cfg.Providers {
@@ -166,6 +162,41 @@ func providerExecutionTimeout(provider ProviderConfig, fallbackSeconds int) time
 		timeout = 120 * time.Second
 	}
 	return timeout
+}
+
+func orchestrationTimeout(cfg OrchestraConfig) time.Duration {
+	baseSeconds := cfg.TimeoutSeconds
+	if baseSeconds <= 0 {
+		baseSeconds = 120
+	}
+	base := time.Duration(baseSeconds) * time.Second
+	longestProvider := base
+	for _, provider := range cfg.Providers {
+		if providerTimeout := providerExecutionTimeout(provider, cfg.TimeoutSeconds); providerTimeout > longestProvider {
+			longestProvider = providerTimeout
+		}
+	}
+	if cfg.JudgeProvider != "" {
+		judgeTimeout := providerExecutionTimeout(findOrBuildJudgeConfig(cfg), cfg.TimeoutSeconds)
+		if judgeTimeout > longestProvider {
+			longestProvider = judgeTimeout
+		}
+	}
+
+	phaseCount := 1
+	if cfg.Strategy == StrategyDebate {
+		rounds := cfg.DebateRounds
+		if rounds <= 0 {
+			rounds = 1
+		}
+		if rounds >= 2 {
+			phaseCount++
+		}
+		if cfg.JudgeProvider != "" && !cfg.NoJudge {
+			phaseCount++
+		}
+	}
+	return longestProvider * time.Duration(phaseCount)
 }
 
 // runPipeline은 프로바이더를 순차적으로 실행하며 이전 출력을 다음 입력에 추가한다.

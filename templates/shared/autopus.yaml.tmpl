@@ -62,7 +62,12 @@ orchestra:
 {{end}}{{if $v.PaneArgs}}      pane_args: [{{range $i, $a := $v.PaneArgs}}{{if $i}}, {{end}}"{{$a}}"{{end}}]
 {{end}}{{if $v.PromptViaArgs}}      prompt_via_args: {{$v.PromptViaArgs}}
 {{end}}{{if $v.InteractiveInput}}      interactive_input: {{$v.InteractiveInput}}
-{{end}}{{end}}{{end}}{{if .Orchestra.Commands}}  commands:
+{{end}}{{if or $v.Subprocess.SchemaFlag $v.Subprocess.StdinMode $v.Subprocess.OutputFormat $v.Subprocess.Timeout}}      subprocess:
+{{if $v.Subprocess.SchemaFlag}}        schema_flag: "{{$v.Subprocess.SchemaFlag}}"
+{{end}}{{if $v.Subprocess.StdinMode}}        stdin_mode: {{$v.Subprocess.StdinMode}}
+{{end}}{{if $v.Subprocess.OutputFormat}}        output_format: {{$v.Subprocess.OutputFormat}}
+{{end}}{{if $v.Subprocess.Timeout}}        timeout: {{$v.Subprocess.Timeout}}
+{{end}}{{end}}{{end}}{{end}}{{if .Orchestra.Commands}}  commands:
 {{range $k, $v := .Orchestra.Commands}}    {{$k}}:
       strategy: {{$v.Strategy}}
       providers: [{{range $i, $p := $v.Providers}}{{if $i}}, {{end}}{{$p}}{{end}}]

@@ -62,6 +62,8 @@ func TestSharedAutopusYamlTemplate(t *testing.T) {
 	assert.Contains(t, result, "yaml-project")
 	assert.Contains(t, result, "mode: full")
 	assert.Contains(t, result, "claude-code")
+	assert.Contains(t, result, "subprocess:")
+	assert.Contains(t, result, "timeout: 420")
 }
 
 func TestClaudeRouterTemplate(t *testing.T) {

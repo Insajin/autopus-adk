@@ -90,6 +90,8 @@ func TestDefaultFullConfig_CodexPromptViaArgs(t *testing.T) {
 	assert.False(t, codex.PromptViaArgs, "codex provider must have PromptViaArgs=false")
 	assert.Equal(t, []string{"exec", "--full-auto", "-m", CodexFrontierModel}, codex.Args,
 		"codex provider must have correct exec-mode args")
+	assert.Equal(t, CodexOrchestraTimeoutSeconds, codex.Subprocess.Timeout,
+		"codex provider must have a longer default orchestra timeout")
 }
 
 // TestDefaultFullConfig_BrainstormCommand verifies that DefaultFullConfig includes
