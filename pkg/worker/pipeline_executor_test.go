@@ -112,6 +112,7 @@ func TestNewPipelineExecutor(t *testing.T) {
 	pe := NewPipelineExecutor(adapter.NewClaudeAdapter(), "/tmp/mcp.json", "/work")
 	if pe == nil {
 		t.Fatal("expected non-nil PipelineExecutor")
+		return
 	}
 	if pe.mcpConfig != "/tmp/mcp.json" {
 		t.Errorf("mcpConfig = %q, want %q", pe.mcpConfig, "/tmp/mcp.json")
