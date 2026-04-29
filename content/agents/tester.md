@@ -43,9 +43,10 @@ Phase 1.5 — after SPEC is finalized, before executor starts implementation.
 
 1. Read SPEC requirements (P0 and P1 priority items)
 2. Read `{SPEC_DIR}/acceptance.md` if it exists — use Given/When/Then scenarios as primary test source
-3. For each requirement, create a test function skeleton that asserts the expected behavior
-4. Tests MUST fail (RED state) — any test that passes indicates already-implemented functionality or an incorrect test
-5. Use table-driven test pattern where applicable
+3. Identify Must oracle acceptance criteria that require exact rows, JSON fields, stdout/file content, parser matches, matching rules, or numeric tolerances
+4. For each requirement, create a test function skeleton that asserts the expected behavior
+5. Tests MUST fail (RED state) — any test that passes indicates already-implemented functionality or an incorrect test
+6. Use table-driven test pattern where applicable
 
 ### Behavioral Assertion Rule (CRITICAL)
 
@@ -82,6 +83,23 @@ func TestCreateUser(t *testing.T) {
 - [ ] Side effect verification (event emitted, dependency called with correct args)
 
 A test that ONLY asserts `NoError` or `NotNil` without checking content is **invalid** and will be rejected by the validator's acceptance coverage check.
+
+### Oracle Acceptance Rule (CRITICAL)
+
+IMPORTANT: Must oracle acceptance criteria require tests with concrete output values. A test addresses an oracle criterion only when it asserts the semantic output named by the criterion.
+
+Valid oracle assertions include:
+- exact return value, row content, JSON field, API response body, stdout substring tied to a value, or file content
+- numeric formula output with an explicit tolerance
+- matching/grouping/deduplication/ordering behavior using heterogeneous entities
+- parser/report contracts that check the required field or section content, not just that a section exists
+
+Invalid structural-only patterns for oracle acceptance:
+- checking only Markdown headings, section labels, file existence, exit code, `NoError`, `NotNil`, or non-empty output
+- using one homogeneous fixture when the criterion requires cross-entity pairing or comparison
+- checking that a report was generated without asserting the expected semantic row/value
+
+When acceptance criteria include exact output rows, numeric tolerances, or matching rules, generated tests MUST assert concrete output values, row contents, JSON fields, stdout substrings tied to values, or file content. Mark structural-only tests invalid for those criteria.
 
 ### Completion Verification
 

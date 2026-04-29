@@ -54,9 +54,22 @@ WHEN `PERMISSION_MODE = "bypass"`, THE SYSTEM SHALL set ALL agents' mode to `byp
 
 WHEN `PERMISSION_MODE = "safe"`, THE SYSTEM SHALL preserve the existing mode assignments (plan/bypassPermissions mix).
 
+## Workflow Authenticity Preflight
+
+WHEN Route A (default subagent pipeline) is selected, THE SYSTEM SHALL preflight that the runtime can create and observe at least one subagent dispatch before Phase 1.
+
+Preflight contract:
+- Initialize `subagent_dispatch_count = 0`, `subagent_roles_dispatched = []`, and `degraded-mode = "none"`.
+- Verify the surface-native subagent tool is available (`Agent`, `task(...)`, `spawn_agent(...)`, or the platform equivalent).
+- On every successful subagent call, increment `subagent_dispatch_count` and append the role or phase name to `subagent_roles_dispatched`.
+- If no dispatch can be created or observed in Route A, stop with a workflow authenticity blocker before Phase 1.
+- The workflow authenticity blocker must tell the user to rerun with a working subagent surface or choose `--solo`.
+- In `--solo` mode, report `subagent_dispatch_count: 0` and label the run as solo mode, not as a degraded subagent pipeline.
+
 ## Pipeline Overview
 
 ```
+Phase 0.7: Authenticity  → main session (subagent surface preflight and evidence counters)
 Phase 1:   Planning        → planner     (model: depends on quality mode, plan)
 Phase 1.5: Test Scaffold   → tester      (sonnet, bypassPermissions) — skip if --skip-scaffold
 Gate 1:    Approval        → skipped if --auto
@@ -577,8 +590,9 @@ Determination: if all "file ownership" entries in the planner's assignment table
 Once all Phases are complete:
 
 1. Collect results from each agent and output a final summary
-2. Update the SPEC file status to `"done"`
-3. Guide next steps: `/auto sync <SPEC-ID>`
+2. Verify `subagent_dispatch_count > 0` for Route A; otherwise fail with workflow authenticity blocker unless `--solo` was selected
+3. Update the SPEC file status to `"done"`
+4. Guide next steps: `/auto sync <SPEC-ID>`
 
 ### Final Summary Format
 
@@ -589,6 +603,9 @@ SPEC: <SPEC-ID>
 Tasks: <completed> / <total>
 Coverage: <measured>%
 Review: APPROVE
+subagent_dispatch_count: <N>
+subagent_roles_dispatched: <planner,tester,executor,validator,...>
+degraded-mode: none | solo | blocker
 
 Completed Files:
 - <file path 1>
@@ -600,5 +617,6 @@ Completed Files:
 - [ ] All Phases executed in order
 - [ ] PASS verdict received at each Gate
 - [ ] Coverage 85%+ confirmed
+- [ ] subagent_dispatch_count recorded, roles listed, degraded-mode state explicit
 - [ ] SPEC status = "done" updated
 - [ ] Final summary output complete

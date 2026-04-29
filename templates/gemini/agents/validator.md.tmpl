@@ -125,7 +125,15 @@ SPEC 디렉토리에서 `acceptance.md`를 **직접 읽어서** 구현 커버리
 4. 변경된 코드와 테스트 파일을 교차 검증:
    - **테스트 매핑**: 각 시나리오에 대응하는 테스트 함수가 존재하는가?
    - **구현 매핑**: 시나리오의 When 절에 해당하는 코드 경로가 실제 로직을 포함하는가? (6a behavioral stub analysis 결과 활용)
-5. 커버리지 보고: `N/M acceptance criteria addressed`
+   - **Semantic output mapping**: Must oracle acceptance criteria의 expected row/value/JSON/stdout/file/numeric tolerance가 테스트 assertion에서 실제로 검증되는가?
+5. structural-only tests를 탐지합니다. Heading, file existence, exit code, `NoError`, `NotNil`, non-empty output만 확인하는 테스트는 oracle acceptance coverage로 인정하지 않습니다.
+6. 커버리지 보고: `N/M acceptance criteria addressed`
+
+**Oracle acceptance criteria**:
+- Must scenario가 numeric formula, statistical method, parser rule, matching rule, report row contract, grouping/deduplication/ordering, or cross-entity comparison을 요구하면 oracle acceptance로 분류합니다.
+- Oracle acceptance는 semantic output을 요구하므로 validator는 테스트가 concrete expected value나 explicit tolerance를 assertion하는지 확인해야 합니다.
+- 대응 테스트가 없거나 structural-only이면 **FAIL** — Recommended Agent: tester.
+- 테스트는 있지만 구현 output이 criterion과 다르면 **FAIL** — Recommended Agent: executor.
 
 **Verdict impact**:
 - P0 (Must) 기준 미충족 → **FAIL** — Recommended Agent: executor
@@ -137,6 +145,7 @@ SPEC 디렉토리에서 `acceptance.md`를 **직접 읽어서** 구현 커버리
 미충족 인수 기준:
 - AC-001 (P0): "{scenario title}" — 대응 테스트/구현 없음
 - AC-003 (P0): "{scenario title}" — 테스트 존재하나 구현이 stub
+- AC-004 (P0): "{scenario title}" — Must oracle acceptance이나 테스트가 structural-only라 semantic output을 검증하지 않음
 ```
 
 이 검증은 RALF 루프에서 executor를 재스폰하여 누락된 acceptance criteria를 구현하도록 유도합니다.

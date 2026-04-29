@@ -65,6 +65,13 @@ For document-only SPEC work, security items may be marked `N/A` only when the no
 - FAIL 기준: 스캐폴드, 설정, 문서, 일부 wiring만 다루고도 완전한 기능처럼 보이게 하거나, 필수 후속 작업을 별도 SPEC 없이 막연히 future work로 남긴다.
 - Example: CLI 플래그 추가만으로 backend/API/UX 동작이 필요한 기능을 닫을 수 없다면 `Related SPECs`와 `Feature Coverage Map`에 후속 SPEC을 생성하거나 참조해야 한다.
 
+### Q-COMP-05 — Semantic invariants are mapped to oracle acceptance
+
+- PASS 기준: `research.md`의 `## Semantic Invariant Inventory`에 있는 각 invariant가 최소 하나의 요구사항, `plan.md` 태스크, 그리고 Must `acceptance.md` 시나리오에 추적된다. 알고리즘, paired/grouped/deduped/ordered 데이터, parser/report row, numeric formula는 concrete expected value나 tolerance가 있는 oracle acceptance로 검증된다.
+- FAIL 기준: invariant가 research prose에만 남거나, requirement/plan/acceptance 중 하나에서 사라지거나, acceptance가 heading/file existence/exit success 같은 structural check만 수행한다.
+- Fix guidance: FAIL이면 `spec.md`, `plan.md`, `acceptance.md`를 함께 점검하고 수정한다. 요구사항 누락은 `spec.md`, implementation ownership 누락은 `plan.md`, observable oracle 누락은 `acceptance.md`에서 보완해야 한다.
+- Example: 원 요청이 common `task_id`로 baseline과 other rows를 pair하라고 했다면 acceptance는 서로 다른 harness label의 overlapping `task_id` 입력과 예상 Cohen's d 또는 McNemar 값을 포함해야 한다.
+
 ## feasibility
 
 ### Q-FEAS-01 — Scope matches the real implementation layer

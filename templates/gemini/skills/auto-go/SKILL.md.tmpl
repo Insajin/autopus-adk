@@ -50,6 +50,14 @@ SPEC 문서를 기반으로 코드를 구현합니다.
 
 When a task modifies 3+ files, exceeds 200 lines, or spans multiple domains, delegate to specialized agents using `@agent`.
 
+### Workflow Authenticity Evidence
+
+- 기본 subagent pipeline을 선택하면 Phase 1 전에 subagent surface 사용 가능 여부를 preflight합니다.
+- 완료 전까지 `subagent_dispatch_count`, `subagent_roles_dispatched`, `degraded-mode`를 기록합니다.
+- subagent pipeline 모드에서 dispatch를 만들거나 관측할 수 없으면 Phase 1 전에 workflow authenticity blocker로 중단합니다.
+- workflow authenticity blocker는 working subagent surface로 재실행하거나 명시적으로 `--solo`를 선택하라고 안내해야 합니다.
+- `--solo`는 `subagent_dispatch_count: 0`으로 보고하되 degraded-mode pipeline처럼 표현하지 않습니다.
+
 ### Executor Agent
 
 ```
@@ -111,6 +119,14 @@ Status symbols: `✓` completed, `→` active, `○` pending. Replace `[N/M task
 🐙 Workflow: {SPEC-ID}
   ✓ plan  →  ● go  →  ○ sync
 ```
+
+current_gate: go completed, sync pending
+phase_4_review_verdict: APPROVE
+subagent_dispatch_count: {N}
+subagent_roles_dispatched: {planner,tester,executor,validator,reviewer,security-auditor}
+degraded-mode: none | solo | blocker
+next_required_step: sync 단계로 이동
+next_command: /auto sync {SPEC-ID}
 
 ### Agent Result Format (use for executor/tester subagent results)
 

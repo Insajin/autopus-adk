@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Semantic invariant acceptance gate hardening (SPEC-ACCGATE-002)** (2026-04-29): SPEC generation and implementation guidance now preserve original task semantic invariants through research inventory, oracle acceptance, behavioral tests, validator coverage, and observable subagent pipeline evidence.
+  - `content/rules/spec-quality.md`, `content/agents/{spec-writer,tester,validator}.md` — `Q-COMP-05`, `Semantic Invariant Inventory`, oracle acceptance, and structural-only test rejection guidance
+  - `content/skills/agent-pipeline.md`, `templates/{claude,codex,gemini}/**`, `pkg/adapter/opencode/opencode_test.go` — `subagent_dispatch_count`, dispatched-role evidence, degraded-mode blocker language, and cross-platform regression coverage
+  - `templates/template_test.go` — source-of-truth template assertions for semantic-invariant and workflow-authenticity contracts
+
 - **Project-local DESIGN.md context support (SPEC-DESIGN-001)** (2026-04-29): UI-sensitive ADK workflows can now discover safe local design context, inject compact `## Design Context` evidence into verify/review surfaces, and import external design references only through explicit sanitized generated artifacts.
   - `pkg/design/**`, `internal/cli/design.go` — safe path policy, source-of-truth frontmatter selection, deterministic summary trimming, UI file detection, public-HTTPS URL fetch guard, sanitizer, import artifact writer, and `auto design init/context/import`
   - `internal/cli/{verify.go,orchestra_helpers.go}`, `pkg/adapter/opencode/opencode_workflow_custom.go` — shared UI detector and design-context reporting/injection for `auto verify`, `auto orchestra review`, and OpenCode verify surfaces
