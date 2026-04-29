@@ -89,6 +89,7 @@ func ResolveRuntime(input Input) (RuntimeConfig, error) {
 			Message: "desktop runtime auth token is missing; run 'auto connect' or complete desktop auth first",
 		}
 	}
+	memoryAgentID, memoryWarnings := resolveRuntimeMemoryAgentID(cfg.BackendURL, authToken, cfg.WorkspaceID, cfg.MemoryAgentID)
 
 	providerName := ResolveProviderName(cfg.Providers)
 	if providerName == "" {
@@ -131,12 +132,13 @@ func ResolveRuntime(input Input) (RuntimeConfig, error) {
 		WorktreeIsolation:    cfg.WorktreeIsolation || EffectiveConcurrency(providerName, cfg.Concurrency) > 1,
 		KnowledgeSync:        true,
 		KnowledgeDir:         cfg.KnowledgeDir,
-		MemoryAgentID:        cfg.MemoryAgentID,
+		MemoryAgentID:        memoryAgentID,
 		WorkerName:           fmt.Sprintf("adk-worker-%s", providerName),
 	}
 	if warn != "" {
 		runtimeCfg.Warnings = append(runtimeCfg.Warnings, warn)
 	}
+	runtimeCfg.Warnings = append(runtimeCfg.Warnings, memoryWarnings...)
 	return runtimeCfg, nil
 }
 
