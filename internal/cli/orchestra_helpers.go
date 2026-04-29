@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/design"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
@@ -41,8 +42,43 @@ func buildReviewPrompt(files []string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("다음 파일들을 코드 리뷰해주세요:\n\n")
 	sb.WriteString(contents)
+	if section := buildReviewDesignContext(files); section != "" {
+		sb.WriteString("\n")
+		sb.WriteString(section)
+		sb.WriteString("\n")
+	}
 	sb.WriteString("품질, 가독성, 잠재적 버그를 중심으로 분석하세요.")
 	return sb.String(), nil
+}
+
+// @AX:NOTE [AUTO]: Review design context is appended only for UI-related files and remains untrusted prompt evidence.
+func buildReviewDesignContext(files []string) string {
+	cfg, err := config.Load(".")
+	if err != nil {
+		cfg = config.DefaultFullConfig(".")
+	}
+	if !design.AnyUIRelatedFile(files, cfg.Design.UIFileGlobs) {
+		return "Design context: skipped (non-ui changes)\n"
+	}
+	if !cfg.Design.InjectOnReview {
+		return "Design context: skipped (disabled)\n"
+	}
+	ctx, err := design.LoadContext(".", design.Options{
+		Enabled:         cfg.Design.Enabled,
+		Paths:           cfg.Design.Paths,
+		MaxContextLines: cfg.Design.MaxContextLines,
+		UIFileGlobs:     cfg.Design.UIFileGlobs,
+	})
+	if err != nil {
+		return fmt.Sprintf("Design context: skipped (%v)\n", err)
+	}
+	if !ctx.Found {
+		return fmt.Sprintf("Design context: skipped (not configured)\n%s", ctx.DiagnosticsSummary())
+	}
+	var sb strings.Builder
+	sb.WriteString(ctx.PromptSection())
+	sb.WriteString("\nReview UI diffs against this context for palette-role drift, typography hierarchy, component guardrails, layout/responsive regressions, and source-of-truth mismatch.\n")
+	return sb.String()
 }
 
 // buildSecurePrompt builds the security analysis prompt, including file contents if provided.

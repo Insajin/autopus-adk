@@ -75,6 +75,7 @@ type HarnessConfig struct {
 	Quality      QualityConf      `yaml:"quality,omitempty"`
 	Skills       SkillsConf       `yaml:"skills,omitempty"`
 	Verify       VerifyConf       `yaml:"verify,omitempty"`
+	Design       DesignConf       `yaml:"design,omitempty"`
 	Constraints  ConstraintConf   `yaml:"constraints,omitempty"`
 	Context      ContextConf      `yaml:"context,omitempty"`
 	Features     FeaturesConf     `yaml:"features,omitempty"`
@@ -215,14 +216,6 @@ type SessionConf struct {
 	MaxContextTokens int    `yaml:"max_context_tokens"`
 }
 
-// VerifyConf is the frontend UX verification configuration.
-type VerifyConf struct {
-	Enabled         bool   `yaml:"enabled"`
-	DefaultViewport string `yaml:"default_viewport"`
-	AutoFix         bool   `yaml:"auto_fix"`
-	MaxFixAttempts  int    `yaml:"max_fix_attempts"`
-}
-
 // ConstraintConf is the anti-pattern constraint configuration.
 type ConstraintConf struct {
 	Enabled bool   `yaml:"enabled"`
@@ -273,6 +266,9 @@ func (c *HarnessConfig) Validate() error {
 	}
 	if err := c.validateSkillsConfig(); err != nil {
 		return err
+	}
+	if c.Design.MaxContextLines < 0 {
+		return fmt.Errorf("design.max_context_lines must be >= 0")
 	}
 	if !c.UsageProfile.IsValid() {
 		return fmt.Errorf("invalid usage_profile %q: must be 'developer' or 'fullstack'", c.UsageProfile)

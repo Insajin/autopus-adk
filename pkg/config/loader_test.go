@@ -43,6 +43,26 @@ spec:
 	assert.Equal(t, "test", cfg.ProjectName)
 	assert.Equal(t, []string{"claude-code", "codex"}, cfg.Platforms)
 	assert.Equal(t, 30, cfg.Lore.StaleThresholdDays)
+	assert.True(t, cfg.Design.Enabled, "missing design section should use defaults for existing configs")
+}
+
+func TestLoad_ExplicitDesignDisabledIsPreserved(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	content := `
+mode: full
+project_name: test
+platforms:
+  - claude-code
+design:
+  enabled: false
+`
+	err := os.WriteFile(filepath.Join(dir, "autopus.yaml"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	cfg, err := Load(dir)
+	require.NoError(t, err)
+	assert.False(t, cfg.Design.Enabled)
 }
 
 func TestLoad_EnvVarExpansion(t *testing.T) {

@@ -655,6 +655,16 @@ ARCHITECTURE.md                    # Domains, layers, dependency map
 
 > 💡 **Why this matters:** Without these documents, an AI agent looking at your project is like a new hire with no onboarding — they'll guess at architecture, miss conventions, and reinvent patterns that already exist. With `/auto setup`, every agent session starts informed.
 
+### Optional `DESIGN.md` for UI Work
+
+Frontend verification and review can use a project-local `DESIGN.md` as lightweight design context. Keep it short and include the source of truth, palette roles, typography hierarchy, component guardrails, layout/responsive rules, and agent guidance. If a project has no `DESIGN.md` or configured design baseline, `/auto verify`, Phase 3.5, `/auto review`, and `auto orchestra review` continue normally and report `Design context: skipped (not configured)` as a non-error condition.
+
+Design context is only injected for UI-related diffs such as `.tsx`, `.jsx`, CSS-family files, theme/token files, or design-system paths. UI findings check palette-role drift, typography hierarchy drift, component guardrail violations, layout/responsive regressions, and source-of-truth mismatch. Review surfaces remain read-only; they report issues and delegate fixes instead of editing files directly.
+
+Generated platform surfaces are not canonical. Update `autopus-adk` content/templates and run `auto update` to refresh `.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*`, and plugin surfaces in a target project.
+
+External design references are untrusted until explicitly promoted. `auto design import` stores sanitized artifacts under `.autopus/design/imports/<import-id>/`; it must not replace a human-maintained `DESIGN.md` by default. URL imports are public-HTTPS-only and SSRF-guarded: they reject local/private/metadata targets and unsafe redirects, cap redirects, timeout, and response size, and persist only redacted diagnostics when rejected.
+
 ### Step 4 · Build Your First Feature
 
 Now you're ready. Describe what you want in plain language:

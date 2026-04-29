@@ -69,6 +69,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newLSPCmd())
 	root.AddCommand(newSearchCmd())
 	root.AddCommand(newDocsCmd())
+	root.AddCommand(newDesignCmd())
 	root.AddCommand(newHashCmd())
 	root.AddCommand(newSkillCmd())
 	root.AddCommand(newOrchestraCmd())

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Project-local DESIGN.md context support (SPEC-DESIGN-001)** (2026-04-29): UI-sensitive ADK workflows can now discover safe local design context, inject compact `## Design Context` evidence into verify/review surfaces, and import external design references only through explicit sanitized generated artifacts.
+  - `pkg/design/**`, `internal/cli/design.go` — safe path policy, source-of-truth frontmatter selection, deterministic summary trimming, UI file detection, public-HTTPS URL fetch guard, sanitizer, import artifact writer, and `auto design init/context/import`
+  - `internal/cli/{verify.go,orchestra_helpers.go}`, `pkg/adapter/opencode/opencode_workflow_custom.go` — shared UI detector and design-context reporting/injection for `auto verify`, `auto orchestra review`, and OpenCode verify surfaces
+  - `content/**`, `templates/**`, `README.md`, `docs/README.ko.md` — platform prompt parity and user docs for optional DESIGN.md, non-blocking skip semantics, read-only review checks, and generated-surface ownership
+
 ### Docs
 
 - **Desktop runtime ownership boundary synced to desktop repo (SPEC-DESKTOP-014)** (2026-04-23): packaged `autopus-desktop-runtime` 의 source/build/release provenance 가 `autopus-desktop/runtime-helper/` 로 이동했음을 문서에 반영하고, ADK의 `connect` / `desktop` / `worker` 표면을 harness 또는 compatibility 범위로 재정의

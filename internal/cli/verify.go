@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/design"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
 
@@ -73,16 +73,29 @@ func runVerify(cmd *cobra.Command, fix, reportOnly bool, viewport string) error 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "경고: git diff 분석 실패: %v\n", err)
 	}
+	uiChanged := filterUIChangedFiles(changed, cfg.Design.UIFileGlobs)
 
-	if len(changed) == 0 {
+	if len(uiChanged) == 0 {
+		fmt.Print(buildVerifyDesignContextReport(".", changed, design.Options{
+			Enabled:         cfg.Design.Enabled && cfg.Design.InjectOnVerify,
+			Paths:           cfg.Design.Paths,
+			MaxContextLines: cfg.Design.MaxContextLines,
+			UIFileGlobs:     cfg.Design.UIFileGlobs,
+		}))
 		fmt.Println("변경된 프론트엔드 파일이 없습니다. verify를 건너뜁니다.")
 		return nil
 	}
 
-	fmt.Fprintf(os.Stderr, "변경된 프론트엔드 파일 %d개 감지됨\n", len(changed))
-	for _, f := range changed {
+	fmt.Fprintf(os.Stderr, "변경된 프론트엔드 파일 %d개 감지됨\n", len(uiChanged))
+	for _, f := range uiChanged {
 		fmt.Fprintf(os.Stderr, "  - %s\n", f)
 	}
+	fmt.Print(buildVerifyDesignContextReport(".", uiChanged, design.Options{
+		Enabled:         cfg.Design.Enabled && cfg.Design.InjectOnVerify,
+		Paths:           cfg.Design.Paths,
+		MaxContextLines: cfg.Design.MaxContextLines,
+		UIFileGlobs:     cfg.Design.UIFileGlobs,
+	}))
 
 	output, err := runPlaywright(effectiveViewport)
 	if err != nil {
@@ -100,7 +113,8 @@ func runVerify(cmd *cobra.Command, fix, reportOnly bool, viewport string) error 
 	return nil
 }
 
-// analyzeGitDiff runs git diff against HEAD~1 and returns changed .tsx/.jsx files.
+// analyzeGitDiff runs git diff against HEAD~1 and returns changed files.
+// @AX:NOTE [AUTO]: HEAD~1 mirrors the existing verify workflow; change if verify moves to staged or working-tree diffs.
 func analyzeGitDiff() ([]string, error) {
 	out, err := exec.Command("git", "diff", "--name-only", "HEAD~1").Output()
 	if err != nil {
@@ -113,13 +127,38 @@ func analyzeGitDiff() ([]string, error) {
 		if line == "" {
 			continue
 		}
-		ext := filepath.Ext(line)
-		if ext == ".tsx" || ext == ".jsx" {
-			files = append(files, line)
-		}
+		files = append(files, line)
 	}
 
 	return files, nil
+}
+
+func filterUIChangedFiles(files []string, globs []string) []string {
+	var ui []string
+	for _, file := range files {
+		if design.IsUIRelatedFile(file, globs) {
+			ui = append(ui, file)
+		}
+	}
+	return ui
+}
+
+func buildVerifyDesignContextReport(root string, changed []string, opts design.Options) string {
+	if !design.AnyUIRelatedFile(changed, opts.UIFileGlobs) {
+		return "design context: skipped (non-ui changes)\n"
+	}
+	ctx, err := design.LoadContext(root, opts)
+	if err != nil {
+		return fmt.Sprintf("design context: skipped (%v)\n", err)
+	}
+	if !ctx.Found {
+		return fmt.Sprintf("design context: skipped (%s)\n%s", ctx.SkipReason, ctx.DiagnosticsSummary())
+	}
+	label := ctx.SourcePath
+	if ctx.BaselinePath != "" {
+		label = label + " -> " + ctx.BaselinePath
+	}
+	return fmt.Sprintf("design context: %s\n%s\n%s", label, ctx.Summary, ctx.DiagnosticsSummary())
 }
 
 // runPlaywright executes Playwright tests with JSON reporter and returns raw output.

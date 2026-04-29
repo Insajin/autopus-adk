@@ -64,6 +64,25 @@ func TestSharedAutopusYamlTemplate(t *testing.T) {
 	assert.Contains(t, result, "claude-code")
 	assert.Contains(t, result, "subprocess:")
 	assert.Contains(t, result, "timeout: 420")
+	assert.Contains(t, result, "design:")
+	assert.Contains(t, result, "max_context_lines:")
+}
+
+func TestSharedDesignTemplate(t *testing.T) {
+	t.Parallel()
+	e := tmpl.New()
+	cfg := config.DefaultFullConfig("design-project")
+
+	tmplPath := filepath.Join(templateRoot(), "shared", "DESIGN.md.tmpl")
+	result, err := e.RenderFile(tmplPath, cfg)
+	require.NoError(t, err)
+
+	assert.Contains(t, result, "source_of_truth")
+	assert.Contains(t, result, "Palette Roles")
+	assert.Contains(t, result, "Typography")
+	assert.Contains(t, result, "Component Guardrails")
+	assert.Contains(t, result, "Responsive Behavior")
+	assert.Contains(t, result, "Agent Prompt Guidance")
 }
 
 func TestClaudeRouterTemplate(t *testing.T) {

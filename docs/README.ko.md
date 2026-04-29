@@ -550,6 +550,16 @@ ARCHITECTURE.md                    # 도메인, 레이어, 의존성 맵
 
 > 💡 **왜 중요한가요?** 이 문서 없이 AI가 프로젝트를 보는 것은, 온보딩 없이 첫 출근한 신입사원과 같습니다 — 아키텍처를 추측하고, 컨벤션을 놓치고, 이미 존재하는 패턴을 다시 만들게 됩니다. `/auto setup`으로 모든 에이전트 세션이 정보를 갖고 시작합니다.
 
+### 선택 사항: UI 작업용 `DESIGN.md`
+
+프론트엔드 검증과 리뷰는 프로젝트 루트의 `DESIGN.md`를 가벼운 디자인 컨텍스트로 사용할 수 있습니다. 문서는 source of truth, palette roles, typography hierarchy, component guardrails, layout/responsive rules, agent guidance를 짧게 담는 것을 권장합니다. `DESIGN.md` 또는 설정된 디자인 baseline이 없으면 `/auto verify`, Phase 3.5, `/auto review`, `auto orchestra review`는 기존처럼 실행되며 `Design context: skipped (not configured)`를 non-error로 보고합니다.
+
+디자인 컨텍스트는 `.tsx`, `.jsx`, CSS 계열 파일, theme/token 파일, design-system 경로 같은 UI diff에만 주입됩니다. UI finding은 palette-role drift, typography hierarchy drift, component guardrail violation, layout/responsive regression, source-of-truth mismatch를 확인합니다. 리뷰 surface는 읽기 전용이며 직접 수정하지 않고 executor/fixer로 수정 작업을 위임합니다.
+
+생성된 플랫폼 surface는 canonical source가 아닙니다. `.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*`, plugin surface를 고치려면 `autopus-adk`의 content/template을 수정한 뒤 대상 프로젝트에서 `auto update`로 갱신하세요.
+
+외부 디자인 reference는 명시적으로 promote되기 전까지 신뢰하지 않는 supplemental context입니다. `auto design import`는 sanitized artifact를 `.autopus/design/imports/<import-id>/` 아래에 저장하며, 기존 사람이 관리하는 `DESIGN.md`를 기본으로 덮어쓰지 않습니다. URL import는 public HTTPS만 허용하는 SSRF 보호 경로로 동작하고 localhost/private/metadata 대상, unsafe redirect, 과도한 redirect, timeout, 1 MiB 초과 응답을 차단하며 거부 시 redacted diagnostics만 남깁니다.
+
 ### 4단계 · 첫 기능 만들기
 
 준비 완료. 원하는 것을 자연어로 설명하세요:

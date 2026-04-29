@@ -29,6 +29,7 @@ var gitignorePatterns = []string{
 	".agents/skills/",
 	".agents/plugins/",
 	".autopus/",
+	".autopus/design/imports/",
 	".mcp.json",
 }
 

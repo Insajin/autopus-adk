@@ -72,3 +72,14 @@ orchestra:
       strategy: {{$v.Strategy}}
       providers: [{{range $i, $p := $v.Providers}}{{if $i}}, {{end}}{{$p}}{{end}}]
 {{end}}{{end}}{{end}}
+design:
+  enabled: {{.Design.Enabled}}
+{{if .Design.Paths}}  paths:
+{{range .Design.Paths}}    - {{.}}
+{{end}}{{end}}  max_context_lines: {{.Design.MaxContextLines}}
+  inject_on_review: {{.Design.InjectOnReview}}
+  inject_on_verify: {{.Design.InjectOnVerify}}
+  external_imports: {{.Design.ExternalImports}}
+{{if .Design.UIFileGlobs}}  ui_globs:
+{{range .Design.UIFileGlobs}}    - {{.}}
+{{end}}{{end}}

@@ -46,6 +46,7 @@ func loadConfig(dir string, persistNormalization bool) (*HarnessConfig, bool, er
 	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
 		return nil, false, fmt.Errorf("parse config: %w", err)
 	}
+	applyMissingDefaults(&cfg, []byte(expanded))
 
 	normalized := MigratePlatformNames(&cfg)
 	if persistNormalization && normalized {
@@ -59,6 +60,18 @@ func loadConfig(dir string, persistNormalization bool) (*HarnessConfig, bool, er
 		return nil, false, fmt.Errorf("validate config: %w", err)
 	}
 	return &cfg, normalized, nil
+}
+
+// @AX:NOTE [AUTO]: Missing design block is backfilled for backward compatibility; explicit design config keeps caller intent.
+func applyMissingDefaults(cfg *HarnessConfig, data []byte) {
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return
+	}
+	defaults := DefaultFullConfig(cfg.ProjectName)
+	if _, ok := raw["design"]; !ok {
+		cfg.Design = defaults.Design
+	}
 }
 
 // Save validates and writes the config to autopus.yaml.

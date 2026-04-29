@@ -68,7 +68,10 @@ func previewCategoryForPath(path string) string {
 	switch {
 	case path == "autopus.yaml" || path == "config.toml" || path == ".codex/config.toml" || path == "opencode.json" || path == ".mcp.json":
 		return "config"
-	case strings.HasSuffix(path, "-manifest.json") || strings.HasSuffix(path, ".meta.yaml") || strings.HasPrefix(path, ".autopus/backup/"):
+	case strings.HasSuffix(path, "-manifest.json") ||
+		strings.HasSuffix(path, ".meta.yaml") ||
+		strings.HasPrefix(path, ".autopus/backup/") ||
+		strings.HasPrefix(path, ".autopus/design/imports/"):
 		return "runtime_state"
 	case strings.HasPrefix(path, ".claude/") ||
 		strings.HasPrefix(path, ".codex/") ||

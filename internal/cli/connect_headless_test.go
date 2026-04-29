@@ -99,6 +99,9 @@ func headlessTestServer(t *testing.T, workspaceID, workspaceName string) *httpte
 				AccessToken: "openai-access-tok",
 			})
 
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "ai-oauth/callback"):
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true}) //nolint:errcheck
+
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -224,6 +227,46 @@ func TestRunHeadlessConnect_OpenAIDeviceCodeFails(t *testing.T) {
 	oauthErrEvent := findEventByStep(events, "openai_oauth")
 	require.NotNil(t, oauthErrEvent)
 	assert.Equal(t, "error", oauthErrEvent.Status)
+}
+
+func TestHeadlessOpenAIOAuth_SubmitsCompletedToken(t *testing.T) {
+	wsID := "ws-submit-001"
+	submitted := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "ai-oauth/device-code"):
+			_ = json.NewEncoder(w).Encode(connect.DeviceCodeResponse{ //nolint:errcheck
+				DeviceCode:      "openai-dc",
+				UserCode:        "OPEN-CODE",
+				VerificationURI: "https://openai.example.com/device",
+				ExpiresIn:       300,
+				Interval:        1,
+			})
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "ai-oauth/device-token"):
+			_ = json.NewEncoder(w).Encode(connect.DeviceTokenResponse{ //nolint:errcheck
+				Status:       "completed",
+				AccessToken:  "openai-access",
+				RefreshToken: "openai-refresh",
+				ExpiresIn:    3600,
+			})
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "ai-oauth/callback"):
+			var payload map[string]string
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			assert.Equal(t, "openai", payload["provider"])
+			assert.Equal(t, "openai-access", payload["access_token"])
+			assert.Equal(t, "openai-refresh", payload["refresh_token"])
+			submitted = true
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true}) //nolint:errcheck
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	err := headlessOpenAIOAuth(context.Background(), srv.URL, "server-token", wsID)
+	require.NoError(t, err)
+	assert.True(t, submitted, "completed OpenAI token must be submitted to the backend")
 }
 
 // findEventByStep returns the first event with the given step and an error status.

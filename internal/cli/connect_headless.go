@@ -154,9 +154,22 @@ func headlessOpenAIOAuth(ctx context.Context, serverURL, authToken, workspaceID 
 		ExpiresIn: dc.ExpiresIn,
 	})
 
-	_, err = connect.PollOpenAIDeviceToken(ctx, serverURL, authToken, workspaceID, dc.DeviceCode, dc.Interval)
+	tokenResp, err := connect.PollOpenAIDeviceToken(ctx, serverURL, authToken, workspaceID, dc.DeviceCode, dc.Interval)
 	if err != nil {
 		return err
+	}
+	if tokenResp.AccessToken == "" {
+		return fmt.Errorf("completed openai oauth response missing access token")
+	}
+
+	client := connect.NewClient(authToken).WithServerURL(serverURL)
+	if err := client.SubmitToken(ctx, connect.SubmitTokenRequest{
+		ProviderToken: tokenResp.AccessToken,
+		RefreshToken:  tokenResp.RefreshToken,
+		WorkspaceID:   workspaceID,
+		Provider:      "openai",
+	}); err != nil {
+		return fmt.Errorf("submit openai token: %w", err)
 	}
 	return nil
 }

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -272,12 +271,7 @@ func TestAnalyzeGitDiff_ReturnsSlice(t *testing.T) {
 		t.Logf("analyzeGitDiff returned error (acceptable in CI without git): %v", err)
 		return
 	}
-	for _, f := range files {
-		ext := filepath.Ext(f)
-		if ext != ".tsx" && ext != ".jsx" {
-			t.Errorf("unexpected file extension in result: %q", f)
-		}
-	}
+	assert.NotNil(t, files)
 }
 
 // TestRunPlaywright_FailsWithoutNpx verifies runPlaywright returns an error when npx is absent.

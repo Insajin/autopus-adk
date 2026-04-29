@@ -144,6 +144,13 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			AutoFix:         true,
 			MaxFixAttempts:  2,
 		},
+		Design: DesignConf{
+			Enabled:         true,
+			MaxContextLines: 80,
+			InjectOnReview:  true,
+			InjectOnVerify:  true,
+			ExternalImports: false,
+		},
 		Context: ContextConf{
 			SignatureMap: true,
 		},
