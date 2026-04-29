@@ -52,6 +52,11 @@ func TestCardBuilder_WithProviders_KnownProviders(t *testing.T) {
 				Build()
 			assert.Equal(t, []string{tc.provider}, card.Providers)
 			assert.Equal(t, tc.expected, card.Skills)
+			if tc.provider == "codex" {
+				assert.Equal(t, codexUnsupportedModelOverrides, card.UnsupportedModelOverrides)
+			} else {
+				assert.Empty(t, card.UnsupportedModelOverrides)
+			}
 		})
 	}
 }
@@ -65,6 +70,7 @@ func TestCardBuilder_WithProviders_NormalizesAliases(t *testing.T) {
 
 	assert.Equal(t, []string{"claude", "codex"}, card.Providers)
 	assert.Equal(t, []string{"analysis", "coding", "generation", "review"}, card.Skills)
+	assert.Equal(t, codexUnsupportedModelOverrides, card.UnsupportedModelOverrides)
 }
 
 func TestServerAgentCardIncludesProvidersAndMergedSkills(t *testing.T) {
@@ -81,6 +87,7 @@ func TestServerAgentCardIncludesProvidersAndMergedSkills(t *testing.T) {
 	card := server.agentCard()
 	assert.Equal(t, []string{"codex"}, card.Providers)
 	assert.Equal(t, []string{"coding", "generation", "review"}, card.Skills)
+	assert.Equal(t, codexUnsupportedModelOverrides, card.UnsupportedModelOverrides)
 }
 
 func TestCardBuilder_WithProviders_UnknownProvider(t *testing.T) {

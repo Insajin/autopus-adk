@@ -60,15 +60,16 @@ type JSONRPCNotification struct {
 
 // AgentCard describes the worker's capabilities for registration.
 type AgentCard struct {
-	Name                string   `json:"name"`
-	Description         string   `json:"description"`
-	URL                 string   `json:"url"`
-	WorkspaceID         string   `json:"workspace_id,omitempty"`
-	Skills              []string `json:"skills"`
-	Providers           []string `json:"providers,omitempty"`
-	ExecutionLanes      []string `json:"execution_lanes,omitempty"`
-	Capabilities        []string `json:"capabilities,omitempty"`
-	SupportedInputModes []string `json:"supported_input_modes"`
+	Name                      string   `json:"name"`
+	Description               string   `json:"description"`
+	URL                       string   `json:"url"`
+	WorkspaceID               string   `json:"workspace_id,omitempty"`
+	Skills                    []string `json:"skills"`
+	Providers                 []string `json:"providers,omitempty"`
+	ExecutionLanes            []string `json:"execution_lanes,omitempty"`
+	Capabilities              []string `json:"capabilities,omitempty"`
+	UnsupportedModelOverrides []string `json:"unsupported_model_overrides,omitempty"`
+	SupportedInputModes       []string `json:"supported_input_modes"`
 }
 
 // Task represents an A2A task with status tracking.

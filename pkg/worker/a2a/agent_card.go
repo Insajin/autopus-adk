@@ -23,6 +23,11 @@ const executionLaneBuildChange = "build_change"
 
 var defaultExecutionLanes = []string{executionLaneBuildChange}
 
+var codexUnsupportedModelOverrides = []string{
+	"openai/*codex*",
+	"*codex*",
+}
+
 // CardBuilder constructs an AgentCard from worker configuration.
 type CardBuilder struct {
 	workerName     string
@@ -67,18 +72,20 @@ func (b *CardBuilder) Build() AgentCard {
 		description = fmt.Sprintf("Autopus ADK Worker v%s", b.version)
 	}
 
-	log.Printf("[a2a] built agent card: name=%s providers=%v skills=%v",
-		b.workerName, b.providers, skills)
+	unsupportedModelOverrides := b.resolveUnsupportedModelOverrides()
+	log.Printf("[a2a] built agent card: name=%s providers=%v skills=%v unsupported_model_overrides=%v",
+		b.workerName, b.providers, skills, unsupportedModelOverrides)
 
 	return AgentCard{
-		Name:                b.workerName,
-		Description:         description,
-		URL:                 b.backendURL,
-		Providers:           append([]string(nil), b.providers...),
-		Skills:              skills,
-		ExecutionLanes:      b.resolveExecutionLanes(),
-		Capabilities:        DefaultCapabilities(),
-		SupportedInputModes: []string{"text"},
+		Name:                      b.workerName,
+		Description:               description,
+		URL:                       b.backendURL,
+		Providers:                 append([]string(nil), b.providers...),
+		Skills:                    skills,
+		ExecutionLanes:            b.resolveExecutionLanes(),
+		Capabilities:              DefaultCapabilities(),
+		UnsupportedModelOverrides: unsupportedModelOverrides,
+		SupportedInputModes:       []string{"text"},
 	}
 }
 
@@ -185,6 +192,15 @@ func (b *CardBuilder) resolveExecutionLanes() []string {
 	}
 	sort.Strings(result)
 	return result
+}
+
+func (b *CardBuilder) resolveUnsupportedModelOverrides() []string {
+	for _, provider := range b.providers {
+		if provider == "codex" {
+			return append([]string(nil), codexUnsupportedModelOverrides...)
+		}
+	}
+	return nil
 }
 
 // RegistrationResult holds the parsed response from agent/register.

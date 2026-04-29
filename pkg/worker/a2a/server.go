@@ -120,15 +120,16 @@ func (s *Server) agentCard() AgentCard {
 		WithExecutionLanes(s.config.ExecutionLanes).
 		Build()
 	return AgentCard{
-		Name:                card.Name,
-		Description:         card.Description,
-		URL:                 card.URL,
-		WorkspaceID:         s.config.WorkspaceID,
-		Providers:           card.Providers,
-		Skills:              mergeSkills(card.Skills, s.config.Skills),
-		ExecutionLanes:      card.ExecutionLanes,
-		Capabilities:        card.Capabilities,
-		SupportedInputModes: []string{"text"},
+		Name:                      card.Name,
+		Description:               card.Description,
+		URL:                       card.URL,
+		WorkspaceID:               s.config.WorkspaceID,
+		Providers:                 card.Providers,
+		Skills:                    mergeSkills(card.Skills, s.config.Skills),
+		ExecutionLanes:            card.ExecutionLanes,
+		Capabilities:              card.Capabilities,
+		UnsupportedModelOverrides: card.UnsupportedModelOverrides,
+		SupportedInputModes:       []string{"text"},
 	}
 }
 
