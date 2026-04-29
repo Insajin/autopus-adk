@@ -44,6 +44,7 @@ func (cfg RuntimeConfig) LoopConfig() worker.LoopConfig {
 		WorkerName:        cfg.WorkerName,
 		MemoryAgentID:     cfg.MemoryAgentID,
 		Skills:            []string{"coding", "review"},
+		Providers:         []string{cfg.ProviderName},
 		Provider:          cfg.ProviderAdapter,
 		MCPConfig:         cfg.MCPConfigPath,
 		WorkDir:           cfg.WorkDir,

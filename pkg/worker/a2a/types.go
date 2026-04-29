@@ -65,6 +65,7 @@ type AgentCard struct {
 	URL                 string   `json:"url"`
 	WorkspaceID         string   `json:"workspace_id,omitempty"`
 	Skills              []string `json:"skills"`
+	Providers           []string `json:"providers,omitempty"`
 	ExecutionLanes      []string `json:"execution_lanes,omitempty"`
 	Capabilities        []string `json:"capabilities,omitempty"`
 	SupportedInputModes []string `json:"supported_input_modes"`
@@ -112,6 +113,7 @@ type SendMessageParams struct {
 	Payload                  json.RawMessage   `json:"payload"`
 	RequiredLane             string            `json:"required_lane,omitempty"`
 	Model                    string            `json:"model,omitempty"`
+	Provider                 string            `json:"provider,omitempty"`
 	PipelinePhases           []string          `json:"pipeline_phases,omitempty"`
 	PipelineInstructions     map[string]string `json:"pipeline_instructions,omitempty"`
 	PipelinePromptTemplates  map[string]string `json:"pipeline_prompt_templates,omitempty"`

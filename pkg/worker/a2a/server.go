@@ -18,6 +18,7 @@ type ServerConfig struct {
 	WorkerName            string
 	WorkspaceID           string
 	Skills                []string
+	Providers             []string
 	ExecutionLanes        []string
 	Handler               TaskHandler
 	AuthToken             string // Bearer token for backend auth (SEC-005)
@@ -115,6 +116,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 func (s *Server) agentCard() AgentCard {
 	card := NewCardBuilder(s.config.WorkerName, s.config.BackendURL).
+		WithProviders(s.config.Providers).
 		WithExecutionLanes(s.config.ExecutionLanes).
 		Build()
 	return AgentCard{
@@ -122,9 +124,10 @@ func (s *Server) agentCard() AgentCard {
 		Description:         card.Description,
 		URL:                 card.URL,
 		WorkspaceID:         s.config.WorkspaceID,
-		Skills:              s.config.Skills,
+		Providers:           card.Providers,
+		Skills:              mergeSkills(card.Skills, s.config.Skills),
 		ExecutionLanes:      card.ExecutionLanes,
-		Capabilities:        DefaultCapabilities(),
+		Capabilities:        card.Capabilities,
 		SupportedInputModes: []string{"text"},
 	}
 }

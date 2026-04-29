@@ -50,9 +50,37 @@ func TestCardBuilder_WithProviders_KnownProviders(t *testing.T) {
 			card := NewCardBuilder("w", "http://x").
 				WithProviders([]string{tc.provider}).
 				Build()
+			assert.Equal(t, []string{tc.provider}, card.Providers)
 			assert.Equal(t, tc.expected, card.Skills)
 		})
 	}
+}
+
+func TestCardBuilder_WithProviders_NormalizesAliases(t *testing.T) {
+	t.Parallel()
+
+	card := NewCardBuilder("w", "http://x").
+		WithProviders([]string{"openai", "codex", "anthropic"}).
+		Build()
+
+	assert.Equal(t, []string{"claude", "codex"}, card.Providers)
+	assert.Equal(t, []string{"analysis", "coding", "generation", "review"}, card.Skills)
+}
+
+func TestServerAgentCardIncludesProvidersAndMergedSkills(t *testing.T) {
+	t.Parallel()
+
+	server := NewServer(ServerConfig{
+		BackendURL:  "https://api.example.com",
+		WorkerName:  "worker",
+		WorkspaceID: "ws-test",
+		Providers:   []string{"openai"},
+		Skills:      []string{"review"},
+	})
+
+	card := server.agentCard()
+	assert.Equal(t, []string{"codex"}, card.Providers)
+	assert.Equal(t, []string{"coding", "generation", "review"}, card.Skills)
 }
 
 func TestCardBuilder_WithProviders_UnknownProvider(t *testing.T) {
@@ -92,6 +120,7 @@ func TestCardBuilder_NoProviders(t *testing.T) {
 		Build()
 
 	assert.Empty(t, card.Skills)
+	assert.Empty(t, card.Providers)
 }
 
 func TestCardBuilder_WithExecutionLanes(t *testing.T) {

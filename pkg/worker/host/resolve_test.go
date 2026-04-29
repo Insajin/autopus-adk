@@ -66,6 +66,7 @@ func TestResolveRuntime_BuildsResolvedConfig(t *testing.T) {
 	assert.Equal(t, customPath, cfg.CredentialsPath)
 	assert.True(t, cfg.KnowledgeSync)
 	require.NotNil(t, cfg.ProviderAdapter)
+	assert.Equal(t, []string{"codex"}, cfg.LoopConfig().Providers)
 }
 
 func TestResolveRuntime_UsesCustomCredentialsPath(t *testing.T) {

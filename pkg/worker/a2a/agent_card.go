@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 )
 
 // providerSkills maps known provider names to their skill sets.
@@ -41,7 +42,7 @@ func NewCardBuilder(name, backendURL string) *CardBuilder {
 
 // WithProviders sets the provider list for skill resolution.
 func (b *CardBuilder) WithProviders(providers []string) *CardBuilder {
-	b.providers = providers
+	b.providers = normalizeProviderList(providers)
 	return b
 }
 
@@ -73,11 +74,67 @@ func (b *CardBuilder) Build() AgentCard {
 		Name:                b.workerName,
 		Description:         description,
 		URL:                 b.backendURL,
+		Providers:           append([]string(nil), b.providers...),
 		Skills:              skills,
 		ExecutionLanes:      b.resolveExecutionLanes(),
 		Capabilities:        DefaultCapabilities(),
 		SupportedInputModes: []string{"text"},
 	}
+}
+
+func normalizeProviderName(raw string) string {
+	name := strings.ToLower(strings.TrimSpace(raw))
+	name = strings.ReplaceAll(name, "_", "-")
+	switch name {
+	case "anthropic", "claude", "claude-code":
+		return "claude"
+	case "openai", "codex", "openai-codex":
+		return "codex"
+	case "google", "gemini", "gemini-cli":
+		return "gemini"
+	case "opencode", "open-code":
+		return "opencode"
+	default:
+		return name
+	}
+}
+
+func normalizeProviderList(providers []string) []string {
+	seen := make(map[string]struct{}, len(providers))
+	result := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		normalized := normalizeProviderName(provider)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func mergeSkills(left, right []string) []string {
+	seen := make(map[string]struct{}, len(left)+len(right))
+	result := make([]string, 0, len(left)+len(right))
+	for _, skills := range [][]string{left, right} {
+		for _, skill := range skills {
+			trimmed := strings.TrimSpace(skill)
+			if trimmed == "" {
+				continue
+			}
+			if _, ok := seen[trimmed]; ok {
+				continue
+			}
+			seen[trimmed] = struct{}{}
+			result = append(result, trimmed)
+		}
+	}
+	sort.Strings(result)
+	return result
 }
 
 // resolveSkills collects and deduplicates skills from all providers.

@@ -26,6 +26,7 @@ type LoopConfig struct {
 	WorkerName    string
 	MemoryAgentID string
 	Skills        []string
+	Providers     []string
 	Provider      adapter.ProviderAdapter
 	MCPConfig     string          // path to worker-mcp.json
 	WorkDir       string          // working directory for subprocesses
@@ -84,6 +85,7 @@ func NewWorkerLoop(config LoopConfig) *WorkerLoop {
 		WorkerName:            config.WorkerName,
 		WorkspaceID:           config.WorkspaceID,
 		Skills:                config.Skills,
+		Providers:             config.Providers,
 		Handler:               wl.handleTask,
 		AuthToken:             config.AuthToken,
 		ApprovalCallback:      wl.handleApproval,
