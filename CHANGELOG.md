@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.42.0] — 2026-04-29
+
 ### Added
 
 - **Semantic invariant acceptance gate hardening (SPEC-ACCGATE-002)** (2026-04-29): SPEC generation and implementation guidance now preserve original task semantic invariants through research inventory, oracle acceptance, behavioral tests, validator coverage, and observable subagent pipeline evidence.
