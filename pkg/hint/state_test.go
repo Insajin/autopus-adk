@@ -13,6 +13,7 @@ func TestNewStateStore(t *testing.T) {
 	}
 	if store == nil {
 		t.Fatal("NewStateStore() returned nil")
+		return
 	}
 	if store.path == "" {
 		t.Fatal("NewStateStore() path is empty")

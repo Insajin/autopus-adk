@@ -209,6 +209,7 @@ func TestMatchBuild(t *testing.T) {
 			}
 			if got == nil {
 				t.Fatal("MatchBuild() = nil, want non-nil")
+				return
 			}
 			if got.Command != tt.wantCmd {
 				t.Errorf("MatchBuild().Command = %q, want %q", got.Command, tt.wantCmd)

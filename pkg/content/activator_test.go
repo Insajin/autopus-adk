@@ -30,6 +30,7 @@ func TestNewSkillActivator(t *testing.T) {
 	a := NewSkillActivator(reg, true, 5, map[string]int{"engineering": 20})
 	if a == nil {
 		t.Fatal("expected non-nil activator")
+		return
 	}
 	if a.maxActive != 5 {
 		t.Errorf("maxActive = %d, want 5", a.maxActive)
