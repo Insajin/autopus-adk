@@ -33,12 +33,18 @@ func (a *CodexAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.
 	}
 	args = append(args, "--json")
 
-	if task.Model != "" && !strings.HasPrefix(task.Model, "openai/") {
-		args = append(args, "-m", task.Model)
-	} else if strings.HasPrefix(task.Model, "openai/") {
-		slog.Warn("openai/* model not supported by codex CLI account, omitting explicit model override",
-			"task_id", task.TaskID,
-			"model", task.Model)
+	if model, ok := codexModelOverride(task.Model); ok {
+		args = append(args, "-m", model)
+	} else if strings.TrimSpace(task.Model) != "" {
+		if isCodexAccountUnsupportedModel(task.Model) {
+			slog.Info("codex model override is not supported by the current account, using codex default model",
+				"task_id", task.TaskID,
+				"model", task.Model)
+		} else {
+			slog.Warn("model is not supported by codex provider, omitting explicit model override",
+				"task_id", task.TaskID,
+				"model", task.Model)
+		}
 	}
 
 	if task.ComputerUse {
@@ -58,6 +64,31 @@ func (a *CodexAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.
 	cmd.Env = env
 
 	return cmd
+}
+
+func codexModelOverride(model string) (string, bool) {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return "", false
+	}
+	if provider, name, ok := strings.Cut(model, "/"); ok {
+		if provider != "openai" || strings.TrimSpace(name) == "" || strings.Contains(name, "/") {
+			return "", false
+		}
+		model = strings.TrimSpace(name)
+	}
+	if isCodexAccountUnsupportedModel(model) {
+		return "", false
+	}
+	return model, true
+}
+
+func isCodexAccountUnsupportedModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	if provider, name, ok := strings.Cut(model, "/"); ok && provider == "openai" {
+		model = strings.TrimSpace(name)
+	}
+	return strings.Contains(model, "codex")
 }
 
 // codexResultEvent is the JSON structure of a Codex result line.

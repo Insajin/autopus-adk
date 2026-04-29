@@ -62,7 +62,7 @@ func TestCodexAdapterBuildCommandWithModel(t *testing.T) {
 	assert.Contains(t, cmd.Args, "o3")
 }
 
-func TestCodexAdapterBuildCommand_OmitsOpenAIModelOverride(t *testing.T) {
+func TestCodexAdapterBuildCommand_NormalizesOpenAIModelOverride(t *testing.T) {
 	a := NewCodexAdapter()
 	task := TaskConfig{
 		TaskID: "task-cm2",
@@ -71,8 +71,39 @@ func TestCodexAdapterBuildCommand_OmitsOpenAIModelOverride(t *testing.T) {
 
 	cmd := a.BuildCommand(context.Background(), task)
 	assert.Contains(t, cmd.Args, "--dangerously-bypass-approvals-and-sandbox")
-	assert.NotContains(t, cmd.Args, "-m")
+	assert.Contains(t, cmd.Args, "-m")
+	assert.Contains(t, cmd.Args, "gpt-5.4")
 	assert.NotContains(t, cmd.Args, "openai/gpt-5.4")
+}
+
+func TestCodexAdapterBuildCommand_OmitsCodexAccountUnsupportedModelOverride(t *testing.T) {
+	a := NewCodexAdapter()
+	for _, model := range []string{"openai/gpt-5.2-codex", "gpt-5.2-codex"} {
+		t.Run(model, func(t *testing.T) {
+			task := TaskConfig{
+				TaskID: "task-cm-codex",
+				Model:  model,
+			}
+
+			cmd := a.BuildCommand(context.Background(), task)
+			assert.Contains(t, cmd.Args, "--dangerously-bypass-approvals-and-sandbox")
+			assert.NotContains(t, cmd.Args, "-m")
+			assert.NotContains(t, cmd.Args, model)
+		})
+	}
+}
+
+func TestCodexAdapterBuildCommand_OmitsNonOpenAIModelOverride(t *testing.T) {
+	a := NewCodexAdapter()
+	task := TaskConfig{
+		TaskID: "task-cm3",
+		Model:  "anthropic/claude-opus-4-6",
+	}
+
+	cmd := a.BuildCommand(context.Background(), task)
+	assert.Contains(t, cmd.Args, "--dangerously-bypass-approvals-and-sandbox")
+	assert.NotContains(t, cmd.Args, "-m")
+	assert.NotContains(t, cmd.Args, "anthropic/claude-opus-4-6")
 }
 
 func TestCodexAdapterParseEvent(t *testing.T) {
