@@ -1,8 +1,9 @@
 # PRD — SPEC-ACCGATE-002
 
 **Title**: Semantic invariant acceptance gate for Autopus workflows
-**Status**: draft
+**Status**: completed
 **Created**: 2026-04-29
+**Completed**: 2026-04-29
 **Target module**: autopus-adk
 
 ## Problem
