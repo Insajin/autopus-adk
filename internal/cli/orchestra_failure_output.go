@@ -18,7 +18,7 @@ type orchestraFailureReport struct {
 	Providers        []string                   `json:"providers"`
 	RunID            string                     `json:"run_id,omitempty"`
 	Duration         string                     `json:"duration,omitempty"`
-	Error            string                     `json:"error"`
+	Error            string                     `json:"error,omitempty"`
 	Summary          string                     `json:"summary,omitempty"`
 	EffectiveTimeout ResolvedOrchestraTimeout   `json:"effective_timeout"`
 	FailedProviders  []orchestraFailureProvider `json:"failed_providers,omitempty"`
@@ -37,6 +37,14 @@ type orchestraFailureProvider struct {
 }
 
 func saveOrchestraFailureReport(command, strategy string, providers []string, timeout ResolvedOrchestraTimeout, result *orchestra.OrchestraResult, runErr error) (string, error) {
+	return saveOrchestraDiagnosticsReport("failed", command, strategy, providers, timeout, result, runErr)
+}
+
+func saveOrchestraDegradedReport(command, strategy string, providers []string, timeout ResolvedOrchestraTimeout, result *orchestra.OrchestraResult) (string, error) {
+	return saveOrchestraDiagnosticsReport("degraded", command, strategy, providers, timeout, result, nil)
+}
+
+func saveOrchestraDiagnosticsReport(prefix, command, strategy string, providers []string, timeout ResolvedOrchestraTimeout, result *orchestra.OrchestraResult, runErr error) (string, error) {
 	dir := ".autopus/orchestra"
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
@@ -47,8 +55,10 @@ func saveOrchestraFailureReport(command, strategy string, providers []string, ti
 		Command:          command,
 		Strategy:         strategy,
 		Providers:        append([]string(nil), providers...),
-		Error:            runErr.Error(),
 		EffectiveTimeout: timeout,
+	}
+	if runErr != nil {
+		report.Error = runErr.Error()
 	}
 	if result != nil {
 		report.RunID = result.RunID
@@ -77,7 +87,7 @@ func saveOrchestraFailureReport(command, strategy string, providers []string, ti
 	}
 
 	ts := time.Now().Format("20060102-150405")
-	filename := filepath.Join(dir, fmt.Sprintf("failed-%s-%s-%s.json", command, strategy, ts))
+	filename := filepath.Join(dir, fmt.Sprintf("%s-%s-%s-%s.json", prefix, command, strategy, ts))
 	if err := os.WriteFile(filename, data, 0o644); err != nil {
 		return "", err
 	}
@@ -106,7 +116,7 @@ func renderOrchestraFailureSummary(timeout ResolvedOrchestraTimeout, result *orc
 		}
 	}
 	if reportPath != "" {
-		fmt.Fprintf(&sb, "- failure report: %s\n", reportPath)
+		fmt.Fprintf(&sb, "- diagnostics report: %s\n", reportPath)
 	}
 	return sb.String()
 }

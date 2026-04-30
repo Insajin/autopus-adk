@@ -61,8 +61,6 @@ func TestResolveOrchestraTimeout_FlagOverridesConfig(t *testing.T) {
 }
 
 func TestSaveOrchestraFailureReport_WritesStructuredArtifact(t *testing.T) {
-	t.Parallel()
-
 	dir := t.TempDir()
 	original, err := os.Getwd()
 	require.NoError(t, err)
@@ -120,4 +118,116 @@ func TestSaveOrchestraFailureReport_WritesStructuredArtifact(t *testing.T) {
 	assert.Contains(t, string(data), "\"source\": \"autopus.yaml orchestra.timeout_seconds\"")
 	assert.Contains(t, string(data), "\"failure_class\": \"timeout\"")
 	assert.Contains(t, string(data), "\"failure_class\": \"capacity_exhausted\"")
+}
+
+func TestSaveOrchestraResult_DegradedRunWritesProviderDiagnostics(t *testing.T) {
+	dir := t.TempDir()
+	original, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() {
+		chdirErr := os.Chdir(original)
+		require.NoError(t, chdirErr)
+	}()
+	require.NoError(t, os.Chdir(dir))
+
+	resolved := ResolvedOrchestraTimeout{
+		Seconds: 600,
+		Source:  "flag --timeout",
+		Providers: []ResolvedProviderTimeout{
+			{Provider: "claude", Duration: 600 * time.Second, Source: "flag --timeout"},
+			{Provider: "codex", Duration: 420 * time.Second, Source: "autopus.yaml orchestra.providers.codex.subprocess.timeout"},
+			{Provider: "gemini", Duration: 600 * time.Second, Source: "flag --timeout"},
+		},
+	}
+	result := &orchestra.OrchestraResult{
+		Strategy: orchestra.StrategyDebate,
+		Merged:   "merged brainstorm output",
+		Duration: 2 * time.Minute,
+		Summary:  "토론 완료 (실패: codex, gemini)",
+		FailedProviders: []orchestra.FailedProvider{
+			{
+				Name:            "codex",
+				Error:           "timeout: provider exceeded 7m0s deadline",
+				FailureClass:    "timeout",
+				NextRemediation: "increase timeout or simplify strategy",
+				StderrPreview:   "context deadline exceeded",
+			},
+			{
+				Name:            "gemini",
+				Error:           "subprocess gemini exited with code 1",
+				FailureClass:    "capacity_exhausted",
+				NextRemediation: "retry later or reduce provider set",
+				StderrPreview:   "RESOURCE_EXHAUSTED MODEL_CAPACITY_EXHAUSTED",
+				OutputPreview:   "No capacity available for model",
+			},
+		},
+	}
+
+	path, err := saveOrchestraResult(
+		"brainstorm",
+		"debate",
+		[]string{"claude", "codex", "gemini"},
+		resolved,
+		result,
+	)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	text := string(data)
+	assert.Contains(t, text, "**Status**: degraded")
+	assert.Contains(t, text, "**Effective Timeout**: 600s (flag --timeout)")
+	assert.Contains(t, text, "## Provider Diagnostics")
+	assert.Contains(t, text, "| codex | timeout |")
+	assert.Contains(t, text, "7m0s")
+	assert.Contains(t, text, "autopus.yaml orchestra.providers.codex.subprocess.timeout")
+	assert.Contains(t, text, "increase timeout or simplify strategy")
+	assert.Contains(t, text, "RESOURCE_EXHAUSTED MODEL_CAPACITY_EXHAUSTED")
+	assert.Contains(t, text, "merged brainstorm output")
+}
+
+func TestSaveOrchestraDegradedReport_WritesSidecarJSON(t *testing.T) {
+	dir := t.TempDir()
+	original, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() {
+		chdirErr := os.Chdir(original)
+		require.NoError(t, chdirErr)
+	}()
+	require.NoError(t, os.Chdir(dir))
+
+	resolved := ResolvedOrchestraTimeout{
+		Seconds: 600,
+		Source:  "flag --timeout",
+		Providers: []ResolvedProviderTimeout{
+			{Provider: "codex", Duration: 420 * time.Second, Source: "autopus.yaml orchestra.providers.codex.subprocess.timeout"},
+		},
+	}
+	result := &orchestra.OrchestraResult{
+		Strategy: orchestra.StrategyDebate,
+		Duration: time.Minute,
+		Summary:  "토론 완료 (실패: codex)",
+		FailedProviders: []orchestra.FailedProvider{
+			{
+				Name:            "codex",
+				Error:           "timeout: provider exceeded 7m0s deadline",
+				FailureClass:    "timeout",
+				NextRemediation: "increase timeout or simplify strategy",
+				StderrPreview:   "context deadline exceeded",
+			},
+		},
+	}
+
+	path, err := saveOrchestraDegradedReport("brainstorm", "debate", []string{"codex"}, resolved, result)
+	require.NoError(t, err)
+	assert.True(t, filepath.IsAbs(path))
+	assert.Contains(t, filepath.Base(path), "degraded-brainstorm-debate-")
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	text := string(data)
+	assert.Contains(t, text, "\"failed_providers\"")
+	assert.Contains(t, text, "\"failure_class\": \"timeout\"")
+	assert.Contains(t, text, "\"retry_hints\"")
+	assert.Contains(t, text, "\"source\": \"autopus.yaml orchestra.providers.codex.subprocess.timeout\"")
 }

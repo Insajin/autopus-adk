@@ -172,6 +172,7 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		Duration:        time.Since(start),
 		Summary:         fmt.Sprintf("subprocess pipeline: %d providers, %d rounds", len(cfg.Providers), cfg.Rounds+1),
 		FailedProviders: r1Failed,
+		Degraded:        len(r1Failed) > 0,
 	}, nil
 }
 

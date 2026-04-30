@@ -97,6 +97,8 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		Duration:        total,
 		Summary:         summary,
 		FailedProviders: failed,
+		RunID:           cfg.RunID,
+		Degraded:        len(failed) > 0,
 	}, nil
 }
 

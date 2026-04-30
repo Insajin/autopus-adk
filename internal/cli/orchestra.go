@@ -239,11 +239,18 @@ func runOrchestraCommand(
 		}
 	} else {
 		fmt.Printf("%s\n", result.Merged)
-		if path, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, result); saveErr == nil {
+		if path, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, resolvedTimeout, result); saveErr == nil {
 			fmt.Fprintf(os.Stderr, "결과 저장: %s\n", path)
 		}
 	}
-	if result.Degraded {
+	if resultIsDegraded(result) {
+		reportPath, reportErr := saveOrchestraDegradedReport(commandName, strategyStr, providerNames, resolvedTimeout, result)
+		if reportErr != nil {
+			fmt.Fprintf(os.Stderr, "진단 보고서 저장 실패: %v\n", reportErr)
+		} else {
+			fmt.Fprintf(os.Stderr, "진단 저장: %s\n", reportPath)
+		}
+		fmt.Fprint(os.Stderr, renderOrchestraFailureSummary(resolvedTimeout, result, reportPath))
 		fmt.Fprintf(os.Stderr, "상태: degraded\n")
 	}
 	if result.Reliability != nil && result.Reliability.ArtifactDir != "" {

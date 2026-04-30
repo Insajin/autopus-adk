@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.42.1] — 2026-04-30
+
+### Fixed
+
+- **Orchestra degraded run diagnostics are now persisted** (2026-04-30): `auto orchestra brainstorm` and related successful-but-degraded runs now preserve structured failed-provider diagnostics in Markdown artifacts, terminal summaries, and sidecar JSON reports.
+  - `internal/cli/{orchestra.go,orchestra_output.go,orchestra_failure_output.go}` — degraded success artifacts now include provider failure class, stderr/stdout previews, timeout provenance, remediation hints, and `degraded-*.json` sidecar reports
+  - `pkg/orchestra/{runner.go,pipeline.go,pipeline_execute.go}` — partial provider failures now mark results as degraded and pass through shared failed-provider classification
+  - `internal/cli/orchestra_timeout_test.go`, `pkg/orchestra/pipeline_execute_test.go` — regression coverage for degraded Markdown/JSON diagnostics and subprocess pipeline failure preservation
+
 ## [v0.42.0] — 2026-04-29
 
 ### Added

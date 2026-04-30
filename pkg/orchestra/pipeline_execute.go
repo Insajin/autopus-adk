@@ -17,9 +17,10 @@ func executeParallel(
 	timeoutSeconds int,
 ) ([]ProviderResult, []FailedProvider, error) {
 	type result struct {
-		pr  ProviderResult
-		err error
-		idx int
+		pr   ProviderResult
+		resp *ProviderResponse
+		err  error
+		idx  int
 	}
 
 	results := make([]result, len(providers))
@@ -49,7 +50,7 @@ func executeParallel(
 			resp, err := backend.Execute(ctx, req)
 			if err != nil {
 				progress.MarkFailed(prov.Name)
-				results[idx] = result{err: err, idx: idx}
+				results[idx] = result{resp: resp, err: err, idx: idx}
 				return
 			}
 			if resp == nil {
@@ -59,12 +60,12 @@ func executeParallel(
 			}
 			if resp.TimedOut {
 				progress.MarkFailed(prov.Name)
-				results[idx] = result{err: fmt.Errorf("%s timed out", prov.Name), idx: idx}
+				results[idx] = result{resp: resp, err: fmt.Errorf("%s timed out", prov.Name), idx: idx}
 				return
 			}
 			if resp.EmptyOutput {
 				progress.MarkFailed(prov.Name)
-				results[idx] = result{err: fmt.Errorf("%s returned empty output", prov.Name), idx: idx}
+				results[idx] = result{resp: resp, err: fmt.Errorf("%s returned empty output", prov.Name), idx: idx}
 				return
 			}
 			progress.MarkDone(prov.Name)
@@ -77,7 +78,7 @@ func executeParallel(
 	var failed []FailedProvider
 	for _, r := range results {
 		if r.err != nil {
-			failed = append(failed, FailedProvider{Name: providers[r.idx].Name, Error: r.err.Error()})
+			failed = append(failed, buildFailedProvider(providers[r.idx], r.resp, r.err, timeoutSeconds))
 		} else {
 			successes = append(successes, r.pr)
 		}
