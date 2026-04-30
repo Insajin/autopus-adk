@@ -4,7 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.43.0] — 2026-05-01
+
 ### Changed
+
+- **UX skills now include platform-neutral design-system reasoning** (2026-05-01): `frontend-skill` now performs a compact UX Intelligence pass before UI implementation, and `frontend-verify` / UX agents use the same matrix for visual verification across Claude, Codex, Gemini, and OpenCode surfaces.
+  - `content/skills/{frontend-skill,frontend-verify}.md`, `content/agents/{frontend-specialist,ux-validator}.md` — design discovery matrix, UX Intelligence synthesis, viewport matrix, state/accessibility checks, and pattern/style mismatch detection
+  - `templates/{codex,gemini}/**/{frontend-skill,frontend-verify,frontend-specialist,ux-validator}*` — regenerated Codex/Gemini surfaces from canonical content
+  - `pkg/content/ux_skill_parity_test.go` — regression coverage that the UX Intelligence sections transform for Claude, Codex, Gemini, and OpenCode
 
 - **DESIGN.md starter now participates in init/update** (2026-04-30): `auto init` creates a non-destructive starter `DESIGN.md`, and `auto update` backfills missing `design:` config plus the starter file for older harness installs.
   - `internal/cli/{init.go,update.go,design.go,update_preview.go}` — starter creation/preservation, update backfill, and `--plan` preview visibility

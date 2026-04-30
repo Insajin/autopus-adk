@@ -35,6 +35,45 @@ Before building, write three things:
 
 Each section gets one job, one dominant visual idea, and one primary takeaway or action.
 
+## UX Intelligence Pass
+
+Run this pass before choosing components, colors, or layout. It is a compact design-system generator inspired by professional UI/UX skill packs, but it must use this project's existing design sources and stack conventions first.
+
+Create a short Design Discovery Matrix:
+
+| Dimension | Decision |
+|-----------|----------|
+| Surface type | marketing page / app workspace / dashboard / editor / mobile flow / game / docs |
+| Product category | SaaS, finance, healthcare, marketplace, devtool, media, commerce, civic, lifestyle, etc. |
+| Primary user | who uses it, how often, and under what pressure |
+| Core job | the task the first screen must make easier |
+| Density | sparse, balanced, operational, data-dense |
+| Trust and risk | low, medium, high; note money, health, security, production-change, or destructive-action risk |
+| Platform stack | web, mobile, desktop, responsive web, 3D/game, native shell |
+
+Then synthesize the working design system:
+
+- page or screen pattern: hero-centric, trust/authority, interactive demo, data-dense dashboard, editor workspace, wizard, gallery, marketplace, or operational console
+- style posture: restrained/minimal, editorial, premium, playful, technical, accessible/public-service, immersive, or brand-led
+- palette roles: primary, accent, surface, muted, danger, success, focus, and data colors; prefer semantic tokens over raw hex in components
+- typography: heading/body roles, scale, line height, data/table number treatment, and whether display type is allowed
+- components: required primitives, empty/loading/error/disabled states, icon set, card usage, form pattern, nav pattern
+- motion: what motion communicates, duration range, reduced-motion fallback, and what must stay static
+- anti-patterns: styles that would damage trust, readability, performance, or product fit
+
+If a safe `DESIGN.md`, token file, component library, or existing screen is present, treat it as the source of truth and make the matrix an interpretation of that source. If no source exists, keep the matrix ephemeral in the work log unless the user explicitly asks to create a design-system file.
+
+Pre-delivery checklist:
+
+- Clickable controls have visible hover/pressed/focus/disabled/loading states.
+- Touch targets are at least 44px/44pt where touch is possible.
+- Text contrast reaches WCAG AA for normal text and does not rely on color alone.
+- Layout is checked at 375, 768, 1024, and 1440px widths when web-responsive.
+- `prefers-reduced-motion` or equivalent platform setting is respected.
+- Images/media reserve stable dimensions and do narrative work.
+- Icons come from the project icon library when one exists; avoid emoji as UI icons.
+- Every first-screen decision supports the core job identified in the matrix.
+
 ## Beautiful Defaults
 
 - Start with composition, not components.
