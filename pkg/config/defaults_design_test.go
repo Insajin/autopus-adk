@@ -64,3 +64,30 @@ design:
 	assert.True(t, cfg.Design.ExternalImports)
 	assert.Equal(t, []string{"*.view"}, cfg.Design.UIFileGlobs)
 }
+
+func TestMissingTopLevelKey_Design(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "autopus.yaml"), []byte(`mode: full
+project_name: test
+platforms:
+  - claude-code
+`), 0o644))
+
+	missing, err := MissingTopLevelKey(dir, "design")
+	require.NoError(t, err)
+	assert.True(t, missing)
+
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "autopus.yaml"), []byte(`mode: full
+project_name: test
+platforms:
+  - claude-code
+design:
+  enabled: false
+`), 0o644))
+
+	missing, err = MissingTopLevelKey(dir, "design")
+	require.NoError(t, err)
+	assert.False(t, missing)
+}

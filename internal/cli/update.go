@@ -4,10 +4,8 @@ package cli
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -17,8 +15,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
-	"github.com/insajin/autopus-adk/pkg/selfupdate"
-	"github.com/insajin/autopus-adk/pkg/version"
 )
 
 func newUpdateCmd() *cobra.Command {
@@ -57,6 +53,20 @@ func newUpdateCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("설정 로드 실패: %w", err)
 			}
+			configExists := true
+			if _, statErr := os.Stat(filepath.Join(dir, "autopus.yaml")); os.IsNotExist(statErr) {
+				configExists = false
+			} else if statErr != nil {
+				return fmt.Errorf("autopus.yaml 확인 실패: %w", statErr)
+			}
+			designConfigMissing := false
+			if configExists {
+				var missingErr error
+				designConfigMissing, missingErr = config.MissingTopLevelKey(dir, "design")
+				if missingErr != nil {
+					return fmt.Errorf("design 설정 확인 실패: %w", missingErr)
+				}
+			}
 
 			if err := validateStatusLineMode(statusLine); err != nil {
 				return err
@@ -67,6 +77,7 @@ func newUpdateCmd() *cobra.Command {
 					dir,
 					cfg,
 					platformNamesMigrated,
+					designConfigMissing,
 					yesFlag,
 					isStdinTTY(),
 				)
@@ -112,13 +123,16 @@ func newUpdateCmd() *cobra.Command {
 			// Orchestra config migration
 			if changed, migrateErr := config.MigrateOrchestraConfig(cfg); migrateErr != nil {
 				return fmt.Errorf("orchestra 마이그레이션 실패: %w", migrateErr)
-			} else if changed || len(addedPlatforms) > 0 {
+			} else if changed || len(addedPlatforms) > 0 || (designConfigMissing && cfg.Design.Enabled) {
 				if saveErr := config.Save(dir, cfg); saveErr != nil {
 					return fmt.Errorf("마이그레이션 설정 저장 실패: %w", saveErr)
 				}
 			}
 			if len(addedPlatforms) > 0 {
 				fmt.Fprintf(cmd.OutOrStdout(), "  + 새 플랫폼 감지: %s\n", strings.Join(addedPlatforms, ", "))
+			}
+			if designConfigMissing && cfg.Design.Enabled {
+				fmt.Fprintln(cmd.OutOrStdout(), "  + design defaults added to autopus.yaml")
 			}
 
 			// 프로젝트 설정 프롬프트 (미설정 항목만, --yes 시 스킵)
@@ -130,6 +144,15 @@ func newUpdateCmd() *cobra.Command {
 				return statusLineErr
 			}
 			warnParentRuleConflicts(cmd, dir, cfg, yesFlag)
+			if configExists && cfg.Design.Enabled {
+				designPath, created, designErr := ensureStarterDesignFile(dir)
+				if designErr != nil {
+					return fmt.Errorf("DESIGN.md 생성 실패: %w", designErr)
+				}
+				if created {
+					fmt.Fprintf(cmd.OutOrStdout(), "  + created %s\n", filepath.Base(designPath))
+				}
+			}
 
 			ctx := context.Background()
 			effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
@@ -193,106 +216,4 @@ func appendDetectedPlatforms(cfg *config.HarnessConfig) []string {
 		added = append(added, platform)
 	}
 	return added
-}
-
-// @AX:NOTE: [AUTO] linear guard-clause pattern with 7 steps (R2-R12) — complexity is managed via early returns; no refactor needed unless new steps are added
-// targetVersion is accepted for future P2 use (pinned version install); currently unused — checker always fetches latest.
-func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion string) error {
-	_ = targetVersion // P2: reserved for pinned version install via --version flag
-	rawVer := strings.TrimPrefix(version.Version(), "v")
-	currentCommit := version.Commit()
-
-	// R12: Dev build guard
-	if (rawVer == "dev" || currentCommit == "none") && !force {
-		return fmt.Errorf("개발 빌드에서는 --force 플래그가 필요합니다")
-	}
-
-	// Strip pseudo-version suffixes for clean semver comparison.
-	// e.g., "0.21.2-0.20260328130835-dd328b13c758+dirty" → "0.21.2"
-	currentVer := rawVer
-	if idx := strings.IndexByte(currentVer, '-'); idx != -1 {
-		currentVer = currentVer[:idx]
-	}
-	if idx := strings.IndexByte(currentVer, '+'); idx != -1 {
-		currentVer = currentVer[:idx]
-	}
-
-	// Pseudo-version or dirty build: always force update to get clean goreleaser binary
-	isPseudo := rawVer != currentVer
-	if isPseudo {
-		force = true
-	}
-
-	// Check latest
-	checker := selfupdate.NewChecker()
-	info, err := checker.CheckLatest(currentVer, runtime.GOOS, runtime.GOARCH)
-	if err != nil {
-		return fmt.Errorf("업데이트 확인 실패: %w", err)
-	}
-
-	// R7: Already up to date
-	if info == nil && !force {
-		fmt.Fprintf(cmd.OutOrStdout(), "이미 최신 버전입니다 (v%s)\n", currentVer)
-		return nil
-	}
-
-	// R10: Check-only mode
-	if checkOnly {
-		if info != nil {
-			fmt.Fprintf(cmd.OutOrStdout(), "업데이트 가능: v%s → %s\n", currentVer, info.TagName)
-		}
-		return nil
-	}
-
-	pathInfo, err := resolveCurrentBinaryPath()
-	if err != nil {
-		return err
-	}
-	execPath := pathInfo.ManagedPath()
-
-	// R13: Check write permission — re-exec with sudo if needed
-	if !isWritable(filepath.Dir(execPath)) {
-		return reExecWithSudo()
-	}
-
-	// Force mode with no newer version: re-fetch latest release info
-	if info == nil {
-		info, err = checker.FetchLatest(runtime.GOOS, runtime.GOARCH)
-		if err != nil {
-			return fmt.Errorf("최신 릴리즈 정보 조회 실패: %w", err)
-		}
-	}
-
-	// Validate download URLs before proceeding
-	if info.ArchiveURL == "" || info.ChecksumURL == "" {
-		return fmt.Errorf("다운로드 URL을 찾을 수 없음 (tag: %s)", info.TagName)
-	}
-
-	// R2: Download archive
-	ver := strings.TrimPrefix(info.TagName, "v")
-	archiveName := selfupdate.ArchiveName(runtime.GOOS, runtime.GOARCH, ver)
-	dl := selfupdate.NewDownloader()
-	tmpDir, _ := os.MkdirTemp("", "autopus-update-*")
-	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			log.Printf("[update] cleanup tmp dir failed: %v", err)
-		}
-	}()
-
-	// R3: Download and verify checksum
-	binaryPath, err := dl.DownloadAndVerify(info.ArchiveURL, info.ChecksumURL, archiveName, tmpDir)
-	if err != nil {
-		return fmt.Errorf("다운로드/검증 실패: %w", err)
-	}
-
-	// R4: Atomic replace
-	replacer := selfupdate.NewReplacer()
-	if err := replacer.Replace(binaryPath, execPath); err != nil {
-		return err
-	}
-
-	// R5: Display result
-	fmt.Fprintf(cmd.OutOrStdout(), "v%s → %s 업데이트 완료\n", currentVer, info.TagName)
-	fmt.Fprintf(cmd.OutOrStdout(), "하네스 파일도 업데이트하려면: auto update\n")
-	return nil
 }

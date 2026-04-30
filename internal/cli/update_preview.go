@@ -51,6 +51,7 @@ func buildUpdatePreview(ctx context.Context, dir string, cfg *config.HarnessConf
 		backupNeeded = backupNeeded || needsBackup
 	}
 
+	result.Items = append(result.Items, buildDesignPreviewItems(dir, cfg)...)
 	result.Items = append(result.Items, buildStatusLinePreviewItems(dir, cfg)...)
 
 	if backupNeeded {
@@ -63,6 +64,26 @@ func buildUpdatePreview(ctx context.Context, dir string, cfg *config.HarnessConf
 	}
 
 	return result, nil
+}
+
+func buildDesignPreviewItems(dir string, cfg *config.HarnessConfig) []previewItem {
+	if cfg == nil || !cfg.Design.Enabled {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(dir, "autopus.yaml")); err != nil {
+		return nil
+	}
+	if _, err := os.Stat(filepath.Join(dir, "DESIGN.md")); err == nil {
+		return nil
+	} else if err != nil && !os.IsNotExist(err) {
+		return nil
+	}
+	return []previewItem{{
+		Path:     "DESIGN.md",
+		Kind:     "create",
+		Category: "tracked_docs",
+		Reason:   "starter design context would be created without overwriting existing project design",
+	}}
 }
 
 func buildPlatformPreview(ctx context.Context, dir string, cfg *config.HarnessConfig, platform string) ([]previewItem, bool, error) {

@@ -29,6 +29,25 @@ func LoadPreviewWithMetadata(dir string) (*HarnessConfig, bool, error) {
 	return loadConfig(dir, false)
 }
 
+// MissingTopLevelKey reports whether an existing autopus.yaml lacks a top-level key.
+func MissingTopLevelKey(dir string, key string) (bool, error) {
+	path := filepath.Join(dir, configFileName)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("read config: %w", err)
+	}
+
+	var raw map[string]any
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return false, fmt.Errorf("parse config: %w", err)
+	}
+	_, ok := raw[key]
+	return !ok, nil
+}
+
 func loadConfig(dir string, persistNormalization bool) (*HarnessConfig, bool, error) {
 	path := filepath.Join(dir, configFileName)
 	data, err := os.ReadFile(path)

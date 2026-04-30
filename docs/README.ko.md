@@ -552,7 +552,7 @@ ARCHITECTURE.md                    # 도메인, 레이어, 의존성 맵
 
 ### 선택 사항: UI 작업용 `DESIGN.md`
 
-프론트엔드 검증과 리뷰는 프로젝트 루트의 `DESIGN.md`를 가벼운 디자인 컨텍스트로 사용할 수 있습니다. 문서는 source of truth, palette roles, typography hierarchy, component guardrails, layout/responsive rules, agent guidance를 짧게 담는 것을 권장합니다. `DESIGN.md` 또는 설정된 디자인 baseline이 없으면 `/auto verify`, Phase 3.5, `/auto review`, `auto orchestra review`는 기존처럼 실행되며 `Design context: skipped (not configured)`를 non-error로 보고합니다.
+프론트엔드 검증과 리뷰는 프로젝트 루트의 `DESIGN.md`를 가벼운 디자인 컨텍스트로 사용할 수 있습니다. `auto init`은 `autopus.yaml` 옆에 starter `DESIGN.md`를 만들되 기존 파일은 덮어쓰지 않고, `auto update`는 오래된 하네스 설치에 starter 파일과 `design:` 설정 블록을 백필합니다. 문서는 source of truth, palette roles, typography hierarchy, component guardrails, layout/responsive rules, agent guidance를 짧게 담는 것을 권장합니다. `DESIGN.md` 또는 설정된 디자인 baseline이 없으면 `/auto verify`, Phase 3.5, `/auto review`, `auto orchestra review`는 기존처럼 실행되며 `Design context: skipped (not configured)`를 non-error로 보고합니다.
 
 디자인 컨텍스트는 `.tsx`, `.jsx`, CSS 계열 파일, theme/token 파일, design-system 경로 같은 UI diff에만 주입됩니다. UI finding은 palette-role drift, typography hierarchy drift, component guardrail violation, layout/responsive regression, source-of-truth mismatch를 확인합니다. 리뷰 surface는 읽기 전용이며 직접 수정하지 않고 executor/fixer로 수정 작업을 위임합니다.
 

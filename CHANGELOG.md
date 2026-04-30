@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **DESIGN.md starter now participates in init/update** (2026-04-30): `auto init` creates a non-destructive starter `DESIGN.md`, and `auto update` backfills missing `design:` config plus the starter file for older harness installs.
+  - `internal/cli/{init.go,update.go,design.go,update_preview.go}` — starter creation/preservation, update backfill, and `--plan` preview visibility
+  - `pkg/config/loader.go` — top-level config key detection for safe migration decisions
+  - `internal/cli/{init_test.go,update_test.go,update_preview_test.go}`, `pkg/config/defaults_design_test.go` — regression coverage for init, update, disabled design, and dry-run behavior
+
 ## [v0.42.1] — 2026-04-30
 
 ### Fixed

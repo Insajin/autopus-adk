@@ -657,7 +657,7 @@ ARCHITECTURE.md                    # Domains, layers, dependency map
 
 ### Optional `DESIGN.md` for UI Work
 
-Frontend verification and review can use a project-local `DESIGN.md` as lightweight design context. Keep it short and include the source of truth, palette roles, typography hierarchy, component guardrails, layout/responsive rules, and agent guidance. If a project has no `DESIGN.md` or configured design baseline, `/auto verify`, Phase 3.5, `/auto review`, and `auto orchestra review` continue normally and report `Design context: skipped (not configured)` as a non-error condition.
+Frontend verification and review can use a project-local `DESIGN.md` as lightweight design context. `auto init` creates a starter `DESIGN.md` next to `autopus.yaml` without overwriting an existing one, and `auto update` backfills the starter plus the `design:` config block for older harness installs. Keep it short and include the source of truth, palette roles, typography hierarchy, component guardrails, layout/responsive rules, and agent guidance. If a project has no `DESIGN.md` or configured design baseline, `/auto verify`, Phase 3.5, `/auto review`, and `auto orchestra review` continue normally and report `Design context: skipped (not configured)` as a non-error condition.
 
 Design context is only injected for UI-related diffs such as `.tsx`, `.jsx`, CSS-family files, theme/token files, or design-system paths. UI findings check palette-role drift, typography hierarchy drift, component guardrail violations, layout/responsive regressions, and source-of-truth mismatch. Review surfaces remain read-only; they report issues and delegate fixes instead of editing files directly.
 

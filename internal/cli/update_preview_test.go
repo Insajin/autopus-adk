@@ -107,6 +107,34 @@ func TestUpdateCmd_PlanShowsLegacyConfigNormalizationWithoutWriting(t *testing.T
 	assert.Contains(t, out.String(), "legacy platform names would be normalized")
 }
 
+func TestUpdateCmd_PlanShowsDesignBackfillWithoutWriting(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "autopus.yaml"), []byte(`mode: full
+project_name: legacy-design-proj
+platforms:
+  - claude-code
+`), 0o644))
+
+	var out bytes.Buffer
+	updateCmd := newTestRootCmd()
+	updateCmd.SetOut(&out)
+	updateCmd.SetErr(&out)
+	updateCmd.SetArgs([]string{"update", "--dir", dir, "--plan", "--yes"})
+	require.NoError(t, updateCmd.Execute())
+
+	assert.NoFileExists(t, filepath.Join(dir, "DESIGN.md"), "preview must not create DESIGN.md")
+	configData, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(configData), "design:", "preview must not rewrite config")
+
+	output := out.String()
+	assert.Contains(t, output, "DESIGN.md")
+	assert.Contains(t, output, "starter design context would be created")
+	assert.Contains(t, output, "design defaults would be persisted in autopus.yaml")
+}
+
 func TestUpdateCmd_PlanShowsStatusLineKeepHint(t *testing.T) {
 	t.Parallel()
 

@@ -113,7 +113,7 @@ func newInitCmd() *cobra.Command {
 			}
 
 			// Step 1: Configuration Wizard
-			tui.Step(out, 1, 4, "Configuration Wizard")
+			tui.Step(out, 1, 5, "Configuration Wizard")
 			if !yes && isStdinTTY() {
 				result, err := tui.RunInitWizard(tui.InitWizardOpts{
 					Quality:         quality,
@@ -186,8 +186,20 @@ func newInitCmd() *cobra.Command {
 
 			warnParentRuleConflicts(cmd, dir, cfg, yes)
 
-			// Step 2: Platform Files
-			tui.Step(out, 2, 4, "Platform Files")
+			// Step 2: Design Context
+			tui.Step(out, 2, 5, "Design Context")
+			designPath, designCreated, err := ensureStarterDesignFile(dir)
+			if err != nil {
+				return fmt.Errorf("DESIGN.md 생성 실패: %w", err)
+			}
+			if designCreated {
+				tui.Successf(out, "created %s", filepath.Base(designPath))
+			} else {
+				tui.Info(out, "DESIGN.md already exists; preserving it")
+			}
+
+			// Step 3: Platform Files
+			tui.Step(out, 3, 5, "Platform Files")
 			ctx := context.Background()
 			if err := generatePlatformFiles(ctx, dir, cfg, cmd); err != nil {
 				return err
@@ -197,20 +209,21 @@ func newInitCmd() *cobra.Command {
 				tui.Warnf(out, "constraints.yaml 생성 실패: %v", err)
 			}
 
-			// Step 3: Gitignore
-			tui.Step(out, 3, 4, "Gitignore")
+			// Step 4: Gitignore
+			tui.Step(out, 4, 5, "Gitignore")
 			if err := updateGitignore(dir); err != nil {
 				return fmt.Errorf(".gitignore 업데이트 실패: %w", err)
 			}
 
-			// Step 4: Summary
-			tui.Step(out, 4, 4, "Summary")
+			// Step 5: Summary
+			tui.Step(out, 5, 5, "Summary")
 			tui.SummaryTable(out, []tui.SummaryRow{
 				{Key: "Profile", Value: string(cfg.UsageProfile.Effective())},
 				{Key: "Quality", Value: cfg.Quality.Default},
 				{Key: "Review Gate", Value: fmt.Sprintf("%v (%d providers)", cfg.Spec.ReviewGate.Enabled, len(cfg.Spec.ReviewGate.Providers))},
 				{Key: "Methodology", Value: cfg.Methodology.Mode},
 				{Key: "Platforms", Value: strings.Join(cfg.Platforms, ", ")},
+				{Key: "Design Context", Value: "DESIGN.md"},
 				{Key: "Language", Value: fmt.Sprintf("comments=%s, commits=%s, ai=%s", cfg.Language.Comments, cfg.Language.Commits, cfg.Language.AIResponses)},
 			})
 			if statusLineSummary != "" {

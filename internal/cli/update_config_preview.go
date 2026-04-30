@@ -17,6 +17,7 @@ func prepareUpdatePreviewConfig(
 	dir string,
 	cfg *config.HarnessConfig,
 	platformNamesMigrated bool,
+	designConfigMissing bool,
 	yesFlag bool,
 	interactive bool,
 ) (*config.HarnessConfig, []string, error) {
@@ -28,6 +29,9 @@ func prepareUpdatePreviewConfig(
 	var reasons []string
 	if platformNamesMigrated {
 		reasons = appendConfigPreviewReason(reasons, "legacy platform names would be normalized in autopus.yaml")
+	}
+	if designConfigMissing && previewCfg.Design.Enabled {
+		reasons = appendConfigPreviewReason(reasons, "design defaults would be persisted in autopus.yaml")
 	}
 
 	if changed, reason := previewLanguagePreview(previewCfg, yesFlag, interactive); changed {

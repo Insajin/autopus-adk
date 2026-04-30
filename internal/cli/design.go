@@ -35,17 +35,8 @@ func newDesignInitCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			target := filepath.Join(root, "DESIGN.md")
-			if _, err := os.Stat(target); err == nil && !force {
-				return fmt.Errorf("refusing to overwrite existing DESIGN.md; rerun with --force to replace it")
-			} else if err != nil && !os.IsNotExist(err) {
-				return err
-			}
-			data, err := templates.FS.ReadFile("shared/DESIGN.md.tmpl")
+			target, err := createStarterDesignFile(root, force)
 			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(target, data, 0o644); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "created %s\n", target)
@@ -122,4 +113,35 @@ func newDesignImportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&trustLabel, "trust-label", "external-reference", "trust label for imported reference")
 	cmd.Flags().BoolVar(&allowExternalImport, "allow-external-import", false, "explicitly allow this external import even when config disables external imports")
 	return cmd
+}
+
+func createStarterDesignFile(root string, force bool) (string, error) {
+	target := filepath.Join(root, "DESIGN.md")
+	if _, err := os.Stat(target); err == nil && !force {
+		return "", fmt.Errorf("refusing to overwrite existing DESIGN.md; rerun with --force to replace it")
+	} else if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+	return target, writeStarterDesignTemplate(target)
+}
+
+func ensureStarterDesignFile(root string) (string, bool, error) {
+	target := filepath.Join(root, "DESIGN.md")
+	if _, err := os.Stat(target); err == nil {
+		return target, false, nil
+	} else if err != nil && !os.IsNotExist(err) {
+		return "", false, err
+	}
+	if err := writeStarterDesignTemplate(target); err != nil {
+		return "", false, err
+	}
+	return target, true, nil
+}
+
+func writeStarterDesignTemplate(target string) error {
+	data, err := templates.FS.ReadFile("shared/DESIGN.md.tmpl")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, data, 0o644)
 }
