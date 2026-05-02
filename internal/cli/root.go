@@ -80,6 +80,9 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newIssueCmd())
 	root.AddCommand(newCheckCmd())
 	root.AddCommand(newExperimentCmd())
+	// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-001: registers the public `auto qa` namespace for QAMESH evidence and feedback workflows.
+	// @AX:REASON: External CLI users and integration tests depend on this registration to expose evidence normalization and repair prompt commands.
+	root.AddCommand(newQACmd())
 	// @AX:NOTE [AUTO] @AX:REASON: Phase 2 addition — registers `auto test` and `auto test run` subcommands; added as part of SPEC-E2E-001
 	root.AddCommand(newAutoTestCmd())
 	root.AddCommand(newAgentCmd())
