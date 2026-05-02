@@ -174,8 +174,17 @@ func writeQAFixtureManifest(t *testing.T, dir, status string) string {
 	t.Helper()
 	artifactDir := filepath.Join(dir, "artifacts")
 	require.NoError(t, os.MkdirAll(artifactDir, 0o755))
-	consolePath := filepath.Join(artifactDir, "console.json")
-	require.NoError(t, os.WriteFile(consolePath, []byte(`{"messages":["redacted console"]}`+"\n"), 0o644))
+	writeArtifact := func(name, body string) string {
+		path := filepath.Join(artifactDir, name)
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o644))
+		return path
+	}
+	tracePath := writeArtifact("trace-summary.json", `{"trace_mode":"summary_only"}`+"\n")
+	screenshotPath := writeArtifact("screenshot-quarantined.json", `{"publishable":false}`+"\n")
+	consolePath := writeArtifact("console.json", `{"messages":["redacted console"]}`+"\n")
+	networkPath := writeArtifact("network-summary.json", `{"events":[]}`+"\n")
+	a11yPath := writeArtifact("a11y-snapshot.aria.yml", "- main\n")
+	oraclePath := writeArtifact("oracle-summary.json", `{"critical_count":0}`+"\n")
 
 	manifest := map[string]any{
 		"schema_version":       "qamesh.evidence.v1",
@@ -191,12 +200,44 @@ func writeQAFixtureManifest(t *testing.T, dir, status string) string {
 		"repair_prompt_ref":    "",
 		"retention_class":      "local-redacted",
 		"reproduction_command": "PLAYWRIGHT_SKIP_GLOBAL_SETUP=true npx playwright test e2e/tests/qamesh-golden.spec.ts --project=chromium",
-		"artifacts": []map[string]any{{
-			"kind":        "console",
-			"path":        consolePath,
-			"publishable": true,
-			"redaction":   "text_redacted_and_scanned",
-		}},
+		"artifacts": []map[string]any{
+			{
+				"kind":        "trace_summary",
+				"path":        tracePath,
+				"publishable": true,
+				"redaction":   "text_redacted_and_scanned",
+			},
+			{
+				"kind":        "screenshot_quarantined",
+				"path":        screenshotPath,
+				"publishable": false,
+				"redaction":   "local_only_quarantine_ref",
+			},
+			{
+				"kind":        "console",
+				"path":        consolePath,
+				"publishable": true,
+				"redaction":   "text_redacted_and_scanned",
+			},
+			{
+				"kind":        "network_summary",
+				"path":        networkPath,
+				"publishable": true,
+				"redaction":   "text_redacted_and_scanned",
+			},
+			{
+				"kind":        "a11y_snapshot",
+				"path":        a11yPath,
+				"publishable": true,
+				"redaction":   "text_redacted_and_scanned",
+			},
+			{
+				"kind":        "oracle_summary",
+				"path":        oraclePath,
+				"publishable": true,
+				"redaction":   "text_redacted_and_scanned",
+			},
+		},
 		"oracle_results": map[string]any{
 			"a11y": map[string]any{
 				"critical_count": 0,

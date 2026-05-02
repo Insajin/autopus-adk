@@ -169,7 +169,7 @@ func (m Manifest) Validate() error {
 	if m.RedactionStatus.Status != "passed" {
 		return fmt.Errorf("redaction_status.status must be passed before publication")
 	}
-	return nil
+	return validateSurfaceContract(m)
 }
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-001: final manifest writing is the publish boundary for sanitized QA evidence.
@@ -181,17 +181,38 @@ func WriteFinalManifest(manifest Manifest, outputDir string) (string, error) {
 	}
 	normalized := manifest
 	normalized.Artifacts = make([]ArtifactRef, 0, len(manifest.Artifacts))
+	parentDir := filepath.Dir(outputDir)
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		return "", err
+	}
+	tempDir, err := os.MkdirTemp(parentDir, "."+safePathSegment(filepath.Base(outputDir))+"-*")
+	if err != nil {
+		return "", err
+	}
+	cleanupTemp := true
+	defer func() {
+		if cleanupTemp {
+			_ = os.RemoveAll(tempDir)
+		}
+	}()
 	for _, artifact := range manifest.Artifacts {
-		copied, err := sanitizeArtifact(artifact, outputDir)
+		copied, err := sanitizeArtifact(artifact, tempDir)
 		if err != nil {
 			return "", err
 		}
 		normalized.Artifacts = append(normalized.Artifacts, copied)
 	}
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+	if entries, err := os.ReadDir(outputDir); err == nil {
+		if len(entries) > 0 {
+			return "", fmt.Errorf("output directory must be empty: %s", RedactText(outputDir))
+		}
+		if err := os.Remove(outputDir); err != nil {
+			return "", err
+		}
+	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	path := filepath.Join(outputDir, "manifest.json")
+	path := filepath.Join(tempDir, "manifest.json")
 	body, err := json.MarshalIndent(normalized, "", "  ")
 	if err != nil {
 		return "", err
@@ -203,7 +224,11 @@ func WriteFinalManifest(manifest Manifest, outputDir string) (string, error) {
 	if err := os.WriteFile(path, append([]byte(text), '\n'), 0o644); err != nil {
 		return "", err
 	}
-	return path, nil
+	if err := os.Rename(tempDir, outputDir); err != nil {
+		return "", err
+	}
+	cleanupTemp = false
+	return filepath.Join(outputDir, "manifest.json"), nil
 }
 
 func NormalizeManifest(manifest Manifest) Manifest {
