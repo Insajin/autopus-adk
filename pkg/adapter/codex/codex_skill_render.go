@@ -49,7 +49,7 @@ This skill is a thin router. After resolving the subcommand, load the matching d
 	frontmatter := strings.TrimSpace(fmt.Sprintf(`---
 name: auto
 description: >
-  Autopus Codex router skill. Use when the user wants %s or %s workflows such as setup, status, plan, go, fix, review, sync, idea, map, why, verify, secure, test, dev, canary, and doctor.
+  Autopus Codex router skill. Use when the user wants %s or %s workflows such as setup, status, plan, go, fix, review, sync, idea, map, why, verify, secure, test, qa, dev, canary, and doctor.
 ---`, "`@auto ...`", "`$auto ...`"))
 	return frontmatter + "\n\n" + strings.TrimSpace(body) + "\n", nil
 }

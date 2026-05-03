@@ -20,6 +20,12 @@ func TestQACmd_IsRegisteredWithEvidenceAndFeedback(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, qa)
 
+	for _, name := range []string{"plan", "adapters", "run"} {
+		sub, _, err := root.Find([]string{"qa", name})
+		require.NoError(t, err)
+		require.NotNil(t, sub)
+	}
+
 	evidence, _, err := root.Find([]string{"qa", "evidence"})
 	require.NoError(t, err)
 	require.NotNil(t, evidence)

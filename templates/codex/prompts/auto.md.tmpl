@@ -1,5 +1,5 @@
 ---
-description: "Autopus 명령 라우터 — setup/status/plan/go/fix/review/sync/idea/map/why/verify/secure/test/dev/canary/doctor 서브커맨드를 해석합니다"
+description: "Autopus 명령 라우터 — setup/status/plan/go/fix/review/sync/idea/map/why/verify/secure/test/qa/dev/canary/doctor 서브커맨드를 해석합니다"
 ---
 
 # auto — Autopus Command Router
@@ -24,13 +24,14 @@ description: "Autopus 명령 라우터 — setup/status/plan/go/fix/review/sync/
 - `verify`: 프론트엔드 UX 검증 워크플로우
 - `secure`: 보안 감사 워크플로우
 - `test`: E2E 시나리오 실행 워크플로우
+- `qa`: QAMESH project QA mesh. Use `auto qa plan`, `auto qa run`, `auto qa evidence`, or `auto qa feedback` according to the requested evidence flow.
 - `dev`: plan → go → sync 오케스트레이션 워크플로우
 - `canary`: 배포 후 상태 점검 워크플로우
 - `doctor`: 하네스 상태 진단 워크플로우
 
 규칙:
-- 첫 토큰이 없는 경우, 사용자의 의도를 위 16개 중 하나로 분류해서 진행합니다.
-- 가능하면 같은 이름의 상세 스킬/프롬프트(`auto-setup`, `auto-status`, `auto-plan`, `auto-go`, `auto-fix`, `auto-review`, `auto-sync`, `auto-idea`, `auto-map`, `auto-why`, `auto-verify`, `auto-secure`, `auto-test`, `auto-dev`, `auto-canary`, `auto-doctor`) 의미를 따릅니다.
+- 첫 토큰이 없는 경우, 사용자의 의도를 위 17개 중 하나로 분류해서 진행합니다.
+- 가능하면 같은 이름의 상세 스킬/프롬프트(`auto-setup`, `auto-status`, `auto-plan`, `auto-go`, `auto-fix`, `auto-review`, `auto-sync`, `auto-idea`, `auto-map`, `auto-why`, `auto-verify`, `auto-secure`, `auto-test`, `auto-qa`, `auto-dev`, `auto-canary`, `auto-doctor`) 의미를 따릅니다.
 - 지원하지 않는 서브커맨드면 지원 목록을 짧게 안내하고 가장 가까운 워크플로우를 제안합니다.
 - Codex 하네스 기본값은 `spawn_agent(...)` 기반 subagent-first 입니다.
 - Codex에서 `--auto`가 있으면, 기본 subagent pipeline 진행에 대한 명시적 승인으로 해석합니다.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -90,6 +91,8 @@ func renderPrompt(manifest Manifest, displayTarget string) string {
 	if manifest.OracleResults.Desktop != nil && manifest.OracleResults.Desktop.TimeoutClassification != "" {
 		fmt.Fprintf(&b, "- Desktop timeout classification: `%s`\n", promptInline(manifest.OracleResults.Desktop.TimeoutClassification))
 	}
+	writeJourneyContext(&b, manifest.SourceRefs)
+	writeFailedChecks(&b, manifest.OracleResults.Checks)
 	if manifest.ReproductionCommand != "" {
 		fmt.Fprintf(&b, "\n## Reproduction\n\n```bash\n%s\n```\n", promptBlock(manifest.ReproductionCommand))
 	}
@@ -104,6 +107,74 @@ func renderPrompt(manifest Manifest, displayTarget string) string {
 		fmt.Fprintf(&b, "- `%s`: `%s` (publishable=%t, redaction=%s)\n", promptInline(artifact.Kind), promptInline(artifact.Path), artifact.Publishable, promptInline(artifact.Redaction))
 	}
 	return b.String()
+}
+
+func writeJourneyContext(b *strings.Builder, refs SourceRefs) {
+	if refs.JourneyID == "" && refs.StepID == "" && refs.Adapter == "" && len(refs.OracleThresholds) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "\n## Journey Context\n\n")
+	if refs.JourneyID != "" {
+		fmt.Fprintf(b, "- Journey: `%s`\n", promptInline(refs.JourneyID))
+	}
+	if refs.StepID != "" {
+		fmt.Fprintf(b, "- Step: `%s`\n", promptInline(refs.StepID))
+	}
+	if refs.Adapter != "" {
+		fmt.Fprintf(b, "- Adapter: `%s`\n", promptInline(refs.Adapter))
+	}
+	if thresholds := formatThresholds(refs.OracleThresholds); thresholds != "" {
+		fmt.Fprintf(b, "- Oracle thresholds: `%s`\n", promptInline(thresholds))
+	}
+}
+
+func writeFailedChecks(b *strings.Builder, checks []CheckResult) {
+	failed := failedChecks(checks)
+	if len(failed) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "\n## Failed Checks\n\n")
+	for _, check := range failed {
+		fmt.Fprintf(b, "- `%s` (`%s`, `%s`)\n", promptInline(check.ID), promptInline(check.Type), promptInline(check.Status))
+		if check.Expected != "" {
+			fmt.Fprintf(b, "  - Expected: `%s`\n", promptInline(check.Expected))
+		}
+		if check.Actual != "" {
+			fmt.Fprintf(b, "  - Actual: `%s`\n", promptInline(check.Actual))
+		}
+		if check.FailureSummary != "" {
+			fmt.Fprintf(b, "  - Failure summary: `%s`\n", promptInline(check.FailureSummary))
+		}
+		if len(check.ArtifactRefs) > 0 {
+			fmt.Fprintf(b, "  - Artifact refs: `%s`\n", promptInline(strings.Join(check.ArtifactRefs, ", ")))
+		}
+	}
+}
+
+func failedChecks(checks []CheckResult) []CheckResult {
+	failed := make([]CheckResult, 0, len(checks))
+	for _, check := range checks {
+		if check.Status == "failed" || check.Status == "blocked" {
+			failed = append(failed, check)
+		}
+	}
+	return failed
+}
+
+func formatThresholds(thresholds map[string]any) string {
+	if len(thresholds) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(thresholds))
+	for key := range thresholds {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%v", key, thresholds[key]))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func writeList(b *strings.Builder, values []string) {

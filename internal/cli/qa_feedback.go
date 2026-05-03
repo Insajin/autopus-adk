@@ -93,5 +93,8 @@ func validateQAFeedbackOptions(opts qaFeedbackOptions) error {
 			return err
 		}
 	}
+	if err := rejectGeneratedQAOutput("output", opts.Output); err != nil {
+		return err
+	}
 	return nil
 }

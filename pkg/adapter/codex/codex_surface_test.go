@@ -58,6 +58,7 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 		"auto-verify",
 		"auto-secure",
 		"auto-test",
+		"auto-qa",
 		"auto-dev",
 		"auto-canary",
 		"auto-doctor",

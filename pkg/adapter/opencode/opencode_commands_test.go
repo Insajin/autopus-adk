@@ -31,4 +31,12 @@ func TestAdapter_Generate_WorkflowCommandsRouteAliasesThroughAuto(t *testing.T) 
 	assert.Contains(t, string(autoStatus), "`/auto status ...` payload로 다시 해석")
 	assert.Contains(t, string(autoStatus), "`skill` 도구로 `auto`를 로드")
 	assert.NotContains(t, string(autoStatus), "`skill` 도구로 `auto-status`를 로드")
+
+	autoQA, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-qa", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoQA), "QAMESH")
+	assert.Contains(t, string(autoQA), "auto qa plan")
+	assert.Contains(t, string(autoQA), "auto qa run")
+	assert.Contains(t, string(autoQA), "auto qa evidence")
+	assert.Contains(t, string(autoQA), "auto qa feedback")
 }

@@ -7,6 +7,9 @@ import (
 )
 
 func validateSurfaceContract(manifest Manifest) error {
+	if manifest.SchemaVersion != SchemaVersionV1 {
+		return nil
+	}
 	switch manifest.Surface {
 	case "browser":
 		if manifest.Lane == "golden" {

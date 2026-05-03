@@ -72,6 +72,13 @@ func TestAPI_CreateUser(t *testing.T) {
 사용자 등록 → 로그인 → 리소스 생성 → 조회 → 삭제
 ```
 
+### QAMESH Source Guidance
+
+- Use `auto qa plan --format json` before project-level QA execution to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without running commands.
+- Use `auto qa run --format json` when deterministic project QA should execute and produce QAMESH run/evidence output.
+- Use `auto qa evidence` when an external producer already wrote a QAMESH manifest and the task is validation, redaction, and publication.
+- Use `auto qa feedback` to turn existing failed QAMESH evidence into provider-specific repair prompt bundles.
+
 ### 원칙
 - 핵심 비즈니스 플로우만 (5-10개)
 - 깨지기 쉬운 UI 셀렉터 피하기

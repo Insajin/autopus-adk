@@ -10,7 +10,11 @@ import (
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-001: QAMESH manifest schema is shared by CLI, browser, and desktop evidence producers.
 // @AX:REASON: Changing schema_version or JSON field contracts breaks cross-surface evidence ingestion and feedback generation.
-const SchemaVersion = "qamesh.evidence.v1"
+const (
+	SchemaVersionV1 = "qamesh.evidence.v1"
+	SchemaVersionV2 = "qamesh.evidence.v2"
+	SchemaVersion   = SchemaVersionV1
+)
 
 type Manifest struct {
 	SchemaVersion       string          `json:"schema_version"`
@@ -48,6 +52,17 @@ type ArtifactRef struct {
 type OracleResults struct {
 	A11y    *A11yOracle    `json:"a11y,omitempty"`
 	Desktop *DesktopOracle `json:"desktop,omitempty"`
+	Checks  []CheckResult  `json:"checks,omitempty"`
+}
+
+type CheckResult struct {
+	ID             string   `json:"id"`
+	Type           string   `json:"type"`
+	Status         string   `json:"status"`
+	Expected       string   `json:"expected,omitempty"`
+	Actual         string   `json:"actual,omitempty"`
+	ArtifactRefs   []string `json:"artifact_refs,omitempty"`
+	FailureSummary string   `json:"failure_summary,omitempty"`
 }
 
 type A11yOracle struct {
@@ -66,10 +81,14 @@ type RedactionStatus struct {
 }
 
 type SourceRefs struct {
-	SourceSpec       string   `json:"source_spec,omitempty"`
-	AcceptanceRefs   []string `json:"acceptance_refs,omitempty"`
-	OwnedPaths       []string `json:"owned_paths,omitempty"`
-	DoNotModifyPaths []string `json:"do_not_modify_paths,omitempty"`
+	SourceSpec       string         `json:"source_spec,omitempty"`
+	AcceptanceRefs   []string       `json:"acceptance_refs,omitempty"`
+	OwnedPaths       []string       `json:"owned_paths,omitempty"`
+	DoNotModifyPaths []string       `json:"do_not_modify_paths,omitempty"`
+	JourneyID        string         `json:"journey_id,omitempty"`
+	StepID           string         `json:"step_id,omitempty"`
+	Adapter          string         `json:"adapter,omitempty"`
+	OracleThresholds map[string]any `json:"oracle_thresholds,omitempty"`
 }
 
 type LocatorContract struct {
@@ -140,10 +159,10 @@ func (m Manifest) Validate() error {
 			return fmt.Errorf("missing required field %s", field)
 		}
 	}
-	if m.SchemaVersion != SchemaVersion {
+	if !isSupportedSchemaVersion(m.SchemaVersion) {
 		return fmt.Errorf("unsupported schema_version %q", m.SchemaVersion)
 	}
-	if m.Surface != "browser" && m.Surface != "desktop" {
+	if !isSupportedSurface(m.SchemaVersion, m.Surface) {
 		return fmt.Errorf("unsupported surface %q", m.Surface)
 	}
 	switch m.Status {
@@ -154,14 +173,11 @@ func (m Manifest) Validate() error {
 	if len(m.Artifacts) == 0 {
 		return fmt.Errorf("missing required field artifacts")
 	}
-	if m.OracleResults.A11y == nil && m.OracleResults.Desktop == nil {
-		return fmt.Errorf("missing required field oracle_results")
+	if err := validateOracleResults(m); err != nil {
+		return err
 	}
-	if strings.TrimSpace(m.SourceRefs.SourceSpec) == "" {
-		return fmt.Errorf("missing required field source_refs.source_spec")
-	}
-	if len(m.SourceRefs.AcceptanceRefs) == 0 {
-		return fmt.Errorf("missing required field source_refs.acceptance_refs")
+	if err := validateSourceRefs(m); err != nil {
+		return err
 	}
 	if strings.TrimSpace(m.RedactionStatus.Status) == "" {
 		return fmt.Errorf("missing required field redaction_status.status")
@@ -238,6 +254,11 @@ func NormalizeManifest(manifest Manifest) Manifest {
 	if manifest.OracleResults.A11y != nil &&
 		(manifest.OracleResults.A11y.CriticalCount > 0 || manifest.OracleResults.A11y.SeriousCount > 0) {
 		manifest.Status = "failed"
+	}
+	if hasCheckStatus(manifest.OracleResults.Checks, "failed") {
+		manifest.Status = "failed"
+	} else if manifest.Status == "passed" && hasCheckStatus(manifest.OracleResults.Checks, "blocked") {
+		manifest.Status = "blocked"
 	}
 	return manifest
 }

@@ -85,6 +85,12 @@ var workflowSpecs = []workflowSpec{
 		Description: "E2E 시나리오 실행 — scenarios.md 기반 검증을 수행합니다",
 	},
 	{
+		Name:        "auto-qa",
+		Description: "QAMESH project QA mesh — auto qa plan, auto qa run, auto qa evidence, auto qa feedback guidance",
+		PromptPath:  "codex/prompts/auto-qa.md.tmpl",
+		SkillPath:   "codex/skills/auto-qa.md.tmpl",
+	},
+	{
 		Name:        "auto-dev",
 		Description: "풀 사이클 개발 — plan → go → sync를 순차 실행합니다",
 	},

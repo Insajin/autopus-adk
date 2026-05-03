@@ -20,8 +20,8 @@ func TestRenderPromptTemplates(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, files, "should produce prompt file mappings")
 
-	// Router + 16 workflow prompts should be generated.
-	assert.Len(t, files, 17)
+	// Router + 17 workflow prompts should be generated.
+	assert.Len(t, files, 18)
 
 	// Verify files written to disk.
 	for _, f := range files {
@@ -59,7 +59,7 @@ func TestPreparePromptFiles_NoDiskWrite(t *testing.T) {
 
 	files, err := a.preparePromptFiles(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 17)
+	assert.Len(t, files, 18)
 
 	// preparePromptFiles should NOT write to disk.
 	promptsDir := filepath.Join(dir, ".codex", "prompts")
@@ -141,6 +141,11 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-verify.md"], "auto verify")
 	assert.Contains(t, byName["auto-secure.md"], "OWASP Top 10")
 	assert.Contains(t, byName["auto-test.md"], "auto test run")
+	assert.Contains(t, byName["auto-qa.md"], "QAMESH")
+	assert.Contains(t, byName["auto-qa.md"], "auto qa plan")
+	assert.Contains(t, byName["auto-qa.md"], "auto qa run")
+	assert.Contains(t, byName["auto-qa.md"], "auto qa evidence")
+	assert.Contains(t, byName["auto-qa.md"], "auto qa feedback")
 	assert.Contains(t, byName["auto-dev.md"], "`auto-plan`")
 	assert.Contains(t, byName["auto-doctor.md"], "auto doctor")
 	assert.Contains(t, byName["auto.md"], "## Autopus Branding")
