@@ -4,13 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Adaptive SPEC review context limit + Provider Health labeling** (2026-05-04, [SPEC-SPECREV-001](.autopus/specs/SPEC-SPECREV-001/spec.md), issue [#55](https://github.com/Insajin/autopus-adk/issues/55)): multi-provider spec review now scales the citation context budget per SPEC and surfaces provider infrastructure failures as a structured verdict label so operators can distinguish content concerns from timeouts.
+  - `pkg/spec/context_limit.go` — new `AdaptiveContextLimit(citedFileCount, ceiling)` mapping (`0~2 → 500`, `3~5 → 1500`, `6+ → 3000`); honors optional `autopus.yaml` ceiling (REQ-CTX-1, REQ-CTX-4)
+  - `pkg/spec/metadata.go` — new `ParseReviewContextOverride` reads optional `review_context_lines` SPEC frontmatter override; rejects values ≤0 or >10000 with explicit error (REQ-CTX-2, REQ-CTX-3)
+  - `internal/cli/spec_review_context.go` — new `resolveSpecReviewContextLimit` orchestrates cited count → adaptive map → frontmatter override → ceiling cap, emitting `SPEC review context: cited=N applied=M [override=frontmatter] [ceiling=K]` to stderr
+  - `pkg/spec/provider_health.go` — new `BuildProviderStatuses`, `RenderProviderHealthSection`, `DegradedLabel`, `ShouldLabelDegraded`; classifies orchestra responses into success/timeout/error and renders `## Provider Health` table (REQ-VERD-1, REQ-VERD-2). Provider Note column is sanitized (control chars stripped, length capped at 200) so committed review.md never embeds raw provider stderr
+  - `pkg/spec/merge.go` — new `MergeVerdictsWithDenomMode` adds optional `excludeFailed` denom mode plus AC-VERD-1 fix (dropped providers without supermajority → REVISE not silent PASS); existing `MergeVerdicts` delegates with `excludeFailed=false`
+  - `pkg/spec/review_persist.go` — `formatReviewMd` now renders `## Provider Health` after the verdict line and appends `(degraded — N/M providers responded)` when failure ratio ≥ 50% (REQ-VERD-2/4)
+  - `pkg/config/schema_spec.go` — new `ExcludeFailedFromDenom bool` yaml field (default false, backward-compatible) (REQ-VERD-3)
+  - `internal/cli/spec_review_loop.go` — wires orchestra responses into `BuildProviderStatuses` and switches to denom-mode merge
+  - **Behavior change**: `MergeVerdicts` now treats any single REVISE vote as REVISE even when the supermajority math would otherwise pass (AC-VERD-BACKCOMPAT). Existing `TestMergeVerdictsSupermajorityPass` was renamed to `TestMergeVerdicts_AnyReviseWins` to reflect this. External tooling that grepped `**Verdict**: PASS` should be updated to handle the new optional `(degraded — N/M …)` suffix.
+
 ### Changed
 
 - **Spec review claude provider defaults relaxed for stability** (2026-05-04, issue [#55](https://github.com/Insajin/autopus-adk/issues/55)): default claude orchestra entry now uses `--effort high` (was `max`) and a per-provider subprocess timeout of 480s, exceeding the 240s global timeout to prevent the 4-minute cutoff observed on opus reasoning during multi-provider spec review.
   - `pkg/config/defaults.go` — new `ClaudeOrchestraTimeoutSeconds = 480` constant; claude provider entry sets `Subprocess.Timeout` and switches `--effort` to `high`
   - `pkg/config/defaults_test.go` — regression coverage for claude provider timeout and effort defaults
   - Existing installs are not auto-migrated — run `auto update` or edit `autopus.yaml` to adopt the new defaults
-  - Follow-up: SPEC-SPECREV-001 covers adaptive `context_max_lines` and provider-health verdict labeling
 
 ## [v0.43.0] — 2026-05-01
 

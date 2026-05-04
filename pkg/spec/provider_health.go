@@ -20,6 +20,7 @@ const (
 
 	// degradedThreshold is the inclusive failure ratio that triggers the
 	// "(degraded — N/M providers responded)" label (REQ-VERD-2).
+	// @AX:NOTE: [AUTO] magic constant — 0.5 is the inclusive REQ-VERD-2 threshold; boundary is >= not >
 	degradedThreshold = 0.5
 
 	// emptyNotePlaceholder renders in the Note column when the upstream value
@@ -90,13 +91,21 @@ func BuildProviderStatuses(
 	return out
 }
 
+// noteMaxLen bounds Note length so provider stderr (which can carry stack
+// traces or absolute filesystem paths) does not become a permanent artifact in
+// committed review.md files.
+// @AX:NOTE: [AUTO] hardening boundary — provider Error strings are sanitized before reaching review.md to prevent leakage of paths/credentials into git history (S-001).
+const noteMaxLen = 200
+
 // classifyResponse maps an orchestra ProviderResponse into a ProviderStatus.
+// Error notes are sanitized: control characters stripped, length capped at
+// noteMaxLen so committed review.md never embeds raw provider stderr.
 func classifyResponse(name string, r orchestra.ProviderResponse) ProviderStatus {
 	switch {
 	case r.TimedOut:
 		return ProviderStatus{Provider: name, Status: providerStatusTimeout, Note: emptyNotePlaceholder}
 	case r.ExitCode != 0 || r.Error != "":
-		note := r.Error
+		note := sanitizeNote(r.Error)
 		if note == "" {
 			note = fmt.Sprintf("exit=%d", r.ExitCode)
 		}
@@ -106,9 +115,40 @@ func classifyResponse(name string, r orchestra.ProviderResponse) ProviderStatus 
 	}
 }
 
+// sanitizeNote strips control characters and truncates the input so untrusted
+// provider stderr cannot inject markdown-breaking characters or leak long
+// paths/credentials into committed review.md.
+func sanitizeNote(in string) string {
+	if in == "" {
+		return ""
+	}
+	var sb strings.Builder
+	sb.Grow(len(in))
+	for _, r := range in {
+		// Replace any control char (newline, carriage return, tab, ASCII 0-31, DEL)
+		// with a single space so the markdown table row stays one line.
+		if r == '\n' || r == '\r' || r == '\t' || r < 0x20 || r == 0x7f {
+			sb.WriteRune(' ')
+			continue
+		}
+		// Pipe character would break the markdown table column boundary.
+		if r == '|' {
+			sb.WriteRune('/')
+			continue
+		}
+		sb.WriteRune(r)
+	}
+	out := strings.TrimSpace(sb.String())
+	if len(out) > noteMaxLen {
+		out = out[:noteMaxLen] + "…"
+	}
+	return out
+}
+
 // ShouldLabelDegraded reports whether the (failed / totalConfigured) ratio
 // reaches the inclusive 50% threshold mandated by REQ-VERD-2. Failure is any
 // status other than "success".
+// @AX:NOTE: [AUTO] subtle invariant — providers absent from statuses slice (missing < 0) count as failures; totalConfigured is the source of truth for denominator
 func ShouldLabelDegraded(statuses []ProviderStatus, totalConfigured int) bool {
 	if totalConfigured <= 0 {
 		return false

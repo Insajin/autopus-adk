@@ -20,6 +20,7 @@ import (
 //   - override: "frontmatter" when a frontmatter override was consumed, else ""
 //   - err: non-nil only on unrecoverable I/O errors; invalid frontmatter values
 //     are reported via stderr and the function falls back to the adaptive mapping.
+// @AX:WARN: [AUTO] multi-stage decision chain — adaptive → frontmatter override → ceiling cap; @AX:REASON: three independent override paths interact; incorrect ordering silently ignores a higher-priority source
 func resolveSpecReviewContextLimit(projectRoot, specDir string, ceiling int, stderr io.Writer) (cited, applied int, override string, err error) {
 	cited = countSpecCitedFiles(projectRoot, specDir)
 	mapped := mapAdaptiveLimit(cited)
@@ -33,13 +34,13 @@ func resolveSpecReviewContextLimit(projectRoot, specDir string, ceiling int, std
 	}
 
 	applied = base
-	cappedByCeiling := false
+	appliedCeiling := 0
 	if ceiling > 0 && ceiling < base {
 		applied = ceiling
-		cappedByCeiling = true
+		appliedCeiling = ceiling
 	}
 
-	emitContextLine(stderr, cited, applied, override, cappedByCeiling)
+	emitContextLine(stderr, cited, applied, override, appliedCeiling)
 	return cited, applied, override, nil
 }
 
@@ -97,14 +98,15 @@ func readFrontmatterOverride(specDir string, stderr io.Writer) (int, bool) {
 	return value, true
 }
 
-// emitContextLine writes the structured stderr summary line.
-func emitContextLine(stderr io.Writer, cited, applied int, override string, cappedByCeiling bool) {
+// emitContextLine writes the structured stderr summary line. ceiling is the
+// actual ceiling value applied (0 when ceiling did not cap the budget).
+func emitContextLine(stderr io.Writer, cited, applied int, override string, ceiling int) {
 	line := fmt.Sprintf("SPEC review context: cited=%d applied=%d", cited, applied)
 	if override != "" {
 		line += " override=" + override
 	}
-	if cappedByCeiling {
-		line += fmt.Sprintf(" ceiling=%d", applied)
+	if ceiling > 0 {
+		line += fmt.Sprintf(" ceiling=%d", ceiling)
 	}
 	fmt.Fprintln(stderr, line)
 }
