@@ -1,9 +1,10 @@
 # SPEC-SPECREV-001: Adaptive Review Context + Provider Health Verdict Labeling
 
-**Status**: approved
+**Status**: implemented
 **Created**: 2026-05-04
 **Domain**: SPECREV
-**Review**: Bootstrap review verdict REVISE attributed to claude provider infra failure (exit code 1); gemini returned PASS with 20/20 checklist PASS and review-findings.json empty. SPEC content has no actionable findings — promoted to approved by main session per LOOP circuit-break + no-findings rule.
+**Review**: Bootstrap review verdict REVISE attributed to claude provider infra failure (exit code 1); gemini returned PASS with 20/20 checklist PASS and review-findings.json empty. SPEC content had no actionable findings — promoted to approved by main session per LOOP circuit-break + no-findings rule.
+**Implementation**: Phase 1.5 RED scaffold (commit 7a6cdab) → Phase 2 G1+G2 (commit 1b84484) → Phase 3 coverage extension (commit 5c62f7c) → Phase 4 review feedback (commit 10527a1). Final state: pkg/spec 88.9% coverage, all tests PASS, reviewer APPROVE, security-auditor PASS.
 
 ## 목적
 
