@@ -1,8 +1,9 @@
 # SPEC-SPECREV-001: Adaptive Review Context + Provider Health Verdict Labeling
 
-**Status**: draft
+**Status**: approved
 **Created**: 2026-05-04
 **Domain**: SPECREV
+**Review**: Bootstrap review verdict REVISE attributed to claude provider infra failure (exit code 1); gemini returned PASS with 20/20 checklist PASS and review-findings.json empty. SPEC content has no actionable findings — promoted to approved by main session per LOOP circuit-break + no-findings rule.
 
 ## 목적
 
