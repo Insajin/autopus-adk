@@ -16,6 +16,19 @@ All notable changes to this project will be documented in this file.
   - `pkg/config/schema_spec.go` — new `ExcludeFailedFromDenom bool` yaml field (default false, backward-compatible) (REQ-VERD-3)
   - `internal/cli/spec_review_loop.go` — wires orchestra responses into `BuildProviderStatuses` and switches to denom-mode merge
   - **Behavior change**: `MergeVerdicts` now treats any single REVISE vote as REVISE even when the supermajority math would otherwise pass (AC-VERD-BACKCOMPAT). Existing `TestMergeVerdictsSupermajorityPass` was renamed to `TestMergeVerdicts_AnyReviseWins` to reflect this. External tooling that grepped `**Verdict**: PASS` should be updated to handle the new optional `(degraded — N/M …)` suffix.
+  - **Follow-up hardening (2026-05-04)**:
+    - `pkg/spec/provider_health.go::sanitizeNote` now uses rune-aware truncation (200 runes + ellipsis) instead of byte slicing, so multi-byte UTF-8 in provider stderr never lands as malformed runes in committed `review.md`.
+    - `pkg/spec/metadata.go` split into 3 files (`metadata.go`, `metadata_status.go`, `metadata_frontmatter.go`) — each ≤100 lines, fully out of the 200-line warning band.
+    - `internal/cli/spec_review_loop.go` now skips ParseVerdict for failed providers (`TimedOut || ExitCode != 0 || Error != ""`). A failed provider's partial stdout containing `VERDICT: REJECT` no longer triggers the REJECT short-circuit (S-005 hardening).
+    - `pkg/orchestra/output_parser.go::ParseReviewer` accepts `PASS | FAIL | N/A` checklist statuses (was `PASS | FAIL`).
+- **Checklist Summary section in review.md** (2026-05-04, SPEC-SPECREV-001 follow-up): `formatReviewMd` now renders a `## Checklist Summary` section between `## Provider Health` and `## Findings` whenever `ReviewResult.ProviderStatuses` carries checklist outcomes. The section follows the same column-aligned table pattern as Provider Health.
+  - Section structure: heading `## Checklist Summary`, columns `| ID | Status | Provider | Reason |`, terminal totals line `Total: N (PASS: P, FAIL: F, N/A: A)`.
+  - `pkg/spec/types.go` — new `ChecklistStatusNA ChecklistStatus = "N/A"` constant; `ChecklistOutcome.Reason` is now required for FAIL **and** N/A (see `content/rules/spec-quality.md` § "N/A Status Guidance" for usage).
+  - `pkg/spec/checklist_render.go` [NEW] — `CountChecklistStatuses` (per-status totals) and `RenderChecklistSection` (markdown table, reason sanitization via shared `sanitizeNote`).
+  - `internal/cli/spec_review_output.go::printChecklistSummary` now prints `체크리스트 결과: N건 (PASS: P, FAIL: F, N/A: A)` — the N/A count is a new field. Tooling that grepped the previous 2-tuple format must be updated.
+  - `internal/cli/spec_self_verify.go` `auto spec self-verify --status` flag now accepts `PASS | FAIL | N/A` (was `PASS | FAIL`); error string is `expected PASS, FAIL, or N/A`.
+  - `pkg/spec/selfverify.go::AppendSelfVerifyEntry` accepts `N/A` and writes it verbatim to `.self-verify.log` JSONL entries.
+  - **External grep contract**: tools that consume `review.md` should expect either `## Provider Health` immediately followed by `## Findings`, or with `## Checklist Summary` interposed when checklist data is present. Section order is: verdict → Provider Health → Checklist Summary → Findings → Provider Responses.
 
 ### Changed
 

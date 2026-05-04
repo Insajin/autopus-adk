@@ -18,7 +18,33 @@ The five primary dimensions map 1:1 to `FindingCategory` values in `pkg/spec/typ
 - `style`
 - `security`
 
-For document-only SPEC work, security items may be marked `N/A` only when the note explains why no real trust boundary, secret, or privileged path is involved.
+## N/A Status Guidance
+
+`N/A` is a first-class checklist status alongside `PASS` and `FAIL`. Use it when a dimension genuinely does not apply to the SPEC under review — never as an escape hatch to avoid analysis. SPEC-SPECREV-001 follow-up made the technical surface uniform: the orchestra parser (`pkg/orchestra/output_parser.go`), the self-verify CLI (`auto spec self-verify --status N/A`), and the persisted review.md `## Checklist Summary` section all accept and surface `N/A` as a distinct count separate from PASS/FAIL.
+
+### When `N/A` is appropriate
+
+| Dimension | Allowed scenarios | Required reason content |
+|-----------|------------------|-------------------------|
+| **correctness** (Q-CORR-*) | SPEC modifies only documentation/markdown; no code, configuration, or runtime contract referenced | Identify the doc-only scope; confirm no `[NEW]` runtime symbol claims |
+| **completeness** (Q-COMP-*) | Rare — usually FAIL or PASS. Acceptable when the dimension overlaps a sibling SPEC and the slice intentionally defers it | Reference the sibling SPEC ID that owns the deferred slice |
+| **feasibility** (Q-FEAS-*) | SPEC is purely conceptual (e.g. brainstorm-staged or pre-design) and runtime/module ownership is explicitly out of scope | State the gating step that establishes feasibility (e.g. follow-up SPEC, prototype) |
+| **style** (Q-STYLE-*) | Rare. Acceptable when a section deliberately uses non-standard formatting validated by a linter exception | Cite the specific linter rule and the rationale for the exception |
+| **security** (Q-SEC-*) | SPEC has no trust boundary, secret, credential, privileged path, or external input parsing | Explain why no real attack surface is involved (matches the existing Q-SEC-* `N/A 기준` entries below) |
+
+### Required reason text
+
+Every `N/A` entry MUST carry a non-empty `Reason` field. Empty `N/A` reasons fail validation downstream:
+- `pkg/spec/selfverify.go::AppendSelfVerifyEntry` accepts the status but operators reading `.self-verify.log` will lose context.
+- `pkg/spec/checklist_render.go::RenderChecklistSection` renders the reason into the review.md table; an empty reason becomes `-`, which is indistinguishable from a PASS placeholder and defeats the audit purpose.
+
+Reason length is sanitized to 200 runes (`pkg/spec/provider_health.go::sanitizeNote`) — keep reasons concise and self-contained.
+
+### Anti-patterns
+
+- Do NOT mark `N/A` to silence a checklist item you have not analyzed.
+- Do NOT mark `N/A` for security on SPECs that touch user input, file paths, secrets, or external network calls — even doc-only SPECs that quote untrusted prompt evidence trigger Q-SEC-01.
+- Do NOT mix `N/A` and `PASS` for the same dimension across providers in multi-provider review without explaining the divergence in the merged finding list.
 
 ## correctness
 
