@@ -101,6 +101,7 @@ func countEscapeHatch(findings []ReviewFinding) int {
 //
 // Backward-compat wrapper: delegates to MergeVerdictsWithDenomMode with
 // excludeFailed=false (SPEC-SPECREV-001 REQ-VERD-3).
+// @AX:NOTE: [AUTO] public API contract — signature is pinned by AC-VERD-BACKCOMPAT; adding parameters here is a breaking change
 func MergeVerdicts(results []ReviewResult, threshold float64, totalProviders int) ReviewVerdict {
 	return MergeVerdictsWithDenomMode(results, threshold, totalProviders, false, 0)
 }
@@ -119,6 +120,8 @@ func MergeVerdicts(results []ReviewResult, threshold float64, totalProviders int
 // (len(results) < totalProviders) and the surviving providers fail to
 // reach the supermajority, the merger returns VerdictRevise instead of
 // silently passing on a single survivor's PASS vote.
+// @AX:WARN: [AUTO] cyclomatic complexity — dual denom-mode branches + AC-VERD-1 special case; @AX:REASON: four independent decision paths make edge cases non-obvious (excludeFailed, denom<=0, dropped providers, tolerance check)
+// @AX:NOTE: [AUTO] behavior boundary — denom<=0 fallback to VerdictRevise only applies when excludeFailed=true; excludeFailed=false falls back to len(results) denom instead
 func MergeVerdictsWithDenomMode(
 	results []ReviewResult,
 	threshold float64,
@@ -166,6 +169,7 @@ func MergeVerdictsWithDenomMode(
 
 // verdictTolerance aligns supermajority math with MergeSupermajority so that
 // 2/3 = 0.6667 qualifies for threshold = 0.67.
+// @AX:NOTE: [AUTO] magic constant — 0.005 compensates for float64 rounding in 2/3 comparisons; must stay in sync with MergeSupermajority
 const verdictTolerance = 0.005
 
 // tallyVerdicts returns (passCount, reviseCount) for the supplied results.
@@ -186,6 +190,7 @@ func tallyVerdicts(results []ReviewResult) (int, int) {
 // excludeFailed branches once the denom has been chosen. PASS requires a
 // strict supermajority AND zero REVISE votes; any REVISE vote keeps the
 // verdict at REVISE so SPEC content concerns are never silently dropped.
+// @AX:NOTE: [AUTO] subtle invariant — reviseCount > 0 takes priority over passCount supermajority (AC-VERD-BACKCOMPAT); a single REVISE always blocks PASS
 func verdictFromCounts(results []ReviewResult, threshold float64, denom float64) ReviewVerdict {
 	passCount, reviseCount := tallyVerdicts(results)
 	if float64(passCount)/denom+verdictTolerance >= threshold && reviseCount == 0 {

@@ -58,9 +58,17 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			return nil, fmt.Errorf("리뷰 실행 실패: %w", err)
 		}
 
-		// Parse verdicts from each provider
+		// Parse verdicts from each provider.
+		// SPEC-SPECREV-001 S-005 hardening: skip responses from providers that
+		// timed out or exited non-zero. Their partial stdout may contain
+		// spurious VERDICT keywords (PASS/REJECT) that must not contribute to
+		// the merged verdict — the ProviderStatuses table already records the
+		// failure for operator visibility.
 		var reviews []spec.ReviewResult
 		for _, resp := range result.Responses {
+			if resp.TimedOut || resp.ExitCode != 0 || resp.Error != "" {
+				continue
+			}
 			r := spec.ParseVerdict(p.specID, resp.Output, resp.Provider, revision, nilIfEmpty(priorFindings))
 			reviews = append(reviews, r)
 		}

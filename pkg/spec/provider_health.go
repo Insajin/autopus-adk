@@ -118,29 +118,36 @@ func classifyResponse(name string, r orchestra.ProviderResponse) ProviderStatus 
 // sanitizeNote strips control characters and truncates the input so untrusted
 // provider stderr cannot inject markdown-breaking characters or leak long
 // paths/credentials into committed review.md.
+//
+// Truncation is rune-aware so multi-byte UTF-8 sequences at the cap boundary
+// are never split, preventing malformed runes in committed review.md.
 func sanitizeNote(in string) string {
 	if in == "" {
 		return ""
 	}
 	var sb strings.Builder
 	sb.Grow(len(in))
+	count := 0
+	truncated := false
 	for _, r := range in {
 		// Replace any control char (newline, carriage return, tab, ASCII 0-31, DEL)
 		// with a single space so the markdown table row stays one line.
 		if r == '\n' || r == '\r' || r == '\t' || r < 0x20 || r == 0x7f {
-			sb.WriteRune(' ')
-			continue
+			r = ' '
+		} else if r == '|' {
+			// Pipe character would break the markdown table column boundary.
+			r = '/'
 		}
-		// Pipe character would break the markdown table column boundary.
-		if r == '|' {
-			sb.WriteRune('/')
-			continue
+		if count >= noteMaxLen {
+			truncated = true
+			break
 		}
 		sb.WriteRune(r)
+		count++
 	}
 	out := strings.TrimSpace(sb.String())
-	if len(out) > noteMaxLen {
-		out = out[:noteMaxLen] + "…"
+	if truncated {
+		out += "…"
 	}
 	return out
 }

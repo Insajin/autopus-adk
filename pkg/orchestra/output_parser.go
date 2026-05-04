@@ -59,8 +59,8 @@ func (op *OutputParser) ParseReviewer(raw string) (*ReviewerOutput, error) {
 	}
 	for _, item := range out.Checklist {
 		switch item.Status {
-		case "PASS", "FAIL":
-			// valid
+		case "PASS", "FAIL", "N/A":
+			// valid; N/A allowed for items that do not apply (e.g. doc-only SPEC security checks).
 		default:
 			return nil, fmt.Errorf("parse reviewer: invalid checklist status %q", item.Status)
 		}

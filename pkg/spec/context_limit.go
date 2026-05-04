@@ -1,5 +1,44 @@
 package spec
 
+import (
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+)
+
+// ErrInvalidContextOverride is returned by ParseReviewContextOverride when the
+// review_context_lines frontmatter value is outside the accepted range
+// (must satisfy 0 < value <= 10000).
+// @AX:NOTE: [AUTO] magic constant — 10000 is the upper bound for review_context_lines override (REQ-CTX-3); matches CLI warning message
+var ErrInvalidContextOverride = errors.New("review_context_lines must be >0 and <=10000")
+
+// ParseReviewContextOverride scans the SPEC frontmatter for the
+// "review_context_lines" key and returns the parsed override.
+//
+// Return semantics:
+//   - present=false, value=0,  err=nil                          : key absent
+//   - present=true,  value=N,  err=nil                          : valid (0 < N <= 10000)
+//   - present=true,  value=N,  err=ErrInvalidContextOverride    : out of range; N is echoed for logging
+//   - present=true,  value=0,  err=<strconv error>              : non-integer value
+func ParseReviewContextOverride(content string) (int, bool, error) {
+	lines := strings.Split(content, "\n")
+	frontmatter := parseSpecFrontmatter(lines)
+	raw, ok := frontmatter["review_context_lines"]
+	if !ok {
+		return 0, false, nil
+	}
+	value, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return 0, true, fmt.Errorf("parse review_context_lines: %w", err)
+	}
+	if value <= 0 || value > 10000 {
+		return value, true, ErrInvalidContextOverride
+	}
+	return value, true, nil
+}
+
+// @AX:NOTE: [AUTO] magic constants — 500/1500/3000 are calibrated budget tiers (REQ-CTX-1); adjust only with SPEC update
 // AdaptiveContextLimit returns the SPEC review context line budget based on the
 // number of unique cited files. The mapping is:
 //

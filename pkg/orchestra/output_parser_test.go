@@ -89,6 +89,17 @@ func TestOutputParser_ParseReviewer_InvalidChecklistStatus(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid checklist status")
 }
 
+func TestOutputParser_ParseReviewer_AcceptsNAChecklistStatus(t *testing.T) {
+	t.Parallel()
+	op := &OutputParser{}
+	input := `{"findings":[],"verdict":"PASS","summary":"ok","checklist":[{"id":"Q-SEC-01","status":"N/A"},{"id":"Q-CORR-01","status":"PASS"}]}`
+	out, err := op.ParseReviewer(input)
+	require.NoError(t, err)
+	assert.Equal(t, "PASS", out.Verdict)
+	require.Len(t, out.Checklist, 2)
+	assert.Equal(t, "N/A", out.Checklist[0].Status)
+}
+
 func TestOutputParser_MarkdownWrapped(t *testing.T) {
 	t.Parallel()
 	op := &OutputParser{}

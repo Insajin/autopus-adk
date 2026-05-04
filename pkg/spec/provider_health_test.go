@@ -8,7 +8,9 @@ package spec_test
 // (timeout, exit-error, missing-response, FailedProvider).
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 
@@ -182,6 +184,44 @@ func TestBuildProviderStatuses_FailedProviderAndMissing(t *testing.T) {
 	require.Equal(spec.ProviderStatus{Provider: "gemini", Status: "error", Note: "binary_or_transport"}, got[1])
 	require.Equal(spec.ProviderStatus{Provider: "codex", Status: "error", Note: "no response"}, got[2])
 	require.Equal(spec.ProviderStatus{Provider: "opus2", Status: "error", Note: "-"}, got[3])
+}
+
+// TestBuildProviderStatuses_NoteSanitization covers the S-001 hardening: provider
+// stderr is run through sanitizeNote before reaching review.md. The test pins
+// three observables: control characters become spaces, pipe characters become
+// slashes (so the markdown table column does not split), and rune-aware
+// truncation never splits a multi-byte UTF-8 sequence.
+func TestBuildProviderStatuses_NoteSanitization(t *testing.T) {
+	t.Parallel()
+
+	// Build a long Korean string (3 bytes per rune) so byte-based truncation at
+	// 200 would land mid-rune. Rune-aware truncation must produce valid UTF-8.
+	longKorean := strings.Repeat("가", 250) // 250 runes × 3 bytes = 750 bytes
+
+	responses := []orchestra.ProviderResponse{
+		{Provider: "p1", ExitCode: 1, Error: "line1\nline2\rline3\ttab"},
+		{Provider: "p2", ExitCode: 1, Error: "table | breaker"},
+		{Provider: "p3", ExitCode: 1, Error: longKorean},
+	}
+	configured := []string{"p1", "p2", "p3"}
+
+	got := spec.BuildProviderStatuses(responses, nil, configured)
+
+	require := assert.New(t)
+	require.Len(got, 3)
+
+	// Control chars replaced with spaces, then TrimSpace + collapsed by Notes.
+	require.Equal("line1 line2 line3 tab", got[0].Note)
+
+	// Pipe character replaced so the markdown row stays well-formed.
+	require.Equal("table / breaker", got[1].Note)
+
+	// Rune-aware truncation: must end with the ellipsis sentinel and decode as
+	// valid UTF-8 (no malformed runes from byte-level slicing).
+	require.True(strings.HasSuffix(got[2].Note, "…"), "long input must be truncated with ellipsis")
+	require.True(utf8.ValidString(got[2].Note), "truncated note must remain valid UTF-8")
+	// 200 runes of "가" + the ellipsis rune = 201 runes total.
+	require.Equal(201, utf8.RuneCountInString(got[2].Note))
 }
 
 // TestDegradedLabel_FormatsExactly covers REQ-VERD-2 label format: the suffix
