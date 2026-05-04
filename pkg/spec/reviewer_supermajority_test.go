@@ -7,8 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestMergeVerdictsSupermajorityPass: [PASS, PASS, REVISE] + threshold 0.67 → VerdictPass
-func TestMergeVerdictsSupermajorityPass(t *testing.T) {
+// TestMergeVerdicts_AnyReviseWins: [PASS, PASS, REVISE] + threshold 0.67 → VerdictRevise
+// SPEC-SPECREV-001 AC-VERD-BACKCOMPAT redefines this case: any REVISE vote keeps
+// the verdict at REVISE so SPEC content concerns are never silently dropped, even
+// when the supermajority math would otherwise pass. Legacy "supermajority PASS"
+// behavior was retired here.
+func TestMergeVerdicts_AnyReviseWins(t *testing.T) {
 	t.Parallel()
 
 	results := []ReviewResult{
@@ -16,9 +20,8 @@ func TestMergeVerdictsSupermajorityPass(t *testing.T) {
 		{Verdict: VerdictPass},
 		{Verdict: VerdictRevise},
 	}
-	// 2/3 = 0.667 >= 0.67 → PASS supermajority
 	got := MergeVerdicts(results, 0.67, 3)
-	assert.Equal(t, VerdictPass, got)
+	assert.Equal(t, VerdictRevise, got)
 }
 
 // TestMergeVerdictsSupermajorityRevise: [PASS, REVISE, REVISE] + threshold 0.67 → VerdictRevise

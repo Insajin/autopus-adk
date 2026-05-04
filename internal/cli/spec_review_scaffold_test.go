@@ -120,13 +120,17 @@ func TestRunSpecReviewReloadsSpecBetweenRevisions(t *testing.T) {
 			return &orchestra.OrchestraResult{
 				Responses: []orchestra.ProviderResponse{
 					{Provider: "claude", Output: "VERDICT: REVISE\nFINDING: [major] [correctness] REQ-A missing details"},
+					{Provider: "gemini", Output: "VERDICT: REVISE"},
 				},
 			}, nil
 		}
-		// revision 1: return PASS
+		// revision 1: return PASS from both providers so SPEC-SPECREV-001 AC-VERD-1
+		// dropped-provider rule does not block the PASS path under the default
+		// 2-provider config.
 		return &orchestra.OrchestraResult{
 			Responses: []orchestra.ProviderResponse{
 				{Provider: "claude", Output: "VERDICT: PASS"},
+				{Provider: "gemini", Output: "VERDICT: PASS"},
 			},
 		}, nil
 	}

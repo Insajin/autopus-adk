@@ -135,7 +135,12 @@ func TestRunSpecReview_PassApprovesSpec(t *testing.T) {
 
 	origRunner := specReviewRunOrchestra
 	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
-		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{{Provider: "claude", Output: "VERDICT: PASS"}}}, nil
+		// Default config has 2 providers (claude, gemini); both must return PASS so
+		// SPEC-SPECREV-001 AC-VERD-1 dropped-provider rule does not flip to REVISE.
+		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{
+			{Provider: "claude", Output: "VERDICT: PASS"},
+			{Provider: "gemini", Output: "VERDICT: PASS"},
+		}}, nil
 	}
 	defer func() { specReviewRunOrchestra = origRunner }()
 

@@ -98,24 +98,79 @@ func countEscapeHatch(findings []ReviewFinding) int {
 // REJECT is a security gate — one REJECT immediately returns VerdictReject.
 // totalProviders is the configured provider count (denominator for threshold math).
 // When no supermajority is reached, any REVISE vote keeps the result as REVISE.
+//
+// Backward-compat wrapper: delegates to MergeVerdictsWithDenomMode with
+// excludeFailed=false (SPEC-SPECREV-001 REQ-VERD-3).
 func MergeVerdicts(results []ReviewResult, threshold float64, totalProviders int) ReviewVerdict {
-	if len(results) == 0 {
-		return VerdictPass
-	}
+	return MergeVerdictsWithDenomMode(results, threshold, totalProviders, false, 0)
+}
 
-	// REJECT is a security gate — one provider is enough.
+// MergeVerdictsWithDenomMode is the denom-mode-aware merger introduced by
+// SPEC-SPECREV-001 REQ-VERD-3.
+//
+// When excludeFailed=true, the threshold denominator becomes
+// (totalProviders - failedCount) so timed-out/errored providers no longer
+// dilute the supermajority math. If every provider failed (denom <= 0) the
+// merger returns VerdictRevise so users still see an actionable verdict
+// rather than a security-gate reject.
+//
+// When excludeFailed=false the legacy behavior is preserved with one
+// correctness fix tied to AC-VERD-1: if dropped providers exist
+// (len(results) < totalProviders) and the surviving providers fail to
+// reach the supermajority, the merger returns VerdictRevise instead of
+// silently passing on a single survivor's PASS vote.
+func MergeVerdictsWithDenomMode(
+	results []ReviewResult,
+	threshold float64,
+	totalProviders int,
+	excludeFailed bool,
+	failedCount int,
+) ReviewVerdict {
+	// REJECT is a security gate — one provider is enough, regardless of denom mode.
 	for _, r := range results {
 		if r.Verdict == VerdictReject {
 			return VerdictReject
 		}
 	}
 
+	if excludeFailed {
+		denom := totalProviders - failedCount
+		if denom <= 0 {
+			// Every configured provider failed — degrade to REVISE per
+			// REQ-VERD-3 (last paragraph) instead of passing or rejecting.
+			return VerdictRevise
+		}
+		return verdictFromCounts(results, threshold, float64(denom))
+	}
+
+	if len(results) == 0 {
+		return VerdictPass
+	}
 	denom := float64(totalProviders)
 	if denom <= 0 {
 		denom = float64(len(results))
 	}
-	passCount := 0
-	reviseCount := 0
+	verdict := verdictFromCounts(results, threshold, denom)
+	// AC-VERD-1 fix: when dropped providers exist and the survivors did not
+	// reach supermajority PASS, do not let the legacy fallthrough emit PASS
+	// on a single survivor's vote — surface REVISE so review.md communicates
+	// the dilution that the degraded label hints at.
+	if verdict == VerdictPass && len(results) < totalProviders {
+		passCount, _ := tallyVerdicts(results)
+		if float64(passCount)/denom+verdictTolerance < threshold {
+			return VerdictRevise
+		}
+	}
+	return verdict
+}
+
+// verdictTolerance aligns supermajority math with MergeSupermajority so that
+// 2/3 = 0.6667 qualifies for threshold = 0.67.
+const verdictTolerance = 0.005
+
+// tallyVerdicts returns (passCount, reviseCount) for the supplied results.
+func tallyVerdicts(results []ReviewResult) (int, int) {
+	passCount, reviseCount := 0, 0
 	for _, r := range results {
 		switch r.Verdict {
 		case VerdictPass:
@@ -124,14 +179,16 @@ func MergeVerdicts(results []ReviewResult, threshold float64, totalProviders int
 			reviseCount++
 		}
 	}
+	return passCount, reviseCount
+}
 
-	// Small tolerance aligns with MergeSupermajority: 2/3=0.6667 qualifies for threshold=0.67.
-	const tol = 0.005
-	// PASS requires a strict supermajority; any doubt falls back to REVISE.
-	if float64(passCount)/denom+tol >= threshold && reviseCount == 0 {
-		return VerdictPass
-	}
-	if float64(passCount)/denom+tol >= threshold && float64(reviseCount)/denom+tol < threshold {
+// verdictFromCounts applies the shared supermajority decision used by both
+// excludeFailed branches once the denom has been chosen. PASS requires a
+// strict supermajority AND zero REVISE votes; any REVISE vote keeps the
+// verdict at REVISE so SPEC content concerns are never silently dropped.
+func verdictFromCounts(results []ReviewResult, threshold float64, denom float64) ReviewVerdict {
+	passCount, reviseCount := tallyVerdicts(results)
+	if float64(passCount)/denom+verdictTolerance >= threshold && reviseCount == 0 {
 		return VerdictPass
 	}
 	if reviseCount > 0 {

@@ -25,14 +25,19 @@ func TestRunSpecReview_PrintsChecklistSummary(t *testing.T) {
 
 	origRunner := specReviewRunOrchestra
 	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		// Default config has 2 providers (claude, gemini); both respond so the
+		// SPEC-SPECREV-001 dropped-provider rule does not downgrade verdict to REVISE.
 		return &orchestra.OrchestraResult{
-			Responses: []orchestra.ProviderResponse{{
-				Provider: "claude",
-				Output: `VERDICT: PASS
+			Responses: []orchestra.ProviderResponse{
+				{
+					Provider: "claude",
+					Output: `VERDICT: PASS
 CHECKLIST: Q-CORR-01 | PASS
 CHECKLIST: Q-COMP-03 | FAIL | acceptance.md에 error path 시나리오 부재
 CHECKLIST: Q-STYLE-01 | PASS`,
-			}},
+				},
+				{Provider: "gemini", Output: "VERDICT: PASS"},
+			},
 		}, nil
 	}
 	defer func() { specReviewRunOrchestra = origRunner }()

@@ -142,6 +142,14 @@ type ReviewFinding struct {
 	EscapeHatch  bool            // true if added via critical/security escape hatch in verify mode
 }
 
+// ProviderStatus captures one provider's outcome for the Provider Health
+// section rendered in review.md (SPEC-SPECREV-001 REQ-VERD-1).
+type ProviderStatus struct {
+	Provider string // provider name (e.g., "claude")
+	Status   string // "success" | "timeout" | "error"
+	Note     string // human-readable detail or "-" when empty
+}
+
 // ReviewResult is the aggregated result of a multi-provider review.
 type ReviewResult struct {
 	SpecID            string             // target SPEC ID
@@ -150,4 +158,5 @@ type ReviewResult struct {
 	ChecklistOutcomes []ChecklistOutcome // structured checklist outcomes from provider responses
 	Responses         []string           // raw provider responses
 	Revision          int                // revision iteration (0 = first review)
+	ProviderStatuses  []ProviderStatus   // per-provider health (SPEC-SPECREV-001 REQ-VERD-1)
 }

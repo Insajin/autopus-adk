@@ -65,8 +65,20 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			reviews = append(reviews, r)
 		}
 
+		// SPEC-SPECREV-001 REQ-VERD-1: build per-provider health from orchestra.
+		configuredNames := make([]string, 0, len(p.providers))
+		for _, pc := range p.providers {
+			configuredNames = append(configuredNames, pc.Name)
+		}
+		providerStatuses := spec.BuildProviderStatuses(result.Responses, result.FailedProviders, configuredNames)
+		failedCount := len(configuredNames) - spec.CountProviderStatus(providerStatuses, "success")
+
 		// REQ-01: use supermajority threshold instead of unanimous PASS.
-		finalVerdict := spec.MergeVerdicts(reviews, p.threshold, len(p.providers))
+		// SPEC-SPECREV-001 REQ-VERD-3: optionally drop failed providers from the denom.
+		finalVerdict := spec.MergeVerdictsWithDenomMode(
+			reviews, p.threshold, len(p.providers),
+			p.gate.ExcludeFailedFromDenom, failedCount,
+		)
 
 		// Flatten all provider findings.
 		var allFindings []spec.ReviewFinding
@@ -89,6 +101,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			ChecklistOutcomes: allChecklistOutcomes,
 			Responses:         allResponses,
 			Revision:          revision,
+			ProviderStatuses:  providerStatuses,
 		}
 
 		// Apply scope lock in verify mode

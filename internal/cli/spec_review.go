@@ -102,11 +102,13 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 		return fmt.Errorf("--multi requires at least 2 installed providers (resolved: %v)", providerNames)
 	}
 
-	// Collect code context once
+	// Collect code context once. Limit is derived adaptively from the number of
+	// files cited in the SPEC, with optional frontmatter override and config ceiling.
 	var codeContext string
 	if gate.AutoCollectContext {
+		_, applied, _, _ := resolveSpecReviewContextLimit(".", specDir, gate.ContextMaxLines, os.Stderr)
 		var ctxErr error
-		codeContext, ctxErr = spec.CollectContextForSpec(".", specDir, gate.ContextMaxLines)
+		codeContext, ctxErr = spec.CollectContextForSpec(".", specDir, applied)
 		if ctxErr != nil {
 			fmt.Fprintf(os.Stderr, "경고: 코드 컨텍스트 수집 실패: %v\n", ctxErr)
 		}
