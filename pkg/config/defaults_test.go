@@ -109,6 +109,44 @@ func TestDefaultFullConfig_BrainstormCommand(t *testing.T) {
 	assert.Contains(t, brainstorm.Providers, "gemini")
 }
 
+// TestDefaultFullConfig_ClaudeProviderTimeout verifies claude has a per-provider
+// subprocess timeout that exceeds the global orchestra timeout, preventing the
+// 4-minute cutoff observed in issue #55 when running `--model opus --effort high`.
+func TestDefaultFullConfig_ClaudeProviderTimeout(t *testing.T) {
+	t.Parallel()
+	cfg := DefaultFullConfig("test-project")
+	require.NotNil(t, cfg)
+
+	claude, ok := cfg.Orchestra.Providers["claude"]
+	require.True(t, ok, "claude provider must exist")
+
+	assert.Equal(t, ClaudeOrchestraTimeoutSeconds, claude.Subprocess.Timeout,
+		"claude provider must declare a per-provider subprocess timeout")
+	assert.Greater(t, claude.Subprocess.Timeout, cfg.Orchestra.TimeoutSeconds,
+		"claude per-provider timeout must exceed the global orchestra timeout")
+}
+
+// TestDefaultFullConfig_ClaudeEffortHigh verifies claude defaults to --effort high
+// (not max) for spec review's structured-output workload. See issue #55 for the
+// rationale: max-effort reasoning routinely exceeded 4 minutes on opus.
+func TestDefaultFullConfig_ClaudeEffortHigh(t *testing.T) {
+	t.Parallel()
+	cfg := DefaultFullConfig("test-project")
+	require.NotNil(t, cfg)
+
+	claude, ok := cfg.Orchestra.Providers["claude"]
+	require.True(t, ok, "claude provider must exist")
+
+	assert.Contains(t, claude.Args, "high",
+		"claude default args must use --effort high (issue #55)")
+	assert.NotContains(t, claude.Args, "max",
+		"claude default args must not use --effort max (issue #55)")
+	assert.Contains(t, claude.PaneArgs, "high",
+		"claude default pane args must use --effort high (issue #55)")
+	assert.NotContains(t, claude.PaneArgs, "max",
+		"claude default pane args must not use --effort max (issue #55)")
+}
+
 // TestDefaultFullConfig_CodexExistsNoOpencode verifies codex exists and opencode
 // is absent from the default config.
 func TestDefaultFullConfig_CodexExistsNoOpencode(t *testing.T) {

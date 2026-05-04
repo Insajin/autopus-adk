@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **Spec review claude provider defaults relaxed for stability** (2026-05-04, issue [#55](https://github.com/Insajin/autopus-adk/issues/55)): default claude orchestra entry now uses `--effort high` (was `max`) and a per-provider subprocess timeout of 480s, exceeding the 240s global timeout to prevent the 4-minute cutoff observed on opus reasoning during multi-provider spec review.
+  - `pkg/config/defaults.go` — new `ClaudeOrchestraTimeoutSeconds = 480` constant; claude provider entry sets `Subprocess.Timeout` and switches `--effort` to `high`
+  - `pkg/config/defaults_test.go` — regression coverage for claude provider timeout and effort defaults
+  - Existing installs are not auto-migrated — run `auto update` or edit `autopus.yaml` to adopt the new defaults
+  - Follow-up: SPEC-SPECREV-001 covers adaptive `context_max_lines` and provider-health verdict labeling
+
 ## [v0.43.0] — 2026-05-01
 
 ### Changed

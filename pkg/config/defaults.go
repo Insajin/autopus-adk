@@ -8,6 +8,10 @@ const (
 	CodexSparkModel              = CodexFrontierModel
 	CodexFallbackModel           = CodexFrontierModel
 	CodexOrchestraTimeoutSeconds = 420
+	// ClaudeOrchestraTimeoutSeconds covers opus reasoning that routinely runs
+	// 3–6 minutes on spec review workloads. Exceeds the 240s global timeout to
+	// prevent the cutoff reported in issue #55.
+	ClaudeOrchestraTimeoutSeconds = 480
 )
 
 // DefaultCodexProviderEntry returns the canonical Codex orchestra provider entry.
@@ -91,7 +95,12 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			TimeoutSeconds:  240,
 			Judge:           "claude",
 			Providers: map[string]ProviderEntry{
-				"claude": {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "max"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "max"}},
+				"claude": {
+					Binary:     "claude",
+					Args:       []string{"--print", "--model", "opus", "--effort", "high"},
+					PaneArgs:   []string{"--print", "--model", "opus", "--effort", "high"},
+					Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
+				},
 				"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
 				"codex":  DefaultCodexProviderEntry(),
 			},
