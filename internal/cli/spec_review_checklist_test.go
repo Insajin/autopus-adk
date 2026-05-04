@@ -46,7 +46,9 @@ CHECKLIST: Q-STYLE-01 | PASS`,
 		require.NoError(t, runSpecReview(context.Background(), "SPEC-REVIEW-CHECKLIST-001", "consensus", 10))
 	})
 
-	assert.Contains(t, stdout, "체크리스트 결과: 3건 (PASS: 2, FAIL: 1)")
+	// SPEC-SPECREV-001 follow-up: stdout summary now includes N/A count so
+	// reviewers can distinguish "all dimensions evaluated" from "some waived".
+	assert.Contains(t, stdout, "체크리스트 결과: 3건 (PASS: 2, FAIL: 1, N/A: 0)")
 	assert.Contains(t, stdout, "- [FAIL] Q-COMP-03: acceptance.md에 error path 시나리오 부재")
 
 	doc, err := spec.Load(specDir)

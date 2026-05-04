@@ -117,13 +117,19 @@ type ChecklistStatus string
 const (
 	ChecklistStatusPass ChecklistStatus = "PASS"
 	ChecklistStatusFail ChecklistStatus = "FAIL"
+	// ChecklistStatusNA marks a checklist item that does not apply to the
+	// reviewed SPEC (per spec-quality.md: e.g. Q-SEC-* on a doc-only SPEC
+	// with no trust boundary, or self-verify entries the reviewer chose to
+	// exclude with a documented reason). N/A items must carry Reason text
+	// so future readers understand why the dimension was waived.
+	ChecklistStatusNA ChecklistStatus = "N/A"
 )
 
 // ChecklistOutcome is a structured checklist result emitted by a provider.
 type ChecklistOutcome struct {
 	ID       string          // checklist item ID (for example, Q-CORR-01)
-	Status   ChecklistStatus // PASS or FAIL
-	Reason   string          // optional reason, required for FAIL in reviewer guidance
+	Status   ChecklistStatus // PASS, FAIL, or N/A
+	Reason   string          // required for FAIL or N/A, optional for PASS
 	Provider string          // provider that emitted the outcome
 	Revision int             // revision iteration (0 = first review)
 }

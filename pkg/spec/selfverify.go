@@ -28,7 +28,11 @@ func AppendSelfVerifyEntry(specDir string, entry SelfVerifyEntry) error {
 	if entry.Timestamp.IsZero() {
 		entry.Timestamp = time.Now().UTC()
 	}
-	if entry.Status != ChecklistStatusPass && entry.Status != ChecklistStatusFail {
+	switch entry.Status {
+	case ChecklistStatusPass, ChecklistStatusFail, ChecklistStatusNA:
+		// valid; N/A allowed per spec-quality.md for items that do not apply
+		// to the reviewed SPEC (e.g. Q-SEC-* dimensions on doc-only SPECs).
+	default:
 		return fmt.Errorf("invalid self-verify status: %s", entry.Status)
 	}
 

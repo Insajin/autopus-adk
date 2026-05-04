@@ -30,8 +30,11 @@ func newSpecSelfVerifyCmd() *cobra.Command {
 			}
 
 			normalizedStatus := spec.ChecklistStatus(strings.ToUpper(strings.TrimSpace(status)))
-			if normalizedStatus != spec.ChecklistStatusPass && normalizedStatus != spec.ChecklistStatusFail {
-				return fmt.Errorf("invalid --status %q: expected PASS or FAIL", status)
+			switch normalizedStatus {
+			case spec.ChecklistStatusPass, spec.ChecklistStatusFail, spec.ChecklistStatusNA:
+				// valid
+			default:
+				return fmt.Errorf("invalid --status %q: expected PASS, FAIL, or N/A", status)
 			}
 
 			resolved, err := spec.ResolveSpecDir(".", specID)

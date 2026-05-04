@@ -47,11 +47,28 @@ func TestAppendSelfVerifyEntry_AppendsAndRetainsLatest100(t *testing.T) {
 func TestAppendSelfVerifyEntry_RejectsInvalidStatus(t *testing.T) {
 	t.Parallel()
 
+	// N/A is now a valid status (SPEC-SPECREV-001 follow-up); use an
+	// unambiguously invalid token to exercise the rejection path.
 	err := AppendSelfVerifyEntry(t.TempDir(), SelfVerifyEntry{
 		Dimension: "style",
-		Status:    ChecklistStatus("N/A"),
+		Status:    ChecklistStatus("MAYBE"),
 	})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid self-verify status")
+}
+
+// TestAppendSelfVerifyEntry_AcceptsNAStatus pins the SPEC-SPECREV-001 follow-up:
+// self-verify entries may now mark a dimension as N/A when the dimension does
+// not apply to the SPEC under review (e.g. Q-SEC-* on a doc-only SPEC).
+func TestAppendSelfVerifyEntry_AcceptsNAStatus(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	err := AppendSelfVerifyEntry(dir, SelfVerifyEntry{
+		Dimension: "security",
+		Status:    ChecklistStatusNA,
+		Reason:    "doc-only SPEC, no trust boundary",
+	})
+	require.NoError(t, err)
 }

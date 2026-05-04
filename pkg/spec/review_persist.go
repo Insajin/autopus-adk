@@ -42,6 +42,10 @@ func formatReviewMd(r *ReviewResult) string {
 		sb.WriteString(section)
 	}
 
+	if section := RenderChecklistSection(r.ChecklistOutcomes); section != "" {
+		sb.WriteString(section)
+	}
+
 	if len(r.Findings) > 0 {
 		sb.WriteString("## Findings\n\n")
 		sb.WriteString("| Provider | Severity | Description |\n")

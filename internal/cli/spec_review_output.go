@@ -11,18 +11,10 @@ func printChecklistSummary(outcomes []spec.ChecklistOutcome) {
 		return
 	}
 
-	passCount := 0
-	failCount := 0
-	for _, outcome := range outcomes {
-		switch outcome.Status {
-		case spec.ChecklistStatusPass:
-			passCount++
-		case spec.ChecklistStatusFail:
-			failCount++
-		}
-	}
+	passCount, failCount, naCount := spec.CountChecklistStatuses(outcomes)
 
-	fmt.Printf("체크리스트 결과: %d건 (PASS: %d, FAIL: %d)\n", len(outcomes), passCount, failCount)
+	fmt.Printf("체크리스트 결과: %d건 (PASS: %d, FAIL: %d, N/A: %d)\n",
+		len(outcomes), passCount, failCount, naCount)
 	for _, outcome := range outcomes {
 		if outcome.Status != spec.ChecklistStatusFail {
 			continue
