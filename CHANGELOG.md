@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [v0.44.0] — 2026-05-05
+
 ### Added
 
 - **Adaptive SPEC review context limit + Provider Health labeling** (2026-05-04, [SPEC-SPECREV-001](.autopus/specs/SPEC-SPECREV-001/spec.md), issue [#55](https://github.com/Insajin/autopus-adk/issues/55)): multi-provider spec review now scales the citation context budget per SPEC and surfaces provider infrastructure failures as a structured verdict label so operators can distinguish content concerns from timeouts.
