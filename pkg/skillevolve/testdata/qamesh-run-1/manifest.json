@@ -1,0 +1,63 @@
+{
+  "schema_version": "qamesh.evidence.v2",
+  "qa_result_id": "qa-skill-evolve-replay-001",
+  "surface": "package",
+  "lane": "fast",
+  "scenario_ref": "skill-evolve:replay",
+  "runner": {
+    "name": "go-test",
+    "command": "go test ./pkg/skillevolve -run Replay -count=1"
+  },
+  "status": "passed",
+  "started_at": "2026-05-06T00:00:00Z",
+  "ended_at": "2026-05-06T00:00:04Z",
+  "duration_ms": 4000,
+  "artifacts": [
+    {
+      "kind": "stdout",
+      "path": "artifacts/stdout.log",
+      "publishable": true,
+      "redaction": "text_redacted_and_scanned"
+    }
+  ],
+  "oracle_results": {
+    "checks": [
+      {
+        "id": "must-semantic-output",
+        "type": "unit_test",
+        "status": "passed",
+        "expected": "candidate bundle exposes semantic output fields required by AC-SEVOLVE-001",
+        "actual": "source_failures, source_hashes, affected_refs, proposed_digest, and replay_plan were present",
+        "artifact_refs": [
+          "stdout"
+        ]
+      }
+    ]
+  },
+  "redaction_status": {
+    "status": "passed"
+  },
+  "source_refs": {
+    "source_spec": "SPEC-SKILL-EVOLVE-001",
+    "acceptance_refs": [
+      "AC-SEVOLVE-003"
+    ],
+    "owned_paths": [
+      "autopus-adk/pkg/skillevolve/**",
+      "autopus-adk/internal/cli/skill_evolve_test.go"
+    ],
+    "do_not_modify_paths": [
+      ".codex/**",
+      ".opencode/**",
+      ".autopus/plugins/**"
+    ],
+    "journey_id": "skill-evolve-replay",
+    "step_id": "must-semantic-output",
+    "adapter": "go-test",
+    "oracle_thresholds": {
+      "must_checks_failed": 0
+    }
+  },
+  "retention_class": "local-redacted",
+  "reproduction_command": "go test ./pkg/skillevolve -run Replay -count=1"
+}

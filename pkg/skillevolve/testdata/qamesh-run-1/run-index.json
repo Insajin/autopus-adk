@@ -1,0 +1,38 @@
+{
+  "schema_version": "qamesh.run_index.v1",
+  "run_id": "qamesh-run-1",
+  "status": "passed",
+  "started_at": "2026-05-06T00:00:00Z",
+  "ended_at": "2026-05-06T00:00:04Z",
+  "profile": "standalone",
+  "lane": "fast",
+  "manifest_paths": [
+    "manifest.json"
+  ],
+  "checks": [
+    {
+      "id": "must-semantic-output",
+      "journey_id": "skill-evolve-replay",
+      "adapter": "go-test",
+      "status": "passed",
+      "expected": "candidate bundle exposes semantic output fields required by AC-SEVOLVE-001",
+      "actual": "source_failures, source_hashes, affected_refs, proposed_digest, and replay_plan were present"
+    }
+  ],
+  "adapter_results": [
+    {
+      "adapter": "go-test",
+      "journey_id": "skill-evolve-replay",
+      "status": "passed",
+      "qamesh_manifest_path": "manifest.json",
+      "repair_prompt_available": false,
+      "setup_gap": null,
+      "failure_summary": ""
+    }
+  ],
+  "setup_gaps": [],
+  "feedback_bundle_paths": [],
+  "redaction_status": {
+    "status": "passed"
+  }
+}
