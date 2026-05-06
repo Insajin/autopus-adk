@@ -3,6 +3,7 @@ package pipeline_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -121,6 +122,25 @@ func TestPhasePromptBuilder_BuildPromptWithManifest(t *testing.T) {
 	assert.Contains(t, pipelineManifestIDs(manifest), "phase:acceptance")
 	assert.Contains(t, pipelineManifestIDs(manifest), "phase:previous:plan")
 	assert.False(t, pipelineManifestEntry(manifest, "phase:previous:plan").CacheEligible)
+}
+
+func TestPhasePromptBuilder_PromptOrderMatchesManifestOrder(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "spec.md"), []byte("spec body"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "plan.md"), []byte("plan body"), 0o644))
+
+	builder := pipeline.NewPhasePromptBuilder(dir)
+	prompt, manifest, err := builder.BuildPromptWithManifest(pipeline.PhasePlan, pipeline.PhaseContext{})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"phase:plan", "phase:spec"}, pipelineManifestIDs(manifest))
+	planIndex := strings.Index(prompt, "## Plan")
+	specIndex := strings.Index(prompt, "## SPEC")
+	require.GreaterOrEqual(t, planIndex, 0)
+	require.GreaterOrEqual(t, specIndex, 0)
+	assert.Less(t, planIndex, specIndex)
 }
 
 func TestPhasePromptBuilder_BuildPromptWithManifestRedactsUnsafeContent(t *testing.T) {

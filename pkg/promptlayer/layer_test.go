@@ -32,6 +32,15 @@ func TestRenderDeterministicLayerOrdering(t *testing.T) {
 	assert.Greater(t, first.Manifest.Entries[0].TokenEstimate, 0)
 }
 
+func TestRenderRequiresLayerID(t *testing.T) {
+	t.Parallel()
+
+	_, err := Render([]Layer{{Kind: KindStable, Group: GroupIdentityRules, Content: "missing id"}})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "prompt layer id is required")
+}
+
 func TestFrozenSnapshotLayerDoesNotDriftWithoutRebuild(t *testing.T) {
 	t.Parallel()
 
@@ -105,6 +114,21 @@ func TestCompareManifestsReportsMetadataChanges(t *testing.T) {
 	assert.Equal(t, "rules", changes[0].ID)
 	assert.Equal(t, InvalidationStableSourceChanged, changes[0].Reason)
 	assert.Equal(t, changes[0].PreviousHash, changes[0].CurrentHash)
+}
+
+func TestGroupPriorityFallbacksByKind(t *testing.T) {
+	t.Parallel()
+
+	layers := []Layer{
+		{ID: "ephemeral", Kind: KindEphemeral, SourceRef: "tool", Content: "later"},
+		{ID: "stable", Kind: KindStable, SourceRef: "rules", Content: "first"},
+		{ID: "snapshot", Kind: KindSnapshot, SourceRef: "recall", Content: "middle"},
+	}
+
+	rendered, err := Render(layers)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"stable", "snapshot", "ephemeral"}, manifestIDs(rendered.Manifest))
 }
 
 func manifestIDs(m Manifest) []string {

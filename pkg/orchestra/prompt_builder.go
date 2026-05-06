@@ -98,47 +98,25 @@ func (pb *PromptBuilder) renderWithManifest(role, name string, data PromptData) 
 	if err != nil {
 		return "", PromptManifest{}, err
 	}
-	manifest, err := buildPromptManifest(role, name, data)
+	layers := buildPromptLayers(role, name, data, prompt)
+	rendered, err := promptlayer.Render(layers)
 	if err != nil {
 		return "", PromptManifest{}, err
 	}
-	return prompt, manifest, nil
+	return rendered.Prompt, rendered.Manifest, nil
 }
 
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-AGENT-PROMPT-001: orchestra:* layer IDs and groups are diagnostic manifest contracts.
 func buildPromptManifest(role, templateName string, data PromptData) (PromptManifest, error) {
-	layers := []promptlayer.Layer{
-		{
-			ID:            "orchestra:" + role + ":identity",
-			Kind:          promptlayer.KindStable,
-			Group:         promptlayer.GroupIdentityRules,
-			SourceRef:     templateName,
-			Content:       stableTemplateLayerContent(templateName),
-			CacheEligible: true,
-		},
-		{
-			ID:            "orchestra:project-context",
-			Kind:          promptlayer.KindStable,
-			Group:         promptlayer.GroupProjectContext,
-			SourceRef:     "orchestra.PromptData project fields",
-			Content:       projectContextLayerContent(data),
-			CacheEligible: true,
-		},
-		{
-			ID:        "orchestra:" + role + ":task",
-			Kind:      promptlayer.KindEphemeral,
-			Group:     promptlayer.GroupUserRequest,
-			SourceRef: "orchestra.PromptData task fields",
-			Content:   taskLayerContent(data),
-		},
+	pb, err := NewPromptBuilder()
+	if err != nil {
+		return PromptManifest{}, err
 	}
-	if data.SnapshotID != "" {
-		sourceRef := safeSnapshotSourceRef(data.SnapshotSourceRefs)
-		if sourceRef == "" {
-			sourceRef = "snapshot"
-		}
-		layers = append(layers, promptlayer.SnapshotLayer(safeSnapshotID(data.SnapshotID), sourceRef, data.SnapshotContent))
+	prompt, err := pb.render(templateName, data)
+	if err != nil {
+		return PromptManifest{}, err
 	}
+	layers := buildPromptLayers(role, templateName, data, prompt)
 	rendered, err := promptlayer.Render(layers)
 	if err != nil {
 		return PromptManifest{}, err
@@ -146,60 +124,59 @@ func buildPromptManifest(role, templateName string, data PromptData) (PromptMani
 	return rendered.Manifest, nil
 }
 
-func projectContextLayerContent(data PromptData) string {
-	var sb strings.Builder
-	sb.WriteString(data.ProjectName)
-	sb.WriteString("\n")
-	sb.WriteString(data.ProjectSummary)
-	sb.WriteString("\n")
-	sb.WriteString(data.TechStack)
-	sb.WriteString("\n")
-	sb.WriteString(strings.Join(data.Components, "\n"))
-	sb.WriteString("\n")
-	sb.WriteString(strings.Join(data.MustReadFiles, "\n"))
-	for _, path := range data.RelevantPaths {
-		sb.WriteString("\n")
-		sb.WriteString(path.Path)
-		sb.WriteString(": ")
-		sb.WriteString(path.Description)
+func buildPromptLayers(role, templateName string, data PromptData, prompt string) []promptlayer.Layer {
+	identity, projectContext, task := splitRenderedPrompt(prompt)
+	layers := []promptlayer.Layer{
+		{
+			ID:            "orchestra:" + role + ":identity",
+			Kind:          promptlayer.KindStable,
+			Group:         promptlayer.GroupIdentityRules,
+			SourceRef:     templateName,
+			Content:       identity,
+			CacheEligible: true,
+		},
+		{
+			ID:            "orchestra:project-context",
+			Kind:          promptlayer.KindStable,
+			Group:         promptlayer.GroupProjectContext,
+			SourceRef:     "orchestra.PromptData project fields",
+			Content:       projectContext,
+			CacheEligible: true,
+		},
 	}
-	sb.WriteString("\n")
-	sb.WriteString(data.TargetModule)
-	return sb.String()
-}
-
-func stableTemplateLayerContent(templateName string) string {
-	names := []string{"shared/orchestra-context.md.tmpl", templateName}
-	var sb strings.Builder
-	for _, name := range names {
-		data, err := templates.FS.ReadFile(name)
-		if err != nil {
-			sb.WriteString("missing template: ")
-			sb.WriteString(name)
-			sb.WriteString("\n")
-			continue
+	if data.SnapshotID != "" {
+		sourceRef := safeSnapshotSourceRef(data.SnapshotSourceRefs)
+		if sourceRef == "" {
+			sourceRef = "snapshot"
 		}
-		sb.WriteString("template: ")
-		sb.WriteString(name)
-		sb.WriteString("\n")
-		sb.Write(data)
-		sb.WriteString("\n")
+		sanitized := promptlayer.SanitizeContent(data.SnapshotContent, promptlayer.ContextOptions{})
+		snapshot := promptlayer.SnapshotLayer(safeSnapshotID(data.SnapshotID), sourceRef, sanitized.Content)
+		snapshot.RedactionStatus = sanitized.RedactionStatus
+		snapshot.InvalidationReason = sanitized.InvalidationReason
+		layers = append(layers, snapshot)
 	}
-	return sb.String()
+	layers = append(layers, promptlayer.Layer{
+		ID:        "orchestra:" + role + ":task",
+		Kind:      promptlayer.KindEphemeral,
+		Group:     promptlayer.GroupUserRequest,
+		SourceRef: "orchestra.PromptData task fields",
+		Content:   task,
+	})
+	return layers
 }
 
-func taskLayerContent(data PromptData) string {
-	var sb strings.Builder
-	sb.WriteString(data.Topic)
-	sb.WriteString("\n")
-	sb.WriteString(data.SpecContent)
-	sb.WriteString("\n")
-	sb.WriteString(data.CodeContext)
-	sb.WriteString("\n")
-	sb.WriteString(data.SchemaMethod)
-	sb.WriteString("\n")
-	sb.WriteString(data.SchemaJSON)
-	return sb.String()
+func splitRenderedPrompt(prompt string) (identity, projectContext, task string) {
+	projectMarker := "\n## Project Context"
+	taskMarker := "\n## Topic"
+	projectIdx := strings.Index(prompt, projectMarker)
+	taskIdx := strings.Index(prompt, taskMarker)
+	if projectIdx < 0 || taskIdx < 0 || taskIdx <= projectIdx {
+		return strings.TrimSpace(prompt), "", ""
+	}
+	identity = strings.TrimSpace(prompt[:projectIdx])
+	projectContext = strings.TrimSpace(prompt[projectIdx+1 : taskIdx])
+	task = strings.TrimSpace(prompt[taskIdx+1:])
+	return identity, projectContext, task
 }
 
 var (

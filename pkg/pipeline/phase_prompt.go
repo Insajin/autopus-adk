@@ -38,7 +38,6 @@ func (b *PhasePromptBuilder) BuildPrompt(phaseID PhaseID, ctx PhaseContext) (str
 // BuildPromptWithManifest constructs a phase prompt and diagnostic layer manifest.
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-AGENT-PROMPT-001: phase:* layer IDs mirror prompt sections and prior-phase injections.
 func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseContext) (string, PromptManifest, error) {
-	var sb strings.Builder
 	var layers []promptlayer.Layer
 
 	// @AX:NOTE: [AUTO] magic constant — "spec.md" filename is a hardcoded filesystem contract
@@ -48,11 +47,8 @@ func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseC
 		return "", PromptManifest{}, fmt.Errorf("read spec.md: %w", err)
 	}
 	if specContent != "" {
-		sb.WriteString("## SPEC\n")
 		sanitized := sanitizePromptContent(specContent)
-		sb.WriteString(sanitized.Content)
-		sb.WriteString("\n\n")
-		layers = append(layers, phaseFileLayer("phase:spec", "spec.md", sanitized, promptlayer.GroupProjectContext))
+		layers = append(layers, phaseFileLayer("phase:spec", "spec.md", "SPEC", sanitized, promptlayer.GroupProjectContext))
 	}
 
 	// Phase-specific additional files and context injection.
@@ -60,78 +56,77 @@ func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseC
 	case PhasePlan:
 		planContent, _ := b.readFile("plan.md")
 		if planContent != "" {
-			sb.WriteString("## Plan\n")
 			sanitized := sanitizePromptContent(planContent)
-			sb.WriteString(sanitized.Content)
-			sb.WriteString("\n\n")
-			layers = append(layers, phaseFileLayer("phase:plan", "plan.md", sanitized, promptlayer.GroupMethodologyTools))
+			layers = append(layers, phaseFileLayer("phase:plan", "plan.md", "Plan", sanitized, promptlayer.GroupMethodologyTools))
 		}
 
 	case PhaseTestScaffold:
-		b.appendFileSectionLayerIfPresent(&sb, &layers, "acceptance.md", "Acceptance")
-		b.injectPriorLayer(&sb, &layers, ctx, PhasePlan, "Plan Output")
+		b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		b.injectPriorLayer(&layers, ctx, PhasePlan, "Plan Output")
 
 	case PhaseImplement:
-		b.appendFileSectionLayerIfPresent(&sb, &layers, "acceptance.md", "Acceptance")
-		b.injectPriorLayer(&sb, &layers, ctx, PhasePlan, "Plan Output")
-		b.injectPriorLayer(&sb, &layers, ctx, PhaseTestScaffold, "Test Scaffold Output")
+		b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		b.injectPriorLayer(&layers, ctx, PhasePlan, "Plan Output")
+		b.injectPriorLayer(&layers, ctx, PhaseTestScaffold, "Test Scaffold Output")
 
 	case PhaseValidate:
-		b.appendFileSectionLayerIfPresent(&sb, &layers, "acceptance.md", "Acceptance")
-		b.injectPriorLayer(&sb, &layers, ctx, PhaseImplement, "Implementation Output")
+		b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		b.injectPriorLayer(&layers, ctx, PhaseImplement, "Implementation Output")
 
 	case PhaseReview:
-		b.appendFileSectionLayerIfPresent(&sb, &layers, "acceptance.md", "Acceptance")
-		b.injectPriorLayer(&sb, &layers, ctx, PhaseValidate, "Validation Output")
+		b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		b.injectPriorLayer(&layers, ctx, PhaseValidate, "Validation Output")
 	}
 
 	rendered, err := promptlayer.Render(layers)
 	if err != nil {
 		return "", PromptManifest{}, err
 	}
-	return sb.String(), rendered.Manifest, nil
+	return rendered.Prompt, rendered.Manifest, nil
 }
 
-func (b *PhasePromptBuilder) appendFileSectionLayerIfPresent(sb *strings.Builder, layers *[]promptlayer.Layer, name, label string) {
+func (b *PhasePromptBuilder) appendFileSectionLayerIfPresent(layers *[]promptlayer.Layer, name, label string) {
 	content, err := b.readFile(name)
 	if err != nil || content == "" {
 		return
 	}
 	sanitized := sanitizePromptContent(content)
-	sb.WriteString(fmt.Sprintf("## %s\n%s\n\n", label, sanitized.Content))
-	*layers = append(*layers, phaseFileLayer("phase:"+strings.TrimSuffix(name, ".md"), name, sanitized, promptlayer.GroupProjectContext))
+	*layers = append(*layers, phaseFileLayer("phase:"+strings.TrimSuffix(name, ".md"), name, label, sanitized, promptlayer.GroupProjectContext))
 }
 
-func (b *PhasePromptBuilder) injectPriorLayer(sb *strings.Builder, layers *[]promptlayer.Layer, ctx PhaseContext, id PhaseID, label string) {
+func (b *PhasePromptBuilder) injectPriorLayer(layers *[]promptlayer.Layer, ctx PhaseContext, id PhaseID, label string) {
 	if ctx.PreviousResults == nil {
 		return
 	}
 	if result, ok := ctx.PreviousResults[id]; ok && result != "" {
 		sanitized := sanitizePromptContent(result)
-		sb.WriteString(fmt.Sprintf("## %s\n%s\n\n", label, sanitized.Content))
 		*layers = append(*layers, promptlayer.Layer{
 			ID:                 "phase:previous:" + string(id),
 			Kind:               promptlayer.KindEphemeral,
 			Group:              promptlayer.GroupTaskContext,
 			SourceRef:          "previous:" + string(id),
-			Content:            sanitized.Content,
+			Content:            formatSection(label, sanitized.Content),
 			RedactionStatus:    sanitized.RedactionStatus,
 			InvalidationReason: sanitized.InvalidationReason,
 		})
 	}
 }
 
-func phaseFileLayer(id, sourceRef string, sanitized promptlayer.SanitizedContent, group promptlayer.Group) promptlayer.Layer {
+func phaseFileLayer(id, sourceRef, label string, sanitized promptlayer.SanitizedContent, group promptlayer.Group) promptlayer.Layer {
 	return promptlayer.Layer{
 		ID:                 id,
 		Kind:               promptlayer.KindStable,
 		Group:              group,
 		SourceRef:          sourceRef,
-		Content:            sanitized.Content,
+		Content:            formatSection(label, sanitized.Content),
 		CacheEligible:      sanitized.RedactionStatus == promptlayer.RedactionPassed,
 		RedactionStatus:    sanitized.RedactionStatus,
 		InvalidationReason: sanitized.InvalidationReason,
 	}
+}
+
+func formatSection(label, content string) string {
+	return fmt.Sprintf("## %s\n%s", label, content)
 }
 
 func sanitizePromptContent(raw string) promptlayer.SanitizedContent {

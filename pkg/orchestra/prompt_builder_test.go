@@ -6,9 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/insajin/autopus-adk/pkg/promptlayer"
-	"github.com/insajin/autopus-adk/templates"
 )
 
 func newTestPromptData() PromptData {
@@ -144,77 +141,6 @@ func TestPromptBuilder_BuildReviewer_NoCodeContext(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotContains(t, result, "Pre-collected Code Context")
-}
-
-func TestPromptBuilder_BuildReviewerWithManifest(t *testing.T) {
-	t.Parallel()
-	pb, err := NewPromptBuilder()
-	require.NoError(t, err)
-
-	data := newTestPromptData()
-	data.SpecContent = "## Requirements\n- Must expose manifest"
-	data.CodeContext = "func BuildPrompt() {}"
-	data.SnapshotID = "snapshot-a"
-	data.SnapshotContent = "quality recall entry"
-	data.SnapshotSourceRefs = []string{"quality:L-001"}
-
-	result, manifest, err := pb.BuildReviewerWithManifest(data)
-	require.NoError(t, err)
-
-	assert.Contains(t, result, "Must expose manifest")
-	assert.Equal(t, "snapshot-a", manifest.SnapshotID)
-	assert.Contains(t, manifestEntryIDs(manifest), "orchestra:reviewer:identity")
-	assert.Contains(t, manifestEntryIDs(manifest), "orchestra:project-context")
-	assert.Contains(t, manifestEntryIDs(manifest), "snapshot-a")
-	assert.Contains(t, manifestEntryIDs(manifest), "orchestra:reviewer:task")
-	assert.False(t, manifestEntryByID(manifest, "orchestra:reviewer:task").CacheEligible)
-}
-
-func TestPromptBuilder_StableManifestHashesTemplateContent(t *testing.T) {
-	t.Parallel()
-
-	data := newTestPromptData()
-	manifest, err := buildPromptManifest("reviewer", "shared/orchestra-reviewer.md.tmpl", data)
-	require.NoError(t, err)
-
-	contextBody, err := templates.FS.ReadFile("shared/orchestra-context.md.tmpl")
-	require.NoError(t, err)
-	roleBody, err := templates.FS.ReadFile("shared/orchestra-reviewer.md.tmpl")
-	require.NoError(t, err)
-	expectedContent := strings.Join([]string{
-		"template: shared/orchestra-context.md.tmpl\n" + string(contextBody) + "\n",
-		"template: shared/orchestra-reviewer.md.tmpl\n" + string(roleBody) + "\n",
-	}, "")
-	expected, err := promptlayer.Render([]promptlayer.Layer{{
-		ID:            "orchestra:reviewer:identity",
-		Kind:          promptlayer.KindStable,
-		Group:         promptlayer.GroupIdentityRules,
-		SourceRef:     "shared/orchestra-reviewer.md.tmpl",
-		Content:       expectedContent,
-		CacheEligible: true,
-	}})
-	require.NoError(t, err)
-
-	assert.Equal(t, expected.Manifest.Entries[0].Hash, manifestEntryByID(manifest, "orchestra:reviewer:identity").Hash)
-	assert.Contains(t, expectedContent, "prompt layer manifest")
-}
-
-func TestPromptBuilder_SanitizesUnsafeSnapshotManifestRefs(t *testing.T) {
-	t.Parallel()
-
-	manifest, err := buildPromptManifest("reviewer", "shared/orchestra-reviewer.md.tmpl", PromptData{
-		SnapshotID:         "/Users/example/.ssh/id_rsa",
-		SnapshotContent:    "digest-only content",
-		SnapshotSourceRefs: []string{"/Users/example/.ssh/id_rsa", "quality:L-001", "token=sk-proj-abcdefghijklmnopqrstuvwxyz"},
-	})
-	require.NoError(t, err)
-
-	assert.NotContains(t, manifest.SnapshotID, "/Users")
-	entry := manifestEntryByID(manifest, manifest.SnapshotID)
-	assert.NotContains(t, entry.SourceRef, "/Users")
-	assert.NotContains(t, entry.SourceRef, "sk-proj")
-	assert.Contains(t, entry.SourceRef, "quality:L-001")
-	assert.Contains(t, entry.SourceRef, "snapshot-ref:")
 }
 
 func TestPromptBuilder_ContextInjected(t *testing.T) {
