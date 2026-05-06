@@ -11,6 +11,8 @@ Use this checklist after `spec.md`, `plan.md`, `acceptance.md`, and `research.md
 5. Retry the full checklist up to 2 times.
 6. If failures remain after the second retry, append `## Open Issues` to the end of `spec.md` and list each remaining `Q-* | category | scope | attempt | reason`.
 
+Prompt-state SPECs MUST name the prompt layer manifest contract and classify stable, snapshot, and ephemeral context so cache invalidation is observable without exposing raw secrets.
+
 The five primary dimensions map 1:1 to `FindingCategory` values in `pkg/spec/types.go`:
 - `correctness`
 - `completeness`

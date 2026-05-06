@@ -66,6 +66,10 @@ Preflight contract:
 - The workflow authenticity blocker must tell the user to rerun with a working subagent surface or choose `--solo`.
 - In `--solo` mode, report `subagent_dispatch_count: 0` and label the run as solo mode, not as a degraded subagent pipeline.
 
+## Prompt Layer Discipline
+
+Pipeline prompts should preserve stable instructions, frozen snapshot recall, and ephemeral task/tool context as separate prompt layer manifest entries. Dry-run or debug output should report cache invalidation scope by layer without exposing raw secrets.
+
 ## Pipeline Overview
 
 ```

@@ -30,6 +30,11 @@ type PromptData struct {
 	// Reviewer fields.
 	SpecContent string
 	CodeContext string
+
+	// Frozen prompt state captured at run start.
+	SnapshotID         string
+	SnapshotContent    string
+	SnapshotSourceRefs []string
 }
 
 // RelevantPath describes a code path relevant to the topic.

@@ -7,6 +7,9 @@ You are reviewing a SPEC document for technical quality, completeness,
 and implementability. Read the SPEC, then read the relevant source code
 to validate whether the SPEC's claims and assumptions are correct.
 
+If a prompt layer manifest is available, verify stable, snapshot, and ephemeral
+layers are separated and cache invalidation is scoped to the changed layer.
+
 {{template "orchestra-context.md.tmpl" .}}
 
 ## Topic

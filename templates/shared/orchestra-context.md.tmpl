@@ -1,6 +1,13 @@
 {{/* orchestra-context.md.tmpl — Common context block injected into all orchestra prompts */}}
 {{/* This partial provides 3-layer project understanding for --bare subprocess providers */}}
 
+## Prompt Layer Discipline
+
+Treat project instructions as stable layers, run-start recall as snapshot layers,
+and current task/tool evidence as ephemeral layers. When a prompt layer manifest
+is provided in dry-run or debug output, use it to reason about cache invalidation
+without exposing raw secrets.
+
 ## Project Context
 
 **Project**: {{.ProjectName}}

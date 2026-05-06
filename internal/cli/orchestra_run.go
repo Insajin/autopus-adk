@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -162,16 +163,31 @@ func executeDryRun(topic string, data orchestra.PromptData, providers []orchestr
 		return fmt.Errorf("dry-run: %w", err)
 	}
 
-	r1Prompt, err := pb.BuildDebaterR1(data)
+	r1Prompt, manifest, err := pb.BuildDebaterR1WithManifest(data)
 	if err != nil {
 		return fmt.Errorf("dry-run: r1 prompt: %w", err)
 	}
 
-	r1File := fmt.Sprintf("orchestra-r1-%s.md", sanitizeFilename(topic))
-	if writeErr := os.WriteFile(r1File, []byte(r1Prompt), 0644); writeErr != nil {
+	safeTopic := sanitizeFilename(topic)
+	if safeTopic == "" {
+		return fmt.Errorf("dry-run: topic does not produce a safe filename")
+	}
+	r1File := fmt.Sprintf("orchestra-r1-%s.md", safeTopic)
+	if writeErr := writeNewPrivateFile(r1File, []byte(r1Prompt)); writeErr != nil {
 		return fmt.Errorf("dry-run: write r1: %w", writeErr)
 	}
 	fmt.Printf("Round 1 prompt: %s\n", r1File)
+
+	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-AGENT-PROMPT-001: dry-run sidecar suffix is asserted by prompt manifest tooling.
+	manifestFile := strings.TrimSuffix(r1File, ".md") + ".manifest.json"
+	manifestBody, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return fmt.Errorf("dry-run: manifest: %w", err)
+	}
+	if writeErr := writeNewPrivateFile(manifestFile, append(manifestBody, '\n')); writeErr != nil {
+		return fmt.Errorf("dry-run: write manifest: %w", writeErr)
+	}
+	fmt.Printf("Round 1 prompt layer manifest: %s\n", manifestFile)
 
 	schema := &orchestra.SchemaBuilder{}
 	for _, role := range []string{"debater_r1", "debater_r2", "judge"} {
@@ -185,6 +201,29 @@ func executeDryRun(topic string, data orchestra.PromptData, providers []orchestr
 
 	fmt.Fprintf(os.Stderr, "Dry run complete. %d providers, %d rounds.\n", len(providers), rounds+1)
 	return nil
+}
+
+func writeNewPrivateFile(path string, body []byte) error {
+	if path == "" {
+		return fmt.Errorf("empty output path")
+	}
+	if info, err := os.Lstat(path); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refuse to overwrite symlink: %s", path)
+		}
+		return fmt.Errorf("refuse to overwrite existing file: %s", path)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(body); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 // sanitizeFilename replaces non-alphanumeric characters for safe filenames.
