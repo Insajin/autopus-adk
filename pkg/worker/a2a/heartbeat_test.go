@@ -166,10 +166,21 @@ func TestHeartbeat_BackendResponseOK_CallsAck(t *testing.T) {
 	// Simulate backend sending {"status":"ok"} response — worker calls HandleHeartbeatResponse
 	for i := 0; i < 3; i++ {
 		time.Sleep(12 * time.Millisecond)
-		// HandleHeartbeatResponse does not exist yet — compile error
-		hb.HandleHeartbeatResponse(map[string]string{"status": "ok"}) // method does not exist yet
+		hb.HandleHeartbeatResponse(map[string]string{"status": "ok"})
 	}
 
 	// Then no timeout should have occurred
 	assert.False(t, timedOut.Load(), "heartbeat ack from backend should prevent timeout (S1)")
+}
+
+func TestHeartbeat_BackendResponseNonOK_DoesNotAck(t *testing.T) {
+	t.Parallel()
+
+	hb := NewHeartbeat(func() error { return nil }, func() {})
+	before := time.Now().Add(-time.Minute)
+	hb.lastAck = before
+
+	hb.HandleHeartbeatResponse(map[string]string{"status": "error"})
+
+	assert.Equal(t, before, hb.lastAck, "non-ok heartbeat response must not acknowledge the heartbeat")
 }

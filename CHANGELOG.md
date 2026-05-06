@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
   - `pkg/memindex/driver` — `modernc.org/sqlite` backed FTS5 startup probe before projection writes
   - `internal/cli/mem.go` and `internal/cli/root.go` — public `auto mem rebuild|search|context|status` command namespace with JSON envelopes
   - `internal/cli/init.go` — generated gitignore patterns now include `.autopus/runtime/` so projection files stay runtime-only
-  - `pkg/worker/a2a/heartbeat.go` — escalated the stale `@AX:TODO` heartbeat branch-test note to `@AX:WARN @AX:CYCLE:3` during sync lifecycle management
+  - `pkg/worker/a2a/{heartbeat.go,heartbeat_test.go}` — resolved the stale `@AX:TODO` heartbeat branch-test note by adding non-ok response coverage and removing the annotation during sync lifecycle management
 
 ## [v0.44.0] — 2026-05-05
 
