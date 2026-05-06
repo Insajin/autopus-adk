@@ -375,7 +375,7 @@ Worker가 영원히 실행되지 않습니다. 각 executor에 도구 호출 예
 
 ### 📦 컨텍스트 압축
 
-파이프라인이 단계를 진행하면서 이전 컨텍스트가 자동으로 압축됩니다 — 중요한 정보를 잃지 않으면서 에이전트 프롬프트를 집중적이고 토큰 한도 내로 유지합니다.
+파이프라인이 단계를 진행하면서 이전 컨텍스트는 고정 스키마로 자동 압축됩니다: Goal, Constraints, Progress, Decisions, Relevant Files, Next Steps, Critical Context. 도구 호출과 결과는 쌍으로 보존/정리되고, 안전하지 않은 provider payload 본문은 생략되며, 적용된 압축은 summary id, source refs, reason codes, budget/blocker 상태가 포함된 메타데이터 이벤트로 남습니다.
 
 ### 🔄 죽지 않는 파이프라인
 
