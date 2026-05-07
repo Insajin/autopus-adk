@@ -94,4 +94,5 @@ During review, verify:
 @.gemini/rules/autopus/file-size-limit.md
 @.gemini/rules/autopus/subagent-delegation.md
 @.gemini/rules/autopus/language-policy.md
+@.gemini/rules/autopus/techstack-freshness.md
 `

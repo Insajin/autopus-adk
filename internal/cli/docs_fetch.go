@@ -36,6 +36,9 @@ func (a *docsCacheAdapter) Get(key string) (*docs.DocResult, error) {
 	return &docs.DocResult{
 		LibraryName: entry.LibraryID,
 		Source:      "cache",
+		Version:     entry.Version,
+		SourceRef:   entry.SourceRef,
+		CheckedAt:   entry.CachedAt,
 		Content:     entry.Content,
 		Tokens:      entry.Tokens,
 	}, nil
@@ -44,6 +47,8 @@ func (a *docsCacheAdapter) Get(key string) (*docs.DocResult, error) {
 func (a *docsCacheAdapter) Set(key string, result *docs.DocResult) error {
 	return a.cache.Set(key, &docs.CacheEntry{
 		LibraryID: result.LibraryName,
+		Version:   result.Version,
+		SourceRef: result.SourceRef,
 		Content:   result.Content,
 		Tokens:    result.Tokens,
 	})

@@ -12,6 +12,10 @@ linter: clippy
 
 Write safe, idiomatic Rust. Avoid `unsafe` unless there is no alternative.
 
+### Greenfield Dependency Policy
+
+When creating a new `Cargo.toml`, use the SPEC/PRD `## Technology Stack Decision` for Rust edition/toolchain and crate versions. Require concrete stable versions, source refs, and checked_at dates; block on missing evidence.
+
 ### Ownership and Borrowing
 
 ```rust

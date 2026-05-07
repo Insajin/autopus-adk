@@ -10,6 +10,9 @@ type DocResult struct {
 	LibraryName string // e.g., "cobra"
 	Package     string // e.g., "github.com/spf13/cobra"
 	Source      string // "context7", "scraper", or "cache"
+	Version     string // resolved library version, when the upstream source reports it
+	SourceRef   string // library ID or official URL used as evidence
+	CheckedAt   time.Time
 	Content     string // documentation text content
 	Tokens      int    // approximate token count
 }
@@ -18,6 +21,8 @@ type DocResult struct {
 type CacheEntry struct {
 	LibraryID string    // e.g., "/spf13/cobra"
 	Topic     string    // e.g., "commands"
+	Version   string    // resolved library version, when available
+	SourceRef string    // library ID or official URL used as evidence
 	Content   string    // documentation content
 	Tokens    int       // approximate token count
 	CachedAt  time.Time // when the entry was cached (for TTL)

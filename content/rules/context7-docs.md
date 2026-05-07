@@ -54,14 +54,21 @@ Inject fetched documentation into subagent prompts as follows:
 ```
 ## Reference Documentation
 
-The following documentation was fetched from Context7 for libraries used in this task.
+The following documentation was fetched from documentation sources for libraries used in this task.
 
 ### {Library Name} (via Context7)
+_Metadata: version={resolved version} | source_ref={library ID or official URL} | checked_at={YYYY-MM-DD}_
+
 {trimmed documentation content — max ~2000 tokens per library}
 
 ### {Library Name 2} (via Context7)
+_Metadata: version={resolved version} | source_ref={library ID or official URL} | checked_at={YYYY-MM-DD}_
+
 {trimmed documentation content}
 ```
+
+For greenfield technology stack choices, documentation content alone is not enough.
+The version/source_ref/checked_at metadata must be copied into the `## Technology Stack Decision` section required by `techstack-freshness`.
 
 ### Adaptive Token Budget
 
@@ -134,6 +141,7 @@ Per-executor refinement queries count toward the pipeline's 5-library limit. A r
 - Do NOT inject full documentation without trimming — always respect token budgets
 - Do NOT skip directly to web search when Context7 MCP is available and applicable
 - Do NOT block the pipeline on Context7 failures — documentation is supplementary, not critical
+- Do NOT treat "latest docs fetched" as a resolved dependency version; record concrete version evidence separately
 
 ## Ref
 

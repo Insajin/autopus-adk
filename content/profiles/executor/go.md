@@ -12,6 +12,10 @@ linter: golangci-lint
 
 Write idiomatic Go. Prefer clarity over cleverness.
 
+### Greenfield Dependency Policy
+
+When creating a new `go.mod`, use the SPEC/PRD `## Technology Stack Decision` for the Go toolchain and module dependency versions. Require concrete stable versions, source refs, and checked_at dates; block on missing evidence.
+
 ### Error Handling
 
 ```go

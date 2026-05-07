@@ -32,11 +32,35 @@ func FormatPromptInjection(results []*DocResult) (string, error) {
 
 	var sb strings.Builder
 	sb.WriteString("## Reference Documentation\n\n")
-	sb.WriteString("The following documentation was fetched from Context7 for libraries used in this task.\n")
+	sb.WriteString("The following documentation was fetched from documentation sources for libraries used in this task.\n")
 
 	for _, r := range results {
-		sb.WriteString(fmt.Sprintf("\n### %s (via %s)\n%s\n", r.LibraryName, sourceLabel(r.Source), r.Content))
+		sb.WriteString(fmt.Sprintf("\n### %s (via %s)\n", r.LibraryName, sourceLabel(r.Source)))
+		meta := formatMetadata(r)
+		if meta != "" {
+			sb.WriteString(meta)
+			sb.WriteString("\n\n")
+		}
+		sb.WriteString(r.Content)
+		sb.WriteString("\n")
 	}
 
 	return sb.String(), nil
+}
+
+func formatMetadata(r *DocResult) string {
+	var parts []string
+	if r.Version != "" {
+		parts = append(parts, "version="+r.Version)
+	}
+	if r.SourceRef != "" {
+		parts = append(parts, "source_ref="+r.SourceRef)
+	}
+	if !r.CheckedAt.IsZero() {
+		parts = append(parts, "checked_at="+r.CheckedAt.UTC().Format("2006-01-02"))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "_Metadata: " + strings.Join(parts, " | ") + "_"
 }

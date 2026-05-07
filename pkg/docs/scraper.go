@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
 
 const (
 	defaultGoDocsBaseURL  = "https://pkg.go.dev"
+	defaultGoProxyBaseURL = "https://proxy.golang.org"
 	defaultNpmRegistryURL = "https://registry.npmjs.org"
 	defaultPyPIBaseURL    = "https://pypi.org"
 )
@@ -18,6 +20,7 @@ const (
 // Scraper fetches documentation from public package registries.
 type Scraper struct {
 	goDocsBaseURL  string
+	goProxyBaseURL string
 	npmRegistryURL string
 	pypiBaseURL    string
 	httpClient     *http.Client
@@ -29,6 +32,11 @@ type ScraperOption func(*Scraper)
 // WithGoDocsBaseURL overrides the pkg.go.dev base URL (useful for tests).
 func WithGoDocsBaseURL(url string) ScraperOption {
 	return func(s *Scraper) { s.goDocsBaseURL = url }
+}
+
+// WithGoProxyBaseURL overrides the Go module proxy base URL (useful for tests).
+func WithGoProxyBaseURL(url string) ScraperOption {
+	return func(s *Scraper) { s.goProxyBaseURL = url }
 }
 
 // WithNpmRegistryURL overrides the npm registry base URL (useful for tests).
@@ -45,6 +53,7 @@ func WithPyPIBaseURL(url string) ScraperOption {
 func NewScraper(opts ...ScraperOption) *Scraper {
 	s := &Scraper{
 		goDocsBaseURL:  defaultGoDocsBaseURL,
+		goProxyBaseURL: defaultGoProxyBaseURL,
 		npmRegistryURL: defaultNpmRegistryURL,
 		pypiBaseURL:    defaultPyPIBaseURL,
 		httpClient:     &http.Client{Timeout: 30 * time.Second},
@@ -69,13 +78,53 @@ func (s *Scraper) FetchGoDocs(pkg string) (*DocResult, error) {
 		content = body // fallback: return raw body if section not found
 	}
 
+	version, versionRef := s.fetchGoLatestVersion(pkg)
+	sourceRef := url
+	if versionRef != "" {
+		sourceRef += "; " + versionRef
+	}
+
 	return &DocResult{
 		LibraryName: pkg,
 		Package:     pkg,
 		Source:      "scraper",
+		Version:     version,
+		SourceRef:   sourceRef,
+		CheckedAt:   time.Now().UTC(),
 		Content:     content,
 		Tokens:      len(content) / 4,
 	}, nil
+}
+
+func (s *Scraper) fetchGoLatestVersion(pkg string) (string, string) {
+	if s.goProxyBaseURL == "" {
+		return "", ""
+	}
+	if s.goDocsBaseURL != defaultGoDocsBaseURL && s.goProxyBaseURL == defaultGoProxyBaseURL {
+		return "", ""
+	}
+
+	endpoint := strings.TrimRight(s.goProxyBaseURL, "/") + "/" + escapePathSegments(pkg) + "/@latest"
+	body, err := s.get(endpoint)
+	if err != nil {
+		return "", ""
+	}
+
+	var payload struct {
+		Version string `json:"Version"`
+	}
+	if err := json.Unmarshal([]byte(body), &payload); err != nil {
+		return "", ""
+	}
+	return payload.Version, endpoint
+}
+
+func escapePathSegments(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
 }
 
 // extractGoSection extracts text content from <section id="pkg-overview">...</section>.
@@ -125,9 +174,10 @@ func (s *Scraper) FetchNpmDocs(pkg string) (*DocResult, error) {
 	}
 
 	var payload struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Readme      string `json:"readme"`
+		Name        string            `json:"name"`
+		Description string            `json:"description"`
+		Readme      string            `json:"readme"`
+		DistTags    map[string]string `json:"dist-tags"`
 	}
 	if err := json.Unmarshal([]byte(body), &payload); err != nil {
 		return nil, fmt.Errorf("npm docs parse: %w", err)
@@ -142,6 +192,9 @@ func (s *Scraper) FetchNpmDocs(pkg string) (*DocResult, error) {
 		LibraryName: pkg,
 		Package:     pkg,
 		Source:      "scraper",
+		Version:     payload.DistTags["latest"],
+		SourceRef:   url,
+		CheckedAt:   time.Now().UTC(),
 		Content:     content,
 		Tokens:      len(content) / 4,
 	}, nil
@@ -159,6 +212,7 @@ func (s *Scraper) FetchPyPIDocs(pkg string) (*DocResult, error) {
 	var payload struct {
 		Info struct {
 			Name        string `json:"name"`
+			Version     string `json:"version"`
 			Summary     string `json:"summary"`
 			Description string `json:"description"`
 		} `json:"info"`
@@ -176,6 +230,9 @@ func (s *Scraper) FetchPyPIDocs(pkg string) (*DocResult, error) {
 		LibraryName: pkg,
 		Package:     pkg,
 		Source:      "scraper",
+		Version:     payload.Info.Version,
+		SourceRef:   url,
+		CheckedAt:   time.Now().UTC(),
 		Content:     content,
 		Tokens:      len(content) / 4,
 	}, nil

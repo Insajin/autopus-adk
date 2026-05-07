@@ -21,6 +21,8 @@ func TestCache_Set_CreatesFile(t *testing.T) {
 	entry := &CacheEntry{
 		LibraryID: "/spf13/cobra",
 		Topic:     "commands",
+		Version:   "1.9.1",
+		SourceRef: "/spf13/cobra",
 		Content:   "# cobra\nCommand library docs.",
 		Tokens:    10,
 	}
@@ -33,6 +35,8 @@ func TestCache_Set_CreatesFile(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Equal(t, entry.Content, got.Content)
 	assert.Equal(t, entry.LibraryID, got.LibraryID)
+	assert.Equal(t, entry.Version, got.Version)
+	assert.Equal(t, entry.SourceRef, got.SourceRef)
 }
 
 // TestCache_Get_HitWithinTTL verifies that a cache hit returns the stored entry within TTL.

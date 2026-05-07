@@ -34,6 +34,7 @@ func TestGenerateRuleFiles_ProducesManagedRuleSet(t *testing.T) {
 		"project-identity.md",
 		"spec-quality.md",
 		"subagent-delegation.md",
+		"techstack-freshness.md",
 		"worktree-safety.md",
 	}
 
@@ -87,6 +88,12 @@ func TestGenerateRuleFiles_Content(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(context7Data), "web search")
 	assert.Contains(t, string(context7Data), "official docs")
+
+	techstackPath := filepath.Join(dir, ".codex", "rules", "autopus", "techstack-freshness.md")
+	techstackData, err := os.ReadFile(techstackPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(techstackData), "Technology Stack Decision")
+	assert.Contains(t, string(techstackData), "greenfield")
 
 	projectIdentityPath := filepath.Join(dir, ".codex", "rules", "autopus", "project-identity.md")
 	projectIdentityData, err := os.ReadFile(projectIdentityPath)

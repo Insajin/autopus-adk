@@ -12,6 +12,10 @@ linter: eslint
 
 Write strict TypeScript. Enable `"strict": true` in tsconfig.json.
 
+### Greenfield Dependency Policy
+
+When creating a new `package.json`, do not choose dependency versions from examples or model memory. Use the SPEC/PRD `## Technology Stack Decision` for concrete stable versions with source refs and checked_at dates. If it is missing, block before writing dependencies.
+
 ### ESM Imports
 
 ```typescript

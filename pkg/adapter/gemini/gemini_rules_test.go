@@ -22,12 +22,13 @@ func TestGeminiGenerateRules(t *testing.T) {
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	// Verify all 4 rule files are created
+	// Verify core rule files are created.
 	rules := []string{
 		"lore-commit.md",
 		"file-size-limit.md",
 		"subagent-delegation.md",
 		"language-policy.md",
+		"techstack-freshness.md",
 	}
 	rulesDir := filepath.Join(dir, ".gemini", "rules", "autopus")
 	for _, rule := range rules {
@@ -60,6 +61,8 @@ func TestGeminiRulesImport(t *testing.T) {
 		"GEMINI.md should have @import for subagent-delegation")
 	assert.Contains(t, content, "@.gemini/rules/autopus/language-policy.md",
 		"GEMINI.md should have @import for language-policy")
+	assert.Contains(t, content, "@.gemini/rules/autopus/techstack-freshness.md",
+		"GEMINI.md should have @import for techstack-freshness")
 }
 
 func TestGeminiRulesContent(t *testing.T) {
@@ -86,6 +89,12 @@ func TestGeminiRulesContent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(fsData), "300 lines",
 		"file-size-limit should reference 300 lines")
+
+	techstackPath := filepath.Join(dir, ".gemini", "rules", "autopus", "techstack-freshness.md")
+	techstackData, err := os.ReadFile(techstackPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(techstackData), "Technology Stack Decision")
+	assert.Contains(t, string(techstackData), "greenfield")
 }
 
 // TestGeminiRulesDoNotContainBrokenImport verifies that the generated rule
@@ -109,6 +118,7 @@ func TestGeminiRulesDoNotContainBrokenImport(t *testing.T) {
 		"context7-docs.md",
 		"doc-storage.md",
 		"objective-reasoning.md",
+		"techstack-freshness.md",
 		"worktree-safety.md",
 	}
 	rulesDir := filepath.Join(dir, ".gemini", "rules", "autopus")

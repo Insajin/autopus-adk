@@ -124,6 +124,9 @@ func (c *Context7Client) Fetch(library, topic string) (*DocResult, error) {
 		LibraryName: info.Name,
 		Package:     info.ID,
 		Source:      "context7",
+		Version:     info.Version,
+		SourceRef:   info.ID,
+		CheckedAt:   time.Now().UTC(),
 		Content:     content.Content,
 		Tokens:      content.Tokens,
 	}, nil

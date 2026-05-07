@@ -259,6 +259,10 @@ func TestClaudeAdapter_Generate_InstallsRules(t *testing.T) {
 	// file-size-limit.md 존재 확인
 	_, statErr = os.Stat(filepath.Join(rulesDir, "file-size-limit.md"))
 	require.NoError(t, statErr, "file-size-limit.md가 존재해야 함")
+
+	techstackData, err := os.ReadFile(filepath.Join(rulesDir, "techstack-freshness.md"))
+	require.NoError(t, err, "techstack-freshness.md가 존재해야 함")
+	assert.Contains(t, string(techstackData), "Technology Stack Decision")
 }
 
 func TestClaudeAdapter_Generate_CLAUDEMDContainsGuidelines(t *testing.T) {

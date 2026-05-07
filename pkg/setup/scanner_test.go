@@ -159,6 +159,36 @@ func TestDetectFrameworks(t *testing.T) {
 	assert.True(t, names["Express"])
 }
 
+func TestDetectFrameworksUsesSharedDetectorSignals(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeFile(t, dir, "next.config.ts", "// next config")
+
+	frameworks := detectFrameworks(dir)
+
+	require.Len(t, frameworks, 1)
+	assert.Equal(t, "Next.js", frameworks[0].Name)
+}
+
+func TestDetectFrameworksIncludesGoAndPythonFrameworks(t *testing.T) {
+	t.Parallel()
+
+	goDir := t.TempDir()
+	writeFile(t, goDir, "go.mod", "module example.com/api\n\ngo 1.23\n\nrequire github.com/gin-gonic/gin v1.10.0\n")
+	goFrameworks := detectFrameworks(goDir)
+	require.Len(t, goFrameworks, 1)
+	assert.Equal(t, "Gin", goFrameworks[0].Name)
+	assert.Equal(t, "v1.10.0", goFrameworks[0].Version)
+
+	pyDir := t.TempDir()
+	writeFile(t, pyDir, "pyproject.toml", "[project]\ndependencies = [\n  \"fastapi>=0.110.0\",\n]\n")
+	pyFrameworks := detectFrameworks(pyDir)
+	require.Len(t, pyFrameworks, 1)
+	assert.Equal(t, "FastAPI", pyFrameworks[0].Name)
+	assert.Equal(t, "0.110.0", pyFrameworks[0].Version)
+}
+
 // --- helpers ---
 
 func setupGoProject(t *testing.T) string {

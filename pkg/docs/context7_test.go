@@ -29,6 +29,30 @@ func TestContext7Client_ResolveLibrary_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/spf13/cobra", result.ID)
 	assert.Equal(t, "cobra", result.Name)
+	assert.Equal(t, "1.9.1", result.Version)
+}
+
+func TestContext7Client_FetchPreservesVersionEvidence(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if r.URL.Path == "/libraries" {
+			_, _ = w.Write([]byte(`{"id": "/spf13/cobra", "name": "cobra", "version": "1.9.1"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"content": "# cobra docs", "tokens": 12}`))
+	}))
+	defer srv.Close()
+
+	client := NewContext7Client(srv.URL)
+	result, err := client.Fetch("cobra", "commands")
+
+	require.NoError(t, err)
+	assert.Equal(t, "1.9.1", result.Version)
+	assert.Equal(t, "/spf13/cobra", result.SourceRef)
+	assert.False(t, result.CheckedAt.IsZero())
 }
 
 // TestContext7Client_ResolveLibrary_NotFound verifies that ErrLibraryNotFound is returned

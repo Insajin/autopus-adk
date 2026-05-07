@@ -74,6 +74,14 @@ IMPORTANT: executor MUST NOT modify test files generated in Phase 1.5.
 - Source code files (e.g., `**/*.go`, `**/*.py`, `**/*.ts`, `**/*.rs`) — excluding test files
 - Dependency manifests (e.g., `go.mod`, `package.json`, `pyproject.toml`, `Cargo.toml`)
 
+## Dependency Manifest Freshness
+
+신규 `go.mod`, `package.json`, `pyproject.toml`, `Cargo.toml` 또는 package manager lock/setup 파일을 만드는 greenfield 작업이면 구현 전에 `research.md` 또는 `prd.md`의 `## Technology Stack Decision`을 확인합니다.
+
+- Technology Stack Decision이 없거나 version/source_ref/checked_at이 비어 있으면 dependency manifest를 작성하지 말고 `BLOCKED`로 보고합니다.
+- `latest`, `next`, unpinned prerelease 문자열을 manifest에 직접 쓰지 않습니다.
+- brownfield 작업에서는 기존 manifest major version을 보존하고 migration SPEC/acceptance가 있을 때만 변경합니다.
+
 ## 완료 기준
 
 - [ ] Phase 1.5 생성 테스트 전부 통과 (GREEN)

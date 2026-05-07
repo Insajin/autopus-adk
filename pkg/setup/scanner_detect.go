@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	frameworkdetect "github.com/insajin/autopus-adk/pkg/detect"
 )
 
 func detectLanguages(dir string) []Language {
@@ -75,6 +77,16 @@ func detectLanguages(dir string) []Language {
 func detectFrameworks(dir string) []Framework {
 	var frameworks []Framework
 
+	seen := map[string]bool{}
+	if fw, err := frameworkdetect.DetectFramework(dir); err == nil && fw != nil && fw.Name != "" {
+		name := displayFrameworkName(fw.Name)
+		frameworks = append(frameworks, Framework{
+			Name:    name,
+			Version: detectFrameworkVersion(dir, fw.Name),
+		})
+		seen[strings.ToLower(name)] = true
+	}
+
 	if data, err := os.ReadFile(filepath.Join(dir, "package.json")); err == nil {
 		var pkg struct {
 			Deps    map[string]string `json:"dependencies"`
@@ -92,13 +104,46 @@ func detectFrameworks(dir string) []Framework {
 		}
 		allDeps := mergeMaps(pkg.Deps, pkg.DevDeps)
 		for key, name := range knownFrameworks {
+			if seen[strings.ToLower(name)] {
+				continue
+			}
 			if ver, ok := allDeps[key]; ok {
 				frameworks = append(frameworks, Framework{Name: name, Version: ver})
+				seen[strings.ToLower(name)] = true
 			}
 		}
 	}
 
 	return frameworks
+}
+
+func displayFrameworkName(name string) string {
+	switch strings.ToLower(name) {
+	case "nextjs":
+		return "Next.js"
+	case "nuxtjs":
+		return "Nuxt.js"
+	case "nestjs":
+		return "NestJS"
+	case "fastapi":
+		return "FastAPI"
+	case "react":
+		return "React"
+	case "vue":
+		return "Vue"
+	case "svelte":
+		return "Svelte"
+	case "gin":
+		return "Gin"
+	case "echo":
+		return "Echo"
+	case "chi":
+		return "Chi"
+	case "axum":
+		return "Axum"
+	default:
+		return name
+	}
 }
 
 func detectBuildFiles(dir string) []BuildFile {

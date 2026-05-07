@@ -58,9 +58,12 @@ Be specific: name files, packages, APIs, or services affected.
 
 **Constraints:**
 - [e.g., Must stay within the existing auth package; no new external dependencies.]
+- [For greenfield work: include a Technology Stack Decision with current stable versions, source refs, and checked-at date before implementation.]
+- [For brownfield work: preserve existing manifest major versions unless migration is explicitly in scope.]
 
 **Dependencies:**
 - [e.g., Requires go-redis v9+; blocked by SPEC-XXX-001 (cache layer).]
+- [For new dependencies: record version source refs from official docs, release notes, or package registries.]
 
 **Impact on existing code:**
 - [e.g., Modifies `internal/user/repository.go`; callers of `GetUser()` are unaffected.]

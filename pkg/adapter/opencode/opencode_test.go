@@ -148,6 +148,11 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(context7Rule), "web search")
 	assert.Contains(t, string(context7Rule), "official docs")
+
+	techstackRule, err := os.ReadFile(filepath.Join(dir, ".opencode", "rules", "autopus", "techstack-freshness.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(techstackRule), "Technology Stack Decision")
+	assert.Contains(t, string(techstackRule), "greenfield")
 }
 
 func TestAdapter_Generate_AutoRouterUsesThinOpenCodeContract(t *testing.T) {

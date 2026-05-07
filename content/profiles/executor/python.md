@@ -12,6 +12,10 @@ linter: ruff
 
 Write modern Python (3.11+). Use type hints everywhere. Prefer `uv` for dependency management.
 
+### Greenfield Dependency Policy
+
+When creating a new `pyproject.toml` or `requirements.txt`, use the SPEC/PRD `## Technology Stack Decision` for the Python runtime and dependency versions. Require concrete stable versions, source refs, and checked_at dates; block on missing evidence.
+
 ### Type Hints
 
 ```python

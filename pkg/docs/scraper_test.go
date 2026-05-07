@@ -3,6 +3,7 @@ package docs
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,31 @@ func TestScraper_FetchGoDocs(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Content)
 	assert.Equal(t, "github.com/spf13/cobra", result.Package)
+	assert.NotEmpty(t, result.SourceRef)
+	assert.False(t, result.CheckedAt.IsZero())
+}
+
+func TestScraper_FetchGoDocsPreservesProxyVersionEvidence(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if strings.HasSuffix(r.URL.Path, "/@latest") {
+			_, _ = w.Write([]byte(`{"Version":"v1.10.0"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body><section id="pkg-overview">Package gin is a web framework.</section></body></html>`))
+	}))
+	defer srv.Close()
+
+	scraper := NewScraper(WithGoDocsBaseURL(srv.URL), WithGoProxyBaseURL(srv.URL))
+	result, err := scraper.FetchGoDocs("github.com/gin-gonic/gin")
+
+	require.NoError(t, err)
+	assert.Equal(t, "v1.10.0", result.Version)
+	assert.Contains(t, result.SourceRef, "/@latest")
 }
 
 // TestScraper_FetchNpmDocs verifies that npm package docs are fetched via registry JSON API.
@@ -41,7 +67,7 @@ func TestScraper_FetchNpmDocs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"name":"express","description":"Fast web framework","readme":"# Express\nMinimal web framework."}`))
+		_, _ = w.Write([]byte(`{"name":"express","description":"Fast web framework","readme":"# Express\nMinimal web framework.","dist-tags":{"latest":"5.1.0"}}`))
 	}))
 	defer srv.Close()
 
@@ -52,6 +78,8 @@ func TestScraper_FetchNpmDocs(t *testing.T) {
 	assert.NotEmpty(t, result.Content)
 	assert.Equal(t, "express", result.Package)
 	assert.Contains(t, result.Content, "Express")
+	assert.Equal(t, "5.1.0", result.Version)
+	assert.False(t, result.CheckedAt.IsZero())
 }
 
 // TestScraper_FetchPyPIDocs verifies that PyPI package docs are fetched from the JSON API.
@@ -64,7 +92,7 @@ func TestScraper_FetchPyPIDocs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"info":{"name":"requests","summary":"HTTP library for Python","description":"# Requests\nSimple HTTP library."}}`))
+		_, _ = w.Write([]byte(`{"info":{"name":"requests","version":"2.32.0","summary":"HTTP library for Python","description":"# Requests\nSimple HTTP library."}}`))
 	}))
 	defer srv.Close()
 
@@ -74,4 +102,5 @@ func TestScraper_FetchPyPIDocs(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.Content)
 	assert.Equal(t, "requests", result.Package)
+	assert.Equal(t, "2.32.0", result.Version)
 }

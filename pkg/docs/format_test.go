@@ -2,6 +2,7 @@ package docs
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,9 @@ func TestFormat_PromptInjection(t *testing.T) {
 	result := &DocResult{
 		LibraryName: "cobra",
 		Source:      "context7",
+		Version:     "1.9.1",
+		SourceRef:   "/spf13/cobra",
+		CheckedAt:   time.Date(2026, 5, 7, 0, 0, 0, 0, time.UTC),
 		Content:     "# cobra\nCommand creation API overview.",
 		Tokens:      20,
 	}
@@ -24,9 +28,13 @@ func TestFormat_PromptInjection(t *testing.T) {
 	formatted, err := FormatPromptInjection([]*DocResult{result})
 	require.NoError(t, err)
 	assert.Contains(t, formatted, "## Reference Documentation")
+	assert.Contains(t, formatted, "documentation sources")
 	assert.Contains(t, formatted, "### cobra")
 	assert.Contains(t, formatted, "Command creation API")
 	assert.Contains(t, formatted, "(via Context7)")
+	assert.Contains(t, formatted, "version=1.9.1")
+	assert.Contains(t, formatted, "source_ref=/spf13/cobra")
+	assert.Contains(t, formatted, "checked_at=2026-05-07")
 }
 
 // TestFormat_MultipleLibraries verifies that multiple library docs are formatted with separate headers.

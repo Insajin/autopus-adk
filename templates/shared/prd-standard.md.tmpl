@@ -167,8 +167,16 @@
 
 **Technology Stack Constraints**
 
-- [e.g., Must use existing Go 1.22+ service — no new language runtimes]
-- [e.g., Frontend must remain in React 18; no framework migration]
+- [For greenfield work: resolve current stable versions through the Technology Stack Decision policy before naming frameworks or dependencies.]
+- [For brownfield work: preserve the existing manifest major versions unless the requirement explicitly approves a migration.]
+- [e.g., Must use the existing Go service in `go.mod` — no new language runtimes.]
+- [e.g., Frontend must remain on the existing React major already present in `package.json`; no framework migration.]
+
+**Technology Stack Decision**
+
+| Mode | Selected stack | Resolved versions | Source refs | Checked at | Rejected alternatives |
+|------|----------------|-------------------|-------------|------------|-----------------------|
+| greenfield / brownfield | [framework/runtime/tool choices] | [versions from current stable sources or existing manifests] | [official docs/release notes/registry refs] | [YYYY-MM-DD] | [alternatives and reason] |
 
 **External Dependencies**
 

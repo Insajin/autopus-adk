@@ -13,6 +13,10 @@ linter: eslint
 
 Build accessible, responsive UI components. Extend the TypeScript profile patterns.
 
+### Greenfield Dependency Policy
+
+For new frontend projects, use the SPEC/PRD `## Technology Stack Decision` before choosing React, Next.js, Vite, Tailwind, router, state, test, or component-library versions. Require concrete stable versions, source refs, and checked_at dates; block on missing evidence.
+
 ### Semantic HTML
 
 ```html

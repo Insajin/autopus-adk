@@ -238,6 +238,7 @@ Step 3: Prepare Injection Payload (Adaptive Token Budget)
   → Hard cap: total injected docs ≤ 10000 tokens
   → Trimming priority: API signatures > config examples > breaking changes > error patterns > tutorials
   → Format as "## Reference Documentation" section
+  → Preserve version/source_ref/checked_at metadata for Technology Stack Decision evidence
 
 Step 4 (optional): Per-Executor Refinement
   → If an executor's task targets a specific API area (e.g., "routing", "testing"),
@@ -246,11 +247,11 @@ Step 4 (optional): Per-Executor Refinement
   → Max 3 refinement queries per pipeline
 ```
 
-**Injection into subsequent phases**: The cached documentation is injected into Phase 2 executor and Phase 3 tester prompts as a `## Reference Documentation` section, following the same pattern as Phase 2 Profile Injection.
+**Injection into subsequent phases**: The cached documentation is injected into Phase 2 executor and Phase 3 tester prompts as a `## Reference Documentation` section, following the same pattern as Phase 2 Profile Injection. When the task is greenfield, the stack version metadata must also be reflected in the SPEC/PRD `## Technology Stack Decision` section before dependency manifests are written.
 
 **Error handling**: Context7 failures (MCP unavailable, no match, empty response) first trigger web fallback. Only when both Context7 and web fallback fail does the pipeline log and skip — documentation is supplementary, never blocks the pipeline.
 
-Ref: `.claude/rules/autopus/context7-docs.md` for detection heuristics, token limits, and anti-patterns.
+Ref: `.claude/rules/autopus/context7-docs.md` for detection heuristics, token limits, and anti-patterns. Ref: `.claude/rules/autopus/techstack-freshness.md` for greenfield version evidence.
 
 ### Phase 2: Implementation
 
