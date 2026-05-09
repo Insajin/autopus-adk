@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -40,6 +41,21 @@ func runCanaryLocalBrowser(ctx context.Context, projectDir string, result *canar
 		return "FAIL"
 	}
 	run := runCanaryBrowserScript(ctx, frontendDir, baseURL)
+	result.Targets = append(result.Targets, run)
+	if run.Status != "PASS" {
+		return "FAIL"
+	}
+	return "PASS"
+}
+
+func runCanaryRemoteBrowser(ctx context.Context, projectDir string, baseURL string, result *canaryResult) string {
+	frontendDir := filepath.Join(projectDir, "Autopus", "frontend")
+	if _, err := os.Stat(filepath.Join(frontendDir, "package.json")); err != nil {
+		result.Skipped = append(result.Skipped, canarySkippedCheck{"browser", "frontend package.json not found"})
+		return "SKIPPED"
+	}
+	run := runCanaryBrowserScript(ctx, frontendDir, strings.TrimRight(baseURL, "/"))
+	run.ID = "browser-staging"
 	result.Targets = append(result.Targets, run)
 	if run.Status != "PASS" {
 		return "FAIL"

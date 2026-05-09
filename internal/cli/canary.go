@@ -12,13 +12,25 @@ import (
 )
 
 type canaryOptions struct {
-	projectDir string
-	url        string
-	watch      string
-	compare    string
-	dryRun     bool
-	jsonOut    bool
-	format     string
+	projectDir  string
+	url         string
+	frontendURL string
+	apiURL      string
+	watch       string
+	compare     string
+	dryRun      bool
+	jsonOut     bool
+	format      string
+}
+
+const (
+	defaultCanaryFrontendURL = "https://staging.autopus.co"
+	defaultCanaryAPIURL      = "https://autopus-staging.up.railway.app"
+)
+
+type canaryTargets struct {
+	FrontendURL string
+	APIURL      string
 }
 
 type canaryResult struct {
@@ -59,7 +71,9 @@ func newCanaryCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.projectDir, "project-dir", ".", "Project root directory")
-	cmd.Flags().StringVar(&opts.url, "url", "", "Deployment URL for endpoint/browser checks")
+	cmd.Flags().StringVar(&opts.url, "url", "", "Legacy deployment URL override for both endpoint and browser checks")
+	cmd.Flags().StringVar(&opts.frontendURL, "frontend-url", defaultCanaryFrontendURL, "Frontend URL for browser checks")
+	cmd.Flags().StringVar(&opts.apiURL, "api-url", defaultCanaryAPIURL, "API URL for endpoint checks")
 	cmd.Flags().StringVar(&opts.watch, "watch", "", "Repeat interval such as 5m (reserved)")
 	cmd.Flags().StringVar(&opts.compare, "compare", "", "Commit SHA to compare against (reserved)")
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Plan canary checks without executing project commands")
@@ -99,10 +113,11 @@ func runCanary(ctx context.Context, opts canaryOptions) (canaryResult, error) {
 	if err != nil {
 		return canaryResult{}, err
 	}
+	targets := resolveCanaryTargets(opts)
 	result := canaryResult{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Project:   filepath.Base(projectDir),
-		Mode:      "local-canary",
+		Mode:      "staging-canary",
 		Verdict:   "PASS",
 		Build:     "PASS",
 		E2E:       "PASS",
@@ -110,9 +125,11 @@ func runCanary(ctx context.Context, opts canaryOptions) (canaryResult, error) {
 		Endpoint:  "SKIPPED",
 		Browser:   "SKIPPED",
 		Flags: map[string]string{
-			"url":     opts.url,
-			"watch":   opts.watch,
-			"compare": opts.compare,
+			"url":          opts.url,
+			"frontend_url": targets.FrontendURL,
+			"api_url":      targets.APIURL,
+			"watch":        opts.watch,
+			"compare":      opts.compare,
 		},
 	}
 	if opts.dryRun {
@@ -124,8 +141,8 @@ func runCanary(ctx context.Context, opts canaryOptions) (canaryResult, error) {
 			canarySkippedCheck{"build", "dry-run"},
 			canarySkippedCheck{"e2e", "dry-run"},
 			canarySkippedCheck{"doctor", "dry-run"},
-			canarySkippedCheck{"endpoint", "no --url supplied"},
-			canarySkippedCheck{"browser", "no --url supplied"},
+			canarySkippedCheck{"endpoint", "dry-run"},
+			canarySkippedCheck{"browser", "dry-run"},
 		)
 		result.Summary = canarySummary(result)
 		return result, writeCanaryLatest(projectDir, result)
@@ -169,21 +186,24 @@ func runCanary(ctx context.Context, opts canaryOptions) (canaryResult, error) {
 		}
 	}
 
-	if strings.TrimSpace(opts.url) == "" {
-		result.Skipped = append(result.Skipped,
-			canarySkippedCheck{"endpoint", "no --url supplied"},
-		)
-		result.Browser = runCanaryLocalBrowser(ctx, projectDir, &result)
-		if result.Browser == "FAIL" {
-			result.Verdict = "FAIL"
-		}
-	} else {
-		result.Endpoint = runCanaryEndpointChecks(ctx, opts.url, &result)
-		result.Browser = runCanaryHTTPPageChecks(ctx, opts.url, &result)
-		if result.Endpoint == "FAIL" || result.Browser == "FAIL" {
-			result.Verdict = "FAIL"
-		}
+	result.Endpoint = runCanaryEndpointChecks(ctx, targets.APIURL, &result)
+	result.Browser = runCanaryRemoteBrowser(ctx, projectDir, targets.FrontendURL, &result)
+	if result.Endpoint == "FAIL" || result.Browser == "FAIL" {
+		result.Verdict = "FAIL"
 	}
 	result.Summary = canarySummary(result)
 	return result, writeCanaryLatest(projectDir, result)
+}
+
+func resolveCanaryTargets(opts canaryOptions) canaryTargets {
+	frontendURL := defaultString(opts.frontendURL, defaultCanaryFrontendURL)
+	apiURL := defaultString(opts.apiURL, defaultCanaryAPIURL)
+	if legacyURL := strings.TrimSpace(opts.url); legacyURL != "" {
+		frontendURL = legacyURL
+		apiURL = legacyURL
+	}
+	return canaryTargets{
+		FrontendURL: strings.TrimRight(frontendURL, "/"),
+		APIURL:      strings.TrimRight(apiURL, "/"),
+	}
 }

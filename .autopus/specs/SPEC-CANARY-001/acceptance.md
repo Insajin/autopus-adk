@@ -12,10 +12,10 @@
 - When: `/auto canary` 실행
 - Then: FAIL 판정과 함께 빌드 에러 메시지가 출력되고, E2E/브라우저 검진은 스킵됨
 
-### S3: URL 지정 브라우저 검진
-- Given: 실행 중인 웹 애플리케이션 URL
-- When: `/auto canary --url http://localhost:3000` 실행
-- Then: 해당 URL에 대해 접근성 트리 스냅샷, 콘솔 에러 수집이 수행됨
+### S3: staging 기본 브라우저/endpoint 검진
+- Given: staging frontend와 staging backend가 배포되어 있음
+- When: `/auto canary` 실행
+- Then: backend staging `/health`, `/metrics`와 frontend staging `/login`, `/docs`, `/marketplace`가 검증됨
 
 ### S4: watch 모드
 - Given: 정상 작동하는 프로젝트
@@ -47,7 +47,7 @@
 ### S9: dry-run JSON evidence
 - Given: initialized project directory
 - When: `auto canary --dry-run --project-dir <dir> --format json` 실행
-- Then: JSON envelope status는 `ok`, verdict는 `PASS`, build/e2e/doctor/endpoint/browser는 `SKIPPED`, skipped reason이 포함됨
+- Then: JSON envelope status는 `ok`, verdict는 `PASS`, build/e2e/doctor/endpoint/browser는 `SKIPPED`, skipped reason과 staging `frontend_url`/`api_url` flags가 포함됨
 
 ### S10: result persistence failure is fail-closed
 - Given: `--project-dir` points at a file path so `.autopus/canary/latest.json` cannot be written

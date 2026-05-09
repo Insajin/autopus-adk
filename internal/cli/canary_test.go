@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRootCmd_CanaryDryRunJSON_PassesWithoutDeploymentURL(t *testing.T) {
+func TestRootCmd_CanaryDryRunJSON_UsesStagingTargetsByDefault(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -33,6 +33,9 @@ func TestRootCmd_CanaryDryRunJSON_PassesWithoutDeploymentURL(t *testing.T) {
 	assert.Equal(t, "PASS", data["verdict"])
 	assert.Equal(t, "SKIPPED", data["endpoint"])
 	assert.Equal(t, "SKIPPED", data["browser"])
+	flags := data["flags"].(map[string]any)
+	assert.Equal(t, defaultCanaryFrontendURL, flags["frontend_url"])
+	assert.Equal(t, defaultCanaryAPIURL, flags["api_url"])
 }
 
 func TestRootCmd_CanaryDryRunJSON_FailsWhenResultCannotBeStored(t *testing.T) {
@@ -55,4 +58,13 @@ func TestRootCmd_CanaryDryRunJSON_FailsWhenResultCannotBeStored(t *testing.T) {
 
 	data := payload["data"].(map[string]any)
 	assert.Equal(t, "FAIL", data["verdict"])
+}
+
+func TestResolveCanaryTargetsLegacyURLOverridesStagingDefaults(t *testing.T) {
+	t.Parallel()
+
+	targets := resolveCanaryTargets(canaryOptions{url: "https://preview.example.com/"})
+
+	assert.Equal(t, "https://preview.example.com", targets.FrontendURL)
+	assert.Equal(t, "https://preview.example.com", targets.APIURL)
 }
