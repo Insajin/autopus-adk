@@ -20,6 +20,7 @@ import (
 //   - override: "frontmatter" when a frontmatter override was consumed, else ""
 //   - err: non-nil only on unrecoverable I/O errors; invalid frontmatter values
 //     are reported via stderr and the function falls back to the adaptive mapping.
+//
 // @AX:WARN: [AUTO] multi-stage decision chain — adaptive → frontmatter override → ceiling cap; @AX:REASON: three independent override paths interact; incorrect ordering silently ignores a higher-priority source
 func resolveSpecReviewContextLimit(projectRoot, specDir string, ceiling int, stderr io.Writer) (cited, applied int, override string, err error) {
 	cited = countSpecCitedFiles(projectRoot, specDir)

@@ -15,7 +15,7 @@ func ProbeFTS5() error {
 	if err != nil {
 		return fmt.Errorf("open sqlite probe: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if _, err := db.Exec(`CREATE VIRTUAL TABLE mem_probe USING fts5(body)`); err != nil {
 		return fmt.Errorf("probe sqlite fts5: %w", err)
 	}

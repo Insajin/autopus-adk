@@ -86,30 +86,6 @@ func slashRel(projectDir, path string) string {
 	return filepath.ToSlash(rel)
 }
 
-func pathWithinExisting(root, target string) (bool, error) {
-	rootAbs, err := filepath.Abs(root)
-	if err != nil {
-		return false, err
-	}
-	rootAbs, err = filepath.EvalSymlinks(rootAbs)
-	if err != nil {
-		return false, err
-	}
-	targetAbs, err := filepath.Abs(target)
-	if err != nil {
-		return false, err
-	}
-	targetAbs, err = filepath.EvalSymlinks(targetAbs)
-	if err != nil {
-		return false, err
-	}
-	rel, err := filepath.Rel(rootAbs, targetAbs)
-	if err != nil {
-		return false, err
-	}
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))), nil
-}
-
 func pathWithinForCreate(root, target string) (bool, error) {
 	rootAbs, err := filepath.Abs(root)
 	if err != nil {

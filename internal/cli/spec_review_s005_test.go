@@ -28,6 +28,15 @@ func TestRunSpecReview_FailedProviderRejectIgnored(t *testing.T) {
 	defer func() { _ = os.Chdir(origWD) }()
 	require.NoError(t, os.Chdir(dir))
 
+	origBuilder := specReviewConfigProviders
+	specReviewConfigProviders = func(_ *config.HarnessConfig, _ []string) []orchestra.ProviderConfig {
+		return []orchestra.ProviderConfig{
+			{Name: "claude", Binary: "claude"},
+			{Name: "gemini", Binary: "gemini"},
+		}
+	}
+	defer func() { specReviewConfigProviders = origBuilder }()
+
 	origRunner := specReviewRunOrchestra
 	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
 		// Default config has 2 providers (claude, gemini).

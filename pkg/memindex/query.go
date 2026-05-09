@@ -23,7 +23,7 @@ func Search(opts SearchOptions) (SearchResponse, error) {
 	if err != nil {
 		return SearchResponse{}, err
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := verifyProjection(db); err != nil {
 		return SearchResponse{}, err
 	}
@@ -87,7 +87,7 @@ func queryRecords(db *sql.DB, projectDir, query string, topK int) ([]SearchResul
 	if err != nil {
 		return nil, &Error{Code: "projection-corrupt", Err: err}
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	results := make([]SearchResult, 0)
 	for rows.Next() {
 		var rowID int64
@@ -135,7 +135,7 @@ func Status(opts Options) (StatusResult, error) {
 		result.RebuildRecommended = true
 		return result, nil
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	if err := verifyProjection(db); err != nil {
 		result.CorruptState = CorruptState{IsCorrupt: true, Reason: err.Error()}
 		result.RebuildRecommended = true
@@ -230,7 +230,7 @@ func countBy(db *sql.DB, query string) (map[string]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	counts := map[string]int{}
 	for rows.Next() {
 		var key string
@@ -248,7 +248,7 @@ func staleRefs(db *sql.DB, projectDir string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	stale := make([]string, 0)
 	for rows.Next() {
 		var ref, hash string

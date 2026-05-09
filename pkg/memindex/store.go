@@ -59,7 +59,7 @@ func writeProjection(db *sql.DB, records []Record, skips []Skip) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.Exec(`INSERT INTO mem_metadata(key, value) VALUES (?, ?)`, "schema_version", SchemaVersion); err != nil {
 		return err
 	}
