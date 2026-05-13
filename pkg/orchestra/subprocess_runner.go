@@ -67,14 +67,7 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 
 	output := stdoutBuf.String()
 	stderrOutput := stderrBuf.String()
-	if lastMessagePath != "" {
-		lastMessage, err := os.ReadFile(lastMessagePath)
-		if err != nil {
-			stderrOutput = appendSubprocessDiagnostic(stderrOutput, fmt.Sprintf("read codex last message: %v", err))
-		} else if strings.TrimSpace(string(lastMessage)) != "" {
-			output = string(lastMessage)
-		}
-	}
+	output, stderrOutput = applyCodexLastMessageOutput(output, stderrOutput, lastMessagePath)
 	resp := &ProviderResponse{
 		Provider:    req.Provider,
 		Output:      output,
