@@ -85,7 +85,7 @@ IMPORTANT: No source code file may exceed 300 lines. Target under 200 lines. Spl
 ### Code Review
 
 During review, verify:
-- No file exceeds 300 lines (REQUIRED)
+- No source code file exceeds 300 lines (REQUIRED)
 - Complex changes use subagent delegation (SUGGESTED)
 
 ## Rules

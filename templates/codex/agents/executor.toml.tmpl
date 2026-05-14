@@ -175,13 +175,14 @@ Tests 형식: `{test command} — N passed, M failed, coverage X%`
 # Harness-only task detection
 if all changed files match *.md:
     skip: build, test, lint (stack-specific commands)
-    apply: markdown lint (markdownlint-cli2 *.md), line count check
+    apply: markdown lint (markdownlint-cli2 *.md), frontmatter validation, section structure check
 ```
 
 완료 기준 대체:
-- [ ] 모든 `.md` 파일이 300줄 미만
 - [ ] 프론트매터 YAML 구문 오류 없음
 - [ ] 섹션 헤더 계층 구조 일관성 유지 (H2 > H3 순서 준수)
+
+300줄 제한은 소스 코드 파일에만 적용하며 SPEC/agent Markdown 문서에는 적용하지 않는다.
 
 ## Result Format
 

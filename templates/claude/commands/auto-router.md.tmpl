@@ -1443,7 +1443,7 @@ Agent(
     - go build ./... passes
     - go vet ./... passes
     - golangci-lint run passes
-    - No file exceeds 300 lines
+    - No source code file exceeds 300 lines
 
     Return format:
     Verdict: PASS | FAIL
@@ -1637,7 +1637,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 
 If all tasks modify only `.md` files:
 - Skip Go build/test validation
-- Validator performs format-only checks (frontmatter validity, 300-line limit)
+- Validator performs format-only checks (frontmatter validity and Markdown structure)
 
 ### [REQUIRED] Pre-Completion Verification
 

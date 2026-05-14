@@ -6,11 +6,11 @@ category: structure
 
 # File Size Limit
 
-IMPORTANT: No single file may exceed 300 lines. This is a HARD limit.
+IMPORTANT: No single source code file may exceed 300 lines. This is a HARD limit.
 
 ## Thresholds
 
-- Target: Under 200 lines per file
+- Target: Under 200 lines per source code file
 - Warning: 200-300 lines (consider splitting)
 - Hard limit: 300 lines (MUST split before committing)
 

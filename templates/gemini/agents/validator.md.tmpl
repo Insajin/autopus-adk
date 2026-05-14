@@ -187,11 +187,12 @@ WHEN changed files include SQL migration files (matching `migrations/*.sql` or `
 
 **수행 항목**:
 - 프론트매터 유효성 검증 (YAML 형식, 필수 키 존재 여부)
-- 파일 크기 제한 검증 (300줄 미만)
+- Markdown 섹션 구조 검증
+- 300줄 제한은 소스 코드 파일에만 적용하므로 `.md` 문서에는 적용하지 않음
 
 ```bash
-# Check frontmatter validity and file size for changed .md files
-git diff --name-only | grep '\.md$' | xargs wc -l
+# List changed Markdown files for frontmatter and structure checks
+git diff --name-only | grep '\.md$'
 ```
 
 ## 출력 형식

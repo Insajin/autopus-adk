@@ -347,7 +347,7 @@ Agent(
     2. Test — all tests pass
     3. Lint — no lint warnings
     4. Coverage — measure test coverage
-    5. Structure — no file exceeds 300 lines
+    5. Structure — no source code file exceeds 300 lines
     6. Seam Verification:
        a. Stub Detection — grep changed files for TODO/stub/placeholder/NotImplemented patterns
        b. Smoke Test — run CLI/API entry point (--help or /health) if applicable

@@ -70,7 +70,7 @@ skills:
   - Rust:  cargo build && cargo test
 
 파일 크기 단계:
-  wc -l 변경 파일 → 300줄 미만 확인
+  wc -l 변경 소스 코드 파일 → 300줄 미만 확인
   초과 시 즉시 분리 후 재검증
 
 품질 단계:
@@ -136,7 +136,7 @@ orchestrator 또는 planner가 이 에이전트를 spawn할 때:
 - [ ] 모든 태스크의 체크포인트 상태 `done` 저장
 - [ ] 프로젝트 스택에 맞는 빌드 성공 (예: `go build`, `npm run build`, `cargo build`)
 - [ ] 프로젝트 스택에 맞는 테스트 통과 (예: `go test`, `pytest`, `npm test`, `cargo test`)
-- [ ] 파일 크기 300줄 미만 준수
+- [ ] 소스 코드 파일 크기 300줄 미만 준수
 - [ ] 검증 루프 최소 1회 완료
 
 ## 완료 보고 형식
