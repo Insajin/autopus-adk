@@ -74,7 +74,7 @@ func TestAPI_CreateUser(t *testing.T) {
 
 ### QAMESH Source Guidance
 
-- Use `auto qa plan --format json` before project-level QA execution to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without running commands.
+- Use `auto qa init --format json` to create project-local starter Journey Packs from detected desktop GUI signals; then use `auto qa plan --format json` before project-level QA execution to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without running commands.
 - Use `auto qa run --format json` when deterministic project QA should execute and produce QAMESH run/evidence output.
 - Use `auto qa explore --dry-run --format json` before GUI exploration; execute it only for explicit local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
 - Use `auto qa evidence` when an external producer already wrote a QAMESH manifest and the task is validation, redaction, and publication.

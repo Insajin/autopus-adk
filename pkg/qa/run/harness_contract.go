@@ -1,12 +1,11 @@
 package run
 
 import (
-	"encoding/json"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
+	qaproject "github.com/insajin/autopus-adk/pkg/qa/project"
 )
 
 func harnessContract(projectDir string) HarnessContract {
@@ -34,7 +33,7 @@ func projectLocalJourneySetupGaps(opts Options, packs []journey.Pack) []SetupGap
 }
 
 func projectLocalJourneyHints(opts Options, packs []journey.Pack) []SetupGap {
-	if hasGUIExplorePack(packs) || isGUIExploreRequest(opts) || !hasDesktopGUISignals(opts.ProjectDir) {
+	if hasGUIExplorePack(packs) || isGUIExploreRequest(opts) || !qaproject.HasDesktopGUISignals(opts.ProjectDir) {
 		return nil
 	}
 	return []SetupGap{{
@@ -62,71 +61,4 @@ func isGUIExploreRequest(opts Options) bool {
 
 func projectLocalGUIJourneyReason() string {
 	return "project-local gui-explore Journey Pack required: ADK is a harness; create .autopus/qa/journeys/<id>.yaml with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention"
-}
-
-func hasDesktopGUISignals(projectDir string) bool {
-	if existsAny(projectDir,
-		"src-tauri/Cargo.toml",
-		"src-tauri/tauri.conf.json",
-		"src-tauri/tauri.conf.json5",
-		"e2e-tests/wdio.conf.mjs",
-		"e2e-macos/run-macos-smoke.mjs",
-		"scripts/visual/run-macos-wkwebview-suite.mjs",
-		"scripts/visual/run-windows-webview2-suite.mjs",
-	) {
-		return true
-	}
-	pkg, ok := readHarnessPackageJSON(filepath.Join(projectDir, "package.json"))
-	if !ok {
-		return false
-	}
-	for _, dep := range []string{"@tauri-apps/api", "electron", "@electron/remote"} {
-		if pkg.hasDependency(dep) {
-			return true
-		}
-	}
-	for script := range pkg.Scripts {
-		name := strings.ToLower(script)
-		if strings.Contains(name, "tauri") || strings.Contains(name, "appium") ||
-			strings.Contains(name, "webdriver") || strings.Contains(name, "visual:macos") ||
-			strings.Contains(name, "visual:windows") || strings.Contains(name, "e2e:linux") {
-			return true
-		}
-	}
-	return false
-}
-
-func existsAny(root string, rels ...string) bool {
-	for _, rel := range rels {
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-type harnessPackageJSON struct {
-	Scripts         map[string]string `json:"scripts"`
-	Dependencies    map[string]string `json:"dependencies"`
-	DevDependencies map[string]string `json:"devDependencies"`
-}
-
-func readHarnessPackageJSON(path string) (harnessPackageJSON, bool) {
-	body, err := os.ReadFile(path)
-	if err != nil {
-		return harnessPackageJSON{}, false
-	}
-	var pkg harnessPackageJSON
-	if err := json.Unmarshal(body, &pkg); err != nil {
-		return harnessPackageJSON{}, false
-	}
-	return pkg, true
-}
-
-func (pkg harnessPackageJSON) hasDependency(name string) bool {
-	if _, ok := pkg.Dependencies[name]; ok {
-		return true
-	}
-	_, ok := pkg.DevDependencies[name]
-	return ok
 }

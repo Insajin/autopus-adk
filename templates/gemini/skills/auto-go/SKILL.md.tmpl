@@ -46,6 +46,12 @@ SPEC 문서를 기반으로 코드를 구현합니다.
 - 커버리지: {{if .IsFullMode}}85{{else}}80{{end}}%+
 - LSP 에러: 0 / 타입 에러: 0 / 린트: 0
 
+## QAMESH Scope Budget
+
+- Inside `go`, run only affected/fast/smoke QAMESH lanes related to the changed scope. Check `auto qa plan --lane fast --format json` before execution.
+- Do not run the full GUI/native/release matrix during `go`; reserve full desktop GUI exploration for explicit `auto qa ...` runs or `auto canary`.
+- If desktop GUI signals exist but no Journey Pack exists, `auto qa init --format json` may create a project-local starter, but the generated pack requires review before execution.
+
 ## Subagent Delegation
 
 When a task modifies 3+ files, exceeds 200 lines, or spans multiple domains, delegate to specialized agents using `@agent`.

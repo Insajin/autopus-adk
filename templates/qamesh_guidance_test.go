@@ -55,9 +55,40 @@ func TestQAMESHRouterTemplateGuidance(t *testing.T) {
 	}
 }
 
+func TestAutoGoQAMESHScopeBudgetGuidance(t *testing.T) {
+	t.Parallel()
+
+	e := tmpl.New()
+	cfg := config.DefaultFullConfig("qa-project")
+	root := templateRoot()
+	paths := []string{
+		filepath.Join(root, "..", "content", "skills", "agent-pipeline.md"),
+		filepath.Join(root, "claude", "commands", "auto-router.md.tmpl"),
+		filepath.Join(root, "codex", "prompts", "auto-go.md.tmpl"),
+		filepath.Join(root, "codex", "skills", "auto-go.md.tmpl"),
+		filepath.Join(root, "codex", "skills", "agent-pipeline.md.tmpl"),
+		filepath.Join(root, "gemini", "commands", "auto-router.md.tmpl"),
+		filepath.Join(root, "gemini", "skills", "auto-go", "SKILL.md.tmpl"),
+		filepath.Join(root, "gemini", "skills", "agent-pipeline", "SKILL.md.tmpl"),
+	}
+	for _, path := range paths {
+		path := path
+		t.Run(filepath.Base(path), func(t *testing.T) {
+			t.Parallel()
+			body, err := renderOrReadTemplate(e, path, cfg)
+			require.NoError(t, err)
+			assert.Contains(t, body, "affected/fast/smoke QAMESH")
+			assert.Contains(t, body, "auto qa plan --lane fast --format json")
+			assert.Contains(t, body, "full GUI/native/release matrix")
+			assert.Contains(t, body, "auto canary")
+		})
+	}
+}
+
 func assertQAMESHGuidance(t *testing.T, body string) {
 	t.Helper()
 	assert.Contains(t, body, "QAMESH")
+	assert.Contains(t, body, "auto qa init")
 	assert.Contains(t, body, "auto qa plan")
 	assert.Contains(t, body, "auto qa run")
 	assert.Contains(t, body, "auto qa explore")
@@ -65,4 +96,15 @@ func assertQAMESHGuidance(t *testing.T, body string) {
 	assert.Contains(t, body, "auto qa feedback")
 	assert.Contains(t, body, "ADK is a harness")
 	assert.Contains(t, body, "project-local Journey Pack")
+}
+
+func renderOrReadTemplate(e *tmpl.Engine, path string, cfg *config.HarnessConfig) (string, error) {
+	if filepath.Ext(path) == ".tmpl" {
+		return e.RenderFile(path, cfg)
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }

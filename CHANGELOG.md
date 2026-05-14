@@ -4,8 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **QAMESH Journey Pack init flow** (2026-05-15): `auto qa init` now creates a project-local `.autopus/qa/journeys/desktop-gui-explore.yaml` starter when desktop GUI signals are detected, preserves existing packs, validates the generated pack before returning, and documents that generated Journey Packs require human review before execution.
+
 ### Changed
 
+- **`auto go` QAMESH scope budget** (2026-05-15): go-stage guidance now limits QAMESH execution to affected/fast/smoke lanes and defers full GUI/native/release matrices to explicit `auto qa ...` or `auto canary` runs.
 - **QAMESH harness/project-local Journey Pack contract** (2026-05-15): `auto qa plan` and `auto qa explore --dry-run` now expose a `harness_contract` declaring ADK as the harness and project-local `.autopus/qa/journeys/**` as the owner of concrete Journey Packs. Desktop GUI signals now produce non-blocking `project_hints` on fast plans and explicit `setup_gaps` on `gui-explore` requests when the target project has not declared a GUI Journey Pack, while `gui-explore` no longer falls back to generic detected Node/Vitest/Playwright adapters.
 
 ## [v0.47.5] — 2026-05-12

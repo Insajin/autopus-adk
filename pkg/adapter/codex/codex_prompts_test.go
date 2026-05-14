@@ -144,6 +144,7 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-secure.md"], "OWASP Top 10")
 	assert.Contains(t, byName["auto-test.md"], "auto test run")
 	assert.Contains(t, byName["auto-qa.md"], "QAMESH")
+	assert.Contains(t, byName["auto-qa.md"], "auto qa init")
 	assert.Contains(t, byName["auto-qa.md"], "auto qa plan")
 	assert.Contains(t, byName["auto-qa.md"], "auto qa run")
 	assert.Contains(t, byName["auto-qa.md"], "auto qa evidence")

@@ -11,10 +11,11 @@ import (
 func newQACmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "qa",
-		Short:         "Normalize QA evidence and generate repair prompts",
+		Short:         "Plan, initialize, run, and publish QAMESH QA evidence",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	cmd.AddCommand(newQAInitCmd())
 	cmd.AddCommand(newQAPlanCmd())
 	cmd.AddCommand(newQAAdaptersCmd())
 	cmd.AddCommand(newQARunCmd())

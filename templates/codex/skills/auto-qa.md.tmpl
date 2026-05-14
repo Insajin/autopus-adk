@@ -1,7 +1,7 @@
 ---
 name: auto-qa
 description: >
-  QAMESH project QA mesh — auto qa plan/run/explore/evidence/feedback guidance
+  QAMESH project QA mesh — auto qa init/plan/run/explore/evidence/feedback guidance
 ---
 
 # auto-qa — QAMESH Project QA Mesh
@@ -16,6 +16,7 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 
 ```bash
 @auto qa plan --format json
+@auto qa init --format json
 @auto qa run --format json
 @auto qa explore --dry-run --format json
 @auto qa evidence --input <manifest> --output <dir> --surface browser --lane golden --scenario <id> --format json
@@ -25,6 +26,7 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 ## Command Selection
 
 - `auto qa plan`: Journey Pack, detected adapter, lane, setup gap, output path를 확인합니다. 프로젝트 명령을 실행하지 않습니다.
+- `auto qa init`: detected desktop GUI signals에 맞춰 `.autopus/qa/journeys/**` 아래 project-local Journey Pack 초안을 생성합니다. 기존 파일은 덮어쓰지 않으며, 생성 후 사람이 command, origin, forbidden action, oracle을 검토해야 합니다.
 - `auto qa run`: deterministic project QA를 실행하고 run index, QAMESH evidence, 선택된 feedback bundle을 생성합니다.
 - `auto qa explore`: explicit GUI Journey Pack만 대상으로 실제 UI 탐색 evidence를 생성합니다. 먼저 `--dry-run`으로 allowed origins, forbidden actions, artifact retention, setup gap을 확인합니다.
 - `auto qa evidence`: producer가 이미 만든 QAMESH manifest를 검증, redaction, publish 경계로 보냅니다.
