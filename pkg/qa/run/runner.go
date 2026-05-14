@@ -80,9 +80,14 @@ func validFeedbackTarget(target string) bool {
 }
 
 func dryRunResult(plan Plan) Result {
+	status := "passed"
+	if len(plan.SetupGaps) > 0 {
+		status = "warning"
+	}
 	return Result{
-		Status:              "passed",
+		Status:              status,
 		DryRun:              true,
+		HarnessContract:     plan.HarnessContract,
 		SelectedJourneys:    plan.SelectedJourneys,
 		SelectedAdapters:    plan.SelectedAdapters,
 		OutputRoot:          plan.OutputRoot,
@@ -103,6 +108,7 @@ func initialResult(opts Options, plan Plan, runID, runDir string) Result {
 	return Result{
 		RunID:             runID,
 		Status:            "passed",
+		HarnessContract:   plan.HarnessContract,
 		SelectedJourneys:  plan.SelectedJourneys,
 		SelectedAdapters:  plan.SelectedAdapters,
 		OutputRoot:        opts.Output,

@@ -17,11 +17,13 @@ type Options struct {
 
 type Plan struct {
 	SelectedLane               string             `json:"selected_lane"`
+	HarnessContract            HarnessContract    `json:"harness_contract"`
 	ConfiguredJourneys         []string           `json:"configured_journeys"`
 	DetectedAdapters           []string           `json:"detected_adapters"`
 	SelectedJourneys           []string           `json:"selected_journeys"`
 	SelectedAdapters           []string           `json:"selected_adapters"`
 	SetupGaps                  []SetupGap         `json:"setup_gaps"`
+	ProjectHints               []SetupGap         `json:"project_hints,omitempty"`
 	Deferred                   []SetupGap         `json:"deferred,omitempty"`
 	OutputRoot                 string             `json:"output_root"`
 	RunIndexPreviewPath        string             `json:"run_index_preview_path"`
@@ -30,6 +32,15 @@ type Plan struct {
 	CandidateJourneys          []CandidateJourney `json:"candidate_journeys,omitempty"`
 	ArtifactPreviewRefs        []ArtifactPreview  `json:"artifact_preview_refs,omitempty"`
 	DryRun                     bool               `json:"dry_run,omitempty"`
+}
+
+type HarnessContract struct {
+	Role                 string `json:"role"`
+	JourneyPackOwnership string `json:"journey_pack_ownership"`
+	JourneyPackRoot      string `json:"journey_pack_root"`
+	RuntimeArtifactRoot  string `json:"runtime_artifact_root"`
+	GeneratedPolicy      string `json:"generated_policy"`
+	Guidance             string `json:"guidance"`
 }
 
 type ArtifactPreview struct {
@@ -79,6 +90,7 @@ type Result struct {
 	RunID               string             `json:"run_id"`
 	Status              string             `json:"status"`
 	DryRun              bool               `json:"dry_run,omitempty"`
+	HarnessContract     HarnessContract    `json:"harness_contract"`
 	SelectedJourneys    []string           `json:"selected_journeys"`
 	SelectedAdapters    []string           `json:"selected_adapters"`
 	OutputRoot          string             `json:"output_root"`

@@ -79,6 +79,7 @@ func TestAPI_CreateUser(t *testing.T) {
 - Use `auto qa explore --dry-run --format json` before GUI exploration; execute it only for explicit local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
 - Use `auto qa evidence` when an external producer already wrote a QAMESH manifest and the task is validation, redaction, and publication.
 - Use `auto qa feedback` to turn existing failed QAMESH evidence into provider-specific repair prompt bundles.
+- ADK is a harness: each concrete Journey Pack is a project-local Journey Pack under `.autopus/qa/journeys/**`, while ADK owns adapters, execution, redaction, and feedback plumbing.
 
 ### 원칙
 - 핵심 비즈니스 플로우만 (5-10개)

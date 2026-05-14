@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **QAMESH harness/project-local Journey Pack contract** (2026-05-15): `auto qa plan` and `auto qa explore --dry-run` now expose a `harness_contract` declaring ADK as the harness and project-local `.autopus/qa/journeys/**` as the owner of concrete Journey Packs. Desktop GUI signals now produce non-blocking `project_hints` on fast plans and explicit `setup_gaps` on `gui-explore` requests when the target project has not declared a GUI Journey Pack, while `gui-explore` no longer falls back to generic detected Node/Vitest/Playwright adapters.
+
 ## [v0.47.5] — 2026-05-12
 
 ### Added

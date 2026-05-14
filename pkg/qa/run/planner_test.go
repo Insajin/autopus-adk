@@ -176,3 +176,98 @@ checks:
 	assert.Equal(t, "go-test", plan.Deferred[0].Adapter)
 	assert.Contains(t, plan.Deferred[0].Reason, "SPEC-QAMESH-003")
 }
+
+func TestBuildPlanReportsHarnessContractAndProjectLocalGUIGap(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src-tauri"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "src-tauri", "Cargo.toml"), []byte("[package]\nname = \"desktop\"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"scripts":{"test:visual:macos":"node scripts/visual/run-macos-wkwebview-suite.mjs"},"dependencies":{"@tauri-apps/api":"latest"}}`), 0o644))
+
+	plan, err := BuildPlan(Options{ProjectDir: dir, Lane: "gui-explore", Output: filepath.Join(dir, "runs")})
+
+	require.NoError(t, err)
+	assert.Equal(t, "harness", plan.HarnessContract.Role)
+	assert.Equal(t, "project-local", plan.HarnessContract.JourneyPackOwnership)
+	assert.Contains(t, plan.HarnessContract.JourneyPackRoot, ".autopus/qa/journeys")
+	require.NotEmpty(t, plan.SetupGaps)
+	assert.Equal(t, "gui-explore", plan.SetupGaps[0].Adapter)
+	assert.Contains(t, plan.SetupGaps[0].Reason, "ADK is a harness")
+	assert.Contains(t, plan.SetupGaps[0].Reason, ".autopus/qa/journeys")
+}
+
+func TestBuildPlanReportsDesktopGUIHintWithoutFastLaneSetupGap(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src-tauri"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "src-tauri", "Cargo.toml"), []byte("[package]\nname = \"desktop\"\n"), 0o644))
+
+	plan, err := BuildPlan(Options{ProjectDir: dir, Lane: "fast", Output: filepath.Join(dir, "runs")})
+
+	require.NoError(t, err)
+	require.NotEmpty(t, plan.ProjectHints)
+	assert.Equal(t, "gui-explore", plan.ProjectHints[0].Adapter)
+	assert.Contains(t, plan.ProjectHints[0].Reason, "desktop GUI tooling detected")
+	for _, gap := range plan.SetupGaps {
+		assert.NotEqual(t, "project-local-gui-explore", gap.JourneyID)
+	}
+}
+
+func TestBuildPlanDoesNotUseDetectedFallbackForGUIExploreLane(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"scripts":{"test":"node test.js"},"devDependencies":{"@playwright/test":"latest","vitest":"latest"}}`), 0o644))
+
+	plan, err := BuildPlan(Options{ProjectDir: dir, Lane: "gui-explore", Output: filepath.Join(dir, "runs")})
+
+	require.NoError(t, err)
+	assert.Contains(t, plan.DetectedAdapters, "playwright")
+	assert.Empty(t, plan.SelectedJourneys)
+	assert.Empty(t, plan.SelectedAdapters)
+	require.NotEmpty(t, plan.SetupGaps)
+	assert.Equal(t, "project-local-gui-explore", plan.SetupGaps[0].JourneyID)
+}
+
+func TestBuildPlanDoesNotReportGUIGapWhenProjectLocalJourneyExists(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src-tauri"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "src-tauri", "Cargo.toml"), []byte("[package]\nname = \"desktop\"\n"), 0o644))
+	journeyDir := filepath.Join(dir, ".autopus", "qa", "journeys")
+	require.NoError(t, os.MkdirAll(journeyDir, 0o755))
+	body := []byte(`id: desktop-gui
+title: Desktop GUI
+surface: desktop
+lanes: [gui-explore]
+adapter:
+  id: gui-explore
+command:
+  run: npm exec playwright test
+  cwd: .
+  timeout: 60s
+checks:
+  - id: desktop-gui
+    type: gui_exploration
+gui:
+  allowed_origins: ["http://127.0.0.1:1420"]
+  forbidden_actions: ["mutation", "payment", "email_send"]
+  selector_strategy: role-first
+  network_policy:
+    mode: local-only
+  artifact_retention:
+    publish_raw: false
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(journeyDir, "desktop-gui.yaml"), body, 0o644))
+
+	plan, err := BuildPlan(Options{ProjectDir: dir, Lane: "gui-explore", Output: filepath.Join(dir, "runs")})
+
+	require.NoError(t, err)
+	assert.Contains(t, plan.SelectedJourneys, "desktop-gui")
+	for _, gap := range plan.SetupGaps {
+		assert.NotEqual(t, "project-local-gui-explore", gap.JourneyID)
+	}
+}

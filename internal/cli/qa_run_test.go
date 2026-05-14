@@ -106,6 +106,32 @@ gui:
 	assert.NoDirExists(t, output)
 }
 
+func TestQAExploreCmd_DryRunReportsProjectLocalJourneyGap(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src-tauri"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "src-tauri", "Cargo.toml"), []byte("[package]\nname = \"desktop\"\n"), 0o644))
+
+	cmd := newQACmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"explore", "--project-dir", dir, "--dry-run", "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+	payload := decodeJSONMap(t, out.Bytes())
+	assert.Equal(t, "warn", payload["status"])
+	data := payload["data"].(map[string]any)
+	assert.Equal(t, "warning", data["status"])
+	contract := data["harness_contract"].(map[string]any)
+	assert.Equal(t, "harness", contract["role"])
+	assert.Equal(t, "project-local", contract["journey_pack_ownership"])
+	gaps := data["setup_gaps"].([]any)
+	require.NotEmpty(t, gaps)
+	assert.Contains(t, gaps[0].(map[string]any)["reason"].(string), "ADK is a harness")
+	assert.NoDirExists(t, filepath.Join(dir, ".autopus", "qa", "runs"))
+}
+
 func TestQACommandsRejectGeneratedSurfaceOutput(t *testing.T) {
 	t.Parallel()
 

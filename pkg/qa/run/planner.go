@@ -24,6 +24,7 @@ func BuildPlan(opts Options) (Plan, error) {
 	candidates := qacompile.FromProject(opts.ProjectDir)
 	plan := Plan{
 		SelectedLane:               opts.Lane,
+		HarnessContract:            harnessContract(opts.ProjectDir),
 		OutputRoot:                 opts.Output,
 		RunIndexPreviewPath:        filepath.Join(opts.Output, "<run-id>", "run-index.json"),
 		ManifestOutputPreviewPaths: []string{},
@@ -69,7 +70,9 @@ func BuildPlan(opts Options) (Plan, error) {
 			plan.SetupGaps = append(plan.SetupGaps, SetupGap{Adapter: detection.AdapterID, Reason: detection.SetupGapReason})
 		}
 	}
-	if len(plan.SelectedJourneys) == 0 && opts.JourneyID == "" {
+	plan.ProjectHints = append(plan.ProjectHints, projectLocalJourneyHints(opts, packs)...)
+	plan.SetupGaps = append(plan.SetupGaps, projectLocalJourneySetupGaps(opts, packs)...)
+	if len(plan.SelectedJourneys) == 0 && opts.JourneyID == "" && allowDetectedFallback(opts) {
 		for _, detection := range detections {
 			if opts.AdapterID != "" && opts.AdapterID != detection.AdapterID {
 				continue
@@ -87,6 +90,10 @@ func BuildPlan(opts Options) (Plan, error) {
 		plan.DetectedAdapters = []string{}
 	}
 	return plan, nil
+}
+
+func allowDetectedFallback(opts Options) bool {
+	return !strings.EqualFold(opts.Lane, "gui-explore") && opts.AdapterID != "gui-explore"
 }
 
 func normalizeOptions(opts Options) Options {

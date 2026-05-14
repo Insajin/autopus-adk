@@ -1751,6 +1751,7 @@ Use QAMESH when the task is project-level deterministic QA execution or evidence
 - Use `auto qa explore --dry-run --format json` before explicit GUI exploration, and run it only for local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
 - Use `auto qa evidence` when a producer already wrote a QAMESH manifest and the task is validation, redaction, and publication.
 - Use `auto qa feedback` to turn existing failed QAMESH evidence into provider-specific repair prompt bundles.
+- ADK is a harness: concrete commands, origins, oracles, and artifacts belong in a project-local Journey Pack under `.autopus/qa/journeys/**`, not in ADK templates.
 
 ### Guardrails
 

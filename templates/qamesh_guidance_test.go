@@ -63,4 +63,6 @@ func assertQAMESHGuidance(t *testing.T, body string) {
 	assert.Contains(t, body, "auto qa explore")
 	assert.Contains(t, body, "auto qa evidence")
 	assert.Contains(t, body, "auto qa feedback")
+	assert.Contains(t, body, "ADK is a harness")
+	assert.Contains(t, body, "project-local Journey Pack")
 }
