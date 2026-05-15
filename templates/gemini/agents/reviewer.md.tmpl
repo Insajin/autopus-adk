@@ -110,7 +110,7 @@ Guardian composition: `validator + security-auditor + perf-engineer`
 
 | 판정 | 후속 동작 |
 |------|-----------|
-| APPROVE | SPEC status를 "done"으로 갱신 |
+| APPROVE | 구현 리뷰 승인만 반환. 메인 세션이 Sync Readiness Gate 통과 후 SPEC status를 "implemented"로 갱신 |
 | REQUEST_CHANGES | executor에게 수정 위임 (최대 2회 반복) |
 | REJECT | 파이프라인 중단, 사용자 개입 요청 |
 

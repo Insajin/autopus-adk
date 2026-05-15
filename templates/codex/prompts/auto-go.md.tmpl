@@ -82,12 +82,29 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 - `Completion Handoff Gates`는 terminal state에서만 출력합니다. review finding이 아직 fixable한데 `@auto go --continue` 또는 수동 review를 next step으로 제시하면 안 됩니다.
 - `go` 성공의 terminal handoff는 `@auto sync {SPEC-ID}` 까지입니다. `go`가 `sync`를 자동 호출하지는 않지만, review 수렴 전에는 sync handoff도 출력하지 않습니다.
 
+## Sync Readiness Gate
+
+최종 handoff 전에 sync가 뒤늦게 구현 누락을 발견하지 않도록 다음을 확정합니다.
+
+- `completion_verdict_preview`: sync의 Completion Verdict와 같은 형식으로 Outcome Lock, mandatory requirements, Must acceptance, Completion Debt, Evolution Ideas를 요약합니다.
+- `sync_ready`: Outcome Lock 만족, mandatory requirements 전부 충족, Must acceptance 전부 충족, Completion Debt `none`일 때만 `yes`.
+- `sync_blockers`: `none` 또는 `implemented` 상태 전환을 막는 blocker 목록.
+- `spec_status_after_go`: 성공 시 `implemented`. `done`/`completed`를 사용하지 않습니다. `completed`는 sync 전용 상태입니다.
+- `sync_evidence_refs`: 변경 파일, 검증 명령, Phase 4 verdict, @AX annotation 결과 또는 `@AX: no-op`.
+
+`sync_ready != yes`이면 workflow lifecycle bar와 sync handoff를 출력하지 말고 blocker를 먼저 해결합니다.
+
 ## Completion Handoff Gates
 
 최종 응답을 성공처럼 닫기 전에 아래 항목을 모두 확정합니다.
 
 - `current_gate`
 - `phase_4_review_verdict` 또는 blocker
+- `completion_verdict_preview`
+- `sync_ready`
+- `sync_blockers`
+- `spec_status_after_go`
+- `sync_evidence_refs`
 - `subagent_dispatch_count`
 - `subagent_roles_dispatched`
 - `degraded-mode`

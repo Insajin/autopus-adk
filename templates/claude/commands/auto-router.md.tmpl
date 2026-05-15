@@ -1172,7 +1172,7 @@ Worktree safety rules R1-R5 apply equally — each builder teammate works in an 
 #### Route C: Single Session (`--solo`)
 
 1. **TDD Implementation**: Execute RED → GREEN → REFACTOR based on tasks in plan.md
-2. **Post-Implementation**: Validate against acceptance.md criteria and update status to done
+2. **Post-Implementation**: Validate against acceptance.md criteria, pass the Sync Readiness Gate, and update status to implemented
 
 #### Subagent Pipeline Phases (Route A)
 
@@ -1712,8 +1712,21 @@ Before displaying completion output, verify ALL phases were evaluated:
 - [ ] Phase 3: Testing — completed (or skipped for harness-only)
 - [ ] Gate 3: Coverage — 85%+ verified (or N/A for harness-only)
 - [ ] Phase 4: Review — APPROVE
+- [ ] Sync Readiness Gate — `completion_verdict_preview`, `sync_ready`, `sync_blockers`, `spec_status_after_go`, and `sync_evidence_refs` recorded
 
 IF any item is unchecked → return to that phase/gate. Do NOT display Completion Guidance.
+
+### Sync Readiness Gate
+
+Before displaying the go workflow lifecycle or handing off to `/auto sync`, confirm the implementation is closed enough for sync:
+
+- `completion_verdict_preview`: Outcome Lock, mandatory requirements, Must acceptance, Completion Debt, and Evolution Ideas summary using the same shape as sync's Completion Verdict.
+- `sync_ready`: `yes` only when Outcome Lock is satisfied, all mandatory requirements and Must acceptance are met, and Completion Debt is `none`.
+- `sync_blockers`: `none` or concrete blockers that prevent setting the SPEC to `implemented`.
+- `spec_status_after_go`: `implemented` on success. Do not use `done` or `completed`; `completed` is reserved for `/auto sync`.
+- `sync_evidence_refs`: changed files, verification commands, Phase 4 verdict, @AX annotation result or `@AX: no-op`.
+
+If `sync_ready` is not `yes`, do not display Completion Guidance. Fix or report the blocker first.
 
 ### Completion Guidance
 
@@ -1730,6 +1743,11 @@ Then show state-aware next step guidance:
 subagent_dispatch_count: {N}
 subagent_roles_dispatched: {planner,tester,executor,validator,annotator,reviewer,security-auditor}
 degraded-mode: none | solo | blocker
+completion_verdict_preview: Outcome Lock satisfied, mandatory N/N, Must acceptance N/N, Completion Debt none
+sync_ready: yes
+sync_blockers: none
+spec_status_after_go: implemented
+sync_evidence_refs: {changed_files, verification_commands, review_verdict, ax_result}
 다음 단계: /auto sync {SPEC-ID}
 ```
 

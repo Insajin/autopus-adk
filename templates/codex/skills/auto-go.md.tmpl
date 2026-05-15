@@ -181,9 +181,22 @@ SPEC Quality Loop:
 - [ ] Phase 3: Testing 완료 또는 harness-only skip
 - [ ] Gate 3: Coverage 확인 완료 또는 N/A
 - [ ] Phase 4: Review APPROVE
+- [ ] Sync Readiness Gate PASS (`completion_verdict_preview`, `sync_ready`, `sync_blockers`, `spec_status_after_go`, `sync_evidence_refs` 기록)
 - [ ] subagent_dispatch_count 기록, role 목록, degraded-mode 상태 확인
 
 하나라도 비어 있으면 sync 단계 안내로 넘어가지 않습니다.
+
+### Sync Readiness Gate
+
+`go`가 성공처럼 종료되기 전에 sync 단계가 뒤늦게 구현 누락을 발견하지 않도록 다음 항목을 확정합니다.
+
+- `completion_verdict_preview`: sync의 Completion Verdict와 같은 형식으로 Outcome Lock, mandatory requirements, Must acceptance, Completion Debt, Evolution Ideas를 요약합니다.
+- `sync_ready`: Outcome Lock 만족, mandatory requirements 전부 충족, Must acceptance 전부 충족, Completion Debt `none`일 때만 `yes`.
+- `sync_blockers`: `none` 또는 `implemented` 상태 전환을 막는 구체 blocker.
+- `spec_status_after_go`: 성공 시 `implemented`. `done`/`completed`를 사용하지 않습니다. `completed`는 `@auto sync` 전용 상태입니다.
+- `sync_evidence_refs`: 변경 파일, 검증 명령, Phase 4 verdict, @AX annotation 결과 또는 `@AX: no-op`.
+
+`sync_ready != yes`이면 workflow lifecycle bar와 `@auto sync` handoff를 출력하지 말고 blocker를 먼저 해결합니다.
 
 ### Completion Handoff Gates
 
@@ -191,6 +204,11 @@ SPEC Quality Loop:
 
 - `current_gate`: 현재 완료 상태 또는 아직 남아 있는 gate 이름
 - `phase_4_review_verdict`: `APPROVE` 또는 completion을 막는 blocker 요약
+- `completion_verdict_preview`: sync가 사용할 완료 판정 미리보기
+- `sync_ready`: `yes` 또는 blocker
+- `sync_blockers`: `none` 또는 blocker 목록
+- `spec_status_after_go`: `implemented`
+- `sync_evidence_refs`: 변경/검증/리뷰/@AX 증거
 - `next_required_step`: supervisor가 다음에 반드시 진행해야 하는 단계
 - `next_command`: surface-native 다음 명령 (`@auto sync {SPEC-ID}` 또는 동등 alias)
 - `auto_progression_state`: `--loop` 여부와 무관하게 handoff를 생략하지 않는다는 상태 설명
@@ -311,6 +329,11 @@ subagent_roles_dispatched: {planner,tester,executor,validator,reviewer,security-
 degraded-mode: none | solo | blocker
 degraded_mode: none | solo | blocker
 delegation_depth: {N}
+completion_verdict_preview: Outcome Lock satisfied, mandatory N/N, Must acceptance N/N, Completion Debt none
+sync_ready: yes
+sync_blockers: none
+spec_status_after_go: implemented
+sync_evidence_refs: {changed_files, verification_commands, review_verdict, ax_result}
 next_required_step: sync 단계로 이동
 next_command: @auto sync {SPEC-ID}
 auto_progression_state: --loop enabled; handoff still required before autonomous continuation

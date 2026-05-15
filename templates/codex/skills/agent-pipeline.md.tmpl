@@ -588,14 +588,28 @@ When all tasks modify only `.md` files:
 
 Determination: if all "file ownership" entries in the planner's assignment table are `*.md`, treat as harness-only.
 
+## Sync Readiness Gate
+
+Before the terminal `@auto sync` handoff, the main session must build a sync handoff package instead of assuming sync will discover remaining implementation work.
+
+Required fields:
+- `completion_verdict_preview`: Outcome Lock, mandatory requirements, Must acceptance, Completion Debt, and Evolution Ideas summary using the same shape as sync's Completion Verdict.
+- `sync_ready`: `yes` only when Outcome Lock is satisfied, all mandatory requirements and Must acceptance are met, and Completion Debt is `none`.
+- `sync_blockers`: `none` or concrete blockers that prevent setting the SPEC to `implemented`.
+- `spec_status_after_go`: `implemented` on success. Do not use `done` or `completed`; `completed` is reserved for `@auto sync`.
+- `sync_evidence_refs`: changed files, verification commands, review verdict, @AX annotation result or `@AX: no-op`.
+
+If `sync_ready` is not `yes`, stop before the workflow lifecycle bar and report the blocker. Do not hand off to `@auto sync` until the implementation scope is closed.
+
 ## Result Integration and Completion
 
 Once all Phases are complete:
 
 1. Collect results from each agent and output a final summary
 2. Verify `subagent_dispatch_count > 0` for Route A; otherwise fail with workflow authenticity blocker unless `--solo` was selected
-3. Update the SPEC file status to `"done"`
-4. Guide next steps: `/auto sync <SPEC-ID>`
+3. Run the Sync Readiness Gate and record `completion_verdict_preview`, `sync_ready`, `sync_blockers`, `sync_evidence_refs`, and `spec_status_after_go`
+4. Update the SPEC file status to `"implemented"`
+5. Guide next steps: `@auto sync <SPEC-ID>`
 
 ### Final Summary Format
 
@@ -609,6 +623,10 @@ Review: APPROVE
 subagent_dispatch_count: <N>
 subagent_roles_dispatched: <planner,tester,executor,validator,...>
 degraded-mode: none | solo | blocker
+completion_verdict_preview: Outcome Lock satisfied, mandatory N/N, Must acceptance N/N, Completion Debt none
+sync_ready: yes
+sync_blockers: none
+spec_status_after_go: implemented
 
 Completed Files:
 - <file path 1>
@@ -621,5 +639,6 @@ Completed Files:
 - [ ] PASS verdict received at each Gate
 - [ ] Coverage 85%+ confirmed
 - [ ] subagent_dispatch_count recorded, roles listed, degraded-mode state explicit
-- [ ] SPEC status = "done" updated
+- [ ] Sync Readiness Gate passed with `completion_verdict_preview` recorded
+- [ ] SPEC status = "implemented" updated
 - [ ] Final summary output complete

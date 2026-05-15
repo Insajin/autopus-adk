@@ -135,6 +135,9 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	assert.Contains(t, string(autoGoSkill), "Autonomous Review Loop Contract")
 	assert.Contains(t, string(autoGoSkill), "fix -> validate -> test -> review verify")
 	assert.Contains(t, string(autoGoSkill), "terminal handoff는 `@auto sync {SPEC-ID}` 까지입니다")
+	assert.Contains(t, string(autoGoSkill), "Sync Readiness Gate")
+	assert.Contains(t, string(autoGoSkill), "completion_verdict_preview")
+	assert.Contains(t, string(autoGoSkill), "spec_status_after_go")
 
 	autoGoPrompt, err := os.ReadFile(filepath.Join(dir, ".codex", "prompts", "auto-go.md"))
 	require.NoError(t, err)
@@ -143,6 +146,8 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	assert.Contains(t, string(autoGoPrompt), "spec.review_gate.enabled")
 	assert.Contains(t, string(autoGoPrompt), "review retry budget이 남아 있는 동안에는 사용자에게 수동 수정")
 	assert.Contains(t, string(autoGoPrompt), "handoff는 terminal state에서만 사용합니다")
+	assert.Contains(t, string(autoGoPrompt), "Sync Readiness Gate")
+	assert.Contains(t, string(autoGoPrompt), "completion_verdict_preview")
 
 	autoGoCodexSkill, err := os.ReadFile(filepath.Join(dir, ".codex", "skills", "auto-go.md"))
 	require.NoError(t, err)
@@ -211,6 +216,8 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	assert.Contains(t, string(agentPipelineSkill), "do not ask the user to manually fix")
 	assert.Contains(t, string(agentPipelineSkill), "Under `--auto --loop`, keep this repair -> validate -> verify cycle inside the same session")
 	assert.Contains(t, string(agentPipelineSkill), "While review retries remain, unresolved findings are not a terminal handoff")
+	assert.Contains(t, string(agentPipelineSkill), "Sync Readiness Gate")
+	assert.Contains(t, string(agentPipelineSkill), "spec_status_after_go")
 }
 
 func TestCodexAndOpenCode_AGENTSMD_UsesSharedPlatformSection(t *testing.T) {

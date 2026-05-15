@@ -44,6 +44,9 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 	assert.Contains(t, pipeline, "explicit approval")
 	assert.Contains(t, pipeline, "Reserved compatibility flag")
 	assert.Contains(t, pipeline, "orchestra-backed review")
+	assert.Contains(t, pipeline, "Sync Readiness Gate")
+	assert.Contains(t, pipeline, "completion_verdict_preview")
+	assert.Contains(t, pipeline, "spec_status_after_go")
 	assert.NotContains(t, pipeline, "bypassPermissions")
 	assert.NotContains(t, pipeline, "auto permission detect")
 

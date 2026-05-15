@@ -98,6 +98,18 @@ When a task modifies 3+ files, exceeds 200 lines, or spans multiple domains, del
 - Use parallel delegation for independent subtasks
 - Maximum 3 sequential agent chains
 
+## Sync Readiness Gate
+
+Before showing the successful `go` workflow lifecycle or handing off to `/auto sync`, confirm the implementation is closed enough for sync.
+
+- `completion_verdict_preview`: Outcome Lock, mandatory requirements, Must acceptance, Completion Debt, and Evolution Ideas summary using the same shape as sync's Completion Verdict.
+- `sync_ready`: `yes` only when Outcome Lock is satisfied, all mandatory requirements and Must acceptance are met, and Completion Debt is `none`.
+- `sync_blockers`: `none` or concrete blockers that prevent setting the SPEC to `implemented`.
+- `spec_status_after_go`: `implemented` on success. Do not use `done` or `completed`; `completed` is reserved for `/auto sync`.
+- `sync_evidence_refs`: changed files, verification commands, Phase 4 verdict, @AX annotation result or `@AX: no-op`.
+
+If `sync_ready` is not `yes`, do not print the sync handoff. Fix or report the blocker first.
+
 ## Multi-Provider 모드
 
 `--multi` 플래그로 멀티 프로바이더 오케스트레이션을 활성화합니다:
@@ -136,6 +148,11 @@ subagent_roles_dispatched: {planner,tester,executor,validator,reviewer,security-
 degraded-mode: none | solo | blocker
 degraded_mode: none | solo | blocker
 delegation_depth: {N}
+completion_verdict_preview: Outcome Lock satisfied, mandatory N/N, Must acceptance N/N, Completion Debt none
+sync_ready: yes
+sync_blockers: none
+spec_status_after_go: implemented
+sync_evidence_refs: {changed_files, verification_commands, review_verdict, ax_result}
 next_required_step: sync 단계로 이동
 next_command: /auto sync {SPEC-ID}
 
