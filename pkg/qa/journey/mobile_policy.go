@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	qaevidence "github.com/insajin/autopus-adk/pkg/qa/evidence"
+	"github.com/insajin/autopus-adk/pkg/qa/mobile"
 )
 
 var sha256DigestRe = regexp.MustCompile(`^sha256:[a-fA-F0-9]{64}$`)
@@ -26,7 +27,7 @@ func validateMobilePolicy(pack Pack, projectDir string) error {
 
 func validateMaestroPolicy(pack Pack, projectDir string) error {
 	if err := validateProjectLocalMobilePath(pack.Mobile.FlowPath, projectDir); err != nil {
-		return validationError(mobilePolicyInvalidCode, err.Error())
+		return validationError(mobile.ReasonProjectLocalFlowRequired, err.Error())
 	}
 	if !strings.HasSuffix(strings.ToLower(pack.Mobile.FlowPath), ".yaml") &&
 		!strings.HasSuffix(strings.ToLower(pack.Mobile.FlowPath), ".yml") {

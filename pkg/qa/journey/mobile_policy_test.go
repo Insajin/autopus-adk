@@ -1,10 +1,12 @@
 package journey
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/qa/mobile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,6 +29,7 @@ func TestValidateMaestroScriptedRequiresProjectLocalYAMLFlow(t *testing.T) {
 	err := Validate(pack, dir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "project-local")
+	assertValidationCode(t, err, mobile.ReasonProjectLocalFlowRequired)
 }
 
 func TestValidateMaestroScriptedRejectsCommandFlowMismatch(t *testing.T) {
@@ -117,4 +120,11 @@ func mobilePack(adapterID string) Pack {
 		Adapter: AdapterRef{ID: adapterID},
 		Checks:  []Check{{ID: "deterministic", Type: "mobile_check"}},
 	}
+}
+
+func assertValidationCode(t *testing.T, err error, code string) {
+	t.Helper()
+	var validationErr *ValidationError
+	require.True(t, errors.As(err, &validationErr), "expected ValidationError, got %T", err)
+	assert.Equal(t, code, validationErr.Code)
 }
