@@ -38,8 +38,8 @@ skills:
 
 1. 사용자 요청 분석 및 목표 명확화
 2. 유사한 기존 패턴 탐색 (codebase 조사)
-3. 완료 상태 정의 및 기능 커버리지 맵 작성
-4. 단일 SPEC 또는 SPEC 세트 분해 판단
+3. Outcome Lock 정의 및 기능 커버리지 맵 작성
+4. Primary SPEC 기본 원칙과 예외적 sibling SPEC 필요성 판단
 5. EARS 형식 요구사항 작성
 6. 기술 접근 방법 설계
 7. 엣지 케이스 및 위험 요소 파악
@@ -49,10 +49,11 @@ skills:
 
 기획 결과는 사용자가 요청한 최종 기능을 기준으로 닫혀야 합니다.
 
-- 단일 SPEC가 충분한 경우: 하나의 응집된 변경으로 happy path, 실패/복구, 통합 경계, 검증까지 닫힙니다.
-- SPEC 세트가 필요한 경우: parent/primary SPEC와 sibling SPEC 목록을 만들고, 각 SPEC의 outcome slice, 의존성, acceptance 책임을 명시합니다.
-- 필수 후속 작업은 `나중에`로 넘기지 말고 별도 SPEC로 분리합니다. 진짜 선택 사항만 out-of-scope로 둡니다.
-- PRD에는 `Feature Coverage Map` 또는 동등한 섹션을 포함해 어떤 SPEC가 전체 기능의 어느 부분을 닫는지 추적 가능하게 합니다.
+- 기본값은 하나의 Outcome Lock당 하나의 Primary SPEC입니다. 아이디어 단계의 필수 요구사항은 Primary SPEC 안에 담아 완료 가능하게 잠급니다.
+- Completion Debt는 Outcome Lock, Must acceptance, 보안/데이터 무결성, 필수 워크플로우를 만족하지 못하게 만드는 누락 작업입니다. Completion Debt는 `나중에`나 `Evolution Ideas`로 내리지 않습니다.
+- Evolution Ideas는 Outcome Lock을 만족한 뒤에도 가능한 개선 제안입니다. 자동으로 follow-up SPEC, sibling SPEC, REQUEST_CHANGES 근거가 되면 안 됩니다.
+- sibling SPEC는 예외이며 최대 2개, 재귀 sibling 금지입니다. 독립 사용자 결과, 별도 배포 repo/module, migration/compat 순서, 보안/컴플라이언스/auth/billing/data 경계, 또는 Primary SPEC가 25개 초과 태스크와 40개 초과 소스 파일을 동시에 요구하는 경우에만 허용합니다.
+- PRD에는 `Feature Coverage Map`, `Completion Debt`, `Evolution Ideas`, 필요 시 `Sibling SPEC Decision`을 포함해 어떤 작업이 완료 필수이고 어떤 제안이 선택 사항인지 추적 가능하게 합니다.
 
 ## 출력
 

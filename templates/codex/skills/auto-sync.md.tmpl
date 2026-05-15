@@ -93,15 +93,30 @@ sync 완료를 선언하거나 workflow lifecycle bar를 표시하기 전에 아
    - 읽은 프로젝트 컨텍스트 파일 목록 또는 missing/no-op 사유를 남깁니다.
 2. `SPEC Path Resolution` 결과
    - `SPEC_PATH`, `TARGET_MODULE`, `WORKING_DIR`를 명시합니다.
-3. `@AX Lifecycle Management` 결과
+3. `Completion Verdict` 결과
+   - `Outcome Lock` 만족 여부, mandatory requirements 충족 수, Must acceptance 충족 수를 기록합니다.
+   - `Completion Debt`가 하나라도 있으면 SPEC 상태를 `completed`로 바꾸지 말고 blocked reason을 남깁니다.
+   - `Evolution Ideas`는 사용자에게 optional improvement로만 표시하고, 자동 follow-up SPEC이나 sibling SPEC으로 추천하지 않습니다.
+4. `@AX Lifecycle Management` 결과
    - TODO/ANCHOR/NOTE 처리 결과를 남기고, 대상 태그가 없으면 반드시 `@AX: no-op`로 기록합니다.
-4. Lore 커밋 결과
+5. Lore 커밋 결과
    - 변경 사항이 있으면 Lore 커밋을 시도하고 commit hash를 남깁니다.
    - 커밋이 실패했거나 보류되면 blocked reason을 남기고 sync를 completed로 선언하지 않습니다.
-5. 2-Phase Commit 판단 결과
+6. 2-Phase Commit 판단 결과
    - module commit / meta commit / skip 중 무엇을 했는지와 이유를 남깁니다.
-6. 완료 출력 순서
+7. 완료 출력 순서
    - 완료 배너, workflow lifecycle bar, 다음 단계 추천은 위 gate가 모두 기록된 뒤에만 표시합니다.
+
+## Completion Verdict Format
+
+```markdown
+## Completion Verdict
+- Outcome Lock: satisfied / blocked
+- Mandatory requirements: N/N
+- Must acceptance: N/N
+- Completion Debt: none / {items}
+- Evolution Ideas: surfaced as optional, not scheduled
+```
 
 ## Branding Formats
 
@@ -133,5 +148,6 @@ Field mappings: `{title}` from spec.md, `N/N` = completed/total tasks, `{verdict
 
 Detection order:
 1. SPEC status `completed` → `🐙 {SPEC-ID} 완료. 다음 기능: /auto plan "기능 설명"`
-2. Other pending SPECs exist → recommend next SPEC to implement
-3. Always append: `배포 후 검증: /auto canary`
+2. Existing pending SPECs created by an approved Sibling SPEC Decision exist → recommend next SPEC to implement
+3. Do not recommend or create pending SPECs from Evolution Ideas
+4. Always append: `배포 후 검증: /auto canary`

@@ -29,8 +29,8 @@ The five primary dimensions map 1:1 to `FindingCategory` values in `pkg/spec/typ
 | Dimension | Allowed scenarios | Required reason content |
 |-----------|------------------|-------------------------|
 | **correctness** (Q-CORR-*) | SPEC modifies only documentation/markdown; no code, configuration, or runtime contract referenced | Identify the doc-only scope; confirm no `[NEW]` runtime symbol claims |
-| **completeness** (Q-COMP-*) | Rare — usually FAIL or PASS. Acceptable when the dimension overlaps a sibling SPEC and the slice intentionally defers it | Reference the sibling SPEC ID that owns the deferred slice |
-| **feasibility** (Q-FEAS-*) | SPEC is purely conceptual (e.g. brainstorm-staged or pre-design) and runtime/module ownership is explicitly out of scope | State the gating step that establishes feasibility (e.g. follow-up SPEC, prototype) |
+| **completeness** (Q-COMP-*) | Rare — usually FAIL or PASS. Acceptable only when the slice is owned by an approved sibling SPEC decision or explicitly outside the Outcome Lock | Reference the sibling SPEC ID or the Outcome Lock non-goal that owns the slice |
+| **feasibility** (Q-FEAS-*) | SPEC is purely conceptual (e.g. brainstorm-staged or pre-design) and runtime/module ownership is explicitly out of scope | State the gating step that establishes feasibility (e.g. prototype or approved sibling SPEC decision) |
 | **style** (Q-STYLE-*) | Rare. Acceptable when a section deliberately uses non-standard formatting validated by a linter exception | Cite the specific linter rule and the rationale for the exception |
 | **security** (Q-SEC-*) | SPEC has no trust boundary, secret, credential, privileged path, or external input parsing | Explain why no real attack surface is involved (matches the existing Q-SEC-* `N/A 기준` entries below) |
 
@@ -93,11 +93,11 @@ Reason length is sanitized to 200 runes (`pkg/spec/provider_health.go::sanitizeN
 - FAIL 기준: type만 적고 조건이나 기대 결과가 없거나, 검증 가능한 관측 지점 없이 행동만 선언한다.
 - Example: self-verify loop를 요구한다면 `research.md`의 `Self-Verify Summary`나 `spec.md`의 `Open Issues`처럼 어느 문서와 어떤 흔적으로 확인하는지 함께 적는다.
 
-### Q-COMP-04 — Requested feature outcome is fully covered or split
+### Q-COMP-04 — Outcome Lock is fully covered by the Primary SPEC
 
-- PASS 기준: 사용자가 요청한 최종 기능 결과가 현재 SPEC 하나로 닫히거나, sibling SPEC 세트로 분해되어 각 outcome slice, 의존성, acceptance 책임이 추적된다.
-- FAIL 기준: 스캐폴드, 설정, 문서, 일부 wiring만 다루고도 완전한 기능처럼 보이게 하거나, 필수 후속 작업을 별도 SPEC 없이 막연히 future work로 남긴다.
-- Example: CLI 플래그 추가만으로 backend/API/UX 동작이 필요한 기능을 닫을 수 없다면 `Related SPECs`와 `Feature Coverage Map`에 후속 SPEC을 생성하거나 참조해야 한다.
+- PASS 기준: `research.md`의 `## Outcome Lock`이 사용자 가시 결과, mandatory requirements, explicit non-goals, completion evidence를 고정하고, Primary SPEC의 requirements/plan/Must acceptance가 이를 닫는다.
+- FAIL 기준: 스캐폴드, 설정, 문서, 일부 wiring만 다루고도 완전한 기능처럼 보이게 하거나, Completion Debt를 `Out of Scope`, `Evolution Ideas`, 막연한 future work로 숨긴다.
+- Example: CLI 플래그 추가만으로 backend/API/UX 동작이 필요한 Outcome Lock을 닫을 수 없다면, Primary SPEC에 해당 동작을 포함하거나 `Completion Debt`로 남겨 sync completion을 막아야 한다.
 
 ### Q-COMP-05 — Semantic invariants are mapped to oracle acceptance
 
@@ -111,6 +111,12 @@ Reason length is sanitized to 200 runes (`pkg/spec/provider_health.go::sanitizeN
 - PASS 기준: `spec.md`에는 `## Traceability Matrix`가 있고 각 requirement가 plan task, acceptance scenario, semantic invariant로 연결된다. `research.md`에는 `## Reviewer Brief`가 있어 intended scope, explicit non-goals, self-verified evidence, reviewer focus를 짧게 제시한다.
 - FAIL 기준: reviewer가 전체 SPEC을 다시 discovery해야 할 정도로 scope/non-goals/추적 근거가 없거나, review focus가 없어 optional deeper-layer 탐색을 유도한다.
 - Example: review focus가 `correctness, convergence safety, regression risk`이면 reviewer는 새로운 제품 scope 제안보다 해당 blocker 검증에 집중해야 한다.
+
+### Q-COMP-07 — Completion Debt and Evolution Ideas are separated
+
+- PASS 기준: `research.md`가 `## Completion Debt`와 `## Evolution Ideas`를 분리한다. Completion Debt는 Outcome Lock, Must acceptance, 보안/데이터 무결성, 필수 workflow를 막는 항목만 포함하고 sync completion을 막는다. Evolution Ideas는 optional improvement로만 남고 SPEC ID, task ID, acceptance ID, sibling SPEC, follow-up SPEC를 자동 생성하지 않는다.
+- FAIL 기준: 필수 누락 작업을 Evolution Ideas로 낮추거나, 선택 개선 제안에 SPEC ID/acceptance/task를 붙여 자동 후속 작업으로 승격하거나, reviewer-discovered future idea를 REQUEST_CHANGES 근거로 삼게 만든다.
+- Example: "더 다양한 export 포맷"이 Outcome Lock 밖의 개선이면 Evolution Ideas에만 기록하고, 사용자가 명시적으로 요청하기 전까지 `/auto plan`이나 sibling SPEC을 추천하지 않는다.
 
 ## feasibility
 
@@ -180,12 +186,12 @@ This appendix is a secondary axis and remains separate from the five primary dim
 - PASS 기준: SPEC이 하나의 명확한 문제와 소수의 밀접한 변경 대상으로 수렴한다.
 - FAIL 기준: unrelated concerns를 한 SPEC에 묶어 reviewer나 executor가 경계를 파악하기 어렵다.
 
-### Q-COH-02 — Follow-on work is split instead of hand-waved
+### Q-COH-02 — Follow-on work does not bypass Outcome Lock
 
-- PASS 기준: 현재 iteration에서 다룰 수 없는 후속 런타임/플랫폼 작업은 별도 SPEC이나 out-of-scope 항목으로 분리된다.
-- FAIL 기준: 현재 문서가 해결하지 못하는 문제를 같은 iteration 안에서 암묵적으로 해결된 것처럼 남긴다.
+- PASS 기준: Outcome Lock에 필요한 후속 런타임/플랫폼 작업은 Primary SPEC에 포함되거나 Completion Debt로 남아 sync completion을 막는다. Outcome Lock 밖의 개선은 Evolution Ideas로만 남는다.
+- FAIL 기준: 현재 문서가 해결하지 못하는 필수 문제를 같은 iteration 안에서 암묵적으로 해결된 것처럼 남기거나, optional idea를 자동 follow-up SPEC으로 예약한다.
 
-### Q-COH-03 — SPEC set boundaries preserve implementation momentum
+### Q-COH-03 — Sibling SPEC boundaries are exceptional and bounded
 
-- PASS 기준: SPEC 세트로 분해된 경우 각 SPEC가 독립적으로 구현 가능한 크기이며, 실행 순서와 handoff가 `plan.md` 또는 `research.md`에서 명확하다.
-- FAIL 기준: 너무 작게 쪼개져 실질 동작 없이 스캐폴드만 만들거나, 너무 크게 묶여 executor가 ownership과 완료 기준을 판단할 수 없다.
+- PASS 기준: sibling SPEC가 있으면 `## Sibling SPEC Decision`이 허용 사유를 명시하고, sibling은 최대 2개이며, 각 SPEC가 독립적으로 구현 가능한 outcome slice와 acceptance 책임을 갖는다. sibling의 sibling은 만들지 않는다.
+- FAIL 기준: 너무 작게 쪼개져 실질 동작 없이 스캐폴드만 만들거나, optional improvement/reviewer idea를 sibling으로 만들거나, 재귀 sibling으로 workflow를 끝나지 않게 한다.

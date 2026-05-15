@@ -48,6 +48,22 @@ triggers:
 - 변경 사항 없으면 커밋 생략
 {{end}}
 
+## Completion Verdict Gate
+
+sync 완료를 선언하기 전에 `## Completion Verdict`를 기록합니다.
+
+```markdown
+## Completion Verdict
+- Outcome Lock: satisfied / blocked
+- Mandatory requirements: N/N
+- Must acceptance: N/N
+- Completion Debt: none / {items}
+- Evolution Ideas: surfaced as optional, not scheduled
+```
+
+- `Completion Debt`가 하나라도 있으면 SPEC 상태를 `completed`로 바꾸지 말고 blocked reason을 남깁니다.
+- `Evolution Ideas`는 사용자에게 optional improvement로만 표시하고, 자동 follow-up SPEC이나 sibling SPEC으로 추천하지 않습니다.
+
 ## Branding Formats
 
 ### Workflow Lifecycle (show after sync completes)
@@ -78,4 +94,5 @@ Field mappings: `{title}` from spec.md, `N/N` = completed/total tasks, `{verdict
 
 Detection order:
 1. SPEC status `completed` → `🐙 {SPEC-ID} 완료. 다음 기능: /auto plan "기능 설명"`
-2. Other pending SPECs exist → recommend next SPEC to implement
+2. Existing pending SPECs created by an approved Sibling SPEC Decision exist → recommend next SPEC to implement
+3. Do not recommend or create pending SPECs from Evolution Ideas

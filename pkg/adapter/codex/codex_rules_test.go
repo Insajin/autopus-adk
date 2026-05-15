@@ -66,6 +66,8 @@ func TestGenerateRuleFiles_Content(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "300 lines",
 		"file-size-limit should reference 300 lines")
+	assert.Contains(t, string(data), "SPEC Markdown files under `.autopus/specs/**`",
+		"file-size-limit should explicitly exempt generated SPEC Markdown")
 	assert.Contains(t, string(data), "platform: codex",
 		"should have codex platform in frontmatter")
 
@@ -121,6 +123,8 @@ func TestAgentsMD_IncludesCoreCodexGuidance(t *testing.T) {
 		"AGENTS.md should preserve delegation policy")
 	assert.Contains(t, content, "### Review Convergence",
 		"AGENTS.md should preserve review convergence guidance")
+	assert.Contains(t, content, "SPEC Markdown files under .autopus/specs/**",
+		"AGENTS.md should prevent agents from applying the source line limit to SPEC docs")
 	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex rule definitions.",
 		"AGENTS.md should reference rules directory")
 	assert.Contains(t, content, ".codex/skills/agent-pipeline.md",

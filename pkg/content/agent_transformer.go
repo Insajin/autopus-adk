@@ -207,7 +207,8 @@ func buildCodexInstructions(meta AgentSourceMeta, body string) string {
 		ops = append(ops, fmt.Sprintf("- Source max turns: %d", meta.MaxTurns))
 	}
 	ops = append(ops,
-		"- File size limit: 300 lines per source file.",
+		"- File size limit applies only to source code files.",
+		"- SPEC Markdown files under `.autopus/specs/**` are documentation and exempt from the 300-line source code limit.",
 		"- Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.",
 	)
 

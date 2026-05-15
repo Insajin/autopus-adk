@@ -235,7 +235,7 @@ spawn_agent executor \
   --task "Implement {task description}" \
   --spec "{SPEC_PATH}" \
   --plan "{SPEC_DIR}/plan.md" \
-  --constraint "File size limit: 300 lines per source file"
+  --constraint "File size limit applies only to source code files; SPEC Markdown under .autopus/specs/** is exempt"
 ```
 
 ### Tester Agent

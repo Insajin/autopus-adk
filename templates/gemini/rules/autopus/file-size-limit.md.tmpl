@@ -1,6 +1,6 @@
 ---
 name: file-size-limit
-description: Hard limit of 300 lines per source file
+description: Hard limit of 300 lines per source code file
 category: structure
 platform: gemini-cli
 ---
@@ -24,6 +24,7 @@ IMPORTANT: No single source code file may exceed 300 lines. This is a HARD limit
 ## Exclusions
 
 This limit applies to source code files only. The following are excluded:
+- SPEC Markdown files under `.autopus/specs/**`: `prd.md`, `spec.md`, `plan.md`, `acceptance.md`, `research.md`, `review.md`
 {{range .Exclusions}}- {{.Description}}: `{{.Pattern}}`
 {{end}}
 ## Counting

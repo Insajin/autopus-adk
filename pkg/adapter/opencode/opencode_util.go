@@ -96,8 +96,8 @@ func rewriteOpenCodeWorkflowExamples(body, subcommand string) string {
 	}
 
 	replacer := strings.NewReplacer(
-		"```\ntask executor \\\n  --task \"Implement {task description}\" \\\n  --spec \".autopus/specs/{SPEC-ID}/spec.md\" \\\n  --plan \".autopus/specs/{SPEC-ID}/plan.md\" \\\n  --constraint \"File size limit: 300 lines per source file\"\n```",
-		"```text\ntask(\n  subagent_type = \"executor\",\n  prompt = \"Implement {task description}. Use .autopus/specs/{SPEC-ID}/spec.md and .autopus/specs/{SPEC-ID}/plan.md as context. Respect the 300-line source-code file limit.\"\n)\n```",
+		"```\ntask executor \\\n  --task \"Implement {task description}\" \\\n  --spec \"{SPEC_PATH}\" \\\n  --plan \"{SPEC_DIR}/plan.md\" \\\n  --constraint \"File size limit applies only to source code files; SPEC Markdown under .autopus/specs/** is exempt\"\n```",
+		"```text\ntask(\n  subagent_type = \"executor\",\n  prompt = \"Implement {task description}. Use {SPEC_PATH} and {SPEC_DIR}/plan.md as context. Respect the 300-line source-code file limit; SPEC Markdown under .autopus/specs/** is exempt.\"\n)\n```",
 		"```\ntask tester \\\n  --task \"Write tests for {scope}\" \\\n  --spec \".autopus/specs/{SPEC-ID}/acceptance.md\" \\\n  --coverage-target 85\n```",
 		"```text\ntask(\n  subagent_type = \"tester\",\n  prompt = \"Write tests for {scope}. Use .autopus/specs/{SPEC-ID}/acceptance.md as context and target 85%% coverage.\"\n)\n```",
 		"```\ntask reviewer \\\n  --task \"Review implementation for {SPEC-ID}\" \\\n  --criteria \"TRUST-5\"\n```",

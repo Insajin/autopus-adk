@@ -283,5 +283,6 @@ func TestClaudeAdapter_Generate_CLAUDEMDContainsGuidelines(t *testing.T) {
 	assert.Contains(t, content, "Subagent Delegation")
 	assert.Contains(t, content, "File Size Limit")
 	assert.Contains(t, content, "300 lines")
+	assert.Contains(t, content, "SPEC Markdown files under .autopus/specs/**")
 	assert.Contains(t, content, "Core Guidelines")
 }

@@ -141,7 +141,7 @@ IMPORTANT: 리뷰는 discovery와 verification을 분리하세요. 첫 리뷰는
 
 ### File Size Limit
 
-IMPORTANT: 생성 파일을 제외한 소스 파일은 300줄 이하를 유지하세요. 가능하면 200줄 이하를 목표로 분리하세요.
+IMPORTANT: 300줄 제한은 소스 코드 파일에만 적용합니다. SPEC Markdown files under .autopus/specs/** are documentation and exempt from the 300-line source code limit. prd.md, spec.md, plan.md, acceptance.md, research.md, review.md는 300줄 초과만으로 분할하거나 거절하지 마세요.
 
 ### Prompting Notes
 

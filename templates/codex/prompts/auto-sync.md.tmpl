@@ -48,14 +48,29 @@ sync 완료를 선언하거나 workflow lifecycle bar를 표시하기 전에 아
 
 1. `Context Load` 수행 결과
 2. `SPEC Path Resolution` 결과 (`SPEC_PATH`, `TARGET_MODULE`, `WORKING_DIR`)
-3. `@AX Lifecycle Management` 결과
+3. `Completion Verdict` 결과
+   - `Outcome Lock` 만족 여부, mandatory requirements 충족 수, Must acceptance 충족 수를 기록합니다.
+   - `Completion Debt`가 하나라도 있으면 SPEC 상태를 `completed`로 바꾸지 말고 blocked reason을 남깁니다.
+   - `Evolution Ideas`는 optional improvement로만 표시하고 자동 follow-up SPEC이나 sibling SPEC으로 추천하지 않습니다.
+4. `@AX Lifecycle Management` 결과
    - 대상 태그가 없으면 반드시 `@AX: no-op`로 남깁니다.
-4. Lore 커밋 결과
+5. Lore 커밋 결과
    - 변경 사항이 있으면 commit hash를 남깁니다.
    - 커밋 실패/보류 시 blocked reason을 남기고 sync completed 선언을 금지합니다.
-5. 2-Phase Commit 판단 결과
-6. 완료 배너/다음 단계 출력은 위 gate를 기록한 뒤에만 수행합니다.
+6. 2-Phase Commit 판단 결과
+7. 완료 배너/다음 단계 출력은 위 gate를 기록한 뒤에만 수행합니다.
+
+## Completion Verdict Format
+
+```markdown
+## Completion Verdict
+- Outcome Lock: satisfied / blocked
+- Mandatory requirements: N/N
+- Must acceptance: N/N
+- Completion Debt: none / {items}
+- Evolution Ideas: surfaced as optional, not scheduled
+```
 
 ## 다음 단계
 
-동기화 완료 후 배포 검증을 권장합니다: `/auto canary`
+동기화 완료 후 Evolution Ideas는 선택 제안으로만 보여주고, 배포 검증을 권장합니다: `/auto canary`

@@ -89,6 +89,8 @@ func TestGeminiRulesContent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(fsData), "300 lines",
 		"file-size-limit should reference 300 lines")
+	assert.Contains(t, string(fsData), "SPEC Markdown files under `.autopus/specs/**`",
+		"file-size-limit should explicitly exempt generated SPEC Markdown")
 
 	techstackPath := filepath.Join(dir, ".gemini", "rules", "autopus", "techstack-freshness.md")
 	techstackData, err := os.ReadFile(techstackPath)

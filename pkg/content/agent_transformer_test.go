@@ -86,6 +86,16 @@ func TestTransformAgentForCodex_RichInstructions(t *testing.T) {
 	assert.Greater(t, len(result), 200)
 }
 
+func TestTransformAgentForCodex_FileSizeLimitExemptsSpecMarkdown(t *testing.T) {
+	t.Parallel()
+
+	src := makeExecutorSource()
+	result := content.TransformAgentForCodex(src)
+
+	assert.Contains(t, result, "File size limit applies only to source code files.")
+	assert.Contains(t, result, "SPEC Markdown files under `.autopus/specs/**` are documentation and exempt")
+}
+
 func TestTransformAgentForGemini_Sections(t *testing.T) {
 	t.Parallel()
 

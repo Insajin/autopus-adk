@@ -132,6 +132,7 @@ func TestAdapter_Generate_CreatesOpenCodeFiles(t *testing.T) {
 	assert.Contains(t, string(autoGoSkill), "subagent_dispatch_count")
 	assert.Contains(t, string(autoGoSkill), "workflow authenticity blocker")
 	assert.Contains(t, string(autoGoSkill), "degraded-mode")
+	assert.Contains(t, string(autoGoSkill), "SPEC Markdown under .autopus/specs/** is exempt")
 	autoReviewSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-review", "SKILL.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoReviewSkill), "repair loop 입력입니다")

@@ -150,7 +150,7 @@ func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding,
 	sb.WriteString("For each finding below, report its current status.\n\n")
 	sb.WriteString("Do NOT stop early, narrow the scope on your own, or replace the requested output with progress notes.\n")
 	sb.WriteString("Review all prior findings in one pass; do not drip-feed one optional suggestion per revision.\n")
-	sb.WriteString("If the auxiliary docs include `## Reviewer Brief`, use its intended scope, explicit non-goals, and reviewer focus to avoid unrelated fresh discovery.\n")
+	sb.WriteString("If auxiliary docs include `## Outcome Lock`, `## Completion Debt`, `## Evolution Ideas`, or `## Reviewer Brief`, use them to block only Completion Debt and keep Evolution Ideas advisory.\n")
 	sb.WriteString("A `suggestion` is advisory and must not be the only reason for REVISE. If VERDICT is PASS, do not keep suggestion-only findings open.\n")
 	sb.WriteString("Responses that omit the required VERDICT/FINDING_STATUS lines are treated as malformed review output.\n\n")
 
@@ -194,7 +194,7 @@ func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFindi
 	sb.WriteString("### Instructions\n\n")
 	sb.WriteString("Do NOT stop early, narrow the scope on your own, or replace the requested output with progress notes.\n")
 	sb.WriteString("Review the whole SPEC in one pass and return the full set of actionable issues together.\n")
-	sb.WriteString("If the auxiliary docs include `## Reviewer Brief`, use its intended scope, explicit non-goals, and reviewer focus to prioritize blocker findings over optional deeper-layer suggestions.\n")
+	sb.WriteString("If auxiliary docs include `## Outcome Lock`, `## Completion Debt`, `## Evolution Ideas`, or `## Reviewer Brief`, use them to prioritize Completion Debt blockers over optional deeper-layer suggestions.\n")
 	sb.WriteString("Use `suggestion` only for non-blocking advisory improvements; suggestions alone must not drive REVISE.\n")
 	sb.WriteString("Responses that omit the required VERDICT/FINDING lines are treated as malformed review output.\n\n")
 

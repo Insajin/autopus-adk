@@ -71,7 +71,7 @@ When a task modifies 3+ files, exceeds 200 lines, or spans multiple domains, del
 @executor Implement {task description}
   Context: .autopus/specs/{SPEC-ID}/spec.md, .autopus/specs/{SPEC-ID}/plan.md
   Repair loop: if review findings are supplied, close all actionable findings in one batch where ownership allows
-  Constraint: File size limit 300 lines per source file
+  Constraint: File size limit applies only to source code files; SPEC Markdown under .autopus/specs/** is exempt
 ```
 
 ### Tester Agent

@@ -42,9 +42,20 @@ git log --oneline -5
 
 ### 3단계: 구조 검사
 
-- 소스 파일 300줄 초과 금지
-- 200줄 초과 파일 분할 권고
+- 소스 코드 파일 300줄 초과 금지
+- 소스 코드 파일 200줄 초과 시 분할 권고
+- SPEC Markdown files under `.autopus/specs/**` are documentation and exempt from the 300-line source code limit.
+- `prd.md`, `spec.md`, `plan.md`, `acceptance.md`, `research.md`, `review.md`는 300줄 초과만으로 REQUEST_CHANGES 대상이 아님
 - 3+ 파일 변경 시 서브에이전트 위임 확인
+
+### 3.5단계: SPEC 완료 범위 수렴 검사
+
+SPEC, plan, sync, 또는 review gate 산출물을 볼 때는 `Outcome Lock` 기준으로만 필수 범위를 판단합니다.
+
+- `Completion Debt`는 Outcome Lock, Must acceptance, 보안/데이터 무결성, 필수 workflow를 막는 항목입니다. 발견되면 blocker 또는 REQUEST_CHANGES 근거가 됩니다.
+- `Evolution Ideas`는 Outcome Lock을 만족한 뒤에도 가능한 선택 개선입니다. 자동 follow-up SPEC, sibling SPEC, REQUEST_CHANGES 근거로 승격하지 않습니다.
+- sibling SPEC 요청은 `Sibling SPEC Decision`이 허용 사유를 충족할 때만 합니다: 독립 사용자 결과, 별도 배포 repo/module, migration/compat sequencing, 보안/컴플라이언스/auth/billing/data 경계, 또는 Primary SPEC가 25개 초과 태스크와 40개 초과 소스 파일을 동시에 요구하는 경우.
+- 리뷰어가 새로 발견한 개선 제안은 critical/security/data integrity risk가 아니면 advisory로 남기고, workflow completion을 막지 않습니다.
 
 ### 4단계: 자동화 검증
 
@@ -230,6 +241,7 @@ When returning results, use the following format at the end of your response:
 - Source effort default: high
 - Source permission intent: plan
 - Source max turns: 30
-- File size limit: 300 lines per source file.
+- File size limit applies only to source code files.
+- SPEC Markdown files under `.autopus/specs/**` are documentation and exempt from the 300-line source code limit.
 - Test coverage target: {{if .IsFullMode}}85{{else}}80{{end}}%+.
 '''

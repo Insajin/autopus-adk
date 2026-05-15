@@ -187,6 +187,8 @@ if all changed files match *.md:
 - [ ] 섹션 헤더 계층 구조 일관성 유지 (H2 > H3 순서 준수)
 
 300줄 제한은 소스 코드 파일에만 적용하며 SPEC/agent Markdown 문서에는 적용하지 않는다.
+SPEC Markdown files under `.autopus/specs/**` are documentation and exempt from the 300-line source code limit.
+`prd.md`, `spec.md`, `plan.md`, `acceptance.md`, `research.md`, `review.md`는 300줄 초과만으로 분할하거나 거절하지 않는다.
 
 ## Result Format
 

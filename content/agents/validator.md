@@ -41,7 +41,7 @@ Detect the project stack from project context (`.autopus/project/tech.md`, `go.m
 If Stack Profile is injected in the prompt, use its specified tools instead.
 
 ### 5. 구조 검증
-- 소스 파일 300줄 초과 여부
+- 소스 코드 파일 300줄 초과 여부
 - 200줄 초과 파일 목록
 
 ### 6. Seam Verification (통합 검증)
@@ -194,6 +194,8 @@ WHEN changed files include SQL migration files (matching `migrations/*.sql` or `
 - 프론트매터 유효성 검증 (YAML 형식, 필수 키 존재 여부)
 - Markdown 섹션 구조 검증
 - 300줄 제한은 소스 코드 파일에만 적용하므로 `.md` 문서에는 적용하지 않음
+- SPEC Markdown files under `.autopus/specs/**` are documentation and exempt from the 300-line source code limit.
+- `prd.md`, `spec.md`, `plan.md`, `acceptance.md`, `research.md`, `review.md`는 300줄 초과만으로 실패 처리하지 않음
 
 ```bash
 # List changed Markdown files for frontmatter and structure checks
