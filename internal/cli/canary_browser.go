@@ -1,52 +1,13 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
-
-func runCanaryLocalBrowser(ctx context.Context, projectDir string, result *canaryResult) string {
-	frontendDir := filepath.Join(projectDir, "Autopus", "frontend")
-	if _, err := os.Stat(filepath.Join(frontendDir, "package.json")); err != nil {
-		result.Skipped = append(result.Skipped, canarySkippedCheck{"browser", "frontend package.json not found"})
-		return "SKIPPED"
-	}
-	port, err := reserveLocalPort()
-	if err != nil {
-		result.Targets = append(result.Targets, canaryTargetResult{ID: "browser", Status: "FAIL", Detail: err.Error()})
-		return "FAIL"
-	}
-	baseURL := "http://127.0.0.1:" + strconv.Itoa(port)
-	server, serverLog, err := startNextServer(ctx, frontendDir, port)
-	if err != nil {
-		result.Targets = append(result.Targets, canaryTargetResult{ID: "browser", Status: "FAIL", Detail: err.Error()})
-		return "FAIL"
-	}
-	defer stopProcess(server)
-
-	if !waitForCanaryURL(ctx, baseURL+"/login", 20*time.Second) {
-		detail := "frontend server did not become ready"
-		if serverLog.Len() > 0 {
-			detail += ": " + serverLog.String()
-		}
-		result.Targets = append(result.Targets, canaryTargetResult{ID: "browser", Status: "FAIL", Detail: detail})
-		return "FAIL"
-	}
-	run := runCanaryBrowserScript(ctx, frontendDir, baseURL)
-	result.Targets = append(result.Targets, run)
-	if run.Status != "PASS" {
-		return "FAIL"
-	}
-	return "PASS"
-}
 
 func runCanaryRemoteBrowser(ctx context.Context, projectDir string, baseURL string, result *canaryResult) string {
 	frontendDir := filepath.Join(projectDir, "Autopus", "frontend")
@@ -61,42 +22,6 @@ func runCanaryRemoteBrowser(ctx context.Context, projectDir string, baseURL stri
 		return "FAIL"
 	}
 	return "PASS"
-}
-
-func reserveLocalPort() (int, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
-	}
-	defer listener.Close()
-	addr, ok := listener.Addr().(*net.TCPAddr)
-	if !ok {
-		return 0, fmt.Errorf("resolve local port")
-	}
-	return addr.Port, nil
-}
-
-func startNextServer(ctx context.Context, dir string, port int) (*exec.Cmd, *bytes.Buffer, error) {
-	cmd := exec.CommandContext(ctx, "npm", "run", "start", "--", "-p", strconv.Itoa(port), "-H", "127.0.0.1") //nolint:gosec
-	cmd.Dir = dir
-	var log bytes.Buffer
-	cmd.Stdout = &log
-	cmd.Stderr = &log
-	if err := cmd.Start(); err != nil {
-		return nil, &log, err
-	}
-	return cmd, &log, nil
-}
-
-func waitForCanaryURL(ctx context.Context, url string, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if canaryHTTPCheck(ctx, url) {
-			return true
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-	return false
 }
 
 func runCanaryBrowserScript(ctx context.Context, dir, baseURL string) canaryTargetResult {
@@ -145,26 +70,4 @@ const targets = ['/login', '/docs', '/marketplace'];
 		return canaryTargetResult{ID: "browser-local", Status: "FAIL", Detail: string(output)}
 	}
 	return canaryTargetResult{ID: "browser-local", Status: "PASS"}
-}
-
-func stopProcess(cmd *exec.Cmd) {
-	if cmd == nil || cmd.Process == nil {
-		return
-	}
-	done := make(chan struct{})
-	go func() {
-		_ = cmd.Wait()
-		close(done)
-	}()
-	_ = cmd.Process.Signal(os.Interrupt)
-	select {
-	case <-done:
-		return
-	case <-time.After(2 * time.Second):
-	}
-	_ = cmd.Process.Kill()
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-	}
 }

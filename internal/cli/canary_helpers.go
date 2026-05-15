@@ -61,17 +61,6 @@ func runCanaryEndpointChecks(ctx context.Context, baseURL string, result *canary
 	return status
 }
 
-func runCanaryHTTPPageChecks(ctx context.Context, baseURL string, result *canaryResult) string {
-	status := "PASS"
-	for _, path := range []string{"/login", "/docs", "/marketplace"} {
-		if !canaryHTTPCheck(ctx, strings.TrimRight(baseURL, "/")+path) {
-			status = "FAIL"
-		}
-		result.Targets = append(result.Targets, canaryTargetResult{ID: "browser" + path, Status: status})
-	}
-	return status
-}
-
 func canaryHTTPCheck(ctx context.Context, url string) bool {
 	reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
