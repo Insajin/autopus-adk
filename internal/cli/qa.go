@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-004: public `auto qa` namespace registration fans into CLI root and QA command tests.
+// @AX:REASON: init, plan, run, explore, release, evidence, and feedback subcommands must remain reachable under the same namespace.
 func newQACmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "qa",
@@ -20,6 +22,7 @@ func newQACmd() *cobra.Command {
 	cmd.AddCommand(newQAAdaptersCmd())
 	cmd.AddCommand(newQARunCmd())
 	cmd.AddCommand(newQAExploreCmd())
+	cmd.AddCommand(newQAReleaseCmd())
 	cmd.AddCommand(newQAEvidenceCmd())
 	cmd.AddCommand(newQAFeedbackCmd())
 	return cmd
@@ -32,6 +35,7 @@ func requireFlag(name, value string) error {
 	return nil
 }
 
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-004: generated-surface deny-list protects QA output flags from writing into harness runtime directories.
 func rejectGeneratedQAOutput(name, value string) error {
 	rel := strings.ToLower(filepath.ToSlash(filepath.Clean(value)))
 	for _, denied := range []string{".codex", ".claude", ".gemini", ".opencode", ".autopus/plugins"} {

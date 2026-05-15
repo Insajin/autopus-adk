@@ -41,6 +41,21 @@ func TestRedactText_MasksJSONSensitiveValuesAndCrossPlatformPaths(t *testing.T) 
 	assert.NotContains(t, redacted, "customer note")
 }
 
+func TestRedactText_MasksCLIFlagValuesAndCredentialURLs(t *testing.T) {
+	t.Parallel()
+
+	raw := "go test ./... --password 'hunter two' --api-key=abc12345 --report https://user:pass@example.test/out?token=tok12345"
+
+	redacted := RedactText(raw)
+
+	require.NoError(t, AssertSafeText(redacted, "command"))
+	assert.Contains(t, redacted, RedactedSecret)
+	assert.NotContains(t, redacted, "hunter")
+	assert.NotContains(t, redacted, "abc12345")
+	assert.NotContains(t, redacted, "user:pass@")
+	assert.NotContains(t, redacted, "tok12345")
+}
+
 func TestFindUnsafeText_FindsProviderBoundLeaks(t *testing.T) {
 	t.Parallel()
 
@@ -49,4 +64,22 @@ func TestFindUnsafeText_FindsProviderBoundLeaks(t *testing.T) {
 	require.NotEmpty(t, findings)
 	assert.Equal(t, "secret", findings[0].Type)
 	assert.NotContains(t, FormatFindings(findings), "qameshfake")
+}
+
+func TestFindUnsafeText_FindsSecretQueryParams(t *testing.T) {
+	t.Parallel()
+
+	findings := FindUnsafeText("https://example.test/out?token=tok12345", "url")
+
+	require.NotEmpty(t, findings)
+	assert.Contains(t, findingTypes(findings), "sensitive_query")
+	assert.NotContains(t, FormatFindings(findings), "tok12345")
+}
+
+func findingTypes(findings []Finding) []string {
+	out := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		out = append(out, finding.Type)
+	}
+	return out
 }
