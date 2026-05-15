@@ -149,6 +149,8 @@ func surfaceForAdapter(id string) string {
 		return "frontend"
 	case "gui-explore":
 		return "frontend"
+	case "maestro-scripted", "appium-mobile-explore":
+		return "mobile"
 	case "custom-command":
 		return "custom"
 	case "auto-test-run", "canary-template":

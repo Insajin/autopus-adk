@@ -88,7 +88,14 @@ type SourceRefs struct {
 	JourneyID        string         `json:"journey_id,omitempty"`
 	StepID           string         `json:"step_id,omitempty"`
 	Adapter          string         `json:"adapter,omitempty"`
+	Mobile           *MobileRefs    `json:"mobile,omitempty"`
 	OracleThresholds map[string]any `json:"oracle_thresholds,omitempty"`
+}
+
+type MobileRefs struct {
+	FlowID            string `json:"flow_id"`
+	AppArtifactDigest string `json:"app_artifact_digest"`
+	DeviceRef         string `json:"device_ref"`
 }
 
 type LocatorContract struct {
@@ -193,6 +200,9 @@ func (m Manifest) Validate() error {
 func WriteFinalManifest(manifest Manifest, outputDir string) (string, error) {
 	manifest = NormalizeManifest(manifest)
 	if err := manifest.Validate(); err != nil {
+		return "", err
+	}
+	if err := validateMobilePublication(manifest); err != nil {
 		return "", err
 	}
 	normalized := manifest

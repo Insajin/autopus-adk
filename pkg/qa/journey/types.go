@@ -12,6 +12,7 @@ type Pack struct {
 	SourceRefs          SourceRefs          `yaml:"source_refs" json:"source_refs"`
 	ProfileRequirements ProfileRequirements `yaml:"profile_requirements" json:"profile_requirements"`
 	GUI                 GUIPolicy           `yaml:"gui,omitempty" json:"gui,omitempty"`
+	Mobile              MobilePolicy        `yaml:"mobile,omitempty" json:"mobile,omitempty"`
 	PassFailAuthority   string              `yaml:"pass_fail_authority,omitempty" json:"pass_fail_authority,omitempty"`
 	InputSource         string              `yaml:"source,omitempty" json:"input_source,omitempty"`
 	Source              string              `yaml:"-" json:"source"`
@@ -68,6 +69,13 @@ type GUINetworkPolicy struct {
 
 type GUIArtifactRetention struct {
 	PublishRaw bool `yaml:"publish_raw,omitempty" json:"publish_raw,omitempty"`
+}
+
+type MobilePolicy struct {
+	FlowPath          string   `yaml:"flow_path,omitempty" json:"flow_path,omitempty"`
+	DeviceTarget      string   `yaml:"device_target,omitempty" json:"device_target,omitempty"`
+	AppArtifactDigest string   `yaml:"app_artifact_digest,omitempty" json:"app_artifact_digest,omitempty"`
+	ForbiddenActions  []string `yaml:"forbidden_actions,omitempty" json:"forbidden_actions,omitempty"`
 }
 
 type ValidationError struct {

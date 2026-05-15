@@ -4,9 +4,12 @@ type Metadata struct {
 	ID                   string   `json:"id"`
 	Surfaces             []string `json:"surfaces"`
 	RequiredBinaries     []string `json:"required_binaries"`
+	SupportedPlatforms   []string `json:"supported_platforms,omitempty"`
 	DefaultLanes         []string `json:"default_lanes"`
 	ArtifactCapabilities []string `json:"artifact_capabilities"`
+	ReadinessFields      []string `json:"readiness_fields,omitempty"`
 	SetupGapReason       string   `json:"setup_gap_reason,omitempty"`
+	SetupGapReasonCodes  []string `json:"setup_gap_reason_codes,omitempty"`
 }
 
 func Registry() []Metadata {
@@ -17,6 +20,8 @@ func Registry() []Metadata {
 		metadata("jest", []string{"frontend", "package"}, []string{"node", "npm"}),
 		metadata("playwright", []string{"frontend"}, []string{"node", "npm"}),
 		metadata("gui-explore", []string{"frontend", "desktop"}, []string{"node", "npm"}),
+		metadata("maestro-scripted", []string{"mobile"}, []string{"maestro"}),
+		metadata("appium-mobile-explore", []string{"mobile"}, []string{"appium"}),
 		metadata("pytest", []string{"cli"}, []string{"pytest"}),
 		metadata("cargo-test", []string{"cli"}, []string{"cargo"}),
 		metadata("auto-test-run", []string{"multi"}, []string{"auto"}),
@@ -55,6 +60,34 @@ func metadata(id string, surfaces, binaries []string) Metadata {
 			"video_trace_ref",
 			"dom_snapshot_digest",
 		)
+	}
+	if id == "maestro-scripted" || id == "appium-mobile-explore" {
+		item.DefaultLanes = []string{"mobile-readiness"}
+		item.SupportedPlatforms = []string{"ios", "android"}
+		item.ArtifactCapabilities = []string{
+			"sanitized_log",
+			"app_artifact_digest",
+			"device_metadata",
+			"deterministic_checks",
+			"screenshot_quarantine_ref",
+			"video_quarantine_ref",
+		}
+		item.ReadinessFields = []string{
+			"device_inventory",
+			"simulator_emulator",
+			"app_artifact",
+			"credentials",
+			"cloud_lab",
+		}
+		item.SetupGapReasonCodes = []string{
+			"missing_device_inventory",
+			"missing_simulator_emulator",
+			"missing_app_artifact",
+			"missing_credentials",
+			"cloud_lab_policy_incomplete",
+			"project_local_flow_required",
+		}
+		item.SetupGapReason = "mobile readiness requires device inventory, simulator/emulator target, app artifact digest, opaque credentials, and cloud lab policy when used"
 	}
 	return item
 }

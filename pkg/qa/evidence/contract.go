@@ -7,6 +7,9 @@ import (
 )
 
 func validateSurfaceContract(manifest Manifest) error {
+	if manifest.SchemaVersion == SchemaVersionV2 && manifest.Surface == "mobile" {
+		return validateMobileContract(manifest)
+	}
 	if manifest.SchemaVersion != SchemaVersionV1 {
 		return nil
 	}

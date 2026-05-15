@@ -15,10 +15,7 @@ const (
 )
 
 func buildManifest(opts Options, pack journey.Pack, result commandResult, checks []IndexCheck) qaevidence.Manifest {
-	artifacts := []qaevidence.ArtifactRef{
-		{Kind: "stdout", Path: result.StdoutPath, Publishable: true, Redaction: "text_redacted_and_scanned"},
-		{Kind: "stderr", Path: result.StderrPath, Publishable: true, Redaction: "text_redacted_and_scanned"},
-	}
+	artifacts := defaultArtifactsForPack(pack, result)
 	if !blocksGUIArtifactPublication(checks) {
 		artifacts = append(artifacts, declaredArtifacts(opts.ProjectDir, pack)...)
 	}
@@ -145,11 +142,24 @@ func sourceRefs(pack journey.Pack) qaevidence.SourceRefs {
 	if refs.SourceSpec == "" && pack.Adapter.ID == "gui-explore" {
 		refs.SourceSpec = "SPEC-QAMESH-003"
 	}
+	if refs.SourceSpec == "" && mobileAdapter(pack.Adapter.ID) {
+		refs.SourceSpec = "SPEC-QAMESH-006"
+	}
 	if refs.SourceSpec == "" {
 		refs.SourceSpec = "SPEC-QAMESH-002"
 	}
 	if len(refs.AcceptanceRefs) == 0 && pack.Adapter.ID == "gui-explore" {
 		refs.AcceptanceRefs = []string{"AC-QAMESH3-004", "AC-QAMESH3-006"}
+	}
+	if refs.Mobile == nil && mobileAdapter(pack.Adapter.ID) {
+		refs.Mobile = &qaevidence.MobileRefs{
+			FlowID:            pack.ID,
+			AppArtifactDigest: pack.Mobile.AppArtifactDigest,
+			DeviceRef:         pack.Mobile.DeviceTarget,
+		}
+	}
+	if len(refs.AcceptanceRefs) == 0 && mobileAdapter(pack.Adapter.ID) {
+		refs.AcceptanceRefs = []string{"AC-QAMESH6-008"}
 	}
 	if len(refs.AcceptanceRefs) == 0 {
 		refs.AcceptanceRefs = []string{"AC-QAMESH2-005"}
@@ -161,4 +171,8 @@ func sourceRefs(pack journey.Pack) qaevidence.SourceRefs {
 		refs.DoNotModifyPaths = []string{".codex/**", ".opencode/**", ".autopus/plugins/**"}
 	}
 	return refs
+}
+
+func mobileAdapter(adapterID string) bool {
+	return adapterID == "maestro-scripted" || adapterID == "appium-mobile-explore"
 }

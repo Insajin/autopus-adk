@@ -26,11 +26,22 @@ func Execute(opts Options) (Result, error) {
 	started := time.Now().UTC()
 	runID := "qa-" + uuid.NewString()
 	runDir := filepath.Join(opts.Output, runID)
+	result := initialResult(opts, plan, runID, runDir)
+	if blocked, status := mobileReadinessExecutionStatus(plan); blocked {
+		result.Status = status
+		result = sanitizeResult(result)
+		if err := writeIndex(result, opts, started, time.Now().UTC()); err != nil {
+			return result, err
+		}
+		if status == "blocked" {
+			return result, fmt.Errorf("qa run blocked")
+		}
+		return result, nil
+	}
 	packs, err := executionPacks(opts, plan)
 	if err != nil {
 		return Result{}, err
 	}
-	result := initialResult(opts, plan, runID, runDir)
 	for _, pack := range packs {
 		adapterResult, manifestPath, checks := executePack(opts, pack, filepath.Join(runDir, "_raw"), runDir)
 		result.AdapterResults = append(result.AdapterResults, adapterResult)

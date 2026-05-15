@@ -20,7 +20,7 @@ func isSupportedSurface(version, surface string) bool {
 		return surface == "browser" || surface == "desktop"
 	case SchemaVersionV2:
 		switch surface {
-		case "cli", "backend", "frontend", "desktop", "package", "custom", "multi":
+		case "cli", "backend", "frontend", "desktop", "package", "custom", "multi", "mobile":
 			return true
 		default:
 			return false
@@ -77,6 +77,9 @@ func validateSourceRefs(manifest Manifest) error {
 	}
 	if strings.TrimSpace(manifest.SourceRefs.Adapter) == "" {
 		return fmt.Errorf("missing required field source_refs.adapter")
+	}
+	if manifest.Surface == "mobile" && manifest.SourceRefs.Mobile == nil {
+		return fmt.Errorf("missing required field source_refs.mobile")
 	}
 	return nil
 }

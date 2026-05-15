@@ -1,6 +1,9 @@
 package run
 
-import "github.com/insajin/autopus-adk/pkg/qa/adapter"
+import (
+	"github.com/insajin/autopus-adk/pkg/qa/adapter"
+	"github.com/insajin/autopus-adk/pkg/qa/mobile"
+)
 
 const RunIndexSchemaVersion = "qamesh.run_index.v1"
 
@@ -23,6 +26,7 @@ type Plan struct {
 	SelectedJourneys           []string           `json:"selected_journeys"`
 	SelectedAdapters           []string           `json:"selected_adapters"`
 	SetupGaps                  []SetupGap         `json:"setup_gaps"`
+	MobileReadiness            *mobile.Readiness  `json:"mobile_readiness,omitempty"`
 	ProjectHints               []SetupGap         `json:"project_hints,omitempty"`
 	Deferred                   []SetupGap         `json:"deferred,omitempty"`
 	OutputRoot                 string             `json:"output_root"`

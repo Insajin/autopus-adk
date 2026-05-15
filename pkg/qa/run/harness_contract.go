@@ -1,21 +1,20 @@
 package run
 
 import (
-	"path/filepath"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
 	qaproject "github.com/insajin/autopus-adk/pkg/qa/project"
 )
 
+// @AX:NOTE [AUTO] [downgraded from ANCHOR - fan_in < 3] @AX:SPEC: SPEC-QAMESH-006: ADK remains the harness while target projects own concrete Journey Packs.
+// @AX:REASON: Plan and run results expose this contract to agents so adapter execution, redaction, and feedback stay separated from product-specific journeys.
 func harnessContract(projectDir string) HarnessContract {
-	journeyRoot := filepath.Join(projectDir, ".autopus", "qa", "journeys")
-	artifactRoot := filepath.Join(projectDir, ".autopus", "qa", "runs")
 	return HarnessContract{
 		Role:                 "harness",
 		JourneyPackOwnership: "project-local",
-		JourneyPackRoot:      filepath.ToSlash(filepath.Clean(journeyRoot)),
-		RuntimeArtifactRoot:  filepath.ToSlash(filepath.Clean(artifactRoot)),
+		JourneyPackRoot:      ".autopus/qa/journeys",
+		RuntimeArtifactRoot:  ".autopus/qa/runs",
 		GeneratedPolicy:      "ADK owns adapters, execution, redaction, and feedback; the target project owns concrete Journey Packs.",
 		Guidance:             "Create or review project-local Journey Packs before GUI execution; do not hard-code product-specific journeys into ADK.",
 	}

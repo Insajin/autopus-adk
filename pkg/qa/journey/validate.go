@@ -27,6 +27,9 @@ func Validate(pack Pack, projectDir string) error {
 	if err := validateGUIPolicy(pack); err != nil {
 		return err
 	}
+	if err := validateMobilePolicy(pack, projectDir); err != nil {
+		return err
+	}
 	return ValidateCommand(pack.Adapter.ID, pack.Command, pack.Artifacts, projectDir, "qa_journey")
 }
 
@@ -96,6 +99,14 @@ func validateAdapterArgv(adapterID string, argv []string) error {
 		return validateJSRunnerArgv(argv, "playwright", "test")
 	case "gui-explore":
 		return validateJSRunnerArgv(argv, "playwright", "test")
+	case "maestro-scripted":
+		if len(argv) != 3 || !executableIs(argv[0], "maestro") || argv[1] != "test" {
+			return fmt.Errorf("maestro-scripted command must be maestro test <project-local-flow>")
+		}
+	case "appium-mobile-explore":
+		if len(argv) != 1 || !executableIs(argv[0], "appium") {
+			return fmt.Errorf("appium-mobile-explore command must be appium")
+		}
 	case "pytest":
 		if executableIs(argv[0], "pytest") {
 			return nil

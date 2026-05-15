@@ -19,13 +19,20 @@ func TestRegistryContainsRequiredAdapters(t *testing.T) {
 		assert.NotEmpty(t, item.DefaultLanes)
 		assert.NotEmpty(t, item.ArtifactCapabilities)
 	}
-	for _, id := range []string{"go-test", "node-script", "vitest", "jest", "playwright", "gui-explore", "pytest", "cargo-test", "auto-test-run", "auto-verify", "canary-template", "custom-command"} {
+	for _, id := range []string{"go-test", "node-script", "vitest", "jest", "playwright", "gui-explore", "maestro-scripted", "appium-mobile-explore", "pytest", "cargo-test", "auto-test-run", "auto-verify", "canary-template", "custom-command"} {
 		assert.True(t, ids[id], id)
 	}
 	gui, ok := ByID("gui-explore")
 	require.True(t, ok)
 	assert.Contains(t, gui.ArtifactCapabilities, "journey_graph")
 	assert.Contains(t, gui.ArtifactCapabilities, "screenshot_quarantine_ref")
+	maestro, ok := ByID("maestro-scripted")
+	require.True(t, ok)
+	assert.Equal(t, []string{"mobile-readiness"}, maestro.DefaultLanes)
+	assert.Contains(t, maestro.SupportedPlatforms, "ios")
+	assert.Contains(t, maestro.ReadinessFields, "app_artifact")
+	assert.NotEmpty(t, maestro.SetupGapReason)
+	assert.Contains(t, maestro.SetupGapReasonCodes, "missing_device_inventory")
 }
 
 func TestDetectFindsProjectAdapters(t *testing.T) {
