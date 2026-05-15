@@ -76,6 +76,14 @@ func TestFindUnsafeText_FindsSecretQueryParams(t *testing.T) {
 	assert.NotContains(t, FormatFindings(findings), "tok12345")
 }
 
+func TestFindUnsafeText_IgnoresHyphenatedWordsContainingFlagNames(t *testing.T) {
+	t.Parallel()
+
+	findings := FindUnsafeText("review failure pattern tie-token should stay searchable", "review")
+
+	assert.Empty(t, findings)
+}
+
 func findingTypes(findings []Finding) []string {
 	out := make([]string, 0, len(findings))
 	for _, finding := range findings {

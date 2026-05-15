@@ -27,7 +27,7 @@ var (
 		regexp.MustCompile(`\bgithub_pat_[A-Za-z0-9_]{20,}\b`),
 	}
 	sensitiveAssignmentRe = regexp.MustCompile(`(?i)\b([A-Z0-9_.-]*(TOKEN|SECRET|PASSWORD|PASSWD|PWD|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|CREDENTIAL|COOKIE|SESSION|AUTH)[A-Z0-9_.-]*)(\s*[:=]\s*)(["']?)([^\s"',}\]]{3,})(["']?)`)
-	sensitiveFlagValueRe  = regexp.MustCompile(`(?i)(--?[A-Z0-9_.-]*(TOKEN|SECRET|PASSWORD|PASSWD|PWD|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|CREDENTIAL|COOKIE|SESSION|AUTH|KEY|PASS)[A-Z0-9_.-]*(?:=|\s+))("[^"]*"|'[^']*'|[^\s"',}\]]{3,})`)
+	sensitiveFlagValueRe  = regexp.MustCompile(`(?i)(^|[\s"'({\[])(--?[A-Z0-9_.-]*(TOKEN|SECRET|PASSWORD|PASSWD|PWD|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|CREDENTIAL|COOKIE|SESSION|AUTH|KEY|PASS)[A-Z0-9_.-]*(?:=|\s+))("[^"]*"|'[^']*'|[^\s"',}\]]{3,})`)
 	jsonSensitiveRe       = regexp.MustCompile(`(?i)("[^"]*(token|secret|password|passwd|pwd|api[_-]?key|apikey|private[_-]?key|access[_-]?key|credential|cookie|session|authorization|auth)[^"]*"\s*:\s*)("[^"]*"|[^",\n}\]]+)`)
 	credentialURLRe       = regexp.MustCompile(`(?i)(https?://)[^/\s:@]+:[^/\s@]+@`)
 	secretQueryRe         = regexp.MustCompile(`(?i)([?&][^=\s&]*(TOKEN|SECRET|PASSWORD|PASSWD|PWD|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|CREDENTIAL|COOKIE|SESSION|AUTH|KEY|PASS)[^=\s&]*=)[^&\s"']+`)
@@ -53,7 +53,7 @@ func RedactText(value string) string {
 		})
 	}
 	text = sensitiveAssignmentRe.ReplaceAllString(text, `${1}${3}${4}`+RedactedSecret+`${6}`)
-	text = sensitiveFlagValueRe.ReplaceAllString(text, `${1}`+RedactedSecret)
+	text = sensitiveFlagValueRe.ReplaceAllString(text, `${1}${2}`+RedactedSecret)
 	text = jsonSensitiveRe.ReplaceAllString(text, `${1}"`+RedactedSecret+`"`)
 	text = credentialURLRe.ReplaceAllString(text, `${1}`+RedactedSecret+`@`)
 	text = secretQueryRe.ReplaceAllString(text, `${1}`+RedactedSecret)
@@ -86,7 +86,7 @@ func FindUnsafeText(value, source string) []Finding {
 		}
 	}
 	for _, match := range sensitiveFlagValueRe.FindAllStringSubmatch(text, -1) {
-		if len(match) > 3 && !strings.Contains(match[3], "[REDACTED") {
+		if len(match) > 4 && !strings.Contains(match[4], "[REDACTED") {
 			findings = append(findings, Finding{Type: "sensitive_flag", Source: source, Sample: RedactText(compactSample(match[0]))})
 		}
 	}
