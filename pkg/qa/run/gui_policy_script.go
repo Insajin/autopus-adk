@@ -12,13 +12,30 @@ let policy = {
 try {
   if (policyPath) policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
 } catch (_) {}
-const allowedOrigins = new Set((policy.allowed_origins || []).map(originOf).filter(Boolean));
+const allowedOriginValues = (policy.allowed_origins || []).map((value) => String(value).trim()).filter(Boolean);
+const allowedOrigins = new Set(allowedOriginValues.map((value) => absoluteOriginOf(value)).filter(Boolean));
 const forbiddenActions = new Set((policy.forbidden_actions || []).map((value) => String(value).trim().toLowerCase()).filter(Boolean));
-function originOf(value) {
+function absoluteOriginOf(value) {
   try { return new URL(String(value)).origin.toLowerCase(); } catch (_) { return ""; }
 }
+function baseCandidates() {
+  const values = [
+    process.env.PLAYWRIGHT_BASE_URL,
+    process.env.AUTOPUS_DESKTOP_GUI_BASE_URL,
+    ...allowedOriginValues
+  ];
+  return values.map((value) => String(value || "").trim()).filter(Boolean);
+}
+function originOfTarget(value) {
+  const absolute = absoluteOriginOf(value);
+  if (absolute) return absolute;
+  for (const base of baseCandidates()) {
+    try { return new URL(String(value), base).origin.toLowerCase(); } catch (_) {}
+  }
+  return "";
+}
 function ensureURLAllowed(target) {
-  const origin = originOf(target);
+  const origin = originOfTarget(target);
   if (!origin || !allowedOrigins.has(origin)) {
     throw new Error("AUTOPUS_QAMESH_GUI_OFF_ORIGIN:" + origin);
   }

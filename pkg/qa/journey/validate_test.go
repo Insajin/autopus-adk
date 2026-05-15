@@ -179,6 +179,7 @@ func TestValidateGUIExplorePolicy(t *testing.T) {
 		{name: "origin path", mutate: func(pack *Pack) { pack.GUI.AllowedOrigins = []string{"http://127.0.0.1:4173/app"} }},
 		{name: "missing forbidden actions", mutate: func(pack *Pack) { pack.GUI.ForbiddenActions = nil }},
 		{name: "selector", mutate: func(pack *Pack) { pack.GUI.SelectorStrategy = "css-first" }},
+		{name: "network policy mode", mutate: func(pack *Pack) { pack.GUI.NetworkPolicy.Mode = "capture-raw" }},
 		{name: "raw headers", mutate: func(pack *Pack) { pack.GUI.NetworkPolicy.RetainHeaders = true }},
 		{name: "raw bodies", mutate: func(pack *Pack) { pack.GUI.NetworkPolicy.RetainBodies = true }},
 		{name: "raw artifacts", mutate: func(pack *Pack) { pack.GUI.ArtifactRetention.PublishRaw = true }},
