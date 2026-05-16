@@ -1,0 +1,131 @@
+{
+  "schema_version": "qamesh.release_index.v1",
+  "release_id": "rel-portable-001",
+  "workspace": {
+    "workspace_id": "fixture-workspace",
+    "repo_id": "portable-shop",
+    "repo_root": "repos/portable-shop"
+  },
+  "profile": "release-candidate",
+  "started_at": "2026-05-15T10:00:00Z",
+  "ended_at": "2026-05-15T10:02:00Z",
+  "status": "blocked",
+  "selected_lanes": [
+    "fast",
+    "browser-staging",
+    "desktop-native",
+    "gui-explore",
+    "mobile-readiness",
+    "canary-explicit"
+  ],
+  "lane_rows": [
+    {
+      "lane": "fast",
+      "lane_policy": "must",
+      "owner_spec": "SPEC-QAMESH-002",
+      "owner_repo": "autopus-adk",
+      "status": "passed",
+      "lane_verdict": "pass",
+      "run_index_path": "qa/run-index.json",
+      "manifest_paths": [
+        "qa/evidence/manifests/login.json"
+      ],
+      "feedback_refs": [],
+      "deterministic_authority": true
+    },
+    {
+      "lane": "browser-staging",
+      "lane_policy": "must",
+      "owner_spec": "SPEC-QAMESH-005",
+      "owner_repo": "autopus-adk",
+      "status": "failed",
+      "lane_verdict": "block",
+      "run_index_path": "qa/run-index.json",
+      "manifest_paths": [
+        "qa/evidence/manifests/login.json"
+      ],
+      "feedback_refs": [
+        "qa/feedback/login-codex/bundle.json"
+      ],
+      "deterministic_authority": true
+    },
+    {
+      "lane": "desktop-native",
+      "lane_policy": "must",
+      "owner_spec": "SPEC-QAMESH-005",
+      "owner_repo": "autopus-adk",
+      "status": "blocked",
+      "lane_verdict": "block",
+      "blockers": [
+        {
+          "reason": "upstream lane failed"
+        }
+      ],
+      "deterministic_authority": true
+    },
+    {
+      "lane": "gui-explore",
+      "lane_policy": "optional",
+      "owner_spec": "SPEC-QAMESH-003",
+      "owner_repo": "autopus-adk",
+      "status": "skipped",
+      "skipped_reason": "not_started_after_block",
+      "lane_verdict": "warn",
+      "deterministic_authority": true
+    },
+    {
+      "lane": "mobile-readiness",
+      "lane_policy": "deferred",
+      "owner_spec": "SPEC-QAMESH-006",
+      "owner_repo": "autopus-adk",
+      "status": "deferred",
+      "lane_verdict": "warn",
+      "deterministic_authority": true
+    },
+    {
+      "lane": "canary-explicit",
+      "lane_policy": "must",
+      "owner_spec": "SPEC-QAMESH-004",
+      "owner_repo": "autopus-adk",
+      "status": "setup_gap",
+      "setup_gap_class": "env-missing",
+      "lane_verdict": "block",
+      "deterministic_authority": true
+    }
+  ],
+  "setup_gaps": [
+    {
+      "lane": "canary-explicit",
+      "setup_gap_class": "env-missing",
+      "reason": "STAGING_HEALTH_URL is not configured",
+      "severity": "high",
+      "blocking": true,
+      "owner_spec": "SPEC-QAMESH-004",
+      "owner_repo": "autopus-adk"
+    }
+  ],
+  "blockers": [
+    {
+      "lane": "browser-staging",
+      "reason": "expired sessions are not redirected before checkout"
+    }
+  ],
+  "output_paths": {
+    "release_index_path": "qa/release-index.json",
+    "run_index_root": "qa",
+    "evidence_root": "qa/evidence",
+    "feedback_root": "qa/feedback"
+  },
+  "feedback_refs": [
+    "qa/feedback/login-codex/bundle.json"
+  ],
+  "deterministic_authority": true,
+  "redaction_status": "redacted",
+  "trend_summary": "1 failed deterministic check across 6 lanes",
+  "source_refs": [
+    "qamesh://source/portable-shop/specs/release"
+  ],
+  "audit_refs": [
+    "qamesh-audit:portable-shop:rel-portable-001"
+  ]
+}

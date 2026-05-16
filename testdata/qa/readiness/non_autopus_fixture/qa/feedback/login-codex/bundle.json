@@ -1,0 +1,7 @@
+{
+  "schema_version": "qamesh.feedback.v1",
+  "target": "codex",
+  "qa_result_id": "qa-login-expired-session",
+  "prompt_path": "repair-prompt.md",
+  "manifest_path": "qa/evidence/manifests/login.json"
+}

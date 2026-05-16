@@ -1,0 +1,62 @@
+{
+  "schema_version": "qamesh.evidence.v2",
+  "qa_result_id": "qa-login-expired-session",
+  "surface": "browser",
+  "lane": "browser-staging",
+  "scenario_ref": "checkout-login",
+  "runner": {
+    "name": "playwright",
+    "command": "npm test -- checkout-login"
+  },
+  "status": "failed",
+  "started_at": "2026-05-15T10:00:30Z",
+  "ended_at": "2026-05-15T10:00:45Z",
+  "duration_ms": 15000,
+  "artifacts": [
+    {
+      "kind": "trace_summary",
+      "label": "Trace summary",
+      "path": "qa/evidence/artifacts/trace-summary.json",
+      "path_display": "qa/evidence/artifacts/trace-summary.json",
+      "publishable": true,
+      "redaction": "text_redacted_and_scanned"
+    },
+    {
+      "kind": "screenshot_masked",
+      "label": "Masked screenshot",
+      "path": "qa/evidence/artifacts/login-masked.txt",
+      "path_display": "qa/evidence/artifacts/login-masked.txt",
+      "publishable": true,
+      "redaction": "masked"
+    }
+  ],
+  "oracle_results": {
+    "checks": [
+      {
+        "id": "login-rejects-expired-session",
+        "type": "browser",
+        "status": "failed",
+        "expected": "expired session is redirected",
+        "actual": "expired session stayed on checkout",
+        "failure_summary": "expired sessions are not redirected before checkout"
+      }
+    ]
+  },
+  "redaction_status": {
+    "status": "passed"
+  },
+  "source_refs": {
+    "source_spec": "SPEC-QAMESH-FIXTURE",
+    "acceptance_refs": [
+      "AC-FIXTURE-001"
+    ],
+    "owned_paths": [
+      "src/checkout/**"
+    ],
+    "do_not_modify_paths": [
+      "node_modules/**"
+    ]
+  },
+  "retention_class": "local-redacted",
+  "reproduction_command": "npm test -- checkout-login"
+}

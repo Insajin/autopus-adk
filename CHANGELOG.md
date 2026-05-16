@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **QAMESH readiness projection and repair handoff (SPEC-QAMESH-007)** (2026-05-16): `auto qa readiness` now validates QAMESH run/release indexes and redacted evidence manifests, rejects unsafe raw refs before rendering or prompt handoff, emits a generic `qamesh.readiness_projection.v1` model with lane status taxonomy, setup gaps, audit/evidence/feedback refs, and safe repair actions, and includes a non-Autopus fixture proving the projection is not product-bound.
+
 - **Deep Interview clarification gate for `auto idea` (SPEC-ADK-IDEA-CLARIFY-001)** (2026-05-15): `auto idea` source guidance and Claude/Codex/Gemini/OpenCode templates now require a five-row `Clarification Ledger` before orchestra fan-out, select the single highest-gain unresolved question in interactive mode, keep `--auto` non-blocking with `assumed`/`deferred` rows, record external `deep-interview` provenance as untrusted evidence, and teach `auto plan --from-idea` / spec-writer guidance to map ledger rows into requirements, non-goals, risks, acceptance seeds, open questions, and reviewer focus.
 
 - **QAMESH Journey Pack init flow** (2026-05-15): `auto qa init` now creates a project-local `.autopus/qa/journeys/desktop-gui-explore.yaml` starter when desktop GUI signals are detected, preserves existing packs, validates the generated pack before returning, and documents that generated Journey Packs require human review before execution.

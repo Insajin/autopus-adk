@@ -1,0 +1,61 @@
+{
+  "schema_version": "qamesh.run_index.v1",
+  "run_id": "run-portable-001",
+  "workspace": {
+    "workspace_id": "fixture-workspace",
+    "repo_id": "portable-shop",
+    "repo_root": "repos/portable-shop"
+  },
+  "status": "failed",
+  "started_at": "2026-05-15T10:00:00Z",
+  "ended_at": "2026-05-15T10:01:00Z",
+  "profile": "release-candidate",
+  "lane": "fast",
+  "source_refs": [
+    "qamesh://source/portable-shop/specs/checkout"
+  ],
+  "manifest_paths": [
+    "qa/evidence/manifests/login.json"
+  ],
+  "feedback_bundle_paths": [
+    "qa/feedback/login-codex/bundle.json"
+  ],
+  "checks": [
+    {
+      "id": "checkout-page-renders",
+      "type": "unit",
+      "status": "passed",
+      "expected": "checkout page renders",
+      "actual": "checkout page rendered"
+    },
+    {
+      "id": "login-rejects-expired-session",
+      "type": "browser",
+      "status": "failed",
+      "expected": "expired session is redirected",
+      "actual": "expired session stayed on checkout",
+      "failure_summary": "expired sessions are not redirected before checkout"
+    },
+    {
+      "id": "desktop-pack",
+      "type": "desktop",
+      "status": "skipped",
+      "expected": "desktop smoke executes",
+      "actual": "deferred lane"
+    }
+  ],
+  "adapter_results": [
+    {
+      "adapter": "vitest",
+      "journey_id": "checkout-login",
+      "status": "failed",
+      "qamesh_manifest_path": "qa/evidence/manifests/login.json",
+      "repair_prompt_available": true,
+      "failure_summary": "expired sessions are not redirected before checkout"
+    }
+  ],
+  "setup_gaps": [],
+  "redaction_status": {
+    "status": "passed"
+  }
+}

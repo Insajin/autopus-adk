@@ -9,7 +9,7 @@ import (
 )
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-004: public `auto qa` namespace registration fans into CLI root and QA command tests.
-// @AX:REASON: init, plan, run, explore, release, evidence, and feedback subcommands must remain reachable under the same namespace.
+// @AX:REASON: init, plan, run, explore, release, readiness, evidence, and feedback subcommands must remain reachable under the same namespace.
 func newQACmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "qa",
@@ -23,6 +23,7 @@ func newQACmd() *cobra.Command {
 	cmd.AddCommand(newQARunCmd())
 	cmd.AddCommand(newQAExploreCmd())
 	cmd.AddCommand(newQAReleaseCmd())
+	cmd.AddCommand(newQAReadinessCmd())
 	cmd.AddCommand(newQAEvidenceCmd())
 	cmd.AddCommand(newQAFeedbackCmd())
 	return cmd
