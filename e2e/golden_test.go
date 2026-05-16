@@ -76,10 +76,12 @@ func normalizeGoldenOutput(name, got string) string {
 	versionLineRe := regexp.MustCompile(`(?m)^   .+$`)
 	summaryLineRe := regexp.MustCompile(`(?m)^auto .+$`)
 	pathLineRe := regexp.MustCompile(`(?m)^path: .+$`)
+	invokedViaLineRe := regexp.MustCompile(`(?m)^invoked via: .+\n?`)
 
 	got = versionLineRe.ReplaceAllString(got, "   <version>")
 	got = summaryLineRe.ReplaceAllString(got, "auto <version> (commit: <commit>, built: <date>)")
 	got = pathLineRe.ReplaceAllString(got, "path: <binary>")
+	got = invokedViaLineRe.ReplaceAllString(got, "")
 	return got
 }
 

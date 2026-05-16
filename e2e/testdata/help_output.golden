@@ -6,6 +6,7 @@ Usage:
 Available Commands:
   agent       Autopus 에이전트 관리
   arch        Architecture analysis and enforcement
+  canary      Run post-deploy health checks
   check       Run harness rule checks
   completion  Generate the autocompletion script for the specified shell
   config      Manage autopus.yaml configuration
@@ -24,10 +25,12 @@ Available Commands:
   lore        Decision knowledge management via git trailers
   lsp         LSP-based code intelligence
   mcp         Desktop and developer MCP integration commands
+  mem         Build and query the decision/quality memory index
   orchestra   다중 모델 오케스트레이션으로 코드를 분석한다
   permission  Manage permission detection
   pipeline    Pipeline monitoring and management
   platform    Manage platforms
+  qa          Plan, initialize, run, and publish QAMESH QA evidence
   quality     Show or change quality mode
   react       CI 실패 감지 및 자동 수정
   search      Search the web using Exa API (requires EXA_API_KEY)
