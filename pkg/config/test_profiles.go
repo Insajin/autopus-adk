@@ -48,6 +48,7 @@ func DefaultTestProfileCapabilities(profile string) []string {
 			"backend-server",
 			"frontend-server",
 			"network",
+			"auth-state",
 		}
 	case TestProfileCI:
 		return []string{

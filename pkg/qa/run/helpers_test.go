@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
 	"github.com/stretchr/testify/assert"
 )
@@ -48,6 +49,15 @@ func TestHelperBranches(t *testing.T) {
 	assert.NotNil(t, setupGapFor(Options{Profile: "standalone"}, journeyPack("canary-template", "")))
 	assert.NotNil(t, setupGapFor(Options{Profile: "standalone"}, journey.Pack{
 		ID:                  "profile",
+		Adapter:             journey.AdapterRef{ID: "go-test"},
+		ProfileRequirements: journey.ProfileRequirements{Capabilities: []string{"frontend-server"}},
+	}))
+	configDir := t.TempDir()
+	cfg := config.DefaultFullConfig("helpers")
+	cfg.Profiles.Test.Capabilities = map[string][]string{"standalone": {"frontend-server"}}
+	assert.NoError(t, config.Save(configDir, cfg))
+	assert.Nil(t, setupGapFor(Options{ProjectDir: configDir, Profile: "standalone"}, journey.Pack{
+		ID:                  "profile-config",
 		Adapter:             journey.AdapterRef{ID: "go-test"},
 		ProfileRequirements: journey.ProfileRequirements{Capabilities: []string{"frontend-server"}},
 	}))

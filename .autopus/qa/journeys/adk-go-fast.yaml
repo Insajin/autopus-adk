@@ -1,0 +1,33 @@
+id: adk-go-fast
+title: Autopus ADK deterministic Go test suite
+surface: cli
+lanes: [fast]
+adapter:
+  id: go-test
+command:
+  argv: ["go", "test", "./..."]
+  cwd: .
+  timeout: 600s
+checks:
+  - id: adk-go-test
+    type: unit_test
+    expected:
+      exit_code: 0
+artifacts:
+  - root: .autopus/qa/runs
+source_refs:
+  source_spec: SPEC-QAMESH-002
+  acceptance_refs: [AC-QAMESH2-005]
+  owned_paths:
+    - cmd/**
+    - content/**
+    - internal/**
+    - pkg/**
+    - templates/**
+    - tests/**
+    - go.mod
+    - go.sum
+  do_not_modify_paths:
+    - .codex/**
+    - .opencode/**
+    - .autopus/plugins/**

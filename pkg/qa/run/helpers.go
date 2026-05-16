@@ -88,7 +88,7 @@ func artifactRefs(values []string) []journey.Artifact {
 }
 
 func setupGapFor(opts Options, pack journey.Pack) *SetupGap {
-	if missing := missingCapabilities(opts.Profile, pack.ProfileRequirements.Capabilities); len(missing) > 0 {
+	if missing := missingCapabilities(opts.ProjectDir, opts.Profile, pack.ProfileRequirements.Capabilities); len(missing) > 0 {
 		return &SetupGap{Adapter: pack.Adapter.ID, JourneyID: pack.ID, Reason: "missing profile capability: " + missing[0]}
 	}
 	item, ok := adapter.ByID(pack.Adapter.ID)
@@ -109,12 +109,12 @@ func setupGapFor(opts Options, pack journey.Pack) *SetupGap {
 	return nil
 }
 
-func missingCapabilities(profile string, required []string) []string {
+func missingCapabilities(projectDir, profile string, required []string) []string {
 	if len(required) == 0 {
 		return nil
 	}
 	available := map[string]bool{}
-	for _, capability := range config.DefaultTestProfileCapabilities(profile) {
+	for _, capability := range availableCapabilities(projectDir, profile) {
 		available[capability] = true
 	}
 	var missing []string
@@ -124,6 +124,14 @@ func missingCapabilities(profile string, required []string) []string {
 		}
 	}
 	return missing
+}
+
+func availableCapabilities(projectDir, profile string) []string {
+	cfg, err := config.LoadPreview(projectDir)
+	if err != nil {
+		return config.DefaultTestProfileCapabilities(profile)
+	}
+	return cfg.AvailableTestCapabilities(profile)
 }
 
 func aggregateStatus(result Result) string {

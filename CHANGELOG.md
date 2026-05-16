@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 - **`auto go` QAMESH scope budget** (2026-05-15): go-stage guidance now limits QAMESH execution to affected/fast/smoke lanes and defers full GUI/native/release matrices to explicit `auto qa ...` or `auto canary` runs.
 - **QAMESH harness/project-local Journey Pack contract** (2026-05-15): `auto qa plan` and `auto qa explore --dry-run` now expose a `harness_contract` declaring ADK as the harness and project-local `.autopus/qa/journeys/**` as the owner of concrete Journey Packs. Desktop GUI signals now produce non-blocking `project_hints` on fast plans and explicit `setup_gaps` on `gui-explore` requests when the target project has not declared a GUI Journey Pack, while `gui-explore` no longer falls back to generic detected Node/Vitest/Playwright adapters.
 
+### Fixed
+
+- **QAMESH profile capability resolution** (2026-05-16): `auto qa run` / `auto qa explore` now resolve required Journey Pack capabilities from the effective test profile, including project-local `autopus.yaml` profile additions. The local profile also advertises `auth-state`, and QAMESH runtime/cache/gui/feedback artifacts are ignored as generated local evidence.
+
 ## [v0.47.5] — 2026-05-12
 
 ### Added

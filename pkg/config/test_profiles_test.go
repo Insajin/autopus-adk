@@ -12,7 +12,7 @@ func TestDefaultTestProfileCapabilities(t *testing.T) {
 	assert.Equal(t, []string{"standalone"}, DefaultTestProfileCapabilities("standalone"))
 	assert.Equal(
 		t,
-		[]string{"standalone", "local", "docker", "db", "redis", "backend-server", "frontend-server", "network"},
+		[]string{"standalone", "local", "docker", "db", "redis", "backend-server", "frontend-server", "network", "auth-state"},
 		DefaultTestProfileCapabilities("local"),
 	)
 	assert.Equal(
