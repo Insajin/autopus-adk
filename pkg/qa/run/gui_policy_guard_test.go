@@ -87,6 +87,30 @@ exit 0
 	assert.Contains(t, check.Actual, "missing=journey_graph.runtime_policy_enforced")
 }
 
+func TestGUIPolicyRuntimeBlocksUnavailableGUITarget(t *testing.T) {
+	dir := fixtureGUIProject(t)
+	prependGUICommand(t, dir, `#!/bin/sh
+mkdir -p .autopus/qa/gui
+printf '{"runtime_policy_enforced":true,"availability":{"status":"unavailable","reason":"page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4173/"},"stopped_actions":[]}' > .autopus/qa/gui/journey-graph.json
+printf '{"available":false,"fallback_reason":"base_url_unavailable"}' > .autopus/qa/gui/a11y.aria.yml
+printf '{"messages":[]}' > .autopus/qa/gui/console-summary.json
+printf '{"requests":[{"url":"http://127.0.0.1:4173/","status_code":null}]}' > .autopus/qa/gui/network-summary.json
+printf '{"sha256":"abc123","local_only":true}' > .autopus/qa/gui/screenshot-ref.json
+exit 0
+`)
+	result, err := Execute(Options{ProjectDir: dir, Profile: "local", Lane: "gui-explore", Output: filepath.Join(dir, "runs")})
+	require.Error(t, err)
+	assert.Equal(t, "blocked", result.Status)
+	assert.Contains(t, result.FailedChecks, guiPolicyRuntimeCheckID)
+	require.Len(t, result.ManifestPaths, 1)
+	manifest := loadManifest(t, result.ManifestPaths[0])
+	check := manifestCheck(t, manifest, guiPolicyRuntimeCheckID)
+	assert.Equal(t, "blocked", manifest.Status)
+	assert.Equal(t, "blocked", check.Status)
+	assert.Contains(t, check.Actual, "target_availability=unavailable")
+	assert.Contains(t, check.FailureSummary, "unavailable")
+}
+
 func TestGUIPolicyRuntimeBlocksBeforeCommandWhenGuardPreflightFails(t *testing.T) {
 	dir := fixtureGUIProject(t)
 	bin := filepath.Join(dir, "bin")

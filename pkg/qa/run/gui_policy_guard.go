@@ -13,6 +13,7 @@ import (
 
 type guiPolicyEvaluation struct {
 	confirmed       bool
+	unavailable     []string
 	blockedAttempts []string
 	outsideRequests []string
 	missingEvidence []string
@@ -30,7 +31,7 @@ func applyGUIPolicyOracle(projectDir string, pack journey.Pack, result *commandR
 		Expected:  expectedGUIRuntimePolicy(pack),
 		Actual:    actualGUIRuntimePolicy(eval),
 	}
-	if len(eval.blockedAttempts) > 0 || len(eval.outsideRequests) > 0 || len(eval.missingEvidence) > 0 {
+	if len(eval.unavailable) > 0 || len(eval.blockedAttempts) > 0 || len(eval.outsideRequests) > 0 || len(eval.missingEvidence) > 0 {
 		check.Status = "blocked"
 		check.FailureSummary = failureGUIRuntimePolicy(eval)
 		result.Status = "blocked"
@@ -52,6 +53,7 @@ func evaluateGUIPolicyEvidence(projectDir string, pack journey.Pack, guardReadyP
 		return eval
 	}
 	eval.confirmed = runtimePolicyConfirmed(graph)
+	eval.unavailable = append(eval.unavailable, guiAvailabilityFailures(graph)...)
 	eval.blockedAttempts = append(eval.blockedAttempts, stoppedPolicyAttempts(graph, pack)...)
 	network, err := readDeclaredJSON(projectDir, pack, "network_summary")
 	if err != nil {
@@ -131,6 +133,20 @@ func stoppedPolicyAttempts(doc map[string]any, pack journey.Pack) []string {
 	return attempts
 }
 
+func guiAvailabilityFailures(doc map[string]any) []string {
+	availability, ok := doc["availability"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	status := strings.ToLower(strings.TrimSpace(stringValue(availability["status"])))
+	switch status {
+	case "", "available", "ready", "ok", "passed":
+		return nil
+	default:
+		return []string{status}
+	}
+}
+
 func expectedGUIRuntimePolicy(pack journey.Pack) string {
 	return "allowed_origins=" + strings.Join(cleanedList(pack.GUI.AllowedOrigins), ",") +
 		"; forbidden_actions=" + strings.Join(cleanedList(pack.GUI.ForbiddenActions), ",")
@@ -138,6 +154,7 @@ func expectedGUIRuntimePolicy(pack journey.Pack) string {
 
 func actualGUIRuntimePolicy(eval guiPolicyEvaluation) string {
 	parts := []string{fmt.Sprintf("runtime_policy_enforced=%t", eval.confirmed)}
+	parts = append(parts, "target_availability="+joinOrNone(eval.unavailable))
 	parts = append(parts, "blocked_attempts="+joinOrNone(eval.blockedAttempts))
 	parts = append(parts, "network_outside_allowed="+joinOrNone(eval.outsideRequests))
 	if len(eval.missingEvidence) > 0 {
@@ -147,6 +164,9 @@ func actualGUIRuntimePolicy(eval guiPolicyEvaluation) string {
 }
 
 func failureGUIRuntimePolicy(eval guiPolicyEvaluation) string {
+	if len(eval.unavailable) > 0 {
+		return "gui target was unavailable"
+	}
 	if len(eval.blockedAttempts) > 0 {
 		return "gui runtime policy blocked unsafe action"
 	}
