@@ -30,7 +30,11 @@ func TestTaskPoller_HitsCorrectURL(t *testing.T) {
 	p.backoff = &AdaptiveBackoff{min: time.Millisecond, max: time.Millisecond, factor: 1, current: time.Millisecond}
 
 	go p.Start(ctx)
-	time.Sleep(20 * time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		return gotPath.Load() == "/api/v1/workspaces/ws-1/tasks/pending" &&
+			gotAuth.Load() == "Bearer tok123"
+	}, 500*time.Millisecond, 5*time.Millisecond)
 	cancel()
 
 	assert.Equal(t, "/api/v1/workspaces/ws-1/tasks/pending", gotPath.Load())
