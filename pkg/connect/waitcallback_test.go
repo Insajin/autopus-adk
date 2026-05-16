@@ -72,7 +72,7 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// When: sending a callback with a code
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/auth/callback?code=test-code-xyz&state=%s", port, flow.State))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/auth/callback?code=test-code-xyz&state=%s", port, flow.State))
 	require.NoError(t, err)
 	resp.Body.Close()
 
@@ -135,7 +135,7 @@ func TestWaitForCallback_ErrorPath(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// When: sending a callback WITHOUT code
-	resp, err := http.Get(fmt.Sprintf("http://localhost:%d/auth/callback?state=%s", port, flow.State))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/auth/callback?state=%s", port, flow.State))
 	require.NoError(t, err)
 	resp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
