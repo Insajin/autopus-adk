@@ -20,6 +20,7 @@ const (
 	guiGuardReadyPathEnv      = "AUTOPUS_QAMESH_GUI_GUARD_READY_PATH"
 	guiPolicyRuntimeCheckID   = "gui-policy-runtime"
 	guiPolicyRuntimeCheckType = "gui_runtime_policy"
+	guiGuardPreflightTimeout  = 15 * time.Second
 )
 
 type guiRuntimeInput struct {
@@ -92,7 +93,7 @@ func verifyGUIGuardPreflight(ctx context.Context, dir string, env []string, inpu
 		return fmt.Errorf("gui runtime guard cannot be installed for command %q", firstArg(args))
 	}
 	_ = os.Remove(input.GuardReadyPath)
-	preflightCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	preflightCtx, cancel := context.WithTimeout(ctx, guiGuardPreflightTimeout)
 	defer cancel()
 	script := `const fs = require("fs"); process.exit(fs.existsSync(process.env.AUTOPUS_QAMESH_GUI_GUARD_READY_PATH) ? 0 : 42);`
 	cmd := exec.CommandContext(preflightCtx, "node", "-e", script)
