@@ -81,6 +81,7 @@ func TestAutoGoQAMESHScopeBudgetGuidance(t *testing.T) {
 			assert.Contains(t, body, "auto qa plan --lane fast --format json")
 			assert.Contains(t, body, "full GUI/native/release matrix")
 			assert.Contains(t, body, "auto canary")
+			assert.Contains(t, body, "post-deploy smoke/status")
 		})
 	}
 }
@@ -97,6 +98,8 @@ func assertQAMESHGuidance(t *testing.T, body string) {
 	assert.Contains(t, body, "auto qa feedback")
 	assert.Contains(t, body, "ADK is a harness")
 	assert.Contains(t, body, "project-local Journey Pack")
+	assert.Contains(t, body, "canary-explicit")
+	assert.Contains(t, body, "post-deploy smoke")
 }
 
 func renderOrReadTemplate(e *tmpl.Engine, path string, cfg *config.HarnessConfig) (string, error) {

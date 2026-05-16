@@ -453,7 +453,7 @@ Agent(
 
 QAMESH scope budget inside `/auto go`:
 - Run only affected/fast/smoke QAMESH lanes that are relevant to the changed scope, typically by checking `auto qa plan --lane fast --format json` before execution.
-- Do not run the full GUI/native/release matrix during `go`; reserve full desktop GUI exploration for explicit `auto qa ...` runs or `auto canary`.
+- Do not run the full GUI/native/release matrix during `go`; reserve full desktop GUI exploration for explicit `auto qa ...` runs. `auto canary` remains a post-deploy smoke/status gate, not the full QAMESH matrix.
 - If desktop GUI signals exist but no Journey Pack exists, `auto qa init --format json` may scaffold a project-local starter, but the generated pack must be reviewed before any GUI execution.
 
 ### Phase 4: Review (Parallel)

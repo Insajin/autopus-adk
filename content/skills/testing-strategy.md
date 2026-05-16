@@ -75,6 +75,7 @@ func TestAPI_CreateUser(t *testing.T) {
 ### QAMESH Source Guidance
 
 - Use `auto qa init --format json` to create project-local starter Journey Packs from detected desktop GUI signals; then use `auto qa plan --format json` before project-level QA execution to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without running commands.
+- Use `auto canary` only for post-deploy smoke/status verification. QAMESH owns deterministic user journey evidence, redacted artifacts, run indexes, and repair feedback; `auto qa release` treats `canary-explicit` as a bridge lane for an explicit post-deploy smoke Journey Pack.
 - Use `auto qa run --format json` when deterministic project QA should execute and produce QAMESH run/evidence output.
 - Use `auto qa explore --dry-run --format json` before GUI exploration; execute it only for explicit local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
 - Use `auto qa release --dry-run --format json` to inspect the fixed release lane set, setup gaps, blocker matrix, redacted command previews, and sibling SPEC readiness before launch gates; use `auto qa release --roadmap --format json` for the canonical roadmap surface.

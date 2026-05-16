@@ -1380,7 +1380,7 @@ Agent(
     Add missing edge case tests.
     Run: go test -race -cover ./...
     Run only affected/fast/smoke QAMESH lanes relevant to the change; inspect with `auto qa plan --lane fast --format json`.
-    Do not run the full GUI/native/release matrix during `go`; reserve that for explicit `auto qa ...` or `auto canary`.
+    Do not run the full GUI/native/release matrix during `go`; reserve that for explicit `auto qa ...`. Use `auto canary` only as a post-deploy smoke/status gate.
     Ensure all tests pass.
   """
 )
@@ -1801,13 +1801,19 @@ Usage: `/auto test`, `/auto test -s init`, `/auto test --json`, `/auto test -v`
 
 Use QAMESH when the task is project-level deterministic QA execution or evidence-to-feedback handoff.
 
+### Boundary With Canary
+
+- Use `auto qa ...` when the task needs deterministic user journeys, QAMESH manifests, redacted artifacts, run indexes, release lane aggregation, or repair prompt bundles.
+- Use `auto canary` when the task is only post-deploy smoke/status verification. Canary records the latest operational health verdict and does not replace QAMESH evidence.
+- In `auto qa release`, `canary-explicit` is a bridge lane for an explicit post-deploy smoke Journey Pack. Without that Journey Pack, report a setup gap instead of inventing a canary command.
+
 ### Command Selection
 
 - Use `auto qa plan --format json` to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without executing project commands.
 - Use `auto qa init --format json` to create project-local starter Journey Packs from detected desktop GUI signals. Existing packs are preserved and generated packs require human review before execution.
 - Use `auto qa run --format json` to execute deterministic project QA and produce QAMESH run-index/evidence output.
 - Use `auto qa explore --dry-run --format json` before explicit GUI exploration, and run it only for local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
-- Use `auto qa release --dry-run --format json` to inspect release lanes, setup gaps, blocker rules, redacted command previews, and sibling SPEC readiness before executing a release gate; use `auto qa release --roadmap --format json` for roadmap governance.
+- Use `auto qa release --dry-run --format json` to inspect release lanes, setup gaps, blocker rules, redacted command previews, sibling SPEC readiness, and the `canary-explicit` post-deploy smoke bridge lane before executing a release gate; use `auto qa release --roadmap --format json` for roadmap governance.
 - Use `auto qa evidence` when a producer already wrote a QAMESH manifest and the task is validation, redaction, and publication.
 - Use `auto qa feedback` to turn existing failed QAMESH evidence into provider-specific repair prompt bundles.
 - ADK is a harness: concrete commands, origins, oracles, and artifacts belong in a project-local Journey Pack under `.autopus/qa/journeys/**`, not in ADK templates.
@@ -1827,6 +1833,12 @@ Usage: `/auto qa init --format json`, `/auto qa plan --format json`, `/auto qa r
 ## canary — Post-deploy Health Check
 
 Run post-deploy health checks: build verification, E2E scenario execution, and browser health inspection.
+
+### Scope Boundary
+
+- `auto canary` is a post-deploy or staging smoke/status gate. It gives the latest operational verdict and writes `.autopus/canary/latest.json`.
+- If the task needs QAMESH manifests, redacted artifacts, run indexes, repair prompt bundles, or cross-surface user journey evidence, route to `auto qa ...`.
+- `auto qa release` may include `canary-explicit`, but that is only a bridge lane for an explicit post-deploy smoke Journey Pack.
 
 ### Pipeline
 

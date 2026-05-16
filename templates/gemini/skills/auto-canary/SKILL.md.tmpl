@@ -19,6 +19,12 @@ triggers:
 
 배포 후 건강 검진을 실행합니다. 빌드, E2E, 브라우저 검사를 순서대로 수행하고 PASS/WARN/FAIL 판정을 냅니다.
 
+## Scope Boundary
+
+- `auto canary`는 post-deploy 또는 staging smoke/status gate입니다. 목표는 현재 빌드, endpoint, browser surface가 운영 가능한지 빠르게 판정하고 `.autopus/canary/latest.json`에 최신 상태를 남기는 것입니다.
+- QAMESH manifest, redacted artifact, run index, repair prompt bundle이 필요하거나 browser/desktop/mobile 사용자 journey를 evidence로 남겨야 하면 `auto qa ...`를 사용합니다.
+- `auto qa release` 안의 `canary-explicit` lane은 명시된 post-deploy smoke Journey Pack을 release gate에 연결하는 bridge lane입니다. Canary 자체가 전체 QAMESH QA mesh를 대체하지 않습니다.
+
 ## 사용법
 
 ```bash
@@ -39,8 +45,8 @@ triggers:
 ## 실행 순서
 
 1. `.autopus/project/canary.md` 또는 `.autopus/project/tech.md` 기준으로 빌드 검증
-2. `.autopus/project/scenarios.md` 기준으로 E2E 실행
-3. 브라우저 건강 검진 수행
+2. `.autopus/project/scenarios.md` 기준으로 smoke E2E 실행
+3. endpoint/browser 건강 검진 수행
 4. PASS/WARN/FAIL 판정
 5. `.autopus/canary/latest.json`에 결과 저장
 
