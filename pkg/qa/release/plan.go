@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
+	qaproject "github.com/insajin/autopus-adk/pkg/qa/project"
 )
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-004: dry-run release plan is the side-effect-free contract for gate inspection.
@@ -14,12 +15,13 @@ func BuildPlan(opts Options) (Plan, error) {
 		return Plan{}, err
 	}
 	policy, _ := profilePolicy(opts.Profile)
-	blockerRules, _ := BlockerRulesForProfile(opts.Profile)
 	packs, err := journey.LoadDir(opts.ProjectDir)
 	if err != nil {
 		return Plan{}, err
 	}
 	journeyRows, redactionStatus := journeyPackRows(packs)
+	policy = adaptPolicyToProject(opts.ProjectDir, policy, journeyRows)
+	blockerRules := blockerRulesForPolicy(opts.Profile, policy)
 	setupGaps := releaseSetupGaps(policy, journeyRows)
 	redactionStatus = setupGapRedactionStatus(setupGaps, redactionStatus)
 	return Plan{
@@ -38,6 +40,59 @@ func BuildPlan(opts Options) (Plan, error) {
 		RedactionRules:  RedactionRules(),
 		SideEffects:     []string{},
 	}, nil
+}
+
+func adaptPolicyToProject(projectDir string, policy ProfilePolicy, rows []JourneyPackRow) ProfilePolicy {
+	hasBrowser := qaproject.HasBrowserSignals(projectDir) || laneCoveredByRows(rows, "browser-staging")
+	hasDesktop := qaproject.HasDesktopGUISignals(projectDir) || laneCoveredByRows(rows, "desktop-native")
+	hasGUI := hasBrowser || hasDesktop || laneCoveredByRows(rows, "gui-explore")
+	if !hasBrowser {
+		policy = demoteLane(policy, "browser-staging")
+	}
+	if !hasDesktop {
+		policy = demoteLane(policy, "desktop-native")
+	}
+	if !hasGUI {
+		policy = demoteLane(policy, "gui-explore")
+	}
+	return policy
+}
+
+func laneCoveredByRows(rows []JourneyPackRow, lane string) bool {
+	for _, row := range rows {
+		if row.Lane == lane {
+			return true
+		}
+	}
+	return false
+}
+
+func demoteLane(policy ProfilePolicy, lane string) ProfilePolicy {
+	policy.MustLanes = removeLane(policy.MustLanes, lane)
+	policy.OptionalLanes = removeLane(policy.OptionalLanes, lane)
+	if !containsLane(policy.DeferredLanes, lane) {
+		policy.DeferredLanes = append(policy.DeferredLanes, lane)
+	}
+	return policy
+}
+
+func removeLane(values []string, lane string) []string {
+	out := values[:0]
+	for _, value := range values {
+		if value != lane {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func containsLane(values []string, lane string) bool {
+	for _, value := range values {
+		if value == lane {
+			return true
+		}
+	}
+	return false
 }
 
 func journeyPackRows(packs []journey.Pack) ([]JourneyPackRow, RedactionState) {

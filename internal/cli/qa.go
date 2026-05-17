@@ -18,6 +18,7 @@ func newQACmd() *cobra.Command {
 		SilenceErrors: true,
 	}
 	cmd.AddCommand(newQAInitCmd())
+	cmd.AddCommand(newQABootstrapCmd())
 	cmd.AddCommand(newQAPlanCmd())
 	cmd.AddCommand(newQAAdaptersCmd())
 	cmd.AddCommand(newQARunCmd())

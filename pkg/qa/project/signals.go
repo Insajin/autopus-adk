@@ -41,6 +41,35 @@ func HasDesktopGUISignals(projectDir string) bool {
 	return false
 }
 
+// HasBrowserSignals detects browser-facing project signals without inferring
+// concrete staging journeys from ADK itself.
+func HasBrowserSignals(projectDir string) bool {
+	if existsAny(projectDir,
+		"playwright.config.ts",
+		"playwright.config.js",
+		"playwright.config.mjs",
+		"playwright.config.cjs",
+		"next.config.ts",
+		"next.config.js",
+		"nuxt.config.ts",
+		"nuxt.config.js",
+		"vite.config.ts",
+		"vite.config.js",
+	) {
+		return true
+	}
+	pkg, ok := readPackageJSON(filepath.Join(projectDir, "package.json"))
+	if !ok {
+		return false
+	}
+	for _, dep := range []string{"@playwright/test", "playwright", "next", "nuxt", "vite", "react", "vue", "svelte"} {
+		if pkg.hasDependency(dep) {
+			return true
+		}
+	}
+	return false
+}
+
 func existsAny(root string, rels ...string) bool {
 	for _, rel := range rels {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil {

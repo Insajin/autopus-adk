@@ -41,6 +41,7 @@ func Execute(opts Options) (ExecutionPayload, error) {
 		AIAnalysisRefs:         []AIAnalysisRef{},
 	}
 	policy, _ := profilePolicy(opts.Profile)
+	policy = adaptPolicyToProject(opts.ProjectDir, policy, plan.JourneyPacks)
 	gaps := gapsByLane(plan.SetupGaps)
 	blocked := false
 	for _, lane := range ReleaseLanes() {

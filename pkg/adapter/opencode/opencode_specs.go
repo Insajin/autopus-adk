@@ -82,7 +82,7 @@ var workflowSpecs = []workflowSpec{
 	},
 	{
 		Name:        "auto-qa",
-		Description: "QAMESH project QA mesh — auto qa init, auto qa plan, auto qa run, auto qa evidence, auto qa feedback guidance",
+		Description: "QAMESH project QA mesh — auto qa init, plan, run, release, evidence, and feedback guidance",
 		PromptPath:  "codex/prompts/auto-qa.md.tmpl",
 		SkillPath:   "codex/skills/auto-qa.md.tmpl",
 	},

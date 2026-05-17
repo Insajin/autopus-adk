@@ -14,6 +14,8 @@ func TestBuildPlanEmitsReleaseContractAndRedactsCommandPreview(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src-tauri"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "src-tauri", "Cargo.toml"), []byte("[package]\nname = \"desktop\"\n"), 0o644))
 	writeReleaseJourney(t, dir, "unit", "fast", "go-test", []string{
 		"go", "test", "./...", "--password", "hunter2",
 		"--report", "https://user:pass@example.test/out",
@@ -67,6 +69,23 @@ func TestBuildPlanEmitsReleaseContractAndRedactsCommandPreview(t *testing.T) {
 	assert.Equal(t, BlockingMatrixVersion, plan.BlockerRules.MatrixVersion)
 	assert.Contains(t, plan.OutputPaths.ReleaseIndexPreviewPath, "release-index.json")
 	assert.Contains(t, siblingSpecIDs(plan.SiblingSpecs), "SPEC-QAMESH-006")
+}
+
+func TestBuildPlanDemotesInapplicableSurfaceLanes(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeReleaseJourney(t, dir, "unit", "fast", "go-test", []string{"go", "test", "./..."})
+	writeReleaseJourney(t, dir, "canary", "canary-explicit", "canary-template", []string{"auto", "canary"})
+
+	plan, err := BuildPlan(Options{ProjectDir: dir, Profile: "release-candidate", DryRun: true})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"fast", "canary-explicit"}, plan.BlockerRules.MustLanes)
+	assert.NotContains(t, plan.BlockerRules.MustLanes, "browser-staging")
+	assert.NotContains(t, plan.BlockerRules.MustLanes, "desktop-native")
+	assertReleaseGap(t, plan.SetupGaps, "browser-staging", SetupGapMissingJourneyPack, false, SeverityMedium)
+	assertReleaseGap(t, plan.SetupGaps, "desktop-native", SetupGapMissingJourneyPack, false, SeverityMedium)
 }
 
 func TestBuildPlanSerializesEmptyAcceptanceRefsAsArray(t *testing.T) {

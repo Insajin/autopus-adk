@@ -33,8 +33,9 @@ func TestQAInitCmd_CreatesValidatedDesktopGUIJourneyPack(t *testing.T) {
 	journeyPath := filepath.Join(dir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml")
 	assert.FileExists(t, journeyPath)
 	created := data["created"].([]any)
-	require.Len(t, created, 1)
-	assert.Equal(t, "desktop-gui-explore", created[0].(map[string]any)["id"])
+	assertContainsCreatedID(t, created, "desktop-gui-explore")
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
+	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
 
 	pack, err := journey.LoadFile(journeyPath)
 	require.NoError(t, err)
@@ -42,6 +43,97 @@ func TestQAInitCmd_CreatesValidatedDesktopGUIJourneyPack(t *testing.T) {
 	assert.Equal(t, "gui-explore", pack.Adapter.ID)
 	assert.Contains(t, pack.Lanes, "gui-explore")
 	assert.Contains(t, pack.GUI.AllowedOrigins, "http://127.0.0.1:1420")
+}
+
+func TestQAInitCmd_CreatesDetectedGoFastJourneyPack(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/app\n\ngo 1.26\n"), 0o644))
+
+	cmd := newQACmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"init", "--project-dir", dir, "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+	data := decodeJSONMap(t, out.Bytes())["data"].(map[string]any)
+	assert.Equal(t, "created", data["status"])
+
+	journeyPath := filepath.Join(dir, ".autopus", "qa", "journeys", "go-fast.yaml")
+	assert.FileExists(t, journeyPath)
+	pack, err := journey.LoadFile(journeyPath)
+	require.NoError(t, err)
+	require.NoError(t, journey.Validate(pack, dir))
+	assert.Equal(t, "go-test", pack.Adapter.ID)
+	assert.Equal(t, []string{"go", "test", "./..."}, pack.Command.Argv)
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
+	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
+}
+
+func TestQAInitCmd_DefaultScaffoldsReleaseWorkflowGate(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	packageJSON := []byte(`{
+  "scripts": {
+    "test": "vitest run",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.0.0",
+    "vitest": "^1.0.0"
+  }
+}`)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), packageJSON, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte("{}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "playwright.config.ts"), []byte("export default {}\n"), 0o644))
+
+	cmd := newQACmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"init", "--project-dir", dir, "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+	data := decodeJSONMap(t, out.Bytes())["data"].(map[string]any)
+	assert.Equal(t, "created", data["status"])
+
+	for _, name := range []string{"node-fast.yaml", "browser-staging-playwright.yaml", "canary-explicit.yaml"} {
+		path := filepath.Join(dir, ".autopus", "qa", "journeys", name)
+		assert.FileExists(t, path)
+		pack, err := journey.LoadFile(path)
+		require.NoError(t, err)
+		require.NoError(t, journey.Validate(pack, dir))
+	}
+	workflowPath := filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml")
+	body, err := os.ReadFile(workflowPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "auto qa release --project-dir . --profile")
+	assert.Contains(t, string(body), "npm ci")
+	assert.Contains(t, string(body), "npx playwright install chromium --with-deps")
+}
+
+func TestQABootstrapCmd_UsesReleaseWorkflowDefaults(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/app\n\ngo 1.26\n"), 0o644))
+
+	cmd := newQACmd()
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+	cmd.SetArgs([]string{"bootstrap", "--project-dir", dir, "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+	payload := decodeJSONMap(t, out.Bytes())
+	assertCommonJSONEnvelope(t, payload, "qa bootstrap")
+	data := payload["data"].(map[string]any)
+	assert.Equal(t, "created", data["status"])
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "go-fast.yaml"))
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
+	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
 }
 
 func TestQAInitCmd_PreservesExistingJourneyPack(t *testing.T) {
@@ -58,7 +150,7 @@ func TestQAInitCmd_PreservesExistingJourneyPack(t *testing.T) {
 	cmd := newQACmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	cmd.SetArgs([]string{"init", "--project-dir", dir, "--format", "json"})
+	cmd.SetArgs([]string{"init", "--project-dir", dir, "--local-only", "--format", "json"})
 
 	require.NoError(t, cmd.Execute())
 	data := decodeJSONMap(t, out.Bytes())["data"].(map[string]any)
@@ -69,18 +161,47 @@ func TestQAInitCmd_PreservesExistingJourneyPack(t *testing.T) {
 	assert.Equal(t, "# user-owned journey pack\n", string(body))
 }
 
-func TestQAInitCmd_NoopsWithoutDesktopGUISignals(t *testing.T) {
+func TestQAInitCmd_LocalOnlySkipsReleaseWorkflow(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/app\n\ngo 1.26\n"), 0o644))
+
+	cmd := newQACmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"init", "--project-dir", dir, "--local-only", "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+	data := decodeJSONMap(t, out.Bytes())["data"].(map[string]any)
+	assert.Equal(t, "created", data["status"])
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "go-fast.yaml"))
+	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
+	assert.NoFileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
+}
+
+func TestQAInitCmd_LocalOnlyNoopsWithoutQASignals(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	cmd := newQACmd()
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	cmd.SetArgs([]string{"init", "--project-dir", dir, "--format", "json"})
+	cmd.SetArgs([]string{"init", "--project-dir", dir, "--local-only", "--format", "json"})
 
 	require.NoError(t, cmd.Execute())
 	data := decodeJSONMap(t, out.Bytes())["data"].(map[string]any)
 	assert.Equal(t, "noop", data["status"])
 	assert.NotEmpty(t, data["warnings"])
 	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml"))
+}
+
+func assertContainsCreatedID(t *testing.T, created []any, id string) {
+	t.Helper()
+	for _, item := range created {
+		if item.(map[string]any)["id"] == id {
+			return
+		}
+	}
+	t.Fatalf("created files did not include %q: %#v", id, created)
 }

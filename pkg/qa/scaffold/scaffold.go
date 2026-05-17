@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
-	qaproject "github.com/insajin/autopus-adk/pkg/qa/project"
 )
 
 const (
@@ -19,6 +18,8 @@ const (
 
 type Options struct {
 	ProjectDir string
+	Release    bool
+	Workflow   string
 }
 
 type Result struct {
@@ -41,50 +42,78 @@ func Init(opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	workflow, err := normalizeWorkflow(opts.Workflow)
+	if err != nil {
+		return Result{}, err
+	}
+	if workflow != workflowNone {
+		opts.Release = true
+	}
 	result := Result{
 		Status:     "noop",
 		ProjectDir: projectDir,
 	}
-	if !qaproject.HasDesktopGUISignals(projectDir) {
-		result.Warnings = []string{"no desktop GUI signals detected; auto qa init did not create a starter Journey Pack"}
-		result.NextSteps = []string{"Run auto qa plan --format json to inspect existing project QA coverage."}
-		return result, nil
+
+	for _, starter := range detectJourneyStarters(projectDir, opts.Release) {
+		if err := ensureStarter(projectDir, starter, &result); err != nil {
+			return Result{}, err
+		}
 	}
-	path, err := desktopGUIJourneyPath(projectDir)
+	if workflow == workflowGitHubActions {
+		if err := ensureStarter(projectDir, githubActionsWorkflowStarter(projectDir), &result); err != nil {
+			return Result{}, err
+		}
+	}
+
+	if len(result.Created) > 0 {
+		result.Status = "created"
+	} else if len(result.Skipped) > 0 {
+		result.Status = "skipped"
+	} else {
+		result.Warnings = []string{"no supported QA signals detected; no starter files were created"}
+	}
+	result.NextSteps = initNextSteps(opts.Release, workflow)
+	return result, nil
+}
+
+func ensureStarter(projectDir string, starter starterFile, result *Result) error {
+	path := filepath.Join(projectDir, filepath.FromSlash(starter.RelPath))
+	rel, err := filepath.Rel(projectDir, path)
 	if err != nil {
-		return Result{}, err
+		return err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("scaffold path escapes project root")
 	}
 	file := FileResult{
-		ID:   DesktopGUIJourneyID,
+		ID:   starter.ID,
 		Path: filepath.ToSlash(path),
 	}
 	if _, err := os.Stat(path); err == nil {
-		file.Reason = "existing project-local Journey Pack preserved"
-		result.Status = "skipped"
+		file.Reason = "existing project-local file preserved"
 		result.Skipped = append(result.Skipped, file)
-		result.NextSteps = initNextSteps()
-		return result, nil
+		return nil
 	} else if !errors.Is(err, os.ErrNotExist) {
-		return Result{}, err
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return Result{}, err
+		return err
 	}
-	if err := writeNewFile(path, []byte(desktopGUIJourneyYAML)); err != nil {
-		return Result{}, err
+	if err := writeNewFile(path, []byte(starter.Body)); err != nil {
+		return err
 	}
-	pack, err := journey.LoadFile(path)
-	if err != nil {
-		return Result{}, err
+	if starter.ValidateJourney {
+		pack, err := journey.LoadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := journey.Validate(pack, projectDir); err != nil {
+			return err
+		}
 	}
-	if err := journey.Validate(pack, projectDir); err != nil {
-		return Result{}, err
-	}
-	file.Reason = "desktop GUI target signals detected"
-	result.Status = "created"
+	file.Reason = starter.Reason
 	result.Created = append(result.Created, file)
-	result.NextSteps = initNextSteps()
-	return result, nil
+	return nil
 }
 
 func normalizeProjectDir(value string) (string, error) {
@@ -109,19 +138,6 @@ func normalizeProjectDir(value string) (string, error) {
 	return real, nil
 }
 
-func desktopGUIJourneyPath(projectDir string) (string, error) {
-	root := filepath.Join(projectDir, filepath.FromSlash(journeyRootRel))
-	target := filepath.Join(root, DesktopGUIJourneyID+".yaml")
-	rel, err := filepath.Rel(projectDir, target)
-	if err != nil {
-		return "", err
-	}
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("journey path escapes project root")
-	}
-	return target, nil
-}
-
 func writeNewFile(path string, body []byte) error {
 	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
@@ -138,61 +154,29 @@ func writeNewFile(path string, body []byte) error {
 	return nil
 }
 
-func initNextSteps() []string {
-	return []string{
-		"Review .autopus/qa/journeys/desktop-gui-explore.yaml for the real app command, origin, forbidden actions, and deterministic oracle.",
-		"Run auto qa plan --lane gui-explore --format json before executing GUI exploration.",
+func initNextSteps(release bool, workflow string) []string {
+	steps := []string{
+		"Review .autopus/qa/journeys/*.yaml and replace starter commands with project-owned deterministic checks before trusting them.",
+		"Run auto qa plan --format json to inspect runnable lanes and setup gaps.",
 	}
+	if release {
+		steps = append(steps, "Run auto qa release --dry-run --profile release-candidate --format json before enabling the gate on a release branch or tag.")
+	}
+	if workflow == workflowGitHubActions {
+		steps = append(steps, "Review .github/workflows/autopus-qa-release.yml and pin the auto installer version before making it required.")
+	}
+	return steps
 }
 
-const desktopGUIJourneyYAML = `# Generated by auto qa init. Review before executing.
-# ADK is a harness; this project-local Journey Pack owns product-specific GUI policy.
-id: desktop-gui-explore
-title: Desktop GUI exploration starter
-surface: desktop
-lanes: [gui-explore]
-adapter:
-  id: gui-explore
-command:
-  run: npm exec playwright test
-  cwd: .
-  timeout: 120s
-checks:
-  - id: desktop-gui-explore
-    type: gui_exploration
-artifacts:
-  - kind: journey_graph
-    path: .autopus/qa/gui/desktop-gui-explore/journey-graph.json
-  - kind: aria_snapshot
-    path: .autopus/qa/gui/desktop-gui-explore/a11y.aria.yml
-  - kind: console_summary
-    path: .autopus/qa/gui/desktop-gui-explore/console-summary.json
-  - kind: network_summary
-    path: .autopus/qa/gui/desktop-gui-explore/network-summary.json
-  - kind: screenshot_quarantine_ref
-    path: .autopus/qa/gui/desktop-gui-explore/screenshot-ref.json
-gui:
-  allowed_origins:
-    - http://127.0.0.1:1420
-  forbidden_actions:
-    - mutation
-    - payment
-    - email_send
-  selector_strategy: role-first
-  network_policy:
-    mode: local-only
-  artifact_retention:
-    publish_raw: false
-source_refs:
-  source_spec: SPEC-QAMESH-003
-  acceptance_refs:
-    - AC-QAMESH3-004
-    - AC-QAMESH3-006
-  owned_paths:
-    - src/**
-    - src-tauri/**
-  do_not_modify_paths:
-    - .codex/**
-    - .opencode/**
-    - .autopus/plugins/**
-`
+func normalizeWorkflow(value string) (string, error) {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		value = workflowNone
+	}
+	switch value {
+	case workflowNone, workflowGitHubActions:
+		return value, nil
+	default:
+		return "", fmt.Errorf("unsupported workflow %q", value)
+	}
+}

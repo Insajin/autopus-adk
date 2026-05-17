@@ -5,6 +5,10 @@ func BlockerRulesForProfile(profile string) (BlockerRules, error) {
 	if err != nil {
 		return BlockerRules{}, err
 	}
+	return blockerRulesForPolicy(profile, policy), nil
+}
+
+func blockerRulesForPolicy(profile string, policy ProfilePolicy) BlockerRules {
 	return BlockerRules{
 		Profile:       profile,
 		MustLanes:     policy.MustLanes,
@@ -13,7 +17,7 @@ func BlockerRulesForProfile(profile string) (BlockerRules, error) {
 		SeverityOrder: SeverityOrder(),
 		MatrixVersion: BlockingMatrixVersion,
 		RuleRows:      policyRuleRows(),
-	}, nil
+	}
 }
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-004: lane row normalization is shared by planning, execution, and blocker matrix tests.

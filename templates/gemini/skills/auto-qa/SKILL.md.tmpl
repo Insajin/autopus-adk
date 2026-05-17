@@ -1,7 +1,7 @@
 ---
 name: auto-qa
 version: "1.0.0"
-description: QAMESH project QA mesh — auto qa init/plan/run/explore/evidence/feedback guidance
+description: QAMESH project QA mesh — auto qa init/plan/run/explore/release/evidence/feedback guidance
 platform: gemini-cli
 project: {{.ProjectName}}
 mode: {{.Mode}}
@@ -12,6 +12,7 @@ triggers:
   - "auto qa plan"
   - "auto qa run"
   - "auto qa explore"
+  - "auto qa release"
   - "auto qa evidence"
   - "auto qa feedback"
 ---
@@ -33,7 +34,8 @@ QAMESH는 project-level deterministic QA 실행, manifest validation, redaction,
 ## Command Selection
 
 - Use `auto qa plan --format json` before execution to inspect Journey Packs, detected adapters, lanes, setup gaps, and output paths without running commands.
-- Use `auto qa init --format json` to create project-local starter Journey Packs from detected desktop GUI signals. Existing packs are preserved and generated packs require human review before execution.
+- Use `auto qa init --format json` as the simple default release-QA setup command. It creates project-local starter Journey Packs and a generic GitHub Actions release gate from detected Go, Node, Python, Rust, Playwright, and desktop signals. Existing files are preserved and generated files require human review before execution.
+- Use `auto qa init --local-only --format json` only when the caller wants Journey Pack starters without release lanes or workflow scaffolding.
 - Use `auto qa run --format json` to execute deterministic project QA and produce run-index/evidence output.
 - Use `auto qa explore --dry-run --format json` before explicit GUI exploration, and run it only when the Journey Pack declares allowed origins, forbidden actions, redaction, and artifact retention policy.
 - Use `auto qa release --dry-run --format json` to inspect release lanes, setup gaps, blocker rules, redacted command previews, sibling SPEC readiness, and the `canary-explicit` post-deploy smoke bridge lane before executing a release gate; use `auto qa release --roadmap --format json` for roadmap governance.
