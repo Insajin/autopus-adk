@@ -196,6 +196,20 @@ func normalizeGenerateOptions(opts *GenerateOptions) GenerateOptions {
 }
 
 func buildSignatureTarget(projectDir string, cfg *config.HarnessConfig) (plannedTarget, bool, error) {
+	if cfg == nil || cfg.Context.SignatureMap {
+		if _, err := os.Stat(filepath.Join(projectDir, "go.mod")); err != nil {
+			if os.IsNotExist(err) {
+				return buildSkipTarget(
+					projectDir,
+					filepath.Join(projectDir, signaturesDir, signaturesFile),
+					ChangeClassGeneratedSurface,
+					"signature map generation requires a root go.mod; meta workspace skipped",
+				), true, nil
+			}
+			return plannedTarget{}, false, fmt.Errorf("inspect go.mod for signature map: %w", err)
+		}
+	}
+
 	content, enabled, err := renderSignatureMapContent(projectDir, cfg)
 	if err != nil {
 		return plannedTarget{}, false, fmt.Errorf("render signature map: %w", err)

@@ -75,3 +75,27 @@ func TestBuildGeneratePlan_MultiRepoWorkspaceHint(t *testing.T) {
 	require.NoError(t, statErr)
 	assert.True(t, info.IsDir())
 }
+
+func TestBuildGeneratePlan_MetaWorkspaceWithoutGoModSkipsSignatureMap(t *testing.T) {
+	t.Parallel()
+
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, "README.md", "# Meta Workspace\n")
+	writeFile(t, filepath.Join(projectDir, "Autopus"), "go.mod", "module example.com/autopus\n\ngo 1.23\n")
+
+	plan, err := BuildGeneratePlan(projectDir, nil)
+	require.NoError(t, err)
+
+	var signatureChange *PlannedChange
+	for i := range plan.Changes {
+		if plan.Changes[i].Path == filepath.Join(".autopus", "context", "signatures.md") {
+			signatureChange = &plan.Changes[i]
+			break
+		}
+	}
+	require.NotNil(t, signatureChange)
+	assert.Equal(t, ChangeActionSkip, signatureChange.Action)
+	assert.Equal(t, ChangeClassGeneratedSurface, signatureChange.Class)
+	assert.Contains(t, signatureChange.Reason, "requires a root go.mod")
+	assert.NoFileExists(t, filepath.Join(projectDir, ".autopus", "context", "signatures.md"))
+}
