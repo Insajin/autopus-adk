@@ -31,6 +31,7 @@ func TestClaudeAdapterBuildCommand(t *testing.T) {
 	assert.Contains(t, cmd.Args, "--output-format")
 	assert.Contains(t, cmd.Args, "stream-json")
 	assert.Contains(t, cmd.Args, "--verbose")
+	assert.NotContains(t, cmd.Args, "--bare")
 	assert.Contains(t, cmd.Args, "--resume")
 	assert.Contains(t, cmd.Args, "worker-sess-task-123")
 	assert.Contains(t, cmd.Args, "--mcp-config")
@@ -125,6 +126,34 @@ func TestClaudeAdapterExtractResult(t *testing.T) {
 	assert.Equal(t, int64(1200), result.DurationMS)
 	assert.Equal(t, "sess-1", result.SessionID)
 	assert.Equal(t, "done", result.Output)
+}
+
+func TestClaudeAdapterExtractResultCurrentClaudeResultField(t *testing.T) {
+	a := NewClaudeAdapter()
+
+	evt := StreamEvent{
+		Type: "result",
+		Data: []byte(`{"cost_usd":0.02,"duration_ms":900,"session_id":"sess-2","result":"done from result field"}`),
+	}
+
+	result := a.ExtractResult(evt)
+	assert.Equal(t, "done from result field", result.Output)
+	assert.False(t, result.IsError)
+}
+
+func TestClaudeAdapterExtractResultError(t *testing.T) {
+	a := NewClaudeAdapter()
+
+	evt := StreamEvent{
+		Type: "result",
+		Data: []byte(`{"is_error":true,"api_error_status":401,"result":"Failed to authenticate. API Error: 401 Invalid authentication credentials","session_id":"sess-err"}`),
+	}
+
+	result := a.ExtractResult(evt)
+	assert.True(t, result.IsError)
+	assert.Equal(t, "Failed to authenticate. API Error: 401 Invalid authentication credentials", result.Output)
+	assert.Equal(t, "claude api error 401: Failed to authenticate. API Error: 401 Invalid authentication credentials", result.Error)
+	assert.Equal(t, "sess-err", result.SessionID)
 }
 
 func TestClaudeAdapterExtractResultInvalidJSON(t *testing.T) {

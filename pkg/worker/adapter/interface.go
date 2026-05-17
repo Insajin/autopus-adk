@@ -44,6 +44,8 @@ type TaskResult struct {
 	DurationMS int64
 	SessionID  string
 	Output     string
+	IsError    bool
+	Error      string
 	Artifacts  []Artifact
 }
 

@@ -22,10 +22,13 @@ type Event struct {
 
 // ResultData holds extracted data from a "result" event.
 type ResultData struct {
-	CostUSD    float64 `json:"cost_usd"`
-	DurationMS int64   `json:"duration_ms"`
-	SessionID  string  `json:"session_id"`
-	Output     string  `json:"output,omitempty"`
+	CostUSD        float64 `json:"cost_usd"`
+	DurationMS     int64   `json:"duration_ms"`
+	SessionID      string  `json:"session_id"`
+	Output         string  `json:"output,omitempty"`
+	Result         string  `json:"result,omitempty"`
+	IsError        bool    `json:"is_error,omitempty"`
+	APIErrorStatus int     `json:"api_error_status,omitempty"`
 }
 
 // InitData holds data from a "system.init" event.

@@ -177,6 +177,9 @@ func (pe *PipelineExecutor) parsePhaseStream(r io.Reader, taskID string, phase P
 		result.DurationMS = tr.DurationMS
 		result.SessionID = tr.SessionID
 		hasResult = true
+		if tr.IsError {
+			return result, providerResultError(pe.provider.Name(), tr)
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return PhaseResult{}, fmt.Errorf("stream scan: %w", err)

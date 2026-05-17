@@ -136,6 +136,9 @@ func (wl *WorkerLoop) executeWithBudget(ctx context.Context, taskCfg adapter.Tas
 		}
 		return adapter.TaskResult{}, fmt.Errorf("parse stream: %w", parseErr)
 	}
+	if result.IsError {
+		return result, providerResultError(wl.config.Provider.Name(), result)
+	}
 	if waitErr != nil {
 		if result.Output != "" {
 			log.Printf("[worker] task %s: exited with error but produced output: %v", taskID, waitErr)
@@ -149,6 +152,21 @@ func (wl *WorkerLoop) executeWithBudget(ctx context.Context, taskCfg adapter.Tas
 	}
 
 	return result, nil
+}
+
+func providerResultError(provider string, result adapter.TaskResult) error {
+	message := strings.TrimSpace(result.Error)
+	if message == "" {
+		message = strings.TrimSpace(result.Output)
+	}
+	if message == "" {
+		message = "provider result marked as error"
+	}
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		provider = "provider"
+	}
+	return fmt.Errorf("%s result error: %s", provider, message)
 }
 
 func (wl *WorkerLoop) parseStream(r io.Reader, taskID string) (adapter.TaskResult, error) {

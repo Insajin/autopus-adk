@@ -179,6 +179,8 @@ func TestBuildProviderConfigs_MixedKnownUnknown(t *testing.T) {
 	require.Len(t, configs, 2)
 
 	assert.Equal(t, "claude", configs[0].Binary, "claude must use hardcoded binary")
+	assert.Contains(t, configs[0].Args, "high", "claude fallback must match current default effort")
+	assert.NotContains(t, configs[0].Args, "max", "claude fallback must not resurrect deprecated max effort")
 	assert.Equal(t, "my-tool", configs[1].Binary, "unknown provider must use name as binary")
 }
 

@@ -63,6 +63,28 @@ func TestExecuteSubprocess_FailWithOutput(t *testing.T) {
 	assert.Equal(t, "partial result", result.Output)
 }
 
+func TestExecuteSubprocess_ProviderResultError(t *testing.T) {
+	claude := adapter.NewClaudeAdapter()
+	script := `head -c0; echo '{"type":"result","is_error":true,"api_error_status":401,"result":"Failed to authenticate. API Error: 401 Invalid authentication credentials","session_id":"session-auth"}'`
+	mock := &mockAdapter{
+		name:      "claude",
+		script:    script,
+		parseFn:   claude.ParseEvent,
+		extractFn: claude.ExtractResult,
+	}
+	wl := &WorkerLoop{config: LoopConfig{Provider: mock}}
+
+	result, err := wl.executeSubprocess(context.Background(), adapter.TaskConfig{
+		TaskID: "test-provider-error",
+		Prompt: "auth failure",
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "claude result error")
+	assert.Contains(t, err.Error(), "claude api error 401")
+	assert.Equal(t, "Failed to authenticate. API Error: 401 Invalid authentication credentials", result.Output)
+	assert.Equal(t, "session-auth", result.SessionID)
+}
+
 func TestExecuteSubprocess_NoResultEvent(t *testing.T) {
 	script := `head -c0; echo '{"type":"system.init"}'; echo '{"type":"system.task_started"}'`
 	mock := &mockAdapter{name: "mock", script: script}

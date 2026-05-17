@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/worker/stream"
 )
@@ -32,7 +33,6 @@ func (a *ClaudeAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 		"--output-format", "stream-json",
 		"--verbose",
 		"--dangerously-skip-permissions",
-		"--bare",
 	}
 
 	args = append(args, "--resume", sessionID)
@@ -90,10 +90,25 @@ func (a *ClaudeAdapter) ExtractResult(event StreamEvent) TaskResult {
 	if err := json.Unmarshal(event.Data, &rd); err != nil {
 		return TaskResult{Output: string(event.Data)}
 	}
-	return TaskResult{
+	output := rd.Output
+	if output == "" {
+		output = rd.Result
+	}
+	result := TaskResult{
 		CostUSD:    rd.CostUSD,
 		DurationMS: rd.DurationMS,
 		SessionID:  rd.SessionID,
-		Output:     rd.Output,
+		Output:     output,
+		IsError:    rd.IsError,
 	}
+	if rd.IsError {
+		result.Error = strings.TrimSpace(output)
+		if result.Error == "" {
+			result.Error = "claude result marked as error"
+		}
+		if rd.APIErrorStatus > 0 {
+			result.Error = fmt.Sprintf("claude api error %d: %s", rd.APIErrorStatus, result.Error)
+		}
+	}
+	return result
 }

@@ -6,7 +6,7 @@ import "slices"
 // defaultProviderEntries holds the canonical default settings for known orchestra providers.
 // @AX:NOTE: [AUTO] hardcoded provider defaults — update when adding new providers or changing CLI flags
 var defaultProviderEntries = map[string]ProviderEntry{
-	"claude": {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "max"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "max"}},
+	"claude": {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}},
 	"codex":  DefaultCodexProviderEntry(),
 	"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
 }
@@ -87,6 +87,16 @@ func migrateKnownProviderDefaults(cfg *HarnessConfig) bool {
 				changed = true
 			}
 		}
+		if providerName == "claude" {
+			if args, migrated := migrateClaudeDeprecatedEffort(existing.Args); migrated {
+				existing.Args = args
+				changed = true
+			}
+			if paneArgs, migrated := migrateClaudeDeprecatedEffort(existing.PaneArgs); migrated {
+				existing.PaneArgs = paneArgs
+				changed = true
+			}
+		}
 		if existing.Subprocess.SchemaFlag == "" && defaults.Subprocess.SchemaFlag != "" {
 			existing.Subprocess.SchemaFlag = defaults.Subprocess.SchemaFlag
 			changed = true
@@ -115,6 +125,16 @@ func migrateCodexDeprecatedArgs(args []string) ([]string, bool) {
 		next = append(next, arg)
 	}
 	return next, changed
+}
+
+func migrateClaudeDeprecatedEffort(args []string) ([]string, bool) {
+	if !slices.Equal(args, []string{"--print", "--model", "opus", "--effort", "max"}) &&
+		!slices.Equal(args, []string{"-p", "--model", "opus", "--effort", "max"}) {
+		return args, false
+	}
+	next := append([]string{}, args...)
+	next[len(next)-1] = "high"
+	return next, true
 }
 
 // EnsureOrchestraProvider ensures a specific provider exists in the orchestra config.
