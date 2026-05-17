@@ -100,6 +100,27 @@ Opportunity-Solution Tree, 다관점 브레인스토밍, 가정 식별을 포함
 | brownfield_impact | answered/assumed/deferred | ... | 1-10 | ... | ... | reviewer focus |
 ```
 
+`Visual Brief`도 Step 3 입력과 사용자 설명에 포함합니다:
+
+````markdown
+## Visual Brief
+- Diagram type: flowchart | wireframe | sequence | data-flow | command-flow
+
+```mermaid
+flowchart TD
+  A[Current state] --> B[Proposed change]
+  B --> C[Outcome Lock]
+```
+
+```text
+[Low-fi wireframe or flow sketch]
+- UI가 있으면 화면/상태/행동을 배치합니다.
+- UI가 없으면 sequence/data-flow/command-flow를 사용합니다.
+```
+````
+
+Visual Brief는 설명 보조 자료입니다. Outcome Lock, mandatory requirements, acceptance seeds에 연결된 항목만 필수 범위로 취급합니다.
+
 Intent Brief의 Problem은 가능하면 `double-diamond` 형식으로 씁니다:
 `[사용자]는 [맥락]에서 [목표]를 달성하려 하지만 [장애물] 때문에 어렵다.`
 
@@ -147,7 +168,7 @@ ICE Top N 아이디어에 핵심 가정의 위험도를 오버레이합니다.
 ### Step 5: BS 파일 저장
 
 `.autopus/brainstorms/BS-{ID}.md`에 결과를 저장합니다.
-BS 파일에는 원본 아이디어뿐 아니라 `## Clarification Ledger`, Intent Brief, `## Outcome Lock`, `## Evolution Ideas`, 미해결 가정, debate focus를 함께 기록합니다.
+BS 파일에는 원본 아이디어뿐 아니라 `## Clarification Ledger`, Intent Brief, `## Visual Brief`, `## Outcome Lock`, `## Evolution Ideas`, 미해결 가정, debate focus를 함께 기록합니다.
 
 ## 출력
 
@@ -155,5 +176,7 @@ BS 파일에는 원본 아이디어뿐 아니라 `## Clarification Ledger`, Inte
 🐙 Workflow: BS-{ID}
   ● idea  →  ○ plan  →  ○ go  →  ○ sync
 ```
+
+출력은 workflow 상태와 함께 Visual Brief의 핵심 플로우차트 또는 wireframe 요지를 짧게 설명합니다.
 
 `--auto` 설정 시 Outcome Lock을 포함해 자동으로 `/auto plan --from-idea BS-{ID}`로 체이닝합니다.

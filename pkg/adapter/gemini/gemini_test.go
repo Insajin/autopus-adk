@@ -218,6 +218,8 @@ func TestGeminiAdapter_Generate_WorkflowSkillsAndCommandsStayAligned(t *testing.
 	assert.Contains(t, string(autoIdeaSkill), "Outcome Lock")
 	assert.Contains(t, string(autoIdeaSkill), "Evolution Ideas")
 	assert.Contains(t, string(autoIdeaSkill), "product-discovery")
+	assert.Contains(t, string(autoIdeaSkill), "Visual Brief")
+	assert.Contains(t, string(autoIdeaSkill), "wireframe")
 
 	autoPlanSkill, err := os.ReadFile(filepath.Join(dir, ".gemini", "skills", "autopus", "auto-plan", "SKILL.md"))
 	require.NoError(t, err)
@@ -228,4 +230,6 @@ func TestGeminiAdapter_Generate_WorkflowSkillsAndCommandsStayAligned(t *testing.
 	assert.Contains(t, string(autoPlanSkill), "Outcome Lock")
 	assert.Contains(t, string(autoPlanSkill), "Completion Debt")
 	assert.Contains(t, string(autoPlanSkill), "Evolution Ideas")
+	assert.Contains(t, string(autoPlanSkill), "Visual Planning Brief")
+	assert.Contains(t, string(autoPlanSkill), "sequence/data-flow")
 }

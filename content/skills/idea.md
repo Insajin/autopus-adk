@@ -113,6 +113,15 @@ Plan handoff mapping:
 - **Who**: 누구를 위한 것인가? (대상 사용자)
 - **When**: 언제 필요한가? (타임라인/맥락)
 
+#### Visual Brief Contract
+
+`idea` 결과는 텍스트 요약만으로 끝내지 말고 사용자 이해를 돕는 `Visual Brief`를 포함합니다.
+
+- 워크플로우, 사용자 여정, 의사결정 흐름이 핵심이면 Mermaid `flowchart`를 포함합니다.
+- 화면/UX가 관련된 아이디어이면 저충실도 텍스트 wireframe을 포함합니다.
+- UI가 없는 CLI/API/백엔드 아이디어이면 억지 wireframe 대신 sequence/data-flow/command-flow 다이어그램을 사용합니다.
+- Visual Brief는 설명 보조 자료입니다. Outcome Lock, mandatory requirements, acceptance seeds에 연결된 항목만 필수 범위로 취급합니다.
+
 #### Opportunity-Solution Tree (선택)
 
 아이디어가 기존 제품 개선인 경우, OST 프레임워크로 구조화:
@@ -419,7 +428,7 @@ BS-{ID} 파일 저장 후 Workflow Lifecycle 바 표시 및 다음 단계 안내
 
 `{target-module}/.autopus/brainstorms/BS-{ID}.md`:
 
-```markdown
+````markdown
 # BS-{ID}: {title}
 
 **Created**: {date}
@@ -450,6 +459,21 @@ BS-{ID} 파일 저장 후 Workflow Lifecycle 바 표시 및 다음 단계 안내
 - Explicit non-goals: {scope_boundary decisions}
 - Completion evidence: {how sync can verify this is done}
 
+## Visual Brief
+
+```mermaid
+flowchart TD
+  User[User intent] --> Outcome[Outcome Lock]
+  Outcome --> Candidate[Recommended direction]
+  Candidate --> Evidence[Completion evidence]
+```
+
+```text
+[Wireframe or flow sketch]
+- Include this only when UI/user-facing interaction helps explain the idea.
+- Use sequence/data-flow/command-flow instead for non-UI work.
+```
+
 ## 프로바이더별 발산 결과
 {raw brainstorm output}
 
@@ -469,7 +493,7 @@ These are improvement opportunities, not required follow-up work. They must not 
 
 ## 다음 단계
 `/auto plan --from-idea BS-{ID} "feature description"`
-```
+````
 
 ## 완료 후 출력
 
@@ -477,5 +501,7 @@ These are improvement opportunities, not required follow-up work. They must not 
 🐙 Workflow: BS-{ID}
   ● idea  →  ○ plan  →  ○ go  →  ○ sync
 ```
+
+출력은 workflow 상태와 함께 Visual Brief의 핵심 플로우차트 또는 wireframe 요지를 짧게 설명합니다.
 
 `--auto` 플래그가 있으면 Outcome Lock을 포함해 자동으로 `/auto plan --from-idea BS-{ID}`로 체이닝합니다.

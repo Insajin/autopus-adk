@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Visual Brief guidance for `auto idea` and `auto plan`** (2026-05-17): idea and planning guidance now ask agents to explain outcomes with an appropriate visual aid: Mermaid flowcharts for workflows/state, low-fi wireframes for UI/UX, or sequence/data-flow/command-flow sketches for CLI/API/backend work. Planner/spec-writer guidance preserves these visuals as explanation and planning context without promoting visual-only elements into requirements unless they map to the Outcome Lock or Must acceptance.
+
 - **QAMESH readiness projection and repair handoff (SPEC-QAMESH-007)** (2026-05-16): `auto qa readiness` now validates QAMESH run/release indexes and redacted evidence manifests, rejects unsafe raw refs before rendering or prompt handoff, emits a generic `qamesh.readiness_projection.v1` model with lane status taxonomy, setup gaps, audit/evidence/feedback refs, and safe repair actions, and includes a non-Autopus fixture proving the projection is not product-bound.
 
 - **Deep Interview clarification gate for `auto idea` (SPEC-ADK-IDEA-CLARIFY-001)** (2026-05-15): `auto idea` source guidance and Claude/Codex/Gemini/OpenCode templates now require a five-row `Clarification Ledger` before orchestra fan-out, select the single highest-gain unresolved question in interactive mode, keep `--auto` non-blocking with `assumed`/`deferred` rows, record external `deep-interview` provenance as untrusted evidence, and teach `auto plan --from-idea` / spec-writer guidance to map ledger rows into requirements, non-goals, risks, acceptance seeds, open questions, and reviewer focus.
