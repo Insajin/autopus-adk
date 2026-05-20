@@ -149,6 +149,15 @@ func TestDefaultFullConfig_ClaudeEffortHigh(t *testing.T) {
 		"claude default pane args must not use --effort max (issue #55)")
 }
 
+func TestDefaultFullConfig_SpecReviewContextUsesAdaptiveLimit(t *testing.T) {
+	t.Parallel()
+	cfg := DefaultFullConfig("test-project")
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, 0, cfg.Spec.ReviewGate.ContextMaxLines,
+		"default context_max_lines must be unset so adaptive SPEC review context is not capped at 500")
+}
+
 // TestDefaultFullConfig_CodexExistsNoOpencode verifies codex exists and opencode
 // is absent from the default config.
 func TestDefaultFullConfig_CodexExistsNoOpencode(t *testing.T) {

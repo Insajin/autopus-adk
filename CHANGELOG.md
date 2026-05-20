@@ -21,6 +21,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **SPEC review issue #55 migration gap** (2026-05-20): `auto spec review` now applies orchestra provider migrations in-memory before building review providers, so existing configs with legacy Claude `--effort max` adopt `--effort high` and the 480s per-provider timeout during review. Legacy generated `context_max_lines: 500` is treated as unset for review execution so the adaptive 500/1500/3000-line context budget is not accidentally capped back to 500.
+
 - **QAMESH profile capability resolution** (2026-05-16): `auto qa run` / `auto qa explore` now resolve required Journey Pack capabilities from the effective test profile, including project-local `autopus.yaml` profile additions. The local profile also advertises `auth-state`, and QAMESH runtime/cache/gui/feedback artifacts are ignored as generated local evidence.
 
 ## [v0.47.5] — 2026-05-12
@@ -97,7 +99,7 @@ All notable changes to this project will be documented in this file.
 - **Spec review claude provider defaults relaxed for stability** (2026-05-04, issue [#55](https://github.com/Insajin/autopus-adk/issues/55)): default claude orchestra entry now uses `--effort high` (was `max`) and a per-provider subprocess timeout of 480s, exceeding the 240s global timeout to prevent the 4-minute cutoff observed on opus reasoning during multi-provider spec review.
   - `pkg/config/defaults.go` — new `ClaudeOrchestraTimeoutSeconds = 480` constant; claude provider entry sets `Subprocess.Timeout` and switches `--effort` to `high`
   - `pkg/config/defaults_test.go` — regression coverage for claude provider timeout and effort defaults
-  - Existing installs are not auto-migrated — run `auto update` or edit `autopus.yaml` to adopt the new defaults
+  - Existing installs are migrated in-memory when `auto spec review` resolves providers; `auto update` can still rewrite `autopus.yaml` to persist the new defaults.
 
 ## [v0.43.0] — 2026-05-01
 

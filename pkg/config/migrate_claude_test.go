@@ -17,6 +17,7 @@ func TestDefaultProviderEntries_ClaudeEffortHigh(t *testing.T) {
 	assert.NotContains(t, claude.Args, "max")
 	assert.Contains(t, claude.PaneArgs, "high")
 	assert.NotContains(t, claude.PaneArgs, "max")
+	assert.Equal(t, ClaudeOrchestraTimeoutSeconds, claude.Subprocess.Timeout)
 }
 
 func TestMigrateOrchestraConfig_ClaudeDeprecatedMaxEffort(t *testing.T) {
@@ -45,4 +46,5 @@ func TestMigrateOrchestraConfig_ClaudeDeprecatedMaxEffort(t *testing.T) {
 	claude := cfg.Orchestra.Providers["claude"]
 	assert.Equal(t, []string{"--print", "--model", "opus", "--effort", "high"}, claude.Args)
 	assert.Equal(t, []string{"-p", "--model", "opus", "--effort", "high"}, claude.PaneArgs)
+	assert.Equal(t, ClaudeOrchestraTimeoutSeconds, claude.Subprocess.Timeout)
 }

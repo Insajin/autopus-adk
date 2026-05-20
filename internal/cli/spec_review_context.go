@@ -10,6 +10,8 @@ import (
 	"github.com/insajin/autopus-adk/pkg/spec"
 )
 
+const legacySpecReviewContextCeiling = 500
+
 // resolveSpecReviewContextLimit derives the per-run SPEC review context line
 // budget by counting cited files, applying the adaptive mapping, honoring an
 // optional frontmatter override, and finally capping by the configured ceiling.
@@ -43,6 +45,13 @@ func resolveSpecReviewContextLimit(projectRoot, specDir string, ceiling int, std
 
 	emitContextLine(stderr, cited, applied, override, appliedCeiling)
 	return cited, applied, override, nil
+}
+
+func effectiveSpecReviewContextCeiling(configured int) int {
+	if configured == legacySpecReviewContextCeiling {
+		return 0
+	}
+	return configured
 }
 
 // countSpecCitedFiles counts unique resolved source files referenced by the

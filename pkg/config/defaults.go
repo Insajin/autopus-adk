@@ -54,7 +54,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				Judge:              "claude",
 				MaxRevisions:       2,
 				AutoCollectContext: true,
-				ContextMaxLines:    500,
+				ContextMaxLines:    0,
 				VerdictThreshold:   0.67,
 				DocContextMaxLines: 200,
 			},

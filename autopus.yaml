@@ -35,7 +35,7 @@ spec:
         judge: claude
         max_revisions: 2
         auto_collect_context: true
-        context_max_lines: 500
+        context_max_lines: 0
 methodology:
     mode: tdd
     enforce: true
@@ -71,7 +71,9 @@ orchestra:
     providers:
         claude:
             binary: claude
-            args: [--print, --model, opus, --effort, max]
+            args: [--print, --model, opus, --effort, high]
+            subprocess:
+                timeout: 480
         codex:
             binary: codex
             args: [exec, --full-auto, -m, gpt-5.5, -c, model_reasoning_effort="xhigh"]

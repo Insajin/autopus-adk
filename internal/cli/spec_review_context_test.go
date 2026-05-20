@@ -183,3 +183,21 @@ func TestResolveSpecReviewContextLimit_AC_CTX_CEIL(t *testing.T) {
 	assert.Contains(t, stderr.String(),
 		"SPEC review context: cited=4 applied=1200 override=frontmatter ceiling=1200")
 }
+
+func TestEffectiveSpecReviewContextCeiling_LegacyDefault500DoesNotCapAdaptive(t *testing.T) {
+	t.Parallel()
+
+	projectRoot, specDir := specReviewCtxFixture(t, "SPEC-FAKE-CTX7",
+		[]string{"pkg/a.go", "pkg/b.go", "pkg/c.go", "pkg/d.go"}, "")
+
+	var stderr bytes.Buffer
+	ceiling := effectiveSpecReviewContextCeiling(500)
+	cited, applied, override, err := resolveSpecReviewContextLimit(projectRoot, specDir, ceiling, &stderr)
+
+	require.NoError(t, err)
+	assert.Equal(t, 4, cited)
+	assert.Equal(t, 1500, applied)
+	assert.Equal(t, "", override)
+	assert.Equal(t, 0, ceiling)
+	assert.Contains(t, stderr.String(), "SPEC review context: cited=4 applied=1500")
+}

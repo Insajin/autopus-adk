@@ -74,6 +74,9 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	if err != nil {
 		return fmt.Errorf("설정 로드 실패: %w", err)
 	}
+	if _, migrateErr := config.MigrateOrchestraConfig(cfg); migrateErr != nil {
+		return fmt.Errorf("설정 마이그레이션 실패: %w", migrateErr)
+	}
 
 	gate := cfg.Spec.ReviewGate
 	if strategy == "" {
@@ -106,7 +109,8 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	// files cited in the SPEC, with optional frontmatter override and config ceiling.
 	var codeContext string
 	if gate.AutoCollectContext {
-		_, applied, _, _ := resolveSpecReviewContextLimit(".", specDir, gate.ContextMaxLines, os.Stderr)
+		contextCeiling := effectiveSpecReviewContextCeiling(gate.ContextMaxLines)
+		_, applied, _, _ := resolveSpecReviewContextLimit(".", specDir, contextCeiling, os.Stderr)
 		var ctxErr error
 		codeContext, ctxErr = spec.CollectContextForSpec(".", specDir, applied)
 		if ctxErr != nil {

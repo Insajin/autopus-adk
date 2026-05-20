@@ -176,9 +176,14 @@ func TestMigrateOrchestraConfig_NilCommandsReturnsEarly(t *testing.T) {
 		ProjectName: "test-project",
 		Platforms:   []string{},
 		Orchestra: OrchestraConf{
-			Enabled:   true,
-			Providers: map[string]ProviderEntry{"claude": {Binary: "claude"}},
-			Commands:  nil,
+			Enabled: true,
+			Providers: map[string]ProviderEntry{
+				"claude": {
+					Binary:     "claude",
+					Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
+				},
+			},
+			Commands: nil,
 		},
 	}
 
@@ -255,7 +260,11 @@ func TestMigrateOrchestraConfig_AlreadyCorrectConfigNoChange(t *testing.T) {
 			Enabled: true,
 			Providers: map[string]ProviderEntry{
 				// codex already present with correct args (post-migration state).
-				"claude": {Binary: "claude", Args: []string{"--print"}},
+				"claude": {
+					Binary:     "claude",
+					Args:       []string{"--print"},
+					Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
+				},
 				"codex": {
 					Binary:        "codex",
 					Args:          []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel},
