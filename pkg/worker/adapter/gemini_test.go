@@ -24,12 +24,12 @@ func TestGeminiAdapterBuildCommand(t *testing.T) {
 
 	cmd := a.BuildCommand(context.Background(), task)
 
-	assert.Contains(t, cmd.Args, "--output-format")
-	assert.Contains(t, cmd.Args, "stream-json")
-	assert.Contains(t, cmd.Args, "--resume")
-	assert.Contains(t, cmd.Args, "worker-sess-task-g1")
-	assert.Contains(t, cmd.Args, "-p")
-	assert.Contains(t, cmd.Args, geminiStdinPrompt)
+	assert.Contains(t, cmd.Args, "--print")
+	assert.NotContains(t, cmd.Args, "--output-format")
+	assert.NotContains(t, cmd.Args, "stream-json")
+	assert.NotContains(t, cmd.Args, "--resume")
+	assert.NotContains(t, cmd.Args, "worker-sess-task-g1")
+	assert.NotContains(t, cmd.Args, "-p")
 	assert.NotContains(t, cmd.Args, "analyze code")
 	assert.Equal(t, "/tmp/gemini-work", cmd.Dir)
 
@@ -45,7 +45,8 @@ func TestGeminiAdapterBuildCommandWithSession(t *testing.T) {
 	}
 
 	cmd := a.BuildCommand(context.Background(), task)
-	assert.Contains(t, cmd.Args, "gem-sess")
+	assert.NotContains(t, cmd.Args, "--resume")
+	assert.NotContains(t, cmd.Args, "gem-sess")
 }
 
 func TestGeminiAdapterBuildCommandWithModel(t *testing.T) {
@@ -56,8 +57,8 @@ func TestGeminiAdapterBuildCommandWithModel(t *testing.T) {
 	}
 
 	cmd := a.BuildCommand(context.Background(), task)
-	assert.Contains(t, cmd.Args, "--model")
-	assert.Contains(t, cmd.Args, "gemini-2.0-flash")
+	assert.NotContains(t, cmd.Args, "--model")
+	assert.NotContains(t, cmd.Args, "gemini-2.0-flash")
 }
 
 func TestGeminiAdapterParseEvent(t *testing.T) {
@@ -79,9 +80,20 @@ func TestGeminiAdapterParseEventToolCall(t *testing.T) {
 	assert.Equal(t, "tool_call", evt.Type)
 }
 
+func TestGeminiAdapterParseEventPlainText(t *testing.T) {
+	a := NewGeminiAdapter()
+
+	evt, err := a.ParseEvent([]byte("plain agy output"))
+	require.NoError(t, err)
+	assert.Equal(t, "result", evt.Type)
+
+	result := a.ExtractResult(evt)
+	assert.Equal(t, "plain agy output", result.Output)
+}
+
 func TestGeminiAdapterParseEventInvalid(t *testing.T) {
 	a := NewGeminiAdapter()
-	_, err := a.ParseEvent([]byte("bad"))
+	_, err := a.ParseEvent([]byte(`{"type":`))
 	require.Error(t, err)
 }
 

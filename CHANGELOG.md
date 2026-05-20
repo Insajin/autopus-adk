@@ -25,6 +25,16 @@ All notable changes to this project will be documented in this file.
 
 - **QAMESH profile capability resolution** (2026-05-16): `auto qa run` / `auto qa explore` now resolve required Journey Pack capabilities from the effective test profile, including project-local `autopus.yaml` profile additions. The local profile also advertises `auth-state`, and QAMESH runtime/cache/gui/feedback artifacts are ignored as generated local evidence.
 
+## [v0.50.10] — 2026-05-20
+
+### Added
+
+- **Official Antigravity CLI harness surface** (2026-05-20): `antigravity-cli` now generates an Antigravity plugin-compatible `.agents/plugins/autopus/` surface with `plugin.json`, skills, rules, agents, and command mappings, while preserving the legacy `.gemini/**` compatibility surface. Generated `GEMINI.md` imports rules from the Antigravity plugin surface, and `.agents/hooks.json` uses official `PreToolUse`/`PostToolUse` hook structure with `run_command` matchers and JSON stdout wrappers.
+
+### Fixed
+
+- **Antigravity AGY worker invocation** (2026-05-20): worker and orchestra defaults now invoke local `agy` through supported non-interactive `--print` mode instead of obsolete Gemini CLI flags such as `--output-format`, `--resume`, and `--model`. Plain-text `agy --print` output is parsed as task results and multiline output is preserved.
+
 ## [v0.47.5] — 2026-05-12
 
 ### Added

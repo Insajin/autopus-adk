@@ -31,6 +31,9 @@ func (a *Adapter) renderAgentFiles() ([]adapter.FileMapping, error) {
 
 	for _, m := range mappings {
 		destPath := filepath.Join(a.root, m.TargetPath)
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return nil, fmt.Errorf("gemini agent directory creation failed %s: %w", filepath.Dir(destPath), err)
+		}
 		if err := os.WriteFile(destPath, m.Content, 0644); err != nil {
 			return nil, fmt.Errorf("gemini agent file write failed %s: %w", destPath, err)
 		}
@@ -72,5 +75,5 @@ func (a *Adapter) prepareAgentMappings() ([]adapter.FileMapping, error) {
 		})
 	}
 
-	return files, nil
+	return append(files, mirrorAntigravityPluginMappings(files)...), nil
 }

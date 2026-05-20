@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
-	"github.com/insajin/autopus-adk/pkg/worker/stream"
 )
 
 // execResult holds the outcome of running a provider subprocess.
@@ -59,27 +59,28 @@ func executeAgentTask(ctx context.Context, reg *adapter.Registry, providerName s
 	stdinPipe.Close()
 
 	// Parse stream output and capture the last result event.
-	parser := stream.NewParser(stdout)
+	scanner := bufio.NewScanner(stdout)
 	var lastResult adapter.TaskResult
 	hasResult := false
-	for {
-		evt, err := parser.Next()
-		if err == io.EOF {
-			break
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
 		}
+		evt, err := prov.ParseEvent([]byte(line))
 		if err != nil {
 			log.Printf("[agent-run] stream parse error: %v", err)
 			continue
 		}
 		if evt.Type == "result" {
-			adapterEvt := adapter.StreamEvent{
-				Type:    evt.Type,
-				Subtype: evt.Subtype,
-				Data:    evt.Raw,
-			}
-			lastResult = prov.ExtractResult(adapterEvt)
+			result := prov.ExtractResult(evt)
+			lastResult = adapter.MergeSequentialResult(prov.Name(), lastResult, hasResult, result)
 			hasResult = true
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return execResult{Status: "failed", DurationMS: time.Since(startTime).Milliseconds()},
+			fmt.Errorf("stream scan: %w", err)
 	}
 
 	waitErr := cmd.Wait()

@@ -13,7 +13,7 @@ var defaultProviderEntries = map[string]ProviderEntry{
 		Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
 	},
 	"codex":  DefaultCodexProviderEntry(),
-	"gemini": {Binary: "agy", PromptViaArgs: false, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
+	"gemini": {Binary: "agy", Args: []string{"--print"}, PromptViaArgs: false, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
 }
 
 // MigrateOrchestraConfig performs all orchestra config migrations.
@@ -102,6 +102,9 @@ func migrateKnownProviderDefaults(cfg *HarnessConfig) bool {
 				changed = true
 			}
 		}
+		if providerName == "gemini" && containsString(cfg.Platforms, "antigravity-cli") {
+			existing, changed = migrateAntigravityGeminiProvider(existing, defaults, true, changed)
+		}
 		if existing.Subprocess.SchemaFlag == "" && defaults.Subprocess.SchemaFlag != "" {
 			existing.Subprocess.SchemaFlag = defaults.Subprocess.SchemaFlag
 			changed = true
@@ -163,6 +166,10 @@ func EnsureOrchestraProvider(cfg *HarnessConfig, providerName string) error {
 			entry = ProviderEntry{Binary: providerName}
 		}
 		cfg.Orchestra.Providers[providerName] = entry
+	} else if providerName == "gemini" && containsString(cfg.Platforms, "antigravity-cli") {
+		defaults := defaultProviderEntries[providerName]
+		existing, _ = migrateAntigravityGeminiProvider(existing, defaults, false, false)
+		cfg.Orchestra.Providers[providerName] = existing
 	}
 
 	// Initialize commands map if nil.

@@ -35,7 +35,8 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig, geminiSkillBas
 	if err != nil {
 		return nil, fmt.Errorf("extended skill rendering failed: %w", err)
 	}
-	for _, ef := range extFiles {
+	extMirrors := mirrorAntigravityPluginMappings(extFiles)
+	for _, ef := range append(extFiles, extMirrors...) {
 		destPath := filepath.Join(a.root, ef.TargetPath)
 		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 			return nil, fmt.Errorf("extended skill dir creation failed %s: %w", filepath.Dir(destPath), err)
@@ -45,6 +46,7 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig, geminiSkillBas
 		}
 	}
 	mappings = append(mappings, extFiles...)
+	mappings = append(mappings, extMirrors...)
 
 	return mappings, nil
 }
@@ -88,7 +90,7 @@ func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.Fil
 		})
 	}
 
-	return files, nil
+	return append(files, mirrorAntigravityPluginMappings(files)...), nil
 }
 
 func hasAutoPrefix(name string) bool {

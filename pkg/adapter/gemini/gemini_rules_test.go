@@ -53,15 +53,15 @@ func TestGeminiRulesImport(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 
-	assert.Contains(t, content, "@.gemini/rules/autopus/lore-commit.md",
+	assert.Contains(t, content, "@.agents/plugins/autopus/rules/lore-commit.md",
 		"GEMINI.md should have @import for lore-commit")
-	assert.Contains(t, content, "@.gemini/rules/autopus/file-size-limit.md",
+	assert.Contains(t, content, "@.agents/plugins/autopus/rules/file-size-limit.md",
 		"GEMINI.md should have @import for file-size-limit")
-	assert.Contains(t, content, "@.gemini/rules/autopus/subagent-delegation.md",
+	assert.Contains(t, content, "@.agents/plugins/autopus/rules/subagent-delegation.md",
 		"GEMINI.md should have @import for subagent-delegation")
-	assert.Contains(t, content, "@.gemini/rules/autopus/language-policy.md",
+	assert.Contains(t, content, "@.agents/plugins/autopus/rules/language-policy.md",
 		"GEMINI.md should have @import for language-policy")
-	assert.Contains(t, content, "@.gemini/rules/autopus/techstack-freshness.md",
+	assert.Contains(t, content, "@.agents/plugins/autopus/rules/techstack-freshness.md",
 		"GEMINI.md should have @import for techstack-freshness")
 }
 

@@ -65,6 +65,7 @@ func (a *Adapter) Clean(_ context.Context) error {
 		filepath.Join(a.root, ".gemini", "rules"),
 		filepath.Join(a.root, ".gemini", "agents"),
 		filepath.Join(a.root, ".agents", "skills"),
+		filepath.Join(a.root, antigravityPluginDir),
 	}
 	for _, d := range dirsToRemove {
 		if err := os.RemoveAll(d); err != nil && !os.IsNotExist(err) {
@@ -81,6 +82,9 @@ func (a *Adapter) Clean(_ context.Context) error {
 		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("%s 제거 실패: %w", filepath.Base(f), err)
 		}
+	}
+	if err := a.removeAntigravityHooksJSON(); err != nil {
+		return err
 	}
 
 	// Remove AUTOPUS marker section from GEMINI.md

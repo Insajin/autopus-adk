@@ -215,6 +215,7 @@ func TestMigrateOrchestraConfig_AntigravityMapsToGeminiProvider(t *testing.T) {
 	gemini, ok := cfg.Orchestra.Providers["gemini"]
 	require.True(t, ok, "gemini provider must exist after migrating antigravity-cli platform")
 	assert.Equal(t, "agy", gemini.Binary, "gemini provider Binary must be 'agy'")
+	assert.Equal(t, []string{"--print"}, gemini.Args, "gemini provider must use Antigravity CLI print mode")
 	assert.False(t, gemini.PromptViaArgs, "gemini provider must have PromptViaArgs=false")
 }
 

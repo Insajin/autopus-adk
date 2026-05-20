@@ -80,6 +80,21 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 		Content:         []byte(geminiMD),
 	})
 
+	pluginFiles, err := prepareAntigravityPluginJSON()
+	if err != nil {
+		return nil, fmt.Errorf("antigravity plugin manifest 생성 실패: %w", err)
+	}
+	for _, pf := range pluginFiles {
+		destPath := filepath.Join(a.root, pf.TargetPath)
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return nil, fmt.Errorf("antigravity plugin 디렉터리 생성 실패: %w", err)
+		}
+		if err := os.WriteFile(destPath, pf.Content, 0644); err != nil {
+			return nil, fmt.Errorf("antigravity plugin 파일 쓰기 실패 %s: %w", destPath, err)
+		}
+	}
+	files = append(files, pluginFiles...)
+
 	skillFiles, err := a.renderSkillTemplates(cfg, geminiSkillDir)
 	if err != nil {
 		return nil, fmt.Errorf("제미니 스킬 템플릿 렌더링 실패: %w", err)
@@ -135,7 +150,14 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 	}
 	files = append(files, statusFiles...)
 
-	// Install hooks and permissions to .gemini/settings.json
+	hookConfigs := a.configuredHooks(cfg)
+	hookFiles, err := a.writeAntigravityHooksJSON(hookConfigs)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, hookFiles...)
+
+	// Install hooks and permissions to Antigravity-compatible settings files.
 	if err := a.applyHooksAndPermissions(ctx, cfg); err != nil {
 		return nil, fmt.Errorf("제미니 훅/권한 설치 실패: %w", err)
 	}

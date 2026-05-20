@@ -42,8 +42,8 @@ auto init --mode full
 auto init --mode lite
 
 # 특정 플랫폼에 설치
-auto init --platform claude-code
-auto init --platform codex,antigravity-cli
+auto init --platforms claude-code
+auto init --platforms codex,antigravity-cli
 
 # 설치 상태 확인
 auto doctor
@@ -94,7 +94,7 @@ hooks:
 |--------|----------|
 | claude-code | `.claude/` |
 | codex | `AGENTS.md`, `.codex/` |
-| antigravity-cli | `.gemini/` |
+| antigravity-cli | `GEMINI.md`, `.gemini/`, `.agents/plugins/autopus/`, `.agents/hooks.json` |
 
 ## 스킬 관리
 

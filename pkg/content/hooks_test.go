@@ -127,6 +127,18 @@ func TestGenerateHookConfigs_AntigravityKeepsOfficialEventNames(t *testing.T) {
 	assert.Contains(t, eventNames, "PostToolUse")
 	assert.NotContains(t, eventNames, "BeforeTool")
 	assert.NotContains(t, eventNames, "AfterTool")
+
+	for _, h := range hooks {
+		assert.Equal(t, "run_command", h.Matcher, "Antigravity hooks must match official tool names")
+		assert.Contains(t, h.Command, "sh -c", "Antigravity hooks must wrap commands for JSON stdout")
+		assert.Contains(t, h.Command, ">&2", "Antigravity hooks should keep command output off stdout")
+		if h.Event == "PreToolUse" {
+			assert.Contains(t, h.Command, `decision`, "PreToolUse must emit a decision JSON object")
+		}
+		if h.Event == "PostToolUse" {
+			assert.Contains(t, h.Command, `{}`, "PostToolUse must emit an empty JSON object")
+		}
+	}
 }
 
 // TestGenerateHookConfigs_ClaudeKeepsEventNames verifies claude-code still

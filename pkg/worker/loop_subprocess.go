@@ -262,7 +262,8 @@ func (wl *WorkerLoop) parseStreamWithBudget(r io.Reader, taskID string, sw *Stdi
 				}
 			}
 		case adapterEvt.Type == "result":
-			lastResult = wl.config.Provider.ExtractResult(adapterEvt)
+			result := wl.config.Provider.ExtractResult(adapterEvt)
+			lastResult = adapter.MergeSequentialResult(wl.config.Provider.Name(), lastResult, hasResult, result)
 			hasResult = true
 		case adapterEvt.Type == "error":
 			log.Printf("[worker] task %s: error event received", taskID)

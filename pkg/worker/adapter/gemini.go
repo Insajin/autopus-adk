@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strings"
 )
-
-const geminiStdinPrompt = "Read the full task from stdin and use it as the authoritative prompt."
 
 // GeminiAdapter implements ProviderAdapter for the Gemini-family provider via AGY CLI.
 type GeminiAdapter struct{}
@@ -23,23 +22,18 @@ func (a *GeminiAdapter) Name() string { return "gemini" }
 
 // BuildCommand constructs the exec.Cmd for the Antigravity AGY CLI.
 func (a *GeminiAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.Cmd {
-	sessionID := task.SessionID
-	if sessionID == "" {
-		sessionID = fmt.Sprintf("worker-sess-%s", task.TaskID)
-	}
-
-	args := []string{
-		"--output-format", "stream-json",
-		"--resume", sessionID,
-	}
-
-	if task.Prompt != "" {
-		// Keep headless mode enabled without leaking the full task prompt via argv.
-		args = append(args, "-p", geminiStdinPrompt)
-	}
+	args := []string{"--print"}
 
 	if task.Model != "" {
-		args = append(args, "--model", task.Model)
+		slog.Warn("model override not supported by antigravity cli provider, using agy default model",
+			"task_id", task.TaskID,
+			"model", task.Model)
+	}
+
+	if task.SessionID != "" {
+		slog.Info("session resume not supported by antigravity cli provider, starting a new conversation",
+			"task_id", task.TaskID,
+			"session_id", task.SessionID)
 	}
 
 	if task.ComputerUse {
@@ -73,10 +67,28 @@ type geminiResultEvent struct {
 // ParseEvent parses a single line of Gemini JSON output into a StreamEvent.
 // Maps Gemini's "tool_call" type to the canonical EventToolCall type.
 func (a *GeminiAdapter) ParseEvent(line []byte) (StreamEvent, error) {
+	trimmed := strings.TrimSpace(string(line))
+	if trimmed == "" {
+		return StreamEvent{}, fmt.Errorf("gemini: empty output line")
+	}
+	if !strings.HasPrefix(trimmed, "{") {
+		synthetic, err := json.Marshal(geminiResultEvent{
+			Type:   "result",
+			Output: trimmed,
+		})
+		if err != nil {
+			return StreamEvent{}, fmt.Errorf("gemini synthesize result: %w", err)
+		}
+		return StreamEvent{
+			Type: "result",
+			Data: synthetic,
+		}, nil
+	}
+
 	var raw struct {
 		Type string `json:"type"`
 	}
-	if err := json.Unmarshal(line, &raw); err != nil {
+	if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
 		return StreamEvent{}, fmt.Errorf("gemini parse: %w", err)
 	}
 	if raw.Type == "" {
@@ -88,7 +100,7 @@ func (a *GeminiAdapter) ParseEvent(line []byte) (StreamEvent, error) {
 	return StreamEvent{
 		Type:    typ,
 		Subtype: subtype,
-		Data:    json.RawMessage(append([]byte(nil), line...)),
+		Data:    json.RawMessage(append([]byte(nil), trimmed...)),
 	}, nil
 }
 

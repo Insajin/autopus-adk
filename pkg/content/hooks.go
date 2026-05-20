@@ -40,19 +40,21 @@ func GenerateHookConfigs(cfg config.HooksConf, platform string, supportsHooks bo
 }
 
 // generateCLIHooks는 CLI 훅 설정을 생성한다.
-// Event names are translated per-platform. Claude Code and Antigravity use
-// PreToolUse/PostToolUse; legacy Gemini CLI used BeforeTool/AfterTool.
+// Event names and tool matchers are translated per-platform. Claude Code uses
+// PreToolUse/PostToolUse with Bash, Antigravity uses the same event names with
+// run_command, and legacy Gemini CLI used BeforeTool/AfterTool.
 func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfig {
 	var hooks []adapter.HookConfig
 	pre := translateHookEvent("PreToolUse", platform)
 	post := translateHookEvent("PostToolUse", platform)
+	commandMatcher := translateHookMatcher("Bash", platform)
 
 	if cfg.PreCommitArch {
 		hooks = appendUniqueHook(hooks, adapter.HookConfig{
 			Event:   pre,
-			Matcher: "Bash",
+			Matcher: commandMatcher,
 			Type:    "command",
-			Command: "auto check --arch --quiet --warn-only",
+			Command: translateHookCommand("auto check --arch --quiet --warn-only", pre, platform),
 			Timeout: 30,
 		})
 	}
@@ -64,9 +66,9 @@ func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfi
 	if cfg.ReactCIFailure {
 		hooks = appendUniqueHook(hooks, adapter.HookConfig{
 			Event:   post,
-			Matcher: "Bash",
+			Matcher: commandMatcher,
 			Type:    "command",
-			Command: "auto react check --quiet",
+			Command: translateHookCommand("auto react check --quiet", post, platform),
 			Timeout: 60,
 		})
 	}
@@ -74,9 +76,9 @@ func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfi
 	if cfg.ReactReview {
 		hooks = appendUniqueHook(hooks, adapter.HookConfig{
 			Event:   post,
-			Matcher: "Bash",
+			Matcher: commandMatcher,
 			Type:    "command",
-			Command: "auto react check --quiet",
+			Command: translateHookCommand("auto react check --quiet", post, platform),
 			Timeout: 60,
 		})
 	}
@@ -124,6 +126,13 @@ func translateHookEvent(claudeEvent, platform string) string {
 	default:
 		return claudeEvent
 	}
+}
+
+func translateHookMatcher(claudeMatcher, platform string) string {
+	if claudeMatcher == "Bash" && platform == "antigravity-cli" {
+		return "run_command"
+	}
+	return claudeMatcher
 }
 
 func appendUniqueHook(hooks []adapter.HookConfig, hook adapter.HookConfig) []adapter.HookConfig {

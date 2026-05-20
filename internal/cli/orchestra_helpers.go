@@ -144,7 +144,7 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	knownProviders := map[string]orchestra.ProviderConfig{
 		"claude": {Name: "claude", Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
 		"codex":  {Name: "codex", Binary: "codex", Args: []string{"exec", "--sandbox", "workspace-write", "-m", config.CodexFrontierModel}, PaneArgs: []string{"-m", config.CodexFrontierModel}, PromptViaArgs: false, SchemaFlag: "--output-schema"},
-		"gemini": {Name: "gemini", Binary: "agy", Args: []string{}, PaneArgs: []string{}, PromptViaArgs: false, StartupTimeout: defaultProviderStartupTimeout("gemini"), OutputFormat: "text"},
+		"gemini": {Name: "gemini", Binary: "agy", Args: []string{"--print"}, PaneArgs: []string{"--print"}, PromptViaArgs: false, StartupTimeout: defaultProviderStartupTimeout("gemini"), OutputFormat: "text"},
 	}
 
 	var result []orchestra.ProviderConfig

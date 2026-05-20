@@ -69,8 +69,9 @@ const geminiMDTemplate = `# Autopus-ADK Harness
 
 ## 스킬 디렉터리
 
-- Gemini Skills: .gemini/skills/
-- Cross-platform: .agents/skills/
+- Legacy Gemini-compatible: .gemini/skills/
+- Antigravity workspace plugin: .agents/plugins/autopus/
+- Antigravity workspace hooks: .agents/hooks.json
 
 ## Core Guidelines
 
@@ -91,9 +92,9 @@ During review, verify:
 
 ## Rules
 
-@.gemini/rules/autopus/lore-commit.md
-@.gemini/rules/autopus/file-size-limit.md
-@.gemini/rules/autopus/subagent-delegation.md
-@.gemini/rules/autopus/language-policy.md
-@.gemini/rules/autopus/techstack-freshness.md
+@.agents/plugins/autopus/rules/lore-commit.md
+@.agents/plugins/autopus/rules/file-size-limit.md
+@.agents/plugins/autopus/rules/subagent-delegation.md
+@.agents/plugins/autopus/rules/language-policy.md
+@.agents/plugins/autopus/rules/techstack-freshness.md
 `

@@ -56,9 +56,13 @@ func (a *Adapter) generateSettings(cfg *config.HarnessConfig) ([]adapter.FileMap
 
 // applyHooksAndPermissions installs hooks and permissions to .gemini/settings.json.
 func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.HarnessConfig) error {
-	hookConfigs, _, _ := content.GenerateProjectHookConfigs(cfg, adapterName, a.SupportsHooks())
+	hookConfigs := a.configuredHooks(cfg)
 	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
-	return a.InstallHooks(ctx, hookConfigs, perms)
+	if err := a.InstallHooks(ctx, hookConfigs, perms); err != nil {
+		return err
+	}
+	_, err := a.writeAntigravityHooksJSON(hookConfigs)
+	return err
 }
 
 // InstallHooks merges hooks and permissions into .gemini/settings.json.

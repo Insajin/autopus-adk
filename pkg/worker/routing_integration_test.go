@@ -247,7 +247,7 @@ func TestRoutingIntegration_TaskConfigModelPropagation(t *testing.T) {
 	assert.Contains(t, codexCmd.Args, codexModel,
 		"Codex CLI args should contain the routed model with -m flag")
 
-	// Gemini-family provider with --model flag.
+	// Antigravity CLI 1.0.0 does not expose a model override flag.
 	geminiModel := router.Route("gemini", "quick fix")
 	geminiCfg := adapter.TaskConfig{
 		TaskID: "task-prop-3",
@@ -255,7 +255,7 @@ func TestRoutingIntegration_TaskConfigModelPropagation(t *testing.T) {
 	}
 	geminiAdapter := adapter.NewGeminiAdapter()
 	geminiCmd := geminiAdapter.BuildCommand(context.Background(), geminiCfg)
-	assert.Contains(t, geminiCmd.Args, "--model")
-	assert.Contains(t, geminiCmd.Args, geminiModel,
-		fmt.Sprintf("Antigravity CLI args should contain the routed model %s", geminiModel))
+	assert.NotContains(t, geminiCmd.Args, "--model")
+	assert.NotContains(t, geminiCmd.Args, geminiModel,
+		fmt.Sprintf("Antigravity CLI args should omit unsupported routed model %s", geminiModel))
 }

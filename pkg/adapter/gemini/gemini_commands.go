@@ -52,6 +52,11 @@ func (a *Adapter) prepareRouterCommand(cfg *config.HarnessConfig) ([]adapter.Fil
 		OverwritePolicy: adapter.OverwriteAlways,
 		Checksum:        checksum(rendered),
 		Content:         []byte(rendered),
+	}, {
+		TargetPath:      filepath.Join(antigravityPluginDir, "skills", "auto", "SKILL.md"),
+		OverwritePolicy: adapter.OverwriteAlways,
+		Checksum:        checksum(rewriteAntigravityPluginContent(rendered)),
+		Content:         []byte(rewriteAntigravityPluginContent(rendered)),
 	}}, nil
 }
 
@@ -113,5 +118,5 @@ func (a *Adapter) prepareCommandMappings(cfg *config.HarnessConfig) ([]adapter.F
 		})
 	}
 
-	return files, nil
+	return append(files, mirrorAntigravityPluginMappings(files)...), nil
 }

@@ -104,7 +104,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 					PaneArgs:   []string{"--print", "--model", "opus", "--effort", "high"},
 					Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
 				},
-				"gemini": {Binary: "agy", PromptViaArgs: false, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
+				"gemini": {Binary: "agy", Args: []string{"--print"}, PromptViaArgs: false, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
 				"codex":  DefaultCodexProviderEntry(),
 			},
 			Commands: map[string]CommandEntry{

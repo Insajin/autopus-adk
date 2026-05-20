@@ -173,3 +173,27 @@ func TestEnsureOrchestraProvider_AppendsToExistingCommands(t *testing.T) {
 	}
 	assert.Equal(t, 1, count, "gemini must not be duplicated in plan command")
 }
+
+func TestEnsureOrchestraProvider_MigratesAntigravityLegacyGeminiEntry(t *testing.T) {
+	t.Parallel()
+
+	cfg := &HarnessConfig{
+		Mode:        ModeFull,
+		ProjectName: "test-project",
+		Platforms:   []string{"antigravity-cli"},
+		Orchestra: OrchestraConf{
+			Enabled: true,
+			Providers: map[string]ProviderEntry{
+				"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}},
+			},
+			Commands: map[string]CommandEntry{},
+		},
+	}
+
+	err := EnsureOrchestraProvider(cfg, "gemini")
+	require.NoError(t, err)
+
+	entry := cfg.Orchestra.Providers["gemini"]
+	assert.Equal(t, "agy", entry.Binary)
+	assert.Equal(t, []string{"--print"}, entry.Args)
+}

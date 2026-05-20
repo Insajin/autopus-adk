@@ -16,6 +16,7 @@ func TestDefaultFullConfig_GeminiPromptViaArgs(t *testing.T) {
 	gemini, ok := cfg.Orchestra.Providers["gemini"]
 	require.True(t, ok, "gemini provider must exist in default full config")
 	assert.False(t, gemini.PromptViaArgs, "gemini provider must have PromptViaArgs=false")
+	assert.Equal(t, []string{"--print"}, gemini.Args, "gemini provider must force Antigravity CLI print mode")
 }
 
 func TestDefaultFullConfig_OtherProvidersPromptViaArgsFalse(t *testing.T) {

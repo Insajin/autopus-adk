@@ -172,6 +172,15 @@ func (pe *PipelineExecutor) parsePhaseStream(r io.Reader, taskID string, phase P
 			continue
 		}
 		tr := pe.provider.ExtractResult(evt)
+		if hasResult {
+			merged := adapter.MergeSequentialResult(pe.provider.Name(), adapter.TaskResult{
+				Output:     result.Output,
+				CostUSD:    result.CostUSD,
+				DurationMS: result.DurationMS,
+				SessionID:  result.SessionID,
+			}, true, tr)
+			tr = merged
+		}
 		result.Output = tr.Output
 		result.CostUSD = tr.CostUSD
 		result.DurationMS = tr.DurationMS

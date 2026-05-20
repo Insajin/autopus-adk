@@ -105,6 +105,12 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		Content:         []byte(geminiMD),
 	})
 
+	pluginFiles, err := prepareAntigravityPluginJSON()
+	if err != nil {
+		return nil, fmt.Errorf("antigravity plugin manifest 생성 실패: %w", err)
+	}
+	files = append(files, pluginFiles...)
+
 	skillMappings, err := a.prepareSkillMappings(cfg)
 	if err != nil {
 		return nil, err
@@ -117,6 +123,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		return nil, fmt.Errorf("extended skill 준비 실패: %w", err)
 	}
 	files = append(files, extSkillMappings...)
+	files = append(files, mirrorAntigravityPluginMappings(extSkillMappings)...)
 
 	cmdMappings, err := a.prepareCommandMappings(cfg)
 	if err != nil {
@@ -155,6 +162,12 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		return nil, err
 	}
 	files = append(files, statusFiles...)
+
+	hookMappings, err := a.prepareAntigravityHooksJSON(a.configuredHooks(cfg))
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, hookMappings...)
 
 	return files, nil
 }

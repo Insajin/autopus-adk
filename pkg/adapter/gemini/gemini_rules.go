@@ -98,7 +98,7 @@ func (a *Adapter) prepareRuleMappings(cfg *config.HarnessConfig) ([]adapter.File
 		})
 	}
 
-	return files, nil
+	return append(files, mirrorAntigravityPluginMappings(files)...), nil
 }
 
 // expandContentImports replaces `@import content/rules/<name>.md` lines with
