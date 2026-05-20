@@ -39,7 +39,15 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			}
 		}
 
+		staticFindings, staticErr := spec.RunSpecContractAnalysis(p.specDir)
+		if staticErr != nil {
+			fmt.Fprintf(os.Stderr, "경고: SPEC static contract analysis 실패: %v\n", staticErr)
+		}
+
 		opts := buildPromptOpts(priorFindings, revision, p.specDir, p.gate)
+		if opts.Mode == spec.ReviewModeDiscover {
+			opts.StaticFindings = staticFindings
+		}
 		prompt := spec.BuildReviewPrompt(doc, p.codeContext, opts) //nolint:govet
 
 		orchCfg := orchestra.OrchestraConfig{
@@ -125,6 +133,8 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			merged.Findings = spec.ApplyScopeLock(merged.Findings, priorFindings, spec.ReviewModeVerify)
 			merged.Findings = spec.NormalizeAdvisoryFindings(merged.Findings)
 		}
+		merged.Findings = spec.MergeDeterministicFindings(merged.Findings, staticFindings, priorFindings, revision)
+		merged.Findings = spec.NormalizeAdvisoryFindings(merged.Findings)
 		merged.Verdict = effectiveReviewVerdict(merged.Verdict, reviews, merged.Findings)
 
 		// A mid-pipeline write failure must abort (issue #38).
@@ -171,6 +181,9 @@ func noProviderReviewsSucceeded(reviews []spec.ReviewResult, statuses []spec.Pro
 
 func effectiveReviewVerdict(verdict spec.ReviewVerdict, reviews []spec.ReviewResult, findings []spec.ReviewFinding) spec.ReviewVerdict {
 	if len(reviews) == 0 {
+		return spec.VerdictRevise
+	}
+	if verdict == spec.VerdictPass && hasActiveFindings(findings) {
 		return spec.VerdictRevise
 	}
 	if verdict != spec.VerdictRevise || hasActiveFindings(findings) {
