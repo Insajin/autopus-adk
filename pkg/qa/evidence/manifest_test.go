@@ -192,7 +192,7 @@ func fixtureManifest(t *testing.T, surface, status string) Manifest {
 	sourceRefs := SourceRefs{
 		SourceSpec:       "SPEC-QAMESH-001",
 		AcceptanceRefs:   []string{"AC-QAMESH-001", "AC-QAMESH-003"},
-		OwnedPaths:       []string{"Autopus/frontend"},
+		OwnedPaths:       []string{"sample-app/frontend"},
 		DoNotModifyPaths: []string{".codex/**"},
 	}
 	scenarioRef := "browser:login"
@@ -208,7 +208,7 @@ func fixtureManifest(t *testing.T, surface, status string) Manifest {
 		sourceRefs = SourceRefs{
 			SourceSpec:       "SPEC-DESKTOP-017",
 			AcceptanceRefs:   []string{"AC-QAMESH-004"},
-			OwnedPaths:       []string{"autopus-desktop"},
+			OwnedPaths:       []string{"sample-desktop"},
 			DoNotModifyPaths: []string{".codex/**"},
 		}
 		scenarioRef = "desktop:macos-smoke"

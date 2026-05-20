@@ -20,7 +20,7 @@ func classify(input FailureInput, reasons []string) classification {
 	if containsAny(reasons, "qamesh_evidence_not_failed", "qamesh_non_deterministic", "qamesh_unsupported_feedback_target", "qamesh_unsafe_feedback_target") {
 		return classification{TaxonomyStaleOrMissingEvidence, KindProductBugFix, StatusReplayFailed, 0.80, PolicyDisabled, MethodContractMapping, evidenceStrength(input)}
 	}
-	if containsAny(reasons, "missing_connector_source", "missing_company_source", "source_setup_gap", "workspace_profile_gap", "non_canonical_source", "setup_gap") {
+	if containsAny(reasons, "missing_connector_source", "missing_source_setup", "source_setup_gap", "workspace_profile_gap", "non_canonical_source", "setup_gap") {
 		return classification{TaxonomySourceSetupGap, KindSourceSetupMission, StatusRouted, 0.90, PolicyApprovalRequired, MethodContractMapping, evidenceStrength(input)}
 	}
 	if containsAny(reasons, "qamesh_failed_check") {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/insajin/autopus-adk/pkg/qa/domainreadiness"
 	qaproject "github.com/insajin/autopus-adk/pkg/qa/project"
 )
 
@@ -14,11 +15,12 @@ const (
 )
 
 type starterFile struct {
-	ID              string
-	RelPath         string
-	Reason          string
-	Body            string
-	ValidateJourney bool
+	ID                    string
+	RelPath               string
+	Reason                string
+	Body                  string
+	ValidateJourney       bool
+	ValidateDomainCatalog bool
 }
 
 type projectSignals struct {
@@ -51,10 +53,28 @@ func detectJourneyStarters(projectDir string, release bool) []starterFile {
 		}
 		starters = append(starters, desktopGUIStarter())
 	}
+	if len(starters) > 0 {
+		starters = append(starters, domainReadinessCatalogStarter())
+	}
 	if release {
 		starters = append(starters, canaryStarter())
 	}
 	return starters
+}
+
+func domainReadinessCatalogStarter() starterFile {
+	body, err := json.MarshalIndent(domainreadiness.StarterCatalog(), "", "  ")
+	if err != nil {
+		body = []byte("{}")
+	}
+	body = append(body, '\n')
+	return starterFile{
+		ID:                    "domain-readiness-catalog",
+		RelPath:               domainreadiness.DefaultCatalogPath,
+		Reason:                "project QA signal detected",
+		ValidateDomainCatalog: true,
+		Body:                  string(body),
+	}
 }
 
 func detectSignals(projectDir string) projectSignals {

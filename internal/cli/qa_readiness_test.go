@@ -38,7 +38,7 @@ func TestQAReadinessCmd_ProjectsReadOnlyRedactedJSONEnvelope(t *testing.T) {
 	assert.Equal(t, "blocked", data["release_verdict"])
 	assert.Equal(t, false, data["raw_payload_present"])
 	assert.Equal(t, "autopus-adk", data["contract_owner"])
-	assert.Equal(t, []any{"Autopus", "autopus-desktop"}, data["reference_consumers"])
+	assert.NotContains(t, data, "reference_consumers")
 
 	statuses := data["lane_statuses"].(map[string]any)
 	assert.Equal(t, "passed", statuses["fast"])

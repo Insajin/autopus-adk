@@ -36,6 +36,7 @@ func TestQAInitCmd_CreatesValidatedDesktopGUIJourneyPack(t *testing.T) {
 	assertContainsCreatedID(t, created, "desktop-gui-explore")
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
 	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 
 	pack, err := journey.LoadFile(journeyPath)
 	require.NoError(t, err)
@@ -69,6 +70,7 @@ func TestQAInitCmd_CreatesDetectedGoFastJourneyPack(t *testing.T) {
 	assert.Equal(t, []string{"go", "test", "./..."}, pack.Command.Argv)
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
 	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 }
 
 func TestQAInitCmd_DefaultScaffoldsReleaseWorkflowGate(t *testing.T) {
@@ -111,6 +113,7 @@ func TestQAInitCmd_DefaultScaffoldsReleaseWorkflowGate(t *testing.T) {
 	assert.Contains(t, string(body), "auto qa release --project-dir . --profile")
 	assert.Contains(t, string(body), "npm ci")
 	assert.Contains(t, string(body), "npx playwright install chromium --with-deps")
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 }
 
 func TestQABootstrapCmd_UsesReleaseWorkflowDefaults(t *testing.T) {
@@ -134,6 +137,7 @@ func TestQABootstrapCmd_UsesReleaseWorkflowDefaults(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "go-fast.yaml"))
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
 	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 }
 
 func TestQAInitCmd_PreservesExistingJourneyPack(t *testing.T) {
@@ -154,8 +158,8 @@ func TestQAInitCmd_PreservesExistingJourneyPack(t *testing.T) {
 
 	require.NoError(t, cmd.Execute())
 	data := decodeJSONMap(t, out.Bytes())["data"].(map[string]any)
-	assert.Equal(t, "skipped", data["status"])
-	assert.NotContains(t, data, "created")
+	assert.Equal(t, "created", data["status"])
+	assertContainsCreatedID(t, data["created"].([]any), "domain-readiness-catalog")
 	body, err := os.ReadFile(journeyPath)
 	require.NoError(t, err)
 	assert.Equal(t, "# user-owned journey pack\n", string(body))
@@ -176,6 +180,7 @@ func TestQAInitCmd_LocalOnlySkipsReleaseWorkflow(t *testing.T) {
 	data := decodeJSONMap(t, out.Bytes())["data"].(map[string]any)
 	assert.Equal(t, "created", data["status"])
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "go-fast.yaml"))
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
 	assert.NoFileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
 }
@@ -194,6 +199,7 @@ func TestQAInitCmd_LocalOnlyNoopsWithoutQASignals(t *testing.T) {
 	assert.Equal(t, "noop", data["status"])
 	assert.NotEmpty(t, data["warnings"])
 	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml"))
+	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 }
 
 func assertContainsCreatedID(t *testing.T, created []any, id string) {

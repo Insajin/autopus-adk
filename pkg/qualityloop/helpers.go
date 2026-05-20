@@ -47,7 +47,7 @@ func ownerFor(kind string) string {
 	case KindQAMESHRepairHandoff, KindSkillEvolveCandidate, KindPromptLayerUpdate:
 		return "autopus-adk"
 	case KindSourceSetupMission, KindWorkspaceEvolutionSignal, KindOperatingPackCandidate, KindLaunchGateBlocker, KindAgentEvalRemediation:
-		return "Autopus/backend"
+		return "project-source-owner"
 	default:
 		return "quality-loop"
 	}
@@ -55,16 +55,23 @@ func ownerFor(kind string) string {
 
 func ownerRepoFor(input FailureInput, kind string) string {
 	if input.TargetArtifact != "" {
-		switch {
-		case strings.HasPrefix(input.TargetArtifact, "autopus-adk/"):
-			return "autopus-adk"
-		case strings.HasPrefix(input.TargetArtifact, "Autopus/"):
-			return "Autopus"
-		case strings.HasPrefix(input.TargetArtifact, "autopus-desktop/"):
-			return "autopus-desktop"
+		if repo := leadingPathSegment(input.TargetArtifact); repo != "" {
+			return repo
 		}
 	}
 	return ownerFor(kind)
+}
+
+func leadingPathSegment(path string) string {
+	path = strings.TrimSpace(strings.TrimLeft(path, "./"))
+	if path == "" || strings.HasPrefix(path, "/") {
+		return ""
+	}
+	segment, _, _ := strings.Cut(path, "/")
+	if segment == "" || strings.Contains(segment, "\\") || strings.Contains(segment, "*") {
+		return ""
+	}
+	return segment
 }
 
 func severityFor(status, taxonomy string) string {

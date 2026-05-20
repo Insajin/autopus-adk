@@ -255,7 +255,7 @@ func writeQAFixtureManifest(t *testing.T, dir, status string) string {
 		"source_refs": map[string]any{
 			"source_spec":         "SPEC-QAMESH-001",
 			"acceptance_refs":     []string{"AC-QAMESH-001", "AC-QAMESH-003"},
-			"owned_paths":         []string{"Autopus/frontend/e2e/tests/qamesh-golden.spec.ts"},
+			"owned_paths":         []string{"sample-app/frontend/e2e/tests/qamesh-golden.spec.ts"},
 			"do_not_modify_paths": []string{".codex/**", ".opencode/**", ".autopus/plugins/**"},
 		},
 	}

@@ -1,8 +1,8 @@
 package readiness
 
 const (
-	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-007: readiness projection schema is the ADK-to-Autopus wire contract.
-	// @AX:REASON: CLI output, backend validation, frontend CEO cards, and desktop message cards consume these JSON field names and status values.
+	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-007: readiness projection schema is the portable ADK QAMESH wire contract.
+	// @AX:REASON: CLI output and downstream project consumers rely on these JSON field names and status values.
 	ProjectionSchemaVersion = "qamesh.readiness_projection.v1"
 	ContractOwner           = "autopus-adk"
 

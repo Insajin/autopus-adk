@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/qa/domainreadiness"
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
 )
 
@@ -111,6 +112,15 @@ func ensureStarter(projectDir string, starter starterFile, result *Result) error
 			return err
 		}
 	}
+	if starter.ValidateDomainCatalog {
+		catalog, err := domainreadiness.LoadCatalogFile(path)
+		if err != nil {
+			return err
+		}
+		if report := domainreadiness.ValidateCatalog(catalog); !report.Valid {
+			return fmt.Errorf("invalid domain readiness starter catalog: %#v", report.MissingDomains)
+		}
+	}
 	file.Reason = starter.Reason
 	result.Created = append(result.Created, file)
 	return nil
@@ -157,6 +167,7 @@ func writeNewFile(path string, body []byte) error {
 func initNextSteps(release bool, workflow string) []string {
 	steps := []string{
 		"Review .autopus/qa/journeys/*.yaml and replace starter commands with project-owned deterministic checks before trusting them.",
+		"Review .autopus/qa/domain-readiness/catalog.json and replace starter domains with project-owned readiness scenarios.",
 		"Run auto qa plan --format json to inspect runnable lanes and setup gaps.",
 	}
 	if release {

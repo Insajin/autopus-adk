@@ -10,18 +10,19 @@ import (
 )
 
 type qaReadinessOptions struct {
-	WorkspaceRoot string
-	RepoRoot      string
-	WorkspaceID   string
-	RepoID        string
-	RunIndexPath  string
-	ReleasePath   string
-	JSONOut       bool
-	Format        string
+	WorkspaceRoot      string
+	RepoRoot           string
+	WorkspaceID        string
+	RepoID             string
+	RunIndexPath       string
+	ReleasePath        string
+	ReferenceConsumers []string
+	JSONOut            bool
+	Format             string
 }
 
-// @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-007: public `auto qa readiness` command emits the projection consumed by Autopus surfaces.
-// @AX:REASON: CLI users, backend ingestion, frontend CEO cards, and desktop cards rely on the flags, JSON mode, and error codes staying stable.
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-007: public `auto qa readiness` command emits portable read-only QAMESH projections.
+// @AX:REASON: CLI users and downstream project surfaces rely on the flags, JSON mode, and error codes staying stable.
 func newQAReadinessCmd() *cobra.Command {
 	var opts qaReadinessOptions
 	cmd := &cobra.Command{
@@ -37,6 +38,7 @@ func newQAReadinessCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.RepoID, "repo-id", "", "Expected repository id")
 	cmd.Flags().StringVar(&opts.RunIndexPath, "run-index", "", "QAMESH run index path")
 	cmd.Flags().StringVar(&opts.ReleasePath, "release-index", "", "QAMESH release index path")
+	cmd.Flags().StringArrayVar(&opts.ReferenceConsumers, "reference-consumer", nil, "Optional downstream consumer name; may be repeated")
 	addJSONFlags(cmd, &opts.JSONOut, &opts.Format)
 	return cmd
 }
@@ -67,8 +69,8 @@ func runQAReadiness(cmd *cobra.Command, opts qaReadinessOptions) error {
 	if err != nil {
 		return qaCommandError(cmd, jsonMode, err, "qa_readiness_blocked", result)
 	}
-	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-007: reference consumers enumerate downstream projection owners for contract drift checks.
-	result.Projection.ReferenceConsumers = []string{"Autopus", "autopus-desktop"}
+	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-007: reference consumers are caller-owned metadata, not ADK product defaults.
+	result.Projection.ReferenceConsumers = append([]string(nil), opts.ReferenceConsumers...)
 	if jsonMode {
 		return writeJSONResult(cmd, jsonStatusOK, result.Projection, nil, nil)
 	}

@@ -176,7 +176,7 @@ func qameshInput(overrides FailureInput) FailureInput {
 		QAMESHStatus:          "failed",
 		RedactionStatus:       RedactionRedacted,
 		EvidenceRefs:          []string{".autopus/qa/runs/qa-run-001/manifest.json"},
-		OwnedPaths:            []string{"Autopus/frontend/src/components/Checkout.tsx"},
+		OwnedPaths:            []string{"sample-app/frontend/src/components/Checkout.tsx"},
 		AffectedAcceptanceIDs: []string{"AC-QIL-003"},
 	}
 	mergeFailureInput(&input, overrides)
