@@ -15,8 +15,8 @@ var (
 	reAllowlistBullet = regexp.MustCompile("(?m)^\\s*[-*]\\s+`([A-Za-z_][A-Za-z0-9_]*)`\\s*(?:[—:-]\\s*)?(.*)$")
 	reBacktickIdent   = regexp.MustCompile("`([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)?)(?:=[^`]*)?`")
 	reEventKindValue  = regexp.MustCompile("event_kind\\s*=\\s*\"?([A-Za-z_][A-Za-z0-9_]*)\"?")
-	reObjectKey       = regexp.MustCompile("(?:^|[,\\s{])([A-Za-z_][A-Za-z0-9_]*)\\s*:")
-	reFindingID       = regexp.MustCompile("^F-(\\d+)$")
+	reObjectKey       = regexp.MustCompile(`(?:^|[,\s{])([A-Za-z_][A-Za-z0-9_]*)\s*:`)
+	reFindingID       = regexp.MustCompile(`^F-(\d+)$`)
 )
 
 // RunSpecContractAnalysis finds deterministic SPEC contract drift that LLM
@@ -94,7 +94,7 @@ func sectionAfterHeading(text, heading string) string {
 		return ""
 	}
 	rest := text[idx:]
-	next := regexp.MustCompile("(?m)^#{2,3}\\s+").FindAllStringIndex(rest, -1)
+	next := regexp.MustCompile(`(?m)^#{2,3}\s+`).FindAllStringIndex(rest, -1)
 	for _, loc := range next {
 		if loc[0] > 0 {
 			return rest[:loc[0]]
