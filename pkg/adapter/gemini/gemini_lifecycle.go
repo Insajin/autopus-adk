@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -52,6 +53,19 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 			Message: ".agents/skills 디렉터리가 없음",
 			Level:   "warning",
 		})
+	}
+
+	// Verify if the autopus plugin is installed in agy
+	if _, lookErr := exec.LookPath(cliBinary); lookErr == nil {
+		cmd := exec.Command("agy", "plugin", "list")
+		output, err := cmd.Output()
+		if err == nil && !strings.Contains(string(output), `"autopus"`) {
+			errs = append(errs, adapter.ValidationError{
+				File:    ".agents/plugins/autopus",
+				Message: "antigravity에 autopus 플러그인이 설치되지 않음 (자동 복구를 위해 'auto setup'을 실행하세요)",
+				Level:   "warning",
+			})
+		}
 	}
 
 	return errs, nil

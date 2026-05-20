@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
@@ -61,8 +62,18 @@ func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.Harn
 	if err := a.InstallHooks(ctx, hookConfigs, perms); err != nil {
 		return err
 	}
-	_, err := a.writeAntigravityHooksJSON(hookConfigs)
-	return err
+	if _, err := a.writeAntigravityHooksJSON(hookConfigs); err != nil {
+		return err
+	}
+
+	// Auto-install the autopus plugin to antigravity (agy) if agy is present in PATH
+	if _, lookErr := exec.LookPath(cliBinary); lookErr == nil {
+		pluginPath := filepath.Join(a.root, antigravityPluginDir)
+		cmd := exec.CommandContext(ctx, cliBinary, "plugin", "install", pluginPath)
+		_ = cmd.Run()
+	}
+
+	return nil
 }
 
 // InstallHooks merges hooks and permissions into .gemini/settings.json.
