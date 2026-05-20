@@ -53,6 +53,8 @@ func antigravityPluginTarget(path string) (string, bool) {
 		return strings.Replace(path, ".gemini/rules/autopus/", antigravityPluginDir+"/rules/", 1), true
 	case strings.HasPrefix(path, ".gemini/agents/autopus/"):
 		return strings.Replace(path, ".gemini/agents/autopus/", antigravityPluginDir+"/agents/", 1), true
+	case path == ".gemini/commands/auto.toml":
+		return filepath.ToSlash(filepath.Join(antigravityPluginDir, "commands", "auto.toml")), true
 	case strings.HasPrefix(path, ".gemini/commands/auto/"):
 		return strings.Replace(path, ".gemini/commands/auto/", antigravityPluginDir+"/commands/auto/", 1), true
 	default:

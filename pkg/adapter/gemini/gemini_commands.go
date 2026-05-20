@@ -86,6 +86,24 @@ func (a *Adapter) renderCommandTemplates(cfg *config.HarnessConfig) ([]adapter.F
 func (a *Adapter) prepareCommandMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	var files []adapter.FileMapping
 
+	// Render main auto.toml command template
+	mainTmplContent, err := templates.FS.ReadFile("gemini/commands/auto.toml.tmpl")
+	if err != nil {
+		return nil, fmt.Errorf("gemini auto.toml 템플릿 읽기 실패: %w", err)
+	}
+
+	mainRendered, err := a.engine.RenderString(string(mainTmplContent), cfg)
+	if err != nil {
+		return nil, fmt.Errorf("gemini auto.toml 템플릿 렌더링 실패: %w", err)
+	}
+
+	files = append(files, adapter.FileMapping{
+		TargetPath:      filepath.Join(".gemini", "commands", "auto.toml"),
+		OverwritePolicy: adapter.OverwriteAlways,
+		Checksum:        checksum(mainRendered),
+		Content:         []byte(mainRendered),
+	})
+
 	entries, err := templates.FS.ReadDir(commandsTemplateDir)
 	if err != nil {
 		return nil, fmt.Errorf("gemini command 템플릿 디렉터리 읽기 실패: %w", err)

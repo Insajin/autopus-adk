@@ -22,6 +22,11 @@ func TestGeminiGenerateCommands(t *testing.T) {
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
+	// Verify auto.toml is created
+	autoPath := filepath.Join(dir, ".gemini", "commands", "auto.toml")
+	_, autoErr := os.Stat(autoPath)
+	assert.NoError(t, autoErr, "auto.toml should exist")
+
 	// Verify all 6 command TOML files are created
 	commands := []string{"plan", "go", "fix", "review", "sync", "idea"}
 	for _, cmd := range commands {
@@ -39,6 +44,15 @@ func TestGeminiCommandTOMLContent(t *testing.T) {
 
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
+
+	// Check auto.toml has prompt field and router skill reference
+	autoPath := filepath.Join(dir, ".gemini", "commands", "auto.toml")
+	autoData, err := os.ReadFile(autoPath)
+	require.NoError(t, err)
+	autoContent := string(autoData)
+	assert.Contains(t, autoContent, "prompt", "auto.toml should have prompt field")
+	assert.Contains(t, autoContent, ".gemini/skills/auto/SKILL.md", "auto.toml should reference auto router skill")
+	assert.Contains(t, autoContent, "test-project", "auto.toml should contain project name")
 
 	// Check plan.toml has prompt field and skill reference
 	planPath := filepath.Join(dir, ".gemini", "commands", "auto", "plan.toml")

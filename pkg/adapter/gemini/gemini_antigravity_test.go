@@ -57,11 +57,17 @@ func TestMirrorAntigravityPluginMappings(t *testing.T) {
 	files := mirrorAntigravityPluginMappings([]adapter.FileMapping{{
 		TargetPath: ".gemini/commands/auto/plan.toml",
 		Content:    []byte("Load .gemini/skills/autopus/auto-plan/SKILL.md"),
+	}, {
+		TargetPath: ".gemini/commands/auto.toml",
+		Content:    []byte("Load .gemini/skills/auto/SKILL.md"),
 	}})
 
-	require.Len(t, files, 1)
+	require.Len(t, files, 2)
 	assert.Equal(t, ".agents/plugins/autopus/commands/auto/plan.toml", files[0].TargetPath)
 	assert.Contains(t, string(files[0].Content), ".agents/plugins/autopus/skills/auto-plan/SKILL.md")
+
+	assert.Equal(t, ".agents/plugins/autopus/commands/auto.toml", files[1].TargetPath)
+	assert.Contains(t, string(files[1].Content), ".agents/plugins/autopus/skills/auto/SKILL.md")
 }
 
 func TestGenerate_CreatesAntigravityHooksJSON(t *testing.T) {
@@ -93,11 +99,16 @@ func TestGenerate_CreatesAntigravityPluginSurface(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, ".agents", "plugins", "autopus", "skills", "auto-plan", "SKILL.md"))
 	assert.FileExists(t, filepath.Join(dir, ".agents", "plugins", "autopus", "rules", "lore-commit.md"))
 	assert.FileExists(t, filepath.Join(dir, ".agents", "plugins", "autopus", "agents", "executor.md"))
+	assert.FileExists(t, filepath.Join(dir, ".agents", "plugins", "autopus", "commands", "auto.toml"))
 	assert.FileExists(t, filepath.Join(dir, ".agents", "plugins", "autopus", "commands", "auto", "plan.toml"))
 
 	commandData, err := os.ReadFile(filepath.Join(dir, ".agents", "plugins", "autopus", "commands", "auto", "plan.toml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(commandData), ".agents/plugins/autopus/skills/auto-plan/SKILL.md")
+
+	autoCommandData, err := os.ReadFile(filepath.Join(dir, ".agents", "plugins", "autopus", "commands", "auto.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoCommandData), ".agents/plugins/autopus/skills/auto/SKILL.md")
 }
 
 func TestRemoveAntigravityHooksJSON_PreservesUserHooks(t *testing.T) {
