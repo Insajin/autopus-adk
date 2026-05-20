@@ -1,5 +1,5 @@
 #!/bin/sh
-# hook-gemini-afteragent.sh — Gemini CLI AfterAgent hook for autopus result collection.
+# hook-gemini-afteragent.sh — Antigravity CLI AfterAgent hook for autopus result collection.
 # Reads hook JSON from stdin, extracts prompt_response,
 # writes result.json and done signal to the session directory.
 # POSIX shell compatible. No jq dependency — uses python3 for JSON.

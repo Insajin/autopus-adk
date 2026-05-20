@@ -18,7 +18,7 @@ func TestUpdateCmd_AllPlatforms(t *testing.T) {
 	dir := t.TempDir()
 
 	initCmd := newTestRootCmd()
-	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code,codex,gemini-cli"})
+	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code,codex,antigravity-cli"})
 	require.NoError(t, initCmd.Execute())
 
 	updateCmd := newTestRootCmd()
@@ -41,28 +41,28 @@ func TestUpdateCmd_MultiplePlatformsOutput(t *testing.T) {
 	require.NoError(t, updateCmd.Execute())
 }
 
-// TestInitCmd_FullModeGemini는 Full 모드로 gemini-cli를 초기화를 테스트한다.
+// TestInitCmd_FullModeGemini는 Full 모드로 antigravity-cli를 초기화를 테스트한다.
 func TestInitCmd_FullModeGemini(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 
 	cmd := newTestRootCmd()
-	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "full-gemini", "--platforms", "gemini-cli"})
+	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "full-gemini", "--platforms", "antigravity-cli"})
 	require.NoError(t, cmd.Execute())
 
 	_, statErr := os.Stat(filepath.Join(dir, "GEMINI.md"))
 	assert.NoError(t, statErr)
 }
 
-// TestInitCmd_GeminiPlatform는 gemini-cli 플랫폼 초기화를 테스트한다.
+// TestInitCmd_GeminiPlatform는 antigravity-cli 플랫폼 초기화를 테스트한다.
 func TestInitCmd_GeminiPlatform(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 
 	cmd := newTestRootCmd()
-	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "gemini-proj", "--platforms", "gemini-cli"})
+	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "gemini-proj", "--platforms", "antigravity-cli"})
 	require.NoError(t, cmd.Execute())
 
 	_, statErr := os.Stat(filepath.Join(dir, "GEMINI.md"))
@@ -134,14 +134,14 @@ func TestInitCmd_ProjectNameFromDir(t *testing.T) {
 	assert.True(t, strings.Contains(string(data), filepath.Base(dir)))
 }
 
-// TestUpdateCmd_GeminiPlatform은 gemini-cli 플랫폼의 update를 테스트한다.
+// TestUpdateCmd_GeminiPlatform은 antigravity-cli 플랫폼의 update를 테스트한다.
 func TestUpdateCmd_GeminiPlatform(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 
 	initCmd := newTestRootCmd()
-	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "gemini-update", "--platforms", "gemini-cli"})
+	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "gemini-update", "--platforms", "antigravity-cli"})
 	require.NoError(t, initCmd.Execute())
 
 	updateCmd := newTestRootCmd()

@@ -40,7 +40,7 @@ func TestSanitizeScreenOutput(t *testing.T) {
 		{"strips OSC with ST terminator", "\x1b]52;c;data\x1b\\visible", "visible"},
 		// CLI banner stripping
 		{"strips Claude banner", "▐▛███▜▌   Claude Code v2.1.87\ncontent here", "content here"},
-		{"strips Gemini banner", "▝▜▄     Gemini CLI v0.35.3     ▝▜▄\ncontent here", "content here"},
+		{"strips Gemini banner", "▝▜▄     Antigravity CLI v0.35.3     ▝▜▄\ncontent here", "content here"},
 		{"strips multi-line banners", "▐▛███▜▌   Claude Code\n▝▜█████▛▘  Opus 4.6\ncontent", "content"},
 	}
 	for _, tt := range tests {

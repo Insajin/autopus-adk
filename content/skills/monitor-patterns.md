@@ -87,7 +87,7 @@ Monitor(
 |----------|---------|
 | claude | `^❯\s*$` |
 | codex | `^codex>\s*$` |
-| gemini-cli | `^>\s*(Type your\|Press Ctrl)` 또는 `gemini>\s*$` |
+| antigravity-cli | `^>\s*(Type your\|Press Ctrl)` 또는 `gemini>\s*$` |
 | opencode | `^opencode›\s*$` 또는 `^>\s*Ready\s*$` |
 
 ### 오버라이드
@@ -100,7 +100,7 @@ orchestra_patterns:
     idle: '^❯\s*$'
   codex:
     idle: '^codex>\s*$'
-  gemini-cli:
+  antigravity-cli:
     idle: '^>\s*(Type your|Press Ctrl)'
   opencode:
     idle: '^opencode›\s*$'
@@ -112,7 +112,7 @@ orchestra_patterns:
 
 ```python
 # Step 0: resolve GREP_LB at runtime (see §3)
-providers = ["claude", "codex", "gemini-cli"]
+providers = ["claude", "codex", "antigravity-cli"]
 pending = set(providers)
 
 # Step 1: launch Monitor per provider (parallel)

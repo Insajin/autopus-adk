@@ -46,6 +46,11 @@ var permissionMap = map[string]map[string]string{
 		"act":    "auto",
 		"bypass": "never",
 	},
+	"antigravity-cli": {
+		"plan":   "plan",
+		"act":    "auto_edit",
+		"bypass": "yolo",
+	},
 	"gemini-cli": {
 		"plan":   "plan",
 		"act":    "auto_edit",

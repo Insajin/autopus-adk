@@ -1,4 +1,4 @@
-// Package gemini implements the Gemini CLI platform adapter.
+// Package gemini implements the Antigravity CLI platform adapter.
 package gemini
 
 import (
@@ -15,12 +15,13 @@ import (
 )
 
 const (
-	adapterName = "gemini-cli"
-	cliBinary   = "gemini"
-	adapterVer  = "1.0.0"
+	adapterName       = "antigravity-cli"
+	legacyAdapterName = "gemini-cli"
+	cliBinary         = "agy"
+	adapterVer        = "1.0.0"
 )
 
-// Adapter is the Gemini CLI platform adapter.
+// Adapter is the Antigravity CLI platform adapter.
 type Adapter struct {
 	root   string
 	engine *tmpl.Engine
@@ -40,16 +41,16 @@ func (a *Adapter) Name() string      { return adapterName }
 func (a *Adapter) Version() string   { return adapterVer }
 func (a *Adapter) CLIBinary() string { return cliBinary }
 
-// SupportsHooks returns true. Gemini CLI supports hooks via .gemini/settings.json.
+// SupportsHooks returns true. Antigravity CLI supports hooks via settings.json.
 func (a *Adapter) SupportsHooks() bool { return true }
 
-// Detect checks whether the gemini binary is installed on PATH.
+// Detect checks whether the agy binary is installed on PATH.
 func (a *Adapter) Detect(_ context.Context) (bool, error) {
 	_, err := exec.LookPath(cliBinary)
 	return err == nil, nil
 }
 
-// Generate creates Gemini CLI files based on the harness config.
+// Generate creates Antigravity CLI files based on the harness config.
 func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
 	geminiSkillDir := filepath.Join(a.root, ".gemini", "skills", "autopus")
 	if err := os.MkdirAll(geminiSkillDir, 0755); err != nil {

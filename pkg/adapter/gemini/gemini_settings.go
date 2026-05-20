@@ -1,4 +1,4 @@
-// Package gemini provides settings.json management for Gemini CLI.
+// Package gemini provides settings.json management for Antigravity CLI.
 package gemini
 
 import (
@@ -56,7 +56,7 @@ func (a *Adapter) generateSettings(cfg *config.HarnessConfig) ([]adapter.FileMap
 
 // applyHooksAndPermissions installs hooks and permissions to .gemini/settings.json.
 func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.HarnessConfig) error {
-	hookConfigs, _, _ := content.GenerateProjectHookConfigs(cfg, "gemini-cli", a.SupportsHooks())
+	hookConfigs, _, _ := content.GenerateProjectHookConfigs(cfg, adapterName, a.SupportsHooks())
 	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
 	return a.InstallHooks(ctx, hookConfigs, perms)
 }
@@ -84,9 +84,8 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 		existingHooks, _ := settings["hooks"].(map[string]any)
 		hooksMap := make(map[string]any)
 
-		// Purge both the new (gemini-native) and legacy (Claude Code) event
-		// names so stale PreToolUse/PostToolUse entries from prior installs
-		// are removed when regenerating with gemini-translated names.
+		// Purge both Antigravity and legacy Gemini event names so stale entries
+		// from prior installs are removed when regenerating hook settings.
 		managedEvents := map[string]bool{
 			"PreToolUse":  true,
 			"PostToolUse": true,

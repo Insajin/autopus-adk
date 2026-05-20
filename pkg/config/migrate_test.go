@@ -187,15 +187,15 @@ func TestMigrateOrchestraConfig_NilCommandsReturnsEarly(t *testing.T) {
 	assert.False(t, changed)
 }
 
-// TestMigrateOrchestraConfig_GeminiCliMapsToGeminiProvider verifies that the
-// platform "gemini-cli" is correctly mapped to the "gemini" orchestra provider.
-func TestMigrateOrchestraConfig_GeminiCliMapsToGeminiProvider(t *testing.T) {
+// TestMigrateOrchestraConfig_AntigravityMapsToGeminiProvider verifies that the
+// platform "antigravity-cli" is correctly mapped to the "gemini" orchestra provider.
+func TestMigrateOrchestraConfig_AntigravityMapsToGeminiProvider(t *testing.T) {
 	t.Parallel()
 
 	cfg := &HarnessConfig{
 		Mode:        ModeFull,
 		ProjectName: "test-project",
-		Platforms:   []string{"gemini-cli"},
+		Platforms:   []string{"antigravity-cli"},
 		Orchestra: OrchestraConf{
 			Enabled:   true,
 			Providers: map[string]ProviderEntry{},
@@ -205,11 +205,11 @@ func TestMigrateOrchestraConfig_GeminiCliMapsToGeminiProvider(t *testing.T) {
 
 	changed, err := MigrateOrchestraConfig(cfg)
 	require.NoError(t, err)
-	assert.True(t, changed, "changed must be true when gemini provider is added for gemini-cli")
+	assert.True(t, changed, "changed must be true when gemini provider is added for antigravity-cli")
 
 	gemini, ok := cfg.Orchestra.Providers["gemini"]
-	require.True(t, ok, "gemini provider must exist after migrating gemini-cli platform")
-	assert.Equal(t, "gemini", gemini.Binary, "gemini provider Binary must be 'gemini'")
+	require.True(t, ok, "gemini provider must exist after migrating antigravity-cli platform")
+	assert.Equal(t, "agy", gemini.Binary, "gemini provider Binary must be 'agy'")
 	assert.False(t, gemini.PromptViaArgs, "gemini provider must have PromptViaArgs=false")
 }
 
@@ -221,7 +221,7 @@ func TestMigrateOrchestraConfig_MixedKnownUnknownPlatforms(t *testing.T) {
 	cfg := &HarnessConfig{
 		Mode:        ModeFull,
 		ProjectName: "test-project",
-		Platforms:   []string{"claude-code", "unknown-tool", "gemini-cli"},
+		Platforms:   []string{"claude-code", "unknown-tool", "antigravity-cli"},
 		Orchestra: OrchestraConf{
 			Enabled:   true,
 			Providers: map[string]ProviderEntry{},
@@ -235,7 +235,7 @@ func TestMigrateOrchestraConfig_MixedKnownUnknownPlatforms(t *testing.T) {
 
 	// Known platforms must produce providers.
 	assert.Contains(t, cfg.Orchestra.Providers, "claude", "claude-code must map to claude provider")
-	assert.Contains(t, cfg.Orchestra.Providers, "gemini", "gemini-cli must map to gemini provider")
+	assert.Contains(t, cfg.Orchestra.Providers, "gemini", "antigravity-cli must map to gemini provider")
 
 	// Unknown platform must not produce a provider.
 	assert.NotContains(t, cfg.Orchestra.Providers, "unknown-tool",

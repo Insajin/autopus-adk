@@ -3,6 +3,7 @@ package setup
 import (
 	"fmt"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
@@ -14,27 +15,31 @@ type ProviderStatus struct {
 	Version   string
 }
 
-// providerPackages maps provider binary names to their npm package names.
+// providerPackages maps npm-installable provider names to their package names.
 var providerPackages = map[string]string{
 	"claude":   "@anthropic-ai/claude-code",
 	"codex":    "@openai/codex",
-	"gemini":   "@google/gemini-cli",
 	"opencode": "opencode",
 }
 
-// providerBinaries is the ordered list of provider binaries to detect.
-var providerBinaries = []string{"claude", "codex", "gemini", "opencode"}
+// providerBinaries is the ordered list of provider names and binaries to detect.
+var providerBinaries = []ProviderStatus{
+	{Name: "claude", Binary: "claude"},
+	{Name: "codex", Binary: "codex"},
+	{Name: "gemini", Binary: "agy"},
+	{Name: "opencode", Binary: "opencode"},
+}
 
 // DetectProviders checks which CLI providers are installed on the system.
 func DetectProviders() []ProviderStatus {
 	results := make([]ProviderStatus, 0, len(providerBinaries))
-	for _, bin := range providerBinaries {
+	for _, provider := range providerBinaries {
 		ps := ProviderStatus{
-			Name:   bin,
-			Binary: bin,
+			Name:   provider.Name,
+			Binary: provider.Binary,
 		}
 
-		path, err := exec.LookPath(bin)
+		path, err := exec.LookPath(provider.Binary)
 		if err != nil {
 			results = append(results, ps)
 			continue
@@ -58,6 +63,10 @@ func detectVersion(binaryPath string) string {
 
 // InstallProvider installs a provider via npm.
 func InstallProvider(name string) error {
+	if name == "gemini" {
+		return installAntigravityCLI()
+	}
+
 	pkg, ok := providerPackages[name]
 	if !ok {
 		return fmt.Errorf("unknown provider: %s", name)
@@ -74,6 +83,32 @@ func InstallProvider(name string) error {
 		return fmt.Errorf("install %s (%s): %w", name, pkg, err)
 	}
 	return nil
+}
+
+func installAntigravityCLI() error {
+	installCmd := antigravityInstallCommand()
+	shell, args := shellCommand(installCmd)
+	cmd := exec.Command(shell, args...)
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("install gemini (Antigravity CLI): %w", err)
+	}
+	return nil
+}
+
+func antigravityInstallCommand() string {
+	if runtime.GOOS == "windows" {
+		return "irm https://antigravity.google/cli/install.ps1 | iex"
+	}
+	return "curl -fsSL https://antigravity.google/cli/install.sh | bash"
+}
+
+func shellCommand(command string) (string, []string) {
+	if runtime.GOOS == "windows" {
+		return "powershell", []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command}
+	}
+	return "sh", []string{"-c", command}
 }
 
 // CheckNodeJS returns true if node is available on PATH.

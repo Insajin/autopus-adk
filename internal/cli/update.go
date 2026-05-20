@@ -167,7 +167,7 @@ func newUpdateCmd() *cobra.Command {
 				case "codex":
 					a := codex.NewWithRoot(dir)
 					_, updateErr = a.Update(ctx, effectiveCfg)
-				case "gemini-cli":
+				case "antigravity-cli":
 					a := gemini.NewWithRoot(dir)
 					_, updateErr = a.Update(ctx, effectiveCfg)
 				case "opencode":

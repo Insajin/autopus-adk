@@ -80,8 +80,8 @@ func TestGeminiRulesContent(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 	assert.Contains(t, content, "Lore Commit", "should contain rule title")
-	assert.Contains(t, content, "platform: gemini-cli",
-		"should have gemini-cli platform in frontmatter")
+	assert.Contains(t, content, "platform: antigravity-cli",
+		"should have antigravity-cli platform in frontmatter")
 
 	// Verify file-size-limit rule exists and has key content
 	fsPath := filepath.Join(dir, ".gemini", "rules", "autopus", "file-size-limit.md")

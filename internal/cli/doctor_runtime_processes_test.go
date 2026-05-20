@@ -85,10 +85,10 @@ func TestCollectRuntimeProcessChecksFixTerminatesStaleProcess(t *testing.T) {
 func TestFindOrphanedOrchestraProviderProcesses(t *testing.T) {
 	restore := stubRuntimeProcessHooks(t,
 		[]runtimeProcessRow{
-			{PID: 41, PPID: 1, Command: "node /opt/homebrew/bin/gemini -m gemini-3.1-pro-preview -p "},
+			{PID: 41, PPID: 1, Command: "node /opt/homebrew/bin/agy"},
 			{PID: 42, PPID: 1, Command: "codex exec --sandbox workspace-write -m gpt-5.5"},
 			{PID: 43, PPID: 1, Command: "claude --print --model opus"},
-			{PID: 44, PPID: 40, Command: "gemini -m gemini-3.1-pro-preview -p active"},
+			{PID: 44, PPID: 40, Command: "agy"},
 			{PID: 45, PPID: 1, Command: "node /opt/homebrew/bin/npm run dev"},
 		},
 		nil,
@@ -106,7 +106,7 @@ func TestFindOrphanedOrchestraProviderProcesses(t *testing.T) {
 
 func TestCollectRuntimeProcessChecksWarnsOnOrphanedProviderProcess(t *testing.T) {
 	restore := stubRuntimeProcessHooks(t,
-		[]runtimeProcessRow{{PID: 51, PPID: 1, Command: "gemini -m gemini-3.1-pro-preview -p "}},
+		[]runtimeProcessRow{{PID: 51, PPID: 1, Command: "agy"}},
 		nil,
 		nil,
 		nil,

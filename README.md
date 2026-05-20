@@ -4,7 +4,7 @@
 
 ### A harness *of* the agents, *by* the agents, *for* the agents.
 
-Make your AI coding tools (Claude Code, Codex, Gemini CLI, OpenCode) work like a real engineering team — with planning, testing, code review, and security audits built in.
+Make your AI coding tools (Claude Code, Codex, Antigravity CLI, OpenCode) work like a real engineering team — with planning, testing, code review, and security audits built in.
 
 **16 agents. 40 skills. One config. Every platform.**
 
@@ -482,7 +482,7 @@ Instead of scraping terminal output, Autopus uses each provider's native hook sy
 | Provider | Hook Type | How |
 |----------|-----------|-----|
 | Claude Code | Stop hook | Extracts `last_assistant_message` |
-| Gemini CLI | AfterAgent hook | Extracts `prompt_response` |
+| Antigravity CLI | AfterAgent hook | Extracts `prompt_response` |
 | OpenCode | Plugin | Extracts `text` field |
 
 Fallback: providers without hooks use ReadScreen + idle detection (SPEC-ORCH-006).
@@ -512,7 +512,7 @@ One `autopus.yaml` generates **native configuration** for every detected support
 |----------|-------------------|
 | **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
-| **Gemini CLI** | `.gemini/`, `GEMINI.md` |
+| **Antigravity CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
 Same 16 agents. Same rules. Shared skills stay full by default. If you want a smaller mixed Codex + OpenCode surface without breaking backward-compatible defaults, keep `skills.shared_surface` as-is and opt into `skills.compiler.mode: split`.
 
@@ -566,12 +566,12 @@ cd your-project
 powershell -c "irm https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.ps1 | iex"
 ```
 
-**That's it.** The installer installs the `auto` CLI plus an `autopus` alias, checks required tools, skips anything already present, and auto-installs missing essentials like `git` and GitHub CLI. It does **not** run `auto init` for you.
+**That's it.** The installer installs the `auto` CLI plus an `autopus` alias, checks required tools, skips anything already present, and auto-installs missing essentials like `git`, GitHub CLI, and Antigravity CLI. It does **not** run `auto init` for you.
 
 Platform command syntax:
 - Codex: install the generated local plugin, then use `@auto ...`; until then, use `$auto ...`
 - OpenCode: use `/auto ...` or `/auto-<subcommand> ...`
-- Claude Code / Gemini CLI: use `/auto ...`
+- Claude Code / Antigravity CLI: use `/auto ...`
 
 > Note: If you run the Windows installer from Git Bash via `powershell -c ...`, restart Git Bash after install so it reloads the updated user `PATH`. The installer prints the exact install directory and a one-line `export PATH=...` fallback for that case.
 
@@ -618,14 +618,14 @@ cd your-project
 auto init
 ```
 
-`auto init` scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Gemini CLI, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
+`auto init` scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Antigravity CLI, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
 
 Claude Code statusline note:
 - If `.claude/settings.json` already has a `statusLine.command`, `auto init` / `auto update` now lets you choose `keep`, `merge`, or `replace` in interactive mode.
 - You can force the same behavior non-interactively with `--statusline-mode keep|merge|replace`.
 
 ```
-✓ Detected: claude-code, codex, gemini-cli, opencode
+✓ Detected: claude-code, codex, antigravity-cli, opencode
 ✓ Generated: .claude/rules/, .claude/skills/, .claude/agents/, CLAUDE.md
 ✓ Generated: .codex/, AGENTS.md
 ✓ Generated: .gemini/, GEMINI.md
@@ -638,7 +638,7 @@ Claude Code statusline note:
 This is the most important step. **AI agents lose all memory between sessions** — every conversation is their first day on the job. `/auto setup` creates the "onboarding documents" that let agents understand your project instantly.
 
 ```bash
-/auto setup     # Claude Code, Gemini CLI, OpenCode
+/auto setup     # Claude Code, Antigravity CLI, OpenCode
 @auto setup     # Codex after local plugin install
 $auto setup     # Codex fallback before plugin install
 ```
@@ -1138,7 +1138,7 @@ orchestra:
     codex:
       binary: codex
     gemini:
-      binary: gemini
+      binary: agy
     opencode:
       binary: opencode
 ```

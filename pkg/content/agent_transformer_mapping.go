@@ -78,7 +78,7 @@ func normalizePlatform(platform string) string {
 	switch platform {
 	case "claude-code":
 		return "claude"
-	case "gemini-cli":
+	case "gemini-cli", "antigravity-cli":
 		return "gemini"
 	default:
 		return platform

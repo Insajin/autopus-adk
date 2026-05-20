@@ -81,9 +81,9 @@ func TestGenerateHookConfigs_AllDisabled(t *testing.T) {
 	assert.Empty(t, gitHooks)
 }
 
-// TestGenerateHookConfigs_GeminiTranslatesEventNames verifies that gemini-cli
-// receives BeforeTool/AfterTool (gemini's native event names) instead of
-// Claude Code's PreToolUse/PostToolUse, which gemini CLI rejects as
+// TestGenerateHookConfigs_GeminiTranslatesEventNames verifies that the legacy
+// Gemini CLI surface receives BeforeTool/AfterTool instead of Claude Code's
+// PreToolUse/PostToolUse, which that CLI rejected as
 // "Invalid hook event name".
 func TestGenerateHookConfigs_GeminiTranslatesEventNames(t *testing.T) {
 	t.Parallel()
@@ -105,6 +105,28 @@ func TestGenerateHookConfigs_GeminiTranslatesEventNames(t *testing.T) {
 	assert.Contains(t, eventNames, "AfterTool", "PostToolUse must be translated to AfterTool for gemini")
 	assert.NotContains(t, eventNames, "PreToolUse", "gemini hooks must not use Claude Code event names")
 	assert.NotContains(t, eventNames, "PostToolUse", "gemini hooks must not use Claude Code event names")
+}
+
+func TestGenerateHookConfigs_AntigravityKeepsOfficialEventNames(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.HooksConf{
+		PreCommitArch:  true,
+		ReactCIFailure: true,
+	}
+
+	hooks, _, err := content.GenerateHookConfigs(cfg, "antigravity-cli", true)
+	require.NoError(t, err)
+
+	eventNames := make([]string, len(hooks))
+	for i, h := range hooks {
+		eventNames[i] = h.Event
+	}
+
+	assert.Contains(t, eventNames, "PreToolUse")
+	assert.Contains(t, eventNames, "PostToolUse")
+	assert.NotContains(t, eventNames, "BeforeTool")
+	assert.NotContains(t, eventNames, "AfterTool")
 }
 
 // TestGenerateHookConfigs_ClaudeKeepsEventNames verifies claude-code still

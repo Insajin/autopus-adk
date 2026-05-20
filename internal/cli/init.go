@@ -73,7 +73,7 @@ func newInitCmd() *cobra.Command {
 					if p == "" {
 						continue
 					}
-					// Normalize provider names to platform names (e.g., "gemini" → "gemini-cli").
+					// Normalize provider names to platform names (e.g., "gemini" -> "antigravity-cli").
 					if corrected := config.ProviderToPlatform(p); corrected != "" {
 						p = corrected
 					}

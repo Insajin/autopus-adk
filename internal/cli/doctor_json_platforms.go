@@ -140,7 +140,7 @@ func validateDoctorPlatform(
 		return claude.NewWithRoot(dir).Validate(ctx)
 	case "codex":
 		return codex.NewWithRoot(dir).Validate(ctx)
-	case "gemini-cli":
+	case "antigravity-cli":
 		return gemini.NewWithRoot(dir).Validate(ctx)
 	case "opencode":
 		return opencode.NewWithRoot(dir).Validate(ctx)

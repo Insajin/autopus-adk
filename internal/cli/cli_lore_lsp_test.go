@@ -214,7 +214,7 @@ func TestPlatformCmd_Help(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// TestPlatformAddCmd_GeminiCLI는 gemini-cli 플랫폼 추가를 테스트한다.
+// TestPlatformAddCmd_GeminiCLI는 antigravity-cli 플랫폼 추가를 테스트한다.
 func TestPlatformAddCmd_GeminiCLI(t *testing.T) {
 	t.Parallel()
 
@@ -225,9 +225,9 @@ func TestPlatformAddCmd_GeminiCLI(t *testing.T) {
 	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code"})
 	assert.NoError(t, initCmd.Execute())
 
-	// gemini-cli 추가
+	// antigravity-cli 추가
 	addCmd := newTestRootCmd()
-	addCmd.SetArgs([]string{"platform", "add", "gemini-cli", "--dir", dir})
+	addCmd.SetArgs([]string{"platform", "add", "antigravity-cli", "--dir", dir})
 	err := addCmd.Execute()
 	assert.NoError(t, err)
 }

@@ -136,7 +136,7 @@ func normalizeCatalogPlatform(platform string) string {
 	switch platform {
 	case "claude", "claude-code":
 		return "claude"
-	case "gemini", "gemini-cli":
+	case "gemini", "gemini-cli", "antigravity-cli":
 		return "gemini"
 	case "codex", "opencode":
 		return platform

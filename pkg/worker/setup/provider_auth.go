@@ -50,11 +50,11 @@ func checkGemini(home string) (bool, string) {
 	if os.Getenv("GOOGLE_API_KEY") != "" {
 		return true, ""
 	}
-	geminiDir := filepath.Join(home, ".config", "gemini")
-	if dirExists(geminiDir) {
+	antigravityDir := filepath.Join(home, ".gemini", "antigravity-cli")
+	if dirExists(antigravityDir) {
 		return true, ""
 	}
-	return false, "1. https://aistudio.google.com 에서 API 키 발급\n      2. 터미널에 다음 명령어를 입력하세요:\n         export GOOGLE_API_KEY=여기에_키_입력\n      3. 또는 gemini login 실행"
+	return false, "1. https://antigravity.google/download 에서 Antigravity CLI 설치\n      2. agy 실행 후 Google 계정으로 로그인\n      3. 원격/CI 환경에서는 다음 명령어를 입력하세요:\n         export GOOGLE_API_KEY=여기에_키_입력"
 }
 
 func checkOpencode() (bool, string) {

@@ -1,4 +1,4 @@
-// Package gemini implements the Gemini CLI platform adapter.
+// Package gemini implements the Antigravity CLI platform adapter.
 package gemini
 
 import (
@@ -17,6 +17,12 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 	oldManifest, err := adapter.LoadManifest(a.root, adapterName)
 	if err != nil {
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
+	}
+	if oldManifest == nil {
+		oldManifest, err = adapter.LoadManifest(a.root, legacyAdapterName)
+		if err != nil {
+			return nil, fmt.Errorf("legacy 매니페스트 로드 실패: %w", err)
+		}
 	}
 
 	if oldManifest == nil {

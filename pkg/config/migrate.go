@@ -8,7 +8,7 @@ import "slices"
 var defaultProviderEntries = map[string]ProviderEntry{
 	"claude": {Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}},
 	"codex":  DefaultCodexProviderEntry(),
-	"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
+	"gemini": {Binary: "agy", PromptViaArgs: false, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
 }
 
 // MigrateOrchestraConfig performs all orchestra config migrations.
@@ -184,8 +184,8 @@ func ProviderToPlatform(name string) string {
 	switch name {
 	case "claude":
 		return "claude-code"
-	case "gemini":
-		return "gemini-cli"
+	case "gemini", "gemini-cli", "agy", "antigravity":
+		return "antigravity-cli"
 	default:
 		return "" // no normalization needed or unknown
 	}
@@ -212,7 +212,7 @@ func PlatformToProvider(platform string) string {
 		return "claude"
 	case "codex":
 		return "codex"
-	case "gemini-cli":
+	case "antigravity-cli", "gemini-cli":
 		return "gemini"
 	case "opencode":
 		return "codex"

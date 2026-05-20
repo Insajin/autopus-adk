@@ -51,7 +51,7 @@ type codexOutput struct {
 	Text string `json:"text"`
 }
 
-// geminiOutput is the JSON structure returned by Gemini CLI.
+// geminiOutput is the JSON structure returned by Antigravity CLI.
 type geminiOutput struct {
 	PromptResponse string `json:"prompt_response"`
 }

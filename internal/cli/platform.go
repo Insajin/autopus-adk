@@ -83,6 +83,9 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 			}
 
 			platform := strings.TrimSpace(args[0])
+			if normalized := config.ProviderToPlatform(platform); normalized != "" {
+				platform = normalized
+			}
 
 			// 유효한 플랫폼 확인 (임시 config로 검증)
 			testCfg := &config.HarnessConfig{
@@ -136,10 +139,10 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
 					return fmt.Errorf("codex 파일 생성 실패: %w", err)
 				}
-			case "gemini-cli":
+			case "antigravity-cli":
 				a := gemini.NewWithRoot(d)
 				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
-					return fmt.Errorf("gemini-cli 파일 생성 실패: %w", err)
+					return fmt.Errorf("antigravity-cli 파일 생성 실패: %w", err)
 				}
 			case "opencode":
 				a := opencode.NewWithRoot(d)
@@ -166,6 +169,9 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 			}
 
 			platform := strings.TrimSpace(args[0])
+			if normalized := config.ProviderToPlatform(platform); normalized != "" {
+				platform = normalized
+			}
 
 			cfg, err := config.Load(d)
 			if err != nil {
@@ -206,7 +212,7 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 			case "codex":
 				a := codex.NewWithRoot(d)
 				_ = a.Clean(ctx)
-			case "gemini-cli":
+			case "antigravity-cli":
 				a := gemini.NewWithRoot(d)
 				_ = a.Clean(ctx)
 			case "opencode":

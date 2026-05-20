@@ -30,20 +30,23 @@ func findOrphanedOrchestraProviderProcesses() []staleRuntimeProcess {
 
 func isOrchestraProviderCommand(command string) bool {
 	fields := strings.Fields(command)
-	return commandHasProviderHeadlessMode(fields, "gemini", "-p", "--prompt") ||
+	return commandHasProvider(fields, "agy") ||
+		commandHasProviderHeadlessMode(fields, "gemini", "-p", "--prompt") ||
 		commandHasProviderHeadlessMode(fields, "codex", "exec") ||
 		commandHasProviderHeadlessMode(fields, "claude", "--print", "-p")
 }
 
-func commandHasProviderHeadlessMode(fields []string, provider string, required ...string) bool {
-	providerSeen := false
+func commandHasProvider(fields []string, provider string) bool {
 	for _, field := range fields {
 		if filepath.Base(field) == provider {
-			providerSeen = true
-			break
+			return true
 		}
 	}
-	if !providerSeen {
+	return false
+}
+
+func commandHasProviderHeadlessMode(fields []string, provider string, required ...string) bool {
+	if !commandHasProvider(fields, provider) {
 		return false
 	}
 	for _, want := range required {

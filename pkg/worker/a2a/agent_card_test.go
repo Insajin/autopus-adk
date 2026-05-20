@@ -34,14 +34,17 @@ func TestCardBuilder_WithProviders_KnownProviders(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		provider string
-		expected []string
+		name             string
+		provider         string
+		expectedProvider string
+		expected         []string
 	}{
-		{"claude", "claude", []string{"analysis", "coding", "review"}},
-		{"codex", "codex", []string{"coding", "generation"}},
-		{"gemini", "gemini", []string{"analysis", "coding", "search"}},
-		{"opencode", "opencode", []string{"coding"}},
+		{"claude", "claude", "claude", []string{"analysis", "coding", "review"}},
+		{"codex", "codex", "codex", []string{"coding", "generation"}},
+		{"gemini", "gemini", "gemini", []string{"analysis", "coding", "search"}},
+		{"antigravity", "antigravity-cli", "gemini", []string{"analysis", "coding", "search"}},
+		{"agy", "agy", "gemini", []string{"analysis", "coding", "search"}},
+		{"opencode", "opencode", "opencode", []string{"coding"}},
 	}
 
 	for _, tc := range tests {
@@ -50,7 +53,7 @@ func TestCardBuilder_WithProviders_KnownProviders(t *testing.T) {
 			card := NewCardBuilder("w", "http://x").
 				WithProviders([]string{tc.provider}).
 				Build()
-			assert.Equal(t, []string{tc.provider}, card.Providers)
+			assert.Equal(t, []string{tc.expectedProvider}, card.Providers)
 			assert.Equal(t, tc.expected, card.Skills)
 			if tc.provider == "codex" {
 				assert.Equal(t, codexUnsupportedModelOverrides, card.UnsupportedModelOverrides)

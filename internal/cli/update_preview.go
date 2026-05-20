@@ -186,7 +186,7 @@ func generatePreviewMappings(ctx context.Context, root string, cfg *config.Harne
 	case "codex":
 		pf, err := codex.NewWithRoot(root).Generate(ctx, cfg)
 		return previewMappings(platform, pf, err)
-	case "gemini-cli":
+	case "antigravity-cli":
 		pf, err := gemini.NewWithRoot(root).Generate(ctx, cfg)
 		return previewMappings(platform, pf, err)
 	case "opencode":

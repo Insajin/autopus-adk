@@ -231,7 +231,7 @@ func TestInitCmd_PlatformNormalization(t *testing.T) {
 	dir := t.TempDir()
 
 	cmd := newTestRootCmd()
-	// "gemini" (provider name) must be normalized to "gemini-cli" (platform name).
+	// "gemini" (provider name) must be normalized to "antigravity-cli" (platform name).
 	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "gemini", "--yes"})
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -239,7 +239,7 @@ func TestInitCmd_PlatformNormalization(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)
 	content := string(data)
-	assert.Contains(t, content, "gemini-cli", "gemini provider name must be normalized to gemini-cli platform name")
+	assert.Contains(t, content, "antigravity-cli", "gemini provider name must be normalized to antigravity-cli platform name")
 	assert.NotContains(t, content, "platforms:\n- gemini\n", "raw 'gemini' provider name must not appear as platform")
 }
 
@@ -262,7 +262,7 @@ func TestInitCmd_NoReviewGateFlag(t *testing.T) {
 func TestInitCmd_AutoDetectsSupportedPlatforms(t *testing.T) {
 	dir := t.TempDir()
 	binDir := t.TempDir()
-	for _, binary := range []string{"claude", "codex", "gemini", "cursor"} {
+	for _, binary := range []string{"claude", "codex", "agy", "cursor"} {
 		makeDummyBinary(t, binDir, binary)
 	}
 	t.Setenv("PATH", binDir)
@@ -274,7 +274,7 @@ func TestInitCmd_AutoDetectsSupportedPlatforms(t *testing.T) {
 
 	cfg, err := config.Load(dir)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"claude-code", "codex", "gemini-cli"}, cfg.Platforms)
+	assert.Equal(t, []string{"claude-code", "codex", "antigravity-cli"}, cfg.Platforms)
 }
 
 func TestInitCmd_AutoDetectFallbacksToClaude(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
@@ -91,14 +92,14 @@ func runDoctorFixWith(
 			}
 		}
 
-		tui.Info(w, fmt.Sprintf("Installing %s: %s", dep.Name, dep.InstallCmd))
-		parts := strings.Fields(dep.InstallCmd)
-		if len(parts) == 0 {
+		installCmd := strings.TrimSpace(dep.InstallCmd)
+		if installCmd == "" {
 			tui.SKIP(w, fmt.Sprintf("%s: no install command defined", dep.Name))
 			continue
 		}
 
-		out, err := run(parts[0], parts[1:]...)
+		tui.Info(w, fmt.Sprintf("Installing %s: %s", dep.Name, installCmd))
+		out, err := runInstallCommand(dep, run)
 		if err != nil {
 			// Suggest npm prefix workaround on permission errors.
 			if strings.Contains(string(out), "EACCES") {
@@ -141,6 +142,24 @@ func runDoctorFixWith(
 	}
 
 	return nil
+}
+
+func runInstallCommand(dep detect.Dependency, run execFunc) ([]byte, error) {
+	installCmd := strings.TrimSpace(dep.InstallCmd)
+	if dep.InstallViaShell {
+		name, args := shellCommand(installCmd)
+		return run(name, args...)
+	}
+
+	parts := strings.Fields(installCmd)
+	return run(parts[0], parts[1:]...)
+}
+
+func shellCommand(command string) (string, []string) {
+	if runtime.GOOS == "windows" {
+		return "powershell", []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command}
+	}
+	return "sh", []string{"-c", command}
 }
 
 // orderByDependency sorts deps so that prerequisites come before dependants.

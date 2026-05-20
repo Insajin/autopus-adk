@@ -247,7 +247,7 @@ func TestRoutingIntegration_TaskConfigModelPropagation(t *testing.T) {
 	assert.Contains(t, codexCmd.Args, codexModel,
 		"Codex CLI args should contain the routed model with -m flag")
 
-	// Gemini with --model flag.
+	// Gemini-family provider with --model flag.
 	geminiModel := router.Route("gemini", "quick fix")
 	geminiCfg := adapter.TaskConfig{
 		TaskID: "task-prop-3",
@@ -257,5 +257,5 @@ func TestRoutingIntegration_TaskConfigModelPropagation(t *testing.T) {
 	geminiCmd := geminiAdapter.BuildCommand(context.Background(), geminiCfg)
 	assert.Contains(t, geminiCmd.Args, "--model")
 	assert.Contains(t, geminiCmd.Args, geminiModel,
-		fmt.Sprintf("Gemini CLI args should contain the routed model %s", geminiModel))
+		fmt.Sprintf("Antigravity CLI args should contain the routed model %s", geminiModel))
 }

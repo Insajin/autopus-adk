@@ -31,11 +31,11 @@ func TestPlatformRemoveCmd_WithCleanup(t *testing.T) {
 	dir := t.TempDir()
 
 	initCmd := newTestRootCmd()
-	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code,gemini-cli"})
+	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code,antigravity-cli"})
 	require.NoError(t, initCmd.Execute())
 
 	removeCmd := newTestRootCmd()
-	removeCmd.SetArgs([]string{"platform", "remove", "gemini-cli", "--dir", dir})
+	removeCmd.SetArgs([]string{"platform", "remove", "antigravity-cli", "--dir", dir})
 	assert.NoError(t, removeCmd.Execute())
 }
 

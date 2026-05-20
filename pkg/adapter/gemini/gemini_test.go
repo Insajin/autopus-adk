@@ -1,4 +1,4 @@
-// Package gemini는 Gemini CLI 어댑터 테스트이다.
+// Package gemini는 Antigravity CLI 어댑터 테스트이다.
 package gemini_test
 
 import (
@@ -17,13 +17,13 @@ import (
 func TestGeminiAdapter_Name(t *testing.T) {
 	t.Parallel()
 	a := gemini.New()
-	assert.Equal(t, "gemini-cli", a.Name())
+	assert.Equal(t, "antigravity-cli", a.Name())
 }
 
 func TestGeminiAdapter_CLIBinary(t *testing.T) {
 	t.Parallel()
 	a := gemini.New()
-	assert.Equal(t, "gemini", a.CLIBinary())
+	assert.Equal(t, "agy", a.CLIBinary())
 }
 
 func TestGeminiAdapter_SupportsHooks(t *testing.T) {

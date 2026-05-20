@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,11 @@ func TestDetectProviders_ReturnsKnownNames(t *testing.T) {
 	assert.Len(t, results, len(knownNames))
 	for _, ps := range results {
 		assert.True(t, knownNames[ps.Name], "unexpected provider: %s", ps.Name)
-		assert.Equal(t, ps.Name, ps.Binary)
+		if ps.Name == "gemini" {
+			assert.Equal(t, "agy", ps.Binary)
+		} else {
+			assert.Equal(t, ps.Name, ps.Binary)
+		}
 	}
 }
 
@@ -98,8 +103,36 @@ func TestInstallNodeJS_NoBrew(t *testing.T) {
 func TestProviderPackages_AllBinariesMapped(t *testing.T) {
 	t.Parallel()
 
-	for _, bin := range providerBinaries {
-		_, ok := providerPackages[bin]
-		assert.True(t, ok, "provider %s should have an npm package mapping", bin)
+	for _, provider := range providerBinaries {
+		if provider.Name == "gemini" {
+			continue
+		}
+		_, ok := providerPackages[provider.Name]
+		assert.True(t, ok, "provider %s should have an npm package mapping", provider.Name)
+	}
+}
+
+func TestAntigravityInstallCommand_UsesOfficialInstaller(t *testing.T) {
+	t.Parallel()
+
+	cmd := antigravityInstallCommand()
+	assert.Contains(t, cmd, "https://antigravity.google/cli/install")
+	if runtime.GOOS == "windows" {
+		assert.Contains(t, cmd, "install.ps1")
+	} else {
+		assert.Contains(t, cmd, "install.sh")
+	}
+}
+
+func TestShellCommand_WrapsInstallPipeline(t *testing.T) {
+	t.Parallel()
+
+	name, args := shellCommand("curl -fsSL https://antigravity.google/cli/install.sh | bash")
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, "powershell", name)
+		assert.Contains(t, args, "-Command")
+	} else {
+		assert.Equal(t, "sh", name)
+		assert.Equal(t, []string{"-c", "curl -fsSL https://antigravity.google/cli/install.sh | bash"}, args)
 	}
 }

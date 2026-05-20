@@ -16,7 +16,7 @@ func TestDoctorCmd_AllPlatforms(t *testing.T) {
 	dir := t.TempDir()
 
 	initCmd := newTestRootCmd()
-	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "doctor-proj", "--platforms", "claude-code,codex,gemini-cli"})
+	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "doctor-proj", "--platforms", "claude-code,codex,antigravity-cli"})
 	require.NoError(t, initCmd.Execute())
 
 	doctorCmd := newTestRootCmd()

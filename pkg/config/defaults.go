@@ -29,7 +29,7 @@ func DefaultCodexProviderEntry() ProviderEntry {
 }
 
 // DefaultFullConfig returns the default config for Full mode.
-// @AX:NOTE: [AUTO] magic constants — model names (opus, sonnet, haiku, Codex GPT-5.x, gemini-3.1-pro-preview), timeouts, and tier mappings are hardcoded below
+// @AX:NOTE: [AUTO] magic constants — model names (opus, sonnet, haiku, Codex GPT-5.x), timeouts, and tier mappings are hardcoded below
 func DefaultFullConfig(projectName string) *HarnessConfig {
 	return &HarnessConfig{
 		Mode:        ModeFull,
@@ -104,7 +104,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 					PaneArgs:   []string{"--print", "--model", "opus", "--effort", "high"},
 					Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
 				},
-				"gemini": {Binary: "gemini", Args: []string{"-m", "gemini-3.1-pro-preview", "-p", ""}, PaneArgs: []string{"-m", "gemini-3.1-pro-preview"}, PromptViaArgs: false},
+				"gemini": {Binary: "agy", PromptViaArgs: false, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
 				"codex":  DefaultCodexProviderEntry(),
 			},
 			Commands: map[string]CommandEntry{

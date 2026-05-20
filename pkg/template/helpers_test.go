@@ -111,15 +111,16 @@ func TestMapPermission(t *testing.T) {
 		{"codex plan", "plan", "codex", "on-request"},
 		{"codex act", "act", "codex", "auto"},
 		{"codex bypass", "bypass", "codex", "never"},
-		// Gemini mappings
-		{"gemini plan", "plan", "gemini-cli", "plan"},
-		{"gemini act", "act", "gemini-cli", "auto_edit"},
-		{"gemini bypass", "bypass", "gemini-cli", "yolo"},
+		// Antigravity mappings
+		{"antigravity plan", "plan", "antigravity-cli", "plan"},
+		{"antigravity act", "act", "antigravity-cli", "auto_edit"},
+		{"antigravity bypass", "bypass", "antigravity-cli", "yolo"},
+		{"legacy gemini plan", "plan", "gemini-cli", "plan"},
 		// Unknown platform
 		{"unknown platform", "plan", "unknown", ""},
 		// Unknown mode
 		{"unknown mode codex", "unknown", "codex", ""},
-		{"unknown mode gemini", "unknown", "gemini-cli", ""},
+		{"unknown mode antigravity", "unknown", "antigravity-cli", ""},
 		// Empty inputs
 		{"empty mode", "", "codex", ""},
 		{"empty platform", "plan", "", ""},

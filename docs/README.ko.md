@@ -4,7 +4,7 @@
 
 ### 에이전트*로 이루어진*, 에이전트*에 의해 운영되는*, 에이전트*를 위한* 하네스.
 
-AI 코딩 도구(Claude Code, Codex, Gemini CLI, OpenCode)가 진짜 개발팀처럼 일하게 만듭니다 — 기획, 테스트, 코드 리뷰, 보안 감사까지 자동으로.
+AI 코딩 도구(Claude Code, Codex, Antigravity CLI, OpenCode)가 진짜 개발팀처럼 일하게 만듭니다 — 기획, 테스트, 코드 리뷰, 보안 감사까지 자동으로.
 
 **16개 에이전트. 40개 스킬. 하나의 설정. 모든 플랫폼.**
 
@@ -423,7 +423,7 @@ auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
 |--------|-------------|
 | **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
-| **Gemini CLI** | `.gemini/`, `GEMINI.md` |
+| **Antigravity CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
 동일한 16개 에이전트. 동일한 규칙. 공유 스킬은 기본적으로 전체가 생성됩니다. 기존 호환성을 유지하면서 mixed Codex + OpenCode 표면을 더 작게 만들고 싶다면 `skills.shared_surface`를 건드리는 대신 `skills.compiler.mode: split`을 opt-in 하세요.
 
@@ -477,7 +477,7 @@ cd your-project
 powershell -c "irm https://raw.githubusercontent.com/Insajin/autopus-adk/main/install.ps1 | iex"
 ```
 
-설치 스크립트는 `auto` CLI와 `autopus` alias를 함께 설치하고, 필수 도구를 점검한 뒤 이미 있는 것은 건너뛰고 누락된 `git`, GitHub CLI 같은 핵심 도구를 자동 설치합니다. 대신 `auto init`은 자동으로 실행하지 않고 사용자에게 맡깁니다.
+설치 스크립트는 `auto` CLI와 `autopus` alias를 함께 설치하고, 필수 도구를 점검한 뒤 이미 있는 것은 건너뛰고 누락된 `git`, GitHub CLI, Antigravity CLI 같은 핵심 도구를 자동 설치합니다. 대신 `auto init`은 자동으로 실행하지 않고 사용자에게 맡깁니다.
 
 <details>
 <summary>기타 설치 방법</summary>
@@ -508,7 +508,7 @@ auto init
 
 Windows에서 `powershell -c ...`를 Git Bash 안에서 실행한 경우에는, 부모 Bash 프로세스의 `PATH`가 즉시 갱신되지 않으므로 설치 후 Git Bash를 다시 열어야 합니다. 이 경우 설치 스크립트가 실제 설치 경로와 `export PATH=...` 안내를 함께 출력합니다.
 
-`auto init`은 설치된 AI 코딩 CLI(Claude Code, Codex, Gemini CLI, OpenCode)를 자동 감지하고, 각 플랫폼에 맞는 **네이티브 설정** — 규칙, 스킬, 에이전트 — 을 하나의 `autopus.yaml`에서 생성합니다.
+`auto init`은 설치된 AI 코딩 CLI(Claude Code, Codex, Antigravity CLI, OpenCode)를 자동 감지하고, 각 플랫폼에 맞는 **네이티브 설정** — 규칙, 스킬, 에이전트 — 을 하나의 `autopus.yaml`에서 생성합니다.
 
 Claude Code statusline 참고:
 - `.claude/settings.json`에 기존 `statusLine.command`가 있으면, `auto init` / `auto update` 인터랙티브 실행 시 `keep`, `merge`, `replace` 중 하나를 고를 수 있습니다.
@@ -517,10 +517,10 @@ Claude Code statusline 참고:
 플랫폼별 명령 문법:
 - Codex: 생성된 로컬 플러그인을 설치한 뒤 `@auto ...`를 사용하고, 그 전에는 `$auto ...`를 사용합니다
 - OpenCode: `/auto ...` 또는 `/auto-<subcommand> ...`를 사용합니다
-- Claude Code / Gemini CLI: `/auto ...`를 사용합니다
+- Claude Code / Antigravity CLI: `/auto ...`를 사용합니다
 
 ```
-✓ 감지됨: claude-code, codex, gemini-cli, opencode
+✓ 감지됨: claude-code, codex, antigravity-cli, opencode
 ✓ 생성됨: .claude/rules/, .claude/skills/, .claude/agents/, CLAUDE.md
 ✓ 생성됨: .codex/, AGENTS.md
 ✓ 생성됨: .gemini/, GEMINI.md
@@ -533,7 +533,7 @@ Claude Code statusline 참고:
 **가장 중요한 단계입니다.** AI 에이전트는 세션 간 모든 기억을 잃습니다 — 매번 프로젝트를 처음 보는 것과 같습니다. `/auto setup`은 에이전트가 프로젝트를 즉시 이해할 수 있게 해주는 "온보딩 문서"를 생성합니다.
 
 ```bash
-/auto setup     # Claude Code, Gemini CLI, OpenCode
+/auto setup     # Claude Code, Antigravity CLI, OpenCode
 @auto setup     # Codex 로컬 플러그인 설치 후
 $auto setup     # Codex 플러그인 설치 전 fallback
 ```
@@ -1055,7 +1055,7 @@ orchestra:
     codex:
       binary: codex
     gemini:
-      binary: gemini
+      binary: agy
     opencode:
       binary: opencode
 ```

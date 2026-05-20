@@ -20,10 +20,10 @@ import (
 )
 
 var initSupportedPlatforms = map[string]bool{
-	"claude-code": true,
-	"codex":       true,
-	"gemini-cli":  true,
-	"opencode":    true,
+	"claude-code":     true,
+	"codex":           true,
+	"antigravity-cli": true,
+	"opencode":        true,
 }
 
 // generatePlatformFiles는 플랫폼별 파일을 생성한다.
@@ -39,7 +39,7 @@ func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessC
 		case "codex":
 			a := codex.NewWithRoot(dir)
 			_, err = a.Generate(ctx, effectiveCfg)
-		case "gemini-cli":
+		case "antigravity-cli":
 			a := gemini.NewWithRoot(dir)
 			_, err = a.Generate(ctx, effectiveCfg)
 		case "opencode":

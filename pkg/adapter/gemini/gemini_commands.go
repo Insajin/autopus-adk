@@ -1,4 +1,4 @@
-// Package gemini provides custom command rendering for Gemini CLI.
+// Package gemini provides custom command rendering for Antigravity CLI.
 package gemini
 
 import (

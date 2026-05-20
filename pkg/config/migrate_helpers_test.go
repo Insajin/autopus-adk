@@ -17,6 +17,7 @@ func TestPlatformToProvider_AllCases(t *testing.T) {
 	}{
 		{"claude-code", "claude"},
 		{"codex", "codex"},
+		{"antigravity-cli", "gemini"},
 		{"gemini-cli", "gemini"},
 		{"opencode", "codex"},
 		{"cursor", ""},
@@ -41,7 +42,10 @@ func TestProviderToPlatform_AllCases(t *testing.T) {
 		want  string
 	}{
 		{"claude", "claude-code"},
-		{"gemini", "gemini-cli"},
+		{"gemini", "antigravity-cli"},
+		{"gemini-cli", "antigravity-cli"},
+		{"agy", "antigravity-cli"},
+		{"antigravity", "antigravity-cli"},
 		{"codex", ""},    // already valid as platform name
 		{"opencode", ""}, // already valid as platform name
 		{"cursor", ""},   // no provider→platform mapping
@@ -57,7 +61,7 @@ func TestProviderToPlatform_AllCases(t *testing.T) {
 	}
 }
 
-// TestMigratePlatformNames_NormalizesGemini verifies gemini is mapped to gemini-cli.
+// TestMigratePlatformNames_NormalizesGemini verifies gemini is mapped to antigravity-cli.
 func TestMigratePlatformNames_NormalizesGemini(t *testing.T) {
 	t.Parallel()
 	cfg := &HarnessConfig{
@@ -65,18 +69,28 @@ func TestMigratePlatformNames_NormalizesGemini(t *testing.T) {
 	}
 	changed := MigratePlatformNames(cfg)
 	assert.True(t, changed)
-	assert.Equal(t, []string{"claude-code", "gemini-cli"}, cfg.Platforms)
+	assert.Equal(t, []string{"claude-code", "antigravity-cli"}, cfg.Platforms)
+}
+
+func TestMigratePlatformNames_MigratesLegacyGeminiCLI(t *testing.T) {
+	t.Parallel()
+	cfg := &HarnessConfig{
+		Platforms: []string{"claude-code", "gemini-cli"},
+	}
+	changed := MigratePlatformNames(cfg)
+	assert.True(t, changed)
+	assert.Equal(t, []string{"claude-code", "antigravity-cli"}, cfg.Platforms)
 }
 
 // TestMigratePlatformNames_NoChangeWhenValid verifies no mutation on valid platform names.
 func TestMigratePlatformNames_NoChangeWhenValid(t *testing.T) {
 	t.Parallel()
 	cfg := &HarnessConfig{
-		Platforms: []string{"claude-code", "gemini-cli"},
+		Platforms: []string{"claude-code", "antigravity-cli"},
 	}
 	changed := MigratePlatformNames(cfg)
 	assert.False(t, changed)
-	assert.Equal(t, []string{"claude-code", "gemini-cli"}, cfg.Platforms)
+	assert.Equal(t, []string{"claude-code", "antigravity-cli"}, cfg.Platforms)
 }
 
 // TestContainsString_TrueAndFalse verifies containsString returns correct results.

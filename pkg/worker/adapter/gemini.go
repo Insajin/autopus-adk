@@ -10,7 +10,7 @@ import (
 
 const geminiStdinPrompt = "Read the full task from stdin and use it as the authoritative prompt."
 
-// GeminiAdapter implements ProviderAdapter for Gemini CLI.
+// GeminiAdapter implements ProviderAdapter for the Gemini-family provider via AGY CLI.
 type GeminiAdapter struct{}
 
 // NewGeminiAdapter creates a new GeminiAdapter.
@@ -21,7 +21,7 @@ func NewGeminiAdapter() *GeminiAdapter {
 // Name returns "gemini".
 func (a *GeminiAdapter) Name() string { return "gemini" }
 
-// BuildCommand constructs the exec.Cmd for Gemini CLI with stream-json output.
+// BuildCommand constructs the exec.Cmd for the Antigravity AGY CLI.
 func (a *GeminiAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.Cmd {
 	sessionID := task.SessionID
 	if sessionID == "" {
@@ -47,7 +47,7 @@ func (a *GeminiAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 			"task_id", task.TaskID)
 	}
 
-	cmd := exec.CommandContext(ctx, ResolveBinary("gemini"), args...)
+	cmd := exec.CommandContext(ctx, ResolveBinary("agy"), args...)
 	cmd.Dir = task.WorkDir
 
 	// Build environment: inherit current env plus task-specific vars.
@@ -61,7 +61,7 @@ func (a *GeminiAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 	return cmd
 }
 
-// geminiResultEvent is the JSON structure of a Gemini result line.
+// geminiResultEvent is the JSON structure of a Gemini-family result line.
 type geminiResultEvent struct {
 	Type       string  `json:"type"`
 	Output     string  `json:"output,omitempty"`

@@ -97,7 +97,7 @@ func normalizeProviderName(raw string) string {
 		return "claude"
 	case "openai", "codex", "openai-codex":
 		return "codex"
-	case "google", "gemini", "gemini-cli":
+	case "google", "gemini", "gemini-cli", "antigravity", "antigravity-cli", "agy":
 		return "gemini"
 	case "opencode", "open-code":
 		return "opencode"

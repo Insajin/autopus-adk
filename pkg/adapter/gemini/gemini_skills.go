@@ -1,4 +1,4 @@
-// Package gemini provides skill template rendering for Gemini CLI.
+// Package gemini provides skill template rendering for Antigravity CLI.
 package gemini
 
 import (

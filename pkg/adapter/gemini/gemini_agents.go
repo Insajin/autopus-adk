@@ -1,4 +1,4 @@
-// Package gemini provides agent content file management for Gemini CLI.
+// Package gemini provides agent content file management for Antigravity CLI.
 package gemini
 
 import (

@@ -18,7 +18,7 @@ type FeedbackResult struct {
 var supportedFeedbackTargets = map[string]string{
 	"codex":    "Codex",
 	"claude":   "Claude Code",
-	"gemini":   "Gemini CLI",
+	"gemini":   "Antigravity CLI",
 	"opencode": "OpenCode",
 }
 

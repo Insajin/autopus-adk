@@ -8,7 +8,7 @@ category: harness
 
 IMPORTANT: Claude Code loads most tool schemas lazily as "deferred tools". Calling them without first loading their schema silently downgrades UI (e.g., `AskUserQuestion` renders as plain text) or raises `InputValidationError` (e.g., `TaskCreate`, `SendMessage`).
 
-This rule applies to Claude Code platforms. Gemini CLI, Codex, and OpenCode do not expose a deferred-tool mechanism — platform adapters may safely ignore or transform the specific tool references below.
+This rule applies to Claude Code platforms. Antigravity CLI, Codex, and OpenCode do not expose a deferred-tool mechanism — platform adapters may safely ignore or transform the specific tool references below.
 
 ## Detection
 

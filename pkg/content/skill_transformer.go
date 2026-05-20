@@ -55,12 +55,13 @@ type parsedSkill struct {
 
 // supportedPlatforms lists the platforms the transformer can target.
 var supportedPlatforms = map[string]bool{
-	"claude":      true,
-	"claude-code": true,
-	"codex":       true,
-	"gemini":      true,
-	"gemini-cli":  true,
-	"opencode":    true,
+	"claude":          true,
+	"claude-code":     true,
+	"codex":           true,
+	"gemini":          true,
+	"gemini-cli":      true,
+	"antigravity-cli": true,
+	"opencode":        true,
 }
 
 // NewSkillTransformer creates a transformer by loading all .md files from dir.

@@ -11,14 +11,14 @@ import (
 	"time"
 )
 
-// Platform은 감지된 코딩 CLI 정보이다.
+// Platform is a detected coding CLI.
 type Platform struct {
-	Name    string // claude-code, codex, gemini-cli 등
-	Binary  string // 실행 파일명
-	Version string // 감지된 버전
+	Name    string // claude-code, codex, antigravity-cli, etc.
+	Binary  string // executable binary name
+	Version string // detected version
 }
 
-// knownCLIs는 알려진 코딩 CLI 목록이다.
+// knownCLIs lists supported coding CLIs.
 var knownCLIs = []struct {
 	name       string
 	binary     string
@@ -26,7 +26,7 @@ var knownCLIs = []struct {
 }{
 	{"claude-code", "claude", "--version"},
 	{"codex", "codex", "--version"},
-	{"gemini-cli", "gemini", "--version"},
+	{"antigravity-cli", "agy", "--version"},
 	{"opencode", "opencode", "--version"},
 	{"cursor", "cursor", "--version"},
 }
@@ -86,7 +86,7 @@ var knownOrchestraProviders = []struct {
 }{
 	{"claude", "claude"},
 	{"codex", "codex"},
-	{"gemini", "gemini"},
+	{"gemini", "agy"},
 }
 
 // DetectOrchestraProviders checks which orchestra provider binaries are installed.
@@ -113,15 +113,16 @@ func InstalledOrchestraProviders() []string {
 	return names
 }
 
-// Dependency는 외부 도구 의존성이다.
+// Dependency describes an external tool dependency.
 type Dependency struct {
-	Name           string
-	Binary         string
-	InstallCmd     string
-	Required       bool // true이면 필수, false이면 권장
-	Description    string
-	DependsOn      string // dependency name that must be installed first
-	PostInstallCmd string // command to run after install (e.g., browser download)
+	Name            string
+	Binary          string
+	InstallCmd      string
+	InstallViaShell bool // run InstallCmd through the OS shell for pipes/redirects
+	Required        bool // true means required, false means recommended
+	Description     string
+	DependsOn       string // dependency name that must be installed first
+	PostInstallCmd  string // command to run after install (e.g., browser download)
 }
 
 // IsNpmBased reports whether this dependency is installed via npm.
@@ -140,7 +141,7 @@ var FullModeDeps = []Dependency{
 	// AI coding CLIs
 	{Name: "claude", Binary: "claude", InstallCmd: "npm i -g @anthropic-ai/claude-code", Required: true, Description: "Claude Code CLI", DependsOn: "node"},
 	{Name: "codex", Binary: "codex", InstallCmd: "npm i -g @openai/codex", Required: true, Description: "OpenAI Codex CLI", DependsOn: "node"},
-	{Name: "gemini", Binary: "gemini", InstallCmd: "npm i -g @google/gemini-cli", Required: true, Description: "Gemini CLI", DependsOn: "node"},
+	{Name: "antigravity", Binary: "agy", InstallCmd: antigravityInstallCmd(), InstallViaShell: true, Required: true, Description: "Google Antigravity CLI"},
 	// Dev tools
 	{Name: "ast-grep", Binary: "sg", InstallCmd: "npm i -g @ast-grep/cli", Required: true, Description: "Structural code search", DependsOn: "node"},
 	{Name: "playwright", Binary: "playwright", InstallCmd: "npm i -g playwright", Required: false, Description: "E2E testing + screenshots", DependsOn: "node", PostInstallCmd: "npx playwright install chromium"},
@@ -204,6 +205,13 @@ func windowsInstallCmd(name string) string {
 		"gh":     "winget install GitHub.cli" + wingetFlags,
 	}
 	return cmds[name]
+}
+
+func antigravityInstallCmd() string {
+	if runtime.GOOS == "windows" {
+		return "irm https://antigravity.google/cli/install.ps1 | iex"
+	}
+	return "curl -fsSL https://antigravity.google/cli/install.sh | bash"
 }
 
 // CheckDependencies는 의존성 상태를 확인한다.

@@ -9,7 +9,7 @@ import (
 
 // PlatformAdapter는 코딩 CLI 플랫폼별 어댑터 인터페이스이다.
 type PlatformAdapter interface {
-	// Name은 어댑터 이름을 반환한다 (claude-code, codex, gemini-cli 등).
+	// Name은 어댑터 이름을 반환한다 (claude-code, codex, antigravity-cli 등).
 	Name() string
 	// Version은 어댑터 버전을 반환한다.
 	Version() string

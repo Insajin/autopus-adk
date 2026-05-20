@@ -88,7 +88,7 @@ func TestCheckProviderAuth_Gemini_GuideContainsURL(t *testing.T) {
 	t.Setenv("GOOGLE_API_KEY", "")
 
 	_, guide := CheckProviderAuth("gemini")
-	assert.Contains(t, guide, "https://aistudio.google.com")
+	assert.Contains(t, guide, "https://antigravity.google/download")
 	assert.Contains(t, guide, "export GOOGLE_API_KEY")
 	assert.Contains(t, guide, "1.")
 	assert.Contains(t, guide, "2.")
@@ -141,8 +141,8 @@ func TestCheckProviderAuth_Gemini_WithDir(t *testing.T) {
 	t.Setenv("HOME", tmp)
 	t.Setenv("GOOGLE_API_KEY", "")
 
-	// Create .config/gemini directory
-	geminiDir := filepath.Join(tmp, ".config", "gemini")
+	// Create Antigravity CLI config directory.
+	geminiDir := filepath.Join(tmp, ".gemini", "antigravity-cli")
 	require.NoError(t, os.MkdirAll(geminiDir, 0755))
 
 	authenticated, guide := CheckProviderAuth("gemini")
@@ -157,7 +157,7 @@ func TestCheckProviderAuth_Gemini_NoAuth(t *testing.T) {
 
 	authenticated, guide := CheckProviderAuth("gemini")
 	assert.False(t, authenticated)
-	assert.Contains(t, guide, "gemini login")
+	assert.Contains(t, guide, "agy")
 }
 
 func TestCheckProviderAuth_Opencode_NoAuth(t *testing.T) {

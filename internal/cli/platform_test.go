@@ -139,7 +139,7 @@ func TestPlatformAddCmd_InvalidPlatform(t *testing.T) {
 	assert.Error(t, err, "잘못된 플랫폼은 에러를 반환해야 함")
 }
 
-// TestPlatformAddCmd_GeminiCli verifies adding gemini-cli platform generates
+// TestPlatformAddCmd_GeminiCli verifies adding antigravity-cli platform generates
 // the correct provider mapping in full-mode config.
 func TestPlatformAddCmd_GeminiCli(t *testing.T) {
 	t.Parallel()
@@ -150,14 +150,14 @@ func TestPlatformAddCmd_GeminiCli(t *testing.T) {
 	require.NoError(t, initCmd.Execute())
 
 	addCmd := newTestRootCmd()
-	addCmd.SetArgs([]string{"platform", "add", "gemini-cli", "--dir", dir})
+	addCmd.SetArgs([]string{"platform", "add", "antigravity-cli", "--dir", dir})
 	require.NoError(t, addCmd.Execute())
 
-	// gemini-cli must map to "gemini" provider in orchestra config.
+	// antigravity-cli must map to "gemini" provider in orchestra config.
 	cfg, err := loadConfigFromDir(dir)
 	require.NoError(t, err)
 	_, ok := cfg.Orchestra.Providers["gemini"]
-	assert.True(t, ok, "gemini-cli must create a 'gemini' provider entry in orchestra config")
+	assert.True(t, ok, "antigravity-cli must create a 'gemini' provider entry in orchestra config")
 }
 
 // TestPlatformRemoveCmd_LastPlatformErrors verifies that removing the last

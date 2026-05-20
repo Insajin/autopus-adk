@@ -40,8 +40,8 @@ func GenerateHookConfigs(cfg config.HooksConf, platform string, supportsHooks bo
 }
 
 // generateCLIHooks는 CLI 훅 설정을 생성한다.
-// Event names are translated per-platform (Claude uses PreToolUse/PostToolUse,
-// Gemini uses BeforeTool/AfterTool). Claude is the canonical source.
+// Event names are translated per-platform. Claude Code and Antigravity use
+// PreToolUse/PostToolUse; legacy Gemini CLI used BeforeTool/AfterTool.
 func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfig {
 	var hooks []adapter.HookConfig
 	pre := translateHookEvent("PreToolUse", platform)

@@ -131,7 +131,7 @@ func replaceAgentCalls(line string, platform string) string {
 				return `spawn_agent ` + name + ` --task "` + task + `"`
 			}
 			return `spawn_agent ` + name
-		case "gemini", "gemini-cli":
+		case "gemini", "gemini-cli", "antigravity-cli":
 			if task != "" {
 				return `@` + name + ` ` + task
 			}

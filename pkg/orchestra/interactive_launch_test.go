@@ -58,20 +58,20 @@ func TestBuildInteractiveLaunchCmd_Claude(t *testing.T) {
 	assert.NotContains(t, cmd, "review this code")
 }
 
-// TestBuildInteractiveLaunchCmd_GeminiNoRunStrip verifies gemini strips "run" (not args mode).
+// TestBuildInteractiveLaunchCmd_GeminiNoRunStrip verifies Antigravity strips "run" (not args mode).
 func TestBuildInteractiveLaunchCmd_GeminiNoRunStrip(t *testing.T) {
 	t.Parallel()
 
 	p := ProviderConfig{
 		Name:     "gemini",
-		Binary:   "gemini",
-		PaneArgs: []string{"run", "-m", "gemini-3.1-pro-preview"},
+		Binary:   "agy",
+		PaneArgs: []string{"run"},
 	}
 
 	cmd := buildInteractiveLaunchCmd(p, "test prompt")
 	// "run" should be stripped for non-args providers
 	assert.NotContains(t, cmd, " run ")
-	assert.Contains(t, cmd, "gemini -m gemini-3.1-pro-preview")
+	assert.Contains(t, cmd, "agy")
 }
 
 // TestBuildInteractiveLaunchCmd_ShellQuoteEscape verifies single quotes in prompt are escaped.

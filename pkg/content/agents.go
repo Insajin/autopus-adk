@@ -72,7 +72,7 @@ func ConvertAgentToPlatform(agent AgentDefinition, platform string) (string, err
 		return convertAgentClaude(agent), nil
 	case "codex":
 		return convertAgentCodex(agent), nil
-	case "gemini", "gemini-cli":
+	case "gemini", "gemini-cli", "antigravity-cli":
 		return convertAgentGemini(agent), nil
 	default:
 		return "", fmt.Errorf("지원하지 않는 플랫폼: %q", platform)

@@ -109,7 +109,7 @@ func TestBuildProviderConfigs(t *testing.T) {
 			name:          "gemini uses stdin",
 			input:         []string{"gemini"},
 			expectName:    "gemini",
-			expectBinary:  "gemini",
+			expectBinary:  "agy",
 			expectViaArgs: false,
 		},
 	}

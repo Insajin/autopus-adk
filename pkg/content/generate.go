@@ -113,7 +113,7 @@ func writeSkillTemplate(templateDir, platform, name, output string) (string, err
 	var path string
 
 	switch platform {
-	case "gemini", "gemini-cli":
+	case "gemini", "gemini-cli", "antigravity-cli":
 		dir := filepath.Join(templateDir, "gemini", "skills", name)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return "", fmt.Errorf("create gemini skill dir: %w", err)
@@ -138,7 +138,7 @@ func buildSkillTemplate(name, body, platform string) string {
 	var sb strings.Builder
 
 	switch platform {
-	case "gemini", "gemini-cli":
+	case "gemini", "gemini-cli", "antigravity-cli":
 		sb.WriteString("---\n")
 		fmt.Fprintf(&sb, "name: auto-%s\n", name)
 		sb.WriteString("---\n\n")

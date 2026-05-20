@@ -163,15 +163,15 @@ func TestResolvePlatform(t *testing.T) {
 			want:     "codex",
 		},
 		{
-			name:     "gemini only in PATH",
+			name:     "agy only in PATH maps to gemini provider",
 			platform: "",
-			binaries: []string{"gemini"},
+			binaries: []string{"agy"},
 			want:     "gemini",
 		},
 		{
 			name:     "multiple binaries — claude wins by priority",
 			platform: "",
-			binaries: []string{"claude", "codex", "gemini"},
+			binaries: []string{"claude", "codex", "agy"},
 			want:     "claude",
 		},
 		{

@@ -24,8 +24,10 @@ const (
 	RuntimeClaudeCode Runtime = "claude-code"
 	// RuntimeCodex is the OpenAI Codex CLI.
 	RuntimeCodex Runtime = "codex"
-	// RuntimeGeminiCLI is the Google Gemini CLI.
-	RuntimeGeminiCLI Runtime = "gemini-cli"
+	// RuntimeAntigravityCLI is the Google Antigravity CLI.
+	RuntimeAntigravityCLI Runtime = "antigravity-cli"
+	// RuntimeGeminiCLI is kept as a legacy alias for older integrations.
+	RuntimeGeminiCLI Runtime = RuntimeAntigravityCLI
 	// RuntimeOpenCode is the OpenCode CLI.
 	RuntimeOpenCode Runtime = "opencode"
 	// RuntimeUnknown means no supported runtime could be detected.
@@ -74,10 +76,11 @@ func SetClaudeVersionForTest(fn func() (string, error)) func() {
 
 // validRuntimes maps the allowed AUTOPUS_PLATFORM values to Runtime constants.
 var validRuntimes = map[string]Runtime{
-	"claude-code": RuntimeClaudeCode,
-	"codex":       RuntimeCodex,
-	"gemini-cli":  RuntimeGeminiCLI,
-	"opencode":    RuntimeOpenCode,
+	"claude-code":     RuntimeClaudeCode,
+	"codex":           RuntimeCodex,
+	"antigravity-cli": RuntimeAntigravityCLI,
+	"gemini-cli":      RuntimeAntigravityCLI,
+	"opencode":        RuntimeOpenCode,
 }
 
 // DetectRuntime returns the detected CLI runtime.

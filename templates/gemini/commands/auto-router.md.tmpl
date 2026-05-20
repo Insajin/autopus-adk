@@ -989,12 +989,12 @@ For parallel tasks, include `isolation: "worktree"` in Agent() calls to enable w
 
 #### Route B: Agent Teams (`--team`)
 
-IMPORTANT: Agent Teams is a **Claude Code-exclusive** feature (TeamCreate/SendMessage/Agent team_name API). Gemini CLI does not have an equivalent runtime.
+IMPORTANT: Agent Teams is a **Claude Code-exclusive** feature (TeamCreate/SendMessage/Agent team_name API). Antigravity CLI does not have an equivalent runtime.
 
-On Gemini CLI, `--team` flag is accepted for cross-platform harness compatibility but always falls back to Route A (subagent pipeline). Display a one-line warning and proceed:
+On Antigravity CLI, `--team` flag is accepted for cross-platform harness compatibility but always falls back to Route A (subagent pipeline). Display a one-line warning and proceed:
 
 ```
-Note: --team flag ignored on Gemini CLI (Claude Code only). Running subagent pipeline instead.
+Note: --team flag ignored on Antigravity CLI (Claude Code only). Running subagent pipeline instead.
 ```
 
 Then continue with Route A phases unchanged. Do NOT attempt `TeamCreate`, `SendMessage`, or any team-scoped API calls — they do not exist in this runtime.
@@ -1511,7 +1511,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--auto` | Autonomous mode: run the full pipeline without user confirmation |
 | `--loop` | RALF loop mode: auto-retry failed gates with extended iteration limits until PASS or circuit break |
 | `--continue` | Resume an interrupted implementation from a previous session |
-| `--team` | Reserved compatibility flag (Claude Code only — on Gemini CLI falls back to subagent pipeline with a warning) |
+| `--team` | Reserved compatibility flag (Claude Code only — on Antigravity CLI falls back to subagent pipeline with a warning) |
 | `--solo` | Single session mode: no subagents, main session implements directly |
 | `--multi` | Multi-provider mode: activate orchestra engine-based review |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |

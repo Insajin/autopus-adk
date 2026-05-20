@@ -128,7 +128,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 		case "codex":
 			a := codex.NewWithRoot(opts.dir)
 			validationErrs, validateErr = a.Validate(ctx)
-		case "gemini-cli":
+		case "antigravity-cli":
 			a := gemini.NewWithRoot(opts.dir)
 			validationErrs, validateErr = a.Validate(ctx)
 		case "opencode":

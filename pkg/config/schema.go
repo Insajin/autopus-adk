@@ -282,11 +282,11 @@ func (c *HarnessConfig) IsFullMode() bool {
 }
 
 var validPlatforms = map[string]bool{
-	"claude-code": true,
-	"codex":       true,
-	"gemini-cli":  true,
-	"opencode":    true,
-	"cursor":      true,
+	"claude-code":     true,
+	"codex":           true,
+	"antigravity-cli": true,
+	"opencode":        true,
+	"cursor":          true,
 }
 
 func isValidPlatform(p string) bool {

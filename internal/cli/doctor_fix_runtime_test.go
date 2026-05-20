@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -50,6 +51,43 @@ func TestRunDoctorFix_InstallFailure(t *testing.T) {
 	err := runDoctorFixWith(&out, deps, true, mockExec, reader)
 	require.NoError(t, err)
 	assert.Contains(t, out.String(), "install failed")
+}
+
+func TestRunDoctorFix_ShellInstallCommand(t *testing.T) {
+	t.Parallel()
+
+	var gotName string
+	var gotArgs []string
+	mockExec := func(name string, args ...string) ([]byte, error) {
+		gotName = name
+		gotArgs = append([]string{}, args...)
+		return []byte("ok"), nil
+	}
+
+	deps := []detect.DependencyStatus{{
+		Dependency: detect.Dependency{
+			Name:            "antigravity",
+			Binary:          "agy",
+			InstallCmd:      "curl -fsSL https://antigravity.google/cli/install.sh | bash",
+			InstallViaShell: true,
+			Required:        true,
+		},
+		Installed: false,
+	}}
+
+	var out bytes.Buffer
+	reader := bufio.NewReader(strings.NewReader(""))
+
+	err := runDoctorFixWith(&out, deps, true, mockExec, reader)
+	require.NoError(t, err)
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, "powershell", gotName)
+		assert.Contains(t, gotArgs, "-Command")
+	} else {
+		assert.Equal(t, "sh", gotName)
+		assert.Equal(t, []string{"-c", "curl -fsSL https://antigravity.google/cli/install.sh | bash"}, gotArgs)
+	}
+	assert.Contains(t, out.String(), "antigravity installed")
 }
 
 func TestRunDoctorFix_EmptyInstallCmd(t *testing.T) {

@@ -27,7 +27,7 @@ var (
 	statusBarRe = regexp.MustCompile(`(?m)^\[\d+\]\s+\d+:.*$`)
 
 	// cliBannerRe matches CLI banner lines containing Unicode block characters
-	// (e.g., ▐▛███▜▌ Claude Code, ▝▜▄ Gemini CLI, etc.).
+	// (e.g., ▐▛███▜▌ Claude Code, ▝▜▄ Antigravity CLI, etc.).
 	cliBannerRe = regexp.MustCompile(`(?m)^[^\n]*[▀▁▂▃▄▅▆▇█▉▊▋▌▍▎▏▐░▒▓▔▕▖▗▘▙▚▛▜▝▞▟]+[^\n]*$`)
 
 	// multiBlankRe matches 3+ consecutive newlines.
@@ -76,7 +76,7 @@ func stripStatusBar(s string) string {
 }
 
 // stripCLIBanners removes lines containing Unicode block characters used in
-// CLI tool banners (Claude Code, Gemini CLI, etc.).
+// CLI tool banners (Claude Code, Antigravity CLI, etc.).
 func stripCLIBanners(s string) string {
 	lines := strings.Split(s, "\n")
 	filtered := make([]string, 0, len(lines))

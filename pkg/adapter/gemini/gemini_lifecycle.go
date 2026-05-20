@@ -1,4 +1,4 @@
-// Package gemini provides lifecycle methods (Validate, Clean) for the Gemini CLI adapter.
+// Package gemini provides lifecycle methods (Validate, Clean) for the Antigravity CLI adapter.
 package gemini
 
 import (

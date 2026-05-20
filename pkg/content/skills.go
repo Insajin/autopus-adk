@@ -107,7 +107,7 @@ func ConvertSkillToPlatform(skill SkillDefinition, platform string) (string, err
 		return convertSkillClaude(skill), nil
 	case "codex":
 		return convertSkillCodex(skill), nil
-	case "gemini", "gemini-cli":
+	case "gemini", "gemini-cli", "antigravity-cli":
 		return convertSkillGemini(skill), nil
 	default:
 		return "", fmt.Errorf("지원하지 않는 플랫폼: %q", platform)

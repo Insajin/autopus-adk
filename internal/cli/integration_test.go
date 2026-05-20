@@ -175,7 +175,7 @@ func TestMultiPlatform_Init(t *testing.T) {
 	dir := t.TempDir()
 
 	_, err := runCmd(t, "init", "--dir", dir, "--project", "multi-proj",
-		"--platforms", "claude-code,codex,gemini-cli")
+		"--platforms", "claude-code,codex,antigravity-cli")
 	require.NoError(t, err)
 
 	// autopus.yaml에 모든 플랫폼 포함 확인
@@ -184,7 +184,7 @@ func TestMultiPlatform_Init(t *testing.T) {
 	yamlStr := string(yamlData)
 	assert.Contains(t, yamlStr, "claude-code")
 	assert.Contains(t, yamlStr, "codex")
-	assert.Contains(t, yamlStr, "gemini-cli")
+	assert.Contains(t, yamlStr, "antigravity-cli")
 
 	// Claude Code 파일 생성 확인
 	assert.DirExists(t, filepath.Join(dir, ".claude", "rules", "autopus"))
@@ -193,7 +193,7 @@ func TestMultiPlatform_Init(t *testing.T) {
 	// Codex 파일 생성 확인
 	assert.DirExists(t, filepath.Join(dir, ".codex"))
 
-	// Gemini CLI 파일 생성 확인
+	// Antigravity CLI 파일 생성 확인
 	assert.DirExists(t, filepath.Join(dir, ".gemini"))
 
 	// .gitignore에 모든 플랫폼 패턴 포함 확인
