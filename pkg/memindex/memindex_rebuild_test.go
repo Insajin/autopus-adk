@@ -37,7 +37,8 @@ func TestMemIndexRebuildSearchStatusContextEndToEnd(t *testing.T) {
 	assert.Equal(t, 1, result.SkippedCountsByReason["invalid_learning_jsonl"])
 	assert.Equal(t, 1, result.SkippedCountsByReason["invalid_qamesh_run_index"])
 	assert.Equal(t, 1, result.SkippedCountsByReason["unredacted_qamesh_run"])
-	assert.GreaterOrEqual(t, result.SkippedCountsByReason["generated_surface"], 2)
+	assert.GreaterOrEqual(t, result.SkippedCountsByReason[SkipReasonWorkspaceGeneratedSurface], 1)
+	assert.GreaterOrEqual(t, result.SkippedCountsByReason[SkipReasonWorkspaceHarnessSurface], 1)
 	assert.NotEmpty(t, result.SourceHashes["L-001"])
 	assert.NotEmpty(t, result.IndexedSources)
 

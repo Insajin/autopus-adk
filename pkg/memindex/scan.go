@@ -22,7 +22,7 @@ func Scan(projectDir string) ([]Record, []Skip, error) {
 		return nil, nil, err
 	}
 	records := make([]Record, 0)
-	skips := generatedSurfaceSkips(abs)
+	skips := workspaceFolderPolicySkips(abs)
 	add := func(next []Record, nextSkips []Skip) {
 		records = append(records, next...)
 		skips = append(skips, nextSkips...)
@@ -64,31 +64,53 @@ func Scan(projectDir string) ([]Record, []Skip, error) {
 
 func scanMarkdownSources(projectDir string) ([]Record, []Skip, error) {
 	roots := []string{
+		filepath.Join(projectDir, "README.md"),
+		filepath.Join(projectDir, "docs"),
+		filepath.Join(projectDir, ".autopus", "vault"),
+		filepath.Join(projectDir, ".autopus", "inbox"),
 		filepath.Join(projectDir, ".autopus", "project"),
 		filepath.Join(projectDir, ".autopus", "specs"),
 	}
 	records := make([]Record, 0)
 	skips := make([]Skip, 0)
 	for _, root := range roots {
-		if _, err := os.Stat(root); err != nil {
+		info, err := os.Stat(root)
+		if err != nil {
 			if os.IsNotExist(err) {
 				continue
 			}
 			return nil, nil, err
 		}
-		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if !info.IsDir() {
+			record, ok, skip, err := markdownRecord(projectDir, root)
+			if err != nil {
+				return nil, nil, err
+			}
+			if !ok {
+				skips = append(skips, skip)
+				continue
+			}
+			records = append(records, record)
+			continue
+		}
+		err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
 			rel := slashRel(projectDir, path)
+			classification := classifyWorkspaceFolderPath(rel)
 			if entry.IsDir() {
-				if deniedGeneratedSurface(rel) {
-					skips = append(skips, Skip{Path: rel, Reason: "generated_surface"})
+				if classification.Class == WorkspaceFolderClassExcluded {
+					skips = append(skips, Skip{Path: rel, Reason: classification.ReasonCode})
 					return filepath.SkipDir
 				}
 				return nil
 			}
 			if filepath.Ext(path) != ".md" {
+				return nil
+			}
+			if classification.Class == WorkspaceFolderClassExcluded {
+				skips = append(skips, Skip{Path: rel, Reason: classification.ReasonCode})
 				return nil
 			}
 			record, ok, skip, err := markdownRecord(projectDir, path)
@@ -115,6 +137,10 @@ func markdownRecord(projectDir, path string) (Record, bool, Skip, error) {
 		return Record{}, false, Skip{}, err
 	}
 	rel := slashRel(projectDir, path)
+	classification := classifyWorkspaceFolderPath(rel)
+	if classification.Class == WorkspaceFolderClassExcluded {
+		return Record{}, false, Skip{Path: rel, Reason: classification.ReasonCode}, nil
+	}
 	if findings := qaevidence.FindUnsafeText(string(body), rel); len(findings) > 0 {
 		return Record{}, false, Skip{Path: rel, Reason: "unsafe_source_text"}, nil
 	}
@@ -124,7 +150,7 @@ func markdownRecord(projectDir, path string) (Record, bool, Skip, error) {
 	}
 	bodyText := string(body)
 	return Record{
-		SourceType:      sourceKindFromPath(rel),
+		SourceType:      workspaceSourceKind(rel, classification),
 		SourceRef:       rel,
 		SourceHash:      hash,
 		Title:           safeText(titleFromMarkdown(path, body)),
@@ -135,7 +161,20 @@ func markdownRecord(projectDir, path string) (Record, bool, Skip, error) {
 		Timestamp:       fileTimestamp(path),
 		RedactionStatus: Redacted,
 		Content:         safeText(bodyText),
+		SourceMetadata:  workspaceMarkdownMetadata(classification),
 	}, true, Skip{}, nil
+}
+
+func workspaceSourceKind(rel string, classification WorkspaceFolderClassification) string {
+	switch classification.Class {
+	case WorkspaceFolderClassCandidate:
+		return "candidate_doc"
+	case WorkspaceFolderClassIndexable:
+		if strings.HasPrefix(filepath.ToSlash(rel), ".autopus/vault/") {
+			return "vault_doc"
+		}
+	}
+	return sourceKindFromPath(rel)
 }
 
 func scanLearning(projectDir string) ([]Record, []Skip, error) {
@@ -193,51 +232,24 @@ func scanLearning(projectDir string) ([]Record, []Skip, error) {
 
 func learningMetadata(entry learn.LearningEntry) map[string]any {
 	return map[string]any{
-		"type":        string(entry.Type),
-		"phase":       entry.Phase,
-		"spec_id":     entry.SpecID,
-		"files":       entry.Files,
-		"packages":    entry.Packages,
-		"pattern":     entry.Pattern,
-		"resolution":  entry.Resolution,
-		"severity":    string(entry.Severity),
-		"reuse_count": entry.ReuseCount,
+		"type":                    string(entry.Type),
+		"phase":                   entry.Phase,
+		"spec_id":                 entry.SpecID,
+		"files":                   entry.Files,
+		"packages":                entry.Packages,
+		"pattern":                 entry.Pattern,
+		"resolution":              entry.Resolution,
+		"severity":                string(entry.Severity),
+		"reuse_count":             entry.ReuseCount,
+		"projection_only":         true,
+		"projection_destination":  "adk_decision_quality_index",
+		"canonical_knowledge_hub": false,
 	}
 }
 
 func learningSearchText(entry learn.LearningEntry, metadata map[string]any) string {
 	body, _ := json.Marshal(metadata)
 	return fmt.Sprintf("%s %s %s %s %s %s", entry.Type, entry.Phase, entry.Pattern, entry.Resolution, entry.Severity, string(body))
-}
-
-func generatedSurfaceSkips(projectDir string) []Skip {
-	candidates := []string{
-		".codex",
-		".claude",
-		".gemini",
-		".opencode",
-		filepath.ToSlash(filepath.Join(".autopus", "plugins")),
-		filepath.ToSlash(filepath.Join(".autopus", "orchestra")),
-		filepath.ToSlash(filepath.Join(".autopus", "brainstorms")),
-	}
-	skips := make([]Skip, 0)
-	for _, rel := range candidates {
-		if _, err := os.Stat(filepath.Join(projectDir, filepath.FromSlash(rel))); err == nil {
-			skips = append(skips, Skip{Path: rel, Reason: "generated_surface"})
-		}
-	}
-	return skips
-}
-
-func deniedGeneratedSurface(rel string) bool {
-	rel = strings.ToLower(filepath.ToSlash(filepath.Clean(rel)))
-	return rel == ".codex" || strings.HasPrefix(rel, ".codex/") ||
-		rel == ".claude" || strings.HasPrefix(rel, ".claude/") ||
-		rel == ".gemini" || strings.HasPrefix(rel, ".gemini/") ||
-		rel == ".opencode" || strings.HasPrefix(rel, ".opencode/") ||
-		rel == ".autopus/plugins" || strings.HasPrefix(rel, ".autopus/plugins/") ||
-		rel == ".autopus/orchestra" || strings.HasPrefix(rel, ".autopus/orchestra/") ||
-		rel == ".autopus/brainstorms" || strings.HasPrefix(rel, ".autopus/brainstorms/")
 }
 
 func acceptanceIDs(body string) []string {

@@ -1,6 +1,9 @@
 # autopus.yaml — {{.ProjectName}}
 # Autopus-ADK 하네스 설정 파일
 # 이 파일을 수정하여 프로젝트에 맞게 커스터마이징하세요.
+# ADK is the harness/execution layer, not the owner of workspace folder identity.
+# Generated/runtime harness surfaces are excluded from canonical Knowledge Hub indexing;
+# human-managed .autopus/project, .autopus/specs, .autopus/vault, README.md, and docs remain admissible by policy.
 
 mode: {{.Mode}}
 project_name: {{.ProjectName}}
