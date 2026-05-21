@@ -23,11 +23,6 @@ checks:
     type: deterministic
     expected:
       exit_code: 0
-artifacts:
-  - kind: stdout
-    path: .autopus/qa/artifacts/%s/stdout.txt
-  - kind: stderr
-    path: .autopus/qa/artifacts/%s/stderr.txt
 source_refs:
   source_spec: %s
   acceptance_refs:
@@ -38,7 +33,7 @@ source_refs:
     - .codex/**
     - .opencode/**
     - .autopus/plugins/**
-`, id, title, surface, renderInlineStrings(lanes), adapter, renderInlineStrings(argv), id, id, id, sourceSpecForLanes(lanes))
+`, id, title, surface, renderInlineStrings(lanes), adapter, renderInlineStrings(argv), id, sourceSpecForLanes(lanes))
 }
 
 func desktopGUIStarter() starterFile {

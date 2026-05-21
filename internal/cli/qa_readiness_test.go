@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -54,4 +55,36 @@ func TestQAReadinessCmd_ProjectsReadOnlyRedactedJSONEnvelope(t *testing.T) {
 	assert.NotContains(t, out.String(), "/Users/")
 	assert.NotContains(t, out.String(), "raw_network")
 	assert.NotContains(t, out.String(), "provider_payload")
+}
+
+func TestQAReadinessCmd_DefaultsToLatestWorkspaceIndexes(t *testing.T) {
+	t.Parallel()
+
+	fixture := filepath.Join("..", "..", "testdata", "qa", "readiness", "non_autopus_fixture")
+	dir := t.TempDir()
+	copyFixtureFile(t, filepath.Join(fixture, "qa", "run-index.json"), filepath.Join(dir, ".autopus", "qa", "runs", "run-001", "run-index.json"))
+	copyFixtureFile(t, filepath.Join(fixture, "qa", "release-index.json"), filepath.Join(dir, ".autopus", "qa", "releases", "release-001", "release-index.json"))
+	copyFixtureFile(t, filepath.Join(fixture, "qa", "evidence", "manifests", "login.json"), filepath.Join(dir, "qa", "evidence", "manifests", "login.json"))
+
+	cmd := NewRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"qa", "readiness", "--workspace-root", dir, "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+	payload := decodeJSONMap(t, out.Bytes())
+	assertCommonJSONEnvelope(t, payload, "auto qa readiness")
+	assert.Equal(t, "ok", payload["status"])
+	data := payload["data"].(map[string]any)
+	assert.Equal(t, "qamesh.readiness_projection.v1", data["schema_version"])
+	assert.Equal(t, "blocked", data["release_verdict"])
+}
+
+func copyFixtureFile(t *testing.T, src, dst string) {
+	t.Helper()
+	body, err := os.ReadFile(src)
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(dst), 0o755))
+	require.NoError(t, os.WriteFile(dst, body, 0o644))
 }

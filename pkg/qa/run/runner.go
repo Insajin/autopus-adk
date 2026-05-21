@@ -44,6 +44,7 @@ func Execute(opts Options) (Result, error) {
 	}
 	for _, pack := range packs {
 		adapterResult, manifestPath, checks := executePack(opts, pack, filepath.Join(runDir, "_raw"), runDir)
+		result.SourceRefs = appendUniqueStrings(result.SourceRefs, packSourceRefs(opts.ProjectDir, pack)...)
 		result.AdapterResults = append(result.AdapterResults, adapterResult)
 		if adapterResult.SetupGap != nil {
 			result.SetupGaps = append(result.SetupGaps, *adapterResult.SetupGap)
@@ -131,6 +132,8 @@ func initialResult(opts Options, plan Plan, runID, runDir string) Result {
 		SetupGaps:         plan.SetupGaps,
 		RedactionStatus:   RedactionStatus{Status: "passed"},
 		FeedbackAvailable: false,
+		Workspace:         workspaceRef(opts.ProjectDir),
+		SourceRefs:        laneSourceRefs(opts.ProjectDir, opts.Lane),
 	}
 }
 

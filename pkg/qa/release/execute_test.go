@@ -39,6 +39,10 @@ func TestExecuteWritesReleaseIndexWhenFirstLaneBlocks(t *testing.T) {
 
 	assert.Equal(t, IndexSchemaVersion, payload.SchemaVersion)
 	assert.Equal(t, GateStatusBlocked, payload.Status)
+	assert.Equal(t, filepath.Base(dir), payload.Workspace.WorkspaceID)
+	assert.Equal(t, filepath.Base(dir), payload.Workspace.RepoID)
+	assert.Equal(t, ".", payload.Workspace.RepoRoot)
+	assert.Contains(t, payload.SourceRefs, "qamesh://source/"+filepath.Base(dir)+"/specs/SPEC-QAMESH-002")
 	assert.Len(t, payload.LaneRows, 7)
 	fast := findLaneRow(t, payload.LaneRows, "fast")
 	assert.Equal(t, LaneStatusFailed, fast.Status)

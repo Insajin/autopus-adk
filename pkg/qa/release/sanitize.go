@@ -16,6 +16,7 @@ func sanitizeIndex(index Index) (Index, RedactionState) {
 	index.StartedAt = redact(index.StartedAt)
 	index.EndedAt = redact(index.EndedAt)
 	index.OutputPaths = sanitizeOutputPaths(index.OutputPaths, redact)
+	index.SourceRefs = sanitizeStrings(index.SourceRefs, redact)
 	for i := range index.SetupGaps {
 		index.SetupGaps[i].Lane = redact(index.SetupGaps[i].Lane)
 		index.SetupGaps[i].Reason = redact(index.SetupGaps[i].Reason)

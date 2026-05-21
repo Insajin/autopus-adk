@@ -11,6 +11,7 @@ func writeIndex(result Result, opts Options, started, ended time.Time) error {
 	index := Index{
 		SchemaVersion:       RunIndexSchemaVersion,
 		RunID:               result.RunID,
+		Workspace:           result.Workspace,
 		Status:              indexStatus(result),
 		StartedAt:           started.Format(time.RFC3339Nano),
 		EndedAt:             ended.Format(time.RFC3339Nano),
@@ -22,6 +23,7 @@ func writeIndex(result Result, opts Options, started, ended time.Time) error {
 		SetupGaps:           result.SetupGaps,
 		FeedbackBundlePaths: result.FeedbackBundlePaths,
 		RedactionStatus:     result.RedactionStatus,
+		SourceRefs:          result.SourceRefs,
 	}
 	body, err := json.MarshalIndent(index, "", "  ")
 	if err != nil {

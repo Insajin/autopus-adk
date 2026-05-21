@@ -29,6 +29,7 @@ func Execute(opts Options) (ExecutionPayload, error) {
 	index := Index{
 		SchemaVersion:          IndexSchemaVersion,
 		ReleaseID:              releaseID,
+		Workspace:              workspaceRef(opts.ProjectDir),
 		Profile:                opts.Profile,
 		StartedAt:              started.Format(timeFormat),
 		SelectedLanes:          ReleaseLanes(),
@@ -39,6 +40,7 @@ func Execute(opts Options) (ExecutionPayload, error) {
 		Blockers:               []Blocker{},
 		FeedbackRefs:           []string{},
 		AIAnalysisRefs:         []AIAnalysisRef{},
+		SourceRefs:             planSourceRefs(opts.ProjectDir, plan),
 	}
 	policy, _ := profilePolicy(opts.Profile)
 	policy = adaptPolicyToProject(opts.ProjectDir, policy, plan.JourneyPacks)

@@ -80,17 +80,17 @@ func laneCatalogRow(lane string) LaneCatalogRow {
 	case "fast":
 		return laneRow(lane, "SPEC-QAMESH-002", "ready", "project-qa-run", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	case "browser-staging":
-		return laneRow(lane, "SPEC-QAMESH-005", "planned", "project-local-journey-pack", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
+		return laneRow(lane, "SPEC-QAMESH-005", "ready", "project-local-journey-pack", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	case "desktop-native":
-		return laneRow(lane, "SPEC-QAMESH-005", "planned", "project-local-journey-pack", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
+		return laneRow(lane, "SPEC-QAMESH-005", "ready", "project-local-journey-pack", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	case "gui-explore":
 		return laneRow(lane, "SPEC-QAMESH-003", "ready", "explicit-gui-journey-pack", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	case "mobile-readiness":
-		return laneRow(lane, "SPEC-QAMESH-006", "planned", "sibling-readiness-contract", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
+		return laneRow(lane, "SPEC-QAMESH-006", "ready", "sibling-readiness-contract", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	case "canary-explicit":
 		return laneRow(lane, "SPEC-QAMESH-004", "ready", "explicit-journey-pack", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	case "evidence-dashboard":
-		return laneRow(lane, "SPEC-QAMESH-007", "planned", "sibling-readiness-contract", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
+		return laneRow(lane, "SPEC-QAMESH-007", "ready", "sibling-readiness-contract", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	default:
 		return laneRow(lane, "SPEC-QAMESH-004", "planned", "unknown", nil)
 	}
@@ -109,9 +109,9 @@ func laneRow(lane, ownerSpec, state, readiness string, profiles []string) LaneCa
 
 func SiblingSpecs() []SiblingSpec {
 	return []SiblingSpec{
-		{SpecID: "SPEC-QAMESH-005", OwnerRepo: "autopus-adk", Lanes: []string{"browser-staging", "desktop-native"}, Status: "planned", Relationship: "sibling"},
-		{SpecID: "SPEC-QAMESH-006", OwnerRepo: "autopus-adk", Lanes: []string{"mobile-readiness"}, Status: "planned", Relationship: "sibling"},
-		{SpecID: "SPEC-QAMESH-007", OwnerRepo: "autopus-adk", Lanes: []string{"evidence-dashboard"}, Status: "planned", Relationship: "sibling"},
+		{SpecID: "SPEC-QAMESH-005", OwnerRepo: "autopus-adk", Lanes: []string{"browser-staging", "desktop-native"}, Status: "ready", Relationship: "sibling"},
+		{SpecID: "SPEC-QAMESH-006", OwnerRepo: "autopus-adk", Lanes: []string{"mobile-readiness"}, Status: "ready", Relationship: "sibling"},
+		{SpecID: "SPEC-QAMESH-007", OwnerRepo: "autopus-adk", Lanes: []string{"evidence-dashboard"}, Status: "ready", Relationship: "sibling"},
 	}
 }
 

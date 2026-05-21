@@ -90,6 +90,12 @@ type AdapterResult struct {
 	FailureSummary        string    `json:"failure_summary"`
 }
 
+type WorkspaceRef struct {
+	WorkspaceID string `json:"workspace_id"`
+	RepoID      string `json:"repo_id"`
+	RepoRoot    string `json:"repo_root"`
+}
+
 type Result struct {
 	RunID               string             `json:"run_id"`
 	Status              string             `json:"status"`
@@ -111,6 +117,8 @@ type Result struct {
 	FeedbackAvailable   bool               `json:"feedback_available"`
 	FeedbackBundlePaths []string           `json:"feedback_bundle_paths"`
 	RedactionStatus     RedactionStatus    `json:"redaction_status"`
+	Workspace           WorkspaceRef       `json:"workspace"`
+	SourceRefs          []string           `json:"source_refs"`
 }
 
 type RedactionStatus struct {
@@ -120,6 +128,7 @@ type RedactionStatus struct {
 type Index struct {
 	SchemaVersion       string          `json:"schema_version"`
 	RunID               string          `json:"run_id"`
+	Workspace           WorkspaceRef    `json:"workspace"`
 	Status              string          `json:"status"`
 	StartedAt           string          `json:"started_at"`
 	EndedAt             string          `json:"ended_at"`
@@ -131,6 +140,7 @@ type Index struct {
 	SetupGaps           []SetupGap      `json:"setup_gaps"`
 	FeedbackBundlePaths []string        `json:"feedback_bundle_paths"`
 	RedactionStatus     RedactionStatus `json:"redaction_status"`
+	SourceRefs          []string        `json:"source_refs"`
 }
 
 type IndexCheck struct {

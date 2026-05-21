@@ -207,9 +207,16 @@ type SiblingSpec struct {
 	Relationship string   `json:"relationship"`
 }
 
+type WorkspaceRef struct {
+	WorkspaceID string `json:"workspace_id"`
+	RepoID      string `json:"repo_id"`
+	RepoRoot    string `json:"repo_root"`
+}
+
 type Index struct {
 	SchemaVersion          string          `json:"schema_version"`
 	ReleaseID              string          `json:"release_id"`
+	Workspace              WorkspaceRef    `json:"workspace"`
 	Profile                string          `json:"profile"`
 	StartedAt              string          `json:"started_at"`
 	EndedAt                string          `json:"ended_at"`
@@ -224,6 +231,7 @@ type Index struct {
 	AIAnalysisRefs         []AIAnalysisRef `json:"ai_analysis_refs"`
 	DeterministicAuthority bool            `json:"deterministic_authority"`
 	RedactionStatus        RedactionState  `json:"redaction_status"`
+	SourceRefs             []string        `json:"source_refs"`
 }
 
 type ExecutionPayload struct {

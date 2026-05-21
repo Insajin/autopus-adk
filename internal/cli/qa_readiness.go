@@ -2,7 +2,12 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -48,6 +53,10 @@ func runQAReadiness(cmd *cobra.Command, opts qaReadinessOptions) error {
 	if err != nil {
 		return err
 	}
+	opts, err = resolveReadinessDefaults(opts)
+	if err != nil {
+		return qaCommandError(cmd, jsonMode, err, "qa_readiness_invalid_flags", nil)
+	}
 	for name, value := range map[string]string{
 		"workspace-id":  opts.WorkspaceID,
 		"repo-id":       opts.RepoID,
@@ -76,4 +85,82 @@ func runQAReadiness(cmd *cobra.Command, opts qaReadinessOptions) error {
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", result.Projection.ReleaseVerdict, result.Projection.LastRunTime)
 	return nil
+}
+
+func resolveReadinessDefaults(opts qaReadinessOptions) (qaReadinessOptions, error) {
+	if opts.WorkspaceRoot == "" {
+		opts.WorkspaceRoot = "."
+	}
+	var err error
+	if opts.RunIndexPath == "" {
+		opts.RunIndexPath, err = latestIndexPath(opts.WorkspaceRoot, filepath.Join(".autopus", "qa", "runs"), "run-index.json")
+		if err != nil {
+			return opts, err
+		}
+	}
+	if opts.ReleasePath == "" {
+		opts.ReleasePath, err = latestIndexPath(opts.WorkspaceRoot, filepath.Join(".autopus", "qa", "releases"), "release-index.json")
+		if err != nil {
+			return opts, err
+		}
+	}
+	if opts.WorkspaceID == "" || opts.RepoID == "" || opts.RepoRoot == "." || opts.RepoRoot == "" {
+		ref, err := readReadinessWorkspaceRef(opts.ReleasePath)
+		if err != nil {
+			return opts, err
+		}
+		if opts.WorkspaceID == "" {
+			opts.WorkspaceID = ref.WorkspaceID
+		}
+		if opts.RepoID == "" {
+			opts.RepoID = ref.RepoID
+		}
+		if opts.RepoRoot == "." || opts.RepoRoot == "" {
+			opts.RepoRoot = filepath.Join(opts.WorkspaceRoot, filepath.FromSlash(ref.RepoRoot))
+		}
+	}
+	return opts, nil
+}
+
+func latestIndexPath(workspaceRoot, relDir, filename string) (string, error) {
+	pattern := filepath.Join(workspaceRoot, relDir, "*", filename)
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", err
+	}
+	if len(matches) == 0 {
+		return "", nil
+	}
+	sort.Slice(matches, func(i, j int) bool {
+		return modTime(matches[i]).After(modTime(matches[j]))
+	})
+	return matches[0], nil
+}
+
+func modTime(path string) time.Time {
+	info, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
+}
+
+type readinessWorkspaceRef struct {
+	WorkspaceID string `json:"workspace_id"`
+	RepoID      string `json:"repo_id"`
+	RepoRoot    string `json:"repo_root"`
+}
+
+func readReadinessWorkspaceRef(path string) (readinessWorkspaceRef, error) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return readinessWorkspaceRef{}, err
+	}
+	var doc struct {
+		Workspace readinessWorkspaceRef `json:"workspace"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return readinessWorkspaceRef{}, err
+	}
+	return doc.Workspace, nil
 }

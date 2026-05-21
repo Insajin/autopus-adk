@@ -44,6 +44,15 @@ func TestExecuteGoJourneyWritesManifestAndRunIndex(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(body), `"schema_version": "qamesh.evidence.v2"`)
 	assert.Contains(t, string(body), `"journey_id": "go-unit"`)
+
+	var index Index
+	indexBody, err := os.ReadFile(result.RunIndexPath)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(indexBody, &index))
+	assert.Equal(t, filepath.Base(dir), index.Workspace.WorkspaceID)
+	assert.Equal(t, filepath.Base(dir), index.Workspace.RepoID)
+	assert.Equal(t, ".", index.Workspace.RepoRoot)
+	assert.Contains(t, index.SourceRefs, "qamesh://source/"+filepath.Base(dir)+"/specs/SPEC-QAMESH-002")
 }
 
 func TestExecuteFailedJourneyWritesFeedback(t *testing.T) {
