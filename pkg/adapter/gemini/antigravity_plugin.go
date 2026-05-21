@@ -72,3 +72,44 @@ func rewriteAntigravityPluginContent(content string) string {
 	)
 	return replacer.Replace(content)
 }
+
+func mirrorAntigravityGlobalCommandMappings(files []adapter.FileMapping) []adapter.FileMapping {
+	mirrored := make([]adapter.FileMapping, 0, len(files))
+	for _, file := range files {
+		target, ok := antigravityGlobalCommandTarget(file.TargetPath)
+		if !ok {
+			continue
+		}
+		content := rewriteAntigravityGlobalCommandContent(string(file.Content))
+		mirrored = append(mirrored, adapter.FileMapping{
+			TargetPath:      target,
+			OverwritePolicy: file.OverwritePolicy,
+			Checksum:        checksum(content),
+			Content:         []byte(content),
+		})
+	}
+	return mirrored
+}
+
+func antigravityGlobalCommandTarget(path string) (string, bool) {
+	path = filepath.ToSlash(path)
+	switch {
+	case path == ".gemini/commands/auto.toml":
+		return ".agents/commands/auto.toml", true
+	case strings.HasPrefix(path, ".gemini/commands/auto/"):
+		return strings.Replace(path, ".gemini/commands/auto/", ".agents/commands/auto/", 1), true
+	default:
+		return "", false
+	}
+}
+
+func rewriteAntigravityGlobalCommandContent(content string) string {
+	replacer := strings.NewReplacer(
+		".gemini/skills/autopus/", ".agents/skills/",
+		".gemini/skills/auto/", ".agents/skills/auto/",
+		".gemini/rules/autopus/", ".agents/rules/",
+		".gemini/agents/autopus/", ".agents/agents/",
+		".gemini/commands/auto/", ".agents/commands/auto/",
+	)
+	return replacer.Replace(content)
+}

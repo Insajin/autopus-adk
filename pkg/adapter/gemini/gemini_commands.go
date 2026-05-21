@@ -136,5 +136,7 @@ func (a *Adapter) prepareCommandMappings(cfg *config.HarnessConfig) ([]adapter.F
 		})
 	}
 
-	return append(files, mirrorAntigravityPluginMappings(files)...), nil
+	pluginMirrors := mirrorAntigravityPluginMappings(files)
+	globalMirrors := mirrorAntigravityGlobalCommandMappings(files)
+	return append(append(files, pluginMirrors...), globalMirrors...), nil
 }

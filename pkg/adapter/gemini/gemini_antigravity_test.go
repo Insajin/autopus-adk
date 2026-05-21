@@ -70,6 +70,25 @@ func TestMirrorAntigravityPluginMappings(t *testing.T) {
 	assert.Contains(t, string(files[1].Content), ".agents/plugins/autopus/skills/auto/SKILL.md")
 }
 
+func TestMirrorAntigravityGlobalCommandMappings(t *testing.T) {
+	t.Parallel()
+
+	files := mirrorAntigravityGlobalCommandMappings([]adapter.FileMapping{{
+		TargetPath: ".gemini/commands/auto/plan.toml",
+		Content:    []byte("Load .gemini/skills/autopus/auto-plan/SKILL.md"),
+	}, {
+		TargetPath: ".gemini/commands/auto.toml",
+		Content:    []byte("Load .gemini/skills/auto/SKILL.md"),
+	}})
+
+	require.Len(t, files, 2)
+	assert.Equal(t, ".agents/commands/auto/plan.toml", files[0].TargetPath)
+	assert.Contains(t, string(files[0].Content), ".agents/skills/auto-plan/SKILL.md")
+
+	assert.Equal(t, ".agents/commands/auto.toml", files[1].TargetPath)
+	assert.Contains(t, string(files[1].Content), ".agents/skills/auto/SKILL.md")
+}
+
 func TestGenerate_CreatesAntigravityHooksJSON(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -95,6 +114,7 @@ func TestGenerate_CreatesAntigravityPluginSurface(t *testing.T) {
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
+	// Verify plugin-level surface
 	assert.FileExists(t, filepath.Join(dir, ".agents", "plugins", "autopus", "plugin.json"))
 	assert.FileExists(t, filepath.Join(dir, ".agents", "plugins", "autopus", "skills", "auto-plan", "SKILL.md"))
 	assert.FileExists(t, filepath.Join(dir, ".agents", "plugins", "autopus", "rules", "lore-commit.md"))
@@ -109,6 +129,18 @@ func TestGenerate_CreatesAntigravityPluginSurface(t *testing.T) {
 	autoCommandData, err := os.ReadFile(filepath.Join(dir, ".agents", "plugins", "autopus", "commands", "auto.toml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoCommandData), ".agents/plugins/autopus/skills/auto/SKILL.md")
+
+	// Verify global surface (/auto shortcuts)
+	assert.FileExists(t, filepath.Join(dir, ".agents", "commands", "auto.toml"))
+	assert.FileExists(t, filepath.Join(dir, ".agents", "commands", "auto", "plan.toml"))
+
+	globalCmdData, err := os.ReadFile(filepath.Join(dir, ".agents", "commands", "auto", "plan.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(globalCmdData), ".agents/skills/auto-plan/SKILL.md")
+
+	globalAutoCmdData, err := os.ReadFile(filepath.Join(dir, ".agents", "commands", "auto.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(globalAutoCmdData), ".agents/skills/auto/SKILL.md")
 }
 
 func TestRemoveAntigravityHooksJSON_PreservesUserHooks(t *testing.T) {
