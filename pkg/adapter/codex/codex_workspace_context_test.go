@@ -34,6 +34,7 @@ func TestCodexAdapter_WorkspacePolicyContextPropagates(t *testing.T) {
 	assert.Contains(t, string(autoSetupSkill), "workspace.md")
 	assert.Contains(t, string(autoSetupSkill), "nested git repo")
 	assert.Contains(t, string(autoSetupSkill), "generated/runtime")
+	assert.Contains(t, string(autoSetupSkill), "auto qa init --project-dir <repo>")
 
 	autoGoSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-go", "SKILL.md"))
 	require.NoError(t, err)
@@ -42,4 +43,5 @@ func TestCodexAdapter_WorkspacePolicyContextPropagates(t *testing.T) {
 	autoSyncSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-sync", "SKILL.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoSyncSkill), ".autopus/project/workspace.md")
+	assert.Contains(t, string(autoSyncSkill), "QA/Journey Pack")
 }

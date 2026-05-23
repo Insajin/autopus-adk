@@ -253,6 +253,7 @@ Agent(
     - Tech stack (languages, frameworks, build tools)
     - Entry points and exported APIs
     - Architecture patterns and domain boundaries
+    - Root repo role, nested git repo boundaries, and QA/Journey Pack target repos with `auto qa init --project-dir <repo>` commands
   """
 )
 ```
@@ -271,6 +272,7 @@ Create or update the 4 files under `.autopus/project/` using the explorer's outp
 - `product.md` — project name, description, core features, use cases, mode
 - `structure.md` — directory structure, package roles, entry points, file stats
 - `tech.md` — tech stack, build, testing, architecture patterns
+- `workspace.md` — root repo role, nested repo boundaries, generated/runtime paths, tracking policy, QA target command routing
 
 > **⏭ POST-STEP**: Project docs written. NEXT REQUIRED STEP: Step 4: Generate scenarios.md. Do NOT skip to Completion.
 
@@ -286,6 +288,7 @@ Analyze codebase to extract user-facing E2E test scenarios (SPEC-E2E-001 R1).
 | `.autopus/project/product.md` | Project name, description, core features, use cases, mode |
 | `.autopus/project/structure.md` | Directory structure, package roles, entry points, file stats |
 | `.autopus/project/tech.md` | Tech stack, build, testing, architecture patterns |
+| `.autopus/project/workspace.md` | Root repo role, nested repo boundaries, generated/runtime paths, QA target command routing |
 | `.autopus/project/scenarios.md` | User-facing E2E test scenarios extracted from the codebase |
 | `.autopus/project/canary.md` | Health check configuration: build, endpoints, browser targets, deploy platform |
 
@@ -1817,6 +1820,7 @@ Use QAMESH when the task is project-level deterministic QA execution or evidence
 
 - Use `auto qa plan --format json` to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without executing project commands.
 - Use `auto qa init --format json` to create project-local starter Journey Packs from detected Go, Node, Python, Rust, Playwright, and desktop signals. Existing packs are preserved and generated packs require human review before execution.
+- In a meta workspace, inspect `.autopus/project/workspace.md` and nested git repos, then run `auto qa init --project-dir <repo> --format json` for the project under test. Do not write root `.autopus/qa/**` unless the root itself is the product repo.
 - `auto qa init --format json` is the simple default release-QA setup command. Use `auto qa init --local-only --format json` only when Journey Pack starters are needed without release lanes or workflow scaffolding. Review commands, env, installer version, and required-gate policy before relying on generated files.
 - Use `auto qa run --format json` to execute deterministic project QA and produce QAMESH run-index/evidence output.
 - Use `auto qa explore --dry-run --format json` before explicit GUI exploration, and run it only for local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
@@ -2394,6 +2398,7 @@ On sync, detect structural changes in the codebase and update:
 - `.autopus/project/structure.md` — reflect directory/file changes
 - `.autopus/project/tech.md` — reflect dependency/build changes
 - `.autopus/project/product.md` — reflect new features/commands
+- `.autopus/project/workspace.md` — reflect root repo role, nested repo boundaries, generated/runtime paths, tracking policy, QA/Journey Pack target command changes
 
 Usage: `/auto sync SPEC-ID`, `/auto sync`
 

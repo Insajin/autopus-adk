@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -202,6 +203,45 @@ func TestQAInitCmd_LocalOnlyNoopsWithoutQASignals(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 }
 
+func TestQAInitCmd_DefaultResolvesNestedWorkspaceTarget(t *testing.T) {
+	root := t.TempDir()
+	desktopDir := filepath.Join(root, "autopus-desktop")
+	adkDir := filepath.Join(root, "autopus-adk")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(desktopDir, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(desktopDir, "src-tauri"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(adkDir, ".git"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(adkDir, "go.mod"), []byte("module example.com/adk\n\ngo 1.26\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(desktopDir, "package.json"), []byte(`{
+  "scripts": {
+    "test": "vitest run",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.0.0"
+  }
+}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(desktopDir, "src-tauri", "tauri.conf.json"), []byte("{}\n"), 0o644))
+
+	t.Chdir(root)
+	cmd := newQACmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"init", "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+	data := decodeJSONMap(t, out.Bytes())["data"].(map[string]any)
+	assert.Equal(t, "created", data["status"])
+	assert.Equal(t, realPath(t, desktopDir), data["project_dir"])
+	assert.Equal(t, realPath(t, root), data["requested_project_dir"])
+	assert.Equal(t, realPath(t, root), data["workspace_root"])
+	assert.Contains(t, data["target_reason"], "autopus-desktop")
+	assert.FileExists(t, filepath.Join(desktopDir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml"))
+	assert.FileExists(t, filepath.Join(desktopDir, ".github", "workflows", "autopus-qa-release.yml"))
+	assert.NoFileExists(t, filepath.Join(root, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
+	assertNextStepContains(t, data["next_steps"].([]any), "auto qa plan --project-dir autopus-desktop --format json")
+}
+
 func assertContainsCreatedID(t *testing.T, created []any, id string) {
 	t.Helper()
 	for _, item := range created {
@@ -210,4 +250,21 @@ func assertContainsCreatedID(t *testing.T, created []any, id string) {
 		}
 	}
 	t.Fatalf("created files did not include %q: %#v", id, created)
+}
+
+func assertNextStepContains(t *testing.T, steps []any, expected string) {
+	t.Helper()
+	for _, item := range steps {
+		if strings.Contains(item.(string), expected) {
+			return
+		}
+	}
+	t.Fatalf("next steps did not include %q: %#v", expected, steps)
+}
+
+func realPath(t *testing.T, path string) string {
+	t.Helper()
+	real, err := filepath.EvalSymlinks(path)
+	require.NoError(t, err)
+	return real
 }

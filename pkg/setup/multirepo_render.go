@@ -36,12 +36,48 @@ func renderWorkspaceSection(info *MultiRepoInfo) string {
 		b.WriteString("\n")
 	}
 
+	b.WriteString(renderQATargetResolution(info))
+
 	b.WriteString("### Deploy Targets\n\n")
 	for _, component := range info.Components {
 		fmt.Fprintf(&b, "- `%s` -> %s\n", component.Name, inferDeployTarget(component))
 	}
 	b.WriteString("\n")
 	return b.String()
+}
+
+func renderQATargetResolution(info *MultiRepoInfo) string {
+	var b strings.Builder
+	b.WriteString("### QA Target Resolution\n\n")
+	b.WriteString("- `auto qa init` writes Journey Packs into the repository under test, not into a meta workspace root.\n")
+	candidates := qaTargetComponents(info)
+	if len(candidates) == 0 {
+		b.WriteString("- No child QA target repository was inferred; pass `--project-dir <repo>` after identifying the project under test.\n")
+	} else {
+		b.WriteString("- Candidate QA target repos:\n")
+		for _, component := range candidates {
+			fmt.Fprintf(
+				&b,
+				"  - `%s/` — %s; run `auto qa init --project-dir %s --auto --loop`\n",
+				component.Path,
+				component.Role,
+				shellToken(component.Path),
+			)
+		}
+	}
+	b.WriteString("- Root `.autopus/qa/**` is generated/runtime evidence; do not commit it unless this root is the product repo under test.\n\n")
+	return b.String()
+}
+
+func qaTargetComponents(info *MultiRepoInfo) []RepoComponent {
+	candidates := []RepoComponent{}
+	for _, component := range info.Components {
+		if component.Path == "." {
+			continue
+		}
+		candidates = append(candidates, component)
+	}
+	return candidates
 }
 
 func renderDevWorkflow(info *MultiRepoInfo) string {
@@ -90,6 +126,13 @@ func inferDeployTarget(component RepoComponent) string {
 func defaultText(value, fallback string) string {
 	if strings.TrimSpace(value) == "" {
 		return fallback
+	}
+	return value
+}
+
+func shellToken(value string) string {
+	if value == "" || strings.ContainsAny(value, " \t\n'\"`$\\") {
+		return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 	}
 	return value
 }

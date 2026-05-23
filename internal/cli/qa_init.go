@@ -72,9 +72,10 @@ func runQAScaffold(cmd *cobra.Command, opts qaInitOptions, errorCode string) err
 		return err
 	}
 	result, err := qascaffold.Init(qascaffold.Options{
-		ProjectDir: opts.ProjectDir,
-		Release:    opts.Release,
-		Workflow:   opts.Workflow,
+		ProjectDir:         opts.ProjectDir,
+		ProjectDirExplicit: cmd.Flags().Changed("project-dir"),
+		Release:            opts.Release,
+		Workflow:           opts.Workflow,
 	})
 	if err != nil {
 		return qaCommandError(cmd, jsonMode, err, errorCode, map[string]any{"project_dir": opts.ProjectDir})

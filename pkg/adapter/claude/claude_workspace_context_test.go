@@ -27,4 +27,5 @@ func TestClaudeAdapter_Generate_PropagatesWorkspacePolicyContext(t *testing.T) {
 	assert.Contains(t, string(autoSkill), "nested git repo")
 	assert.Contains(t, string(autoSkill), "generated/runtime")
 	assert.Contains(t, string(autoSkill), "tracking/commit policy")
+	assert.Contains(t, string(autoSkill), "auto qa init --project-dir <repo>")
 }

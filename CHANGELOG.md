@@ -18,6 +18,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **QA 대상 리포 자동 해석 및 workspace 문서화** (2026-05-23): `auto qa init`이 기본 실행에서 meta workspace를 감지하면 nested git repo의 Go/Node/Python/Rust/Playwright/desktop 신호를 점수화해 Journey Pack을 제품 리포에 생성합니다. `auto setup`/`auto sync` source guidance와 multi-repo 렌더링은 QA/Journey Pack 대상 리포, `auto qa init --project-dir <repo>` 명령, root `.autopus/qa/**` runtime/generated 경계를 명시하도록 갱신되었습니다.
+
 - **`auto go` QAMESH scope budget** (2026-05-15): go-stage guidance now limits QAMESH execution to affected/fast/smoke lanes and defers full GUI/native/release matrices to explicit `auto qa ...` or `auto canary` runs.
 - **QAMESH harness/project-local Journey Pack contract** (2026-05-15): `auto qa plan` and `auto qa explore --dry-run` now expose a `harness_contract` declaring ADK as the harness and project-local `.autopus/qa/journeys/**` as the owner of concrete Journey Packs. Desktop GUI signals now produce non-blocking `project_hints` on fast plans and explicit `setup_gaps` on `gui-explore` requests when the target project has not declared a GUI Journey Pack, while `gui-explore` no longer falls back to generic detected Node/Vitest/Playwright adapters.
 

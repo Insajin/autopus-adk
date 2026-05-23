@@ -9,4 +9,19 @@ Generated/runtime/harness surfaces are excluded from canonical Knowledge Hub ind
 - Indexable local docs: `.autopus/project/**`, `.autopus/specs/**`, `.autopus/vault/**`, `README.md`, `docs/**`
 - Candidate/projection only: `.autopus/inbox/**` requires promotion; sanitized `.autopus/learnings/pipeline.jsonl` rows remain ADK Decision/Quality Index projection evidence.
 
-`auto setup` 결과 문서에는 ADK가 harness layer라는 경계, generated/runtime surface의 source-of-truth repo, root tracking keep/drop policy, 그리고 canonical Knowledge Hub에서 제외되는 경로를 명시해야 합니다.
+`auto setup` 결과 문서에는 ADK가 harness layer라는 경계, generated/runtime surface의 source-of-truth repo, root tracking keep/drop policy, canonical Knowledge Hub에서 제외되는 경로, QA/Journey Pack 대상 리포와 `auto qa init --project-dir <repo>` 명령을 명시해야 합니다.
+
+## OpenCode Invocation
+
+Use `/auto setup` 또는 `/auto setup --auto`로 실행합니다. OpenCode에서도 먼저 `explorer` agent로 코드베이스를 분석하고, 그 결과를 바탕으로 문서를 갱신합니다.
+
+필수 산출물:
+- `ARCHITECTURE.md`
+- `.autopus/project/product.md`
+- `.autopus/project/structure.md`
+- `.autopus/project/tech.md`
+- `.autopus/project/workspace.md`
+- `.autopus/project/scenarios.md`
+- `.autopus/project/canary.md`
+
+`workspace.md`에는 root repo role, nested git repo boundaries, generated/runtime paths, tracking/commit policy, source-of-truth repo, QA/Journey Pack target repos, and `auto qa init --project-dir <repo>` command routing을 기록합니다. meta workspace라면 root `.autopus/qa/**`를 제품 Journey Pack 위치로 쓰지 말고 runtime/generated evidence로 분리합니다.

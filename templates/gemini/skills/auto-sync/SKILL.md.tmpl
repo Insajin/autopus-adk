@@ -35,6 +35,8 @@ triggers:
 5. CHANGELOG 갱신
 6. Lore 형식 자동 커밋{{end}}
 
+repo 경계, 빌드/릴리스 스크립트, desktop/browser/API surface가 바뀌면 `.autopus/project/workspace.md`의 QA/Journey Pack 대상 리포와 `auto qa init --project-dir <repo>` 명령도 갱신합니다. meta workspace의 root `.autopus/qa/**`는 runtime/generated evidence로 취급합니다.
+
 ## LSP 품질 게이트
 
 - 에러: 0 / 경고: 최대 10 / Clean LSP 필요

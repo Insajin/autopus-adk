@@ -18,18 +18,22 @@ const (
 )
 
 type Options struct {
-	ProjectDir string
-	Release    bool
-	Workflow   string
+	ProjectDir         string
+	ProjectDirExplicit bool
+	Release            bool
+	Workflow           string
 }
 
 type Result struct {
-	Status     string       `json:"status"`
-	ProjectDir string       `json:"project_dir"`
-	Created    []FileResult `json:"created,omitempty"`
-	Skipped    []FileResult `json:"skipped,omitempty"`
-	Warnings   []string     `json:"warnings,omitempty"`
-	NextSteps  []string     `json:"next_steps,omitempty"`
+	Status              string       `json:"status"`
+	ProjectDir          string       `json:"project_dir"`
+	RequestedProjectDir string       `json:"requested_project_dir,omitempty"`
+	WorkspaceRoot       string       `json:"workspace_root,omitempty"`
+	TargetReason        string       `json:"target_reason,omitempty"`
+	Created             []FileResult `json:"created,omitempty"`
+	Skipped             []FileResult `json:"skipped,omitempty"`
+	Warnings            []string     `json:"warnings,omitempty"`
+	NextSteps           []string     `json:"next_steps,omitempty"`
 }
 
 type FileResult struct {
@@ -50,9 +54,19 @@ func Init(opts Options) (Result, error) {
 	if workflow != workflowNone {
 		opts.Release = true
 	}
+	resolution := resolveProjectDir(projectDir, opts.ProjectDirExplicit)
+	projectDir = resolution.ProjectDir
 	result := Result{
-		Status:     "noop",
-		ProjectDir: projectDir,
+		Status:              "noop",
+		ProjectDir:          projectDir,
+		RequestedProjectDir: resolution.RequestedProjectDir,
+		WorkspaceRoot:       resolution.WorkspaceRoot,
+		TargetReason:        resolution.TargetReason,
+		Warnings:            resolution.Warnings,
+	}
+	if resolution.SkipScaffold {
+		result.NextSteps = initNextSteps(opts.Release, workflow, projectDir, resolution.WorkspaceRoot)
+		return result, nil
 	}
 
 	for _, starter := range detectJourneyStarters(projectDir, opts.Release) {
@@ -71,9 +85,9 @@ func Init(opts Options) (Result, error) {
 	} else if len(result.Skipped) > 0 {
 		result.Status = "skipped"
 	} else {
-		result.Warnings = []string{"no supported QA signals detected; no starter files were created"}
+		result.Warnings = append(result.Warnings, "no supported QA signals detected; no starter files were created")
 	}
-	result.NextSteps = initNextSteps(opts.Release, workflow)
+	result.NextSteps = initNextSteps(opts.Release, workflow, projectDir, resolution.WorkspaceRoot)
 	return result, nil
 }
 
@@ -164,19 +178,57 @@ func writeNewFile(path string, body []byte) error {
 	return nil
 }
 
-func initNextSteps(release bool, workflow string) []string {
+func initNextSteps(release bool, workflow, projectDir, workspaceRoot string) []string {
+	projectFlag := projectDirFlag(projectDir, workspaceRoot)
+	journeyRoot := ".autopus/qa/journeys/*.yaml"
+	catalogPath := ".autopus/qa/domain-readiness/catalog.json"
+	workflowPath := ".github/workflows/autopus-qa-release.yml"
+	if rel := projectRel(projectDir, workspaceRoot); rel != "" && rel != "." {
+		journeyRoot = filepath.ToSlash(filepath.Join(rel, journeyRoot))
+		catalogPath = filepath.ToSlash(filepath.Join(rel, catalogPath))
+		workflowPath = filepath.ToSlash(filepath.Join(rel, workflowPath))
+	}
 	steps := []string{
-		"Review .autopus/qa/journeys/*.yaml and replace starter commands with project-owned deterministic checks before trusting them.",
-		"Review .autopus/qa/domain-readiness/catalog.json and replace starter domains with project-owned readiness scenarios.",
-		"Run auto qa plan --format json to inspect runnable lanes and setup gaps.",
+		"Review " + journeyRoot + " and replace starter commands with project-owned deterministic checks before trusting them.",
+		"Review " + catalogPath + " and replace starter domains with project-owned readiness scenarios.",
+		"Run auto qa plan" + projectFlag + " --format json to inspect runnable lanes and setup gaps.",
 	}
 	if release {
-		steps = append(steps, "Run auto qa release --dry-run --profile release-candidate --format json before enabling the gate on a release branch or tag.")
+		steps = append(steps, "Run auto qa release"+projectFlag+" --dry-run --profile release-candidate --format json before enabling the gate on a release branch or tag.")
 	}
 	if workflow == workflowGitHubActions {
-		steps = append(steps, "Review .github/workflows/autopus-qa-release.yml and pin the auto installer version before making it required.")
+		steps = append(steps, "Review "+workflowPath+" and pin the auto installer version before making it required.")
 	}
 	return steps
+}
+
+func projectDirFlag(projectDir, workspaceRoot string) string {
+	rel := projectRel(projectDir, workspaceRoot)
+	if rel == "" || rel == "." {
+		return ""
+	}
+	return " --project-dir " + shellToken(filepath.ToSlash(rel))
+}
+
+func projectRel(projectDir, workspaceRoot string) string {
+	if strings.TrimSpace(workspaceRoot) == "" {
+		return ""
+	}
+	rel, err := filepath.Rel(workspaceRoot, projectDir)
+	if err != nil {
+		return ""
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return ""
+	}
+	return filepath.ToSlash(rel)
+}
+
+func shellToken(value string) string {
+	if value == "" || strings.ContainsAny(value, " \t\n'\"`$\\") {
+		return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+	}
+	return value
 }
 
 func normalizeWorkflow(value string) (string, error) {

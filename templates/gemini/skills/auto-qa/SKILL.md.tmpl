@@ -35,6 +35,7 @@ QAMESH는 project-level deterministic QA 실행, manifest validation, redaction,
 
 - Use `auto qa plan --format json` before execution to inspect Journey Packs, detected adapters, lanes, setup gaps, and output paths without running commands.
 - Use `auto qa init --format json` as the simple default release-QA setup command. It creates project-local starter Journey Packs and a generic GitHub Actions release gate from detected Go, Node, Python, Rust, Playwright, and desktop signals. Existing files are preserved and generated files require human review before execution.
+- In a meta workspace, inspect `.autopus/project/workspace.md` and nested git repos, then run `auto qa init --project-dir <repo> --format json` for the project under test. Do not write root `.autopus/qa/**` unless the root itself is the product repo.
 - Use `auto qa init --local-only --format json` only when the caller wants Journey Pack starters without release lanes or workflow scaffolding.
 - Use `auto qa run --format json` to execute deterministic project QA and produce run-index/evidence output.
 - Use `auto qa explore --dry-run --format json` before explicit GUI exploration, and run it only when the Journey Pack declares allowed origins, forbidden actions, redaction, and artifact retention policy.
