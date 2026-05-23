@@ -75,6 +75,9 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 
 	files := make([]adapter.FileMapping, 0, len(skills))
 	for _, skill := range skills {
+		if isWorkflowSkillName(skill.Name) {
+			continue
+		}
 		entry, ok := catalog.Get(skill.Name)
 		if !ok {
 			continue
@@ -95,6 +98,15 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 		})
 	}
 	return files, nil
+}
+
+func isWorkflowSkillName(name string) bool {
+	for _, spec := range workflowSpecs {
+		if spec.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func skillCompilerExplicitlySelects(cfg *config.HarnessConfig, name string) bool {

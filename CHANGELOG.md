@@ -25,6 +25,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **OpenCode shared workflow skill metadata regression** (2026-05-23): `auto update` no longer lets extended `content/skills` entries overwrite `.agents/skills/auto-*` workflow skills, preventing empty `description` frontmatter such as `.agents/skills/auto-setup/SKILL.md` from being emitted and skipped by Codex/OpenCode skill loaders.
+
 - **SPEC review issue #55 migration gap** (2026-05-20): `auto spec review` now applies orchestra provider migrations in-memory before building review providers, so existing configs with legacy Claude `--effort max` adopt `--effort high` and the 480s per-provider timeout during review. Legacy generated `context_max_lines: 500` is treated as unset for review execution so the adaptive 500/1500/3000-line context budget is not accidentally capped back to 500.
 
 - **QAMESH profile capability resolution** (2026-05-16): `auto qa run` / `auto qa explore` now resolve required Journey Pack capabilities from the effective test profile, including project-local `autopus.yaml` profile additions. The local profile also advertises `auth-state`, and QAMESH runtime/cache/gui/feedback artifacts are ignored as generated local evidence.

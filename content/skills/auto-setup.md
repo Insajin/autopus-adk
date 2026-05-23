@@ -1,3 +1,9 @@
+---
+name: auto-setup
+description: 프로젝트 컨텍스트 생성 — 코드베이스를 분석하고 ARCHITECTURE.md 및 .autopus/project 문서를 생성합니다
+category: workflow
+---
+
 # auto-setup — 프로젝트 컨텍스트 생성 스킬
 
 ## Workspace Folder Boundary

@@ -2,6 +2,7 @@ package opencode
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,6 +65,8 @@ func TestAdapter_Generate_WorkflowSkillsUseOpenCodeSurface(t *testing.T) {
 		data, readErr := os.ReadFile(skillPath)
 		require.NoError(t, readErr, skillPath)
 		content := string(data)
+		assert.Contains(t, content, fmt.Sprintf("description: %q", spec.Description), "%s should keep workflow description", skillPath)
+		assert.Contains(t, content, "## Autopus Branding", "%s should keep workflow body", skillPath)
 
 		for _, banned := range bannedInSkills {
 			assert.NotContains(t, content, banned, "%s should not contain %q", skillPath, banned)
