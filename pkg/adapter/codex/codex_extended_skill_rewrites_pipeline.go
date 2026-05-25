@@ -13,17 +13,26 @@ This skill is the default for ` + "`@auto go SPEC-ID`" + `.
 | Flag | Mode | Codex meaning |
 |------|------|---------------|
 | none | Subagent pipeline | Main session orchestrates specialists phase-by-phase |
-| ` + "`--team`" + ` | Reserved compatibility flag | Keep the default subagent pipeline until Codex ships a documented native multi-agent surface |
+| ` + "`--team`" + ` | Codex team profile | Use native ` + "`multi_agent`" + ` tools with Lead/Builder/Guardian coordination |
 | ` + "`--solo`" + ` | Single session | No worker spawning; implement directly in the main session |
 | ` + "`--multi`" + ` | Multi-provider review | Run additional review/validation passes when configured, prefer orchestra-backed review when available |
 
-See .codex/skills/agent-teams.md for the reserved ` + "`--team`" + ` policy and .codex/skills/worktree-isolation.md for parallel ownership rules.
+See .codex/skills/agent-teams.md for the Codex ` + "`--team`" + ` policy and .codex/skills/worktree-isolation.md for parallel ownership rules.
 
 ## Codex Auto Semantics
 
 - In Codex, ` + "`--auto`" + ` means "skip approval gates" and also counts as explicit approval for the default ` + "`spawn_agent(...)`" + ` subagent pipeline.
 - Without ` + "`--auto`" + `, if the runtime policy blocks implicit worker spawning, the main session must explain the constraint and ask before switching to subagents.
-- ` + "`--team`" + ` remains a reserved compatibility flag until Codex ships a distinct native multi-agent surface.
+- ` + "`--team`" + ` selects the Codex team profile. It still uses ` + "`spawn_agent(...)`" + `, but requires explicit Lead/Builder/Guardian coordination and completion evidence.
+
+## Goal Integration
+
+Codex goals are thread-level state. The harness is goal-aware but does not invent goals for ordinary runs.
+
+- If an active goal exists, read it with ` + "`get_goal`" + ` before long-running ` + "`@auto go`" + ` / ` + "`@auto dev`" + ` work and include the objective in worker prompts.
+- If the user explicitly asks to start a goal, prefer ` + "`@auto goal \"<objective>\" [--budget N]`" + ` or use ` + "`create_goal`" + ` once, with a token budget only when the user supplied one.
+- At the terminal handoff, report ` + "`goal_status`" + `. Use ` + "`update_goal`" + ` only when its completion or blocked contract is genuinely satisfied.
+- Do not call goal tools from spawned workers unless the parent prompt explicitly delegates that responsibility.
 
 ## Supervisor Contract
 

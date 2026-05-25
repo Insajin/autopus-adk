@@ -143,34 +143,25 @@ Lead consolidates:
   1. Collect all issues from reviewer + security-auditor
   2. Deduplicate overlapping findings
   3. Apply priority: security > quality
-  4. Send unified issue list to Builder via SendMessage
+  4. Return a unified issue list so the main session can route it to Builder with `send_input(...)`
 
-Lead → Builder:
-  SendMessage({
-    "type": "consolidated_review",
-    "verdict": "REQUEST_CHANGES",
-    "issues": ["[HIGH] SQL injection risk in pkg/db/query.go:42"]
-  })
+Lead/main session → Builder:
+  send_input(
+    target="<builder-agent-id>",
+    message="consolidated_review: REQUEST_CHANGES; issues: [HIGH] SQL injection risk in pkg/db/query.go:42",
+  )
 ```
 
 ## Builder Partial Validation Pattern
 
-In Agent Teams mode, a Builder agent may request focused review during Phase 2 via `SendMessage`.
+In Codex team mode, the main session may route a focused Phase 2 review request from Builder to Guardian with `send_input(...)`.
 
 ```python
-# Builder → Guardian (partial review request)
-SendMessage(to="guardian", message={
-    "type": "partial_validation",
-    "files": ["pkg/auth/token.go"],
-    "reason": "security-sensitive change, pre-check before Gate 2"
-})
-
-# Guardian (reviewer) → Builder (response)
-SendMessage(to="builder", message={
-    "type": "validation_result",
-    "status": "PASS",  # or FAIL
-    "issues": []       # list of issues if FAIL
-})
+# Main session -> Guardian (partial review request)
+send_input(
+    target="<guardian-agent-id>",
+    message="partial_validation: files=pkg/auth/token.go; reason=security-sensitive change, pre-check before Gate 2",
+)
 ```
 
 - reviewer responds with a targeted review scoped to the specified files

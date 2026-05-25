@@ -102,13 +102,13 @@ skills:
 ### 서브에이전트 방식 (기본)
 - `Agent()` 호출로 생성, 결과 반환 후 종료
 - 서브에이전트는 다른 서브에이전트를 생성할 수 없음
-- 중단된 에이전트는 `SendMessage({to: agentId})`로 재개
+- 중단된 에이전트는 메인 세션이 `send_input(...)` 또는 `resume_agent(...)`로 재개
 
-### Agent Teams 방식 (실험적)
-- `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` 필요
-- `TeamCreate`로 팀 생성, `SendMessage`로 팀원 간 통신
-- `TaskCreate/Update/List/Get`으로 작업 공유
-- 완료 후 `TeamDelete`로 팀 리소스 해제
+### Codex Team Profile
+- `.codex/config.toml`에서 `features.multi_agent = true` 필요
+- 메인 세션이 Lead가 되고 `spawn_agent(...)`로 Builder/Guardian worker를 생성
+- worker follow-up은 메인 세션의 `send_input(...)`로 전달
+- 완료 후 더 이상 필요 없는 worker는 `close_agent(...)`로 종료
 
 ## 완료 기준
 

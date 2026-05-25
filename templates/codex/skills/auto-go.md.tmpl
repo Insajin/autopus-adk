@@ -14,6 +14,7 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 @auto go SPEC-ID --continue
 @auto go SPEC-ID --solo --quality ultra
 @auto go SPEC-ID --auto --loop
+@auto go SPEC-ID --team --auto
 ```
 
 ### 플래그
@@ -21,7 +22,7 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 | Flag | Description |
 |------|-------------|
 | `--continue` | 이전 중단 지점에서 재개합니다. |
-| `--team` | Codex에서는 future native multi-agent를 위한 reserved compatibility flag입니다. 현재는 기본 subagent pipeline을 계속 사용합니다. |
+| `--team` | Codex native `multi_agent` 도구 기반 Lead/Builder/Guardian 팀 프로파일로 실행합니다. |
 | `--solo` | 서브에이전트 없이 메인 세션에서 직접 구현합니다. |
 | `--strategy <value>` | `--multi` 리뷰 전략을 지정합니다. |
 | `--skip-scaffold` | 초기 테스트 스캐폴딩 단계를 건너뜁니다. |
@@ -65,7 +66,7 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 ### Step 0: 플래그 파싱
 
 구현 시작 전에 다음 항목을 먼저 확정합니다.
-- `--team` → reserved compatibility flag
+- `--team` → Codex team profile
 - `--solo` → 단일 세션 구현
 - `--strategy <value>`
 - `--continue`
@@ -73,6 +74,7 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 - 글로벌 `--auto` / `--loop` / `--multi` / `--quality`
 
 실행 모드:
+- `--team` → Codex native `multi_agent` 팀 프로파일
 - `--solo` → single session
 - 그 외 → 기본 `spawn_agent(...)` subagent pipeline
 
@@ -152,7 +154,7 @@ SPEC Quality Loop:
 
 - 기본 경로: `.codex/skills/agent-pipeline.md`에 정의된 subagent pipeline
 - `--solo`: 메인 세션 직접 구현
-- `--team`: 현재는 예약 플래그이며 기본 pipeline 의미를 유지
+- `--team`: `.codex/skills/agent-teams.md`의 Codex team profile 적용
 
 ### Workflow Authenticity Evidence
 
@@ -297,7 +299,8 @@ auto orchestra run "{review topic}" --strategy consensus --rounds fast
 - Codex의 기본 구현 모드는 `spawn_agent(...)` 기반 subagent pipeline입니다.
 - Codex에서 `--auto`는 기본 subagent pipeline 진행에 대한 명시적 승인입니다.
 - `--auto`가 없고 현재 Codex 런타임 정책이 암묵적 `spawn_agent(...)` 호출을 제한하면, 조용히 단일 세션으로 폴백하지 말고 하네스 기본값과 제약을 사용자에게 명시적으로 설명한 뒤 서브에이전트 opt-in 또는 `--solo` 선택을 받습니다.
-- `--team`은 future native multi-agent surface를 위한 reserved compatibility flag이며, 현재 Codex에서는 추가 오케스트레이션 의미를 부여하지 않습니다.
+- `--team`은 Codex native `multi_agent` 도구 기반 팀 프로파일이며, `spawn_agent`, `send_input`, `wait_agent`, `close_agent`를 메인 세션이 조율합니다.
+- `/goal` active state가 있으면 `get_goal`로 목표를 확인하고 worker 프롬프트와 최종 `goal_status`에 반영합니다. 새 goal이 필요하면 `@auto goal "<objective>" [--budget N]`을 사용하고, `create_goal`/`update_goal`은 사용자가 명시했거나 goal tool contract가 충족될 때만 사용합니다.
 - `--multi`는 구현 이후 reviewer / security-auditor / orchestra 리뷰를 추가로 붙이는 강화 모드입니다.
 - 전체 파이프라인 단계, 재시도 한도, 게이트 규칙은 `@auto go ...` 라우터 본문을 우선합니다.
 

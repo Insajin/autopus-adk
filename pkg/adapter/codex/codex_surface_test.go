@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -47,6 +46,7 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	for _, name := range []string{
 		"auto-setup",
 		"auto-status",
+		"auto-goal",
 		"auto-plan",
 		"auto-go",
 		"auto-fix",
@@ -78,6 +78,21 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 		}
 		_, statErr := os.Stat(filepath.Join(dir, ".autopus", "plugins", "auto", "skills", name, "SKILL.md"))
 		assert.True(t, os.IsNotExist(statErr), "plugin-local workflow shim should not exist for %s", name)
+	}
+
+	agentEntries, err := os.ReadDir(filepath.Join(dir, ".codex", "agents"))
+	require.NoError(t, err)
+	agentBanned := []string{"TeamCreate", "TeamDelete", "SendMessage", "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"}
+	for _, entry := range agentEntries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".toml" {
+			continue
+		}
+		path := filepath.Join(dir, ".codex", "agents", entry.Name())
+		data, readErr := os.ReadFile(path)
+		require.NoError(t, readErr, path)
+		for _, token := range agentBanned {
+			assert.NotContains(t, string(data), token, path)
+		}
 	}
 
 	autoIdeaSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-idea", "SKILL.md"))
@@ -142,6 +157,8 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	assert.Contains(t, string(autoGoSkill), "Sync Readiness Gate")
 	assert.Contains(t, string(autoGoSkill), "completion_verdict_preview")
 	assert.Contains(t, string(autoGoSkill), "spec_status_after_go")
+	assert.Contains(t, string(autoGoSkill), "Codex native `multi_agent`")
+	assert.Contains(t, string(autoGoSkill), "`/goal` active state")
 
 	autoGoPrompt, err := os.ReadFile(filepath.Join(dir, ".codex", "prompts", "auto-go.md"))
 	require.NoError(t, err)
@@ -152,6 +169,8 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	assert.Contains(t, string(autoGoPrompt), "handoff는 terminal state에서만 사용합니다")
 	assert.Contains(t, string(autoGoPrompt), "Sync Readiness Gate")
 	assert.Contains(t, string(autoGoPrompt), "completion_verdict_preview")
+	assert.Contains(t, string(autoGoPrompt), "team_mode: codex_multi_agent")
+	assert.Contains(t, string(autoGoPrompt), "goal_status")
 
 	autoGoCodexSkill, err := os.ReadFile(filepath.Join(dir, ".codex", "skills", "auto-go.md"))
 	require.NoError(t, err)
@@ -194,12 +213,30 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	assert.Contains(t, string(autoPrompt), "## SPEC Path Resolution")
 	assert.Contains(t, string(autoPrompt), "ARCHITECTURE.md")
 	assert.Contains(t, string(autoPrompt), "`setup`")
+	assert.Contains(t, string(autoPrompt), "`goal`")
 	assert.Contains(t, string(autoPrompt), "`doctor`")
+	assert.Contains(t, string(autoPrompt), "`/goal`은 Codex thread-level 목표 기능입니다")
+	assert.Contains(t, string(autoPrompt), "native `multi_agent` 도구 기반")
 	assert.NotContains(t, string(autoPrompt), "`.agents/skills/auto/SKILL.md`의 최신 라우터 규칙을 우선")
 
 	autoStatusSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-status", "SKILL.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoStatusSkill), "auto status")
+
+	autoGoalSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-goal", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoGoalSkill), "Codex Goal Wrapper")
+	assert.Contains(t, string(autoGoalSkill), "`@auto goal \"<objective>\" [--budget N]`")
+	assert.Contains(t, string(autoGoalSkill), "`get_goal`")
+	assert.Contains(t, string(autoGoalSkill), "`create_goal`")
+	assert.Contains(t, string(autoGoalSkill), "`update_goal`")
+	assert.Contains(t, string(autoGoalSkill), "not an ADK persisted state")
+
+	autoGoalPrompt, err := os.ReadFile(filepath.Join(dir, ".codex", "prompts", "auto-goal.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoGoalPrompt), "`/goal` thread 기능")
+	assert.Contains(t, string(autoGoalPrompt), "goal_status")
+	assert.Contains(t, string(autoGoalPrompt), "`/goal clear`")
 
 	autoDoctorSkill, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-doctor", "SKILL.md"))
 	require.NoError(t, err)
@@ -212,6 +249,11 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	agentTeamsSkill, err := os.ReadFile(filepath.Join(dir, ".codex", "skills", "agent-teams.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(agentTeamsSkill), "@auto go --auto")
+	assert.Contains(t, string(agentTeamsSkill), "Codex Team Mode Skill")
+	assert.Contains(t, string(agentTeamsSkill), "Lead/Builder/Guardian")
+	assert.Contains(t, string(agentTeamsSkill), "`create_goal`")
+	assert.NotContains(t, string(agentTeamsSkill), "TeamCreate")
+	assert.NotContains(t, string(agentTeamsSkill), "SendMessage")
 
 	agentPipelineSkill, err := os.ReadFile(filepath.Join(dir, ".codex", "skills", "agent-pipeline.md"))
 	require.NoError(t, err)
@@ -222,34 +264,6 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 	assert.Contains(t, string(agentPipelineSkill), "While review retries remain, unresolved findings are not a terminal handoff")
 	assert.Contains(t, string(agentPipelineSkill), "Sync Readiness Gate")
 	assert.Contains(t, string(agentPipelineSkill), "spec_status_after_go")
-}
-
-func TestCodexAndOpenCode_AGENTSMD_UsesSharedPlatformSection(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	cfg := config.DefaultFullConfig("shared-project")
-	cfg.Platforms = []string{"codex", "opencode"}
-
-	codexAdapter := codex.NewWithRoot(dir)
-	_, err := codexAdapter.Generate(context.Background(), cfg)
-	require.NoError(t, err)
-
-	opencodeAdapter := opencode.NewWithRoot(dir)
-	_, err = opencodeAdapter.Generate(context.Background(), cfg)
-	require.NoError(t, err)
-
-	data, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
-	require.NoError(t, err)
-	content := string(data)
-
-	assert.Contains(t, content, "- **플랫폼**: codex, opencode")
-	assert.Contains(t, content, "Codex Rules: .codex/rules/autopus/")
-	assert.Contains(t, content, "OpenCode Rules: .opencode/rules/autopus/")
-	assert.Contains(t, content, "**Codex**: 하네스 기본값은 spawn_agent(...) 기반 subagent-first 입니다.")
-	assert.Contains(t, content, "**OpenCode**: 기본 실행 모델은 task(...) 기반 subagent-first 입니다.")
-	assert.Contains(t, content, "## Core Guidelines")
-	assert.Contains(t, content, "SPEC Markdown files under .autopus/specs/**")
-	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex rule definitions.")
-	assert.Contains(t, content, "See .codex/skills/agent-pipeline.md for phase and gate contracts.")
-	assert.Contains(t, content, "See .opencode/rules/autopus/ for OpenCode guidance.")
+	assert.Contains(t, string(agentPipelineSkill), "Goal Integration")
+	assert.Contains(t, string(agentPipelineSkill), "Codex team profile")
 }

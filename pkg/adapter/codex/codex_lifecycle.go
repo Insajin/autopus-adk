@@ -81,24 +81,9 @@ func (a *Adapter) Clean(_ context.Context) error {
 		return fmt.Errorf(".codex/skills 제거 실패: %w", err)
 	}
 	if a.managesFile(filepath.Join(".agents", "skills", "auto", "SKILL.md")) {
-		autoSkillDirs := []string{
-			"auto",
-			"auto-setup",
-			"auto-status",
-			"auto-plan",
-			"auto-go",
-			"auto-fix",
-			"auto-review",
-			"auto-sync",
-			"auto-idea",
-			"auto-map",
-			"auto-why",
-			"auto-verify",
-			"auto-secure",
-			"auto-test",
-			"auto-dev",
-			"auto-canary",
-			"auto-doctor",
+		autoSkillDirs := make([]string, 0, len(workflowSpecs))
+		for _, spec := range workflowSpecs {
+			autoSkillDirs = append(autoSkillDirs, spec.Name)
 		}
 		for _, dir := range autoSkillDirs {
 			if err := os.RemoveAll(filepath.Join(a.root, ".agents", "skills", dir)); err != nil && !os.IsNotExist(err) {

@@ -25,6 +25,10 @@ var workflowSpecs = []workflowSpec{
 		Description: "SPEC 대시보드 — 현재 프로젝트와 서브모듈의 SPEC 상태를 표시합니다",
 	},
 	{
+		Name:        "auto-goal",
+		Description: "Codex goal wrapper — /goal 생성, 상태 확인, 완료/blocked handoff를 Codex goal tool 또는 slash command로 연결합니다",
+	},
+	{
 		Name:        "auto-plan",
 		Description: "SPEC 작성 — 코드베이스 분석 후 EARS 요구사항, 구현 계획, 인수 기준을 생성합니다",
 		PromptPath:  "codex/prompts/auto-plan.md.tmpl",

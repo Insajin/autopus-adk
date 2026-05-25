@@ -32,6 +32,18 @@ func TestAdapter_Generate_WorkflowCommandsRouteAliasesThroughAuto(t *testing.T) 
 	assert.Contains(t, string(autoStatus), "`skill` 도구로 `auto`를 로드")
 	assert.NotContains(t, string(autoStatus), "`skill` 도구로 `auto-status`를 로드")
 
+	autoGoalCommand, err := os.ReadFile(filepath.Join(dir, ".opencode", "commands", "auto-goal.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoGoalCommand), "`/auto goal ...` payload로 다시 해석")
+
+	autoGoal, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-goal", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(autoGoal), "Codex Goal Wrapper")
+	assert.Contains(t, string(autoGoal), "Codex `/goal` compatibility wrapper")
+	assert.Contains(t, string(autoGoal), "get_goal")
+	assert.Contains(t, string(autoGoal), "create_goal")
+	assert.Contains(t, string(autoGoal), "update_goal")
+
 	autoQA, err := os.ReadFile(filepath.Join(dir, ".agents", "skills", "auto-qa", "SKILL.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(autoQA), "QAMESH")

@@ -67,6 +67,7 @@ func thinRouterSkillBody() string {
 		"## OpenCode Notes",
 		"",
 		"- `status`, `verify`, `test`, `qa`, `doctor`는 thin wrapper 성격입니다.",
+		"- `goal`은 Codex `/goal` compatibility wrapper입니다. OpenCode에서는 goal tool을 직접 실행하지 않고 Codex fallback command를 안내합니다.",
 		"- `qa`는 QAMESH guidance로 `auto qa init`, `auto qa plan`, `auto qa run`, `auto qa release`, `auto qa evidence`, `auto qa feedback` 중 목적에 맞는 CLI를 실제 실행합니다.",
 		"- `map`, `secure`, `why`는 OpenCode native analysis workflow로 처리합니다.",
 		"- `dev`는 `plan -> go -> sync` 순서를 유지하며 `--auto`, `--loop`, `--team`, `--multi`, `--quality`, `--model`, `--variant` 를 하위 단계로 전달합니다.",

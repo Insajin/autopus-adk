@@ -105,6 +105,9 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	assert.Contains(t, content, "[agents]")
 	assert.Contains(t, content, "max_threads = 6")
 	assert.Contains(t, content, "max_depth = 1")
+	assert.Contains(t, content, "[features]")
+	assert.Contains(t, content, "goals = true")
+	assert.Contains(t, content, "multi_agent = true")
 	assert.NotContains(t, content, "features.collab")
 }
 
@@ -146,4 +149,35 @@ project_doc_max_bytes = 262144
 		}
 	}
 	assert.True(t, found, "missing browser-use plugin enablement should warn")
+}
+
+func TestValidateConfig_WarnsWhenGoalOrMultiAgentFeatureMissing(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte(`model = "gpt-5.5"
+model_reasoning_effort = "medium"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "cached"
+project_doc_max_bytes = 262144
+
+[features]
+shell_tool = true
+
+[plugins."browser-use@openai-bundled"]
+enabled = true
+`), 0644))
+
+	var errs []adapter.ValidationError
+	a.validateConfig(&errs)
+
+	messages := make(map[string]bool)
+	for _, e := range errs {
+		messages[e.Message] = true
+	}
+	assert.True(t, messages["Codex goals feature가 enabled 상태가 아님"])
+	assert.True(t, messages["Codex multi_agent feature가 enabled 상태가 아님"])
 }

@@ -23,6 +23,8 @@ func customWorkflowBodies(spec workflowSpec) (customWorkflowBody, bool) {
 	switch spec.Name {
 	case "auto-status":
 		return cliWorkflowBody(spec.Name, "SPEC Dashboard", spec.Description, "auto status", "draft / approved / implemented / completed 상태를 요약하고 다음 액션을 제안합니다."), true
+	case "auto-goal":
+		return goalWorkflowBody(spec.Name, spec.Description), true
 	case "auto-verify":
 		return verifyWorkflowBody(spec.Name, spec.Description), true
 	case "auto-test":
@@ -55,6 +57,31 @@ func cliWorkflowBody(name, title, summary, command, result string) customWorkflo
 		"1. 대상 디렉터리와 전달된 플래그를 확인합니다.",
 		"2. Bash tool로 `"+command+"`를 실행합니다.",
 		"3. "+result,
+	)
+
+	return customWorkflowBody{skill: skill}
+}
+
+func goalWorkflowBody(name, summary string) customWorkflowBody {
+	skill := compose(
+		"# "+name+" — Codex Goal Wrapper",
+		"",
+		"## 설명",
+		"",
+		summary,
+		"",
+		"## 실행 규칙",
+		"",
+		"- `auto goal`은 Codex `/goal` compatibility wrapper입니다.",
+		"- OpenCode에는 Codex `get_goal`, `create_goal`, `update_goal` tool surface가 없으므로 별도 ADK persisted state를 만들지 않습니다.",
+		"- OpenCode 세션에서 호출되면 현재 런타임에서는 goal tool을 직접 실행할 수 없다고 설명하고, Codex에서 `/goal <objective>` 또는 `@auto goal \"<objective>\"`를 사용하도록 안내합니다.",
+		"- 이미 사용자가 목표를 자연어로 제공했다면 해당 목표를 현재 OpenCode 작업 컨텍스트로만 보존하고 `.autopus` 파일에는 goal 상태를 쓰지 않습니다.",
+		"",
+		"## Codex Fallback Commands",
+		"",
+		"- 상태 확인: `/goal` 또는 `@auto goal status`",
+		"- 생성: `/goal <objective>` 또는 `@auto goal \"<objective>\" --budget N`",
+		"- 완료/차단: `@auto goal complete` 또는 `@auto goal blocked`",
 	)
 
 	return customWorkflowBody{skill: skill}

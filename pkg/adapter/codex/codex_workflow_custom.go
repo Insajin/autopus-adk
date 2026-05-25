@@ -32,6 +32,8 @@ func customWorkflowBodies(spec workflowSpec) (customWorkflowBody, bool) {
 	switch spec.Name {
 	case "auto-status":
 		return cliWorkflowBody(spec.Name, "SPEC Dashboard", spec.Description, "auto status", "draft / approved / implemented / completed 상태를 요약하고 다음 액션을 제안합니다."), true
+	case "auto-goal":
+		return goalWorkflowBody(spec.Name, spec.Description), true
 	case "auto-verify":
 		return cliWorkflowBody(spec.Name, "Frontend UX Verification", spec.Description, "auto verify", "Playwright 기반 검증 결과와 자동 수정 가능 여부를 함께 보고합니다."), true
 	case "auto-test":
@@ -88,6 +90,81 @@ func cliWorkflowBody(name, title, summary, command, result string) customWorkflo
 		"1. 대상 디렉터리와 전달된 플래그를 확인합니다.",
 		"2. Bash tool로 `"+command+"`를 실행합니다.",
 		"3. "+result,
+	)
+
+	return customWorkflowBody{prompt: prompt, skill: skill}
+}
+
+func goalWorkflowBody(name, summary string) customWorkflowBody {
+	prompt := compose(
+		"# "+name+" — Codex Goal Wrapper",
+		"",
+		"## 설명",
+		"",
+		summary,
+		"",
+		"## 역할",
+		"",
+		"`auto goal`은 Codex `/goal` thread 기능을 Autopus router에서 부르는 thin wrapper입니다. 별도 ADK persisted state를 만들거나 `.autopus` 파일에 목표 상태를 저장하지 않습니다.",
+		"",
+		"## 지원 호출",
+		"",
+		"- `@auto goal` 또는 `@auto goal status`: `get_goal`로 현재 Codex goal 상태를 확인합니다.",
+		"- `@auto goal \"<objective>\" [--budget N]`: 활성 goal이 없을 때 `create_goal`로 objective와 optional token budget을 설정합니다.",
+		"- `@auto goal complete`: 목표가 실제로 달성되었고 남은 필수 작업이 없을 때만 `update_goal(status=\"complete\")`를 호출합니다.",
+		"- `@auto goal blocked`: 같은 blocking condition이 goal turn 기준 3회 이상 반복되고 의미 있는 진행이 불가능할 때만 `update_goal(status=\"blocked\")`를 호출합니다.",
+		"- `@auto goal clear|pause|resume`: 현재 Codex tool surface에 대응 tool이 없으면 `/goal clear`, `/goal pause`, `/goal resume` slash command 사용을 안내합니다.",
+		"",
+		"## 실행 원칙",
+		"",
+		"- 새 goal을 만들기 전에 가능하면 `get_goal`로 active goal 존재 여부를 먼저 확인합니다.",
+		"- active goal이 있으면 덮어쓰려고 하지 말고 현재 objective/status/budget을 보고하고 다음 행동을 제안합니다.",
+		"- goal tool이 현재 런타임에 노출되지 않으면 실패로 숨기지 말고 `/goal <objective>` 또는 `/goal status` fallback을 안내합니다.",
+		"- 완료/blocked 표시는 Codex goal tool contract를 그대로 따르며, 편의상 premature completion을 만들지 않습니다.",
+		"",
+		"## 결과 형식",
+		"",
+		"- `goal_status`: active / complete / blocked / unavailable",
+		"- `objective`: 확인된 목표 또는 생성 요청 목표",
+		"- `next_required_step`: 이어서 실행할 `@auto ...` 명령 또는 `/goal ...` fallback",
+	)
+
+	skill := compose(
+		"# "+name+" — Codex Goal Wrapper",
+		"",
+		"## 설명",
+		"",
+		summary,
+		"",
+		"## Codex Invocation",
+		"",
+		"- `@auto goal`",
+		"- `@auto goal status`",
+		"- `@auto goal \"<objective>\" [--budget N]`",
+		"- `@auto goal complete`",
+		"- `@auto goal blocked`",
+		"- `$auto-goal ...`",
+		"- `$auto goal ...`",
+		"",
+		"## Contract",
+		"",
+		"- `auto goal` is a thin wrapper over the Codex `/goal` thread feature.",
+		"- It is not an ADK persisted state and must not write goal state to `.autopus` or project files.",
+		"- Prefer Codex goal tools when available: `get_goal`, `create_goal`, and `update_goal`.",
+		"- If the goal tools are unavailable, explain the runtime limitation and give the matching `/goal` slash command.",
+		"",
+		"## Command Mapping",
+		"",
+		"1. `@auto goal` or `@auto goal status`: call `get_goal` and summarize objective, status, budget, and next step.",
+		"2. `@auto goal \"<objective>\" [--budget N]`: call `get_goal` first when possible; if no goal exists, call `create_goal(objective=\"<objective>\", token_budget=N)`.",
+		"3. `@auto goal complete`: call `update_goal(status=\"complete\")` only when the objective is actually achieved and no required work remains.",
+		"4. `@auto goal blocked`: call `update_goal(status=\"blocked\")` only after the same blocking condition recurs for at least three consecutive goal turns.",
+		"5. `@auto goal clear|pause|resume`: do not invent local behavior; use `/goal clear`, `/goal pause`, or `/goal resume` if the runtime supports those slash commands.",
+		"",
+		"## Handoff",
+		"",
+		"- When a goal is active, subsequent `@auto plan`, `@auto go`, `@auto dev`, and `@auto sync` work should preserve the objective and report `goal_status` in completion handoff.",
+		"- If a requested workflow would conflict with the active goal, report the conflict before starting the workflow.",
 	)
 
 	return customWorkflowBody{prompt: prompt, skill: skill}
@@ -209,7 +286,7 @@ func devWorkflowBody(name, summary string) customWorkflowBody {
 		"## 실행 규칙",
 		"",
 		"- `dev`는 `plan → go → sync`를 순차 실행하는 orchestration wrapper입니다.",
-		"- `--team`은 Codex에서 reserved compatibility flag이며 현재는 기본 subagent pipeline을 유지합니다.",
+		"- `--team`은 Codex native `multi_agent` 도구 기반 Lead/Builder/Guardian 팀 프로파일로 하위 `go` 단계에 전달합니다.",
 		"- 각 단계가 실패하면 조용히 건너뛰지 말고 실패 지점과 재개 방법을 명시합니다.",
 	)
 

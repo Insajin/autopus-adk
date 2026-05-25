@@ -34,6 +34,7 @@ func (a *Adapter) validateConfig(errs *[]adapter.ValidationError) {
 	}
 	validateDeprecatedConfigKeys(content, errs)
 	validateProjectDocBudget(content, errs)
+	validateCodexFeatureFlags(content, errs)
 	validateBundledCodexPlugins(content, errs)
 }
 
@@ -126,7 +127,28 @@ func validateBundledCodexPlugins(content string, errs *[]adapter.ValidationError
 	})
 }
 
+func validateCodexFeatureFlags(content string, errs *[]adapter.ValidationError) {
+	required := map[string]string{
+		"goals":       "Codex goals feature가 enabled 상태가 아님",
+		"multi_agent": "Codex multi_agent feature가 enabled 상태가 아님",
+	}
+	for key, message := range required {
+		if sectionHasKeyValue(content, "features", key, "true") {
+			continue
+		}
+		*errs = append(*errs, adapter.ValidationError{
+			File:    codexConfigRelPath,
+			Message: message,
+			Level:   "warning",
+		})
+	}
+}
+
 func sectionHasEnabledTrue(content, wantSection string) bool {
+	return sectionHasKeyValue(content, wantSection, "enabled", "true")
+}
+
+func sectionHasKeyValue(content, wantSection, wantKey, wantValue string) bool {
 	var section string
 	for _, line := range strings.Split(content, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -138,7 +160,7 @@ func sectionHasEnabledTrue(content, wantSection string) bool {
 			continue
 		}
 		key, value, ok := parseCodexConfigAssignment(trimmed)
-		if ok && key == "enabled" && value == "true" {
+		if ok && key == wantKey && value == wantValue {
 			return true
 		}
 	}

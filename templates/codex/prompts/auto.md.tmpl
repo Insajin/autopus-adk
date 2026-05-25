@@ -1,5 +1,5 @@
 ---
-description: "Autopus 명령 라우터 — setup/status/plan/go/fix/review/sync/idea/map/why/verify/secure/test/qa/dev/canary/doctor 서브커맨드를 해석합니다"
+description: "Autopus 명령 라우터 — setup/status/goal/plan/go/fix/review/sync/idea/map/why/verify/secure/test/qa/dev/canary/doctor 서브커맨드를 해석합니다"
 ---
 
 # auto — Autopus Command Router
@@ -10,9 +10,12 @@ description: "Autopus 명령 라우터 — setup/status/plan/go/fix/review/sync/
 
 이 문서는 Codex용 canonical router surface 입니다. shared skill과 parity는 유지하되, 의미 해석은 Codex 규약(`spawn_agent(...)`, `@auto`, `--auto`, `--team`)을 기준으로 하세요. 이 프롬프트는 얇은 진입점이며, 플래그 의미(`--auto`, `--loop`, `--multi`, `--quality`, `--team`, `--solo`)를 축약해서 덮어쓰면 안 됩니다.
 
+`/goal`은 Codex thread-level 목표 기능입니다. `@auto goal`만 `/goal`에 대한 thin wrapper로 처리하고, 다른 workflow에서는 active goal이 있으면 목표/예산을 보존한 채 상세 workflow에 전달하세요.
+
 지원 서브커맨드:
 - `setup`: 프로젝트 컨텍스트 생성 워크플로우
 - `status`: SPEC 상태 대시보드 워크플로우
+- `goal`: Codex /goal thin wrapper 워크플로우
 - `plan`: SPEC 작성 워크플로우
 - `go`: SPEC 구현 워크플로우
 - `fix`: 버그 수정 워크플로우
@@ -30,9 +33,10 @@ description: "Autopus 명령 라우터 — setup/status/plan/go/fix/review/sync/
 - `doctor`: 하네스 상태 진단 워크플로우
 
 규칙:
-- 첫 토큰이 없는 경우, 사용자의 의도를 위 17개 중 하나로 분류해서 진행합니다.
-- 가능하면 같은 이름의 상세 스킬/프롬프트(`auto-setup`, `auto-status`, `auto-plan`, `auto-go`, `auto-fix`, `auto-review`, `auto-sync`, `auto-idea`, `auto-map`, `auto-why`, `auto-verify`, `auto-secure`, `auto-test`, `auto-qa`, `auto-dev`, `auto-canary`, `auto-doctor`) 의미를 따릅니다.
+- 첫 토큰이 없는 경우, 사용자의 의도를 위 18개 중 하나로 분류해서 진행합니다.
+- 가능하면 같은 이름의 상세 스킬/프롬프트(`auto-setup`, `auto-status`, `auto-goal`, `auto-plan`, `auto-go`, `auto-fix`, `auto-review`, `auto-sync`, `auto-idea`, `auto-map`, `auto-why`, `auto-verify`, `auto-secure`, `auto-test`, `auto-qa`, `auto-dev`, `auto-canary`, `auto-doctor`) 의미를 따릅니다.
 - 지원하지 않는 서브커맨드면 지원 목록을 짧게 안내하고 가장 가까운 워크플로우를 제안합니다.
 - Codex 하네스 기본값은 `spawn_agent(...)` 기반 subagent-first 입니다.
 - Codex에서 `--auto`가 있으면, 기본 subagent pipeline 진행에 대한 명시적 승인으로 해석합니다.
+- Codex에서 `--team`이 있으면, native `multi_agent` 도구 기반 Lead/Builder/Guardian 팀 프로파일로 진행합니다.
 - 단, `--auto`가 없고 현재 Codex 런타임 정책이 암묵적 `spawn_agent(...)` 호출을 허용하지 않으면 조용히 단일 세션으로 폴백하지 말고, 하네스 기본값과 제약을 명시적으로 설명한 뒤 사용자에게 서브에이전트 진행 여부 또는 `--solo` 선택을 받으세요.

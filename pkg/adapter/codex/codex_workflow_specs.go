@@ -15,7 +15,7 @@ type workflowSpec struct {
 var workflowSpecs = []workflowSpec{
 	{
 		Name:        "auto",
-		Description: "Autopus 명령 라우터 — setup/plan/go/fix/review/sync/canary/idea/status/map/why/verify/secure/test/dev/doctor 서브커맨드를 해석합니다",
+		Description: "Autopus 명령 라우터 — setup/status/goal/plan/go/fix/review/sync/idea/map/why/verify/secure/test/qa/dev/canary/doctor 서브커맨드를 해석합니다",
 		PromptPath:  "codex/prompts/auto.md.tmpl",
 	},
 	{
@@ -27,6 +27,10 @@ var workflowSpecs = []workflowSpec{
 	{
 		Name:        "auto-status",
 		Description: "SPEC 대시보드 — 현재 프로젝트와 서브모듈의 SPEC 상태를 표시합니다",
+	},
+	{
+		Name:        "auto-goal",
+		Description: "Codex goal wrapper — /goal 생성, 상태 확인, 완료/blocked handoff를 Codex goal tool 또는 slash command로 연결합니다",
 	},
 	{
 		Name:        "auto-plan",

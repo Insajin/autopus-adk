@@ -59,7 +59,9 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 ## Supervisor Checklist
 
 - Step 0: 먼저 현재 요청이 read-heavy 탐색인지, write-heavy 구현인지 분류합니다
-- 기본 subagent pipeline이면 Phase 1 전에 `spawn_agent(...)` availability를 preflight하고 workflow authenticity evidence를 초기화합니다
+- 기본 subagent pipeline 또는 `--team`이면 Phase 1 전에 `spawn_agent(...)` availability를 preflight하고 workflow authenticity evidence를 초기화합니다
+- active `/goal`이 있으면 `get_goal`로 목표를 읽고 worker 프롬프트 및 최종 `goal_status`에 반영합니다
+- 새 goal 설정 요청은 `@auto goal "<objective>" [--budget N]` 래퍼로 처리합니다
 - 파일 소유권이 겹치지 않을 때만 병렬 executor를 사용합니다
 - worker를 스폰할 때는 owned paths, 수정 금지 범위, verification, next required step을 명시합니다
 - validation 실패 시 전체 파이프라인을 다시 돌리지 말고 실패한 slice만 좁혀서 재시도합니다
@@ -68,7 +70,8 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 
 ## Workflow Authenticity Evidence
 
-- 기본 subagent pipeline 완료 응답에는 `subagent_dispatch_count`, `subagent_roles_dispatched`, `degraded-mode`가 포함되어야 합니다.
+- 기본 subagent pipeline 또는 `--team` 완료 응답에는 `subagent_dispatch_count`, `subagent_roles_dispatched`, `degraded-mode`가 포함되어야 합니다.
+- `--team`이면 `team_mode: codex_multi_agent`와 `goal_status`를 함께 기록합니다.
 - JSON/report consumers를 위해 `degraded_mode`도 같은 값으로 포함하고 `delegation_depth`, `delegation_depth_cap`, `safety_rail_decisions`를 초기화해야 합니다.
 - subagent pipeline 모드에서 dispatch를 만들거나 관측할 수 없으면 Phase 1 전에 workflow authenticity blocker로 중단합니다.
 - workflow authenticity blocker는 working subagent surface로 재실행하거나 명시적으로 `--solo`를 선택하라고 안내해야 합니다.
@@ -146,5 +149,5 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
   - review 결과가 `approved`로 수렴하지 않으면 판정과 findings를 그대로 보여주고 구현으로 진행하지 않습니다
   - `/auto go --auto`가 review를 재귀 호출해 다시 `go`를 부르는 체인은 금지합니다 (`go` invocation 당 review command 진입 1회가 loop guard입니다)
 - 상세 파이프라인 단계와 phase/gate 계약은 `.codex/skills/agent-pipeline.md`를 따릅니다
-- `--team`은 future native multi-agent surface를 위한 reserved compatibility flag입니다
+- `--team`은 `.codex/skills/agent-teams.md`의 Codex native `multi_agent` 팀 프로파일입니다
 - `--multi`는 reviewer/security-auditor/orchestra 기반 추가 검증을 요청하는 의미입니다
