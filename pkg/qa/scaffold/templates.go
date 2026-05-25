@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-func renderJourney(id, title, surface string, lanes []string, adapter string, argv []string) string {
-	return renderJourneyWithCWD(id, title, surface, lanes, adapter, argv, ".")
-}
-
 func renderJourneyWithCWD(id, title, surface string, lanes []string, adapter string, argv []string, cwd string) string {
 	if strings.TrimSpace(cwd) == "" {
 		cwd = "."
