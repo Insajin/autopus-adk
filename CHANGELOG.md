@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **CodeOps ADK supervised delivery local contract (SPEC-CODEOPS-ADK-001)** (2026-05-25): `auto delivery` now exposes source-owned dry-run planning and strict phase-result envelope validation for PM-owned CodeOps delivery.
+  - `pkg/delivery/**` — canonical workflow mode, provider modes, phase order, generated/runtime deny-list checks, dry-run plan schema, and `codeops.phase_result.v1` validation.
+  - `internal/cli/delivery.go` + `internal/cli/root.go` — public `auto delivery plan|validate` namespace with JSON output and fail-closed validation errors.
+  - Tests passed with `go test ./pkg/delivery ./internal/cli -run 'TestDelivery'`.
+
 - **Codex `/goal` wrapper and native team profile support** (2026-05-25): Codex harness generation now enables `goals` alongside `multi_agent`, exposes `@auto goal` / `$auto goal` as a thin wrapper over Codex `get_goal` / `create_goal` / `update_goal` thread state, and treats `--team` as a native Codex multi-agent Lead/Builder/Guardian profile rather than a Claude Team API compatibility shim. Generated Codex/OpenCode router surfaces, AGENTS guidance, workflow skills, and regression tests now preserve goal handoff semantics without creating separate ADK-persisted goal state.
 
 - **Workspace folder profile policy in memindex/setup guidance (SPEC-WORKSPACE-FOLDER-PROFILE-001)** (2026-05-21): `pkg/memindex` now mirrors workspace folder policy includes/excludes so human-managed project/spec docs remain indexable, `.autopus/inbox/**` remains candidate-only, sanitized learning rows remain projection-only, and generated/runtime/harness paths such as `.autopus/runtime/**`, `.autopus/qa/**`, `.autopus/context/signatures.md`, `.autopus/*-manifest.json`, `.autopus/plugins/**`, `.codex/**`, `.claude/**`, `.gemini/**`, `.opencode/**`, `.agents/plugins/**`, and `config.toml` are skipped with reason codes. Source-owned setup guidance/templates now describe ADK as an execution harness inside a Platform/Desktop-owned workspace folder profile, not the folder identity owner.
