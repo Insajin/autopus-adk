@@ -43,7 +43,7 @@ func renderGitHubActionsWorkflow(signals projectSignals) string {
 	if signals.Stack == "rust" {
 		steps = append(steps, rustSetupStep())
 	}
-	if signals.HasPlaywright {
+	if signals.HasPlaywright || signals.HasBrowser {
 		steps = append(steps, `
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps

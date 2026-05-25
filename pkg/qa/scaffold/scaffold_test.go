@@ -107,6 +107,57 @@ func TestInitCreatesNodePlaywrightAndReleaseWorkflow(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
 }
 
+func TestInitSkipsStarterWhenExistingJourneyPackCoversLane(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "go.mod"), "module example.com/adk\n\ngo 1.26\n")
+	writeJourneyPack(t, dir, "adk-go-fast", "fast", "go-test", []string{"go", "test", "./..."}, ".")
+
+	result, err := Init(Options{ProjectDir: dir, ProjectDirExplicit: true, Release: true})
+	require.NoError(t, err)
+
+	assert.Equal(t, "created", result.Status)
+	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "go-fast.yaml"))
+	assertSkippedID(t, result, "go-fast")
+	assertCreatedID(t, result, "canary-explicit")
+	assertCreatedID(t, result, "domain-readiness-catalog")
+}
+
+func TestInitCreatesBrowserStarterForBrowserAppSignals(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "package.json"), `{
+  "dependencies": {
+    "react": "^19.0.0",
+    "vite": "^7.0.0"
+  }
+}`)
+	writeFile(t, filepath.Join(dir, "vite.config.ts"), "export default {}\n")
+
+	result, err := Init(Options{ProjectDir: dir, ProjectDirExplicit: true, Release: true})
+	require.NoError(t, err)
+
+	assertCreatedID(t, result, "browser-staging-playwright")
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "browser-staging-playwright.yaml"))
+}
+
+func TestInitCreatesDesktopNativeStarterForTauriRustProject(t *testing.T) {
+	dir := t.TempDir()
+	mkdirAll(t, filepath.Join(dir, "src-tauri"))
+	writeFile(t, filepath.Join(dir, "src-tauri", "Cargo.toml"), "[package]\nname = \"desktop\"\n")
+	writeFile(t, filepath.Join(dir, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n")
+
+	result, err := Init(Options{ProjectDir: dir, ProjectDirExplicit: true, Release: true})
+	require.NoError(t, err)
+
+	assertCreatedID(t, result, "desktop-native")
+	body, err := os.ReadFile(filepath.Join(dir, ".autopus", "qa", "journeys", "desktop-native.yaml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(body), `argv: ["cargo", "test"]`)
+	assert.Contains(t, string(body), "  cwd: src-tauri")
+	guiBody, err := os.ReadFile(filepath.Join(dir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(guiBody), `argv: ["pnpm", "exec", "playwright", "test"]`)
+}
+
 func mkdirAll(t *testing.T, path string) {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(path, 0o755))
@@ -118,6 +169,24 @@ func writeFile(t *testing.T, path, body string) {
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o644))
 }
 
+func writeJourneyPack(t *testing.T, dir, id, lane, adapter string, argv []string, cwd string) {
+	t.Helper()
+	journeyDir := filepath.Join(dir, ".autopus", "qa", "journeys")
+	require.NoError(t, os.MkdirAll(journeyDir, 0o755))
+	body := "id: " + id + "\n" +
+		"title: " + id + "\n" +
+		"surface: cli\n" +
+		"lanes: [" + lane + "]\n" +
+		"adapter:\n  id: " + adapter + "\n" +
+		"command:\n  argv:\n"
+	for _, arg := range argv {
+		body += "    - " + arg + "\n"
+	}
+	body += "  cwd: " + cwd + "\n  timeout: 60s\n" +
+		"checks:\n  - id: " + id + "\n    type: deterministic\n"
+	require.NoError(t, os.WriteFile(filepath.Join(journeyDir, id+".yaml"), []byte(body), 0o644))
+}
+
 func assertCreatedID(t *testing.T, result Result, id string) {
 	t.Helper()
 	for _, created := range result.Created {
@@ -126,6 +195,16 @@ func assertCreatedID(t *testing.T, result Result, id string) {
 		}
 	}
 	t.Fatalf("created files did not include %q: %#v", id, result.Created)
+}
+
+func assertSkippedID(t *testing.T, result Result, id string) {
+	t.Helper()
+	for _, skipped := range result.Skipped {
+		if skipped.ID == id {
+			return
+		}
+	}
+	t.Fatalf("skipped files did not include %q: %#v", id, result.Skipped)
 }
 
 func assertNextStepContains(t *testing.T, steps []string, expected string) {

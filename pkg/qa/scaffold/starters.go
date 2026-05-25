@@ -19,6 +19,7 @@ type starterFile struct {
 	RelPath               string
 	Reason                string
 	Body                  string
+	Lanes                 []string
 	ValidateJourney       bool
 	ValidateDomainCatalog bool
 }
@@ -27,8 +28,10 @@ type projectSignals struct {
 	Stack          string
 	Package        packageManifest
 	HasPackage     bool
+	HasBrowser     bool
 	HasPlaywright  bool
 	HasDesktopGUI  bool
+	HasTauriRust   bool
 	PackageManager string
 }
 
@@ -44,14 +47,14 @@ func detectJourneyStarters(projectDir string, release bool) []starterFile {
 	if fast, ok := fastStarter(signals); ok {
 		starters = append(starters, fast)
 	}
-	if signals.HasPlaywright {
+	if signals.HasPlaywright || (release && signals.HasBrowser) {
 		starters = append(starters, browserStagingStarter(signals))
 	}
 	if signals.HasDesktopGUI {
 		if desktop, ok := desktopNativeStarter(signals); ok {
 			starters = append(starters, desktop)
 		}
-		starters = append(starters, desktopGUIStarter())
+		starters = append(starters, desktopGUIStarter(signals))
 	}
 	if len(starters) > 0 {
 		starters = append(starters, domainReadinessCatalogStarter())
@@ -85,6 +88,7 @@ func detectSignals(projectDir string) projectSignals {
 			Dependencies:    map[string]string{},
 			DevDependencies: map[string]string{},
 		},
+		HasTauriRust:   exists(projectDir, "src-tauri/Cargo.toml"),
 		PackageManager: detectPackageManager(projectDir),
 	}
 	if exists(projectDir, "go.mod") {
@@ -101,6 +105,7 @@ func detectSignals(projectDir string) projectSignals {
 	if signals.Stack == "" && exists(projectDir, "Cargo.toml") {
 		signals.Stack = "rust"
 	}
+	signals.HasBrowser = qaproject.HasBrowserSignals(projectDir)
 	signals.HasPlaywright = hasPlaywright(projectDir, signals.Package)
 	return signals
 }
@@ -126,10 +131,10 @@ func nodeFastStarter(signals projectSignals) (starterFile, bool) {
 		return journeyStarter("node-fast", "Node fast test lane", "package", []string{"fast"}, "node-script", []string{pm, "test"}, "package.json test script detected"), true
 	}
 	if hasFileSignal("vitest", signals.Package) {
-		return journeyStarter("vitest-fast", "Vitest fast test lane", "frontend", []string{"fast"}, "vitest", []string{pm, "exec", "vitest", "run"}, "Vitest signals detected"), true
+		return journeyStarter("vitest-fast", "Vitest fast test lane", "frontend", []string{"fast"}, "vitest", jsRunnerArgv(pm, "vitest", "run"), "Vitest signals detected"), true
 	}
 	if hasDependency(signals.Package, "jest") {
-		return journeyStarter("jest-fast", "Jest fast test lane", "frontend", []string{"fast"}, "jest", []string{pm, "exec", "jest"}, "Jest dependency detected"), true
+		return journeyStarter("jest-fast", "Jest fast test lane", "frontend", []string{"fast"}, "jest", jsRunnerArgv(pm, "jest"), "Jest dependency detected"), true
 	}
 	if hasScript(signals.Package, "build") {
 		return journeyStarter("node-build-fast", "Node build fast lane", "package", []string{"fast"}, "node-script", []string{pm, "run", "build"}, "package.json build script detected"), true
@@ -139,7 +144,11 @@ func nodeFastStarter(signals projectSignals) (starterFile, bool) {
 
 func browserStagingStarter(signals projectSignals) starterFile {
 	pm := nodeCommand(signals.PackageManager)
-	return journeyStarter("browser-staging-playwright", "Browser staging Playwright lane", "frontend", []string{"browser-staging"}, "playwright", []string{pm, "exec", "playwright", "test"}, "Playwright signals detected")
+	reason := "browser app signals detected"
+	if signals.HasPlaywright {
+		reason = "Playwright signals detected"
+	}
+	return journeyStarter("browser-staging-playwright", "Browser staging Playwright lane", "frontend", []string{"browser-staging"}, "playwright", jsRunnerArgv(pm, "playwright", "test"), reason)
 }
 
 func desktopNativeStarter(signals projectSignals) (starterFile, bool) {
@@ -149,16 +158,24 @@ func desktopNativeStarter(signals projectSignals) (starterFile, bool) {
 			return journeyStarter("desktop-native", "Desktop native release lane", "desktop", []string{"desktop-native"}, "node-script", []string{pm, "run", script}, "desktop package script detected"), true
 		}
 	}
+	if signals.HasTauriRust {
+		return journeyStarterWithCWD("desktop-native", "Desktop native Rust test lane", "desktop", []string{"desktop-native"}, "cargo-test", []string{"cargo", "test"}, "src-tauri", "Tauri Rust project detected"), true
+	}
 	return starterFile{}, false
 }
 
 func journeyStarter(id, title, surface string, lanes []string, adapter string, argv []string, reason string) starterFile {
+	return journeyStarterWithCWD(id, title, surface, lanes, adapter, argv, ".", reason)
+}
+
+func journeyStarterWithCWD(id, title, surface string, lanes []string, adapter string, argv []string, cwd, reason string) starterFile {
 	return starterFile{
 		ID:              id,
 		RelPath:         filepath.ToSlash(filepath.Join(journeyRootRel, id+".yaml")),
 		Reason:          reason,
+		Lanes:           append([]string(nil), lanes...),
 		ValidateJourney: true,
-		Body:            renderJourney(id, title, surface, lanes, adapter, argv),
+		Body:            renderJourneyWithCWD(id, title, surface, lanes, adapter, argv, cwd),
 	}
 }
 
@@ -201,6 +218,19 @@ func nodeCommand(pm string) string {
 	default:
 		return "npm"
 	}
+}
+
+func jsRunnerArgv(pm, runner string, args ...string) []string {
+	var argv []string
+	switch pm {
+	case "pnpm":
+		argv = []string{"pnpm", "exec", runner}
+	case "yarn":
+		argv = []string{"yarn", runner}
+	default:
+		argv = []string{"npm", "exec", runner}
+	}
+	return append(argv, args...)
 }
 
 func hasPlaywright(projectDir string, manifest packageManifest) bool {

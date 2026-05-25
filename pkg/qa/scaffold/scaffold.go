@@ -69,7 +69,13 @@ func Init(opts Options) (Result, error) {
 		return result, nil
 	}
 
+	coverage, warnings := loadJourneyCoverage(projectDir)
+	result.Warnings = append(result.Warnings, warnings...)
 	for _, starter := range detectJourneyStarters(projectDir, opts.Release) {
+		if coverage.coversStarter(starter) {
+			result.Skipped = append(result.Skipped, coverage.skippedStarter(projectDir, starter))
+			continue
+		}
 		if err := ensureStarter(projectDir, starter, &result); err != nil {
 			return Result{}, err
 		}
