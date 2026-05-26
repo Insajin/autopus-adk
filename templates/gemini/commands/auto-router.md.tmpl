@@ -1236,7 +1236,9 @@ For each task in the planner's assignment table, spawn executor agents:
 
 **GC Suppression**: During parallel worktree execution, all git commands MUST use `git -c gc.auto=0` to prevent garbage collection interference. See `.gemini/rules/autopus/worktree-safety.md`.
 
-Parallel tasks (Mode = "parallel" AND no file ownership conflict):
+Migration directory serialization: tasks that create SQL migrations in the same owning repo and migration directory are sequential, even if their application code ownership is disjoint. Assign final migration numbers only after earlier migration branches are merged or rebased.
+
+Parallel tasks (Mode = "parallel" AND no file ownership conflict AND no migration-directory conflict):
 ```
 # Call MULTIPLE Agent() in a SINGLE message for parallel execution
 # Each parallel executor runs in an isolated git worktree (R1)
@@ -1263,7 +1265,7 @@ Record slot evidence: `active_task_ids`, `queued_task_ids`, `slot_count`, `cap`,
 Required worktree isolation must fail closed with `worktree_isolation_unavailable` unless explicit `override_reason` is present.
 Slot reclaim records exactly one terminal state: `merged`, `discarded`, `preserved_for_manual_review`, or `cleanup_failed`.
 
-Sequential tasks (Mode = "sequential" OR file ownership conflict) do NOT use worktree isolation:
+Sequential tasks (Mode = "sequential" OR file ownership conflict OR migration-directory conflict) do NOT use worktree isolation:
 ```
 # Call Agent() one at a time, passing previous result to next
 # Sequential: merge worktree branch immediately after each task before spawning next
@@ -1481,6 +1483,7 @@ After reviewer, display:
 **Parallel execution rules:**
 - Only parallelize tasks whose Mode is "parallel" in the planner's assignment table
 - File ownership conflict (same path pattern) → force sequential
+- Same owning repo + same SQL migration directory → force sequential until the previous migration branch is merged/rebased and the next number is recalculated
 - Pass SPEC requirements, task description, and relevant file context to each subagent
 
 **Retry limits:** See **Retry Limits Reference** table above.

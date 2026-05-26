@@ -64,6 +64,7 @@ Before spawning parallel agents, the planner checks all file ownership patterns 
 2. **Check 1 — Prefix containment**: If prefix A contains prefix B (or vice versa), mark as conflict
 3. **Check 2 — Glob intersection**: In the same directory, check if one glob is a subset of the other (`*_test.go ⊂ *.go`)
 4. **Check 3 — Different directories**: Non-conflicting by definition
+5. **Check 4 — Migration numbering lane**: If both tasks may create SQL migrations in the same owning repo and migration directory, mark as conflict even when code ownership is otherwise disjoint
 
 **Conflict examples:**
 
@@ -73,6 +74,8 @@ Before spawning parallel agents, the planner checks all file ownership patterns 
 | `pkg/auth/*.go` | `pkg/auth/*_test.go` | Conflict (`*_test.go` ⊂ `*.go`) |
 | `pkg/auth/*.go` | `pkg/api/*.go` | No conflict (different directories) |
 | `pkg/core/` | `pkg/core/sub/` | Conflict (prefix containment) |
+| `Autopus/backend/migrations/*.sql` | `Autopus/backend/migrations/*.sql` | Conflict (same migration numbering lane) |
+| `Autopus/backend/migrations/*.sql` | `other-service/migrations/*.sql` | No conflict (different owning repo/directory) |
 
 **On conflict**: downgrade both tasks to sequential execution (lower task-ID first) and log:
 

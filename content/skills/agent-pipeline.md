@@ -275,6 +275,8 @@ Collect `worktree_path` and `branch` from each return value for Phase 2.1 merge.
 
 Sequential tasks do NOT use `isolation: "worktree"` and merge immediately after completion before the next dependent task is spawned (R3).
 
+Migration numbering rule: any task that creates SQL migration files in the same owning repo and migration directory is sequential, even when application code paths are otherwise disjoint. Assign final migration numbers only after earlier worktree branches are merged or rebased into the branch being deployed. Worker prompts must name the exact migration directory they own and forbid other workers from writing there.
+
 ```
 # Sequential execution example — immediate merge after each task
 result_t1 = Agent(subagent_type="executor", prompt="Implement T1: ...")

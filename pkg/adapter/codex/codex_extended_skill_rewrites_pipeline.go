@@ -182,6 +182,7 @@ Write-heavy rules:
 
 - Parallel writes are allowed only when owned paths do not overlap.
 - If two workers touch the same file or migration chain, switch to sequential execution.
+- If two workers may create SQL migrations in the same owning repo and migration directory, switch to sequential execution and assign numbers only after earlier branches are merged or rebased.
 - If a worker returns blockers that change scope, re-plan before spawning more writers.
 
 ### Gate 2: Validation
@@ -235,7 +236,7 @@ After fixes land, do a diff-only verification pass against the frozen checklist.
 | Condition | Execution |
 |----------|-----------|
 | Non-overlapping ownership | Parallel workers allowed |
-| Shared file or shared migration | Sequential execution |
+| Shared file or same migration directory | Sequential execution |
 | Order dependency between tasks | Sequential execution |
 | One worker blocked on another's output | Wait, integrate, then continue |
 

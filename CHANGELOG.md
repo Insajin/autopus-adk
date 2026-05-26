@@ -25,6 +25,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Project-scoped SQL migration numbering guidance** (2026-05-26): Source-owned database, executor, validator, pipeline, router, and worktree guidance now treats each owning repo's migration directory as a serialized numbering lane. New paired SQL migrations must use 6-digit zero-padded numbers, compute `max(existing)+1` inside the target directory only, keep same-stem up/down pairs, avoid parallel number reservation, and validate affected directories before deploy.
+
 - **QA 대상 리포 자동 해석 및 workspace 문서화** (2026-05-23): `auto qa init`이 기본 실행에서 meta workspace를 감지하면 nested git repo의 Go/Node/Python/Rust/Playwright/desktop 신호를 점수화해 Journey Pack을 제품 리포에 생성합니다. `auto setup`/`auto sync` source guidance와 multi-repo 렌더링은 QA/Journey Pack 대상 리포, `auto qa init --project-dir <repo>` 명령, root `.autopus/qa/**` runtime/generated 경계를 명시하도록 갱신되었습니다.
 
 - **`auto go` QAMESH scope budget** (2026-05-15): go-stage guidance now limits QAMESH execution to affected/fast/smoke lanes and defers full GUI/native/release matrices to explicit `auto qa ...` or `auto canary` runs.

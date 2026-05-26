@@ -31,7 +31,8 @@ Use this guidance when:
 Do not use parallel isolation when:
 
 - tasks touch the same file
-- migrations or generated outputs must be serialized
+- tasks may create SQL migrations in the same owning repo and migration directory
+- generated outputs must be serialized
 - a task depends on a previous task's concrete output
 
 ## Ownership Validation
@@ -41,7 +42,8 @@ Before spawning parallel workers, compare ownership patterns:
 1. Same literal file: conflict
 2. Same directory with overlapping globs: conflict
 3. Parent/child directory ownership: conflict
-4. Different directories with no shared generated output: safe
+4. Same migration directory where both tasks may create SQL migrations: conflict
+5. Different directories with no shared generated output or migration numbering lane: safe
 
 On conflict, downgrade to sequential execution and log the reason.
 

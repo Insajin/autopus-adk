@@ -156,26 +156,35 @@ SPEC 디렉토리에서 `acceptance.md`를 **직접 읽어서** 구현 커버리
 
 ### 8. Migration File Validation
 
-WHEN changed files include SQL migration files (matching `migrations/*.sql` or `db/migrations/*.sql`), validate naming conventions and number uniqueness.
+WHEN changed files include SQL migration files under any project migration directory (for example `migrations/*.sql`, `db/migrations/*.sql`, or `database/migrations/*.sql`), validate naming conventions and directory-scoped numbering.
 
-**Detection**: Check `git diff --name-only` for files matching `**/migrations/*.sql`
+**Detection**: Check `git diff --name-only --diff-filter=ACMRD` for files matching `**/migrations/*.sql`, then group affected files by their parent migration directory. Deleted migration files must still mark their directory as affected.
+
+**Directory scope**: For every affected migration directory, validate all `*.sql` files in that directory, not only the changed files. Never compare or assign numbers across different repos or different migration directories.
 
 **Checks**:
 
 1. **Naming pattern**: Every migration file MUST match `^[0-9]{6}_.*\.(up|down)\.sql$` (6-digit zero-padded number prefix)
    - FAIL if any migration file uses unpadded numbers (e.g., `340_` instead of `000340_`)
-   - Regex: `ls migrations/ | grep -vE '^[0-9]{6}_'` should return empty
+   - Run this check inside each affected migration directory, not from the workspace root
 
-2. **Number uniqueness**: No two migration files may share the same number prefix
-   - Extract numbers: `ls migrations/*.sql | sed 's/.*\///' | cut -c1-6 | sort | uniq -d`
-   - FAIL if duplicates found
+2. **Directory-scoped number ownership**: A migration number may appear only as one `.up.sql` and one `.down.sql` pair with the same full stem
+   - PASS: `000425_add_table.up.sql` + `000425_add_table.down.sql`
+   - FAIL: `000425_add_table.up.sql` + `000425_other_name.down.sql`
+   - FAIL: two `.up.sql` or two `.down.sql` files with the same 6-digit number
 
-3. **Pair completeness**: Every migration number MUST have both `.up.sql` and `.down.sql`
+3. **Pair completeness**: Every migration number in a paired SQL migration directory MUST have both `.up.sql` and `.down.sql`
    - FAIL if orphaned (only up or only down)
+
+4. **New pair ordering**: Newly introduced migration pairs/stems MUST use the next available number after the highest existing number in the same directory
+   - FAIL if a new pair/stem reuses a number that already exists in `HEAD` for that directory with a different stem
+   - ALLOW adding the missing same-stem counterpart when repairing an existing orphaned migration pair
+   - FAIL if another unmerged/uncommitted file in the same directory already claims that new pair/stem number
+   - If multiple tasks need the same migration directory, report a sequentialization blocker instead of accepting parallel numbering
 
 **Skip condition**: No migration files in changed file set → skip check entirely.
 
-**Verdict impact**: Any failure → **FAIL** — Recommended Agent: executor — "Fix migration file naming: use 6-digit zero-padded format (000NNN_description.{up,down}.sql)"
+**Verdict impact**: Any failure → **FAIL** — Recommended Agent: executor — "Fix migration file naming/numbering in the owning migration directory: use 6-digit zero-padded format (000NNN_description.{up,down}.sql), same-stem up/down pairs, and no parallel number reservation."
 
 ## 하네스 전용 모드
 
