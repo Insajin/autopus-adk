@@ -50,7 +50,7 @@ function Show-PathHint([string]$InstallDir, [bool]$PathAdded) {
     if ($env:MSYSTEM) {
         $bashPath = Get-GitBashPath $InstallDir
         Write-Host "  Git Bash에서 설치했다면 현재 창을 다시 열거나 아래를 실행하세요:" -ForegroundColor Yellow
-        Write-Host "    export PATH=""$bashPath:`$PATH""" -ForegroundColor Yellow
+        Write-Host "    export PATH=""${bashPath}:`$PATH""" -ForegroundColor Yellow
     }
 }
 
