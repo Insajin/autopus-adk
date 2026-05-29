@@ -35,7 +35,7 @@ verify:
 
 	// runVerify should return nil because verify.enabled is false.
 	// Pass nil cmd: the viewport flag check is skipped when cmd is nil.
-	runErr := runVerify(nil, false, false, "desktop")
+	runErr := runVerifyWithOptions(nil, false, false, "desktop", verifyVisualOptions{Enabled: true})
 	assert.NoError(t, runErr, "runVerify must return nil when verify is disabled")
 }
 
@@ -71,7 +71,7 @@ verify:
 
 	// runVerify will check node installation and then run git diff.
 	// All cases must not panic.
-	runErr := runVerify(nil, true, false, "desktop")
+	runErr := runVerifyWithOptions(nil, true, false, "desktop", verifyVisualOptions{Enabled: true})
 	_ = runErr
 }
 
@@ -98,7 +98,7 @@ verify:
 	require.NoError(t, os.Chdir(dir))
 
 	// reportOnly=true means effectiveFix = fix && !reportOnly = false regardless of fix value.
-	runErr := runVerify(nil, true, true, "desktop")
+	runErr := runVerifyWithOptions(nil, true, true, "desktop", verifyVisualOptions{Enabled: true})
 	_ = runErr
 }
 
@@ -127,7 +127,7 @@ verify:
 
 	// viewport="desktop" with config default_viewport="mobile" triggers the override branch
 	// because cmd=nil means the flag is treated as not explicitly changed.
-	runErr := runVerify(nil, false, false, "desktop")
+	runErr := runVerifyWithOptions(nil, false, false, "desktop", verifyVisualOptions{Enabled: true})
 	_ = runErr
 }
 
@@ -158,7 +158,7 @@ verify:
 	emptyBin := t.TempDir()
 	t.Setenv("PATH", emptyBin)
 
-	runErr := runVerify(nil, false, false, "desktop")
+	runErr := runVerifyWithOptions(nil, false, false, "desktop", verifyVisualOptions{Enabled: true})
 	assert.Error(t, runErr, "runVerify must error when node is not installed")
 	assert.Contains(t, runErr.Error(), "node.js")
 }
