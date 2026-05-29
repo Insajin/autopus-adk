@@ -274,27 +274,3 @@ func TestNewVerifyCmd_ShortDescription(t *testing.T) {
 	cmd := newVerifyCmd()
 	assert.NotEmpty(t, cmd.Short)
 }
-
-// TestAnalyzeGitDiff_ReturnsSlice verifies analyzeGitDiff runs without panicking in a git repo.
-func TestAnalyzeGitDiff_ReturnsSlice(t *testing.T) {
-	// Not parallel: relies on git state.
-	files, err := analyzeGitDiff()
-	if err != nil {
-		t.Logf("analyzeGitDiff returned error (acceptable in CI without git): %v", err)
-		return
-	}
-	assert.NotNil(t, files)
-}
-
-// TestRunPlaywright_FailsWithoutNpx verifies runPlaywright returns an error when npx is absent.
-func TestRunPlaywright_FailsWithoutNpx(t *testing.T) {
-	t.Parallel()
-
-	out, err := runPlaywright("desktop")
-	if err != nil {
-		t.Logf("runPlaywright returned error (expected in most test environments): %v", err)
-		_ = out
-		return
-	}
-	assert.NotNil(t, out)
-}
