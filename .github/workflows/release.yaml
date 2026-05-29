@@ -10,7 +10,13 @@ permissions:
   id-token: write
 
 jobs:
+  # Release gate: run the full CI suite (build/test/lint/e2e) on the tagged commit.
+  # If any CI job fails, the release job below is skipped — a red build cannot ship.
+  ci:
+    uses: ./.github/workflows/ci.yaml
+
   release:
+    needs: [ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
