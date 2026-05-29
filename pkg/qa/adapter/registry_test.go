@@ -19,13 +19,21 @@ func TestRegistryContainsRequiredAdapters(t *testing.T) {
 		assert.NotEmpty(t, item.DefaultLanes)
 		assert.NotEmpty(t, item.ArtifactCapabilities)
 	}
-	for _, id := range []string{"go-test", "node-script", "vitest", "jest", "playwright", "gui-explore", "maestro-scripted", "appium-mobile-explore", "pytest", "cargo-test", "auto-test-run", "auto-verify", "canary-template", "custom-command"} {
+	for _, id := range []string{"go-test", "node-script", "vitest", "jest", "playwright", "gui-explore", "design-visual", "maestro-scripted", "appium-mobile-explore", "pytest", "cargo-test", "auto-test-run", "auto-verify", "canary-template", "custom-command"} {
 		assert.True(t, ids[id], id)
 	}
 	gui, ok := ByID("gui-explore")
 	require.True(t, ok)
 	assert.Contains(t, gui.ArtifactCapabilities, "journey_graph")
 	assert.Contains(t, gui.ArtifactCapabilities, "screenshot_quarantine_ref")
+	designVisual, ok := ByID("design-visual")
+	require.True(t, ok)
+	assert.Equal(t, []string{"design-visual"}, designVisual.DefaultLanes)
+	assert.Contains(t, designVisual.ArtifactCapabilities, "design_pack")
+	assert.Contains(t, designVisual.ArtifactCapabilities, "visual_gate_report")
+	assert.Contains(t, designVisual.ArtifactCapabilities, "figma_node_metadata")
+	assert.Contains(t, designVisual.SetupGapReasonCodes, "screenshot_baseline_missing")
+	assert.Contains(t, designVisual.SetupGapReasonCodes, "figma_token_missing")
 	maestro, ok := ByID("maestro-scripted")
 	require.True(t, ok)
 	assert.Equal(t, []string{"mobile-readiness"}, maestro.DefaultLanes)

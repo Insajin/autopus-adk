@@ -31,7 +31,7 @@ func TestCollectScreenshots_ValidJSON(t *testing.T) {
 							Results: []playwrightTestResult{
 								{
 									Attachments: []playwrightAttachment{
-										{Name: "screenshot", ContentType: "image/png", Path: "/tmp/shot1.png"},
+										{Name: "screenshot", ContentType: "image/png", Path: "test-results/shot1.png"},
 									},
 								},
 							},
@@ -44,7 +44,7 @@ func TestCollectScreenshots_ValidJSON(t *testing.T) {
 
 	paths := collectScreenshots(input)
 	require.NotNil(t, paths)
-	assert.Equal(t, []string{"/tmp/shot1.png"}, paths)
+	assert.Equal(t, []string{"test-results/shot1.png"}, paths)
 }
 
 // TestCollectScreenshots_EmptyOutput verifies nil is returned for empty input.
@@ -100,7 +100,7 @@ func TestCollectScreenshots_MixedAttachments(t *testing.T) {
 							Results: []playwrightTestResult{
 								{
 									Attachments: []playwrightAttachment{
-										{Name: "screenshot", Path: "/tmp/shot.png"},
+										{Name: "screenshot", Path: "test-results/shot.png"},
 										{Name: "video", Path: "/tmp/video.webm"},
 										{Name: "trace", Path: "/tmp/trace.zip"},
 									},
@@ -114,7 +114,7 @@ func TestCollectScreenshots_MixedAttachments(t *testing.T) {
 	})
 
 	paths := collectScreenshots(input)
-	assert.Equal(t, []string{"/tmp/shot.png"}, paths)
+	assert.Equal(t, []string{"test-results/shot.png"}, paths)
 }
 
 // TestCollectScreenshots_PngSuffixWithoutName verifies .png files are matched by suffix.
@@ -131,7 +131,7 @@ func TestCollectScreenshots_PngSuffixWithoutName(t *testing.T) {
 								{
 									Attachments: []playwrightAttachment{
 										// Name is not "screenshot" but path ends in .png
-										{Name: "custom-shot", Path: "/tmp/custom.png"},
+										{Name: "custom-shot", Path: "test-results/custom.png"},
 									},
 								},
 							},
@@ -143,7 +143,7 @@ func TestCollectScreenshots_PngSuffixWithoutName(t *testing.T) {
 	})
 
 	paths := collectScreenshots(input)
-	assert.Equal(t, []string{"/tmp/custom.png"}, paths)
+	assert.Equal(t, []string{"test-results/custom.png"}, paths)
 }
 
 // TestCollectScreenshots_EmptyPath verifies attachments with empty path are skipped.
@@ -187,7 +187,7 @@ func TestCollectScreenshots_MultipleSpecs(t *testing.T) {
 							Results: []playwrightTestResult{
 								{
 									Attachments: []playwrightAttachment{
-										{Name: "screenshot", Path: "/tmp/a.png"},
+										{Name: "screenshot", Path: "test-results/a.png"},
 									},
 								},
 							},
@@ -200,7 +200,7 @@ func TestCollectScreenshots_MultipleSpecs(t *testing.T) {
 							Results: []playwrightTestResult{
 								{
 									Attachments: []playwrightAttachment{
-										{Name: "screenshot", Path: "/tmp/b.png"},
+										{Name: "screenshot", Path: "test-results/b.png"},
 									},
 								},
 							},
@@ -213,8 +213,8 @@ func TestCollectScreenshots_MultipleSpecs(t *testing.T) {
 
 	paths := collectScreenshots(input)
 	assert.Len(t, paths, 2)
-	assert.Contains(t, paths, "/tmp/a.png")
-	assert.Contains(t, paths, "/tmp/b.png")
+	assert.Contains(t, paths, "test-results/a.png")
+	assert.Contains(t, paths, "test-results/b.png")
 }
 
 // TestCollectScreenshots_EmptySuites verifies empty slice is returned for zero suites.
@@ -253,6 +253,18 @@ func TestNewVerifyCmd_Flags(t *testing.T) {
 	viewportFlag := cmd.Flags().Lookup("viewport")
 	require.NotNil(t, viewportFlag, "flag --viewport must exist")
 	assert.Equal(t, "desktop", viewportFlag.DefValue)
+
+	visualGateFlag := cmd.Flags().Lookup("visual-gate")
+	require.NotNil(t, visualGateFlag, "flag --visual-gate must exist")
+	assert.Equal(t, "true", visualGateFlag.DefValue)
+
+	strictVisualGateFlag := cmd.Flags().Lookup("strict-visual-gate")
+	require.NotNil(t, strictVisualGateFlag, "flag --strict-visual-gate must exist")
+	assert.Equal(t, "false", strictVisualGateFlag.DefValue)
+
+	visualCriticFlag := cmd.Flags().Lookup("visual-critic-report")
+	require.NotNil(t, visualCriticFlag, "flag --visual-critic-report must exist")
+	assert.Equal(t, "", visualCriticFlag.DefValue)
 }
 
 // TestNewVerifyCmd_ShortDescription verifies the Short field is non-empty.

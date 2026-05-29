@@ -20,6 +20,7 @@ func Registry() []Metadata {
 		metadata("jest", []string{"frontend", "package"}, []string{"node", "npm"}),
 		metadata("playwright", []string{"frontend"}, []string{"node", "npm"}),
 		metadata("gui-explore", []string{"frontend", "desktop"}, []string{"node", "npm"}),
+		metadata("design-visual", []string{"frontend", "design"}, []string{"node", "npm"}),
 		metadata("maestro-scripted", []string{"mobile"}, []string{"maestro"}),
 		metadata("appium-mobile-explore", []string{"mobile"}, []string{"appium"}),
 		metadata("pytest", []string{"cli"}, []string{"pytest"}),
@@ -60,6 +61,27 @@ func metadata(id string, surfaces, binaries []string) Metadata {
 			"video_trace_ref",
 			"dom_snapshot_digest",
 		)
+	}
+	if id == "design-visual" {
+		item.DefaultLanes = []string{"design-visual"}
+		item.ArtifactCapabilities = []string{
+			"design_pack",
+			"visual_gate_report",
+			"screenshot_diff_summary",
+			"code_connect_audit",
+			"figma_node_metadata",
+			"stdout",
+			"stderr",
+		}
+		item.SetupGapReasonCodes = []string{
+			"design_context_missing",
+			"token_refs_missing",
+			"component_refs_missing",
+			"screenshot_baseline_missing",
+			"code_connect_mapping_missing",
+			"figma_token_missing",
+		}
+		item.SetupGapReason = "design visual readiness requires a design pack, rendered screenshot evidence, and optional Figma/Code Connect metadata for stronger component reuse"
 	}
 	if id == "maestro-scripted" || id == "appium-mobile-explore" {
 		item.DefaultLanes = []string{"mobile-readiness"}

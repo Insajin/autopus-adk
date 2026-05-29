@@ -2,6 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,4 +106,65 @@ func TestDesignImport_RequiresConfigOptInBeforeArtifact(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "external imports are disabled")
 	assert.NoDirExists(t, filepath.Join(dir, ".autopus", "design", "imports"))
+}
+
+func TestDesignPack_PrintsMarkdown(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "DESIGN.md"), []byte("# Design\n\n## Palette\nUse semantic colors."), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src", "components", "ui"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "src", "components", "ui", "Button.tsx"), []byte("export function Button() { return null }"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src", "tokens"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "src", "tokens", "colors.ts"), []byte("export const primary = '#000'"), 0o644))
+
+	cmd := newDesignCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"pack", "--dir", dir})
+
+	require.NoError(t, cmd.Execute())
+	assert.Contains(t, out.String(), "## Design Source Pack")
+	assert.Contains(t, out.String(), "Design context: DESIGN.md")
+	assert.Contains(t, out.String(), "src/components/ui/Button.tsx")
+}
+
+func TestDesignFigmaAudit_PrintsJSON(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "DESIGN.md"), []byte("https://figma.com/design/abc/Product"), 0o644))
+
+	cmd := newDesignCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"figma", "audit", "--dir", dir, "--format", "json"})
+
+	require.NoError(t, cmd.Execute())
+	assert.Contains(t, out.String(), `"figma_refs"`)
+	assert.Contains(t, out.String(), `"code_connect"`)
+}
+
+func TestDesignFigmaFetch_PrintsCompactJSON(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "DESIGN.md"), []byte("https://figma.com/design/abc/Product?node-id=1-2"), 0o644))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "token", r.Header.Get("X-Figma-Token"))
+		fmt.Fprint(w, `{"name":"Product","nodes":{"1:2":{"document":{"name":"Checkout","type":"FRAME"}}}}`)
+	}))
+	defer server.Close()
+	t.Setenv("FIGMA_ACCESS_TOKEN", "token")
+
+	cmd := newDesignCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"figma", "fetch", "--dir", dir, "--format", "json", "--api-base", server.URL})
+
+	require.NoError(t, cmd.Execute())
+	assert.Contains(t, out.String(), `"status": "fetched"`)
+	assert.Contains(t, out.String(), `"node_name": "Checkout"`)
+	assert.NotContains(t, out.String(), "token")
 }

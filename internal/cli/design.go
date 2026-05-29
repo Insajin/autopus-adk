@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -21,6 +22,8 @@ func newDesignCmd() *cobra.Command {
 	cmd.AddCommand(newDesignInitCmd())
 	cmd.AddCommand(newDesignContextCmd())
 	cmd.AddCommand(newDesignImportCmd())
+	cmd.AddCommand(newDesignPackCmd())
+	cmd.AddCommand(newDesignFigmaCmd())
 	return cmd
 }
 
@@ -113,6 +116,80 @@ func newDesignImportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&trustLabel, "trust-label", "external-reference", "trust label for imported reference")
 	cmd.Flags().BoolVar(&allowExternalImport, "allow-external-import", false, "explicitly allow this external import even when config disables external imports")
 	return cmd
+}
+
+func newDesignPackCmd() *cobra.Command {
+	var dir string
+	var format string
+	var output string
+	var maxRefs int
+	cmd := &cobra.Command{
+		Use:   "pack",
+		Short: "Build a compact design source pack",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveDir(dir)
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(root)
+			if err != nil {
+				return err
+			}
+			pack, err := design.BuildPack(root, design.PackOptions{
+				ContextOptions: design.Options{
+					Enabled:         cfg.Design.Enabled,
+					Paths:           cfg.Design.Paths,
+					MaxContextLines: cfg.Design.MaxContextLines,
+					UIFileGlobs:     cfg.Design.UIFileGlobs,
+				},
+				MaxRefs: maxRefs,
+			})
+			if err != nil {
+				return err
+			}
+			data, err := renderDesignOutput(format, pack)
+			if err != nil {
+				return err
+			}
+			return writeOrPrint(cmd, output, data)
+		},
+	}
+	cmd.Flags().StringVar(&dir, "dir", "", "project root directory")
+	cmd.Flags().StringVar(&format, "format", "markdown", "output format: markdown or json")
+	cmd.Flags().StringVar(&output, "output", "", "write output to a file instead of stdout")
+	cmd.Flags().IntVar(&maxRefs, "max-refs", 30, "maximum refs to include per category")
+	return cmd
+}
+
+type markdownJSON interface {
+	Markdown() string
+	JSON() ([]byte, error)
+}
+
+func renderDesignOutput(format string, value markdownJSON) ([]byte, error) {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "", "markdown", "md":
+		return []byte(value.Markdown()), nil
+	case "json":
+		return value.JSON()
+	default:
+		return nil, fmt.Errorf("unsupported format %q; use markdown or json", format)
+	}
+}
+
+func writeOrPrint(cmd *cobra.Command, output string, data []byte) error {
+	if output == "" {
+		_, err := cmd.OutOrStdout().Write(data)
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(output), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(output, data, 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", output)
+	return nil
 }
 
 func createStarterDesignFile(root string, force bool) (string, error) {

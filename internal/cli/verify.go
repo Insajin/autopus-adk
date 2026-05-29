@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,9 +16,12 @@ import (
 // newVerifyCmd creates the "verify" subcommand for frontend UX verification.
 func newVerifyCmd() *cobra.Command {
 	var (
-		fix        bool
-		reportOnly bool
-		viewport   string
+		fix              bool
+		reportOnly       bool
+		viewport         string
+		visualGate       bool
+		strictVisualGate bool
+		visualCritic     string
 	)
 
 	cmd := &cobra.Command{
@@ -27,20 +29,38 @@ func newVerifyCmd() *cobra.Command {
 		Short: "Run frontend UX verification via Playwright screenshots",
 		Long:  "Analyze git diff for changed frontend files and run Playwright-based screenshot verification.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runVerify(cmd, fix, reportOnly, viewport)
+			return runVerifyWithOptions(cmd, fix, reportOnly, viewport, verifyVisualOptions{
+				Enabled:    visualGate,
+				Strict:     strictVisualGate,
+				CriticPath: visualCritic,
+			})
 		},
 	}
 
 	cmd.Flags().BoolVar(&fix, "fix", true, "Enable auto-fix mode")
 	cmd.Flags().BoolVar(&reportOnly, "report-only", false, "Skip auto-fix and report only")
 	cmd.Flags().StringVar(&viewport, "viewport", "desktop", "Viewport size (desktop, mobile, tablet)")
+	cmd.Flags().BoolVar(&visualGate, "visual-gate", true, "Write a metadata-only visual gate report for UI changes")
+	cmd.Flags().BoolVar(&strictVisualGate, "strict-visual-gate", false, "Fail when the visual gate verdict is FAIL")
+	cmd.Flags().StringVar(&visualCritic, "visual-critic-report", "", "Optional VLM critic JSON report to merge into the visual gate")
 
 	return cmd
 }
 
 // runVerify executes the full frontend verification pipeline.
 // cmd is used to detect whether --viewport was explicitly set by the user.
-func runVerify(cmd *cobra.Command, fix, reportOnly bool, viewport string) error {
+func runVerify(cmd *cobra.Command, fix, reportOnly bool, viewport string, visualArgs ...bool) error {
+	visualGate, strictVisualGate := resolveVisualGateArgs(visualArgs)
+	return runVerifyWithOptions(cmd, fix, reportOnly, viewport, verifyVisualOptions{Enabled: visualGate, Strict: strictVisualGate})
+}
+
+type verifyVisualOptions struct {
+	Enabled    bool
+	Strict     bool
+	CriticPath string
+}
+
+func runVerifyWithOptions(cmd *cobra.Command, fix, reportOnly bool, viewport string, visual verifyVisualOptions) error {
 	cfg, err := config.Load(".")
 	if err != nil {
 		return fmt.Errorf("설정 로드 실패: %w", err)
@@ -90,19 +110,31 @@ func runVerify(cmd *cobra.Command, fix, reportOnly bool, viewport string) error 
 	for _, f := range uiChanged {
 		fmt.Fprintf(os.Stderr, "  - %s\n", f)
 	}
+	designOpts := design.Options{
+		Enabled:         cfg.Design.Enabled && cfg.Design.InjectOnVerify,
+		Paths:           cfg.Design.Paths,
+		MaxContextLines: cfg.Design.MaxContextLines,
+		UIFileGlobs:     cfg.Design.UIFileGlobs,
+	}
 	fmt.Print(buildVerifyDesignContextReport(".", uiChanged, design.Options{
 		Enabled:         cfg.Design.Enabled && cfg.Design.InjectOnVerify,
 		Paths:           cfg.Design.Paths,
 		MaxContextLines: cfg.Design.MaxContextLines,
 		UIFileGlobs:     cfg.Design.UIFileGlobs,
 	}))
-
-	output, err := runPlaywright(effectiveViewport)
-	if err != nil {
-		return fmt.Errorf("playwright 실행 실패: %w", err)
+	designCtx, designErr := design.LoadContext(".", designOpts)
+	if designErr != nil {
+		fmt.Fprintf(os.Stderr, "경고: design context 로드 실패: %v\n", designErr)
 	}
 
-	screenshots := collectScreenshots(output)
+	output, playwrightErr := runPlaywright(effectiveViewport)
+
+	artifacts := collectVisualArtifacts(output)
+	screenshots := collectScreenshotsFromArtifacts(artifacts)
+	var visualGateErr error
+	if visual.Enabled {
+		visualGateErr = writeVerifyVisualGate(".", uiChanged, screenshots, artifacts, effectiveViewport, designCtx, cfg.Verify.MaxFixAttempts, playwrightErr, visual.Strict, visual.CriticPath)
+	}
 
 	fmt.Printf("verify 완료 (viewport: %s, auto-fix: %v)\n", effectiveViewport, effectiveFix)
 	fmt.Printf("스크린샷 %d개 수집됨\n", len(screenshots))
@@ -110,6 +142,12 @@ func runVerify(cmd *cobra.Command, fix, reportOnly bool, viewport string) error 
 		fmt.Printf("  - %s\n", s)
 	}
 
+	if playwrightErr != nil {
+		return fmt.Errorf("playwright 실행 실패: %w", playwrightErr)
+	}
+	if visualGateErr != nil {
+		return visualGateErr
+	}
 	return nil
 }
 
@@ -180,31 +218,4 @@ func runPlaywright(viewport string) ([]byte, error) {
 	}
 
 	return out, nil
-}
-
-// collectScreenshots parses Playwright JSON output and returns screenshot file paths.
-func collectScreenshots(output []byte) []string {
-	var result playwrightResult
-	if err := json.Unmarshal(output, &result); err != nil {
-		return nil
-	}
-
-	var paths []string
-	for _, suite := range result.Suites {
-		for _, spec := range suite.Specs {
-			for _, test := range spec.Tests {
-				for _, res := range test.Results {
-					for _, att := range res.Attachments {
-						if att.Name == "screenshot" || strings.HasSuffix(att.Path, ".png") {
-							if att.Path != "" {
-								paths = append(paths, att.Path)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return paths
 }

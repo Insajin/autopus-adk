@@ -30,9 +30,13 @@ func TestUXSkillIntelligencePassTransformsForAllSupportedPlatforms(t *testing.T)
 			assert.Contains(t, frontendSkill.Content, "Pre-delivery checklist")
 
 			verifySkill := findTransformedSkill(t, skills, "frontend-verify")
+			assert.Contains(t, verifySkill.Content, "Phase 0.4: 디자인 소스 팩 수집")
 			assert.Contains(t, verifySkill.Content, "Phase 0.6: UX 인텔리전스 기준 합성")
 			assert.Contains(t, verifySkill.Content, "## UX Intelligence")
-			assert.Contains(t, verifySkill.Content, "--viewport-matrix")
+			assert.Contains(t, verifySkill.Content, "auto design pack --format markdown")
+			assert.Contains(t, verifySkill.Content, "auto design figma fetch --format markdown")
+			assert.Contains(t, verifySkill.Content, "--visual-gate")
+			assert.Contains(t, verifySkill.Content, "--strict-visual-gate")
 		})
 	}
 }
