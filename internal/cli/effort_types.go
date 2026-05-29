@@ -13,7 +13,7 @@ const (
 	EffortHigh EffortValue = "high"
 	// EffortXHigh is a very high effort tier below max.
 	EffortXHigh EffortValue = "xhigh"
-	// EffortMax is the strongest Claude Code effort tier for Opus 4.7 planning/deep work.
+	// EffortMax is the strongest Claude Code effort tier for Opus 4.8/4.7 planning/deep work.
 	EffortMax EffortValue = "max"
 	// EffortStripped signals that effort must be omitted (Haiku 4.5).
 	EffortStripped EffortValue = ""

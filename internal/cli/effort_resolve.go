@@ -136,7 +136,7 @@ func resolveQualityMode(quality, complexity, model string) (EffortResult, error)
 }
 
 // resolveUltraMode applies Ultra-quality effort mapping per spec R2.
-// Haiku 4.5 → strip; Opus 4.7 → max; others → high.
+// Haiku 4.5 → strip; Opus 4.8 / Opus 4.7 → max; others → high.
 func resolveUltraMode(model string) (EffortResult, error) {
 	normalized := normalizeModelID(model)
 
@@ -149,12 +149,13 @@ func resolveUltraMode(model string) (EffortResult, error) {
 			Model:  model,
 			Reason: "effort_stripped_model=haiku-4-5",
 		}, nil
-	case "opus-4-7":
+	case "opus-4-8", "opus-4-7":
+		// Top-tier Opus models support the strongest effort tier.
 		return EffortResult{
 			Effort: EffortMax,
 			Source: EffortSourceQualityMode,
 			Model:  model,
-			Reason: "ultra mode with Opus 4.7",
+			Reason: "ultra mode with top-tier Opus (4.8/4.7)",
 		}, nil
 	default:
 		// Opus 4.6, Sonnet 4.6, or anything else in ultra mode → high.

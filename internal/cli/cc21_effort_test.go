@@ -150,6 +150,23 @@ func TestCC21_TC3_ResolveEffort_Ultra_Opus47(t *testing.T) {
 		"S2-1 violation: source should be quality_mode, got %q", result.Source)
 }
 
+// --- TC3b: ResolveEffort ultra + Opus 4.8 → max (regression guard) ----------------
+
+// TestCC21_TC3b_ResolveEffort_Ultra_Opus48 verifies that ultra quality with the
+// current default model Opus 4.8 resolves to effort=max, not the high downgrade
+// branch. Guards against the model-ID hardcoding that previously demoted 4.8.
+func TestCC21_TC3b_ResolveEffort_Ultra_Opus48(t *testing.T) {
+	result, err := cli.ResolveEffort(cli.EffortResolveInput{
+		FlagQuality: "ultra",
+		Model:       "opus-4.8",
+	})
+	require.NoError(t, err, "ResolveEffort returned unexpected error")
+	assert.Equal(t, cli.EffortMax, result.Effort,
+		"ultra+opus-4.8 should resolve to max, got %q", result.Effort)
+	assert.Equal(t, cli.EffortSourceQualityMode, result.Source,
+		"source should be quality_mode, got %q", result.Source)
+}
+
 // --- TC4: ResolveEffort ultra + Opus 4.6 → high downgrade (S2-2) -------------------
 
 // TestCC21_TC4_ResolveEffort_Ultra_Opus46 verifies that ultra quality with non-Opus-4.7

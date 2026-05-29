@@ -9,7 +9,7 @@ import (
 func TestDefaultPricingTable_ContainsAllModels(t *testing.T) {
 	table := cost.DefaultPricingTable()
 
-	required := []string{"claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"}
+	required := []string{"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5"}
 	for _, model := range required {
 		if _, ok := table[model]; !ok {
 			t.Errorf("pricing table missing model: %s", model)
@@ -25,6 +25,7 @@ func TestDefaultPricingTable_Prices(t *testing.T) {
 		input  float64
 		output float64
 	}{
+		{"claude-opus-4-8", 5.0, 25.0},
 		{"claude-opus-4-7", 5.0, 25.0},
 		{"claude-sonnet-4-6", 3.0, 15.0},
 		{"claude-haiku-4-5", 1.0, 5.0},
@@ -52,8 +53,8 @@ func TestQualityModeToModels_Ultra(t *testing.T) {
 
 	expected := []string{"planner", "architect", "executor", "tester", "reviewer", "validator"}
 	for _, agent := range expected {
-		if model, ok := agents[agent]; !ok || model != "claude-opus-4-7" {
-			t.Errorf("ultra/%s: want claude-opus-4-7, got %q", agent, model)
+		if model, ok := agents[agent]; !ok || model != "claude-opus-4-8" {
+			t.Errorf("ultra/%s: want claude-opus-4-8, got %q", agent, model)
 		}
 	}
 }
@@ -68,8 +69,8 @@ func TestQualityModeToModels_Balanced(t *testing.T) {
 		agent string
 		model string
 	}{
-		{"planner", "claude-opus-4-7"},
-		{"architect", "claude-opus-4-7"},
+		{"planner", "claude-opus-4-8"},
+		{"architect", "claude-opus-4-8"},
 		{"executor", "claude-sonnet-4-6"},
 		{"tester", "claude-sonnet-4-6"},
 		{"reviewer", "claude-sonnet-4-6"},
@@ -95,10 +96,10 @@ func TestModelForAgent_Known(t *testing.T) {
 		agent string
 		want  string
 	}{
-		{"ultra", "executor", "claude-opus-4-7"},
+		{"ultra", "executor", "claude-opus-4-8"},
 		{"balanced", "executor", "claude-sonnet-4-6"},
 		{"balanced", "validator", "claude-sonnet-4-6"},
-		{"balanced", "planner", "claude-opus-4-7"},
+		{"balanced", "planner", "claude-opus-4-8"},
 	}
 
 	for _, tc := range cases {

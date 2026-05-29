@@ -67,7 +67,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 		Router: RouterConf{
 			Strategy: "balanced",
 			Tiers: map[string]string{
-				"premium":  "claude-opus-4-7",
+				"premium":  "claude-opus-4-8",
 				"standard": "claude-sonnet-4-6",
 				"economy":  "claude-sonnet-4-6",
 			},

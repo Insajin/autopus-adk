@@ -11,10 +11,17 @@ type ModelPricing struct {
 }
 
 // DefaultPricingTable returns the canonical pricing table for supported models.
-// Prices are in USD per 1M tokens as of April 2026 (Opus 4.7 launch).
-// Source: https://www.anthropic.com/news/claude-opus-4-7
+// Prices are in USD per 1M tokens. Opus 4.8 is the current default model;
+// Opus 4.7 pricing is retained because it remains a valid selectable model.
+// Opus 4.8 pricing verified against official docs (checked 2026-05-29):
+// $5 input / $25 output per MTok, identical to Opus 4.7.
+// Source: https://platform.claude.com/docs/en/about-claude/models/overview
 func DefaultPricingTable() map[string]ModelPricing {
 	return map[string]ModelPricing{
+		"claude-opus-4-8": {
+			InputPricePerMillion:  5.0,
+			OutputPricePerMillion: 25.0,
+		},
 		"claude-opus-4-7": {
 			InputPricePerMillion:  5.0,
 			OutputPricePerMillion: 25.0,
@@ -38,18 +45,18 @@ func QualityModeToModels(qualityMode string) map[string]string {
 	case "ultra":
 		// All agents use the highest-capability model.
 		return map[string]string{
-			"planner":   "claude-opus-4-7",
-			"architect": "claude-opus-4-7",
-			"executor":  "claude-opus-4-7",
-			"tester":    "claude-opus-4-7",
-			"reviewer":  "claude-opus-4-7",
-			"validator": "claude-opus-4-7",
+			"planner":   "claude-opus-4-8",
+			"architect": "claude-opus-4-8",
+			"executor":  "claude-opus-4-8",
+			"tester":    "claude-opus-4-8",
+			"reviewer":  "claude-opus-4-8",
+			"validator": "claude-opus-4-8",
 		}
 	case "balanced":
 		// Strategic agents use opus; execution and validation agents use sonnet.
 		return map[string]string{
-			"planner":   "claude-opus-4-7",
-			"architect": "claude-opus-4-7",
+			"planner":   "claude-opus-4-8",
+			"architect": "claude-opus-4-8",
 			"executor":  "claude-sonnet-4-6",
 			"tester":    "claude-sonnet-4-6",
 			"reviewer":  "claude-sonnet-4-6",
