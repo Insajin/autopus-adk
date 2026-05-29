@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Claude Opus 4.8 model adoption + ultra effort mapping fix** (2026-05-29): Default premium/ultra tier, cost pricing table, worker routing, and skill docs/templates now use `claude-opus-4-8` (pricing verified at $5/$25 input/output per MTok against official docs). Opus 4.7 pricing is retained as a still-available legacy model. Fixed `resolveUltraMode` hardcoding `opus-4-7` as the only `max`-effort branch, which silently demoted Opus 4.8 to `high` in ultra mode; 4.8 is now in the max branch with a regression test (TC3b). The harness remains `opus`/`sonnet` alias-based, so only model-ID literals changed; `probeOpus47`/`HasOpus47` are preserved as legacy 4.7-availability probes.
+
 - **CodeOps ADK supervised delivery local contract (SPEC-CODEOPS-ADK-001)** (2026-05-25): `auto delivery` now exposes source-owned dry-run planning and strict phase-result envelope validation for PM-owned CodeOps delivery.
   - `pkg/delivery/**` — canonical workflow mode, provider modes, phase order, generated/runtime deny-list checks, dry-run plan schema, and `codeops.phase_result.v1` validation.
   - `internal/cli/delivery.go` + `internal/cli/root.go` — public `auto delivery plan|validate` namespace with JSON output and fail-closed validation errors.
