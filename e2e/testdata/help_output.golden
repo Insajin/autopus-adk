@@ -11,6 +11,7 @@ Available Commands:
   completion  Generate the autocompletion script for the specified shell
   config      Manage autopus.yaml configuration
   connect     Connect an AI provider via local OAuth flow
+  delivery    Validate ADK supervised delivery contracts
   design      Manage project DESIGN.md context
   desktop     Desktop-owned runtime commands
   docs        Documentation utilities

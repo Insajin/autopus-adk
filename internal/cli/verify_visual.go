@@ -7,18 +7,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/design"
 )
 
-func resolveVisualGateArgs(args []bool) (bool, bool) {
-	visualGate := true
-	strictVisualGate := false
-	if len(args) > 0 {
-		visualGate = args[0]
-	}
-	if len(args) > 1 {
-		strictVisualGate = args[1]
-	}
-	return visualGate, strictVisualGate
-}
-
 func writeVerifyVisualGate(root string, uiChanged, screenshots []string, artifacts []design.VisualArtifact, viewport string, ctx design.Context, maxFixAttempts int, playwrightErr error, strict bool, criticPath string) error {
 	playwrightErrText := ""
 	if playwrightErr != nil {

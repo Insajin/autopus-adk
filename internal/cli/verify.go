@@ -47,13 +47,6 @@ func newVerifyCmd() *cobra.Command {
 	return cmd
 }
 
-// runVerify executes the full frontend verification pipeline.
-// cmd is used to detect whether --viewport was explicitly set by the user.
-func runVerify(cmd *cobra.Command, fix, reportOnly bool, viewport string, visualArgs ...bool) error {
-	visualGate, strictVisualGate := resolveVisualGateArgs(visualArgs)
-	return runVerifyWithOptions(cmd, fix, reportOnly, viewport, verifyVisualOptions{Enabled: visualGate, Strict: strictVisualGate})
-}
-
 type verifyVisualOptions struct {
 	Enabled    bool
 	Strict     bool

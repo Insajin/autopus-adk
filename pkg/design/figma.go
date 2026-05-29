@@ -182,11 +182,6 @@ func isCodeConnectMappingPath(rel string) bool {
 	return base == "code-connect.config.json"
 }
 
-func sanitizeFigmaURL(raw string) string {
-	clean, _, _, _ := parseFigmaURL(raw)
-	return clean
-}
-
 func parseFigmaURL(raw string) (clean, kind, fileKey, nodeID string) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || parsed.Scheme != "https" {
