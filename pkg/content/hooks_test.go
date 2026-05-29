@@ -30,6 +30,8 @@ func TestGenerateHookConfigs_WithHooks(t *testing.T) {
 	assert.Len(t, hooks, 1, "only arch check should be a CLI hook")
 	assert.Equal(t, "PreToolUse", hooks[0].Event)
 	assert.Contains(t, hooks[0].Command, "--arch")
+	assert.Contains(t, hooks[0].Command, "--staged")
+	assert.Contains(t, hooks[0].Command, "--warn-only")
 	// Lore is NOT a CLI hook — it runs via git commit-msg hook.
 	for _, h := range hooks {
 		assert.NotContains(t, h.Command, "--lore", "lore should not be a CLI hook")

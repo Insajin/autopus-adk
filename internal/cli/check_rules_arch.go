@@ -13,7 +13,61 @@ import (
 	"github.com/insajin/autopus-adk/internal/cli/tui"
 )
 
-// checkArchStaged checks only git-staged .go files for size limits.
+var archSourceExtensions = map[string]bool{
+	".c":     true,
+	".cc":    true,
+	".cjs":   true,
+	".cpp":   true,
+	".cs":    true,
+	".css":   true,
+	".cxx":   true,
+	".go":    true,
+	".h":     true,
+	".hpp":   true,
+	".java":  true,
+	".js":    true,
+	".jsx":   true,
+	".kt":    true,
+	".kts":   true,
+	".less":  true,
+	".mjs":   true,
+	".php":   true,
+	".py":    true,
+	".rb":    true,
+	".rs":    true,
+	".sass":  true,
+	".scss":  true,
+	".sh":    true,
+	".swift": true,
+	".ts":    true,
+	".tsx":   true,
+	".vue":   true,
+}
+
+var archSkipDirs = map[string]bool{
+	".agents":           true,
+	".autopus":          true,
+	".claude":           true,
+	".codex":            true,
+	".gemini":           true,
+	".git":              true,
+	".next":             true,
+	".nuxt":             true,
+	".opencode":         true,
+	".output":           true,
+	".svelte-kit":       true,
+	".worktrees":        true,
+	"build":             true,
+	"coverage":          true,
+	"dist":              true,
+	"node_modules":      true,
+	"playwright-report": true,
+	"target":            true,
+	"test-results":      true,
+	"vendor":            true,
+}
+
+// checkArchStaged checks only git-staged source files for size limits.
 func checkArchStaged(dir string, out io.Writer, quiet bool) bool {
 	cmd := exec.Command("git", "diff", "--cached", "--name-only", "--diff-filter=ACM")
 	cmd.Dir = dir
@@ -29,15 +83,17 @@ func checkArchStaged(dir string, out io.Writer, quiet bool) bool {
 		if rel == "" {
 			continue
 		}
-		if !strings.HasSuffix(rel, ".go") {
+		if shouldSkipArchRel(rel) {
 			continue
 		}
-		if isGeneratedGoFile(filepath.Base(rel)) {
+		if !isArchSourceFile(rel) {
+			continue
+		}
+		if isGeneratedSourceFile(filepath.Base(rel)) {
 			continue
 		}
 
-		abs := filepath.Join(dir, rel)
-		lines, err := countLines(abs)
+		lines, err := countStagedLines(dir, rel)
 		if err != nil {
 			continue
 		}
@@ -59,7 +115,7 @@ func checkArchStaged(dir string, out io.Writer, quiet bool) bool {
 	return passed
 }
 
-// checkArchWalk walks the directory tree checking all .go files.
+// checkArchWalk walks the directory tree checking all source files.
 // Skips submodule directories (detected by a .git file inside) and worktree dirs.
 func checkArchWalk(dir string, out io.Writer, quiet bool) bool {
 	passed := true
@@ -68,11 +124,7 @@ func checkArchWalk(dir string, out io.Writer, quiet bool) bool {
 			return err
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] {
-				return filepath.SkipDir
-			}
-			// Skip .claude/worktrees/ directories (agent worktree leftovers).
-			if d.Name() == "worktrees" && strings.HasSuffix(filepath.Dir(path), ".claude") {
+			if archSkipDirs[d.Name()] {
 				return filepath.SkipDir
 			}
 			// Skip submodule directories: they contain a .git file (not directory).
@@ -84,10 +136,10 @@ func checkArchWalk(dir string, out io.Writer, quiet bool) bool {
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, ".go") {
+		if !isArchSourceFile(path) {
 			return nil
 		}
-		if isGeneratedGoFile(d.Name()) {
+		if isGeneratedSourceFile(d.Name()) {
 			return nil
 		}
 
@@ -118,4 +170,58 @@ func checkArchWalk(dir string, out io.Writer, quiet bool) bool {
 		return false
 	}
 	return passed
+}
+
+func isArchSourceFile(path string) bool {
+	return archSourceExtensions[strings.ToLower(filepath.Ext(path))]
+}
+
+func isGeneratedSourceFile(name string) bool {
+	lower := strings.ToLower(name)
+	if isGeneratedGoFile(lower) {
+		return true
+	}
+	if strings.HasSuffix(lower, ".d.ts") ||
+		strings.HasSuffix(lower, ".min.css") ||
+		strings.HasSuffix(lower, ".min.js") ||
+		lower == "build.rs" ||
+		strings.HasPrefix(lower, "mock_") && strings.HasSuffix(lower, ".go") {
+		return true
+	}
+	for _, marker := range []string{"_generated.", ".generated.", "_gen.", ".gen.", ".pb."} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func shouldSkipArchRel(rel string) bool {
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		if archSkipDirs[part] {
+			return true
+		}
+	}
+	return false
+}
+
+func countStagedLines(dir, rel string) (int, error) {
+	cmd := exec.Command("git", "show", ":"+rel)
+	cmd.Dir = dir
+	data, err := cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	return countLinesInBytes(data), nil
+}
+
+func countLinesInBytes(data []byte) int {
+	if len(data) == 0 {
+		return 0
+	}
+	count := bytes.Count(data, []byte{'\n'})
+	if data[len(data)-1] != '\n' {
+		count++
+	}
+	return count
 }

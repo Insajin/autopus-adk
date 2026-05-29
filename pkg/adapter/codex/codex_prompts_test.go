@@ -20,8 +20,8 @@ func TestRenderPromptTemplates(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, files, "should produce prompt file mappings")
 
-	// Router + 18 workflow prompts should be generated.
-	assert.Len(t, files, 19)
+	// Router + 19 workflow prompts should be generated.
+	assert.Len(t, files, 20)
 
 	// Verify files written to disk.
 	for _, f := range files {
@@ -59,7 +59,7 @@ func TestPreparePromptFiles_NoDiskWrite(t *testing.T) {
 
 	files, err := a.preparePromptFiles(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 19)
+	assert.Len(t, files, 20)
 
 	// preparePromptFiles should NOT write to disk.
 	promptsDir := filepath.Join(dir, ".codex", "prompts")
@@ -145,6 +145,8 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-goal.md"], "get_goal")
 	assert.Contains(t, byName["auto-goal.md"], "update_goal")
 	assert.Contains(t, byName["auto-goal.md"], "별도 ADK persisted state")
+	assert.Contains(t, byName["auto-update.md"], "auto --auto update")
+	assert.Contains(t, byName["auto-update.md"], "--local")
 	assert.Contains(t, byName["auto-setup.md"], "explorer")
 	assert.Contains(t, byName["auto-setup.md"], "ARCHITECTURE.md")
 	assert.Contains(t, byName["auto-plan.md"], "auto spec review {SPEC-ID}")

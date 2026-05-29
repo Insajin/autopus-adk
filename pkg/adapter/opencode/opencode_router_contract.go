@@ -6,7 +6,7 @@ import (
 )
 
 func routerDescription() string {
-	return "Autopus 명령 라우터 — OpenCode helper 및 workflow 서브커맨드를 해석합니다"
+	return "Autopus 명령 라우터 — OpenCode helper 및 update workflow 서브커맨드를 해석합니다"
 }
 
 func routerSubcommandCount() int {

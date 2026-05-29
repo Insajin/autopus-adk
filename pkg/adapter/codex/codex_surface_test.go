@@ -47,6 +47,7 @@ func TestCodexAdapter_Generate_WorkflowSurfacesUseCodexConventions(t *testing.T)
 		"auto-setup",
 		"auto-status",
 		"auto-goal",
+		"auto-update",
 		"auto-plan",
 		"auto-go",
 		"auto-fix",

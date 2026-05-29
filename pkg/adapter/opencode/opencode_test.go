@@ -195,6 +195,8 @@ func TestAdapter_Generate_AutoRouterUsesThinOpenCodeContract(t *testing.T) {
 	assert.Contains(t, string(autoSkill), "## Context Load")
 	assert.Contains(t, string(autoSkill), "## SPEC Path Resolution")
 	assert.Contains(t, string(autoSkill), "지원 서브커맨드")
+	assert.Contains(t, string(autoSkill), "`update`")
+	assert.Contains(t, string(autoSkill), "`auto-update`")
 	assert.Contains(t, string(autoSkill), "/auto-canary")
 	assert.NotContains(t, string(autoSkill), "Codex용 canonical router surface")
 }

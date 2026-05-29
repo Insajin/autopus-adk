@@ -49,7 +49,7 @@ This skill is a thin router. After resolving the subcommand, load the matching d
 	frontmatter := strings.TrimSpace(fmt.Sprintf(`---
 name: auto
 description: >
-  Autopus Codex router skill. Use when the user wants %s or %s workflows such as setup, status, goal, plan, go, fix, review, sync, idea, map, why, verify, secure, test, qa, dev, canary, and doctor.
+  Autopus Codex router skill. Use when the user wants %s or %s workflows such as setup, status, goal, update, plan, go, fix, review, sync, idea, map, why, verify, secure, test, qa, dev, canary, and doctor.
 ---`, "`@auto ...`", "`$auto ...`"))
 	return frontmatter + "\n\n" + strings.TrimSpace(body) + "\n", nil
 }
@@ -192,6 +192,7 @@ func rewriteCodexRouterBody(body string) string {
 	body = strings.ReplaceAll(body, "위 8개", fmt.Sprintf("위 %d개", routerSubcommandCount()))
 	body = strings.ReplaceAll(body, "위 17개", fmt.Sprintf("위 %d개", routerSubcommandCount()))
 	body = strings.ReplaceAll(body, "위 18개", fmt.Sprintf("위 %d개", routerSubcommandCount()))
+	body = strings.ReplaceAll(body, "위 19개", fmt.Sprintf("위 %d개", routerSubcommandCount()))
 	body = strings.ReplaceAll(body, "같은 이름의 상세 스킬/프롬프트(`auto-setup`, `auto-plan`, `auto-go`, `auto-fix`, `auto-review`, `auto-sync`, `auto-canary`, `auto-idea`)", "같은 이름의 상세 스킬/프롬프트("+routerDetailSkills()+")")
 	return body
 }

@@ -54,7 +54,7 @@ func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfi
 			Event:   pre,
 			Matcher: commandMatcher,
 			Type:    "command",
-			Command: translateHookCommand("auto check --arch --quiet --warn-only", pre, platform),
+			Command: translateHookCommand("auto check --arch --quiet --staged --warn-only", pre, platform),
 			Timeout: 30,
 		})
 	}

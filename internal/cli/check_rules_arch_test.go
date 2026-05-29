@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,6 +65,50 @@ func TestCheckArchStaged_FailsOnOversizedStaged(t *testing.T) {
 	assert.Contains(t, buf.String(), "big.go")
 }
 
+func TestCheckArchStaged_FailsOnOversizedStagedSource(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	initTestGitRepo(t, dir)
+	writeSourceFileWithLines(t, dir, "panel.tsx", 301)
+
+	runGitCommand(t, dir, "add", "panel.tsx")
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, true)
+	assert.False(t, result, "staged mode should fail when a large TypeScript source file is staged")
+	assert.Contains(t, buf.String(), "panel.tsx")
+}
+
+func TestCheckArchStaged_UsesStagedContent(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	initTestGitRepo(t, dir)
+	writeSourceFileWithLines(t, dir, "staged.ts", 301)
+	runGitCommand(t, dir, "add", "staged.ts")
+	writeTestFile(t, dir, "staged.ts", "const ok = true\n")
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, true)
+	assert.False(t, result, "staged mode should inspect the index rather than the working tree")
+	assert.Contains(t, buf.String(), "staged.ts")
+}
+
+func TestCheckArchWalk_ChecksNonGoSourceFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeSourceFileWithLines(t, dir, "view.tsx", 301)
+	writeSourceFileWithLines(t, dir, "native.rs", 301)
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, false)
+	assert.False(t, result, "walk should fail on oversized non-Go source files")
+	assert.Contains(t, buf.String(), "view.tsx")
+	assert.Contains(t, buf.String(), "native.rs")
+}
+
 func TestCheckArchWalk_SkipsSubmodule(t *testing.T) {
 	t.Parallel()
 
@@ -79,6 +124,34 @@ func TestCheckArchWalk_SkipsSubmodule(t *testing.T) {
 	var buf bytes.Buffer
 	result := checkArch(dir, &buf, true, false)
 	assert.True(t, result, "walk should skip submodule directories")
+}
+
+func TestCheckArchWalk_SkipsRuntimeCacheDirs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	cacheDir := filepath.Join(dir, ".autopus", "qa", "cache", "gopath", "pkg", "mod", "example")
+	require.NoError(t, os.MkdirAll(cacheDir, 0o755))
+	writeGoFileWithComments(t, cacheDir, "vendor_big.go", 300)
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, false)
+	assert.True(t, result, "walk should skip runtime and generated cache directories")
+	assert.Empty(t, buf.String())
+}
+
+func TestCheckArchWalk_SkipsGeneratedSourceFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeSourceFileWithLines(t, dir, "client.generated.ts", 301)
+	writeSourceFileWithLines(t, dir, "types.d.ts", 301)
+	writeSourceFileWithLines(t, dir, "bundle.min.js", 301)
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, false)
+	assert.True(t, result, "walk should skip generated source files")
+	assert.Empty(t, buf.String())
 }
 
 func TestCountLines_ReturnsCorrectCount(t *testing.T) {
@@ -97,4 +170,10 @@ func TestCountLines_NonExistentFile(t *testing.T) {
 
 	_, err := countLines("/nonexistent/path/file.go")
 	assert.Error(t, err)
+}
+
+func writeSourceFileWithLines(t *testing.T, dir, name string, lines int) string {
+	t.Helper()
+
+	return writeTestFile(t, dir, name, strings.Repeat("// line\n", lines))
 }

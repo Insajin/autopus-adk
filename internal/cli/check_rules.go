@@ -38,10 +38,8 @@ var skipDirs = map[string]bool{
 	"node_modules": true,
 }
 
-// checkArch verifies file size limits (300-line hard limit for .go source files).
-// Skips vendor/, .git/, node_modules/, submodule directories (containing a .git file),
-// .claude/worktrees/, *_generated.go, *_gen.go, and *.pb.go files.
-// When stagedOnly is true, only git-staged .go files are checked.
+// checkArch verifies file size limits (300-line hard limit for source files).
+// When stagedOnly is true, only git-staged source files are checked.
 // Returns false if any file exceeds the hard limit.
 func checkArch(dir string, out io.Writer, quiet, stagedOnly bool) bool {
 	if !quiet {

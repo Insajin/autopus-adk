@@ -72,7 +72,7 @@ func (a *Adapter) renderPluginManifestJSON() (string, error) {
 	doc := pluginManifest{
 		Name:        "auto",
 		Version:     "1.0.0",
-		Description: "Autopus workflow router for Codex: setup, status, goal, plan, go, fix, review, sync, idea, map, why, verify, secure, test, qa, dev, canary, and doctor.",
+		Description: "Autopus workflow router for Codex: setup, status, goal, update, plan, go, fix, review, sync, idea, map, why, verify, secure, test, qa, dev, canary, and doctor.",
 		Author:      pluginAuthor{Name: "Autopus", Email: "noreply@autopus.co", URL: "https://autopus.co"},
 		Homepage:    "https://autopus.co",
 		Repository:  "https://github.com/insajin/autopus-adk",
@@ -82,7 +82,7 @@ func (a *Adapter) renderPluginManifestJSON() (string, error) {
 		Interface: pluginInterface{
 			DisplayName:       "Auto",
 			ShortDescription:  "Autopus workflow router for Codex",
-			LongDescription:   "Run the full Autopus setup/status/goal/plan/go/fix/review/sync/idea/map/why/verify/secure/test/qa/dev/canary/doctor workflow set from Codex with a local plugin plus repository-managed helper docs.",
+			LongDescription:   "Run the full Autopus setup/status/goal/update/plan/go/fix/review/sync/idea/map/why/verify/secure/test/qa/dev/canary/doctor workflow set from Codex with a local plugin plus repository-managed helper docs.",
 			DeveloperName:     "Autopus",
 			Category:          "Developer Tools",
 			Capabilities:      []string{"Interactive", "Write", "Planning"},

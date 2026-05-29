@@ -34,6 +34,8 @@ func customWorkflowBodies(spec workflowSpec) (customWorkflowBody, bool) {
 		return cliWorkflowBody(spec.Name, "SPEC Dashboard", spec.Description, "auto status", "draft / approved / implemented / completed 상태를 요약하고 다음 액션을 제안합니다."), true
 	case "auto-goal":
 		return goalWorkflowBody(spec.Name, spec.Description), true
+	case "auto-update":
+		return updateWorkflowBody(spec.Name, spec.Description), true
 	case "auto-verify":
 		return cliWorkflowBody(spec.Name, "Frontend UX Verification", spec.Description, "auto verify", "Playwright 기반 검증 결과와 자동 수정 가능 여부를 함께 보고합니다."), true
 	case "auto-test":

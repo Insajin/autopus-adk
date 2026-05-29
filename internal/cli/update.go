@@ -19,14 +19,19 @@ import (
 
 func newUpdateCmd() *cobra.Command {
 	var dir string
-	var selfFlag, checkOnly, force, yesFlag, previewMode bool
-	var targetVersion, statusLine string
+	var selfFlag, checkOnly, force, yesFlag, previewMode, workspaceFlag, localFlag bool
+	var targetVersion, statusLine, workspaceOnly string
 
 	cmd := &cobra.Command{
-		Use:   "update",
+		Use:   "update [all|repo]",
 		Short: "Update autopus harness files",
 		Long:  "설치된 하네스 파일을 업데이트합니다. 사용자 수정 사항을 보존합니다.",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if globalFlagsFromContext(cmd.Context()).AutoMode {
+				yesFlag = true
+			}
+
 			// R9: Self-update branch
 			if selfFlag {
 				return runSelfUpdate(cmd, checkOnly, force, targetVersion)
@@ -38,6 +43,29 @@ func newUpdateCmd() *cobra.Command {
 					return fmt.Errorf("현재 디렉터리를 가져올 수 없음: %w", err)
 				}
 				dir = cwd
+			}
+			if len(args) > 0 {
+				switch target := strings.TrimSpace(args[0]); target {
+				case "", ".", "local":
+					localFlag = true
+				case "all", "workspace":
+					workspaceFlag = true
+				default:
+					workspaceFlag = true
+					workspaceOnly = target
+				}
+			}
+			if localFlag && (workspaceFlag || workspaceOnly != "") {
+				return fmt.Errorf("--local은 workspace 대상 지정과 함께 사용할 수 없습니다")
+			}
+			if workspaceOnly != "" {
+				workspaceFlag = true
+			}
+			if !localFlag && !workspaceFlag && shouldAutoWorkspaceUpdate(dir) {
+				workspaceFlag = true
+			}
+			if workspaceFlag {
+				return runWorkspaceUpdate(cmd, dir, workspaceOnly, yesFlag, previewMode, statusLine)
 			}
 
 			var (
@@ -203,6 +231,9 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&previewMode, "plan", false, "변경 예정 파일만 계산하고 쓰지 않음")
 	cmd.Flags().BoolVar(&previewMode, "preview", false, "변경 예정 파일만 계산하고 쓰지 않음")
 	cmd.Flags().BoolVar(&previewMode, "dry-run", false, "변경 예정 파일만 계산하고 쓰지 않음")
+	cmd.Flags().BoolVar(&workspaceFlag, "workspace", false, "메타 워크스페이스의 하위 Git 리포까지 업데이트")
+	cmd.Flags().StringVar(&workspaceOnly, "only", "", "--workspace 대상 필터 (쉼표 구분 repo path/name)")
+	cmd.Flags().BoolVar(&localFlag, "local", false, "workspace 자동 감지를 끄고 현재 repo만 업데이트")
 	return cmd
 }
 
