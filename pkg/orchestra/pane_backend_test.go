@@ -1,6 +1,9 @@
 package orchestra
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -153,6 +156,29 @@ func TestBuildResponseFromScreen_Judge(t *testing.T) {
 	out, err := (&OutputParser{}).ParseJudge(resp.Output)
 	require.NoError(t, err)
 	assert.NotEmpty(t, strings.TrimSpace(out.Recommendation))
+}
+
+func TestCollectResponse_PrefersResponseFile(t *testing.T) {
+	t.Parallel()
+	responsePath := filepath.Join(t.TempDir(), "response.md")
+	content := responseBeginMarker + "\nfile answer\n" + responseEndMarker + "\n"
+	require.NoError(t, os.WriteFile(responsePath, []byte(content), 0o600))
+
+	mock := newCmuxMock()
+	mock.readScreenOutput = "screen fallback should not be used"
+	b := NewInteractivePaneBackend(OrchestraConfig{Terminal: mock})
+
+	resp := b.collectResponse(context.Background(), ProviderRequest{Provider: "claude"}, paneInfo{
+		paneID:       "pane-1",
+		responseFile: responsePath,
+	}, true)
+
+	require.NotNil(t, resp)
+	assert.Equal(t, "file answer", resp.Output)
+	assert.False(t, resp.TimedOut)
+	assert.False(t, resp.EmptyOutput)
+	assert.Equal(t, "pane", resp.ExecutedBackend)
+	assert.Zero(t, mock.readScreenCalls, "valid response file should avoid screen collection")
 }
 
 // TestInteractivePaneBackend_Name guards the backend identifier.

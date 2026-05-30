@@ -2,6 +2,8 @@ package orchestra
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -62,6 +64,32 @@ func TestWaitAndCollectResults_SkippedPaneTimedOut(t *testing.T) {
 	require.Len(t, responses, 1)
 	assert.True(t, responses[0].TimedOut, "skipped pane must be marked as timed out")
 	assert.Equal(t, "failed-provider", responses[0].Provider)
+}
+
+func TestWaitAndCollectResults_PrefersResponseFile(t *testing.T) {
+	t.Parallel()
+
+	responsePath := filepath.Join(t.TempDir(), "response.md")
+	content := responseBeginMarker + "\nfile collected output\n" + responseEndMarker + "\n"
+	require.NoError(t, os.WriteFile(responsePath, []byte(content), 0o600))
+
+	mock := newCmuxMock()
+	mock.readScreenOutput = "screen fallback should not be used\n❯\n"
+	panes := []paneInfo{{
+		provider:     ProviderConfig{Name: "claude"},
+		paneID:       "pane-1",
+		responseFile: responsePath,
+	}}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	responses := waitAndCollectResults(ctx, OrchestraConfig{Terminal: mock}, panes, DefaultCompletionPatterns(), time.Now(), nil, nil, 0)
+
+	require.Len(t, responses, 1)
+	assert.Equal(t, "file collected output", responses[0].Output)
+	assert.False(t, responses[0].TimedOut)
+	assert.Zero(t, mock.readScreenCalls, "response file completion should avoid screen reads")
 }
 
 // --- R5: waitForSessionReady uses session-ready patterns ---

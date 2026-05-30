@@ -11,15 +11,25 @@ import (
 // backend never blocks indefinitely while harvesting the screen (REQ-011).
 const finalReadTimeout = 5 * time.Second
 
-// collectResponse reads the pane scrollback, sanitizes it, and builds the final
-// ProviderResponse. timedOut marks REQ-011 deterministic timeout results: the
-// partial screen is still read and sanitized so callers never receive garbage.
-func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req ProviderRequest, paneID terminal.PaneID, timedOut bool) *ProviderResponse {
+// collectResponse prefers the file-backed response contract, then falls back to
+// pane scrollback. timedOut marks deterministic timeout results when fallback
+// screen collection is used.
+func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req ProviderRequest, pi paneInfo, timedOut bool) *ProviderResponse {
+	if output, ok := readResponseFile(pi.responseFile); ok {
+		return &ProviderResponse{
+			Provider:        req.Provider,
+			Output:          output,
+			TimedOut:        false,
+			EmptyOutput:     false,
+			ExecutedBackend: paneBackendName,
+		}
+	}
+
 	// Use a fresh, bounded context for the final read: the original ctx may be
 	// cancelled after a completion timeout (mirrors interactive_collect.go).
 	readCtx, cancel := context.WithTimeout(context.Background(), finalReadTimeout)
 	defer cancel()
-	screen, _ := b.cfg.Terminal.ReadScreen(readCtx, paneID, terminal.ReadScreenOpts{
+	screen, _ := b.cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{
 		Scrollback:      true,
 		ScrollbackLines: scrollbackDepth(b.cfg.ScrollbackLines),
 	})

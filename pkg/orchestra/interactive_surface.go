@@ -39,6 +39,8 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	_ = cfg.Terminal.PipePaneStop(ctx, pi.paneID)
 	_ = cfg.Terminal.Close(ctx, string(pi.paneID))
 	_ = os.Remove(pi.outputFile)
+	cleanupPromptFiles(pi.promptFiles)
+	_ = os.Remove(pi.responseFile)
 
 	// Create new pane.
 	newPaneID, err := cfg.Terminal.SplitPane(ctx, terminal.Horizontal)

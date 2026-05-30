@@ -72,7 +72,23 @@ func TestBuildInteractiveLaunchCmd_GeminiNoRunStrip(t *testing.T) {
 	}
 
 	cmd := buildInteractiveLaunchCmd(p, "test prompt")
-	assert.Equal(t, "agy", cmd, "gemini pane launch must open the TUI without --print or a bare positional prompt")
+	assert.Equal(t, "agy --prompt-interactive 'test prompt'", cmd,
+		"gemini pane launch must use prompt-interactive instead of --print or a bare positional prompt")
+}
+
+func TestBuildInteractiveLaunchCmd_GeminiNoPrompt(t *testing.T) {
+	t.Parallel()
+
+	p := ProviderConfig{
+		Name:             "gemini",
+		Binary:           "agy",
+		Args:             []string{"--print", ""},
+		PromptViaArgs:    true,
+		InteractiveInput: "stdin",
+	}
+
+	cmd := buildInteractiveLaunchCmd(p, "")
+	assert.Equal(t, "agy", cmd, "gemini relaunch without a prompt should open the TUI")
 }
 
 // TestBuildInteractiveLaunchCmd_ShellQuoteEscape verifies single quotes in prompt are escaped.

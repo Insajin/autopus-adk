@@ -10,6 +10,17 @@ import (
 // executeRound sends prompts to all panes and collects responses for one round.
 func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, hookSession *HookSession, round int, prevResponses []ProviderResponse) []ProviderResponse {
 	patterns := DefaultCompletionPatterns()
+	var roundPromptFiles []string
+	var roundResponseFiles []string
+	for _, pi := range panes {
+		if pi.responseFile != "" {
+			roundResponseFiles = append(roundResponseFiles, pi.responseFile)
+		}
+	}
+	defer func() {
+		cleanupPromptFiles(roundPromptFiles)
+		cleanupPromptFiles(roundResponseFiles)
+	}()
 
 	// R1: Validate surfaces for Round 2+ and recreate stale panes.
 	if round > 1 && cfg.SurfaceMgr != nil {
@@ -83,8 +94,8 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			}
 		}
 
-		// Skip sendPrompts for providers that received the prompt via CLI args at launch (round 1 only)
-		if pi.provider.InteractiveInput == "args" && round == 1 {
+		// Skip direct prompt send for providers that received the prompt at launch (round 1 only).
+		if promptDeliveredAtLaunch(pi.provider) && round == 1 {
 			if cfg.ReliabilityStore != nil {
 				receipt := promptReceipt(cfg.RunID, pi.provider.Name, "cli_args", prompt, round, "pass", "")
 				_ = cfg.ReliabilityStore.recordPrompt(receipt)
@@ -107,7 +118,13 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			}
 		}
 
-		sendPrompt := prompt
+		sendPrompt, promptFile, responseFile := panePromptText(cfg, pi.provider, round, prompt)
+		if promptFile != "" {
+			roundPromptFiles = append(roundPromptFiles, promptFile)
+		}
+		if responseFile != "" {
+			roundResponseFiles = append(roundResponseFiles, responseFile)
+		}
 
 		// Sendkeys mode: use SendCommand (cmux send) instead of paste-buffer.
 		// Some TUIs (e.g., Codex/ink) display paste-buffer as "[Pasted Content N chars]"
@@ -124,7 +141,26 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			// R6: On SendLongText failure, attempt pane recreation once, then retry.
 			newPI, recreated, sendErr = sendPromptWithRetry(ctx, cfg, *pi, sendPrompt, round, baselines)
 		}
+		if promptFile != "" {
+			if recreated {
+				newPI.promptFiles = append(newPI.promptFiles, promptFile)
+			} else {
+				pi.promptFiles = append(pi.promptFiles, promptFile)
+				panes[i].promptFiles = pi.promptFiles
+			}
+		}
+		if responseFile != "" {
+			if recreated {
+				newPI.responseFile = responseFile
+			} else {
+				pi.responseFile = responseFile
+				panes[i].responseFile = responseFile
+			}
+		}
 		if sendErr != nil {
+			if recreated {
+				panes[i] = newPI
+			}
 			log.Printf("[Round %d] %s send failed: %v -- skipping", round, pi.provider.Name, sendErr)
 			panes[i].skipWait = true
 			if cfg.ReliabilityStore != nil {

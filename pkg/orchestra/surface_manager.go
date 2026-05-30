@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -134,6 +135,9 @@ func (sm *SurfaceManager) ValidateAndRecover(ctx context.Context, cfg OrchestraC
 		// Clean up old stale pane
 		_ = cfg.Terminal.PipePaneStop(ctx, pi.paneID)
 		_ = cfg.Terminal.Close(ctx, string(pi.paneID))
+		_ = os.Remove(pi.outputFile)
+		cleanupPromptFiles(pi.promptFiles)
+		_ = os.Remove(pi.responseFile)
 
 		newPI := paneInfo{
 			paneID:     w.paneID,

@@ -38,9 +38,10 @@ type mockTerminal struct {
 		PaneID terminal.PaneID
 		Text   string
 	}
-	autoComplete    bool
-	mockOutput      string
-	readIndexByPane map[terminal.PaneID]int
+	promptFileContents []string
+	autoComplete       bool
+	mockOutput         string
+	readIndexByPane    map[terminal.PaneID]int
 }
 
 func (m *mockTerminal) Name() string { return m.name }
@@ -69,6 +70,7 @@ func (m *mockTerminal) SendCommand(_ context.Context, paneID terminal.PaneID, cm
 		PaneID terminal.PaneID
 		Cmd    string
 	}{paneID, cmd})
+	m.recordPromptFileContent(cmd)
 	// If sendCommandErrAfter is set, only error after that many calls
 	if m.sendCommandErrAfter > 0 && len(m.sendCommandCalls) <= m.sendCommandErrAfter {
 		return nil
@@ -89,6 +91,7 @@ func (m *mockTerminal) SendLongText(_ context.Context, paneID terminal.PaneID, t
 		PaneID terminal.PaneID
 		Text   string
 	}{paneID, text})
+	m.recordPromptFileContent(text)
 	return nil
 }
 
@@ -183,6 +186,7 @@ func newPlainMock() *mockTerminal {
 }
 
 var outputFilePattern = regexp.MustCompile(`tee\s+([^;]+?)\s*;\s*echo\s+__AUTOPUS_DONE__\s*>>\s*(\S+)`)
+var promptFileRefPattern = regexp.MustCompile(`@([^ \n']+\.md)`)
 
 func (m *mockTerminal) writeSentinelOutput(cmd string) {
 	matches := outputFilePattern.FindStringSubmatch(cmd)
@@ -199,6 +203,18 @@ func (m *mockTerminal) writeSentinelOutput(cmd string) {
 		output = "mock output"
 	}
 	_ = os.WriteFile(path, []byte(output+"\n"+sentinel+"\n"), 0o600)
+}
+
+func (m *mockTerminal) recordPromptFileContent(text string) {
+	matches := promptFileRefPattern.FindStringSubmatch(text)
+	if len(matches) != 2 {
+		return
+	}
+	content, err := os.ReadFile(matches[1])
+	if err != nil {
+		return
+	}
+	m.promptFileContents = append(m.promptFileContents, string(content))
 }
 
 func shellUnquote(s string) string {

@@ -148,8 +148,8 @@ func TestExecuteRound_TopicIsolation(t *testing.T) {
 
 	// Verify the prompt sent contains the isolation instruction
 	found := false
-	for _, call := range mock.sendLongTextCalls {
-		if strings.Contains(call.Text, "IMPORTANT: Discuss ONLY") {
+	for _, content := range mock.promptFileContents {
+		if strings.Contains(content, "IMPORTANT: Discuss ONLY") {
 			found = true
 			break
 		}
@@ -253,8 +253,10 @@ func TestExecuteRound_Round2_RebuttalPrompt(t *testing.T) {
 	// Round 2 should have sent a rebuttal prompt
 	require.NotEmpty(t, mock.sendLongTextCalls)
 	sent := mock.sendLongTextCalls[0].Text
-	assert.Contains(t, sent, "IMPORTANT: Discuss ONLY",
-		"round 2 rebuttal must include topic isolation")
+	assert.Contains(t, sent, "Markdown file")
+	require.NotEmpty(t, mock.promptFileContents)
+	assert.Contains(t, mock.promptFileContents[0], "IMPORTANT: Discuss ONLY",
+		"round 2 rebuttal prompt file must include topic isolation")
 }
 
 // TestExecuteRound_SkipWaitProviders verifies skipWait providers are skipped.

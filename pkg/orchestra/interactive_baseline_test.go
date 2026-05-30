@@ -106,9 +106,10 @@ func TestSendPrompts_SkipsArgsProvider(t *testing.T) {
 		{provider: stdinProvider, paneID: "pane-2"},
 	}
 	cfg := OrchestraConfig{
-		Providers: []ProviderConfig{argsProvider, stdinProvider},
-		Terminal:  mock,
-		Prompt:    "test prompt",
+		Providers:  []ProviderConfig{argsProvider, stdinProvider},
+		Terminal:   mock,
+		Prompt:     "test prompt",
+		WorkingDir: t.TempDir(),
 	}
 
 	failed := sendPrompts(context.Background(), cfg, panes)
@@ -127,15 +128,30 @@ func TestSendPrompts_SkipsSkipWaitProvider(t *testing.T) {
 		{provider: ProviderConfig{Name: "p2", Binary: "echo"}, paneID: "pane-2"},
 	}
 	cfg := OrchestraConfig{
-		Providers: []ProviderConfig{{Name: "p1"}, {Name: "p2"}},
-		Terminal:  mock,
-		Prompt:    "test",
+		Providers:  []ProviderConfig{{Name: "p1"}, {Name: "p2"}},
+		Terminal:   mock,
+		Prompt:     "test",
+		WorkingDir: t.TempDir(),
 	}
 
 	failed := sendPrompts(context.Background(), cfg, panes)
 	assert.Empty(t, failed)
 	// Only non-skipWait provider should get prompt
 	assert.Len(t, mock.sendLongTextCalls, 1)
+}
+
+func TestWaitForSessionReady_SkipsLaunchPromptProvider(t *testing.T) {
+	t.Parallel()
+	mock := newCmuxMock()
+	mock.readScreenOutput = "generating..."
+	panes := []paneInfo{{
+		provider: ProviderConfig{Name: "gemini", Binary: "agy", InteractiveInput: "stdin"},
+		paneID:   "pane-1",
+	}}
+
+	failed := waitForSessionReady(context.Background(), mock, panes)
+	assert.Empty(t, failed)
+	assert.False(t, panes[0].skipWait)
 }
 
 // TestLaunchInteractiveSessions_SendLongTextError verifies SendLongText failure
@@ -172,14 +188,18 @@ func TestLaunchInteractiveSessions_ArgsMode(t *testing.T) {
 		{provider: argsProvider, paneID: "pane-1"},
 	}
 	cfg := OrchestraConfig{
-		Providers: []ProviderConfig{argsProvider},
-		Terminal:  mock,
-		Prompt:    "fix the bug",
+		Providers:  []ProviderConfig{argsProvider},
+		Terminal:   mock,
+		Prompt:     "fix the bug",
+		WorkingDir: t.TempDir(),
 	}
 
 	failed := launchInteractiveSessions(context.Background(), cfg, panes)
 	assert.Empty(t, failed)
 	require.NotEmpty(t, mock.sendLongTextCalls)
-	// The launch command should include the prompt
-	assert.Contains(t, mock.sendLongTextCalls[0].Text, "fix the bug")
+	assert.Contains(t, mock.sendLongTextCalls[0].Text, "Markdown file")
+	assert.NotContains(t, mock.sendLongTextCalls[0].Text, "fix the bug",
+		"launch command should carry only a short prompt-file instruction")
+	require.NotEmpty(t, mock.promptFileContents)
+	assert.Contains(t, mock.promptFileContents[0], "fix the bug")
 }

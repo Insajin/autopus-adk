@@ -118,8 +118,14 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 	var failed []FailedProvider
 	for i, pi := range panes {
 		var launchPrompt string
-		if pi.provider.InteractiveInput == "args" {
-			launchPrompt = cfg.Prompt
+		var promptFile string
+		var responseFile string
+		if promptDeliveredAtLaunch(pi.provider) {
+			launchPrompt, promptFile, responseFile = panePromptText(cfg, pi.provider, 1, cfg.Prompt)
+			if promptFile != "" {
+				panes[i].promptFiles = append(panes[i].promptFiles, promptFile)
+			}
+			panes[i].responseFile = responseFile
 		}
 		cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, launchPrompt, cfg.WorkingDir)
 		// FR-02: Use SendLongText for launch command body (handles long args-based prompts)
@@ -152,6 +158,9 @@ func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []pa
 	var failed []FailedProvider
 	for i, pi := range panes {
 		if pi.skipWait {
+			continue
+		}
+		if promptDeliveredAtLaunch(pi.provider) {
 			continue
 		}
 		timeout := startupTimeoutFor(pi.provider)
@@ -232,11 +241,16 @@ func sendPrompts(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []F
 			continue
 		}
 		// Skip sendPrompts for providers that received the prompt via CLI args at launch
-		if pi.provider.InteractiveInput == "args" {
+		if promptDeliveredAtLaunch(pi.provider) {
 			continue
 		}
+		promptText, promptFile, responseFile := panePromptText(cfg, pi.provider, 1, cfg.Prompt)
+		if promptFile != "" {
+			panes[i].promptFiles = append(panes[i].promptFiles, promptFile)
+		}
+		panes[i].responseFile = responseFile
 		// Send prompt text via SendLongText (uses buffer-based delivery for long prompts)
-		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, cfg.Prompt); err != nil {
+		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, promptText); err != nil {
 			failed = append(failed, FailedProvider{
 				Name:  pi.provider.Name,
 				Error: fmt.Sprintf("send prompt failed: %v", err),

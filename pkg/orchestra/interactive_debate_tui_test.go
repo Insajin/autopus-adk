@@ -49,8 +49,12 @@ func TestExecuteRound_OpencodeTUI_SendLongTextRound1(t *testing.T) {
 	// TUI mode opencode MUST receive SendLongText in round 1
 	require.NotEmpty(t, mock.sendLongTextCalls,
 		"opencode TUI mode must receive SendLongText in round 1 (R3)")
-	assert.Contains(t, mock.sendLongTextCalls[0].Text, "review this code",
-		"SendLongText must contain the original prompt (R3)")
+	sent := mock.sendLongTextCalls[0].Text
+	assert.Contains(t, sent, "Markdown file",
+		"SendLongText should use a short file-backed instruction")
+	require.NotEmpty(t, mock.promptFileContents)
+	assert.Contains(t, mock.promptFileContents[0], "review this code",
+		"prompt file must contain the original prompt (R3)")
 }
 
 // TestExecuteRound_OpencodeTUI_SendLongTextRound2 verifies that opencode

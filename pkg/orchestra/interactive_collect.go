@@ -38,28 +38,35 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 				baseline = baselines[pi.provider.Name]
 			}
 			timedOut := !waitForCompletion(ctx, cfg, pi, patterns, baseline, hookSession, round)
-			// Fresh context for final read — original ctx may be cancelled after timeout.
-			readCtx, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{
-				Scrollback:      true,
-				ScrollbackLines: scrollbackDepth(cfg.ScrollbackLines),
-			})
-			readCancel()
-			output := cleanScreenOutput(screen)
+			output, responseFileOK := readResponseFile(pi.responseFile)
+			if responseFileOK {
+				timedOut = false
+			}
 
-			// Retry once if output is empty — pane may still be rendering
-			// or completion detection may have fired slightly early.
-			if output == "" {
-				time.Sleep(emptyScreenRetryDelay)
-				retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
-				screen2, _ := cfg.Terminal.ReadScreen(retryCtx, pi.paneID, terminal.ReadScreenOpts{
+			if !responseFileOK {
+				// Fresh context for final read — original ctx may be cancelled after timeout.
+				readCtx, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{
 					Scrollback:      true,
 					ScrollbackLines: scrollbackDepth(cfg.ScrollbackLines),
 				})
-				retryCancel()
-				if retried := cleanScreenOutput(screen2); retried != "" {
-					output = retried
-					log.Printf("[ReadScreen] retry succeeded for %s (pane %s, timedOut=%v)", pi.provider.Name, pi.paneID, timedOut)
+				readCancel()
+				output = cleanScreenOutput(screen)
+
+				// Retry once if output is empty — pane may still be rendering
+				// or completion detection may have fired slightly early.
+				if output == "" {
+					time.Sleep(emptyScreenRetryDelay)
+					retryCtx, retryCancel := context.WithTimeout(context.Background(), 5*time.Second)
+					screen2, _ := cfg.Terminal.ReadScreen(retryCtx, pi.paneID, terminal.ReadScreenOpts{
+						Scrollback:      true,
+						ScrollbackLines: scrollbackDepth(cfg.ScrollbackLines),
+					})
+					retryCancel()
+					if retried := cleanScreenOutput(screen2); retried != "" {
+						output = retried
+						log.Printf("[ReadScreen] retry succeeded for %s (pane %s, timedOut=%v)", pi.provider.Name, pi.paneID, timedOut)
+					}
 				}
 			}
 
@@ -76,7 +83,11 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 			}
 			receiptPath := ""
 			if cfg.ReliabilityStore != nil {
-				receipt := collectionReceipt(cfg.RunID, pi.provider.Name, "poll", "poll", status, errMsg, output, round, partial)
+				collectionMode := "poll"
+				if responseFileOK {
+					collectionMode = "response_file"
+				}
+				receipt := collectionReceipt(cfg.RunID, pi.provider.Name, collectionMode, collectionMode, status, errMsg, output, round, partial)
 				receiptPath = cfg.ReliabilityStore.recordCollection(receipt)
 			}
 

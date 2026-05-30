@@ -67,6 +67,9 @@ func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo,
 		case <-ctx.Done():
 			return false, nil
 		case <-ticker.C:
+			if _, ok := readResponseFile(pi.responseFile); ok {
+				return true, nil
+			}
 			screen, err := d.term.ReadScreen(ctx, pi.paneID, terminal.ReadScreenOpts{})
 			if err != nil {
 				candidateDetected = false

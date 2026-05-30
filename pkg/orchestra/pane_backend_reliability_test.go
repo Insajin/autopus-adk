@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -118,11 +119,12 @@ func TestExecute_S10_PromptGatedOnReady(t *testing.T) {
 	require.NotNil(t, resp)
 
 	// SendLongText is called once for the launch command (no prompt body) and
-	// once for the prompt after ready. The launch command must NOT contain the
-	// prompt; exactly one SendLongText carries the prompt, and it happens after ready.
+	// once for the short prompt-file instruction after ready. The launch command
+	// must NOT contain the prompt; exactly one SendLongText points at the prompt file.
 	var promptSends int
 	for _, lt := range mock.longTextsSnapshot() {
-		if lt == prompt {
+		assert.NotEqual(t, prompt, lt, "full prompt body must not be typed into the pane")
+		if strings.Contains(lt, "Markdown file") {
 			promptSends++
 		}
 	}

@@ -16,10 +16,12 @@ const sentinel = "__AUTOPUS_DONE__"
 
 // paneInfo tracks a provider's pane and output file.
 type paneInfo struct {
-	paneID     terminal.PaneID
-	outputFile string
-	provider   ProviderConfig
-	skipWait   bool // true when SendCommand failed — skip sentinel wait
+	paneID       terminal.PaneID
+	outputFile   string
+	provider     ProviderConfig
+	skipWait     bool // true when SendCommand failed — skip sentinel wait
+	promptFiles  []string
+	responseFile string
 }
 
 // RunPaneOrchestra runs orchestration using terminal panes when available.
@@ -122,7 +124,12 @@ func splitProviderPanes(ctx context.Context, cfg OrchestraConfig) ([]paneInfo, [
 func sendPaneCommands(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []FailedProvider {
 	var failed []FailedProvider
 	for i, pi := range panes {
-		cmd := buildPaneCommand(pi.provider, cfg.Prompt, pi.outputFile) + "\n"
+		prompt, promptFile, responseFile := panePromptText(cfg, pi.provider, 1, cfg.Prompt)
+		if promptFile != "" {
+			panes[i].promptFiles = append(panes[i].promptFiles, promptFile)
+		}
+		panes[i].responseFile = responseFile
+		cmd := buildPaneCommand(pi.provider, prompt, pi.outputFile) + "\n"
 		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, cmd); err != nil {
 			failed = append(failed, FailedProvider{
 				Name:  pi.provider.Name,
@@ -158,7 +165,12 @@ func collectPaneResults(ctx context.Context, panes []paneInfo, start time.Time) 
 		go func(pi paneInfo) {
 			defer wg.Done()
 			err := waitForSentinel(ctx, pi.outputFile)
-			output := readOutputFile(pi.outputFile)
+			output, fromResponseFile := readResponseFile(pi.responseFile)
+			if fromResponseFile {
+				err = nil
+			} else {
+				output = readOutputFile(pi.outputFile)
+			}
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -244,6 +256,8 @@ func cleanupPanes(term terminal.Terminal, panes []paneInfo) {
 	for _, pi := range panes {
 		_ = term.Close(ctx, string(pi.paneID))
 		_ = os.Remove(pi.outputFile)
+		cleanupPromptFiles(pi.promptFiles)
+		_ = os.Remove(pi.responseFile)
 	}
 }
 

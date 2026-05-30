@@ -58,13 +58,19 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 		return paneFallback(ctx, req, "interactive pane execution failed: SplitPane error: "+err.Error())
 	}
 	pi := paneInfo{paneID: paneID, provider: req.Config}
-	defer cleanupInteractivePanes(term, []paneInfo{pi})
+	defer func() { cleanupInteractivePanes(term, []paneInfo{pi}) }()
 
 	// Launch the provider CLI. For args-based providers the prompt rides on the
 	// launch command; otherwise the prompt is sent only after session-ready.
 	launchPrompt := ""
-	if req.Config.InteractiveInput == "args" {
-		launchPrompt = req.Prompt
+	if promptDeliveredAtLaunch(req.Config) {
+		var promptFile string
+		var responseFile string
+		launchPrompt, promptFile, responseFile = panePromptText(b.cfg, req.Config, req.Round, req.Prompt)
+		if promptFile != "" {
+			pi.promptFiles = append(pi.promptFiles, promptFile)
+		}
+		pi.responseFile = responseFile
 	}
 	cmd := buildInteractiveLaunchCmdWithCWD(req.Config, launchPrompt, b.cfg.WorkingDir)
 	if err := term.SendLongText(ctx, paneID, cmd); err != nil {
@@ -74,18 +80,22 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 		return paneFallback(ctx, req, "interactive pane execution failed: launch enter error: "+err.Error())
 	}
 
-	// REQ-009: gate the prompt on session readiness. If the session never
-	// becomes ready the prompt is NEVER sent and we degrade to fallback.
-	ready := pollUntilSessionReady(ctx, term, paneID, SessionReadyPatterns(), startupTimeoutFor(req.Config))
-	if !ready {
-		return paneFallback(ctx, req,
-			"interactive pane execution failed: session never became ready (prompt was not sent)")
-	}
+	if !promptDeliveredAtLaunch(req.Config) {
+		// REQ-009: gate the prompt on session readiness. If the session never
+		// becomes ready the prompt is NEVER sent and we degrade to fallback.
+		ready := pollUntilSessionReady(ctx, term, paneID, SessionReadyPatterns(), startupTimeoutFor(req.Config))
+		if !ready {
+			return paneFallback(ctx, req,
+				"interactive pane execution failed: session never became ready (prompt was not sent)")
+		}
 
-	// REQ-009: send the prompt only after ready, and only for sendkeys-input
-	// providers (args providers already received it at launch).
-	if req.Config.InteractiveInput != "args" {
-		if err := term.SendLongText(ctx, paneID, req.Prompt); err != nil {
+		// REQ-009: send the prompt only after ready when it was not delivered at launch.
+		promptText, promptFile, responseFile := panePromptText(b.cfg, req.Config, req.Round, req.Prompt)
+		if promptFile != "" {
+			pi.promptFiles = append(pi.promptFiles, promptFile)
+		}
+		pi.responseFile = responseFile
+		if err := term.SendLongText(ctx, paneID, promptText); err != nil {
 			return paneFallback(ctx, req, "interactive pane execution failed: prompt send error: "+err.Error())
 		}
 		time.Sleep(promptRegisterDelay)
@@ -100,7 +110,7 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	var hookSession *HookSession
 	completed := waitForCompletion(ctx, b.cfg, pi, DefaultCompletionPatterns(), "", hookSession, req.Round)
 
-	resp := b.collectResponse(ctx, req, paneID, !completed)
+	resp := b.collectResponse(ctx, req, pi, !completed)
 	resp.Duration = time.Since(start)
 	return resp, nil
 }

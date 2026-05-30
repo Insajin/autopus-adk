@@ -3,6 +3,8 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -119,6 +121,29 @@ func TestPaneRunner_CollectsResults(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Len(t, result.Responses, 2)
 	assert.NotEmpty(t, result.Merged)
+}
+
+func TestCollectPaneResults_PrefersResponseFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	outputPath := filepath.Join(dir, "stdout.txt")
+	responsePath := filepath.Join(dir, "response.md")
+	require.NoError(t, os.WriteFile(outputPath, []byte("stdout fallback\n"+sentinel+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(responsePath, []byte(responseBeginMarker+"\nfile result\n"+responseEndMarker+"\n"), 0o600))
+
+	panes := []paneInfo{{
+		provider:     ProviderConfig{Name: "claude"},
+		outputFile:   outputPath,
+		responseFile: responsePath,
+	}}
+
+	responses, failed := collectPaneResults(context.Background(), panes, time.Now())
+
+	require.Empty(t, failed)
+	require.Len(t, responses, 1)
+	assert.Equal(t, "file result", responses[0].Output)
+	assert.False(t, responses[0].TimedOut)
 }
 
 // TestPaneRunner_CleansUpPanes verifies that all panes are closed and
