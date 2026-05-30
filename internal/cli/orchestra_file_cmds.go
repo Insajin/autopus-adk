@@ -17,6 +17,7 @@ func newOrchestraReviewCmd() *cobra.Command {
 		rounds    int
 		noDetach  bool
 		noJudge   bool
+		riskTier  string
 	)
 
 	cmd := &cobra.Command{
@@ -30,11 +31,25 @@ func newOrchestraReviewCmd() *cobra.Command {
 			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
 			timeoutChanged := cmd.Flags().Changed("timeout")
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
+			resolvedRiskTier, riskInputs, err := resolveReviewRiskTier(riskTier, args)
+			if err != nil {
+				return err
+			}
 			prompt, err := buildReviewPrompt(args)
 			if err != nil {
 				return err
 			}
-			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge, TimeoutChanged: timeoutChanged})
+			flags := OrchestraFlags{
+				NoDetach:       noDetach,
+				KeepRelay:      keepRelay,
+				NoJudge:        noJudge,
+				TimeoutChanged: timeoutChanged,
+			}
+			if len(flagProviders) == 0 {
+				flags.RiskTier = resolvedRiskTier
+				flags.RiskInputs = riskInputs
+			}
+			return runOrchestraCommand(cmd.Context(), "review", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, flags)
 		},
 	}
 
@@ -47,6 +62,7 @@ func newOrchestraReviewCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&noDetach, "no-detach", false, "Disable auto-detach mode")
 	cmd.Flags().Bool("keep-relay-output", false, "relay 전략 실행 후 임시 파일 보존")
 	cmd.Flags().BoolVar(&noJudge, "no-judge", false, "Skip judge verdict phase in debate strategy")
+	cmd.Flags().StringVar(&riskTier, "risk-tier", "auto", "리뷰 리스크 티어 (auto|low|medium|high|critical)")
 
 	return cmd
 }

@@ -207,6 +207,8 @@ type OrchestraFlags struct {
 	ContextAware   bool
 	SubprocessMode bool
 	TimeoutChanged bool
+	RiskTier       reviewRiskTier
+	RiskInputs     []string
 }
 
 // isHookModeAvailable checks whether hook-based result collection can be used.

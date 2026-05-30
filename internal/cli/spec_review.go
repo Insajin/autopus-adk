@@ -102,7 +102,7 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다. 설치를 확인하세요: %v", providerNames)
 	}
 	if flags.MultiMode && len(providers) < 2 {
-		return fmt.Errorf("--multi requires at least 2 installed providers (resolved: %v)", providerNames)
+		fmt.Fprintf(os.Stderr, "경고: --multi review requested but only one provider is installed; falling back to single-provider review (resolved: %v)\n", providerNames)
 	}
 
 	// Collect code context once. Limit is derived adaptively from the number of

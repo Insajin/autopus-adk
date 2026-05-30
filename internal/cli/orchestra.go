@@ -139,8 +139,25 @@ func runOrchestraCommand(
 		return fmt.Errorf("유효하지 않은 전략: %q (가능한 값: consensus, pipeline, debate, fastest, relay)", strategyStr)
 	}
 
+	riskTierSingleProvider := false
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다")
+	}
+	if commandName == "review" && flags.RiskTier != "" {
+		adjusted, degraded := applyReviewRiskTierProviders(providers, flags.RiskTier)
+		if len(adjusted) != len(providers) || degraded {
+			fmt.Fprintf(os.Stderr, "리스크 티어: %s", flags.RiskTier)
+			if len(flags.RiskInputs) > 0 {
+				fmt.Fprintf(os.Stderr, " (signals: %s)", strings.Join(flags.RiskInputs, ", "))
+			}
+			if degraded {
+				fmt.Fprintf(os.Stderr, " — multi-provider 대상이지만 사용 가능한 provider가 1개라 단일 provider로 폴백\n")
+			} else {
+				fmt.Fprintf(os.Stderr, " — provider fan-out %d → %d\n", len(providers), len(adjusted))
+			}
+		}
+		providers = adjusted
+		riskTierSingleProvider = len(providers) == 1 && (degraded || flags.RiskTier == reviewRiskTierLow || flags.RiskTier == reviewRiskTierMedium)
 	}
 
 	// Validate --rounds: must be 1-10 and only with debate strategy
@@ -153,7 +170,7 @@ func runOrchestraCommand(
 
 	nd := flags.NoDetach
 	keepRelay := flags.KeepRelay
-	noJudge := flags.NoJudge
+	noJudge := flags.NoJudge || riskTierSingleProvider
 	yieldRounds := flags.YieldRounds
 	contextAware := flags.ContextAware
 	subprocessMode := flags.SubprocessMode

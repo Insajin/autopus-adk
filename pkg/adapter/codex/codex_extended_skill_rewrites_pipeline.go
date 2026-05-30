@@ -15,9 +15,21 @@ This skill is the default for ` + "`@auto go SPEC-ID`" + `.
 | none | Subagent pipeline | Main session orchestrates specialists phase-by-phase |
 | ` + "`--team`" + ` | Codex team profile | Use native ` + "`multi_agent`" + ` tools with Lead/Builder/Guardian coordination |
 | ` + "`--solo`" + ` | Single session | No worker spawning; implement directly in the main session |
-| ` + "`--multi`" + ` | Multi-provider review | Run additional review/validation passes when configured, prefer orchestra-backed review when available |
+| ` + "`--multi`" + ` | Risk-tiered provider review | Run additional dissent review only for high/critical risk when configured; fall back to a single provider when only one is available |
 
 See .codex/skills/agent-teams.md for the Codex ` + "`--team`" + ` policy and .codex/skills/worktree-isolation.md for parallel ownership rules.
+
+## Risk-Tiered Review Policy
+Provider fan-out is advisory evidence, not the source of truth for PASS/FAIL. Deterministic checks, QAMESH evidence, build/test results, canary evidence, and reviewer/security findings remain authoritative.
+
+| Tier | Signals | Provider policy |
+|------|---------|-----------------|
+| ` + "`low`" + ` | docs-only, formatting-only, low-blast-radius changes | single provider |
+| ` + "`medium`" + ` | ordinary source changes with local blast radius | single provider |
+| ` + "`high`" + ` | shared services, handlers, workers, QA/pipeline/orchestra/runtime boundaries, large fan-out | multi-provider dissent review when available; fallback to single provider |
+| ` + "`critical`" + ` | auth/OAuth/JWT, secrets, billing/payments, IAM/permissions, SQL migrations, deployment/release/production mutation, security/legal/compliance/crypto | multi-provider dissent review when available; fallback to single provider with degraded evidence |
+
+` + "`--multi`" + ` requests the risk policy; it does not mean every retry or every low-risk diff must fan out to all providers. Extra provider review should run in discovery, then normal fix/validate/test/review-verify loops should stay focused unless the risk tier remains high/critical after repair.
 
 ## Codex Auto Semantics
 

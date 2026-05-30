@@ -13,7 +13,7 @@ This skill is the default for `/auto go SPEC-ID`.
 | (없음) | **서브에이전트 파이프라인** | Agent tool로 서브에이전트 스폰 (이 스킬). 메인 세션이 파이프라인 흐름 제어 |
 | `--team` | **Codex Team Profile** | native `multi_agent` 도구 기반 Lead/Builder/Guardian 조율 |
 | `--solo` | **단일 세션** | 메인 세션이 직접 TDD 구현. 서브에이전트 없음 |
-| `--multi` | **멀티프로바이더** | Review Phase에서 orchestra engine 사용. 다른 모드와 조합 가능 |
+| `--multi` | **리스크 기반 멀티프로바이더** | Review Phase에서 risk tier가 high/critical이면 orchestra engine으로 추가 dissent review를 실행. 설치된 provider가 1개뿐이면 단일 provider로 폴백 |
 
 For Codex team mode (`--team`), see `.codex/skills/agent-teams.md` for role-based composition (Lead/Builder/Guardian).
 
@@ -74,10 +74,23 @@ Phase 2.5: Annotation      → annotator   (sonnet, bypassPermissions) — @AX t
 Phase 3:   Testing         → tester      (sonnet, acceptEdits)
 Gate 3:    Coverage        → verify 85%+ coverage
 Phase 3.5: UX Verify       → frontend-specialist (sonnet, bypassPermissions) — optional, frontend only
-Phase 4:   Review          → reviewer + security-auditor (parallel) — retry up to 2x on REQUEST_CHANGES
+Phase 4:   Review          → reviewer + security-auditor (parallel) + risk-tiered provider fan-out — retry up to 2x on REQUEST_CHANGES
 ```
 
 > The model assignments above are for Balanced mode. In Ultra mode, all agents run with the premium path.
+
+## Risk-Tiered Review Policy
+
+Provider fan-out is advisory evidence, not the source of truth for PASS/FAIL. Deterministic checks, QAMESH evidence, build/test results, canary evidence, and reviewer/security findings remain authoritative.
+
+| Tier | Signals | Provider policy |
+|------|---------|-----------------|
+| `low` | docs-only, formatting-only, low-blast-radius changes | single provider |
+| `medium` | ordinary source changes with local blast radius | single provider |
+| `high` | shared services, handlers, workers, QA/pipeline/orchestra/runtime boundaries, large fan-out | multi-provider dissent review when available; fallback to single provider |
+| `critical` | auth/OAuth/JWT, secrets, billing/payments, IAM/permissions, SQL migrations, deployment/release/production mutation, security/legal/compliance/crypto | multi-provider dissent review when available; fallback to single provider with degraded evidence |
+
+`--multi` requests the risk policy; it does not mean every retry or every low-risk diff must fan out to all providers. Extra provider review should run in discovery, then normal fix/validate/test/review-verify loops should stay focused unless the risk tier remains high/critical after repair.
 
 ## Quality Mode
 
