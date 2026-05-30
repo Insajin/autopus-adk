@@ -9,8 +9,11 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter"
 )
 
-func (a *Adapter) cleanupDeprecatedSurface() error {
+func (a *Adapter) cleanupDeprecatedSurface(files []adapter.FileMapping) error {
 	if err := a.cleanupPluginWorkflowShims(); err != nil {
+		return err
+	}
+	if err := a.cleanupUnexpectedPluginSkills(files); err != nil {
 		return err
 	}
 	return a.cleanupLegacyRootConfig()
@@ -24,6 +27,46 @@ func (a *Adapter) cleanupPluginWorkflowShims() error {
 		target := filepath.Join(a.root, ".autopus", "plugins", "auto", "skills", spec.Name)
 		if err := os.RemoveAll(target); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("deprecated Codex plugin shim 제거 실패 %s: %w", target, err)
+		}
+	}
+	return nil
+}
+
+func (a *Adapter) cleanupUnexpectedPluginSkills(files []adapter.FileMapping) error {
+	if len(files) == 0 {
+		return nil
+	}
+
+	pluginSkillsRoot := filepath.ToSlash(filepath.Join(".autopus", "plugins", "auto", "skills"))
+	expected := make(map[string]bool)
+	for _, file := range files {
+		target := filepath.ToSlash(file.TargetPath)
+		if !strings.HasPrefix(target, pluginSkillsRoot+"/") {
+			continue
+		}
+		rest := strings.TrimPrefix(target, pluginSkillsRoot+"/")
+		name := strings.Split(rest, "/")[0]
+		if name != "" {
+			expected[name] = true
+		}
+	}
+
+	root := filepath.Join(a.root, ".autopus", "plugins", "auto", "skills")
+	entries, err := os.ReadDir(root)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("Codex plugin skill surface 읽기 실패 %s: %w", root, err)
+	}
+
+	for _, entry := range entries {
+		if expected[entry.Name()] {
+			continue
+		}
+		target := filepath.Join(root, entry.Name())
+		if err := os.RemoveAll(target); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("stale Codex plugin skill 제거 실패 %s: %w", target, err)
 		}
 	}
 	return nil

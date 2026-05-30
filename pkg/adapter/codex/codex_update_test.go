@@ -182,6 +182,26 @@ func TestUpdate_RemovesDeprecatedPluginWorkflowShims(t *testing.T) {
 	assert.True(t, os.IsNotExist(statErr), "deprecated plugin workflow shims should be pruned on update")
 }
 
+func TestUpdate_RemovesUnmanagedStalePluginLongTailSkills(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	staleDir := filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "metrics")
+	require.NoError(t, os.MkdirAll(staleDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(staleDir, "SKILL.md"), []byte("# Metrics Skill\n"), 0644))
+
+	_, err = a.Update(context.Background(), cfg)
+	require.NoError(t, err)
+
+	assert.NoFileExists(t, filepath.Join(staleDir, "SKILL.md"), "unmanaged stale plugin long-tail skills should be pruned on update")
+	assert.FileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"))
+}
+
 func TestUpdate_RemovesLegacyRootCodexConfig(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

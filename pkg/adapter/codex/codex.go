@@ -154,7 +154,7 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	files = append(files, gitHookFiles...)
 
-	if err := a.cleanupDeprecatedSurface(); err != nil {
+	if err := a.cleanupDeprecatedSurface(files); err != nil {
 		return nil, err
 	}
 
@@ -221,7 +221,7 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		finalFiles = append(finalFiles, f)
 	}
 
-	if err := a.cleanupDeprecatedSurface(); err != nil {
+	if err := a.cleanupDeprecatedSurface(newFiles); err != nil {
 		return nil, err
 	}
 
