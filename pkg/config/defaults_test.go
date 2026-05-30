@@ -19,6 +19,7 @@ func TestDefaultFullConfig_GeminiPromptViaArgs(t *testing.T) {
 	// value; the prompt fills the "" slot via PromptViaArgs (injectPromptArg).
 	assert.True(t, gemini.PromptViaArgs, "gemini provider must pass the prompt as the --print value")
 	assert.Equal(t, []string{"--print", ""}, gemini.Args, "gemini provider must use the --print value slot")
+	assert.Equal(t, "stdin", gemini.InteractiveInput, "gemini pane mode must not derive args-based launch input")
 }
 
 func TestDefaultFullConfig_OtherProvidersPromptViaArgsFalse(t *testing.T) {

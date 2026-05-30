@@ -18,17 +18,20 @@ func buildInteractiveLaunchCmd(p ProviderConfig, prompt string) string {
 }
 
 func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir string) string {
-	cmd := p.Binary
-	for _, arg := range paneArgs(p) {
+	cmd := shellQuoteCommandArg(p.Binary)
+	for _, arg := range interactiveLaunchArgs(p) {
 		// Skip non-interactive flags that conflict with TUI mode.
 		// Only skip "run" when NOT using args-based input (args mode needs "run" for opencode).
 		if arg == "--print" || arg == "-p" || arg == "--prompt" || arg == "--quiet" || arg == "-q" {
 			continue
 		}
+		if arg == "" {
+			continue
+		}
 		if arg == "run" && p.InteractiveInput != "args" {
 			continue
 		}
-		cmd += " " + arg
+		cmd += " " + shellQuoteCommandArg(arg)
 	}
 	// REQ-1: Add permission bypass for Claude interactive sessions
 	if p.Binary == "claude" {
@@ -47,6 +50,27 @@ func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir strin
 		return "cd " + shellQuote(workingDir) + " && " + cmd
 	}
 	return cmd
+}
+
+func interactiveLaunchArgs(p ProviderConfig) []string {
+	if p.Name == "gemini" && p.Binary == "agy" && len(p.PaneArgs) == 0 && p.InteractiveInput != "args" {
+		return p.PaneArgs
+	}
+	return paneArgs(p)
+}
+
+func shellQuoteCommandArg(s string) string {
+	if s == "" {
+		return "''"
+	}
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == '-' || r == '_' || r == '.' || r == '/' || r == ':' || r == '=' || r == '@' || r == '%' || r == '+' {
+			continue
+		}
+		return shellQuote(s)
+	}
+	return s
 }
 
 // shellQuote wraps a string in single quotes, escaping any embedded single quotes.

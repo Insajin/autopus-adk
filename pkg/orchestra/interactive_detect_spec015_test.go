@@ -26,6 +26,11 @@ func TestDefaultCompletionPatterns_ProviderSpecificMatching(t *testing.T) {
 			expectedProvider: "claude",
 		},
 		{
+			name:             "claude: unicode heavy right-pointing angle with nbsp",
+			screen:           "some output\n❯\u00a0",
+			expectedProvider: "claude",
+		},
+		{
 			name:             "claude: bare prompt on own line",
 			screen:           "❯",
 			expectedProvider: "claude",
@@ -43,6 +48,11 @@ func TestDefaultCompletionPatterns_ProviderSpecificMatching(t *testing.T) {
 		{
 			name:             "codex: codex> prompt",
 			screen:           "codex> ",
+			expectedProvider: "codex",
+		},
+		{
+			name:             "codex: v0.135 suggested prompt",
+			screen:           "› Summarize recent commits",
 			expectedProvider: "codex",
 		},
 		{
@@ -77,6 +87,20 @@ func TestDefaultCompletionPatterns_ProviderSpecificMatching(t *testing.T) {
 	}
 }
 
+func TestCompletionDetection_ClaudeWorkingStatusDefersIdlePrompt(t *testing.T) {
+	t.Parallel()
+
+	tests := []string{
+		"❯ Return exactly OK.\n\n* Creating…\n\n❯\u00a0",
+		"❯ Return exactly OK.\n\n✢ Cerebrating… (9s · ↑ 150 tokens)\n\n❯\u00a0",
+		"❯ Return exactly OK.\n\n* Wrangling…\n\n❯\u00a0",
+	}
+	for _, screen := range tests {
+		assert.False(t, isPromptVisible(screen, DefaultCompletionPatterns()),
+			"claude shows an idle prompt while still processing; the status line must defer completion")
+	}
+}
+
 // --- R1: ANSI-wrapped prompt detection ---
 
 // TestIsPromptVisible_ANSIWrappedPrompts verifies that ANSI escape codes are stripped
@@ -102,6 +126,11 @@ func TestIsPromptVisible_ANSIWrappedPrompts(t *testing.T) {
 		{
 			name:    "codex prompt with cyan ANSI color",
 			screen:  "\x1b[36mcodex>\x1b[0m ",
+			matched: true,
+		},
+		{
+			name:    "codex v0.135 prompt with ANSI color",
+			screen:  "\x1b[36m› Summarize recent commits\x1b[0m",
 			matched: true,
 		},
 		{
@@ -166,8 +195,10 @@ func TestSessionReadyPatterns_CLIPromptsMatch(t *testing.T) {
 		screen string
 	}{
 		{"claude prompt", "❯"},
+		{"claude startup suggestion", "❯\u00a0Try \"write a test for <filepath>\""},
 		{"gemini prompt", "> Type your message..."},
 		{"codex prompt", "codex> "},
+		{"codex v0.135 prompt", "› Find and fix a bug in @filename"},
 		{"opencode prompt", "Ask anything"},
 	}
 

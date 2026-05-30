@@ -83,20 +83,18 @@ func (a *CmuxAdapter) SendCommand(_ context.Context, paneID PaneID, command stri
 	return nil
 }
 
-// SendLongText sends text to a pane. For short text (<500 bytes) it delegates
-// to SendCommand. For long text it uses set-buffer/paste-buffer/delete-buffer
-// to bypass PTY line-length limits.
+// SendLongText sends text to a pane via set-buffer/paste-buffer/delete-buffer.
+// Buffer paste is used for short and long payloads because cmux send goes
+// through the active keyboard input path and can be affected by IME state.
 // @AX:ANCHOR: [AUTO] public API contract — Terminal interface method; fan_in=3 (interactive.go x2, interactive_debate.go)
-// @AX:NOTE: [AUTO] magic constant 500 — byte threshold for short/long text path split
 func (a *CmuxAdapter) SendLongText(ctx context.Context, paneID PaneID, text string) error {
 	if err := validatePaneID(paneID); err != nil {
 		return fmt.Errorf("cmux: %w", err)
 	}
-	// Short text: delegate to SendCommand
-	if len(text) < 500 {
-		return a.SendCommand(ctx, paneID, text)
+	if text == "" {
+		return nil
 	}
-	// Long text: set-buffer → paste-buffer → delete-buffer
+
 	sanitized := strings.ReplaceAll(string(paneID), ":", "-")
 	bufName := fmt.Sprintf("autopus-%s-%d", sanitized, time.Now().UnixNano())
 

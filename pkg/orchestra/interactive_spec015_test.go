@@ -81,11 +81,11 @@ func TestWaitForSessionReady_ShellDollarNotReady(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	waitForSessionReady(ctx, mock, panes)
-	// If waitForSessionReady returned, it should have been via timeout, not match.
-	// Verify by checking that it took close to the timeout duration.
-	assert.True(t, ctx.Err() != nil || mock.readScreenCalls > 1,
-		"shell $ prompt must NOT trigger session ready — should poll until timeout")
+	failed := waitForSessionReady(ctx, mock, panes)
+	require.Len(t, failed, 1)
+	assert.Equal(t, "claude", failed[0].Name)
+	assert.Contains(t, failed[0].Error, "session never became ready")
+	assert.True(t, panes[0].skipWait, "not-ready pane must be skipped before prompt send")
 }
 
 // TestPollUntilSessionReady_CLIPromptReturnsTrue verifies CLI prompt detection.

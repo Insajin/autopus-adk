@@ -85,6 +85,11 @@ func TestInteractive_FilterPromptLines_RemovesProviderPrompts(t *testing.T) {
 			expected: "real output here",
 		},
 		{
+			name:     "codex v0.135 prompt filtered",
+			input:    "result\n› Summarize recent commits\nmore output",
+			expected: "result\nmore output",
+		},
+		{
 			name:     "no prompt lines unchanged",
 			input:    "just normal output\nsecond line",
 			expected: "just normal output\nsecond line",
@@ -198,6 +203,11 @@ func TestCleanScreenOutput(t *testing.T) {
 		{
 			name:     "codex prompt after ANSI strip",
 			input:    "\x1b[1mresult\x1b[0m\ncodex> \nmore output",
+			expected: "result\nmore output",
+		},
+		{
+			name:     "codex v0.135 prompt after ANSI strip",
+			input:    "\x1b[1mresult\x1b[0m\n› Find and fix a bug in @filename\nmore output",
 			expected: "result\nmore output",
 		},
 	}

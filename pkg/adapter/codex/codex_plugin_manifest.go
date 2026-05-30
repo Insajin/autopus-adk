@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/version"
 )
 
 type pluginManifest struct {
@@ -68,10 +73,12 @@ type marketplacePolicy struct {
 	Products       []string `json:"products,omitempty"`
 }
 
-func (a *Adapter) renderPluginManifestJSON() (string, error) {
+var codexPluginSemverRe = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$`)
+
+func (a *Adapter) renderPluginManifestJSON(cfg *config.HarnessConfig, routerContent string) (string, error) {
 	doc := pluginManifest{
 		Name:        "auto",
-		Version:     "1.0.0",
+		Version:     codexPluginVersion(cfg, routerContent),
 		Description: "Autopus workflow router for Codex: setup, status, goal, update, plan, go, fix, review, sync, idea, map, why, verify, secure, test, qa, dev, canary, and doctor.",
 		Author:      pluginAuthor{Name: "Autopus", Email: "noreply@autopus.co", URL: "https://autopus.co"},
 		Homepage:    "https://autopus.co",
@@ -103,6 +110,75 @@ func (a *Adapter) renderPluginManifestJSON() (string, error) {
 		return "", fmt.Errorf("plugin.json 직렬화 실패: %w", err)
 	}
 	return string(data) + "\n", nil
+}
+
+func codexPluginVersion(cfg *config.HarnessConfig, routerContent string) string {
+	base := codexPluginBaseVersion(version.Version())
+	project := "local"
+	if cfg != nil && strings.TrimSpace(cfg.ProjectName) != "" {
+		project = cfg.ProjectName
+	}
+	slug := codexPluginSlug(project)
+	cacheKey := checksum(codexPluginCacheInput(cfg, routerContent))
+	if len(cacheKey) > 12 {
+		cacheKey = cacheKey[:12]
+	}
+	return fmt.Sprintf("%s+codex.%s.%s", base, slug, cacheKey)
+}
+
+func codexPluginBaseVersion(raw string) string {
+	base := strings.TrimSpace(strings.TrimPrefix(raw, "v"))
+	if idx := strings.Index(base, "+"); idx >= 0 {
+		base = base[:idx]
+	}
+	if codexPluginSemverRe.MatchString(base) {
+		return base
+	}
+	return "0.0.0-dev"
+}
+
+func codexPluginSlug(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var b strings.Builder
+	lastDash := false
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash && b.Len() > 0 {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	slug := strings.Trim(b.String(), "-")
+	if slug == "" {
+		return "local"
+	}
+	if len(slug) > 40 {
+		slug = strings.TrimRight(slug[:40], "-")
+	}
+	if slug == "" {
+		return "local"
+	}
+	return slug
+}
+
+func codexPluginCacheInput(cfg *config.HarnessConfig, routerContent string) string {
+	parts := []string{"codex-plugin", routerContent}
+	if cfg != nil {
+		parts = append(parts,
+			cfg.ProjectName,
+			strings.Join(cfg.Platforms, ","),
+			cfg.Skills.SharedSurface,
+			cfg.Skills.Compiler.Mode,
+			strings.Join(cfg.Skills.Compiler.Bundles, ","),
+			strings.Join(cfg.Skills.Compiler.ExplicitSkills, ","),
+			cfg.Skills.Compiler.CodexLongTailTarget,
+		)
+	}
+	return strings.Join(parts, "\x00")
 }
 
 func (a *Adapter) renderMarketplaceJSON() (string, error) {

@@ -65,7 +65,8 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 
 	launchFailed := launchInteractiveSessions(timeoutCtx, cfg, panes)
 	failed = append(failed, launchFailed...)
-	waitForSessionReady(timeoutCtx, cfg.Terminal, panes)
+	readyFailed := waitForSessionReady(timeoutCtx, cfg.Terminal, panes)
+	failed = append(failed, readyFailed...)
 	promptFailed := sendPrompts(timeoutCtx, cfg, panes)
 	failed = append(failed, promptFailed...)
 
@@ -144,15 +145,26 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 
 // waitForSessionReady polls ReadScreen until a CLI-specific prompt is visible or timeout.
 // Uses SessionReadyPatterns (no shell $ / # patterns) to avoid false positives.
-func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []paneInfo) {
+// Providers that never become ready are marked skipWait so prompts are not sent
+// into a shell or half-launched TUI.
+func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []paneInfo) []FailedProvider {
 	patterns := SessionReadyPatterns()
-	for _, pi := range panes {
+	var failed []FailedProvider
+	for i, pi := range panes {
 		if pi.skipWait {
 			continue
 		}
 		timeout := startupTimeoutFor(pi.provider)
-		pollUntilSessionReady(ctx, term, pi.paneID, patterns, timeout)
+		if pollUntilSessionReady(ctx, term, pi.paneID, patterns, timeout) {
+			continue
+		}
+		panes[i].skipWait = true
+		failed = append(failed, FailedProvider{
+			Name:  pi.provider.Name,
+			Error: fmt.Sprintf("session never became ready after %s (prompt was not sent)", timeout),
+		})
 	}
+	return failed
 }
 
 // pollUntilPrompt polls ReadScreen at short intervals until a prompt pattern is detected or timeout.

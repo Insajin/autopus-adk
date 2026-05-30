@@ -63,15 +63,16 @@ func TestBuildInteractiveLaunchCmd_GeminiNoRunStrip(t *testing.T) {
 	t.Parallel()
 
 	p := ProviderConfig{
-		Name:     "gemini",
-		Binary:   "agy",
-		PaneArgs: []string{"run"},
+		Name:             "gemini",
+		Binary:           "agy",
+		PaneArgs:         []string{},
+		Args:             []string{"--print", ""},
+		PromptViaArgs:    true,
+		InteractiveInput: "stdin",
 	}
 
 	cmd := buildInteractiveLaunchCmd(p, "test prompt")
-	// "run" should be stripped for non-args providers
-	assert.NotContains(t, cmd, " run ")
-	assert.Contains(t, cmd, "agy")
+	assert.Equal(t, "agy", cmd, "gemini pane launch must open the TUI without --print or a bare positional prompt")
 }
 
 // TestBuildInteractiveLaunchCmd_ShellQuoteEscape verifies single quotes in prompt are escaped.
@@ -87,4 +88,17 @@ func TestBuildInteractiveLaunchCmd_ShellQuoteEscape(t *testing.T) {
 
 	cmd := buildInteractiveLaunchCmd(p, "it's a test")
 	assert.Contains(t, cmd, "'it'\\''s a test'")
+}
+
+func TestBuildInteractiveLaunchCmd_CodexPreservesConfigQuoting(t *testing.T) {
+	t.Parallel()
+
+	p := ProviderConfig{
+		Name:     "codex",
+		Binary:   "codex",
+		PaneArgs: []string{"-m", "gpt-5.5", "-c", `model_reasoning_effort="xhigh"`},
+	}
+
+	cmd := buildInteractiveLaunchCmd(p, "")
+	assert.Equal(t, `codex -m gpt-5.5 -c 'model_reasoning_effort="xhigh"'`, cmd)
 }

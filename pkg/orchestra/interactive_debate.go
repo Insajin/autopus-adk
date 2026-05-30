@@ -144,7 +144,7 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 	launchFailed := launchInteractiveSessions(ctx, cfg, panes)
 	if !cfg.HookMode || hookSession == nil {
-		waitForSessionReady(ctx, cfg.Terminal, panes)
+		launchFailed = append(launchFailed, waitForSessionReady(ctx, cfg.Terminal, panes)...)
 	}
 	if cfg.ReliabilityStore != nil {
 		for _, provider := range cfg.Providers {

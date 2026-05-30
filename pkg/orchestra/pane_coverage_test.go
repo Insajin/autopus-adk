@@ -93,6 +93,15 @@ func TestBuildPaneCommand_PromptViaArgs(t *testing.T) {
 	assert.Contains(t, cmd, "PROMPT_EOF")
 }
 
+func TestBuildPaneCommand_PromptViaArgsInjectsEmptySlot(t *testing.T) {
+	t.Parallel()
+	p := ProviderConfig{Name: "gemini", Binary: "agy", Args: []string{"--print", ""}, PromptViaArgs: true}
+	cmd := buildPaneCommand(p, "hello world", "/tmp/test.out")
+
+	assert.Contains(t, cmd, "'agy' '--print' 'hello world' | tee '/tmp/test.out'")
+	assert.NotContains(t, cmd, "'--print' '' 'hello world'")
+}
+
 // TestBuildPaneCommand_StdinMode covers the PromptViaArgs=false branch.
 func TestBuildPaneCommand_StdinMode(t *testing.T) {
 	t.Parallel()

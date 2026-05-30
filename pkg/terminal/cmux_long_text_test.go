@@ -28,9 +28,9 @@ func TestCmuxAdapter_SendLongText_LongText_BufferPath(t *testing.T) {
 	assert.Contains(t, strings.Join(captured.calls[2].args, " "), "delete-buffer")
 }
 
-// TestCmuxAdapter_SendLongText_ShortText_SendCommandPath verifies short text (<500B)
-// uses direct send command, not buffer path.
-func TestCmuxAdapter_SendLongText_ShortText_SendCommandPath(t *testing.T) {
+// TestCmuxAdapter_SendLongText_ShortText_BufferPath verifies short text also uses
+// buffer paste so cmux input does not pass through the active IME state.
+func TestCmuxAdapter_SendLongText_ShortText_BufferPath(t *testing.T) {
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 
@@ -38,11 +38,11 @@ func TestCmuxAdapter_SendLongText_ShortText_SendCommandPath(t *testing.T) {
 	shortText := strings.Repeat("B", 100)
 	err := a.SendLongText(context.Background(), "surface:7", shortText)
 	require.NoError(t, err)
-	require.Len(t, captured.calls, 1, "short text should use single send call")
-	combined := strings.Join(captured.calls[0].args, " ")
-	assert.Contains(t, combined, "send")
-	assert.Contains(t, combined, "--surface")
-	assert.Contains(t, combined, "surface:7")
+	require.Len(t, captured.calls, 3, "short text should use buffer path (3 calls)")
+	assert.Contains(t, strings.Join(captured.calls[0].args, " "), "set-buffer")
+	assert.Contains(t, strings.Join(captured.calls[1].args, " "), "paste-buffer")
+	assert.Contains(t, strings.Join(captured.calls[1].args, " "), "surface:7")
+	assert.Contains(t, strings.Join(captured.calls[2].args, " "), "delete-buffer")
 }
 
 // TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback verifies fallback

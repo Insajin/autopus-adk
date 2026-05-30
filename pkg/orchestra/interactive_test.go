@@ -155,7 +155,7 @@ func TestInteractive_SessionTimeout_ProducesPartialResult(t *testing.T) {
 // TestInteractive_SessionTimeout_PartialOutputPreserved verifies partial output is kept.
 func TestInteractive_SessionTimeout_PartialOutputPreserved(t *testing.T) {
 	mock := newCmuxMock()
-	mock.readScreenOutput = "partial output before timeout"
+	mock.readScreenOutputs = append([]string{"❯\n"}, strings.Split(strings.Repeat("partial output before timeout\n", 20), "\n")[:20]...)
 	cfg := OrchestraConfig{
 		Providers:      []ProviderConfig{echoProvider("slow")},
 		Strategy:       StrategyConsensus,

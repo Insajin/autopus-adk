@@ -3,6 +3,7 @@ package codex
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
@@ -52,6 +53,7 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 		content = normalizeCodexToolingBody(content)
 		content = normalizeCodexExtendedSkill(s.Name, content)
 		relPath := filepath.FromSlash(state.TargetPath)
+		content = ensureCodexSkillFrontmatter(relPath, s.Name, s.Description, content)
 		files = append(files, adapter.FileMapping{
 			TargetPath:      relPath,
 			OverwritePolicy: adapter.OverwriteAlways,
@@ -61,6 +63,24 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 	}
 
 	return files, nil
+}
+
+func ensureCodexSkillFrontmatter(targetPath, name, description, body string) string {
+	if filepath.Base(targetPath) != "SKILL.md" {
+		return body
+	}
+	frontmatter, parsedBody := splitSkillFrontmatter(body)
+	if frontmatter != "" {
+		return frontmatter + "\n\n" + strings.TrimSpace(parsedBody) + "\n"
+	}
+	if strings.TrimSpace(description) == "" {
+		description = name
+	}
+	return fmt.Sprintf("---\nname: %s\ndescription: >\n  %s\n---\n\n%s\n",
+		name,
+		description,
+		strings.TrimSpace(body),
+	)
 }
 
 // logTransformReport prints a summary of skill transformation results.

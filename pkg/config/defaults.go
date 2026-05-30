@@ -110,7 +110,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				},
 				// SPEC-ORCH-021 REQ-014/015: prompt is the value of --print (injected into the ""
 				// slot); pane argv carries no --print (interactive session).
-				"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
+				"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, InteractiveInput: "stdin", Subprocess: SubprocessProvConf{OutputFormat: "text"}},
 				"codex":  DefaultCodexProviderEntry(),
 			},
 			Commands: map[string]CommandEntry{

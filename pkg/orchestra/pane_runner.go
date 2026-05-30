@@ -203,9 +203,10 @@ func buildPaneCommand(provider ProviderConfig, prompt, outputFile string) string
 	safeOutput := shellEscapeArg(outputFile)
 
 	if provider.PromptViaArgs {
+		args = shellEscapeArgs(injectPromptArg(paneArgs(provider), prompt))
 		// SEC-001: use shell-escaped prompt instead of raw double quotes
-		return fmt.Sprintf("%s %s %s | tee %s; echo %s >> %s",
-			binary, args, shellEscapeArg(prompt), safeOutput, sentinel, safeOutput)
+		return fmt.Sprintf("%s %s | tee %s; echo %s >> %s",
+			binary, args, safeOutput, sentinel, safeOutput)
 	}
 	// SEC-001: use unique heredoc delimiter to prevent prompt content from terminating it
 	delim := uniqueHeredocDelimiter("PROMPT_EOF", prompt, randomHex())

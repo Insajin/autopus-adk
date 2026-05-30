@@ -80,7 +80,7 @@ func (a *Adapter) preparePluginMappings(cfg *config.HarnessConfig) ([]adapter.Fi
 	}
 	files = append(files, newSkillMapping(filepath.Join(".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"), routerContent))
 
-	pluginJSON, err := a.renderPluginManifestJSON()
+	pluginJSON, err := a.renderPluginManifestJSON(cfg, routerContent)
 	if err != nil {
 		return nil, err
 	}

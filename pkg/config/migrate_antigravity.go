@@ -25,6 +25,10 @@ func migrateAntigravityGeminiProvider(existing, defaults ProviderEntry, replaceE
 		}
 		changed = true
 	}
+	if defaults.InteractiveInput != "" && existing.InteractiveInput == "" {
+		existing.InteractiveInput = defaults.InteractiveInput
+		changed = true
+	}
 	return existing, changed
 }
 
