@@ -26,6 +26,9 @@ func TestPanePromptText_WritesMarkdownAndReturnsFileInstruction(t *testing.T) {
 	assert.Contains(t, instruction, responsePath)
 	assert.Contains(t, instruction, responseBeginMarker)
 	assert.Contains(t, instruction, responseEndMarker)
+	assert.Contains(t, instruction, "Preserve the output format requested by the prompt.")
+	assert.Contains(t, instruction, "If the prompt requires JSON")
+	assert.NotContains(t, instruction, "- Use Markdown.")
 	assert.Contains(t, instruction, "Treat the prompt file contents as the full user request.")
 
 	content, err := os.ReadFile(path)

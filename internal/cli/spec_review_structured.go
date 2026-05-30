@@ -34,6 +34,10 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 	}
 
 	backend := specReviewBackendFactory(cfg)
+	if backend == nil {
+		return nil, fmt.Errorf("spec review: no execution backend configured")
+	}
+	backend = serializeSpecReviewPaneBackend(backend)
 	parser := &orchestra.OutputParser{}
 	start := time.Now()
 
@@ -97,6 +101,30 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 		Summary:         fmt.Sprintf("structured spec review: %d providers", len(responses)),
 		FailedProviders: failed,
 	}, nil
+}
+
+type serializedSpecReviewBackend struct {
+	inner orchestra.ExecutionBackend
+	mu    sync.Mutex
+}
+
+func serializeSpecReviewPaneBackend(backend orchestra.ExecutionBackend) orchestra.ExecutionBackend {
+	if backend == nil || backend.Name() != "pane" {
+		return backend
+	}
+	// cmux/tmux pane operations mutate the active terminal surface; keep the
+	// structured review fan-out from overlapping split/paste/read/cleanup calls.
+	return &serializedSpecReviewBackend{inner: backend}
+}
+
+func (b *serializedSpecReviewBackend) Execute(ctx context.Context, req orchestra.ProviderRequest) (*orchestra.ProviderResponse, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.inner.Execute(ctx, req)
+}
+
+func (b *serializedSpecReviewBackend) Name() string {
+	return b.inner.Name()
 }
 
 func buildStructuredSpecReviewPrompt(basePrompt, schemaJSON string, inlineSchema bool) string {

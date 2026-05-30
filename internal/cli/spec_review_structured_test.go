@@ -39,6 +39,47 @@ func (f *fakeStructuredReviewBackend) Name() string {
 	return "fake-structured-review"
 }
 
+type concurrencyTrackingPaneBackend struct {
+	mu        sync.Mutex
+	active    int
+	maxActive int
+	delay     time.Duration
+}
+
+func (b *concurrencyTrackingPaneBackend) Execute(ctx context.Context, req orchestra.ProviderRequest) (*orchestra.ProviderResponse, error) {
+	b.mu.Lock()
+	b.active++
+	if b.active > b.maxActive {
+		b.maxActive = b.active
+	}
+	b.mu.Unlock()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(b.delay):
+	}
+
+	b.mu.Lock()
+	b.active--
+	b.mu.Unlock()
+
+	return &orchestra.ProviderResponse{
+		Provider: req.Provider,
+		Output:   `{"verdict":"PASS","summary":"ok","findings":[]}`,
+	}, nil
+}
+
+func (b *concurrencyTrackingPaneBackend) Name() string {
+	return "pane"
+}
+
+func (b *concurrencyTrackingPaneBackend) MaxActive() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.maxActive
+}
+
 func TestRunStructuredSpecReviewOrchestra_InjectsReviewerContract(t *testing.T) {
 	backend := &fakeStructuredReviewBackend{
 		outputs: map[string]orchestra.ProviderResponse{
@@ -65,6 +106,29 @@ func TestRunStructuredSpecReviewOrchestra_InjectsReviewerContract(t *testing.T) 
 	assert.Equal(t, "reviewer", backend.requests[0].Role)
 	assert.Contains(t, backend.requests[0].Prompt, "Structured Response Contract")
 	assert.Contains(t, backend.requests[0].Prompt, "Required JSON schema")
+}
+
+func TestRunStructuredSpecReviewOrchestra_SerializesPaneBackendExecution(t *testing.T) {
+	backend := &concurrencyTrackingPaneBackend{delay: 20 * time.Millisecond}
+
+	origFactory := specReviewBackendFactory
+	specReviewBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return backend }
+	defer func() { specReviewBackendFactory = origFactory }()
+
+	result, err := runStructuredSpecReviewOrchestra(context.Background(), orchestra.OrchestraConfig{
+		Providers: []orchestra.ProviderConfig{
+			{Name: "claude", Binary: "claude"},
+			{Name: "codex", Binary: "codex"},
+			{Name: "gemini", Binary: "agy"},
+			{Name: "opencode", Binary: "opencode"},
+		},
+		Prompt:         "Review this SPEC",
+		TimeoutSeconds: 10,
+	})
+	require.NoError(t, err)
+	require.Len(t, result.Responses, 4)
+	assert.Empty(t, result.FailedProviders)
+	assert.Equal(t, 1, backend.MaxActive(), "pane backend terminal I/O must not overlap")
 }
 
 func TestBuildStructuredSpecReviewPrompt_UsesScopedContractInVerifyMode(t *testing.T) {

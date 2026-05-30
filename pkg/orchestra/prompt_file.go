@@ -97,7 +97,9 @@ Response file rules:
 %s
 %s
 - Put only the final answer between the markers.
-- Use Markdown.
+- Preserve the output format requested by the prompt.
+- If the prompt requires JSON, write only the JSON object or array between the markers, with no Markdown fence or prose.
+- If no output format is specified, Markdown is allowed.
 - Leave the rest of the file unchanged.
 - If you cannot write the response file, print the final answer in the terminal as fallback.
 
