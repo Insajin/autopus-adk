@@ -12,8 +12,10 @@ var defaultProviderEntries = map[string]ProviderEntry{
 		PaneArgs:   []string{"--print", "--model", "opus", "--effort", "high"},
 		Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
 	},
-	"codex":  DefaultCodexProviderEntry(),
-	"gemini": {Binary: "agy", Args: []string{"--print"}, PromptViaArgs: false, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
+	"codex": DefaultCodexProviderEntry(),
+	// SPEC-ORCH-021 REQ-014/015: prompt is the value of --print (injected into "" slot);
+	// pane argv carries no --print (interactive session).
+	"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
 }
 
 // MigrateOrchestraConfig performs all orchestra config migrations.

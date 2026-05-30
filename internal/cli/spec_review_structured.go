@@ -33,7 +33,7 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 		return nil, fmt.Errorf("spec review: embed reviewer schema: %w", err)
 	}
 
-	backend := specReviewBackendFactory()
+	backend := specReviewBackendFactory(cfg)
 	parser := &orchestra.OutputParser{}
 	start := time.Now()
 

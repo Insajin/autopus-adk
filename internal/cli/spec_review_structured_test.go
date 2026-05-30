@@ -47,7 +47,7 @@ func TestRunStructuredSpecReviewOrchestra_InjectsReviewerContract(t *testing.T) 
 	}
 
 	origFactory := specReviewBackendFactory
-	specReviewBackendFactory = func() orchestra.ExecutionBackend { return backend }
+	specReviewBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return backend }
 	defer func() { specReviewBackendFactory = origFactory }()
 
 	result, err := runStructuredSpecReviewOrchestra(context.Background(), orchestra.OrchestraConfig{
@@ -90,7 +90,7 @@ func TestRunStructuredSpecReviewOrchestra_DowngradesMalformedOutput(t *testing.T
 	}
 
 	origFactory := specReviewBackendFactory
-	specReviewBackendFactory = func() orchestra.ExecutionBackend { return backend }
+	specReviewBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return backend }
 	defer func() { specReviewBackendFactory = origFactory }()
 
 	result, err := runStructuredSpecReviewOrchestra(context.Background(), orchestra.OrchestraConfig{
@@ -124,7 +124,7 @@ func TestRunStructuredSpecReviewOrchestra_RecordsTimeoutDiagnostics(t *testing.T
 	}
 
 	origFactory := specReviewBackendFactory
-	specReviewBackendFactory = func() orchestra.ExecutionBackend { return backend }
+	specReviewBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return backend }
 	defer func() { specReviewBackendFactory = origFactory }()
 
 	result, err := runStructuredSpecReviewOrchestra(context.Background(), orchestra.OrchestraConfig{
@@ -165,7 +165,7 @@ func TestRunStructuredSpecReviewOrchestra_PreservesExecutionDiagnostics(t *testi
 	}
 
 	origFactory := specReviewBackendFactory
-	specReviewBackendFactory = func() orchestra.ExecutionBackend { return backend }
+	specReviewBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return backend }
 	defer func() { specReviewBackendFactory = origFactory }()
 
 	result, err := runStructuredSpecReviewOrchestra(context.Background(), orchestra.OrchestraConfig{
@@ -193,7 +193,7 @@ func TestRunStructuredSpecReviewOrchestra_ClassifiesEmptyOutput(t *testing.T) {
 	}
 
 	origFactory := specReviewBackendFactory
-	specReviewBackendFactory = func() orchestra.ExecutionBackend { return backend }
+	specReviewBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return backend }
 	defer func() { specReviewBackendFactory = origFactory }()
 
 	result, err := runStructuredSpecReviewOrchestra(context.Background(), orchestra.OrchestraConfig{

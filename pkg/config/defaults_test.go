@@ -15,8 +15,10 @@ func TestDefaultFullConfig_GeminiPromptViaArgs(t *testing.T) {
 
 	gemini, ok := cfg.Orchestra.Providers["gemini"]
 	require.True(t, ok, "gemini provider must exist in default full config")
-	assert.False(t, gemini.PromptViaArgs, "gemini provider must have PromptViaArgs=false")
-	assert.Equal(t, []string{"--print"}, gemini.Args, "gemini provider must force Antigravity CLI print mode")
+	// SPEC-ORCH-021 REQ-014: --print is a string flag taking the prompt as its
+	// value; the prompt fills the "" slot via PromptViaArgs (injectPromptArg).
+	assert.True(t, gemini.PromptViaArgs, "gemini provider must pass the prompt as the --print value")
+	assert.Equal(t, []string{"--print", ""}, gemini.Args, "gemini provider must use the --print value slot")
 }
 
 func TestDefaultFullConfig_OtherProvidersPromptViaArgsFalse(t *testing.T) {
@@ -89,7 +91,9 @@ func TestDefaultFullConfig_CodexPromptViaArgs(t *testing.T) {
 	codex, ok := cfg.Orchestra.Providers["codex"]
 	require.True(t, ok, "codex provider must exist in default full config")
 	assert.False(t, codex.PromptViaArgs, "codex provider must have PromptViaArgs=false")
-	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel}, codex.Args,
+	// SPEC-ORCH-021 REQ-014/015: exec --sandbox workspace-write (no deprecated
+	// --full-auto) with reasoning effort aligned to autopus.yaml.
+	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, codex.Args,
 		"codex provider must have correct exec-mode args")
 	assert.Equal(t, CodexOrchestraTimeoutSeconds, codex.Subprocess.Timeout,
 		"codex provider must have a longer default orchestra timeout")

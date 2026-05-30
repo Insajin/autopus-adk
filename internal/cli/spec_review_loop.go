@@ -57,6 +57,11 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			TimeoutSeconds: p.timeout,
 			JudgeProvider:  p.gate.Judge,
 			NoJudge:        true,
+			// REQ-006: inject the detected terminal so SelectBackend can choose the
+			// interactive pane backend on cmux/tmux and the subprocess backend on
+			// plain/CI terminals. The terminal import is centralized in
+			// orchestra_terminal.go (detectStructuredTerminal).
+			Terminal: detectStructuredTerminal(),
 		}
 
 		fmt.Fprintf(os.Stderr, "SPEC 리뷰 시작: %s (전략: %s, 리비전: %d)\n", p.specID, p.strategy, revision)

@@ -40,7 +40,8 @@ func TestMigrateOrchestraConfig_OpencodeToCodex(t *testing.T) {
 	codex, hasCodex := cfg.Orchestra.Providers["codex"]
 	require.True(t, hasCodex, "codex provider must exist after migration")
 	assert.Equal(t, "codex", codex.Binary, "codex binary must be 'codex'")
-	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel}, codex.Args)
+	// SPEC-ORCH-021 REQ-014/015: exec --sandbox workspace-write + reasoning effort.
+	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, codex.Args)
 	assert.False(t, codex.PromptViaArgs, "codex PromptViaArgs must be false")
 
 	// Commands must reference codex instead of opencode.

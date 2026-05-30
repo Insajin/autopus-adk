@@ -69,12 +69,13 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 	stderrOutput := stderrBuf.String()
 	output, stderrOutput = applyCodexLastMessageOutput(output, stderrOutput, lastMessagePath)
 	resp := &ProviderResponse{
-		Provider:    req.Provider,
-		Output:      output,
-		Error:       stderrOutput,
-		Duration:    duration,
-		ExitCode:    cmd.ExitCode(),
-		EmptyOutput: strings.TrimSpace(output) == "",
+		Provider:        req.Provider,
+		Output:          output,
+		Error:           stderrOutput,
+		Duration:        duration,
+		ExitCode:        cmd.ExitCode(),
+		EmptyOutput:     strings.TrimSpace(output) == "",
+		ExecutedBackend: "subprocess", // REQ-005/F-003: record direct subprocess production
 	}
 
 	if ctx.Err() != nil {

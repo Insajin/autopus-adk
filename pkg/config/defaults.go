@@ -17,9 +17,11 @@ const (
 // DefaultCodexProviderEntry returns the canonical Codex orchestra provider entry.
 func DefaultCodexProviderEntry() ProviderEntry {
 	return ProviderEntry{
-		Binary:        "codex",
-		Args:          []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel},
-		PaneArgs:      []string{"-m", CodexFrontierModel},
+		Binary: "codex",
+		// SPEC-ORCH-021 REQ-014/015: `exec --sandbox workspace-write` (no deprecated --full-auto);
+		// reasoning effort aligned to autopus.yaml. Pane argv stays interactive (no leading `exec`).
+		Args:          []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`},
+		PaneArgs:      []string{"-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`},
 		PromptViaArgs: false,
 		Subprocess: SubprocessProvConf{
 			SchemaFlag: "--output-schema",
@@ -48,9 +50,11 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			IDFormat:  "SPEC-{DOMAIN}-{NUMBER}",
 			EARSTypes: []string{"ubiquitous", "event-driven", "unwanted", "optional", "complex"},
 			ReviewGate: ReviewGateConf{
-				Enabled:            true,
-				Strategy:           "debate",
-				Providers:          []string{"claude", "gemini"},
+				Enabled:  true,
+				Strategy: "debate",
+				// SPEC-ORCH-021 REQ-016: include codex so it is not silently dropped from
+				// structured review; matches the orchestra command provider set.
+				Providers:          []string{"claude", "codex", "gemini"},
 				Judge:              "claude",
 				MaxRevisions:       2,
 				AutoCollectContext: true,
@@ -104,7 +108,9 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 					PaneArgs:   []string{"--print", "--model", "opus", "--effort", "high"},
 					Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
 				},
-				"gemini": {Binary: "agy", Args: []string{"--print"}, PromptViaArgs: false, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
+				// SPEC-ORCH-021 REQ-014/015: prompt is the value of --print (injected into the ""
+				// slot); pane argv carries no --print (interactive session).
+				"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, Subprocess: SubprocessProvConf{OutputFormat: "text"}},
 				"codex":  DefaultCodexProviderEntry(),
 			},
 			Commands: map[string]CommandEntry{

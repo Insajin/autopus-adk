@@ -26,5 +26,6 @@ func TestMigrateOrchestraConfig_AntigravityMigratesLegacyGeminiProvider(t *testi
 	require.NoError(t, err)
 	assert.True(t, changed)
 	assert.Equal(t, "agy", cfg.Orchestra.Providers["gemini"].Binary)
-	assert.Equal(t, []string{"--print"}, cfg.Orchestra.Providers["gemini"].Args)
+	// SPEC-ORCH-021 REQ-014: prompt is the value of --print (filled into "" slot).
+	assert.Equal(t, []string{"--print", ""}, cfg.Orchestra.Providers["gemini"].Args)
 }

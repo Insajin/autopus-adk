@@ -126,16 +126,19 @@ func runSubprocessPipeline(
 		return executeDryRun(topic, promptData, providerConfigs, roundCount)
 	}
 
-	// Choose backend.
+	// Choose backend (REQ-003). Inject the detected terminal so SelectBackend
+	// returns the interactive pane backend on cmux/tmux terminals and the headless
+	// subprocess backend on plain/CI terminals or when --subprocess is forced.
 	cfg := orchestra.OrchestraConfig{
 		Providers:      providerConfigs,
 		SubprocessMode: forceSubprocess,
 		TimeoutSeconds: timeout,
+		Terminal:       detectStructuredTerminal(),
 	}
-	_ = orchestra.SelectBackend(cfg) // validate selection
+	backend := orchestraRunBackendFactory(cfg)
 
 	pipelineCfg := orchestra.SubprocessPipelineConfig{
-		Backend:        orchestraRunBackendFactory(),
+		Backend:        backend,
 		Providers:      providerConfigs,
 		Topic:          topic,
 		PromptData:     promptData,

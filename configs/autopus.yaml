@@ -77,10 +77,13 @@ orchestra:
         timeout: 480
     codex:
       binary: codex
-      args: ["exec", "--full-auto", "-m", "gpt-5.5"]
-      pane_args: ["-m", "gpt-5.5"]
+      args: ["exec", "--sandbox", "workspace-write", "-m", "gpt-5.5", "-c", 'model_reasoning_effort="xhigh"']
+      pane_args: ["-m", "gpt-5.5", "-c", 'model_reasoning_effort="xhigh"']
     gemini:
       binary: agy
+      args: ["--print", ""]
+      pane_args: []
+      prompt_via_args: true
       subprocess:
         output_format: text
   commands:

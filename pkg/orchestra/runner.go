@@ -21,8 +21,8 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		return nil, fmt.Errorf("유효하지 않은 전략: %q", cfg.Strategy)
 	}
 
-	// Delegate to pane runner for non-plain terminals
-	if !cfg.SubprocessMode && cfg.Terminal != nil && cfg.Terminal.Name() != "plain" {
+	// Delegate to pane runner for non-plain terminals (REQ-007 shared predicate)
+	if paneCapable(cfg.Terminal, cfg.SubprocessMode) {
 		return RunPaneOrchestra(ctx, cfg)
 	}
 

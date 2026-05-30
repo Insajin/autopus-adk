@@ -106,11 +106,13 @@ func TestBuildProviderConfigs(t *testing.T) {
 			expectViaArgs: false,
 		},
 		{
-			name:          "gemini uses stdin",
+			// SPEC-ORCH-021 REQ-014: gemini --print is a string flag taking the
+			// prompt as its value, so the prompt is delivered via args, not stdin.
+			name:          "gemini uses --print value via args",
 			input:         []string{"gemini"},
 			expectName:    "gemini",
 			expectBinary:  "agy",
-			expectViaArgs: false,
+			expectViaArgs: true,
 		},
 	}
 
@@ -123,7 +125,8 @@ func TestBuildProviderConfigs(t *testing.T) {
 			assert.Equal(t, tt.expectBinary, result[0].Binary)
 			assert.Equal(t, tt.expectViaArgs, result[0].PromptViaArgs)
 			if tt.expectName == "gemini" {
-				assert.Equal(t, []string{"--print"}, result[0].Args)
+				// SPEC-ORCH-021 REQ-014: prompt fills the empty "" slot after --print.
+				assert.Equal(t, []string{"--print", ""}, result[0].Args)
 				assert.Equal(t, defaultProviderStartupTimeout("gemini"), result[0].StartupTimeout)
 			}
 		})

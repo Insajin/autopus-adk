@@ -43,12 +43,13 @@ func (b *PaneBackend) Name() string {
 	return "pane"
 }
 
-// SelectBackend chooses the appropriate ExecutionBackend based on config.
-// SubprocessBackend is selected when SubprocessMode is true or Terminal is nil.
-// Otherwise PaneBackend is used.
+// SelectBackend chooses the appropriate ExecutionBackend based on config (REQ-002/003).
+// Interactive-pane execution is the default when the terminal is pane-capable
+// (cmux/tmux-style, non-plain) and subprocess mode is not forced. Plain, nil, or
+// subprocess-forced configs use the subprocess backend (F-001).
 func SelectBackend(cfg OrchestraConfig) ExecutionBackend {
-	if cfg.SubprocessMode || cfg.Terminal == nil {
-		return NewSubprocessBackendImpl()
+	if paneCapable(cfg.Terminal, cfg.SubprocessMode) {
+		return NewInteractivePaneBackend(cfg)
 	}
-	return NewPaneBackend()
+	return NewSubprocessBackendImpl()
 }

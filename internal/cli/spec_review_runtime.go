@@ -11,7 +11,11 @@ import (
 var (
 	specReviewRunOrchestra    = runStructuredSpecReviewOrchestra
 	specReviewConfigProviders = buildReviewProvidersWithConfig
-	specReviewBackendFactory  = orchestra.NewSubprocessBackendImpl
+	// specReviewBackendFactory routes structured spec review through SelectBackend
+	// (REQ-002): pane-capable terminals get the interactive pane backend, plain/CI
+	// terminals get the headless subprocess backend. It accepts the full config so
+	// SelectBackend can read the detected Terminal injected by spec_review_loop.go.
+	specReviewBackendFactory func(orchestra.OrchestraConfig) orchestra.ExecutionBackend = orchestra.SelectBackend
 )
 
 // shippedStatuses lists spec statuses that represent work already delivered.

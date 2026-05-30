@@ -57,7 +57,7 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 	cmd.Flags().BoolVar(&noJudge, "no-judge", false, "Skip judge verdict phase in debate strategy")
 	cmd.Flags().BoolVar(&yieldRounds, "yield-rounds", false, "Round 1 후 JSON 출력 및 pane 유지")
 	cmd.Flags().BoolVar(&contextAware, "context", false, "Allow providers to read project files (skip topic isolation)")
-	cmd.Flags().BoolVar(&subprocess, "subprocess", true, "Use subprocess backend (default: true; use --subprocess=false for pane mode)")
+	cmd.Flags().BoolVar(&subprocess, "subprocess", false, "Force headless -p subprocess backend (default: false; interactive pane is used on cmux/tmux terminals)")
 
 	return cmd
 }

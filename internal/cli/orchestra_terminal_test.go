@@ -1,0 +1,87 @@
+package cli
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/insajin/autopus-adk/pkg/orchestra"
+	"github.com/insajin/autopus-adk/pkg/terminal"
+)
+
+// fakeWiringTerminal is a minimal terminal.Terminal double whose Name() is
+// controllable. SelectBackend/paneCapable only exercise Name(), so the other
+// methods are inert no-ops.
+type fakeWiringTerminal struct{ name string }
+
+func (f fakeWiringTerminal) Name() string { return f.name }
+func (fakeWiringTerminal) CreateWorkspace(context.Context, string) error {
+	return nil
+}
+func (fakeWiringTerminal) SplitPane(context.Context, terminal.Direction) (terminal.PaneID, error) {
+	return "", nil
+}
+func (fakeWiringTerminal) SendCommand(context.Context, terminal.PaneID, string) error {
+	return nil
+}
+func (fakeWiringTerminal) SendLongText(context.Context, terminal.PaneID, string) error {
+	return nil
+}
+func (fakeWiringTerminal) Notify(context.Context, string) error { return nil }
+func (fakeWiringTerminal) ReadScreen(context.Context, terminal.PaneID, terminal.ReadScreenOpts) (string, error) {
+	return "", nil
+}
+func (fakeWiringTerminal) PipePaneStart(context.Context, terminal.PaneID, string) error {
+	return nil
+}
+func (fakeWiringTerminal) PipePaneStop(context.Context, terminal.PaneID) error {
+	return nil
+}
+func (fakeWiringTerminal) Close(context.Context, string) error { return nil }
+
+// TestBrainstormSubprocessFlagDefaultsToFalse verifies REQ-001: the brainstorm
+// command now defaults to the interactive pane path (--subprocess=false).
+func TestBrainstormSubprocessFlagDefaultsToFalse(t *testing.T) {
+	t.Parallel()
+	cmd := newOrchestraBrainstormCmd()
+	flag := cmd.Flags().Lookup("subprocess")
+	require.NotNil(t, flag, "brainstorm command must expose a --subprocess flag")
+	assert.Equal(t, "false", flag.DefValue, "REQ-001: brainstorm default must be pane mode (--subprocess=false)")
+}
+
+// TestSpecReviewBackendFactoryRoutesThroughSelectBackend verifies REQ-002: the
+// default specReviewBackendFactory is SelectBackend, so a pane-capable terminal
+// yields the pane backend and a plain terminal yields the subprocess backend.
+func TestSpecReviewBackendFactoryRoutesThroughSelectBackend(t *testing.T) {
+	t.Parallel()
+
+	paneCfg := orchestra.OrchestraConfig{Terminal: fakeWiringTerminal{name: "cmux"}}
+	paneBackend := specReviewBackendFactory(paneCfg)
+	require.NotNil(t, paneBackend)
+	assert.Equal(t, "pane", paneBackend.Name(), "REQ-002: cmux terminal must route to the interactive pane backend")
+
+	plainCfg := orchestra.OrchestraConfig{Terminal: fakeWiringTerminal{name: "plain"}}
+	plainBackend := specReviewBackendFactory(plainCfg)
+	require.NotNil(t, plainBackend)
+	assert.Equal(t, "subprocess", plainBackend.Name(), "REQ-002: plain terminal must route to the subprocess backend")
+}
+
+// TestOrchestraRunBackendFactoryConsumesSelectBackend verifies REQ-003: the run
+// pipeline builds its backend from SelectBackend with a populated terminal,
+// rather than a hardcoded subprocess factory. A cmux terminal yields pane; a nil
+// terminal yields subprocess.
+func TestOrchestraRunBackendFactoryConsumesSelectBackend(t *testing.T) {
+	t.Parallel()
+
+	paneCfg := orchestra.OrchestraConfig{Terminal: fakeWiringTerminal{name: "cmux"}}
+	paneBackend := orchestraRunBackendFactory(paneCfg)
+	require.NotNil(t, paneBackend)
+	assert.Equal(t, "pane", paneBackend.Name(), "REQ-003: cmux terminal must route to the interactive pane backend")
+
+	subprocessCfg := orchestra.OrchestraConfig{Terminal: nil}
+	subprocessBackend := orchestraRunBackendFactory(subprocessCfg)
+	require.NotNil(t, subprocessBackend)
+	assert.Equal(t, "subprocess", subprocessBackend.Name(), "REQ-003: nil terminal must route to the subprocess backend")
+}

@@ -42,7 +42,7 @@ func TestRunSubprocessPipeline_UsesConfigTimeoutWhenFlagUnchanged(t *testing.T) 
 		}, nil
 	}
 	orchestraRunBuildProviders = buildProviderConfigs
-	orchestraRunBackendFactory = func() orchestra.ExecutionBackend { return noopExecutionBackend{} }
+	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return noopExecutionBackend{} }
 
 	var captured orchestra.SubprocessPipelineConfig
 	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {
@@ -76,7 +76,7 @@ func TestRunSubprocessPipeline_CLITimeoutOverridesConfig(t *testing.T) {
 		}, nil
 	}
 	orchestraRunBuildProviders = buildProviderConfigs
-	orchestraRunBackendFactory = func() orchestra.ExecutionBackend { return noopExecutionBackend{} }
+	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return noopExecutionBackend{} }
 
 	var captured orchestra.SubprocessPipelineConfig
 	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {
@@ -111,7 +111,7 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 		}, nil
 	}
 	orchestraRunBuildProviders = buildProviderConfigs
-	orchestraRunBackendFactory = func() orchestra.ExecutionBackend { return noopExecutionBackend{} }
+	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return noopExecutionBackend{} }
 
 	var captured orchestra.SubprocessPipelineConfig
 	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {

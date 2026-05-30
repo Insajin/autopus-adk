@@ -66,6 +66,9 @@ type ProviderResponse struct {
 	TimedOut    bool          // 타임아웃 여부
 	EmptyOutput bool          // true when stdout is empty (exit 0 but no content)
 	Receipt     string        // reliability collection receipt path, if persisted
+	// ExecutedBackend records which backend produced this response:
+	// "pane", "subprocess", or "" / "none" when neither succeeded (REQ-005, F-003).
+	ExecutedBackend string
 }
 
 // @AX:ANCHOR: [AUTO] failure diagnostics wire schema shared by CLI JSON output, spec health projection, and yield reports.

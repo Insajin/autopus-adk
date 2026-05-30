@@ -143,8 +143,15 @@ func isStdoutTTY() bool {
 func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	knownProviders := map[string]orchestra.ProviderConfig{
 		"claude": {Name: "claude", Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
-		"codex":  {Name: "codex", Binary: "codex", Args: []string{"exec", "--sandbox", "workspace-write", "-m", config.CodexFrontierModel}, PaneArgs: []string{"-m", config.CodexFrontierModel}, PromptViaArgs: false, SchemaFlag: "--output-schema"},
-		"gemini": {Name: "gemini", Binary: "agy", Args: []string{"--print"}, PaneArgs: []string{"--print"}, PromptViaArgs: false, StartupTimeout: defaultProviderStartupTimeout("gemini"), OutputFormat: "text"},
+		// SPEC-ORCH-021 REQ-014/015: codex subprocess uses `exec --sandbox workspace-write`
+		// (no deprecated --full-auto) with reasoning effort aligned to autopus.yaml; pane argv
+		// stays interactive (no leading `exec`). SchemaFlag carries the structured schema.
+		"codex": {Name: "codex", Binary: "codex", Args: []string{"exec", "--sandbox", "workspace-write", "-m", config.CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, PaneArgs: []string{"-m", config.CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, PromptViaArgs: false, SchemaFlag: "--output-schema"},
+		// SPEC-ORCH-021 REQ-014/015: gemini (`agy`) --print is a STRING flag taking the prompt
+		// as its value. Pass the prompt in the empty "" slot via PromptViaArgs (injectPromptArg
+		// replaces "" with the prompt) → `agy --print "<prompt>"`. Pane argv must be interactive,
+		// so it carries no --print.
+		"gemini": {Name: "gemini", Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, StartupTimeout: defaultProviderStartupTimeout("gemini"), OutputFormat: "text"},
 	}
 
 	var result []orchestra.ProviderConfig
