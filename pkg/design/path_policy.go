@@ -97,6 +97,10 @@ func hasParentTraversal(path string) bool {
 	return false
 }
 
+func hasGlobMeta(path string) bool {
+	return strings.ContainsAny(filepath.ToSlash(path), "*?[")
+}
+
 func isInsideRoot(rootAbs, pathAbs string) bool {
 	rel, err := filepath.Rel(rootAbs, pathAbs)
 	if err != nil {

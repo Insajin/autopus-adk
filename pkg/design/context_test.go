@@ -60,6 +60,32 @@ source_of_truth:
 	assert.Contains(t, ctx.PromptSection(), "parent_traversal")
 }
 
+func TestLoadContext_SourceOfTruthGlobStaysDesignEvidence(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFile(t, root, "DESIGN.md", `---
+source_of_truth:
+  - src/tokens/**
+---
+# Project Design
+
+## Palette
+Use semantic tokens.
+`)
+	writeFile(t, root, "src/tokens/color.json", "{}")
+
+	ctx, err := LoadContext(root, Options{Enabled: true, MaxContextLines: 20})
+	require.NoError(t, err)
+	require.True(t, ctx.Found)
+
+	assert.Equal(t, "DESIGN.md", ctx.SourcePath)
+	assert.Empty(t, ctx.BaselinePath)
+	assert.Contains(t, ctx.Summary, "Use semantic tokens.")
+	assert.NotContains(t, ctx.Summary, "source_of_truth")
+	assert.NotContains(t, ctx.DiagnosticsSummary(), "unsupported_extension")
+}
+
 func TestParseSourceOfTruth_InvalidOrMissingFrontmatter(t *testing.T) {
 	t.Parallel()
 

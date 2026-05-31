@@ -9,12 +9,14 @@ import (
 var prioritySectionHints = []string{
 	"source of truth", "palette", "color", "typography", "component",
 	"layout", "responsive", "do", "don't", "dont", "guardrail",
+	"operator", "discovery", "surface", "accessibility", "state",
 }
 
 func BuildSummary(content string, maxLines int) string {
 	if maxLines <= 0 {
 		maxLines = DefaultMaxContextLines
 	}
+	content = stripFrontmatter(content)
 	sections := splitMarkdownSections(content)
 	var chosen []string
 	for _, sec := range sections {
@@ -34,6 +36,18 @@ func BuildSummary(content string, maxLines int) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(chosen, "\n"))
+}
+
+func stripFrontmatter(content string) string {
+	if !strings.HasPrefix(content, "---\n") {
+		return content
+	}
+	rest := strings.TrimPrefix(content, "---\n")
+	end := strings.Index(rest, "\n---")
+	if end < 0 {
+		return content
+	}
+	return strings.TrimPrefix(rest[end+len("\n---"):], "\n")
 }
 
 func (c Context) PromptSection() string {

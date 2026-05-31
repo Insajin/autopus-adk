@@ -65,6 +65,9 @@ func BuildPack(root string, opts PackOptions) (Pack, error) {
 	if !ctx.Found {
 		pack.SetupGaps = appendMissing(pack.SetupGaps, "design_context_missing")
 	}
+	if err := collectDeclaredSourceRefs(root, maxRefs, &pack); err != nil {
+		return Pack{}, err
+	}
 	if err := collectPackRefs(root, maxRefs, &pack); err != nil {
 		return Pack{}, err
 	}
@@ -141,11 +144,11 @@ func collectPackRefs(root string, maxRefs int, pack *Pack) error {
 	return walkDesignCandidateFiles(root, maxRefs*10, func(rel, _ string, _ os.FileInfo) error {
 		switch {
 		case isTokenRef(rel):
-			pack.TokenRefs = appendLimited(pack.TokenRefs, SourceRef{Path: rel, Kind: "token_or_theme"}, maxRefs)
+			pack.TokenRefs = appendUniqueLimited(pack.TokenRefs, SourceRef{Path: rel, Kind: "token_or_theme"}, maxRefs)
 		case isComponentRef(rel):
-			pack.ComponentRefs = appendLimited(pack.ComponentRefs, SourceRef{Path: rel, Kind: "component"}, maxRefs)
+			pack.ComponentRefs = appendUniqueLimited(pack.ComponentRefs, SourceRef{Path: rel, Kind: "component"}, maxRefs)
 		case isScreenshotRef(rel):
-			pack.ScreenshotRefs = appendLimited(pack.ScreenshotRefs, SourceRef{Path: rel, Kind: "screenshot_ref"}, maxRefs)
+			pack.ScreenshotRefs = appendUniqueLimited(pack.ScreenshotRefs, SourceRef{Path: rel, Kind: "screenshot_ref"}, maxRefs)
 		}
 		return nil
 	})
@@ -237,6 +240,15 @@ func appendLimited(refs []SourceRef, ref SourceRef, max int) []SourceRef {
 	refs = append(refs, ref)
 	sortRefs(refs)
 	return refs
+}
+
+func appendUniqueLimited(refs []SourceRef, ref SourceRef, max int) []SourceRef {
+	for _, existing := range refs {
+		if existing.Path == ref.Path && existing.Kind == ref.Kind {
+			return refs
+		}
+	}
+	return appendLimited(refs, ref, max)
 }
 
 func appendMissing(values []string, value string) []string {

@@ -41,6 +41,14 @@ SPEC 문서를 기반으로 코드를 구현합니다.
 1. SPEC 확인 → 구현 → 테스트
 {{end}}
 
+## Frontend Design Preflight
+
+- UI 관련 변경(`.tsx`, `.jsx`, CSS-family, theme/token/design-system 경로, configured UI globs)이 있으면 구현 전에 `auto design pack --format markdown`을 실행하거나 동등한 local evidence를 수집합니다.
+- `DESIGN.md`, declared `source_of_truth`, token/theme refs, shared UI primitives, screenshot/golden refs, Figma refs, Code Connect readiness를 Design Source Pack으로 기록합니다.
+- 구현 전 Design Discovery Matrix를 작성합니다: surface type, core job, density, risk, required primitives, required states, accessibility checks, responsive checks, anti-patterns.
+- source가 없거나 Figma/Code Connect가 없으면 setup gap으로 기록합니다. 기존 프로젝트 디자인 시스템을 임의로 대체하거나 새 palette/radius/shadow 체계를 만들지 않습니다.
+- raw color, generated token edit, primitive token consumption, unlabeled icon-only control, missing focus state, proofless production action, responsive overlap, color-only status meaning은 SPEC 예외가 없는 한 blocking issue로 취급합니다.
+
 ## 품질 기준
 
 - 커버리지: {{if .IsFullMode}}85{{else}}80{{end}}%+

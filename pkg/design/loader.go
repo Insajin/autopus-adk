@@ -46,6 +46,9 @@ func LoadContext(root string, opts Options) (Context, error) {
 		}
 		if data != nil {
 			for _, baseline := range parseSourceOfTruth(string(data)) {
+				if !isPromptReadableSourceRef(baseline) {
+					continue
+				}
 				bctx, ok, bdiag, err := loadSingle(root, baseline, relPath(root, designAbs), maxLines)
 				if err != nil {
 					return Context{}, err
@@ -90,6 +93,13 @@ func LoadContext(root string, opts Options) (Context, error) {
 	}
 
 	return Context{Diagnostics: diagnostics, SkipReason: SkipMissing}, nil
+}
+
+func isPromptReadableSourceRef(path string) bool {
+	if hasGlobMeta(path) {
+		return false
+	}
+	return allowedDesignExts[strings.ToLower(filepath.Ext(path))]
 }
 
 func loadSingle(root, path, declaredBy string, maxLines int) (Context, bool, *Diagnostic, error) {

@@ -31,6 +31,43 @@ func TestBuildPackCollectsDesignSources(t *testing.T) {
 	assert.Contains(t, pack.Markdown(), "Design Source Pack")
 }
 
+func TestBuildPackCollectsDeclaredSourceOfTruthGlobs(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFile(t, root, "DESIGN.md", `---
+source_of_truth:
+  - packages/web/tokens/**
+  - packages/web/src/components/ui/**
+---
+# Design
+
+## Source Of Truth
+Use the declared token and primitive sources.
+`)
+	writeFile(t, root, "packages/web/tokens/semantic/color.light.json", "{}")
+	writeFile(t, root, "packages/web/src/components/ui/Button.tsx", "export function Button() { return null }")
+
+	pack, err := BuildPack(root, PackOptions{
+		ContextOptions: Options{Enabled: true, MaxContextLines: 20},
+		MaxRefs:        10,
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, pack.TokenRefs, SourceRef{
+		Path:   "packages/web/tokens/semantic/color.light.json",
+		Kind:   "token_or_theme",
+		Reason: "source_of_truth",
+	})
+	assert.Contains(t, pack.ComponentRefs, SourceRef{
+		Path:   "packages/web/src/components/ui/Button.tsx",
+		Kind:   "component",
+		Reason: "source_of_truth",
+	})
+	assert.NotContains(t, pack.SetupGaps, "token_refs_missing")
+	assert.NotContains(t, pack.SetupGaps, "component_refs_missing")
+}
+
 func TestBuildPackReportsGapsWhenDesignMissing(t *testing.T) {
 	t.Parallel()
 
