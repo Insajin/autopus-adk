@@ -89,7 +89,7 @@ func (e *SignalEmitter) pollAndEmit(ctx context.Context, pi paneInfo, patterns [
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			screen, err := e.term.ReadScreen(ctx, pi.paneID, terminal.ReadScreenOpts{})
+			screen, err := readScreenBounded(ctx, e.term, pi.paneID, terminal.ReadScreenOpts{})
 			if err != nil {
 				candidateDetected = false
 				continue

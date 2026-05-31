@@ -7,8 +7,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/terminal"
 	"github.com/stretchr/testify/assert"
 )
+
+type deadlineCaptureTerminal struct {
+	mockTerminal
+	remaining []time.Duration
+	calls     int
+}
+
+func (m *deadlineCaptureTerminal) ReadScreen(ctx context.Context, paneID terminal.PaneID, opts terminal.ReadScreenOpts) (string, error) {
+	if deadline, ok := ctx.Deadline(); ok {
+		m.remaining = append(m.remaining, time.Until(deadline))
+	} else {
+		m.remaining = append(m.remaining, 24*time.Hour)
+	}
+	m.calls++
+	return "\u276F\n", nil
+}
 
 // TestScreenPollDetector_TwoPhaseMatch verifies 2-phase consecutive prompt match.
 func TestScreenPollDetector_TwoPhaseMatch(t *testing.T) {
@@ -47,6 +64,29 @@ func TestScreenPollDetector_ContextCancel(t *testing.T) {
 	ok, err := detector.WaitForCompletion(ctx, pi, patterns, "", 0)
 	assert.NoError(t, err)
 	assert.False(t, ok, "cancelled context must return false")
+}
+
+// TestScreenPollDetector_ReadScreenUsesShortPerCallDeadline verifies a single
+// stuck terminal read cannot consume the whole provider timeout.
+func TestScreenPollDetector_ReadScreenUsesShortPerCallDeadline(t *testing.T) {
+	t.Parallel()
+
+	mock := &deadlineCaptureTerminal{}
+	detector := &ScreenPollDetector{term: mock}
+	pi := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "claude"}}
+	patterns := DefaultCompletionPatterns()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	ok, err := detector.WaitForCompletion(ctx, pi, patterns, "", 0)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.GreaterOrEqual(t, len(mock.remaining), 2)
+	for _, remaining := range mock.remaining {
+		assert.LessOrEqual(t, remaining, readScreenPollTimeout+500*time.Millisecond)
+		assert.Greater(t, remaining, time.Duration(0))
+	}
 }
 
 // TestScreenPollDetector_BaselineFiltering verifies baseline prevents false positives.

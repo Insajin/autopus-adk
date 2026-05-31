@@ -178,7 +178,7 @@ func (a *CmuxAdapter) Close(_ context.Context, name string) error {
 }
 
 // ReadScreen reads pane content via cmux read-screen.
-func (a *CmuxAdapter) ReadScreen(_ context.Context, paneID PaneID, opts ReadScreenOpts) (string, error) {
+func (a *CmuxAdapter) ReadScreen(ctx context.Context, paneID PaneID, opts ReadScreenOpts) (string, error) {
 	if err := validatePaneID(paneID); err != nil {
 		return "", fmt.Errorf("cmux: %w", err)
 	}
@@ -192,7 +192,7 @@ func (a *CmuxAdapter) ReadScreen(_ context.Context, paneID PaneID, opts ReadScre
 	if opts.Lines > 0 {
 		args = append(args, "--lines", fmt.Sprintf("%d", opts.Lines))
 	}
-	cmd := execCommand("cmux", args...)
+	cmd := execCommandContext(ctx, "cmux", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("cmux: read-screen pane %s: %w", paneID, err)

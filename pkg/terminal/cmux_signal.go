@@ -27,11 +27,11 @@ func validateSignalName(name string) error {
 
 // SurfaceHealth checks surface health via `cmux surface-health`.
 // Output format: "surface:7 type=terminal in_window=true"
-func (a *CmuxAdapter) SurfaceHealth(_ context.Context, paneID PaneID) (SurfaceStatus, error) {
+func (a *CmuxAdapter) SurfaceHealth(ctx context.Context, paneID PaneID) (SurfaceStatus, error) {
 	if err := validatePaneID(paneID); err != nil {
 		return SurfaceStatus{}, fmt.Errorf("cmux: %w", err)
 	}
-	cmd := execCommand("cmux", "surface-health", "--surface", string(paneID))
+	cmd := execCommandContext(ctx, "cmux", "surface-health", "--surface", string(paneID))
 	out, err := cmd.Output()
 	if err != nil {
 		return SurfaceStatus{}, fmt.Errorf("cmux: surface-health pane %s: %w", paneID, err)

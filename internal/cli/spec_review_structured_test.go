@@ -15,6 +15,7 @@ import (
 
 type fakeStructuredReviewBackend struct {
 	mu       sync.Mutex
+	name     string
 	requests []orchestra.ProviderRequest
 	outputs  map[string]orchestra.ProviderResponse
 	errors   map[string]error
@@ -36,6 +37,9 @@ func (f *fakeStructuredReviewBackend) Execute(_ context.Context, req orchestra.P
 }
 
 func (f *fakeStructuredReviewBackend) Name() string {
+	if f.name != "" {
+		return f.name
+	}
 	return "fake-structured-review"
 }
 

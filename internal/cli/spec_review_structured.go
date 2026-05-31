@@ -60,23 +60,23 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 
 			resp, execErr := backend.Execute(ctx, req)
 			if execErr != nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), resp)
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), resp, backend.Name())
 				return
 			}
 			if resp == nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil)
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil, backend.Name())
 				return
 			}
 			if resp.TimedOut {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider timed out after %s", req.Timeout), resp)
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider timed out after %s", req.Timeout), resp, backend.Name())
 				return
 			}
 			if resp.EmptyOutput {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp)
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp, backend.Name())
 				return
 			}
 			if _, parseErr := parser.ParseReviewer(resp.Output); parseErr != nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp)
+				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp, backend.Name())
 				return
 			}
 
@@ -158,25 +158,48 @@ func isVerifyReviewPrompt(prompt string) bool {
 	return strings.Contains(prompt, "Instructions (Verify Mode)")
 }
 
-func malformedStructuredOutcome(provider string, err error, sourceResp *orchestra.ProviderResponse) specReviewStructuredOutcome {
+func malformedStructuredOutcome(provider string, err error, sourceResp *orchestra.ProviderResponse, backendName string) specReviewStructuredOutcome {
 	description := structuredFailureDescription(err, sourceResp)
 	response := orchestra.ProviderResponse{
-		Provider: provider,
-		Output:   synthesizeMalformedReviewJSON(provider, description),
-		Error:    description,
+		Provider:        provider,
+		Output:          synthesizeMalformedReviewJSON(provider, description),
+		Error:           description,
+		ExecutedBackend: backendName,
 	}
 	failed := &orchestra.FailedProvider{
 		Name:            provider,
 		Error:           description,
 		FailureClass:    structuredFailureClass(err),
 		NextRemediation: structuredFailureRemediation(err, provider),
-		CollectionMode:  "subprocess_stdout",
+		CollectionMode:  structuredFailureCollectionMode(backendName, sourceResp),
 	}
 	if sourceResp != nil {
+		if strings.TrimSpace(sourceResp.ExecutedBackend) != "" {
+			response.ExecutedBackend = sourceResp.ExecutedBackend
+			failed.CollectionMode = structuredFailureCollectionMode(sourceResp.ExecutedBackend, sourceResp)
+		}
 		failed.StderrPreview = truncateStructuredReviewError(sourceResp.Error, 240)
 		failed.OutputPreview = truncateStructuredReviewError(sourceResp.Output, 240)
 	}
 	return specReviewStructuredOutcome{resp: response, failed: failed}
+}
+
+func structuredFailureCollectionMode(backendName string, sourceResp *orchestra.ProviderResponse) string {
+	if sourceResp != nil && strings.TrimSpace(sourceResp.Receipt) != "" {
+		if strings.EqualFold(strings.TrimSpace(backendName), "pane") {
+			return "pane_receipt"
+		}
+	}
+	switch strings.TrimSpace(backendName) {
+	case "pane":
+		return "pane"
+	case "subprocess":
+		return "subprocess_stdout"
+	case "":
+		return "unknown"
+	default:
+		return backendName
+	}
 }
 
 func synthesizeMalformedReviewJSON(provider, description string) string {

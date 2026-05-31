@@ -195,7 +195,7 @@ func pollUntilPrompt(ctx context.Context, term terminal.Terminal, paneID termina
 				log.Printf("[pollUntilPrompt] %s exceeding 20s threshold, still waiting...", paneID)
 				warned = true
 			}
-			screen, err := term.ReadScreen(ctx, paneID, terminal.ReadScreenOpts{})
+			screen, err := readScreenBounded(ctx, term, paneID, terminal.ReadScreenOpts{})
 			if err != nil {
 				continue
 			}
@@ -221,7 +221,7 @@ func pollUntilSessionReady(ctx context.Context, term terminal.Terminal, paneID t
 		case <-deadline:
 			return false
 		case <-ticker.C:
-			screen, err := term.ReadScreen(ctx, paneID, terminal.ReadScreenOpts{})
+			screen, err := readScreenBounded(ctx, term, paneID, terminal.ReadScreenOpts{})
 			if err != nil {
 				continue
 			}

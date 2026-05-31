@@ -78,7 +78,7 @@ func (a *TmuxAdapter) Notify(_ context.Context, message string) error {
 }
 
 // ReadScreen reads pane content via tmux capture-pane.
-func (a *TmuxAdapter) ReadScreen(_ context.Context, paneID PaneID, opts ReadScreenOpts) (string, error) {
+func (a *TmuxAdapter) ReadScreen(ctx context.Context, paneID PaneID, opts ReadScreenOpts) (string, error) {
 	if err := validatePaneID(paneID); err != nil {
 		return "", fmt.Errorf("tmux: %w", err)
 	}
@@ -87,7 +87,7 @@ func (a *TmuxAdapter) ReadScreen(_ context.Context, paneID PaneID, opts ReadScre
 	if opts.ScrollbackLines > 0 {
 		args = append(args, "-S", fmt.Sprintf("-%d", opts.ScrollbackLines))
 	}
-	cmd := execCommand("tmux", args...)
+	cmd := execCommandContext(ctx, "tmux", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("tmux: capture-pane %s: %w", paneID, err)

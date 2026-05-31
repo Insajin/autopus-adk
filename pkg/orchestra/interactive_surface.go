@@ -23,7 +23,7 @@ func needsSurfaceCheck(_ ProviderConfig) bool {
 // validateSurface checks whether a pane's surface is still active by attempting
 // a lightweight ReadScreen call. Returns true if the surface is valid. (R1)
 func validateSurface(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID) bool {
-	_, err := term.ReadScreen(ctx, paneID, terminal.ReadScreenOpts{})
+	_, err := readScreenBounded(ctx, term, paneID, terminal.ReadScreenOpts{})
 	return err == nil
 }
 

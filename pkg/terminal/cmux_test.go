@@ -44,8 +44,9 @@ func (c *capturedCmds) lastName() string {
 // configurable output. output is returned by cmd.Output() calls via printf.
 func newCmuxMockV2(output string, returnErr error) (restore func(), captured *capturedCmds) {
 	orig := execCommand
+	origCtx := execCommandContext
 	cap := &capturedCmds{}
-	execCommand = func(name string, args ...string) *exec.Cmd {
+	buildCmd := func(name string, args ...string) *exec.Cmd {
 		cap.calls = append(cap.calls, struct {
 			name string
 			args []string
@@ -58,7 +59,14 @@ func newCmuxMockV2(output string, returnErr error) (restore func(), captured *ca
 		}
 		return exec.Command("true")
 	}
-	return func() { execCommand = orig }, cap
+	execCommand = buildCmd
+	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		return buildCmd(name, args...)
+	}
+	return func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}, cap
 }
 
 // TestCmuxAdapter_Name verifies Name returns "cmux".

@@ -14,22 +14,38 @@ import (
 // newTmuxMock replaces execCommand and returns a cleanup function and captured args.
 func newTmuxMock() (restore func(), captured *capturedCmd) {
 	orig := execCommand
+	origCtx := execCommandContext
 	cap := &capturedCmd{}
-	execCommand = func(name string, args ...string) *exec.Cmd {
+	buildCmd := func(name string, args ...string) *exec.Cmd {
 		cap.name = name
 		cap.args = args
 		return exec.Command("true")
 	}
-	return func() { execCommand = orig }, cap
+	execCommand = buildCmd
+	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		return buildCmd(name, args...)
+	}
+	return func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}, cap
 }
 
 // newTmuxErrorMock replaces execCommand with a mock that always returns a failing command.
 func newTmuxErrorMock() (restore func()) {
 	orig := execCommand
-	execCommand = func(_ string, _ ...string) *exec.Cmd {
+	origCtx := execCommandContext
+	buildCmd := func(_ string, _ ...string) *exec.Cmd {
 		return exec.Command("false")
 	}
-	return func() { execCommand = orig }
+	execCommand = buildCmd
+	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		return buildCmd(name, args...)
+	}
+	return func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}
 }
 
 // TestTmuxAdapter_Name verifies Name returns "tmux".

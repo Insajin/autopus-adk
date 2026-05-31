@@ -70,7 +70,7 @@ func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo,
 			if _, ok := readResponseFile(pi.responseFile); ok {
 				return true, nil
 			}
-			screen, err := d.term.ReadScreen(ctx, pi.paneID, terminal.ReadScreenOpts{})
+			screen, err := readScreenBounded(ctx, d.term, pi.paneID, terminal.ReadScreenOpts{})
 			if err != nil {
 				candidateDetected = false
 				continue

@@ -209,7 +209,7 @@ func captureBaselines(ctx context.Context, term terminal.Terminal, panes []paneI
 		if pi.skipWait {
 			continue
 		}
-		screen, _ := term.ReadScreen(ctx, pi.paneID, terminal.ReadScreenOpts{})
+		screen, _ := readScreenBounded(ctx, term, pi.paneID, terminal.ReadScreenOpts{})
 		baselines[pi.provider.Name] = screen
 	}
 	return baselines
@@ -242,7 +242,7 @@ func sendPromptWithRetry(ctx context.Context, cfg OrchestraConfig, pi paneInfo, 
 	}
 
 	// Refresh baseline for the new pane
-	if screen, rerr := cfg.Terminal.ReadScreen(ctx, newPI.paneID, terminal.ReadScreenOpts{}); rerr == nil {
+	if screen, rerr := readScreenBounded(ctx, cfg.Terminal, newPI.paneID, terminal.ReadScreenOpts{}); rerr == nil {
 		baselines[pi.provider.Name] = screen
 	}
 
