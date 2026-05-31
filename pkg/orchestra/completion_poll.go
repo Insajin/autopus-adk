@@ -82,6 +82,10 @@ func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo,
 				candidateDetected = false
 				continue
 			}
+			if requiresResponseFileCompletion(pi) {
+				candidateDetected = false
+				continue
+			}
 			// R2: Screen unchanged from baseline -- skip prompt matching to avoid
 			// false positives from previous round's leftover prompt.
 			// Still allow idle fallback to proceed (no continue).

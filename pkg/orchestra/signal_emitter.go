@@ -100,6 +100,10 @@ func (e *SignalEmitter) pollAndEmit(ctx context.Context, pi paneInfo, patterns [
 				candidateDetected = false
 				continue
 			}
+			if requiresResponseFileCompletion(pi) {
+				candidateDetected = false
+				continue
+			}
 			// Skip if screen is still the pre-send baseline.
 			if baseline != "" && screen == baseline {
 				candidateDetected = false

@@ -19,6 +19,7 @@ type paneInfo struct {
 	paneID       terminal.PaneID
 	outputFile   string
 	provider     ProviderConfig
+	role         string
 	skipWait     bool // true when SendCommand failed — skip sentinel wait
 	promptFiles  []string
 	responseFile string

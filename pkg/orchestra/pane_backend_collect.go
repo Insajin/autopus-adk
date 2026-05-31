@@ -24,6 +24,15 @@ func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req Provid
 			ExecutedBackend: paneBackendName,
 		}
 	}
+	if requiresReviewerResponseFile(req, pi) {
+		return &ProviderResponse{
+			Provider:        req.Provider,
+			TimedOut:        timedOut,
+			EmptyOutput:     true,
+			Error:           reviewerResponseFileMissingError(timedOut),
+			ExecutedBackend: paneBackendName,
+		}
+	}
 
 	// Use a fresh, bounded context for the final read: the original ctx may be
 	// cancelled after a completion timeout (mirrors interactive_collect.go).

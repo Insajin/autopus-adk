@@ -58,7 +58,7 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	if err != nil {
 		return paneFallback(ctx, req, "interactive pane execution failed: SplitPane error: "+err.Error())
 	}
-	pi := paneInfo{paneID: paneID, provider: req.Config}
+	pi := paneInfo{paneID: paneID, provider: req.Config, role: req.Role}
 	defer func() { cleanupInteractivePanes(term, []paneInfo{pi}) }()
 
 	// Launch the provider CLI. For args-based providers the prompt rides on the
