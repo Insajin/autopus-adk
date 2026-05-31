@@ -24,9 +24,11 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 	for _, pi := range panes {
 		if pi.skipWait {
 			responses = append(responses, ProviderResponse{
-				Provider: pi.provider.Name,
-				Duration: time.Since(start),
-				TimedOut: true,
+				Provider:    pi.provider.Name,
+				Duration:    time.Since(start),
+				TimedOut:    true,
+				EmptyOutput: true,
+				Error:       "provider was skipped before completion collection",
 			})
 			continue
 		}
@@ -94,14 +96,44 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 			mu.Lock()
 			defer mu.Unlock()
 			responses = append(responses, ProviderResponse{
-				Provider: pi.provider.Name,
-				Output:   output,
-				Duration: time.Since(start),
-				TimedOut: timedOut,
-				Receipt:  receiptPath,
+				Provider:    pi.provider.Name,
+				Output:      output,
+				Duration:    time.Since(start),
+				TimedOut:    timedOut,
+				EmptyOutput: output == "",
+				Error:       errMsg,
+				Receipt:     receiptPath,
 			})
 		}(pi)
 	}
 	wg.Wait()
 	return responses
+}
+
+func responseFailuresFromInteractivePanes(panes []paneInfo, responses []ProviderResponse, fallbackSeconds int, existing []FailedProvider) []FailedProvider {
+	providers := make(map[string]ProviderConfig, len(panes))
+	for _, pi := range panes {
+		providers[pi.provider.Name] = pi.provider
+	}
+	seen := make(map[string]struct{}, len(existing))
+	for _, failure := range existing {
+		seen[failure.Name] = struct{}{}
+	}
+	failures := make([]FailedProvider, 0)
+	for _, resp := range responses {
+		if !resp.TimedOut && !resp.EmptyOutput {
+			continue
+		}
+		if _, ok := seen[resp.Provider]; ok {
+			continue
+		}
+		provider := providers[resp.Provider]
+		if provider.Name == "" {
+			provider = ProviderConfig{Name: resp.Provider}
+		}
+		respCopy := resp
+		failures = append(failures, buildFailedProvider(provider, &respCopy, nil, fallbackSeconds))
+		seen[resp.Provider] = struct{}{}
+	}
+	return failures
 }

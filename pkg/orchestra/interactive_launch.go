@@ -2,11 +2,15 @@ package orchestra
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
+
+const launchScriptsDir = ".autopus/orchestra/launch"
 
 // buildInteractiveLaunchCmd constructs the launch command for interactive mode.
 // Uses the binary name plus model/variant flags from PaneArgs, excluding print/pipe flags.
@@ -94,6 +98,57 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
+func buildPaneLaunchCommand(workingDir string, provider ProviderConfig, prompt string) (string, string, error) {
+	cmd := buildInteractiveLaunchCmdWithCWD(provider, prompt, workingDir)
+	if !usesLaunchScript(provider, prompt) {
+		return cmd, "", nil
+	}
+	path, err := writeLaunchScript(workingDir, provider, cmd)
+	if err != nil {
+		return "", "", err
+	}
+	return "/bin/sh " + shellQuote(path), path, nil
+}
+
+func usesLaunchScript(provider ProviderConfig, prompt string) bool {
+	return usesAntigravityPromptInteractive(provider) && strings.TrimSpace(prompt) != ""
+}
+
+func writeLaunchScript(workingDir string, provider ProviderConfig, command string) (string, error) {
+	baseDir := strings.TrimSpace(workingDir)
+	if baseDir == "" {
+		baseDir = "."
+	}
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve working dir: %w", err)
+	}
+	dir := filepath.Join(absBase, launchScriptsDir)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("create launch script dir: %w", err)
+	}
+	file, err := os.CreateTemp(dir, sanitizeProviderName(provider.Name)+"-launch-*.sh")
+	if err != nil {
+		return "", fmt.Errorf("create launch script: %w", err)
+	}
+	path := file.Name()
+	content := "#!/bin/sh\n" + command + "\n"
+	if _, err := file.WriteString(content); err != nil {
+		_ = file.Close()
+		_ = os.Remove(path)
+		return "", fmt.Errorf("write launch script: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", fmt.Errorf("close launch script: %w", err)
+	}
+	if err := os.Chmod(path, 0o700); err != nil {
+		_ = os.Remove(path)
+		return "", fmt.Errorf("chmod launch script: %w", err)
+	}
+	return path, nil
+}
+
 // cleanupInteractivePanes stops pipe capture and closes panes.
 func cleanupInteractivePanes(term terminal.Terminal, panes []paneInfo) {
 	ctx := context.Background()
@@ -103,5 +158,6 @@ func cleanupInteractivePanes(term terminal.Terminal, panes []paneInfo) {
 		_ = os.Remove(pi.outputFile)
 		cleanupPromptFiles(pi.promptFiles)
 		_ = os.Remove(pi.responseFile)
+		cleanupPromptFiles(pi.launchFiles)
 	}
 }

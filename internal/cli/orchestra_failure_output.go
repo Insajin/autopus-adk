@@ -122,7 +122,26 @@ func renderOrchestraFailureSummary(timeout ResolvedOrchestraTimeout, result *orc
 }
 
 func shouldTreatOrchestraResultAsFailure(result *orchestra.OrchestraResult) bool {
-	return result != nil && len(result.Responses) == 0 && len(result.FailedProviders) > 0
+	if result == nil || len(result.FailedProviders) == 0 {
+		return false
+	}
+	if len(result.Responses) == 0 {
+		return true
+	}
+	failed := make(map[string]struct{}, len(result.FailedProviders))
+	for _, fp := range result.FailedProviders {
+		failed[fp.Name] = struct{}{}
+	}
+	for _, resp := range result.Responses {
+		if _, ok := failed[resp.Provider]; ok {
+			continue
+		}
+		if resp.TimedOut || resp.EmptyOutput || resp.ExitCode != 0 {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func synthesizeOrchestraFailureError(result *orchestra.OrchestraResult) error {

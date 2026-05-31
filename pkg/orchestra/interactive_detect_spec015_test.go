@@ -106,6 +106,22 @@ func TestCompletionDetection_ClaudeWorkingStatusDefersIdlePrompt(t *testing.T) {
 	}
 }
 
+func TestCompletionDetection_GeminiWorkingStatusDefersPrompt(t *testing.T) {
+	t.Parallel()
+
+	screen := `> Use your file-read capability to open and follow the prompt.
+
+▸ Thought for 2s, 553 tokens
+  Analyzing User Requirements
+
+● ListDir(/Users/bitgapnam/Documents/github/autopus-co)
+⣟ Working...
+esc to cancel         Gemini 3.5 Flash (High)`
+
+	assert.False(t, isPromptVisible(screen, DefaultCompletionPatterns()),
+		"gemini can keep prompt text visible while still working; active status must defer completion")
+}
+
 // --- R1: ANSI-wrapped prompt detection ---
 
 // TestIsPromptVisible_ANSIWrappedPrompts verifies that ANSI escape codes are stripped

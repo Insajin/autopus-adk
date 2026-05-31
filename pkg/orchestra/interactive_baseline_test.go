@@ -203,3 +203,30 @@ func TestLaunchInteractiveSessions_ArgsMode(t *testing.T) {
 	require.NotEmpty(t, mock.promptFileContents)
 	assert.Contains(t, mock.promptFileContents[0], "fix the bug")
 }
+
+func TestLaunchInteractiveSessions_AntigravityUsesScriptCommand(t *testing.T) {
+	t.Parallel()
+	mock := newCmuxMock()
+	provider := ProviderConfig{
+		Name:             "gemini",
+		Binary:           "agy",
+		PromptViaArgs:    true,
+		InteractiveInput: "stdin",
+	}
+	panes := []paneInfo{{provider: provider, paneID: "pane-1"}}
+	cfg := OrchestraConfig{
+		Providers:  []ProviderConfig{provider},
+		Terminal:   mock,
+		Prompt:     "Reply with exactly PONG.",
+		WorkingDir: t.TempDir(),
+	}
+
+	failed := launchInteractiveSessions(context.Background(), cfg, panes)
+	assert.Empty(t, failed)
+	require.NotEmpty(t, mock.sendLongTextCalls)
+	assert.Contains(t, mock.sendLongTextCalls[0].Text, "/bin/sh ")
+	assert.NotContains(t, mock.sendLongTextCalls[0].Text, "Reply with exactly PONG.",
+		"pane should receive only the short script invocation")
+	require.NotEmpty(t, panes[0].launchFiles)
+	cleanupPromptFiles(panes[0].launchFiles)
+}

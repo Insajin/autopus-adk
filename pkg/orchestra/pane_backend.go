@@ -12,6 +12,7 @@ const paneBackendName = "pane"
 // promptRegisterDelay is the short delay between pasting prompt text and Enter,
 // mirroring promptSubmitDelay used by the legacy interactive sender.
 const promptRegisterDelay = 100 * time.Millisecond
+const backendCompletionInitialDelay = 5 * time.Second
 
 // InteractivePaneBackend executes a single provider in an interactive terminal
 // pane (cmux/tmux-style). It is the default execution backend (REQ-004) and
@@ -72,13 +73,21 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 		}
 		pi.responseFile = responseFile
 	}
-	cmd := buildInteractiveLaunchCmdWithCWD(req.Config, launchPrompt, b.cfg.WorkingDir)
+	cmd, launchFile, launchErr := buildPaneLaunchCommand(b.cfg.WorkingDir, req.Config, launchPrompt)
+	if launchErr != nil {
+		return paneFallback(ctx, req, "interactive pane execution failed: launch command error: "+launchErr.Error())
+	}
+	if launchFile != "" {
+		pi.launchFiles = append(pi.launchFiles, launchFile)
+	}
 	if err := term.SendLongText(ctx, paneID, cmd); err != nil {
 		return paneFallback(ctx, req, "interactive pane execution failed: launch send error: "+err.Error())
 	}
 	if err := term.SendCommand(ctx, paneID, "\n"); err != nil {
 		return paneFallback(ctx, req, "interactive pane execution failed: launch enter error: "+err.Error())
 	}
+	time.Sleep(promptRegisterDelay)
+	completionBaseline := captureCompletionBaseline(ctx, term, paneID)
 
 	if !promptDeliveredAtLaunch(req.Config) {
 		// REQ-009: gate the prompt on session readiness. If the session never
@@ -102,15 +111,51 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 		if err := term.SendCommand(ctx, paneID, "\n"); err != nil {
 			return paneFallback(ctx, req, "interactive pane execution failed: prompt enter error: "+err.Error())
 		}
+		time.Sleep(promptRegisterDelay)
+		completionBaseline = captureCompletionBaseline(ctx, term, paneID)
 	}
+	sleepBeforeCompletion(ctx, b.cfg)
 
 	// REQ-010/011/012: wait for completion using the resolved detector. hookSession
 	// is nil when HookMode is false, which makes resolveCompletionDetector pick the
 	// non-hook (poll/monitor) path automatically (REQ-012 degrade).
 	var hookSession *HookSession
-	completed := waitForCompletion(ctx, b.cfg, pi, DefaultCompletionPatterns(), "", hookSession, req.Round)
+	completed := waitForCompletion(ctx, b.cfg, pi, DefaultCompletionPatterns(), completionBaseline, hookSession, req.Round)
 
 	resp := b.collectResponse(ctx, req, pi, !completed)
 	resp.Duration = time.Since(start)
 	return resp, nil
+}
+
+func captureCompletionBaseline(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID) string {
+	readCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	screen, err := readScreenBounded(readCtx, term, paneID, terminal.ReadScreenOpts{})
+	if err != nil {
+		return ""
+	}
+	return screen
+}
+
+func sleepBeforeCompletion(ctx context.Context, cfg OrchestraConfig) {
+	delay := completionInitialDelay(cfg, backendCompletionInitialDelay)
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return
+		}
+		capDelay := remaining / 4
+		if capDelay < promptRegisterDelay {
+			capDelay = promptRegisterDelay
+		}
+		if delay > capDelay {
+			delay = capDelay
+		}
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+	case <-timer.C:
+	}
 }

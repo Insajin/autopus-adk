@@ -89,6 +89,12 @@ func (e *SignalEmitter) pollAndEmit(ctx context.Context, pi paneInfo, patterns [
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			if _, ok := readResponseFile(pi.responseFile); ok {
+				if sendErr := e.signal.SendSignal(ctx, signalName); sendErr != nil {
+					log.Printf("[SignalEmitter] send %s failed: %v", signalName, sendErr)
+				}
+				return
+			}
 			screen, err := readScreenBounded(ctx, e.term, pi.paneID, terminal.ReadScreenOpts{})
 			if err != nil {
 				candidateDetected = false

@@ -175,9 +175,10 @@ var providerWorkingPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)✳`), // claude thinking indicator
 	regexp.MustCompile(`(?im)^\s*[·*✢✣✤✥✦✧✳✶✻✽✺✹]\s*[A-Z][A-Za-z]+\s*(…|\.\.\.)(\s*\([^)]*\))?\s*$`), // claude status line while a prompt is running
 	regexp.MustCompile(`[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]`),                                                               // braille spinner (gemini "taking a bit longer")
+	regexp.MustCompile(`(?i)Working(\.\.\.|…)`),                                                      // gemini active tool/model status
 	regexp.MustCompile(`(?i)taking a bit longer`),                                                    // gemini processing message
 	regexp.MustCompile(`(?i)still on it`),                                                            // gemini processing message
-	regexp.MustCompile(`(?i)esc to cancel,\s*\d+[ms]`),                                               // gemini cancel hint with elapsed time
+	regexp.MustCompile(`(?i)esc to cancel`),                                                          // gemini cancel hint while active
 }
 
 // isProviderWorking checks if the screen shows progress indicators meaning the provider is active.

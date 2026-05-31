@@ -22,6 +22,7 @@ type paneInfo struct {
 	skipWait     bool // true when SendCommand failed — skip sentinel wait
 	promptFiles  []string
 	responseFile string
+	launchFiles  []string
 }
 
 // RunPaneOrchestra runs orchestration using terminal panes when available.
@@ -258,6 +259,7 @@ func cleanupPanes(term terminal.Terminal, panes []paneInfo) {
 		_ = os.Remove(pi.outputFile)
 		cleanupPromptFiles(pi.promptFiles)
 		_ = os.Remove(pi.responseFile)
+		cleanupPromptFiles(pi.launchFiles)
 	}
 }
 

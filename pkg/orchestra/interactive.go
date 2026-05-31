@@ -85,6 +85,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 	} else {
 		responses = waitAndCollectResults(timeoutCtx, cfg, panes, patterns, start, nil, hookSession, 0)
 	}
+	failed = append(failed, responseFailuresFromInteractivePanes(panes, responses, timeout, failed)...)
 
 	// Step 8: Merge by strategy (reuse existing mergeByStrategy)
 	total := time.Since(start)
@@ -100,6 +101,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 		Duration:        total,
 		Summary:         summary,
 		FailedProviders: failed,
+		Degraded:        len(failed) > 0,
 	}, nil
 }
 
@@ -127,7 +129,18 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 			}
 			panes[i].responseFile = responseFile
 		}
-		cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, launchPrompt, cfg.WorkingDir)
+		cmd, launchFile, err := buildPaneLaunchCommand(cfg.WorkingDir, pi.provider, launchPrompt)
+		if err != nil {
+			failed = append(failed, FailedProvider{
+				Name:  pi.provider.Name,
+				Error: fmt.Sprintf("launch command failed: %v", err),
+			})
+			panes[i].skipWait = true
+			continue
+		}
+		if launchFile != "" {
+			panes[i].launchFiles = append(panes[i].launchFiles, launchFile)
+		}
 		// FR-02: Use SendLongText for launch command body (handles long args-based prompts)
 		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, cmd); err != nil {
 			failed = append(failed, FailedProvider{

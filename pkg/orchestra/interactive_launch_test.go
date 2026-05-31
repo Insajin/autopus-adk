@@ -1,9 +1,11 @@
 package orchestra
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestBuildInteractiveLaunchCmd_OpencodeWithArgs verifies opencode with InteractiveInput="args"
@@ -89,6 +91,35 @@ func TestBuildInteractiveLaunchCmd_GeminiNoPrompt(t *testing.T) {
 
 	cmd := buildInteractiveLaunchCmd(p, "")
 	assert.Equal(t, "agy --dangerously-skip-permissions", cmd, "gemini relaunch without a prompt should open the TUI")
+}
+
+func TestBuildPaneLaunchCommand_AntigravityPromptUsesShortScript(t *testing.T) {
+	t.Parallel()
+
+	workingDir := t.TempDir()
+	p := ProviderConfig{
+		Name:             "gemini",
+		Binary:           "agy",
+		PromptViaArgs:    true,
+		InteractiveInput: "stdin",
+	}
+
+	cmd, launchFile, err := buildPaneLaunchCommand(workingDir, p, "open the Markdown file and reply PONG")
+	require.NoError(t, err)
+	defer cleanupPromptFiles([]string{launchFile})
+
+	require.NotEmpty(t, launchFile)
+	assert.Contains(t, cmd, "/bin/sh ")
+	assert.Contains(t, cmd, launchFile)
+	assert.NotContains(t, cmd, "open the Markdown file",
+		"pane input must stay short; the long prompt belongs in the script")
+
+	content, err := os.ReadFile(launchFile)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "cd "+shellQuote(workingDir)+" && agy")
+	assert.Contains(t, string(content), "--dangerously-skip-permissions")
+	assert.Contains(t, string(content), "--prompt-interactive")
+	assert.Contains(t, string(content), "open the Markdown file and reply PONG")
 }
 
 // TestBuildInteractiveLaunchCmd_ShellQuoteEscape verifies single quotes in prompt are escaped.
