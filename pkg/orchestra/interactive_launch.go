@@ -33,8 +33,8 @@ func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir strin
 		}
 		cmd += " " + shellQuoteCommandArg(arg)
 	}
-	// REQ-1: Add permission bypass for Claude interactive sessions
-	if p.Binary == "claude" {
+	// REQ-1: Add permission bypass for interactive sessions that support it.
+	if p.Binary == "claude" || usesAntigravityPromptInteractive(p) {
 		if !strings.Contains(cmd, "--dangerously-skip-permissions") {
 			cmd += " --dangerously-skip-permissions"
 		}

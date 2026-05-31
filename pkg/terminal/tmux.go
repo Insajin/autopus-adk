@@ -61,6 +61,13 @@ func (a *TmuxAdapter) SendCommand(_ context.Context, paneID PaneID, command stri
 		return fmt.Errorf("tmux: %w", err)
 	}
 	target := a.session + ":" + string(paneID)
+	if isEnterCommand(command) {
+		cmd := execCommand("tmux", "send-keys", "-t", target, "Enter")
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("tmux: send enter to pane %s: %w", paneID, err)
+		}
+		return nil
+	}
 	cmd := execCommand("tmux", "send-keys", "-t", target, command, "Enter")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("tmux: send command to pane %s: %w", paneID, err)

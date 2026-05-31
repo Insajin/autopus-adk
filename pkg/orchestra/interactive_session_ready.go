@@ -8,11 +8,11 @@ import (
 // sessionReadyPromptPatterns matches CLI-specific prompts WITHOUT shell patterns ($ and #).
 // Used by waitForSessionReady to avoid premature detection on bare shell prompts.
 var sessionReadyPromptPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)^❯(?:\s|\x{00a0})*(?:Try\b.*)?$`),                                                  // claude code prompt, including startup suggestion text
-	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`),                                                       // gemini TUI prompt (> Type your..., > @, bare >)
-	regexp.MustCompile(`(?im)^codex>\s*$`),                                                                     // codex prompt (case-insensitive)
-	regexp.MustCompile(`(?im)^\s*›\s+(Summarize recent commits|Find and fix a bug(?:\s+in\s+@filename)?)\s*$`), // codex v0.135 TUI prompt
-	regexp.MustCompile(`(?im)^Ask anything\s*$`),                                                               // opencode TUI prompt
+	regexp.MustCompile(`(?m)^❯(?:\s|\x{00a0})*(?:Try\b.*)?$`), // claude code prompt, including startup suggestion text
+	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`),      // gemini TUI prompt (> Type your..., > @, bare >)
+	regexp.MustCompile(`(?im)^codex>\s*$`),                    // codex prompt (case-insensitive)
+	regexp.MustCompile(codexSuggestionPromptPattern),          // codex v0.135+ TUI suggestion prompt
+	regexp.MustCompile(`(?im)^Ask anything\s*$`),              // opencode TUI prompt
 	// NOTE: no shell $ or # patterns — this is the key difference from defaultPromptPatterns
 }
 
@@ -22,7 +22,7 @@ var sessionReadyPromptPatterns = []*regexp.Regexp{
 func SessionReadyPatterns() []CompletionPattern {
 	return []CompletionPattern{
 		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯(?:\s|\x{00a0})*(?:Try\b.*)?$`)},
-		{Provider: "codex", Pattern: regexp.MustCompile(`(?im)^(?:codex>\s*|\s*›\s+(?:Summarize recent commits|Find and fix a bug(?:\s+in\s+@filename)?)\s*)$`)},
+		{Provider: "codex", Pattern: regexp.MustCompile(codexReadyPromptPattern)},
 		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`)},
 		{Provider: "opencode", Pattern: regexp.MustCompile(`(?im)^Ask anything\s*$`)},
 	}

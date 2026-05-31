@@ -152,7 +152,7 @@ type CompletionPattern struct {
 func DefaultCompletionPatterns() []CompletionPattern {
 	return []CompletionPattern{
 		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯(?:\s|\x{00a0})*$`)},
-		{Provider: "codex", Pattern: regexp.MustCompile(`(?im)^(?:codex>\s*|\s*›\s+(?:Summarize recent commits|Find and fix a bug(?:\s+in\s+@filename)?)\s*)$`)},
+		{Provider: "codex", Pattern: regexp.MustCompile(codexReadyPromptPattern)},
 		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`)},
 		{Provider: "opencode", Pattern: regexp.MustCompile(`(?im)^Ask anything\s*$`)},
 	}

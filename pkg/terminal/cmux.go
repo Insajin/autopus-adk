@@ -76,6 +76,13 @@ func (a *CmuxAdapter) SendCommand(_ context.Context, paneID PaneID, command stri
 	if err := validatePaneID(paneID); err != nil {
 		return fmt.Errorf("cmux: %w", err)
 	}
+	if isEnterCommand(command) {
+		cmd := execCommand("cmux", "send-key", "--surface", string(paneID), "Enter")
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("cmux: send enter to pane %s: %w", paneID, err)
+		}
+		return nil
+	}
 	cmd := execCommand("cmux", "send", "--surface", string(paneID), command)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("cmux: send command to pane %s: %w", paneID, err)

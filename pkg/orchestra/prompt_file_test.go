@@ -22,11 +22,12 @@ func TestPanePromptText_WritesMarkdownAndReturnsFileInstruction(t *testing.T) {
 	require.NotEmpty(t, responsePath)
 	assert.Contains(t, filepath.ToSlash(path), ".autopus/orchestra/prompts/codex-round-2-")
 	assert.Contains(t, filepath.ToSlash(responsePath), ".autopus/orchestra/responses/codex-round-2-")
-	assert.Contains(t, instruction, "@"+path)
+	assert.Contains(t, instruction, path)
+	assert.NotContains(t, instruction, "@"+path)
 	assert.Contains(t, instruction, responsePath)
 	assert.Contains(t, instruction, responseBeginMarker)
 	assert.Contains(t, instruction, responseEndMarker)
-	assert.Contains(t, instruction, "Preserve the output format requested by the prompt.")
+	assert.Contains(t, instruction, "Preserve the output format requested by the prompt")
 	assert.Contains(t, instruction, "If the prompt requires JSON")
 	assert.NotContains(t, instruction, "- Use Markdown.")
 	assert.Contains(t, instruction, "Treat the prompt file contents as the full user request.")
@@ -39,6 +40,19 @@ func TestPanePromptText_WritesMarkdownAndReturnsFileInstruction(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(responseContent), responseBeginMarker)
 	assert.Contains(t, string(responseContent), responseEndMarker)
+}
+
+func TestPanePromptText_ReturnsSingleLineInstruction(t *testing.T) {
+	t.Parallel()
+	cfg := OrchestraConfig{WorkingDir: t.TempDir()}
+	provider := ProviderConfig{Name: "claude", Binary: "claude"}
+
+	instruction, path, responsePath := panePromptText(cfg, provider, 1, "full prompt body")
+	defer cleanupPromptFiles([]string{path, responsePath})
+
+	require.NotEmpty(t, instruction)
+	assert.NotContains(t, instruction, "\n")
+	assert.NotContains(t, instruction, "\r")
 }
 
 func TestPanePromptText_EmptyPromptDoesNotCreateFile(t *testing.T) {

@@ -128,6 +128,18 @@ func TestTmuxAdapter_SendCommand(t *testing.T) {
 	assert.Contains(t, combined, "go build ./...")
 }
 
+func TestTmuxAdapter_SendCommand_NewlineUsesEnterOnly(t *testing.T) {
+	restore, captured := newTmuxMock()
+	defer restore()
+
+	a := &TmuxAdapter{}
+	err := a.SendCommand(context.Background(), "0", "\n")
+	require.NoError(t, err)
+
+	assert.Equal(t, "tmux", captured.name)
+	assert.Equal(t, []string{"send-keys", "-t", ":0", "Enter"}, captured.args)
+}
+
 // TestTmuxAdapter_Close verifies kill-session is called with the correct target.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestTmuxAdapter_Close(t *testing.T) {

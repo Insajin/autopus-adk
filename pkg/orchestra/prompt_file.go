@@ -84,26 +84,13 @@ func writePromptMarkdown(workingDir string, provider ProviderConfig, round int, 
 func promptFileInstruction(path, responsePath string) string {
 	cleanPath := filepath.Clean(path)
 	cleanResponsePath := filepath.Clean(responsePath)
-	return fmt.Sprintf(`Read and follow the complete prompt in this Markdown file:
-@%s
-
-If @file references are unsupported, open this path directly: %s
-
-Write your final answer to this Markdown response file:
-%s
-
-Response file rules:
-- Write the final answer between these exact markers:
-%s
-%s
-- Put only the final answer between the markers.
-- Preserve the output format requested by the prompt.
-- If the prompt requires JSON, write only the JSON object or array between the markers, with no Markdown fence or prose.
-- If no output format is specified, Markdown is allowed.
-- Leave the rest of the file unchanged.
-- If you cannot write the response file, print the final answer in the terminal as fallback.
-
-Treat the prompt file contents as the full user request.`, cleanPath, cleanPath, cleanResponsePath, responseBeginMarker, responseEndMarker)
+	return fmt.Sprintf(
+		"Use your file-read capability to open and follow the complete prompt in this Markdown file: %s. Write your final answer to this Markdown response file: %s. Response file rules: write the final answer between these exact markers: %s and %s; put only the final answer between the markers; Preserve the output format requested by the prompt; If the prompt requires JSON, write only the JSON object or array between the markers, with no Markdown fence or prose; If no output format is specified, Markdown is allowed; leave the rest of the file unchanged; If you cannot write the response file, print the final answer in the terminal as fallback. Treat the prompt file contents as the full user request.",
+		cleanPath,
+		cleanResponsePath,
+		responseBeginMarker,
+		responseEndMarker,
+	)
 }
 
 func cleanupPromptFiles(paths []string) {

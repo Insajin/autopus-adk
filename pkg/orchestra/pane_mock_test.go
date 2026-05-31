@@ -186,7 +186,7 @@ func newPlainMock() *mockTerminal {
 }
 
 var outputFilePattern = regexp.MustCompile(`tee\s+([^;]+?)\s*;\s*echo\s+__AUTOPUS_DONE__\s*>>\s*(\S+)`)
-var promptFileRefPattern = regexp.MustCompile(`@([^ \n']+\.md)`)
+var promptFileRefPattern = regexp.MustCompile(`(?:@|Markdown file:\s+)([^ \n']+?\.md)`)
 
 func (m *mockTerminal) writeSentinelOutput(cmd string) {
 	matches := outputFilePattern.FindStringSubmatch(cmd)

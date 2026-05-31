@@ -23,14 +23,19 @@ func stripANSI(s string) string {
 
 // defaultPromptPatterns matches common shell and CLI prompts.
 // @AX:NOTE [AUTO] hardcoded prompt regexes — must stay in sync with DefaultCompletionPatterns
+const (
+	codexSuggestionPromptPattern = `(?im)^\s*›\s+\S.*$`
+	codexReadyPromptPattern      = `(?im)^(?:codex>\s*|\s*›\s+\S.*)$`
+)
+
 var defaultPromptPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)^❯(?:\s|\x{00a0})*$`),                                                              // claude code prompt (unicode heavy right-pointing angle)
-	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`),                                                       // gemini TUI prompt (> Type your..., > @, bare >)
-	regexp.MustCompile(`(?im)^codex>\s*$`),                                                                     // codex prompt (case-insensitive)
-	regexp.MustCompile(`(?im)^\s*›\s+(Summarize recent commits|Find and fix a bug(?:\s+in\s+@filename)?)\s*$`), // codex v0.135 TUI prompt
-	regexp.MustCompile(`(?im)^Ask anything\s*$`),                                                               // opencode TUI prompt
-	regexp.MustCompile(`(?m)^\$\s*$`),                                                                          // shell $ prompt
-	regexp.MustCompile(`(?m)^#\s*$`),                                                                           // root # prompt
+	regexp.MustCompile(`(?m)^❯(?:\s|\x{00a0})*$`),        // claude code prompt (unicode heavy right-pointing angle)
+	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`), // gemini TUI prompt (> Type your..., > @, bare >)
+	regexp.MustCompile(`(?im)^codex>\s*$`),               // codex prompt (case-insensitive)
+	regexp.MustCompile(codexSuggestionPromptPattern),     // codex v0.135+ TUI suggestion prompt
+	regexp.MustCompile(`(?im)^Ask anything\s*$`),         // opencode TUI prompt
+	regexp.MustCompile(`(?m)^\$\s*$`),                    // shell $ prompt
+	regexp.MustCompile(`(?m)^#\s*$`),                     // root # prompt
 }
 
 // cliNoisePatterns matches provider CLI lines that are pure noise (used for line-level filtering).

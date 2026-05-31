@@ -144,6 +144,18 @@ func TestCmuxAdapter_SendCommand(t *testing.T) {
 	assert.Contains(t, combined, "echo hello")
 }
 
+func TestCmuxAdapter_SendCommand_NewlineUsesEnterKey(t *testing.T) {
+	restore, captured := newCmuxMockV2("", nil)
+	defer restore()
+
+	a := &CmuxAdapter{}
+	err := a.SendCommand(context.Background(), "surface:7", "\n")
+	require.NoError(t, err)
+
+	assert.Equal(t, "cmux", captured.lastName())
+	assert.Equal(t, []string{"send-key", "--surface", "surface:7", "Enter"}, captured.lastArgs())
+}
+
 // TestCmuxAdapter_Notify verifies notify --title <msg> is issued.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_Notify(t *testing.T) {
