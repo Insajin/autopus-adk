@@ -48,7 +48,7 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 		go func(idx int, provider orchestra.ProviderConfig) {
 			defer wg.Done()
 
-			prompt := buildStructuredSpecReviewPrompt(cfg.Prompt, embeddedSchema, strings.TrimSpace(provider.SchemaFlag) == "")
+			prompt := buildStructuredSpecReviewPrompt(cfg.Prompt, embeddedSchema, shouldInlineStructuredReviewSchema(backend, provider))
 			req := orchestra.ProviderRequest{
 				Provider:   provider.Name,
 				Prompt:     prompt,

@@ -179,6 +179,9 @@ var providerWorkingPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)taking a bit longer`),                                                    // gemini processing message
 	regexp.MustCompile(`(?i)still on it`),                                                            // gemini processing message
 	regexp.MustCompile(`(?i)esc to cancel`),                                                          // gemini cancel hint while active
+	regexp.MustCompile(`(?i)\besc\s+to\b`),                                                           // codex/gemini cancel hint while active
+	regexp.MustCompile(`(?im)^\s*•\s+.+\(\d+(?:m\s+\d+s|s)\s*•\s*e(?:sc)?(?:\s+to)?(?:…|\.\.\.)?`),   // codex active status, often truncated in narrow panes
+	regexp.MustCompile(`(?im)^\s*•\s+.+\(\d+(?:m\s+\d+s|s)\s+(?:…|\.\.\.)`),                          // codex active status when cancel hint is clipped
 }
 
 // isProviderWorking checks if the screen shows progress indicators meaning the provider is active.

@@ -122,6 +122,32 @@ esc to cancel         Gemini 3.5 Flash (High)`
 		"gemini can keep prompt text visible while still working; active status must defer completion")
 }
 
+func TestCompletionDetection_CodexEscToStatusDefersPrompt(t *testing.T) {
+	t.Parallel()
+
+	tests := []string{`codex
+bitgapnam@Mac autopus-co % codex
+│ >_ OpenAI Codex (v0.135.0)
+│ model:     gpt-5.5 xhigh   /model to change
+│ directory: ~/Documents/github/autopus-co
+
+• Calculating Impact Scores (1m 21s • esc to…)
+
+ Context 81% left · ~/Documents/github/autopus-co`,
+		`• Evaluating ideas for inclusion (1m 37s • e…)
+
+  Context 91% left · ~/Documents/github/autopus-co`,
+		`• Evaluating confidence in insights (1m 36s …)
+
+  Context 89% left · ~/Documents/github/autopus-co`,
+	}
+
+	for _, screen := range tests {
+		assert.False(t, isPromptVisible(screen, DefaultCompletionPatterns()),
+			"codex leaves prior shell/prompt text on screen while generating; active status must defer completion")
+	}
+}
+
 // --- R1: ANSI-wrapped prompt detection ---
 
 // TestIsPromptVisible_ANSIWrappedPrompts verifies that ANSI escape codes are stripped
