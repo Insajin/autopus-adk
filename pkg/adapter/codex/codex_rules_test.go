@@ -32,6 +32,7 @@ func TestGenerateRuleFiles_ProducesManagedRuleSet(t *testing.T) {
 		"lore-commit.md",
 		"objective-reasoning.md",
 		"project-identity.md",
+		"shell-portability.md",
 		"spec-quality.md",
 		"subagent-delegation.md",
 		"techstack-freshness.md",
@@ -101,6 +102,12 @@ func TestGenerateRuleFiles_Content(t *testing.T) {
 	projectIdentityData, err := os.ReadFile(projectIdentityPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(projectIdentityData), "Do NOT confuse the user's project")
+
+	shellPortabilityPath := filepath.Join(dir, ".codex", "rules", "autopus", "shell-portability.md")
+	shellPortabilityData, err := os.ReadFile(shellPortabilityPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(shellPortabilityData), "Do NOT prefix commands with GNU `timeout`")
+	assert.Contains(t, string(shellPortabilityData), "exit code `127`")
 }
 
 func TestAgentsMD_IncludesCoreCodexGuidance(t *testing.T) {

@@ -42,6 +42,16 @@ If none of these files exist, display:
 No project context documents found. Run `/auto setup` to initialize.
 ```
 
+## Shell Portability
+
+IMPORTANT: Do not wrap Autopus commands with GNU `timeout` (for example,
+`timeout 540 auto spec review ...`). macOS does not ship GNU `timeout`, so that
+wrapper fails with exit 127 before `auto` runs. For command deadlines, use the
+runtime's native timeout/background controls. For Autopus provider execution
+limits, pass `--timeout <seconds>` to `auto spec review` or `auto orchestra`.
+If you see `command not found: timeout`, classify it as shell-wrapper failure
+and rerun the underlying `auto ...` command without the wrapper.
+
 ## SPEC Path Resolution
 
 WHEN any subcommand receives a SPEC-ID, resolve the actual file path using this standard procedure:

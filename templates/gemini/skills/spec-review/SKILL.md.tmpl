@@ -55,6 +55,11 @@ auto spec review SPEC-PIPE-001
 auto spec review SPEC-AUTH-001 --strategy debate --timeout 180
 ```
 
+Do not wrap these commands with GNU `timeout` (for example,
+`timeout 540 auto spec review ...`). macOS does not include GNU `timeout` by
+default. Use the agent tool's native timeout/background control for wall-clock
+limits, and use `--timeout <seconds>` for Autopus provider execution limits.
+
 ## Configuration (autopus.yaml)
 
 ```yaml

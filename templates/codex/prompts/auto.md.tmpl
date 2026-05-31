@@ -12,6 +12,17 @@ description: "Autopus 명령 라우터 — setup/status/goal/update/plan/go/fix/
 
 `/goal`은 Codex thread-level 목표 기능입니다. `@auto goal`만 `/goal`에 대한 thin wrapper로 처리하고, 다른 workflow에서는 active goal이 있으면 목표/예산을 보존한 채 상세 workflow에 전달하세요.
 
+## Shell Portability
+
+IMPORTANT: Do not wrap Autopus commands with GNU `timeout` (for example,
+`timeout 540 auto spec review ...`). macOS does not ship GNU `timeout`, so that
+wrapper fails with exit 127 before `auto` runs. For command deadlines, use the
+tool/runtime's native timeout, background, or cancellation controls. For Autopus
+provider execution limits, pass `--timeout <seconds>` to `auto spec review` or
+`auto orchestra`. If you see `command not found: timeout`, classify it as
+shell-wrapper failure and rerun the underlying `auto ...` command without the
+wrapper.
+
 지원 서브커맨드:
 - `setup`: 프로젝트 컨텍스트 생성 워크플로우
 - `status`: SPEC 상태 대시보드 워크플로우

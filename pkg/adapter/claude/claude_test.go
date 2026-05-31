@@ -260,6 +260,10 @@ func TestClaudeAdapter_Generate_InstallsRules(t *testing.T) {
 	_, statErr = os.Stat(filepath.Join(rulesDir, "file-size-limit.md"))
 	require.NoError(t, statErr, "file-size-limit.md가 존재해야 함")
 
+	shellPortabilityData, err := os.ReadFile(filepath.Join(rulesDir, "shell-portability.md"))
+	require.NoError(t, err, "shell-portability.md가 존재해야 함")
+	assert.Contains(t, string(shellPortabilityData), "Do NOT prefix commands with GNU `timeout`")
+
 	techstackData, err := os.ReadFile(filepath.Join(rulesDir, "techstack-freshness.md"))
 	require.NoError(t, err, "techstack-freshness.md가 존재해야 함")
 	assert.Contains(t, string(techstackData), "Technology Stack Decision")

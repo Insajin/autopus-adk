@@ -29,6 +29,7 @@ func TestGeminiGenerateRules(t *testing.T) {
 		"subagent-delegation.md",
 		"language-policy.md",
 		"techstack-freshness.md",
+		"shell-portability.md",
 	}
 	rulesDir := filepath.Join(dir, ".gemini", "rules", "autopus")
 	for _, rule := range rules {
@@ -97,6 +98,11 @@ func TestGeminiRulesContent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(techstackData), "Technology Stack Decision")
 	assert.Contains(t, string(techstackData), "greenfield")
+
+	shellPortabilityPath := filepath.Join(dir, ".gemini", "rules", "autopus", "shell-portability.md")
+	shellPortabilityData, err := os.ReadFile(shellPortabilityPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(shellPortabilityData), "Do NOT prefix commands with GNU `timeout`")
 }
 
 // TestGeminiRulesDoNotContainBrokenImport verifies that the generated rule
@@ -122,6 +128,7 @@ func TestGeminiRulesDoNotContainBrokenImport(t *testing.T) {
 		"objective-reasoning.md",
 		"techstack-freshness.md",
 		"worktree-safety.md",
+		"shell-portability.md",
 	}
 	rulesDir := filepath.Join(dir, ".gemini", "rules", "autopus")
 	for _, rule := range rules {
