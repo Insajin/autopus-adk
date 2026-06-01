@@ -170,6 +170,13 @@ func TestValidateGUIExplorePolicy(t *testing.T) {
 	}
 
 	require.NoError(t, Validate(base, t.TempDir()))
+	withMatrix := base
+	withMatrix.GUI.ScreenMatrix = []GUIScreenMatrixRow{{
+		ID:              "dm",
+		Path:            "/dm",
+		RequiredActions: []string{"open-thread"},
+	}}
+	require.NoError(t, Validate(withMatrix, t.TempDir()))
 
 	tests := []struct {
 		name   string
@@ -183,6 +190,13 @@ func TestValidateGUIExplorePolicy(t *testing.T) {
 		{name: "raw headers", mutate: func(pack *Pack) { pack.GUI.NetworkPolicy.RetainHeaders = true }},
 		{name: "raw bodies", mutate: func(pack *Pack) { pack.GUI.NetworkPolicy.RetainBodies = true }},
 		{name: "raw artifacts", mutate: func(pack *Pack) { pack.GUI.ArtifactRetention.PublishRaw = true }},
+		{name: "screen matrix missing identity", mutate: func(pack *Pack) { pack.GUI.ScreenMatrix = []GUIScreenMatrixRow{{RequiredActions: []string{"open"}}} }},
+		{name: "screen matrix unsafe path", mutate: func(pack *Pack) {
+			pack.GUI.ScreenMatrix = []GUIScreenMatrixRow{{ID: "x", Path: "https://example.test/app"}}
+		}},
+		{name: "screen matrix empty action", mutate: func(pack *Pack) {
+			pack.GUI.ScreenMatrix = []GUIScreenMatrixRow{{ID: "x", RequiredActions: []string{""}}}
+		}},
 	}
 	for _, tt := range tests {
 		tt := tt

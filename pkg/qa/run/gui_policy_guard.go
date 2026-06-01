@@ -16,6 +16,8 @@ type guiPolicyEvaluation struct {
 	unavailable     []string
 	blockedAttempts []string
 	outsideRequests []string
+	missingScreens  []string
+	missingActions  []string
 	missingEvidence []string
 }
 
@@ -31,7 +33,7 @@ func applyGUIPolicyOracle(projectDir string, pack journey.Pack, result *commandR
 		Expected:  expectedGUIRuntimePolicy(pack),
 		Actual:    actualGUIRuntimePolicy(eval),
 	}
-	if len(eval.unavailable) > 0 || len(eval.blockedAttempts) > 0 || len(eval.outsideRequests) > 0 || len(eval.missingEvidence) > 0 {
+	if len(eval.unavailable) > 0 || len(eval.blockedAttempts) > 0 || len(eval.outsideRequests) > 0 || len(eval.missingScreens) > 0 || len(eval.missingActions) > 0 || len(eval.missingEvidence) > 0 {
 		check.Status = "blocked"
 		check.FailureSummary = failureGUIRuntimePolicy(eval)
 		result.Status = "blocked"
@@ -55,6 +57,7 @@ func evaluateGUIPolicyEvidence(projectDir string, pack journey.Pack, guardReadyP
 	eval.confirmed = runtimePolicyConfirmed(graph)
 	eval.unavailable = append(eval.unavailable, guiAvailabilityFailures(graph)...)
 	eval.blockedAttempts = append(eval.blockedAttempts, stoppedPolicyAttempts(graph, pack)...)
+	eval.missingScreens, eval.missingActions = evaluateGUIScreenMatrix(graph, pack.GUI.ScreenMatrix)
 	network, err := readDeclaredJSON(projectDir, pack, "network_summary")
 	if err != nil {
 		eval.missingEvidence = append(eval.missingEvidence, err.Error())
@@ -157,6 +160,8 @@ func actualGUIRuntimePolicy(eval guiPolicyEvaluation) string {
 	parts = append(parts, "target_availability="+joinOrNone(eval.unavailable))
 	parts = append(parts, "blocked_attempts="+joinOrNone(eval.blockedAttempts))
 	parts = append(parts, "network_outside_allowed="+joinOrNone(eval.outsideRequests))
+	parts = append(parts, "missing_screens="+joinOrNone(eval.missingScreens))
+	parts = append(parts, "missing_screen_actions="+joinOrNone(eval.missingActions))
 	if len(eval.missingEvidence) > 0 {
 		parts = append(parts, "missing="+strings.Join(eval.missingEvidence, ", "))
 	}
@@ -172,6 +177,9 @@ func failureGUIRuntimePolicy(eval guiPolicyEvaluation) string {
 	}
 	if len(eval.outsideRequests) > 0 {
 		return "gui runtime policy detected off-origin network request"
+	}
+	if len(eval.missingScreens) > 0 || len(eval.missingActions) > 0 {
+		return "gui screen matrix coverage was incomplete"
 	}
 	return "gui runtime policy enforcement was not confirmed"
 }

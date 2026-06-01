@@ -67,7 +67,7 @@ func runCommand(projectDir string, pack journey.Pack, artifactDir string) comman
 	if ctx.Err() == context.DeadlineExceeded {
 		result.Status = "blocked"
 		result.ExitCode = -1
-		result.FailureSummary = "timeout"
+		result.FailureSummary = "timeout after " + timeout.String()
 		return finishCommandResult(result, artifactDir, []byte(stdout.String()), []byte(stderr.String()))
 	}
 	if err != nil {

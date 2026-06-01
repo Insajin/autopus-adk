@@ -59,6 +59,13 @@ type GUIPolicy struct {
 	SelectorStrategy  string               `yaml:"selector_strategy,omitempty" json:"selector_strategy,omitempty"`
 	NetworkPolicy     GUINetworkPolicy     `yaml:"network_policy,omitempty" json:"network_policy,omitempty"`
 	ArtifactRetention GUIArtifactRetention `yaml:"artifact_retention,omitempty" json:"artifact_retention,omitempty"`
+	ScreenMatrix      []GUIScreenMatrixRow `yaml:"screen_matrix,omitempty" json:"screen_matrix,omitempty"`
+}
+
+type GUIScreenMatrixRow struct {
+	ID              string   `yaml:"id,omitempty" json:"id,omitempty"`
+	Path            string   `yaml:"path,omitempty" json:"path,omitempty"`
+	RequiredActions []string `yaml:"required_actions,omitempty" json:"required_actions,omitempty"`
 }
 
 type GUINetworkPolicy struct {

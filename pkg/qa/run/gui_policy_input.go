@@ -44,6 +44,7 @@ func prepareGUIPolicyInput(pack journey.Pack, artifactDir string) (guiRuntimeInp
 		"selector_strategy":  strings.TrimSpace(pack.GUI.SelectorStrategy),
 		"network_policy":     pack.GUI.NetworkPolicy,
 		"artifact_retention": pack.GUI.ArtifactRetention,
+		"screen_matrix":      pack.GUI.ScreenMatrix,
 	}
 	body, err := json.MarshalIndent(policy, "", "  ")
 	if err != nil {

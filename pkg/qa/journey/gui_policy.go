@@ -43,7 +43,44 @@ func validateGUIPolicy(pack Pack) error {
 	if policy.ArtifactRetention.PublishRaw {
 		return validationError("qa_journey_gui_policy_invalid", "gui artifacts may not publish raw screenshots, traces, or videos")
 	}
+	if err := validateGUIScreenMatrix(policy.ScreenMatrix); err != nil {
+		return validationError("qa_journey_gui_policy_invalid", err.Error())
+	}
 	return nil
+}
+
+func validateGUIScreenMatrix(rows []GUIScreenMatrixRow) error {
+	seen := map[string]bool{}
+	for _, row := range rows {
+		id := strings.TrimSpace(row.ID)
+		path := strings.TrimSpace(row.Path)
+		if id == "" && path == "" {
+			return fmt.Errorf("gui.screen_matrix rows require id or path")
+		}
+		key := id
+		if key == "" {
+			key = path
+		}
+		if seen[key] {
+			return fmt.Errorf("gui.screen_matrix contains duplicate screen %q", key)
+		}
+		seen[key] = true
+		if path != "" && invalidGUIRoutePath(path) {
+			return fmt.Errorf("gui.screen_matrix.path must be a project-local route path")
+		}
+		for _, action := range row.RequiredActions {
+			if strings.TrimSpace(action) == "" || strings.ContainsAny(action, "\r\n") {
+				return fmt.Errorf("gui.screen_matrix.required_actions may not contain empty or multiline values")
+			}
+		}
+	}
+	return nil
+}
+
+func invalidGUIRoutePath(path string) bool {
+	return strings.Contains(path, "://") ||
+		strings.HasPrefix(path, "//") ||
+		strings.ContainsAny(path, "\r\n\t ")
 }
 
 func validateOrigin(value string) error {
