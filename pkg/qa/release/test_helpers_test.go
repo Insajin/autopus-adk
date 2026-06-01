@@ -31,6 +31,15 @@ func assertReleaseGap(t *testing.T, rows []SetupGapRow, lane string, class Setup
 	require.Failf(t, "missing setup gap", "lane=%s class=%s", lane, class)
 }
 
+func assertNoReleaseGap(t *testing.T, rows []SetupGapRow, lane string) {
+	t.Helper()
+	for _, row := range rows {
+		if row.Lane == lane {
+			require.Failf(t, "unexpected setup gap", "lane=%s class=%s", lane, row.SetupGapClass)
+		}
+	}
+}
+
 func siblingSpecIDs(rows []SiblingSpec) []string {
 	out := make([]string, 0, len(rows))
 	for _, row := range rows {

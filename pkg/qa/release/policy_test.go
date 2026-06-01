@@ -21,6 +21,21 @@ func TestEvaluateLaneRowsAppliesBlockingMatrix(t *testing.T) {
 	assert.Equal(t, GateStatusBlocked, AggregateGateStatus([]LaneRow{mustGap, optionalFailure}))
 }
 
+func TestDeferredLaneWithoutSetupGapIsInformationalPass(t *testing.T) {
+	t.Parallel()
+
+	deferred := NormalizeLaneRow(LaneRow{
+		Lane:          "mobile-readiness",
+		LanePolicy:    LanePolicyDeferred,
+		Status:        LaneStatusDeferred,
+		SetupGapClass: SetupGapNone,
+	})
+
+	assert.Equal(t, SeverityNone, deferred.Severity)
+	assert.Equal(t, LaneVerdictPass, deferred.LaneVerdict)
+	assert.Equal(t, GateStatusPassed, AggregateGateStatus([]LaneRow{deferred}))
+}
+
 func TestInvalidLaneRowCombinationFailsClosed(t *testing.T) {
 	t.Parallel()
 

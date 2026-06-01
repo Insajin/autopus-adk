@@ -146,6 +146,9 @@ func releaseSetupGaps(policy ProfilePolicy, journeyRows []JourneyPackRow) []Setu
 		}
 		lanePolicy := lanePolicy(policy, lane)
 		class, reason := setupGapForLane(lane)
+		if lanePolicy == LanePolicyDeferred && class == SetupGapSiblingSpecPending {
+			continue
+		}
 		severity := severityForSetupGap(lanePolicy, class)
 		normalized := NormalizeLaneRow(LaneRow{
 			Lane:          lane,

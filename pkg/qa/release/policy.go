@@ -142,7 +142,7 @@ func deferredVerdict(row LaneRow) LaneVerdict {
 	if (row.Status == LaneStatusFailed || row.Status == LaneStatusBlocked) && row.Severity == SeverityCritical {
 		return LaneVerdictBlock
 	}
-	if row.Status == LaneStatusPassed {
+	if row.Status == LaneStatusPassed || (row.Status == LaneStatusDeferred && row.SetupGapClass == SetupGapNone) {
 		return LaneVerdictPass
 	}
 	return LaneVerdictWarn
@@ -192,8 +192,8 @@ func policyRuleRows() []BlockerRuleRow {
 		{LanePolicy: LanePolicyOptional, LaneStatus: "failed|blocked", SetupGapClass: "none", Severity: "info|low|medium", LaneVerdict: LaneVerdictWarn, GateEffect: "keep current gate status"},
 		{LanePolicy: LanePolicyOptional, LaneStatus: "failed|blocked", SetupGapClass: "none", Severity: "high|critical", LaneVerdict: LaneVerdictBlock, GateEffect: "gate blocked"},
 		{LanePolicy: LanePolicyOptional, LaneStatus: "any", SetupGapClass: "policy-forbidden|unsafe-command", Severity: "any", LaneVerdict: LaneVerdictBlock, GateEffect: "gate blocked"},
-		{LanePolicy: LanePolicyDeferred, LaneStatus: "passed", SetupGapClass: "none", Severity: "none", LaneVerdict: LaneVerdictPass, GateEffect: "keep current gate status"},
-		{LanePolicy: LanePolicyDeferred, LaneStatus: "warn|deferred|setup_gap|skipped", SetupGapClass: "non-policy", Severity: "any", LaneVerdict: LaneVerdictWarn, GateEffect: "keep current gate status"},
+		{LanePolicy: LanePolicyDeferred, LaneStatus: "passed|deferred", SetupGapClass: "none", Severity: "none", LaneVerdict: LaneVerdictPass, GateEffect: "keep current gate status"},
+		{LanePolicy: LanePolicyDeferred, LaneStatus: "warn|setup_gap|skipped", SetupGapClass: "non-policy", Severity: "any", LaneVerdict: LaneVerdictWarn, GateEffect: "keep current gate status"},
 		{LanePolicy: LanePolicyDeferred, LaneStatus: "failed|blocked", SetupGapClass: "none", Severity: "info|low|medium|high", LaneVerdict: LaneVerdictWarn, GateEffect: "keep current gate status"},
 		{LanePolicy: LanePolicyDeferred, LaneStatus: "failed|blocked|any", SetupGapClass: "policy-forbidden|unsafe-command|none", Severity: "critical", LaneVerdict: LaneVerdictBlock, GateEffect: "gate blocked"},
 	}

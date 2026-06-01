@@ -81,6 +81,42 @@ func TestExecuteAggregatesOptionalSetupGapAsWarn(t *testing.T) {
 	assert.NotNil(t, canary.Blockers)
 }
 
+func TestExecuteTreatsDeferredSiblingLanesAsInformational(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	for _, lane := range []string{"fast", "browser-staging", "desktop-native", "gui-explore", "canary-explicit"} {
+		adapter := "go-test"
+		argv := []string{"go", "test", "./..."}
+		if lane == "gui-explore" {
+			adapter = "gui-explore"
+			argv = []string{"npx", "playwright", "test"}
+		}
+		if lane == "canary-explicit" {
+			adapter = "canary-template"
+			argv = []string{"auto", "canary"}
+		}
+		writeReleaseJourney(t, dir, lane, lane, adapter, argv)
+	}
+
+	payload, err := Execute(Options{
+		ProjectDir: dir,
+		Profile:    "prelaunch",
+		Output:     filepath.Join(dir, ".autopus", "qa", "releases"),
+		Runner: LaneRunnerFunc(func(_ Options, lane string) (LaneRunResult, error) {
+			return LaneRunResult{Status: LaneStatusPassed, RunIndexPath: ".autopus/qa/runs/" + lane + "/run-index.json"}, nil
+		}),
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, GateStatusPassed, payload.Status)
+	assertNoReleaseGap(t, payload.SetupGaps, "mobile-readiness")
+	assertNoReleaseGap(t, payload.SetupGaps, "evidence-dashboard")
+	mobile := findLaneRow(t, payload.LaneRows, "mobile-readiness")
+	assert.Equal(t, LaneStatusDeferred, mobile.Status)
+	assert.Equal(t, LaneVerdictPass, mobile.LaneVerdict)
+}
+
 func TestExecuteKeepsAIAnalysisUntrustedForVerdict(t *testing.T) {
 	t.Parallel()
 
