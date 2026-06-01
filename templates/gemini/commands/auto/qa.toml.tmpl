@@ -2,7 +2,7 @@ description = "QAMESH project QA mesh"
 prompt = """
 Load the autopus skill from .gemini/skills/autopus/auto-qa/SKILL.md and follow its instructions.
 Pass the user's arguments through as the payload for `auto qa ...`.
-Route to `auto qa init`, `auto qa plan`, `auto qa run`, `auto qa explore`, `auto qa release`, `auto qa evidence`, or `auto qa feedback` according to the user's evidence flow.
+Route to `auto qa full` as the easiest default for full project QA planning, `auto qa full --bootstrap` when starter files are needed, `auto qa coverage` for evidence coverage summaries, `auto qa profile check` for profile capability readiness, or to `auto qa init`, `auto qa plan`, `auto qa run`, `auto qa explore`, `auto qa release`, `auto qa evidence`, or `auto qa feedback` according to the user's evidence flow.
 ADK is a harness: concrete commands, origins, oracles, and artifacts must come from a project-local Journey Pack under `.autopus/qa/journeys/**`.
 Use `auto canary` for post-deploy smoke/status only. In `auto qa release`, `canary-explicit` is only a bridge lane for an explicit post-deploy smoke Journey Pack; without that pack, report a setup gap.
 """

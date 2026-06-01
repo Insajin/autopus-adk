@@ -24,6 +24,39 @@ type qaTargetCandidate struct {
 	Reasons []string
 }
 
+type WorkspaceQATarget struct {
+	ProjectDir string   `json:"project_dir"`
+	RelPath    string   `json:"rel_path"`
+	Score      int      `json:"score"`
+	Reasons    []string `json:"reasons,omitempty"`
+}
+
+func DetectWorkspaceQATargets(root string) ([]WorkspaceQATarget, bool, error) {
+	normalized, err := normalizeProjectDir(root)
+	if err != nil {
+		return nil, false, err
+	}
+	candidates, hasChildRepos := detectWorkspaceQATargets(normalized)
+	targets := make([]WorkspaceQATarget, 0, len(candidates))
+	for _, candidate := range candidates {
+		targets = append(targets, WorkspaceQATarget{
+			ProjectDir: candidate.AbsPath,
+			RelPath:    candidate.RelPath,
+			Score:      candidate.Score,
+			Reasons:    append([]string(nil), candidate.Reasons...),
+		})
+	}
+	return targets, hasChildRepos, nil
+}
+
+func HasQAScaffoldSignals(projectDir string) bool {
+	normalized, err := normalizeProjectDir(projectDir)
+	if err != nil {
+		return false
+	}
+	return hasQAScaffoldSignals(normalized)
+}
+
 func resolveProjectDir(projectDir string, explicit bool) projectDirResolution {
 	resolution := projectDirResolution{ProjectDir: projectDir}
 	if explicit || hasQAScaffoldSignals(projectDir) {

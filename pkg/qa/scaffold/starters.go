@@ -57,7 +57,7 @@ func detectJourneyStarters(projectDir string, release bool) []starterFile {
 		starters = append(starters, desktopGUIStarter(signals))
 	}
 	if len(starters) > 0 {
-		starters = append(starters, domainReadinessCatalogStarter())
+		starters = append(starters, domainReadinessCatalogStarter(projectDir))
 	}
 	if release {
 		starters = append(starters, canaryStarter())
@@ -65,8 +65,8 @@ func detectJourneyStarters(projectDir string, release bool) []starterFile {
 	return starters
 }
 
-func domainReadinessCatalogStarter() starterFile {
-	body, err := json.MarshalIndent(domainreadiness.StarterCatalog(), "", "  ")
+func domainReadinessCatalogStarter(projectDir string) starterFile {
+	body, err := json.MarshalIndent(domainreadiness.StarterCatalogForProject(projectDir), "", "  ")
 	if err != nil {
 		body = []byte("{}")
 	}

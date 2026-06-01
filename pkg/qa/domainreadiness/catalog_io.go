@@ -36,7 +36,7 @@ func WriteStarterCatalog(projectDir, catalogPath string) (string, error) {
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	body, err := json.MarshalIndent(StarterCatalog(), "", "  ")
+	body, err := json.MarshalIndent(StarterCatalogForProject(projectDir), "", "  ")
 	if err != nil {
 		return "", err
 	}
@@ -65,30 +65,6 @@ func StarterCatalog() Catalog {
 		SchemaVersion:   CatalogSchemaVersion,
 		SuiteID:         "project-domain-readiness",
 		RequiredDomains: []string{"core"},
-		Scenarios: []Scenario{{
-			SchemaVersion:           ScenarioSchemaVersion,
-			ScenarioID:              "project-core-readiness",
-			Domain:                  "core",
-			Owner:                   "project-owner",
-			OwningRepo:              ".",
-			SourceSpecRefs:          []string{"SPEC-QAMESH-002"},
-			ScenarioMode:            ScenarioModeContractTest,
-			MutationBoundary:        MutationBoundaryReadOnly,
-			FixtureOrSourceNeed:     []string{"project-owned deterministic test evidence"},
-			JourneyPackRefs:         []string{"fast"},
-			QAMESHLaneRefs:          []string{"fast"},
-			ExpectedEvidence:        []string{"deterministic_check_result"},
-			PassFailOracle:          []string{"exit_code == 0"},
-			FreshnessWindowHours:    24,
-			ForbiddenActions:        []string{"production_mutation", "provider_write", "raw_payload_retention"},
-			LaunchQualityDomain:     "core",
-			BackendContractTestRefs: []string{},
-			SafeExecutionEnvironment: SafeExecutionEnvironment{
-				Kind:        "local_safe_shell",
-				Environment: "local",
-				CWD:         ".",
-				Timeout:     "5m",
-			},
-		}},
+		Scenarios:       []Scenario{contractStarterScenario("project-core-readiness", "core", []string{"fast"}, []string{"fast"}, []string{"SPEC-QAMESH-002"})},
 	}
 }

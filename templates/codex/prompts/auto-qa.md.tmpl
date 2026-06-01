@@ -1,5 +1,5 @@
 ---
-description: "QAMESH project QA mesh — auto qa init/plan/run/explore/release/evidence/feedback guidance"
+description: "QAMESH project QA mesh — auto qa full/init/plan/run/explore/release/coverage/profile/evidence/feedback guidance"
 ---
 
 # auto-qa — QAMESH Project QA Mesh
@@ -18,9 +18,12 @@ QAMESH는 project-level deterministic QA 실행과 evidence/feedback handoff를 
 
 ## Routing
 
+- Use `auto qa full --format json` as the easiest default entrypoint for full project QA planning. It inspects the release-style lane matrix, Journey Packs, setup gaps, and domain-readiness catalog without executing commands. Add `--bootstrap` to create safe starter files first, and add `--run` only when the caller explicitly wants the full gate executed.
+- Use `auto qa coverage --format json` after a run/release to summarize lane, journey, manifest, setup-gap, and domain-readiness coverage.
+- Use `auto qa profile check --format json` when GUI/auth/profile capability readiness matters before execution.
 - Use `auto qa plan --format json` to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without executing project commands.
 - Use `auto qa init --format json` as the simple default release-QA setup command. It scaffolds project-local `.autopus/qa/journeys/**` files and a generic GitHub Actions release gate from detected Go, Node, Python, Rust, Playwright, and desktop signals, but it must not overwrite existing packs and generated files require human review before execution.
-- In a meta workspace, inspect `.autopus/project/workspace.md` and nested git repos, then run `auto qa init --project-dir <repo> --format json` for the project under test. Do not write root `.autopus/qa/**` unless the root itself is the product repo.
+- In a meta workspace, start with `auto qa full --format json`; if it returns project candidates, choose one with `--project-dir <repo>`. Do not write root `.autopus/qa/**` unless the root itself is the product repo.
 - Use `auto qa init --local-only --format json` only when the caller wants Journey Pack starters without release lanes or workflow scaffolding.
 - Use `auto qa run --format json` to execute deterministic project QA and produce run-index/evidence outputs.
 - Use `auto qa explore --dry-run --format json` to inspect explicit GUI exploration journeys, and `auto qa explore --format json` only when a GUI Journey Pack declares allowed origins, forbidden actions, redaction, and artifact retention policy.

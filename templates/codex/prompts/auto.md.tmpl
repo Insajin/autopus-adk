@@ -39,7 +39,7 @@ wrapper.
 - `verify`: 프론트엔드 UX 검증 워크플로우
 - `secure`: 보안 감사 워크플로우
 - `test`: E2E 시나리오 실행 워크플로우
-- `qa`: QAMESH project QA mesh. Use `auto qa init` for the default release-QA setup, or `auto qa plan`, `auto qa run`, `auto qa explore`, `auto qa release`, `auto qa evidence`, or `auto qa feedback` according to the requested evidence flow. ADK is a harness; concrete commands, origins, oracles, and artifacts belong in a project-local Journey Pack. Use `auto canary` for post-deploy smoke/status only; `auto qa release` treats `canary-explicit` as a bridge lane for an explicit post-deploy smoke Journey Pack.
+- `qa`: QAMESH project QA mesh. Use `auto qa full` as the easiest default for full project QA planning, `auto qa full --bootstrap` when starter files are needed, `auto qa coverage` for evidence coverage summaries, `auto qa profile check` for profile capability readiness, `auto qa init` for release-QA setup, or `auto qa plan`, `auto qa run`, `auto qa explore`, `auto qa release`, `auto qa evidence`, or `auto qa feedback` according to the requested evidence flow. ADK is a harness; concrete commands, origins, oracles, and artifacts belong in a project-local Journey Pack. Use `auto canary` for post-deploy smoke/status only; `auto qa release` treats `canary-explicit` as a bridge lane for an explicit post-deploy smoke Journey Pack.
 - `dev`: plan → go → sync 오케스트레이션 워크플로우
 - `canary`: 배포 후 상태 점검 워크플로우
 - `doctor`: 하네스 상태 진단 워크플로우

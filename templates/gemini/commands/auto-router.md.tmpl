@@ -1832,9 +1832,12 @@ Use QAMESH when the task is project-level deterministic QA execution or evidence
 
 ### Command Selection
 
+- Use `auto qa full --format json` as the easiest default entrypoint for full project QA planning. It inspects the release-style lane matrix, Journey Packs, setup gaps, and domain-readiness catalog without executing project commands. Add `--bootstrap` to create safe starter files first, and add `--run` only when the caller explicitly wants the full gate executed.
+- Use `auto qa coverage --format json` after a run/release to summarize lane, journey, manifest, setup-gap, and domain-readiness coverage.
+- Use `auto qa profile check --format json` when GUI/auth/profile capability readiness matters before execution.
 - Use `auto qa plan --format json` to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without executing project commands.
 - Use `auto qa init --format json` to create project-local starter Journey Packs from detected Go, Node, Python, Rust, Playwright, and desktop signals. Existing packs are preserved and generated packs require human review before execution.
-- In a meta workspace, inspect `.autopus/project/workspace.md` and nested git repos, then run `auto qa init --project-dir <repo> --format json` for the project under test. Do not write root `.autopus/qa/**` unless the root itself is the product repo.
+- In a meta workspace, start with `auto qa full --format json`; if it returns project candidates, choose one with `--project-dir <repo>`. Do not write root `.autopus/qa/**` unless the root itself is the product repo.
 - `auto qa init --format json` is the simple default release-QA setup command. Use `auto qa init --local-only --format json` only when Journey Pack starters are needed without release lanes or workflow scaffolding. Review commands, env, installer version, and required-gate policy before relying on generated files.
 - Use `auto qa run --format json` to execute deterministic project QA and produce QAMESH run-index/evidence output.
 - Use `auto qa explore --dry-run --format json` before explicit GUI exploration, and run it only for local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
@@ -1851,7 +1854,7 @@ Use QAMESH when the task is project-level deterministic QA execution or evidence
 - Keep GUI exploration local/staging and deterministic-oracle bound; do not accept production mutation authority or AI-only pass/fail judgment.
 - Do not edit generated root surfaces (`.claude/**`, `.codex/**`, `.gemini/**`, `.opencode/**`, `.autopus/plugins/**`) directly.
 
-Usage: `/auto qa init --format json`, `/auto qa init --local-only --format json`, `/auto qa plan --format json`, `/auto qa run --feedback-to gemini --format json`, `/auto qa explore --dry-run --format json`, `/auto qa release --dry-run --format json`, `/auto qa release --roadmap --format json`, `/auto qa evidence --input manifest.json --output .autopus/qa/evidence --surface browser --lane golden --scenario S1`, `/auto qa feedback --to gemini --evidence manifest.json`
+Usage: `/auto qa full --format json`, `/auto qa full --bootstrap --format json`, `/auto qa full --run --format json`, `/auto qa coverage --format json`, `/auto qa profile check --format json`, `/auto qa init --format json`, `/auto qa init --local-only --format json`, `/auto qa plan --format json`, `/auto qa run --feedback-to gemini --format json`, `/auto qa explore --dry-run --format json`, `/auto qa release --dry-run --format json`, `/auto qa release --roadmap --format json`, `/auto qa evidence --input manifest.json --output .autopus/qa/evidence --surface browser --lane golden --scenario S1`, `/auto qa feedback --to gemini --evidence manifest.json`
 
 ---
 

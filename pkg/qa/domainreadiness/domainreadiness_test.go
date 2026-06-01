@@ -1,6 +1,7 @@
 package domainreadiness
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -24,6 +25,45 @@ func TestStarterCatalogCompilesWithoutProductSpecificBaseline(t *testing.T) {
 	require.Len(t, plan.ScenarioPlans, 1)
 	assert.Equal(t, "project-core-readiness", plan.ScenarioPlans[0].ScenarioID)
 	assert.Empty(t, plan.ScenarioPlans[0].Adapter)
+}
+
+func TestStarterCatalogForProjectAddsBrowserAuthAndBuildDomains(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{
+  "scripts": {"build": "next build"},
+  "dependencies": {"next": "^16.0.0", "next-auth": "^5.0.0"}
+}`), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src", "app", "login"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "next.config.ts"), []byte("export default {}\n"), 0o644))
+
+	catalog := StarterCatalogForProject(dir)
+	plan, err := CompileCatalog(catalog, CompileOptions{ProjectDir: dir, Lane: "full"})
+	require.NoError(t, err)
+
+	assert.True(t, plan.Validation.Valid)
+	assert.ElementsMatch(t, []string{"core", "browser", "auth", "build"}, catalog.RequiredDomains)
+	assert.Contains(t, plan.CoveredDomains, "browser")
+	assert.Contains(t, plan.CoveredDomains, "auth")
+	assert.Contains(t, plan.CoveredDomains, "build")
+	assert.GreaterOrEqual(t, len(plan.ScenarioPlans), 4)
+}
+
+func TestStarterCatalogForProjectAddsDesktopDomain(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src-tauri"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "src-tauri", "Cargo.toml"), []byte("[package]\nname = \"desktop\"\n"), 0o644))
+
+	catalog := StarterCatalogForProject(dir)
+	plan, err := CompileCatalog(catalog, CompileOptions{ProjectDir: dir, Lane: "full"})
+	require.NoError(t, err)
+
+	assert.True(t, plan.Validation.Valid)
+	assert.Contains(t, catalog.RequiredDomains, "desktop")
+	assert.Contains(t, plan.CoveredDomains, "desktop")
 }
 
 func TestLoadCatalogFileRejectsGeneratedSurface(t *testing.T) {
