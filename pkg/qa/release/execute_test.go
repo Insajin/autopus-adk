@@ -24,9 +24,12 @@ func TestExecuteWritesReleaseIndexWhenFirstLaneBlocks(t *testing.T) {
 		Runner: LaneRunnerFunc(func(_ Options, lane string) (LaneRunResult, error) {
 			require.Equal(t, "fast", lane)
 			return LaneRunResult{
-				Status:       LaneStatusFailed,
-				RunIndexPath: ".autopus/qa/runs/fast/run-index.json",
-				FeedbackRefs: []string{".autopus/qa/feedback/fast-codex/bundle.json"},
+				Status:          LaneStatusFailed,
+				RunIndexPath:    ".autopus/qa/runs/fast/run-index.json",
+				ManifestPaths:   []string{".autopus/qa/runs/fast/unit/manifest.json"},
+				FeedbackRefs:    []string{".autopus/qa/feedback/fast-codex/bundle.json"},
+				FailedJourneyID: "unit",
+				FailureSummary:  "expected exit_code=0",
 			}, nil
 		}),
 	})
@@ -47,7 +50,13 @@ func TestExecuteWritesReleaseIndexWhenFirstLaneBlocks(t *testing.T) {
 	fast := findLaneRow(t, payload.LaneRows, "fast")
 	assert.Equal(t, LaneStatusFailed, fast.Status)
 	assert.Equal(t, ".autopus/qa/runs/fast/run-index.json", fast.RunIndexPath)
+	assert.Equal(t, "unit", fast.FailedJourneyID)
+	assert.Equal(t, "expected exit_code=0", fast.FailureSummary)
+	assert.Contains(t, fast.ManifestPaths, ".autopus/qa/runs/fast/unit/manifest.json")
 	assert.Contains(t, fast.FeedbackRefs, ".autopus/qa/feedback/fast-codex/bundle.json")
+	if assert.Len(t, fast.Blockers, 1) {
+		assert.Equal(t, "journey_failed:unit", fast.Blockers[0].Reason)
+	}
 	assert.True(t, fast.DeterministicAuthority)
 	desktop := findLaneRow(t, payload.LaneRows, "desktop-native")
 	assert.Equal(t, LaneStatusSkipped, desktop.Status)

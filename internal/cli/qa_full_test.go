@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	qarelease "github.com/insajin/autopus-adk/pkg/qa/release"
 )
 
 func TestQAFullCmd_DefaultPlansFullGateWithoutSideEffects(t *testing.T) {
@@ -101,4 +103,42 @@ func TestQAFullCmd_IsRegisteredUnderQA(t *testing.T) {
 	fullCmd, _, err := root.Find([]string{"qa", "full"})
 	require.NoError(t, err)
 	require.NotNil(t, fullCmd)
+}
+
+func TestBuildQAFullRunPayloadIncludesRootJourneyBlocker(t *testing.T) {
+	t.Parallel()
+
+	payload := buildQAFullRunPayload(
+		qaFullOptions{ProjectDir: "desktop"},
+		qarelease.ExecutionPayload{Index: qarelease.Index{
+			Profile:       "prelaunch",
+			Status:        qarelease.GateStatusBlocked,
+			SelectedLanes: []string{"fast"},
+			LaneRows: []qarelease.LaneRow{{
+				Lane:            "fast",
+				Status:          qarelease.LaneStatusFailed,
+				LaneVerdict:     qarelease.LaneVerdictBlock,
+				FailedJourneyID: "desktop-messenger-core",
+				FailureSummary:  "expected exit_code=0",
+				Blockers:        []qarelease.Blocker{{Lane: "fast", Reason: "journey_failed:desktop-messenger-core"}},
+				ManifestPaths:   []string{".autopus/qa/runs/r1/desktop-messenger-core/manifest.json"},
+				FeedbackRefs:    []string{},
+				SetupGapClass:   qarelease.SetupGapNone,
+				Severity:        qarelease.SeverityHigh,
+				LanePolicy:      qarelease.LanePolicyMust,
+				RunIndexPath:    ".autopus/qa/runs/r1/run-index.json",
+				OwnerSpec:       "SPEC-QAMESH-002",
+				OwnerRepo:       "autopus-desktop",
+				SkippedReason:   "",
+			}},
+		}},
+		qaFullDomainReadiness{Status: "ready"},
+		nil,
+	)
+
+	assert.Equal(t, "blocked", payload.Summary.Status)
+	assert.Equal(t, "fast", payload.Summary.RootBlockerLane)
+	assert.Equal(t, "journey_failed:desktop-messenger-core", payload.Summary.RootBlockerReason)
+	assert.Equal(t, "desktop-messenger-core", payload.Summary.RootFailedJourneyID)
+	assert.Equal(t, "expected exit_code=0", payload.Summary.RootFailureSummary)
 }

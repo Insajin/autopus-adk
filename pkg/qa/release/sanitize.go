@@ -56,6 +56,8 @@ func sanitizeLaneRow(row LaneRow, redact func(string) string) LaneRow {
 	row.RunIndexPath = redact(row.RunIndexPath)
 	row.ManifestPaths = sanitizeStrings(row.ManifestPaths, redact)
 	row.FeedbackRefs = sanitizeStrings(row.FeedbackRefs, redact)
+	row.FailedJourneyID = redact(row.FailedJourneyID)
+	row.FailureSummary = redact(row.FailureSummary)
 	row.SkippedReason = redact(row.SkippedReason)
 	for i := range row.Blockers {
 		row.Blockers[i].Lane = redact(row.Blockers[i].Lane)

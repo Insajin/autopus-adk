@@ -107,11 +107,14 @@ func (defaultLaneRunner) RunLane(opts Options, lane string) (LaneRunResult, erro
 	if result.RunID != "" {
 		_ = os.RemoveAll(filepath.Join(opts.RunOutputRoot, result.RunID, "_raw"))
 	}
+	failedJourneyID, failureSummary := firstRunFailure(result)
 	return LaneRunResult{
 		Status:          mapRunStatus(result.Status),
 		RunIndexPath:    result.RunIndexPath,
 		ManifestPaths:   result.ManifestPaths,
 		FeedbackRefs:    result.FeedbackBundlePaths,
+		FailedJourneyID: failedJourneyID,
+		FailureSummary:  failureSummary,
 		RedactionStatus: mapRunRedaction(result.RedactionStatus.Status),
 	}, err
 }
@@ -185,6 +188,8 @@ func runResultLaneRow(policy ProfilePolicy, lane string, result LaneRunResult, e
 		RunIndexPath:           result.RunIndexPath,
 		ManifestPaths:          result.ManifestPaths,
 		FeedbackRefs:           result.FeedbackRefs,
+		FailedJourneyID:        result.FailedJourneyID,
+		FailureSummary:         result.FailureSummary,
 		DeterministicAuthority: true,
 	}
 	if err != nil && status != LaneStatusFailed && status != LaneStatusBlocked {

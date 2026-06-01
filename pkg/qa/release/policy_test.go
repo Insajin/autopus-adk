@@ -71,3 +71,19 @@ func TestSetupGapTakesPrecedenceOverWarningNormalization(t *testing.T) {
 	assert.Equal(t, SeverityHigh, row.Severity)
 	assert.Equal(t, LaneVerdictBlock, row.LaneVerdict)
 }
+
+func TestNormalizeLaneRowUsesJourneyFailureBlockerReason(t *testing.T) {
+	t.Parallel()
+
+	row := NormalizeLaneRow(LaneRow{
+		Lane:            "fast",
+		LanePolicy:      LanePolicyMust,
+		Status:          LaneStatusFailed,
+		FailedJourneyID: "desktop-messenger-core",
+	})
+
+	assert.Equal(t, LaneVerdictBlock, row.LaneVerdict)
+	if assert.Len(t, row.Blockers, 1) {
+		assert.Equal(t, "journey_failed:desktop-messenger-core", row.Blockers[0].Reason)
+	}
+}

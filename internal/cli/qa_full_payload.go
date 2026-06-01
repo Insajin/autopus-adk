@@ -36,6 +36,10 @@ type qaFullSummary struct {
 	BlockingSetupGaps   int      `json:"blocking_setup_gaps"`
 	DomainScenarioCount int      `json:"domain_scenario_count"`
 	DomainSetupGap      bool     `json:"domain_setup_gap"`
+	RootBlockerLane     string   `json:"root_blocker_lane,omitempty"`
+	RootBlockerReason   string   `json:"root_blocker_reason,omitempty"`
+	RootFailedJourneyID string   `json:"root_failed_journey_id,omitempty"`
+	RootFailureSummary  string   `json:"root_failure_summary,omitempty"`
 }
 
 type qaFullProjectCandidate struct {
@@ -89,22 +93,14 @@ func buildQAFullRunPayload(opts qaFullOptions, result qarelease.ExecutionPayload
 		status = "setup_gap"
 	}
 	index := result.Index
+	summary := buildQAFullRunSummary(status, result, domain)
 	return qaFullPayload{
-		SchemaVersion: qaFullSchemaVersion,
-		Mode:          "run",
-		Profile:       result.Profile,
-		ProjectDir:    opts.ProjectDir,
-		Bootstrap:     bootstrap,
-		Summary: qaFullSummary{
-			Status:              status,
-			Action:              "run",
-			SelectedLanes:       result.SelectedLanes,
-			JourneyPackCount:    len(result.LaneRows),
-			SetupGapCount:       len(result.SetupGaps),
-			BlockingSetupGaps:   countBlockingSetupGaps(result.SetupGaps),
-			DomainScenarioCount: domainScenarioCount(domain),
-			DomainSetupGap:      domain.Status != "ready",
-		},
+		SchemaVersion:   qaFullSchemaVersion,
+		Mode:            "run",
+		Profile:         result.Profile,
+		ProjectDir:      opts.ProjectDir,
+		Bootstrap:       bootstrap,
+		Summary:         summary,
 		NextCommands:    qaFullRunNextCommands(opts, result, domain),
 		ReleaseResult:   &index,
 		ReleaseIndexRef: result.ReleaseIndexPath,

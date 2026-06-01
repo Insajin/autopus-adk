@@ -64,9 +64,29 @@ func NormalizeLaneRow(row LaneRow) LaneRow {
 	}
 	row.LaneVerdict = evaluateVerdict(row)
 	if row.LaneVerdict == LaneVerdictBlock && len(row.Blockers) == 0 {
-		row.Blockers = []Blocker{{Lane: row.Lane, Reason: "release_lane_blocked"}}
+		row.Blockers = []Blocker{{Lane: row.Lane, Reason: defaultBlockerReason(row)}}
 	}
 	return row
+}
+
+func defaultBlockerReason(row LaneRow) string {
+	if row.FailedJourneyID != "" {
+		if row.Status == LaneStatusBlocked {
+			return "journey_blocked:" + row.FailedJourneyID
+		}
+		return "journey_failed:" + row.FailedJourneyID
+	}
+	if row.SetupGapClass != SetupGapNone {
+		return "setup_gap:" + string(row.SetupGapClass)
+	}
+	switch row.Status {
+	case LaneStatusFailed:
+		return "lane_failed"
+	case LaneStatusBlocked:
+		return "lane_blocked"
+	default:
+		return "release_lane_blocked"
+	}
 }
 
 func AggregateGateStatus(rows []LaneRow) GateStatus {

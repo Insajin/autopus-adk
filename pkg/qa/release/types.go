@@ -47,6 +47,8 @@ type LaneRunResult struct {
 	ManifestPaths   []string        `json:"manifest_paths,omitempty"`
 	FeedbackRefs    []string        `json:"feedback_refs,omitempty"`
 	AIAnalysisRefs  []AIAnalysisRef `json:"ai_analysis_refs,omitempty"`
+	FailedJourneyID string          `json:"failed_journey_id,omitempty"`
+	FailureSummary  string          `json:"failure_summary,omitempty"`
 	RedactionStatus RedactionState  `json:"redaction_status,omitempty"`
 }
 
@@ -251,6 +253,8 @@ type LaneRow struct {
 	RunIndexPath           string        `json:"run_index_path"`
 	ManifestPaths          []string      `json:"manifest_paths"`
 	FeedbackRefs           []string      `json:"feedback_refs"`
+	FailedJourneyID        string        `json:"failed_journey_id,omitempty"`
+	FailureSummary         string        `json:"failure_summary,omitempty"`
 	Blockers               []Blocker     `json:"blockers"`
 	SkippedReason          string        `json:"skipped_reason"`
 	DeterministicAuthority bool          `json:"deterministic_authority"`

@@ -57,9 +57,11 @@ type qaCoverageLane struct {
 
 type qaCoverageJourney struct {
 	JourneyID    string `json:"journey_id"`
+	Lane         string `json:"lane,omitempty"`
 	Adapter      string `json:"adapter,omitempty"`
 	Status       string `json:"status,omitempty"`
 	ManifestPath string `json:"manifest_path,omitempty"`
+	Source       string `json:"source,omitempty"`
 }
 
 func newQACoverageCmd() *cobra.Command {
@@ -172,12 +174,12 @@ func addRunCoverage(payload *qaCoveragePayload, index qarun.Index) {
 			payload.Summary.FailedCheckCount++
 		}
 		if check.JourneyID != "" {
-			payload.Journeys = upsertCoverageJourney(payload.Journeys, qaCoverageJourney{JourneyID: check.JourneyID, Adapter: check.Adapter, Status: check.Status})
+			payload.Journeys = upsertCoverageJourney(payload.Journeys, qaCoverageJourney{JourneyID: check.JourneyID, Lane: index.Lane, Adapter: check.Adapter, Status: check.Status, Source: "run"})
 		}
 	}
 	for _, result := range index.AdapterResults {
 		addCoverageManifests(payload, []string{result.QAMESHManifestPath})
-		payload.Journeys = upsertCoverageJourney(payload.Journeys, qaCoverageJourney{JourneyID: result.JourneyID, Adapter: result.Adapter, Status: result.Status, ManifestPath: result.QAMESHManifestPath})
+		payload.Journeys = upsertCoverageJourney(payload.Journeys, qaCoverageJourney{JourneyID: result.JourneyID, Lane: index.Lane, Adapter: result.Adapter, Status: result.Status, ManifestPath: result.QAMESHManifestPath, Source: "run"})
 	}
 }
 
@@ -193,6 +195,7 @@ func addReleaseCoverage(payload *qaCoveragePayload, index qarelease.Index) {
 			RunIndexPath:  row.RunIndexPath,
 			ManifestCount: manifestCount,
 		})
+		addReleaseJourneyCoverage(payload, row)
 	}
 }
 
@@ -253,6 +256,9 @@ func upsertCoverageJourney(values []qaCoverageJourney, next qaCoverageJourney) [
 	}
 	for i, existing := range values {
 		if existing.JourneyID == next.JourneyID {
+			if next.Lane != "" {
+				values[i].Lane = next.Lane
+			}
 			if next.Adapter != "" {
 				values[i].Adapter = next.Adapter
 			}
@@ -261,6 +267,9 @@ func upsertCoverageJourney(values []qaCoverageJourney, next qaCoverageJourney) [
 			}
 			if next.ManifestPath != "" {
 				values[i].ManifestPath = next.ManifestPath
+			}
+			if next.Source != "" {
+				values[i].Source = next.Source
 			}
 			return values
 		}
