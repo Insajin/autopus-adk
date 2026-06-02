@@ -52,9 +52,6 @@ func ParseVerdict(specID, output, provider string, revision int, priorFindings [
 	} else {
 		// Verify mode: apply status updates from FINDING_STATUS lines
 		result.Findings = parseVerifyFindings(output, provider, revision, priorFindings)
-		if result.Verdict == VerdictPass && !hasExplicitVerifyFindings(output) {
-			result.Findings = markVerifyFindingsResolved(result.Findings)
-		}
 	}
 
 	result.Findings = NormalizeAdvisoryFindings(result.Findings)
@@ -196,21 +193,6 @@ func parseChecklistOutcomes(output, provider string, revision int) []ChecklistOu
 	}
 
 	return outcomes
-}
-
-func hasExplicitVerifyFindings(output string) bool {
-	return findingStatusRe.MatchString(output) || structFindingRe.MatchString(output) || findingRe.MatchString(output)
-}
-
-func markVerifyFindingsResolved(findings []ReviewFinding) []ReviewFinding {
-	updated := make([]ReviewFinding, len(findings))
-	for i, f := range findings {
-		updated[i] = f
-		if f.Status == FindingStatusOpen || f.Status == FindingStatusRegressed {
-			updated[i].Status = FindingStatusResolved
-		}
-	}
-	return updated
 }
 
 // merge.go contains MergeVerdicts, MergeFindingStatuses, ShouldTripCircuitBreaker,

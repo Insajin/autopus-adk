@@ -156,6 +156,41 @@ func TestRunSpecReviewLoop_UsesVerifyModeWhenPriorFindingsExistAtRevisionZero(t 
 	assert.NotContains(t, capturedPrompt, "Review the SPEC and respond with:")
 }
 
+func TestRunSpecReviewLoop_VerifyStatusRequiresProviderAgreement(t *testing.T) {
+	dir := t.TempDir()
+	specID := "SPEC-REVIEW-VERIFY-MERGE-001"
+	specDir := scaffoldReviewSpec(t, dir, specID)
+	doc, err := spec.Load(specDir)
+	require.NoError(t, err)
+
+	priorFindings := []spec.ReviewFinding{{
+		ID:          "F-001",
+		Severity:    "major",
+		Category:    spec.FindingCategoryCorrectness,
+		ScopeRef:    "REQ-001",
+		Description: "Existing blocker",
+		Status:      spec.FindingStatusOpen,
+	}}
+
+	origRunner := specReviewRunOrchestra
+	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		return &orchestra.OrchestraResult{
+			Responses: []orchestra.ProviderResponse{
+				{Provider: "claude", Output: `{"verdict":"PASS","summary":"fixed","finding_statuses":[{"id":"F-001","status":"resolved","reason":"closed"}],"findings":[]}`},
+				{Provider: "codex", Output: `{"verdict":"PASS","summary":"not fixed","finding_statuses":[{"id":"F-001","status":"open","reason":"still open"}],"findings":[]}`},
+			},
+		}, nil
+	}
+	defer func() { specReviewRunOrchestra = origRunner }()
+
+	result, err := runSpecReviewLoop(reviewLoopParams(specID, specDir), doc, priorFindings)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, result.Findings, 1)
+	assert.Equal(t, spec.FindingStatusOpen, result.Findings[0].Status)
+	assert.Equal(t, spec.VerdictRevise, result.Verdict)
+}
+
 func reviewLoopParams(specID, specDir string) specReviewLoopParams {
 	return specReviewLoopParams{
 		ctx:          context.Background(),

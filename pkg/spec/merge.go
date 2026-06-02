@@ -10,8 +10,12 @@ func MergeFindingStatuses(providerResults [][]ReviewFinding, threshold float64) 
 
 	// Flatten and group by finding ID
 	byID := make(map[string][]ReviewFinding)
+	var order []string
 	for _, findings := range providerResults {
 		for _, f := range findings {
+			if _, ok := byID[f.ID]; !ok {
+				order = append(order, f.ID)
+			}
 			byID[f.ID] = append(byID[f.ID], f)
 		}
 	}
@@ -19,7 +23,8 @@ func MergeFindingStatuses(providerResults [][]ReviewFinding, threshold float64) 
 	total := float64(len(providerResults))
 	var merged []ReviewFinding
 
-	for _, group := range byID {
+	for _, id := range order {
+		group := byID[id]
 		if len(group) == 0 {
 			continue
 		}

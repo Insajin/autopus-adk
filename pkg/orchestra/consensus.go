@@ -89,23 +89,50 @@ func MergeStructuredConsensus(responses []ProviderResponse, threshold float64) (
 	sort.Ints(keys)
 
 	for _, key := range keys {
-		// Count how many providers have this key
-		count := 0
-		var texts []string
+		type variant struct {
+			text  string
+			count int
+		}
+		variants := make(map[string]variant)
+		var variantOrder []string
 		for _, items := range parsed {
 			if v, ok := items[key]; ok {
-				count++
-				texts = append(texts, v)
+				norm := normalizeLine(v)
+				if norm == "" {
+					continue
+				}
+				current, exists := variants[norm]
+				if !exists {
+					variantOrder = append(variantOrder, norm)
+					current.text = strings.TrimSpace(v)
+				}
+				current.count++
+				variants[norm] = current
+			}
+		}
+		if len(variantOrder) == 0 {
+			continue
+		}
+
+		best := variants[variantOrder[0]]
+		for _, norm := range variantOrder[1:] {
+			candidate := variants[norm]
+			if candidate.count > best.count {
+				best = candidate
 			}
 		}
 
-		ratio := float64(count) / float64(total)
-		if ratio >= threshold && count > 0 {
-			// Use the first occurrence as canonical text
-			agreedLines = append(agreedLines, fmt.Sprintf("✓ %d. %s", key, texts[0]))
+		ratio := float64(best.count) / float64(total)
+		if ratio >= threshold {
+			agreedLines = append(agreedLines, fmt.Sprintf("✓ %d. %s", key, best.text))
 			agreedCount++
 		} else {
-			disputedLines = append(disputedLines, fmt.Sprintf("△ %d. %s [%d/%d]", key, texts[0], count, total))
+			var parts []string
+			for _, norm := range variantOrder {
+				v := variants[norm]
+				parts = append(parts, fmt.Sprintf("%s [%d/%d]", v.text, v.count, total))
+			}
+			disputedLines = append(disputedLines, fmt.Sprintf("△ %d. %s", key, strings.Join(parts, "; ")))
 		}
 	}
 

@@ -2,7 +2,10 @@ package orchestra
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,6 +82,36 @@ func TestRunOrchestra_Consensus_WithCat(t *testing.T) {
 	assert.Equal(t, StrategyConsensus, result.Strategy)
 	assert.Len(t, result.Responses, 2)
 	assert.NotEmpty(t, result.Summary)
+}
+
+func TestRunOrchestra_ConsensusUsesConfiguredThreshold(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fixture uses POSIX sh")
+	}
+
+	dir := t.TempDir()
+	p1 := writeOutputProvider(t, dir, "p1", "1. shared\n2. pair\n3. only-one\n")
+	p2 := writeOutputProvider(t, dir, "p2", "1. shared\n2. pair\n")
+	p3 := writeOutputProvider(t, dir, "p3", "1. shared\n")
+
+	cfg := OrchestraConfig{
+		Providers: []ProviderConfig{
+			{Name: "p1", Binary: p1},
+			{Name: "p2", Binary: p2},
+			{Name: "p3", Binary: p3},
+		},
+		Strategy:           StrategyConsensus,
+		Prompt:             "ignored by fixture",
+		TimeoutSeconds:     10,
+		ConsensusThreshold: 1.0,
+	}
+
+	result, err := RunOrchestra(context.Background(), cfg)
+	require.NoError(t, err)
+	assert.Contains(t, result.Merged, "✓ 1. shared")
+	assert.NotContains(t, result.Merged, "pair", "2/3 agreement must not pass threshold=1.0")
+	assert.NotContains(t, result.Merged, "only-one", "explicit threshold output should omit disputes")
 }
 
 func TestRunOrchestra_Pipeline_WithCat(t *testing.T) {
@@ -174,4 +207,16 @@ func TestRunOrchestra_DefaultTimeout(t *testing.T) {
 	result, err := RunOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
 	assert.NotNil(t, result)
+}
+
+func writeOutputProvider(t *testing.T, dir, name, output string) string {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	script := "#!/bin/sh\ncat >/dev/null\nprintf '%s' " + shellSingleQuote(output) + "\n"
+	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
+	return path
+}
+
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }

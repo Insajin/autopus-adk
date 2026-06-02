@@ -189,7 +189,7 @@ FINDING_STATUS: F-001 | open | unchanged`
 	assert.Equal(t, 3, result.Findings[0].LastSeenRev, "LastSeenRev must be updated to current revision")
 }
 
-func TestParseVerdict_VerifyMode_PassWithoutStatusesResolvesPriorFindings(t *testing.T) {
+func TestParseVerdict_VerifyMode_PassWithoutStatusesKeepsPriorFindingsOpen(t *testing.T) {
 	t.Parallel()
 
 	prior := []ReviewFinding{
@@ -201,6 +201,6 @@ func TestParseVerdict_VerifyMode_PassWithoutStatusesResolvesPriorFindings(t *tes
 	result := ParseVerdict("SPEC-X-001", output, "claude", 2, prior)
 
 	require.Len(t, result.Findings, 2)
-	assert.Equal(t, FindingStatusResolved, result.Findings[0].Status)
-	assert.Equal(t, FindingStatusResolved, result.Findings[1].Status)
+	assert.Equal(t, FindingStatusOpen, result.Findings[0].Status)
+	assert.Equal(t, FindingStatusRegressed, result.Findings[1].Status)
 }

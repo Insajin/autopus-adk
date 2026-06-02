@@ -54,6 +54,22 @@ func TestMergeStructuredConsensus_AllAgree(t *testing.T) {
 	assert.Contains(t, merged, "합의된 내용")
 }
 
+func TestMergeStructuredConsensus_RequiresMatchingItemText(t *testing.T) {
+	t.Parallel()
+
+	responses := []ProviderResponse{
+		{Provider: "p1", Output: "1. Use SQL\n2. Write tests"},
+		{Provider: "p2", Output: "1. Use NoSQL\n2. Write tests"},
+	}
+
+	merged, _ := MergeStructuredConsensus(responses, 0.66)
+
+	assert.NotContains(t, merged, "✓ 1. Use SQL")
+	assert.NotContains(t, merged, "✓ 1. Use NoSQL")
+	assert.Contains(t, merged, "△ 1.")
+	assert.Contains(t, merged, "✓ 2. Write tests")
+}
+
 func TestMergeStructuredConsensus_FallbackOnUnparseable(t *testing.T) {
 	t.Parallel()
 	// One response has no list items → should fall back (return empty)

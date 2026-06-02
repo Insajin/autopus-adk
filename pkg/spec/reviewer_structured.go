@@ -38,9 +38,6 @@ func parseStructuredVerdict(specID, output, provider string, revision int, prior
 	}
 
 	result.Findings = parseStructuredVerifyFindings(out.Findings, out.FindingStatus, provider, revision, priorFindings)
-	if result.Verdict == VerdictPass && len(out.FindingStatus) == 0 && len(out.Findings) == 0 {
-		result.Findings = markVerifyFindingsResolved(result.Findings)
-	}
 	return result, true
 }
 

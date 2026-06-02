@@ -112,15 +112,21 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		var allFindings []spec.ReviewFinding
 		var allChecklistOutcomes []spec.ChecklistOutcome
 		var allResponses []string
+		var providerFindings [][]spec.ReviewFinding
 		for _, r := range reviews {
 			allFindings = append(allFindings, r.Findings...)
 			allChecklistOutcomes = append(allChecklistOutcomes, r.ChecklistOutcomes...)
 			allResponses = append(allResponses, r.Responses...)
+			providerFindings = append(providerFindings, r.Findings)
 		}
 
-		// REQ-06: MergeSupermajority then DeduplicateFindings.
-		allFindings = spec.MergeSupermajority(allFindings, len(reviews), p.threshold)
-		allFindings = spec.DeduplicateFindings(allFindings)
+		if len(priorFindings) > 0 {
+			allFindings = mergeVerifyFindings(providerFindings, priorFindings, len(reviews), p.threshold)
+		} else {
+			// REQ-06: MergeSupermajority then DeduplicateFindings.
+			allFindings = spec.MergeSupermajority(allFindings, len(reviews), p.threshold)
+			allFindings = spec.DeduplicateFindings(allFindings)
+		}
 		allFindings = spec.NormalizeAdvisoryFindings(allFindings)
 
 		merged := &spec.ReviewResult{

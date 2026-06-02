@@ -75,3 +75,11 @@ func handleFastest(_ context.Context, responses []ProviderResponse, _ OrchestraC
 	summary := fmt.Sprintf("최속 응답: %s (%.1fs)", r.Provider, r.Duration.Seconds())
 	return r.Output, summary, nil
 }
+
+func mergeResponsesByStrategy(ctx context.Context, responses []ProviderResponse, cfg OrchestraConfig) (string, string, error) {
+	fn, err := GetStrategyFunc(cfg.Strategy)
+	if err != nil {
+		return "", "", err
+	}
+	return fn(ctx, responses, cfg)
+}

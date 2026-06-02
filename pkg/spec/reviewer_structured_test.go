@@ -57,3 +57,18 @@ func TestParseVerdict_StructuredJSONPassDefersOpenSuggestionStatus(t *testing.T)
 	assert.Equal(t, FindingStatusDeferred, result.Findings[0].Status)
 	assert.False(t, IsActiveBlockingFinding(result.Findings[0]))
 }
+
+func TestParseVerdict_StructuredJSONPassWithoutStatusesKeepsPriorOpen(t *testing.T) {
+	t.Parallel()
+
+	prior := []ReviewFinding{
+		{ID: "F-001", Status: FindingStatusOpen, Category: FindingCategoryCorrectness, Description: "Existing blocker"},
+	}
+	output := `{"verdict":"PASS","summary":"ok","findings":[]}`
+
+	result := ParseVerdict("SPEC-JSON-004", output, "codex", 2, prior)
+
+	require.Len(t, result.Findings, 1)
+	assert.Equal(t, VerdictPass, result.Verdict)
+	assert.Equal(t, FindingStatusOpen, result.Findings[0].Status)
+}

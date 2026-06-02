@@ -174,6 +174,19 @@ func TestDeduplicateFindings_AssignsSequentialIDs(t *testing.T) {
 	assert.Equal(t, "F-002", deduped[1].ID, "second finding must be F-002")
 }
 
+func TestMergeSupermajority_DoesNotMergeDifferentDescriptionsAtSameScope(t *testing.T) {
+	t.Parallel()
+
+	findings := []ReviewFinding{
+		{Provider: "claude", Category: FindingCategoryCorrectness, ScopeRef: "REQ-001", Description: "Missing rollback acceptance criteria"},
+		{Provider: "codex", Category: FindingCategoryCorrectness, ScopeRef: "REQ-001", Description: "Ambiguous ownership boundary"},
+	}
+
+	merged := MergeSupermajority(findings, 3, 0.67)
+
+	assert.Empty(t, merged, "same category/scope with different descriptions must not become false consensus")
+}
+
 func TestNormalizeAdvisoryFindings_DefersOpenSuggestions(t *testing.T) {
 	t.Parallel()
 

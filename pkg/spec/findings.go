@@ -156,10 +156,11 @@ func MergeSupermajority(findings []ReviewFinding, totalProviders int, threshold 
 		return nil
 	}
 
-	// Group findings by normalized key: category + scopeRef + description-prefix
+	// Group findings by normalized key: category + scopeRef + description-prefix.
 	type groupKey struct {
-		category FindingCategory
-		scopeRef string
+		category          FindingCategory
+		scopeRef          string
+		descriptionPrefix string
 	}
 
 	groups := make(map[groupKey][]ReviewFinding)
@@ -167,8 +168,9 @@ func MergeSupermajority(findings []ReviewFinding, totalProviders int, threshold 
 
 	for _, f := range findings {
 		k := groupKey{
-			category: f.Category,
-			scopeRef: NormalizeScopeRef(f.ScopeRef, ""),
+			category:          f.Category,
+			scopeRef:          NormalizeScopeRef(f.ScopeRef, ""),
+			descriptionPrefix: normalizedDescriptionPrefix(f.Description),
 		}
 		if _, exists := groups[k]; !exists {
 			keyOrder = append(keyOrder, k)
@@ -194,6 +196,15 @@ func MergeSupermajority(findings []ReviewFinding, totalProviders int, threshold 
 	}
 
 	return merged
+}
+
+func normalizedDescriptionPrefix(description string) string {
+	normalized := strings.ToLower(strings.Join(strings.Fields(description), " "))
+	runes := []rune(normalized)
+	if len(runes) > 120 {
+		return string(runes[:120])
+	}
+	return normalized
 }
 
 // NormalizeScopeRef normalizes a scope reference for comparison (REQ-012):

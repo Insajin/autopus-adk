@@ -62,23 +62,9 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 
 	total := time.Since(start)
 
-	var merged, summary string
-	switch cfg.Strategy {
-	case StrategyConsensus:
-		merged, summary = MergeConsensus(responses, 0.66)
-	case StrategyPipeline:
-		merged = FormatPipeline(responses)
-		summary = fmt.Sprintf("파이프라인: %d단계 완료", len(responses))
-	case StrategyDebate:
-		merged, summary = buildDebateMerged(responses, cfg)
-	case StrategyFastest:
-		if len(responses) > 0 {
-			merged = responses[0].Output
-			summary = fmt.Sprintf("최속 응답: %s (%.1fs)", responses[0].Provider, responses[0].Duration.Seconds())
-		}
-	case StrategyRelay:
-		merged = FormatRelay(responses)
-		summary = fmt.Sprintf("릴레이: %d단계 완료", len(responses))
+	merged, summary, mergeErr := mergeResponsesByStrategy(timeoutCtx, responses, cfg)
+	if mergeErr != nil {
+		return buildFailureResult(cfg, failed, roundHistory, start, mergeErr), mergeErr
 	}
 
 	// Append failed provider info to summary if any

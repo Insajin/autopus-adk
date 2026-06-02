@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -230,19 +231,24 @@ func buildPaneCommand(provider ProviderConfig, prompt, outputFile string) string
 
 // mergeByStrategy applies the configured merge strategy to responses.
 func mergeByStrategy(s Strategy, responses []ProviderResponse, cfg OrchestraConfig) (string, string) {
-	switch s {
-	case StrategyPipeline:
-		return FormatPipeline(responses), fmt.Sprintf("파이프라인: %d단계 완료", len(responses))
-	case StrategyDebate:
-		return buildDebateMerged(responses, cfg)
-	case StrategyFastest:
-		if len(responses) > 0 {
-			return responses[0].Output, fmt.Sprintf("최속 응답: %s", responses[0].Provider)
-		}
+	if s == StrategyFastest && allResponsesEmpty(responses) {
 		return "", "응답 없음"
-	default:
-		return MergeConsensus(responses, 0.66)
 	}
+	cfg.Strategy = s
+	merged, summary, err := mergeResponsesByStrategy(context.Background(), responses, cfg)
+	if err != nil {
+		return "", err.Error()
+	}
+	return merged, summary
+}
+
+func allResponsesEmpty(responses []ProviderResponse) bool {
+	for _, r := range responses {
+		if strings.TrimSpace(r.Output) != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // runFallback runs the standard non-pane orchestration as fallback.
