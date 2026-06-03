@@ -85,3 +85,40 @@ func TestOrchestraRunBackendFactoryConsumesSelectBackend(t *testing.T) {
 	require.NotNil(t, subprocessBackend)
 	assert.Equal(t, "subprocess", subprocessBackend.Name(), "REQ-003: nil terminal must route to the subprocess backend")
 }
+
+// TestPaneInteractiveContext verifies that pane execution is disabled in nested
+// agent automation, CI, and any non-TTY stdio context, so structured orchestra
+// falls back to the subprocess backend instead of spawning panes that time out.
+func TestPaneInteractiveContext(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		claudeCode string
+		ci         string
+		stdinTTY   bool
+		stdoutTTY  bool
+		want       bool
+	}{
+		{"interactive tty, no env", "", "", true, true, true},
+		{"nested claude-code automation", "1", "", true, true, false},
+		{"ci environment", "", "true", true, true, false},
+		{"piped stdout", "", "", true, false, false},
+		{"piped stdin", "", "", false, true, false},
+		{"piped both", "", "", false, false, false},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, paneInteractiveContext(tt.claudeCode, tt.ci, tt.stdinTTY, tt.stdoutTTY))
+		})
+	}
+}
+
+// TestDetectStructuredTerminal_NonInteractiveFallsBackToPlain verifies that in a
+// non-interactive process (the unit-test runner pipes stdio) backend selection
+// receives a plain terminal and therefore routes to the subprocess backend.
+func TestDetectStructuredTerminal_NonInteractiveFallsBackToPlain(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "plain", detectStructuredTerminal().Name())
+}
