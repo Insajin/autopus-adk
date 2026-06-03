@@ -54,6 +54,7 @@ func TestDeliveryValidatePhaseResultRejectsGeneratedRuntimeDrift(t *testing.T) {
 		"pkg/source.go",
 		".codex/agents/executor.md",
 		".autopus/context/signatures.md",
+		".agents/hooks.json",
 		"config.toml",
 	}
 
@@ -62,6 +63,7 @@ func TestDeliveryValidatePhaseResultRejectsGeneratedRuntimeDrift(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), ".codex/agents/executor.md")
 	assert.Contains(t, err.Error(), ".autopus/context/signatures.md")
+	assert.Contains(t, err.Error(), ".agents/hooks.json")
 	assert.Contains(t, err.Error(), "config.toml")
 }
 
@@ -135,7 +137,10 @@ func TestDeliveryGeneratedRuntimePathMatching(t *testing.T) {
 
 	assert.True(t, IsGeneratedRuntimePath("./.autopus/foo-manifest.json"))
 	assert.True(t, IsGeneratedRuntimePath(".autopus/runtime/session.json"))
+	assert.True(t, IsGeneratedRuntimePath(".autopus/qa/runs/run-1/manifest.json"))
+	assert.True(t, IsGeneratedRuntimePath(".agents/commands/auto.toml"))
 	assert.True(t, IsGeneratedRuntimePath(".agents/plugins/marketplace.json"))
+	assert.False(t, IsGeneratedRuntimePath(".autopus/qa/journeys/login.yaml"))
 	assert.False(t, IsGeneratedRuntimePath("autopus-adk/pkg/delivery/types.go"))
 	assert.NoError(t, ValidateNoGeneratedRuntimeDrift([]string{"autopus-adk/pkg/delivery/types.go"}))
 	require.Error(t, ValidateNoGeneratedRuntimeDrift([]string{".claude/settings.json"}))

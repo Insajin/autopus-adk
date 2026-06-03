@@ -17,9 +17,16 @@ func ValidateCatalogSource(path string) error {
 		".claude",
 		".gemini",
 		".opencode",
+		".agents/skills",
 		".agents/plugins",
+		".agents/commands",
 		".autopus/plugins",
 		".autopus/qa/runs",
+		".autopus/qa/cache",
+		".autopus/qa/gui",
+		".autopus/qa/feedback",
+		".autopus/qa/evidence",
+		".autopus/qa/releases",
 		".autopus/brainstorms",
 		".autopus/orchestra",
 	}
@@ -27,6 +34,9 @@ func ValidateCatalogSource(path string) error {
 		if rel == prefix || strings.HasPrefix(rel, prefix+"/") || strings.Contains(rel, "/"+prefix+"/") {
 			return fmt.Errorf("catalog source may not be generated surface %s", prefix)
 		}
+	}
+	if rel == ".agents/hooks.json" || strings.HasSuffix(rel, "/.agents/hooks.json") {
+		return fmt.Errorf("catalog source may not be generated surface .agents/hooks.json")
 	}
 	if strings.HasPrefix(filepath.Base(rel), ".autopus-") && strings.HasSuffix(rel, "-manifest.json") {
 		return fmt.Errorf("catalog source may not be generated manifest")

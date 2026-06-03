@@ -45,7 +45,7 @@ func classifyWorkspaceFolderPath(rel string) WorkspaceFolderClassification {
 		return WorkspaceFolderClassification{Class: WorkspaceFolderClassProjectionOnly}
 	case rel == ".autopus/runtime" || strings.HasPrefix(rel, ".autopus/runtime/"):
 		return WorkspaceFolderClassification{Class: WorkspaceFolderClassExcluded, ReasonCode: SkipReasonWorkspaceRuntime}
-	case rel == ".autopus/qa" || strings.HasPrefix(rel, ".autopus/qa/"):
+	case isWorkspaceQARawArtifact(rel):
 		return WorkspaceFolderClassification{Class: WorkspaceFolderClassExcluded, ReasonCode: SkipReasonWorkspaceRawArtifact}
 	case rel == ".autopus/context/signatures.md":
 		return WorkspaceFolderClassification{Class: WorkspaceFolderClassExcluded, ReasonCode: SkipReasonWorkspaceContextSignature}
@@ -53,13 +53,22 @@ func classifyWorkspaceFolderPath(rel string) WorkspaceFolderClassification {
 		return WorkspaceFolderClassification{Class: WorkspaceFolderClassExcluded, ReasonCode: SkipReasonWorkspaceManifest}
 	case rel == ".autopus/plugins" || strings.HasPrefix(rel, ".autopus/plugins/") ||
 		rel == ".autopus/orchestra" || strings.HasPrefix(rel, ".autopus/orchestra/") ||
-		rel == ".autopus/brainstorms" || strings.HasPrefix(rel, ".autopus/brainstorms/"):
+		rel == ".autopus/brainstorms" || strings.HasPrefix(rel, ".autopus/brainstorms/") ||
+		rel == ".autopus/design/imports" || strings.HasPrefix(rel, ".autopus/design/imports/") ||
+		rel == ".autopus/design/verify" || strings.HasPrefix(rel, ".autopus/design/verify/") ||
+		rel == ".autopus/canary" || strings.HasPrefix(rel, ".autopus/canary/") ||
+		rel == ".autopus/backup" || strings.HasPrefix(rel, ".autopus/backup/") ||
+		rel == ".autopus/cache" || strings.HasPrefix(rel, ".autopus/cache/") ||
+		rel == ".autopus/docs" || strings.HasPrefix(rel, ".autopus/docs/"):
 		return WorkspaceFolderClassification{Class: WorkspaceFolderClassExcluded, ReasonCode: SkipReasonWorkspaceGeneratedSurface}
 	case rel == ".codex" || strings.HasPrefix(rel, ".codex/") ||
 		rel == ".claude" || strings.HasPrefix(rel, ".claude/") ||
 		rel == ".gemini" || strings.HasPrefix(rel, ".gemini/") ||
 		rel == ".opencode" || strings.HasPrefix(rel, ".opencode/") ||
+		rel == ".agents/skills" || strings.HasPrefix(rel, ".agents/skills/") ||
 		rel == ".agents/plugins" || strings.HasPrefix(rel, ".agents/plugins/") ||
+		rel == ".agents/commands" || strings.HasPrefix(rel, ".agents/commands/") ||
+		rel == ".agents/hooks.json" ||
 		rel == ".symphony/artifacts" || strings.HasPrefix(rel, ".symphony/artifacts/"):
 		return WorkspaceFolderClassification{Class: WorkspaceFolderClassExcluded, ReasonCode: SkipReasonWorkspaceHarnessSurface}
 	case rel == "config.toml":
@@ -72,16 +81,30 @@ func classifyWorkspaceFolderPath(rel string) WorkspaceFolderClassification {
 func workspaceFolderPolicySkips(projectDir string) []Skip {
 	candidates := []string{
 		".autopus/runtime",
-		".autopus/qa",
+		".autopus/qa/runs",
+		".autopus/qa/cache",
+		".autopus/qa/gui",
+		".autopus/qa/feedback",
+		".autopus/qa/evidence",
+		".autopus/qa/releases",
 		".autopus/context/signatures.md",
 		".autopus/plugins",
 		".autopus/orchestra",
 		".autopus/brainstorms",
+		".autopus/design/imports",
+		".autopus/design/verify",
+		".autopus/canary",
+		".autopus/backup",
+		".autopus/cache",
+		".autopus/docs",
 		".codex",
 		".claude",
 		".gemini",
 		".opencode",
+		".agents/skills",
 		".agents/plugins",
+		".agents/commands",
+		".agents/hooks.json",
 		".symphony/artifacts",
 		"config.toml",
 	}
@@ -137,6 +160,23 @@ func isAutopusManifest(rel string) bool {
 		return false
 	}
 	return strings.HasSuffix(rel, "-manifest.json")
+}
+
+func isWorkspaceQARawArtifact(rel string) bool {
+	rawRoots := []string{
+		".autopus/qa/runs",
+		".autopus/qa/cache",
+		".autopus/qa/gui",
+		".autopus/qa/feedback",
+		".autopus/qa/evidence",
+		".autopus/qa/releases",
+	}
+	for _, root := range rawRoots {
+		if rel == root || strings.HasPrefix(rel, root+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func legacyGeneratedSurfaceReason(reason string) bool {

@@ -95,10 +95,18 @@ func updateGitignore(dir string) error {
 	if data, err := os.ReadFile(gitignorePath); err == nil {
 		existing = string(data)
 	}
+	existingLines := make(map[string]bool)
+	for _, line := range strings.Split(existing, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		existingLines[line] = true
+	}
 
 	var toAdd []string
 	for _, pattern := range gitignorePatterns {
-		if !strings.Contains(existing, pattern) {
+		if !existingLines[pattern] {
 			toAdd = append(toAdd, pattern)
 		}
 	}

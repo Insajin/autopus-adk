@@ -11,7 +11,7 @@ category: workflow
 ADK는 workspace folder profile의 소유자가 아니라 workspace 또는 repo checkout 안에 설치되는 harness/execution layer입니다. `auto setup`은 루트 역할과 추적 정책을 문서화하지만, canonical Knowledge Hub의 folder identity, promotion, admission 정책을 ADK generated surface로 대체하지 않습니다.
 
 Generated/runtime/harness surfaces are excluded from canonical Knowledge Hub indexing unless they are explicitly human-managed project/spec documents:
-- Excluded: `.autopus/runtime/**`, `.autopus/qa/**` raw artifacts, `.autopus/context/signatures.md`, `.autopus/*-manifest.json`, `.autopus/plugins/**`, `.autopus/orchestra/**`, `.autopus/brainstorms/**`, `.codex/**`, `.claude/**`, `.gemini/**`, `.opencode/**`, `.agents/plugins/**`, `.symphony/artifacts/**`, `config.toml`
+- Excluded: `.autopus/runtime/**`, `.autopus/qa/{runs,cache,gui,feedback,evidence,releases}/**` raw artifacts, `.autopus/context/signatures.md`, `.autopus/*-manifest.json`, `.autopus/plugins/**`, `.autopus/orchestra/**`, `.autopus/brainstorms/**`, `.autopus/design/{imports,verify}/**`, `.autopus/canary/**`, `.codex/**`, `.claude/**`, `.gemini/**`, `.opencode/**`, `.agents/{skills,plugins,commands}/**`, `.agents/hooks.json`, `.symphony/artifacts/**`, `config.toml`
 - Indexable local docs: `.autopus/project/**`, `.autopus/specs/**`, `.autopus/vault/**`, `README.md`, `docs/**`
 - Candidate/projection only: `.autopus/inbox/**` requires promotion; sanitized `.autopus/learnings/pipeline.jsonl` rows remain ADK Decision/Quality Index projection evidence.
 

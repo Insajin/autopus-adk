@@ -32,16 +32,22 @@ func TestWorkspaceFolderPolicyClassifiesProfileCompatiblePaths(t *testing.T) {
 		{name: "learning projection", path: ".autopus/learnings/pipeline.jsonl", wantClass: WorkspaceFolderClassProjectionOnly},
 		{name: "runtime", path: ".autopus/runtime/memindex/autopus-mem.sqlite", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceRuntime},
 		{name: "qa raw artifacts", path: ".autopus/qa/runs/run-1/raw.txt", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceRawArtifact},
+		{name: "qa journeys", path: ".autopus/qa/journeys/login.yaml"},
 		{name: "context signatures", path: ".autopus/context/signatures.md", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceContextSignature},
 		{name: "manifest", path: ".autopus/root-manifest.json", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceManifest},
 		{name: "plugins", path: ".autopus/plugins/index.json", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceGeneratedSurface},
 		{name: "orchestra", path: ".autopus/orchestra/session.json", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceGeneratedSurface},
 		{name: "brainstorms", path: ".autopus/brainstorms/idea.md", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceGeneratedSurface},
+		{name: "design verify", path: ".autopus/design/verify/latest.json", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceGeneratedSurface},
+		{name: "canary", path: ".autopus/canary/latest.json", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceGeneratedSurface},
 		{name: "codex", path: ".codex/rules/autopus.md", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
 		{name: "claude", path: ".claude/commands/auto.md", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
 		{name: "gemini", path: ".gemini/commands/auto.md", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
 		{name: "opencode", path: ".opencode/rules/autopus.md", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
+		{name: "agents skills", path: ".agents/skills/auto/SKILL.md", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
 		{name: "agents plugins", path: ".agents/plugins/marketplace.json", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
+		{name: "agents commands", path: ".agents/commands/auto.toml", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
+		{name: "agents hooks", path: ".agents/hooks.json", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
 		{name: "symphony artifacts", path: ".symphony/artifacts/run.json", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceHarnessSurface},
 		{name: "config", path: "config.toml", wantClass: WorkspaceFolderClassExcluded, wantReason: SkipReasonWorkspaceConfig},
 	}
@@ -68,17 +74,22 @@ func TestScanWorkspaceFolderPolicyIncludesCandidatesAndSkipReasons(t *testing.T)
 	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "vault", "curated.md"), "# Curated\n\nVault knowledge.\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "inbox", "draft.md"), "# Draft\n\nCandidate knowledge.\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "runtime", "memindex", "raw.md"), "# Runtime\n")
-	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "qa", "raw", "artifact.md"), "# Raw\n")
+	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "qa", "runs", "raw", "artifact.md"), "# Raw\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "context", "signatures.md"), "# Signatures\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "root-manifest.json"), "{}\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "plugins", "plugin.md"), "# Plugin\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "orchestra", "run.md"), "# Orchestra\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "brainstorms", "idea.md"), "# Brainstorm\n")
+	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "design", "verify", "latest.json"), "{}\n")
+	writeMemIndexFile(t, filepath.Join(projectDir, ".autopus", "canary", "latest.json"), "{}\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".codex", "rules", "generated.md"), "# Codex\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".claude", "commands", "auto.md"), "# Claude\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".gemini", "commands", "auto.md"), "# Gemini\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".opencode", "rules", "auto.md"), "# OpenCode\n")
+	writeMemIndexFile(t, filepath.Join(projectDir, ".agents", "skills", "auto", "SKILL.md"), "# Skill\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".agents", "plugins", "marketplace.json"), "{}\n")
+	writeMemIndexFile(t, filepath.Join(projectDir, ".agents", "commands", "auto.toml"), "{}\n")
+	writeMemIndexFile(t, filepath.Join(projectDir, ".agents", "hooks.json"), "{}\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, ".symphony", "artifacts", "run.json"), "{}\n")
 	writeMemIndexFile(t, filepath.Join(projectDir, "config.toml"), "generated = true\n")
 
