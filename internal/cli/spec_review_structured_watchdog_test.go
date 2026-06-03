@@ -49,6 +49,25 @@ func captureSpecReviewStderr(t *testing.T, fn func()) string {
 	return <-done
 }
 
+func TestSpecReviewWatchdogSeconds_SumsPerProviderTimeouts(t *testing.T) {
+	providers := []orchestra.ProviderConfig{
+		{Name: "claude", ExecutionTimeout: 480 * time.Second},
+		{Name: "codex", ExecutionTimeout: 420 * time.Second},
+		{Name: "gemini"}, // no ExecutionTimeout -> uses the fallback
+	}
+	// 480 + 420 + 150 (fallback for gemini) + 30 base + 3*10 per-provider slack.
+	got := specReviewWatchdogSeconds(providers, 150)
+	assert.Equal(t, 1110, got)
+	// Regression guard: the shared review deadline MUST outlast the longest
+	// single provider timeout, otherwise sequential pane execution cancels it
+	// mid-run and reports a spurious 0/N watchdog timeout.
+	assert.Greater(t, got, 480, "watchdog must outlast the longest per-provider timeout")
+}
+
+func TestSpecReviewWatchdogSeconds_FallbackWhenNoProviders(t *testing.T) {
+	assert.Equal(t, 200, specReviewWatchdogSeconds(nil, 200))
+}
+
 func TestRunStructuredSpecReviewOrchestra_WatchdogSynthesizesPaneFailures(t *testing.T) {
 	backend := &blockingStructuredPaneBackend{}
 

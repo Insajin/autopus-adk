@@ -22,7 +22,10 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 		return nil, fmt.Errorf("spec review: no providers configured")
 	}
 
-	ctx, cancel := structuredSpecReviewContext(ctx, cfg.TimeoutSeconds)
+	// The review context must outlast the SUM of the per-provider timeouts, not
+	// a single per-provider-sized value. See specReviewWatchdogSeconds.
+	watchdogSeconds := specReviewWatchdogSeconds(cfg.Providers, cfg.TimeoutSeconds)
+	ctx, cancel := structuredSpecReviewContext(ctx, watchdogSeconds)
 	defer cancel()
 
 	schema := &orchestra.SchemaBuilder{}
@@ -46,8 +49,8 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 	start := time.Now()
 
 	mode := structuredReviewExecutionMode(backend)
-	fmt.Fprintf(os.Stderr, "SPEC 리뷰 백엔드: %s (providers=%d, timeout=%s, mode=%s)\n",
-		backend.Name(), len(cfg.Providers), formatStructuredReviewTimeout(cfg.TimeoutSeconds), mode)
+	fmt.Fprintf(os.Stderr, "SPEC 리뷰 백엔드: %s (providers=%d, watchdog=%s, mode=%s)\n",
+		backend.Name(), len(cfg.Providers), formatStructuredReviewTimeout(watchdogSeconds), mode)
 
 	results := runStructuredSpecReviewProviders(ctx, cfg, backend, parser, schemaPath, embeddedSchema, mode)
 
@@ -265,4 +268,26 @@ func specReviewTimeout(provider orchestra.ProviderConfig, fallbackSeconds int) t
 		return time.Duration(fallbackSeconds) * time.Second
 	}
 	return 120 * time.Second
+}
+
+// specReviewWatchdogSeconds derives the overall review deadline (in seconds)
+// from the per-provider execution timeouts. The pane backend runs providers
+// sequentially under one shared context, so the global deadline must outlast
+// the SUM of every provider's timeout. Reusing a single per-provider-sized
+// value (e.g. --timeout or orchestra.timeout_seconds) as the global deadline
+// cancels later providers before they ever run and silently defeats the
+// configured per-provider timeouts — the root cause of "0/N providers
+// responded" watchdog timeouts. Subprocess (parallel) execution completes at
+// max(), so the summed budget is a safe upper bound there too. Slack covers
+// schema build, prompt assembly, and pane split/paste/read/cleanup overhead.
+func specReviewWatchdogSeconds(providers []orchestra.ProviderConfig, fallbackSeconds int) int {
+	if len(providers) == 0 {
+		return fallbackSeconds
+	}
+	var total time.Duration
+	for _, provider := range providers {
+		total += specReviewTimeout(provider, fallbackSeconds)
+	}
+	total += 30*time.Second + time.Duration(len(providers))*10*time.Second
+	return int(total / time.Second)
 }
