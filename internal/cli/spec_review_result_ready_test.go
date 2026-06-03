@@ -41,3 +41,38 @@ func TestRunSpecReview_AddsVerdictCompletionHints(t *testing.T) {
 	assert.Contains(t, captured.Providers[0].ResultReadyPatterns, "VERDICT:")
 	assert.Equal(t, specReviewResultReadyGrace, captured.Providers[0].ResultReadyGrace)
 }
+
+func TestNewSpecReviewCmd_RegistersPaneBypassFlags(t *testing.T) {
+	cmd := newSpecReviewCmd()
+	assert.NotNil(t, cmd.Flags().Lookup("subprocess"))
+	assert.NotNil(t, cmd.Flags().Lookup("plain"))
+}
+
+func TestRunSpecReviewWithOptions_ForcesSubprocessBackend(t *testing.T) {
+	dir := t.TempDir()
+	scaffoldReviewSpec(t, dir, "SPEC-REVIEW-SUBPROCESS-001")
+	setFakeProviderOnPath(t, dir, "claude")
+
+	origWD, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() { _ = os.Chdir(origWD) }()
+	require.NoError(t, os.Chdir(dir))
+
+	origBuilder := specReviewConfigProviders
+	specReviewConfigProviders = func(_ *config.HarnessConfig, names []string) []orchestra.ProviderConfig {
+		return []orchestra.ProviderConfig{{Name: "claude", Binary: "claude"}}
+	}
+	defer func() { specReviewConfigProviders = origBuilder }()
+
+	var captured orchestra.OrchestraConfig
+	origRunner := specReviewRunOrchestra
+	specReviewRunOrchestra = func(_ context.Context, cfg orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		captured = cfg
+		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{{Provider: "claude", Output: "VERDICT: PASS"}}}, nil
+	}
+	defer func() { specReviewRunOrchestra = origRunner }()
+
+	err = runSpecReviewWithOptions(context.Background(), "SPEC-REVIEW-SUBPROCESS-001", "consensus", 10, specReviewOptions{forceSubprocess: true})
+	require.NoError(t, err)
+	assert.True(t, captured.SubprocessMode)
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
@@ -12,16 +13,17 @@ import (
 
 // specReviewLoopParams holds all parameters needed by the revision loop.
 type specReviewLoopParams struct {
-	ctx          context.Context
-	specID       string
-	specDir      string
-	strategy     string
-	timeout      int
-	maxRevisions int
-	threshold    float64
-	gate         config.ReviewGateConf
-	providers    []orchestra.ProviderConfig
-	codeContext  string
+	ctx            context.Context
+	specID         string
+	specDir        string
+	strategy       string
+	timeout        int
+	maxRevisions   int
+	threshold      float64
+	gate           config.ReviewGateConf
+	providers      []orchestra.ProviderConfig
+	codeContext    string
+	subprocessMode bool
 }
 
 // runSpecReviewLoop executes the REVISE loop and returns the final merged result.
@@ -57,6 +59,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			TimeoutSeconds: p.timeout,
 			JudgeProvider:  p.gate.Judge,
 			NoJudge:        true,
+			SubprocessMode: p.subprocessMode,
 			// REQ-006: inject the detected terminal so SelectBackend can choose the
 			// interactive pane backend on cmux/tmux and the subprocess backend on
 			// plain/CI terminals. The terminal import is centralized in
@@ -66,7 +69,12 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 
 		fmt.Fprintf(os.Stderr, "SPEC 리뷰 시작: %s (전략: %s, 리비전: %d)\n", p.specID, p.strategy, revision)
 
-		result, err := specReviewRunOrchestra(p.ctx, orchCfg)
+		reviewCtx, cancel := context.WithCancel(p.ctx)
+		if p.timeout > 0 {
+			reviewCtx, cancel = context.WithTimeout(p.ctx, time.Duration(p.timeout)*time.Second)
+		}
+		result, err := specReviewRunOrchestra(reviewCtx, orchCfg)
+		cancel()
 		if err != nil {
 			return nil, fmt.Errorf("리뷰 실행 실패: %w", err)
 		}

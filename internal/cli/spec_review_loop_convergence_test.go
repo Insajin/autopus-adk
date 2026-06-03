@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -116,6 +117,47 @@ func TestRunSpecReviewLoop_StopsAfterProviderOnlyFailures(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, spec.VerdictRevise, result.Verdict)
 	assert.Equal(t, 1, callCount, "provider-only failures must not burn every revision timeout")
+}
+
+func TestRunSpecReviewLoop_AppliesRevisionWatchdogToOrchestra(t *testing.T) {
+	dir := t.TempDir()
+	specID := "SPEC-REVIEW-WATCHDOG-001"
+	specDir := scaffoldReviewSpec(t, dir, specID)
+	doc, err := spec.Load(specDir)
+	require.NoError(t, err)
+
+	callCount := 0
+	origRunner := specReviewRunOrchestra
+	specReviewRunOrchestra = func(ctx context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		callCount++
+		<-ctx.Done()
+		return &orchestra.OrchestraResult{
+			Responses: []orchestra.ProviderResponse{{
+				Provider: "claude",
+				TimedOut: true,
+				Output:   `{"verdict":"REVISE","summary":"provider timed out","findings":[{"severity":"major","category":"completeness","scope_ref":"provider:claude","location":"provider:claude","description":"provider timed out","suggestion":"Retry with a shorter context."}]}`,
+			}},
+			FailedProviders: []orchestra.FailedProvider{{
+				Name:         "claude",
+				FailureClass: "timeout",
+				Error:        ctx.Err().Error(),
+			}},
+		}, nil
+	}
+	defer func() { specReviewRunOrchestra = origRunner }()
+
+	params := reviewLoopParams(specID, specDir)
+	params.timeout = 1
+	params.maxRevisions = 3
+	params.providers = []orchestra.ProviderConfig{{Name: "claude", Binary: "claude"}}
+
+	start := time.Now()
+	result, err := runSpecReviewLoop(params, doc, nil)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Less(t, time.Since(start), 2*time.Second, "revision watchdog must bound orchestra execution")
+	assert.Equal(t, spec.VerdictRevise, result.Verdict)
+	assert.Equal(t, 1, callCount, "watchdog provider failure must not burn every revision")
 }
 
 func TestRunSpecReviewLoop_UsesVerifyModeWhenPriorFindingsExistAtRevisionZero(t *testing.T) {

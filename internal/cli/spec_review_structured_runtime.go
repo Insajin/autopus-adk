@@ -1,0 +1,243 @@
+package cli
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/insajin/autopus-adk/pkg/orchestra"
+)
+
+type indexedSpecReviewOutcome struct {
+	index   int
+	outcome specReviewStructuredOutcome
+}
+
+func structuredSpecReviewContext(ctx context.Context, timeoutSeconds int) (context.Context, context.CancelFunc) {
+	if timeoutSeconds <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+}
+
+func structuredReviewExecutionMode(backend orchestra.ExecutionBackend) string {
+	if backend != nil && backend.Name() == "pane" {
+		return "sequential"
+	}
+	return "parallel"
+}
+
+func runStructuredSpecReviewProviders(
+	ctx context.Context,
+	cfg orchestra.OrchestraConfig,
+	backend orchestra.ExecutionBackend,
+	parser *orchestra.OutputParser,
+	schemaPath string,
+	embeddedSchema string,
+	mode string,
+) []specReviewStructuredOutcome {
+	if mode == "sequential" {
+		return runStructuredSpecReviewProvidersSequential(ctx, cfg, backend, parser, schemaPath, embeddedSchema, mode)
+	}
+	return runStructuredSpecReviewProvidersParallel(ctx, cfg, backend, parser, schemaPath, embeddedSchema, mode)
+}
+
+func runStructuredSpecReviewProvidersSequential(
+	ctx context.Context,
+	cfg orchestra.OrchestraConfig,
+	backend orchestra.ExecutionBackend,
+	parser *orchestra.OutputParser,
+	schemaPath string,
+	embeddedSchema string,
+	mode string,
+) []specReviewStructuredOutcome {
+	results := make([]specReviewStructuredOutcome, len(cfg.Providers))
+	start := time.Now()
+	for i, provider := range cfg.Providers {
+		if err := ctx.Err(); err != nil {
+			results[i] = pendingStructuredReviewTimeoutOutcome(provider, backend.Name(), "queued", cfg.TimeoutSeconds, time.Since(start), err)
+			logStructuredReviewOutcome(provider.Name, backend.Name(), results[i], time.Since(start))
+			continue
+		}
+		results[i] = executeStructuredSpecReviewProvider(ctx, cfg, backend, parser, schemaPath, embeddedSchema, provider, mode)
+	}
+	return results
+}
+
+func runStructuredSpecReviewProvidersParallel(
+	ctx context.Context,
+	cfg orchestra.OrchestraConfig,
+	backend orchestra.ExecutionBackend,
+	parser *orchestra.OutputParser,
+	schemaPath string,
+	embeddedSchema string,
+	mode string,
+) []specReviewStructuredOutcome {
+	results := make([]specReviewStructuredOutcome, len(cfg.Providers))
+	done := make([]bool, len(cfg.Providers))
+	outcomes := make(chan indexedSpecReviewOutcome, len(cfg.Providers))
+	start := time.Now()
+
+	for i, provider := range cfg.Providers {
+		go func(idx int, provider orchestra.ProviderConfig) {
+			outcomes <- indexedSpecReviewOutcome{
+				index:   idx,
+				outcome: executeStructuredSpecReviewProvider(ctx, cfg, backend, parser, schemaPath, embeddedSchema, provider, mode),
+			}
+		}(i, provider)
+	}
+
+	pending := len(cfg.Providers)
+	for pending > 0 {
+		select {
+		case result := <-outcomes:
+			if result.index < 0 || result.index >= len(results) || done[result.index] {
+				continue
+			}
+			results[result.index] = result.outcome
+			done[result.index] = true
+			pending--
+		case <-ctx.Done():
+			for i, provider := range cfg.Providers {
+				if done[i] {
+					continue
+				}
+				results[i] = pendingStructuredReviewTimeoutOutcome(provider, backend.Name(), "provider_execution", cfg.TimeoutSeconds, time.Since(start), ctx.Err())
+				logStructuredReviewOutcome(provider.Name, backend.Name(), results[i], time.Since(start))
+			}
+			return results
+		}
+	}
+	return results
+}
+
+func executeStructuredSpecReviewProvider(
+	ctx context.Context,
+	cfg orchestra.OrchestraConfig,
+	backend orchestra.ExecutionBackend,
+	parser *orchestra.OutputParser,
+	schemaPath string,
+	embeddedSchema string,
+	provider orchestra.ProviderConfig,
+	mode string,
+) specReviewStructuredOutcome {
+	timeout := specReviewTimeout(provider, cfg.TimeoutSeconds)
+	start := time.Now()
+	fmt.Fprintf(os.Stderr, "SPEC 리뷰 provider 시작: %s (backend=%s, timeout=%s, mode=%s)\n",
+		provider.Name, backend.Name(), timeout, mode)
+
+	prompt := buildStructuredSpecReviewPrompt(cfg.Prompt, embeddedSchema, shouldInlineStructuredReviewSchema(backend, provider))
+	req := orchestra.ProviderRequest{
+		Provider:   provider.Name,
+		Prompt:     prompt,
+		SchemaPath: schemaPath,
+		Role:       "reviewer",
+		Timeout:    timeout,
+		Config:     provider,
+	}
+
+	resp, execErr := backend.Execute(ctx, req)
+	elapsed := time.Since(start)
+	if execErr != nil {
+		if ctx.Err() != nil {
+			outcome := structuredReviewTimeoutOutcome(provider.Name, backend.Name(), "provider_execution", timeout, elapsed, ctx.Err(), resp)
+			logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+			return outcome
+		}
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), resp, backend.Name())
+		decorateStructuredFailure(&outcome, timeout, elapsed)
+		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+		return outcome
+	}
+	if resp == nil {
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil, backend.Name())
+		decorateStructuredFailure(&outcome, timeout, elapsed)
+		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+		return outcome
+	}
+	if strings.TrimSpace(resp.ExecutedBackend) == "" {
+		resp.ExecutedBackend = backend.Name()
+	}
+	if resp.TimedOut {
+		outcome := structuredReviewTimeoutOutcome(provider.Name, resp.ExecutedBackend, "provider_execution", timeout, elapsed, fmt.Errorf("provider timed out after %s", req.Timeout), resp)
+		logStructuredReviewOutcome(provider.Name, resp.ExecutedBackend, outcome, elapsed)
+		return outcome
+	}
+	if resp.EmptyOutput {
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp, backend.Name())
+		decorateStructuredFailure(&outcome, timeout, elapsed)
+		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+		return outcome
+	}
+	if _, parseErr := parser.ParseReviewer(resp.Output); parseErr != nil {
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp, backend.Name())
+		decorateStructuredFailure(&outcome, timeout, elapsed)
+		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+		return outcome
+	}
+
+	outcome := specReviewStructuredOutcome{resp: *resp}
+	logStructuredReviewOutcome(provider.Name, resp.ExecutedBackend, outcome, elapsed)
+	return outcome
+}
+
+func pendingStructuredReviewTimeoutOutcome(provider orchestra.ProviderConfig, backendName, stage string, timeoutSeconds int, elapsed time.Duration, err error) specReviewStructuredOutcome {
+	timeout := specReviewTimeout(provider, timeoutSeconds)
+	return structuredReviewTimeoutOutcome(provider.Name, backendName, stage, timeout, elapsed, err, nil)
+}
+
+func structuredReviewTimeoutOutcome(provider, backendName, stage string, timeout, elapsed time.Duration, err error, sourceResp *orchestra.ProviderResponse) specReviewStructuredOutcome {
+	if err == nil {
+		err = context.DeadlineExceeded
+	}
+	description := fmt.Errorf("review watchdog timed out for provider %s backend=%s stage=%s timeout=%s elapsed=%s: %w",
+		provider, backendName, stage, timeout, elapsed.Round(time.Millisecond), err)
+	outcome := malformedStructuredOutcome(provider, description, sourceResp, backendName)
+	decorateStructuredFailure(&outcome, timeout, elapsed)
+	if outcome.failed != nil {
+		outcome.failed.FailureClass = "timeout"
+		outcome.failed.TimeoutSource = "spec_review_timeout"
+	}
+	outcome.resp.TimedOut = true
+	if outcome.resp.Duration <= 0 {
+		outcome.resp.Duration = elapsed
+	}
+	return outcome
+}
+
+func decorateStructuredFailure(outcome *specReviewStructuredOutcome, timeout, elapsed time.Duration) {
+	if outcome == nil || outcome.failed == nil {
+		return
+	}
+	outcome.failed.Role = "reviewer"
+	outcome.failed.ConfiguredDuration = timeout
+	outcome.failed.ElapsedDuration = elapsed
+	if outcome.failed.FailureClass == "timeout" && outcome.failed.TimeoutSource == "" {
+		outcome.failed.TimeoutSource = "provider_execution_timeout"
+	}
+	if outcome.resp.Duration <= 0 {
+		outcome.resp.Duration = elapsed
+	}
+	if outcome.failed.FailureClass == "timeout" {
+		outcome.resp.TimedOut = true
+	}
+}
+
+func logStructuredReviewOutcome(provider, backendName string, outcome specReviewStructuredOutcome, elapsed time.Duration) {
+	if outcome.failed != nil {
+		fmt.Fprintf(os.Stderr, "SPEC 리뷰 provider 실패: %s (backend=%s, class=%s, elapsed=%s): %s\n",
+			provider, backendName, outcome.failed.FailureClass, elapsed.Round(time.Millisecond), truncateStructuredReviewError(outcome.failed.Error, 180))
+		return
+	}
+	fmt.Fprintf(os.Stderr, "SPEC 리뷰 provider 완료: %s (backend=%s, elapsed=%s)\n",
+		provider, backendName, elapsed.Round(time.Millisecond))
+}
+
+func formatStructuredReviewTimeout(timeoutSeconds int) string {
+	if timeoutSeconds <= 0 {
+		return "default"
+	}
+	return (time.Duration(timeoutSeconds) * time.Second).String()
+}

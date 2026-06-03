@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,9 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 	if len(cfg.Providers) == 0 {
 		return nil, fmt.Errorf("spec review: no providers configured")
 	}
+
+	ctx, cancel := structuredSpecReviewContext(ctx, cfg.TimeoutSeconds)
+	defer cancel()
 
 	schema := &orchestra.SchemaBuilder{}
 	schemaPath, cleanup, err := schema.WriteToFile("reviewer")
@@ -41,49 +45,11 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 	parser := &orchestra.OutputParser{}
 	start := time.Now()
 
-	results := make([]specReviewStructuredOutcome, len(cfg.Providers))
-	var wg sync.WaitGroup
-	for i, provider := range cfg.Providers {
-		wg.Add(1)
-		go func(idx int, provider orchestra.ProviderConfig) {
-			defer wg.Done()
+	mode := structuredReviewExecutionMode(backend)
+	fmt.Fprintf(os.Stderr, "SPEC 리뷰 백엔드: %s (providers=%d, timeout=%s, mode=%s)\n",
+		backend.Name(), len(cfg.Providers), formatStructuredReviewTimeout(cfg.TimeoutSeconds), mode)
 
-			prompt := buildStructuredSpecReviewPrompt(cfg.Prompt, embeddedSchema, shouldInlineStructuredReviewSchema(backend, provider))
-			req := orchestra.ProviderRequest{
-				Provider:   provider.Name,
-				Prompt:     prompt,
-				SchemaPath: schemaPath,
-				Role:       "reviewer",
-				Timeout:    specReviewTimeout(provider, cfg.TimeoutSeconds),
-				Config:     provider,
-			}
-
-			resp, execErr := backend.Execute(ctx, req)
-			if execErr != nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), resp, backend.Name())
-				return
-			}
-			if resp == nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil, backend.Name())
-				return
-			}
-			if resp.TimedOut {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider timed out after %s", req.Timeout), resp, backend.Name())
-				return
-			}
-			if resp.EmptyOutput {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp, backend.Name())
-				return
-			}
-			if _, parseErr := parser.ParseReviewer(resp.Output); parseErr != nil {
-				results[idx] = malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp, backend.Name())
-				return
-			}
-
-			results[idx] = specReviewStructuredOutcome{resp: *resp}
-		}(i, provider)
-	}
-	wg.Wait()
+	results := runStructuredSpecReviewProviders(ctx, cfg, backend, parser, schemaPath, embeddedSchema, mode)
 
 	responses := make([]orchestra.ProviderResponse, 0, len(results))
 	failed := make([]orchestra.FailedProvider, 0)
@@ -268,6 +234,9 @@ func structuredFailureRemediation(err error, provider string) string {
 
 func structuredFailureRemediationText(description, provider string) string {
 	msg := strings.ToLower(description)
+	if strings.Contains(msg, "timed out") && strings.Contains(msg, "backend=pane") {
+		return fmt.Sprintf("Retry with `auto spec review <SPEC-ID> --subprocess`, increase --timeout, or set orchestra.providers.%s.subprocess.timeout before rerunning.", provider)
+	}
 	if strings.Contains(msg, "timed out") {
 		return fmt.Sprintf("Increase --timeout or set orchestra.providers.%s.subprocess.timeout, then retry with a smaller review context if needed.", provider)
 	}

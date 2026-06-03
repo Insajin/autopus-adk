@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"sort"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -23,8 +22,10 @@ const (
 // newSpecReviewCmd creates the "spec review" subcommand.
 func newSpecReviewCmd() *cobra.Command {
 	var (
-		strategy string
-		timeout  int
+		strategy        string
+		timeout         int
+		forceSubprocess bool
+		forcePlain      bool
 	)
 
 	cmd := &cobra.Command{
@@ -34,18 +35,30 @@ func newSpecReviewCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			specID := args[0]
-			return runSpecReview(cmd.Context(), specID, strategy, timeout)
+			return runSpecReviewWithOptions(cmd.Context(), specID, strategy, timeout, specReviewOptions{
+				forceSubprocess: forceSubprocess || forcePlain,
+			})
 		},
 	}
 
 	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "review strategy (default: from config)")
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 0, "timeout in seconds (default: from config)")
+	cmd.Flags().BoolVar(&forceSubprocess, "subprocess", false, "Force headless subprocess backend for SPEC review")
+	cmd.Flags().BoolVar(&forcePlain, "plain", false, "Alias for --subprocess; bypass interactive pane backend")
 
 	return cmd
 }
 
+type specReviewOptions struct {
+	forceSubprocess bool
+}
+
 // runSpecReview executes the full SPEC review pipeline with REVISE loop.
 func runSpecReview(ctx context.Context, specID, strategy string, timeout int) error {
+	return runSpecReviewWithOptions(ctx, specID, strategy, timeout, specReviewOptions{})
+}
+
+func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, timeout int, opts specReviewOptions) error {
 	resolved, err := spec.ResolveSpecDir(".", specID)
 	if err != nil {
 		return fmt.Errorf("SPEC 로드 실패: %w", err)
@@ -122,16 +135,17 @@ func runSpecReview(ctx context.Context, specID, strategy string, timeout int) er
 	priorFindings, _ := spec.LoadFindings(specDir)
 
 	loopParams := specReviewLoopParams{
-		ctx:          ctx,
-		specID:       specID,
-		specDir:      specDir,
-		strategy:     strategy,
-		timeout:      timeout,
-		maxRevisions: maxRevisions,
-		threshold:    threshold,
-		gate:         gate,
-		providers:    providers,
-		codeContext:  codeContext,
+		ctx:            ctx,
+		specID:         specID,
+		specDir:        specDir,
+		strategy:       strategy,
+		timeout:        timeout,
+		maxRevisions:   maxRevisions,
+		threshold:      threshold,
+		gate:           gate,
+		providers:      providers,
+		codeContext:    codeContext,
+		subprocessMode: opts.forceSubprocess || resolveSubprocessMode(&cfg.Orchestra),
 	}
 
 	finalResult, err := runSpecReviewLoop(loopParams, doc, priorFindings)
@@ -230,63 +244,4 @@ func resolveSpecReviewProviderNames(cfg *config.HarnessConfig, multi bool) []str
 	}
 
 	return mergeProviderNames(names, sortedProviderKeys(cfg.Orchestra.Providers), defaultProviders())
-}
-
-func mergeProviderNames(groups ...[]string) []string {
-	seen := make(map[string]struct{})
-	var merged []string
-
-	for _, group := range groups {
-		for _, name := range group {
-			if name == "" {
-				continue
-			}
-			if _, ok := seen[name]; ok {
-				continue
-			}
-			seen[name] = struct{}{}
-			merged = append(merged, name)
-		}
-	}
-
-	return merged
-}
-
-func mergeStringValues(groups ...[]string) []string {
-	seen := make(map[string]struct{})
-	var merged []string
-
-	for _, group := range groups {
-		for _, value := range group {
-			if value == "" {
-				continue
-			}
-			if _, ok := seen[value]; ok {
-				continue
-			}
-			seen[value] = struct{}{}
-			merged = append(merged, value)
-		}
-	}
-
-	return merged
-}
-
-func sortedProviderKeys(providers map[string]config.ProviderEntry) []string {
-	names := make([]string, 0, len(providers))
-	for name := range providers {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
-}
-
-func resolveSpecReviewTimeout(cfg *config.HarnessConfig, requested int) int {
-	if requested > 0 {
-		return requested
-	}
-	if cfg != nil && cfg.Orchestra.TimeoutSeconds > 0 {
-		return cfg.Orchestra.TimeoutSeconds
-	}
-	return 120
 }
