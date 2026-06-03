@@ -100,6 +100,8 @@ func TestMigrationNumberingGuidanceContracts(t *testing.T) {
 		},
 		filepath.Join(root, "..", "pkg", "adapter", "codex", "codex_extended_skill_rewrites_pipeline.go"): {
 			"same owning repo and migration directory",
+		},
+		filepath.Join(root, "..", "pkg", "adapter", "codex", "codex_extended_skill_rewrites_pipeline_completion.go"): {
 			"same migration directory",
 		},
 		filepath.Join(root, "..", "pkg", "adapter", "codex", "codex_extended_skill_rewrites_worktree.go"): {
