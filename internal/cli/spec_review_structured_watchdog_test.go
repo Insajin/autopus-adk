@@ -55,9 +55,9 @@ func TestSpecReviewWatchdogSeconds_SumsPerProviderTimeouts(t *testing.T) {
 		{Name: "codex", ExecutionTimeout: 420 * time.Second},
 		{Name: "gemini"}, // no ExecutionTimeout -> uses the fallback
 	}
-	// 480 + 420 + 150 (fallback for gemini) + 30 base + 3*10 per-provider slack.
+	// 2 attempts each: (480 + 420 + 150 fallback for gemini) * 2 + 30 base + 3*10 per-provider slack.
 	got := specReviewWatchdogSeconds(providers, 150)
-	assert.Equal(t, 1110, got)
+	assert.Equal(t, 2160, got)
 	// Regression guard: the shared review deadline MUST outlast the longest
 	// single provider timeout, otherwise sequential pane execution cancels it
 	// mid-run and reports a spurious 0/N watchdog timeout.

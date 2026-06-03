@@ -172,6 +172,15 @@ func executeStructuredSpecReviewProvider(
 		return outcome
 	}
 	if _, parseErr := parser.ParseReviewer(resp.Output); parseErr != nil {
+		if retryResp, retryErr := repromptStructuredReviewerJSON(ctx, backend, parser, req, resp, parseErr); retryErr == nil {
+			outcome := specReviewStructuredOutcome{resp: *retryResp}
+			logStructuredReviewOutcome(provider.Name, retryResp.ExecutedBackend, outcome, time.Since(start))
+			return outcome
+		} else {
+			resp = mergeStructuredRepromptFailureResponse(resp, retryResp)
+			parseErr = fmt.Errorf("invalid reviewer JSON after reprompt: initial: %w; reprompt: %v", parseErr, retryErr)
+			elapsed = time.Since(start)
+		}
 		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp, backend.Name())
 		decorateStructuredFailure(&outcome, timeout, elapsed)
 		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)

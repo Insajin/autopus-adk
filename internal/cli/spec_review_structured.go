@@ -100,7 +100,7 @@ func buildStructuredSpecReviewPrompt(basePrompt, schemaJSON string, inlineSchema
 	var sb strings.Builder
 	sb.WriteString(basePrompt)
 	sb.WriteString("\n\n### Structured Response Contract\n\n")
-	sb.WriteString("Return ONLY valid JSON. Do NOT return progress notes, partial summaries, markdown fences, or prose before/after the JSON.\n")
+	sb.WriteString("Return ONLY one valid JSON object. The first non-whitespace character must be `{` and the last must be `}`. Do NOT return progress notes, markdown fences, bullets, headings, or prose before/after the JSON.\n")
 	sb.WriteString("If you are blocked or the scope is too large, still return valid JSON with `verdict: \"REVISE\"` and describe the blocker in `summary` plus at least one finding.\n")
 	if isVerifyReviewPrompt(basePrompt) {
 		sb.WriteString("In verify mode, scope the review to the prior findings and checklist statuses requested above.\n")
@@ -286,7 +286,7 @@ func specReviewWatchdogSeconds(providers []orchestra.ProviderConfig, fallbackSec
 	}
 	var total time.Duration
 	for _, provider := range providers {
-		total += specReviewTimeout(provider, fallbackSeconds)
+		total += specReviewAttemptTimeoutBudget(provider, fallbackSeconds)
 	}
 	total += 30*time.Second + time.Duration(len(providers))*10*time.Second
 	return int(total / time.Second)
