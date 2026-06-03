@@ -124,6 +124,33 @@ func TestGetStatus_NoDocs(t *testing.T) {
 	status, err := GetStatus(projectDir, "")
 	require.NoError(t, err)
 	assert.False(t, status.Exists)
+	assert.False(t, status.ProjectContext.Exists)
+}
+
+func TestGetStatus_ProjectContextWithoutDocs(t *testing.T) {
+	t.Parallel()
+	projectDir := t.TempDir()
+	for _, name := range requiredProjectContextFiles {
+		writeFile(t, projectDir, filepath.Join(".autopus", "project", name), "# "+name+"\n")
+	}
+
+	status, err := GetStatus(projectDir, "")
+	require.NoError(t, err)
+	assert.False(t, status.Exists, ".autopus/docs bundle is still absent")
+	assert.True(t, status.ProjectContext.Exists)
+	assert.Empty(t, status.ProjectContext.MissingFiles)
+	assert.Contains(t, status.ProjectContext.Files, "workspace.md")
+}
+
+func TestValidateProjectContext_MissingRequiredFile(t *testing.T) {
+	t.Parallel()
+	projectDir := t.TempDir()
+	writeFile(t, projectDir, ".autopus/project/workspace.md", "# workspace\n")
+
+	report := ValidateProjectContext(projectDir)
+	assert.False(t, report.Valid)
+	assert.NotEmpty(t, report.Warnings)
+	assert.Contains(t, report.Warnings[0].Type, "missing_project_context")
 }
 
 func TestGetStatus_WithDocs(t *testing.T) {

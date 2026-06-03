@@ -126,6 +126,20 @@ func TestCheckArchWalk_SkipsSubmodule(t *testing.T) {
 	assert.True(t, result, "walk should skip submodule directories")
 }
 
+func TestCheckArchWalk_SkipsNestedGitRepository(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	nestedDir := filepath.Join(dir, "child-repo")
+	require.NoError(t, os.MkdirAll(filepath.Join(nestedDir, ".git"), 0o755))
+	writeGoFileWithComments(t, nestedDir, "big.go", 300)
+
+	var buf bytes.Buffer
+	result := checkArch(dir, &buf, true, false)
+	assert.True(t, result, "walk should skip sibling repositories in a meta workspace")
+	assert.Empty(t, buf.String())
+}
+
 func TestCheckArchWalk_SkipsRuntimeCacheDirs(t *testing.T) {
 	t.Parallel()
 

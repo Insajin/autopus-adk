@@ -17,6 +17,7 @@ This skill defines when parallel work is safe and how the main session should in
 - Each parallel worker gets a disjoint file ownership slice
 - Each worker edits only its assigned slice in its own forked workspace
 - The main session reviews and integrates returned changes
+- Manual git worktrees are optional operator-managed workspaces, not the default Codex worker mechanism
 
 If ownership cannot be separated cleanly, do not parallelize.
 
@@ -54,7 +55,7 @@ Every parallel worker prompt should include:
 - exact owned paths
 - forbidden paths
 - expected tests or checks
-- required return format
+- required return fields: ` + "`owned_paths`" + `, ` + "`changed_files`" + `, ` + "`verification`" + `, ` + "`blockers`" + `, ` + "`next_required_step`" + `
 
 Example:
 
@@ -65,7 +66,7 @@ spawn_agent(
     message="""
     Own only: pkg/auth/*, internal/auth/*
     Do not edit: pkg/api/*, migrations/*
-    Return changed files and tests run.
+    Return owned_paths, changed_files, verification, blockers, next_required_step.
     """,
 )
 ` + "```" + `
@@ -78,6 +79,7 @@ After workers complete:
 2. Integrate changes in the main session
 3. Run validation after integration, not before
 4. If overlap or regressions appear, continue sequentially
+5. Record whether manual git worktrees were used; absence of manual worktrees is normal for Codex spawned workers
 
 ## Optional Manual Git Worktree Path
 
@@ -152,7 +154,7 @@ Every coding worker prompt should state:
 - files or modules it owns
 - files it must not edit
 - completion criteria
-- expected return format
+- required return fields: ` + "`owned_paths`" + `, ` + "`changed_files`" + `, ` + "`verification`" + `, ` + "`blockers`" + `, ` + "`next_required_step`" + `
 
 ### Context Completeness
 
@@ -197,7 +199,7 @@ spawn_agent(
     Own only: pkg/auth/*
     Goal: implement token refresh flow
     Tests: update auth service tests only
-    Return: changed files, tests run, unresolved blockers
+    Return: owned_paths, changed_files, verification, blockers, next_required_step
     """,
 )
 ` + "```" + `

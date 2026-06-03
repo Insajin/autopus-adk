@@ -140,6 +140,9 @@ func newSetupValidateCmd() *cobra.Command {
 			}
 
 			docsDir := resolveOutputDir(dir, outputDir)
+			if handled, err := setupValidateProjectContextFallback(cmd, dir, docsDir, jsonMode); handled || err != nil {
+				return err
+			}
 			report, valErr := setup.Validate(docsDir, dir)
 			if valErr != nil {
 				if jsonMode {
@@ -250,6 +253,10 @@ func newSetupStatusCmd() *cobra.Command {
 			}
 
 			if !status.Exists {
+				if status.ProjectContext.Exists {
+					writeProjectContextStatus(cmd, status)
+					return nil
+				}
 				tui.Info(cmd.OutOrStdout(), "No documentation found. Run `auto setup generate` to create.")
 				return nil
 			}
@@ -283,18 +290,4 @@ func newSetupStatusCmd() *cobra.Command {
 	cmd.Flags().StringVar(&outputDir, "output", "", "Documentation directory (default: .autopus/docs/)")
 	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
-}
-
-func resolveDirFromArgs(args []string) (string, error) {
-	if len(args) > 0 { //nolint:revive
-		return resolveDir(args[0])
-	}
-	return resolveDir("")
-}
-
-func resolveOutputDir(projectDir, outputDir string) string {
-	if outputDir != "" { //nolint:revive
-		return outputDir
-	}
-	return projectDir + "/.autopus/docs"
 }

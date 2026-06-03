@@ -25,5 +25,6 @@ IMPORTANT: Use subagents for complex tasks. Do NOT implement large features in a
 ## Anti-Patterns
 
 - Do NOT delegate trivial tasks (typo fixes, single-line changes)
-- Do NOT chain more than 3 subagents sequentially
+- Do NOT chain more than 3 nested delegation levels inside a single worker
+- Do NOT treat the 3-level nesting cap as a limit on top-level pipeline phases such as planner -> executor -> validator -> reviewer
 - Do NOT delegate without sufficient context

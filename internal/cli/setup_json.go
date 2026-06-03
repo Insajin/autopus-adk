@@ -15,12 +15,16 @@ type setupStatusFilePayload struct {
 }
 
 type setupStatusPayload struct {
-	ProjectDir  string                   `json:"project_dir"`
-	DocsDir     string                   `json:"docs_dir"`
-	Exists      bool                     `json:"exists"`
-	GeneratedAt time.Time                `json:"generated_at,omitempty"`
-	DriftScore  float64                  `json:"drift_score"`
-	Files       []setupStatusFilePayload `json:"files"`
+	ProjectDir                 string                   `json:"project_dir"`
+	DocsDir                    string                   `json:"docs_dir"`
+	Exists                     bool                     `json:"exists"`
+	GeneratedAt                time.Time                `json:"generated_at,omitempty"`
+	DriftScore                 float64                  `json:"drift_score"`
+	Files                      []setupStatusFilePayload `json:"files"`
+	ProjectContextExists       bool                     `json:"project_context_exists"`
+	ProjectContextDir          string                   `json:"project_context_dir,omitempty"`
+	ProjectContextFiles        []string                 `json:"project_context_files,omitempty"`
+	MissingProjectContextFiles []string                 `json:"missing_project_context_files,omitempty"`
 }
 
 type setupValidationWarningPayload struct {
@@ -58,23 +62,43 @@ func buildSetupStatusPayload(projectDir, outputDir string, status *setup.Status)
 	}
 
 	return setupStatusPayload{
-		ProjectDir:  projectDir,
-		DocsDir:     resolveOutputDir(projectDir, outputDir),
-		Exists:      status.Exists,
-		GeneratedAt: status.GeneratedAt,
-		DriftScore:  status.DriftScore,
-		Files:       files,
+		ProjectDir:                 projectDir,
+		DocsDir:                    resolveOutputDir(projectDir, outputDir),
+		Exists:                     status.Exists,
+		GeneratedAt:                status.GeneratedAt,
+		DriftScore:                 status.DriftScore,
+		Files:                      files,
+		ProjectContextExists:       status.ProjectContext.Exists,
+		ProjectContextDir:          status.ProjectContext.Dir,
+		ProjectContextFiles:        status.ProjectContext.Files,
+		MissingProjectContextFiles: status.ProjectContext.MissingFiles,
 	}
 }
 
 func buildSetupStatusWarnings(status *setup.Status) []jsonMessage {
-	if status.Exists {
-		return nil
+	warnings := []jsonMessage{}
+	if !status.Exists {
+		if status.ProjectContext.Exists {
+			warnings = append(warnings, jsonMessage{
+				Code:    "docs_bundle_not_found",
+				Message: ".autopus/docs bundle is not generated; .autopus/project is available as canonical context.",
+			})
+		} else {
+			warnings = append(warnings, jsonMessage{
+				Code:    "docs_not_found",
+				Message: "No documentation found. Run `auto setup generate` to create.",
+			})
+		}
 	}
-	return []jsonMessage{{
-		Code:    "docs_not_found",
-		Message: "No documentation found. Run `auto setup generate` to create.",
-	}}
+	if status.ProjectContext.Exists {
+		for _, missing := range status.ProjectContext.MissingFiles {
+			warnings = append(warnings, jsonMessage{
+				Code:    "missing_project_context",
+				Message: "Missing project context file: " + missing,
+			})
+		}
+	}
+	return warnings
 }
 
 func buildSetupValidationPayload(projectDir, docsDir string, report *setup.ValidationReport) setupValidationPayload {

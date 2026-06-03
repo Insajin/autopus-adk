@@ -56,6 +56,16 @@ Treat the main session as a state-machine supervisor, not a passive router.
 - Keep the main thread focused on requirements, decisions, and final synthesis.
 - Do not treat subagents as autonomous teammates that negotiate among themselves.
 
+## Prompt Layer Discipline
+
+Keep prompt authority explicit. When routing or spawning workers, preserve this layer order:
+
+- Stable layer: AGENTS.md, installed platform rules, and generated skill contracts
+- Snapshot layer: current SPEC, project context, file ownership, and acceptance criteria
+- Ephemeral layer: the latest user request, run flags, retry state, and focused worker task
+
+Worker prompts must not replace stable policy with ad-hoc instructions. If layers conflict, stop and surface the conflict instead of silently choosing a weaker contract.
+
 ## Phase 0.5: Autonomy Policy
 
 Before spawning workers, decide whether the pipeline can proceed autonomously:
@@ -69,15 +79,18 @@ Before spawning workers, decide whether the pipeline can proceed autonomously:
 
 ` + "```text" + `
 Step 0:    Triage          -> main session
+Phase 0.7: Authenticity    -> main session  (verify real worker dispatch plan)
 Phase 1:   Planning        -> planner
 Phase 1.5: Test Scaffold   -> tester        (optional)
 Gate 1:    Approval        -> main session  (skip with --auto)
 Phase 1.8: Doc Fetch       -> main session  (fetch current docs if needed)
 Phase 2:   Implementation  -> executor x N  (parallel only with disjoint ownership)
+Phase 2.1: Integration     -> main session  (inspect and integrate worker returns)
 Gate 2:    Validation      -> validator
 Phase 2.5: Annotation      -> annotator
 Phase 3:   Testing         -> tester
 Phase 3.5: UX Verify       -> frontend-specialist (optional)
+Gate 3:    Acceptance      -> main session  (coverage of MUST acceptance)
 Phase 4A:  Review          -> reviewer + security-auditor (+ optional multi-provider discovery)
 Phase 4B:  Verify Fixes    -> reviewer/security follow-up, diff-only
 ` + "```" + `
@@ -138,6 +151,17 @@ Planner output should make the next action obvious. Require:
 - execution mode
 - next required step
 
+### Phase 0.7: Workflow Authenticity Preflight
+
+Before implementation, record the dispatch plan in the main session:
+
+- ` + "`subagent_dispatch_count`" + `: number of real workers to spawn, or 0 for ` + "`--solo`" + `
+- worker roles and owned paths
+- expected completion evidence for each worker
+- fallback condition that moves the run back to the main session
+
+Do not claim a subagent pipeline ran if no worker was actually spawned. If the current runtime cannot expose worker tools, state that constraint and proceed only with an explicit ` + "`--solo`" + ` or user opt-in.
+
 ### Worker Prompt Contract
 
 Every spawned worker should receive a prompt that states:
@@ -148,7 +172,7 @@ Every spawned worker should receive a prompt that states:
 - expected verification
 - required return fields
 
-Recommended return fields:
+Required return fields:
 
 - ` + "`owned_paths`" + `
 - ` + "`changed_files`" + `
@@ -197,6 +221,17 @@ Write-heavy rules:
 - If two workers may create SQL migrations in the same owning repo and migration directory, switch to sequential execution and assign numbers only after earlier branches are merged or rebased.
 - If a worker returns blockers that change scope, re-plan before spawning more writers.
 
+### Phase 2.1: Integration
+
+After implementation workers finish, the main session must inspect returned diffs and ownership claims before validation:
+
+- compare ` + "`owned_paths`" + ` with ` + "`changed_files`" + `
+- reject or rework unexpected edits outside owned paths
+- resolve ordering between generated files, migrations, and shared manifests
+- summarize integrated changes and the next required validation step
+
+This phase is mandatory for parallel work and optional only for a genuine single-session ` + "`--solo`" + ` run.
+
 ### Gate 2: Validation
 
 Spawn a validator after implementation lands. If validation fails, respawn a focused fixer instead of rerunning the full pipeline blindly.
@@ -215,6 +250,16 @@ Run annotator after validation PASS. Harness-only markdown changes may skip this
 
 - Tester raises coverage and adds edge-case tests
 - Frontend-specialist runs only when changed files include frontend UI
+
+### Gate 3: Acceptance Coverage
+
+Before review discovery, prove the implementation covers the required acceptance surface:
+
+- map each MUST/P0 acceptance criterion to changed code, tests, or explicit non-applicability
+- keep SHOULD/P1 gaps as completion debt, not hidden success
+- record any unverified acceptance item as a blocker before review
+
+Gate 3 evidence is required even when all tests pass, because tests may not cover every contractual requirement.
 
 ### Phase 4A: Review Discovery
 
@@ -242,59 +287,5 @@ After fixes land, do a diff-only verification pass against the frozen checklist.
 - Stop review retries when the same unresolved finding repeats without material code change.
 - If findings remain actionable and retry budget remains, loop back to a focused fixer, then re-run validation/testing only for the touched scope before returning here.
 - Under ` + "`--auto --loop`" + `, keep this repair -> validate -> verify cycle inside the same session. Only stop for a real blocker, exhausted retry budget, or circuit break.
-
-## Parallelism Rules
-
-| Condition | Execution |
-|----------|-----------|
-| Non-overlapping ownership | Parallel workers allowed |
-| Shared file or same migration directory | Sequential execution |
-| Order dependency between tasks | Sequential execution |
-| One worker blocked on another's output | Wait, integrate, then continue |
-
-## Retry Policy
-
-- Validation: up to 3 retries, or 5 with ` + "`--loop`" + `
-- Review verification: up to 2 retries, or 3 with ` + "`--loop`" + `
-- Repeated worker failure: shrink scope or fall back to the main session
-- Repeated unchanged review finding: stop and surface the blocker instead of rediscovering the whole patch
-- While review retries remain, unresolved findings are not a terminal handoff. Do not suggest ` + "`@auto go --continue`" + ` or manual review yet.
-
-## Result Integration
-
-Each worker should return:
-
-- owned paths
-- changed files
-- verification run
-- blockers or assumptions
-- next required step
-
-The main session owns final integration, status updates, and the decision to continue, retry, or stop.
-
-### Sync Readiness Gate
-
-Before the terminal ` + "`@auto sync`" + ` handoff, build a sync handoff package. Do not assume sync will discover remaining implementation work.
-
-Required fields:
-
-- ` + "`completion_verdict_preview`" + `: Outcome Lock, mandatory requirements, Must acceptance, Completion Debt, and Evolution Ideas summary using the same shape as sync's Completion Verdict
-- ` + "`sync_ready`" + `: ` + "`yes`" + ` only when Outcome Lock is satisfied, all mandatory requirements and Must acceptance are met, and Completion Debt is ` + "`none`" + `
-- ` + "`sync_blockers`" + `: ` + "`none`" + ` or concrete blockers that prevent setting the SPEC to ` + "`implemented`" + `
-- ` + "`spec_status_after_go`" + `: ` + "`implemented`" + ` on success; do not use ` + "`done`" + ` or ` + "`completed`" + ` because ` + "`completed`" + ` is reserved for ` + "`@auto sync`" + `
-- ` + "`sync_evidence_refs`" + `: changed files, verification commands, review verdict, @AX annotation result or ` + "`@AX: no-op`" + `
-
-If ` + "`sync_ready`" + ` is not ` + "`yes`" + `, stop before the workflow lifecycle bar and report the blocker. Only set the SPEC status to ` + "`implemented`" + ` and hand off to ` + "`@auto sync`" + ` when the implementation scope is closed.
-
-## Pre-Completion Checklist
-
-Before you stop, ensure:
-
-- the next required step is either complete or explicitly blocked
-- validation status is known
-- open review findings are either resolved or explicitly carried forward
-- terminal handoff is used only after the final review outcome is known
-- Sync Readiness Gate passed with ` + "`completion_verdict_preview`" + `, ` + "`sync_ready`" + `, ` + "`sync_blockers`" + `, and ` + "`spec_status_after_go`" + ` recorded
-- the final response names the changed scope, verification, and any unresolved blockers
-`
+` + codexAgentPipelineSkillBodyCompletion()
 }

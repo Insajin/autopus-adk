@@ -46,6 +46,12 @@ func TestGenerateAgents_TOMLContent(t *testing.T) {
 		assert.Contains(t, content, "developer_instructions =", "TOML %s should have instructions", f.TargetPath)
 		assert.Contains(t, content, "developer_instructions = '''", "TOML %s should use literal multiline strings", f.TargetPath)
 		assert.NotContains(t, content, "[developer_instructions]", "TOML %s should use flat instructions field", f.TargetPath)
+		assert.Contains(t, content, "Supervisor Return Contract", "TOML %s should include common worker result contract", f.TargetPath)
+		assert.Contains(t, content, "`owned_paths`", "TOML %s should require owned_paths", f.TargetPath)
+		assert.Contains(t, content, "`changed_files`", "TOML %s should require changed_files", f.TargetPath)
+		assert.Contains(t, content, "`verification`", "TOML %s should require verification", f.TargetPath)
+		assert.Contains(t, content, "`blockers`", "TOML %s should require blockers", f.TargetPath)
+		assert.Contains(t, content, "`next_required_step`", "TOML %s should require next_required_step", f.TargetPath)
 	}
 }
 

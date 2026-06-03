@@ -48,6 +48,12 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 	assert.Contains(t, pipeline, "Goal Integration")
 	assert.Contains(t, pipeline, "Risk-Tiered Review Policy")
 	assert.Contains(t, pipeline, "fallback to single provider")
+	assert.Contains(t, pipeline, "Prompt Layer Discipline")
+	assert.Contains(t, pipeline, "Phase 0.7")
+	assert.Contains(t, pipeline, "subagent_dispatch_count")
+	assert.Contains(t, pipeline, "Phase 2.1")
+	assert.Contains(t, pipeline, "Gate 3")
+	assert.Contains(t, pipeline, "Required return fields")
 	assert.Contains(t, pipeline, "Sync Readiness Gate")
 	assert.Contains(t, pipeline, "completion_verdict_preview")
 	assert.Contains(t, pipeline, "spec_status_after_go")
@@ -56,6 +62,8 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 
 	worktree := normalizeCodexExtendedSkill("worktree-isolation", "placeholder")
 	assert.Contains(t, worktree, "forked workspace")
+	assert.Contains(t, worktree, "owned_paths")
+	assert.Contains(t, worktree, "next_required_step")
 	assert.NotContains(t, worktree, "auto pipeline worktree")
 
 	prd := normalizeCodexExtendedSkill("prd", "사용자 입력이 불충분할 경우 AskUserQuestion으로 확인:")

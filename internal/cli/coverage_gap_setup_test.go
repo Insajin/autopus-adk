@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,6 +59,33 @@ func TestSetupStatusCmd_NoDocs(t *testing.T) {
 	assert.Contains(t, buf.String(), "No documentation found")
 }
 
+func TestSetupStatusCmd_ProjectContextWithoutDocs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeProjectContextDocs(t, dir)
+	cmd := newSetupStatusCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	err := cmd.RunE(cmd, []string{dir})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "Project Context Status")
+	assert.NotContains(t, buf.String(), "No documentation found")
+}
+
+func TestSetupValidateCmd_ProjectContextWithoutDocs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeProjectContextDocs(t, dir)
+	cmd := newSetupValidateCmd()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	err := cmd.RunE(cmd, []string{dir})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "Project context documents are present")
+}
+
 // TestSetupValidateCmd_NoDocsDir verifies setup validate returns error when docs missing.
 func TestSetupValidateCmd_NoDocsDir(t *testing.T) {
 	t.Parallel()
@@ -68,6 +96,15 @@ func TestSetupValidateCmd_NoDocsDir(t *testing.T) {
 	cmd.SetOut(&buf)
 	err := cmd.RunE(cmd, []string{dir})
 	_ = err
+}
+
+func writeProjectContextDocs(t *testing.T, dir string) {
+	t.Helper()
+	projectDir := filepath.Join(dir, ".autopus", "project")
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	for _, name := range []string{"product.md", "scenarios.md", "structure.md", "tech.md", "workspace.md"} {
+		require.NoError(t, os.WriteFile(filepath.Join(projectDir, name), []byte("# "+name+"\n"), 0o644))
+	}
 }
 
 // TestSetupUpdateCmd_NoDocsDir verifies setup update when no docs exist.

@@ -116,9 +116,10 @@ func checkArchStaged(dir string, out io.Writer, quiet bool) bool {
 }
 
 // checkArchWalk walks the directory tree checking all source files.
-// Skips submodule directories (detected by a .git file inside) and worktree dirs.
+// Skips nested repositories, submodules, generated harness dirs, and worktree dirs.
 func checkArchWalk(dir string, out io.Writer, quiet bool) bool {
 	passed := true
+	root := filepath.Clean(dir)
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -127,10 +128,11 @@ func checkArchWalk(dir string, out io.Writer, quiet bool) bool {
 			if archSkipDirs[d.Name()] {
 				return filepath.SkipDir
 			}
-			// Skip submodule directories: they contain a .git file (not directory).
-			if d.Name() != "." {
+			// Skip nested Git repositories. Submodules usually contain a .git file,
+			// while sibling repos in a meta workspace contain a .git directory.
+			if filepath.Clean(path) != root {
 				gitPath := filepath.Join(path, ".git")
-				if info, statErr := os.Lstat(gitPath); statErr == nil && !info.IsDir() {
+				if _, statErr := os.Lstat(gitPath); statErr == nil {
 					return filepath.SkipDir
 				}
 			}

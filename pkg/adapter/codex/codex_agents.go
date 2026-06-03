@@ -42,6 +42,7 @@ func (a *Adapter) generateAgents(cfg *config.HarnessConfig) ([]adapter.FileMappi
 			return nil, fmt.Errorf("codex agent 템플릿 렌더링 실패 %s: %w", name, err)
 		}
 		rendered = normalizeCodexHelperPaths(rendered)
+		rendered = normalizeCodexAgentContracts(rendered)
 
 		targetPath := filepath.Join(a.root, ".codex", "agents", agentFile)
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
@@ -89,6 +90,7 @@ func (a *Adapter) prepareAgentFiles(cfg *config.HarnessConfig) ([]adapter.FileMa
 			return nil, fmt.Errorf("codex agent 템플릿 렌더링 실패 %s: %w", name, err)
 		}
 		rendered = normalizeCodexHelperPaths(rendered)
+		rendered = normalizeCodexAgentContracts(rendered)
 
 		files = append(files, adapter.FileMapping{
 			TargetPath:      filepath.Join(".codex", "agents", agentFile),
@@ -157,4 +159,31 @@ func extractAgentMeta(content string) (name, desc string) {
 		}
 	}
 	return name, desc
+}
+
+func normalizeCodexAgentContracts(rendered string) string {
+	if strings.Contains(rendered, "`owned_paths`") &&
+		strings.Contains(rendered, "`changed_files`") &&
+		strings.Contains(rendered, "`verification`") &&
+		strings.Contains(rendered, "`blockers`") &&
+		strings.Contains(rendered, "`next_required_step`") {
+		return rendered
+	}
+
+	contract := `
+## Supervisor Return Contract
+
+When spawned by a supervisor, the final response MUST include these machine-readable fields:
+
+- ` + "`owned_paths`" + `: exact files, directories, or modules the worker owned
+- ` + "`changed_files`" + `: files actually changed, or ` + "`none`" + `
+- ` + "`verification`" + `: commands, checks, or inspections run, including failures
+- ` + "`blockers`" + `: unresolved blockers, or ` + "`none`" + `
+- ` + "`next_required_step`" + `: the next gate, retry, handoff, or ` + "`none`" + `
+`
+	anchor := "\n'''"
+	if idx := strings.LastIndex(rendered, anchor); idx >= 0 {
+		return rendered[:idx] + contract + rendered[idx:]
+	}
+	return strings.TrimRight(rendered, "\n") + "\n" + strings.TrimLeft(contract, "\n")
 }

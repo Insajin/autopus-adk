@@ -8,10 +8,11 @@ import (
 
 // Status returns the documentation status.
 type Status struct {
-	Exists       bool
-	GeneratedAt  time.Time
-	FileStatuses map[string]FileStatus
-	DriftScore   float64
+	Exists         bool
+	GeneratedAt    time.Time
+	FileStatuses   map[string]FileStatus
+	DriftScore     float64
+	ProjectContext ProjectContextStatus
 }
 
 // FileStatus represents the status of a single documentation file.
@@ -25,6 +26,7 @@ type FileStatus struct {
 func GetStatus(projectDir string, outputDir string) (*Status, error) {
 	docsDir := resolveDocsDir(projectDir, outputDir)
 	status := &Status{FileStatuses: make(map[string]FileStatus)}
+	status.ProjectContext = DetectProjectContext(projectDir)
 
 	if _, err := os.Stat(docsDir); err != nil {
 		return status, nil
