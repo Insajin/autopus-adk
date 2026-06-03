@@ -25,6 +25,7 @@ Available Commands:
   learn       Manage pipeline learning entries
   lore        Decision knowledge management via git trailers
   lsp         LSP-based code intelligence
+  map         Map project structure, repositories, and agent-relevant workspace state
   mcp         Desktop and developer MCP integration commands
   mem         Build and query the decision/quality memory index
   orchestra   다중 모델 오케스트레이션으로 코드를 분석한다
