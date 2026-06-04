@@ -12,6 +12,9 @@ const (
 	// 3–6 minutes on spec review workloads. Exceeds the 240s global timeout to
 	// prevent the cutoff reported in issue #55.
 	ClaudeOrchestraTimeoutSeconds = 480
+	// Gemini review through agy can exceed the 240s global timeout on structured
+	// SPEC review prompts, so it needs the same per-provider execution budget.
+	GeminiOrchestraTimeoutSeconds = 480
 )
 
 // DefaultCodexProviderEntry returns the canonical Codex orchestra provider entry.
@@ -110,7 +113,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				},
 				// SPEC-ORCH-021 REQ-014/015: prompt is the value of --print (injected into the ""
 				// slot); pane argv carries no --print (interactive session).
-				"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, InteractiveInput: "stdin", Subprocess: SubprocessProvConf{OutputFormat: "text"}},
+				"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, InteractiveInput: "stdin", Subprocess: SubprocessProvConf{OutputFormat: "text", Timeout: GeminiOrchestraTimeoutSeconds}},
 				"codex":  DefaultCodexProviderEntry(),
 			},
 			Commands: map[string]CommandEntry{

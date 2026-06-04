@@ -70,6 +70,39 @@ func TestMigrateOrchestraConfig_AntigravityReconcilesBarePrintGemini(t *testing.
 	assert.Equal(t, "text", gemini.Subprocess.OutputFormat)
 }
 
+func TestMigrateOrchestraConfig_AntigravityFillsGeminiSubprocessTimeout(t *testing.T) {
+	t.Parallel()
+
+	cfg := &HarnessConfig{
+		Mode:        ModeFull,
+		ProjectName: "test-project",
+		Platforms:   []string{"antigravity-cli"},
+		Orchestra: OrchestraConf{
+			Enabled: true,
+			Providers: map[string]ProviderEntry{
+				"gemini": {
+					Binary:           "agy",
+					Args:             []string{"--print", ""},
+					PromptViaArgs:    true,
+					InteractiveInput: "stdin",
+					Subprocess:       SubprocessProvConf{OutputFormat: "text"},
+				},
+			},
+			Commands: map[string]CommandEntry{
+				"review": {Providers: []string{"gemini"}},
+			},
+		},
+	}
+
+	changed, err := MigrateOrchestraConfig(cfg)
+	require.NoError(t, err)
+	assert.True(t, changed)
+
+	gemini := cfg.Orchestra.Providers["gemini"]
+	assert.Equal(t, GeminiOrchestraTimeoutSeconds, gemini.Subprocess.Timeout,
+		"migration must backfill Gemini timeout so spec review does not fall back to the 240s global timeout")
+}
+
 // TestMigrateOrchestraConfig_AntigravityPreservesContractGemini ensures a gemini
 // entry that already satisfies the SPEC-ORCH-021 contract is not clobbered, and
 // that a second migration pass is a no-op (idempotency).
@@ -88,7 +121,7 @@ func TestMigrateOrchestraConfig_AntigravityPreservesContractGemini(t *testing.T)
 					Args:          []string{"--print", ""},
 					PaneArgs:      []string{},
 					PromptViaArgs: true,
-					Subprocess:    SubprocessProvConf{OutputFormat: "text"},
+					Subprocess:    SubprocessProvConf{OutputFormat: "text", Timeout: GeminiOrchestraTimeoutSeconds},
 				},
 			},
 			Commands: map[string]CommandEntry{
@@ -103,6 +136,7 @@ func TestMigrateOrchestraConfig_AntigravityPreservesContractGemini(t *testing.T)
 	assert.Equal(t, []string{"--print", ""}, gemini.Args)
 	assert.True(t, gemini.PromptViaArgs)
 	assert.Equal(t, "stdin", gemini.InteractiveInput)
+	assert.Equal(t, GeminiOrchestraTimeoutSeconds, gemini.Subprocess.Timeout)
 
 	// Second pass must report no change — the gemini contract is already satisfied.
 	changedAgain, err := MigrateOrchestraConfig(cfg)

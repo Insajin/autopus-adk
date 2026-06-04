@@ -134,6 +134,20 @@ func TestDefaultFullConfig_ClaudeProviderTimeout(t *testing.T) {
 		"claude per-provider timeout must exceed the global orchestra timeout")
 }
 
+func TestDefaultFullConfig_GeminiProviderTimeout(t *testing.T) {
+	t.Parallel()
+	cfg := DefaultFullConfig("test-project")
+	require.NotNil(t, cfg)
+
+	gemini, ok := cfg.Orchestra.Providers["gemini"]
+	require.True(t, ok, "gemini provider must exist")
+
+	assert.Equal(t, GeminiOrchestraTimeoutSeconds, gemini.Subprocess.Timeout,
+		"gemini provider must declare a per-provider subprocess timeout")
+	assert.Greater(t, gemini.Subprocess.Timeout, cfg.Orchestra.TimeoutSeconds,
+		"gemini per-provider timeout must exceed the global orchestra timeout")
+}
+
 // TestDefaultFullConfig_ClaudeEffortHigh verifies claude defaults to --effort high
 // (not max) for spec review's structured-output workload. See issue #55 for the
 // rationale: max-effort reasoning routinely exceeded 4 minutes on opus.
