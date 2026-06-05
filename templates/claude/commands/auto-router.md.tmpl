@@ -792,6 +792,7 @@ Agent(
     15. Apply Q-CORR-04, Q-COMP-05, and Q-COMP-06 from content/rules/spec-quality.md during Self-Verify Summary.
     16. For greenfield/new project/scaffold work, apply techstack-freshness and write `## Technology Stack Decision` in research.md or prd.md with concrete stable versions, source refs, checked_at, and rejected alternatives.
     17. For prompt-state work, record the prompt layer manifest contract: stable instructions, frozen snapshot recall, ephemeral request/evidence, and cache invalidation scope.
+    18. After writing all four SPEC files, run `auto spec validate {SPEC_DIR} --strict` before provider review. Fix deterministic authoring preflight errors locally and rerun validation before returning.
   """
 )
 ```

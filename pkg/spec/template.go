@@ -107,6 +107,13 @@ priority: MEDIUM
 
 현재 상태와 변경이 필요한 배경을 설명합니다.
 
+## Outcome Boundary
+
+- Outcome Lock: [사용자가 기대한 최종 동작]
+- Mandatory requirements: [반드시 충족할 요구]
+- Explicit non-goals: [이번 SPEC에서 하지 않을 일]
+- Completion evidence: [sync 완료 판정에 사용할 증거]
+
 ## Requirements
 
 ### Ubiquitous
@@ -155,6 +162,17 @@ func generatePlanMd(specID, title string) string {
 ## Architecture Considerations
 
 레이어 규칙, 의존성 방향, 기존 패턴과의 정합성을 설명합니다.
+
+## Visual Planning Brief
+
+Mermaid flowchart:
+  flowchart TD
+    A[Current state] --> B[Planned change]
+    B --> C[Outcome Lock]
+
+## Feature Completion Scope
+
+Primary SPEC가 Outcome Lock을 닫는 방법, 승인된 sibling 의존성, 남은 Completion Debt 여부를 설명합니다.
 
 ## Tasks
 
@@ -214,64 +232,5 @@ Then [에러 처리]
 - [ ] 모든 Scenario 통과
 - [ ] Edge Case 처리 완료
 - [ ] 코드 리뷰 완료
-`, specID, title)
-}
-
-// generateResearchMd는 리서치 섹션을 포함한 research.md 내용을 생성한다.
-func generateResearchMd(specID, title string) string {
-	return fmt.Sprintf(`# %s Research: %s
-
-## Codebase Analysis
-
-대상 코드 영역의 구조, 의존성, 패턴을 분석합니다.
-
-### Target Files
-
-| 파일 | 역할 | 변경 필요 |
-|------|------|-----------|
-
-### Dependencies
-
-기존 코드와의 의존 관계를 매핑합니다.
-
-## Lore Decisions
-
-`+"`auto lore context`"+`로 조회한 과거 의사결정 기록입니다.
-
-## Architecture Compliance
-
-`+"`auto arch enforce`"+`로 확인한 아키텍처 정합성 결과입니다.
-
-## Reference Discipline
-
-| Reference | Type | Verification |
-|-----------|------|--------------|
-| [path or symbol] | existing / [NEW] planned addition | existing refs verified with rg/read; [NEW] excluded from existing-reference checks |
-
-## Reviewer Brief
-
-- Intended scope: [이 SPEC가 닫는 결과]
-- Explicit non-goals: [리뷰어가 새 scope로 확장하지 말아야 할 항목]
-- Self-verified: Traceability Matrix, Semantic Invariant Inventory, oracle acceptance, existing/[NEW] reference discipline
-- Reviewer should focus on: correctness, convergence safety, regression risk
-
-## Semantic Invariant Inventory
-
-| ID | source clause | invariant type | affected outputs | acceptance IDs |
-|----|---------------|----------------|------------------|----------------|
-| INV-001 | [sanitized user request evidence] | [ordering / parser / formula / state transition] | [stdout/API field/file content] | S1 |
-
-## Key Findings
-
-리서치 과정에서 발견된 주요 사항을 정리합니다.
-
-## Recommendations
-
-구현 시 참고할 권고사항을 나열합니다.
-
-## Self-Verify Summary
-
-- Q-CORR-04 | status: PASS | attempt: 1 | files: research.md | reason: existing/[NEW] reference discipline recorded
-- Q-COMP-06 | status: PASS | attempt: 1 | files: spec.md, research.md | reason: Reviewer Brief and Traceability Matrix present
 `, specID, title)
 }

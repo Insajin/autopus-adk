@@ -50,7 +50,9 @@ func newSpecNewCmd() *cobra.Command {
 }
 
 func newSpecValidateCmd() *cobra.Command {
-	return &cobra.Command{
+	var strict bool
+
+	cmd := &cobra.Command{
 		Use:   "validate <spec-dir>",
 		Short: "Validate a SPEC document",
 		Args:  cobra.ExactArgs(1),
@@ -61,6 +63,9 @@ func newSpecValidateCmd() *cobra.Command {
 			}
 
 			errs := spec.ValidateSpec(doc)
+			if strict {
+				errs = spec.ValidateSpecSet(args[0], doc)
+			}
 			if len(errs) == 0 {
 				fmt.Println("SPEC 검증 통과")
 				return nil
@@ -82,4 +87,7 @@ func newSpecValidateCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&strict, "strict", false, "Run full authoring preflight across spec.md, plan.md, acceptance.md, and research.md")
+	return cmd
 }
