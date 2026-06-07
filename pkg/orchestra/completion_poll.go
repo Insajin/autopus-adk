@@ -33,7 +33,9 @@ type ScreenPollDetector struct {
 // WaitForCompletion polls ReadScreen at short intervals using 2-phase consecutive match.
 // Phase 1: First prompt pattern match detected.
 // Phase 2: Second consecutive match confirms completion.
-// Idle fallback: After 60s without 2-phase match, checks pipe-pane output file idle.
+// Idle fallback: when the pipe-pane output file has been quiet for idleThresh
+// (anchored to the file's own mtime, not wall-clock since the wait began) and no
+// working indicator is visible, completion is assumed.
 // The round parameter is accepted for interface conformance but unused by poll detection.
 // @AX:NOTE [AUTO] blocking goroutine — safety deadline (10min) auto-applied when caller omits deadline (R3)
 func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo, patterns []CompletionPattern, baseline string, _ int) (bool, error) {
@@ -53,8 +55,6 @@ func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo,
 	defer ticker.Stop()
 
 	candidateDetected := false
-	// R7: Track when idle fallback becomes eligible
-	idleFallbackStart := time.Now()
 
 	// Use per-provider idle threshold if set; otherwise use package default.
 	idleThresh := idleFallbackThreshold
@@ -107,14 +107,30 @@ func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo,
 			} else if !baselineMatch {
 				candidateDetected = false // Reset -- AI resumed output
 			}
-			// R7: Idle fallback -- if 2-phase match hasn't succeeded within threshold,
-			// check if output file is idle (no modifications for outputIdleThreshold).
-			// Skip idle check if provider is actively working (thinking/generating).
-			if pi.outputFile != "" && time.Since(idleFallbackStart) >= idleThresh {
-				if isOutputIdle(pi.outputFile, outputIdleThreshold) && !isProviderWorking(screen) {
-					return true, nil
-				}
+			// R7: Idle fallback -- when the 2-phase prompt match never succeeds,
+			// declare completion once the output file itself has been quiet for
+			// idleThresh and the provider shows no working indicator.
+			if shouldIdleComplete(pi.outputFile, idleThresh, screen) {
+				return true, nil
 			}
 		}
 	}
+}
+
+// shouldIdleComplete reports whether the idle fallback should declare the
+// provider finished: the pipe-pane output file must have been quiet for at least
+// idleThresh AND the screen must show no active working indicator.
+//
+// The silence window is anchored to the output file's own modification time
+// (via isOutputIdle), not to wall-clock time since the wait began. Anchoring to
+// wall-clock let a long-running provider that briefly paused streaming be
+// completed mid-response (truncating the capture). Anchoring to output mtime
+// keeps that from happening while still guaranteeing the fallback fires once the
+// provider truly stops writing — so a provider whose final prompt is
+// unrecognized still finishes instead of hanging until the safety deadline.
+func shouldIdleComplete(outputFile string, idleThresh time.Duration, screen string) bool {
+	if outputFile == "" {
+		return false
+	}
+	return isOutputIdle(outputFile, idleThresh) && !isProviderWorking(screen)
 }

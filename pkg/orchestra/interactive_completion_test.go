@@ -117,19 +117,24 @@ func TestWaitForCompletion_IdleFallback(t *testing.T) {
 	assert.False(t, result, "no outputFile means no idle fallback, should timeout")
 }
 
-// TestWaitForCompletion_IdleFallbackNotBeforeThreshold verifies idle fallback does NOT
-// trigger before the 30s threshold even when output file is idle.
-func TestWaitForCompletion_IdleFallbackNotBeforeThreshold(t *testing.T) {
+// TestWaitForCompletion_IdleFallbackNotWhileOutputFresh verifies the idle
+// fallback does NOT trigger while the pipe-pane output file is still fresh.
+// The silence window is anchored to the output file's own mtime, so a provider
+// that is actively (or recently) streaming is never completed mid-response —
+// this is the F-002 protection that replaced the old wall-clock-from-wait-start
+// warmup, which could expire mid-stream and truncate the capture.
+func TestWaitForCompletion_IdleFallbackNotWhileOutputFresh(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "output.txt")
-	if err := os.WriteFile(outputFile, []byte("done"), 0644); err != nil {
+	if err := os.WriteFile(outputFile, []byte("partial"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	// Set modtime far in the past
-	past := time.Now().Add(-1 * time.Minute)
-	if err := os.Chtimes(outputFile, past, past); err != nil {
+	// Output was just written: well within the idle threshold (default 60s),
+	// so the provider is treated as still producing.
+	fresh := time.Now()
+	if err := os.Chtimes(outputFile, fresh, fresh); err != nil {
 		t.Fatal(err)
 	}
 
@@ -143,14 +148,14 @@ func TestWaitForCompletion_IdleFallbackNotBeforeThreshold(t *testing.T) {
 	}
 	patterns := DefaultCompletionPatterns()
 
-	// Context expires in 5s — well before the 30s idle fallback threshold.
-	// So idle fallback should NOT trigger, and context cancellation should return false.
+	// Context expires in 5s — far below the 60s output-silence threshold, so the
+	// fresh output keeps the idle fallback from firing and cancellation wins.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	result := waitForCompletion(ctx, OrchestraConfig{Terminal: mock}, pi, patterns, "", nil, 0)
 	assert.False(t, result,
-		"idle fallback must not trigger before idleFallbackThreshold (30s)")
+		"idle fallback must not trigger while the output file is still fresh")
 }
 
 // TestIsOutputIdle_FileNotExist verifies isOutputIdle returns false for missing file.
