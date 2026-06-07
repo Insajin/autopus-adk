@@ -40,6 +40,8 @@ skills:
 2. 유사한 기존 패턴 탐색 (codebase 조사)
 3. Outcome Lock 정의 및 기능 커버리지 맵 작성
 4. Visual Brief 작성: workflow/state는 Mermaid flowchart, UI/UX는 low-fi wireframe, CLI/API/backend는 sequence/data-flow/command-flow로 설명
+   - UX intent wireframe gate: screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files가 관련되면 low-fi wireframe을 사용자 의도 확인 도구로 사용합니다.
+   - Interactive planning에서는 current/target states와 1-3 hotspots를 그린 뒤 사용자가 confirm or adjust 할 질문을 둡니다. `--auto`에서 온 입력이면 `wireframe intent: assumed` 또는 `wireframe intent: deferred`를 가정/리스크로 남깁니다.
 5. Primary SPEC 기본 원칙과 예외적 sibling SPEC 필요성 판단
 6. EARS 형식 요구사항 작성
 7. 기술 접근 방법 설계
@@ -56,6 +58,7 @@ skills:
 - sibling SPEC는 예외이며 최대 2개, 재귀 sibling 금지입니다. 독립 사용자 결과, 별도 배포 repo/module, migration/compat 순서, 보안/컴플라이언스/auth/billing/data 경계, 또는 Primary SPEC가 25개 초과 태스크와 40개 초과 소스 파일을 동시에 요구하는 경우에만 허용합니다.
 - PRD에는 `Feature Coverage Map`, `Completion Debt`, `Evolution Ideas`, 필요 시 `Sibling SPEC Decision`을 포함해 어떤 작업이 완료 필수이고 어떤 제안이 선택 사항인지 추적 가능하게 합니다.
 - 기획 결과에는 `Visual Brief`를 포함합니다. Visual Brief는 설명 보조 자료이며, Outcome Lock이나 Must acceptance에 연결되지 않은 시각 요소를 필수 요구사항으로 승격하지 않습니다.
+- UX wireframe은 final design이 아니라 intent probe입니다. 사용자가 confirm or adjust 한 항목이라도 Outcome Lock, mandatory requirement, acceptance seed에 연결되지 않으면 선택 설명이나 리스크로만 남깁니다.
 
 ## 출력
 

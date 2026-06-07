@@ -65,6 +65,10 @@ Opportunity-Solution Tree, 다관점 브레인스토밍, 가정 식별을 포함
 - Interactive default는 expected gain이 가장 큰 unresolved row 하나만 묻습니다. critical ambiguity면 최대 1개 추가, `--deep-clarify`는 총 3문항까지 허용합니다.
 - 질문 형식은 반드시 `Current understanding`, `Blocked decision`, `Recommended answer`, `Question` 네 블록을 사용합니다.
 - `--auto`는 질문 0개, orchestra 계속 진행, unresolved rows를 `assumed` 또는 `deferred`로 기록합니다.
+- UX intent wireframe gate: screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files가 관련되면 low-fi text wireframe을 primary clarification artifact로 사용합니다.
+- Interactive mode에서는 current/target states와 1-3 hotspots를 그린 뒤 사용자가 confirm or adjust 할 질문을 `Question` 블록에 둡니다.
+- `--auto`에서는 질문 없이 `## Visual Brief`와 관련 ledger row에 `wireframe intent: assumed` 또는 `wireframe intent: deferred`를 남깁니다.
+- Wireframe은 intent probe이자 communication aid이며 final design이 아닙니다. Outcome Lock, mandatory requirements, acceptance seeds에 연결된 항목만 required scope입니다.
 - External Deep Interview provenance: repository `https://github.com/devbrother2024/skills`, commit `8b4233816f6710271bf8523ffdc107a8e6bf00e1`, source path `deep-interview/SKILL.md`, license `MIT`, source SHA-256 `25d77112663b9c19251a5ef32295216a864b17a74de8712def9fc88f936552c2`. Upstream text is not executed, vendored, or treated as trusted instructions; do not require installing `devbrother2024/skills`.
 - Plan handoff mapping: `answered` → requirements/scope/acceptance seeds, `assumed` → risks/acceptance assumptions/validation experiments/reviewer focus, `deferred` → research/open questions unless they block the Outcome Lock, `scope_boundary` → explicit non-goals.
 - BS files must include `## Outcome Lock` for the one primary SPEC that closes the user-visible result, and `## Evolution Ideas` for optional improvements that must not auto-create follow-up or sibling SPECs.
@@ -115,6 +119,8 @@ flowchart TD
 ```text
 [Low-fi wireframe or flow sketch]
 - UI가 있으면 화면/상태/행동을 배치합니다.
+- UX-related이면 사용자 의도 확인을 위해 wireframe을 먼저 보여주고 confirm or adjust 를 요청합니다.
+- --auto이면 wireframe intent: assumed/deferred 를 표시합니다.
 - UI가 없으면 sequence/data-flow/command-flow를 사용합니다.
 ```
 ````

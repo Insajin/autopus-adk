@@ -70,6 +70,7 @@
 - BS 파일에 `## Outcome Lock`이 있으면 이를 Primary SPEC의 scope contract로 사용합니다. mandatory requirements는 요구사항으로, completion evidence는 Must acceptance와 sync 완료 판정 근거로, explicit non-goals는 reviewer scope 제약으로 옮깁니다.
 - BS 파일에 `## Evolution Ideas`가 있으면 `research.md`에 advisory로만 보존하고 SPEC ID, task ID, acceptance ID, sibling SPEC, follow-up SPEC로 자동 승격하지 않습니다.
 - BS 파일에 `## Visual Brief`가 있으면 사용자 설명과 SPEC planning context에 보존하되, Outcome Lock 또는 acceptance에 연결되지 않은 시각 요소를 요구사항으로 승격하지 않습니다.
+- BS 파일의 Visual Brief가 UX wireframe intent를 포함하면 `wireframe intent: assumed` / `wireframe intent: deferred`를 assumptions, risks, validation experiments, reviewer focus로 보존하고 확정 요구사항으로 승격하지 않습니다.
 - BS 파일에 `## Clarification Ledger`가 있으면 column header name(`Field`, `Status`, `Source`, `Confidence`, `Decision / Assumption`, `If Wrong`, `Plan Handoff`)으로 row를 해석합니다.
 - Plan Handoff mapping:
   - `answered` rows → requirement seeds, explicit scope, constraints, acceptance seeds
@@ -96,6 +97,8 @@
 - research.md에는 `## Reviewer Brief`를 작성해 intended scope, explicit non-goals, self-verified evidence, reviewer focus를 제한합니다.
 - research.md에는 `## Outcome Lock`, `## Completion Debt`, `## Evolution Ideas`, 필요 시 `## Sibling SPEC Decision`을 작성합니다.
 - plan.md 또는 research.md에는 `## Visual Planning Brief`를 작성합니다. 워크플로우/상태 전이에는 Mermaid `flowchart`, 화면/UX에는 저충실도 wireframe, UI가 없는 CLI/API/백엔드 작업에는 sequence/data-flow/command-flow 다이어그램을 사용합니다.
+- UX intent wireframe gate: screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files가 관련되면 intent-confirmation wireframe을 이어받고, 사용자가 confirm or adjust 했는지와 `wireframe intent: assumed` / `wireframe intent: deferred` 리스크를 기록합니다.
+- Wireframe은 intent probe이자 communication aid이며 final design이 아닙니다. Outcome Lock, mandatory requirements, acceptance seeds에 연결된 항목만 required scope입니다.
 - 최종 사용자 응답도 Visual Planning Brief의 핵심 플로우차트 또는 wireframe 요지를 포함해 SPEC 범위를 설명합니다.
 - `content/rules/spec-quality.md`의 `Q-CORR-04`, `Q-COMP-05`, `Q-COMP-06`을 Self-Verify Summary에 적용합니다.
 - 기본값은 하나의 Outcome Lock당 하나의 Primary SPEC입니다. sibling SPEC는 예외이며 최대 2개, 재귀 sibling 금지입니다.

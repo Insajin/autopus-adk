@@ -88,6 +88,12 @@ Question selection:
 - `--deep-clarify` permits at most 3 total questions.
 - `--auto` asks zero questions, continues to orchestra, and records unresolved rows as `assumed` or `deferred`.
 
+UX intent wireframe gate:
+- Treat a request as UX-related when it mentions or implies screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files.
+- In interactive mode, use a low-fi text wireframe as the primary clarification artifact before asking. Show current/target states plus 1-3 hotspots, then ask the user to confirm or adjust the wireframe in the `Question` block.
+- In `--auto`, ask zero questions and record `wireframe intent: assumed` or `wireframe intent: deferred` inside `## Visual Brief` and the relevant `Clarification Ledger` rows.
+- A wireframe is an intent probe and communication aid, not final design. Only items tied to Outcome Lock, mandatory requirements, or acceptance seeds become required scope.
+
 Question format:
 
 ```markdown
@@ -119,6 +125,8 @@ Plan handoff mapping:
 
 - 워크플로우, 사용자 여정, 의사결정 흐름이 핵심이면 Mermaid `flowchart`를 포함합니다.
 - 화면/UX가 관련된 아이디어이면 저충실도 텍스트 wireframe을 포함합니다.
+- UX-related 아이디어이면 Visual Brief의 wireframe을 사용자 의도 확인 도구로 먼저 사용하고, interactive mode에서는 사용자가 wireframe을 confirm or adjust 하도록 묻습니다.
+- `--auto`에서는 wireframe intent: assumed/deferred 상태를 남기고, 다음 plan 단계가 이를 확정 요구사항이 아니라 검증할 가정으로 다루게 합니다.
 - UI가 없는 CLI/API/백엔드 아이디어이면 억지 wireframe 대신 sequence/data-flow/command-flow 다이어그램을 사용합니다.
 - Visual Brief는 설명 보조 자료입니다. Outcome Lock, mandatory requirements, acceptance seeds에 연결된 항목만 필수 범위로 취급합니다.
 
