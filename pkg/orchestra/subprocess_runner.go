@@ -141,7 +141,12 @@ func setupStdin(cmd command, req ProviderRequest) error {
 			return fmt.Errorf("subprocess %s: open devnull: %w", req.Provider, err)
 		}
 		cmd.SetStdin(devNull)
-		return cmd.Start()
+		startErr := cmd.Start()
+		// The child inherits its own descriptor during Start, so release the
+		// parent copy here. Without this, every PromptViaArgs subprocess run
+		// (including reprompts across a multi-provider review) leaks an fd.
+		_ = devNull.Close()
+		return startErr
 	}
 
 	// File mode is needed either explicitly or for large prompt payloads.

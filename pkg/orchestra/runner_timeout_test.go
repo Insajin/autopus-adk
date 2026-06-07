@@ -22,6 +22,7 @@ func (n nopWriteCloser) Close() error {
 
 type fakeCommand struct {
 	stdinBuf      bytes.Buffer
+	stdin         io.Reader
 	stdout        io.Writer
 	stderr        io.Writer
 	waitCh        chan error
@@ -35,7 +36,7 @@ func (f *fakeCommand) StdinPipe() (io.WriteCloser, error) {
 	return nopWriteCloser{Writer: &f.stdinBuf}, nil
 }
 
-func (f *fakeCommand) SetStdin(_ io.Reader) {}
+func (f *fakeCommand) SetStdin(r io.Reader) { f.stdin = r }
 
 func (f *fakeCommand) SetStdout(w io.Writer) {
 	f.stdout = w

@@ -210,5 +210,10 @@ func verdictFromCounts(results []ReviewResult, threshold float64, denom float64)
 	if reviseCount > 0 {
 		return VerdictRevise
 	}
-	return VerdictPass
+	// Reaching here means the PASS supermajority was not met and there are no
+	// REVISE votes — i.e. providers in the denominator did not vote PASS
+	// (failed/dropped). Returning REVISE prevents a diluted survivor from
+	// silently approving a SPEC. This gives the excludeFailed=true branch the
+	// same AC-VERD-1 protection the legacy branch already applies post-call.
+	return VerdictRevise
 }

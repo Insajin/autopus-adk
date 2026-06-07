@@ -171,6 +171,22 @@ func orchestrationTimeout(cfg OrchestraConfig) time.Duration {
 		baseSeconds = 120
 	}
 	base := time.Duration(baseSeconds) * time.Second
+
+	// Sequential strategies run providers one after another, so the global
+	// deadline must be the SUM of per-provider budgets. Using the max (as the
+	// parallel path does) would let later providers start with an already
+	// expired context — the same failure class as the spec-review 0/N watchdog.
+	if cfg.Strategy == StrategyPipeline || cfg.Strategy == StrategyRelay {
+		total := time.Duration(0)
+		for _, provider := range cfg.Providers {
+			total += providerExecutionTimeout(provider, cfg.TimeoutSeconds)
+		}
+		if total < base {
+			total = base
+		}
+		return total
+	}
+
 	longestProvider := base
 	for _, provider := range cfg.Providers {
 		if providerTimeout := providerExecutionTimeout(provider, cfg.TimeoutSeconds); providerTimeout > longestProvider {
@@ -206,7 +222,13 @@ func runPipeline(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 	prompt := cfg.Prompt
 
 	for _, p := range cfg.Providers {
-		resp, err := runProvider(ctx, p, prompt)
+		// Bound each sequential stage by its own per-provider timeout so one
+		// slow provider cannot consume the whole orchestration budget and
+		// starve the remaining stages.
+		perTimeout := providerExecutionTimeout(p, cfg.TimeoutSeconds)
+		stageCtx, stageCancel := context.WithTimeout(ctx, perTimeout)
+		resp, err := runProvider(stageCtx, p, prompt)
+		stageCancel()
 		if err != nil {
 			return responses, err
 		}
@@ -232,10 +254,9 @@ func runFastest(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, e
 		go func(provider ProviderConfig) {
 			defer wg.Done()
 			resp, err := runProvider(ctx, provider, cfg.Prompt)
-			if err != nil || (resp != nil && resp.TimedOut) {
-				return
-			}
-			if resp == nil {
+			// Reject failures the same way runParallel does: an exit-0 provider
+			// with empty stdout is not a usable "fastest" winner (false green).
+			if err != nil || resp == nil || resp.TimedOut || resp.EmptyOutput {
 				return
 			}
 			select {

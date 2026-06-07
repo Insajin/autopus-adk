@@ -39,7 +39,13 @@ func runRelay(ctx context.Context, cfg *OrchestraConfig) ([]ProviderResponse, er
 
 		prompt := buildRelayPrompt(cfg.Prompt, previous)
 
-		resp, err := runProvider(ctx, agenticP, prompt)
+		// Bound each sequential relay stage by its own per-provider timeout so a
+		// single slow provider cannot exhaust the whole budget and force every
+		// downstream stage to be skipped.
+		perTimeout := providerExecutionTimeout(p, cfg.TimeoutSeconds)
+		stageCtx, stageCancel := context.WithTimeout(ctx, perTimeout)
+		resp, err := runProvider(stageCtx, agenticP, prompt)
+		stageCancel()
 		if err != nil {
 			// Skip failed provider and continue with next (REQ-3a)
 			failed := ProviderResponse{
