@@ -83,9 +83,15 @@ func TestGenerateHookConfigs_AllDisabled(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
-	// All HooksConf fields disabled — only the unconditional completion Stop hook remains.
-	require.Len(t, hooks, 1, "only the completion hook should be present when all opts disabled")
-	assert.Equal(t, "Stop", hooks[0].Event)
+	// All HooksConf fields disabled — the unconditional orchestra hook-IPC hooks
+	// remain: the completion Stop hook and the SessionStart ready hook (SPEC-ORCH-022).
+	require.Len(t, hooks, 2, "completion + session-start ready hooks should be present when all opts disabled")
+	events := map[string]string{}
+	for _, h := range hooks {
+		events[h.Event] = h.Command
+	}
+	assert.Equal(t, ".claude/hooks/autopus/hook-claude-stop.sh", events["Stop"])
+	assert.Equal(t, ".claude/hooks/autopus/hook-claude-sessionstart.sh", events["SessionStart"])
 	assert.Empty(t, gitHooks)
 }
 
@@ -192,8 +198,8 @@ func TestGenerateHookConfigs_DeduplicatesReactHooks(t *testing.T) {
 	hooks, _, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
 	// ReactCIFailure and ReactReview both enabled — dedup keeps only one PostToolUse react hook,
-	// plus the unconditional completion Stop hook.
-	require.Len(t, hooks, 2, "expected one deduped react hook plus the completion Stop hook")
+	// plus the unconditional completion Stop hook and the SessionStart ready hook (SPEC-ORCH-022).
+	require.Len(t, hooks, 3, "expected one deduped react hook plus the completion Stop and SessionStart ready hooks")
 	var reactHook *adapter.HookConfig
 	for i := range hooks {
 		if hooks[i].Event == "PostToolUse" {
@@ -221,8 +227,8 @@ func TestGenerateProjectHookConfigs_ClaudeTaskCreatedEnabled(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "claude-code", true)
 	require.NoError(t, err)
-	// Expect: completion Stop hook + TaskCreated hook.
-	require.Len(t, hooks, 2)
+	// Expect: completion Stop hook + SessionStart ready hook (SPEC-ORCH-022) + TaskCreated hook.
+	require.Len(t, hooks, 3)
 	assert.Empty(t, gitHooks)
 	var taskCreatedHook *adapter.HookConfig
 	for i := range hooks {

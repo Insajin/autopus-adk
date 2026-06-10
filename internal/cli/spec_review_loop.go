@@ -52,6 +52,12 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		}
 		prompt := spec.BuildReviewPrompt(doc, p.codeContext, opts) //nolint:govet
 
+		// SPEC-ORCH-022: the pane provider must launch in the working directory
+		// whose .claude/settings.json carries the orchestra hooks (the same dir
+		// isHookModeAvailable inspects), so its SessionStart/Stop hooks fire and
+		// write the ready/done signals. Without WorkingDir the pane CLI runs in the
+		// surface's default cwd and reads neither hook.
+		workingDir, _ := os.Getwd()
 		orchCfg := orchestra.OrchestraConfig{
 			Providers:      p.providers,
 			Strategy:       orchestra.Strategy(p.strategy),
@@ -60,6 +66,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			JudgeProvider:  p.gate.Judge,
 			NoJudge:        true,
 			SubprocessMode: p.subprocessMode,
+			WorkingDir:     workingDir,
 			// REQ-006: inject the detected terminal so SelectBackend can choose the
 			// interactive pane backend on cmux/tmux and the subprocess backend on
 			// plain/CI terminals. The terminal import is centralized in

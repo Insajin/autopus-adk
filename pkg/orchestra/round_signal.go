@@ -61,6 +61,12 @@ func SendSessionEnvToPane(ctx context.Context, term terminal.Terminal, paneID te
 	if !validSessionID.MatchString(sessionID) {
 		return fmt.Errorf("SendSessionEnvToPane: invalid session ID %q (must match [a-zA-Z0-9_-]+)", sessionID)
 	}
-	cmd := fmt.Sprintf("export AUTOPUS_SESSION_ID=%s", sessionID)
+	// AUTOPUS_SESSION_DIR mirrors NewHookSession's path (os.TempDir based) so the
+	// provider's hooks write the ready/done signals to the exact directory the
+	// orchestrator watches. Without it the hooks hardcode /tmp/autopus and diverge
+	// from os.TempDir() whenever $TMPDIR is not /tmp (e.g. sandboxed runners),
+	// silently no-op-ing every hook (the dir-existence guard fails).
+	dir := filepath.Join(os.TempDir(), "autopus", sessionID)
+	cmd := fmt.Sprintf("export AUTOPUS_SESSION_ID=%s AUTOPUS_SESSION_DIR=%s", sessionID, shellQuote(dir))
 	return term.SendCommand(ctx, paneID, cmd)
 }

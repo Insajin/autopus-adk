@@ -15,7 +15,7 @@ case "$SESSION_ID" in
   *[!a-zA-Z0-9_-]*) exit 0 ;;
 esac
 
-SESSION_DIR="/tmp/autopus/${SESSION_ID}"
+SESSION_DIR="${AUTOPUS_SESSION_DIR:-/tmp/autopus/${SESSION_ID}}"
 if [ ! -d "$SESSION_DIR" ]; then
   exit 0
 fi

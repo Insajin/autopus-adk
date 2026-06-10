@@ -83,6 +83,15 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 		}
 	}
 
+	// SPEC-ORCH-022: create the hook session BEFORE launch so the session
+	// directory exists when the provider's SessionStart hook fires the ready
+	// signal, and so the same session is reused for completion. Degrades to nil
+	// (screen-poll ready + completion) on failure (REQ-012).
+	hookSession := resolveHookSession(b.cfg)
+	if hookSession != nil {
+		defer hookSession.Cleanup()
+	}
+
 	// Launch the provider CLI. For args-based providers the prompt rides on the
 	// launch command; otherwise the prompt is sent only after session-ready.
 	launchPrompt := ""
@@ -114,7 +123,7 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	if !promptDeliveredAtLaunch(req.Config) {
 		// REQ-009: gate the prompt on session readiness. If the session never
 		// becomes ready the prompt is NEVER sent and we degrade to fallback.
-		ready := pollUntilSessionReady(ctx, term, paneID, SessionReadyPatterns(), startupTimeoutFor(req.Config))
+		ready := waitForPaneReady(ctx, term, paneID, SessionReadyPatterns(), startupTimeoutFor(req.Config), hookSession, req.Config.Name, req.Round)
 		if !ready {
 			return paneFallback(ctx, req,
 				"interactive pane execution failed: session never became ready (prompt was not sent)")
@@ -138,15 +147,9 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	}
 	sleepBeforeCompletion(ctx, b.cfg)
 
-	// REQ-010/011/012: wait for completion using the resolved detector.
-	// When HookMode is enabled and a SessionID is set, create a real HookSession
-	// so resolveCompletionDetector can select FileIPCDetector (REQ-006/007).
-	// On creation failure we degrade gracefully to nil so the non-hook poll
-	// path is used instead (REQ-012 degrade — never fail hard here).
-	hookSession := resolveHookSession(b.cfg)
-	if hookSession != nil {
-		defer hookSession.Cleanup()
-	}
+	// REQ-010/011/012: wait for completion using the resolved detector. The hook
+	// session (created before launch) lets resolveCompletionDetector select
+	// FileIPCDetector (REQ-006/007); a nil session degrades to the poll path.
 	completed := waitForCompletion(ctx, b.cfg, pi, DefaultCompletionPatterns(), completionBaseline, hookSession, req.Round)
 
 	resp := b.collectResponse(ctx, req, pi, !completed)
