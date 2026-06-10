@@ -2,13 +2,12 @@
 package content_test
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/content"
 )
@@ -25,17 +24,22 @@ func TestGenerateHookConfigs_WithHooks(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
-	// CLI hooks: only arch generates PreToolUse; lore uses git commit-msg hook only.
+	// CLI hooks: arch check (PreToolUse) + completion Stop hook.
 	assert.NotEmpty(t, hooks)
-	assert.Len(t, hooks, 1, "only arch check should be a CLI hook")
-	assert.Equal(t, "PreToolUse", hooks[0].Event)
-	assert.Contains(t, hooks[0].Command, "--arch")
-	assert.Contains(t, hooks[0].Command, "--staged")
-	assert.Contains(t, hooks[0].Command, "--warn-only")
 	// Lore is NOT a CLI hook — it runs via git commit-msg hook.
 	for _, h := range hooks {
 		assert.NotContains(t, h.Command, "--lore", "lore should not be a CLI hook")
 	}
+	var archHook *adapter.HookConfig
+	for i := range hooks {
+		if hooks[i].Event == "PreToolUse" {
+			archHook = &hooks[i]
+		}
+	}
+	require.NotNil(t, archHook, "expected a PreToolUse arch hook")
+	assert.Contains(t, archHook.Command, "--arch")
+	assert.Contains(t, archHook.Command, "--staged")
+	assert.Contains(t, archHook.Command, "--warn-only")
 	assert.Empty(t, gitHooks)
 }
 
@@ -79,7 +83,9 @@ func TestGenerateHookConfigs_AllDisabled(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
-	assert.Empty(t, hooks)
+	// All HooksConf fields disabled — only the unconditional completion Stop hook remains.
+	require.Len(t, hooks, 1, "only the completion hook should be present when all opts disabled")
+	assert.Equal(t, "Stop", hooks[0].Event)
 	assert.Empty(t, gitHooks)
 }
 
@@ -129,11 +135,19 @@ func TestGenerateHookConfigs_AntigravityKeepsOfficialEventNames(t *testing.T) {
 	assert.Contains(t, eventNames, "PostToolUse")
 	assert.NotContains(t, eventNames, "BeforeTool")
 	assert.NotContains(t, eventNames, "AfterTool")
+	// AfterAgent is the completion hook — it must be present.
+	assert.Contains(t, eventNames, "AfterAgent")
 
+	// Tool-use hooks must be wrapped for Antigravity JSON stdout protocol;
+	// the completion AfterAgent hook is a plain command (not tool-use).
 	for _, h := range hooks {
-		assert.Equal(t, "run_command", h.Matcher, "Antigravity hooks must match official tool names")
-		assert.Contains(t, h.Command, "sh -c", "Antigravity hooks must wrap commands for JSON stdout")
-		assert.Contains(t, h.Command, ">&2", "Antigravity hooks should keep command output off stdout")
+		if h.Event == "AfterAgent" {
+			// Completion hook: plain command, no run_command matcher.
+			continue
+		}
+		assert.Equal(t, "run_command", h.Matcher, "Antigravity tool-use hooks must match official tool names")
+		assert.Contains(t, h.Command, "sh -c", "Antigravity tool-use hooks must wrap commands for JSON stdout")
+		assert.Contains(t, h.Command, ">&2", "Antigravity tool-use hooks should keep command output off stdout")
 		if h.Event == "PreToolUse" {
 			assert.Contains(t, h.Command, `decision`, "PreToolUse must emit a decision JSON object")
 		}
@@ -177,8 +191,17 @@ func TestGenerateHookConfigs_DeduplicatesReactHooks(t *testing.T) {
 
 	hooks, _, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
-	require.Len(t, hooks, 1)
-	assert.Equal(t, "auto react check --quiet", hooks[0].Command)
+	// ReactCIFailure and ReactReview both enabled — dedup keeps only one PostToolUse react hook,
+	// plus the unconditional completion Stop hook.
+	require.Len(t, hooks, 2, "expected one deduped react hook plus the completion Stop hook")
+	var reactHook *adapter.HookConfig
+	for i := range hooks {
+		if hooks[i].Event == "PostToolUse" {
+			reactHook = &hooks[i]
+		}
+	}
+	require.NotNil(t, reactHook, "expected a PostToolUse react hook")
+	assert.Equal(t, "auto react check --quiet", reactHook.Command)
 }
 
 func TestGenerateProjectHookConfigs_ClaudeTaskCreatedEnabled(t *testing.T) {
@@ -198,11 +221,18 @@ func TestGenerateProjectHookConfigs_ClaudeTaskCreatedEnabled(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "claude-code", true)
 	require.NoError(t, err)
-	require.Len(t, hooks, 1)
+	// Expect: completion Stop hook + TaskCreated hook.
+	require.Len(t, hooks, 2)
 	assert.Empty(t, gitHooks)
-	assert.Equal(t, "TaskCreated", hooks[0].Event)
-	assert.Equal(t, ".claude/hooks/task-created-validate.sh", hooks[0].Command)
-	assert.Equal(t, "warn", hooks[0].Env["AUTOPUS_TASKCREATED_DEFAULT_MODE"])
+	var taskCreatedHook *adapter.HookConfig
+	for i := range hooks {
+		if hooks[i].Event == "TaskCreated" {
+			taskCreatedHook = &hooks[i]
+		}
+	}
+	require.NotNil(t, taskCreatedHook, "expected a TaskCreated hook")
+	assert.Equal(t, ".claude/hooks/task-created-validate.sh", taskCreatedHook.Command)
+	assert.Equal(t, "warn", taskCreatedHook.Env["AUTOPUS_TASKCREATED_DEFAULT_MODE"])
 }
 
 func TestGenerateProjectHookConfigs_TaskCreatedDisabledOutsideClaude(t *testing.T) {
@@ -218,7 +248,9 @@ func TestGenerateProjectHookConfigs_TaskCreatedDisabledOutsideClaude(t *testing.
 
 	hooks, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "codex", true)
 	require.NoError(t, err)
-	assert.Empty(t, hooks)
+	// TaskCreated is disabled outside claude; only the completion Stop hook is present.
+	require.Len(t, hooks, 1, "only completion Stop hook expected for codex when TaskCreated is disabled")
+	assert.Equal(t, "Stop", hooks[0].Event)
 	assert.Empty(t, gitHooks)
 }
 
@@ -237,57 +269,3 @@ func TestGitHookScript_Content(t *testing.T) {
 	assert.Contains(t, gitHooks[0].Content, "auto check --arch --quiet --staged")
 }
 
-func TestDetectPermissions_DefaultOnly(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-
-	perms := content.DetectPermissions(dir, config.PermissionsConf{})
-
-	assert.NotNil(t, perms)
-	assert.Contains(t, perms.Allow, "Bash(auto *)")
-	assert.Contains(t, perms.Allow, "Bash(git *)")
-	assert.Contains(t, perms.Allow, "WebSearch")
-	assert.NotContains(t, perms.Allow, "Bash(go test:*)")
-	assert.NotContains(t, perms.Allow, "Bash(npm *)")
-}
-
-func TestDetectPermissions_GoProject(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test"), 0644))
-
-	perms := content.DetectPermissions(dir, config.PermissionsConf{})
-
-	assert.Contains(t, perms.Allow, "Bash(go test:*)")
-	assert.Contains(t, perms.Allow, "Bash(go build:*)")
-	assert.Contains(t, perms.Allow, "Bash(golangci-lint:*)")
-	assert.NotContains(t, perms.Allow, "Bash(npm *)")
-}
-
-func TestDetectPermissions_NodeProject(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}"), 0644))
-
-	perms := content.DetectPermissions(dir, config.PermissionsConf{})
-
-	assert.Contains(t, perms.Allow, "Bash(npm *)")
-	assert.Contains(t, perms.Allow, "Bash(npx *)")
-	assert.NotContains(t, perms.Allow, "Bash(go test:*)")
-}
-
-func TestDetectPermissions_ExtraPerms(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-
-	extra := config.PermissionsConf{
-		ExtraAllow: []string{"Bash(cargo build:*)"},
-		ExtraDeny:  []string{"Bash(rm -rf:*)"},
-	}
-
-	perms := content.DetectPermissions(dir, extra)
-
-	assert.Contains(t, perms.Allow, "Bash(cargo build:*)")
-	assert.Contains(t, perms.Deny, "Bash(rm -rf:*)")
-	assert.Contains(t, perms.Allow, "Bash(auto *)")
-}

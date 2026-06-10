@@ -135,6 +135,10 @@ func runSubprocessPipeline(
 		TimeoutSeconds: timeout,
 		Terminal:       detectStructuredTerminal(),
 	}
+	// SPEC-ORCH-022 T8: enable hook-IPC collection before backend selection so a
+	// pane-capable, hook-installed context collects via done-file instead of
+	// screen polling.
+	applyHookMode(&cfg)
 	backend := orchestraRunBackendFactory(cfg)
 
 	pipelineCfg := orchestra.SubprocessPipelineConfig{
@@ -157,6 +161,14 @@ func runSubprocessPipeline(
 	result, err := orchestraRunExecutePipeline(ctx, pipelineCfg)
 	if err != nil {
 		return fmt.Errorf("subprocess pipeline failed: %w", err)
+	}
+
+	// REQ-009: when all providers failed and no usable responses were collected,
+	// surface an actionable error instead of printing an empty result.
+	if len(result.Responses) == 0 && len(result.FailedProviders) > 0 {
+		return bothBackendsUnavailableError(
+			fmt.Sprintf("%d provider(s) configured, 0 responses received", len(providerConfigs)),
+		)
 	}
 
 	fmt.Println(result.Merged)

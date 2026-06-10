@@ -66,6 +66,11 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			// orchestra_terminal.go (detectStructuredTerminal).
 			Terminal: detectStructuredTerminal(),
 		}
+		// SPEC-ORCH-022 T8: enable hook-IPC completion collection when the
+		// pane-capable, hook-installed context allows it. Without this the relaxed
+		// CLAUDECODE guard routed into the pane backend with HookMode=false and
+		// fell back to screen polling (the 0/N timeout this SPEC fixes).
+		applyHookMode(&orchCfg)
 
 		fmt.Fprintf(os.Stderr, "SPEC 리뷰 시작: %s (전략: %s, 리비전: %d)\n", p.specID, p.strategy, revision)
 
@@ -171,6 +176,19 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 
 		if noProviderReviewsSucceeded(reviews, providerStatuses) {
 			fmt.Fprintf(os.Stderr, "경고: 모든 provider review가 실패하여 리비전 반복을 중단합니다\n")
+			// REQ-009: when both execution paths produced zero raw responses
+			// (not just zero usable reviews after filtering), the operator cannot
+			// recover without fixing the infrastructure. Return an actionable error
+			// with recovery keywords so the cause and fix are immediately visible.
+			// Note: if Responses is non-empty but all were filtered out (TimedOut,
+			// non-zero exit, or empty output), the existing break+return path is
+			// used — those are provider-level failures, not both-backends-unavailable.
+			if len(result.Responses) == 0 {
+				return nil, bothBackendsUnavailableError(
+					fmt.Sprintf("revision %d: %d provider(s) configured, 0 responses received",
+						revision, len(p.providers)),
+				)
+			}
 			break
 		}
 

@@ -89,28 +89,48 @@ func TestOrchestraRunBackendFactoryConsumesSelectBackend(t *testing.T) {
 // TestPaneInteractiveContext verifies that pane execution is disabled in nested
 // agent automation, CI, and any non-TTY stdio context, so structured orchestra
 // falls back to the subprocess backend instead of spawning panes that time out.
+// Also covers REQ-005/REQ-008 CLAUDECODE relaxation and CI floor.
 func TestPaneInteractiveContext(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name       string
-		claudeCode string
-		ci         string
-		stdinTTY   bool
-		stdoutTTY  bool
-		want       bool
+		name          string
+		claudeCode    string
+		ci            string
+		stdinTTY      bool
+		stdoutTTY     bool
+		hookAvailable bool
+		muxInstalled  bool
+		want          bool
 	}{
-		{"interactive tty, no env", "", "", true, true, true},
-		{"nested claude-code automation", "1", "", true, true, false},
-		{"ci environment", "", "true", true, true, false},
-		{"piped stdout", "", "", true, false, false},
-		{"piped stdin", "", "", false, true, false},
-		{"piped both", "", "", false, false, false},
+		// Normal interactive TTY path (no env vars).
+		{"interactive tty, no env", "", "", true, true, false, false, true},
+		{"piped stdout", "", "", true, false, false, false, false},
+		{"piped stdin", "", "", false, true, false, false, false},
+		{"piped both", "", "", false, false, false, false, false},
+
+		// CI floor: always false regardless of CLAUDECODE, hook, or mux.
+		{"ci environment", "", "true", true, true, true, true, false},
+		{"ci beats claudecode", "1", "1", true, true, true, true, false},
+
+		// S5: CLAUDECODE + hook available + mux installed → true.
+		{"S5: claudecode hook+mux ready", "1", "", false, false, true, true, true},
+		// S5b: CLAUDECODE + hook unavailable → false (floor preserved).
+		{"S5b: claudecode no hook", "1", "", false, false, false, true, false},
+		// S5b: CLAUDECODE + mux not installed → false (floor preserved).
+		{"S5b: claudecode no mux", "1", "", false, false, true, false, false},
+		// CLAUDECODE present but both conditions false.
+		{"claudecode no hook no mux", "1", "", false, false, false, false, false},
+
+		// Legacy case: nested claude-code without relaxation flags — still false
+		// when hook/mux unavailable, matching original behavior.
+		{"nested claude-code no hook no mux", "1", "", true, true, false, false, false},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, paneInteractiveContext(tt.claudeCode, tt.ci, tt.stdinTTY, tt.stdoutTTY))
+			got := paneInteractiveContext(tt.claudeCode, tt.ci, tt.stdinTTY, tt.stdoutTTY, tt.hookAvailable, tt.muxInstalled)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -121,4 +141,19 @@ func TestPaneInteractiveContext(t *testing.T) {
 func TestDetectStructuredTerminal_NonInteractiveFallsBackToPlain(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, "plain", detectStructuredTerminal().Name())
+}
+
+// TestSelectBackend_PlainAdapterYieldsSubprocess is the S8 oracle: when
+// SelectBackend receives a PlainAdapter terminal (SubprocessMode=false), the
+// returned backend must be named "subprocess". This is a regression guard on
+// the existing pkg/orchestra/backend.go behaviour — no new code required.
+func TestSelectBackend_PlainAdapterYieldsSubprocess(t *testing.T) {
+	t.Parallel()
+	cfg := orchestra.OrchestraConfig{
+		SubprocessMode: false,
+		Terminal:       &terminal.PlainAdapter{},
+	}
+	backend := orchestra.SelectBackend(cfg)
+	require.NotNil(t, backend, "S8: SelectBackend must return a non-nil backend")
+	assert.Equal(t, "subprocess", backend.Name(), "S8: PlainAdapter must route to subprocess backend")
 }

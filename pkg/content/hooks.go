@@ -83,6 +83,7 @@ func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfi
 		})
 	}
 
+	hooks = append(hooks, generateCompletionHooks(platform)...)
 	return hooks
 }
 

@@ -219,20 +219,37 @@ type OrchestraFlags struct {
 }
 
 // isHookModeAvailable checks whether hook-based result collection can be used.
-// Returns true only when at least one provider has its hook/plugin registered.
+// Returns true when at least one of the user-global or project-local claude
+// settings.json contains both "autopus" and "Stop" strings simultaneously.
+// Either location satisfying the condition is sufficient (OR semantics).
 // @AX:NOTE: [AUTO] magic path and string constants — ~/.claude/settings.json, "autopus", "Stop"
 func isHookModeAvailable() bool {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false
-	}
-	claudeSettings := home + "/.claude/settings.json"
-	data, err := os.ReadFile(claudeSettings)
-	if err != nil {
-		return false
-	}
-	if strings.Contains(string(data), "autopus") && strings.Contains(string(data), "Stop") {
-		return true
+	home, _ := os.UserHomeDir()
+	projectDir, _ := os.Getwd()
+	return hookModeAvailableInDirs(
+		home+"/.claude/settings.json",
+		projectDir+"/.claude/settings.json",
+	)
+}
+
+// hookModeAvailableInDirs checks whether either settings file path contains both
+// "autopus" and "Stop". It is extracted as a helper so tests can inject arbitrary
+// paths without touching the real home directory or the process working directory.
+// Security: only caller-provided, fixed relative paths are used — no user-supplied
+// path segments that could cause traversal.
+func hookModeAvailableInDirs(globalPath, projectPath string) bool {
+	for _, path := range []string{globalPath, projectPath} {
+		if path == "" {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		s := string(data)
+		if strings.Contains(s, "autopus") && strings.Contains(s, "Stop") {
+			return true
+		}
 	}
 	return false
 }

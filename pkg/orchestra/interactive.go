@@ -46,6 +46,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 			cfg.HookMode = false
 		} else {
 			defer hookSession.Cleanup()
+			// Set on orchestrator process env for subprocesses spawned directly.
 			_ = os.Setenv("AUTOPUS_SESSION_ID", cfg.SessionID)
 		}
 	}
@@ -141,6 +142,19 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 		if launchFile != "" {
 			panes[i].launchFiles = append(panes[i].launchFiles, launchFile)
 		}
+		// Export AUTOPUS_SESSION_ID to the pane shell BEFORE launching the provider CLI.
+		// The orchestrator process env set via os.Setenv is NOT inherited by cmux surfaces
+		// (they are independent login shells). SendSessionEnvToPane mirrors the pattern
+		// used by SendRoundEnvToPane for AUTOPUS_ROUND. Without this, hook scripts that
+		// guard on AUTOPUS_SESSION_ID (e.g., hook-claude-stop.sh:8) exit 0 as a no-op.
+		if cfg.HookMode && cfg.SessionID != "" {
+			if envErr := SendSessionEnvToPane(ctx, cfg.Terminal, pi.paneID, cfg.SessionID); envErr != nil {
+				log.Printf("[interactive] SendSessionEnvToPane for %s failed (non-fatal): %v", pi.provider.Name, envErr)
+			} else if enterErr := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); enterErr != nil {
+				log.Printf("[interactive] session-env Enter for %s failed (non-fatal): %v", pi.provider.Name, enterErr)
+			}
+		}
+
 		// FR-02: Use SendLongText for launch command body (handles long args-based prompts)
 		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, cmd); err != nil {
 			failed = append(failed, FailedProvider{
@@ -162,129 +176,7 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 	return failed
 }
 
-// waitForSessionReady polls ReadScreen until a CLI-specific prompt is visible or timeout.
-// Uses SessionReadyPatterns (no shell $ / # patterns) to avoid false positives.
-// Providers that never become ready are marked skipWait so prompts are not sent
-// into a shell or half-launched TUI.
-func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []paneInfo) []FailedProvider {
-	patterns := SessionReadyPatterns()
-	var failed []FailedProvider
-	for i, pi := range panes {
-		if pi.skipWait {
-			continue
-		}
-		if promptDeliveredAtLaunch(pi.provider) {
-			continue
-		}
-		timeout := startupTimeoutFor(pi.provider)
-		if pollUntilSessionReady(ctx, term, pi.paneID, patterns, timeout) {
-			continue
-		}
-		panes[i].skipWait = true
-		failed = append(failed, FailedProvider{
-			Name:  pi.provider.Name,
-			Error: fmt.Sprintf("session never became ready after %s (prompt was not sent)", timeout),
-		})
-	}
-	return failed
-}
-
-// pollUntilPrompt polls ReadScreen at short intervals until a prompt pattern is detected or timeout.
-func pollUntilPrompt(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, patterns []CompletionPattern, timeout time.Duration) bool {
-	startTime := time.Now()
-	deadline := time.After(timeout)
-	ticker := time.NewTicker(promptPollInterval)
-	defer ticker.Stop()
-
-	warned := false
-	for {
-		select {
-		case <-ctx.Done():
-			return false
-		case <-deadline:
-			return false
-		case <-ticker.C:
-			if !warned && time.Since(startTime) > 20*time.Second {
-				log.Printf("[pollUntilPrompt] %s exceeding 20s threshold, still waiting...", paneID)
-				warned = true
-			}
-			screen, err := readScreenBounded(ctx, term, paneID, terminal.ReadScreenOpts{})
-			if err != nil {
-				continue
-			}
-			if isPromptVisible(screen, patterns) {
-				return true
-			}
-		}
-	}
-}
-
-// pollUntilSessionReady polls ReadScreen at short intervals until a session-ready
-// pattern is detected or timeout. Unlike pollUntilPrompt, this uses isSessionReady
-// which excludes shell prompts to prevent false session-ready detection.
-func pollUntilSessionReady(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, patterns []CompletionPattern, timeout time.Duration) bool {
-	deadline := time.After(timeout)
-	ticker := time.NewTicker(sessionReadyPollInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return false
-		case <-deadline:
-			return false
-		case <-ticker.C:
-			screen, err := readScreenBounded(ctx, term, paneID, terminal.ReadScreenOpts{})
-			if err != nil {
-				continue
-			}
-			if isSessionReady(screen, patterns) {
-				return true
-			}
-		}
-	}
-}
-
-// sendPrompts sends the user prompt to each interactive session.
-// Sends prompt text first, then a separate Enter to submit (handles paste-mode CLIs).
-func sendPrompts(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []FailedProvider {
-	var failed []FailedProvider
-	for i, pi := range panes {
-		if pi.skipWait {
-			continue
-		}
-		// Skip sendPrompts for providers that received the prompt via CLI args at launch
-		if promptDeliveredAtLaunch(pi.provider) {
-			continue
-		}
-		promptText, promptFile, responseFile := panePromptText(cfg, pi.provider, 1, cfg.Prompt)
-		if promptFile != "" {
-			panes[i].promptFiles = append(panes[i].promptFiles, promptFile)
-		}
-		panes[i].responseFile = responseFile
-		// Send prompt text via SendLongText (uses buffer-based delivery for long prompts)
-		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, promptText); err != nil {
-			failed = append(failed, FailedProvider{
-				Name:  pi.provider.Name,
-				Error: fmt.Sprintf("send prompt failed: %v", err),
-			})
-			panes[i].skipWait = true
-			continue
-		}
-		// Small delay to let the CLI register the pasted text
-		time.Sleep(promptSubmitDelay)
-		// Send Enter separately to submit the prompt
-		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
-			failed = append(failed, FailedProvider{
-				Name:  pi.provider.Name,
-				Error: fmt.Sprintf("send enter failed: %v", err),
-			})
-			panes[i].skipWait = true
-		}
-	}
-	return failed
-}
-
 // waitAndCollectResults is in interactive_collect.go.
 // waitForCompletion is in interactive_completion.go.
 // buildInteractiveLaunchCmd and cleanupInteractivePanes are in interactive_launch.go.
+// pollUntilPrompt, pollUntilSessionReady, waitForSessionReady, sendPrompts are in interactive_poll.go.

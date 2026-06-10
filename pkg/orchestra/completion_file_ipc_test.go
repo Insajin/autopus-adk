@@ -105,6 +105,32 @@ func TestNewCompletionDetectorWithConfig_FallbackPoll(t *testing.T) {
 	assert.True(t, ok, "should return ScreenPollDetector when hookMode=false")
 }
 
+// TestFileIPCDetector_BoundedTimeout_S7 verifies S7: done-file never appears →
+// WaitForCompletion returns completed=false within explicit tolerance (200ms–1s).
+// This guards against infinite wait when the hook script never fires.
+func TestFileIPCDetector_BoundedTimeout_S7(t *testing.T) {
+	t.Parallel()
+	session := newTestHookSession(t)
+
+	detector := &FileIPCDetector{session: session}
+	// Use a provider name with no done file in the session dir.
+	pi := paneInfo{provider: ProviderConfig{Name: "codex-notarget"}}
+
+	// 200ms deadline — no done file will be created.
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	completed, err := detector.WaitForCompletion(ctx, pi, nil, "", 0)
+	elapsed := time.Since(start)
+
+	assert.NoError(t, err, "S7: WaitForCompletion must not return error on timeout")
+	assert.False(t, completed, "S7: completed must be false when done-file never appears")
+	// Explicit tolerance: must return between 200ms and 1s after context deadline.
+	assert.GreaterOrEqual(t, elapsed, 200*time.Millisecond, "S7: must not return before deadline")
+	assert.Less(t, elapsed, time.Second, "S7: must return within 1s of deadline (no infinite wait)")
+}
+
 // newTestHookSession creates a temporary HookSession for testing.
 func newTestHookSession(t *testing.T) *HookSession {
 	t.Helper()

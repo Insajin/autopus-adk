@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
@@ -116,10 +117,15 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	}
 	sleepBeforeCompletion(ctx, b.cfg)
 
-	// REQ-010/011/012: wait for completion using the resolved detector. hookSession
-	// is nil when HookMode is false, which makes resolveCompletionDetector pick the
-	// non-hook (poll/monitor) path automatically (REQ-012 degrade).
-	var hookSession *HookSession
+	// REQ-010/011/012: wait for completion using the resolved detector.
+	// When HookMode is enabled and a SessionID is set, create a real HookSession
+	// so resolveCompletionDetector can select FileIPCDetector (REQ-006/007).
+	// On creation failure we degrade gracefully to nil so the non-hook poll
+	// path is used instead (REQ-012 degrade — never fail hard here).
+	hookSession := resolveHookSession(b.cfg)
+	if hookSession != nil {
+		defer hookSession.Cleanup()
+	}
 	completed := waitForCompletion(ctx, b.cfg, pi, DefaultCompletionPatterns(), completionBaseline, hookSession, req.Round)
 
 	resp := b.collectResponse(ctx, req, pi, !completed)
@@ -158,4 +164,19 @@ func sleepBeforeCompletion(ctx context.Context, cfg OrchestraConfig) {
 	case <-ctx.Done():
 	case <-timer.C:
 	}
+}
+
+// resolveHookSession creates a HookSession when HookMode is enabled and a
+// SessionID is configured. Returns nil on any failure so callers fall back to
+// the screen-poll completion path (REQ-012 graceful degrade).
+func resolveHookSession(cfg OrchestraConfig) *HookSession {
+	if !cfg.HookMode || cfg.SessionID == "" {
+		return nil
+	}
+	sess, err := NewHookSession(cfg.SessionID)
+	if err != nil {
+		log.Printf("pane_backend: HookSession creation failed for session %q, degrading to poll: %v", cfg.SessionID, err)
+		return nil
+	}
+	return sess
 }

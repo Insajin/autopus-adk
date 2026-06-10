@@ -20,29 +20,54 @@ import (
 // non-interactive context — piped stdio, CI, or a nested agent automation such as
 // Claude Code — those panes never complete and every provider times out (0/N).
 // CMUX_*/TMUX env vars are inherited into such nested processes, so the detected
-// terminal name alone (cmux/tmux) is not sufficient. When the process is not
-// attached to an interactive TTY, report a plain terminal so SelectBackend falls
-// back to the subprocess backend, which works without a TTY.
+// terminal name alone (cmux/tmux) is not sufficient.
+//
+// REQ-005/REQ-008 (CLAUDECODE relaxation): when CLAUDECODE is set and no CI env
+// is present, pane execution is permitted if both the hook subsystem is available
+// (isHookModeAvailable) AND a multiplexer (cmux or tmux) is installed. This
+// allows Claude Code to drive pane-based orchestra without requiring an
+// interactive TTY. The floor is preserved: if either condition is false the
+// result falls back to plain/subprocess just as before.
 func detectStructuredTerminal() terminal.Terminal {
+	hookAvail := isHookModeAvailable()
+	detected := terminal.DetectTerminal()
+	muxInstalled := detected.Name() != "plain"
+
 	if !paneInteractiveContext(
 		os.Getenv("CLAUDECODE"),
 		os.Getenv("CI"),
 		term.IsTerminal(int(os.Stdin.Fd())),
 		term.IsTerminal(int(os.Stdout.Fd())),
+		hookAvail,
+		muxInstalled,
 	) {
 		return &terminal.PlainAdapter{}
 	}
-	return terminal.DetectTerminal()
+	return detected
 }
 
 // paneInteractiveContext reports whether interactive terminal panes can be driven.
-// It returns false in nested agent automation (CLAUDECODE), CI, or whenever stdio
-// is not an interactive TTY — the contexts where spawned provider panes fail to
-// complete and time out 0/N. Kept as a pure function so the decision is
-// unit-testable without manipulating real file descriptors.
-func paneInteractiveContext(claudeCode, ci string, stdinTTY, stdoutTTY bool) bool {
-	if claudeCode != "" || ci != "" {
+//
+// Truth-table (REQ-005/REQ-008):
+//
+//	CI != ""                             → false  (CI always forces subprocess floor)
+//	CI == "" && claudeCode != ""         → hookAvailable && muxInstalled
+//	CI == "" && claudeCode == ""         → stdinTTY && stdoutTTY  (normal interactive path)
+//
+// hookAvailable: isHookModeAvailable() (project-local OR user-global hook config).
+// muxInstalled:  DetectTerminal().Name() != "plain" (cmux OR tmux present).
+//
+// Kept as a pure function so the decision is unit-testable without manipulating
+// real file descriptors or environment variables.
+func paneInteractiveContext(claudeCode, ci string, stdinTTY, stdoutTTY bool, hookAvailable, muxInstalled bool) bool {
+	// CI always forces the subprocess floor regardless of CLAUDECODE.
+	if ci != "" {
 		return false
 	}
+	// CLAUDECODE relaxation: hook + mux must both be present.
+	if claudeCode != "" {
+		return hookAvailable && muxInstalled
+	}
+	// Normal interactive context: both stdio file descriptors must be TTYs.
 	return stdinTTY && stdoutTTY
 }
