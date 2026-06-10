@@ -111,7 +111,8 @@ Orchestrator                cmux daemon            provider CLI (구독)        
 
 | Item | Blocks | Required resolution |
 |------|--------|---------------------|
-| hook-IPC done-file 수집이 실 환경에서 엔게이지하는지 미확인 | Outcome Lock ("done-file IPC로 완료 수집") | applyHookMode/RunInteractivePaneOrchestra를 instrument하여 spec review 실행 중 `/tmp/autopus/{sid}` 세션 디렉토리 + done-file 출현을 확인. 미출현 원인(HookMode set 여부, isHookModeAvailable cwd, RunInteractivePaneOrchestra 진입, NewHookSession 생성) 규명 후 닫는다. |
+| ~~T9: structured 경로(InteractivePaneBackend.Execute)에 AUTOPUS_SESSION_ID pane export 누락~~ **[FIXED 2026-06-10]** | hook 발화 | `pane_backend.go:Execute`에 SplitPane 직후 `SendSessionEnvToPane`(+round) 추가. T4는 RunInteractivePaneOrchestra 경로에만 있었고 structured spec review/orchestra run은 Execute를 직접 타서 누락됐었음. 단위 oracle `TestExecute_ExportsSessionEnvWhenHookMode` 추가. |
+| **session-ready 게이트가 화면 스크래핑 의존 (남은 핵심 블로커)** | Outcome Lock ("done-file IPC로 완료 수집") | `InteractivePaneBackend.Execute`는 hook session(line 125)에 도달하기 **전** `pollUntilSessionReady`(`SessionReadyPatterns` claude `❯` 패턴 화면 스크래핑, line 96)로 prompt를 게이팅한다. CLAUDECODE에서 이 ready 감지가 flaky(때론 통과→hook 도달, 때론 timeout→paneFallback subprocess). hook-IPC는 **완료 감지**만 결정론화하고 **session-ready는 여전히 pre-hook 스크래핑**이라 근본 미해결. 해소: SessionStart hook 기반 ready 파일 시그널 도입(화면 스크래핑 제거) 또는 ready 감지 신뢰성 개선. |
 
 go 단계 oracle(라우팅 truth-table, env-injection 안전성, hookCollectionEligible, detector 선택, bounded timeout)은 모두 통과한다. 그러나 2026-06-10 실 e2e(임시 워크스페이스 + 단일 claude provider + `/tmp/autopus` 75s 폴링)에서 **spec review는 CLAUDECODE에서 0/N 실패 없이 동작(실 claude 리뷰 수집, REVISE 판정)했으나 hook 세션 디렉토리가 출현하지 않아 done-file IPC 수집이 demonstrable하게 확인되지 않았다.** 수집은 screen-scrape pane 또는 subprocess `-p`로 이루어진 것으로 추정된다. routing(T5)·env 주입(T4)·HookMode 배선(T8)·features.Monitor 디커플링은 구현·단위 검증되었으나, end-to-end hook-IPC done-file 경로의 실 환경 엔게이지는 BLOCKING Completion Debt로 남는다. 따라서 이 SPEC은 `implemented`이며 `completed`로 승급해서는 안 된다(false-complete 금지).
 

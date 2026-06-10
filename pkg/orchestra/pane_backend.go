@@ -62,6 +62,27 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	pi := paneInfo{paneID: paneID, provider: req.Config, role: req.Role}
 	defer func() { cleanupInteractivePanes(term, []paneInfo{pi}) }()
 
+	// SPEC-ORCH-022: export the hook session ID (and round) into the pane shell
+	// BEFORE the provider CLI launches so the provider's completion hook
+	// (Stop/AfterAgent) sees AUTOPUS_SESSION_ID and writes the done-file. The
+	// pane is a fresh login shell that does not inherit the orchestrator env, so
+	// os.Setenv alone is invisible to it. The structured spec review / orchestra
+	// run paths drive Execute directly (not RunInteractivePaneOrchestra), so the
+	// env injection that path performs in launchInteractiveSessions must be
+	// mirrored here. Non-fatal: a send failure degrades to screen-poll completion.
+	if b.cfg.HookMode && b.cfg.SessionID != "" {
+		if envErr := SendSessionEnvToPane(ctx, term, paneID, b.cfg.SessionID); envErr != nil {
+			log.Printf("pane_backend: SendSessionEnvToPane failed for %s (non-fatal): %v", req.Provider, envErr)
+		} else {
+			_ = term.SendCommand(ctx, paneID, "\n")
+			if req.Round > 0 {
+				_ = SendRoundEnvToPane(ctx, term, paneID, req.Round)
+				_ = term.SendCommand(ctx, paneID, "\n")
+			}
+			time.Sleep(promptRegisterDelay)
+		}
+	}
+
 	// Launch the provider CLI. For args-based providers the prompt rides on the
 	// launch command; otherwise the prompt is sent only after session-ready.
 	launchPrompt := ""
