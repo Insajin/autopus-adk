@@ -51,7 +51,7 @@ func TestResolveCompletionDetector_MonitorEnabledPrefersSignal(t *testing.T) {
 	assert.True(t, resolved.eventDriven)
 }
 
-func TestResolveCompletionDetector_MonitorEnabledUsesFileIPC(t *testing.T) {
+func TestResolveCompletionDetector_HookModeUsesFileIPCFullBudget(t *testing.T) {
 	t.Parallel()
 
 	mock := newPlainMock()
@@ -63,9 +63,38 @@ func TestResolveCompletionDetector_MonitorEnabledUsesFileIPC(t *testing.T) {
 		HookMode:       true,
 	}, session)
 
+	// SPEC-ORCH-022: the done-file IPC detector is a full-budget wait, NOT an
+	// event-driven detector — it must not be capped by the monitor pattern timeout
+	// and degrade to screen polling (which races the session-dir cleanup against
+	// the provider's Stop hook).
 	_, ok := resolved.detector.(*FileIPCDetector)
 	assert.True(t, ok)
-	assert.True(t, resolved.eventDriven)
+	assert.False(t, resolved.eventDriven)
+}
+
+func TestResolveCompletionDetector_HookModeMonitorDisabledStillUsesFileIPC(t *testing.T) {
+	t.Parallel()
+
+	// Regression for the SPEC-ORCH-022 BLOCKING bug: when the CC21 monitor feature
+	// is OFF (features.Monitor=false → cfg.MonitorEnabled=false) the completion path
+	// previously fell straight to the ScreenPollDetector, which returned the instant
+	// the response rendered and let the deferred session-dir cleanup remove the
+	// directory before the provider's Stop hook wrote the done file. The done-file
+	// IPC floor must stay active whenever a hook session exists, regardless of the
+	// monitor flag.
+	mock := &signalMock{}
+	mock.name = "cmux"
+	session := newTestHookSession(t)
+
+	resolved := resolveCompletionDetector(OrchestraConfig{
+		Terminal:       mock,
+		MonitorEnabled: false,
+		HookMode:       true,
+	}, session)
+
+	_, ok := resolved.detector.(*FileIPCDetector)
+	assert.True(t, ok)
+	assert.False(t, resolved.eventDriven)
 }
 
 func TestCompletionInitialDelay_MonitorEnabledShortensWait(t *testing.T) {

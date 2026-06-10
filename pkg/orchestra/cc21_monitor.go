@@ -21,6 +21,22 @@ func resolveCompletionDetector(cfg OrchestraConfig, hookSession *HookSession) re
 			eventDriven: !isPoll,
 		}
 	}
+	// SPEC-ORCH-022: when a hook session is active the done-file IPC detector is the
+	// authoritative completion contract and the completion floor. Select it first and
+	// as a full-budget wait (eventDriven=false): it must be neither gated on the CC21
+	// monitor feature flag nor capped by the short monitor pattern timeout with a
+	// screen-poll fallback. The monitor-gated path returned the instant the response
+	// rendered on screen, letting the deferred session-dir cleanup (pane_backend.go's
+	// `defer hookSession.Cleanup()`) race the provider's Stop hook — the done file was
+	// written into an already-removed directory and never collected (the 0/N timeout →
+	// screen-scrape fallback this SPEC closes). A full-ctx wait keeps Execute blocked
+	// until the done file appears, so the session directory stays alive for the hook.
+	if cfg.HookMode && hookSession != nil {
+		return resolvedCompletionDetector{
+			detector:    &FileIPCDetector{session: hookSession},
+			eventDriven: false,
+		}
+	}
 	if cfg.MonitorEnabled {
 		if detector, ok := monitorCompletionDetector(cfg, hookSession); ok {
 			return resolvedCompletionDetector{

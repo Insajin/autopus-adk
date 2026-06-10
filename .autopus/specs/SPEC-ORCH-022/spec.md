@@ -1,10 +1,11 @@
 # SPEC-ORCH-022: Claude Code 안 hook-IPC headless 멀티프로바이더 실행 경로 — 구독 세션 결정론적 수집
 
-**Status**: implemented
+**Status**: completed
 **Created**: 2026-06-09
 **Domain**: ORCH
 **Review**: main-session adjudication — `auto spec validate --strict` PASS + spec-quality self-verify 전항목 PASS(research.md) + 4파일 직접 검증 + Option B feasibility 스모크 PASS(cmux headless surface 호스팅, claude Stop hook 발화/last_assistant_message 확인). multi-provider review는 현재 CLAUDECODE→subprocess 경로로 신뢰불가(이 SPEC이 고치는 문제)라 미사용.
 **Implementation note (2026-06-10)**: T1~T8 구현 + features.Monitor 디커플링 완료. 빌드/단위 검증 전부 통과. 단 실 e2e에서 hook-IPC done-file 수집 엔게이지 미확인 → `## Completion Debt`(research.md) BLOCKING. status는 `implemented`이며 Completion Debt 해소 전 `completed` 금지.
+**Completion note (2026-06-11)**: 마지막 BLOCKING(완료 done-file 미수집) 근본 원인 규명·수정·실 e2e 검증 완료 → `completed`. 원인은 타이밍이 아니라 `resolveCompletionDetector`가 `FileIPCDetector`를 `features.Monitor` 뒤에 게이팅한 것: 모니터 off 시 `ScreenPollDetector`로 떨어져 화면 렌더를 done-file보다 먼저 감지→`Execute` 반환→`defer hookSession.Cleanup()`이 Stop hook 발화 직전 세션 dir 삭제(race). 수정: HookMode+hookSession이면 monitor flag/cap과 무관하게 `FileIPCDetector`를 full-budget floor로 우선 선택(`Execute`가 done-file까지 블록) + `hook-claude-stop.sh` done-file 무조건 기록 하드닝. TRUSTED e2e에서 `SESSION_DIR exists=yes` + `claude-done`/`claude-result.json` 수집 + screen-scrape 폴백 미개입 확인. 상세는 research.md `## Completion Debt`. 잔여 비차단 항목(killed-process 시 pane orphan cleanup)은 Evolution Ideas.
 
 ## 목적
 

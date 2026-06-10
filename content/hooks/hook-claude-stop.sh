@@ -31,22 +31,31 @@ else
 fi
 
 # Read hook JSON from stdin and extract last_assistant_message via python3.
-# Input is passed via stdin (not argv) to avoid shell injection.
+# Input is passed via stdin (not argv) to avoid shell injection. Result capture is
+# best-effort: an empty/absent message or a python failure must NOT suppress the
+# done signal below. The done file is the orchestrator's completion contract
+# (SPEC-ORCH-022) — the FileIPCDetector waits on it for the full provider budget,
+# so failing to write it strands the run on a long timeout instead of collecting
+# completion. Always emit a result file (empty output on failure) and never let a
+# chmod on a missing file abort the script under `set -e`.
 python3 -c "
 import json, sys
-data = json.load(sys.stdin)
-msg = data.get('last_assistant_message', '')
-if not msg:
-    sys.exit(0)
-result = {'output': msg, 'exit_code': 0}
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    data = {}
+msg = data.get('last_assistant_message', '') or ''
 with open(sys.argv[1], 'w') as f:
-    json.dump(result, f)
-" "${RESULT_FILE}"
+    json.dump({'output': msg, 'exit_code': 0}, f)
+" "${RESULT_FILE}" 2>/dev/null || true
 
-chmod 600 "${RESULT_FILE}"
+chmod 600 "${RESULT_FILE}" 2>/dev/null || true
 
-# Write done signal (empty file).
+# Write the done signal AFTER the result file (so result-reading collectors never
+# race an early done) and UNCONDITIONALLY (completion must be signalled even when
+# result extraction failed).
 : > "${DONE_FILE}"
+chmod 600 "${DONE_FILE}" 2>/dev/null || true
 
 # Send cmux completion signal for SignalDetector (SPEC-SURFCOMP-001 R8).
 if command -v cmux >/dev/null 2>&1; then
