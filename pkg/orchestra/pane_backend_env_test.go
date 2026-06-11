@@ -19,7 +19,7 @@ import (
 func TestExecute_ExportsSessionEnvWhenHookMode(t *testing.T) {
 	t.Parallel()
 	const sid = "orch-test-sendenv"
-	defer os.RemoveAll("/tmp/autopus/" + sid)
+	defer func() { _ = os.RemoveAll("/tmp/autopus/" + sid) }()
 
 	mock := &seqScreenMock{name: "cmux", screens: []string{"❯ "}}
 	b := NewInteractivePaneBackend(OrchestraConfig{

@@ -274,4 +274,3 @@ func TestGitHookScript_Content(t *testing.T) {
 	// Script uses --staged to only check staged files.
 	assert.Contains(t, gitHooks[0].Content, "auto check --arch --quiet --staged")
 }
-
