@@ -225,8 +225,11 @@ func TestServer_MessageLoop_BackoffOnReceiveError(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	closed := false
 	defer func() {
-		require.NoError(t, srv.Close())
+		if !closed {
+			require.NoError(t, srv.Close())
+		}
 	}()
 
 	srv.config.BackendURL = mb.wsURL()
@@ -247,7 +250,9 @@ func TestServer_MessageLoop_BackoffOnReceiveError(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// Verify server can be closed without hanging.
-	require.NoError(t, srv.Close())
+	err := srv.Close()
+	closed = true
+	require.NoError(t, err)
 }
 
 func TestServer_MessageLoop_ReconnectsAfterReceiveError(t *testing.T) {
