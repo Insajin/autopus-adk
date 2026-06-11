@@ -73,6 +73,7 @@ func normalizeOpenCodeToolingBody(body string) string {
 		"spawn_agent(", "task(",
 		"spawn_agent ", "task ",
 		"AskUserQuestion(", "question(",
+		"request_user_input", "question",
 		"TaskCreate(", "todowrite(",
 		"TaskUpdate(", "todowrite(",
 		"TaskList(", "todowrite(",

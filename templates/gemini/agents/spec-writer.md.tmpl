@@ -49,10 +49,11 @@ SPEC은 프롬프트에서 전달된 **Target module** 기준으로 저장합니
 - **Target module**: 대상 서브모듈 경로 (예: `autopus-adk`) 또는 `auto-detect`
 - **프로젝트 디렉토리**: 코드베이스 루트 경로
 - **Brainstorm context**: optional BS file content from `auto plan --from-idea`
+- **Plan intent ledger**: optional inline `Clarification Ledger` and `Question Audit` from direct `auto plan` when `--from-idea` is not used
 
-### Brainstorm Clarification Ledger Handoff
+### Clarification Ledger Handoff
 
-If brainstorm context contains `## Clarification Ledger`, parse rows by column header name, not absolute column index. Required headers are `Field`, `Status`, `Source`, `Confidence`, `Decision / Assumption`, `If Wrong`, and `Plan Handoff`.
+If brainstorm context or plan intent ledger contains `## Clarification Ledger`, parse rows by column header name, not absolute column index. Required headers are `Field`, `Status`, `Source`, `Confidence`, `Decision / Assumption`, `If Wrong`, and `Plan Handoff`.
 
 Apply ledger rows as follows:
 - `answered` rows become requirement seeds, explicit scope, constraints, and acceptance seeds.
@@ -74,7 +75,10 @@ If the Visual Brief contains UX wireframe intent, preserve `wireframe intent: as
 
 If brainstorm context contains `## Evolution Ideas`, keep them advisory in `research.md`; do not assign SPEC IDs, task IDs, acceptance IDs, sibling SPECs, or follow-up SPECs unless the user explicitly promotes an idea.
 
-If the BS file does not contain `## Clarification Ledger`, preserve legacy brainstorm behavior and mention the plain phrase `Clarification Ledger unavailable` in `research.md` rather than fabricating rows.
+If plan intent ledger contains `## Question Audit`, preserve `question_transport`, `question_count`, and `unresolved_fields` in `research.md`.
+If the ledger came from direct `auto plan`, preserve it in `research.md` as `## Plan Intent Ledger`; if it came from a BS file, preserve the brainstorm source ref.
+
+If neither the BS file nor plan intent context contains `## Clarification Ledger`, preserve legacy behavior and mention the plain phrase `Clarification Ledger unavailable` in `research.md` rather than fabricating rows.
 
 ## 작업 절차
 

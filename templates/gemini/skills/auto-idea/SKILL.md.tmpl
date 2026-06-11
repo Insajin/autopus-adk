@@ -64,6 +64,7 @@ Opportunity-Solution Tree, 다관점 브레인스토밍, 가정 식별을 포함
 - 코드베이스/프로젝트 문서에서 답할 수 있는 row는 먼저 채웁니다. 추론 row는 confidence `6` 이하와 non-empty `If Wrong`이 필요합니다.
 - Interactive default는 expected gain이 가장 큰 unresolved row 하나만 묻습니다. critical ambiguity면 최대 1개 추가, `--deep-clarify`는 총 3문항까지 허용합니다.
 - 질문 형식은 반드시 `Current understanding`, `Blocked decision`, `Recommended answer`, `Question` 네 블록을 사용합니다.
+- Question transport: interactive clarification에는 `AskUserQuestion`을 사용합니다. BS 파일 또는 handoff notes에 `question_transport`, `question_count`, unresolved fields를 기록합니다.
 - `--auto`는 질문 0개, orchestra 계속 진행, unresolved rows를 `assumed` 또는 `deferred`로 기록합니다.
 - UX intent wireframe gate: screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files가 관련되면 low-fi text wireframe을 primary clarification artifact로 사용합니다.
 - Interactive mode에서는 current/target states와 1-3 hotspots를 그린 뒤 사용자가 confirm or adjust 할 질문을 `Question` 블록에 둡니다.
@@ -102,6 +103,13 @@ Opportunity-Solution Tree, 다관점 브레인스토밍, 가정 식별을 포함
 | constraints | answered/assumed/deferred | ... | 1-10 | ... | ... | risk or constraint seed |
 | done_evidence | answered/assumed/deferred | ... | 1-10 | ... | ... | acceptance seed |
 | brownfield_impact | answered/assumed/deferred | ... | 1-10 | ... | ... | reviewer focus |
+```
+
+```markdown
+## Question Audit
+- question_transport: AskUserQuestion | none
+- question_count: 0-3
+- unresolved_fields: [...]
 ```
 
 `Visual Brief`도 Step 3 입력과 사용자 설명에 포함합니다:

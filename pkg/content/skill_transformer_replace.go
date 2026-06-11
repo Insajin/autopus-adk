@@ -224,6 +224,7 @@ func replaceWorkflowTools(line string, platform string) string {
 
 	replacer := strings.NewReplacer(
 		"AskUserQuestion", "question",
+		"request_user_input", "question",
 		"TaskCreate", "todowrite",
 		"TaskUpdate", "todowrite",
 		"TaskList", "todowrite",

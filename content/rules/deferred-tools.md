@@ -48,6 +48,8 @@ Load schemas proactively at these points to avoid mid-flow failures:
 | Trigger | Preload |
 |---------|---------|
 | `/auto` Triage (natural language input) | `AskUserQuestion` |
+| `/auto idea` clarification gate (interactive, non-`--auto`) | `AskUserQuestion` |
+| `/auto plan` intent ledger gate (interactive, non-`--auto`) | `AskUserQuestion` |
 | `/auto go` Gate 1 Approval (non-`--auto`) | `AskUserQuestion` |
 | `/auto go --team` (Route B) | `TeamCreate`, `SendMessage`, `TeamDelete` |
 | `/auto` long-running operations | `TaskCreate`, `TaskUpdate`, `TaskList` |

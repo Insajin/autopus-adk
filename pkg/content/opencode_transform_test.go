@@ -34,6 +34,7 @@ func TestReplacePlatformReferences_OpenCodeMappings(t *testing.T) {
 	input := `Use Agent(subagent_type="reviewer", task="check diff")
 Read @.claude/skills/autopus/worktree-isolation.md before continuing.
 AskUserQuestion if requirements are unclear.
+request_user_input can ask the same clarification.
 TodoWrite before implementation.`
 
 	result := content.ReplacePlatformReferences(input, "opencode")
@@ -41,5 +42,6 @@ TodoWrite before implementation.`
 	assert.Contains(t, result, `task tool → subagent_type="reviewer", prompt="check diff"`)
 	assert.Contains(t, result, `.agents/skills/worktree-isolation/SKILL.md`)
 	assert.Contains(t, result, `question if requirements are unclear.`)
+	assert.Contains(t, result, `question can ask the same clarification.`)
 	assert.Contains(t, result, `todowrite before implementation.`)
 }

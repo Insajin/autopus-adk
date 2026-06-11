@@ -38,15 +38,16 @@ skills:
 
 1. 사용자 요청 분석 및 목표 명확화
 2. 유사한 기존 패턴 탐색 (codebase 조사)
-3. Outcome Lock 정의 및 기능 커버리지 맵 작성
-4. Visual Brief 작성: workflow/state는 Mermaid flowchart, UI/UX는 low-fi wireframe, CLI/API/backend는 sequence/data-flow/command-flow로 설명
+3. `Clarification Ledger` 또는 `Plan Intent Ledger`가 전달되면 answered rows를 PRD Discovery Q&A의 evidence로 재사용하고, `assumed`/`deferred` rows는 risks/open questions로 남김
+4. Outcome Lock 정의 및 기능 커버리지 맵 작성
+5. Visual Brief 작성: workflow/state는 Mermaid flowchart, UI/UX는 low-fi wireframe, CLI/API/backend는 sequence/data-flow/command-flow로 설명
    - UX intent wireframe gate: screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files가 관련되면 low-fi wireframe을 사용자 의도 확인 도구로 사용합니다.
    - Interactive planning에서는 current/target states와 1-3 hotspots를 그린 뒤 사용자가 confirm or adjust 할 질문을 둡니다. `--auto`에서 온 입력이면 `wireframe intent: assumed` 또는 `wireframe intent: deferred`를 가정/리스크로 남깁니다.
-5. Primary SPEC 기본 원칙과 예외적 sibling SPEC 필요성 판단
-6. EARS 형식 요구사항 작성
-7. 기술 접근 방법 설계
-8. 엣지 케이스 및 위험 요소 파악
-9. 구현 우선순위 정의
+6. Primary SPEC 기본 원칙과 예외적 sibling SPEC 필요성 판단
+7. EARS 형식 요구사항 작성
+8. 기술 접근 방법 설계
+9. 엣지 케이스 및 위험 요소 파악
+10. 구현 우선순위 정의
 
 ## 기능 완료 기준
 
@@ -57,6 +58,7 @@ skills:
 - Evolution Ideas는 Outcome Lock을 만족한 뒤에도 가능한 개선 제안입니다. 자동으로 follow-up SPEC, sibling SPEC, REQUEST_CHANGES 근거가 되면 안 됩니다.
 - sibling SPEC는 예외이며 최대 2개, 재귀 sibling 금지입니다. 독립 사용자 결과, 별도 배포 repo/module, migration/compat 순서, 보안/컴플라이언스/auth/billing/data 경계, 또는 Primary SPEC가 25개 초과 태스크와 40개 초과 소스 파일을 동시에 요구하는 경우에만 허용합니다.
 - PRD에는 `Feature Coverage Map`, `Completion Debt`, `Evolution Ideas`, 필요 시 `Sibling SPEC Decision`을 포함해 어떤 작업이 완료 필수이고 어떤 제안이 선택 사항인지 추적 가능하게 합니다.
+- PRD Discovery Q&A는 Ledger가 이미 답한 항목을 재질문하지 않습니다. Outcome Lock이나 Must acceptance를 막는 질문만 추가 확인하고, 나머지는 Open Questions에 `assumed`/`deferred`로 남깁니다.
 - 기획 결과에는 `Visual Brief`를 포함합니다. Visual Brief는 설명 보조 자료이며, Outcome Lock이나 Must acceptance에 연결되지 않은 시각 요소를 필수 요구사항으로 승격하지 않습니다.
 - UX wireframe은 final design이 아니라 intent probe입니다. 사용자가 confirm or adjust 한 항목이라도 Outcome Lock, mandatory requirement, acceptance seed에 연결되지 않으면 선택 설명이나 리스크로만 남깁니다.
 

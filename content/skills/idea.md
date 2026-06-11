@@ -88,6 +88,13 @@ Question selection:
 - `--deep-clarify` permits at most 3 total questions.
 - `--auto` asks zero questions, continues to orchestra, and records unresolved rows as `assumed` or `deferred`.
 
+Question transport:
+- Use the current platform's native interactive question transport when available instead of rendering a numbered text menu.
+- Claude Code surfaces must preload and use `AskUserQuestion` for interactive clarification; see `content/rules/deferred-tools.md`.
+- Codex surfaces use `request_user_input` when that tool is available, otherwise ask one concise plain-text question.
+- OpenCode surfaces use `question` when available, otherwise ask one concise plain-text question.
+- Record `question_transport`, `question_count`, and unresolved ledger fields in the BS file or final handoff notes.
+
 UX intent wireframe gate:
 - Treat a request as UX-related when it mentions or implies screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files.
 - In interactive mode, use a low-fi text wireframe as the primary clarification artifact before asking. Show current/target states plus 1-3 hotspots, then ask the user to confirm or adjust the wireframe in the `Question` block.
@@ -458,6 +465,11 @@ BS-{ID} 파일 저장 후 Workflow Lifecycle 바 표시 및 다음 단계 안내
 | constraints | {answered/assumed/deferred} | {source} | {1-10} | {constraint decision} | {consequence} | risk or constraint seed |
 | done_evidence | {answered/assumed/deferred} | {source} | {1-10} | {done evidence} | {consequence} | acceptance seed |
 | brownfield_impact | {answered/assumed/deferred} | {source} | {1-10} | {module/code impact} | {consequence} | reviewer focus |
+
+## Question Audit
+- question_transport: AskUserQuestion | request_user_input | question | plain_text | none
+- question_count: 0-3
+- unresolved_fields: [...]
 
 ## Outcome Lock
 - User-visible outcome: {one complete result the user expects}
