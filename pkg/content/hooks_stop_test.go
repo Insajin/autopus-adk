@@ -116,6 +116,62 @@ func TestGenerateCLIHooks_CompletionHook_NotAddedForOtherPlatforms(t *testing.T)
 		"opencode should not receive an AfterAgent hook via generateCLIHooks")
 }
 
+// TestGenerateCLIHooks_CompletionHookTimeout pins a positive timeout on the
+// orchestra hook-IPC hooks. The completion scripts (hook-*-stop.sh /
+// hook-gemini-afteragent.sh) run a bidirectional-IPC wait loop of MAX_WAIT=600
+// iterations at ~200ms each (~120s nominal, plus per-iteration python spawn
+// overhead) waiting for the next round's input (SPEC-ORCH-017). The hook timeout
+// MUST exceed that loop AND the Claude Code default (60s); otherwise Claude kills
+// the hook mid-round and the orchestrator's next-round input is lost. A zero/omitted
+// timeout also serializes as "timeout": 0, which Claude Code's settings schema
+// rejects (surfaced by `/doctor`). This is the regression guard for that bug.
+func TestGenerateCLIHooks_CompletionHookTimeout(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.DefaultFullConfig("demo")
+	cfg.Hooks = config.HooksConf{}
+	cfg.Features.CC21 = config.CC21FeaturesConf{}
+
+	// hook-*-stop.sh wait loop: MAX_WAIT=600 iterations * 200ms = 120s nominal.
+	const ipcLoopSeconds = 120
+
+	tests := []struct {
+		platform        string
+		completionEvent string
+		readyEvent      string // "" when the platform has no SessionStart-equivalent ready hook
+	}{
+		{"claude-code", "Stop", "SessionStart"},
+		{"antigravity-cli", "AfterAgent", ""},
+		{"codex", "Stop", ""},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.platform, func(t *testing.T) {
+			t.Parallel()
+
+			hooks, _, err := content.GenerateProjectHookConfigs(cfg, tc.platform, true)
+			require.NoError(t, err)
+
+			completion := findHook(hooks, tc.completionEvent)
+			require.NotNil(t, completion,
+				"platform %q: missing completion hook %q", tc.platform, tc.completionEvent)
+			assert.Greater(t, completion.Timeout, ipcLoopSeconds,
+				"platform %q: completion hook timeout (%ds) must exceed the %ds IPC wait loop so Claude does not kill it mid-round",
+				tc.platform, completion.Timeout, ipcLoopSeconds)
+
+			if tc.readyEvent != "" {
+				ready := findHook(hooks, tc.readyEvent)
+				require.NotNil(t, ready,
+					"platform %q: missing ready hook %q", tc.platform, tc.readyEvent)
+				assert.Positive(t, ready.Timeout,
+					"platform %q: ready hook timeout must be > 0 (a 0 timeout is rejected by Claude Code's settings schema)",
+					tc.platform)
+			}
+		})
+	}
+}
+
 func eventNames(hooks []adapter.HookConfig) []string {
 	names := make([]string, len(hooks))
 	for i, h := range hooks {
