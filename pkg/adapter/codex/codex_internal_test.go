@@ -26,7 +26,10 @@ func TestGenerateHooks(t *testing.T) {
 	assert.Contains(t, string(files[0].Content), "PreToolUse")
 	assert.Contains(t, string(files[0].Content), "PostToolUse")
 	assert.NotContains(t, string(files[0].Content), "SessionStart")
-	assert.NotContains(t, string(files[0].Content), "Stop")
+	// SPEC-ORCH-022 (REQ-002): codex registers a Stop completion hook so the
+	// orchestrator can collect provider completion via done-file IPC. SessionStart
+	// (ready signal) is not registered for codex.
+	assert.Contains(t, string(files[0].Content), "Stop")
 }
 
 func TestPrepareHooksFile_NoDiskWrite(t *testing.T) {
@@ -212,7 +215,8 @@ func TestGenerateHooks_ValidJSON(t *testing.T) {
 	assert.Contains(t, hooks, "PreToolUse")
 	assert.Contains(t, hooks, "PostToolUse")
 	assert.NotContains(t, hooks, "SessionStart")
-	assert.NotContains(t, hooks, "Stop")
+	// SPEC-ORCH-022 (REQ-002): codex registers a Stop completion hook.
+	assert.Contains(t, hooks, "Stop")
 }
 
 func TestRulesReferenceInAgentsMD(t *testing.T) {
