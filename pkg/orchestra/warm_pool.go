@@ -130,7 +130,7 @@ func (wp *WarmPool) Size() int {
 
 // createWarmPane creates a single spare pane with its output file.
 func (wp *WarmPool) createWarmPane(ctx context.Context) (warmPane, error) {
-	paneID, err := wp.term.SplitPane(ctx, terminal.Horizontal)
+	paneID, err := splitTrackedPane(ctx, wp.term, terminal.Horizontal)
 	if err != nil {
 		return warmPane{}, fmt.Errorf("SplitPane: %w", err)
 	}
@@ -164,6 +164,7 @@ func (wp *WarmPool) createWarmPane(ctx context.Context) (warmPane, error) {
 func (wp *WarmPool) cleanupPane(ctx context.Context, w warmPane) {
 	_ = wp.term.PipePaneStop(ctx, w.paneID)
 	_ = wp.term.Close(ctx, string(w.paneID))
+	untrackSurface(string(w.paneID))
 	if w.outputFile != "" {
 		_ = os.Remove(w.outputFile)
 	}

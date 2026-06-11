@@ -155,6 +155,7 @@ func cleanupInteractivePanes(term terminal.Terminal, panes []paneInfo) {
 	for _, pi := range panes {
 		_ = term.PipePaneStop(ctx, pi.paneID)
 		_ = term.Close(ctx, string(pi.paneID))
+		untrackSurface(string(pi.paneID))
 		_ = os.Remove(pi.outputFile)
 		cleanupPromptFiles(pi.promptFiles)
 		_ = os.Remove(pi.responseFile)

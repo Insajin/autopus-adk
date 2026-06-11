@@ -122,7 +122,7 @@ func executeRelayPaneProvider(
 	outputFile := filepath.Join(relayDir, fmt.Sprintf("%s.md", safeName))
 
 	// Create pane
-	paneID, err := term.SplitPane(ctx, terminal.Horizontal)
+	paneID, err := splitTrackedPane(ctx, term, terminal.Horizontal)
 	if err != nil {
 		return skippedResponse(provider.Name, fmt.Sprintf("SplitPane failed: %v", err))
 	}

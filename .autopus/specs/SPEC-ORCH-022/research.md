@@ -144,7 +144,7 @@ These are optional improvements and do not block sync completion.
 | opencode complete plugin을 동일 경로로 활성화 | 1차 타깃은 claude/gemini/codex 구독 세션 | 사용자가 opencode 구독 수집을 명시 요청 |
 | cmux daemon 부재 시 자동 daemon 기동 | degrade floor로 충분, 자동 기동은 부작용 위험 | 사용자가 daemon 자동 관리를 요청 |
 | done-file 수신 진행률 실시간 표시 | 완료 결정론성과 무관한 UX 개선 | 사용자가 진행률 UI 요청 |
-| killed-process 시 pane orphan cleanup | 정상 경로 cleanup(`defer cleanupInteractivePanes`→Close→cmux close-surface)은 동작·누수 surface 0 확인. 미흡은 SIGKILL 등 defer 미실행 경로뿐(드묾) | 사용자가 orphan surface 누적을 관측·보고하면 생성 surface 파일 트래킹 후 orchestra 시작 시 orphan close 구현 |
+| ~~killed-process 시 pane orphan cleanup~~ **[IMPLEMENTED 2026-06-11]** | 정상 경로 cleanup(`defer cleanupInteractivePanes`→Close→cmux close-surface)은 동작·누수 surface 0 확인. 미흡은 SIGKILL 등 defer 미실행 경로뿐(드묾) | **구현**(`pkg/orchestra/surface_tracker.go`): 생성 surface ref를 소유 orchestrator PID별 파일(`os.TempDir()/autopus/surfaces/<pid>.surfaces`)에 트래킹, 정상 close 시 untrack, 첫 pane 생성 시 `sync.Once`로 reap. ⭐**동시-실행 안전**: 소유 PID가 살아있으면(동시 orchestra 또는 자기 자신) 절대 reap 안 함(`processAlive` signal-0 검사) — 죽은 PID 소유 surface만 close. PID 재사용은 reap 1주기 지연으로만 graceful degrade(오살상 없음). 단위테스트 5종(self/live-peer/dead/plain-noop) + 실 cmux end-to-end(surface 생성→dead-PID 트래킹→reap이 pane 실제 제거) 검증. |
 
 ## Sibling SPEC Decision
 

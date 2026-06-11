@@ -101,7 +101,7 @@ func splitProviderPanes(ctx context.Context, cfg OrchestraConfig) ([]paneInfo, [
 		if hasSurface {
 			paneID, err = surfCreator.CreateSurface(ctx)
 		} else {
-			paneID, err = cfg.Terminal.SplitPane(ctx, terminal.Horizontal)
+			paneID, err = splitTrackedPane(ctx, cfg.Terminal, terminal.Horizontal)
 		}
 		if err != nil {
 			cleanupPanes(cfg.Terminal, panes)

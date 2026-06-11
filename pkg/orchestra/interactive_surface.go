@@ -43,7 +43,7 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	_ = os.Remove(pi.responseFile)
 
 	// Create new pane.
-	newPaneID, err := cfg.Terminal.SplitPane(ctx, terminal.Horizontal)
+	newPaneID, err := splitTrackedPane(ctx, cfg.Terminal, terminal.Horizontal)
 	if err != nil {
 		return pi, fmt.Errorf("recreatePane SplitPane for %s: %w", pi.provider.Name, err)
 	}
