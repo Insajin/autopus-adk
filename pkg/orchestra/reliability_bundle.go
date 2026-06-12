@@ -1,15 +1,12 @@
 package orchestra
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -21,19 +18,11 @@ const (
 	reliabilityActiveMarkerName     = ".active"
 )
 
-var sensitivePatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)(authorization\s*:\s*bearer\s+)[^\s]+`),
-	regexp.MustCompile(`(?i)([A-Z0-9_]*API[_-]?KEY\s*=\s*)[^\s]+`),
-	regexp.MustCompile(`(?i)(authorization|token|secret|password|cookie)\s*[:=]\s*[^\s]+`),
-	regexp.MustCompile(`(?i)bearer\s+[a-z0-9._-]+`),
-	regexp.MustCompile(`sk-[A-Za-z0-9_-]+`),
-	regexp.MustCompile(`eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+`),
-}
-
 type reliabilityStore struct {
 	runID      string
 	dir        string
 	mu         sync.Mutex
+	degraded   bool // set once when receipt persistence first fails (REQ-005)
 	preflight  []ProviderPreflightReceipt
 	prompt     []PromptTransportReceipt
 	collection []CollectionReceipt
@@ -208,21 +197,38 @@ func (s *reliabilityStore) writeJSON(name string, payload any) string {
 	path := filepath.Join(s.dir, name)
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
+		s.markDegraded()
 		return ""
 	}
 	if err := s.ensureWritableDir(); err != nil {
+		s.markDegraded()
 		return ""
 	}
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		if retryErr := s.ensureWritableDir(); retryErr != nil {
+			s.markDegraded()
 			return ""
 		}
 		if retryErr := os.WriteFile(path, data, 0o600); retryErr != nil {
+			s.markDegraded()
 			return ""
 		}
 	}
 	_ = s.touchActiveMarker()
 	return path
+}
+
+// markDegraded emits exactly one warning per store the first time receipt
+// persistence fails, so an operator can see that reliability receipts are not being
+// persisted. The caller already holds s.mu (writeJSON runs under the record* lock),
+// so the degraded flag is read/written without additional locking. The caller's
+// empty-string return contract is unchanged (REQ-005).
+func (s *reliabilityStore) markDegraded() {
+	if s.degraded {
+		return
+	}
+	s.degraded = true
+	log.Printf("[WARN] reliability receipt persistence degraded for run %s; receipts will not be persisted to %s", s.runID, s.dir)
 }
 
 func (s *reliabilityStore) ensureWritableDir() error {
@@ -238,50 +244,4 @@ func (s *reliabilityStore) touchActiveMarker() error {
 		[]byte(time.Now().UTC().Format(time.RFC3339Nano)),
 		0o600,
 	)
-}
-
-func sanitizeArtifact(text string) SanitizedArtifact {
-	redacted := redactSensitiveText(text)
-	return SanitizedArtifact{
-		ByteLength: len(text),
-		Hash:       hashString(text),
-		Preview:    safePreview(redacted, 120),
-	}
-}
-
-func redactSensitiveText(text string) string {
-	redacted := text
-	for _, pattern := range sensitivePatterns {
-		redacted = pattern.ReplaceAllStringFunc(redacted, func(s string) string {
-			if groups := pattern.FindStringSubmatch(s); len(groups) == 2 {
-				return groups[1] + "***"
-			}
-			parts := strings.SplitN(s, "=", 2)
-			if len(parts) == 2 {
-				return parts[0] + "=***"
-			}
-			parts = strings.SplitN(s, ":", 2)
-			if len(parts) == 2 {
-				return parts[0] + ": ***"
-			}
-			if strings.HasPrefix(strings.ToLower(s), "bearer ") {
-				return "Bearer ***"
-			}
-			return "***"
-		})
-	}
-	return redacted
-}
-
-func safePreview(text string, max int) string {
-	normalized := strings.Join(strings.Fields(strings.TrimSpace(text)), " ")
-	if len(normalized) <= max {
-		return normalized
-	}
-	return normalized[:max] + "..."
-}
-
-func hashString(text string) string {
-	sum := sha256.Sum256([]byte(text))
-	return hex.EncodeToString(sum[:])
 }

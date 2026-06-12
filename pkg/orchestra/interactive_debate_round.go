@@ -81,7 +81,9 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		if round > 1 {
 			// Only send round env to shell-based providers (args mode).
 			if pi.provider.InteractiveInput == "args" {
-				_ = SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round)
+				if err := SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round); err != nil {
+					log.Printf("[Round %d] %s SendRoundEnvToPane failed: %v", round, pi.provider.Name, err)
+				}
 			}
 			if !pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, round2PollTimeout) {
 				log.Printf("[Round %d] %s prompt not ready within timeout -- skipping", round, pi.provider.Name)

@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,7 +40,9 @@ func TestProcessAlive(t *testing.T) {
 
 func TestTrackAndUntrackSurface(t *testing.T) {
 	orig := surfaceTrackerBase
-	surfaceTrackerBase = t.TempDir()
+	// Use a non-existing subdirectory so MkdirAll creates it with mode 0700,
+	// satisfying the ownership/mode security check in trackSurface (REQ-007).
+	surfaceTrackerBase = filepath.Join(t.TempDir(), "surfaces")
 	defer func() { surfaceTrackerBase = orig }()
 
 	trackSurface("surface:1")
@@ -97,6 +100,87 @@ func TestReapOrphanSurfaces_NoOpForPlainOrNilTerm(t *testing.T) {
 
 	ReapOrphanSurfaces(nil)
 	assert.Equal(t, []string{"surface:30"}, readTrackerRefs(surfaceTrackerFile(deadPID)))
+}
+
+// TestSurfaceTrackerRoot_ReturnsHomePath verifies S9: surfaceTrackerRoot() returns
+// a path under the user home directory when UserHomeDir is available, not under
+// os.TempDir().
+func TestSurfaceTrackerRoot_ReturnsHomePath(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("UserHomeDir unavailable in this environment")
+	}
+	root := surfaceTrackerRoot()
+	require.True(t, strings.HasPrefix(root, home),
+		"surfaceTrackerRoot must be under home dir; got %s", root)
+	tmpDir := os.TempDir()
+	assert.False(t, strings.HasPrefix(root, tmpDir),
+		"surfaceTrackerRoot must not be under TempDir when home is available; got %s", root)
+}
+
+// TestTrackSurface_SkipsWhenDirModeNotSecure verifies S9: trackSurface does not
+// write when the tracking directory mode has group/other permission bits set.
+func TestTrackSurface_SkipsWhenDirModeNotSecure(t *testing.T) {
+	orig := surfaceTrackerBase
+	defer func() { surfaceTrackerBase = orig }()
+
+	// Create a directory with mode 0755 (group/other read permitted).
+	dir := t.TempDir()
+	require.NoError(t, os.Chmod(dir, 0o755))
+	surfaceTrackerBase = dir
+
+	trackSurface("surface:99")
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Empty(t, entries,
+		"tracking file must not be written when dir mode has group/other bits set")
+}
+
+// TestReapOrphanSurfaces_RefValidationAndLegacyNoCreate verifies S10:
+// only refs matching the valid format are passed to Close; invalid refs are
+// logged and skipped; the legacy /tmp path is not created by ReapOrphanSurfaces.
+func TestReapOrphanSurfaces_RefValidationAndLegacyNoCreate(t *testing.T) {
+	orig := surfaceTrackerBase
+	origLegacy := surfaceTrackerLegacyBase
+	defer func() {
+		surfaceTrackerBase = orig
+		surfaceTrackerLegacyBase = origLegacy
+	}()
+
+	base := t.TempDir()
+	surfaceTrackerBase = base
+
+	// Point legacy base to a path that does not exist; verify it is NOT created.
+	legacyBase := filepath.Join(t.TempDir(), "legacy-never-created")
+	surfaceTrackerLegacyBase = legacyBase
+
+	// Write refs including two invalid ones and one valid ref for a dead PID.
+	deadPID := 2147480004
+	writeTrackerRefs(surfaceTrackerFile(deadPID),
+		[]string{"--help", "; rm -rf /", "surface:3"})
+	// Self entry must not be reaped.
+	writeTrackerRefs(surfaceTrackerFile(os.Getpid()), []string{"surface:99"})
+
+	term := &mockTerminal{name: "cmux"}
+	logOutput := captureLog(t, func() {
+		ReapOrphanSurfaces(term)
+	})
+
+	// Only the valid ref "surface:3" must be closed.
+	assert.Equal(t, []string{"surface:3"}, term.closeCalls,
+		"Close must receive exactly {surface:3}")
+
+	// Invalid refs must appear in log output.
+	assert.Contains(t, logOutput, "--help",
+		"invalid ref --help must be logged")
+	assert.Contains(t, logOutput, "; rm -rf /",
+		"invalid ref ; rm -rf / must be logged")
+
+	// Legacy path must not have been created.
+	_, statErr := os.Stat(legacyBase)
+	assert.True(t, os.IsNotExist(statErr),
+		"legacy base must not be created by ReapOrphanSurfaces")
 }
 
 func TestReapOrphanSurfaces_SkipsLivePeerOwner(t *testing.T) {

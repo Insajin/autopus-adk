@@ -6,12 +6,35 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 const PolicySigningSecretEnv = "AUTOPUS_A2A_POLICY_SIGNING_SECRET"
+
+// unsignedWarnOnce guards the once-per-process warning emitted when a signature
+// verification entry point takes the fail-open (unsigned) path because the
+// signing secret is unset. The fail-open policy itself is by-design (see the
+// @AX:ANCHOR below); the warning only makes the disabled state observable.
+var unsignedWarnOnce sync.Once
+
+// warnUnsignedControlPlane emits the unsigned-mode warning exactly once per
+// process. It is called right before an entry point returns nil due to an
+// empty signing secret. Return values and the fail-open policy are unchanged.
+func warnUnsignedControlPlane() {
+	unsignedWarnOnce.Do(func() {
+		log.Printf("[controlplane] %s is unset; control-plane/policy signature verification is disabled (fail-open). Set the secret to enforce signed metadata.", PolicySigningSecretEnv)
+	})
+}
+
+// resetUnsignedWarnOnce re-arms the once guard for test isolation so each test
+// can observe the single warning independently. Not for production use.
+func resetUnsignedWarnOnce() {
+	unsignedWarnOnce = sync.Once{}
+}
 
 // @AX:ANCHOR [AUTO] signed control-plane enforcement gate; keep the env-driven on/off contract stable across worker routing and prompt fallback paths.
 // @AX:REASON: Called by loop_task, pipeline execution, and phase parsing to decide when server-signed metadata must override local defaults.
@@ -22,6 +45,7 @@ func SignedControlPlaneEnforced() bool {
 func ValidateSecurityPolicySignature(taskID string, policy any, signature string) error {
 	secret := signingSecret()
 	if secret == "" {
+		warnUnsignedControlPlane()
 		return nil
 	}
 	if strings.TrimSpace(signature) == "" {
@@ -54,6 +78,7 @@ func VerifySecurityPolicySignature(taskID string, policy any, signature, secret 
 func VerifyCachedPolicyFile(policyPath string, policy any) error {
 	secret := signingSecret()
 	if secret == "" {
+		warnUnsignedControlPlane()
 		return nil
 	}
 	taskID, err := taskIDFromPolicyPath(policyPath)
@@ -70,6 +95,7 @@ func VerifyCachedPolicyFile(policyPath string, policy any) error {
 func ValidateControlPlaneSignature(taskID, model string, pipelinePhases []string, pipelineInstructions map[string]string, pipelinePromptTemplates map[string]string, iterationBudget any, capabilities []string, signature string) error {
 	secret := signingSecret()
 	if secret == "" {
+		warnUnsignedControlPlane()
 		return nil
 	}
 	if !hasControlPlaneMetadata(model, pipelinePhases, pipelineInstructions, pipelinePromptTemplates, iterationBudget) && len(capabilities) == 0 && strings.TrimSpace(signature) == "" {

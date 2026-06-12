@@ -36,10 +36,11 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 	cmd := newCommand(ctx, provider.Binary, args...)
 
 	detector := &fastFailDetector{}
-	stdoutBuf := newFastFailBuffer(detector, func(reason string) {
+	fastFailRules := resolveFastFailRules(provider.FastFailPatterns)
+	stdoutBuf := newFastFailBuffer(detector, fastFailRules, func(reason string) {
 		_ = cmd.Terminate(provider.Name + " fast-fail: " + reason)
 	})
-	stderrBuf := newFastFailBuffer(detector, func(reason string) {
+	stderrBuf := newFastFailBuffer(detector, fastFailRules, func(reason string) {
 		_ = cmd.Terminate(provider.Name + " fast-fail: " + reason)
 	})
 	cmd.SetStdout(stdoutBuf)
@@ -213,12 +214,14 @@ type fastFailBuffer struct {
 	buf       bytes.Buffer
 	lastWrite time.Time
 	detector  *fastFailDetector
+	rules     []FastFailRule
 	onMatch   func(string)
 }
 
-func newFastFailBuffer(detector *fastFailDetector, onMatch func(string)) *fastFailBuffer {
+func newFastFailBuffer(detector *fastFailDetector, rules []FastFailRule, onMatch func(string)) *fastFailBuffer {
 	return &fastFailBuffer{
 		detector: detector,
+		rules:    rules,
 		onMatch:  onMatch,
 	}
 }
@@ -230,7 +233,7 @@ func (b *fastFailBuffer) Write(p []byte) (int, error) {
 	snapshot := b.buf.String()
 	b.mu.Unlock()
 
-	if reason := detectProviderFastFail(snapshot); reason != "" {
+	if reason := matchFastFailRules(snapshot, b.rules); reason != "" {
 		b.detector.Trigger(reason, b.onMatch)
 	}
 	return n, err
@@ -242,20 +245,11 @@ func (b *fastFailBuffer) String() string {
 	return b.buf.String()
 }
 
+// detectProviderFastFail evaluates output against the built-in default fast-fail
+// rules. Retained as a thin wrapper over matchFastFailRules so the default reason
+// strings have a single declarative source (DefaultFastFailRules).
 func detectProviderFastFail(output string) string {
-	lower := strings.ToLower(output)
-	switch {
-	case strings.Contains(lower, "model_capacity_exhausted"):
-		return "provider capacity exhausted"
-	case strings.Contains(lower, "resource_exhausted"):
-		return "provider resource exhausted"
-	case strings.Contains(lower, "no capacity available for model"):
-		return "provider model capacity unavailable"
-	case strings.Contains(lower, "ratelimitexceeded"):
-		return "provider rate limit exceeded"
-	default:
-		return ""
-	}
+	return matchFastFailRules(output, DefaultFastFailRules())
 }
 
 func buildAllProvidersFailedError(failed []FailedProvider, fallback error) error {

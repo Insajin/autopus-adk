@@ -3,8 +3,10 @@ package orchestra
 import (
 	"context"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,8 +26,31 @@ import (
 // process itself) are NEVER touched, so reaping is safe under concurrency.
 
 // surfaceTrackerBase is the directory holding per-PID surface tracking files.
+// It prefers the user home directory and falls back to TempDir.
 // It is a variable so tests can redirect it to an isolated temp directory.
-var surfaceTrackerBase = filepath.Join(os.TempDir(), "autopus", "surfaces")
+var surfaceTrackerBase = surfaceTrackerRoot()
+
+// surfaceTrackerLegacyBase is the old TempDir-based tracking path.
+// ReapOrphanSurfaces reads from it without creating it (read-only reap).
+// It is a variable so tests can redirect it.
+var surfaceTrackerLegacyBase = filepath.Join(os.TempDir(), "autopus", "surfaces")
+
+// validSurfaceRef matches the cmux ref format (e.g. "surface:3", "pane:7",
+// "workspace:1"). Refs not matching this pattern are skipped by ReapOrphanSurfaces
+// to prevent injection of shell metacharacters into terminal.Close.
+var validSurfaceRef = regexp.MustCompile(`^[A-Za-z]+:[0-9]+$`)
+
+// surfaceTrackerRoot returns the preferred base directory for surface tracking
+// files. It prefers ~/.autopus/surfaces and falls back to TempDir when the home
+// directory is unavailable. Callers (trackSurface) are responsible for creating
+// the directory with MkdirAll and verifying ownership/mode before writing.
+func surfaceTrackerRoot() string {
+	home, err := os.UserHomeDir()
+	if err == nil && home != "" {
+		return filepath.Join(home, ".autopus", "surfaces")
+	}
+	return filepath.Join(os.TempDir(), "autopus", "surfaces")
+}
 
 // reapOrphanSurfacesOnce ensures orphan reaping runs at most once per process,
 // triggered lazily by the first interactive pane creation.
@@ -48,12 +73,23 @@ func splitTrackedPane(ctx context.Context, term terminal.Terminal, dir terminal.
 }
 
 // trackSurface appends a surface ref to this process's tracking file (best-effort;
-// tracking failures must never block pane creation).
+// tracking failures must never block pane creation). Before writing, it verifies
+// that the tracking directory is owned by the current user with mode 0700 (no
+// group/other bits). A mismatch indicates a privilege or symlink-swap attack and
+// causes the write to be silently skipped (REQ-007).
 func trackSurface(ref string) {
 	if ref == "" {
 		return
 	}
 	if err := os.MkdirAll(surfaceTrackerBase, 0o700); err != nil {
+		return
+	}
+	// Security: verify ownership and mode before writing.
+	var stat syscall.Stat_t
+	if err := syscall.Stat(surfaceTrackerBase, &stat); err != nil {
+		return
+	}
+	if uint32(os.Getuid()) != stat.Uid || stat.Mode&0o077 != 0 {
 		return
 	}
 	f, err := os.OpenFile(surfaceTrackerFile(os.Getpid()), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
@@ -91,13 +127,26 @@ func untrackSurface(ref string) {
 // concurrent orchestra holds its own panes. It is a no-op for terminals that
 // cannot host surfaces (plain) so cmux tracking files are not discarded without
 // actually closing their surfaces.
+//
+// Each ref is validated against validSurfaceRef before being passed to Close;
+// refs that fail validation are logged and skipped (REQ-007). The legacy
+// TempDir-based path is also reaped read-only (no MkdirAll).
 func ReapOrphanSurfaces(term terminal.Terminal) {
 	if term == nil || term.Name() == "plain" {
 		return
 	}
-	entries, err := os.ReadDir(surfaceTrackerBase)
+	reapOrphanSurfacesFromDir(surfaceTrackerBase, term)
+	if surfaceTrackerLegacyBase != surfaceTrackerBase {
+		reapOrphanSurfacesFromDir(surfaceTrackerLegacyBase, term)
+	}
+}
+
+// reapOrphanSurfacesFromDir performs orphan reaping from a single tracking
+// directory without creating it. Refs are validated before Close is called.
+func reapOrphanSurfacesFromDir(dir string, term terminal.Terminal) {
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return
+		return // dir absent or unreadable — silent no-op
 	}
 	self := os.Getpid()
 	for _, e := range entries {
@@ -108,8 +157,12 @@ func ReapOrphanSurfaces(term terminal.Terminal) {
 		if perr != nil || pid == self || processAlive(pid) {
 			continue
 		}
-		path := filepath.Join(surfaceTrackerBase, e.Name())
+		path := filepath.Join(dir, e.Name())
 		for _, ref := range readTrackerRefs(path) {
+			if !validSurfaceRef.MatchString(ref) {
+				log.Printf("[surface-tracker] skipping invalid ref %q from %s", ref, path)
+				continue
+			}
 			_ = term.Close(context.Background(), ref)
 		}
 		_ = os.Remove(path)

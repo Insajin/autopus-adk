@@ -45,6 +45,12 @@ type ProviderConfig struct {
 	SchemaFlag          string        // subprocess: CLI flag for JSON schema (e.g., "--schema")
 	StdinMode           string        // subprocess: prompt delivery — "pipe" (default) or "file"
 	OutputFormat        string        // subprocess: expected output — "json" (default) or "text"
+	// FastFailPatterns overrides the built-in provider fast-fail rules. When nil,
+	// DefaultFastFailRules() is used (behavior identical to the legacy hardcoded set).
+	FastFailPatterns []FastFailRule
+	// HasHook overrides whether this provider has hook-based result collection.
+	// When nil, the DefaultHookProviders() membership applies (claude/gemini/codex).
+	HasHook *bool
 }
 
 // ReliabilityFallbackMode defines deterministic degradation behavior.

@@ -4,7 +4,13 @@ import "time"
 
 // Prune removes entries older than the given number of days.
 // Returns the number of entries removed.
+// The read-modify-rewrite is serialized under store.mu so a concurrent
+// Append cannot be lost when the kept entries are rewritten. Read and
+// rewriteStore are unlocked primitives, safe to call while holding the mutex.
 func Prune(store *Store, days int) (int, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
 	entries, err := store.Read()
 	if err != nil {
 		return 0, err

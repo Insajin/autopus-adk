@@ -43,8 +43,15 @@ func NewHookSession(sessionID string) (*HookSession, error) {
 	return &HookSession{
 		sessionID:     sessionID,
 		sessionDir:    dir,
-		hookProviders: defaultHookProviders,
+		hookProviders: DefaultHookProviders(),
 	}, nil
+}
+
+// ApplyProviderHooks derives the session's hook-capable provider set from the
+// per-provider ProviderConfig.HasHook overrides. When no provider sets an override
+// the resolved map equals DefaultHookProviders() (INV-003, backward-compatible).
+func (s *HookSession) ApplyProviderHooks(providers []ProviderConfig) {
+	s.hookProviders = resolveHookProviders(providers)
 }
 
 // WaitForDone polls for the provider-specific "{provider}-done" file at 200ms intervals.

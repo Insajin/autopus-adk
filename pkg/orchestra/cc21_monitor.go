@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 )
@@ -86,20 +87,39 @@ func monitorWaitContext(ctx context.Context, timeout time.Duration) (context.Con
 func waitForCompletion(ctx context.Context, cfg OrchestraConfig, pi paneInfo, patterns []CompletionPattern, baseline string, hookSession *HookSession, round int) bool {
 	resolved := resolveCompletionDetector(cfg, hookSession)
 	if !resolved.eventDriven {
-		completed, _ := resolved.detector.WaitForCompletion(ctx, pi, patterns, baseline, round)
-		return completed
+		completed, err := resolved.detector.WaitForCompletion(ctx, pi, patterns, baseline, round)
+		return handleCompletionResult(ctx, pi.provider.Name, completed, err)
 	}
 
 	monitorCtx, cancel := monitorWaitContext(ctx, cfg.MonitorTimeout)
 	defer cancel()
 
-	completed, _ := resolved.detector.WaitForCompletion(monitorCtx, pi, patterns, baseline, round)
+	completed, err := resolved.detector.WaitForCompletion(monitorCtx, pi, patterns, baseline, round)
+	completed = handleCompletionResult(monitorCtx, pi.provider.Name, completed, err)
 	if completed || ctx.Err() != nil {
 		return completed
 	}
 
 	log.Printf("[completion] monitor timeout for %s after %s -- falling back to polling", pi.provider.Name, cfg.MonitorTimeout)
 	fallback := &ScreenPollDetector{term: cfg.Terminal}
-	completed, _ = fallback.WaitForCompletion(ctx, pi, patterns, baseline, round)
-	return completed
+	completed, err = fallback.WaitForCompletion(ctx, pi, patterns, baseline, round)
+	return handleCompletionResult(ctx, pi.provider.Name, completed, err)
+}
+
+// handleCompletionResult normalizes a completion detector result so that detector
+// failures become observable instead of being silently absorbed as "not completed".
+// On a non-nil error it (a) logs the failure with the provider name, (b) distinguishes
+// context cancellation from an I/O failure, and (c) forces completed to false because a
+// detector that errored cannot be trusted to report completion. When err is nil the
+// original completed value is returned unchanged.
+func handleCompletionResult(ctx context.Context, providerName string, completed bool, err error) bool {
+	if err == nil {
+		return completed
+	}
+	if ctx.Err() != nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		log.Printf("[completion] %s detector cancelled: %v", providerName, err)
+	} else {
+		log.Printf("[completion] %s detector I/O failure: %v", providerName, err)
+	}
+	return false
 }

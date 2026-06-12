@@ -74,6 +74,8 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		pb.Round = round + 1
 		pb.PreviousRound = round
 		pb.PreviousResults = prevAnon
+		// REQ-004: fence untrusted participant output with a round-scoped sentinel.
+		pb.Sentinel = sentinelForPreviousResults(prevAnon)
 
 		r2Data, schemaErr := withPromptSchema(pb, schema, "debater_r2", cfg.Providers)
 		if schemaErr != nil {
@@ -104,6 +106,8 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	// Phase 3: Judge synthesis
 	judgeAnon := cpb.AnonymizeForJudge(r1Results, r2Results)
 	jb := NewJudgeBuilder(buildPromptBuilder())
+	// REQ-004: fence untrusted participant output for the judge prompt.
+	pb.Sentinel = sentinelForJudgeResults(judgeAnon)
 	judgeData, err := withPromptSchema(pb, schema, "judge", []ProviderConfig{cfg.Judge})
 	if err != nil {
 		return nil, err

@@ -24,6 +24,10 @@ type PromptData struct {
 	PreviousRound   int
 	PreviousResults []PreviousResult
 
+	// Sentinel is a per-round random marker used to fence untrusted participant
+	// output in the Round 2 and judge templates (BEGIN/END). Empty when unset.
+	Sentinel string
+
 	// Judge fields.
 	AllResults []JudgeResult
 

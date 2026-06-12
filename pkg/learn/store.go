@@ -30,7 +30,18 @@ func NewStore(dir string) (*Store, error) {
 }
 
 // Append adds a new entry to the JSONL file.
+// It acquires the store mutex so that an O_APPEND write cannot interleave with
+// a concurrent read-modify-rewrite (UpdateReuseCount/Prune) and get lost.
 func (s *Store) Append(entry LearningEntry) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.appendUnlocked(entry)
+}
+
+// appendUnlocked writes a single entry without acquiring s.mu. Callers that
+// already hold the store mutex (AppendAtomic) MUST use this primitive instead
+// of Append to avoid re-entrant locking on the non-reentrant sync.Mutex.
+func (s *Store) appendUnlocked(entry LearningEntry) error {
 	data, err := json.Marshal(entry)
 	if err != nil {
 		return fmt.Errorf("marshal entry: %w", err)
@@ -121,11 +132,18 @@ func (s *Store) AppendAtomic(entryType EntryType, opts RecordOpts) error {
 		Resolution: opts.Resolution,
 		Severity:   opts.Severity,
 	}
-	return s.Append(entry)
+	// s.mu is already held: call the unlocked primitive, not Append.
+	return s.appendUnlocked(entry)
 }
 
 // UpdateReuseCount increments reuse_count for the entry with the given ID.
+// The whole read-modify-rewrite is serialized under s.mu so a concurrent
+// Append/AppendAtomic cannot be truncated away by the rewrite. Read is the
+// unlocked primitive, so it is safe to call while holding the mutex.
 func (s *Store) UpdateReuseCount(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	entries, err := s.Read()
 	if err != nil {
 		return err
