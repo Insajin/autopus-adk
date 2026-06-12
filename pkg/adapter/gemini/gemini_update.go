@@ -65,6 +65,7 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		finalFiles = append(finalFiles, f)
 	}
 
+	// @AX:NOTE: [AUTO] file-count-only checksum — manifest integrity reflects file count only, not content hash; not a tamper-detection mechanism
 	pf := &adapter.PlatformFiles{
 		Files:    finalFiles,
 		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
@@ -118,7 +119,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	files = append(files, skillMappings...)
 
 	// Extended skills from content/skills/ via transformer
-	extSkillMappings, err := a.renderExtendedSkills()
+	extSkillMappings, err := a.renderExtendedSkills(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("extended skill 준비 실패: %w", err)
 	}

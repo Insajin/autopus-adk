@@ -6,18 +6,27 @@ import (
 
 	"github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/config"
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 )
 
 // renderExtendedSkills transforms embedded content skills for the Gemini platform
 // and returns file mappings for .gemini/skills/autopus/{skill-name}/SKILL.md.
-func (a *Adapter) renderExtendedSkills() ([]adapter.FileMapping, error) {
+func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	catalog, err := pkgcontent.LoadSkillCatalogFromFS(content.FS, "skills")
+	if err != nil {
+		return nil, fmt.Errorf("skill catalog init: %w", err)
+	}
 	transformer, err := pkgcontent.NewSkillTransformerFromFS(content.FS, "skills")
 	if err != nil {
 		return nil, fmt.Errorf("skill transformer init: %w", err)
 	}
 
-	skills, report, err := transformer.TransformForPlatform("gemini")
+	skills, report, err := transformer.TransformForPlatformWithOptions("gemini", pkgcontent.SkillTransformOptions{
+		ResolveSkillRef: func(name string) string {
+			return pkgcontent.ResolveCatalogSkillRefPath(catalog, name, "gemini", cfg)
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("skill transform for gemini: %w", err)
 	}

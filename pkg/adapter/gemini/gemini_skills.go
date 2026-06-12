@@ -31,7 +31,7 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig, geminiSkillBas
 	}
 
 	// Extended skills from content/skills/ via transformer
-	extFiles, err := a.renderExtendedSkills()
+	extFiles, err := a.renderExtendedSkills(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("extended skill rendering failed: %w", err)
 	}
@@ -93,6 +93,7 @@ func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.Fil
 	return append(files, mirrorAntigravityPluginMappings(files)...), nil
 }
 
+// @AX:NOTE: [AUTO] magic constant — "auto-" prefix is 5 chars; hardcoded length check must be updated if the prefix ever changes
 func hasAutoPrefix(name string) bool {
 	return len(name) >= 5 && name[:5] == "auto-"
 }
