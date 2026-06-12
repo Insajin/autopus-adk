@@ -16,10 +16,24 @@ import (
 // the real temp tree nor concurrent test runs are polluted by tracking files,
 // and so the lazy reap triggered by splitTrackedPane in other tests sees an
 // empty (no-op) directory.
+//
+// It also redirects HOME (and the macOS-specific home env vars) to a throwaway
+// directory so reliabilityRuntimeRoot() — which derives ~/.autopus/runtime/
+// orchestra from os.UserHomeDir() — writes failure bundles into the temp tree
+// instead of polluting the developer's real ~/.autopus/runtime/orchestra/runs.
 func TestMain(m *testing.M) {
 	tmp, err := os.MkdirTemp("", "autopus-surface-tracker-test-")
 	if err == nil {
 		surfaceTrackerBase = filepath.Join(tmp, "surfaces")
+		// Isolate the home directory so os.UserHomeDir()-based runtime roots
+		// resolve under the throwaway tree. HOME covers Unix/macOS; the rest
+		// guard alternate resolution paths.
+		fakeHome := filepath.Join(tmp, "home")
+		if mkErr := os.MkdirAll(fakeHome, 0o700); mkErr == nil {
+			for _, key := range []string{"HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME"} {
+				_ = os.Setenv(key, fakeHome)
+			}
+		}
 	}
 	code := m.Run()
 	if tmp != "" {
@@ -106,6 +120,18 @@ func TestReapOrphanSurfaces_NoOpForPlainOrNilTerm(t *testing.T) {
 // a path under the user home directory when UserHomeDir is available, not under
 // os.TempDir().
 func TestSurfaceTrackerRoot_ReturnsHomePath(t *testing.T) {
+	// This test verifies surfaceTrackerRoot()'s home-vs-TempDir preference, so it
+	// must run against a home directory that is NOT under os.TempDir(). The
+	// process-wide TestMain isolation points HOME at an os.MkdirTemp dir (under
+	// TempDir on macOS), which would defeat the "not under TempDir" assertion.
+	// Inject an explicit synthetic home outside TempDir for this test only;
+	// surfaceTrackerRoot performs no filesystem writes, only path joins, so the
+	// path need not exist.
+	syntheticHome := filepath.Join(string(os.PathSeparator), "synthetic-home", "autopus-test-user")
+	require.False(t, strings.HasPrefix(syntheticHome, os.TempDir()),
+		"test precondition: synthetic home must not be under TempDir")
+	t.Setenv("HOME", syntheticHome)
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skip("UserHomeDir unavailable in this environment")

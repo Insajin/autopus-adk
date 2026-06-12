@@ -106,7 +106,7 @@ func TestBuildJudge_FencesRoundsAndForgedHeaders(t *testing.T) {
 	if idxForged < 0 {
 		t.Fatalf("forged consensus header not present")
 	}
-	if strings.LastIndex(rendered[:idxForged], begin) < 0 || strings.Index(rendered[idxForged:], end) < 0 {
+	if strings.LastIndex(rendered[:idxForged], begin) < 0 || !strings.Contains(rendered[idxForged:], end) {
 		t.Fatalf("forged consensus header is not enclosed by a sentinel fence")
 	}
 	if !strings.Contains(rendered, "untrusted") {

@@ -30,12 +30,6 @@ func warnUnsignedControlPlane() {
 	})
 }
 
-// resetUnsignedWarnOnce re-arms the once guard for test isolation so each test
-// can observe the single warning independently. Not for production use.
-func resetUnsignedWarnOnce() {
-	unsignedWarnOnce = sync.Once{}
-}
-
 // @AX:ANCHOR [AUTO] signed control-plane enforcement gate; keep the env-driven on/off contract stable across worker routing and prompt fallback paths.
 // @AX:REASON: Called by loop_task, pipeline execution, and phase parsing to decide when server-signed metadata must override local defaults.
 func SignedControlPlaneEnforced() bool {

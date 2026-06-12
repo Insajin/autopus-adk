@@ -4,12 +4,19 @@ import (
 	"bytes"
 	"log"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/worker/security"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// resetUnsignedWarnOnce re-arms the once guard for test isolation so each test
+// can observe the single warning independently. Not for production use.
+func resetUnsignedWarnOnce() {
+	unsignedWarnOnce = sync.Once{}
+}
 
 // TestUnsignedControlPlane_WarnsOnceAndReturnsNil is the S8 oracle for REQ-006:
 // when the signing secret is unset, the verification entry points take the

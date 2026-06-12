@@ -41,7 +41,7 @@ All notable changes to this project will be documented in this file.
 
 - **릴리스 게이트에 보안 워크플로 게이팅** (2026-06-12): `security.yml`(gitleaks+govulncheck)이 release 경로에 게이팅되지 않아 태그 푸시가 보안 검사를 우회할 수 있던 구멍을 `workflow_call` + `needs: [ci, security]`로 봉인.
 - **300줄 경계 파일 선제 분할** (2026-06-12): `pkg/worker/compress/tool_pairs.go`(300)→types/prune 2파일, `pkg/qa/evidence/manifest.go`(300)→types 분리, `pkg/adapter/codex/codex_workflow_custom.go`(300)→bodies 분리. 전부 동작 불변(body byte-identical 검증).
-- **CI 커버리지 임계값 80 유지 (정직 보고)** (2026-06-12): 전체 스위트 실측 커버리지 80.7%로 85 상향 시 CI 즉시 적색 — 임계값만 올리는 gate-weakening 역방향 조작 대신 80을 유지하고 갭(85 목표 대비 -4.3%p)을 기록. 상향은 커버리지 보강 작업이 선행되어야 한다.
+- **테스트 커버리지 보강 80.7%→83.9% + CI 임계값 80→83 ratchet** (2026-06-12): 7개 레인 헤르메틱 테스트 보강(+약 1,250 covered 문장, 신규 테스트 70+파일·~7,900줄)으로 domainreadiness 51.7→96.0%, internal/cli 69.2→73.0%, content 84.8→94.8%, setup 85.6→89.7%, orchestra 86.4→88.2% 등 달성. CI 게이트는 실측(83.9%) 아래 0.9%p 여유의 83으로 ratchet. 85 목표 잔여 갭은 hermetic 한계(실 프로세스/PTY/임베디드 FS 에러 경로) — 인터페이스 주입 리팩토링이 선행돼야 하며 별도 작업으로 기록.
 
 - **Project-scoped SQL migration numbering guidance** (2026-05-26): Source-owned database, executor, validator, pipeline, router, and worktree guidance now treats each owning repo's migration directory as a serialized numbering lane. New paired SQL migrations must use 6-digit zero-padded numbers, compute `max(existing)+1` inside the target directory only, keep same-stem up/down pairs, avoid parallel number reservation, and validate affected directories before deploy.
 

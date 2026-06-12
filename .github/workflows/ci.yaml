@@ -31,13 +31,13 @@ jobs:
           go test -race -count=1 -tags integration -coverprofile=coverage.out ./...
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
-          THRESHOLD=${COVERAGE_THRESHOLD:-80}
+          THRESHOLD=${COVERAGE_THRESHOLD:-83}
           if [ "$(echo "$COVERAGE < $THRESHOLD" | bc -l)" -eq 1 ]; then
             echo "::error::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
             exit 1
           fi
         env:
-          COVERAGE_THRESHOLD: "80"
+          COVERAGE_THRESHOLD: "83"
 
       - name: Vet
         run: go vet ./...
