@@ -24,7 +24,12 @@ func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req Provid
 			ExecutedBackend: paneBackendName,
 		}
 	}
-	if requiresReviewerResponseFile(req, pi) {
+	if requiresReviewerResponseFile(req, pi) && !timedOut {
+		// While the reviewer pane is still running, a mid-render screen could be
+		// mis-parsed as the final verdict, so before the deadline only the written
+		// response file is trusted (anti-truncation; issue #59 — claude writes the
+		// response file and completes early while codex/gemini do not, so they run
+		// to the watchdog boundary).
 		return &ProviderResponse{
 			Provider:        req.Provider,
 			TimedOut:        timedOut,
@@ -34,6 +39,13 @@ func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req Provid
 		}
 	}
 
+	// At the deadline a reviewer that printed its answer to the terminal — the
+	// fallback that promptFileInstruction explicitly authorizes ("If you cannot
+	// write the response file, print the final answer in the terminal as
+	// fallback") — would otherwise be discarded. Harvest the screen so the
+	// terminal-fallback answer is preserved instead of lost (issue #59). The
+	// response stays TimedOut because the per-provider budget was still exceeded.
+	//
 	// Use a fresh, bounded context for the final read: the original ctx may be
 	// cancelled after a completion timeout (mirrors interactive_collect.go).
 	readCtx, cancel := context.WithTimeout(context.Background(), finalReadTimeout)
@@ -42,7 +54,13 @@ func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req Provid
 		Scrollback:      true,
 		ScrollbackLines: scrollbackDepth(b.cfg.ScrollbackLines),
 	})
-	return b.buildResponseFromScreen(req.Provider, screen, timedOut)
+	resp := b.buildResponseFromScreen(req.Provider, screen, timedOut)
+	// When a timed-out reviewer pane also left an empty screen, restore the
+	// missing-response-file diagnostic so the failure stays attributable.
+	if resp.EmptyOutput && requiresReviewerResponseFile(req, pi) {
+		resp.Error = reviewerResponseFileMissingError(timedOut)
+	}
+	return resp
 }
 
 // buildResponseFromScreen sanitizes a raw screen capture and constructs the

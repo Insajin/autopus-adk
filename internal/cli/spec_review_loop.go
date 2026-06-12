@@ -171,6 +171,15 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		merged.Findings = spec.NormalizeAdvisoryFindings(merged.Findings)
 		merged.Verdict = effectiveReviewVerdict(merged.Verdict, reviews, merged.Findings)
 
+		// Issue #58: a REVISE verdict with zero findings means a merge path
+		// dropped the findings that justify the verdict. PersistFindings still
+		// writes a valid `[]`, but warn so the inconsistency is observable.
+		if merged.Verdict == spec.VerdictRevise && len(merged.Findings) == 0 {
+			fmt.Fprintf(os.Stderr,
+				"경고: REVISE verdict인데 findings가 비어 있습니다 (SPEC: %s, revision: %d) — 병합 경로에서 findings가 누락되었을 수 있습니다\n",
+				p.specID, revision)
+		}
+
 		// A mid-pipeline write failure must abort (issue #38).
 		if persistErr := spec.PersistFindings(p.specDir, merged.Findings); persistErr != nil {
 			return nil, fmt.Errorf("review findings 저장 실패 (SPEC: %s, revision: %d): %w", p.specID, revision, persistErr)

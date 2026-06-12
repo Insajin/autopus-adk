@@ -92,6 +92,60 @@ func TestValidateSpec_AmbiguousLanguageWarning(t *testing.T) {
 	assert.Greater(t, warnings, 0, "모호한 언어에 대한 경고가 있어야 합니다")
 }
 
+// Issue #60: a requirements-table row whose Priority column is the MoSCoW token
+// "Should" must NOT raise an ambiguous-language warning. The description cell
+// itself carries no ambiguous wording.
+func TestValidateSpec_PriorityShouldColumn_NoAmbiguousWarning(t *testing.T) {
+	t.Parallel()
+
+	doc := &spec.SpecDocument{
+		ID:    "SPEC-PRIO-001",
+		Title: "Priority 열 오탐",
+		Requirements: []spec.Requirement{
+			// Parser feeds the entire markdown table row as Description,
+			// including the Priority cell "Should".
+			{ID: "REQ-001", Type: spec.EARSEventDriven,
+				Description: "| REQ-001 | Event-driven | Should | WHEN 요청이 도착하면, THE SYSTEM SHALL 기록한다 |"},
+		},
+		AcceptanceCriteria: []spec.Criterion{
+			{ID: "AC-001", Description: "기록된다"},
+		},
+	}
+
+	errs := spec.ValidateSpec(doc)
+	for _, e := range errs {
+		assert.NotContains(t, e.Message, "모호한 언어",
+			"Priority column 'Should' must not trigger an ambiguous-language warning (issue #60): %s", e.Message)
+	}
+}
+
+// Issue #60 regression guard: a genuine ambiguous word inside the description
+// cell (not the Priority column) must still warn.
+func TestValidateSpec_AmbiguousWordInDescriptionCell_StillWarns(t *testing.T) {
+	t.Parallel()
+
+	doc := &spec.SpecDocument{
+		ID:    "SPEC-PRIO-002",
+		Title: "진짜 모호어",
+		Requirements: []spec.Requirement{
+			{ID: "REQ-001", Type: spec.EARSUbiquitous,
+				Description: "| REQ-001 | Ubiquitous | Must | The system should log the request |"},
+		},
+		AcceptanceCriteria: []spec.Criterion{
+			{ID: "AC-001", Description: "기록된다"},
+		},
+	}
+
+	errs := spec.ValidateSpec(doc)
+	found := false
+	for _, e := range errs {
+		if e.Level == "warning" && strings.Contains(e.Message, "모호한 언어") {
+			found = true
+		}
+	}
+	assert.True(t, found, "real ambiguous 'should' inside the description cell must still warn")
+}
+
 func TestValidateSpec_EmptyAcceptanceCriteria_Error(t *testing.T) {
 	t.Parallel()
 

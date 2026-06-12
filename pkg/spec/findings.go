@@ -10,7 +10,14 @@ import (
 )
 
 // PersistFindings writes the current findings state to review-findings.json.
+// A nil findings slice is normalized to an empty slice so the sidecar always
+// holds a valid JSON array `[]` instead of the literal `null` (issue #58):
+// `json.MarshalIndent` emits `null` for a nil slice, which makes the file look
+// corrupt to downstream tooling even when review.md still carries the findings.
 func PersistFindings(dir string, findings []ReviewFinding) error {
+	if findings == nil {
+		findings = []ReviewFinding{}
+	}
 	data, err := json.MarshalIndent(findings, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal findings: %w", err)

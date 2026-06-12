@@ -47,6 +47,9 @@ func TestPersistFindings_WritesJSON(t *testing.T) {
 	assert.Equal(t, FindingCategoryCorrectness, parsed[0].Category)
 }
 
+// Issue #58: a nil findings slice (e.g. produced by an empty merge path) must
+// be serialized as an empty JSON array, never the literal `null`. The literal
+// `null` round-trips back to a nil slice and makes the sidecar look corrupt to
 func TestLoadFindings_ReadsPersistedJSON(t *testing.T) {
 	t.Parallel()
 

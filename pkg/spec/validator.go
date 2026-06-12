@@ -8,6 +8,33 @@ import (
 // 모호한 언어 목록
 var ambiguousWords = []string{"should", "might", "could", "possibly", "maybe", "perhaps"}
 
+// moscowPriorities are the MoSCoW Priority-column tokens that can collide with
+// ambiguous words (notably "Should"). When a markdown requirements-table cell
+// holds exactly one of these tokens, it is the Priority column, not prose.
+var moscowPriorities = map[string]bool{"must": true, "should": true, "nice": true}
+
+// ambiguousScanText returns the portion of a requirement description that
+// should be scanned for ambiguous wording. The requirements parser feeds an
+// entire markdown table row as the Description, including the Priority cell, so
+// a "Should" Priority value was misreported as ambiguous prose (issue #60).
+// This drops cells that are exactly a MoSCoW priority token while keeping every
+// other cell, so a genuine ambiguous word inside the description cell
+// (e.g. "The system should log...") still triggers a warning.
+func ambiguousScanText(description string) string {
+	if !strings.Contains(description, "|") {
+		return description
+	}
+	cells := strings.Split(description, "|")
+	kept := make([]string, 0, len(cells))
+	for _, cell := range cells {
+		if moscowPriorities[strings.ToLower(strings.TrimSpace(cell))] {
+			continue
+		}
+		kept = append(kept, cell)
+	}
+	return strings.Join(kept, " ")
+}
+
 // ValidateSpec는 SpecDocument의 유효성을 검증한다.
 func ValidateSpec(doc *SpecDocument) []ValidationError {
 	var errs []ValidationError
@@ -49,7 +76,7 @@ func ValidateSpec(doc *SpecDocument) []ValidationError {
 
 	// 모호한 언어 검사
 	for _, req := range doc.Requirements {
-		lower := strings.ToLower(req.Description)
+		lower := strings.ToLower(ambiguousScanText(req.Description))
 		for _, word := range ambiguousWords {
 			if strings.Contains(lower, word) {
 				errs = append(errs, ValidationError{

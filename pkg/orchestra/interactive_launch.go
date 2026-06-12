@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,10 @@ import (
 )
 
 const launchScriptsDir = ".autopus/orchestra/launch"
+
+// closePaneSurfaceAttempts bounds how many times cleanup retries a failing
+// surface close before giving up and leaving the ref tracked for orphan reaping.
+const closePaneSurfaceAttempts = 3
 
 // buildInteractiveLaunchCmd constructs the launch command for interactive mode.
 // Uses the binary name plus model/variant flags from PaneArgs, excluding print/pipe flags.
@@ -154,11 +159,41 @@ func cleanupInteractivePanes(term terminal.Terminal, panes []paneInfo) {
 	ctx := context.Background()
 	for _, pi := range panes {
 		_ = term.PipePaneStop(ctx, pi.paneID)
-		_ = term.Close(ctx, string(pi.paneID))
-		untrackSurface(string(pi.paneID))
+		closePaneSurface(term, pi.paneID)
 		_ = os.Remove(pi.outputFile)
 		cleanupPromptFiles(pi.promptFiles)
 		_ = os.Remove(pi.responseFile)
 		cleanupPromptFiles(pi.launchFiles)
 	}
+}
+
+// closePaneSurface closes a single pane surface with bounded retries and returns
+// true when the surface was closed. cmux close-surface can fail transiently
+// under the terminal-I/O contention that peaks when a provider's watchdog budget
+// expires (issue #61: a completed provider pane intermittently lingers). A
+// swallowed close failure silently leaks the surface for the rest of the live
+// session — the orphan reaper only reclaims surfaces of dead processes on a
+// later run, never this process's own refs. Two guarantees keep the leak
+// recoverable:
+//   - The surface ref is untracked ONLY on a successful close. Untracking after a
+//     failed close (the previous behavior) discarded the ref so even the
+//     next-run orphan reaper could never reclaim it — a permanent leak.
+//   - A persistent failure is logged with the surface ref so the leak is
+//     observable instead of silent.
+func closePaneSurface(term terminal.Terminal, paneID terminal.PaneID) bool {
+	ref := string(paneID)
+	if ref == "" {
+		return true
+	}
+	ctx := context.Background()
+	var lastErr error
+	for attempt := 0; attempt < closePaneSurfaceAttempts; attempt++ {
+		if lastErr = term.Close(ctx, ref); lastErr == nil {
+			untrackSurface(ref)
+			return true
+		}
+	}
+	log.Printf("[cleanup] surface close failed after %d attempts; leaking ref %q for orphan reaping: %v",
+		closePaneSurfaceAttempts, ref, lastErr)
+	return false
 }
