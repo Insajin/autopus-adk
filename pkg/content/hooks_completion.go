@@ -17,6 +17,10 @@ const (
 	// writes a single ready-signal file and exits. Generous bound that stays
 	// above the Go-side fileIPCReadyTimeout (30s).
 	readyHookTimeoutSeconds = 60
+	// claudeHookDirPrefix anchors Claude Code hook scripts on the project root
+	// regardless of the hook's spawn cwd. Hook commands run via `sh -c`, so the
+	// parameter expansion resolves at execution time.
+	claudeHookDirPrefix = `"${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/autopus/`
 )
 
 // generateCompletionHooks returns the platform-specific orchestra hook-IPC hooks:
@@ -38,8 +42,15 @@ func generateCompletionHooks(platform string) []adapter.HookConfig {
 	var ready entry
 	switch platform {
 	case "claude", "claude-code":
-		completion = entry{"Stop", ".claude/hooks/autopus/hook-claude-stop.sh"}
-		ready = entry{"SessionStart", ".claude/hooks/autopus/hook-claude-sessionstart.sh"}
+		// Claude Code spawns hooks with the session's current working directory,
+		// which differs from the settings root for subagent, worktree, and
+		// subdirectory sessions. A bare relative path then fails with
+		// "No such file or directory" on every Stop/SessionStart event. Anchor on
+		// $CLAUDE_PROJECT_DIR (always set by Claude Code when running hooks); the
+		// ":-." fallback preserves the old relative behavior for any non-Claude
+		// consumer that executes these settings without the variable.
+		completion = entry{"Stop", claudeHookDirPrefix + "hook-claude-stop.sh"}
+		ready = entry{"SessionStart", claudeHookDirPrefix + "hook-claude-sessionstart.sh"}
 	case "antigravity-cli", "gemini", "gemini-cli":
 		// AfterAgent is the Antigravity CLI event fired when the agent session ends.
 		completion = entry{"AfterAgent", ".claude/hooks/autopus/hook-gemini-afteragent.sh"}

@@ -44,12 +44,14 @@ func TestGenerateCLIHooks_StopEvent(t *testing.T) {
 		platform string
 		want     wantHook
 	}{
-		// S1: claude-code Stop hook
+		// S1: claude-code Stop hook — anchored on $CLAUDE_PROJECT_DIR so the
+		// script resolves regardless of the hook's spawn cwd (subagent,
+		// worktree, and subdirectory sessions broke with a bare relative path).
 		{
 			platform: "claude-code",
 			want: wantHook{
 				event:   "Stop",
-				command: ".claude/hooks/autopus/hook-claude-stop.sh",
+				command: `"${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/autopus/hook-claude-stop.sh`,
 				typ:     "command",
 			},
 		},

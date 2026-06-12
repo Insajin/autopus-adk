@@ -90,8 +90,8 @@ func TestGenerateHookConfigs_AllDisabled(t *testing.T) {
 	for _, h := range hooks {
 		events[h.Event] = h.Command
 	}
-	assert.Equal(t, ".claude/hooks/autopus/hook-claude-stop.sh", events["Stop"])
-	assert.Equal(t, ".claude/hooks/autopus/hook-claude-sessionstart.sh", events["SessionStart"])
+	assert.Equal(t, `"${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/autopus/hook-claude-stop.sh`, events["Stop"])
+	assert.Equal(t, `"${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/autopus/hook-claude-sessionstart.sh`, events["SessionStart"])
 	assert.Empty(t, gitHooks)
 }
 
