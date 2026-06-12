@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **SPEC 리뷰 파이프라인 정합성 보강 (SPEC-SPECREV-002)** (2026-06-12): `pkg/spec` provider 체크리스트 파서가 `N/A` 상태를 1급으로 파싱하고(`reChecklist` PASS|FAIL|N/A), self-verify가 빈 reason N/A를 fail-closed로 거부하며, review.md 렌더가 빈 reason N/A를 `reason missing` 마커로 구분 표기한다. inert였던 글로벌 `--loop` 플래그가 spec review 반복 한도 floor(5)로 실효 배선되고(`resolveSpecReviewMaxRevisions`), EARS 미인식 SHALL 라인이 `auto spec validate` warning으로 표면화되며, SPEC Load 실패가 "본문이 비어있습니다" 오진단 대신 원인 보존 메시지로 보고된다. S1~S13 oracle 회귀 잠금.
+
+- **오케스트라·learn·worker 런타임 견고성 하드닝 (SPEC-ORCH-023)** (2026-06-12): cc21 완료 감지의 detector 에러 3중 묵살을 관측 가능(provider 로그 + ctx취소/I/O 구분 + completed=false 강제)으로 전환, learn 스토어 `UpdateReuseCount`/`Prune`의 무잠금 truncate-rewrite를 뮤텍스로 직렬화해 동시 Append 유실 race 봉인(-race oracle), 프로바이더 fast-fail/hook/prompt 패턴을 `ProviderConfig` 오버라이드로 선언화(기본값=기존 하드코딩, default-equivalence oracle), 디베이트/judge 프롬프트 참가자 출력을 라운드별 랜덤 sentinel(`AUTOPUS_PART_<hex>`) 펜스로 감싸 위조 구조 헤더 주입 무력화, reliability 영수증 영속화 실패 store당 1회 경고, unsigned 제어평면 진입 프로세스당 1회 경고(fail-open 정책 불변), surface tracker를 `~/.autopus/surfaces`(uid/0700 검증 + ref 형식 검증 + legacy read-only reap)로 하드닝.
+
+- **플랫폼 어댑터 패리티 보강 (SPEC-PARITY-002)** (2026-06-12): Gemini/Antigravity 생성 규칙에 누락됐던 `deferred-tools`/`project-identity`/`spec-quality` 3종을 추가해 content/rules 14종 패리티를 달성하고, Gemini extended skill의 `.claude/skills/autopus/` 정규 참조를 네이티브 경로로 해소(generate/update 양 경로). `platform:` frontmatter 값을 어댑터 식별자로 정규화(`shell-portability` gemini→antigravity-cli)하고, source−exclusion 양방향 패리티 커버리지 게이트 테스트(`runCoverageGate` + synthetic probe)로 플랫폼 누락의 구조적 재발을 차단.
+
 - **Hook-IPC headless multiprovider completion + pane orphan reaping (SPEC-ORCH-022)** (2026-06-11): Inside Claude Code (CLAUDECODE), `auto spec review` / `orchestra` now collect provider completion through the Stop-hook done-file IPC with no 0/N screen-scrape timeout, finishing SPEC-ORCH-022. The completion detector no longer gates `FileIPCDetector` behind the CC21 monitor feature flag (`resolveCompletionDetector`, `pkg/orchestra/cc21_monitor.go`): when a hook session is active it is selected first as a full-budget completion floor, so `Execute` blocks until the done file appears instead of letting a screen-poll fallback return early and race the deferred session-dir cleanup against the provider's Stop hook (the root cause of the done file landing in an already-removed directory and never being collected). `content/hooks/hook-claude-stop.sh` now writes the done signal unconditionally and guards `chmod`, so an empty assistant message can never suppress completion. Verified end-to-end in a trusted-ancestor cmux e2e (done file collected, session dir alive at Stop time, no screen-scrape fallback). Also adds killed-process pane orphan reaping (`pkg/orchestra/surface_tracker.go`): created cmux/tmux surfaces are tracked per owning orchestrator PID and reaped on the next run only when their owner process is no longer alive, so a SIGKILL/crash leak is cleaned up without ever closing a live concurrent run's panes (PID-liveness gated, with a conservative reap-later degrade on PID reuse).
 
 - **QAMESH one-command full QA entrypoint and coverage/profile diagnostics** (2026-06-01): `auto qa full` now acts as the simple default for full project QA planning, with `--bootstrap` for safe starter generation and `--run` for explicit full gate execution. Meta workspace roots now return scored project candidates instead of writing root QA artifacts. New `auto qa coverage` summarizes latest run/release lane, journey, manifest, setup-gap, and domain-readiness coverage, and `auto qa profile check` compares Journey Pack capability requirements against `standalone/local/ci/prod` test profiles before execution. Domain-readiness starter catalogs now expand from project signals such as browser, auth, desktop, and build surfaces.
@@ -33,6 +39,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **릴리스 게이트에 보안 워크플로 게이팅** (2026-06-12): `security.yml`(gitleaks+govulncheck)이 release 경로에 게이팅되지 않아 태그 푸시가 보안 검사를 우회할 수 있던 구멍을 `workflow_call` + `needs: [ci, security]`로 봉인.
+- **300줄 경계 파일 선제 분할** (2026-06-12): `pkg/worker/compress/tool_pairs.go`(300)→types/prune 2파일, `pkg/qa/evidence/manifest.go`(300)→types 분리, `pkg/adapter/codex/codex_workflow_custom.go`(300)→bodies 분리. 전부 동작 불변(body byte-identical 검증).
+- **CI 커버리지 임계값 80 유지 (정직 보고)** (2026-06-12): 전체 스위트 실측 커버리지 80.7%로 85 상향 시 CI 즉시 적색 — 임계값만 올리는 gate-weakening 역방향 조작 대신 80을 유지하고 갭(85 목표 대비 -4.3%p)을 기록. 상향은 커버리지 보강 작업이 선행되어야 한다.
+
 - **Project-scoped SQL migration numbering guidance** (2026-05-26): Source-owned database, executor, validator, pipeline, router, and worktree guidance now treats each owning repo's migration directory as a serialized numbering lane. New paired SQL migrations must use 6-digit zero-padded numbers, compute `max(existing)+1` inside the target directory only, keep same-stem up/down pairs, avoid parallel number reservation, and validate affected directories before deploy.
 
 - **QA 대상 리포 자동 해석 및 workspace 문서화** (2026-05-23): `auto qa init`이 기본 실행에서 meta workspace를 감지하면 nested git repo의 Go/Node/Python/Rust/Playwright/desktop 신호를 점수화해 Journey Pack을 제품 리포에 생성합니다. `auto setup`/`auto sync` source guidance와 multi-repo 렌더링은 QA/Journey Pack 대상 리포, `auto qa init --project-dir <repo>` 명령, root `.autopus/qa/**` runtime/generated 경계를 명시하도록 갱신되었습니다.
@@ -42,6 +52,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Claude Code Stop/SessionStart 훅 상대경로 실패** (2026-06-12): 설치된 settings.json의 훅 명령이 상대경로(`.claude/hooks/autopus/hook-claude-stop.sh`)라 훅 spawn cwd가 settings 루트와 다른 서브에이전트/하위 디렉토리 세션에서 매 Stop마다 "No such file or directory"로 실패했다(하루 27회 실측). 생성기(`pkg/content/hooks_completion.go`)가 `"${CLAUDE_PROJECT_DIR:-.}"/` 프리픽스로 앵커하도록 수정하고 회귀 테스트로 고정. 설치된 워크스페이스 복사본 7개는 동일 값으로 로컬 패치됨(다음 `auto update` 재생성과 일치).
+
 - **Gemini SPEC review subprocess timeout backfill** (2026-06-04): Default `agy`/Gemini orchestra provider config now declares a 480s subprocess execution timeout, matching the structured SPEC review budget used by Claude, and in-memory orchestra config migration backfills existing `autopus.yaml` entries where `orchestra.providers.gemini.subprocess.timeout` was missing. This prevents Gemini review runs from falling back to the 240s global `orchestra.timeout_seconds` and failing at exactly 4 minutes.
 
 - **OpenCode shared workflow skill metadata regression** (2026-05-23): `auto update` no longer lets extended `content/skills` entries overwrite `.agents/skills/auto-*` workflow skills, preventing empty `description` frontmatter such as `.agents/skills/auto-setup/SKILL.md` from being emitted and skipped by Codex/OpenCode skill loaders.
@@ -49,6 +61,7 @@ All notable changes to this project will be documented in this file.
 - **SPEC review issue #55 migration gap** (2026-05-20): `auto spec review` now applies orchestra provider migrations in-memory before building review providers, so existing configs with legacy Claude `--effort max` adopt `--effort high` and the 480s per-provider timeout during review. Legacy generated `context_max_lines: 500` is treated as unset for review execution so the adaptive 500/1500/3000-line context budget is not accidentally capped back to 500.
 
 - **QAMESH profile capability resolution** (2026-05-16): `auto qa run` / `auto qa explore` now resolve required Journey Pack capabilities from the effective test profile, including project-local `autopus.yaml` profile additions. The local profile also advertises `auth-state`, and QAMESH runtime/cache/gui/feedback artifacts are ignored as generated local evidence.
+
 
 ## [v0.50.10] — 2026-05-20
 
