@@ -84,12 +84,8 @@ func trackSurface(ref string) {
 	if err := os.MkdirAll(surfaceTrackerBase, 0o700); err != nil {
 		return
 	}
-	// Security: verify ownership and mode before writing.
-	var stat syscall.Stat_t
-	if err := syscall.Stat(surfaceTrackerBase, &stat); err != nil {
-		return
-	}
-	if uint32(os.Getuid()) != stat.Uid || stat.Mode&0o077 != 0 {
+	// Security: verify ownership and mode before writing (platform-specific).
+	if !surfaceDirSecure(surfaceTrackerBase) {
 		return
 	}
 	f, err := os.OpenFile(surfaceTrackerFile(os.Getpid()), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
