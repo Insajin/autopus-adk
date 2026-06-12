@@ -99,8 +99,8 @@ func TestNodeFastStarterPicksJestWhenNoTestScript(t *testing.T) {
 		Stack:          "node",
 		PackageManager: "npm",
 		Package: packageManifest{
-			Scripts:        map[string]string{},
-			Dependencies:   map[string]string{},
+			Scripts:         map[string]string{},
+			Dependencies:    map[string]string{},
 			DevDependencies: map[string]string{"jest": "^29.0.0"},
 		},
 	}
@@ -118,8 +118,8 @@ func TestNodeFastStarterPicksVitestSignal(t *testing.T) {
 		Stack:          "node",
 		PackageManager: "npm",
 		Package: packageManifest{
-			Scripts:        map[string]string{},
-			Dependencies:   map[string]string{},
+			Scripts:         map[string]string{},
+			Dependencies:    map[string]string{},
 			DevDependencies: map[string]string{"vitest": "^2.0.0"},
 		},
 	}
@@ -137,8 +137,8 @@ func TestNodeFastStarterFallsBackToBuildScript(t *testing.T) {
 		Stack:          "node",
 		PackageManager: "npm",
 		Package: packageManifest{
-			Scripts:        map[string]string{"build": "vite build"},
-			Dependencies:   map[string]string{},
+			Scripts:         map[string]string{"build": "vite build"},
+			Dependencies:    map[string]string{},
 			DevDependencies: map[string]string{},
 		},
 	}
@@ -156,8 +156,8 @@ func TestNodeFastStarterReturnsFalseWithNoSignals(t *testing.T) {
 		Stack:          "node",
 		PackageManager: "npm",
 		Package: packageManifest{
-			Scripts:        map[string]string{},
-			Dependencies:   map[string]string{},
+			Scripts:         map[string]string{},
+			Dependencies:    map[string]string{},
 			DevDependencies: map[string]string{},
 		},
 	}

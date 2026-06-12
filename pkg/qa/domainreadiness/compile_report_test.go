@@ -144,14 +144,14 @@ func TestUpsertScenarioResultUpdatesExistingEntry(t *testing.T) {
 
 	// Prime with a passed entry.
 	first := ScenarioEvidenceInput{
-		Scenario:            sampleScenario("scn-x", "core"),
-		Result:              ScenarioResultPassed,
-		SourceRefs:          []string{"src"},
-		ActualEvidenceRefs:  []string{"evid"},
-		Freshness:           EvidenceFreshnessCurrent,
-		EvidenceCapturedAt:  time.Now(),
-		RedactionStatus:     RedactionStatusPassed,
-		RetentionClass:      RetentionClassMetadataOnly,
+		Scenario:           sampleScenario("scn-x", "core"),
+		Result:             ScenarioResultPassed,
+		SourceRefs:         []string{"src"},
+		ActualEvidenceRefs: []string{"evid"},
+		Freshness:          EvidenceFreshnessCurrent,
+		EvidenceCapturedAt: time.Now(),
+		RedactionStatus:    RedactionStatusPassed,
+		RetentionClass:     RetentionClassMetadataOnly,
 	}
 
 	row, err := BuildDomainReadinessEvidence(EvidenceBuildInput{

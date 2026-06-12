@@ -136,7 +136,7 @@ func TestJSONPluginSlice_StringsAndNestedArrays(t *testing.T) {
 	value := []any{
 		"plain",
 		[]any{"nested-name", "version"},
-		[]any{}, // empty nested -> skipped
+		[]any{},   // empty nested -> skipped
 		[]any{42}, // non-string head -> skipped
 	}
 	out := jsonPluginSlice(value)
