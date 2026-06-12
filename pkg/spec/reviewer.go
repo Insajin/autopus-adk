@@ -11,7 +11,10 @@ var (
 	findingRe       = regexp.MustCompile(`(?i)FINDING:\s*\[(\w+)]\s*(.+)`)
 	structFindingRe = regexp.MustCompile(`(?i)FINDING:\s*\[(\w+)]\s*\[(\w+)]\s*(\S+)\s+(.+)`)
 	findingStatusRe = regexp.MustCompile(`(?i)FINDING_STATUS:\s*F-(\d+)\s*\|\s*(\w+)\s*\|\s*(.+)`)
-	reChecklist     = regexp.MustCompile(`(?i)CHECKLIST:\s*([A-Z0-9-]+)\s*\|\s*(PASS|FAIL)(?:\s*\|\s*(.+))?`)
+	// reChecklist accepts PASS, FAIL, and N/A (SPEC-SPECREV-002 REQ-001).
+	// The status group is uppercased by parseChecklistOutcomes, so the (?i)
+	// flag also tolerates lowercase provider output (e.g. "n/a").
+	reChecklist = regexp.MustCompile(`(?i)CHECKLIST:\s*([A-Z0-9-]+)\s*\|\s*(PASS|FAIL|N/A)(?:\s*\|\s*(.+))?`)
 )
 
 // ParseVerdict extracts a ReviewResult from raw provider output.
@@ -104,6 +107,8 @@ func parseDiscoverFindings(output, provider string, revision int) []ReviewFindin
 // parseVerifyFindings applies FINDING_STATUS updates from verify mode output.
 // New critical/security findings are registered with EscapeHatch=true.
 // Other new findings are tagged out_of_scope.
+// @AX:WARN [AUTO]: high if-branch count (>8 across nested switch+if); status mutation and escape-hatch classification make this error-prone to extend
+// @AX:REASON: three control axes (status update, severity check, category check) are interleaved in one pass; add new severity/category branches with care
 func parseVerifyFindings(output, provider string, revision int, priorFindings []ReviewFinding) []ReviewFinding {
 	// Start with copies of prior findings, updating LastSeenRev
 	updated := make([]ReviewFinding, len(priorFindings))

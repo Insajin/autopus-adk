@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+// naMissingReasonNote marks an N/A checklist outcome whose Reason is empty.
+// It is distinct from emptyNotePlaceholder ("-") so reviewers can tell a
+// reason-less N/A apart from a PASS row with no note (SPEC-SPECREV-002 REQ-007).
+const naMissingReasonNote = "reason missing"
+
 // CountChecklistStatuses returns the per-status totals from a slice of
 // ChecklistOutcome. Statuses outside PASS/FAIL/N/A are silently ignored so
 // callers can rely on (pass + fail + na) <= len(outcomes).
@@ -41,7 +46,13 @@ func RenderChecklistSection(outcomes []ChecklistOutcome) string {
 	for _, o := range outcomes {
 		reason := sanitizeNote(o.Reason)
 		if reason == "" {
-			reason = emptyNotePlaceholder
+			// An empty-reason N/A gets a dedicated marker; other empty reasons
+			// keep the neutral placeholder.
+			if o.Status == ChecklistStatusNA {
+				reason = naMissingReasonNote
+			} else {
+				reason = emptyNotePlaceholder
+			}
 		}
 		fmt.Fprintf(&sb, "| %s | %s | %s | %s |\n", o.ID, o.Status, o.Provider, reason)
 	}

@@ -74,6 +74,39 @@ func TestRenderChecklistSection_HeadingTableAndTotals(t *testing.T) {
 	assert.Contains(t, got, "Total: 3 (PASS: 1, FAIL: 1, N/A: 1)")
 }
 
+// S13 (SPEC-SPECREV-002 REQ-007): an empty-reason N/A row renders the dedicated
+// "reason missing" marker, while a PASS row with no reason keeps "-".
+func TestRenderChecklistSection_EmptyReasonNAMarker(t *testing.T) {
+	t.Parallel()
+
+	outcomes := []spec.ChecklistOutcome{
+		{ID: "Q-SEC-01", Status: spec.ChecklistStatusNA, Reason: "", Provider: "claude"},
+		{ID: "Q-CORR-01", Status: spec.ChecklistStatusPass, Reason: "", Provider: "claude"},
+	}
+
+	got := spec.RenderChecklistSection(outcomes)
+
+	naRow := checklistRow(got, "Q-SEC-01")
+	require.NotEmpty(t, naRow)
+	assert.Contains(t, naRow, "reason missing")
+	assert.NotContains(t, naRow, "| - |", "N/A empty reason must not render the PASS placeholder")
+
+	passRow := checklistRow(got, "Q-CORR-01")
+	require.NotEmpty(t, passRow)
+	assert.Contains(t, passRow, "| - |", "PASS empty reason keeps the neutral placeholder")
+
+	assert.Contains(t, got, "N/A: 1")
+}
+
+func checklistRow(rendered, id string) string {
+	for _, line := range strings.Split(rendered, "\n") {
+		if strings.Contains(line, id) {
+			return line
+		}
+	}
+	return ""
+}
+
 func TestRenderChecklistSection_ReasonSanitization(t *testing.T) {
 	t.Parallel()
 

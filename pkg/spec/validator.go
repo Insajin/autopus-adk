@@ -62,5 +62,20 @@ func ValidateSpec(doc *SpecDocument) []ValidationError {
 		}
 	}
 
+	// SPEC-SPECREV-002 REQ-004: surface requirement-looking SHALL lines that no
+	// EARS type recognized as warning-level errors so they are not silently
+	// dropped. Flows to `auto spec validate` stderr like other warnings.
+	if doc.RawContent != "" {
+		if _, warnings, _ := ParseEARSWithWarnings(doc.RawContent); len(warnings) > 0 {
+			for _, w := range warnings {
+				errs = append(errs, ValidationError{
+					Field:   "requirements",
+					Message: w,
+					Level:   "warning",
+				})
+			}
+		}
+	}
+
 	return errs
 }

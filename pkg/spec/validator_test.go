@@ -1,6 +1,7 @@
 package spec_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -131,4 +132,32 @@ func TestValidateSpec_EmptyRequirements(t *testing.T) {
 		}
 	}
 	assert.True(t, found)
+}
+
+// S12 (SPEC-SPECREV-002 REQ-004): ValidateSpec surfaces an unrecognized SHALL
+// line in RawContent as exactly one warning-level ValidationError.
+func TestValidateSpec_SurfacesUnrecognizedShallWarning(t *testing.T) {
+	t.Parallel()
+
+	doc := &spec.SpecDocument{
+		ID:    "SPEC-X-001",
+		Title: "제목",
+		Requirements: []spec.Requirement{
+			{ID: "REQ-001", Type: spec.EARSEventDriven, Description: "WHEN x THEN y"},
+		},
+		AcceptanceCriteria: []spec.Criterion{
+			{ID: "AC-001", Description: "ok"},
+		},
+		RawContent: "The button SHALL respond to the click",
+	}
+
+	errs := spec.ValidateSpec(doc)
+
+	count := 0
+	for _, e := range errs {
+		if e.Level == "warning" && strings.Contains(e.Message, "The button SHALL respond to the click") {
+			count++
+		}
+	}
+	assert.Equal(t, 1, count, "exactly one warning naming the unrecognized SHALL line")
 }

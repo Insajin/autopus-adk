@@ -17,7 +17,40 @@ import (
 const (
 	defaultMaxRevisions        = 3
 	specReviewResultReadyGrace = 5 * time.Second
+	// loopModeMinRevisions is the floor applied to the revision budget when the
+	// global --loop flag is set (SPEC-SPECREV-002 REQ-003). It is intentionally
+	// larger than defaultMaxRevisions so the effect is observable under default
+	// config; the circuit breaker still terminates early when no progress is made.
+	loopModeMinRevisions = 5
 )
+
+// loopAwareMaxRevisions applies the --loop floor to a configured revision
+// budget. When loopMode is set, the result is at least loopModeMinRevisions;
+// otherwise the configured value is returned unchanged (floor semantics).
+func loopAwareMaxRevisions(configured int, loopMode bool) int {
+	if loopMode && configured < loopModeMinRevisions {
+		return loopModeMinRevisions
+	}
+	return configured
+}
+
+// resolveSpecReviewMaxRevisions derives the effective revision budget from the
+// review gate config and the --loop flag. A non-positive gate.MaxRevisions
+// falls back to defaultMaxRevisions before the loop floor is applied.
+func resolveSpecReviewMaxRevisions(gate config.ReviewGateConf, loopMode bool) int {
+	configured := gate.MaxRevisions
+	if configured <= 0 {
+		configured = defaultMaxRevisions
+	}
+	return loopAwareMaxRevisions(configured, loopMode)
+}
+
+// wrapSpecLoadError wraps a spec.Load failure with a neutral prefix that names
+// the SPEC ID without asserting an empty body (SPEC-SPECREV-002 REQ-005). The
+// cause is preserved via %w so errors.Is keeps working.
+func wrapSpecLoadError(specID string, err error) error {
+	return fmt.Errorf("SPEC 로드 실패 (%s): %w", specID, err)
+}
 
 // newSpecReviewCmd creates the "spec review" subcommand.
 func newSpecReviewCmd() *cobra.Command {
@@ -67,8 +100,9 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 
 	doc, err := spec.Load(specDir)
 	if err != nil {
-		// A load failure often means the spec.md has no parseable ID or is structurally empty.
-		return fmt.Errorf("SPEC 본문이 비어있습니다: %s (%w)", specID, err)
+		// The real cause (malformed frontmatter, missing ID header, etc.) is
+		// preserved instead of asserting an empty body.
+		return wrapSpecLoadError(specID, err)
 	}
 
 	// REQ-05b: guard against empty spec body before entering the loop.
@@ -99,10 +133,9 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 		strategy = string(orchestra.StrategyDebate)
 	}
 	timeout = resolveSpecReviewTimeout(cfg, timeout)
-	maxRevisions := gate.MaxRevisions
-	if maxRevisions <= 0 {
-		maxRevisions = defaultMaxRevisions
-	}
+	// SPEC-SPECREV-002 REQ-003: consume the global --loop flag so the revision
+	// budget honors the loop floor (inert seam otherwise).
+	maxRevisions := resolveSpecReviewMaxRevisions(gate, flags.LoopMode)
 
 	threshold := gate.VerdictThreshold
 	if threshold <= 0 {

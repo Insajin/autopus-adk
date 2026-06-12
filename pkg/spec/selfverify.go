@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	selfVerifyLogName     = ".self-verify.log"
+	selfVerifyLogName = ".self-verify.log"
+	// @AX:NOTE [AUTO]: magic constant — max retained self-verify log lines; increase if audit history window needs to grow
 	maxSelfVerifyLogLines = 100
 )
 
@@ -34,6 +35,12 @@ func AppendSelfVerifyEntry(specDir string, entry SelfVerifyEntry) error {
 		// to the reviewed SPEC (e.g. Q-SEC-* dimensions on doc-only SPECs).
 	default:
 		return fmt.Errorf("invalid self-verify status: %s", entry.Status)
+	}
+
+	// SPEC-SPECREV-002 REQ-002: an N/A entry without a reason loses the audit
+	// context spec-quality.md requires, so reject it before any log write.
+	if entry.Status == ChecklistStatusNA && strings.TrimSpace(entry.Reason) == "" {
+		return fmt.Errorf("N/A self-verify entry requires a non-empty reason")
 	}
 
 	path := filepath.Join(specDir, selfVerifyLogName)

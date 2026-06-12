@@ -122,3 +122,29 @@ func TestParseEARS_EnglishPatterns(t *testing.T) {
 	require.Len(t, reqs, 1)
 	assert.Equal(t, spec.EARSUbiquitous, reqs[0].Type)
 }
+
+// S7 (SPEC-SPECREV-002 REQ-004): a requirement-looking SHALL line that no EARS
+// type recognizes yields no requirement but a single warning naming the line.
+func TestParseEARSWithWarnings_UnrecognizedShallLineWarns(t *testing.T) {
+	t.Parallel()
+
+	text := "The button SHALL respond to the click"
+	reqs, warnings, err := spec.ParseEARSWithWarnings(text)
+	require.NoError(t, err)
+	require.Len(t, reqs, 0)
+	require.Len(t, warnings, 1)
+	assert.Contains(t, warnings[0], "The button SHALL respond to the click")
+}
+
+// S8 (SPEC-SPECREV-002 REQ-004): a recognized EARS line produces a requirement
+// and no warning.
+func TestParseEARSWithWarnings_RecognizedLineNoWarning(t *testing.T) {
+	t.Parallel()
+
+	text := "WHEN the user clicks THEN the system SHALL respond"
+	reqs, warnings, err := spec.ParseEARSWithWarnings(text)
+	require.NoError(t, err)
+	require.Len(t, reqs, 1)
+	assert.Equal(t, spec.EARSEventDriven, reqs[0].Type)
+	require.Len(t, warnings, 0)
+}

@@ -13,9 +13,13 @@ import (
 	"github.com/insajin/autopus-adk/pkg/spec"
 )
 
-// TestRunSpecReviewRejectsEmptySpecContent verifies that runSpecReview returns an
-// error containing "SPEC 본문이 비어있습니다" when the loaded SPEC has empty RawContent,
-// and that the orchestra mock is never called (CallCount == 0).
+// TestRunSpecReviewRejectsEmptySpecContent verifies that runSpecReview rejects an
+// unparseable (empty) spec.md before calling orchestra (CallCount == 0).
+//
+// SPEC-SPECREV-002 REQ-005: an empty spec.md fails spec.Load at the missing-ID
+// header check (RawContent == "" is unreachable on a successful Load), so the
+// returned error must name the real cause and the SPEC ID without asserting an
+// empty body. The obsolete "SPEC 본문이 비어있습니다" prefix must NOT appear.
 func TestRunSpecReviewRejectsEmptySpecContent(t *testing.T) {
 	// Uses os.Chdir — not parallel-safe.
 	dir := t.TempDir()
@@ -42,8 +46,10 @@ func TestRunSpecReviewRejectsEmptySpecContent(t *testing.T) {
 	// TARGET API: runSpecReview must validate RawContent before calling orchestra
 	execErr := runSpecReview(context.Background(), specID, "consensus", 10)
 	require.Error(t, execErr)
-	assert.Contains(t, execErr.Error(), "SPEC 본문이 비어있습니다")
-	assert.Equal(t, 0, callCount, "orchestra must not be called when SPEC body is empty")
+	assert.Contains(t, execErr.Error(), specID, "error must name the SPEC ID")
+	assert.Contains(t, execErr.Error(), "SPEC ID를 찾을 수 없습니다", "error must surface the real load cause")
+	assert.NotContains(t, execErr.Error(), "SPEC 본문이 비어있습니다", "REQ-005: must not misdiagnose as empty body")
+	assert.Equal(t, 0, callCount, "orchestra must not be called when SPEC content is unparseable")
 }
 
 // TestRunSpecReviewMergesDuplicateFindingsAcrossProviders verifies that identical
