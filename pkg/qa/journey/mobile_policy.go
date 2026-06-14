@@ -26,6 +26,9 @@ func validateMobilePolicy(pack Pack, projectDir string) error {
 }
 
 func validateMaestroPolicy(pack Pack, projectDir string) error {
+	if strings.EqualFold(strings.TrimSpace(pack.PassFailAuthority), "ai") {
+		return validationError(mobilePolicyInvalidCode, "Maestro scripted execution cannot use AI pass/fail authority")
+	}
 	if err := validateProjectLocalMobilePath(pack.Mobile.FlowPath, projectDir); err != nil {
 		return validationError(mobile.ReasonProjectLocalFlowRequired, err.Error())
 	}

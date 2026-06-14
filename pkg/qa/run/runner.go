@@ -3,6 +3,7 @@ package run
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -98,6 +99,7 @@ func dryRunResult(plan Plan) Result {
 	}
 	return Result{
 		Status:              status,
+		Lane:                plan.SelectedLane,
 		DryRun:              true,
 		HarnessContract:     plan.HarnessContract,
 		SelectedJourneys:    plan.SelectedJourneys,
@@ -120,6 +122,7 @@ func initialResult(opts Options, plan Plan, runID, runDir string) Result {
 	return Result{
 		RunID:             runID,
 		Status:            "passed",
+		Lane:              opts.Lane,
 		HarnessContract:   plan.HarnessContract,
 		SelectedJourneys:  plan.SelectedJourneys,
 		SelectedAdapters:  plan.SelectedAdapters,
@@ -173,6 +176,9 @@ func executePack(opts Options, pack journey.Pack, rawRoot, runDir string) (Adapt
 	if gap := setupGapFor(opts, pack); gap != nil {
 		check.Status = "skipped"
 		return AdapterResult{Adapter: pack.Adapter.ID, JourneyID: pack.ID, Status: "skipped", SetupGap: gap}, "", []IndexCheck{check}
+	}
+	if strings.EqualFold(opts.Lane, laneMobileScripted) && mobileAdapter(pack.Adapter.ID) {
+		return executeMobilePack(opts, pack, rawRoot, runDir)
 	}
 	cmdResult := runCommand(opts.ProjectDir, pack, filepath.Join(rawRoot, safeSegment(pack.ID)))
 	applyOracle(opts.ProjectDir, pack, &cmdResult, &check)

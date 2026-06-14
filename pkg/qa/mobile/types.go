@@ -14,6 +14,9 @@ const (
 	ReasonMissingCredentials       = "missing_credentials"
 	ReasonCloudLabPolicyIncomplete = "cloud_lab_policy_incomplete"
 	ReasonProjectLocalFlowRequired = "project_local_flow_required"
+
+	ReasonDeviceRefUnresolved       = "device_ref_unresolved"
+	ReasonAppArtifactDigestMismatch = "app_artifact_digest_mismatch"
 )
 
 type Finding = qaevidence.Finding

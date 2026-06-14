@@ -28,6 +28,14 @@ type commandResult struct {
 }
 
 func runCommand(projectDir string, pack journey.Pack, artifactDir string) commandResult {
+	return runCommandWithEnv(projectDir, pack, artifactDir, nil)
+}
+
+// runCommandWithEnv runs the pack command through the single shared exec engine,
+// optionally injecting extra environment entries (used by the mobile lane to
+// pass the runtime device handle). It reuses the same engine as runCommand so
+// there is no duplicate execution path (REQ-EXEC-01).
+func runCommandWithEnv(projectDir string, pack journey.Pack, artifactDir string, extraEnv []string) commandResult {
 	started := time.Now().UTC()
 	_ = os.MkdirAll(artifactDir, 0o755)
 	args := commandArgs(pack)
@@ -53,7 +61,7 @@ func runCommand(projectDir string, pack journey.Pack, artifactDir string) comman
 	defer cancel()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = filepath.Join(projectDir, pack.Command.CWD)
-	cmd.Env = appendEnvOverrides(allowedEnv(projectDir, pack.Command.EnvAllowlist), guiInput.Env)
+	cmd.Env = appendEnvOverrides(allowedEnv(projectDir, pack.Command.EnvAllowlist), append(append([]string{}, guiInput.Env...), extraEnv...))
 	if err := verifyGUIGuardPreflight(ctx, cmd.Dir, cmd.Env, guiInput, args); err != nil {
 		result.Status = "blocked"
 		result.ExitCode = -1

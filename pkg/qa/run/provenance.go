@@ -46,6 +46,8 @@ func sourceSpecForLane(lane string) string {
 		return "SPEC-QAMESH-003"
 	case "mobile-readiness":
 		return "SPEC-QAMESH-006"
+	case laneMobileScripted:
+		return "SPEC-QAMESH-008"
 	case "canary-explicit":
 		return "SPEC-QAMESH-004"
 	default:

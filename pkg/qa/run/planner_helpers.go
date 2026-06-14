@@ -14,7 +14,7 @@ func allowDetectedFallback(opts Options) bool {
 	if strings.EqualFold(opts.Lane, "gui-explore") || opts.AdapterID == "gui-explore" {
 		return false
 	}
-	return !strings.EqualFold(opts.Lane, "mobile-readiness")
+	return !strings.EqualFold(opts.Lane, "mobile-readiness") && !strings.EqualFold(opts.Lane, laneMobileScripted)
 }
 
 func normalizeOptions(opts Options) Options {

@@ -8,14 +8,18 @@ import (
 const RunIndexSchemaVersion = "qamesh.run_index.v1"
 
 type Options struct {
-	ProjectDir string
-	Profile    string
-	Lane       string
-	JourneyID  string
-	AdapterID  string
-	Output     string
-	DryRun     bool
-	FeedbackTo string
+	ProjectDir    string
+	Profile       string
+	Lane          string
+	JourneyID     string
+	AdapterID     string
+	Output        string
+	DryRun        bool
+	FeedbackTo    string
+	ManagedDevice bool
+	// deviceRunner is the injectable mobile device seam. It is unexported so the
+	// CLI cannot set it; nil resolves to realMobileDeviceRunner at execution.
+	deviceRunner MobileDeviceRunner
 }
 
 type Plan struct {
@@ -99,6 +103,7 @@ type WorkspaceRef struct {
 type Result struct {
 	RunID               string             `json:"run_id"`
 	Status              string             `json:"status"`
+	Lane                string             `json:"lane"`
 	DryRun              bool               `json:"dry_run,omitempty"`
 	HarnessContract     HarnessContract    `json:"harness_contract"`
 	SelectedJourneys    []string           `json:"selected_journeys"`

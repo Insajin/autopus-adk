@@ -24,22 +24,24 @@ func newQARunCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.AdapterID, "adapter", "", "Adapter id filter")
 	cmd.Flags().StringVar(&opts.Output, "output", "", "Run output root")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Plan without executing adapters")
+	cmd.Flags().BoolVar(&opts.ManagedDevice, "managed-device", false, "Opt into managed device boot/install for the mobile-scripted lane")
 	cmd.Flags().StringVar(&opts.FeedbackTo, "feedback-to", "", "Feedback target")
 	addJSONFlags(cmd, &opts.JSONOut, &opts.Format)
 	return cmd
 }
 
 type qaRunOptions struct {
-	ProjectDir string
-	Profile    string
-	Lane       string
-	JourneyID  string
-	AdapterID  string
-	Output     string
-	DryRun     bool
-	FeedbackTo string
-	JSONOut    bool
-	Format     string
+	ProjectDir    string
+	Profile       string
+	Lane          string
+	JourneyID     string
+	AdapterID     string
+	Output        string
+	DryRun        bool
+	ManagedDevice bool
+	FeedbackTo    string
+	JSONOut       bool
+	Format        string
 }
 
 func runQARun(cmd *cobra.Command, opts qaRunOptions) error {
@@ -53,14 +55,15 @@ func runQARun(cmd *cobra.Command, opts qaRunOptions) error {
 		}
 	}
 	result, err := qarun.Execute(qarun.Options{
-		ProjectDir: opts.ProjectDir,
-		Profile:    opts.Profile,
-		Lane:       opts.Lane,
-		JourneyID:  opts.JourneyID,
-		AdapterID:  opts.AdapterID,
-		Output:     opts.Output,
-		DryRun:     opts.DryRun,
-		FeedbackTo: opts.FeedbackTo,
+		ProjectDir:    opts.ProjectDir,
+		Profile:       opts.Profile,
+		Lane:          opts.Lane,
+		JourneyID:     opts.JourneyID,
+		AdapterID:     opts.AdapterID,
+		Output:        opts.Output,
+		DryRun:        opts.DryRun,
+		ManagedDevice: opts.ManagedDevice,
+		FeedbackTo:    opts.FeedbackTo,
 	})
 	if err != nil {
 		if jsonMode {
@@ -75,6 +78,6 @@ func runQARun(cmd *cobra.Command, opts qaRunOptions) error {
 	if jsonMode {
 		return writeJSONResult(cmd, status, result, nil, nil)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", result.Status, result.RunIndexPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "%s %s lane=%s\n", result.Status, result.RunIndexPath, result.Lane)
 	return nil
 }

@@ -70,6 +70,42 @@ func HasBrowserSignals(projectDir string) bool {
 	return false
 }
 
+// HasAndroidSignals detects project-local Android tooling without inferring
+// concrete QA journeys from ADK itself. Bare build.gradle/settings.gradle are
+// excluded because they are too broad to imply an Android app.
+func HasAndroidSignals(projectDir string) bool {
+	return existsAny(projectDir,
+		"android/build.gradle",
+		"android/build.gradle.kts",
+		"android/app/build.gradle",
+		"android/app/build.gradle.kts",
+		"android/app/src/main/AndroidManifest.xml",
+		"app/build.gradle",
+		"app/build.gradle.kts",
+		"AndroidManifest.xml",
+	)
+}
+
+// HasIOSSignals detects project-local iOS tooling without inferring concrete QA
+// journeys from ADK itself. Bare Info.plist is excluded because it is too broad
+// to imply an iOS app.
+func HasIOSSignals(projectDir string) bool {
+	if existsAny(projectDir,
+		"ios/Runner.xcodeproj",
+		"ios/Runner.xcworkspace",
+		"ios/Podfile",
+		"Podfile",
+	) {
+		return true
+	}
+	for _, p := range []string{"*.xcodeproj", "*.xcworkspace", "ios/*.xcodeproj", "ios/*.xcworkspace"} {
+		if m, _ := filepath.Glob(filepath.Join(projectDir, filepath.FromSlash(p))); len(m) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func existsAny(root string, rels ...string) bool {
 	for _, rel := range rels {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err == nil {

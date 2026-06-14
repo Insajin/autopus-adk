@@ -19,6 +19,14 @@ func buildManifest(opts Options, pack journey.Pack, result commandResult, checks
 	if !blocksGUIArtifactPublication(checks) {
 		artifacts = append(artifacts, declaredArtifacts(opts.ProjectDir, pack)...)
 	}
+	refs := sourceRefs(pack)
+	// @AX:NOTE: [AUTO] magic constants — fallback SPEC and AC refs for the mobile-scripted lane when the pack omits source_refs
+	if strings.EqualFold(opts.Lane, laneMobileScripted) && strings.TrimSpace(pack.SourceRefs.SourceSpec) == "" {
+		refs.SourceSpec = "SPEC-QAMESH-008"
+		if len(pack.SourceRefs.AcceptanceRefs) == 0 {
+			refs.AcceptanceRefs = []string{"AC-QAMESH8-007"}
+		}
+	}
 	return qaevidence.Manifest{
 		SchemaVersion:       qaevidence.SchemaVersionV2,
 		QAResultID:          pack.ID + "-" + strings.ReplaceAll(result.StartedAt.Format("20060102150405.000000000"), ".", ""),
@@ -33,7 +41,7 @@ func buildManifest(opts Options, pack journey.Pack, result commandResult, checks
 		Artifacts:           artifacts,
 		OracleResults:       qaevidence.OracleResults{Checks: manifestChecks(pack, checks, artifacts)},
 		RedactionStatus:     qaevidence.RedactionStatus{Status: "passed"},
-		SourceRefs:          sourceRefs(pack),
+		SourceRefs:          refs,
 		RetentionClass:      "local-redacted",
 		ReproductionCommand: result.Command,
 	}
@@ -173,6 +181,8 @@ func sourceRefs(pack journey.Pack) qaevidence.SourceRefs {
 	return refs
 }
 
+// @AX:ANCHOR: [AUTO] adapter identity gate — called from runner.go, manifest.go (x3), mobile_manifest.go; controls lane routing and evidence provenance
+// @AX:REASON: Adding a mobile adapter ID here is the single required change to onboard a new mobile surface; omitting it silently skips mobile evidence attribution
 func mobileAdapter(adapterID string) bool {
 	return adapterID == "maestro-scripted" || adapterID == "appium-mobile-explore"
 }

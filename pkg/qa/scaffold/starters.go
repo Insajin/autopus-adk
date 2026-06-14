@@ -25,14 +25,16 @@ type starterFile struct {
 }
 
 type projectSignals struct {
-	Stack          string
-	Package        packageManifest
-	HasPackage     bool
-	HasBrowser     bool
-	HasPlaywright  bool
-	HasDesktopGUI  bool
-	HasTauriRust   bool
-	PackageManager string
+	Stack             string
+	Package           packageManifest
+	HasPackage        bool
+	HasBrowser        bool
+	HasPlaywright     bool
+	HasDesktopGUI     bool
+	HasTauriRust      bool
+	HasAndroidSignals bool
+	HasIOSSignals     bool
+	PackageManager    string
 }
 
 type packageManifest struct {
@@ -55,6 +57,9 @@ func detectJourneyStarters(projectDir string, release bool) []starterFile {
 			starters = append(starters, desktop)
 		}
 		starters = append(starters, desktopGUIStarter(signals))
+	}
+	if signals.HasAndroidSignals || signals.HasIOSSignals {
+		starters = append(starters, mobileScriptedStarter(signals))
 	}
 	if len(starters) > 0 {
 		starters = append(starters, domainReadinessCatalogStarter(projectDir))
@@ -107,6 +112,8 @@ func detectSignals(projectDir string) projectSignals {
 	}
 	signals.HasBrowser = qaproject.HasBrowserSignals(projectDir)
 	signals.HasPlaywright = hasPlaywright(projectDir, signals.Package)
+	signals.HasAndroidSignals = qaproject.HasAndroidSignals(projectDir)
+	signals.HasIOSSignals = qaproject.HasIOSSignals(projectDir)
 	return signals
 }
 

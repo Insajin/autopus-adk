@@ -68,6 +68,7 @@ func BuildPlan(opts Options) (Plan, error) {
 		}
 	}
 	applyMobileReadiness(&plan, opts)
+	applyMobileScriptedLane(&plan, opts)
 	plan.ProjectHints = append(plan.ProjectHints, projectLocalJourneyHints(opts, packs)...)
 	plan.SetupGaps = append(plan.SetupGaps, projectLocalJourneySetupGaps(opts, packs)...)
 	if len(plan.SelectedJourneys) == 0 && opts.JourneyID == "" && allowDetectedFallback(opts) {

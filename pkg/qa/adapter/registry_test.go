@@ -36,7 +36,7 @@ func TestRegistryContainsRequiredAdapters(t *testing.T) {
 	assert.Contains(t, designVisual.SetupGapReasonCodes, "figma_token_missing")
 	maestro, ok := ByID("maestro-scripted")
 	require.True(t, ok)
-	assert.Equal(t, []string{"mobile-readiness"}, maestro.DefaultLanes)
+	assert.Equal(t, []string{"mobile-readiness", "mobile-scripted"}, maestro.DefaultLanes)
 	assert.Contains(t, maestro.SupportedPlatforms, "ios")
 	assert.Contains(t, maestro.ReadinessFields, "app_artifact")
 	assert.NotEmpty(t, maestro.SetupGapReason)

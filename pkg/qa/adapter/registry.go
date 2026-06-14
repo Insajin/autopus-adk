@@ -83,8 +83,12 @@ func metadata(id string, surfaces, binaries []string) Metadata {
 		}
 		item.SetupGapReason = "design visual readiness requires a design pack, rendered screenshot evidence, and optional Figma/Code Connect metadata for stronger component reuse"
 	}
+	// @AX:NOTE: [AUTO] magic constants — mobile adapter default lanes must stay in sync with laneMobileScripted and mobileAdapter() in pkg/qa/run
 	if id == "maestro-scripted" || id == "appium-mobile-explore" {
 		item.DefaultLanes = []string{"mobile-readiness"}
+		if id == "maestro-scripted" {
+			item.DefaultLanes = []string{"mobile-readiness", "mobile-scripted"}
+		}
 		item.SupportedPlatforms = []string{"ios", "android"}
 		item.ArtifactCapabilities = []string{
 			"sanitized_log",
@@ -108,6 +112,8 @@ func metadata(id string, surfaces, binaries []string) Metadata {
 			"missing_credentials",
 			"cloud_lab_policy_incomplete",
 			"project_local_flow_required",
+			"device_ref_unresolved",
+			"app_artifact_digest_mismatch",
 		}
 		item.SetupGapReason = "mobile readiness requires device inventory, simulator/emulator target, app artifact digest, opaque credentials, and cloud lab policy when used"
 	}
