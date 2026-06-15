@@ -1,5 +1,22 @@
 package adapter
 
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-011: published reason-code contract between pkg/qa/adapter and pkg/qa/releasereadiness/dispatch.go — renaming either string requires a matching change in dispatchLane and any JSON consumers that pattern-match these codes.
+// Surface-dispatch reason codes are emitted by release-readiness dispatch
+// (pkg/qa/releasereadiness) when a lane cannot run because its surface tooling
+// is unavailable or the surface is absent entirely. They are additive package
+// constants and do not alter any adapter's existing SetupGapReasonCodes.
+const (
+	ReasonSurfaceToolUnavailable = "surface_tool_unavailable"
+	ReasonSurfaceAbsent          = "surface_absent"
+)
+
+// SurfaceDispatchReasonCodes returns the surface-dispatch reason codes in a
+// stable order so callers can enumerate the contract without depending on a
+// specific adapter's metadata.
+func SurfaceDispatchReasonCodes() []string {
+	return []string{ReasonSurfaceToolUnavailable, ReasonSurfaceAbsent}
+}
+
 type Metadata struct {
 	ID                   string   `json:"id"`
 	Surfaces             []string `json:"surfaces"`
