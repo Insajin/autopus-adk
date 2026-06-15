@@ -107,10 +107,42 @@ func runStructuredSpecReviewProvidersParallel(
 				results[i] = pendingStructuredReviewTimeoutOutcome(provider, backend.Name(), "provider_execution", cfg.TimeoutSeconds, time.Since(start), ctx.Err())
 				logStructuredReviewOutcome(provider.Name, backend.Name(), results[i], time.Since(start))
 			}
+			// Drain the still-running provider goroutines before returning so they
+			// cannot write shared process globals (os.Stderr via structured review
+			// logging) after the caller has moved on and restored those globals.
+			// Bounded by a grace window so a backend that ignores context
+			// cancellation cannot reintroduce the hang the watchdog prevents.
+			drainInFlightSpecReviewProviders(outcomes, pending)
 			return results
 		}
 	}
 	return results
+}
+
+// specReviewDrainGrace bounds how long the parallel runner waits for in-flight
+// provider goroutines to exit after the review context is cancelled. Backends
+// that honor context cancellation return well within this window; the bound
+// stops a context-ignoring backend from reintroducing the watchdog hang.
+const specReviewDrainGrace = 2 * time.Second
+
+// drainInFlightSpecReviewProviders waits for the remaining provider goroutines
+// to send their outcomes so they do not outlive the parallel runner and race on
+// shared process globals (notably os.Stderr through structured review logging).
+// The drain is bounded by specReviewDrainGrace.
+func drainInFlightSpecReviewProviders(outcomes <-chan indexedSpecReviewOutcome, pending int) {
+	if pending <= 0 {
+		return
+	}
+	grace := time.NewTimer(specReviewDrainGrace)
+	defer grace.Stop()
+	for pending > 0 {
+		select {
+		case <-outcomes:
+			pending--
+		case <-grace.C:
+			return
+		}
+	}
 }
 
 func executeStructuredSpecReviewProvider(
