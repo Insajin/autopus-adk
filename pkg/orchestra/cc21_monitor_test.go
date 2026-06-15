@@ -97,6 +97,31 @@ func TestResolveCompletionDetector_HookModeMonitorDisabledStillUsesFileIPC(t *te
 	assert.False(t, resolved.eventDriven)
 }
 
+func TestWaitForCompletion_HookModeNonHookProviderFallsBackToScreenPoll(t *testing.T) {
+	t.Parallel()
+
+	mock := newPlainMock()
+	mock.readScreenOutput = "> Type your message\n"
+	session := newTestHookSession(t)
+	session.SetHookProviders(map[string]bool{"claude": true})
+
+	pi := paneInfo{
+		paneID:       "pane-1",
+		provider:     ProviderConfig{Name: "gemini", Binary: "agy"},
+		role:         "reviewer",
+		responseFile: "missing-response.md",
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 1600*time.Millisecond)
+	defer cancel()
+
+	ok := waitForCompletion(ctx, OrchestraConfig{
+		Terminal: mock,
+		HookMode: true,
+	}, pi, DefaultCompletionPatterns(), "", session, 1)
+
+	assert.True(t, ok, "non-hook agy provider must use screen completion instead of hook done-file wait")
+}
+
 func TestCompletionInitialDelay_MonitorEnabledShortensWait(t *testing.T) {
 	t.Parallel()
 

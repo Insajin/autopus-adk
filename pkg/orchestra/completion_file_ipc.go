@@ -3,6 +3,8 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -17,9 +19,10 @@ type FileIPCDetector struct {
 // defaultFileIPCTimeout is the fallback timeout when the context has no deadline.
 const defaultFileIPCTimeout = 10 * time.Minute
 
-// WaitForCompletion polls for the provider's done signal file via HookSession.
-// Uses round-scoped signals when round > 0, otherwise uses the standard done file.
-// Timeout is derived from the context deadline; falls back to defaultFileIPCTimeout.
+// WaitForCompletion polls for either the provider's response-file marker or its
+// done signal file via HookSession. Uses round-scoped signals when round > 0,
+// otherwise uses the standard done file. Timeout is derived from the context
+// deadline; falls back to defaultFileIPCTimeout.
 func (d *FileIPCDetector) WaitForCompletion(ctx context.Context, pi paneInfo, _ []CompletionPattern, _ string, round int) (bool, error) {
 	provider := pi.provider.Name
 	if provider == "" {
@@ -27,24 +30,42 @@ func (d *FileIPCDetector) WaitForCompletion(ctx context.Context, pi paneInfo, _ 
 	}
 
 	timeout := fileIPCTimeout(ctx)
-
-	var err error
+	doneName := sanitizeProviderName(provider) + "-done"
 	if round > 0 {
-		err = d.session.WaitForDoneRoundCtx(ctx, timeout, provider, round)
-	} else {
-		err = d.session.WaitForDone(timeout, provider)
+		doneName = RoundSignalName(provider, round, "done")
+	}
+	return d.waitForDoneOrResponseFile(ctx, timeout, doneName, pi.responseFile)
+}
+
+func (d *FileIPCDetector) waitForDoneOrResponseFile(ctx context.Context, timeout time.Duration, doneName, responseFile string) (bool, error) {
+	if _, ok := readResponseFile(responseFile); ok {
+		return true, nil
 	}
 
-	if err != nil {
-		// Context cancellation means the caller gave up -- not an error.
-		if ctx.Err() != nil {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	donePath := filepath.Join(d.session.Dir(), doneName)
+	if _, err := os.Stat(donePath); err == nil {
+		return true, nil
+	}
+	for {
+		select {
+		case <-ctx.Done():
 			return false, nil
+		case <-deadline.C:
+			return false, nil
+		case <-ticker.C:
+			if _, ok := readResponseFile(responseFile); ok {
+				return true, nil
+			}
+			if _, err := os.Stat(donePath); err == nil {
+				return true, nil
+			}
 		}
-		// Timeout from HookSession -- treat as "not completed yet".
-		return false, nil
 	}
-
-	return true, nil
 }
 
 // fileIPCTimeout extracts the remaining time from the context deadline.

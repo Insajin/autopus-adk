@@ -134,7 +134,7 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		var newPI paneInfo
 		var recreated bool
 		var sendErr error
-		if pi.provider.InteractiveInput == "sendkeys" {
+		if shouldUseSendkeysPromptInput(pi.provider, promptFile != "") {
 			// Normalize newlines to spaces for sendkeys (shell line continuation prevention).
 			normalized := strings.ReplaceAll(sendPrompt, "\n", " ")
 			sendErr = cfg.Terminal.SendCommand(ctx, pi.paneID, normalized)
@@ -167,7 +167,7 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			panes[i].skipWait = true
 			if cfg.ReliabilityStore != nil {
 				mode := "send_long_text"
-				if pi.provider.InteractiveInput == "sendkeys" {
+				if shouldUseSendkeysPromptInput(pi.provider, promptFile != "") {
 					mode = "sendkeys"
 				}
 				receipt := promptReceipt(cfg.RunID, pi.provider.Name, mode, sendPrompt, round, "failed", sendErr.Error())
@@ -177,7 +177,7 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		}
 		if cfg.ReliabilityStore != nil {
 			mode := "send_long_text"
-			if pi.provider.InteractiveInput == "sendkeys" {
+			if shouldUseSendkeysPromptInput(pi.provider, promptFile != "") {
 				mode = "sendkeys"
 			}
 			receipt := promptReceipt(cfg.RunID, pi.provider.Name, mode, sendPrompt, round, "pass", "")
@@ -188,8 +188,8 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			panes[i] = newPI
 			targetPaneID = newPI.paneID
 		}
-		submitDelay := 100 * time.Millisecond
-		if cfg.HookMode && hookSession != nil {
+		submitDelay := panePromptSubmitDelay(pi.provider)
+		if cfg.HookMode && hookSession != nil && !isCodexInteractiveProvider(pi.provider) {
 			submitDelay = 50 * time.Millisecond
 		}
 		time.Sleep(submitDelay)
@@ -229,6 +229,16 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 	var responses []ProviderResponse
 	if cfg.HookMode && hookSession != nil {
 		responses = collectRoundHookResults(pollCtx, cfg, hookSession, round)
+		var pollPanes []paneInfo
+		for _, pi := range panes {
+			if pi.skipWait || hookSession.HasHook(pi.provider.Name) {
+				continue
+			}
+			pollPanes = append(pollPanes, pi)
+		}
+		if len(pollPanes) > 0 {
+			responses = append(responses, waitAndCollectResults(pollCtx, cfg, pollPanes, patterns, time.Now(), baselines, nil, round)...)
+		}
 	} else {
 		responses = waitAndCollectResults(pollCtx, cfg, panes, patterns, time.Now(), baselines, hookSession, round)
 	}

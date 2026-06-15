@@ -81,9 +81,9 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 
 		fmt.Fprintf(os.Stderr, "SPEC 리뷰 시작: %s (전략: %s, 리비전: %d)\n", p.specID, p.strategy, revision)
 
-		// The review watchdog must outlast the SUM of the per-provider timeouts
-		// so sequential pane execution does not cancel later providers before
-		// they run. p.timeout is the per-provider fallback, not the global cap.
+		// The review watchdog must outlast the longest per-provider attempt
+		// budget. Provider execution itself is isolated by child contexts in
+		// the structured review parallel fan-out.
 		reviewCtx, cancel := context.WithCancel(p.ctx)
 		if watchdog := specReviewWatchdogSeconds(p.providers, p.timeout); watchdog > 0 {
 			reviewCtx, cancel = context.WithTimeout(p.ctx, time.Duration(watchdog)*time.Second)

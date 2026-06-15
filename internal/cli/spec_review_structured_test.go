@@ -112,7 +112,7 @@ func TestRunStructuredSpecReviewOrchestra_InjectsReviewerContract(t *testing.T) 
 	assert.Contains(t, backend.requests[0].Prompt, "Required JSON schema")
 }
 
-func TestRunStructuredSpecReviewOrchestra_SerializesPaneBackendExecution(t *testing.T) {
+func TestRunStructuredSpecReviewOrchestra_RunsPaneBackendInParallel(t *testing.T) {
 	backend := &concurrencyTrackingPaneBackend{delay: 20 * time.Millisecond}
 
 	origFactory := specReviewBackendFactory
@@ -132,7 +132,7 @@ func TestRunStructuredSpecReviewOrchestra_SerializesPaneBackendExecution(t *test
 	require.NoError(t, err)
 	require.Len(t, result.Responses, 4)
 	assert.Empty(t, result.FailedProviders)
-	assert.Equal(t, 1, backend.MaxActive(), "pane backend terminal I/O must not overlap")
+	assert.Greater(t, backend.MaxActive(), 1, "pane backend providers must overlap so one hang does not serialize siblings")
 }
 
 func TestBuildStructuredSpecReviewPrompt_UsesScopedContractInVerifyMode(t *testing.T) {

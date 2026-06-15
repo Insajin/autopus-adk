@@ -108,6 +108,7 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 		if err != nil {
 			cfg.HookMode = false
 		} else {
+			hs.ApplyProviderHooks(cfg.Providers)
 			defer hs.Cleanup()
 			hookSession = hs
 		}

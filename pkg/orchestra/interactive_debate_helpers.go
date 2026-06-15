@@ -10,12 +10,9 @@ import (
 )
 
 // collectRoundHookResults collects hook-based results for a specific round.
-// @AX:NOTE: [AUTO] magic constant 60s default timeout — per-provider wait; overridden by cfg.TimeoutSeconds
+// Each provider waits on its own execution timeout so one missing hook signal
+// does not consume the full round budget for every sibling provider.
 func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *HookSession, round int) []ProviderResponse {
-	timeout := 60 * time.Second
-	if cfg.TimeoutSeconds > 0 {
-		timeout = time.Duration(cfg.TimeoutSeconds) * time.Second
-	}
 	if cfg.ReliabilityStore == nil && cfg.RunID != "" {
 		if store, err := newReliabilityStore(cfg.RunID); err == nil {
 			cfg.ReliabilityStore = store
@@ -34,8 +31,12 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 		wg.Add(1)
 		go func(provider ProviderConfig) {
 			defer wg.Done()
+			if !session.HasHook(provider.Name) {
+				return
+			}
 
 			start := time.Now()
+			timeout := providerExecutionTimeout(provider, cfg.TimeoutSeconds)
 			err := session.WaitForDoneRoundCtx(ctx, timeout, provider.Name, round)
 			if err != nil {
 				receiptPath := ""

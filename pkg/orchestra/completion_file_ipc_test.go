@@ -69,6 +69,53 @@ func TestFileIPCDetector_ContextCancellation(t *testing.T) {
 	assert.False(t, ok, "should return false on context timeout")
 }
 
+func TestFileIPCDetector_ResponseFileMarkerExists(t *testing.T) {
+	t.Parallel()
+	session := newTestHookSession(t)
+	responsePath := filepath.Join(t.TempDir(), "codex-response.md")
+	writeMarkedResponse(t, responsePath, `{"verdict":"PASS","summary":"ok","findings":[]}`)
+
+	detector := &FileIPCDetector{session: session}
+	pi := paneInfo{
+		provider:     ProviderConfig{Name: "codex"},
+		role:         "reviewer",
+		responseFile: responsePath,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	ok, err := detector.WaitForCompletion(ctx, pi, nil, "", 1)
+	assert.NoError(t, err)
+	assert.True(t, ok, "response-file marker should complete hook-mode reviewer without a done file")
+}
+
+func TestFileIPCDetector_ResponseFileMarkerArrivesBeforeDoneFile(t *testing.T) {
+	t.Parallel()
+	session := newTestHookSession(t)
+	responsePath := filepath.Join(t.TempDir(), "codex-response.md")
+
+	detector := &FileIPCDetector{session: session}
+	pi := paneInfo{
+		provider:     ProviderConfig{Name: "codex"},
+		role:         "reviewer",
+		responseFile: responsePath,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	content := markedResponse(`{"verdict":"PASS","summary":"ok","findings":[]}`)
+	go func() {
+		time.Sleep(120 * time.Millisecond)
+		_ = os.WriteFile(responsePath, []byte(content), 0o600)
+	}()
+
+	start := time.Now()
+	ok, err := detector.WaitForCompletion(ctx, pi, nil, "", 1)
+	assert.NoError(t, err)
+	assert.True(t, ok, "response-file marker should unblock FileIPC wait even when the hook done file never appears")
+	assert.Less(t, time.Since(start), time.Second)
+}
+
 // TestNewCompletionDetectorWithConfig_FileIPC verifies factory returns FileIPCDetector
 // when hookMode is true and terminal has no signal support.
 func TestNewCompletionDetectorWithConfig_FileIPC(t *testing.T) {
@@ -140,4 +187,13 @@ func newTestHookSession(t *testing.T) *HookSession {
 		sessionDir:    dir,
 		hookProviders: defaultHookProviders,
 	}
+}
+
+func writeMarkedResponse(t *testing.T, path, body string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(path, []byte(markedResponse(body)), 0o600))
+}
+
+func markedResponse(body string) string {
+	return responseBeginMarker + "\n" + body + "\n" + responseEndMarker + "\n"
 }

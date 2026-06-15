@@ -73,6 +73,10 @@ func resolveHookProviders(providers []ProviderConfig) map[string]bool {
 	for _, p := range providers {
 		if p.HasHook != nil {
 			out[p.Name] = *p.HasHook
+			continue
+		}
+		if usesAntigravityPromptInteractive(p) {
+			out[p.Name] = false
 		}
 	}
 	return out

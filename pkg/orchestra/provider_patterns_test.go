@@ -63,6 +63,7 @@ func TestResolveHookProviders_OverrideBehavior(t *testing.T) {
 	got := resolveHookProviders([]ProviderConfig{
 		{Name: "claude", HasHook: &off},
 		{Name: "custom", HasHook: &on},
+		{Name: "gemini", Binary: "agy"},
 	})
 	if got["claude"] {
 		t.Fatalf("claude override to false must disable hook")
@@ -70,8 +71,8 @@ func TestResolveHookProviders_OverrideBehavior(t *testing.T) {
 	if !got["custom"] {
 		t.Fatalf("custom override to true must enable hook")
 	}
-	if !got["gemini"] {
-		t.Fatalf("unoverridden gemini must keep default true")
+	if got["gemini"] {
+		t.Fatalf("agy-backed gemini must not wait for Claude-style hook files")
 	}
 }
 

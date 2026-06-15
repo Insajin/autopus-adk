@@ -23,9 +23,6 @@ func structuredSpecReviewContext(ctx context.Context, timeoutSeconds int) (conte
 }
 
 func structuredReviewExecutionMode(backend orchestra.ExecutionBackend) string {
-	if backend != nil && backend.Name() == "pane" {
-		return "sequential"
-	}
 	return "parallel"
 }
 
@@ -82,9 +79,12 @@ func runStructuredSpecReviewProvidersParallel(
 
 	for i, provider := range cfg.Providers {
 		go func(idx int, provider orchestra.ProviderConfig) {
+			timeout := specReviewAttemptTimeoutBudget(provider, cfg.TimeoutSeconds)
+			childCtx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
 			outcomes <- indexedSpecReviewOutcome{
 				index:   idx,
-				outcome: executeStructuredSpecReviewProvider(ctx, cfg, backend, parser, schemaPath, embeddedSchema, provider, mode),
+				outcome: executeStructuredSpecReviewProvider(childCtx, cfg, backend, parser, schemaPath, embeddedSchema, provider, mode),
 			}
 		}(i, provider)
 	}

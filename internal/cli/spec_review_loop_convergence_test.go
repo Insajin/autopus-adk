@@ -150,7 +150,7 @@ func TestRunSpecReviewLoop_AppliesRevisionWatchdogToOrchestra(t *testing.T) {
 	params.timeout = 1
 	params.maxRevisions = 3
 	params.providers = []orchestra.ProviderConfig{{Name: "claude", Binary: "claude"}}
-	// The review watchdog is now derived from the SUM of per-provider timeouts
+	// The review watchdog is derived from the longest per-provider attempt budget
 	// (see specReviewWatchdogSeconds), not the raw params.timeout. Bound the test
 	// via a short parent context so it stays fast while still proving that a
 	// watchdog/timeout failure breaks the revision loop instead of burning every

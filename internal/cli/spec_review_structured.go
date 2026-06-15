@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/orchestra"
@@ -22,8 +21,8 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 		return nil, fmt.Errorf("spec review: no providers configured")
 	}
 
-	// The review context must outlast the SUM of the per-provider timeouts, not
-	// a single per-provider-sized value. See specReviewWatchdogSeconds.
+	// The review context must outlast the longest per-provider attempt budget.
+	// Provider execution itself is isolated by child contexts in the parallel fan-out.
 	watchdogSeconds := specReviewWatchdogSeconds(cfg.Providers, cfg.TimeoutSeconds)
 	ctx, cancel := structuredSpecReviewContext(ctx, watchdogSeconds)
 	defer cancel()
@@ -44,7 +43,9 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 	if backend == nil {
 		return nil, fmt.Errorf("spec review: no execution backend configured")
 	}
-	backend = serializeSpecReviewPaneBackend(backend)
+	cleanupHookSession := ownStructuredReviewHookSession(cfg)
+	defer cleanupHookSession()
+
 	parser := &orchestra.OutputParser{}
 	start := time.Now()
 
@@ -72,28 +73,16 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 	}, nil
 }
 
-type serializedSpecReviewBackend struct {
-	inner orchestra.ExecutionBackend
-	mu    sync.Mutex
-}
-
-func serializeSpecReviewPaneBackend(backend orchestra.ExecutionBackend) orchestra.ExecutionBackend {
-	if backend == nil || backend.Name() != "pane" {
-		return backend
+func ownStructuredReviewHookSession(cfg orchestra.OrchestraConfig) func() {
+	if !cfg.HookMode || strings.TrimSpace(cfg.SessionID) == "" {
+		return func() {}
 	}
-	// cmux/tmux pane operations mutate the active terminal surface; keep the
-	// structured review fan-out from overlapping split/paste/read/cleanup calls.
-	return &serializedSpecReviewBackend{inner: backend}
-}
-
-func (b *serializedSpecReviewBackend) Execute(ctx context.Context, req orchestra.ProviderRequest) (*orchestra.ProviderResponse, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.inner.Execute(ctx, req)
-}
-
-func (b *serializedSpecReviewBackend) Name() string {
-	return b.inner.Name()
+	hookSession, err := orchestra.NewHookSession(cfg.SessionID)
+	if err != nil {
+		return func() {}
+	}
+	hookSession.ApplyProviderHooks(cfg.Providers)
+	return hookSession.Cleanup
 }
 
 func buildStructuredSpecReviewPrompt(basePrompt, schemaJSON string, inlineSchema bool) string {
@@ -271,23 +260,21 @@ func specReviewTimeout(provider orchestra.ProviderConfig, fallbackSeconds int) t
 }
 
 // specReviewWatchdogSeconds derives the overall review deadline (in seconds)
-// from the per-provider execution timeouts. The pane backend runs providers
-// sequentially under one shared context, so the global deadline must outlast
-// the SUM of every provider's timeout. Reusing a single per-provider-sized
-// value (e.g. --timeout or orchestra.timeout_seconds) as the global deadline
-// cancels later providers before they ever run and silently defeats the
-// configured per-provider timeouts — the root cause of "0/N providers
-// responded" watchdog timeouts. Subprocess (parallel) execution completes at
-// max(), so the summed budget is a safe upper bound there too. Slack covers
-// schema build, prompt assembly, and pane split/paste/read/cleanup overhead.
+// from the longest provider attempt budget. Structured review providers run in
+// parallel, and each provider gets its own child context, so a hung provider
+// should be bounded by its own timeout instead of forcing a sum-of-providers
+// deadline. Slack covers schema build, prompt assembly, pane split/paste/read,
+// cleanup, and goroutine fan-in overhead.
 func specReviewWatchdogSeconds(providers []orchestra.ProviderConfig, fallbackSeconds int) int {
 	if len(providers) == 0 {
 		return fallbackSeconds
 	}
-	var total time.Duration
+	var longest time.Duration
 	for _, provider := range providers {
-		total += specReviewAttemptTimeoutBudget(provider, fallbackSeconds)
+		if budget := specReviewAttemptTimeoutBudget(provider, fallbackSeconds); budget > longest {
+			longest = budget
+		}
 	}
-	total += 30*time.Second + time.Duration(len(providers))*10*time.Second
-	return int(total / time.Second)
+	longest += 30*time.Second + time.Duration(len(providers))*10*time.Second
+	return int(longest / time.Second)
 }

@@ -49,19 +49,20 @@ func captureSpecReviewStderr(t *testing.T, fn func()) string {
 	return <-done
 }
 
-func TestSpecReviewWatchdogSeconds_SumsPerProviderTimeouts(t *testing.T) {
+func TestSpecReviewWatchdogSeconds_UsesLongestParallelProviderBudget(t *testing.T) {
 	providers := []orchestra.ProviderConfig{
 		{Name: "claude", ExecutionTimeout: 480 * time.Second},
 		{Name: "codex", ExecutionTimeout: 420 * time.Second},
 		{Name: "gemini"}, // no ExecutionTimeout -> uses the fallback
 	}
-	// 2 attempts each: (480 + 420 + 150 fallback for gemini) * 2 + 30 base + 3*10 per-provider slack.
+	// 2 attempts for the longest provider: 480*2 + 30 base + 3*10 per-provider slack.
 	got := specReviewWatchdogSeconds(providers, 150)
-	assert.Equal(t, 2160, got)
-	// Regression guard: the shared review deadline MUST outlast the longest
-	// single provider timeout, otherwise sequential pane execution cancels it
-	// mid-run and reports a spurious 0/N watchdog timeout.
+	assert.Equal(t, 1020, got)
+	// Regression guard: the shared review deadline must outlast the longest
+	// single provider attempt budget while avoiding the old sum-of-providers
+	// deadline used by sequential pane execution.
 	assert.Greater(t, got, 480, "watchdog must outlast the longest per-provider timeout")
+	assert.Less(t, got, 2160, "parallel watchdog must not sum independent provider budgets")
 }
 
 func TestSpecReviewWatchdogSeconds_FallbackWhenNoProviders(t *testing.T) {
@@ -102,9 +103,9 @@ func TestRunStructuredSpecReviewOrchestra_WatchdogSynthesizesPaneFailures(t *tes
 	assert.True(t, result.Responses[0].TimedOut)
 	assert.Contains(t, result.FailedProviders[0].Error, "backend=pane")
 	assert.Contains(t, result.FailedProviders[0].Error, "stage=provider_execution")
-	assert.Contains(t, result.FailedProviders[1].Error, "stage=queued")
+	assert.Contains(t, result.FailedProviders[1].Error, "stage=provider_execution")
 	assert.Contains(t, stderr, "SPEC 리뷰 백엔드: pane")
-	assert.Contains(t, stderr, "mode=sequential")
+	assert.Contains(t, stderr, "mode=parallel")
 	assert.Contains(t, stderr, "SPEC 리뷰 provider 시작: claude")
 	assert.Contains(t, stderr, "SPEC 리뷰 provider 실패: claude")
 }

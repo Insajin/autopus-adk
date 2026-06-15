@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
@@ -45,6 +46,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 			// R8: fallback to non-hook mode
 			cfg.HookMode = false
 		} else {
+			hookSession.ApplyProviderHooks(cfg.Providers)
 			defer hookSession.Cleanup()
 			// Set on orchestrator process env for subprocesses spawned directly.
 			_ = os.Setenv("AUTOPUS_SESSION_ID", cfg.SessionID)
@@ -118,60 +120,65 @@ func startPipeCapture(ctx context.Context, term terminal.Terminal, panes []paneI
 
 // launchInteractiveSessions launches provider CLIs in each pane using SendLongText (FR-02).
 func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []FailedProvider {
-	var failed []FailedProvider
-	for i, pi := range panes {
-		var launchPrompt string
-		var promptFile string
-		var responseFile string
-		if promptDeliveredAtLaunch(pi.provider) {
-			launchPrompt, promptFile, responseFile = panePromptText(cfg, pi.provider, 1, cfg.Prompt)
-			if promptFile != "" {
-				panes[i].promptFiles = append(panes[i].promptFiles, promptFile)
+	var wg sync.WaitGroup
+	failedCh := make(chan FailedProvider, len(panes)*2)
+	for i := range panes {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			pi := panes[i]
+			recordFailure := func(message string) {
+				failedCh <- FailedProvider{Name: pi.provider.Name, Error: message}
+				panes[i].skipWait = true
 			}
-			panes[i].responseFile = responseFile
-		}
-		cmd, launchFile, err := buildPaneLaunchCommand(cfg.WorkingDir, pi.provider, launchPrompt)
-		if err != nil {
-			failed = append(failed, FailedProvider{
-				Name:  pi.provider.Name,
-				Error: fmt.Sprintf("launch command failed: %v", err),
-			})
-			panes[i].skipWait = true
-			continue
-		}
-		if launchFile != "" {
-			panes[i].launchFiles = append(panes[i].launchFiles, launchFile)
-		}
-		// Export AUTOPUS_SESSION_ID to the pane shell BEFORE launching the provider CLI.
-		// The orchestrator process env set via os.Setenv is NOT inherited by cmux surfaces
-		// (they are independent login shells). SendSessionEnvToPane mirrors the pattern
-		// used by SendRoundEnvToPane for AUTOPUS_ROUND. Without this, hook scripts that
-		// guard on AUTOPUS_SESSION_ID (e.g., hook-claude-stop.sh:8) exit 0 as a no-op.
-		if cfg.HookMode && cfg.SessionID != "" {
-			if envErr := SendSessionEnvToPane(ctx, cfg.Terminal, pi.paneID, cfg.SessionID); envErr != nil {
-				log.Printf("[interactive] SendSessionEnvToPane for %s failed (non-fatal): %v", pi.provider.Name, envErr)
-			} else if enterErr := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); enterErr != nil {
-				log.Printf("[interactive] session-env Enter for %s failed (non-fatal): %v", pi.provider.Name, enterErr)
+			var launchPrompt string
+			var promptFile string
+			var responseFile string
+			if promptDeliveredAtLaunch(pi.provider) {
+				launchPrompt, promptFile, responseFile = panePromptText(cfg, pi.provider, 1, cfg.Prompt)
+				if promptFile != "" {
+					panes[i].promptFiles = append(panes[i].promptFiles, promptFile)
+				}
+				panes[i].responseFile = responseFile
 			}
-		}
+			cmd, launchFile, err := buildPaneLaunchCommand(cfg.WorkingDir, pi.provider, launchPrompt)
+			if err != nil {
+				recordFailure(fmt.Sprintf("launch command failed: %v", err))
+				return
+			}
+			if launchFile != "" {
+				panes[i].launchFiles = append(panes[i].launchFiles, launchFile)
+			}
+			// Export AUTOPUS_SESSION_ID to the pane shell BEFORE launching the provider CLI.
+			// The orchestrator process env set via os.Setenv is NOT inherited by cmux surfaces
+			// (they are independent login shells). SendSessionEnvToPane mirrors the pattern
+			// used by SendRoundEnvToPane for AUTOPUS_ROUND. Without this, hook scripts that
+			// guard on AUTOPUS_SESSION_ID (e.g., hook-claude-stop.sh:8) exit 0 as a no-op.
+			if cfg.HookMode && cfg.SessionID != "" {
+				if envErr := SendSessionEnvToPane(ctx, cfg.Terminal, pi.paneID, cfg.SessionID); envErr != nil {
+					log.Printf("[interactive] SendSessionEnvToPane for %s failed (non-fatal): %v", pi.provider.Name, envErr)
+				} else if enterErr := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); enterErr != nil {
+					log.Printf("[interactive] session-env Enter for %s failed (non-fatal): %v", pi.provider.Name, enterErr)
+				}
+			}
 
-		// FR-02: Use SendLongText for launch command body (handles long args-based prompts)
-		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, cmd); err != nil {
-			failed = append(failed, FailedProvider{
-				Name:  pi.provider.Name,
-				Error: fmt.Sprintf("launch session failed: %v", err),
-			})
-			panes[i].skipWait = true
-			continue
-		}
-		// Send Enter separately (SendLongText contract: callers send Enter)
-		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
-			failed = append(failed, FailedProvider{
-				Name:  pi.provider.Name,
-				Error: fmt.Sprintf("launch enter failed: %v", err),
-			})
-			panes[i].skipWait = true
-		}
+			// FR-02: Use SendLongText for launch command body (handles long args-based prompts)
+			if err := cfg.Terminal.SendLongText(ctx, pi.paneID, cmd); err != nil {
+				recordFailure(fmt.Sprintf("launch session failed: %v", err))
+				return
+			}
+			// Send Enter separately (SendLongText contract: callers send Enter)
+			time.Sleep(promptRegisterDelay)
+			if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
+				recordFailure(fmt.Sprintf("launch enter failed: %v", err))
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(failedCh)
+	failed := make([]FailedProvider, 0)
+	for failure := range failedCh {
+		failed = append(failed, failure)
 	}
 	return failed
 }

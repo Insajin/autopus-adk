@@ -15,9 +15,8 @@ func WaitAndCollectHookResults(cfg OrchestraConfig, sessionID string) ([]Provide
 	if err != nil {
 		return nil, err
 	}
+	session.ApplyProviderHooks(cfg.Providers)
 	defer session.Cleanup()
-
-	timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
 
 	var (
 		responses []ProviderResponse
@@ -31,7 +30,7 @@ func WaitAndCollectHookResults(cfg OrchestraConfig, sessionID string) ([]Provide
 			defer wg.Done()
 			start := time.Now()
 
-			resp := collectSingleProvider(session, p, timeout, start)
+			resp := collectSingleProvider(session, p, hookWatcherTimeout(p, cfg.TimeoutSeconds), start)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -41,6 +40,13 @@ func WaitAndCollectHookResults(cfg OrchestraConfig, sessionID string) ([]Provide
 
 	wg.Wait()
 	return responses, nil
+}
+
+func hookWatcherTimeout(provider ProviderConfig, fallbackSeconds int) time.Duration {
+	if provider.ExecutionTimeout > 0 {
+		return provider.ExecutionTimeout
+	}
+	return time.Duration(fallbackSeconds) * time.Second
 }
 
 // collectSingleProvider collects a result from a single provider.

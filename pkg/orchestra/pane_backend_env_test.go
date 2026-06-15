@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -65,4 +66,66 @@ func TestExecute_NoSessionEnvWhenHookModeOff(t *testing.T) {
 		require.NotContains(t, c, "export AUTOPUS_SESSION_ID=",
 			"Execute must not export AUTOPUS_SESSION_ID when HookMode is off")
 	}
+}
+
+func TestExecute_DoesNotCleanupSharedHookSession(t *testing.T) {
+	const sid = "orch-test-shared-hook-owner"
+	sessionDir := filepath.Join(os.TempDir(), "autopus", sid)
+	require.NoError(t, os.RemoveAll(sessionDir))
+	defer func() { _ = os.RemoveAll(sessionDir) }()
+
+	provider := ProviderConfig{Name: "gemini", Binary: "agy"}
+	mock := &seqScreenMock{name: "cmux", screens: []string{readyScreen}}
+	b := NewInteractivePaneBackend(OrchestraConfig{
+		Terminal:   mock,
+		HookMode:   true,
+		SessionID:  sid,
+		WorkingDir: t.TempDir(),
+		Providers:  []ProviderConfig{provider},
+	})
+	req := ProviderRequest{
+		Provider: "gemini",
+		Config:   provider,
+		Prompt:   "review this",
+		Role:     "reviewer",
+		Timeout:  time.Second,
+	}
+
+	resp, err := b.Execute(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.DirExists(t, sessionDir,
+		"provider-level Execute must not remove the shared hook session while sibling providers may still be running")
+}
+
+func TestExecute_CodexPromptUsesSendkeysAfterReady(t *testing.T) {
+	t.Parallel()
+
+	mock := &seqScreenMock{name: "cmux", screens: []string{readyScreen}}
+	provider := ProviderConfig{Name: "codex", Binary: "codex", PaneArgs: []string{"-m", "gpt-5.4"}}
+	b := NewInteractivePaneBackend(OrchestraConfig{
+		Terminal:     mock,
+		WorkingDir:   t.TempDir(),
+		InitialDelay: time.Millisecond,
+	})
+	req := ProviderRequest{
+		Provider: "codex",
+		Config:   provider,
+		Prompt:   "review this",
+		Role:     "reviewer",
+		Timeout:  3 * time.Second,
+	}
+
+	resp, err := b.Execute(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	var promptCommandFound bool
+	for _, c := range mock.commands {
+		if strings.Contains(c, "Markdown file") && strings.Contains(c, "AUTOPUS_RESPONSE_BEGIN") {
+			promptCommandFound = true
+		}
+	}
+	require.True(t, promptCommandFound, "codex prompt-file instruction must be sent via SendCommand/sendkeys so the TUI can submit it reliably")
+	require.Len(t, mock.longTexts, 1, "codex should use SendLongText only for the launch command, not for the prompt-file instruction")
 }

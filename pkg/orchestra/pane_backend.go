@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
@@ -88,9 +89,6 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	// signal, and so the same session is reused for completion. Degrades to nil
 	// (screen-poll ready + completion) on failure (REQ-012).
 	hookSession := resolveHookSession(b.cfg)
-	if hookSession != nil {
-		defer hookSession.Cleanup()
-	}
 
 	// Launch the provider CLI. For args-based providers the prompt rides on the
 	// launch command; otherwise the prompt is sent only after session-ready.
@@ -114,6 +112,7 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	if err := term.SendLongText(ctx, paneID, cmd); err != nil {
 		return paneFallback(ctx, req, "interactive pane execution failed: launch send error: "+err.Error())
 	}
+	time.Sleep(promptRegisterDelay)
 	if err := term.SendCommand(ctx, paneID, "\n"); err != nil {
 		return paneFallback(ctx, req, "interactive pane execution failed: launch enter error: "+err.Error())
 	}
@@ -135,10 +134,10 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 			pi.promptFiles = append(pi.promptFiles, promptFile)
 		}
 		pi.responseFile = responseFile
-		if err := term.SendLongText(ctx, paneID, promptText); err != nil {
+		if err := sendPanePromptInput(ctx, term, paneID, req.Config, promptText, promptFile != ""); err != nil {
 			return paneFallback(ctx, req, "interactive pane execution failed: prompt send error: "+err.Error())
 		}
-		time.Sleep(promptRegisterDelay)
+		time.Sleep(panePromptSubmitDelay(req.Config))
 		if err := term.SendCommand(ctx, paneID, "\n"); err != nil {
 			return paneFallback(ctx, req, "interactive pane execution failed: prompt enter error: "+err.Error())
 		}
@@ -155,6 +154,37 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	resp := b.collectResponse(ctx, req, pi, !completed)
 	resp.Duration = time.Since(start)
 	return resp, nil
+}
+
+func sendPanePromptInput(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, provider ProviderConfig, promptText string, fileBacked bool) error {
+	if shouldUseSendkeysPromptInput(provider, fileBacked) {
+		normalized := strings.ReplaceAll(promptText, "\n", " ")
+		return term.SendCommand(ctx, paneID, normalized)
+	}
+	return term.SendLongText(ctx, paneID, promptText)
+}
+
+func shouldUseSendkeysPromptInput(provider ProviderConfig, fileBacked bool) bool {
+	if strings.EqualFold(strings.TrimSpace(provider.InteractiveInput), "sendkeys") {
+		return true
+	}
+	if !fileBacked {
+		return false
+	}
+	return isCodexInteractiveProvider(provider)
+}
+
+func isCodexInteractiveProvider(provider ProviderConfig) bool {
+	name := strings.EqualFold(strings.TrimSpace(provider.Name), "codex")
+	binary := strings.TrimSpace(provider.Binary)
+	return name || binary == "codex" || strings.HasSuffix(binary, "/codex")
+}
+
+func panePromptSubmitDelay(provider ProviderConfig) time.Duration {
+	if isCodexInteractiveProvider(provider) {
+		return 750 * time.Millisecond
+	}
+	return promptRegisterDelay
 }
 
 func captureCompletionBaseline(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID) string {
@@ -202,5 +232,6 @@ func resolveHookSession(cfg OrchestraConfig) *HookSession {
 		log.Printf("pane_backend: HookSession creation failed for session %q, degrading to poll: %v", cfg.SessionID, err)
 		return nil
 	}
+	sess.ApplyProviderHooks(cfg.Providers)
 	return sess
 }

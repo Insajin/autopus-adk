@@ -22,8 +22,9 @@ func resolveCompletionDetector(cfg OrchestraConfig, hookSession *HookSession) re
 			eventDriven: !isPoll,
 		}
 	}
-	// SPEC-ORCH-022: when a hook session is active the done-file IPC detector is the
-	// authoritative completion contract and the completion floor. Select it first and
+	// SPEC-ORCH-022: when a hook session is active the IPC detector is the
+	// authoritative completion floor. It accepts either a structured reviewer
+	// response-file marker or the provider done-file. Select it first and
 	// as a full-budget wait (eventDriven=false): it must be neither gated on the CC21
 	// monitor feature flag nor capped by the short monitor pattern timeout with a
 	// screen-poll fallback. The monitor-gated path returned the instant the response
@@ -85,6 +86,12 @@ func monitorWaitContext(ctx context.Context, timeout time.Duration) (context.Con
 }
 
 func waitForCompletion(ctx context.Context, cfg OrchestraConfig, pi paneInfo, patterns []CompletionPattern, baseline string, hookSession *HookSession, round int) bool {
+	if cfg.HookMode && hookSession != nil && !hookSession.HasHook(pi.provider.Name) {
+		fallback := &ScreenPollDetector{term: cfg.Terminal}
+		completed, err := fallback.WaitForCompletion(ctx, pi, patterns, baseline, round)
+		return handleCompletionResult(ctx, pi.provider.Name, completed, err)
+	}
+
 	resolved := resolveCompletionDetector(cfg, hookSession)
 	if !resolved.eventDriven {
 		completed, err := resolved.detector.WaitForCompletion(ctx, pi, patterns, baseline, round)

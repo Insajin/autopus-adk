@@ -161,6 +161,27 @@ func TestCollectRoundHookResults_Timeout(t *testing.T) {
 	assert.True(t, responses[0].TimedOut)
 }
 
+func TestCollectRoundHookResults_UsesProviderExecutionTimeout(t *testing.T) {
+	t.Parallel()
+	sess, err := NewHookSession("test-collect-round-provider-timeout")
+	require.NoError(t, err)
+	defer sess.Cleanup()
+
+	cfg := OrchestraConfig{
+		Providers: []ProviderConfig{{
+			Name:             "claude",
+			ExecutionTimeout: 200 * time.Millisecond,
+		}},
+		TimeoutSeconds: 5,
+	}
+
+	start := time.Now()
+	responses := collectRoundHookResults(context.Background(), cfg, sess, 99)
+	require.Len(t, responses, 1)
+	assert.True(t, responses[0].TimedOut)
+	assert.Less(t, time.Since(start), 1500*time.Millisecond, "provider timeout must isolate hook hangs from the global timeout")
+}
+
 // TestCollectRoundHookResults_MissingResult verifies graceful handling when
 // done file exists but result file does not.
 func TestCollectRoundHookResults_MissingResult(t *testing.T) {
