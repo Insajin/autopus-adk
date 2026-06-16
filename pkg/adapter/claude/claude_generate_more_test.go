@@ -73,7 +73,7 @@ func TestClaudeAdapter_Generate_ProducesFileSizeLimitRule(t *testing.T) {
 }
 
 // TestClaudeAdapter_Generate_InstallsHooksAndPermissions verifies that
-// applyHooksAndPermissions is executed during Generate (settings.json created).
+// Hook and permission settings are emitted during Generate.
 func TestClaudeAdapter_Generate_InstallsHooksAndPermissions(t *testing.T) {
 	t.Parallel()
 

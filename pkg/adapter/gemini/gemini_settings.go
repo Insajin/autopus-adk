@@ -69,22 +69,6 @@ func (a *Adapter) generateSettingsWithHooks(cfg *config.HarnessConfig) ([]adapte
 	return buildGeminiSettingsMapping(settings)
 }
 
-// applyHooksAndPermissions installs hooks and permissions to .gemini/settings.json.
-func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.HarnessConfig) error {
-	hookConfigs := a.configuredHooks(cfg)
-	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
-	if err := a.InstallHooks(ctx, hookConfigs, perms); err != nil {
-		return err
-	}
-	if _, err := a.writeAntigravityHooksJSON(hookConfigs); err != nil {
-		return err
-	}
-
-	a.installAntigravityPluginIfAvailable(ctx)
-
-	return nil
-}
-
 func (a *Adapter) installAntigravityPluginIfAvailable(ctx context.Context) {
 	if _, lookErr := exec.LookPath(cliBinary); lookErr == nil {
 		pluginPath := filepath.Join(a.root, antigravityPluginDir)

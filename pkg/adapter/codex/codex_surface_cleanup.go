@@ -90,14 +90,6 @@ func (a *Adapter) cleanupLegacyRootConfig() error {
 	return nil
 }
 
-func (a *Adapter) cleanupStaleManagedSurfaces(oldManifest *adapter.Manifest, files []adapter.FileMapping, backupDir *string) error {
-	if oldManifest == nil {
-		return nil
-	}
-	diff := adapter.BuildManifestDiff(oldManifest, files, codexPruneRoots())
-	return adapter.PruneManagedPaths(a.root, diff.Prune, backupDir)
-}
-
 func codexPruneRoots() []string {
 	return []string{
 		filepath.ToSlash(filepath.Join(".codex", "skills")),

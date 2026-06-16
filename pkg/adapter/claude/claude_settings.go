@@ -13,21 +13,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/content"
 )
 
-// applyHooksAndPermissions는 hooks와 permissions를 .claude/settings.json에 설치한다.
-// Always writes settings.json — DetectPermissions always returns non-nil with common defaults.
-func (a *Adapter) applyHooksAndPermissions(_ context.Context, cfg *config.HarnessConfig) error {
-	files, err := a.prepareHooksAndPermissionsFiles(cfg)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
-		if err := writeClaudeMapping(a.root, file); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (a *Adapter) prepareHooksAndPermissionsFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	a.statusLineMode = resolveStatusLineMode(cfg, InspectStatusLine(a.root))
 	hookConfigs, gitHooks, _ := content.GenerateProjectHookConfigs(cfg, "claude-code", a.SupportsHooks())
