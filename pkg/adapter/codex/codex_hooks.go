@@ -79,7 +79,7 @@ func (a *Adapter) prepareGitHookFiles(cfg *config.HarnessConfig) ([]adapter.File
 		})
 	}
 
-	return files, nil
+	return adapter.FilterUnsupportedRootGitHookFiles(a.root, files), nil
 }
 
 // renderHooksTemplate renders the codex hooks.json template.

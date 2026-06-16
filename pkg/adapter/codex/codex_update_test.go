@@ -245,6 +245,25 @@ func TestUpdate_RemovesUnmanagedStalePluginLongTailSkills(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"))
 }
 
+func TestUpdate_LinkedWorktreeGitFileSkipsRootGitHooks(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+	require.NoError(t, os.RemoveAll(filepath.Join(dir, ".git")))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".git"), []byte("gitdir: /tmp/autopus-worktree\n"), 0644))
+
+	pf, err := a.Update(context.Background(), cfg)
+	require.NoError(t, err)
+	assert.NotNil(t, pf)
+	for _, file := range pf.Files {
+		assert.False(t, strings.HasPrefix(filepath.ToSlash(file.TargetPath), ".git/hooks/"), file.TargetPath)
+	}
+}
+
 func TestUpdate_RemovesLegacyRootCodexConfig(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

@@ -58,6 +58,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **worktree gitfile 대상 update 실패** (2026-06-16): 연결 worktree처럼 `.git`이 디렉터리가 아니라 `gitdir:` 파일인 저장소에서 Codex/OpenCode fallback git hook 경로 `.git/hooks/*`를 transaction write/prune 대상으로 잡아 `lstat ... .git/hooks/pre-commit: not a directory`로 `auto update --workspace`가 실패하던 문제를 수정했다. native hook surface(`.codex/hooks.json`, OpenCode plugin)는 계속 갱신하되 root-local fallback git hook은 해당 형태에서 건너뛴다.
+
 - **Claude Code Stop/SessionStart 훅 상대경로 실패** (2026-06-12): 설치된 settings.json의 훅 명령이 상대경로(`.claude/hooks/autopus/hook-claude-stop.sh`)라 훅 spawn cwd가 settings 루트와 다른 서브에이전트/하위 디렉토리 세션에서 매 Stop마다 "No such file or directory"로 실패했다(하루 27회 실측). 생성기(`pkg/content/hooks_completion.go`)가 `"${CLAUDE_PROJECT_DIR:-.}"/` 프리픽스로 앵커하도록 수정하고 회귀 테스트로 고정. 설치된 워크스페이스 복사본 7개는 동일 값으로 로컬 패치됨(다음 `auto update` 재생성과 일치).
 
 - **Gemini SPEC review subprocess timeout backfill** (2026-06-04): Default `agy`/Gemini orchestra provider config now declares a 480s subprocess execution timeout, matching the structured SPEC review budget used by Claude, and in-memory orchestra config migration backfills existing `autopus.yaml` entries where `orchestra.providers.gemini.subprocess.timeout` was missing. This prevents Gemini review runs from falling back to the 240s global `orchestra.timeout_seconds` and failing at exactly 4 minutes.

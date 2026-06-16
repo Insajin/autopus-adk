@@ -25,16 +25,17 @@ func (a *Adapter) buildUpdateTransactionPlan(
 		Checksum: adapter.Checksum(fmt.Sprintf("%d", len(finalFiles))),
 	}
 	diff := adapter.BuildManifestDiff(oldManifest, files, opencodePruneRoots())
+	removes := adapter.TransactionRemovesFromManifestDiff(diff, false)
 
 	return adapter.TransactionPlan{
 		Writes:   adapter.TransactionWritesFromFiles(finalFiles, opencodeFileMode),
-		Removes:  adapter.TransactionRemovesFromManifestDiff(diff, false),
+		Removes:  adapter.FilterUnsupportedRootGitHookRemoves(a.root, removes),
 		Manifest: adapter.ManifestFromFiles(adapterName, pf),
 	}, pf
 }
 
 func opencodeFileMode(path string) os.FileMode {
-	if isExecutablePath(path) {
+	if adapter.IsRootGitHookPath(path) || isExecutablePath(path) {
 		return 0755
 	}
 	return 0644

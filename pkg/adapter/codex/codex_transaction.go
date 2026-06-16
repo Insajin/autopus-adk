@@ -71,7 +71,7 @@ func (a *Adapter) buildUpdateTransactionRemoves(
 	if remove, ok := a.legacyRootConfigRemove(); ok {
 		removes = append(removes, remove)
 	}
-	return removes, nil
+	return adapter.FilterUnsupportedRootGitHookRemoves(a.root, removes), nil
 }
 
 func (a *Adapter) pluginWorkflowShimRemoves() []adapter.TransactionRemove {
@@ -140,7 +140,7 @@ func (a *Adapter) legacyRootConfigRemove() (adapter.TransactionRemove, bool) {
 
 func codexFileMode(path string) os.FileMode {
 	clean := filepath.ToSlash(path)
-	if strings.HasPrefix(clean, ".git/hooks/") || strings.HasSuffix(clean, ".sh") {
+	if adapter.IsRootGitHookPath(clean) || strings.HasSuffix(clean, ".sh") {
 		return 0755
 	}
 	return 0644

@@ -49,7 +49,7 @@ func (a *Adapter) prepareGitHookMappings(cfg *config.HarnessConfig) ([]adapter.F
 			Content:         []byte(hook.Content),
 		})
 	}
-	return files, nil
+	return adapter.FilterUnsupportedRootGitHookFiles(a.root, files), nil
 }
 
 func renderHookPlugin(hooks []adapter.HookConfig) (string, error) {
