@@ -185,6 +185,7 @@ func newUpdateCmd() *cobra.Command {
 			ctx := context.Background()
 			effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
 			updated := 0
+			var platformErrors []string
 
 			for _, p := range cfg.Platforms {
 				var updateErr error
@@ -207,6 +208,7 @@ func newUpdateCmd() *cobra.Command {
 				}
 				if updateErr != nil {
 					fmt.Fprintf(cmd.OutOrStdout(), "  ✗ %s: %v\n", p, updateErr)
+					platformErrors = append(platformErrors, fmt.Sprintf("%s: %v", p, updateErr))
 				} else {
 					fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s updated\n", p)
 					updated++
@@ -217,6 +219,9 @@ func newUpdateCmd() *cobra.Command {
 				fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", statusLineSummary)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Update complete: %d platform(s) updated\n", updated)
+			if len(platformErrors) > 0 {
+				return fmt.Errorf("플랫폼 업데이트 실패: %s", strings.Join(platformErrors, "; "))
+			}
 			return nil
 		},
 	}

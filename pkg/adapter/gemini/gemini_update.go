@@ -25,68 +25,16 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		}
 	}
 
-	if oldManifest == nil {
-		return a.Generate(ctx, cfg)
-	}
-
 	newFiles, err := a.prepareFiles(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	var backupDir string
-	var finalFiles []adapter.FileMapping
-
-	for _, f := range newFiles {
-		action := adapter.ResolveAction(a.root, f.TargetPath, f.OverwritePolicy, oldManifest)
-
-		if action == adapter.ActionSkip {
-			continue
-		}
-		if action == adapter.ActionBackup {
-			if backupDir == "" {
-				backupDir, err = adapter.CreateBackupDir(a.root)
-				if err != nil {
-					return nil, err
-				}
-			}
-			if _, backupErr := adapter.BackupFile(a.root, f.TargetPath, backupDir); backupErr != nil {
-				return nil, backupErr
-			}
-		}
-
-		targetPath := filepath.Join(a.root, f.TargetPath)
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-			return nil, fmt.Errorf("디렉터리 생성 실패: %w", err)
-		}
-		if err := os.WriteFile(targetPath, f.Content, 0644); err != nil {
-			return nil, fmt.Errorf("파일 쓰기 실패 %s: %w", f.TargetPath, err)
-		}
-		finalFiles = append(finalFiles, f)
+	plan, pf := a.buildUpdateTransactionPlan(oldManifest, newFiles)
+	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
+		return nil, err
 	}
-
-	// @AX:NOTE: [AUTO] file-count-only checksum — manifest integrity reflects file count only, not content hash; not a tamper-detection mechanism
-	pf := &adapter.PlatformFiles{
-		Files:    finalFiles,
-		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
-	}
-
-	m := adapter.ManifestFromFiles(adapterName, pf)
-	if saveErr := m.Save(a.root); saveErr != nil {
-		return nil, fmt.Errorf("매니페스트 저장 실패: %w", saveErr)
-	}
-
-	if backupDir != "" {
-		fmt.Fprintf(os.Stderr, "  백업됨: %s\n", backupDir)
-	}
-
-	// Hooks and permissions are applied to .gemini/settings.json after the
-	// template-based file writes above — Update was previously skipping this
-	// step, leaving stale Claude Code event names (PreToolUse/PostToolUse)
-	// in place after the event-name translation was added.
-	if err := a.applyHooksAndPermissions(ctx, cfg); err != nil {
-		return nil, fmt.Errorf("제미니 훅/권한 설치 실패: %w", err)
-	}
+	a.installAntigravityPluginIfAvailable(ctx)
 
 	return pf, nil
 }
@@ -146,7 +94,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		files = append(files, agentMappings...)
 	}
 
-	settingsMappings, err := a.generateSettings(cfg)
+	settingsMappings, err := a.generateSettingsWithHooks(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -171,4 +119,37 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	files = append(files, hookMappings...)
 
 	return files, nil
+}
+
+func (a *Adapter) buildUpdateTransactionPlan(
+	oldManifest *adapter.Manifest,
+	newFiles []adapter.FileMapping,
+) (adapter.TransactionPlan, *adapter.PlatformFiles) {
+	finalFiles := make([]adapter.FileMapping, 0, len(newFiles))
+	for _, file := range newFiles {
+		action := adapter.ResolveAction(a.root, file.TargetPath, file.OverwritePolicy, oldManifest)
+		if action == adapter.ActionSkip {
+			continue
+		}
+		finalFiles = append(finalFiles, file)
+	}
+
+	// @AX:NOTE: [AUTO] file-count-only checksum — manifest integrity reflects file count only, not content hash; not a tamper-detection mechanism
+	pf := &adapter.PlatformFiles{
+		Files:    finalFiles,
+		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
+	}
+
+	return adapter.TransactionPlan{
+		Writes:   adapter.TransactionWritesFromFiles(finalFiles, geminiFileMode),
+		Manifest: adapter.ManifestFromFiles(adapterName, pf),
+	}, pf
+}
+
+func geminiFileMode(path string) os.FileMode {
+	clean := filepath.ToSlash(path)
+	if filepath.Ext(clean) == ".sh" {
+		return 0755
+	}
+	return 0644
 }

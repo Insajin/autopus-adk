@@ -178,65 +178,16 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
 	}
 
-	if oldManifest == nil {
-		return a.Generate(ctx, cfg)
-	}
-
 	newFiles, err := a.prepareFiles(cfg)
 	if err != nil {
 		return nil, err
 	}
-	var backupDir string
-	if err := a.cleanupStaleManagedSurfaces(oldManifest, newFiles, &backupDir); err != nil {
+	plan, pf, err := a.buildUpdateTransactionPlan(cfg, oldManifest, newFiles)
+	if err != nil {
 		return nil, err
 	}
-
-	var finalFiles []adapter.FileMapping
-
-	for _, f := range newFiles {
-		action := adapter.ResolveAction(a.root, f.TargetPath, f.OverwritePolicy, oldManifest)
-
-		if action == adapter.ActionSkip {
-			continue
-		}
-		if action == adapter.ActionBackup {
-			if backupDir == "" {
-				backupDir, err = adapter.CreateBackupDir(a.root)
-				if err != nil {
-					return nil, err
-				}
-			}
-			if _, backupErr := adapter.BackupFile(a.root, f.TargetPath, backupDir); backupErr != nil {
-				return nil, backupErr
-			}
-		}
-
-		targetPath := filepath.Join(a.root, f.TargetPath)
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-			return nil, fmt.Errorf("디렉터리 생성 실패: %w", err)
-		}
-		if err := os.WriteFile(targetPath, f.Content, 0644); err != nil {
-			return nil, fmt.Errorf("파일 쓰기 실패 %s: %w", f.TargetPath, err)
-		}
-		finalFiles = append(finalFiles, f)
-	}
-
-	if err := a.cleanupDeprecatedSurface(newFiles); err != nil {
+	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
 		return nil, err
-	}
-
-	pf := &adapter.PlatformFiles{
-		Files:    finalFiles,
-		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
-	}
-
-	m := adapter.ManifestFromFiles(adapterName, filterCodexManifestFiles(cfg, pf))
-	if saveErr := m.Save(a.root); saveErr != nil {
-		return nil, fmt.Errorf("매니페스트 저장 실패: %w", saveErr)
-	}
-
-	if backupDir != "" {
-		fmt.Fprintf(os.Stderr, "  백업됨: %s\n", backupDir)
 	}
 
 	return pf, nil

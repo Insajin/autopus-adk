@@ -55,6 +55,20 @@ func (a *Adapter) generateSettings(cfg *config.HarnessConfig) ([]adapter.FileMap
 	}}, nil
 }
 
+func (a *Adapter) generateSettingsWithHooks(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	files, err := a.generateSettings(cfg)
+	if err != nil || len(files) == 0 {
+		return files, err
+	}
+
+	settings := make(map[string]any)
+	if err := json.Unmarshal(files[0].Content, &settings); err != nil {
+		return nil, fmt.Errorf("gemini settings JSON 파싱 실패: %w", err)
+	}
+	applyGeminiHooksAndPermissions(settings, a.configuredHooks(cfg), content.DetectPermissions(a.root, cfg.Hooks.Permissions))
+	return buildGeminiSettingsMapping(settings)
+}
+
 // applyHooksAndPermissions installs hooks and permissions to .gemini/settings.json.
 func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.HarnessConfig) error {
 	hookConfigs := a.configuredHooks(cfg)
@@ -66,14 +80,17 @@ func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.Harn
 		return err
 	}
 
-	// Auto-install the autopus plugin to antigravity (agy) if agy is present in PATH
+	a.installAntigravityPluginIfAvailable(ctx)
+
+	return nil
+}
+
+func (a *Adapter) installAntigravityPluginIfAvailable(ctx context.Context) {
 	if _, lookErr := exec.LookPath(cliBinary); lookErr == nil {
 		pluginPath := filepath.Join(a.root, antigravityPluginDir)
 		cmd := exec.CommandContext(ctx, cliBinary, "plugin", "install", pluginPath)
 		_ = cmd.Run()
 	}
-
-	return nil
 }
 
 // InstallHooks merges hooks and permissions into .gemini/settings.json.
@@ -85,16 +102,16 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 
 	settingsPath := filepath.Join(settingsDir, "settings.json")
 
-	var settings map[string]any
-	data, err := os.ReadFile(settingsPath)
-	if err == nil {
-		if err := json.Unmarshal(data, &settings); err != nil {
-			settings = make(map[string]any)
-		}
-	} else {
-		settings = make(map[string]any)
+	settings := readGeminiSettings(settingsPath)
+	applyGeminiHooksAndPermissions(settings, hooks, perms)
+	files, err := buildGeminiSettingsMapping(settings)
+	if err != nil {
+		return err
 	}
+	return adapter.WriteFileIfChanged(settingsPath, files[0].Content, 0644)
+}
 
+func applyGeminiHooksAndPermissions(settings map[string]any, hooks []adapter.HookConfig, perms *adapter.PermissionSet) {
 	if len(hooks) > 0 {
 		existingHooks, _ := settings["hooks"].(map[string]any)
 		hooksMap := make(map[string]any)
@@ -148,12 +165,32 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 		}
 		settings["permissions"] = permMap
 	}
+}
 
+func buildGeminiSettingsMapping(settings map[string]any) ([]adapter.FileMapping, error) {
 	out, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
-		return fmt.Errorf("gemini settings.json 직렬화 실패: %w", err)
+		return nil, fmt.Errorf("gemini settings.json 직렬화 실패: %w", err)
 	}
-	return adapter.WriteFileIfChanged(settingsPath, append(out, '\n'), 0644)
+	content := append(out, '\n')
+	return []adapter.FileMapping{{
+		TargetPath:      filepath.Join(".gemini", "settings.json"),
+		OverwritePolicy: adapter.OverwriteMerge,
+		Checksum:        checksum(string(content)),
+		Content:         content,
+	}}, nil
+}
+
+func readGeminiSettings(path string) map[string]any {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return make(map[string]any)
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		return make(map[string]any)
+	}
+	return settings
 }
 
 // mergeSettingsMaps merges new settings into existing, preserving user keys.

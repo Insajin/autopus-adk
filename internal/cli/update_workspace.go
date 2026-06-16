@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/setup"
 )
 
@@ -49,11 +51,38 @@ func runWorkspaceUpdate(cmd *cobra.Command, dir, only string, yes, preview bool,
 		fmt.Fprintf(out, "  - %s skipped: %s\n", skip.Path, skip.Reason)
 	}
 
+	if !preview {
+		if err := preflightWorkspaceUpdateTargets(cmd, targets, statusLine); err != nil {
+			return err
+		}
+	}
+
 	processed := 0
+	var applied []appliedWorkspaceUpdate
 	for _, target := range targets {
 		fmt.Fprintf(out, "\n[%s] %s\n", target.Path, target.AbsPath)
+		beforeTransactions, err := committedTransactionSet(target.AbsPath, preview)
+		if err != nil {
+			if rollbackErr := rollbackAppliedWorkspaceUpdates(applied); rollbackErr != nil {
+				return fmt.Errorf("%s transaction scan failed: %w; rollback failed: %v", target.Path, err, rollbackErr)
+			}
+			return fmt.Errorf("%s transaction scan failed: %w", target.Path, err)
+		}
 		if err := runNestedUpdateCommand(cmd, target, yes, preview, statusLine); err != nil {
+			if rollbackErr := rollbackAppliedWorkspaceUpdates(applied); rollbackErr != nil {
+				return fmt.Errorf("%s 업데이트 실패: %w; rollback failed: %v", target.Path, err, rollbackErr)
+			}
 			return fmt.Errorf("%s 업데이트 실패: %w", target.Path, err)
+		}
+		newTransactions, err := newCommittedTransactions(target.AbsPath, beforeTransactions, preview)
+		if err != nil {
+			if rollbackErr := rollbackAppliedWorkspaceUpdates(applied); rollbackErr != nil {
+				return fmt.Errorf("%s transaction scan failed: %w; rollback failed: %v", target.Path, err, rollbackErr)
+			}
+			return fmt.Errorf("%s transaction scan failed: %w", target.Path, err)
+		}
+		if len(newTransactions) > 0 {
+			applied = append(applied, appliedWorkspaceUpdate{Target: target, Journals: newTransactions})
 		}
 		processed++
 	}
@@ -106,6 +135,45 @@ func collectWorkspaceUpdateTargets(dir, only string) ([]workspaceUpdateTarget, [
 		}
 	}
 	return targets, skips, nil
+}
+
+func preflightWorkspaceUpdateTargets(cmd *cobra.Command, targets []workspaceUpdateTarget, statusLine string) error {
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	for _, target := range targets {
+		if err := preflightWorkspaceUpdateTarget(ctx, cmd, target, statusLine); err != nil {
+			return fmt.Errorf("%s 사전 검증 실패: %w", target.Path, err)
+		}
+	}
+	return nil
+}
+
+func preflightWorkspaceUpdateTarget(ctx context.Context, cmd *cobra.Command, target workspaceUpdateTarget, statusLine string) error {
+	cfg, err := config.LoadPreview(target.AbsPath)
+	if err != nil {
+		return fmt.Errorf("설정 로드 실패: %w", err)
+	}
+	appendDetectedPlatforms(cfg)
+	// Keep migrations in-memory only. The real local update persists them after
+	// all workspace targets have passed this preflight.
+	if _, migrateErr := config.MigrateOrchestraConfig(cfg); migrateErr != nil {
+		return fmt.Errorf("orchestra 마이그레이션 실패: %w", migrateErr)
+	}
+	if _, statusErr := applyStatusLineMode(cmd, target.AbsPath, cfg, statusLine, false); statusErr != nil {
+		return statusErr
+	}
+	effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
+	for _, platform := range cfg.Platforms {
+		switch platform {
+		case "claude-code", "codex", "antigravity-cli", "opencode":
+			if _, _, previewErr := buildPlatformPreview(ctx, target.AbsPath, effectiveCfg, platform); previewErr != nil {
+				return previewErr
+			}
+		}
+	}
+	return nil
 }
 
 func detectWorkspaceComponents(dir string) ([]workspaceUpdateTarget, error) {

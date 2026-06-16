@@ -73,49 +73,14 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 	if err != nil {
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
 	}
-	if oldManifest == nil {
-		return a.Generate(ctx, cfg)
-	}
 
 	files, err := a.prepareFiles(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	var backupDir string
-	if err := a.cleanupStaleManagedSurfaces(oldManifest, files, &backupDir); err != nil {
+	plan, pf := a.buildUpdateTransactionPlan(oldManifest, files)
+	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
 		return nil, err
-	}
-
-	var finalFiles []adapter.FileMapping
-	for _, file := range files {
-		action := adapter.ResolveAction(a.root, file.TargetPath, file.OverwritePolicy, oldManifest)
-		if action == adapter.ActionSkip {
-			continue
-		}
-		if action == adapter.ActionBackup {
-			if backupDir == "" {
-				backupDir, err = adapter.CreateBackupDir(a.root)
-				if err != nil {
-					return nil, err
-				}
-			}
-			if _, backupErr := adapter.BackupFile(a.root, file.TargetPath, backupDir); backupErr != nil {
-				return nil, backupErr
-			}
-		}
-		if err := writeMapping(a.root, file); err != nil {
-			return nil, err
-		}
-		finalFiles = append(finalFiles, file)
-	}
-
-	pf := &adapter.PlatformFiles{Files: finalFiles, Checksum: adapter.Checksum(fmt.Sprintf("%d", len(finalFiles)))}
-	m := adapter.ManifestFromFiles(adapterName, pf)
-	if err := m.Save(a.root); err != nil {
-		return nil, fmt.Errorf("매니페스트 저장 실패: %w", err)
-	}
-	if backupDir != "" {
-		fmt.Fprintf(os.Stderr, "  백업됨: %s\n", backupDir)
 	}
 	return pf, nil
 }

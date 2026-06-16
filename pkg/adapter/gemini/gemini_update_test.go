@@ -24,6 +24,22 @@ func TestUpdate_NoManifest(t *testing.T) {
 	assert.NoError(t, statErr)
 }
 
+func TestUpdate_NoManifestWriteFailureRollsBackCreatedFiles(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".gemini", "settings.json"), 0755))
+
+	_, err := a.Update(context.Background(), cfg)
+
+	require.Error(t, err)
+	assert.NoFileExists(t, filepath.Join(dir, "GEMINI.md"))
+	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "antigravity-cli-manifest.json"))
+	assert.DirExists(t, filepath.Join(dir, ".gemini", "settings.json"))
+}
+
 func TestUpdate_WithManifest(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -42,6 +58,33 @@ func TestUpdate_WithManifest(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(dir, "GEMINI.md"))
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "updated-project")
+}
+
+func TestUpdate_WithManifestWriteFailureRollsBackExistingFiles(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	geminiPath := filepath.Join(dir, "GEMINI.md")
+	beforeGemini, err := os.ReadFile(geminiPath)
+	require.NoError(t, err)
+
+	settingsPath := filepath.Join(dir, ".gemini", "settings.json")
+	require.NoError(t, os.Remove(settingsPath))
+	require.NoError(t, os.MkdirAll(settingsPath, 0755))
+
+	cfg.ProjectName = "updated-project"
+	_, err = a.Update(context.Background(), cfg)
+
+	require.Error(t, err)
+	afterGemini, readErr := os.ReadFile(geminiPath)
+	require.NoError(t, readErr)
+	assert.Equal(t, string(beforeGemini), string(afterGemini))
+	assert.DirExists(t, settingsPath)
 }
 
 func TestUpdate_UserModifiedFile(t *testing.T) {

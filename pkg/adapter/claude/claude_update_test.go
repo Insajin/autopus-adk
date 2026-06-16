@@ -31,6 +31,24 @@ func TestClaudeAdapter_Update_FreshInstallGeneratesAndSavesManifest(t *testing.T
 	assert.NoError(t, statErr, "manifest file must exist after fresh update")
 }
 
+func TestClaudeAdapter_Update_NoManifestWriteFailureRollsBackCreatedFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := claude.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".mcp.json"), 0o755))
+
+	_, err := a.Update(context.Background(), cfg)
+
+	require.Error(t, err)
+	assert.NoFileExists(t, filepath.Join(dir, "CLAUDE.md"))
+	assert.NoFileExists(t, filepath.Join(dir, ".claude", "skills", "auto", "SKILL.md"))
+	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "claude-code-manifest.json"))
+	assert.DirExists(t, filepath.Join(dir, ".mcp.json"))
+}
+
 func TestClaudeAdapter_Update_SecondRunIsIdempotentSkip(t *testing.T) {
 	t.Parallel()
 
@@ -54,6 +72,34 @@ func TestClaudeAdapter_Update_SecondRunIsIdempotentSkip(t *testing.T) {
 	after, readErr := os.ReadFile(rulePath)
 	require.NoError(t, readErr)
 	assert.Equal(t, before, after, "unchanged managed file must remain byte-identical across updates")
+}
+
+func TestClaudeAdapter_Update_WithManifestWriteFailureRollsBackExistingFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := claude.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	claudePath := filepath.Join(dir, "CLAUDE.md")
+	beforeClaude, err := os.ReadFile(claudePath)
+	require.NoError(t, err)
+
+	mcpPath := filepath.Join(dir, ".mcp.json")
+	require.NoError(t, os.Remove(mcpPath))
+	require.NoError(t, os.MkdirAll(mcpPath, 0o755))
+
+	cfg.ProjectName = "updated-project"
+	_, err = a.Update(context.Background(), cfg)
+
+	require.Error(t, err)
+	afterClaude, readErr := os.ReadFile(claudePath)
+	require.NoError(t, readErr)
+	assert.Equal(t, string(beforeClaude), string(afterClaude))
+	assert.DirExists(t, mcpPath)
 }
 
 func TestClaudeAdapter_Update_BacksUpUserModifiedManagedFile(t *testing.T) {

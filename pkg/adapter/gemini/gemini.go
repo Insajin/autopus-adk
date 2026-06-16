@@ -122,8 +122,8 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 		files = append(files, agentFiles...)
 	}
 
-	// Generate settings.json (MCP servers, base config)
-	settingsFiles, err := a.generateSettings(cfg)
+	// Generate settings.json with hooks and permissions already merged.
+	settingsFiles, err := a.generateSettingsWithHooks(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("제미니 설정 생성 실패: %w", err)
 	}
@@ -157,10 +157,7 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 	}
 	files = append(files, hookFiles...)
 
-	// Install hooks and permissions to Antigravity-compatible settings files.
-	if err := a.applyHooksAndPermissions(ctx, cfg); err != nil {
-		return nil, fmt.Errorf("제미니 훅/권한 설치 실패: %w", err)
-	}
+	a.installAntigravityPluginIfAvailable(ctx)
 
 	pf := &adapter.PlatformFiles{
 		Files:    files,

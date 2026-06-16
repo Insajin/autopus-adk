@@ -80,9 +80,16 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 	}
 	files = append(files, statusFiles...)
 
-	if err := a.applyHooksAndPermissions(ctx, cfg); err != nil {
+	hookSettingsFiles, err := a.prepareHooksAndPermissionsFiles(cfg)
+	if err != nil {
 		return nil, err
 	}
+	for _, file := range hookSettingsFiles {
+		if err := writeClaudeMapping(a.root, file); err != nil {
+			return nil, err
+		}
+	}
+	files = append(files, hookSettingsFiles...)
 
 	ruleFiles, err := a.copyContentFiles(cfg, "rules", filepath.Join(".claude", "rules", "autopus"))
 	if err != nil {

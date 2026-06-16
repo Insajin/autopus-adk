@@ -3,8 +3,6 @@ package claude
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -18,96 +16,55 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
 	}
 
-	if oldManifest == nil {
-		pf, err := a.Generate(ctx, cfg)
-		if err != nil {
-			return nil, err
-		}
-		m := adapter.ManifestFromFiles(adapterName, pf)
-		if saveErr := m.Save(a.root); saveErr != nil {
-			return nil, fmt.Errorf("매니페스트 저장 실패: %w", saveErr)
-		}
-		return pf, nil
-	}
-
 	newFiles, err := a.prepareFiles(cfg)
 	if err != nil {
 		return nil, err
 	}
+	hookFiles, err := a.prepareHooksAndPermissionsFiles(cfg)
+	if err != nil {
+		return nil, err
+	}
+	newFiles = append(newFiles, hookFiles...)
 
-	var backupDir string
-	var results []adapter.UpdateResult
-	var finalFiles []adapter.FileMapping
-
-	for _, f := range newFiles {
-		action := adapter.ResolveAction(a.root, f.TargetPath, f.OverwritePolicy, oldManifest)
-
-		switch action {
-		case adapter.ActionSkip:
-			results = append(results, adapter.UpdateResult{
-				Path:   f.TargetPath,
-				Action: adapter.ActionSkip,
-			})
-			continue
-		case adapter.ActionBackup:
-			if backupDir == "" {
-				backupDir, err = adapter.CreateBackupDir(a.root)
-				if err != nil {
-					return nil, err
-				}
-			}
-			backupPath, backupErr := adapter.BackupFile(a.root, f.TargetPath, backupDir)
-			if backupErr != nil {
-				return nil, backupErr
-			}
-			results = append(results, adapter.UpdateResult{
-				Path:       f.TargetPath,
-				Action:     adapter.ActionBackup,
-				BackupPath: backupPath,
-			})
-		}
-
-		targetPath := filepath.Join(a.root, f.TargetPath)
-		targetDir := filepath.Dir(targetPath)
-		if err := os.MkdirAll(targetDir, 0755); err != nil {
-			return nil, fmt.Errorf("디렉터리 생성 실패 %s: %w", targetDir, err)
-		}
-
-		perm := os.FileMode(0644)
-		if filepath.Ext(f.TargetPath) == ".sh" {
-			perm = 0755
-		}
-		if err := os.WriteFile(targetPath, f.Content, perm); err != nil {
-			return nil, fmt.Errorf("파일 쓰기 실패 %s: %w", f.TargetPath, err)
-		}
-		finalFiles = append(finalFiles, f)
+	plan, pf := a.buildUpdateTransactionPlan(oldManifest, newFiles)
+	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
+		return nil, err
 	}
 
-	if err := a.applyHooksAndPermissions(ctx, cfg); err != nil {
-		return nil, err
+	return pf, nil
+}
+
+func (a *Adapter) buildUpdateTransactionPlan(
+	oldManifest *adapter.Manifest,
+	newFiles []adapter.FileMapping,
+) (adapter.TransactionPlan, *adapter.PlatformFiles) {
+	finalFiles := make([]adapter.FileMapping, 0, len(newFiles))
+	skippedPaths := make([]string, 0)
+
+	for _, file := range newFiles {
+		action := adapter.ResolveAction(a.root, file.TargetPath, file.OverwritePolicy, oldManifest)
+		if action == adapter.ActionSkip {
+			skippedPaths = append(skippedPaths, file.TargetPath)
+			continue
+		}
+		finalFiles = append(finalFiles, file)
 	}
 
 	pf := &adapter.PlatformFiles{
 		Files:    finalFiles,
 		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
 	}
-
-	m := adapter.ManifestFromFiles(adapterName, pf)
-	for _, r := range results {
-		if r.Action != adapter.ActionSkip {
-			continue
-		}
-		if prev, ok := oldManifest.Files[r.Path]; ok {
-			m.Files[r.Path] = prev
+	manifest := adapter.ManifestFromFiles(adapterName, pf)
+	if oldManifest != nil {
+		for _, path := range skippedPaths {
+			if prev, ok := oldManifest.Files[path]; ok {
+				manifest.Files[path] = prev
+			}
 		}
 	}
-	if saveErr := m.Save(a.root); saveErr != nil {
-		return nil, fmt.Errorf("매니페스트 저장 실패: %w", saveErr)
-	}
 
-	if backupDir != "" {
-		fmt.Fprintf(os.Stderr, "  백업됨: %s\n", backupDir)
-	}
-
-	return pf, nil
+	return adapter.TransactionPlan{
+		Writes:   adapter.TransactionWritesFromFiles(finalFiles, claudeFileMode),
+		Manifest: manifest,
+	}, pf
 }

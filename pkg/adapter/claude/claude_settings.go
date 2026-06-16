@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -14,38 +15,51 @@ import (
 
 // applyHooksAndPermissions는 hooks와 permissions를 .claude/settings.json에 설치한다.
 // Always writes settings.json — DetectPermissions always returns non-nil with common defaults.
-func (a *Adapter) applyHooksAndPermissions(ctx context.Context, cfg *config.HarnessConfig) error {
-	a.statusLineMode = resolveStatusLineMode(cfg, InspectStatusLine(a.root))
-	hookConfigs, gitHooks, _ := content.GenerateProjectHookConfigs(cfg, "claude-code", a.SupportsHooks())
-	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
-	if err := a.InstallHooks(ctx, hookConfigs, perms); err != nil {
-		return fmt.Errorf("hooks/permissions 설치 실패: %w", err)
+func (a *Adapter) applyHooksAndPermissions(_ context.Context, cfg *config.HarnessConfig) error {
+	files, err := a.prepareHooksAndPermissionsFiles(cfg)
+	if err != nil {
+		return err
 	}
-	// Write git hooks as fallback when CLI hooks not supported
-	for _, gh := range gitHooks {
-		ghPath := filepath.Join(a.root, gh.Path)
-		if err := os.MkdirAll(filepath.Dir(ghPath), 0755); err != nil {
-			return fmt.Errorf("git hook 디렉터리 생성 실패: %w", err)
-		}
-		if err := os.WriteFile(ghPath, []byte(gh.Content), 0755); err != nil {
-			return fmt.Errorf("git hook 쓰기 실패: %w", err)
+	for _, file := range files {
+		if err := writeClaudeMapping(a.root, file); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
+func (a *Adapter) prepareHooksAndPermissionsFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	a.statusLineMode = resolveStatusLineMode(cfg, InspectStatusLine(a.root))
+	hookConfigs, gitHooks, _ := content.GenerateProjectHookConfigs(cfg, "claude-code", a.SupportsHooks())
+	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
+	settings, err := a.prepareSettingsMapping(hookConfigs, perms)
+	if err != nil {
+		return nil, fmt.Errorf("hooks/permissions 준비 실패: %w", err)
+	}
+	files := []adapter.FileMapping{settings}
+	for _, gh := range gitHooks {
+		files = append(files, adapter.FileMapping{
+			TargetPath:      gh.Path,
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(gh.Content),
+			Content:         []byte(gh.Content),
+		})
+	}
+	return files, nil
+}
+
 // InstallHooks는 .claude/settings.json에 훅과 권한을 Claude Code 중첩 스키마로 설치한다.
 func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, perms *adapter.PermissionSet) error {
-	settingsDir := filepath.Join(a.root, ".claude")
-	if err := os.MkdirAll(settingsDir, 0755); err != nil {
-		return fmt.Errorf("설정 디렉터리 생성 실패: %w", err)
+	mapping, err := a.prepareSettingsMapping(hooks, perms)
+	if err != nil {
+		return err
 	}
+	return writeClaudeMapping(a.root, mapping)
+}
 
-	settingsPath := filepath.Join(settingsDir, "settings.json")
-
-	// Load existing settings.json or create new
+func (a *Adapter) prepareSettingsMapping(hooks []adapter.HookConfig, perms *adapter.PermissionSet) (adapter.FileMapping, error) {
 	var settings map[string]interface{}
-	data, err := os.ReadFile(settingsPath)
+	data, err := os.ReadFile(filepath.Join(a.root, ".claude", "settings.json"))
 	if err == nil {
 		if err := json.Unmarshal(data, &settings); err != nil {
 			settings = make(map[string]interface{})
@@ -130,9 +144,34 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 
 	out, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
-		return fmt.Errorf("settings.json 직렬화 실패: %w", err)
+		return adapter.FileMapping{}, fmt.Errorf("settings.json 직렬화 실패: %w", err)
 	}
-	return adapter.WriteFileIfChanged(settingsPath, append(out, '\n'), 0644)
+	content := append(out, '\n')
+	return adapter.FileMapping{
+		TargetPath:      filepath.Join(".claude", "settings.json"),
+		OverwritePolicy: adapter.OverwriteMerge,
+		Checksum:        checksum(string(content)),
+		Content:         content,
+	}, nil
+}
+
+func writeClaudeMapping(root string, file adapter.FileMapping) error {
+	targetPath := filepath.Join(root, file.TargetPath)
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		return fmt.Errorf("디렉터리 생성 실패 %s: %w", filepath.Dir(targetPath), err)
+	}
+	if err := adapter.WriteFileIfChanged(targetPath, file.Content, claudeFileMode(file.TargetPath)); err != nil {
+		return fmt.Errorf("파일 쓰기 실패 %s: %w", file.TargetPath, err)
+	}
+	return nil
+}
+
+func claudeFileMode(path string) os.FileMode {
+	clean := filepath.ToSlash(path)
+	if strings.HasPrefix(clean, ".git/hooks/") || strings.HasSuffix(clean, ".sh") {
+		return 0755
+	}
+	return 0644
 }
 
 // toStringSlice converts an any (typically []any from JSON) to []string.

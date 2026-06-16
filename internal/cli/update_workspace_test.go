@@ -185,6 +185,56 @@ func TestUpdateCmd_GlobalAutoAllowsSmartWorkspaceApply(t *testing.T) {
 	assert.FileExists(t, filepath.Join(child, ".codex", "config.toml"))
 }
 
+func TestUpdateCmd_WorkspaceApplyPreflightsAllConfigsBeforeWriting(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	root := t.TempDir()
+	child := filepath.Join(root, "autopus-desktop")
+
+	makeWorkspaceRepo(t, root)
+	makeWorkspaceRepo(t, child)
+	writeWorkspaceHarnessConfig(t, root, "meta-workspace")
+	require.NoError(t, os.WriteFile(filepath.Join(child, "autopus.yaml"), []byte("mode:\n\tbroken"), 0644))
+
+	var out bytes.Buffer
+	cmd := newTestRootCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"update", "--dir", root, "--workspace", "--yes"})
+	err := cmd.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "autopus-desktop 사전 검증 실패")
+	assert.Contains(t, err.Error(), "설정 로드 실패")
+	assert.NoFileExists(t, filepath.Join(root, ".codex", "config.toml"))
+	assert.NoFileExists(t, filepath.Join(child, ".codex", "config.toml"))
+}
+
+func TestUpdateCmd_WorkspaceApplyPreflightsPlatformPreviewBeforeWriting(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	root := t.TempDir()
+	child := filepath.Join(root, "autopus-desktop")
+
+	makeWorkspaceRepo(t, root)
+	makeWorkspaceRepo(t, child)
+	writeWorkspaceHarnessConfig(t, root, "meta-workspace")
+	writeWorkspaceHarnessConfig(t, child, "autopus-desktop")
+	require.NoError(t, os.MkdirAll(filepath.Join(child, ".autopus"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(child, ".autopus", "codex-manifest.json"), []byte("{broken"), 0644))
+
+	var out bytes.Buffer
+	cmd := newTestRootCmd()
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"update", "--dir", root, "--workspace", "--yes"})
+	err := cmd.Execute()
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "autopus-desktop 사전 검증 실패")
+	assert.Contains(t, err.Error(), "매니페스트")
+	assert.NoFileExists(t, filepath.Join(root, ".codex", "config.toml"))
+	assert.NoFileExists(t, filepath.Join(child, ".codex", "config.toml"))
+}
+
 func TestUpdateCmd_WorkspaceApplyRequiresYes(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	root := t.TempDir()
