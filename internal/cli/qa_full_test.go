@@ -38,6 +38,11 @@ func TestQAFullCmd_DefaultPlansFullGateWithoutSideEffects(t *testing.T) {
 	assert.NotZero(t, int(summary["setup_gap_count"].(float64)))
 	assert.Contains(t, stringSlice(summary["selected_lanes"]), "fast")
 
+	policy := data["qa_policy"].(map[string]any)
+	assert.Equal(t, "qamesh", policy["orchestrator"])
+	assert.Equal(t, "auto-detected-from-project-journey-packs", policy["runner_selection"])
+	assert.Contains(t, stringSlice(policy["user_choice_required_for"]), "execution")
+
 	releasePlan := data["release_plan"].(map[string]any)
 	assert.Equal(t, "qamesh.release_plan.v1", releasePlan["schema_version"])
 
@@ -69,6 +74,10 @@ func TestQAFullCmd_SelectsProjectWhenWorkspaceRootHasMultipleTargets(t *testing.
 	assert.Equal(t, "warn", payload["status"])
 	data := payload["data"].(map[string]any)
 	assert.Equal(t, "select_project", data["mode"])
+	policy := data["qa_policy"].(map[string]any)
+	assert.Equal(t, "qamesh", policy["orchestrator"])
+	assert.Contains(t, stringSlice(policy["runner_adapters"]), "node-script")
+	assert.Contains(t, stringSlice(policy["user_choice_required_for"]), "project-dir")
 	candidates := data["project_candidates"].([]any)
 	assert.Len(t, candidates, 2)
 	next := stringSlice(data["next_commands"])
@@ -92,6 +101,11 @@ func TestQAFullCmd_BootstrapCreatesSafeStarterFiles(t *testing.T) {
 	data := payload["data"].(map[string]any)
 	bootstrap := data["bootstrap"].(map[string]any)
 	assert.Equal(t, "created", bootstrap["status"])
+	policy := data["qa_policy"].(map[string]any)
+	assert.Equal(t, "qamesh", policy["orchestrator"])
+	assert.Contains(t, stringSlice(policy["runner_adapters"]), "node-script")
+	assert.Contains(t, stringSlice(policy["runner_adapters"]), "playwright")
+	assert.Contains(t, policy["playwright_role"], "not a competing QA mode")
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "node-fast.yaml"))
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 }
@@ -137,6 +151,8 @@ func TestBuildQAFullRunPayloadIncludesRootJourneyBlocker(t *testing.T) {
 	)
 
 	assert.Equal(t, "blocked", payload.Summary.Status)
+	assert.Equal(t, "qamesh", payload.QAPolicy.Orchestrator)
+	assert.Contains(t, payload.QAPolicy.UserChoiceRequiredFor, "execution")
 	assert.Equal(t, "fast", payload.Summary.RootBlockerLane)
 	assert.Equal(t, "journey_failed:desktop-messenger-core", payload.Summary.RootBlockerReason)
 	assert.Equal(t, "desktop-messenger-core", payload.Summary.RootFailedJourneyID)

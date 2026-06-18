@@ -1858,6 +1858,12 @@ Usage: `/auto test`, `/auto test -s init`, `/auto test --json`, `/auto test -v`
 
 Use QAMESH when the task is project-level deterministic QA execution or evidence-to-feedback handoff.
 
+### Runner Boundary
+
+- QAMESH is the default project QA orchestration layer.
+- Playwright is not a competing QA mode. When detected, it becomes a browser/gui Journey runner adapter under QAMESH.
+- Ask users to choose the project under test, execution authority, environment/origin, credentials boundary, mobile/cloud device boundary, or explicit canary command. Do not ask them to choose between QAMESH and Playwright.
+
 ### Boundary With Canary
 
 - Use `auto qa ...` when the task needs deterministic user journeys, QAMESH manifests, redacted artifacts, run indexes, release lane aggregation, or repair prompt bundles.

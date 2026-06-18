@@ -68,6 +68,7 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 
 	prd := normalizeCodexExtendedSkill("prd", "사용자 입력이 불충분할 경우 AskUserQuestion으로 확인:")
 	assert.NotContains(t, prd, "AskUserQuestion")
+	assert.Contains(t, prd, "request_user_input")
 	assert.Contains(t, prd, "plain-text")
 }
 

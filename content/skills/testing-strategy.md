@@ -74,6 +74,8 @@ func TestAPI_CreateUser(t *testing.T) {
 
 ### QAMESH Source Guidance
 
+- QAMESH is the default project QA orchestration layer. Playwright is not a competing mode; when detected, it is registered as a browser/gui Journey runner adapter.
+- Ask users to choose the project under test, execution authority, environment/origin, credentials boundary, mobile/cloud device boundary, or explicit canary command. Do not ask them to choose between QAMESH and Playwright.
 - Use `auto qa init --format json` as the simple default release-QA setup command for arbitrary projects. It creates project-local starter Journey Packs plus a generic GitHub Actions QAMESH release gate.
 - Use `auto qa init --local-only --format json` when only Journey Pack starters are needed. Review generated commands, env, installer version, and required-gate policy before trusting the workflow.
 - Use `auto qa plan --format json` before project-level QA execution to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without running commands.

@@ -62,7 +62,7 @@
 - Columns: `Field`, `Status`, `Source`, `Confidence`, `Decision / Assumption`, `If Wrong`, `Plan Handoff`
 - 프로젝트 문서와 코드에서 답할 수 있는 row를 먼저 채우고, inferred row는 confidence `6` 이하와 non-empty `If Wrong`을 기록합니다.
 - Interactive default는 expected gain이 가장 큰 unresolved row 1개만 묻습니다. critical ambiguity면 최대 1개 추가하고, `--deep-clarify`와 같은 깊은 질문 확장은 plan에서 자동 활성화하지 않습니다.
-- Question transport: Codex에서는 `request_user_input`이 가능하면 사용하고, 없으면 `Current understanding`, `Blocked decision`, `Recommended answer`, `Question` 네 블록을 포함한 짧은 plain-text 질문으로 묻습니다.
+- Question transport: Codex에서는 active tool list에 `request_user_input`이 있으면 반드시 사용합니다. Codex App Server client는 같은 질문 contract를 `tool/requestUserInput`으로 매핑합니다. Codex 질문 tool이 없을 때만 `Current understanding`, `Blocked decision`, `Recommended answer`, `Question` 네 블록을 포함한 짧은 plain-text 질문으로 묻습니다.
 - `--auto`는 질문 0개, unresolved rows를 `assumed` 또는 `deferred`로 기록합니다.
 - `Question Audit`에 `question_transport`, `question_count`, `unresolved_fields`를 기록합니다.
 - Inline ledger는 PRD planner와 spec-writer prompt에 함께 전달하고, `research.md`에는 `## Clarification Ledger` 또는 `## Plan Intent Ledger`로 보존합니다.

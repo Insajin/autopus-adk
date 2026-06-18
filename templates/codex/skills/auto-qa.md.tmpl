@@ -12,6 +12,12 @@ description: >
 
 Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 스킬은 `auto qa` namespace의 thin routing guidance이며, 실제 결과는 CLI 실행으로만 확인합니다.
 
+## Runner Boundary
+
+- QAMESH is the default project QA orchestration layer.
+- Playwright is not a competing QA mode. When detected, it becomes a browser/gui Journey runner adapter under QAMESH.
+- Ask users to choose the project under test, execution authority, environment/origin, credentials boundary, mobile/cloud device boundary, or explicit canary command. Do not ask them to choose between QAMESH and Playwright.
+
 ## Boundary With Canary
 
 - `auto qa`는 deterministic user journey, evidence manifest, redaction, run index, release lane aggregation, and repair feedback를 다루는 QAMESH QA mesh입니다.

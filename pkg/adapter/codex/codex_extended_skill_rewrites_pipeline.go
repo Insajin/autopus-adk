@@ -71,7 +71,7 @@ Worker prompts must not replace stable policy with ad-hoc instructions. If layer
 Before spawning workers, decide whether the pipeline can proceed autonomously:
 
 - If ` + "`--auto`" + ` is set, continue without confirmation and treat it as explicit approval for the default subagent pipeline.
-- If user intent is ambiguous, ask one concise plain-text question in the main session.
+- If user intent is ambiguous, use ` + "`request_user_input`" + ` when it is present in the active tool list; otherwise ask one concise plain-text question in the main session.
 - Do not rely on Claude-only permission or question APIs.
 - If the task is write-heavy and ownership is unclear, stop parallel fan-out and resolve ownership first.
 

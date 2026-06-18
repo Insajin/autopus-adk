@@ -16,6 +16,7 @@ type qaFullPayload struct {
 	Mode              string                   `json:"mode"`
 	Profile           string                   `json:"profile"`
 	ProjectDir        string                   `json:"project_dir"`
+	QAPolicy          qaFullPolicy             `json:"qa_policy"`
 	Bootstrap         *qascaffold.Result       `json:"bootstrap,omitempty"`
 	Summary           qaFullSummary            `json:"summary"`
 	NextCommands      []string                 `json:"next_commands"`
@@ -73,6 +74,7 @@ func buildQAFullPlanPayload(opts qaFullOptions, plan qarelease.Plan, domain qaFu
 		Mode:            "plan",
 		Profile:         plan.Profile,
 		ProjectDir:      opts.ProjectDir,
+		QAPolicy:        qaFullPolicyForPlan(plan),
 		Bootstrap:       bootstrap,
 		Summary:         summary,
 		NextCommands:    qaFullNextCommands(opts, plan, domain),
@@ -99,6 +101,7 @@ func buildQAFullRunPayload(opts qaFullOptions, result qarelease.ExecutionPayload
 		Mode:            "run",
 		Profile:         result.Profile,
 		ProjectDir:      opts.ProjectDir,
+		QAPolicy:        qaFullPolicyForRun(result.Index),
 		Bootstrap:       bootstrap,
 		Summary:         summary,
 		NextCommands:    qaFullRunNextCommands(opts, result, domain),
@@ -132,6 +135,7 @@ func buildQAFullSelectProjectPayload(opts qaFullOptions, targets []qascaffold.Wo
 		Mode:          "select_project",
 		Profile:       opts.Profile,
 		ProjectDir:    opts.ProjectDir,
+		QAPolicy:      qaFullPolicyForCandidates(candidates),
 		Summary: qaFullSummary{
 			Status: status,
 			Action: action,

@@ -98,6 +98,10 @@ func assertQAMESHGuidance(t *testing.T, body string) {
 	assert.Contains(t, body, "auto qa feedback")
 	assert.Contains(t, body, "ADK is a harness")
 	assert.Contains(t, body, "project-local Journey Pack")
+	assert.Contains(t, body, "QAMESH is the default project QA orchestration layer")
+	assert.Contains(t, body, "Playwright")
+	assert.Contains(t, body, "not a competing")
+	assert.Contains(t, body, "choose between QAMESH and Playwright")
 	assert.Contains(t, body, "canary-explicit")
 	assert.Contains(t, body, "post-deploy smoke")
 }

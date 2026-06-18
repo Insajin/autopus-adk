@@ -113,6 +113,8 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 		byName[filepath.Base(f.TargetPath)] = string(f.Content)
 	}
 
+	assert.Contains(t, byName["auto.md"], "request_user_input")
+	assert.Contains(t, byName["auto.md"], "tool/requestUserInput")
 	assert.Contains(t, byName["auto-idea.md"], "orchestra CLI를 반드시 먼저 호출")
 	assert.Contains(t, byName["auto-idea.md"], "Clarification Ledger")
 	assert.Contains(t, byName["auto-idea.md"], "Current understanding")
@@ -121,6 +123,8 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-idea.md"], "Question")
 	assert.Contains(t, byName["auto-idea.md"], "Question Audit")
 	assert.Contains(t, byName["auto-idea.md"], "question_transport")
+	assert.Contains(t, byName["auto-idea.md"], "request_user_input")
+	assert.Contains(t, byName["auto-idea.md"], "tool/requestUserInput")
 	assert.Contains(t, byName["auto-idea.md"], "goal")
 	assert.Contains(t, byName["auto-idea.md"], "scope_boundary")
 	assert.Contains(t, byName["auto-idea.md"], "done_evidence")
@@ -132,6 +136,8 @@ func TestRenderPromptTemplates_WorkflowContractsPresent(t *testing.T) {
 	assert.Contains(t, byName["auto-plan.md"], "Clarification Ledger")
 	assert.Contains(t, byName["auto-plan.md"], "Plan Intent Ledger")
 	assert.Contains(t, byName["auto-plan.md"], "Question Audit")
+	assert.Contains(t, byName["auto-plan.md"], "request_user_input")
+	assert.Contains(t, byName["auto-plan.md"], "tool/requestUserInput")
 	assert.Contains(t, byName["auto-plan.md"], "answered")
 	assert.Contains(t, byName["auto-plan.md"], "assumed")
 	assert.Contains(t, byName["auto-plan.md"], "deferred")

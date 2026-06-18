@@ -79,7 +79,7 @@ Question selection:
 - `--auto` asks zero questions, continues to orchestra, and records unresolved rows as `assumed` or `deferred`.
 
 Question transport:
-- Use `request_user_input` when available; otherwise ask one concise plain-text question.
+- Use `request_user_input` whenever it is present in the active tool list. Codex App Server clients should map the same question contract to `tool/requestUserInput`. Ask one concise plain-text question only when no Codex question tool is exposed.
 - Record `question_transport`, `question_count`, and unresolved ledger fields in the BS file or final handoff notes.
 
 Question format:

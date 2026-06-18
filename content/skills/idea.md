@@ -91,7 +91,7 @@ Question selection:
 Question transport:
 - Use the current platform's native interactive question transport when available instead of rendering a numbered text menu.
 - Claude Code surfaces must preload and use `AskUserQuestion` for interactive clarification; see `content/rules/deferred-tools.md`.
-- Codex surfaces use `request_user_input` when that tool is available, otherwise ask one concise plain-text question.
+- Codex surfaces must use `request_user_input` when it is present in the active tool list; Codex App Server clients should map the same question contract to `tool/requestUserInput`. Fall back to one concise plain-text question only when no Codex question tool is exposed.
 - OpenCode surfaces use `question` when available, otherwise ask one concise plain-text question.
 - Record `question_transport`, `question_count`, and unresolved ledger fields in the BS file or final handoff notes.
 

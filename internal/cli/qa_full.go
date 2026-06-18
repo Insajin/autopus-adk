@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -161,6 +162,9 @@ func resolveQAFullProjectSelection(cmd *cobra.Command, opts qaFullOptions) (*qaF
 func writeQAFullText(cmd *cobra.Command, payload qaFullPayload) {
 	fmt.Fprintf(cmd.OutOrStdout(), "full qa %s profile=%s project=%s\n", payload.Summary.Status, payload.Profile, payload.ProjectDir)
 	fmt.Fprintf(cmd.OutOrStdout(), "mode=%s action=%s lanes=%d journeys=%d setup_gaps=%d domain_scenarios=%d\n", payload.Mode, payload.Summary.Action, len(payload.Summary.SelectedLanes), payload.Summary.JourneyPackCount, payload.Summary.SetupGapCount, payload.Summary.DomainScenarioCount)
+	if payload.QAPolicy.Orchestrator != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "qa_policy=%s adapters=%s choices=%s\n", payload.QAPolicy.Orchestrator, strings.Join(payload.QAPolicy.RunnerAdapters, ","), strings.Join(payload.QAPolicy.UserChoiceRequiredFor, ","))
+	}
 	if payload.Bootstrap != nil {
 		fmt.Fprintf(cmd.OutOrStdout(), "bootstrap=%s created=%d skipped=%d\n", payload.Bootstrap.Status, len(payload.Bootstrap.Created), len(payload.Bootstrap.Skipped))
 	}
