@@ -84,6 +84,79 @@ func TestCheckLatest_APIError(t *testing.T) {
 	assert.Nil(t, info)
 }
 
+// TestCheckLatest_SendsGitHubHeaders verifies that release checks identify the
+// client with GitHub's expected REST API headers.
+func TestCheckLatest_SendsGitHubHeaders(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "autopus-adk-selfupdate", r.Header.Get("User-Agent"))
+		assert.Equal(t, "application/vnd.github+json", r.Header.Get("Accept"))
+		assert.Equal(t, "2022-11-28", r.Header.Get("X-GitHub-Api-Version"))
+
+		resp := map[string]any{
+			"tag_name": "v0.7.0",
+			"assets":   []map[string]any{},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	checker := NewChecker(WithAPIBaseURL(srv.URL))
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
+
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	assert.Equal(t, "v0.7.0", info.TagName)
+}
+
+// TestCheckLatest_UsesConfiguredToken verifies that callers can raise GitHub
+// API rate limits by supplying an auth token.
+func TestCheckLatest_UsesConfiguredToken(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+
+		resp := map[string]any{
+			"tag_name": "v0.7.0",
+			"assets":   []map[string]any{},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	checker := NewChecker(WithAPIBaseURL(srv.URL), WithGitHubToken(" test-token "))
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
+
+	require.NoError(t, err)
+	require.NotNil(t, info)
+}
+
+// TestCheckLatest_RateLimit403Actionable verifies that GitHub API rate-limit
+// failures tell the user how to retry with an authenticated request.
+func TestCheckLatest_RateLimit403Actionable(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-RateLimit-Remaining", "0")
+		w.Header().Set("X-RateLimit-Reset", "1767225600")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"API rate limit exceeded"}`))
+	}))
+	defer srv.Close()
+
+	checker := NewChecker(WithAPIBaseURL(srv.URL))
+	info, err := checker.CheckLatest("0.6.0", "darwin", "arm64")
+
+	require.Error(t, err)
+	assert.Nil(t, info)
+	assert.Contains(t, err.Error(), "GitHub API returned status 403")
+	assert.Contains(t, err.Error(), "API rate limit exceeded")
+	assert.Contains(t, err.Error(), "GH_TOKEN")
+	assert.Contains(t, err.Error(), "2026-01-01T00:00:00Z")
+}
+
 // TestCheckLatest_InvalidJSON verifies that a malformed JSON response from
 // GitHub API returns an error rather than panicking on type assertion.
 func TestCheckLatest_InvalidJSON(t *testing.T) {

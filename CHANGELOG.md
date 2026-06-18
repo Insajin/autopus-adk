@@ -60,6 +60,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Windows self-update GitHub API 403 진단 보강** (2026-06-18): `auto update --self`의 릴리스 확인 요청이 명시적인 GitHub REST API 헤더(`User-Agent`, `Accept`, API version)를 보내도록 수정하고, `AUTOPUS_GITHUB_TOKEN`/`GITHUB_TOKEN`/`GH_TOKEN` 기반 인증 요청을 지원한다. GitHub API가 403을 반환하면 응답 본문과 rate-limit reset 정보를 포함해 토큰 설정 후 재시도할 수 있도록 안내한다.
+
 - **worktree gitfile 대상 update 실패** (2026-06-16): 연결 worktree처럼 `.git`이 디렉터리가 아니라 `gitdir:` 파일인 저장소에서 Codex/OpenCode fallback git hook 경로 `.git/hooks/*`를 transaction write/prune 대상으로 잡아 `lstat ... .git/hooks/pre-commit: not a directory`로 `auto update --workspace`가 실패하던 문제를 수정했다. native hook surface(`.codex/hooks.json`, OpenCode plugin)는 계속 갱신하되 root-local fallback git hook은 해당 형태에서 건너뛴다.
 
 - **Claude Code Stop/SessionStart 훅 상대경로 실패** (2026-06-12): 설치된 settings.json의 훅 명령이 상대경로(`.claude/hooks/autopus/hook-claude-stop.sh`)라 훅 spawn cwd가 settings 루트와 다른 서브에이전트/하위 디렉토리 세션에서 매 Stop마다 "No such file or directory"로 실패했다(하루 27회 실측). 생성기(`pkg/content/hooks_completion.go`)가 `"${CLAUDE_PROJECT_DIR:-.}"/` 프리픽스로 앵커하도록 수정하고 회귀 테스트로 고정. 설치된 워크스페이스 복사본 7개는 동일 값으로 로컬 패치됨(다음 `auto update` 재생성과 일치).

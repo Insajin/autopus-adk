@@ -23,6 +23,8 @@ func TestDownloadAndVerify_Success(t *testing.T) {
 	checksumLine := checksum + "  " + archiveName + "\n"
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "autopus-adk-selfupdate", r.Header.Get("User-Agent"))
+
 		switch r.URL.Path {
 		case "/" + archiveName:
 			w.Header().Set("Content-Type", "application/octet-stream")
@@ -71,6 +73,29 @@ func TestDownloadAndVerify_HTTPError(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "HTTP 403")
+}
+
+func TestGitHubTokenForURL(t *testing.T) {
+	t.Setenv("AUTOPUS_GITHUB_TOKEN", "env-token")
+
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{"github", "https://github.com/insajin/autopus-adk/releases/download/v0.7.0/archive.zip", "env-token"},
+		{"api github", "https://api.github.com/repos/insajin/autopus-adk/releases/latest", "env-token"},
+		{"github subdomain", "https://uploads.github.com/repos/insajin/autopus-adk/releases/assets/1", "env-token"},
+		{"githubusercontent cdn", "https://objects.githubusercontent.com/github-production-release-asset/example", ""},
+		{"non github", "https://example.com/archive.zip", ""},
+		{"invalid", "://bad-url", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, githubTokenForURL(tt.url))
+		})
+	}
 }
 
 // TestDownloadAndVerify_RetrySuccess verifies that transient HTTP errors

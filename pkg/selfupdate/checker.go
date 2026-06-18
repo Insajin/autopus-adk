@@ -3,14 +3,19 @@ package selfupdate
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Checker fetches and checks for new releases.
 type Checker struct {
 	apiBaseURL string
+	authToken  string
+	client     *http.Client
 }
 
 // CheckLatest checks GitHub API for the latest release.
@@ -31,14 +36,23 @@ func (c *Checker) CheckLatest(currentVersion, goos, goarch string) (*ReleaseInfo
 // FetchLatest fetches the latest release info regardless of version comparison.
 // Used when --force reinstalls the current version.
 func (c *Checker) FetchLatest(goos, goarch string) (*ReleaseInfo, error) {
-	resp, err := http.Get(c.apiBaseURL)
+	req, err := newSelfUpdateRequest(c.apiBaseURL, c.authToken)
+	if err != nil {
+		return nil, err
+	}
+
+	client := c.client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+		return nil, githubAPIStatusError(resp)
 	}
 
 	var release map[string]any
@@ -96,6 +110,8 @@ func NewChecker(opts ...CheckerOption) *Checker {
 	// @AX:NOTE: [AUTO] magic constant — GitHub releases API URL, repo path must match goreleaser config
 	c := &Checker{
 		apiBaseURL: "https://api.github.com/repos/insajin/autopus-adk/releases/latest",
+		authToken:  githubTokenFromEnv(),
+		client:     http.DefaultClient,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -111,6 +127,80 @@ func WithAPIBaseURL(url string) CheckerOption {
 	return func(c *Checker) {
 		c.apiBaseURL = url
 	}
+}
+
+// WithGitHubToken sets an explicit token for GitHub API requests.
+func WithGitHubToken(token string) CheckerOption {
+	return func(c *Checker) {
+		c.authToken = strings.TrimSpace(token)
+	}
+}
+
+// WithHTTPClient sets a custom HTTP client for testing.
+func WithHTTPClient(client *http.Client) CheckerOption {
+	return func(c *Checker) {
+		if client != nil {
+			c.client = client
+		}
+	}
+}
+
+func githubTokenFromEnv() string {
+	for _, name := range []string{"AUTOPUS_GITHUB_TOKEN", "GITHUB_TOKEN", "GH_TOKEN"} {
+		if token := strings.TrimSpace(os.Getenv(name)); token != "" {
+			return token
+		}
+	}
+	return ""
+}
+
+func newSelfUpdateRequest(rawURL, token string) (*http.Request, error) {
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "autopus-adk-selfupdate")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if token = strings.TrimSpace(token); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return req, nil
+}
+
+func githubAPIStatusError(resp *http.Response) error {
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	message := strings.TrimSpace(githubAPIMessage(body))
+	details := []string{fmt.Sprintf("GitHub API returned status %d", resp.StatusCode)}
+	if message != "" {
+		details = append(details, message)
+	}
+	if resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0" {
+		rateHint := "GitHub API rate limit exceeded; set GH_TOKEN, GITHUB_TOKEN, or AUTOPUS_GITHUB_TOKEN and retry"
+		if reset := githubRateLimitReset(resp.Header.Get("X-RateLimit-Reset")); reset != "" {
+			rateHint += "; reset at " + reset
+		}
+		details = append(details, rateHint)
+	}
+	return fmt.Errorf("%s", strings.Join(details, ": "))
+}
+
+func githubAPIMessage(body []byte) string {
+	var payload struct {
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(body, &payload); err == nil && payload.Message != "" {
+		return payload.Message
+	}
+	return string(body)
+}
+
+func githubRateLimitReset(raw string) string {
+	seconds, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || seconds <= 0 {
+		return ""
+	}
+	return time.Unix(seconds, 0).UTC().Format(time.RFC3339)
 }
 
 // stripPreRelease removes pre-release suffixes ("-0.2026..." or "+dirty") from a version string,

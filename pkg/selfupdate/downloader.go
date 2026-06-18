@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,7 +75,13 @@ func httpGetWithRetry(url string, maxSize int64) ([]byte, error) {
 			time.Sleep(time.Duration(attempt*2) * time.Second)
 		}
 
-		resp, err := http.Get(url)
+		req, err := newSelfUpdateRequest(url, githubTokenForURL(url))
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			lastErr = err
 			continue
@@ -95,6 +102,18 @@ func httpGetWithRetry(url string, maxSize int64) ([]byte, error) {
 		return data, nil
 	}
 	return nil, fmt.Errorf("failed after %d attempts: %w", downloadRetries, lastErr)
+}
+
+func githubTokenForURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "github.com" || host == "api.github.com" || strings.HasSuffix(host, ".github.com") {
+		return githubTokenFromEnv()
+	}
+	return ""
 }
 
 // ParseChecksums parses checksums.txt format into a map.
