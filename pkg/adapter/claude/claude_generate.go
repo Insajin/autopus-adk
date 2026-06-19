@@ -132,6 +132,24 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 			return nil, fmt.Errorf("에이전트 파일 복사 실패: %w", err)
 		}
 		files = append(files, agentFiles...)
+
+		// REQ-004: emit the generated Route A workflow JS and register it in
+		// the manifest (manifest registration happens automatically below).
+		workflowDir := filepath.Join(a.root, ".claude", "workflows")
+		if err := os.MkdirAll(workflowDir, 0755); err != nil {
+			return nil, fmt.Errorf("워크플로우 디렉터리 생성 실패: %w", err)
+		}
+		workflowFiles, err := a.workflowFiles(cfg)
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range workflowFiles {
+			targetPath := filepath.Join(a.root, f.TargetPath)
+			if err := os.WriteFile(targetPath, f.Content, 0644); err != nil {
+				return nil, fmt.Errorf("워크플로우 파일 쓰기 실패: %w", err)
+			}
+		}
+		files = append(files, workflowFiles...)
 	}
 
 	pf := &adapter.PlatformFiles{

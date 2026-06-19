@@ -931,6 +931,7 @@ IMPORTANT: You MUST parse these flags from $ARGUMENTS before any other action.
 
 Global flags (`--auto`, `--loop`, `--multi`, `--quality`, `--effort`) are already stripped. Extract the remaining go-specific flags:
 - `--team` → `TEAMS_MODE = true/false` (Agent Teams)
+- `--workflow` → `WORKFLOW_MODE = true/false` (deterministic Route A workflow — claude-code only; see Route: Deterministic Workflow below)
 - `--solo` → `SOLO_MODE = true/false` (single session, no subagents)
 - `--strategy <value>` → `STRATEGY = value`
 - `--continue` → `CONTINUE_MODE = true/false`
@@ -945,6 +946,7 @@ Inherit from global flags:
 - `EFFORT` ← `--effort`
 
 Determine execution mode:
+- `WORKFLOW_MODE = true` → Deterministic Workflow route (claude-code only; auto fail-fast to Route A if doctor fails or platform is non-claude)
 - `TEAMS_MODE = true` → Agent Teams mode
 - `SOLO_MODE = true` → Single session mode
 - Otherwise → **Subagent pipeline** (default)
@@ -1224,6 +1226,41 @@ Worktree safety rules R1-R5 apply equally — each builder teammate works in an 
 
 1. **TDD Implementation**: Execute RED → GREEN → REFACTOR based on tasks in plan.md
 2. **Post-Implementation**: Validate against acceptance.md criteria, pass the Sync Readiness Gate, and update status to implemented
+
+#### Route: Deterministic Workflow (`--workflow`)
+
+IMPORTANT: This route runs Route A as a deterministic Claude Code Workflow. It is **claude-code only** and **opt-in**. The non-claude platforms (codex, antigravity-cli, opencode) do not render this route and ignore the flag.
+
+Reference: `.claude/skills/autopus/harness-workflow.md`
+
+Preflight check (run before dispatching the workflow):
+1. `auto workflow doctor` — capability gate (required vs advisory primitives; min version 2.1.154)
+2. Platform must be `claude`
+
+If `auto workflow doctor` reports `overall: fail` OR the platform is not claude, emit a `fail-fast` fallback log line and enter Route A **without executing any workflow**:
+```
+[workflow] fallback-class=fail-fast reason={doctor_fail|non_claude_platform}: deterministic workflow unavailable, running Route A subagent pipeline.
+```
+
+Otherwise dispatch the generated `.claude/workflows/route_a.workflow.js` Workflow, which runs the four ordered phases and records a run journal:
+1. **planning** — implementation plan and task breakdown (no working-tree mutation beyond plan artifacts)
+2. **implementation** — repository-mutating work; worktree lifecycle stays in the Go runtime, the JS owns sequencing only
+3. **gate_build_test** — deterministic gate; verdict derives from build/test **exit codes** (`verdict_source: exit_code`) via the `auto workflow gate` JS→Go bridge, not from an LLM verdict
+4. **release_hygiene** — generated-surface drift gate + Lore commit format (`auto check --lore`) + 300-line source limit (`auto check --arch --staged`)
+
+Inspect the planned run without executing it: `auto workflow render --dry-run`.
+
+Fallback taxonomy (every failure maps to exactly one class — no silent opt-out):
+
+| Failure kind | Class |
+|--------------|-------|
+| `non_claude_platform` | `fail-fast` |
+| `doctor_fail` | `fail-fast` |
+| `parity_drift` | `fail-closed` |
+| `execution_abort` | `resumable` |
+| `api_unavailable` | `explicit` |
+
+The manifest (`content/workflows/route_a.{md,schema.json}`) is the source of truth; the workflow JS is a generated, edit-forbidden surface.
 
 #### Subagent Pipeline Phases (Route A)
 
@@ -1738,6 +1775,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--loop` | RALF loop mode: auto-retry failed gates with extended iteration limits until PASS or circuit break |
 | `--continue` | Resume an interrupted implementation from a previous session |
 | `--team` | Agent Teams mode: use Claude Code Agent Teams (experimental) for multi-agent collaboration |
+| `--workflow` | Deterministic Route A workflow (claude-code only): run via the generated workflow JS with an exit-code build/test gate; auto fail-fast to Route A if `auto workflow doctor` fails or platform is non-claude |
 | `--solo` | Single session mode: no subagents, main session implements directly |
 | `--multi` | Risk-tiered provider review: high/critical fan out when available, otherwise single-provider fallback |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |

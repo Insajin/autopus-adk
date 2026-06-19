@@ -70,11 +70,25 @@ func bundlesForSkill(name, category string) []string {
 	}
 }
 
-func visibilityForSkill(_ string) string {
+// claudeOnlySkillSet lists skills that are scoped to the claude-code platform
+// only. Their documentation and capabilities (e.g. the deterministic
+// `--workflow` route) rely on claude-code-exclusive primitives, so they MUST
+// NOT be compiled into codex/gemini/opencode surfaces.
+var claudeOnlySkillSet = map[string]bool{
+	"harness-workflow": true,
+}
+
+func visibilityForSkill(name string) string {
+	if claudeOnlySkillSet[name] {
+		return SkillVisibilityClaudeOnly
+	}
 	return SkillVisibilityShared
 }
 
-func compileTargetsForSkill(_ string) []string {
+func compileTargetsForSkill(name string) []string {
+	if claudeOnlySkillSet[name] {
+		return []string{"claude"}
+	}
 	return []string{"claude", "codex", "gemini", "opencode"}
 }
 

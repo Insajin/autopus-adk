@@ -25,6 +25,9 @@ func GenerateAllTemplates(contentDir, templateDir string) error {
 	if err := generateSkillTemplates(contentDir, templateDir); err != nil {
 		return fmt.Errorf("skill templates: %w", err)
 	}
+	if err := generateWorkflowTemplates(contentDir, templateDir); err != nil {
+		return fmt.Errorf("workflow templates: %w", err)
+	}
 	return nil
 }
 

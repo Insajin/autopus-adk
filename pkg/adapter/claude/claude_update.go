@@ -26,6 +26,16 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 	newFiles = append(newFiles, hookFiles...)
 
+	// REQ-004: keep Update in parity with Generate — the generated Route A
+	// workflow JS is a full-mode surface, so it must be re-emitted on update too.
+	if cfg.IsFullMode() {
+		workflowFiles, err := a.workflowFiles(cfg)
+		if err != nil {
+			return nil, err
+		}
+		newFiles = append(newFiles, workflowFiles...)
+	}
+
 	plan, pf := a.buildUpdateTransactionPlan(oldManifest, newFiles)
 	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
 		return nil, err
