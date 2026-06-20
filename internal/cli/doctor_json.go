@@ -22,6 +22,7 @@ type doctorJSONData struct {
 	Runtime       []doctorRuntimeProcessPayload `json:"runtime_processes,omitempty"`
 	RuleConflicts []doctorRuleConflictPayload   `json:"rule_conflicts,omitempty"`
 	InstalledCLIs []doctorCLIPayload            `json:"installed_clis,omitempty"`
+	Hygiene       *statusHygienePayload         `json:"hygiene,omitempty"`
 }
 
 type doctorConfigPayload struct {
@@ -93,6 +94,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 			Status:   "fail",
 			Detail:   fmt.Sprintf("autopus.yaml load failed: %v", err),
 		})
+		report.collectHygieneChecks(opts.dir)
 		return report
 	}
 
@@ -117,6 +119,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 	report.collectQualityGateChecks(cfg)
 	report.collectProviderTransportSmokeChecks(cfg, opts)
 	report.collectHookChecks(opts.dir)
+	report.collectHygieneChecks(opts.dir)
 
 	return report
 }

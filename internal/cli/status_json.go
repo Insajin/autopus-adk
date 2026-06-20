@@ -9,9 +9,10 @@ import (
 )
 
 type statusJSONData struct {
-	Summary  statusJSONSummary   `json:"summary"`
-	Specs    []statusJSONSpec    `json:"specs,omitempty"`
-	Findings []statusJSONFinding `json:"findings,omitempty"`
+	Summary  statusJSONSummary     `json:"summary"`
+	Specs    []statusJSONSpec      `json:"specs,omitempty"`
+	Findings []statusJSONFinding   `json:"findings,omitempty"`
+	Hygiene  *statusHygienePayload `json:"hygiene,omitempty"`
 }
 
 type statusJSONSummary struct {
@@ -50,6 +51,10 @@ func normalizeSpecStatus(status string) string {
 func runStatusJSON(cmd *cobra.Command, dir string) error {
 	specs := scanAllSpecs(dir)
 	data, warnings, checks, status := buildStatusJSONPayload(dir, specs)
+	hygiene := collectStatusHygiene(dir)
+	payload := hygiene.payload()
+	data.Hygiene = &payload
+	applyHygieneJSON("status", hygiene, &warnings, &checks, &status)
 	return writeJSONResult(cmd, status, data, warnings, checks)
 }
 

@@ -109,3 +109,28 @@ func TestScanAllSpecs_SubmodulePropagated(t *testing.T) {
 	assert.Equal(t, "", modules["SPEC-ROOT-001"])
 	assert.Equal(t, "mymodule", modules["SPEC-SUB-001"])
 }
+
+func TestScanAllSpecs_SkipsGeneratedAutopusSubtrees(t *testing.T) {
+	t.Parallel()
+
+	base := t.TempDir()
+
+	realDir := filepath.Join(base, ".autopus", "specs", "SPEC-REAL-001")
+	require.NoError(t, os.MkdirAll(realDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(realDir, "spec.md"),
+		[]byte("---\nstatus: completed\ntitle: Real SPEC\n---\n"), 0o644))
+
+	generatedDir := filepath.Join(base, ".autopus", "plugins", "auto", ".autopus", "specs", "SPEC-GENERATED-001")
+	require.NoError(t, os.MkdirAll(generatedDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(generatedDir, "spec.md"),
+		[]byte("---\nstatus: draft\ntitle: Generated SPEC\n---\n"), 0o644))
+
+	all := scanAllSpecs(base)
+
+	ids := map[string]bool{}
+	for _, entry := range all {
+		ids[entry.id] = true
+	}
+	assert.True(t, ids["SPEC-REAL-001"])
+	assert.False(t, ids["SPEC-GENERATED-001"])
+}

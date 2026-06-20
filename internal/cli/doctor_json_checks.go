@@ -231,3 +231,10 @@ func (r *doctorJSONReport) collectHookChecks(dir string) {
 		Detail:   "permissions: not configured (run 'auto update' to install)",
 	})
 }
+
+func (r *doctorJSONReport) collectHygieneChecks(dir string) {
+	hygiene := collectStatusHygiene(dir)
+	payload := hygiene.payload()
+	r.data.Hygiene = &payload
+	applyHygieneJSON("doctor", hygiene, &r.warnings, &r.checks, &r.status)
+}

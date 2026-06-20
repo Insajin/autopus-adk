@@ -110,6 +110,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	cfg, err := loadHarnessConfigForDir(opts.dir, globalFlags{})
 	if err != nil {
 		tui.FAIL(out, fmt.Sprintf("autopus.yaml 로드 실패: %v", err))
+		renderHygieneText(out, collectStatusHygiene(opts.dir))
 		return nil
 	}
 	tui.OK(out, fmt.Sprintf("autopus.yaml (mode: %s)", cfg.Mode))
@@ -229,6 +230,12 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 
 	tui.SectionHeader(out, "Hooks & Permissions")
 	if !checkHooksPermissions(out, opts.dir) {
+		allOK = false
+	}
+
+	hygiene := collectStatusHygiene(opts.dir)
+	renderHygieneText(out, hygiene)
+	if hygiene.hasWarning() {
 		allOK = false
 	}
 

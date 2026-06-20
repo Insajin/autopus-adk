@@ -142,34 +142,6 @@ func scanSpecs(specsDir string) ([]specEntry, error) {
 	return specs, nil
 }
 
-// scanAllSpecs scans top-level and submodule depth-1 SPEC directories.
-func scanAllSpecs(baseDir string) []specEntry {
-	var all []specEntry
-
-	// Top-level: {baseDir}/.autopus/specs/
-	topSpecs, _ := scanSpecs(filepath.Join(baseDir, ".autopus", "specs"))
-	all = append(all, topSpecs...)
-
-	// Submodules depth 1: {baseDir}/*/.autopus/specs/
-	entries, err := os.ReadDir(baseDir)
-	if err != nil {
-		return all
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		subSpecsDir := filepath.Join(baseDir, entry.Name(), ".autopus", "specs")
-		subSpecs, _ := scanSpecs(subSpecsDir)
-		for i := range subSpecs {
-			subSpecs[i].module = entry.Name()
-		}
-		all = append(all, subSpecs...)
-	}
-
-	return all
-}
-
 func newStatusCmd() *cobra.Command {
 	var (
 		dir        string
@@ -231,8 +203,10 @@ func runStatusText(cmd *cobra.Command, dir string) error {
 	out := cmd.OutOrStdout()
 
 	specs := scanAllSpecs(dir)
+	hygiene := collectStatusHygiene(dir)
 	if len(specs) == 0 {
 		_, _ = fmt.Fprintln(out, "SPEC이 없습니다. `/auto plan`으로 시작하세요.")
+		renderHygieneText(out, hygiene)
 		return nil
 	}
 
@@ -261,5 +235,6 @@ func runStatusText(cmd *cobra.Command, dir string) error {
 	_, _ = fmt.Fprintln(out)
 	summary := fmt.Sprintf("전체: %d/%d 완료", doneCount, len(specs))
 	_, _ = fmt.Fprintf(out, "  %s\n", tui.MutedStyle.Render(summary))
+	renderHygieneText(out, hygiene)
 	return nil
 }
