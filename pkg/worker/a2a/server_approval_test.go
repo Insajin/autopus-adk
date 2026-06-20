@@ -3,7 +3,6 @@ package a2a
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,11 +14,7 @@ func TestServer_HandleApproval_CallsCallbackAndUpdatesStatus(t *testing.T) {
 	mb := newMockBackend()
 	defer mb.close()
 
-	var (
-		callbackMu     sync.Mutex
-		callbackCalled bool
-		callbackParams ApprovalRequestParams
-	)
+	callbackCh := make(chan ApprovalRequestParams, 1)
 
 	srv := NewServer(ServerConfig{
 		BackendURL: mb.wsURL(),
@@ -29,10 +24,7 @@ func TestServer_HandleApproval_CallsCallbackAndUpdatesStatus(t *testing.T) {
 			return &TaskResult{}, nil
 		},
 		ApprovalCallback: func(params ApprovalRequestParams) {
-			callbackMu.Lock()
-			defer callbackMu.Unlock()
-			callbackCalled = true
-			callbackParams = params
+			callbackCh <- params
 		},
 	})
 
@@ -87,9 +79,12 @@ func TestServer_HandleApproval_CallsCallbackAndUpdatesStatus(t *testing.T) {
 	assert.Equal(t, "task-approval-001", statusParams.TaskID)
 
 	// Verify callback was invoked with correct params.
-	callbackMu.Lock()
-	defer callbackMu.Unlock()
-	assert.True(t, callbackCalled)
+	var callbackParams ApprovalRequestParams
+	select {
+	case callbackParams = <-callbackCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("approval callback was not invoked")
+	}
 	assert.Equal(t, "task-approval-001", callbackParams.TaskID)
 	assert.Equal(t, "approval-001", callbackParams.ApprovalID)
 	assert.Equal(t, "trace-001", callbackParams.TraceID)
