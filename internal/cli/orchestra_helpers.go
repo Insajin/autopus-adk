@@ -60,14 +60,6 @@ func buildReviewPromptWithEffectiveConfig(files []string, effectiveCfg effective
 }
 
 // @AX:NOTE [AUTO]: Review design context is appended only for UI-related files and remains untrusted prompt evidence.
-func buildReviewDesignContext(files []string) string {
-	effectiveCfg, err := loadEffectiveHarnessConfigForFlags(globalFlags{})
-	if err != nil {
-		effectiveCfg = effectiveHarnessConfig{Config: config.DefaultFullConfig("."), ConfigDir: "."}
-	}
-	return buildReviewDesignContextWithEffectiveConfig(files, effectiveCfg)
-}
-
 func buildReviewDesignContextWithEffectiveConfig(files []string, effectiveCfg effectiveHarnessConfig) string {
 	cfg := effectiveCfg.Config
 	if !design.AnyUIRelatedFile(files, cfg.Design.UIFileGlobs) {
