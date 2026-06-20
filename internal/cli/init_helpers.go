@@ -26,6 +26,16 @@ var initSupportedPlatforms = map[string]bool{
 	"opencode":        true,
 }
 
+var legacyRootGeneratedGitignorePatterns = map[string]string{
+	".claude/":     "/.claude/",
+	".claude.json": "/.claude.json",
+	".codex/":      "/.codex/",
+	".gemini/":     "/.gemini/",
+	".mcp.json":    "/.mcp.json",
+	".opencode/":   "/.opencode/",
+	"config.toml":  "/config.toml",
+}
+
 // generatePlatformFiles는 플랫폼별 파일을 생성한다.
 func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessConfig, cmd *cobra.Command) error {
 	effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
@@ -95,6 +105,7 @@ func updateGitignore(dir string) error {
 	if data, err := os.ReadFile(gitignorePath); err == nil {
 		existing = string(data)
 	}
+	existing, migrated := migrateLegacyRootGeneratedGitignorePatterns(existing)
 	existingLines := make(map[string]bool)
 	for _, line := range strings.Split(existing, "\n") {
 		line = strings.TrimSpace(line)
@@ -111,20 +122,41 @@ func updateGitignore(dir string) error {
 		}
 	}
 
-	if len(toAdd) == 0 {
+	if len(toAdd) == 0 && !migrated {
 		return nil
 	}
 
 	var sb strings.Builder
 	sb.WriteString(existing)
-	if existing != "" && !strings.HasSuffix(existing, "\n") {
-		sb.WriteString("\n")
-	}
-	sb.WriteString("\n# Autopus-ADK generated files\n")
-	for _, p := range toAdd {
-		sb.WriteString(p)
-		sb.WriteString("\n")
+	if len(toAdd) > 0 {
+		if existing != "" && !strings.HasSuffix(existing, "\n") {
+			sb.WriteString("\n")
+		}
+		sb.WriteString("\n# Autopus-ADK generated files\n")
+		for _, p := range toAdd {
+			sb.WriteString(p)
+			sb.WriteString("\n")
+		}
 	}
 
 	return os.WriteFile(gitignorePath, []byte(sb.String()), 0644)
+}
+
+func migrateLegacyRootGeneratedGitignorePatterns(existing string) (string, bool) {
+	if existing == "" {
+		return existing, false
+	}
+	lines := strings.Split(existing, "\n")
+	changed := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if replacement, ok := legacyRootGeneratedGitignorePatterns[trimmed]; ok {
+			lines[i] = replacement
+			changed = true
+		}
+	}
+	if !changed {
+		return existing, false
+	}
+	return strings.Join(lines, "\n"), true
 }

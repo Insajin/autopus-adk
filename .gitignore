@@ -13,6 +13,7 @@ coverage.out
 .autopus/plugins/
 .autopus/orchestra/
 .autopus/brainstorms/
+.autopus/txns/
 .autopus/design/imports/
 .autopus/design/verify/
 .autopus/canary/
@@ -32,18 +33,18 @@ coverage.out
 **/.autopus/specs/**/review.md
 **/.autopus/specs/**/review-findings.json
 **/.autopus/specs/**/.self-verify.log
-.claude/
-.claude.json
-.codex/
-.gemini/
-.opencode/
+/.claude/
+/.claude.json
+/.codex/
+/.gemini/
+/.opencode/
 .agents/skills/
 .agents/plugins/
 .agents/commands/
 .agents/hooks.json
 .symphony/artifacts/
-.mcp.json
-config.toml
+/.mcp.json
+/config.toml
 
 # Build artifacts
 /auto

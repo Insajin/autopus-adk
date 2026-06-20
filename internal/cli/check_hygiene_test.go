@@ -146,6 +146,25 @@ func TestCheckCmd_HygieneBlocksRuntimeEvenWithSourceOfTruthChange(t *testing.T) 
 	}
 }
 
+func TestCheckCmd_HygieneAllowsGeneratedRuntimeUntrackCleanup(t *testing.T) {
+	dir := t.TempDir()
+	initHygieneTestGitRepo(t, dir)
+	writeNestedTestFile(t, dir, ".autopus/brainstorms/BS-001.md", "# Brainstorm\n")
+	runHygieneGitCommand(t, dir, "add", "-f", ".autopus/brainstorms/BS-001.md")
+	runHygieneGitCommand(t, dir, "commit", "-m", "test fixture")
+	runHygieneGitCommand(t, dir, "rm", "--cached", ".autopus/brainstorms/BS-001.md")
+
+	root := newTestRootCmd()
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs([]string{"check", "--hygiene", "--quiet", "--dir", dir})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("generated/runtime index-only cleanup should pass hygiene: %v\n%s", err, buf.String())
+	}
+}
+
 func initHygieneTestGitRepo(t *testing.T, dir string) {
 	t.Helper()
 

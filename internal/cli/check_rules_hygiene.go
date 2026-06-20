@@ -37,7 +37,7 @@ func checkHygiene(dir string, out io.Writer, quiet bool) bool {
 		tui.SectionHeader(out, "hygiene: generated/runtime drift")
 	}
 
-	staged, err := stagedGitPaths(dir, "ACMRD")
+	staged, err := stagedGitPaths(dir, "ACMR")
 	if err != nil {
 		if !quiet {
 			tui.Info(out, "not a git worktree or no staged index, skipping hygiene check")
