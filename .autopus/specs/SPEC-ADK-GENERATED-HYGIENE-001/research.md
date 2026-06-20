@@ -117,6 +117,207 @@ Untracked path family:
 
 Next cleanup family remains: local/generated config and manifests (`config.toml`, `.autopus/*-manifest.json`, `.agents/plugins/marketplace.json`).
 
+## Slice 3 Dry-Run: Local Config, Manifests, Marketplace
+
+2026-06-20 slice 3 dry-run reviewed the next tracked-but-ignored path family before any index mutation.
+
+Pre-slice status:
+
+```bash
+git status --short --branch
+```
+
+Observed state:
+
+- Branch: `main...origin/main [ahead 4]`
+- Existing unstaged generated/runtime drift remains in `.autopus/*-manifest.json`, `.autopus/plugins/**`, `.claude/**`, `.codex/**`, `.gemini/**`, `.opencode/**`, and `config.toml`.
+- No staged changes were present before this slice.
+- `.autopus/brainstorms/**` remains untracked from the index; `git ls-files .autopus/brainstorms` returns no paths.
+
+Tracked-but-ignored inventory:
+
+```bash
+git ls-files -c -i --exclude-standard | wc -l
+```
+
+Result: `187`
+
+Family count before slice 3:
+
+| Family | Count | Slice decision |
+|--------|-------|----------------|
+| `.opencode/**` | 44 | defer to platform generated surface slice |
+| `.codex/**` | 44 | defer to platform generated surface slice |
+| `.autopus/specs/**/review.md` | 38 | defer to SPEC review evidence slice |
+| `.gemini/**` | 35 | defer to platform generated surface slice |
+| `.autopus/plugins/**` | 18 | defer to plugin generated surface slice |
+| `.autopus/*-manifest.json` | 4 | include in slice 3 |
+| `config.toml` | 1 | include in slice 3 |
+| `.claude/**` | 1 | defer to platform generated surface slice |
+| `.autopus/specs/**/review-findings.json` | 1 | defer to SPEC review evidence slice |
+| `.agents/plugins/marketplace.json` | 1 | include in slice 3 |
+
+Dry-run command:
+
+```bash
+git rm --cached --dry-run -- \
+  config.toml \
+  .agents/plugins/marketplace.json \
+  .autopus/claude-code-manifest.json \
+  .autopus/codex-manifest.json \
+  .autopus/gemini-cli-manifest.json \
+  .autopus/opencode-manifest.json
+```
+
+Dry-run output:
+
+```text
+rm '.agents/plugins/marketplace.json'
+rm '.autopus/claude-code-manifest.json'
+rm '.autopus/codex-manifest.json'
+rm '.autopus/gemini-cli-manifest.json'
+rm '.autopus/opencode-manifest.json'
+rm 'config.toml'
+```
+
+Path family dry-run split:
+
+```bash
+git rm --cached --dry-run -- config.toml
+git rm --cached --dry-run -- .agents/plugins/marketplace.json
+git rm --cached --dry-run -- .autopus/claude-code-manifest.json .autopus/codex-manifest.json .autopus/gemini-cli-manifest.json .autopus/opencode-manifest.json
+```
+
+Results:
+
+- `config.toml`: 1 path, local runtime config, ignored by `/.gitignore` pattern `/config.toml`.
+- `.agents/plugins/marketplace.json`: 1 path, generated plugin marketplace, ignored by `.gitignore` pattern `.agents/plugins/`.
+- `.autopus/*-manifest.json`: 4 paths, generated platform manifests, ignored by `.gitignore` pattern `.autopus/*-manifest.json`.
+
+Ignore evidence:
+
+```bash
+git check-ignore -v --no-index -- config.toml .agents/plugins/marketplace.json .autopus/claude-code-manifest.json .autopus/codex-manifest.json .autopus/gemini-cli-manifest.json .autopus/opencode-manifest.json
+```
+
+Output:
+
+```text
+.gitignore:47:/config.toml	config.toml
+.gitignore:42:.agents/plugins/	.agents/plugins/marketplace.json
+.gitignore:11:.autopus/*-manifest.json	.autopus/claude-code-manifest.json
+.gitignore:11:.autopus/*-manifest.json	.autopus/codex-manifest.json
+.gitignore:11:.autopus/*-manifest.json	.autopus/gemini-cli-manifest.json
+.gitignore:11:.autopus/*-manifest.json	.autopus/opencode-manifest.json
+```
+
+Slice judgment:
+
+- Proceed with three small index-only untrack operations: `config.toml`, `.autopus/*-manifest.json`, then `.agents/plugins/marketplace.json`.
+- Do not edit generated/runtime file contents. This slice only removes tracked ignored local/generated files from the Git index.
+- `config.toml` is already absent from the working tree (`D config.toml`), so `git rm --cached` records the same intended deletion in the index without touching a source file.
+- Keep `.autopus/plugins/**`, `.codex/**`, `.claude/**`, `.gemini/**`, `.opencode/**`, and SPEC review artifacts out of this slice.
+- Expected tracked-but-ignored count after this slice: `181`.
+
+Read-only planner review agreed with the split and recommended treating `config.toml` as its own small sub-slice because the file was already absent in the working tree. The manifest files and plugin marketplace metadata can be grouped as generated registry metadata, with evidence split by sub-family.
+
+## Slice 3 Applied: Local Config, Manifests, Marketplace
+
+2026-06-20 slice 3 applied exact-path index-only untrack operations after the dry-run evidence above.
+
+Commands:
+
+```bash
+git rm --cached -- config.toml
+git rm --cached -- .autopus/claude-code-manifest.json .autopus/codex-manifest.json .autopus/gemini-cli-manifest.json .autopus/opencode-manifest.json
+git rm --cached -- .agents/plugins/marketplace.json
+```
+
+Result:
+
+- `config.toml`: removed from the Git index. The working tree file was already absent before this slice, so this records the intended end of local runtime config tracking rather than preserving a local ignored copy.
+- `.autopus/*-manifest.json`: 4 generated platform manifest files removed from the Git index only; local generated files remain present and ignored.
+- `.agents/plugins/marketplace.json`: generated plugin marketplace metadata removed from the Git index only; local generated file remains present and ignored.
+
+Post-slice inventory:
+
+```bash
+git ls-files -- config.toml .agents/plugins/marketplace.json .autopus/claude-code-manifest.json .autopus/codex-manifest.json .autopus/gemini-cli-manifest.json .autopus/opencode-manifest.json
+```
+
+Result: no tracked paths.
+
+```bash
+git ls-files -c -i --exclude-standard | wc -l
+```
+
+Result: `181`
+
+```bash
+git ls-files -c -i --exclude-standard | rg '^(config\.toml$|\.agents/plugins/marketplace\.json$|\.autopus/.*-manifest\.json$)' || true
+```
+
+Result: no remaining tracked-but-ignored paths from this slice.
+
+Local file presence check:
+
+```text
+marketplace_exists
+.autopus/claude-code-manifest.json exists
+.autopus/codex-manifest.json exists
+.autopus/gemini-cli-manifest.json exists
+.autopus/opencode-manifest.json exists
+config_missing
+```
+
+Regenerate/diff verification:
+
+```bash
+go run ./cmd/auto update --local --dry-run --yes
+```
+
+Result: exit 0. The command uses the local source tree and preview mode, so it computes managed output without writing generated files.
+
+Relevant preview output:
+
+```text
+[codex] extended skills: 46 compatible, 1 incompatible
+[gemini] extended skills: 46 compatible, 1 incompatible
+Preview: auto update
+- [generated_surface] retain .agents/plugins/marketplace.json (codex) — managed checksum is unchanged and would be retained
+- [runtime_state] update .autopus/antigravity-cli-manifest.json (antigravity-cli) — manifest diff would record 4 emit, 198 retain, 0 prune actions
+- [runtime_state] update .autopus/claude-code-manifest.json (claude-code) — manifest diff would record 4 emit, 93 retain, 0 prune actions
+- [runtime_state] update .autopus/codex-manifest.json (codex) — manifest diff would record 7 emit, 104 retain, 10 prune actions
+- [runtime_state] update .autopus/opencode-manifest.json (opencode) — manifest diff would record 3 emit, 117 retain, 0 prune actions
+```
+
+Interpretation:
+
+- `.agents/plugins/marketplace.json` remains deterministically regenerable from the Codex plugin marketplace output.
+- Current `autopus.yaml` platforms are `claude-code`, `codex`, `antigravity-cli`, and `opencode`. The current regenerate target for Gemini-family output is `.autopus/antigravity-cli-manifest.json`; the tracked `.autopus/gemini-cli-manifest.json` removed in this slice is legacy generated metadata already outside the current platform regenerate path.
+- The preview records manifest diff actions for the current generated manifest family without mutating the working tree.
+- `config.toml` is local runtime config, not a deterministic platform manifest target. It was already missing before the slice and remains absent after the index cleanup.
+
+No-write check after preview:
+
+```bash
+git diff --cached --name-status
+```
+
+Result remains limited to the intended 7 staged paths:
+
+```text
+D	.agents/plugins/marketplace.json
+D	.autopus/claude-code-manifest.json
+D	.autopus/codex-manifest.json
+D	.autopus/gemini-cli-manifest.json
+D	.autopus/opencode-manifest.json
+M	.autopus/specs/SPEC-ADK-GENERATED-HYGIENE-001/research.md
+D	config.toml
+```
+
+Next cleanup family remains: SPEC review evidence (`.autopus/specs/**/review.md`, `.autopus/specs/**/review-findings.json`) or plugin generated surface (`.autopus/plugins/**`), depending on desired blast radius.
+
 ## Path Family Mapping
 
 | Generated family | Canonical source owner | Cleanup stance |
