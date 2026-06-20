@@ -2,22 +2,22 @@
 
 # Agent Pipeline Skill
 
-A 5-Phase multi-agent pipeline orchestration skill. This is the **default** execution mode for `/auto go`.
+A 5-Phase multi-agent pipeline orchestration skill. This is the **default** execution mode for `@auto go`.
 
 ## Activation
 
-This skill is the default for `/auto go SPEC-ID`.
+This skill is the default for `@auto go SPEC-ID`.
 
 | 플래그 | 모드 | 설명 |
 |--------|------|------|
-| (없음) | **서브에이전트 파이프라인** | Agent tool로 서브에이전트 스폰 (이 스킬). 메인 세션이 파이프라인 흐름 제어 |
-| `--team` | **Agent Teams** | Claude Code Agent Teams 사용. 팀원 간 직접 통신, 공유 태스크 리스트, 자기 조율 |
+| (없음) | **서브에이전트 파이프라인** | `spawn_agent(...)`로 specialist worker를 phase별 스폰. 메인 세션이 파이프라인 흐름 제어 |
+| `--team` | **Codex team profile** | Codex native `multi_agent` 도구 기반 Lead/Builder/Guardian coordination |
 | `--solo` | **단일 세션** | 메인 세션이 직접 TDD 구현. 서브에이전트 없음 |
 | `--multi` | **리스크 기반 멀티프로바이더** | Review Phase에서 risk tier가 high/critical이면 orchestra engine으로 추가 dissent review를 실행. 설치된 provider가 1개뿐이면 단일 provider로 폴백 |
 
-For Agent Teams mode (`--team`), see `.codex/skills/autopus/agent-teams.md` for role-based team composition (Lead/Builder/Guardian).
+For Codex team profile mode (`--team`), see `.codex/skills/agent-teams.md` for role-based team composition (Lead/Builder/Guardian).
 
-@.codex/skills/autopus/worktree-isolation.md
+@.codex/skills/worktree-isolation.md
 
 ## Permission Mode Detection
 

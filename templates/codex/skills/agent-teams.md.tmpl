@@ -1,237 +1,109 @@
 # auto-agent-teams
 
-# Agent Teams Skill
+# Codex Team Mode Skill
 
 ## Overview
 
-Agent Teams mode (`--team`) enables role-based team collaboration via Claude Code Agent Teams. Instead of spawning ephemeral subagents per task, this mode creates persistent teammates that communicate directly, share a task list, and self-coordinate through the pipeline.
+Codex `--team` mode is a first-class Autopus team profile built on the native Codex `multi_agent` tool surface.
 
-**Activation flag**: `/auto go SPEC-ID --team`
+**Activation flag**: `@auto go SPEC-ID --team`
 
-## Activation
+This mode does not use Claude Code Team APIs. It uses `spawn_agent(...)`, `send_input(...)`, `wait_agent(...)`, and `close_agent(...)` from the Codex `multi_agent` feature.
 
-### Prerequisites
+## Prerequisites
 
-| Requirement | Value | How to verify |
-|-------------|-------|---------------|
-| Claude Code version | v2.1.32 or later | `claude --version` |
-| Environment variable | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | `echo $CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` |
-| Feature status | **Experimental** — disabled by default | Official: https://code.claude.com/docs/en/agent-teams |
+- Codex CLI exposes `multi_agent` and `goals` as enabled features. Verify with `codex features list` when in doubt.
+- `.codex/config.toml` should contain `[features] multi_agent = true` and `goals = true`.
+- The current Codex session must expose `spawn_agent`. If it does not, stop before Phase 1 with a workflow authenticity blocker and ask for a working multi-agent surface or `--solo`.
 
-### Environment Setup
+## Mode Semantics
 
-```bash
-export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-```
+| Invocation | Behavior |
+|------------|----------|
+| `@auto go` | Default subagent pipeline: phase-by-phase specialist spawning |
+| `@auto go --auto` | Skip confirmation gates and treat subagent spawning as explicitly approved |
+| `@auto go --solo` | Disable subagents; main session implements directly |
+| `@auto go --team` | Use the Codex team profile: main session as Lead, Builder/Guardian workers, explicit coordination and teardown |
 
-The Autopus harness injects this variable via `.codex/settings.json` automatically.
+## Team Composition
 
-### Failure Modes
+The main session is always the **Lead**. Do not spawn a separate lead worker.
 
-If the variable is not set OR Claude Code is below v2.1.32, the pipeline MUST error with:
+- **Lead**: main session. Owns phase/gate state, worker prompts, result integration, final handoff, and goal status.
+- **Builder**: one or more `executor`/`tester` workers with disjoint write ownership.
+- **Guardian**: `validator`, `reviewer`, and security-focused workers that verify and review Builder output.
 
-```
-Error: Agent Teams mode unavailable
-  Claude Code version: {detected} (required: v2.1.32+)
-  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: {set|not set}
-Fallback: Run without --team to use the subagent pipeline mode.
-```
-
-## Team Constraints (Official)
-
-Agent Teams enforces these rules at the Claude Code layer — violating them fails at runtime:
-
-| Constraint | Rule |
-|-----------|------|
-| Nested teams | Teammates MUST NOT call `TeamCreate` — only the top-level session can create a team |
-| Cleanup authority | Only the Lead (team creator) may delete the team; teammates request cleanup via `SendMessage` |
-| Recommended size | **3–5 teammates** per team (official guidance). Autopus default (Lead + 1–2 Builders + Guardian) fits this range |
-| Persistence | Team config persists in `~/.codex/teams/{team-name}/config.json`; task list in `~/.codex/tasks/{team-name}/` |
-
-## Team Roles
-
-### Lead (1 agent)
-
-**Responsibilities**: planner + reviewer
-
-- Joins the team as a teammate — the **top-level session** creates the team and spawns Lead via `TeamCreate` + `Agent(..., team_name=..., name="lead")`. Lead MUST NOT call `TeamCreate` itself (Claude Code rejects nested team creation at runtime).
-- Runs Phase 1 (Planning) to produce the execution plan
-- Coordinates tasks with Builder(s) and Guardian via `SendMessage`
-- Monitors task list and consolidates results
-- Runs Phase 4 (Review) and finalizes output
-- Re-assigns or requests fallback from the top-level session if a teammate fails
-
-### Builder (1–2 agents)
-
-**Responsibilities**: executor + tester + annotator + frontend-specialist
-
-- Implements code following TDD (RED → GREEN → REFACTOR)
-- Writes tests in Phase 1.5 (Test Scaffold) before implementation
-- Executes Phase 2 (Implementation) in an isolated worktree
-- Applies `@AX` annotation tags in Phase 2.5 (Annotation)
-- Communicates validation requests to Guardian via `SendMessage`
-- Reports completion to Lead via `SendMessage`
-
-### Guardian (1 agent)
-
-**Responsibilities**: validator + security-auditor + perf-engineer
-
-- Executes Gate 2 (Validation): coverage, lint, race conditions
-- Performs security audit on modified files
-- Monitors performance regressions
-- Responds to partial validation requests from Builder
-- Reports validation results to Lead via `SendMessage`
-
-## Team Creation Pattern
-
-All team lifecycle operations (create, spawn, delete) are owned by the **top-level session** — the Claude Code main session that receives the user's `/auto go --team` invocation. Teammates MUST NOT call `TeamCreate`; this is enforced by Claude Code at runtime.
-
-### Prerequisite — Load deferred tool schemas
-
-`TeamCreate`, `SendMessage`, and `TeamDelete` are deferred tools. Load their schemas once before first use:
-
-```
-ToolSearch(query="select:TeamCreate,SendMessage,TeamDelete")
-```
-
-### Spawn sequence (top-level session only)
+## Spawn Pattern
 
 ```python
-TEAM_NAME = f"team-{spec_id.lower()}"         # e.g., "team-auth-001"
-
-# Step 1: Top-level session creates the team.
-# Side effect: the main session is AUTOMATICALLY registered as a member with
-# name="team-lead" and agentType=<agent_type>. Do NOT spawn a separate lead Agent().
-TeamCreate(
-    team_name   = TEAM_NAME,                  # NOTE: parameter is team_name, NOT name
-    description = "<SPEC title>",
-    agent_type  = "planner",
+spawn_agent(
+    agent_type="executor",
+    message="""
+    Role: Builder.
+    Own only: <paths>.
+    Do not edit: <paths>.
+    Completion: implement the assigned task and run focused tests.
+    Return: owned_paths, changed_files, verification, blockers, next_required_step.
+    """,
 )
 
-# Step 2: Top-level session spawns the 3 non-lead teammates in a SINGLE message
-# (Agent() calls must be emitted together to spawn in parallel)
-spawn_agent executor
-spawn_agent tester
-spawn_agent validator
+spawn_agent(
+    agent_type="validator",
+    message="""
+    Role: Guardian.
+    Verify the Builder-owned paths only.
+    Return: owned_paths, changed_files, verification, blockers, next_required_step.
+    """,
+)
 ```
 
-Each teammate loads its agent definition from `.codex/agents/autopus/` and inherits its frontmatter (tools, model, skills, permissionMode). The `name` field becomes the addressable handle for `SendMessage({to: "<name>"})`. The main session is addressable as `team-lead`.
-
-### Verification gate
-
-After spawn, the top-level session MUST verify all 4 core members are registered (team-lead + 3 teammates):
-
-```bash
-jq '.members | length' ~/.codex/teams/{TEAM_NAME}/config.json
-# expected: 4 (team-lead + builder-1 + tester + guardian)
-jq -r '.members[].name' ~/.codex/teams/{TEAM_NAME}/config.json
-# expected lines: team-lead, builder-1, tester, guardian
-```
-
-If `.members | length < 4`, the team is **not** viable for multi-agent collaboration. Abort Route B and fall back to Route A (subagent pipeline).
-
-### Teardown
-
-WHEN the pipeline terminates (success, abort, or circuit break), shut down teammates per-teammate (broadcast `to:"*"` accepts plain text only, not structured shutdown messages), then call `TeamDelete()`:
-
-```python
-for name in ("builder-1", "tester", "guardian"):
-    SendMessage(to=name, message={"type": "shutdown_request", "reason": "pipeline complete"})
-
-# After teammates respond and exit (typically <10s)
-TeamDelete()     # fails if any active teammate remains
-```
-
-Task assignment via `SendMessage`:
-
-```python
-# Lead → Builder
-SendMessage(to="builder", message={
-    "phase": "Phase 2",
-    "tasks": [...],
-    "worktree": "<path>"
-})
-
-# Lead → Guardian
-SendMessage(to="guardian", message={
-    "phase": "Gate 2",
-    "target_branch": "<branch>",
-    "coverage_threshold": 85
-})
-```
+Use `send_input(...)` only from the Lead/main session when a worker needs follow-up instructions. Use `wait_agent(...)` sparingly, and `close_agent(...)` once a worker is no longer needed.
 
 ## Execution Flow
 
-```
-Lead: Phase 1 (Planning)
-  → Assigns tasks to Builder(s) and Guardian
+```text
+Lead: Step 0 / Phase 1
+  -> parse flags, resolve SPEC, plan ownership, spawn workers
 
-Builder: Phase 1.5 (Test Scaffold)
-  → Writes failing tests first (RED)
+Builder: Phase 1.5 / Phase 2
+  -> write focused tests, implement assigned paths, report changed files
 
-Builder: Phase 2 (Implementation)
-  → GREEN phase in isolated worktree
-  → Merge back after completion
+Guardian: Gate 2 / Phase 4
+  -> validate Builder output, review security and quality risks
 
-Builder: Phase 2.5 (Annotation)
-  → Applies @AX tags to modified files
-
-Guardian: Gate 2 (Validation)
-  → go test -race ./...
-  → Coverage check (85%+)
-  → golangci-lint run
-  → Security audit
-
-Lead: Phase 4 (Review)
-  → Consolidates all results
-  → Final quality check
-  → Produces review report
+Lead: Integration / Handoff
+  -> inspect worker returns, decide retry/abort, close workers, report evidence
 ```
 
-## Builder-Guardian Direct Communication (P1-R3)
+Codex workers are not autonomous teammates that negotiate among themselves. The main session coordinates all follow-up with `send_input(...)` and integrates results.
 
-Builder can request partial validation from Guardian without waiting for Lead coordination:
-
-```python
-# Builder → Guardian (partial validation request)
-SendMessage(to="guardian", message={
-    "type": "partial_validation",
-    "files": ["pkg/foo/bar.go"],
-    "reason": "security-sensitive change"
-})
-
-# Guardian → Builder (validation result)
-SendMessage(to="builder", message={
-    "type": "validation_result",
-    "status": "PASS",  # or FAIL
-    "issues": []
-})
-```
-
-All direct interactions are logged in the pipeline log:
-
-```
-[P1-R3] builder → guardian: partial_validation request (pkg/foo/bar.go)
-[P1-R3] guardian → builder: PASS
-```
-
-## Subagent Fallback Strategy
+## Fallback Strategy
 
 | Scenario | Action |
 |----------|--------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` not set | Error + fallback guidance to use subagent pipeline |
-| Builder teammate fails mid-task | Lead re-assigns task to another Builder or spawns a subagent |
-| Guardian teammate fails | Lead falls back to subagent validator with `spawn_agent validator` |
-| Team creation fails | Abort and fall back to default subagent pipeline |
+| `spawn_agent` unavailable | Stop before Phase 1 with workflow authenticity blocker |
+| Builder worker fails mid-task | Lead reassigns to another bounded worker or switches to focused main-session repair |
+| Guardian worker fails | Lead reruns validation/review with a fresh Guardian worker or reports blocker |
+| Team coordination cannot be observed | Abort team profile and ask for a working multi-agent surface or `--solo` |
 
 ## Worktree Isolation
 
-The same worktree isolation rules (R1–R5 from `worktree-isolation.md`) apply in Agent Teams mode:
+The same worktree isolation rules from `worktree-isolation.md` apply when parallel Builder workers need branch separation:
 
-- Each Builder teammate works in an independent git worktree
-- Maximum 5 simultaneous worktrees
-- GC suppression: `git -c gc.auto=0 <command>` required during parallel execution
-- Exponential backoff on shared resource lock contention (3s → 6s → 12s)
-- Failed worktrees cleaned up with `git worktree remove --force <path>`
+- Assign disjoint write scopes before spawning workers.
+- Use independent worktrees for parallel implementation when required.
+- Merge or inspect worker output sequentially in the main session.
+- Do not rely on Claude-only `team_name`, task-list, or implicit worktree APIs.
 
-**Ref**: SPEC-WORKTREE-001, `@.codex/skills/autopus/worktree-isolation.md`
+**Ref**: SPEC-WORKTREE-001, `.codex/skills/worktree-isolation.md`
+
+## Completion Evidence
+
+Team mode final output must include:
+
+- `team_mode: codex_multi_agent`
+- `subagent_dispatch_count`
+- `subagent_roles_dispatched`
+- `goal_status` when a Codex goal is active, otherwise `goal_status: none`
+- `degraded-mode` and `degraded_mode`
+- `next_required_step`
