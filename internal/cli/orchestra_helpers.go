@@ -32,6 +32,14 @@ func buildFileContents(files []string) (string, error) {
 
 // buildReviewPrompt builds the review prompt, including file contents if provided.
 func buildReviewPrompt(files []string) (string, error) {
+	effectiveCfg, err := loadEffectiveHarnessConfigForFlags(globalFlags{})
+	if err != nil {
+		effectiveCfg = effectiveHarnessConfig{Config: config.DefaultFullConfig("."), ConfigDir: "."}
+	}
+	return buildReviewPromptWithEffectiveConfig(files, effectiveCfg)
+}
+
+func buildReviewPromptWithEffectiveConfig(files []string, effectiveCfg effectiveHarnessConfig) (string, error) {
 	if len(files) == 0 {
 		return "현재 프로젝트의 코드를 리뷰해주세요. 품질, 가독성, 잠재적 버그를 중심으로 분석하세요.", nil
 	}
@@ -42,7 +50,7 @@ func buildReviewPrompt(files []string) (string, error) {
 	var sb strings.Builder
 	sb.WriteString("다음 파일들을 코드 리뷰해주세요:\n\n")
 	sb.WriteString(contents)
-	if section := buildReviewDesignContext(files); section != "" {
+	if section := buildReviewDesignContextWithEffectiveConfig(files, effectiveCfg); section != "" {
 		sb.WriteString("\n")
 		sb.WriteString(section)
 		sb.WriteString("\n")
@@ -53,17 +61,22 @@ func buildReviewPrompt(files []string) (string, error) {
 
 // @AX:NOTE [AUTO]: Review design context is appended only for UI-related files and remains untrusted prompt evidence.
 func buildReviewDesignContext(files []string) string {
-	cfg, err := config.Load(".")
+	effectiveCfg, err := loadEffectiveHarnessConfigForFlags(globalFlags{})
 	if err != nil {
-		cfg = config.DefaultFullConfig(".")
+		effectiveCfg = effectiveHarnessConfig{Config: config.DefaultFullConfig("."), ConfigDir: "."}
 	}
+	return buildReviewDesignContextWithEffectiveConfig(files, effectiveCfg)
+}
+
+func buildReviewDesignContextWithEffectiveConfig(files []string, effectiveCfg effectiveHarnessConfig) string {
+	cfg := effectiveCfg.Config
 	if !design.AnyUIRelatedFile(files, cfg.Design.UIFileGlobs) {
 		return "Design context: skipped (non-ui changes)\n"
 	}
 	if !cfg.Design.InjectOnReview {
 		return "Design context: skipped (disabled)\n"
 	}
-	ctx, err := design.LoadContext(".", design.Options{
+	ctx, err := loadEffectiveDesignContext(effectiveCfg, design.Options{
 		Enabled:         cfg.Design.Enabled,
 		Paths:           cfg.Design.Paths,
 		MaxContextLines: cfg.Design.MaxContextLines,

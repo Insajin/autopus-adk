@@ -279,6 +279,8 @@ These are optional improvements and do not block sync completion.
 9. `Q-COMP-07`을 적용해 Completion Debt와 Evolution Ideas가 분리되고 optional idea가 후속 SPEC으로 승격되지 않았는지 확인합니다.
 10. 전체 체크리스트를 최대 2회까지 다시 적용합니다.
 11. 2회 재시도 후에도 FAIL이 남으면 `spec.md` 말미에 `## Open Issues` 섹션을 추가하고 `Q-* | category | scope | attempt | reason` 형식으로 기록합니다.
+12. 4개 파일 저장 후 `auto spec validate {SPEC_DIR} --strict`를 실행합니다. 로컬 source tree 검증 중이면 `go run ./cmd/auto spec validate {SPEC_DIR} --strict`를 사용해도 됩니다.
+13. `auto spec validate --strict`가 error를 반환하면 provider review로 넘기지 말고, deterministic finding을 먼저 수정한 뒤 다시 실행합니다. 2회 수정 후에도 실패가 남으면 `## Open Issues`에 남은 preflight 오류와 reason을 기록합니다.
 
 예시:
 

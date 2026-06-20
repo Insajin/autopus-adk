@@ -85,10 +85,11 @@ orchestra:
         gemini:
             binary: agy
             args: [--print, ""]
-            pane_args: []
             prompt_via_args: true
+            interactive_input: stdin
             subprocess:
                 output_format: text
+                timeout: 480
     commands:
         brainstorm:
             strategy: debate

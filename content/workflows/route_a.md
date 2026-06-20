@@ -43,14 +43,18 @@ to branch. A non-zero build or test exit code yields `verdict: fail`.
 The `release_hygiene` terminal phase enforces release safety before sync:
 
 - **Generated-surface drift gate**: blocks the run when generated surfaces
-  (`.claude` / `.codex` / `.gemini` / `.opencode` / `.autopus/orchestra`) are
-  staged without a corresponding source-of-truth change.
-- **Lore commit format**: enforces the pending commit message via
-  `auto check --lore --message <msgfile>`.
-- **300-line source limit**: enforces the limit via `auto check --arch --staged`.
+  (`.claude` / `.codex` / `.gemini` / `.opencode` / `.autopus/plugins`) are
+  staged without a matching source-of-truth change, and always blocks runtime
+  artifacts such as `.autopus/txns` / `.autopus/orchestra`. The workflow JS
+  shells out to `auto check --hygiene`.
+- **300-line source limit**: enforces the staged source limit through the same
+  workflow call: `auto check --hygiene --arch --quiet --staged`.
+- **Lore commit format**: the commit-msg boundary enforces pending commit
+  messages via `auto check --lore --message <msgfile>`.
 
 ## JS-to-Go bridge
 
-The `gate_build_test` phase is the only phase that crosses into Go execution for
-its verdict. The bridge is the `auto workflow gate` CLI subcommand, keeping
-exit-code adjudication in the Go runtime and out of the JS sequencing layer.
+The `gate_build_test` and `release_hygiene` phases cross into Go execution for
+deterministic verdicts. `gate_build_test` uses the `auto workflow gate` CLI
+subcommand, while `release_hygiene` uses `auto check --hygiene --arch --quiet
+--staged`. JS owns sequencing; Go owns policy and exit-code adjudication.

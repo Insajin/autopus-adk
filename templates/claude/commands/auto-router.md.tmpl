@@ -1246,7 +1246,7 @@ Otherwise dispatch the generated `.claude/workflows/route_a.workflow.js` Workflo
 1. **planning** — implementation plan and task breakdown (no working-tree mutation beyond plan artifacts)
 2. **implementation** — repository-mutating work; worktree lifecycle stays in the Go runtime, the JS owns sequencing only
 3. **gate_build_test** — deterministic gate; verdict derives from build/test **exit codes** (`verdict_source: exit_code`) via the `auto workflow gate` JS→Go bridge, not from an LLM verdict
-4. **release_hygiene** — generated-surface drift gate + Lore commit format (`auto check --lore`) + 300-line source limit (`auto check --arch --staged`)
+4. **release_hygiene** — generated/runtime drift gate + 300-line staged source limit (`auto check --hygiene --arch --quiet --staged`); commit-msg hooks enforce Lore format (`auto check --lore --message <msgfile>`)
 
 Inspect the planned run without executing it: `auto workflow render --dry-run`.
 

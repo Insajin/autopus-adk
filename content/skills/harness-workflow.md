@@ -83,10 +83,12 @@ and match `content/workflows/route_a.schema.json`.
 4. **release_hygiene** — terminal phase that enforces release safety before
    sync:
    - **Generated-surface drift gate** — blocks when generated surfaces
-     (`.claude` / `.codex` / `.gemini` / `.opencode` / `.autopus/orchestra`) are
-     staged without a corresponding source-of-truth change.
-   - **Lore commit format** — `auto check --lore --message <msgfile>`.
-   - **300-line source limit** — `auto check --arch --staged`.
+     (`.claude` / `.codex` / `.gemini` / `.opencode` / `.autopus/plugins`) are
+     staged without a matching source-of-truth change, and always blocks runtime
+     artifacts such as `.autopus/txns` / `.autopus/orchestra`.
+   - **300-line source limit** — `auto check --hygiene --arch --quiet --staged`.
+   - **Lore commit format** — the commit-msg hook uses
+     `auto check --lore --message <msgfile>` for the pending message boundary.
 
 ## Fallback Taxonomy
 

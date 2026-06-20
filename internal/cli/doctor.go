@@ -16,7 +16,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
-	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
 
@@ -108,7 +107,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	out := cmd.OutOrStdout()
 	tui.BannerWithInfo(out, "autopus-adk", "doctor")
 
-	cfg, err := config.Load(opts.dir)
+	cfg, err := loadHarnessConfigForDir(opts.dir, globalFlags{})
 	if err != nil {
 		tui.FAIL(out, fmt.Sprintf("autopus.yaml 로드 실패: %v", err))
 		return nil

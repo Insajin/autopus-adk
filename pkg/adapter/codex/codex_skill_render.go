@@ -245,6 +245,7 @@ func normalizeCodexToolingBody(body string) string {
 		"Phase 0.5: Permission    → detect      (auto permission detect)", "Phase 0.5: Permission    → main session (decide autonomy vs confirmation)",
 	)
 	body = replacer.Replace(body)
+	body = normalizeCodexStandaloneToolNames(body)
 	body = strings.ReplaceAll(body, "Agent(", "spawn_agent(")
 	body = strings.ReplaceAll(body, "subagent_type =", "agent_type =")
 	body = strings.ReplaceAll(body, "prompt = ", "message = ")

@@ -64,8 +64,16 @@ func TestAPI_CreateUser(t *testing.T) {
 
 - QAMESH is the default project QA orchestration layer. Playwright is not a competing mode; when detected, it is registered as a browser/gui Journey runner adapter.
 - Ask users to choose the project under test, execution authority, environment/origin, credentials boundary, mobile/cloud device boundary, or explicit canary command. Do not ask them to choose between QAMESH and Playwright.
-- Use `auto qa full --format json` as the default planning entrypoint; add `--bootstrap` for reviewed starter files and `--run` only for explicit execution authority.
-- ADK is a harness: each concrete Journey Pack is project-local under `.autopus/qa/journeys/**`, while ADK owns adapters, execution, redaction, and feedback plumbing.
+- Use `auto qa init --format json` as the simple default release-QA setup command for arbitrary projects. It creates project-local starter Journey Packs plus a generic GitHub Actions QAMESH release gate.
+- Use `auto qa init --local-only --format json` when only Journey Pack starters are needed. Review generated commands, env, installer version, and required-gate policy before trusting the workflow.
+- Use `auto qa plan --format json` before project-level QA execution to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without running commands.
+- Use `auto canary` only for post-deploy smoke/status verification. QAMESH owns deterministic user journey evidence, redacted artifacts, run indexes, and repair feedback; `auto qa release` treats `canary-explicit` as a bridge lane for an explicit post-deploy smoke Journey Pack.
+- Use `auto qa run --format json` when deterministic project QA should execute and produce QAMESH run/evidence output.
+- Use `auto qa explore --dry-run --format json` before GUI exploration; execute it only for explicit local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
+- Use `auto qa release --dry-run --format json` to inspect the fixed release lane set, setup gaps, blocker matrix, redacted command previews, and sibling SPEC readiness before launch gates; use `auto qa release --roadmap --format json` for the canonical roadmap surface.
+- Use `auto qa evidence` when an external producer already wrote a QAMESH manifest and the task is validation, redaction, and publication.
+- Use `auto qa feedback` to turn existing failed QAMESH evidence into provider-specific repair prompt bundles.
+- ADK is a harness: each concrete Journey Pack is a project-local Journey Pack under `.autopus/qa/journeys/**`, while ADK owns adapters, execution, redaction, and feedback plumbing.
 
 ### 원칙
 - 핵심 비즈니스 플로우만 (5-10개)

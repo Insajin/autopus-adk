@@ -112,17 +112,9 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 
 	flags := globalFlagsFromContext(ctx)
 
-	configDir, err := resolveConfigDir(nil, flags.ConfigPath)
-	if err != nil {
-		return fmt.Errorf("설정 경로 확인 실패: %w", err)
-	}
-
-	cfg, err := config.Load(configDir)
+	cfg, err := loadHarnessConfigForFlags(flags)
 	if err != nil {
 		return fmt.Errorf("설정 로드 실패: %w", err)
-	}
-	if _, migrateErr := config.MigrateOrchestraConfig(cfg); migrateErr != nil {
-		return fmt.Errorf("설정 마이그레이션 실패: %w", migrateErr)
 	}
 
 	gate := cfg.Spec.ReviewGate

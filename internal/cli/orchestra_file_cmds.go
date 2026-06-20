@@ -35,7 +35,11 @@ func newOrchestraReviewCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			prompt, err := buildReviewPrompt(args)
+			effectiveCfg, err := loadEffectiveHarnessConfigForFlags(globalFlagsFromContext(cmd.Context()))
+			if err != nil {
+				return err
+			}
+			prompt, err := buildReviewPromptWithEffectiveConfig(args, effectiveCfg)
 			if err != nil {
 				return err
 			}

@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
-	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 type doctorJSONReport struct {
@@ -81,7 +79,7 @@ func runDoctorJSON(cmd *cobra.Command, opts doctorOptions) error {
 func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONReport {
 	report := doctorJSONReport{status: jsonStatusOK}
 
-	cfg, err := config.Load(opts.dir)
+	cfg, err := loadHarnessConfigForDir(opts.dir, globalFlags{})
 	if err != nil {
 		report.status = jsonStatusWarn
 		report.data.Config = &doctorConfigPayload{Loaded: false}

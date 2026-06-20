@@ -37,6 +37,7 @@ func TestGenerateHookConfigs_WithHooks(t *testing.T) {
 		}
 	}
 	require.NotNil(t, archHook, "expected a PreToolUse arch hook")
+	assert.Contains(t, archHook.Command, "--hygiene")
 	assert.Contains(t, archHook.Command, "--arch")
 	assert.Contains(t, archHook.Command, "--staged")
 	assert.Contains(t, archHook.Command, "--warn-only")
@@ -56,7 +57,7 @@ func TestGenerateHookConfigs_WithoutHooks(t *testing.T) {
 	// CLI hooks not supported — git hook scripts returned.
 	assert.Empty(t, hooks)
 	assert.NotEmpty(t, gitHooks)
-	// pre-commit (arch --staged) + commit-msg (lore --message) both present.
+	// pre-commit (hygiene + arch --staged) + commit-msg (lore --message) both present.
 	var paths []string
 	for _, g := range gitHooks {
 		paths = append(paths, g.Path)
@@ -272,5 +273,5 @@ func TestGitHookScript_Content(t *testing.T) {
 	require.NotEmpty(t, gitHooks)
 
 	// Script uses --staged to only check staged files.
-	assert.Contains(t, gitHooks[0].Content, "auto check --arch --quiet --staged")
+	assert.Contains(t, gitHooks[0].Content, "auto check --hygiene --arch --quiet --staged")
 }

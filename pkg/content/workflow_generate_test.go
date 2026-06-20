@@ -57,6 +57,9 @@ func TestS1_DeterministicGeneration(t *testing.T) {
 	if firstLine := strings.SplitN(js1, "\n", 2)[0]; !strings.Contains(firstLine, "GENERATED") || !strings.Contains(firstLine, "DO NOT EDIT") {
 		t.Errorf("first line missing generated warning: %q", firstLine)
 	}
+	if !strings.Contains(js1, "agent.exec(['auto', 'check', '--hygiene', '--arch', '--quiet', '--staged'])") {
+		t.Errorf("release_hygiene must invoke the CLI hygiene gate, got:\n%s", js1)
+	}
 
 	// Phase-id set from generated JS.
 	jsIDs := extractPhaseIDsFromJS(js1)

@@ -99,7 +99,7 @@ func runOrchestraCommand(
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
 
 	// Attempt to load config; fall back to hardcoded defaults on failure.
-	harnessCfg, configErr := loadHarnessConfig()
+	harnessCfg, configErr := loadHarnessConfigForFlags(globalFlagsFromContext(ctx))
 
 	var (
 		strategyStr string

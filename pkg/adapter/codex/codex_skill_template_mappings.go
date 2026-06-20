@@ -23,6 +23,14 @@ func (a *Adapter) prepareSkillTemplateMappings(cfg *config.HarnessConfig) ([]ada
 		}
 
 		skillFile := strings.TrimSuffix(entry.Name(), ".tmpl")
+		emit, err := shouldEmitCodexRepoSkillTemplate(skillFile, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("코덱스 스킬 템플릿 대상 판정 실패 %s: %w", entry.Name(), err)
+		}
+		if !emit {
+			continue
+		}
+
 		tmplContent, err := templates.FS.ReadFile("codex/skills/" + entry.Name())
 		if err != nil {
 			return nil, fmt.Errorf("코덱스 스킬 템플릿 읽기 실패 %s: %w", entry.Name(), err)

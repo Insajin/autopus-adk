@@ -65,6 +65,35 @@ func TestDetectGeneratedDrift_NormalizesPath(t *testing.T) {
 	}
 }
 
+// Root meta workspaces track human-authored project/SPEC docs but must not
+// stage harness runtime/generated surface drift without a source-of-truth edit.
+func TestDetectGeneratedDrift_RootWorkspacePolicy(t *testing.T) {
+	staged := []string{
+		".autopus/project/workspace.md",
+		".autopus/specs/SPEC-EXAMPLE/spec.md",
+		".autopus/codex-manifest.json",
+		".autopus/plugins/auto/skills/auto/SKILL.md",
+		".autopus/context/signatures.md",
+		".autopus/txns/20260616T031132.311968000-codex/journal.json",
+		".agents/plugins/marketplace.json",
+		"config.toml",
+	}
+
+	drift := DetectGeneratedDrift(staged, false)
+	want := []string{
+		".agents/plugins/marketplace.json",
+		".autopus/codex-manifest.json",
+		".autopus/context/signatures.md",
+		".autopus/plugins/auto/skills/auto/SKILL.md",
+		".autopus/txns/20260616T031132.311968000-codex/journal.json",
+		"config.toml",
+	}
+
+	if strings.Join(drift, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("drift = %v, want %v", drift, want)
+	}
+}
+
 // S13: a 301-line source file plus a non-Lore message both block, with the
 // oversized path in BlockedPaths and a Lore violation in Reasons.
 func TestHygiene_BlocksOversizeAndLore(t *testing.T) {

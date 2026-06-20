@@ -54,7 +54,7 @@ func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfi
 			Event:   pre,
 			Matcher: commandMatcher,
 			Type:    "command",
-			Command: translateHookCommand("auto check --arch --quiet --staged --warn-only", pre, platform),
+			Command: translateHookCommand("auto check --hygiene --arch --quiet --staged --warn-only", pre, platform),
 			Timeout: 30,
 		})
 	}
@@ -165,7 +165,7 @@ func sameHookConfig(a, b adapter.HookConfig) bool {
 }
 
 // generateGitHooks는 .git/hooks/ 스크립트를 생성한다.
-// pre-commit: arch check with --staged (only staged files).
+// pre-commit: hygiene + arch checks with --staged (only staged files).
 // commit-msg: lore format check on the commit message being written.
 func generateGitHooks(cfg config.HooksConf) []GitHookScript {
 	var hooks []GitHookScript
@@ -193,7 +193,7 @@ func buildPreCommitScript(cfg config.HooksConf) string {
 	s := "#!/bin/sh\n# Autopus-ADK pre-commit hook (자동 생성)\nset -e\n\n"
 
 	if cfg.PreCommitArch {
-		s += "# 아키텍처 규칙 검사 (staged 파일만)\nauto check --arch --quiet --staged\n\n"
+		s += "# 릴리스 hygiene 및 아키텍처 규칙 검사 (staged 파일만)\nauto check --hygiene --arch --quiet --staged\n\n"
 	}
 
 	s += "exit 0\n"

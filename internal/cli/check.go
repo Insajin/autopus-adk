@@ -16,6 +16,7 @@ func newCheckCmd() *cobra.Command {
 		archFlag            bool
 		cc21Flag            bool
 		loreFlag            bool
+		hygieneFlag         bool
 		initialPromptFlag   bool
 		monitorCommandsFlag bool
 		quietFlag           bool
@@ -67,7 +68,7 @@ func newCheckCmd() *cobra.Command {
 			}
 
 			flags := globalFlagsFromContext(cmd.Context())
-			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, initialPromptFlag, monitorCommandsFlag, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
+			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
 			if !allOK {
 				return fmt.Errorf("check failed")
 			}
@@ -78,6 +79,7 @@ func newCheckCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&archFlag, "arch", false, "Check architecture rules (file size limit)")
 	cmd.Flags().BoolVar(&cc21Flag, "cc21", false, "Run SPEC-CC21-001 checks (effort frontmatter + initialPrompt guard)")
 	cmd.Flags().BoolVar(&loreFlag, "lore", false, "Check Lore commit format")
+	cmd.Flags().BoolVar(&hygieneFlag, "hygiene", false, "Check staged generated/runtime drift")
 	cmd.Flags().BoolVar(&initialPromptFlag, "initial-prompt-guard", false, "Check subagent files for forbidden initialPrompt field (SPEC-CC21-001 R11b)")
 	cmd.Flags().BoolVar(&monitorCommandsFlag, "monitor-commands", false, "Lint Monitor commands for line-buffered grep guards")
 	cmd.Flags().BoolVar(&quietFlag, "quiet", false, "Suppress non-error output")
@@ -95,10 +97,15 @@ func newCheckCmd() *cobra.Command {
 // When warnOnly is true, violations are still printed but the function always returns true.
 // When staged is true, arch check only examines git-staged files.
 // When messageFile is non-empty, lore check validates that file instead of the last commit.
-func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, initialPromptFlag, monitorCommandsFlag bool, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
-	runAll := !archFlag && !cc21Flag && !loreFlag && !initialPromptFlag && !monitorCommandsFlag
+func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag bool, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
+	runAll := !archFlag && !cc21Flag && !loreFlag && !hygieneFlag && !initialPromptFlag && !monitorCommandsFlag
 	allOK := true
 
+	if hygieneFlag || runAll {
+		if !checkHygiene(dir, out, quiet) {
+			allOK = false
+		}
+	}
 	if archFlag || runAll {
 		if !checkArch(dir, out, quiet, staged) {
 			allOK = false

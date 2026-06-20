@@ -28,6 +28,13 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig) ([]adapter.Fil
 
 		name := entry.Name()
 		skillFile := strings.TrimSuffix(name, ".tmpl")
+		emit, err := shouldEmitCodexRepoSkillTemplate(skillFile, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("코덱스 스킬 템플릿 대상 판정 실패 %s: %w", name, err)
+		}
+		if !emit {
+			continue
+		}
 
 		tmplContent, err := templates.FS.ReadFile("codex/skills/" + name)
 		if err != nil {

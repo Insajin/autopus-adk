@@ -10,14 +10,26 @@ import (
 
 // GeneratedSurfacePrefixes are the path prefixes the release hygiene drift gate
 // treats as generated surfaces. Staging any of these without a corresponding
-// source-of-truth change is blocked (REQ-012). The autopus entry is scoped to
-// `.autopus/orchestra/` so legitimate `.autopus/specs` edits are not blocked.
+// source-of-truth change is blocked (REQ-012). The .autopus entries are scoped
+// so legitimate `.autopus/specs` and `.autopus/project` edits are not blocked.
 var GeneratedSurfacePrefixes = []string{
 	".claude/",
 	".codex/",
 	".gemini/",
 	".opencode/",
+	".agents/plugins/",
+	".autopus/brainstorms/",
 	".autopus/orchestra/",
+	".autopus/plugins/",
+	".autopus/txns/",
+}
+
+// GeneratedSurfaceExactPaths are generated/runtime files that are not cleanly
+// expressible as directory prefixes without blocking human-managed project docs.
+var GeneratedSurfaceExactPaths = []string{
+	".agents/plugins/marketplace.json",
+	".autopus/context/signatures.md",
+	"config.toml",
 }
 
 // DefaultSourceLimit is the hard per-file source line limit.
@@ -45,12 +57,30 @@ func hasGeneratedPrefix(p string) bool {
 	// Normalize slash-based git paths (e.g. ".//.claude/x", "a/../.claude/x")
 	// so non-canonical inputs cannot bypass the generated-surface block-list.
 	clean := strings.TrimPrefix(path.Clean(p), "./")
+	for _, exact := range GeneratedSurfaceExactPaths {
+		if clean == exact {
+			return true
+		}
+	}
+	if isRootAutopusManifest(clean) {
+		return true
+	}
 	for _, prefix := range GeneratedSurfacePrefixes {
 		if strings.HasPrefix(clean, prefix) {
 			return true
 		}
 	}
 	return false
+}
+
+func isRootAutopusManifest(clean string) bool {
+	if !strings.HasPrefix(clean, ".autopus/") {
+		return false
+	}
+	if path.Dir(clean) != ".autopus" {
+		return false
+	}
+	return strings.HasSuffix(path.Base(clean), "-manifest.json")
 }
 
 // CheckStagedSourceSizes returns the paths whose line count exceeds limit.

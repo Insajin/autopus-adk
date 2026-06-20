@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 type globalFlags struct {
@@ -110,7 +108,7 @@ func validateQualityPreset(cmd *cobra.Command, configPath, preset string) error 
 		return fmt.Errorf("resolve config dir for --quality: %w", err)
 	}
 
-	cfg, err := config.Load(configDir)
+	cfg, err := loadHarnessConfigForDir(configDir, globalFlags{ConfigPath: configPath})
 	if err != nil {
 		return fmt.Errorf("load config for --quality: %w", err)
 	}

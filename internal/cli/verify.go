@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/design"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
@@ -54,10 +53,15 @@ type verifyVisualOptions struct {
 }
 
 func runVerifyWithOptions(cmd *cobra.Command, fix, reportOnly bool, viewport string, visual verifyVisualOptions) error {
-	cfg, err := config.Load(".")
+	flags := globalFlags{}
+	if cmd != nil {
+		flags = globalFlagsFromContext(cmd.Context())
+	}
+	effectiveCfg, err := loadEffectiveHarnessConfigForFlags(flags)
 	if err != nil {
 		return fmt.Errorf("설정 로드 실패: %w", err)
 	}
+	cfg := effectiveCfg.Config
 
 	if !cfg.Verify.Enabled {
 		fmt.Fprintln(os.Stderr, "경고: verify 기능이 비활성화되어 있습니다 (verify.enabled: false)")
@@ -89,7 +93,7 @@ func runVerifyWithOptions(cmd *cobra.Command, fix, reportOnly bool, viewport str
 	uiChanged := filterUIChangedFiles(changed, cfg.Design.UIFileGlobs)
 
 	if len(uiChanged) == 0 {
-		fmt.Print(buildVerifyDesignContextReport(".", changed, design.Options{
+		fmt.Print(buildVerifyDesignContextReport(effectiveCfg.designRoot(), changed, design.Options{
 			Enabled:         cfg.Design.Enabled && cfg.Design.InjectOnVerify,
 			Paths:           cfg.Design.Paths,
 			MaxContextLines: cfg.Design.MaxContextLines,
@@ -109,13 +113,13 @@ func runVerifyWithOptions(cmd *cobra.Command, fix, reportOnly bool, viewport str
 		MaxContextLines: cfg.Design.MaxContextLines,
 		UIFileGlobs:     cfg.Design.UIFileGlobs,
 	}
-	fmt.Print(buildVerifyDesignContextReport(".", uiChanged, design.Options{
+	fmt.Print(buildVerifyDesignContextReport(effectiveCfg.designRoot(), uiChanged, design.Options{
 		Enabled:         cfg.Design.Enabled && cfg.Design.InjectOnVerify,
 		Paths:           cfg.Design.Paths,
 		MaxContextLines: cfg.Design.MaxContextLines,
 		UIFileGlobs:     cfg.Design.UIFileGlobs,
 	}))
-	designCtx, designErr := design.LoadContext(".", designOpts)
+	designCtx, designErr := loadEffectiveDesignContext(effectiveCfg, designOpts)
 	if designErr != nil {
 		fmt.Fprintf(os.Stderr, "경고: design context 로드 실패: %v\n", designErr)
 	}

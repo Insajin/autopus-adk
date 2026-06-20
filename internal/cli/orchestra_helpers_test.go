@@ -51,6 +51,25 @@ func TestBuildReviewPrompt_IncludesDesignContextForUIFiles(t *testing.T) {
 	assert.Contains(t, prompt, "source-of-truth mismatch")
 }
 
+func TestBuildReviewPrompt_FallsBackToParentDesignContextForNestedModule(t *testing.T) {
+	root := t.TempDir()
+	child := filepath.Join(root, "autopus-desktop")
+	require.NoError(t, os.MkdirAll(filepath.Join(child, "src"), 0o755))
+	writeSparseModuleConfig(t, child)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "DESIGN.md"), []byte("# Design\n\n## Components\nParent button rules."), 0o644))
+	require.NoError(t, config.Save(root, config.DefaultFullConfig("root-workspace")))
+	require.NoError(t, os.WriteFile(filepath.Join(child, "src", "Button.tsx"), []byte("export function Button() { return <button /> }\n"), 0o644))
+
+	t.Chdir(child)
+	effectiveCfg, err := loadEffectiveHarnessConfigForDir(child, globalFlags{})
+	require.NoError(t, err)
+	prompt, err := buildReviewPromptWithEffectiveConfig([]string{"src/Button.tsx"}, effectiveCfg)
+	require.NoError(t, err)
+
+	assert.Contains(t, prompt, "## Design Context")
+	assert.Contains(t, prompt, "Parent button rules.")
+}
+
 func TestBuildReviewPrompt_ReportsDesignContextSkip(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)

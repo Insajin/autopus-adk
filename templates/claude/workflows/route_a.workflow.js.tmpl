@@ -33,6 +33,8 @@ export default async function run() {
     }
   });
   await phase('release_hygiene', { retry: 0, budget: 30000 }, async () => {
-    log('phase', 'release_hygiene');
+    // Release hygiene: generated/runtime drift + staged source size gate.
+    const out = await agent.exec(['auto', 'check', '--hygiene', '--arch', '--quiet', '--staged']);
+    log('release_hygiene', 'pass', out.stdout);
   });
 }

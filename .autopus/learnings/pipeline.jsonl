@@ -1,0 +1,1 @@
+{"id":"L-001","timestamp":"2026-06-12T16:25:07.228286+09:00","type":"fix_pattern","phase":"","files":["pkg/content/hooks_completion.go"],"packages":null,"pattern":"Claude Code 훅 상대경로가 spawn cwd 가변으로 'No such file or directory' 반복 → 생성기에서 ${CLAUDE_PROJECT_DIR:-.} 앵커로 해결, 설치본은 재생성 수렴","resolution":"","severity":"","reuse_count":0}

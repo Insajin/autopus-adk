@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -10,13 +11,65 @@ import (
 )
 
 func loadHarnessConfig() (*config.HarnessConfig, error) {
-	cfg, err := config.Load(".")
+	return loadHarnessConfigForFlags(globalFlags{})
+}
+
+func loadHarnessConfigForFlags(flags globalFlags) (*config.HarnessConfig, error) {
+	return loadHarnessConfigForDir(".", flags)
+}
+
+func loadHarnessConfigForDir(startDir string, flags globalFlags) (*config.HarnessConfig, error) {
+	effective, err := loadEffectiveHarnessConfigForDir(startDir, flags)
 	if err != nil {
 		return nil, err
 	}
-	// Apply migrations in-memory so orchestra always uses current provider set.
-	_, _ = config.MigrateOrchestraConfig(cfg)
-	return cfg, nil
+	return effective.Config, nil
+}
+
+func loadEffectiveHarnessConfigForFlags(flags globalFlags) (effectiveHarnessConfig, error) {
+	return loadEffectiveHarnessConfigForDir(".", flags)
+}
+
+func loadEffectiveHarnessConfigForDir(startDir string, flags globalFlags) (effectiveHarnessConfig, error) {
+	configPath := strings.TrimSpace(flags.ConfigPath)
+	if configPath != "" {
+		configDir, err := resolveConfigDir(nil, configPath)
+		if err != nil {
+			return effectiveHarnessConfig{}, err
+		}
+		cfg, err := loadAndMigrateHarnessConfig(configDir)
+		if err != nil {
+			return effectiveHarnessConfig{}, err
+		}
+		return effectiveHarnessConfig{Config: cfg, ConfigDir: configDir}, nil
+	}
+
+	cfg, err := loadAndMigrateHarnessConfig(startDir)
+	if err != nil {
+		return effectiveHarnessConfig{}, err
+	}
+	effective := effectiveHarnessConfig{Config: cfg, ConfigDir: startDir}
+
+	missing, err := detectMissingInheritedHarnessSections(startDir, cfg)
+	if err != nil {
+		return effectiveHarnessConfig{}, err
+	}
+	effective.Missing = missing
+	if !missing.any() {
+		return effective, nil
+	}
+
+	parent, parentDir, err := findAncestorHarnessConfigWithReusableWiring(startDir)
+	if err != nil {
+		return effectiveHarnessConfig{}, err
+	}
+	if parent == nil {
+		return effective, nil
+	}
+
+	inheritReusableHarnessWiring(cfg, parent, missing)
+	effective.ParentDir = parentDir
+	return effective, nil
 }
 
 // loadOrchestraConfig loads the orchestra configuration from autopus.yaml

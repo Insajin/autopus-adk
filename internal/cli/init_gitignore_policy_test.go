@@ -31,6 +31,7 @@ func TestGitignorePatternsUseNarrowAutopusPolicy(t *testing.T) {
 	required := []string{
 		".autopus/*-manifest.json",
 		".autopus/plugins/",
+		".autopus/txns/",
 		".autopus/qa/runs/",
 		".autopus/runtime/",
 		".codex/",

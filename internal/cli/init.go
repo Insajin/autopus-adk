@@ -23,6 +23,7 @@ var gitignorePatterns = []string{
 	".autopus/plugins/",
 	".autopus/orchestra/",
 	".autopus/brainstorms/",
+	".autopus/txns/",
 	".autopus/design/imports/",
 	".autopus/design/verify/",
 	".autopus/canary/",
