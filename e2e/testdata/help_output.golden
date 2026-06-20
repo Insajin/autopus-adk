@@ -47,6 +47,7 @@ Available Commands:
   verify      Run frontend UX verification via Playwright screenshots
   version     Print version information
   worker      Harness worker validation and legacy local-host compatibility
+  workflow    Inspect and gate the opt-in deterministic workflow route
 
 Flags:
       --auto                       Run without confirmation prompts
