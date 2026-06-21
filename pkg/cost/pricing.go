@@ -45,22 +45,30 @@ func QualityModeToModels(qualityMode string) map[string]string {
 	case "ultra":
 		// All agents use the highest-capability model.
 		return map[string]string{
-			"planner":   "claude-opus-4-8",
-			"architect": "claude-opus-4-8",
-			"executor":  "claude-opus-4-8",
-			"tester":    "claude-opus-4-8",
-			"reviewer":  "claude-opus-4-8",
-			"validator": "claude-opus-4-8",
+			"planner":          "claude-opus-4-8",
+			"architect":        "claude-opus-4-8",
+			"executor":         "claude-opus-4-8",
+			"tester":           "claude-opus-4-8",
+			"reviewer":         "claude-opus-4-8",
+			"validator":        "claude-opus-4-8",
+			"test_scaffold":    "claude-opus-4-8",
+			"annotator":        "claude-opus-4-8",
+			"security_auditor": "claude-opus-4-8",
 		}
 	case "balanced":
 		// Strategic agents use opus; execution and validation agents use sonnet.
+		// Team-phase roles (test_scaffold, annotator, security_auditor) are
+		// execution/validation-class and therefore mapped to sonnet in balanced mode.
 		return map[string]string{
-			"planner":   "claude-opus-4-8",
-			"architect": "claude-opus-4-8",
-			"executor":  "claude-sonnet-4-6",
-			"tester":    "claude-sonnet-4-6",
-			"reviewer":  "claude-sonnet-4-6",
-			"validator": "claude-sonnet-4-6",
+			"planner":          "claude-opus-4-8",
+			"architect":        "claude-opus-4-8",
+			"executor":         "claude-sonnet-4-6",
+			"tester":           "claude-sonnet-4-6",
+			"reviewer":         "claude-sonnet-4-6",
+			"validator":        "claude-sonnet-4-6",
+			"test_scaffold":    "claude-sonnet-4-6",
+			"annotator":        "claude-sonnet-4-6",
+			"security_auditor": "claude-sonnet-4-6",
 		}
 	default:
 		return nil

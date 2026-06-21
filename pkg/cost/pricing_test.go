@@ -110,6 +110,45 @@ func TestModelForAgent_Known(t *testing.T) {
 	}
 }
 
+// TestModelForAgent_TeamPhaseRoles verifies S3 acceptance values for the three
+// team-phase roles added in SPEC-HARNESS-WORKFLOW-TEAM-001 T8.
+func TestModelForAgent_TeamPhaseRoles(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		mode  string
+		agent string
+		want  string
+	}{
+		// Existing roles — regression guard (S3 anchor values).
+		{"ultra", "executor", "claude-opus-4-8"},
+		{"balanced", "executor", "claude-sonnet-4-6"},
+		{"balanced", "planner", "claude-opus-4-8"},
+		// New team-phase roles — ultra mode.
+		{"ultra", "annotator", "claude-opus-4-8"},
+		{"ultra", "security_auditor", "claude-opus-4-8"},
+		{"ultra", "test_scaffold", "claude-opus-4-8"},
+		// New team-phase roles — balanced mode.
+		{"balanced", "annotator", "claude-sonnet-4-6"},
+		{"balanced", "security_auditor", "claude-sonnet-4-6"},
+		{"balanced", "test_scaffold", "claude-sonnet-4-6"},
+	}
+
+	for _, tc := range cases {
+		tc := tc // capture range variable
+		t.Run(tc.mode+"/"+tc.agent, func(t *testing.T) {
+			t.Parallel()
+			got := cost.ModelForAgent(tc.mode, tc.agent)
+			if got == "" {
+				t.Errorf("ModelForAgent(%q, %q): got empty string, want %q", tc.mode, tc.agent, tc.want)
+			}
+			if got != tc.want {
+				t.Errorf("ModelForAgent(%q, %q): want %q, got %q", tc.mode, tc.agent, tc.want, got)
+			}
+		})
+	}
+}
+
 func TestModelForAgent_Unknown(t *testing.T) {
 	if got := cost.ModelForAgent("unknown-mode", "planner"); got != "" {
 		t.Errorf("unknown mode should return empty string, got %q", got)

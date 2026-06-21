@@ -3,6 +3,7 @@ package workflow
 import (
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -98,5 +99,62 @@ func TestParseSchema_RejectsUnsafePhaseID(t *testing.T) {
 	// snake_case and hyphenated ids remain accepted.
 	if _, err := ParseSchema([]byte(`{"phases":[{"id":"gate_build_test"},{"id":"release-hygiene"}]}`)); err != nil {
 		t.Errorf("safe ids rejected: %v", err)
+	}
+}
+
+// TestParseSchema_RoundTripQualitySets round-trips the model/effort/depth fields
+// and asserts the new accessor maps surface them.
+func TestParseSchema_RoundTripQualitySets(t *testing.T) {
+	t.Parallel()
+	data := []byte(`{"phases":[
+		{"id":"planning","model":"claude-opus-4-8","effort":"medium"},
+		{"id":"implementation","model":"claude-sonnet-4-6","effort":"high","fan_out_cap":5},
+		{"id":"review","verify_votes":3,"synthesis":true,"retry":2}
+	]}`)
+	s, err := ParseSchema(data)
+	if err != nil {
+		t.Fatalf("ParseSchema: %v", err)
+	}
+	if got := s.ModelSet(); got["planning"] != "claude-opus-4-8" || got["implementation"] != "claude-sonnet-4-6" {
+		t.Errorf("ModelSet = %v", got)
+	}
+	if got := s.EffortSet(); got["planning"] != "medium" || got["implementation"] != "high" {
+		t.Errorf("EffortSet = %v", got)
+	}
+	d := s.DepthSet()
+	if d["implementation"].FanOutCap != 5 {
+		t.Errorf("implementation FanOutCap = %d, want 5", d["implementation"].FanOutCap)
+	}
+	if d["review"].VerifyVotes != 3 || !d["review"].Synthesis || d["review"].Retry != 2 {
+		t.Errorf("review depth = %+v", d["review"])
+	}
+}
+
+// TestParseSchema_RejectsVerifyVotesOverCap locks S4: a verify_votes above the
+// cap is rejected fail-closed and the error names the cap.
+func TestParseSchema_RejectsVerifyVotesOverCap(t *testing.T) {
+	t.Parallel()
+	_, err := ParseSchema([]byte(`{"phases":[{"id":"review","verify_votes":4}]}`))
+	if err == nil {
+		t.Fatal("expected verify_votes over-cap rejection")
+	}
+	if !strings.Contains(err.Error(), "cap") {
+		t.Errorf("error %q should mention the cap", err)
+	}
+}
+
+// TestParseSchema_RetryCap locks S13: retry above the cap is rejected; a
+// within-cap retry is preserved in RetrySet.
+func TestParseSchema_RetryCap(t *testing.T) {
+	t.Parallel()
+	if _, err := ParseSchema([]byte(`{"phases":[{"id":"planning","retry":5}]}`)); err == nil {
+		t.Fatal("expected retry over-cap rejection")
+	}
+	s, err := ParseSchema([]byte(`{"phases":[{"id":"planning","retry":2}]}`))
+	if err != nil {
+		t.Fatalf("ParseSchema retry=2: %v", err)
+	}
+	if got := s.RetrySet(); got["planning"] != 2 {
+		t.Errorf("RetrySet[planning] = %d, want 2", got["planning"])
 	}
 }

@@ -11,12 +11,25 @@ import (
 // the deterministic phase order, the gate verdict source, the manifest/schema
 // paths, a deterministic prompt-manifest hash, and the generated workflow JS.
 type DryRunReport struct {
-	PhaseOrder         []string `json:"phase_order"`
-	GateVerdictSource  string   `json:"gate_verdict_source"`
-	ManifestPath       string   `json:"manifest_path"`
-	SchemaPath         string   `json:"schema_path"`
-	PromptManifestHash string   `json:"prompt_manifest_hash"`
-	JS                 string   `json:"js"`
+	PhaseOrder         []string        `json:"phase_order"`
+	GateVerdictSource  string          `json:"gate_verdict_source"`
+	ManifestPath       string          `json:"manifest_path"`
+	SchemaPath         string          `json:"schema_path"`
+	PromptManifestHash string          `json:"prompt_manifest_hash"`
+	JS                 string          `json:"js"`
+	Phases             []RenderedPhase `json:"phases"`
+}
+
+// RenderedPhase exposes the per-phase model, effort, and depth surface so the
+// dry-run report is inspectable (REQ-012, S9). It is the rendered (baseline or
+// overlaid) view of a single phase.
+type RenderedPhase struct {
+	ID          string `json:"id"`
+	Model       string `json:"model"`
+	Effort      string `json:"effort"`
+	VerifyVotes int    `json:"verify_votes"`
+	FanOutCap   int    `json:"fan_out_cap"`
+	Synthesis   bool   `json:"synthesis"`
 }
 
 // Render builds the dry-run report from the parsed schema, prompt layers, and
@@ -31,6 +44,7 @@ func Render(s Schema, layers []promptlayer.Layer, jsContent, manifestPath, schem
 		SchemaPath:         schemaPath,
 		PromptManifestHash: PromptManifestHash(layers),
 		JS:                 jsContent,
+		Phases:             OverlayPhases(s, nil),
 	}
 }
 

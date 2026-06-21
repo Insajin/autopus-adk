@@ -41,6 +41,35 @@ func TestRender_DeterministicPhaseOrder(t *testing.T) {
 	}
 }
 
+// S9: Render exposes a per-phase model/effort/depth surface drawn from the
+// schema baseline.
+func TestRender_ExposesPerPhaseQuality(t *testing.T) {
+	data := []byte(`{"phases":[
+		{"id":"planning","model":"claude-opus-4-8","effort":"medium"},
+		{"id":"implementation","model":"claude-sonnet-4-6","effort":"high","fan_out_cap":5},
+		{"id":"review","verify_votes":3,"synthesis":true},
+		{"id":"gate_build_test","verdict_source":"exit_code"}
+	]}`)
+	s, err := ParseSchema(data)
+	if err != nil {
+		t.Fatalf("ParseSchema: %v", err)
+	}
+	report := Render(s, nil, "js", "m", "s")
+	byID := make(map[string]RenderedPhase, len(report.Phases))
+	for _, p := range report.Phases {
+		byID[p.ID] = p
+	}
+	if p := byID["planning"]; p.Model != "claude-opus-4-8" || p.Effort != "medium" {
+		t.Errorf("planning = %+v", p)
+	}
+	if p := byID["implementation"]; p.FanOutCap != 5 {
+		t.Errorf("implementation fan_out_cap = %d, want 5", p.FanOutCap)
+	}
+	if p := byID["review"]; p.VerifyVotes != 3 || !p.Synthesis {
+		t.Errorf("review = %+v", p)
+	}
+}
+
 func stableLayer(id, content string) promptlayer.Layer {
 	return promptlayer.Layer{
 		ID:      id,

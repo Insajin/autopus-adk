@@ -124,3 +124,79 @@ diverging element.
 | Doctor reports `overall: fail` | No — auto fail-fast into Route A |
 
 **Ref**: SPEC-HARNESS-WORKFLOW-001
+
+---
+
+## Team Workflow Substrate — route_team
+
+> **claude-code only.** The team workflow substrate (`route_team`) is scoped to the claude-code platform by the same platform constraint that governs `route_a`. codex, antigravity-cli, and opencode never emit `route_team.workflow.js` and are unaffected (regression-0 guarantee).
+
+### Overview
+
+When `/auto go SPEC-ID --team` is invoked on claude-code and `auto workflow doctor` passes (and no disable flag is active), the pipeline is served by the **deterministic team Workflow substrate** instead of ad-hoc Agent Teams. The substrate is implemented as `.claude/workflows/route_team.workflow.js` — a **generated, edit-forbidden surface** derived from the manifest by `auto generate-templates`. Do not edit the JS by hand.
+
+### Capability Gate
+
+The team workflow substrate uses the **same `auto workflow doctor` gate** as `route_a`, including the same minimum version (`2.1.154`) and the same required vs advisory primitive classification. The parity gate now additionally covers model/effort/depth resolution (see Quality Binding below).
+
+Disable paths (pre-route opt-out, not a taxonomy failure):
+- `--no-workflow` flag
+- `autopus.yaml` → `workflow.team_default=false`
+
+Doctor-fail path: emit `[workflow] fallback-class=fail-fast reason=doctor_fail` and fall back to Route A **without** entering Agent Teams.
+
+### 8 Ordered Phases
+
+The `route_team` workflow runs exactly eight ordered phases. Phase IDs are authoritative and match `content/workflows/route_team.schema.json`.
+
+| Phase | Type | Description |
+|-------|------|-------------|
+| **planning** | `agent()` | Produces the implementation plan and task breakdown; does not mutate the working tree beyond plan artifacts. |
+| **test_scaffold** | `agent()` | Writes failing test skeletons for P0/P1 requirements (RED state). |
+| **implementation** | `agent()` — bounded executor fan-out | Repository-mutating work. Fan-out cap: **≤ 5 concurrent executors**. Worktree lifecycle stays in the Go runtime; the JS owns sequencing only. |
+| **gate_build_test** | **deterministic `agent.exec` gate** | Verdict derives from build/test **exit codes** (`verdict_source: exit_code`), not from an LLM verdict. Shells out to `auto workflow gate` (the JS→Go execution bridge) which emits `{verdict, verdict_source, build_exit, test_exit}` JSON. A non-zero exit yields `verdict: fail`. |
+| **annotation** | `agent()` | Applies `@AX` annotation tags to all files modified during implementation. |
+| **testing** | `agent()` | Raises test coverage to 85%+; runs `go test -race -cover ./...` and affected QAMESH lanes. |
+| **review** | `agent()` — bounded reviewer fan-out | Runs `reviewer` and `security-auditor` in parallel. Verify votes are bounded: **verify_votes ≤ 3**. Ultra quality mode adds a synthesis step after 3-vote adversarial verify. |
+| **release_hygiene** | **deterministic `agent.exec` gate** | `auto check --hygiene --arch --quiet --staged` enforces the 300-line source limit and generated-surface drift gate. Commit-msg hooks enforce Lore format via `auto check --lore --message <msgfile>`. |
+
+### Manifest Source of Truth
+
+| Artifact | Role |
+|----------|------|
+| `content/workflows/route_team.md` | Human-authoritative manifest |
+| `content/workflows/route_team.schema.json` | Machine-authoritative manifest |
+| `templates/claude/workflows/route_team.workflow.js.tmpl` | Template — generated surface, edit-forbidden |
+| `.claude/workflows/route_team.workflow.js` | Installed generated surface — edit-forbidden |
+
+Edit the manifest files and run `auto generate-templates` to regenerate the JS. The parity gate compares phase-id, retry, budget, and result-type sets across the markdown, schema, and JS; any divergence fails generation closed.
+
+### Quality Binding
+
+Per-run `--quality` resolves **three dimensions simultaneously** through the existing resolvers:
+
+- **Model tier** — `ModelForAgent`: ultra → Opus for all agent phases; balanced → per-agent defaults.
+- **Effort** — `ResolveEffort`: ultra → higher effort ceiling; balanced → per-agent defaults.
+- **Orchestration depth** — `ResolveDepth`: ultra = 3-vote adversarial verify + synthesis in the review phase; balanced = single-vote. Hard caps: verify_votes ≤ 3, fan_out_cap ≤ 5, retry ≤ 3.
+
+The resolved quality is injected through the `AUTOPUS_WORKFLOW_QUALITY` environment variable. The workflow JS reads `RT.<phase>` to override the schema baseline literal for each phase.
+
+Inspect resolved per-phase model/effort/depth without executing agents:
+
+```
+auto workflow render --route team [--quality <mode>]
+```
+
+### Fallback Taxonomy
+
+The `route_team` substrate shares the same fallback taxonomy as `route_a` — silent opt-out is forbidden.
+
+| Failure kind | Class | Behavior |
+|--------------|-------|----------|
+| `non_claude_platform` | `fail-fast` | Abort immediately, fall back to Route A |
+| `doctor_fail` | `fail-fast` | Abort immediately, fall back to Route A |
+| `parity_drift` | `fail-closed` | Refuse to proceed and block |
+| `execution_abort` | `resumable` | Resume from a recorded checkpoint |
+| `api_unavailable` | `explicit` | Surface to the operator for a decision |
+
+**Ref**: SPEC-HARNESS-WORKFLOW-TEAM-001

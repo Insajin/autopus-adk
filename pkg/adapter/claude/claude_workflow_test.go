@@ -56,3 +56,35 @@ func TestGenerateProducesRouteAWorkflow(t *testing.T) {
 		t.Errorf("manifest does not register the workflow path:\n%s", string(mdata))
 	}
 }
+
+// TestGenerateInstallsBothWorkflowRoutes verifies S17 / T17: full-mode Generate
+// installs BOTH the Route A and the team workflow JS, and each file's first line
+// carries the generated / edit-forbidden warning.
+func TestGenerateInstallsBothWorkflowRoutes(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := claude.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	if _, err := a.Generate(context.Background(), cfg); err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	for _, name := range []string{"route_a.workflow.js", "route_team.workflow.js"} {
+		wfPath := filepath.Join(dir, ".claude", "workflows", name)
+		data, err := os.ReadFile(wfPath)
+		if err != nil {
+			t.Fatalf("workflow file not found at %s: %v", wfPath, err)
+		}
+		content := string(data)
+
+		firstLine := content
+		if idx := strings.IndexByte(content, '\n'); idx >= 0 {
+			firstLine = content[:idx]
+		}
+		if !strings.Contains(firstLine, "GENERATED") || !strings.Contains(firstLine, "DO NOT EDIT") {
+			t.Errorf("%s first line missing generated/edit-forbidden warning: %q", name, firstLine)
+		}
+	}
+}

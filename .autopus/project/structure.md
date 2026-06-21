@@ -137,12 +137,16 @@ autopus-adk/
 │   │   ├── pane_shell.go        #     Shell 이스케이프, 프로바이더명 정제
 │   │   ├── interactive.go       #     인터랙티브 pane 실행 플로우 (pipe capture, session launch, completion wait)
 │   │   └── interactive_detect.go #    완료 감지 로직 (프롬프트 패턴, idle 감지, ANSI 스트립)
-│   ├── workflow/                #   결정적 --workflow 라우트 기반층 (SPEC-HARNESS-WORKFLOW-001)
+│   ├── workflow/                #   결정적 --workflow/--team 라우트 기반층 (SPEC-HARNESS-WORKFLOW-001/-TEAM-001)
 │   │   ├── schema.go            #     workflow manifest schema 파싱 (phase-id/retry/budget/result-type)
+│   │   ├── schema_sets.go       #     route_a/route_team phase-set 정의 (TEAM-001)
+│   │   ├── schema_validate.go   #     model/effort JS-injection whitelist + depth cap fail-closed (TEAM-001)
+│   │   ├── binding.go           #     QualityBinding 데이터 타입 (품질→model/effort/depth, 디스패치 주입 seam) (TEAM-001)
+│   │   ├── depth.go             #     ResolveDepth 순수 함수 (bounded fan-out/vote cap) (TEAM-001)
 │   │   ├── doctor.go            #     capability gate (required hard-gate / advisory probe)
 │   │   ├── doctor_version.go    #     claude-code 최소 버전 핀 (>= 2.1.154)
 │   │   ├── gate.go              #     deterministic Gate — injectable CommandRunner (build/test exit-code)
-│   │   ├── render.go            #     dry-run 렌더 + prompt-manifest 해시
+│   │   ├── render.go            #     dry-run 렌더 + prompt-manifest 해시 + route/quality overlay (TEAM-001)
 │   │   ├── fallback.go          #     fallback taxonomy 분류기 (fail-fast/fail-closed/resumable/explicit)
 │   │   └── drift_gate.go        #     release hygiene — generated-surface drift + Lore/300 차단
 │   ├── template/                #   템플릿 엔진

@@ -18,6 +18,8 @@ Agent Teams mode (`--team`) enables role-based team collaboration via Claude Cod
 
 **Activation flag**: `/auto go SPEC-ID --team`
 
+> **Team Workflow Substrate — claude-code platform note**: On the claude-code platform, when `auto workflow doctor` passes and the team workflow substrate is not disabled (no `--no-workflow` flag and no `workflow.team_default=false` in `autopus.yaml`), `/auto go --team` is served by the **deterministic team Workflow substrate** (`route_team`) documented in `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`). The manual Agent Teams orchestration in this skill (Step B1–B6 below) is the **disable/fallback path**: it activates when `--no-workflow` is set, when `auto workflow doctor` fails (fail-fast → Route A, not Agent Teams), or on non-claude platforms where `--team` retains its existing platform-native semantics. The Agent Teams contract below remains fully authoritative for all disable/fallback scenarios.
+
 ## Activation
 
 ### Prerequisites

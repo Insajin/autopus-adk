@@ -83,7 +83,70 @@ func checkWorkflowParity(a parityArtifacts) error {
 		}
 	}
 
+	// Per-phase model/effort/depth tokens. These fire only for agent phases that
+	// declare a baseline (model != ""); route_a phases have empty model/effort
+	// and zero depth, so no token check runs and route_a parity is unchanged.
+	if err := checkPerPhaseQualityParity(a); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// checkPerPhaseQualityParity verifies that each schema phase's baseline
+// model/effort/depth tokens appear inside that phase's own derived-JS block.
+// The block is bounded by phase('<id>' up to the next phase('  (or end). The
+// diverging element is named <phase>.<field> (e.g. planning.model).
+func checkPerPhaseQualityParity(a parityArtifacts) error {
+	models := a.schema.ModelSet()
+	efforts := a.schema.EffortSet()
+	depths := a.schema.DepthSet()
+
+	for _, p := range a.schema.Phases {
+		model := models[p.ID]
+		if model == "" {
+			// Non-agent phase (gate/hygiene) or no baseline: nothing to check.
+			continue
+		}
+		block := phaseJSBlock(a.derivedJS, p.ID)
+		if !strings.Contains(block, "model="+model) {
+			return fmt.Errorf("parity drift: %s.model baseline %q absent in derived JS block", p.ID, model)
+		}
+		if effort := efforts[p.ID]; effort != "" && !strings.Contains(block, "effort="+effort) {
+			return fmt.Errorf("parity drift: %s.effort baseline %q absent in derived JS block", p.ID, effort)
+		}
+		d := depths[p.ID]
+		if d.FanOutCap > 0 {
+			if !strings.Contains(block, fmt.Sprintf("fan_out_cap=%d", d.FanOutCap)) {
+				return fmt.Errorf("parity drift: %s.fan_out_cap baseline %d absent in derived JS block", p.ID, d.FanOutCap)
+			}
+		}
+		if d.VerifyVotes > 0 {
+			if !strings.Contains(block, fmt.Sprintf("verify_votes=%d", d.VerifyVotes)) {
+				return fmt.Errorf("parity drift: %s.verify_votes baseline %d absent in derived JS block", p.ID, d.VerifyVotes)
+			}
+			if !strings.Contains(block, fmt.Sprintf("synthesis=%t", d.Synthesis)) {
+				return fmt.Errorf("parity drift: %s.synthesis baseline %t absent in derived JS block", p.ID, d.Synthesis)
+			}
+		}
+	}
+	return nil
+}
+
+// phaseJSBlock slices the derived JS into the substring owned by a single phase:
+// from the phase('<id>' marker up to the next phase('  marker (or end of input).
+// An empty result means the phase marker was not found.
+func phaseJSBlock(js, id string) string {
+	marker := "phase('" + id + "'"
+	start := strings.Index(js, marker)
+	if start < 0 {
+		return ""
+	}
+	rest := js[start+len(marker):]
+	if next := strings.Index(rest, "phase('"); next >= 0 {
+		return rest[:next]
+	}
+	return rest
 }
 
 // extractPhaseIDsFromJS collects phase-ids declared in the derived JS template

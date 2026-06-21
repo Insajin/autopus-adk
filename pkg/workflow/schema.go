@@ -16,10 +16,15 @@ import (
 // ResultType carries the verdict_source for the deterministic gate phase
 // (e.g. "exit_code"); it is "" for non-gate phases.
 type PhaseDef struct {
-	ID         string `json:"id"`
-	Retry      int    `json:"retry"`
-	Budget     int    `json:"budget"`
-	ResultType string `json:"result_type"`
+	ID          string `json:"id"`
+	Retry       int    `json:"retry"`
+	Budget      int    `json:"budget"`
+	ResultType  string `json:"result_type"`
+	Model       string `json:"model"`
+	Effort      string `json:"effort"`
+	VerifyVotes int    `json:"verify_votes"`
+	FanOutCap   int    `json:"fan_out_cap"`
+	Synthesis   bool   `json:"synthesis"`
 }
 
 // Schema is the parsed manifest with phases in execution order.
@@ -36,6 +41,11 @@ type rawPhase struct {
 	Budget        int    `json:"budget"`
 	ResultType    string `json:"result_type"`
 	VerdictSource string `json:"verdict_source"`
+	Model         string `json:"model"`
+	Effort        string `json:"effort"`
+	VerifyVotes   int    `json:"verify_votes"`
+	FanOutCap     int    `json:"fan_out_cap"`
+	Synthesis     bool   `json:"synthesis"`
 }
 
 type rawSchema struct {
@@ -66,15 +76,34 @@ func ParseSchema(data []byte) (Schema, error) {
 		if !isSafePhaseID(rp.ID) {
 			return Schema{}, fmt.Errorf("parse workflow schema: phase %d has unsafe id %q (allowed: [A-Za-z0-9_-])", i, rp.ID)
 		}
+		// JS-injection trust boundary (REQ-011, S6): model and effort strings
+		// are interpolated into generated workflow JS, so reject any value
+		// outside the closed whitelist before it reaches that surface.
+		if !isSafeAgentModel(rp.Model) {
+			return Schema{}, fmt.Errorf("parse workflow schema: phase %d has unsafe model %q (not whitelisted)", i, rp.Model)
+		}
+		if !isSafeEffort(rp.Effort) {
+			return Schema{}, fmt.Errorf("parse workflow schema: phase %d has unsafe effort %q", i, rp.Effort)
+		}
+		// Bounded depth (REQ-004, S4): verify votes, fan-out, and retry are hard
+		// capped; values above the ceiling are rejected, never silently clamped.
+		if err := validateDepthCaps(rp.ID, rp.VerifyVotes, rp.FanOutCap, rp.Retry); err != nil {
+			return Schema{}, err
+		}
 		rt := rp.ResultType
 		if rt == "" {
 			rt = rp.VerdictSource
 		}
 		s.Phases = append(s.Phases, PhaseDef{
-			ID:         rp.ID,
-			Retry:      rp.Retry,
-			Budget:     rp.Budget,
-			ResultType: rt,
+			ID:          rp.ID,
+			Retry:       rp.Retry,
+			Budget:      rp.Budget,
+			ResultType:  rt,
+			Model:       rp.Model,
+			Effort:      rp.Effort,
+			VerifyVotes: rp.VerifyVotes,
+			FanOutCap:   rp.FanOutCap,
+			Synthesis:   rp.Synthesis,
 		})
 	}
 	return s, nil

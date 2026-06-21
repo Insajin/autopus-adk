@@ -1083,6 +1083,17 @@ Agent Teams unavailable: Claude Code v2.1.32+ and CLAUDE_CODE_EXPERIMENTAL_AGENT
 Fallback: /auto go SPEC-ID (subagent pipeline mode, no --team flag)
 ```
 
+##### Team Workflow Substrate Selection (claude-code only, pre-route)
+
+Before creating the team, resolve which substrate serves `--team` on this platform:
+
+| Condition | Behavior |
+|-----------|----------|
+| platform=claude-code AND `auto workflow doctor` overall=pass AND `--no-workflow` NOT set AND `workflow.team_default` NOT `false` | Serve via the **deterministic team Workflow substrate** (`route_team`). The installed `.claude/workflows/route_team.workflow.js` runs 8 ordered phases: planning → test_scaffold → implementation → gate_build_test → annotation → testing → review → release_hygiene. See `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`) for the full contract. |
+| `--no-workflow` set OR `autopus.yaml` → `workflow.team_default=false` | Skip the workflow substrate and run the existing Claude Code Agent Teams behavior below unchanged. This is a **pre-route opt-out**, NOT a taxonomy failure. |
+| `auto workflow doctor` overall=fail | Emit `[workflow] fallback-class=fail-fast reason=doctor_fail` and fall back to Route A (subagent pipeline). Do NOT enter the Agent Teams flow or any team workflow. |
+| Non-claude platform | The `--team` flag keeps its existing platform-native semantics. This substrate-selection logic is claude-code only and does not affect codex, antigravity-cli, or opencode. |
+
 Team composition stays within the official 3–5 member guidance (see agent-teams.md "Team Constraints"). Default 4-member core fits; phase-dependent members (below) should replace core members, not stack on top, to respect the size limit.
 
 Team composition — each member maps 1:1 to a specialized agent definition:
@@ -1377,6 +1388,11 @@ Priority order:
 Quality mode determines the execution profile in Agent() calls:
 - **Ultra**: force the premium path for every agent
 - **Balanced**: omit explicit overrides and rely on each agent's default profile
+
+For the **team Workflow substrate** (`route_team`), quality mode resolves three dimensions simultaneously through the existing resolvers:
+- **Model tier** — `ModelForAgent`: ultra → Opus for all agents; balanced → per-agent defaults.
+- **Effort** — `ResolveEffort`: ultra → higher effort ceiling; balanced → per-agent defaults.
+- **Orchestration depth** — `ResolveDepth`: ultra = 3-vote adversarial verify + synthesis step; balanced = single-vote. Caps apply regardless of mode: verify_votes ≤ 3, fan_out_cap ≤ 5, retry ≤ 3.
 
 Display after determination:
 ```
@@ -1763,7 +1779,7 @@ When `--multi` flag is set, activate the risk-tiered review policy:
 - If only one provider is installed, fall back to single-provider review and record degraded evidence instead of failing
 - Can be combined with `--strategy`: consensus (default), debate, pipeline, fastest
 
-`--team --multi` combination: Agent Teams + risk-tiered provider review activated in the Review Phase.
+`--team --multi` is orthogonal: `--multi` activates risk-tiered provider review only in the review phase at high/critical risk tier and does NOT change substrate selection (the team Workflow substrate is still used when `auto workflow doctor` passes and no disable flag is set).
 
 Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent Teams), `/auto go SPEC-ID --solo` (single session), `/auto go SPEC-ID --quality ultra`, `/auto go SPEC-ID --auto --loop`
 
@@ -1776,6 +1792,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--continue` | Resume an interrupted implementation from a previous session |
 | `--team` | Agent Teams mode: use Claude Code Agent Teams (experimental) for multi-agent collaboration |
 | `--workflow` | Deterministic Route A workflow (claude-code only): run via the generated workflow JS with an exit-code build/test gate; auto fail-fast to Route A if `auto workflow doctor` fails or platform is non-claude |
+| `--no-workflow` | Disable the team Workflow substrate for `--team`; run Agent Teams directly without the `route_team` workflow JS (pre-route opt-out) |
 | `--solo` | Single session mode: no subagents, main session implements directly |
 | `--multi` | Risk-tiered provider review: high/critical fan out when available, otherwise single-provider fallback |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |

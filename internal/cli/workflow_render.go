@@ -12,21 +12,15 @@ import (
 	"github.com/insajin/autopus-adk/templates"
 )
 
-const (
-	workflowSchemaEmbedPath   = "workflows/route_a.schema.json"
-	workflowContractEmbedPath = "workflows/route_a.md"
-	workflowJSEmbedPath       = "claude/workflows/route_a.workflow.js.tmpl"
-
-	workflowContractDisplayPath = "content/workflows/route_a.md"
-	workflowSchemaDisplayPath   = "content/workflows/route_a.schema.json"
-)
-
-// newWorkflowRenderCmd loads the canonical manifest from the embedded content/
-// and templates/ filesystems and emits the dry-run report (phase order, gate
-// verdict source, manifest/schema paths, deterministic prompt-manifest hash, and
-// the generated JS) without executing any agent (REQ-010, S7/S11).
+// newWorkflowRenderCmd loads the canonical manifest for the selected route from
+// the embedded content/ and templates/ filesystems and emits the dry-run report
+// (phase order, gate verdict source, manifest/schema paths, deterministic
+// prompt-manifest hash, per-phase model/effort/depth, and the generated JS)
+// without executing any agent (REQ-010/REQ-012, S7/S9/S11/S16/S18).
 func newWorkflowRenderCmd() *cobra.Command {
 	var dryRun bool
+	var route string
+	var quality string
 
 	cmd := &cobra.Command{
 		Use:           "render",
@@ -34,7 +28,12 @@ func newWorkflowRenderCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			schemaBytes, err := content.FS.ReadFile(workflowSchemaEmbedPath)
+			re, routeKey, err := selectRouteEmbed(route)
+			if err != nil {
+				return err
+			}
+
+			schemaBytes, err := content.FS.ReadFile(re.schemaEmbed)
 			if err != nil {
 				return fmt.Errorf("read embedded workflow schema: %w", err)
 			}
@@ -43,11 +42,11 @@ func newWorkflowRenderCmd() *cobra.Command {
 				return fmt.Errorf("parse workflow schema: %w", err)
 			}
 
-			contractBytes, err := content.FS.ReadFile(workflowContractEmbedPath)
+			contractBytes, err := content.FS.ReadFile(re.contractEmbed)
 			if err != nil {
 				return fmt.Errorf("read embedded workflow contract: %w", err)
 			}
-			jsBytes, err := templates.FS.ReadFile(workflowJSEmbedPath)
+			jsBytes, err := templates.FS.ReadFile(re.jsEmbed)
 			if err != nil {
 				return fmt.Errorf("read embedded workflow js template: %w", err)
 			}
@@ -57,20 +56,28 @@ func newWorkflowRenderCmd() *cobra.Command {
 					ID:        "workflow-contract",
 					Kind:      promptlayer.KindStable,
 					Group:     promptlayer.GroupMethodologyTools,
-					SourceRef: workflowContractDisplayPath,
+					SourceRef: re.contractDisplay,
 					Content:   string(contractBytes),
 				},
 				{
 					ID:        "workflow-schema",
 					Kind:      promptlayer.KindStable,
 					Group:     promptlayer.GroupMethodologyTools,
-					SourceRef: workflowSchemaDisplayPath,
+					SourceRef: re.schemaDisplay,
 					Content:   string(schemaBytes),
 				},
 			}
 
 			report := workflow.Render(schema, layers, string(jsBytes),
-				workflowContractDisplayPath, workflowSchemaDisplayPath)
+				re.contractDisplay, re.schemaDisplay)
+
+			// Quality is an ephemeral overlay: it changes the per-phase model/
+			// effort/depth view but never the prompt-manifest hash. Only the team
+			// route carries a quality binding.
+			if quality != "" && routeKey == "route_team" {
+				binding := resolveTeamQualityBinding(quality, "")
+				report.Phases = workflow.OverlayPhases(schema, &binding)
+			}
 
 			printRenderReport(cmd, report, dryRun)
 			return nil
@@ -78,6 +85,8 @@ func newWorkflowRenderCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Render for inspection without executing any agent")
+	cmd.Flags().StringVar(&route, "route", "route_a", "Workflow route to render (route_a or route_team)")
+	cmd.Flags().StringVar(&quality, "quality", "", "Quality tier overlay for the team route (ultra or balanced)")
 	return cmd
 }
 
@@ -93,6 +102,10 @@ func printRenderReport(cmd *cobra.Command, report workflow.DryRunReport, dryRun 
 	fmt.Fprintf(out, "manifest: %s\n", report.ManifestPath)
 	fmt.Fprintf(out, "schema: %s\n", report.SchemaPath)
 	fmt.Fprintf(out, "prompt-manifest hash: %s\n", report.PromptManifestHash)
+	for _, ph := range report.Phases {
+		fmt.Fprintf(out, "phase %s: model=%s effort=%s verify_votes=%d fan_out_cap=%d synthesis=%v\n",
+			ph.ID, ph.Model, ph.Effort, ph.VerifyVotes, ph.FanOutCap, ph.Synthesis)
+	}
 	fmt.Fprintln(out, "--- generated workflow js ---")
 	fmt.Fprintln(out, report.JS)
 }
