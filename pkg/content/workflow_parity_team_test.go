@@ -19,12 +19,12 @@ const teamDriftMD = "# Route Team\n\n### planning\nplan.\n"
 
 // teamDriftJS keeps the schema phase-id/retry/budget tokens aligned (so the
 // per-phase quality check is reached) but diverges on the planning model token.
-const teamDriftJS = `export default async function run() {
-  await phase('planning', { retry: 0, budget: 60000 }, async () => {
-    // route_team baseline planning: model=claude-sonnet-4-6 effort=medium
-    await agent('planner', { model: 'claude-sonnet-4-6', effort: 'medium' });
-  });
-}
+const teamDriftJS = `const ctx = args || {};
+const RT = (args && args.quality) || {};
+
+await phase('planning');
+// route_team baseline planning: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 60000
+await agent(` + "`" + `Execute planner agent for spec ${ctx.spec || ''}` + "`" + `, { model: (RT.planning && RT.planning.model) || 'claude-sonnet-4-6', effort: (RT.planning && RT.planning.effort) || 'medium' });
 `
 
 // TestS5_ParityPerPhaseModelDrift verifies the per-phase quality parity check

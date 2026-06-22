@@ -1256,8 +1256,8 @@ If `auto workflow doctor` reports `overall: fail` OR the platform is not claude,
 Otherwise dispatch the generated `.claude/workflows/route_a.workflow.js` Workflow, which runs the four ordered phases and records a run journal:
 1. **planning** — implementation plan and task breakdown (no working-tree mutation beyond plan artifacts)
 2. **implementation** — repository-mutating work; worktree lifecycle stays in the Go runtime, the JS owns sequencing only
-3. **gate_build_test** — deterministic gate; verdict derives from build/test **exit codes** (`verdict_source: exit_code`) via the `auto workflow gate` JS→Go bridge, not from an LLM verdict
-4. **release_hygiene** — generated/runtime drift gate + 300-line staged source limit (`auto check --hygiene --arch --quiet --staged`); commit-msg hooks enforce Lore format (`auto check --lore --message <msgfile>`)
+3. **gate_build_test** — deterministic gate; verdict derives from build/test **exit codes** (`verdict_source: exit_code`) executed outside the JS via the Go runtime (calling `auto workflow gate`), not from an LLM verdict
+4. **release_hygiene** — generated/runtime drift gate + 300-line staged source limit (`auto check --hygiene --arch --quiet --staged`); commit-msg hooks enforce Lore format (`auto check --lore --message <msgfile>`), executed outside the JS via the Go runtime
 
 Inspect the planned run without executing it: `auto workflow render --dry-run`.
 
@@ -1393,6 +1393,16 @@ For the **team Workflow substrate** (`route_team`), quality mode resolves three 
 - **Model tier** — `ModelForAgent`: ultra → Opus for all agents; balanced → per-agent defaults.
 - **Effort** — `ResolveEffort`: ultra → higher effort ceiling; balanced → per-agent defaults.
 - **Orchestration depth** — `ResolveDepth`: ultra = 3-vote adversarial verify + synthesis step; balanced = single-vote. Caps apply regardless of mode: verify_votes ≤ 3, fan_out_cap ≤ 5, retry ≤ 3.
+
+The resolved quality is delivered through the Workflow `args` input (`args.quality`). The workflow JS reads `RT.<phase>` from `args.quality` to override the schema baseline literal for each phase.
+
+**Segment-launch dispatcher contract** (`args` schema: `{spec, workingDir, quality, segment}`):
+1. Launch segment A: `workflow({scriptPath}, {spec, workingDir, quality, segment:'A'})` — runs planning through gate_build_test boundary marker.
+2. Run `auto workflow gate` (Go, exit-code). If `verdict != pass`: **abort. Do NOT launch segment B.**
+3. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality, segment:'B'})` — runs annotation through release_hygiene boundary marker.
+4. Run `auto check --hygiene --arch --quiet --staged`.
+
+The gate phases are segment-boundary markers in the JS (no shell-out logic embedded); all exit-code adjudication is performed by the dispatcher between segment launches.
 
 Display after determination:
 ```

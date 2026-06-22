@@ -12,8 +12,8 @@ import (
 func TestResolveTeamQualityBinding_SerializesBarePhaseMap(t *testing.T) {
 	t.Parallel()
 
-	if teamQualityEnvKey != "AUTOPUS_WORKFLOW_QUALITY" {
-		t.Fatalf("teamQualityEnvKey = %q, want AUTOPUS_WORKFLOW_QUALITY", teamQualityEnvKey)
+	if teamQualityArgsKey != "quality" {
+		t.Fatalf("teamQualityArgsKey = %q, want quality", teamQualityArgsKey)
 	}
 
 	b := resolveTeamQualityBinding("ultra", "")

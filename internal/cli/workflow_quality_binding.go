@@ -7,10 +7,10 @@ import (
 	"github.com/insajin/autopus-adk/pkg/workflow"
 )
 
-// teamQualityEnvKey is the environment variable the generated route_team JS reads
-// to load the per-phase quality binding (REQ-015, S20). The value is the JSON of
+// teamQualityArgsKey is the field in args the generated route_team JS reads
+// to load the per-phase quality binding (REQ-005). The value is the JSON of
 // the bare phase map so the JS can read RT.<phase>.model/effort/...
-const teamQualityEnvKey = "AUTOPUS_WORKFLOW_QUALITY"
+const teamQualityArgsKey = "quality"
 
 // teamPhaseRoles maps each agent-driven team phase to the agent role(s) it runs.
 // Deterministic phases (gate_build_test, release_hygiene) carry no roles and get
@@ -61,7 +61,7 @@ func resolveTeamQualityBinding(quality, complexity string) workflow.QualityBindi
 }
 
 // serializeTeamQualityBinding marshals the BARE phase map (not the wrapper) so
-// the generated JS reads RT.<phase>.<field> directly from the env JSON.
+// the generated JS reads RT.<phase>.<field> directly from args.quality.
 func serializeTeamQualityBinding(b workflow.QualityBinding) (string, error) {
 	data, err := json.Marshal(b.Phases)
 	if err != nil {

@@ -36,3 +36,12 @@ var safeEfforts = map[string]bool{
 func isSafeEffort(e string) bool {
 	return e == "" || safeEfforts[e]
 }
+
+// isSafeResultType reports whether rt is a whitelisted verdict_source. The
+// result_type is interpolated into a single-line comment in the generated
+// workflow JS, so a newline-bearing value could terminate the comment and emit
+// an executable statement. Restrict it to the closed set; the empty string is
+// allowed because non-gate phases carry no verdict source.
+func isSafeResultType(rt string) bool {
+	return rt == "" || rt == VerdictSourceExitCode
+}

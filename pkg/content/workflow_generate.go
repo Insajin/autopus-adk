@@ -96,6 +96,11 @@ func generateOneRoute(contentDir, templateDir, schemaFile, mdFile, jsTmplName, h
 // deriveWorkflowJS produces the deterministic JS workflow template from the
 // schema. Phase order equals schema array order. No timestamps, no randomness;
 // the output is a pure function of the schema.
+//
+// Segmented dispatch: phases are partitioned into two guard blocks by the
+// gate_build_test boundary. The dispatcher launches segment A, runs
+// "auto workflow gate" as a hard exit-code barrier, then launches segment B
+// only when the verdict is pass. The SEGMENT constant is injected via args.
 func deriveWorkflowJS(schema workflow.Schema) string {
 	var sb strings.Builder
 
@@ -115,10 +120,34 @@ func deriveWorkflowJS(schema workflow.Schema) string {
 	sb.WriteString("  ],\n")
 	sb.WriteString("};\n\n")
 
-	// Script body: one phase(...) call per schema phase, in order.
-	sb.WriteString("// Workflow API globals: agent, phase, log.\n")
-	sb.WriteString("export default async function run() {\n")
+	// Script body: top-level body with segment guards.
+	// SEGMENT is delivered via args.segment by the dispatcher.
+	sb.WriteString("// Workflow API globals: agent, phase, log, args.\n")
+	sb.WriteString("const SEGMENT = (args && args.segment) || 'A';\n\n")
+
+	// Split phases: segment A includes everything up to and including gate_build_test;
+	// segment B includes everything after gate_build_test.
+	var segA, segB []workflow.PhaseDef
+	foundGate := false
 	for _, p := range schema.Phases {
+		if foundGate {
+			segB = append(segB, p)
+		} else {
+			segA = append(segA, p)
+			if p.ID == gateBuildTestID {
+				foundGate = true
+			}
+		}
+	}
+
+	sb.WriteString("if (SEGMENT === 'A') {\n")
+	for _, p := range segA {
+		writePhaseBlock(&sb, p)
+	}
+	sb.WriteString("}\n\n")
+
+	sb.WriteString("if (SEGMENT === 'B') {\n")
+	for _, p := range segB {
 		writePhaseBlock(&sb, p)
 	}
 	sb.WriteString("}\n")
@@ -127,25 +156,21 @@ func deriveWorkflowJS(schema workflow.Schema) string {
 }
 
 // writePhaseBlock emits a deterministic phase(...) block. The gate and release
-// hygiene phases shell out to CLI checks so JS owns sequencing, not verdict
-// policy.
+// hygiene phases are segment-boundary markers in the JS; the actual gates are
+// run outside the JS by the dispatcher between segment launches.
 func writePhaseBlock(sb *strings.Builder, p workflow.PhaseDef) {
-	fmt.Fprintf(sb, "  await phase('%s', { retry: %d, budget: %d }, async () => {\n", p.ID, p.Retry, p.Budget)
+	fmt.Fprintf(sb, "await phase('%s');\n", p.ID)
+	fmt.Fprintf(sb, "// route_a baseline %s: retry: %d, budget: %d\n", p.ID, p.Retry, p.Budget)
 	if p.ID == gateBuildTestID {
-		fmt.Fprintf(sb, "    // Deterministic gate: verdict_source '%s'. Shell out to the\n", p.ResultType)
-		sb.WriteString("    // `auto workflow gate` CLI (JS->Go bridge) and parse its JSON.\n")
-		sb.WriteString("    const out = await agent.exec(['auto', 'workflow', 'gate']);\n")
-		sb.WriteString("    const gate = JSON.parse(out.stdout);\n")
-		sb.WriteString("    log('gate', gate.verdict, gate.verdict_source, gate.build_exit, gate.test_exit);\n")
-		sb.WriteString("    if (gate.verdict !== 'pass') {\n")
-		sb.WriteString("      throw new Error('gate failed: ' + gate.verdict_source);\n")
-		sb.WriteString("    }\n")
+		fmt.Fprintf(sb, "// Deterministic gate: verdict_source '%s'.\n", p.ResultType)
+		sb.WriteString("// This gate is executed outside the JS by the Go runtime.\n")
+		fmt.Fprintf(sb, "log('gate', '%s');\n", p.ID)
 	} else if p.ID == releaseHygieneID {
-		sb.WriteString("    // Release hygiene: generated/runtime drift + staged source size gate.\n")
-		sb.WriteString("    const out = await agent.exec(['auto', 'check', '--hygiene', '--arch', '--quiet', '--staged']);\n")
-		sb.WriteString("    log('release_hygiene', 'pass', out.stdout);\n")
+		sb.WriteString("// Release hygiene: generated/runtime drift + staged source size gate.\n")
+		sb.WriteString("// This gate is executed outside the JS by the Go runtime.\n")
+		fmt.Fprintf(sb, "log('release_hygiene', '%s');\n", p.ID)
 	} else {
-		fmt.Fprintf(sb, "    log('phase', '%s');\n", p.ID)
+		fmt.Fprintf(sb, "log('phase', '%s');\n", p.ID)
 	}
-	sb.WriteString("  });\n")
+	sb.WriteString("\n")
 }

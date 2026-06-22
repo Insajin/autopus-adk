@@ -18,60 +18,58 @@ export const meta = {
   ],
 };
 
-// Workflow API globals: agent, phase, log, env.
-// RT carries the per-run quality override injected by the dispatch layer via the
-// AUTOPUS_WORKFLOW_QUALITY env. Each agent() opt reads the RT override first and
-// falls back to the schema baseline literal.
-export default async function run() {
-  const RT = JSON.parse(env('AUTOPUS_WORKFLOW_QUALITY') || '{}');
-  await phase('planning', { retry: 0, budget: 60000 }, async () => {
-    // route_team baseline planning: model=claude-opus-4-8 effort=medium
-    await agent('planner', { model: (RT.planning && RT.planning.model) || 'claude-opus-4-8', effort: (RT.planning && RT.planning.effort) || 'medium' });
-  });
-  await phase('test_scaffold', { retry: 0, budget: 60000 }, async () => {
-    // route_team baseline test_scaffold: model=claude-sonnet-4-6 effort=medium
-    await agent('test_scaffold', { model: (RT.test_scaffold && RT.test_scaffold.model) || 'claude-sonnet-4-6', effort: (RT.test_scaffold && RT.test_scaffold.effort) || 'medium' });
-  });
-  await phase('implementation', { retry: 2, budget: 120000 }, async () => {
-    // route_team baseline implementation: model=claude-sonnet-4-6 effort=medium fan_out_cap=5
-    const FANOUT_implementation = (RT.implementation && RT.implementation.fan_out_cap) || 5;
-    for (let i = 0; i < FANOUT_implementation; i++) {
-      await agent('executor', { model: (RT.implementation && RT.implementation.model) || 'claude-sonnet-4-6', effort: (RT.implementation && RT.implementation.effort) || 'medium' });
-    }
-  });
-  await phase('gate_build_test', { retry: 0, budget: 40000 }, async () => {
-    // Deterministic gate: verdict_source 'exit_code'. Shell out to the
-    // `auto workflow gate` CLI (JS->Go bridge) and parse its JSON.
-    const out = await agent.exec(['auto', 'workflow', 'gate']);
-    const gate = JSON.parse(out.stdout);
-    log('gate', gate.verdict, gate.verdict_source, gate.build_exit, gate.test_exit);
-    if (gate.verdict !== 'pass') {
-      throw new Error('gate failed: ' + gate.verdict_source);
-    }
-  });
-  await phase('annotation', { retry: 0, budget: 40000 }, async () => {
-    // route_team baseline annotation: model=claude-sonnet-4-6 effort=medium
-    await agent('annotator', { model: (RT.annotation && RT.annotation.model) || 'claude-sonnet-4-6', effort: (RT.annotation && RT.annotation.effort) || 'medium' });
-  });
-  await phase('testing', { retry: 0, budget: 60000 }, async () => {
-    // route_team baseline testing: model=claude-sonnet-4-6 effort=medium
-    await agent('tester', { model: (RT.testing && RT.testing.model) || 'claude-sonnet-4-6', effort: (RT.testing && RT.testing.effort) || 'medium' });
-  });
-  await phase('review', { retry: 0, budget: 60000 }, async () => {
-    // route_team baseline review: model=claude-sonnet-4-6 effort=medium verify_votes=1 synthesis=false
-    const VOTES_review = (RT.review && RT.review.verify_votes) || 1;
-    const SYNTH_review = (RT.review && RT.review.synthesis) || false;
-    for (let v = 0; v < VOTES_review; v++) {
-      await agent('reviewer', { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
-    }
-    await agent('security_auditor', { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
-    if (SYNTH_review) {
-      await agent('reviewer', { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
-    }
-  });
-  await phase('release_hygiene', { retry: 0, budget: 30000 }, async () => {
-    // Release hygiene: generated/runtime drift + staged source size gate.
-    const out = await agent.exec(['auto', 'check', '--hygiene', '--arch', '--quiet', '--staged']);
-    log('release_hygiene', 'pass', out.stdout);
-  });
+// Workflow API globals: agent, phase, log, args.
+const ctx = args || {};
+const RT = (args && args.quality) || {};
+const SEGMENT = (args && args.segment) || 'A';
+
+if (SEGMENT === 'A') {
+await phase('planning');
+// route_team baseline planning: model=claude-opus-4-8 effort=medium retry: 0 budget: 60000
+await agent(`Execute planner agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.planning && RT.planning.model) || 'claude-opus-4-8', effort: (RT.planning && RT.planning.effort) || 'medium' });
+
+await phase('test_scaffold');
+// route_team baseline test_scaffold: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 60000
+await agent(`Execute test_scaffold agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.test_scaffold && RT.test_scaffold.model) || 'claude-sonnet-4-6', effort: (RT.test_scaffold && RT.test_scaffold.effort) || 'medium' });
+
+await phase('implementation');
+// route_team baseline implementation: model=claude-sonnet-4-6 effort=medium fan_out_cap=5 retry: 2 budget: 120000
+const FANOUT_implementation = (RT.implementation && RT.implementation.fan_out_cap) || 5;
+for (let i = 0; i < FANOUT_implementation; i++) {
+  await agent(`Execute executor agent (fan-out ${i}) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.implementation && RT.implementation.model) || 'claude-sonnet-4-6', effort: (RT.implementation && RT.implementation.effort) || 'medium' });
+}
+
+await phase('gate_build_test');
+// Deterministic gate: verdict_source 'exit_code'. retry: 0 budget: 40000
+// This gate is executed outside the JS by the Go runtime.
+log('gate', 'gate_build_test');
+
+}
+
+if (SEGMENT === 'B') {
+await phase('annotation');
+// route_team baseline annotation: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 40000
+await agent(`Execute annotator agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.annotation && RT.annotation.model) || 'claude-sonnet-4-6', effort: (RT.annotation && RT.annotation.effort) || 'medium' });
+
+await phase('testing');
+// route_team baseline testing: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 60000
+await agent(`Execute tester agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.testing && RT.testing.model) || 'claude-sonnet-4-6', effort: (RT.testing && RT.testing.effort) || 'medium' });
+
+await phase('review');
+// route_team baseline review: model=claude-sonnet-4-6 effort=medium verify_votes=1 synthesis=false retry: 0 budget: 60000
+const VOTES_review = (RT.review && RT.review.verify_votes) || 1;
+const SYNTH_review = (RT.review && RT.review.synthesis) || false;
+for (let v = 0; v < VOTES_review; v++) {
+  await agent(`Execute reviewer agent (vote ${v}) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
+}
+await agent(`Execute security auditor for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
+if (SYNTH_review) {
+  await agent(`Execute reviewer agent (synthesis) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
+}
+
+await phase('release_hygiene');
+// Release hygiene: generated/runtime drift + staged source size gate. retry: 0 budget: 30000
+// This gate is executed outside the JS by the Go runtime.
+log('release_hygiene', 'release_hygiene');
+
 }

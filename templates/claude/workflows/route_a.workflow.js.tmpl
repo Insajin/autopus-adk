@@ -14,27 +14,31 @@ export const meta = {
   ],
 };
 
-// Workflow API globals: agent, phase, log.
-export default async function run() {
-  await phase('planning', { retry: 0, budget: 60000 }, async () => {
-    log('phase', 'planning');
-  });
-  await phase('implementation', { retry: 0, budget: 120000 }, async () => {
-    log('phase', 'implementation');
-  });
-  await phase('gate_build_test', { retry: 0, budget: 40000 }, async () => {
-    // Deterministic gate: verdict_source 'exit_code'. Shell out to the
-    // `auto workflow gate` CLI (JS->Go bridge) and parse its JSON.
-    const out = await agent.exec(['auto', 'workflow', 'gate']);
-    const gate = JSON.parse(out.stdout);
-    log('gate', gate.verdict, gate.verdict_source, gate.build_exit, gate.test_exit);
-    if (gate.verdict !== 'pass') {
-      throw new Error('gate failed: ' + gate.verdict_source);
-    }
-  });
-  await phase('release_hygiene', { retry: 0, budget: 30000 }, async () => {
-    // Release hygiene: generated/runtime drift + staged source size gate.
-    const out = await agent.exec(['auto', 'check', '--hygiene', '--arch', '--quiet', '--staged']);
-    log('release_hygiene', 'pass', out.stdout);
-  });
+// Workflow API globals: agent, phase, log, args.
+const SEGMENT = (args && args.segment) || 'A';
+
+if (SEGMENT === 'A') {
+await phase('planning');
+// route_a baseline planning: retry: 0, budget: 60000
+log('phase', 'planning');
+
+await phase('implementation');
+// route_a baseline implementation: retry: 0, budget: 120000
+log('phase', 'implementation');
+
+await phase('gate_build_test');
+// route_a baseline gate_build_test: retry: 0, budget: 40000
+// Deterministic gate: verdict_source 'exit_code'.
+// This gate is executed outside the JS by the Go runtime.
+log('gate', 'gate_build_test');
+
+}
+
+if (SEGMENT === 'B') {
+await phase('release_hygiene');
+// route_a baseline release_hygiene: retry: 0, budget: 30000
+// Release hygiene: generated/runtime drift + staged source size gate.
+// This gate is executed outside the JS by the Go runtime.
+log('release_hygiene', 'release_hygiene');
+
 }

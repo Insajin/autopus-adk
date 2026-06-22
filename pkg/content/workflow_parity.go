@@ -68,17 +68,18 @@ func checkWorkflowParity(a parityArtifacts) error {
 		}
 	}
 
-	// retry/budget/result-type tokens must be present in the JS for each phase.
+	// retry/budget/result-type tokens must be present in the JS for each phase block.
 	for _, p := range a.schema.Phases {
+		block := phaseJSBlock(a.derivedJS, p.ID)
 		retryTok := fmt.Sprintf("retry: %d", p.Retry)
 		budgetTok := fmt.Sprintf("budget: %d", p.Budget)
-		if !strings.Contains(a.derivedJS, retryTok) {
+		if !strings.Contains(block, retryTok) {
 			return fmt.Errorf("parity drift: phase %q retry value %d absent in derived JS", p.ID, p.Retry)
 		}
-		if !strings.Contains(a.derivedJS, budgetTok) {
+		if !strings.Contains(block, budgetTok) {
 			return fmt.Errorf("parity drift: phase %q budget value %d absent in derived JS", p.ID, p.Budget)
 		}
-		if p.ResultType != "" && !strings.Contains(a.derivedJS, p.ResultType) {
+		if p.ResultType != "" && !strings.Contains(block, p.ResultType) {
 			return fmt.Errorf("parity drift: phase %q result-type %q absent in derived JS", p.ID, p.ResultType)
 		}
 	}

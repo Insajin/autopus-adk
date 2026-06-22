@@ -48,11 +48,10 @@ the worktree slot cap, and worktree reclaim stay in the Go runtime
 
 The `gate_build_test` phase is the **deterministic gate**. Its verdict derives
 from build and test command **exit codes** (`verdict_source: exit_code`), not
-from an LLM verdict. The workflow JS shells out to the `auto workflow gate` CLI
-subcommand — the **JS-to-Go execution bridge** — which runs build and test
-through an injectable `CommandRunner` seam and emits a structured
-`{verdict, verdict_source, build_exit, test_exit}` JSON. A non-zero build or test
-exit code yields `verdict: fail`.
+from an LLM verdict. The gate is executed outside the JS via the Go runtime (calling
+`auto workflow gate`), which runs build and test through an injectable `CommandRunner`
+seam and emits a structured `{verdict, verdict_source, build_exit, test_exit}` JSON.
+A non-zero build or test exit code yields `verdict: fail`.
 
 ### annotation
 
@@ -76,13 +75,13 @@ The `release_hygiene` terminal phase enforces release safety before sync:
 
 - **Generated-surface drift gate**: blocks the run when generated surfaces are
   staged without a matching source-of-truth change, and always blocks runtime
-  artifacts. The workflow JS shells out to `auto check --hygiene`.
-- **300-line source limit**: enforces the staged source limit through the same
-  workflow call: `auto check --hygiene --arch --quiet --staged`.
+  artifacts. The Go runtime executes `auto check --hygiene` outside the JS.
+- **300-line source limit**: enforces the staged source limit through the Go
+  runtime execution: `auto check --hygiene --arch --quiet --staged`.
 
-## JS-to-Go bridge
+## External Go Execution
 
-The `gate_build_test` and `release_hygiene` phases cross into Go execution for
-deterministic verdicts. `gate_build_test` uses the `auto workflow gate` CLI
-subcommand, while `release_hygiene` uses `auto check --hygiene --arch --quiet
---staged`. JS owns sequencing; Go owns policy and exit-code adjudication.
+The deterministic gates for `gate_build_test` and `release_hygiene` are executed
+outside the JS Workflow environment by the Go runtime framework. `gate_build_test`
+uses `auto workflow gate` CLI command, while `release_hygiene` uses `auto check --hygiene --arch --quiet --staged`.
+JS owns sequencing; Go owns policy and exit-code adjudication.

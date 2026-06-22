@@ -64,27 +64,39 @@ func TestS1S19_TeamDeterministicGeneration(t *testing.T) {
 	}
 
 	implBlock := phaseJSBlock(js1, "implementation")
-	for _, want := range []string{"for", "agent('executor'", "fan_out_cap=5", "RT.implementation", "'claude-sonnet-4-6'"} {
+	for _, want := range []string{"for", "agent(`Execute executor", "fan_out_cap=5", "RT.implementation", "'claude-sonnet-4-6'"} {
 		if !strings.Contains(implBlock, want) {
 			t.Errorf("implementation block missing %q, got:\n%s", want, implBlock)
 		}
 	}
 
 	reviewBlock := phaseJSBlock(js1, "review")
-	for _, want := range []string{"agent('reviewer'", "agent('security_auditor'"} {
+	for _, want := range []string{"agent(`Execute reviewer", "agent(`Execute security auditor"} {
 		if !strings.Contains(reviewBlock, want) {
 			t.Errorf("review block missing %q, got:\n%s", want, reviewBlock)
 		}
 	}
 
 	gateBlock := phaseJSBlock(js1, "gate_build_test")
-	if !strings.Contains(gateBlock, "agent.exec(['auto', 'workflow', 'gate'])") {
-		t.Errorf("gate_build_test block missing workflow gate bridge, got:\n%s", gateBlock)
+	if gateBlock == "" {
+		t.Errorf("gate_build_test block must exist")
+	}
+	if !strings.Contains(gateBlock, "log(") {
+		t.Errorf("gate_build_test block must emit a log() marker")
+	}
+	if strings.Contains(gateBlock, "agent.exec(") {
+		t.Errorf("gate_build_test block must not call agent.exec (gate runs outside the JS in the Go dispatcher)")
 	}
 
 	hygieneBlock := phaseJSBlock(js1, "release_hygiene")
-	if !strings.Contains(hygieneBlock, "agent.exec(['auto', 'check', '--hygiene', '--arch', '--quiet', '--staged'])") {
-		t.Errorf("release_hygiene block missing hygiene bridge, got:\n%s", hygieneBlock)
+	if hygieneBlock == "" {
+		t.Errorf("release_hygiene block must exist")
+	}
+	if !strings.Contains(hygieneBlock, "log(") {
+		t.Errorf("release_hygiene block must emit a log() marker")
+	}
+	if strings.Contains(hygieneBlock, "agent.exec(") {
+		t.Errorf("release_hygiene block must not call agent.exec (gate runs outside the JS in the Go dispatcher)")
 	}
 }
 

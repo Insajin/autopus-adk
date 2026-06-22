@@ -75,11 +75,12 @@ and match `content/workflows/route_a.schema.json`.
    the Go runtime (`pkg/pipeline`); the workflow JS owns sequencing only.
 3. **gate_build_test** — the deterministic gate. Its verdict derives from build
    and test command **exit codes** (`verdict_source: exit_code`), not from an
-   LLM verdict. The JS shells out to the `auto workflow gate` CLI subcommand —
-   the **JS-to-Go execution bridge** — which runs build and test through an
+   LLM verdict. The gate is executed outside the JS via the Go runtime (calling
+   `auto workflow gate`), which runs build and test through an
    injectable `CommandRunner` seam and emits
    `{verdict, verdict_source, build_exit, test_exit}` JSON. A non-zero build or
-   test exit code yields `verdict: fail`.
+   test exit code yields `verdict: fail`. The JS carries this phase as a sequencing
+   marker with no shell-out primitives embedded.
 4. **release_hygiene** — terminal phase that enforces release safety before
    sync:
    - **Generated-surface drift gate** — blocks when generated surfaces
@@ -154,11 +155,11 @@ The `route_team` workflow runs exactly eight ordered phases. Phase IDs are autho
 | **planning** | `agent()` | Produces the implementation plan and task breakdown; does not mutate the working tree beyond plan artifacts. |
 | **test_scaffold** | `agent()` | Writes failing test skeletons for P0/P1 requirements (RED state). |
 | **implementation** | `agent()` — bounded executor fan-out | Repository-mutating work. Fan-out cap: **≤ 5 concurrent executors**. Worktree lifecycle stays in the Go runtime; the JS owns sequencing only. |
-| **gate_build_test** | **deterministic `agent.exec` gate** | Verdict derives from build/test **exit codes** (`verdict_source: exit_code`), not from an LLM verdict. Shells out to `auto workflow gate` (the JS→Go execution bridge) which emits `{verdict, verdict_source, build_exit, test_exit}` JSON. A non-zero exit yields `verdict: fail`. |
+| **gate_build_test** | **deterministic Go gate** | Verdict derives from build/test **exit codes** (`verdict_source: exit_code`), not from an LLM verdict. Executed outside the JS via Go runtime (calling `auto workflow gate` execution bridge) which emits `{verdict, verdict_source, build_exit, test_exit}` JSON. A non-zero exit yields `verdict: fail`. |
 | **annotation** | `agent()` | Applies `@AX` annotation tags to all files modified during implementation. |
 | **testing** | `agent()` | Raises test coverage to 85%+; runs `go test -race -cover ./...` and affected QAMESH lanes. |
 | **review** | `agent()` — bounded reviewer fan-out | Runs `reviewer` and `security-auditor` in parallel. Verify votes are bounded: **verify_votes ≤ 3**. Ultra quality mode adds a synthesis step after 3-vote adversarial verify. |
-| **release_hygiene** | **deterministic `agent.exec` gate** | `auto check --hygiene --arch --quiet --staged` enforces the 300-line source limit and generated-surface drift gate. Commit-msg hooks enforce Lore format via `auto check --lore --message <msgfile>`. |
+| **release_hygiene** | **deterministic Go gate** | Executed outside the JS via Go runtime (calling `auto check --hygiene --arch --quiet --staged`) which enforces the 300-line source limit and generated-surface drift gate. Commit-msg hooks enforce Lore format via `auto check --lore --message <msgfile>`. |
 
 ### Manifest Source of Truth
 
@@ -179,7 +180,30 @@ Per-run `--quality` resolves **three dimensions simultaneously** through the exi
 - **Effort** — `ResolveEffort`: ultra → higher effort ceiling; balanced → per-agent defaults.
 - **Orchestration depth** — `ResolveDepth`: ultra = 3-vote adversarial verify + synthesis in the review phase; balanced = single-vote. Hard caps: verify_votes ≤ 3, fan_out_cap ≤ 5, retry ≤ 3.
 
-The resolved quality is injected through the `AUTOPUS_WORKFLOW_QUALITY` environment variable. The workflow JS reads `RT.<phase>` to override the schema baseline literal for each phase.
+The resolved quality is delivered through the Workflow `args` input (`args.quality`). The workflow JS reads `RT.<phase>` from `args.quality` to override the schema baseline literal for each phase.
+
+### Workflow input args Schema
+
+The per-run context is passed via the `args` global with the following schema:
+- `spec`: target SPEC ID (string)
+- `workingDir`: absolute path to the workspace directory (string)
+- `quality`: serialized per-phase quality binding (JSON object)
+- `segment`: which segment to execute — `'A'` (planning through gate_build_test) or `'B'` (post-gate phases through release_hygiene); defaults to `'A'` when absent
+
+### Segmented Dispatch Contract
+
+The dispatcher (main session) launches the workflow in two segments separated by the deterministic gate. This is required because a single `workflow({scriptPath}, args)` launch runs all phases unconditionally — there is no re-entry point to block post-gate phases from within JS.
+
+**Dispatcher sequence:**
+1. Launch segment A: `workflow({scriptPath}, {spec, workingDir, quality, segment:'A'})`
+   — executes planning, implementation, and the gate_build_test boundary marker.
+2. After segment A returns, run `auto workflow gate` (Go runtime, exit-code verdict).
+   — If `verdict != pass`: **abort. Do NOT launch segment B.**
+3. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality, segment:'B'})`
+   — executes annotation, testing, review, and the release_hygiene boundary marker.
+4. After segment B returns, run `auto check --hygiene --arch --quiet --staged`.
+
+The gate phases (`gate_build_test`, `release_hygiene`) are **segment-boundary markers** in the JS — they emit `phase(id)` + `log(...)` but contain no shell-out logic. All exit-code adjudication is performed by the dispatcher between segment launches (`verdict_source: exit_code` is preserved).
 
 Inspect resolved per-phase model/effort/depth without executing agents:
 

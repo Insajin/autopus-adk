@@ -94,6 +94,13 @@ func ParseSchema(data []byte) (Schema, error) {
 		if rt == "" {
 			rt = rp.VerdictSource
 		}
+		// JS-injection trust boundary (Q-SEC-01): result_type is interpolated
+		// into a single-line comment in the generated workflow JS. Reject any
+		// value outside the closed whitelist (e.g. newline-bearing) before it can
+		// terminate the comment and emit an executable statement. Fail closed.
+		if !isSafeResultType(rt) {
+			return Schema{}, fmt.Errorf("parse workflow schema: phase %d has unsafe result_type %q (allowed: \"\" or %q)", i, rt, VerdictSourceExitCode)
+		}
 		s.Phases = append(s.Phases, PhaseDef{
 			ID:          rp.ID,
 			Retry:       rp.Retry,
