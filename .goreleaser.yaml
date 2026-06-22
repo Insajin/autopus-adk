@@ -64,16 +64,27 @@ changelog:
       - '^test:'
       - '^ci:'
 
-# brews:
-#   - ids:
-#       - auto
-#     repository:
-#       owner: insajin
-#       name: homebrew-autopus
-#     homepage: "https://github.com/insajin/autopus-adk"
-#     description: "Agentic Development Kit for coding CLIs"
-#     license: "MIT"
-#     install: |
-#       bin.install "auto"
-#     test: |
-#       system "#{bin}/auto", "version"
+brews:
+  - name: auto
+    ids:
+      - auto
+    repository:
+      owner: Insajin
+      name: homebrew-autopus
+      branch: main
+      # Cross-repo push needs a token with write access to the tap repo; the
+      # default Actions GITHUB_TOKEN is scoped to autopus-adk only. Set the
+      # HOMEBREW_TAP_TOKEN secret (a PAT / fine-grained token with contents:write
+      # on Insajin/homebrew-autopus) — release.yaml passes it through.
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/Insajin/autopus-adk"
+    description: "Agentic Development Kit for coding CLIs (the auto CLI)"
+    license: "MIT"
+    commit_author:
+      name: autopus-release-bot
+      email: noreply@autopus.co
+    install: |
+      bin.install "auto"
+    test: |
+      system "#{bin}/auto", "version"

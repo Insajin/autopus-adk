@@ -45,3 +45,8 @@ jobs:
         run: goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Cross-repo token for publishing the Homebrew formula to the separate
+          # Insajin/homebrew-autopus tap repo (the default GITHUB_TOKEN cannot
+          # write to another repo). Must be a PAT / fine-grained token with
+          # contents:write on the tap repo, stored as the HOMEBREW_TAP_TOKEN secret.
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
