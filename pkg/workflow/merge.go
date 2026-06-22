@@ -212,7 +212,11 @@ func selectWorktrees(records []worktreeRecord, runID, workingDir string) []workt
 // escape after filepath.Clean, symlinks (never followed — exfil defence), and
 // non-regular files. Skipping at collection time keeps the copy step total.
 func changedFiles(ctx context.Context, r GitOutputRunner, wtPath string) ([]string, error) {
-	stdout, exit, err := r.Run(ctx, wtPath, "status", "--porcelain")
+	// --untracked-files=all is REQUIRED: the default porcelain output collapses a
+	// new untracked directory to a single "?? dir/" entry, which would be skipped
+	// as a non-regular path and lose every file an executor created inside a new
+	// package directory. -uall lists each nested file individually.
+	stdout, exit, err := r.Run(ctx, wtPath, "status", "--porcelain", "--untracked-files=all")
 	if err != nil || exit != 0 {
 		return nil, fmt.Errorf("exit=%d: %w", exit, err)
 	}
