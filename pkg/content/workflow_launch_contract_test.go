@@ -188,8 +188,14 @@ func TestLaunchContract_RouteTeam(t *testing.T) {
 	agentPhases := []string{"planning", "test_scaffold", "implementation", "annotation", "testing", "review"}
 	for _, pid := range agentPhases {
 		block := phaseJSBlock(js, pid)
-		if !strings.Contains(block, "agent(`") {
-			t.Errorf("Route Team phase %s must call agent with template literal, got:\n%s", pid, block)
+		if pid == "implementation" {
+			if !strings.Contains(block, "agent(taskPrompt") {
+				t.Errorf("Route Team phase implementation must call agent with taskPrompt, got:\n%s", block)
+			}
+		} else {
+			if !strings.Contains(block, "agent(`") {
+				t.Errorf("Route Team phase %s must call agent with template literal, got:\n%s", pid, block)
+			}
 		}
 		if strings.Contains(block, "agent('") || strings.Contains(block, "agent(\"") {
 			t.Errorf("Route Team phase %s must not call agent with role-only string, got:\n%s", pid, block)

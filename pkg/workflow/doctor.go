@@ -16,10 +16,19 @@ const (
 )
 
 // RequiredPrimitives are hard-gated: any unavailable one fails the gate.
-var RequiredPrimitives = []string{"claude", "agent", "schema", "phase"}
+//
+// parallel and isolation are required (not advisory) because the generated
+// route_team workflow JS hard-depends on them: the implementation phase
+// dispatches its executor fan-out through parallel(...) with each executor
+// carrying isolation: 'worktree' (SPEC-HARNESS-WORKFLOW-FIDELITY-001 REQ-004).
+// A runtime missing either primitive would pass an advisory-only gate and then
+// crash mid-launch at the parallel(...) call — strictly worse than failing the
+// gate up front and falling back to the safe Route A path. Gating them makes
+// that failure fail-fast at the doctor boundary.
+var RequiredPrimitives = []string{"claude", "agent", "schema", "phase", "parallel", "isolation"}
 
 // AdvisoryPrimitives are probed and reported but never affect the verdict.
-var AdvisoryPrimitives = []string{"parallel", "isolation", "budget", "agent-model-override"}
+var AdvisoryPrimitives = []string{"budget", "agent-model-override"}
 
 // Prober is the injectable capability-probe seam. The production implementation
 // inspects the claude-code runtime; tests inject a fake.

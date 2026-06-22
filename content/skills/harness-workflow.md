@@ -154,11 +154,11 @@ The `route_team` workflow runs exactly eight ordered phases. Phase IDs are autho
 |-------|------|-------------|
 | **planning** | `agent()` | Produces the implementation plan and task breakdown; does not mutate the working tree beyond plan artifacts. |
 | **test_scaffold** | `agent()` | Writes failing test skeletons for P0/P1 requirements (RED state). |
-| **implementation** | `agent()` — bounded executor fan-out | Repository-mutating work. Fan-out cap: **≤ 5 concurrent executors**. Worktree lifecycle stays in the Go runtime; the JS owns sequencing only. |
+| **implementation** | `agent()` — task-threaded parallel executors | Runs executor agents concurrently via `parallel()` with `isolation: 'worktree'`, threading them over task assignments (`plan.tasks[i]`) produced by the planner. Fan-out count is dynamically bounded by `min(tasks.length, cap)` with `cap ≤ 5`. |
 | **gate_build_test** | **deterministic Go gate** | Verdict derives from build/test **exit codes** (`verdict_source: exit_code`), not from an LLM verdict. Executed outside the JS via Go runtime (calling `auto workflow gate` execution bridge) which emits `{verdict, verdict_source, build_exit, test_exit}` JSON. A non-zero exit yields `verdict: fail`. |
 | **annotation** | `agent()` | Applies `@AX` annotation tags to all files modified during implementation. |
 | **testing** | `agent()` | Raises test coverage to 85%+; runs `go test -race -cover ./...` and affected QAMESH lanes. |
-| **review** | `agent()` — bounded reviewer fan-out | Runs `reviewer` and `security-auditor` in parallel. Verify votes are bounded: **verify_votes ≤ 3**. Ultra quality mode adds a synthesis step after 3-vote adversarial verify. |
+| **review** | `agent()` — dual-role verify-vote loop | Runs specialized `reviewer` (for verify-vote and optional synthesis) and `security-auditor` in parallel. Verify votes are bounded: **verify_votes ≤ 3**. |
 | **release_hygiene** | **deterministic Go gate** | Executed outside the JS via Go runtime (calling `auto check --hygiene --arch --quiet --staged`) which enforces the 300-line source limit and generated-surface drift gate. Commit-msg hooks enforce Lore format via `auto check --lore --message <msgfile>`. |
 
 ### Manifest Source of Truth

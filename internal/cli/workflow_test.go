@@ -89,12 +89,12 @@ func TestWorkflowDoctor_BelowMinVersionExitsNonZero(t *testing.T) {
 	}
 }
 
-// S14: doctor with an advisory primitive (isolation) unavailable but all
-// required available and version ok exits 0 with isolation advisory + overall
+// S14: doctor with an advisory primitive (budget) unavailable but all
+// required available and version ok exits 0 with budget advisory + overall
 // pass.
 func TestWorkflowDoctor_AdvisoryUnavailableExitsZero(t *testing.T) {
 	out, err := runWorkflow(
-		fakeProber{unavailable: map[string]bool{"isolation": true}, version: "2.1.154"},
+		fakeProber{unavailable: map[string]bool{"budget": true}, version: "2.1.154"},
 		nil, "workflow", "doctor")
 	if err != nil {
 		t.Fatalf("expected zero exit, got error: %v", err)
@@ -103,9 +103,29 @@ func TestWorkflowDoctor_AdvisoryUnavailableExitsZero(t *testing.T) {
 	if report.Overall != "pass" {
 		t.Fatalf("overall = %q, want pass", report.Overall)
 	}
-	iso := findStatus(t, report, "isolation")
-	if iso.Status != "unavailable" || iso.Gating {
-		t.Fatalf("isolation = %+v, want unavailable+advisory(non-gating)", iso)
+	b := findStatus(t, report, "budget")
+	if b.Status != "unavailable" || b.Gating {
+		t.Fatalf("budget = %+v, want unavailable+advisory(non-gating)", b)
+	}
+}
+
+// FIDELITY-001 F1: doctor with the required parallel primitive unavailable exits
+// non-zero (fail-fast) so /auto go --team falls back to the safe Route A path
+// rather than crashing mid-launch at parallel(...).
+func TestWorkflowDoctor_ParallelUnavailableFailsGate(t *testing.T) {
+	out, err := runWorkflow(
+		fakeProber{unavailable: map[string]bool{"parallel": true}, version: "2.1.154"},
+		nil, "workflow", "doctor")
+	if err == nil {
+		t.Fatal("expected non-zero exit when required primitive parallel is unavailable")
+	}
+	report := decodeReport(t, out)
+	if report.Overall != "fail" {
+		t.Fatalf("overall = %q, want fail", report.Overall)
+	}
+	p := findStatus(t, report, "parallel")
+	if p.Status != "unavailable" || !p.Gating {
+		t.Fatalf("parallel = %+v, want unavailable+gating(required)", p)
 	}
 }
 

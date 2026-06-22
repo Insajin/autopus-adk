@@ -23,21 +23,49 @@ const ctx = args || {};
 const RT = (args && args.quality) || {};
 const SEGMENT = (args && args.segment) || 'A';
 
+const PLAN_SCHEMA = {
+  type: 'object',
+  properties: {
+    tasks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id:          { type: 'string' },
+          description: { type: 'string' },
+          files:       { type: 'array', items: { type: 'string' } }
+        },
+        required: ['id', 'description', 'files']
+      }
+    }
+  },
+  required: ['tasks']
+};
+
 if (SEGMENT === 'A') {
 await phase('planning');
 // route_team baseline planning: model=claude-opus-4-8 effort=medium retry: 0 budget: 60000
-await agent(`Execute planner agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.planning && RT.planning.model) || 'claude-opus-4-8', effort: (RT.planning && RT.planning.effort) || 'medium' });
+const plan = await agent(`Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}, produce the task assignment table (id, description, file ownership)`, { agentType: 'planner', schema: PLAN_SCHEMA, model: (RT.planning && RT.planning.model) || 'claude-opus-4-8', effort: (RT.planning && RT.planning.effort) || 'medium' });
 
 await phase('test_scaffold');
 // route_team baseline test_scaffold: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 60000
-await agent(`Execute test_scaffold agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.test_scaffold && RT.test_scaffold.model) || 'claude-sonnet-4-6', effort: (RT.test_scaffold && RT.test_scaffold.effort) || 'medium' });
+await agent(`Scaffold tests for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'tester', model: (RT.test_scaffold && RT.test_scaffold.model) || 'claude-sonnet-4-6', effort: (RT.test_scaffold && RT.test_scaffold.effort) || 'medium' });
 
 await phase('implementation');
 // route_team baseline implementation: model=claude-sonnet-4-6 effort=medium fan_out_cap=5 retry: 2 budget: 120000
 const FANOUT_implementation = (RT.implementation && RT.implementation.fan_out_cap) || 5;
-for (let i = 0; i < FANOUT_implementation; i++) {
-  await agent(`Execute executor agent (fan-out ${i}) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.implementation && RT.implementation.model) || 'claude-sonnet-4-6', effort: (RT.implementation && RT.implementation.effort) || 'medium' });
+const tasks_implementation = (plan && plan.tasks) || [];
+const limit_implementation = Math.min(tasks_implementation.length, FANOUT_implementation);
+const executors_implementation = [];
+for (let i = 0; i < limit_implementation; i++) {
+  const task = tasks_implementation[i];
+  const taskPrompt = `Implement task ${task.id}: ${task.description}, files: ${task.files ? task.files.join(', ') : ''} for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`;
+  executors_implementation.push(() => agent(taskPrompt, { agentType: 'executor', isolation: 'worktree', model: (RT.implementation && RT.implementation.model) || 'claude-sonnet-4-6', effort: (RT.implementation && RT.implementation.effort) || 'medium' }));
 }
+if (executors_implementation.length === 0) {
+  executors_implementation.push(() => agent(`Implement SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''} (no planner task breakdown; implement the full SPEC)`, { agentType: 'executor', isolation: 'worktree', model: (RT.implementation && RT.implementation.model) || 'claude-sonnet-4-6', effort: (RT.implementation && RT.implementation.effort) || 'medium' }));
+}
+await parallel(executors_implementation);
 
 await phase('gate_build_test');
 // Deterministic gate: verdict_source 'exit_code'. retry: 0 budget: 40000
@@ -49,22 +77,22 @@ log('gate', 'gate_build_test');
 if (SEGMENT === 'B') {
 await phase('annotation');
 // route_team baseline annotation: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 40000
-await agent(`Execute annotator agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.annotation && RT.annotation.model) || 'claude-sonnet-4-6', effort: (RT.annotation && RT.annotation.effort) || 'medium' });
+await agent(`Scan and apply @AX annotations for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'annotator', model: (RT.annotation && RT.annotation.model) || 'claude-sonnet-4-6', effort: (RT.annotation && RT.annotation.effort) || 'medium' });
 
 await phase('testing');
 // route_team baseline testing: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 60000
-await agent(`Execute tester agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.testing && RT.testing.model) || 'claude-sonnet-4-6', effort: (RT.testing && RT.testing.effort) || 'medium' });
+await agent(`Run and verify tests for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'tester', model: (RT.testing && RT.testing.model) || 'claude-sonnet-4-6', effort: (RT.testing && RT.testing.effort) || 'medium' });
 
 await phase('review');
 // route_team baseline review: model=claude-sonnet-4-6 effort=medium verify_votes=1 synthesis=false retry: 0 budget: 60000
 const VOTES_review = (RT.review && RT.review.verify_votes) || 1;
 const SYNTH_review = (RT.review && RT.review.synthesis) || false;
 for (let v = 0; v < VOTES_review; v++) {
-  await agent(`Execute reviewer agent (vote ${v}) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
+  await agent(`Review changes for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''} (vote ${v})`, { agentType: 'reviewer', model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
 }
-await agent(`Execute security auditor for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
+await agent(`Perform OWASP security audit for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'security-auditor', model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
 if (SYNTH_review) {
-  await agent(`Execute reviewer agent (synthesis) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
+  await agent(`Synthesize review results for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'reviewer', model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
 }
 
 await phase('release_hygiene');

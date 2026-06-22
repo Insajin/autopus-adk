@@ -64,17 +64,26 @@ func TestS1S19_TeamDeterministicGeneration(t *testing.T) {
 	}
 
 	implBlock := phaseJSBlock(js1, "implementation")
-	for _, want := range []string{"for", "agent(`Execute executor", "fan_out_cap=5", "RT.implementation", "'claude-sonnet-4-6'"} {
+	for _, want := range []string{"parallel(", "agent(taskPrompt", "isolation: 'worktree'", "agentType: 'executor'", "fan_out_cap=5", "RT.implementation", "'claude-sonnet-4-6'"} {
 		if !strings.Contains(implBlock, want) {
 			t.Errorf("implementation block missing %q, got:\n%s", want, implBlock)
 		}
 	}
 
 	reviewBlock := phaseJSBlock(js1, "review")
-	for _, want := range []string{"agent(`Execute reviewer", "agent(`Execute security auditor"} {
+	for _, want := range []string{"agent(`Review changes for SPEC", "agent(`Perform OWASP security audit", "agent(`Synthesize review results for SPEC", "agentType: 'reviewer'", "agentType: 'security-auditor'"} {
 		if !strings.Contains(reviewBlock, want) {
 			t.Errorf("review block missing %q, got:\n%s", want, reviewBlock)
 		}
+	}
+	// FIDELITY-001 F4: both the verify-vote loop call and the synthesis pass call
+	// carry agentType: 'reviewer' (2 occurrences); the audit pass carries exactly
+	// one security-auditor. This locks synthesis agentType consistency.
+	if got := strings.Count(reviewBlock, "agentType: 'reviewer'"); got != 2 {
+		t.Errorf("review block reviewer agentType count = %d, want 2 (vote loop + synthesis)", got)
+	}
+	if got := strings.Count(reviewBlock, "agentType: 'security-auditor'"); got != 1 {
+		t.Errorf("review block security-auditor agentType count = %d, want 1", got)
 	}
 
 	gateBlock := phaseJSBlock(js1, "gate_build_test")

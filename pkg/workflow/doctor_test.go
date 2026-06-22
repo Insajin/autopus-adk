@@ -59,23 +59,46 @@ func TestEvaluate_BelowMinVersionFailsGate(t *testing.T) {
 	}
 }
 
-// S14: an advisory primitive (isolation) unavailable does NOT fail the gate when
+// S14: an advisory primitive (budget) unavailable does NOT fail the gate when
 // all required primitives are available and the version is ok.
 func TestEvaluate_AdvisoryUnavailableDoesNotFailGate(t *testing.T) {
 	r := EvaluateCapabilities(fakeProber{
-		unavailable: map[string]bool{"isolation": true},
+		unavailable: map[string]bool{"budget": true},
 		version:     "2.1.154",
 	})
 
-	iso := findPrimitive(t, r, "isolation")
-	if iso.Status != StatusUnavailable {
-		t.Fatalf("isolation status = %q, want unavailable", iso.Status)
+	b := findPrimitive(t, r, "budget")
+	if b.Status != StatusUnavailable {
+		t.Fatalf("budget status = %q, want unavailable", b.Status)
 	}
-	if iso.Gating {
-		t.Fatal("isolation must be non-gating (advisory)")
+	if b.Gating {
+		t.Fatal("budget must be non-gating (advisory)")
 	}
 	if r.Overall != OverallPass {
 		t.Fatalf("overall = %q, want pass", r.Overall)
+	}
+}
+
+// FIDELITY-001 F1: parallel and isolation are required (gating) primitives because
+// the generated route_team JS hard-depends on parallel(...) + isolation:'worktree'.
+// An unavailable one must fail the gate and be reported gating, so a runtime that
+// lacks them fails fast instead of crashing mid-launch.
+func TestEvaluate_ParallelIsolationAreRequiredGating(t *testing.T) {
+	for _, name := range []string{"parallel", "isolation"} {
+		r := EvaluateCapabilities(fakeProber{
+			unavailable: map[string]bool{name: true},
+			version:     "2.1.154",
+		})
+		p := findPrimitive(t, r, name)
+		if p.Status != StatusUnavailable {
+			t.Fatalf("%s status = %q, want unavailable", name, p.Status)
+		}
+		if !p.Gating {
+			t.Fatalf("%s must be marked gating (required)", name)
+		}
+		if r.Overall != OverallFail {
+			t.Fatalf("overall with %s unavailable = %q, want fail", name, r.Overall)
+		}
 	}
 }
 

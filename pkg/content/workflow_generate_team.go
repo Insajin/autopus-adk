@@ -12,12 +12,34 @@ import (
 // agent.exec bridges and have no role entry.
 var teamPhaseRoles = map[string]string{
 	"planning":       "planner",
-	"test_scaffold":  "test_scaffold",
+	"test_scaffold":  "tester",
 	"implementation": "executor",
 	"annotation":     "annotator",
 	"testing":        "tester",
 	"review":         "reviewer",
 }
+
+// PLAN_SCHEMA literal text to be emitted into the template.
+const planSchemaJS = `const PLAN_SCHEMA = {
+  type: 'object',
+  properties: {
+    tasks: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id:          { type: 'string' },
+          description: { type: 'string' },
+          files:       { type: 'array', items: { type: 'string' } }
+        },
+        required: ['id', 'description', 'files']
+      }
+    }
+  },
+  required: ['tasks']
+};
+
+`
 
 // deriveTeamWorkflowJS produces the deterministic route_team JS workflow template
 // from the schema. Phase order equals schema array order. The output is a pure
@@ -61,6 +83,7 @@ func deriveTeamWorkflowJS(schema workflow.Schema) string {
 	sb.WriteString("const ctx = args || {};\n")
 	sb.WriteString("const RT = (args && args.quality) || {};\n")
 	sb.WriteString("const SEGMENT = (args && args.segment) || 'A';\n\n")
+	sb.WriteString(planSchemaJS)
 
 	// Split phases: segment A includes everything up to and including gate_build_test;
 	// segment B includes everything after gate_build_test.
@@ -107,6 +130,8 @@ func writeTeamPhaseBlock(sb *strings.Builder, p workflow.PhaseDef, model, effort
 		fmt.Fprintf(sb, "// Release hygiene: generated/runtime drift + staged source size gate. %s\n", extra)
 		sb.WriteString("// This gate is executed outside the JS by the Go runtime.\n")
 		fmt.Fprintf(sb, "log('release_hygiene', '%s');\n", p.ID)
+	case p.ID == "planning":
+		writeTeamPlanningBlock(sb, p.ID, model, effort, extra)
 	case depth.FanOutCap > 0:
 		writeTeamFanOutBlock(sb, p.ID, model, effort, depth.FanOutCap, extra)
 	case depth.VerifyVotes > 0:
@@ -114,23 +139,60 @@ func writeTeamPhaseBlock(sb *strings.Builder, p workflow.PhaseDef, model, effort
 	default:
 		writeTeamBaselineComment(sb, p.ID, model, effort, extra)
 		role := teamPhaseRoles[p.ID]
-		fmt.Fprintf(sb, "await agent(`Execute %s agent for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, %s);\n",
-			role, teamAgentOpt(p.ID, model, effort))
+		var prompt string
+		switch p.ID {
+		case "test_scaffold":
+			prompt = "Scaffold tests for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}"
+		case "annotation":
+			prompt = "Scan and apply @AX annotations for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}"
+		case "testing":
+			prompt = "Run and verify tests for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}"
+		default:
+			prompt = fmt.Sprintf("Execute %s agent for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}", role)
+		}
+		fmt.Fprintf(sb, "await agent(`%s`, %s);\n",
+			prompt, teamAgentOpt(p.ID, model, effort, role))
 	}
 	sb.WriteString("\n")
+}
+
+// writeTeamPlanningBlock emits the structured-output planner call.
+func writeTeamPlanningBlock(sb *strings.Builder, id, model, effort string, extra string) {
+	writeTeamBaselineComment(sb, id, model, effort, extra)
+	prompt := "Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}, produce the task assignment table (id, description, file ownership)"
+	opt := fmt.Sprintf("{ agentType: 'planner', schema: PLAN_SCHEMA, model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
+		id, id, model, id, id, effort)
+	fmt.Fprintf(sb, "const plan = await agent(`%s`, %s);\n", prompt, opt)
 }
 
 // writeTeamFanOutBlock emits the bounded executor fan-out loop for the
 // implementation phase. The fan-out count is RT-overridable but falls back to
 // the schema fan_out_cap.
+//
+// The real Workflow runtime contract is parallel(thunks: Array<() => Promise>):
+// it takes a single array of deferred call thunks, not spread already-invoked
+// promises. So the loop pushes `() => agent(...)` thunks and calls
+// `parallel(executors)` with the array. A degenerate floor guarantees at least
+// one executor when the planner produces no tasks (FIDELITY-001 F2).
 func writeTeamFanOutBlock(sb *strings.Builder, id, model, effort string, fanOut int, extra string) {
 	writeTeamBaselineComment(sb, id, model, effort, fmt.Sprintf("fan_out_cap=%d %s", fanOut, extra))
+	opt := fmt.Sprintf("{ agentType: 'executor', isolation: 'worktree', model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
+		id, id, model, id, id, effort)
 	fmt.Fprintf(sb, "const FANOUT_%s = (RT.%s && RT.%s.fan_out_cap) || %d;\n", id, id, id, fanOut)
-	fmt.Fprintf(sb, "for (let i = 0; i < FANOUT_%s; i++) {\n", id)
-	role := teamPhaseRoles[id]
-	fmt.Fprintf(sb, "  await agent(`Execute %s agent (fan-out ${i}) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, %s);\n",
-		role, teamAgentOpt(id, model, effort))
+	fmt.Fprintf(sb, "const tasks_%s = (plan && plan.tasks) || [];\n", id)
+	fmt.Fprintf(sb, "const limit_%s = Math.min(tasks_%s.length, FANOUT_%s);\n", id, id, id)
+	fmt.Fprintf(sb, "const executors_%s = [];\n", id)
+	fmt.Fprintf(sb, "for (let i = 0; i < limit_%s; i++) {\n", id)
+	fmt.Fprintf(sb, "  const task = tasks_%s[i];\n", id)
+	fmt.Fprintf(sb, "  const taskPrompt = `Implement task ${task.id}: ${task.description}, files: ${task.files ? task.files.join(', ') : ''} for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`;\n")
+	fmt.Fprintf(sb, "  executors_%s.push(() => agent(taskPrompt, %s));\n", id, opt)
 	sb.WriteString("}\n")
+	// Degenerate floor: an empty/failed plan.tasks would otherwise leave zero
+	// executors and silently no-op the implementation phase (worse than Route A).
+	fmt.Fprintf(sb, "if (executors_%s.length === 0) {\n", id)
+	fmt.Fprintf(sb, "  executors_%s.push(() => agent(`Implement SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''} (no planner task breakdown; implement the full SPEC)`, %s));\n", id, opt)
+	sb.WriteString("}\n")
+	fmt.Fprintf(sb, "await parallel(executors_%s);\n", id)
 }
 
 // writeTeamReviewBlock emits the reviewer verify-vote loop followed by the
@@ -139,18 +201,20 @@ func writeTeamFanOutBlock(sb *strings.Builder, id, model, effort string, fanOut 
 func writeTeamReviewBlock(sb *strings.Builder, id, model, effort string, depth workflow.DepthProfile, extra string) {
 	writeTeamBaselineComment(sb, id, model, effort,
 		fmt.Sprintf("verify_votes=%d synthesis=%t %s", depth.VerifyVotes, depth.Synthesis, extra))
-	opt := teamAgentOpt(id, model, effort)
 	fmt.Fprintf(sb, "const VOTES_%s = (RT.%s && RT.%s.verify_votes) || %d;\n", id, id, id, depth.VerifyVotes)
 	fmt.Fprintf(sb, "const SYNTH_%s = (RT.%s && RT.%s.synthesis) || %t;\n", id, id, id, depth.Synthesis)
-	role := teamPhaseRoles[id]
+
+	reviewerOpt := teamAgentOpt(id, model, effort, "reviewer")
+	secAuditorOpt := teamAgentOpt(id, model, effort, "security-auditor")
+
 	fmt.Fprintf(sb, "for (let v = 0; v < VOTES_%s; v++) {\n", id)
-	fmt.Fprintf(sb, "  await agent(`Execute %s agent (vote ${v}) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, %s);\n",
-		role, opt)
+	fmt.Fprintf(sb, "  await agent(`Review changes for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''} (vote ${v})`, %s);\n", reviewerOpt)
 	sb.WriteString("}\n")
-	fmt.Fprintf(sb, "await agent(`Execute security auditor for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, %s);\n", opt)
+
+	fmt.Fprintf(sb, "await agent(`Perform OWASP security audit for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, %s);\n", secAuditorOpt)
+
 	fmt.Fprintf(sb, "if (SYNTH_%s) {\n", id)
-	fmt.Fprintf(sb, "  await agent(`Execute %s agent (synthesis) for spec ${ctx.spec || ''} in ${ctx.workingDir || ''}`, %s);\n",
-		role, opt)
+	fmt.Fprintf(sb, "  await agent(`Synthesize review results for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, %s);\n", reviewerOpt)
 	sb.WriteString("}\n")
 }
 
@@ -168,7 +232,7 @@ func writeTeamBaselineComment(sb *strings.Builder, id, model, effort, extra stri
 
 // teamAgentOpt builds the RT-overridable agent() options literal for a phase:
 // each field reads the RT override first and falls back to the schema baseline.
-func teamAgentOpt(id, model, effort string) string {
-	return fmt.Sprintf("{ model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
-		id, id, model, id, id, effort)
+func teamAgentOpt(id, model, effort, agentType string) string {
+	return fmt.Sprintf("{ agentType: '%s', model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
+		agentType, id, id, model, id, id, effort)
 }
