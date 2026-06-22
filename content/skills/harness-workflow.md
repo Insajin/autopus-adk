@@ -197,11 +197,20 @@ The dispatcher (main session) launches the workflow in two segments separated by
 **Dispatcher sequence:**
 1. Launch segment A: `workflow({scriptPath}, {spec, workingDir, quality, segment:'A'})`
    — executes planning, implementation, and the gate_build_test boundary marker.
-2. After segment A returns, run `auto workflow gate` (Go runtime, exit-code verdict).
+   Executor agents run with `isolation: 'worktree'`; their changes are **uncommitted**
+   working-tree edits stranded in separate worktrees under `.claude/worktrees/`.
+2. Run `auto workflow merge --run <segment-A-runid>` (Go runtime, worktree consolidation).
+   — Discovers all executor worktrees matching the run ID, copies their uncommitted
+   changes into `workingDir`, stages them with `git add`, and removes the worktrees.
+   This step is required before the gate: without it, `auto workflow gate` would
+   build/test the unchanged main tree (vacuous pass). Conflicts (same file touched by
+   two executors) are reported in the JSON result but are not a hard failure — the
+   operator/gate decides. Exit non-zero only on a hard infrastructure error.
+3. After merge, run `auto workflow gate` (Go runtime, exit-code verdict).
    — If `verdict != pass`: **abort. Do NOT launch segment B.**
-3. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality, segment:'B'})`
+4. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality, segment:'B'})`
    — executes annotation, testing, review, and the release_hygiene boundary marker.
-4. After segment B returns, run `auto check --hygiene --arch --quiet --staged`.
+5. After segment B returns, run `auto check --hygiene --arch --quiet --staged`.
 
 The gate phases (`gate_build_test`, `release_hygiene`) are **segment-boundary markers** in the JS — they emit `phase(id)` + `log(...)` but contain no shell-out logic. All exit-code adjudication is performed by the dispatcher between segment launches (`verdict_source: exit_code` is preserved).
 

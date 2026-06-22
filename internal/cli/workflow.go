@@ -25,6 +25,7 @@ func NewWorkflowCmd(prober workflow.Prober, runner workflow.CommandRunner) *cobr
 	cmd.AddCommand(newWorkflowDoctorCmd(prober))
 	cmd.AddCommand(newWorkflowGateCmd(runner))
 	cmd.AddCommand(newWorkflowRenderCmd())
+	cmd.AddCommand(newWorkflowMergeCmd())
 	return cmd
 }
 
