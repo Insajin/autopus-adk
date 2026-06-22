@@ -158,10 +158,16 @@ func writeTeamPhaseBlock(sb *strings.Builder, p workflow.PhaseDef, model, effort
 	sb.WriteString("\n")
 }
 
-// writeTeamPlanningBlock emits the structured-output planner call.
+// writeTeamPlanningBlock emits the structured-output planner call. The prompt
+// constrains task decomposition for parallel isolated-worktree execution: each
+// task must own a DISJOINT set of files, and files that depend on each other to
+// compile (an implementation and its test, a type and its consumers) MUST be
+// grouped into the SAME task. This prevents the cross-task-dependency overlap
+// where a test-only task's executor recreates the implementation file already
+// owned by another task — which the merge would then flag as a conflict and skip.
 func writeTeamPlanningBlock(sb *strings.Builder, id, model, effort string, extra string) {
 	writeTeamBaselineComment(sb, id, model, effort, extra)
-	prompt := "Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}, produce the task assignment table (id, description, file ownership)"
+	prompt := "Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}. Decompose into independently-implementable tasks for parallel isolated-worktree execution: every task owns a DISJOINT set of files, and files that depend on each other to compile (e.g. an implementation and its test, or a type and its consumers) MUST be grouped into the SAME task so a single executor owns them — never split inter-dependent files across tasks. Produce the task assignment table (id, description, file ownership)"
 	opt := fmt.Sprintf("{ agentType: 'planner', schema: PLAN_SCHEMA, model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
 		id, id, model, id, id, effort)
 	fmt.Fprintf(sb, "const plan = await agent(`%s`, %s);\n", prompt, opt)
@@ -186,7 +192,7 @@ func writeTeamFanOutBlock(sb *strings.Builder, id, model, effort string, fanOut 
 	fmt.Fprintf(sb, "const executors_%s = [];\n", id)
 	fmt.Fprintf(sb, "for (let i = 0; i < limit_%s; i++) {\n", id)
 	fmt.Fprintf(sb, "  const task = tasks_%s[i];\n", id)
-	fmt.Fprintf(sb, "  const taskPrompt = `Implement task ${task.id}: ${task.description}, files: ${task.files ? task.files.join(', ') : ''} for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`;\n")
+	fmt.Fprintf(sb, "  const taskPrompt = `Implement task ${task.id}: ${task.description}. You own ONLY these files: ${task.files ? task.files.join(', ') : ''} — create or modify only files in that set; every other file belongs to a parallel executor and must not be created or touched. SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`;\n")
 	fmt.Fprintf(sb, "  executors_%s.push(() => agent(taskPrompt, %s));\n", id, opt)
 	sb.WriteString("}\n")
 	// Degenerate floor: an empty/failed plan.tasks would otherwise leave zero

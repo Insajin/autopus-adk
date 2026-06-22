@@ -154,7 +154,7 @@ The `route_team` workflow runs exactly eight ordered phases. Phase IDs are autho
 |-------|------|-------------|
 | **planning** | `agent()` | Produces the implementation plan and task breakdown; does not mutate the working tree beyond plan artifacts. |
 | **test_scaffold** | `agent()` | Writes failing test skeletons for P0/P1 requirements (RED state). |
-| **implementation** | `agent()` — task-threaded parallel executors | Runs executor agents concurrently via `parallel()` with `isolation: 'worktree'`, threading them over task assignments (`plan.tasks[i]`) produced by the planner. Fan-out count is dynamically bounded by `min(tasks.length, cap)` with `cap ≤ 5`. |
+| **implementation** | `agent()` — task-threaded parallel executors | Runs executor agents concurrently via `parallel()` with `isolation: 'worktree'`, threading them over task assignments (`plan.tasks[i]`) produced by the planner. Each executor owns a **disjoint** file set; the planner groups inter-dependent files (impl + its test) into one task so isolated executors never recreate each other's files (overlap → merge conflict → skip). Fan-out count is dynamically bounded by `min(tasks.length, cap)` with `cap ≤ 5`. |
 | **gate_build_test** | **deterministic Go gate** | Verdict derives from build/test **exit codes** (`verdict_source: exit_code`), not from an LLM verdict. Executed outside the JS via Go runtime (calling `auto workflow gate` execution bridge) which emits `{verdict, verdict_source, build_exit, test_exit}` JSON. A non-zero exit yields `verdict: fail`. |
 | **annotation** | `agent()` | Applies `@AX` annotation tags to all files modified during implementation. |
 | **testing** | `agent()` | Raises test coverage to 85%+; runs `go test -race -cover ./...` and affected QAMESH lanes. |
