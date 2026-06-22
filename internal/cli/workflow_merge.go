@@ -20,11 +20,12 @@ import (
 func newWorkflowMergeCmd() *cobra.Command {
 	var runID string
 	var workingDir string
+	var ownershipFile string
 
 	cmd := &cobra.Command{
 		Use:           "merge",
 		Short:         "Consolidate executor worktree changes into the working directory (JS->Go bridge)",
-		Long:          "Copies uncommitted changes from all executor worktrees matching --run into workingDir, stages them with git add, and removes the worktrees. Emits a WorktreeMergeResult JSON to stdout.",
+		Long:          "Copies uncommitted changes from all executor worktrees matching --run into workingDir, stages them with git add, and removes the worktrees. With --ownership <plan.json>, restricts each worktree to its planner-assigned files (hard overlap guarantee). Emits a WorktreeMergeResult JSON to stdout.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -41,8 +42,20 @@ func newWorkflowMergeCmd() *cobra.Command {
 				dir = cwd
 			}
 
+			var ownership []workflow.TaskOwnership
+			if ownershipFile != "" {
+				data, err := os.ReadFile(ownershipFile) //nolint:gosec // operator-supplied dispatcher plan file
+				if err != nil {
+					return fmt.Errorf("read ownership file: %w", err)
+				}
+				ownership, err = workflow.ParsePlanOwnership(data)
+				if err != nil {
+					return fmt.Errorf("parse ownership plan: %w", err)
+				}
+			}
+
 			runner := liveGitOutputRunner{}
-			result, err := workflow.MergeExecutorWorktrees(cmd.Context(), runner, dir, runID)
+			result, err := workflow.MergeExecutorWorktreesWithOwnership(cmd.Context(), runner, dir, runID, ownership)
 			if err != nil {
 				return fmt.Errorf("merge executor worktrees: %w", err)
 			}
@@ -74,6 +87,7 @@ func newWorkflowMergeCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&runID, "run", "", "Run ID whose executor worktrees to merge (required)")
 	cmd.Flags().StringVar(&workingDir, "working-dir", "", "Working directory (defaults to cwd)")
+	cmd.Flags().StringVar(&ownershipFile, "ownership", "", "Path to the planner plan JSON; restricts each worktree to its assigned files (hard overlap guarantee)")
 	return cmd
 }
 

@@ -4,10 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
-	"strings"
 )
 
 // GitOutputRunner runs a git subcommand in dir and captures stdout.
@@ -28,6 +25,10 @@ type WorktreeMergeResult struct {
 	MergedWorktrees []string `json:"merged_worktrees"`
 	MergedFiles     []string `json:"merged_files"`
 	Conflicts       []string `json:"conflicts"`
+	// SkippedOutOfScope lists files an executor created outside its task's file
+	// ownership (only populated when ownership enforcement is active). They are
+	// reported but never copied.
+	SkippedOutOfScope []string `json:"skipped_out_of_scope,omitempty"`
 }
 
 // EncodeJSON serializes the merge result for CLI stdout consumption.
@@ -58,6 +59,17 @@ type worktreeRecord struct {
 // the path is added to Conflicts and skipped (not copied). Planner file-ownership
 // makes this rare; the CLI/operator decides how to resolve.
 func MergeExecutorWorktrees(ctx context.Context, r GitOutputRunner, workingDir, runID string) (WorktreeMergeResult, error) {
+	return MergeExecutorWorktreesWithOwnership(ctx, r, workingDir, runID, nil)
+}
+
+// MergeExecutorWorktreesWithOwnership is MergeExecutorWorktrees with hard file
+// ownership enforcement. When ownership is non-nil, each worktree is matched to
+// the task it performed (best file overlap) and only files within that task's
+// ownership are merged; files an executor created outside its ownership (overlap
+// into another task's files) are reported in SkippedOutOfScope and never copied.
+// This eliminates the executor-overlap conflict at its source. ownership=nil
+// preserves the plain conflict-skip behavior.
+func MergeExecutorWorktreesWithOwnership(ctx context.Context, r GitOutputRunner, workingDir, runID string, ownership []TaskOwnership) (WorktreeMergeResult, error) {
 	result := WorktreeMergeResult{RunID: runID}
 
 	// Step 1: list all worktrees.
@@ -82,15 +94,11 @@ func MergeExecutorWorktrees(ctx context.Context, r GitOutputRunner, workingDir, 
 	})
 
 	// Step 3: collect changed files per worktree.
-	// ownership maps relpath → first worktree that claimed it.
-	ownership := make(map[string]string) // relpath → worktreePath
-	conflicts := make(map[string]bool)
 	type wtFiles struct {
 		wt    worktreeRecord
 		files []string
 	}
 	var plan []wtFiles
-
 	for _, wt := range selected {
 		files, err := changedFiles(ctx, r, wt.path)
 		if err != nil {
@@ -98,25 +106,52 @@ func MergeExecutorWorktrees(ctx context.Context, r GitOutputRunner, workingDir, 
 		}
 		sort.Strings(files)
 		plan = append(plan, wtFiles{wt: wt, files: files})
+	}
 
-		for _, f := range files {
-			if _, seen := ownership[f]; seen {
+	// Step 3b: hard ownership enforcement. Assign each worktree 1:1 to the task it
+	// performed (global best-overlap, so two worktrees never claim one task) and
+	// drop files outside that task's ownership as out-of-scope. This removes the
+	// executor-overlap conflict at its source.
+	if ownership != nil {
+		sets := make([][]string, len(plan))
+		for i := range plan {
+			sets[i] = plan[i].files
+		}
+		assign := assignWorktreesToTasks(sets, ownership)
+		for i := range plan {
+			var kept []string
+			for _, f := range plan[i].files {
+				if assign[i] >= 0 && ownsFile(ownership[assign[i]].Files, f) {
+					kept = append(kept, f)
+				} else {
+					result.SkippedOutOfScope = append(result.SkippedOutOfScope, f)
+				}
+			}
+			plan[i].files = kept
+		}
+	}
+
+	// Step 4: build file → owning-worktree map and detect cross-worktree conflicts.
+	fileOwner := make(map[string]string) // relpath → worktreePath
+	conflicts := make(map[string]bool)
+	for _, p := range plan {
+		for _, f := range p.files {
+			if _, seen := fileOwner[f]; seen {
 				conflicts[f] = true
 			} else {
-				ownership[f] = wt.path
+				fileOwner[f] = p.wt.path
 			}
 		}
 	}
 
-	// Step 4 & 5: copy non-conflicting files; collect merged worktree paths.
+	// Step 5: copy non-conflicting files; collect merged worktree paths.
 	for _, p := range plan {
 		result.MergedWorktrees = append(result.MergedWorktrees, p.wt.path)
 		for _, relpath := range p.files {
 			if conflicts[relpath] {
 				continue
 			}
-			// Only copy from the owning worktree.
-			if ownership[relpath] != p.wt.path {
+			if fileOwner[relpath] != p.wt.path { // copy only from the owning worktree
 				continue
 			}
 			if err := copyFile(p.wt.path, relpath, workingDir); err != nil {
@@ -132,133 +167,24 @@ func MergeExecutorWorktrees(ctx context.Context, r GitOutputRunner, workingDir, 
 	}
 	sort.Strings(result.Conflicts)
 	sort.Strings(result.MergedFiles)
+	result.SkippedOutOfScope = sortedUnique(result.SkippedOutOfScope)
 
 	return result, nil
 }
 
-// parseWorktreeList parses `git worktree list --porcelain` output into records.
-// Format per worktree block:
-//
-//	worktree /abs/path
-//	HEAD <sha>
-//	branch refs/heads/<branchname>    (or "detached")
-//	(blank line separator)
-func parseWorktreeList(out string) []worktreeRecord {
-	var records []worktreeRecord
-	var cur worktreeRecord
-	for _, line := range strings.Split(out, "\n") {
-		if strings.HasPrefix(line, "worktree ") {
-			cur = worktreeRecord{path: strings.TrimPrefix(line, "worktree ")}
-		} else if strings.HasPrefix(line, "branch ") {
-			ref := strings.TrimPrefix(line, "branch ")
-			cur.branch = strings.TrimPrefix(ref, "refs/heads/")
-		} else if line == "" && cur.path != "" {
-			records = append(records, cur)
-			cur = worktreeRecord{}
-		}
-	}
-	if cur.path != "" {
-		records = append(records, cur)
-	}
-	return records
-}
-
-// selectWorktrees returns worktrees that belong to runID.
-// Match criteria (runtime convention, observed on v2.1.174):
-//   - branch == "worktree-<runID>-<N>"
-//   - OR base(path) starts with "<runID>-"
-//
-// In addition to the name match, the worktree MUST physically reside strictly
-// under <workingDir>/.claude/worktrees/ (resolved via EvalSymlinks). This
-// containment is a hard safety boundary: it excludes the main worktree (== the
-// working dir, which would otherwise self-truncate on copy) and any unrelated
-// worktree (e.g. one under .worktrees/), so a stray/short --run value can never
-// cause a destructive `git worktree remove --force` of legitimate work.
-func selectWorktrees(records []worktreeRecord, runID, workingDir string) []worktreeRecord {
-	branchPrefix := "worktree-" + runID + "-"
-	pathPrefix := runID + "-"
-
-	root, err := filepath.Abs(filepath.Join(workingDir, ".claude", "worktrees"))
-	if err != nil {
+// sortedUnique returns the input sorted with duplicates removed (nil-safe).
+func sortedUnique(in []string) []string {
+	if len(in) == 0 {
 		return nil
 	}
-	if resolved, err := filepath.EvalSymlinks(root); err == nil {
-		root = resolved
-	}
-
-	var out []worktreeRecord
-	for _, r := range records {
-		abs, err := filepath.Abs(r.path)
-		if err != nil {
-			continue
-		}
-		if resolved, err := filepath.EvalSymlinks(abs); err == nil {
-			abs = resolved
-		}
-		if abs == root || !strings.HasPrefix(abs, root+string(os.PathSeparator)) {
-			continue // outside the .claude/worktrees/ containment root
-		}
-		if strings.HasPrefix(r.branch, branchPrefix) || strings.HasPrefix(filepath.Base(r.path), pathPrefix) {
-			out = append(out, r)
+	seen := make(map[string]bool, len(in))
+	var out []string
+	for _, s := range in {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
 		}
 	}
+	sort.Strings(out)
 	return out
-}
-
-// changedFiles parses `git status --porcelain` in wtPath and returns the
-// repo-relative paths of all changed/untracked files that are safe to copy.
-// Handles: ?? (untracked), M (modified), A (added), R (renamed — uses post-rename).
-// Skipped (silently): deleted entries (D — the file no longer exists), paths that
-// escape after filepath.Clean, symlinks (never followed — exfil defence), and
-// non-regular files. Skipping at collection time keeps the copy step total.
-func changedFiles(ctx context.Context, r GitOutputRunner, wtPath string) ([]string, error) {
-	// --untracked-files=all is REQUIRED: the default porcelain output collapses a
-	// new untracked directory to a single "?? dir/" entry, which would be skipped
-	// as a non-regular path and lose every file an executor created inside a new
-	// package directory. -uall lists each nested file individually.
-	stdout, exit, err := r.Run(ctx, wtPath, "status", "--porcelain", "--untracked-files=all")
-	if err != nil || exit != 0 {
-		return nil, fmt.Errorf("exit=%d: %w", exit, err)
-	}
-	var files []string
-	for _, line := range strings.Split(stdout, "\n") {
-		if len(line) < 4 {
-			continue
-		}
-		// Porcelain format: XY SP <path>  OR  XY SP <oldpath> -> <newpath>
-		xy := line[:2]
-		if xy[0] == 'D' || xy[1] == 'D' {
-			continue // deletion — nothing to copy; avoids a missing-source abort
-		}
-		rest := line[3:]
-
-		// Handle rename: "old -> new" — take the post-rename (destination).
-		var relpath string
-		if idx := strings.Index(rest, " -> "); idx >= 0 {
-			relpath = rest[idx+4:]
-		} else {
-			relpath = rest
-		}
-		relpath = strings.Trim(relpath, "\"")
-
-		if !isSafePath(relpath) {
-			continue
-		}
-		// Never copy or follow a symlink / non-regular source (exfil defence:
-		// a symlink to ~/.ssh/id_ed25519 must not be read into the repo).
-		info, err := os.Lstat(filepath.Join(wtPath, relpath))
-		if err != nil {
-			continue // missing/deleted between status and now
-		}
-		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-			continue
-		}
-		// Skip hard-linked files (Nlink>1): a worktree file linked to an external
-		// inode is an exfil signal (laundering an outside secret into the repo).
-		if hardLinked(info) {
-			continue
-		}
-		files = append(files, relpath)
-	}
-	return files, nil
 }

@@ -199,13 +199,22 @@ The dispatcher (main session) launches the workflow in two segments separated by
    — executes planning, implementation, and the gate_build_test boundary marker.
    Executor agents run with `isolation: 'worktree'`; their changes are **uncommitted**
    working-tree edits stranded in separate worktrees under `.claude/worktrees/`.
-2. Run `auto workflow merge --run <segment-A-runid>` (Go runtime, worktree consolidation).
-   — Discovers all executor worktrees matching the run ID, copies their uncommitted
-   changes into `workingDir`, stages them with `git add`, and removes the worktrees.
-   This step is required before the gate: without it, `auto workflow gate` would
-   build/test the unchanged main tree (vacuous pass). Conflicts (same file touched by
-   two executors) are reported in the JSON result but are not a hard failure — the
+   Segment A **returns `{ plan }`** (the planner's task assignment); capture it.
+1b. Persist the returned plan to a temp JSON file, e.g.
+   `<workingDir>/.claude/workflows/run-<runid>-plan.json` (the dispatcher can write
+   files; the workflow JS cannot). This drives ownership enforcement in step 2.
+2. Run `auto workflow merge --run <segment-A-runid> --ownership <plan.json>` (Go
+   runtime, worktree consolidation). With `--ownership`, each worktree is assigned
+   1:1 to the task it performed and **only files within that task's ownership are
+   merged** — files an executor created outside its assigned set (overlap into
+   another task's files) are reported in `skipped_out_of_scope` and never copied,
+   giving a hard guarantee against executor overlap. Merge then copies the owned
+   uncommitted changes into `workingDir`, stages them with `git add`, and removes
+   the worktrees. This step is required before the gate: without it, `auto workflow
+   gate` would build/test the unchanged main tree (vacuous pass). Any residual
+   same-file conflict is reported in the JSON but is not a hard failure — the
    operator/gate decides. Exit non-zero only on a hard infrastructure error.
+   (Without `--ownership`, merge falls back to the plain conflict-skip behavior.)
 3. After merge, run `auto workflow gate` (Go runtime, exit-code verdict).
    — If `verdict != pass`: **abort. Do NOT launch segment B.**
 4. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality, segment:'B'})`

@@ -23,6 +23,7 @@ const ARGV = (typeof args === 'string') ? (args ? JSON.parse(args) : {}) : (args
 const ctx = ARGV;
 const RT = (ARGV && ARGV.quality) || {};
 const SEGMENT = (ARGV && ARGV.segment) || 'A';
+let plan = null;
 
 const PLAN_SCHEMA = {
   type: 'object',
@@ -46,7 +47,7 @@ const PLAN_SCHEMA = {
 if (SEGMENT === 'A') {
 await phase('planning');
 // route_team baseline planning: model=claude-opus-4-8 effort=medium retry: 0 budget: 60000
-const plan = await agent(`Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}. Decompose into independently-implementable tasks for parallel isolated-worktree execution: every task owns a DISJOINT set of files, and files that depend on each other to compile (e.g. an implementation and its test, or a type and its consumers) MUST be grouped into the SAME task so a single executor owns them — never split inter-dependent files across tasks. Produce the task assignment table (id, description, file ownership)`, { agentType: 'planner', schema: PLAN_SCHEMA, model: (RT.planning && RT.planning.model) || 'claude-opus-4-8', effort: (RT.planning && RT.planning.effort) || 'medium' });
+plan = await agent(`Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}. Decompose into independently-implementable tasks for parallel isolated-worktree execution: every task owns a DISJOINT set of files, and files that depend on each other to compile (e.g. an implementation and its test, or a type and its consumers) MUST be grouped into the SAME task so a single executor owns them — never split inter-dependent files across tasks. Produce the task assignment table (id, description, file ownership)`, { agentType: 'planner', schema: PLAN_SCHEMA, model: (RT.planning && RT.planning.model) || 'claude-opus-4-8', effort: (RT.planning && RT.planning.effort) || 'medium' });
 
 await phase('test_scaffold');
 // route_team baseline test_scaffold: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 60000
@@ -102,3 +103,5 @@ await phase('release_hygiene');
 log('release_hygiene', 'release_hygiene');
 
 }
+
+return { plan };

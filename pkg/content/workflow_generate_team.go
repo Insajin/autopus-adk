@@ -84,7 +84,13 @@ func deriveTeamWorkflowJS(schema workflow.Schema) string {
 	sb.WriteString(workflowArgvNormalizeJS)
 	sb.WriteString("const ctx = ARGV;\n")
 	sb.WriteString("const RT = (ARGV && ARGV.quality) || {};\n")
-	sb.WriteString("const SEGMENT = (ARGV && ARGV.segment) || 'A';\n\n")
+	sb.WriteString("const SEGMENT = (ARGV && ARGV.segment) || 'A';\n")
+	// plan is declared at top level (not const inside the segment-A guard) so it
+	// can be returned to the dispatcher. The dispatcher persists plan.tasks and
+	// passes it to `auto workflow merge --ownership` to ENFORCE file ownership,
+	// turning the planner's disjoint-file decomposition from a prompt-level
+	// suggestion into a hard merge-time guarantee against executor overlap.
+	sb.WriteString("let plan = null;\n\n")
 	sb.WriteString(planSchemaJS)
 
 	// Split phases: segment A includes everything up to and including gate_build_test;
@@ -112,7 +118,11 @@ func deriveTeamWorkflowJS(schema workflow.Schema) string {
 	for _, p := range segB {
 		writeTeamPhaseBlock(&sb, p, models[p.ID], efforts[p.ID], depths[p.ID])
 	}
-	sb.WriteString("}\n")
+	sb.WriteString("}\n\n")
+
+	// Return the planner output so the dispatcher can enforce file ownership at
+	// the merge step. In segment B plan is null (planning runs only in segment A).
+	sb.WriteString("return { plan };\n")
 
 	return sb.String()
 }
@@ -170,7 +180,9 @@ func writeTeamPlanningBlock(sb *strings.Builder, id, model, effort string, extra
 	prompt := "Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}. Decompose into independently-implementable tasks for parallel isolated-worktree execution: every task owns a DISJOINT set of files, and files that depend on each other to compile (e.g. an implementation and its test, or a type and its consumers) MUST be grouped into the SAME task so a single executor owns them — never split inter-dependent files across tasks. Produce the task assignment table (id, description, file ownership)"
 	opt := fmt.Sprintf("{ agentType: 'planner', schema: PLAN_SCHEMA, model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
 		id, id, model, id, id, effort)
-	fmt.Fprintf(sb, "const plan = await agent(`%s`, %s);\n", prompt, opt)
+	// Assigns the top-level `plan` (declared in the preamble) so it can be both
+	// consumed by the fan-out and returned to the dispatcher.
+	fmt.Fprintf(sb, "plan = await agent(`%s`, %s);\n", prompt, opt)
 }
 
 // writeTeamFanOutBlock emits the bounded executor fan-out loop for the
