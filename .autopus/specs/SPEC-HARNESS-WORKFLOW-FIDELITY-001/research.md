@@ -185,6 +185,16 @@ These are optional improvements and do not block sync completion.
 - **F-005 (suggestion) | DEFERRED→Completion Debt** | S10 operational 단계에 parallel/isolation 런타임 honor 확인 포함. F-001 doctor 승격으로 미지원 시 fail-fast 보장됐고, 실 honor 관측은 실 LLM 종단(Completion Debt) 범위. 0-서브에이전트 probe로 parallel 계약은 경험적 확인 완료.
 - **codex REVISE(merge) 판정 재조정**: codex의 "agentType 키 미입증" major는 실 Workflow 계약 + 경험적 probe로 종결; "args.quality cap 우회"는 args.quality를 Go 디스패처(bounded ResolveDepth ≤5/3)만 설정하고 런타임 `min(tasks,cap)`이 추가 bound → 신뢰 경계 내. claude judge PASS + reviewer/security gate PASS를 권위로 채택(per-provider authority).
 
+### Live e2e findings (2026-06-22) — args 전파 버그 발견·수정
+
+사용자 승인 후 실 Workflow 런타임(v2.1.174)에 디스패치한 live 검증 결과:
+
+1. **launch 무결성(PASS)**: 재생성 route_team.workflow.js를 실 런타임에 디스패치 — `meta` 파싱·전 phase 본문 정상(SyntaxError 0).
+2. **parallel 계약(PASS)**: 0-서브에이전트 probe로 `parallel([() => Promise.resolve(...)])` → 결과 배열, `parallel([])` → clean no-op 경험적 확인.
+3. ⭐**args 전파 버그(CRITICAL, 발견→수정→재검증)**: **실 런타임은 `args` 글로벌을 object가 아니라 JSON STRING으로 전달한다**(`typeof args === 'string'` 실측). 따라서 baseline의 `const SEGMENT = (args && args.segment) || 'A'`는 항상 'A'로 폴백하고 `const ctx = args`는 `.spec`이 없어 빈 컨텍스트가 된다 → **segment B가 영영 실행 불가**(segmented dispatch 무력화)·executor가 SPEC 컨텍스트 결여. RUNTIME-001이 "launch PROVEN"이라 한 것은 **args 없이** 돌린 0-agent 실행이라 이 버그가 잠복했다(launch는 됐으나 args는 한 번도 실전 전달된 적 없음 — `[[learning_adversarial_verify_feed_reality]]`). **수정**: 두 생성기 공유 preamble에 `const ARGV = (typeof args === 'string') ? (args ? JSON.parse(args) : {}) : (args || {})` 정규화 추가(route_a + route_team 모두), 이후 `ctx`/`RT`/`SEGMENT`는 ARGV에서 읽음. **재검증**: 수정 전 sentinel `segment:'Z'`는 planner 1개를 잘못 spawn(SEGMENT 버그 'A')했으나, 수정 후 동일 sentinel은 **0 agents**(SEGMENT 정상 'Z') → fix 실증. launch-contract 오라클에 ARGV 정규화 단언 추가. (route_a 표면도 변하므로 golden 재생성; route_a segment dispatch도 동일 버그였으므로 동반 수정 — RUNTIME-001 correctness 후속.)
+4. **planner schema 캡처(PASS)**: 실 planner agent(opus, agentType:'planner')에 `schema: PLAN_SCHEMA`로 디스패치 → 검증된 `{tasks:[{id,description,files}]}` 2-task 반환(file ownership greeting.go vs greeting_test.go 비충돌). agentType 해석 + structured-output 캡처 + task threading 연료가 실 런타임에서 동작 실증(1 agent·45.8k tok·13.5s).
+5. **executor parallel/worktree 실 코드-write fan-out + 디스패처 segment-gate 루프(미실행)**: parallel·isolation·planner 각 조각은 개별 실증됐으나, 실 executor가 worktree에서 코드를 mutate하는 full fan-out + `auto workflow gate` barrier + segment B까지의 종단 루프는 파괴적(실 repo worktree 변형)·고비용이라 미실행. operational Completion Debt로 잔존(사용자 승인 + 격리 환경 필요).
+
 ## Authoring Preflight
 
 `auto spec validate .autopus/specs/SPEC-HARNESS-WORKFLOW-FIDELITY-001 --strict` 최초 실행은 canonical English 섹션 헤더 누락(`## Requirements`/`## Implementation Strategy`/`## Tasks`/`## Test Scenarios`/`## Oracle Acceptance Notes`)과 Must acceptance structural-only 판정으로 6 error 반환. SPEC 문서 헤더를 canonical 영문으로 정정하고 `## Oracle Acceptance Notes`(concrete expected output 신호 + 대표 expected substring)를 추가해 재실행 결과 `SPEC 검증 통과`(EXIT=0). 변경은 SPEC 4개 문서에 한정(소스/`.tmpl`/config 무수정).

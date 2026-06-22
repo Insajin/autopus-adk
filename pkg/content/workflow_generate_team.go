@@ -76,13 +76,15 @@ func deriveTeamWorkflowJS(schema workflow.Schema) string {
 	sb.WriteString("};\n\n")
 
 	// Script body preamble: ctx, RT quality override, and SEGMENT selector.
+	// The runtime `args` global is a JSON string, so normalize it to ARGV first.
 	// RT carries the per-run quality override injected by the dispatch layer via
 	// args.quality. Each agent() opt reads the RT override first and falls back to
 	// the schema baseline literal. SEGMENT is delivered via args.segment.
 	sb.WriteString("// Workflow API globals: agent, phase, log, args.\n")
-	sb.WriteString("const ctx = args || {};\n")
-	sb.WriteString("const RT = (args && args.quality) || {};\n")
-	sb.WriteString("const SEGMENT = (args && args.segment) || 'A';\n\n")
+	sb.WriteString(workflowArgvNormalizeJS)
+	sb.WriteString("const ctx = ARGV;\n")
+	sb.WriteString("const RT = (ARGV && ARGV.quality) || {};\n")
+	sb.WriteString("const SEGMENT = (ARGV && ARGV.segment) || 'A';\n\n")
 	sb.WriteString(planSchemaJS)
 
 	// Split phases: segment A includes everything up to and including gate_build_test;

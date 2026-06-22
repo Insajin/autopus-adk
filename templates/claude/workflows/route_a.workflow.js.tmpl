@@ -15,7 +15,8 @@ export const meta = {
 };
 
 // Workflow API globals: agent, phase, log, args.
-const SEGMENT = (args && args.segment) || 'A';
+const ARGV = (typeof args === 'string') ? (args ? JSON.parse(args) : {}) : (args || {});
+const SEGMENT = (ARGV && ARGV.segment) || 'A';
 
 if (SEGMENT === 'A') {
 await phase('planning');

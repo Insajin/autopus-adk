@@ -61,8 +61,15 @@ func assertLaunchContractCommon(t *testing.T, js string, name string) {
 func assertSegmentGuards(t *testing.T, js, name string, firstSegBPhase string) {
 	t.Helper()
 
-	// SEGMENT preamble
-	if !strings.Contains(js, "const SEGMENT = (args && args.segment) || 'A'") {
+	// args normalization: the runtime delivers args as a JSON string, so the JS
+	// must JSON.parse it before reading .segment/.spec/.quality (RUNTIME-001 gap
+	// surfaced by the FIDELITY-001 live e2e). Without this, segment B never runs.
+	if !strings.Contains(js, "const ARGV = (typeof args === 'string')") || !strings.Contains(js, "JSON.parse(args)") {
+		t.Errorf("[%s] missing ARGV string-args normalization preamble", name)
+	}
+
+	// SEGMENT preamble (reads the normalized ARGV, not the raw string args)
+	if !strings.Contains(js, "const SEGMENT = (ARGV && ARGV.segment) || 'A'") {
 		t.Errorf("[%s] missing SEGMENT preamble", name)
 	}
 
@@ -206,9 +213,9 @@ func TestLaunchContract_RouteTeam(t *testing.T) {
 		}
 	}
 
-	// preamble ctx = args or args.quality
-	if !strings.Contains(js, "const ctx = args") && !strings.Contains(js, "args.quality") {
-		t.Errorf("Route Team missing args preamble")
+	// preamble binds ctx and RT to the normalized ARGV (not raw string args)
+	if !strings.Contains(js, "const ctx = ARGV") || !strings.Contains(js, "ARGV.quality") {
+		t.Errorf("Route Team missing normalized ARGV preamble (ctx/quality)")
 	}
 }
 

@@ -19,9 +19,10 @@ export const meta = {
 };
 
 // Workflow API globals: agent, phase, log, args.
-const ctx = args || {};
-const RT = (args && args.quality) || {};
-const SEGMENT = (args && args.segment) || 'A';
+const ARGV = (typeof args === 'string') ? (args ? JSON.parse(args) : {}) : (args || {});
+const ctx = ARGV;
+const RT = (ARGV && ARGV.quality) || {};
+const SEGMENT = (ARGV && ARGV.segment) || 'A';
 
 const PLAN_SCHEMA = {
   type: 'object',
