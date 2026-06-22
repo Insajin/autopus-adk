@@ -132,7 +132,7 @@ func atomicCopy(src, dst string) error {
 		return err
 	}
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName) // no-op once renamed; cleans up on failure
+	defer func() { _ = os.Remove(tmpName) }() // no-op once renamed; cleans up on failure
 
 	if _, err := io.Copy(tmp, in); err != nil {
 		tmp.Close()
