@@ -33,6 +33,7 @@ func TestAdapter_Update_SplitCompilerPrunesRepoVisibleLongTailWhenMovingToPlugin
 	_, err = a.Update(context.Background(), splitCfg)
 	require.NoError(t, err)
 
+	assert.FileExists(t, filepath.Join(a.root, ".codex", "skills", "make-interfaces-feel-better.md"), "core polish skill must remain repo-visible for Codex even when long-tail skills move to the plugin surface")
 	assert.FileExists(t, filepath.Join(a.root, ".autopus", "plugins", "auto", "skills", "metrics", "SKILL.md"), "acceptance S7: split compiler must materialize Codex long-tail skills in the plugin-scoped target")
 	assert.NoFileExists(t, filepath.Join(a.root, ".codex", "skills", "metrics.md"), "acceptance S4/S7: stale repo-visible Codex long-tail artifact must be pruned when ownership moves to the plugin surface")
 }

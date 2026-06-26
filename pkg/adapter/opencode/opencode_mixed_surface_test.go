@@ -67,6 +67,7 @@ func TestAdapter_Generate_AutoSharedSurfaceUsesCoreSharedSkillSetInMixedMode(t *
 
 	assert.FileExists(t, filepath.Join(dir, ".agents", "skills", "planning", "SKILL.md"))
 	assert.FileExists(t, filepath.Join(dir, ".agents", "skills", "agent-pipeline", "SKILL.md"))
+	assert.FileExists(t, filepath.Join(dir, ".agents", "skills", "make-interfaces-feel-better", "SKILL.md"))
 	assert.NoFileExists(t, filepath.Join(dir, ".agents", "skills", "metrics", "SKILL.md"))
 	assert.NoFileExists(t, filepath.Join(dir, ".agents", "skills", "product-discovery", "SKILL.md"))
 }
