@@ -89,12 +89,13 @@ func TestOrchestraRunBackendFactoryConsumesSelectBackend(t *testing.T) {
 // TestPaneInteractiveContext verifies that pane execution is disabled in nested
 // agent automation, CI, and any non-TTY stdio context, so structured orchestra
 // falls back to the subprocess backend instead of spawning panes that time out.
-// Also covers REQ-005/REQ-008 CLAUDECODE relaxation and CI floor.
+// Also covers REQ-005/REQ-008 nested-agent relaxation and CI floor.
 func TestPaneInteractiveContext(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name          string
 		claudeCode    string
+		codex         string
 		ci            string
 		stdinTTY      bool
 		stdoutTTY     bool
@@ -103,33 +104,40 @@ func TestPaneInteractiveContext(t *testing.T) {
 		want          bool
 	}{
 		// Normal interactive TTY path (no env vars).
-		{"interactive tty, no env", "", "", true, true, false, false, true},
-		{"piped stdout", "", "", true, false, false, false, false},
-		{"piped stdin", "", "", false, true, false, false, false},
-		{"piped both", "", "", false, false, false, false, false},
+		{"interactive tty, no env", "", "", "", true, true, false, false, true},
+		{"piped stdout", "", "", "", true, false, false, false, false},
+		{"piped stdin", "", "", "", false, true, false, false, false},
+		{"piped both", "", "", "", false, false, false, false, false},
 
 		// CI floor: always false regardless of CLAUDECODE, hook, or mux.
-		{"ci environment", "", "true", true, true, true, true, false},
-		{"ci beats claudecode", "1", "1", true, true, true, true, false},
+		{"ci environment", "", "", "true", true, true, true, true, false},
+		{"ci beats claudecode", "1", "", "1", true, true, true, true, false},
 
 		// S5: CLAUDECODE + hook available + mux installed → true.
-		{"S5: claudecode hook+mux ready", "1", "", false, false, true, true, true},
+		{"S5: claudecode hook+mux ready", "1", "", "", false, false, true, true, true},
+		// S5c: CODEX + hook available + mux installed → true.
+		{"S5c: codex hook+mux ready", "", "1", "", false, false, true, true, true},
+		// CI floor: CODEX cannot force pane mode in CI.
+		{"ci beats codex", "", "1", "1", false, false, true, true, false},
 		// S5b: CLAUDECODE + hook unavailable → false (floor preserved).
-		{"S5b: claudecode no hook", "1", "", false, false, false, true, false},
+		{"S5b: claudecode no hook", "1", "", "", false, false, false, true, false},
 		// S5b: CLAUDECODE + mux not installed → false (floor preserved).
-		{"S5b: claudecode no mux", "1", "", false, false, true, false, false},
+		{"S5b: claudecode no mux", "1", "", "", false, false, true, false, false},
+		// CODEX floor mirrors CLAUDECODE: both hook and mux are required.
+		{"codex no hook", "", "1", "", false, false, false, true, false},
+		{"codex no mux", "", "1", "", false, false, true, false, false},
 		// CLAUDECODE present but both conditions false.
-		{"claudecode no hook no mux", "1", "", false, false, false, false, false},
+		{"claudecode no hook no mux", "1", "", "", false, false, false, false, false},
 
 		// Legacy case: nested claude-code without relaxation flags — still false
 		// when hook/mux unavailable, matching original behavior.
-		{"nested claude-code no hook no mux", "1", "", true, true, false, false, false},
+		{"nested claude-code no hook no mux", "1", "", "", true, true, false, false, false},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := paneInteractiveContext(tt.claudeCode, tt.ci, tt.stdinTTY, tt.stdoutTTY, tt.hookAvailable, tt.muxInstalled)
+			got := paneInteractiveContext(tt.claudeCode, tt.codex, tt.ci, tt.stdinTTY, tt.stdoutTTY, tt.hookAvailable, tt.muxInstalled)
 			assert.Equal(t, tt.want, got)
 		})
 	}
