@@ -133,6 +133,22 @@ Primary SPEC이든 예외적 sibling SPEC 세트든 `research.md`에 `## Outcome
 - `research.md`의 `## Reviewer Brief`: intended scope, explicit non-goals, self-verified evidence, reviewer focus를 짧게 적어 review gate의 탐색 범위를 제한합니다.
 - `acceptance.md`의 Must scenario는 oracle-first로 작성합니다. 파일 존재, heading, exit code, non-empty output만으로는 Must acceptance를 닫지 않습니다.
 
+### 3.30. Minimality Decision Matrix
+
+`research.md`에는 반드시 `## Minimality Decision Matrix`를 작성합니다. 이 표는 line-count 절감이 아니라 필요한 만큼만 구현하기 위한 결정 증거입니다.
+
+Required ladder rows:
+- `actual need`
+- `existing code/helper/pattern`
+- `stdlib/native`
+- `existing dependency`
+- `new dependency or abstraction` / `new dependency or new abstraction`
+- `minimum sufficient verification`
+
+새 dependency 또는 새 abstraction을 계획할 때는 위 순서대로 `actual need`, `existing code/helper/pattern`, `stdlib/native`, `existing dependency`, `new dependency or abstraction` / `new dependency or new abstraction` 증거를 기록합니다. 앞선 대안 확인 근거가 없으면 해당 확장은 accepted scope가 아니라 `revise-target` 또는 risk로 남깁니다. 사용자가 명시적으로 확장을 요청한 경우에도 intent, considered alternatives, justification, verification obligation을 보존합니다.
+
+`minimum sufficient verification`은 Outcome Lock을 닫는 가장 작은 검증 세트를 고르되, security, validation, accessibility, data-loss, deterministic-oracle, generated-surface-hygiene gate를 줄이지 않습니다.
+
 ### 3.5. Oracle acceptance 매핑
 
 - Semantic invariant가 paired, comparative, grouping, ordering, deduplication, parser/report, or numeric formula semantics를 포함하면 최소 하나의 Must acceptance scenario를 oracle acceptance로 작성합니다.
@@ -221,6 +237,16 @@ Then [기대 결과]
 
 ## 설계 결정
 [왜 이 접근법인지, 대안 검토]
+
+## Minimality Decision Matrix
+| Ladder step | Evidence | Decision | Receipt item |
+|-------------|----------|----------|--------------|
+| actual need | [Outcome Lock / request evidence] | proceed / revise-target / risk | [important choice] |
+| existing code/helper/pattern | [rg/read evidence] | reuse / not applicable | [reused surface/helper] |
+| stdlib/native | [stdlib or native platform evidence] | use / not sufficient | [native choice or reason] |
+| existing dependency | [manifest/import evidence] | reuse / not sufficient | [dependency reused or skipped] |
+| new dependency or abstraction / new dependency or new abstraction | [justification after previous checks] | accepted / revise-target / risk | [why added or skipped] |
+| minimum sufficient verification | [focused commands, oracle, parity, safety gates] | required checks | [verification selected] |
 
 ## Semantic Invariant Inventory
 | ID | source clause | invariant type | affected outputs | acceptance IDs |
@@ -316,6 +342,7 @@ These are optional improvements and do not block sync completion.
 - spec.md는 `## Traceability Matrix`를 포함하고 Requirement, Plan Task, Acceptance Scenario, Semantic Invariant를 연결
 - plan.md 또는 research.md는 `## Visual Planning Brief`를 포함하고 작업 성격에 맞는 flowchart, wireframe, sequence/data-flow 중 하나를 사용
 - research.md는 `## Reference Discipline`과 `## Reviewer Brief`를 포함해 existing/[NEW] 구분과 review focus를 기록
+- research.md는 `## Minimality Decision Matrix`를 포함하고 `actual need`, `existing code/helper/pattern`, `stdlib/native`, `existing dependency`, `new dependency or abstraction` / `new abstraction`, `minimum sufficient verification` 각 row의 evidence, decision, receipt item을 기록
 - greenfield 요청이면 research.md 또는 prd.md가 `## Technology Stack Decision`을 포함하고 concrete stable versions, source refs, checked_at을 기록
 - Must oracle acceptance는 concrete expected output 또는 explicit tolerance를 포함
 - plan.md의 태스크는 독립적으로 실행 가능한 단위

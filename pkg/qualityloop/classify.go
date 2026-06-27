@@ -26,7 +26,9 @@ func classify(input FailureInput, reasons []string) classification {
 	if containsAny(reasons, "qamesh_failed_check") {
 		return classification{TaxonomyProductBug, KindQAMESHRepairHandoff, StatusAwaitingReplay, 0.93, PolicyReplayRequired, MethodDeterministicOracle, EvidenceDeterministic}
 	}
-	if containsAny(reasons, "skill_instruction_gap", "playbook_import_unresolved", "operating_pack_scanner_block", "role_mismatch", "reviewer_gate_bypassed", "bad_escalation") {
+	if containsAny(reasons, append([]string{
+		"skill_instruction_gap", "playbook_import_unresolved", "operating_pack_scanner_block", "role_mismatch", "reviewer_gate_bypassed", "bad_escalation",
+	}, minimalityReasonCodes()...)...) {
 		if contains(reasons, "operating_pack_scanner_block") {
 			return classification{TaxonomySkillOrPlaybookGap, KindOperatingPackCandidate, StatusQuarantined, 0.84, PolicyApprovalRequired, MethodContractMapping, evidenceStrength(input)}
 		}

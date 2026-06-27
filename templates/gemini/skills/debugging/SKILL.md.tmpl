@@ -55,6 +55,12 @@ go test -cpuprofile cpu.out -memprofile mem.out
 - **타입/변환**: 오버플로우, nil 포인터
 - **외부 의존성**: API 변경, 설정 오류
 
+Caller/shared root-cause rule:
+- 증상 위치(symptom location), owning function/path, caller 목록 또는 grep evidence를 기록합니다.
+- caller와 shared root-cause path를 먼저 확인한 뒤 패치 위치를 선택합니다.
+- 증상 위치만 패치하고 caller/shared root-cause evidence가 없으면 patch plan을 `revise-target`으로 표시합니다.
+- evidence가 증상 위치 자체가 root cause이거나 affected caller가 하나뿐임을 보여줄 때만 focused patch를 허용합니다.
+
 ### 3단계: 최소 수정
 
 ```
@@ -81,6 +87,7 @@ go test -race ./...
 
 - [ ] 버그 재현 테스트 작성 및 FAIL 확인
 - [ ] 근본 원인 파악
+- [ ] caller/shared root-cause path 확인 또는 `revise-target` 기록
 - [ ] 최소 수정 적용
 - [ ] 재현 테스트 PASS 확인
 - [ ] 전체 테스트 스위트 통과

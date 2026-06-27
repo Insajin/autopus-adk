@@ -2,6 +2,23 @@ package codex
 
 func codexAgentPipelineSkillBodyCompletion() string {
 	return `
+## Minimality Discipline
+
+Use the minimality ladder before implementation task assignment:
+
+1. Confirm the actual need.
+2. Search existing code/helper/pattern choices.
+3. Prefer stdlib or native platform features when sufficient.
+4. Reuse an existing dependency before adding a new one.
+5. Add a new dependency or abstraction only with justification and a verification obligation.
+6. Select the minimum sufficient verification that closes acceptance.
+
+Minimum sufficient implementation is not shortest code. Do not weaken security, validation, accessibility, data-loss handling, deterministic oracle, or generated-surface hygiene gates to simplify a patch.
+
+Executor prompts must ask workers to inspect existing code paths, helpers, and patterns before adding helpers or abstractions. Tester and validator prompts must keep the minimum sufficient verification set explicit.
+
+Terminal handoffs should include a concise receipt of important decisions, such as reused primitive, skipped dependency, justified abstraction, and focused regression test. Do not expose an internal mode state to users.
+
 ## Parallelism Rules
 
 | Condition | Execution |

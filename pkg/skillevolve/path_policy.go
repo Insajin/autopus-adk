@@ -19,7 +19,14 @@ func cleanRelPath(rel string) string {
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-SKILL-EVOLVE-001: generated/root harness paths are excluded from skill evolution writes.
 // @AX:REASON: Safety and promotion gates rely on this policy to keep generated platform surfaces out of candidate application.
 func isGeneratedSurfacePath(rel string) bool {
-	rel = cleanRelPath(rel)
+	raw := strings.TrimSpace(strings.ReplaceAll(rel, "\\", "/"))
+	if raw == "" {
+		return false
+	}
+	if isUnsafeCandidatePath(raw) {
+		return true
+	}
+	rel = cleanRelPath(raw)
 	generatedPrefixes := []string{
 		".agents/",
 		".codex/",
@@ -27,13 +34,39 @@ func isGeneratedSurfacePath(rel string) bool {
 		".claude/",
 		".gemini/",
 		".autopus/plugins/",
+		".autopus/runtime/",
+		".autopus/orchestra/",
+		".autopus/brainstorms/",
+		".autopus/canary/",
 	}
 	for _, prefix := range generatedPrefixes {
-		if rel == strings.TrimSuffix(prefix, "/") || strings.HasPrefix(rel, prefix) {
+		base := strings.TrimSuffix(prefix, "/")
+		if rel == base || strings.HasPrefix(rel, prefix) || strings.HasSuffix(rel, "/"+base) || strings.Contains(rel, "/"+prefix) {
 			return true
 		}
 	}
+	if rel == ".autopus/context/signatures.md" || strings.HasSuffix(rel, "/.autopus/context/signatures.md") || rel == "config.toml" || strings.HasSuffix(rel, "/config.toml") {
+		return true
+	}
+	if (strings.HasPrefix(rel, ".autopus/") || strings.Contains(rel, "/.autopus/")) && strings.HasSuffix(rel, "-manifest.json") {
+		return true
+	}
 	return strings.Contains(rel, "/plugins/cache/") || strings.Contains(rel, "/.codex/plugins/cache/")
+}
+
+func isUnsafeCandidatePath(rel string) bool {
+	if path.IsAbs(rel) || filepath.IsAbs(rel) || strings.Contains(rel, "\x00") {
+		return true
+	}
+	if len(rel) >= 2 && rel[1] == ':' {
+		return true
+	}
+	for _, segment := range strings.Split(rel, "/") {
+		if segment == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 func isADKSourceOfTruthPath(rel string) bool {

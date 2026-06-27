@@ -1,6 +1,9 @@
 package qualityloop
 
-import "strings"
+import (
+	"path"
+	"strings"
+)
 
 func aggregateRepeatedFailures(inputs []FailureInput, result *NormalizeResult) map[int]bool {
 	groups := map[string][]int{}
@@ -31,12 +34,63 @@ func repeatedADKFailure(input FailureInput) bool {
 	if input.RedactionStatus == "failed" || input.RawPayloadPresent {
 		return false
 	}
+	if isGeneratedSurfacePath(input.TargetArtifact) {
+		return false
+	}
 	for _, ref := range append(append([]string{}, input.AffectedRefs...), input.OwnedPaths...) {
-		if strings.HasPrefix(ref, "autopus-adk/") && !isGeneratedSurfacePath(ref) {
+		if isGeneratedSurfacePath(ref) {
+			return false
+		}
+		if isADKOwnedPath(ref) {
 			return true
 		}
 	}
-	return strings.HasPrefix(input.TargetArtifact, "autopus-adk/") && !isGeneratedSurfacePath(input.TargetArtifact)
+	return isADKOwnedPath(input.TargetArtifact)
+}
+
+func isADKOwnedPath(rel string) bool {
+	rel = strings.TrimSpace(strings.ReplaceAll(rel, "\\", "/"))
+	if rel == "" || path.IsAbs(rel) || strings.Contains(rel, "\x00") || hasParentPathSegment(rel) {
+		return false
+	}
+	rel = path.Clean(rel)
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "/") || isGeneratedSurfacePath(rel) {
+		return false
+	}
+	rel = strings.TrimPrefix(rel, "autopus-adk/")
+	rel = path.Clean(rel)
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, "../") || strings.HasPrefix(rel, "/") || isGeneratedSurfacePath(rel) {
+		return false
+	}
+	for _, prefix := range []string{"content/", "templates/", "pkg/", ".autopus/specs/"} {
+		if strings.HasPrefix(rel, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasParentPathSegment(rel string) bool {
+	for _, segment := range strings.Split(rel, "/") {
+		if segment == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+func minimalityReasonCodes() []string {
+	return []string{
+		"unnecessary_dependency",
+		"duplicate_helper",
+		"single_impl_abstraction",
+		"stdlib_available",
+		"native_available",
+		"yagni_expansion",
+		"existing_helper_available",
+		"existing_dependency_available",
+		"shrink_scope_available",
+	}
 }
 
 func repeatedSkillCandidate(failures []FailureInput) ImprovementCandidate {

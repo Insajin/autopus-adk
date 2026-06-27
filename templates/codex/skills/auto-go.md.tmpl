@@ -55,6 +55,17 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 3. 테스트 작성
 {{end}}
 
+## Minimality Discipline
+
+Before implementation assignment, apply the minimality ladder: `actual need` → `existing code/helper/pattern` → `stdlib/native` → `existing dependency` → `new dependency or abstraction` → `minimum sufficient verification`.
+
+- Executors must search existing code paths, helpers, and patterns before adding new helpers, dependencies, or abstractions.
+- Minimum sufficient implementation means the smallest change that closes the Outcome Lock with evidence, not the shortest code.
+- Do not reduce non-reducible gates: `security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle`, `generated-surface-hygiene`.
+- `minimum sufficient verification` must include the focused checks needed for the changed surface while preserving those gates.
+- Final handoff must include a concise receipt of important choices: reused existing code/helper/pattern, skipped dependency or abstraction, accepted new dependency or abstraction with evidence, and selected verification.
+- `qualityloop`/`skillevolve` signals are candidate-only and remain isolated/quarantined; do not apply them during this workflow.
+
 ## Frontend Design Preflight
 
 - UI 관련 변경(`.tsx`, `.jsx`, CSS-family, theme/token/design-system 경로, configured UI globs)이 있으면 구현 전에 `auto design pack --format markdown`을 실행하거나 동등한 local evidence를 수집합니다.
@@ -205,6 +216,7 @@ SPEC Quality Loop:
 - `sync_blockers`: `none` 또는 `implemented` 상태 전환을 막는 구체 blocker.
 - `spec_status_after_go`: 성공 시 `implemented`. `done`/`completed`를 사용하지 않습니다. `completed`는 `@auto sync` 전용 상태입니다.
 - `sync_evidence_refs`: 변경 파일, 검증 명령, Phase 4 verdict, @AX annotation 결과 또는 `@AX: no-op`.
+- `decision_receipt`: reused existing code/helper/pattern, skipped dependency or abstraction, accepted expansion with evidence, and minimum sufficient verification summary.
 
 `sync_ready != yes`이면 workflow lifecycle bar와 `@auto sync` handoff를 출력하지 말고 blocker를 먼저 해결합니다.
 
@@ -219,6 +231,7 @@ SPEC Quality Loop:
 - `sync_blockers`: `none` 또는 blocker 목록
 - `spec_status_after_go`: `implemented`
 - `sync_evidence_refs`: 변경/검증/리뷰/@AX 증거
+- `decision_receipt`: 중요한 구현 선택과 minimum sufficient verification 요약
 - `next_required_step`: supervisor가 다음에 반드시 진행해야 하는 단계
 - `next_command`: surface-native 다음 명령 (`@auto sync {SPEC-ID}` 또는 동등 alias)
 - `auto_progression_state`: `--loop` 여부와 무관하게 handoff를 생략하지 않는다는 상태 설명
@@ -263,7 +276,7 @@ spawn_agent executor \
   --task "Implement {task description}" \
   --spec "{SPEC_PATH}" \
   --plan "{SPEC_DIR}/plan.md" \
-  --constraint "File size limit applies only to source code files; SPEC Markdown under .autopus/specs/** is exempt"
+  --constraint "Apply the minimality ladder: actual need, existing code/helper/pattern, stdlib/native, existing dependency, new dependency or abstraction, minimum sufficient verification. Search existing helpers before adding a new abstraction. File size limit applies only to source code files; SPEC Markdown under .autopus/specs/** is exempt"
 ```
 
 ### Tester Agent
@@ -345,6 +358,7 @@ sync_ready: yes
 sync_blockers: none
 spec_status_after_go: implemented
 sync_evidence_refs: {changed_files, verification_commands, review_verdict, ax_result}
+decision_receipt: reused existing code/helper/pattern; skipped unjustified dependency or abstraction; minimum sufficient verification selected
 next_required_step: sync 단계로 이동
 next_command: @auto sync {SPEC-ID}
 auto_progression_state: --loop enabled; handoff still required before autonomous continuation

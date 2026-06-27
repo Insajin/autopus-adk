@@ -56,6 +56,17 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 2. 파일별 구현
 3. 테스트 작성{{end}}
 
+## Minimality Discipline
+
+Apply the minimality ladder before assigning or implementing work: `actual need` → `existing code/helper/pattern` → `stdlib/native` → `existing dependency` → `new dependency or abstraction` → `minimum sufficient verification`.
+
+- Search existing code paths, helpers, and patterns before adding new helpers, dependencies, or abstractions.
+- Minimum sufficient implementation closes the Outcome Lock with evidence; it is not shortest-code optimization.
+- Do not reduce non-reducible gates: `security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle`, `generated-surface-hygiene`.
+- `minimum sufficient verification` selects focused checks for the changed surface while preserving those gates.
+- The final handoff includes a receipt for important choices: reused existing code/helper/pattern, skipped dependency or abstraction, accepted expansion with evidence, and focused verification.
+- `qualityloop`/`skillevolve` findings are candidate-only and remain isolated/quarantined in this workflow.
+
 ## Supervisor Checklist
 
 - Step 0: 먼저 현재 요청이 read-heavy 탐색인지, write-heavy 구현인지 분류합니다
@@ -94,6 +105,7 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 - `sync_blockers`: `none` 또는 `implemented` 상태 전환을 막는 blocker 목록.
 - `spec_status_after_go`: 성공 시 `implemented`. `done`/`completed`를 사용하지 않습니다. `completed`는 sync 전용 상태입니다.
 - `sync_evidence_refs`: 변경 파일, 검증 명령, Phase 4 verdict, @AX annotation 결과 또는 `@AX: no-op`.
+- `decision_receipt`: reused existing code/helper/pattern, skipped dependency or abstraction, accepted expansion with evidence, and minimum sufficient verification summary.
 
 `sync_ready != yes`이면 workflow lifecycle bar와 sync handoff를 출력하지 말고 blocker를 먼저 해결합니다.
 
@@ -108,6 +120,7 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 - `sync_blockers`
 - `spec_status_after_go`
 - `sync_evidence_refs`
+- `decision_receipt`
 - `subagent_dispatch_count`
 - `subagent_roles_dispatched`
 - `degraded-mode`

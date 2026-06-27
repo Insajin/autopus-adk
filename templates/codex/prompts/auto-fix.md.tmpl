@@ -16,12 +16,16 @@ description: "버그 수정 — 재현 테스트를 먼저 작성한 뒤 최소 
 
 1. 버그 재현 테스트 작성
 2. 테스트 실패 확인
-3. 최소 코드 변경으로 수정
-4. 테스트 통과 확인
-5. 전체 테스트 스위트 실행
+3. symptom location, owning function/path, caller 목록 또는 grep evidence 확인
+4. caller/shared root-cause path 확인 후 패치 위치 결정
+5. 최소 코드 변경으로 수정
+6. 테스트 통과 확인
+7. 전체 테스트 스위트 실행
 
 ## 규칙
 
 - 재현 테스트 없이 수정하지 않음
 - 버그 범위 외 코드 변경 금지
 - 파일 크기 제한: 소스 코드 파일 300줄 이하 (SPEC Markdown은 제외)
+- caller/shared root-cause evidence 없이 증상 위치만 고치는 계획은 `revise-target`입니다
+- final response receipt에는 caller/shared root-cause checked, focused patch target, minimum sufficient verification을 포함합니다

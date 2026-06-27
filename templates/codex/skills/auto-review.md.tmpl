@@ -29,18 +29,32 @@
 - 이 리뷰가 `@auto go --auto --loop` 내부에서 실행 중이면, `REQUEST_CHANGES`는 terminal handoff가 아니라 같은 invocation 안의 repair loop 입력입니다.
 - 위 경우 retry budget이 남아 있으면 `@auto go --continue` 를 권장하지 말고, 열린 findings checklist를 executor/fixer로 되돌려 자동 수렴을 계속합니다.
 - standalone `@auto review`에서만, loop 문맥이 없고 사용자가 다음 복구 명령을 원할 때 `@auto fix ...` 또는 `@auto go {SPEC-ID} --continue` 같은 후속 명령을 제안합니다.
+- Findings must be split into `Correctness/Security Findings` and `Complexity Findings`.
+- Correctness/security findings include behavior, build/test, contract, validation, accessibility, data-safety, security, deterministic oracle, and generated-surface hygiene and remain authoritative for the verdict.
+- Complexity findings use tags from `delete`, `stdlib`, `native`, `yagni`, `shrink`, `existing-helper`, `existing-dependency`.
+- If a complexity suggestion would weaken correctness, security, accessibility, validation, or data-safety, downgrade or reject it.
+- Final response receipt summarizes authoritative correctness/security action, advisory or blocking complexity action, skipped unsafe simplification, and minimum sufficient verification.
+- `qualityloop`/`skillevolve` signals are candidate-only and remain isolated/quarantined; do not apply them from review.
 
 ## TRUST 5 기준
 
-- **T**ested: 커버리지 {{if .IsFullMode}}85{{else}}80{{end}}%+
-- **R**eadable: 명확한 네이밍, 린트 클린
-- **U**nderstandable: 문서화, 복잡도 수용
-- **S**ecured: OWASP 준수, 입력 검증
-- **T**rackable: Conventional Commits, 이슈 참조
+TRUST 5 dimensions: Tested, Readable, Unified, Secured, Trackable.
+
+- Tested: 커버리지 {{if .IsFullMode}}85{{else}}80{{end}}%+
+- Readable: 명확한 네이밍, 린트 클린
+- Unified: 프로젝트 패턴, 포매터, 린터와 일관
+- Secured: OWASP 준수, 입력 검증
+- Trackable: Conventional Commits, 이슈 참조
 
 ## UI Design Context Checks
 
 When present, cite the compact `## Design Context` source path in UI findings. Required checks: palette-role drift, typography hierarchy drift, component guardrails, layout/responsive regressions, and source-of-truth mismatch.
+
+## Output Sections
+
+- `Correctness/Security Findings`
+- `Complexity Findings` tagged with `delete`, `stdlib`, `native`, `yagni`, `shrink`, `existing-helper`, or `existing-dependency`
+- `Decision Receipt`
 
 ## Branding Formats
 

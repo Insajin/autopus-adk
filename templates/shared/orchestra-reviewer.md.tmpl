@@ -43,19 +43,27 @@ Use Grep to check for callers of functions mentioned in the SPEC.
 - Are there simpler alternatives that achieve the same goal?
 - Will this create technical debt or maintenance burden?
 
-### 3. Risk Identification
+### 3. Complexity Assessment
+- Identify simpler alternatives, unnecessary dependency, duplicate helper, single-implementation abstraction, and YAGNI signals.
+- Use complexity tags when applicable: `delete`, `stdlib`, `native`, `yagni`, `shrink`, `existing-helper`, `existing-dependency`.
+- Keep `Correctness/Security Findings` authoritative over `Complexity Findings`; if a simplification would weaken security, validation, accessibility, data-loss handling, or correctness, downgrade or reject the complexity finding.
+- Keep correctness/security findings authoritative over complexity-only findings even when the simpler alternative is valid.
+- `qualityloop`/`skillevolve` references are candidate-only signals and remain isolated/quarantined until replay and approval outside this review.
+
+### 4. Risk Identification
 - What could go wrong during implementation?
 - What assumptions are unvalidated?
 - Are there backward compatibility concerns?
 
-### 4. Findings
+### 5. Findings
 For each issue found:
 - **Severity**: critical / major / minor / suggestion
 - **Location**: which requirement or section
 - **Description**: what's wrong
 - **Suggestion**: how to fix it
+- Split findings into `Correctness/Security Findings` and `Complexity Findings` when the schema allows free-form sections or category fields.
 
-### 5. Verdict
+### 6. Verdict
 - **PASS**: SPEC is ready for implementation
 - **REVISE**: Issues found that must be addressed before implementation
 - **REJECT**: Fundamental design problems requiring redesign

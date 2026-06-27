@@ -54,6 +54,13 @@ Run the project's test command with race/thread-safety flags on the specific bug
 # 스택 트레이스 분석
 ```
 
+Caller/shared root-cause inspection is mandatory before accepting a patch plan:
+- Record the symptom location and owning function/path.
+- Use grep/read evidence to list callers or prove there are no relevant callers.
+- Check whether the root cause is shared by callers or a shared helper/path.
+- If the proposed patch only changes the symptom location without caller/shared root-cause evidence, mark the plan `revise-target`.
+- A focused symptom-location patch is allowed only when evidence shows that location is the root cause or the only affected caller path.
+
 ### 3단계: 최소 수정
 ```
 원칙:

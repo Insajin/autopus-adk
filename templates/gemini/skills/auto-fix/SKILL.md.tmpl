@@ -29,9 +29,17 @@ triggers:
 
 1. 재현 테스트 작성 (먼저)
 2. 테스트 실패 확인
-3. 최소 수정
-4. 테스트 통과 확인
-5. 전체 스위트 실행
+3. symptom location, owning function/path, caller 목록 또는 grep evidence 확인
+4. caller/shared root-cause path 확인 후 패치 위치 결정
+5. 최소 수정
+6. 테스트 통과 확인
+7. 전체 스위트 실행
+
+## 규칙
+
+- caller/shared root-cause evidence 없이 증상 위치만 고치는 계획은 `revise-target`으로 표시합니다.
+- focused patch는 증상 위치가 root cause이거나 affected caller가 하나뿐이라는 근거가 있을 때만 허용합니다.
+- final response에는 caller/shared root-cause checked, focused patch target, minimum sufficient verification을 receipt로 요약합니다.
 
 ## Branding Formats
 

@@ -41,6 +41,17 @@ SPEC 문서를 기반으로 코드를 구현합니다.
 1. SPEC 확인 → 구현 → 테스트
 {{end}}
 
+## Minimality Discipline
+
+Before implementation assignment, apply the minimality ladder: `actual need` → `existing code/helper/pattern` → `stdlib/native` → `existing dependency` → `new dependency or abstraction` → `minimum sufficient verification`.
+
+- Executors must search existing code paths, helpers, and patterns before adding new helpers, dependencies, or abstractions.
+- Minimum sufficient implementation means the smallest change that closes the Outcome Lock with evidence, not the shortest code.
+- Do not reduce non-reducible gates: `security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle`, `generated-surface-hygiene`.
+- `minimum sufficient verification` must include focused checks for the changed surface while preserving those gates.
+- Final handoff must include a concise receipt of important choices: reused existing code/helper/pattern, skipped dependency or abstraction, accepted expansion with evidence, and selected verification.
+- `qualityloop`/`skillevolve` signals are candidate-only and remain isolated/quarantined; do not apply them during this workflow.
+
 ## Frontend Design Preflight
 
 - UI 관련 변경(`.tsx`, `.jsx`, CSS-family, theme/token/design-system 경로, configured UI globs)이 있으면 구현 전에 `auto design pack --format markdown`을 실행하거나 동등한 local evidence를 수집합니다.
@@ -78,6 +89,8 @@ When a task modifies 3+ files, exceeds 200 lines, or spans multiple domains, del
 ```
 @executor Implement {task description}
   Context: .autopus/specs/{SPEC-ID}/spec.md, .autopus/specs/{SPEC-ID}/plan.md
+  Minimality ladder: actual need, existing code/helper/pattern, stdlib/native, existing dependency, new dependency or abstraction, minimum sufficient verification
+  Constraint: Search existing helpers and patterns before adding a new dependency or abstraction
   Repair loop: if review findings are supplied, close all actionable findings in one batch where ownership allows
   Constraint: File size limit applies only to source code files; SPEC Markdown under .autopus/specs/** is exempt
 ```
@@ -115,6 +128,7 @@ Before showing the successful `go` workflow lifecycle or handing off to `/auto s
 - `sync_blockers`: `none` or concrete blockers that prevent setting the SPEC to `implemented`.
 - `spec_status_after_go`: `implemented` on success. Do not use `done` or `completed`; `completed` is reserved for `/auto sync`.
 - `sync_evidence_refs`: changed files, verification commands, Phase 4 verdict, @AX annotation result or `@AX: no-op`.
+- `decision_receipt`: reused existing code/helper/pattern, skipped dependency or abstraction, accepted expansion with evidence, and minimum sufficient verification summary.
 
 If `sync_ready` is not `yes`, do not print the sync handoff. Fix or report the blocker first.
 
@@ -161,6 +175,7 @@ sync_ready: yes
 sync_blockers: none
 spec_status_after_go: implemented
 sync_evidence_refs: {changed_files, verification_commands, review_verdict, ax_result}
+decision_receipt: reused existing code/helper/pattern; skipped unjustified dependency or abstraction; minimum sufficient verification selected
 next_required_step: sync 단계로 이동
 next_command: /auto sync {SPEC-ID}
 
