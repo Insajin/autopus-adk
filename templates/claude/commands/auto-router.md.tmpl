@@ -1092,8 +1092,8 @@ Before creating the team, resolve which substrate serves `--team` on this platfo
 
 | Condition | Behavior |
 |-----------|----------|
-| platform=claude-code AND `auto workflow doctor` overall=pass AND `--no-workflow` NOT set AND `workflow.team_default` NOT `false` | Serve via the **deterministic team Workflow substrate** (`route_team`). The installed `.claude/workflows/route_team.workflow.js` runs 8 ordered phases: planning → test_scaffold → implementation → gate_build_test → annotation → testing → review → release_hygiene. See `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`) for the full contract. |
-| `--no-workflow` set OR `autopus.yaml` → `workflow.team_default=false` | Skip the workflow substrate and run the existing Claude Code Agent Teams behavior below unchanged. This is a **pre-route opt-out**, NOT a taxonomy failure. |
+| platform=claude-code AND `auto workflow doctor` overall=pass AND `--no-workflow` NOT set AND `workflow.team_default` NOT `false` | Serve via the **deterministic team Workflow substrate** (`route_team`). The installed `.claude/workflows/route_team.workflow.js` runs 8 ordered phases: planning → test_scaffold → implementation → gate_build_test → annotation → testing → review → release_hygiene. See `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`) for the full contract. (Note: `workflow.team_default` maps to the real `WorkflowConf.TeamDefault` config field.) |
+| `--no-workflow` set OR `autopus.yaml` → `workflow.team_default=false` | Skip the workflow substrate and run the existing Claude Code Agent Teams behavior below unchanged. This is a **pre-route opt-out** (distinct from `--no-workflow`) that maps to the real `WorkflowConf.TeamDefault` field. |
 | `auto workflow doctor` overall=fail | Emit `[workflow] fallback-class=fail-fast reason=doctor_fail` and fall back to Route A (subagent pipeline). Do NOT enter the Agent Teams flow or any team workflow. |
 | Non-claude platform | The `--team` flag keeps its existing platform-native semantics. This substrate-selection logic is claude-code only and does not affect codex, antigravity-cli, or opencode. |
 
@@ -1399,13 +1399,13 @@ For the **team Workflow substrate** (`route_team`), quality mode resolves three 
 
 The resolved quality is delivered through the Workflow `args` input (`args.quality`). The workflow JS reads `RT.<phase>` from `args.quality` to override the schema baseline literal for each phase.
 
-**Segment-launch dispatcher contract** (`args` schema: `{spec, workingDir, quality, segment}`):
-1. Launch segment A: `workflow({scriptPath}, {spec, workingDir, quality, segment:'A'})` — runs planning through gate_build_test boundary marker.
-2. Run `auto workflow gate` (Go, exit-code). If `verdict != pass`: **abort. Do NOT launch segment B.**
-3. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality, segment:'B'})` — runs annotation through release_hygiene boundary marker.
-4. Run `auto check --hygiene --arch --quiet --staged`.
+**Segment-launch dispatcher contract** (`args` schema: `{spec, workingDir, quality, segment}`, `segment` ∈ `{'A','B','C','D'}`). A segment ends after every phase that needs a deterministic dispatcher interposition before the next phase — `gate_build_test` (A), the coverage-gated `testing` phase (B), and `review` (C); `release_hygiene` is D:
+1. Launch segment A: `workflow({scriptPath}, {spec, workingDir, quality, segment:'A'})` — runs planning, test_scaffold, implementation, and the gate_build_test boundary marker. Then run `auto workflow gate` (Go, exit-code). If the gate returns `verdict: fail`, the dispatcher runs a RALF remediation loop computed by `pkg/workflow.RunGateRemediation`. It spawns a fixer (executor) agent and re-runs the failed segment. The retry budget is capped by `MaxRetry` (3) from `pkg/workflow/depth.go`. If two consecutive gate evaluations produce the same signature, the loop aborts early with `AbortReason="circuit_break_no_progress"`. Pass → continue.
+2. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality, segment:'B'})` — runs annotation and testing. After testing, evaluate the coverage gate using `pkg/workflow.EvaluateCoverageGate`. If coverage is below the threshold (default 85), it yields `verdict: fail` (exit-code style) and runs the fixer remediation loop. This blocks segment C until coverage passes. Pass → continue.
+3. Launch segment C: `workflow({scriptPath}, {spec, workingDir, quality, segment:'C'})` — runs review. When review completes, consolidate findings using `pkg/workflow.ConsolidateReviewVerdict` (a security FAIL — `Barrier=true`, `Reason="security_fail"` — outranks a code-quality REQUEST_CHANGES). If a barrier is triggered, the dispatcher runs the review barrier loop computed by `pkg/workflow.RunReviewBarrier` (budget capped by `MaxRetry`), spawning an executor to fix findings and re-running review. On budget exhaustion it aborts with `review_budget_exhausted` and does **not** launch release_hygiene. Pass → continue.
+4. Launch segment D: `workflow({scriptPath}, {spec, workingDir, quality, segment:'D'})` — runs the release_hygiene boundary marker, then run `auto check --hygiene --arch --quiet --staged`.
 
-The gate phases are segment-boundary markers in the JS (no shell-out logic embedded); all exit-code adjudication is performed by the dispatcher between segment launches.
+The gate phases (`gate_build_test`, `release_hygiene`) are segment-boundary markers in the JS (no shell-out logic and no LLM verdict embedded); all exit-code/barrier adjudication is performed by the dispatcher between segment launches.
 
 Display after determination:
 ```

@@ -19,6 +19,12 @@ const (
 	MaxVerifyVotes = 3
 	MaxFanOut      = 5
 	MaxRetry       = 3
+	// MaxPhases bounds the declared phase count. The team workflow generator
+	// labels segments with string(rune('A'+segmentIndex)); since segments never
+	// exceed phases, capping phases at 26 keeps every segment label within the
+	// safe A..Z charset — closing the one generated-JS token not otherwise behind
+	// a charset whitelist (defense-in-depth at the SoT parse boundary).
+	MaxPhases = 26
 )
 
 // ResolveDepth maps a quality tier to a bounded DepthProfile. "ultra" runs the

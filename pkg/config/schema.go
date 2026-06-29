@@ -83,6 +83,7 @@ type HarnessConfig struct {
 	Profiles     ProfilesConf     `yaml:"profiles,omitempty"`
 	UsageProfile UsageProfile     `yaml:"usage_profile,omitempty"` // developer (default) or fullstack
 	Hints        HintsConf        `yaml:"hints,omitempty"`
+	Workflow     WorkflowConf     `yaml:"workflow,omitempty"`
 	Runtime      RuntimeConf      `yaml:"-"`
 }
 
@@ -272,6 +273,9 @@ func (c *HarnessConfig) Validate() error {
 	}
 	if !c.UsageProfile.IsValid() {
 		return fmt.Errorf("invalid usage_profile %q: must be 'developer' or 'fullstack'", c.UsageProfile)
+	}
+	if err := c.Workflow.Validate(); err != nil {
+		return err
 	}
 	return nil
 }

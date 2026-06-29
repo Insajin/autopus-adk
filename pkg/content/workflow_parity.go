@@ -82,6 +82,12 @@ func checkWorkflowParity(a parityArtifacts) error {
 		if p.ResultType != "" && !strings.Contains(block, p.ResultType) {
 			return fmt.Errorf("parity drift: phase %q result-type %q absent in derived JS", p.ID, p.ResultType)
 		}
+		if p.CoverageThreshold > 0 {
+			covTok := fmt.Sprintf("coverage_threshold=%d", p.CoverageThreshold)
+			if !strings.Contains(block, covTok) {
+				return fmt.Errorf("parity drift: phase %q coverage_threshold value %d absent in derived JS", p.ID, p.CoverageThreshold)
+			}
+		}
 	}
 
 	// Per-phase model/effort/depth tokens. These fire only for agent phases that

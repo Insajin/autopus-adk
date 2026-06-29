@@ -53,6 +53,12 @@ from an LLM verdict. The gate is executed outside the JS via the Go runtime (cal
 seam and emits a structured `{verdict, verdict_source, build_exit, test_exit}` JSON.
 A non-zero build or test exit code yields `verdict: fail`.
 
+When the gate returns a failed verdict, the system runs a RALF remediation loop
+computed by `pkg/workflow.RunGateRemediation`. It spawns a fixer (executor) agent
+and re-runs the failed segment, bounded by the schema gate retry budget (capped at `MaxRetry`=3).
+The loop circuit-breaks and aborts early (Aborted=true, AbortReason="circuit_break_no_progress")
+if two consecutive gate evaluations produce the same build/test exit-code signature.
+
 ### annotation
 
 The annotation phase runs the `annotator` agent to apply `@AX` tags and other
@@ -63,11 +69,23 @@ structured annotations to the implemented changes.
 The testing phase runs the `tester` agent to round out coverage beyond the
 initial scaffold and confirm the suite is green.
 
+Once testing completes, the system evaluates the deterministic coverage gate using
+`pkg/workflow.EvaluateCoverageGate` with the schema-declared threshold (default 85).
+It parses the coverage percentage from the stdout of the coverage command (using the
+injectable `CoverageRunner.RunOutput` seam, entirely LLM-free). A measured coverage percentage
+below the threshold yields `verdict: fail` (exit-code style) and runs a fixer remediation loop.
+
 ### review
 
 The review phase runs the `reviewer` agent (bounded by `verify_votes`) followed
 by the `security_auditor` agent. An optional `synthesis` pass merges reviewer
 findings when the schema enables it.
+
+If findings trigger a barrier, the system runs a review barrier loop computed by
+`pkg/workflow.RunReviewBarrier`. It spawns an executor to fix the findings and re-runs the review
+up to the review retry budget (capped at `MaxRetry`=3), aborting with `review_budget_exhausted` if spent.
+The verdict is consolidated by `pkg/workflow.ConsolidateReviewVerdict` so a security-auditor
+FAIL (Barrier=true, Reason="security_fail") outranks and blocks a reviewer APPROVE.
 
 ### release_hygiene
 

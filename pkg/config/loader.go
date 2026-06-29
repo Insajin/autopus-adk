@@ -91,6 +91,18 @@ func applyMissingDefaults(cfg *HarnessConfig, data []byte) {
 	if _, ok := raw["design"]; !ok {
 		cfg.Design = defaults.Design
 	}
+	// Backfill workflow defaults when the section is omitted entirely. When the
+	// key IS present, the explicit unmarshalled values are preserved (e.g.
+	// team_default: false stays false).
+	if _, ok := raw["workflow"]; !ok {
+		cfg.Workflow = defaults.Workflow
+	} else {
+		if rawWf, ok := raw["workflow"].(map[string]any); ok {
+			if _, hasTeamDefault := rawWf["team_default"]; !hasTeamDefault {
+				cfg.Workflow.TeamDefault = true
+			}
+		}
+	}
 }
 
 // Save validates and writes the config to autopus.yaml.

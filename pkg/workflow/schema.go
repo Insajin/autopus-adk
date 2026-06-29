@@ -16,15 +16,16 @@ import (
 // ResultType carries the verdict_source for the deterministic gate phase
 // (e.g. "exit_code"); it is "" for non-gate phases.
 type PhaseDef struct {
-	ID          string `json:"id"`
-	Retry       int    `json:"retry"`
-	Budget      int    `json:"budget"`
-	ResultType  string `json:"result_type"`
-	Model       string `json:"model"`
-	Effort      string `json:"effort"`
-	VerifyVotes int    `json:"verify_votes"`
-	FanOutCap   int    `json:"fan_out_cap"`
-	Synthesis   bool   `json:"synthesis"`
+	ID                string `json:"id"`
+	Retry             int    `json:"retry"`
+	Budget            int    `json:"budget"`
+	ResultType        string `json:"result_type"`
+	Model             string `json:"model"`
+	Effort            string `json:"effort"`
+	VerifyVotes       int    `json:"verify_votes"`
+	FanOutCap         int    `json:"fan_out_cap"`
+	Synthesis         bool   `json:"synthesis"`
+	CoverageThreshold int    `json:"coverage_threshold"`
 }
 
 // Schema is the parsed manifest with phases in execution order.
@@ -36,16 +37,17 @@ type Schema struct {
 // result-type field so the JSON manifest can use the more descriptive
 // "verdict_source" key for the gate phase.
 type rawPhase struct {
-	ID            string `json:"id"`
-	Retry         int    `json:"retry"`
-	Budget        int    `json:"budget"`
-	ResultType    string `json:"result_type"`
-	VerdictSource string `json:"verdict_source"`
-	Model         string `json:"model"`
-	Effort        string `json:"effort"`
-	VerifyVotes   int    `json:"verify_votes"`
-	FanOutCap     int    `json:"fan_out_cap"`
-	Synthesis     bool   `json:"synthesis"`
+	ID                string `json:"id"`
+	Retry             int    `json:"retry"`
+	Budget            int    `json:"budget"`
+	ResultType        string `json:"result_type"`
+	VerdictSource     string `json:"verdict_source"`
+	Model             string `json:"model"`
+	Effort            string `json:"effort"`
+	VerifyVotes       int    `json:"verify_votes"`
+	FanOutCap         int    `json:"fan_out_cap"`
+	Synthesis         bool   `json:"synthesis"`
+	CoverageThreshold int    `json:"coverage_threshold"`
 }
 
 type rawSchema struct {
@@ -54,6 +56,8 @@ type rawSchema struct {
 
 // ParseSchema unmarshals route_a.schema.json bytes into a Schema, preserving
 // phase array order as execution order.
+// @AX:WARN [AUTO]: 11 fail-closed validation branches guard the JS-injection trust boundary (phase count/id/model/effort/result_type/depth caps).
+// @AX:REASON [AUTO]: This is the single SoT parse gate for generated workflow JS; any branch weakened or reordered can let an unsafe field reach the generated-JS surface. Treat additions as security-relevant.
 func ParseSchema(data []byte) (Schema, error) {
 	var raw rawSchema
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -63,6 +67,13 @@ func ParseSchema(data []byte) (Schema, error) {
 	}
 	if len(raw.Phases) == 0 {
 		return Schema{}, fmt.Errorf("parse workflow schema: no phases declared")
+	}
+	// JS-injection trust boundary: the team generator labels segments with
+	// string(rune('A'+segmentIndex)). Segments never exceed phases, so capping
+	// phases keeps every segment label inside the safe A..Z charset. Fail closed
+	// here rather than emit a non-alphanumeric label into the generated JS.
+	if len(raw.Phases) > MaxPhases {
+		return Schema{}, fmt.Errorf("parse workflow schema: %d phases exceeds cap %d", len(raw.Phases), MaxPhases)
 	}
 	s := Schema{Phases: make([]PhaseDef, 0, len(raw.Phases))}
 	for i, rp := range raw.Phases {
@@ -90,6 +101,12 @@ func ParseSchema(data []byte) (Schema, error) {
 		if err := validateDepthCaps(rp.ID, rp.VerifyVotes, rp.FanOutCap, rp.Retry); err != nil {
 			return Schema{}, err
 		}
+		// Bounded coverage threshold (REQ, S15): 0 means unset/disabled; any
+		// configured value must be a valid percentage. Reject out-of-range
+		// values at the SoT parse boundary; fail closed.
+		if rp.CoverageThreshold < 0 || rp.CoverageThreshold > 100 {
+			return Schema{}, fmt.Errorf("parse workflow schema: phase %q coverage_threshold %d out of range (0..100)", rp.ID, rp.CoverageThreshold)
+		}
 		rt := rp.ResultType
 		if rt == "" {
 			rt = rp.VerdictSource
@@ -102,15 +119,16 @@ func ParseSchema(data []byte) (Schema, error) {
 			return Schema{}, fmt.Errorf("parse workflow schema: phase %d has unsafe result_type %q (allowed: \"\" or %q)", i, rt, VerdictSourceExitCode)
 		}
 		s.Phases = append(s.Phases, PhaseDef{
-			ID:          rp.ID,
-			Retry:       rp.Retry,
-			Budget:      rp.Budget,
-			ResultType:  rt,
-			Model:       rp.Model,
-			Effort:      rp.Effort,
-			VerifyVotes: rp.VerifyVotes,
-			FanOutCap:   rp.FanOutCap,
-			Synthesis:   rp.Synthesis,
+			ID:                rp.ID,
+			Retry:             rp.Retry,
+			Budget:            rp.Budget,
+			ResultType:        rt,
+			Model:             rp.Model,
+			Effort:            rp.Effort,
+			VerifyVotes:       rp.VerifyVotes,
+			FanOutCap:         rp.FanOutCap,
+			Synthesis:         rp.Synthesis,
+			CoverageThreshold: rp.CoverageThreshold,
 		})
 	}
 	return s, nil

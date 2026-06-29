@@ -48,10 +48,21 @@ const planSchemaJS = `const PLAN_SCHEMA = {
 // via ModelSet/EffortSet/DepthSet; the agent role per phase comes from the fixed
 // teamPhaseRoles map.
 //
-// Segmented dispatch: phases are partitioned into two guard blocks by the
-// gate_build_test boundary. The dispatcher launches segment A, runs
-// "auto workflow gate" as a hard exit-code barrier, then launches segment B
-// only when the verdict is pass. The SEGMENT constant is injected via args.
+// Segmented dispatch: phases are partitioned into N guard blocks, one per
+// deterministic dispatcher interposition point. A segment ENDS after every
+// phase that requires a Go-side barrier before the next phase runs:
+//   - gate_build_test: the build/test exit-code gate.
+//   - the coverage-gated phase (CoverageThreshold > 0, i.e. testing): the
+//     coverage gate runs after it.
+//   - the review phase (VerifyVotes > 0, i.e. review): the review barrier runs
+//     after it.
+//
+// Segments are labelled A, B, C, ... in order. The dispatcher launches each
+// segment, runs its interposed barrier as a hard exit-code check, then launches
+// the next segment only when the verdict is pass. For the standard 8-phase
+// route_team schema this yields 4 segments: A(planning,test_scaffold,
+// implementation,gate_build_test) B(annotation,testing) C(review)
+// D(release_hygiene). The SEGMENT constant is injected via args.
 func deriveTeamWorkflowJS(schema workflow.Schema) string {
 	models := schema.ModelSet()
 	efforts := schema.EffortSet()
@@ -93,35 +104,37 @@ func deriveTeamWorkflowJS(schema workflow.Schema) string {
 	sb.WriteString("let plan = null;\n\n")
 	sb.WriteString(planSchemaJS)
 
-	// Split phases: segment A includes everything up to and including gate_build_test;
-	// segment B includes everything after gate_build_test.
-	var segA, segB []workflow.PhaseDef
-	foundGate := false
+	// Partition phases into N segments. A segment ends after any phase that
+	// needs a deterministic dispatcher interposition before the next phase:
+	// gate_build_test, the coverage-gated phase, or the review phase.
+	isSegmentBoundary := func(p workflow.PhaseDef) bool {
+		return p.ID == gateBuildTestID || p.CoverageThreshold > 0 || p.VerifyVotes > 0
+	}
+	var segments [][]workflow.PhaseDef
+	var cur []workflow.PhaseDef
 	for _, p := range schema.Phases {
-		if foundGate {
-			segB = append(segB, p)
-		} else {
-			segA = append(segA, p)
-			if p.ID == gateBuildTestID {
-				foundGate = true
-			}
+		cur = append(cur, p)
+		if isSegmentBoundary(p) {
+			segments = append(segments, cur)
+			cur = nil
 		}
 	}
-
-	sb.WriteString("if (SEGMENT === 'A') {\n")
-	for _, p := range segA {
-		writeTeamPhaseBlock(&sb, p, models[p.ID], efforts[p.ID], depths[p.ID])
+	if len(cur) > 0 {
+		segments = append(segments, cur)
 	}
-	sb.WriteString("}\n\n")
 
-	sb.WriteString("if (SEGMENT === 'B') {\n")
-	for _, p := range segB {
-		writeTeamPhaseBlock(&sb, p, models[p.ID], efforts[p.ID], depths[p.ID])
+	for i, seg := range segments {
+		label := string(rune('A' + i))
+		fmt.Fprintf(&sb, "if (SEGMENT === '%s') {\n", label)
+		for _, p := range seg {
+			writeTeamPhaseBlock(&sb, p, models[p.ID], efforts[p.ID], depths[p.ID])
+		}
+		sb.WriteString("}\n\n")
 	}
-	sb.WriteString("}\n\n")
 
 	// Return the planner output so the dispatcher can enforce file ownership at
-	// the merge step. In segment B plan is null (planning runs only in segment A).
+	// the merge step. Outside segment A plan is null (planning runs only in
+	// segment A).
 	sb.WriteString("return { plan };\n")
 
 	return sb.String()
@@ -133,6 +146,9 @@ func deriveTeamWorkflowJS(schema workflow.Schema) string {
 func writeTeamPhaseBlock(sb *strings.Builder, p workflow.PhaseDef, model, effort string, depth workflow.DepthProfile) {
 	fmt.Fprintf(sb, "await phase('%s');\n", p.ID)
 	extra := fmt.Sprintf("retry: %d budget: %d", p.Retry, p.Budget)
+	if p.CoverageThreshold > 0 {
+		extra += fmt.Sprintf(" coverage_threshold=%d", p.CoverageThreshold)
+	}
 	switch {
 	case p.ID == gateBuildTestID:
 		fmt.Fprintf(sb, "// Deterministic gate: verdict_source '%s'. %s\n", p.ResultType, extra)

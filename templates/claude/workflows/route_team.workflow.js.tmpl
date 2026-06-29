@@ -70,7 +70,7 @@ if (executors_implementation.length === 0) {
 await parallel(executors_implementation);
 
 await phase('gate_build_test');
-// Deterministic gate: verdict_source 'exit_code'. retry: 0 budget: 40000
+// Deterministic gate: verdict_source 'exit_code'. retry: 2 budget: 40000
 // This gate is executed outside the JS by the Go runtime.
 log('gate', 'gate_build_test');
 
@@ -82,11 +82,14 @@ await phase('annotation');
 await agent(`Scan and apply @AX annotations for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'annotator', model: (RT.annotation && RT.annotation.model) || 'claude-sonnet-4-6', effort: (RT.annotation && RT.annotation.effort) || 'medium' });
 
 await phase('testing');
-// route_team baseline testing: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 60000
+// route_team baseline testing: model=claude-sonnet-4-6 effort=medium retry: 0 budget: 60000 coverage_threshold=85
 await agent(`Run and verify tests for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'tester', model: (RT.testing && RT.testing.model) || 'claude-sonnet-4-6', effort: (RT.testing && RT.testing.effort) || 'medium' });
 
+}
+
+if (SEGMENT === 'C') {
 await phase('review');
-// route_team baseline review: model=claude-sonnet-4-6 effort=medium verify_votes=1 synthesis=false retry: 0 budget: 60000
+// route_team baseline review: model=claude-sonnet-4-6 effort=medium verify_votes=1 synthesis=false retry: 2 budget: 60000
 const VOTES_review = (RT.review && RT.review.verify_votes) || 1;
 const SYNTH_review = (RT.review && RT.review.synthesis) || false;
 for (let v = 0; v < VOTES_review; v++) {
@@ -97,6 +100,9 @@ if (SYNTH_review) {
   await agent(`Synthesize review results for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'reviewer', model: (RT.review && RT.review.model) || 'claude-sonnet-4-6', effort: (RT.review && RT.review.effort) || 'medium' });
 }
 
+}
+
+if (SEGMENT === 'D') {
 await phase('release_hygiene');
 // Release hygiene: generated/runtime drift + staged source size gate. retry: 0 budget: 30000
 // This gate is executed outside the JS by the Go runtime.

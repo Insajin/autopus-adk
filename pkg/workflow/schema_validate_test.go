@@ -1,6 +1,65 @@
 package workflow
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
+
+// phasesJSON builds a schema with n minimally-valid phases (id only) for cap tests.
+func phasesJSON(n int) []byte {
+	parts := make([]string, n)
+	for i := range parts {
+		parts[i] = fmt.Sprintf(`{"id":"p%d"}`, i)
+	}
+	return []byte(`{"phases":[` + strings.Join(parts, ",") + `]}`)
+}
+
+// TestParseSchema_PhaseCountCap locks the MaxPhases fail-closed boundary: a phase
+// count above MaxPhases is rejected at the parse boundary (so the team generator's
+// string(rune('A'+segmentIndex)) segment labels can never leave the A..Z charset),
+// while a count at the cap parses.
+func TestParseSchema_PhaseCountCap(t *testing.T) {
+	t.Parallel()
+	if _, err := ParseSchema(phasesJSON(MaxPhases + 1)); err == nil {
+		t.Fatalf("expected %d phases (> cap %d) to be rejected", MaxPhases+1, MaxPhases)
+	} else if !strings.Contains(err.Error(), "exceeds cap") {
+		t.Fatalf("error must name the cap, got: %v", err)
+	}
+	if _, err := ParseSchema(phasesJSON(MaxPhases)); err != nil {
+		t.Fatalf("%d phases (== cap) should parse: %v", MaxPhases, err)
+	}
+}
+
+// TestParseSchema_CoverageThresholdBounds locks S15: coverage_threshold is a
+// percentage; values outside 0..100 are rejected at the parse boundary with an
+// error naming the field, while a valid in-range value (and 0 = unset) parses.
+func TestParseSchema_CoverageThresholdBounds(t *testing.T) {
+	t.Parallel()
+	overRange := []byte(`{"phases":[{"id":"testing","coverage_threshold":150}]}`)
+	_, err := ParseSchema(overRange)
+	if err == nil {
+		t.Fatal("expected coverage_threshold 150 to be rejected")
+	}
+	if !strings.Contains(err.Error(), "coverage_threshold") {
+		t.Fatalf("error must name coverage_threshold, got: %v", err)
+	}
+
+	valid := []byte(`{"phases":[{"id":"testing","coverage_threshold":85}]}`)
+	if _, err := ParseSchema(valid); err != nil {
+		t.Fatalf("coverage_threshold 85 should parse: %v", err)
+	}
+
+	unset := []byte(`{"phases":[{"id":"planning","coverage_threshold":0}]}`)
+	if _, err := ParseSchema(unset); err != nil {
+		t.Fatalf("coverage_threshold 0 (unset) should parse: %v", err)
+	}
+
+	negative := []byte(`{"phases":[{"id":"testing","coverage_threshold":-1}]}`)
+	if _, err := ParseSchema(negative); err == nil {
+		t.Fatal("expected negative coverage_threshold to be rejected")
+	}
+}
 
 // TestParseSchema_RejectsInjectionModel locks S6: a model string carrying JS
 // breakout characters is rejected at the parse boundary before it can reach the

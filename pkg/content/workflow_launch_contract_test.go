@@ -179,8 +179,10 @@ func TestLaunchContract_RouteTeam(t *testing.T) {
 	js := deriveTeamWorkflowJS(schema)
 	assertLaunchContractCommon(t, js, "route_team")
 
-	// S11: segment guards — route_team segment B starts with annotation
-	assertSegmentGuards(t, js, "route_team", "annotation")
+	// S11/S13: route_team uses N-segment interposition. For the 8-phase schema
+	// this is 4 segments: A(..gate_build_test) B(annotation,testing) C(review)
+	// D(release_hygiene). assertTeamMultiSegment validates the boundaries.
+	assertTeamMultiSegment(t, js, "route_team")
 
 	// S2: Specific assertions for Route Team
 	if strings.Contains(js, "JSON.parse(env") {
