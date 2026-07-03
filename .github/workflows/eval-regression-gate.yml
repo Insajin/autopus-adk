@@ -1,0 +1,66 @@
+# Eval-regression PR gate (SPEC-EVAL-REGRESSION-CI-001).
+#
+# This gate consumes the eval_regression_report.v1 artifact produced upstream by
+# the Primary SPEC (SPEC-COMPANY-OPS-EVAL-001, REQ-COE-EXPORT-001) and fails the
+# PR check when verdict.Blocked is true, or when the artifact is missing,
+# malformed, stale, or unsafe. The gate recomputes nothing (REQ-ECI-SEAM-001).
+#
+# LATENT-SAFE POSTURE (honest wired-but-latent):
+#   The auto-check step runs ONLY when the artifact is already present at
+#   EVAL_REGRESSION_ARTIFACT (see the `if: hashFiles(...) != ''` guard). While
+#   the backend has not yet published eval_regression_report.v1 (current latent
+#   phase), the guarded step is SKIPPED — not failed — so live PRs keep passing.
+#   Once the backend publishes the artifact this step becomes a required check
+#   and a blocked verdict will fail the PR. The CLI itself fails closed on a
+#   present-but-missing/bad/stale/unsafe artifact (proven by G3/G4/G5/G6).
+#   NOTE: the auto-check step deliberately omits --warn-only so a blocked
+#   verdict fails the pull-request check (REQ-ECI-CI-001, G8).
+
+name: Eval Regression Gate
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # SINGLE SOURCE OF TRUTH for the artifact path. The `if:` hashFiles() guard and
+  # the `run:` command below both reference this exact path — keep the literal in
+  # the `if:` guard textually identical to this value if it is ever changed.
+  EVAL_REGRESSION_ARTIFACT: .autopus/artifacts/eval_regression_report.json
+
+jobs:
+  eval-regression:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to conservative, widely-available stable majors. These majors
+      # exist and remain supported; a non-existent pin would fail checkout/setup
+      # on every PR.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build auto CLI
+        run: go build -o bin/auto ./cmd/auto
+
+      # SECURITY (provenance / trust boundary — MANDATORY before live activation):
+      #   The gate treats the verdict artifact as AUTHORITATIVE and recomputes
+      #   nothing (by design). It currently reads the artifact from the PR-head
+      #   working tree. Once the backend publishes a real eval_regression_report.v1,
+      #   a malicious PR could COMMIT a `blocked:false` artifact into its own tree
+      #   to force a green gate. DO NOT trust a PR-committed artifact once live:
+      #   before making this a required check, the artifact MUST be produced by a
+      #   trusted job at runtime, or verified via provenance/attestation — the gate
+      #   must NOT read a PR-writable file as authoritative. This is NOT exploitable
+      #   in the current latent phase (no artifact is published yet, so the
+      #   `if: hashFiles(...)` guard skips this step entirely).
+      #
+      # Latent-safe: only enforce once the backend publishes the artifact. The
+      # hashFiles() literal below MUST stay in sync with EVAL_REGRESSION_ARTIFACT.
+      - name: Eval regression gate
+        if: hashFiles('.autopus/artifacts/eval_regression_report.json') != ''
+        run: bin/auto check --eval-regression --eval-regression-artifact "$EVAL_REGRESSION_ARTIFACT"
