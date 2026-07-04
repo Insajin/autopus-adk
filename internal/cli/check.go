@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
+	"github.com/insajin/autopus-adk/pkg/evalregression"
 )
 
 func newCheckCmd() *cobra.Command {
@@ -27,9 +29,10 @@ func newCheckCmd() *cobra.Command {
 		gateFlag            string
 		dir                 string
 
-		evalRegressionFlag         bool
-		evalRegressionArtifactFlag string
-		evalRegressionMaxAgeFlag   time.Duration
+		evalRegressionFlag            bool
+		evalRegressionArtifactFlag    string
+		evalRegressionAttestationFlag string
+		evalRegressionMaxAgeFlag      time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -73,7 +76,7 @@ func newCheckCmd() *cobra.Command {
 			}
 
 			flags := globalFlagsFromContext(cmd.Context())
-			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag, evalRegressionArtifactFlag, evalRegressionMaxAgeFlag, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
+			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag, evalRegressionArtifactFlag, evalRegressionAttestationFlag, evalRegressionMaxAgeFlag, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
 			if !allOK {
 				return fmt.Errorf("check failed")
 			}
@@ -95,6 +98,7 @@ func newCheckCmd() *cobra.Command {
 	cmd.Flags().StringVar(&dir, "dir", "", "Project root directory")
 	cmd.Flags().BoolVar(&evalRegressionFlag, "eval-regression", false, "Fail closed on a blocked/missing/stale/unsafe eval_regression_report.v1 artifact (SPEC-EVAL-REGRESSION-CI-001)")
 	cmd.Flags().StringVar(&evalRegressionArtifactFlag, "eval-regression-artifact", "", "Path to the eval_regression_report.v1 artifact")
+	cmd.Flags().StringVar(&evalRegressionAttestationFlag, "eval-regression-attestation", "", "Path to the eval_regression_attestation.v1 sidecar (defaults to a path derived from the artifact)")
 	cmd.Flags().DurationVar(&evalRegressionMaxAgeFlag, "eval-regression-max-age", 24*time.Hour, "Freshness window for the eval-regression artifact")
 
 	return cmd
@@ -105,7 +109,7 @@ func newCheckCmd() *cobra.Command {
 // When warnOnly is true, violations are still printed but the function always returns true.
 // When staged is true, arch check only examines git-staged files.
 // When messageFile is non-empty, lore check validates that file instead of the last commit.
-func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag bool, evalRegressionArtifact string, evalRegressionMaxAge time.Duration, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
+func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag bool, evalRegressionArtifact, evalRegressionAttestation string, evalRegressionMaxAge time.Duration, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
 	runAll := !archFlag && !cc21Flag && !loreFlag && !hygieneFlag && !initialPromptFlag && !monitorCommandsFlag && !evalRegressionFlag
 	allOK := true
 
@@ -158,7 +162,11 @@ func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, ini
 		}
 	}
 	if evalRegressionFlag {
-		if !checkEvalRegression(dir, evalRegressionArtifact, evalRegressionMaxAge, time.Now(), out, quiet, warnOnly) {
+		attestationPath := evalRegressionAttestation
+		if strings.TrimSpace(attestationPath) == "" {
+			attestationPath = deriveEvalRegressionAttestationPath(evalRegressionArtifact)
+		}
+		if !checkEvalRegression(dir, evalRegressionArtifact, attestationPath, evalRegressionMaxAge, time.Now(), evalregression.CommittedEvalRegressionPublicKeys(), out, quiet, warnOnly) {
 			allOK = false
 		}
 	}
