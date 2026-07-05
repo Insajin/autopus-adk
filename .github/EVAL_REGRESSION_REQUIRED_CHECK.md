@@ -1,79 +1,145 @@
-# Eval Regression Gate — Required-Check Readiness Runbook
+# Eval Regression Gate - Required-Check Readiness Runbook
 
-Ops runbook for promoting the eval-regression gate to a **required status check**
-on branch `main`.
+Ops runbook for promoting the eval-regression gate to a required status check on
+branch `main`. The live gate is owned by the sibling **Autopus repo**
+(`github.com/Insajin/Autopus`); this `autopus-adk` repo owns the verifier CLI,
+the committed public-key allowlist, and this runbook.
 
-Ref: SPEC-EVAL-REGRESSION-PROV-001 (REQ-EVP-READY-001), extends
-SPEC-EVAL-REGRESSION-CI-001. Mirrors the branch-protection registration precedent
-in `autopus-desktop/tests/visual/README.md`.
+Ref: SPEC-EVAL-GATE-LIVE-001 (REQ-EGL-RUNBOOK-001), extending
+SPEC-EVAL-REGRESSION-PROV-001 and SPEC-EVAL-REGRESSION-CI-001.
 
-> IMPORTANT: This SPEC performs **no** branch-protection change. Promotion is an
-> OPS-ONLY privileged action and MUST NOT be automated by the pipeline. The
-> `gh api ... /branches/main/protection` command below is documentation for an
-> operator to run manually, out of band, after the readiness gate is met.
+> IMPORTANT: This document performs no privileged action. Branch protection,
+> repository secrets, CODEOWNERS, and org ruleset changes are OPS-ONLY actions
+> that an operator performs manually after the readiness checks below pass.
 
 ## Gate check context name
 
-The workflow `.github/workflows/eval-regression-gate.yml` defines a single job:
+The live workflow is expected at:
 
-```yaml
-jobs:
-  eval-regression:      # <-- this job name renders as the check context
+```text
+Autopus/.github/workflows/eval-regression-gate.yml
 ```
 
-The check **context name** is the job name: `eval-regression`.
-
-GitHub renders the context from the job id/name; confirm the exact rendered
-context on a recent commit before registering it (do not guess):
+The workflow defines the gate job as `eval-regression`; GitHub renders the check
+context from the job id/name. Confirm the exact rendered context on a recent
+Autopus repo commit before registering it:
 
 ```bash
-# Confirm the rendered check context name on a real commit SHA.
-gh api repos/:owner/:repo/commits/<sha>/check-runs \
+# Confirm the rendered check context name on a real Autopus commit SHA.
+gh api repos/Insajin/Autopus/commits/<sha>/check-runs \
   --jq '.check_runs[].name'
 ```
 
-Use the value printed for the eval-regression job as the authoritative context
-string in the registration step below (it is expected to be `eval-regression`).
+Use the printed value for the eval-regression job as the authoritative context
+string in branch protection. It is expected to be `eval-regression`, but the
+rendered `check-runs` response is the source of truth.
 
-## Readiness precondition (LIVE-A gate)
+## Trusted fetch dry-run oracle
 
-Do NOT promote until ALL of the following hold:
+The Autopus gate must fetch only the trusted producer workflow's successful run
+for the current pull-request head SHA. During workflow review, confirm the fetch
+selection contains all three pins: workflow identity, commit, and success status.
 
-1. **LIVE-A is live.** SPEC-COE-RUNTIME-LIVE-001 emits a real
-   `eval_regression_report.v1` report **and** a valid
-   `eval_regression_attestation.v1` sidecar, signed with a key whose public half
-   is in the committed allowlist, published from a **trusted producer** workflow
-   run (not the PR head).
-2. **The gate passes on a known-good control PR.** A PR carrying a validly-signed,
-   allowlisted, fresh, non-blocked report makes the `eval-regression` check green.
-3. **A blocked control PR fails closed.** A PR carrying a validly-signed blocked
-   report makes the check red (exit 1, reason `regression_blocked`).
+```bash
+# Review oracle only; do not run from this adk test suite.
+selected_run_id="$(
+  gh run list \
+    --workflow eval-regression-producer.yml \
+    --event pull_request \
+    --commit <head_sha> \
+    --status success \
+    --json databaseId \
+    --jq '.[0].databaseId'
+)"
 
-Until (1) holds, the gate is EXPECTED to fail closed on `artifact_missing` /
-`artifact_unsigned`; that is why it is intentionally NOT yet required.
+test -n "$selected_run_id" || {
+  echo "artifact_missing"
+  exit 1
+}
 
-## Registration (ops-only, run manually)
+gh run download <selected_run_id> \
+  --name eval-regression-report \
+  --dir .autopus/artifacts
+```
 
-Add the `eval-regression` context to branch `main`'s required status checks. This
-mirrors the desktop precedent
-(`gh api repos/:owner/:repo/branches/main/protection --field required_status_checks[contexts][]='linux-visual-regression'`):
+The same-SHA replay defense depends on this exact selection shape:
+`--workflow eval-regression-producer.yml`, `--event pull_request`,
+`--commit <head_sha>`, and `--status success`. A run from any other workflow or
+event at the same SHA must never be selected, even if it uploads an artifact
+named `eval-regression-report`. If no trusted producer run exists for that SHA,
+the gate fails closed with
+`artifact_missing`.
+
+## Operator provisioning checklist
+
+Complete these steps outside this repository and outside untrusted PR code:
+
+1. Generate the ed25519 signing key securely outside the repo, preferably in a
+   secret manager or controlled ops workstation. Never commit the private key,
+   generated seed, shell history, or derived secret material.
+2. Configure the Autopus repo producer workflow with the signing secrets
+   `EVAL_REGRESSION_SIGNING_KEY` and `EVAL_REGRESSION_SIGNING_KEY_ID`.
+3. Configure the producer workflow's DB/network credentials in the Autopus repo
+   secrets or environment protection layer. The producer needs only the minimum
+   database and network access required to read the live eval-regression verdict
+   source.
+4. Commit only the public key to the `autopus-adk` allowlist in
+   `pkg/evalregression/attestation.go`, keyed by the exact
+   `EVAL_REGRESSION_SIGNING_KEY_ID` `key_id`.
+5. For key rotation, use a rotation overlap: keep both old and new public keys
+   in the adk allowlist while both signing keys may produce artifacts, then
+   remove the old public key after the producer has fully cut over.
+6. Protect Autopus repo workflow definitions before the check becomes required:
+   add CODEOWNERS coverage or an org ruleset for `Autopus/.github/workflows/**`,
+   including `eval-regression-producer.yml` and `eval-regression-gate.yml`.
+7. Confirm the rendered `eval-regression` check context through the `check-runs`
+   API on a real Autopus commit, then register that exact context in Autopus repo
+   branch protection.
+8. Run a known-good control PR and a blocked control PR. The good control must
+   pass with reason `ok`; the blocked control must fail with reason
+   `regression_blocked`.
+
+## Branch protection registration
+
+After the checklist passes, add the rendered `eval-regression` context to branch
+`main` in the Autopus repo required status checks:
 
 ```bash
 # OPS-ONLY. Requires an admin token. Not run by CI or this SPEC.
-gh api repos/:owner/:repo/branches/main/protection \
+gh api repos/Insajin/Autopus/branches/main/protection \
   --method PUT \
   --field required_status_checks[strict]=true \
   --field required_status_checks[contexts][]='eval-regression'
 ```
 
-Or via the GitHub UI: **Settings → Branches → Branch protection rules → `main` →
-Require status checks to pass before merging → add `eval-regression`**.
+Or via the GitHub UI in the Autopus repo: **Settings -> Branches -> Branch
+protection rules -> `main` -> Require status checks to pass before merging ->
+add `eval-regression`**.
+
+## Readiness precondition
+
+Do not promote until all of the following hold:
+
+1. LIVE-A emits a real `eval_regression_report.v1` report and a valid
+   `eval_regression_attestation.v1` sidecar from the trusted producer workflow.
+2. The report is signed with the key whose public half is committed to the adk
+   allowlist under the matching `key_id`.
+3. The Autopus gate downloads the trusted producer's successful head-SHA run
+   artifact and runs `auto check --eval-regression` unconditionally.
+4. The adk workflow `.github/workflows/eval-regression-gate.yml` is absent, so
+   there is no dormant duplicate gate in this verifier repository.
+
+Until the production public key is committed and the Autopus repo secrets are
+configured, the gate is expected to fail closed on `artifact_missing`,
+`artifact_unsigned`, or `signature_key_unknown`. That is the intended safe
+default, not an incomplete implementation.
 
 ## Non-goals and safety
 
-- No secrets or tokens are inlined in this runbook or the workflow. The admin
-  token used for the `gh api` PUT is supplied by the operator's own environment.
-- This document changes no repository settings by itself; it only records the
-  procedure and its LIVE-A precondition.
-- Reversal: remove `eval-regression` from `required_status_checks[contexts][]`
-  via the same `gh api` endpoint or the UI if the gate needs to be de-listed.
+- This document does not run `gh api`, write secrets, alter branch protection, or
+  create CODEOWNERS/org ruleset entries.
+- No secret values are inlined. Secret names are listed only so an operator can
+  wire the producer consistently.
+- Reversal: remove `eval-regression` from
+  `required_status_checks[contexts][]` in the Autopus repo branch protection if
+  the gate needs to be de-listed.

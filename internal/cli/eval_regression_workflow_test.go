@@ -1,82 +1,155 @@
 package cli
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// readWorkflowYAML loads the committed eval-regression gate workflow relative to
-// the internal/cli package directory.
-func readWorkflowYAML(t *testing.T) string {
+func readRunbook(t *testing.T) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "eval-regression-gate.yml"))
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "EVAL_REGRESSION_REQUIRED_CHECK.md"))
 	if err != nil {
-		t.Fatalf("S9: read workflow: %v", err)
+		t.Fatalf("read readiness runbook: %v", err)
 	}
 	return string(data)
 }
 
-// S9 — the hardened workflow pins the verifier and never silently skips. Concrete
-// substring oracle over the committed yaml (SPEC-EVAL-REGRESSION-PROV-001,
-// REQ-EVP-PIN-001 / REQ-EVP-GATE-001 / REQ-EVP-PINACT-001).
-func TestEvalRegressionWorkflowPinsVerifierAndFailsClosed(t *testing.T) {
-	yaml := readWorkflowYAML(t)
-
-	// Trigger is present.
-	if !strings.Contains(yaml, "pull_request") {
-		t.Fatalf("S9: workflow must trigger on pull_request")
-	}
-
-	// L2: the verifier is obtained via a PINNED released binary, not a PR-head
-	// build. Assert the pinned-install fetch is present.
-	if !strings.Contains(yaml, "go install github.com/insajin/autopus-adk/cmd/auto@") {
-		t.Fatalf("S9: workflow must fetch a pinned verifier via 'go install github.com/insajin/autopus-adk/cmd/auto@<tag>'")
-	}
-
-	// The removed L2 hole: the PR-head verifier build must be gone.
-	if strings.Contains(yaml, "go build -o bin/auto ./cmd/auto") {
-		t.Fatalf("S9: workflow must NOT build the verifier from PR head ('go build -o bin/auto ./cmd/auto')")
-	}
-
-	// No advisory/warn mode anywhere — a blocked verdict must fail the check.
-	if strings.Contains(yaml, "--warn-only") {
-		t.Fatalf("S9: workflow must contain NO --warn-only substring")
-	}
-
-	// No bare hashFiles() skip guarding the gate — a missing/unsigned artifact
-	// must fail closed rather than be skipped.
-	if strings.Contains(yaml, "hashFiles('.autopus/artifacts/eval_regression_report.json') != ''") {
-		t.Fatalf("S9: workflow must NOT contain a bare hashFiles() skip guarding the gate")
-	}
-
-	// Pinned actions (REQ-EVP-PINACT-001): fixed major refs are present.
-	if !strings.Contains(yaml, "actions/checkout@v4") || !strings.Contains(yaml, "actions/setup-go@v5") {
-		t.Fatalf("S9: workflow must pin actions/checkout@v4 and actions/setup-go@v5")
+func requireContainsAll(t *testing.T, subject string, required ...string) {
+	t.Helper()
+	for _, needle := range required {
+		if !strings.Contains(subject, needle) {
+			t.Fatalf("expected content to contain %q", needle)
+		}
 	}
 }
 
-// S11 (Should, readiness) — the required-check readiness runbook exists, targets
-// the branch-protection endpoint, and references the gate check context name
-// (REQ-EVP-READY-001). Lightweight existence + substring assertion.
-func TestEvalRegressionRequiredCheckRunbookExists(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "EVAL_REGRESSION_REQUIRED_CHECK.md"))
-	if err != nil {
-		t.Fatalf("S11: read readiness runbook: %v", err)
+// The adk repository owns the verifier library/CLI only. The live gate moved to
+// the sibling Autopus repository, so keeping an adk workflow would create a
+// dormant duplicate gate with stale trust assumptions.
+func TestEvalRegressionADKWorkflowIsRetired(t *testing.T) {
+	path := filepath.Join("..", "..", ".github", "workflows", "eval-regression-gate.yml")
+	_, err := os.Stat(path)
+	if err == nil {
+		t.Fatalf("adk eval-regression workflow must be retired: %s still exists", path)
 	}
-	doc := string(data)
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("stat adk eval-regression workflow: %v", err)
+	}
+}
 
-	if !strings.Contains(doc, "branches/main/protection") {
-		t.Fatalf("S11: runbook must reference the repos/:owner/:repo/branches/main/protection endpoint")
+// S9/S13 review oracle: when the sibling Autopus gate YAML is present, validate
+// the exact same-SHA replay-safe fetch shape. When this adk checkout cannot see
+// that sibling YAML, require the runbook to carry the same dry-run oracle so the
+// gate review remains deterministic and network-free.
+func TestEvalRegressionAutopusGateFetchSelectionReviewOracle(t *testing.T) {
+	siblingGate := filepath.Join("..", "..", "..", "Autopus", ".github", "workflows", "eval-regression-gate.yml")
+	data, err := os.ReadFile(siblingGate)
+	if err == nil {
+		assertAutopusGateFetchSelection(t, string(data))
+		assertAutopusProducerTrustedCheckout(t)
+		return
 	}
-	if !strings.Contains(doc, "required_status_checks[contexts][]") {
-		t.Fatalf("S11: runbook must add the gate context to required_status_checks[contexts][]")
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("read sibling Autopus gate workflow: %v", err)
 	}
-	if !strings.Contains(doc, "eval-regression") {
-		t.Fatalf("S11: runbook must reference the 'eval-regression' gate check context name")
+
+	doc := readRunbook(t)
+	requireContainsAll(t, doc,
+		"Autopus/.github/workflows/eval-regression-gate.yml",
+		"gh run list",
+		"--workflow eval-regression-producer.yml",
+		"--event pull_request",
+		"--commit <head_sha>",
+		"--status success",
+		"--json databaseId",
+		"gh run download <selected_run_id>",
+		"eval-regression-report",
+		"artifact_missing",
+		"same-SHA",
+	)
+}
+
+func assertAutopusProducerTrustedCheckout(t *testing.T) {
+	t.Helper()
+	siblingProducer := filepath.Join("..", "..", "..", "Autopus", ".github", "workflows", "eval-regression-producer.yml")
+	data, err := os.ReadFile(siblingProducer)
+	if err != nil {
+		t.Fatalf("read sibling Autopus producer workflow: %v", err)
 	}
-	if !strings.Contains(doc, "check-runs") {
-		t.Fatalf("S11: runbook must instruct the operator to confirm the rendered context via check-runs")
+	yaml := string(data)
+	requireContainsAll(t, yaml,
+		"pull_request",
+		"actions/checkout@v4",
+		"Checkout trusted producer code",
+		"repository: ${{ github.repository }}",
+		"ref: ${{ github.event.pull_request.base.sha || github.sha }}",
+		"go run ./cmd/eval-regression-export",
+		"actions/upload-artifact@v4",
+		"name: eval-regression-report",
+		"eval_regression_report.v1",
+		"eval_regression_attestation.v1",
+	)
+	if strings.Contains(yaml, "github.event.pull_request.head.repo.full_name") {
+		t.Fatalf("Autopus producer workflow must not checkout PR-head repository with signing secrets")
 	}
+	if strings.Contains(yaml, "ref: ${{ env.HEAD_SHA }}") {
+		t.Fatalf("Autopus producer workflow must not run PR-head producer code with signing secrets")
+	}
+	if strings.Contains(yaml, "workflow_dispatch") {
+		t.Fatalf("Autopus producer workflow must not expose signing secrets through workflow_dispatch")
+	}
+}
+
+func assertAutopusGateFetchSelection(t *testing.T, yaml string) {
+	t.Helper()
+	requireContainsAll(t, yaml,
+		"pull_request",
+		"actions/checkout@v4",
+		"actions/setup-go@v5",
+		"actions/download-artifact@v4",
+		"go install github.com/insajin/autopus-adk/cmd/auto@",
+		"gh run list",
+		"--workflow eval-regression-producer.yml",
+		"--event pull_request",
+		"--commit",
+		"github.event.pull_request.head.sha",
+		"--status success",
+		"--json databaseId",
+		"gh run download",
+		"eval-regression-report",
+		"auto check --eval-regression",
+	)
+	if strings.Contains(yaml, "--warn-only") {
+		t.Fatalf("Autopus gate workflow must not contain --warn-only")
+	}
+	if strings.Contains(yaml, "hashFiles('.autopus/artifacts/eval_regression_report.json') != ''") {
+		t.Fatalf("Autopus gate workflow must not skip on hashFiles; absence must fail closed")
+	}
+}
+
+// S12 — the required-check readiness runbook exists, targets the Autopus repo,
+// and carries the operator-only key, secret, branch-protection, and workflow-path
+// enforcement checklist. The test is a reviewable dry-run: it performs no
+// privileged GitHub action and invokes no network command.
+func TestEvalRegressionRequiredCheckRunbookExists(t *testing.T) {
+	doc := readRunbook(t)
+
+	requireContainsAll(t, doc,
+		"Autopus repo",
+		"branches/main/protection",
+		"required_status_checks[contexts][]",
+		"eval-regression",
+		"check-runs",
+		"EVAL_REGRESSION_SIGNING_KEY",
+		"EVAL_REGRESSION_SIGNING_KEY_ID",
+		"DB/network credentials",
+		"key_id",
+		"rotation overlap",
+		"CODEOWNERS",
+		"org ruleset",
+		".github/workflows/**",
+	)
 }
