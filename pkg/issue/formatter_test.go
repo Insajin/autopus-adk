@@ -1,6 +1,8 @@
 package issue_test
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -78,6 +80,41 @@ func TestFormatMarkdown_WithoutTelemetry(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.NotContains(t, body, "Recent Telemetry")
+}
+
+// TestFormatMarkdown_SanitizesSecrets reproduces the leak where Command and
+// ErrorMessage are rendered into the issue body without sanitization,
+// exposing API keys, credential URLs, and home paths to a public repo.
+func TestFormatMarkdown_SanitizesSecrets(t *testing.T) {
+	t.Parallel()
+
+	const (
+		apiKey  = "sk-live-ABCDEF0123456789"
+		credURL = "https://user:supersecrettoken@host/x"
+	)
+
+	// Use the real home directory so this exercises the actual SanitizePath
+	// behavior (it redacts os.UserHomeDir(), not an arbitrary literal path).
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+	home := filepath.Join(homeDir, "private")
+
+	report := issue.IssueReport{
+		Title: "Test error report",
+		Context: issue.IssueContext{
+			ErrorMessage: "failed with token " + apiKey + " at " + home,
+			Command:      "curl " + credURL,
+			ExitCode:     1,
+		},
+		Hash: "secrettest",
+	}
+
+	body, err := issue.FormatMarkdown(report)
+	require.NoError(t, err)
+
+	assert.NotContains(t, body, apiKey, "API key must not appear in the rendered issue body")
+	assert.NotContains(t, body, "supersecrettoken", "credential URL secret must not appear in the rendered issue body")
+	assert.NotContains(t, body, home, "home directory path must not appear in the rendered issue body")
 }
 
 func TestFormatMarkdown_TruncatesLargeBody(t *testing.T) {

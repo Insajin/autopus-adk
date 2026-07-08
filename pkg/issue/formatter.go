@@ -32,7 +32,11 @@ func FormatMarkdown(report IssueReport) (string, error) {
 		return "", fmt.Errorf("formatter: render template: %w", err)
 	}
 
-	body := buf.String()
+	// Sanitize the fully rendered body as a single fail-closed choke point.
+	// This covers every field (Command, ErrorMessage, ConfigYAML, Telemetry)
+	// regardless of which caller invokes FormatMarkdown, so both the
+	// interactive confirm path and the --auto-submit path are protected.
+	body := Sanitize(buf.String())
 	if len(body) > maxBodyBytes {
 		body = body[:maxBodyBytes] + truncatedMarker
 	}
