@@ -147,10 +147,12 @@ func buildRebuttalPrompt(original string, otherResponses []ProviderResponse, rou
 		cleanedOutputs[i] = stripICEScores(r.Output)
 	}
 	cappedOutputs := capPromptSections(cleanedOutputs, rebuttalPromptTotalTokens, rebuttalPromptPerParticipant)
+	sentinel := newDebateSentinel(cappedOutputs...)
 
+	writeDebateFenceNotice(&sb, rebuttalFenceSecurityNote)
 	for i := range otherResponses {
 		alias := fmt.Sprintf("Participant %c", 'A'+rune(i))
-		fmt.Fprintf(&sb, "## %s:\n%s\n\n", alias, cappedOutputs[i])
+		writeDebateFenceBlock(&sb, "##", alias, cappedOutputs[i], sentinel)
 	}
 
 	sb.WriteString(`Respond in exactly 3 steps:
@@ -184,10 +186,12 @@ func buildJudgmentPrompt(topic string, arguments []ProviderResponse) string {
 		cleanedOutputs[i] = stripICEScores(r.Output)
 	}
 	cappedOutputs := capPromptSections(cleanedOutputs, judgePromptTotalTokens, judgePromptPerParticipant)
+	sentinel := newDebateSentinel(cappedOutputs...)
 
+	writeDebateFenceNotice(&sb, judgeFenceSecurityNote)
 	for i := range arguments {
 		alias := fmt.Sprintf("Participant %c", 'A'+rune(i))
-		fmt.Fprintf(&sb, "### %s:\n%s\n\n", alias, cappedOutputs[i])
+		writeDebateFenceBlock(&sb, "###", alias, cappedOutputs[i], sentinel)
 	}
 
 	sb.WriteString(`## Judging Instructions

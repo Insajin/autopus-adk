@@ -21,6 +21,7 @@ func TestValidateCommand_ShellMetacharacters(t *testing.T) {
 		{"subshell injection", "echo $(whoami)", true},
 		{"backtick injection", "echo `id`", true},
 		{"double ampersand", "echo ok && echo bad", true},
+		{"background operator", "sleep 999 & echo ok", true},
 		{"double pipe", "echo ok || echo bad", true},
 		{"brace expansion", "echo {a,b}", true},
 		{"input redirect", "cat < /etc/passwd", true},
@@ -134,6 +135,7 @@ func TestValidateCommand_ErrorMessageIncludesSpecificChar(t *testing.T) {
 	}{
 		{"semicolon identified", "echo; bad", ";"},
 		{"pipe identified", "cat | grep", "|"},
+		{"background operator identified", "sleep 1 & echo ok", "&"},
 		{"double-ampersand identified", "a && b", "&&"},
 	}
 

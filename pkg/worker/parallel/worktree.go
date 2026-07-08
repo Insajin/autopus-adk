@@ -1,40 +1,65 @@
 package parallel
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/insajin/autopus-adk/pkg/worker/taskid"
 )
+
+type worktreeCommandResult struct {
+	stdout []byte
+	stderr []byte
+}
 
 // WorktreeManager creates and removes git worktrees for task isolation.
 // All git commands use gc.auto=0 to suppress garbage collection during
 // parallel execution, preventing pack file contention.
 type WorktreeManager struct {
-	baseDir string
+	baseDir       string
+	runCommand    worktreeCommandRunner
+	sleep         retrySleeper
+	lockRetryBase time.Duration
 }
+
+type worktreeCommandRunner func(dir, name string, args ...string) (worktreeCommandResult, error)
 
 // NewWorktreeManager creates a manager rooted at the given repository directory.
 func NewWorktreeManager(baseDir string) *WorktreeManager {
-	return &WorktreeManager{baseDir: baseDir}
+	return &WorktreeManager{
+		baseDir:       baseDir,
+		runCommand:    runGitCommand,
+		sleep:         time.Sleep,
+		lockRetryBase: lockRetryBase,
+	}
 }
 
 // Create creates a new worktree for the given task on a fresh branch.
 // Returns the worktree path.
 func (m *WorktreeManager) Create(taskID string) (string, error) {
+	if err := taskid.Validate(taskID); err != nil {
+		return "", err
+	}
 	wtPath := m.worktreePath(taskID)
 	branch := fmt.Sprintf("worker-%s", taskID)
 
-	cmd := exec.Command(
-		"git", "-c", "gc.auto=0",
+	args := []string{
+		"-c", "gc.auto=0",
 		"worktree", "add", wtPath, "-b", branch,
-	)
-	cmd.Dir = m.baseDir
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("worktree create %s: %s: %w", taskID, strings.TrimSpace(string(out)), err)
+	}
+	if err := retryOnLock(func() error {
+		result, err := m.commandRunner()(m.baseDir, "git", args...)
+		if err != nil {
+			return &worktreeCreateError{taskID: taskID, stderr: string(result.stderr), err: err}
+		}
+		return nil
+	}, m.retrySleep(), m.retryBase()); err != nil {
+		return "", err
 	}
 	if err := m.ensureRuntimeExclude(wtPath); err != nil {
 		return "", err
@@ -110,6 +135,45 @@ func (m *WorktreeManager) List() ([]string, error) {
 // worktreePath returns the filesystem path for a task's worktree.
 func (m *WorktreeManager) worktreePath(taskID string) string {
 	return filepath.Join(m.baseDir, ".worktrees", fmt.Sprintf("worker-%s", taskID))
+}
+
+func (m *WorktreeManager) commandRunner() worktreeCommandRunner {
+	if m.runCommand != nil {
+		return m.runCommand
+	}
+	return runGitCommand
+}
+
+func (m *WorktreeManager) retrySleep() retrySleeper {
+	if m.sleep != nil {
+		return m.sleep
+	}
+	return time.Sleep
+}
+
+func (m *WorktreeManager) retryBase() time.Duration {
+	if m.lockRetryBase > 0 {
+		return m.lockRetryBase
+	}
+	return lockRetryBase
+}
+
+// @AX:WARN [AUTO] git command execution seam - Create supplies fixed argv and tests inject this runner; no shell expansion occurs.
+// @AX:REASON: The live worktree path must call git directly; task IDs are validated and argv is never shell-expanded.
+func runGitCommand(dir, name string, args ...string) (worktreeCommandResult, error) {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	var result worktreeCommandResult
+	cmd.Stdout = bytes.NewBuffer(nil)
+	cmd.Stderr = bytes.NewBuffer(nil)
+	err := cmd.Run()
+	if stdout, ok := cmd.Stdout.(*bytes.Buffer); ok {
+		result.stdout = stdout.Bytes()
+	}
+	if stderr, ok := cmd.Stderr.(*bytes.Buffer); ok {
+		result.stderr = stderr.Bytes()
+	}
+	return result, err
 }
 
 func (m *WorktreeManager) ensureRuntimeExclude(worktreePath string) error {

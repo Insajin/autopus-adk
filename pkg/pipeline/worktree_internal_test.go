@@ -28,7 +28,7 @@ func TestWorktreeManager_Remove_ResolvesSymlinkedPath(t *testing.T) {
 		_ = exec.Command("git", "branch", "-D", branch).Run()
 	})
 
-	require.NoError(t, mgr.addWorktreeWithRetry(t.Context(), aliasPath, branch))
+	require.NoError(t, mgr.addWorktree(t.Context(), aliasPath, branch))
 	mgr.paths[aliasPath] = struct{}{}
 
 	require.NoError(t, mgr.Remove(t.Context(), aliasPath))

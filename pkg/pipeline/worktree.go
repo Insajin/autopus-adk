@@ -8,15 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 )
 
-// @AX:NOTE: [AUTO] magic constants — maxWorktrees(5), lockRetryBase(3s), lockRetryAttempts(3) encode worktree-safety rule limits
+// @AX:NOTE: [AUTO] magic constant - maxWorktrees(5) encodes the worktree-safety rule limit
 const (
-	maxWorktrees      = 5
-	lockRetryBase     = 3 * time.Second
-	lockRetryFactor   = 2
-	lockRetryAttempts = 3
+	maxWorktrees = 5
 )
 
 // WorktreeManager manages isolated git worktrees for parallel pipeline execution.
@@ -68,7 +64,7 @@ func (m *WorktreeManager) Create(ctx context.Context, branch string) (string, er
 	wtBranch := fmt.Sprintf("worktree/%s", safeBranch)
 
 	if m.isGitRepo {
-		if err := m.addWorktreeWithRetry(ctx, dir, wtBranch); err != nil {
+		if err := m.addWorktree(ctx, dir, wtBranch); err != nil {
 			// Fallback: directory was already created by MkdirTemp; use it as-is.
 			// This allows tests without a real git repo to still function.
 			_ = os.RemoveAll(dir)
@@ -83,10 +79,9 @@ func (m *WorktreeManager) Create(ctx context.Context, branch string) (string, er
 	return dir, nil
 }
 
-// @AX:WARN: [AUTO] git command execution with user-derived branch name — mitigated by inline ValidateBranchName (line 92) + upstream sanitizeBranchName in Create; defense-in-depth layers active
-// addWorktreeWithRetry runs "git -c gc.auto=0 worktree add" with exponential backoff
-// on shared resource lock errors (refs.lock, packed-refs.lock, etc.).
-func (m *WorktreeManager) addWorktreeWithRetry(ctx context.Context, dir, branch string) error {
+// @AX:WARN: [AUTO] git command execution with user-derived branch name — mitigated by inline ValidateBranchName and upstream sanitizeBranchName in Create; defense-in-depth layers active
+// @AX:REASON: The retained pipeline public API still shells out to git; branch names are sanitized before command construction and passed as argv.
+func (m *WorktreeManager) addWorktree(ctx context.Context, dir, branch string) error {
 	// Inline validation — defense-in-depth even if caller already validated
 	if branch != "" {
 		if err := ValidateBranchName(branch); err != nil {
@@ -94,42 +89,20 @@ func (m *WorktreeManager) addWorktreeWithRetry(ctx context.Context, dir, branch 
 		}
 	}
 
-	var lastErr error
-	wait := lockRetryBase
-
-	for attempt := 0; attempt <= lockRetryAttempts; attempt++ {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(wait):
-			}
-			wait *= lockRetryFactor
-		}
-
-		//nolint:gosec // branch and dir are internally generated; no user input injection.
-		args := []string{"-c", "gc.auto=0", "worktree", "add"}
-		if branch != "" {
-			args = append(args, "-b", branch)
-		} else {
-			args = append(args, "--detach")
-		}
-		args = append(args, dir)
-		cmd := exec.CommandContext(ctx, "git", args...)
-		out, err := cmd.CombinedOutput()
-		if err == nil {
-			return nil
-		}
-
-		lastErr = fmt.Errorf("git worktree add: %w (output: %s)", err, strings.TrimSpace(string(out)))
-
-		// Only retry on lock-related errors.
-		if !isLockError(string(out)) {
-			break
-		}
+	//nolint:gosec // branch and dir are internally generated; no user input injection.
+	args := []string{"-c", "gc.auto=0", "worktree", "add"}
+	if branch != "" {
+		args = append(args, "-b", branch)
+	} else {
+		args = append(args, "--detach")
 	}
-
-	return lastErr
+	args = append(args, dir)
+	cmd := exec.CommandContext(ctx, "git", args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git worktree add: %w (output: %s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // Remove removes a git worktree and cleans up tracking.
@@ -226,25 +199,6 @@ func sanitizeBranchName(name string) (string, error) {
 		"\\", "-",
 	)
 	return replacer.Replace(name), nil
-}
-
-// isLockError returns true when the git command output indicates a shared lock conflict.
-func isLockError(output string) bool {
-	lockPatterns := []string{
-		"refs.lock",
-		"packed-refs.lock",
-		"shallow.lock",
-		"index.lock",
-		"unable to lock",
-		"lock file",
-	}
-	lower := strings.ToLower(output)
-	for _, p := range lockPatterns {
-		if strings.Contains(lower, p) {
-			return true
-		}
-	}
-	return false
 }
 
 func isNotWorktreeError(output string) bool {

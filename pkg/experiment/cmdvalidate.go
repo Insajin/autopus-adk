@@ -27,7 +27,7 @@ var disallowedMultiChar = []string{"&&", "||", "$("}
 // disallowedSingleChar lists single-character shell metacharacters.
 // Braces and angle brackets inside single-quoted strings are safe,
 // but we validate at the raw command level for defense in depth.
-var disallowedSingleChar = ";|`(){}<>\n\r"
+var disallowedSingleChar = ";&|`(){}<>\n\r"
 
 // ValidateCommand checks cmd for disallowed shell metacharacters.
 // Returns an error if any are found, unless AllowShellMeta() is passed.

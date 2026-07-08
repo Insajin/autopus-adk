@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -39,8 +40,78 @@ func newExperimentCmd() *cobra.Command {
 	cmd.AddCommand(newExperimentResetCmd())
 	cmd.AddCommand(newExperimentSummaryCmd())
 	cmd.AddCommand(newExperimentStatusCmd())
+	cmd.AddCommand(newExperimentRunCmd())
 
 	return cmd
+}
+
+// newExperimentRunCmd creates `auto experiment run`.
+func newExperimentRunCmd() *cobra.Command {
+	var f experimentFlags
+
+	cmd := &cobra.Command{
+		Use:   "run",
+		Short: "Run an experiment loop with in-process hard stops",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if f.metric == "" {
+				return fmt.Errorf("--metric is required")
+			}
+
+			cfg := buildConfig(f)
+			summary, reason, err := experiment.NewLoop(cfg).Run(cmd.Context(), metricBackedStep(cfg))
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(),
+				"stop_reason=%s total_iterations=%d keep=%d discard=%d best=%.4f\n",
+				reason, summary.TotalIterations, summary.KeepCount, summary.DiscardCount, summary.BestMetric,
+			)
+			return nil
+		},
+	}
+
+	addExperimentFlags(cmd, &f)
+	return cmd
+}
+
+func metricBackedStep(cfg experiment.Config) experiment.StepFunc {
+	var (
+		best    float64
+		hasBest bool
+	)
+
+	return func(ctx context.Context, iteration int) (experiment.StepResult, error) {
+		out, err := experiment.RunMetricMedian(ctx, cfg.MetricCmd, cfg.MetricRuns)
+		if err != nil {
+			return experiment.StepResult{}, fmt.Errorf("metric run: %w", err)
+		}
+		value, err := experiment.ExtractMetric(out, cfg.MetricKey)
+		if err != nil {
+			return experiment.StepResult{}, fmt.Errorf("extract metric: %w", err)
+		}
+
+		improved := !hasBest || cfg.Direction.IsBetter(value, best)
+		status := "discard"
+		if improved {
+			status = "keep"
+			best = value
+			hasBest = true
+		}
+
+		return experiment.StepResult{
+			Result: experiment.Result{
+				Iteration:   iteration,
+				MetricValue: value,
+				MetricKey:   cfg.MetricKey,
+				Unit:        out.Unit,
+				Status:      status,
+				Description: fmt.Sprintf("metric iteration %d", iteration),
+				Timestamp:   time.Now(),
+			},
+			Improved: improved,
+		}, nil
+	}
 }
 
 // newExperimentInitCmd creates `auto experiment init`.
