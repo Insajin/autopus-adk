@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"log"
 	"time"
+
+	"github.com/insajin/autopus-adk/pkg/worker/taskid"
 )
 
 func (s *Server) enqueueAndDispatchTask(ctx context.Context, reqID json.RawMessage, params SendMessageParams) error {
-	if params.TaskID == "" {
-		return fmt.Errorf("missing task ID")
+	if err := taskid.Validate(params.TaskID); err != nil {
+		return err
 	}
 	if err := s.trackQueuedTask(params.TaskID); err != nil {
 		return err
@@ -74,6 +76,7 @@ func (s *Server) dropTask(taskID string) {
 }
 
 // @AX:ANCHOR [AUTO] task execution contract — applies SecurityPolicy timeout and per-task context; callers rely on UpdateTaskStatus being sent for all terminal states — fan_in: 3 (handleSendMessage goroutine, cancel path, timeout path)
+// @AX:REASON: This function is the A2A task lifecycle boundary that enforces cancellation, timeout, and terminal status reporting.
 // dispatchTask runs the task handler and reports the result.
 // Uses a per-task cancellable context so individual tasks can be canceled (REQ-A2A-H02).
 // Applies SecurityPolicy.TimeoutSec as a hard deadline when configured.
