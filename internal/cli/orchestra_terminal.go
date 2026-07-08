@@ -22,9 +22,10 @@ import (
 // CMUX_*/TMUX env vars are inherited into such nested processes, so the detected
 // terminal name alone (cmux/tmux) is not sufficient.
 //
-// REQ-005/REQ-008 (nested-agent relaxation): when CLAUDECODE or CODEX is set and
-// no CI env is present, pane execution is permitted if both the hook subsystem is
-// available (isHookModeAvailable) AND a multiplexer (cmux or tmux) is installed.
+// REQ-005/REQ-008 (nested-agent relaxation): when CLAUDECODE or a Codex runtime
+// marker is set and no CI env is present, pane execution is permitted if both the
+// hook subsystem is available (isHookModeAvailable) AND a multiplexer (cmux or
+// tmux) is installed.
 // This allows agent runtimes to drive pane-based orchestra without requiring an
 // interactive TTY. The floor is preserved: if either condition is false the result
 // falls back to plain/subprocess just as before.
@@ -32,10 +33,19 @@ func detectStructuredTerminal() terminal.Terminal {
 	hookAvail := isHookModeAvailable()
 	detected := terminal.DetectTerminal()
 	muxInstalled := detected.Name() != "plain"
+	codexRuntime := ""
+	if hasCodexRuntimeMarker(
+		os.Getenv("CODEX"),
+		os.Getenv("CODEX_CI"),
+		os.Getenv("CODEX_THREAD_ID"),
+		os.Getenv("CODEX_MANAGED_BY_NPM"),
+	) {
+		codexRuntime = "1"
+	}
 
 	if !paneInteractiveContext(
 		os.Getenv("CLAUDECODE"),
-		os.Getenv("CODEX"),
+		codexRuntime,
 		os.Getenv("CI"),
 		term.IsTerminal(int(os.Stdin.Fd())),
 		term.IsTerminal(int(os.Stdout.Fd())),
@@ -51,24 +61,28 @@ func detectStructuredTerminal() terminal.Terminal {
 //
 // Truth-table (REQ-005/REQ-008):
 //
-//	CI != ""                                      → false  (CI always forces subprocess floor)
-//	CI == "" && (claudeCode != "" || codex != "") → hookAvailable && muxInstalled
-//	CI == "" && no nested agent env               → stdinTTY && stdoutTTY  (normal interactive path)
+//	CI != ""                                             → false  (CI always forces subprocess floor)
+//	CI == "" && (claudeCode != "" || codexRuntime != "") → hookAvailable && muxInstalled
+//	CI == "" && no nested agent env                      → stdinTTY && stdoutTTY  (normal interactive path)
 //
 // hookAvailable: isHookModeAvailable() (project-local OR user-global hook config).
 // muxInstalled:  DetectTerminal().Name() != "plain" (cmux OR tmux present).
 //
 // Kept as a pure function so the decision is unit-testable without manipulating
 // real file descriptors or environment variables.
-func paneInteractiveContext(claudeCode, codex, ci string, stdinTTY, stdoutTTY bool, hookAvailable, muxInstalled bool) bool {
+func paneInteractiveContext(claudeCode, codexRuntime, ci string, stdinTTY, stdoutTTY bool, hookAvailable, muxInstalled bool) bool {
 	// CI always forces the subprocess floor regardless of nested agent runtime.
 	if ci != "" {
 		return false
 	}
 	// Nested-agent relaxation: hook + mux must both be present.
-	if claudeCode != "" || codex != "" {
+	if claudeCode != "" || codexRuntime != "" {
 		return hookAvailable && muxInstalled
 	}
 	// Normal interactive context: both stdio file descriptors must be TTYs.
 	return stdinTTY && stdoutTTY
+}
+
+func hasCodexRuntimeMarker(codex, codexCI, codexThreadID, codexManagedByNPM string) bool {
+	return codex != "" || codexCI != "" || codexThreadID != "" || codexManagedByNPM != ""
 }
