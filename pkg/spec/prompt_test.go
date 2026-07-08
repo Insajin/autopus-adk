@@ -45,7 +45,10 @@ func TestBuildReviewPromptIncludesAuxiliaryDocs(t *testing.T) {
 	assert.Contains(t, prompt, "### Plan Document", "plan.md section must be present")
 	assert.Contains(t, prompt, "### Research Document", "research.md section must be present")
 	assert.Contains(t, prompt, "### Acceptance Criteria Document", "acceptance.md section must be present")
-	assert.Contains(t, prompt, "... (trimmed 50 more lines)", "oversize research.md must show trim notice")
+	assert.Contains(t, prompt, "[Review-context notice: 50 additional lines were omitted",
+		"oversize research.md must show a source-safe trim notice")
+	assert.Contains(t, prompt, "not a source document defect",
+		"review prompt must tell reviewers the trim notice is not document evidence")
 }
 
 // TestBuildReviewPromptOmitsMissingDocs verifies that absent auxiliary files are
@@ -111,4 +114,14 @@ func TestBuildReviewPromptIncludesFewShotExamples(t *testing.T) {
 
 	// AVOID label for legacy format
 	assert.Contains(t, prompt, "do NOT use")
+}
+
+func TestBuildReviewPromptWarnsAgainstTrimNoticeFindings(t *testing.T) {
+	t.Parallel()
+
+	doc := &SpecDocument{ID: "SPEC-TRIM-001", Title: "Trim Notice"}
+	prompt := BuildReviewPrompt(doc, "", ReviewPromptOptions{})
+
+	assert.Contains(t, prompt, "review-context notice")
+	assert.Contains(t, prompt, "not as a source-document defect or finding evidence")
 }

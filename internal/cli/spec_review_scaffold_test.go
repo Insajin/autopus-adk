@@ -135,8 +135,8 @@ func TestRunSpecReviewReloadsSpecBetweenRevisions(t *testing.T) {
 		// 2-provider config.
 		return &orchestra.OrchestraResult{
 			Responses: []orchestra.ProviderResponse{
-				{Provider: "claude", Output: "VERDICT: PASS"},
-				{Provider: "gemini", Output: "VERDICT: PASS"},
+				{Provider: "claude", Output: "VERDICT: PASS\nFINDING_STATUS: F-001 | resolved | fixed after reload"},
+				{Provider: "gemini", Output: "VERDICT: PASS\nFINDING_STATUS: F-001 | resolved | fixed after reload"},
 			},
 		}, nil
 	}

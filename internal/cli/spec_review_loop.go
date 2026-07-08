@@ -146,9 +146,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		if len(priorFindings) > 0 {
 			allFindings = mergeVerifyFindings(providerFindings, priorFindings, len(reviews), p.threshold)
 		} else {
-			// REQ-06: MergeSupermajority then DeduplicateFindings.
-			allFindings = spec.MergeSupermajority(allFindings, len(reviews), p.threshold)
-			allFindings = spec.DeduplicateFindings(allFindings)
+			allFindings = mergeDiscoverFindings(allFindings, len(reviews), p.threshold, finalVerdict)
 		}
 		allFindings = spec.NormalizeAdvisoryFindings(allFindings)
 

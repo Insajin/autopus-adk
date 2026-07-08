@@ -8,6 +8,7 @@ import (
 )
 
 const defaultDocContextMaxLines = 200
+const trimNoticeFormat = "[Review-context notice: %d additional lines were omitted from this injected excerpt because of the prompt context limit. This notice is not a source document defect and must not be used as SPEC quality finding evidence.]"
 
 // BuildReviewPrompt constructs a review prompt from a SPEC document and code context.
 // specDir (optional variadic): path to the spec directory for loading plan.md/research.md/acceptance.md.
@@ -127,7 +128,7 @@ func trimToLines(content string, maxLines int) string {
 	}
 	trimmed := strings.Join(lines[:maxLines], "\n")
 	extra := len(lines) - maxLines
-	return fmt.Sprintf("%s\n... (trimmed %d more lines)", trimmed, extra)
+	return fmt.Sprintf("%s\n"+trimNoticeFormat, trimmed, extra)
 }
 
 // buildVerifyInstructions writes checklist-based instructions for verify mode.
@@ -151,6 +152,7 @@ func buildVerifyInstructions(sb *strings.Builder, priorFindings []ReviewFinding,
 	sb.WriteString("Do NOT stop early, narrow the scope on your own, or replace the requested output with progress notes.\n")
 	sb.WriteString("Review all prior findings in one pass; do not drip-feed one optional suggestion per revision.\n")
 	sb.WriteString("If auxiliary docs include `## Outcome Lock`, `## Completion Debt`, `## Evolution Ideas`, or `## Reviewer Brief`, use them to block only Completion Debt and keep Evolution Ideas advisory.\n")
+	writeTrimNoticeInstruction(sb)
 	sb.WriteString("A `suggestion` is advisory and must not be the only reason for REVISE. If VERDICT is PASS, do not keep suggestion-only findings open.\n")
 	sb.WriteString("Responses that omit the required VERDICT/FINDING_STATUS lines are treated as malformed review output.\n\n")
 
@@ -195,6 +197,7 @@ func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFindi
 	sb.WriteString("Do NOT stop early, narrow the scope on your own, or replace the requested output with progress notes.\n")
 	sb.WriteString("Review the whole SPEC in one pass and return the full set of actionable issues together.\n")
 	sb.WriteString("If auxiliary docs include `## Outcome Lock`, `## Completion Debt`, `## Evolution Ideas`, or `## Reviewer Brief`, use them to prioritize Completion Debt blockers over optional deeper-layer suggestions.\n")
+	writeTrimNoticeInstruction(sb)
 	sb.WriteString("Use `suggestion` only for non-blocking advisory improvements; suggestions alone must not drive REVISE.\n")
 	sb.WriteString("Responses that omit the required VERDICT/FINDING lines are treated as malformed review output.\n\n")
 
@@ -218,6 +221,10 @@ func buildDiscoverInstructions(sb *strings.Builder, staticFindings []ReviewFindi
 	}
 	sb.WriteString("   Severity levels: critical, major, minor, suggestion\n")
 	sb.WriteString("   Category: correctness, completeness, feasibility, style, security\n")
+}
+
+func writeTrimNoticeInstruction(sb *strings.Builder) {
+	sb.WriteString("If an injected excerpt contains a review-context notice about omitted lines, treat it as prompt-budget metadata, not as a source-document defect or finding evidence.\n")
 }
 
 // writeVerdictRules writes the default or custom verdict decision rules.

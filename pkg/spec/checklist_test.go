@@ -69,7 +69,8 @@ func TestBuildReviewPrompt_TrimsChecklistToDocContextMaxLines(t *testing.T) {
 
 	prompt := BuildReviewPrompt(doc, "", opts)
 
-	assert.Contains(t, prompt, "... (trimmed 100 more lines)")
+	assert.Contains(t, prompt, "[Review-context notice: 100 additional lines were omitted")
+	assert.Contains(t, prompt, "not a source document defect")
 	assert.NotContains(t, prompt, strings.Repeat("checklist line\n", 250))
 }
 
