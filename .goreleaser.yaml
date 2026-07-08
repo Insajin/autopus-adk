@@ -73,9 +73,8 @@ brews:
       name: homebrew-autopus
       branch: main
       # Cross-repo push needs a token with write access to the tap repo; the
-      # default Actions GITHUB_TOKEN is scoped to autopus-adk only. Set the
-      # HOMEBREW_TAP_TOKEN secret (a PAT / fine-grained token with contents:write
-      # on Insajin/homebrew-autopus) — release.yaml passes it through.
+      # default Actions GITHUB_TOKEN is scoped to autopus-adk only. release.yaml
+      # generates this token from the Homebrew release GitHub App installation.
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/Insajin/autopus-adk"
