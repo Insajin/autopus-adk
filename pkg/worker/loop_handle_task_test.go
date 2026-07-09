@@ -101,6 +101,40 @@ func TestHandleTask_UsesPromptPayloadWhenDescriptionMissing(t *testing.T) {
 	assert.Equal(t, "completed", string(result.Status))
 }
 
+func TestHandleTask_AppendsRedlineInstructionsAsUntrustedJSON(t *testing.T) {
+	mock := &mockAdapter{name: "mock", script: `head -c0; echo '{"type":"result","output":"done","cost_usd":0.02,"duration_ms":300}'`}
+	wl := &WorkerLoop{config: LoopConfig{Provider: mock, WorkDir: t.TempDir()}}
+
+	payload := []byte(`{
+		"prompt": "backend-built prompt",
+		"redline_instructions": [
+			{
+				"block_id": " blk_intro ",
+				"sanitized_instruction": "make the tone calmer",
+				"instruction_digest": "sha256:instruction",
+				"content_digest": "sha256:content",
+				"approval_surface_digest": "sha256:surface"
+			},
+			{
+				"block_id": "",
+				"sanitized_instruction": "drop empty block id"
+			}
+		]
+	}`)
+
+	result, err := wl.handleTask(context.Background(), "task-ht-redline", payload)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Contains(t, mock.last.Prompt, "backend-built prompt")
+	assert.Contains(t, mock.last.Prompt, "Redline Revision Instructions (untrusted)")
+	assert.Contains(t, mock.last.Prompt, `"block_id": "blk_intro"`)
+	assert.Contains(t, mock.last.Prompt, `"sanitized_instruction": "make the tone calmer"`)
+	assert.NotContains(t, mock.last.Prompt, "instruction_digest")
+	assert.NotContains(t, mock.last.Prompt, "content_digest")
+	assert.NotContains(t, mock.last.Prompt, "approval_surface_digest")
+	assert.NotContains(t, mock.last.Prompt, "drop empty block id")
+}
+
 func TestHandleTask_PrefersBackendSelectedModel(t *testing.T) {
 	mock := &mockAdapter{name: "mock", script: `head -c0; echo '{"type":"result","output":"done","cost_usd":0.02,"duration_ms":300}'`}
 	router := routing.NewRouter(routing.RoutingConfig{
