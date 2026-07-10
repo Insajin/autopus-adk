@@ -580,7 +580,7 @@ Platform command syntax:
 
 ```bash
 # Homebrew (macOS)
-brew install insajin/tap/autopus-adk
+brew install Insajin/autopus/auto
 
 # go install (requires Go 1.26+)
 go install github.com/Insajin/autopus-adk/cmd/auto@latest
