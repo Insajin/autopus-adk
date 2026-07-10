@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
@@ -62,14 +63,19 @@ func runSubprocessPipeline(
 ) error {
 	explicitProviderSelection := len(providerNames) > 0
 	explicitJudge := judgeName != ""
-	orchConf, configErr := orchestraRunLoadConfig()
+	runtimeFlags := globalFlagsFromContext(ctx)
+	harnessCfg, configErr := orchestraRunLoadConfig(runtimeFlags)
+	var orchConf *config.OrchestraConf
+	if harnessCfg != nil {
+		orchConf = &harnessCfg.Orchestra
+	}
 
 	var providerConfigs []orchestra.ProviderConfig
 	if configErr != nil || orchConf == nil {
 		if len(providerNames) == 0 {
 			providerNames = defaultProviders()
 		}
-		providerConfigs = orchestraRunBuildProviders(providerNames)
+		providerConfigs = orchestraRunBuildProviders(providerNames, runtimeFlags.Quality, runtimeFlags.Effort)
 	} else {
 		providerConfigs = resolveProviders(orchConf, "run", providerNames)
 		if judgeName == "" {
@@ -84,6 +90,7 @@ func runSubprocessPipeline(
 	if configErr != nil || orchConf == nil {
 		timeout = resolveCommandTimeout(nil, timeout, timeoutChanged)
 	}
+	providerConfigs = resolveCodexProviderCapabilities(ctx, providerConfigs)
 
 	if len(providerConfigs) == 0 {
 		return fmt.Errorf("no providers available")

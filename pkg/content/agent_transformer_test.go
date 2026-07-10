@@ -78,8 +78,8 @@ func TestTransformAgentForCodex_RichInstructions(t *testing.T) {
 
 	// S1: TOML with developer_instructions >= 200 chars
 	assert.Contains(t, result, `name = "executor"`)
-	assert.Contains(t, result, `model = "gpt-5.5"`)
-	assert.Contains(t, result, `model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}medium{{end}}"`)
+	assert.Contains(t, result, `{{with .CodexAgentModel "executor" "sonnet" "medium"}}model = "{{.}}"{{end}}`)
+	assert.Contains(t, result, `{{with .CodexAgentEffort "executor" "sonnet" "medium"}}model_reasoning_effort = "{{.}}"{{end}}`)
 	assert.Contains(t, result, "developer_instructions =")
 	assert.Contains(t, result, "{{.ProjectName}}")
 	assert.Contains(t, result, "{{if .IsFullMode}}")
@@ -125,8 +125,8 @@ func TestTransformAgentForCodex_EmptyBody(t *testing.T) {
 	result := content.TransformAgentForCodex(src)
 
 	assert.Contains(t, result, `name = "minimal"`)
-	assert.Contains(t, result, `model = "gpt-5.5"`)
-	assert.Contains(t, result, `model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}medium{{end}}"`)
+	assert.Contains(t, result, `{{with .CodexAgentModel "minimal" "haiku" "medium"}}model = "{{.}}"{{end}}`)
+	assert.Contains(t, result, `{{with .CodexAgentEffort "minimal" "haiku" "medium"}}model_reasoning_effort = "{{.}}"{{end}}`)
 	assert.Contains(t, result, "developer_instructions =")
 }
 

@@ -14,6 +14,8 @@ import (
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
+var runOrchestraExecute = orchestra.RunOrchestra
+
 // newOrchestraCmd creates the orchestra root command.
 // @AX:ANCHOR: [AUTO] CLI entry point — registers all 7 orchestra subcommands; changes here affect all orchestra routes
 func newOrchestraCmd() *cobra.Command {
@@ -99,7 +101,8 @@ func runOrchestraCommand(
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
 
 	// Attempt to load config; fall back to hardcoded defaults on failure.
-	harnessCfg, configErr := loadHarnessConfigForFlags(globalFlagsFromContext(ctx))
+	runtimeFlags := globalFlagsFromContext(ctx)
+	harnessCfg, configErr := loadHarnessConfigForFlags(runtimeFlags)
 
 	var (
 		strategyStr string
@@ -117,7 +120,7 @@ func runOrchestraCommand(
 		if len(names) == 0 {
 			names = defaultProviders()
 		}
-		providers = buildProviderConfigs(names)
+		providers = buildProviderConfigsForRuntime(names, runtimeFlags.Quality, runtimeFlags.Effort)
 	} else {
 		orchConf = &harnessCfg.Orchestra
 		// Config loaded: resolve strategy, providers, and judge with priority
@@ -128,6 +131,7 @@ func runOrchestraCommand(
 			judge = resolveJudge(orchConf, commandName, "")
 		}
 	}
+	providers = resolveCodexProviderCapabilities(ctx, providers)
 
 	resolvedThreshold, err := resolveAndValidateThreshold(orchConf, configErr, commandName, threshold)
 	if err != nil {
@@ -233,7 +237,7 @@ func runOrchestraCommand(
 		return nil
 	}
 
-	result, err := orchestra.RunOrchestra(ctx, cfg)
+	result, err := runOrchestraExecute(ctx, cfg)
 	if err == nil && shouldTreatOrchestraResultAsFailure(result) {
 		err = synthesizeOrchestraFailureError(result)
 	}

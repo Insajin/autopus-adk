@@ -141,6 +141,7 @@ type ProviderEntry struct {
 	Binary           string             `yaml:"binary"`
 	Args             []string           `yaml:"args,flow"`
 	PaneArgs         []string           `yaml:"pane_args,flow,omitempty"`
+	ModelPolicy      string             `yaml:"model_policy,omitempty"`
 	PromptViaArgs    bool               `yaml:"prompt_via_args,omitempty"`
 	InteractiveInput string             `yaml:"interactive_input,omitempty"`
 	WorkingPatterns  []string           `yaml:"working_patterns,flow,omitempty"`
@@ -256,14 +257,8 @@ func (c *HarnessConfig) Validate() error {
 			return fmt.Errorf("features.cc21.task_created_mode %q is invalid", c.Features.CC21.TaskCreatedMode)
 		}
 	}
-	// Validate that each agent model value in quality presets is a known tier.
-	validModelTiers := map[string]bool{"opus": true, "sonnet": true, "haiku": true}
-	for presetName, preset := range c.Quality.Presets {
-		for agentName, tier := range preset.Agents {
-			if !validModelTiers[tier] {
-				return fmt.Errorf("quality.presets[%s].agents[%s]: unknown model tier %q", presetName, agentName, tier)
-			}
-		}
+	if err := c.validateModelSelectionConfig(); err != nil {
+		return err
 	}
 	if err := c.validateSkillsConfig(); err != nil {
 		return err

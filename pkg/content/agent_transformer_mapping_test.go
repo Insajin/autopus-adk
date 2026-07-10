@@ -97,9 +97,9 @@ func TestReplaceToolReferences_ClaudePassthrough(t *testing.T) {
 func TestMapModel(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "gpt-5.5", content.MapModel("sonnet", "codex"))
-	assert.Equal(t, "gpt-5.5", content.MapModel("opus", "codex"))
-	assert.Equal(t, "gpt-5.5", content.MapModel("haiku", "codex"))
+	assert.Equal(t, "gpt-5.6-terra", content.MapModel("sonnet", "codex"))
+	assert.Equal(t, "gpt-5.6-sol", content.MapModel("opus", "codex"))
+	assert.Equal(t, "gpt-5.6-luna", content.MapModel("haiku", "codex"))
 	assert.Equal(t, "gemini-2.5-pro", content.MapModel("sonnet", "gemini"))
 	assert.Equal(t, "gemini-2.5-flash", content.MapModel("haiku", "gemini"))
 
@@ -112,7 +112,7 @@ func TestMapModel(t *testing.T) {
 func TestMapEffort(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "xhigh", content.MapEffort("max", "codex"))
+	assert.Equal(t, "max", content.MapEffort("max", "codex"))
 	assert.Equal(t, "xhigh", content.MapEffort("xhigh", "codex"))
 	assert.Equal(t, "high", content.MapEffort("high", "codex"))
 	assert.Equal(t, "medium", content.MapEffort("medium", "codex"))

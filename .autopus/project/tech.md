@@ -124,7 +124,7 @@
 | Testing | tester | sonnet | opus | bypassPermissions | 커버리지 보강 |
 | Review | reviewer + security-auditor | sonnet | opus | plan | TRUST 5 코드 리뷰 + 보안 감사 (병렬) |
 
-*adaptive: Balanced 모드에서 태스크 complexity에 따라 HIGH→opus, MEDIUM/LOW→sonnet 동적 선택. Codex/OpenCode는 gpt-5.4를 유지하고 reasoning만 조절
+*adaptive: Balanced 모드에서 태스크 complexity에 따라 HIGH→opus, MEDIUM/LOW→sonnet 동적 선택. Codex는 Sol/Terra/Luna 품질 프로필을 사용하고 OpenCode는 설정된 모델을 유지
 
 ### Agent Teams Mode (`--team`)
 

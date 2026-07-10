@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,18 +25,22 @@ const (
 
 // Adapter is the Codex platform adapter.
 type Adapter struct {
-	root   string
-	engine *tmpl.Engine
+	root                string
+	engine              *tmpl.Engine
+	codexCatalogProbed  bool
+	codexCatalogJSON    []byte
+	codexFallbackWriter io.Writer
+	codexFallbackSeen   map[string]struct{}
 }
 
 // New creates an adapter rooted at the current directory.
 func New() *Adapter {
-	return &Adapter{root: ".", engine: tmpl.New()}
+	return &Adapter{root: ".", engine: tmpl.New(), codexFallbackWriter: os.Stderr}
 }
 
 // NewWithRoot creates an adapter rooted at the specified path.
 func NewWithRoot(root string) *Adapter {
-	return &Adapter{root: root, engine: tmpl.New()}
+	return &Adapter{root: root, engine: tmpl.New(), codexFallbackWriter: os.Stderr}
 }
 
 func (a *Adapter) Name() string      { return adapterName }
@@ -52,7 +57,8 @@ func (a *Adapter) Detect(_ context.Context) (bool, error) {
 }
 
 // Generate creates Codex platform files based on harness config.
-func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
+func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
+	a.prepareCodexCatalog(ctx)
 	skillsDir := filepath.Join(a.root, ".codex", "skills")
 	if err := os.MkdirAll(skillsDir, 0755); err != nil {
 		return nil, fmt.Errorf(".codex/skills 디렉터리 생성 실패: %w", err)
@@ -173,6 +179,7 @@ func (a *Adapter) Generate(_ context.Context, cfg *config.HarnessConfig) (*adapt
 
 // Update updates files based on manifest diff.
 func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
+	a.prepareCodexCatalog(ctx)
 	oldManifest, err := adapter.LoadManifest(a.root, adapterName)
 	if err != nil {
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)

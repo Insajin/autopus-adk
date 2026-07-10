@@ -1,12 +1,12 @@
 package config
 
 const (
-	CodexFrontierModel           = "gpt-5.5"
-	CodexStandardModel           = CodexFrontierModel
-	CodexMiniModel               = CodexFrontierModel
-	CodexCodingModel             = CodexFrontierModel
-	CodexSparkModel              = CodexFrontierModel
-	CodexFallbackModel           = CodexFrontierModel
+	CodexFrontierModel           = CodexSolModel
+	CodexStandardModel           = CodexTerraModel
+	CodexMiniModel               = CodexLunaModel
+	CodexCodingModel             = CodexSolModel
+	CodexSparkModel              = CodexLunaModel
+	CodexFallbackModel           = CodexLegacyModel
 	CodexOrchestraTimeoutSeconds = 420
 	// ClaudeOrchestraTimeoutSeconds covers opus reasoning that routinely runs
 	// 3–6 minutes on spec review workloads. Exceeds the 240s global timeout to
@@ -19,12 +19,19 @@ const (
 
 // DefaultCodexProviderEntry returns the canonical Codex orchestra provider entry.
 func DefaultCodexProviderEntry() ProviderEntry {
+	return CodexProviderEntryForQuality(QualityConf{Default: "balanced"})
+}
+
+// CodexProviderEntryForQuality returns a managed Codex provider for a quality mode.
+func CodexProviderEntryForQuality(quality QualityConf) ProviderEntry {
+	profile := quality.CodexOrchestraProfile()
 	return ProviderEntry{
-		Binary: "codex",
+		Binary:      "codex",
+		ModelPolicy: ProviderModelPolicyQuality,
 		// SPEC-ORCH-021 REQ-014/015: `exec --sandbox workspace-write` (no deprecated --full-auto);
 		// reasoning effort aligned to autopus.yaml. Pane argv stays interactive (no leading `exec`).
-		Args:          []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`},
-		PaneArgs:      []string{"-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`},
+		Args:          []string{"exec", "--sandbox", "workspace-write", "-m", profile.Model, "-c", `model_reasoning_effort="` + profile.Effort + `"`},
+		PaneArgs:      []string{"-m", profile.Model, "-c", `model_reasoning_effort="` + profile.Effort + `"`},
 		PromptViaArgs: false,
 		Subprocess: SubprocessProvConf{
 			SchemaFlag: "--output-schema",

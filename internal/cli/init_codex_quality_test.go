@@ -10,17 +10,49 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInitCmd_QualityUltraSetsCodexReasoningEffort(t *testing.T) {
-	t.Parallel()
+func TestInitCmd_QualityUltraSetsCodexProfile(t *testing.T) {
+	assertInitCodexQualityProfile(t, "ultra", "ultra", "gpt-5.6-sol", "max")
+}
+
+func TestInitCmd_QualityBalancedSetsCodexProfile(t *testing.T) {
+	assertInitCodexQualityProfile(t, "balanced", "xhigh", "gpt-5.6-terra", "medium")
+}
+
+func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorModel, executorEffort string) {
+	t.Helper()
+	installCodex56CatalogFixture(t)
 	dir := t.TempDir()
 
 	cmd := newTestRootCmd()
-	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "codex", "--yes", "--quality", "ultra"})
-	err := cmd.Execute()
-	require.NoError(t, err)
+	cmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "codex", "--yes", "--quality", quality})
+	require.NoError(t, cmd.Execute())
 
 	data, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(data), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "`+rootEffort+`"`)
+
+	executor, err := os.ReadFile(filepath.Join(dir, ".codex", "agents", "executor.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(executor), `model = "`+executorModel+`"`)
+	assert.Contains(t, string(executor), `model_reasoning_effort = "`+executorEffort+`"`)
+
+	harnessData, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
+	require.NoError(t, err)
+	harness := string(harnessData)
+	assert.Contains(t, harness, "model_policy: quality")
+	assert.Contains(t, harness, "gpt-5.6-sol")
+	assert.GreaterOrEqual(t, strings.Count(harness, `model_reasoning_effort="`+rootEffort+`"`), 2)
+}
+
+func installCodex56CatalogFixture(t *testing.T) {
+	t.Helper()
+	binDir := t.TempDir()
+	script := `#!/bin/sh
+printf '%s' '{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"medium"},{"effort":"high"}]},{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"max"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}'
+`
+	path := filepath.Join(binDir, "codex")
+	require.NoError(t, os.WriteFile(path, []byte(script), 0755))
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }

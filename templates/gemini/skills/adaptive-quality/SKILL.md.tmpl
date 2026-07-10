@@ -49,7 +49,7 @@ When criteria overlap (e.g., 1 file but 250 lines), use the highest matching lev
 
 Platform note:
 - Claude: HIGH=`opus`, MEDIUM/LOW=`sonnet`
-- Codex: all tiers resolve to `gpt-5.5`; Ultra renders every role as `xhigh`, while Balanced differentiates roles by `model_reasoning_effort`
+- Codex: Balanced uses Sol/`xhigh` for strategic and Opus-tier work, Terra with role effort for Sonnet-tier work, and Luna with role effort for Haiku-tier work. Ultra uses Sol/`ultra` for the supervisor and orchestra, and Sol/`max` for managed workers.
 - OpenCode: keep the configured default runtime model; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
 ## Effort Mapping (SPEC-CC21-001)
@@ -76,10 +76,14 @@ Codex-specific rendering:
 
 | Mode | Agent / Tier | `model_reasoning_effort` |
 |------|--------------|--------------------------|
-| Ultra | any role | `xhigh` |
-| Balanced | Opus-class roles | `xhigh` |
-| Balanced | reviewer | `high` |
-| Balanced | standard execution/validation roles | `medium` |
+| Ultra | supervisor / orchestra | Sol + `ultra` |
+| Ultra | managed worker | Sol + `max` |
+| Balanced | supervisor / orchestra / Opus-tier worker | Sol + `xhigh` |
+| Balanced | reviewer (Sonnet tier) | Terra + `high` |
+| Balanced | standard Sonnet-tier worker | Terra + `medium` |
+| Balanced | Haiku-tier worker | Luna + declared effort (capped at `max`) |
+
+Codex custom agent files are loaded when a session starts. To change their persistent quality profile, run `auto quality set <mode>`, then `auto update`, and start a new Codex session. A per-run `--quality` override can change a managed orchestra launch, but it cannot hot-swap agents already loaded by the current session.
 
 Unsupported env values must fail open to Quality Mode defaults. Use `auto effort detect` when the runtime needs the resolved value explicitly.
 

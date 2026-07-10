@@ -102,6 +102,20 @@ func TestDefaultFullConfig_CodexPromptViaArgs(t *testing.T) {
 		"codex provider must use Codex CLI structured output schema support")
 }
 
+func TestDefaultCodexProviderEntryUsesBalancedProfile(t *testing.T) {
+	t.Parallel()
+
+	entry := DefaultCodexProviderEntry()
+	assert.Equal(t, ProviderModelPolicyQuality, entry.ModelPolicy)
+	assert.Equal(t, CodexSolModel, CodexFrontierModel)
+	assert.Equal(t, CodexTerraModel, CodexStandardModel)
+	assert.Equal(t, CodexLunaModel, CodexMiniModel)
+	assert.Equal(t,
+		[]string{"exec", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="xhigh"`},
+		entry.Args,
+	)
+}
+
 // TestDefaultFullConfig_BrainstormCommand verifies that DefaultFullConfig includes
 // a brainstorm command entry with debate strategy and all three providers.
 func TestDefaultFullConfig_BrainstormCommand(t *testing.T) {

@@ -41,7 +41,7 @@ func loadEffectiveHarnessConfigForDir(startDir string, flags globalFlags) (effec
 		if err != nil {
 			return effectiveHarnessConfig{}, err
 		}
-		return effectiveHarnessConfig{Config: cfg, ConfigDir: configDir}, nil
+		return applyRuntimeHarnessOverrides(effectiveHarnessConfig{Config: cfg, ConfigDir: configDir}, flags), nil
 	}
 
 	cfg, err := loadAndMigrateHarnessConfig(startDir)
@@ -56,7 +56,7 @@ func loadEffectiveHarnessConfigForDir(startDir string, flags globalFlags) (effec
 	}
 	effective.Missing = missing
 	if !missing.any() {
-		return effective, nil
+		return applyRuntimeHarnessOverrides(effective, flags), nil
 	}
 
 	parent, parentDir, err := findAncestorHarnessConfigWithReusableWiring(startDir)
@@ -64,12 +64,12 @@ func loadEffectiveHarnessConfigForDir(startDir string, flags globalFlags) (effec
 		return effectiveHarnessConfig{}, err
 	}
 	if parent == nil {
-		return effective, nil
+		return applyRuntimeHarnessOverrides(effective, flags), nil
 	}
 
 	inheritReusableHarnessWiring(cfg, parent, missing)
 	effective.ParentDir = parentDir
-	return effective, nil
+	return applyRuntimeHarnessOverrides(effective, flags), nil
 }
 
 // loadOrchestraConfig loads the orchestra configuration from autopus.yaml
@@ -111,20 +111,7 @@ func resolveProviders(conf *config.OrchestraConf, commandName string, flagProvid
 		if interactiveInput == "" && entry.PromptViaArgs {
 			interactiveInput = "args"
 		}
-		result = append(result, orchestra.ProviderConfig{
-			Name:             name,
-			Binary:           entry.Binary,
-			Args:             entry.Args,
-			PaneArgs:         entry.PaneArgs,
-			PromptViaArgs:    entry.PromptViaArgs,
-			InteractiveInput: interactiveInput,
-			StartupTimeout:   resolveProviderStartupTimeout(name),
-			ExecutionTimeout: resolveProviderExecutionTimeout(entry),
-			WorkingPatterns:  resolveWorkingPatterns(name, entry.WorkingPatterns),
-			SchemaFlag:       entry.Subprocess.SchemaFlag,
-			StdinMode:        entry.Subprocess.StdinMode,
-			OutputFormat:     entry.Subprocess.OutputFormat,
-		})
+		result = append(result, providerConfigFromEntry(name, entry, interactiveInput))
 	}
 	return result
 }

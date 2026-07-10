@@ -19,7 +19,7 @@ func (a *Adapter) generateConfig(cfg *config.HarnessConfig) ([]adapter.FileMappi
 		return nil, fmt.Errorf("codex config 템플릿 읽기 실패: %w", err)
 	}
 
-	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+	rendered, err := a.engine.RenderString(string(tmplContent), a.codexRenderData(cfg))
 	if err != nil {
 		return nil, fmt.Errorf("codex config 템플릿 렌더링 실패: %w", err)
 	}
@@ -50,7 +50,7 @@ func (a *Adapter) prepareConfigFile(cfg *config.HarnessConfig) ([]adapter.FileMa
 		return nil, fmt.Errorf("codex config 템플릿 읽기 실패: %w", err)
 	}
 
-	rendered, err := a.engine.RenderString(string(tmplContent), cfg)
+	rendered, err := a.engine.RenderString(string(tmplContent), a.codexRenderData(cfg))
 	if err != nil {
 		return nil, fmt.Errorf("codex config 템플릿 렌더링 실패: %w", err)
 	}

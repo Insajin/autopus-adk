@@ -25,6 +25,9 @@ func TestGenerateConfig(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, ".codex", "config.toml"))
 	assert.Contains(t, string(files[0].Content), "test-project")
 	assert.Contains(t, string(files[0].Content), "context7")
+	rootSection := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
+	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
 }
 
 func TestGenerateConfig_PreservesExistingCodexModelSettings(t *testing.T) {
@@ -34,8 +37,8 @@ func TestGenerateConfig_PreservesExistingCodexModelSettings(t *testing.T) {
 	cfg := config.DefaultFullConfig("test-project")
 	configPath := filepath.Join(dir, ".codex", "config.toml")
 	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
-	require.NoError(t, os.WriteFile(configPath, []byte(`model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+	require.NoError(t, os.WriteFile(configPath, []byte(`model = "custom-model"
+model_reasoning_effort = "ultra"
 model_reasoning_summary = "detailed"
 model_verbosity = "high"
 approval_policy = "never"
@@ -45,14 +48,30 @@ approval_policy = "never"
 	require.NoError(t, err)
 	content := string(files[0].Content)
 
-	assert.Contains(t, content, `model = "gpt-5.4"`)
-	assert.Contains(t, content, `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, content, `model = "custom-model"`)
+	assert.Contains(t, content, `model_reasoning_effort = "ultra"`)
 	assert.Contains(t, content, `model_reasoning_summary = "detailed"`)
 	assert.Contains(t, content, `model_verbosity = "high"`)
 	assert.Contains(t, content, `approval_policy = "on-request"`)
 }
 
-func TestGenerateConfig_UsesUltraQualityEffort(t *testing.T) {
+func TestGenerateConfig_PreservesUserModelValueLiteral(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
+	require.NoError(t, os.WriteFile(configPath, []byte("model='custom/model' # keep\nmodel_reasoning_effort='ultra' # keep\n"), 0644))
+
+	files, err := a.generateConfig(config.DefaultFullConfig("literal-project"))
+	require.NoError(t, err)
+	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
+	assert.Contains(t, root, "model = 'custom/model' # keep")
+	assert.Contains(t, root, "model_reasoning_effort = 'ultra' # keep")
+}
+
+func TestGenerateConfig_UsesUltraQualityProfile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -64,8 +83,8 @@ func TestGenerateConfig_UsesUltraQualityEffort(t *testing.T) {
 	content := string(files[0].Content)
 
 	rootSection := strings.SplitN(content, "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model = "gpt-5.5"`)
-	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
 }
 
 func TestPrepareConfigFile_NoDiskWrite(t *testing.T) {
@@ -97,7 +116,7 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	assert.Contains(t, content, `command = "npx"`)
 	assert.Contains(t, content, `args = ["-y", "@upstash/context7-mcp@latest"]`)
 	assert.NotContains(t, content, "@anthropic-ai/context7-mcp")
-	assert.Contains(t, content, `model = "gpt-5.5"`)
+	assert.Contains(t, content, `model = "gpt-5.6-sol"`)
 	assert.Contains(t, content, `approval_policy = "on-request"`)
 	assert.Contains(t, content, `sandbox_mode = "workspace-write"`)
 	assert.Contains(t, content, `web_search = "cached"`)

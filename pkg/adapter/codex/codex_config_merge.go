@@ -22,6 +22,7 @@ func preserveUserCodexModelSettings(rendered, existing string) string {
 
 	var section string
 	lines := strings.Split(rendered, "\n")
+	applied := make(map[string]bool, len(overrides))
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if parsedSection, ok := parseCodexConfigSection(trimmed); ok {
@@ -32,9 +33,30 @@ func preserveUserCodexModelSettings(rendered, existing string) string {
 		if !ok || !isUserOwnedCodexConfigKey(section, key) {
 			continue
 		}
-		if replacement, ok := overrides[section+"."+key]; ok {
+		overrideKey := section + "." + key
+		if replacement, ok := overrides[overrideKey]; ok {
 			lines[i] = replaceCodexConfigAssignmentValue(line, replacement)
+			applied[overrideKey] = true
 		}
+	}
+
+	var missingRoot []string
+	for _, key := range []string{"model", "model_reasoning_effort", "model_reasoning_summary", "model_verbosity"} {
+		overrideKey := "." + key
+		if value, ok := overrides[overrideKey]; ok && !applied[overrideKey] {
+			missingRoot = append(missingRoot, key+" = "+value)
+		}
+	}
+	if len(missingRoot) > 0 {
+		insertAt := len(lines)
+		for i, line := range lines {
+			if _, ok := parseCodexConfigSection(strings.TrimSpace(line)); ok {
+				insertAt = i
+				break
+			}
+		}
+		missingRoot = append(missingRoot, "")
+		lines = append(lines[:insertAt], append(missingRoot, lines[insertAt:]...)...)
 	}
 	return strings.Join(lines, "\n")
 }

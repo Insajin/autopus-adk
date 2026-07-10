@@ -1,7 +1,7 @@
 name = "planner"
 description = "기능 기획 및 요구사항 분석 전문 에이전트. 사용자 요청을 명확한 요구사항과 구현 계획으로 변환한다."
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+{{with .CodexAgentModel "planner" "opus" "max"}}model = "{{.}}"{{end}}
+{{with .CodexAgentEffort "planner" "opus" "max"}}model_reasoning_effort = "{{.}}"{{end}}
 developer_instructions = '''
 You are the planner agent for project {{.ProjectName}}.
 
@@ -143,7 +143,7 @@ Model is selected per task based on complexity:
 
 Platform note:
 - Claude never uses `haiku` in this workspace; LOW stays on `sonnet`
-- Codex maps all source tiers to `gpt-5.5`; quality differences are expressed through reasoning effort
+- Codex maps Balanced Opus-tier tasks to Sol/`xhigh`, Sonnet-tier tasks to Terra with role effort, and Haiku-tier tasks to Luna with role effort; Ultra managed workers use Sol/`max`
 - OpenCode uses its configured default runtime model; LOW/MEDIUM/HIGH act as reasoning-profile hints until explicit model overrides are surfaced
 
 ### Override

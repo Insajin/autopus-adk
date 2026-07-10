@@ -125,8 +125,8 @@ func TestUpdate_PreservesUserCodexModelSettings(t *testing.T) {
 	configPath := filepath.Join(dir, ".codex", "config.toml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	userConfig := strings.Replace(string(data), `model = "gpt-5.5"`, `model = "gpt-5.4"`, 1)
-	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "medium"`, `model_reasoning_effort = "xhigh"`, 1)
+	userConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.4"`, 1)
+	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "ultra"`, 1)
 	require.NoError(t, os.WriteFile(configPath, []byte(userConfig), 0644))
 
 	_, err = a.Update(context.Background(), cfg)
@@ -136,11 +136,11 @@ func TestUpdate_PreservesUserCodexModelSettings(t *testing.T) {
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
 	assert.Contains(t, rootSection, `model = "gpt-5.4"`)
-	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
 	assert.NotContains(t, string(updated), "[profiles.")
 }
 
-func TestUpdate_PreservesExistingMediumEffortWhenQualityBecomesUltra(t *testing.T) {
+func TestUpdate_PreservesExistingBalancedEffortWhenQualityBecomesUltra(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -156,7 +156,7 @@ func TestUpdate_PreservesExistingMediumEffortWhenQualityBecomesUltra(t *testing.
 	updated, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model_reasoning_effort = "medium"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
 }
 
 func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *testing.T) {
@@ -171,7 +171,8 @@ func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *te
 	configPath := filepath.Join(dir, ".codex", "config.toml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	userConfig := strings.Replace(string(data), `model = "gpt-5.5"`, `model = "gpt-5.4"`, 1)
+	userConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.4"`, 1)
+	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "medium"`, 1)
 	require.NoError(t, os.WriteFile(configPath, []byte(userConfig), 0644))
 
 	cfg.Quality.Default = "ultra"

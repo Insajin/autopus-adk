@@ -10,6 +10,22 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
+func TestBuildReviewProvidersWithConfig_UsesRuntimeCodexQualityProfile(t *testing.T) {
+	dir := t.TempDir()
+	setFakeProviderOnPath(t, dir, "codex")
+
+	cfg := config.DefaultFullConfig("spec-review-quality")
+	cfg.Platforms = []string{"codex"}
+	cfg.Quality.Default = "balanced"
+	cfg.Orchestra.Providers = map[string]config.ProviderEntry{"codex": managedCodexProviderForTest(cfg.Quality)}
+	effective := applyRuntimeHarnessOverrides(effectiveHarnessConfig{Config: cfg}, globalFlags{Quality: "ultra", Effort: config.CodexEffortMax})
+
+	result := buildReviewProvidersWithConfig(effective.Config, []string{"codex"})
+	require.Len(t, result, 1)
+	assertCodexProfileInArgs(t, result[0].Args, config.CodexSolModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, result[0].PaneArgs, config.CodexSolModel, config.CodexEffortMax)
+}
+
 func TestBuildReviewProvidersWithConfig_UsesResolvedProviderSettings(t *testing.T) {
 	dir := t.TempDir()
 	setFakeProviderOnPath(t, dir, "gemini")

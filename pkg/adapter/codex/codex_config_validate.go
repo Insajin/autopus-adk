@@ -22,7 +22,7 @@ func (a *Adapter) validateConfig(errs *[]adapter.ValidationError) {
 	}
 
 	content := string(data)
-	required := []string{"model", "model_reasoning_effort", "approval_policy", "sandbox_mode", "web_search"}
+	required := []string{"approval_policy", "sandbox_mode", "web_search"}
 	for _, key := range required {
 		if !containsConfigKey(content, key) {
 			*errs = append(*errs, adapter.ValidationError{

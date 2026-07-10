@@ -269,6 +269,7 @@ func TestMigrateOrchestraConfig_AlreadyCorrectConfigNoChange(t *testing.T) {
 				},
 				"codex": {
 					Binary:        "codex",
+					ModelPolicy:   ProviderModelPolicyPinned,
 					Args:          []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel},
 					PromptViaArgs: false,
 					Subprocess:    SubprocessProvConf{Timeout: CodexOrchestraTimeoutSeconds, SchemaFlag: "--output-schema"},

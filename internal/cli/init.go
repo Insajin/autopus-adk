@@ -195,6 +195,10 @@ func newInitCmd() *cobra.Command {
 				}
 			}
 
+			if _, err := config.MigrateOrchestraConfig(cfg); err != nil {
+				return fmt.Errorf("orchestra 설정 정규화 실패: %w", err)
+			}
+
 			// Save config after all prompts.
 			if err := config.Save(dir, cfg); err != nil {
 				return fmt.Errorf("autopus.yaml 저장 실패: %w", err)

@@ -182,6 +182,8 @@ Use Windows paths like C:\Users\user\.codex\agents when explaining recovery.
 
 	got := string(data)
 	assert.Contains(t, got, `name = "windows-agent"`)
+	assert.Contains(t, got, `{{with .CodexAgentModel "windows-agent" "sonnet" "medium"}}model = "{{.}}"{{end}}`)
+	assert.Contains(t, got, `{{with .CodexAgentEffort "windows-agent" "sonnet" "medium"}}model_reasoning_effort = "{{.}}"{{end}}`)
 	assert.Contains(t, got, "developer_instructions = '''")
 	assert.NotContains(t, got, "[developer_instructions]")
 	assert.NotContains(t, got, "text =")

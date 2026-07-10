@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -171,6 +172,37 @@ project_doc_max_bytes = 65536
 		}
 	}
 	assert.True(t, found, "project doc budget warning should be reported")
+}
+
+func TestCodexAdapter_Validate_AllowsInheritedModelDefaults(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	a := codex.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	lines := strings.Split(string(data), "\n")
+	filtered := lines[:0]
+	for _, line := range lines {
+		if strings.HasPrefix(line, "model =") || strings.HasPrefix(line, "model_reasoning_effort =") {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	require.NoError(t, os.WriteFile(configPath, []byte(strings.Join(filtered, "\n")), 0644))
+
+	errs, err := a.Validate(context.Background())
+	require.NoError(t, err)
+	for _, validationErr := range errs {
+		assert.NotContains(t, validationErr.Message, "model 설정이 없음")
+		assert.NotContains(t, validationErr.Message, "model_reasoning_effort 설정이 없음")
+	}
 }
 
 func TestCodexAdapter_Validate_WarnsWhenContext7FallbackMissing(t *testing.T) {

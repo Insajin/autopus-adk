@@ -1,0 +1,184 @@
+# SPEC-CODEXQUAL-001: GPT-5.6 품질별 Codex 실행 프로필
+
+**Status**: completed
+**Created**: 2026-07-10
+**Domain**: CODEXQUAL
+
+## 목적
+
+Autopus-ADK의 Codex 모델 및 reasoning effort 결정을 persistent quality, 명시적 orchestra
+runtime override, 실행 역할, agent tier, declared worker effort, 현재 Codex capability에 따라
+일관되게 해석한다. fresh supervisor, managed subagent/native multi-agent, quality-managed
+orchestra가 같은 정책을 사용하되 사용자 소유 설정과 다른 플랫폼 정책은 보존한다.
+
+## Outcome Boundary
+
+### Outcome Lock
+
+- **User-visible outcome**: 사용자는 별도의 로컬 Codex 설정 변경 없이 Balanced와 Ultra에 맞는
+  GPT-5.6 프로필을 생성·실행한다. `max`와 `ultra`는 delegation 의미에 따라 worker와 depth 0
+  실행에서 구분되며, capability 부족 시 선택 결과와 이유를 확인할 수 있다.
+- **Mandatory requirements**: REQ-001~REQ-010을 모두 구현해야 한다.
+- **Explicit non-goals**: Claude/OpenCode 정책, Codex fan-out·`max_threads`·`max_depth`, per-spawn
+  custom-agent override, 사용자 소유 설정 강제 이행, 역사적 기록 재작성, entitlement telemetry는
+  변경하지 않는다.
+- **Scenario evidence**: `acceptance.md`의 S1~S20을 모두 통과해야 한다. S1~S9는 동일한
+  full-support catalog fixture와 명시된 declared-effort 입력을 사용하며, S13~S18은 capability
+  분기와 모든 consumer 투영을 검증한다.
+- **Execution evidence**: 실제 경로를 사용한 strict validation, focused/full Go tests, vet, build,
+  generated surface parity, 현재 로컬 `codex debug models` smoke를 완료해야 한다. 명령은
+  `acceptance.md`의 Verification Commands를 단일 기준으로 사용한다.
+
+## Policy Matrix
+
+| Scope | Balanced | Ultra | Rationale |
+|---|---|---|---|
+| Supervisor | Sol + `xhigh` | Sol + `ultra` | 전략 판단; Ultra depth 0에서 자동 위임 허용 |
+| Opus agent | Sol + `xhigh` | Sol + `max` | Balanced는 declared effort와 무관하게 전략 품질을 `xhigh`로 고정하고, Ultra worker는 중첩 자동 위임을 금지 |
+| Sonnet agent | Terra + normalized declared effort | Sol + `max` | Balanced 반복 작업 비용 절감 |
+| Haiku agent | Luna + normalized declared effort | Sol + `max` | Balanced 단순·고빈도 작업 비용 절감 |
+| Quality-managed orchestra | Sol + `xhigh` | Sol + `ultra` | 독립 depth 0 분석 프로세스 |
+
+Sol, Terra, Luna는 각각 `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`를 뜻한다.
+
+## Requirements
+
+### REQ-001 (Ubiquitous / Priority: Must)
+
+the system SHALL provide one canonical Codex profile and capability resolver for supervisor,
+managed agent, and quality-managed orchestra model/effort decisions.
+
+### REQ-002 (Event-driven / Priority: Must)
+
+WHEN a quality-managed Codex orchestra profile is resolved, THEN the system SHALL determine effective
+quality in the order explicit runtime `--quality`, persistent `quality.default`, `balanced`, treat only
+exact `ultra` as Ultra, and use the Balanced supervisor/orchestra profile for every other preset while
+retaining that preset's role mapping for persistently generated managed agents.
+
+### REQ-003 (Event-driven / Priority: Must)
+
+WHEN a fresh Codex supervisor config is rendered, THEN the system SHALL emit Sol plus `xhigh` for
+Balanced and Sol plus `ultra` for Ultra after applying the capability resolver.
+
+### REQ-004 (Event-driven / Priority: Must)
+
+WHEN a managed Codex agent definition is rendered, THEN the system SHALL map its effective Opus,
+Sonnet, or Haiku tier and declared effort through the Policy Matrix, normalize an empty or unknown
+declared effort to `medium`, cap declared worker `ultra` at `max`, and use Sol plus `max` for every
+Ultra worker.
+
+### REQ-005 (Event-driven / Priority: Must)
+
+WHEN a Codex orchestra provider has `model_policy: quality`, THEN the system SHALL apply explicit
+runtime `--effort` after effective quality so that `--effort` wins over quality-derived effort, update
+only the managed model/effort options before an argv `--` terminator in both subprocess Args and
+interactive PaneArgs, leave the disk config unchanged, and exclude `model_policy: pinned` providers and
+already generated managed-agent files from runtime quality/effort changes.
+
+### REQ-006 (Unwanted / Priority: Must)
+
+IF an existing Codex root model/effort is user-owned, THEN the system SHALL preserve each parsed
+assignment's right-hand-side literal, including its quoted value, across update even when surrounding
+template spacing is normalized; IF a provider has `model_policy: pinned`, THEN the system SHALL preserve
+its Binary, Args, PaneArgs, every slice element, ordering, quoting, unrelated flag, and `--` suffix.
+
+### REQ-007 (Unwanted / Priority: Must)
+
+IF the requested effort is absent from an available requested model, THEN the system SHALL retain that
+model and select the highest supported effort no greater than the canonical request in
+`ultra,max,xhigh,high,medium,low` order with reason `effort_unavailable`, or retain the model, omit the
+effort override, and expose `runtime_default` when no supported effort is no greater than the request.
+
+### REQ-008 (Unwanted / Priority: Must)
+
+IF the requested GPT-5.6 model is absent from a valid catalog and compatible `gpt-5.5` is present,
+THEN the system SHALL select `gpt-5.5`, cap effort at `xhigh`, and expose exact reason
+`model_unavailable`, omit managed model/effort fields and expose `runtime_default` when the valid catalog
+has neither the requested model nor a compatible legacy tuple, or use the legacy `gpt-5.5` profile with
+effort capped at `xhigh` and expose `catalog_unknown` when the catalog probe is unavailable, times out,
+exceeds its bounds, or returns invalid JSON.
+
+### REQ-009 (Optional / Priority: Must)
+
+WHERE a running Codex session has already loaded custom agent files, THEN the system SHALL describe
+per-run quality/effort overrides as unsupported for those workers and require `auto quality set`,
+`auto update`, and a new Codex session instead of claiming a per-spawn model override.
+
+### REQ-010 (Ubiquitous / Priority: Must)
+
+the system SHALL leave Claude and OpenCode model, effort, model override, and variant behavior unchanged.
+
+## Ownership And Precedence
+
+Quality-managed orchestra precedence is:
+
+1. Effective quality: explicit runtime `--quality` > persistent `quality.default` > `balanced`.
+2. Effective effort: explicit runtime `--effort` > effort derived from effective quality.
+3. Capability: the catalog resolver may lower or omit the requested effort and may select the compatible
+   legacy model according to REQ-007 and REQ-008.
+
+The runtime overlay applies only to Codex providers marked `model_policy: quality`. It is ephemeral and
+updates neither `autopus.yaml` nor already generated agent files. Managed agent files use persistent
+`quality.default` because the Codex subagent call schema has no per-spawn model or effort fields.
+Existing `.codex/config.toml` root model/effort assignments are user-owned after first generation;
+managed `.codex/agents/*.toml` files remain Autopus-owned and refresh on update.
+
+New canonical Codex providers use `model_policy: quality`. An explicit `pinned` marker is never overlaid.
+During migration, only the exact historical Autopus `gpt-5.5+xhigh` Args and PaneArgs tuples, with no
+extra or reordered element, are promoted to `quality`. Every other unmarked provider becomes `pinned`.
+
+Root preservation and provider preservation deliberately use different units. Root merge preserves the
+parsed right-hand-side literal for each user-owned assignment while the generated template may normalize
+whitespace. Pinned provider migration and runtime resolution preserve the complete Binary, Args, and
+PaneArgs values as slice-equality oracles. For a quality-managed provider, only model/effort tokens before
+the first `--` are managed; the terminator and its complete suffix remain unchanged.
+
+## Compatibility
+
+The resolver consumes a structured, size-bounded capability catalog. A managed worker normalizes its
+declared effort before capability resolution: blank or unknown becomes `medium`, `ultra` becomes `max`,
+and Balanced Opus remains fixed at `xhigh`. The capability resolver first preserves the requested model
+and chooses the highest supported effort no greater than the request. If none exists, it preserves the
+model but omits effort with `runtime_default`.
+
+The resolver changes to `gpt-5.5` only when the requested GPT-5.6 model is absent and a compatible legacy
+tuple exists. Legacy effort never exceeds `xhigh`, and this branch reports `model_unavailable`. A valid
+catalog with no compatible requested or legacy tuple returns empty managed fields with `runtime_default`.
+An unavailable, timed-out, oversized, empty, or malformed catalog is distinct: it selects the legacy
+profile with the same `xhigh` cap and reports `catalog_unknown`. Fallback receipts expose `requested`,
+`selected`, and `reason`; adapter rendering deduplicates identical receipts, while each independently
+resolved orchestra provider emits one receipt.
+
+## Traceability Matrix
+
+| Requirement | Invariant | Plan Task | Acceptance |
+|---|---|---|---|
+| REQ-001 | INV-001 | T1, T5 | S1, S18 |
+| REQ-002 | INV-001, INV-006 | T1, T4 | S2, S9 |
+| REQ-003 | INV-001 | T2, T5 | S3, S4, S18 |
+| REQ-004 | INV-001, INV-004 | T3, T5 | S5, S6, S7, S18 |
+| REQ-005 | INV-001, INV-002, INV-006 | T4, T5 | S8, S9, S11, S12, S18 |
+| REQ-006 | INV-002 | T2, T4 | S10, S11, S12 |
+| REQ-007 | INV-003 | T1, T5 | S13, S14, S18 |
+| REQ-008 | INV-003, INV-005 | T1, T5 | S15, S16, S17, S18 |
+| REQ-009 | INV-004 | T3, T6 | S19 |
+| REQ-010 | INV-007 | T6, T7 | S20 |
+
+## Related SPECs
+
+- None. This primary SPEC closes the model policy outcome within `autopus-adk`.
+
+## Completion Verdict
+
+- **Outcome Lock**: satisfied.
+- **Mandatory requirements**: REQ-001~REQ-010 implemented and verified.
+- **Must acceptance**: S1~S20 passed with the evidence mapped in `acceptance.md`.
+- **Verification**: focused and race tests, `go test ./... -count=1`, `go vet ./...`, and
+  `go build ./...` passed. Strict SPEC review passed all 43 checklist items and resolved all seven
+  discovered findings.
+- **Live evidence**: `codex-cli 0.144.0` reported Sol and Terra through `ultra`, Luna through `max`,
+  and GPT-5.5 through `xhigh`; fresh-init smoke matched the Balanced and Ultra policy matrix.
+- **Residual provider health**: the Codex formal-review provider timed out at its configured seven-minute
+  boundary; Claude and Gemini completed, the combined review gate returned PASS, and no open finding
+  depends on the timed-out response.
+- **Completion Debt**: none. Optional evolution ideas remain outside the Outcome Lock.

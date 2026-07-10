@@ -50,24 +50,6 @@ func TestFormatTOMLMultilineString(t *testing.T) {
 	}
 }
 
-func TestFormatCodexEffortLine(t *testing.T) {
-	// xhigh effort: literal, no template placeholder.
-	got := formatCodexEffortLine("xhigh")
-	if got != `model_reasoning_effort = "xhigh"` {
-		t.Errorf("xhigh effort = %q", got)
-	}
-	// Other effort: template expression embedded.
-	got = formatCodexEffortLine("high")
-	if !strings.Contains(got, "high") || !strings.Contains(got, "{{if") {
-		t.Errorf("non-xhigh effort = %q", got)
-	}
-	// Empty effort: still contains template placeholder.
-	got = formatCodexEffortLine("")
-	if !strings.Contains(got, "{{if") {
-		t.Errorf("empty effort = %q", got)
-	}
-}
-
 // --- hooks helpers ---
 
 func TestSameHookConfig(t *testing.T) {

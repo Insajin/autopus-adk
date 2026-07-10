@@ -34,6 +34,7 @@ type ProviderConfig struct {
 	Binary              string        // executable binary path
 	Args                []string      // args for non-interactive mode
 	PaneArgs            []string      // args for pane mode (overrides Args when set)
+	ModelPolicy         string        // model selection ownership: quality-managed or user-pinned
 	PromptViaArgs       bool          // true: pass prompt as last arg (gemini), false: pass via stdin (claude, codex)
 	InteractiveInput    string        // interactive prompt delivery: "args" = via CLI arg at launch, "" = via sendkeys (default)
 	StartupTimeout      time.Duration // per-provider startup timeout; 0 uses name-based default

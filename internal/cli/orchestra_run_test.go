@@ -33,15 +33,17 @@ func TestRunSubprocessPipeline_UsesConfigTimeoutWhenFlagUnchanged(t *testing.T) 
 		orchestraRunExecutePipeline = origExecutePipeline
 	})
 
-	orchestraRunLoadConfig = func() (*config.OrchestraConf, error) {
-		return &config.OrchestraConf{
-			TimeoutSeconds: 240,
-			Providers: map[string]config.ProviderEntry{
-				"claude": {Binary: "claude"},
+	orchestraRunLoadConfig = func(globalFlags) (*config.HarnessConfig, error) {
+		return &config.HarnessConfig{
+			Orchestra: config.OrchestraConf{
+				TimeoutSeconds: 240,
+				Providers: map[string]config.ProviderEntry{
+					"claude": {Binary: "claude"},
+				},
 			},
 		}, nil
 	}
-	orchestraRunBuildProviders = buildProviderConfigs
+	orchestraRunBuildProviders = buildProviderConfigsForRuntime
 	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return noopExecutionBackend{} }
 
 	var captured orchestra.SubprocessPipelineConfig
@@ -67,15 +69,17 @@ func TestRunSubprocessPipeline_CLITimeoutOverridesConfig(t *testing.T) {
 		orchestraRunExecutePipeline = origExecutePipeline
 	})
 
-	orchestraRunLoadConfig = func() (*config.OrchestraConf, error) {
-		return &config.OrchestraConf{
-			TimeoutSeconds: 240,
-			Providers: map[string]config.ProviderEntry{
-				"claude": {Binary: "claude"},
+	orchestraRunLoadConfig = func(globalFlags) (*config.HarnessConfig, error) {
+		return &config.HarnessConfig{
+			Orchestra: config.OrchestraConf{
+				TimeoutSeconds: 240,
+				Providers: map[string]config.ProviderEntry{
+					"claude": {Binary: "claude"},
+				},
 			},
 		}, nil
 	}
-	orchestraRunBuildProviders = buildProviderConfigs
+	orchestraRunBuildProviders = buildProviderConfigsForRuntime
 	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return noopExecutionBackend{} }
 
 	var captured orchestra.SubprocessPipelineConfig
@@ -101,16 +105,18 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 		orchestraRunExecutePipeline = origExecutePipeline
 	})
 
-	orchestraRunLoadConfig = func() (*config.OrchestraConf, error) {
-		return &config.OrchestraConf{
-			Judge: "claude",
-			Providers: map[string]config.ProviderEntry{
-				"claude": {Binary: "claude"},
-				"codex":  {Binary: "codex", Args: []string{"exec"}},
+	orchestraRunLoadConfig = func(globalFlags) (*config.HarnessConfig, error) {
+		return &config.HarnessConfig{
+			Orchestra: config.OrchestraConf{
+				Judge: "claude",
+				Providers: map[string]config.ProviderEntry{
+					"claude": {Binary: "claude"},
+					"codex":  {Binary: "codex", Args: []string{"exec"}},
+				},
 			},
 		}, nil
 	}
-	orchestraRunBuildProviders = buildProviderConfigs
+	orchestraRunBuildProviders = buildProviderConfigsForRuntime
 	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return noopExecutionBackend{} }
 
 	var captured orchestra.SubprocessPipelineConfig
@@ -124,4 +130,42 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 	assert.Equal(t, "codex", captured.Judge.Name)
 	require.Len(t, captured.Providers, 1)
 	assert.Equal(t, "codex", captured.Providers[0].Name)
+}
+
+func TestRunSubprocessPipeline_AppliesRuntimeCodexQualityAndEffort(t *testing.T) {
+	installRuntimeCodexCatalogFixture(t)
+	origLoadConfig := orchestraRunLoadConfig
+	origBuildProviders := orchestraRunBuildProviders
+	origBackendFactory := orchestraRunBackendFactory
+	origExecutePipeline := orchestraRunExecutePipeline
+	t.Cleanup(func() {
+		orchestraRunLoadConfig = origLoadConfig
+		orchestraRunBuildProviders = origBuildProviders
+		orchestraRunBackendFactory = origBackendFactory
+		orchestraRunExecutePipeline = origExecutePipeline
+	})
+
+	orchestraRunLoadConfig = func(flags globalFlags) (*config.HarnessConfig, error) {
+		cfg := config.DefaultFullConfig("run-quality")
+		cfg.Platforms = []string{"codex"}
+		cfg.Quality.Default = "balanced"
+		cfg.Orchestra.Providers["codex"] = managedCodexProviderForTest(cfg.Quality)
+		effective := applyRuntimeHarnessOverrides(effectiveHarnessConfig{Config: cfg}, flags)
+		return effective.Config, nil
+	}
+	orchestraRunBuildProviders = buildProviderConfigsForRuntime
+	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return noopExecutionBackend{} }
+
+	var captured orchestra.SubprocessPipelineConfig
+	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {
+		captured = cfg
+		return &orchestra.OrchestraResult{Merged: "ok", Summary: "done"}, nil
+	}
+
+	ctx := withGlobalFlags(context.Background(), globalFlags{Quality: "ultra", Effort: config.CodexEffortMax})
+	err := runSubprocessPipeline(ctx, "topic", "debate", []string{"codex"}, "fast", 120, false, "", false, false)
+	require.NoError(t, err)
+	require.Len(t, captured.Providers, 1)
+	assertCodexProfileInArgs(t, captured.Providers[0].Args, config.CodexSolModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, captured.Providers[0].PaneArgs, config.CodexSolModel, config.CodexEffortMax)
 }

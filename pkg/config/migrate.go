@@ -18,11 +18,20 @@ var defaultProviderEntries = map[string]ProviderEntry{
 	"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, InteractiveInput: "stdin", Subprocess: SubprocessProvConf{OutputFormat: "text", Timeout: GeminiOrchestraTimeoutSeconds}},
 }
 
+func defaultProviderEntryForQuality(providerName string, quality QualityConf) (ProviderEntry, bool) {
+	if providerName == "codex" {
+		return CodexProviderEntryForQuality(quality), true
+	}
+	entry, ok := defaultProviderEntries[providerName]
+	return entry, ok
+}
+
 // MigrateOrchestraConfig performs all orchestra config migrations.
 // It returns (changed bool, err error).
 //
 // Migrations applied:
-//  1. (reserved — previously enforced codex PromptViaArgs, now removed)
+//  1. Classify Codex model policy: exact historical defaults become quality-managed;
+//     every other unmarked provider becomes pinned.
 //  2. Migrate opencode provider entries back to codex.
 //  3. For each platform that maps to a known orchestra provider,
 //     add the provider entry if it is missing.
@@ -49,9 +58,12 @@ func MigrateOrchestraConfig(cfg *HarnessConfig) (bool, error) {
 		if providerName == "" {
 			continue
 		}
-		existing, exists := cfg.Orchestra.Providers[providerName]
-		if !exists || len(existing.Args) == 0 {
-			if entry, known := defaultProviderEntries[providerName]; known {
+		existing, exists, classified := classifyStoredCustomUnmarkedEmptyCodexProvider(cfg.Orchestra.Providers, providerName)
+		if classified {
+			changed = true
+		}
+		if shouldRestoreProviderDefaults(providerName, existing, exists) {
+			if entry, known := defaultProviderEntryForQuality(providerName, cfg.Quality); known {
 				cfg.Orchestra.Providers[providerName] = entry
 				changed = true
 			} else if !exists {
@@ -89,9 +101,14 @@ func migrateKnownProviderDefaults(cfg *HarnessConfig) bool {
 			continue
 		}
 		if providerName == "codex" {
-			if args, migrated := migrateCodexDeprecatedArgs(existing.Args); migrated {
-				existing.Args = args
+			var migrated bool
+			existing, migrated = migrateCodexProviderModelPolicy(existing, cfg.Quality)
+			if migrated {
 				changed = true
+			}
+			if existing.ModelPolicy == ProviderModelPolicyPinned {
+				cfg.Orchestra.Providers[providerName] = existing
+				continue
 			}
 		}
 		if providerName == "claude" {
@@ -120,23 +137,6 @@ func migrateKnownProviderDefaults(cfg *HarnessConfig) bool {
 	return changed
 }
 
-func migrateCodexDeprecatedArgs(args []string) ([]string, bool) {
-	if len(args) == 0 {
-		return args, false
-	}
-	changed := false
-	next := make([]string, 0, len(args)+1)
-	for _, arg := range args {
-		if arg == "--full-auto" {
-			next = append(next, "--sandbox", "workspace-write")
-			changed = true
-			continue
-		}
-		next = append(next, arg)
-	}
-	return next, changed
-}
-
 func migrateClaudeDeprecatedEffort(args []string) ([]string, bool) {
 	if !slices.Equal(args, []string{"--print", "--model", "opus", "--effort", "max"}) &&
 		!slices.Equal(args, []string{"-p", "--model", "opus", "--effort", "max"}) {
@@ -160,9 +160,9 @@ func EnsureOrchestraProvider(cfg *HarnessConfig, providerName string) error {
 	}
 
 	// Add provider if missing, or update if args are empty (stale config).
-	existing, exists := cfg.Orchestra.Providers[providerName]
-	if !exists || len(existing.Args) == 0 {
-		entry, known := defaultProviderEntries[providerName]
+	existing, exists, _ := classifyStoredCustomUnmarkedEmptyCodexProvider(cfg.Orchestra.Providers, providerName)
+	if shouldRestoreProviderDefaults(providerName, existing, exists) {
+		entry, known := defaultProviderEntryForQuality(providerName, cfg.Quality)
 		if !known {
 			// Use a sensible zero-value entry for unknown providers.
 			entry = ProviderEntry{Binary: providerName}
@@ -256,8 +256,9 @@ func MigrateOpencodeToCodex(cfg *HarnessConfig) (bool, error) {
 	delete(cfg.Orchestra.Providers, "opencode")
 
 	// Add codex entry if not already present, or update if args are empty.
-	if existing, hasCodex := cfg.Orchestra.Providers["codex"]; !hasCodex || len(existing.Args) == 0 {
-		cfg.Orchestra.Providers["codex"] = defaultProviderEntries["codex"]
+	existing, hasCodex, _ := classifyStoredCustomUnmarkedEmptyCodexProvider(cfg.Orchestra.Providers, "codex")
+	if shouldRestoreProviderDefaults("codex", existing, hasCodex) {
+		cfg.Orchestra.Providers["codex"] = CodexProviderEntryForQuality(cfg.Quality)
 	}
 
 	// Replace opencode with codex in all command provider lists.

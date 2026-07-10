@@ -41,7 +41,7 @@ func TestGenerateAgents_TOMLContent(t *testing.T) {
 		content := string(f.Content)
 		assert.Contains(t, content, "name =", "TOML %s should have name field", f.TargetPath)
 		assert.Contains(t, content, "description =", "TOML %s should have description field", f.TargetPath)
-		assert.Contains(t, content, `model = "gpt-5.5"`, "TOML %s should use the Codex frontier model", f.TargetPath)
+		assert.Contains(t, content, `model = "gpt-5.6-`, "TOML %s should use a GPT-5.6 role model", f.TargetPath)
 		assert.Contains(t, content, "model_reasoning_effort =", "TOML %s should set effort explicitly", f.TargetPath)
 		assert.Contains(t, content, "developer_instructions =", "TOML %s should have instructions", f.TargetPath)
 		assert.Contains(t, content, "developer_instructions = '''", "TOML %s should use literal multiline strings", f.TargetPath)
@@ -70,11 +70,14 @@ func TestGenerateAgents_BalancedQualityUsesRoleEffort(t *testing.T) {
 	}
 
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model = "gpt-5.6-sol"`)
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model_reasoning_effort = "high"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model = "gpt-5.6-terra"`)
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model_reasoning_effort = "medium"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model = "gpt-5.6-terra"`)
 }
 
-func TestGenerateAgents_UltraQualityUsesXHighEffort(t *testing.T) {
+func TestGenerateAgents_UltraQualityUsesSolMax(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -86,8 +89,9 @@ func TestGenerateAgents_UltraQualityUsesXHighEffort(t *testing.T) {
 
 	for _, f := range files {
 		content := string(f.Content)
-		assert.Contains(t, content, `model = "gpt-5.5"`, "TOML %s should use the Codex frontier model", f.TargetPath)
-		assert.Contains(t, content, `model_reasoning_effort = "xhigh"`, "TOML %s should use xhigh in ultra mode", f.TargetPath)
+		assert.Contains(t, content, `model = "gpt-5.6-sol"`, "TOML %s should use Sol in ultra mode", f.TargetPath)
+		assert.Contains(t, content, `model_reasoning_effort = "max"`, "TOML %s should use max in ultra mode", f.TargetPath)
+		assert.NotContains(t, content, `model_reasoning_effort = "ultra"`, "managed workers must not auto-delegate", f.TargetPath)
 	}
 }
 

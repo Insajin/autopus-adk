@@ -135,7 +135,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 	}
 
 	providerNames := resolveSpecReviewProviderNames(cfg, flags.MultiMode)
-	providers := configureSpecReviewProviders(specReviewConfigProviders(cfg, providerNames))
+	providers := configureSpecReviewProviders(resolveCodexProviderCapabilities(ctx, specReviewConfigProviders(cfg, providerNames)))
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다. 설치를 확인하세요: %v", providerNames)
 	}

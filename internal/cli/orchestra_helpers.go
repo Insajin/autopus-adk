@@ -146,12 +146,23 @@ func isStdoutTTY() bool {
 // This is the hardcoded fallback used when config is unavailable.
 // @AX:NOTE: [AUTO] hardcoded provider registry — add new providers here and in agenticArgs when expanding provider support
 func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
+	return buildProviderConfigsForRuntime(names, "", "")
+}
+
+func buildProviderConfigsForRuntime(names []string, quality, effort string) []orchestra.ProviderConfig {
+	qualityConf := config.QualityConf{Default: strings.TrimSpace(quality)}
+	codexEntry := config.CodexProviderEntryForQuality(qualityConf)
+	if effort = strings.TrimSpace(effort); effort != "" {
+		profile := qualityConf.CodexOrchestraProfile()
+		profile.Effort = effort
+		codexEntry = config.ApplyCodexProviderProfile(codexEntry, profile)
+	}
 	knownProviders := map[string]orchestra.ProviderConfig{
 		"claude": {Name: "claude", Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
 		// SPEC-ORCH-021 REQ-014/015: codex subprocess uses `exec --sandbox workspace-write`
 		// (no deprecated --full-auto) with reasoning effort aligned to autopus.yaml; pane argv
 		// stays interactive (no leading `exec`). SchemaFlag carries the structured schema.
-		"codex": {Name: "codex", Binary: "codex", Args: []string{"exec", "--sandbox", "workspace-write", "-m", config.CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, PaneArgs: []string{"-m", config.CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, PromptViaArgs: false, SchemaFlag: "--output-schema"},
+		"codex": providerConfigFromEntry("codex", codexEntry, ""),
 		// SPEC-ORCH-021 REQ-014/015: gemini (`agy`) --print is a STRING flag taking the prompt
 		// as its value. Pass the prompt in the empty "" slot via PromptViaArgs (injectPromptArg
 		// replaces "" with the prompt) → `agy --print "<prompt>"`. Pane argv must be interactive,
@@ -172,6 +183,24 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 		}
 	}
 	return result
+}
+
+func providerConfigFromEntry(name string, entry config.ProviderEntry, interactiveInput string) orchestra.ProviderConfig {
+	return orchestra.ProviderConfig{
+		Name:             name,
+		Binary:           entry.Binary,
+		Args:             append([]string(nil), entry.Args...),
+		PaneArgs:         append([]string(nil), entry.PaneArgs...),
+		ModelPolicy:      entry.ModelPolicy,
+		PromptViaArgs:    entry.PromptViaArgs,
+		InteractiveInput: interactiveInput,
+		StartupTimeout:   resolveProviderStartupTimeout(name),
+		ExecutionTimeout: resolveProviderExecutionTimeout(entry),
+		WorkingPatterns:  resolveWorkingPatterns(name, entry.WorkingPatterns),
+		SchemaFlag:       entry.Subprocess.SchemaFlag,
+		StdinMode:        entry.Subprocess.StdinMode,
+		OutputFormat:     entry.Subprocess.OutputFormat,
+	}
 }
 
 // defaultProviders returns the hardcoded default provider list.

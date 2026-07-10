@@ -133,7 +133,7 @@ The quality mode — determined by the `--quality` flag or interactive selection
 
 Use the premium path for all Agent() calls.
 
-On model-tiered platforms, this means adding `model: "opus"`. On Codex, all source tiers resolve to `gpt-5.5`; use `model_reasoning_effort` to express premium versus standard paths. OpenCode should keep its configured default model and increase reasoning effort.
+On model-tiered platforms, this means adding `model: "opus"`. Codex renders Ultra managed workers as Sol/`max`; the depth-0 supervisor and orchestra use Sol/`ultra`. OpenCode should keep its configured default model and increase reasoning effort.
 
 ```
 Agent(
@@ -184,7 +184,7 @@ In Balanced mode, task complexity determines the profile per Agent() call:
 
 Current workspace policy:
 - Claude never uses `haiku`; LOW stays on `sonnet`
-- Codex maps all source tiers to `gpt-5.5`; Ultra uses `xhigh` for every role, and Balanced differentiates LOW/MEDIUM/HIGH by reasoning effort
+- Codex maps Balanced Opus-tier work to Sol/`xhigh`, Sonnet-tier work to Terra with role effort, and Haiku-tier work to Luna with role effort; Ultra managed workers use Sol/`max`
 - OpenCode should keep its configured default runtime model and vary reasoning effort rather than forcing a model ID
 
 In Ultra mode, complexity is IGNORED — all agents use the premium path.
@@ -297,7 +297,7 @@ Parallel tasks use `isolation: "worktree"` so each executor works in an independ
 # Parallel execution example — with worktree isolation
 # Premium-path handling varies by platform:
 # - Claude/Gemini: add model="opus"
-# - Codex: stay on gpt-5.5 and increase reasoning effort for hard checks
+# - Codex: use the generated quality-aware Sol/Terra/Luna worker profile
 # - OpenCode: keep the default model and increase reasoning effort
 Agent(subagent_type="executor", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Balanced
 Agent(subagent_type="executor", model="opus", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Ultra

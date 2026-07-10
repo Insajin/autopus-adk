@@ -99,14 +99,13 @@ func (t *AgentTransformer) Sources() []AgentSource {
 func TransformAgentForCodex(src AgentSource) string {
 	var sb strings.Builder
 
-	model := MapModel(src.Meta.Model, "codex")
 	effort := MapEffort(src.Meta.Effort, "codex")
 	body := NormalizeAgentReferences(src.Body, "codex")
 
 	fmt.Fprintf(&sb, "name = %q\n", src.Meta.Name)
 	fmt.Fprintf(&sb, "description = %q\n", src.Meta.Description)
-	fmt.Fprintf(&sb, "model = %q\n", model)
-	sb.WriteString(formatCodexEffortLine(effort))
+	fmt.Fprintf(&sb, "{{with .CodexAgentModel %q %q %q}}model = \"{{.}}\"{{end}}\n", src.Meta.Name, src.Meta.Model, effort)
+	sb.WriteString(formatCodexAgentEffortLine(src.Meta.Name, src.Meta.Model, effort))
 	sb.WriteString("\n")
 
 	// Preserve the source structure so Codex keeps the phase contracts and I/O shape.
@@ -118,11 +117,13 @@ func TransformAgentForCodex(src AgentSource) string {
 	return sb.String()
 }
 
-func formatCodexEffortLine(effort string) string {
-	if effort == "xhigh" {
-		return `model_reasoning_effort = "xhigh"`
-	}
-	return fmt.Sprintf(`model_reasoning_effort = "{{if eq .Quality.Default "ultra"}}xhigh{{else}}%s{{end}}"`, effort)
+func formatCodexAgentEffortLine(agentName, sourceTier, effort string) string {
+	return fmt.Sprintf(
+		`{{with .CodexAgentEffort %q %q %q}}model_reasoning_effort = "{{.}}"{{end}}`,
+		agentName,
+		sourceTier,
+		effort,
+	)
 }
 
 // TransformAgentForGemini produces a Gemini MD template from an agent source.

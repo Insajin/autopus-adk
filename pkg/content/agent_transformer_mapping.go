@@ -10,9 +10,9 @@ import (
 // modelMapping maps source model tiers to platform-specific model names.
 var modelMapping = map[string]map[string]string{
 	"codex": {
-		"sonnet": config.CodexFrontierModel,
+		"sonnet": config.CodexStandardModel,
 		"opus":   config.CodexFrontierModel,
-		"haiku":  config.CodexFrontierModel,
+		"haiku":  config.CodexMiniModel,
 	},
 	"gemini": {
 		"sonnet": "gemini-2.5-pro",
@@ -24,7 +24,7 @@ var modelMapping = map[string]map[string]string{
 // effortMapping maps source effort tiers to platform-specific reasoning controls.
 var effortMapping = map[string]map[string]string{
 	"codex": {
-		"max":    "xhigh",
+		"max":    "max",
 		"xhigh":  "xhigh",
 		"high":   "high",
 		"medium": "medium",
