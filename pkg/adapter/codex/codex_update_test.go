@@ -117,6 +117,7 @@ func TestUpdate_PreservesUserCodexModelSettings(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
+	useFullCodexCatalogForTest(a)
 	cfg := config.DefaultFullConfig("test-project")
 
 	_, err := a.Generate(context.Background(), cfg)
@@ -127,6 +128,8 @@ func TestUpdate_PreservesUserCodexModelSettings(t *testing.T) {
 	require.NoError(t, err)
 	userConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.4"`, 1)
 	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "ultra"`, 1)
+	require.Contains(t, userConfig, `model = "gpt-5.4"`)
+	require.Contains(t, userConfig, `model_reasoning_effort = "ultra"`)
 	require.NoError(t, os.WriteFile(configPath, []byte(userConfig), 0644))
 
 	_, err = a.Update(context.Background(), cfg)
@@ -163,6 +166,7 @@ func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *te
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
+	useFullCodexCatalogForTest(a)
 	cfg := config.DefaultFullConfig("test-project")
 
 	_, err := a.Generate(context.Background(), cfg)
@@ -173,6 +177,8 @@ func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *te
 	require.NoError(t, err)
 	userConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.4"`, 1)
 	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "medium"`, 1)
+	require.Contains(t, userConfig, `model = "gpt-5.4"`)
+	require.Contains(t, userConfig, `model_reasoning_effort = "medium"`)
 	require.NoError(t, os.WriteFile(configPath, []byte(userConfig), 0644))
 
 	cfg.Quality.Default = "ultra"
