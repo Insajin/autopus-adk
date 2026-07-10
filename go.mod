@@ -2,7 +2,7 @@ module github.com/insajin/autopus-adk
 
 go 1.26
 
-toolchain go1.26.4
+toolchain go1.26.5
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0
