@@ -9,4 +9,5 @@ type DesignConf struct {
 	InjectOnVerify  bool     `yaml:"inject_on_verify"`
 	ExternalImports bool     `yaml:"external_imports"`
 	UIFileGlobs     []string `yaml:"ui_globs,omitempty"`
+	DocsProviders   []string `yaml:"docs_providers,omitempty"`
 }

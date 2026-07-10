@@ -63,6 +63,20 @@ Then synthesize the working design system:
 
 If a safe `DESIGN.md`, token file, component library, or existing screen is present, treat it as the source of truth and make the matrix an interpretation of that source. If no source exists, keep the matrix ephemeral in the work log unless the user explicitly asks to create a design-system file.
 
+## Design System Docs Preflight
+
+Before writing new UI code, inspect project-local design docs and component APIs:
+
+```bash
+auto design pack --format markdown
+auto design docs --format markdown
+```
+
+- Use `auto design docs` to identify whether the project uses Astryx, shadcn/Radix/Tailwind, or only local design sources.
+- If Astryx is detected, read template skeletons and component docs before coding: `npx astryx template --list --dense`, `npx astryx template <name> --skeleton --dense`, `npx astryx component <Name> --dense`, and `npx astryx docs tokens --dense`.
+- If Astryx is not detected, do not add Astryx by default. Use the project's local `DESIGN.md`, token/theme files, and shared components as the source of truth.
+- Never invent component props, import paths, raw colors, or spacing values when a project-local or provider doc source exists.
+
 Pre-delivery checklist:
 
 - Clickable controls have visible hover/pressed/focus/disabled/loading states.

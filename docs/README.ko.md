@@ -965,6 +965,7 @@ SPEC 상태 업데이트, 프로젝트 문서 재생성, @AX 태그 라이프사
 | `auto skill` | 스킬 관리 (list / info / create) |
 | `auto search` | 지식 검색 (Exa) |
 | `auto docs` | 라이브러리 문서 조회 (Context7) |
+| `auto design` | 디자인 컨텍스트와 provider 문서 (context / import / pack / docs / figma) |
 | `auto lsp` | LSP 연동 (diagnostics / refs / rename / symbols / definition) |
 | `auto verify` | 프론트엔드 UX 검증 (Playwright + VLM) |
 | `auto check` | 하네스 규칙 검사 (안티패턴 스캔) |

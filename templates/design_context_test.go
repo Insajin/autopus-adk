@@ -34,6 +34,7 @@ func TestCommandRouterTemplatesMentionDesignContext(t *testing.T) {
 			assert.Contains(t, result, "typography hierarchy")
 			assert.Contains(t, result, "component guardrail")
 			assert.Contains(t, result, "source-of-truth mismatch")
+			assert.Contains(t, result, "auto design docs")
 		})
 	}
 }
@@ -57,6 +58,7 @@ func TestReviewTemplatesMentionDesignContext(t *testing.T) {
 			assert.Contains(t, result, "Design Context")
 			assert.Contains(t, result, "palette-role drift")
 			assert.Contains(t, result, "source-of-truth mismatch")
+			assert.Contains(t, result, "auto design docs")
 		})
 	}
 }
@@ -82,6 +84,7 @@ func TestFrontendVerifyTemplatesMentionDesignContext(t *testing.T) {
 			assert.Contains(t, result, "typography hierarchy")
 			assert.Contains(t, result, "component guardrail")
 			assert.Contains(t, result, "source-of-truth")
+			assert.Contains(t, result, "auto design docs")
 		})
 	}
 }

@@ -78,3 +78,93 @@ func TestBuildPackReportsGapsWhenDesignMissing(t *testing.T) {
 	assert.Contains(t, pack.SetupGaps, "token_refs_missing")
 	assert.Contains(t, pack.SetupGaps, "component_refs_missing")
 }
+
+func TestBuildDesignSystemDocsDetectsAstryx(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFile(t, root, "package.json", `{
+  "dependencies": {
+    "@astryxdesign/core": "1.0.0",
+    "@astryxdesign/theme-neutral": "1.0.0"
+  },
+  "devDependencies": {
+    "@astryxdesign/cli": "1.0.0"
+  }
+}`)
+
+	docs, err := BuildDesignSystemDocs(root, DesignSystemDocsOptions{MaxRefs: 10})
+	require.NoError(t, err)
+	require.Len(t, docs.Providers, 1)
+	assert.Equal(t, "astryx", docs.Providers[0].Name)
+	assert.Contains(t, docs.Providers[0].Packages, "@astryxdesign/core")
+	assert.Contains(t, docs.Providers[0].Preflight, "npx astryx component <Name> --dense")
+	assert.NotContains(t, docs.Providers[0].Preflight, "npx astryx init --features agents --agent codex")
+	assert.Equal(t, "https://astryx.atmeta.com/mcp", docs.Providers[0].MCP)
+	assert.Contains(t, docs.Markdown(), "npx astryx template --list --dense")
+}
+
+func TestBuildDesignSystemDocsSkipsMalformedPackageManifest(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFile(t, root, "package.json", `{"dependencies":{"@astryxdesign/core":"1.0.0"}}`)
+	writeFile(t, root, "examples/broken/package.json", `{not-json`)
+
+	docs, err := BuildDesignSystemDocs(root, DesignSystemDocsOptions{MaxRefs: 10})
+	require.NoError(t, err)
+	require.Len(t, docs.Providers, 1)
+	assert.Equal(t, "astryx", docs.Providers[0].Name)
+}
+
+func TestBuildDesignSystemDocsDoesNotInferExplicitRadixFromLocalComponents(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFile(t, root, "src/components/ui/button.tsx", "export function Button() { return null }")
+
+	docs, err := BuildDesignSystemDocs(root, DesignSystemDocsOptions{
+		Providers: []string{"radix"},
+		MaxRefs:   10,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, docs.Providers)
+	assert.Contains(t, docs.SetupGaps, "design_system_docs_provider_missing")
+}
+
+func TestBuildDesignSystemDocsDetectsProjectLocalShadcnStack(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFile(t, root, "package.json", `{
+  "dependencies": {
+    "@radix-ui/react-dialog": "1.0.0",
+    "tailwindcss": "4.0.0"
+  }
+}`)
+	writeFile(t, root, "src/components/ui/button.tsx", "export function Button() { return null }")
+	writeFile(t, root, "tokens/semantic/color.light.json", "{}")
+
+	docs, err := BuildDesignSystemDocs(root, DesignSystemDocsOptions{MaxRefs: 10})
+	require.NoError(t, err)
+	require.Len(t, docs.Providers, 2)
+	assert.Equal(t, "shadcn-radix-tailwind", docs.Providers[0].Name)
+	assert.Equal(t, "local-design-sources", docs.Providers[1].Name)
+	assert.Contains(t, docs.Providers[0].Packages, "@radix-ui/react-dialog")
+	assert.Contains(t, docs.Providers[0].Packages, "tailwindcss")
+	assert.Contains(t, docs.Providers[0].Preflight, "auto design pack --format markdown")
+}
+
+func TestBuildPackIncludesDesignSystemDocs(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeFile(t, root, "DESIGN.md", "# Design\n\nUse tokens.")
+	writeFile(t, root, "package.json", `{"dependencies":{"@astryxdesign/core":"1.0.0"}}`)
+
+	pack, err := BuildPack(root, PackOptions{ContextOptions: Options{Enabled: true}, MaxRefs: 10})
+	require.NoError(t, err)
+	require.NotEmpty(t, pack.DesignDocs.Providers)
+	assert.Contains(t, pack.Markdown(), "Design-system docs")
+	assert.Contains(t, pack.Markdown(), "astryx")
+}

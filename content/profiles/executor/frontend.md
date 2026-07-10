@@ -17,6 +17,19 @@ Build accessible, responsive UI components. Extend the TypeScript profile patter
 
 For new frontend projects, use the SPEC/PRD `## Technology Stack Decision` before choosing React, Next.js, Vite, Tailwind, router, state, test, or component-library versions. Require concrete stable versions, source refs, and checked_at dates; block on missing evidence.
 
+### Design System Docs Preflight
+
+Before creating or changing UI components, inspect the project design sources and provider docs:
+
+```bash
+auto design pack --format markdown
+auto design docs --format markdown
+```
+
+- If Astryx is detected, read `npx astryx template --list --dense`, `npx astryx template <name> --skeleton --dense`, `npx astryx component <Name> --dense`, and `npx astryx docs tokens --dense` before writing Astryx component code.
+- If Astryx is not detected, do not add it by default. Reuse the local `DESIGN.md`, token/theme files, and shared UI primitives.
+- Do not invent component props, import paths, raw colors, or spacing values when provider docs or local component implementations exist.
+
 ### Semantic HTML
 
 ```html

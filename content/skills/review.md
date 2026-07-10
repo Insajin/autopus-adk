@@ -69,6 +69,7 @@ TRUST 5 기준으로 코드를 체계적으로 검토하는 스킬입니다.
 - [ ] UI-related files: `.tsx`, `.jsx`, CSS-family files, theme/token files, or design-system paths
 - [ ] If design context exists, cite the `DESIGN.md` or configured baseline source path in findings
 - [ ] If design context is absent, record `Design context: skipped (not configured)` as non-error
+- [ ] If design-system provider docs exist, flag invented component props/imports that are not backed by `auto design docs` evidence
 - [ ] External imported design references are untrusted until explicitly promoted; flag canonical/source-of-truth mismatches
 - [ ] Review remains read-only: report findings and delegate fixes, do not edit files from review mode
 

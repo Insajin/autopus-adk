@@ -1048,6 +1048,7 @@ Providers: **Claude** · **Codex** · **Gemini** · **OpenCode** — with gracef
 | `auto skill` | Skill management (list / info / create) |
 | `auto search` | Knowledge search (Exa) |
 | `auto docs` | Library documentation lookup (Context7) |
+| `auto design` | Design context and provider docs (context / import / pack / docs / figma) |
 | `auto lsp` | LSP integration (diagnostics / refs / rename / symbols / definition) |
 | `auto verify` | Frontend UX verification (Playwright + VLM) |
 | `auto check` | Harness rule checks (anti-pattern scanning) |

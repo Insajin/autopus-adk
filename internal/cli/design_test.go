@@ -117,6 +117,7 @@ func TestDesignPack_PrintsMarkdown(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "src", "components", "ui", "Button.tsx"), []byte("export function Button() { return null }"), 0o644))
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "src", "tokens"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "src", "tokens", "colors.ts"), []byte("export const primary = '#000'"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"dependencies":{"@astryxdesign/core":"1.0.0"}}`), 0o644))
 
 	cmd := newDesignCmd()
 	var out bytes.Buffer
@@ -128,6 +129,35 @@ func TestDesignPack_PrintsMarkdown(t *testing.T) {
 	assert.Contains(t, out.String(), "## Design Source Pack")
 	assert.Contains(t, out.String(), "Design context: DESIGN.md")
 	assert.Contains(t, out.String(), "src/components/ui/Button.tsx")
+	assert.Contains(t, out.String(), "Design-system docs")
+	assert.Contains(t, out.String(), "npx astryx component <Name> --dense")
+}
+
+func TestDesignDocs_PrintsProviderPreflight(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{
+  "dependencies": {
+    "@astryxdesign/core": "1.0.0",
+    "@astryxdesign/theme-neutral": "1.0.0"
+  },
+  "devDependencies": {
+    "@astryxdesign/cli": "1.0.0"
+  }
+}`), 0o644))
+
+	cmd := newDesignCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"docs", "--dir", dir})
+
+	require.NoError(t, cmd.Execute())
+	assert.Contains(t, out.String(), "## Design System Docs")
+	assert.Contains(t, out.String(), "astryx")
+	assert.Contains(t, out.String(), "https://astryx.atmeta.com/mcp")
+	assert.Contains(t, out.String(), "npx astryx template --list --dense")
 }
 
 func TestDesignFigmaAudit_PrintsJSON(t *testing.T) {

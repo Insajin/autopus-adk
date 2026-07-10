@@ -443,10 +443,12 @@ Agent(
        - Summary: {palette roles, typography hierarchy, component guardrails, layout/responsive rules}
 
        If no context exists, record "Design context: skipped (not configured)" as non-error.
-    3. Generate or heal Playwright E2E tests for affected components
-    4. Execute tests and capture screenshots
-    5. Analyze screenshots for visual issues (layout, readability, responsiveness, palette-role drift, typography hierarchy drift, component guardrail violations, source-of-truth mismatch)
-    6. Attempt auto-fix for WARN/FAIL items (max 2 attempts)
+    3. Run or inspect `auto design docs --format markdown` and record detected design-system docs providers.
+       If Astryx is detected, verify template/component/token docs lookup evidence. If Astryx is absent, do not add or require it.
+    4. Generate or heal Playwright E2E tests for affected components
+    5. Execute tests and capture screenshots
+    6. Analyze screenshots for visual issues (layout, readability, responsiveness, palette-role drift, typography hierarchy drift, component guardrail violations, source-of-truth mismatch, invented component props/imports)
+    7. Attempt auto-fix for WARN/FAIL items (max 2 attempts)
 
     Return format:
     Verdict: PASS | WARN | FAIL

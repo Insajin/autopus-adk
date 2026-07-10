@@ -84,6 +84,9 @@ design:
   inject_on_review: {{.Design.InjectOnReview}}
   inject_on_verify: {{.Design.InjectOnVerify}}
   external_imports: {{.Design.ExternalImports}}
+{{if .Design.DocsProviders}}  docs_providers:
+{{range .Design.DocsProviders}}    - {{.}}
+{{end}}{{end}}
 {{if .Design.UIFileGlobs}}  ui_globs:
 {{range .Design.UIFileGlobs}}    - {{.}}
 {{end}}{{end}}

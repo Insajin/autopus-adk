@@ -81,11 +81,14 @@ Before deriving UX Intelligence, run or inspect the project-local design source 
 
 ```bash
 auto design pack --format markdown
+auto design docs --format markdown
 auto design figma audit --format markdown
 auto design figma fetch --format markdown
 ```
 
-Use the pack as metadata-only evidence for source availability, token/component refs, screenshot/golden refs, Figma refs, compact fetched Figma node metadata, and Code Connect readiness. Missing pack data is a setup gap, not an instruction to invent a new design system.
+Use the pack and docs provider report as metadata-only evidence for source availability, token/component refs, provider docs preflight, screenshot/golden refs, Figma refs, compact fetched Figma node metadata, and Code Connect readiness. Missing pack data is a setup gap, not an instruction to invent a new design system.
+
+If `auto design docs` detects Astryx, verify that new Astryx UI work was preceded by template skeleton and component/token docs lookup (`npx astryx template --list --dense`, `npx astryx template <name> --skeleton --dense`, `npx astryx component <Name> --dense`, `npx astryx docs tokens --dense`). If Astryx is not detected, do not require or add Astryx; inspect local `DESIGN.md`, tokens, and shared components instead.
 
 Record:
 - surface type and product category
@@ -93,6 +96,7 @@ Record:
 - density and risk level
 - page/screen pattern and style posture
 - required checks and product-specific anti-patterns
+- provider-backed component import paths and props when a design-system provider exists
 
 If no canonical source exists, mark it as `UX intelligence: inferred (no canonical design source)` rather than blocking verification.
 

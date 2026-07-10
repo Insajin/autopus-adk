@@ -23,6 +23,7 @@ func newDesignCmd() *cobra.Command {
 	cmd.AddCommand(newDesignContextCmd())
 	cmd.AddCommand(newDesignImportCmd())
 	cmd.AddCommand(newDesignPackCmd())
+	cmd.AddCommand(newDesignDocsCmd())
 	cmd.AddCommand(newDesignFigmaCmd())
 	return cmd
 }
@@ -142,7 +143,8 @@ func newDesignPackCmd() *cobra.Command {
 					MaxContextLines: cfg.Design.MaxContextLines,
 					UIFileGlobs:     cfg.Design.UIFileGlobs,
 				},
-				MaxRefs: maxRefs,
+				MaxRefs:       maxRefs,
+				DocsProviders: cfg.Design.DocsProviders,
 			})
 			if err != nil {
 				return err
@@ -158,6 +160,50 @@ func newDesignPackCmd() *cobra.Command {
 	cmd.Flags().StringVar(&format, "format", "markdown", "output format: markdown or json")
 	cmd.Flags().StringVar(&output, "output", "", "write output to a file instead of stdout")
 	cmd.Flags().IntVar(&maxRefs, "max-refs", 30, "maximum refs to include per category")
+	return cmd
+}
+
+func newDesignDocsCmd() *cobra.Command {
+	var dir string
+	var format string
+	var output string
+	var maxRefs int
+	var providers []string
+	cmd := &cobra.Command{
+		Use:   "docs",
+		Short: "Print design-system docs provider preflight",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveDir(dir)
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(root)
+			if err != nil {
+				return err
+			}
+			effectiveProviders := providers
+			if len(effectiveProviders) == 0 {
+				effectiveProviders = cfg.Design.DocsProviders
+			}
+			docs, err := design.BuildDesignSystemDocs(root, design.DesignSystemDocsOptions{
+				Providers: effectiveProviders,
+				MaxRefs:   maxRefs,
+			})
+			if err != nil {
+				return err
+			}
+			data, err := renderDesignOutput(format, docs)
+			if err != nil {
+				return err
+			}
+			return writeOrPrint(cmd, output, data)
+		},
+	}
+	cmd.Flags().StringVar(&dir, "dir", "", "project root directory")
+	cmd.Flags().StringVar(&format, "format", "markdown", "output format: markdown or json")
+	cmd.Flags().StringVar(&output, "output", "", "write output to a file instead of stdout")
+	cmd.Flags().IntVar(&maxRefs, "max-refs", 30, "maximum refs to inspect")
+	cmd.Flags().StringSliceVar(&providers, "provider", nil, "design-system docs provider to inspect (repeatable; auto, astryx, shadcn, radix, tailwind, local)")
 	return cmd
 }
 

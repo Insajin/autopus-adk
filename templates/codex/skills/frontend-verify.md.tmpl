@@ -26,14 +26,17 @@ UI 관련 변경이 있으면 스크린샷 분석 전에 project-local design so
 
 ```bash
 auto design pack --format markdown
+auto design docs --format markdown
 auto design figma audit --format markdown
 auto design figma fetch --format markdown
 ```
 
 - `auto design pack`은 `DESIGN.md`, token/theme/design-system 파일, shared component refs, screenshot/golden refs, Figma refs, Code Connect readiness를 metadata-only로 요약합니다.
+- `auto design docs`는 Astryx/shadcn/Radix/Tailwind/local design-system provider를 감지하고, UI 작성 전에 확인해야 할 template/component/token docs preflight를 metadata-only로 요약합니다.
 - `auto design figma audit`은 네트워크나 인증 없이 Figma URL refs와 Code Connect 파일/패키지 존재만 확인합니다.
 - `auto design figma fetch`는 `FIGMA_ACCESS_TOKEN` 또는 `FIGMA_TOKEN`이 있을 때 Figma node URL에서 compact node metadata를 가져옵니다. 토큰이 없으면 `figma_token_missing` setup gap만 기록합니다.
 - 디자인 소스 팩이 비어 있어도 검증은 계속하되 `design_context_missing`, `token_refs_missing`, `component_refs_missing`, `code_connect_mapping_missing` 같은 setup gap을 후속 개선 근거로 기록합니다.
+- Astryx provider가 감지될 때만 `npx astryx template --list --dense`, `npx astryx template <name> --skeleton --dense`, `npx astryx component <Name> --dense`, `npx astryx docs tokens --dense` 흐름을 사용합니다. Astryx가 없는 프로젝트에 Astryx 의존성을 추가하지 않습니다.
 
 ### Phase 0.5: 디자인 컨텍스트 로드
 
@@ -123,6 +126,8 @@ npx playwright test --reporter=json
 - component guardrail violation
 - source-of-truth baseline mismatch
 - UX Intelligence pattern/style mismatch
+- design-system docs preflight missing before new component/template usage
+- invented component import path or prop not backed by local docs/provider docs
 - missing hover/pressed/focus/disabled/loading states on changed controls
 - touch target or safe-area regression on touch-capable layouts
 - reduced-motion, loading, empty, or error state omission when the changed flow exposes those states

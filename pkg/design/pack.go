@@ -3,10 +3,6 @@ package design
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -19,6 +15,7 @@ type SourceRef struct {
 type PackOptions struct {
 	ContextOptions Options
 	MaxRefs        int
+	DocsProviders  []string
 }
 
 type Pack struct {
@@ -29,6 +26,7 @@ type Pack struct {
 	ScreenshotRefs []SourceRef      `json:"screenshot_refs,omitempty"`
 	FigmaRefs      []FigmaRef       `json:"figma_refs,omitempty"`
 	CodeConnect    CodeConnectAudit `json:"code_connect"`
+	DesignDocs     DesignSystemDocs `json:"design_system_docs"`
 	SetupGaps      []string         `json:"setup_gaps,omitempty"`
 }
 
@@ -71,6 +69,15 @@ func BuildPack(root string, opts PackOptions) (Pack, error) {
 	if err := collectPackRefs(root, maxRefs, &pack); err != nil {
 		return Pack{}, err
 	}
+	docs, err := BuildDesignSystemDocs(root, DesignSystemDocsOptions{
+		Providers: opts.DocsProviders,
+		MaxRefs:   maxRefs,
+	})
+	if err != nil {
+		return Pack{}, err
+	}
+	pack.DesignDocs = docs
+	pack.SetupGaps = appendMissingMany(pack.SetupGaps, docs.SetupGaps)
 	if len(pack.TokenRefs) == 0 {
 		pack.SetupGaps = appendMissing(pack.SetupGaps, "token_refs_missing")
 	}
@@ -103,6 +110,17 @@ func (p Pack) Markdown() string {
 		}
 	}
 	fmt.Fprintf(&sb, "- Code Connect: %s\n", p.CodeConnect.Status)
+	if len(p.DesignDocs.Providers) == 0 {
+		sb.WriteString("- Design-system docs: none detected\n")
+	} else {
+		sb.WriteString("- Design-system docs:\n")
+		for _, provider := range p.DesignDocs.Providers {
+			fmt.Fprintf(&sb, "  - %s (%s)\n", provider.Name, provider.Status)
+			for _, cmd := range provider.Preflight {
+				fmt.Fprintf(&sb, "    - `%s`\n", cmd)
+			}
+		}
+	}
 	if len(p.SetupGaps) > 0 {
 		sb.WriteString("- Setup gaps:\n")
 		for _, gap := range p.SetupGaps {
@@ -140,117 +158,6 @@ func contextToPackContext(ctx Context) PackContext {
 	return out
 }
 
-func collectPackRefs(root string, maxRefs int, pack *Pack) error {
-	return walkDesignCandidateFiles(root, maxRefs*10, func(rel, _ string, _ os.FileInfo) error {
-		switch {
-		case isTokenRef(rel):
-			pack.TokenRefs = appendUniqueLimited(pack.TokenRefs, SourceRef{Path: rel, Kind: "token_or_theme"}, maxRefs)
-		case isComponentRef(rel):
-			pack.ComponentRefs = appendUniqueLimited(pack.ComponentRefs, SourceRef{Path: rel, Kind: "component"}, maxRefs)
-		case isScreenshotRef(rel):
-			pack.ScreenshotRefs = appendUniqueLimited(pack.ScreenshotRefs, SourceRef{Path: rel, Kind: "screenshot_ref"}, maxRefs)
-		}
-		return nil
-	})
-}
-
-func walkDesignCandidateFiles(root string, visitLimit int, fn func(rel, abs string, info os.FileInfo) error) error {
-	rootAbs, err := filepath.Abs(root)
-	if err != nil {
-		return err
-	}
-	if evaluatedRoot, err := filepath.EvalSymlinks(rootAbs); err == nil {
-		rootAbs = evaluatedRoot
-	}
-	visited := 0
-	return filepath.WalkDir(rootAbs, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		rel := relPath(rootAbs, path)
-		if entry.IsDir() {
-			if shouldSkipPackDir(rel) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if visitLimit > 0 && visited >= visitLimit {
-			return nil
-		}
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if info.Size() > MaxLocalContextBytes {
-			return nil
-		}
-		visited++
-		return fn(rel, path, info)
-	})
-}
-
-func shouldSkipPackDir(rel string) bool {
-	clean := filepath.ToSlash(rel)
-	if clean == "." {
-		return false
-	}
-	base := strings.ToLower(filepath.Base(clean))
-	switch base {
-	case ".git", "node_modules", "vendor", "dist", "build", ".next", "coverage", "target":
-		return true
-	}
-	return strings.HasPrefix(clean, ".autopus/runtime") ||
-		strings.HasPrefix(clean, ".autopus/qa") ||
-		strings.HasPrefix(clean, ".autopus/orchestra") ||
-		strings.HasPrefix(clean, ".autopus/brainstorms") ||
-		strings.HasPrefix(clean, ".autopus/design/imports")
-}
-
-func isTokenRef(rel string) bool {
-	lower := strings.ToLower(filepath.ToSlash(rel))
-	base := filepath.Base(lower)
-	if strings.Contains(lower, "design-system") || strings.Contains(lower, "/tokens/") || strings.Contains(lower, "/theme/") {
-		return true
-	}
-	return strings.Contains(base, "token") || strings.Contains(base, "theme") || strings.HasPrefix(base, "tailwind.config") || base == "globals.css"
-}
-
-func isComponentRef(rel string) bool {
-	lower := strings.ToLower(filepath.ToSlash(rel))
-	ext := filepath.Ext(lower)
-	if ext != ".tsx" && ext != ".jsx" {
-		return false
-	}
-	return strings.Contains(lower, "/components/") || strings.Contains(lower, "/ui/") || strings.Contains(lower, "/primitives/")
-}
-
-func isScreenshotRef(rel string) bool {
-	lower := strings.ToLower(filepath.ToSlash(rel))
-	ext := filepath.Ext(lower)
-	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".webp" {
-		return false
-	}
-	return strings.Contains(lower, "screenshot") || strings.Contains(lower, "snapshot") || strings.Contains(lower, "golden")
-}
-
-func appendLimited(refs []SourceRef, ref SourceRef, max int) []SourceRef {
-	if max > 0 && len(refs) >= max {
-		return refs
-	}
-	refs = append(refs, ref)
-	sortRefs(refs)
-	return refs
-}
-
-func appendUniqueLimited(refs []SourceRef, ref SourceRef, max int) []SourceRef {
-	for _, existing := range refs {
-		if existing.Path == ref.Path && existing.Kind == ref.Kind {
-			return refs
-		}
-	}
-	return appendLimited(refs, ref, max)
-}
-
 func appendMissing(values []string, value string) []string {
 	for _, existing := range values {
 		if existing == value {
@@ -260,10 +167,11 @@ func appendMissing(values []string, value string) []string {
 	return append(values, value)
 }
 
-func sortRefs(refs []SourceRef) {
-	sort.Slice(refs, func(i, j int) bool {
-		return refs[i].Path < refs[j].Path
-	})
+func appendMissingMany(values []string, additions []string) []string {
+	for _, addition := range additions {
+		values = appendMissing(values, addition)
+	}
+	return values
 }
 
 func writeRefList(sb *strings.Builder, label string, refs []SourceRef) {

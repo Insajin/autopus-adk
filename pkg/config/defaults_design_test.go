@@ -49,6 +49,9 @@ design:
   inject_on_review: false
   inject_on_verify: true
   external_imports: true
+  docs_providers:
+    - astryx
+    - shadcn
   ui_globs:
     - "*.view"
 `
@@ -62,6 +65,7 @@ design:
 	assert.False(t, cfg.Design.InjectOnReview)
 	assert.True(t, cfg.Design.InjectOnVerify)
 	assert.True(t, cfg.Design.ExternalImports)
+	assert.Equal(t, []string{"astryx", "shadcn"}, cfg.Design.DocsProviders)
 	assert.Equal(t, []string{"*.view"}, cfg.Design.UIFileGlobs)
 }
 
