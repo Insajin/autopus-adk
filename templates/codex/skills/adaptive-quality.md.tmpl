@@ -4,7 +4,7 @@
 
 ## Overview
 
-Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the execution profile used for each `Agent()` call. High-complexity tasks still receive the strongest reasoning path, while routine tasks stay on the standard path. In this workspace, Claude no longer falls back to haiku; Codex stays on GPT-5.5 and varies reasoning effort; OpenCode keeps its configured default model.
+Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the execution profile used for each `Agent()` call. High-complexity tasks still receive the strongest reasoning path, while routine tasks stay on the standard path. In this workspace, Claude no longer falls back to haiku; Codex maps managed workers to Sol/Terra/Luna, while new projects leave the primary session on the user's model unless `supervisor_model_policy: quality` is selected; OpenCode keeps its configured default model.
 
 ## Relationship to Quality Mode
 
@@ -47,7 +47,7 @@ When criteria overlap (e.g., 1 file but 250 lines), use the highest matching lev
 
 Platform note:
 - Claude: HIGH=`opus`, MEDIUM/LOW=`sonnet`
-- Codex: Balanced uses Sol/`xhigh` for strategic and Opus-tier work, Terra with role effort for Sonnet-tier work, and Luna with role effort for Haiku-tier work. Ultra uses Sol/`ultra` for the supervisor and orchestra, and Sol/`max` for managed workers.
+- Codex: Balanced uses Sol/`xhigh` for quality-managed strategic and Opus-tier work, Terra with role effort for Sonnet-tier work, and Luna with role effort for Haiku-tier work. Ultra uses Sol/`ultra` for a quality-managed supervisor and orchestra, and Sol/`max` for managed workers. An `inherit` supervisor keeps the user's Codex runtime default in either mode.
 - OpenCode: keep the configured default runtime model; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
 ## Effort Mapping (SPEC-CC21-001)
@@ -74,14 +74,15 @@ Codex-specific rendering:
 
 | Mode | Agent / Tier | `model_reasoning_effort` |
 |------|--------------|--------------------------|
-| Ultra | supervisor / orchestra | Sol + `ultra` |
+| Any | supervisor (`supervisor_model_policy: inherit`, default) | User Codex runtime default |
+| Ultra | quality-managed supervisor / orchestra | Sol + `ultra` |
 | Ultra | managed worker | Sol + `max` |
-| Balanced | supervisor / orchestra / Opus-tier worker | Sol + `xhigh` |
+| Balanced | quality-managed supervisor / orchestra / Opus-tier worker | Sol + `xhigh` |
 | Balanced | reviewer (Sonnet tier) | Terra + `high` |
 | Balanced | standard Sonnet-tier worker | Terra + `medium` |
 | Balanced | Haiku-tier worker | Luna + declared effort (capped at `max`) |
 
-Codex custom agent files are loaded when a session starts. To change their persistent quality profile, run `auto quality set <mode>`, then `auto update`, and start a new Codex session. A per-run `--quality` override can change a managed orchestra launch, but it cannot hot-swap agents already loaded by the current session.
+Codex custom agent files are loaded when a session starts. Run `auto quality <mode> --apply` to persist a quality profile and refresh the current project's managed agents, then start a new Codex session. `auto quality supervisor inherit --apply` keeps the primary session on the user's configured Codex model. `auto quality supervisor quality --apply` opts an unchanged Autopus-managed root config into the managed Sol profile; user-owned root model or effort assignments remain preserved and take precedence. A per-run `--quality` override can change a managed orchestra launch, but it cannot hot-swap agents already loaded by the current session.
 
 Unsupported env values must fail open to Quality Mode defaults. Use `auto effort detect` when the runtime needs the resolved value explicitly.
 

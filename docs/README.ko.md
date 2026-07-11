@@ -793,7 +793,23 @@ sequenceDiagram
 ```bash
 /auto go SPEC-ID --quality ultra      # 모든 에이전트를 Opus로 — 최고 품질
 /auto go SPEC-ID --quality balanced   # 적응형: 태스크 복잡도별 Opus/Sonnet/Haiku
+
+auto quality ultra --apply            # Ultra를 기본값으로 저장하고 현재 프로젝트에 반영
+auto quality balanced --apply         # Balanced를 기본값으로 저장하고 현재 프로젝트에 반영
+auto quality supervisor inherit --apply  # Codex 주 세션에서 사용자 기본 모델을 사용
+auto quality show                     # 저장된 품질 모드와 주 세션 정책 확인
 ```
+
+새 프로젝트의 `supervisor_model_policy` 기본값은 `inherit`입니다. 따라서 Autopus는 Codex 주
+세션의 사용자 기본 모델을 덮어쓰지 않습니다. 품질 모드는 관리형 에이전트와 quality-managed
+orchestra provider에 계속 적용됩니다. 이 정책이 없는 기존 프로젝트는 이전의 quality-managed
+해석을 유지하되, 소유권이 모호한 markerless root assignment는 마이그레이션 중 보존합니다.
+알려진 생성 프로필을 명시적으로 제거하려면 `auto quality supervisor inherit --apply`를,
+변경되지 않은 Autopus 관리 주 세션 설정에 선택한 품질 모드의 Sol 프로필을 적용하려면
+`auto quality supervisor quality --apply`를 실행하세요. 사용자가 직접 설정한 프로젝트의
+`model` 또는 `model_reasoning_effort` 값은 그대로 유지되며 이 정책보다 먼저 적용됩니다.
+관리형 에이전트 정의는 세션을 시작할 때 불러오므로, 설정을 반영한 뒤 새 Codex 세션을
+시작해야 합니다.
 
 | 모드 | Planner | Executor | Validator | 비용 |
 |------|---------|----------|-----------|------|
@@ -953,6 +969,7 @@ SPEC 상태 업데이트, 프로젝트 문서 재생성, @AX 태그 라이프사
 |--------|------|
 | `auto init` | 하네스 초기화 — 플랫폼 감지, 파일 생성 |
 | `auto update` | 하네스 업데이트 (마커 기반, 사용자 편집 보존) |
+| `auto quality` | 품질 모드 저장·조회, 관리형 프로필 반영, 주 세션 모델 소유권 선택 |
 | `auto doctor` | 상태 진단 |
 | `auto platform` | 플랫폼 관리 (list / add / remove) |
 | `auto arch` | 아키텍처 분석 (generate / enforce) |

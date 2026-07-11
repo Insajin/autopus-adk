@@ -9,6 +9,13 @@ import (
 
 // prepareFiles prepares files without writing to disk.
 func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	return a.prepareFilesWithManifest(cfg, nil)
+}
+
+func (a *Adapter) prepareFilesWithManifest(
+	cfg *config.HarnessConfig,
+	oldManifest *adapter.Manifest,
+) ([]adapter.FileMapping, error) {
 	var files []adapter.FileMapping
 
 	if codexOwnsSharedSurface(cfg) {
@@ -74,7 +81,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, hooksPrepFiles...)
 
-	configPrepFiles, err := a.prepareConfigFile(cfg)
+	configPrepFiles, err := a.prepareConfigFileWithManifest(cfg, oldManifest)
 	if err != nil {
 		return nil, fmt.Errorf("config 준비 실패: %w", err)
 	}

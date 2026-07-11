@@ -1,12 +1,18 @@
 package config
 
-// CodexSupervisorModel exposes the desired managed supervisor model to templates.
+// CodexSupervisorModel exposes a managed model only when the project opts in.
 func (c *HarnessConfig) CodexSupervisorModel() string {
+	if c == nil || !c.Quality.ManagesSupervisorModel() {
+		return ""
+	}
 	return c.Quality.CodexSupervisorModel()
 }
 
-// CodexSupervisorEffort exposes the desired managed supervisor effort to templates.
+// CodexSupervisorEffort exposes managed effort only when the project opts in.
 func (c *HarnessConfig) CodexSupervisorEffort() string {
+	if c == nil || !c.Quality.ManagesSupervisorModel() {
+		return ""
+	}
 	return c.Quality.CodexSupervisorEffort()
 }
 

@@ -103,3 +103,4 @@ orchestra:
 
 quality:
   default: balanced
+  supervisor_model_policy: inherit

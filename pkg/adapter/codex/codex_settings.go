@@ -26,7 +26,8 @@ func (a *Adapter) generateConfig(cfg *config.HarnessConfig) ([]adapter.FileMappi
 
 	targetPath := filepath.Join(a.root, codexConfigRelPath)
 	if existing, readErr := os.ReadFile(targetPath); readErr == nil {
-		rendered = preserveUserCodexModelSettings(rendered, string(existing))
+		preservation := codexModelSettingsToPreserve(existing, nil, false)
+		rendered = preserveUserCodexModelSettings(rendered, preservation)
 	}
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return nil, fmt.Errorf("codex config 디렉터리 생성 실패: %w", err)
@@ -45,6 +46,13 @@ func (a *Adapter) generateConfig(cfg *config.HarnessConfig) ([]adapter.FileMappi
 
 // prepareConfigFile returns the project-scoped Codex config mapping without writing to disk.
 func (a *Adapter) prepareConfigFile(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	return a.prepareConfigFileWithManifest(cfg, nil)
+}
+
+func (a *Adapter) prepareConfigFileWithManifest(
+	cfg *config.HarnessConfig,
+	oldManifest *adapter.Manifest,
+) ([]adapter.FileMapping, error) {
 	tmplContent, err := templates.FS.ReadFile("codex/config.toml.tmpl")
 	if err != nil {
 		return nil, fmt.Errorf("codex config 템플릿 읽기 실패: %w", err)
@@ -55,7 +63,9 @@ func (a *Adapter) prepareConfigFile(cfg *config.HarnessConfig) ([]adapter.FileMa
 		return nil, fmt.Errorf("codex config 템플릿 렌더링 실패: %w", err)
 	}
 	if existing, readErr := os.ReadFile(filepath.Join(a.root, codexConfigRelPath)); readErr == nil {
-		rendered = preserveUserCodexModelSettings(rendered, string(existing))
+		legacyPolicy := cfg.Quality.SupervisorModelPolicy == ""
+		preservation := codexModelSettingsToPreserve(existing, oldManifest, legacyPolicy)
+		rendered = preserveUserCodexModelSettings(rendered, preservation)
 	}
 
 	return []adapter.FileMapping{{

@@ -125,7 +125,7 @@ The quality mode — determined by the `--quality` flag or interactive selection
 
 Use the premium path for all Agent() calls.
 
-On model-tiered platforms, this means adding `model: "opus"`. Codex renders Ultra managed workers as Sol/`max`; the depth-0 supervisor and orchestra use Sol/`ultra`. OpenCode should keep its configured default model and increase reasoning effort.
+On model-tiered platforms, this means adding `model: "opus"`. Codex renders Ultra managed workers as Sol/`max`; a quality-managed depth-0 supervisor and orchestra use Sol/`ultra`, while an `inherit` supervisor keeps the user's Codex runtime default. User-owned root model or effort assignments remain preserved and take precedence. OpenCode should keep its configured default model and increase reasoning effort.
 
 ```
 Agent(

@@ -62,6 +62,7 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 			a.codexFallbackWriter = nil
 			cfg := config.DefaultFullConfig("capability-matrix")
 			cfg.Quality.Default = "ultra"
+			cfg.Quality.SupervisorModelPolicy = "quality"
 
 			rootFiles, err := a.generateConfig(cfg)
 			require.NoError(t, err)

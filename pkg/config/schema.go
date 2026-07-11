@@ -25,8 +25,9 @@ type QualityPreset struct {
 
 // QualityConf holds quality preset definitions and the default preset name.
 type QualityConf struct {
-	Default string                   `yaml:"default,omitempty"`
-	Presets map[string]QualityPreset `yaml:"presets,omitempty"`
+	Default               string                   `yaml:"default,omitempty"`
+	SupervisorModelPolicy string                   `yaml:"supervisor_model_policy,omitempty"`
+	Presets               map[string]QualityPreset `yaml:"presets,omitempty"`
 }
 
 // SkillsConf holds configuration for the skills activation system.

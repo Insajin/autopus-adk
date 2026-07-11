@@ -862,7 +862,22 @@ sequenceDiagram
 ```bash
 /auto go SPEC-ID --quality ultra      # All agents on Opus — max quality
 /auto go SPEC-ID --quality balanced   # Adaptive: Opus/Sonnet/Haiku by task complexity
+
+auto quality ultra --apply            # Persist Ultra and refresh this project's managed agents
+auto quality balanced --apply         # Persist Balanced and refresh this project's managed agents
+auto quality supervisor inherit --apply  # Use the user's Codex model for the primary session
+auto quality show                     # Show the persisted mode and supervisor policy
 ```
+
+New projects default to `supervisor_model_policy: inherit`, so Autopus does not override the
+user's Codex model for the primary session. Quality mode still controls managed agents and
+quality-managed orchestra providers. Existing projects without this policy keep the legacy
+quality interpretation, while ambiguous markerless root assignments are preserved during migration.
+Run `auto quality supervisor inherit --apply` to explicitly remove a known generated root profile, or
+`auto quality supervisor quality --apply` to opt an unchanged Autopus-managed primary config into the
+Sol profile for the selected quality mode. User-owned project model or effort assignments remain
+preserved and take precedence. Start a new Codex session after applying changes so managed agent
+definitions are reloaded.
 
 ```mermaid
 flowchart LR
@@ -1036,6 +1051,7 @@ Providers: **Claude** · **Codex** · **Gemini** · **OpenCode** — with gracef
 |---------|-------------|
 | `auto init` | Initialize harness — detect platforms, generate files |
 | `auto update` | Update harness (preserves user edits via markers) |
+| `auto quality` | Persist/show quality mode, apply managed profiles, or choose supervisor model ownership |
 | `auto doctor` | Health diagnostics |
 | `auto platform` | Manage platforms (list / add / remove) |
 | `auto arch` | Architecture analysis (generate / enforce) |

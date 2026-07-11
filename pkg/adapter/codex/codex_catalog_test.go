@@ -22,6 +22,7 @@ func TestGenerateConfig_CatalogDowngradesEffortOnSameModel(t *testing.T) {
 	a.codexFallbackWriter = &warnings
 	cfg := config.DefaultFullConfig("catalog-project")
 	cfg.Quality.Default = "ultra"
+	cfg.Quality.SupervisorModelPolicy = "quality"
 
 	files, err := a.generateConfig(cfg)
 	require.NoError(t, err)
@@ -42,6 +43,7 @@ func TestGenerateConfig_CatalogFallsBackToLegacyModel(t *testing.T) {
 	a.codexCatalogJSON = []byte(`{"models":[{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}`)
 	cfg := config.DefaultFullConfig("legacy-project")
 	cfg.Quality.Default = "ultra"
+	cfg.Quality.SupervisorModelPolicy = "quality"
 
 	files, err := a.generateConfig(cfg)
 	require.NoError(t, err)
@@ -59,6 +61,7 @@ func TestGenerateConfig_CatalogUnknownUsesLegacyModel(t *testing.T) {
 	a.codexFallbackWriter = &warnings
 	cfg := config.DefaultFullConfig("unknown-catalog-project")
 	cfg.Quality.Default = "ultra"
+	cfg.Quality.SupervisorModelPolicy = "quality"
 
 	files, err := a.generateConfig(cfg)
 	require.NoError(t, err)

@@ -106,6 +106,7 @@ orchestra:
             providers: [claude, codex, gemini]
 quality:
     default: ultra
+    supervisor_model_policy: inherit
     presets:
         balanced:
             description: 핵심 분석은 Opus, 기본 작업은 Sonnet. Haiku 미사용.

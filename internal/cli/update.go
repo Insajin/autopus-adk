@@ -2,7 +2,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,10 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -182,27 +177,14 @@ func newUpdateCmd() *cobra.Command {
 				}
 			}
 
-			ctx := context.Background()
+			ctx := cmd.Context()
 			effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
 			updated := 0
 			var platformErrors []string
 
 			for _, p := range cfg.Platforms {
-				var updateErr error
-				switch p {
-				case "claude-code":
-					a := claude.NewWithRoot(dir)
-					_, updateErr = a.Update(ctx, effectiveCfg)
-				case "codex":
-					a := codex.NewWithRoot(dir)
-					_, updateErr = a.Update(ctx, effectiveCfg)
-				case "antigravity-cli":
-					a := gemini.NewWithRoot(dir)
-					_, updateErr = a.Update(ctx, effectiveCfg)
-				case "opencode":
-					a := opencode.NewWithRoot(dir)
-					_, updateErr = a.Update(ctx, effectiveCfg)
-				default:
+				supported, updateErr := updateHarnessPlatform(ctx, dir, p, effectiveCfg)
+				if !supported {
 					fmt.Fprintf(cmd.OutOrStdout(), "  경고: 알 수 없는 플랫폼 %q, 건너뜀\n", p)
 					continue
 				}

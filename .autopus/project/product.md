@@ -37,7 +37,7 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 | Agent Pipeline | `/auto go --team` | 멀티에이전트 파이프라인 (planner→tester(scaffold)→executor→annotator→tester→validator→reviewer+security-auditor) |
 | Agent Teams | `/auto go --team` | 역할 기반 팀 구성 (Lead/Builder/Guardian) via Claude Code Agent Teams |
 | Adaptive Quality | `/auto go --quality balanced` | 태스크 복잡도별 실행 프로필 선택(HIGH→opus, MEDIUM/LOW→sonnet). Codex는 Sol/Terra/Luna 품질 프로필을 사용하고 OpenCode는 설정된 모델을 유지 |
-| Quality Mode | `/auto go --quality` | 품질 모드 선택. Claude Ultra는 전체 Opus, Codex Ultra는 supervisor/orchestra Sol+`ultra`와 managed worker Sol+`max`, Balanced는 역할별 Sol/Terra/Luna 프로필 사용 |
+| Quality Mode | `/auto go --quality`, `auto quality` | 품질 모드 선택 및 영속 적용. Codex 주 세션은 기본적으로 사용자 모델을 상속하고, 관리형 워커와 orchestra는 Ultra/Balanced의 Sol/Terra/Luna 프로필을 사용 |
 | RALF Loop | `/auto go --loop` | 품질 게이트 자동 재시도 (RALF: RED-GREEN-REFACTOR-LOOP), circuit breaker 내장 |
 | SPEC Dashboard | `auto status` | SPEC 상태 대시보드 (done/in-progress/draft 표시) |
 | Dev One-Shot | `/auto dev` | plan → go → sync 원샷 사이클 자동 실행 (`--idea` 플래그로 idea → plan → go → sync 4단계 사이클 지원) |

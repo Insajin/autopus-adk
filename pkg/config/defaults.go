@@ -133,7 +133,8 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 		// Quality presets map agent roles to model tiers.
 		// "ultra" uses Opus for all agents; "balanced" is the cost-effective default.
 		Quality: QualityConf{
-			Default: "balanced",
+			Default:               "balanced",
+			SupervisorModelPolicy: SupervisorModelPolicyInherit,
 			Presets: map[string]QualityPreset{
 				"ultra": {
 					Description: "모든 에이전트를 Opus로 실행. 최고 품질.",

@@ -7,10 +7,11 @@
 탐지는 bounded runner와 structured JSON parser로 분리해 테스트할 수 있게 만들고, 탐지 실패는
 관측 가능한 fallback 결과로 처리한다.
 
-사용자 소유권 경계는 유지한다. fresh root template은 새 정책을 사용하지만 기존 root
-`model`/`model_reasoning_effort`의 우변 literal은 merge 단계에서 보존한다. orchestra에는
-managed policy 표시를 추가하고, 명시적 pinned/custom provider의 Binary·Args·PaneArgs slice는
-runtime quality/effort overlay에서도 그대로 둔다.
+사용자 소유권 경계는 유지한다. fresh root template은 새 정책을 사용하고, 기존 root의 사용자
+소유 `model`/`model_reasoning_effort` 우변 literal은 키 단위로 보존한다. 정책이 없는 레거시
+설정은 보존 우선으로 처리하고, 명시적 supervisor 정책에서만 exact generated tuple을 회수한다.
+orchestra에는 managed policy 표시를 추가하고, 명시적 pinned/custom provider의
+Binary·Args·PaneArgs slice는 runtime quality/effort overlay에서도 그대로 둔다.
 
 ## Visual Planning Brief
 
@@ -40,10 +41,11 @@ managed agent와 pinned provider에는 전달하지 않는다.
   quality precedence, structured catalog parser, fallback reason을 추가한다. full-support와 partial
   catalog를 사용하는 table-driven RED/GREEN 테스트로 `supported`, `effort_unavailable`,
   `model_unavailable`, `runtime_default`, `catalog_unknown`을 고정한다.
-- [x] T2: `templates/codex/config.toml.tmpl`과 Codex adapter merge를 갱신한다. full-support catalog에서
-  fresh Balanced=`Sol+xhigh`, Ultra=`Sol+ultra`를 생성한다. 기존 root model/effort는 값만 비교하지
-  말고 파싱된 우변 literal을 보존하는 oracle을 두며, template whitespace normalization과 provider
-  slice 보존을 같은 계약으로 오해하지 않도록 테스트를 분리한다.
+- [x] T2: `templates/codex/config.toml.tmpl`과 Codex adapter merge를 갱신한다. fresh root는
+  `inherit`로 project-local model/effort를 생략하고, 명시적 quality-managed root만 full-support
+  catalog에서 Balanced=`Sol+xhigh`, Ultra=`Sol+ultra`를 생성한다. 사용자 root model/effort는
+  키 목록 마커와 파싱된 우변 literal로 보존하고, 레거시 markerless tuple·비모델 checksum
+  drift·quoted key·multiline TOML fixture를 분리 검증한다.
 - [x] T3: `pkg/content` transformer가 agent name, source fallback tier, preset role tier, source declared
   effort를 resolver에 전달하도록 갱신한다. model과 effort를 서로 다른 declared-effort 입력으로
   해석하지 않도록 한 tuple에서 계산한다. blank/unknown declared effort=`medium`, worker
@@ -63,7 +65,7 @@ managed agent와 pinned provider에는 전달하지 않는다.
   capability matrix를 root model/effort, agent model/effort, subprocess Args, interactive PaneArgs에
   투영하는 통합 oracle을 추가하고 fallback receipt의 `requested`, `selected`, `reason`을 검증한다.
 - [x] T6: adaptive-quality/agent-pipeline의 source와 Codex generated guidance를 새 행렬과 runtime
-  경계로 동기화한다. persistent worker 변경에는 `auto quality set`, `auto update`, 새 세션이 필요하고
+  경계로 동기화한다. persistent worker 변경에는 `auto quality <mode> --apply`와 새 세션이 필요하고
   per-run `--quality`/`--effort`는 quality-managed orchestra에만 즉시 적용된다고 명시한다.
   planner/validator agent body, `ARCHITECTURE.md`, `.autopus/project/product.md`,
   `.autopus/project/tech.md`, active `autopus.yaml` 예시를 감사하고 OpenCode/Claude golden 회귀를 실행한다.
@@ -81,8 +83,8 @@ T1의 RED/GREEN resolver가 T2~T5의 선행 조건이다. T2와 T4는 파일 소
 
 ## Feature Completion Scope
 
-Primary SPEC 하나가 정책 SoT, fresh supervisor 생성, managed agent 생성, canonical orchestra runtime
-overlay, capability fallback, 사용자 설정 보존, 문서 parity를 함께 닫는다. 별도 sibling SPEC에
+Primary SPEC 하나가 정책 SoT, fresh supervisor 상속 정책, opt-in supervisor 및 managed agent 생성,
+canonical orchestra runtime overlay, capability fallback, 사용자 설정 보존, 문서 parity를 함께 닫는다. 별도 sibling SPEC에
 의존하지 않는다. Per-run quality가 이미 로드된 custom agent를 바꾸지 못하는 제약은 REQ-009의
 명시적 사용자 계약으로 닫는다. mode-qualified agent 파일을 두 벌 생성하는 확장은 Outcome Lock에
 포함하지 않는다.

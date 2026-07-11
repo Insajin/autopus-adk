@@ -14,40 +14,58 @@ import (
 )
 
 func newQualityCmd() *cobra.Command {
+	var apply bool
 	cmd := &cobra.Command{
 		Use:   "quality [preset]",
-		Short: "Show or change quality mode",
-		Long: "Show or change quality.default in autopus.yaml.\n\n" +
-			"Run without arguments to choose a preset interactively.",
+		Short: "Show or change quality mode and Codex supervisor ownership",
+		Long: "Show or change quality.default and quality.supervisor_model_policy in autopus.yaml.\n\n" +
+			"Use `auto quality <preset> --apply` for a persistent worker mode change, or run without arguments to choose interactively.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
-				return runQualitySet(cmd, args[0])
+				return runQualitySet(cmd, args[0], apply)
 			}
-			return runQualityInteractive(cmd)
+			return runQualityInteractive(cmd, apply)
 		},
 	}
+	cmd.PersistentFlags().BoolVar(&apply, "apply", false, "Apply the saved quality or supervisor policy to this project's harness files")
 	cmd.AddCommand(newQualityShowCmd())
-	cmd.AddCommand(newQualitySetCmd())
+	cmd.AddCommand(newQualitySetCmd(&apply))
+	cmd.AddCommand(newQualitySupervisorCmd(&apply))
 	return cmd
+}
+
+func newQualitySupervisorCmd(apply *bool) *cobra.Command {
+	return &cobra.Command{
+		Use:     "supervisor <inherit|quality>",
+		Aliases: []string{"model"},
+		Short:   "Choose whether Codex inherits the user model or follows quality mode",
+		Long: "Choose ownership of the primary Codex session model. `inherit` removes a known Autopus-managed root profile; " +
+			"`quality` uses the selected quality profile. Explicit user-owned model settings remain preserved.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runQualitySupervisorSet(cmd, args[0], apply != nil && *apply)
+		},
+	}
 }
 
 func newQualityShowCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "show",
-		Short: "Show current quality mode",
-		Args:  cobra.NoArgs,
-		RunE:  runQualityShow,
+		Use:     "show",
+		Aliases: []string{"status"},
+		Short:   "Show current quality mode and supervisor policy",
+		Args:    cobra.NoArgs,
+		RunE:    runQualityShow,
 	}
 }
 
-func newQualitySetCmd() *cobra.Command {
+func newQualitySetCmd(apply *bool) *cobra.Command {
 	return &cobra.Command{
 		Use:   "set <preset>",
 		Short: "Set quality.default",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runQualitySet(cmd, args[0])
+			return runQualitySet(cmd, args[0], apply != nil && *apply)
 		},
 	}
 }
@@ -59,12 +77,13 @@ func runQualityShow(cmd *cobra.Command, _ []string) error {
 	}
 	out := cmd.OutOrStdout()
 	fmt.Fprintf(out, "quality.default = %s\n", cfg.Quality.Default)
+	fmt.Fprintf(out, "quality.supervisor_model_policy = %s\n", cfg.Quality.EffectiveSupervisorModelPolicy())
 	fmt.Fprintf(out, "config = %s\n", filepath.Join(dir, "autopus.yaml"))
 	fmt.Fprintf(out, "available = %s\n", strings.Join(orderedQualityPresets(cfg), ", "))
 	return nil
 }
 
-func runQualitySet(cmd *cobra.Command, preset string) error {
+func runQualitySet(cmd *cobra.Command, preset string, apply bool) error {
 	dir, cfg, err := loadQualityConfig(cmd)
 	if err != nil {
 		return err
@@ -77,10 +96,33 @@ func runQualitySet(cmd *cobra.Command, preset string) error {
 		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "quality.default = %s\n", preset)
+	if apply {
+		return applyQualityHarness(cmd, dir, cfg, "auto quality "+preset+" --apply")
+	}
 	return nil
 }
 
-func runQualityInteractive(cmd *cobra.Command) error {
+func runQualitySupervisorSet(cmd *cobra.Command, policy string, apply bool) error {
+	dir, cfg, err := loadQualityConfig(cmd)
+	if err != nil {
+		return err
+	}
+	policy = strings.TrimSpace(policy)
+	cfg.Quality.SupervisorModelPolicy = policy
+	if !cfg.Quality.IsValidSupervisorModelPolicy() || policy == "" {
+		return fmt.Errorf("unknown supervisor model policy %q (available: inherit, quality)", policy)
+	}
+	if err := saveQualitySupervisorPolicy(dir, cfg, policy); err != nil {
+		return err
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "quality.supervisor_model_policy = %s\n", policy)
+	if apply {
+		return applyQualityHarness(cmd, dir, cfg, "auto quality supervisor "+policy+" --apply")
+	}
+	return nil
+}
+
+func runQualityInteractive(cmd *cobra.Command, apply bool) error {
 	dir, cfg, err := loadQualityConfig(cmd)
 	if err != nil {
 		return err
@@ -115,20 +157,44 @@ func runQualityInteractive(cmd *cobra.Command) error {
 		return err
 	}
 	fmt.Fprintf(out, "quality.default = %s\n", choice)
+	if apply {
+		return applyQualityHarness(cmd, dir, cfg, "auto quality "+choice+" --apply")
+	}
 	return nil
 }
 
 func loadQualityConfig(cmd *cobra.Command) (string, *config.HarnessConfig, error) {
 	flags := globalFlagsFromContext(cmd.Context())
+	if err := validateQualityConfigPath(flags.ConfigPath); err != nil {
+		return "", nil, err
+	}
 	dir, err := resolveConfigDir(cmd, flags.ConfigPath)
 	if err != nil {
 		return "", nil, fmt.Errorf("resolve config dir: %w", err)
 	}
-	cfg, err := config.Load(dir)
+	cfg, err := config.LoadPreview(dir)
 	if err != nil {
 		return "", nil, fmt.Errorf("load config: %w", err)
 	}
 	return dir, cfg, nil
+}
+
+func validateQualityConfigPath(configPath string) error {
+	configPath = strings.TrimSpace(configPath)
+	if configPath == "" {
+		return nil
+	}
+	info, err := os.Stat(configPath)
+	if err == nil && info.IsDir() {
+		return nil
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("inspect --config path: %w", err)
+	}
+	if filepath.Base(filepath.Clean(configPath)) != "autopus.yaml" {
+		return fmt.Errorf("quality commands require --config to be a project directory or a file named autopus.yaml")
+	}
+	return nil
 }
 
 func validateQualityChoice(cfg *config.HarnessConfig, preset string) error {
@@ -160,7 +226,7 @@ func orderedQualityPresets(cfg *config.HarnessConfig) []string {
 func readQualityChoice(cmd *cobra.Command, options []string) (string, error) {
 	in := cmd.InOrStdin()
 	if f, ok := in.(*os.File); ok && f == os.Stdin && !isStdinTTY() {
-		return "", fmt.Errorf("interactive quality selection requires a TTY; use `auto quality set <preset>`")
+		return "", fmt.Errorf("interactive quality selection requires a TTY; use `auto quality <preset>`")
 	}
 	reader := bufio.NewReader(in)
 	answer, err := reader.ReadString('\n')

@@ -25,7 +25,48 @@ func TestQualityShowCmd(t *testing.T) {
 	require.NoError(t, root.Execute())
 	out := buf.String()
 	assert.Contains(t, out, "quality.default = balanced")
+	assert.Contains(t, out, "quality.supervisor_model_policy = inherit")
 	assert.Contains(t, out, "available = ultra, balanced")
+}
+
+func TestQualityStatusAlias(t *testing.T) {
+	dir := writeQualityTestConfig(t, "balanced")
+	root := NewRootCmd()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetArgs([]string{"--config", filepath.Join(dir, "autopus.yaml"), "quality", "status"})
+
+	require.NoError(t, root.Execute())
+	assert.Contains(t, buf.String(), "quality.default = balanced")
+}
+
+func TestQualitySupervisorCmdPersistsInheritPolicy(t *testing.T) {
+	dir := writeQualityTestConfig(t, "balanced")
+	cfg, err := config.LoadPreview(dir)
+	require.NoError(t, err)
+	cfg.Quality.SupervisorModelPolicy = "quality"
+	require.NoError(t, config.Save(dir, cfg))
+
+	root := NewRootCmd()
+	buf := &bytes.Buffer{}
+	root.SetOut(buf)
+	root.SetArgs([]string{"--config", filepath.Join(dir, "autopus.yaml"), "quality", "supervisor", "inherit"})
+
+	require.NoError(t, root.Execute())
+	assert.Contains(t, buf.String(), "quality.supervisor_model_policy = inherit")
+	updated, err := config.LoadPreview(dir)
+	require.NoError(t, err)
+	assert.Equal(t, "inherit", updated.Quality.SupervisorModelPolicy)
+}
+
+func TestQualitySupervisorCmdRejectsUnknownPolicy(t *testing.T) {
+	dir := writeQualityTestConfig(t, "balanced")
+	root := NewRootCmd()
+	root.SetArgs([]string{"--config", filepath.Join(dir, "autopus.yaml"), "quality", "supervisor", "forced"})
+
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown supervisor model policy")
 }
 
 func TestQualitySetCmd_UpdatesDefault(t *testing.T) {
@@ -40,7 +81,6 @@ func TestQualitySetCmd_UpdatesDefault(t *testing.T) {
 
 	require.NoError(t, root.Execute())
 	assert.Contains(t, buf.String(), "quality.default = ultra")
-
 	cfg, err := config.LoadPreview(dir)
 	require.NoError(t, err)
 	assert.Equal(t, "ultra", cfg.Quality.Default)
@@ -49,7 +89,6 @@ func TestQualitySetCmd_UpdatesDefault(t *testing.T) {
 func TestQualityCmd_ArgIsSetShorthand(t *testing.T) {
 	dir := writeQualityTestConfig(t, "ultra")
 	configPath := filepath.Join(dir, "autopus.yaml")
-
 	root := NewRootCmd()
 	root.SetArgs([]string{"--config", configPath, "quality", "balanced"})
 
@@ -62,7 +101,6 @@ func TestQualityCmd_ArgIsSetShorthand(t *testing.T) {
 func TestQualityCmd_InteractiveChoice(t *testing.T) {
 	dir := writeQualityTestConfig(t, "balanced")
 	configPath := filepath.Join(dir, "autopus.yaml")
-
 	root := NewRootCmd()
 	buf := &bytes.Buffer{}
 	root.SetOut(buf)
@@ -72,7 +110,6 @@ func TestQualityCmd_InteractiveChoice(t *testing.T) {
 
 	require.NoError(t, root.Execute())
 	assert.Contains(t, buf.String(), "Select quality mode:")
-
 	cfg, err := config.LoadPreview(dir)
 	require.NoError(t, err)
 	assert.Equal(t, "ultra", cfg.Quality.Default)
@@ -81,25 +118,12 @@ func TestQualityCmd_InteractiveChoice(t *testing.T) {
 func TestQualityCmd_InvalidPresetFails(t *testing.T) {
 	dir := writeQualityTestConfig(t, "balanced")
 	configPath := filepath.Join(dir, "autopus.yaml")
-
 	root := NewRootCmd()
 	root.SetArgs([]string{"--config", configPath, "quality", "turbo"})
 
 	err := root.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `unknown quality preset "turbo"`)
-}
-
-func TestReplaceQualityDefaultLine_PreservesInlineComment(t *testing.T) {
-	t.Parallel()
-	raw := []byte("quality:\n  default: balanced # keep this\n")
-
-	line, ok := findQualityDefaultLine(raw)
-	require.True(t, ok)
-	updated, err := replaceQualityDefaultLine(raw, line, "ultra")
-	require.NoError(t, err)
-
-	assert.Equal(t, "quality:\n  default: ultra # keep this\n", string(updated))
 }
 
 func writeQualityTestConfig(t *testing.T, defaultPreset string) string {

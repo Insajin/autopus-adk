@@ -38,10 +38,16 @@ func (a *Adapter) codexRenderData(cfg *config.HarnessConfig) any {
 }
 
 func (c codexRenderContext) CodexSupervisorModel() string {
+	if !c.Quality.ManagesSupervisorModel() {
+		return ""
+	}
 	return c.resolve(c.Quality.CodexSupervisorProfile()).Effective.Model
 }
 
 func (c codexRenderContext) CodexSupervisorEffort() string {
+	if !c.Quality.ManagesSupervisorModel() {
+		return ""
+	}
 	return c.resolve(c.Quality.CodexSupervisorProfile()).Effective.Effort
 }
 

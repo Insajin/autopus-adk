@@ -8,16 +8,19 @@
 
 Autopus-ADK의 Codex 모델 및 reasoning effort 결정을 persistent quality, 명시적 orchestra
 runtime override, 실행 역할, agent tier, declared worker effort, 현재 Codex capability에 따라
-일관되게 해석한다. fresh supervisor, managed subagent/native multi-agent, quality-managed
-orchestra가 같은 정책을 사용하되 사용자 소유 설정과 다른 플랫폼 정책은 보존한다.
+일관되게 해석한다. Codex 주 세션은 기본적으로 사용자 runtime 모델을 상속하고, 명시적으로
+quality-managed 정책을 선택한 supervisor와 managed subagent/native multi-agent,
+quality-managed orchestra는 같은 프로필 resolver를 사용한다. 사용자 소유 설정과 다른 플랫폼
+정책은 보존한다.
 
 ## Outcome Boundary
 
 ### Outcome Lock
 
-- **User-visible outcome**: 사용자는 별도의 로컬 Codex 설정 변경 없이 Balanced와 Ultra에 맞는
-  GPT-5.6 프로필을 생성·실행한다. `max`와 `ultra`는 delegation 의미에 따라 worker와 depth 0
-  실행에서 구분되며, capability 부족 시 선택 결과와 이유를 확인할 수 있다.
+- **User-visible outcome**: 사용자의 Codex 주 세션 모델은 새 프로젝트에서 그대로 유지된다.
+  사용자는 `auto quality <mode> --apply`로 Balanced와 Ultra에 맞는 관리형 GPT-5.6 프로필을
+  저장하고 반영한다. `max`와 `ultra`는 delegation 의미에 따라 worker와 depth 0 실행에서
+  구분되며, capability 부족 시 선택 결과와 이유를 확인할 수 있다.
 - **Mandatory requirements**: REQ-001~REQ-010을 모두 구현해야 한다.
 - **Explicit non-goals**: Claude/OpenCode 정책, Codex fan-out·`max_threads`·`max_depth`, per-spawn
   custom-agent override, 사용자 소유 설정 강제 이행, 역사적 기록 재작성, entitlement telemetry는
@@ -33,7 +36,8 @@ orchestra가 같은 정책을 사용하되 사용자 소유 설정과 다른 플
 
 | Scope | Balanced | Ultra | Rationale |
 |---|---|---|---|
-| Supervisor | Sol + `xhigh` | Sol + `ultra` | 전략 판단; Ultra depth 0에서 자동 위임 허용 |
+| Supervisor (`inherit`, default) | User Codex runtime default | User Codex runtime default | 사용자 주 세션 모델 소유권 보존 |
+| Supervisor (`quality`) | Sol + `xhigh` | Sol + `ultra` | 명시적으로 opt-in한 전략 판단; Ultra depth 0에서 자동 위임 허용 |
 | Opus agent | Sol + `xhigh` | Sol + `max` | Balanced는 declared effort와 무관하게 전략 품질을 `xhigh`로 고정하고, Ultra worker는 중첩 자동 위임을 금지 |
 | Sonnet agent | Terra + normalized declared effort | Sol + `max` | Balanced 반복 작업 비용 절감 |
 | Haiku agent | Luna + normalized declared effort | Sol + `max` | Balanced 단순·고빈도 작업 비용 절감 |
@@ -57,8 +61,11 @@ retaining that preset's role mapping for persistently generated managed agents.
 
 ### REQ-003 (Event-driven / Priority: Must)
 
-WHEN a fresh Codex supervisor config is rendered, THEN the system SHALL emit Sol plus `xhigh` for
-Balanced and Sol plus `ultra` for Ultra after applying the capability resolver.
+WHEN a fresh Codex supervisor config is rendered with `supervisor_model_policy: inherit`, THEN the
+system SHALL omit project-local model and effort assignments so the Codex runtime default is inherited;
+WHEN the policy is `quality`, THEN the system SHALL emit Sol plus `xhigh` for Balanced and Sol plus
+`ultra` for Ultra after applying the capability resolver. A missing legacy policy is interpreted as
+`quality` for backward compatibility.
 
 ### REQ-004 (Event-driven / Priority: Must)
 
@@ -77,10 +84,14 @@ already generated managed-agent files from runtime quality/effort changes.
 
 ### REQ-006 (Unwanted / Priority: Must)
 
-IF an existing Codex root model/effort is user-owned, THEN the system SHALL preserve each parsed
-assignment's right-hand-side literal, including its quoted value, across update even when surrounding
-template spacing is normalized; IF a provider has `model_policy: pinned`, THEN the system SHALL preserve
-its Binary, Args, PaneArgs, every slice element, ordering, quoting, unrelated flag, and `--` suffix.
+IF an existing Codex root model/effort key is user-owned, THEN the system SHALL preserve that key's
+parsed right-hand-side literal, including its quoted value, across repeated updates and record durable
+per-key ownership; IF a manifest-tracked root has an explicit supervisor policy and an exact known
+generated model/effort tuple, THEN the system SHALL refresh or remove that tuple even when an unrelated
+config key changed; IF a legacy config has no supervisor policy and its markerless model tuple is
+ambiguous, THEN the system SHALL preserve it until the user explicitly selects `inherit` or `quality`;
+IF a provider has `model_policy: pinned`, THEN the system SHALL preserve its Binary, Args, PaneArgs,
+every slice element, ordering, quoting, unrelated flag, and `--` suffix.
 
 ### REQ-007 (Unwanted / Priority: Must)
 
@@ -101,8 +112,8 @@ exceeds its bounds, or returns invalid JSON.
 ### REQ-009 (Optional / Priority: Must)
 
 WHERE a running Codex session has already loaded custom agent files, THEN the system SHALL describe
-per-run quality/effort overrides as unsupported for those workers and require `auto quality set`,
-`auto update`, and a new Codex session instead of claiming a per-spawn model override.
+per-run quality/effort overrides as unsupported for those workers and provide
+`auto quality <mode> --apply` plus a new Codex session instead of claiming a per-spawn model override.
 
 ### REQ-010 (Ubiquitous / Priority: Must)
 
@@ -120,8 +131,14 @@ Quality-managed orchestra precedence is:
 The runtime overlay applies only to Codex providers marked `model_policy: quality`. It is ephemeral and
 updates neither `autopus.yaml` nor already generated agent files. Managed agent files use persistent
 `quality.default` because the Codex subagent call schema has no per-spawn model or effort fields.
-Existing `.codex/config.toml` root model/effort assignments are user-owned after first generation;
-managed `.codex/agents/*.toml` files remain Autopus-owned and refresh on update.
+Fresh configs use `supervisor_model_policy: inherit`; existing configs with no policy retain the legacy
+`quality` interpretation. Because older manifests cannot distinguish every markerless user tuple from a
+generated tuple, legacy root assignments are preservation-first until
+`auto quality supervisor inherit|quality --apply` records an explicit policy. Under an explicit policy,
+exact known generated tuples are Autopus-owned and may refresh even if an unrelated setting caused
+whole-file checksum drift. Untracked custom tuples and durable key-list markers establish user ownership
+only for their named root assignments across later manifest rewrites. Managed `.codex/agents/*.toml`
+files remain Autopus-owned and refresh on update.
 
 New canonical Codex providers use `model_policy: quality`. An explicit `pinned` marker is never overlaid.
 During migration, only the exact historical Autopus `gpt-5.5+xhigh` Args and PaneArgs tuples, with no

@@ -185,7 +185,7 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
 	}
 
-	newFiles, err := a.prepareFiles(cfg)
+	newFiles, err := a.prepareFilesWithManifest(cfg, oldManifest)
 	if err != nil {
 		return nil, err
 	}

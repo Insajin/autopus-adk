@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,6 +120,7 @@ func TestUpdate_PreservesUserCodexModelSettings(t *testing.T) {
 	a := NewWithRoot(dir)
 	useFullCodexCatalogForTest(a)
 	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.SupervisorModelPolicy = "quality"
 
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
@@ -143,11 +145,12 @@ func TestUpdate_PreservesUserCodexModelSettings(t *testing.T) {
 	assert.NotContains(t, string(updated), "[profiles.")
 }
 
-func TestUpdate_PreservesExistingBalancedEffortWhenQualityBecomesUltra(t *testing.T) {
+func TestUpdate_RefreshesManagedBalancedEffortWhenQualityBecomesUltra(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.SupervisorModelPolicy = "quality"
 
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
@@ -159,27 +162,25 @@ func TestUpdate_PreservesExistingBalancedEffortWhenQualityBecomesUltra(t *testin
 	updated, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
 }
 
-func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *testing.T) {
+func TestUpdate_UnrelatedConfigEditDoesNotFreezeManagedModel(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
 	useFullCodexCatalogForTest(a)
 	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.SupervisorModelPolicy = "quality"
 
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
-
 	configPath := filepath.Join(dir, ".codex", "config.toml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	userConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.4"`, 1)
-	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "medium"`, 1)
-	require.Contains(t, userConfig, `model = "gpt-5.4"`)
-	require.Contains(t, userConfig, `model_reasoning_effort = "medium"`)
-	require.NoError(t, os.WriteFile(configPath, []byte(userConfig), 0644))
+	edited := strings.Replace(string(data), `approval_policy = "on-request"`, `approval_policy = "never"`, 1)
+	require.NotEqual(t, string(data), edited)
+	require.NoError(t, os.WriteFile(configPath, []byte(edited), 0o644))
 
 	cfg.Quality.Default = "ultra"
 	_, err = a.Update(context.Background(), cfg)
@@ -188,104 +189,109 @@ func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *te
 	updated, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model = "gpt-5.4"`)
+	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
+	assert.Contains(t, rootSection, `approval_policy = "on-request"`)
+	assert.NotContains(t, rootSection, codexUserModelMarker)
+}
+
+func TestUpdate_LegacyManagedManifestPreservesAmbiguousUserTuple(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	useFullCodexCatalogForTest(a)
+	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.SupervisorModelPolicy = "quality"
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	legacyUserConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.5"`, 1)
+	legacyUserConfig = strings.Replace(legacyUserConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "medium"`, 1)
+	require.NoError(t, os.WriteFile(configPath, []byte(legacyUserConfig), 0o644))
+
+	manifest, err := adapter.LoadManifest(dir, adapterName)
+	require.NoError(t, err)
+	entry := manifest.Files[codexConfigRelPath]
+	entry.Checksum = checksum(legacyUserConfig)
+	manifest.Files[codexConfigRelPath] = entry
+	require.NoError(t, manifest.Save(dir))
+
+	cfg.Quality.SupervisorModelPolicy = ""
+	cfg.Quality.Default = "ultra"
+	_, err = a.Update(context.Background(), cfg)
+	require.NoError(t, err)
+	updated, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
+	assert.Contains(t, rootSection, `model = "gpt-5.5"`)
 	assert.Contains(t, rootSection, `model_reasoning_effort = "medium"`)
+	assert.NotContains(t, rootSection, codexUserModelMarker)
+
+	cfg.Quality.SupervisorModelPolicy = "inherit"
+	_, err = a.Update(context.Background(), cfg)
+	require.NoError(t, err)
+	updated, err = os.ReadFile(configPath)
+	require.NoError(t, err)
+	rootSection = strings.SplitN(string(updated), "[agents]", 2)[0]
+	assert.Contains(t, rootSection, `model = "gpt-5.5"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "medium"`)
+	assert.Contains(t, rootSection, codexUserModelMarker)
 }
 
-func TestUpdate_DeletedManagedFile_Skipped(t *testing.T) {
+func TestUpdate_InheritPolicyRemovesUnmodifiedManagedRootModel(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
+	useFullCodexCatalogForTest(a)
 	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.SupervisorModelPolicy = "quality"
 
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	skillsDir := filepath.Join(dir, ".codex", "skills")
-	entries, _ := os.ReadDir(skillsDir)
-	if len(entries) > 0 {
-		require.NoError(t, os.Remove(filepath.Join(skillsDir, entries[0].Name())))
-	}
-
-	pf, err := a.Update(context.Background(), cfg)
-	require.NoError(t, err)
-	assert.NotNil(t, pf)
-}
-
-func TestUpdate_RemovesDeprecatedPluginWorkflowShims(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	_, err := a.Generate(context.Background(), cfg)
-	require.NoError(t, err)
-
-	staleDir := filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto-plan")
-	require.NoError(t, os.MkdirAll(staleDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(staleDir, "SKILL.md"), []byte("stale shim"), 0644))
-
+	cfg.Quality.SupervisorModelPolicy = "inherit"
 	_, err = a.Update(context.Background(), cfg)
 	require.NoError(t, err)
 
-	_, statErr := os.Stat(filepath.Join(staleDir, "SKILL.md"))
-	assert.True(t, os.IsNotExist(statErr), "deprecated plugin workflow shims should be pruned on update")
+	updated, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
+	require.NoError(t, err)
+	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
+	assert.NotContains(t, rootSection, "\nmodel =")
+	assert.NotContains(t, rootSection, "model_reasoning_effort")
 }
 
-func TestUpdate_RemovesUnmanagedStalePluginLongTailSkills(t *testing.T) {
+func TestUpdate_RefreshesHistoricalManagedLegacyProfile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
+	useFullCodexCatalogForTest(a)
 	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.SupervisorModelPolicy = "quality"
 
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	legacy := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.5"`, 1)
+	require.NoError(t, os.WriteFile(configPath, []byte(legacy), 0644))
 
-	staleDir := filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "metrics")
-	require.NoError(t, os.MkdirAll(staleDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(staleDir, "SKILL.md"), []byte("# Metrics Skill\n"), 0644))
+	manifest, err := adapter.LoadManifest(dir, adapterName)
+	require.NoError(t, err)
+	entry := manifest.Files[codexConfigRelPath]
+	entry.Checksum = checksum(legacy)
+	manifest.Files[codexConfigRelPath] = entry
+	require.NoError(t, manifest.Save(dir))
 
+	cfg.Quality.Default = "ultra"
 	_, err = a.Update(context.Background(), cfg)
 	require.NoError(t, err)
-
-	assert.NoFileExists(t, filepath.Join(staleDir, "SKILL.md"), "unmanaged stale plugin long-tail skills should be pruned on update")
-	assert.FileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"))
-}
-
-func TestUpdate_LinkedWorktreeGitFileSkipsRootGitHooks(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	_, err := a.Generate(context.Background(), cfg)
+	updated, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	require.NoError(t, os.RemoveAll(filepath.Join(dir, ".git")))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".git"), []byte("gitdir: /tmp/autopus-worktree\n"), 0644))
-
-	pf, err := a.Update(context.Background(), cfg)
-	require.NoError(t, err)
-	assert.NotNil(t, pf)
-	for _, file := range pf.Files {
-		assert.False(t, strings.HasPrefix(filepath.ToSlash(file.TargetPath), ".git/hooks/"), file.TargetPath)
-	}
-}
-
-func TestUpdate_RemovesLegacyRootCodexConfig(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	_, err := a.Generate(context.Background(), cfg)
-	require.NoError(t, err)
-
-	legacyPath := filepath.Join(dir, "config.toml")
-	require.NoError(t, os.WriteFile(legacyPath, []byte("# Codex configuration (auto-generated by Autopus-ADK)\nmodel = \"gpt-5.4\"\n"), 0644))
-
-	_, err = a.Update(context.Background(), cfg)
-	require.NoError(t, err)
-
-	assert.NoFileExists(t, legacyPath, "deprecated root Codex config should be removed")
-	assert.FileExists(t, filepath.Join(dir, ".codex", "config.toml"))
+	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
+	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
 }

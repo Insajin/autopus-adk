@@ -10,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestInitCmd_QualityUltraSetsCodexProfile(t *testing.T) {
+func TestInitCmd_QualityUltraInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
 	assertInitCodexQualityProfile(t, "ultra", "ultra", "gpt-5.6-sol", "max")
 }
 
-func TestInitCmd_QualityBalancedSetsCodexProfile(t *testing.T) {
+func TestInitCmd_QualityBalancedInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
 	assertInitCodexQualityProfile(t, "balanced", "xhigh", "gpt-5.6-terra", "medium")
 }
 
@@ -30,8 +30,8 @@ func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorMo
 	data, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(data), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
-	assert.Contains(t, rootSection, `model_reasoning_effort = "`+rootEffort+`"`)
+	assert.NotContains(t, rootSection, "\nmodel =")
+	assert.NotContains(t, rootSection, "model_reasoning_effort")
 
 	executor, err := os.ReadFile(filepath.Join(dir, ".codex", "agents", "executor.toml"))
 	require.NoError(t, err)
@@ -41,6 +41,7 @@ func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorMo
 	harnessData, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)
 	harness := string(harnessData)
+	assert.Contains(t, harness, "supervisor_model_policy: inherit")
 	assert.Contains(t, harness, "model_policy: quality")
 	assert.Contains(t, harness, "gpt-5.6-sol")
 	assert.GreaterOrEqual(t, strings.Count(harness, `model_reasoning_effort="`+rootEffort+`"`), 2)

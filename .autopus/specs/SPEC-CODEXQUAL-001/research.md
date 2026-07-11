@@ -84,11 +84,12 @@ model/effort field가 없다.
 
 | Decision | Reason |
 |---|---|
-| Balanced supervisor를 Sol+xhigh로 사용 | supervisor는 계획, gate, 합성을 담당하는 전략 역할이다 |
+| Fresh supervisor는 사용자 Codex 기본값을 상속 | project-local model/effort가 사용자 전역 설정을 가리지 않게 한다 |
+| Quality-managed Balanced supervisor를 Sol+xhigh로 사용 | 명시적으로 opt-in한 supervisor는 계획, gate, 합성을 담당하는 전략 역할이다 |
 | Balanced Opus worker를 declared effort와 무관하게 Sol+xhigh로 고정 | 핵심 전략 품질을 유지하고 Ultra 비용·delegation 경계와 구분한다 |
 | Balanced Sonnet/Haiku worker는 normalized declared effort 사용 | 반복 작업 비용을 낮추면서 source role의 추론 의도를 보존한다 |
 | unknown/blank declared effort는 medium, worker ultra는 max | 비표준 입력을 결정적으로 처리하고 nested automatic delegation을 막는다 |
-| Ultra supervisor/orchestra를 Sol+ultra로 사용 | 둘 다 depth 0 실행이며 자동 task delegation을 활용할 수 있다 |
+| Quality-managed Ultra supervisor/orchestra를 Sol+ultra로 사용 | 둘 다 depth 0 실행이며 자동 task delegation을 활용할 수 있다 |
 | Ultra managed worker를 Sol+max로 사용 | supervisor가 이미 worker를 배치하므로 worker의 중첩 delegation을 요청하지 않는다 |
 | runtime `--effort`가 quality-derived effort보다 우선 | 명시적 실행 override가 preset보다 구체적인 사용자 의도다 |
 | runtime override는 quality-managed orchestra로 제한 | pinned ownership과 세션 시작 시 로드된 agent file contract를 지킨다 |
@@ -136,7 +137,7 @@ model/effort field가 없다.
 
 | User outcome | Runtime surface | Requirement | Acceptance |
 |---|---|---|---|
-| Balanced/Ultra supervisor 기본 | Codex root template + adapter merge | REQ-003, REQ-006 | S3, S4, S10, S18 |
+| 사용자 supervisor 기본 상속 및 quality opt-in | Codex root template + adapter merge | REQ-003, REQ-006 | S3, S4, S10, S18 |
 | tier별 subagent/native team | content transformer + managed agent TOML | REQ-004, REQ-009 | S5~S7, S18, S19 |
 | quality별 orchestra | provider config + three CLI entry paths | REQ-002, REQ-005, REQ-006 | S2, S8, S9, S11, S12, S18 |
 | availability fallback | bounded catalog probe + profile resolver + receipt | REQ-007, REQ-008 | S13~S18 |
@@ -144,16 +145,16 @@ model/effort field가 없다.
 
 ## Question Audit
 
-- Balanced supervisor 품질: 사용자가 Sol+xhigh로 상향을 확정했다.
+- Supervisor 소유권: 새 프로젝트는 사용자 Codex 기본값을 상속하고, 명시적 `quality` 정책에서만 Sol 프로필을 사용한다.
 - `max` 대 `ultra`: live catalog와 공식 문서를 재확인했다. Ultra는 단순 상위 token budget이 아니라
   automatic task delegation을 포함하므로 실행 역할별로 구분한다.
 - Balanced Opus: declared `max`를 그대로 쓰지 않고 `xhigh`로 고정한다. 전략 품질은 유지하면서
   Ultra worker의 `max`와 비용 경계를 분명히 하기 위한 의도된 정책이다.
 - Per-run custom agent 전환: agent 파일은 세션 시작 시 로드된다. persistent 변경에는
-  `auto quality set`, `auto update`, 새 Codex 세션이 필요하다.
+  `auto quality <mode> --apply`와 새 Codex 세션이 필요하다.
 - Runtime override: `--quality`와 `--effort`는 quality-managed orchestra에만 즉시 적용한다.
   `--effort`가 quality-derived effort보다 우선한다.
-- Custom quality preset: exact `ultra`만 Ultra supervisor/orchestra profile을 선택한다. 나머지는
+- Custom quality preset: exact `ultra`만 quality-managed Ultra supervisor/orchestra profile을 선택한다. 나머지는
   Balanced profile을 사용하면서 persistent generation에서는 preset의 role tier mapping을 유지한다.
 - 미해결 제품 결정: 없음.
 
