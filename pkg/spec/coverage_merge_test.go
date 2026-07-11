@@ -24,6 +24,21 @@ func TestMergeFindingStatuses_ResolvedSupermajority(t *testing.T) {
 	assert.Equal(t, FindingStatusResolved, merged[0].Status)
 }
 
+func TestMergeFindingStatuses_TwoOfThreeMeetsRoundedThreshold(t *testing.T) {
+	t.Parallel()
+
+	providerResults := [][]ReviewFinding{
+		{{ID: "F-001", Status: FindingStatusResolved}},
+		{{ID: "F-001", Status: FindingStatusResolved}},
+		{{ID: "F-001", Status: FindingStatusOpen}},
+	}
+
+	merged := MergeFindingStatuses(providerResults, 0.67)
+
+	require.Len(t, merged, 1)
+	assert.Equal(t, FindingStatusResolved, merged[0].Status)
+}
+
 func TestMergeFindingStatuses_BelowThresholdStaysOpen(t *testing.T) {
 	t.Parallel()
 

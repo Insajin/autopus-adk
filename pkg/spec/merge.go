@@ -41,7 +41,7 @@ func MergeFindingStatuses(providerResults [][]ReviewFinding, threshold float64) 
 			}
 		}
 
-		if float64(resolvedCount)/total >= threshold {
+		if float64(resolvedCount)/total+supermajorityTolerance >= threshold {
 			base.Status = FindingStatusResolved
 		} else if regressedCount > 0 {
 			base.Status = FindingStatusRegressed
@@ -171,17 +171,17 @@ func MergeVerdictsWithDenomMode(
 	// the dilution that the degraded label hints at.
 	if verdict == VerdictPass && len(results) < totalProviders {
 		passCount, _ := tallyVerdicts(results)
-		if float64(passCount)/denom+verdictTolerance < threshold {
+		if float64(passCount)/denom+supermajorityTolerance < threshold {
 			return VerdictRevise
 		}
 	}
 	return verdict
 }
 
-// verdictTolerance aligns supermajority math with MergeSupermajority so that
+// supermajorityTolerance keeps verdict and finding-status merges aligned so
 // 2/3 = 0.6667 qualifies for threshold = 0.67.
 // @AX:NOTE: [AUTO] magic constant — 0.005 compensates for float64 rounding in 2/3 comparisons; must stay in sync with MergeSupermajority
-const verdictTolerance = 0.005
+const supermajorityTolerance = 0.005
 
 // tallyVerdicts returns (passCount, reviseCount) for the supplied results.
 func tallyVerdicts(results []ReviewResult) (int, int) {
@@ -204,7 +204,7 @@ func tallyVerdicts(results []ReviewResult) (int, int) {
 // @AX:NOTE: [AUTO] subtle invariant — reviseCount > 0 takes priority over passCount supermajority (AC-VERD-BACKCOMPAT); a single REVISE always blocks PASS
 func verdictFromCounts(results []ReviewResult, threshold float64, denom float64) ReviewVerdict {
 	passCount, reviseCount := tallyVerdicts(results)
-	if float64(passCount)/denom+verdictTolerance >= threshold && reviseCount == 0 {
+	if float64(passCount)/denom+supermajorityTolerance >= threshold && reviseCount == 0 {
 		return VerdictPass
 	}
 	if reviseCount > 0 {
