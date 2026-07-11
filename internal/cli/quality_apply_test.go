@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -136,10 +137,6 @@ func TestQualitySupervisorApplyUpdatesActualCodexRootAndAgents(t *testing.T) {
 	cfg.Platforms = []string{"codex"}
 	require.NoError(t, config.Save(dir, cfg))
 
-	originalUpdater := qualityPlatformUpdater
-	qualityPlatformUpdater = updateHarnessPlatform
-	t.Cleanup(func() { qualityPlatformUpdater = originalUpdater })
-
 	qualityRoot := NewRootCmd()
 	qualityRoot.SetOut(&bytes.Buffer{})
 	qualityRoot.SetErr(&bytes.Buffer{})
@@ -167,13 +164,55 @@ func TestQualitySupervisorApplyUpdatesActualCodexRootAndAgents(t *testing.T) {
 	assert.NotContains(t, rootSection, "model_reasoning_effort")
 }
 
+func TestQualityUltraApplyWritesSelectiveCodexAgentEffort(t *testing.T) {
+	installQualityCodexCatalogFixture(t)
+	dir := writeQualityTestConfig(t, "balanced")
+	cfg, err := config.LoadPreview(dir)
+	require.NoError(t, err)
+	cfg.Platforms = []string{"codex"}
+	require.NoError(t, config.Save(dir, cfg))
+
+	root := NewRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"--config", filepath.Join(dir, "autopus.yaml"), "quality", "ultra", "--apply"})
+	require.NoError(t, root.Execute())
+
+	maxAgents := map[string]bool{
+		"architect.toml":        true,
+		"planner.toml":          true,
+		"security-auditor.toml": true,
+	}
+	agentDir := filepath.Join(dir, ".codex", "agents")
+	entries, err := os.ReadDir(agentDir)
+	require.NoError(t, err)
+	require.Len(t, entries, 16)
+	seenMaxAgents := make(map[string]bool, len(maxAgents))
+	for _, entry := range entries {
+		data, readErr := os.ReadFile(filepath.Join(agentDir, entry.Name()))
+		require.NoError(t, readErr)
+		effort := "xhigh"
+		if maxAgents[entry.Name()] {
+			effort = "max"
+			seenMaxAgents[entry.Name()] = true
+		}
+		assert.Contains(t, string(data), `model = "gpt-5.6-sol"`, entry.Name())
+		assert.Contains(t, string(data), `model_reasoning_effort = "`+effort+`"`, entry.Name())
+		assert.NotContains(t, string(data), `model_reasoning_effort = "ultra"`, entry.Name())
+	}
+	assert.Equal(t, maxAgents, seenMaxAgents)
+}
+
 func installQualityCodexCatalogFixture(t *testing.T) {
 	t.Helper()
-	binDir := t.TempDir()
-	script := `#!/bin/sh
-printf '%s' '{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"medium"},{"effort":"high"}]},{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"max"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}'
-`
-	path := filepath.Join(binDir, "codex")
-	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	catalog := []byte(`{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"medium"},{"effort":"high"}]},{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"max"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}`)
+	originalUpdater := qualityPlatformUpdater
+	qualityPlatformUpdater = func(ctx context.Context, dir, platform string, cfg *config.HarnessConfig) (bool, error) {
+		if platform != "codex" {
+			return originalUpdater(ctx, dir, platform, cfg)
+		}
+		_, err := codex.NewWithRoot(dir, codex.WithModelCatalog(catalog)).Update(ctx, cfg)
+		return true, err
+	}
+	t.Cleanup(func() { qualityPlatformUpdater = originalUpdater })
 }

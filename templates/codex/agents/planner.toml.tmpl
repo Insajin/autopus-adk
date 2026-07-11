@@ -143,7 +143,7 @@ Model is selected per task based on complexity:
 
 Platform note:
 - Claude never uses `haiku` in this workspace; LOW stays on `sonnet`
-- Codex maps Balanced Opus-tier tasks to Sol/`xhigh`, Sonnet-tier tasks to Terra with role effort, and Haiku-tier tasks to Luna with role effort; Ultra managed workers use Sol/`max`
+- Codex maps Balanced Opus-tier tasks to Sol/`xhigh`, Sonnet-tier tasks to Terra with role effort, and Haiku-tier tasks to Luna with role effort; in Ultra, a quality-managed supervisor and orchestra use Sol/`ultra`, `planner`/`architect`/`security-auditor` use Sol/`max`, and every other managed agent uses Sol/`xhigh`
 - OpenCode uses its configured default runtime model; LOW/MEDIUM/HIGH act as reasoning-profile hints until explicit model overrides are surfaced
 
 ### Override

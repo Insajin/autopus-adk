@@ -47,7 +47,7 @@ When criteria overlap (e.g., 1 file but 250 lines), use the highest matching lev
 
 Platform note:
 - Claude: HIGH=`opus`, MEDIUM/LOW=`sonnet`
-- Codex: Balanced uses Sol/`xhigh` for quality-managed strategic and Opus-tier work, Terra with role effort for Sonnet-tier work, and Luna with role effort for Haiku-tier work. Ultra uses Sol/`ultra` for a quality-managed supervisor and orchestra, and Sol/`max` for managed workers. An `inherit` supervisor keeps the user's Codex runtime default in either mode.
+- Codex: Balanced uses Sol/`xhigh` for quality-managed strategic and Opus-tier work, Terra with role effort for Sonnet-tier work, and Luna with role effort for Haiku-tier work. Ultra uses Sol/`ultra` for a quality-managed supervisor and orchestra, Sol/`max` for `planner`, `architect`, and `security-auditor`, and Sol/`xhigh` for every other managed agent. An `inherit` supervisor keeps the user's Codex runtime default in either mode.
 - OpenCode: keep the configured default runtime model; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
 ## Effort Mapping (SPEC-CC21-001)
@@ -76,7 +76,8 @@ Codex-specific rendering:
 |------|--------------|--------------------------|
 | Any | supervisor (`supervisor_model_policy: inherit`, default) | User Codex runtime default |
 | Ultra | quality-managed supervisor / orchestra | Sol + `ultra` |
-| Ultra | managed worker | Sol + `max` |
+| Ultra | `planner` / `architect` / `security-auditor` | Sol + `max` |
+| Ultra | every other managed agent | Sol + `xhigh` |
 | Balanced | quality-managed supervisor / orchestra / Opus-tier worker | Sol + `xhigh` |
 | Balanced | reviewer (Sonnet tier) | Terra + `high` |
 | Balanced | standard Sonnet-tier worker | Terra + `medium` |

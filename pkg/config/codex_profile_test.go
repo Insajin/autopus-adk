@@ -71,7 +71,13 @@ func TestQualityConfCodexAgentProfile(t *testing.T) {
 		{name: "fallback tier", quality: balanced, agent: "unmapped", fallbackTier: "haiku", declaredEffort: "high", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortHigh}},
 		{name: "invalid effort defaults medium", quality: balanced, agent: "executor", fallbackTier: "sonnet", declaredEffort: "invalid", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMedium}},
 		{name: "balanced agents clamp declared ultra to max", quality: balanced, agent: "executor", fallbackTier: "sonnet", declaredEffort: "ultra", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMax}},
-		{name: "ultra agents use max without nested delegation", quality: QualityConf{Default: "ultra"}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax}},
+		{name: "ultra planner uses max", quality: QualityConf{Default: "ultra"}, agent: "planner", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax}},
+		{name: "ultra architect uses max", quality: QualityConf{Default: "ultra"}, agent: "architect", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax}},
+		{name: "ultra security auditor uses max", quality: QualityConf{Default: "ultra"}, agent: "security-auditor", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax}},
+		{name: "ultra executor uses xhigh", quality: QualityConf{Default: "ultra"}, agent: "executor", fallbackTier: "opus", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{name: "ultra spec writer uses xhigh", quality: QualityConf{Default: "ultra"}, agent: "spec-writer", fallbackTier: "opus", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{name: "ultra underscore security name uses xhigh", quality: QualityConf{Default: "ultra"}, agent: "security_auditor", fallbackTier: "opus", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{name: "ultra unknown agent uses xhigh", quality: QualityConf{Default: "ultra"}, agent: "custom-agent", fallbackTier: "opus", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
 		{name: "invalid quality follows balanced", quality: QualityConf{Default: "invalid"}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortHigh}},
 		{name: "custom quality uses its role tier", quality: QualityConf{Default: "custom", Presets: map[string]QualityPreset{"custom": {Agents: map[string]string{"executor": "haiku"}}}}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortHigh}},
 	}
@@ -84,6 +90,34 @@ func TestQualityConfCodexAgentProfile(t *testing.T) {
 			assert.Equal(t, tt.want.Model, tt.quality.CodexAgentModel(tt.agent, tt.fallbackTier))
 			assert.Equal(t, tt.want.Effort, tt.quality.CodexAgentEffort(tt.agent, tt.fallbackTier, tt.declaredEffort))
 		})
+	}
+}
+
+func TestQualityConfCodexUltraAgentProfileIgnoresTierAndDeclaredEffort(t *testing.T) {
+	t.Parallel()
+
+	roles := []struct {
+		name   string
+		effort string
+	}{
+		{name: "planner", effort: CodexEffortMax},
+		{name: "architect", effort: CodexEffortMax},
+		{name: "security-auditor", effort: CodexEffortMax},
+		{name: "executor", effort: CodexEffortXHigh},
+		{name: "custom-agent", effort: CodexEffortXHigh},
+	}
+	tiers := []string{"opus", "sonnet", "haiku", "unknown", ""}
+	efforts := []string{CodexEffortLow, CodexEffortMedium, CodexEffortHigh, CodexEffortXHigh, CodexEffortMax, CodexEffortUltra, "unknown", ""}
+	ultra := QualityConf{Default: "ultra"}
+
+	for _, role := range roles {
+		want := CodexProfile{Model: CodexSolModel, Effort: role.effort}
+		for _, tier := range tiers {
+			for _, effort := range efforts {
+				assert.Equal(t, want, ultra.CodexAgentProfile(role.name, tier, effort),
+					"role=%s tier=%q declared_effort=%q", role.name, tier, effort)
+			}
+		}
 	}
 }
 

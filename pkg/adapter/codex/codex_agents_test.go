@@ -77,22 +77,35 @@ func TestGenerateAgents_BalancedQualityUsesRoleEffort(t *testing.T) {
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model = "gpt-5.6-terra"`)
 }
 
-func TestGenerateAgents_UltraQualityUsesSolMax(t *testing.T) {
+func TestGenerateAgents_UltraQualityUsesSelectiveSolEffort(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 	cfg.Quality.Default = "ultra"
+	maxAgents := map[string]bool{
+		"architect.toml":        true,
+		"planner.toml":          true,
+		"security-auditor.toml": true,
+	}
 
 	files, err := a.generateAgents(cfg)
 	require.NoError(t, err)
 
+	seenMaxAgents := make(map[string]bool, len(maxAgents))
 	for _, f := range files {
 		content := string(f.Content)
+		effort := "xhigh"
+		name := filepath.Base(f.TargetPath)
+		if maxAgents[name] {
+			effort = "max"
+			seenMaxAgents[name] = true
+		}
 		assert.Contains(t, content, `model = "gpt-5.6-sol"`, "TOML %s should use Sol in ultra mode", f.TargetPath)
-		assert.Contains(t, content, `model_reasoning_effort = "max"`, "TOML %s should use max in ultra mode", f.TargetPath)
+		assert.Contains(t, content, `model_reasoning_effort = "`+effort+`"`, "TOML %s should use its ultra role effort", f.TargetPath)
 		assert.NotContains(t, content, `model_reasoning_effort = "ultra"`, "managed workers must not auto-delegate", f.TargetPath)
 	}
+	assert.Equal(t, maxAgents, seenMaxAgents)
 }
 
 func TestPrepareAgentFiles_NoDiskWrite(t *testing.T) {

@@ -33,14 +33,31 @@ type Adapter struct {
 	codexFallbackSeen   map[string]struct{}
 }
 
+// Option customizes a Codex adapter.
+type Option func(*Adapter)
+
+// WithModelCatalog uses a fixed model catalog instead of probing the Codex CLI.
+func WithModelCatalog(catalogJSON []byte) Option {
+	return func(a *Adapter) {
+		a.codexCatalogProbed = true
+		a.codexCatalogJSON = append([]byte(nil), catalogJSON...)
+	}
+}
+
 // New creates an adapter rooted at the current directory.
 func New() *Adapter {
 	return &Adapter{root: ".", engine: tmpl.New(), codexFallbackWriter: os.Stderr}
 }
 
 // NewWithRoot creates an adapter rooted at the specified path.
-func NewWithRoot(root string) *Adapter {
-	return &Adapter{root: root, engine: tmpl.New(), codexFallbackWriter: os.Stderr}
+func NewWithRoot(root string, options ...Option) *Adapter {
+	a := &Adapter{root: root, engine: tmpl.New(), codexFallbackWriter: os.Stderr}
+	for _, option := range options {
+		if option != nil {
+			option(a)
+		}
+	}
+	return a
 }
 
 func (a *Adapter) Name() string      { return adapterName }

@@ -82,8 +82,12 @@ func (q QualityConf) CodexOrchestraEffort() string { return q.CodexOrchestraProf
 // CodexAgentProfile maps an agent's effective tier and declared effort to Codex.
 func (q QualityConf) CodexAgentProfile(agentName, fallbackTier, declaredEffort string) CodexProfile {
 	if q.codexQualityMode() == "ultra" {
-		// Custom agents use max so only the supervisor owns automatic delegation.
-		return CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax}
+		effort := CodexEffortXHigh
+		switch agentName {
+		case "planner", "architect", "security-auditor":
+			effort = CodexEffortMax
+		}
+		return CodexProfile{Model: CodexSolModel, Effort: effort}
 	}
 
 	switch q.codexAgentTier(agentName, fallbackTier) {

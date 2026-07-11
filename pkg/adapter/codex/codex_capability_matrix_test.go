@@ -29,7 +29,7 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 				{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}
 			]}`,
 			root:        config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortUltra},
-			agent:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			agent:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortXHigh},
 			rootReason:  config.CodexResolutionSupported,
 			agentReason: config.CodexResolutionSupported,
 		},
@@ -40,7 +40,7 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 				{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}
 			]}`,
 			root:        config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
-			agent:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			agent:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortXHigh},
 			rootReason:  config.CodexResolutionEffortUnavailable,
 			agentReason: config.CodexResolutionSupported,
 		},

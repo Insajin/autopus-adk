@@ -90,7 +90,8 @@ model/effort field가 없다.
 | Balanced Sonnet/Haiku worker는 normalized declared effort 사용 | 반복 작업 비용을 낮추면서 source role의 추론 의도를 보존한다 |
 | unknown/blank declared effort는 medium, worker ultra는 max | 비표준 입력을 결정적으로 처리하고 nested automatic delegation을 막는다 |
 | Quality-managed Ultra supervisor/orchestra를 Sol+ultra로 사용 | 둘 다 depth 0 실행이며 자동 task delegation을 활용할 수 있다 |
-| Ultra managed worker를 Sol+max로 사용 | supervisor가 이미 worker를 배치하므로 worker의 중첩 delegation을 요청하지 않는다 |
+| Ultra의 planner/architect/security-auditor를 Sol+max로 사용 | 전략·보안 worker 품질을 유지하면서 중첩 delegation을 요청하지 않는다 |
+| Ultra의 나머지 managed/unknown role을 Sol+xhigh로 사용 | 일반 worker 호출이 많은 파이프라인의 토큰 소비를 제한한다 |
 | runtime `--effort`가 quality-derived effort보다 우선 | 명시적 실행 override가 preset보다 구체적인 사용자 의도다 |
 | runtime override는 quality-managed orchestra로 제한 | pinned ownership과 세션 시작 시 로드된 agent file contract를 지킨다 |
 | root는 RHS literal, provider는 complete slice로 보존 | 실제 merge는 root whitespace를 정규화하지만 provider argv ordering과 quoting은 실행 의미를 바꾼다 |
@@ -128,7 +129,7 @@ model/effort field가 없다.
 | INV-001 | 같은 desired tuple과 catalog는 모든 consumer에서 같은 `CodexProfileResolution`을 만든다 | REQ-001~005 | S1~S9, S18 |
 | INV-002 | root RHS literal과 pinned provider complete slices는 각 소유권 단위에서 보존된다 | REQ-005, REQ-006 | S9~S12 |
 | INV-003 | capability resolver는 model을 먼저 보존하고 요청보다 높은 effort를 선택하지 않는다 | REQ-007, REQ-008 | S13~S18 |
-| INV-004 | worker는 unknown/blank=`medium`, declared ultra=`max`이며 per-spawn override를 지원한다고 안내하지 않는다 | REQ-004, REQ-009 | S5~S7, S19 |
+| INV-004 | Ultra worker는 전략 3개만 `max`, 나머지는 `xhigh`, 전체 worker는 `ultra` 금지이며 per-spawn override를 지원한다고 안내하지 않는다 | REQ-004, REQ-009 | S5~S7, S19 |
 | INV-005 | invalid catalog와 valid-but-missing catalog는 각각 `catalog_unknown`과 `runtime_default`로 구분된다 | REQ-008 | S16~S18 |
 | INV-006 | orchestra는 quality와 effort precedence를 지키며 runtime overlay를 disk에 쓰지 않는다 | REQ-002, REQ-005 | S2, S8, S9 |
 | INV-007 | Codex 정책 변경은 Claude/OpenCode model contract를 바꾸지 않는다 | REQ-010 | S20 |
@@ -149,7 +150,9 @@ model/effort field가 없다.
 - `max` 대 `ultra`: live catalog와 공식 문서를 재확인했다. Ultra는 단순 상위 token budget이 아니라
   automatic task delegation을 포함하므로 실행 역할별로 구분한다.
 - Balanced Opus: declared `max`를 그대로 쓰지 않고 `xhigh`로 고정한다. 전략 품질은 유지하면서
-  Ultra worker의 `max`와 비용 경계를 분명히 하기 위한 의도된 정책이다.
+  Ultra 전략 worker의 `max`와 비용 경계를 분명히 하기 위한 의도된 정책이다.
+- Ultra worker: planner, architect, security-auditor만 `max`를 사용하고 나머지는 `xhigh`를 사용한다.
+  어떤 managed worker도 자동 delegation이 있는 `ultra`를 사용하지 않는다.
 - Per-run custom agent 전환: agent 파일은 세션 시작 시 로드된다. persistent 변경에는
   `auto quality <mode> --apply`와 새 Codex 세션이 필요하다.
 - Runtime override: `--quality`와 `--effort`는 quality-managed orchestra에만 즉시 적용한다.
@@ -195,10 +198,10 @@ model/effort field가 없다.
 |---|---|
 | F1 / `model_unavailable` 미정의 | REQ-008, Compatibility, Fallback Reason Inventory, S15에 exact reason과 legacy ceiling을 정의했다 |
 | F2 / REQ-009 EARS type | 허용 type `Optional`과 `WHERE ... THEN the system SHALL` 형식으로 고쳤다 |
-| F3 / worker effort normalization | REQ-004, plan T3, S5/S6에 blank/unknown=`medium`, ultra=`max`를 고정했다 |
+| F3 / worker effort normalization | REQ-004, plan T3, S5/S6에 Balanced blank/unknown=`medium`, Ultra 역할별 `max|xhigh`를 고정했다 |
 | F4 / Balanced Opus 근거 | Policy Matrix, Decision Record, Question Audit에 fixed `xhigh` 근거를 명시했다 |
 | F5 / unknown effort 결정성 | managed worker normalization과 canonical capability order를 REQ-004/REQ-007로 분리했다 |
-| F6 / MapEffort ultra bypass | model/effort를 같은 declared tuple로 resolver에 전달하고 worker resolver에서 `max`로 cap하도록 T3/S5/S6에 고정했다 |
+| F6 / MapEffort ultra bypass | model/effort를 같은 declared tuple로 resolver에 전달하고 Ultra worker resolver가 역할별 `max|xhigh`를 선택하도록 T3/S5/S6에 고정했다 |
 | F7 / `ApplyCodexProviderProfile` reference | Reference Discipline에 `pkg/config/codex_provider.go`의 [IMPLEMENTED] symbol로 등록했다 |
 
 ## Codex Timeout Convergence Record

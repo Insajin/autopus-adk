@@ -49,7 +49,8 @@ managed agent와 pinned provider에는 전달하지 않는다.
 - [x] T3: `pkg/content` transformer가 agent name, source fallback tier, preset role tier, source declared
   effort를 resolver에 전달하도록 갱신한다. model과 effort를 서로 다른 declared-effort 입력으로
   해석하지 않도록 한 tuple에서 계산한다. blank/unknown declared effort=`medium`, worker
-  declared `ultra`=`max`, Balanced Opus=`xhigh`, Ultra worker=`Sol+max` RED 테스트를 먼저 추가한다.
+  declared `ultra`=`max`, Balanced Opus=`xhigh`, Ultra 전략 3개=`Sol+max`, 나머지 worker와 unknown
+  role=`Sol+xhigh` RED 테스트를 먼저 추가한다.
   이후 16개 Codex agent template을 source와 동기화하고 native subagent/team surface가 같은 generated
   agent 파일을 참조하는지 검증한다.
 - [x] T4: canonical Codex orchestra provider에 `model_policy: quality`를 표시하고 config migration 및

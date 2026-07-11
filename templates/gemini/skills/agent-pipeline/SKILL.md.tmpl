@@ -125,7 +125,7 @@ The quality mode — determined by the `--quality` flag or interactive selection
 
 Use the premium path for all Agent() calls.
 
-On model-tiered platforms, this means adding `model: "opus"`. Codex renders Ultra managed workers as Sol/`max`; a quality-managed depth-0 supervisor and orchestra use Sol/`ultra`, while an `inherit` supervisor keeps the user's Codex runtime default. User-owned root model or effort assignments remain preserved and take precedence. OpenCode should keep its configured default model and increase reasoning effort.
+On model-tiered platforms, this means adding `model: "opus"`. Codex uses a role-selective Ultra profile: a quality-managed depth-0 supervisor and orchestra use Sol/`ultra`; `planner`, `architect`, and `security-auditor` use Sol/`max`; every other managed agent uses Sol/`xhigh`. An `inherit` supervisor keeps the user's Codex runtime default. User-owned root model or effort assignments remain preserved and take precedence. OpenCode should keep its configured default model and increase reasoning effort.
 
 ```
 Agent(
@@ -176,7 +176,7 @@ In Balanced mode, task complexity determines the profile per Agent() call:
 
 Current workspace policy:
 - Claude never uses `haiku`; LOW stays on `sonnet`
-- Codex maps Balanced Opus-tier work to Sol/`xhigh`, Sonnet-tier work to Terra with role effort, and Haiku-tier work to Luna with role effort; Ultra managed workers use Sol/`max`
+- Codex maps Balanced Opus-tier work to Sol/`xhigh`, Sonnet-tier work to Terra with role effort, and Haiku-tier work to Luna with role effort; in Ultra, a quality-managed supervisor and orchestra use Sol/`ultra`, `planner`/`architect`/`security-auditor` use Sol/`max`, and every other managed agent uses Sol/`xhigh`
 - OpenCode should keep its configured default runtime model and vary reasoning effort rather than forcing a model ID
 
 In Ultra mode, complexity is IGNORED — all agents use the premium path.

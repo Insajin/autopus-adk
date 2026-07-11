@@ -11,14 +11,14 @@ import (
 )
 
 func TestInitCmd_QualityUltraInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
-	assertInitCodexQualityProfile(t, "ultra", "ultra", "gpt-5.6-sol", "max")
+	assertInitCodexQualityProfile(t, "ultra", "ultra", "gpt-5.6-sol", "xhigh", "max")
 }
 
 func TestInitCmd_QualityBalancedInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
-	assertInitCodexQualityProfile(t, "balanced", "xhigh", "gpt-5.6-terra", "medium")
+	assertInitCodexQualityProfile(t, "balanced", "xhigh", "gpt-5.6-terra", "medium", "xhigh")
 }
 
-func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorModel, executorEffort string) {
+func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorModel, executorEffort, plannerEffort string) {
 	t.Helper()
 	installCodex56CatalogFixture(t)
 	dir := t.TempDir()
@@ -37,6 +37,10 @@ func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorMo
 	require.NoError(t, err)
 	assert.Contains(t, string(executor), `model = "`+executorModel+`"`)
 	assert.Contains(t, string(executor), `model_reasoning_effort = "`+executorEffort+`"`)
+	planner, err := os.ReadFile(filepath.Join(dir, ".codex", "agents", "planner.toml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(planner), `model = "gpt-5.6-sol"`)
+	assert.Contains(t, string(planner), `model_reasoning_effort = "`+plannerEffort+`"`)
 
 	harnessData, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)

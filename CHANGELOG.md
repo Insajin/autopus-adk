@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Codex Ultra 역할별 worker effort 적용** (2026-07-11): Codex Ultra의 quality-managed supervisor와 orchestra는 Sol+`ultra`를 유지하고, 전략·보안 역할인 `planner`·`architect`·`security-auditor`만 Sol+`max`, 그 밖의 모든 관리형 에이전트와 unknown role은 Sol+`xhigh`를 사용하도록 중앙 profile resolver를 조정했다. `auto quality ultra --apply`와 fresh init이 같은 3개/나머지 역할 분리를 생성하며, 어떤 managed worker도 자동 task delegation이 있는 `ultra` effort를 받지 않는다.
+
 - **Codex 사용자 기본 모델 상속 및 품질 모드 즉시 적용** (2026-07-11): 새 프로젝트는 `quality.supervisor_model_policy: inherit`를 사용해 `.codex/config.toml`에 주 세션 model/effort를 쓰지 않고 사용자의 Codex 기본값을 상속한다. 정책 필드가 없는 기존 프로젝트의 markerless root 설정은 보존 우선으로 이행하며, `auto quality supervisor inherit|quality --apply`로 소유권을 명시할 수 있다. Codex 설정 업데이트는 사용자 소유 키 목록을 기록해 해당 assignment만 반복 업데이트 후에도 보존하고, 비모델 checksum drift가 생성 model/effort를 고정하지 않도록 한다. `auto quality ultra|balanced --apply`는 설정을 원문 보존 방식으로 저장한 뒤 현재 프로젝트의 플랫폼 하네스를 갱신하고, 일부 플랫폼 실패 시 적용 수와 정확한 재시도 명령을 출력한다.
 
 - **디자인 시스템 문서 provider preflight** (2026-07-10): `auto design docs`가 프로젝트의 Astryx, shadcn/Radix/Tailwind, 로컬 디자인 소스를 metadata-only로 감지하고 component/template/token 문서 preflight를 Markdown 또는 JSON으로 출력한다. `auto design pack`에도 같은 provider 보고서와 setup gap을 포함하며, `design.docs_providers`로 탐지 범위를 제한할 수 있다. Frontend executor, reviewer, verifier와 Claude/Codex/Gemini 템플릿은 감지된 provider의 실제 props/import/token 문서를 먼저 확인하고, Astryx가 없는 프로젝트에는 의존성을 추가하지 않도록 동기화했다.

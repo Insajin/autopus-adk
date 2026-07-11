@@ -28,12 +28,12 @@ func TestTransformAgentForCodex_RendersQualityAwareProfiles(t *testing.T) {
 	ultra := config.QualityConf{Default: "ultra"}
 
 	tests := []struct {
-		name         string
-		source       content.AgentSource
-		quality      config.QualityConf
-		wantModel    string
-		wantEffort   string
-		forbidEffort string
+		name          string
+		source        content.AgentSource
+		quality       config.QualityConf
+		wantModel     string
+		wantEffort    string
+		forbidEfforts []string
 	}{
 		{
 			name:       "balanced planner",
@@ -71,12 +71,20 @@ func TestTransformAgentForCodex_RendersQualityAwareProfiles(t *testing.T) {
 			wantEffort: "max",
 		},
 		{
-			name:         "ultra worker does not delegate",
-			source:       codexProfileSource("executor", "sonnet", "medium"),
-			quality:      ultra,
-			wantModel:    "gpt-5.6-sol",
-			wantEffort:   "max",
-			forbidEffort: "ultra",
+			name:          "ultra strategic worker uses max",
+			source:        codexProfileSource("planner", "opus", "max"),
+			quality:       ultra,
+			wantModel:     "gpt-5.6-sol",
+			wantEffort:    "max",
+			forbidEfforts: []string{"ultra"},
+		},
+		{
+			name:          "ultra general worker uses xhigh",
+			source:        codexProfileSource("executor", "sonnet", "medium"),
+			quality:       ultra,
+			wantModel:     "gpt-5.6-sol",
+			wantEffort:    "xhigh",
+			forbidEfforts: []string{"max", "ultra"},
 		},
 	}
 
@@ -87,8 +95,8 @@ func TestTransformAgentForCodex_RendersQualityAwareProfiles(t *testing.T) {
 			got := renderCodexAgentTemplate(t, content.TransformAgentForCodex(tt.source), tt.quality)
 			assert.Contains(t, got, `model = "`+tt.wantModel+`"`)
 			assert.Contains(t, got, `model_reasoning_effort = "`+tt.wantEffort+`"`)
-			if tt.forbidEffort != "" {
-				assert.NotContains(t, got, `model_reasoning_effort = "`+tt.forbidEffort+`"`)
+			for _, effort := range tt.forbidEfforts {
+				assert.NotContains(t, got, `model_reasoning_effort = "`+effort+`"`)
 			}
 		})
 	}

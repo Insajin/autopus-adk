@@ -149,11 +149,12 @@
 
 | Mode | Description | Cost |
 |------|-------------|------|
-| Ultra | 모든 에이전트를 Opus로 실행 | 높음 |
+| Ultra | 모든 에이전트에 플랫폼별 프리미엄 실행 경로 적용 | 높음 |
 | Balanced (default) | 핵심 분석=Opus, 구현=Sonnet, 검증=Haiku | 보통 |
 
 Codex 주 세션의 기본 `supervisor_model_policy`는 `inherit`이며 사용자 Codex 모델을 상속한다.
 `quality`로 명시하면 주 세션도 Ultra의 Sol+`ultra` 또는 Balanced의 Sol+`xhigh`를 사용한다.
+Codex Ultra에서 quality-managed supervisor와 orchestra는 Sol+`ultra`, `planner`·`architect`·`security-auditor`는 Sol+`max`, 나머지 관리형 에이전트는 Sol+`xhigh`를 사용한다.
 `auto quality <mode> --apply`는 선택한 모드를 저장하고 현재 프로젝트의 관리형 에이전트를 갱신한다.
 
 ## @AX Annotation System

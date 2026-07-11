@@ -860,7 +860,7 @@ sequenceDiagram
 ### Quality Modes
 
 ```bash
-/auto go SPEC-ID --quality ultra      # All agents on Opus — max quality
+/auto go SPEC-ID --quality ultra      # Premium path for every role; Codex effort varies by role
 /auto go SPEC-ID --quality balanced   # Adaptive: Opus/Sonnet/Haiku by task complexity
 
 auto quality ultra --apply            # Persist Ultra and refresh this project's managed agents
@@ -878,6 +878,10 @@ Run `auto quality supervisor inherit --apply` to explicitly remove a known gener
 Sol profile for the selected quality mode. User-owned project model or effort assignments remain
 preserved and take precedence. Start a new Codex session after applying changes so managed agent
 definitions are reloaded.
+
+In Codex Ultra, a quality-managed supervisor and orchestra use Sol+`ultra`; `planner`, `architect`,
+and `security-auditor` use Sol+`max`; every other managed agent uses Sol+`xhigh`. The Opus labels
+below describe model-tiered platform behavior; Codex uses this role-selective effort profile.
 
 ```mermaid
 flowchart LR
@@ -990,7 +994,7 @@ Phase 3    │ 🧪 Tester          │ Coverage → 85%+
 Phase 4    │ 🔍 Reviewer + 🛡️    │ TRUST 5 + OWASP audit
 ```
 
-Options: `--team` for Agent Teams · `--solo` for single-session TDD · `--quality ultra` for all-Opus execution · `--multi` for multi-model review
+Options: `--team` for Agent Teams · `--solo` for single-session TDD · `--quality ultra` for the premium execution path · `--multi` for multi-model review
 
 ### 📦 Step 3 · `/auto sync` — Ship and Document
 

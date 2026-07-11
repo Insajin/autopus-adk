@@ -791,7 +791,7 @@ sequenceDiagram
 ### 품질 모드
 
 ```bash
-/auto go SPEC-ID --quality ultra      # 모든 에이전트를 Opus로 — 최고 품질
+/auto go SPEC-ID --quality ultra      # 모든 역할에 프리미엄 경로 적용, Codex effort는 역할별 차등
 /auto go SPEC-ID --quality balanced   # 적응형: 태스크 복잡도별 Opus/Sonnet/Haiku
 
 auto quality ultra --apply            # Ultra를 기본값으로 저장하고 현재 프로젝트에 반영
@@ -810,6 +810,11 @@ orchestra provider에 계속 적용됩니다. 이 정책이 없는 기존 프로
 `model` 또는 `model_reasoning_effort` 값은 그대로 유지되며 이 정책보다 먼저 적용됩니다.
 관리형 에이전트 정의는 세션을 시작할 때 불러오므로, 설정을 반영한 뒤 새 Codex 세션을
 시작해야 합니다.
+
+Codex Ultra에서 quality-managed supervisor와 orchestra는 Sol+`ultra`, `planner`·`architect`·
+`security-auditor`는 Sol+`max`, 나머지 관리형 에이전트는 Sol+`xhigh`를 사용합니다. 아래 표의
+Opus 표기는 모델 계층을 지원하는 플랫폼의 동작을 나타내며, Codex는 이 역할별 effort 정책을
+사용합니다.
 
 | 모드 | Planner | Executor | Validator | 비용 |
 |------|---------|----------|-----------|------|
@@ -908,7 +913,7 @@ Phase 3    │ 🧪 Tester          │ 커버리지 → 85%+
 Phase 4    │ 🔍 Reviewer + 🛡️    │ TRUST 5 + OWASP 감사
 ```
 
-옵션: `--team` Agent Teams · `--solo` 단일 세션 TDD · `--quality ultra` 전체 Opus 실행 · `--multi` 멀티 모델 리뷰
+옵션: `--team` Agent Teams · `--solo` 단일 세션 TDD · `--quality ultra` 프리미엄 실행 경로 · `--multi` 멀티 모델 리뷰
 
 ### 📦 3단계 · `/auto sync` — 배포하고 문서화하기
 

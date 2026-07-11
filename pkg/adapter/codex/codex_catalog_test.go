@@ -173,22 +173,22 @@ func TestGenerateAgents_AppliesCatalogFallbackProfiles(t *testing.T) {
 
 			files, err := a.generateAgents(cfg)
 			require.NoError(t, err)
-			var executor string
+			var planner string
 			for _, file := range files {
-				if file.TargetPath == filepath.Join(".codex", "agents", "executor.toml") {
-					executor = string(file.Content)
+				if file.TargetPath == filepath.Join(".codex", "agents", "planner.toml") {
+					planner = string(file.Content)
 					break
 				}
 			}
-			require.NotEmpty(t, executor)
+			require.NotEmpty(t, planner)
 			if tt.wantOmissions {
-				assert.NotContains(t, executor, "\nmodel =")
-				assert.NotContains(t, executor, "model_reasoning_effort")
+				assert.NotContains(t, planner, "\nmodel =")
+				assert.NotContains(t, planner, "model_reasoning_effort")
 				assert.Contains(t, warnings.String(), "reason="+tt.wantReason)
 				return
 			}
-			assert.Contains(t, executor, `model = "`+tt.wantModel+`"`)
-			assert.Contains(t, executor, `model_reasoning_effort = "`+tt.wantEffort+`"`)
+			assert.Contains(t, planner, `model = "`+tt.wantModel+`"`)
+			assert.Contains(t, planner, `model_reasoning_effort = "`+tt.wantEffort+`"`)
 			assert.Contains(t, warnings.String(), "reason="+tt.wantReason)
 		})
 	}

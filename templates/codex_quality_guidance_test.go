@@ -29,6 +29,9 @@ func TestCodexQualityGuidanceDocumentsLoadedAgentBoundary(t *testing.T) {
 		assert.Contains(t, content, "user-owned root model or effort assignments remain preserved and take precedence")
 		assert.Contains(t, content, "new Codex session")
 		assert.Contains(t, content, "cannot hot-swap agents already loaded")
+		assert.Contains(t, content, "`planner` / `architect` / `security-auditor`")
+		assert.Contains(t, content, "every other managed agent")
+		assert.NotContains(t, content, "| Ultra | managed worker | Sol + `max` |")
 		assert.NotContains(t, content, "Ultra uses Sol/`ultra` for the supervisor and orchestra")
 	}
 
@@ -44,6 +47,8 @@ func TestCodexQualityGuidanceDocumentsLoadedAgentBoundary(t *testing.T) {
 		assert.Contains(t, content, "quality-managed depth-0 supervisor")
 		assert.Contains(t, content, "`inherit` supervisor keeps the user's Codex runtime default")
 		assert.Contains(t, content, "User-owned root model or effort assignments remain preserved and take precedence")
+		assert.Contains(t, content, "`planner`, `architect`, and `security-auditor` use Sol/`max`")
+		assert.Contains(t, content, "every other managed agent uses Sol/`xhigh`")
 		assert.NotContains(t, content, "the depth-0 supervisor and orchestra use Sol/`ultra`")
 	}
 }
