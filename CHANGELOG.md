@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **기존 Codex 프로젝트의 모델 상속 이행** (2026-07-11): `auto update`가 Autopus에서 생성한 뒤 수정되지 않은 과거 `.codex/config.toml`의 `gpt-5.5+xhigh` 설정을 감지하면 `quality.supervisor_model_policy: inherit`를 명시하고 프로젝트의 model/effort override를 제거한다. 생성 헤더, manifest merge 정책, 전체 파일 checksum, 과거 관리 tuple이 모두 일치할 때만 자동 이행하며, 사용자 marker, checksum drift, custom tuple은 그대로 보존한다. 같은 릴리스에서 잘못 `pinned`로 기록한 정확한 v0.50.66 Codex orchestra provider는 `quality`로 복구하되 near-match와 명시적 최신 정책은 변경하지 않는다. `auto update --plan`은 쓰기 없이 예정된 이행을 표시한다. Codex 갱신이 실패하면 supervisor policy를 원복하고, workspace 후속 target이 실패하면 앞선 target과 현재 target의 generated transaction 및 원래 `autopus.yaml`을 함께 복원한다. `auto doctor`는 실제 merge와 같은 키 단위 ownership 규칙으로 legacy shadowing, 소유권이 모호한 설정, 적용되지 않은 explicit `inherit`를 읽기 전용 경고로 보고한다.
+
 - **플랫폼별 스킬 제외 출력 명확화** (2026-07-11): Codex와 Gemini 하네스 업데이트에서 Claude 전용 스킬을 오류처럼 보이는 `incompatible`로 표시하던 문구를 `platform-skipped`로 바꾸고, 제외된 스킬 이름을 함께 표시한다. 플랫폼별 스킬 생성 동작은 그대로 유지한다.
 
 - **Go 표준 라이브러리 TLS 취약점 대응** (2026-07-10): toolchain과 Security workflow를 Go `1.26.5`로 올려 `crypto/tls`의 Encrypted Client Hello privacy leak인 `GO-2026-5856`을 해소했다. Security Scan이 patch version을 명시적으로 설치하므로 runner의 `1.26` 해석이나 캐시 상태와 관계없이 수정된 표준 라이브러리로 `govulncheck`와 릴리즈 gate를 실행한다.

@@ -223,6 +223,9 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	if !checkQualityGate(out, cfg) {
 		allOK = false
 	}
+	if !checkCodexModelOwnershipText(out, opts.dir, cfg) {
+		allOK = false
+	}
 
 	if !checkProviderTransportSmokeText(out, cfg, opts) {
 		allOK = false

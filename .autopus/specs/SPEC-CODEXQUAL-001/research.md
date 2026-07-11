@@ -2,16 +2,17 @@
 
 ## Outcome Lock
 
-- **User outcome**: 사용자는 로컬 Codex 설정을 직접 고치지 않아도 persistent Balanced/Ultra와
-  명시적 orchestra runtime override에 맞는 GPT-5.6 model/effort를 얻는다. 기존 user-owned root와
+- **User outcome**: 사용자는 로컬 Codex 설정을 직접 고치지 않아도 기존 generated root의 사용자
+  기본 모델 상속 이행, persistent Balanced/Ultra, 명시적 orchestra runtime override에 맞는
+  GPT-5.6 model/effort를 얻는다. 기존 user-owned root와
   pinned provider는 보존되고, capability 부족 시 effective selection과 reason이 보인다.
 - **Mandatory scope**: `spec.md`의 REQ-001~REQ-010 전체를 하나의 Primary SPEC에서 닫는다.
 - **Explicit non-goals**: Claude/OpenCode model 정책, Codex fan-out·`max_threads`·`max_depth`,
   per-spawn custom-agent override, 사용자 설정 강제 이행, 과거 기록 재작성, entitlement telemetry는
   변경하지 않는다.
-- **Scenario evidence**: `acceptance.md`의 S1~S20 전체가 completion oracle이다. S1~S9는
+- **Scenario evidence**: `acceptance.md`의 S1~S22 전체가 completion oracle이다. S1~S9는
   `C_FULL`과 declared-effort 입력을 명시하고, S13~S18은 fallback 분기와 root·agent·Args·PaneArgs
-  capability 소비를 검증한다.
+  capability 소비를 검증하며, S21~S22는 legacy 이행의 소유권과 rollback 경계를 검증한다.
 - **Execution evidence**: `acceptance.md`의 실제 경로 strict command, focused/full/race Go tests,
   vet, build, template parity, local `codex debug models`, git hygiene commands를 실행한다.
 
@@ -127,7 +128,7 @@ model/effort field가 없다.
 | ID | Invariant | Requirements | Oracle |
 |---|---|---|---|
 | INV-001 | 같은 desired tuple과 catalog는 모든 consumer에서 같은 `CodexProfileResolution`을 만든다 | REQ-001~005 | S1~S9, S18 |
-| INV-002 | root RHS literal과 pinned provider complete slices는 각 소유권 단위에서 보존된다 | REQ-005, REQ-006 | S9~S12 |
+| INV-002 | root RHS literal과 pinned provider complete slices는 각 소유권 단위에서 보존되고 managed legacy migration은 실패 시 복원된다 | REQ-005, REQ-006 | S9~S12, S21, S22 |
 | INV-003 | capability resolver는 model을 먼저 보존하고 요청보다 높은 effort를 선택하지 않는다 | REQ-007, REQ-008 | S13~S18 |
 | INV-004 | Ultra worker는 전략 3개만 `max`, 나머지는 `xhigh`, 전체 worker는 `ultra` 금지이며 per-spawn override를 지원한다고 안내하지 않는다 | REQ-004, REQ-009 | S5~S7, S19 |
 | INV-005 | invalid catalog와 valid-but-missing catalog는 각각 `catalog_unknown`과 `runtime_default`로 구분된다 | REQ-008 | S16~S18 |
@@ -138,7 +139,7 @@ model/effort field가 없다.
 
 | User outcome | Runtime surface | Requirement | Acceptance |
 |---|---|---|---|
-| 사용자 supervisor 기본 상속 및 quality opt-in | Codex root template + adapter merge | REQ-003, REQ-006 | S3, S4, S10, S18 |
+| 사용자 supervisor 기본 상속, managed legacy 이행 및 quality opt-in | Codex root template + adapter merge + update/doctor rollback | REQ-003, REQ-006 | S3, S4, S10, S18, S21, S22 |
 | tier별 subagent/native team | content transformer + managed agent TOML | REQ-004, REQ-009 | S5~S7, S18, S19 |
 | quality별 orchestra | provider config + three CLI entry paths | REQ-002, REQ-005, REQ-006 | S2, S8, S9, S11, S12, S18 |
 | availability fallback | bounded catalog probe + profile resolver + receipt | REQ-007, REQ-008 | S13~S18 |
@@ -186,7 +187,7 @@ model/effort field가 없다.
   fallback receipt, persistent worker lifecycle만 검토한다.
 - **Non-goals**: Claude/OpenCode policy redesign, Codex concurrency/depth, per-spawn override, telemetry,
   unrelated design changes는 finding 범위에서 제외한다.
-- **Evidence**: REQ-001~010 ↔ INV-001~007 ↔ S1~S20 traceability, `C_FULL`/partial/invalid fixtures,
+- **Evidence**: REQ-001~010 ↔ INV-001~007 ↔ S1~S22 traceability, `C_FULL`/partial/invalid fixtures,
   Scenario Evidence Map, Reference Discipline의 실제 구현 경로를 사용한다.
 - **Self-verification**: strict command를 실제 SPEC directory 경로로 실행한 뒤 focused/full/race tests,
   vet, build, live catalog, git hygiene 순서로 확인한다. 문서만 존재하거나 stale 문자열이 없다는
@@ -208,13 +209,13 @@ model/effort field가 없다.
 
 | ID | Closure location |
 |---|---|
-| CS-001 | spec/research Outcome Lock에 user outcome, REQ-001~010, non-goals, S1~S20, execution evidence를 고정했다 |
+| CS-001 | spec/research Outcome Lock에 user outcome, REQ-001~010, non-goals, S1~S22, execution evidence를 고정했다 |
 | CS-002 | REQ-002와 Ownership And Precedence에 `runtime --quality > quality.default > balanced`를 고정했다 |
 | CS-003 | REQ-005와 S2/S9에 `--effort > quality-derived effort`, quality-managed orchestra-only 범위를 고정했다 |
 | CS-004 | REQ-008과 S15~S17에 `model_unavailable`, legacy ceiling, runtime/catalog reason을 구분했다 |
 | CS-005 | REQ-004/REQ-007과 S5/S6/S14에 unknown normalization, worker cap, no-lower 동작을 고정했다 |
-| CS-006 | REQ-006과 S10/S11에 root RHS literal과 provider complete slice 보존 단위를 분리했다 |
-| CS-007 | 모든 문서의 acceptance 범위를 S1~S20으로 통일하고 Traceability/Feature Coverage를 갱신했다 |
+| CS-006 | REQ-006과 S10/S11/S21/S22에 root RHS literal, provider complete slice, safe migration/rollback 단위를 분리했다 |
+| CS-007 | 모든 문서의 acceptance 범위를 S1~S22로 통일하고 Traceability/Feature Coverage를 갱신했다 |
 | CS-008 | plan T5와 S18에 root·agent·Args·PaneArgs 통합 capability oracle을 추가했다 |
 | CS-009 | S16의 unavailable/malformed와 S17의 valid-but-missing fixture를 분리했다 |
 | CS-010 | Completion Debt를 없음으로 닫고 unsupported-account smoke를 Verification Limitation으로 옮겼다 |
@@ -229,7 +230,7 @@ model/effort field가 없다.
 | Q-CORR-03 | PASS | REQ-009를 허용 EARS type `Optional`/`WHERE` 형식으로 정정했다 |
 | Q-CORR-04 | PASS | `ApplyCodexProviderProfile`을 포함한 reference의 실제 파일을 확인했다 |
 | Q-COMP-01 | PASS | prd/spec/plan/acceptance/research가 outcome, contract, task, oracle, evidence 역할을 분리한다 |
-| Q-COMP-02 | PASS | REQ-001~010이 invariant와 S1~S20에 모두 연결된다 |
+| Q-COMP-02 | PASS | REQ-001~010이 invariant와 S1~S22에 모두 연결된다 |
 | Q-COMP-03 | PASS | trigger, behavior, exact selected tuple/reason, 관측 지점을 명시했다 |
 | Q-COMP-04 | PASS | Outcome Lock이 user outcome, scope, non-goals, completion evidence를 포함한다 |
 | Q-COMP-05 | PASS | INV-001~007을 concrete consumer/fallback oracle에 연결했다 |
@@ -240,7 +241,7 @@ model/effort field가 없다.
 | Q-FEAS-03 | PASS | Verification Commands가 repo에서 실행 가능한 명령과 실제 SPEC 경로를 사용한다 |
 | Q-STYLE-01 | PASS | 모든 requirement가 `SHALL`로 단정되고 모호한 should/might를 쓰지 않는다 |
 | Q-STYLE-02 | PASS | EARS type과 Priority를 별도 축으로 유지한다 |
-| Q-STYLE-03 | PASS | S1~S20이 bare Given/When/Then/And 형식을 사용한다 |
+| Q-STYLE-03 | PASS | S1~S22가 bare Given/When/Then/And 형식을 사용한다 |
 | Q-SEC-01 | PASS | external catalog는 timeout, byte, model, slug, effort bounds로 제한한다 |
 | Q-SEC-02 | PASS | user-owned 설정을 정해진 literal/slice 단위로 보존하고 secret을 다루지 않는다 |
 | Q-SEC-03 | PASS | receipt는 requested/selected/reason만 출력하고 persistent artifact를 만들지 않는다 |

@@ -117,6 +117,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 	report.collectRuleConflictChecks(opts.dir, cfg)
 	report.collectCLIChecks()
 	report.collectQualityGateChecks(cfg)
+	report.collectCodexModelOwnershipCheck(opts.dir, cfg)
 	report.collectProviderTransportSmokeChecks(cfg, opts)
 	report.collectHookChecks(opts.dir)
 	report.collectHygieneChecks(opts.dir)

@@ -19,6 +19,12 @@ var historicalCanonicalCodexPaneArgs = []string{
 	"-m", CodexLegacyModel, "-c", `model_reasoning_effort="xhigh"`,
 }
 
+var v05066AutoPinnedCodexArgs = []string{
+	"exec", "--sandbox", "workspace-write", "-m", CodexLegacyModel,
+}
+
+var v05066AutoPinnedCodexPaneArgs = []string{"-m", CodexLegacyModel}
+
 // ApplyCodexProviderProfile changes only model policy arguments. Other provider
 // flags remain in their original order.
 func ApplyCodexProviderProfile(entry ProviderEntry, profile CodexProfile) ProviderEntry {
@@ -173,9 +179,28 @@ func isHistoricalCanonicalCodexProvider(entry ProviderEntry) bool {
 		slices.Equal(entry.PaneArgs, historicalCanonicalCodexPaneArgs)
 }
 
+func isV05066AutoPinnedCodexProvider(entry ProviderEntry) bool {
+	return entry.ModelPolicy == ProviderModelPolicyPinned &&
+		entry.Binary == "codex" &&
+		slices.Equal(entry.Args, v05066AutoPinnedCodexArgs) &&
+		slices.Equal(entry.PaneArgs, v05066AutoPinnedCodexPaneArgs) &&
+		!entry.PromptViaArgs &&
+		entry.InteractiveInput == "" &&
+		len(entry.WorkingPatterns) == 0 &&
+		entry.Subprocess == (SubprocessProvConf{
+			SchemaFlag: "--output-schema",
+			Timeout:    CodexOrchestraTimeoutSeconds,
+		})
+}
+
 func migrateCodexProviderModelPolicy(entry ProviderEntry, quality QualityConf) (ProviderEntry, bool) {
 	switch entry.ModelPolicy {
 	case ProviderModelPolicyPinned:
+		if quality.SupervisorModelPolicy == "" && isV05066AutoPinnedCodexProvider(entry) {
+			entry.ModelPolicy = ProviderModelPolicyQuality
+			entry = ApplyCodexProviderProfile(entry, quality.CodexOrchestraProfile())
+			return entry, true
+		}
 		return entry, false
 	case ProviderModelPolicyQuality:
 		updated := ApplyCodexProviderProfile(entry, quality.CodexOrchestraProfile())

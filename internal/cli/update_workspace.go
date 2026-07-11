@@ -61,6 +61,13 @@ func runWorkspaceUpdate(cmd *cobra.Command, dir, only string, yes, preview bool,
 	var applied []appliedWorkspaceUpdate
 	for _, target := range targets {
 		fmt.Fprintf(out, "\n[%s] %s\n", target.Path, target.AbsPath)
+		configSnapshot, err := captureWorkspaceConfigSnapshot(target.AbsPath, preview)
+		if err != nil {
+			if rollbackErr := rollbackAppliedWorkspaceUpdates(applied); rollbackErr != nil {
+				return fmt.Errorf("%s config snapshot failed: %w; rollback failed: %v", target.Path, err, rollbackErr)
+			}
+			return fmt.Errorf("%s config snapshot failed: %w", target.Path, err)
+		}
 		beforeTransactions, err := committedTransactionSet(target.AbsPath, preview)
 		if err != nil {
 			if rollbackErr := rollbackAppliedWorkspaceUpdates(applied); rollbackErr != nil {
@@ -68,21 +75,36 @@ func runWorkspaceUpdate(cmd *cobra.Command, dir, only string, yes, preview bool,
 			}
 			return fmt.Errorf("%s transaction scan failed: %w", target.Path, err)
 		}
-		if err := runNestedUpdateCommand(cmd, target, yes, preview, statusLine); err != nil {
-			if rollbackErr := rollbackAppliedWorkspaceUpdates(applied); rollbackErr != nil {
-				return fmt.Errorf("%s 업데이트 실패: %w; rollback failed: %v", target.Path, err, rollbackErr)
+		if updateErr := runNestedUpdateCommand(cmd, target, yes, preview, statusLine); updateErr != nil {
+			currentJournals, scanErr := newCommittedTransactions(target.AbsPath, beforeTransactions, preview)
+			current := appliedWorkspaceUpdate{
+				Target:         target,
+				Journals:       currentJournals,
+				ConfigSnapshot: configSnapshot,
 			}
-			return fmt.Errorf("%s 업데이트 실패: %w", target.Path, err)
+			rollbackErr := rollbackWorkspaceUpdateWithCurrent(applied, current)
+			if scanErr != nil {
+				updateErr = fmt.Errorf("%w; transaction scan failed: %v", updateErr, scanErr)
+			}
+			if rollbackErr != nil {
+				return fmt.Errorf("%s 업데이트 실패: %w; rollback failed: %v", target.Path, updateErr, rollbackErr)
+			}
+			return fmt.Errorf("%s 업데이트 실패: %w", target.Path, updateErr)
 		}
 		newTransactions, err := newCommittedTransactions(target.AbsPath, beforeTransactions, preview)
 		if err != nil {
-			if rollbackErr := rollbackAppliedWorkspaceUpdates(applied); rollbackErr != nil {
+			current := appliedWorkspaceUpdate{Target: target, ConfigSnapshot: configSnapshot}
+			if rollbackErr := rollbackWorkspaceUpdateWithCurrent(applied, current); rollbackErr != nil {
 				return fmt.Errorf("%s transaction scan failed: %w; rollback failed: %v", target.Path, err, rollbackErr)
 			}
 			return fmt.Errorf("%s transaction scan failed: %w", target.Path, err)
 		}
-		if len(newTransactions) > 0 {
-			applied = append(applied, appliedWorkspaceUpdate{Target: target, Journals: newTransactions})
+		if !preview {
+			applied = append(applied, appliedWorkspaceUpdate{
+				Target:         target,
+				Journals:       newTransactions,
+				ConfigSnapshot: configSnapshot,
+			})
 		}
 		processed++
 	}
@@ -161,6 +183,8 @@ func preflightWorkspaceUpdateTarget(ctx context.Context, cmd *cobra.Command, tar
 	if _, migrateErr := config.MigrateOrchestraConfig(cfg); migrateErr != nil {
 		return fmt.Errorf("orchestra 마이그레이션 실패: %w", migrateErr)
 	}
+	// Apply reports ownership inspection errors from the real target.
+	_, _ = migrateLegacyCodexSupervisorPolicy(target.AbsPath, cfg)
 	if _, statusErr := applyStatusLineMode(cmd, target.AbsPath, cfg, statusLine, false); statusErr != nil {
 		return statusErr
 	}

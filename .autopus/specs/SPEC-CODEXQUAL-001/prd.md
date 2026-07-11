@@ -59,7 +59,7 @@ planner, architect, security-auditor는 `max`를 사용하고, 나머지는 `xhi
 
 ## 성공 기준
 
-- REQ-001~REQ-010이 `acceptance.md`의 S1~S20과 semantic invariant로 완전히 추적된다.
+- REQ-001~REQ-010이 `acceptance.md`의 S1~S22와 semantic invariant로 완전히 추적된다.
 - full-support, partial-support, malformed, valid-but-missing catalog fixture가 서로 분리된 oracle로 고정된다.
 - fresh root, managed agent, subprocess Args, interactive PaneArgs가 동일 capability 결과를 소비한다.
 - persistent quality, runtime quality, runtime effort, pinned ownership의 우선순위 테스트가 통과한다.

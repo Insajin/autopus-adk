@@ -131,13 +131,15 @@ Then Binary는 입력과 정확히 같다
 And Args와 PaneArgs의 모든 원소, ordering, quoting, `--` suffix는 입력 slice와 정확히 같다
 And catalog probe를 호출하지 않는다
 
-### S12: legacy canonical provider만 quality policy로 이행한다 (REQ-005, REQ-006)
+### S12: legacy canonical provider와 v0.50.66 auto-pinned provider만 quality policy로 이행한다 (REQ-005, REQ-006)
 
 Given marker가 없고 Args와 PaneArgs가 exact historical `gpt-5.5+xhigh` canonical tuple인 provider가 주어진다
-And extra, reordered, pane-only, custom Binary 중 하나를 가진 near-match provider가 각각 주어진다
+And raw supervisor policy가 없으며 Binary=`codex`, Args=`exec --sandbox workspace-write -m gpt-5.5`, PaneArgs=`-m gpt-5.5`, canonical subprocess를 가진 v0.50.66 auto-pinned provider가 주어진다
+And auto-pinned signature에서 custom Binary, extra arg, pane mismatch, custom subprocess 중 하나를 가진 near-match provider가 각각 주어진다
+And 같은 exact model-only signature에 현대 supervisor policy가 명시된 pinned provider가 주어진다
 When config migration을 실행한다
-Then exact tuple만 `model_policy: quality`가 되고 persistent quality profile로 해석된다
-And 모든 near-match provider는 `model_policy: pinned`이 되며 Binary, Args, PaneArgs가 변하지 않는다
+Then unmarked exact tuple과 v0.50.66 auto-pinned exact signature만 `model_policy: quality`가 되고 persistent Balanced/Ultra profile로 해석된다
+And 모든 near-match와 현대 명시 policy의 pinned provider는 Binary, Args, PaneArgs, subprocess를 포함해 byte-for-byte 변하지 않는다
 
 ### S13: 같은 GPT-5.6 모델에서 effort를 먼저 낮춘다 (REQ-007)
 
@@ -209,6 +211,25 @@ When 전체 생성 및 회귀 테스트를 실행한다
 Then Claude model/effort 결과는 기존 기대값과 같다
 And OpenCode는 `openai/gpt-5.4`, configured override, `--variant` 계약을 유지한다
 
+### S21: 변경되지 않은 legacy root만 inherit로 자동 이행한다 (REQ-006)
+
+Given supervisor policy가 없고 generated header, no-user-marker, merge-policy manifest entry, matching whole-file checksum, exact historical `gpt-5.5+xhigh`를 모두 가진 root config가 주어진다
+And checksum drift, missing manifest, user marker, custom tuple, `gpt-5.5+medium` 중 하나를 가진 보존 대상이 각각 주어진다
+When `auto update`와 `auto update --plan`을 각각 실행한다
+Then exact managed config만 `supervisor_model_policy: inherit`를 영속화하고 root model/effort assignment를 제거한다
+And 모든 보존 대상은 기존 policy와 assignment를 유지한다
+And plan은 예정된 inherit 이행을 보고하지만 `autopus.yaml`, `.codex/config.toml`, manifest의 바이트를 변경하지 않는다
+
+### S22: legacy root 이행은 실패와 진단 경계를 보존한다 (REQ-006)
+
+Given 자동 이행 대상에서 Codex transaction이 실패하는 경우가 주어진다
+And explicit `inherit`인데 project model/effort override가 남은 경우가 주어진다
+And 먼저 성공한 workspace target 뒤에서 다음 target이 실패하는 경우가 주어진다
+When local update, doctor, workspace update를 각각 실행한다
+Then local update는 legacy missing policy와 기존 Codex config를 복원하고 이행 성공을 출력하지 않는다
+And doctor는 stale override를 경고하되 `autopus.yaml`과 `.codex/config.toml`을 변경하지 않는다
+And workspace rollback은 먼저 성공한 target의 generated transaction과 원래 `autopus.yaml` 바이트를 함께 복원한다
+
 ## Scenario Evidence Map
 
 | Scenarios | Primary automated evidence |
@@ -218,12 +239,14 @@ And OpenCode는 `openai/gpt-5.4`, configured override, `--variant` 계약을 유
 | S5, S6, S7 | `TestTransformAgentForCodex_RendersQualityAwareProfiles`, `TestGenerateAgents_BalancedQualityUsesRoleEffort`, `TestGenerateAgents_UltraQualityUsesSelectiveSolEffort`, template parity tests |
 | S8, S9 | `TestCodexProviderEntryForQuality`, `TestLoadHarnessConfigForDir_CodexRuntimeOverridesAreEphemeral`, `TestLoadHarnessConfigForDir_RuntimeBalancedOverridesPersistentUltra`, `TestRunOrchestraCommand_AppliesRuntimeCodexQualityAndEffort`, `TestRunSubprocessPipeline_AppliesRuntimeCodexQualityAndEffort`, `TestBuildReviewProvidersWithConfig_UsesRuntimeCodexQualityProfile` |
 | S10 | `TestGenerateConfig_PreservesUserModelValueLiteral`, `TestGenerateConfig_PreservesQuotedUserModelKey`, `TestGenerateConfig_IgnoresModelAndMarkerInsideMultilineString`, `TestUpdate_PreservesUserCodexModelSettings`, `TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra`, `TestUpdate_LegacyManagedManifestPreservesAmbiguousUserTuple`, `TestUpdate_UnrelatedConfigEditDoesNotFreezeManagedModel`, `TestUpdate_UserMarkerPreservesOnlyNamedCodexSetting`, `TestUpdate_InheritPolicyRemovesUnmodifiedManagedRootModel`, `TestUpdate_RefreshesHistoricalManagedLegacyProfile` |
-| S11, S12 | `TestMigrateOrchestraConfig_ExplicitPinnedCodexRemainsByteForByte`, `TestMigrateOrchestraConfig_MarksExactHistoricalCodexDefaultsQualityManaged`, near-match and empty-provider migration tests, `TestApplyCodexProviderProfilePreservesTerminatorSuffix` |
+| S11, S12 | `TestMigrateOrchestraConfig_ExplicitPinnedCodexRemainsByteForByte`, `TestMigrateOrchestraConfig_MarksExactHistoricalCodexDefaultsQualityManaged`, `TestMigrateOrchestraConfig_V05066AutoPinnedModelOnlyCodex_RepairsToQuality`, `TestMigrateOrchestraConfig_V05066AutoPinnedNearMatches_RemainPinnedByteForByte`, `TestMigrateOrchestraConfig_ExplicitModernPinnedModelOnlyCodex_RemainsPinnedByteForByte`, empty-provider migration tests, `TestApplyCodexProviderProfilePreservesTerminatorSuffix` |
 | S13, S14, S15 | `TestResolveCodexProfile`, `TestGenerateConfig_CatalogDowngradesEffortOnSameModel`, `TestGenerateConfig_CatalogFallsBackToLegacyModel`, `TestResolveCodexProviderCapabilities_NoLowerEffortKeepsModel`, `TestResolveCodexProviderCapabilities_MissingModelUsesLegacy` |
 | S16, S17 | `TestResolveCodexProfileCatalogUnknown`, catalog bounds tests, `TestGenerateConfig_CatalogUnknownUsesLegacyModel`, `TestGenerateAgents_AppliesCatalogFallbackProfiles`, `TestResolveCodexProviderCapabilities_UnknownCatalogUsesLegacy`, `TestResolveCodexProviderCapabilities_OversizedCatalogUsesLegacy`, `TestResolveCodexProviderCapabilities_OmitsOverridesForRuntimeDefault` |
 | S18 | `TestCodexCapabilityMatrixProjectsEveryConsumer`가 같은 `C_FULL`, `C_SOL_NO_ULTRA`, `C_VALID_MISSING` fixture를 root, agent, Args, PaneArgs에 함께 투영하고 selected tuple/reason을 비교 |
 | S19 | `TestCodexQualityGuidanceDocumentsLoadedAgentBoundary`가 adaptive-quality와 agent-pipeline의 canonical source, Codex template, Gemini template에서 inherit/quality-managed 경계, user-owned 보존, stale 무조건 supervisor 문구 부재를 함께 검증 |
 | S20 | `go test ./pkg/adapter/opencode ./templates`와 전체 regression suite |
+| S21 | `TestInspectLegacySupervisorModelMigratesKnownManagedProfiles`, `TestInspectLegacySupervisorModelPreservesAmbiguousOrOwnedOverrides`, `TestUpdateCmdMigratesUnchangedLegacyCodexSupervisorToInherit`, `TestUpdatePlanReportsLegacyCodexMigrationWithoutWriting`, `TestUpdateCmdPreservesDriftedLegacyCodexSupervisor` |
+| S22 | `TestUpdateCmdRollsBackSupervisorPolicyWhenCodexWriteFails`, `TestCheckCodexModelOwnershipText_ExplicitInheritWithStaleOverrideWarns`, `TestCodexModelOwnershipCheck_DoesNotModifyProjectFiles`, `TestUpdateCmd_WorkspaceApplyRollsBackCommittedTargetWhenLaterWriteFails` |
 
 ## Verification Commands
 

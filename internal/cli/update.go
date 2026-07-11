@@ -126,6 +126,13 @@ func newUpdateCmd() *cobra.Command {
 						"orchestra config migration would be persisted",
 					)
 				}
+				supervisorMigrated, supervisorErr := migrateLegacyCodexSupervisorPolicy(dir, previewCfg)
+				if supervisorErr != nil {
+					return fmt.Errorf("Codex supervisor model migration failed: %w", supervisorErr)
+				}
+				if supervisorMigrated {
+					configReasons = appendConfigPreviewReason(configReasons, legacyCodexSupervisorPreviewReason)
+				}
 
 				effectiveCfg := applyFlagCC21Overrides(previewCfg, globalFlagsFromContext(cmd.Context()))
 				if _, modeErr := applyStatusLineMode(cmd, dir, effectiveCfg, statusLine, false); modeErr != nil {
@@ -143,10 +150,12 @@ func newUpdateCmd() *cobra.Command {
 
 			addedPlatforms := appendDetectedPlatforms(cfg)
 
-			// Orchestra config migration
-			if changed, migrateErr := config.MigrateOrchestraConfig(cfg); migrateErr != nil {
+			// Persist config migrations before rendering platform-owned files.
+			orchestraMigrated, migrateErr := config.MigrateOrchestraConfig(cfg)
+			if migrateErr != nil {
 				return fmt.Errorf("orchestra 마이그레이션 실패: %w", migrateErr)
-			} else if changed || len(addedPlatforms) > 0 || (designConfigMissing && cfg.Design.Enabled) {
+			}
+			if orchestraMigrated || len(addedPlatforms) > 0 || (designConfigMissing && cfg.Design.Enabled) {
 				if saveErr := config.Save(dir, cfg); saveErr != nil {
 					return fmt.Errorf("마이그레이션 설정 저장 실패: %w", saveErr)
 				}
@@ -178,9 +187,19 @@ func newUpdateCmd() *cobra.Command {
 			}
 
 			ctx := cmd.Context()
+			supervisorMigrated, supervisorErr := migrateLegacyCodexSupervisorPolicy(dir, cfg)
+			if supervisorErr != nil {
+				return fmt.Errorf("Codex supervisor model migration failed: %w", supervisorErr)
+			}
+			if supervisorMigrated {
+				if saveErr := config.Save(dir, cfg); saveErr != nil {
+					return fmt.Errorf("Codex supervisor model migration save failed: %w", saveErr)
+				}
+			}
 			effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
 			updated := 0
 			var platformErrors []string
+			codexUpdated := false
 
 			for _, p := range cfg.Platforms {
 				supported, updateErr := updateHarnessPlatform(ctx, dir, p, effectiveCfg)
@@ -194,6 +213,19 @@ func newUpdateCmd() *cobra.Command {
 				} else {
 					fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s updated\n", p)
 					updated++
+					if p == "codex" {
+						codexUpdated = true
+					}
+				}
+			}
+			if supervisorMigrated {
+				if codexUpdated {
+					fmt.Fprintln(cmd.OutOrStdout(), "  + Codex supervisor model now inherits the user default")
+				} else {
+					cfg.Quality.SupervisorModelPolicy = ""
+					if rollbackErr := config.Save(dir, cfg); rollbackErr != nil {
+						platformErrors = append(platformErrors, fmt.Sprintf("Codex supervisor policy rollback: %v", rollbackErr))
+					}
 				}
 			}
 
