@@ -149,6 +149,7 @@ func TestUpdate_RefreshesManagedBalancedEffortWhenQualityBecomesUltra(t *testing
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
+	useFullCodexCatalogForTest(a)
 	cfg := config.DefaultFullConfig("test-project")
 	cfg.Quality.SupervisorModelPolicy = "quality"
 
