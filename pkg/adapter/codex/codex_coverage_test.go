@@ -74,16 +74,17 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 
 func TestLogTransformReport_Nil(t *testing.T) {
 	t.Parallel()
-	logTransformReport("codex", nil)
+	logTransformReport(nil)
 }
 
 func TestLogTransformReport_WithData(t *testing.T) {
 	t.Parallel()
 	report := &pkgcontent.TransformReport{
+		Platform:     "codex",
 		Compatible:   []string{"skill-a", "skill-b"},
 		Incompatible: []string{"skill-c"},
 	}
-	logTransformReport("codex", report)
+	logTransformReport(report)
 }
 
 // --- Hooks ---

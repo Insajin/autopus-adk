@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **플랫폼별 스킬 제외 출력 명확화** (2026-07-11): Codex와 Gemini 하네스 업데이트에서 Claude 전용 스킬을 오류처럼 보이는 `incompatible`로 표시하던 문구를 `platform-skipped`로 바꾸고, 제외된 스킬 이름을 함께 표시한다. 플랫폼별 스킬 생성 동작은 그대로 유지한다.
+
 - **Go 표준 라이브러리 TLS 취약점 대응** (2026-07-10): toolchain과 Security workflow를 Go `1.26.5`로 올려 `crypto/tls`의 Encrypted Client Hello privacy leak인 `GO-2026-5856`을 해소했다. Security Scan이 patch version을 명시적으로 설치하므로 runner의 `1.26` 해석이나 캐시 상태와 관계없이 수정된 표준 라이브러리로 `govulncheck`와 릴리즈 gate를 실행한다.
 
 - **route_team executor coordination — planner가 상호의존 파일을 분리해 발생하던 merge conflict 예방 (SPEC-HARNESS-WORKFLOW-FIDELITY-001 chained run 발견)** (2026-06-22): chained run 관측 — planner가 impl(`greeting.go`)과 그 test(`greeting_test.go`)를 별도 task로 분리하면, test task의 executor가 격리 worktree에서 컴파일을 위해 impl을 재생성→두 executor가 같은 파일 소유→merge가 conflict로 skip→build 불가(fail-fast, 안전하나 run 재시도 필요). 근본 원인은 isolated 병렬 실행에 맞지 않는 task 분해. **수정**(`pkg/content/workflow_generate_team.go`): planner 프롬프트를 "병렬 isolated-worktree 실행용 disjoint task 분해 + 컴파일 상호의존 파일(impl+test, type+소비자)은 한 task로 그룹화·절대 분리 금지" 제약으로 enrich + executor 프롬프트에 "배정된 files만 소유/생성, 그 외 파일은 병렬 executor 소유라 손대지 말 것" 가드. **planner-only probe 실증**: 동일 impl+test SPEC→taskCount=1, greeting.go+greeting_test.go가 같은 task(grouped), planner가 "상호의존→단일 executor 소유 필수" 명시 추론. merge 무변경(conflict 정책 그대로 안전망).

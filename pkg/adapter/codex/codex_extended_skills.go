@@ -36,7 +36,7 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 		return nil, fmt.Errorf("skill transform for codex: %w", err)
 	}
 
-	logTransformReport("codex", report)
+	logTransformReport(report)
 
 	var files []adapter.FileMapping
 	for _, s := range skills {
@@ -84,12 +84,12 @@ func ensureCodexSkillFrontmatter(targetPath, name, description, body string) str
 }
 
 // logTransformReport prints a summary of skill transformation results.
-func logTransformReport(platform string, report *pkgcontent.TransformReport) {
-	if report == nil {
+func logTransformReport(report *pkgcontent.TransformReport) {
+	summary := pkgcontent.FormatTransformReport(report)
+	if summary == "" {
 		return
 	}
-	fmt.Printf("  [%s] extended skills: %d compatible, %d incompatible\n",
-		platform, len(report.Compatible), len(report.Incompatible))
+	fmt.Println(summary)
 }
 
 func skillCompilerExplicitlySelects(cfg *config.HarnessConfig, name string) bool {

@@ -31,7 +31,7 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 		return nil, fmt.Errorf("skill transform for gemini: %w", err)
 	}
 
-	logTransformReport("gemini", report)
+	logTransformReport(report)
 
 	var files []adapter.FileMapping
 	for _, s := range skills {
@@ -49,10 +49,10 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 }
 
 // logTransformReport prints a summary of skill transformation results.
-func logTransformReport(platform string, report *pkgcontent.TransformReport) {
-	if report == nil {
+func logTransformReport(report *pkgcontent.TransformReport) {
+	summary := pkgcontent.FormatTransformReport(report)
+	if summary == "" {
 		return
 	}
-	fmt.Printf("  [%s] extended skills: %d compatible, %d incompatible\n",
-		platform, len(report.Compatible), len(report.Incompatible))
+	fmt.Println(summary)
 }

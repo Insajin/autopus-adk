@@ -212,3 +212,42 @@ func TestSkillTransformer_EmptyDir(t *testing.T) {
 	assert.Empty(t, report.Compatible)
 	assert.Empty(t, report.Incompatible)
 }
+
+func TestFormatTransformReport(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		report *content.TransformReport
+		want   string
+	}{
+		{
+			name: "nil report",
+			want: "",
+		},
+		{
+			name: "no platform-skipped skills",
+			report: &content.TransformReport{
+				Platform:   "codex",
+				Compatible: []string{"skill-a", "skill-b"},
+			},
+			want: "  [codex] extended skills: 2 compatible, 0 platform-skipped",
+		},
+		{
+			name: "lists platform-skipped skills in stable order",
+			report: &content.TransformReport{
+				Platform:     "gemini",
+				Compatible:   []string{"skill-a"},
+				Incompatible: []string{"skill-c", "skill-b"},
+			},
+			want: "  [gemini] extended skills: 1 compatible, 2 platform-skipped (skill-b, skill-c)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, content.FormatTransformReport(tt.report))
+		})
+	}
+}

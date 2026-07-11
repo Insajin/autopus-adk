@@ -48,14 +48,15 @@ func TestAcceptance_S4_GeminiSkillRefsResolved(t *testing.T) {
 
 func TestLogTransformReport_Nil(t *testing.T) {
 	t.Parallel()
-	logTransformReport("gemini", nil)
+	logTransformReport(nil)
 }
 
 func TestLogTransformReport_WithData(t *testing.T) {
 	t.Parallel()
 	report := &pkgcontent.TransformReport{
+		Platform:     "gemini",
 		Compatible:   []string{"a", "b"},
 		Incompatible: []string{"c"},
 	}
-	logTransformReport("gemini", report)
+	logTransformReport(report)
 }

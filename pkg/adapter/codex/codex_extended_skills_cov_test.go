@@ -55,5 +55,5 @@ func TestEnsureCodexSkillFrontmatter_EmptyDescriptionFallsBackToName(t *testing.
 func TestLogTransformReport_NilSafe(t *testing.T) {
 	t.Parallel()
 	// Must not panic on nil report.
-	assert.NotPanics(t, func() { logTransformReport("codex", nil) })
+	assert.NotPanics(t, func() { logTransformReport(nil) })
 }

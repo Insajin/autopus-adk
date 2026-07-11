@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -34,6 +35,23 @@ type TransformReport struct {
 	Platform     string
 	Compatible   []string
 	Incompatible []string
+}
+
+// FormatTransformReport returns the user-facing platform transformation summary.
+func FormatTransformReport(report *TransformReport) string {
+	if report == nil {
+		return ""
+	}
+
+	summary := fmt.Sprintf("  [%s] extended skills: %d compatible, %d platform-skipped",
+		report.Platform, len(report.Compatible), len(report.Incompatible))
+	if len(report.Incompatible) == 0 {
+		return summary
+	}
+
+	skipped := append([]string(nil), report.Incompatible...)
+	sort.Strings(skipped)
+	return fmt.Sprintf("%s (%s)", summary, strings.Join(skipped, ", "))
 }
 
 // SkillTransformOptions controls optional canonical reference rewrites.
