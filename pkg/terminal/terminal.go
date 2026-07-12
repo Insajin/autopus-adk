@@ -31,6 +31,15 @@ type SurfaceCreator interface {
 	CreateSurface(ctx context.Context) (PaneID, error)
 }
 
+// PaneFocuser is an optional interface for terminals that can bring an
+// existing pane or surface to the foreground. Keeping it separate from
+// Terminal preserves compatibility with adapters and test doubles that do not
+// support programmatic focus.
+type PaneFocuser interface {
+	// FocusPane brings paneID to the foreground.
+	FocusPane(ctx context.Context, paneID PaneID) error
+}
+
 // Terminal is the unified interface for terminal multiplexer adapters.
 // @AX:ANCHOR [AUTO] core public API contract — all adapters (cmux, tmux, plain) implement this interface
 // @AX:REASON: any method signature change here breaks all three adapters and every CLI handler that calls them; treat as a stable boundary

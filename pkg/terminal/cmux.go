@@ -71,6 +71,19 @@ func (a *CmuxAdapter) SplitPane(_ context.Context, dir Direction) (PaneID, error
 	return PaneID(ref), nil
 }
 
+// FocusPane brings an existing cmux surface to the foreground. cmux exposes
+// focus through move-surface --focus even when no destination is supplied.
+func (a *CmuxAdapter) FocusPane(_ context.Context, paneID PaneID) error {
+	if err := validatePaneID(paneID); err != nil {
+		return fmt.Errorf("cmux: %w", err)
+	}
+	cmd := execCommand("cmux", "move-surface", "--surface", string(paneID), "--focus", "true")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("cmux: focus pane %s: %w", paneID, err)
+	}
+	return nil
+}
+
 // SendCommand sends a command string to the specified pane via --surface flag.
 func (a *CmuxAdapter) SendCommand(_ context.Context, paneID PaneID, command string) error {
 	if err := validatePaneID(paneID); err != nil {

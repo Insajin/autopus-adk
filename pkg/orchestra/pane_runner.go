@@ -110,6 +110,7 @@ func splitProviderPanes(ctx context.Context, cfg OrchestraConfig) ([]paneInfo, [
 		tmpFile.Close()
 		panes = append(panes, paneInfo{paneID: paneID, outputFile: tmpFile.Name(), provider: p})
 	}
+	focusFirstProviderPane(ctx, cfg.Terminal, panes)
 	return panes, nil, nil
 }
 
