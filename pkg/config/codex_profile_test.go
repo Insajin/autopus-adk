@@ -38,7 +38,7 @@ func TestQualityConfCodexOrchestraProfile(t *testing.T) {
 		(QualityConf{Default: "balanced"}).CodexOrchestraProfile(),
 	)
 	assert.Equal(t,
-		CodexProfile{Model: CodexSolModel, Effort: CodexEffortUltra},
+		CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax},
 		(QualityConf{Default: "ultra"}).CodexOrchestraProfile(),
 	)
 }
@@ -255,7 +255,7 @@ func TestCodexProviderEntryForQuality(t *testing.T) {
 		wantEffort string
 	}{
 		{name: "balanced", quality: QualityConf{Default: "balanced"}, wantModel: CodexSolModel, wantEffort: CodexEffortXHigh},
-		{name: "ultra", quality: QualityConf{Default: "ultra"}, wantModel: CodexSolModel, wantEffort: CodexEffortUltra},
+		{name: "ultra", quality: QualityConf{Default: "ultra"}, wantModel: CodexSolModel, wantEffort: CodexEffortMax},
 	}
 
 	for _, tt := range tests {

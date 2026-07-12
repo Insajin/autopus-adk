@@ -73,7 +73,11 @@ func (q QualityConf) CodexSupervisorModel() string { return q.CodexSupervisorPro
 func (q QualityConf) CodexSupervisorEffort() string { return q.CodexSupervisorProfile().Effort }
 
 // CodexOrchestraProfile returns the managed Codex subprocess profile.
-func (q QualityConf) CodexOrchestraProfile() CodexProfile { return q.CodexSupervisorProfile() }
+func (q QualityConf) CodexOrchestraProfile() CodexProfile {
+	profile := q.CodexSupervisorProfile()
+	profile.Effort = normalizeManagedCodexEffort(profile.Effort)
+	return profile
+}
 
 func (q QualityConf) CodexOrchestraModel() string { return q.CodexOrchestraProfile().Model }
 

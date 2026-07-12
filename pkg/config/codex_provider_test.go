@@ -143,7 +143,10 @@ func TestCodexProfileFromArgsIgnoresTerminatorSuffixAndReadsLongConfig(t *testin
 func TestResolveCodexProviderProfileUsesCatalogResolution(t *testing.T) {
 	t.Parallel()
 
-	entry := CodexProviderEntryForQuality(QualityConf{Default: "ultra"})
+	entry := ApplyCodexProviderProfile(
+		CodexProviderEntryForQuality(QualityConf{Default: "ultra"}),
+		CodexProfile{Model: CodexSolModel, Effort: CodexEffortUltra},
+	)
 	catalog := []byte(`{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"}]}]}`)
 
 	got, resolution := ResolveCodexProviderProfile(entry, catalog)

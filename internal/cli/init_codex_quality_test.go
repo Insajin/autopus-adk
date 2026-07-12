@@ -11,7 +11,7 @@ import (
 )
 
 func TestInitCmd_QualityUltraInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
-	assertInitCodexQualityProfile(t, "ultra", "ultra", "gpt-5.6-sol", "xhigh", "max")
+	assertInitCodexQualityProfile(t, "ultra", "max", "gpt-5.6-sol", "xhigh", "max")
 }
 
 func TestInitCmd_QualityBalancedInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {

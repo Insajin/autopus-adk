@@ -72,7 +72,7 @@ func TestLoadHarnessConfigForDir_RuntimeBalancedOverridesPersistentUltra(t *test
 	disk, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(disk), "default: ultra")
-	assert.Contains(t, string(disk), `model_reasoning_effort="ultra"`)
+	assert.Contains(t, string(disk), `model_reasoning_effort="max"`)
 }
 
 func TestRunOrchestraCommand_AppliesRuntimeCodexQualityAndEffort(t *testing.T) {
@@ -155,7 +155,7 @@ func TestBuildProviderConfigsForRuntime_CodexQualityMatrix(t *testing.T) {
 	}{
 		{name: "default balanced", want: config.CodexEffortXHigh},
 		{name: "balanced", quality: "balanced", want: config.CodexEffortXHigh},
-		{name: "ultra", quality: "ultra", want: config.CodexEffortUltra},
+		{name: "ultra", quality: "ultra", want: config.CodexEffortMax},
 		{name: "explicit effort", quality: "ultra", effort: config.CodexEffortMax, want: config.CodexEffortMax},
 	}
 	for _, tt := range tests {

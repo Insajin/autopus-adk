@@ -143,8 +143,8 @@ func TestMigrateOrchestraConfig_ExplicitQualityCodexUsesPersistentQuality(t *tes
 	_, err := MigrateOrchestraConfig(cfg)
 	require.NoError(t, err)
 	got := cfg.Orchestra.Providers["codex"]
-	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="ultra"`, "--json"}, got.Args)
-	assert.Equal(t, []string{"--search", "-m", CodexSolModel, "-c", `model_reasoning_effort="ultra"`}, got.PaneArgs)
+	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="max"`, "--json"}, got.Args)
+	assert.Equal(t, []string{"--search", "-m", CodexSolModel, "-c", `model_reasoning_effort="max"`}, got.PaneArgs)
 }
 
 func TestMigrateOrchestraConfig_PinsUnmarkedDeprecatedCodexWithoutRewriting(t *testing.T) {
