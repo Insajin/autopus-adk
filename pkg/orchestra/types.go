@@ -111,6 +111,7 @@ type OrchestraResult struct {
 	RunID           string               // reliability correlation run ID
 	Degraded        bool                 // true when one or more providers were skipped/degraded
 	Reliability     *ReliabilitySummary  // persisted receipts / bundle summary
+	Yield           *YieldOutput         // structured pane/session metadata when execution yields to the caller
 }
 
 // OrchestraConfig는 오케스트레이션 실행 설정이다.

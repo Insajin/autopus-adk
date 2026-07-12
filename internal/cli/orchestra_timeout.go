@@ -39,6 +39,10 @@ func resolveOrchestraTimeout(conf *config.OrchestraConf, requestedTimeout int, t
 			Duration: fallback,
 			Source:   resolved.Source,
 		}
+		if timeoutChanged && requestedTimeout > 0 {
+			resolved.Providers = append(resolved.Providers, detail)
+			continue
+		}
 		if provider.ExecutionTimeout > 0 {
 			detail.Duration = provider.ExecutionTimeout
 			detail.Source = "provider_execution_timeout"
@@ -52,4 +56,19 @@ func resolveOrchestraTimeout(conf *config.OrchestraConf, requestedTimeout int, t
 		resolved.Providers = append(resolved.Providers, detail)
 	}
 	return resolved
+}
+
+func applyResolvedProviderTimeouts(providers []orchestra.ProviderConfig, resolved ResolvedOrchestraTimeout) []orchestra.ProviderConfig {
+	byProvider := make(map[string]time.Duration, len(resolved.Providers))
+	for _, detail := range resolved.Providers {
+		byProvider[detail.Provider] = detail.Duration
+	}
+
+	updated := append([]orchestra.ProviderConfig(nil), providers...)
+	for i := range updated {
+		if duration, ok := byProvider[updated[i].Name]; ok {
+			updated[i].ExecutionTimeout = duration
+		}
+	}
+	return updated
 }

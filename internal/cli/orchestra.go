@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -180,6 +181,7 @@ func runOrchestraCommand(
 	subprocessMode := flags.SubprocessMode
 	resolvedTimeout := resolveOrchestraTimeout(orchConf, timeout, flags.TimeoutChanged, providers)
 	timeout = resolvedTimeout.Seconds
+	providers = applyResolvedProviderTimeouts(providers, resolvedTimeout)
 	term := terminal.DetectTerminal()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"
@@ -252,13 +254,11 @@ func runOrchestraCommand(
 		return fmt.Errorf("오케스트레이션 실패: %w", err)
 	}
 
-	// R9: --no-judge outputs structured JSON when round history is available.
-	if noJudge && len(result.RoundHistory) > 0 {
-		yieldOut := orchestra.BuildYieldOutputFromResult(result, sessionID)
-		if writeErr := orchestra.WriteYieldOutput(os.Stdout, yieldOut); writeErr != nil {
-			return fmt.Errorf("write JSON output: %w", writeErr)
-		}
-	} else {
+	structured, writeErr := writeOrchestraPrimaryOutput(os.Stdout, result, noJudge, sessionID)
+	if writeErr != nil {
+		return fmt.Errorf("write JSON output: %w", writeErr)
+	}
+	if !structured {
 		fmt.Printf("%s\n", result.Merged)
 		if path, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, resolvedTimeout, result); saveErr == nil {
 			fmt.Fprintf(os.Stderr, "결과 저장: %s\n", path)
@@ -279,4 +279,15 @@ func runOrchestraCommand(
 	}
 	fmt.Fprintf(os.Stderr, "\n요약: %s (총 %s)\n", result.Summary, result.Duration.Round(1e6))
 	return nil
+}
+
+func writeOrchestraPrimaryOutput(w io.Writer, result *orchestra.OrchestraResult, noJudge bool, sessionID string) (bool, error) {
+	if result.Yield != nil {
+		return true, orchestra.WriteYieldOutput(w, *result.Yield)
+	}
+	if noJudge && len(result.RoundHistory) > 0 {
+		output := orchestra.BuildYieldOutputFromResult(result, sessionID)
+		return true, orchestra.WriteYieldOutput(w, output)
+	}
+	return false, nil
 }

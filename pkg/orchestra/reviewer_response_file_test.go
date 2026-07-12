@@ -32,6 +32,18 @@ func TestScreenPollDetector_ReviewerRequiresResponseFileDespitePrompt(t *testing
 	assert.False(t, ok, "reviewer completion must wait for a written response file")
 }
 
+func TestResponseFileCompletion_CodexBrainstormRequiresFinalMarker(t *testing.T) {
+	t.Parallel()
+
+	pi := paneInfo{
+		provider:     ProviderConfig{Name: "codex", Binary: "codex"},
+		responseFile: filepath.Join(t.TempDir(), "codex-brainstorm.md"),
+	}
+
+	assert.True(t, requiresResponseFileCompletion(pi),
+		"a visible prompt must not complete Codex before its final response marker")
+}
+
 func TestScreenPollDetector_AntigravityReviewerUsesScreenCompletion(t *testing.T) {
 	t.Parallel()
 

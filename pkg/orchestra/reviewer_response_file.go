@@ -11,7 +11,10 @@ func requiresReviewerResponseFile(req ProviderRequest, pi paneInfo) bool {
 }
 
 func requiresResponseFileCompletion(pi paneInfo) bool {
-	return pi.responseFile != "" && reviewerRequiresResponseFile(pi.provider) && isReviewerRole(pi.role)
+	if pi.responseFile == "" || !reviewerRequiresResponseFile(pi.provider) {
+		return false
+	}
+	return isReviewerRole(pi.role) || isCodexInteractiveProvider(pi.provider)
 }
 
 func isReviewerRole(role string) bool {
