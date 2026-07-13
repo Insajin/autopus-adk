@@ -107,8 +107,8 @@ func TestWorkflowRender_TeamQualityOverlay(t *testing.T) {
 
 	balanced := renderLines(t, "--route", "team", "--quality", "balanced")
 	implB := findLine(balanced, "phase implementation:")
-	if !strings.Contains(implB, "model=claude-sonnet-4-6") || !strings.Contains(implB, "effort=medium") {
-		t.Fatalf("balanced implementation = %q, want sonnet-4-6 + medium", implB)
+	if !strings.Contains(implB, "model=claude-sonnet-5") || !strings.Contains(implB, "effort=medium") {
+		t.Fatalf("balanced implementation = %q, want sonnet-5 + medium", implB)
 	}
 	reviewB := findLine(balanced, "phase review:")
 	if !strings.Contains(reviewB, "verify_votes=1") || !strings.Contains(reviewB, "synthesis=false") {

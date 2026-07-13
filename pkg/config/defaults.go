@@ -82,8 +82,8 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Strategy: "balanced",
 			Tiers: map[string]string{
 				"premium":  "claude-opus-4-8",
-				"standard": "claude-sonnet-4-6",
-				"economy":  "claude-sonnet-4-6",
+				"standard": "claude-sonnet-5",
+				"economy":  "claude-sonnet-5",
 			},
 			Categories: map[string]string{
 				"visual":     "standard",

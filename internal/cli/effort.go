@@ -71,7 +71,7 @@ Effort values: low | medium | high | xhigh | max
 
 	cmd.Flags().StringVar(&quality, "quality", "", "Quality mode preset (ultra|balanced)")
 	cmd.Flags().StringVar(&complexity, "complexity", "", "Task complexity hint (low|medium|high)")
-	cmd.Flags().StringVar(&model, "model", "", "Model identifier (opus-4.7|opus-4.6|sonnet-4.6|haiku-4.5)")
+	cmd.Flags().StringVar(&model, "model", "", "Model identifier (opus-4.8|opus-4.7|sonnet-5|sonnet-4.6|haiku-4.5)")
 	cmd.Flags().StringVar(&agent, "agent", "", "Agent name for frontmatter lookup (future use)")
 	cmd.Flags().StringVar(&format, "format", "plain", "Output format (plain|json)")
 	cmd.Flags().StringVar(&effortFlag, "effort", "", "Explicit effort value (overrides quality-mode mapping)")

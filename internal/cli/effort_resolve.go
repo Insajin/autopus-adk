@@ -158,7 +158,7 @@ func resolveUltraMode(model string) (EffortResult, error) {
 			Reason: "ultra mode with top-tier Opus (4.8/4.7)",
 		}, nil
 	default:
-		// Opus 4.6, Sonnet 4.6, or anything else in ultra mode → high.
+		// Opus 4.6, Sonnet 5, Sonnet 4.6, or anything else in ultra mode → high.
 		return EffortResult{
 			Effort: EffortHigh,
 			Source: EffortSourceQualityMode,

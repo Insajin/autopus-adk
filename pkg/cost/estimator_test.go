@@ -45,7 +45,7 @@ func TestEstimateCost_UltraExecutor(t *testing.T) {
 }
 
 func TestEstimateCost_BalancedExecutor(t *testing.T) {
-	// balanced/executor → claude-sonnet-4-6: input=$3/M, output=$15/M
+	// balanced/executor → claude-sonnet-5: input=$3/M, output=$15/M
 	// total=4000 → input=3000, output=1000
 	// cost = (3000/1_000_000 * 3) + (1000/1_000_000 * 15) = 0.009 + 0.015 = 0.024
 	e := cost.NewEstimator("balanced")
@@ -59,7 +59,7 @@ func TestEstimateCost_BalancedExecutor(t *testing.T) {
 }
 
 func TestEstimateCost_BalancedValidator(t *testing.T) {
-	// balanced/validator → claude-sonnet-4-6: input=$3/M, output=$15/M
+	// balanced/validator → claude-sonnet-5: input=$3/M, output=$15/M
 	// total=1_000_000 → input=750_000, output=250_000
 	// cost = (750_000/1_000_000 * 3.0) + (250_000/1_000_000 * 15.0) = 2.25 + 3.75 = 6.00
 	e := cost.NewEstimator("balanced")

@@ -30,6 +30,12 @@ func DefaultPricingTable() map[string]ModelPricing {
 			InputPricePerMillion:  3.0,
 			OutputPricePerMillion: 15.0,
 		},
+		// Sonnet 5 standard pricing (intro pricing is $2/$10 through 2026-08-31);
+		// standard pricing is retained here as the durable value. Checked 2026-07-13.
+		"claude-sonnet-5": {
+			InputPricePerMillion:  3.0,
+			OutputPricePerMillion: 15.0,
+		},
 		"claude-haiku-4-5": {
 			InputPricePerMillion:  1.0,
 			OutputPricePerMillion: 5.0,
@@ -56,19 +62,19 @@ func QualityModeToModels(qualityMode string) map[string]string {
 			"security_auditor": "claude-opus-4-8",
 		}
 	case "balanced":
-		// Strategic agents use opus; execution and validation agents use sonnet.
+		// Strategic agents use opus; execution and validation agents use sonnet-5.
 		// Team-phase roles (test_scaffold, annotator, security_auditor) are
-		// execution/validation-class and therefore mapped to sonnet in balanced mode.
+		// execution/validation-class and therefore mapped to sonnet-5 in balanced mode.
 		return map[string]string{
 			"planner":          "claude-opus-4-8",
 			"architect":        "claude-opus-4-8",
-			"executor":         "claude-sonnet-4-6",
-			"tester":           "claude-sonnet-4-6",
-			"reviewer":         "claude-sonnet-4-6",
-			"validator":        "claude-sonnet-4-6",
-			"test_scaffold":    "claude-sonnet-4-6",
-			"annotator":        "claude-sonnet-4-6",
-			"security_auditor": "claude-sonnet-4-6",
+			"executor":         "claude-sonnet-5",
+			"tester":           "claude-sonnet-5",
+			"reviewer":         "claude-sonnet-5",
+			"validator":        "claude-sonnet-5",
+			"test_scaffold":    "claude-sonnet-5",
+			"annotator":        "claude-sonnet-5",
+			"security_auditor": "claude-sonnet-5",
 		}
 	default:
 		return nil

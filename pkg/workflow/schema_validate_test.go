@@ -106,6 +106,7 @@ func TestIsSafeAgentModel(t *testing.T) {
 	cases := map[string]bool{
 		"":                          true,
 		"claude-opus-4-8":           true,
+		"claude-sonnet-5":           true,
 		"claude-sonnet-4-6":         true,
 		"claude-haiku-4-5":          true,
 		"gpt-4":                     false,

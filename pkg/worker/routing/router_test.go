@@ -26,7 +26,7 @@ func TestRoute(t *testing.T) {
 			name:     "S5: claude simple message returns sonnet",
 			provider: "claude",
 			message:  "현재 상태 확인",
-			want:     "claude-sonnet-4-6",
+			want:     "claude-sonnet-5",
 		},
 		{
 			name:     "claude complex message returns opus",
@@ -38,7 +38,7 @@ func TestRoute(t *testing.T) {
 			name:     "claude medium message returns sonnet",
 			provider: "claude",
 			message:  strings.Repeat("a", 500) + " 수정 변경",
-			want:     "claude-sonnet-4-6",
+			want:     "claude-sonnet-5",
 		},
 		{
 			name:     "unknown provider returns empty",

@@ -73,7 +73,7 @@ router:
   strategy: category
   tiers:
     fast: gemini-flash
-    smart: claude-sonnet-4-6
+    smart: claude-sonnet-5
     ultra: claude-opus-4-8
   categories:
     visual: fast

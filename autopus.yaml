@@ -43,9 +43,9 @@ methodology:
 router:
     strategy: balanced
     tiers:
-        economy: claude-sonnet-4-6
+        economy: claude-sonnet-5
         premium: claude-opus-4-8
-        standard: claude-sonnet-4-6
+        standard: claude-sonnet-5
     categories:
         deep: premium
         git: economy
