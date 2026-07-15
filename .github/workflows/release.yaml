@@ -128,6 +128,7 @@ jobs:
             -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign >/dev/null
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$keychain_password" "$keychain_path" >/dev/null
+          security list-keychains -d user -s "$keychain_path"
           identity=$(security find-identity -v -p codesigning "$keychain_path" \
             | awk -F'"' '/Developer ID Application:/ && /\(GP2PFA2PUV\)/ { print $2 }')
           if [[ -z "$identity" || "$identity" == *$'\n'* ]]; then

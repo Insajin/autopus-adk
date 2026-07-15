@@ -112,6 +112,7 @@ func TestReleaseWorkflow_RequiresRealKeyAndMetadataBeforeGoReleaser(t *testing.T
 		"COMPANION_RELEASE_PRODUCTION:",
 		"scripts/companion-release/validate-environment.sh",
 		"if: always()",
+		"security list-keychains -d user -s \"$keychain_path\"",
 		"security delete-keychain",
 	}
 	for _, value := range required {
@@ -123,6 +124,14 @@ func TestReleaseWorkflow_RequiresRealKeyAndMetadataBeforeGoReleaser(t *testing.T
 	releaseIndex := strings.Index(workflow, "goreleaser release --clean")
 	if validateIndex < 0 || releaseIndex < 0 || validateIndex >= releaseIndex {
 		t.Fatal("companion release validation must run before GoReleaser")
+	}
+	importIndex := strings.Index(workflow, "security import")
+	partitionIndex := strings.Index(workflow, "security set-key-partition-list")
+	searchListIndex := strings.Index(workflow, "security list-keychains -d user -s")
+	identityIndex := strings.Index(workflow, "security find-identity")
+	if importIndex < 0 || partitionIndex <= importIndex || searchListIndex <= partitionIndex ||
+		identityIndex <= searchListIndex {
+		t.Fatal("temporary signing keychain must enter the user search list before identity lookup")
 	}
 	releaseStep := workflow[releaseIndex:]
 	if strings.Contains(releaseStep, "ADK_COMPANION_ED25519_PRIVATE_KEY") {
