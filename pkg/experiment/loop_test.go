@@ -95,7 +95,7 @@ func TestLoopRun_ContextCancellationStopsAfterFirstStep(t *testing.T) {
 	assert.Equal(t, 1, summary.TotalIterations)
 }
 
-func TestLoopRun_TimeoutStopsAfterFirstStep(t *testing.T) {
+func TestLoopRun_ConfiguredTimeoutStopsAtAValidIterationBoundary(t *testing.T) {
 	t.Parallel()
 
 	cfg := DefaultConfig()
@@ -111,9 +111,67 @@ func TestLoopRun_TimeoutStopsAfterFirstStep(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+	assert.Equal(t, StopReasonTimeout, reason)
+	assert.LessOrEqual(t, calls, 1)
+	assert.Equal(t, calls, summary.TotalIterations)
+}
+
+func TestLoopRun_DeadlineAfterStepRecordsExactlyOneIteration(t *testing.T) {
+	t.Parallel()
+
+	cfg := DefaultConfig()
+	cfg.MaxIterations = 50
+	cfg.CircuitBreakerN = 50
+	cfg.ExperimentTimeout = 0
+	ctx := newControlledDeadlineContext()
+
+	calls := 0
+	summary, reason, err := NewLoop(cfg).Run(ctx, func(ctx context.Context, iteration int) (StepResult, error) {
+		calls++
+		ctx.(*controlledDeadlineContext).expire()
+		return noImprovementStepResult(iteration), nil
+	})
+
+	require.NoError(t, err)
 	assert.Equal(t, 1, calls)
 	assert.Equal(t, StopReasonTimeout, reason)
 	assert.Equal(t, 1, summary.TotalIterations)
+}
+
+func TestLoopRun_ExpiredDeadlineStopsBeforeFirstStep(t *testing.T) {
+	t.Parallel()
+
+	ctx := newControlledDeadlineContext()
+	ctx.expire()
+	calls := 0
+	summary, reason, err := NewLoop(DefaultConfig()).Run(ctx, func(ctx context.Context, iteration int) (StepResult, error) {
+		calls++
+		return noImprovementStepResult(iteration), nil
+	})
+
+	require.NoError(t, err)
+	assert.Zero(t, calls)
+	assert.Equal(t, StopReasonTimeout, reason)
+	assert.Zero(t, summary.TotalIterations)
+}
+
+type controlledDeadlineContext struct {
+	done chan struct{}
+	err  error
+}
+
+func newControlledDeadlineContext() *controlledDeadlineContext {
+	return &controlledDeadlineContext{done: make(chan struct{})}
+}
+
+func (ctx *controlledDeadlineContext) Deadline() (time.Time, bool) { return time.Time{}, false }
+func (ctx *controlledDeadlineContext) Done() <-chan struct{}       { return ctx.done }
+func (ctx *controlledDeadlineContext) Err() error                  { return ctx.err }
+func (ctx *controlledDeadlineContext) Value(any) any               { return nil }
+
+func (ctx *controlledDeadlineContext) expire() {
+	ctx.err = context.DeadlineExceeded
+	close(ctx.done)
 }
 
 func noImprovementStepResult(iteration int) StepResult {

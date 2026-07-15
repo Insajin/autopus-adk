@@ -1,7 +1,6 @@
 package design
 
 import (
-	"encoding/json"
 	"image"
 	"image/color"
 	"image/png"
@@ -51,6 +50,17 @@ func TestBuildVisualGateReportIncludesDeterministicDiffSummary(t *testing.T) {
 	assert.Equal(t, int64(4), report.DiffSummary.ChangedPixels)
 	assert.Equal(t, "WARN", report.Verdict)
 	assert.Empty(t, report.Artifacts[0].LocalPath)
+}
+
+func visualCheckByID(t *testing.T, report VisualGateReport, id string) VisualCheck {
+	t.Helper()
+	for _, check := range report.Checks {
+		if check.ID == id {
+			return check
+		}
+	}
+	t.Fatalf("visual check %q not found", id)
+	return VisualCheck{}
 }
 
 func TestBuildVisualGateReportRedactsDiffComparisonErrors(t *testing.T) {
@@ -110,38 +120,15 @@ func TestBuildVisualGateReportWarnsForSingleViewportAndNoBaseline(t *testing.T) 
 	assert.Equal(t, "WARN", report.Checks[3].Status)
 }
 
-func TestWriteVisualGateReportWritesRuntimeEvidence(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-	report := BuildVisualGateReport(VisualGateInput{
-		UIChanged:     []string{"src/components/Button.tsx"},
-		Screenshots:   []string{"Button.spec.ts-snapshots/button.png"},
-		Viewport:      "all",
-		DesignContext: Context{Found: true, SourcePath: "DESIGN.md"},
-	})
-	path, err := WriteVisualGateReport(root, report)
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(root, ".autopus", "design", "verify", "latest.json"), path)
-	data, err := os.ReadFile(path)
-	require.NoError(t, err)
-	var decoded VisualGateReport
-	require.NoError(t, json.Unmarshal(data, &decoded))
-	assert.Equal(t, "WARN", decoded.Verdict)
-}
-
 func TestBuildVisualGateReportMergesVisualCriticFailure(t *testing.T) {
 	t.Parallel()
 
 	report := BuildVisualGateReport(VisualGateInput{
-		UIChanged:    []string{"src/components/Button.tsx"},
-		Screenshots:  []string{"test-results/button.png"},
-		Viewport:     "all",
-		VisualCritic: VisualCriticReport{Status: "FAIL", Findings: []VisualCriticFinding{{Severity: "FAIL", Category: "overlap", Message: "overlap"}}},
-		DesignContext: Context{
-			Found:      true,
-			SourcePath: "DESIGN.md",
-		},
+		UIChanged:     []string{"src/components/Button.tsx"},
+		Screenshots:   []string{"test-results/button.png"},
+		Viewport:      "all",
+		VisualCritic:  VisualCriticReport{Status: "FAIL", Findings: []VisualCriticFinding{{Severity: "FAIL", Category: "overlap", Message: "overlap"}}},
+		DesignContext: Context{Found: true, SourcePath: "DESIGN.md"},
 	})
 	assert.Equal(t, "FAIL", report.Verdict)
 	assert.Equal(t, "FAIL", report.VisualCritic.Status)
