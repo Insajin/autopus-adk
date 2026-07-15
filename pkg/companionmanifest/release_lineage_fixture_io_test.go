@@ -215,11 +215,15 @@ func (fixture *executableLineageFixture) writeProvisionedProductionScript(t *tes
 		"A0_ARM64_MANIFEST_SHA256": fixture.pins.arm64Manifest,
 	}
 	for name, value := range replacements {
-		blank := "readonly " + name + "=''"
-		if strings.Count(source, blank) != 1 {
+		productionValue, ok := immutableA0LineagePins[name]
+		if !ok {
+			t.Fatalf("production lineage pin %s is not defined", name)
+		}
+		production := "readonly " + name + "='" + productionValue + "'"
+		if strings.Count(source, production) != 1 {
 			t.Fatalf("production lineage pin declaration %s is not exact", name)
 		}
-		source = strings.Replace(source, blank, "readonly "+name+"='"+value+"'", 1)
+		source = strings.Replace(source, production, "readonly "+name+"='"+value+"'", 1)
 	}
 	if err := os.WriteFile(fixture.provisionedScriptPath, []byte(source), 0o700); err != nil {
 		t.Fatal(err)

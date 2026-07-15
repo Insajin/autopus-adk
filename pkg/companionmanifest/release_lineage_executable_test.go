@@ -3,9 +3,21 @@ package companionmanifest
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 	"testing"
 )
+
+var immutableA0LineagePins = map[string]string{
+	"A0_COMMIT_SHA":            "7372a484eaf87a07e224476a6161f792b73d7dfb",
+	"A0_RECEIPT_SHA256":        "4a588fa4991c515e9520861af5567fd2fe4c19e2c23adb8963bd37ebc46a5bbc",
+	"A0_SIGNATURE_SHA256":      "7f248929d807b689acab575888b0a7600bd2ea17cce1e5fcc11f72af9c510173",
+	"A0_RECORD_SHA256":         "84ee9403223aabd1f60e5e55e79a5c7d6b2c764bc594435cbf7c4e997e2ce475",
+	"A0_PUBLIC_KEY_SHA256":     "c387da9e9c43dbaa2605207a00635c84937ff397a8b6ed73414d2e66b89941a4",
+	"A0_CHECKSUMS_SHA256":      "17f7591ec789071e0d03c547d2a79565269de1cc13bdbc173d3703ad77947904",
+	"A0_AMD64_MANIFEST_SHA256": "162dd3b21781ba59a099d41802771e2a31b3f1f80607f6dd832249803e2abdbf",
+	"A0_ARM64_MANIFEST_SHA256": "8f9e28f9a0672f0e2fdb99e55027650407fd9def2d1d62ea2313b88cd83c3f61",
+}
 
 func TestReleasePublicKeyReceipt_GoReleaserA0FixtureFailsClosedOnTampering(t *testing.T) {
 	tools := newExecutableLineageTools(t)
@@ -26,13 +38,17 @@ func TestReleasePublicKeyReceipt_GoReleaserA0FixtureFailsClosedOnTampering(t *te
 		code   string
 		tamper func(*testing.T, *executableLineageFixture)
 	}{
+		{name: "release_not_immutable", code: "prior_evidence_unverifiable: A0 release is not immutable and final", tamper: tamperLineageReleaseImmutable},
 		{name: "archive_bytes", code: "prior_archive_checksum_mismatch", tamper: tamperLineageArchiveBytes},
 		{name: "checksums", code: "prior_checksums_bytes_mismatch", tamper: tamperLineageChecksums},
 		{name: "embedded_manifest", code: "prior_manifest_digest_mismatch", tamper: tamperLineageManifest},
+		{name: "arm64_manifest_pin", code: "prior_manifest_digest_mismatch: prior manifest differs from its A0 pin", tamper: tamperLineageARM64ManifestPin},
 		{name: "receipt_key_overlap", code: "prior_key_overlap_mismatch", tamper: tamperLineageReceiptKey},
 		{name: "phase", code: "prior_release_identity_mismatch", tamper: tamperLineagePhase},
 		{name: "version", code: "prior_manifest_version_mismatch", tamper: tamperLineageVersion},
 		{name: "signing_key", code: "prior_evidence_unverifiable", tamper: tamperLineageSigningKey},
+		{name: "receipt_pin", code: "prior_receipt_bytes_mismatch: prior receipt differs from its A0 pin", tamper: tamperLineageReceiptPin},
+		{name: "signature_pin", code: "prior_signature_bytes_mismatch: prior signature differs from its A0 pin", tamper: tamperLineageSignaturePin},
 		{name: "public_key_pin", code: "prior_public_key_digest_mismatch", tamper: tamperLineagePublicKeyPin},
 		{name: "record_pin", code: "prior_record_digest_mismatch", tamper: tamperLineageRecordPin},
 		{name: "commit_pin", code: "prior_release_identity_mismatch", tamper: tamperLineageCommitPin},
@@ -57,6 +73,16 @@ func TestReleasePublicKeyReceipt_GoReleaserA0FixtureFailsClosedOnTampering(t *te
 			}
 		})
 	}
+}
+
+func tamperLineageReleaseImmutable(t *testing.T, fixture *executableLineageFixture) {
+	t.Helper()
+	var release executableLineageRelease
+	if err := json.Unmarshal(readLineageFile(t, fixture.releaseJSON), &release); err != nil {
+		t.Fatal(err)
+	}
+	release.Immutable = false
+	writeLineageJSON(t, fixture.releaseJSON, release)
 }
 
 func tamperLineageArchiveBytes(t *testing.T, fixture *executableLineageFixture) {
@@ -137,6 +163,21 @@ func tamperLineageSigningKey(t *testing.T, fixture *executableLineageFixture) {
 	fixture.writeSigningKey(t, bytes.Repeat([]byte{0x42}, 32))
 }
 
+func tamperLineageReceiptPin(t *testing.T, fixture *executableLineageFixture) {
+	t.Helper()
+	fixture.pins.receipt = differentHex(fixture.pins.receipt, 64)
+}
+
+func tamperLineageSignaturePin(t *testing.T, fixture *executableLineageFixture) {
+	t.Helper()
+	fixture.pins.signature = differentHex(fixture.pins.signature, 64)
+}
+
+func tamperLineageARM64ManifestPin(t *testing.T, fixture *executableLineageFixture) {
+	t.Helper()
+	fixture.pins.arm64Manifest = differentHex(fixture.pins.arm64Manifest, 64)
+}
+
 func tamperLineagePublicKeyPin(t *testing.T, fixture *executableLineageFixture) {
 	t.Helper()
 	fixture.pins.publicKey = differentHex(fixture.pins.publicKey, 64)
@@ -180,14 +221,10 @@ func differentHex(current string, length int) string {
 
 func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *testing.T) {
 	source := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage.sh"))
-	for _, declaration := range []string{
-		"readonly A0_COMMIT_SHA=''", "readonly A0_RECEIPT_SHA256=''",
-		"readonly A0_SIGNATURE_SHA256=''", "readonly A0_RECORD_SHA256=''",
-		"readonly A0_PUBLIC_KEY_SHA256=''", "readonly A0_CHECKSUMS_SHA256=''",
-		"readonly A0_AMD64_MANIFEST_SHA256=''", "readonly A0_ARM64_MANIFEST_SHA256=''",
-	} {
+	for name, value := range immutableA0LineagePins {
+		declaration := "readonly " + name + "='" + value + "'"
 		if strings.Count(source, declaration) != 1 {
-			t.Fatalf("production blank pin declaration drifted: %s", declaration)
+			t.Fatalf("production immutable pin declaration drifted: %s", declaration)
 		}
 	}
 	for _, bypass := range []string{

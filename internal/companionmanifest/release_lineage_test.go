@@ -48,7 +48,7 @@ func TestReleaseSourceValidator_ExactTagAndFortyHexCommit(t *testing.T) {
 	}
 }
 
-func TestLineageVerifier_A0BootstrapsWhileA1WithoutPinsFailsClosed(t *testing.T) {
+func TestLineageVerifier_A0BootstrapsWhileA1WithoutLiveEvidenceFailsClosed(t *testing.T) {
 	script := filepath.Join(repositoryRoot(t), "scripts/companion-release/verify-public-key-lineage.sh")
 	cases := []struct {
 		name    string
@@ -57,13 +57,13 @@ func TestLineageVerifier_A0BootstrapsWhileA1WithoutPinsFailsClosed(t *testing.T)
 		message string
 	}{
 		{name: "A0", tag: "v0.50.69", wantOK: true, message: "bootstrap accepted"},
-		{name: "A1", tag: "v0.50.70", message: "A0 commit pin is not provisioned"},
+		{name: "A1", tag: "v0.50.70", message: "missing GITHUB_TOKEN"},
 		{name: "outside", tag: "v0.50.71", message: "outside the frozen A0/A1 policy"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			command := exec.Command("bash", script)
-			command.Env = append(os.Environ(), "GITHUB_REF_NAME="+test.tag)
+			command.Env = []string{"GITHUB_REF_NAME=" + test.tag, "PATH=" + os.Getenv("PATH")}
 			output, err := command.CombinedOutput()
 			if test.wantOK && err != nil {
 				t.Fatalf("A0 bootstrap failed: %v\n%s", err, output)
