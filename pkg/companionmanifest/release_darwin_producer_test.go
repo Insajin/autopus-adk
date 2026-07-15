@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -76,6 +77,40 @@ func TestDarwinReleaseProducer_SigningFailureReportsBoundedDiagnostic(t *testing
 		t.Fatal("signing diagnostic leaked private key")
 	}
 	assertNoDarwinReleaseMetadata(t, filepath.Dir(artifact))
+}
+
+func TestDarwinReleaseProducer_IdentityFailureReportsBoundedDiagnostic(t *testing.T) {
+	_, artifact, output, err := runDarwinReleaseProducer(t, "identity_failure", false)
+	if err == nil {
+		t.Fatalf("producer accepted failed code identity verification\n%s", output)
+	}
+	if !strings.Contains(string(output), "codesign verify: fixture verification diagnostic 1") {
+		t.Fatalf("producer suppressed code identity diagnostic: %s", output)
+	}
+	if strings.Contains(string(output), "codesign verify: fixture verification diagnostic 9") {
+		t.Fatalf("producer emitted an unbounded code identity diagnostic: %s", output)
+	}
+	assertNoDarwinReleaseMetadata(t, filepath.Dir(artifact))
+}
+
+func TestDarwinReleaseProducer_RequirementCompilesWithNativeParser(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("native code requirement parser is only available on macOS")
+	}
+	const marker = "designated_requirement='"
+	requirement := string(readRepositoryFile(t, filepath.Join("scripts", "companion-release", "produce.sh")))
+	start := strings.Index(requirement, marker)
+	if start < 0 {
+		t.Fatal("producer is missing the designated requirement")
+	}
+	requirement = requirement[start+len(marker):]
+	end := strings.IndexByte(requirement, '\'')
+	if end < 0 {
+		t.Fatal("producer designated requirement is unterminated")
+	}
+	if output, err := exec.Command("/usr/bin/csreq", "-r="+requirement[:end], "-t").CombinedOutput(); err != nil {
+		t.Fatalf("native code requirement parser rejected production policy: %v\n%s", err, output)
+	}
 }
 
 func runDarwinReleaseProducer(t *testing.T, scenario string, mutate bool) (string, string, []byte, error) {
@@ -163,7 +198,21 @@ func fakeCodesign(t *testing.T, args []string) {
 		return
 	}
 	if containsArgument(args, "--verify") {
+		for _, required := range []string{
+			"--check-notarization",
+			`-R=identifier "co.autopus.adk" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "GP2PFA2PUV" and notarized`,
+		} {
+			if !containsArgument(args, required) {
+				t.Fatalf("codesign verification arguments missing %q: %v", required, args)
+			}
+		}
 		appendDarwinReleaseEvent(t, "identity_verification")
+		if scenario == "identity_failure" {
+			for index := 1; index <= 9; index++ {
+				fmt.Fprintf(os.Stderr, "fixture verification diagnostic %d\n", index)
+			}
+			os.Exit(1)
+		}
 		if scenario == "unsigned" || scenario == "ad_hoc" {
 			os.Exit(1)
 		}

@@ -112,13 +112,13 @@ trap 'exit 1' HUP INT TERM
 
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/adk-companion-release.XXXXXX")
 codesign_error="$temp_dir/codesign-error.txt"
-report_codesign_error() {
-  local line line_count=0
+report_codesign_diagnostic() {
+  local label=$1 path=$2 line line_count=0
   while IFS= read -r line || [[ -n "$line" ]]; do
-    printf 'companion release: codesign: %.1024s\n' "$line" >&2
+    printf 'companion release: %s: %.1024s\n' "$label" "$line" >&2
     line_count=$((line_count + 1))
     [[ "$line_count" -lt 8 ]] || break
-  done <"$codesign_error"
+  done <"$path"
 }
 
 if [[ -n "${APPLE_SIGNING_KEYCHAIN-}" ]]; then
@@ -126,12 +126,12 @@ if [[ -n "${APPLE_SIGNING_KEYCHAIN-}" ]]; then
     --keychain "$APPLE_SIGNING_KEYCHAIN" \
     --identifier co.autopus.adk --options runtime --timestamp "$artifact_path" \
     >/dev/null 2>"$codesign_error" \
-    || { report_codesign_error; fail 'Developer ID signing failed'; }
+    || { report_codesign_diagnostic 'codesign' "$codesign_error"; fail 'Developer ID signing failed'; }
 else
   "$codesign_tool" --force --sign "$APPLE_SIGNING_IDENTITY" \
     --identifier co.autopus.adk --options runtime --timestamp "$artifact_path" \
     >/dev/null 2>"$codesign_error" \
-    || { report_codesign_error; fail 'Developer ID signing failed'; }
+    || { report_codesign_diagnostic 'codesign' "$codesign_error"; fail 'Developer ID signing failed'; }
 fi
 
 notary_container="$temp_dir/auto.zip"
@@ -155,9 +155,12 @@ uuid_pattern='^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-5][0-9A-Fa-f]{3}-[89ABab][0-9A-F
   || fail 'notarization was not Accepted with a valid submission UUID'
 
 designated_requirement='identifier "co.autopus.adk" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "GP2PFA2PUV" and notarized'
-"$codesign_tool" --verify --strict --all-architectures --verbose=2 \
-  "-R=$designated_requirement" "$artifact_path" >"$identity_details" 2>&1 \
-  || fail 'code-sign designated requirement verification failed'
+if ! "$codesign_tool" --verify --strict --all-architectures --verbose=2 \
+  --check-notarization "-R=$designated_requirement" "$artifact_path" \
+  >"$identity_details" 2>&1; then
+  report_codesign_diagnostic 'codesign verify' "$identity_details"
+  fail 'code-sign designated requirement verification failed'
+fi
 "$codesign_tool" -dv --verbose=4 "$artifact_path" >"$identity_details" 2>&1 \
   || fail 'code-sign identity inspection failed'
 grep -Fqx 'Identifier=co.autopus.adk' "$identity_details" \
