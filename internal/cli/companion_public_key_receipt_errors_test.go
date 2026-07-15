@@ -77,7 +77,7 @@ func TestPublicKeyReceiptBundleDescriptorHelpers_RejectMalformedState(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer unix.Close(directoryFD)
+	defer func() { _ = unix.Close(directoryFD) }()
 	if err := writePublicKeyReceiptBundleEntry(directoryFD, "empty", nil); err == nil {
 		t.Fatal("empty bundle entry was accepted")
 	}
@@ -174,7 +174,7 @@ func TestPublicKeyReceiptBundleDescriptor_InvalidReceiptOrSignatureFailsReverify
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer unix.Close(directoryFD)
+			defer func() { _ = unix.Close(directoryFD) }()
 			if err := writePublicKeyReceiptBundleEntry(
 				directoryFD,
 				publicKeyReceiptEntryName,

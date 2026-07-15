@@ -222,7 +222,7 @@ func (transaction *publicKeyReceiptBundleTransaction) verifyPublished(
 	if err != nil {
 		return errors.New("open published public key receipt bundle")
 	}
-	defer unix.Close(publishedFD)
+	defer func() { _ = unix.Close(publishedFD) }()
 	var publishedStat unix.Stat_t
 	if unix.Fstat(publishedFD, &publishedStat) != nil ||
 		!securePublicKeyReceiptDirectoryStat(&publishedStat, 0o700) ||

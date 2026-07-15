@@ -28,7 +28,7 @@ func readPublicKeyReceiptSigningKey(
 	if err != nil {
 		return nil, errors.New("open receipt signing key directory")
 	}
-	defer unix.Close(parentFD)
+	defer func() { _ = unix.Close(parentFD) }()
 	var parentStat unix.Stat_t
 	if err := unix.Fstat(parentFD, &parentStat); err != nil {
 		return nil, errors.New("inspect receipt signing key directory")
@@ -108,7 +108,7 @@ func samePublicKeyReceiptDirectoryPath(path string, want unix.Stat_t) bool {
 	if err != nil {
 		return false
 	}
-	defer unix.Close(fd)
+	defer func() { _ = unix.Close(fd) }()
 	var got unix.Stat_t
 	return unix.Fstat(fd, &got) == nil && samePublicKeyReceiptUnixFile(want, got)
 }
