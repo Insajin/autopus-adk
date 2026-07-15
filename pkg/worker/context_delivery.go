@@ -12,10 +12,6 @@ import (
 
 const maxRetainedRequiredContextTokens = 128 * 1024
 
-func (wl *WorkerLoop) requiredContextForTask(specID string, requiredReferences []string) (string, error) {
-	return wl.requiredContextForTaskAtRoot(wl.config.WorkDir, specID, requiredReferences)
-}
-
 func (wl *WorkerLoop) requiredContextForTaskAtRoot(root, specID string, requiredReferences []string) (string, error) {
 	if !workerUsesGPTContextDelivery(wl.config.Provider) {
 		return "", nil
