@@ -4,50 +4,51 @@ Usage:
   auto [command]
 
 Available Commands:
-  agent       Autopus 에이전트 관리
-  arch        Architecture analysis and enforcement
-  canary      Run post-deploy health checks
-  check       Run harness rule checks
-  completion  Generate the autocompletion script for the specified shell
-  config      Manage autopus.yaml configuration
-  connect     Connect an AI provider via local OAuth flow
-  delivery    Validate ADK supervised delivery contracts
-  design      Manage project DESIGN.md context
-  desktop     Desktop-owned runtime commands
-  docs        Documentation utilities
-  doctor      Check autopus harness health
-  effort      Manage effort level detection
-  experiment  Run and manage experiment loops
-  hash        Hash each line of a file using xxhash
-  help        Help about any command
-  init        Initialize autopus harness in the current project
-  issue       Manage auto issue reports
-  learn       Manage pipeline learning entries
-  lore        Decision knowledge management via git trailers
-  lsp         LSP-based code intelligence
-  map         Map project structure, repositories, and agent-relevant workspace state
-  mcp         Desktop and developer MCP integration commands
-  mem         Build and query the decision/quality memory index
-  orchestra   다중 모델 오케스트레이션으로 코드를 분석한다
-  permission  Manage permission detection
-  pipeline    Pipeline monitoring and management
-  platform    Manage platforms
-  qa          Plan, initialize, run, and publish QAMESH QA evidence
-  quality     Show or change quality mode and Codex supervisor ownership
-  react       CI 실패 감지 및 자동 수정
-  search      Search the web using Exa API (requires EXA_API_KEY)
-  setup       Generate and manage project documentation for AI agents
-  skill       Autopus 빌트인 스킬 관리
-  spec        SPEC document management
-  status      Show SPEC dashboard
-  telemetry   Manage pipeline telemetry
-  terminal    Terminal multiplexer operations
-  test        Run E2E scenarios against the project
-  update      Update autopus harness files
-  verify      Run frontend UX verification via Playwright screenshots
-  version     Print version information
-  worker      Harness worker validation and legacy local-host compatibility
-  workflow    Inspect and gate the opt-in deterministic workflow route
+  agent              Autopus 에이전트 관리
+  arch               Architecture analysis and enforcement
+  canary             Run post-deploy health checks
+  check              Run harness rule checks
+  companion-manifest Produce signed ADK companion release manifests
+  completion         Generate the autocompletion script for the specified shell
+  config             Manage autopus.yaml configuration
+  connect            Connect an AI provider via local OAuth flow
+  delivery           Validate ADK supervised delivery contracts
+  design             Manage project DESIGN.md context
+  desktop            Desktop-owned runtime commands
+  docs               Documentation utilities
+  doctor             Check autopus harness health
+  effort             Manage effort level detection
+  experiment         Run and manage experiment loops
+  hash               Hash each line of a file using xxhash
+  help               Help about any command
+  init               Initialize autopus harness in the current project
+  issue              Manage auto issue reports
+  learn              Manage pipeline learning entries
+  lore               Decision knowledge management via git trailers
+  lsp                LSP-based code intelligence
+  map                Map project structure, repositories, and agent-relevant workspace state
+  mcp                Desktop and developer MCP integration commands
+  mem                Build and query the decision/quality memory index
+  orchestra          다중 모델 오케스트레이션으로 코드를 분석한다
+  permission         Manage permission detection
+  pipeline           Pipeline monitoring and management
+  platform           Manage platforms
+  qa                 Plan, initialize, run, and publish QAMESH QA evidence
+  quality            Show or change quality mode and Codex supervisor ownership
+  react              CI 실패 감지 및 자동 수정
+  search             Search the web using Exa API (requires EXA_API_KEY)
+  setup              Generate and manage project documentation for AI agents
+  skill              Autopus 빌트인 스킬 관리
+  spec               SPEC document management
+  status             Show SPEC dashboard
+  telemetry          Manage pipeline telemetry
+  terminal           Terminal multiplexer operations
+  test               Run E2E scenarios against the project
+  update             Update autopus harness files
+  verify             Run frontend UX verification via Playwright screenshots
+  version            Print version information
+  worker             Harness worker validation and legacy local-host compatibility
+  workflow           Inspect and gate the opt-in deterministic workflow route
 
 Flags:
       --auto                       Run without confirmation prompts
