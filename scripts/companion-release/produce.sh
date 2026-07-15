@@ -110,18 +110,30 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/adk-companion-release.XXXXXX")
+codesign_error="$temp_dir/codesign-error.txt"
+report_codesign_error() {
+  local line line_count=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    printf 'companion release: codesign: %.1024s\n' "$line" >&2
+    line_count=$((line_count + 1))
+    [[ "$line_count" -lt 8 ]] || break
+  done <"$codesign_error"
+}
+
 if [[ -n "${APPLE_SIGNING_KEYCHAIN-}" ]]; then
   "$codesign_tool" --force --sign "$APPLE_SIGNING_IDENTITY" \
     --keychain "$APPLE_SIGNING_KEYCHAIN" \
     --identifier co.autopus.adk --options runtime --timestamp "$artifact_path" \
-    >/dev/null 2>&1 || fail 'Developer ID signing failed'
+    >/dev/null 2>"$codesign_error" \
+    || { report_codesign_error; fail 'Developer ID signing failed'; }
 else
   "$codesign_tool" --force --sign "$APPLE_SIGNING_IDENTITY" \
     --identifier co.autopus.adk --options runtime --timestamp "$artifact_path" \
-    >/dev/null 2>&1 || fail 'Developer ID signing failed'
+    >/dev/null 2>"$codesign_error" \
+    || { report_codesign_error; fail 'Developer ID signing failed'; }
 fi
 
-temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/adk-companion-release.XXXXXX")
 notary_container="$temp_dir/auto.zip"
 notary_response="$temp_dir/notarytool.json"
 identity_details="$temp_dir/codesign-details.txt"

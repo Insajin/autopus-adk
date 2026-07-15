@@ -61,6 +61,23 @@ func TestDarwinReleaseProducer_PostManifestMutationFailsClosed(t *testing.T) {
 	assertNoDarwinReleaseMetadata(t, filepath.Dir(artifact))
 }
 
+func TestDarwinReleaseProducer_SigningFailureReportsBoundedDiagnostic(t *testing.T) {
+	_, artifact, output, err := runDarwinReleaseProducer(t, "signing_failure", false)
+	if err == nil {
+		t.Fatalf("producer accepted failed Developer ID signing\n%s", output)
+	}
+	if !strings.Contains(string(output), "codesign: fixture signing diagnostic 1") {
+		t.Fatalf("producer suppressed codesign diagnostic: %s", output)
+	}
+	if strings.Contains(string(output), "codesign: fixture signing diagnostic 9") {
+		t.Fatalf("producer emitted an unbounded codesign diagnostic: %s", output)
+	}
+	if strings.Contains(string(output), "private-release-material") {
+		t.Fatal("signing diagnostic leaked private key")
+	}
+	assertNoDarwinReleaseMetadata(t, filepath.Dir(artifact))
+}
+
 func runDarwinReleaseProducer(t *testing.T, scenario string, mutate bool) (string, string, []byte, error) {
 	t.Helper()
 	dir := t.TempDir()
@@ -126,6 +143,12 @@ func fakeCodesign(t *testing.T, args []string) {
 			if !containsArgument(args, required) {
 				t.Fatalf("codesign signing arguments missing %q: %v", required, args)
 			}
+		}
+		if scenario == "signing_failure" {
+			for index := 1; index <= 9; index++ {
+				fmt.Fprintf(os.Stderr, "fixture signing diagnostic %d\n", index)
+			}
+			os.Exit(1)
 		}
 		appendDarwinReleaseEvent(t, "developer_id_sign")
 		if scenario != "unsigned" {
