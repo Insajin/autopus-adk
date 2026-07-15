@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_rollback_replay_reservation",
+  "admission_generation": "v2",
+  "authorization_identity_sha256": "sha256:129521ff443c4ec01bc71cbb621c1dd3d515d5f460130a16732bf639b52e4978",
+  "primary_reservation_sha256": "sha256:bd733533ab255957154e2b31cd905c165c6f0c9719671ace7909116a620e648e",
+  "primary_ledger_sha256": "sha256:a8ceed2ebceae72bb120c84ecc6ace10e6ee0c2f4678c3eaa340ab86a3602aab",
+  "applied_rollback_receipt_sha256": "sha256:a00bed018f5c5f4482fcec2dacdd5a07c82f43e5e936ecf27e7042fe9d482def",
+  "evaluator_summary_sha256": "sha256:7ee81e2bf2f71ebc5d9a09471aa8b1f4b1e5513c0b69d60dfc161aff9a064f4e",
+  "calls_reserved": 5,
+  "raw_tokens_reserved": 114000,
+  "concurrency": 1,
+  "retries": 0,
+  "state": "CONSUMED_ON_RESERVATION"
+}

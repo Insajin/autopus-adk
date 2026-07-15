@@ -20,6 +20,12 @@ func safeText(value string) string {
 	return compact(text, 1200)
 }
 
+func receiptSafeText(value string) string {
+	text := qaevidence.RedactText(value)
+	text = strings.ReplaceAll(text, "\x00", " ")
+	return strings.TrimSpace(strings.Join(strings.Fields(text), " "))
+}
+
 func compact(value string, limit int) string {
 	value = strings.TrimSpace(strings.Join(strings.Fields(value), " "))
 	if limit > 0 && len(value) > limit {

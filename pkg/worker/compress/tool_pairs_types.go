@@ -168,3 +168,34 @@ func hasToolKinds(blocks []toolBlock) (bool, bool) {
 	}
 	return hasCalls, hasResults
 }
+
+func successfulToolPair(pair *toolPair) bool {
+	if pair == nil || pair.call == nil || pair.result == nil {
+		return false
+	}
+	start := strings.IndexByte(pair.result.text, '{')
+	end := strings.LastIndexByte(pair.result.text, '}')
+	if start < 0 || end <= start {
+		return false
+	}
+	var payload struct {
+		Status  string `json:"status"`
+		Success *bool  `json:"success"`
+		IsError *bool  `json:"is_error"`
+	}
+	if err := json.Unmarshal([]byte(pair.result.text[start:end+1]), &payload); err != nil {
+		return false
+	}
+	if payload.IsError != nil && *payload.IsError {
+		return false
+	}
+	if payload.Success != nil {
+		return *payload.Success
+	}
+	switch strings.ToLower(strings.TrimSpace(payload.Status)) {
+	case "success", "succeeded", "completed":
+		return true
+	default:
+		return false
+	}
+}

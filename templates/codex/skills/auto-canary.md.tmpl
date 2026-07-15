@@ -1,5 +1,11 @@
 # auto-canary — 배포 검증 스킬
 
+## Context Profile: canary
+
+- `core + canary`만 로드하며 `.autopus/project/canary.md`를 health-check source로 사용합니다.
+- `learning`은 현재 canary 판정에 독립적으로 관련된 경우에만 조건부로 로드합니다.
+- scenarios와 signatures는 로드하지 않습니다.
+
 **프로젝트**: {{.ProjectName}} | **모드**: {{.Mode}}
 
 ## 설명
@@ -31,8 +37,8 @@
 
 ## 실행 순서
 
-1. `.autopus/project/canary.md` 또는 `.autopus/project/tech.md` 기준으로 빌드 검증
-2. `.autopus/project/scenarios.md` 기준으로 smoke E2E 실행
+1. `.autopus/project/canary.md`에 선언된 build/smoke 검증
+2. canary 설정에 선언된 endpoint/browser health check 실행
 3. endpoint/browser 건강 검진 수행
 4. PASS/WARN/FAIL 판정
 5. `.autopus/canary/latest.json` 에 결과 저장
@@ -40,7 +46,7 @@
 ## Codex Notes
 
 - 전체 파이프라인 규칙과 검증 체크리스트는 `@auto canary` 라우터 본문을 우선합니다.
-- `scenarios.md`가 없으면 E2E를 건너뛰고 `@auto setup` 안내를 표시합니다.
+- `canary.md`가 없으면 설정 부재를 명시하고 `@auto setup` 안내를 표시합니다.
 - `--compare` 값은 commit SHA 형식 검증 후 사용합니다.
 
 ## 판정 기준

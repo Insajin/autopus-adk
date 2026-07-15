@@ -1,0 +1,51 @@
+{
+  "version": 2,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_transport_diagnosis_terminal_outcome",
+  "outcome": "TRANSPORT_DIAGNOSIS_TERMINAL_OPERATIONAL_FAILURE",
+  "authorization_identity": "sha256:345523b25569eee5f691d3960c2caca0709aebcd324c7db103cb3c2b0ecf013f",
+  "authorization_consumed": true,
+  "same_authorization_resumable": false,
+  "policy_sha256": "sha256:e60cc741ea5a2abd0be0ba7e25d5d6c639fe9e2b0cd52c10dcb14ac1565b6cdc",
+  "config_sha256": "sha256:bdec20a7c73616afdcd5c70fa069f88a392a8da928bb90c8f4e192af657f5c80",
+  "schema_sha256": "sha256:0f77892d0472dedf2e6cdee5a9064e7e0798ad29e43769c87a00aff26f159306",
+  "preflight_sha256": "sha256:4e26043b3cc0ac3df8ff74a78f0616a48dacb99bc7041419f572bbc400ac8c04",
+  "partial_ledger_sha256": "sha256:3f5e76621709e9a77e222a317d34ebad664bbc1735c1f1ae2cec1f9fb2a51c6f",
+  "runtime_reservation_sha256": "sha256:f0b4b4d3b6b40a0048ce245905b6884ac736cbb5161140cdb254cd94a05a83a5",
+  "runtime_identity": {
+    "auto_version": "0.50.68-ute-transport-diagnosis-v2",
+    "auto_executable_sha256": "sha256:fc5bf47bb3db020876605d7450661e732817790ab9190895bd6f78726096360a",
+    "codex_cli_version": "0.144.1"
+  },
+  "execution": {
+    "task_id": "ute-corpus-v1-006",
+    "role": "reviewer",
+    "effort": "xhigh",
+    "planned_calls": 1,
+    "attempted_calls": 1,
+    "raw_token_cap": 22000,
+    "observed_raw_total_tokens": null,
+    "actual_usage_calls": 0,
+    "usage_status": "unavailable",
+    "retries": 0,
+    "failure_code": "process_nonzero",
+    "operational_error_class": "unknown",
+    "operational_error_fingerprint": "sha256:e161c851c1a8c4fdea86c031ea524f1e0c7d39c7399eb950ea081fa8d90f0a42"
+  },
+  "decision": {
+    "transport_conclusion_available": false,
+    "provider_error_event_detail_classified": false,
+    "semantic_evaluation_performed": false,
+    "promotion_eligible": false,
+    "effective_profile": "full_ultra",
+    "implemented": false,
+    "next_live_attempt_requires_new_policy_and_explicit_authorization": true
+  },
+  "privacy": {
+    "raw_stderr_retained": false,
+    "raw_provider_error_event_retained": false,
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "absolute_paths_retained": false
+  }
+}

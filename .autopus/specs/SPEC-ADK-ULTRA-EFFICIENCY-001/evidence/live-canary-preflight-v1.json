@@ -1,0 +1,223 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "live_route_team_canary_preflight",
+  "observed_on": "2026-07-12",
+  "frozen_corpus_hash": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+  "authorized_scope": {
+    "provider": "codex",
+    "provider_call_cap": 64,
+    "raw_token_cap": 1500000,
+    "concurrency": 1,
+    "retries": 0,
+    "provider_cost_usd": null
+  },
+  "observed_spend": {
+    "provider_calls_made": 0,
+    "raw_total_tokens": 0,
+    "provider_cost_usd": null
+  },
+  "corpus_integrity": {
+    "task_count": 12,
+    "low_medium_tasks": 5,
+    "high_critical_tasks": 7,
+    "commits_present": 12,
+    "direct_parent_pairs": 12,
+    "tuple_hashes_matched": 12,
+    "binary_patch_hashes_matched": 12,
+    "path_counts_matched": 12,
+    "total_binary_patch_bytes": 218722
+  },
+  "canonical_live_accounting": {
+    "route_team_provider": "claude-code",
+    "full_profile_min_calls_per_task": 10,
+    "compact_profile_min_calls_per_task": 7,
+    "baseline_full_min_calls": 120,
+    "candidate_policy_min_calls": 105,
+    "paired_full_workflow_min_calls": 225,
+    "paired_review_segment_min_calls": 105,
+    "authorized_call_cap": 64,
+    "within_authorized_cap": false
+  },
+  "deterministic_target_preflight": {
+    "planned_task_ids": [
+      "ute-corpus-v1-001",
+      "ute-corpus-v1-004",
+      "ute-corpus-v1-005",
+      "ute-corpus-v1-011",
+      "ute-corpus-v1-012",
+      "ute-corpus-v1-002",
+      "ute-corpus-v1-009"
+    ],
+    "executed_tasks": 6,
+    "accepted_tasks": 5,
+    "failed_tasks": 1,
+    "not_executed_after_circuit_break": [
+      "ute-corpus-v1-009"
+    ],
+    "records": [
+      {
+        "task_id": "ute-corpus-v1-001",
+        "target_commit": "f81708c6621558fc333afea886475d1927167553",
+        "verification_command": "git diff --check",
+        "expected_patch_hash": "sha256:8840c0c3478f98ea54476f3c2032c4cc919acccf41f4e10f90228c6479053815",
+        "actual_patch_hash": "sha256:8840c0c3478f98ea54476f3c2032c4cc919acccf41f4e10f90228c6479053815",
+        "switch_exit_code": 0,
+        "verification_exit_code": 0,
+        "duration_seconds": 0,
+        "verification_log_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "tracked_worktree_clean": true,
+        "accepted": true
+      },
+      {
+        "task_id": "ute-corpus-v1-004",
+        "target_commit": "44d1af9ae78acea90b7b0eb032f51cb049043342",
+        "verification_command": "go test ./internal/cli",
+        "expected_patch_hash": "sha256:d4ce2c2a17ccfebbc0b8f602a8b692f87bea5739545de1f7bf6c7411e55d9cd1",
+        "actual_patch_hash": "sha256:d4ce2c2a17ccfebbc0b8f602a8b692f87bea5739545de1f7bf6c7411e55d9cd1",
+        "switch_exit_code": 0,
+        "verification_exit_code": 0,
+        "duration_seconds": 71,
+        "verification_log_hash": "sha256:6ab23366cc8367436dba234ba89d391bbb154a7494c16340c681fdcd7d0f4687",
+        "tracked_worktree_clean": true,
+        "accepted": true
+      },
+      {
+        "task_id": "ute-corpus-v1-005",
+        "target_commit": "dcb20b8839cbfc67fbc2c7fc9e2340f196f1b657",
+        "verification_command": "go test ./pkg/workflow",
+        "expected_patch_hash": "sha256:08ce75d21cbfa2a7082518feb2934e1dbc35039ad69c40a0b0332e462ae35263",
+        "actual_patch_hash": "sha256:08ce75d21cbfa2a7082518feb2934e1dbc35039ad69c40a0b0332e462ae35263",
+        "switch_exit_code": 0,
+        "verification_exit_code": 0,
+        "duration_seconds": 5,
+        "verification_log_hash": "sha256:8c19daa5c87047e8e74a93d7189e097757631e7410c84182e03e8abe63a1412c",
+        "tracked_worktree_clean": true,
+        "accepted": true
+      },
+      {
+        "task_id": "ute-corpus-v1-011",
+        "target_commit": "5e2f849171c1b488117705ccf73d272cec432346",
+        "verification_command": "git diff --check",
+        "expected_patch_hash": "sha256:3eae654165d48961f667efdb3356eeeafee9b30efd605da2b215b9229d8168de",
+        "actual_patch_hash": "sha256:3eae654165d48961f667efdb3356eeeafee9b30efd605da2b215b9229d8168de",
+        "switch_exit_code": 0,
+        "verification_exit_code": 0,
+        "duration_seconds": 0,
+        "verification_log_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "tracked_worktree_clean": true,
+        "accepted": true
+      },
+      {
+        "task_id": "ute-corpus-v1-012",
+        "target_commit": "a8776c857126b968074003f77cca77658a41e259",
+        "verification_command": "git diff --check",
+        "expected_patch_hash": "sha256:43c078bdbf9eec7a2aa6f8ac35ef5d7632c21e021e0f407a47a3dff2de1c1c00",
+        "actual_patch_hash": "sha256:43c078bdbf9eec7a2aa6f8ac35ef5d7632c21e021e0f407a47a3dff2de1c1c00",
+        "switch_exit_code": 0,
+        "verification_exit_code": 0,
+        "duration_seconds": 0,
+        "verification_log_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "tracked_worktree_clean": true,
+        "accepted": true
+      },
+      {
+        "task_id": "ute-corpus-v1-002",
+        "target_commit": "03b3daad3dfc580c34cac1fd799a9483bba98400",
+        "verification_command": "go test ./...",
+        "expected_patch_hash": "sha256:3f32f1a40670c1d11193fd251293acbce8429bbe1a14aabd0b5ef8bdc6100667",
+        "actual_patch_hash": "sha256:3f32f1a40670c1d11193fd251293acbce8429bbe1a14aabd0b5ef8bdc6100667",
+        "switch_exit_code": 0,
+        "verification_exit_code": 1,
+        "duration_seconds": 226,
+        "verification_log_hash": "sha256:b0b456e3ac5dfb19afa394d3234be35830a5bcab2a025a80ee826a394a98bc1a",
+        "tracked_worktree_clean": true,
+        "accepted": false
+      }
+    ]
+  },
+  "fail_closed_findings": [
+    {
+      "code": "provider_surface_mismatch",
+      "detail": "The production route_team path is Claude Code scoped; direct Codex calls are not live route_team evidence."
+    },
+    {
+      "code": "provider_call_cap_insufficient",
+      "detail": "The canonical paired workflow requires at least 225 provider calls; even review-only requires 105."
+    },
+    {
+      "code": "canonical_execution_contract_mismatch",
+      "detail": "The approved concurrency and retry policy cannot replace the production route_team concurrency/retry contract."
+    },
+    {
+      "code": "historical_verification_failed",
+      "detail": "One selected target failed its frozen verification command before provider execution."
+    },
+    {
+      "code": "high_risk_canary_downshift",
+      "detail": "The rollout evaluator could emit compact_ultra for an eligible high/critical canary."
+    },
+    {
+      "code": "partial_corpus_promotion",
+      "detail": "The strict paired evaluator did not require exact frozen-corpus completeness."
+    },
+    {
+      "code": "quality_outcome_fail_open",
+      "detail": "The live evaluator did not require a complete, internally derived objective and security outcome ledger."
+    },
+    {
+      "code": "audit_quality_linkage_ambiguous",
+      "detail": "Audit membership did not require exactly one matching low/medium quality row with the same rollout risk."
+    },
+    {
+      "code": "rollback_application_unproven",
+      "detail": "A logical rollback receipt alone does not prove the workflow binding returned to full_ultra."
+    }
+  ],
+  "source_remediation": {
+    "high_risk_canary_downshift": {
+      "status": "RESOLVED",
+      "behavior": "high, critical, sensitive, and unknown canaries remain full_ultra and full_depth",
+      "verification": "focused and race tests passed"
+    },
+    "partial_corpus_promotion": {
+      "status": "RESOLVED",
+      "behavior": "strict paired trials require an exact expected task corpus and incomplete evidence blocks promotion",
+      "verification": "focused and race tests passed"
+    },
+    "quality_outcome_fail_open": {
+      "status": "RESOLVED",
+      "behavior": "live trials require complete oracle, verification, and mandatory security outcomes; regressions are derived internally",
+      "verification": "focused and race tests passed"
+    },
+    "audit_quality_linkage_ambiguous": {
+      "status": "RESOLVED",
+      "behavior": "an audit hash must identify exactly one low or medium quality row whose risk matches the rollout risk",
+      "verification": "low and medium positive tests, three strict rejection tests, full CLI race, and frozen diff-only review passed"
+    },
+    "frozen_review_verdict": "PASS",
+    "remaining_operational_blockers": [
+      "provider_surface_mismatch",
+      "provider_call_cap_insufficient",
+      "canonical_execution_contract_mismatch",
+      "historical_verification_failed",
+      "rollback_application_unproven"
+    ]
+  },
+  "decision": {
+    "status": "BLOCKED_BEFORE_PROVIDER_CALL",
+    "candidate_behavior_active": false,
+    "active_profile": "full_ultra",
+    "cd_03_status": "open",
+    "surrogate_executed": false,
+    "reason": "The authorized Codex budget cannot produce authentic Claude route_team evidence without violating policy invariants."
+  },
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "provider_jsonl_retained": false,
+    "verification_logs_retained": false,
+    "absolute_paths_retained": false,
+    "credential_values_read_or_retained": false
+  }
+}

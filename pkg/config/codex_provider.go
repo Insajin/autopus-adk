@@ -46,8 +46,14 @@ func applyCodexProfileArgs(args []string, profile CodexProfile, subprocess bool)
 	next := make([]string, 0, len(args)+4)
 	modelFound := false
 	effortFound := false
+	jsonFound := false
 	for i := 0; i < len(managedArgs); i++ {
 		switch managedArgs[i] {
+		case "--json":
+			if subprocess && !jsonFound {
+				next = append(next, managedArgs[i])
+				jsonFound = true
+			}
 		case "-m", "--model":
 			if i+1 < len(managedArgs) {
 				if profile.Model != "" {
@@ -94,6 +100,15 @@ func applyCodexProfileArgs(args []string, profile CodexProfile, subprocess bool)
 	}
 	if profile.Effort != "" && !effortFound {
 		next = append(next, "-c", codexReasoningEffortAssignment(profile.Effort))
+	}
+	if subprocess && !jsonFound {
+		at := 0
+		if len(next) > 0 && next[0] == "exec" {
+			at = 1
+		}
+		next = append(next, "")
+		copy(next[at+1:], next[at:])
+		next[at] = "--json"
 	}
 	return append(next, suffix...)
 }

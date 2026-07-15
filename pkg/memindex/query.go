@@ -175,6 +175,9 @@ func Context(opts ContextOptions) (ContextResult, error) {
 	if budget <= 0 {
 		budget = 800
 	}
+	if opts.BuildReceipt {
+		return buildContextReceipt(opts, budget, topK)
+	}
 	response, err := Search(SearchOptions{
 		ProjectDir: opts.ProjectDir,
 		IndexPath:  opts.IndexPath,
@@ -186,11 +189,13 @@ func Context(opts ContextOptions) (ContextResult, error) {
 	}
 	selected, omitted, prompt := renderContext(opts.Query, response.Results, budget)
 	return ContextResult{
-		Query:        opts.Query,
-		BudgetTokens: budget,
-		OmittedCount: omitted,
-		Results:      selected,
-		Prompt:       prompt,
+		Query:              opts.Query,
+		BudgetTokens:       budget,
+		RecallBudgetTokens: budget,
+		OmittedCount:       omitted,
+		Results:            selected,
+		Prompt:             prompt,
+		EstimatedTokens:    approxTokens(prompt),
 	}, nil
 }
 

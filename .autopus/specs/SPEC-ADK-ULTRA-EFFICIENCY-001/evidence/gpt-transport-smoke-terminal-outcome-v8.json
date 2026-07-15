@@ -1,0 +1,61 @@
+{
+  "version": 8,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_transport_diagnosis_terminal_outcome",
+  "outcome": "TRANSPORT_DIAGNOSIS_TERMINAL_PASS",
+  "authorization_identity": "sha256:c524d53a9b12d84457ee2ad44c7149c31648c35227ef066f938467af8a74945a",
+  "authorization_consumed": true,
+  "same_authorization_resumable": false,
+  "authorized_at": "2026-07-15T12:48:10+09:00",
+  "policy_sha256": "sha256:a8452ea635e09298b71044a00dddef02b13ac7073f828e4cf902add6d8a6b845",
+  "config_sha256": "sha256:2d714d493ca29d9b1bcea87dfd96e8cef0e1278edd5e34bf15053e9430fc3f39",
+  "schema_sha256": "sha256:ceedc01912682cbb2cf870a7e0cd00c7096f48449d9f8602e9e52d92449b94e4",
+  "preflight_sha256": "sha256:76fa7e15ea7114428d74ef9520a7055778c361ea4f702e69c8cabd2e89a76353",
+  "ledger_sha256": "sha256:f81df2cc4b083d2649bcd948328003a434411a394aea98a82aa095ee86e6593d",
+  "runtime_reservation_sha256": "sha256:b300d143c097ed6bcc4f3af61304ad39e78e611a33db189cbd8cf66c77824142",
+  "runtime_identity": {
+    "auto_version": "0.50.68-ute-transport-diagnosis-v8",
+    "auto_executable_sha256": "sha256:5744f2c4190a1f557320bd6f8034dd809e88bec626b237df1dd8d403fdc148f8",
+    "harness_sha256": "sha256:3caf3539135f03c1b613b7bf0468674736520d8a841961822f5ae1131814c8c8",
+    "codex_cli_version": "0.144.1"
+  },
+  "execution": {
+    "task_id": "ute-corpus-v1-006",
+    "role": "reviewer",
+    "effort": "xhigh",
+    "planned_calls": 1,
+    "attempted_calls": 1,
+    "raw_token_cap": 22000,
+    "observed_raw_total_tokens": 16094,
+    "actual_usage_calls": 1,
+    "usage_status": "actual",
+    "unique_model_call_count": 1,
+    "tool_calls": 0,
+    "retries": 0,
+    "failure_code": null,
+    "transport_schema_conformance": "PASS"
+  },
+  "decision": {
+    "transport_conclusion_available": true,
+    "transport_result": "PASS",
+    "canonical_result_receipt_available": true,
+    "canonical_usage_receipt_available": true,
+    "end_to_end_transport_contract_accepted": true,
+    "missing_key_normalization_branch_observation_available": false,
+    "historical_v7_exact_root_cause_classified": false,
+    "semantic_evaluation_performed": false,
+    "promotion_eligible": false,
+    "transport_precondition_for_full_evaluation_satisfied": true,
+    "full_58_plus_5_execution_authorized": false,
+    "effective_profile": "full_ultra",
+    "implemented": false,
+    "next_full_evaluation_requires_new_frozen_admission_and_explicit_authorization": true
+  },
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "provider_stdout_stderr_retained": false,
+    "provider_event_values_retained": false,
+    "absolute_paths_retained": false
+  }
+}

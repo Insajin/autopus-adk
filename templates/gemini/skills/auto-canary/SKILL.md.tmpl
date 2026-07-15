@@ -19,6 +19,11 @@ triggers:
 
 배포 후 건강 검진을 실행합니다. 빌드, E2E, 브라우저 검사를 순서대로 수행하고 PASS/WARN/FAIL 판정을 냅니다.
 
+## Context Profile
+
+- Required: core workspace policy, canary, and the declared canary command.
+- Excluded: scenarios, signatures, and unrelated learnings.
+
 ## Scope Boundary
 
 - `auto canary`는 post-deploy 또는 staging smoke/status gate입니다. 목표는 현재 빌드, endpoint, browser surface가 운영 가능한지 빠르게 판정하고 `.autopus/canary/latest.json`에 최신 상태를 남기는 것입니다.
@@ -44,8 +49,8 @@ triggers:
 
 ## 실행 순서
 
-1. `.autopus/project/canary.md` 또는 `.autopus/project/tech.md` 기준으로 빌드 검증
-2. `.autopus/project/scenarios.md` 기준으로 smoke E2E 실행
+1. `.autopus/project/canary.md`에 선언된 build 검증 실행
+2. `canary.md`에 선언된 canary/smoke 명령만 실행
 3. endpoint/browser 건강 검진 수행
 4. PASS/WARN/FAIL 판정
 5. `.autopus/canary/latest.json`에 결과 저장

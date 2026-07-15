@@ -94,7 +94,7 @@ func TestDefaultFullConfig_CodexPromptViaArgs(t *testing.T) {
 	assert.False(t, codex.PromptViaArgs, "codex provider must have PromptViaArgs=false")
 	// SPEC-ORCH-021 REQ-014/015: exec --sandbox workspace-write (no deprecated
 	// --full-auto) with reasoning effort aligned to autopus.yaml.
-	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, codex.Args,
+	assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, codex.Args,
 		"codex provider must have correct exec-mode args")
 	assert.Equal(t, CodexOrchestraTimeoutSeconds, codex.Subprocess.Timeout,
 		"codex provider must have a longer default orchestra timeout")
@@ -111,7 +111,7 @@ func TestDefaultCodexProviderEntryUsesBalancedProfile(t *testing.T) {
 	assert.Equal(t, CodexTerraModel, CodexStandardModel)
 	assert.Equal(t, CodexLunaModel, CodexMiniModel)
 	assert.Equal(t,
-		[]string{"exec", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="xhigh"`},
+		[]string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="xhigh"`},
 		entry.Args,
 	)
 }

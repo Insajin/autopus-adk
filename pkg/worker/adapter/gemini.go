@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os/exec"
 	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 )
 
 // GeminiAdapter implements ProviderAdapter for the Gemini-family provider via AGY CLI.
@@ -80,8 +82,9 @@ func (a *GeminiAdapter) ParseEvent(line []byte) (StreamEvent, error) {
 			return StreamEvent{}, fmt.Errorf("gemini synthesize result: %w", err)
 		}
 		return StreamEvent{
-			Type: "result",
-			Data: synthetic,
+			Type:  "result",
+			Data:  synthetic,
+			Usage: []telemetry.UsageEnvelope{unboundGeminiUsage(nil)},
 		}, nil
 	}
 
@@ -96,11 +99,17 @@ func (a *GeminiAdapter) ParseEvent(line []byte) (StreamEvent, error) {
 	}
 
 	typ, subtype := splitEventType(raw.Type)
+	toolCalls := 0
+	if typ == "tool_call" {
+		toolCalls = 1
+	}
 
 	return StreamEvent{
-		Type:    typ,
-		Subtype: subtype,
-		Data:    json.RawMessage(append([]byte(nil), trimmed...)),
+		Type:      typ,
+		Subtype:   subtype,
+		Data:      json.RawMessage(append([]byte(nil), trimmed...)),
+		Usage:     parseGeminiUsage([]byte(trimmed), raw.Type),
+		ToolCalls: toolCalls,
 	}, nil
 }
 
@@ -115,5 +124,32 @@ func (a *GeminiAdapter) ExtractResult(event StreamEvent) TaskResult {
 		DurationMS: re.DurationMS,
 		SessionID:  re.SessionID,
 		Output:     re.Output,
+		Usage:      append([]telemetry.UsageEnvelope(nil), event.Usage...),
+		ToolCalls:  event.ToolCalls,
 	}
+}
+
+func parseGeminiUsage(data []byte, eventType string) []telemetry.UsageEnvelope {
+	if eventType != "result" {
+		return nil
+	}
+	var receipt struct {
+		providerUsageIdentity
+		CostUSD *float64 `json:"cost_usd"`
+	}
+	if json.Unmarshal(data, &receipt) != nil {
+		return nil
+	}
+	return []telemetry.UsageEnvelope{unboundGeminiUsageWithIdentity(receipt.CostUSD, receipt.providerUsageIdentity)}
+}
+
+func unboundGeminiUsage(cost *float64) telemetry.UsageEnvelope {
+	return unboundGeminiUsageWithIdentity(cost, providerUsageIdentity{})
+}
+
+func unboundGeminiUsageWithIdentity(cost *float64, identity providerUsageIdentity) telemetry.UsageEnvelope {
+	var input telemetry.UsageInput
+	applyUsageIdentity(&input, identity, "gemini", "agy.print.v1")
+	input.ActualCostUSD = cost
+	return normalizeProviderUsage(input)
 }

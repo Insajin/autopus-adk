@@ -23,13 +23,13 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 
 	for _, pi := range panes {
 		if pi.skipWait {
-			responses = append(responses, ProviderResponse{
+			responses = append(responses, unavailableResponse(ProviderResponse{
 				Provider:    pi.provider.Name,
 				Duration:    time.Since(start),
 				TimedOut:    true,
 				EmptyOutput: true,
 				Error:       "provider was skipped before completion collection",
-			})
+			}, usageSourcePane, usageReasonPane))
 			continue
 		}
 		wg.Add(1)
@@ -95,7 +95,7 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 
 			mu.Lock()
 			defer mu.Unlock()
-			responses = append(responses, ProviderResponse{
+			responses = append(responses, unavailableResponse(ProviderResponse{
 				Provider:    pi.provider.Name,
 				Output:      output,
 				Duration:    time.Since(start),
@@ -103,7 +103,7 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 				EmptyOutput: output == "",
 				Error:       errMsg,
 				Receipt:     receiptPath,
-			})
+			}, usageSourcePane, usageReasonPane))
 		}(pi)
 	}
 	wg.Wait()

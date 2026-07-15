@@ -1,0 +1,579 @@
+{
+  "absolute_paths_retained": false,
+  "admission_generation": "v2",
+  "artifact_count": 142,
+  "artifacts": [
+    {
+      "name": "aa-evaluator-input-v1.json",
+      "sha256": "sha256:cc63dcdff20cd0f64eb0d6c4b2893434340fe8c8dfb7b7a5d808b18a292840e3"
+    },
+    {
+      "name": "aa-evaluator-input-v1.sha256",
+      "sha256": "sha256:580fa92f438f36fa65b310a1229ee14d99d9c5dbcfecee3f36d5f21e24006bb8"
+    },
+    {
+      "name": "aa-evaluator-result-v1.json",
+      "sha256": "sha256:a34fe927339ef8ffc1c1a5cd3a8e301cfb8a1d470f3f56beb413313ae9bfb0ed"
+    },
+    {
+      "name": "aa-evaluator-result-v1.sha256",
+      "sha256": "sha256:ce2f7ff24ae64df27e6796bba2d9022a544964e4b7a729084a48fd8856b448c4"
+    },
+    {
+      "name": "aa-measurement-v1.json",
+      "sha256": "sha256:e62814cdc507552565af208b1d711ccbed6745499aae25f44bb09585bb5f975c"
+    },
+    {
+      "name": "aa-measurement-v1.sha256",
+      "sha256": "sha256:be6da32b914181a17c42f3780a5526c976af243030d4d93b6a07701d7c1dac49"
+    },
+    {
+      "name": "capability-pilot-v1.json",
+      "sha256": "sha256:295455eaf9ecd6b9353b0be6b99fd5c43686918ff6fcda18367125de306bd939"
+    },
+    {
+      "name": "capability-pilot-v1.sha256",
+      "sha256": "sha256:7c9d32877cc2841b86c7d47eede3aeecce8956dcccb291f1bb0eb89db70c8534"
+    },
+    {
+      "name": "corpus-v1.json",
+      "sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a"
+    },
+    {
+      "name": "corpus-v1.sha256",
+      "sha256": "sha256:da6f2903470ba5c603d7e52af106f6e7629065232f48c7c04a02d1b26d4afb74"
+    },
+    {
+      "name": "gpt-authorization-closure-v1.json",
+      "sha256": "sha256:bde1c49d7458f43a1cb9bfd478bd84991645b161d6b9f9e7794f042e2051bf42"
+    },
+    {
+      "name": "gpt-authorization-closure-v1.sha256",
+      "sha256": "sha256:dbcbb5a89d868aec746ac09ee66b24fcdefd5448c75f935ad76371c65187ac76"
+    },
+    {
+      "name": "gpt-canary-cohort-v1.json",
+      "sha256": "sha256:d6fc675b4fb8b240b2bfdc79fc1439fb783650c169ca07796c967e78103b6419"
+    },
+    {
+      "name": "gpt-canary-cohort-v1.sha256",
+      "sha256": "sha256:1e537551b83bf768e2b7b935ce72bd72d3eff2e2e39ae2ef9002f8a108c2a5e1"
+    },
+    {
+      "name": "gpt-canary-preflight-v1.json",
+      "sha256": "sha256:230afb38942b330d8806e76c3b0ee6a3022ee8d3834d28b6356df6fa561f1025"
+    },
+    {
+      "name": "gpt-canary-preflight-v1.sha256",
+      "sha256": "sha256:1222863decd177bf539331dfd670eaa3048083ece514eb15eab2b4cab3753658"
+    },
+    {
+      "name": "gpt-codex-config-v1.json",
+      "sha256": "sha256:7360f0cca97dbda515af48054b93da23c8701f3078b6cd57aad2af5906473e8f"
+    },
+    {
+      "name": "gpt-codex-config-v1.sha256",
+      "sha256": "sha256:9d9404772a6c61080eca4e70c5dfa15898dba3eb8d61a3ebd4200167eb0c55bf"
+    },
+    {
+      "name": "gpt-codex-policy-v1.json",
+      "sha256": "sha256:1640281825b184f9ffbb92dc36a9afac27a5b55a9ff9d2632aadfa2dcce9430b"
+    },
+    {
+      "name": "gpt-codex-policy-v1.sha256",
+      "sha256": "sha256:89c4fa7b94293570baf00d1801534d7ada146a7c7e7e2b34e6a0f436997cb121"
+    },
+    {
+      "name": "gpt-diagnostic-authorization-reuse-v1.json",
+      "sha256": "sha256:340e59d8791403853d5d4281bb02b0cdb4fb2af5d1c01ecc5644f15719649ebd"
+    },
+    {
+      "name": "gpt-diagnostic-authorization-reuse-v1.sha256",
+      "sha256": "sha256:785d05d2236803718a6a55a0586beef423179f20a1aceccbaea57cd00b5d3aef"
+    },
+    {
+      "name": "gpt-diagnostic-call-ledger-v1.partial-fail.json",
+      "sha256": "sha256:d0d3881e6fdad03c3289761a535f3f34f5603001c0d96af9c66acea840ac6ee0"
+    },
+    {
+      "name": "gpt-diagnostic-call-ledger-v1.partial-fail.sha256",
+      "sha256": "sha256:6472f9ba3740f63b8730e372ddb2e8a0180afc08a91a6a5bb2c50750417af7d7"
+    },
+    {
+      "name": "gpt-diagnostic-cohort-v1.json",
+      "sha256": "sha256:d060fe3ae06e5ee063c66a57dc7b6a96bd9c929361e81ca2e26d48d333db0d9f"
+    },
+    {
+      "name": "gpt-diagnostic-cohort-v1.sha256",
+      "sha256": "sha256:709cfdaa5e5108ba8a81a78be496a7a7962ae0cc09acaba188ae13b6382df7ad"
+    },
+    {
+      "name": "gpt-diagnostic-config-v1.json",
+      "sha256": "sha256:bff64292fdf49343bde1a53d9d40ffbea0af5f338cd48385c2a2dc6d752e0565"
+    },
+    {
+      "name": "gpt-diagnostic-config-v1.sha256",
+      "sha256": "sha256:0766a7661bc48006faa01684583b0c464d5678ad78bfb20671d5434b6df4d891"
+    },
+    {
+      "name": "gpt-diagnostic-policy-v1.json",
+      "sha256": "sha256:4a4b84f7087a5bf40aa0f5c3c2e883e29d235e80bf91c84c1186ec758248b12f"
+    },
+    {
+      "name": "gpt-diagnostic-policy-v1.sha256",
+      "sha256": "sha256:dabf12792d02af9d6218d98909c2de3e97ac56a8cfeb89c6f4df84129b173153"
+    },
+    {
+      "name": "gpt-diagnostic-preflight-v1.json",
+      "sha256": "sha256:83d79efa72892605276746e114ce740113e97d5225dbf5b6ab4bd1519f4de552"
+    },
+    {
+      "name": "gpt-diagnostic-preflight-v1.sha256",
+      "sha256": "sha256:52585679bec2e2f6fb8c5cb6806fb4260ea1f15f6e0399a27a464b3d770a67cc"
+    },
+    {
+      "name": "gpt-diagnostic-terminal-outcome-v1.json",
+      "sha256": "sha256:9869bbceea0a5ba2db05b48980f4cda44ede8dceda1e2325e678826155a13892"
+    },
+    {
+      "name": "gpt-diagnostic-terminal-outcome-v1.sha256",
+      "sha256": "sha256:31a891adc122d0dc834a740222c8265b37981d03d3b2651fa49dab390407b237"
+    },
+    {
+      "name": "gpt-diagnostic-verdict-schema-v1.json",
+      "sha256": "sha256:d81f0205cbc02ac7af0d0897078041f765873ba287b8dfd2c0dd3e66f35ca605"
+    },
+    {
+      "name": "gpt-diagnostic-verdict-schema-v1.sha256",
+      "sha256": "sha256:f72c979dd5c77aa97733a592bb9ef2003834ba5761f0ade546b477f78c82c304"
+    },
+    {
+      "name": "gpt-primary-call-ledger-v1.partial-fail.json",
+      "sha256": "sha256:f1b2fc2171af84464c6e5e7f39d5db62918480740d60abe4fabc93784987b582"
+    },
+    {
+      "name": "gpt-primary-call-ledger-v1.partial-fail.sha256",
+      "sha256": "sha256:2d8db197a6642d1087df55c752b492145895abd56a1a9025e9fdf12a54be97c9"
+    },
+    {
+      "name": "gpt-primary-terminal-outcome-v1.json",
+      "sha256": "sha256:29f0a73fe758e4b564870922269bce24297795e8ba3040f346fca610ef1007b8"
+    },
+    {
+      "name": "gpt-primary-terminal-outcome-v1.sha256",
+      "sha256": "sha256:18944b57fef4bb9c2da6c5db2533e959e52136d541858bd18b7b8ea981cec461"
+    },
+    {
+      "name": "gpt-snapshot-manifest-v1.json",
+      "sha256": "sha256:9932a70e74cc38b83cee786c3a671b2e3fd962ce021ceec0eeb1a2b249f66370"
+    },
+    {
+      "name": "gpt-snapshot-manifest-v1.sha256",
+      "sha256": "sha256:8c2054266dc4fbb641f2ccd4500e6d077aeb28623a53afd80fd607f0bb568c1a"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v1.json",
+      "sha256": "sha256:9dd237bf913b7ac30d4002e733b8299c007f7cb1646a0c1020a9dbbdc1bc2e34"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v1.sha256",
+      "sha256": "sha256:00804f570aecc881efe8b96c2f4459333d91fc28b7d14d2b40a35e6a05e2279c"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v2.json",
+      "sha256": "sha256:bdec20a7c73616afdcd5c70fa069f88a392a8da928bb90c8f4e192af657f5c80"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v2.sha256",
+      "sha256": "sha256:32e56edd282e96cc4bf2087fee67cdffbac924f2779c9fde5c6d0a3cfaee48e2"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v3.json",
+      "sha256": "sha256:f05ca25b74cdd748d97919c31357cc3676cf15c1f41b53f830232fe070d56eb6"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v3.sha256",
+      "sha256": "sha256:770c0776d23b4c04628ee8b62f932108dc2eb5f6b48f798c1e5b4e94bfcf9a86"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v4.json",
+      "sha256": "sha256:1dce4c89d3e52231bb1cdeb54c96f2a6bbf82004b1ac14e3fcabd7d2f1821711"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v4.sha256",
+      "sha256": "sha256:2efc32ffdb536f6fd3094236a178e89e3a2cf3b6d3f27090a5eac50e0cc87bd6"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v5.json",
+      "sha256": "sha256:42b57ec9d7619263dd78cabff60570cdc7051203270625558b798a036428b074"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v5.sha256",
+      "sha256": "sha256:f04135af1ed1a9cc51c2bccfcb4bb4883f9776988c6f9db350648bd3442d955e"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v6.json",
+      "sha256": "sha256:d88c97544931b2ac9b409100656220bf20da75b134a7208f348fa3bf49345e78"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v6.sha256",
+      "sha256": "sha256:fbb8ec3919958697c064987893566c1d80f912f0c7a31801ab644e01819ea6fe"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v7.json",
+      "sha256": "sha256:d3c1a5747c3dc1626fad4e4636086eab32f94b54fa9ce2f479ed388965ee299d"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v7.sha256",
+      "sha256": "sha256:ed055ce1669690e0e8147e7d5df567ec17d82e9eb697445dcfa7208851e99952"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v8.json",
+      "sha256": "sha256:2d714d493ca29d9b1bcea87dfd96e8cef0e1278edd5e34bf15053e9430fc3f39"
+    },
+    {
+      "name": "gpt-transport-smoke-config-v8.sha256",
+      "sha256": "sha256:c8b87695ef18532459375f1fa7ff1bf06ac3fb43c27db9d1cdbca223a0901334"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v1.partial-fail.json",
+      "sha256": "sha256:eca927f2802b734336d5c34bd3833fb1a4385c93eff6f97a825bf153cbbe37c6"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v1.partial-fail.sha256",
+      "sha256": "sha256:9467c3177652814039d312109b0a644f6731f323b28f4636593f5d1755bb989b"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v2.partial-fail.json",
+      "sha256": "sha256:3f5e76621709e9a77e222a317d34ebad664bbc1735c1f1ae2cec1f9fb2a51c6f"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v2.partial-fail.sha256",
+      "sha256": "sha256:96b6a4bfa107fb355bf656faa458ae9a12352f1884baf773e7f4dd543d4f6632"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v3.partial-fail.json",
+      "sha256": "sha256:32b0144aa61e34bad7b277390ac341e57f9cd0a2c1cefb9d240b45cd743735d8"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v3.partial-fail.sha256",
+      "sha256": "sha256:f98eb8d309eaa34c2b1565122348dc23311080bfbe2ca2c5835e99b8faf8c59d"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v4.partial-fail.json",
+      "sha256": "sha256:7fdd5f75b610e71fceabbb910b477b2d00ec838f02b048b0d073b3bb16d04383"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v4.partial-fail.sha256",
+      "sha256": "sha256:55bc05f7dcdb8db911169e93752476b8620a63e11ace0c14795bcbf6d098452f"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v5.partial-fail.json",
+      "sha256": "sha256:df2f065ba9e0f5e9548e64e69eb92f36497f0a975da150abd28327ebaa30cc3a"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v5.partial-fail.sha256",
+      "sha256": "sha256:1ec4174fc07f283a89924526cb9a3bf497f6ea5c692f002fd75e8164ea4718a9"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v6.partial-fail.json",
+      "sha256": "sha256:f583d987fa793b98c89553c33789f8e8c88b4429546a341c8d09022b671d709f"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v6.partial-fail.sha256",
+      "sha256": "sha256:cc49cca159e348c05f95981d6749df5df0bc86bdc93f08fb675cadc38177260b"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v7.partial-fail.json",
+      "sha256": "sha256:a614cf254c02bbbe178f3b818cf50eae34b8191d3251db7834ae85aac185b73f"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v7.partial-fail.sha256",
+      "sha256": "sha256:1cfc0dcf3b7ef3fcb44851aa0ab4bb22e6c97f18813c647c9c822e6ffb307653"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v8.json",
+      "sha256": "sha256:f81df2cc4b083d2649bcd948328003a434411a394aea98a82aa095ee86e6593d"
+    },
+    {
+      "name": "gpt-transport-smoke-ledger-v8.sha256",
+      "sha256": "sha256:248db4da379998f9af24b629f6f7420db10b8d819d64577b11c733f07e0afc03"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v1.json",
+      "sha256": "sha256:38b6ae94b0edf4c9cf09a505a5ff1b4f8cec17a478306cde99b95d9aec2411a3"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v1.sha256",
+      "sha256": "sha256:ae2285b30c179b1614178cdccfeb5736a8268cbc73a2364167fa3aa45f34f2ad"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v2.json",
+      "sha256": "sha256:e60cc741ea5a2abd0be0ba7e25d5d6c639fe9e2b0cd52c10dcb14ac1565b6cdc"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v2.sha256",
+      "sha256": "sha256:a3b8c2b27e80dab8ee4b137b4767ad6da9333bc6635b11d997ac91be24cdaded"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v3.json",
+      "sha256": "sha256:b5c627569f95733511d10dda2c67b034e25f645fd292fe7b90f7bd1913180d07"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v3.sha256",
+      "sha256": "sha256:89dcef8ef35cda325742ba3e4187c3100f57bb93029f45eec6afe864b7abbcd4"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v4.json",
+      "sha256": "sha256:a562141171b03e3ffc61aee968dc09a1760b1216448469d8db95788ec33654bf"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v4.sha256",
+      "sha256": "sha256:391e009cf2cbb4ddebc355d4d73f184a80ec0cc3cb930ebba9462c9063b16910"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v5.json",
+      "sha256": "sha256:49b57c44cfef9105dd93d92441b3c17c1d678cfb6b04527da2fec81c78388f19"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v5.sha256",
+      "sha256": "sha256:750786b8566e1a01d849f7f95c216dec942eb74ed13eaa4f909949fb61bdf808"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v6.json",
+      "sha256": "sha256:d2da17f57fa900281d350a186dd7ed0e2aa6dcda9957c03df00e200eeca33495"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v6.sha256",
+      "sha256": "sha256:e558252b741227d4c1c2dcd0b0088beeae37a82cc7ff422f6c0409cad09d30c7"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v7.json",
+      "sha256": "sha256:e03ab4a20c4c6cea4a82364d9f86b782556c800dcd4a78d875d3673095384d66"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v7.sha256",
+      "sha256": "sha256:b058a1de0fc652ca0ad2e6a40e151a22802652d4ec8cf923f718ebb1dff70fd2"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v8.json",
+      "sha256": "sha256:a8452ea635e09298b71044a00dddef02b13ac7073f828e4cf902add6d8a6b845"
+    },
+    {
+      "name": "gpt-transport-smoke-policy-v8.sha256",
+      "sha256": "sha256:682c2e1be14b9db88cec5be0649f604db581eb1da5a639b91747b86522a1ec61"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v1.json",
+      "sha256": "sha256:d92a3cd44da58a7daff27a60245b6a4c6197c6b5d3cc6a1596384784237c90a4"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v1.sha256",
+      "sha256": "sha256:f103aea681838cae46ad4c0838f45e9f8302846440f8265a274100232a5e695e"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v2.json",
+      "sha256": "sha256:4e26043b3cc0ac3df8ff74a78f0616a48dacb99bc7041419f572bbc400ac8c04"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v2.sha256",
+      "sha256": "sha256:ef6c6cecd9cd5e9be297657fdc6e83450ff65c2a44add760c8782ba458510c6f"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v3.json",
+      "sha256": "sha256:18792e4bdc12ca1007d6ef275b2d02032f08a1e5ba674c03d81d22598a56f4f4"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v3.sha256",
+      "sha256": "sha256:6097ead173a8e97dc0a00b2af5130f7e1d9443de6aedc1ff1e0ba8fdcfa8145b"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v4.json",
+      "sha256": "sha256:da363839a19dc63805e1f5574759a3eb1a1d6fcc73ea340e5a665cc6a19e78cb"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v4.sha256",
+      "sha256": "sha256:683dd3f7f7faba9ebcaff573b76a6990752e98121295039e6b8588a161099c73"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v5.json",
+      "sha256": "sha256:a3548711c44c3dc3b776cc38ef7460417795b9485dac9f70f2b5c37d998cea16"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v5.sha256",
+      "sha256": "sha256:9af8e80743c26d10015940c87c788c034364df4f77c95f0bd60905a1202a5e8a"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v6.json",
+      "sha256": "sha256:c0eb6253943680908eaa1a9027469cf5ba6d5a44b631bee380b35c8b92fbb1b2"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v6.sha256",
+      "sha256": "sha256:1ab39aacfc9fadc2e1ccf219eb2020fa3356a078ecc910e75979b61d8f0e1f78"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v7.json",
+      "sha256": "sha256:33b1a1a266d722a32fd40abe93d9878c656e022f58a6b40e5726676cf651c4ab"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v7.sha256",
+      "sha256": "sha256:315c2bbce3501f9bb3d75a4ecfb601f30cb2940b6724869f868e4fea13eae754"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v8.json",
+      "sha256": "sha256:76fa7e15ea7114428d74ef9520a7055778c361ea4f702e69c8cabd2e89a76353"
+    },
+    {
+      "name": "gpt-transport-smoke-preflight-v8.sha256",
+      "sha256": "sha256:f2bb8725ab2b6ce55e15e549afa4fe22c171c5ef8c6b4a78a0a04cb63050ff18"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v1.json",
+      "sha256": "sha256:61006491dddaadb43822608d10af5c3baa2e166950973dec95655ffd28003ced"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v1.sha256",
+      "sha256": "sha256:d3dbdfecf9643282e484111d4e9757ab8e5407e5cddebfc5b4bc0533e0ddc224"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v2.json",
+      "sha256": "sha256:0f77892d0472dedf2e6cdee5a9064e7e0798ad29e43769c87a00aff26f159306"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v2.sha256",
+      "sha256": "sha256:f03183e01b90b7ac454553c355f7f6345ff7a9232f81f3d416fbadde5476c249"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v3.json",
+      "sha256": "sha256:ab787a1b9581b76160ffc48b1c22659865caa250a5f20de4249fb0ec6b81ec8d"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v3.sha256",
+      "sha256": "sha256:1abb7d3b15a502b284e42485be5d3f57b834e92a4cc28210c01f994550aefa7e"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v4.json",
+      "sha256": "sha256:a90b361e401497102d90b563082f38ff0a3600376dffdef9b4ebfe106ccb1421"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v4.sha256",
+      "sha256": "sha256:aafc869544736b0bb06737416346f7c4f61c281c07ec119327827ecfbc52bd60"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v5.json",
+      "sha256": "sha256:2c6da9ba42f09487b4c7a8d1704e08133cbfe2b05ea7001101fea92a23994d6c"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v5.sha256",
+      "sha256": "sha256:d0e353fb52b0a52a74e2104a76b9fd71541cdd3b30590fbb4a1b89d9fcc88721"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v6.json",
+      "sha256": "sha256:4d7a5cb92e32f45897a3a21adea0c638dd75893b109b2cb20205ba307379b986"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v6.sha256",
+      "sha256": "sha256:d317bf0d4ab8ccc1c547b49f8cb8a10705f62535f9f8f14b3df959810b55fd07"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v7.json",
+      "sha256": "sha256:ceedc01912682cbb2cf870a7e0cd00c7096f48449d9f8602e9e52d92449b94e4"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v7.sha256",
+      "sha256": "sha256:6b7e175fea9200af01a6ef6bb4579563f2e2ce2b40e0f3ad70d5d67933597717"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v8.json",
+      "sha256": "sha256:ceedc01912682cbb2cf870a7e0cd00c7096f48449d9f8602e9e52d92449b94e4"
+    },
+    {
+      "name": "gpt-transport-smoke-schema-v8.sha256",
+      "sha256": "sha256:626a2edccf6303bc1b5719828917448e8a514b7a08a8e13d62cf3b690829afe0"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v1.json",
+      "sha256": "sha256:b92db43b32a9880b8e7e6987ba6398a50ccaef323f709beef698b07f6438f268"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v1.sha256",
+      "sha256": "sha256:e3da18e0f90aad1aff9eba3ff52febd7b0f406614fe9c431eb6d71fbadcd1314"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v2.json",
+      "sha256": "sha256:1723f7906b5e544fd9c7c3b7418bf9fd3522254e4d434da6987a34776a9c7196"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v2.sha256",
+      "sha256": "sha256:9f4921e3ba8dd896979e3bef9eb43a169914a601bb2f658cfe440714f55cafc4"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v3.json",
+      "sha256": "sha256:ac0e928e43d1da5a4ed609e255ea2d67ef9361cbec27fa6fc42a5a96c518b23e"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v3.sha256",
+      "sha256": "sha256:b193ed3cda3243a694bfe20a6abe19a11088785dbbfe7ae8b09fbd4aa08fae60"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v4.json",
+      "sha256": "sha256:27a2cae7b3470ab219153738dbf75d9d35a24c342ed88aae00e2b7bad2edad18"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v4.sha256",
+      "sha256": "sha256:eac4067873d252b301dd9755c5a769371be354733c77e93350b123b690679670"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v5.json",
+      "sha256": "sha256:40a7abef2e1d2d9da5477352b09277892b138b4ec17ceee68240189b2ec389a0"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v5.sha256",
+      "sha256": "sha256:ac201bc7929502eb5aa827868574a60f354599906a9ef227d056486532fe98cb"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v6.json",
+      "sha256": "sha256:35f76e17743874c7878f26743b6eacc75e201dbe0fc8897f23ee7b1f2a1e4905"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v6.sha256",
+      "sha256": "sha256:0f4e66178661b8d0e8f4c35704479f01b1a3f49bcbe80f3fa45195ae157a6fb3"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v7.json",
+      "sha256": "sha256:9e6db74077d64d72b515497a640b21891e7d65cd3780a505d2ca1800cb19f0f6"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v7.sha256",
+      "sha256": "sha256:020b40cb4a37a62ace732aa1e8615f97a6e98698daf86f99d39c07b963122584"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v8.json",
+      "sha256": "sha256:13f31960752167111bc202899721f67e05b3c3d6da5c71372f778bfe65776792"
+    },
+    {
+      "name": "gpt-transport-smoke-terminal-outcome-v8.sha256",
+      "sha256": "sha256:ebc0aa848b895f6aa602eef89616cb1350dc9db90c311fc6c30de066e58a8b04"
+    },
+    {
+      "name": "gpt-verdict-schema-v1.json",
+      "sha256": "sha256:0db59f348c8612b6dec9c7b6a55553f92c4220450c778d82f67d9394f65d5a12"
+    },
+    {
+      "name": "gpt-verdict-schema-v1.sha256",
+      "sha256": "sha256:02b2c82d1544227ca32eec21f8f510256119d64380aecc32f6cb0a69209885ee"
+    },
+    {
+      "name": "live-canary-preflight-v1.json",
+      "sha256": "sha256:76e7963d7529b8ef141bcf9266d31768e0c54feea034820f980d2518ebcbc4ee"
+    },
+    {
+      "name": "live-canary-preflight-v1.sha256",
+      "sha256": "sha256:648819fbfe5199bf37fe721f2ed68ab0000440c530c89265714a3d57d3e6d2b7"
+    }
+  ],
+  "evidence_kind": "gpt_codex_prior_evidence_manifest",
+  "excluded_future_generation": "v2_dynamic_and_authorization",
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "version": 2
+}

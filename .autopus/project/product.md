@@ -26,7 +26,8 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 | Architecture | `auto arch` | 코드 구조 분석 및 ARCHITECTURE.md 생성 |
 | PRD Generation | `/auto plan` | PRD(Product Requirements Document) 자동 생성 (Standard 10섹션 / Minimal 5섹션) |
 | SPEC Management | `auto spec` | EARS 형식 요구사항 작성/검증 |
-| SPEC Review | `auto spec review` | 멀티-프로바이더 SPEC 리뷰 게이트 |
+| SPEC Review | `auto spec review` | 모든 reviewer가 GPT alias일 때 매 리비전마다 core, 존재하는 architecture, 추가 필수 문서와 SPEC 4종을 검증해 provider prompt에 한 번씩 전달한다. mixed/Claude/Gemini 구성은 기존 review prompt 동작을 유지 |
+| GPT/Codex Required Context | `auto workflow context`, `auto workflow binding` | core/SPEC와 존재하는 architecture 문서를 안전 변환 전 raw source hash와 실제 전달 prompt hash를 가진 body-free manifest로 동결한다. compact Ultra는 supervisor 추가 필수-ref 집합까지 동일할 때만 허용하며 실패 시 `full_ultra`를 유지 |
 | Decision Tracking | `auto lore` | Git trailer 기반 의사결정 추적 (9-trailer 프로토콜) |
 | Documentation | `auto setup` | 프로젝트 컨텍스트 문서 생성/업데이트 + single-repo/monorepo/multi-repo workspace topology 반영 |
 | Multi-Repo Workspace | `auto setup`, `auto arch` | nested git repo 감지, cross-repo dependency mapping, repository boundary/workflow 문서 생성 |
@@ -67,6 +68,8 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 | Framework Detection | `/auto setup` | 14개 프레임워크 시그널 감지 (Next.js, Nuxt, NestJS, FastAPI, Django, Flask, Gin, Echo, Chi, Axum, React, Vue, Svelte) |
 | Deep Worker | `/auto go` (agent) | 장시간 자율 탐색+구현 에이전트 |
 
+GPT/Codex 문서 전달에서 토큰 예산은 memory/knowledge/index의 선택적 recall에만 적용한다. 필수 문서는 secret redaction과 injection neutralization을 거치며 raw source hash와 전달 prompt hash를 모두 남긴다. 최종 worktree에서 만든 동일 frozen snapshot을 direct worker와 모든 phase가 재사용하고, 후속 phase에는 원 태스크 계약을 한 번씩 다시 붙인다. `context_ack`는 진단용 요청이고 실제 강제는 예상 ref 집합과 해시 검증이다. all-GPT `auto spec review`는 반복 지정할 수 있는 `--required-document`와 `--conditional-profile`을 supervisor-held 옵션에 포함하고, 각 리비전에서 `BuildContextDelivery` 결과를 같은 옵션으로 엄격하게 검증한다. 검증된 core, 존재하는 architecture, 추가 문서 전문과 spec/plan/research/acceptance 전문은 중복 없이 provider prompt에 들어간다. 필수 문서 누락, receipt 변조, ref 집합 불일치, stale snapshot, 잘못된 SPEC 또는 128K 초과는 orchestra/provider 호출 전에 차단한다. mixed/Claude/Gemini review와 provider-neutral pipeline helper의 non-GPT 경로는 기존 동작을 유지한다.
+
 ## Supported Platforms
 
 | Platform | Adapter | Binary | Status |
@@ -106,6 +109,7 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 24. **다국어 SigMap**: Go 및 TypeScript 시그니처 동시 추출 (regex 기반 TS 지원)
 25. **테스트 러너 자동 감지**: jest/vitest/pytest/cargo 프레임워크 자동 인식
 26. **Deep Worker 에이전트**: 장시간 자율 탐색+구현 지원 에이전트
+27. **맥락 보존형 GPT/Codex 실행**: `auto workflow context` manifest와 post-worktree retained snapshot으로 필수 project/SPEC/available architecture 문서 및 supervisor 추가 ref를 검증하고, optional recall만 토큰 예산에 맞춰 조정
 
 ## Modes
 

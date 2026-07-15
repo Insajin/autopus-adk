@@ -76,7 +76,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		summary = fmt.Sprintf("%s (실패: %s)", summary, strings.Join(names, ", "))
 	}
 
-	return &OrchestraResult{
+	return finalizeOrchestraResult(&OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
 		RoundHistory:    roundHistory,
@@ -86,7 +86,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		FailedProviders: failed,
 		RunID:           cfg.RunID,
 		Degraded:        len(failed) > 0,
-	}, nil
+	}), nil
 }
 
 // runParallel executes all providers in parallel with per-goroutine context (R1)

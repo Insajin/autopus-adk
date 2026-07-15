@@ -16,15 +16,34 @@ const trimNoticeFormat = "[Review-context notice: %d additional lines were omitt
 // The full spec.md content is included to prevent false positives from parser truncation
 // (e.g., multi-line requirements with SQL schemas or itemized lists after the EARS header).
 func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptOptions, specDir ...string) string {
+	if opts.RequireCompleteDocuments && len(opts.completeDocuments) == 0 {
+		documents, err := loadCompleteReviewDocuments(resolveReviewSpecDir(opts, specDir))
+		if err != nil {
+			return ""
+		}
+		frozenDoc, err := freezeCompleteReviewSpec(doc, documents)
+		if err != nil {
+			return ""
+		}
+		doc = frozenDoc
+		opts.completeDocuments = documents
+	}
 	var sb strings.Builder
 
 	sb.WriteString("You are reviewing a SPEC document for correctness, completeness, and feasibility.\n\n")
 	fmt.Fprintf(&sb, "## SPEC: %s — %s\n\n", doc.ID, doc.Title)
+	if opts.RequireCompleteDocuments {
+		injectCompleteContextDocs(&sb, opts.completeDocuments)
+	}
 
 	// Include full spec.md content to avoid parser-induced truncation.
 	// The EARS parser only captures single-line descriptions, missing multi-line
 	// requirement bodies (SQL schemas, itemized lists, etc.).
-	if doc.RawContent != "" {
+	if opts.RequireCompleteDocuments {
+		if !injectCompleteSpecDoc(&sb, opts.completeDocuments) {
+			return ""
+		}
+	} else if doc.RawContent != "" {
 		sb.WriteString("### Full SPEC Document\n\n")
 		sb.WriteString(doc.RawContent)
 		sb.WriteString("\n\n")
@@ -53,11 +72,15 @@ func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptO
 		dir = specDir[0]
 	}
 	if dir != "" {
-		maxLines := opts.DocContextMaxLines
-		if maxLines <= 0 {
-			maxLines = defaultDocContextMaxLines
+		if opts.RequireCompleteDocuments {
+			injectCompleteAuxDocs(&sb, opts.completeDocuments)
+		} else {
+			maxLines := opts.DocContextMaxLines
+			if maxLines <= 0 {
+				maxLines = defaultDocContextMaxLines
+			}
+			injectAuxDocs(&sb, dir, maxLines)
 		}
-		injectAuxDocs(&sb, dir, maxLines)
 	}
 
 	if codeContext != "" {
@@ -69,7 +92,9 @@ func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptO
 
 	checklistIncluded := false
 	maxLines := opts.DocContextMaxLines
-	if maxLines <= 0 {
+	if opts.RequireCompleteDocuments {
+		maxLines = int(^uint(0) >> 1)
+	} else if maxLines <= 0 {
 		maxLines = defaultDocContextMaxLines
 	}
 	if checklistBody, checklistPath, err := loadChecklistForPrompt(opts); err != nil {

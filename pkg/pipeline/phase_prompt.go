@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/insajin/autopus-adk/pkg/memindex"
 	"github.com/insajin/autopus-adk/pkg/promptlayer"
 )
 
@@ -14,12 +16,18 @@ import (
 type PhaseContext struct {
 	// PreviousResults maps PhaseID to the normalized output of that phase.
 	PreviousResults map[PhaseID]string
+	// ContextResult is the bounded delegated context receipt for this phase.
+	ContextResult *memindex.ContextResult
 }
 
 // PhasePromptBuilder builds prompts for each pipeline phase by reading files
 // from a spec directory and injecting previous phase results.
 type PhasePromptBuilder struct {
-	specDir string
+	specDir                       string
+	requiredSnapshotOnce          sync.Once
+	requiredSnapshotLayers        []promptlayer.Layer
+	requiredSnapshotLoadErr       error
+	requiredSnapshotFirstPassHook func()
 }
 
 // NewPhasePromptBuilder creates a PhasePromptBuilder that reads files from specDir.
@@ -38,44 +46,73 @@ func (b *PhasePromptBuilder) BuildPrompt(phaseID PhaseID, ctx PhaseContext) (str
 // BuildPromptWithManifest constructs a phase prompt and diagnostic layer manifest.
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-AGENT-PROMPT-001: phase:* layer IDs mirror prompt sections and prior-phase injections.
 func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseContext) (string, PromptManifest, error) {
+	receiptMode := ctx.ContextResult != nil && strings.TrimSpace(ctx.ContextResult.Prompt) != ""
 	var layers []promptlayer.Layer
 
-	// @AX:NOTE: [AUTO] magic constant — "spec.md" filename is a hardcoded filesystem contract
-	// Always include spec.md when it exists.
-	specContent, err := b.readFile("spec.md")
-	if err != nil && !os.IsNotExist(err) {
-		return "", PromptManifest{}, fmt.Errorf("read spec.md: %w", err)
-	}
-	if specContent != "" {
-		sanitized := sanitizePromptContent(specContent)
-		layers = append(layers, phaseFileLayer("phase:spec", "spec.md", "SPEC", sanitized, promptlayer.GroupProjectContext))
+	if receiptMode {
+		requiredLayers, err := b.requiredPhaseDocumentLayers()
+		if err != nil {
+			return "", PromptManifest{}, err
+		}
+		layers = append(layers, requiredLayers...)
+	} else {
+		// @AX:NOTE: [AUTO] magic constant — "spec.md" filename is a hardcoded filesystem contract
+		// Always include spec.md when it exists.
+		specContent, err := b.readFile("spec.md")
+		if err != nil && !os.IsNotExist(err) {
+			return "", PromptManifest{}, fmt.Errorf("read spec.md: %w", err)
+		}
+		if specContent != "" {
+			sanitized := sanitizePromptContent(specContent)
+			layers = append(layers, phaseFileLayer("phase:spec", "spec.md", "SPEC", sanitized))
+		}
 	}
 
 	// Phase-specific additional files and context injection.
 	switch phaseID {
 	case PhasePlan:
-		planContent, _ := b.readFile("plan.md")
-		if planContent != "" {
-			sanitized := sanitizePromptContent(planContent)
-			layers = append(layers, phaseFileLayer("phase:plan", "plan.md", "Plan", sanitized, promptlayer.GroupMethodologyTools))
+		if !receiptMode {
+			planContent, _ := b.readFile("plan.md")
+			if planContent != "" {
+				sanitized := sanitizePromptContent(planContent)
+				layers = append(layers, phaseFileLayer("phase:plan", "plan.md", "Plan", sanitized))
+			}
 		}
 
 	case PhaseTestScaffold:
-		b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		if !receiptMode {
+			b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		}
 		b.injectPriorLayer(&layers, ctx, PhasePlan, "Plan Output")
 
 	case PhaseImplement:
-		b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		if !receiptMode {
+			b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		}
 		b.injectPriorLayer(&layers, ctx, PhasePlan, "Plan Output")
 		b.injectPriorLayer(&layers, ctx, PhaseTestScaffold, "Test Scaffold Output")
 
 	case PhaseValidate:
-		b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		if !receiptMode {
+			b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		}
 		b.injectPriorLayer(&layers, ctx, PhaseImplement, "Implementation Output")
 
 	case PhaseReview:
-		b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		if !receiptMode {
+			b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
+		}
 		b.injectPriorLayer(&layers, ctx, PhaseValidate, "Validation Output")
+	}
+	if receiptMode {
+		sanitized := sanitizePromptContent(ctx.ContextResult.Prompt)
+		layers = append(layers, promptlayer.Layer{
+			ID: "phase:context-receipt", Kind: promptlayer.KindSnapshot,
+			Group: promptlayer.GroupTaskContext, SourceRef: "context-receipt",
+			Content: sanitized.Content, CacheEligible: false,
+			RedactionStatus:    sanitized.RedactionStatus,
+			InvalidationReason: sanitized.InvalidationReason,
+		})
 	}
 
 	rendered, err := promptlayer.Render(layers)
@@ -91,7 +128,7 @@ func (b *PhasePromptBuilder) appendFileSectionLayerIfPresent(layers *[]promptlay
 		return
 	}
 	sanitized := sanitizePromptContent(content)
-	*layers = append(*layers, phaseFileLayer("phase:"+strings.TrimSuffix(name, ".md"), name, label, sanitized, promptlayer.GroupProjectContext))
+	*layers = append(*layers, phaseFileLayer("phase:"+strings.TrimSuffix(name, ".md"), name, label, sanitized))
 }
 
 func (b *PhasePromptBuilder) injectPriorLayer(layers *[]promptlayer.Layer, ctx PhaseContext, id PhaseID, label string) {
@@ -112,11 +149,11 @@ func (b *PhasePromptBuilder) injectPriorLayer(layers *[]promptlayer.Layer, ctx P
 	}
 }
 
-func phaseFileLayer(id, sourceRef, label string, sanitized promptlayer.SanitizedContent, group promptlayer.Group) promptlayer.Layer {
+func phaseFileLayer(id, sourceRef, label string, sanitized promptlayer.SanitizedContent) promptlayer.Layer {
 	return promptlayer.Layer{
 		ID:                 id,
-		Kind:               promptlayer.KindStable,
-		Group:              group,
+		Kind:               promptlayer.KindSnapshot,
+		Group:              promptlayer.GroupFrozenSnapshot,
 		SourceRef:          sourceRef,
 		Content:            formatSection(label, sanitized.Content),
 		CacheEligible:      sanitized.RedactionStatus == promptlayer.RedactionPassed,

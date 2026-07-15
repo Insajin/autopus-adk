@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -118,4 +119,39 @@ func TestGeminiAdapterExtractResultInvalidJSON(t *testing.T) {
 	evt := StreamEvent{Data: []byte("nope")}
 	result := a.ExtractResult(evt)
 	assert.Equal(t, "nope", result.Output)
+}
+
+func TestGeminiAdapterParseEvent_PlainTextMarksUsageUnavailable(t *testing.T) {
+	a := NewGeminiAdapter()
+	evt, err := a.ParseEvent([]byte("plain agy output"))
+	require.NoError(t, err)
+
+	result := a.ExtractResult(evt)
+	require.Len(t, result.Usage, 1)
+	assert.Equal(t, telemetry.UsageStatusUnavailable, result.Usage[0].UsageStatus)
+	assert.Equal(t, telemetry.UsageReasonProviderAbsent, result.Usage[0].UnavailableReason)
+}
+
+func TestGeminiAdapterExtractResult_StructuredCostOnly(t *testing.T) {
+	a := NewGeminiAdapter()
+	evt, err := a.ParseEvent([]byte(`{"type":"result","run_id":"run-g","call_id":"call-g","output":"done","cost_usd":0.15}`))
+	require.NoError(t, err)
+
+	result := a.ExtractResult(evt)
+	require.Len(t, result.Usage, 1)
+	assert.Equal(t, telemetry.UsageStatusCostOnly, result.Usage[0].UsageStatus)
+	assert.Nil(t, result.Usage[0].RawTotalTokens)
+}
+
+func TestGeminiAdapter_MultiplePlainEventsPreserveOutputAndUnavailableReceipts(t *testing.T) {
+	a := NewGeminiAdapter()
+	firstEvent, err := a.ParseEvent([]byte("line one"))
+	require.NoError(t, err)
+	secondEvent, err := a.ParseEvent([]byte("line two"))
+	require.NoError(t, err)
+
+	got := MergeSequentialResult("gemini", a.ExtractResult(firstEvent), true, a.ExtractResult(secondEvent))
+
+	assert.Equal(t, "line one\nline two", got.Output)
+	require.Len(t, got.Usage, 2, "unbound receipts must remain ordered until worker identity binding")
 }

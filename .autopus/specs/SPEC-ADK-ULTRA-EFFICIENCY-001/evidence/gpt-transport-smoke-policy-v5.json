@@ -1,0 +1,47 @@
+{
+  "version": 5,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_provider_event_shape_diagnosis_policy",
+  "authorization": {
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "provider_call_cap": 1,
+    "raw_token_cap": 22000,
+    "concurrency": 1,
+    "retries": 0,
+    "single_use": true
+  },
+  "task": {
+    "task_id": "ute-corpus-v1-006",
+    "base_commit": "8c39b08b15511b0131b503db898d8be7800c27fa",
+    "target_commit": "7795dd441fa1feda07214a54c6563284cd9ce401",
+    "expected_patch_sha256": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b"
+  },
+  "call": {"role": "reviewer", "role_ordinal": 1, "effort": "xhigh", "raw_token_budget": 22000},
+  "operational_failure_metadata": {
+    "class_fingerprint_version": "autopus-operational-error-v1",
+    "stage_allowlist": ["subprocess_start", "stream_scan", "process_wait", "missing_result", "evidence_postcondition"],
+    "signal_allowlist": ["stderr", "provider_failure_event", "stream_parse_failure"],
+    "provider_event_kind_allowlist": ["error", "turn_failed", "error_and_turn_failed"],
+    "provider_event_shape_allowlist": [
+      "top_level_message", "top_level_code", "top_level_status", "top_level_status_code",
+      "top_level_error_string", "nested_error_object", "nested_error_message",
+      "nested_error_type", "nested_error_code"
+    ],
+    "provider_event_values_retained": false,
+    "signal_and_shape_order_is_canonical": true,
+    "result_binding": {"task_id": "ute-corpus-v1-006", "status": "failed"},
+    "memory_cap_bytes_per_raw_source": 65536,
+    "raw_sources_retained": false,
+    "scanner_error_requires_process_reap": true
+  },
+  "execution_runtime": {
+    "harness_sha256": "sha256:82d0b30338fbc467d80b507411cf2bdd5e8cc7d3dd1f60de973bd4e2c4bb4e14",
+    "auto_version": "0.50.68-ute-transport-diagnosis-v5",
+    "auto_executable_sha256": "sha256:b4d67aac8b946f067c2df3c3656422647947a7ab28757d8bab0e671f9b620f37",
+    "codex_cli_version": "0.144.1"
+  },
+  "transport_only": true,
+  "semantic_evaluation_performed": false,
+  "promotion_eligible": false
+}

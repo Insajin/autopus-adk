@@ -1,9 +1,104 @@
 package compress
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"sort"
+	"strings"
 )
+
+// @AX:NOTE: [AUTO] @AX:SPEC: SPEC-ADK-ULTRA-EFFICIENCY-001 — bounded excerpts retain evidence while preventing pruned tool bodies from regrowing context.
+const softPruneExcerptLimit = 160
+
+func softPruneToolPairs(text string, blocks []toolBlock, keepRecent int) pruneDetails {
+	pairs := collectToolPairs(blocks)
+	eligible := make([]*toolPair, 0, len(pairs))
+	for _, pair := range pairs {
+		if successfulToolPair(pair) {
+			eligible = append(eligible, pair)
+		}
+	}
+	incomplete := 0
+	for _, pair := range pairs {
+		if pair.call == nil || pair.result == nil {
+			incomplete++
+		}
+	}
+	if incomplete > 0 {
+		return pruneDetails{
+			Text:                text,
+			IncompletePairCount: incomplete,
+			ReasonCodes:         []string{ReasonIncompleteToolPair},
+		}
+	}
+	sort.Slice(eligible, func(i, j int) bool { return eligible[i].end < eligible[j].end })
+	if len(eligible) <= keepRecent {
+		return pruneDetails{Text: text}
+	}
+
+	artifactDigest := sha256.Sum256([]byte(text))
+	toPrune := eligible[:len(eligible)-keepRecent]
+	replacements := make([]replacement, 0, len(toPrune))
+	for _, pair := range toPrune {
+		replacements = append(replacements, replacement{
+			start: pair.start,
+			end:   pair.end,
+			text:  softPrunedPairRecord(pair, artifactDigest),
+		})
+	}
+	return pruneDetails{
+		Text:            applyReplacements(text, replacements),
+		PrunedPairCount: len(toPrune),
+		ReasonCodes:     []string{ReasonToolPairPruned},
+	}
+}
+
+func softPrunedPairRecord(pair *toolPair, artifactDigest [sha256.Size]byte) string {
+	pairText := pair.call.text + "\n" + pair.result.text
+	pairDigest := sha256.Sum256([]byte(pairText))
+	safeText, _ := redactUnsafeContext(pairText)
+	refs := extractSourceRefs(safeText)
+	if len(refs) == 0 {
+		refs = []string{"none"}
+	}
+	excerptText, _ := omitToolPayloadBodies(safeText)
+	return fmt.Sprintf(
+		`[tool_pair pruned: status=success pair=%s ordinal=%s digest=sha256:%x artifact_ref=phase-output:sha256:%x source_refs=%s excerpt="%s"]`,
+		safeEvidenceRef(pairRef(pair)), ordinalRef(pair), pairDigest, artifactDigest, strings.Join(refs, ","), boundedEvidenceExcerpt(excerptText),
+	)
+}
+
+func safeEvidenceRef(value string) string {
+	redacted, reasons := redactUnsafeContext(value)
+	if len(reasons) == 0 && redacted == value && isSimpleEvidenceRef(value) {
+		return value
+	}
+	digest := sha256.Sum256([]byte(value))
+	return fmt.Sprintf("redacted-ref-%x", digest[:6])
+}
+
+func isSimpleEvidenceRef(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || strings.ContainsRune("._:-", r) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func boundedEvidenceExcerpt(text string) string {
+	text = strings.Join(strings.Fields(text), " ")
+	text = strings.ReplaceAll(text, `"`, `'`)
+	if len(text) > softPruneExcerptLimit {
+		text = text[:softPruneExcerptLimit]
+	}
+	return text
+}
 
 func pruneToolPairs(text string, blocks []toolBlock, keepRecent int) pruneDetails {
 	pairs := collectToolPairs(blocks)

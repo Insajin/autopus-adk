@@ -262,7 +262,7 @@ func TestCodexProviderEntryForQuality(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			entry := CodexProviderEntryForQuality(tt.quality)
-			assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", tt.wantModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, entry.Args)
+			assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", tt.wantModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, entry.Args)
 			assert.Equal(t, []string{"-m", tt.wantModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, entry.PaneArgs)
 		})
 	}

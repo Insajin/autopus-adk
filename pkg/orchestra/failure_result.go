@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 )
 
 var (
@@ -32,6 +34,8 @@ func buildFailedProviderWithContext(
 		OtherProvidersContinued: otherProvidersContinued,
 	}
 	if resp != nil {
+		failure.Usage = append([]telemetry.UsageEnvelope(nil), resp.Usage...)
+		failure.UsageCapability = resp.UsageCapability
 		if resp.Provider != "" {
 			failure.Name = resp.Provider
 		}
@@ -179,14 +183,14 @@ func buildFailureResult(cfg OrchestraConfig, failed []FailedProvider, roundHisto
 	if summary == "" && runErr != nil {
 		summary = runErr.Error()
 	}
-	return &OrchestraResult{
+	return finalizeOrchestraResult(&OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Duration:        time.Since(start),
 		Summary:         summary,
 		FailedProviders: failed,
 		RoundHistory:    roundHistory,
 		RunID:           cfg.RunID,
-	}
+	})
 }
 
 func failureSummary(failed []FailedProvider) string {

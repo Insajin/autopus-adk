@@ -1,0 +1,904 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "codex_aa_instrumentation_measurement",
+  "executed_on": "2026-07-12",
+  "execution": {
+    "provider": "codex",
+    "provider_version": "0.144.1",
+    "model": "gpt-5.6-sol",
+    "model_version": "gpt-5.6-sol",
+    "effort_policy": "xhigh",
+    "risk_policy": "instrumentation-aa-v1",
+    "cache_stratum": "provider-managed-stable-prefix-v1",
+    "config_hash": "sha256:a57f176a70e0d9998b2fbcb02de32d65ffc5aca7961993aeeca84ebdba3e0bff",
+    "surface": "codex exec",
+    "sandbox": "read-only",
+    "ephemeral": true,
+    "ignore_user_config": true,
+    "ignore_rules": true,
+    "skip_git_repo_check": true,
+    "prompt_transport": "stdin",
+    "output_transport": "jsonl",
+    "retries": 0,
+    "concurrency": 1,
+    "authorized_call_budget": 40,
+    "observed_provider_calls": 40,
+    "observed_raw_token_cap": 800000,
+    "observed_raw_total_tokens": 603754,
+    "provider_cost_usd": null,
+    "cost_observability": "unavailable_codex_subscription_cli"
+  },
+  "neutrality_bindings": {
+    "baseline_objective_hash": "sha256:7171b4e80d21ab86c8797b5c48b7b8dec9affeb59240bd6fdd7ad636fff8644f",
+    "candidate_objective_hash": "sha256:7171b4e80d21ab86c8797b5c48b7b8dec9affeb59240bd6fdd7ad636fff8644f",
+    "baseline_call_policy_hash": "sha256:7c9f149724d621603580c38ced52d88ddc40e133d212ebb4b29f6355ed4bb6c3",
+    "candidate_call_policy_hash": "sha256:7c9f149724d621603580c38ced52d88ddc40e133d212ebb4b29f6355ed4bb6c3",
+    "baseline_acceptance_hash": "sha256:e408c46563f2c1e64c07c1e11548357b27be4bb0a512572f60c9e10ae2bff99a",
+    "candidate_acceptance_hash": "sha256:e408c46563f2c1e64c07c1e11548357b27be4bb0a512572f60c9e10ae2bff99a",
+    "expected_output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+    "expected_empty_stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "acceptance": {
+    "minimum_actual_coverage_pct": 95,
+    "required_exit_code": 0,
+    "exact_output_required": true,
+    "zero_tool_events_required": true,
+    "actual_input_output_usage_required": true
+  },
+  "sanitization": {
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "raw_jsonl_retained": false,
+    "raw_stderr_retained": false,
+    "retained_fields": [
+      "arm",
+      "call_index",
+      "exit_code",
+      "duration_seconds",
+      "output_match",
+      "output_hash",
+      "tool_events",
+      "actual_complete",
+      "numeric_usage",
+      "stderr_hash"
+    ]
+  },
+  "arms": [
+    {
+      "arm": "A",
+      "eligible_calls": 20,
+      "actual_complete_calls": 20,
+      "successful_calls": 20,
+      "output_match_calls": 20,
+      "zero_tool_calls": 20,
+      "exit_zero_calls": 20,
+      "actual_coverage_pct": 100,
+      "raw_total_tokens": 250720,
+      "duration_seconds": 71,
+      "distinct_output_hashes": [
+        "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45"
+      ],
+      "distinct_stderr_hashes": [
+        "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "calls": [
+        {
+          "arm": "A",
+          "call_index": 1,
+          "exit_code": 0,
+          "duration_seconds": 5,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 2,
+          "exit_code": 0,
+          "duration_seconds": 2,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 3,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 14902,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 4918,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 14912
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 4,
+          "exit_code": 0,
+          "duration_seconds": 4,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 5,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 6,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 14902,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 4918,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 14912
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 7,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 8,
+          "exit_code": 0,
+          "duration_seconds": 4,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 9,
+          "exit_code": 0,
+          "duration_seconds": 4,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 12032,
+            "uncached_input_tokens": 230,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 10,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 11,
+          "exit_code": 0,
+          "duration_seconds": 4,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 12,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 13,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 14,
+          "exit_code": 0,
+          "duration_seconds": 6,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 15,
+          "exit_code": 0,
+          "duration_seconds": 2,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 16,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 17,
+          "exit_code": 0,
+          "duration_seconds": 5,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 18,
+          "exit_code": 0,
+          "duration_seconds": 5,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 12032,
+            "uncached_input_tokens": 230,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 19,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 2278,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "A",
+          "call_index": 20,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 12262,
+            "cached_input_tokens": 12032,
+            "uncached_input_tokens": 230,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 12272
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "arm": "B",
+      "eligible_calls": 20,
+      "actual_complete_calls": 20,
+      "successful_calls": 20,
+      "output_match_calls": 20,
+      "zero_tool_calls": 20,
+      "exit_zero_calls": 20,
+      "actual_coverage_pct": 100,
+      "raw_total_tokens": 353034,
+      "duration_seconds": 92,
+      "distinct_output_hashes": [
+        "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45"
+      ],
+      "distinct_stderr_hashes": [
+        "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      ],
+      "calls": [
+        {
+          "arm": "B",
+          "call_index": 1,
+          "exit_code": 0,
+          "duration_seconds": 6,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 2,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 3,
+          "exit_code": 0,
+          "duration_seconds": 4,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 4,
+          "exit_code": 0,
+          "duration_seconds": 2,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 5,
+          "exit_code": 0,
+          "duration_seconds": 6,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 6,
+          "exit_code": 0,
+          "duration_seconds": 5,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17066,
+            "cached_input_tokens": 8960,
+            "uncached_input_tokens": 8106,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17076
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 7,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 19848,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 9864,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 19858
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 8,
+          "exit_code": 0,
+          "duration_seconds": 7,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 9,
+          "exit_code": 0,
+          "duration_seconds": 10,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 10,
+          "exit_code": 0,
+          "duration_seconds": 2,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 11,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 12,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 13,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 14,
+          "exit_code": 0,
+          "duration_seconds": 5,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 15,
+          "exit_code": 0,
+          "duration_seconds": 4,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 17152,
+            "uncached_input_tokens": 264,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 16,
+          "exit_code": 0,
+          "duration_seconds": 4,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 19848,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 9864,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 19858
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 17,
+          "exit_code": 0,
+          "duration_seconds": 4,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 9984,
+            "uncached_input_tokens": 7432,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 18,
+          "exit_code": 0,
+          "duration_seconds": 12,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 17152,
+            "uncached_input_tokens": 264,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 19,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 17152,
+            "uncached_input_tokens": 264,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "arm": "B",
+          "call_index": 20,
+          "exit_code": 0,
+          "duration_seconds": 3,
+          "output_match": true,
+          "output_hash": "sha256:1895f0c812dfd330306844e5e3cc73f1c1c1e68b053eadb8c80e6e672b176e45",
+          "tool_events": 0,
+          "actual_complete": true,
+          "usage": {
+            "input_tokens_total": 17416,
+            "cached_input_tokens": 17152,
+            "uncached_input_tokens": 264,
+            "output_tokens_total": 10,
+            "reasoning_tokens": 0,
+            "raw_total_tokens": 17426
+          },
+          "stderr_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ],
+  "combined_summary": {
+    "eligible_calls": 40,
+    "actual_complete_calls": 40,
+    "successful_calls": 40,
+    "actual_coverage_pct": 100,
+    "raw_total_tokens": 603754,
+    "duration_seconds": 163,
+    "failed_calls": 0,
+    "retried_calls": 0,
+    "raw_token_cap_respected": true,
+    "call_budget_respected": true
+  },
+  "completion_debt_scope": {
+    "cd_02_global_status": "open",
+    "resolved_scopes": [
+      "direct_codex_subprocess:actual_usage_and_instrumentation_neutrality"
+    ],
+    "remaining_paths_policy": "shadow_or_full_ultra",
+    "cd_03_status": "open",
+    "behavior_promotion_state": "blocked",
+    "reason": "paired live quality, canary, audit, and rollback evidence is not present"
+  },
+  "evaluator": {
+    "input_file": "aa-evaluator-input-v1.json",
+    "input_sha256": "sha256:cc63dcdff20cd0f64eb0d6c4b2893434340fe8c8dfb7b7a5d808b18a292840e3",
+    "result_file": "aa-evaluator-result-v1.json",
+    "result_sha256": "sha256:a34fe927339ef8ffc1c1a5cd3a8e301cfb8a1d470f3f56beb413313ae9bfb0ed",
+    "measurement_gate": "PASS",
+    "neutrality_gate": "PASS",
+    "actual_usage_capture_pct": 100,
+    "promotion_decision": "BLOCKED",
+    "promotion_reason": "insufficient_paired_evidence",
+    "rollout_decision": "SHADOW",
+    "active_profile": "full_ultra"
+  }
+}

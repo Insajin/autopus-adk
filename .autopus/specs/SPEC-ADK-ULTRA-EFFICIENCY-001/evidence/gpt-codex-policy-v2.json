@@ -1,0 +1,190 @@
+{
+  "admission_generation": "v2",
+  "audit": {
+    "nonce": "audit-nonce-39",
+    "rate_percent": 20,
+    "required_profile_both_arms": "full5",
+    "selected_task_id": "ute-corpus-v1-005",
+    "selected_task_risk": "medium",
+    "selection_algorithm": "sha256_mod_100_v1",
+    "selection_table_receipt": "gpt-canary-preflight-v1.json"
+  },
+  "authorization": {
+    "concurrency": 1,
+    "provider": "codex",
+    "provider_call_cap": 64,
+    "raw_token_cap": 1500000,
+    "retries": 0
+  },
+  "circuit_breaker": {
+    "partial_receipt_promotion_eligible": false,
+    "state": "CLOSED_BEFORE_RUN",
+    "stop_without_retry_on": [
+      "nonzero_process_exit",
+      "result_not_success",
+      "verdict_not_pass",
+      "finding_count_nonzero",
+      "tool_call_nonzero",
+      "usage_not_actual",
+      "model_call_count_not_one",
+      "role_budget_exceeded",
+      "identity_mismatch",
+      "schema_mismatch",
+      "raw_retention_detected",
+      "authorization_admission_failure"
+    ]
+  },
+  "decision": {
+    "activation": false,
+    "implemented": false,
+    "promotion": false,
+    "status": "AWAITING_EXPLICIT_FULL_EVALUATION_AUTHORIZATION"
+  },
+  "evidence_kind": "gpt_codex_full_evaluation_policy",
+  "execution_runtime": {
+    "admission_bundle_algorithm": "sha256-named-member-manifest-v1",
+    "admission_bundle_member_count": 9,
+    "admission_bundle_sha256": "sha256:45711d43d420414be3ec462155542d9eeb0d4dd5d36daec9dee1ae801bd616ab",
+    "auto_executable_sha256": "sha256:5744f2c4190a1f557320bd6f8034dd809e88bec626b237df1dd8d403fdc148f8",
+    "auto_version": "0.50.68-ute-transport-diagnosis-v8",
+    "codex_cli_version": "0.144.1",
+    "codex_executable_sha256": "sha256:134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477",
+    "full_chain_algorithm": "sha256-named-member-manifest-v1",
+    "full_chain_harness_sha256": "sha256:9c449510ae7918f2d066119cfc2374739e4ae7e83100321645c0c79710afc626",
+    "full_chain_member_count": 17,
+    "harness_sha256": "sha256:18a3f923553208d0ae2df24e4582f3983b7381c5069ceeee7bafffbb5096a22a"
+  },
+  "frozen_artifacts": {
+    "cohort_sha256": "sha256:d6fc675b4fb8b240b2bfdc79fc1439fb783650c169ca07796c967e78103b6419",
+    "config_sha256": "sha256:cbeec982ffb2e11eea1d65345c3190a03016d6d0c96c1e84b28c50d006d0a6de",
+    "corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+    "prior_evidence_manifest_sha256": "sha256:37c234dddab88bbc0b4edbbbdc45b4b3b648118cbd821c97f377cdd2d7b7ba98",
+    "schedule_sha256": "sha256:274111c56b896522e6c90ed07d83e508ce909214ef871fd42de03267a73a0196",
+    "snapshot_manifest_sha256": "sha256:06196bcc3d143c89f28d56e7ee7c222d423ffc8ec6acd78d447b40dac99284c2",
+    "transport_terminal_sha256": "sha256:13f31960752167111bc202899721f67e05b3c3d6da5c71372f778bfe65776792",
+    "verdict_schema_sha256": "sha256:c6d47cb848abfd0ee9ef3514072cb4786945835e0ad852c5f13cecf434529e0b"
+  },
+  "hard_envelope": {
+    "planned_total_calls": 63,
+    "planned_worst_case_raw_tokens": 1446000,
+    "primary_calls": 58,
+    "primary_max_calls": 14,
+    "primary_worst_case_raw_tokens": 1332000,
+    "primary_xhigh_calls": 44,
+    "raw_token_safety_margin": 54000,
+    "rollback_max_calls": 1,
+    "rollback_replay_calls": 5,
+    "rollback_worst_case_raw_tokens": 114000,
+    "rollback_xhigh_calls": 4,
+    "unplanned_call_slots": 1
+  },
+  "neutrality": {
+    "arm_mapping_retained_only_in_sanitized_external_ledger": true,
+    "call_ids": "opaque_sha256_prefix",
+    "consolidator_input": "bounded_prior_verdict_and_finding_count_only",
+    "provider_cwd_excludes_arm_identity": true,
+    "provider_prompt_excludes": [
+      "baseline",
+      "candidate",
+      "experiment arm"
+    ]
+  },
+  "privacy": {
+    "absolute_paths_retained": false,
+    "provider_stdout_stderr_retained": false,
+    "raw_patch_retained": false,
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "retained_field_scan_required": true,
+    "session_or_environment_retained": false
+  },
+  "profiles": {
+    "compact2": [
+      {
+        "effort": "xhigh",
+        "raw_token_budget": 22000,
+        "role": "reviewer",
+        "role_ordinal": 1
+      },
+      {
+        "effort": "max",
+        "raw_token_budget": 26000,
+        "role": "security-auditor",
+        "role_ordinal": 1
+      }
+    ],
+    "full5": [
+      {
+        "effort": "xhigh",
+        "raw_token_budget": 22000,
+        "role": "reviewer",
+        "role_ordinal": 1
+      },
+      {
+        "effort": "xhigh",
+        "raw_token_budget": 22000,
+        "role": "reviewer",
+        "role_ordinal": 2
+      },
+      {
+        "effort": "xhigh",
+        "raw_token_budget": 22000,
+        "role": "reviewer",
+        "role_ordinal": 3
+      },
+      {
+        "effort": "max",
+        "raw_token_budget": 26000,
+        "role": "security-auditor",
+        "role_ordinal": 1
+      },
+      {
+        "effort": "xhigh",
+        "raw_token_budget": 22000,
+        "role": "review-consolidator",
+        "role_ordinal": 1
+      }
+    ]
+  },
+  "rollback": {
+    "profile": "full5",
+    "promotion_eligible": false,
+    "requires_validated_applied_receipt": true,
+    "runs_only_after_primary_and_prior_gates": true,
+    "task_id": "ute-corpus-v1-001"
+  },
+  "schedule_semantics": {
+    "baseline_arm": "A",
+    "baseline_profile": "full5",
+    "candidate_arm": "B",
+    "candidate_compact_tasks": [
+      "ute-corpus-v1-001",
+      "ute-corpus-v1-004",
+      "ute-corpus-v1-011",
+      "ute-corpus-v1-012"
+    ],
+    "candidate_full_tasks": [
+      "ute-corpus-v1-005",
+      "ute-corpus-v1-006",
+      "ute-corpus-v1-009"
+    ],
+    "one_process_at_a_time": true,
+    "retry_on_failure": false,
+    "task_pair_orders": [
+      "001:AB",
+      "004:BA",
+      "005:AB",
+      "011:BA",
+      "012:AB",
+      "006:BA",
+      "009:AB"
+    ]
+  },
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "transport_gate": {
+    "same_authorization_reusable": false,
+    "status": "PASS",
+    "terminal_sha256": "sha256:13f31960752167111bc202899721f67e05b3c3d6da5c71372f778bfe65776792"
+  },
+  "version": 2
+}

@@ -66,6 +66,7 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	}
 
 	allResults := r1Results
+	roundHistory := [][]ProviderResponse{providerResultsToResponses(r1Results)}
 	var r2Results []ProviderResult
 
 	// Phase 2: Cross-pollination rounds
@@ -101,6 +102,7 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		r1Failed = append(r1Failed, roundFailed...)
 		r2Results = roundResults
 		allResults = roundResults
+		roundHistory = append(roundHistory, providerResultsToResponses(roundResults))
 	}
 
 	// Phase 3: Judge synthesis
@@ -163,13 +165,11 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 
 	// Build response list for OrchestraResult
 	var responses []ProviderResponse
-	for _, r := range r1Results {
-		responses = append(responses, ProviderResponse{Provider: r.Provider, Output: r.Output})
-	}
+	responses = append(responses, providerResultsToResponses(r1Results)...)
 	judgeResp.Provider = cfg.Judge.Name + " (judge)"
 	responses = append(responses, *judgeResp)
 
-	return &OrchestraResult{
+	result := &OrchestraResult{
 		Strategy:        StrategyDebate,
 		Responses:       responses,
 		Merged:          merged,
@@ -177,7 +177,21 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		Summary:         fmt.Sprintf("subprocess pipeline: %d providers, %d rounds", len(cfg.Providers), cfg.Rounds+1),
 		FailedProviders: r1Failed,
 		Degraded:        len(r1Failed) > 0,
-	}, nil
+		RoundHistory:    roundHistory,
+	}
+	aggregateOrchestraUsage(result)
+	return result, nil
+}
+
+func providerResultsToResponses(results []ProviderResult) []ProviderResponse {
+	responses := make([]ProviderResponse, 0, len(results))
+	for _, result := range results {
+		responses = append(responses, ProviderResponse{
+			Provider: result.Provider, Output: result.Output,
+			Usage: result.Usage, UsageCapability: result.UsageCapability,
+		})
+	}
+	return responses
 }
 
 // buildPromptBuilder creates a PromptBuilder, panicking on error (templates are embedded).

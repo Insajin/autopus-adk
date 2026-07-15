@@ -16,13 +16,13 @@ const finalReadTimeout = 5 * time.Second
 // screen collection is used.
 func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req ProviderRequest, pi paneInfo, timedOut bool) *ProviderResponse {
 	if output, ok := readResponseFile(pi.responseFile); ok {
-		return &ProviderResponse{
+		return markUnavailableUsage(&ProviderResponse{
 			Provider:        req.Provider,
 			Output:          output,
 			TimedOut:        false,
 			EmptyOutput:     false,
 			ExecutedBackend: paneBackendName,
-		}
+		}, usageSourcePane, usageReasonPane)
 	}
 	if requiresReviewerResponseFile(req, pi) && !timedOut {
 		// While the reviewer pane is still running, a mid-render screen could be
@@ -30,13 +30,13 @@ func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req Provid
 		// response file is trusted (anti-truncation; issue #59 — claude writes the
 		// response file and completes early while codex/gemini do not, so they run
 		// to the watchdog boundary).
-		return &ProviderResponse{
+		return markUnavailableUsage(&ProviderResponse{
 			Provider:        req.Provider,
 			TimedOut:        timedOut,
 			EmptyOutput:     true,
 			Error:           reviewerResponseFileMissingError(timedOut),
 			ExecutedBackend: paneBackendName,
-		}
+		}, usageSourcePane, usageReasonPane)
 	}
 
 	// At the deadline a reviewer that printed its answer to the terminal — the
@@ -73,11 +73,11 @@ func (b *InteractivePaneBackend) buildResponseFromScreen(provider, rawScreen str
 		// stripped everything (e.g., prompt-only screens).
 		sanitized = SanitizeScreenOutput(rawScreen)
 	}
-	return &ProviderResponse{
+	return markUnavailableUsage(&ProviderResponse{
 		Provider:        provider,
 		Output:          sanitized,
 		TimedOut:        timedOut,
 		EmptyOutput:     sanitized == "",
 		ExecutedBackend: paneBackendName,
-	}
+	}, usageSourcePane, usageReasonPane)
 }

@@ -133,6 +133,12 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 		}
 		files = append(files, agentFiles...)
 
+		workflowSkillFiles, err := a.renderWorkflowSkills(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("상세 workflow 스킬 생성 실패: %w", err)
+		}
+		files = append(files, workflowSkillFiles...)
+
 		// REQ-004: emit the generated Route A workflow JS and register it in
 		// the manifest (manifest registration happens automatically below).
 		workflowDir := filepath.Join(a.root, ".claude", "workflows")

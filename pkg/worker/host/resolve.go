@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	worker "github.com/insajin/autopus-adk/pkg/worker"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
@@ -44,6 +45,10 @@ type RuntimeConfig struct {
 
 // LoopConfig converts the resolved runtime config into the shared WorkerLoop config.
 func (cfg RuntimeConfig) LoopConfig() worker.LoopConfig {
+	telemetryRoot := strings.TrimSpace(cfg.WorkDir)
+	if telemetryRoot == "" {
+		telemetryRoot = "."
+	}
 	return worker.LoopConfig{
 		BackendURL:                     cfg.BackendURL,
 		WorkerName:                     cfg.WorkerName,
@@ -62,6 +67,9 @@ func (cfg RuntimeConfig) LoopConfig() worker.LoopConfig {
 		WorktreeFallbackOverrideReason: runtimeWorktreeFallbackOverrideReason(),
 		KnowledgeSync:                  cfg.KnowledgeSync,
 		KnowledgeDir:                   cfg.KnowledgeDir,
+		RecordAgentRun: func(run telemetry.AgentRun) error {
+			return telemetry.AppendAgentRun(telemetryRoot, run)
+		},
 	}
 }
 

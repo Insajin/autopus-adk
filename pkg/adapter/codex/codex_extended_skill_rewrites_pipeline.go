@@ -65,6 +65,7 @@ Keep prompt authority explicit. When routing or spawning workers, preserve this 
 - Ephemeral layer: the latest user request, run flags, retry state, and focused worker task
 
 Worker prompts must not replace stable policy with ad-hoc instructions. If layers conflict, stop and surface the conflict instead of silently choosing a weaker contract.
+` + codexRequiredContextDeliveryContract() + `
 
 ## Phase 0.5: Autonomy Policy
 
@@ -99,7 +100,7 @@ Phase 4B:  Verify Fixes    -> reviewer/security follow-up, diff-only
 
 Quality mode influences model choice, not platform semantics:
 
-- Ultra: pass ` + "`model=\"opus\"`" + ` to spawned workers
+- Ultra: use the GPT model and reasoning effort resolved by the verified workflow quality binding
 - Balanced: use each role's default model
 - Adaptive: choose stronger models only for high-complexity tasks
 
@@ -132,8 +133,8 @@ Spawn a planner when the task has enough scope to justify decomposition.
 
 ` + "```python" + `
 spawn_agent(
-    agent_type="planner",
-    fork_context=True,
+    task_name="planner",
+    fork_turns="all",
     message="""
     Read SPEC-XXX.
     Produce an execution table with task id, owner role, mode, and file ownership.
@@ -202,8 +203,8 @@ Parallel implementation is valid only with disjoint ownership. Prefer narrow wor
 
 ` + "```python" + `
 spawn_agent(
-    agent_type="executor",
-    fork_context=True,
+    task_name="executor",
+    fork_turns="all",
     message="""
     Own only: pkg/auth/*.
     Follow TDD for task T1.

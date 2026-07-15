@@ -1,0 +1,18 @@
+{
+  "active_profile": "full_ultra",
+  "after_binding_sha256": "sha256:280947da4fbb8256fda384a83c4077781d1679ef90ad46f096b6cbd8368f8336",
+  "applied": true,
+  "atomic_replace": true,
+  "before_binding_sha256": "sha256:ccb17e6a289944c5ab00f135d04a94b585e7844024b3480f9f74ed40053b42b3",
+  "config_sha256": "sha256:cbeec982ffb2e11eea1d65345c3190a03016d6d0c96c1e84b28c50d006d0a6de",
+  "decision": "ROLLBACK",
+  "evidence_kind": "applied_policy_rollback",
+  "fsync_completed": true,
+  "logical_rollback_result_sha256": "sha256:d556622df5e363a49604f1602abbdea563c71825eea70c4c8330223b5d3bc0b7",
+  "policy_sha256": "sha256:147b22163b267ddcd12af5ff27225399f92351db75512d12afbc73386ce7d791",
+  "primary_ledger_sha256": "sha256:a8ceed2ebceae72bb120c84ecc6ace10e6ee0c2f4678c3eaa340ab86a3602aab",
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "state_readback": "full_ultra",
+  "state_readback_sha256": "sha256:280947da4fbb8256fda384a83c4077781d1679ef90ad46f096b6cbd8368f8336",
+  "version": 1
+}

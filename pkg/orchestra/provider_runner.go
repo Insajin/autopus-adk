@@ -66,8 +66,8 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 		_ = stdinPipe.Close()
 
 		waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh, readyMonitor)
-		stdoutOutput, stderrOutput := applyCodexLastMessageOutput(stdoutBuf.String(), stderrBuf.String(), lastMessagePath)
-		return buildProviderResponse(start, provider, stdoutOutput, stderrOutput, detector.Reason(), waitErr, ctx, cmd.ExitCode())
+		return finishProviderResponse(providerResponseArgs{start, provider, detector.Reason(), waitErr, ctx, cmd.ExitCode()},
+			stdoutBuf.String(), stderrBuf.String(), lastMessagePath)
 	}
 
 	cmd.SetStdin(nil)
@@ -77,8 +77,8 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 
 	waitCh := startCommandWait(cmd)
 	waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh, readyMonitor)
-	stdoutOutput, stderrOutput := applyCodexLastMessageOutput(stdoutBuf.String(), stderrBuf.String(), lastMessagePath)
-	return buildProviderResponse(start, provider, stdoutOutput, stderrOutput, detector.Reason(), waitErr, ctx, cmd.ExitCode())
+	return finishProviderResponse(providerResponseArgs{start, provider, detector.Reason(), waitErr, ctx, cmd.ExitCode()},
+		stdoutBuf.String(), stderrBuf.String(), lastMessagePath)
 }
 
 func runProviderWithProgress(ctx context.Context, provider ProviderConfig, prompt string, tracker *ProgressTracker) (*ProviderResponse, error) {

@@ -1,0 +1,19 @@
+---
+name: auto-verify
+description: Playwright 기반 프론트엔드 UX와 visual evidence를 검증합니다
+platform: antigravity-cli
+---
+
+# auto-verify
+
+## Context Profile
+
+Load core workspace policy, changed UI scope, declared design sources, and affected test evidence. Do not load canary or unrelated scenarios.
+
+## Contract
+
+1. Run `auto verify` with user flags unchanged and detect the configured browser/test surface.
+2. Generate or heal only affected tests, then run them and inspect screenshots where visual judgment is required.
+3. Check layout, accessibility, focus, responsive behavior, states, and deterministic oracles.
+4. Separate verified findings from suggestions; make no product edit unless the user requested a fix.
+5. Report commands, artifacts, PASS/FAIL, and the next recovery action.

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "created_at": "2026-07-12T14:43:29Z",
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "scope": "gpt-codex-only",
+  "finding": {
+    "id": "GPT-CANARY-CUMULATIVE-AUTHORIZATION-001",
+    "severity": "P1",
+    "status": "RESOLVED",
+    "summary": "A new state or output directory can no longer reset consumption for the same frozen authorization."
+  },
+  "authorization": {
+    "identity": "sha256:1640281825b184f9ffbb92dc36a9afac27a5b55a9ff9d2632aadfa2dcce9430b",
+    "identity_source": "gpt-codex-policy-v1.json sha256",
+    "provider_call_cap": 64,
+    "raw_token_cap": 1500000,
+    "concurrency": 1,
+    "retries": 0,
+    "primary_calls_reserved": 58,
+    "rollback_calls_reserved": 5,
+    "total_calls_reserved": 63,
+    "total_raw_tokens_reserved": 1446000,
+    "state": "CONSUMED_ON_RECONCILIATION"
+  },
+  "canonical_contract": {
+    "live_output_must_equal_static_evidence_root": true,
+    "noncanonical_output_exception_present": false,
+    "runtime_state_path_template": ".autopus/runtime/ute-authorizations/<policy-sha256>/",
+    "runtime_state_is_gitignored": true,
+    "primary_reservation_is_atomic": true,
+    "rollback_reservation_is_atomic": true,
+    "claim_survives_crash_or_ledger_move": true
+  },
+  "reconciliation": {
+    "source_ledger": "gpt-primary-call-ledger-v1.partial-fail.json",
+    "source_ledger_sha256": "sha256:f1b2fc2171af84464c6e5e7f39d5db62918480740d60abe4fabc93784987b582",
+    "source_ledger_valid": true,
+    "terminal_state": "PARTIAL_FAIL",
+    "observed_calls": 39,
+    "observed_raw_total_tokens": 523811,
+    "runtime_reservation_sha256": "sha256:84a15025ffc1864b523c4fde06e1f56cc8a33a273247942fe9ca20c6604c7e38",
+    "runtime_reservation_sidecar_valid": true
+  },
+  "actual_reuse_probe": {
+    "sentinel_executable_invocations": 0,
+    "canonical_output_reuse_exit_code": 1,
+    "noncanonical_output_reuse_exit_code": 1,
+    "provider_calls_made": 0,
+    "raw_total_tokens": 0,
+    "partial_ledger_sha256_unchanged": true,
+    "terminal_outcome_sha256_unchanged": true,
+    "runtime_reservation_sha256_unchanged": true
+  },
+  "implementation_receipts": {
+    "ute_codex_canary_sh_sha256": "sha256:8ec88fb382f245d464867d2d7192213982082e3327b4bdb0749fd3775e053171",
+    "ute_codex_canary_authorization_sh_sha256": "sha256:496580cee009301ab2528b6f1d600a72a129ca4691e8c5e24affcc801322c75d",
+    "ute_codex_canary_test_sh_sha256": "sha256:886c7a8d0b364416c536eae99ad40887cc8a9f833e9260b4bad6e5e69104b662",
+    "ute_codex_canary_auth_testlib_sh_sha256": "sha256:de00e64c2807d0fc6d3b0d1887dbb45139a7a83578245c7609c1701022966fcc",
+    "ute_gpt_evidence_test_sh_sha256": "sha256:6e8c6fb088875c4d46dbc4e503111d76a4fd316fed43c9f724c0e95d3f22dc6b"
+  },
+  "verification": {
+    "bash_syntax": "PASS",
+    "canary_auth_reuse_concurrency_suite": "PASS",
+    "gpt_evidence_cross_suite": "PASS",
+    "independent_diff_only_review": "PASS",
+    "open_p0": 0,
+    "open_p1": 0,
+    "open_p2": 0
+  },
+  "decision": {
+    "current_authorization_reusable": false,
+    "current_primary_resumable": false,
+    "rollback_replay_admissible": false,
+    "promotion_eligible": false,
+    "candidate_activated": false,
+    "effective_safe_profile": "full_ultra",
+    "next_live_run_requires_new_frozen_policy_hash": true,
+    "next_live_run_requires_explicit_authorization": true
+  }
+}

@@ -39,7 +39,7 @@ func TestMigrateOpencodeToCodex_Basic(t *testing.T) {
 	require.True(t, hasCodex, "codex provider must exist after migration")
 	assert.Equal(t, "codex", codex.Binary)
 	// SPEC-ORCH-021 REQ-014/015: exec --sandbox workspace-write + reasoning effort.
-	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, codex.Args)
+	assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, codex.Args)
 	assert.False(t, codex.PromptViaArgs, "codex PromptViaArgs must be false")
 	assert.Equal(t, CodexOrchestraTimeoutSeconds, codex.Subprocess.Timeout)
 	assert.Equal(t, "--output-schema", codex.Subprocess.SchemaFlag)
@@ -148,7 +148,7 @@ func TestDefaultProviderEntries_CodexArgs(t *testing.T) {
 	require.True(t, ok, "codex must exist in defaultProviderEntries")
 
 	// SPEC-ORCH-021 REQ-014/015: exec --sandbox workspace-write + reasoning effort.
-	expectedArgs := []string{"exec", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}
+	expectedArgs := []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}
 	assert.Equal(t, expectedArgs, codex.Args, "codex args must match new exec-mode format")
 	assert.Equal(t, "codex", codex.Binary)
 }

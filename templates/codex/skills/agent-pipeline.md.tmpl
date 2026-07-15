@@ -63,6 +63,22 @@ Preflight contract:
 
 Pipeline prompts should preserve stable instructions, frozen snapshot recall, and ephemeral task/tool context as separate prompt layer manifest entries. Dry-run or debug output should report cache invalidation scope by layer without exposing raw secrets.
 
+## Scoped Context Receipt Contract
+
+Before delegating a worker task, select a receipt-metadata budget between 800 and 2,000 estimated tokens. Required document bodies are outside that budget; only optional memory recall uses its residual capacity.
+
+Every receipt must include:
+
+- Outcome Lock and constraints
+- owned paths and forbidden paths
+- acceptance criteria and required references
+- current decision delta
+- snapshot hash and prompt-manifest hash
+- selected recall source references and hashes
+- omitted recall count
+
+Build a body-free manifest with `auto workflow context`, then deliver every required document through its stable reference and hashes. Bind compact selection to the same command, SPEC, conditional profiles, and supervisor-held task references with `auto workflow binding --context-manifest ... --context-command go --context-spec-dir ... --context-required-document <ref>`. Repeat the task-reference flag for the exact set used by `auto workflow context --required-document <ref>`. Workers must read those references; request `context_ack` as diagnostic evidence, while supervisor-held references and hashes remain the integrity gate. Never truncate, summarize, drop, or replace required documents with the receipt. Missing, empty, stale, unreadable, incomplete, omitted-reference, replayed, wrong-SPEC, or hash-mismatched context is `context_integrity_failed`: retain full Ultra and block provider dispatch until the documents are restored or the task is split. Optional recall may be omitted; required references may not.
+
 ## Minimality Discipline
 
 Every planner, executor, tester, reviewer, and fixer prompt must include this minimality ladder before task assignment:

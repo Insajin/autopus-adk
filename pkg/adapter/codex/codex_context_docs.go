@@ -1,13 +1,65 @@
 package codex
 
+import (
+	"fmt"
+	"strings"
+)
+
 func codexProjectContextLoadList() string {
-	return "1. `ARCHITECTURE.md`\n" +
-		"2. `.autopus/project/product.md`\n" +
-		"3. `.autopus/project/structure.md`\n" +
-		"4. `.autopus/project/tech.md`\n" +
-		"5. `.autopus/project/workspace.md`\n" +
-		"6. `.autopus/project/scenarios.md`\n" +
-		"7. `.autopus/project/canary.md`\n" +
-		"8. `.autopus/context/signatures.md`\n" +
-		"9. `.autopus/learnings/pipeline.jsonl`\n"
+	return "- `core`: `AGENTS.md`, `.autopus/project/workspace.md`\n" +
+		"- `architecture`: `ARCHITECTURE.md`, `.autopus/project/product.md`, `.autopus/project/structure.md`, `.autopus/project/tech.md`\n" +
+		"- `test`: `.autopus/project/scenarios.md`\n" +
+		"- `canary`: `.autopus/project/canary.md`\n" +
+		"- `signature`: `.autopus/context/signatures.md`\n" +
+		"- `learning`: `.autopus/learnings/pipeline.jsonl`\n"
+}
+
+func injectCodexContextProfile(body string) string {
+	if strings.Contains(body, "## Context Profile:") {
+		return body
+	}
+	var profile string
+	switch {
+	case strings.Contains(body, "# auto-plan"):
+		profile = "## Context Profile: plan\n\n- Load `core + architecture + relevant SPEC`.\n- Load `signature` or `learning` only when independently relevant.\n- Do not load test or canary profiles."
+	case strings.Contains(body, "# auto-test"):
+		profile = "## Context Profile: test\n\n- Load `core + test`, including `.autopus/project/scenarios.md`.\n- Load `signature` or `learning` only when independently relevant.\n- Do not load the canary profile."
+	case strings.Contains(body, "# auto-canary"):
+		profile = "## Context Profile: canary\n\n- Load `core + canary`, including `.autopus/project/canary.md`.\n- Load `learning` only when independently relevant.\n- Do not load test or signature profiles."
+	}
+	if profile == "" {
+		return body
+	}
+	return injectAfterFirstHeading(body, profile)
+}
+
+func codexRouterExecutionContract() string {
+	return fmt.Sprintf("## Router Execution Contract\n\n"+
+		"- Treat this file as a thin entrypoint only.\n"+
+		"- After resolving the subcommand, immediately load the matching detailed workflow surface (%s) before answering or acting.\n"+
+		"- Do not stay at the router layer when a detailed workflow exists for the request.\n"+
+		"- Load core workspace policy first, then only the selected command context profile.\n\n"+
+		"## Context Load\n\n"+
+		"Context profiles map to these documents:\n\n"+
+		codexProjectContextLoadList()+"\n"+
+		"- `plan = core + architecture + relevant SPEC`; `signature` and `learning` are conditional.\n"+
+		"- `test = core + test`; `signature` and `learning` are conditional.\n"+
+		"- `canary = core + canary`; only `learning` is conditional.\n"+
+		"- Do not load scenarios, canary, signatures, learnings, or unrelated product documents outside the selected profile.\n"+
+		"- If core documents are absent, explicitly note the gap and recommend `@auto setup`.\n\n"+
+		"## SPEC Path Resolution\n\n"+
+		"When any workflow receives a SPEC-ID, resolve the actual file path before opening files, spawning workers, or running build/test commands:\n\n"+
+		"1. Check `.autopus/specs/{SPEC-ID}/spec.md` (top-level, cross-module or legacy SPECs).\n"+
+		"2. Recursively search `**/.autopus/specs/{SPEC-ID}/spec.md`, skipping `.git`, `node_modules`, `vendor`, `.cache`, and `dist`.\n\n"+
+		"From the resolved path, extract:\n\n"+
+		"- `SPEC_PATH`: full path to `spec.md`\n"+
+		"- `SPEC_DIR`: parent SPEC directory\n"+
+		"- `TARGET_MODULE`: submodule path, or `.` for top-level SPECs\n"+
+		"- `WORKING_DIR`: the directory where build/test commands run (`TARGET_MODULE` or `.`)\n\n"+
+		"Error handling:\n\n"+
+		"- 0 matches: report the SPEC is missing and list available SPEC IDs.\n"+
+		"- 2+ matches: report the duplicate paths and stop for clarification.\n"+
+		"- All detailed workflows must use the resolved values instead of assuming `.autopus/specs/{SPEC-ID}` is rooted at the current directory.\n",
+		routerDetailSkills(),
+	)
 }

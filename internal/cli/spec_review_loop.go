@@ -13,17 +13,18 @@ import (
 
 // specReviewLoopParams holds all parameters needed by the revision loop.
 type specReviewLoopParams struct {
-	ctx            context.Context
-	specID         string
-	specDir        string
-	strategy       string
-	timeout        int
-	maxRevisions   int
-	threshold      float64
-	gate           config.ReviewGateConf
-	providers      []orchestra.ProviderConfig
-	codeContext    string
-	subprocessMode bool
+	ctx             context.Context
+	specID          string
+	specDir         string
+	strategy        string
+	timeout         int
+	maxRevisions    int
+	threshold       float64
+	gate            config.ReviewGateConf
+	providers       []orchestra.ProviderConfig
+	codeContext     string
+	subprocessMode  bool
+	contextDelivery *specReviewContextDelivery
 }
 
 // runSpecReviewLoop executes the REVISE loop and returns the final merged result.
@@ -35,22 +36,15 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		if revision > 0 {
 			reloaded, err := spec.Load(p.specDir)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "경고: spec 재로드 실패 (이전 버전 유지): %v\n", err)
-			} else {
-				doc = reloaded
+				return nil, fmt.Errorf("SPEC 문맥 재로드 실패: %w", err)
 			}
+			doc = reloaded
 		}
 
-		staticFindings, staticErr := spec.RunSpecContractAnalysis(p.specDir)
-		if staticErr != nil {
-			fmt.Fprintf(os.Stderr, "경고: SPEC static contract analysis 실패: %v\n", staticErr)
+		prompt, staticFindings, err := buildSpecReviewProviderPrompt(p, doc, priorFindings, revision)
+		if err != nil {
+			return nil, fmt.Errorf("리뷰 필수 문서 전달 실패: %w", err)
 		}
-
-		opts := buildPromptOpts(priorFindings, revision, p.specDir, p.gate)
-		if opts.Mode == spec.ReviewModeDiscover {
-			opts.StaticFindings = staticFindings
-		}
-		prompt := spec.BuildReviewPrompt(doc, p.codeContext, opts) //nolint:govet
 
 		// SPEC-ORCH-022: the pane provider must launch in the working directory
 		// whose .claude/settings.json carries the orchestra hooks (the same dir

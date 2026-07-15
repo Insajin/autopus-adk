@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "bounded_provider_capability_pilot",
+  "observed_on": "2026-07-12",
+  "frozen_corpus_hash": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+  "scope": {
+    "purpose": "prove that installed provider CLIs can emit actual-complete usage without retaining prompt or response bodies",
+    "provider_call_cap": 3,
+    "provider_calls_made": 3,
+    "a_a_execution": "not_executed",
+    "canary_execution": "not_executed",
+    "route_team_execution": "not_executed"
+  },
+  "installed_surfaces": {
+    "claude_cli": "2.1.198",
+    "codex_cli": "0.144.1",
+    "gemini_cli": "0.47.0",
+    "agy_cli": "1.1.1",
+    "installed_auto": {
+      "version": "0.50.68",
+      "commit": "46dd7c3",
+      "current_worktree_feature_parity": false
+    }
+  },
+  "calls": [
+    {
+      "call_id": "capability-claude-001",
+      "provider": "claude",
+      "provider_version": "2.1.198",
+      "transport": "print_stream_json",
+      "usage_status": "actual",
+      "input_tokens_total": 20092,
+      "uncached_input_tokens": 2952,
+      "cache_creation_input_tokens": 1923,
+      "cache_read_input_tokens": 15217,
+      "output_tokens_total": 5,
+      "raw_total_tokens": 20097,
+      "actual_cost_usd": 0.0423045,
+      "model_identity": "ambiguous_multi_model_top_level_usage",
+      "comparison_eligible": false,
+      "exclusion_reason": "trusted_single_model_version_missing"
+    },
+    {
+      "call_id": "capability-codex-001",
+      "provider": "codex",
+      "provider_version": "0.144.1",
+      "transport": "exec_jsonl",
+      "usage_status": "actual",
+      "input_tokens_total": 18064,
+      "cached_input_tokens": 9984,
+      "cached_input_relation": "subset_of_input",
+      "output_tokens_total": 5,
+      "reasoning_tokens": 0,
+      "reasoning_relation": "subset_of_output",
+      "raw_total_tokens": 18069,
+      "actual_cost_usd": null,
+      "model_identity": "not_fixed_by_invocation",
+      "comparison_eligible": false,
+      "exclusion_reason": "trusted_model_version_missing"
+    },
+    {
+      "call_id": "capability-claude-002",
+      "provider": "claude",
+      "provider_version": "2.1.198",
+      "transport": "print_stream_json_no_session_persistence",
+      "usage_status": "actual",
+      "input_tokens_total": 20092,
+      "uncached_input_tokens": 2952,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 17140,
+      "output_tokens_total": 5,
+      "raw_total_tokens": 20097,
+      "actual_cost_usd": 0.024036,
+      "model_identity": "ambiguous_multi_model_top_level_usage",
+      "comparison_eligible": false,
+      "exclusion_reason": "trusted_single_model_version_missing"
+    }
+  ],
+  "pilot_summary": {
+    "actual_complete_calls": 3,
+    "observed_calls": 3,
+    "actual_complete_coverage_pct": 100,
+    "comparison_eligible_calls": 0,
+    "raw_total_tokens": 58263,
+    "known_actual_cost_usd": 0.0663405,
+    "unknown_cost_calls": 1
+  },
+  "execution_path_capability": [
+    {
+      "path": "direct_claude_subprocess",
+      "provider_cli_version": "2.1.198",
+      "structured_usage": "observed_actual",
+      "live_calls": 2,
+      "promotion_state": "blocked",
+      "reason": "single trusted model stratum not established"
+    },
+    {
+      "path": "direct_codex_subprocess",
+      "provider_cli_version": "0.144.1",
+      "structured_usage": "observed_actual",
+      "live_calls": 1,
+      "promotion_state": "blocked",
+      "reason": "trusted model version not established"
+    },
+    {
+      "path": "worker_claude_codex",
+      "provider_cli_version": "version_dependent",
+      "structured_usage": "hermetic_parser_verified",
+      "live_calls": 0,
+      "promotion_state": "shadow_full_ultra",
+      "reason": "live A/A execution not performed"
+    },
+    {
+      "path": "worker_gemini_agy",
+      "provider_cli_version": "agy-1.1.1",
+      "structured_usage": "cost_only_or_unavailable",
+      "live_calls": 0,
+      "promotion_state": "shadow_full_ultra",
+      "reason": "actual token usage unsupported"
+    },
+    {
+      "path": "orchestra_claude",
+      "provider_cli_version": "2.1.198",
+      "structured_usage": "parser_capable_transport_not_live_verified",
+      "live_calls": 0,
+      "promotion_state": "shadow_full_ultra",
+      "reason": "no compatible live A/A evidence"
+    },
+    {
+      "path": "orchestra_codex",
+      "provider_cli_version": "0.144.1",
+      "structured_usage": "parser_capable_transport_not_live_verified",
+      "live_calls": 0,
+      "promotion_state": "shadow_full_ultra",
+      "reason": "no compatible live A/A evidence"
+    },
+    {
+      "path": "pane_hook",
+      "provider_cli_version": "not_applicable",
+      "structured_usage": "unavailable",
+      "live_calls": 0,
+      "promotion_state": "full_ultra",
+      "reason": "trusted provider receipt unavailable"
+    },
+    {
+      "path": "route_team",
+      "provider_cli_version": "mixed",
+      "structured_usage": "not_live_executed",
+      "live_calls": 0,
+      "promotion_state": "full_ultra",
+      "reason": "live route-team canary and audit evidence absent"
+    }
+  ],
+  "promotion_gate": {
+    "a_a_eligible_calls": 0,
+    "a_a_actual_complete_coverage_pct": null,
+    "required_coverage_pct": 95,
+    "status": "blocked",
+    "fallback": "shadow_full_ultra",
+    "blockers": [
+      "a_a_not_executed",
+      "trusted_comparison_stratum_incomplete",
+      "route_team_canary_not_executed",
+      "rollback_receipt_not_exercised"
+    ]
+  },
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "stderr_retained": false,
+    "credential_values_read_or_retained": false,
+    "absolute_paths_retained": false
+  }
+}

@@ -1,0 +1,19 @@
+---
+name: auto-doctor
+description: 하네스 설치, platform wiring, manifest 상태를 진단합니다
+platform: antigravity-cli
+---
+
+# auto-doctor
+
+## Context Profile
+
+Load core workspace policy, harness config, manifests, and platform registration only. Exclude product scenarios, canary, signatures, and learnings.
+
+## Contract
+
+1. Run `auto doctor` with all requested flags unchanged.
+2. Inspect canonical source availability, generated surface registration, hooks, plugins, dependencies, and stale manifests.
+3. Classify source defects separately from generated/runtime drift and user-owned configuration.
+4. Report PASS/WARN/FAIL with exact evidence and safe repair commands.
+5. Do not mutate files unless the user explicitly requests repair.

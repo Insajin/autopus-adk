@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 )
 
 // OrchestraSession holds state for a yield-rounds orchestra session.
@@ -28,10 +30,12 @@ type SessionProviderConfig struct {
 
 // SessionProviderResponse is a serializable subset of ProviderResponse.
 type SessionProviderResponse struct {
-	Provider   string `json:"provider"`
-	Output     string `json:"output"`
-	DurationMs int64  `json:"duration_ms"`
-	TimedOut   bool   `json:"timed_out"`
+	Provider        string                    `json:"provider"`
+	Output          string                    `json:"output"`
+	DurationMs      int64                     `json:"duration_ms"`
+	TimedOut        bool                      `json:"timed_out"`
+	Usage           []telemetry.UsageEnvelope `json:"usage,omitempty"`
+	UsageCapability UsageCapability           `json:"usage_capability"`
 }
 
 // NewSessionID generates a unique session ID: orch-{timestamp}-{random hex}.

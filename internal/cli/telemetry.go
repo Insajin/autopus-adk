@@ -22,6 +22,7 @@ func newTelemetryCmd() *cobra.Command {
 	cmd.AddCommand(newTelemetrySummaryCmd())
 	cmd.AddCommand(newTelemetryCostCmd())
 	cmd.AddCommand(newTelemetryCompareCmd())
+	cmd.AddCommand(newTelemetryEfficiencyCmd())
 
 	return cmd
 }
@@ -30,14 +31,16 @@ func newTelemetryCmd() *cobra.Command {
 // used by agents to record pipeline, phase, and agent-run telemetry events.
 func newTelemetryRecordCmd() *cobra.Command {
 	var (
-		specID      string
-		agent       string
-		phase       string
-		action      string
-		status      string
-		files       int
-		tokens      int
-		qualityMode string
+		specID           string
+		agent            string
+		phase            string
+		action           string
+		status           string
+		files            int
+		tokens           int
+		qualityMode      string
+		usageJSON        string
+		acceptanceStatus string
 	)
 
 	cmd := &cobra.Command{
@@ -49,14 +52,16 @@ func newTelemetryRecordCmd() *cobra.Command {
 				return fmt.Errorf("telemetry record: get cwd: %w", err)
 			}
 			return runTelemetryRecord(baseDir, recordParams{
-				specID:      specID,
-				agent:       agent,
-				phase:       phase,
-				action:      action,
-				status:      status,
-				files:       files,
-				tokens:      tokens,
-				qualityMode: qualityMode,
+				specID:           specID,
+				agent:            agent,
+				phase:            phase,
+				action:           action,
+				status:           status,
+				files:            files,
+				tokens:           tokens,
+				qualityMode:      qualityMode,
+				usageJSON:        usageJSON,
+				acceptanceStatus: acceptanceStatus,
 			})
 		},
 	}
@@ -69,6 +74,8 @@ func newTelemetryRecordCmd() *cobra.Command {
 	cmd.Flags().IntVar(&files, "files", 0, "Number of files modified")
 	cmd.Flags().IntVar(&tokens, "tokens", 0, "Estimated token count")
 	cmd.Flags().StringVar(&qualityMode, "quality-mode", "balanced", "Quality mode (ultra|balanced)")
+	cmd.Flags().StringVar(&usageJSON, "usage-json", "", "Path to a normalized usage envelope JSON file")
+	cmd.Flags().StringVar(&acceptanceStatus, "acceptance-status", "", "Objective acceptance status: PASS or FAIL")
 
 	return cmd
 }
@@ -174,6 +181,7 @@ func newTelemetryCostCmd() *cobra.Command {
 				return writeJSONResult(cmd, status, buildTelemetryCostPayload(*run), warnings, nil)
 			}
 			_, _ = fmt.Fprint(cmd.OutOrStdout(), cost.FormatCostReport(*run))
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), telemetry.FormatUsageCost(*run))
 			return nil
 		},
 	}

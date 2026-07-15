@@ -1,0 +1,46 @@
+{
+  "version": 2,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_transport_diagnosis_preflight",
+  "provider_receipt": false,
+  "observed_spend": {
+    "provider_calls_made": 0,
+    "raw_total_tokens": 0
+  },
+  "frozen_artifacts": {
+    "policy_sha256": "sha256:e60cc741ea5a2abd0be0ba7e25d5d6c639fe9e2b0cd52c10dcb14ac1565b6cdc",
+    "config_sha256": "sha256:bdec20a7c73616afdcd5c70fa069f88a392a8da928bb90c8f4e192af657f5c80",
+    "schema_sha256": "sha256:0f77892d0472dedf2e6cdee5a9064e7e0798ad29e43769c87a00aff26f159306",
+    "corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a"
+  },
+  "authorization_identity": {
+    "algorithm": "sha256_nul_tuple_v1",
+    "fields": ["policy_sha256", "config_sha256", "schema_sha256", "corpus_sha256"],
+    "trailing_separator": false,
+    "sha256": "sha256:345523b25569eee5f691d3960c2caca0709aebcd324c7db103cb3c2b0ecf013f"
+  },
+  "protocol": {
+    "task_id": "ute-corpus-v1-006",
+    "role": "reviewer",
+    "effort": "xhigh",
+    "provider_call_cap": 1,
+    "raw_token_cap": 22000,
+    "concurrency": 1,
+    "retries": 0
+  },
+  "checks": [
+    {"name": "raw_free_operational_classifier", "status": "PASS"},
+    {"name": "canonical_class_fingerprint", "status": "PASS"},
+    {"name": "explicit_evidence_stream", "status": "PASS"},
+    {"name": "hermetic_green", "status": "PASS"},
+    {"name": "independent_review", "status": "PASS"}
+  ],
+  "decision": {
+    "status": "EXPLICIT_LIVE_AUTHORIZATION_GRANTED",
+    "transport_only": true,
+    "semantic_evaluation_performed": false,
+    "promotion_eligible": false,
+    "provider_execution_started": false,
+    "authorized_at": "2026-07-14T05:52:19+09:00"
+  }
+}

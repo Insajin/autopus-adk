@@ -48,6 +48,13 @@ func TestAgentRunCmd_ValidTask(t *testing.T) {
 
 	dir := t.TempDir()
 	taskID := "T01"
+	binDir := filepath.Join(dir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o755))
+	fakeClaude := `#!/bin/sh
+printf '%s\n' '{"type":"result","result":"ok","session_id":"legacy-session"}'
+`
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "claude"), []byte(fakeClaude), 0o755))
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	// Create the expected context.yaml.
 	runsDir := filepath.Join(dir, ".autopus", "runs", taskID)

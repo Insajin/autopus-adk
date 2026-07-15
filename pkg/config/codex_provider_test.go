@@ -66,7 +66,7 @@ func TestApplyCodexProviderProfileOmitsManagedFieldsForRuntimeDefault(t *testing
 	}
 
 	got := ApplyCodexProviderProfile(entry, CodexProfile{})
-	assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-c", `foo="bar"`}, got.Args)
+	assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-c", `foo="bar"`}, got.Args)
 	assert.Equal(t, []string{"--search"}, got.PaneArgs)
 }
 
@@ -87,7 +87,7 @@ func TestApplyCodexProviderProfilePreservesTerminatorSuffix(t *testing.T) {
 
 	got := ApplyCodexProviderProfile(entry, CodexProfile{Model: CodexSolModel, Effort: CodexEffortUltra})
 	assert.Equal(t, []string{
-		"exec", "--model=" + CodexSolModel, "-c", `model_reasoning_effort="ultra"`,
+		"exec", "--json", "--model=" + CodexSolModel, "-c", `model_reasoning_effort="ultra"`,
 		"--", "child", "-m", "child-model", "--config=model_reasoning_effort=low",
 	}, got.Args)
 	assert.Equal(t, []string{
@@ -97,7 +97,7 @@ func TestApplyCodexProviderProfilePreservesTerminatorSuffix(t *testing.T) {
 
 	runtimeDefault := ApplyCodexProviderProfile(entry, CodexProfile{})
 	assert.Equal(t, []string{
-		"exec", "--", "child", "-m", "child-model", "--config=model_reasoning_effort=low",
+		"exec", "--json", "--", "child", "-m", "child-model", "--config=model_reasoning_effort=low",
 	}, runtimeDefault.Args)
 	assert.Equal(t, []string{
 		"--", "child", "--model=child-model", "-c", `model_reasoning_effort="low"`,
@@ -119,13 +119,13 @@ func TestApplyCodexProviderProfileHandlesLongConfigOption(t *testing.T) {
 
 	got := ApplyCodexProviderProfile(entry, CodexProfile{Model: CodexSolModel, Effort: CodexEffortUltra})
 	assert.Equal(t, []string{
-		"exec", "--model=" + CodexSolModel,
+		"exec", "--json", "--model=" + CodexSolModel,
 		`--config=model_reasoning_effort="ultra"`, "--config=foo=bar",
 	}, got.Args)
 	assert.Equal(t, []string{"--config=model_reasoning_effort=\"ultra\"", "-m", CodexSolModel}, got.PaneArgs)
 
 	got = ApplyCodexProviderProfile(entry, CodexProfile{})
-	assert.Equal(t, []string{"exec", "--config=foo=bar"}, got.Args)
+	assert.Equal(t, []string{"exec", "--json", "--config=foo=bar"}, got.Args)
 	assert.Empty(t, got.PaneArgs)
 }
 

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/insajin/autopus-adk/pkg/worker/stream"
 )
 
@@ -74,13 +75,18 @@ func (a *ClaudeAdapter) ParseEvent(line []byte) (StreamEvent, error) {
 		return StreamEvent{}, err
 	}
 	typ := evt.Type
+	toolCalls := 0
 	if typ == "tool_use" {
 		typ = stream.EventToolCall
+		toolCalls = 1
 	}
+	usage := parseClaudeUsage(evt.Raw)
 	return StreamEvent{
-		Type:    typ,
-		Subtype: evt.Subtype,
-		Data:    evt.Raw,
+		Type:      typ,
+		Subtype:   evt.Subtype,
+		Data:      evt.Raw,
+		Usage:     usage,
+		ToolCalls: toolCalls,
 	}, nil
 }
 
@@ -94,12 +100,22 @@ func (a *ClaudeAdapter) ExtractResult(event StreamEvent) TaskResult {
 	if output == "" {
 		output = rd.Result
 	}
+	var current struct {
+		TotalCostUSD *float64 `json:"total_cost_usd"`
+	}
+	_ = json.Unmarshal(event.Data, &current)
+	costUSD := rd.CostUSD
+	if current.TotalCostUSD != nil {
+		costUSD = *current.TotalCostUSD
+	}
 	result := TaskResult{
-		CostUSD:    rd.CostUSD,
+		CostUSD:    costUSD,
 		DurationMS: rd.DurationMS,
 		SessionID:  rd.SessionID,
 		Output:     output,
 		IsError:    rd.IsError,
+		Usage:      append([]telemetry.UsageEnvelope(nil), event.Usage...),
+		ToolCalls:  event.ToolCalls,
 	}
 	if rd.IsError {
 		result.Error = strings.TrimSpace(output)
@@ -111,4 +127,37 @@ func (a *ClaudeAdapter) ExtractResult(event StreamEvent) TaskResult {
 		}
 	}
 	return result
+}
+
+func parseClaudeUsage(data []byte) []telemetry.UsageEnvelope {
+	var receipt struct {
+		providerUsageIdentity
+		CostUSD      *float64 `json:"cost_usd"`
+		TotalCostUSD *float64 `json:"total_cost_usd"`
+		Usage        *struct {
+			InputTokens         *int64 `json:"input_tokens"`
+			CacheCreationTokens *int64 `json:"cache_creation_input_tokens"`
+			CacheReadTokens     *int64 `json:"cache_read_input_tokens"`
+			OutputTokens        *int64 `json:"output_tokens"`
+		} `json:"usage"`
+	}
+	if json.Unmarshal(data, &receipt) != nil {
+		return nil
+	}
+	var input telemetry.UsageInput
+	applyUsageIdentity(&input, receipt.providerUsageIdentity, "claude", "claude.stream-json.result.v1")
+	input.ActualCostUSD = receipt.TotalCostUSD
+	if input.ActualCostUSD == nil {
+		input.ActualCostUSD = receipt.CostUSD
+	}
+	if receipt.Usage != nil {
+		input.UncachedInputTokens = receipt.Usage.InputTokens
+		input.CacheCreationInputTokens = receipt.Usage.CacheCreationTokens
+		input.CacheReadInputTokens = receipt.Usage.CacheReadTokens
+		input.OutputTokensTotal = receipt.Usage.OutputTokens
+	}
+	if receipt.Usage == nil && receipt.CostUSD == nil && receipt.TotalCostUSD == nil {
+		return nil
+	}
+	return []telemetry.UsageEnvelope{normalizeProviderUsage(input)}
 }

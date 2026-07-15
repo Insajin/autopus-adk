@@ -24,12 +24,12 @@ func runRelayPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orchestra
 		if err != nil {
 			return nil, err
 		}
-		return &OrchestraResult{
+		return finalizeOrchestraResult(&OrchestraResult{
 			Strategy:  cfg.Strategy,
 			Responses: responses,
 			Merged:    FormatRelay(responses),
 			Summary:   fmt.Sprintf("relay: %d stages completed", len(responses)),
-		}, nil
+		}), nil
 	}
 
 	start := time.Now()
@@ -92,13 +92,13 @@ func runRelayPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orchestra
 	}
 
 	total := time.Since(start)
-	return &OrchestraResult{
+	return finalizeOrchestraResult(&OrchestraResult{
 		Strategy:  cfg.Strategy,
 		Responses: responses,
 		Merged:    FormatRelay(responses),
 		Duration:  total,
 		Summary:   fmt.Sprintf("relay pane: %d stages completed", len(responses)),
-	}, nil
+	}), nil
 }
 
 // executeRelayPaneProvider runs a single provider in a pane and collects its output.
@@ -143,11 +143,11 @@ func executeRelayPaneProvider(
 		}
 		if waitErr := hookSession.WaitForDone(hookTimeout, provider.Name); waitErr == nil {
 			if result, readErr := hookSession.ReadResult(provider.Name); readErr == nil {
-				return ProviderResponse{
+				return unavailableResponse(ProviderResponse{
 					Provider: provider.Name,
 					Output:   result.Output,
 					ExitCode: result.ExitCode,
-				}
+				}, usageSourceHook, usageReasonHook)
 			}
 		}
 		// R8: fallback to sentinel wait on hook failure
@@ -162,21 +162,21 @@ func executeRelayPaneProvider(
 		output = fmt.Sprintf("[pane: %s completed]", provider.Name)
 	}
 
-	return ProviderResponse{
+	return unavailableResponse(ProviderResponse{
 		Provider: provider.Name,
 		Output:   output,
 		TimedOut: timedOut,
-	}
+	}, usageSourcePane, usageReasonPane)
 }
 
 // skippedResponse creates a SKIPPED response for a failed provider (REQ-3a pattern).
 // @AX:NOTE [AUTO] ExitCode -1 is the magic sentinel for "provider never ran" — checked by allFailed logic
 func skippedResponse(name, reason string) ProviderResponse {
-	return ProviderResponse{
+	return unavailableResponse(ProviderResponse{
 		Provider: name,
 		Output:   fmt.Sprintf("[SKIPPED: %s -- %s]", name, reason),
 		ExitCode: -1,
-	}
+	}, usageSourcePane, usageReasonPane)
 }
 
 // buildRelayPaneCommand constructs a heredoc shell command for relay pane execution.

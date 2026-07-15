@@ -1,0 +1,20 @@
+---
+name: auto-test
+description: scenarios.md 기반 E2E 시나리오를 실행하고 증거를 보고합니다
+platform: antigravity-cli
+---
+
+# auto-test
+
+## Context Profile
+
+- Required: core workspace policy and scenarios.
+- Excluded: canary, signatures, and unrelated learnings.
+
+## Contract
+
+1. Run `auto test run` with arguments unchanged and use the declared WORKING_DIR/build command.
+2. Execute scenarios in declared order with deterministic oracles and safe environment boundaries.
+3. Record scenario-level PASS/FAIL/SKIP, commands, artifacts, and failure causes.
+4. Do not convert an unavailable environment into PASS or invent missing scenarios.
+5. Recommend the smallest recovery action; edit tests only when the request includes repair.

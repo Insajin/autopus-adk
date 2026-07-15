@@ -1,18 +1,22 @@
 package templates_test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/insajin/autopus-adk/pkg/config"
+	tmpl "github.com/insajin/autopus-adk/pkg/template"
 )
 
 func TestMigrationNumberingGuidanceContracts(t *testing.T) {
 	t.Parallel()
 
 	root := templateRoot()
+	e := tmpl.New()
+	cfg := config.DefaultFullConfig("migration-project")
 	files := map[string][]string{
 		filepath.Join(root, "..", "content", "profiles", "executor", "go.md"): {
 			"Project-Scoped Directory Resolution",
@@ -114,10 +118,10 @@ func TestMigrationNumberingGuidanceContracts(t *testing.T) {
 		path, expected := path, expected
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			t.Parallel()
-			content, err := os.ReadFile(path)
+			content, err := semanticContractSurface(e, path, cfg)
 			require.NoError(t, err)
 			for _, phrase := range expected {
-				assert.Contains(t, string(content), phrase)
+				assert.Contains(t, content, phrase)
 			}
 		})
 	}

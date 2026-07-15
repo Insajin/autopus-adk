@@ -77,14 +77,14 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 		merged = fmt.Sprintf("[pane mode] %d providers executed", len(responses))
 	}
 
-	return &OrchestraResult{
+	return finalizeOrchestraResult(&OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
 		Merged:          merged,
 		Duration:        total,
 		Summary:         summary,
 		FailedProviders: failed,
-	}, nil
+	}), nil
 }
 
 // splitProviderPanes creates a visible split pane and temp file for each provider.
@@ -150,11 +150,11 @@ func collectPaneResults(ctx context.Context, panes []paneInfo, start time.Time) 
 	for _, pi := range panes {
 		if pi.skipWait {
 			// SendCommand already failed — record as response with no output
-			responses = append(responses, ProviderResponse{
+			responses = append(responses, unavailableResponse(ProviderResponse{
 				Provider: pi.provider.Name,
 				Duration: time.Since(start),
 				TimedOut: true,
-			})
+			}, usageSourcePane, usageReasonPane))
 			continue
 		}
 		wg.Add(1)
@@ -171,12 +171,12 @@ func collectPaneResults(ctx context.Context, panes []paneInfo, start time.Time) 
 			mu.Lock()
 			defer mu.Unlock()
 
-			responses = append(responses, ProviderResponse{
+			responses = append(responses, unavailableResponse(ProviderResponse{
 				Provider: pi.provider.Name,
 				Output:   output,
 				Duration: time.Since(start),
 				TimedOut: err != nil,
-			})
+			}, usageSourcePane, usageReasonPane))
 			if err != nil {
 				failed = append(failed, FailedProvider{
 					Name:  pi.provider.Name,

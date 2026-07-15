@@ -1,0 +1,30 @@
+{
+  "activation_eligible": false,
+  "admission_generation": "v2",
+  "authorization_identity_sha256": "sha256:129521ff443c4ec01bc71cbb621c1dd3d515d5f460130a16732bf639b52e4978",
+  "effective_profile": "full_ultra",
+  "evidence_kind": "gpt_full_evaluation_terminal_outcome",
+  "failure_code": null,
+  "hashes": {
+    "auto_executable_sha256": "sha256:5744f2c4190a1f557320bd6f8034dd809e88bec626b237df1dd8d403fdc148f8",
+    "evaluator_summary_sha256": "sha256:7ee81e2bf2f71ebc5d9a09471aa8b1f4b1e5513c0b69d60dfc161aff9a064f4e",
+    "primary_ledger_sha256": "sha256:a8ceed2ebceae72bb120c84ecc6ace10e6ee0c2f4678c3eaa340ab86a3602aab",
+    "rollback_ledger_sha256": "sha256:e3b3dd78cbffa28419b6f9eabd88a11799370959400083b5322e62979cfeeba5",
+    "rollback_reservation_sha256": "sha256:032eec05a180733e14a0fccf0f375869b74c490010e799d5e5ddba2bbfec4edb"
+  },
+  "implemented": false,
+  "observed_raw_total_tokens": 1161766,
+  "privacy": {
+    "raw_retained": false
+  },
+  "promotion_eligible": false,
+  "provider_calls": 63,
+  "provider_calls_made_by_finalizer": 0,
+  "reservation_sha256": "sha256:bd733533ab255957154e2b31cd905c165c6f0c9719671ace7909116a620e648e",
+  "retries": 0,
+  "rollout_decision": "ELIGIBLE_NEXT_CANARY",
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "success": true,
+  "terminal_state": "ELIGIBLE_NEXT_CANARY",
+  "version": 1
+}

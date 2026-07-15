@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_diagnostic_local_preflight",
+  "provider_receipt": false,
+  "observed_spend": {
+    "provider_calls_made": 0,
+    "raw_total_tokens": 0
+  },
+  "frozen_artifacts": {
+    "policy_sha256": "sha256:4a4b84f7087a5bf40aa0f5c3c2e883e29d235e80bf91c84c1186ec758248b12f",
+    "config_sha256": "sha256:bff64292fdf49343bde1a53d9d40ffbea0af5f338cd48385c2a2dc6d752e0565",
+    "verdict_schema_sha256": "sha256:d81f0205cbc02ac7af0d0897078041f765873ba287b8dfd2c0dd3e66f35ca605",
+    "cohort_sha256": "sha256:d060fe3ae06e5ee063c66a57dc7b6a96bd9c929361e81ca2e26d48d333db0d9f"
+  },
+  "authorization_identity": {
+    "algorithm": "sha256_nul_tuple_v1",
+    "fields": [
+      "policy_sha256",
+      "config_sha256",
+      "verdict_schema_sha256",
+      "cohort_sha256"
+    ],
+    "trailing_separator": false,
+    "sha256": "sha256:920e6370cebb84739872233cd4a0eeb88295bf816b19b6d43cfac99591a1dc20"
+  },
+  "deterministic_receipts": {
+    "task_id": "ute-corpus-v1-006",
+    "expected_patch_sha256": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+    "observed_patch_sha256": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+    "verification_command": "go test ./internal/cli ./pkg/spec",
+    "verification_exit_code": 0,
+    "status": "PASS",
+    "security_observation_required_both_arms": true,
+    "authority": "deterministic patch and test failures override model observations"
+  },
+  "schedule": {
+    "task_id": "ute-corpus-v1-006",
+    "arms": [
+      "A",
+      "B"
+    ],
+    "profile_both_arms": "full5",
+    "xhigh_calls": 8,
+    "max_calls": 2,
+    "total_calls": 10,
+    "worst_case_raw_tokens": 228000,
+    "concurrency": 1,
+    "retries": 0
+  },
+  "checks": [
+    {
+      "name": "diagnostic_parser_bounded_fields",
+      "status": "PASS"
+    },
+    {
+      "name": "diagnostic_fail_is_valid_observation",
+      "status": "PASS"
+    },
+    {
+      "name": "legacy_strict_fail_remains_operational_failure",
+      "status": "PASS"
+    },
+    {
+      "name": "exact_task_patch_and_scope_hashes",
+      "status": "PASS"
+    },
+    {
+      "name": "single_use_authorization_and_cap_arithmetic",
+      "status": "PASS"
+    }
+  ],
+  "decision": {
+    "status": "READY_FOR_EXPLICIT_DIAGNOSTIC_EXECUTION",
+    "diagnostic_only": true,
+    "promotion_eligible": false,
+    "provider_execution_started": false
+  },
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_patch_retained": false,
+    "raw_response_retained": false,
+    "finding_text_retained": false,
+    "absolute_paths_retained": false
+  }
+}

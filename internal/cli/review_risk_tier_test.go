@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -28,6 +29,10 @@ func TestInferReviewRiskTier(t *testing.T) {
 		{name: "auth boundary", files: []string{"internal/services/auth_session.go"}, want: reviewRiskTierCritical},
 		{name: "migration boundary", files: []string{"backend/migrations/000447_add_locale.up.sql"}, want: reviewRiskTierCritical},
 		{name: "large source fanout", files: []string{"a.go", "b.go", "c.go", "d.go", "e.go"}, want: reviewRiskTierHigh},
+		{name: "protobuf contract", files: []string{"proto/public/service.proto"}, want: reviewRiskTierHigh},
+		{name: "openapi contract", files: []string{"contracts/openapi.yaml"}, want: reviewRiskTierHigh},
+		{name: "swagger contract", files: []string{"contracts/swagger.json"}, want: reviewRiskTierHigh},
+		{name: "graphql contract", files: []string{"schema/public.graphql"}, want: reviewRiskTierHigh},
 	}
 
 	for _, tt := range tests {
@@ -36,6 +41,39 @@ func TestInferReviewRiskTier(t *testing.T) {
 			assert.Equal(t, tt.want, inferReviewRiskTier(tt.files))
 		})
 	}
+}
+
+func TestDiscoverChangedFilesForRiskTier_IncludesStagedUnstagedAndUntracked(t *testing.T) {
+	dir := t.TempDir()
+	runGit := func(args ...string) {
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, out)
+		}
+	}
+	runGit("init", "-q")
+	for _, name := range []string{"staged.go", "unstaged.go"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("package sample\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runGit("add", ".")
+	runGit("commit", "-qm", "base")
+	if err := os.WriteFile(filepath.Join(dir, "staged.go"), []byte("package sample\n// staged\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runGit("add", "staged.go")
+	if err := os.WriteFile(filepath.Join(dir, "unstaged.go"), []byte("package sample\n// unstaged\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "untracked.go"), []byte("package sample\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := discoverChangedFilesForRiskTierIn(dir)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"staged.go", "unstaged.go", "untracked.go"}, got)
 }
 
 func TestApplyReviewRiskTierProviders(t *testing.T) {

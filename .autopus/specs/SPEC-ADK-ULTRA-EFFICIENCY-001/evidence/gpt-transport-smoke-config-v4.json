@@ -1,0 +1,40 @@
+{
+  "version": 4,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_failure_source_diagnosis_config",
+  "provider": "codex",
+  "provider_version": "0.144.1",
+  "model": "gpt-5.6-sol",
+  "model_version": "gpt-5.6-sol",
+  "canonical_execution": {
+    "argv": ["auto", "agent", "run", "ute-corpus-v1-006"],
+    "direct_codex_forbidden": true
+  },
+  "context": {
+    "evidence_mode": true,
+    "diagnostic_mode": true,
+    "strict_verdict": true,
+    "zero_tool_calls_required": true,
+    "codex": {
+      "sandbox": "read-only",
+      "ephemeral": true,
+      "ignore_user_config": true,
+      "ignore_rules": true,
+      "skip_git_repo_check": true,
+      "zero_tool_mode": true,
+      "source_schema": "gpt-transport-smoke-schema-v4.json",
+      "runtime_output_schema": "gpt-diagnostic-verdict-schema-v1.json",
+      "raw_token_budget": 22000
+    }
+  },
+  "cache_stratum": "provider-managed-stable-prefix-v1",
+  "operational_failure_receipt": {
+    "class_fingerprint_canonical": true,
+    "stage_and_signals_allowlisted": true,
+    "task_and_failure_status_bound": true,
+    "raw_sources_persisted": false
+  },
+  "transport_only": true,
+  "semantic_evaluation_performed": false,
+  "promotion_eligible": false
+}

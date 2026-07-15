@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_transport_smoke_ledger",
+  "completed": false,
+  "transport_only": true,
+  "semantic_evaluation_performed": false,
+  "promotion_eligible": false,
+  "failure_code": "process_nonzero",
+  "planned_calls": 1,
+  "attempted_calls": 1,
+  "raw_token_cap": 22000,
+  "observed_raw_total_tokens": null,
+  "actual_usage_calls": 0,
+  "usage_status": "unavailable",
+  "operational_error_class": "schema_or_response",
+  "operational_error_fingerprint": "sha256:93174493bf84d0bccc598ae7f7a6672060fb65251814fc4983b28be448d7239a",
+  "operational_error_stage": "process_wait",
+  "operational_error_signals": [
+    "provider_failure_event"
+  ],
+  "operational_provider_event_kind": "error_and_turn_failed",
+  "operational_provider_event_shape": [
+    "top_level_message",
+    "nested_error_object",
+    "nested_error_message"
+  ],
+  "operational_provider_events": [
+    {
+      "kind": "error",
+      "shape": [
+        "top_level_message"
+      ],
+      "traits": [
+        "schema_or_response"
+      ],
+      "status_families": []
+    },
+    {
+      "kind": "turn_failed",
+      "shape": [
+        "nested_error_object",
+        "nested_error_message"
+      ],
+      "traits": [
+        "schema_or_response"
+      ],
+      "status_families": []
+    }
+  ],
+  "authorization_identity": {
+    "sha256": "sha256:b956b634ab0664f276e9a6dfa09ce517b58b48055d0d7ed4df9136b3e69a6ea4"
+  },
+  "calls": [
+    {
+      "sequence": 1,
+      "task_id": "ute-corpus-v1-006",
+      "role": "reviewer",
+      "effort": "xhigh",
+      "status": "operational_failure",
+      "failure_code": "process_nonzero"
+    }
+  ]
+}

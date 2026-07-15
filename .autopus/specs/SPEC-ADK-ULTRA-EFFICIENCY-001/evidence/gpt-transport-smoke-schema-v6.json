@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:autopus:spec-adk-ultra-efficiency-001:gpt-transport-smoke:v6",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "finding_count",
+    "finding_codes",
+    "finding_scope_hashes"
+  ],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "const": "PASS"
+    },
+    "finding_count": {
+      "type": "integer",
+      "const": 0
+    },
+    "finding_codes": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "finding_scope_hashes": {
+      "type": "array",
+      "maxItems": 0
+    }
+  }
+}

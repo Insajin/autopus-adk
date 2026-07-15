@@ -3,35 +3,45 @@ package memindex
 import (
 	"fmt"
 	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/promptlayer"
 )
 
 func renderContext(query string, results []SearchResult, budgetTokens int) ([]SearchResult, int, string) {
-	var b strings.Builder
-	fmt.Fprintf(&b, "## Quality Recall\n\n")
-	fmt.Fprintf(&b, "Query: %s\n\n", safeText(query))
+	prefix := fmt.Sprintf("## Quality Recall\n\nQuery: %s\n\n", safeText(query))
+	emptyPrompt := renderSelectedContext(prefix, nil, len(results))
+	if budgetTokens <= 0 || approxTokens(emptyPrompt) > budgetTokens {
+		return nil, len(results), ""
+	}
 	selected := make([]SearchResult, 0, len(results))
 	for _, result := range results {
-		line := contextLine(result)
-		if approxTokens(b.String()+line) > budgetTokens && len(selected) > 0 {
+		candidate := append(append([]SearchResult(nil), selected...), result)
+		if approxTokens(renderSelectedContext(prefix, candidate, len(results)-len(candidate))) > budgetTokens {
 			break
 		}
-		if approxTokens(b.String()+line) > budgetTokens {
-			break
-		}
-		b.WriteString(line)
 		selected = append(selected, result)
 	}
 	omitted := len(results) - len(selected)
+	return selected, omitted, renderSelectedContext(prefix, selected, omitted)
+}
+
+func renderSelectedContext(prefix string, results []SearchResult, omitted int) string {
+	var b strings.Builder
+	b.WriteString(prefix)
+	for _, result := range results {
+		b.WriteString(contextLine(result))
+	}
 	if omitted > 0 {
 		fmt.Fprintf(&b, "\nomitted_results: %d\n", omitted)
 	}
-	return selected, omitted, b.String()
+	return b.String()
 }
 
 func contextLine(result SearchResult) string {
 	parts := []string{
 		fmt.Sprintf("- [%d] %s", result.Rank, safeText(result.Title)),
 		fmt.Sprintf("  source_ref: %s", safeText(result.SourceRef)),
+		fmt.Sprintf("  source_hash: %s", safeText(result.SourceHash)),
 		fmt.Sprintf("  source_type: %s", result.SourceType),
 		fmt.Sprintf("  freshness: %s", result.FreshnessState),
 		fmt.Sprintf("  failure_pattern: %s", compact(safeText(result.Title), 180)),
@@ -48,8 +58,5 @@ func contextLine(result SearchResult) string {
 }
 
 func approxTokens(value string) int {
-	if value == "" {
-		return 0
-	}
-	return len([]rune(value))/4 + 1
+	return promptlayer.EstimateTokens(value)
 }

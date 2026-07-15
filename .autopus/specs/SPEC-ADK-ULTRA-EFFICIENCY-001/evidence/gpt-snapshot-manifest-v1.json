@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "created_at": "2026-07-12T13:54:30Z",
+  "scope": "gpt-codex-only",
+  "source_snapshot": {
+    "head_commit": "63b42c010ce877ab9370a3fdd0788e497d586c6f",
+    "head_commit_short": "63b42c010ce8",
+    "selection_command": "git ls-files -c -o --exclude-standard",
+    "tracked_and_untracked_nonignored_only": true,
+    "ignored_and_runtime_artifacts_excluded": true,
+    "file_count": 2776,
+    "manifest_format": "sha256sum-v1: bytewise-sorted relative regular-file paths",
+    "manifest_sha256": "sha256:a230c12eaa2b497cfab85dbe59ec77db1227cea70d43cfa19f78e7674f904329"
+  },
+  "repository_objects": {
+    "immutable_bare_snapshot": true,
+    "head_commit": "63b42c010ce877ab9370a3fdd0788e497d586c6f",
+    "corpus_object_preflight": "PASS",
+    "git_fsck_full_strict": "PASS"
+  },
+  "auto_binary": {
+    "version": "0.50.68-ute-gpt-v1",
+    "commit": "63b42c010ce8",
+    "build_date": "2026-07-12T00:00:00Z",
+    "go_version": "go1.26.5 darwin/arm64",
+    "trimpath": true,
+    "buildvcs": false,
+    "independent_build_count": 2,
+    "independent_builds_byte_identical": true,
+    "sha256": "sha256:12e5a27e51807c2044a65e64f5b9125e09d62477c21a66c05a0eb414587b299b"
+  },
+  "codex_runtime": {
+    "provider": "codex",
+    "provider_version": "0.144.1",
+    "provider_version_receipt_sha256": "sha256:94a47f9404ab2a59e43382c7fb34fcdf97deb3fb10ca762aac23daa699f0db5c",
+    "model": "gpt-5.6-sol",
+    "supported_reasoning_efforts": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+      "ultra"
+    ],
+    "normalized_catalog_receipt_sha256": "sha256:38571985d0cb519f16a9a93a312ca803c37521ea7f67c1005d948901d00199fe"
+  },
+  "validation": {
+    "go_test_all": "PASS",
+    "go_vet_all": "PASS",
+    "spec_validate_strict": "PASS",
+    "codex_canary_hermetic_suite": "PASS",
+    "gpt_evidence_hermetic_suite": "PASS",
+    "source_manifest_recheck_after_validation": "PASS"
+  },
+  "observed_spend": {
+    "provider_calls_made": 0,
+    "raw_total_tokens": 0
+  },
+  "decision": {
+    "primary_execution_ready": true,
+    "promotion_eligible": false,
+    "candidate_activated": false
+  }
+}

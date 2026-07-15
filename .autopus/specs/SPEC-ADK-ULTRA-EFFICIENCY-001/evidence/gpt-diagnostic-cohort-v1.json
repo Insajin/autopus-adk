@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_diagnostic_cohort",
+  "source_corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+  "task_count": 1,
+  "pair_order": "AB",
+  "task": {
+    "task_id": "ute-corpus-v1-006",
+    "category": "multi_module",
+    "base_commit": "8c39b08b15511b0131b503db898d8be7800c27fa",
+    "target_commit": "7795dd441fa1feda07214a54c6563284cd9ce401",
+    "task_brief": "Preserve merged review findings and avoid false trim notices.",
+    "risk_tier": "high",
+    "execution_shape": "cross_package_review_fix",
+    "path_count": 7,
+    "verification_command": "go test ./internal/cli ./pkg/spec",
+    "task_hash": "sha256:01ba26060d9b6e2b8882ac156a500272b01604b0b2f8fe7794fdd96f336ea465",
+    "oracle_hash": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+    "allowed_scope_hashes": [
+      "sha256:86caac50db9c74a2979ff531218a0d280b5ac4bd081fe64015a65241976151e7",
+      "sha256:ddcf6887f5e7ac209f865859d16a5af5dcad53ccdd41f54957990090797cc77d",
+      "sha256:76b6d2125a770bca96ba4f27cb24e45161a632c40a6c46db39cbcb3185146d79",
+      "sha256:4bdf7823374a6e35d89f5ca621eddf185a112fc263fd717b354df965c88231bc",
+      "sha256:0f32d1c748ec05ae586dc739d7f09b4630a32529c0cbfbff766f497dab39a7ea",
+      "sha256:918808f1a4266cfb36ebae85a800d43bd27696b1a4123d67288d1e0a2518d834",
+      "sha256:b7bac541738a06c6a959fccd6082f85e2cf25bb6d607536e4a4b348bc89bdf43"
+    ]
+  },
+  "arms": [
+    {
+      "arm": "A",
+      "profile": "full5"
+    },
+    {
+      "arm": "B",
+      "profile": "full5"
+    }
+  ],
+  "diagnostic_only": true,
+  "promotion_eligible": false
+}

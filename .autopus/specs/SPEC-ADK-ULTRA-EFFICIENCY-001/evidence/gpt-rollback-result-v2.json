@@ -1,0 +1,97 @@
+{
+  "comparison": {
+    "ab_task_ids": [
+      "sha256:f3658defa8e7dc0fa55008dd7af3ff30f38dbc1d4f8b1b3a2e6d1c554f2f2f12",
+      "sha256:80d3db38edff2fb67fcdce09af06c52c0f5f9d39652f9331ee640de3cbd18599",
+      "sha256:dff105cc65db48cd100d88fb6f7ee67bd5ed1aeca47a5d55f9fb7e9c4acca0f0",
+      "sha256:e7a2203ac0eee944055690ab7e605c4a8a8f56c0a9fc33a59265bb3eb70c43ce"
+    ],
+    "ba_task_ids": [
+      "sha256:181c612abd0cad8529eac60b02fa96f7bf34121f67fc5d56acda0187f4b47c98",
+      "sha256:ac46752905207e6d6ef9ebdd53773c7c6d0ae539315b5e8fe4b8266ba59d4f71",
+      "sha256:65a72158775e37d3defedae3eb620de807031b4c3578bb06020d975ac182f162"
+    ],
+    "excluded_tasks": [],
+    "expected_corpus_complete": true,
+    "expected_task_count": 7,
+    "expected_task_ids": [
+      "sha256:f3658defa8e7dc0fa55008dd7af3ff30f38dbc1d4f8b1b3a2e6d1c554f2f2f12",
+      "sha256:181c612abd0cad8529eac60b02fa96f7bf34121f67fc5d56acda0187f4b47c98",
+      "sha256:80d3db38edff2fb67fcdce09af06c52c0f5f9d39652f9331ee640de3cbd18599",
+      "sha256:ac46752905207e6d6ef9ebdd53773c7c6d0ae539315b5e8fe4b8266ba59d4f71",
+      "sha256:dff105cc65db48cd100d88fb6f7ee67bd5ed1aeca47a5d55f9fb7e9c4acca0f0",
+      "sha256:65a72158775e37d3defedae3eb620de807031b4c3578bb06020d975ac182f162",
+      "sha256:e7a2203ac0eee944055690ab7e605c4a8a8f56c0a9fc33a59265bb3eb70c43ce"
+    ],
+    "median_paired_raw_reduction_pct": 59.918,
+    "paired_a_raw_tokens": 645274,
+    "paired_b_raw_tokens": 425757,
+    "paired_expected_task_count": 7,
+    "paired_reduction_pct": 34.019,
+    "paired_task_count": 7,
+    "paired_task_ids": [
+      "sha256:f3658defa8e7dc0fa55008dd7af3ff30f38dbc1d4f8b1b3a2e6d1c554f2f2f12",
+      "sha256:181c612abd0cad8529eac60b02fa96f7bf34121f67fc5d56acda0187f4b47c98",
+      "sha256:80d3db38edff2fb67fcdce09af06c52c0f5f9d39652f9331ee640de3cbd18599",
+      "sha256:ac46752905207e6d6ef9ebdd53773c7c6d0ae539315b5e8fe4b8266ba59d4f71",
+      "sha256:dff105cc65db48cd100d88fb6f7ee67bd5ed1aeca47a5d55f9fb7e9c4acca0f0",
+      "sha256:65a72158775e37d3defedae3eb620de807031b4c3578bb06020d975ac182f162",
+      "sha256:e7a2203ac0eee944055690ab7e605c4a8a8f56c0a9fc33a59265bb3eb70c43ce"
+    ],
+    "provisional_25_pct_target": "PASS",
+    "unexpected_task_ids": [],
+    "unpaired_task_ids": []
+  },
+  "measurement": {
+    "actual_usage_capture_pct": 100,
+    "measurement_gate": "PASS",
+    "neutrality_gate": "PASS",
+    "rollout_decision": "sufficient_measurement"
+  },
+  "promotion": {
+    "high_critical_regressions": 0,
+    "measured_median_raw_reduction_pct": 59.918,
+    "provisional_25_pct_target": "PASS",
+    "reason_codes": [
+      "policy_parity_failed"
+    ],
+    "rollout_decision": "ROLLBACK"
+  },
+  "quality": {
+    "candidate_failure_task_ids": [],
+    "complete": true,
+    "consistent": true,
+    "derived_regressions": [],
+    "duplicate_task_ids": [],
+    "expected_task_count": 7,
+    "inconsistent_task_ids": [],
+    "missing_task_ids": [],
+    "objective_pass_count": 7,
+    "outcome_row_count": 7,
+    "security_pass_count": 7,
+    "unexpected_task_ids": []
+  },
+  "rollout_receipt": {
+    "active_profile": "full_ultra",
+    "audit_selection": {
+      "algorithm": "sha256_mod_100_v1",
+      "bucket": 89,
+      "rate_percent": 20,
+      "selected": false
+    },
+    "config_hash": "sha256:cbeec982ffb2e11eea1d65345c3190a03016d6d0c96c1e84b28c50d006d0a6de",
+    "decision": "ROLLBACK",
+    "experiment_id": "sha256:7df2aac4785feb992f24819fa924eeae1c7576814ba8877a7d3af8407f1306a1",
+    "full_depth": true,
+    "policy_hash": "sha256:147b22163b267ddcd12af5ff27225399f92351db75512d12afbc73386ce7d791",
+    "reason_codes": [
+      "policy_parity_failed"
+    ],
+    "receipt_kind": "rollback",
+    "recorded_at": "2026-07-15T08:43:39.64338Z",
+    "risk_tier": "medium",
+    "task_corpus_hash": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+    "version": 1
+  },
+  "version": 1
+}

@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"os/exec"
 	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 )
 
 // CodexAdapter implements ProviderAdapter for OpenAI Codex CLI.
@@ -22,16 +24,26 @@ func (a *CodexAdapter) Name() string { return "codex" }
 
 // BuildCommand constructs the exec.Cmd for Codex CLI.
 func (a *CodexAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.Cmd {
-	// Worker tasks already run inside an isolated worktree with platform-level
-	// policy enforcement. Git push requires outbound network access, which the
-	// Codex workspace sandbox blocks in workspace-write mode.
-	args := []string{"exec", "--dangerously-bypass-approvals-and-sandbox"}
+	args := []string{"exec"}
+	if task.Codex.evidenceSafe() {
+		args = append(args, "--sandbox", safeCodexSandbox(task.Codex.Sandbox))
+		args = appendCodexEvidenceFlags(args, task.Codex)
+	} else {
+		// Legacy workers already run in an externally isolated worktree.
+		args = append(args, "--dangerously-bypass-approvals-and-sandbox")
+	}
 	if task.Prompt != "" {
 		// Read the sensitive task prompt from stdin instead of exposing it
 		// in the process argv where other local processes can inspect it.
 		args = append(args, "-")
 	}
 	args = append(args, "--json")
+	if effort, ok := codexReasoningEffort(task.Effort); ok {
+		args = append(args, "-c", `model_reasoning_effort="`+effort+`"`)
+	}
+	if task.Codex.RawTokenBudget > 0 {
+		args = append(args, "-c", codexRolloutBudget(task.Codex.RawTokenBudget))
+	}
 
 	if model, ok := codexModelOverride(task.Model); ok {
 		args = append(args, "-m", model)
@@ -64,6 +76,58 @@ func (a *CodexAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.
 	cmd.Env = EnvironWithToolPath(env)
 
 	return cmd
+}
+
+func (o CodexTaskOptions) evidenceSafe() bool {
+	return o.Sandbox != "" || o.Ephemeral || o.IgnoreUserConfig || o.IgnoreRules ||
+		o.SkipGitRepoCheck || o.OutputSchema != "" ||
+		o.ZeroToolMode || o.RawTokenBudget != 0
+}
+
+func safeCodexSandbox(mode CodexSandboxMode) string {
+	if mode == CodexSandboxWorkspaceWrite {
+		return string(CodexSandboxWorkspaceWrite)
+	}
+	return string(CodexSandboxReadOnly)
+}
+
+func appendCodexEvidenceFlags(args []string, options CodexTaskOptions) []string {
+	flags := []struct {
+		enabled bool
+		value   string
+	}{
+		{options.Ephemeral, "--ephemeral"},
+		{options.IgnoreUserConfig, "--ignore-user-config"},
+		{options.IgnoreRules, "--ignore-rules"},
+		{options.SkipGitRepoCheck, "--skip-git-repo-check"},
+	}
+	for _, flag := range flags {
+		if flag.enabled {
+			args = append(args, flag.value)
+		}
+	}
+	if schema := strings.TrimSpace(options.OutputSchema); schema != "" {
+		args = append(args, "--output-schema", schema)
+	}
+	if options.ZeroToolMode {
+		for _, feature := range []string{"multi_agent", "multi_agent_v2", "enable_fanout", "shell_tool", "apps", "hooks"} {
+			args = append(args, "--disable", feature)
+		}
+	}
+	return args
+}
+
+func codexReasoningEffort(effort string) (string, bool) {
+	switch effort {
+	case "low", "medium", "high", "xhigh", "max", "ultra":
+		return effort, true
+	default:
+		return "", false
+	}
+}
+
+func codexRolloutBudget(limit int64) string {
+	return fmt.Sprintf("features.rollout_budget={enabled=true,limit_tokens=%d,reminder_at_remaining_tokens=[],sampling_token_weight=1.0,prefill_token_weight=1.0}", limit)
 }
 
 func codexModelOverride(model string) (string, bool) {
@@ -135,14 +199,30 @@ func (a *CodexAdapter) ParseEvent(line []byte) (StreamEvent, error) {
 				Data: synthetic,
 			}, nil
 		}
+		switch item.Item.Type {
+		case "", "reasoning", "error":
+		default:
+			return StreamEvent{
+				Type:      "tool_call",
+				Subtype:   item.Item.Type,
+				Data:      json.RawMessage(append([]byte(nil), line...)),
+				ToolCalls: 1,
+			}, nil
+		}
 	}
 
 	typ, subtype := splitEventType(raw.Type)
+	toolCalls := 0
+	if typ == "tool_call" {
+		toolCalls = 1
+	}
 
 	return StreamEvent{
-		Type:    typ,
-		Subtype: subtype,
-		Data:    json.RawMessage(append([]byte(nil), line...)),
+		Type:      typ,
+		Subtype:   subtype,
+		Data:      json.RawMessage(append([]byte(nil), line...)),
+		Usage:     parseCodexUsage(line, raw.Type),
+		ToolCalls: toolCalls,
 	}, nil
 }
 
@@ -156,5 +236,46 @@ func (a *CodexAdapter) ExtractResult(event StreamEvent) TaskResult {
 		CostUSD:   re.CostUSD,
 		SessionID: re.SessionID,
 		Output:    re.Output,
+		Usage:     append([]telemetry.UsageEnvelope(nil), event.Usage...),
+		ToolCalls: event.ToolCalls,
 	}
+}
+
+func parseCodexUsage(data []byte, eventType string) []telemetry.UsageEnvelope {
+	var receipt struct {
+		providerUsageIdentity
+		CostUSD *float64 `json:"cost_usd"`
+		Usage   *struct {
+			InputTokens     *int64 `json:"input_tokens"`
+			CachedTokens    *int64 `json:"cached_input_tokens"`
+			OutputTokens    *int64 `json:"output_tokens"`
+			ReasoningTokens *int64 `json:"reasoning_output_tokens"`
+			ToolTokens      *int64 `json:"tool_tokens"`
+			ToolRelation    string `json:"tool_tokens_relation"`
+		} `json:"usage"`
+	}
+	if json.Unmarshal(data, &receipt) != nil {
+		return nil
+	}
+	if receipt.Usage == nil && receipt.CostUSD == nil {
+		return nil
+	}
+	if eventType != "turn.completed" && eventType != "result" {
+		return nil
+	}
+	var input telemetry.UsageInput
+	applyUsageIdentity(&input, receipt.providerUsageIdentity, "codex", "codex.exec-json.turn.completed.v1")
+	input.ActualCostUSD = receipt.CostUSD
+	if receipt.Usage != nil {
+		input.InputTokensTotal = receipt.Usage.InputTokens
+		input.CachedInputTokens = receipt.Usage.CachedTokens
+		input.OutputTokensTotal = receipt.Usage.OutputTokens
+		input.ReasoningTokens = receipt.Usage.ReasoningTokens
+		if receipt.Usage.ReasoningTokens != nil {
+			input.ReasoningRelation = telemetry.ComponentSubsetOfOutput
+		}
+		input.ToolTokens = receipt.Usage.ToolTokens
+		input.ToolRelation = receipt.Usage.ToolRelation
+	}
+	return []telemetry.UsageEnvelope{normalizeProviderUsage(input)}
 }

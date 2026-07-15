@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "created_at": "2026-07-12T21:41:19Z",
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_task006_diagnostic_authorization_reuse_probe",
+  "scope": "gpt-codex-only",
+  "authorization_identity": "sha256:920e6370cebb84739872233cd4a0eeb88295bf816b19b6d43cfac99591a1dc20",
+  "probe": {
+    "kind": "same_authorization_reuse",
+    "execution_opt_in_present": true,
+    "canonical_output_used": true,
+    "exit_code": 1,
+    "rejection_code": "authorization_already_consumed_or_concurrently_reserved",
+    "sentinel_executable_invocations": 0,
+    "provider_calls_made": 0,
+    "raw_total_tokens": 0
+  },
+  "runtime_claim": {
+    "relative_path": ".autopus/runtime/ute-diagnostic-authorizations/920e6370cebb84739872233cd4a0eeb88295bf816b19b6d43cfac99591a1dc20/reservation.json",
+    "state": "CONSUMED_ON_RESERVATION",
+    "sha256_before": "sha256:cb719f052ed7eb14b3a099eb5db4488ddd3bb310dc44bc309d2c4764003079cb",
+    "sha256_after": "sha256:cb719f052ed7eb14b3a099eb5db4488ddd3bb310dc44bc309d2c4764003079cb",
+    "unchanged": true
+  },
+  "immutable_sources": {
+    "partial_ledger_sha256": "sha256:d0d3881e6fdad03c3289761a535f3f34f5603001c0d96af9c66acea840ac6ee0",
+    "terminal_outcome_sha256": "sha256:9869bbceea0a5ba2db05b48980f4cda44ede8dceda1e2325e678826155a13892",
+    "partial_ledger_unchanged": true,
+    "terminal_outcome_unchanged": true
+  },
+  "decision": {
+    "current_authorization_reusable": false,
+    "provider_execution_started": false,
+    "diagnostic_quality_conclusion_changed": false,
+    "promotion_eligible": false,
+    "full_ultra_remains_active": true,
+    "next_attempt_requires_transport_failure_diagnosis": true,
+    "next_attempt_requires_new_policy_hash": true,
+    "next_attempt_requires_explicit_authorization": true
+  }
+}

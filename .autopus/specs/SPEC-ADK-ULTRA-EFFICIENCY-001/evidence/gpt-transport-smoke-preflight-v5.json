@@ -1,0 +1,51 @@
+{
+  "version": 5,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_provider_event_shape_diagnosis_preflight",
+  "provider_receipt": false,
+  "observed_spend": {"provider_calls_made": 0, "raw_total_tokens": 0},
+  "frozen_artifacts": {
+    "policy_sha256": "sha256:49b57c44cfef9105dd93d92441b3c17c1d678cfb6b04527da2fec81c78388f19",
+    "config_sha256": "sha256:42b57ec9d7619263dd78cabff60570cdc7051203270625558b798a036428b074",
+    "schema_sha256": "sha256:2c6da9ba42f09487b4c7a8d1704e08133cbfe2b05ea7001101fea92a23994d6c",
+    "corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a"
+  },
+  "authorization_identity": {
+    "algorithm": "sha256_nul_tuple_v1",
+    "fields": ["policy_sha256", "config_sha256", "schema_sha256", "corpus_sha256"],
+    "trailing_separator": false,
+    "sha256": "sha256:036f1f0534fddaf72897ea5062ebd5747c558a725a47fa0149fd8de033469a64"
+  },
+  "protocol": {
+    "task_id": "ute-corpus-v1-006",
+    "role": "reviewer",
+    "effort": "xhigh",
+    "provider_call_cap": 1,
+    "raw_token_cap": 22000,
+    "concurrency": 1,
+    "retries": 0
+  },
+  "runtime_candidate": {
+    "auto_version": "0.50.68-ute-transport-diagnosis-v5",
+    "auto_executable_sha256": "sha256:b4d67aac8b946f067c2df3c3656422647947a7ab28757d8bab0e671f9b620f37",
+    "harness_sha256": "sha256:82d0b30338fbc467d80b507411cf2bdd5e8cc7d3dd1f60de973bd4e2c4bb4e14",
+    "codex_cli_version": "0.144.1"
+  },
+  "checks": [
+    {"name": "official_jsonl_event_types_confirmed", "status": "PASS"},
+    {"name": "provider_event_payload_schema_not_assumed", "status": "PASS"},
+    {"name": "raw_free_event_kind_and_shape", "status": "PASS"},
+    {"name": "provider_event_values_nonretention", "status": "PASS"},
+    {"name": "task_status_binding_and_canonical_allowlists", "status": "PASS"},
+    {"name": "scanner_process_reap_race_vet_and_hermetic_harness", "status": "PASS"},
+    {"name": "frozen_runtime_identity", "status": "PASS"}
+  ],
+  "decision": {
+    "status": "EXPLICIT_LIVE_AUTHORIZATION_GRANTED",
+    "transport_only": true,
+    "semantic_evaluation_performed": false,
+    "promotion_eligible": false,
+    "provider_execution_started": false,
+    "authorized_at": "2026-07-15T07:15:30+09:00"
+  }
+}

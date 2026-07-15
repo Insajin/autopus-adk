@@ -1,0 +1,233 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "provenance": {
+    "source": "local_git_history",
+    "sibling_corpus_recovery": "unavailable",
+    "target_selection": "maintainer_supplied",
+    "base_selection": "first_parent",
+    "oracle_bytes": "exact bytes from git diff --binary <base_commit> <target_commit>"
+  },
+  "hash_algorithm": "sha256",
+  "task_hash_tuple_contract": {
+    "encoding": "UTF-8",
+    "separator": "NUL",
+    "trailing_separator": false,
+    "fields": [
+      "version",
+      "task_id",
+      "category",
+      "base_commit",
+      "target_commit",
+      "task_brief",
+      "risk_tier",
+      "execution_shape",
+      "verification_command"
+    ]
+  },
+  "task_count": 12,
+  "category_counts": {
+    "debugging": 2,
+    "docs_config": 1,
+    "multi_module": 3,
+    "research_review": 2,
+    "security_migration": 3,
+    "single_file_fix": 1
+  },
+  "source_repo": "autopus-adk",
+  "generated_at": "2026-07-12",
+  "tasks": [
+    {
+      "task_id": "ute-corpus-v1-001",
+      "category": "docs_config",
+      "base_commit": "6595377ed78aad5a09f30ffbafffa9798f6fb0ff",
+      "target_commit": "f81708c6621558fc333afea886475d1927167553",
+      "task_brief": "Document release paths and changelog state.",
+      "risk_tier": "low",
+      "execution_shape": "docs_multi_file",
+      "path_count": 2,
+      "verification_command": "git diff --check",
+      "task_hash": "sha256:fac11ca2f98a23ea83b28bcc61255edde85e81c0f711658b256c725922f4e303",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:8840c0c3478f98ea54476f3c2032c4cc919acccf41f4e10f90228c6479053815"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-002",
+      "category": "security_migration",
+      "base_commit": "f264a38079c24d5bba8e0da75ad2623a6ffd366d",
+      "target_commit": "03b3daad3dfc580c34cac1fd799a9483bba98400",
+      "task_brief": "Upgrade the Go toolchain used by the security workflow.",
+      "risk_tier": "high",
+      "execution_shape": "config_migration",
+      "path_count": 3,
+      "verification_command": "go test ./...",
+      "task_hash": "sha256:1d467299145871382ee0219d932ce8721c9aa359d176a51c7fa548538e0659f2",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:3f32f1a40670c1d11193fd251293acbce8429bbe1a14aabd0b5ef8bdc6100667"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-003",
+      "category": "single_file_fix",
+      "base_commit": "218291745486a82071d5a62e346584e91456da3c",
+      "target_commit": "1af3c6115c4525f5fb4571e24d09a288b6f2f3ca",
+      "task_brief": "Stop a watchdog goroutine leak and race in structured SPEC review.",
+      "risk_tier": "high",
+      "execution_shape": "single_file_fix",
+      "path_count": 1,
+      "verification_command": "go test -race ./internal/cli",
+      "task_hash": "sha256:1f6b573c998f3838028e2530d48082246cfce2f61222839362be8ae529ba4f06",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:48adce6416841f35e24ba9266b9ca54b2e21f97a8a7d36f916b320bb996a43eb"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-004",
+      "category": "debugging",
+      "base_commit": "fadf136a7882ed77724169ccaccd3d5c86e1c9ce",
+      "target_commit": "44d1af9ae78acea90b7b0eb032f51cb049043342",
+      "task_brief": "Correct Codex review pane detection and cover the terminal behavior.",
+      "risk_tier": "medium",
+      "execution_shape": "code_and_test",
+      "path_count": 2,
+      "verification_command": "go test ./internal/cli",
+      "task_hash": "sha256:08ca0cde64b78772f7d298eddac967e48d8efc379b6dbe6fdf0f99f691a01b1e",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:d4ce2c2a17ccfebbc0b8f602a8b692f87bea5739545de1f7bf6c7411e55d9cd1"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-005",
+      "category": "debugging",
+      "base_commit": "1f91332e7465a699904edb8c6abf5cc21881ebc1",
+      "target_commit": "dcb20b8839cbfc67fbc2c7fc9e2340f196f1b657",
+      "task_brief": "Include untracked files from newly created directories during workflow merge.",
+      "risk_tier": "medium",
+      "execution_shape": "code_test_and_changelog",
+      "path_count": 3,
+      "verification_command": "go test ./pkg/workflow",
+      "task_hash": "sha256:e414021cbf4da33e47794324f90a14987fcfe3cffe5805db8aacdacbcb96adfc",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:08ce75d21cbfa2a7082518feb2934e1dbc35039ad69c40a0b0332e462ae35263"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-006",
+      "category": "multi_module",
+      "base_commit": "8c39b08b15511b0131b503db898d8be7800c27fa",
+      "target_commit": "7795dd441fa1feda07214a54c6563284cd9ce401",
+      "task_brief": "Preserve merged review findings and avoid false trim notices.",
+      "risk_tier": "high",
+      "execution_shape": "cross_package_review_fix",
+      "path_count": 7,
+      "verification_command": "go test ./internal/cli ./pkg/spec",
+      "task_hash": "sha256:01ba26060d9b6e2b8882ac156a500272b01604b0b2f8fe7794fdd96f336ea465",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-007",
+      "category": "security_migration",
+      "base_commit": "3edc529996c5653dd199ac11df197913d9c5ff77",
+      "target_commit": "2aa61c2d95b1eb6f5a2d48625d7164da603e2613",
+      "task_brief": "Migrate inherited Codex model configuration without overriding project intent.",
+      "risk_tier": "high",
+      "execution_shape": "cross_package_migration",
+      "path_count": 20,
+      "verification_command": "go test ./internal/cli ./pkg/adapter/codex ./pkg/config",
+      "task_hash": "sha256:a8e1b205476b1c74a98ec51b27c086b682bb6333be030f06b4e0c55c6f85ab7a",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:c527ae6ef6831d78bf2951296ad40a5964b8492be6675d1014c6631e5e6a7b1c"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-008",
+      "category": "multi_module",
+      "base_commit": "1af3c6115c4525f5fb4571e24d09a288b6f2f3ca",
+      "target_commit": "bef7d8e38525a8557df717495e2f8c37c2543d27",
+      "task_brief": "Extend update transaction rollback across platform adapters.",
+      "risk_tier": "high",
+      "execution_shape": "cross_adapter_transaction",
+      "path_count": 23,
+      "verification_command": "go test ./internal/cli ./pkg/adapter/...",
+      "task_hash": "sha256:6fcc6469fb30c3cf2f9662d690531a1199314e9db6abb919b47cb5092830135f",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:160007f86e54b5fa49fcd2a7ae1ee09b085556d67899ddbe2e0d46cb54f5a404"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-009",
+      "category": "security_migration",
+      "base_commit": "2f70dd5d1ac9a57d0420fde32e61cf99d83ec511",
+      "target_commit": "fadf136a7882ed77724169ccaccd3d5c86e1c9ce",
+      "task_brief": "Redact complete issue report bodies before public formatting.",
+      "risk_tier": "critical",
+      "execution_shape": "security_code_and_test",
+      "path_count": 2,
+      "verification_command": "go test ./pkg/issue",
+      "task_hash": "sha256:8be1a0f893a49a5de2bc265ca6e05d824c7e710221fcf0294e26de22e5ca043b",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:4e46f8006b9e4da12dd9c47269cd15b6c239586d2fdcf55700e953888246830a"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-010",
+      "category": "multi_module",
+      "base_commit": "ca6e1bb23745089b7b1e13c417ed7283b7d9ef80",
+      "target_commit": "fc7cab44e3b281c282bd3c29a02ed2eed56c2fa0",
+      "task_brief": "Diagnose GitHub API 403 failures and support authenticated self-update requests.",
+      "risk_tier": "high",
+      "execution_shape": "multi_component_code_and_test",
+      "path_count": 5,
+      "verification_command": "go test ./pkg/selfupdate",
+      "task_hash": "sha256:5b9e1f6a57d0a362a094b157795d3381d337bff547279c836e9a2c025a76f724",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:a205ded7bf4567f72ea353b0b3551016c8af803803595301bd48aabae6d874c1"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-011",
+      "category": "research_review",
+      "base_commit": "dcb20b8839cbfc67fbc2c7fc9e2340f196f1b657",
+      "target_commit": "5e2f849171c1b488117705ccf73d272cec432346",
+      "task_brief": "Record a successful chained route-team SPEC run.",
+      "risk_tier": "low",
+      "execution_shape": "single_file_research",
+      "path_count": 1,
+      "verification_command": "git diff --check",
+      "task_hash": "sha256:61e9a1c04c26ce21225fdf41432de7042d517e1715bf8369dff87caf3c665773",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:3eae654165d48961f667efdb3356eeeafee9b30efd605da2b215b9229d8168de"
+      }
+    },
+    {
+      "task_id": "ute-corpus-v1-012",
+      "category": "research_review",
+      "base_commit": "6ee855025b4b1957d8b91fbc1155d44e2c8c85e9",
+      "target_commit": "a8776c857126b968074003f77cca77658a41e259",
+      "task_brief": "Record the live route-team E2E merge blocker.",
+      "risk_tier": "medium",
+      "execution_shape": "single_file_research",
+      "path_count": 1,
+      "verification_command": "git diff --check",
+      "task_hash": "sha256:e49a068e2a90bb2b709cc448661b97355d94573b27cb9e23d14a6ede4d554603",
+      "oracle": {
+        "type": "expected_git_patch_sha256",
+        "hash": "sha256:43c078bdbf9eec7a2aa6f8ac35ef5d7632c21e021e0f407a47a3dff2de1c1c00"
+      }
+    }
+  ]
+}

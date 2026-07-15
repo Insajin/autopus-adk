@@ -2,12 +2,16 @@ package orchestra
 
 import (
 	"fmt"
+
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 )
 
 // ProviderResult holds a single provider's output from one round.
 type ProviderResult struct {
-	Provider string // real provider name
-	Output   string // raw output text
+	Provider        string // real provider name
+	Output          string // raw output text
+	Usage           []telemetry.UsageEnvelope
+	UsageCapability UsageCapability
 }
 
 // CrossPollinateBuilder anonymizes provider outputs and builds

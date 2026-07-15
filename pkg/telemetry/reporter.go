@@ -20,6 +20,9 @@ func FormatSummary(run PipelineRun) string {
 	fmt.Fprintf(&b, "Quality: %s\n", run.QualityMode)
 	fmt.Fprintf(&b, "Duration: %s\n", formatDuration(run.TotalDuration))
 	fmt.Fprintf(&b, "Retries: %d\n", run.RetryCount)
+	if summary, ok := pipelineEfficiency(run); ok {
+		writeEfficiencySummary(&b, summary)
+	}
 
 	if len(run.Phases) > 0 {
 		b.WriteString("\n### Phases\n")
@@ -62,8 +65,88 @@ func FormatComparison(run1, run2 PipelineRun) string {
 	for _, r := range rows {
 		fmt.Fprintf(&b, "| %s | %s | %s |\n", r.label, r.v1, r.v2)
 	}
+	left, leftOK := pipelineEfficiency(run1)
+	right, rightOK := pipelineEfficiency(run2)
+	if leftOK || rightOK {
+		fmt.Fprintf(&b, "| Raw tokens | %d | %d |\n", left.RawTokens, right.RawTokens)
+		fmt.Fprintf(&b, "| Actual coverage | %.1f%% | %.1f%% |\n", left.ActualCoverage*100, right.ActualCoverage*100)
+		fmt.Fprintf(&b, "| Accepted tasks | %d | %d |\n", left.AcceptedTasks, right.AcceptedTasks)
+		fmt.Fprintf(&b, "| Raw / accepted | %s | %s |\n", nullableFloat(left.RawTotalTokensPerAcceptedTask), nullableFloat(right.RawTotalTokensPerAcceptedTask))
+		fmt.Fprintf(&b, "| Actual cost | %s | %s |\n", nullableUSD(left.BillableActualCostUSD), nullableUSD(right.BillableActualCostUSD))
+		comparison := CompareUsageSpend(pipelineUsage(run1), pipelineUsage(run2))
+		fmt.Fprintf(&b, "| Raw reduction |  | %.3f%% |\n", comparison.RawTokenReductionPct)
+		fmt.Fprintf(&b, "| Actual cost reduction |  | %s |\n", nullablePercent(comparison.ActualCostReductionPct))
+	}
 
 	return b.String()
+}
+
+// FormatUsageCost renders provider-actual and estimated billable spend without
+// relabeling either value as the other.
+func FormatUsageCost(run PipelineRun) string {
+	summary, ok := pipelineEfficiency(run)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("실제 비용: %s | 추정 비용: %s | 모델 호출: %d | 도구 호출: %d\n",
+		nullableUSD(summary.BillableActualCostUSD), nullableUSD(summary.BillableEstimatedCostUSD),
+		summary.UniqueModelCallCount, summary.ToolCallCount)
+}
+
+func pipelineEfficiency(run PipelineRun) (EfficiencySummary, bool) {
+	agents := make([]AgentRun, 0)
+	observed := false
+	for _, phase := range run.Phases {
+		for _, agent := range phase.Agents {
+			agents = append(agents, agent)
+			if len(agent.Usage) > 0 || agent.ToolCalls > 0 || agent.AcceptanceStatus != "" {
+				observed = true
+			}
+		}
+	}
+	return SummarizeEfficiency(agents), observed
+}
+
+func pipelineUsage(run PipelineRun) []UsageEnvelope {
+	usage := make([]UsageEnvelope, 0)
+	for _, phase := range run.Phases {
+		for _, agent := range phase.Agents {
+			usage = append(usage, agent.Usage...)
+		}
+	}
+	return usage
+}
+
+func writeEfficiencySummary(b *strings.Builder, summary EfficiencySummary) {
+	b.WriteString("\n### Usage\n")
+	fmt.Fprintf(b, "Actual coverage: %.1f%%\n", summary.ActualCoverage*100)
+	fmt.Fprintf(b, "Raw tokens: %d\n", summary.RawTokens)
+	fmt.Fprintf(b, "Model calls: %d\n", summary.UniqueModelCallCount)
+	fmt.Fprintf(b, "Tool calls: %d\n", summary.ToolCallCount)
+	fmt.Fprintf(b, "Failed-task spend: %d raw tokens\n", summary.FailedSpendRawTokens)
+	fmt.Fprintf(b, "Accepted tasks: %d\n", summary.AcceptedTasks)
+	fmt.Fprintf(b, "Raw tokens / accepted task: %s\n", nullableFloat(summary.RawTotalTokensPerAcceptedTask))
+}
+
+func nullableFloat(value *float64) string {
+	if value == nil {
+		return "null"
+	}
+	return fmt.Sprintf("%.2f", *value)
+}
+
+func nullableUSD(value *float64) string {
+	if value == nil {
+		return "null"
+	}
+	return fmt.Sprintf("$%.4f", *value)
+}
+
+func nullablePercent(value *float64) string {
+	if value == nil {
+		return "null"
+	}
+	return fmt.Sprintf("%.3f%%", *value)
 }
 
 // FormatCostLine returns a one-line cost summary for display after pipeline completion.

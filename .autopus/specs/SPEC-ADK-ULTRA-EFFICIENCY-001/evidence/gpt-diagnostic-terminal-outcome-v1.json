@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "created_at": "2026-07-12T21:21:58Z",
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "scope": "gpt-codex-only",
+  "authorization_identity": "sha256:920e6370cebb84739872233cd4a0eeb88295bf816b19b6d43cfac99591a1dc20",
+  "outcome": "DIAGNOSTIC_TERMINAL_OPERATIONAL_FAILURE",
+  "diagnostic_only": true,
+  "promotion_eligible": false,
+  "candidate_activated": false,
+  "effective_safe_profile": "full_ultra",
+  "ledger": {
+    "file": "gpt-diagnostic-call-ledger-v1.partial-fail.json",
+    "sha256": "sha256:d0d3881e6fdad03c3289761a535f3f34f5603001c0d96af9c66acea840ac6ee0",
+    "completed": false,
+    "failure_code": "process_nonzero",
+    "attempted_calls": 1,
+    "observed_calls": 1,
+    "actual_usage_calls": 0,
+    "observed_raw_total_tokens": 0,
+    "retry_count": 0,
+    "tool_calls": 0
+  },
+  "failure_event": {
+    "sequence": 1,
+    "task_id": "ute-corpus-v1-006",
+    "arm": "A",
+    "pair_order": "AB",
+    "profile": "full5",
+    "role": "reviewer",
+    "role_ordinal": 1,
+    "effort": "xhigh",
+    "process_status": "FAIL",
+    "verdict": null,
+    "finding_count": null,
+    "usage_status": "unavailable",
+    "raw_total_tokens": null,
+    "tool_calls": 0,
+    "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "deterministic_authority": {
+    "task_id": "ute-corpus-v1-006",
+    "expected_patch_sha256": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+    "verification_command": "go test ./internal/cli ./pkg/spec",
+    "verification_exit_code": 0,
+    "status": "PASS",
+    "does_not_establish_diagnostic_quality": true
+  },
+  "diagnostic_protocol": {
+    "planned_calls": 10,
+    "planned_raw_token_cap": 228000,
+    "xhigh_calls": 8,
+    "max_calls": 2,
+    "concurrency": 1,
+    "retries": 0,
+    "valid_bounded_fail_continues": true,
+    "new_policy_sha256": "sha256:4a4b84f7087a5bf40aa0f5c3c2e883e29d235e80bf91c84c1186ec758248b12f",
+    "new_config_sha256": "sha256:bff64292fdf49343bde1a53d9d40ffbea0af5f338cd48385c2a2dc6d752e0565",
+    "new_schema_sha256": "sha256:d81f0205cbc02ac7af0d0897078041f765873ba287b8dfd2c0dd3e66f35ca605",
+    "new_cohort_sha256": "sha256:d060fe3ae06e5ee063c66a57dc7b6a96bd9c929361e81ca2e26d48d333db0d9f"
+  },
+  "safety": {
+    "raw_prompt_retained": false,
+    "raw_patch_retained": false,
+    "raw_response_retained": false,
+    "provider_stdout_stderr_retained": false,
+    "isolated_telemetry_retained": false,
+    "absolute_paths_retained": false,
+    "authorization_consumed": true,
+    "same_authorization_resumable": false
+  },
+  "decision": {
+    "diagnostic_finding_observed": false,
+    "promotion_eligible": false,
+    "primary_spec_completion_changed": false,
+    "full_ultra_remains_active": true,
+    "next_attempt_requires_new_policy_hash": true,
+    "next_attempt_requires_explicit_authorization": true,
+    "next_attempt_requires_transport_failure_diagnosis": true
+  }
+}

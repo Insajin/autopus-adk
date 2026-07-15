@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "created_at": "2026-07-12T14:05:39Z",
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "scope": "gpt-codex-only",
+  "outcome": "CIRCUIT_OPEN",
+  "reason": "NON_PASS_VERDICT",
+  "primary_ledger": {
+    "file": "gpt-primary-call-ledger-v1.partial-fail.json",
+    "sha256": "sha256:f1b2fc2171af84464c6e5e7f39d5db62918480740d60abe4fabc93784987b582",
+    "completed": false,
+    "evaluation_eligible": false,
+    "promotion_eligible": false,
+    "failure_code": "process_nonzero"
+  },
+  "observed": {
+    "provider_calls_made": 39,
+    "successful_calls": 38,
+    "failed_calls": 1,
+    "raw_total_tokens": 523811,
+    "actual_usage_calls": 39,
+    "unique_call_ids": 39,
+    "unique_run_ids": 39,
+    "retry_count": 0,
+    "tool_calls": 0,
+    "completed_task_arm_groups": 10,
+    "complete_paired_tasks": 5,
+    "role_counts": {
+      "reviewer": 23,
+      "security_auditor": 10,
+      "review_consolidator": 6
+    },
+    "effort_counts": {
+      "xhigh": 29,
+      "max": 10
+    },
+    "maximum_observed_raw_tokens": {
+      "xhigh": 15405,
+      "max": 15441
+    },
+    "budget_violations": 0,
+    "identity_mismatches": 0
+  },
+  "failure_event": {
+    "sequence": 39,
+    "task_id": "ute-corpus-v1-006",
+    "risk_tier": "high",
+    "arm": "B",
+    "pair_order": "BA",
+    "profile": "full5",
+    "role": "reviewer",
+    "role_ordinal": 1,
+    "model": "gpt-5.6-sol",
+    "effort": "xhigh",
+    "verdict": "FAIL",
+    "finding_count": 1,
+    "usage_status": "actual",
+    "raw_total_tokens": 14850,
+    "raw_token_budget": 22000,
+    "tool_calls": 0,
+    "attempt": 1
+  },
+  "deterministic_target_recheck": {
+    "task_id": "ute-corpus-v1-006",
+    "target_commit": "7795dd441fa1feda07214a54c6563284cd9ce401",
+    "expected_patch_sha256": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+    "observed_patch_sha256": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+    "verification_command": "go test ./internal/cli ./pkg/spec",
+    "verification_exit_code": 0,
+    "status": "PASS",
+    "authority_rule": "deterministic PASS cannot convert a supplementary GPT FAIL into promotion eligibility"
+  },
+  "fail_closed_checks": {
+    "strict_evaluator_admitted_partial_ledger": false,
+    "strict_evaluator_exit_code": 1,
+    "strict_evaluator_artifacts_published": false,
+    "rollback_replay_admitted_partial_ledger": false,
+    "rollback_replay_exit_code": 1,
+    "rollback_replay_provider_calls": 0,
+    "state_cleanup_complete": true
+  },
+  "authorization": {
+    "provider_call_cap": 64,
+    "raw_token_cap": 1500000,
+    "concurrency": 1,
+    "retries": 0,
+    "provider_calls_remaining_but_not_admissible": 25,
+    "raw_tokens_remaining_but_not_admissible": 976189
+  },
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_patch_retained": false,
+    "raw_response_retained": false,
+    "provider_jsonl_retained": false,
+    "provider_stdout_stderr_retained": false,
+    "isolated_telemetry_retained": false,
+    "absolute_paths_retained": false
+  },
+  "rollout": {
+    "strict_efficiency_evaluation_executed": false,
+    "complete_quality_ledger_generated": false,
+    "applied_rollback_receipt_generated": false,
+    "rollback_replay_executed": false,
+    "candidate_activated": false,
+    "user_config_mutated": false,
+    "repository_policy_activated": false,
+    "effective_safe_profile": "full_ultra",
+    "decision": "BLOCKED_NO_PROMOTION"
+  },
+  "lifecycle": {
+    "spec_status": "approved",
+    "implemented": false,
+    "completion_debt_open": true,
+    "next_live_run_requires_new_frozen_protocol": true,
+    "next_live_run_requires_explicit_authorization": true
+  }
+}

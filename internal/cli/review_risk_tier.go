@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/orchestra"
@@ -121,6 +122,7 @@ func allDocumentationFiles(files []string) bool {
 	return true
 }
 
+// @AX:NOTE: [AUTO] @AX:SPEC: SPEC-ADK-ULTRA-EFFICIENCY-001 — any sensitive-domain substring forces the critical/full-review path.
 func isCriticalReviewPath(file string) bool {
 	lower := strings.ToLower(file)
 	criticalTokens := []string{
@@ -141,7 +143,19 @@ func isCriticalReviewPath(file string) bool {
 
 func isHighReviewPath(file string) bool {
 	lower := strings.ToLower(file)
+	base := strings.ToLower(filepath.Base(lower))
+	if strings.HasSuffix(lower, ".proto") || strings.HasSuffix(lower, ".graphql") || strings.HasSuffix(lower, ".gql") ||
+		strings.HasPrefix(base, "openapi.") || strings.HasPrefix(base, "swagger.") {
+		return true
+	}
 	highPrefixes := []string{
+		"api/",
+		"proto/",
+		"openapi/",
+		"swagger/",
+		"graphql/",
+		"internal/api/",
+		"pkg/api/",
 		"internal/services/",
 		"internal/handlers/",
 		"internal/workers/",
@@ -171,10 +185,39 @@ func isSourceReviewPath(file string) bool {
 }
 
 func changedFilesForRiskTier() []string {
-	out, err := exec.Command("git", "diff", "--name-only", "--diff-filter=ACMR").Output()
-	if err != nil {
-		return nil
+	files, _ := discoverChangedFilesForRiskTier()
+	return files
+}
+
+// discoverChangedFilesForRiskTier preserves discovery failures for callers
+// that must fail closed. changedFilesForRiskTier retains the legacy best-effort
+// behavior used by the review command.
+func discoverChangedFilesForRiskTier() ([]string, error) {
+	return discoverChangedFilesForRiskTierIn("")
+}
+
+func discoverChangedFilesForRiskTierIn(dir string) ([]string, error) {
+	commands := [][]string{
+		{"diff", "--name-only", "--diff-filter=ACMRD"},
+		{"diff", "--cached", "--name-only", "--diff-filter=ACMRD"},
+		{"ls-files", "--others", "--exclude-standard"},
 	}
-	lines := strings.Split(string(out), "\n")
-	return normalizeRiskTierFiles(lines)
+	seen := make(map[string]struct{})
+	for _, args := range commands {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.Output()
+		if err != nil {
+			return nil, err
+		}
+		for _, file := range normalizeRiskTierFiles(strings.Split(string(out), "\n")) {
+			seen[file] = struct{}{}
+		}
+	}
+	files := make([]string, 0, len(seen))
+	for file := range seen {
+		files = append(files, file)
+	}
+	sort.Strings(files)
+	return files, nil
 }

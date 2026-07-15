@@ -11,6 +11,7 @@ const (
 
 	// @AX:NOTE: [AUTO] @AX:SPEC: SPEC-CONTEXT-COMPRESS-001: reason strings are compaction event wire values consumed by JSONL logs and tests
 	ReasonBelowThreshold         = "below_threshold"
+	ReasonSoftPrune              = "soft_prune"
 	ReasonThresholdExceeded      = "threshold_exceeded"
 	ReasonToolPairPruned         = "tool_pair_pruned"
 	ReasonIncompleteToolPair     = "incomplete_tool_pair"
@@ -131,6 +132,41 @@ func buildCompactionEvent(phaseName, provider, original, summary string, prune p
 		ReasonCodes:         uniqueStrings(reasons),
 		SourceRefs:          extractSourceRefs(safeOriginal + "\n" + safePruned),
 		CompactionApplied:   true,
+	}
+}
+
+func buildSoftPruneEvent(phaseName, provider, original, output string, prune pruneDetails) CompactionEvent {
+	redactedOriginal, redactionReasons := redactUnsafeContext(original)
+	safeOriginal, omittedOriginalBodies := omitToolPayloadBodies(redactedOriginal)
+	redactedOutput, _ := redactUnsafeContext(output)
+	safeOutput, omittedOutputBodies := omitToolPayloadBodies(redactedOutput)
+	reasons := append([]string{ReasonSoftPrune}, prune.ReasonCodes...)
+	if omittedOriginalBodies || omittedOutputBodies {
+		reasons = append(reasons, ReasonProviderPayloadOmitted)
+	}
+	for _, reason := range redactionReasons {
+		switch reason {
+		case "secret":
+			reasons = append(reasons, ReasonSecretRedacted)
+		case "local_path":
+			reasons = append(reasons, ReasonLocalPathRedacted)
+		case "provider_payload":
+			reasons = append(reasons, ReasonProviderPayloadOmitted)
+		}
+	}
+	return CompactionEvent{
+		Type:                EventTypeCompaction,
+		Phase:               phaseName,
+		Provider:            provider,
+		ModelProfile:        provider,
+		TriggerThreshold:    WindowSize(provider) / 2,
+		InputEstimate:       EstimateTokens(original),
+		OutputEstimate:      EstimateTokens(output),
+		PrunedPairCount:     prune.PrunedPairCount,
+		IncompletePairCount: prune.IncompletePairCount,
+		ReasonCodes:         uniqueStrings(reasons),
+		SourceRefs:          extractSourceRefs(safeOriginal + "\n" + safeOutput),
+		CompactionApplied:   prune.PrunedPairCount > 0,
 	}
 }
 

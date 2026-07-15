@@ -98,6 +98,23 @@ func (a *Adapter) renderRouterCommand(cfg *config.HarnessConfig) ([]adapter.File
 	}}, nil
 }
 
+func (a *Adapter) renderWorkflowSkills(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	mappings, err := a.prepareWorkflowSkillMappings(cfg)
+	if err != nil {
+		return nil, err
+	}
+	for _, mapping := range mappings {
+		targetPath := filepath.Join(a.root, mapping.TargetPath)
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			return nil, fmt.Errorf("상세 workflow 디렉터리 생성 실패: %w", err)
+		}
+		if err := os.WriteFile(targetPath, mapping.Content, 0644); err != nil {
+			return nil, fmt.Errorf("상세 workflow 쓰기 실패 %s: %w", targetPath, err)
+		}
+	}
+	return mappings, nil
+}
+
 // copyContentFiles는 embedded content FS에서 파일을 읽어 대상 디렉터리에 복사한다.
 // subDir: "skills" or "agents"
 // targetRelDir: relative destination path (e.g. ".claude/skills/autopus")

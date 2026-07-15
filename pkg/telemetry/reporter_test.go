@@ -169,3 +169,22 @@ func TestFormatSummary_SingleAgentNoMultiplier(t *testing.T) {
 	assert.Contains(t, out, "planner")
 	assert.NotContains(t, out, "planner×")
 }
+
+func TestFormatSummary_UsageReportsRawCoverageAndAcceptedTaskSpend(t *testing.T) {
+	input, output, cost := int64(100), int64(20), 0.01
+	run := samplePipelineRun("SPEC-X", telemetry.StatusPass, "ultra", time.Minute, 0)
+	run.Phases[0].Agents[0].TaskID = "task-1"
+	run.Phases[0].Agents[0].AcceptanceStatus = telemetry.StatusPass
+	run.Phases[0].Agents[0].ToolCalls = 2
+	run.Phases[0].Agents[0].Usage = []telemetry.UsageEnvelope{telemetry.NormalizeUsage(telemetry.UsageInput{
+		RunID: "run", CallID: "call", TaskID: "task-1", Source: telemetry.UsageSourceProvider,
+		InputTokensTotal: &input, OutputTokensTotal: &output, ActualCostUSD: &cost,
+	})}
+
+	out := telemetry.FormatSummary(run)
+
+	assert.Contains(t, out, "Actual coverage: 100.0%")
+	assert.Contains(t, out, "Raw tokens: 120")
+	assert.Contains(t, out, "Accepted tasks: 1")
+	assert.Contains(t, out, "Tool calls: 2")
+}

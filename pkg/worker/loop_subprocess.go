@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/budget"
 	"github.com/insajin/autopus-adk/pkg/worker/security"
@@ -79,8 +80,7 @@ func budgetConfigFromMessage(msg taskPayloadMessage) *BudgetConfig {
 	}
 }
 
-// executeSubprocess spawns the provider CLI, pipes the prompt via stdin,
-// and reads stdout line-by-line through StreamParser.
+// executeSubprocess spawns the provider CLI and parses its stream.
 func (wl *WorkerLoop) executeSubprocess(ctx context.Context, taskCfg adapter.TaskConfig) (adapter.TaskResult, error) {
 	return wl.executeWithBudget(ctx, taskCfg, nil)
 }
@@ -88,6 +88,11 @@ func (wl *WorkerLoop) executeSubprocess(ctx context.Context, taskCfg adapter.Tas
 // executeWithBudget spawns the provider CLI with optional budget tracking.
 // @WARN: When budget is exhausted, EmergencyStop.Stop() is called.
 func (wl *WorkerLoop) executeWithBudget(ctx context.Context, taskCfg adapter.TaskConfig, bc *BudgetConfig) (adapter.TaskResult, error) {
+	taskCfg = attachRequiredContext(taskCfg)
+	if err := validateRetainedPromptAdmission(taskCfg.Prompt); err != nil {
+		return adapter.TaskResult{}, err
+	}
+	taskCfg = ensureUsageIdentity(taskCfg, "execute", "executor")
 	cmd := wl.config.Provider.BuildCommand(ctx, taskCfg)
 	prepareCommandProcessGroup(cmd)
 
@@ -127,14 +132,14 @@ func (wl *WorkerLoop) executeWithBudget(ctx context.Context, taskCfg adapter.Tas
 		log.Printf("[worker] task %s: failed to close stdin pipe: %v", taskID, err)
 	}
 
-	result, parseErr := wl.parseStreamWithBudget(stdout, taskID, nil, bc)
+	result, parseErr := wl.parseStreamWithTaskConfig(stdout, taskCfg, nil, bc)
 	waitErr := cmd.Wait()
 	if parseErr != nil {
 		stderrStr := strings.TrimSpace(stderrBuf.String())
 		if stderrStr != "" {
 			log.Printf("[worker] task %s: stderr: %s", taskID, stderrStr)
 		}
-		return adapter.TaskResult{}, fmt.Errorf("parse stream: %w", parseErr)
+		return result, fmt.Errorf("parse stream: %w", parseErr)
 	}
 	if result.IsError {
 		return result, providerResultError(wl.config.Provider.Name(), result)
@@ -154,30 +159,24 @@ func (wl *WorkerLoop) executeWithBudget(ctx context.Context, taskCfg adapter.Tas
 	return result, nil
 }
 
-func providerResultError(provider string, result adapter.TaskResult) error {
-	message := strings.TrimSpace(result.Error)
-	if message == "" {
-		message = strings.TrimSpace(result.Output)
-	}
-	if message == "" {
-		message = "provider result marked as error"
-	}
-	provider = strings.TrimSpace(provider)
-	if provider == "" {
-		provider = "provider"
-	}
-	return fmt.Errorf("%s result error: %s", provider, message)
-}
-
 func (wl *WorkerLoop) parseStream(r io.Reader, taskID string) (adapter.TaskResult, error) {
 	return wl.parseStreamWithBudget(r, taskID, nil, nil)
 }
 
 func (wl *WorkerLoop) parseStreamWithBudget(r io.Reader, taskID string, sw *StdinWriter, bc *BudgetConfig) (adapter.TaskResult, error) {
+	taskCfg := ensureUsageIdentity(adapter.TaskConfig{TaskID: taskID}, "execute", "executor")
+	return wl.parseStreamWithTaskConfig(r, taskCfg, sw, bc)
+}
+
+func (wl *WorkerLoop) parseStreamWithTaskConfig(r io.Reader, taskCfg adapter.TaskConfig, sw *StdinWriter, bc *BudgetConfig) (adapter.TaskResult, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), maxSubprocessLineBytes)
 	var lastResult adapter.TaskResult
 	hasResult := false
+	allUsage := make([]telemetry.UsageEnvelope, 0)
+	totalToolCalls := 0
+	sawToolEvent := false
+	taskID := taskCfg.TaskID
 
 	var counter *budget.Counter
 	var injector *budget.WarningInjector
@@ -199,6 +198,7 @@ func (wl *WorkerLoop) parseStreamWithBudget(r io.Reader, taskID string, sw *Stdi
 			log.Printf("[stream] skipping malformed line: %v", err)
 			continue
 		}
+		allUsage = mergeBoundUsage(allUsage, bindUsageIdentity(adapterEvt.Usage, taskCfg, wl.config.Provider.Name()))
 
 		switch {
 		case adapterEvt.Type == "system" && adapterEvt.Subtype == "init":
@@ -234,6 +234,12 @@ func (wl *WorkerLoop) parseStreamWithBudget(r io.Reader, taskID string, sw *Stdi
 				Message: "task notification",
 			})
 		case adapterEvt.Type == stream.EventToolCall || adapterEvt.Type == "tool_use":
+			sawToolEvent = true
+			count := adapterEvt.ToolCalls
+			if count == 0 {
+				count = 1
+			}
+			totalToolCalls += count
 			if counter != nil {
 				r := counter.Increment()
 				log.Printf("[worker] task %s: tool call %d/%d", taskID, r.Count, r.Budget.Limit)
@@ -258,11 +264,22 @@ func (wl *WorkerLoop) parseStreamWithBudget(r io.Reader, taskID string, sw *Stdi
 							evidence.ActionSequence,
 						))
 					}
+					lastResult.Usage = mergeBoundUsage(allUsage, lastResult.Usage)
+					lastResult.ToolCalls = totalToolCalls
 					return lastResult, fmt.Errorf("iteration budget exceeded: %d/%d", r.Count, r.Budget.Limit)
 				}
 			}
 		case adapterEvt.Type == "result":
 			result := wl.config.Provider.ExtractResult(adapterEvt)
+			result.Usage = bindUsageIdentity(result.Usage, taskCfg, wl.config.Provider.Name())
+			reportedToolCalls := result.ToolCalls
+			if adapterEvt.ToolCalls > reportedToolCalls {
+				reportedToolCalls = adapterEvt.ToolCalls
+			}
+			if !sawToolEvent && reportedToolCalls > totalToolCalls {
+				totalToolCalls = reportedToolCalls
+			}
+			result.ToolCalls = 0
 			lastResult = adapter.MergeSequentialResult(wl.config.Provider.Name(), lastResult, hasResult, result)
 			hasResult = true
 		case adapterEvt.Type == "error":
@@ -270,10 +287,14 @@ func (wl *WorkerLoop) parseStreamWithBudget(r io.Reader, taskID string, sw *Stdi
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return adapter.TaskResult{}, fmt.Errorf("stream scan: %w", err)
+		lastResult.Usage = mergeBoundUsage(allUsage, lastResult.Usage)
+		lastResult.ToolCalls = totalToolCalls
+		return lastResult, fmt.Errorf("stream scan: %w", err)
 	}
 	if !hasResult {
-		return adapter.TaskResult{}, fmt.Errorf("no result event received for task %s", taskID)
+		return adapter.TaskResult{Usage: allUsage, ToolCalls: totalToolCalls}, fmt.Errorf("no result event received for task %s", taskID)
 	}
+	lastResult.Usage = mergeBoundUsage(allUsage, lastResult.Usage)
+	lastResult.ToolCalls = totalToolCalls
 	return lastResult, nil
 }

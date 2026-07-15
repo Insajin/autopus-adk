@@ -1,0 +1,36 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "finding_count",
+    "finding_codes",
+    "finding_scope_hashes"
+  ],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "PASS"
+      ]
+    },
+    "finding_count": {
+      "type": "integer",
+      "enum": [
+        0
+      ]
+    },
+    "finding_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "finding_scope_hashes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

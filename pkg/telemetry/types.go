@@ -24,13 +24,26 @@ const (
 
 // AgentRun records a single agent execution within a pipeline phase.
 type AgentRun struct {
-	AgentName       string        `json:"agent_name"`
-	StartTime       time.Time     `json:"start_time"`
-	EndTime         time.Time     `json:"end_time"`
-	Duration        time.Duration `json:"duration_ns"`
-	Status          string        `json:"status"` // PASS or FAIL
-	FilesModified   int           `json:"files_modified"`
-	EstimatedTokens int           `json:"estimated_tokens"`
+	AgentName        string          `json:"agent_name"`
+	SpecID           string          `json:"spec_id,omitempty"`
+	TaskID           string          `json:"task_id,omitempty"`
+	RunID            string          `json:"run_id,omitempty"`
+	CallID           string          `json:"call_id,omitempty"`
+	Attempt          int             `json:"attempt,omitempty"`
+	Provider         string          `json:"provider,omitempty"`
+	Model            string          `json:"model,omitempty"`
+	Effort           string          `json:"effort,omitempty"`
+	Phase            string          `json:"phase,omitempty"`
+	Role             string          `json:"role,omitempty"`
+	StartTime        time.Time       `json:"start_time"`
+	EndTime          time.Time       `json:"end_time"`
+	Duration         time.Duration   `json:"duration_ns"`
+	Status           string          `json:"status"` // PASS or FAIL
+	AcceptanceStatus string          `json:"acceptance_status,omitempty"`
+	FilesModified    int             `json:"files_modified"`
+	EstimatedTokens  int             `json:"estimated_tokens"`
+	ToolCalls        int             `json:"tool_calls,omitempty"`
+	Usage            []UsageEnvelope `json:"usage,omitempty"`
 }
 
 // PhaseRecord records a single phase within a pipeline execution.

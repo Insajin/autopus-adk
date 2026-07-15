@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/insajin/autopus-adk/pkg/worker"
 	"github.com/insajin/autopus-adk/pkg/worker/setup"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,39 @@ func TestResolveProviderName_PrefersAuthenticatedConfiguredProvider(t *testing.T
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpHome, ".codex"), 0o755))
 
 	assert.Equal(t, "codex", ResolveProviderName([]string{"claude", "codex"}))
+}
+
+func TestRuntimeConfig_LoopConfigPersistsSuccessAndFailureActualUsageOnce(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	loopCfg := (RuntimeConfig{WorkDir: root}).LoopConfig()
+	require.NotNil(t, loopCfg.RecordAgentRun)
+
+	for _, status := range []string{telemetry.StatusPass, telemetry.StatusFail} {
+		input, output := int64(10), int64(5)
+		run := telemetry.AgentRun{
+			AgentName: "worker", Status: status, AcceptanceStatus: status,
+			Usage: []telemetry.UsageEnvelope{telemetry.NormalizeUsage(telemetry.UsageInput{
+				RunID: "run-" + status, CallID: "call-" + status,
+				Source: telemetry.UsageSourceProvider, InputTokensTotal: &input, OutputTokensTotal: &output,
+			})},
+		}
+		require.NoError(t, loopCfg.RecordAgentRun(run))
+	}
+
+	events, err := telemetry.LoadAllEvents(root)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	statuses := make(map[string]int)
+	for _, event := range events {
+		var run telemetry.AgentRun
+		require.NoError(t, json.Unmarshal(event.Data, &run))
+		statuses[run.Status]++
+		require.Len(t, run.Usage, 1)
+		assert.Equal(t, telemetry.UsageStatusActual, run.Usage[0].UsageStatus)
+	}
+	assert.Equal(t, 1, statuses[telemetry.StatusPass])
+	assert.Equal(t, 1, statuses[telemetry.StatusFail])
 }
 
 func TestResolveProviderName_FallsBackToFirstConfiguredWhenNoneAuthenticated(t *testing.T) {

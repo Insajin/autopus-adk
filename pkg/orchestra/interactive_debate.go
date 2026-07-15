@@ -264,10 +264,12 @@ func buildYieldSession(sessionID string, panes []paneInfo, responses []ProviderR
 	round := make([]SessionProviderResponse, 0, len(responses))
 	for _, response := range responses {
 		round = append(round, SessionProviderResponse{
-			Provider:   response.Provider,
-			Output:     response.Output,
-			DurationMs: response.Duration.Milliseconds(),
-			TimedOut:   response.TimedOut,
+			Provider:        response.Provider,
+			Output:          response.Output,
+			DurationMs:      response.Duration.Milliseconds(),
+			TimedOut:        response.TimedOut,
+			Usage:           response.Usage,
+			UsageCapability: response.UsageCapability,
 		})
 	}
 	session.Rounds = append(session.Rounds, round)

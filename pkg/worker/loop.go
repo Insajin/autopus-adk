@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/insajin/autopus-adk/pkg/worker/a2a"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/audit"
@@ -47,6 +48,8 @@ type LoopConfig struct {
 	WorktreeFallbackOverrideReason string
 	KnowledgeSync                  bool   // enable local knowledge context loading
 	KnowledgeDir                   string // local knowledge directory hint (defaults to WorkDir)
+	// RecordAgentRun is the single injected persistence boundary for final task usage.
+	RecordAgentRun func(telemetry.AgentRun) error
 }
 
 // WorkerLoop integrates A2A Server, ProviderAdapter, ContextBuilder, and StreamParser.

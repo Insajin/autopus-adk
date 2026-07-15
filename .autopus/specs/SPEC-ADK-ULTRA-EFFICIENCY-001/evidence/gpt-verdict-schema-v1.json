@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:autopus:spec-adk-ultra-efficiency-001:gpt-verdict:v1",
+  "title": "GPT Codex strict review verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "finding_count"
+  ],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "finding_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    }
+  }
+}

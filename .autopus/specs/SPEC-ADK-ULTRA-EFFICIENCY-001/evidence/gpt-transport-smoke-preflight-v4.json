@@ -1,0 +1,49 @@
+{
+  "version": 4,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_failure_source_diagnosis_preflight",
+  "provider_receipt": false,
+  "observed_spend": {"provider_calls_made": 0, "raw_total_tokens": 0},
+  "frozen_artifacts": {
+    "policy_sha256": "sha256:a562141171b03e3ffc61aee968dc09a1760b1216448469d8db95788ec33654bf",
+    "config_sha256": "sha256:1dce4c89d3e52231bb1cdeb54c96f2a6bbf82004b1ac14e3fcabd7d2f1821711",
+    "schema_sha256": "sha256:a90b361e401497102d90b563082f38ff0a3600376dffdef9b4ebfe106ccb1421",
+    "corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a"
+  },
+  "authorization_identity": {
+    "algorithm": "sha256_nul_tuple_v1",
+    "fields": ["policy_sha256", "config_sha256", "schema_sha256", "corpus_sha256"],
+    "trailing_separator": false,
+    "sha256": "sha256:11bc59a14df0ce2c77e44e28bf644b1a8e07d6d63825189b81988b1da51a1a03"
+  },
+  "protocol": {
+    "task_id": "ute-corpus-v1-006",
+    "role": "reviewer",
+    "effort": "xhigh",
+    "provider_call_cap": 1,
+    "raw_token_cap": 22000,
+    "concurrency": 1,
+    "retries": 0
+  },
+  "runtime_candidate": {
+    "auto_version": "0.50.68-ute-transport-diagnosis-v4",
+    "auto_executable_sha256": "sha256:f7d4c12f354e3f8b106e68ada07286e658f888b32b3467f8a9b6137debd89bd9",
+    "codex_cli_version": "0.144.1"
+  },
+  "checks": [
+    {"name": "raw_free_stage_and_signals", "status": "PASS"},
+    {"name": "task_and_failure_status_binding", "status": "PASS"},
+    {"name": "scanner_error_process_reap", "status": "PASS"},
+    {"name": "focused_race_vet_and_hermetic_harness", "status": "PASS"},
+    {"name": "local_codex_config_and_model_effort_support", "status": "PASS"},
+    {"name": "frozen_runtime_identity", "status": "PASS"}
+  ],
+  "decision": {
+    "status": "EXPLICIT_LIVE_AUTHORIZATION_GRANTED",
+    "transport_only": true,
+    "semantic_evaluation_performed": false,
+    "promotion_eligible": false,
+    "provider_execution_started": false,
+    "authorized_at": "2026-07-14T13:05:43+09:00"
+  }
+}

@@ -48,7 +48,7 @@ func TestQAMESHRouterTemplateGuidance(t *testing.T) {
 		tmplPath := tmplPath
 		t.Run(filepath.Base(filepath.Dir(tmplPath))+"-"+filepath.Base(tmplPath), func(t *testing.T) {
 			t.Parallel()
-			result, err := e.RenderFile(tmplPath, cfg)
+			result, err := semanticContractSurface(e, tmplPath, cfg)
 			require.NoError(t, err)
 			assertQAMESHGuidance(t, result)
 		})
@@ -107,12 +107,5 @@ func assertQAMESHGuidance(t *testing.T, body string) {
 }
 
 func renderOrReadTemplate(e *tmpl.Engine, path string, cfg *config.HarnessConfig) (string, error) {
-	if filepath.Ext(path) == ".tmpl" {
-		return e.RenderFile(path, cfg)
-	}
-	body, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return string(body), nil
+	return semanticContractSurface(e, path, cfg)
 }

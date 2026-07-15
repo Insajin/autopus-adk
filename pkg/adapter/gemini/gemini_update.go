@@ -64,15 +64,14 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	if err != nil {
 		return nil, err
 	}
-	files = append(files, skillMappings...)
 
 	// Extended skills from content/skills/ via transformer
 	extSkillMappings, err := a.renderExtendedSkills(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("extended skill 준비 실패: %w", err)
 	}
-	files = append(files, extSkillMappings...)
-	files = append(files, mirrorAntigravityPluginMappings(extSkillMappings)...)
+	extMirrors := mirrorAntigravityPluginMappings(extSkillMappings)
+	files = append(files, mergeSkillMappings(skillMappings, append(extSkillMappings, extMirrors...))...)
 
 	cmdMappings, err := a.prepareCommandMappings(cfg)
 	if err != nil {

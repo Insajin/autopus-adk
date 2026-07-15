@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_diagnostic_policy",
+  "authorization": {
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "provider_call_cap": 10,
+    "raw_token_cap": 228000,
+    "concurrency": 1,
+    "retries": 0,
+    "single_use": true
+  },
+  "schedule": {
+    "task_id": "ute-corpus-v1-006",
+    "pair_order": "AB",
+    "arm_profiles": {
+      "A": "full5",
+      "B": "full5"
+    },
+    "xhigh_calls": 8,
+    "max_calls": 2,
+    "total_calls": 10,
+    "worst_case_raw_tokens": 228000
+  },
+  "profile": [
+    {
+      "role": "reviewer",
+      "role_ordinal": 1,
+      "effort": "xhigh",
+      "raw_token_budget": 22000
+    },
+    {
+      "role": "reviewer",
+      "role_ordinal": 2,
+      "effort": "xhigh",
+      "raw_token_budget": 22000
+    },
+    {
+      "role": "reviewer",
+      "role_ordinal": 3,
+      "effort": "xhigh",
+      "raw_token_budget": 22000
+    },
+    {
+      "role": "security-auditor",
+      "role_ordinal": 1,
+      "effort": "max",
+      "raw_token_budget": 26000
+    },
+    {
+      "role": "review-consolidator",
+      "role_ordinal": 1,
+      "effort": "xhigh",
+      "raw_token_budget": 22000
+    }
+  ],
+  "finding_codes": [
+    "correctness",
+    "security",
+    "regression",
+    "test_gap",
+    "task_mismatch",
+    "deterministic_conflict",
+    "scope_uncertain"
+  ],
+  "valid_diagnostic_fail_continues": true,
+  "circuit_breaker_on": [
+    "process_nonzero",
+    "tool_event",
+    "usage_not_actual",
+    "identity_mismatch",
+    "schema_mismatch",
+    "scope_hash_outside_frozen_set",
+    "raw_retention",
+    "call_or_token_cap"
+  ],
+  "authoritative_receipts": [
+    "exact_target_patch_hash",
+    "deterministic_verification_exit_zero",
+    "mandatory_security_observation_both_arms"
+  ],
+  "diagnostic_only": true,
+  "promotion_eligible": false
+}

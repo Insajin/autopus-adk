@@ -30,7 +30,7 @@ func CodexProviderEntryForQuality(quality QualityConf) ProviderEntry {
 		ModelPolicy: ProviderModelPolicyQuality,
 		// SPEC-ORCH-021 REQ-014/015: `exec --sandbox workspace-write` (no deprecated --full-auto);
 		// reasoning effort aligned to autopus.yaml. Pane argv stays interactive (no leading `exec`).
-		Args:          []string{"exec", "--sandbox", "workspace-write", "-m", profile.Model, "-c", `model_reasoning_effort="` + profile.Effort + `"`},
+		Args:          []string{"exec", "--json", "--sandbox", "workspace-write", "-m", profile.Model, "-c", `model_reasoning_effort="` + profile.Effort + `"`},
 		PaneArgs:      []string{"-m", profile.Model, "-c", `model_reasoning_effort="` + profile.Effort + `"`},
 		PromptViaArgs: false,
 		Subprocess: SubprocessProvConf{

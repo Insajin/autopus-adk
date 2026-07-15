@@ -41,6 +41,20 @@ func (c *DefaultCompressor) Compress(phaseName, output, provider string) string 
 // CompressDetailed returns compressed output plus compaction event metadata.
 func (c *DefaultCompressor) CompressDetailed(phaseName, output, provider string) CompactionResult {
 	if !ShouldCompress(output, provider) {
+		prune := softPruneToolPairs(output, findToolBlocks(output), c.KeepRecentTools)
+		if prune.IncompletePairCount > 0 {
+			return CompactionResult{
+				Output:  output,
+				Event:   buildSoftPruneEvent(phaseName, provider, output, output, prune),
+				Blocker: ReasonIncompleteToolPair,
+			}
+		}
+		if prune.PrunedPairCount > 0 {
+			return CompactionResult{
+				Output: prune.Text,
+				Event:  buildSoftPruneEvent(phaseName, provider, output, prune.Text, prune),
+			}
+		}
 		return CompactionResult{
 			Output: output,
 			Event:  newCompactionEvent(phaseName, provider, output, false),
@@ -65,7 +79,9 @@ func (c *DefaultCompressor) CompressDetailed(phaseName, output, provider string)
 		EstimateTokens(output), EstimateTokens(summary))
 
 	result := CompactionResult{Output: summary, Event: event}
-	if strings.Contains(summary, "context-budget") {
+	if prune.IncompletePairCount > 0 {
+		result.Blocker = ReasonIncompleteToolPair
+	} else if strings.Contains(summary, "context-budget") {
 		result.Blocker = "context-budget"
 	}
 	return result

@@ -38,7 +38,6 @@ func TestGeminiAdapter_Generate_MinimalityDisciplineRenderedSurfaces(t *testing.
 		{filepath.Join(".gemini", "skills", "autopus", "auto-fix", "SKILL.md"), []string{"caller", "shared root-cause", "revise-target", "receipt"}},
 		{filepath.Join(".gemini", "skills", "autopus", "auto-review", "SKILL.md"), append(reviewTokens, "receipt")},
 		{filepath.Join(".gemini", "skills", "autopus", "agent-pipeline", "SKILL.md"), []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"}},
-		{filepath.Join(".gemini", "skills", "auto", "SKILL.md"), []string{"Minimality Decision Matrix", "minimality ladder", "shared root-cause", "Correctness/Security Findings"}},
 	}
 
 	for _, tc := range cases {

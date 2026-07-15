@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "measurement": {
+    "actual_usage_capture_pct": 100,
+    "measurement_gate": "PASS",
+    "neutrality_gate": "PASS",
+    "rollout_decision": "sufficient_measurement"
+  },
+  "comparison": {
+    "expected_task_ids": [],
+    "unexpected_task_ids": [],
+    "expected_task_count": 0,
+    "paired_expected_task_count": 0,
+    "expected_corpus_complete": false,
+    "paired_task_ids": [],
+    "unpaired_task_ids": [],
+    "excluded_tasks": [],
+    "ab_task_ids": [],
+    "ba_task_ids": [],
+    "paired_a_raw_tokens": 0,
+    "paired_b_raw_tokens": 0,
+    "paired_reduction_pct": 0,
+    "median_paired_raw_reduction_pct": 0,
+    "provisional_25_pct_target": "NOT_MET",
+    "paired_task_count": 0
+  },
+  "quality": {
+    "expected_task_count": 0,
+    "outcome_row_count": 0,
+    "complete": false,
+    "consistent": false,
+    "objective_pass_count": 0,
+    "security_pass_count": 0,
+    "missing_task_ids": null,
+    "duplicate_task_ids": null,
+    "unexpected_task_ids": null,
+    "inconsistent_task_ids": null,
+    "candidate_failure_task_ids": null,
+    "derived_regressions": null
+  },
+  "promotion": {
+    "high_critical_regressions": 0,
+    "measured_median_raw_reduction_pct": 0,
+    "provisional_25_pct_target": "NOT_MET",
+    "rollout_decision": "BLOCKED",
+    "reason_codes": [
+      "insufficient_paired_evidence"
+    ]
+  },
+  "rollout_receipt": {
+    "version": 1,
+    "experiment_id": "sha256:f8545495993c288570ad3a9e6c5d7a365fa66e978c9e29a753f57d4a3de00c81",
+    "task_corpus_hash": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+    "policy_hash": "sha256:7c9f149724d621603580c38ced52d88ddc40e133d212ebb4b29f6355ed4bb6c3",
+    "config_hash": "sha256:a57f176a70e0d9998b2fbcb02de32d65ffc5aca7961993aeeca84ebdba3e0bff",
+    "recorded_at": "2026-07-12T07:38:20.685393Z",
+    "receipt_kind": "shadow",
+    "decision": "SHADOW",
+    "active_profile": "full_ultra",
+    "risk_tier": "low",
+    "full_depth": true,
+    "audit_selection": {
+      "selected": false,
+      "bucket": 0,
+      "rate_percent": 0,
+      "algorithm": ""
+    }
+  }
+}

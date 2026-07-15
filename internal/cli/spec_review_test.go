@@ -25,9 +25,10 @@ func TestNewSpecReviewCmd_Structure(t *testing.T) {
 	// Use should start with "review"
 	assert.Equal(t, "review <SPEC-ID>", cmd.Use)
 
-	// strategy and timeout flags must be present
 	assert.NotNil(t, cmd.Flags().Lookup("strategy"), "strategy flag must exist")
 	assert.NotNil(t, cmd.Flags().Lookup("timeout"), "timeout flag must exist")
+	assert.NotNil(t, cmd.Flags().Lookup("required-document"), "required-document flag must exist")
+	assert.NotNil(t, cmd.Flags().Lookup("conditional-profile"), "conditional-profile flag must exist")
 }
 
 // TestNewSpecReviewCmd_RequiresExactlyOneArg verifies cobra arg validation.

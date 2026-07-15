@@ -119,6 +119,11 @@ When a task modifies 3+ files, exceeds 200 lines, or spans multiple domains, del
 - Use parallel delegation for independent subtasks
 - Maximum 3 sequential agent chains
 
+### Migration Directory Serialization
+
+- Migration directory serialization: tasks that create SQL migrations in the same owning repo and migration directory run sequentially, even when application-code ownership is disjoint.
+- Assign final migration numbers only after earlier migration branches are merged or rebased; parallel dispatch requires no file ownership conflict and no migration-directory conflict.
+
 ## Sync Readiness Gate
 
 Before showing the successful `go` workflow lifecycle or handing off to `/auto sync`, confirm the implementation is closed enough for sync.

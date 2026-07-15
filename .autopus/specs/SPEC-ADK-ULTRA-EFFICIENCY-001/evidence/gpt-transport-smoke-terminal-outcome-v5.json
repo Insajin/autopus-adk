@@ -1,0 +1,69 @@
+{
+  "version": 5,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_transport_diagnosis_terminal_outcome",
+  "outcome": "TRANSPORT_DIAGNOSIS_TERMINAL_OPERATIONAL_FAILURE",
+  "authorization_identity": "sha256:036f1f0534fddaf72897ea5062ebd5747c558a725a47fa0149fd8de033469a64",
+  "authorization_consumed": true,
+  "same_authorization_resumable": false,
+  "policy_sha256": "sha256:49b57c44cfef9105dd93d92441b3c17c1d678cfb6b04527da2fec81c78388f19",
+  "config_sha256": "sha256:42b57ec9d7619263dd78cabff60570cdc7051203270625558b798a036428b074",
+  "schema_sha256": "sha256:2c6da9ba42f09487b4c7a8d1704e08133cbfe2b05ea7001101fea92a23994d6c",
+  "preflight_sha256": "sha256:a3548711c44c3dc3b776cc38ef7460417795b9485dac9f70f2b5c37d998cea16",
+  "partial_ledger_sha256": "sha256:df2f065ba9e0f5e9548e64e69eb92f36497f0a975da150abd28327ebaa30cc3a",
+  "runtime_reservation_sha256": "sha256:f4593e9e203e7b32ef9e8985fae944967827b64794c15b6c2e45be3f2c13294e",
+  "runtime_identity": {
+    "auto_version": "0.50.68-ute-transport-diagnosis-v5",
+    "auto_executable_sha256": "sha256:b4d67aac8b946f067c2df3c3656422647947a7ab28757d8bab0e671f9b620f37",
+    "harness_sha256": "sha256:82d0b30338fbc467d80b507411cf2bdd5e8cc7d3dd1f60de973bd4e2c4bb4e14",
+    "codex_cli_version": "0.144.1"
+  },
+  "execution": {
+    "task_id": "ute-corpus-v1-006",
+    "role": "reviewer",
+    "effort": "xhigh",
+    "planned_calls": 1,
+    "attempted_calls": 1,
+    "raw_token_cap": 22000,
+    "observed_raw_total_tokens": null,
+    "actual_usage_calls": 0,
+    "usage_status": "unavailable",
+    "retries": 0,
+    "failure_code": "process_nonzero",
+    "operational_error_class": "unknown",
+    "operational_error_fingerprint": "sha256:e161c851c1a8c4fdea86c031ea524f1e0c7d39c7399eb950ea081fa8d90f0a42",
+    "operational_error_stage": "process_wait",
+    "operational_error_signals": [
+      "provider_failure_event"
+    ],
+    "operational_provider_event_kind": "error_and_turn_failed",
+    "operational_provider_event_shape": [
+      "top_level_message",
+      "nested_error_object",
+      "nested_error_message"
+    ]
+  },
+  "decision": {
+    "transport_conclusion_available": false,
+    "failure_source_metadata_available": true,
+    "provider_failure_event_observed": true,
+    "provider_failure_event_kind_available": true,
+    "provider_failure_event_shape_available": true,
+    "provider_failure_event_values_available": false,
+    "provider_error_root_cause_classified": false,
+    "stderr_observed": false,
+    "semantic_evaluation_performed": false,
+    "promotion_eligible": false,
+    "effective_profile": "full_ultra",
+    "implemented": false,
+    "next_live_attempt_requires_new_policy_and_explicit_authorization": true
+  },
+  "privacy": {
+    "raw_stderr_retained": false,
+    "raw_provider_error_event_retained": false,
+    "provider_event_values_retained": false,
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "absolute_paths_retained": false
+  }
+}

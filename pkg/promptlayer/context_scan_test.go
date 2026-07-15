@@ -18,7 +18,7 @@ func TestLoadContextLayerRejectsUnsafeInputWithReasonCodes(t *testing.T) {
 	path := filepath.Join(root, "AGENTS.md")
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o644))
 
-	layer, err := LoadContextLayer(root, "AGENTS.md", ContextOptions{MaxBytes: 96})
+	layer, err := LoadContextLayer(root, "AGENTS.md", ContextOptions{MaxBytes: 96, Kind: KindStable})
 	require.NoError(t, err)
 
 	assert.Equal(t, KindStable, layer.Kind)

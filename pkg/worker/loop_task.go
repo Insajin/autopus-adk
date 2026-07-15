@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/insajin/autopus-adk/pkg/worker/a2a"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/budget"
@@ -27,9 +28,18 @@ type taskPayloadMessage struct {
 	PipelinePromptTemplates map[string]string           `json:"pipeline_prompt_templates,omitempty"`
 	IterationBudget         *budget.IterationBudget     `json:"iteration_budget,omitempty"`
 	SpecID                  string                      `json:"spec_id,omitempty"`
+	RequiredReferences      []string                    `json:"required_references,omitempty"`
 	Model                   string                      `json:"model,omitempty"`
 	CorrelationID           string                      `json:"correlation_id,omitempty"`
 	SessionID               string                      `json:"session_id,omitempty"`
+	Attempt                 int                         `json:"attempt,omitempty"`
+	Effort                  string                      `json:"effort,omitempty"`
+	Role                    string                      `json:"role,omitempty"`
+	ProviderVersion         string                      `json:"provider_version,omitempty"`
+	ModelVersion            string                      `json:"model_version,omitempty"`
+	RiskPolicy              string                      `json:"risk_policy,omitempty"`
+	CacheStratum            string                      `json:"cache_stratum,omitempty"`
+	ConfigHash              string                      `json:"config_hash,omitempty"`
 }
 
 type redlineInstructionMessage struct {
@@ -41,9 +51,23 @@ type redlineInstructionMessage struct {
 func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload json.RawMessage) (*a2a.TaskResult, error) {
 	log.Printf("[worker] received task: %s", taskID)
 	defer cleanupPolicy(taskID)
+	startedAt := time.Now()
+	recordedTelemetry := false
+	var msg taskPayloadMessage
+	recordFinalUsage := func(result adapter.TaskResult, status, acceptance string) {
+		if recordedTelemetry || wl.config.RecordAgentRun == nil {
+			return
+		}
+		recordedTelemetry = true
+		run := buildTaskAgentRun(wl.config, msg, taskID, startedAt, time.Now(), result, status, acceptance)
+		if err := wl.config.RecordAgentRun(run); err != nil {
+			log.Printf("[worker] telemetry record failed for task %s: %v", taskID, err)
+		}
+	}
 
 	taskMeta := taskRunMeta{TraceID: taskID}
 	failTask := func(err error, result adapter.TaskResult, sessionID string) (*a2a.TaskResult, error) {
+		recordFinalUsage(result, telemetry.StatusFail, telemetry.StatusFail)
 		pending, _ := wl.pendingApproval(taskID)
 		if result.SessionID == "" {
 			result.SessionID = strings.TrimSpace(sessionID)
@@ -70,7 +94,6 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 		return failureResult, err
 	}
 
-	var msg taskPayloadMessage
 	if err := json.Unmarshal(payload, &msg); err != nil {
 		return failTask(fmt.Errorf("parse task payload: %w", err), adapter.TaskResult{}, "")
 	}
@@ -108,6 +131,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 		})
 	}
 	prompt = appendRedlineInstructionsToPrompt(prompt, msg.RedlineInstructions)
+	persistentTask := wl.persistentTaskContext(taskID, msg)
 
 	var model string
 	if msg.Model != "" {
@@ -116,14 +140,26 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 		model = wl.config.Router.Route(wl.config.Provider.Name(), descriptionSeed)
 	}
 
-	taskCfg := adapter.TaskConfig{
-		TaskID:    taskID,
-		SessionID: msg.SessionID,
-		Prompt:    prompt,
-		MCPConfig: wl.config.MCPConfig,
-		WorkDir:   wl.config.WorkDir,
-		Model:     model,
-	}
+	taskCfg := ensureUsageIdentity(adapter.TaskConfig{
+		TaskID:          taskID,
+		Attempt:         msg.Attempt,
+		Effort:          msg.Effort,
+		Role:            msg.Role,
+		SessionID:       msg.SessionID,
+		Prompt:          prompt,
+		PersistentTask:  persistentTask,
+		ResolveContext:  workerUsesGPTContextDelivery(wl.config.Provider),
+		ContextSpecID:   msg.SpecID,
+		ContextRefs:     append([]string(nil), msg.RequiredReferences...),
+		MCPConfig:       wl.config.MCPConfig,
+		WorkDir:         wl.config.WorkDir,
+		Model:           model,
+		ProviderVersion: msg.ProviderVersion,
+		ModelVersion:    msg.ModelVersion,
+		RiskPolicy:      msg.RiskPolicy,
+		CacheStratum:    msg.CacheStratum,
+		ConfigHash:      msg.ConfigHash,
+	}, "execute", "executor")
 	budgetCfg := budgetConfigFromMessage(msg)
 
 	phasePlan, err := ParsePhasePlan(msg.PipelinePhases)
@@ -143,9 +179,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 	if len(phasePlan) > 0 || len(phaseInstructions) > 0 || len(phasePromptTemplates) > 0 {
 		result, err = wl.executePipelineWithParallel(
 			ctx,
-			taskID,
-			prompt,
-			model,
+			taskCfg,
 			phasePlan,
 			phaseInstructions,
 			phasePromptTemplates,
@@ -189,6 +223,7 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 			}
 		}()
 	}
+	recordFinalUsage(result, telemetry.StatusPass, telemetry.StatusPass)
 
 	return &a2a.TaskResult{
 		Status:        a2a.StatusCompleted,
@@ -197,6 +232,29 @@ func (wl *WorkerLoop) handleTask(ctx context.Context, taskID string, payload jso
 		TraceID:       resolveTaskTraceID(taskID, pending, taskMeta),
 		CorrelationID: taskMeta.CorrelationID,
 	}, nil
+}
+
+func buildTaskAgentRun(config LoopConfig, msg taskPayloadMessage, taskID string, start, end time.Time, result adapter.TaskResult, status, acceptance string) telemetry.AgentRun {
+	agentName := strings.TrimSpace(config.WorkerName)
+	if agentName == "" {
+		agentName = "worker"
+	}
+	run := telemetry.AgentRun{
+		AgentName: agentName, SpecID: msg.SpecID, TaskID: taskID,
+		StartTime: start, EndTime: end, Duration: end.Sub(start), Status: status,
+		AcceptanceStatus: acceptance, Model: msg.Model, Effort: msg.Effort,
+		Role: msg.Role, Attempt: msg.Attempt, ToolCalls: result.ToolCalls, Usage: result.Usage,
+	}
+	if len(result.Usage) > 0 {
+		first := result.Usage[0]
+		run.RunID, run.Attempt = first.RunID, first.Attempt
+		if len(result.Usage) == 1 {
+			run.CallID = first.CallID
+		}
+		run.Provider, run.Model = first.Provider, first.Model
+		run.Effort, run.Phase, run.Role = first.Effort, first.Phase, first.Role
+	}
+	return run
 }
 
 func appendRedlineInstructionsToPrompt(prompt string, instructions []redlineInstructionMessage) string {

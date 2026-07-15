@@ -110,6 +110,9 @@ func (wl *WorkerLoop) executeWithParallel(
 		return adapter.TaskResult{}, err
 	}
 	defer cleanupWorktree()
+	if err := wl.resolveTaskRequiredContext(&taskCfg, taskCfg.WorkDir); err != nil {
+		return adapter.TaskResult{}, fmt.Errorf("required context delivery: %w", err)
+	}
 	execution := buildExecutionContextSnapshot(
 		wl.config,
 		requestedWorkDir,
@@ -158,7 +161,7 @@ func (wl *WorkerLoop) executeWithParallel(
 
 func (wl *WorkerLoop) executePipelineWithParallel(
 	ctx context.Context,
-	taskID, prompt, model string,
+	taskCfg adapter.TaskConfig,
 	phases []Phase,
 	instructions map[Phase]string,
 	promptTemplates map[Phase]string,
@@ -166,6 +169,7 @@ func (wl *WorkerLoop) executePipelineWithParallel(
 	meta taskRunMeta,
 ) (adapter.TaskResult, error) {
 	startTime := time.Now()
+	taskID, prompt, model := taskCfg.TaskID, taskCfg.Prompt, taskCfg.Model
 
 	if wl.auditWriter != nil {
 		recordAuditEvent(wl.auditWriter, newAuditStartedEvent(taskID, false), wl.auditLogger)
@@ -186,6 +190,9 @@ func (wl *WorkerLoop) executePipelineWithParallel(
 		return adapter.TaskResult{}, err
 	}
 	defer cleanupWorktree()
+	if err := wl.resolveTaskRequiredContext(&taskCfg, workDir); err != nil {
+		return adapter.TaskResult{}, fmt.Errorf("required context delivery: %w", err)
+	}
 	execution := buildExecutionContextSnapshot(
 		wl.config,
 		requestedWorkDir,
@@ -203,6 +210,10 @@ func (wl *WorkerLoop) executePipelineWithParallel(
 	})
 
 	pe := NewPipelineExecutor(wl.config.Provider, wl.config.MCPConfig, workDir)
+	pe.SetRequiredContext(taskCfg.RequiredContext)
+	pe.SetPersistentTask(taskCfg.PersistentTask)
+	pe.SetUsageIdentity(taskCfg.RunID, taskCfg.Attempt, taskCfg.Effort, taskCfg.Role)
+	pe.SetUsageProvenance(taskCfg.ProviderVersion, taskCfg.ModelVersion, taskCfg.RiskPolicy, taskCfg.CacheStratum, taskCfg.ConfigHash)
 	baseline := captureExecutionBaseline(workDir)
 	pe.SetEnvVars(envVars)
 	pe.SetInterruptRecorder(func(evt AuditEvent) {
@@ -222,7 +233,7 @@ func (wl *WorkerLoop) executePipelineWithParallel(
 		if wl.auditWriter != nil {
 			recordAuditEvent(wl.auditWriter, newAuditFailedEvent(taskID, durationMS, false), wl.auditLogger)
 		}
-		return adapter.TaskResult{}, err
+		return result, err
 	}
 	artifact, verifyErr := verifyExecutionPostconditions(workDir, prompt, baseline)
 	if artifact.Name != "" {

@@ -1,0 +1,69 @@
+{
+  "activation_eligible": false,
+  "admission_generation": "v2",
+  "applied_rollback_ready": true,
+  "audit_task_005": "PASS",
+  "authorization_identity_sha256": "sha256:129521ff443c4ec01bc71cbb621c1dd3d515d5f460130a16732bf639b52e4978",
+  "critical_sentinel_009": "PASS",
+  "evaluator_artifacts": {
+    "gpt-applied-rollback-v2.json": "sha256:a00bed018f5c5f4482fcec2dacdd5a07c82f43e5e936ecf27e7042fe9d482def",
+    "gpt-efficiency-input-v2.json": "sha256:fede4c32938c1202e00026497ceef7a21e1e8782f8e5f52f28fe5fff9e69b4f0",
+    "gpt-efficiency-result-v2.json": "sha256:d6a6aefb4806486c491aa9173149e61d97dcc3e83d042a8df3025524bef112f3",
+    "gpt-quality-ledger-v2.json": "sha256:0f09491db112d5d530c449bde70043680e9cb953818e026a0abe163b7cb5f05d",
+    "gpt-rollback-input-v2.json": "sha256:59e4b08379adeb4f109e68964f8723fc61e0a1c7362e06122cd3f6522a91d2e1",
+    "gpt-rollback-result-v2.json": "sha256:d556622df5e363a49604f1602abbdea563c71825eea70c4c8330223b5d3bc0b7",
+    "gpt-rollout-audit-input-v2.json": "sha256:3ca34a519a75e1674e8f37c8b8b393321c03bf65009b4b90d7f9396274c1e15e",
+    "gpt-rollout-audit-result-v2.json": "sha256:1fa04470ef97a8ad16547ad6d5fe7710b2fb6e90cd170994e37d8d14e777574a",
+    "gpt-rollout-critical-input-v2.json": "sha256:b9d7be4ac794f1a1b8d125b734e5b8531faef559966d7bd8635eef17a1340d07",
+    "gpt-rollout-critical-result-v2.json": "sha256:634aad474ece5bdfa88c61b6ffb0500116232c0f63f3872953504916a74c2676",
+    "gpt-rollout-high-input-v2.json": "sha256:ca9b337db13e36b54f72388f469154644f24d50f3a381fad7be6533a7d6353d1",
+    "gpt-rollout-high-result-v2.json": "sha256:0ef30b4bb4ce5e4070fca535f4679b6fb1c3951cde83f59a8b03993f2a4aa352",
+    "gpt-rollout-receipts-v2.json": "sha256:e6f3eb4e91cb2e2e610a98de1c6fbba75593f6fa8040fe0879de403312509e2d",
+    "gpt-security-receipts-v2.json": "sha256:e2eb7dbe5c1a3cd8d599c050a72815abba7eb0c7ad8b257ca9be0c0880268b87"
+  },
+  "evaluator_decision": "ELIGIBLE_NEXT_CANARY",
+  "evidence_kind": "gpt_primary_evaluation_summary",
+  "hashes": {
+    "applied_rollback_sha256": "sha256:a00bed018f5c5f4482fcec2dacdd5a07c82f43e5e936ecf27e7042fe9d482def",
+    "primary_ledger_sha256": "sha256:a8ceed2ebceae72bb120c84ecc6ace10e6ee0c2f4678c3eaa340ab86a3602aab",
+    "quality_ledger_sha256": "sha256:0f09491db112d5d530c449bde70043680e9cb953818e026a0abe163b7cb5f05d",
+    "rollout_receipts_sha256": "sha256:e6f3eb4e91cb2e2e610a98de1c6fbba75593f6fa8040fe0879de403312509e2d",
+    "security_receipts_sha256": "sha256:e2eb7dbe5c1a3cd8d599c050a72815abba7eb0c7ad8b257ca9be0c0880268b87"
+  },
+  "high_sentinel_006": "PASS",
+  "implemented": false,
+  "median_paired_raw_reduction_pct": 59.918,
+  "neutrality_scope": "instrumentation_wrapper_only_not_depth_policy",
+  "observed_raw_total_tokens": 1071031,
+  "primary_calls": 58,
+  "promotion_eligible": false,
+  "provider_calls_made_by_builder": 0,
+  "quality_tasks_expected": 7,
+  "quality_tasks_passed": 7,
+  "replay_eligible": true,
+  "rollback_replay_status": "pending",
+  "security_receipts_expected": 14,
+  "security_receipts_passed": 14,
+  "sentinels": {
+    "audit": {
+      "audit_rate_percent": 100,
+      "selected": true,
+      "task_hash": "sha256:e414021cbf4da33e47794324f90a14987fcfe3cffe5805db8aacdacbcb96adfc",
+      "task_id": "ute-corpus-v1-005"
+    },
+    "critical": {
+      "audit_rate_percent": 0,
+      "selected": false,
+      "task_hash": "sha256:8be1a0f893a49a5de2bc265ca6e05d824c7e710221fcf0294e26de22e5ca043b",
+      "task_id": "ute-corpus-v1-009"
+    },
+    "high": {
+      "audit_rate_percent": 0,
+      "selected": false,
+      "task_hash": "sha256:01ba26060d9b6e2b8882ac156a500272b01604b0b2f8fe7794fdd96f336ea465",
+      "task_id": "ute-corpus-v1-006"
+    }
+  },
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "version": 1
+}

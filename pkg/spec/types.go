@@ -101,14 +101,16 @@ const (
 
 // ReviewPromptOptions configures mode-aware review prompt generation.
 type ReviewPromptOptions struct {
-	Mode               ReviewMode      // discover or verify
-	PriorFindings      []ReviewFinding // unresolved findings from previous round (verify mode)
-	StaticFindings     []ReviewFinding // pre-seeded findings from static analysis (discover mode)
-	SpecDir            string          // path to spec directory for loading auxiliary docs
-	PassCriteria       string          // overrides default verdict decision rules in prompt
-	DocContextMaxLines int             // max lines per auxiliary doc (0 = use default 200)
-	checklistFS        fs.FS
-	checklistDiskPaths []string
+	Mode                     ReviewMode      // discover or verify
+	PriorFindings            []ReviewFinding // unresolved findings from previous round (verify mode)
+	StaticFindings           []ReviewFinding // pre-seeded findings from static analysis (discover mode)
+	SpecDir                  string          // path to spec directory for loading auxiliary docs
+	PassCriteria             string          // overrides default verdict decision rules in prompt
+	DocContextMaxLines       int             // max lines per auxiliary doc (0 = use default 200)
+	RequireCompleteDocuments bool            // fail closed unless the required SPEC document set is frozen in full
+	completeDocuments        []completeReviewDocument
+	checklistFS              fs.FS
+	checklistDiskPaths       []string
 }
 
 // ChecklistStatus represents the status of a checklist item.

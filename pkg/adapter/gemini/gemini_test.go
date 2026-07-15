@@ -190,7 +190,7 @@ func TestGeminiAdapter_Generate_WorkflowSkillsAndCommandsStayAligned(t *testing.
 
 	routerSkill, err := os.ReadFile(filepath.Join(dir, ".gemini", "skills", "auto", "SKILL.md"))
 	require.NoError(t, err)
-	assert.Contains(t, string(routerSkill), "## Subcommand Routing")
+	assert.Contains(t, string(routerSkill), "## Routing Contract")
 
 	for _, name := range []string{"plan", "go", "fix", "review", "sync", "idea", "canary"} {
 		skillPath := filepath.Join(dir, ".gemini", "skills", "autopus", "auto-"+name, "SKILL.md")

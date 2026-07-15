@@ -1,9 +1,7 @@
 package templates_test
 
 import (
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,14 +32,8 @@ func TestPromptLayerManifestSourceContracts(t *testing.T) {
 		path, expected := path, expected
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			t.Parallel()
-			body, err := os.ReadFile(path)
+			text, err := semanticContractSurface(e, path, cfg)
 			require.NoError(t, err)
-			text := string(body)
-			if strings.HasSuffix(path, ".tmpl") && !strings.Contains(path, filepath.Join("shared", "orchestra-")) {
-				rendered, renderErr := e.RenderFile(path, cfg)
-				require.NoError(t, renderErr)
-				text = rendered
-			}
 			for _, phrase := range expected {
 				assert.Contains(t, text, phrase)
 			}

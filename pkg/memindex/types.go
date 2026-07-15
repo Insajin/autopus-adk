@@ -116,19 +116,40 @@ type CorruptState struct {
 }
 
 type ContextOptions struct {
-	ProjectDir   string
-	IndexPath    string
-	Query        string
-	BudgetTokens int
-	TopK         int
+	ProjectDir         string
+	IndexPath          string
+	Query              string
+	BudgetTokens       int
+	TopK               int
+	BuildReceipt       bool
+	OutcomeLock        string
+	Constraints        []string
+	OwnedPaths         []string
+	ForbiddenPaths     []string
+	AcceptanceCriteria []string
+	RequiredReferences []string
+	DecisionDelta      string
+	SnapshotHash       string
+	PromptManifestHash string
 }
 
 type ContextResult struct {
-	Query        string         `json:"query"`
-	BudgetTokens int            `json:"budget_tokens"`
-	OmittedCount int            `json:"omitted_count"`
-	Results      []SearchResult `json:"results"`
-	Prompt       string         `json:"prompt"`
+	Query              string         `json:"query"`
+	BudgetTokens       int            `json:"budget_tokens"`
+	RecallBudgetTokens int            `json:"recall_budget_tokens,omitempty"`
+	EstimatedTokens    int            `json:"estimated_tokens,omitempty"`
+	OmittedCount       int            `json:"omitted_count"`
+	Results            []SearchResult `json:"results"`
+	Prompt             string         `json:"prompt"`
+	OutcomeLock        string         `json:"outcome_lock,omitempty"`
+	Constraints        []string       `json:"constraints,omitempty"`
+	OwnedPaths         []string       `json:"owned_paths,omitempty"`
+	ForbiddenPaths     []string       `json:"forbidden_paths,omitempty"`
+	AcceptanceCriteria []string       `json:"acceptance_criteria,omitempty"`
+	RequiredReferences []string       `json:"required_references,omitempty"`
+	DecisionDelta      string         `json:"decision_delta,omitempty"`
+	SnapshotHash       string         `json:"snapshot_hash,omitempty"`
+	PromptManifestHash string         `json:"prompt_manifest_hash,omitempty"`
 }
 
 type Error struct {

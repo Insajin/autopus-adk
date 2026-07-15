@@ -1,0 +1,63 @@
+{
+  "version": 7,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_structured_outputs_subset_diagnosis_config",
+  "provider": "codex",
+  "provider_version": "0.144.1",
+  "model": "gpt-5.6-sol",
+  "model_version": "gpt-5.6-sol",
+  "canonical_execution": {
+    "argv": [
+      "auto",
+      "agent",
+      "run",
+      "ute-corpus-v1-006"
+    ],
+    "direct_codex_forbidden": true
+  },
+  "context": {
+    "evidence_mode": true,
+    "diagnostic_mode": true,
+    "strict_verdict": true,
+    "zero_tool_calls_required": true,
+    "codex": {
+      "sandbox": "read-only",
+      "ephemeral": true,
+      "ignore_user_config": true,
+      "ignore_rules": true,
+      "skip_git_repo_check": true,
+      "zero_tool_mode": true,
+      "source_schema": "gpt-transport-smoke-schema-v7.json",
+      "runtime_output_schema": "gpt-diagnostic-verdict-schema-v1.json",
+      "raw_token_budget": 22000
+    }
+  },
+  "structured_output_compatibility": {
+    "profile": "openai_structured_outputs_conservative_subset_v1",
+    "exact_schema_match_required": true,
+    "all_arrays_have_items": true,
+    "unsupported_composition_rejected": true,
+    "source_schema_sidecar_required": true,
+    "runtime_copy_hash_bound": true,
+    "runtime_copy_check_precedes_authorization_claim": true,
+    "local_postvalidation_enforces_pass": true,
+    "local_postvalidation_enforces_zero_findings": true
+  },
+  "cache_stratum": "provider-managed-stable-prefix-v1",
+  "operational_failure_receipt": {
+    "class_fingerprint_canonical": true,
+    "stage_signals_kind_shape_allowlisted": true,
+    "per_event_canonical_projection": true,
+    "per_event_empty_arrays_required": true,
+    "event_aggregate_and_class_cross_bound": true,
+    "conflicting_provider_evidence_stays_unknown": true,
+    "invalid_event_metadata_clears_all": true,
+    "task_and_failure_status_bound": true,
+    "provider_event_values_persisted": false,
+    "provider_event_raw_hashes_persisted": false,
+    "raw_sources_persisted": false
+  },
+  "transport_only": true,
+  "semantic_evaluation_performed": false,
+  "promotion_eligible": false
+}

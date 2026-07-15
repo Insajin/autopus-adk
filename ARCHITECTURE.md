@@ -27,6 +27,8 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 | SigMap | `pkg/sigmap` | AST-based exported API signature extraction and rendering (Go + TypeScript) |
 | Constraint | `pkg/constraint` | Anti-pattern registry and violation scanning |
 | Pipeline | `pkg/pipeline` | Pipeline state persistence, checkpoint management, phase handoff compaction events |
+| Prompt Layer | `pkg/promptlayer` | Required-context profiles, available architecture documents, complete loading, secret redaction/injection neutralization, and body-free raw-source/delivered-prompt SHA-256 verification |
+| Retained Worker | `pkg/worker` | GPT/Codex direct and phase-split execution with a post-worktree, verified, non-compressible required-context snapshot |
 | Worker Compression | `pkg/worker/compress` | Structured context compression for phase handoffs, tool pair pruning, redacted compaction metadata |
 | Telemetry | `pkg/telemetry` | Pipeline execution telemetry recording and reporting (JSONL) |
 | Cost | `pkg/cost` | Token-based cost estimation and pricing tables |
@@ -55,6 +57,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 │  pkg/e2e/        pkg/selfupdate/    │
 │  pkg/content/profiles               │
 │  pkg/pipeline/                      │
+│  pkg/promptlayer/ pkg/worker/       │
 ├─────────────────────────────────────┤
 │  pkg/config/     pkg/template/      │  Infrastructure
 │  pkg/detect/     pkg/version/       │
@@ -88,6 +91,8 @@ cmd/auto/main.go
         ├→ pkg/selfupdate/
         ├→ pkg/detect/
         ├→ pkg/pipeline/
+        ├→ pkg/promptlayer/
+        ├→ pkg/worker/          → pkg/promptlayer/, pkg/adapter/
         └→ pkg/version/
 ```
 
@@ -117,6 +122,9 @@ cmd/auto/main.go
 | SigMap | `pkg/sigmap/extractor.go` | go/ast-based exported API inventory extraction |
 | Pipeline Checkpoint | `pkg/pipeline/checkpoint.go` | YAML-based pipeline state persistence with stale detection |
 | Structured Context Compression | `pkg/worker/compress` + `pkg/pipeline/events.go` | Seven-section phase summaries, pair-aware tool pruning, compaction metadata, and fail-closed budget blockers |
+| Verified Required Context | `pkg/promptlayer/context_delivery.go` + `internal/cli/workflow_{context,binding_context}.go` | Body-free raw source and delivered sanitized prompt hashes freeze core, SPEC, available architecture, and supervisor-held additional references; omission/replay/hash mismatch rejects compact Ultra while `full_ultra` remains selected |
+| Retained Context Reattachment | `pkg/worker/context_delivery.go` + `pkg/worker/pipeline_context.go` | One GPT/Codex snapshot is built after final worktree assignment and reused unchanged across direct/phase dispatch outside compression; the original task is added once to each later phase, and integrity/admission failures block provider calls |
+| Complete SPEC Review Input | `internal/cli/spec_review_context_delivery.go` + `pkg/spec/prompt_{documents,context_delivery*}.go` | On every all-GPT review revision, the supervisor builds and strictly verifies core, available architecture, declared conditional, extra required, and four SPEC documents, then injects each body once into the provider prompt; missing/tampered/wrong-set/stale/wrong-SPEC or over-128K input fails before orchestra/provider dispatch, while mixed/Claude/Gemini review retains the legacy path |
 | Multi-Language SigMap | `pkg/sigmap/iface.go` | Extractor interface for pluggable language support (Go + TypeScript) |
 | Test Runner Detection | `pkg/detect/testrunner.go` | Auto-detection of test frameworks (jest/vitest/pytest/cargo) |
 | Meta-Agent Builder | `internal/cli/agent_create.go` | Pattern-based agent/skill scaffold generation |

@@ -36,7 +36,7 @@ func TestWorktreeSafetyTemplateContracts(t *testing.T) {
 		path := path
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			t.Parallel()
-			result, err := e.RenderFile(path, cfg)
+			result, err := semanticContractSurface(e, path, cfg)
 			require.NoError(t, err)
 			for _, phrase := range expected {
 				assert.Contains(t, result, phrase)

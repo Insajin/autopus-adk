@@ -21,8 +21,13 @@ SPEC-ID를 인자로 받아 구현을 실행합니다.
 
 ## Context Load
 
-- 구현 전에 `ARCHITECTURE.md`, `.autopus/project/product.md`, `structure.md`, `tech.md`, `workspace.md`, `scenarios.md`, `canary.md`를 우선 읽어 현재 프로젝트 컨텍스트를 복원합니다.
-- 위 문서가 없으면 컨텍스트 부재를 명시하고 필요 시 `@auto setup`을 권장하되, 현재 구현 작업 자체는 계속 진행할 수 있습니다.
+- 구현 전에 `auto workflow context --project-dir <root> --command go --spec-dir <SPEC_DIR> --format json`으로 필수 문서 매니페스트를 생성하고 검증합니다.
+- `AGENTS.md`, `.autopus/project/workspace.md`, 현재 존재하는 architecture 문서, relevant `spec.md`, `plan.md`, `acceptance.md` 전문은 receipt 예산 밖의 비축약 frozen snapshot입니다.
+- scenarios, canary, signatures, learnings는 현재 task가 명시적으로 선언한 경우에만 추가합니다.
+- task별 추가 문서는 context 생성 시 `--required-document <ref>`로 선언하고, binding 검증 시 같은 집합을 `--context-required-document <ref>`로 다시 전달합니다.
+- worker 프롬프트에 required references와 해시를 전달하고 `context_ack`를 진단 증거로 요청합니다. 무결성 판정은 supervisor가 보유한 reference 집합과 해시를 기준으로 합니다.
+- 필수 문서가 없거나 비어 있거나 잘렸거나 해시가 다르면 full Ultra binding을 유지하되 provider를 호출하지 않습니다. 문서를 복구하거나 task를 분할한 뒤 다시 검증합니다. 전체 입력이 안전 한도를 넘으면 문서를 자르지 말고 task를 분할하거나 차단합니다.
+- 토큰 예산으로 줄일 수 있는 것은 memory/index의 optional recall뿐이며, receipt는 필수 문서를 대체하지 않습니다.
 
 ## SPEC Path Resolution
 

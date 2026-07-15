@@ -55,10 +55,12 @@ func wrapSpecLoadError(specID string, err error) error {
 // newSpecReviewCmd creates the "spec review" subcommand.
 func newSpecReviewCmd() *cobra.Command {
 	var (
-		strategy        string
-		timeout         int
-		forceSubprocess bool
-		forcePlain      bool
+		strategy            string
+		timeout             int
+		forceSubprocess     bool
+		forcePlain          bool
+		requiredDocuments   []string
+		conditionalProfiles []string
 	)
 
 	cmd := &cobra.Command{
@@ -69,7 +71,9 @@ func newSpecReviewCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			specID := args[0]
 			return runSpecReviewWithOptions(cmd.Context(), specID, strategy, timeout, specReviewOptions{
-				forceSubprocess: forceSubprocess || forcePlain,
+				forceSubprocess:     forceSubprocess || forcePlain,
+				requiredDocuments:   requiredDocuments,
+				conditionalProfiles: conditionalProfiles,
 			})
 		},
 	}
@@ -78,12 +82,16 @@ func newSpecReviewCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 0, "timeout in seconds (default: from config)")
 	cmd.Flags().BoolVar(&forceSubprocess, "subprocess", false, "Force headless subprocess backend for SPEC review")
 	cmd.Flags().BoolVar(&forcePlain, "plain", false, "Alias for --subprocess; bypass interactive pane backend")
+	cmd.Flags().StringArrayVar(&requiredDocuments, "required-document", nil, "Additional root-relative required review document")
+	cmd.Flags().StringArrayVar(&conditionalProfiles, "conditional-profile", nil, "Declared conditional review context profile")
 
 	return cmd
 }
 
 type specReviewOptions struct {
-	forceSubprocess bool
+	forceSubprocess     bool
+	requiredDocuments   []string
+	conditionalProfiles []string
 }
 
 // runSpecReview executes the full SPEC review pipeline with REVISE loop.
@@ -142,6 +150,10 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 	if flags.MultiMode && len(providers) < 2 {
 		fmt.Fprintf(os.Stderr, "경고: --multi review requested but only one provider is installed; falling back to single-provider review (resolved: %v)\n", providerNames)
 	}
+	contextDelivery, err := prepareSpecReviewContextDelivery(specDir, providers, opts)
+	if err != nil {
+		return fmt.Errorf("리뷰 문서 전달 범위 확인 실패: %w", err)
+	}
 
 	// Collect code context once. Limit is derived adaptively from the number of
 	// files cited in the SPEC, with optional frontmatter override and config ceiling.
@@ -160,17 +172,18 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 	priorFindings, _ := spec.LoadFindings(specDir)
 
 	loopParams := specReviewLoopParams{
-		ctx:            ctx,
-		specID:         specID,
-		specDir:        specDir,
-		strategy:       strategy,
-		timeout:        timeout,
-		maxRevisions:   maxRevisions,
-		threshold:      threshold,
-		gate:           gate,
-		providers:      providers,
-		codeContext:    codeContext,
-		subprocessMode: opts.forceSubprocess || resolveSubprocessMode(&cfg.Orchestra),
+		ctx:             ctx,
+		specID:          specID,
+		specDir:         specDir,
+		strategy:        strategy,
+		timeout:         timeout,
+		maxRevisions:    maxRevisions,
+		threshold:       threshold,
+		gate:            gate,
+		providers:       providers,
+		codeContext:     codeContext,
+		subprocessMode:  opts.forceSubprocess || resolveSubprocessMode(&cfg.Orchestra),
+		contextDelivery: contextDelivery,
 	}
 
 	finalResult, err := runSpecReviewLoop(loopParams, doc, priorFindings)

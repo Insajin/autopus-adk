@@ -1,9 +1,7 @@
 package templates_test
 
 import (
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,12 +87,7 @@ func TestTechnologyStackFreshnessTemplateContracts(t *testing.T) {
 
 func renderOrReadTechstackContract(t *testing.T, e *tmpl.Engine, cfg *config.HarnessConfig, path string) string {
 	t.Helper()
-	if strings.HasSuffix(path, ".tmpl") {
-		result, err := e.RenderFile(path, cfg)
-		require.NoError(t, err)
-		return result
-	}
-	data, err := os.ReadFile(path)
+	result, err := semanticContractSurface(e, path, cfg)
 	require.NoError(t, err)
-	return string(data)
+	return result
 }

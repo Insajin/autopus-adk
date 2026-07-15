@@ -65,7 +65,9 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 	waitErr := waitForCommand(ctx, cmd, req.Provider, waitCh, nil)
 	duration := time.Since(start)
 
-	output := stdoutBuf.String()
+	rawOutput := stdoutBuf.String()
+	usage, usageCapability := decorateProviderUsage(req.Config, req.Role, req.Round, rawOutput)
+	output := rawOutput
 	stderrOutput := stderrBuf.String()
 	output, stderrOutput = applyCodexLastMessageOutput(output, stderrOutput, lastMessagePath)
 	resp := &ProviderResponse{
@@ -76,6 +78,8 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 		ExitCode:        cmd.ExitCode(),
 		EmptyOutput:     strings.TrimSpace(output) == "",
 		ExecutedBackend: "subprocess", // REQ-005/F-003: record direct subprocess production
+		Usage:           usage,
+		UsageCapability: usageCapability,
 	}
 
 	if ctx.Err() != nil {

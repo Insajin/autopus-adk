@@ -73,6 +73,22 @@ Preflight contract:
 
 Pipeline prompts should preserve stable instructions, frozen snapshot recall, and ephemeral task/tool context as separate prompt layer manifest entries. Dry-run or debug output should report cache invalidation scope by layer without exposing raw secrets.
 
+## Scoped Context Receipt Contract
+
+Before delegating a worker task, select one total context-receipt budget between 800 and 2,000 estimated tokens. Reserve the mandatory fields first, then give only the residual budget to optional memory recall.
+
+Every receipt must include:
+
+- Outcome Lock and constraints
+- owned paths and forbidden paths
+- acceptance criteria and required references
+- current decision delta
+- snapshot hash and prompt-manifest hash
+- selected recall source references and hashes
+- omitted recall count
+
+Do not relay full repeated artifact bodies to workers. Keep original artifacts retrievable through stable source references and pass only the selected command profile, bounded recall prompt, and task-specific evidence. If mandatory fields alone exceed the selected budget, fail closed and shrink the task or references before delegation.
+
 ## Minimality Discipline
 
 Every planner, executor, tester, reviewer, and fixer prompt must include this minimality ladder before task assignment:

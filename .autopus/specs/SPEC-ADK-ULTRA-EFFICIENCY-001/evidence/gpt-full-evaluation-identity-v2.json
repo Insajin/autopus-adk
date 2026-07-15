@@ -1,0 +1,45 @@
+{
+  "admission_generation": "v2",
+  "authorization_envelope": {
+    "concurrency": 1,
+    "planned_worst_case_raw_tokens": 1446000,
+    "primary_calls": 58,
+    "provider_call_cap": 64,
+    "raw_token_cap": 1500000,
+    "retries": 0,
+    "rollback_calls": 5,
+    "total_calls": 63
+  },
+  "decision": {
+    "activation": false,
+    "implemented": false,
+    "promotion": false
+  },
+  "evidence_kind": "gpt_codex_full_evaluation_identity",
+  "frozen_artifacts": {
+    "cohort_sha256": "sha256:d6fc675b4fb8b240b2bfdc79fc1439fb783650c169ca07796c967e78103b6419",
+    "config_sha256": "sha256:cbeec982ffb2e11eea1d65345c3190a03016d6d0c96c1e84b28c50d006d0a6de",
+    "corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+    "policy_sha256": "sha256:147b22163b267ddcd12af5ff27225399f92351db75512d12afbc73386ce7d791",
+    "prior_evidence_manifest_sha256": "sha256:37c234dddab88bbc0b4edbbbdc45b4b3b648118cbd821c97f377cdd2d7b7ba98",
+    "schedule_sha256": "sha256:274111c56b896522e6c90ed07d83e508ce909214ef871fd42de03267a73a0196",
+    "snapshot_manifest_sha256": "sha256:06196bcc3d143c89f28d56e7ee7c222d423ffc8ec6acd78d447b40dac99284c2",
+    "transport_terminal_sha256": "sha256:13f31960752167111bc202899721f67e05b3c3d6da5c71372f778bfe65776792",
+    "verdict_schema_sha256": "sha256:c6d47cb848abfd0ee9ef3514072cb4786945835e0ad852c5f13cecf434529e0b"
+  },
+  "runtime": {
+    "admission_bundle_algorithm": "sha256-named-member-manifest-v1",
+    "admission_bundle_member_count": 9,
+    "admission_bundle_sha256": "sha256:45711d43d420414be3ec462155542d9eeb0d4dd5d36daec9dee1ae801bd616ab",
+    "auto_executable_sha256": "sha256:5744f2c4190a1f557320bd6f8034dd809e88bec626b237df1dd8d403fdc148f8",
+    "auto_version": "0.50.68-ute-transport-diagnosis-v8",
+    "codex_cli_version": "0.144.1",
+    "codex_executable_sha256": "sha256:134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477",
+    "full_chain_algorithm": "sha256-named-member-manifest-v1",
+    "full_chain_harness_sha256": "sha256:9c449510ae7918f2d066119cfc2374739e4ae7e83100321645c0c79710afc626",
+    "full_chain_member_count": 17,
+    "harness_sha256": "sha256:18a3f923553208d0ae2df24e4582f3983b7381c5069ceeee7bafffbb5096a22a"
+  },
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "version": 2
+}

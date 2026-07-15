@@ -44,7 +44,7 @@ func TestMigrateOrchestraConfig_MarksExactHistoricalCodexDefaultsQualityManaged(
 
 			got := cfg.Orchestra.Providers["codex"]
 			assert.Equal(t, ProviderModelPolicyQuality, got.ModelPolicy)
-			assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="` + tt.effort + `"`}, got.Args)
+			assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="` + tt.effort + `"`}, got.Args)
 			assert.Equal(t, []string{"-m", CodexSolModel, "-c", `model_reasoning_effort="` + tt.effort + `"`}, got.PaneArgs)
 		})
 	}

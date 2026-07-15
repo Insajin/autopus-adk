@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
@@ -19,6 +20,15 @@ const (
 	StrategyFastest   Strategy = "fastest"
 	StrategyRelay     Strategy = "relay"
 )
+
+// UsageCapability describes whether an execution path can expose trustworthy
+// provider usage independently from its human-readable output.
+type UsageCapability struct {
+	Supported bool   `json:"supported"`
+	Observed  bool   `json:"observed"`
+	Source    string `json:"source,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+}
 
 // ValidStrategies는 유효한 전략 목록이다.
 var ValidStrategies = []Strategy{StrategyConsensus, StrategyPipeline, StrategyDebate, StrategyFastest, StrategyRelay}
@@ -76,42 +86,49 @@ type ProviderResponse struct {
 	// ExecutedBackend records which backend produced this response:
 	// "pane", "subprocess", or "" / "none" when neither succeeded (REQ-005, F-003).
 	ExecutedBackend string
+	Usage           []telemetry.UsageEnvelope `json:"usage,omitempty"`
+	UsageCapability UsageCapability           `json:"usage_capability"`
 }
 
 // @AX:ANCHOR: [AUTO] failure diagnostics wire schema shared by CLI JSON output, spec health projection, and yield reports.
 // @AX:REASON: JSON field names and timeout/redaction metadata must stay stable for downstream failure summaries and retry hints.
 // FailedProvider records a provider that failed during execution.
 type FailedProvider struct {
-	Name                    string        `json:"provider"`                            // Provider name
-	Role                    string        `json:"role,omitempty"`                      // role that timed out or failed, when known
-	Error                   string        `json:"error"`                               // Error message
-	FailureClass            string        `json:"failure_class"`                       // timeout, capacity_exhausted, rate_limited, binary_or_transport, execution_error
-	TimeoutSource           string        `json:"timeout_source,omitempty"`            // source used to resolve timeout duration
-	ConfiguredDuration      time.Duration `json:"configured_duration,omitempty"`       // configured timeout duration
-	ElapsedDuration         time.Duration `json:"elapsed_duration,omitempty"`          // observed provider duration
-	OtherProvidersContinued bool          `json:"other_providers_continued,omitempty"` // true when a sibling provider completed
-	PreflightFailed         bool          `json:"preflight_failed,omitempty"`          // true when execution stopped before round start
-	Receipt                 string        `json:"receipt,omitempty"`                   // reliability receipt path, if persisted
-	NextRemediation         string        `json:"next_remediation,omitempty"`          // exact next step surfaced in summaries
-	CollectionMode          string        `json:"collection_mode,omitempty"`           // hook, poll, file_ipc, subprocess_stdout
-	CorrelationRunID        string        `json:"correlation_run_id,omitempty"`        // run identifier for artifact lookup
-	StderrPreview           string        `json:"stderr_preview,omitempty"`            // sanitized stderr excerpt for postmortem summaries
-	OutputPreview           string        `json:"output_preview,omitempty"`            // sanitized stdout excerpt for postmortem summaries
+	Name                    string                    `json:"provider"`                            // Provider name
+	Role                    string                    `json:"role,omitempty"`                      // role that timed out or failed, when known
+	Error                   string                    `json:"error"`                               // Error message
+	FailureClass            string                    `json:"failure_class"`                       // timeout, capacity_exhausted, rate_limited, binary_or_transport, execution_error
+	TimeoutSource           string                    `json:"timeout_source,omitempty"`            // source used to resolve timeout duration
+	ConfiguredDuration      time.Duration             `json:"configured_duration,omitempty"`       // configured timeout duration
+	ElapsedDuration         time.Duration             `json:"elapsed_duration,omitempty"`          // observed provider duration
+	OtherProvidersContinued bool                      `json:"other_providers_continued,omitempty"` // true when a sibling provider completed
+	PreflightFailed         bool                      `json:"preflight_failed,omitempty"`          // true when execution stopped before round start
+	Receipt                 string                    `json:"receipt,omitempty"`                   // reliability receipt path, if persisted
+	NextRemediation         string                    `json:"next_remediation,omitempty"`          // exact next step surfaced in summaries
+	CollectionMode          string                    `json:"collection_mode,omitempty"`           // hook, poll, file_ipc, subprocess_stdout
+	CorrelationRunID        string                    `json:"correlation_run_id,omitempty"`        // run identifier for artifact lookup
+	StderrPreview           string                    `json:"stderr_preview,omitempty"`            // sanitized stderr excerpt for postmortem summaries
+	OutputPreview           string                    `json:"output_preview,omitempty"`            // sanitized stdout excerpt for postmortem summaries
+	Usage                   []telemetry.UsageEnvelope `json:"usage,omitempty"`
+	UsageCapability         UsageCapability           `json:"usage_capability"`
 }
 
 // OrchestraResult는 오케스트레이션 최종 결과이다.
 type OrchestraResult struct {
-	Strategy        Strategy             // 사용된 전략
-	Responses       []ProviderResponse   // 개별 프로바이더 응답
-	Merged          string               // 병합된 최종 결과
-	Duration        time.Duration        // 전체 실행 시간
-	Summary         string               // 전략별 요약 (합의율, 파이프라인 단계 등)
-	FailedProviders []FailedProvider     // Providers that failed during execution
-	RoundHistory    [][]ProviderResponse // Per-round provider responses for debate strategy
-	RunID           string               // reliability correlation run ID
-	Degraded        bool                 // true when one or more providers were skipped/degraded
-	Reliability     *ReliabilitySummary  // persisted receipts / bundle summary
-	Yield           *YieldOutput         // structured pane/session metadata when execution yields to the caller
+	Strategy        Strategy                  // 사용된 전략
+	Responses       []ProviderResponse        // 개별 프로바이더 응답
+	Merged          string                    // 병합된 최종 결과
+	Duration        time.Duration             // 전체 실행 시간
+	Summary         string                    // 전략별 요약 (합의율, 파이프라인 단계 등)
+	FailedProviders []FailedProvider          // Providers that failed during execution
+	RoundHistory    [][]ProviderResponse      // Per-round provider responses for debate strategy
+	RunID           string                    // reliability correlation run ID
+	Degraded        bool                      // true when one or more providers were skipped/degraded
+	Reliability     *ReliabilitySummary       // persisted receipts / bundle summary
+	Usage           []telemetry.UsageEnvelope // deduplicated model-call receipts
+	UsageAggregate  telemetry.UsageAggregate  // additive usage summary
+	UsageCapability UsageCapability           // aggregate execution-path capability
+	Yield           *YieldOutput              // structured pane/session metadata when execution yields to the caller
 }
 
 // OrchestraConfig는 오케스트레이션 실행 설정이다.

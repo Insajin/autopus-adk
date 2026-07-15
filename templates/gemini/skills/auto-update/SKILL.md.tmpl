@@ -1,0 +1,19 @@
+---
+name: auto-update
+description: canonical ADK source에서 하네스 surface를 갱신합니다
+platform: antigravity-cli
+---
+
+# auto-update
+
+## Context Profile
+
+Load core workspace policy and installed harness configuration. Exclude product scenarios, canary, signatures, and learnings.
+
+## Contract
+
+1. Detect whether the current directory is an ADK source repo, product repo, or meta workspace.
+2. Preserve user-owned provider/model configuration and forward all update flags unchanged.
+3. Run the canonical update workflow; never patch installed `.claude`, `.codex`, `.gemini`, `.opencode`, plugin-cache, or runtime files directly.
+4. Verify Generate/Update parity, manifest health, and tracked-but-ignored drift.
+5. Report updated canonical sources separately from local generated reflections.

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_transport_smoke_terminal_outcome",
+  "outcome": "TRANSPORT_SMOKE_TERMINAL_OPERATIONAL_FAILURE",
+  "authorization_identity": "sha256:7078b87735deb9026654c38ae04305ab8874099ad99c5b4ae37d9956e0232b27",
+  "authorization_consumed": true,
+  "same_authorization_resumable": false,
+  "policy_sha256": "sha256:38b6ae94b0edf4c9cf09a505a5ff1b4f8cec17a478306cde99b95d9aec2411a3",
+  "config_sha256": "sha256:9dd237bf913b7ac30d4002e733b8299c007f7cb1646a0c1020a9dbbdc1bc2e34",
+  "schema_sha256": "sha256:61006491dddaadb43822608d10af5c3baa2e166950973dec95655ffd28003ced",
+  "preflight_sha256": "sha256:d92a3cd44da58a7daff27a60245b6a4c6197c6b5d3cc6a1596384784237c90a4",
+  "partial_ledger_sha256": "sha256:eca927f2802b734336d5c34bd3833fb1a4385c93eff6f97a825bf153cbbe37c6",
+  "runtime_reservation_sha256": "sha256:14245ee951aed6e95eb75e23a9b25387afcc80b804bdbfe37769fbb4122b1956",
+  "runtime_identity": {
+    "auto_version": "0.50.68-ute-transport-smoke-v1",
+    "auto_executable_sha256": "sha256:b90c7445ca8365ccf20ea044a4793f7f8bd16a4cd0f7385915b605e6493518d5",
+    "codex_cli_version": "0.144.1"
+  },
+  "execution": {
+    "task_id": "ute-corpus-v1-006",
+    "role": "reviewer",
+    "effort": "xhigh",
+    "planned_calls": 1,
+    "attempted_calls": 1,
+    "raw_token_cap": 22000,
+    "observed_raw_total_tokens": null,
+    "actual_usage_calls": 0,
+    "usage_status": "unavailable",
+    "tool_calls": null,
+    "retries": 0,
+    "failure_code": "process_nonzero"
+  },
+  "decision": {
+    "transport_conclusion_available": false,
+    "semantic_evaluation_performed": false,
+    "promotion_eligible": false,
+    "effective_profile": "full_ultra",
+    "implemented": false,
+    "next_live_attempt_requires_new_policy_and_explicit_authorization": true
+  },
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_response_retained": false,
+    "provider_stdout_stderr_retained": false,
+    "absolute_paths_retained": false
+  }
+}

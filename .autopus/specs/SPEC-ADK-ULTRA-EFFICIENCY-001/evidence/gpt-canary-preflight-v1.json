@@ -1,0 +1,261 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_local_preflight_dry_run",
+  "observed_on": "2026-07-12",
+  "provider_receipt": false,
+  "historical_claude_preflight_artifact": "live-canary-preflight-v1.json",
+  "scope_note": "This is the GPT/Codex local integrity and dry-run receipt. It does not replace, rewrite, or reinterpret the historical Claude route-team preflight.",
+  "authorized_scope": {
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "provider_version": "0.144.1",
+    "provider_call_cap": 64,
+    "raw_token_cap": 1500000,
+    "concurrency": 1,
+    "retries": 0
+  },
+  "observed_spend": {
+    "provider_calls_made": 0,
+    "raw_total_tokens": 0,
+    "provider_cost_usd": null
+  },
+  "frozen_artifacts": {
+    "corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+    "cohort_sha256": "sha256:d6fc675b4fb8b240b2bfdc79fc1439fb783650c169ca07796c967e78103b6419",
+    "policy_sha256": "sha256:1640281825b184f9ffbb92dc36a9afac27a5b55a9ff9d2632aadfa2dcce9430b",
+    "config_sha256": "sha256:7360f0cca97dbda515af48054b93da23c8701f3078b6cd57aad2af5906473e8f",
+    "verdict_schema_sha256": "sha256:0db59f348c8612b6dec9c7b6a55553f92c4220450c778d82f67d9394f65d5a12"
+  },
+  "deterministic_target_preflight": {
+    "receipt_source": "parent_supervisor_provided_isolated_clone_receipts",
+    "authority": "deterministic_target_patch_and_verification",
+    "task_count": 12,
+    "passed_tasks": 12,
+    "failed_tasks": 0,
+    "status": "PASS",
+    "records": [
+      {
+        "task_id": "ute-corpus-v1-001",
+        "base_commit": "6595377ed78aad5a09f30ffbafffa9798f6fb0ff",
+        "target_commit": "f81708c6621558fc333afea886475d1927167553",
+        "verification_command": "git diff --check",
+        "expected_patch_hash": "sha256:8840c0c3478f98ea54476f3c2032c4cc919acccf41f4e10f90228c6479053815",
+        "observed_patch_hash": "sha256:8840c0c3478f98ea54476f3c2032c4cc919acccf41f4e10f90228c6479053815",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-002",
+        "base_commit": "f264a38079c24d5bba8e0da75ad2623a6ffd366d",
+        "target_commit": "03b3daad3dfc580c34cac1fd799a9483bba98400",
+        "verification_command": "go test ./...",
+        "expected_patch_hash": "sha256:3f32f1a40670c1d11193fd251293acbce8429bbe1a14aabd0b5ef8bdc6100667",
+        "observed_patch_hash": "sha256:3f32f1a40670c1d11193fd251293acbce8429bbe1a14aabd0b5ef8bdc6100667",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-003",
+        "base_commit": "218291745486a82071d5a62e346584e91456da3c",
+        "target_commit": "1af3c6115c4525f5fb4571e24d09a288b6f2f3ca",
+        "verification_command": "go test -race ./internal/cli",
+        "expected_patch_hash": "sha256:48adce6416841f35e24ba9266b9ca54b2e21f97a8a7d36f916b320bb996a43eb",
+        "observed_patch_hash": "sha256:48adce6416841f35e24ba9266b9ca54b2e21f97a8a7d36f916b320bb996a43eb",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-004",
+        "base_commit": "fadf136a7882ed77724169ccaccd3d5c86e1c9ce",
+        "target_commit": "44d1af9ae78acea90b7b0eb032f51cb049043342",
+        "verification_command": "go test ./internal/cli",
+        "expected_patch_hash": "sha256:d4ce2c2a17ccfebbc0b8f602a8b692f87bea5739545de1f7bf6c7411e55d9cd1",
+        "observed_patch_hash": "sha256:d4ce2c2a17ccfebbc0b8f602a8b692f87bea5739545de1f7bf6c7411e55d9cd1",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-005",
+        "base_commit": "1f91332e7465a699904edb8c6abf5cc21881ebc1",
+        "target_commit": "dcb20b8839cbfc67fbc2c7fc9e2340f196f1b657",
+        "verification_command": "go test ./pkg/workflow",
+        "expected_patch_hash": "sha256:08ce75d21cbfa2a7082518feb2934e1dbc35039ad69c40a0b0332e462ae35263",
+        "observed_patch_hash": "sha256:08ce75d21cbfa2a7082518feb2934e1dbc35039ad69c40a0b0332e462ae35263",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-006",
+        "base_commit": "8c39b08b15511b0131b503db898d8be7800c27fa",
+        "target_commit": "7795dd441fa1feda07214a54c6563284cd9ce401",
+        "verification_command": "go test ./internal/cli ./pkg/spec",
+        "expected_patch_hash": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+        "observed_patch_hash": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-007",
+        "base_commit": "3edc529996c5653dd199ac11df197913d9c5ff77",
+        "target_commit": "2aa61c2d95b1eb6f5a2d48625d7164da603e2613",
+        "verification_command": "go test ./internal/cli ./pkg/adapter/codex ./pkg/config",
+        "expected_patch_hash": "sha256:c527ae6ef6831d78bf2951296ad40a5964b8492be6675d1014c6631e5e6a7b1c",
+        "observed_patch_hash": "sha256:c527ae6ef6831d78bf2951296ad40a5964b8492be6675d1014c6631e5e6a7b1c",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-008",
+        "base_commit": "1af3c6115c4525f5fb4571e24d09a288b6f2f3ca",
+        "target_commit": "bef7d8e38525a8557df717495e2f8c37c2543d27",
+        "verification_command": "go test ./internal/cli ./pkg/adapter/...",
+        "expected_patch_hash": "sha256:160007f86e54b5fa49fcd2a7ae1ee09b085556d67899ddbe2e0d46cb54f5a404",
+        "observed_patch_hash": "sha256:160007f86e54b5fa49fcd2a7ae1ee09b085556d67899ddbe2e0d46cb54f5a404",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-009",
+        "base_commit": "2f70dd5d1ac9a57d0420fde32e61cf99d83ec511",
+        "target_commit": "fadf136a7882ed77724169ccaccd3d5c86e1c9ce",
+        "verification_command": "go test ./pkg/issue",
+        "expected_patch_hash": "sha256:4e46f8006b9e4da12dd9c47269cd15b6c239586d2fdcf55700e953888246830a",
+        "observed_patch_hash": "sha256:4e46f8006b9e4da12dd9c47269cd15b6c239586d2fdcf55700e953888246830a",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-010",
+        "base_commit": "ca6e1bb23745089b7b1e13c417ed7283b7d9ef80",
+        "target_commit": "fc7cab44e3b281c282bd3c29a02ed2eed56c2fa0",
+        "verification_command": "go test ./pkg/selfupdate",
+        "expected_patch_hash": "sha256:a205ded7bf4567f72ea353b0b3551016c8af803803595301bd48aabae6d874c1",
+        "observed_patch_hash": "sha256:a205ded7bf4567f72ea353b0b3551016c8af803803595301bd48aabae6d874c1",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-011",
+        "base_commit": "dcb20b8839cbfc67fbc2c7fc9e2340f196f1b657",
+        "target_commit": "5e2f849171c1b488117705ccf73d272cec432346",
+        "verification_command": "git diff --check",
+        "expected_patch_hash": "sha256:3eae654165d48961f667efdb3356eeeafee9b30efd605da2b215b9229d8168de",
+        "observed_patch_hash": "sha256:3eae654165d48961f667efdb3356eeeafee9b30efd605da2b215b9229d8168de",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "task_id": "ute-corpus-v1-012",
+        "base_commit": "6ee855025b4b1957d8b91fbc1155d44e2c8c85e9",
+        "target_commit": "a8776c857126b968074003f77cca77658a41e259",
+        "verification_command": "git diff --check",
+        "expected_patch_hash": "sha256:43c078bdbf9eec7a2aa6f8ac35ef5d7632c21e021e0f407a47a3dff2de1c1c00",
+        "observed_patch_hash": "sha256:43c078bdbf9eec7a2aa6f8ac35ef5d7632c21e021e0f407a47a3dff2de1c1c00",
+        "verification_exit_code": 0,
+        "status": "PASS"
+      }
+    ]
+  },
+  "audit_selection": {
+    "algorithm": "sha256_mod_100_v1",
+    "policy_hash": "sha256:1640281825b184f9ffbb92dc36a9afac27a5b55a9ff9d2632aadfa2dcce9430b",
+    "rate_percent": 20,
+    "selected_task_id": "ute-corpus-v1-005",
+    "selected_count": 1,
+    "buckets": [
+      {
+        "task_id": "ute-corpus-v1-001",
+        "task_hash": "sha256:fac11ca2f98a23ea83b28bcc61255edde85e81c0f711658b256c725922f4e303",
+        "bucket": 91,
+        "selected": false
+      },
+      {
+        "task_id": "ute-corpus-v1-004",
+        "task_hash": "sha256:08ca0cde64b78772f7d298eddac967e48d8efc379b6dbe6fdf0f99f691a01b1e",
+        "bucket": 64,
+        "selected": false
+      },
+      {
+        "task_id": "ute-corpus-v1-005",
+        "task_hash": "sha256:e414021cbf4da33e47794324f90a14987fcfe3cffe5805db8aacdacbcb96adfc",
+        "bucket": 13,
+        "selected": true
+      },
+      {
+        "task_id": "ute-corpus-v1-011",
+        "task_hash": "sha256:61e9a1c04c26ce21225fdf41432de7042d517e1715bf8369dff87caf3c665773",
+        "bucket": 22,
+        "selected": false
+      },
+      {
+        "task_id": "ute-corpus-v1-012",
+        "task_hash": "sha256:e49a068e2a90bb2b709cc448661b97355d94573b27cb9e23d14a6ede4d554603",
+        "bucket": 94,
+        "selected": false
+      }
+    ]
+  },
+  "schedule_dry_run": {
+    "primary_calls": 58,
+    "primary_xhigh_calls": 44,
+    "primary_max_calls": 14,
+    "primary_worst_case_raw_tokens": 1332000,
+    "rollback_calls": 5,
+    "rollback_xhigh_calls": 4,
+    "rollback_max_calls": 1,
+    "rollback_worst_case_raw_tokens": 114000,
+    "complete_calls": 63,
+    "complete_worst_case_raw_tokens": 1446000,
+    "within_authorization": true
+  },
+  "checks": [
+    {
+      "name": "static_sha_sidecars",
+      "status": "PASS"
+    },
+    {
+      "name": "corpus_cohort_exact_match",
+      "status": "PASS"
+    },
+    {
+      "name": "git_base_target_parent_and_patch_objects",
+      "status": "PASS"
+    },
+    {
+      "name": "strict_verdict_schema",
+      "status": "PASS"
+    },
+    {
+      "name": "model_role_and_isolation_policy",
+      "status": "PASS"
+    },
+    {
+      "name": "call_and_token_arithmetic",
+      "status": "PASS"
+    },
+    {
+      "name": "audit_task_005_unique_selection",
+      "status": "PASS"
+    },
+    {
+      "name": "hermetic_fake_auto_primary_rollback_and_circuit_breaker",
+      "status": "PASS"
+    }
+  ],
+  "decision": {
+    "status": "READY_FOR_EXPLICIT_GPT_PRIMARY_EXECUTION",
+    "provider_execution_started": false,
+    "evaluation_eligible": false,
+    "promotion_eligible": false,
+    "reason": "Local preflight proves integrity and admission only; live sanitized usage receipts, evaluator output, quality ledger, audit linkage, and applied rollback remain required."
+  },
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_patch_retained": false,
+    "raw_response_retained": false,
+    "provider_jsonl_retained": false,
+    "absolute_paths_retained": false,
+    "credential_values_read_or_retained": false
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:autopus:spec-adk-ultra-efficiency-001:gpt-diagnostic-verdict:v1",
+  "title": "GPT Codex bounded diagnostic verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "finding_count",
+    "finding_codes",
+    "finding_scope_hashes"
+  ],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "finding_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "finding_codes": {
+      "type": "array",
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "correctness",
+          "security",
+          "regression",
+          "test_gap",
+          "task_mismatch",
+          "deterministic_conflict",
+          "scope_uncertain"
+        ]
+      }
+    },
+    "finding_scope_hashes": {
+      "type": "array",
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "PASS"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "finding_count": {
+            "const": 0
+          },
+          "finding_codes": {
+            "maxItems": 0
+          },
+          "finding_scope_hashes": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "finding_count": {
+            "minimum": 1
+          },
+          "finding_codes": {
+            "minItems": 1
+          },
+          "finding_scope_hashes": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ]
+}

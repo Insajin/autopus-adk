@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_transport_smoke_ledger",
+  "completed": false,
+  "transport_only": true,
+  "semantic_evaluation_performed": false,
+  "promotion_eligible": false,
+  "failure_code": "process_nonzero",
+  "planned_calls": 1,
+  "attempted_calls": 1,
+  "raw_token_cap": 22000,
+  "observed_raw_total_tokens": null,
+  "actual_usage_calls": 0,
+  "usage_status": "unavailable",
+  "operational_error_class": "unknown",
+  "operational_error_fingerprint": "sha256:e161c851c1a8c4fdea86c031ea524f1e0c7d39c7399eb950ea081fa8d90f0a42",
+  "authorization_identity": {
+    "sha256": "sha256:345523b25569eee5f691d3960c2caca0709aebcd324c7db103cb3c2b0ecf013f"
+  },
+  "calls": [
+    {
+      "sequence": 1,
+      "task_id": "ute-corpus-v1-006",
+      "role": "reviewer",
+      "effort": "xhigh",
+      "status": "operational_failure",
+      "failure_code": "process_nonzero"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "finding_count": {
+      "type": "integer"
+    },
+    "verdict": {
+      "enum": [
+        "PASS",
+        "FAIL"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "verdict",
+    "finding_count"
+  ],
+  "type": "object"
+}

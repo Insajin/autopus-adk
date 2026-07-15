@@ -52,7 +52,8 @@ func hookWatcherTimeout(provider ProviderConfig, fallbackSeconds int) time.Durat
 // collectSingleProvider collects a result from a single provider.
 // Uses hook-based collection if available, otherwise returns a fallback response.
 // @AX:NOTE [AUTO] triple-fallback chain: hook timeout -> result read fail -> placeholder; all paths return valid ProviderResponse
-func collectSingleProvider(session *HookSession, p ProviderConfig, timeout time.Duration, start time.Time) ProviderResponse {
+func collectSingleProvider(session *HookSession, p ProviderConfig, timeout time.Duration, start time.Time) (response ProviderResponse) {
+	defer func() { markUnavailableUsage(&response, usageSourceHook, usageReasonHook) }()
 	if !session.HasHook(p.Name) {
 		// R8 fallback: no hook configured, return placeholder for non-hook providers
 		return ProviderResponse{
@@ -101,11 +102,13 @@ func collectSingleProvider(session *HookSession, p ProviderConfig, timeout time.
 
 // HookResultToProviderResponse converts a HookResult into a ProviderResponse.
 func HookResultToProviderResponse(hr HookResult, provider string, duration time.Duration) ProviderResponse {
-	return ProviderResponse{
+	response := ProviderResponse{
 		Provider:    provider,
 		Output:      hr.Output,
 		ExitCode:    hr.ExitCode,
 		Duration:    duration,
 		EmptyOutput: hr.Output == "",
 	}
+	markUnavailableUsage(&response, usageSourceHook, usageReasonHook)
+	return response
 }

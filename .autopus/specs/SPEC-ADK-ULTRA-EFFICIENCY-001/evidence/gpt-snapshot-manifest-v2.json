@@ -1,0 +1,37 @@
+{
+  "absolute_paths_retained": false,
+  "admission_generation": "v2",
+  "evidence_kind": "gpt_codex_snapshot_manifest",
+  "repository": {
+    "bare": true,
+    "head_commit": "8537d14b12d183046b0796f61a9830e228bc735e",
+    "head_tree": "e5ac0a67c4de7f596477be12fa03c5324644243f",
+    "object_format": "sha1"
+  },
+  "required_commits": [
+    "03b3daad3dfc580c34cac1fd799a9483bba98400",
+    "1af3c6115c4525f5fb4571e24d09a288b6f2f3ca",
+    "1f91332e7465a699904edb8c6abf5cc21881ebc1",
+    "218291745486a82071d5a62e346584e91456da3c",
+    "2aa61c2d95b1eb6f5a2d48625d7164da603e2613",
+    "2f70dd5d1ac9a57d0420fde32e61cf99d83ec511",
+    "3edc529996c5653dd199ac11df197913d9c5ff77",
+    "44d1af9ae78acea90b7b0eb032f51cb049043342",
+    "5e2f849171c1b488117705ccf73d272cec432346",
+    "6595377ed78aad5a09f30ffbafffa9798f6fb0ff",
+    "6ee855025b4b1957d8b91fbc1155d44e2c8c85e9",
+    "7795dd441fa1feda07214a54c6563284cd9ce401",
+    "8c39b08b15511b0131b503db898d8be7800c27fa",
+    "a8776c857126b968074003f77cca77658a41e259",
+    "bef7d8e38525a8557df717495e2f8c37c2543d27",
+    "ca6e1bb23745089b7b1e13c417ed7283b7d9ef80",
+    "dcb20b8839cbfc67fbc2c7fc9e2340f196f1b657",
+    "f264a38079c24d5bba8e0da75ad2623a6ffd366d",
+    "f81708c6621558fc333afea886475d1927167553",
+    "fadf136a7882ed77724169ccaccd3d5c86e1c9ce",
+    "fc7cab44e3b281c282bd3c29a02ed2eed56c2fa0"
+  ],
+  "source_corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a",
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "version": 2
+}

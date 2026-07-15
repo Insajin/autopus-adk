@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_canary_policy",
+  "authorization": {
+    "provider": "codex",
+    "provider_call_cap": 64,
+    "raw_token_cap": 1500000,
+    "concurrency": 1,
+    "retries": 0
+  },
+  "hard_envelope": {
+    "primary_calls": 58,
+    "primary_xhigh_calls": 44,
+    "primary_max_calls": 14,
+    "primary_worst_case_raw_tokens": 1332000,
+    "rollback_replay_calls": 5,
+    "rollback_xhigh_calls": 4,
+    "rollback_max_calls": 1,
+    "rollback_worst_case_raw_tokens": 114000,
+    "planned_total_calls": 63,
+    "planned_worst_case_raw_tokens": 1446000,
+    "raw_token_safety_margin": 54000,
+    "unplanned_call_slots": 1
+  },
+  "profiles": {
+    "full5": [
+      {
+        "role": "reviewer",
+        "role_ordinal": 1,
+        "effort": "xhigh",
+        "raw_token_budget": 22000
+      },
+      {
+        "role": "reviewer",
+        "role_ordinal": 2,
+        "effort": "xhigh",
+        "raw_token_budget": 22000
+      },
+      {
+        "role": "reviewer",
+        "role_ordinal": 3,
+        "effort": "xhigh",
+        "raw_token_budget": 22000
+      },
+      {
+        "role": "security-auditor",
+        "role_ordinal": 1,
+        "effort": "max",
+        "raw_token_budget": 26000
+      },
+      {
+        "role": "review-consolidator",
+        "role_ordinal": 1,
+        "effort": "xhigh",
+        "raw_token_budget": 22000
+      }
+    ],
+    "compact2": [
+      {
+        "role": "reviewer",
+        "role_ordinal": 1,
+        "effort": "xhigh",
+        "raw_token_budget": 22000
+      },
+      {
+        "role": "security-auditor",
+        "role_ordinal": 1,
+        "effort": "max",
+        "raw_token_budget": 26000
+      }
+    ]
+  },
+  "schedule_semantics": {
+    "baseline_arm": "A",
+    "candidate_arm": "B",
+    "baseline_profile": "full5",
+    "candidate_compact_tasks": [
+      "ute-corpus-v1-001",
+      "ute-corpus-v1-004",
+      "ute-corpus-v1-011",
+      "ute-corpus-v1-012"
+    ],
+    "candidate_full_tasks": [
+      "ute-corpus-v1-005",
+      "ute-corpus-v1-006",
+      "ute-corpus-v1-009"
+    ],
+    "task_pair_orders": [
+      "001:AB",
+      "004:BA",
+      "005:AB",
+      "011:BA",
+      "012:AB",
+      "006:BA",
+      "009:AB"
+    ],
+    "one_process_at_a_time": true,
+    "retry_on_failure": false
+  },
+  "audit": {
+    "selection_algorithm": "sha256_mod_100_v1",
+    "rate_percent": 20,
+    "nonce": "audit-nonce-39",
+    "selected_task_id": "ute-corpus-v1-005",
+    "selected_task_risk": "medium",
+    "required_profile_both_arms": "full5",
+    "selection_table_receipt": "gpt-canary-preflight-v1.json"
+  },
+  "neutrality": {
+    "call_ids": "opaque_sha256_prefix",
+    "provider_prompt_excludes": [
+      "baseline",
+      "candidate",
+      "experiment arm"
+    ],
+    "provider_cwd_excludes_arm_identity": true,
+    "arm_mapping_retained_only_in_sanitized_external_ledger": true,
+    "consolidator_input": "bounded_prior_verdict_and_finding_count_only"
+  },
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_patch_retained": false,
+    "raw_response_retained": false,
+    "provider_stdout_stderr_retained": false,
+    "session_or_environment_retained": false,
+    "absolute_paths_retained": false,
+    "retained_field_scan_required": true
+  },
+  "circuit_breaker": {
+    "state": "CLOSED_BEFORE_RUN",
+    "stop_without_retry_on": [
+      "nonzero_process_exit",
+      "result_not_success",
+      "verdict_not_pass",
+      "finding_count_nonzero",
+      "tool_call_nonzero",
+      "usage_not_actual",
+      "model_call_count_not_one",
+      "role_budget_exceeded",
+      "identity_mismatch",
+      "schema_mismatch",
+      "raw_retention_detected",
+      "authorization_admission_failure"
+    ],
+    "partial_receipt_promotion_eligible": false
+  },
+  "rollback": {
+    "requires_validated_applied_receipt": true,
+    "task_id": "ute-corpus-v1-001",
+    "profile": "full5",
+    "runs_only_after_primary_and_prior_gates": true,
+    "promotion_eligible": false
+  }
+}

@@ -1,18 +1,22 @@
 package templates_test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/insajin/autopus-adk/pkg/config"
+	tmpl "github.com/insajin/autopus-adk/pkg/template"
 )
 
 func TestMinimalityDisciplineSourceSurfaceParity(t *testing.T) {
 	t.Parallel()
 
 	root := templateRoot()
+	e := tmpl.New()
+	cfg := config.DefaultFullConfig("minimality-project")
 	reviewTokens := []string{
 		"Correctness/Security Findings",
 		"Complexity Findings",
@@ -205,9 +209,8 @@ func TestMinimalityDisciplineSourceSurfaceParity(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			body, err := os.ReadFile(tc.path)
+			text, err := semanticContractSurface(e, tc.path, cfg)
 			require.NoError(t, err)
-			text := string(body)
 			for _, token := range tc.tokens {
 				assert.Contains(t, text, token, "%s should contain %q", tc.path, token)
 			}

@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/insajin/autopus-adk/pkg/worker/adapter"
 	"github.com/insajin/autopus-adk/pkg/worker/budget"
 	"github.com/insajin/autopus-adk/pkg/worker/compress"
@@ -31,6 +32,7 @@ type PhaseResult struct {
 	DurationMS int64
 	SessionID  string
 	ToolCalls  int // number of tool calls made during this phase
+	Usage      []telemetry.UsageEnvelope
 }
 
 // @AX:NOTE: [AUTO] hardcoded phase order defines the worker phase-split default; keep aligned with prompts and server phase plans
@@ -53,17 +55,26 @@ type PipelineExecutor struct {
 	phasePromptTemplates map[Phase]string
 	allocator            *budget.PhaseAllocator // nil if budget not configured
 	iterationBudget      *budget.IterationBudget
-	compressor           compress.ContextCompressor // nil if compression not configured
-	router               *routing.Router            // nil if routing not configured
+	compressor           compress.ContextCompressor
+	compactionRecorder   func(compress.CompactionEvent)
+	router               *routing.Router // nil if routing not configured
 	interruptRecorder    func(AuditEvent)
+	runID                string
+	attempt              int
+	effort               string
+	role                 string
+	usageProvenance      usageProvenance
+	requiredContext      string
+	persistentTask       string
 }
 
 // NewPipelineExecutor creates a new PipelineExecutor.
 func NewPipelineExecutor(provider adapter.ProviderAdapter, mcpConfig, workDir string) *PipelineExecutor {
 	return &PipelineExecutor{
-		provider:  provider,
-		mcpConfig: mcpConfig,
-		workDir:   workDir,
+		provider:   provider,
+		mcpConfig:  mcpConfig,
+		workDir:    workDir,
+		compressor: compress.NewDefaultCompressor(2),
 	}
 }
 
@@ -81,6 +92,12 @@ func (pe *PipelineExecutor) SetIterationBudget(iterationBudget budget.IterationB
 // SetCompressor configures context compression for phase transitions.
 func (pe *PipelineExecutor) SetCompressor(c compress.ContextCompressor) {
 	pe.compressor = c
+}
+
+// SetCompactionRecorder configures a typed sink for applied compaction and
+// fail-closed integrity events.
+func (pe *PipelineExecutor) SetCompactionRecorder(record func(compress.CompactionEvent)) {
+	pe.compactionRecorder = record
 }
 
 // SetEnvVars configures additional environment variables for all pipeline phases.
@@ -129,6 +146,20 @@ func (pe *PipelineExecutor) SetRouter(r *routing.Router) {
 	pe.router = r
 }
 
+// SetUsageIdentity configures task-wide usage identity. Each phase still gets
+// its own call identity while sharing this run identity.
+func (pe *PipelineExecutor) SetUsageIdentity(runID string, attempt int, effort, role string) {
+	pe.runID = runID
+	pe.attempt = attempt
+	pe.effort = effort
+	pe.role = role
+}
+
+// SetUsageProvenance configures supervisor-trusted usage provenance for every phase.
+func (pe *PipelineExecutor) SetUsageProvenance(providerVersion, modelVersion, riskPolicy, cacheStratum, configHash string) {
+	pe.usageProvenance = usageProvenance{providerVersion, modelVersion, riskPolicy, cacheStratum, configHash}
+}
+
 // Execute runs the full pipeline: planner -> executor(s) -> tester -> reviewer.
 // Each phase uses an independent --resume session ID.
 // Returns an aggregated TaskResult combining all phase outputs.
@@ -144,6 +175,10 @@ func (pe *PipelineExecutor) ExecuteWithPlan(ctx context.Context, taskID, prompt,
 	log.Printf("[pipeline] starting phase-split for task %s", taskID)
 
 	routedModel := pe.resolveModel(model, prompt)
+	identity := ensureUsageIdentity(adapter.TaskConfig{
+		TaskID: taskID, RunID: pe.runID, Attempt: pe.attempt, Effort: pe.effort, Role: pe.role,
+	}, "pipeline", "worker")
+	pe.runID, pe.attempt = identity.RunID, identity.Attempt
 	prevOutput := prompt
 	normalizedPhases := normalizePhasePlan(phases)
 	if len(normalizedPhases) == 0 {
@@ -155,10 +190,10 @@ func (pe *PipelineExecutor) ExecuteWithPlan(ctx context.Context, taskID, prompt,
 		totalCost     float64
 		totalDuration int64
 	)
-	for _, phase := range normalizedPhases {
+	for phaseIndex, phase := range normalizedPhases {
 		select {
 		case <-ctx.Done():
-			return adapter.TaskResult{}, ctx.Err()
+			return pe.aggregateResults(results, totalCost, totalDuration), ctx.Err()
 		default:
 		}
 
@@ -166,12 +201,15 @@ func (pe *PipelineExecutor) ExecuteWithPlan(ctx context.Context, taskID, prompt,
 
 		phasePrompt, err := pe.phasePrompt(phase, prevOutput)
 		if err != nil {
-			return adapter.TaskResult{}, err
+			return pe.aggregateResults(results, totalCost, totalDuration), err
 		}
-		result, err := pe.runPhase(ctx, taskID, phase, phasePrompt, routedModel)
+		result, err := pe.runPhaseWithTaskContext(ctx, taskID, phase, phasePrompt, routedModel, phaseIndex > 0)
 		if err != nil {
 			log.Printf("[pipeline] phase %s failed for task %s: %v", phase, taskID, err)
-			return adapter.TaskResult{}, fmt.Errorf("phase %s: %w", phase, err)
+			results = append(results, result)
+			totalCost += result.CostUSD
+			totalDuration += result.DurationMS
+			return pe.aggregateResults(results, totalCost, totalDuration), fmt.Errorf("phase %s: %w", phase, err)
 		}
 
 		pe.completePhase(phase, result.ToolCalls)
@@ -181,7 +219,7 @@ func (pe *PipelineExecutor) ExecuteWithPlan(ctx context.Context, taskID, prompt,
 		totalDuration += result.DurationMS
 		nextOutput, err := pe.nextPhaseInput(phase, result.Output)
 		if err != nil {
-			return adapter.TaskResult{}, err
+			return pe.aggregateResults(results, totalCost, totalDuration), err
 		}
 		prevOutput = nextOutput
 
@@ -223,6 +261,9 @@ func (pe *PipelineExecutor) nextPhaseInput(phase Phase, output string) (string, 
 		CompressDetailed(string, string, string) compress.CompactionResult
 	}); ok {
 		result := detailed.CompressDetailed(string(phase), output, pe.provider.Name())
+		if pe.compactionRecorder != nil && (result.Event.CompactionApplied || result.Blocker != "") {
+			pe.compactionRecorder(result.Event)
+		}
 		if result.Blocker != "" {
 			return "", fmt.Errorf("phase %s compaction blocker: %s", phase, result.Blocker)
 		}

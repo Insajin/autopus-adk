@@ -159,7 +159,7 @@ func TestTemplates_FullModeConditionals(t *testing.T) {
 	// 라우터 템플릿에서 Full 모드 조건부 블록 확인
 	tmplPath := filepath.Join(root, "claude", "commands", "auto-router.md.tmpl")
 
-	result, err := e.RenderFile(tmplPath, cfg)
+	result, err := semanticContractSurface(e, tmplPath, cfg)
 	require.NoError(t, err)
 
 	// Full 모드에서는 go/review/secure 서브커맨드의 스킬 참조가 포함됨
@@ -252,7 +252,7 @@ func TestWorkflowAuthenticityTemplateContracts(t *testing.T) {
 		path := path
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			t.Parallel()
-			result, err := e.RenderFile(path, cfg)
+			result, err := semanticContractSurface(e, path, cfg)
 			require.NoError(t, err)
 			assert.Contains(t, result, "subagent_dispatch_count")
 			assert.Contains(t, result, "workflow authenticity blocker")
@@ -288,7 +288,7 @@ func TestSemanticInvariantPlatformTemplateContracts(t *testing.T) {
 		path, expected := path, expected
 		t.Run(filepath.Base(path), func(t *testing.T) {
 			t.Parallel()
-			result, err := e.RenderFile(path, cfg)
+			result, err := semanticContractSurface(e, path, cfg)
 			require.NoError(t, err)
 			for _, phrase := range expected {
 				assert.Contains(t, result, phrase)

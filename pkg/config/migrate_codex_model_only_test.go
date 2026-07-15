@@ -31,7 +31,7 @@ func TestMigrateOrchestraConfig_V05066AutoPinnedModelOnlyCodex_RepairsToQuality(
 
 			got := cfg.Orchestra.Providers["codex"]
 			assert.Equal(t, ProviderModelPolicyQuality, got.ModelPolicy)
-			assert.Equal(t, []string{"exec", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, got.Args)
+			assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, got.Args)
 			assert.Equal(t, []string{"-m", CodexSolModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, got.PaneArgs)
 			assert.Equal(t, canonicalLegacyCodexSubprocess(), got.Subprocess)
 		})
@@ -68,6 +68,20 @@ func TestMigrateOrchestraConfig_V05066AutoPinnedNearMatches_RemainPinnedByteForB
 			}
 		})
 	}
+}
+
+func TestMigrateOrchestraConfig_QualityCodexStructuredUsageIsIdempotent(t *testing.T) {
+	t.Parallel()
+	cfg := legacyAutoPinnedCodexConfig("ultra")
+
+	for range 2 {
+		_, err := MigrateOrchestraConfig(cfg)
+		require.NoError(t, err)
+	}
+
+	got := cfg.Orchestra.Providers["codex"]
+	assert.Equal(t, 1, countString(got.Args, "--json"))
+	assert.NotContains(t, got.PaneArgs, "--json")
 }
 
 func TestMigrateOrchestraConfig_ExplicitModernPinnedModelOnlyCodex_RemainsPinnedByteForByte(t *testing.T) {

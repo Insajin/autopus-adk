@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_task006_diagnostic_call_ledger",
+  "completed": false,
+  "diagnostic_only": true,
+  "promotion_eligible": false,
+  "circuit_breaker": "OPEN",
+  "failure_code": "process_nonzero",
+  "attempted_calls": 1,
+  "planned_calls": 10,
+  "observed_calls": 1,
+  "planned_worst_case_raw_tokens": 228000,
+  "observed_raw_total_tokens": 0,
+  "diagnostic_conclusion": "INCOMPLETE",
+  "bounded_fail_observations": 0,
+  "authorization": {
+    "provider_call_cap": 10,
+    "raw_token_cap": 228000,
+    "concurrency": 1,
+    "retries": 0,
+    "single_use": true
+  },
+  "deterministic_receipts": {
+    "task_id": "ute-corpus-v1-006",
+    "expected_patch_sha256": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+    "observed_patch_sha256": "sha256:55f5f87f5521d0d595758cede60d331692a3d338f3ce99cc7d851d9deb083a2b",
+    "verification_exit_code": 0,
+    "security_observation_required_both_arms": true
+  },
+  "identity": {
+    "authorization_identity": "sha256:920e6370cebb84739872233cd4a0eeb88295bf816b19b6d43cfac99591a1dc20",
+    "policy_sha256": "sha256:4a4b84f7087a5bf40aa0f5c3c2e883e29d235e80bf91c84c1186ec758248b12f",
+    "config_sha256": "sha256:bff64292fdf49343bde1a53d9d40ffbea0af5f338cd48385c2a2dc6d752e0565",
+    "verdict_schema_sha256": "sha256:d81f0205cbc02ac7af0d0897078041f765873ba287b8dfd2c0dd3e66f35ca605",
+    "cohort_sha256": "sha256:d060fe3ae06e5ee063c66a57dc7b6a96bd9c929361e81ca2e26d48d333db0d9f",
+    "provider": "codex",
+    "model": "gpt-5.6-sol",
+    "provider_version": "0.144.1",
+    "model_version": "gpt-5.6-sol",
+    "auto_executable_sha256": "sha256:69fb5068b0f57d1e015a23aa5c5a4414b3f823b23fd89eeb199025fa2a38c5b5",
+    "auto_version": "0.50.68-ute-gpt-diag-v1",
+    "codex_cli_version": "0.144.1"
+  },
+  "calls": [
+    {
+      "sequence": 1,
+      "task_id": "ute-corpus-v1-006",
+      "arm": "A",
+      "order": "AB",
+      "profile": "full5",
+      "role": "reviewer",
+      "role_ordinal": 1,
+      "effort": "xhigh",
+      "raw_token_budget": 22000,
+      "result": {
+        "status": "failed",
+        "verdict": null,
+        "finding_count": null,
+        "finding_codes": [],
+        "finding_scope_hashes": [],
+        "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "usage_status": "unavailable",
+        "unique_model_call_count": 0,
+        "raw_total_tokens": null,
+        "tool_calls": 0,
+        "run_id": "r340693c77b0f1f4f69fc0fc2",
+        "call_id": "c0fa5c166e04f6c2c767ffcf8"
+      },
+      "agent_run": {
+        "status": "FAIL",
+        "acceptance_status": null,
+        "tool_calls": 0
+      },
+      "usage": {
+        "provider": null,
+        "model": null,
+        "effort": null,
+        "provider_version": null,
+        "model_version": null,
+        "risk_policy": null,
+        "cache_stratum": null,
+        "config_hash": null,
+        "source_schema": null,
+        "raw_total_tokens": null,
+        "input_tokens_total": null,
+        "output_tokens_total": null,
+        "run_id": null,
+        "call_id": null,
+        "task_id": null
+      }
+    }
+  ],
+  "privacy": {
+    "raw_prompt_retained": false,
+    "raw_patch_retained": false,
+    "raw_response_retained": false,
+    "finding_text_retained": false,
+    "provider_stdout_stderr_retained": false,
+    "absolute_paths_retained": false
+  }
+}

@@ -89,6 +89,12 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 			return nil, fmt.Errorf("에이전트 파일 준비 실패: %w", err)
 		}
 		files = append(files, agentFiles...)
+
+		workflowSkillFiles, err := a.prepareWorkflowSkillMappings(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("상세 workflow 스킬 준비 실패: %w", err)
+		}
+		files = append(files, workflowSkillFiles...)
 	}
 
 	return files, nil

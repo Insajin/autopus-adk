@@ -118,6 +118,9 @@ func normalizeCodexSkillBody(body, subcommand string) string {
 }
 
 func injectCodexBrandingBlock(body string, router bool) string {
+	if !router {
+		body = injectCodexContextProfile(body)
+	}
 	if strings.Contains(body, "## Autopus Branding") {
 		return body
 	}
@@ -155,34 +158,6 @@ func decorateCodexWorkflowPrompt(rendered string, router bool) string {
 		return strings.TrimSpace(body) + "\n"
 	}
 	return frontmatter + "\n\n" + strings.TrimSpace(body) + "\n"
-}
-
-func codexRouterExecutionContract() string {
-	return fmt.Sprintf("## Router Execution Contract\n\n"+
-		"- Treat this file as a thin entrypoint only.\n"+
-		"- After resolving the subcommand, immediately load the matching detailed workflow surface (%s) before answering or acting.\n"+
-		"- Do not stay at the router layer when a detailed workflow exists for the request.\n"+
-		"- Always load the project context documents before routing or executing the workflow.\n\n"+
-		"## Context Load\n\n"+
-		"Before processing any `@auto` subcommand, read these files if they exist:\n\n"+
-		codexProjectContextLoadList()+"\n"+
-		"- If none of these files exist, explicitly note that project context is missing and recommend `@auto setup`.\n"+
-		"- Do not skip this load step just because the subcommand looks obvious.\n\n"+
-		"## SPEC Path Resolution\n\n"+
-		"When any workflow receives a SPEC-ID, resolve the actual file path before opening files, spawning workers, or running build/test commands:\n\n"+
-		"1. Check `.autopus/specs/{SPEC-ID}/spec.md` (top-level, cross-module or legacy SPECs).\n"+
-		"2. Recursively search `**/.autopus/specs/{SPEC-ID}/spec.md`, skipping `.git`, `node_modules`, `vendor`, `.cache`, and `dist`.\n\n"+
-		"From the resolved path, extract:\n\n"+
-		"- `SPEC_PATH`: full path to `spec.md`\n"+
-		"- `SPEC_DIR`: parent SPEC directory\n"+
-		"- `TARGET_MODULE`: submodule path, or `.` for top-level SPECs\n"+
-		"- `WORKING_DIR`: the directory where build/test commands run (`TARGET_MODULE` or `.`)\n\n"+
-		"Error handling:\n\n"+
-		"- 0 matches: report the SPEC is missing and list available SPEC IDs.\n"+
-		"- 2+ matches: report the duplicate paths and stop for clarification.\n"+
-		"- All detailed workflows must use the resolved values instead of assuming `.autopus/specs/{SPEC-ID}` is rooted at the current directory.\n",
-		routerDetailSkills(),
-	)
 }
 
 func rewriteCodexRouterBody(body string) string {

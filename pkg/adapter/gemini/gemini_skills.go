@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -15,19 +16,9 @@ import (
 // renders them, writes to .gemini/skills/autopus/{skill}/SKILL.md, and
 // returns file mappings.
 func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig, geminiSkillBaseDir string) ([]adapter.FileMapping, error) {
-	mappings, err := a.prepareSkillMappings(cfg)
+	platformMappings, err := a.prepareSkillMappings(cfg)
 	if err != nil {
 		return nil, err
-	}
-
-	for _, m := range mappings {
-		destPath := filepath.Join(a.root, m.TargetPath)
-		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-			return nil, fmt.Errorf("제미니 스킬 디렉터리 생성 실패 %s: %w", filepath.Dir(destPath), err)
-		}
-		if err := os.WriteFile(destPath, m.Content, 0644); err != nil {
-			return nil, fmt.Errorf("제미니 SKILL.md 쓰기 실패 %s: %w", destPath, err)
-		}
 	}
 
 	// Extended skills from content/skills/ via transformer
@@ -36,19 +27,17 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig, geminiSkillBas
 		return nil, fmt.Errorf("extended skill rendering failed: %w", err)
 	}
 	extMirrors := mirrorAntigravityPluginMappings(extFiles)
-	for _, ef := range append(extFiles, extMirrors...) {
-		destPath := filepath.Join(a.root, ef.TargetPath)
+	files := mergeSkillMappings(platformMappings, append(extFiles, extMirrors...))
+	for _, mapping := range files {
+		destPath := filepath.Join(a.root, mapping.TargetPath)
 		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
 			return nil, fmt.Errorf("extended skill dir creation failed %s: %w", filepath.Dir(destPath), err)
 		}
-		if err := os.WriteFile(destPath, ef.Content, 0644); err != nil {
+		if err := os.WriteFile(destPath, mapping.Content, 0644); err != nil {
 			return nil, fmt.Errorf("extended skill write failed %s: %w", destPath, err)
 		}
 	}
-	mappings = append(mappings, extFiles...)
-	mappings = append(mappings, extMirrors...)
-
-	return mappings, nil
+	return files, nil
 }
 
 // prepareSkillMappings renders skill templates and returns file mappings
@@ -96,4 +85,40 @@ func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.Fil
 // @AX:NOTE: [AUTO] magic constant — "auto-" prefix is 5 chars; hardcoded length check must be updated if the prefix ever changes
 func hasAutoPrefix(name string) bool {
 	return len(name) >= 5 && name[:5] == "auto-"
+}
+
+// mergeSkillMappings selects one canonical owner for each generated target.
+// Platform templates own auto-* route contracts; transformed catalog skills
+// own shared non-route collisions. Sorted targets keep writes and manifests
+// deterministic across Generate and Update, including Antigravity mirrors.
+func mergeSkillMappings(platform, transformed []adapter.FileMapping) []adapter.FileMapping {
+	byTarget := make(map[string]adapter.FileMapping, len(platform)+len(transformed))
+	for _, mapping := range platform {
+		byTarget[filepath.Clean(mapping.TargetPath)] = mapping
+	}
+	for _, mapping := range transformed {
+		target := filepath.Clean(mapping.TargetPath)
+		if _, exists := byTarget[target]; exists && isAutoRouteSkillTarget(target) {
+			continue
+		}
+		byTarget[target] = mapping
+	}
+
+	targets := make([]string, 0, len(byTarget))
+	for target := range byTarget {
+		targets = append(targets, target)
+	}
+	sort.Strings(targets)
+	merged := make([]adapter.FileMapping, 0, len(targets))
+	for _, target := range targets {
+		merged = append(merged, byTarget[target])
+	}
+	return merged
+}
+
+func isAutoRouteSkillTarget(target string) bool {
+	if filepath.Base(target) != "SKILL.md" {
+		return false
+	}
+	return hasAutoPrefix(filepath.Base(filepath.Dir(target)))
 }

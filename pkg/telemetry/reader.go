@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // telemetrySubDir is the sub-path appended to baseDir when scanning for JSONL files.
@@ -90,16 +91,14 @@ func LatestPipelineRun(baseDir string) (*PipelineRun, error) {
 	if err != nil {
 		return nil, err
 	}
-	pipeline := FilterByType(events, EventTypePipelineEnd)
-	if len(pipeline) == 0 {
-		return nil, nil
-	}
-	// Events are sorted ascending; last entry is most recent.
-	var run PipelineRun
-	if err := json.Unmarshal(pipeline[len(pipeline)-1].Data, &run); err != nil {
+	runs, err := decodePipelineRuns(events)
+	if err != nil {
 		return nil, err
 	}
-	return &run, nil
+	if len(runs) == 0 {
+		return nil, nil
+	}
+	return &runs[len(runs)-1], nil
 }
 
 // PipelineRunsBySpecID returns all pipeline_end PipelineRun values from baseDir
@@ -109,15 +108,97 @@ func PipelineRunsBySpecID(baseDir, specID string) ([]PipelineRun, error) {
 	if err != nil {
 		return nil, err
 	}
+	decoded, err := decodePipelineRuns(events)
+	if err != nil {
+		return nil, err
+	}
 	var runs []PipelineRun
-	for _, e := range FilterByType(events, EventTypePipelineEnd) {
-		var run PipelineRun
-		if err := json.Unmarshal(e.Data, &run); err != nil {
-			return nil, err
-		}
+	for _, run := range decoded {
 		if run.SpecID == specID {
 			runs = append(runs, run)
 		}
 	}
 	return runs, nil
+}
+
+func decodePipelineRuns(events []Event) ([]PipelineRun, error) {
+	completed := make([]PipelineRun, 0)
+	fallback := make([]PipelineRun, 0)
+	for i, event := range events {
+		if event.Type != EventTypePipelineEnd {
+			continue
+		}
+		var run PipelineRun
+		if err := json.Unmarshal(event.Data, &run); err != nil {
+			return nil, err
+		}
+		if len(run.Phases) == 0 {
+			hydratePipelineRun(events, i, event.Timestamp, &run)
+		}
+		fallback = append(fallback, run)
+		if run.FinalStatus != "" {
+			completed = append(completed, run)
+		}
+	}
+	if len(completed) > 0 {
+		return completed, nil
+	}
+	return fallback, nil
+}
+
+func hydratePipelineRun(events []Event, endIndex int, endTime time.Time, run *PipelineRun) {
+	startIndex := latestPipelineStart(events, endIndex, run.SpecID)
+	if startIndex < 0 {
+		return
+	}
+	run.StartTime = events[startIndex].Timestamp
+	run.EndTime = endTime
+	run.TotalDuration = endTime.Sub(run.StartTime)
+	var start struct {
+		QualityMode string `json:"quality_mode"`
+	}
+	_ = json.Unmarshal(events[startIndex].Data, &start)
+	if run.QualityMode == "" {
+		run.QualityMode = start.QualityMode
+	}
+	phaseIndex := make(map[string]int)
+	for _, event := range events[startIndex+1 : endIndex] {
+		if event.Type != EventTypeAgentRun {
+			continue
+		}
+		var agent AgentRun
+		if json.Unmarshal(event.Data, &agent) != nil || agent.SpecID != run.SpecID {
+			continue
+		}
+		phase := agent.Phase
+		if phase == "" {
+			phase = "agent"
+		}
+		index, exists := phaseIndex[phase]
+		if !exists {
+			index = len(run.Phases)
+			phaseIndex[phase] = index
+			run.Phases = append(run.Phases, PhaseRecord{Name: phase, StartTime: agent.StartTime})
+		}
+		record := &run.Phases[index]
+		record.Agents = append(record.Agents, agent)
+		record.EndTime = agent.EndTime
+		record.Duration += agent.Duration
+		record.Status = agent.Status
+	}
+}
+
+func latestPipelineStart(events []Event, endIndex int, specID string) int {
+	for i := endIndex - 1; i >= 0; i-- {
+		if events[i].Type != EventTypePipelineStart {
+			continue
+		}
+		var start struct {
+			SpecID string `json:"spec_id"`
+		}
+		if json.Unmarshal(events[i].Data, &start) == nil && start.SpecID == specID {
+			return i
+		}
+	}
+	return -1
 }

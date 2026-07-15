@@ -69,7 +69,9 @@ func executeParallel(
 				return
 			}
 			progress.MarkDone(prov.Name)
-			results[idx] = result{pr: ProviderResult{Provider: prov.Name, Output: resp.Output}, idx: idx}
+			results[idx] = result{pr: ProviderResult{
+				Provider: prov.Name, Output: resp.Output, Usage: resp.Usage, UsageCapability: resp.UsageCapability,
+			}, idx: idx}
 		}(i, p)
 	}
 	wg.Wait()

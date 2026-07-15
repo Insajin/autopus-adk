@@ -1,0 +1,105 @@
+{
+  "admission_generation": "v2",
+  "auto_binary": {
+    "accepted_version_pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$",
+    "hash_algorithm": "sha256",
+    "hash_and_version_recorded_in_ledger": true,
+    "version_command": [
+      "version",
+      "--short"
+    ]
+  },
+  "canonical_execution": {
+    "argv": [
+      "auto",
+      "agent",
+      "run",
+      "<corpus-task-id>"
+    ],
+    "attempt": 1,
+    "binary": "caller_supplied_built_auto",
+    "concurrency": 1,
+    "direct_codex_forbidden": true,
+    "retries": 0
+  },
+  "context_options": {
+    "codex": {
+      "ephemeral": true,
+      "ignore_rules": true,
+      "ignore_user_config": true,
+      "output_schema": "gpt-verdict-schema.json",
+      "sandbox": "read-only",
+      "skip_git_repo_check": true,
+      "zero_tool_mode": true
+    },
+    "evidence_mode": true,
+    "strict_verdict": true,
+    "zero_tool_calls_required": true
+  },
+  "effective_codex_flags": {
+    "disabled_features": [
+      "multi_agent",
+      "multi_agent_v2",
+      "enable_fanout",
+      "shell_tool",
+      "apps",
+      "hooks"
+    ],
+    "ephemeral": true,
+    "ignore_rules": true,
+    "ignore_user_config": true,
+    "model": "gpt-5.6-sol",
+    "model_reasoning_effort_from_role": true,
+    "output_schema": "gpt-verdict-schema.json",
+    "quality_managed_json": true,
+    "rollout_budget": {
+      "enabled": true,
+      "limit_tokens_from_role": true,
+      "prefill_token_weight": 1.0,
+      "reminder_at_remaining_tokens": [],
+      "sampling_token_weight": 1.0
+    },
+    "sandbox": "read-only",
+    "skip_git_repo_check": true
+  },
+  "effort_policy": "codex_review_xhigh_security_max_v1",
+  "evidence_kind": "gpt_codex_full_evaluation_execution_config",
+  "freeze": {
+    "activation": false,
+    "implemented": false,
+    "promotion": false,
+    "provider_calls_made": 0
+  },
+  "identity": {
+    "cache_stratum": "provider-managed-stable-prefix-v1",
+    "model_version": "gpt-5.6-sol",
+    "phase": "review",
+    "provider_version": "0.144.1"
+  },
+  "model": "gpt-5.6-sol",
+  "model_version": "gpt-5.6-sol",
+  "provider": "codex",
+  "provider_version": "0.144.1",
+  "retention": {
+    "context_prompt_patch_schema_result_provider_stdout_provider_stderr": "0600_temp_delete_after_call",
+    "isolated_telemetry": "capture_exact_last_agent_run_then_delete",
+    "persistent_output": "sanitized_ledger_and_sha256_sidecar_only"
+  },
+  "risk_policy_source": "gpt-codex-policy-v2.sha256",
+  "role_policy": {
+    "review-consolidator": {
+      "effort": "xhigh",
+      "raw_token_budget": 22000
+    },
+    "reviewer": {
+      "effort": "xhigh",
+      "raw_token_budget": 22000
+    },
+    "security-auditor": {
+      "effort": "max",
+      "raw_token_budget": 26000
+    }
+  },
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "version": 2
+}

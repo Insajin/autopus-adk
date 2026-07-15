@@ -97,7 +97,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 		merged = fmt.Sprintf("[interactive mode] %d providers executed", len(responses))
 	}
 
-	return &OrchestraResult{
+	return finalizeOrchestraResult(&OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
 		Merged:          merged,
@@ -105,7 +105,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 		Summary:         summary,
 		FailedProviders: failed,
 		Degraded:        len(failed) > 0,
-	}, nil
+	}), nil
 }
 
 // startPipeCapture starts pipe-pane output streaming for each pane.

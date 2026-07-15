@@ -1,0 +1,108 @@
+{
+  "version": 6,
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "evidence_kind": "gpt_codex_task006_provider_event_traits_diagnosis_preflight",
+  "provider_receipt": false,
+  "observed_spend": {
+    "provider_calls_made": 0,
+    "raw_total_tokens": 0
+  },
+  "frozen_artifacts": {
+    "policy_sha256": "sha256:d2da17f57fa900281d350a186dd7ed0e2aa6dcda9957c03df00e200eeca33495",
+    "config_sha256": "sha256:d88c97544931b2ac9b409100656220bf20da75b134a7208f348fa3bf49345e78",
+    "schema_sha256": "sha256:4d7a5cb92e32f45897a3a21adea0c638dd75893b109b2cb20205ba307379b986",
+    "corpus_sha256": "sha256:a3454f01b734d3f72060bc9b93972032b908f88940960e7f7b0953ab7356958a"
+  },
+  "authorization_identity": {
+    "algorithm": "sha256_nul_tuple_v1",
+    "fields": [
+      "policy_sha256",
+      "config_sha256",
+      "schema_sha256",
+      "corpus_sha256"
+    ],
+    "trailing_separator": false,
+    "sha256": "sha256:b956b634ab0664f276e9a6dfa09ce517b58b48055d0d7ed4df9136b3e69a6ea4"
+  },
+  "protocol": {
+    "task_id": "ute-corpus-v1-006",
+    "role": "reviewer",
+    "effort": "xhigh",
+    "provider_call_cap": 1,
+    "raw_token_cap": 22000,
+    "concurrency": 1,
+    "retries": 0
+  },
+  "runtime_candidate": {
+    "auto_version": "0.50.68-ute-transport-diagnosis-v6",
+    "auto_executable_sha256": "sha256:083a42a0e2016d1d46b435a511027684c9752aa0a37bca9e70a939bc80ee02f4",
+    "harness_sha256": "sha256:4550f954dd178f904c31747012daffdc164a9d701c12270b720ddafb72ae27ff",
+    "codex_cli_version": "0.144.1"
+  },
+  "checks": [
+    {
+      "name": "official_jsonl_event_types_confirmed",
+      "status": "PASS"
+    },
+    {
+      "name": "provider_event_payload_schema_not_assumed",
+      "status": "PASS"
+    },
+    {
+      "name": "local_codex_login_status_exit_zero",
+      "status": "PASS"
+    },
+    {
+      "name": "local_model_catalog_contains_target_and_xhigh",
+      "status": "PASS"
+    },
+    {
+      "name": "required_codex_exec_flags_present",
+      "status": "PASS"
+    },
+    {
+      "name": "raw_free_per_event_traits_and_status_families",
+      "status": "PASS"
+    },
+    {
+      "name": "empty_receipt_arrays_are_explicit",
+      "status": "PASS"
+    },
+    {
+      "name": "provider_conflict_or_unclassified_stays_unknown",
+      "status": "PASS"
+    },
+    {
+      "name": "aggregate_kind_shape_and_class_cross_bound",
+      "status": "PASS"
+    },
+    {
+      "name": "invalid_event_metadata_clears_all",
+      "status": "PASS"
+    },
+    {
+      "name": "full_cli_race_vet_and_v1_v6_hermetic_regression",
+      "status": "PASS"
+    },
+    {
+      "name": "independent_review_p0_p1_p2_zero",
+      "status": "PASS"
+    },
+    {
+      "name": "frozen_runtime_identity",
+      "status": "PASS"
+    },
+    {
+      "name": "prior_v1_v5_evidence_immutable",
+      "status": "PASS"
+    }
+  ],
+  "decision": {
+    "status": "EXPLICIT_LIVE_AUTHORIZATION_GRANTED",
+    "transport_only": true,
+    "semantic_evaluation_performed": false,
+    "promotion_eligible": false,
+    "provider_execution_started": false,
+    "authorized_at": "2026-07-15T09:01:14+09:00"
+  }
+}

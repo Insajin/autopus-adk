@@ -107,7 +107,7 @@ func (j *Job) CollectResults() (*OrchestraResult, error) {
 	}
 	cfg := OrchestraConfig{Strategy: j.Strategy, JudgeProvider: j.Judge}
 	merged, summary := mergeByStrategy(j.Strategy, responses, cfg)
-	return &OrchestraResult{
+	return finalizeOrchestraResult(&OrchestraResult{
 		Strategy:  j.Strategy,
 		Responses: responses,
 		Merged:    merged,
@@ -117,7 +117,7 @@ func (j *Job) CollectResults() (*OrchestraResult, error) {
 			RunID:       j.RunID,
 			ArtifactDir: j.ArtifactDir,
 		},
-	}, nil
+	}), nil
 }
 
 // Cleanup removes the job directory and all its contents.

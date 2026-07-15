@@ -17,6 +17,12 @@ autopus-adk/
 │   ├── arch.go                  #   auto arch: 아키텍처 분석
 │   ├── spec.go                  #   auto spec: SPEC 관리
 │   ├── spec_review.go           #   auto spec review: 멀티-프로바이더 리뷰
+│   ├── spec_review_context_delivery.go #   all-GPT 리비전별 필수-context 생성·엄격 검증·prompt 연결
+│   ├── spec_review_context_scope.go #   SPEC 경로에서 project root와 root-relative SPEC ref 도출
+│   ├── workflow.go              #   auto workflow 서브커맨드 등록
+│   ├── workflow_context.go      #   body-free 필수-context manifest 생성·검증
+│   ├── workflow_binding.go      #   Ultra review binding 및 compact/full 선택
+│   ├── workflow_binding_context.go # command/SPEC/추가 필수-ref 집합/hash match gate
 │   ├── lore.go                  #   auto lore: 의사결정 추적
 │   ├── lsp.go                   #   auto lsp: LSP 연동
 │   ├── search.go                #   auto search: 지식 검색
@@ -105,6 +111,9 @@ autopus-adk/
 │   │   ├── validator.go         #     SPEC 검증
 │   │   ├── reviewer.go          #     멀티-프로바이더 리뷰
 │   │   ├── prompt.go            #     프롬프트 생성
+│   │   ├── prompt_documents.go  #     GPT-only 4문서 freeze·SPEC directory-ID·128K admission
+│   │   ├── prompt_context_delivery.go # 검증된 core/architecture/extra와 SPEC 4종을 중복 없이 주입
+│   │   ├── prompt_context_delivery_validate.go # 전달 body/manifest/hash metadata 재검증
 │   │   ├── template.go          #     SPEC 템플릿
 │   │   └── types.go             #     Requirement, Criterion
 │   ├── lore/                    #   의사결정 추적
@@ -149,6 +158,14 @@ autopus-adk/
 │   │   ├── render.go            #     dry-run 렌더 + prompt-manifest 해시 + route/quality overlay (TEAM-001)
 │   │   ├── fallback.go          #     fallback taxonomy 분류기 (fail-fast/fail-closed/resumable/explicit)
 │   │   └── drift_gate.go        #     release hygiene — generated-surface drift + Lore/300 차단
+│   ├── promptlayer/             #   계층형 프롬프트와 검증된 필수 문서 전달
+│   │   ├── context_profile.go   #     command별 core/spec/conditional context profile
+│   │   ├── context_scan.go      #     root 경계, 전체 로드, secret redaction/injection neutralization
+│   │   └── context_delivery.go  #     body-free raw-source/delivered-prompt hash + stale/tamper 검증
+│   ├── worker/                  #   retained provider worker와 phase-split 실행
+│   │   ├── context_delivery.go  #     최종 worktree에서 GPT/Codex 필수 snapshot 생성·128K admission
+│   │   ├── pipeline_context.go  #     동일 비압축 snapshot 재사용, 후속 phase에 원 태스크 1회 첨부
+│   │   └── compress/            #     선택적 phase handoff 압축; 필수 snapshot은 입력하지 않음
 │   ├── template/                #   템플릿 엔진
 │   │   ├── engine.go            #     Go template 래퍼
 │   │   └── funcmap.go           #     커스텀 함수

@@ -48,12 +48,12 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 					_ = cfg.ReliabilityStore.writeFailureBundle("hook collection timed out", "retry with subprocess fallback", true)
 				}
 				mu.Lock()
-				responses = append(responses, ProviderResponse{
+				responses = append(responses, unavailableResponse(ProviderResponse{
 					Provider: provider.Name,
 					Duration: time.Since(start),
 					TimedOut: true,
 					Receipt:  receiptPath,
-				})
+				}, usageSourcePane, usageReasonPane))
 				mu.Unlock()
 				return
 			}
@@ -76,12 +76,12 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 				receiptPath = cfg.ReliabilityStore.recordCollection(receipt)
 			}
 			mu.Lock()
-			responses = append(responses, ProviderResponse{
+			responses = append(responses, unavailableResponse(ProviderResponse{
 				Provider: provider.Name,
 				Output:   output,
 				Duration: time.Since(start),
 				Receipt:  receiptPath,
-			})
+			}, usageSourcePane, usageReasonPane))
 			mu.Unlock()
 		}(p)
 	}
@@ -212,7 +212,7 @@ func buildDebateResult(cfg OrchestraConfig, responses []ProviderResponse, roundH
 	if result.Degraded && !strings.Contains(result.Summary, "degraded") {
 		result.Summary = fmt.Sprintf("%s (degraded: %s)", result.Summary, joinFailedProviderNames(result.FailedProviders))
 	}
-	return result
+	return finalizeOrchestraResult(result)
 }
 
 func deriveFailedProviders(roundHistory [][]ProviderResponse) []FailedProvider {
@@ -266,11 +266,11 @@ func mergeByStrategyWithRoundHistory(rounds [][]ProviderResponse, cfg OrchestraC
 		finalResponses = rounds[len(rounds)-1]
 	}
 	merged, summary := mergeByStrategy(cfg.Strategy, finalResponses, cfg)
-	return &OrchestraResult{
+	return finalizeOrchestraResult(&OrchestraResult{
 		Strategy:     cfg.Strategy,
 		Responses:    finalResponses,
 		Merged:       merged,
 		Summary:      summary,
 		RoundHistory: rounds,
-	}
+	})
 }

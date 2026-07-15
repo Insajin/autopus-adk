@@ -1,0 +1,97 @@
+{
+  "audit": {
+    "active_profile": "full_ultra",
+    "audit_selection": {
+      "algorithm": "sha256_mod_100_v1",
+      "bucket": 80,
+      "rate_percent": 100,
+      "selected": true
+    },
+    "decision": "AUDIT",
+    "experiment_identity": "ute-gpt-rollout-audit-v2",
+    "experiment_identity_sha256": "sha256:94e9f776e543d162f589fa1874d7be43cac02daed20f315977a846f229849a26",
+    "full_depth": true,
+    "input_sha256": "sha256:3ca34a519a75e1674e8f37c8b8b393321c03bf65009b4b90d7f9396274c1e15e",
+    "result_sha256": "sha256:1fa04470ef97a8ad16547ad6d5fe7710b2fb6e90cd170994e37d8d14e777574a",
+    "risk_tier": "medium",
+    "selection_reason": "audit_sample",
+    "sentinel": {
+      "audit_rate_percent": 100,
+      "selected": true,
+      "task_hash": "sha256:e414021cbf4da33e47794324f90a14987fcfe3cffe5805db8aacdacbcb96adfc",
+      "task_id": "ute-corpus-v1-005"
+    }
+  },
+  "critical": {
+    "active_profile": "full_ultra",
+    "audit_selection": {
+      "algorithm": "",
+      "bucket": 0,
+      "rate_percent": 0,
+      "selected": false
+    },
+    "decision": "CANARY",
+    "experiment_identity": "ute-gpt-rollout-critical-v2:ute-corpus-v1-009:sha256:8be1a0f893a49a5de2bc265ca6e05d824c7e710221fcf0294e26de22e5ca043b",
+    "experiment_identity_sha256": "sha256:6f091c09b7a7e072e8bcd6c94b5affa9a22282f4b853d87c05fb024ea75a798d",
+    "full_depth": true,
+    "input_sha256": "sha256:b9d7be4ac794f1a1b8d125b734e5b8531faef559966d7bd8635eef17a1340d07",
+    "result_sha256": "sha256:634aad474ece5bdfa88c61b6ffb0500116232c0f63f3872953504916a74c2676",
+    "risk_tier": "critical",
+    "selection_reason": "risk_requires_full_depth",
+    "sentinel": {
+      "audit_rate_percent": 0,
+      "selected": false,
+      "task_hash": "sha256:8be1a0f893a49a5de2bc265ca6e05d824c7e710221fcf0294e26de22e5ca043b",
+      "task_id": "ute-corpus-v1-009"
+    }
+  },
+  "evidence_kind": "gpt_rollout_receipts",
+  "high": {
+    "active_profile": "full_ultra",
+    "audit_selection": {
+      "algorithm": "",
+      "bucket": 0,
+      "rate_percent": 0,
+      "selected": false
+    },
+    "decision": "CANARY",
+    "experiment_identity": "ute-gpt-rollout-high-v2:ute-corpus-v1-006:sha256:01ba26060d9b6e2b8882ac156a500272b01604b0b2f8fe7794fdd96f336ea465",
+    "experiment_identity_sha256": "sha256:a4711c2efeaa15a2857fe0ac7f015c09bcc70e7fa20c0e1e9bf77373eb8542fb",
+    "full_depth": true,
+    "input_sha256": "sha256:ca9b337db13e36b54f72388f469154644f24d50f3a381fad7be6533a7d6353d1",
+    "result_sha256": "sha256:0ef30b4bb4ce5e4070fca535f4679b6fb1c3951cde83f59a8b03993f2a4aa352",
+    "risk_tier": "high",
+    "selection_reason": "risk_requires_full_depth",
+    "sentinel": {
+      "audit_rate_percent": 0,
+      "selected": false,
+      "task_hash": "sha256:01ba26060d9b6e2b8882ac156a500272b01604b0b2f8fe7794fdd96f336ea465",
+      "task_id": "ute-corpus-v1-006"
+    }
+  },
+  "primary": {
+    "active_profile": "compact_ultra",
+    "audit_selection": {
+      "algorithm": "sha256_mod_100_v1",
+      "bucket": 89,
+      "rate_percent": 20,
+      "selected": false
+    },
+    "decision": "CANARY",
+    "experiment_identity": "ute-gpt-primary-v2",
+    "experiment_identity_sha256": "sha256:806d8491066ef7bf9f5e6bd801412d8c6e01e660de06fb5a806b63ca7c4fd6ee",
+    "full_depth": false,
+    "input_sha256": "sha256:fede4c32938c1202e00026497ceef7a21e1e8782f8e5f52f28fe5fff9e69b4f0",
+    "result_sha256": "sha256:d6a6aefb4806486c491aa9173149e61d97dcc3e83d042a8df3025524bef112f3",
+    "risk_tier": "medium",
+    "selection_reason": "eligible_canary",
+    "sentinel": {
+      "audit_rate_percent": 20,
+      "selected": false,
+      "task_hash": "sha256:08ca0cde64b78772f7d298eddac967e48d8efc379b6dbe6fdf0f99f691a01b1e",
+      "task_id": "ute-corpus-v1-004"
+    }
+  },
+  "spec_id": "SPEC-ADK-ULTRA-EFFICIENCY-001",
+  "version": 1
+}

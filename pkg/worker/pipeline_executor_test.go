@@ -120,12 +120,15 @@ func TestNewPipelineExecutor(t *testing.T) {
 	if pe.workDir != "/work" {
 		t.Errorf("workDir = %q, want %q", pe.workDir, "/work")
 	}
+	if pe.compressor == nil {
+		t.Fatal("production pipeline must install the default compressor")
+	}
 }
 
 func TestPipelineExecutor_SetCompressor(t *testing.T) {
 	pe := NewPipelineExecutor(adapter.NewClaudeAdapter(), "", "/tmp")
-	if pe.compressor != nil {
-		t.Error("compressor should be nil by default")
+	if pe.compressor == nil {
+		t.Fatal("compressor should be installed by default")
 	}
 
 	c := compress.NewDefaultCompressor(2)

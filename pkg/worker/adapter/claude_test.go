@@ -2,9 +2,11 @@ package adapter
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/telemetry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -162,6 +164,40 @@ func TestClaudeAdapterExtractResultInvalidJSON(t *testing.T) {
 	evt := StreamEvent{Data: []byte("bad json")}
 	result := a.ExtractResult(evt)
 	assert.Equal(t, "bad json", result.Output)
+}
+
+func TestClaudeAdapterExtractResult_AnthropicUsagePreservesCacheBreakdown(t *testing.T) {
+	a := NewClaudeAdapter()
+	evt, err := a.ParseEvent([]byte(`{"type":"result","run_id":"run-1","call_id":"call-1","task_id":"task-1","attempt":2,"phase":"implementation","role":"executor","effort":"high","model":"claude-opus-4-6","result":"done","usage":{"input_tokens":600,"cache_creation_input_tokens":100,"cache_read_input_tokens":300,"output_tokens":200}}`))
+	require.NoError(t, err)
+
+	result := a.ExtractResult(evt)
+	require.Len(t, result.Usage, 1)
+	usage := result.Usage[0]
+	assert.Equal(t, telemetry.UsageStatusActual, usage.UsageStatus)
+	assert.Equal(t, "run-1", usage.RunID)
+	assert.Equal(t, "call-1", usage.CallID)
+	assert.Equal(t, int64(1000), *usage.InputTokensTotal)
+	assert.Equal(t, int64(1200), *usage.RawTotalTokens)
+	assert.Equal(t, int64(100), *usage.CacheCreationInputTokens)
+	assert.Equal(t, int64(300), *usage.CacheReadInputTokens)
+
+	payload, marshalErr := json.Marshal(usage)
+	require.NoError(t, marshalErr)
+	assert.NotContains(t, string(payload), "done")
+}
+
+func TestClaudeAdapterExtractResult_CostOnlyDoesNotInventTokens(t *testing.T) {
+	a := NewClaudeAdapter()
+	evt, err := a.ParseEvent([]byte(`{"type":"result","run_id":"run-2","call_id":"call-2","result":"done","total_cost_usd":0.25}`))
+	require.NoError(t, err)
+
+	result := a.ExtractResult(evt)
+	require.Len(t, result.Usage, 1)
+	assert.InDelta(t, 0.25, result.CostUSD, 0.001)
+	assert.Equal(t, telemetry.UsageStatusCostOnly, result.Usage[0].UsageStatus)
+	assert.Nil(t, result.Usage[0].InputTokensTotal)
+	assert.Nil(t, result.Usage[0].RawTotalTokens)
 }
 
 // envContains checks that the env slice contains the expected key=value pair.
