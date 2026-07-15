@@ -15,12 +15,15 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		catalog     string
-		root        config.CodexProfile
-		agent       config.CodexProfile
-		rootReason  config.CodexResolutionReason
-		agentReason config.CodexResolutionReason
+		name             string
+		catalog          string
+		rendered         config.CodexProfile
+		provider         config.CodexProfile
+		providerReason   config.CodexResolutionReason
+		supervisor       config.CodexProfile
+		supervisorReason config.CodexResolutionReason
+		agent            config.CodexProfile
+		agentReason      config.CodexResolutionReason
 	}{
 		{
 			name: "full support",
@@ -28,10 +31,13 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 				{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},
 				{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}
 			]}`,
-			root:        config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortUltra},
-			agent:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortXHigh},
-			rootReason:  config.CodexResolutionSupported,
-			agentReason: config.CodexResolutionSupported,
+			rendered:         config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortUltra},
+			provider:         config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			providerReason:   config.CodexResolutionSupported,
+			supervisor:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortUltra},
+			supervisorReason: config.CodexResolutionSupported,
+			agent:            config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortXHigh},
+			agentReason:      config.CodexResolutionSupported,
 		},
 		{
 			name: "effort downgrade",
@@ -39,16 +45,20 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 				{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"}]},
 				{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}
 			]}`,
-			root:        config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
-			agent:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortXHigh},
-			rootReason:  config.CodexResolutionEffortUnavailable,
-			agentReason: config.CodexResolutionSupported,
+			rendered:         config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			provider:         config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			providerReason:   config.CodexResolutionSupported,
+			supervisor:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			supervisorReason: config.CodexResolutionEffortUnavailable,
+			agent:            config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortXHigh},
+			agentReason:      config.CodexResolutionSupported,
 		},
 		{
-			name:        "runtime default",
-			catalog:     `{"models":[{"slug":"other-model","supported_reasoning_levels":[{"effort":"medium"}]}]}`,
-			rootReason:  config.CodexResolutionRuntimeDefault,
-			agentReason: config.CodexResolutionRuntimeDefault,
+			name:             "runtime default",
+			catalog:          `{"models":[{"slug":"other-model","supported_reasoning_levels":[{"effort":"medium"}]}]}`,
+			providerReason:   config.CodexResolutionRuntimeDefault,
+			supervisorReason: config.CodexResolutionRuntimeDefault,
+			agentReason:      config.CodexResolutionRuntimeDefault,
 		},
 	}
 
@@ -70,22 +80,22 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 			require.NoError(t, err)
 			root := strings.SplitN(string(rootFiles[0].Content), "[agents]", 2)[0]
 			executor := codexAgentMappingContent(t, agentFiles, "executor.toml")
-			assertCodexRenderedProfile(t, root, tt.root)
+			assertCodexRenderedProfile(t, root, tt.rendered)
 			assertCodexRenderedProfile(t, executor, tt.agent)
 
 			provider, providerResolution := config.ResolveCodexProviderProfile(
 				config.CodexProviderEntryForQuality(cfg.Quality),
 				[]byte(tt.catalog),
 			)
-			assertCodexProviderProfile(t, provider.Args, tt.root)
-			assertCodexProviderProfile(t, provider.PaneArgs, tt.root)
-			assert.Equal(t, tt.rootReason, providerResolution.Reason)
+			assertCodexProviderProfile(t, provider.Args, tt.provider)
+			assertCodexProviderProfile(t, provider.PaneArgs, tt.provider)
+			assert.Equal(t, tt.providerReason, providerResolution.Reason)
 
 			rootResolution := config.ResolveCodexProfile(cfg.Quality.CodexSupervisorProfile(), []byte(tt.catalog))
 			agentResolution := config.ResolveCodexProfile(cfg.Quality.CodexAgentProfile("executor", "sonnet", "medium"), []byte(tt.catalog))
-			assert.Equal(t, tt.rootReason, rootResolution.Reason)
+			assert.Equal(t, tt.supervisorReason, rootResolution.Reason)
 			assert.Equal(t, tt.agentReason, agentResolution.Reason)
-			assert.Equal(t, tt.root, rootResolution.Effective)
+			assert.Equal(t, tt.supervisor, rootResolution.Effective)
 			assert.Equal(t, tt.agent, agentResolution.Effective)
 		})
 	}
