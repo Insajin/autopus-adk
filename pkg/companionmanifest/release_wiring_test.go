@@ -94,6 +94,17 @@ func TestGoReleaser_CompanionProducerIsAssociatedWithEveryDarwinBuild(t *testing
 
 func TestReleaseWorkflow_RequiresRealKeyAndMetadataBeforeGoReleaser(t *testing.T) {
 	workflow := string(readRepositoryFile(t, filepath.Join(".github", "workflows", "release.yaml")))
+	var permissionContract struct {
+		Jobs map[string]struct {
+			Permissions map[string]string `yaml:"permissions"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal([]byte(workflow), &permissionContract); err != nil {
+		t.Fatalf("parse release workflow permissions: %v", err)
+	}
+	if got := permissionContract.Jobs["release"].Permissions["id-token"]; got != "write" {
+		t.Fatalf("release job id-token permission = %q, want write", got)
+	}
 	required := []string{
 		"runs-on: macos-14",
 		"secrets.APPLE_API_ISSUER",
@@ -125,6 +136,26 @@ func TestReleaseWorkflow_RequiresRealKeyAndMetadataBeforeGoReleaser(t *testing.T
 	if validateIndex < 0 || releaseIndex < 0 || validateIndex >= releaseIndex {
 		t.Fatal("companion release validation must run before GoReleaser")
 	}
+	_, goReleaserStep := releaseWorkflowStepContaining(t, releaseWorkflowContract(t), "goreleaser release --clean")
+	if !goReleaserOIDCCommandValid(goReleaserStep.Run) {
+		t.Fatal("GoReleaser OIDC bindings must be arguments of its continued env -i command")
+	}
+	mutations := map[string]string{
+		"continuation_removed_before_oidc": strings.Replace(goReleaserStep.Run,
+			`GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_TOKEN="$GITHUB_TOKEN" \`,
+			`GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_TOKEN="$GITHUB_TOKEN"`, 1),
+		"oidc_binding_outside_command": strings.Replace(goReleaserStep.Run,
+			`ACTIONS_ID_TOKEN_REQUEST_TOKEN="$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \`,
+			`ACTIONS_ID_TOKEN_REQUEST_TOKEN="$ACTIONS_ID_TOKEN_REQUEST_TOKEN"`, 1),
+	}
+	for name, mutated := range mutations {
+		if mutated == goReleaserStep.Run {
+			t.Fatalf("mutation %s did not alter GoReleaser command", name)
+		}
+		if goReleaserOIDCCommandValid(mutated) {
+			t.Fatalf("invalid GoReleaser command passed contract mutation %s", name)
+		}
+	}
 	importIndex := strings.Index(workflow, "security import")
 	partitionIndex := strings.Index(workflow, "security set-key-partition-list")
 	searchListIndex := strings.Index(workflow, "security list-keychains -d user -s")
@@ -137,6 +168,37 @@ func TestReleaseWorkflow_RequiresRealKeyAndMetadataBeforeGoReleaser(t *testing.T
 	if strings.Contains(releaseStep, "ADK_COMPANION_ED25519_PRIVATE_KEY") {
 		t.Fatal("GoReleaser step receives private key instead of key-file path")
 	}
+}
+
+func goReleaserOIDCCommandValid(run string) bool {
+	var command strings.Builder
+	started := false
+	terminalLine := ""
+	for _, rawLine := range strings.Split(run, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if !started {
+			if !strings.HasPrefix(line, "env -i ") {
+				continue
+			}
+			started = true
+		}
+		continued := strings.HasSuffix(line, `\`)
+		line = strings.TrimSpace(strings.TrimSuffix(line, `\`))
+		command.WriteString(line + " ")
+		if !continued {
+			terminalLine = line
+			break
+		}
+	}
+	if terminalLine != "goreleaser release --clean" {
+		return false
+	}
+	for _, name := range []string{"ACTIONS_ID_TOKEN_REQUEST_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_URL"} {
+		if !strings.Contains(command.String(), name+`="$`+name+`"`) {
+			return false
+		}
+	}
+	return true
 }
 
 func readRepositoryFile(t *testing.T, name string) []byte {
