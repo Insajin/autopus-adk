@@ -107,6 +107,7 @@ func NewRootCmd() *cobra.Command {
 	// @AX:REASON: External CLI users and integration tests depend on rebuild/search/context/status subcommands staying reachable.
 	root.AddCommand(newMemCmd())
 	root.AddCommand(newWorkflowCmd())
+	root.AddCommand(newCompanionManifestCmd())
 
 	return root
 }

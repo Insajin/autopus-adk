@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Desktop 장치 설정 릴리스 handoff (SPEC-DESKTOP-DEVICE-SETUP-001)** (2026-07-14): 결정론적 companion manifest producer, detached Ed25519 서명, Darwin 릴리스 배선, 검증·롤백 계약은 코드로 구현됐으며 관련 집중 테스트가 통과했다. 다만 `T11`과 `AC-019`는 충족되지 않았으며 릴리스도 완료되지 않았다. Production Desktop 릴리스 정책의 `pinnedPublicKeys`와 `priorReleaseKeyIds`는 비어 있고, 실제 이전 릴리스 키 ID와의 중첩이 필요하다. 실제 key ID와 public key는 릴리스 custodian이 제공해야 하며 fixture 값을 사용할 수 없다. 서명·공증된 현재 ADK 아티팩트와 실제 릴리스 증거는 외부 blocker로 남아 있다.
+
 - **Codex Ultra 역할별 worker effort 적용** (2026-07-11): Codex Ultra의 quality-managed supervisor와 orchestra는 Sol+`ultra`를 유지하고, 전략·보안 역할인 `planner`·`architect`·`security-auditor`만 Sol+`max`, 그 밖의 모든 관리형 에이전트와 unknown role은 Sol+`xhigh`를 사용하도록 중앙 profile resolver를 조정했다. `auto quality ultra --apply`와 fresh init이 같은 3개/나머지 역할 분리를 생성하며, 어떤 managed worker도 자동 task delegation이 있는 `ultra` effort를 받지 않는다.
 
 - **Codex 사용자 기본 모델 상속 및 품질 모드 즉시 적용** (2026-07-11): 새 프로젝트는 `quality.supervisor_model_policy: inherit`를 사용해 `.codex/config.toml`에 주 세션 model/effort를 쓰지 않고 사용자의 Codex 기본값을 상속한다. 정책 필드가 없는 기존 프로젝트의 markerless root 설정은 보존 우선으로 이행하며, `auto quality supervisor inherit|quality --apply`로 소유권을 명시할 수 있다. Codex 설정 업데이트는 사용자 소유 키 목록을 기록해 해당 assignment만 반복 업데이트 후에도 보존하고, 비모델 checksum drift가 생성 model/effort를 고정하지 않도록 한다. `auto quality ultra|balanced --apply`는 설정을 원문 보존 방식으로 저장한 뒤 현재 프로젝트의 플랫폼 하네스를 갱신하고, 일부 플랫폼 실패 시 적용 수와 정확한 재시도 명령을 출력한다.
