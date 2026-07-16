@@ -58,6 +58,13 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 
 func TestCIWorkflow_StaticAndMacOSContractsArePullRequestSafe(t *testing.T) {
 	workflow := readCIStabilityWorkflow(t, ".github/workflows/ci.yaml")
+	for _, id := range []string{"test", "macos-runtime"} {
+		checkout := ciUsesStep(t, workflow.Jobs[id], "actions/checkout@")
+		if checkout.With["fetch-depth"] != 0 {
+			t.Fatalf("CI job %s checkout fetch-depth = %v, want 0 for release ancestry checks",
+				id, checkout.With["fetch-depth"])
+		}
+	}
 	static := workflow.Jobs["static-contracts"]
 	if run := ciStepRun(t, static, "Validate GitHub Actions workflows"); run != "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7" {
 		t.Fatalf("actionlint command = %q", run)
@@ -154,5 +161,16 @@ func ciStep(t *testing.T, job ciStabilityJob, name string) ciStabilityStep {
 		}
 	}
 	t.Fatalf("CI step %q is missing", name)
+	return ciStabilityStep{}
+}
+
+func ciUsesStep(t *testing.T, job ciStabilityJob, prefix string) ciStabilityStep {
+	t.Helper()
+	for _, step := range job.Steps {
+		if strings.HasPrefix(step.Uses, prefix) {
+			return step
+		}
+	}
+	t.Fatalf("CI uses step %q is missing", prefix)
 	return ciStabilityStep{}
 }
