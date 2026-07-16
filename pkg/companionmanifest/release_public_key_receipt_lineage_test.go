@@ -13,6 +13,10 @@ const (
 	publicKeyReceiptA0Repository = "Insajin/autopus-adk"
 	publicKeyReceiptA0Tag        = "v0.50.69"
 	publicKeyReceiptA0Version    = "0.50.69"
+	publicKeyReceiptA1Tag        = "v0.50.70"
+	publicKeyReceiptA1Version    = "0.50.70"
+	publicKeyReceiptA2Tag        = "v0.50.71"
+	publicKeyReceiptA2Version    = "0.50.71"
 	minimumLongLivedReceiptSecs  = "31536000"
 )
 
@@ -67,6 +71,7 @@ func TestReleasePublicKeyReceipt_A0Policy_IsOneExactAuditableBootstrap(t *testin
 		"COMPANION_VERSION",
 		"release_phase='A0'",
 		"release_phase='A1'",
+		"release_phase='A2'",
 	} {
 		if !strings.Contains(scripts, exact) {
 			t.Fatalf("missing exact A0 bootstrap release policy %q", exact)
@@ -74,6 +79,9 @@ func TestReleasePublicKeyReceipt_A0Policy_IsOneExactAuditableBootstrap(t *testin
 	}
 	if !exactA0TagVersionGuard(scripts) {
 		t.Fatal("A0 bootstrap is not conjunctively restricted to tag v0.50.69 and version 0.50.69")
+	}
+	if !exactA2TagVersionGuard(scripts) {
+		t.Fatal("A2 release is not conjunctively restricted to tag v0.50.71 and version 0.50.71")
 	}
 	workflow := releaseWorkflowContract(t)
 	for _, job := range workflow.Jobs {
@@ -107,7 +115,7 @@ func TestReleasePublicKeyReceipt_ExactA0Phase_AllowsUnprovisionedPinsWithCurrent
 	}
 }
 
-func TestReleasePublicKeyReceipt_A1PriorEvidence_VerifiesImmutableA0ReleaseAndCurrentEquality(t *testing.T) {
+func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredecessorAndCurrentEquality(t *testing.T) {
 	api := productionPublicKeyReceiptAPI(t)
 	workflow := releaseWorkflowContract(t)
 	lineageIndex, lineageStep := publicKeyReceiptLineageStep(t, workflow)
@@ -121,7 +129,7 @@ func TestReleasePublicKeyReceipt_A1PriorEvidence_VerifiesImmutableA0ReleaseAndCu
 	scripts := normalizedReleaseText(releaseScriptsText(t))
 	for _, required := range []string{
 		"gh api", "gh release download", "releases/tags/",
-		publicKeyReceiptA0Repository, publicKeyReceiptA0Tag,
+		publicKeyReceiptA0Repository, publicKeyReceiptA0Tag, publicKeyReceiptA1Tag,
 		"tag_name", "target_commitish", "cmp --",
 		"prior_receipt", "current_receipt", "record_sha256", "public_key_sha256",
 	} {
@@ -136,7 +144,8 @@ func TestReleasePublicKeyReceipt_A1PriorEvidence_VerifiesImmutableA0ReleaseAndCu
 	if got := strings.Count(scripts, "cmp --"); got < wantComparisons {
 		t.Fatalf("A1 exact receipt/signature-or-envelope byte comparisons = %d, want at least %d", got, wantComparisons)
 	}
-	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.71", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.72", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA2Tag, "prior_evidence_unverifiable")
 	if !a0LineagePinsProvisioned(t, scripts, api) {
 		requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.70", "prior_evidence_unverifiable")
 	}
@@ -211,11 +220,24 @@ func exactA0TagVersionGuard(source string) bool {
 	return false
 }
 
+func exactA2TagVersionGuard(source string) bool {
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`GITHUB_REF_NAME.{0,240}v0\.50\.71.{0,400}COMPANION_VERSION.{0,240}0\.50\.71`),
+		regexp.MustCompile(`COMPANION_VERSION.{0,240}0\.50\.71.{0,400}GITHUB_REF_NAME.{0,240}v0\.50\.71`),
+	}
+	for _, pattern := range patterns {
+		if pattern.MatchString(source) {
+			return true
+		}
+	}
+	return false
+}
+
 func publicKeyReceiptLineageStep(t *testing.T, workflow publicKeyReceiptWorkflow) (int, publicKeyReceiptWorkflowStep) {
 	t.Helper()
 	index, step, ok := findPublicKeyReceiptLineageStep(workflow)
 	if !ok {
-		t.Fatal("missing production contract: release workflow has no A1 public-key receipt lineage preflight")
+		t.Fatal("missing production contract: release workflow has no prior-release receipt lineage preflight")
 	}
 	return index, step
 }

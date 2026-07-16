@@ -1,0 +1,144 @@
+name: Recover Homebrew Formula Bridge
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  recover-formula-bridge:
+    environment:
+      name: adk-companion-release
+    permissions:
+      contents: read
+    runs-on: macos-14
+    steps:
+      - name: Check out exact A2 release tag
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: refs/tags/v0.50.71
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate exact recovery source
+        id: release-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          actual_head=$(git rev-parse --verify 'HEAD^{commit}')
+          [[ "$actual_head" =~ ^[0-9a-f]{40}$ ]]
+          validation_output=$(mktemp "$RUNNER_TEMP/formula-recovery-source.XXXXXX")
+          trap 'rm -f -- "$validation_output"' EXIT
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_REF_NAME='v0.50.71' GITHUB_REF_TYPE='tag' \
+            GITHUB_SHA="$actual_head" GITHUB_OUTPUT="$validation_output" \
+            scripts/companion-release/validate-source.sh
+          [[ "$(grep -Ec '^source-commit=[0-9a-f]{40}$' "$validation_output")" == '1' ]]
+          source_commit=$(sed -n 's/^source-commit=//p' "$validation_output")
+          [[ "$source_commit" == "$actual_head" ]]
+          printf 'source-commit=%s\n' "$source_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Verify immutable release and download checksums
+        id: release-evidence
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
+        run: |
+          set -euo pipefail
+          umask 077
+          fail() {
+            printf 'formula recovery evidence: %s\n' "$1" >&2
+            exit 1
+          }
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
+            || fail 'validated source commit is malformed'
+          release_json=$(mktemp "$RUNNER_TEMP/formula-recovery-release.XXXXXX") \
+            || fail 'cannot create release metadata file'
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.71-checksums.txt"
+          [[ ! -e "$checksums_path" && ! -L "$checksums_path" ]] \
+            || fail 'checksums destination already exists'
+          cleanup() {
+            local status=$?
+            rm -f -- "$release_json" || status=$?
+            if (( status != 0 )); then
+              rm -f -- "$checksums_path" || true
+            fi
+            return "$status"
+          }
+          trap cleanup EXIT
+          if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
+            -H 'Accept: application/vnd.github+json' \
+            'repos/Insajin/autopus-adk/releases/tags/v0.50.71' > "$release_json"; then
+            fail 'cannot read the exact A2 GitHub release'
+          fi
+          jq -e --arg tag 'v0.50.71' --arg commit "$SOURCE_COMMIT" '
+            .tag_name == $tag and
+            .target_commitish == $commit and
+            .draft == false and
+            .prerelease == false and
+            .immutable == true and
+            (.assets | type == "array")
+          ' "$release_json" >/dev/null \
+            || fail 'A2 GitHub release is not immutable, final, or source-bound'
+          checksums_name='checksums.txt'
+          jq -e --arg name "$checksums_name" \
+            '[.assets[] | select(.name == $name)] | length == 1' \
+            "$release_json" >/dev/null \
+            || fail 'A2 release must contain exactly one checksums.txt asset'
+          asset_id=$(jq -er --arg name "$checksums_name" '
+            .assets[] |
+            select(.name == $name and .state == "uploaded" and .size > 0) |
+            .id | select(type == "number")
+          ' "$release_json") || fail 'checksums.txt asset metadata is malformed'
+          [[ "$asset_id" =~ ^[1-9][0-9]*$ ]] \
+            || fail 'checksums.txt asset identifier is malformed'
+          asset_digest=$(jq -er --arg name "$checksums_name" '
+            .assets[] | select(.name == $name) | .digest |
+            select(type == "string" and test("^sha256:[0-9a-f]{64}$"))
+          ' "$release_json") || fail 'checksums.txt API digest is missing or malformed'
+          if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
+            -H 'Accept: application/octet-stream' \
+            "repos/Insajin/autopus-adk/releases/assets/${asset_id}" > "$checksums_path"; then
+            fail 'cannot download checksums.txt from the A2 release'
+          fi
+          [[ -f "$checksums_path" && ! -L "$checksums_path" && -s "$checksums_path" ]] \
+            || fail 'downloaded checksums.txt is not a non-empty regular file'
+          local_digest=$(shasum -a 256 "$checksums_path" | awk '{print $1}') \
+            || fail 'cannot digest downloaded checksums.txt'
+          [[ "$local_digest" =~ ^[0-9a-f]{64}$ ]] \
+            || fail 'local checksums.txt digest is malformed'
+          [[ "sha256:${local_digest}" == "$asset_digest" ]] \
+            || fail 'downloaded checksums.txt differs from its GitHub API digest'
+          printf 'checksums-path=%s\n' "$checksums_path" >> "$GITHUB_OUTPUT"
+
+      - name: Create Homebrew tap token
+        id: homebrew-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.HOMEBREW_APP_CLIENT_ID }}
+          private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}
+          owner: Insajin
+          repositories: homebrew-autopus
+          permission-contents: write
+
+      - name: Reconcile Homebrew Formula bridge
+        shell: bash
+        env:
+          COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}
+          HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_REF_NAME='v0.50.71' \
+            COMPANION_VERSION='0.50.71' \
+            COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
+            HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
+            scripts/companion-release/publish-homebrew-formula-bridge.sh
+
+      - name: Remove downloaded release evidence
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/autopus-v0.50.71-checksums.txt"

@@ -20,6 +20,7 @@ const (
 	lineageIssuedAt   = "2026-07-14T00:00:00Z"
 	lineageExpiresAt  = "2027-07-15T00:00:00Z"
 	lineageA0Version  = "0.50.69"
+	lineageA1Version  = "0.50.70"
 	lineageBundleName = "adk-companion-public-key-receipt.bundle"
 )
 
@@ -30,16 +31,21 @@ type executableLineageTools struct {
 
 type executableLineagePins struct {
 	commit        string
+	tagObject     string
 	receipt       string
 	signature     string
 	record        string
 	publicKey     string
 	checksums     string
+	amd64Archive  string
+	arm64Archive  string
 	amd64Manifest string
 	arm64Manifest string
 }
 
 type goReleaserA0Evidence struct {
+	tag       string
+	version   string
 	commit    string
 	archives  map[string][]byte
 	checksums []byte
@@ -61,7 +67,9 @@ type executableLineageFixture struct {
 	expiresAt             string
 	targetCommit          string
 	tagCommit             string
+	tagObject             string
 	releaseTag            string
+	currentTag            string
 	token                 string
 	checksums             []byte
 	archiveMutation       lineageArchiveMutation
@@ -69,6 +77,7 @@ type executableLineageFixture struct {
 	omitSignatureEntry    bool
 	releaseJSON           string
 	tagJSON               string
+	annotatedTagJSON      string
 	commitJSON            string
 	assetsDir             string
 	mockToolsDir          string
@@ -95,14 +104,20 @@ func newExecutableLineageFixture(
 	t.Helper()
 	root := t.TempDir()
 	seed := sha256.Sum256([]byte("autopus-f07-lineage-ed25519-seed"))
+	currentTag := publicKeyReceiptA1Tag
+	if evidence.version == lineageA1Version {
+		currentTag = publicKeyReceiptA2Tag
+	}
 	fixture := &executableLineageFixture{
 		root: root, tools: tools, evidence: evidence, pins: evidence.pins,
 		keyPath: filepath.Join(root, "release-key"), issuedAt: lineageIssuedAt,
 		expiresAt: lineageExpiresAt, targetCommit: evidence.commit, tagCommit: evidence.commit,
-		releaseTag: publicKeyReceiptA0Tag, token: "f07-mock-github-token",
+		tagObject:  evidence.pins.tagObject,
+		releaseTag: evidence.tag, currentTag: currentTag, token: "f07-mock-github-token",
 		checksums: append([]byte(nil), evidence.checksums...),
 		assetsDir: filepath.Join(root, "assets"), mockToolsDir: filepath.Join(root, "tools"),
 		releaseJSON: filepath.Join(root, "release.json"), tagJSON: filepath.Join(root, "tag.json"),
+		annotatedTagJSON:      filepath.Join(root, "annotated-tag.json"),
 		commitJSON:            filepath.Join(root, "commit.json"),
 		provisionedScriptPath: filepath.Join(root, "verify-public-key-lineage.sh"),
 	}
@@ -134,7 +149,7 @@ func (fixture *executableLineageFixture) run(t *testing.T) (string, error) {
 	command := exec.Command("bash", fixture.provisionedScriptPath)
 	command.Env = []string{
 		"PATH=" + fixture.mockToolsDir + string(os.PathListSeparator) + os.Getenv("PATH"),
-		"HOME=" + home, "TMPDIR=" + tmp, "GITHUB_REF_NAME=v0.50.70",
+		"HOME=" + home, "TMPDIR=" + tmp, "GITHUB_REF_NAME=" + fixture.currentTag,
 		"GITHUB_TOKEN=" + fixture.token, "COMPANION_SIGNER=" + fixture.tools.signer,
 		"COMPANION_RECEIPT_VERIFIER=" + fixture.tools.verifier,
 		"COMPANION_SIGNING_KEY_FILE=" + fixture.keyPath, "COMPANION_KEY_ID=" + lineageKeyID,

@@ -10,10 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestReleaseWorkflow_ExactPhasesProtectedEnvironmentAndImmutableActions(t *testing.T) {
+func TestReleaseWorkflow_ExactA2ProtectedEnvironmentAndImmutableActions(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"v0.50.69", "v0.50.70", "refs/tags/v0.50.69", "refs/tags/v0.50.70",
+		"v0.50.71", "refs/tags/v0.50.71",
 		"environment:", "adk-companion-release",
 	} {
 		if !strings.Contains(release, required) {
@@ -22,6 +22,11 @@ func TestReleaseWorkflow_ExactPhasesProtectedEnvironmentAndImmutableActions(t *t
 	}
 	if strings.Contains(release, "- 'v*'") || strings.Contains(release, "- v*") {
 		t.Fatal("arbitrary version tags can enter the protected release job")
+	}
+	for _, forbidden := range []string{"'v0.50.69'", "'v0.50.70'", "refs/tags/v0.50.69", "refs/tags/v0.50.70"} {
+		if strings.Contains(release, forbidden) {
+			t.Fatalf("historical tag %q can enter the A2 release workflow", forbidden)
+		}
 	}
 	immutable := regexp.MustCompile(`^[^@[:space:]]+@[0-9a-f]{40}$`)
 	for _, name := range []string{
@@ -67,6 +72,48 @@ func TestGoReleaser_TargetCommitishUsesValidatedFortyHexSourceCommit(t *testing.
 	} {
 		if !strings.Contains(workflow, required) {
 			t.Fatalf("release source SHA contract missing %q", required)
+		}
+	}
+}
+
+func TestReleaseSourceValidator_A2PinsAnnotatedTagAndBothAncestors(t *testing.T) {
+	source := readReleaseFile(t, "scripts/companion-release/validate-source.sh")
+	for _, declaration := range []string{
+		"readonly A2_A1_ANCESTOR_SHA='e25e8be02b55b9385f58919c30ad1ccf92179030'",
+		"readonly A2_MAIN_ANCESTOR_SHA='acb735cca0ef120cfed0d01863de09535310b5a3'",
+	} {
+		if strings.Count(source, declaration) != 1 {
+			t.Fatalf("A2 immutable ancestry pin drifted: %s", declaration)
+		}
+	}
+	for _, required := range []string{
+		`git cat-file -t "refs/tags/$GITHUB_REF_NAME"`,
+		`git merge-base --is-ancestor "$A2_A1_ANCESTOR_SHA" "$GITHUB_SHA"`,
+		`git merge-base --is-ancestor "$A2_MAIN_ANCESTOR_SHA" "$GITHUB_SHA"`,
+		`[[ "$tag_object_type" == 'tag' ]]`,
+	} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("A2 source gate missing %q", required)
+		}
+	}
+}
+
+func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *testing.T) {
+	release := readReleaseFile(t, ".github/workflows/release.yaml")
+	releaseIndex := strings.Index(release, "goreleaser release --clean")
+	bridgeIndex := strings.Index(release, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
+	cleanupIndex := strings.Index(release, "Remove release credentials and keychain")
+	if releaseIndex < 0 || bridgeIndex <= releaseIndex || cleanupIndex <= bridgeIndex {
+		t.Fatalf("Homebrew bridge ordering release=%d bridge=%d cleanup=%d", releaseIndex, bridgeIndex, cleanupIndex)
+	}
+	for _, exact := range []string{
+		"GITHUB_REF_NAME='v0.50.71'",
+		"COMPANION_VERSION='0.50.71'",
+		"COMPANION_CHECKSUMS_PATH='dist/checksums.txt'",
+		`HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN"`,
+	} {
+		if !strings.Contains(release, exact) {
+			t.Fatalf("Homebrew formula bridge missing exact input %q", exact)
 		}
 	}
 }

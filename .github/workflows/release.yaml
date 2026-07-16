@@ -2,8 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.69'
-      - 'v0.50.70'
+      - 'v0.50.71'
 permissions:
   contents: read
 jobs:
@@ -18,7 +17,7 @@ jobs:
 
   release:
     needs: [ci, security]
-    if: github.ref == 'refs/tags/v0.50.69' || github.ref == 'refs/tags/v0.50.70'
+    if: github.ref == 'refs/tags/v0.50.71'
     environment:
       name: adk-companion-release
     permissions:
@@ -260,6 +259,18 @@ jobs:
             COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT="$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
             COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS="$COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS" \
             goreleaser release --clean
+
+      - name: Publish Homebrew formula bridge
+        shell: bash
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_REF_NAME='v0.50.71' \
+            COMPANION_VERSION='0.50.71' \
+            COMPANION_CHECKSUMS_PATH='dist/checksums.txt' \
+            HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
+            scripts/companion-release/publish-homebrew-formula-bridge.sh
 
       - name: Remove release credentials and keychain
         if: always()

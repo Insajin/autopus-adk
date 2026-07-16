@@ -579,8 +579,8 @@ Platform command syntax:
 <summary>Other install methods</summary>
 
 ```bash
-# Homebrew (macOS)
-brew install Insajin/autopus/auto
+# Homebrew (macOS) — canonical new install
+brew install --cask Insajin/autopus/auto
 
 # go install (requires Go 1.26+)
 go install github.com/Insajin/autopus-adk/cmd/auto@latest
@@ -591,6 +591,14 @@ cd autopus-adk && make build && make install
 
 # After manual install, initialize:
 cd your-project && auto init
+```
+
+Homebrew Cask is the canonical Homebrew distribution. If you previously installed the legacy
+Formula, remove it before installing the Cask:
+
+```bash
+brew uninstall --formula auto
+brew install --cask Insajin/autopus/auto
 ```
 
 </details>
@@ -608,8 +616,8 @@ cd your-project && auto init
 After install, the script explains these commands:
 
 - `auto init`: initialize the current project and generate `autopus.yaml` plus platform files
-- `auto update --self`: update the `auto` CLI binary itself
-- `auto update`: refresh rules, skills, agents, and other generated harness files in your project
+- `auto update --self`: update only the `auto` CLI binary
+- `auto update`: refresh the current project's generated rules, skills, agents, and platform files
 
 ### Step 2 · Initialize the Project
 
@@ -709,7 +717,8 @@ That's it — production-ready code with tests, security audit, and full documen
 
 ### Keeping Autopus Up to Date
 
-Autopus has two types of updates:
+Autopus has two separate update steps. When adopting a new release, run them in order from the
+project you want to refresh.
 
 **1. Binary update** — update the `auto` CLI itself:
 
@@ -717,15 +726,21 @@ Autopus has two types of updates:
 auto update --self
 ```
 
-Downloads the latest release from GitHub, verifies SHA256 checksum, and atomically replaces the binary. Check your current version with `auto version`.
+Downloads the latest release from GitHub, verifies its SHA256 checksum, and atomically replaces
+only the CLI binary. It does not refresh any generated project files. Check your current version
+with `auto version`.
 
-**2. Harness update** — update rules, skills, and agents in your project:
+**2. Harness update** — apply the installed CLI's templates to the current project:
 
 ```bash
 auto update
 ```
 
-Regenerates `.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*`, and other platform-specific files from the latest templates. With `skills.compiler.mode: split`, the update preview/apply flow also manages `.opencode/skills/*` and `.autopus/plugins/auto/skills/*`, including stale artifact pruning. Your custom edits outside `AUTOPUS:BEGIN`~`AUTOPUS:END` markers are preserved. Newly installed platforms are auto-detected.
+Regenerates rules, skills, agents, and platform-specific files such as `.claude/*`, `.codex/*`,
+`.gemini/*`, `.opencode/*`, and `.agents/skills/*` from the templates in the installed CLI. With
+`skills.compiler.mode: split`, the update preview/apply flow also manages `.opencode/skills/*` and
+`.autopus/plugins/auto/skills/*`, including stale artifact pruning. Your custom edits outside
+`AUTOPUS:BEGIN`~`AUTOPUS:END` markers are preserved. Newly installed platforms are auto-detected.
 
 If Claude Code already has a user-managed `statusLine.command`, the update flow defaults to preserving it, can merge it with the managed Autopus statusline, or replace it entirely via `--statusline-mode keep|merge|replace`.
 
@@ -735,7 +750,8 @@ If Claude Code already has a user-managed `statusLine.command`, the update flow 
 auto update --self && auto update
 ```
 
-> **When to update:** Run `auto update --self` when a new version is released. Then `auto update` to get new rules, skills, and agents into your project.
+> **When to update:** `auto update --self` installs the new binary. The release is reflected in the
+> current project's generated surfaces only after the following `auto update` succeeds.
 
 ### Common Scenarios
 
@@ -878,6 +894,11 @@ Run `auto quality supervisor inherit --apply` to explicitly remove a known gener
 Sol profile for the selected quality mode. User-owned project model or effort assignments remain
 preserved and take precedence. Start a new Codex session after applying changes so managed agent
 definitions are reloaded.
+
+GPT/Codex Ultra support in the CLI and Ultra activation in a project are separate. Installing a
+new binary does not enable Ultra. Run `auto update` to refresh the project's generated files, then
+opt in with `auto quality ultra --apply` and start a new Codex session. Any Ultra compact rollout or
+promotion remains separate and is not activated by these update commands.
 
 In Codex Ultra, a quality-managed supervisor and orchestra use Sol+`ultra`; `planner`, `architect`,
 and `security-auditor` use Sol+`max`; every other managed agent uses Sol+`xhigh`. The Opus labels

@@ -30,10 +30,25 @@ type executableLineageRelease struct {
 	Assets          []executableLineageAsset `json:"assets"`
 }
 
-// The archive bytes come from GoReleaser; Apple trust events remain synthetic test inputs.
 func produceGoReleaserA0FixtureEvidence(
 	t *testing.T,
 	tools executableLineageTools,
+) *goReleaserA0Evidence {
+	return produceGoReleaserFixtureEvidence(t, tools, publicKeyReceiptA0Tag, lineageA0Version, false)
+}
+
+func produceGoReleaserA1FixtureEvidence(
+	t *testing.T,
+	tools executableLineageTools,
+) *goReleaserA0Evidence {
+	return produceGoReleaserFixtureEvidence(t, tools, publicKeyReceiptA1Tag, lineageA1Version, true)
+}
+
+func produceGoReleaserFixtureEvidence(
+	t *testing.T,
+	tools executableLineageTools,
+	releaseTag, releaseVersion string,
+	annotated bool,
 ) *goReleaserA0Evidence {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), "repository")
@@ -43,9 +58,17 @@ func produceGoReleaserA0FixtureEvidence(
 	runLineageCommand(t, root, "git", "config", "user.email", "f07@example.invalid")
 	runLineageCommand(t, root, "git", "remote", "add", "origin", "https://example.invalid/Insajin/autopus-adk.git")
 	runLineageCommand(t, root, "git", "add", ".")
-	runLineageCommand(t, root, "git", "commit", "-qm", "F07 exact GoReleaser A0 fixture")
-	runLineageCommand(t, root, "git", "tag", publicKeyReceiptA0Tag)
+	runLineageCommand(t, root, "git", "commit", "-qm", "F07 exact GoReleaser lineage fixture")
+	if annotated {
+		runLineageCommand(t, root, "git", "tag", "-am", "F07 annotated predecessor", releaseTag)
+	} else {
+		runLineageCommand(t, root, "git", "tag", releaseTag)
+	}
 	commit := strings.TrimSpace(runLineageCommand(t, root, "git", "rev-parse", "HEAD"))
+	tagObject := ""
+	if annotated {
+		tagObject = strings.TrimSpace(runLineageCommand(t, root, "git", "rev-parse", releaseTag))
+	}
 
 	credentialRoot := filepath.Join(filepath.Dir(root), "credentials")
 	if err := os.Mkdir(credentialRoot, 0o700); err != nil {
@@ -65,7 +88,7 @@ func produceGoReleaserA0FixtureEvidence(
 	environment := append(os.Environ(), toolEnv...)
 	environment = append(environment,
 		"GO_WANT_COMPANION_SIGNER_HELPER=1", "TMPDIR="+tmpDir,
-		"GITHUB_REF_NAME="+publicKeyReceiptA0Tag, "COMPANION_SOURCE_COMMIT="+commit,
+		"GITHUB_REF_NAME="+releaseTag, "COMPANION_SOURCE_COMMIT="+commit,
 		"COMPANION_BUILD_PROVENANCE=github-actions:Insajin/autopus-adk@"+commit,
 		"COMPANION_HANDOFF="+lineageHandoff, "COMPANION_ROLLBACK_FLOOR=5069",
 		"COMPANION_ISSUED_AT=2026-07-15T00:00:00Z",
@@ -82,12 +105,15 @@ func produceGoReleaserA0FixtureEvidence(
 	command := exec.Command("go", args...)
 	command.Dir, command.Env = root, environment
 	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("exact GoReleaser A0 output: %v\n%s", err, output)
+		t.Fatalf("exact GoReleaser %s output: %v\n%s", releaseTag, err, output)
 	}
 
-	evidence := &goReleaserA0Evidence{commit: commit, archives: map[string][]byte{}}
+	evidence := &goReleaserA0Evidence{
+		tag: releaseTag, version: releaseVersion, commit: commit, archives: map[string][]byte{},
+	}
+	evidence.pins.tagObject = tagObject
 	for _, architecture := range []string{"amd64", "arm64"} {
-		name := fmt.Sprintf("autopus-adk_%s_darwin_%s.tar.gz", lineageA0Version, architecture)
+		name := fmt.Sprintf("autopus-adk_%s_darwin_%s.tar.gz", releaseVersion, architecture)
 		evidence.archives[architecture] = readLineageFile(t, filepath.Join(root, "dist", name))
 		entries, err := decodeLineageArchive(evidence.archives[architecture])
 		if err != nil {
@@ -103,22 +129,26 @@ func produceGoReleaserA0FixtureEvidence(
 		}
 	}
 	evidence.checksums = readLineageFile(t, filepath.Join(root, "dist", "checksums.txt"))
-	evidence.pins = captureGoReleaserPins(evidence, privateKey)
+	evidence.pins = captureGoReleaserPins(evidence, privateKey, tagObject)
 	return evidence
 }
 
 func captureGoReleaserPins(
 	evidence *goReleaserA0Evidence,
 	privateKey ed25519.PrivateKey,
+	tagObject string,
 ) executableLineagePins {
 	amd64, _ := decodeLineageArchive(evidence.archives["amd64"])
 	arm64, _ := decodeLineageArchive(evidence.archives["arm64"])
 	receiptDigest, signatureDigest := lineageDigest(evidence.receipt), lineageDigest(evidence.signature)
 	return executableLineagePins{
-		commit: evidence.commit, receipt: receiptDigest, signature: signatureDigest,
+		commit: evidence.commit, tagObject: tagObject,
+		receipt: receiptDigest, signature: signatureDigest,
 		record:        lineageRecordDigest(receiptDigest, signatureDigest),
 		publicKey:     lineageDigest(privateKey.Public().(ed25519.PublicKey)),
 		checksums:     lineageDigest(evidence.checksums),
+		amd64Archive:  lineageDigest(evidence.archives["amd64"]),
+		arm64Archive:  lineageDigest(evidence.archives["arm64"]),
 		amd64Manifest: lineageDigest(amd64["adk-companion-manifest.json"].data),
 		arm64Manifest: lineageDigest(arm64["adk-companion-manifest.json"].data),
 	}
@@ -134,7 +164,7 @@ func (fixture *executableLineageFixture) writeEvidence(t *testing.T) {
 	}
 	assets := make([]executableLineageAsset, 0, 3)
 	for _, architecture := range []string{"amd64", "arm64"} {
-		name := fmt.Sprintf("autopus-adk_%s_darwin_%s.tar.gz", lineageA0Version, architecture)
+		name := fmt.Sprintf("autopus-adk_%s_darwin_%s.tar.gz", fixture.evidence.version, architecture)
 		data := append([]byte(nil), fixture.evidence.archives[architecture]...)
 		if fixture.archiveMutation != nil {
 			data = fixture.archiveMutation(t, architecture, data)
@@ -163,9 +193,19 @@ func (fixture *executableLineageFixture) writeEvidence(t *testing.T) {
 	writeLineageJSON(t, fixture.releaseJSON, executableLineageRelease{
 		TagName: fixture.releaseTag, TargetCommitish: fixture.targetCommit, Immutable: true, Assets: assets,
 	})
-	writeLineageJSON(t, fixture.tagJSON, map[string]any{
-		"object": map[string]string{"type": "commit", "sha": fixture.tagCommit},
-	})
+	if fixture.tagObject == "" {
+		writeLineageJSON(t, fixture.tagJSON, map[string]any{
+			"object": map[string]string{"type": "commit", "sha": fixture.tagCommit},
+		})
+	} else {
+		writeLineageJSON(t, fixture.tagJSON, map[string]any{
+			"object": map[string]string{"type": "tag", "sha": fixture.tagObject},
+		})
+		writeLineageJSON(t, fixture.annotatedTagJSON, map[string]any{
+			"tag":    fixture.releaseTag,
+			"object": map[string]string{"type": "commit", "sha": fixture.tagCommit},
+		})
+	}
 	writeLineageJSON(t, fixture.commitJSON, map[string]string{"sha": fixture.evidence.commit})
 }
 
@@ -181,6 +221,7 @@ if [[ "${1-}" == 'api' ]]; then
   case "${2-}" in
     */releases/tags/*) exec /bin/cat ` + shellQuote(fixture.releaseJSON) + ` ;;
     */git/ref/tags/*) exec /bin/cat ` + shellQuote(fixture.tagJSON) + ` ;;
+    */git/tags/*) exec /bin/cat ` + shellQuote(fixture.annotatedTagJSON) + ` ;;
     */commits/*) exec /bin/cat ` + shellQuote(fixture.commitJSON) + ` ;;
     *) exit 64 ;;
   esac
@@ -214,8 +255,20 @@ func (fixture *executableLineageFixture) writeProvisionedProductionScript(t *tes
 		"A0_AMD64_MANIFEST_SHA256": fixture.pins.amd64Manifest,
 		"A0_ARM64_MANIFEST_SHA256": fixture.pins.arm64Manifest,
 	}
+	if fixture.currentTag == publicKeyReceiptA2Tag {
+		replacements["A1_COMMIT_SHA"] = fixture.pins.commit
+		replacements["A1_TAG_OBJECT_SHA"] = fixture.pins.tagObject
+		replacements["A1_CHECKSUMS_SHA256"] = fixture.pins.checksums
+		replacements["A1_AMD64_ARCHIVE_SHA256"] = fixture.pins.amd64Archive
+		replacements["A1_ARM64_ARCHIVE_SHA256"] = fixture.pins.arm64Archive
+		replacements["A1_AMD64_MANIFEST_SHA256"] = fixture.pins.amd64Manifest
+		replacements["A1_ARM64_MANIFEST_SHA256"] = fixture.pins.arm64Manifest
+	}
 	for name, value := range replacements {
 		productionValue, ok := immutableA0LineagePins[name]
+		if !ok {
+			productionValue, ok = immutableA1LineagePins[name]
+		}
 		if !ok {
 			t.Fatalf("production lineage pin %s is not defined", name)
 		}
@@ -226,6 +279,11 @@ func (fixture *executableLineageFixture) writeProvisionedProductionScript(t *tes
 		source = strings.Replace(source, production, "readonly "+name+"='"+value+"'", 1)
 	}
 	if err := os.WriteFile(fixture.provisionedScriptPath, []byte(source), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	helper := releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage-archive.sh")
+	helperPath := filepath.Join(filepath.Dir(fixture.provisionedScriptPath), "verify-public-key-lineage-archive.sh")
+	if err := os.WriteFile(helperPath, helper, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
