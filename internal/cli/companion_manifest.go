@@ -176,6 +176,10 @@ func readPrivateKey(input io.Reader) (ed25519.PrivateKey, error) {
 }
 
 func digestRegularFile(path string) (string, error) {
+	return digestRegularFileWithPostReadHook(path, nil)
+}
+
+func digestRegularFileWithPostReadHook(path string, postReadHook func()) (string, error) {
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() {
 		return "", errors.New("artifact must be a regular file")
@@ -189,9 +193,42 @@ func digestRegularFile(path string) (string, error) {
 	if err != nil || !openedInfo.Mode().IsRegular() || !os.SameFile(info, openedInfo) {
 		return "", errors.New("artifact identity changed while opening")
 	}
-	digest := sha256.New()
-	if _, err := io.Copy(digest, file); err != nil {
+	firstDigest, err := digestOpenArtifact(file)
+	if err != nil {
 		return "", errors.New("digest artifact")
 	}
-	return "sha256:" + hex.EncodeToString(digest.Sum(nil)), nil
+	if postReadHook != nil {
+		postReadHook()
+	}
+	if !artifactPathMatchesOpenFile(path, info, file) {
+		return "", errors.New("artifact identity changed while digesting")
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", errors.New("rewind artifact")
+	}
+	secondDigest, err := digestOpenArtifact(file)
+	if err != nil {
+		return "", errors.New("redigest artifact")
+	}
+	if !bytes.Equal(firstDigest, secondDigest) ||
+		!artifactPathMatchesOpenFile(path, info, file) {
+		return "", errors.New("artifact changed while digesting")
+	}
+	return "sha256:" + hex.EncodeToString(firstDigest), nil
+}
+
+func digestOpenArtifact(file *os.File) ([]byte, error) {
+	digest := sha256.New()
+	if _, err := io.Copy(digest, file); err != nil {
+		return nil, err
+	}
+	return digest.Sum(nil), nil
+}
+
+func artifactPathMatchesOpenFile(path string, initial os.FileInfo, file *os.File) bool {
+	pathInfo, pathErr := os.Lstat(path)
+	openedInfo, openedErr := file.Stat()
+	return pathErr == nil && openedErr == nil && pathInfo.Mode().IsRegular() &&
+		openedInfo.Mode().IsRegular() && os.SameFile(initial, pathInfo) &&
+		os.SameFile(initial, openedInfo)
 }

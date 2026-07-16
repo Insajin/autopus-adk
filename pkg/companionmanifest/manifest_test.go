@@ -110,6 +110,15 @@ func TestSignCanonical_InvalidPrivateKey_IsRejected(t *testing.T) {
 	}
 }
 
+func TestSignCanonical_InconsistentFullLengthPrivateKey_IsRejected(t *testing.T) {
+	_, privateKey := testKey()
+	inconsistent := append(ed25519.PrivateKey(nil), privateKey...)
+	inconsistent[len(inconsistent)-1] ^= 1
+	if _, _, err := SignCanonical(testManifest(), inconsistent); err == nil {
+		t.Fatal("SignCanonical() accepted an inconsistent 64-byte private key")
+	}
+}
+
 func validPolicy(publicKey ed25519.PublicKey) VerificationPolicy {
 	return VerificationPolicy{
 		PinnedKeys: map[string]PinnedKey{

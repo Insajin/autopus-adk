@@ -122,6 +122,10 @@ func beginPublicKeyReceiptBundleTransaction(
 		_ = unix.Close(parentFD)
 		return nil, errors.New("public key receipt parent directory is not secure")
 	}
+	if err := recoverStalePublicKeyReceiptStages(parentFD); err != nil {
+		_ = unix.Close(parentFD)
+		return nil, err
+	}
 	var existing unix.Stat_t
 	err = unix.Fstatat(parentFD, output.bundleName, &existing, unix.AT_SYMLINK_NOFOLLOW)
 	if err == nil || !errors.Is(err, unix.ENOENT) {
@@ -152,13 +156,23 @@ func (transaction *publicKeyReceiptBundleTransaction) createStage() error {
 			unix.O_NONBLOCK | unix.O_CLOEXEC
 		stageFD, err := unix.Openat(transaction.parentFD, name, flags, 0)
 		if err != nil {
+			_ = unix.Unlinkat(transaction.parentFD, name, unix.AT_REMOVEDIR)
 			return errors.New("open public key receipt staging directory")
 		}
 		transaction.stageFD = stageFD
 		if unix.Fstat(stageFD, &transaction.stageStat) != nil ||
 			!securePublicKeyReceiptDirectoryStat(&transaction.stageStat, 0o700) ||
 			!transaction.stageNameMatchesDescriptor() {
+			_ = unix.Close(stageFD)
+			transaction.stageFD = -1
+			_ = unix.Unlinkat(transaction.parentFD, name, unix.AT_REMOVEDIR)
 			return errors.New("invalid public key receipt staging directory")
+		}
+		if err := unix.Flock(stageFD, unix.LOCK_EX|unix.LOCK_NB); err != nil {
+			_ = unix.Close(stageFD)
+			transaction.stageFD = -1
+			_ = unix.Unlinkat(transaction.parentFD, name, unix.AT_REMOVEDIR)
+			return errors.New("lock public key receipt staging directory")
 		}
 		return nil
 	}

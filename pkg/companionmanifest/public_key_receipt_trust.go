@@ -12,10 +12,10 @@ import (
 const publicKeyReceiptRecordDomain = "autopus.public-key-receipt.a0-record.v1\x00"
 
 const (
-	configuredA0ReceiptSHA256   = ""
-	configuredA0SignatureSHA256 = ""
-	configuredA0PublicKeySHA256 = ""
-	configuredA0RecordSHA256    = ""
+	configuredA0ReceiptSHA256   = "sha256:4a588fa4991c515e9520861af5567fd2fe4c19e2c23adb8963bd37ebc46a5bbc"
+	configuredA0SignatureSHA256 = "sha256:7f248929d807b689acab575888b0a7600bd2ea17cce1e5fcc11f72af9c510173"
+	configuredA0PublicKeySHA256 = "sha256:c387da9e9c43dbaa2605207a00635c84937ff397a8b6ed73414d2e66b89941a4"
+	configuredA0RecordSHA256    = "sha256:84ee9403223aabd1f60e5e55e79a5c7d6b2c764bc594435cbf7c4e997e2ce475"
 )
 
 // ErrPublicKeyReceiptA0Unprovisioned means immutable release pins are absent.

@@ -4,6 +4,7 @@ package companionmanifest
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -82,11 +83,18 @@ func SignCanonical(manifest Manifest, privateKey ed25519.PrivateKey) ([]byte, []
 	if len(privateKey) != ed25519.PrivateKeySize {
 		return nil, nil, errors.New("invalid signing key")
 	}
+	seed := privateKey.Seed()
+	defer clear(seed)
+	normalizedKey := ed25519.NewKeyFromSeed(seed)
+	defer clear(normalizedKey)
+	if subtle.ConstantTimeCompare(privateKey, normalizedKey) != 1 {
+		return nil, nil, errors.New("invalid signing key")
+	}
 	canonical, err := CanonicalBytes(manifest)
 	if err != nil {
 		return nil, nil, err
 	}
-	return canonical, ed25519.Sign(privateKey, canonical), nil
+	return canonical, ed25519.Sign(normalizedKey, canonical), nil
 }
 
 func validateManifest(manifest Manifest) error {

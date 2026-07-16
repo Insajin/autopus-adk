@@ -126,7 +126,7 @@ func TestNewPublicKeyReceiptA0Anchor_EmptyEvidence_FailsClosed(t *testing.T) {
 	}
 }
 
-func TestVerifyConfiguredPublicKeyReceiptBundle_UnpublishedA0Pins_FailsClosed(t *testing.T) {
+func TestVerifyConfiguredPublicKeyReceiptBundle_NonProductionRecord_FailsPinned(t *testing.T) {
 	receiptBytes, signature, _, _ := issuedPublicKeyReceipt(t)
 	bundlePath := writePublicKeyReceiptTrustBundle(t, receiptBytes, signature)
 
@@ -134,8 +134,8 @@ func TestVerifyConfiguredPublicKeyReceiptBundle_UnpublishedA0Pins_FailsClosed(t 
 		bundlePath,
 		validPublicKeyReceiptPolicy(),
 	)
-	if !errors.Is(err, ErrPublicKeyReceiptA0Unprovisioned) {
-		t.Fatalf("VerifyConfiguredPublicKeyReceiptBundle() error = %v", err)
+	if err == nil || errors.Is(err, ErrPublicKeyReceiptA0Unprovisioned) {
+		t.Fatalf("non-production configured bundle error = %v", err)
 	}
 }
 

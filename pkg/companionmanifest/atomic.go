@@ -2,7 +2,6 @@ package companionmanifest
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -55,26 +54,15 @@ func WriteAtomic(path string, data []byte) (returnErr error) {
 	return syncDirectory(dir)
 }
 
-// WriteSignedFiles commits the detached signature first and manifest last.
+// WriteSignedFiles transactionally replaces a manifest and detached signature pair.
 func WriteSignedFiles(manifestPath, signaturePath string, manifest, signature []byte) error {
-	manifestAbs, err := filepath.Abs(manifestPath)
-	if err != nil {
-		return errors.New("resolve manifest output")
-	}
-	signatureAbs, err := filepath.Abs(signaturePath)
-	if err != nil {
-		return errors.New("resolve signature output")
-	}
-	if manifestAbs == signatureAbs || filepath.Dir(manifestAbs) != filepath.Dir(signatureAbs) {
-		return errors.New("signed outputs must be distinct files in one directory")
-	}
-	if err := WriteAtomic(signatureAbs, signature); err != nil {
-		return fmt.Errorf("write detached signature: %w", err)
-	}
-	if err := WriteAtomic(manifestAbs, manifest); err != nil {
-		return fmt.Errorf("write manifest: %w", err)
-	}
-	return nil
+	return writeSignedFilesWithFault(
+		manifestPath,
+		signaturePath,
+		manifest,
+		signature,
+		nil,
+	)
 }
 
 func writeAll(file *os.File, data []byte) error {

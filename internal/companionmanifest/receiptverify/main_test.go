@@ -134,6 +134,37 @@ func TestVerifyReceipt_MalformedInputsFailClosed(t *testing.T) {
 	}
 }
 
+func TestDecodePrivateKeyAndClear_AlwaysClearsEncodedInput(t *testing.T) {
+	valid := append(
+		[]byte(" \n"),
+		[]byte(base64.StdEncoding.EncodeToString(testPrivateKey(t)))...,
+	)
+	valid = append(valid, '\n')
+	tests := []struct {
+		name      string
+		encoded   []byte
+		wantError bool
+	}{
+		{name: "valid", encoded: valid},
+		{name: "invalid", encoded: []byte("not-base64"), wantError: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			encoded := append([]byte(nil), test.encoded...)
+			privateKey, err := decodePrivateKeyAndClear(encoded)
+			if (err != nil) != test.wantError {
+				t.Fatalf("decodePrivateKeyAndClear() error = %v, wantError = %v", err, test.wantError)
+			}
+			clear(privateKey)
+			for index, value := range encoded {
+				if value != 0 {
+					t.Fatalf("encoded[%d] = %d, want cleared buffer", index, value)
+				}
+			}
+		})
+	}
+}
+
 func receiptFixture(t *testing.T) (verifyOptions, []byte, []byte) {
 	t.Helper()
 	privateKey := testPrivateKey(t)

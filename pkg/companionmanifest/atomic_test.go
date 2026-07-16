@@ -85,6 +85,7 @@ func TestAtomicOutputs_InvalidPaths_AreRejected(t *testing.T) {
 	dir := t.TempDir()
 	same := filepath.Join(dir, "same")
 	otherDir := t.TempDir()
+	reserved := filepath.Join(dir, signedPairCleanupPrefix+"output")
 	cases := []struct {
 		name string
 		run  func() error
@@ -93,6 +94,9 @@ func TestAtomicOutputs_InvalidPaths_AreRejected(t *testing.T) {
 		{name: "missing directory", run: func() error { return WriteAtomic(filepath.Join(dir, "missing", "file"), nil) }},
 		{name: "directory as output", run: func() error { return WriteAtomic(dir, nil) }},
 		{name: "same signed path", run: func() error { return WriteSignedFiles(same, same, nil, nil) }},
+		{name: "reserved signed namespace", run: func() error {
+			return WriteSignedFiles(reserved, filepath.Join(dir, "signature"), nil, nil)
+		}},
 		{name: "different signed dirs", run: func() error {
 			return WriteSignedFiles(filepath.Join(dir, "manifest"), filepath.Join(otherDir, "signature"), nil, nil)
 		}},

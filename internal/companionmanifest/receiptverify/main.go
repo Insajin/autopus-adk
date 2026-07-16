@@ -169,13 +169,23 @@ func readPrivateKey(path string) (ed25519.PrivateKey, error) {
 	if err != nil {
 		return nil, errors.New("read release signing key")
 	}
-	decoded, err := base64.StdEncoding.Strict().DecodeString(string(bytes.TrimSpace(encoded)))
-	if err != nil || len(decoded) != ed25519.PrivateKeySize {
+	return decodePrivateKeyAndClear(encoded)
+}
+
+func decodePrivateKeyAndClear(encoded []byte) (ed25519.PrivateKey, error) {
+	defer clear(encoded)
+	trimmed := bytes.TrimSpace(encoded)
+	encoding := base64.StdEncoding.Strict()
+	decoded := make([]byte, encoding.DecodedLen(len(trimmed)))
+	decodedLength, err := encoding.Decode(decoded, trimmed)
+	if err != nil || decodedLength != ed25519.PrivateKeySize {
 		clear(decoded)
 		return nil, errors.New("release signing key is invalid")
 	}
-	privateKey := ed25519.PrivateKey(decoded)
-	normalized := ed25519.NewKeyFromSeed(privateKey.Seed())
+	privateKey := ed25519.PrivateKey(decoded[:decodedLength])
+	seed := privateKey.Seed()
+	normalized := ed25519.NewKeyFromSeed(seed)
+	clear(seed)
 	if subtle.ConstantTimeCompare(privateKey, normalized) != 1 {
 		clear(privateKey)
 		clear(normalized)

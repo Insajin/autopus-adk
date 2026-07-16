@@ -31,6 +31,16 @@ func TestReleasePublicKeyReceipt_Workflow_SecretsAreStepScopedAndCleanupFailures
 			}
 		}
 	}
+	_, sourceStep := releaseWorkflowStepContaining(t, workflow, "Validate exact release source")
+	wantSourcePins := map[string]string{
+		"COMPANION_APPROVED_SOURCE_COMMIT": "${{ vars.ADK_COMPANION_APPROVED_SOURCE_COMMIT }}",
+		"COMPANION_APPROVED_SOURCE_TREE":   "${{ vars.ADK_COMPANION_APPROVED_SOURCE_TREE }}",
+	}
+	for name, want := range wantSourcePins {
+		if got := sourceStep.Env[name]; got != want {
+			t.Fatalf("exact release source %s = %q, want repository variable %q", name, got, want)
+		}
+	}
 	raw := string(releaseSourceFile(t, ".github/workflows/release.yaml"))
 	if strings.Contains(raw, "$GITHUB_ENV") {
 		t.Fatal("release workflow promotes credential state through GITHUB_ENV instead of keeping it step-scoped")
@@ -139,7 +149,10 @@ func publicKeyReceiptAllowedStepEnv() map[string]struct{} {
 		"COMPANION_PLATFORM", "COMPANION_BUILD_PROVENANCE", "COMPANION_HANDOFF",
 		"COMPANION_ROLLBACK_FLOOR", "COMPANION_ISSUED_AT", "COMPANION_EXPIRES_AT",
 		"COMPANION_KEY_ID", "COMPANION_RELEASE_PRODUCTION", "COMPANION_SIGNING_KEY_FILE",
-		"COMPANION_SIGNER", "COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT",
+		"COMPANION_APPROVED_SOURCE_COMMIT", "COMPANION_APPROVED_SOURCE_TREE",
+		"COMPANION_SIGNER", "COMPANION_MANIFEST_VERIFIER",
+		"COMPANION_RELEASE_TIME_VALIDATION_REQUIRED",
+		"COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT",
 		"COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT",
 		"COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS",
 	}
