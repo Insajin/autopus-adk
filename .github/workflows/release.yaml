@@ -1,20 +1,15 @@
 name: Release
-
 on:
   push:
     tags:
-      - 'v*'
-
+      - 'v0.50.71'
 permissions:
-  contents: write
-  id-token: write
-
+  contents: read
 jobs:
   # Release gate: run the full CI suite (build/test/lint/e2e) on the tagged commit.
   # If any CI job fails, the release job below is skipped — a red build cannot ship.
   ci:
     uses: ./.github/workflows/ci.yaml
-
   # Security gate: run secret scan and govulncheck on the tagged commit.
   # Blocks release if any vulnerability or secret leak is detected.
   security:
@@ -22,28 +17,262 @@ jobs:
 
   release:
     needs: [ci, security]
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/tags/v0.50.71'
+    environment:
+      name: adk-companion-release
+    permissions:
+      contents: write
+      id-token: write
+    runs-on: macos-14
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-go@v6
+      - name: Validate exact release source
+        id: release-source
+        shell: bash
+        env:
+          COMPANION_APPROVED_SOURCE_COMMIT: ${{ vars.ADK_COMPANION_APPROVED_SOURCE_COMMIT }}
+          COMPANION_APPROVED_SOURCE_TREE: ${{ vars.ADK_COMPANION_APPROVED_SOURCE_TREE }}
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" GITHUB_REF_NAME="$GITHUB_REF_NAME" \
+            GITHUB_REF_TYPE="$GITHUB_REF_TYPE" GITHUB_SHA="$GITHUB_SHA" \
+            GITHUB_OUTPUT="$GITHUB_OUTPUT" COMPANION_SOURCE_PIN_REQUIRED=1 \
+            COMPANION_APPROVED_SOURCE_COMMIT="$COMPANION_APPROVED_SOURCE_COMMIT" \
+            COMPANION_APPROVED_SOURCE_TREE="$COMPANION_APPROVED_SOURCE_TREE" \
+            scripts/companion-release/validate-source.sh
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
 
+      - name: Verify tidy source without mutation
+        shell: bash
+        run: go mod tidy -diff
+
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
-          version: "~> v2"
+          version: "v2.17.0"
           install-only: true
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3.5.0
+        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 # v3.5.0
+
+      - name: Build companion release verification tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          signer="$RUNNER_TEMP/auto-companion-manifest-signer"
+          verifier="$RUNNER_TEMP/auto-companion-receipt-verifier"
+          manifest_verifier="$RUNNER_TEMP/auto-companion-manifest-verifier"
+          [[ ! -e "$signer" && ! -L "$signer" &&
+             ! -e "$verifier" && ! -L "$verifier" &&
+             ! -e "$manifest_verifier" && ! -L "$manifest_verifier" ]]
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$signer" ./cmd/auto
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$verifier" \
+            ./internal/companionmanifest/receiptverify
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$manifest_verifier" \
+            ./scripts/companion-release/manifestverify
+          chmod 0700 "$signer" "$verifier" "$manifest_verifier"
+
+      - name: Prepare release credentials
+        id: release-credentials
+        shell: bash
+        env:
+          APPLE_API_ISSUER_SECRET: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_SECRET: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          ADK_COMPANION_ED25519_PRIVATE_KEY: ${{ secrets.ADK_COMPANION_ED25519_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in \
+            APPLE_API_ISSUER_SECRET APPLE_API_KEY_SECRET APPLE_API_KEY_P8 \
+            APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD \
+            ADK_COMPANION_ED25519_PRIVATE_KEY
+          do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::required release credential ${name} is not configured"
+              exit 1
+            fi
+          done
+          if [[ ! "$APPLE_API_KEY_SECRET" =~ ^[A-Za-z0-9]{1,64}$ ]] || \
+             [[ ! "$APPLE_API_ISSUER_SECRET" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
+            echo '::error::Apple API key metadata is invalid'
+            exit 1
+          fi
+          credential_dir="$RUNNER_TEMP/adk-release-credentials"
+          [[ ! -e "$credential_dir" && ! -L "$credential_dir" ]]
+          install -m 0700 -d "$credential_dir"
+          api_key_path="$credential_dir/AuthKey_${APPLE_API_KEY_SECRET}.p8"
+          certificate_path="$credential_dir/developer-id.p12"
+          companion_key_path="$credential_dir/companion-ed25519-private-key"
+          keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
+          keychain_password_file="$credential_dir/keychain-password"
+          [[ ! -e "$keychain_path" && ! -L "$keychain_path" ]]
+          printf '%s' "$APPLE_API_KEY_P8" > "$api_key_path"
+          printf '%s' "$APPLE_CERTIFICATE" | /usr/bin/base64 -D > "$certificate_path"
+          printf '%s' "$ADK_COMPANION_ED25519_PRIVATE_KEY" > "$companion_key_path"
+          /usr/bin/openssl rand -hex 32 > "$keychain_password_file"
+          chmod 0600 \
+            "$api_key_path" "$certificate_path" "$companion_key_path" \
+            "$keychain_password_file"
+          keychain_password=$(<"$keychain_password_file")
+          security create-keychain -p "$keychain_password" "$keychain_path" >/dev/null
+          chmod 0600 "$keychain_path"
+          security set-keychain-settings -t 3600 -u "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -k "$keychain_path" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign >/dev/null
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_password" "$keychain_path" >/dev/null
+          security list-keychains -d user -s "$keychain_path"
+          identity=$(security find-identity -v -p codesigning "$keychain_path" \
+            | awk -F'"' '/Developer ID Application:/ && /\(GP2PFA2PUV\)/ { print $2 }')
+          if [[ -z "$identity" || "$identity" == *$'\n'* ]]; then
+            echo '::error::exactly one GP2PFA2PUV Developer ID Application identity is required'
+            exit 1
+          fi
+          rm -f -- "$certificate_path"
+          printf 'apple-signing-identity=%s\n' "$identity" >> "$GITHUB_OUTPUT"
+
+      - name: Validate companion release inputs
+        shell: bash
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_PATH: ${{ runner.temp }}/adk-release-credentials/AuthKey_${{ secrets.APPLE_API_KEY }}.p8
+          APPLE_SIGNING_IDENTITY: ${{ steps.release-credentials.outputs.apple-signing-identity }}
+          APPLE_SIGNING_KEYCHAIN: ${{ runner.temp }}/adk-release.keychain-db
+          COMPANION_PLATFORM: darwin
+          COMPANION_BUILD_PROVENANCE: github-actions:${{ github.repository }}@${{ github.sha }}
+          COMPANION_HANDOFF: ${{ vars.ADK_COMPANION_HANDOFF }}
+          COMPANION_ROLLBACK_FLOOR: ${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}
+          COMPANION_ISSUED_AT: ${{ vars.ADK_COMPANION_ISSUED_AT }}
+          COMPANION_EXPIRES_AT: ${{ vars.ADK_COMPANION_EXPIRES_AT }}
+          COMPANION_KEY_ID: ${{ vars.ADK_COMPANION_KEY_ID }}
+          COMPANION_RELEASE_PRODUCTION: "1"
+          COMPANION_SIGNING_KEY_FILE: ${{ runner.temp }}/adk-release-credentials/companion-ed25519-private-key
+          COMPANION_SIGNER: ${{ runner.temp }}/auto-companion-manifest-signer
+          COMPANION_MANIFEST_VERIFIER: ${{ runner.temp }}/auto-companion-manifest-verifier
+          COMPANION_RELEASE_TIME_VALIDATION_REQUIRED: "1"
+          COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT }}
+          COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT }}
+          COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS: "31536000"
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            APPLE_API_ISSUER="$APPLE_API_ISSUER" APPLE_API_KEY="$APPLE_API_KEY" \
+            APPLE_API_KEY_PATH="$APPLE_API_KEY_PATH" \
+            APPLE_SIGNING_IDENTITY="$APPLE_SIGNING_IDENTITY" \
+            APPLE_SIGNING_KEYCHAIN="$APPLE_SIGNING_KEYCHAIN" \
+            COMPANION_PLATFORM="$COMPANION_PLATFORM" \
+            COMPANION_BUILD_PROVENANCE="$COMPANION_BUILD_PROVENANCE" \
+            COMPANION_HANDOFF="$COMPANION_HANDOFF" \
+            COMPANION_ROLLBACK_FLOOR="$COMPANION_ROLLBACK_FLOOR" \
+            COMPANION_ISSUED_AT="$COMPANION_ISSUED_AT" \
+            COMPANION_EXPIRES_AT="$COMPANION_EXPIRES_AT" \
+            COMPANION_KEY_ID="$COMPANION_KEY_ID" \
+            COMPANION_RELEASE_PRODUCTION="$COMPANION_RELEASE_PRODUCTION" \
+            COMPANION_SIGNING_KEY_FILE="$COMPANION_SIGNING_KEY_FILE" \
+            COMPANION_SIGNER="$COMPANION_SIGNER" \
+            COMPANION_RECEIPT_VERIFIER="$RUNNER_TEMP/auto-companion-receipt-verifier" \
+            COMPANION_MANIFEST_VERIFIER="$COMPANION_MANIFEST_VERIFIER" \
+            COMPANION_RELEASE_TIME_VALIDATION_REQUIRED="$COMPANION_RELEASE_TIME_VALIDATION_REQUIRED" \
+            COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT="$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT" \
+            COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT="$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
+            COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS="$COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS" \
+            scripts/companion-release/validate-environment.sh
+
+      - name: Verify public-key receipt lineage
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMPANION_HANDOFF: ${{ vars.ADK_COMPANION_HANDOFF }}
+          COMPANION_ROLLBACK_FLOOR: ${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}
+          COMPANION_KEY_ID: ${{ vars.ADK_COMPANION_KEY_ID }}
+          COMPANION_SIGNING_KEY_FILE: ${{ runner.temp }}/adk-release-credentials/companion-ed25519-private-key
+          COMPANION_SIGNER: ${{ runner.temp }}/auto-companion-manifest-signer
+          COMPANION_MANIFEST_VERIFIER: ${{ runner.temp }}/auto-companion-manifest-verifier
+          COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT }}
+          COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT }}
+          COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS: "31536000"
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_TOKEN="$GITHUB_TOKEN" \
+            COMPANION_HANDOFF="$COMPANION_HANDOFF" \
+            COMPANION_ROLLBACK_FLOOR="$COMPANION_ROLLBACK_FLOOR" \
+            COMPANION_KEY_ID="$COMPANION_KEY_ID" \
+            COMPANION_SIGNING_KEY_FILE="$COMPANION_SIGNING_KEY_FILE" \
+            COMPANION_SIGNER="$COMPANION_SIGNER" \
+            COMPANION_RECEIPT_VERIFIER="$RUNNER_TEMP/auto-companion-receipt-verifier" \
+            COMPANION_MANIFEST_VERIFIER="$COMPANION_MANIFEST_VERIFIER" \
+            COMPANION_LINEAGE_MANIFEST_VERIFICATION_REQUIRED=1 \
+            COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT="$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT" \
+            COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT="$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
+            scripts/companion-release/verify-public-key-lineage.sh
+
+      - name: Run GoReleaser
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_PATH: ${{ runner.temp }}/adk-release-credentials/AuthKey_${{ secrets.APPLE_API_KEY }}.p8
+          APPLE_SIGNING_IDENTITY: ${{ steps.release-credentials.outputs.apple-signing-identity }}
+          APPLE_SIGNING_KEYCHAIN: ${{ runner.temp }}/adk-release.keychain-db
+          COMPANION_BUILD_PROVENANCE: github-actions:${{ github.repository }}@${{ github.sha }}
+          COMPANION_HANDOFF: ${{ vars.ADK_COMPANION_HANDOFF }}
+          COMPANION_ROLLBACK_FLOOR: ${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}
+          COMPANION_ISSUED_AT: ${{ vars.ADK_COMPANION_ISSUED_AT }}
+          COMPANION_EXPIRES_AT: ${{ vars.ADK_COMPANION_EXPIRES_AT }}
+          COMPANION_KEY_ID: ${{ vars.ADK_COMPANION_KEY_ID }}
+          COMPANION_RELEASE_PRODUCTION: "1"
+          COMPANION_SIGNING_KEY_FILE: ${{ runner.temp }}/adk-release-credentials/companion-ed25519-private-key
+          COMPANION_SIGNER: ${{ runner.temp }}/auto-companion-manifest-signer
+          COMPANION_MANIFEST_VERIFIER: ${{ runner.temp }}/auto-companion-manifest-verifier
+          COMPANION_RELEASE_TIME_VALIDATION_REQUIRED: "1"
+          COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT }}
+          COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT }}
+          COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS: "31536000"
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_TOKEN="$GITHUB_TOKEN" \
+            ACTIONS_ID_TOKEN_REQUEST_TOKEN="$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            ACTIONS_ID_TOKEN_REQUEST_URL="$ACTIONS_ID_TOKEN_REQUEST_URL" \
+            APPLE_API_ISSUER="$APPLE_API_ISSUER" APPLE_API_KEY="$APPLE_API_KEY" \
+            APPLE_API_KEY_PATH="$APPLE_API_KEY_PATH" \
+            APPLE_SIGNING_IDENTITY="$APPLE_SIGNING_IDENTITY" \
+            APPLE_SIGNING_KEYCHAIN="$APPLE_SIGNING_KEYCHAIN" \
+            COMPANION_BUILD_PROVENANCE="$COMPANION_BUILD_PROVENANCE" \
+            COMPANION_HANDOFF="$COMPANION_HANDOFF" \
+            COMPANION_ROLLBACK_FLOOR="$COMPANION_ROLLBACK_FLOOR" \
+            COMPANION_ISSUED_AT="$COMPANION_ISSUED_AT" \
+            COMPANION_EXPIRES_AT="$COMPANION_EXPIRES_AT" \
+            COMPANION_KEY_ID="$COMPANION_KEY_ID" \
+            COMPANION_RELEASE_PRODUCTION="$COMPANION_RELEASE_PRODUCTION" \
+            COMPANION_SIGNING_KEY_FILE="$COMPANION_SIGNING_KEY_FILE" \
+            COMPANION_SIGNER="$COMPANION_SIGNER" \
+            COMPANION_RECEIPT_VERIFIER="$RUNNER_TEMP/auto-companion-receipt-verifier" \
+            COMPANION_MANIFEST_VERIFIER="$COMPANION_MANIFEST_VERIFIER" \
+            COMPANION_RELEASE_TIME_VALIDATION_REQUIRED="$COMPANION_RELEASE_TIME_VALIDATION_REQUIRED" \
+            COMPANION_SOURCE_COMMIT="${{ steps.release-source.outputs.source-commit }}" \
+            COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT="$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT" \
+            COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT="$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
+            COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS="$COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS" \
+            goreleaser release --clean
 
       - name: Create Homebrew tap token
         id: homebrew-app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           client-id: ${{ vars.HOMEBREW_APP_CLIENT_ID }}
           private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}
@@ -51,12 +280,59 @@ jobs:
           repositories: homebrew-autopus
           permission-contents: write
 
-      - name: Run GoReleaser
-        run: goreleaser release --clean
+      - name: Publish Homebrew formula bridge
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Cross-repo token for publishing the Homebrew formula to the separate
-          # Insajin/homebrew-autopus tap repo. The token is generated from the
-          # Homebrew release GitHub App above because the default GITHUB_TOKEN
-          # cannot write to another repo.
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_REF_NAME='v0.50.71' \
+            COMPANION_VERSION='0.50.71' \
+            COMPANION_CHECKSUMS_PATH='dist/checksums.txt' \
+            COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
+            HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
+            scripts/companion-release/publish-homebrew-formula-bridge.sh
+
+      - name: Remove release credentials and keychain
+        if: always()
+        shell: bash
+        run: |
+          set -u
+          cleanup_status=0
+          keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
+          if [[ -e "$keychain_path" || -L "$keychain_path" ]]; then
+            if security delete-keychain "$keychain_path"; then :; else cleanup_status=$?; fi
+          fi
+          if [[ -e "$RUNNER_TEMP/adk-release-credentials" ||
+                -L "$RUNNER_TEMP/adk-release-credentials" ]]; then
+            if rm -rf -- "$RUNNER_TEMP/adk-release-credentials"; then
+              :
+            else
+              cleanup_status=$?
+            fi
+          fi
+          if [[ -e "$RUNNER_TEMP/auto-companion-manifest-signer" ||
+                -L "$RUNNER_TEMP/auto-companion-manifest-signer" ]]; then
+            if rm -f -- "$RUNNER_TEMP/auto-companion-manifest-signer"; then
+              :
+            else
+              cleanup_status=$?
+            fi
+          fi
+          if [[ -e "$RUNNER_TEMP/auto-companion-receipt-verifier" ||
+                -L "$RUNNER_TEMP/auto-companion-receipt-verifier" ]]; then
+            if rm -f -- "$RUNNER_TEMP/auto-companion-receipt-verifier"; then
+              :
+            else
+              cleanup_status=$?
+            fi
+          fi
+          if [[ -e "$RUNNER_TEMP/auto-companion-manifest-verifier" ||
+                -L "$RUNNER_TEMP/auto-companion-manifest-verifier" ]]; then
+            if rm -f -- "$RUNNER_TEMP/auto-companion-manifest-verifier"; then
+              :
+            else
+              cleanup_status=$?
+            fi
+          fi
+          exit "$cleanup_status"

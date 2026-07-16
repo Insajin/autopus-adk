@@ -1,0 +1,280 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+fail() {
+  printf 'companion release: %s\n' "$1" >&2
+  exit 1
+}
+
+require_environment() {
+  local name="$1"
+  [[ -n "${!name-}" ]] || fail "required environment variable ${name} is missing"
+}
+
+sha256_file() {
+  local output digest
+  output=$("$shasum_tool" -a 256 "$1") || return 1
+  digest="${output%%[[:space:]]*}"
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf 'sha256:%s' "$digest"
+}
+
+require_environment COMPANION_PLATFORM
+if [[ "$COMPANION_PLATFORM" != 'darwin' ]]; then
+  exit 0
+fi
+
+for name in COMPANION_ARTIFACT COMPANION_TARGET COMPANION_ARCHITECTURE COMPANION_VERSION; do
+  require_environment "$name"
+done
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+"$script_dir/validate-environment.sh"
+
+[[ "$(uname -s)" == 'Darwin' ]] || fail 'Darwin release requires macOS'
+codesign_tool=/usr/bin/codesign
+ditto_tool=/usr/bin/ditto
+xcrun_tool=/usr/bin/xcrun
+plutil_tool=/usr/bin/plutil
+shasum_tool=/usr/bin/shasum
+for tool in "$codesign_tool" "$ditto_tool" "$xcrun_tool" "$plutil_tool" "$shasum_tool"; do
+  [[ -f "$tool" && ! -L "$tool" && -x "$tool" ]] || fail 'required Darwin release tool is unavailable'
+done
+
+case "$COMPANION_ARCHITECTURE" in
+  amd64|arm64) ;;
+  *) fail 'COMPANION_ARCHITECTURE is not a shipped Darwin architecture' ;;
+esac
+[[ "$COMPANION_TARGET" == "darwin_${COMPANION_ARCHITECTURE}"* ]] \
+  || fail 'COMPANION_TARGET does not match the Darwin architecture'
+[[ "$COMPANION_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,255}$ ]] \
+  || fail 'COMPANION_VERSION is invalid'
+
+public_key_receipt_enabled=0
+if [[ -n "${COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT-}" ]]; then
+  public_key_receipt_enabled=1
+  require_environment GITHUB_REF_NAME
+  if [[ "$GITHUB_REF_NAME" == 'v0.50.69' && "$COMPANION_VERSION" == '0.50.69' ]]; then
+    release_phase='A0'
+  elif [[ "$GITHUB_REF_NAME" == 'v0.50.70' && "$COMPANION_VERSION" == '0.50.70' ]]; then
+    release_phase='A1'
+  elif [[ "$GITHUB_REF_NAME" == 'v0.50.71' && "$COMPANION_VERSION" == '0.50.71' ]]; then
+    release_phase='A2'
+  else
+    fail 'public_key_receipt_release_identity_mismatch'
+  fi
+fi
+
+artifact="$COMPANION_ARTIFACT"
+[[ -f "$artifact" && ! -L "$artifact" && -x "$artifact" ]] \
+  || fail 'COMPANION_ARTIFACT is not a regular executable'
+artifact_dir=$(cd -- "$(dirname -- "$artifact")" && pwd)
+artifact_path="$artifact_dir/$(basename -- "$artifact")"
+[[ "$(basename -- "$artifact_path")" == 'auto' ]] || fail 'Darwin companion artifact must be named auto'
+
+manifest_path="$artifact_dir/adk-companion-manifest.json"
+signature_path="$artifact_dir/adk-companion-manifest.sig"
+receipt_path="$artifact_dir/adk-companion-darwin-receipt.json"
+public_key_bundle_path="$artifact_dir/adk-companion-public-key-receipt.bundle"
+for output in "$manifest_path" "$signature_path" "$receipt_path" "$public_key_bundle_path"; do
+  [[ ! -e "$output" && ! -L "$output" ]] || fail 'Darwin release output already exists'
+done
+
+temp_dir=''
+receipt_temp=''
+succeeded=0
+cleanup() {
+  local status=$?
+  local rollback_status=0
+  if [[ -n "$receipt_temp" ]]; then
+    if rm -f -- "$receipt_temp"; then :; else rollback_status=$?; fi
+  fi
+  if [[ -n "$temp_dir" ]]; then
+    if rm -rf -- "$temp_dir"; then :; else rollback_status=$?; fi
+  fi
+  if [[ "$succeeded" != '1' ]]; then
+    if rm -f -- "$manifest_path" "$signature_path" "$receipt_path"; then
+      :
+    else
+      rollback_status=$?
+    fi
+    if [[ -e "$public_key_bundle_path" || -L "$public_key_bundle_path" ]]; then
+      if rm -rf -- "$public_key_bundle_path"; then :; else rollback_status=$?; fi
+    fi
+  fi
+  if [[ "$rollback_status" != '0' ]]; then
+    printf 'companion release: partial release publication rollback failed\n' >&2
+    return "$rollback_status"
+  fi
+  return "$status"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/adk-companion-release.XXXXXX")
+codesign_error="$temp_dir/codesign-error.txt"
+report_codesign_diagnostic() {
+  local label=$1 path=$2 line line_count=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    printf 'companion release: %s: %.1024s\n' "$label" "$line" >&2
+    line_count=$((line_count + 1))
+    [[ "$line_count" -lt 8 ]] || break
+  done <"$path"
+}
+
+if [[ -n "${APPLE_SIGNING_KEYCHAIN-}" ]]; then
+  "$codesign_tool" --force --sign "$APPLE_SIGNING_IDENTITY" \
+    --keychain "$APPLE_SIGNING_KEYCHAIN" \
+    --identifier co.autopus.adk --options runtime --timestamp "$artifact_path" \
+    >/dev/null 2>"$codesign_error" \
+    || { report_codesign_diagnostic 'codesign' "$codesign_error"; fail 'Developer ID signing failed'; }
+else
+  "$codesign_tool" --force --sign "$APPLE_SIGNING_IDENTITY" \
+    --identifier co.autopus.adk --options runtime --timestamp "$artifact_path" \
+    >/dev/null 2>"$codesign_error" \
+    || { report_codesign_diagnostic 'codesign' "$codesign_error"; fail 'Developer ID signing failed'; }
+fi
+
+notary_container="$temp_dir/auto.zip"
+notary_response="$temp_dir/notarytool.json"
+identity_details="$temp_dir/codesign-details.txt"
+"$ditto_tool" -c -k --sequesterRsrc --keepParent "$artifact_path" "$notary_container" \
+  >/dev/null 2>&1 || fail 'notarizable container creation failed'
+"$xcrun_tool" notarytool submit "$notary_container" \
+  --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" \
+  --wait --output-format json >"$notary_response" 2>/dev/null \
+  || fail 'notarytool submission failed'
+
+if ! notary_status=$("$plutil_tool" -extract status raw -o - "$notary_response" 2>/dev/null); then
+  fail 'notarytool response is missing status'
+fi
+if ! notary_id=$("$plutil_tool" -extract id raw -o - "$notary_response" 2>/dev/null); then
+  fail 'notarytool response is missing submission UUID'
+fi
+uuid_pattern='^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-5][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$'
+[[ "$notary_status" == 'Accepted' && "$notary_id" =~ $uuid_pattern ]] \
+  || fail 'notarization was not Accepted with a valid submission UUID'
+
+designated_requirement='identifier "co.autopus.adk" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists and certificate leaf[subject.OU] = "GP2PFA2PUV" and notarized'
+if ! "$codesign_tool" --verify --strict --all-architectures --verbose=2 \
+  --check-notarization "-R=$designated_requirement" "$artifact_path" \
+  >"$identity_details" 2>&1; then
+  report_codesign_diagnostic 'codesign verify' "$identity_details"
+  fail 'code-sign designated requirement verification failed'
+fi
+"$codesign_tool" -dv --verbose=4 "$artifact_path" >"$identity_details" 2>&1 \
+  || fail 'code-sign identity inspection failed'
+grep -Fqx 'Identifier=co.autopus.adk' "$identity_details" \
+  || fail 'signed binary identifier is invalid'
+grep -Fqx 'TeamIdentifier=GP2PFA2PUV' "$identity_details" \
+  || fail 'signed binary Team ID is invalid'
+grep -Eq '^Timestamp=.+$' "$identity_details" \
+  || fail 'signed binary secure timestamp is missing'
+grep -Eq '^CodeDirectory .*flags=.*\(.*runtime.*\)' "$identity_details" \
+  || fail 'signed binary hardened runtime is missing'
+if grep -Fqx 'Signature=adhoc' "$identity_details"; then
+  fail 'ad hoc signature is forbidden'
+fi
+
+if [[ "$public_key_receipt_enabled" == '1' ]]; then
+  signing_key_digest_before=$(sha256_file "$COMPANION_SIGNING_KEY_FILE") \
+    || fail 'cannot digest companion signing key'
+fi
+
+manifest_sign_args=(companion-manifest sign \
+  --artifact "$artifact_path" \
+  --manifest-output "$manifest_path" \
+  --signature-output "$signature_path" \
+  --version "$COMPANION_VERSION" \
+  --platform "$COMPANION_PLATFORM" \
+  --architecture "$COMPANION_ARCHITECTURE" \
+  --build-provenance "$COMPANION_BUILD_PROVENANCE" \
+  --handoff "$COMPANION_HANDOFF" \
+  --rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+  --issued-at "$COMPANION_ISSUED_AT" \
+  --expires-at "$COMPANION_EXPIRES_AT" \
+  --key-id "$COMPANION_KEY_ID")
+env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+  "$COMPANION_SIGNER" "${manifest_sign_args[@]}" \
+  <"$COMPANION_SIGNING_KEY_FILE" >/dev/null \
+  || fail 'companion manifest signing failed'
+
+[[ -f "$manifest_path" && ! -L "$manifest_path" ]] || fail 'companion manifest was not produced'
+[[ -f "$signature_path" && ! -L "$signature_path" ]] || fail 'companion signature was not produced'
+[[ "$(wc -c <"$signature_path" | tr -d '[:space:]')" == '64' ]] \
+  || fail 'companion signature is not raw Ed25519 bytes'
+if ! artifact_digest=$("$plutil_tool" -extract artifact_digest raw -o - "$manifest_path" 2>/dev/null); then
+  fail 'companion manifest artifact digest is missing'
+fi
+actual_digest=$(sha256_file "$artifact_path") || fail 'cannot digest signed companion artifact'
+[[ "$artifact_digest" == "$actual_digest" ]] || fail 'artifact changed after companion manifest digest'
+manifest_digest=$(sha256_file "$manifest_path") || fail 'cannot digest companion manifest'
+signature_digest=$(sha256_file "$signature_path") || fail 'cannot digest companion signature'
+
+receipt_temp=$(mktemp "$artifact_dir/.adk-companion-receipt.XXXXXX")
+printf '%s' \
+  "{\"schema_version\":\"adk-companion-darwin-receipt.v1\",\"artifact_digest\":\"$artifact_digest\",\"manifest_digest\":\"$manifest_digest\",\"signature_digest\":\"$signature_digest\",\"version\":\"$COMPANION_VERSION\",\"platform\":\"darwin\",\"architecture\":\"$COMPANION_ARCHITECTURE\",\"code_identity\":{\"identifier\":\"co.autopus.adk\",\"team_id\":\"GP2PFA2PUV\",\"developer_id\":true,\"hardened_runtime\":true,\"secure_timestamp\":true,\"designated_requirement_verified\":true},\"notarization\":{\"status\":\"Accepted\",\"submission_id\":\"$notary_id\"}}" \
+  >"$receipt_temp"
+chmod 0600 "$receipt_temp"
+mv -f -- "$receipt_temp" "$receipt_path"
+receipt_temp=''
+
+if [[ "$public_key_receipt_enabled" == '1' ]]; then
+  public_key_receipt_args=(companion-manifest public-key-receipt
+    --key-file "$COMPANION_SIGNING_KEY_FILE"
+    --bundle-output "$public_key_bundle_path"
+    --key-id "$COMPANION_KEY_ID"
+    --issued-at "$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT"
+    --expires-at "$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT"
+    --handoff "$COMPANION_HANDOFF"
+    --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR")
+  env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$COMPANION_SIGNER" "${public_key_receipt_args[@]}" >/dev/null \
+    || fail 'public key receipt production failed'
+  [[ -d "$public_key_bundle_path" && ! -L "$public_key_bundle_path" ]] \
+    || fail 'public key receipt production failed'
+  bundle_entry_count=$(find "$public_key_bundle_path" -mindepth 1 -maxdepth 1 -print | wc -l)
+  [[ "${bundle_entry_count//[[:space:]]/}" == '2' ]] \
+    || fail 'public key receipt production failed'
+  for entry in public-key-receipt.json public-key-receipt.sig; do
+    [[ -f "$public_key_bundle_path/$entry" && ! -L "$public_key_bundle_path/$entry" ]] \
+      || fail 'public key receipt production failed'
+  done
+  [[ "$(wc -c <"$public_key_bundle_path/public-key-receipt.sig" | tr -d '[:space:]')" == '64' ]] \
+    || fail 'public key receipt production failed'
+  env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$COMPANION_RECEIPT_VERIFIER" \
+    --receipt "$public_key_bundle_path/public-key-receipt.json" \
+    --signature "$public_key_bundle_path/public-key-receipt.sig" \
+    --signing-key "$COMPANION_SIGNING_KEY_FILE" \
+    --key-id "$COMPANION_KEY_ID" \
+    --issued-at "$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT" \
+    --expires-at "$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
+    --handoff "$COMPANION_HANDOFF" \
+    --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+    || fail 'public key receipt independent verification failed'
+  if [[ -n "${COMPANION_MANIFEST_VERIFIER-}" ]]; then
+    env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+      "$COMPANION_MANIFEST_VERIFIER" \
+      --artifact "$artifact_path" \
+      --manifest "$manifest_path" \
+      --signature "$signature_path" \
+      --receipt "$public_key_bundle_path/public-key-receipt.json" \
+      --receipt-signature "$public_key_bundle_path/public-key-receipt.sig" \
+      --signing-key "$COMPANION_SIGNING_KEY_FILE" \
+      --key-id "$COMPANION_KEY_ID" \
+      --version "$COMPANION_VERSION" \
+      --platform "$COMPANION_PLATFORM" \
+      --architecture "$COMPANION_ARCHITECTURE" \
+      --handoff "$COMPANION_HANDOFF" \
+      --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+      || fail 'manifest and artifact independent verification failed'
+  fi
+  signing_key_digest_after=$(sha256_file "$COMPANION_SIGNING_KEY_FILE") \
+    || fail 'manifest_public_key_digest_mismatch'
+  [[ "$signing_key_digest_before" == "$signing_key_digest_after" ]] \
+    || fail 'manifest_public_key_digest_mismatch'
+  printf 'companion release: public key receipt phase %s produced\n' "$release_phase"
+fi
+succeeded=1

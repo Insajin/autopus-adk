@@ -1,10 +1,6 @@
 version: 2
 project_name: autopus-adk
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - id: auto
     binary: auto
@@ -23,6 +19,15 @@ builds:
       - -X github.com/insajin/autopus-adk/pkg/version.version={{.Version}}
       - -X github.com/insajin/autopus-adk/pkg/version.commit={{.ShortCommit}}
       - -X github.com/insajin/autopus-adk/pkg/version.date={{.Date}}
+    hooks:
+      post:
+        - cmd: scripts/companion-release/produce.sh
+          env:
+            - COMPANION_ARTIFACT={{ .Path }}
+            - COMPANION_TARGET={{ .Target }}
+            - COMPANION_PLATFORM={{ .Os }}
+            - COMPANION_ARCHITECTURE={{ .Arch }}
+            - COMPANION_VERSION={{ .Version }}
 
 archives:
   - id: auto
@@ -36,9 +41,23 @@ archives:
           - zip
           - tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - src: LICENSE*
+      - src: README*
+      - src: CHANGELOG*
+      - src: '{{ if eq .Os "darwin" }}dist/auto_{{ .Target }}/adk-companion-manifest.json{{ else }}scripts/companion-release/no-files-*{{ end }}'
+        dst: adk-companion-manifest.json
+      - src: '{{ if eq .Os "darwin" }}dist/auto_{{ .Target }}/adk-companion-manifest.sig{{ else }}scripts/companion-release/no-files-*{{ end }}'
+        dst: adk-companion-manifest.sig
+      - src: '{{ if eq .Os "darwin" }}dist/auto_{{ .Target }}/adk-companion-darwin-receipt.json{{ else }}scripts/companion-release/no-files-*{{ end }}'
+        dst: adk-companion-darwin-receipt.json
+      - src: '{{ if eq .Os "darwin" }}dist/auto_{{ .Target }}/adk-companion-public-key-receipt.bundle/**{{ else }}scripts/companion-release/no-files-*{{ end }}'
+        dst: adk-companion-public-key-receipt.bundle
+        strip_parent: true
 
 release:
   replace_existing_artifacts: true
+  target_commitish: "{{ .Env.COMPANION_SOURCE_COMMIT }}"
 
 checksum:
   name_template: 'checksums.txt'
@@ -64,26 +83,23 @@ changelog:
       - '^test:'
       - '^ci:'
 
-brews:
+homebrew_casks:
   - name: auto
+    # GoReleaser renders the canonical Cask, but publication is reconciled with
+    # the legacy Formula only after the GitHub release is immutable.
+    skip_upload: true
     ids:
       - auto
     repository:
       owner: Insajin
       name: homebrew-autopus
       branch: main
-      # Cross-repo push needs a token with write access to the tap repo; the
-      # default Actions GITHUB_TOKEN is scoped to autopus-adk only. release.yaml
-      # generates this token from the Homebrew release GitHub App installation.
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
+    directory: Casks
     homepage: "https://github.com/Insajin/autopus-adk"
     description: "Agentic Development Kit for coding CLIs (the auto CLI)"
     license: "MIT"
     commit_author:
       name: autopus-release-bot
       email: noreply@autopus.co
-    install: |
-      bin.install "auto"
-    test: |
-      system "#{bin}/auto", "version"
+    binaries:
+      - auto
