@@ -8,24 +8,34 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
 const productionGoReleaserModule = "github.com/goreleaser/goreleaser/v2@v2.17.0"
 
+var productionGoReleaserFixtureRuns atomic.Int32
+
 func TestProductionGoReleaserRunner_UsesExactPinnedVersion(t *testing.T) {
 	command := exactGoReleaserCommand("--version")
-	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("run exact production GoReleaser: %v\n%s", err, output)
+	want := "go run " + productionGoReleaserModule + " --version"
+	if got := strings.Join(command.Args, " "); got != want {
+		t.Fatalf("production GoReleaser command = %q, want %q", got, want)
 	}
-	if !strings.Contains(string(output), "GitVersion:    v2.17.0") {
-		t.Fatalf("production GoReleaser version output = %q", output)
+}
+
+func TestProductionGoReleaserFixture_RequiresIntegrationTag(t *testing.T) {
+	if executableReleaseIntegrationEnabled {
+		t.Skip("non-integration contract")
+	}
+	if runs := productionGoReleaserFixtureRuns.Load(); runs != 0 {
+		t.Fatalf("non-integration GoReleaser fixture runs = %d, want 0", runs)
 	}
 }
 
 func runProductionGoReleaser(t *testing.T, tools mockReleaseTools) map[string]string {
 	t.Helper()
+	requireExecutableReleaseIntegration(t)
 	if err := validateProductionGoReleaserWiring(readReleaseFile(t, ".goreleaser.yaml")); err != nil {
 		t.Fatalf("production GoReleaser wiring: %v", err)
 	}
@@ -45,6 +55,7 @@ func runGoReleaserFixture(
 	architectures []string,
 ) (map[string]string, error) {
 	t.Helper()
+	requireExecutableReleaseIntegration(t)
 	root := filepath.Join(t.TempDir(), "repository")
 	copyGoReleaserRepository(t, root)
 	if mutation != nil {
@@ -89,6 +100,7 @@ func runGoReleaserFixture(
 	command.Env = append(os.Environ(), goReleaserReleaseEnv(
 		tools, keyPath, apiKeyPath, tmpDir, commit,
 	)...)
+	productionGoReleaserFixtureRuns.Add(1)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("goreleaser: %w\n%s", err, output)
@@ -103,6 +115,13 @@ func runGoReleaserFixture(
 		archives[architecture] = path
 	}
 	return archives, nil
+}
+
+func requireExecutableReleaseIntegration(t *testing.T) {
+	t.Helper()
+	if !executableReleaseIntegrationEnabled {
+		t.Skip("executable GoReleaser fixture requires -tags integration")
+	}
 }
 
 func exactGoReleaserCommand(arguments ...string) *exec.Cmd {

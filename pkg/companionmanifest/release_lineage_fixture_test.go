@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -84,16 +86,48 @@ type executableLineageFixture struct {
 	provisionedScriptPath string
 }
 
+var (
+	sharedExecutableLineageSigner   []byte
+	sharedExecutableLineageVerifier []byte
+	executableLineageToolsOnce      sync.Once
+	executableLineageToolsBuildRuns atomic.Int32
+)
+
 func newExecutableLineageTools(t *testing.T) executableLineageTools {
 	t.Helper()
+	requireExecutableLineageIntegration(t)
+	executableLineageToolsOnce.Do(func() {
+		root := t.TempDir()
+		tools := executableLineageTools{
+			signer:   filepath.Join(root, "auto-companion-manifest-signer"),
+			verifier: filepath.Join(root, "auto-companion-receipt-verifier"),
+		}
+		buildExecutableLineageBinary(t, tools.signer, "./cmd/auto")
+		buildExecutableLineageBinary(t, tools.verifier,
+			"./internal/companionmanifest/receiptverify")
+		sharedExecutableLineageSigner = readLineageFile(t, tools.signer)
+		sharedExecutableLineageVerifier = readLineageFile(t, tools.verifier)
+		executableLineageToolsBuildRuns.Add(1)
+	})
 	root := t.TempDir()
 	tools := executableLineageTools{
 		signer:   filepath.Join(root, "auto-companion-manifest-signer"),
 		verifier: filepath.Join(root, "auto-companion-receipt-verifier"),
 	}
-	buildExecutableLineageBinary(t, tools.signer, "./cmd/auto")
-	buildExecutableLineageBinary(t, tools.verifier, "./internal/companionmanifest/receiptverify")
+	if err := os.WriteFile(tools.signer, sharedExecutableLineageSigner, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(tools.verifier, sharedExecutableLineageVerifier, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	return tools
+}
+
+func requireExecutableLineageIntegration(t *testing.T) {
+	t.Helper()
+	if !executableLineageIntegrationEnabled {
+		t.Skip("executable GoReleaser lineage fixture requires -tags integration")
+	}
 }
 
 func newExecutableLineageFixture(

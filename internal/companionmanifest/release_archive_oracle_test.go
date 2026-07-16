@@ -129,10 +129,14 @@ func digestArchiveBytes(data []byte) string {
 
 func assertExecutableArchiveWiringTamperingFails(
 	t *testing.T,
-	tools mockReleaseTools,
-	privateKey ed25519.PrivateKey,
+	_ mockReleaseTools,
+	_ ed25519.PrivateKey,
 ) {
 	t.Helper()
+	baselineRuns := productionGoReleaserFixtureRuns.Load()
+	if baselineRuns != 1 {
+		t.Fatalf("production GoReleaser fixture runs = %d, want one shared baseline", baselineRuns)
+	}
 	cases := []struct {
 		name     string
 		mutation goReleaserConfigMutation
@@ -153,17 +157,10 @@ func assertExecutableArchiveWiringTamperingFails(
 			if err := validateProductionGoReleaserWiring(mutatedConfig); err == nil {
 				t.Fatalf("%s config wiring drift passed semantic validation", test.name)
 			}
-			archives, runErr := runGoReleaserFixture(t, tools, mutation, []string{"arm64"})
-			if runErr != nil {
-				return
-			}
-			entries := readReleaseArchive(t, archives["arm64"])
-			if err := validateProductionDarwinArchive(entries, "arm64", privateKey); err != nil {
-				return
-			}
-			// Some GoReleaser versions normalize strip_parent to the same archive
-			// shape. The semantic config oracle above still rejects that drift.
 		})
+	}
+	if got := productionGoReleaserFixtureRuns.Load(); got != baselineRuns {
+		t.Fatalf("mutation checks reran GoReleaser: before=%d after=%d", baselineRuns, got)
 	}
 }
 

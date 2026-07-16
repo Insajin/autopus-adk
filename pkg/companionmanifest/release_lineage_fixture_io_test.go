@@ -44,7 +44,7 @@ func produceGoReleaserA1FixtureEvidence(
 	return produceGoReleaserFixtureEvidence(t, tools, publicKeyReceiptA1Tag, lineageA1Version, true)
 }
 
-func produceGoReleaserFixtureEvidence(
+func produceUncachedGoReleaserFixtureEvidence(
 	t *testing.T,
 	tools executableLineageTools,
 	releaseTag, releaseVersion string,
