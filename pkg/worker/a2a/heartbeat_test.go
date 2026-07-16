@@ -38,23 +38,21 @@ func TestHeartbeat_AckResetsTimeout(t *testing.T) {
 	t.Parallel()
 
 	var timedOut atomic.Bool
-	hb := NewHeartbeat(func() error { return nil }, func() {
+	var sent atomic.Bool
+	hb := NewHeartbeat(func() error {
+		sent.Store(true)
+		return nil
+	}, func() {
 		timedOut.Store(true)
 	})
-	hb.interval = 10 * time.Millisecond
-	hb.timeout = 30 * time.Millisecond
+	hb.timeout = time.Hour
+	hb.lastAck = time.Now().Add(-2 * time.Hour)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	hb.Start(ctx)
-
-	// Keep acking to prevent timeout.
-	for i := 0; i < 5; i++ {
-		time.Sleep(15 * time.Millisecond)
-		hb.Ack()
-	}
+	hb.Ack()
+	hb.tick()
 
 	assert.False(t, timedOut.Load(), "should not timeout when Ack is called regularly")
+	assert.True(t, sent.Load(), "heartbeat should continue after Ack resets the timeout")
 }
 
 func TestHeartbeat_TimeoutFires(t *testing.T) {

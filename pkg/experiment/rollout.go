@@ -101,18 +101,6 @@ func safeRiskTier(risk string) string {
 }
 
 // @AX:NOTE: [AUTO] @AX:SPEC: SPEC-ADK-ULTRA-EFFICIENCY-001 — unsafe receipt identifiers are replaced by hashes rather than echoed or rejected.
-func safeReceiptToken(value string) string {
-	if value != "" && len(value) <= 64 && strings.IndexFunc(value, func(r rune) bool {
-		asciiLetter := r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
-		asciiDigit := r >= '0' && r <= '9'
-		return !(asciiLetter || asciiDigit || strings.ContainsRune("-_.:", r))
-	}) == -1 {
-		return value
-	}
-	digest := sha256.Sum256([]byte(value))
-	return "sha256:" + hex.EncodeToString(digest[:])
-}
-
 func digestReceiptField(value string) string {
 	if canonicalSHA256(value) {
 		return value

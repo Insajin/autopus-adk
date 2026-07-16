@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
-	"regexp"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/telemetry"
@@ -46,8 +45,6 @@ type claudeUsageEvent struct {
 		OutputTokens        *int64 `json:"output_tokens"`
 	} `json:"usage"`
 }
-
-var safeUsageID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`)
 
 // parseCodexUsage extracts only allowlisted usage and identity fields. Provider
 // prompts, response bodies, and arbitrary event metadata are never retained.
@@ -136,21 +133,6 @@ func forEachJSONLine(raw string, visit func([]byte)) {
 			return
 		}
 	}
-}
-
-func safeProviderIdentity(value, fallback string) string {
-	if safeUsageID.MatchString(value) {
-		return value
-	}
-	return fallback
-}
-
-func safeMetadata(value string) string {
-	value = strings.TrimSpace(value)
-	if len(value) > 128 || !safeUsageID.MatchString(value) {
-		return ""
-	}
-	return value
 }
 
 func safeRelation(value string) string {

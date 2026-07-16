@@ -165,7 +165,7 @@ const context = await browser.newContext({
 
 Collect all screenshots to `./playwright-screenshots/` for analysis.
 
-When using `auto verify`, preserve the generated `.autopus/design/verify/latest.json` visual gate report as QAMESH-compatible metadata evidence. `--strict-visual-gate` is opt-in and should only be used when the parent prompt asks for a blocking visual gate.
+When using `auto verify`, preserve `.autopus/design/verify/latest.json` for v1 consumers and `.autopus/design/verify/latest.v2.json` for detailed proof. Treat both as a QAMESH handoff candidate; ingestion is not proven until a real consumer validates the report. `--strict-visual-gate` is opt-in and should only be used when the parent prompt asks for a blocking visual gate.
 
 ### Step 4 — Analyze Screenshots for Visual Issues
 

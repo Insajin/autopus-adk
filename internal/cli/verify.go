@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -53,6 +55,9 @@ type verifyVisualOptions struct {
 }
 
 func runVerifyWithOptions(cmd *cobra.Command, fix, reportOnly bool, viewport string, visual verifyVisualOptions) error {
+	if visual.Strict && !visual.Enabled {
+		return fmt.Errorf("--strict-visual-gate requires --visual-gate=true")
+	}
 	flags := globalFlags{}
 	if cmd != nil {
 		flags = globalFlagsFromContext(cmd.Context())
@@ -126,26 +131,41 @@ func runVerifyWithOptions(cmd *cobra.Command, fix, reportOnly bool, viewport str
 
 	output, playwrightErr := runPlaywright(effectiveViewport)
 
-	artifacts := collectVisualArtifacts(output)
+	evidence := collectVisualEvidence(output)
+	artifacts := evidence.Artifacts
 	screenshots := collectScreenshotsFromArtifacts(artifacts)
+	if evidence.SnapshotProofStatus != "" && evidence.SnapshotProofStatus != "enabled" {
+		fmt.Fprintf(os.Stderr, "경고: snapshot comparison proof %s: %s\n", evidence.SnapshotProofStatus, evidence.SnapshotProofDiagnostic)
+	}
 	var visualGateErr error
 	if visual.Enabled {
-		visualGateErr = writeVerifyVisualGate(".", uiChanged, screenshots, artifacts, effectiveViewport, designCtx, cfg.Verify.MaxFixAttempts, playwrightErr, visual.Strict, visual.CriticPath)
+		visualGateErr = writeVerifyVisualGateEvidence(".", uiChanged, screenshots, evidence, effectiveViewport, designCtx, cfg.Verify.MaxFixAttempts, playwrightErr, visual.Strict, visual.CriticPath)
 	}
 
 	fmt.Printf("verify 완료 (viewport: %s, auto-fix: %v)\n", effectiveViewport, effectiveFix)
-	fmt.Printf("스크린샷 %d개 수집됨\n", len(screenshots))
+	fmt.Printf("시각 증거 %d개 수집됨 (스크린샷 artifact %d, Playwright 비교 %d)\n", len(screenshots)+len(evidence.Assertions), len(screenshots), len(evidence.Assertions))
 	for _, s := range screenshots {
 		fmt.Printf("  - %s\n", s)
 	}
+	for _, assertion := range evidence.Assertions {
+		fmt.Printf("  - [%s] %s", assertion.Status, filepath.Base(assertion.Name))
+		if assertion.Project != "" {
+			fmt.Printf(" (%s)", assertion.Project)
+		}
+		if assertion.BaselinePath != "" {
+			fmt.Printf(" — baseline: %s", design.RedactVisualPath(".", assertion.BaselinePath))
+		}
+		fmt.Println()
+	}
 
+	return combineVerifyErrors(playwrightErr, visualGateErr)
+}
+
+func combineVerifyErrors(playwrightErr, visualGateErr error) error {
 	if playwrightErr != nil {
-		return fmt.Errorf("playwright 실행 실패: %w", playwrightErr)
+		playwrightErr = fmt.Errorf("playwright 실행 실패: %w", playwrightErr)
 	}
-	if visualGateErr != nil {
-		return visualGateErr
-	}
-	return nil
+	return errors.Join(playwrightErr, visualGateErr)
 }
 
 // analyzeGitDiff runs git diff against HEAD~1 and returns changed files.
@@ -194,25 +214,4 @@ func buildVerifyDesignContextReport(root string, changed []string, opts design.O
 		label = label + " -> " + ctx.BaselinePath
 	}
 	return fmt.Sprintf("design context: %s\n%s\n%s", label, ctx.Summary, ctx.DiagnosticsSummary())
-}
-
-// runPlaywright executes Playwright tests with JSON reporter and returns raw output.
-func runPlaywright(viewport string) ([]byte, error) {
-	args := []string{
-		"playwright", "test",
-		"--reporter=json",
-	}
-	if viewport != "" && viewport != "desktop" {
-		args = append(args, "--project="+viewport)
-	}
-
-	cmd := exec.Command("npx", args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		// Playwright may return non-zero exit code on test failures;
-		// return output regardless so screenshots can be collected.
-		return out, fmt.Errorf("playwright 실행 오류 (종료 코드 포함): %w", err)
-	}
-
-	return out, nil
 }
