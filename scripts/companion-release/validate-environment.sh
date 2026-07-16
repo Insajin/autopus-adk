@@ -76,6 +76,11 @@ secure_regular_file "$COMPANION_SIGNING_KEY_FILE" 'companion signing key'
 secure_regular_file "$APPLE_API_KEY_PATH" 'Apple API key'
 [[ -f "$COMPANION_SIGNER" && ! -L "$COMPANION_SIGNER" && -x "$COMPANION_SIGNER" ]] \
   || fail 'COMPANION_SIGNER is not a regular executable'
+if [[ -n "${COMPANION_MANIFEST_VERIFIER-}" ]]; then
+  [[ -f "$COMPANION_MANIFEST_VERIFIER" && ! -L "$COMPANION_MANIFEST_VERIFIER" &&
+     -x "$COMPANION_MANIFEST_VERIFIER" ]] \
+    || fail 'COMPANION_MANIFEST_VERIFIER is not a regular executable'
+fi
 
 receipt_policy_present=0
 for name in \
@@ -90,8 +95,8 @@ done
 
 if [[ "${COMPANION_RELEASE_PRODUCTION-}" == '1' ]]; then
   for name in \
-    APPLE_CERTIFICATE_PASSWORD \
     APPLE_SIGNING_KEYCHAIN \
+    COMPANION_MANIFEST_VERIFIER \
     COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT \
     COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT \
     COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS
@@ -100,6 +105,9 @@ if [[ "${COMPANION_RELEASE_PRODUCTION-}" == '1' ]]; then
   done
   [[ "$(uname -s)" == 'Darwin' ]] || fail 'production Darwin release requires macOS'
   secure_regular_file "$APPLE_SIGNING_KEYCHAIN" 'Apple signing keychain'
+  [[ -f "$COMPANION_MANIFEST_VERIFIER" && ! -L "$COMPANION_MANIFEST_VERIFIER" &&
+     -x "$COMPANION_MANIFEST_VERIFIER" ]] \
+    || fail 'COMPANION_MANIFEST_VERIFIER is not a regular executable'
   receipt_policy_present=1
 fi
 
@@ -135,3 +143,21 @@ if [[ "$receipt_policy_present" == '1' ]]; then
      manifest_expires_epoch <= receipt_expires_epoch )) \
     || fail 'manifest_window_outside_receipt'
 fi
+
+time_validation_required="${COMPANION_RELEASE_TIME_VALIDATION_REQUIRED-0}"
+if [[ "${COMPANION_RELEASE_PRODUCTION-}" == '1' ]]; then
+  time_validation_required=1
+fi
+case "$time_validation_required" in
+  0) ;;
+  1)
+    [[ "$receipt_policy_present" == '1' ]] \
+      || fail 'current-time validation requires the complete receipt policy'
+    now_epoch=$(date -u '+%s') || fail 'cannot obtain current UTC release time'
+    (( now_epoch >= manifest_issued_epoch && now_epoch < manifest_expires_epoch )) \
+      || fail 'companion manifest is outside its current validity window'
+    (( now_epoch >= receipt_issued_epoch && now_epoch < receipt_expires_epoch )) \
+      || fail 'public key receipt is outside its current validity window'
+    ;;
+  *) fail 'COMPANION_RELEASE_TIME_VALIDATION_REQUIRED must be 0 or 1' ;;
+esac

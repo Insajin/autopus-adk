@@ -6,7 +6,7 @@ extract_bundle() {
   install -m 0700 -d "$output_dir"
   tar -tzf "$archive" >"$listing" \
     || fail prior_evidence_malformed "${prior_phase} archive cannot be listed"
-  for entry in "$ARTIFACT_NAME" "$MANIFEST_NAME" \
+  for entry in "$ARTIFACT_NAME" "$MANIFEST_NAME" "$MANIFEST_SIGNATURE_NAME" \
     "$BUNDLE_NAME/$RECEIPT_NAME" "$BUNDLE_NAME/$SIGNATURE_NAME"; do
     [[ "$(grep -Fxc "$entry" "$listing")" == '1' ]] \
       || fail prior_evidence_absent "canonical archive entry is absent: ${entry}"
@@ -23,10 +23,14 @@ extract_bundle() {
     || fail prior_evidence_absent 'cannot extract prior signature'
   tar -xOzf "$archive" "$MANIFEST_NAME" >"$output_dir/$MANIFEST_NAME" \
     || fail prior_evidence_absent 'cannot extract prior manifest'
+  tar -xOzf "$archive" "$MANIFEST_SIGNATURE_NAME" \
+    >"$output_dir/$MANIFEST_SIGNATURE_NAME" \
+    || fail prior_evidence_absent 'cannot extract prior manifest signature'
   tar -xOzf "$archive" "$ARTIFACT_NAME" >"$output_dir/$ARTIFACT_NAME" \
     || fail prior_evidence_absent 'cannot extract prior artifact'
   chmod 0600 "$output_dir/$RECEIPT_NAME" "$output_dir/$SIGNATURE_NAME" \
-    "$output_dir/$MANIFEST_NAME" "$output_dir/$ARTIFACT_NAME"
+    "$output_dir/$MANIFEST_NAME" "$output_dir/$MANIFEST_SIGNATURE_NAME" \
+    "$output_dir/$ARTIFACT_NAME"
   manifest="$output_dir/$MANIFEST_NAME"
   manifest_version=$(jq -er '.version | select(type == "string")' "$manifest") \
     || fail prior_evidence_malformed 'prior manifest version is malformed'
@@ -49,4 +53,23 @@ extract_bundle() {
     || fail prior_manifest_artifact_mismatch 'prior manifest does not bind its artifact'
   [[ "$(sha256_file "$manifest")" == "sha256:$manifest_pin" ]] \
     || fail prior_manifest_digest_mismatch "prior manifest differs from its ${prior_phase} pin"
+  if [[ -n "${COMPANION_MANIFEST_VERIFIER-}" ]]; then
+    env -i PATH="$PATH" HOME="${HOME-}" \
+      "$COMPANION_MANIFEST_VERIFIER" \
+      --artifact "$output_dir/$ARTIFACT_NAME" \
+      --manifest "$manifest" \
+      --signature "$output_dir/$MANIFEST_SIGNATURE_NAME" \
+      --receipt "$output_dir/$RECEIPT_NAME" \
+      --receipt-signature "$output_dir/$SIGNATURE_NAME" \
+      --key-id "$COMPANION_KEY_ID" \
+      --version "$prior_version" \
+      --platform darwin \
+      --architecture "$architecture" \
+      --handoff "$COMPANION_HANDOFF" \
+      --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+      --public-key-sha256 "sha256:$A0_PUBLIC_KEY_SHA256" \
+      --manifest-sha256 "sha256:$manifest_pin" \
+      || fail prior_manifest_signature_mismatch \
+        'prior manifest signature or artifact binding is invalid'
+  fi
 }

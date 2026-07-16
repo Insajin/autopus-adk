@@ -8,6 +8,7 @@ readonly TAP_REPOSITORY='Insajin/homebrew-autopus'
 readonly TAP_BRANCH='main'
 readonly CASK_PATH='Casks/auto.rb'
 readonly FORMULA_PATH='Formula/auto.rb'
+readonly PRIOR_CASK_BLOB='025587ee9d6d6deddfb51c1f2661ee36a30c1ef1'
 readonly PRIOR_FORMULA_BLOB='df2d8e25636f8a3db842948d119d46f31afd94ab'
 
 fail() {
@@ -134,19 +135,15 @@ decode_api_content() {
     || fail 'Homebrew tap content is not valid base64'
 }
 
-cask_response="$temp_dir/cask-response.json"
-cask_content="$temp_dir/cask.rb"
 cask_target="$temp_dir/cask-target.rb"
 render_homebrew_cask "$cask_target" "$RELEASE_VERSION" \
   "$darwin_amd64_sha" "$darwin_arm64_sha" "$linux_amd64_sha" "$linux_arm64_sha"
-api_get "$CASK_PATH" "$cask_response"
-decode_api_content "$cask_response" "$cask_content"
-if ! jq -e '.sha | type == "string" and test("^[0-9a-f]{40}$")' \
-  "$cask_response" >/dev/null; then
-  fail 'Homebrew tap Cask response has an invalid blob SHA'
+if [[ -n "${COMPANION_CASK_PATH-}" ]]; then
+  [[ -f "$COMPANION_CASK_PATH" && ! -L "$COMPANION_CASK_PATH" ]] \
+    || fail 'GoReleaser Cask output is not a regular file'
+  cmp -s "$cask_target" "$COMPANION_CASK_PATH" \
+    || fail 'GoReleaser Cask output differs from the canonical renderer'
 fi
-cmp -s "$cask_target" "$cask_content" \
-  || fail 'published Cask differs from canonical GoReleaser v2.17.0 output'
 
 formula_target="$temp_dir/formula-target.rb"
 render_homebrew_formula_bridge "$formula_target" "$RELEASE_TAG" "$RELEASE_VERSION" \
@@ -160,39 +157,50 @@ sha256_file() {
   printf '%s' "$digest"
 }
 
-formula_response="$temp_dir/formula-response.json"
-formula_current="$temp_dir/formula-current.rb"
-api_get "$FORMULA_PATH" "$formula_response"
-decode_api_content "$formula_response" "$formula_current"
-target_digest=$(sha256_file "$formula_target") || fail 'cannot digest target Formula'
-current_digest=$(sha256_file "$formula_current") || fail 'cannot digest current Formula'
-if [[ "$target_digest" == "$current_digest" ]] && cmp -s "$formula_target" "$formula_current"; then
-  printf 'homebrew formula bridge: Formula is already current\n'
-  exit 0
-fi
+reconcile_tap_file() {
+  local stem="$1" label="$2" remote_path="$3" target="$4" prior_blob="$5"
+  local commit_message="$6" drift_message="$7"
+  local response="$temp_dir/${stem}-response.json"
+  local current="$temp_dir/${stem}-current.rb"
+  local request="$temp_dir/${stem}-request.json"
+  local update_response="$temp_dir/${stem}-update-response.json"
+  local target_digest current_digest blob encoded
 
-formula_blob=$(jq -er '.sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
-  "$formula_response") || fail 'Homebrew tap Formula response has an invalid blob SHA'
-[[ "$formula_blob" == "$PRIOR_FORMULA_BLOB" ]] \
-  || fail 'Homebrew tap Formula has drifted from the pinned prior blob'
+  api_get "$remote_path" "$response"
+  decode_api_content "$response" "$current"
+  target_digest=$(sha256_file "$target") || fail "cannot digest target ${label}"
+  current_digest=$(sha256_file "$current") || fail "cannot digest current ${label}"
+  if [[ "$target_digest" == "$current_digest" ]] && cmp -s "$target" "$current"; then
+    printf 'homebrew formula bridge: %s is already current\n' "$label"
+    return 0
+  fi
 
-formula_base64=$(base64 <"$formula_target" | tr -d '\r\n') \
-  || fail 'cannot encode target Formula'
-jq -n \
-  --arg message 'Bridge legacy Formula users to the signed Cask for v0.50.71' \
-  --arg content "$formula_base64" --arg sha "$formula_blob" --arg branch "$TAP_BRANCH" \
-  '{message: $message, content: $content, sha: $sha, branch: $branch}' \
-  >"$temp_dir/formula-request.json" || fail 'cannot construct Formula update request'
-if ! GH_TOKEN="$tap_token" gh api --method PUT \
-  -H 'Accept: application/vnd.github+json' \
-  "repos/${TAP_REPOSITORY}/contents/${FORMULA_PATH}" \
-  --input "$temp_dir/formula-request.json" \
-  >"$temp_dir/formula-update-response.json" 2>"$temp_dir/gh-error"; then
-  fail 'Homebrew tap Formula compare-and-swap update failed'
-fi
+  blob=$(jq -er '.sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+    "$response") || fail "Homebrew tap ${label} response has an invalid blob SHA"
+  [[ "$blob" == "$prior_blob" ]] || fail "$drift_message"
+  encoded=$(base64 <"$target" | tr -d '\r\n') \
+    || fail "cannot encode target ${label}"
+  jq -n --arg message "$commit_message" --arg content "$encoded" \
+    --arg sha "$blob" --arg branch "$TAP_BRANCH" \
+    '{message: $message, content: $content, sha: $sha, branch: $branch}' \
+    >"$request" || fail "cannot construct ${label} update request"
+  if ! GH_TOKEN="$tap_token" gh api --method PUT \
+    -H 'Accept: application/vnd.github+json' \
+    "repos/${TAP_REPOSITORY}/contents/${remote_path}" --input "$request" \
+    >"$update_response" 2>"$temp_dir/gh-error"; then
+    fail "Homebrew tap ${label} compare-and-swap update failed"
+  fi
 
-api_get "$FORMULA_PATH" "$formula_response"
-decode_api_content "$formula_response" "$formula_current"
-cmp -s "$formula_target" "$formula_current" \
-  || fail 'Homebrew tap Formula differs after publication'
-printf 'homebrew formula bridge: Formula bridge published and verified\n'
+  api_get "$remote_path" "$response"
+  decode_api_content "$response" "$current"
+  cmp -s "$target" "$current" \
+    || fail "Homebrew tap ${label} differs after publication"
+  printf 'homebrew formula bridge: %s published and verified\n' "$label"
+}
+
+reconcile_tap_file cask Cask "$CASK_PATH" "$cask_target" "$PRIOR_CASK_BLOB" \
+  'Publish signed Cask for v0.50.71' \
+  'published Cask differs from canonical GoReleaser v2.17.0 output and its pinned prior blob'
+reconcile_tap_file formula Formula "$FORMULA_PATH" "$formula_target" "$PRIOR_FORMULA_BLOB" \
+  'Bridge legacy Formula users to the signed Cask for v0.50.71' \
+  'Homebrew tap Formula has drifted from the pinned prior blob'

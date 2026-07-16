@@ -21,6 +21,7 @@ readonly A1_AMD64_MANIFEST_SHA256='09b4e206fa94e4be1e2aebf6924ab8d0f349f23aaa217
 readonly A1_ARM64_MANIFEST_SHA256='db3a7a5381d2fa2f9e70682324b59304c5beeaaf695e91d2621f880dc7211230'
 readonly BUNDLE_NAME='adk-companion-public-key-receipt.bundle' RECEIPT_NAME='public-key-receipt.json'
 readonly SIGNATURE_NAME='public-key-receipt.sig' MANIFEST_NAME='adk-companion-manifest.json'
+readonly MANIFEST_SIGNATURE_NAME='adk-companion-manifest.sig'
 readonly ARTIFACT_NAME='auto' CHECKSUMS_NAME='checksums.txt'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 readonly LOCAL_EVIDENCE_ERROR='fixture_or_local_evidence_forbidden'
@@ -82,6 +83,12 @@ for name in GITHUB_TOKEN COMPANION_SIGNER COMPANION_RECEIPT_VERIFIER \
   COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT; do
   require_environment "$name"
 done
+case "${COMPANION_LINEAGE_MANIFEST_VERIFICATION_REQUIRED-0}" in
+  0) ;;
+  1) require_environment COMPANION_MANIFEST_VERIFIER ;;
+  *) fail prior_evidence_unverifiable \
+       'COMPANION_LINEAGE_MANIFEST_VERIFICATION_REQUIRED must be 0 or 1' ;;
+esac
 for tool in gh jq tar cmp shasum xxd awk grep find wc; do
   command -v "$tool" >/dev/null || fail prior_evidence_unverifiable "required tool ${tool} is unavailable"
 done
@@ -90,6 +97,11 @@ done
 [[ -f "$COMPANION_RECEIPT_VERIFIER" && ! -L "$COMPANION_RECEIPT_VERIFIER" &&
    -x "$COMPANION_RECEIPT_VERIFIER" ]] \
   || fail prior_evidence_unverifiable 'companion receipt verifier is invalid'
+if [[ -n "${COMPANION_MANIFEST_VERIFIER-}" ]]; then
+  [[ -f "$COMPANION_MANIFEST_VERIFIER" && ! -L "$COMPANION_MANIFEST_VERIFIER" &&
+     -x "$COMPANION_MANIFEST_VERIFIER" ]] \
+    || fail prior_evidence_unverifiable 'companion manifest verifier is invalid'
+fi
 [[ -f "$COMPANION_SIGNING_KEY_FILE" && ! -L "$COMPANION_SIGNING_KEY_FILE" ]] \
   || fail prior_evidence_unverifiable 'companion signing key file is invalid'
 temp_dir=''

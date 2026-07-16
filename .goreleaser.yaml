@@ -1,10 +1,6 @@
 version: 2
 project_name: autopus-adk
 
-before:
-  hooks:
-    - go mod tidy
-
 builds:
   - id: auto
     binary: auto
@@ -89,16 +85,15 @@ changelog:
 
 homebrew_casks:
   - name: auto
+    # GoReleaser renders the canonical Cask, but publication is reconciled with
+    # the legacy Formula only after the GitHub release is immutable.
+    skip_upload: true
     ids:
       - auto
     repository:
       owner: Insajin
       name: homebrew-autopus
       branch: main
-      # Cross-repo push needs a token with write access to the tap repo; the
-      # default Actions GITHUB_TOKEN is scoped to autopus-adk only. release.yaml
-      # generates this token from the Homebrew release GitHub App installation.
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Casks
     homepage: "https://github.com/Insajin/autopus-adk"
     description: "Agentic Development Kit for coding CLIs (the auto CLI)"

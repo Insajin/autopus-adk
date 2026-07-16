@@ -3,6 +3,7 @@ package companionmanifest
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,6 +27,18 @@ func TestMain(m *testing.M) {
 	_ = os.Setenv("PATH", previousPath)
 	_ = os.RemoveAll(wrapperRoot)
 	os.Exit(code)
+}
+
+func TestReleaseHardeningBashContract(t *testing.T) {
+	root := repositoryRoot(t)
+	contract := filepath.Join(root, "scripts", "companion-release", "tests",
+		"release-hardening-test.sh")
+	command := exec.Command("/bin/bash", contract)
+	command.Dir = root
+	command.Env = os.Environ()
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("release hardening contract: %v\n%s", err, output)
+	}
 }
 
 const releaseFixtureBash = `#!/bin/bash

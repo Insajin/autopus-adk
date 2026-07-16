@@ -37,6 +37,22 @@ if [[ "$release_phase" == 'A2' ]]; then
     >/dev/null 2>&1 || fail 'A2 source does not contain the immutable A1 release'
   git merge-base --is-ancestor "$A2_MAIN_ANCESTOR_SHA" "$GITHUB_SHA" \
     >/dev/null 2>&1 || fail 'A2 source does not contain the integrated main base'
+  case "${COMPANION_SOURCE_PIN_REQUIRED-0}" in
+    0) ;;
+    1)
+      for name in COMPANION_APPROVED_SOURCE_COMMIT COMPANION_APPROVED_SOURCE_TREE; do
+        [[ -n "${!name-}" ]] || fail "required approved source pin ${name} is missing"
+        [[ "${!name}" =~ ^[0-9a-f]{40}$ ]] || fail "approved source pin ${name} is malformed"
+      done
+      source_tree=$(git rev-parse --verify 'HEAD^{tree}') \
+        || fail 'cannot resolve checked-out source tree'
+      [[ "$GITHUB_SHA" == "$COMPANION_APPROVED_SOURCE_COMMIT" ]] \
+        || fail 'release commit differs from the approved exact source commit'
+      [[ "$source_tree" == "$COMPANION_APPROVED_SOURCE_TREE" ]] \
+        || fail 'release tree differs from the approved exact source tree'
+      ;;
+    *) fail 'COMPANION_SOURCE_PIN_REQUIRED must be 0 or 1' ;;
+  esac
 fi
 
 printf 'release-phase=%s\nsource-commit=%s\n' "$release_phase" "$GITHUB_SHA" \

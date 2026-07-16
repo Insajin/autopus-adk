@@ -254,6 +254,23 @@ if [[ "$public_key_receipt_enabled" == '1' ]]; then
     --handoff "$COMPANION_HANDOFF" \
     --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
     || fail 'public key receipt independent verification failed'
+  if [[ -n "${COMPANION_MANIFEST_VERIFIER-}" ]]; then
+    env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+      "$COMPANION_MANIFEST_VERIFIER" \
+      --artifact "$artifact_path" \
+      --manifest "$manifest_path" \
+      --signature "$signature_path" \
+      --receipt "$public_key_bundle_path/public-key-receipt.json" \
+      --receipt-signature "$public_key_bundle_path/public-key-receipt.sig" \
+      --signing-key "$COMPANION_SIGNING_KEY_FILE" \
+      --key-id "$COMPANION_KEY_ID" \
+      --version "$COMPANION_VERSION" \
+      --platform "$COMPANION_PLATFORM" \
+      --architecture "$COMPANION_ARCHITECTURE" \
+      --handoff "$COMPANION_HANDOFF" \
+      --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+      || fail 'manifest and artifact independent verification failed'
+  fi
   signing_key_digest_after=$(sha256_file "$COMPANION_SIGNING_KEY_FILE") \
     || fail 'manifest_public_key_digest_mismatch'
   [[ "$signing_key_digest_before" == "$signing_key_digest_after" ]] \
