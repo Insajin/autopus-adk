@@ -20,11 +20,11 @@ func readInstallerFile(t *testing.T, path string) string {
 func TestWindowsInstallerGitBashPathHintEscapesColon(t *testing.T) {
 	script := readInstallerFile(t, "install.ps1")
 
-	if strings.Contains(script, "\"$bashPath:`$PATH\"") {
-		t.Fatalf("Git Bash PATH hint uses $bashPath: in a double-quoted PowerShell string; use ${bashPath}: so PowerShell does not parse the colon as part of the variable reference")
+	if strings.Contains(script, `$bashPath:`) {
+		t.Fatal("Git Bash PATH hint lets PowerShell parse the colon as part of the variable reference")
 	}
-	if !strings.Contains(script, "\"${bashPath}:`$PATH\"") {
-		t.Fatalf("Git Bash PATH hint should interpolate ${bashPath}: before escaped $PATH")
+	if !strings.Contains(script, `'    export PATH="{0}:$PATH"' -f $bashPath`) {
+		t.Fatal("Git Bash PATH hint should format the path without nested PowerShell quoting")
 	}
 }
 
