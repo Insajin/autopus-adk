@@ -136,6 +136,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 	if strategy == "" && flags.MultiMode {
 		strategy = string(orchestra.StrategyDebate)
 	}
+	requestedTimeout := timeout
 	timeout = resolveSpecReviewTimeout(cfg, timeout)
 	// SPEC-SPECREV-002 REQ-003: consume the global --loop flag so the revision
 	// budget honors the loop floor (inert seam otherwise).
@@ -148,6 +149,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 
 	providerNames := resolveSpecReviewProviderNames(cfg, flags.MultiMode)
 	providers := configureSpecReviewProviders(resolveCodexProviderCapabilities(ctx, specReviewConfigProviders(cfg, providerNames)))
+	providers = applySpecReviewExecutionTimeout(providers, requestedTimeout)
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다. 설치를 확인하세요: %v", providerNames)
 	}

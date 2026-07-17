@@ -89,6 +89,15 @@ func classifyFailedProvider(name string, f orchestra.FailedProvider) ProviderSta
 		status = providerStatusTimeout
 	}
 	note := f.FailureClass
+	if status == providerStatusTimeout {
+		note = timeoutProviderHealthNote(
+			f.TimeoutSource,
+			f.ConfiguredDuration,
+			f.ElapsedDuration,
+			f.CollectionMode,
+			hasPartialProviderOutput(f.OutputPreview),
+		)
+	}
 	if note == "" {
 		note = emptyNotePlaceholder
 	}
@@ -111,7 +120,14 @@ const noteMaxLen = 200
 func classifyResponse(name string, r orchestra.ProviderResponse) ProviderStatus {
 	switch {
 	case r.TimedOut:
-		return ProviderStatus{Provider: name, Status: providerStatusTimeout, Note: emptyNotePlaceholder}
+		note := timeoutProviderHealthNote(
+			"",
+			0,
+			r.Duration,
+			collectionModeFromBackend(r.ExecutedBackend),
+			hasPartialProviderOutput(r.Output),
+		)
+		return ProviderStatus{Provider: name, Status: providerStatusTimeout, Note: note}
 	case r.ExitCode != 0:
 		note := sanitizeNote(r.Error)
 		if note == "" {
