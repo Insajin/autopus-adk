@@ -188,7 +188,7 @@ function Show-PathHint([string]$InstallDir, [bool]$PathAdded) {
     if ($PathAdded) { Write-Host "  New terminals will pick up: $InstallDir" -ForegroundColor Yellow }
     if ($env:MSYSTEM) {
         $bashPath = Get-GitBashPath $InstallDir
-        Write-Host "  Git Bash에서 설치했다면 현재 창을 다시 열거나 아래를 실행하세요:" -ForegroundColor Yellow
+        Write-Host "  If you installed from Git Bash, reopen this window or run:" -ForegroundColor Yellow
         Write-Host ('    export PATH="{0}:$PATH"' -f $bashPath) -ForegroundColor Yellow
     }
 }
@@ -288,7 +288,7 @@ function Main {
             Write-Host "  Run manually: auto doctor" -ForegroundColor Yellow
         }
         Ok ""
-        Ok "🐙 Autopus-ADK is ready!"
+        Ok "$([char]::ConvertFromUtf32(0x1F419)) Autopus-ADK is ready!"
         Ok ""
         Show-NextSteps
     } finally {
