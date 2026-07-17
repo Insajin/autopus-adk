@@ -43,7 +43,7 @@ func checkFreshness(dir string) ([]freshnessCheckResult, error) {
 					}
 				}
 			}
-			
+
 			res := freshnessCheckResult{
 				id: "doctor.evidence.learnings",
 			}

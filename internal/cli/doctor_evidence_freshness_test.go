@@ -18,7 +18,7 @@ func TestDoctor_EvidenceFreshness(t *testing.T) {
 
 	learningsDir := filepath.Join(dir, ".autopus", "learnings")
 	require.NoError(t, os.MkdirAll(learningsDir, 0o755))
-	
+
 	projectDir := filepath.Join(dir, ".autopus", "project")
 	require.NoError(t, os.MkdirAll(projectDir, 0o755))
 
@@ -47,7 +47,7 @@ func TestDoctor_EvidenceFreshness(t *testing.T) {
 	}
 
 	staleTime := time.Now().Add(-40 * 24 * time.Hour)
-	
+
 	rawLearningsStale := `{"id":"L-001","timestamp":"` + staleTime.Format(time.RFC3339) + `"}`
 	require.NoError(t, os.WriteFile(filepath.Join(learningsDir, "pipeline.jsonl"), []byte(rawLearningsStale), 0o644))
 
