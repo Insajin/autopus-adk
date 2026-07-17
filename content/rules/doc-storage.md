@@ -41,6 +41,8 @@ WHEN `/auto sync` runs:
 
 Both phases run in sequence. Phase B is skipped if no root files changed.
 
+Before committing, run `auto sync verify` (read-only, zero git mutations) to classify dirty files into this deterministic Phase A / Phase B plan and surface boundary violations (cross-boundary misplacement, SPEC location vs referenced-module mismatch, unrelated-file mixing). Use `auto sync verify --strict` in hooks or CI to exit non-zero when any violation is reported.
+
 ## Context Document Rotation
 
 IMPORTANT: The session-load context documents MUST stay compact current-state maps, not append-only ledgers. WHEN `/auto sync` updates them, per-SPEC completion history rotates into per-document archive files instead of accumulating. Unbounded history makes every `/auto` session load truncate at the context cap.
