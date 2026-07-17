@@ -69,6 +69,8 @@ setup.test
 credentials.json
 credentials.enc
 *.pem
+!scripts/release-signing/release-k1-public.pem
+!scripts/release-signing/release-k2-public.pem
 *.key
 .env
 .env.*

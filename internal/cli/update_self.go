@@ -74,7 +74,7 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 	archiveName := selfupdate.ArchiveName(runtime.GOOS, runtime.GOARCH, ver)
 	err = withSelfUpdateTempDir(func(tmpDir string) error {
 		dl := selfupdate.NewDownloader()
-		binaryPath, err := dl.DownloadAndVerify(
+		binaryPath, err := dl.DownloadAndVerifyWithSignature(
 			info.ArchiveURL,
 			info.ChecksumURL,
 			info.SignatureURL,

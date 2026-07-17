@@ -1,103 +1,114 @@
 package selfupdate
 
 import (
+	"bytes"
 	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/pem"
-	"errors"
+	"fmt"
 	"time"
 )
 
-// dateLayout is the UTC calendar-date format used for ExpiresAt comparisons.
-// Two dateLayout strings compare lexicographically the same as
-// chronologically, so expiry checks need no time-arithmetic on the hot path
-// (mirrors install.sh's `date -u +%Y-%m-%d` shell comparison in verify_signature).
-const dateLayout = "2006-01-02"
+const releaseKeyExpiryLayout = "2006-01-02"
 
-// PinnedReleaseKey is embedded trust material for verifying the publisher's
-// release-signing ECDSA P-256 signature over checksums.txt. KeyID and
-// ExpiresAt exist for audit/rotation bookkeeping only: the signed artifact is
-// a bare file with no in-band key identifier, so verification never looks a
-// key up by KeyID — see VerifyReleaseSignature's multi-trial semantics.
-type PinnedReleaseKey struct {
-	KeyID        string // audit/rotation bookkeeping only, never read from the wire
-	ExpiresAt    string // UTC calendar date, "YYYY-MM-DD"
-	PublicKeyPEM string // PEM-encoded SPKI (x509 PKIX), P-256 curve
+type pinnedReleaseKey struct {
+	Fingerprint  string
+	ExpiresAt    string
+	PublicKeyPEM string
 }
 
-// EmbeddedReleaseKeys is the pinned trust anchor set compiled into the auto
-// binary. It is the sole source of truth for release authenticity: GitHub
-// release assets (including any KeyID hint they might carry) are untrusted
-// input and never influence which key is used to verify them.
-//
-// Rotation procedure (2-key transition window):
-//  1. Generate a new ECDSA P-256 key pair. Provision the new private key as
-//     an additional CI secret alongside (not replacing) the current one.
-//  2. Append the new public key here as a second PinnedReleaseKey with its
-//     own KeyID/ExpiresAt. Both keys are now in the active trial set: the
-//     producer signs new releases with the new key, and clients still
-//     running the old binary keep verifying successfully because their
-//     embedded set already contains both keys.
-//  3. Once the retiring key's ExpiresAt has passed, drop its entry in a
-//     follow-up release.
-//
-// This mirrors the KeyID/ExpiresAt bookkeeping shape of
-// pkg/companionmanifest.PublicKeyReceipt (see public_key_receipt.go), but
-// verification here is multi-trial rather than a keyed map lookup (see
-// signature.go), because a bare detached signature carries no in-band KeyID
-// field to key a lookup on.
-var EmbeddedReleaseKeys = []PinnedReleaseKey{
+// K1 is the active release signer. K2 is prepositioned as the offline-next
+// rotation anchor; the v0.50.73 workflow signs with K1 only.
+var embeddedReleaseKeys = [...]pinnedReleaseKey{
 	{
-		KeyID:     "10105084",
-		ExpiresAt: "2028-07-17",
+		Fingerprint: "e1fdfe066484c7eae8ff16fa4b1ee6237b8d06299c2b66ced485f029af77837f",
+		ExpiresAt:   "2028-07-17",
 		PublicKeyPEM: `-----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1E7VSEqlwEUXAGh8uCIxYKAlFyQ3
-lOdYWlCbaLtSt1WegBqHD+TjkRiLqoGcGHouS7Nwu1bjk7ZZu26bp6BnIA==
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEDFjY80Lc2GJSsd8M6uAO/v7AZK3Z
+1sPEXrK4Hbm4m4+ykavvcoKlpZ5sn/T/l2InDXuhxkdX6aFv57bicik2Ug==
+-----END PUBLIC KEY-----`,
+	},
+	{
+		Fingerprint: "93d9f681d829f2d0bdba7e1853e6acf9ae2ffd2c760355853218e920c35cc5ff",
+		ExpiresAt:   "2030-07-17",
+		PublicKeyPEM: `-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEp+d1byDqWFismSIMWhTEHnbo/pdp
+7JVZwhXOIZJb0q2WHLxwMD7P77Fkr75Xnx1qYZgfvIl9Sg8Z+V9gSaq8Og==
 -----END PUBLIC KEY-----`,
 	},
 }
 
-// ActiveKeys returns the parsed ECDSA public keys from keys whose ExpiresAt
-// has not passed as of now (pre-trial expiry gate) and whose PEM SPKI parses
-// as a P-256 key. A malformed ExpiresAt or PEM excludes that entry rather
-// than failing the whole call, so one bad rotation entry cannot lock every
-// client out of an otherwise-valid key.
-func ActiveKeys(keys []PinnedReleaseKey, now time.Time) []*ecdsa.PublicKey {
-	nowDate := now.UTC().Format(dateLayout)
-	var active []*ecdsa.PublicKey
-	for _, k := range keys {
-		if _, err := time.Parse(dateLayout, k.ExpiresAt); err != nil {
-			continue
-		}
-		if nowDate > k.ExpiresAt {
-			// Expired: strictly after ExpiresAt, matching install.sh's
-			// `[ "$now" \> "$EXPIRES_n" ]` lexicographic gate.
-			continue
-		}
-		pub, err := parseECDSASPKIPEM(k.PublicKeyPEM)
-		if err != nil {
-			continue
-		}
-		active = append(active, pub)
+func activeReleaseKeys(keys []pinnedReleaseKey, now time.Time) (map[string]*ecdsa.PublicKey, error) {
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("%w: no keys configured", ErrMalformedEmbeddedReleaseKey)
 	}
-	return active
+
+	active := make(map[string]*ecdsa.PublicKey, len(keys))
+	seen := make(map[string]struct{}, len(keys))
+	nowDate := now.UTC().Format(releaseKeyExpiryLayout)
+	for index, key := range keys {
+		publicKey, fingerprint, err := parsePinnedReleaseKey(key)
+		if err != nil {
+			return nil, fmt.Errorf("%w at index %d: %v", ErrMalformedEmbeddedReleaseKey, index, err)
+		}
+		if _, duplicate := seen[fingerprint]; duplicate {
+			return nil, fmt.Errorf("%w at index %d: duplicate fingerprint", ErrMalformedEmbeddedReleaseKey, index)
+		}
+		seen[fingerprint] = struct{}{}
+
+		expiresAt, err := time.Parse(releaseKeyExpiryLayout, key.ExpiresAt)
+		if err != nil || expiresAt.Format(releaseKeyExpiryLayout) != key.ExpiresAt {
+			return nil, fmt.Errorf("%w at index %d: invalid expiry date", ErrMalformedEmbeddedReleaseKey, index)
+		}
+		if nowDate <= key.ExpiresAt {
+			active[fingerprint] = publicKey
+		}
+	}
+	if len(active) == 0 {
+		return nil, ErrAllReleaseSigningKeysExpired
+	}
+	return active, nil
 }
 
-func parseECDSASPKIPEM(pemStr string) (*ecdsa.PublicKey, error) {
-	block, _ := pem.Decode([]byte(pemStr))
-	if block == nil {
-		return nil, errors.New("invalid PEM block")
+func parsePinnedReleaseKey(key pinnedReleaseKey) (*ecdsa.PublicKey, string, error) {
+	if !validReleaseKeyFingerprint(key.Fingerprint) {
+		return nil, "", fmt.Errorf("invalid fingerprint")
 	}
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	pemBytes := []byte(key.PublicKeyPEM)
+	if !bytes.HasPrefix(pemBytes, []byte("-----BEGIN PUBLIC KEY-----")) {
+		return nil, "", fmt.Errorf("PUBLIC KEY PEM block must begin at byte zero")
+	}
+	block, rest := pem.Decode(pemBytes)
+	if block == nil || block.Type != "PUBLIC KEY" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
+		return nil, "", fmt.Errorf("expected exactly one PUBLIC KEY PEM block")
+	}
+	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
-		return nil, err
+		return nil, "", fmt.Errorf("parse SPKI: %w", err)
 	}
-	ecdsaPub, ok := pub.(*ecdsa.PublicKey)
-	if !ok {
-		return nil, errors.New("not an ECDSA public key")
+	publicKey, ok := parsed.(*ecdsa.PublicKey)
+	if !ok || publicKey.Curve != elliptic.P256() {
+		return nil, "", fmt.Errorf("expected ECDSA P-256 public key")
 	}
-	if ecdsaPub.Curve.Params().Name != "P-256" {
-		return nil, errors.New("not a P-256 curve key")
+	digest := sha256.Sum256(block.Bytes)
+	fingerprint := hex.EncodeToString(digest[:])
+	if fingerprint != key.Fingerprint {
+		return nil, "", fmt.Errorf("SPKI fingerprint mismatch")
 	}
-	return ecdsaPub, nil
+	return publicKey, fingerprint, nil
+}
+
+func validReleaseKeyFingerprint(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	for _, character := range value {
+		if (character < '0' || character > '9') && (character < 'a' || character > 'f') {
+			return false
+		}
+	}
+	return true
 }

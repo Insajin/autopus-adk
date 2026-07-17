@@ -1,37 +1,123 @@
 # SPEC-ADK-RELEASE-SIGNING-001 구현 계획
 
-## Tasks
+## 진행 원칙
 
-- [x] **T1 — producer 서명 산출 + secret 위생** (REQ-001): `checksums.txt`의 SHA-256에 publisher ECDSA P-256 서명을 만들어 `checksums.txt.sig` release asset을 게시.
-  - CI 서명 스텝(F-002): `umask 077` → `keyfile="$(mktemp)"` → `printf '%s' "$ADK_RELEASE_ECDSA_PRIVATE_KEY" > "$keyfile"` → `trap 'rm -f "$keyfile"' EXIT` → `openssl dgst -sha256 -sign "$keyfile" -out dist/checksums.txt.sig dist/checksums.txt`. env 이름(`ADK_RELEASE_ECDSA_PRIVATE_KEY`)과 파일 경로 변수(`keyfile`) 표기 일치. 대안: `[NEW] auto release sign-checksums`(Go `ecdsa.SignASN1`) — openssl 경로 선호.
-  - `.goreleaser.yaml` `signs:`에 두 번째 엔트리 추가(`artifacts: checksum`, `signature: ${artifact}.sig`, `cmd: openssl`) 또는 release.yaml post 스텝. 기존 cosign 엔트리 존치.
-  - **전용 release-signing ECDSA 키** 신규 프로비저닝: CI secret placeholder `ADK_RELEASE_ECDSA_PRIVATE_KEY`(companion ed25519 키와 분리). 소스 ≤300줄.
-
-- [x] **T2 — selfupdate 검증 배선** (REQ-002, 003, 006, 009): `[NEW] pkg/selfupdate/signature.go`에 `VerifyReleaseSignature(checksums, sig []byte) error` — `sha256.Sum256(checksums)` 후 비만료 임베드 키 각각으로 `ecdsa.VerifyASN1(pub_i, hash, sig)` multi-trial, 하나라도 true면 nil, 전부 false면 `no trusted release signing key verified`, 시도 집합 공집합이면 `all embedded keys expired`. `downloader.go::DownloadAndVerify`에 signature URL 파라미터 추가, **checksum 비교(line 58) 이전** 서명 검증 선행(폴백 없음). `types.go::ReleaseInfo`에 `SignatureURL`, `checker.go::FetchLatest` switch에 `case "checksums.txt.sig"`, `internal/cli/update_self.go:81` 호출부에 `info.SignatureURL` 전달. 정상 경로 출력 유지.
-
-- [x] **T3 — 임베드 pinned key 집합 + 만료 게이트 + 회전** (REQ-002, 007, 008): `[NEW] pkg/selfupdate/pinnedkey.go`에 pinned key **집합**(각 항목: PEM SPKI pubkey·KeyID·ExpiresAt) 상수 + `activeKeys(now)` 조회(ExpiresAt 지난 키 제외). 로드는 `x509.ParsePKIXPublicKey`→`*ecdsa.PublicKey` 단언(P-256 곡선 확인). 와이어 KeyID 미사용; KeyID는 감사·회전 북키핑. 회전 = 후속 릴리스에서 과도기 2키 병행 임베드(시도 집합 2개) 후 구키 제거(`PublicKeyReceipt` 패턴 참조 주석). 실제 키는 회전 시 생성, 문서엔 placeholder.
-
-- [x] **T4 — install.sh 검증 + 만료 대칭 + fail-open 제거** (REQ-004, 005, 006, 007, 008, 009): `install.sh`에 pinned key 집합 임베드(키별 PEM 상수 + `EXPIRES_1="YYYY-MM-DD"` …). `verify_signature()` — `checksums.txt.sig` 다운로드, 만료 게이트(F-003): `now="$(date -u +%Y-%m-%d)"` 후 각 `EXPIRES_n`과 **사전식 문자열 비교**(`[ "$now" \> "$EXPIRES_n" ]`; ISO 날짜는 사전식=시간식, crypto 불필요·POSIX 포터블)로 만료 키 제외, 남은 키마다 임시 PEM 기록 후 `openssl dgst -sha256 -verify pub.pem -signature checksums.txt.sig checksums.txt`(유효 `Verified OK` exit 0, 변조 `Error Verifying Data` exit 1) 시도. 하나라도 통과 없으면 `no trusted release signing key verified`, 활성 키 0이면 `all embedded keys expired`, openssl 미탐지면 안내 후 각각 `err`(exit 1). 활성 1키면 루프가 단일 `dgst -verify` 호출과 동일. main(line 165-174)에서 checksum grep **이전** 호출. 기존 `verify_checksum` line 131-135 fail-open(`return 0`)을 fail-closed `err`로 교체.
-
-- [x] **T5 — 롤아웃 순서·버전 경계** (REQ-009): 첫 서명 릴리스 tag를 signing floor로 기록(현행 `v0.50.71`, `pkg/version` 흐름). install.sh 배포는 첫 서명 릴리스 이후로 순서 고정(fail-closed가 미서명 최신 릴리스 차단). 구버전 소급 불가를 CHANGELOG/README에 한계로 명시.
-
-- [x] **T6 — oracle 테스트** (전체 REQ): `[NEW] pkg/selfupdate/signature_test.go` — 합성 `ecdsa.GenerateKey(elliptic.P256(), rand.Reader)`로 S1~S9 각 concrete 기대. S8은 3서브케이스: (a) 임베드 밖 공격자 키 서명→`no trusted…`, (b) 유일 임베드 키 ExpiresAt 과거→`all embedded keys expired`(유효 서명이라도), (c) 2키 임베드·2번째 키 서명→통과(회전창). Go 서명↔openssl 검증 양방향(R3). `[NEW] install.sh` 검증 함수용 shell 테스트(stock LibreSSL 3.3.6): 정상/변조/부재/openssl부재/만료 exit·메시지. acceptance S1~S9와 1:1.
+- v0.50.73을 signing floor로 사용합니다. v0.50.72 이하는 unsigned legacy release입니다.
+- Stage 1 producer와 Go consumer를 먼저 배포합니다.
+- v0.50.73 live asset을 검증한 다음 Stage 2에서 POSIX와 Windows installer를 fail-closed로 전환합니다.
+- fresh K1과 offline-next K2는 repository 밖 ceremony에서 생성하고 recovery를 검증했습니다. 소스에는 두 public pin만 포함합니다.
+- v0.50.73 workflow는 K1만 사용합니다. K2 온라인 활성화는 이번 릴리스 범위가 아닙니다.
+- 기존 cosign keyless bundle은 유지합니다.
 
 ## Implementation Strategy
 
-- **재사용 우선**: 신규 Go 의존성 0. 서명/검증 stdlib `crypto/ecdsa`·`x509`·`sha256`; 회전·핀은 `companionmanifest` `PublicKeyReceipt`/`PinnedKey` **패턴** 참조(in-band KeyID 조회는 bare 파일에 부적합→multi-trial로 대체).
-- **변경 범위**: selfupdate 4개 기존 파일 소폭 수정 + 2개 신규, install.sh 1개, .goreleaser.yaml 1개 + 신규 서명 스텝. 신규 소스 ≤300줄(목표 ≤200), signature/pinnedkey 파일 분리.
-- **fail-closed·대칭 원칙**: 서명 부재·불일치·공격자키·전만료·openssl 부재 전부 중단. 만료 게이트와 multi-trial을 두 소비자에 대칭 구현. checksum-only 폴백·skip 경로 신설 금지, 기존 install.sh skip 제거.
-- **키 용도·와이어 분리**: release 서명은 companion ed25519와 별개 전용 ECDSA 키. KeyID는 와이어에 싣지 않고 임베드 북키핑용.
-- **producer/consumer 순서**: T1(서명) → 첫 서명 릴리스 → T4/install.sh 배포. 검증기는 서명 릴리스만 대상.
+- **RED**: envelope 형식, malformed pin, 4인자 API, producer·workflow wiring 기대값을 먼저 실패 테스트로 고정합니다.
+- **GREEN**: Go 표준 라이브러리와 POSIX shell·openssl만 사용해 Stage 1 최소 구현을 완성합니다.
+- **REFACTOR**: synthetic key 주입 seam을 package-private로 줄이고 format bounds를 세 소비자가 재사용할 공개 계약으로 고정합니다.
+- **Release sequence**: Stage 1 code + K1·K2 public pin → K1 Environment secret → v0.50.73 live oracle → Stage 2 installers 순서를 hard gate로 유지합니다.
+
+## Tasks
+
+- [x] **T1 — V1 envelope와 trust-anchor 계약 구현** (REQ-001, REQ-006)
+  - 전체 4,096바이트, 레코드 1~16개, 줄 256바이트 제한을 적용합니다.
+  - exact header, LF 종료, CR/BOM/NUL/빈 줄 거부, full lowercase fingerprint, 탭 한 개, canonical base64·DER, duplicate fingerprint 거부를 구현합니다.
+  - malformed embedded key와 all-expired를 서로 다른 sentinel error로 고정합니다.
+  - fresh K1과 offline-next K2의 PEM·full fingerprint·만료일을 Go consumer와 checked-in 파일에 동일하게 고정합니다.
+
+- [x] **T2 — deterministic multi-key producer 구현** (REQ-002)
+  - `scripts/release-signing/sign-checksums.sh CHECKSUMS OUTPUT KEY_FILE...`을 구현합니다.
+  - 각 private key에서 P-256 SPKI와 full fingerprint를 계산합니다.
+  - fingerprint 오름차순으로 envelope를 생성하고 duplicate/non-P256 키를 거부합니다.
+  - JSON과 jq를 사용하지 않습니다.
+
+- [x] **T3 — release workflow 키 위생과 pair preflight 구현** (REQ-003)
+  - raw secret을 별도의 짧은 step에서 0600 파일로 만듭니다.
+  - checked-in K1 public PEM과 full fingerprint를 유지합니다.
+  - K2 public pin은 선배포하되 workflow preflight와 GoReleaser 입력에는 추가하지 않습니다.
+  - GoReleaser 전에 private/public/fingerprint tuple을 확인합니다.
+  - GoReleaser에는 secret 값이 아니라 파일 경로만 전달합니다.
+  - 기존 always-run credential cleanup을 재사용합니다.
+
+- [x] **T4 — Go self-update consumer 구현** (REQ-004~006)
+  - checker가 `checksums.txt.signatures`를 찾도록 합니다.
+  - V1 envelope 검증을 checksum parsing보다 먼저 실행합니다.
+  - 구조적으로 유효한 unknown fingerprint는 무시하되 known active signature가 하나 이상 통과해야 성공하도록 합니다.
+  - 기존 4인자 `DownloadAndVerify`를 유지하고 exact sibling URL 파생에 실패하면 중단합니다.
+  - synthetic key 주입 seam은 package-private로 제한합니다.
+
+- [x] **T5 — Stage 1 oracle 구현** (REQ-001~006)
+  - 합성 P-256 키로 정상, 변조, 공격자, unknown+known, duplicate, malformed DER/base64, 만료, malformed pin을 검증합니다.
+  - helper의 dual-sign 정렬, duplicate와 non-P256 거부를 실행합니다.
+  - GoReleaser v2.17.0 실행으로 실제 `checksums.txt.signatures`를 만든 뒤 같은 Go verifier가 통과하는지 확인합니다.
+
+- [ ] **T6 — K1·K2 ceremony와 v0.50.73 live release** (REQ-003, REQ-009)
+  - [x] fresh K1과 offline-next K2를 생성하고 encrypted local custody와 Keychain 기반 recovery를 검증합니다.
+  - [x] K1·K2 public PEM과 full fingerprint를 checked-in 정본과 Go consumer에 선배포합니다.
+  - [ ] K1 GitHub Environment secret을 설정합니다. 기존 secret이 fresh K1과 같은 쌍이라고 가정하지 않습니다.
+  - [x] K2는 offline-next로 유지하고 GitHub secret이나 v0.50.73 signing input에 추가하지 않습니다.
+  - v0.50.73을 릴리스하고 `checksums.txt`, `checksums.txt.bundle`, `checksums.txt.signatures`를 확인합니다.
+  - 내려받은 live envelope를 Go verifier와 openssl로 검증하고 release evidence를 보존합니다.
+
+- [ ] **T7 — POSIX installer Stage 2** (REQ-007, REQ-009, REQ-010)
+  - T6 live evidence가 PASS인 경우에만 시작합니다.
+  - `install.sh`에 동일한 4 KiB/16-record envelope parser와 active-key 검증을 구현합니다.
+  - openssl 부재, malformed envelope, 서명 실패, checksum 실패를 모두 fail-closed로 처리합니다.
+  - raw-main origin 한계를 문서와 테스트에 남깁니다.
+
+- [ ] **T8 — Windows installer Stage 2** (REQ-008~010)
+  - T6 live evidence가 PASS인 경우에만 시작합니다.
+  - PowerShell 5.1과 7 공통 코드로 SPKI DER를 CNG `ECS1` blob으로 바꿉니다.
+  - canonical DER `r`, `s`를 고정 32바이트씩 채운 P1363 서명으로 바꾸고 `ECDsaCng.VerifyHash`를 실행합니다.
+  - POSIX와 같은 파싱 한도·중복·unknown·만료 정책을 적용합니다.
+
+- [ ] **T9 — 전체 수렴과 lifecycle 종료** (REQ-010)
+  - 세 소비자의 상태, signing floor, raw-main 한계, 키 회전 절차를 README/docs/CHANGELOG에 반영합니다.
+  - full race/vet/shell/GoReleaser/release wiring gate를 실행합니다.
+  - Stage 2까지 끝난 뒤에만 SPEC을 implemented로 전환하고 sync를 진행합니다.
+
+## Gate 순서
+
+```text
+Stage 1 code/test
+  -> fresh K1 + offline-next K2 public pin and recovery receipt
+  -> K1 GitHub Environment secret + exact pair preflight
+  -> v0.50.73 release
+  -> live envelope verification
+  -> install.sh Stage 2
+  -> install.ps1 Stage 2
+  -> three-consumer regression + sync
+```
+
+앞 gate가 실패하면 다음 gate로 진행하지 않습니다. 특히 live envelope 검증 전에 installer를 fail-closed로 배포하지 않습니다.
 
 ## Visual Planning Brief
 
-검증 data-flow(multi-trial + 만료 게이트)와 동일-origin 교체 방어 다이어그램은 `research.md`의 `## Visual Planning Brief` 참조. 핵심: 두 소비자 모두 비만료 임베드 키 집합으로 ECDSA 서명 multi-trial(Go `ecdsa.VerifyASN1` / sh `openssl dgst -sha256 -verify`) → pass → sha256(archive) 비교 → install/replace. 어느 실패도 fail-closed.
+```text
+KEY_FILE... -> deterministic envelope producer -> checksums.txt.signatures
+                                                    |
+archive + checksums + envelope (untrusted)           v
+      -> strict full parse -> active known key verify -> checksum verify -> replace/install
+                               | failure
+                               +-> fail closed
+```
+
+producer와 세 consumer가 같은 4 KiB/16-record/256-byte-line 계약을 사용해야 합니다. 회전 중에는 K1+K2 레코드를 함께 싣고, 각 consumer는 자신이 아는 active fingerprint 중 하나 이상을 검증합니다.
 
 ## Feature Completion Scope
 
-- Primary SPEC이 Outcome Lock 4요소(서명 자산·selfupdate fail-closed·install.sh fail-closed·정상 UX 불변)를 T1~T6로 모두 닫는다. REQ-008(만료·multi-trial·회전)은 두 소비자 대칭으로 SPEC 내 종결.
-- 승인된 sibling 의존성: 없음.
-- 남은 Completion Debt: 없음.
-- Evolution Ideas(homebrew 체인, Rekor 소비, SLSA)는 optional이며 완료를 막지 않는다.
+- Primary SPEC 안에서 Stage 1 producer·Go consumer, v0.50.73 live gate, Stage 2 POSIX·Windows consumer까지 닫습니다.
+- sibling SPEC은 만들지 않습니다.
+- 현재 Completion Debt는 K1 Environment secret과 pair 확인, live release, 두 installer, 최종 문서 동기화입니다.
+- raw-main 독립 trust origin, Homebrew 서명, SLSA/Rekor는 Evolution Idea이며 완료를 막지 않습니다.
+
+## 현재 blocker
+
+1. K1 GitHub Environment secret이 fresh checked-in K1과 pair인지 확인되지 않았습니다.
+2. v0.50.73 live asset이 아직 없습니다.
+3. T7과 T8은 T6 PASS 전까지 의도적으로 대기합니다.
+
+## 운영 한계
+
+- K1·K2 encrypted local custody와 Keychain 기반 recovery 검증은 완료했습니다.
+- 별도의 off-device 독립 매체 보관은 현 환경에서 확인하지 못했습니다. 이 문서는 그 수준의 재해 복구를 완료했다고 주장하지 않습니다.
+- K2 온라인 signing activation과 K1+K2 overlap은 후속 회전 단계입니다.
