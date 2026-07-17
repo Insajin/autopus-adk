@@ -1,0 +1,11 @@
+{
+  "release_url": "https://github.com/Insajin/autopus-adk/releases/tag/v0.50.73",
+  "release_run_url": "https://github.com/Insajin/autopus-adk/actions/runs/29588526312",
+  "published_at": "2026-07-17T14:55:27Z",
+  "tag_object": "b1ebab0af82536f8a4bc1ed93f31f82f6c53d008",
+  "source_commit": "334b297f05942accbecdfa15b54e38e005c82f2d",
+  "checksums_sha256": "a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1",
+  "bundle_sha256": "3155a3fc25414eb9d019804c6fa4523a8230621ebd097d4f40e4d715cb19a027",
+  "signatures_sha256": "a1b1643f78995fea5b773d8e213d4e33e1d71ff98ec142c14a6361a4e20cccb3",
+  "verified_at": "2026-07-17T14:57:00Z"
+}

@@ -1,5 +1,6 @@
 #!/bin/sh
 set -e
+umask 077
 
 # autopus-adk 설치 스크립트
 # 사용법: curl -fsSL https://get.autopus.co | sh
@@ -12,6 +13,9 @@ REPO="Insajin/autopus-adk"
 BINARY="auto"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 ALIAS="autopus"
+SIGNING_FLOOR="0.50.73"
+VERIFIER_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/release-signing/verify-checksums-v1.sh"
+VERIFIER_SHA256="d9eeaaa029269d4ed9008e38527e3bbe3229d2f93a44f9d2a63b79109c9dcbf9"
 
 # 색상 출력
 info()  { printf '\033[1;34m%s\033[0m\n' "$1"; }
@@ -99,7 +103,7 @@ detect_arch() {
 # 최신 버전 조회
 get_latest_version() {
     if command -v curl > /dev/null 2>&1; then
-        curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
+        curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
     elif command -v wget > /dev/null 2>&1; then
         wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
     else
@@ -112,31 +116,41 @@ download() {
     url="$1"
     dest="$2"
     if command -v curl > /dev/null 2>&1; then
-        curl -sSL "$url" -o "$dest"
+        curl -fsSL "$url" -o "$dest"
     elif command -v wget > /dev/null 2>&1; then
         wget -qO "$dest" "$url"
+    else
+        return 1
     fi
+}
+
+version_supports_signing() {
+    printf '%s\n' "$1" | awk -F. '
+        NF != 3 { exit 1 }
+        {
+            for (i=1; i<=3; i++) if ($i !~ /^[0-9][0-9]*$/) exit 1
+            major=$1+0; minor=$2+0; patch=$3+0
+            if (major > 0 || (major == 0 && (minor > 50 || (minor == 50 && patch >= 73)))) exit 0
+            exit 1
+        }'
 }
 
 # SHA256 체크섬 검증
 verify_checksum() {
     archive="$1"
     expected_checksum="$2"
+    failure_code="${3:-release_checksum_mismatch}"
 
     if command -v sha256sum > /dev/null 2>&1; then
         actual=$(sha256sum "$archive" | awk '{print $1}')
     elif command -v shasum > /dev/null 2>&1; then
         actual=$(shasum -a 256 "$archive" | awk '{print $1}')
     else
-        echo "  ⚠ 다운로드 파일 무결성 검증 도구를 찾을 수 없습니다."
-        echo "    macOS: 기본 포함(shasum)이므로 터미널을 재시작해보세요."
-        echo "    Linux: sudo apt install coreutils (또는 yum install coreutils)"
-        echo "  체크섬 검증을 건너뜁니다."
-        return 0
+        err "release_checksum_tool_unavailable: SHA-256 검증 도구가 없어 설치를 중단합니다."
     fi
 
     if [ "$actual" != "$expected_checksum" ]; then
-        err "체크섬 불일치! 다운로드가 변조되었을 수 있습니다.\n  expected: ${expected_checksum}\n  actual:   ${actual}"
+        err "${failure_code}: 다운로드 파일의 SHA-256이 일치하지 않습니다."
     fi
 }
 
@@ -148,6 +162,8 @@ main() {
     if [ -z "$VERSION" ]; then
         err "최신 버전을 가져올 수 없습니다. GitHub API 한도를 확인하세요."
     fi
+    version_supports_signing "$VERSION" || \
+        err "unsigned_release_not_supported: v${SIGNING_FLOOR} 이상만 안전하게 설치할 수 있습니다."
 
     info "autopus-adk v${VERSION} 설치 중... (${OS}/${ARCH})"
 
@@ -155,23 +171,43 @@ main() {
     BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}"
     URL="${BASE_URL}/${ARCHIVE}"
     CHECKSUMS_URL="${BASE_URL}/checksums.txt"
+    SIGNATURES_URL="${BASE_URL}/checksums.txt.signatures"
 
     TMPDIR="$(mktemp -d)"
     trap 'rm -rf "$TMPDIR"' EXIT
 
-    info "다운로드: ${URL}"
-    download "$URL" "${TMPDIR}/${ARCHIVE}"
+    VERIFIER_PATH="${TMPDIR}/verify-checksums-v1.sh"
+    download "$VERIFIER_URL" "$VERIFIER_PATH" || \
+        err "installer_verifier_download_failed: 서명 검증기를 받을 수 없습니다."
+    verify_checksum "$VERIFIER_PATH" "$VERIFIER_SHA256" installer_verifier_integrity_failed
+    . "$VERIFIER_PATH"
 
-    # SHA256 체크섬 검증
-    info "체크섬 검증 중..."
-    download "$CHECKSUMS_URL" "${TMPDIR}/checksums.txt"
-    EXPECTED=$(grep "${ARCHIVE}" "${TMPDIR}/checksums.txt" | awk '{print $1}')
-    if [ -n "$EXPECTED" ]; then
-        verify_checksum "${TMPDIR}/${ARCHIVE}" "$EXPECTED"
-        ok "체크섬 검증 통과 ✓"
-    else
-        err "checksums.txt에서 ${ARCHIVE}의 체크섬을 찾을 수 없습니다"
+    download "$CHECKSUMS_URL" "${TMPDIR}/checksums.txt" || \
+        err "release_checksum_download_failed: checksums.txt를 받을 수 없습니다."
+    download "$SIGNATURES_URL" "${TMPDIR}/checksums.txt.signatures" || \
+        err "release_signature_download_failed: 서명 envelope를 받을 수 없습니다."
+    mkdir -m 700 "${TMPDIR}/release-v1"
+    if ! verify_release_checksums_v1 "${TMPDIR}/checksums.txt" \
+        "${TMPDIR}/checksums.txt.signatures" "${TMPDIR}/release-v1"; then
+        err "릴리스 서명 검증에 실패하여 설치를 중단합니다."
     fi
+    ok "릴리스 서명 검증 통과 ✓"
+
+    info "다운로드: ${URL}"
+    download "$URL" "${TMPDIR}/${ARCHIVE}" || \
+        err "release_archive_download_failed: 릴리스 아카이브를 받을 수 없습니다."
+    if ! EXPECTED=$(awk -v name="$ARCHIVE" '
+        $2 == name {
+            if (NF != 2 || length($1) != 64 || $1 ~ /[^0-9a-f]/ || found) exit 2
+            found=1; hash=$1
+        }
+        END { if (!found) exit 1; print hash }
+    ' "${TMPDIR}/checksums.txt"); then
+        err "release_checksum_manifest_invalid: 아카이브의 exact checksum 1건이 필요합니다."
+    fi
+    info "체크섬 검증 중..."
+    verify_checksum "${TMPDIR}/${ARCHIVE}" "$EXPECTED"
+    ok "체크섬 검증 통과 ✓"
 
     info "압축 해제 중..."
     tar -xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
@@ -219,4 +255,6 @@ main() {
     echo ""
 }
 
-main
+if [ "${AUTOPUS_INSTALLER_TEST_SOURCE:-}" != "1" ]; then
+    main
+fi

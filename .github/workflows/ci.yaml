@@ -132,6 +132,9 @@ jobs:
           go test -race -count=1 -timeout=8m
           ./internal/companionmanifest/... ./pkg/companionmanifest/... ./pkg/selfupdate
 
+      - name: Test macOS POSIX installer signing
+        run: go test -count=1 -timeout=5m . -run '^TestPOSIXInstaller'
+
   windows-runtime:
     name: windows-runtime
     runs-on: windows-latest
@@ -152,3 +155,13 @@ jobs:
         run: >-
           go test -count=1 -timeout=5m ./internal/cli
           -run '^(TestResolveCurrentBinaryPath_FailsClosedWhenSymlinkEvalFails|TestWithSelfUpdateTempDir_DoesNotRunAfterCreateFailure)$'
+
+      - name: Test Windows installer signing on PowerShell 5.1
+        run: >-
+          powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File scripts/release-signing/tests/windows-installer-signing-test.ps1
+
+      - name: Test Windows installer signing on PowerShell 7
+        run: >-
+          pwsh.exe -NoLogo -NoProfile -NonInteractive
+          -File scripts/release-signing/tests/windows-installer-signing-test.ps1
