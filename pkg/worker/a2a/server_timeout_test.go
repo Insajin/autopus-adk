@@ -14,6 +14,12 @@ import (
 // is applied as a hard deadline via context.WithTimeout. The subprocess (handler) should
 // be interrupted when the deadline expires.
 func TestDispatchTask_TimeoutSec_EnforcesDeadline(t *testing.T) {
+	// Task dispatch fails closed by default when the signing secret is
+	// unset (SPEC-ADK-WORKER-TRUST-DEFAULTS-001); this test exercises
+	// TimeoutSec deadline enforcement, not signature verification, so opt
+	// into unsigned mode explicitly.
+	t.Setenv(AllowUnsignedControlPlaneEnv, "1")
+
 	mb := newMockBackend()
 	defer mb.close()
 
@@ -73,6 +79,10 @@ func TestDispatchTask_TimeoutSec_EnforcesDeadline(t *testing.T) {
 // TestDispatchTask_ZeroTimeoutSec_NoBehaviorChange verifies that TimeoutSec = 0
 // does not apply any timeout (backward compatibility).
 func TestDispatchTask_ZeroTimeoutSec_NoBehaviorChange(t *testing.T) {
+	// See TestDispatchTask_TimeoutSec_EnforcesDeadline: opt into unsigned
+	// mode so dispatch reaches the handler under test.
+	t.Setenv(AllowUnsignedControlPlaneEnv, "1")
+
 	mb := newMockBackend()
 	defer mb.close()
 

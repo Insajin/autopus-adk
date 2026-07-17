@@ -109,6 +109,12 @@ func (mb *mockBackend) waitForMessages(t *testing.T, n int, timeout time.Duratio
 }
 
 func TestServer_SendMessage_Success(t *testing.T) {
+	// Task dispatch fails closed by default when the signing secret is
+	// unset (SPEC-ADK-WORKER-TRUST-DEFAULTS-001); this test exercises
+	// dispatch mechanics, not signature verification, so opt into unsigned
+	// mode explicitly.
+	t.Setenv(AllowUnsignedControlPlaneEnv, "1")
+
 	mb := newMockBackend()
 	defer mb.close()
 
@@ -183,6 +189,10 @@ func TestServer_SendMessage_Success(t *testing.T) {
 }
 
 func TestServer_SendMessage_HandlerError(t *testing.T) {
+	// See TestServer_SendMessage_Success: opt into unsigned mode so
+	// dispatch reaches the handler under test.
+	t.Setenv(AllowUnsignedControlPlaneEnv, "1")
+
 	mb := newMockBackend()
 	defer mb.close()
 

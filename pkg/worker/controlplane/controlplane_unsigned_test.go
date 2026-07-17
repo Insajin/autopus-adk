@@ -18,15 +18,18 @@ func resetUnsignedWarnOnce() {
 	unsignedWarnOnce = sync.Once{}
 }
 
-// TestUnsignedControlPlane_WarnsOnceAndReturnsNil is the S8 oracle for REQ-006:
-// when the signing secret is unset, the verification entry points take the
-// fail-open path, return nil, and emit exactly one warning per process.
+// TestUnsignedControlPlane_WarnsOnceAndReturnsNil is the S5 oracle for
+// REQ-005/REQ-007: when the signing secret is unset AND the operator has
+// explicitly opted out via AllowUnsignedControlPlaneEnv, the verification
+// entry points take the fail-open path, return nil, and emit exactly one
+// warning per process that never includes the secret value.
 //
 // This test is intentionally NOT parallel: it captures the global log output
 // and resets the package-level once guard, both of which are process-wide.
 func TestUnsignedControlPlane_WarnsOnceAndReturnsNil(t *testing.T) {
-	// Given: the signing secret is unset and the once-guard is reset.
+	// Given: the signing secret is unset and unsigned mode is explicitly allowed.
 	t.Setenv(PolicySigningSecretEnv, "")
+	t.Setenv(AllowUnsignedControlPlaneEnv, "1")
 	resetUnsignedWarnOnce()
 
 	var buf bytes.Buffer
@@ -65,9 +68,11 @@ func TestUnsignedControlPlane_WarnsOnceAndReturnsNil(t *testing.T) {
 
 // TestUnsignedControlPlane_AllEntryPointsShareOnce verifies that the three
 // verification entry points share a single process-wide warning guard: across
-// all of them, only one warning is emitted while the secret is unset.
+// all of them, only one warning is emitted while the secret is unset and
+// unsigned mode is explicitly allowed.
 func TestUnsignedControlPlane_AllEntryPointsShareOnce(t *testing.T) {
 	t.Setenv(PolicySigningSecretEnv, "")
+	t.Setenv(AllowUnsignedControlPlaneEnv, "1")
 	resetUnsignedWarnOnce()
 
 	var buf bytes.Buffer

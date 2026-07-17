@@ -52,15 +52,21 @@ func ResolveBinary(name string) string {
 	return name
 }
 
-// EnvironWithToolPath prepends well-known CLI install directories to PATH.
-// GUI-launched desktop apps often inherit a restricted PATH, while npm-based
-// provider shims such as Codex resolve node through /usr/bin/env.
+// EnvironWithToolPath appends well-known CLI install directories to PATH,
+// placed after the inherited PATH so identically named binaries resolve from
+// the inherited PATH first. GUI-launched desktop apps often inherit a
+// restricted PATH, while npm-based provider shims such as Codex resolve node
+// through /usr/bin/env; appending keeps those tools discoverable without
+// letting a user-writable well-known directory shadow the inherited PATH.
 func EnvironWithToolPath(env []string) []string {
 	currentPath := envValue(env, "PATH")
-	parts := append([]string{}, wellKnownDirs...)
+	var parts []string
 	if currentPath != "" {
 		parts = append(parts, strings.Split(currentPath, string(os.PathListSeparator))...)
 	}
+	// Trade-off: a binary present in both the inherited PATH and a
+	// well-known directory now always resolves from the inherited PATH.
+	parts = append(parts, wellKnownDirs...)
 
 	seen := make(map[string]bool, len(parts))
 	merged := make([]string, 0, len(parts))

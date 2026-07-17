@@ -8,6 +8,7 @@ import (
 
 const (
 	PolicySigningSecretEnv              = controlplane.PolicySigningSecretEnv
+	AllowUnsignedControlPlaneEnv        = controlplane.AllowUnsignedControlPlaneEnv
 	CapabilityServerModelV1             = "server_model_v1"
 	CapabilityPipelinePhasesV1          = "pipeline_phases_v1"
 	CapabilityPipelineInstructionsV1    = "pipeline_instructions_v1"

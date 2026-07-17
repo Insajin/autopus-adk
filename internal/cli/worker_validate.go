@@ -69,6 +69,16 @@ func runWorkerValidate(cmd *cobra.Command, policyPath, command, workDir string) 
 		os.Exit(1)
 		return nil
 	}
+
+	// REQ-011: report the unsigned-disabled diagnostic distinctly from a
+	// genuine signature mismatch, without leaking the secret value. When the
+	// operator has explicitly opted into unsigned mode, fall through to the
+	// legacy warn-once/PASS-DENY behavior via VerifyCachedPolicyFile below.
+	if !controlplane.SignedControlPlaneEnforced() && !controlplane.UnsignedControlPlaneAllowed() {
+		fmt.Fprintf(cmd.OutOrStdout(), "DENY: signature verification disabled (unsigned); set %s to enable it, or set %s=1 to explicitly allow unsigned mode (dev/self-host only)\n", controlplane.PolicySigningSecretEnv, controlplane.AllowUnsignedControlPlaneEnv)
+		os.Exit(1)
+		return nil
+	}
 	if err := controlplane.VerifyCachedPolicyFile(policyPath, policy); err != nil {
 		fmt.Fprintf(cmd.OutOrStdout(), "DENY: invalid policy signature: %v\n", err)
 		os.Exit(1)

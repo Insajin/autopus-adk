@@ -145,6 +145,12 @@ func TestServer_UnknownMethod(t *testing.T) {
 }
 
 func TestServer_SendMessage_DuplicateTaskID(t *testing.T) {
+	// Task dispatch fails closed by default when the signing secret is
+	// unset (SPEC-ADK-WORKER-TRUST-DEFAULTS-001); this test exercises
+	// duplicate-task-ID rejection, not signature verification, so opt into
+	// unsigned mode explicitly.
+	t.Setenv(AllowUnsignedControlPlaneEnv, "1")
+
 	mb := newMockBackend()
 	defer mb.close()
 
