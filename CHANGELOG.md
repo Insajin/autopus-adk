@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Codex SPEC 리뷰 응답 수집 안정화** (2026-07-17): pane이 기본인 환경에서도 `codex exec` 프로바이더는 실행 전에 subprocess 수집 경로를 선택해 최종 응답 파일을 직접 읽으며, 응답을 별도 pane 파일에 쓰지 않았다는 이유로 전체 제한 시간까지 대기하던 문제를 제거했다. 명시적 `--timeout`은 provider 실행 예산에도 동일하게 적용되고, timeout 상태는 원문 stdout·stderr·경로·비밀값 없이 source, budget, elapsed, collection mode, partial-output 여부만 구조화해 기록한다. Claude, Gemini, Codex 비-`exec`, 강제 subprocess 경로는 기존 동작을 유지한다.
+
 - **Self-update 교체 트랜잭션 하드닝** (2026-07-17): 새 바이너리를 대상 파일시스템의 전용 stage에 준비하고 파일·디렉터리를 동기화한 뒤에만 교체하도록 변경했다. Darwin/Linux는 원자 교환 후 inode를 다시 확인하며, 동시 변경이나 동기화 실패 시 원자적으로 되돌리고 되돌리기마저 실패하면 복구 stage를 보존한다. 교환을 지원하지 않는 커널·파일시스템에서는 기존 바이너리를 유지한 채 안전하게 중단한다. Windows는 실행 중인 바이너리를 `target.old`에 보존하고 no-replace·write-through 이동으로 설치한다. 성공한 설치의 복구본에는 완료 marker를 남겨 다음 실행에서만 정리하고, marker가 없거나 유효하지 않은 복구본은 자동 삭제하지 않는다. Windows 런타임 CI와 모든 OS에서 실행되는 상태 머신 회귀 테스트를 추가했다. 임시 디렉터리 생성 실패, symlink·hardlink alias, target 변경, 부분 복사, chmod·xattr·sync 실패도 교체 전에 차단한다.
 
 - **v0.50.72 macOS self-update 서명 보존** (2026-07-17): v0.50.72에 포함된 새 updater는 SHA-256 검증을 마친 macOS 릴리스 바이너리를 설치한 뒤 ad hoc 서명으로 다시 쓰던 동작을 제거했다. 이 updater가 수행하는 교체는 다운로드한 Mach-O 바이트와 Developer ID 서명, Team ID를 그대로 보존하며, Darwin 전용 회귀 테스트가 바이트 해시와 코드 서명 식별자의 일치를 검증한다. A3 릴리스 게이트는 immutable `v0.50.71`의 commit, annotated tag object, checksums, Darwin archive와 manifest를 고정 검증하고 A0 공개키 record의 연속성을 유지한다. Homebrew는 `v0.50.71` Formula 마이그레이션 브리지를 동결하고 canonical Cask만 `v0.50.72`로 갱신한다.
