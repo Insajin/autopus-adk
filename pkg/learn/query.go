@@ -15,7 +15,6 @@ const (
 )
 
 // MatchRelevance scores how relevant an entry is to the given query.
-// Returns 0.0 if no match.
 func MatchRelevance(entry LearningEntry, query RelevanceQuery) float64 {
 	if len(query.Files) == 0 && len(query.Packages) == 0 && len(query.Keywords) == 0 {
 		return 0.0
@@ -23,7 +22,6 @@ func MatchRelevance(entry LearningEntry, query RelevanceQuery) float64 {
 
 	var score float64
 
-	// File path matching
 	for _, qf := range query.Files {
 		for _, ef := range entry.Files {
 			if qf == ef {
@@ -32,7 +30,6 @@ func MatchRelevance(entry LearningEntry, query RelevanceQuery) float64 {
 		}
 	}
 
-	// Package matching
 	for _, qp := range query.Packages {
 		for _, ep := range entry.Packages {
 			if qp == ep {
@@ -41,7 +38,6 @@ func MatchRelevance(entry LearningEntry, query RelevanceQuery) float64 {
 		}
 	}
 
-	// Keyword matching in Pattern and Resolution
 	combined := strings.ToLower(entry.Pattern + " " + entry.Resolution)
 	for _, kw := range query.Keywords {
 		if strings.Contains(combined, strings.ToLower(kw)) {
@@ -53,7 +49,6 @@ func MatchRelevance(entry LearningEntry, query RelevanceQuery) float64 {
 		return 0.0
 	}
 
-	// Recency bonus: entries within recencyBonusDays get a boost
 	if !entry.Timestamp.IsZero() {
 		age := time.Since(entry.Timestamp)
 		if age < time.Duration(recencyBonusDays)*24*time.Hour {
@@ -64,8 +59,7 @@ func MatchRelevance(entry LearningEntry, query RelevanceQuery) float64 {
 	return score
 }
 
-// QueryRelevant returns entries with relevance score above threshold,
-// sorted by score descending.
+// QueryRelevant returns entries with relevance score above threshold.
 func QueryRelevant(store *Store, query RelevanceQuery, threshold float64) ([]LearningEntry, error) {
 	entries, err := store.Read()
 	if err != nil {
@@ -77,12 +71,24 @@ func QueryRelevant(store *Store, query RelevanceQuery, threshold float64) ([]Lea
 		score float64
 	}
 	var results []scored
+
+	isSpecOnly := query.SpecID != "" && len(query.Files) == 0 && len(query.Packages) == 0 && len(query.Keywords) == 0
+
 	for _, e := range entries {
-		s := MatchRelevance(e, query)
-		if s >= threshold {
-			results = append(results, scored{e, s})
+		if query.SpecID != "" && e.SpecID != query.SpecID {
+			continue
+		}
+
+		if isSpecOnly {
+			results = append(results, scored{e, 1.0})
+		} else {
+			s := MatchRelevance(e, query)
+			if s >= threshold {
+				results = append(results, scored{e, s})
+			}
 		}
 	}
+
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].score > results[j].score
 	})

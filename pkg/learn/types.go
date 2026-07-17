@@ -1,7 +1,9 @@
 package learn
 
 import (
+	"encoding/json"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -39,6 +41,7 @@ type LearningEntry struct {
 	Resolution string    `json:"resolution"`
 	Severity   Severity  `json:"severity"`
 	ReuseCount int       `json:"reuse_count"`
+	Line       int       `json:"-"`
 }
 
 // entryIDRegex matches L-{NNN} format (one or more digits after L-).
@@ -54,6 +57,7 @@ type RelevanceQuery struct {
 	Files    []string
 	Packages []string
 	Keywords []string
+	SpecID   string
 }
 
 // Summary holds learning summary for sync display (R8).
@@ -81,4 +85,55 @@ type RecordOpts struct {
 type PatternStat struct {
 	Pattern    string
 	ReuseCount int
+}
+
+// UnmarshalJSON customizes parsing of LearningEntry including fallback timestamp parsing.
+func (le *LearningEntry) UnmarshalJSON(b []byte) error {
+	type Alias LearningEntry
+	aux := &struct {
+		Timestamp string `json:"timestamp"`
+		*Alias
+	}{
+		Alias: (*Alias)(le),
+	}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	if aux.Timestamp == "" {
+		return nil
+	}
+
+	tStr := strings.Trim(aux.Timestamp, `"`)
+	var t time.Time
+	var err error
+	formats := []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+		"2006-01-02T15:04:05-0700",
+		"2006-01-02T15:04:05.999999999-0700",
+		"2006-01-02T15:04:05.999999-0700",
+		"2006-01-02T15:04:05.999-0700",
+	}
+	for _, f := range formats {
+		t, err = time.Parse(f, tStr)
+		if err == nil {
+			le.Timestamp = t
+			return nil
+		}
+	}
+	return err
+}
+
+// MarshalJSON customizes serialization of LearningEntry to ensure canonical RFC3339 timestamp.
+func (le LearningEntry) MarshalJSON() ([]byte, error) {
+	type Alias LearningEntry
+	tStr := le.Timestamp.Format(time.RFC3339Nano)
+	aux := &struct {
+		Timestamp string `json:"timestamp"`
+		Alias
+	}{
+		Timestamp: tStr,
+		Alias:     (Alias)(le),
+	}
+	return json.Marshal(aux)
 }

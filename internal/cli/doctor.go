@@ -250,6 +250,8 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	// touches allOK, so a project with a pending update is not reported as failed.
 	renderDriftTextContext(ctx, out, opts.dir, cfg)
 
+	renderEvidenceFreshnessText(out, opts.dir, cfg)
+
 	fmt.Fprintln(out)
 	tui.ResultBox(out, allOK, func() string {
 		if allOK {

@@ -10,9 +10,9 @@ import (
 )
 
 // newLearnPruneCmd returns the `auto learn prune` subcommand.
-// --days is required.
 func newLearnPruneCmd() *cobra.Command {
 	var days int
+	var maxAge int
 
 	cmd := &cobra.Command{
 		Use:   "prune",
@@ -28,18 +28,25 @@ func newLearnPruneCmd() *cobra.Command {
 				return fmt.Errorf("open store: %w", err)
 			}
 
-			removed, err := learn.Prune(store, days)
+			pruneDays := days
+			if cmd.Flags().Changed("max-age") {
+				pruneDays = maxAge
+			} else if !cmd.Flags().Changed("days") {
+				return fmt.Errorf("either --days or --max-age is required")
+			}
+
+			removed, err := learn.Prune(store, pruneDays)
 			if err != nil {
 				return fmt.Errorf("prune: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Removed %d entries older than %d days.\n", removed, days)
+			fmt.Fprintf(cmd.OutOrStdout(), "Removed %d entries older than %d days.\n", removed, pruneDays)
 			return nil
 		},
 	}
 
 	cmd.Flags().IntVar(&days, "days", 0, "Remove entries older than this many days")
-	_ = cmd.MarkFlagRequired("days")
+	cmd.Flags().IntVar(&maxAge, "max-age", 0, "Remove entries older than this many days (alternative to --days)")
 
 	return cmd
 }

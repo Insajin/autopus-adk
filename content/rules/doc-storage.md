@@ -97,6 +97,11 @@ WHEN `/auto sync` records a changelog entry:
 
 `auto doctor` also runs an advisory drift gate that reports installed-surface content drift, orphan platform manifests, and — in the ADK source repo — un-regenerated templates and a stale binary commit. Like the weight guard it is non-blocking and only hints at `auto update`, `rm`, or `generate-templates` rather than repairing anything.
 
+### Evidence Freshness Guard
+
+`auto doctor` runs an advisory evidence freshness guard that reports the age of learnings, canary, and memindex loops. Like the other guards, it is non-blocking and warns when the age exceeds 30 days, suggesting `auto learn record`, `auto canary`, or `auto mem rebuild` to refresh the evidence.
+Additionally, the `--spec` query filter can be used with `auto learn query` to restrict results strictly to entries matching a specific SPEC ID.
+
 ## Anti-Patterns
 
 - Do NOT store module-specific SPECs at the root level

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -10,9 +11,9 @@ import (
 )
 
 // newLearnQueryCmd returns the `auto learn query` subcommand.
-// Accepts --files, --packages, --keywords as string slices.
 func newLearnQueryCmd() *cobra.Command {
 	var files, packages, keywords []string
+	var spec string
 
 	cmd := &cobra.Command{
 		Use:   "query",
@@ -28,10 +29,20 @@ func newLearnQueryCmd() *cobra.Command {
 				return fmt.Errorf("open store: %w", err)
 			}
 
+			_, skips, err := store.ReadTolerant()
+			if err == nil && len(skips) > 0 {
+				var lines []string
+				for _, s := range skips {
+					lines = append(lines, fmt.Sprintf("%d", s.Line))
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(), "WARNING: skipped %d parsing error(s) at line(s): %s\n", len(skips), strings.Join(lines, ", "))
+			}
+
 			q := learn.RelevanceQuery{
 				Files:    files,
 				Packages: packages,
 				Keywords: keywords,
+				SpecID:   spec,
 			}
 
 			entries, err := learn.QueryRelevant(store, q, 1.0)
@@ -57,6 +68,7 @@ func newLearnQueryCmd() *cobra.Command {
 	cmd.Flags().StringSliceVar(&files, "files", nil, "File paths to match against")
 	cmd.Flags().StringSliceVar(&packages, "packages", nil, "Package names to match against")
 	cmd.Flags().StringSliceVar(&keywords, "keywords", nil, "Keywords to match against")
+	cmd.Flags().StringVar(&spec, "spec", "", "Spec ID to filter by")
 
 	return cmd
 }

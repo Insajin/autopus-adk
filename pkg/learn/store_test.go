@@ -120,7 +120,6 @@ func TestStore_Read_EmptyFile(t *testing.T) {
 func TestStore_Read_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
-	// Given: store file with invalid JSON
 	dir := t.TempDir()
 	learningsDir := filepath.Join(dir, ".autopus", "learnings")
 	require.NoError(t, os.MkdirAll(learningsDir, 0o755))
@@ -130,11 +129,15 @@ func TestStore_Read_InvalidJSON(t *testing.T) {
 	store, err := NewStore(dir)
 	require.NoError(t, err)
 
-	// When: reading
-	_, err = store.Read()
+	entries, err := store.Read()
+	require.NoError(t, err)
+	assert.Empty(t, entries)
 
-	// Then: error on invalid JSON
-	assert.Error(t, err)
+	_, skips, err := store.ReadTolerant()
+	require.NoError(t, err)
+	assert.Len(t, skips, 1)
+	assert.Equal(t, 1, skips[0].Line)
+	assert.Equal(t, "not valid json", skips[0].Raw)
 }
 
 func TestStore_NextID_EmptyStore(t *testing.T) {
