@@ -72,7 +72,7 @@ func detectTemplateRegenDrift(dir string) ([]string, bool) {
 	if err != nil {
 		return nil, false
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 
 	contentDir := filepath.Join(dir, "content")
 	if err := content.GenerateAllTemplates(contentDir, tmp); err != nil {

@@ -210,7 +210,7 @@ func generateDriftBaseline(
 	if err != nil {
 		return nil, false
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 
 	if seed != nil {
 		if err := seed(tmp); err != nil {
