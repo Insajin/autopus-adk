@@ -3,9 +3,10 @@ package orchestra
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -99,17 +100,7 @@ func appendTransportEvent(path, event string) error {
 	return f.Close()
 }
 
-func newOrderedFallbackProvider(t *testing.T, name, eventsPath, gatePath string) ProviderConfig {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("ordered fallback fixture requires a POSIX shell")
-	}
-	binary := filepath.Join(t.TempDir(), "provider-fixture")
-	script := "#!/bin/sh\ncat >/dev/null\n" +
-		"if [ ! -f \"$2\" ]; then printf 'subprocess-before-cleanup\\n' >> \"$1\"; fi\n" +
-		"printf 'subprocess:%s\\n' \"$3\" >> \"$1\"\n" +
-		"printf 'fallback output\\n'\n"
-	require.NoError(t, os.WriteFile(binary, []byte(script), 0o700))
+func newOrderedFallbackProvider(binary, name, eventsPath, gatePath string) ProviderConfig {
 	return ProviderConfig{
 		Name: name, Binary: binary, Args: []string{eventsPath, gatePath, name}, OutputFormat: "text",
 	}
@@ -120,14 +111,48 @@ func TestRunPaneOrchestra_PartialSplitCleansBeforeAllowedFallback(t *testing.T) 
 	dir := t.TempDir()
 	eventsPath := filepath.Join(dir, "events.log")
 	gatePath := filepath.Join(dir, "cleanup.done")
+	binary, err := os.Executable()
+	require.NoError(t, err)
 	term := &orderedSplitTerminal{eventsPath: eventsPath, cleanupGate: gatePath}
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
-			newOrderedFallbackProvider(t, "first", eventsPath, gatePath),
-			newOrderedFallbackProvider(t, "second", eventsPath, gatePath),
+			newOrderedFallbackProvider(binary, "first", eventsPath, gatePath),
+			newOrderedFallbackProvider(binary, "second", eventsPath, gatePath),
 		},
 		Strategy: StrategyConsensus, Prompt: "fallback only after cleanup",
 		TimeoutSeconds: 3, Terminal: term,
+	}
+	originalNewCommand := newCommand
+	t.Cleanup(func() { newCommand = originalNewCommand })
+	newCommand = func(_ context.Context, _ string, args ...string) command {
+		waitCh := make(chan error, 1)
+		waitCh <- nil
+		if len(args) != 3 {
+			return &fakeCommand{
+				waitCh: waitCh,
+				startFn: func(*fakeCommand) error {
+					return fmt.Errorf("unexpected provider args: %v", args)
+				},
+			}
+		}
+		return &fakeCommand{
+			waitCh:   waitCh,
+			exitCode: 0,
+			startFn: func(cmd *fakeCommand) error {
+				if _, err := os.Stat(args[1]); errors.Is(err, os.ErrNotExist) {
+					if err := appendTransportEvent(args[0], "subprocess-before-cleanup"); err != nil {
+						return err
+					}
+				} else if err != nil {
+					return err
+				}
+				if err := appendTransportEvent(args[0], "subprocess:"+args[2]); err != nil {
+					return err
+				}
+				_, err := io.WriteString(cmd.stdout, "fallback output\n")
+				return err
+			},
+		}
 	}
 
 	result, err := RunPaneOrchestra(context.Background(), cfg)
