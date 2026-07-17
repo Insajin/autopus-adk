@@ -48,3 +48,11 @@ Related: <SPEC-ID, issue, or related change>
 - Sign with `🐙 Autopus <noreply@autopus.co>`
 - NEVER add `Co-Authored-By` trailers
 - When committing from Codex, build the full Lore message first and use `git commit -F <message-file>` so trailers and sign-off are preserved exactly.
+
+## Merge and Squash Commits
+
+GitHub PR merges land on the default branch as commits too — they MUST carry Lore format, or the branch history silently drifts out of compliance.
+
+- Squash merge: edit the squash commit message before confirming. The PR title becomes the subject — give the PR a Lore-valid title (`<type>(<scope>): <subject>`), and paste the Lore body + trailers + `🐙 Autopus <noreply@autopus.co>` sign-off into the squash message body (GitHub's default bullet list of commit subjects is NOT a valid Lore body).
+- Merge commit: the auto-generated `Merge pull request #N ...` subject is not Lore-valid. Prefer squash merge, or use `merge(<scope>): <subject>` locally with full trailers when a merge commit is required.
+- The same rule applies to release/RC integration merges (for example `merge(release): ...`).

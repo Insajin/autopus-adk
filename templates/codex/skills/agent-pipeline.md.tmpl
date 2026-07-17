@@ -331,7 +331,7 @@ WHEN executor agents are spawned in Phase 2, THE SYSTEM SHALL inject the assigne
 **Injection procedure:**
 1. Read the task's assigned Profile from the planner's assignment table
 2. Load the profile: check `.autopus/profiles/executor/{profile}.md` first (Tier 2/3), then `content/profiles/executor/{profile}.md` (Tier 1)
-3. If `extends` is set, resolve the base profile and merge Instructions
+3. If `extends` is set (optional frontmatter on generated profiles; built-in Tier 1 profiles are flat), resolve the base profile and merge Instructions
 4. Prepend the merged profile content and Context7 docs (from Phase 1.8) to the executor prompt:
 
 ```

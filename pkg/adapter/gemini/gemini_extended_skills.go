@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/insajin/autopus-adk/content"
@@ -54,5 +55,6 @@ func logTransformReport(report *pkgcontent.TransformReport) {
 	if summary == "" {
 		return
 	}
-	fmt.Println(summary)
+	// Diagnostics go to stderr so JSON consumers reading stdout stay parseable.
+	fmt.Fprintln(os.Stderr, summary)
 }

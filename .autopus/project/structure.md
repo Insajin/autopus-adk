@@ -65,7 +65,7 @@ autopus-adk/
 │   │   │   ├── claude_markers.go #      Marker lifecycle & validation
 │   │   │   └── claude_settings.go #     Hooks/permissions serialization
 │   │   ├── codex/               #     Codex 어댑터
-│   │   ├── gemini/              #     Gemini CLI 어댑터
+│   │   ├── gemini/              #     Antigravity CLI(구 Gemini) 어댑터
 │   │   ├── opencode/            #     OpenCode 어댑터 (planned)
 │   │   └── cursor/              #     Cursor 어댑터 (planned)
 │   ├── config/                  #   설정 관리
@@ -232,7 +232,7 @@ autopus-adk/
 │   ├── shared/                  #   공통 템플릿 (branding-formats, ux-helpers, prd-standard, prd-minimal)
 │   ├── claude/                  #   Claude Code
 │   ├── codex/                   #   Codex
-│   ├── gemini/                  #   Gemini CLI
+│   ├── gemini/                  #   Antigravity CLI(구 Gemini)
 │   ├── opencode/                #   OpenCode
 │   └── cursor/                  #   Cursor
 ├── content/                     # 임베디드 콘텐츠

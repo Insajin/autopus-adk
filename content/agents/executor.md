@@ -143,7 +143,7 @@ The profile provides stack-specific guidance:
 
 ### Extended Profiles
 
-When a framework profile extends a language profile, both are included:
+`extends` is optional frontmatter on generated framework profiles — the built-in Tier 1 profiles are flat and do not use it. When a framework profile does extend a language profile, both are included:
 - Language profile Instructions appear first (base patterns)
 - Framework profile Instructions appear second (framework-specific overrides)
 

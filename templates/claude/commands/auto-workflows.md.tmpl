@@ -1433,7 +1433,7 @@ Display: `권한 모드: {bypass | safe}`
 WHEN `.autopus/learnings/pipeline.jsonl` exists, THE SYSTEM SHALL query for entries matching the current SPEC's file paths, packages, or domain keywords:
 
 ```bash
-auto learn query --spec {SPEC_ID} --limit 5 --format prompt
+auto learn query --spec {SPEC_ID}
 ```
 
 If the command fails or is unavailable, read `.autopus/learnings/pipeline.jsonl` directly, parse JSON entries, and match by:
@@ -2315,7 +2315,7 @@ Reproduce the bug and fix it with minimal changes. Uses a Reproduction-First app
 WHEN `.autopus/learnings/pipeline.jsonl` exists, THE SYSTEM SHALL query for entries matching the error context (file path, package, error pattern):
 
 ```bash
-auto learn query --files {affected_files} --pattern "{error_description}" --limit 3 --format prompt
+auto learn query --files {affected_files} --keywords "{error_description}"
 ```
 
 If matching entries found, display:

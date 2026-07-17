@@ -38,7 +38,7 @@ Verification primitives available:
 - **Depends**: N/A
 - **Status**: active
 
-### S3: init-gemini — Gemini CLI platform init
+### S3: init-gemini — Antigravity CLI(구 Gemini CLI) platform init
 - **Command**: `auto init --platform gemini`
 - **Precondition**: empty project directory with go.mod
 - **Env**: N/A

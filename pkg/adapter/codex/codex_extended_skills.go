@@ -2,6 +2,7 @@ package codex
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -89,7 +90,8 @@ func logTransformReport(report *pkgcontent.TransformReport) {
 	if summary == "" {
 		return
 	}
-	fmt.Println(summary)
+	// Diagnostics go to stderr so JSON consumers reading stdout stay parseable.
+	fmt.Fprintln(os.Stderr, summary)
 }
 
 func skillCompilerExplicitlySelects(cfg *config.HarnessConfig, name string) bool {
