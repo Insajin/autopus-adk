@@ -24,7 +24,7 @@ func resolveCurrentBinaryPath() (binaryPathInfo, error) {
 
 	resolvedPath, err := evalBinarySymlinks(execPath)
 	if err != nil {
-		resolvedPath = execPath
+		return binaryPathInfo{}, fmt.Errorf("현재 바이너리 경로를 안전하게 해석할 수 없음: %w", err)
 	}
 
 	return binaryPathInfo{

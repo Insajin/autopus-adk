@@ -35,7 +35,7 @@ func TestResolveCurrentBinaryPath_ResolvesSymlinkTarget(t *testing.T) {
 	assert.True(t, info.IsSymlinked())
 }
 
-func TestResolveCurrentBinaryPath_FallsBackWhenSymlinkEvalFails(t *testing.T) {
+func TestResolveCurrentBinaryPath_FailsClosedWhenSymlinkEvalFails(t *testing.T) {
 	originalExecutable := currentExecutablePath
 	originalEval := evalBinarySymlinks
 	t.Cleanup(func() {
@@ -46,8 +46,6 @@ func TestResolveCurrentBinaryPath_FallsBackWhenSymlinkEvalFails(t *testing.T) {
 	currentExecutablePath = func() (string, error) { return "/tmp/auto", nil }
 	evalBinarySymlinks = func(string) (string, error) { return "", assert.AnError }
 
-	info, err := resolveCurrentBinaryPath()
-	require.NoError(t, err)
-	assert.Equal(t, "/tmp/auto", info.ManagedPath())
-	assert.False(t, info.IsSymlinked())
+	_, err := resolveCurrentBinaryPath()
+	require.ErrorIs(t, err, assert.AnError)
 }
