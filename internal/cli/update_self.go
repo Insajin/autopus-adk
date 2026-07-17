@@ -14,6 +14,8 @@ import (
 	"github.com/insajin/autopus-adk/pkg/version"
 )
 
+var makeSelfUpdateTempDir = os.MkdirTemp
+
 // @AX:NOTE: [AUTO] linear guard-clause pattern with 7 steps (R2-R12) — complexity is managed via early returns; no refactor needed unless new steps are added
 // targetVersion is accepted for future P2 use (pinned version install); currently unused — checker always fetches latest.
 func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion string) error {
@@ -70,27 +72,39 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 
 	ver := strings.TrimPrefix(info.TagName, "v")
 	archiveName := selfupdate.ArchiveName(runtime.GOOS, runtime.GOARCH, ver)
-	dl := selfupdate.NewDownloader()
-	tmpDir, _ := os.MkdirTemp("", "autopus-update-*")
-	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			log.Printf("[update] cleanup tmp dir failed: %v", err)
+	err = withSelfUpdateTempDir(func(tmpDir string) error {
+		dl := selfupdate.NewDownloader()
+		binaryPath, err := dl.DownloadAndVerify(
+			info.ArchiveURL,
+			info.ChecksumURL,
+			archiveName,
+			tmpDir,
+		)
+		if err != nil {
+			return fmt.Errorf("다운로드/검증 실패: %w", err)
 		}
-	}()
-
-	binaryPath, err := dl.DownloadAndVerify(info.ArchiveURL, info.ChecksumURL, archiveName, tmpDir)
+		return selfupdate.NewReplacer().Replace(binaryPath, execPath)
+	})
 	if err != nil {
-		return fmt.Errorf("다운로드/검증 실패: %w", err)
-	}
-
-	replacer := selfupdate.NewReplacer()
-	if err := replacer.Replace(binaryPath, execPath); err != nil {
 		return err
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "v%s → %s 업데이트 완료\n", currentVer, info.TagName)
 	fmt.Fprintf(cmd.OutOrStdout(), "하네스 파일도 업데이트하려면: auto update\n")
 	return nil
+}
+
+func withSelfUpdateTempDir(run func(string) error) error {
+	tmpDir, err := makeSelfUpdateTempDir("", "autopus-update-*")
+	if err != nil {
+		return fmt.Errorf("self-update 임시 디렉터리 생성 실패: %w", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			log.Printf("[update] cleanup tmp dir failed: %v", err)
+		}
+	}()
+	return run(tmpDir)
 }
 
 func trimPseudoVersion(rawVer string) string {

@@ -494,7 +494,7 @@ Fallback: providers without hooks use ReadScreen + idle detection (SPEC-ORCH-006
 | **Reaction Engine** | `auto react check/apply` | Detects CI failures, analyzes logs, generates fix reports automatically |
 | **Meta-Agent Builder** | `auto agent create` / `auto skill create` | Scaffold custom agents and skills from patterns |
 | **Hard Gate** | `auto check --gate` | Enforce mandatory pipeline gates (mandatory/advisory modes) |
-| **Self-Update** | `auto update --self` | Atomic binary update — GitHub Releases check + SHA256 verification |
+| **Self-Update** | `auto update --self` | Verified binary update — atomic exchange on Darwin/Linux, `.old` recovery on Windows |
 | **Cost Tracking** | `auto telemetry cost` | Token-based pipeline cost estimation per model |
 | **Issue Reporter** | `auto issue report` | Auto-collect error context, sanitize secrets, create GitHub issues |
 | **Signature Map** | `auto setup` | Extract exported API signatures (Go + TypeScript) via AST analysis |
@@ -726,10 +726,29 @@ project you want to refresh.
 auto update --self
 ```
 
-Downloads the latest release from GitHub, verifies its SHA256 checksum, and atomically replaces
-only the CLI binary. It does not refresh any generated project files. Check your current version
-with `auto version`. On macOS, the updater included in v0.50.72 and later preserves the downloaded
+Downloads the latest release from GitHub, verifies its SHA256 checksum, and replaces only the CLI
+binary. It does not refresh any generated project files. Check your current version with
+`auto version`. On macOS, the updater included in v0.50.72 and later preserves the downloaded
 release bytes and Developer ID signature.
+
+Darwin and Linux stage the new binary on the target filesystem and commit it with an atomic
+exchange. If the kernel or filesystem does not support atomic exchange, the update fails before
+changing the installed binary; use the package manager or reinstall the release manually instead.
+
+Windows preserves the installed binary beside the target as `<binary>.old` while placing the new
+binary. A forced process or power interruption between those two moves can leave the target path
+temporarily absent. Restore it from PowerShell, using the actual installation path, and then rerun
+the update:
+
+```powershell
+Move-Item -LiteralPath "C:\path\to\auto.exe.old" -Destination "C:\path\to\auto.exe"
+auto update --self
+```
+
+If both `auto.exe` and `auto.exe.old` exist, the updater removes `.old` automatically only when its
+own `<binary>.old.autopus-complete` marker proves that the prior installation finished. An unmarked
+or invalid recovery file is never deleted automatically: confirm which binary you want to keep,
+then restore or remove `.old` manually.
 
 > **One-time macOS migration from v0.50.71 or earlier:** Do not use the one-line shortcut below for
 > this migration. Run these commands separately and in order:
@@ -1237,7 +1256,7 @@ autopus-adk/
 │   ├── orchestra/      # Multi-model orchestration (4 strategies + brainstorm + interactive debate + hooks)
 │   ├── pipeline/       # Pipeline state persistence + checkpoint + team monitor
 │   ├── search/         # Knowledge search (Context7/Exa) + hash-based search
-│   ├── selfupdate/     # CLI binary self-update (SHA256, atomic replace)
+│   ├── selfupdate/     # CLI binary self-update (SHA256, transactional replace)
 │   ├── setup/          # Project doc generation + validation
 │   ├── sigmap/         # AST-based API signature extraction (Go + TypeScript)
 │   ├── spec/           # EARS requirement parsing/validation

@@ -9,6 +9,10 @@ import "crypto/ed25519"
 // (reason signature_invalid) so a mismatched sidecar can never reach trust.
 const EvalRegressionAttestationSchemaV1 = "eval_regression_attestation.v1"
 
+// EvalRegressionAttestationSchemaV2 identifies the context-bound attestation
+// envelope used by strict production consumers.
+const EvalRegressionAttestationSchemaV2 = "eval_regression_attestation.v2"
+
 // EvalRegressionAttestationV1 is the read-only consumer mirror of the producer's
 // signature sidecar. It re-declares ONLY the six public fields the verifier
 // reads; the producer single-sources signing. The json tags are the EXACT
@@ -24,6 +28,33 @@ type EvalRegressionAttestationV1 struct {
 	SignatureB64  string `json:"signature_b64"`
 	ReportSHA256  string `json:"report_sha256"`
 	ProducedAt    string `json:"produced_at"`
+}
+
+// EvalRegressionAttestationV2 binds the report digest to an explicit trust
+// lane, environment transition, source revision, and workspace scope.
+type EvalRegressionAttestationV2 struct {
+	SchemaVersion     string `json:"schema_version"`
+	KeyID             string `json:"key_id"`
+	Algorithm         string `json:"algorithm"`
+	SignatureB64      string `json:"signature_b64"`
+	ReportSHA256      string `json:"report_sha256"`
+	ProducedAt        string `json:"produced_at"`
+	TrustLane         string `json:"trust_lane"`
+	SourceEnvironment string `json:"source_environment"`
+	TargetEnvironment string `json:"target_environment"`
+	SourceRevision    string `json:"source_revision"`
+	WorkspaceScope    string `json:"workspace_scope"`
+}
+
+// EvalRegressionAttestationPolicyV2 defines the exact context a strict
+// consumer expects. Every field is mandatory and compared without coercion.
+type EvalRegressionAttestationPolicyV2 struct {
+	ExpectedKeyID     string
+	TrustLane         string
+	SourceEnvironment string
+	TargetEnvironment string
+	SourceRevision    string
+	WorkspaceScope    string
 }
 
 // @AX:NOTE [AUTO] Source of truth for trusted signers — PUBLIC keys only; empty allowlist is intentionally fail-closed (REQ-EVP-KEYUNK-001).

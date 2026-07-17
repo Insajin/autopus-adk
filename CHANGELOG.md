@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **Self-update 교체 트랜잭션 하드닝** (2026-07-17): 새 바이너리를 대상 파일시스템의 전용 stage에 준비하고 파일·디렉터리를 동기화한 뒤에만 교체하도록 변경했다. Darwin/Linux는 원자 교환 후 inode를 다시 확인하며, 동시 변경이나 동기화 실패 시 원자적으로 되돌리고 되돌리기마저 실패하면 복구 stage를 보존한다. 교환을 지원하지 않는 커널·파일시스템에서는 기존 바이너리를 유지한 채 안전하게 중단한다. Windows는 실행 중인 바이너리를 `target.old`에 보존하고 no-replace·write-through 이동으로 설치한다. 성공한 설치의 복구본에는 완료 marker를 남겨 다음 실행에서만 정리하고, marker가 없거나 유효하지 않은 복구본은 자동 삭제하지 않는다. Windows 런타임 CI와 모든 OS에서 실행되는 상태 머신 회귀 테스트를 추가했다. 임시 디렉터리 생성 실패, symlink·hardlink alias, target 변경, 부분 복사, chmod·xattr·sync 실패도 교체 전에 차단한다.
+
 - **v0.50.72 macOS self-update 서명 보존** (2026-07-17): v0.50.72에 포함된 새 updater는 SHA-256 검증을 마친 macOS 릴리스 바이너리를 설치한 뒤 ad hoc 서명으로 다시 쓰던 동작을 제거했다. 이 updater가 수행하는 교체는 다운로드한 Mach-O 바이트와 Developer ID 서명, Team ID를 그대로 보존하며, Darwin 전용 회귀 테스트가 바이트 해시와 코드 서명 식별자의 일치를 검증한다. A3 릴리스 게이트는 immutable `v0.50.71`의 commit, annotated tag object, checksums, Darwin archive와 manifest를 고정 검증하고 A0 공개키 record의 연속성을 유지한다. Homebrew는 `v0.50.71` Formula 마이그레이션 브리지를 동결하고 canonical Cask만 `v0.50.72`로 갱신한다.
 
 - **v0.50.72 macOS 기존 self-update의 릴리스 후 이행 안내** (2026-07-17): immutable v0.50.72 릴리스와 새 replacer는 변경하지 않았다. 격리 환경의 smoke test에서 v0.50.71 이하의 macOS 기존 updater가 수행하는 첫 `auto update --self`는 설치한 v0.50.72를 ad hoc 서명으로 다시 쓸 수 있음을 확인했다. 이 경로에서는 `auto update --self`, `auto update --self --force`, `auto update`를 순서대로 한 번 실행해야 한다. 두 번째 명령은 이미 설치된 v0.50.72의 수정된 updater가 릴리스와 정확히 같은 바이트를 다시 설치하여 Developer ID 서명과 `TeamIdentifier=GP2PFA2PUV`를 복원한다. v0.50.72 이상에서 시작하는 이후 self-update는 바이너리 단계에서 `auto update --self` 한 번만 필요하며 릴리스 바이트와 서명을 보존한다. Cask 신규 설치와 기존 Formula에서 Cask로의 이행은 서명된 릴리스 아티팩트를 직접 설치하므로 이 1회 이행 절차의 대상이 아니다.
