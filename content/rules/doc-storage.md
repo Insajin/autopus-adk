@@ -89,6 +89,10 @@ WHEN `/auto sync` records a changelog entry:
 
 `auto doctor` sums the seven session-load documents and emits a non-blocking warning when the combined size exceeds 120000 bytes or any single document exceeds 20000 bytes. The warning is advisory — it never fails harness health — and signals that rotation is overdue.
 
+### Drift Guard
+
+`auto doctor` also runs an advisory drift gate that reports installed-surface content drift, orphan platform manifests, and — in the ADK source repo — un-regenerated templates and a stale binary commit. Like the weight guard it is non-blocking and only hints at `auto update`, `rm`, or `generate-templates` rather than repairing anything.
+
 ## Anti-Patterns
 
 - Do NOT store module-specific SPECs at the root level

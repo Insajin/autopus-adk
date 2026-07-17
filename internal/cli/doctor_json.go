@@ -122,6 +122,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 	report.collectHookChecks(opts.dir)
 	report.collectContextWeightChecks(opts.dir)
 	report.collectHygieneChecks(opts.dir)
+	report.collectDriftGateChecks(opts.dir, cfg)
 
 	return report
 }

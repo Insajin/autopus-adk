@@ -246,6 +246,10 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 		allOK = false
 	}
 
+	// Drift observation is advisory: it mirrors the JSON drift checks but never
+	// touches allOK, so a project with a pending update is not reported as failed.
+	renderDriftText(out, opts.dir, cfg)
+
 	fmt.Fprintln(out)
 	tui.ResultBox(out, allOK, func() string {
 		if allOK {
