@@ -1,6 +1,9 @@
 package evalregression
 
-import "crypto/ed25519"
+import (
+	"crypto/ed25519"
+	"encoding/base64"
+)
 
 // EvalRegressionAttestationSchemaV1 is the exact schema_version this consumer
 // accepts for the out-of-band signature sidecar. It mirrors the Primary
@@ -57,7 +60,21 @@ type EvalRegressionAttestationPolicyV2 struct {
 	WorkspaceScope    string
 }
 
-// @AX:NOTE [AUTO] Source of truth for trusted signers — PUBLIC keys only; empty allowlist is intentionally fail-closed (REQ-EVP-KEYUNK-001).
+const (
+	evalRegressionPromotionKeyID        = "autopus-eval-staging-to-main-2026-07"
+	evalRegressionPromotionPublicKeyB64 = "D6euTz5IarNy68TfJ4tdzOwVomIXoiDEzEtefKmprz8="
+)
+
+func mustEvalRegressionPublicKey(encoded string) ed25519.PublicKey {
+	encoding := base64.StdEncoding.Strict()
+	raw, err := encoding.DecodeString(encoded)
+	if err != nil || len(raw) != ed25519.PublicKeySize || encoding.EncodeToString(raw) != encoded {
+		panic("invalid committed eval regression public key")
+	}
+	return ed25519.PublicKey(raw)
+}
+
+// @AX:NOTE [AUTO] Source of truth for trusted signers — PUBLIC keys only; unknown keys remain fail-closed (REQ-EVP-KEYUNK-001).
 // evalRegressionPublicKeys is the committed public-key allowlist keyed by
 // key_id. It is the SOURCE OF TRUTH for trusted signers on the consumer side.
 //
@@ -69,12 +86,16 @@ type EvalRegressionAttestationPolicyV2 struct {
 //     overlap-window key rotation (REQ-EVP-ROTATE-001): both the outgoing and
 //     incoming public keys are allowlisted during the overlap, and the outgoing
 //     entry is removed after the cutover.
-//   - It is intentionally EMPTY today. The real production public key is added
-//     by ops once LIVE-A emits real signed artifacts (Named Residual). An empty
-//     allowlist is correctly fail-closed: any present artifact resolves no key
-//     and is rejected as signature_key_unknown, and an absent attestation is
-//     rejected as artifact_unsigned. There is no unsigned-accept path.
-var evalRegressionPublicKeys = map[string]ed25519.PublicKey{}
+//   - The staging-to-main promotion signer is scoped to its dedicated key_id.
+//     Its only runtime signing source is the Autopus main-promotion GitHub
+//     Environment. An optional encrypted recovery escrow may retain a
+//     controlled copy; repositories, Railway variables, and logs must not.
+//   - Any key_id absent from this map is rejected as signature_key_unknown, and
+//     an absent attestation is rejected as artifact_unsigned. There is no
+//     unsigned-accept path.
+var evalRegressionPublicKeys = map[string]ed25519.PublicKey{
+	evalRegressionPromotionKeyID: mustEvalRegressionPublicKey(evalRegressionPromotionPublicKeyB64),
+}
 
 // CommittedEvalRegressionPublicKeys returns a defensive copy of the committed
 // public-key allowlist for the CLI production path. The copy prevents a caller
