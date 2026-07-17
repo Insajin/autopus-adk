@@ -2,13 +2,13 @@
 set -euo pipefail
 umask 077
 
-readonly RELEASE_TAG='v0.50.72'
-readonly RELEASE_VERSION='0.50.72'
+readonly RELEASE_TAG='v0.50.73'
+readonly RELEASE_VERSION='0.50.73'
 readonly RELEASE_POLICY='cask-only'
 readonly TAP_REPOSITORY='Insajin/homebrew-autopus'
 readonly TAP_BRANCH='main'
 readonly CASK_PATH='Casks/auto.rb'
-readonly PRIOR_CASK_BLOB='8d09a2d11a62b3db5fd7b3523f2626a34604b0b9'
+readonly PRIOR_CASK_BLOB='f7b8542cf7b7d788d1720087f3781bef94c29e24'
 
 fail() {
   printf 'homebrew cask publication: %s\n' "$1" >&2
@@ -198,5 +198,5 @@ reconcile_tap_file() {
 }
 
 reconcile_tap_file cask Cask "$CASK_PATH" "$cask_target" "$PRIOR_CASK_BLOB" \
-  'Publish signed Cask for v0.50.72' \
-  'published Cask differs from canonical v0.50.71 output and its pinned prior blob'
+  'Publish signed Cask for v0.50.73' \
+  'published Cask differs from canonical v0.50.72 output and its pinned prior blob'

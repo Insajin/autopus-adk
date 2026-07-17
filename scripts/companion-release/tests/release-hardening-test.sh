@@ -34,7 +34,7 @@ goreleaser_step=$(sed -n '/name: Run GoReleaser/,/name: Create Homebrew tap toke
 [[ "$goreleaser_step" != *APPLE_CERTIFICATE_PASSWORD* ]] || fail 'GoReleaser receives certificate password'
 contains "$release" "COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb'"
 contains "$producer" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='8d09a2d11a62b3db5fd7b3523f2626a34604b0b9'"
+contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='f7b8542cf7b7d788d1720087f3781bef94c29e24'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 not_contains "$homebrew_bridge" 'Formula/auto.rb'
 not_contains "$homebrew_bridge" 'FORMULA_PATH'
@@ -48,8 +48,8 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.72'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.72'
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.73'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.73'
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -58,7 +58,7 @@ trap 'rm -rf -- "$temp"' EXIT
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid
-git -C "$temp/source" tag -am 'A3 fixture' v0.50.72
+git -C "$temp/source" tag -am 'A4 fixture' v0.50.73
 commit=$(git -C "$temp/source" rev-parse HEAD)
 tree=$(git -C "$temp/source" rev-parse 'HEAD^{tree}')
 if [[ "${tree: -1}" == '0' ]]; then
@@ -68,7 +68,7 @@ else
 fi
 run_source_gate() {
   local approved_commit="${1-}" approved_tree="${2-}"
-  env GITHUB_REF_NAME=v0.50.72 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
+  env GITHUB_REF_NAME=v0.50.73 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
     GITHUB_OUTPUT="$temp/source-output" COMPANION_SOURCE_PIN_REQUIRED=1 \
     COMPANION_APPROVED_SOURCE_COMMIT="$approved_commit" \
     COMPANION_APPROVED_SOURCE_TREE="$approved_tree" \
@@ -160,37 +160,39 @@ fi
 contains "$lineage_archive" 'MANIFEST_SIGNATURE_NAME'
 contains "$lineage_archive" 'COMPANION_MANIFEST_VERIFIER'
 
-# A3 updates only the Cask and keeps the exact v0.50.71 Formula frozen.
+# A4 updates only the Cask and keeps the exact v0.50.71 Formula frozen.
 state="$temp/tap-state"
 mkdir -m 0700 "$state" "$temp/bin"
 install -m 0700 "$tests_dir/testdata/mock-tap-gh.sh" "$temp/bin/gh"
 checksums="$temp/checksums.txt"
-printf '%064d  autopus-adk_0.50.72_darwin_amd64.tar.gz\n' 1 >"$checksums"
-printf '%064d  autopus-adk_0.50.72_darwin_arm64.tar.gz\n' 2 >>"$checksums"
-printf '%064d  autopus-adk_0.50.72_linux_amd64.tar.gz\n' 3 >>"$checksums"
-printf '%064d  autopus-adk_0.50.72_linux_arm64.tar.gz\n' 4 >>"$checksums"
+printf '%064d  autopus-adk_0.50.73_darwin_amd64.tar.gz\n' 1 >"$checksums"
+printf '%064d  autopus-adk_0.50.73_darwin_arm64.tar.gz\n' 2 >>"$checksums"
+printf '%064d  autopus-adk_0.50.73_linux_amd64.tar.gz\n' 3 >>"$checksums"
+printf '%064d  autopus-adk_0.50.73_linux_arm64.tar.gz\n' 4 >>"$checksums"
 source "$script_dir/publish-homebrew-formula-bridge-render.sh"
-render_homebrew_cask "$temp/prior-cask.rb" 0.50.71 \
-  "$(printf '%064d' 1)" "$(printf '%064d' 2)" \
-  "$(printf '%064d' 3)" "$(printf '%064d' 4)"
+render_homebrew_cask "$temp/prior-cask.rb" 0.50.72 \
+  '064c994fd739616fabfd7b353511d633d3b73b41912f756ee8e6b655ea9366ad' \
+  'c218a8df21ac7a7fe459e294942aa9e5b2e676d0a90a644bf486b4452f628a23' \
+  'b5f25b4b151e48d1b5558d54b66161a87b09f0d3a4f81aef972cab9f349df31b' \
+  '4177fc636a0c919ada9b40e1b76f926f75e3a6b300d6aeae5b63e5027c79ea6d'
 render_homebrew_formula_bridge "$temp/frozen-formula.rb" v0.50.71 0.50.71 \
   "$(printf '%064d' 1)" "$(printf '%064d' 2)" \
   "$(printf '%064d' 3)" "$(printf '%064d' 4)"
 jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
-  '{sha:"8d09a2d11a62b3db5fd7b3523f2626a34604b0b9",content:$content}' >"$state/cask.json"
+  '{sha:"f7b8542cf7b7d788d1720087f3781bef94c29e24",content:$content}' >"$state/cask.json"
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
 cp "$state/formula.json" "$temp/formula-before.json"
-bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.72
-  COMPANION_VERSION=0.50.72 COMPANION_HOMEBREW_POLICY=cask-only
+bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.73
+  COMPANION_VERSION=0.50.73 COMPANION_HOMEBREW_POLICY=cask-only
   COMPANION_CHECKSUMS_PATH="$checksums" HOMEBREW_TAP_TOKEN=fixture)
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \
-  || fail 'A3 did not update only the Cask'
+  || fail 'A4 did not update only the Cask'
 cmp -s "$temp/formula-before.json" "$state/formula.json" \
   || fail 'frozen v0.50.71 Formula blob or bytes changed'
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \
-  || fail 'A3 Cask-only reconciler is not idempotent'
+  || fail 'A4 Cask-only reconciler is not idempotent'
 
 printf 'release hardening test: PASS\n'

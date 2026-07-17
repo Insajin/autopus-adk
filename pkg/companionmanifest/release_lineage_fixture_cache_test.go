@@ -20,6 +20,7 @@ var goReleaserLineageCaches = map[string]*goReleaserLineageCache{
 	publicKeyReceiptA1Tag: {version: lineageA1Version, annotated: true},
 	publicKeyReceiptA2Tag: {version: publicKeyReceiptA2Version, annotated: true},
 	publicKeyReceiptA3Tag: {version: publicKeyReceiptA3Version, annotated: true},
+	publicKeyReceiptA4Tag: {version: publicKeyReceiptA4Version, annotated: true},
 }
 
 func produceGoReleaserFixtureEvidence(
@@ -70,6 +71,7 @@ func TestGoReleaserLineageFixtures_ProcessCacheBuildsEachCoordinateOnce(t *testi
 		{tag: publicKeyReceiptA1Tag, version: lineageA1Version, annotated: true},
 		{tag: publicKeyReceiptA2Tag, version: publicKeyReceiptA2Version, annotated: true},
 		{tag: publicKeyReceiptA3Tag, version: publicKeyReceiptA3Version, annotated: true},
+		{tag: publicKeyReceiptA4Tag, version: publicKeyReceiptA4Version, annotated: true},
 	}
 	for _, test := range cases {
 		first := produceGoReleaserFixtureEvidence(t, tools, test.tag, test.version, test.annotated)

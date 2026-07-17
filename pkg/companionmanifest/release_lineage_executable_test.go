@@ -39,6 +39,16 @@ var immutableA2LineagePins = map[string]string{
 	"A2_ARM64_MANIFEST_SHA256": "f780452da57ec0a845bd8dae22dcd134b920c593c9ba61f496380136f243c8c0",
 }
 
+var immutableA3LineagePins = map[string]string{
+	"A3_COMMIT_SHA":            "ba5509b692a43dc8a70e0bd6173acb56166ed67f",
+	"A3_TAG_OBJECT_SHA":        "19fd06cec4f60218b07727e649f9671b27c1f7a7",
+	"A3_CHECKSUMS_SHA256":      "1c88282d9cc215c4a766059ab9da79eecbb42126535f54b2d201e7f1309b35fe",
+	"A3_AMD64_ARCHIVE_SHA256":  "064c994fd739616fabfd7b353511d633d3b73b41912f756ee8e6b655ea9366ad",
+	"A3_ARM64_ARCHIVE_SHA256":  "c218a8df21ac7a7fe459e294942aa9e5b2e676d0a90a644bf486b4452f628a23",
+	"A3_AMD64_MANIFEST_SHA256": "2a88c6f40e8bda35c9342fac496ed424187d25f1fa2ac0be0c714bb10c9c1490",
+	"A3_ARM64_MANIFEST_SHA256": "80243b2fc0409d7743b9a7f94eaa88091ec1c53382b7215169157be314767e7e",
+}
+
 func TestReleasePublicKeyReceipt_GoReleaserA0FixtureFailsClosedOnTampering(t *testing.T) {
 	tools := newExecutableLineageTools(t)
 	evidence := produceGoReleaserA0FixtureEvidence(t, tools)
@@ -243,6 +253,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 	source := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage.sh"))
 	for _, pins := range []map[string]string{
 		immutableA0LineagePins, immutableA1LineagePins, immutableA2LineagePins,
+		immutableA3LineagePins,
 	} {
 		for name, value := range pins {
 			declaration := "readonly " + name + "='" + value + "'"
@@ -253,7 +264,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 	}
 	for _, bypass := range []string{
 		"TEST_PIN", "PIN_FILE", "PIN_OVERRIDE", "GO_WANT_LINEAGE",
-		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_",
+		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_",
 	} {
 		if strings.Contains(source, bypass) {
 			t.Fatalf("production lineage exposes test pin bypass %q", bypass)

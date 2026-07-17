@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **v0.50.73 companion A4 릴리스 계보 준비** (2026-07-17): 릴리스 워크플로를 정확한 `v0.50.73` 태그와 보호 환경에만 열고, A4가 immutable `v0.50.72`의 commit, annotated tag object, checksums, Darwin archive와 manifest pin을 직접 검증하도록 확장했다. A0부터 이어진 공개키 receipt/signature/record 바이트는 그대로 재게시하며, Homebrew는 고정된 `v0.50.72` Cask blob에서 canonical `v0.50.73` Cask로만 CAS 갱신하고 `v0.50.71` Formula는 호출하거나 변경하지 않는다. 이 항목은 릴리스 준비 코드이며 태그 생성, 환경 source pin 갱신, 실제 서명·공증·게시 완료를 뜻하지 않는다.
+
 - **v0.50.72 macOS self-update 서명 보존** (2026-07-17): v0.50.72에 포함된 새 updater는 SHA-256 검증을 마친 macOS 릴리스 바이너리를 설치한 뒤 ad hoc 서명으로 다시 쓰던 동작을 제거했다. 이 updater가 수행하는 교체는 다운로드한 Mach-O 바이트와 Developer ID 서명, Team ID를 그대로 보존하며, Darwin 전용 회귀 테스트가 바이트 해시와 코드 서명 식별자의 일치를 검증한다. A3 릴리스 게이트는 immutable `v0.50.71`의 commit, annotated tag object, checksums, Darwin archive와 manifest를 고정 검증하고 A0 공개키 record의 연속성을 유지한다. Homebrew는 `v0.50.71` Formula 마이그레이션 브리지를 동결하고 canonical Cask만 `v0.50.72`로 갱신한다.
 
 - **v0.50.72 macOS 기존 self-update의 릴리스 후 이행 안내** (2026-07-17): immutable v0.50.72 릴리스와 새 replacer는 변경하지 않았다. 격리 환경의 smoke test에서 v0.50.71 이하의 macOS 기존 updater가 수행하는 첫 `auto update --self`는 설치한 v0.50.72를 ad hoc 서명으로 다시 쓸 수 있음을 확인했다. 이 경로에서는 `auto update --self`, `auto update --self --force`, `auto update`를 순서대로 한 번 실행해야 한다. 두 번째 명령은 이미 설치된 v0.50.72의 수정된 updater가 릴리스와 정확히 같은 바이트를 다시 설치하여 Developer ID 서명과 `TeamIdentifier=GP2PFA2PUV`를 복원한다. v0.50.72 이상에서 시작하는 이후 self-update는 바이너리 단계에서 `auto update --self` 한 번만 필요하며 릴리스 바이트와 서명을 보존한다. Cask 신규 설치와 기존 Formula에서 Cask로의 이행은 서명된 릴리스 아티팩트를 직접 설치하므로 이 1회 이행 절차의 대상이 아니다.

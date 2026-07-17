@@ -91,6 +91,8 @@ func directPredecessorPinReplacements(fixture *executableLineageFixture) map[str
 		prefix = "A1"
 	case publicKeyReceiptA3Tag:
 		prefix = "A2"
+	case publicKeyReceiptA4Tag:
+		prefix = "A3"
 	default:
 		return nil
 	}
@@ -108,6 +110,7 @@ func directPredecessorPinReplacements(fixture *executableLineageFixture) map[str
 func immutableProductionLineagePin(name string) (string, bool) {
 	for _, pins := range []map[string]string{
 		immutableA0LineagePins, immutableA1LineagePins, immutableA2LineagePins,
+		immutableA3LineagePins,
 	} {
 		if value, ok := pins[name]; ok {
 			return value, true
