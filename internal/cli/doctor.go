@@ -236,6 +236,10 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 		allOK = false
 	}
 
+	// Context weight is advisory: it warns on an over-weight session-load set
+	// but never fails harness health, so its result does not touch allOK.
+	checkContextWeight(out, opts.dir)
+
 	hygiene := collectStatusHygiene(opts.dir)
 	renderHygieneText(out, hygiene)
 	if hygiene.hasWarning() {
