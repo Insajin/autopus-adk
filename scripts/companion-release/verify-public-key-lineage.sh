@@ -5,6 +5,7 @@ readonly A0_REPOSITORY='Insajin/autopus-adk' A0_TAG='v0.50.69' A0_VERSION='0.50.
 readonly A1_REPOSITORY='Insajin/autopus-adk' A1_TAG='v0.50.70' A1_VERSION='0.50.70'
 readonly A2_REPOSITORY='Insajin/autopus-adk' A2_TAG='v0.50.71' A2_VERSION='0.50.71'
 readonly A3_TAG='v0.50.72' A3_VERSION='0.50.72'
+readonly A3_REPOSITORY='Insajin/autopus-adk' A4_TAG='v0.50.73' A4_VERSION='0.50.73'
 readonly A0_COMMIT_SHA='7372a484eaf87a07e224476a6161f792b73d7dfb'
 readonly A0_RECEIPT_SHA256='4a588fa4991c515e9520861af5567fd2fe4c19e2c23adb8963bd37ebc46a5bbc'
 readonly A0_SIGNATURE_SHA256='7f248929d807b689acab575888b0a7600bd2ea17cce1e5fcc11f72af9c510173'
@@ -27,6 +28,13 @@ readonly A2_AMD64_ARCHIVE_SHA256='babce99376a647e801ea06d99f3575c87414551cbbeb77
 readonly A2_ARM64_ARCHIVE_SHA256='fbe9693d3517bdbaf92f230d7aa7561b728ba002749c2d06b6eef08170fed60b'
 readonly A2_AMD64_MANIFEST_SHA256='82d8e22a3943dd8efc14dafd0c28ac11d415b1c1a8ff5447beb658a5cff11be4'
 readonly A2_ARM64_MANIFEST_SHA256='f780452da57ec0a845bd8dae22dcd134b920c593c9ba61f496380136f243c8c0'
+readonly A3_COMMIT_SHA='ba5509b692a43dc8a70e0bd6173acb56166ed67f'
+readonly A3_TAG_OBJECT_SHA='19fd06cec4f60218b07727e649f9671b27c1f7a7'
+readonly A3_CHECKSUMS_SHA256='1c88282d9cc215c4a766059ab9da79eecbb42126535f54b2d201e7f1309b35fe'
+readonly A3_AMD64_ARCHIVE_SHA256='064c994fd739616fabfd7b353511d633d3b73b41912f756ee8e6b655ea9366ad'
+readonly A3_ARM64_ARCHIVE_SHA256='c218a8df21ac7a7fe459e294942aa9e5b2e676d0a90a644bf486b4452f628a23'
+readonly A3_AMD64_MANIFEST_SHA256='2a88c6f40e8bda35c9342fac496ed424187d25f1fa2ac0be0c714bb10c9c1490'
+readonly A3_ARM64_MANIFEST_SHA256='80243b2fc0409d7743b9a7f94eaa88091ec1c53382b7215169157be314767e7e'
 readonly BUNDLE_NAME='adk-companion-public-key-receipt.bundle' RECEIPT_NAME='public-key-receipt.json'
 readonly SIGNATURE_NAME='public-key-receipt.sig' MANIFEST_NAME='adk-companion-manifest.json'
 readonly MANIFEST_SIGNATURE_NAME='adk-companion-manifest.sig'
@@ -46,8 +54,7 @@ require_environment GITHUB_REF_NAME
 COMPANION_VERSION="${GITHUB_REF_NAME#v}"
 if [[ "$GITHUB_REF_NAME" == 'v0.50.69' && "$COMPANION_VERSION" == '0.50.69' ]]; then
   release_phase='A0'
-  printf 'companion release lineage: %s bootstrap accepted for %s@%s\n' \
-    "$release_phase" "$A0_REPOSITORY" "$A0_TAG"
+  printf 'companion release lineage: %s bootstrap accepted for %s@%s\n' "$release_phase" "$A0_REPOSITORY" "$A0_TAG"
   exit 0
 elif [[ "$GITHUB_REF_NAME" == "$A1_TAG" && "$COMPANION_VERSION" == "$A1_VERSION" ]]; then
   release_phase='A1' prior_phase='A0' prior_repository="$A0_REPOSITORY" prior_evidence_source="$A0_EVIDENCE_SOURCE"
@@ -64,26 +71,21 @@ elif [[ "$GITHUB_REF_NAME" == "$A3_TAG" && "$COMPANION_VERSION" == "$A3_VERSION"
   prior_tag="$A2_TAG" prior_version="$A2_VERSION" prior_commit="$A2_COMMIT_SHA"
   prior_tag_object="$A2_TAG_OBJECT_SHA" prior_checksums="$A2_CHECKSUMS_SHA256" prior_amd64_archive="$A2_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A2_ARM64_ARCHIVE_SHA256"
   prior_amd64_manifest="$A2_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A2_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A4_TAG" && "$COMPANION_VERSION" == "$A4_VERSION" ]]; then
+  release_phase='A4' prior_phase='A3' prior_repository="$A3_REPOSITORY" prior_evidence_source='immutable A3 GitHub release' prior_tag="$A3_TAG" prior_version="$A3_VERSION" prior_commit="$A3_COMMIT_SHA"
+  prior_tag_object="$A3_TAG_OBJECT_SHA" prior_checksums="$A3_CHECKSUMS_SHA256" prior_amd64_archive="$A3_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A3_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A3_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A3_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4 policy'
 fi
-nonzero_hex "$prior_commit" 40 \
-  || fail prior_evidence_unverifiable \
-    "${prior_phase} commit pin is not provisioned; ${LOCAL_EVIDENCE_ERROR}"
-for pin in \
-  "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" \
-  "$A0_RECORD_SHA256" "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" \
-  "$prior_amd64_manifest" "$prior_arm64_manifest"
-do
-  nonzero_hex "$pin" 64 \
-    || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
+nonzero_hex "$prior_commit" 40 || fail prior_evidence_unverifiable "${prior_phase} commit pin is not provisioned; ${LOCAL_EVIDENCE_ERROR}"
+for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
+  "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
+  nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
 done
-if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ]]; then
-  nonzero_hex "$prior_tag_object" 40 \
-    || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
+if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' ]]; then
+  nonzero_hex "$prior_tag_object" 40 || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
   for pin in "$prior_amd64_archive" "$prior_arm64_archive"; do
-    nonzero_hex "$pin" 64 \
-      || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"
+    nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"
   done
 fi
 for name in GITHUB_TOKEN COMPANION_SIGNER COMPANION_RECEIPT_VERIFIER \
@@ -94,14 +96,12 @@ done
 case "${COMPANION_LINEAGE_MANIFEST_VERIFICATION_REQUIRED-0}" in
   0) ;;
   1) require_environment COMPANION_MANIFEST_VERIFIER ;;
-  *) fail prior_evidence_unverifiable \
-       'COMPANION_LINEAGE_MANIFEST_VERIFICATION_REQUIRED must be 0 or 1' ;;
+  *) fail prior_evidence_unverifiable 'COMPANION_LINEAGE_MANIFEST_VERIFICATION_REQUIRED must be 0 or 1' ;;
 esac
 for tool in gh jq tar cmp shasum xxd awk grep find wc; do
   command -v "$tool" >/dev/null || fail prior_evidence_unverifiable "required tool ${tool} is unavailable"
 done
-[[ -f "$COMPANION_SIGNER" && ! -L "$COMPANION_SIGNER" && -x "$COMPANION_SIGNER" ]] \
-  || fail prior_evidence_unverifiable 'companion signer is invalid'
+[[ -f "$COMPANION_SIGNER" && ! -L "$COMPANION_SIGNER" && -x "$COMPANION_SIGNER" ]] || fail prior_evidence_unverifiable 'companion signer is invalid'
 [[ -f "$COMPANION_RECEIPT_VERIFIER" && ! -L "$COMPANION_RECEIPT_VERIFIER" &&
    -x "$COMPANION_RECEIPT_VERIFIER" ]] \
   || fail prior_evidence_unverifiable 'companion receipt verifier is invalid'

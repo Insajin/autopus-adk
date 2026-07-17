@@ -17,16 +17,16 @@ var frozenFormulaDigests = []string{
 	"8f331702c5d98418b45203d0b7b604f52a36d9e08b2a7dcbb6d5f6fe712ef878",
 }
 
-func TestHomebrewFormulaBridge_A3PinsCaskOnlyTapTransition(t *testing.T) {
+func TestHomebrewFormulaBridge_A4PinsCaskOnlyTapTransition(t *testing.T) {
 	source := readReleaseFile(t, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
 	for _, required := range []string{
-		"readonly RELEASE_TAG='v0.50.72'",
-		"readonly RELEASE_VERSION='0.50.72'",
-		"readonly PRIOR_CASK_BLOB='8d09a2d11a62b3db5fd7b3523f2626a34604b0b9'",
+		"readonly RELEASE_TAG='v0.50.73'",
+		"readonly RELEASE_VERSION='0.50.73'",
+		"readonly PRIOR_CASK_BLOB='f7b8542cf7b7d788d1720087f3781bef94c29e24'",
 		"COMPANION_HOMEBREW_POLICY", "cask-only",
 	} {
 		if !strings.Contains(source, required) {
-			t.Fatalf("A3 Homebrew policy missing %q", required)
+			t.Fatalf("A4 Homebrew policy missing %q", required)
 		}
 	}
 	for _, forbidden := range []string{
@@ -34,7 +34,7 @@ func TestHomebrewFormulaBridge_A3PinsCaskOnlyTapTransition(t *testing.T) {
 		"reconcile_tap_file formula Formula",
 	} {
 		if strings.Contains(source, forbidden) {
-			t.Fatalf("A3 production path still references the frozen Formula via %q", forbidden)
+			t.Fatalf("A4 production path still references the frozen Formula via %q", forbidden)
 		}
 	}
 }
@@ -57,7 +57,7 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 			fixture.writeAPIContent(t, "cask.json", strings.Repeat("c", 40), malicious)
 
 			output, err := fixture.run(nil)
-			if err == nil || !strings.Contains(string(output), "published Cask differs from canonical v0.50.71") {
+			if err == nil || !strings.Contains(string(output), "published Cask differs from canonical v0.50.72") {
 				t.Fatalf("%s Cask result: %v\n%s", stanza, err, output)
 			}
 			if got := fixture.updateCount(t, "cask"); got != "0" {
@@ -69,11 +69,11 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 
 func homebrewBridgeCask() string {
 	return strings.NewReplacer(
-		`version "0.50.70"`, `version "0.50.71"`,
-		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", bridgeDigests[0],
-		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", bridgeDigests[1],
-		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", bridgeDigests[2],
-		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", bridgeDigests[3],
+		`version "0.50.70"`, `version "0.50.72"`,
+		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "064c994fd739616fabfd7b353511d633d3b73b41912f756ee8e6b655ea9366ad",
+		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "c218a8df21ac7a7fe459e294942aa9e5b2e676d0a90a644bf486b4452f628a23",
+		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "b5f25b4b151e48d1b5558d54b66161a87b09f0d3a4f81aef972cab9f349df31b",
+		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "4177fc636a0c919ada9b40e1b76f926f75e3a6b300d6aeae5b63e5027c79ea6d",
 	).Replace(publishedV05070Cask)
 }
 
