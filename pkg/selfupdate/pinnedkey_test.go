@@ -4,132 +4,161 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/pem"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestActiveKeys_ExcludesExpired verifies the pre-trial expiry gate: a key
-// whose ExpiresAt has passed as of now is excluded from the active set.
-func TestActiveKeys_ExcludesExpired(t *testing.T) {
+func TestActiveReleaseKeys_ExpiryBoundaryAndRotation(t *testing.T) {
 	t.Parallel()
 
-	_, expired := generateReleaseTestKey(t, "2020-01-01")
-	_, active := generateReleaseTestKey(t, "2099-12-31")
+	_, expired := generateReleaseTestKey(t, "2026-07-16")
+	_, boundary := generateReleaseTestKey(t, "2026-07-17")
+	_, future := generateReleaseTestKey(t, "2099-12-31")
 
-	got := ActiveKeys([]PinnedReleaseKey{expired, active}, referenceTime)
+	active, err := activeReleaseKeys(
+		[]pinnedReleaseKey{expired, boundary, future},
+		time.Date(2026, 7, 17, 23, 59, 59, 0, time.UTC),
+	)
 
-	require.Len(t, got, 1)
-	assert.True(t, got[0].Equal(mustParsePublicKey(t, active.PublicKeyPEM)))
-}
-
-// TestActiveKeys_BoundaryDateStillActive verifies a key is NOT excluded on
-// its exact ExpiresAt date -- only strictly-after excludes it, matching
-// install.sh's `[ "$now" \> "$EXPIRES_n" ]` lexicographic gate.
-func TestActiveKeys_BoundaryDateStillActive(t *testing.T) {
-	t.Parallel()
-
-	_, pinned := generateReleaseTestKey(t, "2026-07-17")
-	now := time.Date(2026, 7, 17, 23, 59, 59, 0, time.UTC)
-
-	got := ActiveKeys([]PinnedReleaseKey{pinned}, now)
-
-	assert.Len(t, got, 1)
-}
-
-// TestActiveKeys_DayAfterExpiryExcluded verifies the day immediately after
-// ExpiresAt excludes the key.
-func TestActiveKeys_DayAfterExpiryExcluded(t *testing.T) {
-	t.Parallel()
-
-	_, pinned := generateReleaseTestKey(t, "2026-07-17")
-	now := time.Date(2026, 7, 18, 0, 0, 0, 0, time.UTC)
-
-	got := ActiveKeys([]PinnedReleaseKey{pinned}, now)
-
-	assert.Empty(t, got)
-}
-
-// TestActiveKeys_MalformedPEMExcludedNotPanicking verifies a malformed
-// embedded PEM entry is excluded defensively instead of panicking, so one
-// bad rotation entry cannot lock every client out of an otherwise-valid key.
-func TestActiveKeys_MalformedPEMExcludedNotPanicking(t *testing.T) {
-	t.Parallel()
-
-	bad := PinnedReleaseKey{KeyID: "bad", ExpiresAt: "2099-12-31", PublicKeyPEM: "not a pem"}
-	_, good := generateReleaseTestKey(t, "2099-12-31")
-
-	got := ActiveKeys([]PinnedReleaseKey{bad, good}, referenceTime)
-
-	require.Len(t, got, 1)
-}
-
-// TestActiveKeys_MalformedExpiresAtExcluded verifies a key with an
-// unparsable ExpiresAt is excluded rather than crashing the filter.
-func TestActiveKeys_MalformedExpiresAtExcluded(t *testing.T) {
-	t.Parallel()
-
-	_, badDate := generateReleaseTestKey(t, "not-a-date")
-
-	got := ActiveKeys([]PinnedReleaseKey{badDate}, referenceTime)
-
-	assert.Empty(t, got)
-}
-
-// TestActiveKeys_RejectsNonP256Curve verifies a key on a different curve
-// (e.g. P-384) is excluded, since verification assumes P-256.
-func TestActiveKeys_RejectsNonP256Curve(t *testing.T) {
-	t.Parallel()
-
-	priv, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	require.NoError(t, err)
-	pubDER, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
-	require.NoError(t, err)
-	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER})
-	nonP256 := PinnedReleaseKey{KeyID: "p384", ExpiresAt: "2099-12-31", PublicKeyPEM: string(pemBytes)}
-
-	got := ActiveKeys([]PinnedReleaseKey{nonP256}, referenceTime)
-
-	assert.Empty(t, got)
+	require.Len(t, active, 2)
+	require.Contains(t, active, boundary.Fingerprint)
+	require.Contains(t, active, future.Fingerprint)
 }
 
-// TestEmbeddedReleaseKeys_ProductionKeyIsValid is a regression guard on the
-// production trust anchor: it must parse as a P-256 SPKI key and its KeyID
-// bookkeeping constant must match sha256(SPKI DER)'s first 8 hex chars, so a
-// future hand-edit of the embedded PEM cannot silently desync from its KeyID
-// label.
-func TestEmbeddedReleaseKeys_ProductionKeyIsValid(t *testing.T) {
+func TestActiveReleaseKeys_RejectsMalformedTrustAnchors(t *testing.T) {
 	t.Parallel()
 
-	require.Len(t, EmbeddedReleaseKeys, 1)
-	key := EmbeddedReleaseKeys[0]
-
-	pub := mustParsePublicKey(t, key.PublicKeyPEM)
-	assert.Equal(t, "P-256", pub.Curve.Params().Name)
-
-	pubDER, err := x509.MarshalPKIXPublicKey(pub)
+	_, valid := generateReleaseTestKey(t, "2099-12-31")
+	validBlock, _ := pem.Decode([]byte(valid.PublicKeyPEM))
+	require.NotNil(t, validBlock)
+	withHeaders := &pem.Block{
+		Type:    validBlock.Type,
+		Headers: map[string]string{"Proc-Type": "4,ENCRYPTED"},
+		Bytes:   validBlock.Bytes,
+	}
+	p384, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	require.NoError(t, err)
-	digest := sha256.Sum256(pubDER)
-	assert.Equal(t, key.KeyID, hex.EncodeToString(digest[:])[:8])
+	p384DER, err := x509.MarshalPKIXPublicKey(&p384.PublicKey)
+	require.NoError(t, err)
+	p384PEM := string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: p384DER}))
 
-	// Must still be active well before its documented expiry.
-	active := ActiveKeys(EmbeddedReleaseKeys, referenceTime)
-	assert.Len(t, active, 1)
+	tests := []struct {
+		name string
+		key  pinnedReleaseKey
+	}{
+		{"missing set", pinnedReleaseKey{}},
+		{"invalid expiry", withPinnedExpiry(valid, "2099-99-99")},
+		{"invalid PEM", withPinnedPEM(valid, "not a pem")},
+		{"leading PEM data", withPinnedPEM(valid, "\n"+valid.PublicKeyPEM)},
+		{"PEM headers", withPinnedPEM(valid, string(pem.EncodeToMemory(withHeaders)))},
+		{"trailing PEM data", withPinnedPEM(valid, valid.PublicKeyPEM+"garbage")},
+		{"non P-256 key", withPinnedPEM(valid, p384PEM)},
+		{"uppercase fingerprint", withPinnedFingerprint(valid, strings.ToUpper(valid.Fingerprint))},
+		{"fingerprint mismatch", withPinnedFingerprint(valid, strings.Repeat("0", 64))},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := activeReleaseKeys([]pinnedReleaseKey{test.key}, referenceTime)
+
+			require.ErrorIs(t, err, ErrMalformedEmbeddedReleaseKey)
+			require.False(t, errors.Is(err, ErrAllReleaseSigningKeysExpired))
+		})
+	}
+
+	_, err = activeReleaseKeys(nil, referenceTime)
+	require.ErrorIs(t, err, ErrMalformedEmbeddedReleaseKey)
 }
 
-func mustParsePublicKey(t *testing.T, pemStr string) *ecdsa.PublicKey {
-	t.Helper()
-	block, _ := pem.Decode([]byte(pemStr))
-	require.NotNil(t, block)
-	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+func TestActiveReleaseKeys_DuplicateFingerprintUsesMalformedSentinel(t *testing.T) {
+	t.Parallel()
+
+	_, valid := generateReleaseTestKey(t, "2099-12-31")
+
+	_, err := activeReleaseKeys([]pinnedReleaseKey{valid, valid}, referenceTime)
+
+	require.ErrorIs(t, err, ErrMalformedEmbeddedReleaseKey)
+	require.False(t, errors.Is(err, ErrAllReleaseSigningKeysExpired))
+}
+
+func TestActiveReleaseKeys_AllExpiredUsesDedicatedSentinel(t *testing.T) {
+	t.Parallel()
+
+	_, first := generateReleaseTestKey(t, "2020-01-01")
+	_, second := generateReleaseTestKey(t, "2026-07-16")
+
+	_, err := activeReleaseKeys([]pinnedReleaseKey{first, second}, referenceTime)
+
+	require.ErrorIs(t, err, ErrAllReleaseSigningKeysExpired)
+	require.False(t, errors.Is(err, ErrMalformedEmbeddedReleaseKey))
+}
+
+func TestEmbeddedReleaseKeys_AreFullFingerprintP256AndActive(t *testing.T) {
+	t.Parallel()
+
+	want := []struct {
+		fingerprint string
+		expiresAt   string
+	}{
+		{"e1fdfe066484c7eae8ff16fa4b1ee6237b8d06299c2b66ced485f029af77837f", "2028-07-17"},
+		{"93d9f681d829f2d0bdba7e1853e6acf9ae2ffd2c760355853218e920c35cc5ff", "2030-07-17"},
+	}
+	require.Len(t, embeddedReleaseKeys, len(want))
+	for index, key := range embeddedReleaseKeys {
+		publicKey, fingerprint, err := parsePinnedReleaseKey(key)
+		require.NoError(t, err)
+		require.Equal(t, "P-256", publicKey.Curve.Params().Name)
+		require.Equal(t, want[index].fingerprint, fingerprint)
+		require.Equal(t, want[index].expiresAt, key.ExpiresAt)
+	}
+
+	active, err := activeReleaseKeys(embeddedReleaseKeys[:], referenceTime)
 	require.NoError(t, err)
-	ecdsaPub, ok := pub.(*ecdsa.PublicKey)
-	require.True(t, ok)
-	return ecdsaPub
+	require.Len(t, active, len(want))
+	for _, expected := range want {
+		require.Contains(t, active, expected.fingerprint)
+	}
+}
+
+func TestEmbeddedReleaseKeys_MatchCheckedInReleasePins(t *testing.T) {
+	t.Parallel()
+
+	require.Len(t, embeddedReleaseKeys, 2)
+	for index, name := range []string{"k1", "k2"} {
+		key := embeddedReleaseKeys[index]
+		publicPEM, err := os.ReadFile(filepath.Join("..", "..", "scripts", "release-signing", "release-"+name+"-public.pem"))
+		require.NoError(t, err)
+		fingerprint, err := os.ReadFile(filepath.Join("..", "..", "scripts", "release-signing", "release-"+name+".fingerprint"))
+		require.NoError(t, err)
+
+		require.Equal(t, key.PublicKeyPEM+"\n", string(publicPEM))
+		require.Equal(t, key.Fingerprint+"\n", string(fingerprint))
+	}
+}
+
+func withPinnedExpiry(key pinnedReleaseKey, value string) pinnedReleaseKey {
+	key.ExpiresAt = value
+	return key
+}
+
+func withPinnedPEM(key pinnedReleaseKey, value string) pinnedReleaseKey {
+	key.PublicKeyPEM = value
+	return key
+}
+
+func withPinnedFingerprint(key pinnedReleaseKey, value string) pinnedReleaseKey {
+	key.Fingerprint = value
+	return key
 }

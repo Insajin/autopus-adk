@@ -23,6 +23,7 @@ func TestCheckLatest_NewVersionAvailable(t *testing.T) {
 			"assets": []map[string]any{
 				{"name": "autopus-adk_0.7.0_darwin_arm64.tar.gz", "browser_download_url": "https://example.com/autopus-adk_0.7.0_darwin_arm64.tar.gz"},
 				{"name": "checksums.txt", "browser_download_url": "https://example.com/checksums.txt"},
+				{"name": "checksums.txt.signatures", "browser_download_url": "https://example.com/checksums.txt.signatures"},
 			},
 		}
 		_ = json.NewEncoder(w).Encode(resp)
@@ -37,6 +38,7 @@ func TestCheckLatest_NewVersionAvailable(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, info)
 	assert.Equal(t, "v0.7.0", info.TagName)
+	assert.Equal(t, "https://example.com/checksums.txt.signatures", info.SignatureURL)
 }
 
 // TestCheckLatest_AlreadyUpToDate verifies that when current version matches

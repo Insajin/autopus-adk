@@ -94,7 +94,7 @@ func (c *Checker) FetchLatest(goos, goarch string) (*ReleaseInfo, error) {
 			archiveURL = url
 		case "checksums.txt":
 			checksumURL = url
-		case "checksums.txt.sig":
+		case "checksums.txt.signatures":
 			signatureURL = url
 		}
 	}

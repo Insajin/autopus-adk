@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -57,29 +58,19 @@ func buildEmptyTarGz(t *testing.T, name string) []byte {
 
 // generateReleaseTestKey creates a synthetic ECDSA P-256 key pair for release
 // signature tests and returns both the private key (for signing test
-// fixtures) and its PinnedReleaseKey record (for the trust-anchor trial
+// fixtures) and its pinnedReleaseKey record (for the trust-anchor trial
 // set). Production keys never appear in tests.
-func generateReleaseTestKey(t *testing.T, expiresAt string) (*ecdsa.PrivateKey, PinnedReleaseKey) {
+func generateReleaseTestKey(t *testing.T, expiresAt string) (*ecdsa.PrivateKey, pinnedReleaseKey) {
 	t.Helper()
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	pubDER, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
 	require.NoError(t, err)
 	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER})
-	return priv, PinnedReleaseKey{
-		KeyID:        "test-" + expiresAt,
+	fingerprint := sha256.Sum256(pubDER)
+	return priv, pinnedReleaseKey{
+		Fingerprint:  fmt.Sprintf("%x", fingerprint),
 		ExpiresAt:    expiresAt,
 		PublicKeyPEM: string(pemBytes),
 	}
-}
-
-// signReleaseChecksums produces a detached ECDSA P-256 ASN.1/DER signature
-// over data's SHA-256 digest, matching the producer's
-// `openssl dgst -sha256 -sign` output format.
-func signReleaseChecksums(t *testing.T, priv *ecdsa.PrivateKey, data []byte) []byte {
-	t.Helper()
-	digest := sha256.Sum256(data)
-	sig, err := ecdsa.SignASN1(rand.Reader, priv, digest[:])
-	require.NoError(t, err)
-	return sig
 }

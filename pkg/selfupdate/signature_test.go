@@ -2,184 +2,194 @@ package selfupdate
 
 import (
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/x509"
-	"encoding/pem"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"encoding/asn1"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"math/big"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// referenceTime is a fixed instant used across signature/pinnedkey tests so
-// ExpiresAt fixtures ("2020-01-01", "2099-12-31") are unambiguous regardless
-// of when the test suite actually runs.
 var referenceTime = time.Date(2026, 7, 17, 0, 0, 0, 0, time.UTC)
 
-// TestVerifyReleaseSignature_S1_NormalPath verifies that a signature made by
-// the sole embedded key over the exact checksums bytes verifies successfully.
-func TestVerifyReleaseSignature_S1_NormalPath(t *testing.T) {
+func TestVerifyReleaseSignatures_AcceptsKnownSignatureAmongUnknownEntries(t *testing.T) {
 	t.Parallel()
 
-	priv, pinned := generateReleaseTestKey(t, "2099-12-31")
-	checksums := []byte("abc123  autopus-adk_0.7.0_darwin_arm64.tar.gz\n")
-	sig := signReleaseChecksums(t, priv, checksums)
+	knownPrivate, known := generateReleaseTestKey(t, "2099-12-31")
+	unknownPrivate, unknown := generateReleaseTestKey(t, "2099-12-31")
+	checksums := []byte("abc123  autopus-adk_0.50.73_darwin_arm64.tar.gz\n")
+	envelope := releaseSignatureEnvelope(t, checksums,
+		testEnvelopeSigner{private: unknownPrivate, fingerprint: unknown.Fingerprint},
+		testEnvelopeSigner{private: knownPrivate, fingerprint: known.Fingerprint},
+	)
 
-	err := VerifyReleaseSignature(checksums, sig, []PinnedReleaseKey{pinned}, referenceTime)
+	err := verifyReleaseSignatures(checksums, envelope, []pinnedReleaseKey{known}, referenceTime)
 
 	require.NoError(t, err)
 }
 
-// TestVerifyReleaseSignature_S2_TamperedChecksums verifies that a signature
-// valid for the original checksums bytes fails once a single byte changes.
-func TestVerifyReleaseSignature_S2_TamperedChecksums(t *testing.T) {
+func TestVerifyReleaseSignatures_FailsClosedForTamperingAndUntrustedSigners(t *testing.T) {
 	t.Parallel()
 
-	priv, pinned := generateReleaseTestKey(t, "2099-12-31")
-	checksums := []byte("abc123  autopus-adk_0.7.0_darwin_arm64.tar.gz\n")
-	sig := signReleaseChecksums(t, priv, checksums)
-	tampered := []byte("abc124  autopus-adk_0.7.0_darwin_arm64.tar.gz\n")
+	trustedPrivate, trusted := generateReleaseTestKey(t, "2099-12-31")
+	attackerPrivate, attacker := generateReleaseTestKey(t, "2099-12-31")
+	checksums := []byte("abc123  archive.tar.gz\n")
 
-	err := VerifyReleaseSignature(tampered, sig, []PinnedReleaseKey{pinned}, referenceTime)
+	tests := []struct {
+		name      string
+		payload   []byte
+		signers   []testEnvelopeSigner
+		wantError error
+	}{
+		{
+			name:      "tampered checksums",
+			payload:   []byte("abc124  archive.tar.gz\n"),
+			signers:   []testEnvelopeSigner{{private: trustedPrivate, fingerprint: trusted.Fingerprint}},
+			wantError: ErrNoTrustedReleaseSignature,
+		},
+		{
+			name:      "attacker fingerprint and signature",
+			payload:   checksums,
+			signers:   []testEnvelopeSigner{{private: attackerPrivate, fingerprint: attacker.Fingerprint}},
+			wantError: ErrNoTrustedReleaseSignature,
+		},
+		{
+			name:      "trusted fingerprint with attacker signature",
+			payload:   checksums,
+			signers:   []testEnvelopeSigner{{private: attackerPrivate, fingerprint: trusted.Fingerprint}},
+			wantError: ErrNoTrustedReleaseSignature,
+		},
+	}
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no trusted release signing key verified")
-}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			envelope := releaseSignatureEnvelope(t, checksums, test.signers...)
 
-// TestVerifyReleaseSignature_S4S6_AttackerKeyOutsideEmbeddedSet verifies that
-// a signature made by a key outside the embedded set is rejected even though
-// the signature is cryptographically valid for its own (untrusted) key. This
-// also covers S6's same-origin full-replacement threat: an attacker who
-// rewrites archive+checksums+sig together still signs with a key the client
-// never embedded.
-func TestVerifyReleaseSignature_S4S6_AttackerKeyOutsideEmbeddedSet(t *testing.T) {
-	t.Parallel()
+			err := verifyReleaseSignatures(test.payload, envelope, []pinnedReleaseKey{trusted}, referenceTime)
 
-	attackerPriv, _ := generateReleaseTestKey(t, "2099-12-31")
-	_, embeddedPinned := generateReleaseTestKey(t, "2099-12-31")
-	checksums := []byte("abc123  autopus-adk_0.7.0_darwin_arm64.tar.gz\n")
-	sig := signReleaseChecksums(t, attackerPriv, checksums)
-
-	err := VerifyReleaseSignature(checksums, sig, []PinnedReleaseKey{embeddedPinned}, referenceTime)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no trusted release signing key verified")
-}
-
-// TestVerifyReleaseSignature_S8b_SoleKeyExpired verifies the pre-trial expiry
-// gate excludes the only embedded key before any cryptographic attempt, even
-// though the signature itself is valid for that key.
-func TestVerifyReleaseSignature_S8b_SoleKeyExpired(t *testing.T) {
-	t.Parallel()
-
-	priv, pinned := generateReleaseTestKey(t, "2020-01-01")
-	checksums := []byte("checksum fixture\n")
-	sig := signReleaseChecksums(t, priv, checksums)
-
-	err := VerifyReleaseSignature(checksums, sig, []PinnedReleaseKey{pinned}, referenceTime)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "all embedded keys expired")
-}
-
-// TestVerifyReleaseSignature_S8c_RotationWindow verifies that a 2-key
-// embedded set (K1, newly rotated-in K2) still verifies a signature made
-// with K2 -- the rotation window multi-trial passes.
-func TestVerifyReleaseSignature_S8c_RotationWindow(t *testing.T) {
-	t.Parallel()
-
-	_, pinned1 := generateReleaseTestKey(t, "2099-12-31")
-	priv2, pinned2 := generateReleaseTestKey(t, "2099-12-31")
-	checksums := []byte("checksum fixture\n")
-	sig := signReleaseChecksums(t, priv2, checksums)
-
-	err := VerifyReleaseSignature(checksums, sig, []PinnedReleaseKey{pinned1, pinned2}, referenceTime)
-
-	require.NoError(t, err)
-}
-
-// TestVerifyReleaseSignature_EmptyKeySet verifies that an empty pinned key
-// set is treated as "all expired" rather than panicking or passing.
-func TestVerifyReleaseSignature_EmptyKeySet(t *testing.T) {
-	t.Parallel()
-
-	err := VerifyReleaseSignature([]byte("checksum fixture\n"), []byte("not-a-signature"), nil, referenceTime)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "all embedded keys expired")
-}
-
-// --- R3: Go <-> openssl ECDSA-over-SHA256 interoperability ---
-
-func requireOpenSSL(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("openssl"); err != nil {
-		t.Skip("openssl not found in PATH; skipping interop test")
+			require.ErrorIs(t, err, test.wantError)
+		})
 	}
 }
 
-// TestVerifyReleaseSignature_InteropGoSignsOpenSSLVerifies signs with Go's
-// ecdsa.SignASN1 and verifies with the openssl CLI, confirming Go's stdlib
-// output matches what the producer's `openssl dgst -sha256 -verify` step
-// (and install.sh's verify_signature) expect.
-func TestVerifyReleaseSignature_InteropGoSignsOpenSSLVerifies(t *testing.T) {
-	requireOpenSSL(t)
+func TestParseReleaseSignatureEnvelope_RejectsMalformedInput(t *testing.T) {
+	t.Parallel()
 
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	private, pinned := generateReleaseTestKey(t, "2099-12-31")
+	checksums := []byte("checksum fixture\n")
+	valid := releaseSignatureEnvelope(t, checksums,
+		testEnvelopeSigner{private: private, fingerprint: pinned.Fingerprint},
+	)
+	validLine := strings.Split(string(valid), "\n")[1]
+	validEncoded := strings.Split(validLine, "\t")[1]
+	validDER, err := base64.StdEncoding.DecodeString(validEncoded)
 	require.NoError(t, err)
-	checksums := []byte("interop fixture: go signs, openssl verifies\n")
-	digest := sha256.Sum256(checksums)
-	sig, err := ecdsa.SignASN1(rand.Reader, priv, digest[:])
+	uppercase := strings.ToUpper(pinned.Fingerprint) + validLine[64:]
+	badDER, err := asn1.Marshal(struct{ R, S *big.Int }{big.NewInt(0), big.NewInt(1)})
 	require.NoError(t, err)
+	badDERLine := pinned.Fingerprint + "\t" + base64.StdEncoding.EncodeToString(badDER)
+	smallDER, err := asn1.Marshal(struct{ R, S *big.Int }{big.NewInt(1), big.NewInt(1)})
+	require.NoError(t, err)
+	unpaddedBase64 := strings.TrimRight(base64.StdEncoding.EncodeToString(smallDER), "=")
+	trailingDER := base64.StdEncoding.EncodeToString(append(validDER, 0))
 
-	dir := t.TempDir()
-	pubDER, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
-	require.NoError(t, err)
-	pubPath := filepath.Join(dir, "pub.pem")
-	require.NoError(t, os.WriteFile(pubPath, pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER}), 0o600))
-	checksumsPath := filepath.Join(dir, "checksums.txt")
-	require.NoError(t, os.WriteFile(checksumsPath, checksums, 0o600))
-	sigPath := filepath.Join(dir, "checksums.txt.sig")
-	require.NoError(t, os.WriteFile(sigPath, sig, 0o600))
+	tests := []struct {
+		name string
+		data string
+	}{
+		{"empty", ""},
+		{"wrong header", "AUTOPUS-RELEASE-SIGNATURE-V2\n" + validLine + "\n"},
+		{"header only", ReleaseSignatureEnvelopeHeader + "\n"},
+		{"UTF-8 BOM", "\ufeff" + string(valid)},
+		{"CRLF", strings.ReplaceAll(string(valid), "\n", "\r\n")},
+		{"NUL", ReleaseSignatureEnvelopeHeader + "\n" + validLine + "\x00\n"},
+		{"missing final newline", strings.TrimSuffix(string(valid), "\n")},
+		{"blank record", ReleaseSignatureEnvelopeHeader + "\n\n" + validLine + "\n"},
+		{"uppercase fingerprint", ReleaseSignatureEnvelopeHeader + "\n" + uppercase + "\n"},
+		{"short fingerprint", ReleaseSignatureEnvelopeHeader + "\n" + validLine[1:] + "\n"},
+		{"space separator", ReleaseSignatureEnvelopeHeader + "\n" + strings.Replace(validLine, "\t", " ", 1) + "\n"},
+		{"invalid base64", ReleaseSignatureEnvelopeHeader + "\n" + pinned.Fingerprint + "\t***\n"},
+		{"unpadded base64", ReleaseSignatureEnvelopeHeader + "\n" + pinned.Fingerprint + "\t" + unpaddedBase64 + "\n"},
+		{"invalid DER integers", ReleaseSignatureEnvelopeHeader + "\n" + badDERLine + "\n"},
+		{"trailing DER data", ReleaseSignatureEnvelopeHeader + "\n" + pinned.Fingerprint + "\t" + trailingDER + "\n"},
+		{"duplicate fingerprint", ReleaseSignatureEnvelopeHeader + "\n" + validLine + "\n" + validLine + "\n"},
+		{"oversized record", ReleaseSignatureEnvelopeHeader + "\n" + strings.Repeat("a", MaxReleaseSignatureLineSize+1) + "\n"},
+	}
 
-	out, err := exec.Command("openssl", "dgst", "-sha256", "-verify", pubPath, "-signature", sigPath, checksumsPath).CombinedOutput()
-	require.NoError(t, err, "openssl verify failed: %s", out)
-	assert.Contains(t, string(out), "Verified OK")
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := parseReleaseSignatureEnvelope([]byte(test.data))
+
+			require.ErrorIs(t, err, ErrMalformedReleaseSignatureEnvelope)
+		})
+	}
 }
 
-// TestVerifyReleaseSignature_InteropOpenSSLSignsGoVerifies signs with the
-// openssl CLI (matching the producer's actual `openssl dgst -sha256 -sign`
-// step) and verifies with VerifyReleaseSignature, confirming the Go consumer
-// accepts real producer-shaped signatures.
-func TestVerifyReleaseSignature_InteropOpenSSLSignsGoVerifies(t *testing.T) {
-	requireOpenSSL(t)
+func TestParseReleaseSignatureEnvelope_RejectsCountAndSizeOverflow(t *testing.T) {
+	t.Parallel()
 
-	dir := t.TempDir()
-	privPath := filepath.Join(dir, "priv.pem")
-	pubPath := filepath.Join(dir, "pub.pem")
-	require.NoError(t, exec.Command("openssl", "ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", privPath).Run())
-	require.NoError(t, exec.Command("openssl", "ec", "-in", privPath, "-pubout", "-out", pubPath).Run())
+	private, _ := generateReleaseTestKey(t, "2099-12-31")
+	checksums := []byte("checksum fixture\n")
+	signers := make([]testEnvelopeSigner, 0, MaxReleaseSignatureCount+1)
+	for range MaxReleaseSignatureCount + 1 {
+		_, key := generateReleaseTestKey(t, "2099-12-31")
+		signers = append(signers, testEnvelopeSigner{private: private, fingerprint: key.Fingerprint})
+	}
+	tooMany := releaseSignatureEnvelope(t, checksums, signers...)
 
-	checksums := []byte("interop fixture: openssl signs, go verifies\n")
-	checksumsPath := filepath.Join(dir, "checksums.txt")
-	require.NoError(t, os.WriteFile(checksumsPath, checksums, 0o600))
-	sigPath := filepath.Join(dir, "checksums.txt.sig")
-	signOut, err := exec.Command("openssl", "dgst", "-sha256", "-sign", privPath, "-out", sigPath, checksumsPath).CombinedOutput()
-	require.NoError(t, err, "openssl sign failed: %s", signOut)
+	_, err := parseReleaseSignatureEnvelope(tooMany)
+	require.ErrorIs(t, err, ErrMalformedReleaseSignatureEnvelope)
 
-	sig, err := os.ReadFile(sigPath)
-	require.NoError(t, err)
-	pubPEM, err := os.ReadFile(pubPath)
-	require.NoError(t, err)
+	oversized := append([]byte(ReleaseSignatureEnvelopeHeader+"\n"), make([]byte, MaxReleaseSignatureEnvelopeSize)...)
+	_, err = parseReleaseSignatureEnvelope(oversized)
+	require.ErrorIs(t, err, ErrMalformedReleaseSignatureEnvelope)
+}
 
-	pinned := PinnedReleaseKey{KeyID: "interop", ExpiresAt: "2099-12-31", PublicKeyPEM: string(pubPEM)}
-	verifyErr := VerifyReleaseSignature(checksums, sig, []PinnedReleaseKey{pinned}, referenceTime)
+func TestVerifyReleaseSignatures_DistinguishesExpiredAndMalformedKeys(t *testing.T) {
+	t.Parallel()
 
-	require.NoError(t, verifyErr)
+	private, expired := generateReleaseTestKey(t, "2020-01-01")
+	checksums := []byte("checksum fixture\n")
+	envelope := releaseSignatureEnvelope(t, checksums,
+		testEnvelopeSigner{private: private, fingerprint: expired.Fingerprint},
+	)
+
+	err := verifyReleaseSignatures(checksums, envelope, []pinnedReleaseKey{expired}, referenceTime)
+	require.ErrorIs(t, err, ErrAllReleaseSigningKeysExpired)
+	require.False(t, errors.Is(err, ErrMalformedEmbeddedReleaseKey))
+
+	malformed := expired
+	malformed.ExpiresAt = "not-a-date"
+	err = verifyReleaseSignatures(checksums, envelope, []pinnedReleaseKey{malformed}, referenceTime)
+	require.ErrorIs(t, err, ErrMalformedEmbeddedReleaseKey)
+	require.False(t, errors.Is(err, ErrAllReleaseSigningKeysExpired))
+}
+
+type testEnvelopeSigner struct {
+	private     *ecdsa.PrivateKey
+	fingerprint string
+}
+
+func releaseSignatureEnvelope(t *testing.T, checksums []byte, signers ...testEnvelopeSigner) []byte {
+	t.Helper()
+	var builder strings.Builder
+	builder.WriteString(ReleaseSignatureEnvelopeHeader + "\n")
+	for _, signer := range signers {
+		digest := sha256.Sum256(checksums)
+		signature, err := ecdsa.SignASN1(rand.Reader, signer.private, digest[:])
+		require.NoError(t, err)
+		fmt.Fprintf(&builder, "%s\t%s\n", signer.fingerprint, base64.StdEncoding.EncodeToString(signature))
+	}
+	return []byte(builder.String())
 }

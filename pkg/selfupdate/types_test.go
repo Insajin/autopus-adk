@@ -13,16 +13,18 @@ func TestReleaseInfo_Fields(t *testing.T) {
 
 	// Given/When: a ReleaseInfo is constructed with all fields
 	info := ReleaseInfo{
-		TagName:     "v0.7.0",
-		ArchiveURL:  "https://example.com/autopus-adk_0.7.0_darwin_arm64.tar.gz",
-		ChecksumURL: "https://example.com/checksums.txt",
-		ArchiveName: "autopus-adk_0.7.0_darwin_arm64.tar.gz",
+		TagName:      "v0.7.0",
+		ArchiveURL:   "https://example.com/autopus-adk_0.7.0_darwin_arm64.tar.gz",
+		ChecksumURL:  "https://example.com/checksums.txt",
+		SignatureURL: "https://example.com/checksums.txt.signatures",
+		ArchiveName:  "autopus-adk_0.7.0_darwin_arm64.tar.gz",
 	}
 
 	// Then: all fields are accessible and correct
 	assert.Equal(t, "v0.7.0", info.TagName)
 	assert.NotEmpty(t, info.ArchiveURL)
 	assert.NotEmpty(t, info.ChecksumURL)
+	assert.NotEmpty(t, info.SignatureURL)
 	assert.NotEmpty(t, info.ArchiveName)
 }
 

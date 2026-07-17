@@ -35,8 +35,12 @@ type releaseConfig struct {
 		Binaries  []string `yaml:"binaries"`
 	} `yaml:"homebrew_casks"`
 	Signs []struct {
-		Command   string `yaml:"cmd"`
-		Artifacts string `yaml:"artifacts"`
+		ID        string   `yaml:"id"`
+		Command   string   `yaml:"cmd"`
+		Artifacts string   `yaml:"artifacts"`
+		Arguments []string `yaml:"args"`
+		Signature string   `yaml:"signature"`
+		Output    bool     `yaml:"output"`
 	} `yaml:"signs"`
 }
 
@@ -87,14 +91,23 @@ func TestGoReleaser_CompanionProducerIsAssociatedWithEveryDarwinBuild(t *testing
 		len(cask.Binaries) != 1 || cask.Binaries[0] != "auto" {
 		t.Fatalf("Homebrew cask flow changed: %#v", cask)
 	}
-	// SPEC-ADK-RELEASE-SIGNING-001: cosign's keyless bundle stays as
-	// defense-in-depth transparency logging, alongside a second consumer-verified
-	// ECDSA P-256 signer over the same checksum artifact.
 	if len(config.Signs) != 2 || config.Signs[0].Command != "cosign" || config.Signs[0].Artifacts != "checksum" {
 		t.Fatalf("cosign checksum flow changed: %#v", config.Signs)
 	}
-	if config.Signs[1].Command != "sh" || config.Signs[1].Artifacts != "checksum" {
+	if config.Signs[1].ID != "ecdsa-release-envelope" ||
+		config.Signs[1].Command != "scripts/release-signing/sign-checksums.sh" ||
+		config.Signs[1].Artifacts != "checksum" ||
+		config.Signs[1].Signature != "${artifact}.signatures" ||
+		!config.Signs[1].Output {
 		t.Fatalf("ECDSA release-signing checksum flow changed: %#v", config.Signs)
+	}
+	wantArguments := []string{
+		"${artifact}",
+		"${signature}",
+		"{{ .Env.ADK_RELEASE_ECDSA_PRIVATE_KEY_FILE }}",
+	}
+	if strings.Join(config.Signs[1].Arguments, "\n") != strings.Join(wantArguments, "\n") {
+		t.Fatalf("ECDSA release-signing arguments = %#v, want %#v", config.Signs[1].Arguments, wantArguments)
 	}
 }
 

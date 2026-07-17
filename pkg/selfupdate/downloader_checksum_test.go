@@ -20,7 +20,8 @@ func TestDownloadAndVerify_ChecksumMismatch(t *testing.T) {
 	wrongChecksum := "0000000000000000000000000000000000000000000000000000000000000000"
 	checksumLine := wrongChecksum + "  " + archiveName + "\n"
 	priv, pinned := generateReleaseTestKey(t, "2099-12-31")
-	sig := signReleaseChecksums(t, priv, []byte(checksumLine))
+	envelope := releaseSignatureEnvelope(t, []byte(checksumLine),
+		testEnvelopeSigner{private: priv, fingerprint: pinned.Fingerprint})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -28,8 +29,8 @@ func TestDownloadAndVerify_ChecksumMismatch(t *testing.T) {
 			_, _ = w.Write(archiveContent)
 		case "/checksums.txt":
 			_, _ = w.Write([]byte(checksumLine))
-		case "/checksums.txt.sig":
-			_, _ = w.Write(sig)
+		case "/checksums.txt.signatures":
+			_, _ = w.Write(envelope)
 		default:
 			http.NotFound(w, r)
 		}
@@ -37,11 +38,11 @@ func TestDownloadAndVerify_ChecksumMismatch(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	dl := NewDownloader(WithPinnedKeys([]PinnedReleaseKey{pinned}))
-	_, err := dl.DownloadAndVerify(
+	dl := newDownloaderForTest([]pinnedReleaseKey{pinned}, referenceTime)
+	_, err := dl.DownloadAndVerifyWithSignature(
 		srv.URL+"/"+archiveName,
 		srv.URL+"/checksums.txt",
-		srv.URL+"/checksums.txt.sig",
+		srv.URL+"/checksums.txt.signatures",
 		archiveName,
 		destDir,
 	)
@@ -58,14 +59,15 @@ func TestDownloadAndVerify_ChecksumNotFound(t *testing.T) {
 	archiveName := "autopus-adk_0.7.0_darwin_arm64.tar.gz"
 	checksumLine := "abc123  other_file.tar.gz\n"
 	priv, pinned := generateReleaseTestKey(t, "2099-12-31")
-	sig := signReleaseChecksums(t, priv, []byte(checksumLine))
+	envelope := releaseSignatureEnvelope(t, []byte(checksumLine),
+		testEnvelopeSigner{private: priv, fingerprint: pinned.Fingerprint})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/checksums.txt":
 			_, _ = w.Write([]byte(checksumLine))
-		case "/checksums.txt.sig":
-			_, _ = w.Write(sig)
+		case "/checksums.txt.signatures":
+			_, _ = w.Write(envelope)
 		default:
 			http.NotFound(w, r)
 		}
@@ -73,11 +75,11 @@ func TestDownloadAndVerify_ChecksumNotFound(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	dl := NewDownloader(WithPinnedKeys([]PinnedReleaseKey{pinned}))
-	_, err := dl.DownloadAndVerify(
+	dl := newDownloaderForTest([]pinnedReleaseKey{pinned}, referenceTime)
+	_, err := dl.DownloadAndVerifyWithSignature(
 		srv.URL+"/"+archiveName,
 		srv.URL+"/checksums.txt",
-		srv.URL+"/checksums.txt.sig",
+		srv.URL+"/checksums.txt.signatures",
 		archiveName,
 		destDir,
 	)

@@ -5,7 +5,7 @@ type ReleaseInfo struct {
 	TagName      string // e.g. "v0.7.0"
 	ArchiveURL   string // download URL for the archive
 	ChecksumURL  string // download URL for checksums.txt
-	SignatureURL string // download URL for checksums.txt.sig; empty if the release predates publisher signing
+	SignatureURL string // download URL for checksums.txt.signatures; empty when the release asset is absent
 	ArchiveName  string // e.g. "autopus-adk_0.7.0_darwin_arm64.tar.gz"
 }
 

@@ -146,6 +146,30 @@ jobs:
           rm -f -- "$certificate_path"
           printf 'apple-signing-identity=%s\n' "$identity" >> "$GITHUB_OUTPUT"
 
+      - name: Materialize release signing key
+        shell: bash
+        env:
+          ADK_RELEASE_ECDSA_PRIVATE_KEY: ${{ secrets.ADK_RELEASE_ECDSA_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ -n "$ADK_RELEASE_ECDSA_PRIVATE_KEY" ]]
+          credential_dir="$RUNNER_TEMP/adk-release-credentials"
+          [[ -d "$credential_dir" && ! -L "$credential_dir" ]]
+          release_signing_key_path="$credential_dir/release-ecdsa-private-key"
+          [[ ! -e "$release_signing_key_path" && ! -L "$release_signing_key_path" ]]
+          printf '%s' "$ADK_RELEASE_ECDSA_PRIVATE_KEY" > "$release_signing_key_path"
+          chmod 0600 "$release_signing_key_path"
+
+      - name: Verify release signing key pair
+        shell: bash
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            scripts/release-signing/verify-key-pair.sh \
+            "$RUNNER_TEMP/adk-release-credentials/release-ecdsa-private-key" \
+            scripts/release-signing/release-k1-public.pem \
+            scripts/release-signing/release-k1.fingerprint
+
       - name: Validate companion release inputs
         shell: bash
         env:
@@ -224,7 +248,7 @@ jobs:
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ADK_RELEASE_ECDSA_PRIVATE_KEY: ${{ secrets.ADK_RELEASE_ECDSA_PRIVATE_KEY }}
+          ADK_RELEASE_ECDSA_PRIVATE_KEY_FILE: ${{ runner.temp }}/adk-release-credentials/release-ecdsa-private-key
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ runner.temp }}/adk-release-credentials/AuthKey_${{ secrets.APPLE_API_KEY }}.p8
@@ -247,7 +271,7 @@ jobs:
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_TOKEN="$GITHUB_TOKEN" \
-            ADK_RELEASE_ECDSA_PRIVATE_KEY="$ADK_RELEASE_ECDSA_PRIVATE_KEY" \
+            ADK_RELEASE_ECDSA_PRIVATE_KEY_FILE="$ADK_RELEASE_ECDSA_PRIVATE_KEY_FILE" \
             ACTIONS_ID_TOKEN_REQUEST_TOKEN="$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             ACTIONS_ID_TOKEN_REQUEST_URL="$ACTIONS_ID_TOKEN_REQUEST_URL" \
             APPLE_API_ISSUER="$APPLE_API_ISSUER" APPLE_API_KEY="$APPLE_API_KEY" \
