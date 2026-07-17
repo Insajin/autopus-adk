@@ -89,13 +89,13 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 	return responses
 }
 
-// runJudgeRound executes the judge verdict after all debate rounds.
-// Always runs judge as a non-interactive subprocess for reliable completion detection.
+// runJudgeRound executes the judge verdict after all debate rounds through the
+// same pane-aware backend selection as the participant providers.
 // Uses a fresh context with 120s timeout since the parent context may be near expiry
 // after debate rounds consumed most of the allotted time.
-// R1: cmd.Run() return (process exit event) is the primary completion signal;
-// the context timeout is a safety net only — judge completion is event-based, not poll-based.
-func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *HookSession, responses []ProviderResponse, _ int) *ProviderResponse {
+// The selected backend owns bounded completion detection; the context timeout
+// remains the outer safety bound and still respects parent cancellation.
+func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *HookSession, responses []ProviderResponse, round int) *ProviderResponse {
 	judgment := buildJudgmentPrompt(cfg.Prompt, responses)
 	judgeCfg := findOrBuildJudgeConfig(cfg)
 
@@ -107,10 +107,25 @@ func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *Ho
 	judgeCtx, cancel := context.WithTimeout(ctx, judgeTimeout)
 	defer cancel()
 
-	fmt.Fprintf(os.Stderr, "[Judge] subprocess 실행 중 (provider: %s, timeout: %s)...\n", cfg.JudgeProvider, judgeTimeout)
-	resp, err := runProvider(judgeCtx, judgeCfg, judgment)
+	backendCfg := cfg
+	backendCfg.HookMode = false
+	backendCfg.SessionID = ""
+	backend := SelectBackend(backendCfg)
+	fmt.Fprintf(os.Stderr, "[Judge] %s 실행 중 (provider: %s, timeout: %s)...\n", backend.Name(), cfg.JudgeProvider, judgeTimeout)
+	resp, err := backend.Execute(judgeCtx, ProviderRequest{
+		Provider: judgeCfg.Name,
+		Prompt:   judgment,
+		Role:     "judge",
+		Round:    round + 1,
+		Timeout:  judgeTimeout,
+		Config:   judgeCfg,
+	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[Judge] 프로세스 실행 실패: %v\n", err)
+		executedBackend := backend.Name()
+		if resp != nil && resp.ExecutedBackend != "" {
+			executedBackend = resp.ExecutedBackend
+		}
+		fmt.Fprintf(os.Stderr, "[Judge] %s 실행 실패: %v\n", executedBackend, err)
 		return nil
 	}
 	if resp == nil || resp.TimedOut {
@@ -121,7 +136,10 @@ func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *Ho
 		fmt.Fprintf(os.Stderr, "[Judge] 빈 출력으로 판정 생략\n")
 		return nil
 	}
-	fmt.Fprintf(os.Stderr, "[Judge] 판정 완료 (%s)\n", resp.Duration.Round(time.Millisecond))
+	if resp.ExecutedBackend == "" {
+		resp.ExecutedBackend = backend.Name()
+	}
+	fmt.Fprintf(os.Stderr, "[Judge] 판정 완료 (backend=%s, %s)\n", resp.ExecutedBackend, resp.Duration.Round(time.Millisecond))
 	resp.Provider = cfg.JudgeProvider + " (judge)"
 	return resp
 }

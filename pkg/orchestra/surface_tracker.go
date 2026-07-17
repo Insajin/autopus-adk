@@ -35,10 +35,15 @@ var surfaceTrackerBase = surfaceTrackerRoot()
 // It is a variable so tests can redirect it.
 var surfaceTrackerLegacyBase = filepath.Join(os.TempDir(), "autopus", "surfaces")
 
-// validSurfaceRef matches the cmux ref format (e.g. "surface:3", "pane:7",
-// "workspace:1"). Refs not matching this pattern are skipped by ReapOrphanSurfaces
-// to prevent injection of shell metacharacters into terminal.Close.
-var validSurfaceRef = regexp.MustCompile(`^[A-Za-z]+:[0-9]+$`)
+// validSurfaceRef matches safe cmux and tmux surface reference formats.
+var validSurfaceRef = regexp.MustCompile(`^([A-Za-z]+:[0-9]+|%[0-9]+)$`)
+
+func surfaceRefCompatible(backend, ref string) bool {
+	if backend == "tmux" {
+		return strings.HasPrefix(ref, "%")
+	}
+	return backend == "cmux" && !strings.HasPrefix(ref, "%")
+}
 
 // surfaceTrackerRoot returns the preferred base directory for surface tracking
 // files. It prefers ~/.autopus/surfaces and falls back to TempDir when the home
@@ -137,8 +142,7 @@ func ReapOrphanSurfaces(term terminal.Terminal) {
 	}
 }
 
-// reapOrphanSurfacesFromDir performs orphan reaping from a single tracking
-// directory without creating it. Refs are validated before Close is called.
+// reapOrphanSurfacesFromDir reaps compatible refs and retains retryable refs.
 func reapOrphanSurfacesFromDir(dir string, term terminal.Terminal) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -154,14 +158,22 @@ func reapOrphanSurfacesFromDir(dir string, term terminal.Terminal) {
 			continue
 		}
 		path := filepath.Join(dir, e.Name())
-		for _, ref := range readTrackerRefs(path) {
+		refs := readTrackerRefs(path)
+		kept := refs[:0]
+		for _, ref := range refs {
 			if !validSurfaceRef.MatchString(ref) {
 				log.Printf("[surface-tracker] skipping invalid ref %q from %s", ref, path)
 				continue
 			}
-			_ = term.Close(context.Background(), ref)
+			if !surfaceRefCompatible(term.Name(), ref) {
+				kept = append(kept, ref)
+				continue
+			}
+			if err := term.Close(context.Background(), ref); err != nil {
+				kept = append(kept, ref)
+			}
 		}
-		_ = os.Remove(path)
+		writeTrackerRefs(path, kept)
 	}
 }
 

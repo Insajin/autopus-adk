@@ -168,11 +168,33 @@ func TestCodexRuntimeMarkerIncludesCurrentCodexCLIEnv(t *testing.T) {
 	}
 }
 
-// TestDetectStructuredTerminal_NonInteractiveFallsBackToPlain verifies that in a
-// non-interactive process (the unit-test runner pipes stdio) backend selection
-// receives a plain terminal and therefore routes to the subprocess backend.
+// TestDetectStructuredTerminal_NonInteractiveFallsBackToPlain verifies the
+// non-interactive/CI floor without inheriting the host's agent markers, hook
+// files, cwd, or terminal multiplexer state.
 func TestDetectStructuredTerminal_NonInteractiveFallsBackToPlain(t *testing.T) {
-	t.Parallel()
+	// Given: a fully isolated CI process. CI is the deterministic integration
+	// oracle; the pure TestPaneInteractiveContext table covers individual TTY
+	// combinations without consulting real file descriptors.
+	for _, key := range []string{
+		"CLAUDECODE",
+		"CODEX",
+		"CODEX_CI",
+		"CODEX_THREAD_ID",
+		"CODEX_MANAGED_BY_NPM",
+		"TMUX",
+		"TMUX_PANE",
+		"CMUX_SOCKET_PATH",
+		"CMUX_WORKSPACE_ID",
+		"CMUX_SURFACE_ID",
+		"CMUX_PANE_ID",
+	} {
+		t.Setenv(key, "")
+	}
+	t.Setenv("CI", "1")
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(t.TempDir())
+
+	// When/Then: host hooks or installed cmux/tmux binaries cannot bypass CI.
 	assert.Equal(t, "plain", detectStructuredTerminal().Name())
 }
 

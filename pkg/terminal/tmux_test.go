@@ -92,23 +92,37 @@ func TestTmuxAdapter_CreateWorkspace_NestedSession(t *testing.T) {
 	err := a.CreateWorkspace(context.Background(), "nested-session")
 	require.NoError(t, err)
 	assert.Equal(t, "tmux", captured.name)
-	combined := strings.Join(captured.args, " ")
-	assert.Contains(t, combined, "new-window", "must use new-window when nested in tmux")
-	assert.NotContains(t, combined, "new-session", "must NOT use new-session when nested in tmux")
+	assert.Equal(t, []string{"new-window", "-n", "nested-session"}, captured.args)
+	assert.NotContains(t, captured.args, "-t", "nested workspace name must not be used as a target window")
+	assert.Empty(t, a.session, "nested tmux must keep using the active session")
 }
 
-// TestTmuxAdapter_SplitPane verifies the split-window command uses correct flags.
+// TestTmuxAdapter_SplitPane_EmptyOutputReturnsError verifies that a successful
+// tmux process without a printed pane ID cannot create an untrackable pane.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
-func TestTmuxAdapter_SplitPane(t *testing.T) {
+func TestTmuxAdapter_SplitPane_EmptyOutputReturnsError(t *testing.T) {
 	restore, captured := newTmuxMock()
 	defer restore()
 
 	a := &TmuxAdapter{}
-	_, err := a.SplitPane(context.Background(), Horizontal)
-	require.NoError(t, err)
+	paneID, err := a.SplitPane(context.Background(), Horizontal)
+	require.Error(t, err)
+	assert.Empty(t, paneID)
 	assert.Equal(t, "tmux", captured.name)
 	combined := strings.Join(captured.args, " ")
 	assert.Contains(t, combined, "split-window")
+}
+
+// TestTmuxAdapter_SplitPane_MalformedOutputReturnsError verifies that only a
+// single tmux global pane ID can enter surface tracking and cleanup.
+func TestTmuxAdapter_SplitPane_MalformedOutputReturnsError(t *testing.T) {
+	restore, _ := newTmuxOutputMock("not-a-pane\n")
+	defer restore()
+
+	paneID, err := (&TmuxAdapter{}).SplitPane(context.Background(), Horizontal)
+
+	require.Error(t, err)
+	assert.Empty(t, paneID)
 }
 
 // TestTmuxAdapter_SendCommand verifies send-keys is called with correct session, pane, and command.
@@ -137,7 +151,7 @@ func TestTmuxAdapter_SendCommand_NewlineUsesEnterOnly(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "tmux", captured.name)
-	assert.Equal(t, []string{"send-keys", "-t", ":0", "Enter"}, captured.args)
+	assert.Equal(t, []string{"send-keys", "-t", "0", "Enter"}, captured.args)
 }
 
 // TestTmuxAdapter_Close verifies kill-session is called with the correct target.
@@ -249,7 +263,7 @@ func TestTmuxAdapter_Close_Error(t *testing.T) {
 // TestTmuxAdapter_SplitPane_Vertical verifies the vertical direction flag is passed.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestTmuxAdapter_SplitPane_Vertical(t *testing.T) {
-	restore, captured := newTmuxMock()
+	restore, captured := newTmuxOutputMock("%42\n")
 	defer restore()
 
 	a := &TmuxAdapter{}
