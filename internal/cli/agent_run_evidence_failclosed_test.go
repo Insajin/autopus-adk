@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -35,7 +34,7 @@ func TestAgentRunEvidence_ExecutionFailuresAreFailClosedAndSingleShot(t *testing
 				require.NoError(t, readErr)
 				pid, parseErr := strconv.Atoi(strings.TrimSpace(string(pidBytes)))
 				require.NoError(t, parseErr)
-				assert.Error(t, syscall.Kill(pid, 0), "scanner failure left the provider subprocess alive")
+				assert.False(t, processAliveForTest(pid), "scanner failure left the provider subprocess alive")
 			}
 
 			data, readErr := os.ReadFile(filepath.Join(runsDir, "result.yaml"))
