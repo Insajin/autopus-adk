@@ -180,7 +180,7 @@ func TestRESTPoller_StopsWhenWebSocketRecovers(t *testing.T) {
 func TestRESTPoller_AuthFailure_SurfacesError(t *testing.T) {
 	t.Parallel()
 
-	var authErrors atomic.Int32
+	authErrorObserved := make(chan int, 1)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -195,18 +195,25 @@ func TestRESTPoller_AuthFailure_SurfacesError(t *testing.T) {
 		PollInterval: 10 * time.Millisecond,
 		TaskHandler:  func(task PollResult) error { return nil }, // PollResult does not exist yet
 		OnAuthError: func(statusCode int) { // OnAuthError callback does not exist yet
-			authErrors.Add(1)
+			select {
+			case authErrorObserved <- statusCode:
+			default:
+			}
 		},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	poller.Start(ctx) // method does not exist yet
 
-	time.Sleep(40 * time.Millisecond)
-
-	// Then auth error is surfaced
-	assert.Greater(t, authErrors.Load(), int32(0), "401 from poll endpoint must surface auth error (S11)")
+	// Then auth error is surfaced after the 401 response is processed.
+	select {
+	case statusCode := <-authErrorObserved:
+		cancel()
+		assert.Equal(t, http.StatusUnauthorized, statusCode, "401 from poll endpoint must surface auth error (S11)")
+	case <-time.After(time.Second):
+		require.FailNow(t, "401 from poll endpoint must surface auth error (S11)")
+	}
 }
 
 func TestRESTPoller_SetAuthToken(t *testing.T) {
