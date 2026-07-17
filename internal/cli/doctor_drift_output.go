@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -25,7 +26,15 @@ const (
 // touched, so overall_ok stays true (REQ-007, the collectContextWeightChecks
 // precedent). Checks are skipped entirely when their subject is absent (REQ-008).
 func (r *doctorJSONReport) collectDriftGateChecks(dir string, cfg *config.HarnessConfig) {
-	for _, res := range collectContentDrift(dir, cfg) {
+	r.collectDriftGateChecksContext(context.Background(), dir, cfg)
+}
+
+func (r *doctorJSONReport) collectDriftGateChecksContext(
+	ctx context.Context,
+	dir string,
+	cfg *config.HarnessConfig,
+) {
+	for _, res := range collectContentDriftContext(ctx, dir, cfg) {
 		r.checks = append(r.checks, contentDriftCheck(res))
 	}
 
@@ -145,7 +154,16 @@ func driftReprPaths(paths []string) string {
 // manifests or a source repo see no Drift section. The section is advisory and
 // its warnings never flip the doctor verdict.
 func renderDriftText(out io.Writer, dir string, cfg *config.HarnessConfig) {
-	content := collectContentDrift(dir, cfg)
+	renderDriftTextContext(context.Background(), out, dir, cfg)
+}
+
+func renderDriftTextContext(
+	ctx context.Context,
+	out io.Writer,
+	dir string,
+	cfg *config.HarnessConfig,
+) {
+	content := collectContentDriftContext(ctx, dir, cfg)
 	orphans := detectOrphanManifests(dir, cfg)
 	source := collectSourceDrift(dir)
 

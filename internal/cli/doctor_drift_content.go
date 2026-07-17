@@ -5,12 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
+	"github.com/insajin/autopus-adk/pkg/codexruntime"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -29,17 +31,67 @@ type contentDriftResult struct {
 	DriftPaths []string
 }
 
+const driftCodexCatalogTimeout = 5 * time.Second
+
+// driftGenerationSnapshot freezes external generation inputs shared by the two
+// seeded roots. In particular, Codex must use one catalog response for both
+// roots or an external catalog change could be mistaken for root-state drift.
+type driftGenerationSnapshot struct {
+	codexCatalog      []byte
+	codexCatalogFixed bool
+}
+
+type driftCatalogProbe func(context.Context, string, time.Duration) ([]byte, error)
+
+type driftBaselineGenerator func(
+	context.Context,
+	string,
+	*config.HarnessConfig,
+	driftGenerationSnapshot,
+	func(string) error,
+) (*adapter.PlatformFiles, bool)
+
+type driftContentDeps struct {
+	probeCatalog     driftCatalogProbe
+	generateBaseline driftBaselineGenerator
+}
+
+func defaultDriftContentDeps() driftContentDeps {
+	return driftContentDeps{
+		probeCatalog:     codexruntime.ProbeModelCatalog,
+		generateBaseline: generateDriftBaseline,
+	}
+}
+
+func captureDriftGenerationSnapshot(
+	ctx context.Context,
+	platform string,
+	probe driftCatalogProbe,
+) driftGenerationSnapshot {
+	if platform != "codex" {
+		return driftGenerationSnapshot{}
+	}
+	catalog, err := probe(ctx, "codex", driftCodexCatalogTimeout)
+	if err != nil {
+		catalog = nil
+	}
+	return driftGenerationSnapshot{codexCatalog: catalog, codexCatalogFixed: true}
+}
+
 // driftAdapterFor returns the platform adapter rooted at root, or nil for an
 // unknown platform token. It mirrors validateDoctorPlatform's switch so the
 // drift gate reuses the same adapter contract the rest of doctor relies on.
-func driftAdapterFor(platform, root string) adapter.PlatformAdapter {
+func driftAdapterFor(platform, root string, snapshot driftGenerationSnapshot) adapter.PlatformAdapter {
 	switch platform {
 	case "claude-code":
 		return claude.NewWithRoot(root)
 	case "codex":
+		if snapshot.codexCatalogFixed {
+			return codex.NewWithRoot(root, codex.WithModelCatalog(snapshot.codexCatalog))
+		}
 		return codex.NewWithRoot(root)
 	case "antigravity-cli":
-		return gemini.NewWithRoot(root)
+		return gemini.NewWithRoot(root, gemini.WithoutPluginInstall())
 	case "opencode":
 		return opencode.NewWithRoot(root)
 	default:
@@ -53,10 +105,27 @@ func driftAdapterFor(platform, root string) adapter.PlatformAdapter {
 // installed surface and real manifests are never mutated — generation happens in
 // isolated temp roots.
 func collectContentDrift(dir string, cfg *config.HarnessConfig) []contentDriftResult {
+	return collectContentDriftContext(context.Background(), dir, cfg)
+}
+
+// collectContentDriftContext is the context-aware implementation. The wrapper
+// preserves existing doctor call sites while generation and catalog probes share
+// one cancellation boundary all the way down to platform adapters.
+func collectContentDriftContext(ctx context.Context, dir string, cfg *config.HarnessConfig) []contentDriftResult {
+	return collectContentDriftWithDeps(ctx, dir, cfg, defaultDriftContentDeps())
+}
+
+func collectContentDriftWithDeps(
+	ctx context.Context,
+	dir string,
+	cfg *config.HarnessConfig,
+	deps driftContentDeps,
+) []contentDriftResult {
 	if cfg == nil {
 		return nil
 	}
 	var results []contentDriftResult
+	snapshots := make(map[string]driftGenerationSnapshot)
 	for _, platform := range cfg.Platforms {
 		// Manifest presence is the "installed" gate. A read error or absent
 		// manifest means this platform is not installed here — skip quietly.
@@ -64,7 +133,12 @@ func collectContentDrift(dir string, cfg *config.HarnessConfig) []contentDriftRe
 		if err != nil || m == nil {
 			continue
 		}
-		res, ok := computeContentDrift(dir, platform, cfg)
+		snapshot, exists := snapshots[platform]
+		if !exists {
+			snapshot = captureDriftGenerationSnapshot(ctx, platform, deps.probeCatalog)
+			snapshots[platform] = snapshot
+		}
+		res, ok := computeContentDrift(ctx, dir, platform, cfg, snapshot, deps.generateBaseline)
 		if !ok {
 			continue
 		}
@@ -77,16 +151,22 @@ func collectContentDrift(dir string, cfg *config.HarnessConfig) []contentDriftRe
 // platform and hashes each installed file against the freshly generated content.
 // It returns ok=false when generation into a temp root fails, so a broken
 // platform degrades to a silent skip rather than a false drift signal.
-func computeContentDrift(dir, platform string, cfg *config.HarnessConfig) (contentDriftResult, bool) {
+func computeContentDrift(
+	ctx context.Context,
+	dir, platform string,
+	cfg *config.HarnessConfig,
+	snapshot driftGenerationSnapshot,
+	generateBaseline driftBaselineGenerator,
+) (contentDriftResult, bool) {
 	// Two isolated seeded temp roots isolate the pure template+cfg surface from
 	// root-path and pre-existing-state dependent files (F-002 determinism gate):
 	// A is empty, B carries representative user state. Only files byte-identical
 	// across A and B are pure functions of (template, cfg) and safe to compare.
-	filesA, ok := generateDriftBaseline(platform, cfg, nil)
+	filesA, ok := generateBaseline(ctx, platform, cfg, snapshot, nil)
 	if !ok {
 		return contentDriftResult{}, false
 	}
-	filesB, ok := generateDriftBaseline(platform, cfg, seedUserState)
+	filesB, ok := generateBaseline(ctx, platform, cfg, snapshot, seedUserState)
 	if !ok {
 		return contentDriftResult{}, false
 	}
@@ -119,7 +199,13 @@ func computeContentDrift(dir, platform string, cfg *config.HarnessConfig) (conte
 // isolated temp root, optionally seeded with representative user state. The
 // temp root is removed before returning; the in-memory FileMapping content and
 // checksums are all the drift comparison needs.
-func generateDriftBaseline(platform string, cfg *config.HarnessConfig, seed func(string) error) (*adapter.PlatformFiles, bool) {
+func generateDriftBaseline(
+	ctx context.Context,
+	platform string,
+	cfg *config.HarnessConfig,
+	snapshot driftGenerationSnapshot,
+	seed func(string) error,
+) (*adapter.PlatformFiles, bool) {
 	tmp, err := os.MkdirTemp("", "autopus-drift-")
 	if err != nil {
 		return nil, false
@@ -132,11 +218,11 @@ func generateDriftBaseline(platform string, cfg *config.HarnessConfig, seed func
 		}
 	}
 
-	ad := driftAdapterFor(platform, tmp)
+	ad := driftAdapterFor(platform, tmp, snapshot)
 	if ad == nil {
 		return nil, false
 	}
-	pf, err := ad.Generate(context.Background(), cfg)
+	pf, err := ad.Generate(ctx, cfg)
 	if err != nil || pf == nil {
 		return nil, false
 	}

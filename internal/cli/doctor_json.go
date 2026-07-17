@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -79,6 +78,7 @@ func runDoctorJSON(cmd *cobra.Command, opts doctorOptions) error {
 
 func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONReport {
 	report := doctorJSONReport{status: jsonStatusOK}
+	ctx := doctorCommandContext(cmd)
 
 	cfg, err := loadHarnessConfigForDir(opts.dir, globalFlags{})
 	if err != nil {
@@ -111,7 +111,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 		Detail:   fmt.Sprintf("autopus.yaml loaded (mode: %s)", cfg.Mode),
 	})
 
-	report.collectPlatformChecks(context.Background(), opts.dir, cfg)
+	report.collectPlatformChecks(ctx, opts.dir, cfg)
 	report.collectDependencyChecks(cmd, opts)
 	report.collectRuntimeProcessChecks(opts)
 	report.collectRuleConflictChecks(opts.dir, cfg)
@@ -122,7 +122,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 	report.collectHookChecks(opts.dir)
 	report.collectContextWeightChecks(opts.dir)
 	report.collectHygieneChecks(opts.dir)
-	report.collectDriftGateChecks(opts.dir, cfg)
+	report.collectDriftGateChecksContext(ctx, opts.dir, cfg)
 
 	return report
 }

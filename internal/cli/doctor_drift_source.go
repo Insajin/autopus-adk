@@ -84,12 +84,13 @@ func detectTemplateRegenDrift(dir string) ([]string, bool) {
 	return stale, true
 }
 
-// diffRegeneratedTemplates walks the freshly regenerated tree and returns the
-// slash-form relative paths whose committed counterpart is missing or differs.
-// Only regenerated files are compared, so template files outside the generator's
-// scope never produce a false drift signal.
+// diffRegeneratedTemplates compares both directions: regenerated files detect
+// missing/stale committed output, while committed generator-owned paths detect
+// residue left behind after a source is deleted. Static template families are
+// excluded from the reverse comparison by content.IsGeneratedTemplatePath.
 func diffRegeneratedTemplates(committedDir, regenDir string) []string {
-	var stale []string
+	staleSet := make(map[string]bool)
+	regenerated := make(map[string]bool)
 	_ = filepath.WalkDir(regenDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return nil
@@ -98,16 +99,37 @@ func diffRegeneratedTemplates(committedDir, regenDir string) []string {
 		if relErr != nil {
 			return nil
 		}
+		rel = filepath.ToSlash(rel)
+		regenerated[rel] = true
 		regenBytes, readErr := os.ReadFile(p)
 		if readErr != nil {
 			return nil
 		}
 		committedBytes, cErr := os.ReadFile(filepath.Join(committedDir, rel))
 		if cErr != nil || !bytesEqual(committedBytes, regenBytes) {
-			stale = append(stale, filepath.ToSlash(rel))
+			staleSet[rel] = true
 		}
 		return nil
 	})
+	_ = filepath.WalkDir(committedDir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(committedDir, p)
+		if relErr != nil {
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+		if content.IsGeneratedTemplatePath(rel) && !regenerated[rel] {
+			staleSet[rel] = true
+		}
+		return nil
+	})
+
+	stale := make([]string, 0, len(staleSet))
+	for rel := range staleSet {
+		stale = append(stale, rel)
+	}
 	sort.Strings(stale)
 	return stale
 }

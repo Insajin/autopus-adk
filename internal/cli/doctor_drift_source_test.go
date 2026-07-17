@@ -64,6 +64,23 @@ func TestDriftTemplateRegen_MissingCommitted(t *testing.T) {
 	assert.Equal(t, []string{"gemini/agents/new-agent.md.tmpl"}, stale)
 }
 
+// TestDriftTemplateRegen_ObsoleteGeneratedTemplate detects the reverse drift:
+// a source was deleted, regeneration no longer emits its previously owned
+// template, but the committed generated artifact still remains. Hand-authored
+// template families must not be reported by this reverse comparison.
+func TestDriftTemplateRegen_ObsoleteGeneratedTemplate(t *testing.T) {
+	committed := t.TempDir()
+	regen := t.TempDir()
+
+	writeTreeFile(t, committed, "codex/agents/removed-agent.toml.tmpl", "OBSOLETE")
+	writeTreeFile(t, committed, "codex/prompts/auto-fix.md.tmpl", "STATIC")
+	writeTreeFile(t, committed, "codex/skills/auto-fix.md.tmpl", "STATIC ROUTE")
+
+	stale := diffRegeneratedTemplates(committed, regen)
+	assert.Equal(t, []string{"codex/agents/removed-agent.toml.tmpl"}, stale,
+		"only generator-owned residue is stale")
+}
+
 // TestCollectSourceDrift_NonSourceRepo_NoChecks verifies S5's skip branch: a
 // non-source repo yields no template_regen or binary_stale checks.
 func TestCollectSourceDrift_NonSourceRepo_NoChecks(t *testing.T) {

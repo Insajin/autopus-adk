@@ -4,13 +4,18 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
+	"github.com/insajin/autopus-adk/pkg/adapter/codex"
+	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -136,4 +141,76 @@ func appendToFile(t *testing.T, path, extra string) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, append(data, []byte(extra)...), 0o644))
+}
+
+// TestContentDrift_AntigravityBaselineNeverInstallsPlugin guards the doctor's
+// read-only boundary. Generating an isolated comparison baseline must not turn
+// into an external `agy plugin install` call merely because agy is on PATH.
+func TestContentDrift_AntigravityBaselineNeverInstallsPlugin(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake PATH executable uses a POSIX shell")
+	}
+	dir := t.TempDir()
+	binDir := t.TempDir()
+	marker := filepath.Join(t.TempDir(), "agy-called")
+	cfg := config.DefaultFullConfig("drift-antigravity")
+	cfg.Platforms = []string{"antigravity-cli"}
+
+	// Seed an installed manifest while agy is absent, then expose a marker
+	// executable only for the doctor baseline generation under test.
+	t.Setenv("PATH", binDir)
+	_, err := gemini.NewWithRoot(dir).Generate(context.Background(), cfg)
+	require.NoError(t, err)
+	writeMarkerExecutable(t, filepath.Join(binDir, "agy"), marker, "{}")
+
+	results := collectContentDrift(dir, cfg)
+	_, ok := findContentDrift(results, "antigravity-cli")
+	require.True(t, ok, "antigravity baseline must still be compared")
+	_, err = os.Stat(marker)
+	assert.ErrorIs(t, err, os.ErrNotExist,
+		"doctor content drift must never invoke external plugin installation")
+}
+
+// TestContentDrift_CodexCatalogProbedOnce ensures both seeded roots share one
+// immutable runtime catalog snapshot without depending on subprocess timing.
+func TestContentDrift_CodexCatalogProbedOnce(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.DefaultFullConfig("drift-codex")
+	cfg.Platforms = []string{"codex"}
+
+	_, err := codex.NewWithRoot(dir, codex.WithModelCatalog(nil)).Generate(context.Background(), cfg)
+	require.NoError(t, err)
+	payload := []byte(`{"models":[{"slug":"gpt-5.4","supported_reasoning_levels":[{"effort":"high"}]}]}`)
+	probeCalls := 0
+	var snapshots [][]byte
+	deps := defaultDriftContentDeps()
+	deps.probeCatalog = func(context.Context, string, time.Duration) ([]byte, error) {
+		probeCalls++
+		return append([]byte(nil), payload...), nil
+	}
+	productionGenerate := deps.generateBaseline
+	deps.generateBaseline = func(
+		ctx context.Context,
+		platform string,
+		cfg *config.HarnessConfig,
+		snapshot driftGenerationSnapshot,
+		seed func(string) error,
+	) (*adapter.PlatformFiles, bool) {
+		snapshots = append(snapshots, append([]byte(nil), snapshot.codexCatalog...))
+		return productionGenerate(ctx, platform, cfg, snapshot, seed)
+	}
+
+	results := collectContentDriftWithDeps(context.Background(), dir, cfg, deps)
+	_, ok := findContentDrift(results, "codex")
+	require.True(t, ok, "codex baseline must still be compared")
+	assert.Equal(t, 1, probeCalls, "one catalog probe must serve both roots")
+	require.Len(t, snapshots, 2)
+	assert.Equal(t, payload, snapshots[0])
+	assert.Equal(t, snapshots[0], snapshots[1], "both roots must reuse the same immutable snapshot")
+}
+
+func writeMarkerExecutable(t *testing.T, path, marker, stdout string) {
+	t.Helper()
+	script := "#!/bin/sh\nprintf 'called\\n' >> '" + marker + "'\nprintf '%s' '" + stdout + "'\n"
+	require.NoError(t, os.WriteFile(path, []byte(script), 0o755))
 }

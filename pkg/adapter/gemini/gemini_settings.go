@@ -70,6 +70,9 @@ func (a *Adapter) generateSettingsWithHooks(cfg *config.HarnessConfig) ([]adapte
 }
 
 func (a *Adapter) installAntigravityPluginIfAvailable(ctx context.Context) {
+	if a.skipPluginInstall {
+		return
+	}
 	if _, lookErr := exec.LookPath(cliBinary); lookErr == nil {
 		pluginPath := filepath.Join(a.root, antigravityPluginDir)
 		cmd := exec.CommandContext(ctx, cliBinary, "plugin", "install", pluginPath)
