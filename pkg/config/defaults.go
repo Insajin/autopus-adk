@@ -71,6 +71,9 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				ContextMaxLines:    0,
 				VerdictThreshold:   0.67,
 				DocContextMaxLines: 200,
+				// MinProviders 0 = derive the majority quorum from the configured
+				// provider count (spec.DefaultMinProviders); REQ-RINT-QUORUM-05.
+				MinProviders: 0,
 			},
 		},
 		Methodology: MethodologyConf{

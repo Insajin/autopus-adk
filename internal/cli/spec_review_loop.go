@@ -172,8 +172,13 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 				p.specID, revision)
 		}
 
+		// SPEC-ADK-REVIEW-INTEGRITY-001: record per-document observation coverage
+		// and provider quorum so the promotion gate can fail closed on partial
+		// observation. Coverage is persisted into the findings sidecar.
+		coverages := applyObservationIntegrity(merged, p.specDir, p.gate, len(p.providers))
+
 		// A mid-pipeline write failure must abort (issue #38).
-		if persistErr := spec.PersistFindings(p.specDir, merged.Findings); persistErr != nil {
+		if persistErr := spec.PersistFindingsWithCoverage(p.specDir, merged.Findings, coverages); persistErr != nil {
 			return nil, fmt.Errorf("review findings 저장 실패 (SPEC: %s, revision: %d): %w", p.specID, revision, persistErr)
 		}
 		if persistErr := spec.PersistReview(p.specDir, merged); persistErr != nil {
