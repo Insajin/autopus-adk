@@ -205,9 +205,11 @@ autopus-adk/
 │   │   └── sync.go              #     증분 시나리오 동기화
 │   ├── selfupdate/              #   CLI 바이너리 자동 업데이트
 │   │   ├── types.go             #     ReleaseInfo, UpdateResult 타입
-│   │   ├── checker.go           #     GitHub API 호출, semver 비교
-│   │   ├── downloader.go        #     아카이브 다운로드, SHA256 검증, tar 추출
-│   │   ├── replacer.go          #     임시 파일 → os.Rename atomic replace
+│   │   ├── checker.go           #     GitHub API 호출, semver 비교, 서명 asset 탐색
+│   │   ├── signature.go         #     V1 envelope 파싱과 ECDSA P-256 게시자 서명 검증
+│   │   ├── pinnedkey.go         #     K1·K2 공개키 pin과 만료일 검증
+│   │   ├── downloader.go        #     서명 우선 검증, SHA256 검증, tar/zip 추출
+│   │   ├── replacer*.go         #     OS별 트랜잭션 교체와 복구
 │   │   └── platform.go          #     GOOS/GOARCH → 아카이브 이름 매핑
 │   ├── experiment/              #   자율 반복 실험 엔진
 │   │   ├── types.go             #     Config, Result, MetricOutput, Direction 타입
@@ -253,6 +255,9 @@ autopus-adk/
 │   ├── specs/                   #   SPEC 문서
 │   ├── brainstorms/             #   브레인스토밍 결과 (BS-{ID}.md)
 │   └── project/                 #   프로젝트 컨텍스트 문서
+├── scripts/release-signing/     # 게시자 서명 producer/verifier, 공개키 pin, live fixture
+├── install.sh                   # POSIX 서명 우선 설치기
+├── install.ps1                  # Windows PowerShell 5.1/7 서명 우선 설치기
 ├── Makefile                     # 빌드 자동화
 ├── .goreleaser.yaml             # 릴리즈 자동화
 ├── go.mod / go.sum              # 의존성 관리
