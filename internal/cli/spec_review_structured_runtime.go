@@ -54,8 +54,9 @@ func runStructuredSpecReviewProvidersSequential(
 	start := time.Now()
 	for i, provider := range cfg.Providers {
 		if err := ctx.Err(); err != nil {
-			results[i] = pendingStructuredReviewTimeoutOutcome(provider, backend.Name(), "queued", cfg.TimeoutSeconds, time.Since(start), err)
-			logStructuredReviewOutcome(provider.Name, backend.Name(), results[i], time.Since(start))
+			backendName := specReviewProviderBackendName(backend, provider)
+			results[i] = pendingStructuredReviewTimeoutOutcome(provider, backendName, "queued", cfg.TimeoutSeconds, time.Since(start), err)
+			logStructuredReviewOutcome(provider.Name, backendName, results[i], time.Since(start))
 			continue
 		}
 		results[i] = executeStructuredSpecReviewProvider(ctx, cfg, backend, parser, schemaPath, embeddedSchema, provider, mode)
@@ -104,8 +105,9 @@ func runStructuredSpecReviewProvidersParallel(
 				if done[i] {
 					continue
 				}
-				results[i] = pendingStructuredReviewTimeoutOutcome(provider, backend.Name(), "provider_execution", cfg.TimeoutSeconds, time.Since(start), ctx.Err())
-				logStructuredReviewOutcome(provider.Name, backend.Name(), results[i], time.Since(start))
+				backendName := specReviewProviderBackendName(backend, provider)
+				results[i] = pendingStructuredReviewTimeoutOutcome(provider, backendName, "provider_execution", cfg.TimeoutSeconds, time.Since(start), ctx.Err())
+				logStructuredReviewOutcome(provider.Name, backendName, results[i], time.Since(start))
 			}
 			// Drain the still-running provider goroutines before returning so they
 			// cannot write shared process globals (os.Stderr via structured review
@@ -155,12 +157,13 @@ func executeStructuredSpecReviewProvider(
 	provider orchestra.ProviderConfig,
 	mode string,
 ) specReviewStructuredOutcome {
+	selectedBackend := selectSpecReviewProviderBackend(backend, provider)
 	timeout := specReviewTimeout(provider, cfg.TimeoutSeconds)
 	start := time.Now()
 	fmt.Fprintf(os.Stderr, "SPEC 리뷰 provider 시작: %s (backend=%s, timeout=%s, mode=%s)\n",
-		provider.Name, backend.Name(), timeout, mode)
+		provider.Name, selectedBackend.Name(), timeout, mode)
 
-	prompt := buildStructuredSpecReviewPrompt(cfg.Prompt, embeddedSchema, shouldInlineStructuredReviewSchema(backend, provider))
+	prompt := buildStructuredSpecReviewPrompt(cfg.Prompt, embeddedSchema, shouldInlineStructuredReviewSchema(selectedBackend, provider))
 	req := orchestra.ProviderRequest{
 		Provider:   provider.Name,
 		Prompt:     prompt,
@@ -170,27 +173,27 @@ func executeStructuredSpecReviewProvider(
 		Config:     provider,
 	}
 
-	resp, execErr := backend.Execute(ctx, req)
+	resp, execErr := selectedBackend.Execute(ctx, req)
 	elapsed := time.Since(start)
 	if execErr != nil {
 		if ctx.Err() != nil {
-			outcome := structuredReviewTimeoutOutcome(provider.Name, backend.Name(), "provider_execution", timeout, elapsed, ctx.Err(), resp)
-			logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+			outcome := structuredReviewTimeoutOutcome(provider.Name, selectedBackend.Name(), "provider_execution", timeout, elapsed, ctx.Err(), resp)
+			logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
 			return outcome
 		}
-		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), resp, backend.Name())
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), resp, selectedBackend.Name())
 		decorateStructuredFailure(&outcome, timeout, elapsed)
-		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+		logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
 		return outcome
 	}
 	if resp == nil {
-		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil, backend.Name())
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil, selectedBackend.Name())
 		decorateStructuredFailure(&outcome, timeout, elapsed)
-		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+		logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
 		return outcome
 	}
 	if strings.TrimSpace(resp.ExecutedBackend) == "" {
-		resp.ExecutedBackend = backend.Name()
+		resp.ExecutedBackend = selectedBackend.Name()
 	}
 	if resp.TimedOut {
 		outcome := structuredReviewTimeoutOutcome(provider.Name, resp.ExecutedBackend, "provider_execution", timeout, elapsed, fmt.Errorf("provider timed out after %s", req.Timeout), resp)
@@ -198,13 +201,13 @@ func executeStructuredSpecReviewProvider(
 		return outcome
 	}
 	if resp.EmptyOutput {
-		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp, backend.Name())
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp, selectedBackend.Name())
 		decorateStructuredFailure(&outcome, timeout, elapsed)
-		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+		logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
 		return outcome
 	}
 	if _, parseErr := parser.ParseReviewer(resp.Output); parseErr != nil {
-		if retryResp, retryErr := repromptStructuredReviewerJSON(ctx, backend, parser, req, resp, parseErr); retryErr == nil {
+		if retryResp, retryErr := repromptStructuredReviewerJSON(ctx, selectedBackend, parser, req, resp, parseErr); retryErr == nil {
 			outcome := specReviewStructuredOutcome{resp: *retryResp}
 			logStructuredReviewOutcome(provider.Name, retryResp.ExecutedBackend, outcome, time.Since(start))
 			return outcome
@@ -213,9 +216,9 @@ func executeStructuredSpecReviewProvider(
 			parseErr = fmt.Errorf("invalid reviewer JSON after reprompt: initial: %w; reprompt: %v", parseErr, retryErr)
 			elapsed = time.Since(start)
 		}
-		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp, backend.Name())
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp, selectedBackend.Name())
 		decorateStructuredFailure(&outcome, timeout, elapsed)
-		logStructuredReviewOutcome(provider.Name, backend.Name(), outcome, elapsed)
+		logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
 		return outcome
 	}
 

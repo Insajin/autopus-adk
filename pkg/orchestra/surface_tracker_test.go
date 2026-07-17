@@ -1,6 +1,7 @@
 package orchestra
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -207,6 +208,56 @@ func TestReapOrphanSurfaces_RefValidationAndLegacyNoCreate(t *testing.T) {
 	_, statErr := os.Stat(legacyBase)
 	assert.True(t, os.IsNotExist(statErr),
 		"legacy base must not be created by ReapOrphanSurfaces")
+}
+
+func TestReapOrphanSurfaces_TmuxClosesGlobalPaneRef(t *testing.T) {
+	orig := surfaceTrackerBase
+	surfaceTrackerBase = t.TempDir()
+	defer func() { surfaceTrackerBase = orig }()
+
+	deadPID := 2147480005
+	writeTrackerRefs(surfaceTrackerFile(deadPID), []string{"%42"})
+
+	term := &mockTerminal{name: "tmux"}
+	ReapOrphanSurfaces(term)
+
+	assert.Equal(t, []string{"%42"}, term.closeCalls,
+		"tmux Close must receive exactly the valid global pane ref")
+}
+
+func TestReapOrphanSurfaces_CmuxPreservesTmuxGlobalPaneRef(t *testing.T) {
+	orig := surfaceTrackerBase
+	surfaceTrackerBase = t.TempDir()
+	defer func() { surfaceTrackerBase = orig }()
+
+	deadPID := 2147480006
+	trackerFile := surfaceTrackerFile(deadPID)
+	writeTrackerRefs(trackerFile, []string{"%42"})
+
+	term := &mockTerminal{name: "cmux"}
+	ReapOrphanSurfaces(term)
+
+	assert.Empty(t, term.closeCalls, "cmux must not close a tmux global pane ref")
+	assert.Equal(t, []string{"%42"}, readTrackerRefs(trackerFile),
+		"incompatible ref must remain tracked for a later tmux reaper")
+}
+
+func TestReapOrphanSurfaces_CloseErrorPreservesRefForRetry(t *testing.T) {
+	orig := surfaceTrackerBase
+	surfaceTrackerBase = t.TempDir()
+	defer func() { surfaceTrackerBase = orig }()
+
+	deadPID := 2147480007
+	trackerFile := surfaceTrackerFile(deadPID)
+	writeTrackerRefs(trackerFile, []string{"surface:77"})
+
+	term := &mockTerminal{name: "cmux", closeErr: errors.New("close failed")}
+	ReapOrphanSurfaces(term)
+
+	assert.Equal(t, []string{"surface:77"}, term.closeCalls,
+		"compatible ref must be passed to Close")
+	assert.Equal(t, []string{"surface:77"}, readTrackerRefs(trackerFile),
+		"failed Close ref must remain tracked for retry")
 }
 
 func TestReapOrphanSurfaces_SkipsLivePeerOwner(t *testing.T) {

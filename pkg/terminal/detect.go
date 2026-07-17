@@ -1,7 +1,11 @@
 // Package terminal provides terminal multiplexer detection.
 package terminal
 
-import "github.com/insajin/autopus-adk/pkg/detect"
+import (
+	"os"
+
+	"github.com/insajin/autopus-adk/pkg/detect"
+)
 
 // isInstalled is a mockable wrapper around detect.IsInstalled for testing.
 // @AX:WARN [AUTO] global state mutation — isInstalled is a mutable package-level variable replaced by tests
@@ -9,10 +13,13 @@ import "github.com/insajin/autopus-adk/pkg/detect"
 var isInstalled = detect.IsInstalled
 
 // DetectTerminal returns the best available terminal adapter.
-// Priority: cmux > tmux > plain.
-// @AX:ANCHOR [AUTO] high fan-in entry point — called by 6 CLI command handlers in terminal_cmd.go
-// @AX:REASON: changes to detection priority (cmux > tmux > plain) affect all terminal subcommands; coordinate with terminal_cmd.go callers before modifying
+// Priority: active tmux > cmux > tmux > plain.
+// @AX:ANCHOR [AUTO]: high fan-in terminal/backend selection entry point — used by 6 terminal handlers and 5 orchestra paths
+// @AX:REASON: active-mux priority affects terminal commands plus orchestra launch, collection, cleanup, and injection
 func DetectTerminal() Terminal {
+	if os.Getenv("TMUX") != "" && isInstalled("tmux") {
+		return &TmuxAdapter{}
+	}
 	if isInstalled("cmux") {
 		return &CmuxAdapter{}
 	}

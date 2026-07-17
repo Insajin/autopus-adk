@@ -129,9 +129,14 @@ func TestRESTPoller_StopsWhenWebSocketRecovers(t *testing.T) {
 	t.Parallel()
 
 	var pollCount atomic.Int32
+	pollObserved := make(chan struct{}, 2)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pollCount.Add(1)
+		select {
+		case pollObserved <- struct{}{}:
+		default:
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]interface{}{})
 	}))
@@ -150,18 +155,23 @@ func TestRESTPoller_StopsWhenWebSocketRecovers(t *testing.T) {
 	defer cancel()
 	poller.Start(ctx) // method does not exist yet
 
-	// Wait for polling to start
-	time.Sleep(35 * time.Millisecond)
-	countBeforeStop := pollCount.Load()
-	assert.GreaterOrEqual(t, countBeforeStop, int32(2), "polling should have started")
+	// Observe two requests so the recurring polling contract is established
+	// independently of goroutine scheduling latency.
+	for range 2 {
+		select {
+		case <-pollObserved:
+		case <-time.After(time.Second):
+			require.FailNow(t, "polling should have started")
+		}
+	}
 
 	// When WebSocket recovers — Stop() is called (method does not exist yet — compile error)
 	poller.Stop() // method does not exist yet
+	countAfterStop := pollCount.Load()
 
 	// Then polling stops
 	time.Sleep(50 * time.Millisecond)
-	countAfterStop := pollCount.Load()
-	assert.Equal(t, countBeforeStop, countAfterStop, "polling must stop when WS recovers (S10)")
+	assert.Equal(t, countAfterStop, pollCount.Load(), "polling must stop when WS recovers (S10)")
 }
 
 // TestRESTPoller_AuthFailure_DoesNotRetry asserts S11 (worker side):

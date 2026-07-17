@@ -167,4 +167,11 @@ type ReviewResult struct {
 	Responses         []string           // raw provider responses
 	Revision          int                // revision iteration (0 = first review)
 	ProviderStatuses  []ProviderStatus   // per-provider health (SPEC-SPECREV-001 REQ-VERD-1)
+
+	// Observation-integrity fields (SPEC-ADK-REVIEW-INTEGRITY-001). All are
+	// additive and optional so existing consumers and prior artifacts are
+	// unaffected.
+	DocCoverages      []DocCoverage `json:"doc_coverages,omitempty"`      // per-aux-doc injection coverage (REQ-RINT-COV-01)
+	DegradedReasons   []string      `json:"degraded_reasons,omitempty"`   // e.g. partial_doc_context, provider_quorum (REQ-RINT-TRUNC-04/QUORUM-05)
+	OverridePromotion bool          `json:"override_promotion,omitempty"` // true when --allow-degraded promoted a degraded PASS (REQ-RINT-OVERRIDE-07)
 }

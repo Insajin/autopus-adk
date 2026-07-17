@@ -33,18 +33,18 @@ func NewInteractivePaneBackend(cfg OrchestraConfig) *InteractivePaneBackend {
 // Name returns "pane".
 func (b *InteractivePaneBackend) Name() string { return paneBackendName }
 
-// Execute drives one provider pane end-to-end. On any failure BEFORE a
-// deterministic pane result is produced (split, launch, never-ready, send),
-// it degrades to best-effort subprocess fallback (REQ-005/013). A completion
-// timeout is a deterministic pane result, not a failure: it returns a
-// TimedOut response with sanitized partial output (REQ-011).
+// Execute drives one provider pane end-to-end. Subprocess fallback is allowed
+// only before pane provisioning commits. A non-empty pane ID is the commit
+// point; launch, readiness, prompt, and collection failures after that point
+// remain pane-path failures. A completion timeout returns a deterministic
+// TimedOut pane response with sanitized partial output (REQ-011).
 //
-// @AX:WARN [AUTO]: multi-stage terminal I/O with >=8 sequential failure branches; any new stage MUST preserve the fallback-before-deterministic-result contract.
-// @AX:REASON: split/launch/ready-gate/send/wait stages each branch to paneFallback (fan-out 7); reordering or skipping the session-ready gate (REQ-009) silently sends the prompt before the CLI is live.
+// @AX:WARN [AUTO]: multi-stage terminal I/O with >=8 sequential failure branches; any new stage MUST preserve the SplitPane commit-point contract.
+// @AX:REASON: only terminal absence and SplitPane failure may invoke subprocess fallback; every failure after a non-empty pane ID must report ExecutedBackend=pane without running a provider subprocess.
 func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderRequest) (*ProviderResponse, error) {
 	if b.cfg.Terminal == nil {
 		// Defensive: no terminal means we cannot run a pane at all.
-		return paneFallback(ctx, req, "interactive pane execution failed: no terminal attached")
+		return paneProvisioningFallback(ctx, req, "interactive pane execution failed: no terminal attached")
 	}
 
 	if req.Timeout > 0 {
@@ -57,8 +57,15 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	start := time.Now()
 
 	paneID, err := splitTrackedPane(ctx, term, terminal.Horizontal)
+	if paneID == "" {
+		if err != nil {
+			return paneProvisioningFallback(ctx, req, "interactive pane execution failed: SplitPane error: "+err.Error())
+		}
+		return paneProvisioningFallback(ctx, req, "interactive pane execution failed: SplitPane returned an empty pane ID")
+	}
 	if err != nil {
-		return paneFallback(ctx, req, "interactive pane execution failed: SplitPane error: "+err.Error())
+		closePaneSurface(term, paneID)
+		return paneExecutionFailure(req, "interactive pane execution failed after SplitPane committed pane "+string(paneID)+": "+err.Error())
 	}
 	pi := paneInfo{paneID: paneID, provider: req.Config, role: req.Role}
 	defer func() { cleanupInteractivePanes(term, []paneInfo{pi}) }()
@@ -104,27 +111,27 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	}
 	cmd, launchFile, launchErr := buildPaneLaunchCommand(b.cfg.WorkingDir, req.Config, launchPrompt)
 	if launchErr != nil {
-		return paneFallback(ctx, req, "interactive pane execution failed: launch command error: "+launchErr.Error())
+		return paneExecutionFailure(req, "interactive pane execution failed: launch command error: "+launchErr.Error())
 	}
 	if launchFile != "" {
 		pi.launchFiles = append(pi.launchFiles, launchFile)
 	}
 	if err := term.SendLongText(ctx, paneID, cmd); err != nil {
-		return paneFallback(ctx, req, "interactive pane execution failed: launch send error: "+err.Error())
+		return paneExecutionFailure(req, "interactive pane execution failed: launch send error: "+err.Error())
 	}
 	time.Sleep(promptRegisterDelay)
 	if err := term.SendCommand(ctx, paneID, "\n"); err != nil {
-		return paneFallback(ctx, req, "interactive pane execution failed: launch enter error: "+err.Error())
+		return paneExecutionFailure(req, "interactive pane execution failed: launch enter error: "+err.Error())
 	}
 	time.Sleep(promptRegisterDelay)
 	completionBaseline := captureCompletionBaseline(ctx, term, paneID)
 
 	if !promptDeliveredAtLaunch(req.Config) {
 		// REQ-009: gate the prompt on session readiness. If the session never
-		// becomes ready the prompt is NEVER sent and we degrade to fallback.
+		// becomes ready the prompt is never sent and the committed pane fails.
 		ready := waitForPaneReady(ctx, term, paneID, SessionReadyPatterns(), startupTimeoutFor(req.Config), hookSession, req.Config.Name, req.Round)
 		if !ready {
-			return paneFallback(ctx, req,
+			return paneExecutionFailure(req,
 				"interactive pane execution failed: session never became ready (prompt was not sent)")
 		}
 
@@ -135,11 +142,11 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 		}
 		pi.responseFile = responseFile
 		if err := sendPanePromptInput(ctx, term, paneID, req.Config, promptText, promptFile != ""); err != nil {
-			return paneFallback(ctx, req, "interactive pane execution failed: prompt send error: "+err.Error())
+			return paneExecutionFailure(req, "interactive pane execution failed: prompt send error: "+err.Error())
 		}
 		time.Sleep(panePromptSubmitDelay(req.Config))
 		if err := term.SendCommand(ctx, paneID, "\n"); err != nil {
-			return paneFallback(ctx, req, "interactive pane execution failed: prompt enter error: "+err.Error())
+			return paneExecutionFailure(req, "interactive pane execution failed: prompt enter error: "+err.Error())
 		}
 		time.Sleep(promptRegisterDelay)
 		completionBaseline = captureCompletionBaseline(ctx, term, paneID)

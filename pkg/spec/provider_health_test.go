@@ -154,7 +154,7 @@ func TestBuildProviderStatuses_OrchestraResponses(t *testing.T) {
 	require := assert.New(t)
 	require.Len(got, 4)
 	require.Equal(spec.ProviderStatus{Provider: "claude", Status: "success", Note: "-"}, got[0])
-	require.Equal(spec.ProviderStatus{Provider: "gemini", Status: "timeout", Note: "-"}, got[1])
+	require.Equal(spec.ProviderStatus{Provider: "gemini", Status: "timeout", Note: "timeout; source=unknown; budget=unknown; elapsed=unknown; collection=unknown; partial_output=false"}, got[1])
 	require.Equal(spec.ProviderStatus{Provider: "codex", Status: "error", Note: "subprocess crashed"}, got[2])
 	require.Equal(spec.ProviderStatus{Provider: "opus2", Status: "error", Note: "exit=137"}, got[3])
 }

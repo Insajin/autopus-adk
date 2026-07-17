@@ -76,6 +76,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newOrchestraCmd())
 	root.AddCommand(newSetupCmd())
 	root.AddCommand(newStatusCmd())
+	root.AddCommand(newSyncCmd())
 	root.AddCommand(newVerifyCmd())
 	root.AddCommand(newTelemetryCmd())
 	root.AddCommand(newIssueCmd())

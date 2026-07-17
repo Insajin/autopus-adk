@@ -1063,7 +1063,10 @@ Update SPEC status, regenerate project docs, manage @AX tag lifecycle, and commi
 
 ```bash
 /auto sync SPEC-HOOK-001
+auto sync verify --spec SPEC-HOOK-001 --strict
 ```
+
+Before committing a multi-repo sync, `auto sync verify` creates a read-only Phase A/Phase B staging plan. It excludes generated/runtime, tracked-but-ignored, unclassified, and shell-unsafe paths; `--spec` limits the plan to workspace-relative files owned by exactly one SPEC host, and `--strict` fails on anything excluded or unrelated.
 
 ```
 ╭────────────────────────────────────╮
@@ -1165,6 +1168,7 @@ Providers: **Claude** · **Codex** · **Gemini** · **OpenCode** — with gracef
 | `/auto secure` | OWASP Top 10 security audit |
 | `/auto map` | Codebase structure analysis |
 | `/auto sync SPEC-ID` | Sync docs after implementation |
+| `auto sync verify [--spec SPEC-ID] [--strict]` | Read-only, fail-closed multi-repo commit plan |
 | `/auto dev "description"` | Full power: plan(--multi --ultrathink) → go(--team --loop) → sync |
 | `/auto setup` | Generate/update project context docs |
 | `/auto stale` | Detect stale decisions and patterns |

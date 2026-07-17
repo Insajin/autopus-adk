@@ -70,3 +70,68 @@ func TestHookModeAvailableInDirs_BothPathsMissingReturnsFalse(t *testing.T) {
 	)
 	assert.False(t, ok, "both missing paths must return false without panicking")
 }
+
+// TestIsHookModeAvailable_NestedWorkingDirectoryFindsAncestorProjectHook
+// verifies that orchestra hook detection follows the owning project root when
+// the command is launched from a nested module or background terminal cwd.
+func TestIsHookModeAvailable_NestedWorkingDirectoryFindsAncestorProjectHook(t *testing.T) {
+	// Given: only the ancestor project has an Autopus Stop hook. Keep HOME
+	// isolated so a real user-global Claude configuration cannot satisfy the test.
+	projectRoot := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(projectRoot, "autopus.yaml"),
+		[]byte("project: nested-hook-test\n"),
+		0o600,
+	))
+	claudeDir := filepath.Join(projectRoot, ".claude")
+	require.NoError(t, os.MkdirAll(claudeDir, 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(claudeDir, "settings.json"),
+		[]byte(`{"hooks":{"Stop":[{"matcher":"","hooks":[{"type":"command","command":"autopus hook stop"}]}]}}`),
+		0o600,
+	))
+
+	nestedDir := filepath.Join(projectRoot, "modules", "nested")
+	require.NoError(t, os.MkdirAll(nestedDir, 0o700))
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(nestedDir)
+
+	// When: hook availability is resolved from the nested working directory.
+	available := isHookModeAvailable()
+
+	// Then: the ancestor project's hook keeps structured orchestra pane-capable.
+	assert.True(t, available, "nested orchestra cwd must discover the ancestor project hook")
+}
+
+// TestIsHookModeAvailable_StopsAtNearestAutopusProjectRoot verifies that a
+// hook belonging to an unrelated ancestor workspace is not treated as the
+// current project's hook.
+func TestIsHookModeAvailable_StopsAtNearestAutopusProjectRoot(t *testing.T) {
+	// Given: the nearest Autopus project has no hook, while its parent does.
+	ancestor := t.TempDir()
+	ancestorClaudeDir := filepath.Join(ancestor, ".claude")
+	require.NoError(t, os.MkdirAll(ancestorClaudeDir, 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(ancestorClaudeDir, "settings.json"),
+		[]byte(`{"hooks":{"Stop":[{"matcher":"","hooks":[{"type":"command","command":"autopus hook stop"}]}]}}`),
+		0o600,
+	))
+
+	projectRoot := filepath.Join(ancestor, "current-project")
+	require.NoError(t, os.MkdirAll(projectRoot, 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(projectRoot, "autopus.yaml"),
+		[]byte("project: current-project\n"),
+		0o600,
+	))
+	nestedDir := filepath.Join(projectRoot, "modules", "nested")
+	require.NoError(t, os.MkdirAll(nestedDir, 0o700))
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(nestedDir)
+
+	// When: hook availability is resolved inside the marker-bounded project.
+	available := isHookModeAvailable()
+
+	// Then: the unrelated ancestor hook must not enable hook mode.
+	assert.False(t, available, "hook discovery must stop at the nearest autopus.yaml project root")
+}

@@ -89,6 +89,15 @@ func classifyFailedProvider(name string, f orchestra.FailedProvider) ProviderSta
 		status = providerStatusTimeout
 	}
 	note := f.FailureClass
+	if status == providerStatusTimeout {
+		note = timeoutProviderHealthNote(
+			f.TimeoutSource,
+			f.ConfiguredDuration,
+			f.ElapsedDuration,
+			f.CollectionMode,
+			hasPartialProviderOutput(f.OutputPreview),
+		)
+	}
 	if note == "" {
 		note = emptyNotePlaceholder
 	}
@@ -111,7 +120,14 @@ const noteMaxLen = 200
 func classifyResponse(name string, r orchestra.ProviderResponse) ProviderStatus {
 	switch {
 	case r.TimedOut:
-		return ProviderStatus{Provider: name, Status: providerStatusTimeout, Note: emptyNotePlaceholder}
+		note := timeoutProviderHealthNote(
+			"",
+			0,
+			r.Duration,
+			collectionModeFromBackend(r.ExecutedBackend),
+			hasPartialProviderOutput(r.Output),
+		)
+		return ProviderStatus{Provider: name, Status: providerStatusTimeout, Note: note}
 	case r.ExitCode != 0:
 		note := sanitizeNote(r.Error)
 		if note == "" {
@@ -204,6 +220,53 @@ func DegradedLabel(statuses []ProviderStatus, totalConfigured int) string {
 	}
 	n := CountProviderStatus(statuses, providerStatusSuccess)
 	return fmt.Sprintf(" (degraded — %d/%d providers responded)", n, totalConfigured)
+}
+
+// SPEC-ADK-REVIEW-INTEGRITY-001 REQ-RINT-QUORUM-05 quorum policy.
+// How many providers must return a usable review before the review gate may
+// auto-promote a SPEC to "approved". These reuse the existing ProviderStatus /
+// CountProviderStatus machinery instead of duplicating provider bookkeeping.
+
+// DegradedReasonProviderQuorum is the machine-readable degraded reason recorded
+// on the verdict when the usable-provider count falls below the quorum. The
+// promotion gate reads this code to block auto-promotion (REQ-RINT-QUORUM-05).
+const DegradedReasonProviderQuorum = "provider_quorum"
+
+// DefaultMinProviders returns the majority quorum for a configured provider
+// count: configured/2 + 1 (integer division). This keeps single-provider local
+// reviews passing (n=1 -> 1) while blocking a 1-of-3 promotion (n=3 -> 2). A
+// non-positive count is treated as requiring one usable review (fail-closed).
+// @AX:NOTE: [AUTO] magic constant — configured/2 + 1 encodes "majority"; dropping the +1 would let n=2 pass at quorum=1 and silently weaken REQ-RINT-QUORUM-05
+func DefaultMinProviders(configured int) int {
+	if configured <= 0 {
+		return 1
+	}
+	return configured/2 + 1
+}
+
+// EffectiveMinProviders resolves the configured minimum against the provider
+// count. A configured value <= 0 means "unset" and derives the majority default
+// via DefaultMinProviders; a positive value is used verbatim as an operator
+// override.
+func EffectiveMinProviders(configured, configuredMin int) int {
+	if configuredMin > 0 {
+		return configuredMin
+	}
+	return DefaultMinProviders(configured)
+}
+
+// MeetsProviderQuorum reports whether the number of providers that returned a
+// usable ("success") review meets the effective minimum quorum. When the quorum
+// is not met it returns a human-readable detail string ("providers N/M < quorum
+// Q") suitable for surfacing alongside DegradedReasonProviderQuorum; when met
+// the detail string is empty.
+func MeetsProviderQuorum(statuses []ProviderStatus, configured, minProviders int) (bool, string) {
+	quorum := EffectiveMinProviders(configured, minProviders)
+	responded := CountProviderStatus(statuses, providerStatusSuccess)
+	if responded >= quorum {
+		return true, ""
+	}
+	return false, fmt.Sprintf("providers %d/%d < quorum %d", responded, configured, quorum)
 }
 
 // RenderProviderHealthSection renders the markdown section that documents

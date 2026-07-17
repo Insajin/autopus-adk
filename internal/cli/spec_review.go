@@ -59,6 +59,7 @@ func newSpecReviewCmd() *cobra.Command {
 		timeout             int
 		forceSubprocess     bool
 		forcePlain          bool
+		allowDegraded       bool
 		requiredDocuments   []string
 		conditionalProfiles []string
 	)
@@ -72,6 +73,7 @@ func newSpecReviewCmd() *cobra.Command {
 			specID := args[0]
 			return runSpecReviewWithOptions(cmd.Context(), specID, strategy, timeout, specReviewOptions{
 				forceSubprocess:     forceSubprocess || forcePlain,
+				allowDegraded:       allowDegraded,
 				requiredDocuments:   requiredDocuments,
 				conditionalProfiles: conditionalProfiles,
 			})
@@ -82,6 +84,7 @@ func newSpecReviewCmd() *cobra.Command {
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 0, "timeout in seconds (default: from config)")
 	cmd.Flags().BoolVar(&forceSubprocess, "subprocess", false, "Force headless subprocess backend for SPEC review")
 	cmd.Flags().BoolVar(&forcePlain, "plain", false, "Alias for --subprocess; bypass interactive pane backend")
+	cmd.Flags().BoolVar(&allowDegraded, "allow-degraded", false, "Promote a PASS even when a document was truncated or the provider quorum was not met (records an audit override)")
 	cmd.Flags().StringArrayVar(&requiredDocuments, "required-document", nil, "Additional root-relative required review document")
 	cmd.Flags().StringArrayVar(&conditionalProfiles, "conditional-profile", nil, "Declared conditional review context profile")
 
@@ -90,6 +93,7 @@ func newSpecReviewCmd() *cobra.Command {
 
 type specReviewOptions struct {
 	forceSubprocess     bool
+	allowDegraded       bool
 	requiredDocuments   []string
 	conditionalProfiles []string
 }
@@ -132,6 +136,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 	if strategy == "" && flags.MultiMode {
 		strategy = string(orchestra.StrategyDebate)
 	}
+	requestedTimeout := timeout
 	timeout = resolveSpecReviewTimeout(cfg, timeout)
 	// SPEC-SPECREV-002 REQ-003: consume the global --loop flag so the revision
 	// budget honors the loop floor (inert seam otherwise).
@@ -144,6 +149,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 
 	providerNames := resolveSpecReviewProviderNames(cfg, flags.MultiMode)
 	providers := configureSpecReviewProviders(resolveCodexProviderCapabilities(ctx, specReviewConfigProviders(cfg, providerNames)))
+	providers = applySpecReviewExecutionTimeout(providers, requestedTimeout)
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다. 설치를 확인하세요: %v", providerNames)
 	}
@@ -193,7 +199,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 
 	// Output final result
 	if finalResult != nil {
-		if persistErr := syncReviewedSpecStatus(specDir, finalResult); persistErr != nil {
+		if persistErr := syncReviewedSpecStatus(specDir, finalResult, opts.allowDegraded); persistErr != nil {
 			return fmt.Errorf("SPEC 상태 업데이트 실패 (SPEC: %s): %w", specID, persistErr)
 		}
 		fmt.Printf("SPEC 리뷰 완료: %s\n", specID)

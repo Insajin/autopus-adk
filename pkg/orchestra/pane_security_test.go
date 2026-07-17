@@ -31,9 +31,10 @@ func TestReadOutputFile_EmptyFile(t *testing.T) {
 	assert.Empty(t, readOutputFile(path))
 }
 
-// TestCleanupPanes_CloseError verifies that cleanupPanes handles Close errors gracefully.
+// TestCleanupPanes_CloseError verifies that a persistent Close error consumes
+// the bounded retry budget without preventing temporary-file cleanup.
 func TestCleanupPanes_CloseError(t *testing.T) {
-	t.Parallel()
+	isolateSurfaceTracker(t)
 
 	mock := newCmuxMock()
 	mock.closeErr = fmt.Errorf("close failed: connection reset")
@@ -46,11 +47,13 @@ func TestCleanupPanes_CloseError(t *testing.T) {
 		{paneID: "pane-1", outputFile: tmpFile, provider: ProviderConfig{Name: "p1"}},
 	}
 
-	// Should not panic even when Close returns error
+	// Cleanup remains best-effort after the bounded Close retry budget expires.
 	cleanupPanes(mock, panes)
-	assert.Len(t, mock.closeCalls, 1)
+	assert.Len(t, mock.closeCalls, closePaneSurfaceAttempts,
+		"persistent Close errors must stop at the bounded retry budget")
 	_, err := os.Stat(tmpFile)
-	assert.True(t, os.IsNotExist(err), "temp file should be removed")
+	assert.ErrorIs(t, err, os.ErrNotExist,
+		"temp file cleanup must continue after persistent Close errors")
 }
 
 // TestCleanupPanes_MultiplePanes verifies cleanup of multiple panes and files.

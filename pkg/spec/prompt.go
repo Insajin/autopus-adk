@@ -3,7 +3,6 @@ package spec
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -75,11 +74,7 @@ func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptO
 		if opts.RequireCompleteDocuments {
 			injectCompleteAuxDocs(&sb, opts.completeDocuments)
 		} else {
-			maxLines := opts.DocContextMaxLines
-			if maxLines <= 0 {
-				maxLines = defaultDocContextMaxLines
-			}
-			injectAuxDocs(&sb, dir, maxLines)
+			injectAuxDocs(&sb, dir, ResolveAuxTotalBudget(opts.DocContextMaxLines))
 		}
 	}
 
@@ -114,32 +109,16 @@ func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptO
 }
 
 // injectAuxDocs injects plan.md, research.md, and acceptance.md into the prompt.
-// Missing files are silently skipped. Each file is trimmed to maxLines.
-func injectAuxDocs(sb *strings.Builder, specDir string, maxLines int) {
-	docs := []struct {
-		name string
-	}{
-		{"plan.md"},
-		{"research.md"},
-		{"acceptance.md"},
-	}
-
-	sectionNames := map[string]string{
-		"plan.md":       "### Plan Document",
-		"research.md":   "### Research Document",
-		"acceptance.md": "### Acceptance Criteria Document",
-	}
-	for _, d := range docs {
-		path := filepath.Join(specDir, d.name)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue // file does not exist — not an error
-		}
-		content := trimToLines(string(data), maxLines)
-		header := sectionNames[d.name]
-		sb.WriteString(header)
+// Missing files are silently skipped. Documents inject in full while their
+// combined line count fits totalBudget; over budget, the largest document is
+// compacted with tail-critical sections preserved rather than head-trimmed
+// (REQ-RINT-FULL-02, REQ-RINT-STRUCT-03). The shared planning core also backs
+// AuxDocCoverages so coverage records match what was actually injected.
+func injectAuxDocs(sb *strings.Builder, specDir string, totalBudget int) {
+	for _, plan := range planAuxDocInjection(specDir, totalBudget) {
+		sb.WriteString(plan.header)
 		sb.WriteString("\n\n")
-		sb.WriteString(content)
+		sb.WriteString(plan.excerpt)
 		sb.WriteString("\n\n")
 	}
 }

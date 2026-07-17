@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -13,15 +14,16 @@ const noneBackendMarker = "none"
 // when both backends are unavailable (REQ-013/S14).
 const recoveryHint = "ensure a logged-in cmux/tmux CLI session and that the provider CLI is logged in"
 
-// paneFallback handles best-effort subprocess fallback after interactive-pane
-// execution fails BEFORE producing a deterministic result (REQ-005/013).
+// paneProvisioningFallback handles best-effort subprocess fallback only when
+// no pane was committed (no terminal or SplitPane failed). Once SplitPane
+// returns a non-empty pane ID, execution failures must stay on the pane path.
 //
 // On subprocess success it returns the subprocess response tagged
 // ExecutedBackend="subprocess" (recoverable path, S6). When the subprocess
 // backend is also unavailable it returns an actionable error naming BOTH
 // failure causes plus a recovery instruction, and a response marked so neither
 // backend is recorded as successful (S14).
-func paneFallback(ctx context.Context, req ProviderRequest, paneFailureReason string) (*ProviderResponse, error) {
+func paneProvisioningFallback(ctx context.Context, req ProviderRequest, paneFailureReason string) (*ProviderResponse, error) {
 	resp, err := NewSubprocessBackendImpl().Execute(ctx, req)
 	if err == nil && resp != nil && !subprocessFailed(resp) {
 		resp.ExecutedBackend = "subprocess"
@@ -46,6 +48,34 @@ func paneFallback(ctx context.Context, req ProviderRequest, paneFailureReason st
 		ExecutedBackend: noneBackendMarker,
 	}
 	return failed, actionable
+}
+
+// paneExecutionFailure reports a failure after pane provisioning committed.
+// It deliberately does not invoke the subprocess backend.
+func paneExecutionFailure(req ProviderRequest, reason string) (*ProviderResponse, error) {
+	err := errors.New(reason)
+	resp := markUnavailableUsage(&ProviderResponse{
+		Provider:        req.Provider,
+		Error:           reason,
+		ExecutedBackend: paneBackendName,
+	}, usageSourcePane, usageReasonPane)
+	return resp, err
+}
+
+// paneProvisioningError identifies failures originating from SplitPane. Callers
+// may fall back to subprocess only for this error type.
+type paneProvisioningError struct{ cause error }
+
+func (e *paneProvisioningError) Error() string { return e.cause.Error() }
+func (e *paneProvisioningError) Unwrap() error { return e.cause }
+
+func newPaneProvisioningError(cause error) error {
+	return &paneProvisioningError{cause: cause}
+}
+
+func isPaneProvisioningError(err error) bool {
+	var target *paneProvisioningError
+	return errors.As(err, &target)
 }
 
 // subprocessFailed reports whether a subprocess response should be treated as a

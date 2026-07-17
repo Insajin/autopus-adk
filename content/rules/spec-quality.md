@@ -13,6 +13,8 @@ Use this checklist after `spec.md`, `plan.md`, `acceptance.md`, and `research.md
 
 Prompt-state SPECs MUST name the prompt layer manifest contract and classify stable, snapshot, and ephemeral context so cache invalidation is observable without exposing raw secrets.
 
+Keep `plan.md`, `research.md`, and `acceptance.md` each at or under the 200-line review injection cap (the authoring cap). A file over the cap is injected under structure-preserving compression fallback and the review is labeled with degraded observation coverage, so staying under the cap is what lets a well-formed SPEC be fully observed without an override. `auto spec validate <dir> --strict` emits a warning-level finding naming the file, its line count, and the cap, and still exits zero, so authors see the truncation risk before review.
+
 The five primary dimensions map 1:1 to `FindingCategory` values in `pkg/spec/types.go`:
 - `correctness`
 - `completeness`

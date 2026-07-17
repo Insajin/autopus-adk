@@ -147,7 +147,24 @@ fi
 printf 'tamper\n' >>"$temp/manifest/auto"
 if "$verifier" "${signing_verify_args[@]}" >/dev/null 2>&1; then fail 'tampered artifact passed'; fi
 printf 'signed companion artifact\n' >"$temp/manifest/auto"
-printf '\001' | dd of="$temp/manifest/adk-companion-manifest.sig" bs=1 seek=0 conv=notrunc 2>/dev/null
+manifest_signature="$temp/manifest/adk-companion-manifest.sig"
+signature_size_before=$(wc -c <"$manifest_signature")
+(( signature_size_before == 64 )) || fail 'fixture manifest signature length drifted'
+signature_byte_before=$(od -An -tu1 -N1 "$manifest_signature" | tr -d '[:space:]')
+case "$signature_byte_before" in
+  1) signature_byte_replacement=2 ;;
+  ''|*[!0-9]*) fail 'fixture manifest signature byte could not be read' ;;
+  *) signature_byte_replacement=1 ;;
+esac
+if (( signature_byte_replacement == 1 )); then printf '\001'; else printf '\002'; fi |
+  dd of="$manifest_signature" bs=1 seek=0 conv=notrunc 2>/dev/null
+signature_size_after=$(wc -c <"$manifest_signature")
+(( signature_size_after == signature_size_before )) || fail 'manifest signature tamper changed length'
+signature_byte_after=$(od -An -tu1 -N1 "$manifest_signature" | tr -d '[:space:]')
+[[ "$signature_byte_after" == "$signature_byte_replacement" ]] ||
+  fail 'manifest signature tamper did not write the replacement byte'
+[[ "$signature_byte_after" != "$signature_byte_before" ]] ||
+  fail 'manifest signature tamper was a no-op'
 if "$verifier" "${signing_verify_args[@]}" >/dev/null 2>&1; then fail 'tampered manifest signature passed'; fi
 go run "$tests_dir/testdata/generate-manifest-fixture.go" "$temp/manifest" \
   'attacker replacement artifact'

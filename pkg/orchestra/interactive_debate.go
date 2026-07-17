@@ -117,6 +117,9 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 	// Split panes for each provider.
 	panes, _, err := splitProviderPanes(ctx, cfg)
 	if err != nil {
+		if !isPaneProvisioningError(err) {
+			return nil, fmt.Errorf("interactive debate pane setup failed after provisioning: %w", err)
+		}
 		if cfg.ReliabilityStore != nil {
 			event := ReliabilityEvent{
 				SchemaVersion: reliabilitySchemaVersion,

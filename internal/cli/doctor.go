@@ -115,7 +115,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	}
 	tui.OK(out, fmt.Sprintf("autopus.yaml (mode: %s)", cfg.Mode))
 
-	ctx := context.Background()
+	ctx := doctorCommandContext(cmd)
 	allOK := true
 	for _, p := range cfg.Platforms {
 		var validationErrs []adapter.ValidationError
@@ -236,11 +236,19 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 		allOK = false
 	}
 
+	// Context weight is advisory: it warns on an over-weight session-load set
+	// but never fails harness health, so its result does not touch allOK.
+	checkContextWeight(out, opts.dir)
+
 	hygiene := collectStatusHygiene(opts.dir)
 	renderHygieneText(out, hygiene)
 	if hygiene.hasWarning() {
 		allOK = false
 	}
+
+	// Drift observation is advisory: it mirrors the JSON drift checks but never
+	// touches allOK, so a project with a pending update is not reported as failed.
+	renderDriftTextContext(ctx, out, opts.dir, cfg)
 
 	fmt.Fprintln(out)
 	tui.ResultBox(out, allOK, func() string {
@@ -251,4 +259,11 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	}())
 
 	return nil
+}
+
+func doctorCommandContext(cmd *cobra.Command) context.Context {
+	if ctx := cmd.Context(); ctx != nil {
+		return ctx
+	}
+	return context.Background()
 }

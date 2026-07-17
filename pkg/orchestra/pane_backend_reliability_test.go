@@ -184,10 +184,14 @@ func TestExecute_S12_TimeoutDeterministic(t *testing.T) {
 
 	if err != nil {
 		// Ready gate consumed the budget under load -> deterministic REQ-009
-		// failure that degraded to the (unavailable) subprocess fallback. This is
-		// an actionable error, not a hang or garbage.
+		// committed-pane failure. It remains on the pane transport and returns an
+		// actionable error rather than crossing into subprocess execution.
 		assert.Contains(t, err.Error(), "interactive pane execution failed",
 			"ready-gate timeout must surface a deterministic actionable failure")
+		if resp != nil {
+			assert.Equal(t, paneBackendName, resp.ExecutedBackend,
+				"a ready-gate failure after SplitPane must remain on the pane backend")
+		}
 		return
 	}
 

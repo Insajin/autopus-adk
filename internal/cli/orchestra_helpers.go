@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -252,25 +253,33 @@ type OrchestraFlags struct {
 	RiskInputs     []string
 }
 
-// isHookModeAvailable checks whether hook-based result collection can be used.
-// Returns true when at least one of the user-global or project-local claude
-// settings.json contains both "autopus" and "Stop" strings simultaneously.
-// Either location satisfying the condition is sufficient (OR semantics).
-// @AX:NOTE: [AUTO] magic path and string constants — ~/.claude/settings.json, "autopus", "Stop"
+// isHookModeAvailable checks global, cwd-local, and nearest project-root settings.
+// @AX:NOTE [AUTO]: hook discovery uses ~/.claude/settings.json markers "autopus"/"Stop" and autopus.yaml as the project-root boundary
 func isHookModeAvailable() bool {
 	home, _ := os.UserHomeDir()
-	projectDir, _ := os.Getwd()
-	return hookModeAvailableInDirs(
-		home+"/.claude/settings.json",
-		projectDir+"/.claude/settings.json",
-	)
+	cwd, err := os.Getwd()
+	globalPath := filepath.Join(home, ".claude", "settings.json")
+	if err != nil {
+		return hookModeAvailableInDirs(globalPath, "")
+	}
+	if hookModeAvailableInDirs(globalPath, "") {
+		return true
+	}
+	if hookModeAvailableInDirs("", filepath.Join(cwd, ".claude", "settings.json")) {
+		return true
+	}
+	for dir := cwd; ; dir = filepath.Dir(dir) {
+		if _, err := os.Stat(filepath.Join(dir, "autopus.yaml")); err == nil {
+			return hookModeAvailableInDirs("", filepath.Join(dir, ".claude", "settings.json"))
+		}
+		if filepath.Dir(dir) == dir {
+			return false
+		}
+	}
 }
 
-// hookModeAvailableInDirs checks whether either settings file path contains both
-// "autopus" and "Stop". It is extracted as a helper so tests can inject arbitrary
-// paths without touching the real home directory or the process working directory.
-// Security: only caller-provided, fixed relative paths are used — no user-supplied
-// path segments that could cause traversal.
+// hookModeAvailableInDirs checks injected settings paths for both hook markers.
+// Callers provide fixed paths; user-supplied path segments are not accepted.
 func hookModeAvailableInDirs(globalPath, projectPath string) bool {
 	for _, path := range []string{globalPath, projectPath} {
 		if path == "" {
