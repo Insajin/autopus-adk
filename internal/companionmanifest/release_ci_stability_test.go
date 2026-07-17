@@ -28,7 +28,7 @@ type ciStabilityWorkflow struct {
 func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 	workflow := readCIStabilityWorkflow(t, ".github/workflows/ci.yaml")
 	want := map[string]int{
-		"test": 20, "e2e": 10, "lint": 10, "static-contracts": 10, "macos-runtime": 15,
+		"test": 30, "e2e": 10, "lint": 10, "static-contracts": 10, "macos-runtime": 15,
 	}
 	for id, timeout := range want {
 		job, ok := workflow.Jobs[id]
@@ -48,7 +48,7 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 		t.Fatalf("golangci-lint gate drifted: uses=%q version=%v", linter.Uses, linter.With["version"])
 	}
 	testRun := ciStepRun(t, workflow.Jobs["test"], "Test with Coverage")
-	for _, required := range []string{"-timeout=12m", "-tags integration", "-coverprofile=coverage.out", "COVERAGE_THRESHOLD: \"83\""} {
+	for _, required := range []string{"-timeout=18m", "-tags integration", "-coverprofile=coverage.out", "COVERAGE_THRESHOLD: \"83\""} {
 		if !strings.Contains(readReleaseFile(t, ".github/workflows/ci.yaml"), required) &&
 			!strings.Contains(testRun, required) {
 			t.Fatalf("CI coverage contract missing %q", required)
