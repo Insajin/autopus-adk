@@ -28,8 +28,10 @@ readonly A2_AMD64_ARCHIVE_SHA256='babce99376a647e801ea06d99f3575c87414551cbbeb77
 readonly A2_ARM64_ARCHIVE_SHA256='fbe9693d3517bdbaf92f230d7aa7561b728ba002749c2d06b6eef08170fed60b'
 readonly A2_AMD64_MANIFEST_SHA256='82d8e22a3943dd8efc14dafd0c28ac11d415b1c1a8ff5447beb658a5cff11be4'
 readonly A2_ARM64_MANIFEST_SHA256='f780452da57ec0a845bd8dae22dcd134b920c593c9ba61f496380136f243c8c0'
-readonly A3_COMMIT_SHA='ba5509b692a43dc8a70e0bd6173acb56166ed67f' A3_TAG_OBJECT_SHA='19fd06cec4f60218b07727e649f9671b27c1f7a7'
-readonly A3_CHECKSUMS_SHA256='1c88282d9cc215c4a766059ab9da79eecbb42126535f54b2d201e7f1309b35fe' A3_AMD64_ARCHIVE_SHA256='064c994fd739616fabfd7b353511d633d3b73b41912f756ee8e6b655ea9366ad'
+readonly A3_COMMIT_SHA='ba5509b692a43dc8a70e0bd6173acb56166ed67f'
+readonly A3_TAG_OBJECT_SHA='19fd06cec4f60218b07727e649f9671b27c1f7a7'
+readonly A3_CHECKSUMS_SHA256='1c88282d9cc215c4a766059ab9da79eecbb42126535f54b2d201e7f1309b35fe'
+readonly A3_AMD64_ARCHIVE_SHA256='064c994fd739616fabfd7b353511d633d3b73b41912f756ee8e6b655ea9366ad'
 readonly A3_ARM64_ARCHIVE_SHA256='c218a8df21ac7a7fe459e294942aa9e5b2e676d0a90a644bf486b4452f628a23'
 readonly A3_AMD64_MANIFEST_SHA256='2a88c6f40e8bda35c9342fac496ed424187d25f1fa2ac0be0c714bb10c9c1490'
 readonly A3_ARM64_MANIFEST_SHA256='80243b2fc0409d7743b9a7f94eaa88091ec1c53382b7215169157be314767e7e'
@@ -70,10 +72,8 @@ elif [[ "$GITHUB_REF_NAME" == "$A3_TAG" && "$COMPANION_VERSION" == "$A3_VERSION"
   prior_tag_object="$A2_TAG_OBJECT_SHA" prior_checksums="$A2_CHECKSUMS_SHA256" prior_amd64_archive="$A2_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A2_ARM64_ARCHIVE_SHA256"
   prior_amd64_manifest="$A2_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A2_ARM64_MANIFEST_SHA256"
 elif [[ "$GITHUB_REF_NAME" == "$A4_TAG" && "$COMPANION_VERSION" == "$A4_VERSION" ]]; then
-  release_phase='A4' prior_phase='A3' prior_repository="$A3_REPOSITORY" prior_evidence_source='immutable A3 GitHub release'
-  prior_tag="$A3_TAG" prior_version="$A3_VERSION" prior_commit="$A3_COMMIT_SHA"
-  prior_tag_object="$A3_TAG_OBJECT_SHA" prior_checksums="$A3_CHECKSUMS_SHA256" prior_amd64_archive="$A3_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A3_ARM64_ARCHIVE_SHA256"
-  prior_amd64_manifest="$A3_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A3_ARM64_MANIFEST_SHA256"
+  release_phase='A4' prior_phase='A3' prior_repository="$A3_REPOSITORY" prior_evidence_source='immutable A3 GitHub release' prior_tag="$A3_TAG" prior_version="$A3_VERSION" prior_commit="$A3_COMMIT_SHA"
+  prior_tag_object="$A3_TAG_OBJECT_SHA" prior_checksums="$A3_CHECKSUMS_SHA256" prior_amd64_archive="$A3_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A3_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A3_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A3_ARM64_MANIFEST_SHA256"
 else
   fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4 policy'
 fi
