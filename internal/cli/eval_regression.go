@@ -124,9 +124,28 @@ func deriveEvalRegressionAttestationPath(artifactPath string) string {
 // (advisory) but still prints the verdict (REQ-ECI-WARN-001).
 func checkEvalRegression(dir, artifactPath, attestationPath string, maxAge time.Duration, now time.Time, trusted map[string]ed25519.PublicKey, out io.Writer, quiet, warnOnly bool) bool {
 	_ = dir // artifact path is absolute/explicit; dir is accepted for dispatch symmetry.
+	return writeEvalRegressionDecision(
+		evaluateEvalRegression(artifactPath, attestationPath, maxAge, now, trusted),
+		out,
+		quiet,
+		warnOnly,
+	)
+}
 
-	decision := evaluateEvalRegression(artifactPath, attestationPath, maxAge, now, trusted)
+// checkEvalRegressionStrict is the v2 production trust path. An invalid policy
+// remains mandatory even when the caller requested advisory mode.
+func checkEvalRegressionStrict(dir, artifactPath, attestationPath string, maxAge time.Duration, now time.Time, trusted map[string]ed25519.PublicKey, policy evalregression.EvalRegressionAttestationPolicyV2, out io.Writer, quiet, warnOnly bool) bool {
+	_ = dir
+	_, policyOK := evalregression.ValidateEvalRegressionAttestationPolicyV2(policy)
+	return writeEvalRegressionDecision(
+		evaluateEvalRegressionStrict(artifactPath, attestationPath, maxAge, now, trusted, policy),
+		out,
+		quiet,
+		warnOnly && policyOK,
+	)
+}
 
+func writeEvalRegressionDecision(decision evalregression.GateDecision, out io.Writer, quiet, warnOnly bool) bool {
 	if !quiet {
 		line := "eval-regression: " + decision.Reason
 		if decision.AttributedVersion != "" {
@@ -150,6 +169,35 @@ func checkEvalRegression(dir, artifactPath, attestationPath string, maxAge time.
 // before-trust chain. It is split out so checkEvalRegression only handles the
 // print/warn-only surface.
 func evaluateEvalRegression(artifactPath, attestationPath string, maxAge time.Duration, now time.Time, trusted map[string]ed25519.PublicKey) evalregression.GateDecision {
+	return evaluateEvalRegressionWithVerifier(
+		artifactPath,
+		attestationPath,
+		maxAge,
+		now,
+		func(reportBytes, attestationBytes []byte) (string, bool) {
+			return evalregression.VerifyEvalRegressionArtifact(reportBytes, attestationBytes, trusted)
+		},
+	)
+}
+
+func evaluateEvalRegressionStrict(artifactPath, attestationPath string, maxAge time.Duration, now time.Time, trusted map[string]ed25519.PublicKey, policy evalregression.EvalRegressionAttestationPolicyV2) evalregression.GateDecision {
+	if reason, ok := evalregression.ValidateEvalRegressionAttestationPolicyV2(policy); !ok {
+		return evalregression.GateDecision{Blocked: true, ExitCode: 1, Reason: reason}
+	}
+	return evaluateEvalRegressionWithVerifier(
+		artifactPath,
+		attestationPath,
+		maxAge,
+		now,
+		func(reportBytes, attestationBytes []byte) (string, bool) {
+			return evalregression.VerifyEvalRegressionArtifactV2Strict(reportBytes, attestationBytes, trusted, policy)
+		},
+	)
+}
+
+type evalRegressionVerifier func(reportBytes, attestationBytes []byte) (reason string, ok bool)
+
+func evaluateEvalRegressionWithVerifier(artifactPath, attestationPath string, maxAge time.Duration, now time.Time, verify evalRegressionVerifier) evalregression.GateDecision {
 	// 1. Read report bytes once. Missing precedes verify (fail closed).
 	reportBytes, missReason, missErr := readEvalRegressionReportBytes(artifactPath)
 	if missErr != nil {
@@ -163,7 +211,7 @@ func evaluateEvalRegression(artifactPath, attestationPath string, maxAge time.Du
 
 	// 3. Verify signature over the raw report bytes BEFORE decode. On failure the
 	// unverified report is never decoded and its blocked field is never read.
-	if reason, ok := evalregression.VerifyEvalRegressionArtifact(reportBytes, attData, trusted); !ok {
+	if reason, ok := verify(reportBytes, attData); !ok {
 		return evalregression.GateDecision{Blocked: true, ExitCode: 1, Reason: reason}
 	}
 

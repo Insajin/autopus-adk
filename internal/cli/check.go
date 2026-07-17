@@ -29,10 +29,16 @@ func newCheckCmd() *cobra.Command {
 		gateFlag            string
 		dir                 string
 
-		evalRegressionFlag            bool
-		evalRegressionArtifactFlag    string
-		evalRegressionAttestationFlag string
-		evalRegressionMaxAgeFlag      time.Duration
+		evalRegressionFlag                          bool
+		evalRegressionArtifactFlag                  string
+		evalRegressionAttestationFlag               string
+		evalRegressionMaxAgeFlag                    time.Duration
+		evalRegressionExpectedKeyIDFlag             string
+		evalRegressionExpectedTrustLaneFlag         string
+		evalRegressionExpectedSourceEnvironmentFlag string
+		evalRegressionExpectedTargetEnvironmentFlag string
+		evalRegressionExpectedSourceRevisionFlag    string
+		evalRegressionExpectedWorkspaceScopeFlag    string
 	)
 
 	cmd := &cobra.Command{
@@ -51,6 +57,25 @@ func newCheckCmd() *cobra.Command {
 			out := cmd.OutOrStdout()
 			if !quietFlag {
 				tui.BannerWithInfo(out, "autopus-adk", "check")
+			}
+			policy := evalregression.EvalRegressionAttestationPolicyV2{
+				ExpectedKeyID:     evalRegressionExpectedKeyIDFlag,
+				TrustLane:         evalRegressionExpectedTrustLaneFlag,
+				SourceEnvironment: evalRegressionExpectedSourceEnvironmentFlag,
+				TargetEnvironment: evalRegressionExpectedTargetEnvironmentFlag,
+				SourceRevision:    evalRegressionExpectedSourceRevisionFlag,
+				WorkspaceScope:    evalRegressionExpectedWorkspaceScopeFlag,
+			}
+			if evalRegressionFlag {
+				if reason, ok := evalregression.ValidateEvalRegressionAttestationPolicyV2(policy); !ok {
+					if !quietFlag {
+						fmt.Fprintln(out, "eval-regression: "+reason)
+					}
+					return fmt.Errorf("check failed")
+				}
+				if gateFlag != "" {
+					return fmt.Errorf("--eval-regression cannot be combined with --gate")
+				}
 			}
 
 			if gateFlag != "" {
@@ -76,7 +101,7 @@ func newCheckCmd() *cobra.Command {
 			}
 
 			flags := globalFlagsFromContext(cmd.Context())
-			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag, evalRegressionArtifactFlag, evalRegressionAttestationFlag, evalRegressionMaxAgeFlag, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
+			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag, evalRegressionArtifactFlag, evalRegressionAttestationFlag, evalRegressionMaxAgeFlag, policy, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
 			if !allOK {
 				return fmt.Errorf("check failed")
 			}
@@ -98,20 +123,28 @@ func newCheckCmd() *cobra.Command {
 	cmd.Flags().StringVar(&dir, "dir", "", "Project root directory")
 	cmd.Flags().BoolVar(&evalRegressionFlag, "eval-regression", false, "Fail closed on a blocked/missing/stale/unsafe eval_regression_report.v1 artifact (SPEC-EVAL-REGRESSION-CI-001)")
 	cmd.Flags().StringVar(&evalRegressionArtifactFlag, "eval-regression-artifact", "", "Path to the eval_regression_report.v1 artifact")
-	cmd.Flags().StringVar(&evalRegressionAttestationFlag, "eval-regression-attestation", "", "Path to the eval_regression_attestation.v1 sidecar (defaults to a path derived from the artifact)")
+	cmd.Flags().StringVar(&evalRegressionAttestationFlag, "eval-regression-attestation", "", "Path to the eval_regression_attestation.v2 sidecar (defaults to a path derived from the artifact)")
 	cmd.Flags().DurationVar(&evalRegressionMaxAgeFlag, "eval-regression-max-age", 24*time.Hour, "Freshness window for the eval-regression artifact")
+	cmd.Flags().StringVar(&evalRegressionExpectedKeyIDFlag, "eval-regression-expected-key-id", "", "Required trusted key ID for the eval-regression attestation")
+	cmd.Flags().StringVar(&evalRegressionExpectedTrustLaneFlag, "eval-regression-expected-trust-lane", "", "Required trust lane for the eval-regression attestation")
+	cmd.Flags().StringVar(&evalRegressionExpectedSourceEnvironmentFlag, "eval-regression-expected-source-environment", "", "Required source environment for the eval-regression attestation")
+	cmd.Flags().StringVar(&evalRegressionExpectedTargetEnvironmentFlag, "eval-regression-expected-target-environment", "", "Required target environment for the eval-regression attestation")
+	cmd.Flags().StringVar(&evalRegressionExpectedSourceRevisionFlag, "eval-regression-expected-source-revision", "", "Required source revision for the eval-regression attestation")
+	cmd.Flags().StringVar(&evalRegressionExpectedWorkspaceScopeFlag, "eval-regression-expected-workspace-scope", "", "Required workspace scope for the eval-regression attestation")
 
 	return cmd
 }
 
 // runChecks executes the selected checks and returns true if all pass.
 // If no specific check flag is set, all checks run.
-// When warnOnly is true, violations are still printed but the function always returns true.
+// When warnOnly is true, violations are advisory except an invalid v2 trust
+// policy, which remains mandatory and fail-closed.
 // When staged is true, arch check only examines git-staged files.
 // When messageFile is non-empty, lore check validates that file instead of the last commit.
-func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag bool, evalRegressionArtifact, evalRegressionAttestation string, evalRegressionMaxAge time.Duration, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
+func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag bool, evalRegressionArtifact, evalRegressionAttestation string, evalRegressionMaxAge time.Duration, evalRegressionPolicy evalregression.EvalRegressionAttestationPolicyV2, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
 	runAll := !archFlag && !cc21Flag && !loreFlag && !hygieneFlag && !initialPromptFlag && !monitorCommandsFlag && !evalRegressionFlag
 	allOK := true
+	evalRegressionPolicyOK := true
 
 	if hygieneFlag || runAll {
 		if !checkHygiene(dir, out, quiet) {
@@ -162,16 +195,19 @@ func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, ini
 		}
 	}
 	if evalRegressionFlag {
+		if _, ok := evalregression.ValidateEvalRegressionAttestationPolicyV2(evalRegressionPolicy); !ok {
+			evalRegressionPolicyOK = false
+		}
 		attestationPath := evalRegressionAttestation
 		if strings.TrimSpace(attestationPath) == "" {
 			attestationPath = deriveEvalRegressionAttestationPath(evalRegressionArtifact)
 		}
-		if !checkEvalRegression(dir, evalRegressionArtifact, attestationPath, evalRegressionMaxAge, time.Now(), evalregression.CommittedEvalRegressionPublicKeys(), out, quiet, warnOnly) {
+		if !checkEvalRegressionStrict(dir, evalRegressionArtifact, attestationPath, evalRegressionMaxAge, time.Now(), evalregression.CommittedEvalRegressionPublicKeys(), evalRegressionPolicy, out, quiet, warnOnly) {
 			allOK = false
 		}
 	}
 
-	if warnOnly {
+	if warnOnly && evalRegressionPolicyOK {
 		return true
 	}
 	return allOK
