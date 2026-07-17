@@ -728,8 +728,28 @@ auto update --self
 
 Downloads the latest release from GitHub, verifies its SHA256 checksum, and atomically replaces
 only the CLI binary. It does not refresh any generated project files. Check your current version
-with `auto version`. On macOS, the replacement preserves the downloaded binary bytes and its
-release code signature.
+with `auto version`. On macOS, the updater included in v0.50.72 and later preserves the downloaded
+release bytes and Developer ID signature.
+
+> **One-time macOS migration from v0.50.71 or earlier:** Do not use the one-line shortcut below for
+> this migration. Run these commands separately and in order:
+>
+> ```bash
+> auto update --self
+> auto update --self --force
+> auto update
+> ```
+>
+> The first command is still executed by the legacy updater. It verifies the SHA256 checksum, but
+> may replace the downloaded Developer ID signature with an ad hoc signature. After that first hop
+> installs v0.50.72 or later, the second command is executed by the fixed updater now on disk and
+> reinstalls the exact release bytes, restoring the Developer ID signature and
+> `TeamIdentifier=GP2PFA2PUV`. The final `auto update` refreshes the current project's generated
+> files. If the installed CLI is
+> already v0.50.72 or later, future binary self-updates need only one `auto update --self`; run
+> `auto update` afterward when you also need to refresh a project. A fresh Cask install, including a
+> migration from the legacy Formula to the Cask, installs the signed release artifact directly and
+> does not require the two self-update commands.
 
 **2. Harness update** — apply the installed CLI's templates to the current project:
 
@@ -745,7 +765,7 @@ Regenerates rules, skills, agents, and platform-specific files such as `.claude/
 
 If Claude Code already has a user-managed `statusLine.command`, the update flow defaults to preserving it, can merge it with the managed Autopus statusline, or replace it entirely via `--statusline-mode keep|merge|replace`.
 
-**Both at once:**
+**Both at once (when the installed CLI is v0.50.72 or later):**
 
 ```bash
 auto update --self && auto update
