@@ -3,14 +3,15 @@ package selfupdate
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestReplace_Success verifies that an existing binary is atomically replaced
-// with a new binary, preserving the original file permissions.
+// TestReplace_Success verifies that an existing binary is transactionally
+// replaced with a new binary while preserving the original file permissions.
 func TestReplace_Success(t *testing.T) {
 	t.Parallel()
 
@@ -32,13 +33,15 @@ func TestReplace_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, newContent, gotContent)
 
-	info, err := os.Stat(targetPath)
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0755), info.Mode().Perm())
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(targetPath)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0755), info.Mode().Perm())
+	}
 }
 
-// TestReplace_TargetNotFound verifies that replacing a non-existent target
-// returns an error from os.Stat.
+// TestReplace_TargetNotFound verifies that Lstat preflight rejects a missing
+// target before replacement preparation begins.
 func TestReplace_TargetNotFound(t *testing.T) {
 	t.Parallel()
 
@@ -56,6 +59,9 @@ func TestReplace_TargetNotFound(t *testing.T) {
 // a read-only directory returns an error with actionable guidance.
 func TestReplace_PermissionError(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not enforce POSIX directory mode bits")
+	}
 
 	readOnlyDir := t.TempDir()
 	targetPath := filepath.Join(readOnlyDir, "autopus-adk")
@@ -73,8 +79,8 @@ func TestReplace_PermissionError(t *testing.T) {
 	assert.Contains(t, err.Error(), "permission")
 }
 
-// TestReplace_RestoreOnFailure verifies that if the new binary copy/rename
-// fails, the old binary is restored from .old.
+// TestReplace_RestoreOnFailure verifies that replacement preparation failure
+// leaves the installed binary untouched.
 func TestReplace_RestoreOnFailure(t *testing.T) {
 	t.Parallel()
 
@@ -84,12 +90,12 @@ func TestReplace_RestoreOnFailure(t *testing.T) {
 	targetPath := filepath.Join(destDir, "auto.exe")
 	require.NoError(t, os.WriteFile(targetPath, []byte("old"), 0755))
 
-	// Use a non-existent new binary path to trigger rename/copy failure.
+	// Use a non-existent new binary path to trigger source preflight failure.
 	err := r.Replace("/nonexistent/path/auto.exe", targetPath)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "새 바이너리 교체 실패")
 
-	// Old binary should be restored.
+	// The installed binary remains untouched.
 	got, err := os.ReadFile(targetPath)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("old"), got)
