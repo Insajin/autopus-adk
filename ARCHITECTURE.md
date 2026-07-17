@@ -35,7 +35,7 @@ Autopus-ADK (Agentic Development Kit) is a Go CLI tool that installs the Autopus
 | Issue | `pkg/issue` | Auto issue reporter: error context collection, sanitization, GitHub issue submission |
 | Experiment | `pkg/experiment` | Autonomous experiment loop: metric execution, git operations, circuit breaker, simplicity scoring |
 | E2E | `pkg/e2e` | E2E scenario generation, execution, verification, sync for target projects |
-| SelfUpdate | `pkg/selfupdate` | CLI binary self-update: GitHub Releases check, download, SHA256 verify, atomic replace |
+| SelfUpdate | `pkg/selfupdate` | CLI binary self-update: GitHub Releases check, ECDSA publisher-envelope verification, SHA256 verification, atomic replace |
 | Profile | `pkg/content/profiles.go` | Executor profile system: load, parse, merge, resolve extends for stack-specific executor configuration |
 | Verify | `internal/cli/verify.go` | Frontend UX verification via Playwright screenshots |
 
@@ -141,7 +141,7 @@ cmd/auto/main.go
 | Experiment Loop | `pkg/experiment/` + `.claude/skills/autopus/experiment.md` | Skill-orchestrated autonomous iteration loop with CLI utility commands for metric execution, git state management, circuit breaking, and simplicity scoring |
 | Workspace Topology | `pkg/setup/{workspace.go,multirepo*.go}` | Single-repo, monorepo, multi-repo workspace detection and cross-repo dependency mapping |
 | E2E Scenarios | `pkg/e2e/` + `pkg/setup/scenarios.go` | User-facing E2E scenario generation (Cobra extraction + cross-repo synthesis), execution engine, verification primitives, incremental sync |
-| Self-Update | `pkg/selfupdate/` + `internal/cli/update.go` | GitHub Releases API check, SHA256 checksum verification, atomic binary replacement via os.Rename |
+| Self-Update | `pkg/selfupdate/` + `internal/cli/update.go` | GitHub Releases API check, fail-closed ECDSA publisher-envelope verification before SHA256 checksum verification, transactional binary replacement |
 | Executor Profile | `pkg/content/profiles.go` + `content/profiles/executor/*.md` | 3-tier profile system (builtin/generated/custom) with extends composition, stack-specific executor configuration |
 | Framework Detection | `pkg/detect/framework.go` | Signal-based framework detection (14 frameworks) for auto-generated profile creation |
 

@@ -1,7 +1,7 @@
 # SPEC-ADK-RELEASE-SIGNING-001: 배포 아티팩트 게시자 서명 검증
 
-**Status**: in-progress
-**Review verdict**: REVISE
+**Status**: completed
+**Review verdict**: APPROVE
 **Created**: 2026-07-17
 **Signing floor**: v0.50.73
 **Domain**: RELEASE-SIGNING
@@ -58,7 +58,7 @@ AUTOPUS-RELEASE-SIGNATURE-V1
 | 바이너리와 설치기에 포함한 P-256 공개키·fingerprint·만료일 | trusted anchor | 릴리스 자산에서 키나 만료일을 받지 않습니다. |
 | K1 release-signing private key | secret | GitHub Environment secret을 짧은 step에서 0600 임시 파일로 만들고, 배포 전 checked-in K1과 pair인지 확인합니다. |
 | K2 offline-next private key | secret, offline | encrypted custody와 recovery 검증을 마쳤지만 GitHub secret이나 v0.50.73 producer 입력으로 사용하지 않습니다. |
-| `raw.githubusercontent.com/.../main/install.{sh,ps1}` | 별도 신뢰 경계 | 저장소 main과 릴리스 자산을 함께 장악한 공격은 스크립트 안의 pin도 바꿀 수 있습니다. 이 SPEC은 release-asset-only 공격을 막지만 raw-main origin 침해까지 해결한다고 주장하지 않습니다. |
+| `raw.githubusercontent.com/.../main/install.{sh,ps1}` | 별도 신뢰 경계 | 신뢰된 설치기 바이트가 유지될 때 release-asset-only 공격을 막습니다. 저장소 main이나 raw-main 전달 경로가 침해되면 공격자는 pin·검증 코드·다운로드 대상을 바꿀 수 있어 릴리스 자산 장악 없이도 우회할 수 있습니다. |
 
 ## Requirements
 
@@ -106,11 +106,11 @@ WHEN 서명, checksum, 아카이브 검증이 모두 통과할 때, THE SYSTEM S
 
 | 단계 | 범위 | 상태 |
 |---|---|---|
-| Stage 1A | V1 envelope, multi-key producer, fresh K1·offline-next K2 pin, K1 preflight, Go verifier, 4인자 API 호환 | 구현됨, 전체 gate 진행 중 |
+| Stage 1A | V1 envelope, multi-key producer, fresh K1·offline-next K2 pin, K1 preflight, Go verifier, 4인자 API 호환 | 완료 |
 | Stage 1B | K1·K2 encrypted custody와 recovery 검증, public pin 선배포 | 완료 |
-| Stage 1C | K1 GitHub Environment secret 설정, v0.50.73 release, live asset 검증 | 차단됨 |
-| Stage 2A | `install.sh` V1 검증과 fail-closed 전환 | 대기 |
-| Stage 2B | `install.ps1` PS5.1/7 V1 검증과 fail-closed 전환 | 대기 |
+| Stage 1C | K1 GitHub Environment secret 설정, v0.50.73 release, live asset 검증 | 완료 |
+| Stage 2A | `install.sh` V1 검증과 fail-closed 전환 | 완료 |
+| Stage 2B | `install.ps1` PS5.1/7 V1 검증과 fail-closed 전환 | 완료 |
 
 ## 명시적 비목표
 
@@ -135,7 +135,10 @@ WHEN 서명, checksum, 아카이브 검증이 모두 통과할 때, THE SYSTEM S
 | `scripts/release-signing/release-k{1,2}-{public.pem,.fingerprint}` | 두 P-256 public pin의 checked-in 정본 |
 | `.goreleaser.yaml` | checksum envelope signer wiring, cosign 존치 |
 | `.github/workflows/release.yaml` | 짧은 secret materialization, preflight, cleanup |
-| `install.sh`, `install.ps1` | 서명 검증은 Stage 2 대상. Stage 1은 조기 유입된 `.sig` 구현만 제거하고 A4 installer 동작을 유지 |
+| `scripts/release-signing/verify-checksums-v1.sh` | POSIX V1 parser, embedded K1·K2 pin, OpenSSL verification |
+| `install.sh` | SHA-256 pinned verifier를 로드하고 signature → checksum → extraction/install 순서를 강제 |
+| `install.ps1` | PS5.1/7 공통 strict parser, SPKI→ECS1, DER→P1363, ECDsaCng verification |
+| `.github/workflows/ci.yaml`, `scripts/release-signing/tests/**` | Ubuntu·macOS·Windows cross-runtime oracle와 v0.50.73 live fixture |
 
 ## Traceability Matrix
 
@@ -152,12 +155,16 @@ WHEN 서명, checksum, 아카이브 검증이 모두 통과할 때, THE SYSTEM S
 | REQ-009 | T6, T7, T8 | S10, S11, S12 | INV-008 |
 | REQ-010 | T9 | S13 | INV-009 |
 
-## 완료 부채와 차단 요인
+## 완료 판정과 증거
 
-- 2026-07-17 ceremony에서 fresh K1과 offline-next K2의 encrypted local custody와 Keychain 기반 recovery를 검증했습니다. 별도의 off-device 독립 매체 보관은 현 환경에서 확인하지 못했으므로 완료 증거로 주장하지 않습니다.
-- K1 `ADK_RELEASE_ECDSA_PRIVATE_KEY`를 GitHub Environment에 설정하고 checked-in K1과 pair인지 확인해야 합니다. workflow preflight가 불일치나 부재를 차단합니다.
-- K2는 offline-next 상태를 유지하며 GitHub secret이나 v0.50.73 producer 입력으로 활성화하지 않습니다.
-- v0.50.73 live `checksums.txt.signatures`를 producer와 Go verifier로 검증해야 합니다.
-- 그 증거가 나온 뒤 POSIX와 Windows installer를 Stage 2로 구현해야 합니다.
+- K1 `ADK_RELEASE_ECDSA_PRIVATE_KEY`는 GitHub Environment `adk-companion-release`에만 설정했고, release run `29588526312`의 exact pair preflight가 checked-in K1과 일치함을 확인했습니다. K2는 GitHub secret과 signing input에 없습니다.
+- annotated tag `v0.50.73`은 source commit `334b297f05942accbecdfa15b54e38e005c82f2d`를 가리키며, release에는 `checksums.txt`, 기존 cosign `checksums.txt.bundle`, 신규 `checksums.txt.signatures`가 함께 게시됐습니다.
+- live checksum SHA-256은 `a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1`, live envelope SHA-256은 `a1b1643f78995fea5b773d8e213d4e33e1d71ff98ec142c14a6361a4e20cccb3`이며 K1 fingerprint와 OpenSSL·Go 검증이 모두 통과했습니다.
+- Stage 2 CI run `29618589360`에서 Windows PowerShell 5.1·7 CNG oracle과 macOS stock LibreSSL POSIX oracle이 통과했습니다. 독립 리뷰는 P0/P1/P2 finding 0으로 APPROVE했습니다.
+- Outcome Lock은 만족했고 Mandatory requirements는 10/10, Must acceptance는 S1~S13 13/13, Completion Debt는 없습니다.
 
-따라서 이 SPEC은 아직 `approved`, `implemented`, `completed`가 아닙니다.
+## 운영 잔여와 비목표
+
+- encrypted local backup과 Keychain recovery는 검증했지만 별도의 off-device 독립 매체 보관은 확인하지 못했습니다. 이는 운영 복원력 한계이며 이 SPEC의 Completion Debt로 완료를 과장하지 않습니다.
+- K2는 offline-next 상태입니다. K1+K2 overlap과 K1 retirement는 실제 회전 시점의 운영 절차입니다.
+- 저장소 main 또는 raw-main 설치기 전달 경로의 침해는 여전히 범위 밖입니다. 독립 installer origin은 Evolution Idea이며 자동 후속 작업으로 예약하지 않습니다.

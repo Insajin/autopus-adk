@@ -624,10 +624,13 @@ Autopus-ADK 업데이트는 서로 다른 두 단계로 진행합니다. 새 릴
 auto update --self
 ```
 
-GitHub Releases에서 최신 버전을 확인하고 SHA256 체크섬을 검증한 뒤 CLI 바이너리만
-교체합니다. 이 명령은 프로젝트의 생성 파일을 갱신하지 않습니다. 현재 버전은
-`auto version`으로 확인하세요. macOS에서는 v0.50.72부터 포함된 업데이터가 다운로드한
-릴리스 바이트와 Developer ID 서명을 그대로 보존합니다.
+GitHub Releases에서 최신 버전을 확인하고 CLI 바이너리만 교체합니다. v0.50.73부터 포함된
+업데이터는 ECDSA P-256 게시자 서명 envelope(`checksums.txt.signatures`)로 `checksums.txt`를 먼저
+인증한 다음, 압축을 풀기 전에 아카이브의 SHA256 체크섬을 검증합니다. 서명 데이터가 없거나
+형식이 잘못됐거나 신뢰할 수 없거나 만료됐으면 체크섬만 검증하는 방식으로 돌아가지 않고 중단합니다.
+이 명령은 프로젝트의 생성 파일을 갱신하지 않습니다. 현재 버전은 `auto version`으로
+확인하세요. macOS에서는 v0.50.72부터 포함된 업데이터가 다운로드한 릴리스 바이트와
+Developer ID 서명도 그대로 보존합니다.
 
 Darwin과 Linux에서는 대상 파일시스템에 새 바이너리를 준비한 뒤 원자 교환으로 반영합니다.
 커널이나 파일시스템이 원자 교환을 지원하지 않으면 설치된 바이너리를 변경하지 않고
@@ -657,9 +660,10 @@ auto update --self
 > auto update
 > ```
 >
-> 첫 번째 명령은 기존 업데이터가 실행합니다. SHA256 체크섬을 검증하지만, 다운로드한
-> Developer ID 서명을 ad hoc 서명으로 바꿀 수 있습니다. 첫 실행으로 v0.50.72 이상을 설치한
-> 뒤에는 디스크에 설치된 수정된 업데이터가 두 번째 명령을 실행합니다. 이 명령이 릴리스와
+> 첫 번째 명령은 기존 업데이터가 실행합니다. SHA256 체크섬은 검증하지만 게시자 서명
+> envelope를 인증하지 않으며, 다운로드한 Developer ID 서명을 ad hoc 서명으로 바꿀 수
+> 있습니다. 첫 실행으로 v0.50.72 이상을 설치하면 디스크의 수정된 업데이터가 두 번째 명령을
+> 실행합니다. 이 명령이 릴리스와
 > 정확히 같은 바이너리 바이트를 다시 설치하여 Developer ID 서명과
 > `TeamIdentifier=GP2PFA2PUV`를 복원합니다. 마지막 `auto update`는 현재 프로젝트의 생성
 > 파일을 갱신합니다. 이미 v0.50.72 이상을 사용 중이라면 이후 바이너리 self-update에는
@@ -1049,7 +1053,7 @@ auto sync verify --spec SPEC-HOOK-001 --strict
 | `auto canary` | 배포 후 헬스 체크 (빌드 + E2E + 브라우저) |
 | `auto connect` | 프로바이더 연결 마법사 (server auth → workspace → OpenAI OAuth) |
 | `auto connect status` | 저장된 연결 상태 로컬 검증/ready 요약 |
-| `auto update --self` | CLI 바이너리 자동 업데이트 (GitHub Releases + SHA256) |
+| `auto update --self` | CLI 바이너리 자동 업데이트 (게시자 서명 + SHA256) |
 
 </details>
 
@@ -1156,7 +1160,7 @@ autopus-adk/
 │   ├── orchestra/      # 멀티 모델 오케스트레이션 (전략 4개 + brainstorm + 인터랙티브 토론 + 훅)
 │   ├── pipeline/       # 파이프라인 상태 지속성 + 체크포인트 + 팀 모니터
 │   ├── search/         # 지식 검색 (Context7/Exa) + 해시 기반 검색
-│   ├── selfupdate/     # CLI 바이너리 자동 업데이트 (SHA256, 트랜잭션 교체)
+│   ├── selfupdate/     # CLI 바이너리 자동 업데이트 (게시자 서명, SHA256, 트랜잭션 교체)
 │   ├── setup/          # 프로젝트 문서 생성 + 검증
 │   ├── sigmap/         # AST 기반 API 시그니처 추출 (Go + TypeScript)
 │   ├── spec/           # EARS 요구사항 파싱/검증
@@ -1211,7 +1215,14 @@ security:
 
 ### 바이너리 배포 안전성
 
-모든 바이너리 릴리즈에는 **SHA256 체크섬** (`checksums.txt`)이 포함되며, 설치 시 자동으로 검증됩니다.
+v0.50.73부터 모든 바이너리 릴리즈에는 **SHA256 체크섬**(`checksums.txt`)과 ECDSA P-256
+게시자 서명 envelope(`checksums.txt.signatures`)가 포함됩니다. 현재 POSIX 설치기, Windows 설치기,
+그리고 v0.50.73부터 포함된 self-updater는 아카이브를 다운로드하거나 압축 해제하기 전에
+체크섬 매니페스트의 게시자 서명을 인증하고, 이어서 아카이브 체크섬을 검증합니다. 체크섬만
+검증하는 설치 방식으로 돌아가지 않으며, 설치기는 v0.50.72 이하의 unsigned 릴리스를 거부합니다.
+
+POSIX 경로에는 OpenSSL과 `sha256sum` 또는 `shasum`이 필요하며, 검증 도구가 없으면 안전하게
+중단합니다. Windows 경로는 운영체제의 CNG 구현과 `Get-FileHash`를 사용합니다.
 
 **권장: 설치 전 스크립트 확인**
 
@@ -1230,11 +1241,18 @@ VERSION=$(curl -s https://api.github.com/repos/Insajin/autopus-adk/releases/late
 curl -LO "https://github.com/Insajin/autopus-adk/releases/download/v${VERSION}/autopus-adk_${VERSION}_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz"
 curl -LO "https://github.com/Insajin/autopus-adk/releases/download/v${VERSION}/checksums.txt"
 
-# SHA256 검증
+# SHA256 무결성만 검증(게시자 인증은 하지 않음)
 shasum -a 256 -c checksums.txt --ignore-missing
 ```
 
-`auto update --self`도 바이너리 교체 전에 SHA256 체크섬을 검증합니다.
+게시자까지 인증하려면 내용을 확인한 현재 설치기 또는 v0.50.73부터 포함된 self-updater를
+사용하세요. 두 경로 모두 신뢰할 수 있는 게시자 서명이 통과해야 `checksums.txt`를 수용합니다.
+
+신뢰 경계: 한 줄 설치기는 저장소 `main` 브랜치에서 제공됩니다. 설치기나 업데이터의 신뢰된
+바이트가 유지되는 동안 게시자 서명은 GitHub와 CDN이 전달하는 릴리스 자산의 변조를
+방어합니다. 그러나 설치기 bootstrap 자체를 인증하지는 않습니다. 저장소 `main`이나 raw-main
+전달 경로가 침해되면 공격자는 릴리스 자산을 장악하지 않고도 검증기·핀·다운로드 대상을
+바꿀 수 있습니다. 독립적으로 고정된 설치기 origin은 아직 제공하지 않습니다.
 
 ### 하지 않는 것들
 

@@ -726,10 +726,12 @@ project you want to refresh.
 auto update --self
 ```
 
-Downloads the latest release from GitHub, verifies its SHA256 checksum, and replaces only the CLI
-binary. It does not refresh any generated project files. Check your current version with
-`auto version`. On macOS, the updater included in v0.50.72 and later preserves the downloaded
-release bytes and Developer ID signature.
+Downloads the latest release from GitHub and replaces only the CLI binary. The updater included in
+v0.50.73 and later first authenticates `checksums.txt` with the ECDSA P-256 publisher envelope
+`checksums.txt.signatures`, then verifies the archive's SHA256 checksum before extraction. Missing,
+malformed, untrusted, or expired signing data fails closed. This command does not refresh generated
+project files. Check your current version with `auto version`. On macOS, the updater included in
+v0.50.72 and later also preserves the downloaded release bytes and Developer ID signature.
 
 Darwin and Linux stage the new binary on the target filesystem and commit it with an atomic
 exchange. If the kernel or filesystem does not support atomic exchange, the update fails before
@@ -759,8 +761,9 @@ then restore or remove `.old` manually.
 > auto update
 > ```
 >
-> The first command is still executed by the legacy updater. It verifies the SHA256 checksum, but
-> may replace the downloaded Developer ID signature with an ad hoc signature. After that first hop
+> The first command is still executed by the legacy updater. It verifies the SHA256 checksum
+> without authenticating the publisher envelope and may replace the downloaded Developer ID
+> signature with an ad hoc signature. After that first hop
 > installs v0.50.72 or later, the second command is executed by the fixed updater now on disk and
 > reinstalls the exact release bytes, restoring the Developer ID signature and
 > `TeamIdentifier=GP2PFA2PUV`. The final `auto update` refreshes the current project's generated
@@ -1149,7 +1152,7 @@ Providers: **Claude** · **Codex** · **Gemini** · **OpenCode** — with gracef
 | `auto canary` | Post-deploy health check (build + E2E + browser) |
 | `auto connect` | Provider connection wizard (server auth → workspace → OpenAI OAuth) |
 | `auto connect status` | Local verify/readiness summary for saved connect state |
-| `auto update --self` | CLI binary self-update (GitHub Releases + SHA256) |
+| `auto update --self` | CLI binary self-update (publisher signature + SHA256) |
 
 </details>
 
@@ -1256,7 +1259,7 @@ autopus-adk/
 │   ├── orchestra/      # Multi-model orchestration (4 strategies + brainstorm + interactive debate + hooks)
 │   ├── pipeline/       # Pipeline state persistence + checkpoint + team monitor
 │   ├── search/         # Knowledge search (Context7/Exa) + hash-based search
-│   ├── selfupdate/     # CLI binary self-update (SHA256, transactional replace)
+│   ├── selfupdate/     # CLI binary self-update (publisher signature, SHA256, transactional replace)
 │   ├── setup/          # Project doc generation + validation
 │   ├── sigmap/         # AST-based API signature extraction (Go + TypeScript)
 │   ├── spec/           # EARS requirement parsing/validation
@@ -1311,7 +1314,14 @@ security:
 
 ### Binary Distribution Safety
 
-Every binary release includes **SHA256 checksums** (`checksums.txt`), verified automatically during installation. No blind `curl | sh` — every download is integrity-checked before execution.
+Every binary release from v0.50.73 includes **SHA256 checksums** (`checksums.txt`) and an ECDSA
+P-256 publisher envelope (`checksums.txt.signatures`). The current POSIX installer, Windows
+installer, and the self-updater shipped in v0.50.73 or later authenticate the checksum manifest
+before downloading or extracting an archive, then verify the archive checksum. They do not fall
+back to checksum-only installation. The installers reject unsigned v0.50.72-or-earlier releases.
+
+The POSIX path requires OpenSSL plus `sha256sum` or `shasum`; missing verification tools fail
+closed. The Windows path uses the platform CNG implementation and `Get-FileHash`.
 
 **Recommended: Inspect before you install**
 
@@ -1330,11 +1340,18 @@ VERSION=$(curl -s https://api.github.com/repos/Insajin/autopus-adk/releases/late
 curl -LO "https://github.com/Insajin/autopus-adk/releases/download/v${VERSION}/autopus-adk_${VERSION}_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz"
 curl -LO "https://github.com/Insajin/autopus-adk/releases/download/v${VERSION}/checksums.txt"
 
-# Verify SHA256
+# Verify SHA256 integrity only (this does not authenticate the publisher)
 shasum -a 256 -c checksums.txt --ignore-missing
 ```
 
-`auto update --self` also verifies SHA256 checksums before replacing the binary.
+For an authenticated install, use the inspected current installer or the updater shipped in
+v0.50.73 or later; both require a trusted publisher signature before accepting `checksums.txt`.
+
+Trust boundary: the one-line installers are served from the repository's `main` branch. Given
+trusted installer or updater bytes, publisher verification protects release assets delivered by
+GitHub and its CDN. It does not authenticate the installer bootstrap itself. A compromise of
+repository `main` or raw-main delivery can replace the verifier, pins, or download target without
+also compromising the release assets. An independently pinned installer origin is not provided yet.
 
 ### What We Don't Do
 
