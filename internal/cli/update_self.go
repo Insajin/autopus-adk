@@ -77,6 +77,7 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 		binaryPath, err := dl.DownloadAndVerify(
 			info.ArchiveURL,
 			info.ChecksumURL,
+			info.SignatureURL,
 			archiveName,
 			tmpDir,
 		)

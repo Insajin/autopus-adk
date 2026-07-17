@@ -726,7 +726,8 @@ project you want to refresh.
 auto update --self
 ```
 
-Downloads the latest release from GitHub, verifies its SHA256 checksum, and replaces only the CLI
+Downloads the latest release from GitHub, verifies the publisher's release signature
+(ECDSA P-256, pinned public key) and then its SHA256 checksum, and replaces only the CLI
 binary. It does not refresh any generated project files. Check your current version with
 `auto version`. On macOS, the updater included in v0.50.72 and later preserves the downloaded
 release bytes and Developer ID signature.
@@ -1311,7 +1312,19 @@ security:
 
 ### Binary Distribution Safety
 
-Every binary release includes **SHA256 checksums** (`checksums.txt`), verified automatically during installation. No blind `curl | sh` — every download is integrity-checked before execution.
+Every binary release includes a **publisher ECDSA P-256 signature** over `checksums.txt`
+(`checksums.txt.sig`), verified before the SHA256 checksums inside it are ever trusted. Both
+`install.sh` and `auto update --self` carry an embedded pinned public key set as their sole trust
+anchor — GitHub release assets (including any key hint they might carry) are treated as untrusted
+input. Verification is fail-closed: a missing, tampered, or unrecognized signature, an unrecognized
+signing key, or a missing checksum/signature tool aborts the install or update instead of silently
+falling back to checksum-only trust. No blind `curl | sh` — every download is signature- and
+integrity-checked before execution.
+
+> **Legacy releases**: GitHub releases are immutable, so releases at or before `v0.50.71` cannot
+> have a `.sig` asset added retroactively. Signing starts with the first release built after this
+> feature shipped; until then, `install.sh` and `auto update --self` correctly refuse to install an
+> unsigned release rather than silently falling back to checksum-only trust.
 
 **Recommended: Inspect before you install**
 

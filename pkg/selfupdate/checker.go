@@ -71,7 +71,7 @@ func (c *Checker) FetchLatest(goos, goarch string) (*ReleaseInfo, error) {
 		return nil, fmt.Errorf("unexpected API response: missing or invalid assets")
 	}
 
-	var archiveURL, checksumURL, archiveName string
+	var archiveURL, checksumURL, signatureURL, archiveName string
 	expectedArchive := ArchiveName(goos, goarch, version)
 
 	for _, asset := range assets {
@@ -94,14 +94,17 @@ func (c *Checker) FetchLatest(goos, goarch string) (*ReleaseInfo, error) {
 			archiveURL = url
 		case "checksums.txt":
 			checksumURL = url
+		case "checksums.txt.sig":
+			signatureURL = url
 		}
 	}
 
 	return &ReleaseInfo{
-		TagName:     tagName,
-		ArchiveURL:  archiveURL,
-		ChecksumURL: checksumURL,
-		ArchiveName: archiveName,
+		TagName:      tagName,
+		ArchiveURL:   archiveURL,
+		ChecksumURL:  checksumURL,
+		SignatureURL: signatureURL,
+		ArchiveName:  archiveName,
 	}, nil
 }
 

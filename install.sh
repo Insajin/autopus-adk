@@ -128,15 +128,77 @@ verify_checksum() {
     elif command -v shasum > /dev/null 2>&1; then
         actual=$(shasum -a 256 "$archive" | awk '{print $1}')
     else
-        echo "  ⚠ 다운로드 파일 무결성 검증 도구를 찾을 수 없습니다."
-        echo "    macOS: 기본 포함(shasum)이므로 터미널을 재시작해보세요."
-        echo "    Linux: sudo apt install coreutils (또는 yum install coreutils)"
-        echo "  체크섬 검증을 건너뜁니다."
-        return 0
+        err "다운로드 파일 무결성 검증 도구를 찾을 수 없습니다.
+  macOS: 기본 포함(shasum)이므로 터미널을 재시작해보세요.
+  Linux: sudo apt install coreutils (또는 yum install coreutils)
+  체크섬 검증 도구 없이는 설치를 진행할 수 없습니다."
     fi
 
     if [ "$actual" != "$expected_checksum" ]; then
         err "체크섬 불일치! 다운로드가 변조되었을 수 있습니다.\n  expected: ${expected_checksum}\n  actual:   ${actual}"
+    fi
+}
+
+# 임베드된 pinned 릴리스 서명 ECDSA P-256 공개키 집합 (SPEC-ADK-RELEASE-SIGNING-001).
+# release assets는 untrusted 입력이며 이 키 집합이 유일한 신뢰 앵커다. KEYID는
+# 감사·회전 북키핑 전용(서명엔 KeyID가 없어 조회에 안 쓰임, multi-trial로 검증).
+# 회전(2-key 과도기): RELEASE_PUBKEY_2/_EXPIRES/_KEYID 추가 후 RELEASE_KEY_COUNT=2,
+# 구키 만료 배포본 확산 후 후속 릴리스에서 제거. pkg/selfupdate/pinnedkey.go와 동형.
+RELEASE_KEY_COUNT=1
+RELEASE_PUBKEY_1_KEYID="10105084"
+RELEASE_PUBKEY_1_EXPIRES="2028-07-17"
+RELEASE_PUBKEY_1='-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1E7VSEqlwEUXAGh8uCIxYKAlFyQ3
+lOdYWlCbaLtSt1WegBqHD+TjkRiLqoGcGHouS7Nwu1bjk7ZZu26bp6BnIA==
+-----END PUBLIC KEY-----'
+
+# 릴리스 서명(publisher ECDSA P-256 detached ASN.1/DER, checksums.txt 대상) 검증.
+# 만료되지 않은 임베드 키 전부로 multi-trial 시도, 하나라도 통과하면 진위 인정.
+# openssl 부재·전키 만료·전키 실패는 모두 fail-closed(REQ-004/005/007/008).
+verify_signature() {
+    checksums_file="$1"
+    sig_file="$2"
+
+    if ! command -v openssl > /dev/null 2>&1; then
+        err "서명을 검증할 수 없습니다: openssl을 찾을 수 없습니다.
+  macOS: 재시작해보거나 Xcode Command Line Tools를 설치하세요. Linux: sudo apt/yum install openssl.
+  대체 검증 경로: auto update --self (이미 설치된 auto CLI가 서명을 검증하며 갱신). openssl 없이는 설치를 중단합니다."
+    fi
+
+    now="$(date -u +%Y-%m-%d)"
+    key_dir="$(mktemp -d)"
+    active_count=0
+    verified=""
+    i=1
+    while [ "$i" -le "$RELEASE_KEY_COUNT" ]; do
+        eval "pubkey=\$RELEASE_PUBKEY_${i}"
+        eval "expires=\$RELEASE_PUBKEY_${i}_EXPIRES"
+
+        # ISO 8601 날짜는 사전식 비교=시간식 비교이므로 crypto 없이 문자열 비교로 만료 게이트를 구현한다.
+        if [ "$now" \> "$expires" ]; then
+            i=$((i + 1))
+            continue
+        fi
+        active_count=$((active_count + 1))
+
+        pub_pem="${key_dir}/pub_${i}.pem"
+        printf '%s\n' "$pubkey" > "$pub_pem"
+
+        if openssl dgst -sha256 -verify "$pub_pem" -signature "$sig_file" "$checksums_file" > /dev/null 2>&1; then
+            verified="1"
+            break
+        fi
+
+        i=$((i + 1))
+    done
+
+    rm -rf "$key_dir"
+
+    if [ "$active_count" -eq 0 ]; then
+        err "all embedded keys expired"
+    fi
+    if [ -z "$verified" ]; then
+        err "no trusted release signing key verified"
     fi
 }
 
@@ -155,6 +217,7 @@ main() {
     BASE_URL="https://github.com/${REPO}/releases/download/v${VERSION}"
     URL="${BASE_URL}/${ARCHIVE}"
     CHECKSUMS_URL="${BASE_URL}/checksums.txt"
+    SIGNATURE_URL="${BASE_URL}/checksums.txt.sig"
 
     TMPDIR="$(mktemp -d)"
     trap 'rm -rf "$TMPDIR"' EXIT
@@ -162,9 +225,15 @@ main() {
     info "다운로드: ${URL}"
     download "$URL" "${TMPDIR}/${ARCHIVE}"
 
-    # SHA256 체크섬 검증
-    info "체크섬 검증 중..."
+    # 릴리스 서명 검증 — checksums.txt를 신뢰하기 전에 선행한다 (REQ-002/004/006).
+    info "릴리스 서명 검증 중..."
     download "$CHECKSUMS_URL" "${TMPDIR}/checksums.txt"
+    download "$SIGNATURE_URL" "${TMPDIR}/checksums.txt.sig"
+    verify_signature "${TMPDIR}/checksums.txt" "${TMPDIR}/checksums.txt.sig"
+    ok "릴리스 서명 검증 통과 ✓"
+
+    # SHA256 체크섬 검증 (서명으로 인증된 checksums.txt에 대해서만 신뢰)
+    info "체크섬 검증 중..."
     EXPECTED=$(grep "${ARCHIVE}" "${TMPDIR}/checksums.txt" | awk '{print $1}')
     if [ -n "$EXPECTED" ]; then
         verify_checksum "${TMPDIR}/${ARCHIVE}" "$EXPECTED"
@@ -219,4 +288,9 @@ main() {
     echo ""
 }
 
-main
+# INSTALL_SH_TEST_SOURCE=1로 소싱하면 main()을 실행하지 않는다.
+# scripts/test-install-signing.sh가 verify_signature/verify_checksum만
+# 단위 검증할 때 실제 설치가 트리거되지 않도록 하기 위함이다.
+if [ "${INSTALL_SH_TEST_SOURCE:-}" != "1" ]; then
+    main
+fi

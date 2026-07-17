@@ -20,6 +20,8 @@ func TestDownloadAndVerify_InvalidGzip(t *testing.T) {
 	checksum := fmt.Sprintf("%x", sha256.Sum256(archiveContent))
 	archiveName := "autopus-adk_0.7.0_darwin_arm64.tar.gz"
 	checksumLine := checksum + "  " + archiveName + "\n"
+	priv, pinned := generateReleaseTestKey(t, "2099-12-31")
+	sig := signReleaseChecksums(t, priv, []byte(checksumLine))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -27,6 +29,8 @@ func TestDownloadAndVerify_InvalidGzip(t *testing.T) {
 			_, _ = w.Write(archiveContent)
 		case "/checksums.txt":
 			_, _ = w.Write([]byte(checksumLine))
+		case "/checksums.txt.sig":
+			_, _ = w.Write(sig)
 		default:
 			http.NotFound(w, r)
 		}
@@ -34,10 +38,11 @@ func TestDownloadAndVerify_InvalidGzip(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	dl := NewDownloader()
+	dl := NewDownloader(WithPinnedKeys([]PinnedReleaseKey{pinned}))
 	_, err := dl.DownloadAndVerify(
 		srv.URL+"/"+archiveName,
 		srv.URL+"/checksums.txt",
+		srv.URL+"/checksums.txt.sig",
 		archiveName,
 		destDir,
 	)
@@ -54,6 +59,8 @@ func TestDownloadAndVerify_EmptyArchive(t *testing.T) {
 	checksum := fmt.Sprintf("%x", sha256.Sum256(archiveContent))
 	archiveName := "autopus-adk_0.7.0_darwin_arm64.tar.gz"
 	checksumLine := checksum + "  " + archiveName + "\n"
+	priv, pinned := generateReleaseTestKey(t, "2099-12-31")
+	sig := signReleaseChecksums(t, priv, []byte(checksumLine))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -61,6 +68,8 @@ func TestDownloadAndVerify_EmptyArchive(t *testing.T) {
 			_, _ = w.Write(archiveContent)
 		case "/checksums.txt":
 			_, _ = w.Write([]byte(checksumLine))
+		case "/checksums.txt.sig":
+			_, _ = w.Write(sig)
 		default:
 			http.NotFound(w, r)
 		}
@@ -68,10 +77,11 @@ func TestDownloadAndVerify_EmptyArchive(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	dl := NewDownloader()
+	dl := NewDownloader(WithPinnedKeys([]PinnedReleaseKey{pinned}))
 	_, err := dl.DownloadAndVerify(
 		srv.URL+"/"+archiveName,
 		srv.URL+"/checksums.txt",
+		srv.URL+"/checksums.txt.sig",
 		archiveName,
 		destDir,
 	)

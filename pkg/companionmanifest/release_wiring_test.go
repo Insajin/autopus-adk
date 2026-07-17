@@ -87,8 +87,14 @@ func TestGoReleaser_CompanionProducerIsAssociatedWithEveryDarwinBuild(t *testing
 		len(cask.Binaries) != 1 || cask.Binaries[0] != "auto" {
 		t.Fatalf("Homebrew cask flow changed: %#v", cask)
 	}
-	if len(config.Signs) != 1 || config.Signs[0].Command != "cosign" || config.Signs[0].Artifacts != "checksum" {
+	// SPEC-ADK-RELEASE-SIGNING-001: cosign's keyless bundle stays as
+	// defense-in-depth transparency logging, alongside a second consumer-verified
+	// ECDSA P-256 signer over the same checksum artifact.
+	if len(config.Signs) != 2 || config.Signs[0].Command != "cosign" || config.Signs[0].Artifacts != "checksum" {
 		t.Fatalf("cosign checksum flow changed: %#v", config.Signs)
+	}
+	if config.Signs[1].Command != "sh" || config.Signs[1].Artifacts != "checksum" {
+		t.Fatalf("ECDSA release-signing checksum flow changed: %#v", config.Signs)
 	}
 }
 

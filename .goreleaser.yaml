@@ -63,7 +63,8 @@ checksum:
   name_template: 'checksums.txt'
 
 signs:
-  - cmd: cosign
+  - id: cosign
+    cmd: cosign
     artifacts: checksum
     args:
       - "sign-blob"
@@ -74,6 +75,23 @@ signs:
     output: true
     env:
       - COSIGN_EXPERIMENTAL=1
+  # ECDSA P-256 detached signature over checksums.txt (SPEC-ADK-RELEASE-SIGNING-001).
+  # Consumers (pkg/selfupdate, install.sh) verify this with a pinned public key
+  # set; cosign's keyless bundle above is kept as defense-in-depth transparency
+  # logging, not as the consumer-verified trust anchor.
+  - id: ecdsa-release
+    cmd: sh
+    artifacts: checksum
+    args:
+      - "-c"
+      - |-
+        umask 077
+        kf="$(mktemp)"
+        trap 'rm -f "$kf"' EXIT
+        printf '%s' "$ADK_RELEASE_ECDSA_PRIVATE_KEY" > "$kf"
+        openssl dgst -sha256 -sign "$kf" -out "${signature}" "${artifact}"
+    signature: "${artifact}.sig"
+    output: true
 
 changelog:
   sort: asc

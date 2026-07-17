@@ -224,6 +224,7 @@ jobs:
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ADK_RELEASE_ECDSA_PRIVATE_KEY: ${{ secrets.ADK_RELEASE_ECDSA_PRIVATE_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_PATH: ${{ runner.temp }}/adk-release-credentials/AuthKey_${{ secrets.APPLE_API_KEY }}.p8
@@ -246,6 +247,7 @@ jobs:
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_TOKEN="$GITHUB_TOKEN" \
+            ADK_RELEASE_ECDSA_PRIVATE_KEY="$ADK_RELEASE_ECDSA_PRIVATE_KEY" \
             ACTIONS_ID_TOKEN_REQUEST_TOKEN="$ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             ACTIONS_ID_TOKEN_REQUEST_URL="$ACTIONS_ID_TOKEN_REQUEST_URL" \
             APPLE_API_ISSUER="$APPLE_API_ISSUER" APPLE_API_KEY="$APPLE_API_KEY" \

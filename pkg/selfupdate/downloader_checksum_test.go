@@ -19,6 +19,8 @@ func TestDownloadAndVerify_ChecksumMismatch(t *testing.T) {
 	archiveName := "autopus-adk_0.7.0_darwin_arm64.tar.gz"
 	wrongChecksum := "0000000000000000000000000000000000000000000000000000000000000000"
 	checksumLine := wrongChecksum + "  " + archiveName + "\n"
+	priv, pinned := generateReleaseTestKey(t, "2099-12-31")
+	sig := signReleaseChecksums(t, priv, []byte(checksumLine))
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -26,6 +28,8 @@ func TestDownloadAndVerify_ChecksumMismatch(t *testing.T) {
 			_, _ = w.Write(archiveContent)
 		case "/checksums.txt":
 			_, _ = w.Write([]byte(checksumLine))
+		case "/checksums.txt.sig":
+			_, _ = w.Write(sig)
 		default:
 			http.NotFound(w, r)
 		}
@@ -33,10 +37,11 @@ func TestDownloadAndVerify_ChecksumMismatch(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	dl := NewDownloader()
+	dl := NewDownloader(WithPinnedKeys([]PinnedReleaseKey{pinned}))
 	_, err := dl.DownloadAndVerify(
 		srv.URL+"/"+archiveName,
 		srv.URL+"/checksums.txt",
+		srv.URL+"/checksums.txt.sig",
 		archiveName,
 		destDir,
 	)
@@ -51,10 +56,16 @@ func TestDownloadAndVerify_ChecksumNotFound(t *testing.T) {
 	t.Parallel()
 
 	archiveName := "autopus-adk_0.7.0_darwin_arm64.tar.gz"
+	checksumLine := "abc123  other_file.tar.gz\n"
+	priv, pinned := generateReleaseTestKey(t, "2099-12-31")
+	sig := signReleaseChecksums(t, priv, []byte(checksumLine))
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/checksums.txt":
-			_, _ = w.Write([]byte("abc123  other_file.tar.gz\n"))
+			_, _ = w.Write([]byte(checksumLine))
+		case "/checksums.txt.sig":
+			_, _ = w.Write(sig)
 		default:
 			http.NotFound(w, r)
 		}
@@ -62,10 +73,11 @@ func TestDownloadAndVerify_ChecksumNotFound(t *testing.T) {
 	defer srv.Close()
 
 	destDir := t.TempDir()
-	dl := NewDownloader()
+	dl := NewDownloader(WithPinnedKeys([]PinnedReleaseKey{pinned}))
 	_, err := dl.DownloadAndVerify(
 		srv.URL+"/"+archiveName,
 		srv.URL+"/checksums.txt",
+		srv.URL+"/checksums.txt.sig",
 		archiveName,
 		destDir,
 	)
