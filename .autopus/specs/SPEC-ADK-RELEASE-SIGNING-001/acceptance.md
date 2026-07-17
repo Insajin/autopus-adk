@@ -91,7 +91,7 @@ production `.goreleaser.yaml`은 기존 cosign `checksums.txt.bundle` signer와 
 
 ## Release gate
 
-### S10: v0.50.73 live asset (Must, pending)
+### S10: v0.50.73 live asset (Must, PASS)
 
 Given fresh K1·offline-next K2의 encrypted custody와 recovery 검증이 완료되고, GitHub Environment secret이 checked-in K1과 pair입니다.
 When v0.50.73 release workflow가 완료됩니다.
@@ -99,37 +99,43 @@ Then release assets에 `checksums.txt`, `checksums.txt.bundle`, `checksums.txt.s
 
 이 시나리오가 PASS하기 전에는 S11과 S12 코드를 raw-main installer에 배포해서는 안 됩니다.
 
+Evidence: release run `29588526312`, release/tag `v0.50.73`, source commit `334b297f05942accbecdfa15b54e38e005c82f2d`, live fixture `scripts/release-signing/tests/fixtures/v0.50.73/`. 세 자산과 K1 signature를 독립 검증했습니다.
+
 ## Stage 2: installers
 
-### S11: POSIX installer (Must, pending)
+### S11: POSIX installer (Must, PASS)
 
 Given v0.50.73 이상의 signed release가 있습니다.
 When `install.sh`가 정상, 변조, unknown-only, malformed, duplicate, all-expired, openssl-absent fixture를 처리합니다.
 Then 정상만 exit 0이며 나머지는 exit 1이고 바이너리를 설치하지 않아야 합니다. 파싱 한도와 error taxonomy는 Go consumer와 같아야 합니다.
 
-### S12: Windows installer PS5.1/7 (Must, pending)
+Evidence: Ubuntu root oracle과 Stage 2 CI run `29618589360`의 macOS stock LibreSSL oracle이 정상, K2 rotation, 변조, unknown-only, malformed wire/base64/DER, duplicate, all-expired, helper drift, OpenSSL·checksum-tool 부재, checksum mismatch를 검증했습니다.
+
+### S12: Windows installer PS5.1/7 (Must, PASS)
 
 Given producer-shaped P-256 SPKI DER와 ASN.1/DER signature vector가 있습니다.
 When Windows PowerShell 5.1과 PowerShell 7에서 SPKI를 CNG `ECS1` blob으로, DER를 canonical P1363 64바이트로 바꿔 검증합니다.
 Then 두 runtime 모두 정상 vector는 true, checksum·signature·fingerprint 변조는 false여야 합니다. malformed/duplicate/all-expired/unknown-only 입력은 설치 전에 실패해야 합니다.
 
-### S13: 정상 UX와 trust limitation (Must, pending)
+Evidence: Stage 2 CI run `29618589360`, job `88008858920`에서 Windows PowerShell 5.1과 PowerShell 7이 같은 live K1 vector, strict parser, ECS1/P1363 변환, 실패 전 설치 0건, 정상 Main 설치 경로를 모두 통과했습니다.
+
+### S13: 정상 UX와 trust limitation (Must, PASS)
 
 - 세 소비자의 정상 성공 메시지와 무인 설치 흐름은 기존과 같아야 합니다.
 - 문서는 v0.50.73 floor와 v0.50.72 이하 unsigned 상태를 명시해야 합니다.
-- 문서는 raw-main installer가 release assets와 독립된 trust anchor가 아니며, repository main까지 함께 장악한 공격은 이 SPEC의 방어 범위 밖이라고 명시해야 합니다.
+- 문서는 raw-main installer가 release assets와 독립된 trust anchor가 아니며, repository main이나 raw-main 전달 경로가 침해되면 release assets 장악 없이도 우회할 수 있음을 명시해야 합니다.
 
 ## 완료 판정
 
 | Gate | 현재 상태 | 완료 조건 |
 |---|---|---|
-| Stage 1 code/test | 진행 중 | race, vet, shell syntax, GoReleaser check/oracle PASS |
+| Stage 1 code/test | PASS | race, vet, shell syntax, GoReleaser check/oracle PASS |
 | K1·K2 local ceremony와 public pin | PASS | encrypted custody·recovery receipt, checked-in/embedded 2-pin parity |
-| K1 GitHub Environment | BLOCKED | fresh K1 secret 설정과 pair preflight PASS |
-| v0.50.73 live release | BLOCKED | S10 PASS |
-| POSIX installer | PENDING | S11 PASS |
-| Windows installer | PENDING | S12 PASS on PS5.1 and PS7 |
-| SPEC completion | PENDING | S1~S13 Must 전체 PASS |
+| K1 GitHub Environment | PASS | fresh K1 secret 설정과 pair preflight PASS |
+| v0.50.73 live release | PASS | S10 PASS |
+| POSIX installer | PASS | S11 PASS |
+| Windows installer | PASS | S12 PASS on PS5.1 and PS7 |
+| SPEC completion | PASS | S1~S13 Must 전체 PASS |
 
 ## Oracle Acceptance Notes
 

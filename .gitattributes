@@ -1,3 +1,6 @@
 scripts/release-signing/*.fingerprint text eol=lf
 scripts/release-signing/*.pem text eol=lf
 scripts/release-signing/*.sh text eol=lf
+scripts/release-signing/**/*.ps1 text eol=lf
+scripts/release-signing/**/*.sh text eol=lf
+scripts/release-signing/tests/fixtures/** text eol=lf

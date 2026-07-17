@@ -41,9 +41,9 @@
 ## Release
 
 - **Tool**: GoReleaser
-- **OS**: Linux, macOS
+- **OS**: Linux, macOS, Windows
 - **Arch**: amd64, arm64
-- **Format**: tar.gz + checksums
+- **Format**: tar.gz/zip + `checksums.txt` + cosign bundle + ECDSA P-256 publisher envelope
 
 ## Testing
 
@@ -86,7 +86,7 @@
 | Experiment Loop | `pkg/experiment/` | 스킬 오케스트레이션 + CLI 유틸리티 분리 (메트릭 실행, git 상태 관리, circuit breaker) |
 | Worktree Isolation | `content/skills/worktree-isolation.md` | 병렬 executor 워크트리 격리, Phase 2.1 배치 머지 |
 | E2E Scenarios | `pkg/e2e/` + `pkg/setup/scenarios.go` | 시나리오 기반 E2E 테스트 생성/실행/검증 (Cobra 추출, cross-repo synthetic scenario, 증분 동기화) |
-| Self-Update | `pkg/selfupdate/` | GitHub Releases 체크, SHA256 검증, atomic replace (stdlib only: net/http, crypto/sha256, archive/tar) |
+| Self-Update | `pkg/selfupdate/` | GitHub Releases 확인, Go 표준 라이브러리 기반 ECDSA 게시자 서명 검증, SHA256 검증, 트랜잭션 교체 |
 | Pipeline Checkpoint | `pkg/pipeline/checkpoint.go` | YAML 기반 파이프라인 상태 체크포인트, stale 감지 |
 | Multi-Language SigMap | `pkg/sigmap/iface.go` | Extractor 인터페이스로 언어별 플러그인 지원 (Go + TypeScript) |
 | Test Runner Detection | `pkg/detect/testrunner.go` | 프로젝트 타입별 테스트 프레임워크 자동 감지 |
