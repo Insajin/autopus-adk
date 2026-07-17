@@ -29,6 +29,16 @@ var immutableA1LineagePins = map[string]string{
 	"A1_ARM64_MANIFEST_SHA256": "db3a7a5381d2fa2f9e70682324b59304c5beeaaf695e91d2621f880dc7211230",
 }
 
+var immutableA2LineagePins = map[string]string{
+	"A2_COMMIT_SHA":            "7b5b52822b0cda75bf6c971f5f1c2a713881008c",
+	"A2_TAG_OBJECT_SHA":        "0088a9f1201e0bb11a940aa9dc4aff83aef1656c",
+	"A2_CHECKSUMS_SHA256":      "5317226720dff159e73d692cc0cb447fddb134fe7c6d2046031adb377fb60092",
+	"A2_AMD64_ARCHIVE_SHA256":  "babce99376a647e801ea06d99f3575c87414551cbbeb77dfeed5cfa23851b964",
+	"A2_ARM64_ARCHIVE_SHA256":  "fbe9693d3517bdbaf92f230d7aa7561b728ba002749c2d06b6eef08170fed60b",
+	"A2_AMD64_MANIFEST_SHA256": "82d8e22a3943dd8efc14dafd0c28ac11d415b1c1a8ff5447beb658a5cff11be4",
+	"A2_ARM64_MANIFEST_SHA256": "f780452da57ec0a845bd8dae22dcd134b920c593c9ba61f496380136f243c8c0",
+}
+
 func TestReleasePublicKeyReceipt_GoReleaserA0FixtureFailsClosedOnTampering(t *testing.T) {
 	tools := newExecutableLineageTools(t)
 	evidence := produceGoReleaserA0FixtureEvidence(t, tools)
@@ -231,7 +241,9 @@ func differentHex(current string, length int) string {
 
 func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *testing.T) {
 	source := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage.sh"))
-	for _, pins := range []map[string]string{immutableA0LineagePins, immutableA1LineagePins} {
+	for _, pins := range []map[string]string{
+		immutableA0LineagePins, immutableA1LineagePins, immutableA2LineagePins,
+	} {
 		for name, value := range pins {
 			declaration := "readonly " + name + "='" + value + "'"
 			if strings.Count(source, declaration) != 1 {
@@ -240,7 +252,8 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 		}
 	}
 	for _, bypass := range []string{
-		"TEST_PIN", "PIN_FILE", "PIN_OVERRIDE", "GO_WANT_LINEAGE", "COMPANION_A0_", "COMPANION_A1_",
+		"TEST_PIN", "PIN_FILE", "PIN_OVERRIDE", "GO_WANT_LINEAGE",
+		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_",
 	} {
 		if strings.Contains(source, bypass) {
 			t.Fatalf("production lineage exposes test pin bypass %q", bypass)

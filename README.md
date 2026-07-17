@@ -728,7 +728,8 @@ auto update --self
 
 Downloads the latest release from GitHub, verifies its SHA256 checksum, and atomically replaces
 only the CLI binary. It does not refresh any generated project files. Check your current version
-with `auto version`.
+with `auto version`. On macOS, the replacement preserves the downloaded binary bytes and its
+release code signature.
 
 **2. Harness update** — apply the installed CLI's templates to the current project:
 

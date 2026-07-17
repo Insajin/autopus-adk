@@ -11,68 +11,68 @@ import (
 	"testing"
 )
 
-const priorFormulaBlob = "df2d8e25636f8a3db842948d119d46f31afd94ab"
+const (
+	a3PriorCaskBlob     = "8d09a2d11a62b3db5fd7b3523f2626a34604b0b9"
+	a3FrozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
+)
 
 var bridgeDigests = []string{
 	strings.Repeat("1", 64), strings.Repeat("2", 64),
 	strings.Repeat("3", 64), strings.Repeat("4", 64),
 }
 
-func TestHomebrewFormulaBridge_PublishesThenIsIdempotent(t *testing.T) {
+func TestHomebrewFormulaBridge_A3UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
 	fixture := newHomebrewBridgeFixture(t)
+	frozenFormula, err := os.ReadFile(filepath.Join(fixture.state, "formula.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	output, err := fixture.run(nil)
 	if err != nil {
-		t.Fatalf("publish Formula bridge: %v\n%s", err, output)
+		t.Fatalf("publish A3 Cask: %v\n%s", err, output)
 	}
-	formula := fixture.formulaContent(t)
-	for _, required := range []string{
-		`version "0.50.71"`,
-		`deprecate! date: "2026-07-16", because: "is distributed as a signed cask", replacement_cask: "auto"`,
-		`bin.install "auto"`, `brew uninstall --formula auto`,
-		`brew install --cask Insajin/autopus/auto`,
-		`assert_match version.to_s, shell_output("#{bin}/auto version")`,
-	} {
-		if !strings.Contains(formula, required) {
-			t.Fatalf("published Formula missing %q", required)
-		}
+	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.72"`) {
+		t.Fatalf("published Cask is not v0.50.72:\n%s", cask)
 	}
-	if got := strings.Count(formula, "releases/download/v0.50.71/"); got != 4 {
-		t.Fatalf("published Formula archive URL count = %d, want 4", got)
+	if got := fixture.updateCount(t, "cask"); got != "1" {
+		t.Fatalf("Cask update count = %q, want 1", got)
 	}
-	if got := fixture.updateCount(t); got != "1" {
-		t.Fatalf("Formula update count = %q, want 1", got)
+	if got := fixture.updateCount(t, "formula"); got != "0" {
+		t.Fatalf("Formula update count = %q, want 0", got)
+	}
+	if got := fixture.callCount(t, "formula"); got != "0" {
+		t.Fatalf("Formula API call count = %q, want 0", got)
+	}
+	formulaAfter, err := os.ReadFile(filepath.Join(fixture.state, "formula.json"))
+	if err != nil || string(formulaAfter) != string(frozenFormula) {
+		t.Fatalf("frozen v0.50.71 Formula record changed: %v", err)
 	}
 	output, err = fixture.run(nil)
-	if err != nil || !strings.Contains(string(output), "already current") {
+	if err != nil || !strings.Contains(string(output), "Cask is already current") {
 		t.Fatalf("idempotent run: %v\n%s", err, output)
 	}
-	if got := fixture.updateCount(t); got != "1" {
-		t.Fatalf("idempotent update count = %q, want 1", got)
+	if got := fixture.updateCount(t, "cask"); got != "1" {
+		t.Fatalf("idempotent Cask update count = %q, want 1", got)
+	}
+	if got := fixture.updateCount(t, "formula"); got != "0" {
+		t.Fatalf("idempotent Formula update count = %q, want 0", got)
 	}
 	output, err = fixture.run(map[string]string{"HOMEBREW_TAP_TOKEN": "", "GH_TOKEN": "fallback-token"})
-	if err != nil {
-		t.Fatalf("GH_TOKEN fallback: %v\n%s", err, output)
+	if calls := fixture.callCount(t, "formula"); err != nil || calls != "0" {
+		t.Fatalf("GH_TOKEN fallback: %v, Formula calls=%s\n%s", err, calls, output)
 	}
 }
 
-func TestHomebrewFormulaBridge_RejectsRemoteDriftAndCaskMismatch(t *testing.T) {
-	t.Run("prior Formula drift", func(t *testing.T) {
-		fixture := newHomebrewBridgeFixture(t)
-		fixture.writeAPIContent(t, "formula.json", strings.Repeat("a", 40), "drifted Formula\n")
-		output, err := fixture.run(nil)
-		if err == nil || !strings.Contains(string(output), "drifted from the pinned prior blob") {
-			t.Fatalf("Formula drift result: %v\n%s", err, output)
-		}
-	})
+func TestHomebrewFormulaBridge_RejectsCaskMismatch(t *testing.T) {
 	t.Run("published Cask mismatch", func(t *testing.T) {
 		fixture := newHomebrewBridgeFixture(t)
 		mismatch := strings.Replace(fixture.cask, bridgeDigests[0], strings.Repeat("f", 64), 1)
-		fixture.writeAPIContent(t, "cask.json", strings.Repeat("c", 40), mismatch)
+		fixture.writeAPIContent(t, "cask.json", strings.Repeat("a", 40), mismatch)
 		output, err := fixture.run(nil)
-		if err == nil || !strings.Contains(string(output), "differs from canonical GoReleaser v2.17.0 output") {
+		if err == nil || !strings.Contains(string(output), "Cask") {
 			t.Fatalf("Cask mismatch result: %v\n%s", err, output)
 		}
-		if got := fixture.updateCount(t); got != "0" {
+		if got := fixture.updateCount(t, "cask"); got != "0" {
 			t.Fatalf("Cask mismatch performed %s updates", got)
 		}
 	})
@@ -102,13 +102,14 @@ func TestHomebrewFormulaBridge_RejectsChecksumAmbiguity(t *testing.T) {
 
 func TestHomebrewFormulaBridge_RejectsIdentityMismatchWithoutCredentialLeak(t *testing.T) {
 	for _, test := range []struct{ name, key, value string }{
-		{"tag", "GITHUB_REF_NAME", "v0.50.72"},
-		{"version", "COMPANION_VERSION", "0.50.72"},
+		{"tag", "GITHUB_REF_NAME", "v0.50.71"},
+		{"version", "COMPANION_VERSION", "0.50.71"},
+		{"policy", "COMPANION_HOMEBREW_POLICY", "formula-update"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newHomebrewBridgeFixture(t)
 			output, err := fixture.run(map[string]string{test.key: test.value})
-			if err == nil || !strings.Contains(string(output), "one-release Formula bridge policy") {
+			if err == nil || !strings.Contains(strings.ToLower(string(output)), "policy") {
 				t.Fatalf("identity mismatch result: %v\n%s", err, output)
 			}
 		})
@@ -146,8 +147,8 @@ func newHomebrewBridgeFixture(t *testing.T) homebrewBridgeFixture {
 	if err := os.WriteFile(fixture.checksums, []byte(fixture.checksumText), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	fixture.writeAPIContent(t, "cask.json", strings.Repeat("c", 40), fixture.cask)
-	fixture.writeAPIContent(t, "formula.json", priorFormulaBlob, "legacy Formula\n")
+	fixture.writeAPIContent(t, "cask.json", a3PriorCaskBlob, fixture.cask)
+	fixture.writeAPIContent(t, "formula.json", a3FrozenFormulaBlob, homebrewBridgeFormula(t))
 	writeExecutable(t, filepath.Join(bin, "gh"), homebrewBridgeMockGH)
 	return fixture
 }
@@ -156,9 +157,10 @@ func (fixture homebrewBridgeFixture) run(overrides map[string]string) ([]byte, e
 	environment := map[string]string{
 		"PATH":   filepath.Join(fixture.root, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"TMPDIR": filepath.Join(fixture.root, "tmp"), "MOCK_STATE": fixture.state,
-		"GITHUB_REF_NAME": "v0.50.71", "COMPANION_VERSION": "0.50.71",
-		"COMPANION_CHECKSUMS_PATH": fixture.checksums,
-		"HOMEBREW_TAP_TOKEN":       "fixture-tap-token", "GH_TOKEN": "",
+		"GITHUB_REF_NAME": "v0.50.72", "COMPANION_VERSION": "0.50.72",
+		"COMPANION_HOMEBREW_POLICY": "cask-only",
+		"COMPANION_CHECKSUMS_PATH":  fixture.checksums,
+		"HOMEBREW_TAP_TOKEN":        "fixture-tap-token", "GH_TOKEN": "",
 	}
 	for name, value := range overrides {
 		environment[name] = value
@@ -205,9 +207,9 @@ func (fixture homebrewBridgeFixture) writeAPIContent(t *testing.T, name, sha, co
 	}
 }
 
-func (fixture homebrewBridgeFixture) formulaContent(t *testing.T) string {
+func (fixture homebrewBridgeFixture) apiContent(t *testing.T, name string) string {
 	t.Helper()
-	payload, err := os.ReadFile(filepath.Join(fixture.state, "formula.json"))
+	payload, err := os.ReadFile(filepath.Join(fixture.state, name))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,9 +224,21 @@ func (fixture homebrewBridgeFixture) formulaContent(t *testing.T) string {
 	return string(decoded)
 }
 
-func (fixture homebrewBridgeFixture) updateCount(t *testing.T) string {
+func (fixture homebrewBridgeFixture) updateCount(t *testing.T, name string) string {
 	t.Helper()
-	value, err := os.ReadFile(filepath.Join(fixture.state, "updates"))
+	value, err := os.ReadFile(filepath.Join(fixture.state, name+".updates"))
+	if os.IsNotExist(err) {
+		return "0"
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(value))
+}
+
+func (fixture homebrewBridgeFixture) callCount(t *testing.T, name string) string {
+	t.Helper()
+	value, err := os.ReadFile(filepath.Join(fixture.state, name+".calls"))
 	if os.IsNotExist(err) {
 		return "0"
 	}
@@ -238,9 +252,9 @@ func homebrewBridgeChecksums() string {
 	names := []string{"darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"}
 	var output strings.Builder
 	for index, name := range names {
-		fmt.Fprintf(&output, "%s  autopus-adk_0.50.71_%s.tar.gz\n", bridgeDigests[index], name)
+		fmt.Fprintf(&output, "%s  autopus-adk_0.50.72_%s.tar.gz\n", bridgeDigests[index], name)
 	}
-	fmt.Fprintf(&output, "%s  autopus-adk_0.50.71_windows_amd64.zip\n", strings.Repeat("5", 64))
+	fmt.Fprintf(&output, "%s  autopus-adk_0.50.72_windows_amd64.zip\n", strings.Repeat("5", 64))
 	return output.String()
 }
 
@@ -261,21 +275,24 @@ if [[ "${MOCK_FAIL_WITH_TOKEN-}" == '1' ]]; then
   printf 'mock diagnostic included %s\n' "$GH_TOKEN" >&2
   exit 72
 fi
-case "$method:$endpoint" in
-  GET:*Casks/auto.rb*) exec cat "$MOCK_STATE/cask.json" ;;
-  GET:*Formula/auto.rb*) exec cat "$MOCK_STATE/formula.json" ;;
-  PUT:*Formula/auto.rb)
-    current_sha=$(jq -er '.sha' "$MOCK_STATE/formula.json")
-    [[ "$(jq -er '.sha' "$input")" == "$current_sha" ]]
-    [[ "$(jq -er '.branch' "$input")" == 'main' ]]
-    jq -er '.content' "$input" | tr -d '\r\n' | base64 --decode >"$MOCK_STATE/formula.rb"
-    jq -n --rawfile body "$MOCK_STATE/formula.rb" \
-      '{sha:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",content:($body|@base64)}' \
-      >"$MOCK_STATE/formula.json"
-    count=$(cat "$MOCK_STATE/updates" 2>/dev/null || printf '0')
-    printf '%s\n' "$((count + 1))" >"$MOCK_STATE/updates"
-    printf '{}\n'
-    ;;
+case "$endpoint" in
+  *Casks/auto.rb*) name='cask'; next_sha='1111111111111111111111111111111111111111' ;;
+  *Formula/auto.rb*) name='formula'; next_sha='2222222222222222222222222222222222222222' ;;
   *) exit 64 ;;
 esac
+state="$MOCK_STATE/${name}.json"
+calls=$(cat "$MOCK_STATE/${name}.calls" 2>/dev/null || printf '0')
+printf '%s\n' "$((calls + 1))" >"$MOCK_STATE/${name}.calls"
+[[ "$method" == 'GET' ]] && exec cat "$state"
+[[ "$method" == 'PUT' && -f "$input" ]]
+current_sha=$(jq -er '.sha' "$state")
+[[ "$(jq -er '.sha' "$input")" == "$current_sha" ]]
+[[ "$(jq -er '.branch' "$input")" == 'main' ]]
+content=$(jq -er '.content' "$input")
+jq -n --arg sha "$next_sha" --arg content "$content" \
+  '{sha:$sha,content:$content}' >"$state"
+count_file="$MOCK_STATE/${name}.updates"
+count=$(cat "$count_file" 2>/dev/null || printf '0')
+printf '%s\n' "$((count + 1))" >"$count_file"
+printf '{}\n'
 `

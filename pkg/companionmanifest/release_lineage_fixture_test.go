@@ -139,8 +139,11 @@ func newExecutableLineageFixture(
 	root := t.TempDir()
 	seed := sha256.Sum256([]byte("autopus-f07-lineage-ed25519-seed"))
 	currentTag := publicKeyReceiptA1Tag
-	if evidence.version == lineageA1Version {
+	switch evidence.version {
+	case lineageA1Version:
 		currentTag = publicKeyReceiptA2Tag
+	case publicKeyReceiptA2Version:
+		currentTag = publicKeyReceiptA3Tag
 	}
 	fixture := &executableLineageFixture{
 		root: root, tools: tools, evidence: evidence, pins: evidence.pins,

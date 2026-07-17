@@ -130,4 +130,4 @@ jobs:
       - name: Test macOS companion runtime contracts
         run: >-
           go test -race -count=1 -timeout=8m
-          ./internal/companionmanifest/... ./pkg/companionmanifest/...
+          ./internal/companionmanifest/... ./pkg/companionmanifest/... ./pkg/selfupdate
