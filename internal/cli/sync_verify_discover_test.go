@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -125,14 +126,29 @@ func TestSyncVerifyS8ReadOnlyInvariant(t *testing.T) {
 	syncGit(t, root, "add", "ARCHITECTURE.md")
 	syncWrite(t, root, ".autopus/project/tech.md", "tech\n")
 	syncWrite(t, modA, "src/app.ts", "export const x = 1\n")
+	syncWrite(t, modA, ".autopus/specs/SPEC-READONLY-001/spec.md", "Owns `src/app.ts`.\n")
+	syncWrite(t, modA, ".autopus/specs/SPEC-READONLY-001/plan.md", "Implement `src/app.ts`.\n")
+	syncGit(t, modA, "add", ".autopus/specs/SPEC-READONLY-001")
+	syncGit(t, modA, "commit", "-m", "read-only spec")
 
 	repoDirs := map[string]string{".": root, "mod-a": modA}
-	type snap struct{ status, head string }
+	type snap struct {
+		status    string
+		head      string
+		indexHash [sha256.Size]byte
+		indexTime int64
+	}
 	before := map[string]snap{}
 	for label, dir := range repoDirs {
+		indexData, err := os.ReadFile(filepath.Join(dir, ".git", "index"))
+		require.NoError(t, err)
+		indexInfo, err := os.Stat(filepath.Join(dir, ".git", "index"))
+		require.NoError(t, err)
 		before[label] = snap{
-			status: syncGitOut(t, dir, "status", "--porcelain=v1", "--untracked-files=all"),
-			head:   syncGitOut(t, dir, "rev-parse", "HEAD"),
+			status:    syncGitOut(t, dir, "--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all"),
+			head:      syncGitOut(t, dir, "rev-parse", "HEAD"),
+			indexHash: sha256.Sum256(indexData),
+			indexTime: indexInfo.ModTime().UnixNano(),
 		}
 	}
 
@@ -140,17 +156,25 @@ func TestSyncVerifyS8ReadOnlyInvariant(t *testing.T) {
 	for _, variant := range []struct {
 		spec   string
 		strict bool
-	}{{"", false}, {"", true}} {
+	}{{"", false}, {"SPEC-READONLY-001", false}, {"", true}} {
 		var buf bytes.Buffer
 		_, _ = executeSyncVerify(&buf, root, variant.spec, variant.strict)
 	}
 
 	for label, dir := range repoDirs {
+		indexData, err := os.ReadFile(filepath.Join(dir, ".git", "index"))
+		require.NoError(t, err)
+		indexInfo, err := os.Stat(filepath.Join(dir, ".git", "index"))
+		require.NoError(t, err)
 		after := snap{
-			status: syncGitOut(t, dir, "status", "--porcelain=v1", "--untracked-files=all"),
-			head:   syncGitOut(t, dir, "rev-parse", "HEAD"),
+			status:    syncGitOut(t, dir, "--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all"),
+			head:      syncGitOut(t, dir, "rev-parse", "HEAD"),
+			indexHash: sha256.Sum256(indexData),
+			indexTime: indexInfo.ModTime().UnixNano(),
 		}
 		assert.Equal(t, before[label].status, after.status, "porcelain status unchanged for %s", label)
 		assert.Equal(t, before[label].head, after.head, "HEAD unchanged for %s", label)
+		assert.Equal(t, before[label].indexHash, after.indexHash, "index bytes unchanged for %s", label)
+		assert.Equal(t, before[label].indexTime, after.indexTime, "index mtime unchanged for %s", label)
 	}
 }

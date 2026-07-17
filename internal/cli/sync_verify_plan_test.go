@@ -19,17 +19,18 @@ func TestSyncVerifyS6SpecOwnershipSplit(t *testing.T) {
 	// SPEC directory committed (clean) so only the two pkg files are dirty.
 	syncWrite(t, modA, ".autopus/specs/SPEC-FOO-001/plan.md",
 		"# plan\n\n- [ ] T1: implement pkg/foo.go\n")
-	syncGit(t, modA, "add", ".autopus/specs/SPEC-FOO-001/plan.md")
+	syncWrite(t, modA, ".autopus/specs/SPEC-FOO-001/spec.md", "# spec\n")
+	syncGit(t, modA, "add", ".autopus/specs/SPEC-FOO-001")
 	syncGit(t, modA, "commit", "-m", "spec")
 	syncWrite(t, modA, "pkg/foo.go", "package pkg\n")
 	syncWrite(t, modA, "pkg/unrelated.go", "package pkg\n")
 
 	repos, err := collectDirty(root)
 	require.NoError(t, err)
-	owned, unrelated, found := splitSpecOwnership(repos, "SPEC-FOO-001")
-	require.True(t, found)
-	assert.Equal(t, []string{"pkg/foo.go"}, owned)
-	assert.Equal(t, []string{"pkg/unrelated.go"}, unrelated)
+	owned, unrelated, err := splitSpecOwnership(repos, "SPEC-FOO-001", classifyWorkspace(repos))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"mod-a/pkg/foo.go"}, owned)
+	assert.Equal(t, []string{"mod-a/pkg/unrelated.go"}, unrelated)
 
 	var buf bytes.Buffer
 	n, err := executeSyncVerify(&buf, root, "SPEC-FOO-001", false)

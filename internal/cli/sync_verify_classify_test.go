@@ -48,6 +48,7 @@ func TestSyncVerifyS3Misplacement(t *testing.T) {
 	nestedRepo(t, root, "mod-a")
 	syncWrite(t, root, ".autopus/specs/SPEC-FOO-001/plan.md",
 		"# plan\n\n- [ ] T1: implement mod-a/pkg/foo.go handler\n")
+	syncWrite(t, root, ".autopus/specs/SPEC-FOO-001/spec.md", "# spec\n")
 
 	var buf bytes.Buffer
 	n, err := executeSyncVerify(&buf, root, "", false)
@@ -69,6 +70,7 @@ func TestSyncVerifyS4LocationMismatch(t *testing.T) {
 	nestedRepo(t, root, "mod-b")
 	syncWrite(t, modA, ".autopus/specs/SPEC-BAR-001/plan.md",
 		"# plan\n\n- [ ] T1: mod-a/pkg/a.go\n- [ ] T2: mod-b/pkg/b.go\n")
+	syncWrite(t, modA, ".autopus/specs/SPEC-BAR-001/spec.md", "# spec\n")
 
 	var buf bytes.Buffer
 	_, err := executeSyncVerify(&buf, root, "", false)

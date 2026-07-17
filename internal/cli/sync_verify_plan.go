@@ -19,7 +19,7 @@ func renderPlan(out io.Writer, phaseA []phaseGroup, phaseB phaseGroup) {
 		fmt.Fprintln(out, "  (no module changes)")
 	}
 	for _, g := range phaseA {
-		fmt.Fprintf(out, "  git -C %s add %s\n", g.RepoPath, strings.Join(g.Files, " "))
+		renderGroupActions(out, g)
 		fmt.Fprintln(out, loreReminderLine)
 	}
 
@@ -28,8 +28,20 @@ func renderPlan(out io.Writer, phaseA []phaseGroup, phaseB phaseGroup) {
 		fmt.Fprintln(out, "  (no meta changes)")
 		return
 	}
-	fmt.Fprintf(out, "  git -C . add %s\n", strings.Join(phaseB.Files, " "))
+	renderGroupActions(out, phaseB)
 	fmt.Fprintln(out, loreReminderLine)
+}
+
+func renderGroupActions(out io.Writer, group phaseGroup) {
+	if len(group.AddFiles) > 0 {
+		fmt.Fprintf(out, "  git -C %s add -- %s\n", group.RepoPath, strings.Join(group.AddFiles, " "))
+	}
+	if len(group.UpdateFiles) > 0 {
+		fmt.Fprintf(out, "  git -C %s add -u -- %s\n", group.RepoPath, strings.Join(group.UpdateFiles, " "))
+	}
+	if len(group.StagedOnly) > 0 {
+		fmt.Fprintf(out, "  already staged in %s: %s\n", group.RepoPath, displayPaths(group.StagedOnly))
+	}
 }
 
 // renderSpecSplit prints the --spec owned vs unrelated partition.
@@ -55,5 +67,5 @@ func joinOrNone(items []string) string {
 	if len(items) == 0 {
 		return "(none)"
 	}
-	return strings.Join(items, ", ")
+	return displayPaths(items)
 }

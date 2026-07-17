@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -65,7 +64,7 @@ func executeSyncVerify(out io.Writer, dir, specID string, strict bool) (int, err
 	if dir == "" {
 		wd, err := os.Getwd()
 		if err != nil {
-			return 0, fmt.Errorf("cannot resolve working directory: %w", err)
+			return 0, fmt.Errorf("cannot resolve working directory")
 		}
 		dir = wd
 	}
@@ -80,26 +79,30 @@ func executeSyncVerify(out io.Writer, dir, specID string, strict bool) (int, err
 	}
 
 	modules := moduleSet(repos)
-	phaseA, phaseB := classifyPhases(repos)
-	warnings := detectViolations(repos, modules)
+	classified := classifyWorkspace(repos)
+	warnings, err := detectViolations(repos, modules, classified)
+	if err != nil {
+		return 0, err
+	}
 
 	var specOwned, specUnrelated []string
 	if specID != "" {
-		owned, unrelated, found := splitSpecOwnership(repos, specID)
-		if !found {
-			return 0, fmt.Errorf("sync verify: SPEC %s not found under any .autopus/specs/ tree", specID)
+		owned, unrelated, splitErr := splitSpecOwnership(repos, specID, classified)
+		if splitErr != nil {
+			return 0, splitErr
 		}
 		specOwned, specUnrelated = owned, unrelated
+		classified = filterPlanForOwned(classified, owned)
 		if len(unrelated) > 0 {
 			warnings = append(warnings, fmt.Sprintf(
 				"WARN  unrelated-mixing: dirty files not owned by %s: %s",
-				specID, strings.Join(unrelated, ", ")))
+				specID, displayPaths(unrelated)))
 		}
 	}
 	sort.Strings(warnings)
 
 	fmt.Fprintf(out, "sync verify — %d repo(s), read-only (no git mutations)\n\n", len(repos))
-	renderPlan(out, phaseA, phaseB)
+	renderPlan(out, classified.PhaseA, classified.PhaseB)
 	if specID != "" {
 		renderSpecSplit(out, specID, specOwned, specUnrelated)
 	}

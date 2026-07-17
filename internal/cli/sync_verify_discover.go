@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -9,64 +11,51 @@ import (
 	"github.com/insajin/autopus-adk/pkg/setup"
 )
 
-// dirtyFile is a single working-tree change with staging flags derived from the
-// git porcelain XY status codes.
 type dirtyFile struct {
-	Rel      string // repo-relative slash path
-	Staged   bool   // index side (X) carries a change
-	Unstaged bool   // worktree side (Y) carries a change, or the entry is untracked
+	Rel      string
+	Staged   bool
+	Unstaged bool
+	Missing  bool
 }
 
-// repoDirty holds the read-only dirty inventory for one commit-boundary repo.
 type repoDirty struct {
-	Path    string // slash path relative to the meta root ("." for the root repo)
-	AbsPath string
-	IsRoot  bool
-	Files   []dirtyFile
+	Path           string
+	AbsPath        string
+	IsRoot         bool
+	Files          []dirtyFile
+	TrackedIgnored []string
 }
 
-// resolveMetaRoot walks upward from startDir and returns the outermost git repo
-// whose immediate children include at least one nested git repo. That repo is
-// the meta workspace root for two-phase sync classification.
 func resolveMetaRoot(startDir string) (string, error) {
 	abs, err := filepath.Abs(startDir)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot resolve workspace start directory")
 	}
 
 	metaRoot := ""
-	cur := abs
-	for {
+	for cur := abs; ; cur = filepath.Dir(cur) {
 		if info := setup.DetectMultiRepo(cur); info != nil && hasRootComponent(info) {
 			metaRoot = cur
 		}
-		parent := filepath.Dir(cur)
-		if parent == cur {
+		if filepath.Dir(cur) == cur {
 			break
 		}
-		cur = parent
 	}
-
 	if metaRoot == "" {
-		return "", fmt.Errorf("no multi-repo workspace found from the current directory (need a git repo with at least one nested repository)")
+		return "", fmt.Errorf("no multi-repo workspace found from the current directory")
 	}
 	return metaRoot, nil
 }
 
-// hasRootComponent reports whether the detected workspace treats the scanned
-// directory itself as a git repo (the "." component), guarding against picking a
-// non-git parent that merely contains repo children.
 func hasRootComponent(info *setup.MultiRepoInfo) bool {
-	for _, c := range info.Components {
-		if c.Path == "." {
+	for _, component := range info.Components {
+		if component.Path == "." {
 			return true
 		}
 	}
 	return false
 }
 
-// collectDirty enumerates every commit-boundary repo under metaRoot and gathers
-// its dirty files via read-only git status. It performs zero git mutations.
 func collectDirty(metaRoot string) ([]repoDirty, error) {
 	info := setup.DetectMultiRepo(metaRoot)
 	if info == nil {
@@ -74,94 +63,212 @@ func collectDirty(metaRoot string) ([]repoDirty, error) {
 	}
 
 	nested := map[string]bool{}
-	for _, c := range info.Components {
-		if c.Path != "." {
-			nested[c.Path] = true
+	for _, component := range info.Components {
+		if component.Path != "." {
+			nested[component.Path] = true
 		}
 	}
 
-	var repos []repoDirty
-	for _, c := range info.Components {
-		lines, err := hygieneGitLines(c.AbsPath, "status", "--porcelain=v1", "--untracked-files=all")
+	repos := make([]repoDirty, 0, len(info.Components))
+	for _, component := range info.Components {
+		status, err := runSyncGit(component.Path, component.AbsPath,
+			"status", "--porcelain=v1", "-z", "--untracked-files=all")
 		if err != nil {
-			return nil, fmt.Errorf("read-only git status failed for repo %s: %w", c.Path, err)
+			return nil, err
 		}
-		files := parsePorcelainXY(lines)
-		if c.Path == "." {
+		files, err := parsePorcelainXY(status)
+		if err != nil {
+			return nil, fmt.Errorf("malformed git status for repo %s", diagnosticRepoLabel(component.Path))
+		}
+		ignoredRaw, err := runSyncGit(component.Path, component.AbsPath,
+			"ls-files", "-c", "-i", "--exclude-standard", "-z")
+		if err != nil {
+			return nil, err
+		}
+		ignored, err := parseNULPaths(ignoredRaw)
+		if err != nil {
+			return nil, fmt.Errorf("malformed tracked-but-ignored inventory for repo %s", diagnosticRepoLabel(component.Path))
+		}
+		if component.Path == "." {
 			files = filterNestedRepoEntries(files, nested)
+			ignored = filterNestedPaths(ignored, nested)
 		}
 		repos = append(repos, repoDirty{
-			Path:    c.Path,
-			AbsPath: c.AbsPath,
-			IsRoot:  c.Path == ".",
-			Files:   files,
+			Path:           component.Path,
+			AbsPath:        component.AbsPath,
+			IsRoot:         component.Path == ".",
+			Files:          files,
+			TrackedIgnored: ignored,
 		})
 	}
 	return repos, nil
 }
 
-// parsePorcelainXY converts `git status --porcelain=v1` lines into dirtyFile
-// records, preserving staged/unstaged flags from the XY code columns.
-func parsePorcelainXY(lines []string) []dirtyFile {
+func runSyncGit(repoLabel, dir string, args ...string) ([]byte, error) {
+	gitArgs := append([]string{"--no-optional-locks"}, args...)
+	cmd := exec.Command("git", gitArgs...)
+	cmd.Dir = dir
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	// Git stderr is intentionally discarded: it can contain absolute paths,
+	// credentials embedded in remotes, or attacker-controlled local text.
+	if err := cmd.Run(); err != nil {
+		op := "command"
+		if len(args) > 0 {
+			op = args[0]
+		}
+		return nil, fmt.Errorf("read-only git %s failed for repo %s", op, diagnosticRepoLabel(repoLabel))
+	}
+	return stdout.Bytes(), nil
+}
+
+func parsePorcelainXY(raw []byte) ([]dirtyFile, error) {
 	var out []dirtyFile
-	for _, line := range lines {
-		if len(line) < 4 {
+	for offset := 0; offset < len(raw); {
+		record, next, ok := nextNULRecord(raw, offset)
+		if !ok || len(record) < 4 || record[2] != ' ' {
+			return nil, fmt.Errorf("invalid porcelain record")
+		}
+		x, y := record[0], record[1]
+		if !validPorcelainCode(x) || !validPorcelainCode(y) {
+			return nil, fmt.Errorf("invalid porcelain status")
+		}
+		out = appendDirtyPath(out, string(record[3:]), x, y, x == 'D' || y == 'D')
+		offset = next
+		if x == 'R' || x == 'C' || y == 'R' || y == 'C' {
+			source, afterSource, sourceOK := nextNULRecord(raw, offset)
+			if !sourceOK || len(source) == 0 {
+				return nil, fmt.Errorf("rename source missing")
+			}
+			if x == 'R' || y == 'R' {
+				out = appendRenameSource(out, string(source), x, y)
+			}
+			offset = afterSource
+		}
+	}
+	return mergeDirtyFiles(out), nil
+}
+
+func nextNULRecord(raw []byte, offset int) ([]byte, int, bool) {
+	if offset >= len(raw) {
+		return nil, offset, false
+	}
+	idx := bytes.IndexByte(raw[offset:], 0)
+	if idx < 0 {
+		return nil, offset, false
+	}
+	end := offset + idx
+	return raw[offset:end], end + 1, true
+}
+
+func validPorcelainCode(code byte) bool {
+	return strings.ContainsRune(" MTADRCU?!", rune(code))
+}
+
+func appendDirtyPath(files []dirtyFile, rel string, x, y byte, missing bool) []dirtyFile {
+	if rel == "" {
+		return files
+	}
+	untracked := x == '?' && y == '?'
+	return append(files, dirtyFile{
+		Rel:      normalizeGitRel(rel),
+		Staged:   x != ' ' && x != '?',
+		Unstaged: y != ' ' || untracked,
+		Missing:  missing,
+	})
+}
+
+func appendRenameSource(files []dirtyFile, rel string, x, y byte) []dirtyFile {
+	if rel == "" {
+		return files
+	}
+	return append(files, dirtyFile{
+		Rel:      normalizeGitRel(rel),
+		Staged:   x == 'R',
+		Unstaged: y == 'R',
+		Missing:  true,
+	})
+}
+
+func mergeDirtyFiles(files []dirtyFile) []dirtyFile {
+	merged := map[string]dirtyFile{}
+	for _, file := range files {
+		if file.Rel == "" {
 			continue
 		}
-		x := line[0]
-		y := line[1]
-		untracked := line[:2] == "??"
-
-		rel := strings.TrimSpace(line[3:])
-		if idx := strings.LastIndex(rel, " -> "); idx >= 0 {
-			rel = rel[idx+4:]
+		current, seen := merged[file.Rel]
+		current.Rel = file.Rel
+		current.Staged = current.Staged || file.Staged
+		current.Unstaged = current.Unstaged || file.Unstaged
+		if seen {
+			current.Missing = current.Missing && file.Missing
+		} else {
+			current.Missing = file.Missing
 		}
-		rel = normalizeGitRel(strings.Trim(rel, `"`))
-		if rel == "" {
-			continue
-		}
-
-		out = append(out, dirtyFile{
-			Rel:      rel,
-			Staged:   x != ' ' && x != '?',
-			Unstaged: y != ' ' || untracked,
-		})
+		merged[file.Rel] = current
+	}
+	out := make([]dirtyFile, 0, len(merged))
+	for _, file := range merged {
+		out = append(out, file)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Rel < out[j].Rel })
 	return out
 }
 
-// filterNestedRepoEntries removes root-repo entries that actually belong to a
-// nested repo (git surfaces embedded repos as a single entry), so each dirty
-// file is attributed to exactly one repo.
+func parseNULPaths(raw []byte) ([]string, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	var paths []string
+	for offset := 0; offset < len(raw); {
+		record, next, ok := nextNULRecord(raw, offset)
+		if !ok || len(record) == 0 {
+			return nil, fmt.Errorf("invalid NUL path list")
+		}
+		paths = append(paths, normalizeGitRel(string(record)))
+		offset = next
+	}
+	return uniqueSortedGitPaths(paths), nil
+}
+
 func filterNestedRepoEntries(files []dirtyFile, nested map[string]bool) []dirtyFile {
-	var out []dirtyFile
-	for _, f := range files {
-		if nested[f.Rel] {
-			continue
+	out := make([]dirtyFile, 0, len(files))
+	for _, file := range files {
+		if !belongsToNestedRepo(file.Rel, nested) {
+			out = append(out, file)
 		}
-		skip := false
-		for n := range nested {
-			if strings.HasPrefix(f.Rel, n+"/") {
-				skip = true
-				break
-			}
-		}
-		if skip {
-			continue
-		}
-		out = append(out, f)
 	}
 	return out
 }
 
-// moduleSet returns the set of nested module repo paths (excluding the root).
-func moduleSet(repos []repoDirty) map[string]bool {
-	m := map[string]bool{}
-	for _, r := range repos {
-		if !r.IsRoot {
-			m[r.Path] = true
+func filterNestedPaths(paths []string, nested map[string]bool) []string {
+	var out []string
+	for _, rel := range paths {
+		if !belongsToNestedRepo(rel, nested) {
+			out = append(out, rel)
 		}
 	}
-	return m
+	return out
+}
+
+func belongsToNestedRepo(rel string, nested map[string]bool) bool {
+	if nested[rel] {
+		return true
+	}
+	for repo := range nested {
+		if strings.HasPrefix(rel, repo+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func moduleSet(repos []repoDirty) map[string]bool {
+	modules := map[string]bool{}
+	for _, repo := range repos {
+		if !repo.IsRoot {
+			modules[repo.Path] = true
+		}
+	}
+	return modules
 }

@@ -7,11 +7,11 @@ IMPORTANT: All documents MUST be stored in the correct location based on their s
 | Document Type | Location | Git Repo | Example |
 |---------------|----------|----------|---------|
 | Project context | Root | meta repo | `ARCHITECTURE.md`, `.autopus/project/*` |
-| Harness config | Root | meta repo | `CLAUDE.md`, `.claude/`, `autopus.yaml` |
+| Harness bootstrap config | Root | meta repo | `CLAUDE.md`, `autopus.yaml`, `opencode.json`, `.mcp.json`, `.autopus/context/constraints.yaml` |
+| Generated harness/runtime surface | Local working copy only | Do not commit | `.claude/`, `.codex/`, `.gemini/`, `.opencode/`, `.autopus/plugins/`, `.autopus/*-manifest.json` |
 | Cross-module SPEC | Root `.autopus/specs/` | meta repo | SPECs affecting 2+ modules |
 | Module-specific SPEC | `{module}/.autopus/specs/` | module repo | SPECs affecting a single module |
-| Cross-module BS | Root `.autopus/brainstorms/` | meta repo | Ideas spanning 2+ modules |
-| Module-specific BS | `{module}/.autopus/brainstorms/` | module repo | Ideas for a single module |
+| Brainstorm/runtime output | Local working copy only | Do not commit | `.autopus/brainstorms/`, `.autopus/orchestra/`, `.autopus/runtime/` |
 | CHANGELOG | Root | meta repo | `CHANGELOG.md` |
 | Module CHANGELOG | `{module}/CHANGELOG.md` | module repo | Module-specific changes |
 
@@ -37,11 +37,13 @@ SPEC IDs and BS IDs MUST be globally unique across the entire workspace.
 WHEN `/auto sync` runs:
 
 1. **Module commit** (Phase A): SPEC files within `{TARGET_MODULE}` are committed to the module's git repo
-2. **Meta commit** (Phase B): Root-level documents (`ARCHITECTURE.md`, `.autopus/project/`, `CHANGELOG.md`) are committed to the meta repo
+2. **Meta commit** (Phase B): Canonical root documents and reviewed bootstrap config (`AGENTS.md`, `ARCHITECTURE.md`, `CLAUDE.md`, `autopus.yaml`, `opencode.json`, `.mcp.json`, `.autopus/context/constraints.yaml`, `.autopus/project/`, `.autopus/specs/`, `.autopus/learnings/pipeline.jsonl`, and human-maintained root Markdown) are committed to the meta repo
 
 Both phases run in sequence. Phase B is skipped if no root files changed.
 
-Before committing, run `auto sync verify` (read-only, zero git mutations) to classify dirty files into this deterministic Phase A / Phase B plan and surface boundary violations (cross-boundary misplacement, SPEC location vs referenced-module mismatch, unrelated-file mixing). Use `auto sync verify --strict` in hooks or CI to exit non-zero when any violation is reported.
+Before committing, run `auto sync verify` (read-only, zero git mutations). It inventories NUL-delimited Git status plus tracked-but-ignored files with optional locks disabled, partitions every path into a Phase A/B candidate, blocked generated/runtime path, or unclassified path, and renders only shell-safe candidates as `git -C <repo> add -- <paths>`. Generated/runtime, tracked-but-ignored, unsafe, and unclassified paths never enter a copy-ready command.
+
+Use `auto sync verify --spec SPEC-ID` to locate exactly one regular, non-symlink SPEC host across the whole workspace, plan only workspace-relative dirty paths owned by that SPEC, and report every unrelated path. Use `--strict` in hooks or CI to exit non-zero for any boundary, ownership, blocked, or unclassified warning.
 
 ## Context Document Rotation
 
