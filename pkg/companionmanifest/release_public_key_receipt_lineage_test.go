@@ -17,6 +17,8 @@ const (
 	publicKeyReceiptA1Version    = "0.50.70"
 	publicKeyReceiptA2Tag        = "v0.50.71"
 	publicKeyReceiptA2Version    = "0.50.71"
+	publicKeyReceiptA3Tag        = "v0.50.72"
+	publicKeyReceiptA3Version    = "0.50.72"
 	minimumLongLivedReceiptSecs  = "31536000"
 )
 
@@ -72,6 +74,7 @@ func TestReleasePublicKeyReceipt_A0Policy_IsOneExactAuditableBootstrap(t *testin
 		"release_phase='A0'",
 		"release_phase='A1'",
 		"release_phase='A2'",
+		"release_phase='A3'",
 	} {
 		if !strings.Contains(scripts, exact) {
 			t.Fatalf("missing exact A0 bootstrap release policy %q", exact)
@@ -82,6 +85,9 @@ func TestReleasePublicKeyReceipt_A0Policy_IsOneExactAuditableBootstrap(t *testin
 	}
 	if !exactA2TagVersionGuard(scripts) {
 		t.Fatal("A2 release is not conjunctively restricted to tag v0.50.71 and version 0.50.71")
+	}
+	if !exactA3TagVersionGuard(scripts) {
+		t.Fatal("A3 release is not conjunctively restricted to tag v0.50.72 and version 0.50.72")
 	}
 	workflow := releaseWorkflowContract(t)
 	for _, job := range workflow.Jobs {
@@ -130,6 +136,7 @@ func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredece
 	for _, required := range []string{
 		"gh api", "gh release download", "releases/tags/",
 		publicKeyReceiptA0Repository, publicKeyReceiptA0Tag, publicKeyReceiptA1Tag,
+		publicKeyReceiptA2Tag, publicKeyReceiptA3Tag,
 		"tag_name", "target_commitish", "cmp --",
 		"prior_receipt", "current_receipt", "record_sha256", "public_key_sha256",
 	} {
@@ -144,7 +151,8 @@ func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredece
 	if got := strings.Count(scripts, "cmp --"); got < wantComparisons {
 		t.Fatalf("A1 exact receipt/signature-or-envelope byte comparisons = %d, want at least %d", got, wantComparisons)
 	}
-	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.72", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.73", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA3Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA2Tag, "prior_evidence_unverifiable")
 	if !a0LineagePinsProvisioned(t, scripts, api) {
 		requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.70", "prior_evidence_unverifiable")
@@ -224,6 +232,19 @@ func exactA2TagVersionGuard(source string) bool {
 	patterns := []*regexp.Regexp{
 		regexp.MustCompile(`GITHUB_REF_NAME.{0,240}v0\.50\.71.{0,400}COMPANION_VERSION.{0,240}0\.50\.71`),
 		regexp.MustCompile(`COMPANION_VERSION.{0,240}0\.50\.71.{0,400}GITHUB_REF_NAME.{0,240}v0\.50\.71`),
+	}
+	for _, pattern := range patterns {
+		if pattern.MatchString(source) {
+			return true
+		}
+	}
+	return false
+}
+
+func exactA3TagVersionGuard(source string) bool {
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`GITHUB_REF_NAME.{0,240}v0\.50\.72.{0,400}COMPANION_VERSION.{0,240}0\.50\.72`),
+		regexp.MustCompile(`COMPANION_VERSION.{0,240}0\.50\.72.{0,400}GITHUB_REF_NAME.{0,240}v0\.50\.72`),
 	}
 	for _, pattern := range patterns {
 		if pattern.MatchString(source) {

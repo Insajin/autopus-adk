@@ -61,6 +61,59 @@ func TestReleaseSourceValidator_A2RejectsSourceWithoutPinnedAncestors(t *testing
 	}
 }
 
+func TestReleaseSourceValidator_A3AcceptsAnnotatedA2DescendantAndExactPins(t *testing.T) {
+	dir := cloneCurrentReleaseRepository(t)
+	sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
+	tree := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD^{tree}"))
+	runGit(t, dir, "tag", "-am", "A3 release candidate", "v0.50.72")
+	output, err := runReleaseSourceValidator(t, dir, "v0.50.72", sha,
+		"COMPANION_SOURCE_PIN_REQUIRED=1",
+		"COMPANION_APPROVED_SOURCE_COMMIT="+sha,
+		"COMPANION_APPROVED_SOURCE_TREE="+tree,
+	)
+	if err != nil {
+		t.Fatalf("annotated pinned A3 rejected: %v\n%s", err, output)
+	}
+	if !strings.Contains(output, "release-phase=A3") || !strings.Contains(output, "source-commit="+sha) {
+		t.Fatalf("validated A3 output = %q", output)
+	}
+}
+
+func TestReleaseSourceValidator_A3RejectsLightweightTagAndMissingA2(t *testing.T) {
+	t.Run("lightweight", func(t *testing.T) {
+		dir := cloneCurrentReleaseRepository(t)
+		sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
+		runGit(t, dir, "tag", "v0.50.72")
+		output, err := runReleaseSourceValidator(t, dir, "v0.50.72", sha)
+		if err == nil || !strings.Contains(output, "A3 release tag must be annotated") {
+			t.Fatalf("lightweight A3 result: %v\n%s", err, output)
+		}
+	})
+	t.Run("missing_A2", func(t *testing.T) {
+		dir, sha := newMinimalSourceRepository(t)
+		runGit(t, dir, "tag", "-am", "orphan A3", "v0.50.72")
+		output, err := runReleaseSourceValidator(t, dir, "v0.50.72", sha)
+		if err == nil || !strings.Contains(output, "does not contain the immutable A2 release") {
+			t.Fatalf("A2-free A3 result: %v\n%s", err, output)
+		}
+	})
+}
+
+func TestReleaseSourceValidator_A3RejectsUnapprovedSourcePin(t *testing.T) {
+	dir := cloneCurrentReleaseRepository(t)
+	sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
+	tree := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD^{tree}"))
+	runGit(t, dir, "tag", "-am", "A3 release candidate", "v0.50.72")
+	output, err := runReleaseSourceValidator(t, dir, "v0.50.72", sha,
+		"COMPANION_SOURCE_PIN_REQUIRED=1",
+		"COMPANION_APPROVED_SOURCE_COMMIT="+strings.Repeat("a", 40),
+		"COMPANION_APPROVED_SOURCE_TREE="+tree,
+	)
+	if err == nil || !strings.Contains(output, "release commit differs from the approved exact source commit") {
+		t.Fatalf("unapproved A3 source result: %v\n%s", err, output)
+	}
+}
+
 func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *testing.T) {
 	dir := cloneCurrentReleaseRepository(t)
 	taggedSHA := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
@@ -74,7 +127,7 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 	for _, test := range []struct{ name, tag, sha, message string }{
 		{name: "head_tag", tag: "v0.50.71", sha: headSHA, message: "checked-out source, tag, and release commit differ"},
 		{name: "github_sha", tag: "v0.50.71", sha: taggedSHA, message: "checked-out source, tag, and release commit differ"},
-		{name: "outside", tag: "v0.50.72", sha: headSHA, message: "outside the frozen A0/A1/A2 policy"},
+		{name: "outside", tag: "v0.50.73", sha: headSHA, message: "outside the frozen A0/A1/A2/A3 policy"},
 	} {
 		output, err := runReleaseSourceValidator(t, dir, test.tag, test.sha)
 		if err == nil || !strings.Contains(output, test.message) {
@@ -83,7 +136,7 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 	}
 }
 
-func TestLineageVerifier_A0BootstrapsWhileA1AndA2WithoutLiveEvidenceFailClosed(t *testing.T) {
+func TestLineageVerifier_A0BootstrapsWhileA1ThroughA3WithoutLiveEvidenceFailClosed(t *testing.T) {
 	script := filepath.Join(repositoryRoot(t), "scripts/companion-release/verify-public-key-lineage.sh")
 	cases := []struct {
 		name    string
@@ -94,7 +147,8 @@ func TestLineageVerifier_A0BootstrapsWhileA1AndA2WithoutLiveEvidenceFailClosed(t
 		{name: "A0", tag: "v0.50.69", wantOK: true, message: "bootstrap accepted"},
 		{name: "A1", tag: "v0.50.70", message: "missing GITHUB_TOKEN"},
 		{name: "A2", tag: "v0.50.71", message: "missing GITHUB_TOKEN"},
-		{name: "outside", tag: "v0.50.72", message: "outside the frozen A0/A1/A2 policy"},
+		{name: "A3", tag: "v0.50.72", message: "missing GITHUB_TOKEN"},
+		{name: "outside", tag: "v0.50.73", message: "outside the frozen A0/A1/A2/A3 policy"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

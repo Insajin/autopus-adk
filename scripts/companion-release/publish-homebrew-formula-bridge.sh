@@ -2,17 +2,16 @@
 set -euo pipefail
 umask 077
 
-readonly RELEASE_TAG='v0.50.71'
-readonly RELEASE_VERSION='0.50.71'
+readonly RELEASE_TAG='v0.50.72'
+readonly RELEASE_VERSION='0.50.72'
+readonly RELEASE_POLICY='cask-only'
 readonly TAP_REPOSITORY='Insajin/homebrew-autopus'
 readonly TAP_BRANCH='main'
 readonly CASK_PATH='Casks/auto.rb'
-readonly FORMULA_PATH='Formula/auto.rb'
-readonly PRIOR_CASK_BLOB='025587ee9d6d6deddfb51c1f2661ee36a30c1ef1'
-readonly PRIOR_FORMULA_BLOB='df2d8e25636f8a3db842948d119d46f31afd94ab'
+readonly PRIOR_CASK_BLOB='8d09a2d11a62b3db5fd7b3523f2626a34604b0b9'
 
 fail() {
-  printf 'homebrew formula bridge: %s\n' "$1" >&2
+  printf 'homebrew cask publication: %s\n' "$1" >&2
   exit 1
 }
 
@@ -21,13 +20,17 @@ require_environment() {
   [[ -n "${!name-}" ]] || fail "required environment variable ${name} is missing"
 }
 
-for name in GITHUB_REF_NAME COMPANION_VERSION COMPANION_CHECKSUMS_PATH; do
+for name in \
+  GITHUB_REF_NAME COMPANION_VERSION COMPANION_HOMEBREW_POLICY COMPANION_CHECKSUMS_PATH
+do
   require_environment "$name"
 done
 [[ "$GITHUB_REF_NAME" == "$RELEASE_TAG" ]] \
-  || fail 'release tag is outside the one-release Formula bridge policy'
+  || fail 'release tag is outside the exact Cask publication policy'
 [[ "$COMPANION_VERSION" == "$RELEASE_VERSION" ]] \
-  || fail 'release version is outside the one-release Formula bridge policy'
+  || fail 'release version is outside the exact Cask publication policy'
+[[ "$COMPANION_HOMEBREW_POLICY" == "$RELEASE_POLICY" ]] \
+  || fail 'release policy is not exact cask-only publication'
 
 tap_token="${HOMEBREW_TAP_TOKEN-}"
 if [[ -z "$tap_token" ]]; then
@@ -61,8 +64,8 @@ render_helper="$script_dir/publish-homebrew-formula-bridge-render.sh"
   || fail 'Formula bridge renderer is not a regular non-symlink file'
 # shellcheck source=publish-homebrew-formula-bridge-render.sh
 source "$render_helper"
-declare -F render_homebrew_cask render_homebrew_formula_bridge >/dev/null \
-  || fail 'Formula bridge renderer contract is incomplete'
+declare -F render_homebrew_cask >/dev/null \
+  || fail 'Cask renderer contract is incomplete'
 
 checksums_path="$COMPANION_CHECKSUMS_PATH"
 [[ -f "$checksums_path" && ! -L "$checksums_path" ]] \
@@ -145,10 +148,6 @@ if [[ -n "${COMPANION_CASK_PATH-}" ]]; then
     || fail 'GoReleaser Cask output differs from the canonical renderer'
 fi
 
-formula_target="$temp_dir/formula-target.rb"
-render_homebrew_formula_bridge "$formula_target" "$RELEASE_TAG" "$RELEASE_VERSION" \
-  "$darwin_amd64_sha" "$darwin_arm64_sha" "$linux_amd64_sha" "$linux_arm64_sha"
-
 sha256_file() {
   local output digest
   output=$("${sha256_command[@]}" "$1") || return 1
@@ -171,7 +170,7 @@ reconcile_tap_file() {
   target_digest=$(sha256_file "$target") || fail "cannot digest target ${label}"
   current_digest=$(sha256_file "$current") || fail "cannot digest current ${label}"
   if [[ "$target_digest" == "$current_digest" ]] && cmp -s "$target" "$current"; then
-    printf 'homebrew formula bridge: %s is already current\n' "$label"
+    printf 'homebrew cask publication: %s is already current\n' "$label"
     return 0
   fi
 
@@ -195,12 +194,9 @@ reconcile_tap_file() {
   decode_api_content "$response" "$current"
   cmp -s "$target" "$current" \
     || fail "Homebrew tap ${label} differs after publication"
-  printf 'homebrew formula bridge: %s published and verified\n' "$label"
+  printf 'homebrew cask publication: %s published and verified\n' "$label"
 }
 
 reconcile_tap_file cask Cask "$CASK_PATH" "$cask_target" "$PRIOR_CASK_BLOB" \
-  'Publish signed Cask for v0.50.71' \
-  'published Cask differs from canonical GoReleaser v2.17.0 output and its pinned prior blob'
-reconcile_tap_file formula Formula "$FORMULA_PATH" "$formula_target" "$PRIOR_FORMULA_BLOB" \
-  'Bridge legacy Formula users to the signed Cask for v0.50.71' \
-  'Homebrew tap Formula has drifted from the pinned prior blob'
+  'Publish signed Cask for v0.50.72' \
+  'published Cask differs from canonical v0.50.71 output and its pinned prior blob'

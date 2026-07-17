@@ -255,20 +255,11 @@ func (fixture *executableLineageFixture) writeProvisionedProductionScript(t *tes
 		"A0_AMD64_MANIFEST_SHA256": fixture.pins.amd64Manifest,
 		"A0_ARM64_MANIFEST_SHA256": fixture.pins.arm64Manifest,
 	}
-	if fixture.currentTag == publicKeyReceiptA2Tag {
-		replacements["A1_COMMIT_SHA"] = fixture.pins.commit
-		replacements["A1_TAG_OBJECT_SHA"] = fixture.pins.tagObject
-		replacements["A1_CHECKSUMS_SHA256"] = fixture.pins.checksums
-		replacements["A1_AMD64_ARCHIVE_SHA256"] = fixture.pins.amd64Archive
-		replacements["A1_ARM64_ARCHIVE_SHA256"] = fixture.pins.arm64Archive
-		replacements["A1_AMD64_MANIFEST_SHA256"] = fixture.pins.amd64Manifest
-		replacements["A1_ARM64_MANIFEST_SHA256"] = fixture.pins.arm64Manifest
+	for name, value := range directPredecessorPinReplacements(fixture) {
+		replacements[name] = value
 	}
 	for name, value := range replacements {
-		productionValue, ok := immutableA0LineagePins[name]
-		if !ok {
-			productionValue, ok = immutableA1LineagePins[name]
-		}
+		productionValue, ok := immutableProductionLineagePin(name)
 		if !ok {
 			t.Fatalf("production lineage pin %s is not defined", name)
 		}

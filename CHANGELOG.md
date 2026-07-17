@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **v0.50.72 macOS self-update 서명 보존** (2026-07-17): `auto update --self`가 SHA-256 검증을 마친 macOS 릴리스 바이너리를 설치한 뒤 ad hoc 서명으로 다시 쓰던 동작을 제거했다. 이제 다운로드한 Mach-O 바이트와 Developer ID 서명, Team ID를 그대로 보존하며, Darwin 전용 회귀 테스트가 바이트 해시와 코드 서명 식별자의 일치를 검증한다. A3 릴리스 게이트는 immutable `v0.50.71`의 commit, annotated tag object, checksums, Darwin archive와 manifest를 고정 검증하고 A0 공개키 record의 연속성을 유지한다. Homebrew는 `v0.50.71` Formula 마이그레이션 브리지를 동결하고 canonical Cask만 `v0.50.72`로 갱신한다.
+
 ### Added
 
 - **v0.50.71 RC 릴리스 계보 및 업데이트 경로 완성** (2026-07-16): 최신 `main`의 GPT Ultra 구현과 `v0.50.70`의 companion 릴리스 계보를 실제 merge ancestry로 통합했다. 릴리스 워크플로는 정확한 `v0.50.71`만 허용하고, A2가 immutable A1의 commit·annotated tag object·checksums·Darwin archive·manifest pin과 A0부터 이어진 공개키 receipt/signature/record를 모두 검증한 뒤 같은 key record를 재게시하도록 fail-closed로 확장했다. Homebrew Cask를 canonical 배포 경로로 유지하면서 기존 Formula 사용자는 한 번의 호환 릴리스로 갱신한 뒤 Cask로 옮기도록 CAS 기반 bridge와 설치 안내를 추가했으며, 바이너리 갱신 뒤 `auto update`를 실행해야 프로젝트의 생성 파일이 반영된다는 경계도 문서화했다. 이 항목은 RC 코드 준비 상태를 기록하며 태그 생성·실제 릴리스·정책 promotion·Ultra compact 활성화·Desktop B0/R1 완료를 뜻하지 않는다.
