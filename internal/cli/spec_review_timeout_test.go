@@ -97,7 +97,7 @@ func TestRunSpecReview_CLITimeout480OverridesCodexRequestBudget(t *testing.T) {
 
 func TestRunSpecReview_CLITimeoutOverridesEveryProviderBudget(t *testing.T) {
 	dir, specID, _ := writeGPTReviewContextProject(t)
-	for _, name := range []string{"codex", "claude", "gemini"} {
+	for _, name := range []string{"codex", "claude", "agy"} {
 		setFakeProviderOnPath(t, dir, name)
 	}
 
