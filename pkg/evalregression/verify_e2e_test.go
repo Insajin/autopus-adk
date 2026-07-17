@@ -2,7 +2,7 @@ package evalregression
 
 import (
 	"crypto/ed25519"
-	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -110,28 +110,38 @@ func TestEvalRegressionLiveGateE2EReasons(t *testing.T) {
 	})
 }
 
-func TestCommittedAllowlistEmptyAndDefensiveForE2E(t *testing.T) {
+func TestCommittedAllowlistContainsPromotionKeyAndIsDefensiveForE2E(t *testing.T) {
+	const (
+		wantKeyID        = "autopus-eval-staging-to-main-2026-07"
+		wantPublicKeyB64 = "D6euTz5IarNy68TfJ4tdzOwVomIXoiDEzEtefKmprz8="
+	)
+
 	keys := CommittedEvalRegressionPublicKeys()
-	if len(keys) != 0 {
-		t.Fatalf("committed allowlist length = %d, want 0", len(keys))
+	if len(keys) != 1 {
+		t.Fatalf("committed allowlist length = %d, want 1", len(keys))
+	}
+	publicKey, present := keys[wantKeyID]
+	if !present {
+		t.Fatalf("committed allowlist missing promotion key_id %q", wantKeyID)
+	}
+	if len(publicKey) != ed25519.PublicKeySize {
+		t.Fatalf("committed public key length = %d, want %d", len(publicKey), ed25519.PublicKeySize)
+	}
+	if got := base64.StdEncoding.EncodeToString(publicKey); got != wantPublicKeyB64 {
+		t.Fatalf("committed public key = %q, want %q", got, wantPublicKeyB64)
 	}
 
-	pub, _, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatalf("generate public key: %v", err)
-	}
-	keys["egl-should-not-stick"] = pub
-
+	publicKey[0] ^= 0xff
+	delete(keys, wantKeyID)
+	keys["egl-should-not-stick"] = ed25519.PublicKey("attacker")
 	again := CommittedEvalRegressionPublicKeys()
-	if len(again) != 0 {
-		t.Fatalf("committed allowlist mutated through defensive copy: length = %d, want 0", len(again))
+	if len(again) != 1 {
+		t.Fatalf("committed allowlist mutated through defensive copy: length = %d, want 1", len(again))
 	}
-
-	priv, _ := newSigner(t)
-	report := e2eReportJSON(false, e2eFixedNow.Add(-1*time.Hour).Format(time.RFC3339), "candidate")
-	att := signBytes(t, report, e2eKeyID, priv)
-	reason, exitCode := evaluateE2E(t, report, att, again)
-	if reason != reasonSignatureKeyUnknown || exitCode != 1 {
-		t.Fatalf("empty committed allowlist: expected (%q, 1), got (%q, %d)", reasonSignatureKeyUnknown, reason, exitCode)
+	if _, present := again["egl-should-not-stick"]; present {
+		t.Fatalf("committed allowlist accepted injected key through defensive copy")
+	}
+	if got := base64.StdEncoding.EncodeToString(again[wantKeyID]); got != wantPublicKeyB64 {
+		t.Fatalf("committed public key mutated through defensive copy: got %q, want %q", got, wantPublicKeyB64)
 	}
 }
