@@ -65,7 +65,7 @@ Pipeline prompts should preserve stable instructions, frozen snapshot recall, an
 
 ## Scoped Context Receipt Contract
 
-Before delegating a worker task, select a receipt-metadata budget between 800 and 2,000 estimated tokens. Required document bodies are outside that budget; only optional memory recall uses its residual capacity.
+Before delegating a worker task, select one total context-receipt budget between 800 and 2,000 estimated tokens. Reserve the mandatory fields first, then give only the residual budget to optional memory recall.
 
 Every receipt must include:
 
@@ -77,7 +77,7 @@ Every receipt must include:
 - selected recall source references and hashes
 - omitted recall count
 
-Build a body-free manifest with `auto workflow context`, then deliver every required document through its stable reference and hashes. Bind compact selection to the same command, SPEC, conditional profiles, and supervisor-held task references with `auto workflow binding --context-manifest ... --context-command go --context-spec-dir ... --context-required-document <ref>`. Repeat the task-reference flag for the exact set used by `auto workflow context --required-document <ref>`. Workers must read those references; request `context_ack` as diagnostic evidence, while supervisor-held references and hashes remain the integrity gate. Never truncate, summarize, drop, or replace required documents with the receipt. Missing, empty, stale, unreadable, incomplete, omitted-reference, replayed, wrong-SPEC, or hash-mismatched context is `context_integrity_failed`: retain full Ultra and block provider dispatch until the documents are restored or the task is split. Optional recall may be omitted; required references may not.
+Do not relay full repeated artifact bodies to workers. Keep original artifacts retrievable through stable source references and pass only the selected command profile, bounded recall prompt, and task-specific evidence. If mandatory fields alone exceed the selected budget, fail closed and shrink the task or references before delegation.
 
 ## Minimality Discipline
 

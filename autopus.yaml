@@ -76,9 +76,9 @@ orchestra:
                 timeout: 480
         codex:
             binary: codex
-            args: [exec, --sandbox, workspace-write, -m, gpt-5.6-sol, -c, model_reasoning_effort="max"]
-            model_policy: quality
+            args: [exec, --json, --sandbox, workspace-write, -m, gpt-5.6-sol, -c, model_reasoning_effort="max"]
             pane_args: [-m, gpt-5.6-sol, -c, model_reasoning_effort="max"]
+            model_policy: quality
             interactive_input: sendkeys
             subprocess:
                 schema_flag: --output-schema
@@ -142,3 +142,6 @@ design:
     inject_on_review: true
     inject_on_verify: true
     external_imports: false
+workflow:
+    team_default: true
+    coverage_threshold: 85
