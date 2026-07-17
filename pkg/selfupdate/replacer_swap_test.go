@@ -21,12 +21,13 @@ func TestCommitWithAtomicSwap_RollsBackChangedTarget(t *testing.T) {
 	require.NoError(t, os.Mkdir(stageDir, 0700))
 	stagePath := filepath.Join(stageDir, "auto")
 	require.NoError(t, os.WriteFile(stagePath, []byte("new"), 0711))
+	originalPath := filepath.Join(dir, "original")
 	swapCalls := 0
 
 	err = commitWithAtomicSwap(stagePath, targetPath, expected, func(left, right string) error {
 		swapCalls++
 		if swapCalls == 1 {
-			require.NoError(t, os.Remove(targetPath))
+			require.NoError(t, os.Rename(targetPath, originalPath))
 			require.NoError(t, os.WriteFile(targetPath, []byte("concurrent"), 0700))
 		}
 		return exchangeForTest(left, right)
@@ -48,6 +49,7 @@ func TestCommitWithAtomicSwap_PreservesStageWhenRollbackFails(t *testing.T) {
 	require.NoError(t, err)
 	stagePath := filepath.Join(dir, "new")
 	require.NoError(t, os.WriteFile(stagePath, []byte("new"), 0711))
+	originalPath := filepath.Join(dir, "original")
 	sentinel := errors.New("rollback failed")
 	swapCalls := 0
 
@@ -56,7 +58,7 @@ func TestCommitWithAtomicSwap_PreservesStageWhenRollbackFails(t *testing.T) {
 		if swapCalls == 2 {
 			return sentinel
 		}
-		require.NoError(t, os.Remove(targetPath))
+		require.NoError(t, os.Rename(targetPath, originalPath))
 		require.NoError(t, os.WriteFile(targetPath, []byte("concurrent"), 0700))
 		return exchangeForTest(left, right)
 	}, func(string) error { return nil })
