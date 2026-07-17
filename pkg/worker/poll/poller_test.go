@@ -127,19 +127,11 @@ func TestTaskPoller_LargeResponseTruncated(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	var receivedLen atomic.Int64
-	ctx, cancel := context.WithCancel(context.Background())
-	p := NewTaskPoller(srv.URL, "tok", "ws", func(data []byte) {
-		receivedLen.Store(int64(len(data)))
-	})
-	p.backoff = &AdaptiveBackoff{min: time.Millisecond, max: time.Millisecond, factor: 1, current: time.Millisecond}
+	p := NewTaskPoller(srv.URL, "tok", "ws", func([]byte) {})
+	body, err := p.fetchPending(context.Background())
 
-	go p.Start(ctx)
-
-	require.Eventually(t, func() bool { return receivedLen.Load() > 0 }, 500*time.Millisecond, 10*time.Millisecond)
-	cancel()
-
-	assert.LessOrEqual(t, receivedLen.Load(), int64(10<<20), "body should be limited to 10MB")
+	require.NoError(t, err)
+	assert.Len(t, body, maxBodyBytes, "body should be limited to 10MB")
 }
 
 func TestTaskPoller_ContextCancellation(t *testing.T) {
