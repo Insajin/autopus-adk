@@ -57,7 +57,10 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 	// Split panes for each provider
 	panes, failed, err := splitProviderPanes(timeoutCtx, cfg)
 	if err != nil {
-		return runFallback(ctx, cfg)
+		if isPaneProvisioningError(err) {
+			return runFallback(ctx, cfg)
+		}
+		return nil, fmt.Errorf("pane setup failed after provisioning: %w", err)
 	}
 
 	// Ensure cleanup runs on exit
@@ -90,25 +93,39 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 // splitProviderPanes creates a visible split pane and temp file for each provider.
 // Multi-provider review/spec-review/idea flows rely on simultaneous pane
 // visibility, so provider fan-out must not use hidden tab surfaces.
-// Returns early with error if pane creation fails (caller should fallback).
+// Only a SplitPane result with an empty pane ID is a provisioning failure that
+// permits fallback. A non-empty ID commits pane transport even when accompanied
+// by an error, so that result is cleaned up and returned as a post-commit error.
 func splitProviderPanes(ctx context.Context, cfg OrchestraConfig) ([]paneInfo, []FailedProvider, error) {
 	panes := make([]paneInfo, 0, len(cfg.Providers))
 	for _, p := range cfg.Providers {
 		paneID, err := splitTrackedPane(ctx, cfg.Terminal, terminal.Horizontal)
-		if err != nil {
+		if paneID == "" {
 			cleanupPanes(cfg.Terminal, panes)
-			return nil, nil, err
+			if err != nil {
+				return nil, nil, newPaneProvisioningError(fmt.Errorf("SplitPane for %s: %w", p.Name, err))
+			}
+			return nil, nil, newPaneProvisioningError(fmt.Errorf("SplitPane for %s returned an empty pane ID", p.Name))
 		}
+		if err != nil {
+			closePaneSurface(cfg.Terminal, paneID)
+			cleanupPanes(cfg.Terminal, panes)
+			return nil, nil, fmt.Errorf("SplitPane for %s committed pane %s and then failed: %w", p.Name, paneID, err)
+		}
+		panes = append(panes, paneInfo{paneID: paneID, provider: p})
 		// SEC-002: sanitize provider name to prevent path traversal
 		safeName := sanitizeProviderName(p.Name)
 		// SEC-003: use os.CreateTemp to avoid symlink race
 		tmpFile, err := os.CreateTemp("", "autopus-orch-"+safeName+"-")
 		if err != nil {
 			cleanupPanes(cfg.Terminal, panes)
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("create pane output for %s: %w", p.Name, err)
 		}
-		tmpFile.Close()
-		panes = append(panes, paneInfo{paneID: paneID, outputFile: tmpFile.Name(), provider: p})
+		panes[len(panes)-1].outputFile = tmpFile.Name()
+		if err := tmpFile.Close(); err != nil {
+			cleanupPanes(cfg.Terminal, panes)
+			return nil, nil, fmt.Errorf("close pane output for %s: %w", p.Name, err)
+		}
 	}
 	focusFirstProviderPane(ctx, cfg.Terminal, panes)
 	return panes, nil, nil
@@ -253,9 +270,8 @@ func runFallback(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, er
 
 // cleanupPanes closes panes and removes temporary output files.
 func cleanupPanes(term terminal.Terminal, panes []paneInfo) {
-	ctx := context.Background()
 	for _, pi := range panes {
-		_ = term.Close(ctx, string(pi.paneID))
+		closePaneSurface(term, pi.paneID)
 		_ = os.Remove(pi.outputFile)
 		cleanupPromptFiles(pi.promptFiles)
 		_ = os.Remove(pi.responseFile)

@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -85,21 +86,34 @@ func TestRunOrchestra_Consensus_WithCat(t *testing.T) {
 }
 
 func TestRunOrchestra_ConsensusUsesConfiguredThreshold(t *testing.T) {
-	t.Parallel()
-	if runtime.GOOS == "windows" {
-		t.Skip("shell script fixture uses POSIX sh")
+	// This test replaces the package command factory, so it must not run in
+	// parallel with other tests that use the same seam.
+	originalNewCommand := newCommand
+	t.Cleanup(func() { newCommand = originalNewCommand })
+	outputs := map[string]string{
+		"p1": "1. shared\n2. pair\n3. only-one\n",
+		"p2": "1. shared\n2. pair\n",
+		"p3": "1. shared\n",
 	}
-
-	dir := t.TempDir()
-	p1 := writeOutputProvider(t, dir, "p1", "1. shared\n2. pair\n3. only-one\n")
-	p2 := writeOutputProvider(t, dir, "p2", "1. shared\n2. pair\n")
-	p3 := writeOutputProvider(t, dir, "p3", "1. shared\n")
+	newCommand = func(_ context.Context, _ string, args ...string) command {
+		waitCh := make(chan error, 1)
+		waitCh <- nil
+		return &fakeCommand{
+			waitCh: waitCh,
+			startFn: func(cmd *fakeCommand) error {
+				_, err := io.WriteString(cmd.stdout, outputs[args[0]])
+				return err
+			},
+		}
+	}
+	binary, err := os.Executable()
+	require.NoError(t, err)
 
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
-			{Name: "p1", Binary: p1},
-			{Name: "p2", Binary: p2},
-			{Name: "p3", Binary: p3},
+			{Name: "p1", Binary: binary, Args: []string{"p1"}},
+			{Name: "p2", Binary: binary, Args: []string{"p2"}},
+			{Name: "p3", Binary: binary, Args: []string{"p3"}},
 		},
 		Strategy:           StrategyConsensus,
 		Prompt:             "ignored by fixture",

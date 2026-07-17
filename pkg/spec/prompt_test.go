@@ -10,28 +10,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestBuildReviewPromptIncludesAuxiliaryDocs verifies that plan.md, research.md, and
-// acceptance.md in opts.SpecDir are injected into the prompt with trimming at 200 lines.
+// TestBuildReviewPromptIncludesAuxiliaryDocs verifies that plan.md, research.md,
+// and acceptance.md in opts.SpecDir are injected into the prompt. Under the
+// generous default total budget (SPEC-ADK-REVIEW-INTEGRITY-001 REQ-RINT-FULL-02)
+// a typical oversize document injects in full with no truncation notice —
+// replacing the prior head-only 200-line trim.
 func TestBuildReviewPromptIncludesAuxiliaryDocs(t *testing.T) {
 	t.Parallel()
 
 	specDir := t.TempDir()
 
-	// plan.md: 50 lines — fits within 200-line limit
+	// plan.md: 50 lines
 	planLines := make([]string, 50)
 	for i := range planLines {
 		planLines[i] = "plan line"
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(specDir, "plan.md"), []byte(strings.Join(planLines, "\n")), 0o644))
 
-	// research.md: 250 lines — exceeds 200-line limit, must be trimmed
+	// research.md: 250 lines — exceeds the legacy 200-line cap but fits the
+	// generous default budget, so it must now inject in full.
 	researchLines := make([]string, 250)
 	for i := range researchLines {
 		researchLines[i] = "research line"
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(specDir, "research.md"), []byte(strings.Join(researchLines, "\n")), 0o644))
 
-	// acceptance.md: 80 lines — fits within limit
+	// acceptance.md: 80 lines
 	acceptanceLines := make([]string, 80)
 	for i := range acceptanceLines {
 		acceptanceLines[i] = "acceptance line"
@@ -45,10 +49,8 @@ func TestBuildReviewPromptIncludesAuxiliaryDocs(t *testing.T) {
 	assert.Contains(t, prompt, "### Plan Document", "plan.md section must be present")
 	assert.Contains(t, prompt, "### Research Document", "research.md section must be present")
 	assert.Contains(t, prompt, "### Acceptance Criteria Document", "acceptance.md section must be present")
-	assert.Contains(t, prompt, "[Review-context notice: 50 additional lines were omitted",
-		"oversize research.md must show a source-safe trim notice")
-	assert.Contains(t, prompt, "not a source document defect",
-		"review prompt must tell reviewers the trim notice is not document evidence")
+	assert.NotContains(t, prompt, "additional lines were omitted",
+		"a 250-line research.md fits the generous default budget and must inject in full")
 }
 
 // TestBuildReviewPromptOmitsMissingDocs verifies that absent auxiliary files are

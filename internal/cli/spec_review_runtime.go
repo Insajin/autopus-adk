@@ -26,7 +26,7 @@ var shippedStatuses = map[string]struct{}{
 	"implemented": {},
 }
 
-func syncReviewedSpecStatus(specDir string, result *spec.ReviewResult) error {
+func syncReviewedSpecStatus(specDir string, result *spec.ReviewResult, allowDegraded bool) error {
 	if result == nil {
 		return nil
 	}
@@ -42,6 +42,26 @@ func syncReviewedSpecStatus(specDir string, result *spec.ReviewResult) error {
 	}
 	if _, shipped := shippedStatuses[strings.ToLower(doc.Status)]; shipped {
 		return nil
+	}
+
+	// SPEC-ADK-REVIEW-INTEGRITY-001 REQ-RINT-PROMO-06: a clean PASS auto-promotes
+	// only when every auxiliary document was fully observed and the provider
+	// quorum was met. Degraded observation blocks promotion unless the operator
+	// passed --allow-degraded, which promotes via a recorded audit override.
+	decision := evaluateIntegrityGate(result.DegradedReasons, allowDegraded)
+	if !decision.promote {
+		// Leave the prior status unchanged and surface why plus the remedy.
+		fmt.Println(formatIntegrityBlockMessage(decision.reasons))
+		return nil
+	}
+	if decision.viaOverride {
+		result.OverridePromotion = true
+		fmt.Println(formatIntegrityOverrideAudit(decision.reasons))
+		// Re-persist review.md so the override audit line (rendered by
+		// review_persist from OverridePromotion) lands in the artifact.
+		if err := spec.PersistReview(specDir, result); err != nil {
+			return fmt.Errorf("status gate: persist override audit: %w", err)
+		}
 	}
 
 	return spec.UpdateStatus(specDir, "approved")

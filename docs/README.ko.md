@@ -963,7 +963,10 @@ SPEC 상태 업데이트, 프로젝트 문서 재생성, @AX 태그 라이프사
 
 ```bash
 /auto sync SPEC-HOOK-001
+auto sync verify --spec SPEC-HOOK-001 --strict
 ```
+
+멀티 리포 동기화를 커밋하기 전에 `auto sync verify`로 read-only Phase A/Phase B 스테이징 계획을 확인합니다. generated/runtime, tracked-but-ignored, 미분류, 셸에서 안전하지 않은 경로는 계획에서 제외합니다. `--spec`은 SPEC 호스트가 정확히 하나인지 확인한 뒤 워크스페이스 상대 경로 가운데 해당 SPEC이 소유한 파일만 남깁니다. `--strict`는 제외되거나 무관한 경로가 하나라도 있으면 실패합니다.
 
 ```
 ╭────────────────────────────────────╮
@@ -1065,6 +1068,7 @@ SPEC 상태 업데이트, 프로젝트 문서 재생성, @AX 태그 라이프사
 | `/auto secure` | OWASP Top 10 보안 감사 |
 | `/auto map` | 코드베이스 구조 분석 |
 | `/auto sync SPEC-ID` | 구현 후 문서 동기화 |
+| `auto sync verify [--spec SPEC-ID] [--strict]` | 읽기 전용 fail-closed 멀티 리포 커밋 계획 |
 | `/auto dev "설명"` | 풀 파워: plan(--multi --ultrathink) → go(--team --loop) → sync |
 | `/auto setup` | 프로젝트 컨텍스트 문서 생성/업데이트 |
 | `/auto stale` | 오래된 결정 및 패턴 감지 |

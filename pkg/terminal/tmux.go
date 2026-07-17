@@ -17,6 +17,35 @@ type TmuxAdapter struct {
 // Name returns the adapter name.
 func (a *TmuxAdapter) Name() string { return "tmux" }
 
+func validateTmuxPaneID(id string) error {
+	if len(id) < 2 || id[0] != '%' {
+		return fmt.Errorf("invalid tmux pane ID %q", id)
+	}
+	for _, r := range id[1:] {
+		if r < '0' || r > '9' {
+			return fmt.Errorf("invalid tmux pane ID %q", id)
+		}
+	}
+	return nil
+}
+
+// @AX:ANCHOR [AUTO]: shared tmux pane-target contract used by command, screen, pipe, text, and close paths
+// @AX:REASON: global %pane IDs and session-scoped IDs must remain validated and targeted consistently across six callers
+func tmuxPaneTarget(session string, paneID PaneID) (string, error) {
+	id := string(paneID)
+	if strings.HasPrefix(id, "%") {
+		if err := validateTmuxPaneID(id); err != nil {
+			return "", err
+		}
+	} else if err := validatePaneID(paneID); err != nil {
+		return "", err
+	}
+	if session == "" || strings.HasPrefix(id, "%") {
+		return id, nil
+	}
+	return session + ":" + id, nil
+}
+
 // CreateWorkspace creates a new tmux session or window.
 // When running inside an existing tmux session (TMUX env set), creates a new window
 // instead to avoid nested session errors.
@@ -24,10 +53,15 @@ func (a *TmuxAdapter) CreateWorkspace(_ context.Context, name string) error {
 	if err := validateWorkspaceName(name); err != nil {
 		return fmt.Errorf("tmux: %w", err)
 	}
-	a.session = name
+	nested := os.Getenv("TMUX") != ""
 	cmd := buildTmuxCreateCmd(name)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("tmux: create workspace %q: %w", name, err)
+	}
+	if nested {
+		a.session = ""
+	} else {
+		a.session = name
 	}
 	return nil
 }
@@ -36,7 +70,7 @@ func (a *TmuxAdapter) CreateWorkspace(_ context.Context, name string) error {
 // Uses new-window when already inside a tmux session to avoid nesting errors.
 func buildTmuxCreateCmd(name string) *exec.Cmd {
 	if os.Getenv("TMUX") != "" {
-		return execCommand("tmux", "new-window", "-t", name)
+		return execCommand("tmux", "new-window", "-n", name)
 	}
 	return execCommand("tmux", "new-session", "-d", "-s", name)
 }
@@ -47,20 +81,28 @@ func (a *TmuxAdapter) SplitPane(_ context.Context, dir Direction) (PaneID, error
 	if dir == Vertical {
 		flag = "-v"
 	}
-	cmd := execCommand("tmux", "split-window", "-t", a.session, flag)
+	args := []string{"split-window", "-P", "-F", "#{pane_id}"}
+	if a.session != "" {
+		args = append(args, "-t", a.session)
+	}
+	cmd := execCommand("tmux", append(args, flag)...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("tmux: split pane: %w", err)
 	}
-	return PaneID(strings.TrimSpace(string(out))), nil
+	id := strings.TrimSuffix(strings.TrimSuffix(string(out), "\n"), "\r")
+	if err := validateTmuxPaneID(id); err != nil {
+		return "", fmt.Errorf("tmux: split pane: %w", err)
+	}
+	return PaneID(id), nil
 }
 
 // SendCommand sends a shell command to the specified pane.
 func (a *TmuxAdapter) SendCommand(_ context.Context, paneID PaneID, command string) error {
-	if err := validatePaneID(paneID); err != nil {
+	target, err := tmuxPaneTarget(a.session, paneID)
+	if err != nil {
 		return fmt.Errorf("tmux: %w", err)
 	}
-	target := a.session + ":" + string(paneID)
 	if isEnterCommand(command) {
 		cmd := execCommand("tmux", "send-keys", "-t", target, "Enter")
 		if err := cmd.Run(); err != nil {
@@ -86,10 +128,10 @@ func (a *TmuxAdapter) Notify(_ context.Context, message string) error {
 
 // ReadScreen reads pane content via tmux capture-pane.
 func (a *TmuxAdapter) ReadScreen(ctx context.Context, paneID PaneID, opts ReadScreenOpts) (string, error) {
-	if err := validatePaneID(paneID); err != nil {
+	target, err := tmuxPaneTarget(a.session, paneID)
+	if err != nil {
 		return "", fmt.Errorf("tmux: %w", err)
 	}
-	target := a.session + ":" + string(paneID)
 	args := []string{"capture-pane", "-t", target, "-p"}
 	if opts.ScrollbackLines > 0 {
 		args = append(args, "-S", fmt.Sprintf("-%d", opts.ScrollbackLines))
@@ -104,10 +146,10 @@ func (a *TmuxAdapter) ReadScreen(ctx context.Context, paneID PaneID, opts ReadSc
 
 // PipePaneStart starts streaming pane output to a file via tmux pipe-pane.
 func (a *TmuxAdapter) PipePaneStart(_ context.Context, paneID PaneID, outputFile string) error {
-	if err := validatePaneID(paneID); err != nil {
+	target, err := tmuxPaneTarget(a.session, paneID)
+	if err != nil {
 		return fmt.Errorf("tmux: %w", err)
 	}
-	target := a.session + ":" + string(paneID)
 	// SEC-007: shell-escape outputFile to prevent command injection via malicious paths
 	cmd := execCommand("tmux", "pipe-pane", "-t", target, "-O", "cat >> '"+strings.ReplaceAll(outputFile, "'", "'\\''")+"'")
 	if err := cmd.Run(); err != nil {
@@ -118,10 +160,10 @@ func (a *TmuxAdapter) PipePaneStart(_ context.Context, paneID PaneID, outputFile
 
 // PipePaneStop stops pipe-pane output streaming via no-arg pipe-pane.
 func (a *TmuxAdapter) PipePaneStop(_ context.Context, paneID PaneID) error {
-	if err := validatePaneID(paneID); err != nil {
+	target, err := tmuxPaneTarget(a.session, paneID)
+	if err != nil {
 		return fmt.Errorf("tmux: %w", err)
 	}
-	target := a.session + ":" + string(paneID)
 	cmd := execCommand("tmux", "pipe-pane", "-t", target)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("tmux: pipe-pane stop %s: %w", paneID, err)
@@ -132,10 +174,10 @@ func (a *TmuxAdapter) PipePaneStop(_ context.Context, paneID PaneID) error {
 // SendLongText sends text to a pane, using load-buffer/paste-buffer for text >= 500 bytes
 // to avoid tmux send-keys truncation. Does not send Enter — callers handle that.
 func (a *TmuxAdapter) SendLongText(_ context.Context, paneID PaneID, text string) error {
-	if err := validatePaneID(paneID); err != nil {
+	target, err := tmuxPaneTarget(a.session, paneID)
+	if err != nil {
 		return fmt.Errorf("tmux: %w", err)
 	}
-	target := a.session + ":" + string(paneID)
 
 	// Short text: use send-keys without Enter
 	if len(text) < 500 {
@@ -177,8 +219,18 @@ func (a *TmuxAdapter) SendLongText(_ context.Context, paneID PaneID, text string
 	return nil
 }
 
-// Close kills the named tmux session.
+// Close kills a global tmux pane ID or the named tmux session.
 func (a *TmuxAdapter) Close(_ context.Context, name string) error {
+	if strings.HasPrefix(name, "%") {
+		if _, err := tmuxPaneTarget("", PaneID(name)); err != nil {
+			return fmt.Errorf("tmux: %w", err)
+		}
+		cmd := execCommand("tmux", "kill-pane", "-t", name)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("tmux: kill pane %q: %w", name, err)
+		}
+		return nil
+	}
 	cmd := execCommand("tmux", "kill-session", "-t", name)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("tmux: kill session %q: %w", name, err)

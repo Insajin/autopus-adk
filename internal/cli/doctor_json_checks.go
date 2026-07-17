@@ -238,3 +238,41 @@ func (r *doctorJSONReport) collectHygieneChecks(dir string) {
 	r.data.Hygiene = &payload
 	applyHygieneJSON("doctor", hygiene, &r.warnings, &r.checks, &r.status)
 }
+
+// collectContextWeightChecks mirrors the text context-weight guard (REQ-CLD-007)
+// into the JSON report. It is advisory: over-weight warnings are surfaced as
+// warn-status checks but never flip the envelope status, so overall_ok stays
+// true. The guard is silent in repositories without the meta-workspace docs.
+func (r *doctorJSONReport) collectContextWeightChecks(dir string) {
+	rep := measureContextWeight(dir)
+	if rep.PresentCount == 0 {
+		return
+	}
+
+	totalCheck := jsonCheck{
+		ID:       "doctor.context_weight.total",
+		Severity: "info",
+		Status:   "pass",
+		Detail: fmt.Sprintf("context load set %dB across %d docs (soft cap %dB)",
+			rep.TotalBytes, rep.PresentCount, contextWeightTotalWarnBytes),
+	}
+	if rep.OverTotal {
+		totalCheck.Severity = "warning"
+		totalCheck.Status = "warn"
+		totalCheck.Detail = fmt.Sprintf("context load set %dB exceeds %dB soft cap across %d docs",
+			rep.TotalBytes, contextWeightTotalWarnBytes, rep.PresentCount)
+	}
+	r.checks = append(r.checks, totalCheck)
+
+	for _, d := range rep.Docs {
+		if d.OverCap {
+			r.checks = append(r.checks, jsonCheck{
+				ID:       "doctor.context_weight.doc." + d.Name,
+				Severity: "warning",
+				Status:   "warn",
+				Detail: fmt.Sprintf("context doc %s %dB exceeds %dB soft cap",
+					d.Name, d.Bytes, contextWeightPerDocWarnBytes),
+			})
+		}
+	}
+}

@@ -41,6 +41,7 @@ Available Commands:
   skill              Autopus 빌트인 스킬 관리
   spec               SPEC document management
   status             Show SPEC dashboard
+  sync               Multi-repo sync helpers (2-phase commit planning)
   telemetry          Manage pipeline telemetry
   terminal           Terminal multiplexer operations
   test               Run E2E scenarios against the project
