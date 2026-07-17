@@ -35,6 +35,13 @@ func commitWithAtomicSwap(
 ) error {
 	stageDir := filepath.Dir(stagePath)
 	targetDir := filepath.Dir(targetPath)
+	currentInfo, err := os.Lstat(targetPath)
+	if err != nil {
+		return fmt.Errorf("inspect target before atomic commit: %w", err)
+	}
+	if !currentInfo.Mode().IsRegular() || !os.SameFile(expected, currentInfo) {
+		return errors.New("target binary changed before atomic commit")
+	}
 	if err := syncDir(stageDir); err != nil {
 		return fmt.Errorf("sync staged directory: %w", err)
 	}

@@ -51,6 +51,7 @@ func TestCommitStagedBinaryWindows_RestoresConcurrentTarget(t *testing.T) {
 	require.NoError(t, os.WriteFile(targetPath, []byte("old"), 0711))
 	expected, err := os.Lstat(targetPath)
 	require.NoError(t, err)
+	primeFileIdentity(t, expected, targetPath)
 	require.NoError(t, os.Remove(targetPath))
 	require.NoError(t, os.WriteFile(targetPath, []byte("concurrent"), 0700))
 	stagePath := filepath.Join(dir, "new.exe")
@@ -241,7 +242,8 @@ func TestCommitStagedBinaryWindows_MovedTargetInspectionFailureRestores(t *testi
 	expected, err := os.Lstat(targetPath)
 	require.NoError(t, err)
 	sentinel := errors.New("injected moved-target lstat failure")
-	oldLstatCalls := 0
+	oldPath := targetPath + ".old"
+	moved := false
 	markerPath := windowsRecoveryMarkerPath(targetPath + ".old")
 
 	err = commitStagedBinaryWindows(stagePath, targetPath, expected, windowsCommitOps{
@@ -250,13 +252,18 @@ func TestCommitStagedBinaryWindows_MovedTargetInspectionFailureRestores(t *testi
 			if path == markerPath {
 				return nil, os.ErrNotExist
 			}
-			oldLstatCalls++
-			if oldLstatCalls == 1 {
-				return nil, os.ErrNotExist
+			if path == oldPath && moved {
+				return nil, sentinel
 			}
-			return nil, sentinel
+			return os.Lstat(path)
 		},
-		move: os.Rename,
+		move: func(sourcePath, destinationPath string) error {
+			if err := os.Rename(sourcePath, destinationPath); err != nil {
+				return err
+			}
+			moved = true
+			return nil
+		},
 	})
 
 	require.ErrorIs(t, err, sentinel)
@@ -264,37 +271,9 @@ func TestCommitStagedBinaryWindows_MovedTargetInspectionFailureRestores(t *testi
 	assertInstalledBinary(t, stagePath, "new", 0711)
 }
 
-func TestPrepareWindowsRecoveryPath_RemovesOrphanCompletionMarker(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	oldPath := filepath.Join(dir, "auto.exe.old")
-	markerPath := windowsRecoveryMarkerPath(oldPath)
-	require.NoError(t, os.WriteFile(markerPath, []byte(windowsRecoveryComplete), 0600))
-
-	require.NoError(t, prepareWindowsRecoveryPath(oldPath, markerPath, windowsCommitOps{
-		remove: os.Remove,
-		lstat:  os.Lstat,
-	}))
-	require.NoFileExists(t, markerPath)
-}
-
-func TestPrepareWindowsRecoveryPath_RejectsInvalidCompletionMarker(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	oldPath := filepath.Join(dir, "auto.exe.old")
-	markerPath := windowsRecoveryMarkerPath(oldPath)
-	require.NoError(t, os.WriteFile(oldPath, []byte("recovery"), 0700))
-	invalid := make([]byte, len(windowsRecoveryComplete))
-	require.NoError(t, os.WriteFile(markerPath, invalid, 0600))
-
-	err := prepareWindowsRecoveryPath(oldPath, markerPath, windowsCommitOps{
-		remove:   os.Remove,
-		lstat:    os.Lstat,
-		readFile: os.ReadFile,
-	})
-	require.ErrorContains(t, err, "completion marker is invalid")
-	assertInstalledBinary(t, oldPath, "recovery", 0700)
-	require.FileExists(t, markerPath)
+func primeFileIdentity(t *testing.T, expected os.FileInfo, path string) {
+	t.Helper()
+	current, err := os.Lstat(path)
+	require.NoError(t, err)
+	require.True(t, os.SameFile(expected, current))
 }

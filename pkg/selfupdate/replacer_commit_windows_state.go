@@ -22,6 +22,14 @@ func commitStagedBinaryWindows(
 	expected os.FileInfo,
 	ops windowsCommitOps,
 ) error {
+	currentInfo, err := ops.lstat(targetPath)
+	if err != nil {
+		return fmt.Errorf("inspect target binary before Windows commit: %w", err)
+	}
+	if !currentInfo.Mode().IsRegular() || !os.SameFile(expected, currentInfo) {
+		return errors.New("target binary changed before Windows commit")
+	}
+
 	oldPath := targetPath + ".old"
 	markerPath := windowsRecoveryMarkerPath(oldPath)
 	if err := prepareWindowsRecoveryPath(oldPath, markerPath, ops); err != nil {
