@@ -133,6 +133,6 @@ func TestReleaseSigning_WorkflowMaterializesAndPreflightsKeyBeforeGoReleaser(t *
 		t.Fatalf("release signing producer is not checked in: %v", err)
 	}
 	if strings.Contains(workflowSource, "release-k2") {
-		t.Fatal("v0.50.73 workflow must keep K2 offline and sign with K1 only")
+		t.Fatal("v0.50.74 workflow must keep K2 offline and sign with K1 only")
 	}
 }

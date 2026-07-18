@@ -72,16 +72,60 @@ run_main() (
     main
 )
 
+expect_mode_0755() {
+    name=$1
+    target=$2
+    if actual=$(stat -f '%Lp' "$target" 2>/dev/null); then
+        :
+    elif actual=$(stat -c '%a' "$target" 2>/dev/null); then
+        :
+    else
+        printf '  [FAIL] %s: cannot read mode\n' "$name" >&2
+        exit 1
+    fi
+    if [ "$actual" != 755 ]; then
+        printf '  [FAIL] %s: mode %s, want 755\n' "$name" "$actual" >&2
+        exit 1
+    fi
+    printf '  [OK] %s mode 0755\n' "$name"
+}
+
 success_dir="$V1_WORK/install-success"
 if ! success_output=$(run_main "$success_dir" 0.50.73 "$PATH" 2>&1); then
     printf '  [FAIL] normal install: %s\n' "$success_output" >&2
     exit 1
 fi
 test -x "$success_dir/auto"
+expect_mode_0755 "non-sudo install directory" "$success_dir"
+expect_mode_0755 "non-sudo installed binary" "$success_dir/auto"
 case "$success_output" in
     *"릴리스 서명 검증 통과"*"autopus-adk v0.50.73 설치 완료"*) printf '  [OK] normal install UX\n' ;;
     *) printf '  [FAIL] normal install UX: %s\n' "$success_output" >&2; exit 1 ;;
 esac
+
+forced_sudo_dir="$V1_WORK/install-sudo"
+fake_bin="$V1_WORK/fake-bin"
+mkdir "$fake_bin"
+printf '%s\n' '#!/bin/sh' \
+    'for arg do' \
+    '    [ "$arg" = "$AUTOPUS_TEST_FORCE_SUDO_DIR" ] && exit 1' \
+    'done' \
+    'exec "$AUTOPUS_TEST_REAL_MKDIR" "$@"' > "$fake_bin/mkdir"
+printf '%s\n' '#!/bin/sh' \
+    'PATH=$AUTOPUS_TEST_REAL_PATH' \
+    'export PATH' \
+    'exec "$@"' > "$fake_bin/sudo"
+chmod +x "$fake_bin/mkdir" "$fake_bin/sudo"
+AUTOPUS_TEST_FORCE_SUDO_DIR=$forced_sudo_dir
+AUTOPUS_TEST_REAL_MKDIR=$(command -v mkdir)
+AUTOPUS_TEST_REAL_PATH=$PATH
+export AUTOPUS_TEST_FORCE_SUDO_DIR AUTOPUS_TEST_REAL_MKDIR AUTOPUS_TEST_REAL_PATH
+if ! sudo_output=$(run_main "$forced_sudo_dir" 0.50.73 "$fake_bin:$PATH" 2>&1); then
+    printf '  [FAIL] forced sudo install: %s\n' "$sudo_output" >&2
+    exit 1
+fi
+expect_mode_0755 "sudo install directory" "$forced_sudo_dir"
+expect_mode_0755 "sudo installed binary" "$forced_sudo_dir/auto"
 
 expect_main_failure() {
     name=$1

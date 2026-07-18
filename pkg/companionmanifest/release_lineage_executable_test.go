@@ -253,7 +253,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 	source := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage.sh"))
 	for _, pins := range []map[string]string{
 		immutableA0LineagePins, immutableA1LineagePins, immutableA2LineagePins,
-		immutableA3LineagePins,
+		immutableA3LineagePins, immutableA4LineagePins,
 	} {
 		for name, value := range pins {
 			declaration := "readonly " + name + "='" + value + "'"
@@ -264,7 +264,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 	}
 	for _, bypass := range []string{
 		"TEST_PIN", "PIN_FILE", "PIN_OVERRIDE", "GO_WANT_LINEAGE",
-		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_",
+		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_", "COMPANION_A4_",
 	} {
 		if strings.Contains(source, bypass) {
 			t.Fatalf("production lineage exposes test pin bypass %q", bypass)

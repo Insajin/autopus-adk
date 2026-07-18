@@ -213,17 +213,17 @@ main() {
     tar -xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
 
     info "${INSTALL_DIR}/${BINARY} 에 설치 중..."
-    if [ -w "$INSTALL_DIR" ] || { [ ! -e "$INSTALL_DIR" ] && mkdir -p "$INSTALL_DIR" 2>/dev/null; }; then
+    if [ -w "$INSTALL_DIR" ] || { [ ! -e "$INSTALL_DIR" ] && mkdir -m 755 -p "$INSTALL_DIR" 2>/dev/null; }; then
         cp "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-        chmod +x "${INSTALL_DIR}/${BINARY}"
+        chmod 755 "${INSTALL_DIR}/${BINARY}"
         ln -sf "${INSTALL_DIR}/${BINARY}" "${INSTALL_DIR}/${ALIAS}"
         USED_SUDO=""
     else
         echo ""
         echo "  시스템 폴더(${INSTALL_DIR})에 설치하기 위해 관리자 비밀번호가 필요합니다."
-        sudo mkdir -p "$INSTALL_DIR"
+        sudo mkdir -m 755 -p "$INSTALL_DIR"
         sudo cp "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-        sudo chmod +x "${INSTALL_DIR}/${BINARY}"
+        sudo chmod 755 "${INSTALL_DIR}/${BINARY}"
         sudo ln -sf "${INSTALL_DIR}/${BINARY}" "${INSTALL_DIR}/${ALIAS}"
         USED_SUDO="sudo"
     fi

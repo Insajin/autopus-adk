@@ -6,6 +6,7 @@ readonly A1_REPOSITORY='Insajin/autopus-adk' A1_TAG='v0.50.70' A1_VERSION='0.50.
 readonly A2_REPOSITORY='Insajin/autopus-adk' A2_TAG='v0.50.71' A2_VERSION='0.50.71'
 readonly A3_TAG='v0.50.72' A3_VERSION='0.50.72'
 readonly A3_REPOSITORY='Insajin/autopus-adk' A4_TAG='v0.50.73' A4_VERSION='0.50.73'
+readonly A4_REPOSITORY='Insajin/autopus-adk' A5_TAG='v0.50.74' A5_VERSION='0.50.74'
 readonly A0_COMMIT_SHA='7372a484eaf87a07e224476a6161f792b73d7dfb'
 readonly A0_RECEIPT_SHA256='4a588fa4991c515e9520861af5567fd2fe4c19e2c23adb8963bd37ebc46a5bbc'
 readonly A0_SIGNATURE_SHA256='7f248929d807b689acab575888b0a7600bd2ea17cce1e5fcc11f72af9c510173'
@@ -35,6 +36,13 @@ readonly A3_AMD64_ARCHIVE_SHA256='064c994fd739616fabfd7b353511d633d3b73b41912f75
 readonly A3_ARM64_ARCHIVE_SHA256='c218a8df21ac7a7fe459e294942aa9e5b2e676d0a90a644bf486b4452f628a23'
 readonly A3_AMD64_MANIFEST_SHA256='2a88c6f40e8bda35c9342fac496ed424187d25f1fa2ac0be0c714bb10c9c1490'
 readonly A3_ARM64_MANIFEST_SHA256='80243b2fc0409d7743b9a7f94eaa88091ec1c53382b7215169157be314767e7e'
+readonly A4_COMMIT_SHA='334b297f05942accbecdfa15b54e38e005c82f2d'
+readonly A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'
+readonly A4_CHECKSUMS_SHA256='a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1'
+readonly A4_AMD64_ARCHIVE_SHA256='da7f6ef4396591ff0b728f976536d261ecb084038fffab7c7662a6f7329ade2a'
+readonly A4_ARM64_ARCHIVE_SHA256='ff046f6af316236166d514608a1b432c2f3a01efbd8aab03b54d2c2639d2f422'
+readonly A4_AMD64_MANIFEST_SHA256='86940b9c7eb89308aff4260d9a6178d933d3f1a9833e601ac8c1e914c225a7b5'
+readonly A4_ARM64_MANIFEST_SHA256='a68a10a46b0778ccc858855323fd45cf0b9727f76fa45b16efdbc83b320128f0'
 readonly BUNDLE_NAME='adk-companion-public-key-receipt.bundle' RECEIPT_NAME='public-key-receipt.json'
 readonly SIGNATURE_NAME='public-key-receipt.sig' MANIFEST_NAME='adk-companion-manifest.json'
 readonly MANIFEST_SIGNATURE_NAME='adk-companion-manifest.sig'
@@ -43,13 +51,6 @@ readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 readonly LOCAL_EVIDENCE_ERROR='fixture_or_local_evidence_forbidden'
 fail() { printf 'companion release lineage: %s: %s\n' "$1" "$2" >&2; exit 1; }
 require_environment() { local name="$1"; [[ -n "${!name-}" ]] || fail prior_evidence_unverifiable "missing ${name}"; }
-sha256_file() {
-  local output digest
-  output=$(shasum -a 256 "$1") || return 1; digest="${output%%[[:space:]]*}"
-  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
-  printf 'sha256:%s' "$digest"
-}
-nonzero_hex() { [[ "$1" =~ ^[0-9a-f]{$2}$ && -n "${1//0/}" ]]; }
 require_environment GITHUB_REF_NAME
 COMPANION_VERSION="${GITHUB_REF_NAME#v}"
 if [[ "$GITHUB_REF_NAME" == 'v0.50.69' && "$COMPANION_VERSION" == '0.50.69' ]]; then
@@ -74,15 +75,22 @@ elif [[ "$GITHUB_REF_NAME" == "$A3_TAG" && "$COMPANION_VERSION" == "$A3_VERSION"
 elif [[ "$GITHUB_REF_NAME" == "$A4_TAG" && "$COMPANION_VERSION" == "$A4_VERSION" ]]; then
   release_phase='A4' prior_phase='A3' prior_repository="$A3_REPOSITORY" prior_evidence_source='immutable A3 GitHub release' prior_tag="$A3_TAG" prior_version="$A3_VERSION" prior_commit="$A3_COMMIT_SHA"
   prior_tag_object="$A3_TAG_OBJECT_SHA" prior_checksums="$A3_CHECKSUMS_SHA256" prior_amd64_archive="$A3_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A3_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A3_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A3_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A5_TAG" && "$COMPANION_VERSION" == "$A5_VERSION" ]]; then
+  release_phase='A5' prior_phase='A4' prior_repository="$A4_REPOSITORY" prior_evidence_source='immutable A4 GitHub release' prior_tag="$A4_TAG" prior_version="$A4_VERSION" prior_commit="$A4_COMMIT_SHA"
+  prior_tag_object="$A4_TAG_OBJECT_SHA" prior_checksums="$A4_CHECKSUMS_SHA256" prior_amd64_archive="$A4_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A4_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A4_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A4_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5 policy'
 fi
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd); archive_helper="$script_dir/verify-public-key-lineage-archive.sh"
+[[ -f "$archive_helper" && ! -L "$archive_helper" ]] || fail prior_evidence_unverifiable 'lineage archive verifier is invalid'
+# shellcheck source=verify-public-key-lineage-archive.sh
+source "$archive_helper"
 nonzero_hex "$prior_commit" 40 || fail prior_evidence_unverifiable "${prior_phase} commit pin is not provisioned; ${LOCAL_EVIDENCE_ERROR}"
 for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
   "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
   nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
 done
-if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' ]]; then
+if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' ]]; then
   nonzero_hex "$prior_tag_object" 40 || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
   for pin in "$prior_amd64_archive" "$prior_arm64_archive"; do
     nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"
@@ -125,9 +133,7 @@ cleanup() {
 trap cleanup EXIT; trap 'exit 1' HUP INT TERM
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/adk-public-key-lineage.XXXXXX") \
   || fail prior_evidence_unverifiable 'cannot allocate verification workspace'
-release_json="$temp_dir/prior-release.json"
-tag_ref_json="$temp_dir/prior-tag-ref.json"
-commit_json="$temp_dir/prior-commit.json"
+release_json="$temp_dir/prior-release.json" tag_ref_json="$temp_dir/prior-tag-ref.json" commit_json="$temp_dir/prior-commit.json"
 env -i PATH="$PATH" HOME="${HOME-}" GITHUB_TOKEN="$GITHUB_TOKEN" \
   gh api "repos/$prior_repository/releases/tags/$prior_tag" >"$release_json" \
   || fail prior_evidence_absent "cannot obtain ${prior_evidence_source} metadata"
@@ -205,12 +211,6 @@ for asset in "$PRIOR_AMD64_ASSET" "$PRIOR_ARM64_ASSET" "$CHECKSUMS_NAME"; do
   [[ -z "$archive_pin" || "$actual_asset_digest" == "sha256:$archive_pin" ]] \
     || fail prior_archive_digest_mismatch "${prior_phase} archive differs from its pin: ${asset}"
 done
-script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-archive_helper="$script_dir/verify-public-key-lineage-archive.sh"
-[[ -f "$archive_helper" && ! -L "$archive_helper" ]] \
-  || fail prior_evidence_unverifiable 'lineage archive verifier is invalid'
-# shellcheck source=verify-public-key-lineage-archive.sh
-source "$archive_helper"
 extract_bundle "$download_dir/$PRIOR_AMD64_ASSET" "$temp_dir/amd64" amd64 \
   "$prior_amd64_manifest"
 extract_bundle "$download_dir/$PRIOR_ARM64_ASSET" "$temp_dir/arm64" arm64 \

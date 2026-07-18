@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+sha256_file() {
+  local output digest
+  output=$(shasum -a 256 "$1") || return 1
+  digest="${output%%[[:space:]]*}"
+  [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf 'sha256:%s' "$digest"
+}
+
+nonzero_hex() { [[ "$1" =~ ^[0-9a-f]{$2}$ && -n "${1//0/}" ]]; }
+
 extract_bundle() {
   local archive="$1" output_dir="$2" architecture="$3" manifest_pin="$4"
   local listing="$output_dir/archive-entries"
