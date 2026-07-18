@@ -58,7 +58,10 @@ func rewriteLineageArchive(
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
-	gzipWriter := gzip.NewWriter(&output)
+	gzipWriter, err := gzip.NewWriterLevel(&output, gzip.BestSpeed)
+	if err != nil {
+		t.Fatal(err)
+	}
 	tarWriter := tar.NewWriter(gzipWriter)
 	for _, entry := range entries {
 		entryData, keep := mutate(entry.header.Name, append([]byte(nil), entry.data...))
