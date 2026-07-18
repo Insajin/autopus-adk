@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **v0.50.74 companion A5 릴리스 계보와 설치 권한 하드닝** (2026-07-18): 릴리스 워크플로를 정확한 `v0.50.74` 태그와 보호 환경에만 열고, A5가 immutable `v0.50.73`의 commit, annotated tag object, checksums, Darwin archive와 manifest pin을 직접 검증하도록 확장했다. A0부터 이어진 공개키 receipt/signature/record 바이트는 그대로 유지하며, Homebrew는 고정된 `v0.50.73` Cask blob에서 canonical `v0.50.74` Cask로만 CAS 갱신하고 `v0.50.71` Formula는 계속 동결한다. POSIX 설치기는 `umask 077`과 sudo 경로에서도 설치 디렉터리와 바이너리의 최종 권한을 `0755`로 보장하며 두 경로의 mode oracle을 추가했다. 이 항목은 릴리스 준비 코드이며 태그 생성, 환경 source pin 갱신, 실제 서명·공증·게시 완료를 뜻하지 않는다.
+
 - **v0.50.73 companion A4 릴리스 계보 준비** (2026-07-17): 릴리스 워크플로를 정확한 `v0.50.73` 태그와 보호 환경에만 열고, A4가 immutable `v0.50.72`의 commit, annotated tag object, checksums, Darwin archive와 manifest pin을 직접 검증하도록 확장했다. A0부터 이어진 공개키 receipt/signature/record 바이트는 그대로 재게시하며, Homebrew는 고정된 `v0.50.72` Cask blob에서 canonical `v0.50.73` Cask로만 CAS 갱신하고 `v0.50.71` Formula는 호출하거나 변경하지 않는다. 이 항목은 릴리스 준비 코드이며 태그 생성, 환경 source pin 갱신, 실제 서명·공증·게시 완료를 뜻하지 않는다.
 
 - **Codex SPEC 리뷰 응답 수집 안정화** (2026-07-17): pane이 기본인 환경에서도 `codex exec` 프로바이더는 실행 전에 subprocess 수집 경로를 선택해 최종 응답 파일을 직접 읽으며, 응답을 별도 pane 파일에 쓰지 않았다는 이유로 전체 제한 시간까지 대기하던 문제를 제거했다. 명시적 `--timeout`은 provider 실행 예산에도 동일하게 적용되고, timeout 상태는 원문 stdout·stderr·경로·비밀값 없이 source, budget, elapsed, collection mode, partial-output 여부만 구조화해 기록한다. Claude, Gemini, Codex 비-`exec`, 강제 subprocess 경로는 기존 동작을 유지한다.

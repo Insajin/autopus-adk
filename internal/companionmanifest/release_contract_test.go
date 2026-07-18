@@ -10,10 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestReleaseWorkflow_ExactA4ProtectedEnvironmentAndImmutableActions(t *testing.T) {
+func TestReleaseWorkflow_ExactA5ProtectedEnvironmentAndImmutableActions(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"v0.50.73", "refs/tags/v0.50.73",
+		"v0.50.74", "refs/tags/v0.50.74",
 		"environment:", "adk-companion-release",
 	} {
 		if !strings.Contains(release, required) {
@@ -24,11 +24,11 @@ func TestReleaseWorkflow_ExactA4ProtectedEnvironmentAndImmutableActions(t *testi
 		t.Fatal("arbitrary version tags can enter the protected release job")
 	}
 	for _, forbidden := range []string{
-		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'",
-		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72",
+		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'",
+		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73",
 	} {
 		if strings.Contains(release, forbidden) {
-			t.Fatalf("historical tag %q can enter the A4 release workflow", forbidden)
+			t.Fatalf("historical tag %q can enter the A5 release workflow", forbidden)
 		}
 	}
 	immutable := regexp.MustCompile(`^[^@[:space:]]+@[0-9a-f]{40}$`)
@@ -138,6 +138,24 @@ func TestReleaseSourceValidator_A4PinsAnnotatedTagAndA3Ancestor(t *testing.T) {
 	}
 }
 
+func TestReleaseSourceValidator_A5PinsAnnotatedTagAndA4Ancestor(t *testing.T) {
+	source := readReleaseFile(t, "scripts/companion-release/validate-source.sh")
+	declaration := "readonly A5_A4_ANCESTOR_SHA='334b297f05942accbecdfa15b54e38e005c82f2d'"
+	if strings.Count(source, declaration) != 1 {
+		t.Fatalf("A5 immutable A4 ancestry pin drifted: %s", declaration)
+	}
+	for _, required := range []string{
+		`git cat-file -t "refs/tags/$GITHUB_REF_NAME"`,
+		`git merge-base --is-ancestor "$A5_A4_ANCESTOR_SHA" "$GITHUB_SHA"`,
+		`[[ "$tag_object_type" == 'tag' ]]`,
+		"COMPANION_APPROVED_SOURCE_COMMIT", "COMPANION_APPROVED_SOURCE_TREE",
+	} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("A5 source gate missing %q", required)
+		}
+	}
+}
+
 func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	releaseIndex := strings.Index(release, "goreleaser release --clean")
@@ -147,8 +165,8 @@ func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *t
 		t.Fatalf("Homebrew bridge ordering release=%d bridge=%d cleanup=%d", releaseIndex, bridgeIndex, cleanupIndex)
 	}
 	for _, exact := range []string{
-		"GITHUB_REF_NAME='v0.50.73'",
-		"COMPANION_VERSION='0.50.73'",
+		"GITHUB_REF_NAME='v0.50.74'",
+		"COMPANION_VERSION='0.50.74'",
 		"COMPANION_CHECKSUMS_PATH='dist/checksums.txt'",
 		`HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN"`,
 	} {
