@@ -104,6 +104,7 @@ func NewRootCmd() *cobra.Command {
 	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-CODEOPS-ADK-001: registers the public `auto delivery` namespace for supervised delivery contract checks.
 	// @AX:REASON: Backend/Desktop delivery gates and CLI tests depend on local dry-run planning and envelope validation staying reachable.
 	root.AddCommand(newDeliveryCmd())
+	root.AddCommand(newReviewCmd())
 	// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-AUTO-MEM-001: registers the public `auto mem` namespace for memory projection workflows.
 	// @AX:REASON: External CLI users and integration tests depend on rebuild/search/context/status subcommands staying reachable.
 	root.AddCommand(newMemCmd())
