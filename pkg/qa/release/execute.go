@@ -97,13 +97,7 @@ const timeFormat = "2006-01-02T15:04:05.999999999Z07:00"
 
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-004: default release execution delegates lanes to QAMESH run and emits codex feedback bundle refs.
 func (defaultLaneRunner) RunLane(opts Options, lane string) (LaneRunResult, error) {
-	result, err := qarun.Execute(qarun.Options{
-		ProjectDir: opts.ProjectDir,
-		Profile:    opts.Profile,
-		Lane:       lane,
-		Output:     opts.RunOutputRoot,
-		FeedbackTo: "codex",
-	})
+	result, err := qarun.Execute(qarunOptionsForLane(opts, lane))
 	if result.RunID != "" {
 		_ = os.RemoveAll(filepath.Join(opts.RunOutputRoot, result.RunID, "_raw"))
 	}
@@ -117,6 +111,17 @@ func (defaultLaneRunner) RunLane(opts Options, lane string) (LaneRunResult, erro
 		FailureSummary:  failureSummary,
 		RedactionStatus: mapRunRedaction(result.RedactionStatus.Status),
 	}, err
+}
+
+func qarunOptionsForLane(opts Options, lane string) qarun.Options {
+	return qarun.Options{
+		ProjectDir:      opts.ProjectDir,
+		Profile:         opts.Profile,
+		Lane:            lane,
+		Output:          opts.RunOutputRoot,
+		FeedbackTo:      "codex",
+		RuntimeProvider: opts.RuntimeProvider,
+	}
 }
 
 func executionOutputPaths(opts Options, releaseID string) OutputPaths {
@@ -175,6 +180,9 @@ func runResultLaneRow(policy ProfilePolicy, lane string, result LaneRunResult, e
 	catalog := laneByID(lane)
 	status := result.Status
 	if status == "" {
+		status = LaneStatusBlocked
+	}
+	if result.RedactionStatus == RedactionBlocked {
 		status = LaneStatusBlocked
 	}
 	row := LaneRow{

@@ -3,6 +3,7 @@ package release
 import (
 	"path/filepath"
 
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
 	qaproject "github.com/insajin/autopus-adk/pkg/qa/project"
 )
@@ -17,6 +18,9 @@ func BuildPlan(opts Options) (Plan, error) {
 	policy, _ := profilePolicy(opts.Profile)
 	packs, err := journey.LoadDir(opts.ProjectDir)
 	if err != nil {
+		return Plan{}, err
+	}
+	if err := validateReleaseRuntimeProvider(opts.RuntimeProvider, packs); err != nil {
 		return Plan{}, err
 	}
 	journeyRows, redactionStatus := journeyPackRows(packs)
@@ -115,7 +119,7 @@ func journeyPackRows(packs []journey.Pack) ([]JourneyPackRow, RedactionState) {
 				CommandDeclared:        commandDeclared(pack.Command),
 				CommandPreview:         preview,
 				CommandPreviewRedacted: redacted,
-				Executable:             commandDeclared(pack.Command),
+				Executable:             executableReleasePack(pack),
 				SourceSpec:             sourceSpecForPack(pack, lane),
 				AcceptanceRefs:         nonNilStrings(pack.SourceRefs.AcceptanceRefs),
 				InventedCommand:        false,
@@ -135,7 +139,7 @@ func nonNilStrings(values []string) []string {
 func releaseSetupGaps(policy ProfilePolicy, journeyRows []JourneyPackRow) []SetupGapRow {
 	covered := map[string]bool{}
 	for _, row := range journeyRows {
-		if row.CommandDeclared && row.Executable {
+		if row.Executable {
 			covered[row.Lane] = true
 		}
 	}
@@ -201,6 +205,22 @@ func sourceLabel(value string) string {
 
 func commandDeclared(command journey.Command) bool {
 	return len(command.Argv) > 0 || command.Run != ""
+}
+
+func executableReleasePack(pack journey.Pack) bool {
+	return commandDeclared(pack.Command) || pack.Adapter.ID == "desktop-accessibility-observe"
+}
+
+func validateReleaseRuntimeProvider(provider desktopobserve.RuntimeProvider, packs []journey.Pack) error {
+	if provider != "" && provider != desktopobserve.RuntimeProviderLocal && provider != desktopobserve.RuntimeProviderOrca {
+		return desktopobserve.ErrRuntimeProviderInvalid
+	}
+	for _, pack := range packs {
+		if pack.Adapter.ID == "desktop-accessibility-observe" && provider == "" {
+			return desktopobserve.ErrRuntimeProviderRequired
+		}
+	}
+	return nil
 }
 
 func sourceSpecForPack(pack journey.Pack, lane string) string {

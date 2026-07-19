@@ -200,9 +200,9 @@ func domainScenarioCount(domain qaFullDomainReadiness) int {
 }
 
 func qaFullNextCommands(opts qaFullOptions, plan qarelease.Plan, domain qaFullDomainReadiness) []string {
-	commands := []string{qaFullCommandString(qaFullOptions{ProjectDir: opts.ProjectDir, Profile: plan.Profile, Output: opts.Output, RunOutputRoot: opts.RunOutputRoot, Run: true}, false)}
+	commands := []string{qaFullCommandString(qaFullOptions{ProjectDir: opts.ProjectDir, Profile: plan.Profile, Output: opts.Output, RunOutputRoot: opts.RunOutputRoot, Run: true, RuntimeProviders: opts.RuntimeProviders}, false)}
 	if len(plan.JourneyPacks) == 0 || len(plan.SetupGaps) > 0 {
-		commands = append(commands, qaFullCommandString(qaFullOptions{ProjectDir: opts.ProjectDir, Profile: plan.Profile, Output: opts.Output, RunOutputRoot: opts.RunOutputRoot, Bootstrap: true}, false))
+		commands = append(commands, qaFullCommandString(qaFullOptions{ProjectDir: opts.ProjectDir, Profile: plan.Profile, Output: opts.Output, RunOutputRoot: opts.RunOutputRoot, Bootstrap: true, RuntimeProviders: opts.RuntimeProviders}, false))
 		commands = append(commands, "auto qa init --project-dir "+shellWord(opts.ProjectDir)+" --format json")
 	}
 	if domain.Status != "ready" {
@@ -232,8 +232,8 @@ func qaFullProjectCandidateCommands(opts qaFullOptions, candidates []qaFullProje
 		if project == "" {
 			project = candidate.ProjectDir
 		}
-		commands = append(commands, qaFullCommandString(qaFullOptions{ProjectDir: project, Profile: opts.Profile, Bootstrap: true}, true))
-		commands = append(commands, qaFullCommandString(qaFullOptions{ProjectDir: project, Profile: opts.Profile}, true))
+		commands = append(commands, qaFullCommandString(qaFullOptions{ProjectDir: project, Profile: opts.Profile, Bootstrap: true, RuntimeProviders: opts.RuntimeProviders}, true))
+		commands = append(commands, qaFullCommandString(qaFullOptions{ProjectDir: project, Profile: opts.Profile, RuntimeProviders: opts.RuntimeProviders}, true))
 	}
 	return uniqueCommands(commands)
 }
@@ -257,6 +257,9 @@ func qaFullCommandString(opts qaFullOptions, jsonMode bool) string {
 	}
 	if opts.RunOutputRoot != "" {
 		parts = append(parts, "--run-output", shellWord(opts.RunOutputRoot))
+	}
+	if len(opts.RuntimeProviders) == 1 {
+		parts = append(parts, "--runtime-provider", opts.RuntimeProviders[0])
 	}
 	if jsonMode {
 		parts = append(parts, "--format", "json")

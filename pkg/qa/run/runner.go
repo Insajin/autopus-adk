@@ -173,6 +173,9 @@ func selectedPacks(opts Options) ([]journey.Pack, error) {
 
 func executePack(opts Options, pack journey.Pack, rawRoot, runDir string) (AdapterResult, string, []IndexCheck) {
 	check := IndexCheck{ID: firstCheckID(pack), JourneyID: pack.ID, Adapter: pack.Adapter.ID, Expected: "exit_code=0"}
+	if pack.Adapter.ID == "desktop-accessibility-observe" {
+		return executeDesktopObservationPack(opts, pack, runDir)
+	}
 	if gap := setupGapFor(opts, pack); gap != nil {
 		check.Status = "skipped"
 		return AdapterResult{Adapter: pack.Adapter.ID, JourneyID: pack.ID, Status: "skipped", SetupGap: gap}, "", []IndexCheck{check}

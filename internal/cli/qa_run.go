@@ -25,28 +25,37 @@ func newQARunCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.Output, "output", "", "Run output root")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Plan without executing adapters")
 	cmd.Flags().BoolVar(&opts.ManagedDevice, "managed-device", false, "Opt into managed device boot/install for the mobile-scripted lane")
+	cmd.Flags().StringArrayVar(&opts.RuntimeProviders, "runtime-provider", nil, "Desktop observation runtime provider (local or orca; exactly one)")
 	cmd.Flags().StringVar(&opts.FeedbackTo, "feedback-to", "", "Feedback target")
 	addJSONFlags(cmd, &opts.JSONOut, &opts.Format)
 	return cmd
 }
 
 type qaRunOptions struct {
-	ProjectDir    string
-	Profile       string
-	Lane          string
-	JourneyID     string
-	AdapterID     string
-	Output        string
-	DryRun        bool
-	ManagedDevice bool
-	FeedbackTo    string
-	JSONOut       bool
-	Format        string
+	ProjectDir       string
+	Profile          string
+	Lane             string
+	JourneyID        string
+	AdapterID        string
+	Output           string
+	DryRun           bool
+	ManagedDevice    bool
+	RuntimeProviders []string
+	FeedbackTo       string
+	JSONOut          bool
+	Format           string
 }
 
 func runQARun(cmd *cobra.Command, opts qaRunOptions) error {
 	jsonMode, err := resolveJSONMode(opts.JSONOut, opts.Format)
 	if err != nil {
+		return err
+	}
+	runtimeProvider, err := parseQARuntimeProvider(cmd, jsonMode, opts.RuntimeProviders)
+	if err != nil {
+		return err
+	}
+	if err := requireQARuntimeProvider(cmd, jsonMode, runtimeProvider, runRequiresQARuntimeProvider(opts)); err != nil {
 		return err
 	}
 	if opts.Output != "" {
@@ -55,15 +64,16 @@ func runQARun(cmd *cobra.Command, opts qaRunOptions) error {
 		}
 	}
 	result, err := qarun.Execute(qarun.Options{
-		ProjectDir:    opts.ProjectDir,
-		Profile:       opts.Profile,
-		Lane:          opts.Lane,
-		JourneyID:     opts.JourneyID,
-		AdapterID:     opts.AdapterID,
-		Output:        opts.Output,
-		DryRun:        opts.DryRun,
-		ManagedDevice: opts.ManagedDevice,
-		FeedbackTo:    opts.FeedbackTo,
+		ProjectDir:      opts.ProjectDir,
+		Profile:         opts.Profile,
+		Lane:            opts.Lane,
+		JourneyID:       opts.JourneyID,
+		AdapterID:       opts.AdapterID,
+		Output:          opts.Output,
+		DryRun:          opts.DryRun,
+		ManagedDevice:   opts.ManagedDevice,
+		RuntimeProvider: runtimeProvider,
+		FeedbackTo:      opts.FeedbackTo,
 	})
 	if err != nil {
 		if jsonMode {

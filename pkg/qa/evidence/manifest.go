@@ -1,11 +1,14 @@
 package evidence
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 )
 
 func LoadManifest(path string) (Manifest, error) {
@@ -13,11 +16,73 @@ func LoadManifest(path string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
+	if err := rejectManifestDuplicateKeys(body); err != nil {
+		return Manifest{}, fmt.Errorf("parse manifest: %w", err)
+	}
 	var manifest Manifest
 	if err := json.Unmarshal(body, &manifest); err != nil {
 		return Manifest{}, fmt.Errorf("parse manifest: %w", err)
 	}
+	if isDesktopObservationContract(manifest) || hasDesktopObservationJSONMarker(body) {
+		return decodeDesktopObservationManifest(body)
+	}
 	return manifest, nil
+}
+
+func decodeDesktopObservationManifest(body []byte) (Manifest, error) {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	var manifest Manifest
+	if err := decoder.Decode(&manifest); err != nil {
+		if strings.Contains(err.Error(), "unknown field") {
+			return Manifest{}, fmt.Errorf("parse Q12 manifest: %w: %v", desktopobserve.ErrUnknownField, err)
+		}
+		return Manifest{}, fmt.Errorf("parse Q12 manifest: %w", err)
+	}
+	if err := requireManifestJSONEOF(decoder); err != nil {
+		return Manifest{}, fmt.Errorf("parse Q12 manifest: %w", err)
+	}
+	if manifest.OracleResults.DesktopObservation == nil {
+		return Manifest{}, fmt.Errorf("validate Q12 manifest: desktop observation typed oracle is required")
+	}
+	raw, err := rawDesktopObservation(body)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("parse Q12 manifest: %w", err)
+	}
+	observation, err := desktopobserve.DecodeObservationEvidence(raw)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("parse Q12 manifest: %w", err)
+	}
+	manifest.OracleResults.DesktopObservation = &observation
+	if err := manifest.Validate(); err != nil {
+		return Manifest{}, fmt.Errorf("validate Q12 manifest: %w", err)
+	}
+	return manifest, nil
+}
+
+func rawDesktopObservation(body []byte) ([]byte, error) {
+	var document struct {
+		OracleResults struct {
+			DesktopObservation json.RawMessage `json:"desktop_observation"`
+		} `json:"oracle_results"`
+	}
+	if err := json.Unmarshal(body, &document); err != nil || len(document.OracleResults.DesktopObservation) == 0 {
+		return nil, desktopobserve.ErrMalformedEnvelope
+	}
+	return document.OracleResults.DesktopObservation, nil
+}
+
+func hasDesktopObservationJSONMarker(body []byte) bool {
+	var document map[string]json.RawMessage
+	if json.Unmarshal(body, &document) != nil {
+		return false
+	}
+	var oracleResults map[string]json.RawMessage
+	if json.Unmarshal(document["oracle_results"], &oracleResults) != nil {
+		return false
+	}
+	_, exists := oracleResults["desktop_observation"]
+	return exists
 }
 
 func ResolveArtifactPaths(manifest Manifest, baseDir string) (Manifest, error) {
@@ -102,6 +167,16 @@ func WriteFinalManifest(manifest Manifest, outputDir string) (string, error) {
 		return "", err
 	}
 	normalized := manifest
+	desktopObservation := isDesktopObservationContract(manifest)
+	var desktopObservationBody []byte
+	if desktopObservation {
+		observation, canonicalBody, err := canonicalDesktopObservation(*manifest.OracleResults.DesktopObservation)
+		if err != nil {
+			return "", err
+		}
+		normalized.OracleResults.DesktopObservation = &observation
+		desktopObservationBody = canonicalBody
+	}
 	normalized.Artifacts = make([]ArtifactRef, 0, len(manifest.Artifacts))
 	parentDir := filepath.Dir(outputDir)
 	if err := os.MkdirAll(parentDir, 0o755); err != nil {
@@ -118,11 +193,40 @@ func WriteFinalManifest(manifest Manifest, outputDir string) (string, error) {
 		}
 	}()
 	for _, artifact := range manifest.Artifacts {
-		copied, err := sanitizeArtifact(artifact, tempDir)
+		var copied ArtifactRef
+		if desktopObservation {
+			copied, err = copyDesktopObservationArtifact(artifact, desktopObservationBody, tempDir)
+		} else {
+			copied, err = sanitizeArtifact(artifact, tempDir)
+		}
 		if err != nil {
 			return "", err
 		}
 		normalized.Artifacts = append(normalized.Artifacts, copied)
+	}
+	path := filepath.Join(tempDir, "manifest.json")
+	body, err := json.MarshalIndent(normalized, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	text := string(body)
+	if desktopObservation {
+		if RedactText(text) != text {
+			return "", fmt.Errorf("desktop observation requires publication-time redaction to be a no-op")
+		}
+	} else {
+		text = RedactText(text)
+	}
+	if err := AssertSafeText(text, path); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, append([]byte(text), '\n'), 0o644); err != nil {
+		return "", err
+	}
+	if desktopObservation {
+		if err := scanDesktopObservationPublication(tempDir, normalized); err != nil {
+			return "", err
+		}
 	}
 	if entries, err := os.ReadDir(outputDir); err == nil {
 		if len(entries) > 0 {
@@ -132,18 +236,6 @@ func WriteFinalManifest(manifest Manifest, outputDir string) (string, error) {
 			return "", err
 		}
 	} else if !os.IsNotExist(err) {
-		return "", err
-	}
-	path := filepath.Join(tempDir, "manifest.json")
-	body, err := json.MarshalIndent(normalized, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	text := RedactText(string(body))
-	if err := AssertSafeText(text, path); err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(path, append([]byte(text), '\n'), 0o644); err != nil {
 		return "", err
 	}
 	if err := os.Rename(tempDir, outputDir); err != nil {

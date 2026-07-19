@@ -12,14 +12,15 @@ import (
 )
 
 type qaFullOptions struct {
-	ProjectDir    string
-	Profile       string
-	Output        string
-	RunOutputRoot string
-	Run           bool
-	Bootstrap     bool
-	JSONOut       bool
-	Format        string
+	ProjectDir       string
+	Profile          string
+	Output           string
+	RunOutputRoot    string
+	Run              bool
+	Bootstrap        bool
+	RuntimeProviders []string
+	JSONOut          bool
+	Format           string
 }
 
 func newQAFullCmd() *cobra.Command {
@@ -38,6 +39,7 @@ func newQAFullCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.RunOutputRoot, "run-output", "", "QAMESH run output root")
 	cmd.Flags().BoolVar(&opts.Run, "run", false, "Execute the full gate instead of planning only")
 	cmd.Flags().BoolVar(&opts.Bootstrap, "bootstrap", false, "Create safe QA starter files before planning or running")
+	cmd.Flags().StringArrayVar(&opts.RuntimeProviders, "runtime-provider", nil, "Desktop observation runtime provider (local or orca; exactly one)")
 	addJSONFlags(cmd, &opts.JSONOut, &opts.Format)
 	return cmd
 }
@@ -45,6 +47,13 @@ func newQAFullCmd() *cobra.Command {
 func runQAFull(cmd *cobra.Command, opts qaFullOptions) error {
 	jsonMode, err := resolveJSONMode(opts.JSONOut, opts.Format)
 	if err != nil {
+		return err
+	}
+	runtimeProvider, err := parseQARuntimeProvider(cmd, jsonMode, opts.RuntimeProviders)
+	if err != nil {
+		return err
+	}
+	if err := requireQARuntimeProvider(cmd, jsonMode, runtimeProvider, projectRequiresQARuntimeProvider(opts.ProjectDir)); err != nil {
 		return err
 	}
 	if opts.Output != "" {
@@ -71,6 +80,9 @@ func runQAFull(cmd *cobra.Command, opts qaFullOptions) error {
 	if selection != nil && selection.ProjectDir != "" {
 		opts.ProjectDir = selection.ProjectDir
 	}
+	if err := requireQARuntimeProvider(cmd, jsonMode, runtimeProvider, projectRequiresQARuntimeProvider(opts.ProjectDir)); err != nil {
+		return err
+	}
 	var bootstrap *qascaffold.Result
 	if opts.Bootstrap {
 		result, err := qascaffold.Init(qascaffold.Options{
@@ -85,11 +97,12 @@ func runQAFull(cmd *cobra.Command, opts qaFullOptions) error {
 		bootstrap = &result
 	}
 	releaseOpts := qarelease.Options{
-		ProjectDir:    opts.ProjectDir,
-		Profile:       opts.Profile,
-		Output:        opts.Output,
-		RunOutputRoot: opts.RunOutputRoot,
-		Command:       qaFullCommandString(opts, jsonMode),
+		ProjectDir:      opts.ProjectDir,
+		Profile:         opts.Profile,
+		Output:          opts.Output,
+		RunOutputRoot:   opts.RunOutputRoot,
+		Command:         qaFullCommandString(opts, jsonMode),
+		RuntimeProvider: runtimeProvider,
 	}
 	domain := loadQAFullDomainReadiness(opts.ProjectDir)
 	if opts.Run {

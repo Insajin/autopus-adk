@@ -26,25 +26,35 @@ func newQAReleaseCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.RunOutputRoot, "run-output", "", "QAMESH run output root")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Plan without executing lanes")
 	cmd.Flags().BoolVar(&opts.Roadmap, "roadmap", false, "Print release QA roadmap")
+	cmd.Flags().StringArrayVar(&opts.RuntimeProviders, "runtime-provider", nil, "Desktop observation runtime provider (local or orca; exactly one)")
 	addJSONFlags(cmd, &opts.JSONOut, &opts.Format)
 	return cmd
 }
 
 type qaReleaseOptions struct {
-	ProjectDir    string
-	Profile       string
-	Output        string
-	RunOutputRoot string
-	DryRun        bool
-	Roadmap       bool
-	JSONOut       bool
-	Format        string
+	ProjectDir       string
+	Profile          string
+	Output           string
+	RunOutputRoot    string
+	DryRun           bool
+	Roadmap          bool
+	RuntimeProviders []string
+	JSONOut          bool
+	Format           string
 }
 
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-004: CLI release command is the user-facing release gate orchestration boundary.
 func runQARelease(cmd *cobra.Command, opts qaReleaseOptions) error {
 	jsonMode, err := resolveJSONMode(opts.JSONOut, opts.Format)
 	if err != nil {
+		return err
+	}
+	runtimeProvider, err := parseQARuntimeProvider(cmd, jsonMode, opts.RuntimeProviders)
+	if err != nil {
+		return err
+	}
+	required := !opts.Roadmap && projectRequiresQARuntimeProvider(opts.ProjectDir)
+	if err := requireQARuntimeProvider(cmd, jsonMode, runtimeProvider, required); err != nil {
 		return err
 	}
 	if opts.Output != "" {
@@ -65,12 +75,13 @@ func runQARelease(cmd *cobra.Command, opts qaReleaseOptions) error {
 		return qaReleaseJSONError(cmd, jsonMode, err, "qa_release_invalid_profile", map[string]any{"profile": opts.Profile})
 	}
 	releaseOpts := qarelease.Options{
-		ProjectDir:    opts.ProjectDir,
-		Profile:       opts.Profile,
-		Output:        opts.Output,
-		RunOutputRoot: opts.RunOutputRoot,
-		Command:       command,
-		DryRun:        opts.DryRun,
+		ProjectDir:      opts.ProjectDir,
+		Profile:         opts.Profile,
+		Output:          opts.Output,
+		RunOutputRoot:   opts.RunOutputRoot,
+		Command:         command,
+		DryRun:          opts.DryRun,
+		RuntimeProvider: runtimeProvider,
 	}
 	if opts.DryRun {
 		plan, err := qarelease.BuildPlan(releaseOpts)
@@ -119,6 +130,9 @@ func releaseCommandString(opts qaReleaseOptions, jsonMode bool) string {
 	}
 	if opts.Roadmap {
 		parts = append(parts, "--roadmap")
+	}
+	if len(opts.RuntimeProviders) == 1 {
+		parts = append(parts, "--runtime-provider", opts.RuntimeProviders[0])
 	}
 	if jsonMode {
 		parts = append(parts, "--format", "json")

@@ -1,6 +1,7 @@
 package journey
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,7 +41,15 @@ func LoadFile(path string) (Pack, error) {
 	if err := yaml.Unmarshal(body, &pack); err != nil {
 		return Pack{}, err
 	}
-	if strings.TrimSpace(pack.Command.CWD) == "" {
+	if pack.Adapter.ID == desktopObservationAdapterID {
+		var strictPack Pack
+		decoder := yaml.NewDecoder(bytes.NewReader(body))
+		decoder.KnownFields(true)
+		if err := decoder.Decode(&strictPack); err != nil {
+			return Pack{}, err
+		}
+		pack = strictPack
+	} else if strings.TrimSpace(pack.Command.CWD) == "" {
 		pack.Command.CWD = "."
 	}
 	return pack, nil

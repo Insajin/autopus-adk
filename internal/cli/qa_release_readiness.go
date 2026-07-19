@@ -11,11 +11,12 @@ import (
 
 // qaReleaseReadinessOptions holds the flags for `auto qa release-readiness`.
 type qaReleaseReadinessOptions struct {
-	ProjectDir string
-	Approve    bool
-	Decline    bool
-	JSONOut    bool
-	Format     string
+	ProjectDir       string
+	Approve          bool
+	Decline          bool
+	RuntimeProviders []string
+	JSONOut          bool
+	Format           string
 }
 
 // newQAReleaseReadinessCmd constructs the explicit `auto qa release-readiness`
@@ -34,6 +35,7 @@ func newQAReleaseReadinessCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.ProjectDir, "project-dir", ".", "Project directory to analyze")
 	cmd.Flags().BoolVar(&opts.Approve, "approve", false, "Approve the diff, persist regenerated packs, and dispatch cross-surface execution")
 	cmd.Flags().BoolVar(&opts.Decline, "decline", false, "Explicitly decline the diff (no write, no execution)")
+	cmd.Flags().StringArrayVar(&opts.RuntimeProviders, "runtime-provider", nil, "Desktop observation runtime provider (local or orca; exactly one)")
 	addJSONFlags(cmd, &opts.JSONOut, &opts.Format)
 	return cmd
 }
@@ -45,11 +47,19 @@ func runQAReleaseReadiness(cmd *cobra.Command, opts qaReleaseReadinessOptions) e
 	if err != nil {
 		return err
 	}
+	runtimeProvider, err := parseQARuntimeProvider(cmd, jsonMode, opts.RuntimeProviders)
+	if err != nil {
+		return err
+	}
+	if err := requireQARuntimeProvider(cmd, jsonMode, runtimeProvider, projectRequiresQARuntimeProvider(opts.ProjectDir)); err != nil {
+		return err
+	}
 
 	payload, err := releasereadiness.Orchestrate(releasereadiness.Options{
-		ProjectDir: opts.ProjectDir,
-		Approve:    opts.Approve,
-		Decline:    opts.Decline,
+		ProjectDir:      opts.ProjectDir,
+		Approve:         opts.Approve,
+		Decline:         opts.Decline,
+		RuntimeProvider: runtimeProvider,
 	})
 	if err != nil {
 		if jsonMode {
