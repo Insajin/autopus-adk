@@ -50,8 +50,11 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.75'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.75'
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.76'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.76'
+not_contains "$release" "'v0.50.75'"
+not_contains "$release" 'refs/tags/v0.50.75'
+not_contains "$recovery" 'refs/tags/v0.50.75'
 contains "$source_gate" "readonly A6_A5_ANCESTOR_SHA='b27252cb1148192a8ae1a95195c50e5f221453a4'"
 contains "$lineage" 'source "$pins_helper"'
 contains "$lineage_pins" "A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'"
@@ -75,7 +78,7 @@ trap 'rm -rf -- "$temp"' EXIT
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid
-git -C "$temp/source" tag -am 'A6 fixture' v0.50.75
+git -C "$temp/source" tag -am 'A6 fixture' v0.50.76
 commit=$(git -C "$temp/source" rev-parse HEAD)
 tree=$(git -C "$temp/source" rev-parse 'HEAD^{tree}')
 if [[ "${tree: -1}" == '0' ]]; then
@@ -85,7 +88,7 @@ else
 fi
 run_source_gate() {
   local approved_commit="${1-}" approved_tree="${2-}"
-  env GITHUB_REF_NAME=v0.50.75 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
+  env GITHUB_REF_NAME=v0.50.76 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
     GITHUB_OUTPUT="$temp/source-output" COMPANION_SOURCE_PIN_REQUIRED=1 \
     COMPANION_APPROVED_SOURCE_COMMIT="$approved_commit" \
     COMPANION_APPROVED_SOURCE_TREE="$approved_tree" \
@@ -199,10 +202,10 @@ state="$temp/tap-state"
 mkdir -m 0700 "$state" "$temp/bin"
 install -m 0700 "$tests_dir/testdata/mock-tap-gh.sh" "$temp/bin/gh"
 checksums="$temp/checksums.txt"
-printf '%064d  autopus-adk_0.50.75_darwin_amd64.tar.gz\n' 1 >"$checksums"
-printf '%064d  autopus-adk_0.50.75_darwin_arm64.tar.gz\n' 2 >>"$checksums"
-printf '%064d  autopus-adk_0.50.75_linux_amd64.tar.gz\n' 3 >>"$checksums"
-printf '%064d  autopus-adk_0.50.75_linux_arm64.tar.gz\n' 4 >>"$checksums"
+printf '%064d  autopus-adk_0.50.76_darwin_amd64.tar.gz\n' 1 >"$checksums"
+printf '%064d  autopus-adk_0.50.76_darwin_arm64.tar.gz\n' 2 >>"$checksums"
+printf '%064d  autopus-adk_0.50.76_linux_amd64.tar.gz\n' 3 >>"$checksums"
+printf '%064d  autopus-adk_0.50.76_linux_arm64.tar.gz\n' 4 >>"$checksums"
 source "$script_dir/publish-homebrew-formula-bridge-render.sh"
 render_homebrew_cask "$temp/prior-cask.rb" 0.50.74 \
   'aeb9d048579c77ab17f4a4ec3a1160778d16c627747c5af5f341e664e1417cb0' \
@@ -217,8 +220,8 @@ jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
 cp "$state/formula.json" "$temp/formula-before.json"
-bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.75
-  COMPANION_VERSION=0.50.75 COMPANION_HOMEBREW_POLICY=cask-only
+bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.76
+  COMPANION_VERSION=0.50.76 COMPANION_HOMEBREW_POLICY=cask-only
   COMPANION_CHECKSUMS_PATH="$checksums" HOMEBREW_TAP_TOKEN=fixture)
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \

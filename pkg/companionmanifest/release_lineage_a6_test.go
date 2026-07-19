@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	publicKeyReceiptA6Tag     = "v0.50.75"
-	publicKeyReceiptA6Version = "0.50.75"
+	publicKeyReceiptA6Tag     = "v0.50.76"
+	publicKeyReceiptA6Version = "0.50.76"
 )
 
 var immutableA5LineagePins = map[string]string{
@@ -33,7 +33,7 @@ func TestReleasePublicKeyReceipt_GoReleaserA6FixtureProducesCurrentArtifacts(t *
 			t.Fatalf("decode A6 %s archive: %v", architecture, err)
 		}
 		manifest := entries["adk-companion-manifest.json"].data
-		if !bytes.Contains(manifest, []byte(`"version":"0.50.75"`)) {
+		if !bytes.Contains(manifest, []byte(`"version":"0.50.76"`)) {
 			t.Fatalf("A6 %s manifest does not carry the current version", architecture)
 		}
 		for _, name := range []string{
@@ -115,5 +115,5 @@ func tamperA6ManifestPin(t *testing.T, fixture *executableLineageFixture) {
 }
 
 func exactA6TagVersionGuard(source string) bool {
-	return exactLineageTagVersionGuard(source, "75")
+	return exactLineageTagVersionGuard(source, "76")
 }

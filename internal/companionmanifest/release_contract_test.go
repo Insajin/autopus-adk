@@ -13,7 +13,7 @@ import (
 func TestReleaseWorkflow_ExactA6ProtectedEnvironmentAndImmutableActions(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"v0.50.75", "refs/tags/v0.50.75",
+		"v0.50.76", "refs/tags/v0.50.76",
 		"environment:", "adk-companion-release",
 	} {
 		if !strings.Contains(release, required) {
@@ -24,8 +24,8 @@ func TestReleaseWorkflow_ExactA6ProtectedEnvironmentAndImmutableActions(t *testi
 		t.Fatal("arbitrary version tags can enter the protected release job")
 	}
 	for _, forbidden := range []string{
-		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'",
-		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74",
+		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'",
+		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75",
 	} {
 		if strings.Contains(release, forbidden) {
 			t.Fatalf("historical tag %q can enter the A6 release workflow", forbidden)
@@ -183,8 +183,8 @@ func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *t
 		t.Fatalf("Homebrew bridge ordering release=%d bridge=%d cleanup=%d", releaseIndex, bridgeIndex, cleanupIndex)
 	}
 	for _, exact := range []string{
-		"GITHUB_REF_NAME='v0.50.75'",
-		"COMPANION_VERSION='0.50.75'",
+		"GITHUB_REF_NAME='v0.50.76'",
+		"COMPANION_VERSION='0.50.76'",
 		"COMPANION_CHECKSUMS_PATH='dist/checksums.txt'",
 		`HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN"`,
 	} {

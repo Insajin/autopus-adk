@@ -99,7 +99,7 @@ func TestReleasePublicKeyReceipt_A0Policy_IsOneExactAuditableBootstrap(t *testin
 		t.Fatal("A5 release is not conjunctively restricted to tag v0.50.74 and version 0.50.74")
 	}
 	if !exactA6TagVersionGuard(scripts) {
-		t.Fatal("A6 release is not conjunctively restricted to tag v0.50.75 and version 0.50.75")
+		t.Fatal("A6 release is not conjunctively restricted to tag v0.50.76 and version 0.50.76")
 	}
 	workflow := releaseWorkflowContract(t)
 	for _, job := range workflow.Jobs {
@@ -164,7 +164,8 @@ func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredece
 	if got := strings.Count(scripts, "cmp --"); got < wantComparisons {
 		t.Fatalf("A1 exact receipt/signature-or-envelope byte comparisons = %d, want at least %d", got, wantComparisons)
 	}
-	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.76", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.75", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.77", "prior_release_identity_mismatch")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA6Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA5Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA4Tag, "prior_evidence_unverifiable")

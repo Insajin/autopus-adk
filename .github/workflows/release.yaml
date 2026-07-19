@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.75'
+      - 'v0.50.76'
 permissions:
   contents: read
 jobs:
@@ -17,7 +17,7 @@ jobs:
 
   release:
     needs: [ci, security]
-    if: github.ref == 'refs/tags/v0.50.75'
+    if: github.ref == 'refs/tags/v0.50.76'
     environment:
       name: adk-companion-release
     permissions:
@@ -312,8 +312,8 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.75' \
-            COMPANION_VERSION='0.50.75' \
+            GITHUB_REF_NAME='v0.50.76' \
+            COMPANION_VERSION='0.50.76' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH='dist/checksums.txt' \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \

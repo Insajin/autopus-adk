@@ -67,7 +67,7 @@ if [[ -n "${COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT-}" ]]; then
     release_phase='A4'
   elif [[ "$GITHUB_REF_NAME" == 'v0.50.74' && "$COMPANION_VERSION" == '0.50.74' ]]; then
     release_phase='A5'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.75' && "$COMPANION_VERSION" == '0.50.75' ]]; then
+  elif [[ "$GITHUB_REF_NAME" == 'v0.50.76' && "$COMPANION_VERSION" == '0.50.76' ]]; then
     release_phase='A6'
   else
     fail 'public_key_receipt_release_identity_mismatch'
