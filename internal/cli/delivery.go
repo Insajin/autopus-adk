@@ -32,6 +32,8 @@ func newDeliveryCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newDeliveryValidateCmd())
 	cmd.AddCommand(newDeliveryPlanCmd())
+	cmd.AddCommand(newDeliveryDoctorCmd())
+	cmd.AddCommand(newDeliveryPrepareCmd())
 	return cmd
 }
 
