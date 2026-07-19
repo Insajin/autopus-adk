@@ -6,7 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- **v0.50.76 companion A6 릴리스 재수렴** (2026-07-19): 공개 릴리스가 생성되지 않은 `v0.50.75` 실패 태그는 감사 이력으로 보존하고, 릴리스 워크플로·복구 경로·producer·Homebrew Cask 게시 좌표를 정확한 `v0.50.76`으로 옮겼다. A6의 직접 선행 릴리스는 마지막으로 게시된 immutable `v0.50.74`이며, source commit `b27252cb1148192a8ae1a95195c50e5f221453a4`, annotated tag object, checksums, Darwin archive와 manifest pin 및 prior Cask blob `ceed648bfece4555e8310b6e894fedc847520960`을 그대로 검증한다. `v0.50.75`를 실패하게 한 Codex 훅의 미확인 `Close()` 오류 2건은 반환 오류에 결합하고 미사용 helper는 제거해 동일한 `golangci-lint v2.12.2`를 통과시켰다. 이 항목은 재릴리스 준비 상태이며 실제 서명·공증·immutable release·Cask 게시의 라이브 증거는 성공 후 동기화한다.
+- **v0.50.77 companion A6 릴리스 재수렴** (2026-07-19): 미게시 `v0.50.75`·`v0.50.76` 태그를 감사 이력으로 보존하고 릴리스 좌표를 정확한 `v0.50.77`으로 옮겼다. `connect.NewClient`는 더 이상 전역 `http.DefaultTransport`를 공유하지 않고 기본 transport clone을 소유하므로, 병렬 `httptest.Server.Close()`가 Go 1.26에서 다른 클라이언트의 진행 중 요청을 깨뜨리지 않는다. A6의 직접 선행 릴리스는 마지막으로 게시된 immutable `v0.50.74`이며, 기존 A5 계보 pin과 prior Cask blob `ceed648bfece4555e8310b6e894fedc847520960`을 그대로 검증한다. 이 항목은 재릴리스 준비 상태이며 실제 서명·공증·immutable release·Cask 게시의 라이브 증거는 성공 후 동기화한다.
+
+- **v0.50.76 companion A6 릴리스 시도 실패(미게시)** (2026-07-19): annotated tag object `88b8b47dac32686ed7d343e815f6d5d36a42ff34`는 source commit `c4556c8b294c616b745d67c9fe418963deaed07f`에 고정해 보존한다. Release 실행 `29681010220`은 lint·보안·플랫폼 런타임을 통과했지만, 전체 race/integration coverage에서 `pkg/connect`의 전역 HTTP transport 공유가 `TestListWorkspaces_Unauthorized`를 깨뜨렸다. release job은 skipped됐고 GitHub Release 자산과 Homebrew 변경은 생성되지 않았으며, 같은 태그를 이동하거나 재사용하지 않고 `v0.50.77`로 재수렴한다.
 
 - **v0.50.75 companion A6 릴리스 시도 실패(미게시)** (2026-07-19): annotated tag는 source commit `70b9feff75fa75da330fa4bc93b59507924c8447`에 고정해 보존한다. Release 실행 `29680368022`의 CI lint가 Codex 훅 정적 분석 부채 3건을 탐지해 release job이 실행되지 않았으며, GitHub Release 자산과 Homebrew 변경은 생성되지 않았다. 같은 태그를 이동하거나 재사용하지 않고 `v0.50.76`으로 재수렴한다.
 

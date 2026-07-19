@@ -207,7 +207,8 @@ func ExchangeAuthCode(ctx context.Context, req CallbackRequest) (*OAuthResult, e
 	}
 	httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := newHTTPClient(30 * time.Second)
+	defer client.CloseIdleConnections()
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("token exchange: %w", err)

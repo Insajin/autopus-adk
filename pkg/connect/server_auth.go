@@ -64,7 +64,7 @@ type Client struct {
 func NewClient(authToken string) *Client {
 	return &Client{
 		authToken:  authToken,
-		httpClient: &http.Client{},
+		httpClient: newHTTPClient(0),
 	}
 }
 

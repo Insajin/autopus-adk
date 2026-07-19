@@ -20,8 +20,8 @@ var frozenFormulaDigests = []string{
 func TestHomebrewFormulaBridge_A6PinsCaskOnlyTapTransition(t *testing.T) {
 	source := readReleaseFile(t, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
 	for _, required := range []string{
-		"readonly RELEASE_TAG='v0.50.76'",
-		"readonly RELEASE_VERSION='0.50.76'",
+		"readonly RELEASE_TAG='v0.50.77'",
+		"readonly RELEASE_VERSION='0.50.77'",
 		"readonly PRIOR_CASK_BLOB='ceed648bfece4555e8310b6e894fedc847520960'",
 		"COMPANION_HOMEBREW_POLICY", "cask-only",
 	} {

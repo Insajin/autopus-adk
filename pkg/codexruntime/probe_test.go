@@ -13,13 +13,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const catalogProbeTestTimeout = time.Minute
+
 func TestProbeModelCatalogReturnsValidatedOutput(t *testing.T) {
 	t.Parallel()
 
 	payload := `{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"ultra"}]}]}`
 	binary := writeCatalogProbe(t, fmt.Sprintf("printf '%%s' '%s'", payload))
 
-	got, err := ProbeModelCatalog(context.Background(), binary, 20*time.Second)
+	got, err := ProbeModelCatalog(context.Background(), binary, catalogProbeTestTimeout)
 	require.NoError(t, err)
 	assert.Equal(t, payload, string(got))
 }
@@ -29,7 +31,7 @@ func TestProbeModelCatalogRejectsOversizedStdout(t *testing.T) {
 
 	binary := writeCatalogProbe(t, fmt.Sprintf("yes x | head -c %d", config.MaxCodexModelCatalogBytes+1))
 
-	_, err := ProbeModelCatalog(context.Background(), binary, 20*time.Second)
+	_, err := ProbeModelCatalog(context.Background(), binary, catalogProbeTestTimeout)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeds")
 }

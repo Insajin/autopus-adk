@@ -58,7 +58,8 @@ func RequestOpenAIDeviceCode(ctx context.Context, serverURL, authToken, workspac
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+authToken)
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := newHTTPClient(30 * time.Second)
+	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request device code: %w", err)
@@ -98,7 +99,8 @@ func PollOpenAIDeviceToken(ctx context.Context, serverURL, authToken, workspaceI
 		return nil, fmt.Errorf("marshal token poll request: %w", err)
 	}
 
-	httpClient := &http.Client{Timeout: 30 * time.Second}
+	httpClient := newHTTPClient(30 * time.Second)
+	defer httpClient.CloseIdleConnections()
 
 	for {
 		select {

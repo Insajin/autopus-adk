@@ -24,7 +24,7 @@ case "$GITHUB_REF_NAME" in
   v0.50.72) release_phase='A3' ;;
   v0.50.73) release_phase='A4' ;;
   v0.50.74) release_phase='A5' ;;
-  v0.50.76) release_phase='A6' ;;
+  v0.50.77) release_phase='A6' ;;
   *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'

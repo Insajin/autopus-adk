@@ -165,8 +165,9 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 	for _, test := range []struct{ name, tag, sha, message string }{
 		{name: "head_tag", tag: "v0.50.71", sha: headSHA, message: "checked-out source, tag, and release commit differ"},
 		{name: "github_sha", tag: "v0.50.71", sha: taggedSHA, message: "checked-out source, tag, and release commit differ"},
-		{name: "failed_A6_tag", tag: "v0.50.75", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
-		{name: "outside", tag: "v0.50.77", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
+		{name: "failed_A6_tag_75", tag: "v0.50.75", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
+		{name: "failed_A6_tag_76", tag: "v0.50.76", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
+		{name: "outside", tag: "v0.50.78", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
 	} {
 		output, err := runReleaseSourceValidator(t, dir, test.tag, test.sha)
 		if err == nil || !strings.Contains(output, test.message) {
@@ -189,9 +190,10 @@ func TestLineageVerifier_A0BootstrapsWhileA1ThroughA6WithoutLiveEvidenceFailClos
 		{name: "A3", tag: "v0.50.72", message: "missing GITHUB_TOKEN"},
 		{name: "A4", tag: "v0.50.73", message: "missing GITHUB_TOKEN"},
 		{name: "A5", tag: "v0.50.74", message: "missing GITHUB_TOKEN"},
-		{name: "A6", tag: "v0.50.76", message: "missing GITHUB_TOKEN"},
-		{name: "failed_A6_tag", tag: "v0.50.75", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
-		{name: "outside", tag: "v0.50.77", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
+		{name: "A6", tag: "v0.50.77", message: "missing GITHUB_TOKEN"},
+		{name: "failed_A6_tag_75", tag: "v0.50.75", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
+		{name: "failed_A6_tag_76", tag: "v0.50.76", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
+		{name: "outside", tag: "v0.50.78", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

@@ -7,7 +7,7 @@ readonly A2_REPOSITORY='Insajin/autopus-adk' A2_TAG='v0.50.71' A2_VERSION='0.50.
 readonly A3_TAG='v0.50.72' A3_VERSION='0.50.72'
 readonly A3_REPOSITORY='Insajin/autopus-adk' A4_TAG='v0.50.73' A4_VERSION='0.50.73'
 readonly A4_REPOSITORY='Insajin/autopus-adk' A5_TAG='v0.50.74' A5_VERSION='0.50.74'
-readonly A5_REPOSITORY='Insajin/autopus-adk' A6_TAG='v0.50.76' A6_VERSION='0.50.76'
+readonly A5_REPOSITORY='Insajin/autopus-adk' A6_TAG='v0.50.77' A6_VERSION='0.50.77'
 readonly BUNDLE_NAME='adk-companion-public-key-receipt.bundle' RECEIPT_NAME='public-key-receipt.json'
 readonly SIGNATURE_NAME='public-key-receipt.sig' MANIFEST_NAME='adk-companion-manifest.json'
 readonly MANIFEST_SIGNATURE_NAME='adk-companion-manifest.sig'
