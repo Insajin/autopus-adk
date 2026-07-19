@@ -112,7 +112,7 @@ Release 실행 `29640813340`은 정확한 source commit `b27252cb1148192a8ae1a95
 - Darwin amd64·arm64 바이너리는 `Identifier=co.autopus.adk`, `TeamIdentifier=GP2PFA2PUV`, hardened runtime, secure timestamp와 notarized designated requirement를 모두 만족합니다. A0 receipt record SHA-256 `84ee9403223aabd1f60e5e55e79a5c7d6b2c764bc594435cbf7c4e997e2ce475`는 A5까지 같은 바이트를 유지합니다. amd64 manifest SHA-256은 `5b4381d3f2180b19c0da9d419ebc8452b9ba04c73c8d0921c2a74c09ab38b85c`, arm64 manifest SHA-256은 `62a9f78302ee000c16c1c73669282e955fc3abc82f850ff4a77d0e04069f4aed`입니다.
 - 라이브 네이티브 바이너리는 `0.50.74`와 commit `b27252c`를 보고합니다. Darwin 두 아키텍처 아카이브에서 `auto`의 권한은 `0755`입니다. Homebrew commit `9e3b9b4076b47b85218b14632c79a3d796e6769c`는 `Casks/auto.rb`만 갱신했고 Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 유지했습니다.
 
-### v0.50.77 A6 계보 재수렴 (PENDING LIVE RELEASE)
+### v0.50.77 A6 계보 재수렴 (PASS)
 
 A6는 immutable `v0.50.74`를 직접 선행 릴리스로 검증합니다. 고정된 A5 증거는 source commit `b27252cb1148192a8ae1a95195c50e5f221453a4`, annotated tag object `c79f133f0108bf3f07cee0162c1abeecf9d379d1`, checksums SHA-256 `48c79e1fb47444aa83909794cd041bdfed18bf263bf5c0209578540382824ad4`입니다. Darwin amd64·arm64 archive SHA-256은 각각 `aeb9d048579c77ab17f4a4ec3a1160778d16c627747c5af5f341e664e1417cb0`, `bc90e594c91de61dabc2982f60249b638d448fa3f6643004fe6d45cdd0cc5eab`이고, embedded manifest SHA-256은 각각 `5b4381d3f2180b19c0da9d419ebc8452b9ba04c73c8d0921c2a74c09ab38b85c`, `62a9f78302ee000c16c1c73669282e955fc3abc82f850ff4a77d0e04069f4aed`입니다.
 
@@ -120,7 +120,14 @@ A6는 immutable `v0.50.74`를 직접 선행 릴리스로 검증합니다. 고정
 
 `v0.50.76` annotated tag object `88b8b47dac32686ed7d343e815f6d5d36a42ff34`는 source commit `c4556c8b294c616b745d67c9fe418963deaed07f`에 고정되어 있습니다. Release 실행 `29681010220`은 lint·보안·플랫폼 런타임을 통과했지만 전체 race/integration coverage에서 `pkg/connect`의 전역 HTTP transport 공유로 실패했습니다. release job은 skipped됐고 GitHub Release 자산과 Homebrew 변경은 생성되지 않았습니다. 이 실패 태그도 이동·재사용하지 않습니다.
 
-Homebrew 전이는 A5 Cask blob `ceed648bfece4555e8310b6e894fedc847520960`을 prior CAS pin으로 사용하고 Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`를 계속 동결합니다. 이 절은 코드·계보 준비 상태만 기록하며, `v0.50.77` 태그와 보호 환경 source pin, 실제 서명·공증·immutable release, Cask 게시의 라이브 증거는 릴리스 성공 후 별도로 동기화해야 합니다.
+Release 실행 `29682893087`은 보호 환경에 고정한 source commit `902f1acfa91f1d0a2ac9471d5cd79117031a2599`와 tree `a5a2f72495b0f25f4dedb80952d2a881377c5b64`를 검증했습니다. annotated tag object `41feed7decafac33d8f7f43e06804e3c9bf37ef3`는 이 commit을 가리키며, 실행은 변경 불가능한 최종 릴리스를 게시했습니다.
+
+독립 라이브 검증은 다음을 모두 통과했습니다.
+
+- 11개 릴리스 자산의 로컬 SHA-256이 GitHub 서버 digest와 일치합니다. `checksums.txt` SHA-256 `fb1a35dcdb44255aad43b7ae74950ed59f05ccf44abde9cadf28ecfa0dfce37a`는 8개 플랫폼 아카이브를 모두 검증합니다. Darwin amd64·arm64 아카이브 SHA-256은 각각 `d5e47076c1fc898d2b3f5880b6edfcf9a12e805633dcba2691da22f300d41dc9`, `d6d092177a5406c194eea1de4fbd11b8af92a03814eb143a294541a3a578b9ab`입니다.
+- `checksums.txt.signatures` SHA-256은 `868b0da1806a1d712fcc9e0fe1e1ef0d08d91e21e4a2e99256e5be1f73f59221`입니다. 활성 K1 fingerprint `e1fdfe066484c7eae8ff16fa4b1ee6237b8d06299c2b66ced485f029af77837f`의 서명이 유효합니다. SHA-256 `e706c83d0bb311f2821e5065fd8e4626789312cb0037f16edee82041f4cb1b5a`인 cosign bundle도 정확한 `release.yaml@refs/tags/v0.50.77` OIDC identity로 검증됐습니다.
+- Darwin amd64·arm64 바이너리는 `Identifier=co.autopus.adk`, `TeamIdentifier=GP2PFA2PUV`, hardened runtime, secure timestamp와 notarized designated requirement를 모두 만족합니다. 두 바이너리는 `0.50.77`과 commit `902f1ac`을 보고하며 아카이브 안의 권한은 `0755`입니다. amd64·arm64 manifest SHA-256은 각각 `64c634130b16a74cbb33f666d316a05d9a7a1012246dc58fde6e15350b71d0c5`, `b6611c04990b048bc5545e37c942bc8e7e4fab8592d546eaab80d7084991bea6`이고, artifact·manifest·receipt 서명 결합 검증을 통과했습니다. 두 아키텍처의 공개키 receipt 바이트는 동일하며 SHA-256은 `4a588fa4991c515e9520861af5567fd2fe4c19e2c23adb8963bd37ebc46a5bbc`입니다.
+- 검증된 Homebrew commit `a6adcd0ff7e0eff72f30dab9e9f7f0f73b8c9328`은 A5 게시 commit `9e3b9b4076b47b85218b14632c79a3d796e6769c`를 부모로 두고 `Casks/auto.rb`만 변경했습니다. Cask blob은 prior CAS pin `ceed648bfece4555e8310b6e894fedc847520960`에서 `39b9b77eb51149ff87df7ad4f8fb3c5300b1302c`로 갱신됐고, Cask의 네 플랫폼 digest가 릴리스 아카이브와 일치합니다. Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 변경되지 않았습니다.
 
 ## Stage 2: installers
 
