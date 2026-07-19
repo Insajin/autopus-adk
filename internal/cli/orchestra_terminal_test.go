@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	runtimedetect "github.com/insajin/autopus-adk/pkg/detect"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
@@ -164,6 +165,38 @@ func TestCodexRuntimeMarkerIncludesCurrentCodexCLIEnv(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tt.want, hasCodexRuntimeMarker(tt.codex, tt.codexCI, tt.codexThreadID, tt.codexManagedByNPM))
+		})
+	}
+}
+
+func TestPaneInteractiveContextWithRuntime_ProcessTreeAgentUsesNestedGate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		runtime       runtimedetect.AgentRuntime
+		ci            string
+		hookAvailable bool
+		muxInstalled  bool
+		want          bool
+	}{
+		{"claude ancestry", runtimedetect.AgentRuntimeClaudeCode, "", true, true, true},
+		{"codex ancestry", runtimedetect.AgentRuntimeCodex, "", true, true, true},
+		{"unrelated ancestry", runtimedetect.AgentRuntimeUnknown, "", true, true, false},
+		{"ci floor beats claude ancestry", runtimedetect.AgentRuntimeClaudeCode, "1", true, true, false},
+		{"ci floor beats codex ancestry", runtimedetect.AgentRuntimeCodex, "1", true, true, false},
+		{"claude ancestry still requires hook", runtimedetect.AgentRuntimeClaudeCode, "", false, true, false},
+		{"codex ancestry still requires mux", runtimedetect.AgentRuntimeCodex, "", true, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := paneInteractiveContextWithRuntime(
+				"", false, tt.runtime, tt.ci,
+				false, false, tt.hookAvailable, tt.muxInstalled,
+			)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
