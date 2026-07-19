@@ -112,6 +112,12 @@ Release 실행 `29640813340`은 정확한 source commit `b27252cb1148192a8ae1a95
 - Darwin amd64·arm64 바이너리는 `Identifier=co.autopus.adk`, `TeamIdentifier=GP2PFA2PUV`, hardened runtime, secure timestamp와 notarized designated requirement를 모두 만족합니다. A0 receipt record SHA-256 `84ee9403223aabd1f60e5e55e79a5c7d6b2c764bc594435cbf7c4e997e2ce475`는 A5까지 같은 바이트를 유지합니다. amd64 manifest SHA-256은 `5b4381d3f2180b19c0da9d419ebc8452b9ba04c73c8d0921c2a74c09ab38b85c`, arm64 manifest SHA-256은 `62a9f78302ee000c16c1c73669282e955fc3abc82f850ff4a77d0e04069f4aed`입니다.
 - 라이브 네이티브 바이너리는 `0.50.74`와 commit `b27252c`를 보고합니다. Darwin 두 아키텍처 아카이브에서 `auto`의 권한은 `0755`입니다. Homebrew commit `9e3b9b4076b47b85218b14632c79a3d796e6769c`는 `Casks/auto.rb`만 갱신했고 Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 유지했습니다.
 
+### v0.50.75 A6 계보 준비 (PENDING LIVE RELEASE)
+
+A6는 immutable `v0.50.74`를 직접 선행 릴리스로 검증합니다. 고정된 A5 증거는 source commit `b27252cb1148192a8ae1a95195c50e5f221453a4`, annotated tag object `c79f133f0108bf3f07cee0162c1abeecf9d379d1`, checksums SHA-256 `48c79e1fb47444aa83909794cd041bdfed18bf263bf5c0209578540382824ad4`입니다. Darwin amd64·arm64 archive SHA-256은 각각 `aeb9d048579c77ab17f4a4ec3a1160778d16c627747c5af5f341e664e1417cb0`, `bc90e594c91de61dabc2982f60249b638d448fa3f6643004fe6d45cdd0cc5eab`이고, embedded manifest SHA-256은 각각 `5b4381d3f2180b19c0da9d419ebc8452b9ba04c73c8d0921c2a74c09ab38b85c`, `62a9f78302ee000c16c1c73669282e955fc3abc82f850ff4a77d0e04069f4aed`입니다.
+
+Homebrew 전이는 A5 Cask blob `ceed648bfece4555e8310b6e894fedc847520960`을 prior CAS pin으로 사용하고 Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`를 계속 동결합니다. 이 절은 코드·계보 준비 상태만 기록하며, `v0.50.75` 태그와 보호 환경 source pin, 실제 서명·공증·immutable release, Cask 게시의 라이브 증거는 릴리스 성공 후 별도로 동기화해야 합니다.
+
 ## Stage 2: installers
 
 ### S11: POSIX installer (Must, PASS)

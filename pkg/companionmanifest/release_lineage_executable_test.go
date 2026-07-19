@@ -250,24 +250,33 @@ func differentHex(current string, length int) string {
 }
 
 func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *testing.T) {
-	source := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage.sh"))
+	pinsSource := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage-pins.sh"))
+	runtimeSource := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage.sh")) + pinsSource
 	for _, pins := range []map[string]string{
 		immutableA0LineagePins, immutableA1LineagePins, immutableA2LineagePins,
-		immutableA3LineagePins, immutableA4LineagePins,
+		immutableA3LineagePins, immutableA4LineagePins, immutableA5LineagePins,
 	} {
 		for name, value := range pins {
 			declaration := "readonly " + name + "='" + value + "'"
-			if strings.Count(source, declaration) != 1 {
+			if strings.Count(pinsSource, declaration) != 1 {
 				t.Fatalf("production immutable pin declaration drifted: %s", declaration)
 			}
 		}
 	}
 	for _, bypass := range []string{
 		"TEST_PIN", "PIN_FILE", "PIN_OVERRIDE", "GO_WANT_LINEAGE",
-		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_", "COMPANION_A4_",
+		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_", "COMPANION_A4_", "COMPANION_A5_",
 	} {
-		if strings.Contains(source, bypass) {
+		if strings.Contains(runtimeSource, bypass) {
 			t.Fatalf("production lineage exposes test pin bypass %q", bypass)
+		}
+	}
+	for _, required := range []string{
+		`[[ -f "$pins_helper" && ! -L "$pins_helper" ]]`,
+		`source "$pins_helper"`,
+	} {
+		if !strings.Contains(runtimeSource, required) {
+			t.Fatalf("production lineage pin helper gate missing %q", required)
 		}
 	}
 }

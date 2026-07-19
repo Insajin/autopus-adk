@@ -248,6 +248,7 @@ exit 64
 func (fixture *executableLineageFixture) writeProvisionedProductionScript(t *testing.T) {
 	t.Helper()
 	source := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage.sh"))
+	pinsSource := string(releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage-pins.sh"))
 	replacements := map[string]string{
 		"A0_COMMIT_SHA": fixture.pins.commit, "A0_RECEIPT_SHA256": fixture.pins.receipt,
 		"A0_SIGNATURE_SHA256": fixture.pins.signature, "A0_RECORD_SHA256": fixture.pins.record,
@@ -264,12 +265,16 @@ func (fixture *executableLineageFixture) writeProvisionedProductionScript(t *tes
 			t.Fatalf("production lineage pin %s is not defined", name)
 		}
 		production := "readonly " + name + "='" + productionValue + "'"
-		if strings.Count(source, production) != 1 {
+		if strings.Count(pinsSource, production) != 1 {
 			t.Fatalf("production lineage pin declaration %s is not exact", name)
 		}
-		source = strings.Replace(source, production, "readonly "+name+"='"+value+"'", 1)
+		pinsSource = strings.Replace(pinsSource, production, "readonly "+name+"='"+value+"'", 1)
 	}
 	if err := os.WriteFile(fixture.provisionedScriptPath, []byte(source), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	pinsPath := filepath.Join(filepath.Dir(fixture.provisionedScriptPath), "verify-public-key-lineage-pins.sh")
+	if err := os.WriteFile(pinsPath, []byte(pinsSource), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	helper := releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage-archive.sh")

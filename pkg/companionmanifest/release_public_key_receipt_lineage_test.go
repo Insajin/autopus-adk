@@ -77,7 +77,7 @@ func TestReleasePublicKeyReceipt_A0Policy_IsOneExactAuditableBootstrap(t *testin
 		"release_phase='A1'",
 		"release_phase='A2'",
 		"release_phase='A3'",
-		"release_phase='A4'", "release_phase='A5'",
+		"release_phase='A4'", "release_phase='A5'", "release_phase='A6'",
 	} {
 		if !strings.Contains(scripts, exact) {
 			t.Fatalf("missing exact A0 bootstrap release policy %q", exact)
@@ -97,6 +97,9 @@ func TestReleasePublicKeyReceipt_A0Policy_IsOneExactAuditableBootstrap(t *testin
 	}
 	if !exactA5TagVersionGuard(scripts) {
 		t.Fatal("A5 release is not conjunctively restricted to tag v0.50.74 and version 0.50.74")
+	}
+	if !exactA6TagVersionGuard(scripts) {
+		t.Fatal("A6 release is not conjunctively restricted to tag v0.50.75 and version 0.50.75")
 	}
 	workflow := releaseWorkflowContract(t)
 	for _, job := range workflow.Jobs {
@@ -146,6 +149,7 @@ func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredece
 		"gh api", "gh release download", "releases/tags/",
 		publicKeyReceiptA0Repository, publicKeyReceiptA0Tag, publicKeyReceiptA1Tag,
 		publicKeyReceiptA2Tag, publicKeyReceiptA3Tag, publicKeyReceiptA4Tag, publicKeyReceiptA5Tag,
+		publicKeyReceiptA6Tag,
 		"tag_name", "target_commitish", "cmp --",
 		"prior_receipt", "current_receipt", "record_sha256", "public_key_sha256",
 	} {
@@ -160,7 +164,8 @@ func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredece
 	if got := strings.Count(scripts, "cmp --"); got < wantComparisons {
 		t.Fatalf("A1 exact receipt/signature-or-envelope byte comparisons = %d, want at least %d", got, wantComparisons)
 	}
-	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.75", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.76", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA6Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA5Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA4Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA3Tag, "prior_evidence_unverifiable")

@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	a5PriorCaskBlob     = "4766a91527cf068faf854d618156c97adcb340d3"
-	a5FrozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
+	a6PriorCaskBlob     = "ceed648bfece4555e8310b6e894fedc847520960"
+	a6FrozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
 )
 
 var bridgeDigests = []string{
@@ -21,7 +21,7 @@ var bridgeDigests = []string{
 	strings.Repeat("3", 64), strings.Repeat("4", 64),
 }
 
-func TestHomebrewFormulaBridge_A5UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
+func TestHomebrewFormulaBridge_A6UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
 	fixture := newHomebrewBridgeFixture(t)
 	frozenFormula, err := os.ReadFile(filepath.Join(fixture.state, "formula.json"))
 	if err != nil {
@@ -29,10 +29,10 @@ func TestHomebrewFormulaBridge_A5UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
 	}
 	output, err := fixture.run(nil)
 	if err != nil {
-		t.Fatalf("publish A5 Cask: %v\n%s", err, output)
+		t.Fatalf("publish A6 Cask: %v\n%s", err, output)
 	}
-	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.74"`) {
-		t.Fatalf("published Cask is not v0.50.74:\n%s", cask)
+	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.75"`) {
+		t.Fatalf("published Cask is not v0.50.75:\n%s", cask)
 	}
 	if got := fixture.updateCount(t, "cask"); got != "1" {
 		t.Fatalf("Cask update count = %q, want 1", got)
@@ -102,8 +102,8 @@ func TestHomebrewFormulaBridge_RejectsChecksumAmbiguity(t *testing.T) {
 
 func TestHomebrewFormulaBridge_RejectsIdentityMismatchWithoutCredentialLeak(t *testing.T) {
 	for _, test := range []struct{ name, key, value string }{
-		{"tag", "GITHUB_REF_NAME", "v0.50.73"},
-		{"version", "COMPANION_VERSION", "0.50.73"},
+		{"tag", "GITHUB_REF_NAME", "v0.50.74"},
+		{"version", "COMPANION_VERSION", "0.50.74"},
 		{"policy", "COMPANION_HOMEBREW_POLICY", "formula-update"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -147,8 +147,8 @@ func newHomebrewBridgeFixture(t *testing.T) homebrewBridgeFixture {
 	if err := os.WriteFile(fixture.checksums, []byte(fixture.checksumText), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	fixture.writeAPIContent(t, "cask.json", a5PriorCaskBlob, fixture.cask)
-	fixture.writeAPIContent(t, "formula.json", a5FrozenFormulaBlob, homebrewBridgeFormula(t))
+	fixture.writeAPIContent(t, "cask.json", a6PriorCaskBlob, fixture.cask)
+	fixture.writeAPIContent(t, "formula.json", a6FrozenFormulaBlob, homebrewBridgeFormula(t))
 	writeExecutable(t, filepath.Join(bin, "gh"), homebrewBridgeMockGH)
 	return fixture
 }
@@ -157,7 +157,7 @@ func (fixture homebrewBridgeFixture) run(overrides map[string]string) ([]byte, e
 	environment := map[string]string{
 		"PATH":   filepath.Join(fixture.root, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"TMPDIR": filepath.Join(fixture.root, "tmp"), "MOCK_STATE": fixture.state,
-		"GITHUB_REF_NAME": "v0.50.74", "COMPANION_VERSION": "0.50.74",
+		"GITHUB_REF_NAME": "v0.50.75", "COMPANION_VERSION": "0.50.75",
 		"COMPANION_HOMEBREW_POLICY": "cask-only",
 		"COMPANION_CHECKSUMS_PATH":  fixture.checksums,
 		"HOMEBREW_TAP_TOKEN":        "fixture-tap-token", "GH_TOKEN": "",
@@ -252,9 +252,9 @@ func homebrewBridgeChecksums() string {
 	names := []string{"darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"}
 	var output strings.Builder
 	for index, name := range names {
-		fmt.Fprintf(&output, "%s  autopus-adk_0.50.74_%s.tar.gz\n", bridgeDigests[index], name)
+		fmt.Fprintf(&output, "%s  autopus-adk_0.50.75_%s.tar.gz\n", bridgeDigests[index], name)
 	}
-	fmt.Fprintf(&output, "%s  autopus-adk_0.50.74_windows_amd64.zip\n", strings.Repeat("5", 64))
+	fmt.Fprintf(&output, "%s  autopus-adk_0.50.75_windows_amd64.zip\n", strings.Repeat("5", 64))
 	return output.String()
 }
 

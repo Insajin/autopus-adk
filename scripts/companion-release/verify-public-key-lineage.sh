@@ -7,42 +7,7 @@ readonly A2_REPOSITORY='Insajin/autopus-adk' A2_TAG='v0.50.71' A2_VERSION='0.50.
 readonly A3_TAG='v0.50.72' A3_VERSION='0.50.72'
 readonly A3_REPOSITORY='Insajin/autopus-adk' A4_TAG='v0.50.73' A4_VERSION='0.50.73'
 readonly A4_REPOSITORY='Insajin/autopus-adk' A5_TAG='v0.50.74' A5_VERSION='0.50.74'
-readonly A0_COMMIT_SHA='7372a484eaf87a07e224476a6161f792b73d7dfb'
-readonly A0_RECEIPT_SHA256='4a588fa4991c515e9520861af5567fd2fe4c19e2c23adb8963bd37ebc46a5bbc'
-readonly A0_SIGNATURE_SHA256='7f248929d807b689acab575888b0a7600bd2ea17cce1e5fcc11f72af9c510173'
-readonly A0_RECORD_SHA256='84ee9403223aabd1f60e5e55e79a5c7d6b2c764bc594435cbf7c4e997e2ce475'
-readonly A0_PUBLIC_KEY_SHA256='c387da9e9c43dbaa2605207a00635c84937ff397a8b6ed73414d2e66b89941a4'
-readonly A0_CHECKSUMS_SHA256='17f7591ec789071e0d03c547d2a79565269de1cc13bdbc173d3703ad77947904'
-readonly A0_AMD64_MANIFEST_SHA256='162dd3b21781ba59a099d41802771e2a31b3f1f80607f6dd832249803e2abdbf'
-readonly A0_ARM64_MANIFEST_SHA256='8f9e28f9a0672f0e2fdb99e55027650407fd9def2d1d62ea2313b88cd83c3f61'
-readonly A1_COMMIT_SHA='e25e8be02b55b9385f58919c30ad1ccf92179030'
-readonly A1_TAG_OBJECT_SHA='c6c72fa99234e3d8687e1c138b976fe7a62c5e00'
-readonly A1_CHECKSUMS_SHA256='b9c8ad8b5e93228277d514ec8e246290664c6d28b473c3c80ae65b8510bcda9c'
-readonly A1_AMD64_ARCHIVE_SHA256='9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd'
-readonly A1_ARM64_ARCHIVE_SHA256='a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c'
-readonly A1_AMD64_MANIFEST_SHA256='09b4e206fa94e4be1e2aebf6924ab8d0f349f23aaa217c33505685efb55ee163'
-readonly A1_ARM64_MANIFEST_SHA256='db3a7a5381d2fa2f9e70682324b59304c5beeaaf695e91d2621f880dc7211230'
-readonly A2_COMMIT_SHA='7b5b52822b0cda75bf6c971f5f1c2a713881008c'
-readonly A2_TAG_OBJECT_SHA='0088a9f1201e0bb11a940aa9dc4aff83aef1656c'
-readonly A2_CHECKSUMS_SHA256='5317226720dff159e73d692cc0cb447fddb134fe7c6d2046031adb377fb60092'
-readonly A2_AMD64_ARCHIVE_SHA256='babce99376a647e801ea06d99f3575c87414551cbbeb77dfeed5cfa23851b964'
-readonly A2_ARM64_ARCHIVE_SHA256='fbe9693d3517bdbaf92f230d7aa7561b728ba002749c2d06b6eef08170fed60b'
-readonly A2_AMD64_MANIFEST_SHA256='82d8e22a3943dd8efc14dafd0c28ac11d415b1c1a8ff5447beb658a5cff11be4'
-readonly A2_ARM64_MANIFEST_SHA256='f780452da57ec0a845bd8dae22dcd134b920c593c9ba61f496380136f243c8c0'
-readonly A3_COMMIT_SHA='ba5509b692a43dc8a70e0bd6173acb56166ed67f'
-readonly A3_TAG_OBJECT_SHA='19fd06cec4f60218b07727e649f9671b27c1f7a7'
-readonly A3_CHECKSUMS_SHA256='1c88282d9cc215c4a766059ab9da79eecbb42126535f54b2d201e7f1309b35fe'
-readonly A3_AMD64_ARCHIVE_SHA256='064c994fd739616fabfd7b353511d633d3b73b41912f756ee8e6b655ea9366ad'
-readonly A3_ARM64_ARCHIVE_SHA256='c218a8df21ac7a7fe459e294942aa9e5b2e676d0a90a644bf486b4452f628a23'
-readonly A3_AMD64_MANIFEST_SHA256='2a88c6f40e8bda35c9342fac496ed424187d25f1fa2ac0be0c714bb10c9c1490'
-readonly A3_ARM64_MANIFEST_SHA256='80243b2fc0409d7743b9a7f94eaa88091ec1c53382b7215169157be314767e7e'
-readonly A4_COMMIT_SHA='334b297f05942accbecdfa15b54e38e005c82f2d'
-readonly A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'
-readonly A4_CHECKSUMS_SHA256='a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1'
-readonly A4_AMD64_ARCHIVE_SHA256='da7f6ef4396591ff0b728f976536d261ecb084038fffab7c7662a6f7329ade2a'
-readonly A4_ARM64_ARCHIVE_SHA256='ff046f6af316236166d514608a1b432c2f3a01efbd8aab03b54d2c2639d2f422'
-readonly A4_AMD64_MANIFEST_SHA256='86940b9c7eb89308aff4260d9a6178d933d3f1a9833e601ac8c1e914c225a7b5'
-readonly A4_ARM64_MANIFEST_SHA256='a68a10a46b0778ccc858855323fd45cf0b9727f76fa45b16efdbc83b320128f0'
+readonly A5_REPOSITORY='Insajin/autopus-adk' A6_TAG='v0.50.75' A6_VERSION='0.50.75'
 readonly BUNDLE_NAME='adk-companion-public-key-receipt.bundle' RECEIPT_NAME='public-key-receipt.json'
 readonly SIGNATURE_NAME='public-key-receipt.sig' MANIFEST_NAME='adk-companion-manifest.json'
 readonly MANIFEST_SIGNATURE_NAME='adk-companion-manifest.sig'
@@ -50,6 +15,11 @@ readonly ARTIFACT_NAME='auto' CHECKSUMS_NAME='checksums.txt'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 readonly LOCAL_EVIDENCE_ERROR='fixture_or_local_evidence_forbidden'
 fail() { printf 'companion release lineage: %s: %s\n' "$1" "$2" >&2; exit 1; }
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) || fail prior_evidence_unverifiable 'cannot resolve lineage verifier directory'
+pins_helper="$script_dir/verify-public-key-lineage-pins.sh"
+[[ -f "$pins_helper" && ! -L "$pins_helper" ]] || fail prior_evidence_unverifiable 'lineage pin source is invalid'
+# shellcheck source=verify-public-key-lineage-pins.sh
+source "$pins_helper"
 require_environment() { local name="$1"; [[ -n "${!name-}" ]] || fail prior_evidence_unverifiable "missing ${name}"; }
 require_environment GITHUB_REF_NAME
 COMPANION_VERSION="${GITHUB_REF_NAME#v}"
@@ -78,10 +48,13 @@ elif [[ "$GITHUB_REF_NAME" == "$A4_TAG" && "$COMPANION_VERSION" == "$A4_VERSION"
 elif [[ "$GITHUB_REF_NAME" == "$A5_TAG" && "$COMPANION_VERSION" == "$A5_VERSION" ]]; then
   release_phase='A5' prior_phase='A4' prior_repository="$A4_REPOSITORY" prior_evidence_source='immutable A4 GitHub release' prior_tag="$A4_TAG" prior_version="$A4_VERSION" prior_commit="$A4_COMMIT_SHA"
   prior_tag_object="$A4_TAG_OBJECT_SHA" prior_checksums="$A4_CHECKSUMS_SHA256" prior_amd64_archive="$A4_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A4_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A4_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A4_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A6_TAG" && "$COMPANION_VERSION" == "$A6_VERSION" ]]; then
+  release_phase='A6' prior_phase='A5' prior_repository="$A5_REPOSITORY" prior_evidence_source='immutable A5 GitHub release' prior_tag="$A5_TAG" prior_version="$A5_VERSION" prior_commit="$A5_COMMIT_SHA"
+  prior_tag_object="$A5_TAG_OBJECT_SHA" prior_checksums="$A5_CHECKSUMS_SHA256" prior_amd64_archive="$A5_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A5_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A5_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A5_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6 policy'
 fi
-script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd); archive_helper="$script_dir/verify-public-key-lineage-archive.sh"
+archive_helper="$script_dir/verify-public-key-lineage-archive.sh"
 [[ -f "$archive_helper" && ! -L "$archive_helper" ]] || fail prior_evidence_unverifiable 'lineage archive verifier is invalid'
 # shellcheck source=verify-public-key-lineage-archive.sh
 source "$archive_helper"
@@ -90,7 +63,7 @@ for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
   "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
   nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
 done
-if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' ]]; then
+if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' ]]; then
   nonzero_hex "$prior_tag_object" 40 || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
   for pin in "$prior_amd64_archive" "$prior_arm64_archive"; do
     nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"

@@ -16,6 +16,7 @@ source_gate="$script_dir/validate-source.sh"
 environment_gate="$script_dir/validate-environment.sh"
 lineage_archive="$script_dir/verify-public-key-lineage-archive.sh"
 lineage="$script_dir/verify-public-key-lineage.sh"
+lineage_pins="$script_dir/verify-public-key-lineage-pins.sh"
 producer="$script_dir/produce.sh"
 homebrew_bridge="$script_dir/publish-homebrew-formula-bridge.sh"
 
@@ -35,7 +36,7 @@ goreleaser_step=$(sed -n '/name: Run GoReleaser/,/name: Create Homebrew tap toke
 [[ "$goreleaser_step" != *APPLE_CERTIFICATE_PASSWORD* ]] || fail 'GoReleaser receives certificate password'
 contains "$release" "COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb'"
 contains "$producer" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='4766a91527cf068faf854d618156c97adcb340d3'"
+contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='ceed648bfece4555e8310b6e894fedc847520960'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 not_contains "$homebrew_bridge" 'Formula/auto.rb'
 not_contains "$homebrew_bridge" 'FORMULA_PATH'
@@ -49,16 +50,23 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.74'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.74'
-contains "$source_gate" "readonly A5_A4_ANCESTOR_SHA='334b297f05942accbecdfa15b54e38e005c82f2d'"
-contains "$lineage" "A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'"
-contains "$lineage" "A4_CHECKSUMS_SHA256='a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1'"
-contains "$lineage" "A4_AMD64_ARCHIVE_SHA256='da7f6ef4396591ff0b728f976536d261ecb084038fffab7c7662a6f7329ade2a'"
-contains "$lineage" "A4_ARM64_ARCHIVE_SHA256='ff046f6af316236166d514608a1b432c2f3a01efbd8aab03b54d2c2639d2f422'"
-contains "$lineage" "A4_AMD64_MANIFEST_SHA256='86940b9c7eb89308aff4260d9a6178d933d3f1a9833e601ac8c1e914c225a7b5'"
-contains "$lineage" "A4_ARM64_MANIFEST_SHA256='a68a10a46b0778ccc858855323fd45cf0b9727f76fa45b16efdbc83b320128f0'"
-contains "$lineage" "release_phase='A5' prior_phase='A4'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.75'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.75'
+contains "$source_gate" "readonly A6_A5_ANCESTOR_SHA='b27252cb1148192a8ae1a95195c50e5f221453a4'"
+contains "$lineage" 'source "$pins_helper"'
+contains "$lineage_pins" "A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'"
+contains "$lineage_pins" "A4_CHECKSUMS_SHA256='a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1'"
+contains "$lineage_pins" "A4_AMD64_ARCHIVE_SHA256='da7f6ef4396591ff0b728f976536d261ecb084038fffab7c7662a6f7329ade2a'"
+contains "$lineage_pins" "A4_ARM64_ARCHIVE_SHA256='ff046f6af316236166d514608a1b432c2f3a01efbd8aab03b54d2c2639d2f422'"
+contains "$lineage_pins" "A4_AMD64_MANIFEST_SHA256='86940b9c7eb89308aff4260d9a6178d933d3f1a9833e601ac8c1e914c225a7b5'"
+contains "$lineage_pins" "A4_ARM64_MANIFEST_SHA256='a68a10a46b0778ccc858855323fd45cf0b9727f76fa45b16efdbc83b320128f0'"
+contains "$lineage_pins" "A5_TAG_OBJECT_SHA='c79f133f0108bf3f07cee0162c1abeecf9d379d1'"
+contains "$lineage_pins" "A5_CHECKSUMS_SHA256='48c79e1fb47444aa83909794cd041bdfed18bf263bf5c0209578540382824ad4'"
+contains "$lineage_pins" "A5_AMD64_ARCHIVE_SHA256='aeb9d048579c77ab17f4a4ec3a1160778d16c627747c5af5f341e664e1417cb0'"
+contains "$lineage_pins" "A5_ARM64_ARCHIVE_SHA256='bc90e594c91de61dabc2982f60249b638d448fa3f6643004fe6d45cdd0cc5eab'"
+contains "$lineage_pins" "A5_AMD64_MANIFEST_SHA256='5b4381d3f2180b19c0da9d419ebc8452b9ba04c73c8d0921c2a74c09ab38b85c'"
+contains "$lineage_pins" "A5_ARM64_MANIFEST_SHA256='62a9f78302ee000c16c1c73669282e955fc3abc82f850ff4a77d0e04069f4aed'"
+contains "$lineage" "release_phase='A6' prior_phase='A5'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -67,7 +75,7 @@ trap 'rm -rf -- "$temp"' EXIT
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid
-git -C "$temp/source" tag -am 'A5 fixture' v0.50.74
+git -C "$temp/source" tag -am 'A6 fixture' v0.50.75
 commit=$(git -C "$temp/source" rev-parse HEAD)
 tree=$(git -C "$temp/source" rev-parse 'HEAD^{tree}')
 if [[ "${tree: -1}" == '0' ]]; then
@@ -77,7 +85,7 @@ else
 fi
 run_source_gate() {
   local approved_commit="${1-}" approved_tree="${2-}"
-  env GITHUB_REF_NAME=v0.50.74 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
+  env GITHUB_REF_NAME=v0.50.75 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
     GITHUB_OUTPUT="$temp/source-output" COMPANION_SOURCE_PIN_REQUIRED=1 \
     COMPANION_APPROVED_SOURCE_COMMIT="$approved_commit" \
     COMPANION_APPROVED_SOURCE_TREE="$approved_tree" \
@@ -186,39 +194,39 @@ fi
 contains "$lineage_archive" 'MANIFEST_SIGNATURE_NAME'
 contains "$lineage_archive" 'COMPANION_MANIFEST_VERIFIER'
 
-# A5 updates only the Cask and keeps the exact v0.50.71 Formula frozen.
+# A6 updates only the Cask and keeps the exact v0.50.71 Formula frozen.
 state="$temp/tap-state"
 mkdir -m 0700 "$state" "$temp/bin"
 install -m 0700 "$tests_dir/testdata/mock-tap-gh.sh" "$temp/bin/gh"
 checksums="$temp/checksums.txt"
-printf '%064d  autopus-adk_0.50.74_darwin_amd64.tar.gz\n' 1 >"$checksums"
-printf '%064d  autopus-adk_0.50.74_darwin_arm64.tar.gz\n' 2 >>"$checksums"
-printf '%064d  autopus-adk_0.50.74_linux_amd64.tar.gz\n' 3 >>"$checksums"
-printf '%064d  autopus-adk_0.50.74_linux_arm64.tar.gz\n' 4 >>"$checksums"
+printf '%064d  autopus-adk_0.50.75_darwin_amd64.tar.gz\n' 1 >"$checksums"
+printf '%064d  autopus-adk_0.50.75_darwin_arm64.tar.gz\n' 2 >>"$checksums"
+printf '%064d  autopus-adk_0.50.75_linux_amd64.tar.gz\n' 3 >>"$checksums"
+printf '%064d  autopus-adk_0.50.75_linux_arm64.tar.gz\n' 4 >>"$checksums"
 source "$script_dir/publish-homebrew-formula-bridge-render.sh"
-render_homebrew_cask "$temp/prior-cask.rb" 0.50.73 \
-  'da7f6ef4396591ff0b728f976536d261ecb084038fffab7c7662a6f7329ade2a' \
-  'ff046f6af316236166d514608a1b432c2f3a01efbd8aab03b54d2c2639d2f422' \
-  '059c59cb4796f6639d87eb4d99eaa7c9fa5a401fe7d58ed0f0983859dfd4fd92' \
-  'f4c8d7252a92620f2624c7a7af974fa313d3c56d686383b63fbff641ea268c94'
+render_homebrew_cask "$temp/prior-cask.rb" 0.50.74 \
+  'aeb9d048579c77ab17f4a4ec3a1160778d16c627747c5af5f341e664e1417cb0' \
+  'bc90e594c91de61dabc2982f60249b638d448fa3f6643004fe6d45cdd0cc5eab' \
+  'ac95ad2bc5d24cccac8a73555d0845738f04306b8e5f7cef0843ce0f7d4b2a6d' \
+  'eba5fd17e8b1b66349b26028f4487448bc0a49c3975a66defe1ece76744f7ad7'
 render_homebrew_formula_bridge "$temp/frozen-formula.rb" v0.50.71 0.50.71 \
   "$(printf '%064d' 1)" "$(printf '%064d' 2)" \
   "$(printf '%064d' 3)" "$(printf '%064d' 4)"
 jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
-  '{sha:"4766a91527cf068faf854d618156c97adcb340d3",content:$content}' >"$state/cask.json"
+  '{sha:"ceed648bfece4555e8310b6e894fedc847520960",content:$content}' >"$state/cask.json"
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
 cp "$state/formula.json" "$temp/formula-before.json"
-bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.74
-  COMPANION_VERSION=0.50.74 COMPANION_HOMEBREW_POLICY=cask-only
+bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.75
+  COMPANION_VERSION=0.50.75 COMPANION_HOMEBREW_POLICY=cask-only
   COMPANION_CHECKSUMS_PATH="$checksums" HOMEBREW_TAP_TOKEN=fixture)
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \
-  || fail 'A5 did not update only the Cask'
+  || fail 'A6 did not update only the Cask'
 cmp -s "$temp/formula-before.json" "$state/formula.json" \
   || fail 'frozen v0.50.71 Formula blob or bytes changed'
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \
-  || fail 'A5 Cask-only reconciler is not idempotent'
+  || fail 'A6 Cask-only reconciler is not idempotent'
 
 printf 'release hardening test: PASS\n'

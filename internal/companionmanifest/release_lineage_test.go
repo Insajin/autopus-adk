@@ -165,7 +165,7 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 	for _, test := range []struct{ name, tag, sha, message string }{
 		{name: "head_tag", tag: "v0.50.71", sha: headSHA, message: "checked-out source, tag, and release commit differ"},
 		{name: "github_sha", tag: "v0.50.71", sha: taggedSHA, message: "checked-out source, tag, and release commit differ"},
-		{name: "outside", tag: "v0.50.75", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5 policy"},
+		{name: "outside", tag: "v0.50.76", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
 	} {
 		output, err := runReleaseSourceValidator(t, dir, test.tag, test.sha)
 		if err == nil || !strings.Contains(output, test.message) {
@@ -174,7 +174,7 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 	}
 }
 
-func TestLineageVerifier_A0BootstrapsWhileA1ThroughA5WithoutLiveEvidenceFailClosed(t *testing.T) {
+func TestLineageVerifier_A0BootstrapsWhileA1ThroughA6WithoutLiveEvidenceFailClosed(t *testing.T) {
 	script := filepath.Join(repositoryRoot(t), "scripts/companion-release/verify-public-key-lineage.sh")
 	cases := []struct {
 		name    string
@@ -188,7 +188,8 @@ func TestLineageVerifier_A0BootstrapsWhileA1ThroughA5WithoutLiveEvidenceFailClos
 		{name: "A3", tag: "v0.50.72", message: "missing GITHUB_TOKEN"},
 		{name: "A4", tag: "v0.50.73", message: "missing GITHUB_TOKEN"},
 		{name: "A5", tag: "v0.50.74", message: "missing GITHUB_TOKEN"},
-		{name: "outside", tag: "v0.50.75", message: "outside the frozen A0/A1/A2/A3/A4/A5 policy"},
+		{name: "A6", tag: "v0.50.75", message: "missing GITHUB_TOKEN"},
+		{name: "outside", tag: "v0.50.76", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6 policy"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
