@@ -8,12 +8,6 @@ import (
 	"sync"
 )
 
-type desktopFileIdentity struct {
-	device uint64
-	inode  uint64
-	links  uint64
-}
-
 type secureDesktopSpawnSpec struct {
 	command      string
 	arguments    []string

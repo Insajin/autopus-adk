@@ -27,7 +27,10 @@ type desktopCodeIdentity struct {
 	count   uint8
 }
 
-func readDesktopCodeIdentity(reader io.ReaderAt, size int64) (desktopCodeIdentity, error) {
+func readDesktopCodeIdentity(
+	reader io.ReaderAt,
+	size int64,
+) (identity desktopCodeIdentity, resultErr error) {
 	if reader == nil || size <= 0 || size > maxDesktopProviderExecutableBytes {
 		return desktopCodeIdentity{}, errDesktopProviderUnavailable
 	}
@@ -35,7 +38,12 @@ func readDesktopCodeIdentity(reader io.ReaderAt, size int64) (desktopCodeIdentit
 	if err != nil {
 		return desktopCodeIdentity{}, errDesktopProviderUnavailable
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			identity = desktopCodeIdentity{}
+			resultErr = errDesktopProviderUnavailable
+		}
+	}()
 	offset, length, err := desktopCodeSignatureRange(file)
 	if err != nil || length == 0 || length > maxDesktopSignatureBytes ||
 		base > uint64(size) || uint64(offset) > uint64(size)-base ||

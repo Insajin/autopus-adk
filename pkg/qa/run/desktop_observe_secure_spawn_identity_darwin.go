@@ -7,6 +7,12 @@ import (
 	"syscall"
 )
 
+type desktopFileIdentity struct {
+	device uint64
+	inode  uint64
+	links  uint64
+}
+
 func desktopExecutableFileIdentity(info os.FileInfo) (desktopFileIdentity, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok || stat.Nlink != 1 {
