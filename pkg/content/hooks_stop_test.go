@@ -69,7 +69,7 @@ func TestGenerateCLIHooks_StopEvent(t *testing.T) {
 			platform: "codex",
 			want: wantHook{
 				event:   "Stop",
-				command: ".claude/hooks/autopus/hook-codex-stop.sh",
+				command: `"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.codex/hooks/autopus/hook-codex-stop.sh"`,
 				typ:     "command",
 			},
 		},
@@ -144,7 +144,7 @@ func TestGenerateCLIHooks_CompletionHookTimeout(t *testing.T) {
 	}{
 		{"claude-code", "Stop", "SessionStart"},
 		{"antigravity-cli", "AfterAgent", ""},
-		{"codex", "Stop", ""},
+		{"codex", "Stop", "SessionStart"},
 	}
 
 	for _, tc := range tests {

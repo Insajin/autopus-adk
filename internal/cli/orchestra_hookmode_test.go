@@ -46,3 +46,16 @@ func TestNewOrchSessionID_MatchesSafePattern(t *testing.T) {
 		t.Fatalf("newOrchSessionID() = %q does not match %s", got, sessionIDPattern)
 	}
 }
+
+func TestNewOrchSessionID_IsUnique(t *testing.T) {
+	t.Parallel()
+	const count = 256
+	ids := make(map[string]struct{}, count)
+	for i := 0; i < count; i++ {
+		id := newOrchSessionID()
+		if _, exists := ids[id]; exists {
+			t.Fatalf("newOrchSessionID() collision: %q", id)
+		}
+		ids[id] = struct{}{}
+	}
+}

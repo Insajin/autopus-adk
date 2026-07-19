@@ -45,14 +45,11 @@ func (b *issue59ReviewBackend) requestCount() int {
 	return len(b.requests)
 }
 
-func TestExecuteStructuredSpecReviewProvider_CodexExecCallsOnlySubprocess(t *testing.T) {
-	pane := &issue59ReviewBackend{name: "pane"}
-	subprocess := &issue59ReviewBackend{
-		name:      "subprocess",
+func TestExecuteStructuredSpecReviewProvider_CodexExecKeepsPrimaryPane(t *testing.T) {
+	pane := &issue59ReviewBackend{
+		name:      "pane",
 		responses: []orchestra.ProviderResponse{{Output: `{"verdict":"PASS","summary":"ok","findings":[]}`}},
 	}
-	restore := stubSpecReviewSubprocessBackend(t, subprocess)
-	defer restore()
 
 	outcome := executeStructuredSpecReviewProvider(
 		context.Background(),
@@ -66,23 +63,18 @@ func TestExecuteStructuredSpecReviewProvider_CodexExecCallsOnlySubprocess(t *tes
 	)
 
 	require.Nil(t, outcome.failed)
-	assert.Equal(t, "subprocess", outcome.resp.ExecutedBackend)
-	assert.Zero(t, pane.requestCount())
-	assert.Equal(t, 1, subprocess.requestCount())
+	assert.Equal(t, "pane", outcome.resp.ExecutedBackend)
+	assert.Equal(t, 1, pane.requestCount())
 }
 
-func TestExecuteStructuredSpecReviewProvider_PreselectsSubprocessForCodexReprompt(t *testing.T) {
-	pane := &issue59ReviewBackend{name: "pane"}
-	subprocess := &issue59ReviewBackend{
-		name: "subprocess",
+func TestExecuteStructuredSpecReviewProvider_CodexRepromptKeepsPrimaryPane(t *testing.T) {
+	pane := &issue59ReviewBackend{
+		name: "pane",
 		responses: []orchestra.ProviderResponse{
 			{Output: "not json"},
 			{Output: `{"verdict":"PASS","summary":"ok","findings":[]}`},
 		},
 	}
-	restore := stubSpecReviewSubprocessBackend(t, subprocess)
-	defer restore()
-
 	outcome := executeStructuredSpecReviewProvider(
 		context.Background(),
 		orchestra.OrchestraConfig{TimeoutSeconds: 90, Prompt: "review"},
@@ -100,51 +92,36 @@ func TestExecuteStructuredSpecReviewProvider_PreselectsSubprocessForCodexRepromp
 	)
 
 	require.Nil(t, outcome.failed)
-	assert.Equal(t, "subprocess", outcome.resp.ExecutedBackend)
-	assert.Zero(t, pane.requestCount())
-	require.Equal(t, 2, subprocess.requestCount(), "reprompt must use the selected subprocess backend")
-	subprocess.mu.Lock()
-	defer subprocess.mu.Unlock()
-	assert.NotContains(t, subprocess.requests[0].Prompt, "Required JSON schema:")
-	assert.NotContains(t, subprocess.requests[1].Prompt, "Required JSON schema:")
+	assert.Equal(t, "pane", outcome.resp.ExecutedBackend)
+	require.Equal(t, 2, pane.requestCount(), "initial request and reprompt must use the primary pane backend")
+	pane.mu.Lock()
+	defer pane.mu.Unlock()
+	assert.Contains(t, pane.requests[0].Prompt, "Required JSON schema:")
+	assert.Contains(t, pane.requests[1].Prompt, "Required JSON schema:")
 }
 
-func TestSelectSpecReviewProviderBackend_PreservesNonEligibleBackends(t *testing.T) {
+func TestSpecReviewProviderBackendName_UsesPrimaryBackend(t *testing.T) {
 	pane := &issue59ReviewBackend{name: "pane"}
 	subprocess := &issue59ReviewBackend{name: "subprocess"}
-	created := 0
-	restore := stubSpecReviewSubprocessFactory(t, func() orchestra.ExecutionBackend {
-		created++
-		return subprocess
-	})
-	defer restore()
-
 	tests := []struct {
-		name     string
-		primary  orchestra.ExecutionBackend
-		provider orchestra.ProviderConfig
+		name    string
+		backend orchestra.ExecutionBackend
+		want    string
 	}{
-		{name: "claude", primary: pane, provider: orchestra.ProviderConfig{Name: "claude", Binary: "claude", Args: []string{"--print"}}},
-		{name: "gemini", primary: pane, provider: orchestra.ProviderConfig{Name: "gemini", Binary: "gemini", Args: []string{"exec"}}},
-		{name: "codex non-exec", primary: pane, provider: orchestra.ProviderConfig{Name: "codex", Binary: "codex", Args: []string{"--search", "exec"}}},
-		{name: "codex case mismatch", primary: pane, provider: orchestra.ProviderConfig{Name: "codex", Binary: "codex", Args: []string{"Exec"}}},
-		{name: "forced subprocess", primary: subprocess, provider: orchestra.ProviderConfig{Name: "codex", Binary: "codex", Args: []string{"exec"}}},
+		{name: "pane", backend: pane, want: "pane"},
+		{name: "explicit subprocess", backend: subprocess, want: "subprocess"},
+		{name: "missing", backend: nil, want: "unknown"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			selected := selectSpecReviewProviderBackend(tt.primary, tt.provider)
-			assert.Same(t, tt.primary, selected)
+			assert.Equal(t, tt.want, specReviewProviderBackendName(tt.backend))
 		})
 	}
-	assert.Zero(t, created)
 }
 
 func TestExecuteStructuredSpecReviewProvider_UsesSelectedBackendForFailureDiagnostics(t *testing.T) {
-	pane := &issue59ReviewBackend{name: "pane"}
-	subprocess := &issue59ReviewBackend{name: "subprocess", err: errors.New("boom")}
-	restore := stubSpecReviewSubprocessBackend(t, subprocess)
-	defer restore()
+	pane := &issue59ReviewBackend{name: "pane", err: errors.New("boom")}
 
 	outcome := executeStructuredSpecReviewProvider(
 		context.Background(),
@@ -158,22 +135,9 @@ func TestExecuteStructuredSpecReviewProvider_UsesSelectedBackendForFailureDiagno
 	)
 
 	require.NotNil(t, outcome.failed)
-	assert.Equal(t, "subprocess_stdout", outcome.failed.CollectionMode)
-	assert.Equal(t, "subprocess", outcome.resp.ExecutedBackend)
-	assert.Zero(t, pane.requestCount())
-	assert.Equal(t, 1, subprocess.requestCount())
-}
-
-func stubSpecReviewSubprocessBackend(t *testing.T, backend orchestra.ExecutionBackend) func() {
-	t.Helper()
-	return stubSpecReviewSubprocessFactory(t, func() orchestra.ExecutionBackend { return backend })
-}
-
-func stubSpecReviewSubprocessFactory(t *testing.T, factory func() orchestra.ExecutionBackend) func() {
-	t.Helper()
-	original := specReviewSubprocessBackendFactory
-	specReviewSubprocessBackendFactory = factory
-	return func() { specReviewSubprocessBackendFactory = original }
+	assert.Equal(t, "pane", outcome.failed.CollectionMode)
+	assert.Equal(t, "pane", outcome.resp.ExecutedBackend)
+	assert.Equal(t, 1, pane.requestCount())
 }
 
 func TestApplySpecReviewExecutionTimeout_PreservesDefaultsAndInput(t *testing.T) {

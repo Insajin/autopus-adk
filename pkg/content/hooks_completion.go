@@ -21,13 +21,17 @@ const (
 	// regardless of the hook's spawn cwd. Hook commands run via `sh -c`, so the
 	// parameter expansion resolves at execution time.
 	claudeHookDirPrefix = `"${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/autopus/`
+	// Codex hooks may run with a subdirectory as cwd. Resolve the checked-out
+	// project root at hook execution time and use assets installed by the Codex
+	// adapter itself, so codex-only harnesses do not depend on Claude surfaces.
+	codexHookDirPrefix = `"$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.codex/hooks/autopus/`
 )
 
 // generateCompletionHooks returns the platform-specific orchestra hook-IPC hooks:
 // a completion hook that signals when the agent session ends, and (for claude) a
 // SessionStart hook that signals when the session is ready to receive a prompt
-// (SPEC-ORCH-022). The scripts are installed to .claude/hooks/autopus/ by the
-// claude adapter; that Command path is shared across platforms that reference them.
+// (SPEC-ORCH-022). Each provider adapter owns the hook assets referenced by its
+// generated configuration.
 // Platforms without a known completion hook (e.g. opencode) return nil.
 func generateCompletionHooks(platform string) []adapter.HookConfig {
 	type entry struct {
@@ -55,7 +59,8 @@ func generateCompletionHooks(platform string) []adapter.HookConfig {
 		// AfterAgent is the Antigravity CLI event fired when the agent session ends.
 		completion = entry{"AfterAgent", ".claude/hooks/autopus/hook-gemini-afteragent.sh"}
 	case "codex":
-		completion = entry{"Stop", ".claude/hooks/autopus/hook-codex-stop.sh"}
+		completion = entry{"Stop", codexHookDirPrefix + "hook-codex-stop.sh\""}
+		ready = entry{"SessionStart", codexHookDirPrefix + "hook-codex-sessionstart.sh\""}
 	default:
 		return nil
 	}

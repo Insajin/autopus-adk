@@ -255,9 +255,10 @@ func TestGenerateProjectHookConfigs_TaskCreatedDisabledOutsideClaude(t *testing.
 
 	hooks, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "codex", true)
 	require.NoError(t, err)
-	// TaskCreated is disabled outside claude; only the completion Stop hook is present.
-	require.Len(t, hooks, 1, "only completion Stop hook expected for codex when TaskCreated is disabled")
-	assert.Equal(t, "Stop", hooks[0].Event)
+	// TaskCreated is disabled outside claude; Codex still receives the completion
+	// and readiness hooks required by pane IPC.
+	require.Len(t, hooks, 2, "completion Stop and SessionStart hooks expected for codex")
+	assert.ElementsMatch(t, []string{"Stop", "SessionStart"}, eventNames(hooks))
 	assert.Empty(t, gitHooks)
 }
 

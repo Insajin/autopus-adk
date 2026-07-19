@@ -6,14 +6,21 @@ import (
 	"os"
 	"path/filepath"
 
+	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/content"
 )
 
+var codexHookAssetNames = []string{
+	"hook-codex-stop.sh",
+	"hook-codex-sessionstart.sh",
+}
+
 // generateHooks renders hooks.json template and merges with existing user hooks.
-// Autopus-managed hooks are identified by the "__autopus__" marker key.
-// User hooks (without the marker) are preserved during merge.
+// Legacy Autopus hooks are recognized by their marker or managed command;
+// user hooks are preserved during merge. Generated JSON contains only fields
+// from the official Codex hook schema.
 func (a *Adapter) generateHooks(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	rendered, err := a.renderHooksTemplate(cfg)
 	if err != nil {
@@ -26,19 +33,26 @@ func (a *Adapter) generateHooks(cfg *config.HarnessConfig) ([]adapter.FileMappin
 		return nil, err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		return nil, fmt.Errorf(".codex 디렉터리 생성 실패: %w", err)
-	}
-	if err := os.WriteFile(targetPath, merged, 0644); err != nil {
+	if err := writeCodexManagedFile(a.root, filepath.Join(".codex", "hooks.json"), merged, 0o644); err != nil {
 		return nil, fmt.Errorf("codex hooks.json 쓰기 실패: %w", err)
 	}
 
-	return []adapter.FileMapping{{
+	files := []adapter.FileMapping{{
 		TargetPath:      filepath.Join(".codex", "hooks.json"),
 		OverwritePolicy: adapter.OverwriteMerge,
 		Checksum:        checksum(string(merged)),
 		Content:         merged,
-	}}, nil
+	}}
+	assets, err := prepareCodexHookAssets()
+	if err != nil {
+		return nil, err
+	}
+	for _, asset := range assets {
+		if err := writeCodexManagedFile(a.root, asset.TargetPath, asset.Content, 0o755); err != nil {
+			return nil, fmt.Errorf("codex hook 쓰기 실패 %s: %w", asset.TargetPath, err)
+		}
+	}
+	return append(files, assets...), nil
 }
 
 // prepareHooksFile returns hooks.json file mapping without writing to disk.
@@ -55,12 +69,34 @@ func (a *Adapter) prepareHooksFile(cfg *config.HarnessConfig) ([]adapter.FileMap
 		return nil, err
 	}
 
-	return []adapter.FileMapping{{
+	files := []adapter.FileMapping{{
 		TargetPath:      filepath.Join(".codex", "hooks.json"),
 		OverwritePolicy: adapter.OverwriteMerge,
 		Checksum:        checksum(string(merged)),
 		Content:         merged,
-	}}, nil
+	}}
+	assets, err := prepareCodexHookAssets()
+	if err != nil {
+		return nil, err
+	}
+	return append(files, assets...), nil
+}
+
+func prepareCodexHookAssets() ([]adapter.FileMapping, error) {
+	files := make([]adapter.FileMapping, 0, len(codexHookAssetNames))
+	for _, name := range codexHookAssetNames {
+		data, err := contentfs.FS.ReadFile("hooks/" + name)
+		if err != nil {
+			return nil, fmt.Errorf("codex hook asset 읽기 실패 %s: %w", name, err)
+		}
+		files = append(files, adapter.FileMapping{
+			TargetPath:      filepath.Join(".codex", "hooks", "autopus", name),
+			OverwritePolicy: adapter.OverwriteAlways,
+			Checksum:        checksum(string(data)),
+			Content:         data,
+		})
+	}
+	return files, nil
 }
 
 func (a *Adapter) prepareGitHookFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
@@ -89,13 +125,17 @@ func (a *Adapter) renderHooksTemplate(cfg *config.HarnessConfig) (string, error)
 		return "", fmt.Errorf("codex hooks 생성 실패: %w", err)
 	}
 
-	doc := hooksDoc{Hooks: make(map[string]hookEntries)}
+	doc := hooksDoc{Hooks: make(map[string]hookGroups)}
 	for _, hook := range hooks {
-		doc.Hooks[hook.Event] = append(doc.Hooks[hook.Event], hookEntry{
-			Type:    hook.Type,
-			Command: hook.Command,
+		doc.Hooks[hook.Event] = append(doc.Hooks[hook.Event], hookGroup{
 			Matcher: hook.Matcher,
-			Timeout: hook.Timeout,
+			Hooks: hookHandlers{{
+				Type:          hook.Type,
+				Command:       hook.Command,
+				Timeout:       hook.Timeout,
+				Env:           hook.Env,
+				StatusMessage: autopusHookStatusMessage,
+			}},
 		})
 	}
 
@@ -106,8 +146,8 @@ func (a *Adapter) renderHooksTemplate(cfg *config.HarnessConfig) (string, error)
 	return string(rendered), nil
 }
 
-// mergeHooks reads existing hooks.json from disk, preserves user hooks (no __autopus__ marker),
-// and upserts Autopus-managed hooks from the rendered template.
+// mergeHooks reads existing hooks.json from disk, preserves user hooks, and
+// upserts Autopus-managed hooks from the rendered template.
 func mergeHooks(existingPath, rendered string) ([]byte, error) {
 	// Parse rendered autopus hooks and stamp them with marker
 	var autopusDoc hooksDoc
@@ -117,85 +157,28 @@ func mergeHooks(existingPath, rendered string) ([]byte, error) {
 	stampAutopusMarker(&autopusDoc)
 
 	// Read existing file — if missing or invalid, use autopus-only result
+	if info, err := os.Lstat(existingPath); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return nil, fmt.Errorf("existing hooks JSON is a symlink: %s", existingPath)
+	} else if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("existing hooks JSON 검사 실패: %w", err)
+	}
+
 	existingData, err := os.ReadFile(existingPath)
 	if err != nil {
-		return json.MarshalIndent(autopusDoc, "", "  ")
+		if os.IsNotExist(err) {
+			return json.MarshalIndent(autopusDoc, "", "  ")
+		}
+		return nil, fmt.Errorf("existing hooks JSON 읽기 실패: %w", err)
 	}
 
 	var existingDoc hooksDoc
 	if err := json.Unmarshal(existingData, &existingDoc); err != nil {
-		return json.MarshalIndent(autopusDoc, "", "  ")
+		return nil, fmt.Errorf("existing hooks JSON 파싱 실패: %w", err)
 	}
 
 	// Merge each hook category: keep user hooks, upsert autopus hooks
 	merged := mergeHookCategories(existingDoc, autopusDoc)
 	return json.MarshalIndent(merged, "", "  ")
-}
-
-// hooksDoc represents the top-level hooks.json structure.
-type hooksDoc struct {
-	Hooks map[string]hookEntries `json:"hooks"`
-}
-
-// hookEntry represents a single hook entry in hooks.json.
-type hookEntry struct {
-	Type    string `json:"type,omitempty"`
-	Command string `json:"command"`
-	Matcher string `json:"matcher,omitempty"`
-	Timeout int    `json:"timeout,omitempty"`
-	Autopus bool   `json:"__autopus__,omitempty"`
-}
-
-// hookEntries ensures nil hook slices serialize as [] rather than null.
-type hookEntries []hookEntry
-
-func (e hookEntries) MarshalJSON() ([]byte, error) {
-	if e == nil {
-		return []byte("[]"), nil
-	}
-
-	type alias hookEntries
-	return json.Marshal(alias(e))
-}
-
-// stampAutopusMarker marks all hooks in the document as Autopus-managed.
-func stampAutopusMarker(doc *hooksDoc) {
-	for cat, entries := range doc.Hooks {
-		for i := range entries {
-			entries[i].Autopus = true
-		}
-		doc.Hooks[cat] = entries
-	}
-}
-
-// mergeHookCategories merges existing and autopus hook documents.
-// User hooks (Autopus==false) are preserved; autopus hooks are replaced.
-func mergeHookCategories(existing, autopus hooksDoc) hooksDoc {
-	result := hooksDoc{Hooks: make(map[string]hookEntries)}
-
-	// Collect all category names
-	cats := make(map[string]bool)
-	for c := range existing.Hooks {
-		cats[c] = true
-	}
-	for c := range autopus.Hooks {
-		cats[c] = true
-	}
-
-	for cat := range cats {
-		// Keep user hooks from existing
-		merged := make(hookEntries, 0, len(existing.Hooks[cat])+len(autopus.Hooks[cat]))
-		for _, e := range existing.Hooks[cat] {
-			if !e.Autopus {
-				merged = append(merged, e)
-			}
-		}
-		// Append all autopus hooks for this category
-		merged = append(merged, autopus.Hooks[cat]...)
-		result.Hooks[cat] = merged
-	}
-
-	return result
 }
 
 // installGitHooks generates and writes git hooks as fallback.

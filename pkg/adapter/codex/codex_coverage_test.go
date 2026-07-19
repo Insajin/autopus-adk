@@ -100,7 +100,8 @@ func TestRenderHooksTemplate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, rendered, "PreToolUse")
 	assert.Contains(t, rendered, "PostToolUse")
-	assert.NotContains(t, rendered, "SessionStart")
+	assert.Contains(t, rendered, "SessionStart")
+	assert.Contains(t, rendered, `"hooks"`)
 	assert.NotContains(t, rendered, "auto session save")
 	assert.NotContains(t, rendered, "auto check --status")
 	assert.NotContains(t, rendered, "auto check --lore --quiet")
@@ -111,7 +112,7 @@ func TestGenerateHooks_WritesToDisk(t *testing.T) {
 	dir := t.TempDir()
 	files, err := NewWithRoot(dir).generateHooks(config.DefaultFullConfig("test"))
 	require.NoError(t, err)
-	require.Len(t, files, 1)
+	require.Len(t, files, 3)
 	data, err := os.ReadFile(filepath.Join(dir, ".codex", "hooks.json"))
 	require.NoError(t, err)
 	assert.JSONEq(t, string(files[0].Content), string(data))
@@ -133,7 +134,7 @@ func TestPrepareHooksFile_MergesExisting(t *testing.T) {
 
 	files, err := a.prepareHooksFile(cfg)
 	require.NoError(t, err)
-	require.Len(t, files, 1)
+	require.Len(t, files, 3)
 
 	content := string(files[0].Content)
 	assert.Contains(t, content, "user.sh", "user hook preserved")
@@ -150,7 +151,7 @@ func TestMergeHooks_InvalidRenderedJSON(t *testing.T) {
 
 func TestMergeHookCategories_EmptyDocs(t *testing.T) {
 	t.Parallel()
-	empty := hooksDoc{Hooks: map[string]hookEntries{}}
+	empty := hooksDoc{Hooks: map[string]hookGroups{}}
 	result := mergeHookCategories(empty, empty)
 	assert.NotNil(t, result.Hooks)
 	assert.Empty(t, result.Hooks)

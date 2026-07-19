@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
@@ -11,10 +12,10 @@ import (
 // backend never blocks indefinitely while harvesting the screen (REQ-011).
 const finalReadTimeout = 5 * time.Second
 
-// collectResponse prefers the file-backed response contract, then falls back to
-// pane scrollback. timedOut marks deterministic timeout results when fallback
-// screen collection is used.
-func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req ProviderRequest, pi paneInfo, timedOut bool) *ProviderResponse {
+// collectResponse prefers the file-backed response contract, then a structured
+// hook result, and finally pane scrollback. timedOut marks deterministic timeout
+// results only when both structured collection paths are unavailable.
+func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req ProviderRequest, pi paneInfo, timedOut bool, hookSessions ...*HookSession) *ProviderResponse {
 	if output, ok := readResponseFile(pi.responseFile); ok {
 		return markUnavailableUsage(&ProviderResponse{
 			Provider:        req.Provider,
@@ -24,27 +25,23 @@ func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req Provid
 			ExecutedBackend: paneBackendName,
 		}, usageSourcePane, usageReasonPane)
 	}
-	if requiresReviewerResponseFile(req, pi) && !timedOut {
-		// While the reviewer pane is still running, a mid-render screen could be
-		// mis-parsed as the final verdict, so before the deadline only the written
-		// response file is trusted (anti-truncation; issue #59 — claude writes the
-		// response file and completes early while codex/gemini do not, so they run
-		// to the watchdog boundary).
-		return markUnavailableUsage(&ProviderResponse{
-			Provider:        req.Provider,
-			TimedOut:        timedOut,
-			EmptyOutput:     true,
-			Error:           reviewerResponseFileMissingError(timedOut),
-			ExecutedBackend: paneBackendName,
-		}, usageSourcePane, usageReasonPane)
+	if len(hookSessions) > 0 && hookSessions[0] != nil {
+		if result, err := hookSessions[0].ReadResultRound(req.Provider, req.Round); err == nil && strings.TrimSpace(result.Output) != "" {
+			response := HookResultToProviderResponse(*result, req.Provider, 0)
+			response.TimedOut = false
+			response.EmptyOutput = false
+			response.ExecutedBackend = paneBackendName
+			return &response
+		}
 	}
-
-	// At the deadline a reviewer that printed its answer to the terminal — the
+	// After an authoritative completion signal or at the deadline, a reviewer
+	// that printed its answer to the terminal — the
 	// fallback that promptFileInstruction explicitly authorizes ("If you cannot
 	// write the response file, print the final answer in the terminal as
 	// fallback") — would otherwise be discarded. Harvest the screen so the
-	// terminal-fallback answer is preserved instead of lost (issue #59). The
-	// response stays TimedOut because the per-provider budget was still exceeded.
+	// terminal-fallback answer is preserved instead of lost (issue #59). This is
+	// safe after completion because the pane is no longer mid-render. The response
+	// stays TimedOut only when the per-provider budget was exceeded.
 	//
 	// Use a fresh, bounded context for the final read: the original ctx may be
 	// cancelled after a completion timeout (mirrors interactive_collect.go).

@@ -19,10 +19,19 @@ type FileIPCDetector struct {
 // defaultFileIPCTimeout is the fallback timeout when the context has no deadline.
 const defaultFileIPCTimeout = 10 * time.Minute
 
-// WaitForCompletion polls for either the provider's response-file marker or its
-// done signal file via HookSession. Uses round-scoped signals when round > 0,
-// otherwise uses the standard done file. Timeout is derived from the context
-// deadline; falls back to defaultFileIPCTimeout.
+// codexResponseFileGrace gives a trusted Stop hook time to publish result+done
+// before a valid marked response file becomes the compatibility completion
+// signal. Project-local Codex hooks are skipped until the user trusts their
+// exact definition, so done-only waiting would otherwise consume the full
+// provider budget immediately after install or update.
+const codexResponseFileGrace = time.Second
+
+// WaitForCompletion polls HookSession artifacts. Codex gives its done signal
+// priority so a Stop hook can finish before pane cleanup. A complete marked
+// response becomes a compatibility signal only after a short grace period,
+// preventing project hook trust from turning into a full-budget timeout. Other
+// providers retain the immediate response-file path. Timeout is derived from the
+// context deadline and falls back to defaultFileIPCTimeout.
 func (d *FileIPCDetector) WaitForCompletion(ctx context.Context, pi paneInfo, _ []CompletionPattern, _ string, round int) (bool, error) {
 	provider := pi.provider.Name
 	if provider == "" {
@@ -34,14 +43,33 @@ func (d *FileIPCDetector) WaitForCompletion(ctx context.Context, pi paneInfo, _ 
 	if round > 0 {
 		doneName = RoundSignalName(provider, round, "done")
 	}
-	return d.waitForDoneOrResponseFile(ctx, timeout, doneName, pi.responseFile)
+	isCodex := isCodexInteractiveProvider(pi.provider)
+	responseGrace := time.Duration(0)
+	if isCodex {
+		responseGrace = codexResponseFileGrace
+	}
+	return d.waitForCompletionSignal(ctx, timeout, doneName, pi.responseFile, !isCodex, responseGrace)
 }
 
-func (d *FileIPCDetector) waitForDoneOrResponseFile(ctx context.Context, timeout time.Duration, doneName, responseFile string) (bool, error) {
-	if _, ok := readResponseFile(responseFile); ok {
-		return true, nil
+func (d *FileIPCDetector) waitForCompletionSignal(
+	ctx context.Context,
+	timeout time.Duration,
+	doneName string,
+	responseFile string,
+	allowResponseFile bool,
+	responseGrace time.Duration,
+) (bool, error) {
+	if allowResponseFile {
+		if _, ok := readResponseFile(responseFile); ok {
+			return true, nil
+		}
 	}
-
+	var responseObservedAt time.Time
+	if responseGrace > 0 {
+		if _, ok := readResponseFile(responseFile); ok {
+			responseObservedAt = time.Now()
+		}
+	}
 	deadline := time.NewTimer(timeout)
 	defer deadline.Stop()
 	ticker := time.NewTicker(200 * time.Millisecond)
@@ -58,11 +86,21 @@ func (d *FileIPCDetector) waitForDoneOrResponseFile(ctx context.Context, timeout
 		case <-deadline.C:
 			return false, nil
 		case <-ticker.C:
-			if _, ok := readResponseFile(responseFile); ok {
-				return true, nil
-			}
 			if _, err := os.Stat(donePath); err == nil {
 				return true, nil
+			}
+			if allowResponseFile {
+				if _, ok := readResponseFile(responseFile); ok {
+					return true, nil
+				}
+			} else if responseGrace > 0 {
+				if _, ok := readResponseFile(responseFile); !ok {
+					responseObservedAt = time.Time{}
+				} else if responseObservedAt.IsZero() {
+					responseObservedAt = time.Now()
+				} else if time.Since(responseObservedAt) >= responseGrace {
+					return true, nil
+				}
 			}
 		}
 	}

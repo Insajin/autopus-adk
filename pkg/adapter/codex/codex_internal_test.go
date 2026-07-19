@@ -20,16 +20,26 @@ func TestGenerateHooks(t *testing.T) {
 
 	files, err := a.generateHooks(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 1)
+	assert.Len(t, files, 3)
 	assert.Equal(t, filepath.Join(".codex", "hooks.json"), files[0].TargetPath)
 	assert.FileExists(t, filepath.Join(dir, ".codex", "hooks.json"))
+	assert.FileExists(t, filepath.Join(dir, ".codex", "hooks", "autopus", "hook-codex-stop.sh"))
+	assert.FileExists(t, filepath.Join(dir, ".codex", "hooks", "autopus", "hook-codex-sessionstart.sh"))
+	stopInfo, err := os.Stat(filepath.Join(dir, ".codex", "hooks", "autopus", "hook-codex-stop.sh"))
+	require.NoError(t, err)
+	assert.NotZero(t, stopInfo.Mode().Perm()&0o111, "installed Codex hook must be executable")
 	assert.Contains(t, string(files[0].Content), "PreToolUse")
 	assert.Contains(t, string(files[0].Content), "PostToolUse")
-	assert.NotContains(t, string(files[0].Content), "SessionStart")
-	// SPEC-ORCH-022 (REQ-002): codex registers a Stop completion hook so the
-	// orchestrator can collect provider completion via done-file IPC. SessionStart
-	// (ready signal) is not registered for codex.
+	assert.Contains(t, string(files[0].Content), "SessionStart")
+	// SPEC-ORCH-022: Codex owns both completion and ready hooks so a codex-only
+	// harness can use file IPC without depending on Claude-generated assets.
 	assert.Contains(t, string(files[0].Content), "Stop")
+	var doc hooksDoc
+	require.NoError(t, json.Unmarshal(files[0].Content, &doc))
+	stop := requireHookGroup(t, doc, "Stop", 0)
+	assert.NotEmpty(t, stop.Hooks, "Codex commands must use event -> matcher group -> hooks[] schema")
+	assert.Equal(t, autopusHookStatusMessage, stop.Hooks[0].StatusMessage)
+	assert.NotContains(t, string(files[0].Content), "__autopus__")
 }
 
 func TestPrepareHooksFile_NoDiskWrite(t *testing.T) {
@@ -40,7 +50,7 @@ func TestPrepareHooksFile_NoDiskWrite(t *testing.T) {
 
 	files, err := a.prepareHooksFile(cfg)
 	require.NoError(t, err)
-	assert.Len(t, files, 1)
+	assert.Len(t, files, 3)
 
 	_, err = os.Stat(filepath.Join(dir, ".codex", "hooks.json"))
 	assert.True(t, os.IsNotExist(err))
@@ -204,7 +214,7 @@ func TestGenerateHooks_ValidJSON(t *testing.T) {
 
 	files, err := a.generateHooks(cfg)
 	require.NoError(t, err)
-	require.Len(t, files, 1)
+	require.Len(t, files, 3)
 
 	var parsed map[string]interface{}
 	err = json.Unmarshal(files[0].Content, &parsed)
@@ -214,8 +224,8 @@ func TestGenerateHooks_ValidJSON(t *testing.T) {
 	require.True(t, ok, "should have hooks key")
 	assert.Contains(t, hooks, "PreToolUse")
 	assert.Contains(t, hooks, "PostToolUse")
-	assert.NotContains(t, hooks, "SessionStart")
-	// SPEC-ORCH-022 (REQ-002): codex registers a Stop completion hook.
+	assert.Contains(t, hooks, "SessionStart")
+	// SPEC-ORCH-022: codex registers completion and ready hooks.
 	assert.Contains(t, hooks, "Stop")
 }
 

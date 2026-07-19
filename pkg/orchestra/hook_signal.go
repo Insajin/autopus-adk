@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -151,6 +152,54 @@ func (s *HookSession) ReadResultRound(provider string, round int) (*HookResult, 
 		return s.readResultFile(resultName)
 	}
 	return s.ReadResult(provider)
+}
+
+// ResetAttempt removes stale IPC artifacts for exactly one provider attempt.
+// Round zero keeps the legacy unscoped done/result names while readiness and
+// bidirectional-input signals remain explicitly round-scoped. Sibling providers
+// and other rounds are never touched, so parallel executions may safely share a
+// HookSession directory.
+func (s *HookSession) ResetAttempt(provider string, round int) error {
+	if err := validateHookArtifactProvider(provider); err != nil {
+		return err
+	}
+	safeProvider := provider
+	doneName := safeProvider + "-done"
+	resultName := safeProvider + "-result.json"
+	if round > 0 {
+		doneName = RoundSignalName(safeProvider, round, "done")
+		resultName = RoundSignalName(safeProvider, round, "result.json")
+	}
+
+	names := []string{
+		doneName,
+		resultName,
+		RoundSignalName(safeProvider, round, "ready"),
+		RoundSignalName(safeProvider, round, "input.json"),
+		RoundSignalName(safeProvider, round, "abort"),
+	}
+	for _, name := range names {
+		if err := os.Remove(filepath.Join(s.sessionDir, name)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("reset hook attempt artifact %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func validateHookArtifactProvider(provider string) error {
+	if provider == "" {
+		return errors.New("hook provider name is empty")
+	}
+	for _, char := range provider {
+		if (char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '_' || char == '-' {
+			continue
+		}
+		return fmt.Errorf("hook provider name contains unsafe character: %q", provider)
+	}
+	return nil
 }
 
 // readResultFile reads and parses a named result file from the session directory.

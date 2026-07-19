@@ -69,7 +69,7 @@ func TestFileIPCDetector_ContextCancellation(t *testing.T) {
 	assert.False(t, ok, "should return false on context timeout")
 }
 
-func TestFileIPCDetector_ResponseFileMarkerExists(t *testing.T) {
+func TestFileIPCDetector_ResponseFileMarkerDoesNotReplaceDoneSignal(t *testing.T) {
 	t.Parallel()
 	session := newTestHookSession(t)
 	responsePath := filepath.Join(t.TempDir(), "codex-response.md")
@@ -81,15 +81,15 @@ func TestFileIPCDetector_ResponseFileMarkerExists(t *testing.T) {
 		role:         "reviewer",
 		responseFile: responsePath,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 
 	ok, err := detector.WaitForCompletion(ctx, pi, nil, "", 1)
 	assert.NoError(t, err)
-	assert.True(t, ok, "response-file marker should complete hook-mode reviewer without a done file")
+	assert.False(t, ok, "response output must not close the pane before the Stop hook finishes")
 }
 
-func TestFileIPCDetector_ResponseFileMarkerArrivesBeforeDoneFile(t *testing.T) {
+func TestFileIPCDetector_ResponseFileMarkerWaitsForDoneFile(t *testing.T) {
 	t.Parallel()
 	session := newTestHookSession(t)
 	responsePath := filepath.Join(t.TempDir(), "codex-response.md")
@@ -105,15 +105,63 @@ func TestFileIPCDetector_ResponseFileMarkerArrivesBeforeDoneFile(t *testing.T) {
 
 	content := markedResponse(`{"verdict":"PASS","summary":"ok","findings":[]}`)
 	go func() {
-		time.Sleep(120 * time.Millisecond)
+		time.Sleep(80 * time.Millisecond)
 		_ = os.WriteFile(responsePath, []byte(content), 0o600)
+		time.Sleep(320 * time.Millisecond)
+		donePath := filepath.Join(session.Dir(), RoundSignalName("codex", 1, "done"))
+		_ = os.WriteFile(donePath, []byte{}, 0o600)
 	}()
 
 	start := time.Now()
 	ok, err := detector.WaitForCompletion(ctx, pi, nil, "", 1)
 	assert.NoError(t, err)
-	assert.True(t, ok, "response-file marker should unblock FileIPC wait even when the hook done file never appears")
+	assert.True(t, ok, "done file should complete the hook-mode reviewer")
+	assert.GreaterOrEqual(t, time.Since(start), 350*time.Millisecond,
+		"response-file marker must not unblock the wait before done")
 	assert.Less(t, time.Since(start), time.Second)
+}
+
+func TestFileIPCDetector_CodexResponseFileFallsBackAfterHookTrustGrace(t *testing.T) {
+	t.Parallel()
+	session := newTestHookSession(t)
+	responsePath := filepath.Join(t.TempDir(), "codex-response.md")
+	writeMarkedResponse(t, responsePath, `{"verdict":"PASS","summary":"trusted response file","findings":[]}`)
+
+	detector := &FileIPCDetector{session: session}
+	pi := paneInfo{
+		provider:     ProviderConfig{Name: "codex"},
+		role:         "reviewer",
+		responseFile: responsePath,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	ok, err := detector.WaitForCompletion(ctx, pi, nil, "", 1)
+	elapsed := time.Since(start)
+	assert.NoError(t, err)
+	assert.True(t, ok, "a valid response file must avoid the full watchdog when project hooks are not trusted yet")
+	assert.GreaterOrEqual(t, elapsed, 900*time.Millisecond, "the Stop hook keeps a grace window to finish first")
+	assert.Less(t, elapsed, 2*time.Second, "untrusted hooks must not strand a completed response until the provider deadline")
+}
+
+func TestFileIPCDetector_NonCodexResponseFileRetainsLegacyCompletion(t *testing.T) {
+	t.Parallel()
+	session := newTestHookSession(t)
+	responsePath := filepath.Join(t.TempDir(), "claude-response.md")
+	writeMarkedResponse(t, responsePath, `{"verdict":"PASS","summary":"ok","findings":[]}`)
+	detector := &FileIPCDetector{session: session}
+	pi := paneInfo{
+		provider:     ProviderConfig{Name: "claude"},
+		role:         "reviewer",
+		responseFile: responsePath,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	ok, err := detector.WaitForCompletion(ctx, pi, nil, "", 0)
+	assert.NoError(t, err)
+	assert.True(t, ok)
 }
 
 // TestNewCompletionDetectorWithConfig_FileIPC verifies factory returns FileIPCDetector

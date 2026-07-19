@@ -70,6 +70,18 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	pi := paneInfo{paneID: paneID, provider: req.Config, role: req.Role}
 	defer func() { cleanupInteractivePanes(term, []paneInfo{pi}) }()
 
+	// Create and reset the provider-scoped hook attempt before launch. Structured
+	// reviewer reprompts reuse the same session/provider/round, so stale done or
+	// result artifacts would otherwise complete the new pane immediately. The
+	// reset is intentionally provider-scoped because sibling providers execute in
+	// parallel within the same HookSession directory.
+	hookSession := resolveHookSession(b.cfg)
+	if hookSession != nil && hookSession.HasHook(req.Config.Name) {
+		if resetErr := hookSession.ResetAttempt(req.Config.Name, req.Round); resetErr != nil {
+			return paneExecutionFailure(req, "interactive pane execution failed: reset hook attempt: "+resetErr.Error())
+		}
+	}
+
 	// SPEC-ORCH-022: export the hook session ID (and round) into the pane shell
 	// BEFORE the provider CLI launches so the provider's completion hook
 	// (Stop/AfterAgent) sees AUTOPUS_SESSION_ID and writes the done-file. The
@@ -90,12 +102,6 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 			time.Sleep(promptRegisterDelay)
 		}
 	}
-
-	// SPEC-ORCH-022: create the hook session BEFORE launch so the session
-	// directory exists when the provider's SessionStart hook fires the ready
-	// signal, and so the same session is reused for completion. Degrades to nil
-	// (screen-poll ready + completion) on failure (REQ-012).
-	hookSession := resolveHookSession(b.cfg)
 
 	// Launch the provider CLI. For args-based providers the prompt rides on the
 	// launch command; otherwise the prompt is sent only after session-ready.
@@ -158,7 +164,7 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	// FileIPCDetector (REQ-006/007); a nil session degrades to the poll path.
 	completed := waitForCompletion(ctx, b.cfg, pi, DefaultCompletionPatterns(), completionBaseline, hookSession, req.Round)
 
-	resp := b.collectResponse(ctx, req, pi, !completed)
+	resp := b.collectResponse(ctx, req, pi, !completed, hookSession)
 	resp.Duration = time.Since(start)
 	return resp, nil
 }

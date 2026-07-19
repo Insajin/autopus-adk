@@ -77,6 +77,9 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 
 // Clean removes files created by this adapter.
 func (a *Adapter) Clean(_ context.Context) error {
+	if err := removeCodexHookAssets(a.root); err != nil {
+		return fmt.Errorf("Codex hook asset 제거 실패: %w", err)
+	}
 	if err := os.RemoveAll(filepath.Join(a.root, ".codex", "skills")); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf(".codex/skills 제거 실패: %w", err)
 	}

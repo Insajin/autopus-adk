@@ -191,7 +191,7 @@ func runOrchestraCommand(
 	// Hook mode requires `auto init` to install hooks first (SPEC-ORCH-007 R5/R6).
 	sessionID := ""
 	if interactive && monitorRuntime.HookMode {
-		sessionID = fmt.Sprintf("orch-%d", time.Now().UnixMilli())
+		sessionID = orchestra.NewSessionID()
 	}
 
 	cfg := orchestra.OrchestraConfig{

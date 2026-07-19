@@ -171,6 +171,8 @@ func TestCodexAdapter_Clean(t *testing.T) {
 
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
+	userHook := filepath.Join(dir, ".codex", "hooks", "autopus", "user-hook.sh")
+	require.NoError(t, os.WriteFile(userHook, []byte("user-owned"), 0o700))
 
 	err = a.Clean(context.Background())
 	require.NoError(t, err)
@@ -181,4 +183,13 @@ func TestCodexAdapter_Clean(t *testing.T) {
 
 	_, statErr = os.Stat(filepath.Join(dir, ".agents", "skills", "auto"))
 	assert.True(t, os.IsNotExist(statErr))
+
+	for _, name := range []string{"hook-codex-stop.sh", "hook-codex-sessionstart.sh"} {
+		_, statErr = os.Stat(filepath.Join(dir, ".codex", "hooks", "autopus", name))
+		assert.ErrorIs(t, statErr, os.ErrNotExist, "managed Codex hook asset must be removed")
+	}
+	userHookData, readErr := os.ReadFile(userHook)
+	require.NoError(t, readErr)
+	assert.Equal(t, "user-owned", string(userHookData))
+	assert.FileExists(t, filepath.Join(dir, ".codex", "hooks.json"), "merged user hook configuration must not be removed")
 }

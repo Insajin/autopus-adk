@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"fmt"
-	"time"
-
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
@@ -47,5 +44,5 @@ func hookCollectionEligible(term terminal.Terminal, subprocessMode, hookAvailabl
 // newOrchSessionID returns a hook session ID matching the safe pattern enforced
 // by NewHookSession and SendSessionEnvToPane ([a-zA-Z0-9_-]+).
 func newOrchSessionID() string {
-	return fmt.Sprintf("orch-%d", time.Now().UnixMilli())
+	return orchestra.NewSessionID()
 }

@@ -91,7 +91,7 @@ func TestSignalEmitter_ReviewerRequiresResponseFileBeforeSignal(t *testing.T) {
 	assert.Empty(t, mock.getSentSignals())
 }
 
-func TestCollectResponse_ReviewerMissingResponseFileDoesNotUseScreenFallback(t *testing.T) {
+func TestCollectResponse_ReviewerMissingResponseFileUsesScreenFallbackAfterCompletion(t *testing.T) {
 	t.Parallel()
 
 	mock := newCmuxMock()
@@ -109,11 +109,11 @@ func TestCollectResponse_ReviewerMissingResponseFileDoesNotUseScreenFallback(t *
 
 	require.NotNil(t, resp)
 	assert.Equal(t, "codex", resp.Provider)
-	assert.Empty(t, resp.Output)
-	assert.True(t, resp.EmptyOutput)
-	assert.Contains(t, resp.Error, "response file")
+	assert.Contains(t, resp.Output, "screen fallback")
+	assert.False(t, resp.EmptyOutput)
+	assert.Empty(t, resp.Error)
 	assert.Equal(t, "pane", resp.ExecutedBackend)
-	assert.Zero(t, mock.readScreenCalls, "reviewer collection must not fall back to screen output")
+	assert.Equal(t, 1, mock.readScreenCalls, "completed reviewer may use its documented terminal fallback")
 }
 
 func TestCollectResponse_AntigravityReviewerUsesScreenFallbackWithoutTimeout(t *testing.T) {

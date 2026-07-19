@@ -54,7 +54,7 @@ func runStructuredSpecReviewProvidersSequential(
 	start := time.Now()
 	for i, provider := range cfg.Providers {
 		if err := ctx.Err(); err != nil {
-			backendName := specReviewProviderBackendName(backend, provider)
+			backendName := specReviewProviderBackendName(backend)
 			results[i] = pendingStructuredReviewTimeoutOutcome(provider, backendName, "queued", cfg.TimeoutSeconds, time.Since(start), err)
 			logStructuredReviewOutcome(provider.Name, backendName, results[i], time.Since(start))
 			continue
@@ -105,7 +105,7 @@ func runStructuredSpecReviewProvidersParallel(
 				if done[i] {
 					continue
 				}
-				backendName := specReviewProviderBackendName(backend, provider)
+				backendName := specReviewProviderBackendName(backend)
 				results[i] = pendingStructuredReviewTimeoutOutcome(provider, backendName, "provider_execution", cfg.TimeoutSeconds, time.Since(start), ctx.Err())
 				logStructuredReviewOutcome(provider.Name, backendName, results[i], time.Since(start))
 			}
@@ -157,13 +157,19 @@ func executeStructuredSpecReviewProvider(
 	provider orchestra.ProviderConfig,
 	mode string,
 ) specReviewStructuredOutcome {
-	selectedBackend := selectSpecReviewProviderBackend(backend, provider)
 	timeout := specReviewTimeout(provider, cfg.TimeoutSeconds)
 	start := time.Now()
+	backendName := specReviewProviderBackendName(backend)
 	fmt.Fprintf(os.Stderr, "SPEC 리뷰 provider 시작: %s (backend=%s, timeout=%s, mode=%s)\n",
-		provider.Name, selectedBackend.Name(), timeout, mode)
+		provider.Name, backendName, timeout, mode)
+	if backend == nil {
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("execution backend unavailable"), nil, backendName)
+		decorateStructuredFailure(&outcome, timeout, time.Since(start))
+		logStructuredReviewOutcome(provider.Name, backendName, outcome, time.Since(start))
+		return outcome
+	}
 
-	prompt := buildStructuredSpecReviewPrompt(cfg.Prompt, embeddedSchema, shouldInlineStructuredReviewSchema(selectedBackend, provider))
+	prompt := buildStructuredSpecReviewPrompt(cfg.Prompt, embeddedSchema, shouldInlineStructuredReviewSchema(backend, provider))
 	req := orchestra.ProviderRequest{
 		Provider:   provider.Name,
 		Prompt:     prompt,
@@ -173,27 +179,27 @@ func executeStructuredSpecReviewProvider(
 		Config:     provider,
 	}
 
-	resp, execErr := selectedBackend.Execute(ctx, req)
+	resp, execErr := backend.Execute(ctx, req)
 	elapsed := time.Since(start)
 	if execErr != nil {
 		if ctx.Err() != nil {
-			outcome := structuredReviewTimeoutOutcome(provider.Name, selectedBackend.Name(), "provider_execution", timeout, elapsed, ctx.Err(), resp)
-			logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
+			outcome := structuredReviewTimeoutOutcome(provider.Name, backendName, "provider_execution", timeout, elapsed, ctx.Err(), resp)
+			logStructuredReviewOutcome(provider.Name, backendName, outcome, elapsed)
 			return outcome
 		}
-		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), resp, selectedBackend.Name())
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("execution failed: %w", execErr), resp, backendName)
 		decorateStructuredFailure(&outcome, timeout, elapsed)
-		logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
+		logStructuredReviewOutcome(provider.Name, backendName, outcome, elapsed)
 		return outcome
 	}
 	if resp == nil {
-		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil, selectedBackend.Name())
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned nil response"), nil, backendName)
 		decorateStructuredFailure(&outcome, timeout, elapsed)
-		logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
+		logStructuredReviewOutcome(provider.Name, backendName, outcome, elapsed)
 		return outcome
 	}
 	if strings.TrimSpace(resp.ExecutedBackend) == "" {
-		resp.ExecutedBackend = selectedBackend.Name()
+		resp.ExecutedBackend = backendName
 	}
 	if resp.TimedOut {
 		outcome := structuredReviewTimeoutOutcome(provider.Name, resp.ExecutedBackend, "provider_execution", timeout, elapsed, fmt.Errorf("provider timed out after %s", req.Timeout), resp)
@@ -201,13 +207,13 @@ func executeStructuredSpecReviewProvider(
 		return outcome
 	}
 	if resp.EmptyOutput {
-		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp, selectedBackend.Name())
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("provider returned empty output"), resp, backendName)
 		decorateStructuredFailure(&outcome, timeout, elapsed)
-		logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
+		logStructuredReviewOutcome(provider.Name, backendName, outcome, elapsed)
 		return outcome
 	}
 	if _, parseErr := parser.ParseReviewer(resp.Output); parseErr != nil {
-		if retryResp, retryErr := repromptStructuredReviewerJSON(ctx, selectedBackend, parser, req, resp, parseErr); retryErr == nil {
+		if retryResp, retryErr := repromptStructuredReviewerJSON(ctx, backend, parser, req, resp, parseErr); retryErr == nil {
 			outcome := specReviewStructuredOutcome{resp: *retryResp}
 			logStructuredReviewOutcome(provider.Name, retryResp.ExecutedBackend, outcome, time.Since(start))
 			return outcome
@@ -216,9 +222,9 @@ func executeStructuredSpecReviewProvider(
 			parseErr = fmt.Errorf("invalid reviewer JSON after reprompt: initial: %w; reprompt: %v", parseErr, retryErr)
 			elapsed = time.Since(start)
 		}
-		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp, selectedBackend.Name())
+		outcome := malformedStructuredOutcome(provider.Name, fmt.Errorf("invalid reviewer JSON: %w", parseErr), resp, backendName)
 		decorateStructuredFailure(&outcome, timeout, elapsed)
-		logStructuredReviewOutcome(provider.Name, selectedBackend.Name(), outcome, elapsed)
+		logStructuredReviewOutcome(provider.Name, backendName, outcome, elapsed)
 		return outcome
 	}
 

@@ -318,7 +318,7 @@ spawn_agent reviewer \
 auto orchestra run "{review topic}" --strategy consensus --rounds fast
 ```
 
-서브프로세스 모드가 자동 적용되며, 여러 AI 프로바이더의 합의 기반 리뷰를 수행합니다.
+pane-capable 터미널에서는 로그인된 interactive pane이 기본이며, plain/CI·mux 미가용·명시적 `--subprocess`에서만 subprocess를 사용해 여러 AI 프로바이더의 합의 기반 리뷰를 수행합니다.
 
 ## Codex Notes
 
