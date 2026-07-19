@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-var codePrefixes = []string{"pkg/", "cmd/", "internal/", "src/", "app/"}
 var ownedPathPattern = regexp.MustCompile(`^[A-Za-z0-9_./@+-]+\.(?:go|ts|tsx|js|jsx|py|rs|md|json|yaml|yml|toml)$`)
 var inlineCodePathPattern = regexp.MustCompile("`([^`\\n]+)`")
 
@@ -32,6 +31,7 @@ func extractOwnedTokens(text string) []string {
 }
 
 func addOwnedToken(seen map[string]bool, token string) {
+	token = strings.TrimPrefix(strings.TrimSpace(token), "[NEW] ")
 	if !ownedPathPattern.MatchString(token) || strings.Contains(token, "\\") || path.IsAbs(token) {
 		return
 	}
@@ -46,14 +46,8 @@ func referencedModules(text string, modules map[string]bool) []string {
 	found := map[string]bool{}
 	for _, token := range extractOwnedTokens(text) {
 		for module := range modules {
-			if !strings.HasPrefix(token, module+"/") {
-				continue
-			}
-			rest := strings.TrimPrefix(token, module+"/")
-			for _, prefix := range codePrefixes {
-				if strings.HasPrefix(rest, prefix) {
-					found[module] = true
-				}
+			if strings.HasPrefix(token, module+"/") {
+				found[module] = true
 			}
 		}
 	}

@@ -18,6 +18,7 @@ var rootTrackedExact = map[string]bool{
 	"autopus.yaml":                      true,
 	"opencode.json":                     true,
 	".mcp.json":                         true,
+	".gitignore":                        true,
 	".autopus/context/constraints.yaml": true,
 	".autopus/learnings/pipeline.jsonl": true,
 }

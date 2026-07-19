@@ -19,7 +19,7 @@ func TestSyncVerifyPartitionsCanonicalRootPolicyAndGeneratedSurfaces(t *testing.
 
 	for _, rel := range []string{
 		"AGENTS.md", "ARCHITECTURE.md", "CLAUDE.md", "autopus.yaml",
-		"opencode.json", ".mcp.json", ".autopus/context/constraints.yaml",
+		"opencode.json", ".mcp.json", ".gitignore", ".autopus/context/constraints.yaml",
 		".autopus/project/workspace.md", ".autopus/specs/SPEC-META-001/spec.md",
 		".autopus/specs/SPEC-META-001/plan.md",
 		".autopus/learnings/pipeline.jsonl", "README.md",
@@ -54,7 +54,7 @@ func TestSyncVerifyPartitionsCanonicalRootPolicyAndGeneratedSurfaces(t *testing.
 	assert.Equal(t, len(inventoryWorkspacePaths(repos)), partitioned, "every inventory path has exactly one partition")
 
 	for _, rel := range []string{
-		"AGENTS.md", "opencode.json", ".mcp.json", ".autopus/context/constraints.yaml",
+		"AGENTS.md", "opencode.json", ".mcp.json", ".gitignore", ".autopus/context/constraints.yaml",
 		".autopus/learnings/pipeline.jsonl", "README.md",
 	} {
 		assert.Contains(t, text, rel, "root keep path must be a Phase B candidate")

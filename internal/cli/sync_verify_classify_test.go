@@ -61,6 +61,31 @@ func TestSyncVerifyS3Misplacement(t *testing.T) {
 	assert.Contains(t, out, "mod-a/.autopus/specs/")
 }
 
+func TestSyncVerifyRootSpecRecognizesCrossModuleInlineReferences(t *testing.T) {
+	modules := map[string]bool{
+		"Autopus":                true,
+		"autopus-adk":            true,
+		"autopus-agent-protocol": true,
+		"autopus-desktop":        true,
+	}
+	text := "`Autopus/backend/internal/services/codeops.go` " +
+		"`[NEW] autopus-agent-protocol/codeops_execution.go` " +
+		"`[NEW] autopus-desktop/src/components/SessionRunConsole.tsx` " +
+		"`autopus-adk/internal/cli/delivery.go`"
+
+	assert.Equal(t,
+		[]string{"Autopus", "autopus-adk", "autopus-agent-protocol", "autopus-desktop"},
+		referencedModules(text, modules),
+	)
+	assert.Empty(t, classifySpecLocation("SPEC-CROSS-001", ".", referencedModules(text, modules)))
+	assert.Contains(t, extractOwnedTokens(text), "autopus-agent-protocol/codeops_execution.go")
+	unsafe := "`autopus-desktop/runtime-helper/**` `autopus-desktop/../../escape.go`"
+	assert.Empty(t, referencedModules(unsafe, modules),
+		"glob and traversal tokens must not become ownership evidence")
+	assert.Empty(t, extractOwnedTokens(unsafe),
+		"glob and traversal tokens must never become staging tokens")
+}
+
 // --- S4: SPEC location vs code-path module mismatch (module SPEC -> cross-module) ---
 
 func TestSyncVerifyS4LocationMismatch(t *testing.T) {
