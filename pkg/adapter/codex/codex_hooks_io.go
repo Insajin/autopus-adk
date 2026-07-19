@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-func writeCodexManagedFile(rootPath, relativePath string, data []byte, mode os.FileMode) error {
+func writeCodexManagedFile(rootPath, relativePath string, data []byte, mode os.FileMode) (returnErr error) {
 	clean, err := cleanCodexManagedPath(relativePath)
 	if err != nil {
 		return err
@@ -21,7 +21,11 @@ func writeCodexManagedFile(rootPath, relativePath string, data []byte, mode os.F
 	if err != nil {
 		return fmt.Errorf("open repository root: %w", err)
 	}
-	defer root.Close()
+	defer func() {
+		if err := root.Close(); err != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("close repository root: %w", err))
+		}
+	}()
 
 	if err := ensureCodexManagedDirs(root, filepath.Dir(clean), true); err != nil {
 		return err
@@ -65,12 +69,16 @@ func writeCodexManagedFile(rootPath, relativePath string, data []byte, mode os.F
 	return nil
 }
 
-func removeCodexHookAssets(rootPath string) error {
+func removeCodexHookAssets(rootPath string) (returnErr error) {
 	root, err := os.OpenRoot(rootPath)
 	if err != nil {
 		return fmt.Errorf("open repository root: %w", err)
 	}
-	defer root.Close()
+	defer func() {
+		if err := root.Close(); err != nil {
+			returnErr = errors.Join(returnErr, fmt.Errorf("close repository root: %w", err))
+		}
+	}()
 
 	assetDir := filepath.Join(".codex", "hooks", "autopus")
 	if err := ensureCodexManagedDirs(root, assetDir, false); err != nil {

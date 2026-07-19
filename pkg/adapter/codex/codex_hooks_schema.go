@@ -120,18 +120,6 @@ func mergeHookCategories(existing, autopus hooksDoc) hooksDoc {
 	return result
 }
 
-func isAutopusHookGroup(group hookGroup) bool {
-	if group.Autopus {
-		return true
-	}
-	for _, handler := range group.Hooks {
-		if isAutopusHookHandler(handler) {
-			return true
-		}
-	}
-	return false
-}
-
 func isAutopusHookHandler(handler hookHandler) bool {
 	if handler.Autopus || handler.StatusMessage == autopusHookStatusMessage {
 		return true
