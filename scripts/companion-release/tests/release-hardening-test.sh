@@ -36,7 +36,7 @@ goreleaser_step=$(sed -n '/name: Run GoReleaser/,/name: Create Homebrew tap toke
 [[ "$goreleaser_step" != *APPLE_CERTIFICATE_PASSWORD* ]] || fail 'GoReleaser receives certificate password'
 contains "$release" "COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb'"
 contains "$producer" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='ceed648bfece4555e8310b6e894fedc847520960'"
+contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='39b9b77eb51149ff87df7ad4f8fb3c5300b1302c'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 not_contains "$homebrew_bridge" 'Formula/auto.rb'
 not_contains "$homebrew_bridge" 'FORMULA_PATH'
@@ -50,8 +50,13 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.77'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.77'
+contains "$release" "- 'v0.50.78'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.78'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.78'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.78'
+not_contains "$release" "'v0.50.77'"
+not_contains "$release" 'refs/tags/v0.50.77'
+not_contains "$recovery" 'refs/tags/v0.50.77'
 not_contains "$release" "'v0.50.75'"
 not_contains "$release" 'refs/tags/v0.50.75'
 not_contains "$recovery" 'refs/tags/v0.50.75'
@@ -59,6 +64,7 @@ not_contains "$release" "'v0.50.76'"
 not_contains "$release" 'refs/tags/v0.50.76'
 not_contains "$recovery" 'refs/tags/v0.50.76'
 contains "$source_gate" "readonly A6_A5_ANCESTOR_SHA='b27252cb1148192a8ae1a95195c50e5f221453a4'"
+contains "$source_gate" "readonly A7_A6_ANCESTOR_SHA='902f1acfa91f1d0a2ac9471d5cd79117031a2599'"
 contains "$lineage" 'source "$pins_helper"'
 contains "$lineage_pins" "A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'"
 contains "$lineage_pins" "A4_CHECKSUMS_SHA256='a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1'"
@@ -72,7 +78,18 @@ contains "$lineage_pins" "A5_AMD64_ARCHIVE_SHA256='aeb9d048579c77ab17f4a4ec3a116
 contains "$lineage_pins" "A5_ARM64_ARCHIVE_SHA256='bc90e594c91de61dabc2982f60249b638d448fa3f6643004fe6d45cdd0cc5eab'"
 contains "$lineage_pins" "A5_AMD64_MANIFEST_SHA256='5b4381d3f2180b19c0da9d419ebc8452b9ba04c73c8d0921c2a74c09ab38b85c'"
 contains "$lineage_pins" "A5_ARM64_MANIFEST_SHA256='62a9f78302ee000c16c1c73669282e955fc3abc82f850ff4a77d0e04069f4aed'"
-contains "$lineage" "release_phase='A6' prior_phase='A5'"
+contains "$lineage_pins" "A6_COMMIT_SHA='902f1acfa91f1d0a2ac9471d5cd79117031a2599'"
+contains "$lineage_pins" "A6_TAG_OBJECT_SHA='41feed7decafac33d8f7f43e06804e3c9bf37ef3'"
+contains "$lineage_pins" "A6_CHECKSUMS_SHA256='fb1a35dcdb44255aad43b7ae74950ed59f05ccf44abde9cadf28ecfa0dfce37a'"
+contains "$lineage_pins" "A6_AMD64_ARCHIVE_SHA256='d5e47076c1fc898d2b3f5880b6edfcf9a12e805633dcba2691da22f300d41dc9'"
+contains "$lineage_pins" "A6_ARM64_ARCHIVE_SHA256='d6d092177a5406c194eea1de4fbd11b8af92a03814eb143a294541a3a578b9ab'"
+contains "$lineage_pins" "A6_AMD64_MANIFEST_SHA256='64c634130b16a74cbb33f666d316a05d9a7a1012246dc58fde6e15350b71d0c5'"
+contains "$lineage_pins" "A6_ARM64_MANIFEST_SHA256='b6611c04990b048bc5545e37c942bc8e7e4fab8592d546eaab80d7084991bea6'"
+contains "$lineage" "release_phase='A7' prior_phase='A6'"
+contains "$producer" "GITHUB_REF_NAME\" == 'v0.50.78'"
+contains "$producer" "release_phase='A7'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.78'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.78'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -81,7 +98,7 @@ trap 'rm -rf -- "$temp"' EXIT
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid
-git -C "$temp/source" tag -am 'A6 fixture' v0.50.77
+git -C "$temp/source" tag -am 'A7 fixture' v0.50.78
 commit=$(git -C "$temp/source" rev-parse HEAD)
 tree=$(git -C "$temp/source" rev-parse 'HEAD^{tree}')
 if [[ "${tree: -1}" == '0' ]]; then
@@ -91,7 +108,7 @@ else
 fi
 run_source_gate() {
   local approved_commit="${1-}" approved_tree="${2-}"
-  env GITHUB_REF_NAME=v0.50.77 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
+  env GITHUB_REF_NAME=v0.50.78 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
     GITHUB_OUTPUT="$temp/source-output" COMPANION_SOURCE_PIN_REQUIRED=1 \
     COMPANION_APPROVED_SOURCE_COMMIT="$approved_commit" \
     COMPANION_APPROVED_SOURCE_TREE="$approved_tree" \
@@ -200,39 +217,39 @@ fi
 contains "$lineage_archive" 'MANIFEST_SIGNATURE_NAME'
 contains "$lineage_archive" 'COMPANION_MANIFEST_VERIFIER'
 
-# A6 updates only the Cask and keeps the exact v0.50.71 Formula frozen.
+# A7 updates only the Cask and keeps the exact v0.50.71 Formula frozen.
 state="$temp/tap-state"
 mkdir -m 0700 "$state" "$temp/bin"
 install -m 0700 "$tests_dir/testdata/mock-tap-gh.sh" "$temp/bin/gh"
 checksums="$temp/checksums.txt"
-printf '%064d  autopus-adk_0.50.77_darwin_amd64.tar.gz\n' 1 >"$checksums"
-printf '%064d  autopus-adk_0.50.77_darwin_arm64.tar.gz\n' 2 >>"$checksums"
-printf '%064d  autopus-adk_0.50.77_linux_amd64.tar.gz\n' 3 >>"$checksums"
-printf '%064d  autopus-adk_0.50.77_linux_arm64.tar.gz\n' 4 >>"$checksums"
+printf '%064d  autopus-adk_0.50.78_darwin_amd64.tar.gz\n' 1 >"$checksums"
+printf '%064d  autopus-adk_0.50.78_darwin_arm64.tar.gz\n' 2 >>"$checksums"
+printf '%064d  autopus-adk_0.50.78_linux_amd64.tar.gz\n' 3 >>"$checksums"
+printf '%064d  autopus-adk_0.50.78_linux_arm64.tar.gz\n' 4 >>"$checksums"
 source "$script_dir/publish-homebrew-formula-bridge-render.sh"
-render_homebrew_cask "$temp/prior-cask.rb" 0.50.74 \
-  'aeb9d048579c77ab17f4a4ec3a1160778d16c627747c5af5f341e664e1417cb0' \
-  'bc90e594c91de61dabc2982f60249b638d448fa3f6643004fe6d45cdd0cc5eab' \
-  'ac95ad2bc5d24cccac8a73555d0845738f04306b8e5f7cef0843ce0f7d4b2a6d' \
-  'eba5fd17e8b1b66349b26028f4487448bc0a49c3975a66defe1ece76744f7ad7'
+render_homebrew_cask "$temp/prior-cask.rb" 0.50.77 \
+  'd5e47076c1fc898d2b3f5880b6edfcf9a12e805633dcba2691da22f300d41dc9' \
+  'd6d092177a5406c194eea1de4fbd11b8af92a03814eb143a294541a3a578b9ab' \
+  '30d759af89373df9ecf93cf5ae592c42b7ad51481f07a22f7cb08b2278007eab' \
+  '7a2637f6de5d582f67881857425f5dd9375a0234a258de8b950b4e7f63b021ab'
 render_homebrew_formula_bridge "$temp/frozen-formula.rb" v0.50.71 0.50.71 \
   "$(printf '%064d' 1)" "$(printf '%064d' 2)" \
   "$(printf '%064d' 3)" "$(printf '%064d' 4)"
 jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
-  '{sha:"ceed648bfece4555e8310b6e894fedc847520960",content:$content}' >"$state/cask.json"
+  '{sha:"39b9b77eb51149ff87df7ad4f8fb3c5300b1302c",content:$content}' >"$state/cask.json"
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
 cp "$state/formula.json" "$temp/formula-before.json"
-bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.77
-  COMPANION_VERSION=0.50.77 COMPANION_HOMEBREW_POLICY=cask-only
+bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.78
+  COMPANION_VERSION=0.50.78 COMPANION_HOMEBREW_POLICY=cask-only
   COMPANION_CHECKSUMS_PATH="$checksums" HOMEBREW_TAP_TOKEN=fixture)
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \
-  || fail 'A6 did not update only the Cask'
+  || fail 'A7 did not update only the Cask'
 cmp -s "$temp/formula-before.json" "$state/formula.json" \
   || fail 'frozen v0.50.71 Formula blob or bytes changed'
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \
-  || fail 'A6 Cask-only reconciler is not idempotent'
+  || fail 'A7 Cask-only reconciler is not idempotent'
 
 printf 'release hardening test: PASS\n'

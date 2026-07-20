@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -31,12 +32,20 @@ func (a *CmuxAdapter) SurfaceHealth(ctx context.Context, paneID PaneID) (Surface
 	if err := validatePaneID(paneID); err != nil {
 		return SurfaceStatus{}, fmt.Errorf("cmux: %w", err)
 	}
-	cmd := execCommandContext(ctx, "cmux", "surface-health", "--surface", string(paneID))
+	args := []string{"surface-health"}
+	workspace := a.workspaceRef
+	if workspace == "" {
+		workspace = os.Getenv("CMUX_WORKSPACE_ID")
+	}
+	if workspace != "" {
+		args = append(args, "--workspace", workspace)
+	}
+	cmd := execCommandContext(ctx, "cmux", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return SurfaceStatus{}, fmt.Errorf("cmux: surface-health pane %s: %w", paneID, err)
 	}
-	return parseSurfaceHealth(string(out))
+	return parseSurfaceHealthForPane(string(out), paneID)
 }
 
 // parseSurfaceHealth parses cmux surface-health output.
@@ -46,6 +55,11 @@ func parseSurfaceHealth(output string) (SurfaceStatus, error) {
 	if trimmed == "" {
 		return SurfaceStatus{}, fmt.Errorf("cmux: empty surface-health output")
 	}
+	lines := nonEmptyLines(trimmed)
+	if len(lines) != 1 {
+		return SurfaceStatus{}, fmt.Errorf("cmux: expected one surface-health line, got %d", len(lines))
+	}
+	trimmed = lines[0]
 	status := SurfaceStatus{Valid: true}
 	for field := range strings.FieldsSeq(trimmed) {
 		switch {
@@ -61,6 +75,32 @@ func parseSurfaceHealth(output string) (SurfaceStatus, error) {
 		return SurfaceStatus{}, fmt.Errorf("cmux: no surface ref in output %q", trimmed)
 	}
 	return status, nil
+}
+
+func parseSurfaceHealthForPane(output string, paneID PaneID) (SurfaceStatus, error) {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" {
+		return SurfaceStatus{}, fmt.Errorf("cmux: empty surface-health output")
+	}
+	target := string(paneID)
+	for _, line := range nonEmptyLines(trimmed) {
+		for field := range strings.FieldsSeq(line) {
+			if field == target {
+				return parseSurfaceHealth(line)
+			}
+		}
+	}
+	return SurfaceStatus{}, fmt.Errorf("cmux: pane %s not found in surface-health output", paneID)
+}
+
+func nonEmptyLines(output string) []string {
+	lines := make([]string, 0, strings.Count(output, "\n")+1)
+	for line := range strings.Lines(output) {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			lines = append(lines, trimmed)
+		}
+	}
+	return lines
 }
 
 // WaitForSignal blocks until the named signal is received via `cmux wait-for`.

@@ -54,12 +54,12 @@ func (a *CmuxAdapter) CreateSurface(_ context.Context) (PaneID, error) {
 }
 
 // SplitPane creates a new split pane in the given direction and returns its surface ref.
-func (a *CmuxAdapter) SplitPane(_ context.Context, dir Direction) (PaneID, error) {
+func (a *CmuxAdapter) SplitPane(ctx context.Context, dir Direction) (PaneID, error) {
 	direction := "right"
 	if dir == Vertical {
 		direction = "down"
 	}
-	cmd := execCommand("cmux", "new-split", direction)
+	cmd := execCommandContext(ctx, "cmux", "new-split", direction)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("cmux: split pane: %w", err)

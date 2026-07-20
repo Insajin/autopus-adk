@@ -92,7 +92,7 @@ func newPaneBoundaryMarkerProvider(t *testing.T, name, binaryName string) (Provi
 	dir := t.TempDir()
 	binary := filepath.Join(dir, binaryName)
 	marker := filepath.Join(dir, "subprocess-called")
-	script := "#!/bin/sh\ncat >/dev/null\n: > \"$1\"\nprintf 'subprocess fixture output\\n'\n"
+	script := "#!/bin/sh\ncat >/dev/null\n: > \"$1\"\nprintf '%s\\n' '{\"recommendation\":\"subprocess fixture judge\"}'\n"
 	require.NoError(t, os.WriteFile(binary, []byte(script), 0o700))
 	return ProviderConfig{
 		Name:         name,

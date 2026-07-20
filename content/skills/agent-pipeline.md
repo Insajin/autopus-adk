@@ -21,11 +21,13 @@ This skill is the default for `/auto go SPEC-ID`.
 | 플래그 | 모드 | 설명 |
 |--------|------|------|
 | (없음) | **서브에이전트 파이프라인** | Agent tool로 서브에이전트 스폰 (이 스킬). 메인 세션이 파이프라인 흐름 제어 |
-| `--team` | **Agent Teams** | Claude Code Agent Teams 사용. 팀원 간 직접 통신, 공유 태스크 리스트, 자기 조율 |
+| `--team` | **플랫폼 native team profile** | 지원 플랫폼은 전용 팀 스킬을 로드하고, 미지원 플랫폼은 fail-close 후 기본 서브에이전트 파이프라인 사용을 안내 |
 | `--solo` | **단일 세션** | 메인 세션이 직접 TDD 구현. 서브에이전트 없음 |
 | `--multi` | **리스크 기반 멀티프로바이더** | Review Phase에서 risk tier가 high/critical이면 orchestra engine으로 추가 dissent review를 실행. 설치된 provider가 1개뿐이면 단일 provider로 폴백 |
 
-For Agent Teams mode (`--team`), see `.claude/skills/autopus/agent-teams.md` for role-based team composition (Lead/Builder/Guardian).
+The platform adapter owns the `--team` binding. It must load its dedicated team
+contract only when native lifecycle support exists; otherwise it must stop with
+an unsupported-mode diagnostic instead of emitting foreign tool calls.
 
 @.claude/skills/autopus/worktree-isolation.md
 

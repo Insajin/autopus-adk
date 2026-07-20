@@ -146,7 +146,7 @@ func aggregateOrchestraUsage(result *OrchestraResult) {
 
 func finalizeOrchestraResult(result *OrchestraResult) *OrchestraResult {
 	aggregateOrchestraUsage(result)
-	return result
+	return finalizeOrchestrationContract(result)
 }
 
 func dedupeUsage(receipts []telemetry.UsageEnvelope) []telemetry.UsageEnvelope {

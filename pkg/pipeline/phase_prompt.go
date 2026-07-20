@@ -18,6 +18,8 @@ type PhaseContext struct {
 	PreviousResults map[PhaseID]string
 	// ContextResult is the bounded delegated context receipt for this phase.
 	ContextResult *memindex.ContextResult
+	// FrozenRequiredDocuments requires one immutable snapshot of all required SPEC documents.
+	FrozenRequiredDocuments bool
 }
 
 // PhasePromptBuilder builds prompts for each pipeline phase by reading files
@@ -47,9 +49,10 @@ func (b *PhasePromptBuilder) BuildPrompt(phaseID PhaseID, ctx PhaseContext) (str
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-AGENT-PROMPT-001: phase:* layer IDs mirror prompt sections and prior-phase injections.
 func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseContext) (string, PromptManifest, error) {
 	receiptMode := ctx.ContextResult != nil && strings.TrimSpace(ctx.ContextResult.Prompt) != ""
+	frozenMode := receiptMode || ctx.FrozenRequiredDocuments
 	var layers []promptlayer.Layer
 
-	if receiptMode {
+	if frozenMode {
 		requiredLayers, err := b.requiredPhaseDocumentLayers()
 		if err != nil {
 			return "", PromptManifest{}, err
@@ -71,7 +74,7 @@ func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseC
 	// Phase-specific additional files and context injection.
 	switch phaseID {
 	case PhasePlan:
-		if !receiptMode {
+		if !frozenMode {
 			planContent, _ := b.readFile("plan.md")
 			if planContent != "" {
 				sanitized := sanitizePromptContent(planContent)
@@ -80,26 +83,26 @@ func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseC
 		}
 
 	case PhaseTestScaffold:
-		if !receiptMode {
+		if !frozenMode {
 			b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
 		}
 		b.injectPriorLayer(&layers, ctx, PhasePlan, "Plan Output")
 
 	case PhaseImplement:
-		if !receiptMode {
+		if !frozenMode {
 			b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
 		}
 		b.injectPriorLayer(&layers, ctx, PhasePlan, "Plan Output")
 		b.injectPriorLayer(&layers, ctx, PhaseTestScaffold, "Test Scaffold Output")
 
 	case PhaseValidate:
-		if !receiptMode {
+		if !frozenMode {
 			b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
 		}
 		b.injectPriorLayer(&layers, ctx, PhaseImplement, "Implementation Output")
 
 	case PhaseReview:
-		if !receiptMode {
+		if !frozenMode {
 			b.appendFileSectionLayerIfPresent(&layers, "acceptance.md", "Acceptance")
 		}
 		b.injectPriorLayer(&layers, ctx, PhaseValidate, "Validation Output")

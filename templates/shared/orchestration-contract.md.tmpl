@@ -1,0 +1,81 @@
+# Orchestration Semantic Contract
+
+`orchestration-contract.v1` is the platform-neutral policy source for Autopus
+multi-provider and multi-agent workflows. Platform surfaces may change tool
+bindings, but MUST preserve the semantic JSON blocks below exactly.
+
+Every orchestrated command emits `orchestration_run_receipt.v1`. The receipt
+keeps these fields distinct:
+
+- `requested_providers`, `configured_providers`, `resolved_providers`
+- `attempted_providers`, `usable_providers`, `failed_providers`
+- `requested_strategy`, `effective_strategy`, `degraded_reasons`
+- `critical_veto`, `analysis_verdict`, `gate_status`, `terminal_state`
+- `worker_receipts`, `dispatch_count`, `judge_status`, `artifacts`
+
+An unknown contract version, strategy, verdict, or gate state fails closed.
+Provider analysis is evidence; deterministic gates remain authoritative.
+
+Synchronous gates invoke orchestra with `--no-detach --format json` and require
+`schema=orchestration_cli_result.v1` with an embedded
+`orchestration_run_receipt.v1`. A deliberately detached run follows the typed
+two-step handoff: `auto orchestra wait <job-id> --format json` returns
+`orchestra_job_wait.v1` plus `next_required_step`, then
+`auto orchestra result <job-id> --format json` returns the same typed result
+envelope and receipt used by synchronous consumers.
+
+## Review
+
+```json
+{
+  "schema": "orchestration-contract.v1",
+  "workflow": "review",
+  "semantics": {
+    "risk_tiered_review": true,
+    "forward_strategy_and_providers": true,
+    "degraded_requires_override": true,
+    "discovery_verification_split": true,
+    "retry_budget": 2
+  }
+}
+```
+
+## Idea
+
+```json
+{
+  "schema": "orchestration-contract.v1",
+  "workflow": "idea",
+  "semantics": {
+    "forward_strategy_and_providers": true,
+    "minimum_rounds": 2,
+    "fallback_minimum_rounds": 2,
+    "blind_separate_judge": true,
+    "different_model_family": true,
+    "preserve_dissent": true
+  }
+}
+```
+
+## Team
+
+```json
+{
+  "schema": "orchestration-contract.v1",
+  "workflow": "team",
+  "semantics": {
+    "supervisor": "main_session",
+    "dispatch_evidence": true,
+    "disjoint_ownership": true,
+    "integration_gate": true,
+    "teardown": true,
+    "worker_receipt_fields": [
+      "owned_paths",
+      "changed_files",
+      "verification",
+      "blockers",
+      "next_required_step"
+    ]
+  }
+}
+```

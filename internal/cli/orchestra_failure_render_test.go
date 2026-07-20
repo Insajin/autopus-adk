@@ -116,6 +116,13 @@ func TestShouldTreatOrchestraResultAsFailure_Cases(t *testing.T) {
 
 	assert.False(t, shouldTreatOrchestraResultAsFailure(nil))
 	assert.False(t, shouldTreatOrchestraResultAsFailure(&orchestra.OrchestraResult{}))
+	assert.True(t, shouldTreatOrchestraResultAsFailure(&orchestra.OrchestraResult{
+		GateStatus: "blocked", Responses: []orchestra.ProviderResponse{{Provider: "healthy", Output: "ok"}},
+	}))
+	assert.Contains(t, synthesizeOrchestraFailureError(&orchestra.OrchestraResult{
+		GateStatus: "blocked", ConfiguredProviders: []string{"a", "b", "c"},
+		UsableProviders: []string{"a"}, QuorumRequired: 2, DegradedReasons: []string{"provider_quorum"},
+	}).Error(), "quorum 미충족")
 
 	// Failed providers but no responses → failure.
 	assert.True(t, shouldTreatOrchestraResultAsFailure(&orchestra.OrchestraResult{

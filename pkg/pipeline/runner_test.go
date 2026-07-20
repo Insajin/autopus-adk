@@ -19,7 +19,7 @@ func TestSequentialRunner_RunPhases_ExecutesInOrder(t *testing.T) {
 
 	// Given: a SequentialRunner with 5 phases and a recording backend
 	recorder := &FakeBackend{
-		Responses: []string{"out1", "out2", "out3", "Verdict: PASS", "Verdict: APPROVE"},
+		Responses: []string{"out1", "out2", "out3", "VERDICT: PASS", "VERDICT: APPROVE"},
 	}
 	phases := pipeline.DefaultPhases()
 	runner := pipeline.NewSequentialRunner(recorder)
@@ -50,7 +50,7 @@ func TestSequentialRunner_RunPhases_SavesCheckpoint(t *testing.T) {
 	// Given: a SequentialRunner with a checkpoint directory
 	dir := t.TempDir()
 	recorder := &FakeBackend{
-		Responses: []string{"out1", "out2", "out3", "Verdict: PASS", "Verdict: APPROVE"},
+		Responses: []string{"out1", "out2", "out3", "VERDICT: PASS", "VERDICT: APPROVE"},
 	}
 	phases := pipeline.DefaultPhases()
 	runner := pipeline.NewSequentialRunner(recorder)
@@ -77,8 +77,8 @@ func TestSequentialRunner_RunPhases_GateFail_Retries(t *testing.T) {
 	// Given: a backend that returns FAIL on first call, PASS on second
 	recorder := &FakeBackend{
 		Responses: []string{
-			"FAIL: first attempt",  // validate phase fails
-			"PASS: second attempt", // retry succeeds
+			"VERDICT: FAIL", // validate phase fails
+			"VERDICT: PASS", // retry succeeds
 			"out3", "out4", "out5",
 		},
 	}
@@ -105,7 +105,7 @@ func TestSequentialRunner_RunPhases_GateFail_ExceedsRetry(t *testing.T) {
 	// Given: a backend that always returns FAIL
 	recorder := &FakeBackend{
 		// 4 responses to cover 1 initial + 3 retries
-		Responses: []string{"FAIL", "FAIL", "FAIL", "FAIL"},
+		Responses: []string{"VERDICT: FAIL", "VERDICT: FAIL", "VERDICT: FAIL", "VERDICT: FAIL"},
 	}
 	phases := []pipeline.Phase{
 		{ID: pipeline.PhaseValidate, Gate: pipeline.GateValidation, MaxRetries: 3},

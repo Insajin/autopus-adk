@@ -124,8 +124,11 @@ func TestRunOrchestra_ConsensusUsesConfiguredThreshold(t *testing.T) {
 	result, err := RunOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
 	assert.Contains(t, result.Merged, "✓ 1. shared")
-	assert.NotContains(t, result.Merged, "pair", "2/3 agreement must not pass threshold=1.0")
-	assert.NotContains(t, result.Merged, "only-one", "explicit threshold output should omit disputes")
+	assert.Contains(t, result.Merged, "## 이견이 있는 내용")
+	assert.Contains(t, result.Merged, "△ 2. pair [2/3]",
+		"2/3 agreement must remain visible as dissent at threshold=1.0")
+	assert.Contains(t, result.Merged, "△ 3. only-one [1/3]",
+		"explicit thresholds must not delete minority evidence")
 }
 
 func TestRunOrchestra_Pipeline_WithCat(t *testing.T) {
@@ -164,6 +167,8 @@ func TestRunOrchestra_Fastest_WithCat(t *testing.T) {
 	assert.Equal(t, StrategyFastest, result.Strategy)
 	// fastest는 첫 번째 응답만 반환
 	assert.Len(t, result.Responses, 1)
+	assert.Equal(t, 2, result.DispatchCount)
+	assert.ElementsMatch(t, []string{"fast1", "fast2"}, result.AttemptedProviders)
 	assert.Contains(t, result.Summary, "최속 응답")
 }
 
@@ -191,6 +196,7 @@ func TestRunOrchestra_Timeout(t *testing.T) {
 
 func TestRunOrchestra_Debate_WithCat(t *testing.T) {
 	t.Parallel()
+	judge := typedJudgeProvider(t, "judge")
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			echoProvider("debater1"),
@@ -199,12 +205,14 @@ func TestRunOrchestra_Debate_WithCat(t *testing.T) {
 		Strategy:       StrategyDebate,
 		Prompt:         "debate topic",
 		TimeoutSeconds: 10,
-		JudgeProvider:  "claude",
+		JudgeProvider:  judge.Name,
+		JudgeConfig:    &judge,
 	}
 	result, err := RunOrchestra(context.Background(), cfg)
 	require.NoError(t, err)
 	assert.Equal(t, StrategyDebate, result.Strategy)
 	assert.Contains(t, result.Summary, "판정")
+	assert.Equal(t, JudgePassed, result.JudgeStatus)
 }
 
 func TestRunOrchestra_DefaultTimeout(t *testing.T) {

@@ -24,12 +24,12 @@ func runRelayPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orchestra
 		if err != nil {
 			return nil, err
 		}
-		return finalizeOrchestraResult(&OrchestraResult{
+		return finalizeOrchestraResultForConfig(&OrchestraResult{
 			Strategy:  cfg.Strategy,
 			Responses: responses,
 			Merged:    FormatRelay(responses),
 			Summary:   fmt.Sprintf("relay: %d stages completed", len(responses)),
-		}), nil
+		}, cfg), nil
 	}
 
 	start := time.Now()
@@ -92,13 +92,13 @@ func runRelayPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orchestra
 	}
 
 	total := time.Since(start)
-	return finalizeOrchestraResult(&OrchestraResult{
+	return finalizeOrchestraResultForConfig(&OrchestraResult{
 		Strategy:  cfg.Strategy,
 		Responses: responses,
 		Merged:    FormatRelay(responses),
 		Duration:  total,
 		Summary:   fmt.Sprintf("relay pane: %d stages completed", len(responses)),
-	}), nil
+	}, cfg), nil
 }
 
 // executeRelayPaneProvider runs a single provider in a pane and collects its output.
@@ -122,7 +122,7 @@ func executeRelayPaneProvider(
 	outputFile := filepath.Join(relayDir, fmt.Sprintf("%s.md", safeName))
 
 	// Create pane
-	paneID, err := splitTrackedPane(ctx, term, terminal.Horizontal)
+	paneID, err := splitPaneSerialized(ctx, term, terminal.Horizontal)
 	if err != nil {
 		return skippedResponse(provider.Name, fmt.Sprintf("SplitPane failed: %v", err))
 	}

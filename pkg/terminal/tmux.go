@@ -76,7 +76,7 @@ func buildTmuxCreateCmd(name string) *exec.Cmd {
 }
 
 // SplitPane splits the current pane horizontally or vertically.
-func (a *TmuxAdapter) SplitPane(_ context.Context, dir Direction) (PaneID, error) {
+func (a *TmuxAdapter) SplitPane(ctx context.Context, dir Direction) (PaneID, error) {
 	flag := "-h"
 	if dir == Vertical {
 		flag = "-v"
@@ -85,7 +85,7 @@ func (a *TmuxAdapter) SplitPane(_ context.Context, dir Direction) (PaneID, error
 	if a.session != "" {
 		args = append(args, "-t", a.session)
 	}
-	cmd := execCommand("tmux", append(args, flag)...)
+	cmd := execCommandContext(ctx, "tmux", append(args, flag)...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("tmux: split pane: %w", err)

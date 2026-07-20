@@ -24,8 +24,9 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 		return RunPaneOrchestra(ctx, cfg)
 	}
 
-	// Debate strategy with multi-round: delegate to interactive debate loop.
-	if cfg.Strategy == StrategyDebate && cfg.DebateRounds >= 2 {
+	// Debate always delegates to the round/judge state machine, including the
+	// one-round preset. A one-shot interactive fan-out is not a debate.
+	if cfg.Strategy == StrategyDebate {
 		return runInteractiveDebate(ctx, cfg)
 	}
 
@@ -56,8 +57,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 	panes, failed, err := splitProviderPanes(timeoutCtx, cfg)
 	if err != nil {
 		if isPaneProvisioningError(err) {
-			cfg.Interactive = false
-			return RunPaneOrchestra(ctx, cfg)
+			return runFallback(ctx, cfg, err)
 		}
 		return nil, fmt.Errorf("interactive pane setup failed after provisioning: %w", err)
 	}
@@ -100,7 +100,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 		merged = fmt.Sprintf("[interactive mode] %d providers executed", len(responses))
 	}
 
-	return finalizeOrchestraResult(&OrchestraResult{
+	return finalizeOrchestraResultForConfig(&OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
 		Merged:          merged,
@@ -108,7 +108,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 		Summary:         summary,
 		FailedProviders: failed,
 		Degraded:        len(failed) > 0,
-	}), nil
+	}, cfg), nil
 }
 
 // startPipeCapture starts pipe-pane output streaming for each pane.

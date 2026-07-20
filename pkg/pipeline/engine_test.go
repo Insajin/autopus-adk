@@ -17,11 +17,19 @@ import (
 func TestSubprocessEngine_Run_ExecutesAllPhases(t *testing.T) {
 	t.Parallel()
 
-	// Given: a SubprocessEngine configured for a known SPEC
+	// Given: a SubprocessEngine configured with an observable backend.
+	recorder := &FakeBackend{Responses: []string{
+		"plan output",
+		"test scaffold output",
+		"implement output",
+		"VERDICT: PASS",
+		"VERDICT: APPROVE",
+	}}
 	cfg := pipeline.EngineConfig{
 		SpecID:   "SPEC-TEST-001",
 		Platform: "codex",
 		Strategy: pipeline.StrategySequential,
+		Backend:  recorder,
 	}
 	engine := pipeline.NewSubprocessEngine(cfg)
 
@@ -32,6 +40,9 @@ func TestSubprocessEngine_Run_ExecutesAllPhases(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Len(t, result.PhaseResults, 5)
+	assert.Equal(t, 5, recorder.CallCount)
+	assert.Equal(t, 5, result.Receipt.DispatchCount)
+	assert.Equal(t, pipeline.TerminalCompleted, result.Receipt.Terminal)
 }
 
 // TestSubprocessEngine_Run_InjectsResultToNextPhase verifies that each phase's
@@ -45,8 +56,8 @@ func TestSubprocessEngine_Run_InjectsResultToNextPhase(t *testing.T) {
 			"plan output",
 			"test scaffold output",
 			"implement output",
-			"validate output",
-			"review output",
+			"VERDICT: PASS",
+			"VERDICT: APPROVE",
 		},
 	}
 	cfg := pipeline.EngineConfig{
@@ -73,6 +84,10 @@ func TestSubprocessEngine_Run_ResumeFromCheckpoint(t *testing.T) {
 
 	// Given: a checkpoint indicating phase 1 (Plan) is done
 	cp := &pipeline.Checkpoint{
+		Version:       pipeline.CheckpointVersion,
+		RouteVersion:  pipeline.PipelineRouteVersion,
+		SpecID:        "SPEC-TEST-001",
+		SnapshotHash:  "sha256:resume-fixture",
 		Phase:         "plan",
 		GitCommitHash: "abc123",
 		TaskStatus: map[string]pipeline.CheckpointStatus{
@@ -83,16 +98,17 @@ func TestSubprocessEngine_Run_ResumeFromCheckpoint(t *testing.T) {
 		Responses: []string{
 			"test scaffold output",
 			"implement output",
-			"validate output",
-			"review output",
+			"VERDICT: PASS",
+			"VERDICT: APPROVE",
 		},
 	}
 	cfg := pipeline.EngineConfig{
-		SpecID:     "SPEC-TEST-001",
-		Platform:   "codex",
-		Strategy:   pipeline.StrategySequential,
-		Backend:    recorder,
-		Checkpoint: cp,
+		SpecID:       "SPEC-TEST-001",
+		Platform:     "codex",
+		Strategy:     pipeline.StrategySequential,
+		Backend:      recorder,
+		Checkpoint:   cp,
+		SnapshotHash: "sha256:resume-fixture",
 	}
 	engine := pipeline.NewSubprocessEngine(cfg)
 
@@ -149,8 +165,8 @@ func TestSubprocessEngine_Run_CompactsPreviousPhaseOutput(t *testing.T) {
 			largePlanOutput,
 			"test scaffold output",
 			"implement output",
-			"validate output",
-			"review output",
+			"VERDICT: PASS",
+			"VERDICT: APPROVE",
 		},
 	}
 	cfg := pipeline.EngineConfig{
@@ -206,7 +222,9 @@ func TestSubprocessEngine_Run_FailsClosedOnCompactionBlocker(t *testing.T) {
 	result, err := engine.Run(context.Background())
 
 	require.Error(t, err)
-	assert.Nil(t, result)
+	require.NotNil(t, result)
 	assert.Contains(t, err.Error(), "context-budget")
+	assert.Equal(t, pipeline.TerminalBlocked, result.Receipt.Terminal)
+	assert.Equal(t, 1, result.Receipt.DispatchCount)
 	assert.Equal(t, 1, recorder.CallCount, "must stop before the next model call")
 }

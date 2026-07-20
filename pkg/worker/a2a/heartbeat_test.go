@@ -111,12 +111,17 @@ func TestHeartbeat_SendsJSONRPCHeartbeat(t *testing.T) {
 
 	var mu sync.Mutex
 	var sentMessages [][]byte
+	sent := make(chan struct{}, 1)
 	sendFn := func(msg []byte) error {
 		cp := make([]byte, len(msg))
 		copy(cp, msg)
 		mu.Lock()
 		sentMessages = append(sentMessages, cp)
 		mu.Unlock()
+		select {
+		case sent <- struct{}{}:
+		default:
+		}
 		return nil
 	}
 
@@ -125,10 +130,14 @@ func TestHeartbeat_SendsJSONRPCHeartbeat(t *testing.T) {
 	hb.timeout = 200 * time.Millisecond
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	hb.Start(ctx)
-	time.Sleep(25 * time.Millisecond)
+	select {
+	case <-sent:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for heartbeat")
+	}
 	cancel()
-	time.Sleep(5 * time.Millisecond)
 
 	mu.Lock()
 	msgs := make([][]byte, len(sentMessages))

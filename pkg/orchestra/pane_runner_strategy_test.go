@@ -19,5 +19,6 @@ func TestMergeByStrategy_ConsensusUsesConfiguredThreshold(t *testing.T) {
 	merged, _ := mergeByStrategy(StrategyConsensus, responses, cfg)
 
 	assert.Contains(t, merged, "✓ 1. shared")
-	assert.NotContains(t, merged, "pair")
+	assert.Contains(t, merged, "## 이견이 있는 내용")
+	assert.Contains(t, merged, "△ 2. pair [2/3]")
 }

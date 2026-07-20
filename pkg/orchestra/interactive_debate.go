@@ -80,7 +80,7 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 		for i := range result.FailedProviders {
 			result.FailedProviders[i].CorrelationRunID = cfg.RunID
 		}
-		return result, nil
+		return finalizeDebateOutcome(result, cfg)
 	}
 
 	result := buildDebateResult(cfg, responses, roundHistory, start)
@@ -88,7 +88,7 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 	for i := range result.FailedProviders {
 		result.FailedProviders[i].CorrelationRunID = cfg.RunID
 	}
-	return result, nil
+	return finalizeDebateOutcome(result, cfg)
 }
 
 // runPaneDebate executes the multi-turn debate loop using terminal panes.
@@ -132,8 +132,8 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 			}
 			_ = cfg.ReliabilityStore.recordEvent(event)
 		}
-		log.Printf("[debate] splitProviderPanes failed: %v -- falling back to non-interactive", err)
-		return runNonInteractiveDebate(ctx, cfg, rounds, start)
+		log.Printf("[debate] splitProviderPanes failed: %v -- applying fallback policy", err)
+		return runFallback(ctx, cfg, err)
 	}
 	// R5: Skip pane cleanup when yield mode is active — keep panes alive.
 	if !cfg.YieldRounds {
@@ -212,15 +212,14 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 			for i := range result.FailedProviders {
 				result.FailedProviders[i].CorrelationRunID = cfg.RunID
 			}
-			return result, nil
+			return finalizeDebateOutcome(result, cfg)
 		}
 
-		// Early consensus detection: check if all responses are substantially similar.
-		if round < rounds && len(roundResponses) >= 2 {
-			if consensusReached(roundResponses, cfg) {
-				fmt.Fprintf(os.Stderr, "[Debate] 조기 합의 도달 — 라운드 %d에서 중단\n", round)
-				break
-			}
+		// Preserve the contract's two-round minimum before allowing convergence
+		// to shorten deeper debate presets.
+		if mayStopDebateEarly(round, rounds, roundResponses, cfg) {
+			fmt.Fprintf(os.Stderr, "[Debate] 조기 합의 도달 — 라운드 %d에서 중단\n", round)
+			break
 		}
 	}
 
@@ -234,6 +233,13 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 		judgeResp := runJudgeRound(ctx, cfg, panes, hookSession, finalResponses, rounds)
 		if judgeResp != nil {
 			finalResponses = append(finalResponses, *judgeResp)
+		} else {
+			judgeCfg := findOrBuildJudgeConfig(cfg)
+			failure := buildFailedProviderWithContext(
+				judgeCfg, nil, fmt.Errorf("judge execution failed or returned no usable output"),
+				cfg.TimeoutSeconds, "judge", len(finalResponses) > 0,
+			)
+			launchFailed = append(launchFailed, failure)
 		}
 	}
 
@@ -245,7 +251,7 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 	for i := range result.FailedProviders {
 		result.FailedProviders[i].CorrelationRunID = cfg.RunID
 	}
-	return result, nil
+	return finalizeDebateOutcome(result, cfg)
 }
 
 func buildYieldSession(sessionID string, panes []paneInfo, responses []ProviderResponse, createdAt time.Time) OrchestraSession {

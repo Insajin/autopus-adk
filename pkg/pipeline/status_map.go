@@ -1,7 +1,7 @@
 package pipeline
 
-// phaseSequence defines the canonical ordering of pipeline phases.
-var phaseSequence = []string{"phase1", "phase1.5", "phase2", "phase3", "phase4"}
+// legacyPhaseSequence is retained for checkpoints written before pipeline-route.v1.
+var legacyPhaseSequence = []string{"phase1", "phase1.5", "phase2", "phase3", "phase4"}
 
 // MapCheckpointToPhases converts a Checkpoint to DashboardData for rendering.
 //
@@ -12,8 +12,11 @@ var phaseSequence = []string{"phase1", "phase1.5", "phase2", "phase3", "phase4"}
 //   - Phases after the current phase are marked "pending".
 //   - If the checkpoint phase is not recognized, all phases are "pending".
 func MapCheckpointToPhases(cp *Checkpoint) DashboardData {
+	if usesCanonicalPhaseIDs(cp) {
+		return mapCanonicalCheckpoint(cp)
+	}
 	currentIdx := -1
-	for i, p := range phaseSequence {
+	for i, p := range legacyPhaseSequence {
 		if p == cp.Phase {
 			currentIdx = i
 			break
@@ -21,14 +24,60 @@ func MapCheckpointToPhases(cp *Checkpoint) DashboardData {
 	}
 
 	result := DashboardData{
-		Phases: make(map[string]PhaseStatus, len(phaseSequence)),
+		Phases: make(map[string]PhaseStatus, len(legacyPhaseSequence)),
 		Agents: make(map[string]string),
 	}
 
-	for i, p := range phaseSequence {
+	for i, p := range legacyPhaseSequence {
 		result.Phases[p] = resolvePhaseStatus(i, currentIdx, cp.TaskStatus)
 	}
 
+	return result
+}
+
+func usesCanonicalPhaseIDs(cp *Checkpoint) bool {
+	if cp == nil {
+		return false
+	}
+	if cp.RouteVersion == PipelineRouteVersion || cp.Version == CheckpointVersion {
+		return true
+	}
+	for _, phase := range DefaultPhases() {
+		if cp.Phase == string(phase.ID) {
+			return true
+		}
+		if _, ok := cp.TaskStatus[string(phase.ID)]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func mapCanonicalCheckpoint(cp *Checkpoint) DashboardData {
+	result := DashboardData{
+		Phases: make(map[string]PhaseStatus, len(DefaultPhases())),
+		Agents: make(map[string]string),
+	}
+	for _, phase := range DefaultPhases() {
+		status := cp.TaskStatus[string(phase.ID)]
+		switch status {
+		case CheckpointStatusDone:
+			result.Phases[string(phase.ID)] = PhaseDone
+		case CheckpointStatusSkipped:
+			result.Phases[string(phase.ID)] = PhaseSkipped
+		case CheckpointStatusInProgress:
+			result.Phases[string(phase.ID)] = PhaseRunning
+		case CheckpointStatusFailed:
+			result.Phases[string(phase.ID)] = PhaseFailed
+		case CheckpointStatusCancelled:
+			result.Phases[string(phase.ID)] = PhaseCancelled
+		default:
+			result.Phases[string(phase.ID)] = PhasePending
+		}
+	}
+	if cp.Receipt != nil {
+		result.Blocker = cp.Receipt.Blocker
+	}
 	return result
 }
 

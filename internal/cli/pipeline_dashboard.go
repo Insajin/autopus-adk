@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -36,23 +37,19 @@ func newPipelineDashboardCmd() *cobra.Command {
 				return err
 			}
 
-			cwd, err := os.Getwd()
+			cp, err := loadFlatCheckpoint(specCheckpointPath(specID))
 			if err != nil {
-				return fmt.Errorf("get working directory: %w", err)
-			}
-
-			cp, err := pipeline.Load(cwd)
-			if err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					return fmt.Errorf("load pipeline checkpoint for %s: %w", specID, err)
+				}
 				// Fallback to all-pending when checkpoint file does not exist.
-				cmd.PrintErrln("Warning: no checkpoint file found, showing default state")
+				cmd.PrintErrln("Warning: no per-SPEC checkpoint found, showing default state")
+				phases := make(map[string]pipeline.PhaseStatus)
+				for _, phase := range pipeline.DefaultPhases() {
+					phases[string(phase.ID)] = pipeline.PhasePending
+				}
 				data := pipeline.DashboardData{
-					Phases: map[string]pipeline.PhaseStatus{
-						"phase1":   pipeline.PhasePending,
-						"phase1.5": pipeline.PhasePending,
-						"phase2":   pipeline.PhasePending,
-						"phase3":   pipeline.PhasePending,
-						"phase4":   pipeline.PhasePending,
-					},
+					Phases: phases,
 					Agents: map[string]string{},
 				}
 				output := pipeline.RenderDashboard(data)

@@ -138,7 +138,8 @@ func TestRunDebate_JudgeRunsWithPartialResponses(t *testing.T) {
 		t.Skip("Skipping on Windows")
 	}
 
-	// Only one debater succeeds; judge is a real binary (cat).
+	judge := typedJudgeProvider(t, "cat-judge")
+	// Only one debater succeeds; judge emits a typed JudgeOutput.
 	cfg := OrchestraConfig{
 		Providers: []ProviderConfig{
 			echoProvider("gemini"),
@@ -147,19 +148,9 @@ func TestRunDebate_JudgeRunsWithPartialResponses(t *testing.T) {
 		Strategy:       StrategyDebate,
 		Prompt:         "topic",
 		TimeoutSeconds: 10,
-		// Judge is 'cat' which is always installed.
-		JudgeProvider: "cat-judge",
+		JudgeProvider:  judge.Name,
+		JudgeConfig:    &judge,
 	}
-
-	// Override judge lookup: inject a cat-based judge into providers for test isolation.
-	// findOrBuildJudgeConfig falls back to Binary=JudgeProvider when not in Providers,
-	// so we add it explicitly.
-	cfg.Providers = append(cfg.Providers, ProviderConfig{
-		Name:          "cat-judge",
-		Binary:        "cat",
-		Args:          []string{},
-		PromptViaArgs: false,
-	})
 
 	responses, _, _, err := runDebate(context.Background(), cfg)
 	require.NoError(t, err)

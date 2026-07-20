@@ -39,9 +39,10 @@ func TestRunSpecReview_FailedProviderRejectIgnored(t *testing.T) {
 
 	origRunner := specReviewRunOrchestra
 	specReviewRunOrchestra = func(_ context.Context, _ orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
-		// Default config has 2 providers (claude, gemini).
-		// claude succeeds with PASS; gemini failed (ExitCode=1) but its partial
-		// stdout contains a spurious "VERDICT: REJECT" — must be ignored.
+		// The default policy requests claude, codex, and gemini. Only claude and
+		// gemini resolve in this fixture; codex must remain in the denominator.
+		// Claude succeeds with PASS; gemini failed (ExitCode=1) but its partial
+		// stdout contains a spurious "VERDICT: REJECT" and must be ignored.
 		return &orchestra.OrchestraResult{Responses: []orchestra.ProviderResponse{
 			{Provider: "claude", ExitCode: 0, Output: "VERDICT: PASS"},
 			{Provider: "gemini", ExitCode: 1, Error: "subprocess crash", Output: "partial output\nVERDICT: REJECT"},
@@ -57,9 +58,10 @@ func TestRunSpecReview_FailedProviderRejectIgnored(t *testing.T) {
 	reviewText := string(reviewBytes)
 	assert.NotContains(t, reviewText, "**Verdict**: REJECT",
 		"failed provider's partial REJECT must not short-circuit the merged verdict")
-	// gemini failed → 1/2 ratio = 50% → degraded label expected.
-	assert.Contains(t, reviewText, "(degraded — 1/2 providers responded)",
-		"degraded label must reflect 1 success out of 2 configured providers")
+	// gemini failed and codex was unresolved: 1/3 policy coverage is degraded.
+	assert.Contains(t, reviewText, "(degraded — 1/3 providers responded)",
+		"degraded label must retain all three configured providers")
+	assert.Contains(t, reviewText, spec.DegradedReasonProviderQuorum)
 }
 
 func TestRunSpecReview_StderrWarningsDoNotDegradeSuccessfulProviders(t *testing.T) {

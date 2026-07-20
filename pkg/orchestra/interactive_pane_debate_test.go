@@ -106,12 +106,14 @@ func TestRunPaneDebate_WithJudge(t *testing.T) {
 		Interactive:    true,
 		InitialDelay:   time.Millisecond,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
 	defer cancel()
 
 	result, err := runPaneDebate(ctx, cfg, 1, 45*time.Second, time.Now())
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.NotNil(t, result)
+	assert.Equal(t, JudgeFailed, result.JudgeStatus)
+	assert.Equal(t, TerminalBlocked, result.TerminalState)
 }
 
 // TestRunPaneDebate_ContextCancellation verifies cancellation during debate.

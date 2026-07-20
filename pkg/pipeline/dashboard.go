@@ -20,6 +20,10 @@ const (
 	PhaseDone PhaseStatus = "done"
 	// PhaseFailed indicates the phase encountered an error.
 	PhaseFailed PhaseStatus = "failed"
+	// PhaseSkipped indicates the phase was intentionally not dispatched.
+	PhaseSkipped PhaseStatus = "skipped"
+	// PhaseCancelled indicates execution was cancelled before completion.
+	PhaseCancelled PhaseStatus = "cancelled"
 )
 
 // DashboardData holds all data needed to render a pipeline dashboard.
@@ -35,6 +39,12 @@ var phaseOrder = []struct {
 	key  string
 	name string
 }{
+	{string(PhasePlan), "Planning"},
+	{string(PhaseTestScaffold), "Test Scaffold"},
+	{string(PhaseImplement), "Implementation"},
+	{string(PhaseValidate), "Validation"},
+	{string(PhaseReview), "Review"},
+	// Legacy keys remain renderable for pre-v1 in-memory callers.
 	{"phase1", "Planning"},
 	{"phase1.5", "Test Scaffold"},
 	{"phase2", "Implementation"},
@@ -54,6 +64,10 @@ func statusIcon(s PhaseStatus) string {
 		return "\033[33m▶ running\033[0m"
 	case PhaseFailed:
 		return "\033[31m✗ failed\033[0m"
+	case PhaseSkipped:
+		return "\033[36m↷ skipped\033[0m"
+	case PhaseCancelled:
+		return "\033[31m■ cancelled\033[0m"
 	default:
 		return "\033[2m○ pending\033[0m"
 	}

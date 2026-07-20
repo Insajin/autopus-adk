@@ -1,9 +1,16 @@
 package cli
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/insajin/autopus-adk/pkg/orchestra"
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
@@ -58,4 +65,59 @@ func TestNewOrchSessionID_IsUnique(t *testing.T) {
 		}
 		ids[id] = struct{}{}
 	}
+}
+
+func TestRunOrchestraCommand_CodexHookEnablesPaneIPC(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(projectRoot, "autopus.yaml"),
+		[]byte("project: legacy-codex-hook-test\n"),
+		0o600,
+	))
+	codexDir := filepath.Join(projectRoot, ".codex")
+	require.NoError(t, os.MkdirAll(codexDir, 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(codexDir, "hooks.json"),
+		[]byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":".codex/hooks/autopus/hook-codex-stop.sh"}]}]}}`),
+		0o600,
+	))
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("AUTOPUS_PLATFORM", "codex")
+	t.Chdir(projectRoot)
+
+	originalDetector := runOrchestraTerminalDetector
+	originalRun := runOrchestraExecute
+	t.Cleanup(func() {
+		runOrchestraTerminalDetector = originalDetector
+		runOrchestraExecute = originalRun
+	})
+	runOrchestraTerminalDetector = func() terminal.Terminal { return stubTerminal{name: "cmux"} }
+	var captured orchestra.OrchestraConfig
+	runOrchestraExecute = func(_ context.Context, cfg orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		captured = cfg
+		return &orchestra.OrchestraResult{Merged: "ok", Summary: "done"}, nil
+	}
+
+	err := runOrchestraCommand(
+		context.Background(), "plan", "consensus", []string{"claude"},
+		30, "", "topic", 0, 0, OrchestraFlags{NoDetach: true},
+	)
+	require.NoError(t, err)
+	assert.True(t, captured.Interactive, "active mux must keep the pane execution path")
+	assert.True(t, captured.HookMode, "Codex Stop hook must enable pane IPC on shared orchestra commands")
+	assert.NotEmpty(t, captured.SessionID)
+}
+
+func TestApplyHookMode_ForcedSubprocessClearsLegacyPaneState(t *testing.T) {
+	cfg := orchestra.OrchestraConfig{
+		Terminal:       stubTerminal{name: "cmux"},
+		SubprocessMode: true,
+		HookMode:       true,
+		SessionID:      "stale-pane-session",
+	}
+
+	applyHookMode(&cfg)
+
+	assert.False(t, cfg.HookMode)
+	assert.Empty(t, cfg.SessionID)
 }

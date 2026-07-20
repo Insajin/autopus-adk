@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 	"time"
 
@@ -117,27 +116,22 @@ func (sm *SurfaceManager) checkAll(ctx context.Context, panes []paneInfo) {
 // Returns updated paneInfo and whether recovery occurred.
 // This replaces the inline surface validation logic in executeRound().
 func (sm *SurfaceManager) ValidateAndRecover(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round int) (paneInfo, bool, error) {
-	healthy := sm.IsHealthy(pi.paneID)
-	if healthy {
-		// Double-check with live ReadScreen if signal says healthy
-		if !validateSurface(ctx, cfg.Terminal, pi.paneID) {
-			healthy = false
+	cachedHealthy := sm.IsHealthy(pi.paneID)
+	// Signal health is advisory. Always confirm with live terminal I/O before
+	// teardown so a stale or mismatched signal sample cannot destroy a live pane.
+	if validateSurface(ctx, cfg.Terminal, pi.paneID) {
+		if !cachedHealthy {
+			log.Printf("[SurfaceManager] ignoring false-negative health sample for %s (%s)", pi.provider.Name, pi.paneID)
+			sm.mu.Lock()
+			sm.health[string(pi.paneID)] = terminal.SurfaceStatus{Valid: true, SurfaceRef: string(pi.paneID)}
+			sm.mu.Unlock()
 		}
-	}
-	if healthy {
 		return pi, false, nil // No recovery needed
 	}
 
 	// Surface is stale — try warm pool first for instant recovery.
 	if w := sm.acquireWarm(); w != nil {
 		log.Printf("[SurfaceManager] using warm spare pane for %s (%s -> %s)", pi.provider.Name, pi.paneID, w.paneID)
-
-		// Clean up old stale pane
-		_ = cfg.Terminal.PipePaneStop(ctx, pi.paneID)
-		_ = cfg.Terminal.Close(ctx, string(pi.paneID))
-		_ = os.Remove(pi.outputFile)
-		cleanupPromptFiles(pi.promptFiles)
-		_ = os.Remove(pi.responseFile)
 
 		newPI := paneInfo{
 			paneID:     w.paneID,
@@ -150,10 +144,21 @@ func (sm *SurfaceManager) ValidateAndRecover(ctx context.Context, cfg OrchestraC
 		cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, "", cfg.WorkingDir)
 		if sendErr := cfg.Terminal.SendLongText(ctx, w.paneID, cmd); sendErr != nil {
 			log.Printf("[SurfaceManager] warm pane CLI launch failed, falling back to recreatePane: %v", sendErr)
-			_ = cfg.Terminal.Close(ctx, string(w.paneID))
+			sm.warmPool.cleanupPane(ctx, *w)
 			goto coldRecovery
 		}
-		_ = cfg.Terminal.SendCommand(ctx, w.paneID, "\n")
+		if sendErr := cfg.Terminal.SendCommand(ctx, w.paneID, "\n"); sendErr != nil {
+			log.Printf("[SurfaceManager] warm pane CLI submit failed, falling back to recreatePane: %v", sendErr)
+			sm.warmPool.cleanupPane(ctx, *w)
+			goto coldRecovery
+		}
+		if !pollUntilSessionReady(ctx, cfg.Terminal, w.paneID, SessionReadyPatterns(), startupTimeoutFor(pi.provider)) {
+			log.Printf("[SurfaceManager] warm pane CLI session did not become ready, falling back to recreatePane")
+			sm.warmPool.cleanupPane(ctx, *w)
+			goto coldRecovery
+		}
+
+		retirePaneAfterReplacement(ctx, cfg.Terminal, pi)
 
 		// Update health cache
 		sm.mu.Lock()

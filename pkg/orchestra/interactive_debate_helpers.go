@@ -96,7 +96,7 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 // The selected backend owns bounded completion detection; the context timeout
 // remains the outer safety bound and still respects parent cancellation.
 func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *HookSession, responses []ProviderResponse, round int) *ProviderResponse {
-	judgment := buildJudgmentPrompt(cfg.Prompt, responses)
+	judgment := buildTypedJudgmentPrompt(cfg.Prompt, responses)
 	judgeCfg := findOrBuildJudgeConfig(cfg)
 
 	// Bound the judge with both the parent context and a local timeout.
@@ -136,6 +136,10 @@ func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *Ho
 		fmt.Fprintf(os.Stderr, "[Judge] 빈 출력으로 판정 생략\n")
 		return nil
 	}
+	if _, parseErr := (&OutputParser{}).ParseJudge(resp.Output); parseErr != nil {
+		fmt.Fprintf(os.Stderr, "[Judge] invalid typed output: %v\n", parseErr)
+		return nil
+	}
 	if resp.ExecutedBackend == "" {
 		resp.ExecutedBackend = backend.Name()
 	}
@@ -155,9 +159,8 @@ func consensusReached(responses []ProviderResponse, cfg OrchestraConfig) bool {
 	if threshold <= 0 {
 		threshold = 0.66 // Default consensus threshold
 	}
-	_, summary := MergeConsensus(responses, threshold)
-	n := countNonEmpty(responses)
-	return summary == fmt.Sprintf("합의율: %d/%d (100%%)", n, n)
+	metrics := deriveConsensusMetrics(responses, threshold)
+	return metrics != nil && metrics.TotalClaims > 0 && metrics.DissentClaims == 0
 }
 
 // countNonEmpty counts responses with non-empty output.
@@ -230,7 +233,7 @@ func buildDebateResult(cfg OrchestraConfig, responses []ProviderResponse, roundH
 	if result.Degraded && !strings.Contains(result.Summary, "degraded") {
 		result.Summary = fmt.Sprintf("%s (degraded: %s)", result.Summary, joinFailedProviderNames(result.FailedProviders))
 	}
-	return finalizeOrchestraResult(result)
+	return finalizeOrchestraResultForConfig(result, cfg)
 }
 
 func deriveFailedProviders(roundHistory [][]ProviderResponse) []FailedProvider {
@@ -284,11 +287,11 @@ func mergeByStrategyWithRoundHistory(rounds [][]ProviderResponse, cfg OrchestraC
 		finalResponses = rounds[len(rounds)-1]
 	}
 	merged, summary := mergeByStrategy(cfg.Strategy, finalResponses, cfg)
-	return finalizeOrchestraResult(&OrchestraResult{
+	return finalizeOrchestraResultForConfig(&OrchestraResult{
 		Strategy:     cfg.Strategy,
 		Responses:    finalResponses,
 		Merged:       merged,
 		Summary:      summary,
 		RoundHistory: rounds,
-	})
+	}, cfg)
 }

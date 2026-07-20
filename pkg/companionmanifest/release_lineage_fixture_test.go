@@ -150,6 +150,8 @@ func newExecutableLineageFixture(
 		currentTag = publicKeyReceiptA5Tag
 	case publicKeyReceiptA5Version:
 		currentTag = publicKeyReceiptA6Tag
+	case publicKeyReceiptA6Version:
+		currentTag = publicKeyReceiptA7Tag
 	}
 	fixture := &executableLineageFixture{
 		root: root, tools: tools, evidence: evidence, pins: evidence.pins,

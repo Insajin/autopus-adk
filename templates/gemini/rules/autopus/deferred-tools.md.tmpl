@@ -1,8 +1,19 @@
 ---
 name: deferred-tools
-description: Load deferred tool schemas via ToolSearch before use to keep interactive UI and scheduling tools functional
+description: Antigravity deferred-tool compatibility and fail-closed team-mode policy
 category: harness
 platform: antigravity-cli
 ---
 
-@import content/rules/deferred-tools.md
+# Deferred Tools Loading
+
+Use only tool names exposed by the current Antigravity CLI runtime. Load a schema
+through the platform's native discovery surface before the first deferred call.
+If discovery does not expose a requested tool, stop that route with an
+unsupported-tool diagnostic; never substitute a primitive from another agent
+platform.
+
+Persistent Claude team lifecycle is not supported on this platform. `--team`
+must fail closed and direct the user to the ordinary Antigravity subagent
+pipeline. Do not emit guessed team creation, direct teammate messaging, or team
+deletion calls.

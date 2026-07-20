@@ -64,13 +64,13 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 		}
 	}
 
-	return &orchestra.OrchestraResult{
+	return orchestra.FinalizeOrchestrationResult(&orchestra.OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
 		Duration:        time.Since(start),
 		Summary:         fmt.Sprintf("structured spec review: %d providers", len(responses)),
 		FailedProviders: failed,
-	}, nil
+	}, cfg), nil
 }
 
 func ownStructuredReviewHookSession(cfg orchestra.OrchestraConfig) func() {

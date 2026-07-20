@@ -91,4 +91,5 @@ func TestRunOrchestraCommand_AppliesExplicitTimeoutToProviderExecution(t *testin
 	require.Len(t, captured.Providers, 1)
 	assert.Equal(t, 300, captured.TimeoutSeconds)
 	assert.Equal(t, 300*time.Second, captured.Providers[0].ExecutionTimeout)
+	assert.Empty(t, captured.FallbackMode, "empty policy must preserve the default subprocess fallback")
 }

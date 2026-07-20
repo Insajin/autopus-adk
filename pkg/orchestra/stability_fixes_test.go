@@ -203,9 +203,11 @@ func TestNoJudge_SkipsJudgeInDebate(t *testing.T) {
 // TestNoJudge_False_IncludesJudge verifies judge runs when NoJudge is false.
 func TestNoJudge_False_IncludesJudge(t *testing.T) {
 	t.Parallel()
+	judge := typedJudgeProvider(t, "judge")
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 1, Prompt: "with-judge test",
-		JudgeProvider: "claude",
+		JudgeProvider: judge.Name,
+		JudgeConfig:   &judge,
 		NoJudge:       false,
 		Providers: []ProviderConfig{
 			echoProvider("claude"),

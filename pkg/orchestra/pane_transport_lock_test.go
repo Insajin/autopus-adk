@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
 	"github.com/stretchr/testify/assert"
@@ -167,6 +168,36 @@ func TestRunPaneOrchestra_PartialSplitCleansBeforeAllowedFallback(t *testing.T) 
 	assert.NotContains(t, events, "subprocess-before-cleanup")
 	assert.FileExists(t, gatePath)
 	assert.Zero(t, term.sendCommandCalls+term.sendLongTextCalls, "no provider command may launch in a partial pane set")
+	assert.Contains(t, result.Summary, "SplitPane for second: second split failed",
+		"the successful subprocess fallback must preserve the original pane failure")
+	assert.Contains(t, result.DegradedReasons, "pane_partial_split_cleanup")
+	require.NotNil(t, result.RunReceipt)
+	assert.Contains(t, result.RunReceipt.DegradedReasons, "pane_partial_split_cleanup",
+		"the machine-readable receipt must expose the partial-pane degradation")
+}
+
+func TestRunPaneOrchestra_DebateWithPaneTerminal_DoesNotRequireInteractiveFlag(t *testing.T) {
+	term := newCmuxMock()
+	term.splitPaneErr = errors.New("debate pane unavailable")
+	cfg := OrchestraConfig{
+		Providers:      []ProviderConfig{echoProvider("claude")},
+		Strategy:       StrategyDebate,
+		Prompt:         "use the attached pane terminal",
+		TimeoutSeconds: 3,
+		Terminal:       term,
+		FallbackMode:   FallbackModeAbort,
+		NoJudge:        true,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	result, err := RunPaneOrchestra(ctx, cfg)
+
+	require.Error(t, err)
+	require.NotNil(t, result)
+	assert.Len(t, term.splitPaneCalls, 1,
+		"pane transport selection must not depend on the interactive-session flag")
+	assert.Contains(t, err.Error(), "debate pane unavailable")
 }
 
 func TestRunJudgeRound_EmptySplitErrorAllowsSubprocessFallback(t *testing.T) {

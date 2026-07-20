@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -109,15 +108,35 @@ func resolvePlatform(platform string) string {
 }
 
 // @AX:ANCHOR: [AUTO] CLI integration boundary — wires cobra command args into pipeline engine (fan-in: CLI + tests)
-// @AX:REASON: Default delegation safety metadata is initialized here before the pipeline engine enforces authenticity and depth checks.
+// @AX:REASON: Resolves SPEC identity, executable backend, and canonical receipt storage before dispatch.
 // runPipeline executes the pipeline for the given SPEC ID.
 func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) error {
+	if err := pipeline.ValidateSpecID(specID); err != nil {
+		return err
+	}
+	gitHash, _ := getCurrentGitHash()
+	requestedStrategy := pipeline.Strategy(cfg.Strategy)
+	resolvedSpec, err := resolvePipelineSpec(specID)
+	if err != nil {
+		return pipelineBlockedError(specID, "", gitHash, requestedStrategy, err)
+	}
+	if err := pipeline.ValidateStrategy(requestedStrategy); err != nil {
+		return pipelineBlockedError(specID, resolvedSpec.SnapshotHash, gitHash, requestedStrategy, err)
+	}
 	platform := resolvePlatform(cfg.Platform)
 	flags := globalFlagsFromContext(cmd.Context())
 
 	cp, err := LoadCheckpointIfContinue(specID, cfg.Continue)
 	if err != nil {
 		return err
+	}
+
+	var backend pipeline.PhaseBackend
+	if !cfg.DryRun {
+		backend, err = newPipelineProviderBackend(platform)
+		if err != nil {
+			return pipelineBlockedError(specID, resolvedSpec.SnapshotHash, gitHash, requestedStrategy, err)
+		}
 	}
 
 	// Initialize learn store if learnings directory exists.
@@ -128,23 +147,24 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	}
 
 	engineCfg := pipeline.EngineConfig{
-		SpecID:     specID,
-		Platform:   platform,
-		Strategy:   pipeline.Strategy(cfg.Strategy),
-		Checkpoint: cp,
-		DryRun:     cfg.DryRun,
+		SpecID:        specID,
+		SpecDir:       resolvedSpec.Dir,
+		Platform:      platform,
+		Strategy:      requestedStrategy,
+		Backend:       backend,
+		Checkpoint:    cp,
+		DryRun:        cfg.DryRun,
+		SnapshotHash:  resolvedSpec.SnapshotHash,
+		GitCommitHash: gitHash,
 		RunConfig: pipeline.RunConfig{
-			SpecID:     specID,
-			LearnStore: learnStore,
-			DelegationSafety: pipeline.DelegationContext{
-				DefaultSubagentPipeline:  true,
-				SubagentSurfaceAvailable: true,
-			},
+			SpecID:        specID,
+			CheckpointDir: pipelineStateDir,
+			LearnStore:    learnStore,
 		},
 	}
 
 	engine := pipeline.NewSubprocessEngine(engineCfg)
-	result, err := engine.Run(context.Background())
+	result, err := engine.Run(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("pipeline run failed: %w", err)
 	}

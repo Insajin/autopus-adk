@@ -22,12 +22,13 @@ type specReviewLoopParams struct {
 	threshold       float64
 	gate            config.ReviewGateConf
 	providers       []orchestra.ProviderConfig
+	configuredNames []string
 	codeContext     string
 	subprocessMode  bool
 	contextDelivery *specReviewContextDelivery
+	runtimeEvidence *specReviewRuntimeEvidence
 }
 
-// runSpecReviewLoop executes the REVISE loop and returns the final merged result.
 func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFindings []spec.ReviewFinding) (*spec.ReviewResult, error) {
 	var finalResult *spec.ReviewResult
 
@@ -53,14 +54,17 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		// surface's default cwd and reads neither hook.
 		workingDir, _ := os.Getwd()
 		orchCfg := orchestra.OrchestraConfig{
-			Providers:      p.providers,
-			Strategy:       orchestra.Strategy(p.strategy),
-			Prompt:         prompt,
-			TimeoutSeconds: p.timeout,
-			JudgeProvider:  p.gate.Judge,
-			NoJudge:        true,
-			SubprocessMode: p.subprocessMode,
-			WorkingDir:     workingDir,
+			Providers:           p.providers,
+			RequestedProviders:  append([]string(nil), p.configuredNames...),
+			ConfiguredProviders: append([]string(nil), p.configuredNames...),
+			Strategy:            orchestra.Strategy(p.strategy),
+			Prompt:              prompt,
+			TimeoutSeconds:      p.timeout,
+			JudgeProvider:       p.gate.Judge,
+			NoJudge:             true,
+			SubprocessMode:      p.subprocessMode,
+			WorkingDir:          workingDir,
+			RunID:               orchestra.NewSessionID(),
 			// REQ-006: inject the detected terminal so SelectBackend can choose the
 			// interactive pane backend on cmux/tmux and the subprocess backend on
 			// plain/CI terminals. The terminal import is centralized in
@@ -87,6 +91,13 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		if err != nil {
 			return nil, fmt.Errorf("리뷰 실행 실패: %w", err)
 		}
+		if p.runtimeEvidence != nil {
+			p.runtimeEvidence.RunID = orchCfg.RunID
+			if result.RunReceipt != nil && result.RunReceipt.RunID != "" {
+				p.runtimeEvidence.RunID = result.RunReceipt.RunID
+			}
+			p.runtimeEvidence.FinishedAt = time.Now().UTC()
+		}
 
 		// Parse verdicts from each provider.
 		// SPEC-SPECREV-001 S-005 hardening: skip responses from providers that
@@ -111,17 +122,14 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		}
 
 		// SPEC-SPECREV-001 REQ-VERD-1: build per-provider health from orchestra.
-		configuredNames := make([]string, 0, len(p.providers))
-		for _, pc := range p.providers {
-			configuredNames = append(configuredNames, pc.Name)
-		}
+		configuredNames := specReviewConfiguredNames(p.configuredNames, p.providers)
 		providerStatuses := spec.BuildProviderStatuses(result.Responses, result.FailedProviders, configuredNames)
 		failedCount := len(configuredNames) - spec.CountProviderStatus(providerStatuses, "success")
 
 		// REQ-01: use supermajority threshold instead of unanimous PASS.
 		// SPEC-SPECREV-001 REQ-VERD-3: optionally drop failed providers from the denom.
 		finalVerdict := spec.MergeVerdictsWithDenomMode(
-			reviews, p.threshold, len(p.providers),
+			reviews, p.threshold, len(configuredNames),
 			p.gate.ExcludeFailedFromDenom, failedCount,
 		)
 
@@ -175,7 +183,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		// SPEC-ADK-REVIEW-INTEGRITY-001: record per-document observation coverage
 		// and provider quorum so the promotion gate can fail closed on partial
 		// observation. Coverage is persisted into the findings sidecar.
-		coverages := applyObservationIntegrity(merged, p.specDir, p.gate, len(p.providers))
+		coverages := applyObservationIntegrity(merged, p.specDir, p.gate, len(configuredNames))
 
 		// A mid-pipeline write failure must abort (issue #38).
 		if persistErr := spec.PersistFindingsWithCoverage(p.specDir, merged.Findings, coverages); persistErr != nil {

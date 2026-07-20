@@ -31,9 +31,18 @@ func buildFailedProviderWithContext(
 	failure := FailedProvider{
 		Name:                    provider.Name,
 		Role:                    role,
+		ModelFamily:             provider.ModelFamily,
 		OtherProvidersContinued: otherProvidersContinued,
 	}
 	if resp != nil {
+		failure.ExecutedBackend = resp.ExecutedBackend
+		failure.TerminalState = resp.TerminalState
+		failure.DegradedReasons = append([]string(nil), resp.DegradedReasons...)
+		failure.PreflightFailed = resp.ExecutedBackend == noneBackendMarker &&
+			(resp.TerminalState == TerminalSkipped || resp.TerminalState == TerminalBlocked)
+		failure.ExitCode = resp.ExitCode
+		failure.TimedOut = resp.TimedOut
+		failure.Receipt = resp.Receipt
 		failure.Usage = append([]telemetry.UsageEnvelope(nil), resp.Usage...)
 		failure.UsageCapability = resp.UsageCapability
 		if resp.Provider != "" {
@@ -178,19 +187,21 @@ func redactFailureText(text string) string {
 	return redacted
 }
 
-func buildFailureResult(cfg OrchestraConfig, failed []FailedProvider, roundHistory [][]ProviderResponse, start time.Time, runErr error) *OrchestraResult {
+func buildFailureResult(cfg OrchestraConfig, responses []ProviderResponse, failed []FailedProvider, roundHistory [][]ProviderResponse, start time.Time, runErr error) *OrchestraResult {
 	summary := failureSummary(failed)
 	if summary == "" && runErr != nil {
 		summary = runErr.Error()
 	}
-	return finalizeOrchestraResult(&OrchestraResult{
+	return finalizeOrchestraResultForConfig(&OrchestraResult{
 		Strategy:        cfg.Strategy,
+		Responses:       responses,
 		Duration:        time.Since(start),
 		Summary:         summary,
 		FailedProviders: failed,
 		RoundHistory:    roundHistory,
 		RunID:           cfg.RunID,
-	})
+		TerminalState:   TerminalBlocked,
+	}, cfg)
 }
 
 func failureSummary(failed []FailedProvider) string {

@@ -6,6 +6,29 @@
 
 변경된 코드를 TRUST 5 기준으로 리뷰합니다.
 
+## Canonical Semantic Contract
+
+```json
+{
+  "schema": "orchestration-contract.v1",
+  "workflow": "review",
+  "semantics": {
+    "risk_tiered_review": true,
+    "forward_strategy_and_providers": true,
+    "degraded_requires_override": true,
+    "discovery_verification_split": true,
+    "retry_budget": 2
+  }
+}
+```
+
+Every provider run emits `orchestration_run_receipt.v1` and keeps
+`requested_providers`, `configured_providers`, `resolved_providers`,
+`attempted_providers`, `usable_providers`, `failed_providers`,
+`degraded_reasons`, `critical_veto`, `analysis_verdict`, and `gate_status`
+separate. A degraded or Critical-vetoed analysis cannot become APPROVE without
+an explicit audited override.
+
 ## 사용법
 
 ```
@@ -13,6 +36,7 @@
 @auto review path/to/file
 @auto review HEAD~3..HEAD
 @auto review --risk-tier high
+@auto review --risk-tier high --strategy debate --providers claude,codex
 ```
 
 ## 실행 원칙
@@ -35,6 +59,25 @@
 - If a complexity suggestion would weaken correctness, security, accessibility, validation, or data-safety, downgrade or reject it.
 - Final response receipt summarizes authoritative correctness/security action, advisory or blocking complexity action, skipped unsafe simplification, and minimum sufficient verification.
 - `qualityloop`/`skillevolve` signals are candidate-only and remain isolated/quarantined; do not apply them from review.
+
+## Multi-provider discovery and verification
+
+For every review, resolve `RISK_TIER`, `STRATEGY`, and `PROVIDERS` from the
+user flags and configuration. Forward explicit values unchanged:
+
+```bash
+auto orchestra review {review paths} --risk-tier {RISK_TIER} --strategy {STRATEGY} --providers {PROVIDERS} --no-detach --format json
+```
+
+Omit `--providers` only when the user did not supply it. The orchestra review
+must return `schema=orchestration_cli_result.v1` with an embedded
+`receipt.schema=orchestration_run_receipt.v1`; reject detached job IDs or
+untyped prose at this synchronous gate. The review is discovery: freeze its
+actionable findings, preserve dissent, and treat an
+unresolved Critical security/correctness finding as `critical_veto=true`.
+After a fixer closes the checklist, run deterministic validation and a focused
+verification review. Retry repair → validate → verify at most 2 times. Do not
+replace this path with generic `auto orchestra run`.
 
 ## TRUST 5 기준
 

@@ -10,6 +10,7 @@ import (
 type ProviderResult struct {
 	Provider        string // real provider name
 	Output          string // raw output text
+	Response        ProviderResponse
 	Usage           []telemetry.UsageEnvelope
 	UsageCapability UsageCapability
 }

@@ -72,7 +72,7 @@ func generateAgentTemplates(contentDir, templateDir string) error {
 }
 
 // generateSkillTemplates transforms skills into Codex and Gemini templates.
-// Existing auto-* command skill templates are preserved (not overwritten).
+// Route and capability-bound templates are preserved for native tool bindings.
 func generateSkillTemplates(contentDir, templateDir string) error {
 	transformer, err := NewSkillTransformer(filepath.Join(contentDir, "skills"))
 	if err != nil {
@@ -86,8 +86,8 @@ func generateSkillTemplates(contentDir, templateDir string) error {
 		}
 
 		for _, skill := range transformed {
-			// Skip auto-* names to preserve existing command skill templates
-			if strings.HasPrefix(skill.Name, "auto-") {
+			// Keep route contracts and team mode on their platform-native adapters.
+			if strings.HasPrefix(skill.Name, "auto-") || skill.Name == "agent-teams" {
 				continue
 			}
 

@@ -90,7 +90,7 @@ func TestHandleDebate_TwoResponses(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, merged, "claude의 의견")
 	assert.Contains(t, merged, "codex의 의견")
-	assert.Contains(t, summary, "판정: gemini")
+	assert.Contains(t, summary, "판정 실패: gemini")
 }
 
 func TestHandleDebate_NoJudge(t *testing.T) {
@@ -147,14 +147,12 @@ func TestHandleConsensus_BelowThreshold(t *testing.T) {
 
 // R3: handleConsensus must use OrchestraConfig.ConsensusThreshold instead of hardcoded 0.66.
 // This test sets threshold=1.0 so only unanimous lines pass, then verifies that
-// a line appearing in 2/3 responses is excluded. Currently handleConsensus ignores
-// the config field and always passes 0.66, so this test MUST FAIL.
+// a line appearing in 2/3 responses is classified as dissent rather than consensus.
 func TestHandleConsensus_UsesConfigThreshold(t *testing.T) {
 	t.Parallel()
 
-	// "python is popular" appears in 2 of 3 responses (67%).
-	// With threshold=1.0 it should NOT appear in consensus.
-	// With the hardcoded 0.66, it WILL appear — proving the config is ignored.
+	// "python is popular" appears in 2 of 3 responses (67%). With
+	// threshold=1.0 it must remain visible outside the consensus section.
 	responses := []ProviderResponse{
 		makeResponse("p1", "golang is great\npython is popular"),
 		makeResponse("p2", "golang is great\npython is popular"),
@@ -167,9 +165,11 @@ func TestHandleConsensus_UsesConfigThreshold(t *testing.T) {
 	}
 	merged, _, err := handleConsensus(context.Background(), responses, cfg)
 	require.NoError(t, err)
-	// "python is popular" is 2/3 (67%) — with threshold=1.0 it must NOT be consensus
-	assert.NotContains(t, merged, "python is popular",
-		"handleConsensus should respect ConsensusThreshold=1.0 and exclude 67% lines")
+	assert.Contains(t, merged, "✓ golang is great")
+	assert.Contains(t, merged, "## 이견이 있는 내용")
+	assert.Contains(t, merged, "△ python is popular [p1, p2]",
+		"handleConsensus must preserve 67% evidence as dissent at threshold=1.0")
+	assert.Contains(t, merged, "△ rust is fast [p3]")
 }
 
 // R3: handleConsensus with zero threshold should use default 0.66.

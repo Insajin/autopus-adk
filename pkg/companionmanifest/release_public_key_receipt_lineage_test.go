@@ -77,7 +77,7 @@ func TestReleasePublicKeyReceipt_A0Policy_IsOneExactAuditableBootstrap(t *testin
 		"release_phase='A1'",
 		"release_phase='A2'",
 		"release_phase='A3'",
-		"release_phase='A4'", "release_phase='A5'", "release_phase='A6'",
+		"release_phase='A4'", "release_phase='A5'", "release_phase='A6'", "release_phase='A7'",
 	} {
 		if !strings.Contains(scripts, exact) {
 			t.Fatalf("missing exact A0 bootstrap release policy %q", exact)
@@ -149,7 +149,7 @@ func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredece
 		"gh api", "gh release download", "releases/tags/",
 		publicKeyReceiptA0Repository, publicKeyReceiptA0Tag, publicKeyReceiptA1Tag,
 		publicKeyReceiptA2Tag, publicKeyReceiptA3Tag, publicKeyReceiptA4Tag, publicKeyReceiptA5Tag,
-		publicKeyReceiptA6Tag,
+		publicKeyReceiptA6Tag, publicKeyReceiptA7Tag,
 		"tag_name", "target_commitish", "cmp --",
 		"prior_receipt", "current_receipt", "record_sha256", "public_key_sha256",
 	} {
@@ -166,7 +166,8 @@ func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredece
 	}
 	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.75", "prior_release_identity_mismatch")
 	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.76", "prior_release_identity_mismatch")
-	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.78", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.79", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA7Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA6Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA5Tag, "prior_evidence_unverifiable")
 	requirePublicKeyReceiptLineagePhaseFailure(t, publicKeyReceiptA4Tag, "prior_evidence_unverifiable")

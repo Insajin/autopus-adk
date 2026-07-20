@@ -44,7 +44,7 @@ func (b *InteractivePaneBackend) Name() string { return paneBackendName }
 func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderRequest) (*ProviderResponse, error) {
 	if b.cfg.Terminal == nil {
 		// Defensive: no terminal means we cannot run a pane at all.
-		return paneProvisioningFallback(ctx, req, "interactive pane execution failed: no terminal attached")
+		return paneProvisioningFallback(ctx, b.cfg, req, "interactive pane execution failed: no terminal attached")
 	}
 
 	if req.Timeout > 0 {
@@ -56,12 +56,12 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	term := b.cfg.Terminal
 	start := time.Now()
 
-	paneID, err := splitTrackedPane(ctx, term, terminal.Horizontal)
+	paneID, err := splitPaneSerialized(ctx, term, terminal.Horizontal)
 	if paneID == "" {
 		if err != nil {
-			return paneProvisioningFallback(ctx, req, "interactive pane execution failed: SplitPane error: "+err.Error())
+			return paneProvisioningFallback(ctx, b.cfg, req, "interactive pane execution failed: SplitPane error: "+err.Error())
 		}
-		return paneProvisioningFallback(ctx, req, "interactive pane execution failed: SplitPane returned an empty pane ID")
+		return paneProvisioningFallback(ctx, b.cfg, req, "interactive pane execution failed: SplitPane returned an empty pane ID")
 	}
 	if err != nil {
 		closePaneSurface(term, paneID)

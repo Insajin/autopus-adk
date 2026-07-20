@@ -21,6 +21,16 @@ func (noopExecutionBackend) Name() string {
 	return "noop"
 }
 
+func successfulDebateRunResult(provider string) *orchestra.OrchestraResult {
+	return &orchestra.OrchestraResult{
+		Strategy:    orchestra.StrategyDebate,
+		Responses:   []orchestra.ProviderResponse{{Provider: provider, Output: "usable result"}},
+		Merged:      "ok",
+		Summary:     "done",
+		JudgeStatus: orchestra.JudgePassed,
+	}
+}
+
 func TestRunSubprocessPipeline_UsesConfigTimeoutWhenFlagUnchanged(t *testing.T) {
 	origLoadConfig := orchestraRunLoadConfig
 	origBuildProviders := orchestraRunBuildProviders
@@ -49,7 +59,7 @@ func TestRunSubprocessPipeline_UsesConfigTimeoutWhenFlagUnchanged(t *testing.T) 
 	var captured orchestra.SubprocessPipelineConfig
 	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {
 		captured = cfg
-		return &orchestra.OrchestraResult{Merged: "ok", Summary: "done"}, nil
+		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
 	err := runSubprocessPipeline(context.Background(), "topic", "debate", []string{"claude"}, "standard", 120, false, "", false, false)
@@ -85,7 +95,7 @@ func TestRunSubprocessPipeline_CLITimeoutOverridesConfig(t *testing.T) {
 	var captured orchestra.SubprocessPipelineConfig
 	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {
 		captured = cfg
-		return &orchestra.OrchestraResult{Merged: "ok", Summary: "done"}, nil
+		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
 	err := runSubprocessPipeline(context.Background(), "topic", "debate", []string{"claude"}, "standard", 90, true, "", false, false)
@@ -122,7 +132,7 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 	var captured orchestra.SubprocessPipelineConfig
 	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {
 		captured = cfg
-		return &orchestra.OrchestraResult{Merged: "ok", Summary: "done"}, nil
+		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
 	err := runSubprocessPipeline(context.Background(), "topic", "debate", []string{"codex"}, "fast", 120, false, "", false, false)
@@ -159,7 +169,7 @@ func TestRunSubprocessPipeline_AppliesRuntimeCodexQualityAndEffort(t *testing.T)
 	var captured orchestra.SubprocessPipelineConfig
 	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {
 		captured = cfg
-		return &orchestra.OrchestraResult{Merged: "ok", Summary: "done"}, nil
+		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
 	ctx := withGlobalFlags(context.Background(), globalFlags{Quality: "ultra", Effort: config.CodexEffortMax})

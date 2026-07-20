@@ -35,7 +35,8 @@ func TestTmuxAdapter_NotSignalCapable(t *testing.T) {
 
 // TestCmuxAdapter_SurfaceHealth_Success verifies output parsing of surface-health.
 func TestCmuxAdapter_SurfaceHealth_Success(t *testing.T) {
-	restore, _ := newCmuxMockV2("surface:7 type=terminal in_window=true", nil)
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:2")
+	restore, captured := newCmuxMockV2("surface:7 type=terminal in_window=true", nil)
 	defer restore()
 
 	a := &CmuxAdapter{}
@@ -44,6 +45,8 @@ func TestCmuxAdapter_SurfaceHealth_Success(t *testing.T) {
 	assert.True(t, status.Valid)
 	assert.Equal(t, "surface:7", status.SurfaceRef)
 	assert.True(t, status.InWindow)
+	require.Len(t, captured.calls, 1)
+	assert.Equal(t, []string{"surface-health", "--workspace", "workspace:2"}, captured.calls[0].args)
 }
 
 // TestCmuxAdapter_SurfaceHealth_NotInWindow verifies in_window=false parsing.
@@ -57,6 +60,42 @@ func TestCmuxAdapter_SurfaceHealth_NotInWindow(t *testing.T) {
 	assert.True(t, status.Valid)
 	assert.Equal(t, "surface:3", status.SurfaceRef)
 	assert.False(t, status.InWindow)
+}
+
+// TestCmuxAdapter_SurfaceHealth_MultipleSurfacesSelectsRequested verifies that
+// workspace-wide health output cannot overwrite the requested pane with the last line.
+func TestCmuxAdapter_SurfaceHealth_MultipleSurfacesSelectsRequested(t *testing.T) {
+	output := strings.Join([]string{
+		"surface:3 type=terminal in_window=false",
+		"surface:7 type=terminal in_window=true",
+		"surface:9 type=terminal in_window=false",
+	}, "\n")
+	restore, _ := newCmuxMockV2(output, nil)
+	defer restore()
+
+	a := &CmuxAdapter{}
+	status, err := a.SurfaceHealth(context.Background(), "surface:7")
+	require.NoError(t, err)
+	assert.True(t, status.Valid)
+	assert.Equal(t, "surface:7", status.SurfaceRef)
+	assert.True(t, status.InWindow)
+}
+
+// TestCmuxAdapter_SurfaceHealth_MissingRequestedSurfaceReturnsError verifies that
+// a different healthy surface cannot make a missing provider pane look healthy.
+func TestCmuxAdapter_SurfaceHealth_MissingRequestedSurfaceReturnsError(t *testing.T) {
+	output := strings.Join([]string{
+		"surface:3 type=terminal in_window=true",
+		"surface:70 type=terminal in_window=true",
+	}, "\n")
+	restore, _ := newCmuxMockV2(output, nil)
+	defer restore()
+
+	a := &CmuxAdapter{}
+	status, err := a.SurfaceHealth(context.Background(), "surface:7")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "surface:7")
+	assert.False(t, status.Valid)
 }
 
 // TestCmuxAdapter_SurfaceHealth_InvalidPaneID verifies validation rejects bad pane IDs.
@@ -111,6 +150,11 @@ func TestParseSurfaceHealth_Variants(t *testing.T) {
 		{
 			name:    "no surface ref",
 			input:   "type=terminal in_window=true",
+			wantErr: true,
+		},
+		{
+			name:    "multiple surface lines",
+			input:   "surface:7 type=terminal in_window=true\nsurface:9 type=terminal in_window=false",
 			wantErr: true,
 		},
 	}

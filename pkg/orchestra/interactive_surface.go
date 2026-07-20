@@ -35,15 +35,9 @@ func validateSurface(ctx context.Context, term terminal.Terminal, paneID termina
 func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round int) (paneInfo, error) {
 	oldPaneID := pi.paneID
 
-	// Clean up stale surface.
-	_ = cfg.Terminal.PipePaneStop(ctx, pi.paneID)
-	_ = cfg.Terminal.Close(ctx, string(pi.paneID))
-	_ = os.Remove(pi.outputFile)
-	cleanupPromptFiles(pi.promptFiles)
-	_ = os.Remove(pi.responseFile)
-
-	// Create new pane.
-	newPaneID, err := splitTrackedPane(ctx, cfg.Terminal, terminal.Horizontal)
+	// Prepare a replacement while the old pane remains available. The old pane
+	// is retired only after the new CLI session reaches the commit point.
+	newPaneID, err := splitPaneSerialized(ctx, cfg.Terminal, terminal.Horizontal)
 	if err != nil {
 		return pi, fmt.Errorf("recreatePane SplitPane for %s: %w", pi.provider.Name, err)
 	}
@@ -52,10 +46,14 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	safeName := sanitizeProviderName(pi.provider.Name)
 	tmpFile, err := os.CreateTemp("", "autopus-orch-"+safeName+"-")
 	if err != nil {
-		_ = cfg.Terminal.Close(ctx, string(newPaneID))
+		closePaneSurface(cfg.Terminal, newPaneID)
 		return pi, fmt.Errorf("recreatePane CreateTemp for %s: %w", pi.provider.Name, err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		closePaneSurface(cfg.Terminal, newPaneID)
+		_ = os.Remove(tmpFile.Name())
+		return pi, fmt.Errorf("recreatePane close output for %s: %w", pi.provider.Name, err)
+	}
 
 	// Start pipe capture on new pane with retry — cmux surfaces need time to initialize.
 	// Pipe capture is used only for idle fallback detection (isOutputIdle).
@@ -91,21 +89,31 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	// SendLongText later by the caller.
 	cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, "", cfg.WorkingDir)
 	if err := cfg.Terminal.SendLongText(ctx, newPaneID, cmd); err != nil {
-		_ = cfg.Terminal.Close(ctx, string(newPaneID))
+		closePaneSurface(cfg.Terminal, newPaneID)
 		_ = os.Remove(tmpFile.Name())
 		return pi, fmt.Errorf("recreatePane launch for %s: %w", pi.provider.Name, err)
 	}
-	_ = cfg.Terminal.SendCommand(ctx, newPaneID, "\n")
+	if err := cfg.Terminal.SendCommand(ctx, newPaneID, "\n"); err != nil {
+		closePaneSurface(cfg.Terminal, newPaneID)
+		_ = os.Remove(tmpFile.Name())
+		return pi, fmt.Errorf("recreatePane launch enter for %s: %w", pi.provider.Name, err)
+	}
 
 	// Wait for session readiness.
 	patterns := SessionReadyPatterns()
 	timeout := startupTimeoutFor(pi.provider)
-	pollUntilSessionReady(ctx, cfg.Terminal, newPaneID, patterns, timeout)
+	if !pollUntilSessionReady(ctx, cfg.Terminal, newPaneID, patterns, timeout) {
+		closePaneSurface(cfg.Terminal, newPaneID)
+		_ = os.Remove(tmpFile.Name())
+		return pi, fmt.Errorf("recreatePane session for %s did not become ready after %s", pi.provider.Name, timeout)
+	}
 
 	// Post-ready stabilization: allow the CLI and cmux surface to fully
 	// initialize before accepting paste-buffer input. Without this delay,
 	// paste-buffer fails with exit status 1 on newly created surfaces.
 	time.Sleep(recreatePostReadyDelay)
+
+	retirePaneAfterReplacement(ctx, cfg.Terminal, pi)
 
 	// R3: Log successful recreation.
 	log.Printf("[Surface] %s pane recreated: %s → %s", pi.provider.Name, oldPaneID, newPaneID)
@@ -116,4 +124,13 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 		provider:   pi.provider,
 		skipWait:   false,
 	}, nil
+}
+
+func retirePaneAfterReplacement(ctx context.Context, term terminal.Terminal, pi paneInfo) {
+	_ = term.PipePaneStop(ctx, pi.paneID)
+	closePaneSurface(term, pi.paneID)
+	_ = os.Remove(pi.outputFile)
+	cleanupPromptFiles(pi.promptFiles)
+	_ = os.Remove(pi.responseFile)
+	cleanupPromptFiles(pi.launchFiles)
 }

@@ -4,14 +4,14 @@ on:
   workflow_dispatch: {}
 
 # Canonical invocation after the immutable release exists:
-# gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.77
+# gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.78
 
 permissions:
   contents: read
 
 jobs:
   recover-formula-bridge:
-    if: github.ref == 'refs/tags/v0.50.77'
+    if: github.ref == 'refs/tags/v0.50.78'
     environment:
       name: adk-companion-release
     permissions:
@@ -19,10 +19,10 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 20
     steps:
-      - name: Check out exact A6 release tag
+      - name: Check out exact A7 release tag
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: refs/tags/v0.50.77
+          ref: refs/tags/v0.50.78
           fetch-depth: 0
           persist-credentials: false
 
@@ -40,7 +40,7 @@ jobs:
           validation_output=$(mktemp "$RUNNER_TEMP/formula-recovery-source.XXXXXX")
           trap 'rm -f -- "$validation_output"' EXIT
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.77' GITHUB_REF_TYPE='tag' \
+            GITHUB_REF_NAME='v0.50.78' GITHUB_REF_TYPE='tag' \
             GITHUB_SHA="$actual_head" GITHUB_OUTPUT="$validation_output" \
             COMPANION_SOURCE_PIN_REQUIRED=1 \
             COMPANION_APPROVED_SOURCE_COMMIT="$COMPANION_APPROVED_SOURCE_COMMIT" \
@@ -68,7 +68,7 @@ jobs:
             || fail 'validated source commit is malformed'
           release_json=$(mktemp "$RUNNER_TEMP/formula-recovery-release.XXXXXX") \
             || fail 'cannot create release metadata file'
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.77-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.78-checksums.txt"
           [[ ! -e "$checksums_path" && ! -L "$checksums_path" ]] \
             || fail 'checksums destination already exists'
           cleanup() {
@@ -82,10 +82,10 @@ jobs:
           trap cleanup EXIT
           if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
             -H 'Accept: application/vnd.github+json' \
-            'repos/Insajin/autopus-adk/releases/tags/v0.50.77' > "$release_json"; then
-            fail 'cannot read the exact A6 GitHub release'
+            'repos/Insajin/autopus-adk/releases/tags/v0.50.78' > "$release_json"; then
+            fail 'cannot read the exact A7 GitHub release'
           fi
-          jq -e --arg tag 'v0.50.77' --arg commit "$SOURCE_COMMIT" '
+          jq -e --arg tag 'v0.50.78' --arg commit "$SOURCE_COMMIT" '
             .tag_name == $tag and
             .target_commitish == $commit and
             .draft == false and
@@ -93,12 +93,12 @@ jobs:
             .immutable == true and
             (.assets | type == "array")
           ' "$release_json" >/dev/null \
-            || fail 'A6 GitHub release is not immutable, final, or source-bound'
+            || fail 'A7 GitHub release is not immutable, final, or source-bound'
           checksums_name='checksums.txt'
           jq -e --arg name "$checksums_name" \
             '[.assets[] | select(.name == $name)] | length == 1' \
             "$release_json" >/dev/null \
-            || fail 'A6 release must contain exactly one checksums.txt asset'
+            || fail 'A7 release must contain exactly one checksums.txt asset'
           asset_id=$(jq -er --arg name "$checksums_name" '
             .assets[] |
             select(.name == $name and .state == "uploaded" and .size > 0) |
@@ -113,7 +113,7 @@ jobs:
           if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
             -H 'Accept: application/octet-stream' \
             "repos/Insajin/autopus-adk/releases/assets/${asset_id}" > "$checksums_path"; then
-            fail 'cannot download checksums.txt from the A6 release'
+            fail 'cannot download checksums.txt from the A7 release'
           fi
           [[ -f "$checksums_path" && ! -L "$checksums_path" && -s "$checksums_path" ]] \
             || fail 'downloaded checksums.txt is not a non-empty regular file'
@@ -143,8 +143,8 @@ jobs:
         run: |
           set -euo pipefail
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.77' \
-            COMPANION_VERSION='0.50.77' \
+            GITHUB_REF_NAME='v0.50.78' \
+            COMPANION_VERSION='0.50.78' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
@@ -153,4 +153,4 @@ jobs:
       - name: Remove downloaded release evidence
         if: always()
         shell: bash
-        run: rm -f -- "$RUNNER_TEMP/autopus-v0.50.77-checksums.txt"
+        run: rm -f -- "$RUNNER_TEMP/autopus-v0.50.78-checksums.txt"

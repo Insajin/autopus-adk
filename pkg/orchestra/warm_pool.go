@@ -28,6 +28,8 @@ type WarmPool struct {
 	pool     []warmPane
 	poolSize int // target pool size
 	mu       sync.Mutex
+	inFlight sync.WaitGroup
+	closed   bool
 }
 
 // NewWarmPool creates a WarmPool targeting the given number of spare panes.
@@ -46,11 +48,17 @@ func NewWarmPool(term terminal.Terminal, size int) *WarmPool {
 // Errors during pane creation are logged but not fatal — the pool
 // starts partially filled and replenishes in the background.
 func (wp *WarmPool) Init(ctx context.Context) {
+	if !wp.beginOperation() {
+		return
+	}
+	defer wp.inFlight.Done()
+
 	for i := range wp.poolSize {
 		wp.mu.Lock()
 		currentLen := len(wp.pool)
+		closed := wp.closed
 		wp.mu.Unlock()
-		if currentLen >= wp.poolSize {
+		if closed || currentLen >= wp.poolSize {
 			break
 		}
 		w, err := wp.createWarmPane(ctx)
@@ -58,9 +66,9 @@ func (wp *WarmPool) Init(ctx context.Context) {
 			log.Printf("[WarmPool] init: failed to create spare pane %d/%d: %v", i+1, wp.poolSize, err)
 			continue
 		}
-		wp.mu.Lock()
-		wp.pool = append(wp.pool, w)
-		wp.mu.Unlock()
+		if !wp.storePane(ctx, w) {
+			break
+		}
 		log.Printf("[WarmPool] init: spare pane %d/%d created (%s)", i+1, wp.poolSize, w.paneID)
 	}
 }
@@ -69,7 +77,7 @@ func (wp *WarmPool) Init(ctx context.Context) {
 func (wp *WarmPool) Acquire() *warmPane {
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
-	if len(wp.pool) == 0 {
+	if wp.closed || len(wp.pool) == 0 {
 		return nil
 	}
 	// Pop from the end (LIFO — most recently created pane is freshest)
@@ -81,8 +89,13 @@ func (wp *WarmPool) Acquire() *warmPane {
 // Replenish creates a new spare pane to refill the pool in the background.
 // Safe to call from a goroutine.
 func (wp *WarmPool) Replenish(ctx context.Context) {
+	if !wp.beginOperation() {
+		return
+	}
+	defer wp.inFlight.Done()
+
 	wp.mu.Lock()
-	if len(wp.pool) >= wp.poolSize {
+	if wp.closed || len(wp.pool) >= wp.poolSize {
 		wp.mu.Unlock()
 		return
 	}
@@ -94,21 +107,17 @@ func (wp *WarmPool) Replenish(ctx context.Context) {
 		log.Printf("[WarmPool] replenish failed: %v", err)
 		return
 	}
-	wp.mu.Lock()
-	// Re-check after creation to avoid exceeding target
-	if len(wp.pool) < wp.poolSize {
-		wp.pool = append(wp.pool, w)
-	} else {
-		// Pool was filled by another goroutine; clean up
-		wp.mu.Unlock()
-		wp.cleanupPane(ctx, w)
-		return
-	}
-	wp.mu.Unlock()
+	wp.storePane(ctx, w)
 }
 
 // Close cleans up all spare panes in the pool.
 func (wp *WarmPool) Close(ctx context.Context) {
+	wp.mu.Lock()
+	wp.closed = true
+	wp.mu.Unlock()
+
+	wp.inFlight.Wait()
+
 	wp.mu.Lock()
 	panes := make([]warmPane, len(wp.pool))
 	copy(panes, wp.pool)
@@ -128,19 +137,45 @@ func (wp *WarmPool) Size() int {
 	return len(wp.pool)
 }
 
+func (wp *WarmPool) beginOperation() bool {
+	wp.mu.Lock()
+	defer wp.mu.Unlock()
+	if wp.closed {
+		return false
+	}
+	wp.inFlight.Add(1)
+	return true
+}
+
+func (wp *WarmPool) storePane(ctx context.Context, w warmPane) bool {
+	wp.mu.Lock()
+	if !wp.closed && len(wp.pool) < wp.poolSize {
+		wp.pool = append(wp.pool, w)
+		wp.mu.Unlock()
+		return true
+	}
+	wp.mu.Unlock()
+	wp.cleanupPane(ctx, w)
+	return false
+}
+
 // createWarmPane creates a single spare pane with its output file.
 func (wp *WarmPool) createWarmPane(ctx context.Context) (warmPane, error) {
-	paneID, err := splitTrackedPane(ctx, wp.term, terminal.Horizontal)
+	paneID, err := splitPaneSerialized(ctx, wp.term, terminal.Horizontal)
 	if err != nil {
 		return warmPane{}, fmt.Errorf("SplitPane: %w", err)
 	}
 
 	tmpFile, err := os.CreateTemp("", "autopus-warm-spare-")
 	if err != nil {
-		_ = wp.term.Close(ctx, string(paneID))
+		closePaneSurface(wp.term, paneID)
 		return warmPane{}, fmt.Errorf("CreateTemp: %w", err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		closePaneSurface(wp.term, paneID)
+		_ = os.Remove(tmpFile.Name())
+		return warmPane{}, fmt.Errorf("close output file: %w", err)
+	}
 
 	// Start pipe capture so the pane is ready for idle fallback detection.
 	if pipeErr := wp.term.PipePaneStart(ctx, paneID, tmpFile.Name()); pipeErr != nil {
@@ -163,8 +198,7 @@ func (wp *WarmPool) createWarmPane(ctx context.Context) (warmPane, error) {
 // cleanupPane closes a single warm pane and removes its output file.
 func (wp *WarmPool) cleanupPane(ctx context.Context, w warmPane) {
 	_ = wp.term.PipePaneStop(ctx, w.paneID)
-	_ = wp.term.Close(ctx, string(w.paneID))
-	untrackSurface(string(w.paneID))
+	closePaneSurface(wp.term, w.paneID)
 	if w.outputFile != "" {
 		_ = os.Remove(w.outputFile)
 	}

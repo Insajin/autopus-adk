@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -94,6 +95,43 @@ func applyReviewRiskTierProviders(providers []orchestra.ProviderConfig, tier rev
 
 func tierRequiresMultipleProviders(tier reviewRiskTier) bool {
 	return tier == reviewRiskTierHigh || tier == reviewRiskTierCritical
+}
+
+func applyReviewProviderPolicy(
+	providers []orchestra.ProviderConfig,
+	commandName string,
+	tier reviewRiskTier,
+	inputs []string,
+	explicit bool,
+	w io.Writer,
+) ([]orchestra.ProviderConfig, bool) {
+	if commandName != "review" || tier == "" {
+		return providers, false
+	}
+	adjusted, degraded := providers, tierRequiresMultipleProviders(tier) && len(providers) < 2
+	if !explicit {
+		adjusted, degraded = applyReviewRiskTierProviders(providers, tier)
+	}
+	if len(adjusted) != len(providers) || degraded {
+		fmt.Fprintf(w, "리스크 티어: %s", tier)
+		if len(inputs) > 0 {
+			fmt.Fprintf(w, " (signals: %s)", strings.Join(inputs, ", "))
+		}
+		if degraded {
+			fmt.Fprintln(w, " — multi-provider 대상이지만 provider가 1개라 단일 provider로 폴백")
+		} else {
+			fmt.Fprintf(w, " — provider fan-out %d → %d\n", len(providers), len(adjusted))
+		}
+	}
+	single := len(adjusted) == 1 && (degraded || tier == reviewRiskTierLow || tier == reviewRiskTierMedium)
+	return adjusted, single
+}
+
+func reviewRiskMinimumProviders(commandName string, tier reviewRiskTier) int {
+	if commandName == "review" && tierRequiresMultipleProviders(tier) {
+		return 2
+	}
+	return 0
 }
 
 func normalizeRiskTierFiles(files []string) []string {

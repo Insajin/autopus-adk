@@ -11,6 +11,13 @@ import (
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 )
 
+const openCodeDeferredToolsRule = `# OpenCode Deferred Tool Compatibility
+
+Use only tools exposed by the current OpenCode runtime. If a requested tool is
+absent, stop that route with an unsupported-tool diagnostic. Persistent Claude
+team lifecycle is unavailable here; use the ordinary OpenCode task pipeline.
+`
+
 func (a *Adapter) prepareRuleMappings() ([]adapter.FileMapping, error) {
 	entries, err := contentfs.FS.ReadDir("rules")
 	if err != nil {
@@ -27,6 +34,9 @@ func (a *Adapter) prepareRuleMappings() ([]adapter.FileMapping, error) {
 			return nil, fmt.Errorf("rule 파일 읽기 실패 %s: %w", entry.Name(), readErr)
 		}
 		content := pkgcontent.ReplacePlatformReferences(string(data), "opencode")
+		if entry.Name() == "deferred-tools.md" {
+			content = openCodeDeferredToolsRule
+		}
 		relPath := filepath.Join(".opencode", "rules", "autopus", entry.Name())
 		files = append(files, adapter.FileMapping{
 			TargetPath:      relPath,

@@ -20,6 +20,12 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	if !cfg.Strategy.IsValid() {
 		return nil, fmt.Errorf("유효하지 않은 전략: %q", cfg.Strategy)
 	}
+	if !cfg.FallbackMode.IsValid() {
+		return nil, fmt.Errorf("unknown fallback mode %q", cfg.FallbackMode)
+	}
+	if result, err := preflightJudgeFamilySeparation(cfg); err != nil {
+		return result, err
+	}
 
 	// Delegate to pane runner for non-plain terminals (REQ-007 shared predicate)
 	if paneCapable(cfg.Terminal, cfg.SubprocessMode) {
@@ -43,13 +49,14 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 
 	switch cfg.Strategy {
 	case StrategyPipeline:
-		responses, err = runPipeline(timeoutCtx, cfg)
+		responses, failed, err = runPipeline(timeoutCtx, cfg)
 	case StrategyFastest:
 		responses, err = runFastest(timeoutCtx, cfg)
 	case StrategyDebate:
 		responses, roundHistory, failed, err = runDebate(timeoutCtx, cfg)
 	case StrategyRelay:
 		responses, err = runRelay(timeoutCtx, &cfg)
+		failed = decorateRelayExecutionEvidence(responses, cfg)
 	default:
 		// consensus: prepend structured prompt prefix, then run parallel with graceful degradation
 		consensusCfg := cfg
@@ -57,14 +64,14 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		responses, failed, err = runParallel(timeoutCtx, consensusCfg)
 	}
 	if err != nil {
-		return buildFailureResult(cfg, failed, roundHistory, start, err), err
+		return buildFailureResult(cfg, responses, failed, roundHistory, start, err), err
 	}
 
 	total := time.Since(start)
 
 	merged, summary, mergeErr := mergeResponsesByStrategy(timeoutCtx, responses, cfg)
 	if mergeErr != nil {
-		return buildFailureResult(cfg, failed, roundHistory, start, mergeErr), mergeErr
+		return buildFailureResult(cfg, responses, failed, roundHistory, start, mergeErr), mergeErr
 	}
 
 	// Append failed provider info to summary if any
@@ -76,7 +83,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		summary = fmt.Sprintf("%s (실패: %s)", summary, strings.Join(names, ", "))
 	}
 
-	return finalizeOrchestraResult(&OrchestraResult{
+	result := &OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
 		RoundHistory:    roundHistory,
@@ -86,7 +93,15 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		FailedProviders: failed,
 		RunID:           cfg.RunID,
 		Degraded:        len(failed) > 0,
-	}), nil
+	}
+	if cfg.Strategy == StrategyFastest {
+		result.AttemptedProviders = providerConfigNames(cfg.Providers)
+		result.DispatchCount = len(cfg.Providers)
+	}
+	if cfg.Strategy == StrategyDebate {
+		return finalizeDebateOutcome(result, cfg)
+	}
+	return finalizeOrchestraResultForConfig(result, cfg), nil
 }
 
 // runParallel executes all providers in parallel with per-goroutine context (R1)
@@ -112,6 +127,13 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 			defer wg.Done()
 			defer cancel()
 			resp, err := runProviderWithProgress(childCtx, provider, cfg.Prompt, progress)
+			role := "participant"
+			if cfg.Strategy == StrategyDebate {
+				role = "debater_r1"
+			}
+			applyProviderRequestEvidence(resp, ProviderRequest{
+				Provider: provider.Name, Config: provider, Role: role, Round: 1,
+			}, "subprocess")
 			results[idx] = providerResult{resp: resp, err: err, idx: idx}
 		}(i, p, childCancel)
 	}
@@ -134,14 +156,23 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 	otherProvidersContinued := len(responses) > 0
 	failed := make([]FailedProvider, 0, len(failedResults))
 	for _, r := range failedResults {
-		failed = append(failed, buildFailedProviderWithContext(
+		failure := buildFailedProviderWithContext(
 			cfg.Providers[r.idx],
 			r.resp,
 			r.err,
 			cfg.TimeoutSeconds,
 			"",
 			otherProvidersContinued,
-		))
+		)
+		failure.Attempt = 1
+		if cfg.Strategy == StrategyDebate {
+			failure.Role = "debater_r1"
+		}
+		failure.ExecutedBackend = "subprocess"
+		if r.resp != nil && r.resp.ExecutedBackend != "" {
+			failure.ExecutedBackend = r.resp.ExecutedBackend
+		}
+		failed = append(failed, failure)
 	}
 
 	if len(responses) == 0 {
@@ -214,31 +245,6 @@ func orchestrationTimeout(cfg OrchestraConfig) time.Duration {
 		}
 	}
 	return longestProvider * time.Duration(phaseCount)
-}
-
-// runPipeline은 프로바이더를 순차적으로 실행하며 이전 출력을 다음 입력에 추가한다.
-func runPipeline(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, error) {
-	responses := make([]ProviderResponse, 0, len(cfg.Providers))
-	prompt := cfg.Prompt
-
-	for _, p := range cfg.Providers {
-		// Bound each sequential stage by its own per-provider timeout so one
-		// slow provider cannot consume the whole orchestration budget and
-		// starve the remaining stages.
-		perTimeout := providerExecutionTimeout(p, cfg.TimeoutSeconds)
-		stageCtx, stageCancel := context.WithTimeout(ctx, perTimeout)
-		resp, err := runProvider(stageCtx, p, prompt)
-		stageCancel()
-		if err != nil {
-			return responses, err
-		}
-		responses = append(responses, *resp)
-		// 다음 단계 프롬프트에 이전 출력 추가
-		if resp.Output != "" {
-			prompt = fmt.Sprintf("%s\n\n이전 단계 결과:\n%s", cfg.Prompt, resp.Output)
-		}
-	}
-	return responses, nil
 }
 
 // runFastest는 모든 프로바이더를 병렬로 실행하고 첫 번째 성공 응답을 반환한다.

@@ -176,6 +176,11 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 	}
 	files = append(files, hookFiles...)
 
+	files, err = rewriteSanitizedGeminiMappings(a.root, files)
+	if err != nil {
+		return nil, err
+	}
+
 	a.installAntigravityPluginIfAvailable(ctx)
 
 	pf := &adapter.PlatformFiles{
