@@ -142,13 +142,16 @@ func (sm *SurfaceManager) ValidateAndRecover(ctx context.Context, cfg OrchestraC
 
 		// Launch CLI session on the warm pane
 		cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, "", cfg.WorkingDir)
-		if sendErr := cfg.Terminal.SendLongText(ctx, w.paneID, cmd); sendErr != nil {
+		sendErr, enterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, w.paneID, promptRegisterDelay, func() error {
+			return cfg.Terminal.SendLongText(ctx, w.paneID, cmd)
+		})
+		if sendErr != nil {
 			log.Printf("[SurfaceManager] warm pane CLI launch failed, falling back to recreatePane: %v", sendErr)
 			sm.warmPool.cleanupPane(ctx, *w)
 			goto coldRecovery
 		}
-		if sendErr := cfg.Terminal.SendCommand(ctx, w.paneID, "\n"); sendErr != nil {
-			log.Printf("[SurfaceManager] warm pane CLI submit failed, falling back to recreatePane: %v", sendErr)
+		if enterErr != nil {
+			log.Printf("[SurfaceManager] warm pane CLI submit failed, falling back to recreatePane: %v", enterErr)
 			sm.warmPool.cleanupPane(ctx, *w)
 			goto coldRecovery
 		}
@@ -223,9 +226,19 @@ func captureBaselines(ctx context.Context, term terminal.Terminal, panes []paneI
 // sendPromptWithRetry sends a prompt to a pane, retrying on the same pane first
 // before falling back to pane recreation as a last resort.
 // Returns updated paneInfo and whether recreation occurred.
-func sendPromptWithRetry(ctx context.Context, cfg OrchestraConfig, pi paneInfo, prompt string, round int, baselines map[string]string) (paneInfo, bool, error) {
+func sendPromptWithRetry(ctx context.Context, cfg OrchestraConfig, pi paneInfo, prompt string, round int, baselines map[string]string, submitDelay time.Duration) (paneInfo, bool, error) {
+	submit := func(paneID terminal.PaneID) (error, error) {
+		return sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, paneID, submitDelay, func() error {
+			return cfg.Terminal.SendLongText(ctx, paneID, prompt)
+		}, time.Second)
+	}
+
 	// Initial attempt on existing pane
-	if err := cfg.Terminal.SendLongText(ctx, pi.paneID, prompt); err == nil {
+	sendErr, enterErr := submit(pi.paneID)
+	if enterErr != nil {
+		return pi, false, &paneSubmitEnterError{err: enterErr}
+	}
+	if sendErr == nil {
 		return pi, false, nil
 	}
 
@@ -233,8 +246,14 @@ func sendPromptWithRetry(ctx context.Context, cfg OrchestraConfig, pi paneInfo, 
 	for i, wait := range samePaneRetryBackoffs {
 		log.Printf("[Round %d] %s same-pane retry %d/%d, waiting %v...",
 			round, pi.provider.Name, i+1, len(samePaneRetryBackoffs), wait)
-		time.Sleep(wait)
-		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, prompt); err == nil {
+		if err := waitPaneInputDelay(ctx, wait); err != nil {
+			return pi, false, err
+		}
+		sendErr, enterErr = submit(pi.paneID)
+		if enterErr != nil {
+			return pi, false, &paneSubmitEnterError{err: enterErr}
+		}
+		if sendErr == nil {
 			return pi, false, nil
 		}
 	}
@@ -252,8 +271,12 @@ func sendPromptWithRetry(ctx context.Context, cfg OrchestraConfig, pi paneInfo, 
 	}
 
 	// Final attempt on the newly created pane
-	if retryErr := cfg.Terminal.SendLongText(ctx, newPI.paneID, prompt); retryErr != nil {
-		return newPI, true, fmt.Errorf("SendLongText failed after recreation: %w", retryErr)
+	sendErr, enterErr = submit(newPI.paneID)
+	if enterErr != nil {
+		return newPI, true, &paneSubmitEnterError{err: enterErr}
+	}
+	if sendErr != nil {
+		return newPI, true, fmt.Errorf("SendLongText failed after recreation: %w", sendErr)
 	}
 	return newPI, true, nil
 }

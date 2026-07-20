@@ -81,22 +81,30 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 
 	// Set round env on new pane before launching CLI.
 	if round > 1 && pi.provider.InteractiveInput == "args" {
-		_ = SendRoundEnvToPane(ctx, cfg.Terminal, newPaneID, round)
+		roundErr, roundEnterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, newPaneID, 0, func() error {
+			return SendRoundEnvToPane(ctx, cfg.Terminal, newPaneID, round)
+		})
+		if roundErr != nil || roundEnterErr != nil {
+			log.Printf("[recreatePane] %s round env failed (non-fatal): send=%v enter=%v", pi.provider.Name, roundErr, roundEnterErr)
+		}
 	}
 
 	// Relaunch CLI session. For args providers in round > 1, launch in REPL
 	// mode without the original prompt — the round prompt will be sent via
 	// SendLongText later by the caller.
 	cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, "", cfg.WorkingDir)
-	if err := cfg.Terminal.SendLongText(ctx, newPaneID, cmd); err != nil {
+	launchErr, launchEnterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, newPaneID, promptRegisterDelay, func() error {
+		return cfg.Terminal.SendLongText(ctx, newPaneID, cmd)
+	})
+	if launchErr != nil {
 		closePaneSurface(cfg.Terminal, newPaneID)
 		_ = os.Remove(tmpFile.Name())
-		return pi, fmt.Errorf("recreatePane launch for %s: %w", pi.provider.Name, err)
+		return pi, fmt.Errorf("recreatePane launch for %s: %w", pi.provider.Name, launchErr)
 	}
-	if err := cfg.Terminal.SendCommand(ctx, newPaneID, "\n"); err != nil {
+	if launchEnterErr != nil {
 		closePaneSurface(cfg.Terminal, newPaneID)
 		_ = os.Remove(tmpFile.Name())
-		return pi, fmt.Errorf("recreatePane launch enter for %s: %w", pi.provider.Name, err)
+		return pi, fmt.Errorf("recreatePane launch enter for %s: %w", pi.provider.Name, launchEnterErr)
 	}
 
 	// Wait for session readiness.

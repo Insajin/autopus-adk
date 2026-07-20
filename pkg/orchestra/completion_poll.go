@@ -77,8 +77,9 @@ func (d *ScreenPollDetector) WaitForCompletion(ctx context.Context, pi paneInfo,
 			}
 			// Auto-approve provider tool permission prompts (e.g., gemini "Action Required")
 			if needsToolApproval(screen) {
-				_ = d.term.SendCommand(ctx, pi.paneID, "1")
-				_ = d.term.SendCommand(ctx, pi.paneID, "\n")
+				_, _ = sendPaneInputAndEnterSerialized(ctx, d.term, pi.paneID, 0, func() error {
+					return d.term.SendCommand(ctx, pi.paneID, "1")
+				})
 				candidateDetected = false
 				continue
 			}

@@ -85,18 +85,18 @@ func (a *CmuxAdapter) FocusPane(_ context.Context, paneID PaneID) error {
 }
 
 // SendCommand sends a command string to the specified pane via --surface flag.
-func (a *CmuxAdapter) SendCommand(_ context.Context, paneID PaneID, command string) error {
+func (a *CmuxAdapter) SendCommand(ctx context.Context, paneID PaneID, command string) error {
 	if err := validatePaneID(paneID); err != nil {
 		return fmt.Errorf("cmux: %w", err)
 	}
 	if isEnterCommand(command) {
-		cmd := execCommand("cmux", "send-key", "--surface", string(paneID), "Enter")
+		cmd := execCommandContext(ctx, "cmux", "send-key", "--surface", string(paneID), "Enter")
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("cmux: send enter to pane %s: %w", paneID, err)
 		}
 		return nil
 	}
-	cmd := execCommand("cmux", "send", "--surface", string(paneID), command)
+	cmd := execCommandContext(ctx, "cmux", "send", "--surface", string(paneID), command)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("cmux: send command to pane %s: %w", paneID, err)
 	}
@@ -119,21 +119,21 @@ func (a *CmuxAdapter) SendLongText(ctx context.Context, paneID PaneID, text stri
 	bufName := fmt.Sprintf("autopus-%s-%d", sanitized, time.Now().UnixNano())
 
 	// set-buffer
-	setCmd := execCommand("cmux", "set-buffer", "--name", bufName, text)
+	setCmd := execCommandContext(ctx, "cmux", "set-buffer", "--name", bufName, text)
 	if err := setCmd.Run(); err != nil {
 		// FR-10: fallback to chunked send on set-buffer failure
 		return a.sendChunked(ctx, paneID, text)
 	}
 	// paste-buffer — fall back to chunked send if paste fails (e.g., on recreated surfaces)
-	pasteCmd := execCommand("cmux", "paste-buffer", "--name", bufName, "--surface", string(paneID))
+	pasteCmd := execCommandContext(ctx, "cmux", "paste-buffer", "--name", bufName, "--surface", string(paneID))
 	if err := pasteCmd.Run(); err != nil {
 		// Clean up buffer before fallback
-		delFallback := execCommand("cmux", "delete-buffer", "--name", bufName)
+		delFallback := execCommandContext(ctx, "cmux", "delete-buffer", "--name", bufName)
 		_ = delFallback.Run()
 		return a.sendChunked(ctx, paneID, text)
 	}
 	// delete-buffer (best-effort, FR-11)
-	delCmd := execCommand("cmux", "delete-buffer", "--name", bufName)
+	delCmd := execCommandContext(ctx, "cmux", "delete-buffer", "--name", bufName)
 	_ = delCmd.Run()
 	return nil
 }
@@ -151,7 +151,13 @@ func (a *CmuxAdapter) sendChunked(ctx context.Context, paneID PaneID, text strin
 		}
 		// Brief pause between chunks to let PTY flush.
 		if end < len(text) {
-			time.Sleep(150 * time.Millisecond)
+			timer := time.NewTimer(150 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
 		}
 	}
 	return nil

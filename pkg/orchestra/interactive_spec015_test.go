@@ -227,13 +227,15 @@ func TestSendRoundEnv_SentForArgsProvider(t *testing.T) {
 	}
 	_ = executeRound(ctx, cfg, panes, nil, 2, prevResponses)
 
-	// Verify that "export AUTOPUS_ROUND=2" was sent via SendCommand for args-based provider.
-	found := false
-	for _, call := range mock.sendCommandCalls {
-		if call.Cmd == "export AUTOPUS_ROUND=2" {
-			found = true
+	// Verify that the export is immediately committed with Enter before any
+	// prompt input can be attached to the shell line.
+	foundCommittedExport := false
+	for i, call := range mock.sendCommandCalls {
+		if call.Cmd == "export AUTOPUS_ROUND=2" && i+1 < len(mock.sendCommandCalls) {
+			next := mock.sendCommandCalls[i+1]
+			foundCommittedExport = next.PaneID == call.PaneID && next.Cmd == "\n"
 			break
 		}
 	}
-	assert.True(t, found, "args provider must receive export AUTOPUS_ROUND via SendCommand")
+	assert.True(t, foundCommittedExport, "args provider round env must be committed with an adjacent Enter")
 }

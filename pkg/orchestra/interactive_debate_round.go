@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"log"
 	"strings"
 	"time"
@@ -81,8 +82,11 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		if round > 1 {
 			// Only send round env to shell-based providers (args mode).
 			if pi.provider.InteractiveInput == "args" {
-				if err := SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round); err != nil {
-					log.Printf("[Round %d] %s SendRoundEnvToPane failed: %v", round, pi.provider.Name, err)
+				roundErr, roundEnterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, pi.paneID, 0, func() error {
+					return SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round)
+				})
+				if roundErr != nil || roundEnterErr != nil {
+					log.Printf("[Round %d] %s SendRoundEnvToPane failed: send=%v enter=%v", round, pi.provider.Name, roundErr, roundEnterErr)
 				}
 			}
 			if !pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, round2PollTimeout) {
@@ -134,14 +138,25 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		var newPI paneInfo
 		var recreated bool
 		var sendErr error
+		submitDelay := panePromptSubmitDelay(pi.provider)
+		if cfg.HookMode && hookSession != nil && !isCodexInteractiveProvider(pi.provider) {
+			submitDelay = 50 * time.Millisecond
+		}
 		if shouldUseSendkeysPromptInput(pi.provider, promptFile != "") {
 			// Normalize newlines to spaces for sendkeys (shell line continuation prevention).
 			normalized := strings.ReplaceAll(sendPrompt, "\n", " ")
-			sendErr = cfg.Terminal.SendCommand(ctx, pi.paneID, normalized)
+			var enterErr error
+			sendErr, enterErr = sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, pi.paneID, submitDelay, func() error {
+				return cfg.Terminal.SendCommand(ctx, pi.paneID, normalized)
+			}, time.Second)
+			if enterErr != nil {
+				sendErr = &paneSubmitEnterError{err: enterErr}
+			}
 			newPI = *pi
 		} else {
-			// R6: On SendLongText failure, attempt pane recreation once, then retry.
-			newPI, recreated, sendErr = sendPromptWithRetry(ctx, cfg, *pi, sendPrompt, round, baselines)
+			// R6: retry failed prompt commits before recreating the pane. Each
+			// successful paste includes its Enter inside the same cmux transaction.
+			newPI, recreated, sendErr = sendPromptWithRetry(ctx, cfg, *pi, sendPrompt, round, baselines, submitDelay)
 		}
 		if promptFile != "" {
 			if recreated {
@@ -167,8 +182,14 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			panes[i].skipWait = true
 			if cfg.ReliabilityStore != nil {
 				mode := "send_long_text"
+				var enterFailure *paneSubmitEnterError
+				if errors.As(sendErr, &enterFailure) {
+					mode = "submit_enter"
+				}
 				if shouldUseSendkeysPromptInput(pi.provider, promptFile != "") {
-					mode = "sendkeys"
+					if mode != "submit_enter" {
+						mode = "sendkeys"
+					}
 				}
 				receipt := promptReceipt(cfg.RunID, pi.provider.Name, mode, sendPrompt, round, "failed", sendErr.Error())
 				_ = cfg.ReliabilityStore.recordPrompt(receipt)
@@ -183,29 +204,8 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			receipt := promptReceipt(cfg.RunID, pi.provider.Name, mode, sendPrompt, round, "pass", "")
 			_ = cfg.ReliabilityStore.recordPrompt(receipt)
 		}
-		targetPaneID := pi.paneID
 		if recreated {
 			panes[i] = newPI
-			targetPaneID = newPI.paneID
-		}
-		submitDelay := panePromptSubmitDelay(pi.provider)
-		if cfg.HookMode && hookSession != nil && !isCodexInteractiveProvider(pi.provider) {
-			submitDelay = 50 * time.Millisecond
-		}
-		time.Sleep(submitDelay)
-		// R8: Retry once on SendCommand (Enter) failure.
-		if err := cfg.Terminal.SendCommand(ctx, targetPaneID, "\n"); err != nil {
-			log.Printf("[Round %d] %s SendCommand failed: %v — retrying", round, pi.provider.Name, err)
-			time.Sleep(1 * time.Second)
-			if retryErr := cfg.Terminal.SendCommand(ctx, targetPaneID, "\n"); retryErr != nil {
-				log.Printf("[Round %d] %s SendCommand retry failed: %v — skipping", round, pi.provider.Name, retryErr)
-				panes[i].skipWait = true
-				if cfg.ReliabilityStore != nil {
-					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "submit_enter", sendPrompt, round, "failed", retryErr.Error())
-					_ = cfg.ReliabilityStore.recordPrompt(receipt)
-				}
-				continue
-			}
 		}
 	}
 
