@@ -8,7 +8,7 @@ readonly target_blob='1111111111111111111111111111111111111111'
 readonly target_tree='2222222222222222222222222222222222222222'
 readonly target_commit='3333333333333333333333333333333333333333'
 
-[[ "${1-}" == 'api' ]]
+[[ "${1-}" == 'api' ]] || exit 64
 shift
 method='GET'
 input=''
@@ -35,22 +35,22 @@ increment() {
 
 case "$endpoint" in
   *contents/Casks/auto.rb*)
-    [[ "$method" == 'GET' ]]
+    [[ "$method" == 'GET' ]] || exit 64
     exec cat "$MOCK_TAP_STATE/cask.json"
     ;;
   *contents/Formula/auto.rb*)
-    [[ "$method" == 'GET' ]]
+    [[ "$method" == 'GET' ]] || exit 64
     increment formula-get
     exec cat "$MOCK_TAP_STATE/formula.json"
     ;;
   *git/ref/heads/main*)
-    [[ "$method" == 'GET' ]]
+    [[ "$method" == 'GET' ]] || exit 64
     exec cat "$MOCK_TAP_STATE/branch.json"
     ;;
   *git/refs/heads/main*)
-    [[ "$method" == 'PATCH' && -f "$input" ]]
-    [[ "$(jq -er '.sha' "$input")" == "$target_commit" ]]
-    [[ "$(jq -er '.force' "$input")" == 'false' ]]
+    [[ "$method" == 'PATCH' && -f "$input" ]] || exit 64
+    [[ "$(jq -er '.sha' "$input")" == "$target_commit" ]] || exit 65
+    [[ "$(jq -er '.force' "$input")" == 'false' ]] || exit 65
     if [[ -e "$MOCK_TAP_STATE/race-before-ref" ]]; then
       jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"4444444444444444444444444444444444444444",url:"https://example.invalid/racer"}}' \
         >"$MOCK_TAP_STATE/branch.json"
@@ -62,7 +62,8 @@ case "$endpoint" in
         '{sha:"6666666666666666666666666666666666666666",content:$content}' \
         >"$MOCK_TAP_STATE/formula.json"
     fi
-    [[ "$(jq -er '.object.sha' "$MOCK_TAP_STATE/branch.json")" == "$prior_commit" ]]
+    [[ "$(jq -er '.object.sha' "$MOCK_TAP_STATE/branch.json")" == "$prior_commit" ]] \
+      || exit 65
     content=$(<"$MOCK_TAP_STATE/pending-cask-content")
     jq -n --arg content "$content" --arg sha "$target_blob" \
       '{sha:$sha,content:$content}' >"$MOCK_TAP_STATE/cask.json"
@@ -73,21 +74,21 @@ case "$endpoint" in
     cat "$MOCK_TAP_STATE/branch.json"
     ;;
   *git/commits/"$prior_commit"*)
-    [[ "$method" == 'GET' ]]
+    [[ "$method" == 'GET' ]] || exit 64
     jq -n --arg sha "$prior_commit" --arg tree "$prior_tree" \
       '{sha:$sha,tree:{sha:$tree},parents:[{sha:"7777777777777777777777777777777777777777"}],url:"https://example.invalid/prior-commit"}'
     ;;
   *git/blobs*)
-    [[ "$method" == 'POST' && -f "$input" ]]
-    [[ "$(jq -er '.encoding' "$input")" == 'base64' ]]
+    [[ "$method" == 'POST' && -f "$input" ]] || exit 64
+    [[ "$(jq -er '.encoding' "$input")" == 'base64' ]] || exit 65
     jq -er '.content | select(type == "string" and length > 0)' "$input" \
-      >"$MOCK_TAP_STATE/pending-cask-content"
+      >"$MOCK_TAP_STATE/pending-cask-content" || exit 65
     increment blob-create
     jq -n --arg sha "$target_blob" \
       '{sha:$sha,url:"https://example.invalid/target-blob"}'
     ;;
   *git/trees/"$target_tree"*)
-    [[ "$method" == 'GET' ]]
+    [[ "$method" == 'GET' ]] || exit 64
     jq -n --arg sha "$target_tree" --arg blob "$target_blob" \
       '{sha:$sha,truncated:false,tree:[
         {path:"Casks/auto.rb",mode:"100644",type:"blob",sha:$blob},
@@ -95,22 +96,22 @@ case "$endpoint" in
       ]}'
     ;;
   *git/trees*)
-    [[ "$method" == 'POST' && -f "$input" ]]
+    [[ "$method" == 'POST' && -f "$input" ]] || exit 64
     jq -e --arg base "$prior_tree" --arg blob "$target_blob" '
       .base_tree == $base and (.tree | length) == 1 and
       .tree[0] == {path:"Casks/auto.rb",mode:"100644",type:"blob",sha:$blob}
-    ' "$input" >/dev/null
+    ' "$input" >/dev/null || exit 65
     increment tree-create
     jq -n --arg sha "$target_tree" --arg blob "$target_blob" \
       '{sha:$sha,url:"https://example.invalid/target-tree",truncated:false,
         tree:[{path:"Casks/auto.rb",mode:"100644",type:"blob",sha:$blob}]}'
     ;;
   *git/commits*)
-    [[ "$method" == 'POST' && -f "$input" ]]
+    [[ "$method" == 'POST' && -f "$input" ]] || exit 64
     jq -e --arg tree "$target_tree" --arg parent "$prior_commit" '
       .message == "Publish signed Cask for v0.50.80" and .tree == $tree and
       .parents == [$parent]
-    ' "$input" >/dev/null
+    ' "$input" >/dev/null || exit 65
     increment commit-create
     jq -n --arg sha "$target_commit" --arg tree "$target_tree" \
       --arg parent "$prior_commit" \
