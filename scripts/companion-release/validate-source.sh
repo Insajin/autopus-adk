@@ -8,6 +8,7 @@ readonly A4_A3_ANCESTOR_SHA='ba5509b692a43dc8a70e0bd6173acb56166ed67f'
 readonly A5_A4_ANCESTOR_SHA='334b297f05942accbecdfa15b54e38e005c82f2d'
 readonly A6_A5_ANCESTOR_SHA='b27252cb1148192a8ae1a95195c50e5f221453a4'
 readonly A7_A6_ANCESTOR_SHA='902f1acfa91f1d0a2ac9471d5cd79117031a2599'
+readonly A8_A7_ANCESTOR_SHA='51de6030a69a8e36fcf7e5790ef157eff6fedf00'
 
 fail() {
   printf 'companion release source: %s\n' "$1" >&2
@@ -27,7 +28,8 @@ case "$GITHUB_REF_NAME" in
   v0.50.74) release_phase='A5' ;;
   v0.50.77) release_phase='A6' ;;
   v0.50.78) release_phase='A7' ;;
-  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7 policy' ;;
+  v0.50.79) release_phase='A8' ;;
+  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'
 [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || fail 'source commit is not exact 40-hex'
@@ -41,7 +43,8 @@ tag_commit=$(git rev-parse --verify "${GITHUB_REF_NAME}^{commit}") \
 
 if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
       "$release_phase" == 'A4' || "$release_phase" == 'A5' ||
-      "$release_phase" == 'A6' || "$release_phase" == 'A7' ]]; then
+      "$release_phase" == 'A6' || "$release_phase" == 'A7' ||
+      "$release_phase" == 'A8' ]]; then
   tag_object_type=$(git cat-file -t "refs/tags/$GITHUB_REF_NAME" 2>/dev/null) \
     || fail "cannot resolve exact ${release_phase} tag object"
   [[ "$tag_object_type" == 'tag' ]] \
@@ -63,9 +66,12 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
   elif [[ "$release_phase" == 'A6' ]]; then
     git merge-base --is-ancestor "$A6_A5_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A6 source does not contain the immutable A5 release'
-  else
+  elif [[ "$release_phase" == 'A7' ]]; then
     git merge-base --is-ancestor "$A7_A6_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A7 source does not contain the immutable A6 release'
+  else
+    git merge-base --is-ancestor "$A8_A7_ANCESTOR_SHA" "$GITHUB_SHA" \
+      >/dev/null 2>&1 || fail 'A8 source does not contain the immutable A7 release'
   fi
   case "${COMPANION_SOURCE_PIN_REQUIRED-0}" in
     0) ;;

@@ -10,10 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestReleaseWorkflow_ExactA7ProtectedEnvironmentAndImmutableActions(t *testing.T) {
+func TestReleaseWorkflow_ExactA8ProtectedEnvironmentAndImmutableActions(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"v0.50.78", "refs/tags/v0.50.78",
+		"v0.50.79", "refs/tags/v0.50.79",
 		"environment:", "adk-companion-release",
 	} {
 		if !strings.Contains(release, required) {
@@ -24,11 +24,11 @@ func TestReleaseWorkflow_ExactA7ProtectedEnvironmentAndImmutableActions(t *testi
 		t.Fatal("arbitrary version tags can enter the protected release job")
 	}
 	for _, forbidden := range []string{
-		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'", "'v0.50.76'", "'v0.50.77'",
-		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75", "refs/tags/v0.50.76", "refs/tags/v0.50.77",
+		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'", "'v0.50.76'", "'v0.50.77'", "'v0.50.78'",
+		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75", "refs/tags/v0.50.76", "refs/tags/v0.50.77", "refs/tags/v0.50.78",
 	} {
 		if strings.Contains(release, forbidden) {
-			t.Fatalf("historical tag %q can enter the A7 release workflow", forbidden)
+			t.Fatalf("historical tag %q can enter the A8 release workflow", forbidden)
 		}
 	}
 	immutable := regexp.MustCompile(`^[^@[:space:]]+@[0-9a-f]{40}$`)
@@ -192,23 +192,49 @@ func TestReleaseSourceValidator_A7PinsAnnotatedTagAndA6Ancestor(t *testing.T) {
 	}
 }
 
+func TestReleaseSourceValidator_A8PinsAnnotatedTagAndA7Ancestor(t *testing.T) {
+	source := readReleaseFile(t, "scripts/companion-release/validate-source.sh")
+	declaration := "readonly A8_A7_ANCESTOR_SHA='51de6030a69a8e36fcf7e5790ef157eff6fedf00'"
+	if strings.Count(source, declaration) != 1 {
+		t.Fatalf("A8 immutable A7 ancestry pin drifted: %s", declaration)
+	}
+	for _, required := range []string{
+		`git cat-file -t "refs/tags/$GITHUB_REF_NAME"`,
+		`git merge-base --is-ancestor "$A8_A7_ANCESTOR_SHA" "$GITHUB_SHA"`,
+		`[[ "$tag_object_type" == 'tag' ]]`,
+		"COMPANION_APPROVED_SOURCE_COMMIT", "COMPANION_APPROVED_SOURCE_TREE",
+	} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("A8 source gate missing %q", required)
+		}
+	}
+}
+
 func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	releaseIndex := strings.Index(release, "goreleaser release --clean")
+	evidenceIndex := strings.Index(release, "scripts/companion-release/verify-current-release.sh")
+	tokenIndex := strings.Index(release, "name: Create Homebrew tap token")
 	bridgeIndex := strings.Index(release, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
 	cleanupIndex := strings.Index(release, "Remove release credentials and keychain")
-	if releaseIndex < 0 || bridgeIndex <= releaseIndex || cleanupIndex <= bridgeIndex {
-		t.Fatalf("Homebrew bridge ordering release=%d bridge=%d cleanup=%d", releaseIndex, bridgeIndex, cleanupIndex)
+	if releaseIndex < 0 || evidenceIndex <= releaseIndex || tokenIndex <= evidenceIndex ||
+		bridgeIndex <= tokenIndex || cleanupIndex <= bridgeIndex {
+		t.Fatalf("Homebrew ordering release=%d evidence=%d token=%d bridge=%d cleanup=%d",
+			releaseIndex, evidenceIndex, tokenIndex, bridgeIndex, cleanupIndex)
 	}
 	for _, exact := range []string{
-		"GITHUB_REF_NAME='v0.50.78'",
-		"COMPANION_VERSION='0.50.78'",
-		"COMPANION_CHECKSUMS_PATH='dist/checksums.txt'",
+		"GITHUB_REF_NAME='v0.50.79'",
+		"COMPANION_VERSION='0.50.79'",
+		"COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}",
+		`COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"`,
 		`HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN"`,
 	} {
 		if !strings.Contains(release, exact) {
 			t.Fatalf("Homebrew formula bridge missing exact input %q", exact)
 		}
+	}
+	if strings.Contains(release, "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'") {
+		t.Fatal("Homebrew publication can consume unverified local checksums")
 	}
 }
 

@@ -129,13 +129,21 @@ Release 실행 `29682893087`은 보호 환경에 고정한 source commit `902f1a
 - Darwin amd64·arm64 바이너리는 `Identifier=co.autopus.adk`, `TeamIdentifier=GP2PFA2PUV`, hardened runtime, secure timestamp와 notarized designated requirement를 모두 만족합니다. 두 바이너리는 `0.50.77`과 commit `902f1ac`을 보고하며 아카이브 안의 권한은 `0755`입니다. amd64·arm64 manifest SHA-256은 각각 `64c634130b16a74cbb33f666d316a05d9a7a1012246dc58fde6e15350b71d0c5`, `b6611c04990b048bc5545e37c942bc8e7e4fab8592d546eaab80d7084991bea6`이고, artifact·manifest·receipt 서명 결합 검증을 통과했습니다. 두 아키텍처의 공개키 receipt 바이트는 동일하며 SHA-256은 `4a588fa4991c515e9520861af5567fd2fe4c19e2c23adb8963bd37ebc46a5bbc`입니다.
 - 검증된 Homebrew commit `a6adcd0ff7e0eff72f30dab9e9f7f0f73b8c9328`은 A5 게시 commit `9e3b9b4076b47b85218b14632c79a3d796e6769c`를 부모로 두고 `Casks/auto.rb`만 변경했습니다. Cask blob은 prior CAS pin `ceed648bfece4555e8310b6e894fedc847520960`에서 `39b9b77eb51149ff87df7ad4f8fb3c5300b1302c`로 갱신됐고, Cask의 네 플랫폼 digest가 릴리스 아카이브와 일치합니다. Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 변경되지 않았습니다.
 
-### v0.50.78 A7 릴리스 준비 (PENDING)
+### v0.50.78 A7 릴리스 게시 (PASS)
 
-A7은 immutable `v0.50.77`을 직접 선행 릴리스로 검증하도록 준비합니다. 고정된 A6 증거는 source commit `902f1acfa91f1d0a2ac9471d5cd79117031a2599`, annotated tag object `41feed7decafac33d8f7f43e06804e3c9bf37ef3`, checksums SHA-256 `fb1a35dcdb44255aad43b7ae74950ed59f05ccf44abde9cadf28ecfa0dfce37a`입니다. Darwin amd64·arm64 archive SHA-256은 각각 `d5e47076c1fc898d2b3f5880b6edfcf9a12e805633dcba2691da22f300d41dc9`, `d6d092177a5406c194eea1de4fbd11b8af92a03814eb143a294541a3a578b9ab`이고, embedded manifest SHA-256은 각각 `64c634130b16a74cbb33f666d316a05d9a7a1012246dc58fde6e15350b71d0c5`, `b6611c04990b048bc5545e37c942bc8e7e4fab8592d546eaab80d7084991bea6`입니다.
+Release 실행 `29731718978`은 source commit `51de6030a69a8e36fcf7e5790ef157eff6fedf00`와 tree `3cd00b17bd8bd6aa8def213de1c5765c3611765d`를 검증하고, annotated tag object `417a318fb6a11a720e2c4102e92e39ea9ed676e9`에서 immutable 최종 릴리스를 게시했습니다. `checksums.txt` SHA-256은 `322d2ef21dff55f02ca36944aba88ee5da92fdae6bcd16a89319f1697efb9733`이며, Darwin amd64·arm64 archive SHA-256은 각각 `43018046ab37027b7fba3888d288961cb5abc136e478deaa9f878586bcce6629`, `e72653fd3094537caa60398e2017d409796d7ceef88a7662ca93b6299e9d00ec`입니다. 두 archive에서 독립 산출한 embedded manifest SHA-256은 각각 `3f7c879c93dea0d119805987bef434b65c1a53684e80f78b5d9a0c9c2cd011d5`, `87ef2a30d6ee8c9abe9e679d597d0a4fbe9bb5cdee1266572476ad6a66aef975`입니다.
 
-Homebrew publication은 prior Cask blob `39b9b77eb51149ff87df7ad4f8fb3c5300b1302c`와 일치할 때만 canonical A7 Cask를 CAS 방식으로 게시해야 합니다. 동결된 Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 읽거나 변경하지 않습니다.
+Homebrew commit `700e0e544c3c774eb07a61dcaa68465c73a21cd3`은 검증된 A6 게시 commit을 부모로 두고 `Casks/auto.rb`만 변경했습니다. Cask blob은 prior CAS pin `39b9b77eb51149ff87df7ad4f8fb3c5300b1302c`에서 `a46b37d61bfd62a31fd5f4c6731d4f83fa1c868a`로 갱신됐고, Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 유지됐습니다.
 
-현재 상태는 PENDING입니다. exact tag deployment policy 추가, 최종 source commit·tree pin 확정, annotated `v0.50.78` 태그 생성, 전체 CI·Security와 보호 환경 승인, 서명·공증, 11개 자산의 immutable GitHub Release 게시, Homebrew Cask 반영과 독립 라이브 검증이 완료된 뒤에만 PASS로 전환합니다.
+### v0.50.79 A8 핫픽스 릴리스 준비 (PENDING)
+
+A8은 immutable `v0.50.78`을 직접 선행 릴리스로 검증하도록 준비합니다. 고정된 A7 증거는 source commit `51de6030a69a8e36fcf7e5790ef157eff6fedf00`, source tree `3cd00b17bd8bd6aa8def213de1c5765c3611765d`, annotated tag object `417a318fb6a11a720e2c4102e92e39ea9ed676e9`, checksums SHA-256 `322d2ef21dff55f02ca36944aba88ee5da92fdae6bcd16a89319f1697efb9733`입니다. Darwin amd64·arm64 archive SHA-256은 각각 `43018046ab37027b7fba3888d288961cb5abc136e478deaa9f878586bcce6629`, `e72653fd3094537caa60398e2017d409796d7ceef88a7662ca93b6299e9d00ec`이고, embedded manifest SHA-256은 각각 `3f7c879c93dea0d119805987bef434b65c1a53684e80f78b5d9a0c9c2cd011d5`, `87ef2a30d6ee8c9abe9e679d597d0a4fbe9bb5cdee1266572476ad6a66aef975`입니다.
+
+Homebrew publication은 live prior Cask blob `a46b37d61bfd62a31fd5f4c6731d4f83fa1c868a`와 일치할 때만 canonical A8 Cask를 CAS 방식으로 게시해야 합니다. 동결된 Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 호출하거나 변경하지 않습니다.
+
+기본 릴리스와 recovery는 같은 current-release verifier를 사용해야 합니다. 이 verifier는 Homebrew 토큰을 만들기 전에 exact tag와 source commit, final·immutable 상태, 중복 없는 정확한 11개 자산, 각 자산의 uploaded·non-empty·API SHA-256 metadata를 검증해야 합니다. 서버에서 다시 받은 `checksums.txt`의 크기와 API digest가 일치해야 하며, 정확한 8개 archive checksum은 각 archive의 API digest와 모두 일치해야 합니다. 어느 검증이라도 실패하면 Homebrew 토큰 생성과 Cask 게시로 진행하지 않습니다.
+
+현재 상태는 PENDING입니다. `v0.50.78`은 이동·재사용하지 않습니다. exact tag deployment policy 추가, 최종 A8 source commit·tree pin 확정, annotated `v0.50.79` 태그 생성, 전체 CI·Security와 보호 환경 승인, 서명·공증, 11개 자산의 immutable GitHub Release 게시, Homebrew Cask 반영과 독립 라이브 검증이 완료된 뒤에만 PASS로 전환합니다.
 
 ## Stage 2: installers
 
