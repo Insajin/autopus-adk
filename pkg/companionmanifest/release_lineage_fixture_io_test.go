@@ -65,6 +65,7 @@ func produceUncachedGoReleaserFixtureEvidence(
 		runLineageCommand(t, root, "git", "tag", releaseTag)
 	}
 	commit := strings.TrimSpace(runLineageCommand(t, root, "git", "rev-parse", "HEAD"))
+	tree := strings.TrimSpace(runLineageCommand(t, root, "git", "rev-parse", "HEAD^{tree}"))
 	tagObject := ""
 	if annotated {
 		tagObject = strings.TrimSpace(runLineageCommand(t, root, "git", "rev-parse", releaseTag))
@@ -130,6 +131,7 @@ func produceUncachedGoReleaserFixtureEvidence(
 	}
 	evidence.checksums = readLineageFile(t, filepath.Join(root, "dist", "checksums.txt"))
 	evidence.pins = captureGoReleaserPins(evidence, privateKey, tagObject)
+	evidence.pins.tree = tree
 	return evidence
 }
 
@@ -206,7 +208,7 @@ func (fixture *executableLineageFixture) writeEvidence(t *testing.T) {
 			"object": map[string]string{"type": "commit", "sha": fixture.tagCommit},
 		})
 	}
-	writeLineageJSON(t, fixture.commitJSON, map[string]string{"sha": fixture.evidence.commit})
+	writeLineageJSON(t, fixture.commitJSON, map[string]any{"sha": fixture.evidence.commit, "commit": map[string]any{"tree": map[string]string{"sha": fixture.evidence.pins.tree}}})
 }
 
 func (fixture *executableLineageFixture) writeMockGitHub(t *testing.T) {
