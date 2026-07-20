@@ -32,6 +32,7 @@ coverage.out
 .autopus/audit.jsonl
 **/.autopus/specs/**/review.md
 **/.autopus/specs/**/review-findings.json
+**/.autopus/specs/**/review-receipt.json
 **/.autopus/specs/**/.self-verify.log
 /.claude/
 /.claude.json

@@ -180,9 +180,11 @@ func TestRunInteractiveDebate_SingleProvider(t *testing.T) {
 // non-interactive fallback mode.
 func TestRunInteractiveDebate_WithJudge_NoTerminal(t *testing.T) {
 	t.Parallel()
+	judge := typedJudgeProvider(t, "judge")
 	cfg := OrchestraConfig{
 		Strategy: StrategyDebate, DebateRounds: 1, Prompt: "judge test",
-		JudgeProvider: "claude",
+		JudgeProvider: judge.Name,
+		JudgeConfig:   &judge,
 		Providers: []ProviderConfig{
 			echoProvider("claude"),
 			echoProvider("gemini"),

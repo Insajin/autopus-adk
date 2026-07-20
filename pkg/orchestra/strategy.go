@@ -3,7 +3,6 @@ package orchestra
 import (
 	"context"
 	"fmt"
-	"strings"
 )
 
 // StrategyFunc는 프로바이더 응답을 전략에 따라 처리하는 함수 타입이다.
@@ -36,13 +35,6 @@ func handleConsensus(_ context.Context, responses []ProviderResponse, cfg Orches
 		threshold = cfg.ConsensusThreshold
 	}
 	merged, summary := MergeConsensus(responses, threshold)
-	// When an explicit threshold is configured, return only the consensus
-	// section — disputed lines are excluded from the merged output.
-	if cfg.ConsensusThreshold > 0 {
-		if idx := strings.Index(merged, "\n\n## 이견"); idx >= 0 {
-			merged = merged[:idx]
-		}
-	}
 	return merged, summary, nil
 }
 

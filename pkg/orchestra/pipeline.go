@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -15,13 +16,14 @@ var RoundPresets = map[string]int{
 
 // SubprocessPipelineConfig holds configuration for the subprocess pipeline.
 type SubprocessPipelineConfig struct {
-	Backend        ExecutionBackend
-	Providers      []ProviderConfig
-	Topic          string
-	PromptData     PromptData
-	Rounds         int // number of cross-pollination rounds (0=fast, 1=standard, 2=deep)
-	Judge          ProviderConfig
-	TimeoutSeconds int
+	Backend                      ExecutionBackend
+	Providers                    []ProviderConfig
+	Topic                        string
+	PromptData                   PromptData
+	Rounds                       int // number of cross-pollination rounds (0=fast, 1=standard, 2=deep)
+	Judge                        ProviderConfig
+	RequireJudgeFamilySeparation bool
+	TimeoutSeconds               int
 }
 
 // RunSubprocessPipeline executes the full subprocess debate pipeline:
@@ -32,6 +34,10 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	}
 	if cfg.Backend == nil {
 		return nil, fmt.Errorf("pipeline: backend is nil")
+	}
+	contractCfg := subprocessPipelineContractConfig(cfg)
+	if result, err := preflightJudgeFamilySeparation(contractCfg); err != nil {
+		return result, err
 	}
 
 	start := time.Now()
@@ -60,13 +66,26 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		return nil, fmt.Errorf("pipeline: debater_r1 prompt: %w", err)
 	}
 
-	r1Results, r1Failed, err := executeParallel(ctx, cfg.Backend, cfg.Providers, r1Prompt, schemaPath, "debater_r1", 1, cfg.TimeoutSeconds)
+	rawR1Results, r1Failed, err := executeParallel(ctx, cfg.Backend, cfg.Providers, r1Prompt, schemaPath, "debater_r1", 1, cfg.TimeoutSeconds)
+	r1Evidence := providerResultsToResponses(rawR1Results)
+	if terminal, reasons, transitioned := failedPolicyTransition(r1Failed); transitioned {
+		runErr := fmt.Errorf("pipeline: round 1: pane fallback policy %s", terminal)
+		return buildSubprocessPolicyTransition(cfg, r1Evidence, r1Failed, nil, start, terminal, reasons), runErr
+	}
 	if err != nil {
-		return nil, fmt.Errorf("pipeline: round 1: %w", err)
+		runErr := fmt.Errorf("pipeline: round 1: %w", err)
+		return buildSubprocessParticipantFailure(cfg, r1Failed, nil, start, runErr), runErr
+	}
+	r1Results, hadR1Skip := activeProviderResults(rawR1Results)
+	roundHistory := [][]ProviderResponse{r1Evidence}
+	if len(r1Results) == 0 && hadR1Skip {
+		reasons := skippedTransitionReasons(r1Evidence)
+		return buildSubprocessPolicyTransition(
+			cfg, r1Evidence, r1Failed, roundHistory, start, TerminalSkipped, reasons,
+		), nil
 	}
 
 	allResults := r1Results
-	roundHistory := [][]ProviderResponse{providerResultsToResponses(r1Results)}
 	var r2Results []ProviderResult
 
 	// Phase 2: Cross-pollination rounds
@@ -80,29 +99,51 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 
 		r2Data, schemaErr := withPromptSchema(pb, schema, "debater_r2", cfg.Providers)
 		if schemaErr != nil {
-			return nil, schemaErr
+			return buildSubprocessParticipantFailure(cfg, r1Failed, roundHistory, start, schemaErr), schemaErr
 		}
 
 		r2Prompt, promptErr := buildPromptBuilder().BuildDebaterR2(r2Data)
 		if promptErr != nil {
-			return nil, fmt.Errorf("pipeline: debater_r2 prompt: %w", promptErr)
+			runErr := fmt.Errorf("pipeline: debater_r2 prompt: %w", promptErr)
+			return buildSubprocessParticipantFailure(cfg, r1Failed, roundHistory, start, runErr), runErr
 		}
 
 		r2SchemaPath, r2Cleanup, schemaErr := schema.WriteToFile("debater_r2")
 		if schemaErr != nil {
-			return nil, fmt.Errorf("pipeline: r2 schema: %w", schemaErr)
+			runErr := fmt.Errorf("pipeline: r2 schema: %w", schemaErr)
+			return buildSubprocessParticipantFailure(cfg, r1Failed, roundHistory, start, runErr), runErr
 		}
 		defer r2Cleanup()
 
-		roundResults, roundFailed, roundErr := executeParallel(ctx, cfg.Backend, cfg.Providers, r2Prompt, r2SchemaPath, "debater_r2", round+1, cfg.TimeoutSeconds)
+		rawRoundResults, roundFailed, roundErr := executeParallel(ctx, cfg.Backend, cfg.Providers, r2Prompt, r2SchemaPath, "debater_r2", round+1, cfg.TimeoutSeconds)
+		roundEvidence := providerResultsToResponses(rawRoundResults)
+		if terminal, reasons, transitioned := failedPolicyTransition(roundFailed); transitioned {
+			r1Failed = append(r1Failed, roundFailed...)
+			if len(roundEvidence) > 0 {
+				roundHistory = append(roundHistory, roundEvidence)
+			}
+			runErr := fmt.Errorf("pipeline: round %d: pane fallback policy %s", round+1, terminal)
+			return buildSubprocessPolicyTransition(
+				cfg, roundEvidence, r1Failed, roundHistory, start, terminal, reasons,
+			), runErr
+		}
 		if roundErr != nil {
-			return nil, fmt.Errorf("pipeline: round %d: %w", round+1, roundErr)
+			r1Failed = append(r1Failed, roundFailed...)
+			runErr := fmt.Errorf("pipeline: round %d: %w", round+1, roundErr)
+			return buildSubprocessParticipantFailure(cfg, r1Failed, roundHistory, start, runErr), runErr
 		}
 
 		r1Failed = append(r1Failed, roundFailed...)
+		roundResults, hadRoundSkip := activeProviderResults(rawRoundResults)
+		roundHistory = append(roundHistory, roundEvidence)
+		if len(roundResults) == 0 && hadRoundSkip {
+			return buildSubprocessPolicyTransition(
+				cfg, roundEvidence, r1Failed, roundHistory, start, TerminalSkipped,
+				skippedTransitionReasons(roundEvidence),
+			), nil
+		}
 		r2Results = roundResults
 		allResults = roundResults
-		roundHistory = append(roundHistory, providerResultsToResponses(roundResults))
 	}
 
 	// Phase 3: Judge synthesis
@@ -112,20 +153,23 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	pb.Sentinel = sentinelForJudgeResults(judgeAnon)
 	judgeData, err := withPromptSchema(pb, schema, "judge", []ProviderConfig{cfg.Judge})
 	if err != nil {
-		return nil, err
+		return buildSubprocessParticipantFailure(cfg, r1Failed, roundHistory, start, err), err
 	}
 
 	judgeReq, err := jb.Build(judgeData, judgeAnon)
 	if err != nil {
-		return nil, fmt.Errorf("pipeline: judge build: %w", err)
+		runErr := fmt.Errorf("pipeline: judge build: %w", err)
+		return buildSubprocessParticipantFailure(cfg, r1Failed, roundHistory, start, runErr), runErr
 	}
 	judgeReq.Config = cfg.Judge
 	judgeReq.Provider = cfg.Judge.Name
+	judgeReq.Round = cfg.Rounds + 2
 	judgeReq.Timeout = providerExecutionTimeout(cfg.Judge, cfg.TimeoutSeconds)
 
 	judgeSchemaPath, judgeCleanup, err := schema.WriteToFile("judge")
 	if err != nil {
-		return nil, fmt.Errorf("pipeline: judge schema: %w", err)
+		runErr := fmt.Errorf("pipeline: judge schema: %w", err)
+		return buildSubprocessParticipantFailure(cfg, r1Failed, roundHistory, start, runErr), runErr
 	}
 	defer judgeCleanup()
 	judgeReq.SchemaPath = judgeSchemaPath
@@ -135,21 +179,55 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	defer stopJudgeProgress()
 	judgeProgress.MarkRunning(cfg.Judge.Name)
 	judgeResp, err := cfg.Backend.Execute(ctx, judgeReq)
+	applyProviderRequestEvidence(judgeResp, judgeReq, cfg.Backend.Name())
+	if judgeResp != nil && (judgeResp.TerminalState == TerminalSkipped || judgeResp.TerminalState == TerminalBlocked) {
+		finalResults := r2Results
+		if len(finalResults) == 0 {
+			finalResults = r1Results
+		}
+		responses := providerResultsToResponses(finalResults)
+		judgeResp.Provider = cfg.Judge.Name + " (judge)"
+		responses = append(responses, *judgeResp)
+		reasons := append([]string(nil), judgeResp.DegradedReasons...)
+		if judgeResp.TerminalState == TerminalSkipped {
+			judgeProgress.MarkDone(cfg.Judge.Name)
+			return buildSubprocessPolicyTransition(
+				cfg, responses, r1Failed, roundHistory, start, TerminalSkipped, reasons,
+			), nil
+		}
+		judgeProgress.MarkFailed(cfg.Judge.Name)
+		if err == nil {
+			err = fmt.Errorf("judge pane fallback policy blocked execution")
+		}
+		judgeFailure := buildFailedProviderWithContext(
+			cfg.Judge, judgeResp, err, cfg.TimeoutSeconds, "judge", len(finalResults) > 0,
+		)
+		judgeFailure.Attempt = judgeReq.Round
+		return buildSubprocessPolicyTransition(
+			cfg, responses, append(r1Failed, judgeFailure), roundHistory,
+			start, TerminalBlocked, reasons,
+		), fmt.Errorf("pipeline: judge execute: %w", err)
+	}
 	if err != nil {
 		judgeProgress.MarkFailed(cfg.Judge.Name)
-		return nil, fmt.Errorf("pipeline: judge execute: %w", err)
+		runErr := fmt.Errorf("pipeline: judge execute: %w", err)
+		return buildSubprocessJudgeFailure(cfg, r1Failed, roundHistory, r1Results, r2Results, start, judgeResp, runErr), runErr
 	}
 	if judgeResp == nil {
 		judgeProgress.MarkFailed(cfg.Judge.Name)
-		return nil, fmt.Errorf("pipeline: judge returned no response")
+		runErr := fmt.Errorf("pipeline: judge returned no response")
+		return buildSubprocessJudgeFailure(cfg, r1Failed, roundHistory, r1Results, r2Results, start, nil, runErr), runErr
 	}
 	if judgeResp.TimedOut {
 		judgeProgress.MarkFailed(cfg.Judge.Name)
-		return nil, fmt.Errorf("pipeline: judge timed out")
+		runErr := fmt.Errorf("pipeline: judge timed out")
+		return buildSubprocessJudgeFailure(cfg, r1Failed, roundHistory, r1Results, r2Results, start, judgeResp, runErr), runErr
 	}
-	if judgeResp.EmptyOutput {
+	if judgeResp.EmptyOutput || strings.TrimSpace(judgeResp.Output) == "" {
 		judgeProgress.MarkFailed(cfg.Judge.Name)
-		return nil, fmt.Errorf("pipeline: judge returned empty output")
+		judgeResp.EmptyOutput = true
+		runErr := fmt.Errorf("pipeline: judge returned empty output")
+		return buildSubprocessJudgeFailure(cfg, r1Failed, roundHistory, r1Results, r2Results, start, judgeResp, runErr), runErr
 	}
 	judgeProgress.MarkDone(cfg.Judge.Name)
 
@@ -157,8 +235,8 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	parser := &OutputParser{}
 	judgeOutput, err := parser.ParseJudge(judgeResp.Output)
 	if err != nil {
-		// Non-fatal: use raw output as recommendation if parse fails
-		judgeOutput = &JudgeOutput{Recommendation: judgeResp.Output}
+		runErr := fmt.Errorf("pipeline: judge output invalid: %w", err)
+		return buildSubprocessJudgeFailure(cfg, r1Failed, roundHistory, r1Results, r2Results, start, judgeResp, runErr), runErr
 	}
 
 	merged := MergeSubprocessResults(judgeOutput, cpb.IdentityMap(), r1Results, r2Results)
@@ -178,49 +256,7 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		FailedProviders: r1Failed,
 		Degraded:        len(r1Failed) > 0,
 		RoundHistory:    roundHistory,
+		JudgeStatus:     JudgePassed,
 	}
-	aggregateOrchestraUsage(result)
-	return result, nil
-}
-
-func providerResultsToResponses(results []ProviderResult) []ProviderResponse {
-	responses := make([]ProviderResponse, 0, len(results))
-	for _, result := range results {
-		responses = append(responses, ProviderResponse{
-			Provider: result.Provider, Output: result.Output,
-			Usage: result.Usage, UsageCapability: result.UsageCapability,
-		})
-	}
-	return responses
-}
-
-// buildPromptBuilder creates a PromptBuilder, panicking on error (templates are embedded).
-func buildPromptBuilder() *PromptBuilder {
-	pb, err := NewPromptBuilder()
-	if err != nil {
-		panic(fmt.Sprintf("pipeline: failed to create prompt builder: %v", err))
-	}
-	return pb
-}
-
-func withPromptSchema(
-	base PromptData,
-	schema *SchemaBuilder,
-	role string,
-	providers []ProviderConfig,
-) (PromptData, error) {
-	data := base
-	if providersSupportCLISchema(providers) {
-		data.SchemaMethod = ""
-		data.SchemaJSON = ""
-		return data, nil
-	}
-
-	embedded, err := schema.EmbedInPrompt(role)
-	if err != nil {
-		return PromptData{}, fmt.Errorf("pipeline: embed %s schema in prompt: %w", role, err)
-	}
-	data.SchemaMethod = "prompt"
-	data.SchemaJSON = embedded
-	return data, nil
+	return finalizeOrchestraResultForConfig(result, contractCfg), nil
 }

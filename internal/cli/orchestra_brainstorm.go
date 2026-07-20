@@ -21,6 +21,7 @@ func newOrchestraBrainstormCmd() *cobra.Command {
 		yieldRounds  bool
 		contextAware bool
 		subprocess   bool
+		outputFormat string
 	)
 
 	cmd := &cobra.Command{
@@ -41,7 +42,7 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 				prompt = prependProjectContext(prompt)
 			}
 			resolvedRounds := resolveRounds(flagStrategy, rounds)
-			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge, YieldRounds: yieldRounds, ContextAware: contextAware, SubprocessMode: subprocess, TimeoutChanged: timeoutChanged})
+			return runOrchestraCommand(cmd.Context(), "brainstorm", flagStrategy, flagProviders, timeout, judge, prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, NoJudge: noJudge, YieldRounds: yieldRounds, ContextAware: contextAware, SubprocessMode: subprocess, TimeoutChanged: timeoutChanged, OutputFormat: outputFormat})
 		},
 	}
 
@@ -58,6 +59,7 @@ judge 모델이 ICE 점수로 아이디어를 통합하고 증폭합니다.`,
 	cmd.Flags().BoolVar(&yieldRounds, "yield-rounds", false, "Round 1 후 JSON 출력 및 pane 유지")
 	cmd.Flags().BoolVar(&contextAware, "context", false, "Allow providers to read project files (skip topic isolation)")
 	cmd.Flags().BoolVar(&subprocess, "subprocess", false, "Force headless -p subprocess backend (default: false; interactive pane is used on cmux/tmux terminals)")
+	cmd.Flags().StringVar(&outputFormat, "format", orchestraOutputText, "Output format (text|json)")
 
 	return cmd
 }

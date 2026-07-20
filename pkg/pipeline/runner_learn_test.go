@@ -20,12 +20,12 @@ type mockBackend struct {
 	callIdx int
 }
 
-// Execute returns the next configured output, defaulting to "Verdict: PASS".
+// Execute returns the next configured output, defaulting to a typed pass.
 func (m *mockBackend) Execute(_ context.Context, _ PhaseRequest) (*PhaseResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.callIdx >= len(m.outputs) {
-		return &PhaseResponse{Output: "Verdict: PASS"}, nil
+		return &PhaseResponse{Output: "VERDICT: PASS"}, nil
 	}
 	out := m.outputs[m.callIdx]
 	m.callIdx++
@@ -43,7 +43,7 @@ func (e *errBackend) Execute(_ context.Context, _ PhaseRequest) (*PhaseResponse,
 }
 
 // phaseOutputBackend returns pre-configured outputs keyed by PhaseID.
-// Falls back to "Verdict: PASS" for unmapped phases.
+// Falls back to a typed pass for unmapped phases.
 type phaseOutputBackend struct {
 	outputs map[PhaseID]string
 }
@@ -53,7 +53,7 @@ func (p *phaseOutputBackend) Execute(_ context.Context, req PhaseRequest) (*Phas
 	if out, ok := p.outputs[req.PhaseID]; ok {
 		return &PhaseResponse{Output: out}, nil
 	}
-	return &PhaseResponse{Output: "Verdict: PASS"}, nil
+	return &PhaseResponse{Output: "VERDICT: PASS"}, nil
 }
 
 // newLearnStoreForTest creates a temporary learn.Store for testing.
@@ -75,7 +75,7 @@ func TestSequentialRunner_GateFail_RecordsLearning(t *testing.T) {
 		outputs: []string{
 			"gate failure 1", // attempt 0: no "PASS" token
 			"gate failure 2", // attempt 1: no "PASS" token
-			"Verdict: PASS",  // attempt 2: passes
+			"VERDICT: PASS",  // attempt 2: passes
 		},
 	}
 	store := newLearnStoreForTest(t)
@@ -109,7 +109,7 @@ func TestSequentialRunner_NilStore_NoPanic(t *testing.T) {
 
 	// Given: backend that fails once (no PASS token) then passes, nil learn store
 	backend := &mockBackend{
-		outputs: []string{"gate failure output", "Verdict: PASS"},
+		outputs: []string{"gate failure output", "VERDICT: PASS"},
 	}
 	phases := []Phase{
 		{ID: PhaseValidate, Gate: GateValidation, MaxRetries: 1},
@@ -134,7 +134,7 @@ func TestParallelRunner_GateFail_RecordsLearning(t *testing.T) {
 	backend := &phaseOutputBackend{
 		outputs: map[PhaseID]string{
 			PhaseValidate: "no pass token here", // GateValidation fails: no "PASS"
-			PhaseReview:   "Verdict: PASS",
+			PhaseReview:   "VERDICT: PASS",
 		},
 	}
 	store := newLearnStoreForTest(t)

@@ -117,7 +117,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, hookMappings...)
 
-	return files, nil
+	return sanitizeUnsupportedClaudeTeamMappings(files), nil
 }
 
 func (a *Adapter) buildUpdateTransactionPlan(

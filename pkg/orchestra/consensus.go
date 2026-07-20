@@ -57,82 +57,62 @@ func MergeStructuredConsensus(responses []ProviderResponse, threshold float64) (
 		return "", ""
 	}
 
-	// Try to parse all responses as structured
+	// Parse every response before merging. A single unstructured response keeps
+	// the legacy line-based fallback available to callers.
 	parsed := make([]map[int]string, len(responses))
 	for i, r := range responses {
 		items, err := parseStructuredResponse(r.Output)
 		if err != nil {
-			// Any failure → fall back to line-based
 			return "", ""
 		}
 		parsed[i] = items
 	}
 
-	// Collect all unique keys across all responses
-	keySet := make(map[int]bool)
-	for _, items := range parsed {
-		for k := range items {
-			keySet[k] = true
+	total := len(responses)
+	type claim struct {
+		index     int
+		text      string
+		providers []string
+	}
+	claims := make(map[string]*claim)
+	var claimOrder []string
+	for providerIndex, items := range parsed {
+		keys := make([]int, 0, len(items))
+		for key := range items {
+			keys = append(keys, key)
+		}
+		sort.Ints(keys)
+		seenByProvider := make(map[string]bool, len(keys))
+		for _, key := range keys {
+			text := strings.TrimSpace(items[key])
+			identity := normalizeLine(text)
+			if identity == "" || seenByProvider[identity] {
+				continue
+			}
+			seenByProvider[identity] = true
+			entry, exists := claims[identity]
+			if !exists {
+				entry = &claim{index: key, text: text}
+				claims[identity] = entry
+				claimOrder = append(claimOrder, identity)
+			}
+			entry.providers = append(entry.providers, responses[providerIndex].Provider)
 		}
 	}
 
-	total := len(responses)
 	var agreedLines []string
 	var disputedLines []string
 	agreedCount := 0
-
-	// Sort keys for deterministic output order
-	keys := make([]int, 0, len(keySet))
-	for k := range keySet {
-		keys = append(keys, k)
-	}
-	sort.Ints(keys)
-
-	for _, key := range keys {
-		type variant struct {
-			text  string
-			count int
-		}
-		variants := make(map[string]variant)
-		var variantOrder []string
-		for _, items := range parsed {
-			if v, ok := items[key]; ok {
-				norm := normalizeLine(v)
-				if norm == "" {
-					continue
-				}
-				current, exists := variants[norm]
-				if !exists {
-					variantOrder = append(variantOrder, norm)
-					current.text = strings.TrimSpace(v)
-				}
-				current.count++
-				variants[norm] = current
-			}
-		}
-		if len(variantOrder) == 0 {
-			continue
-		}
-
-		best := variants[variantOrder[0]]
-		for _, norm := range variantOrder[1:] {
-			candidate := variants[norm]
-			if candidate.count > best.count {
-				best = candidate
-			}
-		}
-
-		ratio := float64(best.count) / float64(total)
+	for _, identity := range claimOrder {
+		entry := claims[identity]
+		count := len(entry.providers)
+		ratio := float64(count) / float64(total)
+		line := fmt.Sprintf("%d. %s [%d/%d]", entry.index, entry.text, count, total)
 		if ratio >= threshold {
-			agreedLines = append(agreedLines, fmt.Sprintf("✓ %d. %s", key, best.text))
+			agreedLines = append(agreedLines, "✓ "+line)
 			agreedCount++
 		} else {
-			var parts []string
-			for _, norm := range variantOrder {
-				v := variants[norm]
-				parts = append(parts, fmt.Sprintf("%s [%d/%d]", v.text, v.count, total))
-			}
-			disputedLines = append(disputedLines, fmt.Sprintf("△ %d. %s", key, strings.Join(parts, "; ")))
+			disputedLines = append(disputedLines, "△ "+line)
 		}
 	}
 
@@ -147,9 +127,9 @@ func MergeStructuredConsensus(responses []ProviderResponse, threshold float64) (
 		sb.WriteString(strings.Join(disputedLines, "\n"))
 	}
 
-	allKeys := len(keySet)
+	totalClaims := len(claimOrder)
 	summary := fmt.Sprintf("합의율: %d/%d (%.0f%%)",
-		agreedCount, allKeys, float64(agreedCount)/float64(max1(allKeys))*100)
+		agreedCount, totalClaims, float64(agreedCount)/float64(max1(totalClaims))*100)
 
 	return sb.String(), summary
 }

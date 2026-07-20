@@ -61,6 +61,10 @@ func runSubprocessPipeline(
 	forceSubprocess bool,
 	dryRun bool,
 ) error {
+	requestedStrategy := orchestra.Strategy(strings.ToLower(strings.TrimSpace(strategyStr)))
+	if requestedStrategy != orchestra.StrategyDebate && requestedStrategy != orchestra.StrategyConsensus {
+		return fmt.Errorf("unsupported orchestra run strategy %q (use debate or consensus)", strategyStr)
+	}
 	explicitProviderSelection := len(providerNames) > 0
 	explicitJudge := judgeName != ""
 	runtimeFlags := globalFlagsFromContext(ctx)
@@ -95,6 +99,7 @@ func runSubprocessPipeline(
 	if len(providerConfigs) == 0 {
 		return fmt.Errorf("no providers available")
 	}
+	configuredNames := providerConfigNames(providerConfigs)
 
 	// Resolve round preset.
 	roundCount, ok := orchestra.RoundPresets[roundsPreset]
@@ -137,10 +142,15 @@ func runSubprocessPipeline(
 	// returns the interactive pane backend on cmux/tmux terminals and the headless
 	// subprocess backend on plain/CI terminals or when --subprocess is forced.
 	cfg := orchestra.OrchestraConfig{
-		Providers:      providerConfigs,
-		SubprocessMode: forceSubprocess,
-		TimeoutSeconds: timeout,
-		Terminal:       detectStructuredTerminal(),
+		Providers:           providerConfigs,
+		RequestedProviders:  append([]string(nil), configuredNames...),
+		ConfiguredProviders: append([]string(nil), configuredNames...),
+		Strategy:            requestedStrategy,
+		Prompt:              topic,
+		SubprocessMode:      forceSubprocess,
+		TimeoutSeconds:      timeout,
+		Terminal:            detectStructuredTerminal(),
+		FallbackMode:        orchestra.FallbackModeSubprocess,
 	}
 	// SPEC-ORCH-022 T8: enable hook-IPC collection before backend selection so a
 	// pane-capable, hook-installed context collects via done-file instead of
@@ -165,9 +175,15 @@ func runSubprocessPipeline(
 	fmt.Fprintf(os.Stderr, "Strategy: %s | Providers: %s | Rounds: %s (%d)\n",
 		strategyStr, strings.Join(names, ", "), roundsPreset, roundCount+1)
 
-	result, err := orchestraRunExecutePipeline(ctx, pipelineCfg)
+	result, err := executeOrchestraRunStrategy(ctx, requestedStrategy, cfg, pipelineCfg)
 	if err != nil {
 		return fmt.Errorf("subprocess pipeline failed: %w", err)
+	}
+	if result == nil {
+		return fmt.Errorf("subprocess pipeline failed: orchestration returned no result")
+	}
+	if shouldTreatOrchestraResultAsFailure(result) {
+		return fmt.Errorf("subprocess pipeline failed: %w", synthesizeOrchestraFailureError(result))
 	}
 
 	// REQ-009: when all providers failed and no usable responses were collected,

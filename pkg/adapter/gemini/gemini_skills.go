@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"sort"
 
+	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
+	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 	"github.com/insajin/autopus-adk/templates"
 )
 
@@ -44,6 +46,10 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig, geminiSkillBas
 // without writing to disk. Used by both renderSkillTemplates and prepareFiles.
 func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	var files []adapter.FileMapping
+	catalog, err := pkgcontent.LoadSkillCatalogFromFS(contentfs.FS, "skills")
+	if err != nil {
+		return nil, fmt.Errorf("skill catalog init: %w", err)
+	}
 
 	entries, err := templates.FS.ReadDir("gemini/skills")
 	if err != nil {
@@ -55,6 +61,10 @@ func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.Fil
 			continue
 		}
 		skillName := entry.Name()
+		if skill, ok := catalog.Get(skillName); ok &&
+			!pkgcontent.ResolveCatalogSkillState(skill, "gemini", cfg).Compiled {
+			continue
+		}
 
 		tmplPath := "gemini/skills/" + skillName + "/SKILL.md.tmpl"
 		tmplContent, err := templates.FS.ReadFile(tmplPath)

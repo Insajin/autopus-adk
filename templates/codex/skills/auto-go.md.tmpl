@@ -25,6 +25,7 @@ SPEC 문서를 기반으로 코드를 구현합니다.{{if .IsFullMode}} {{.Meth
 | `--team` | Codex native `multi_agent` 도구 기반 Lead/Builder/Guardian 팀 프로파일로 실행합니다. |
 | `--solo` | 서브에이전트 없이 메인 세션에서 직접 구현합니다. |
 | `--strategy <value>` | `--multi` 리뷰 전략을 지정합니다. |
+| `--providers <list>` | SPEC 및 코드 리뷰에 전달할 provider 목록을 지정합니다. |
 | `--skip-scaffold` | 초기 테스트 스캐폴딩 단계를 건너뜁니다. |
 
 ### 공통 플래그
@@ -93,6 +94,7 @@ Before implementation assignment, apply the minimality ladder: `actual need` →
 - `--team` → Codex team profile
 - `--solo` → 단일 세션 구현
 - `--strategy <value>`
+- `--providers <list>` → `PROVIDERS`; 입력이 없으면 provider 플래그를 생략
 - `--continue`
 - `--skip-scaffold`
 - 글로벌 `--auto` / `--loop` / `--multi` / `--quality`
@@ -123,7 +125,7 @@ Before implementation assignment, apply the minimality ladder: `actual need` →
 | LOOP_MODE | AUTO_MODE | 동작 |
 |-----------|-----------|------|
 | false | false | 구현 진행 금지. `/auto spec review {SPEC-ID}` 안내 후 중단. |
-| false | true | `auto spec review {SPEC-ID}` 1회 트리거 → 상태 재로드 → `approved`이면 Step 3 진입, 아니면 verdict/findings 보고 후 중단. 재귀 auto-chain 금지. |
+| false | true | `auto spec review {SPEC-ID} --strategy {STRATEGY} [--providers {PROVIDERS}]` 1회 트리거 → 현재 invocation의 promotion receipt 검증 → 승격 증거가 있으면 Step 3 진입, 아니면 verdict/findings 보고 후 중단. 재귀 auto-chain 금지. |
 | true | * | **SPEC Quality Loop** 진입. 구현 Phase 1은 loop이 PASS 또는 circuit break로 종료된 후에만 허용. |
 
 - review gate 내부의 단일 review iteration은 `auto spec review`의 `max_revisions` 루프에 맡기되, SPEC Quality Loop는 그 위에서 verdict 단위 (PASS/REVISE/REJECT) 의 외부 사이클을 형성합니다.
@@ -136,11 +138,22 @@ Before implementation assignment, apply the minimality ladder: `actual need` →
 SPEC Quality Loop:
   ┌─→ TARGET   : review-findings.json 의 Status="open" 항목 추출
   │   REVISE   : spec-writer 서브에이전트에 finding-scoped 프롬프트 위임
-  │   VERIFY   : `auto spec review {SPEC-ID} --strategy {STRATEGY}` 재실행
+  │   VERIFY   : `auto spec review {SPEC-ID} --strategy {STRATEGY} [--providers {PROVIDERS}]` 재실행
   └── LOOP     : verdict == PASS, max iter, 또는 circuit break까지
 ```
 
-**Bootstrap**: `review.md` 가 아직 없으면 첫 revise 전에 `auto spec review` 1회 트리거 (iter 0, 예산 차감 안 함).
+**Bootstrap**: `review.md` 가 아직 없으면 첫 revise 전에 `auto spec review {SPEC-ID} --strategy {STRATEGY} [--providers {PROVIDERS}]` 1회 트리거 (iter 0, 예산 차감 안 함).
+
+각 review 호출 뒤 `{SPEC_DIR}/review-receipt.json`을 읽고
+`schema=spec_review_promotion_receipt.v1`인지 확인합니다. draft gate를 통과하려면
+현재 invocation의 `run_id`와 일치하고 `finished_at`이 invocation 시작 이후여야
+합니다. 또한 `analysis_verdict=PASS`, `gate_status=passed`,
+`critical_veto=false`, `current_status=approved`가 필수이며,
+`degraded_reasons`가 비어 있지 않으면 `override_applied=true`도 필수입니다.
+review 직전 상태가 draft였을 때는 `status_changed=true`여야 합니다. 이미
+approved였던 SPEC의 clean re-review는 `status_changed=false`여도 위 current-run
+조건이 모두 맞으면 허용합니다. receipt가 없거나 stale/invalid이면 fail-close
+합니다. `go`는 SPEC 상태를 직접 수정하지 않습니다.
 
 **Iteration limit**: 최대 **3** quality iterations.
 
@@ -156,7 +169,10 @@ SPEC Quality Loop:
 - open finding count 감소 → 진행, 계속.
 - 같은 finding ID 가 2회 연속 그대로 → circuit break (stuck).
 - open count 증가 + 새 finding ID 가 다른 scope → circuit break (regression).
-- verdict PASS → exit loop, `Status: approved` 갱신 후 Step 3 진입.
+- verdict PASS → exit loop. 현재 review receipt에서 `analysis_verdict=PASS`,
+  `gate_status=passed`, `critical_veto=false`, `current_status=approved`, 유효한
+  current-run/degraded override 증거를 확인한 뒤 Step 3 진입. review 직전 상태가
+  draft일 때만 `status_changed=true`를 요구합니다.
 
 **Circuit break 출력**:
 
@@ -315,10 +331,20 @@ spawn_agent reviewer \
 `--multi` 플래그로 멀티 프로바이더 오케스트레이션을 활성화합니다:
 
 ```bash
-auto orchestra run "{review topic}" --strategy consensus --rounds fast
+auto orchestra review {review paths} --risk-tier {risk_tier} --strategy {strategy} --providers {providers} --no-detach --format json
 ```
 
 pane-capable 터미널에서는 로그인된 interactive pane이 기본이며, plain/CI·mux 미가용·명시적 `--subprocess`에서만 subprocess를 사용해 여러 AI 프로바이더의 합의 기반 리뷰를 수행합니다.
+
+The review result is an `orchestration_run_receipt.v1`. Preserve
+`requested_providers`, `configured_providers`, `resolved_providers`,
+`attempted_providers`, `usable_providers`, `failed_providers`,
+`degraded_reasons`, `critical_veto`, `analysis_verdict`, and `gate_status`.
+Provider discovery evidence never overrides deterministic validation, and a
+degraded PASS requires an explicit audited override.
+The synchronous review gate accepts only `schema=orchestration_cli_result.v1` with
+an embedded `receipt.schema=orchestration_run_receipt.v1`; a detached job ID or
+untyped prose cannot satisfy the gate.
 
 ## Codex Notes
 

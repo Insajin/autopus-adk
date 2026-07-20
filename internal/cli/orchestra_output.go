@@ -43,7 +43,15 @@ func saveOrchestraResult(command, strategy string, providers []string, timeout R
 	if diagnostics := renderProviderDiagnosticsMarkdown(timeout, result.FailedProviders); diagnostics != "" {
 		content += "\n" + diagnostics
 	}
-	return filename, os.WriteFile(filename, []byte(content), 0o644)
+	if err := os.WriteFile(filename, []byte(content), 0o644); err != nil {
+		return filename, err
+	}
+	if result != nil && result.RunReceipt != nil {
+		if _, err := writeOrchestraReceiptArtifact(filename, result); err != nil {
+			return filename, err
+		}
+	}
+	return filename, nil
 }
 
 func resultIsDegraded(result *orchestra.OrchestraResult) bool {

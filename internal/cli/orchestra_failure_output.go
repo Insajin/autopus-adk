@@ -122,7 +122,13 @@ func renderOrchestraFailureSummary(timeout ResolvedOrchestraTimeout, result *orc
 }
 
 func shouldTreatOrchestraResultAsFailure(result *orchestra.OrchestraResult) bool {
-	if result == nil || len(result.FailedProviders) == 0 {
+	if result == nil {
+		return false
+	}
+	if result.TerminalState == orchestra.TerminalBlocked || result.GateStatus == "blocked" || result.JudgeStatus == orchestra.JudgeFailed {
+		return true
+	}
+	if len(result.FailedProviders) == 0 {
 		return false
 	}
 	if len(result.Responses) == 0 {
@@ -148,7 +154,29 @@ func synthesizeOrchestraFailureError(result *orchestra.OrchestraResult) error {
 	if result == nil {
 		return fmt.Errorf("모든 프로바이더가 실패했습니다")
 	}
+	if result.Veto {
+		return fmt.Errorf("해결되지 않은 Critical finding이 gate를 차단했습니다")
+	}
+	if result.JudgeStatus == orchestra.JudgeFailed {
+		return fmt.Errorf("필수 judge가 실패했습니다: %s", summarizeFailedProviders(result.FailedProviders))
+	}
+	if containsDegradedReason(result.DegradedReasons, "provider_quorum") {
+		return fmt.Errorf("프로바이더 quorum 미충족: usable %d/%d, required %d",
+			len(result.UsableProviders), len(result.ConfiguredProviders), result.QuorumRequired)
+	}
+	if result.TerminalState == orchestra.TerminalBlocked && len(result.FailedProviders) == 0 {
+		return fmt.Errorf("오케스트레이션 gate가 차단되었습니다")
+	}
 	return fmt.Errorf("모든 프로바이더가 실패했습니다: %s", summarizeFailedProviders(result.FailedProviders))
+}
+
+func containsDegradedReason(reasons []string, target string) bool {
+	for _, reason := range reasons {
+		if reason == target {
+			return true
+		}
+	}
+	return false
 }
 
 func summarizeFailedProviders(failed []orchestra.FailedProvider) string {

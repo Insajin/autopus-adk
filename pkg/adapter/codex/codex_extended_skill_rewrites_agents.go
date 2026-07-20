@@ -10,6 +10,29 @@ Codex ` + "`--team`" + ` mode is a first-class Autopus team profile built on the
 
 **Activation flag**: ` + "`@auto go SPEC-ID --team`" + `
 
+## Canonical Semantic Contract
+
+` + "```json" + `
+{
+  "schema": "orchestration-contract.v1",
+  "workflow": "team",
+  "semantics": {
+    "supervisor": "main_session",
+    "dispatch_evidence": true,
+    "disjoint_ownership": true,
+    "integration_gate": true,
+    "teardown": true,
+    "worker_receipt_fields": [
+      "owned_paths",
+      "changed_files",
+      "verification",
+      "blockers",
+      "next_required_step"
+    ]
+  }
+}
+` + "```" + `
+
 This mode does not use Claude Code Team APIs. It uses ` + "`spawn_agent(...)`" + `, ` + "`send_input(...)`" + `, ` + "`wait_agent(...)`" + `, and ` + "`close_agent(...)`" + ` from the Codex ` + "`multi_agent`" + ` feature.
 
 ## Prerequisites
@@ -49,7 +72,8 @@ The main session is always the Lead. Do not spawn a separate lead worker.
 
 ` + "```python" + `
 spawn_agent(
-    agent_type="executor",
+    task_name="builder",
+    fork_turns="all",
     message="""
     Role: Builder.
     Own only: <paths>.
@@ -60,7 +84,8 @@ spawn_agent(
 )
 
 spawn_agent(
-    agent_type="validator",
+    task_name="guardian",
+    fork_turns="all",
     message="""
     Role: Guardian.
     Verify the Builder-owned paths only.

@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/insajin/autopus-adk/pkg/pipeline"
 )
 
@@ -41,12 +39,7 @@ func loadCheckpointIfContinue(specID string, continueFlag bool, warn io.Writer) 
 
 	hash, err := getCurrentGitHash()
 	if err != nil {
-		// Git not available: fall back to load without hash comparison.
-		cp, loadErr := loadFlatCheckpoint(path)
-		if loadErr != nil {
-			return nil, checkpointNotFoundErr(specID)
-		}
-		return cp, nil
+		return nil, fmt.Errorf("cannot verify checkpoint for %s without git HEAD: %w", specID, err)
 	}
 
 	cp, err := loadFlatCheckpointWithHash(path, hash)
@@ -56,29 +49,18 @@ func loadCheckpointIfContinue(specID string, continueFlag bool, warn io.Writer) 
 
 	if cp.Stale {
 		fmt.Fprintf(warn,
-			"Warning: checkpoint for SPEC-%s is stale (saved hash %s differs from HEAD %s). Proceeding anyway.\n",
+			"Warning: checkpoint for %s is stale (saved hash %s differs from HEAD %s). Resume blocked.\n",
 			specID, cp.GitCommitHash, hash,
 		)
+		return nil, fmt.Errorf("checkpoint for %s is stale", specID)
 	}
-
 	return cp, nil
 }
 
 // loadFlatCheckpoint reads a checkpoint from an explicit file path
 // (e.g. .autopus/pipeline-state/SPEC-001.yaml).
 func loadFlatCheckpoint(path string) (*pipeline.Checkpoint, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("checkpoint: file not found: %s", path)
-		}
-		return nil, fmt.Errorf("checkpoint: read %s: %w", path, err)
-	}
-	var cp pipeline.Checkpoint
-	if err := yaml.Unmarshal(data, &cp); err != nil {
-		return nil, fmt.Errorf("checkpoint: unmarshal: %w", err)
-	}
-	return &cp, nil
+	return pipeline.LoadFile(path)
 }
 
 // loadFlatCheckpointWithHash loads a flat checkpoint and sets Stale when hashes differ.

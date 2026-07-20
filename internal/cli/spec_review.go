@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/pkg/config"
-	"github.com/insajin/autopus-adk/pkg/detect"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 	"github.com/insajin/autopus-adk/pkg/spec"
 )
@@ -60,6 +59,7 @@ func newSpecReviewCmd() *cobra.Command {
 		forceSubprocess     bool
 		forcePlain          bool
 		allowDegraded       bool
+		providers           []string
 		requiredDocuments   []string
 		conditionalProfiles []string
 	)
@@ -74,6 +74,7 @@ func newSpecReviewCmd() *cobra.Command {
 			return runSpecReviewWithOptions(cmd.Context(), specID, strategy, timeout, specReviewOptions{
 				forceSubprocess:     forceSubprocess || forcePlain,
 				allowDegraded:       allowDegraded,
+				providers:           append([]string(nil), providers...),
 				requiredDocuments:   requiredDocuments,
 				conditionalProfiles: conditionalProfiles,
 			})
@@ -85,6 +86,7 @@ func newSpecReviewCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&forceSubprocess, "subprocess", false, "Force headless subprocess backend for SPEC review")
 	cmd.Flags().BoolVar(&forcePlain, "plain", false, "Alias for --subprocess; bypass interactive pane backend")
 	cmd.Flags().BoolVar(&allowDegraded, "allow-degraded", false, "Promote a PASS even when a document was truncated or the provider quorum was not met (records an audit override)")
+	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "Provider list override (default: from config)")
 	cmd.Flags().StringArrayVar(&requiredDocuments, "required-document", nil, "Additional root-relative required review document")
 	cmd.Flags().StringArrayVar(&conditionalProfiles, "conditional-profile", nil, "Declared conditional review context profile")
 
@@ -94,6 +96,7 @@ func newSpecReviewCmd() *cobra.Command {
 type specReviewOptions struct {
 	forceSubprocess     bool
 	allowDegraded       bool
+	providers           []string
 	requiredDocuments   []string
 	conditionalProfiles []string
 }
@@ -147,7 +150,10 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 		threshold = 0.67
 	}
 
-	providerNames := resolveSpecReviewProviderNames(cfg, flags.MultiMode)
+	providerNames := append([]string(nil), opts.providers...)
+	if len(providerNames) == 0 {
+		providerNames = resolveSpecReviewProviderNames(cfg, flags.MultiMode)
+	}
 	providers := configureSpecReviewProviders(resolveCodexProviderCapabilities(ctx, specReviewConfigProviders(cfg, providerNames)))
 	providers = applySpecReviewExecutionTimeout(providers, requestedTimeout)
 	if len(providers) == 0 {
@@ -177,6 +183,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 	// Load any prior findings (from a previous interrupted run)
 	priorFindings, _ := spec.LoadFindings(specDir)
 
+	runtimeEvidence := &specReviewRuntimeEvidence{}
 	loopParams := specReviewLoopParams{
 		ctx:             ctx,
 		specID:          specID,
@@ -187,9 +194,11 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 		threshold:       threshold,
 		gate:            gate,
 		providers:       providers,
+		configuredNames: append([]string(nil), providerNames...),
 		codeContext:     codeContext,
 		subprocessMode:  opts.forceSubprocess || resolveSubprocessMode(&cfg.Orchestra),
 		contextDelivery: contextDelivery,
+		runtimeEvidence: runtimeEvidence,
 	}
 
 	finalResult, err := runSpecReviewLoop(loopParams, doc, priorFindings)
@@ -199,11 +208,19 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 
 	// Output final result
 	if finalResult != nil {
-		if persistErr := syncReviewedSpecStatus(specDir, finalResult, opts.allowDegraded); persistErr != nil {
+		promotionReceipt, persistErr := syncReviewedSpecStatusWithReceipt(
+			specDir, finalResult, opts.allowDegraded, *runtimeEvidence,
+		)
+		if persistErr != nil {
 			return fmt.Errorf("SPEC 상태 업데이트 실패 (SPEC: %s): %w", specID, persistErr)
+		}
+		receiptPath, receiptErr := persistSpecReviewPromotionReceipt(specDir, promotionReceipt)
+		if receiptErr != nil {
+			return fmt.Errorf("SPEC review receipt 저장 실패 (SPEC: %s): %w", specID, receiptErr)
 		}
 		fmt.Printf("SPEC 리뷰 완료: %s\n", specID)
 		fmt.Printf("판정: %s\n", finalResult.Verdict)
+		fmt.Printf("Promotion receipt: %s\n", receiptPath)
 		if len(finalResult.Findings) > 0 {
 			// Issue #44: surface status breakdown instead of raw count so operators
 			// can tell at a glance whether any findings are still open.
@@ -231,61 +248,4 @@ func hasActiveFindings(findings []spec.ReviewFinding) bool {
 		}
 	}
 	return false
-}
-
-// buildReviewProviders builds provider configs, skipping missing binaries.
-func buildReviewProviders(names []string) []orchestra.ProviderConfig {
-	all := buildProviderConfigs(names)
-	return filterInstalledProviders(all)
-}
-
-func buildReviewProvidersWithConfig(cfg *config.HarnessConfig, names []string) []orchestra.ProviderConfig {
-	if cfg == nil {
-		return buildReviewProviders(names)
-	}
-	all := resolveProviders(&cfg.Orchestra, "review", names)
-	return filterInstalledProviders(all)
-}
-
-func filterInstalledProviders(all []orchestra.ProviderConfig) []orchestra.ProviderConfig {
-	var available []orchestra.ProviderConfig
-	for _, p := range all {
-		if detect.IsInstalled(p.Binary) {
-			available = append(available, p)
-		} else {
-			fmt.Fprintf(os.Stderr, "경고: %s 바이너리를 찾을 수 없습니다 (건너뜀)\n", p.Binary)
-		}
-	}
-	return available
-}
-
-func configureSpecReviewProviders(providers []orchestra.ProviderConfig) []orchestra.ProviderConfig {
-	configured := make([]orchestra.ProviderConfig, len(providers))
-	copy(configured, providers)
-
-	for i := range configured {
-		configured[i].ResultReadyPatterns = mergeStringValues(configured[i].ResultReadyPatterns, []string{"VERDICT:"})
-		if configured[i].ResultReadyGrace <= 0 {
-			configured[i].ResultReadyGrace = specReviewResultReadyGrace
-		}
-	}
-
-	return configured
-}
-
-func resolveSpecReviewProviderNames(cfg *config.HarnessConfig, multi bool) []string {
-	if cfg == nil {
-		return nil
-	}
-
-	names := mergeProviderNames(cfg.Spec.ReviewGate.Providers)
-	if !multi {
-		return names
-	}
-
-	if cmd, ok := cfg.Orchestra.Commands["review"]; ok {
-		names = mergeProviderNames(names, cmd.Providers)
-	}
-
-	return mergeProviderNames(names, sortedProviderKeys(cfg.Orchestra.Providers), defaultProviders())
 }

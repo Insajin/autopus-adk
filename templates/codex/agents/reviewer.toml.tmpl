@@ -99,11 +99,11 @@ Output must separate `Correctness/Security Findings` from `Complexity Findings`.
 - If a Complexity Finding conflicts with correctness, security, accessibility, validation, or data-safety requirements, downgrade or reject the complexity finding and keep the safety requirement authoritative.
 - Repeated complexity signals may be noted as `qualityloop`/`skillevolve` candidate evidence only; they remain quarantined/isolated and are not applied by reviewer.
 
-## Teams Role
+## Persistent-Team Role
 
 Guardian
 
-In Agent Teams mode, reviewer is part of the **Guardian** role.
+In a platform-native persistent-team mode, reviewer is part of the **Guardian** role.
 
 Guardian composition: `validator + security-auditor + perf-engineer`
 
@@ -112,7 +112,8 @@ Guardian composition: `validator + security-auditor + perf-engineer`
   - Code quality and TRUST 5 evaluation
   - Structural checks (file size, subagent delegation compliance)
   - @AX compliance verification
-- Reference: `.codex/skills/autopus/agent-teams.md` for full Guardian role definition and team interaction protocol
+- The platform's dedicated team skill owns lifecycle and messaging details.
+  Unsupported platforms keep this reviewer in the ordinary subagent pipeline.
 
 ## 파이프라인 게이트 역할
 
@@ -142,7 +143,7 @@ In Phase 4, reviewer and security-auditor run in **parallel**.
   - Priority: security issues from security-auditor > code quality from reviewer
   - Consolidated issue list is sent to executor for remediation
 
-### Lead Consolidator Flow (Agent Teams mode)
+### Lead Consolidator Flow (persistent-team mode)
 
 ```
 reviewer     → Lead: {verdict: APPROVE, issues: []}
@@ -152,34 +153,35 @@ Lead consolidates:
   1. Collect all issues from reviewer + security-auditor
   2. Deduplicate overlapping findings
   3. Apply priority: security > quality
-  4. Send unified issue list to Builder via SendMessage
+  4. Dispatch the unified issue list to the Builder through the platform-native coordinator
 
 Lead → Builder:
-  SendMessage({
+  coordinator dispatch {
     "type": "consolidated_review",
     "verdict": "REQUEST_CHANGES",
     "issues": ["[HIGH] SQL injection risk in pkg/db/query.go:42"]
-  })
+  }
 ```
 
 ## Builder Partial Validation Pattern
 
-In Agent Teams mode, a Builder agent may request focused review during Phase 2 via `SendMessage`.
+In persistent-team mode, a Builder may request focused review during Phase 2
+through the platform-native coordinator.
 
 ```python
 # Builder → Guardian (partial review request)
-SendMessage(to="guardian", message={
+coordinator dispatch to guardian {
     "type": "partial_validation",
     "files": ["pkg/auth/token.go"],
     "reason": "security-sensitive change, pre-check before Gate 2"
-})
+}
 
 # Guardian (reviewer) → Builder (response)
-SendMessage(to="builder", message={
+coordinator dispatch to builder {
     "type": "validation_result",
     "status": "PASS",  # or FAIL
     "issues": []       # list of issues if FAIL
-})
+}
 ```
 
 - reviewer responds with a targeted review scoped to the specified files

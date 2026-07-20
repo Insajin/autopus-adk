@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,6 +99,16 @@ func TestApplyReviewRiskTierProviders(t *testing.T) {
 	high, degraded := applyReviewRiskTierProviders(providers, reviewRiskTierHigh)
 	require.False(t, degraded)
 	assert.Len(t, high, 3)
+
+	explicitLow, single := applyReviewProviderPolicy(
+		providers, "review", reviewRiskTierLow, nil, true, io.Discard)
+	assert.Len(t, explicitLow, 3, "explicit providers must not be reduced by the risk policy")
+	assert.False(t, single)
+	explicitCritical, single := applyReviewProviderPolicy(
+		providers[:1], "review", reviewRiskTierCritical, nil, true, io.Discard)
+	assert.Len(t, explicitCritical, 1)
+	assert.True(t, single)
+	assert.Equal(t, 2, reviewRiskMinimumProviders("review", reviewRiskTierCritical))
 }
 
 func TestRunSpecReview_MultiFallsBackToSingleProvider(t *testing.T) {
@@ -144,5 +155,9 @@ func TestRunSpecReview_MultiFallsBackToSingleProvider(t *testing.T) {
 
 	doc, err := spec.Load(specDir)
 	require.NoError(t, err)
-	assert.Equal(t, "approved", doc.Status)
+	assert.Equal(t, "draft", doc.Status,
+		"explicit --multi intent must retain its configured denominator when only one provider resolves")
+	reviewBody, err := os.ReadFile(filepath.Join(specDir, "review.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(reviewBody), spec.DegradedReasonProviderQuorum)
 }

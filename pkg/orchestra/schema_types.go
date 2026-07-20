@@ -96,6 +96,7 @@ type ReviewerOutput struct {
 
 // Finding represents a single review finding.
 type Finding struct {
+	ID          string `json:"id,omitempty"`        // stable finding identifier when supplied by the reviewer
 	Severity    string `json:"severity"`            // critical, major, minor, suggestion
 	Category    string `json:"category,omitempty"`  // correctness, completeness, feasibility, style, security
 	ScopeRef    string `json:"scope_ref,omitempty"` // REQ-001 or path:line

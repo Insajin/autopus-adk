@@ -95,6 +95,7 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 	if err != nil {
 		return err
 	}
+	files = sanitizeUnsupportedClaudeTeamMappings(files)
 	return adapter.WriteFileIfChanged(settingsPath, files[0].Content, 0644)
 }
 

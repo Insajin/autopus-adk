@@ -8,6 +8,9 @@ triggers:
   - 팀 구성
 category: agentic
 level1_metadata: "Agent Teams, role-based, Lead-Builder-Guardian, SendMessage, worktree isolation"
+platforms:
+  - claude
+  - codex
 ---
 
 # Agent Teams Skill
@@ -17,6 +20,33 @@ level1_metadata: "Agent Teams, role-based, Lead-Builder-Guardian, SendMessage, w
 Agent Teams mode (`--team`) enables role-based team collaboration via Claude Code Agent Teams. Instead of spawning ephemeral subagents per task, this mode creates persistent teammates that communicate directly, share a task list, and self-coordinate through the pipeline.
 
 **Activation flag**: `/auto go SPEC-ID --team`
+
+## Canonical Semantic Contract
+
+```json
+{
+  "schema": "orchestration-contract.v1",
+  "workflow": "team",
+  "semantics": {
+    "supervisor": "main_session",
+    "dispatch_evidence": true,
+    "disjoint_ownership": true,
+    "integration_gate": true,
+    "teardown": true,
+    "worker_receipt_fields": [
+      "owned_paths",
+      "changed_files",
+      "verification",
+      "blockers",
+      "next_required_step"
+    ]
+  }
+}
+```
+
+Claude binds this semantic contract to its native team lifecycle below. Codex
+uses its native multi-agent binding. Gemini and OpenCode do not compile this
+Claude/Codex-only team skill; their default subagent pipelines remain available.
 
 > **Team Workflow Substrate — claude-code platform note**: On the claude-code platform, when `auto workflow doctor` passes and the team workflow substrate is not disabled (no `--no-workflow` flag and no `workflow.team_default=false` in `autopus.yaml` which maps to the real `WorkflowConf.TeamDefault` field), `/auto go --team` is served by the **deterministic team Workflow substrate** (`route_team`) documented in `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`). This substrate features faithful dispatching of specialized subagent types (`planner`, `tester`, `executor`, `annotator`, `reviewer`, `security-auditor`) with enriched role-task prompts, structured planner schema capture (`PLAN_SCHEMA`), and dynamic task-threaded parallel executors running with `isolation: 'worktree'`. The substrate is dispatched in **four segments** via `args.segment` — segment A (planning → test_scaffold → implementation → gate_build_test marker), then the dispatcher runs `auto workflow gate` as a hard exit-code barrier; only on pass it launches segment B (annotation → testing), after which it evaluates the coverage gate (`EvaluateCoverageGate`, default threshold 85) as a hard barrier; only on pass it launches segment C (review), after which it consolidates findings (`ConsolidateReviewVerdict`) and runs the review barrier (`RunReviewBarrier`) which blocks release_hygiene on a security FAIL / REQUEST_CHANGES until the retry budget clears; only on pass it launches segment D (release_hygiene marker → `auto check --hygiene --arch --quiet --staged`). See `content/skills/harness-workflow.md` (`### Segmented Dispatch Contract`) for the full dispatcher sequence. The manual Agent Teams orchestration in this skill (Step B1–B6 below) is the **disable/fallback path**: it activates when `--no-workflow` is set, when `auto workflow doctor` fails (fail-fast → Route A, not Agent Teams), or on non-claude platforms where `--team` retains its existing platform-native semantics. The Agent Teams contract below remains fully authoritative for all disable/fallback scenarios.
 
@@ -66,7 +96,7 @@ Agent Teams enforces these rules at the Claude Code layer — violating them fai
 
 **Responsibilities**: planner + reviewer
 
-- Joins the team as a teammate — the **top-level session** creates the team and spawns Lead via `TeamCreate` + `Agent(..., team_name=..., name="lead")`. Lead MUST NOT call `TeamCreate` itself (Claude Code rejects nested team creation at runtime).
+- The **top-level session** is the Lead and becomes a member when it calls `TeamCreate`; do not spawn a separate Lead. Teammates MUST NOT call `TeamCreate` because Claude Code rejects nested team creation.
 - Runs Phase 1 (Planning) to produce the execution plan
 - Coordinates tasks with Builder(s) and Guardian via `SendMessage`
 - Monitors task list and consolidates results
@@ -120,11 +150,25 @@ TeamCreate(
     agent_type  = "planner",
 )
 
-# Step 2: Top-level session spawns the 3 non-lead teammates in a SINGLE message
-# (Agent() calls must be emitted together to spawn in parallel)
-Agent(subagent_type="executor",  team_name=TEAM_NAME, name="builder-1", isolation="worktree")
-Agent(subagent_type="tester",    team_name=TEAM_NAME, name="tester")
-Agent(subagent_type="validator", team_name=TEAM_NAME, name="guardian")
+# Step 2: Top-level session spawns the 3 non-lead teammates in a SINGLE message.
+# Every successful observed dispatch increments dispatch_count.
+dispatch_count = 0
+Agent(
+    subagent_type="executor", team_name=TEAM_NAME, name="builder-1", isolation="worktree",
+    prompt="""Own only owned_paths; never modify forbidden_paths. Return exactly:
+    owned_paths, changed_files, verification, blockers, next_required_step.""",
+)
+Agent(
+    subagent_type="tester", team_name=TEAM_NAME, name="tester",
+    prompt="""Own only test owned_paths; production paths are forbidden_paths. Return exactly:
+    owned_paths, changed_files, verification, blockers, next_required_step.""",
+)
+Agent(
+    subagent_type="validator", team_name=TEAM_NAME, name="guardian",
+    prompt="""Read-only validation; all source paths are forbidden_paths. Return exactly:
+    owned_paths, changed_files, verification, blockers, next_required_step.""",
+)
+# After membership evidence confirms each teammate, dispatch_count must equal 3.
 ```
 
 Each teammate loads its agent definition from `.claude/agents/autopus/` and inherits its frontmatter (tools, model, skills, permissionMode). The `name` field becomes the addressable handle for `SendMessage({to: "<name>"})`. The main session is addressable as `team-lead`.
@@ -142,6 +186,12 @@ jq -r '.members[].name' ~/.claude/teams/{TEAM_NAME}/config.json
 
 If `.members | length < 4`, the team is **not** viable for multi-agent collaboration. Abort Route B and fall back to Route A (subagent pipeline).
 
+Record observed dispatch evidence before work begins:
+
+```json
+{"dispatch_count": 3, "observed_handles": ["builder-1", "tester", "guardian"], "membership_verified": true}
+```
+
 ### Teardown
 
 WHEN the pipeline terminates (success, abort, or circuit break), shut down teammates per-teammate (broadcast `to:"*"` accepts plain text only, not structured shutdown messages), then call `TeamDelete()`:
@@ -154,23 +204,38 @@ for name in ("builder-1", "tester", "guardian"):
 TeamDelete()     # fails if any active teammate remains
 ```
 
+After deletion, persist teardown evidence with `shutdown_acknowledged`,
+`team_config_absent`, and `teardown: "complete"`. A missing acknowledgement or
+remaining team config is a blocker, not a successful teardown.
+
 Task assignment via `SendMessage`:
 
 ```python
 # Lead → Builder
-SendMessage(to="builder", message={
+SendMessage(to="builder-1", message={
     "phase": "Phase 2",
     "tasks": [...],
-    "worktree": "<path>"
+    "owned_paths": ["<disjoint paths>"],
+    "forbidden_paths": ["<all paths owned by other workers>"],
+    "worktree": "<path>",
+    "return_fields": ["owned_paths", "changed_files", "verification", "blockers", "next_required_step"]
 })
 
 # Lead → Guardian
 SendMessage(to="guardian", message={
     "phase": "Gate 2",
     "target_branch": "<branch>",
-    "coverage_threshold": 85
+    "coverage_threshold": 85,
+    "owned_paths": [],
+    "forbidden_paths": ["<all source paths>"],
+    "return_fields": ["owned_paths", "changed_files", "verification", "blockers", "next_required_step"]
 })
 ```
+
+The Lead rejects a worker receipt that omits a required field or reports a
+change outside `owned_paths`. Only after all receipts are accepted may the Lead
+run the integration gate against the combined diff and record its command,
+exit status, and output digest.
 
 ## Execution Flow
 
@@ -213,7 +278,7 @@ SendMessage(to="guardian", message={
 })
 
 # Guardian → Builder (validation result)
-SendMessage(to="builder", message={
+SendMessage(to="builder-1", message={
     "type": "validation_result",
     "status": "PASS",  # or FAIL
     "issues": []
@@ -223,8 +288,8 @@ SendMessage(to="builder", message={
 All direct interactions are logged in the pipeline log:
 
 ```
-[P1-R3] builder → guardian: partial_validation request (pkg/foo/bar.go)
-[P1-R3] guardian → builder: PASS
+[P1-R3] builder-1 → guardian: partial_validation request (pkg/foo/bar.go)
+[P1-R3] guardian → builder-1: PASS
 ```
 
 ## Subagent Fallback Strategy

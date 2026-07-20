@@ -52,7 +52,10 @@ func newOrchestraJobStatusCmd() *cobra.Command {
 // Polls CheckStatus until done/timeout and prints the final status.
 // @AX:NOTE [AUTO] REQ-5 blocking wait — 1s poll interval; reloads job JSON each cycle to pick up new results
 func newOrchestraJobWaitCmd() *cobra.Command {
-	var jobDir string
+	var (
+		jobDir       string
+		outputFormat string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "wait <jobID>",
@@ -69,8 +72,7 @@ func newOrchestraJobWaitCmd() *cobra.Command {
 			for {
 				status := job.CheckStatus()
 				if status == orchestra.JobStatusDone || status == orchestra.JobStatusTimeout || status == orchestra.JobStatusError {
-					fmt.Fprintf(cmd.OutOrStdout(), "Job %s: %s\n", job.ID, status)
-					return nil
+					return writeOrchestraJobWaitOutput(cmd.OutOrStdout(), job.ID, status, outputFormat)
 				}
 				time.Sleep(1 * time.Second)
 				// Reload job to pick up new results
@@ -83,6 +85,7 @@ func newOrchestraJobWaitCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&jobDir, "job-dir", os.TempDir(), "Directory containing job files")
+	cmd.Flags().StringVar(&outputFormat, "format", orchestraOutputText, "Output format (text|json)")
 	return cmd
 }
 
@@ -91,8 +94,9 @@ func newOrchestraJobWaitCmd() *cobra.Command {
 // @AX:NOTE [AUTO] REQ-5 result retrieval — --cleanup removes both job subdir and JSON file
 func newOrchestraJobResultCmd() *cobra.Command {
 	var (
-		jobDir  string
-		cleanup bool
+		jobDir       string
+		cleanup      bool
+		outputFormat string
 	)
 
 	cmd := &cobra.Command{
@@ -111,7 +115,9 @@ func newOrchestraJobResultCmd() *cobra.Command {
 				return fmt.Errorf("collect results: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "%s\n", result.Merged)
+			if err := writeOrchestraCLIOutput(cmd.OutOrStdout(), result, outputFormat); err != nil {
+				return err
+			}
 
 			if cleanup {
 				// Remove job subdirectory if it exists
@@ -132,5 +138,6 @@ func newOrchestraJobResultCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&jobDir, "job-dir", os.TempDir(), "Directory containing job files")
 	cmd.Flags().BoolVar(&cleanup, "cleanup", false, "Remove job directory after displaying results")
+	cmd.Flags().StringVar(&outputFormat, "format", orchestraOutputText, "Output format (text|json)")
 	return cmd
 }

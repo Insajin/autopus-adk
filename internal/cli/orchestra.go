@@ -44,44 +44,6 @@ func newOrchestraCmd() *cobra.Command {
 
 // newOrchestraReviewCmd and newOrchestraSecureCmd live in orchestra_file_cmds.go.
 
-// newOrchestraPlanCmd creates the plan subcommand.
-func newOrchestraPlanCmd() *cobra.Command {
-	var (
-		strategy  string
-		providers []string
-		timeout   int
-		rounds    int
-		noDetach  bool
-	)
-
-	cmd := &cobra.Command{
-		Use:   "plan \"description\"",
-		Short: "여러 모델로 구현 계획을 수립한다",
-		Long:  "여러 코딩 CLI를 사용하여 기능 구현 계획을 합의 방식으로 수립합니다.",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			flagStrategy := flagStringIfChanged(cmd, "strategy", strategy)
-			flagProviders := flagStringSliceIfChanged(cmd, "providers", providers)
-			keepRelay, _ := cmd.Flags().GetBool("keep-relay-output")
-			thresholdFlag, _ := cmd.Flags().GetFloat64("threshold")
-			timeoutChanged := cmd.Flags().Changed("timeout")
-			resolvedRounds := resolveRounds(flagStrategy, rounds)
-			prompt := args[0]
-			return runOrchestraCommand(cmd.Context(), "plan", flagStrategy, flagProviders, timeout, "", prompt, resolvedRounds, thresholdFlag, OrchestraFlags{NoDetach: noDetach, KeepRelay: keepRelay, TimeoutChanged: timeoutChanged})
-		},
-	}
-
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "", "오케스트레이션 전략 (consensus|pipeline|debate|fastest|relay)")
-	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "사용할 프로바이더 목록")
-	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "타임아웃 (초)")
-	cmd.Flags().Float64("threshold", 0, "consensus 전략 합의 임계값 (0.0-1.0)")
-	cmd.Flags().IntVar(&rounds, "rounds", 0, "debate 라운드 수 (1-10, debate 전략 전용)")
-	cmd.Flags().BoolVar(&noDetach, "no-detach", false, "Disable auto-detach mode")
-	cmd.Flags().Bool("keep-relay-output", false, "relay 전략 실행 후 임시 파일 보존")
-
-	return cmd
-}
-
 // runOrchestraCommand resolves config and runs the orchestration.
 // It loads autopus.yaml first, resolves strategy and providers via config,
 // and falls back to buildProviderConfigs when config is unavailable.
@@ -100,6 +62,9 @@ func runOrchestraCommand(
 ) error {
 	// @AX:NOTE [AUTO] REQ-11 opportunistic GC — fires on every orchestra invocation; 1h TTL
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
+	if err := validateOrchestraOutputFormat(flags.OutputFormat); err != nil {
+		return err
+	}
 
 	// Attempt to load config; fall back to hardcoded defaults on failure.
 	runtimeFlags := globalFlagsFromContext(ctx)
@@ -109,6 +74,7 @@ func runOrchestraCommand(
 		strategyStr string
 		orchConf    *config.OrchestraConf
 		providers   []orchestra.ProviderConfig
+		judgeConfig *orchestra.ProviderConfig
 	)
 
 	if configErr != nil || harnessCfg == nil {
@@ -133,6 +99,11 @@ func runOrchestraCommand(
 		}
 	}
 	providers = resolveCodexProviderCapabilities(ctx, providers)
+	initialProviderNames := providerConfigNames(providers)
+	requestedProviderNames := append([]string(nil), initialProviderNames...)
+	if len(flagProviders) > 0 {
+		requestedProviderNames = append([]string(nil), flagProviders...)
+	}
 
 	resolvedThreshold, err := resolveAndValidateThreshold(orchConf, configErr, commandName, threshold)
 	if err != nil {
@@ -144,26 +115,11 @@ func runOrchestraCommand(
 		return fmt.Errorf("유효하지 않은 전략: %q (가능한 값: consensus, pipeline, debate, fastest, relay)", strategyStr)
 	}
 
-	riskTierSingleProvider := false
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다")
 	}
-	if commandName == "review" && flags.RiskTier != "" {
-		adjusted, degraded := applyReviewRiskTierProviders(providers, flags.RiskTier)
-		if len(adjusted) != len(providers) || degraded {
-			fmt.Fprintf(os.Stderr, "리스크 티어: %s", flags.RiskTier)
-			if len(flags.RiskInputs) > 0 {
-				fmt.Fprintf(os.Stderr, " (signals: %s)", strings.Join(flags.RiskInputs, ", "))
-			}
-			if degraded {
-				fmt.Fprintf(os.Stderr, " — multi-provider 대상이지만 사용 가능한 provider가 1개라 단일 provider로 폴백\n")
-			} else {
-				fmt.Fprintf(os.Stderr, " — provider fan-out %d → %d\n", len(providers), len(adjusted))
-			}
-		}
-		providers = adjusted
-		riskTierSingleProvider = len(providers) == 1 && (degraded || flags.RiskTier == reviewRiskTierLow || flags.RiskTier == reviewRiskTierMedium)
-	}
+	providers, riskTierSingleProvider := applyReviewProviderPolicy(
+		providers, commandName, flags.RiskTier, flags.RiskInputs, flags.ProvidersExplicit, os.Stderr)
 
 	// Validate --rounds: must be 1-10 and only with debate strategy
 	if rounds > 0 && s != orchestra.StrategyDebate {
@@ -172,6 +128,26 @@ func runOrchestraCommand(
 	if rounds > 10 {
 		return fmt.Errorf("--rounds 값은 1-10 범위여야 합니다 (입력: %d)", rounds)
 	}
+	if commandName == "brainstorm" && s == orchestra.StrategyDebate {
+		if flags.NoJudge {
+			return fmt.Errorf("brainstorm debate: a separate different-family judge is required")
+		}
+		originalProviders := append([]orchestra.ProviderConfig(nil), providers...)
+		var separationErr error
+		var judgeFamily string
+		providers, judgeFamily, separationErr = separateBrainstormJudge(providers, judge)
+		if separationErr != nil {
+			return separationErr
+		}
+		judgeConfig, separationErr = resolveBrainstormJudgeConfig(
+			originalProviders, orchConf, commandName, judge, judgeFamily,
+			runtimeFlags.Quality, runtimeFlags.Effort,
+		)
+		if separationErr != nil {
+			return separationErr
+		}
+	}
+	configuredProviderNames := providerConfigNames(providers)
 
 	nd := flags.NoDetach
 	keepRelay := flags.KeepRelay
@@ -195,33 +171,36 @@ func runOrchestraCommand(
 	}
 
 	cfg := orchestra.OrchestraConfig{
-		Providers:          providers,
-		Strategy:           s,
-		Prompt:             prompt,
-		TimeoutSeconds:     timeout,
-		JudgeProvider:      judge,
-		DebateRounds:       rounds,
-		ConsensusThreshold: resolvedThreshold,
-		Terminal:           term,
-		NoDetach:           nd,
-		KeepRelayOutput:    keepRelay,
-		Interactive:        interactive,
-		HookMode:           monitorRuntime.HookMode,
-		SessionID:          sessionID,
-		NoJudge:            noJudge,
-		YieldRounds:        yieldRounds,
-		ContextAware:       contextAware,
-		SubprocessMode:     subprocessMode,
-		MonitorEnabled:     monitorRuntime.Enabled,
-		MonitorTimeout:     monitorRuntime.PatternTimeout,
-		WorkingDir:         workingDir,
-		FallbackMode:       orchestra.FallbackModeSkip,
+		Providers:           providers,
+		RequestedProviders:  requestedProviderNames,
+		ConfiguredProviders: configuredProviderNames,
+		Strategy:            s,
+		Prompt:              prompt,
+		TimeoutSeconds:      timeout,
+		JudgeProvider:       judge,
+		JudgeConfig:         judgeConfig,
+		DebateRounds:        rounds,
+		ConsensusThreshold:  resolvedThreshold,
+		MinimumProviders:    reviewRiskMinimumProviders(commandName, flags.RiskTier),
+		Terminal:            term,
+		NoDetach:            nd,
+		KeepRelayOutput:     keepRelay,
+		Interactive:         interactive,
+		HookMode:            monitorRuntime.HookMode,
+		SessionID:           sessionID,
+		NoJudge:             noJudge,
+		YieldRounds:         yieldRounds,
+		ContextAware:        contextAware,
+		SubprocessMode:      subprocessMode,
+		MonitorEnabled:      monitorRuntime.Enabled,
+		MonitorTimeout:      monitorRuntime.PatternTimeout,
+		WorkingDir:          workingDir,
+		FallbackMode:        flags.FallbackMode,
+		RequireJudgeFamilySeparation: commandName == "brainstorm" &&
+			s == orchestra.StrategyDebate,
 	}
 
-	providerNames := make([]string, len(providers))
-	for i, p := range providers {
-		providerNames[i] = p.Name
-	}
+	providerNames := providerConfigNames(providers)
 	fmt.Fprintf(os.Stderr, "전략: %s, 프로바이더: %s\n", strategyStr, strings.Join(providerNames, ", "))
 
 	// @AX:NOTE [AUTO] REQ-1 auto-detach branch — returns job ID to stdout, status to stderr; skips RunOrchestra
@@ -254,6 +233,19 @@ func runOrchestraCommand(
 		return fmt.Errorf("오케스트레이션 실패: %w", err)
 	}
 
+	if flags.OutputFormat == orchestraOutputJSON {
+		resultPath, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, resolvedTimeout, result)
+		if saveErr != nil {
+			return fmt.Errorf("save orchestra result: %w", saveErr)
+		}
+		fmt.Fprintf(os.Stderr, "결과 저장: %s\n", resultPath)
+		fmt.Fprintf(os.Stderr, "Receipt: %s.receipt.json\n", resultPath)
+		if writeErr := writeOrchestraCLIOutput(os.Stdout, result, orchestraOutputJSON); writeErr != nil {
+			return fmt.Errorf("write JSON output: %w", writeErr)
+		}
+		return nil
+	}
+
 	structured, writeErr := writeOrchestraPrimaryOutput(os.Stdout, result, noJudge, sessionID)
 	if writeErr != nil {
 		return fmt.Errorf("write JSON output: %w", writeErr)
@@ -262,6 +254,9 @@ func runOrchestraCommand(
 		fmt.Printf("%s\n", result.Merged)
 		if path, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, resolvedTimeout, result); saveErr == nil {
 			fmt.Fprintf(os.Stderr, "결과 저장: %s\n", path)
+			if result.RunReceipt != nil {
+				fmt.Fprintf(os.Stderr, "Receipt: %s.receipt.json\n", path)
+			}
 		}
 	}
 	if resultIsDegraded(result) {

@@ -8,7 +8,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/pipeline"
 )
 
-// TestEvaluateGate_Validation_PassOnSuccess verifies that "PASS" in output
+// TestEvaluateGate_Validation_PassOnSuccess verifies that one exact typed PASS
 // yields VerdictPass for a validation gate.
 func TestEvaluateGate_Validation_PassOnSuccess(t *testing.T) {
 	t.Parallel()
@@ -17,8 +17,8 @@ func TestEvaluateGate_Validation_PassOnSuccess(t *testing.T) {
 		name   string
 		output string
 	}{
-		{"uppercase PASS", "All tests passed. PASS"},
-		{"PASS at start", "PASS: all validations succeeded"},
+		{"typed PASS", "VERDICT: PASS"},
+		{"typed PASS after prose", "All tests passed.\nVERDICT: PASS"},
 		{"lowercase pass ignored", "pass"},
 	}
 
@@ -29,7 +29,7 @@ func TestEvaluateGate_Validation_PassOnSuccess(t *testing.T) {
 			// When: EvaluateGate is called for a validation gate
 			verdict := pipeline.EvaluateGate(pipeline.GateValidation, tt.output)
 
-			// Then: verdict is Pass when output contains uppercase PASS
+			// Then: only an exact typed PASS declaration succeeds.
 			if tt.name == "lowercase pass ignored" {
 				assert.Equal(t, pipeline.VerdictFail, verdict)
 			} else {
@@ -65,8 +65,8 @@ func TestEvaluateGate_Validation_FailOnError(t *testing.T) {
 	}
 }
 
-// TestEvaluateGate_Review_ApproveOnApproval verifies that "APPROVE" in output
-// yields VerdictPass for a review gate.
+// TestEvaluateGate_Review_ApproveOnApproval verifies the exact typed review
+// approval contract.
 func TestEvaluateGate_Review_ApproveOnApproval(t *testing.T) {
 	t.Parallel()
 
@@ -74,8 +74,8 @@ func TestEvaluateGate_Review_ApproveOnApproval(t *testing.T) {
 		name   string
 		output string
 	}{
-		{"explicit APPROVE", "APPROVE: changes look good"},
-		{"APPROVED variant", "APPROVED"},
+		{"typed APPROVE", "VERDICT: APPROVE"},
+		{"typed APPROVE after prose", "Review complete.\nVERDICT: APPROVE"},
 	}
 
 	for _, tt := range tests {
@@ -97,7 +97,7 @@ func TestEvaluateGate_Review_RequestChanges(t *testing.T) {
 	t.Parallel()
 
 	// Given: review output requesting changes
-	output := "REQUEST_CHANGES: fix the error handling"
+	output := "VERDICT: REQUEST_CHANGES"
 
 	// When: EvaluateGate is called
 	verdict := pipeline.EvaluateGate(pipeline.GateReview, output)

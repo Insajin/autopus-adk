@@ -46,7 +46,7 @@ func TestRunOrchestra_DebateJudgeRunsAfterProviderTimeout(t *testing.T) {
 						signal(waitCh, nil)
 						return nil
 					}
-					_, _ = io.WriteString(cmd.stdout, "judge response")
+					_, _ = io.WriteString(cmd.stdout, `{"recommendation":"judge response"}`)
 					time.AfterFunc(50*time.Millisecond, func() { signal(waitCh, nil) })
 					return nil
 				},

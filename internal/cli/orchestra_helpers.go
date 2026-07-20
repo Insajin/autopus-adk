@@ -159,7 +159,7 @@ func buildProviderConfigsForRuntime(names []string, quality, effort string) []or
 		codexEntry = config.ApplyCodexProviderProfile(codexEntry, profile)
 	}
 	knownProviders := map[string]orchestra.ProviderConfig{
-		"claude": {Name: "claude", Binary: "claude", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
+		"claude": {Name: "claude", Binary: "claude", ModelFamily: "anthropic", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
 		// SPEC-ORCH-021 REQ-014/015: codex subprocess uses `exec --sandbox workspace-write`
 		// (no deprecated --full-auto) with reasoning effort aligned to autopus.yaml; pane argv
 		// stays interactive (no leading `exec`). SchemaFlag carries the structured schema.
@@ -168,7 +168,7 @@ func buildProviderConfigsForRuntime(names []string, quality, effort string) []or
 		// as its value. Pass the prompt in the empty "" slot via PromptViaArgs (injectPromptArg
 		// replaces "" with the prompt) → `agy --print "<prompt>"`. Pane argv must be interactive,
 		// so it carries no --print.
-		"gemini": {Name: "gemini", Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, StartupTimeout: defaultProviderStartupTimeout("gemini"), OutputFormat: "text"},
+		"gemini": {Name: "gemini", Binary: "agy", ModelFamily: "google", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, StartupTimeout: defaultProviderStartupTimeout("gemini"), OutputFormat: "text"},
 	}
 
 	var result []orchestra.ProviderConfig
@@ -177,9 +177,10 @@ func buildProviderConfigsForRuntime(names []string, quality, effort string) []or
 			result = append(result, p)
 		} else {
 			result = append(result, orchestra.ProviderConfig{
-				Name:   name,
-				Binary: name,
-				Args:   []string{},
+				Name:        name,
+				Binary:      name,
+				ModelFamily: providerModelFamily(name),
+				Args:        []string{},
 			})
 		}
 	}
@@ -190,6 +191,7 @@ func providerConfigFromEntry(name string, entry config.ProviderEntry, interactiv
 	return orchestra.ProviderConfig{
 		Name:             name,
 		Binary:           entry.Binary,
+		ModelFamily:      providerModelFamily(name),
 		Args:             append([]string(nil), entry.Args...),
 		PaneArgs:         append([]string(nil), entry.PaneArgs...),
 		ModelPolicy:      entry.ModelPolicy,
@@ -239,21 +241,6 @@ func resolveAndValidateThreshold(orchConf *config.OrchestraConf, configErr error
 	return resolved, nil
 }
 
-// OrchestraFlags holds optional boolean flags for runOrchestraCommand.
-// Using a struct instead of variadic any prevents silent breakage when flags are added or reordered.
-type OrchestraFlags struct {
-	NoDetach       bool
-	KeepRelay      bool
-	NoJudge        bool
-	YieldRounds    bool
-	ContextAware   bool
-	SubprocessMode bool
-	TimeoutChanged bool
-	RiskTier       reviewRiskTier
-	RiskInputs     []string
-}
-
-// isHookModeAvailable checks global, cwd-local, and nearest project-root settings.
 // @AX:NOTE [AUTO]: hook discovery uses ~/.claude/settings.json markers "autopus"/"Stop" and autopus.yaml as the project-root boundary
 func isHookModeAvailable() bool {
 	home, _ := os.UserHomeDir()

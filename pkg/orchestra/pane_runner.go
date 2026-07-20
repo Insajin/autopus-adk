@@ -31,19 +31,35 @@ type paneInfo struct {
 // Falls back to RunOrchestra for plain terminals or when pane creation fails.
 // @AX:NOTE [AUTO] pane-based orchestration entry point — 2 callers (runner.go, tests)
 func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, error) {
+	if !cfg.FallbackMode.IsValid() {
+		return nil, fmt.Errorf("unknown fallback mode %q", cfg.FallbackMode)
+	}
 	// Fallback: nil terminal or plain terminal
 	if cfg.Terminal == nil || cfg.Terminal.Name() == "plain" {
 		return RunOrchestra(ctx, cfg)
 	}
 
-	// Interactive mode: use interactive CLI sessions instead of sentinel-based (SPEC-ORCH-006)
-	if cfg.Interactive {
-		return RunInteractivePaneOrchestra(ctx, cfg)
-	}
-
 	// Relay strategy uses sequential pane execution (SPEC-ORCH-005)
 	if cfg.Strategy == StrategyRelay {
 		return runRelayPaneOrchestra(ctx, cfg)
+	}
+
+	// Debate always executes its round/judge state machine. Interactive callers
+	// keep pane visibility; non-interactive pane callers use the subprocess state
+	// machine instead of relabeling a one-shot pane fan-out as debate.
+	if cfg.Strategy == StrategyDebate {
+		if cfg.Interactive {
+			return runInteractiveDebate(ctx, cfg)
+		}
+		debateCfg := cfg
+		debateCfg.Terminal = nil
+		debateCfg.SubprocessMode = true
+		return RunOrchestra(ctx, debateCfg)
+	}
+
+	// Interactive mode: use interactive CLI sessions instead of sentinel-based (SPEC-ORCH-006)
+	if cfg.Interactive {
+		return RunInteractivePaneOrchestra(ctx, cfg)
 	}
 
 	start := time.Now()
@@ -80,14 +96,14 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 		merged = fmt.Sprintf("[pane mode] %d providers executed", len(responses))
 	}
 
-	return finalizeOrchestraResult(&OrchestraResult{
+	return finalizeOrchestraResultForConfig(&OrchestraResult{
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
 		Merged:          merged,
 		Duration:        total,
 		Summary:         summary,
 		FailedProviders: failed,
-	}), nil
+	}, cfg), nil
 }
 
 // splitProviderPanes creates a visible split pane and temp file for each provider.
@@ -259,13 +275,6 @@ func allResponsesEmpty(responses []ProviderResponse) bool {
 		}
 	}
 	return true
-}
-
-// runFallback runs the standard non-pane orchestration as fallback.
-func runFallback(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, error) {
-	fallbackCfg := cfg
-	fallbackCfg.Terminal = nil
-	return RunOrchestra(ctx, fallbackCfg)
 }
 
 // cleanupPanes closes panes and removes temporary output files.

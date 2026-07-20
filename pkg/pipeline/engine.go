@@ -33,21 +33,35 @@ type PhaseBackend interface {
 type PhaseRequest struct {
 	Prompt  string
 	PhaseID PhaseID
+	Attempt int
 }
 
 // PhaseResponse is the output from PhaseBackend.Execute.
 type PhaseResponse struct {
-	Output string
+	Output       string
+	Provider     string
+	Backend      string
+	Role         string
+	ExitCode     int
+	TimedOut     bool
+	FailureClass string
+	Artifact     string
 }
 
 // EngineConfig is the configuration for SubprocessEngine.
 type EngineConfig struct {
-	SpecID     string
+	SpecID string
+	// SpecDir is the resolved, trusted directory containing required SPEC documents.
+	SpecDir    string
 	Platform   string
 	Strategy   Strategy
 	Backend    PhaseBackend
 	Checkpoint *Checkpoint
 	DryRun     bool
+	// SnapshotHash binds resume state to the resolved SPEC body.
+	SnapshotHash string
+	// GitCommitHash binds persisted state to the current source revision.
+	GitCommitHash string
 	// Compressor compacts previous phase output before injecting it into the next prompt.
 	Compressor compress.ContextCompressor
 	// RunConfig holds runner-level configuration including the learn store.
@@ -58,6 +72,7 @@ type EngineConfig struct {
 type PipelineResult struct {
 	PhaseResults     []PhaseResult
 	CompactionEvents []compress.CompactionEvent
+	Receipt          OrchestrationRunReceipt
 }
 
 // PhaseResult holds the outcome of a single phase execution.
@@ -65,100 +80,29 @@ type PhaseResult struct {
 	PhaseID         PhaseID
 	Output          string
 	Verdict         GateVerdict
+	Status          CheckpointStatus
+	Attempts        int
 	CompactionEvent *compress.CompactionEvent
-}
-
-// noopBackend is the default backend used when none is configured.
-// It returns empty responses without calling any subprocess.
-type noopBackend struct{}
-
-func (n *noopBackend) Execute(_ context.Context, _ PhaseRequest) (*PhaseResponse, error) {
-	return &PhaseResponse{}, nil
 }
 
 // SubprocessEngine implements PipelineEngine using subprocess execution.
 type SubprocessEngine struct {
-	cfg EngineConfig
+	cfg           EngineConfig
+	promptBuilder *PhasePromptBuilder
 }
 
 // @AX:ANCHOR: [AUTO] @AX:REASON: public API contract — entry point called from CLI and tests (fan-in >= 3)
 // NewSubprocessEngine creates a SubprocessEngine with the given config.
 func NewSubprocessEngine(cfg EngineConfig) *SubprocessEngine {
-	if cfg.Backend == nil {
-		cfg.Backend = &noopBackend{}
-	}
 	if cfg.Compressor == nil {
 		// @AX:NOTE: [AUTO] @AX:SPEC: SPEC-CONTEXT-COMPRESS-001: keepRecent=2 is the default phase-transition compaction policy
 		cfg.Compressor = compress.NewDefaultCompressor(2)
 	}
-	return &SubprocessEngine{cfg: cfg}
-}
-
-// @AX:ANCHOR: [AUTO] @AX:REASON: architectural boundary — sole orchestration entry point for 5-phase pipeline
-// Run executes the full 5-phase pipeline.
-func (e *SubprocessEngine) Run(ctx context.Context) (*PipelineResult, error) {
-	if err := e.cfg.RunConfig.preflightWorkflowAuthenticity(); err != nil {
-		return nil, err
+	engine := &SubprocessEngine{cfg: cfg}
+	if cfg.SpecDir != "" {
+		engine.promptBuilder = NewPhasePromptBuilder(cfg.SpecDir)
 	}
-	phases := DefaultPhases()
-
-	results := make([]PhaseResult, len(phases))
-	var previousOutput string
-	var compactionEvents []compress.CompactionEvent
-
-	for i, phase := range phases {
-		phaseID := phase.ID
-
-		// Pre-populate result with phase ID so skipped phases still appear.
-		results[i] = PhaseResult{PhaseID: phaseID}
-
-		// Skip phases that are already done in the checkpoint.
-		if e.cfg.Checkpoint != nil {
-			status, found := e.cfg.Checkpoint.TaskStatus[string(phaseID)]
-			if found && status == CheckpointStatusDone {
-				continue
-			}
-		}
-
-		// Build prompt by injecting previous phase output.
-		prompt := buildPrompt(e.cfg.SpecID, phaseID, previousOutput)
-
-		// In dry-run mode, generate the prompt but do not invoke the backend.
-		if e.cfg.DryRun {
-			results[i] = PhaseResult{PhaseID: phaseID, Output: prompt}
-			continue
-		}
-
-		req := PhaseRequest{
-			Prompt:  prompt,
-			PhaseID: phaseID,
-		}
-		if err := e.cfg.RunConfig.checkDelegationSafety(phaseID); err != nil {
-			return nil, err
-		}
-
-		resp, err := e.cfg.Backend.Execute(ctx, req)
-		if err != nil {
-			return nil, fmt.Errorf("phase %s: %w", phaseID, err)
-		}
-
-		results[i] = PhaseResult{
-			PhaseID: phaseID,
-			Output:  resp.Output,
-		}
-		previousOutput = resp.Output
-		nextOutput, event, err := e.compactPhaseOutput(phaseID, resp.Output)
-		if err != nil {
-			return nil, err
-		}
-		if event != nil {
-			results[i].CompactionEvent = event
-			compactionEvents = append(compactionEvents, *event)
-			previousOutput = nextOutput
-		}
-	}
-
-	return &PipelineResult{PhaseResults: results, CompactionEvents: compactionEvents}, nil
+	return engine
 }
 
 // @AX:NOTE: [AUTO] magic constant in format string — SPEC/Phase labels are part of prompt contract

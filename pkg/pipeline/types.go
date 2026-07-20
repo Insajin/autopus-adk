@@ -16,6 +16,10 @@ const (
 	CheckpointStatusDone CheckpointStatus = "done"
 	// CheckpointStatusFailed indicates the task failed.
 	CheckpointStatusFailed CheckpointStatus = "failed"
+	// CheckpointStatusSkipped indicates the task was intentionally not dispatched.
+	CheckpointStatusSkipped CheckpointStatus = "skipped"
+	// CheckpointStatusCancelled indicates the task was cancelled before completion.
+	CheckpointStatusCancelled CheckpointStatus = "cancelled"
 )
 
 // String returns the canonical string representation of a CheckpointStatus.
@@ -25,9 +29,14 @@ func (s CheckpointStatus) String() string {
 
 // Checkpoint holds the persisted state of a pipeline execution.
 type Checkpoint struct {
+	Version       string                      `yaml:"version,omitempty"`
+	RouteVersion  string                      `yaml:"route_version,omitempty"`
+	SpecID        string                      `yaml:"spec_id,omitempty"`
+	SnapshotHash  string                      `yaml:"snapshot_hash,omitempty"`
 	Phase         string                      `yaml:"phase"`
 	GitCommitHash string                      `yaml:"git_commit_hash"`
 	TaskStatus    map[string]CheckpointStatus `yaml:"task_status"`
+	Receipt       *OrchestrationRunReceipt    `yaml:"receipt,omitempty"`
 	// Stale is set to true when the saved hash differs from the current HEAD.
 	// It is not persisted to disk.
 	Stale bool `yaml:"-"`
@@ -35,17 +44,27 @@ type Checkpoint struct {
 
 // checkpointYAML is the on-disk representation used for marshalling.
 type checkpointYAML struct {
-	Phase         string            `yaml:"phase"`
-	GitCommitHash string            `yaml:"git_commit_hash"`
-	TaskStatus    map[string]string `yaml:"task_status"`
+	Version       string                   `yaml:"version,omitempty"`
+	RouteVersion  string                   `yaml:"route_version,omitempty"`
+	SpecID        string                   `yaml:"spec_id,omitempty"`
+	SnapshotHash  string                   `yaml:"snapshot_hash,omitempty"`
+	Phase         string                   `yaml:"phase"`
+	GitCommitHash string                   `yaml:"git_commit_hash"`
+	TaskStatus    map[string]string        `yaml:"task_status"`
+	Receipt       *OrchestrationRunReceipt `yaml:"receipt,omitempty"`
 }
 
 // MarshalYAML serialises the Checkpoint to YAML bytes.
 func (c *Checkpoint) MarshalYAML() ([]byte, error) {
 	raw := checkpointYAML{
+		Version:       c.Version,
+		RouteVersion:  c.RouteVersion,
+		SpecID:        c.SpecID,
+		SnapshotHash:  c.SnapshotHash,
 		Phase:         c.Phase,
 		GitCommitHash: c.GitCommitHash,
 		TaskStatus:    make(map[string]string, len(c.TaskStatus)),
+		Receipt:       c.Receipt,
 	}
 	for k, v := range c.TaskStatus {
 		raw.TaskStatus[k] = string(v)
@@ -60,7 +79,12 @@ func (c *Checkpoint) UnmarshalYAML(data []byte) error {
 		return err
 	}
 	c.Phase = raw.Phase
+	c.Version = raw.Version
+	c.RouteVersion = raw.RouteVersion
+	c.SpecID = raw.SpecID
+	c.SnapshotHash = raw.SnapshotHash
 	c.GitCommitHash = raw.GitCommitHash
+	c.Receipt = raw.Receipt
 	if raw.TaskStatus != nil {
 		c.TaskStatus = make(map[string]CheckpointStatus, len(raw.TaskStatus))
 		for k, v := range raw.TaskStatus {

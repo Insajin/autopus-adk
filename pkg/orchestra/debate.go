@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-
-	"github.com/insajin/autopus-adk/pkg/detect"
 )
 
 // runDebate executes the full debate flow:
@@ -39,20 +37,15 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, []
 		}
 	}
 
-	// Phase 3 (optional): judge verdict when JudgeProvider is set, not skipped, and its binary is installed.
-	// Resolve the judge's binary first (may differ from JudgeProvider name).
+	// Phase 3 (optional): judge verdict. A required judge failure remains visible
+	// in the same failed-provider stream as participant failures.
 	if cfg.JudgeProvider != "" && !cfg.NoJudge {
-		judgeCfg := findOrBuildJudgeConfig(cfg)
-		if detect.IsInstalled(judgeCfg.Binary) {
-			progress := NewProgressTracker([]string{judgeCfg.Name})
-			stopProgress := progress.StartHeartbeat(ctx, progressHeartbeatInterval)
-			defer stopProgress()
-			judgment := buildJudgmentPrompt(cfg.Prompt, responses)
-			judgeResp, judgeErr := runProviderWithProgress(ctx, judgeCfg, judgment, progress)
-			if judgeErr == nil && judgeResp != nil && !judgeResp.TimedOut && !judgeResp.EmptyOutput {
-				judgeResp.Provider = cfg.JudgeProvider + " (judge)"
-				responses = append(responses, *judgeResp)
-			}
+		judgeResp, judgeFailure := executeDebateJudge(ctx, cfg, responses)
+		if judgeResp != nil {
+			responses = append(responses, *judgeResp)
+		}
+		if judgeFailure != nil {
+			round1Failed = append(round1Failed, *judgeFailure)
 		}
 	}
 
@@ -88,6 +81,9 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 			}
 			rebuttalPrompt := buildRebuttalPrompt(cfg.Prompt, others, 2)
 			resp, err := runProviderWithProgress(ctx, provider, rebuttalPrompt, progress)
+			applyProviderRequestEvidence(resp, ProviderRequest{
+				Provider: provider.Name, Config: provider, Role: "debater_r2", Round: 2,
+			}, "subprocess")
 			rebuttalResults[idx] = providerResult{resp: resp, err: err, idx: idx}
 		}(i, p)
 	}
@@ -100,15 +96,24 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 		switch {
 		case r.err != nil:
 			fp := buildFailedProvider(cfg.Providers[i], r.resp, r.err, cfg.TimeoutSeconds)
+			fp.Role = "debater_r2"
+			fp.Attempt = 2
+			fp.ExecutedBackend = "subprocess"
 			fp.Name = name
 			fp.Error = fmt.Sprintf("rebuttal: %s", fp.Error)
 			failed = append(failed, fp)
 		case r.resp != nil && r.resp.TimedOut:
 			fp := buildFailedProvider(cfg.Providers[i], r.resp, nil, cfg.TimeoutSeconds)
+			fp.Role = "debater_r2"
+			fp.Attempt = 2
+			fp.ExecutedBackend = r.resp.ExecutedBackend
 			fp.Error = "rebuttal " + fp.Error
 			failed = append(failed, fp)
 		case r.resp != nil && r.resp.EmptyOutput:
 			fp := buildFailedProvider(cfg.Providers[i], r.resp, nil, cfg.TimeoutSeconds)
+			fp.Role = "debater_r2"
+			fp.Attempt = 2
+			fp.ExecutedBackend = r.resp.ExecutedBackend
 			fp.Error = "rebuttal " + fp.Error
 			failed = append(failed, fp)
 		default:
@@ -253,6 +258,10 @@ func buildDebateMerged(responses []ProviderResponse, cfg OrchestraConfig) (strin
 			preview = preview[:50]
 		}
 		summary = fmt.Sprintf("토론 완료, 판정: %s (verdict: %s)", judgeLabel, preview)
+	} else if cfg.JudgeProvider != "" && cfg.NoJudge {
+		summary = fmt.Sprintf("토론 완료, 판정 생략: %s", judgeLabel)
+	} else if cfg.JudgeProvider != "" {
+		summary = fmt.Sprintf("토론 완료, 필수 판정 실패: %s", judgeLabel)
 	} else {
 		summary = fmt.Sprintf("토론 완료, 판정: %s", judgeLabel)
 	}
@@ -263,6 +272,9 @@ func buildDebateMerged(responses []ProviderResponse, cfg OrchestraConfig) (strin
 // findOrBuildJudgeConfig finds the judge's ProviderConfig from cfg.Providers,
 // or creates a default one with Name and Binary both set to JudgeProvider.
 func findOrBuildJudgeConfig(cfg OrchestraConfig) ProviderConfig {
+	if cfg.JudgeConfig != nil && cfg.JudgeConfig.Name != "" {
+		return *cfg.JudgeConfig
+	}
 	for _, p := range cfg.Providers {
 		if p.Name == cfg.JudgeProvider {
 			return p

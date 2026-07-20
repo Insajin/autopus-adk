@@ -162,12 +162,14 @@ func buildProviderResponse(start time.Time, provider ProviderConfig, stdout, std
 	}
 
 	resp := &ProviderResponse{
-		Provider:    provider.Name,
-		Output:      stdout,
-		Error:       stderr,
-		Duration:    duration,
-		ExitCode:    exitCode,
-		EmptyOutput: strings.TrimSpace(stdout) == "",
+		Provider:        provider.Name,
+		Output:          stdout,
+		Error:           stderr,
+		Duration:        duration,
+		ExitCode:        exitCode,
+		EmptyOutput:     strings.TrimSpace(stdout) == "",
+		ExecutedBackend: "subprocess",
+		ModelFamily:     provider.ModelFamily,
 	}
 
 	if ctx.Err() != nil {

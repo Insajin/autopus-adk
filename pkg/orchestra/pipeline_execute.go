@@ -48,6 +48,7 @@ func executeParallel(
 			}
 			progress.MarkRunning(prov.Name)
 			resp, err := backend.Execute(ctx, req)
+			applyProviderRequestEvidence(resp, req, backend.Name())
 			if err != nil {
 				progress.MarkFailed(prov.Name)
 				results[idx] = result{resp: resp, err: err, idx: idx}
@@ -56,6 +57,14 @@ func executeParallel(
 			if resp == nil {
 				progress.MarkFailed(prov.Name)
 				results[idx] = result{err: fmt.Errorf("%s returned no response", prov.Name), idx: idx}
+				return
+			}
+			if resp.TerminalState == TerminalSkipped {
+				progress.MarkDone(prov.Name)
+				results[idx] = result{pr: ProviderResult{
+					Provider: prov.Name, Response: *resp,
+					Usage: resp.Usage, UsageCapability: resp.UsageCapability,
+				}, idx: idx}
 				return
 			}
 			if resp.TimedOut {
@@ -70,7 +79,8 @@ func executeParallel(
 			}
 			progress.MarkDone(prov.Name)
 			results[idx] = result{pr: ProviderResult{
-				Provider: prov.Name, Output: resp.Output, Usage: resp.Usage, UsageCapability: resp.UsageCapability,
+				Provider: prov.Name, Output: resp.Output, Response: *resp,
+				Usage: resp.Usage, UsageCapability: resp.UsageCapability,
 			}, idx: idx}
 		}(i, p)
 	}
@@ -88,14 +98,21 @@ func executeParallel(
 	}
 	otherProvidersContinued := len(successes) > 0
 	for _, r := range failedResults {
-		failed = append(failed, buildFailedProviderWithContext(
+		failure := buildFailedProviderWithContext(
 			providers[r.idx],
 			r.resp,
 			r.err,
 			timeoutSeconds,
 			role,
 			otherProvidersContinued,
-		))
+		)
+		failure.Attempt = round
+		failure.ModelFamily = providers[r.idx].ModelFamily
+		failure.ExecutedBackend = backend.Name()
+		if r.resp != nil && r.resp.ExecutedBackend != "" {
+			failure.ExecutedBackend = r.resp.ExecutedBackend
+		}
+		failed = append(failed, failure)
 	}
 	if len(successes) == 0 {
 		return nil, failed, fmt.Errorf("all %d providers failed", len(providers))

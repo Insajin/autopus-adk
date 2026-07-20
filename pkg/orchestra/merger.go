@@ -13,6 +13,9 @@ func MergeConsensus(responses []ProviderResponse, threshold float64) (string, st
 	if len(responses) == 0 {
 		return "", "응답 없음"
 	}
+	if merged, summary, ok := mergeReviewerFindingConsensus(responses, threshold); ok {
+		return merged, summary
+	}
 
 	// Try structured parsing first
 	if merged, summary := MergeStructuredConsensus(responses, threshold); merged != "" {

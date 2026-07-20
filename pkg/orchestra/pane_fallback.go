@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // noneBackendMarker records that neither the pane nor the subprocess backend
@@ -23,10 +24,36 @@ const recoveryHint = "ensure a logged-in cmux/tmux CLI session and that the prov
 // backend is also unavailable it returns an actionable error naming BOTH
 // failure causes plus a recovery instruction, and a response marked so neither
 // backend is recorded as successful (S14).
-func paneProvisioningFallback(ctx context.Context, req ProviderRequest, paneFailureReason string) (*ProviderResponse, error) {
+func paneProvisioningFallback(ctx context.Context, cfg OrchestraConfig, req ProviderRequest, paneFailureReason string) (*ProviderResponse, error) {
+	switch cfg.FallbackMode {
+	case FallbackModeSkip:
+		return &ProviderResponse{
+			Provider: req.Provider, ExecutedBackend: noneBackendMarker,
+			Role: req.Role, Attempt: req.Round, ModelFamily: req.Config.ModelFamily,
+			EmptyOutput: true, TerminalState: TerminalSkipped,
+			DegradedReasons: []string{"pane_provisioning_skipped"},
+		}, nil
+	case FallbackModeAbort:
+		err := fmt.Errorf("pane provisioning aborted by fallback policy: %s", paneFailureReason)
+		return &ProviderResponse{
+			Provider: req.Provider, Error: err.Error(), ExecutedBackend: noneBackendMarker,
+			Role: req.Role, Attempt: req.Round, ModelFamily: req.Config.ModelFamily,
+			EmptyOutput: true, TerminalState: TerminalBlocked,
+			DegradedReasons: []string{"pane_provisioning_aborted"},
+		}, err
+	case "", FallbackModeSubprocess:
+		// Continue below.
+	default:
+		return nil, fmt.Errorf("unknown fallback mode %q", cfg.FallbackMode)
+	}
 	resp, err := NewSubprocessBackendImpl().Execute(ctx, req)
 	if err == nil && resp != nil && !subprocessFailed(resp) {
 		resp.ExecutedBackend = "subprocess"
+		resp.Role = req.Role
+		resp.Attempt = req.Round
+		resp.ModelFamily = req.Config.ModelFamily
+		resp.TerminalState = TerminalCompleted
+		resp.DegradedReasons = append(resp.DegradedReasons, "pane_provisioning_fallback")
 		return resp, nil
 	}
 
@@ -82,4 +109,39 @@ func isPaneProvisioningError(err error) bool {
 // failure (timed out or empty), so we do not pass off an empty fallback as success.
 func subprocessFailed(resp *ProviderResponse) bool {
 	return resp.TimedOut || resp.EmptyOutput
+}
+
+// runFallback applies the configured pre-commit pane provisioning policy.
+func runFallback(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, error) {
+	switch cfg.FallbackMode {
+	case "", FallbackModeSubprocess:
+		fallbackCfg := cfg
+		fallbackCfg.Terminal = nil
+		fallbackCfg.SubprocessMode = true
+		result, err := RunOrchestra(ctx, fallbackCfg)
+		if result != nil {
+			result.Degraded = true
+			appendDegradedReason(result, "pane_provisioning_fallback")
+			result = finalizeOrchestraResultForConfig(result, cfg)
+		}
+		return result, err
+	case FallbackModeSkip:
+		result := &OrchestraResult{
+			Strategy:        cfg.Strategy,
+			Summary:         "pane provisioning skipped by fallback policy",
+			Degraded:        true,
+			DegradedReasons: []string{"pane_provisioning_skipped"},
+			TerminalState:   TerminalSkipped,
+			GateStatus:      "skipped",
+			AnalysisVerdict: "skipped",
+		}
+		return finalizeOrchestraResultForConfig(result, cfg), nil
+	case FallbackModeAbort:
+		err := fmt.Errorf("pane provisioning aborted by fallback policy")
+		result := buildFailureResult(cfg, nil, nil, nil, time.Now(), err)
+		appendDegradedReason(result, "pane_provisioning_aborted")
+		return result, err
+	default:
+		return nil, fmt.Errorf("unknown fallback mode %q", cfg.FallbackMode)
+	}
 }

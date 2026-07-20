@@ -53,5 +53,5 @@ func (a *Adapter) prepareFiles(_ context.Context, cfg *config.HarnessConfig) ([]
 	}
 	files = append(files, configMapping)
 
-	return files, nil
+	return sanitizeUnsupportedClaudeTeamMappings(files), nil
 }

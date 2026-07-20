@@ -21,6 +21,13 @@ const (
 	StrategyRelay     Strategy = "relay"
 )
 
+// IsValid reports whether the fallback policy is supported. The empty value
+// preserves the legacy subprocess fallback for callers created before the
+// explicit policy field was added.
+func (m ReliabilityFallbackMode) IsValid() bool {
+	return m == "" || m == FallbackModeSubprocess || m == FallbackModeSkip || m == FallbackModeAbort
+}
+
 // UsageCapability describes whether an execution path can expose trustworthy
 // provider usage independently from its human-readable output.
 type UsageCapability struct {
@@ -42,6 +49,7 @@ func (s Strategy) IsValid() bool {
 type ProviderConfig struct {
 	Name                string        // provider name (claude, codex, gemini)
 	Binary              string        // executable binary path
+	ModelFamily         string        // stable model-family identity used for judge separation policy
 	Args                []string      // args for non-interactive mode
 	PaneArgs            []string      // args for pane mode (overrides Args when set)
 	ModelPolicy         string        // model selection ownership: quality-managed or user-pinned
@@ -86,6 +94,11 @@ type ProviderResponse struct {
 	// ExecutedBackend records which backend produced this response:
 	// "pane", "subprocess", or "" / "none" when neither succeeded (REQ-005, F-003).
 	ExecutedBackend string
+	Role            string
+	Attempt         int
+	ModelFamily     string
+	DegradedReasons []string
+	TerminalState   string
 	Usage           []telemetry.UsageEnvelope `json:"usage,omitempty"`
 	UsageCapability UsageCapability           `json:"usage_capability"`
 }
@@ -96,6 +109,13 @@ type ProviderResponse struct {
 type FailedProvider struct {
 	Name                    string                    `json:"provider"`                            // Provider name
 	Role                    string                    `json:"role,omitempty"`                      // role that timed out or failed, when known
+	Attempt                 int                       `json:"attempt,omitempty"`                   // one-based role/round attempt
+	ModelFamily             string                    `json:"model_family,omitempty"`              // provider model-family identity
+	ExecutedBackend         string                    `json:"executed_backend,omitempty"`          // backend that observed the failed attempt
+	TerminalState           string                    `json:"terminal_state,omitempty"`            // policy transition observed before or during dispatch
+	DegradedReasons         []string                  `json:"degraded_reasons,omitempty"`          // machine-readable policy degradation evidence
+	ExitCode                int                       `json:"exit_code,omitempty"`                 // provider exit code when available
+	TimedOut                bool                      `json:"timed_out,omitempty"`                 // true when the failed attempt timed out
 	Error                   string                    `json:"error"`                               // Error message
 	FailureClass            string                    `json:"failure_class"`                       // timeout, capacity_exhausted, rate_limited, binary_or_transport, execution_error
 	TimeoutSource           string                    `json:"timeout_source,omitempty"`            // source used to resolve timeout duration
@@ -129,36 +149,66 @@ type OrchestraResult struct {
 	UsageAggregate  telemetry.UsageAggregate  // additive usage summary
 	UsageCapability UsageCapability           // aggregate execution-path capability
 	Yield           *YieldOutput              // structured pane/session metadata when execution yields to the caller
+	RunReceipt      *OrchestrationRunReceipt  `json:"run_receipt,omitempty"`
+
+	// Additive orchestration_run_receipt.v1 projection. Legacy fields above
+	// remain the compatibility API while these fields make execution policy and
+	// terminal evidence machine-readable.
+	ReceiptSchema       string                   `json:"receipt_schema,omitempty"`
+	RequestedStrategy   Strategy                 `json:"requested_strategy,omitempty"`
+	EffectiveStrategy   Strategy                 `json:"effective_strategy,omitempty"`
+	RequestedProviders  []string                 `json:"requested_providers,omitempty"`
+	ConfiguredProviders []string                 `json:"configured_providers,omitempty"`
+	ResolvedProviders   []string                 `json:"resolved_providers,omitempty"`
+	AttemptedProviders  []string                 `json:"attempted_providers,omitempty"`
+	UsableProviders     []string                 `json:"usable_providers,omitempty"`
+	FailedProviderNames []string                 `json:"failed_providers,omitempty"`
+	DegradedReasons     []string                 `json:"degraded_reasons,omitempty"`
+	JudgeStatus         string                   `json:"judge_status,omitempty"`
+	AnalysisVerdict     string                   `json:"analysis_verdict,omitempty"`
+	GateStatus          string                   `json:"gate_status,omitempty"`
+	TerminalState       string                   `json:"terminal_state,omitempty"`
+	DispatchCount       int                      `json:"dispatch_count"`
+	QuorumRequired      int                      `json:"quorum_required,omitempty"`
+	QuorumMet           bool                     `json:"quorum_met"`
+	ConsensusMetrics    *ConsensusMetrics        `json:"consensus_metrics,omitempty"`
+	Veto                bool                     `json:"critical_veto,omitempty"`
+	JudgeSeparation     *JudgeSeparationEvidence `json:"judge_separation,omitempty"`
 }
 
 // OrchestraConfig는 오케스트레이션 실행 설정이다.
 type OrchestraConfig struct {
-	Providers          []ProviderConfig   // 참여 프로바이더 목록
-	Strategy           Strategy           // 실행 전략
-	Prompt             string             // 전달할 프롬프트
-	TimeoutSeconds     int                // 타임아웃 (초)
-	JudgeProvider      string             // debate 전략에서 최종 판정 프로바이더
-	DebateRounds       int                // Number of debate rounds (1=no rebuttal, 2=with rebuttal). 0 defaults to 1.
-	Terminal           terminal.Terminal  // Optional terminal for pane-based execution. Nil means non-interactive mode.
-	NoDetach           bool               // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
-	KeepRelayOutput    bool               // when true, preserve temp relay output files after execution
-	Interactive        bool               // when true, use interactive pane mode instead of sentinel-based
-	HookMode           bool               // when true, use hook file signals instead of ReadScreen for result collection
-	SessionID          string             // unique session ID for hook file signal directory
-	ConsensusThreshold float64            // consensus threshold (0 uses default 0.66)
-	InitialDelay       time.Duration      // delay before completion polling starts (0 uses default 20s)
-	CompletionDetector CompletionDetector // completion detection strategy (nil = auto-detect from Terminal)
-	ScrollbackLines    int                // R3: ReadScreen scrollback depth (default 500, 0 = use terminal default)
-	NoJudge            bool               // R4: skip judge verdict phase when true
-	YieldRounds        bool               // R5: yield after round 1 with JSON output, keep panes alive
-	ContextAware       bool               // R8: when true, skip topic isolation so providers can read project files
-	SubprocessMode     bool               // when true, use SubprocessBackend instead of PaneBackend
-	RoundPreset        string             // round preset: "fast", "standard", "deep" (for T8)
-	MonitorEnabled     bool               // when true, prefer CC21 monitor-style completion over polling
-	MonitorTimeout     time.Duration      // max wait for monitor-style completion before polling fallback
-	WorkingDir         string             // requested working directory for pane-backed launches
-	RunID              string             // optional run correlation ID; autogenerated when empty
-	FallbackMode       ReliabilityFallbackMode
+	Providers                    []ProviderConfig   // 참여 프로바이더 목록
+	RequestedProviders           []string           // names requested before config/capability resolution
+	ConfiguredProviders          []string           // policy denominator before installation filtering
+	Strategy                     Strategy           // 실행 전략
+	Prompt                       string             // 전달할 프롬프트
+	TimeoutSeconds               int                // 타임아웃 (초)
+	JudgeProvider                string             // debate 전략에서 최종 판정 프로바이더
+	JudgeConfig                  *ProviderConfig    // optional judge config when the judge is not a participant
+	RequireJudgeFamilySeparation bool               // fail closed unless required judge uses a known, distinct model family
+	DebateRounds                 int                // Number of debate rounds (1=no rebuttal, 2=with rebuttal). 0 defaults to 1.
+	Terminal                     terminal.Terminal  // Optional terminal for pane-based execution. Nil means non-interactive mode.
+	NoDetach                     bool               // @AX:NOTE [AUTO] REQ-1 — when true, disable auto-detach even on pane terminals; maps to CLI --no-detach flag
+	KeepRelayOutput              bool               // when true, preserve temp relay output files after execution
+	Interactive                  bool               // when true, use interactive pane mode instead of sentinel-based
+	HookMode                     bool               // when true, use hook file signals instead of ReadScreen for result collection
+	SessionID                    string             // unique session ID for hook file signal directory
+	ConsensusThreshold           float64            // consensus threshold (0 uses default 0.66)
+	MinimumProviders             int                // policy floor for quorum; 0 uses configured-provider majority
+	InitialDelay                 time.Duration      // delay before completion polling starts (0 uses default 20s)
+	CompletionDetector           CompletionDetector // completion detection strategy (nil = auto-detect from Terminal)
+	ScrollbackLines              int                // R3: ReadScreen scrollback depth (default 500, 0 = use terminal default)
+	NoJudge                      bool               // R4: skip judge verdict phase when true
+	YieldRounds                  bool               // R5: yield after round 1 with JSON output, keep panes alive
+	ContextAware                 bool               // R8: when true, skip topic isolation so providers can read project files
+	SubprocessMode               bool               // when true, use SubprocessBackend instead of PaneBackend
+	RoundPreset                  string             // round preset: "fast", "standard", "deep" (for T8)
+	MonitorEnabled               bool               // when true, prefer CC21 monitor-style completion over polling
+	MonitorTimeout               time.Duration      // max wait for monitor-style completion before polling fallback
+	WorkingDir                   string             // requested working directory for pane-backed launches
+	RunID                        string             // optional run correlation ID; autogenerated when empty
+	FallbackMode                 ReliabilityFallbackMode
 	// SurfaceMgr is set during interactive debate setup.
 	// Not part of initial config -- populated by runPaneDebate().
 	SurfaceMgr *SurfaceManager
