@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/insajin/autopus-adk/pkg/processprobe"
 )
 
 // Platform is a detected coding CLI.
@@ -30,6 +32,11 @@ var knownCLIs = []struct {
 	{"opencode", "opencode", "--version"},
 	{"cursor", "cursor", "--version"},
 }
+
+const (
+	cliVersionTimeout   = 5 * time.Second
+	cliVersionWaitDelay = 250 * time.Millisecond
+)
 
 // DetectPlatforms는 PATH에서 코딩 CLI를 감지한다.
 func DetectPlatforms() []Platform {
@@ -55,16 +62,21 @@ func IsInstalled(binary string) bool {
 }
 
 func detectBinary(binary, versionArg string) (string, bool) {
+	return detectBinaryWithLimits(binary, versionArg, cliVersionTimeout, cliVersionWaitDelay)
+}
+
+func detectBinaryWithLimits(binary, versionArg string, timeout, waitDelay time.Duration) (string, bool) {
 	path, err := exec.LookPath(binary)
 	if err != nil {
 		return "", false
 	}
-	_ = path
 	// Timeout prevents hang when a CLI doesn't respond to --version
 	// (e.g., opens GUI or waits for input on Windows).
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, binary, versionArg).Output()
+	cmd := exec.CommandContext(ctx, path, versionArg)
+	cmd.WaitDelay = waitDelay
+	out, err := processprobe.Output(cmd)
 	if err != nil {
 		return "unknown", true
 	}

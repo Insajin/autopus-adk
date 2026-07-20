@@ -81,9 +81,10 @@ func detectDefaultPlatforms() []string {
 }
 
 // detectInstalledPlatforms returns installed, ADK-supported platforms in a stable order.
+// Detection is presence-only and never executes provider binaries.
 // Unlike detectDefaultPlatforms, it does not add any fallback platform.
 func detectInstalledPlatforms() []string {
-	detected := detect.DetectPlatforms()
+	detected := detect.DetectInstalledPlatforms()
 	platforms := make([]string, 0, len(detected))
 	seen := make(map[string]bool, len(detected))
 

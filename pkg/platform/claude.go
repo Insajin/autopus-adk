@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/processprobe"
 )
 
 // Runtime identifies the CLI host executing the harness.
@@ -200,7 +201,7 @@ func claudeVersion() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	out, err := execCommandFunc(ctx, "claude", "--version").Output()
+	out, err := processprobe.Output(execCommandFunc(ctx, "claude", "--version"))
 	if err != nil {
 		return "", err
 	}

@@ -8,12 +8,16 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/processprobe"
 )
 
+const antigravityPluginListTimeout = 2 * time.Second
+
 // Validate checks the validity of installed files.
-func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error) {
+func (a *Adapter) Validate(ctx context.Context) ([]adapter.ValidationError, error) {
 	var errs []adapter.ValidationError
 
 	geminiMDPath := filepath.Join(a.root, "GEMINI.md")
@@ -56,9 +60,14 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 	}
 
 	// Verify if the autopus plugin is installed in agy
-	if _, lookErr := exec.LookPath(cliBinary); lookErr == nil {
-		cmd := exec.Command("agy", "plugin", "list")
-		output, err := cmd.Output()
+	if binary, lookErr := exec.LookPath(cliBinary); lookErr == nil {
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		probeCtx, cancel := context.WithTimeout(ctx, antigravityPluginListTimeout)
+		cmd := exec.CommandContext(probeCtx, binary, "plugin", "list")
+		output, err := processprobe.Output(cmd)
+		cancel()
 		if err == nil && !strings.Contains(string(output), `"autopus"`) {
 			errs = append(errs, adapter.ValidationError{
 				File:    ".agents/plugins/autopus",
