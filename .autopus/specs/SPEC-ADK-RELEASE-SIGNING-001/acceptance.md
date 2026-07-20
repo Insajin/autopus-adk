@@ -129,6 +129,14 @@ Release 실행 `29682893087`은 보호 환경에 고정한 source commit `902f1a
 - Darwin amd64·arm64 바이너리는 `Identifier=co.autopus.adk`, `TeamIdentifier=GP2PFA2PUV`, hardened runtime, secure timestamp와 notarized designated requirement를 모두 만족합니다. 두 바이너리는 `0.50.77`과 commit `902f1ac`을 보고하며 아카이브 안의 권한은 `0755`입니다. amd64·arm64 manifest SHA-256은 각각 `64c634130b16a74cbb33f666d316a05d9a7a1012246dc58fde6e15350b71d0c5`, `b6611c04990b048bc5545e37c942bc8e7e4fab8592d546eaab80d7084991bea6`이고, artifact·manifest·receipt 서명 결합 검증을 통과했습니다. 두 아키텍처의 공개키 receipt 바이트는 동일하며 SHA-256은 `4a588fa4991c515e9520861af5567fd2fe4c19e2c23adb8963bd37ebc46a5bbc`입니다.
 - 검증된 Homebrew commit `a6adcd0ff7e0eff72f30dab9e9f7f0f73b8c9328`은 A5 게시 commit `9e3b9b4076b47b85218b14632c79a3d796e6769c`를 부모로 두고 `Casks/auto.rb`만 변경했습니다. Cask blob은 prior CAS pin `ceed648bfece4555e8310b6e894fedc847520960`에서 `39b9b77eb51149ff87df7ad4f8fb3c5300b1302c`로 갱신됐고, Cask의 네 플랫폼 digest가 릴리스 아카이브와 일치합니다. Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 변경되지 않았습니다.
 
+### v0.50.78 A7 릴리스 준비 (PENDING)
+
+A7은 immutable `v0.50.77`을 직접 선행 릴리스로 검증하도록 준비합니다. 고정된 A6 증거는 source commit `902f1acfa91f1d0a2ac9471d5cd79117031a2599`, annotated tag object `41feed7decafac33d8f7f43e06804e3c9bf37ef3`, checksums SHA-256 `fb1a35dcdb44255aad43b7ae74950ed59f05ccf44abde9cadf28ecfa0dfce37a`입니다. Darwin amd64·arm64 archive SHA-256은 각각 `d5e47076c1fc898d2b3f5880b6edfcf9a12e805633dcba2691da22f300d41dc9`, `d6d092177a5406c194eea1de4fbd11b8af92a03814eb143a294541a3a578b9ab`이고, embedded manifest SHA-256은 각각 `64c634130b16a74cbb33f666d316a05d9a7a1012246dc58fde6e15350b71d0c5`, `b6611c04990b048bc5545e37c942bc8e7e4fab8592d546eaab80d7084991bea6`입니다.
+
+Homebrew publication은 prior Cask blob `39b9b77eb51149ff87df7ad4f8fb3c5300b1302c`와 일치할 때만 canonical A7 Cask를 CAS 방식으로 게시해야 합니다. 동결된 Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 읽거나 변경하지 않습니다.
+
+현재 상태는 PENDING입니다. exact tag deployment policy 추가, 최종 source commit·tree pin 확정, annotated `v0.50.78` 태그 생성, 전체 CI·Security와 보호 환경 승인, 서명·공증, 11개 자산의 immutable GitHub Release 게시, Homebrew Cask 반영과 독립 라이브 검증이 완료된 뒤에만 PASS로 전환합니다.
+
 ## Stage 2: installers
 
 ### S11: POSIX installer (Must, PASS)
