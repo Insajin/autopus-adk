@@ -108,7 +108,11 @@ func TestOutputWindowsSuccessKeepsDetachedChildAlive(t *testing.T) {
 }
 
 func TestOutputWindowsHelperProcess(t *testing.T) {
-	switch os.Getenv(windowsProbeModeEnv) {
+	mode := os.Getenv(windowsProbeModeEnv)
+	if mode == "" {
+		return
+	}
+	switch mode {
 	case "version":
 		fmt.Fprintln(os.Stdout, "1.2.3")
 	case "failure":
@@ -153,6 +157,8 @@ func TestOutputWindowsHelperProcess(t *testing.T) {
 			[]byte(strconv.Itoa(cmd.Process.Pid)), 0o600))
 		fmt.Fprintln(os.Stdout, "1.2.3")
 	}
+	// Keep fixture stdout free of the test runner's PASS banner.
+	os.Exit(0)
 }
 
 func windowsProbeCommand(t *testing.T, mode string, timeout time.Duration) (*exec.Cmd, context.CancelFunc) {
