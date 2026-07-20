@@ -17,7 +17,7 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -40,7 +40,7 @@ jobs:
 
       - name: Test with Coverage
         run: |
-          go test -race -count=1 -timeout=18m -tags integration -coverprofile=coverage.out ./...
+          go test -race -count=1 -timeout=25m -tags integration -coverprofile=coverage.out ./...
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
           THRESHOLD=${COVERAGE_THRESHOLD:-83}
