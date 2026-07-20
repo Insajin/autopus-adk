@@ -81,7 +81,7 @@ func TestSendPromptWithRetry_Success(t *testing.T) {
 	baselines := map[string]string{}
 
 	newPI, recreated, err := sendPromptWithRetry(
-		context.Background(), cfg, pi, "hello world", 1, baselines,
+		context.Background(), cfg, pi, "hello world", 1, baselines, 0,
 	)
 	require.NoError(t, err)
 	assert.False(t, recreated)
@@ -98,7 +98,7 @@ func TestSendPromptWithRetry_FailsAllAttempts(t *testing.T) {
 
 	// SendLongText always fails, and recreatePane fails too because it calls SendLongText.
 	_, _, err := sendPromptWithRetry(
-		context.Background(), cfg, pi, "hello world", 1, baselines,
+		context.Background(), cfg, pi, "hello world", 1, baselines, 0,
 	)
 	assert.Error(t, err)
 }
@@ -119,7 +119,7 @@ func TestSendPromptWithRetry_RecreateAndRetrySuccess(t *testing.T) {
 	baselines := map[string]string{"claude": "old baseline"}
 
 	newPI, recreated, err := sendPromptWithRetry(
-		context.Background(), cfg, pi, "hello world", 1, baselines,
+		context.Background(), cfg, pi, "hello world", 1, baselines, 0,
 	)
 	require.NoError(t, err)
 	assert.True(t, recreated, "pane should be recreated after same-pane retries exhausted")

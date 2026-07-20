@@ -49,8 +49,9 @@ func TestCmuxAdapter_SendLongText_ShortText_BufferPath(t *testing.T) {
 // to chunked send when set-buffer fails.
 func TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback(t *testing.T) {
 	orig := execCommand
+	origCtx := execCommandContext
 	var calls []string
-	execCommand = func(name string, args ...string) *exec.Cmd {
+	buildCmd := func(name string, args ...string) *exec.Cmd {
 		combined := strings.Join(args, " ")
 		calls = append(calls, combined)
 		if strings.Contains(combined, "set-buffer") {
@@ -58,7 +59,12 @@ func TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback(t *testing.T) {
 		}
 		return exec.Command("true")
 	}
-	defer func() { execCommand = orig }()
+	execCommand = buildCmd
+	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd { return buildCmd(name, args...) }
+	defer func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}()
 
 	a := &CmuxAdapter{}
 	longText := strings.Repeat("C", 2000)
@@ -74,8 +80,9 @@ func TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback(t *testing.T) {
 // to chunked send when paste-buffer fails (e.g., Codex ink TUI).
 func TestCmuxAdapter_SendLongText_PasteBufferFails_ChunkedFallback(t *testing.T) {
 	orig := execCommand
+	origCtx := execCommandContext
 	var calls []string
-	execCommand = func(name string, args ...string) *exec.Cmd {
+	buildCmd := func(name string, args ...string) *exec.Cmd {
 		combined := strings.Join(args, " ")
 		calls = append(calls, combined)
 		if strings.Contains(combined, "paste-buffer") {
@@ -83,7 +90,12 @@ func TestCmuxAdapter_SendLongText_PasteBufferFails_ChunkedFallback(t *testing.T)
 		}
 		return exec.Command("true")
 	}
-	defer func() { execCommand = orig }()
+	execCommand = buildCmd
+	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd { return buildCmd(name, args...) }
+	defer func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}()
 
 	a := &CmuxAdapter{}
 	longText := strings.Repeat("P", 5000)
@@ -103,14 +115,20 @@ func TestCmuxAdapter_SendLongText_PasteBufferFails_ChunkedFallback(t *testing.T)
 // text at 3500-byte boundaries.
 func TestCmuxAdapter_sendChunked_SplitsCorrectly(t *testing.T) {
 	orig := execCommand
+	origCtx := execCommandContext
 	var sendPayloads []string
-	execCommand = func(name string, args ...string) *exec.Cmd {
+	buildCmd := func(name string, args ...string) *exec.Cmd {
 		if len(args) >= 4 && args[0] == "send" {
 			sendPayloads = append(sendPayloads, args[3])
 		}
 		return exec.Command("true")
 	}
-	defer func() { execCommand = orig }()
+	execCommand = buildCmd
+	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd { return buildCmd(name, args...) }
+	defer func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}()
 
 	a := &CmuxAdapter{}
 	text := strings.Repeat("X", 8000)
@@ -128,11 +146,17 @@ func TestCmuxAdapter_sendChunked_SplitsCorrectly(t *testing.T) {
 func TestCmuxAdapter_SendLongText_UniqueBufferNames(t *testing.T) {
 	var allArgs [][]string
 	orig := execCommand
-	execCommand = func(name string, args ...string) *exec.Cmd {
+	origCtx := execCommandContext
+	buildCmd := func(name string, args ...string) *exec.Cmd {
 		allArgs = append(allArgs, args)
 		return exec.Command("true")
 	}
-	defer func() { execCommand = orig }()
+	execCommand = buildCmd
+	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd { return buildCmd(name, args...) }
+	defer func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}()
 
 	a := &CmuxAdapter{}
 	longText := strings.Repeat("D", 2000)

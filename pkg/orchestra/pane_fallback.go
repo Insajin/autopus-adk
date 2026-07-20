@@ -26,6 +26,17 @@ var paneSplitGate = func() chan struct{} {
 	return gate
 }()
 
+// paneInputGate serializes cmux input commits across surfaces. cmux accepts a
+// paste and its trailing Enter through separate CLI calls; allowing another
+// surface to paste between those calls can attach the Enter to the wrong input
+// transaction and leave a provider pane blank or with a corrupted command.
+// tmux and other terminals keep their existing parallel behavior.
+var paneInputGate = func() chan struct{} {
+	gate := make(chan struct{}, 1)
+	gate <- struct{}{}
+	return gate
+}()
+
 func splitPaneSerialized(ctx context.Context, term terminal.Terminal, dir terminal.Direction) (terminal.PaneID, error) {
 	select {
 	case <-ctx.Done():
@@ -35,6 +46,79 @@ func splitPaneSerialized(ctx context.Context, term terminal.Terminal, dir termin
 	defer func() { paneSplitGate <- struct{}{} }()
 	return splitTrackedPane(ctx, term, dir)
 }
+
+// sendPaneInputAndEnterSerialized commits one pane input as an indivisible
+// send/delay/Enter transaction on cmux. sendErr reports failure before the
+// submit key; enterErr reports cancellation during the registration delay or
+// failure to send Enter.
+func sendPaneInputAndEnterSerialized(
+	ctx context.Context,
+	term terminal.Terminal,
+	paneID terminal.PaneID,
+	delay time.Duration,
+	send func() error,
+	enterRetryDelays ...time.Duration,
+) (sendErr, enterErr error) {
+	if err := ctx.Err(); err != nil {
+		return err, nil
+	}
+
+	if strings.EqualFold(strings.TrimSpace(term.Name()), "cmux") {
+		select {
+		case <-ctx.Done():
+			return ctx.Err(), nil
+		case <-paneInputGate:
+		}
+		defer func() { paneInputGate <- struct{}{} }()
+		// Cancellation and the gate token can become ready together. Re-check
+		// after acquisition so a canceled queued transaction never reaches cmux.
+		if err := ctx.Err(); err != nil {
+			return err, nil
+		}
+	}
+
+	if err := send(); err != nil {
+		return err, nil
+	}
+	if err := waitPaneInputDelay(ctx, delay); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	enterErr = term.SendCommand(ctx, paneID, "\n")
+	for _, retryDelay := range enterRetryDelays {
+		if enterErr == nil {
+			break
+		}
+		if err := waitPaneInputDelay(ctx, retryDelay); err != nil {
+			return nil, err
+		}
+		enterErr = term.SendCommand(ctx, paneID, "\n")
+	}
+	return nil, enterErr
+}
+
+func waitPaneInputDelay(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return ctx.Err()
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+type paneSubmitEnterError struct {
+	err error
+}
+
+func (e *paneSubmitEnterError) Error() string { return "submit Enter: " + e.err.Error() }
+func (e *paneSubmitEnterError) Unwrap() error { return e.err }
 
 // paneProvisioningFallback handles best-effort subprocess fallback only when
 // no pane was committed (no terminal or SplitPane failed). Once SplitPane

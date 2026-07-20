@@ -4,14 +4,14 @@ on:
   workflow_dispatch: {}
 
 # Canonical invocation after the immutable release exists:
-# gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.79
+# gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.80
 
 permissions:
   contents: read
 
 jobs:
   recover-formula-bridge:
-    if: github.ref == 'refs/tags/v0.50.79'
+    if: github.ref == 'refs/tags/v0.50.80'
     environment:
       name: adk-companion-release
     permissions:
@@ -19,10 +19,10 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 20
     steps:
-      - name: Check out exact A8 release tag
+      - name: Check out exact A9 release tag
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: refs/tags/v0.50.79
+          ref: refs/tags/v0.50.80
           fetch-depth: 0
           persist-credentials: false
 
@@ -40,7 +40,7 @@ jobs:
           validation_output=$(mktemp "$RUNNER_TEMP/formula-recovery-source.XXXXXX")
           trap 'rm -f -- "$validation_output"' EXIT
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.79' GITHUB_REF_TYPE='tag' \
+            GITHUB_REF_NAME='v0.50.80' GITHUB_REF_TYPE='tag' \
             GITHUB_SHA="$actual_head" GITHUB_OUTPUT="$validation_output" \
             COMPANION_SOURCE_PIN_REQUIRED=1 \
             COMPANION_APPROVED_SOURCE_COMMIT="$COMPANION_APPROVED_SOURCE_COMMIT" \
@@ -59,7 +59,7 @@ jobs:
           COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.79-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.80-checksums.txt"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_TOKEN="$GITHUB_TOKEN" \
             COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
@@ -84,8 +84,8 @@ jobs:
         run: |
           set -euo pipefail
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.79' \
-            COMPANION_VERSION='0.50.79' \
+            GITHUB_REF_NAME='v0.50.80' \
+            COMPANION_VERSION='0.50.80' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
@@ -94,4 +94,4 @@ jobs:
       - name: Remove downloaded release evidence
         if: always()
         shell: bash
-        run: rm -f -- "$RUNNER_TEMP/autopus-v0.50.79-checksums.txt"
+        run: rm -f -- "$RUNNER_TEMP/autopus-v0.50.80-checksums.txt"

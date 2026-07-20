@@ -42,7 +42,7 @@ func TestSendPromptWithRetry_SuccessOnFirstAttempt(t *testing.T) {
 	pi := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "claude", Binary: "echo"}}
 	baselines := map[string]string{}
 
-	newPI, recreated, err := sendPromptWithRetry(context.Background(), cfg, pi, "test prompt", 1, baselines)
+	newPI, recreated, err := sendPromptWithRetry(context.Background(), cfg, pi, "test prompt", 1, baselines, 0)
 	require.NoError(t, err)
 	assert.False(t, recreated, "should not recreate on success")
 	assert.Equal(t, pi.paneID, newPI.paneID)
@@ -60,7 +60,7 @@ func TestSendPromptWithRetry_SamePaneRetrySucceeds(t *testing.T) {
 	pi := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "claude", Binary: "echo"}}
 	baselines := map[string]string{}
 
-	newPI, recreated, err := sendPromptWithRetry(context.Background(), cfg, pi, "test prompt", 2, baselines)
+	newPI, recreated, err := sendPromptWithRetry(context.Background(), cfg, pi, "test prompt", 2, baselines, 0)
 	require.NoError(t, err)
 	assert.False(t, recreated, "same-pane retry should not trigger recreation")
 	assert.Equal(t, pi.paneID, newPI.paneID, "pane ID should remain unchanged")
@@ -80,7 +80,7 @@ func TestSendPromptWithRetry_AllRetriesFail_RecreatesPane(t *testing.T) {
 	pi := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "claude", Binary: "echo"}}
 	baselines := map[string]string{}
 
-	newPI, recreated, err := sendPromptWithRetry(context.Background(), cfg, pi, "test prompt", 2, baselines)
+	newPI, recreated, err := sendPromptWithRetry(context.Background(), cfg, pi, "test prompt", 2, baselines, 0)
 	require.NoError(t, err)
 	assert.True(t, recreated, "should recreate after all same-pane retries exhausted")
 	assert.NotEqual(t, pi.paneID, newPI.paneID, "recreated pane should have new ID")
@@ -98,7 +98,7 @@ func TestSendPromptWithRetry_RecreationFails(t *testing.T) {
 	pi := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "claude", Binary: "echo"}}
 	baselines := map[string]string{}
 
-	_, _, err := sendPromptWithRetry(context.Background(), cfg, pi, "test prompt", 2, baselines)
+	_, _, err := sendPromptWithRetry(context.Background(), cfg, pi, "test prompt", 2, baselines, 0)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "recreatePane failed")
 }

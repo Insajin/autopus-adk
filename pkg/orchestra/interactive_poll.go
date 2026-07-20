@@ -145,22 +145,23 @@ func sendPrompts(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []F
 			panes[i].promptFiles = append(panes[i].promptFiles, promptFile)
 		}
 		panes[i].responseFile = responseFile
-		// Send prompt text via SendLongText (uses buffer-based delivery for long prompts).
-		if err := cfg.Terminal.SendLongText(ctx, pi.paneID, promptText); err != nil {
+		// Commit prompt text and Enter as one cmux input transaction. Separate
+		// provider surfaces otherwise share cmux's asynchronous input queue.
+		sendErr, enterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, pi.paneID, promptSubmitDelay, func() error {
+			return cfg.Terminal.SendLongText(ctx, pi.paneID, promptText)
+		})
+		if sendErr != nil {
 			failed = append(failed, FailedProvider{
 				Name:  pi.provider.Name,
-				Error: "send prompt failed: " + err.Error(),
+				Error: "send prompt failed: " + sendErr.Error(),
 			})
 			panes[i].skipWait = true
 			continue
 		}
-		// Small delay to let the CLI register the pasted text.
-		time.Sleep(promptSubmitDelay)
-		// Send Enter separately to submit the prompt.
-		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
+		if enterErr != nil {
 			failed = append(failed, FailedProvider{
 				Name:  pi.provider.Name,
-				Error: "send enter failed: " + err.Error(),
+				Error: "send enter failed: " + enterErr.Error(),
 			})
 			panes[i].skipWait = true
 		}

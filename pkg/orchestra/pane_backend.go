@@ -91,13 +91,22 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	// env injection that path performs in launchInteractiveSessions must be
 	// mirrored here. Non-fatal: a send failure degrades to screen-poll completion.
 	if b.cfg.HookMode && b.cfg.SessionID != "" {
-		if envErr := SendSessionEnvToPane(ctx, term, paneID, b.cfg.SessionID); envErr != nil {
+		envErr, enterErr := sendPaneInputAndEnterSerialized(ctx, term, paneID, 0, func() error {
+			return SendSessionEnvToPane(ctx, term, paneID, b.cfg.SessionID)
+		})
+		if envErr != nil {
 			log.Printf("pane_backend: SendSessionEnvToPane failed for %s (non-fatal): %v", req.Provider, envErr)
 		} else {
-			_ = term.SendCommand(ctx, paneID, "\n")
+			if enterErr != nil {
+				log.Printf("pane_backend: session-env Enter failed for %s (non-fatal): %v", req.Provider, enterErr)
+			}
 			if req.Round > 0 {
-				_ = SendRoundEnvToPane(ctx, term, paneID, req.Round)
-				_ = term.SendCommand(ctx, paneID, "\n")
+				roundErr, roundEnterErr := sendPaneInputAndEnterSerialized(ctx, term, paneID, 0, func() error {
+					return SendRoundEnvToPane(ctx, term, paneID, req.Round)
+				})
+				if roundErr != nil || roundEnterErr != nil {
+					log.Printf("pane_backend: round env failed for %s (non-fatal): send=%v enter=%v", req.Provider, roundErr, roundEnterErr)
+				}
 			}
 			time.Sleep(promptRegisterDelay)
 		}
@@ -122,12 +131,14 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	if launchFile != "" {
 		pi.launchFiles = append(pi.launchFiles, launchFile)
 	}
-	if err := term.SendLongText(ctx, paneID, cmd); err != nil {
-		return paneExecutionFailure(req, "interactive pane execution failed: launch send error: "+err.Error())
+	launchSendErr, launchEnterErr := sendPaneInputAndEnterSerialized(ctx, term, paneID, promptRegisterDelay, func() error {
+		return term.SendLongText(ctx, paneID, cmd)
+	})
+	if launchSendErr != nil {
+		return paneExecutionFailure(req, "interactive pane execution failed: launch send error: "+launchSendErr.Error())
 	}
-	time.Sleep(promptRegisterDelay)
-	if err := term.SendCommand(ctx, paneID, "\n"); err != nil {
-		return paneExecutionFailure(req, "interactive pane execution failed: launch enter error: "+err.Error())
+	if launchEnterErr != nil {
+		return paneExecutionFailure(req, "interactive pane execution failed: launch enter error: "+launchEnterErr.Error())
 	}
 	time.Sleep(promptRegisterDelay)
 	completionBaseline := captureCompletionBaseline(ctx, term, paneID)
@@ -147,12 +158,14 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 			pi.promptFiles = append(pi.promptFiles, promptFile)
 		}
 		pi.responseFile = responseFile
-		if err := sendPanePromptInput(ctx, term, paneID, req.Config, promptText, promptFile != ""); err != nil {
-			return paneExecutionFailure(req, "interactive pane execution failed: prompt send error: "+err.Error())
+		promptSendErr, promptEnterErr := sendPaneInputAndEnterSerialized(ctx, term, paneID, panePromptSubmitDelay(req.Config), func() error {
+			return sendPanePromptInput(ctx, term, paneID, req.Config, promptText, promptFile != "")
+		})
+		if promptSendErr != nil {
+			return paneExecutionFailure(req, "interactive pane execution failed: prompt send error: "+promptSendErr.Error())
 		}
-		time.Sleep(panePromptSubmitDelay(req.Config))
-		if err := term.SendCommand(ctx, paneID, "\n"); err != nil {
-			return paneExecutionFailure(req, "interactive pane execution failed: prompt enter error: "+err.Error())
+		if promptEnterErr != nil {
+			return paneExecutionFailure(req, "interactive pane execution failed: prompt enter error: "+promptEnterErr.Error())
 		}
 		time.Sleep(promptRegisterDelay)
 		completionBaseline = captureCompletionBaseline(ctx, term, paneID)

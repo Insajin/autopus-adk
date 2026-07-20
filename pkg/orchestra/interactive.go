@@ -158,22 +158,26 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 			// used by SendRoundEnvToPane for AUTOPUS_ROUND. Without this, hook scripts that
 			// guard on AUTOPUS_SESSION_ID (e.g., hook-claude-stop.sh:8) exit 0 as a no-op.
 			if cfg.HookMode && cfg.SessionID != "" {
-				if envErr := SendSessionEnvToPane(ctx, cfg.Terminal, pi.paneID, cfg.SessionID); envErr != nil {
+				envErr, enterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, pi.paneID, 0, func() error {
+					return SendSessionEnvToPane(ctx, cfg.Terminal, pi.paneID, cfg.SessionID)
+				})
+				if envErr != nil {
 					log.Printf("[interactive] SendSessionEnvToPane for %s failed (non-fatal): %v", pi.provider.Name, envErr)
-				} else if enterErr := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); enterErr != nil {
+				} else if enterErr != nil {
 					log.Printf("[interactive] session-env Enter for %s failed (non-fatal): %v", pi.provider.Name, enterErr)
 				}
 			}
 
 			// FR-02: Use SendLongText for launch command body (handles long args-based prompts)
-			if err := cfg.Terminal.SendLongText(ctx, pi.paneID, cmd); err != nil {
-				recordFailure(fmt.Sprintf("launch session failed: %v", err))
+			sendErr, enterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, pi.paneID, promptRegisterDelay, func() error {
+				return cfg.Terminal.SendLongText(ctx, pi.paneID, cmd)
+			})
+			if sendErr != nil {
+				recordFailure(fmt.Sprintf("launch session failed: %v", sendErr))
 				return
 			}
-			// Send Enter separately (SendLongText contract: callers send Enter)
-			time.Sleep(promptRegisterDelay)
-			if err := cfg.Terminal.SendCommand(ctx, pi.paneID, "\n"); err != nil {
-				recordFailure(fmt.Sprintf("launch enter failed: %v", err))
+			if enterErr != nil {
+				recordFailure(fmt.Sprintf("launch enter failed: %v", enterErr))
 			}
 		}(i)
 	}

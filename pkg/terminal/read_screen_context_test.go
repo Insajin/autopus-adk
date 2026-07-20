@@ -62,3 +62,53 @@ func TestInteractive_TmuxAdapter_ReadScreen_UsesContextCommand(t *testing.T) {
 	assert.True(t, contextCalled)
 	assert.False(t, plainCalled)
 }
+
+func TestCmuxAdapter_SendCommandUsesContextCommand(t *testing.T) {
+	orig := execCommand
+	origCtx := execCommandContext
+	defer func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}()
+
+	plainCalled := false
+	contextCalls := 0
+	execCommand = func(_ string, _ ...string) *exec.Cmd {
+		plainCalled = true
+		return exec.Command("false")
+	}
+	execCommandContext = func(_ context.Context, _ string, _ ...string) *exec.Cmd {
+		contextCalls++
+		return exec.Command("true")
+	}
+
+	err := (&CmuxAdapter{}).SendCommand(context.Background(), "surface:7", "\n")
+	require.NoError(t, err)
+	assert.Equal(t, 1, contextCalls)
+	assert.False(t, plainCalled)
+}
+
+func TestCmuxAdapter_SendLongTextUsesContextCommands(t *testing.T) {
+	orig := execCommand
+	origCtx := execCommandContext
+	defer func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}()
+
+	plainCalled := false
+	contextCalls := 0
+	execCommand = func(_ string, _ ...string) *exec.Cmd {
+		plainCalled = true
+		return exec.Command("false")
+	}
+	execCommandContext = func(_ context.Context, _ string, _ ...string) *exec.Cmd {
+		contextCalls++
+		return exec.Command("true")
+	}
+
+	err := (&CmuxAdapter{}).SendLongText(context.Background(), "surface:7", "launch")
+	require.NoError(t, err)
+	assert.Equal(t, 3, contextCalls)
+	assert.False(t, plainCalled)
+}
