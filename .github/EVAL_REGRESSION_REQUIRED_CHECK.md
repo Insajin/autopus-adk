@@ -36,20 +36,28 @@ rendered `check-runs` response is the source of truth.
 
 ## Trusted fetch dry-run oracle
 
-The Autopus gate must fetch only the trusted producer workflow's successful run
-for the current pull-request head SHA. During workflow review, confirm the fetch
-selection contains all three pins: workflow identity, commit, and success status.
+The Autopus gate must fetch only the trusted producer workflow's successful
+`pull_request_target` run for the current pull-request number and head SHA.
+During workflow review, confirm the selection pins workflow identity, event,
+exact display title, and success status. `--commit` is intentionally not used:
+the trusted-base workflow run is associated with the base commit, not PR-head
+code.
 
 ```bash
 # Review oracle only; do not run from this adk test suite.
-selected_run_id="$(
+expected="Eval Regression Producer PR #<pr_number> head <head_sha>"
+runs_json="$(
   gh run list \
     --workflow eval-regression-producer.yml \
-    --event pull_request \
-    --commit <head_sha> \
+    --event pull_request_target \
     --status success \
-    --json databaseId \
-    --jq '.[0].databaseId'
+    --limit 100 \
+    --json databaseId,displayTitle,createdAt
+)"
+selected_run_id="$(
+  jq -r --arg expected "$expected" \
+    '[.[] | select(.displayTitle == $expected)] | sort_by(.createdAt) | reverse | .[0].databaseId // empty' \
+    <<<"$runs_json"
 )"
 
 test -n "$selected_run_id" || {
@@ -58,17 +66,17 @@ test -n "$selected_run_id" || {
 }
 
 gh run download <selected_run_id> \
-  --name eval-regression-report \
+  --name eval-regression-report-pr-<pr_number>-<head_sha> \
   --dir .autopus/artifacts
 ```
 
 The same-SHA replay defense depends on this exact selection shape:
-`--workflow eval-regression-producer.yml`, `--event pull_request`,
-`--commit <head_sha>`, and `--status success`. A run from any other workflow or
-event at the same SHA must never be selected, even if it uploads an artifact
-named `eval-regression-report`. If no trusted producer run exists for that SHA,
-the gate fails closed with
-`artifact_missing`.
+`--workflow eval-regression-producer.yml`, `--event pull_request_target`,
+`--status success`, and the exact display title
+`Eval Regression Producer PR #<pr_number> head <head_sha>`. A run from another
+workflow, event, PR, or head SHA must never be selected, even if it uploads a
+similarly named artifact. If no exact trusted producer run exists, the gate
+fails closed with `artifact_missing`.
 
 ## Operator provisioning checklist
 
@@ -77,8 +85,9 @@ Complete these steps outside this repository and outside untrusted PR code:
 1. Generate the ed25519 signing key securely outside the repo, preferably in a
    secret manager or controlled ops workstation. Never commit the private key,
    generated seed, shell history, or derived secret material.
-2. Configure the Autopus repo producer workflow with the signing secrets
-   `EVAL_REGRESSION_SIGNING_KEY` and `EVAL_REGRESSION_SIGNING_KEY_ID`.
+2. Configure the Autopus repo producer workflow with the signing secret
+   `EVAL_REGRESSION_SIGNING_KEY` and protected Environment variable
+   `EVAL_REGRESSION_SIGNING_KEY_ID`.
 3. Configure the producer workflow's DB/network credentials in the Autopus repo
    secrets or environment protection layer. The producer needs only the minimum
    database and network access required to read the live eval-regression verdict
@@ -121,7 +130,7 @@ add `eval-regression`**.
 Do not promote until all of the following hold:
 
 1. LIVE-A emits a real `eval_regression_report.v1` report and a valid
-   `eval_regression_attestation.v1` sidecar from the trusted producer workflow.
+   `eval_regression_attestation.v2` sidecar from the trusted producer workflow.
 2. The report is signed with the key whose public half is committed to the adk
    allowlist under the matching `key_id`.
 3. The Autopus gate downloads the trusted producer's successful head-SHA run

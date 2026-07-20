@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -23,6 +24,24 @@ func requireContainsAll(t *testing.T, subject string, required ...string) {
 		if !strings.Contains(subject, needle) {
 			t.Fatalf("expected content to contain %q", needle)
 		}
+	}
+}
+
+func requireImmutableAction(t *testing.T, workflow, action string) {
+	t.Helper()
+	pattern := regexp.MustCompile(`(?m)^\s*uses:\s+` + regexp.QuoteMeta(action) + `@[0-9a-f]{40}\s*$`)
+	if !pattern.MatchString(workflow) {
+		t.Fatalf("expected %s to use an immutable 40-hex revision", action)
+	}
+}
+
+func requireImmutableADKRevision(t *testing.T, workflow string) {
+	t.Helper()
+	if !regexp.MustCompile(`(?m)^\s*adk_revision="[0-9a-f]{40}"\s*$`).MatchString(workflow) {
+		t.Fatal("Autopus gate must pin the ADK verifier to an immutable 40-hex revision")
+	}
+	if !strings.Contains(workflow, `go install "github.com/insajin/autopus-adk/cmd/auto@${adk_revision}"`) {
+		t.Fatal("Autopus gate must install the pinned ADK verifier revision")
 	}
 }
 
@@ -61,12 +80,13 @@ func TestEvalRegressionAutopusGateFetchSelectionReviewOracle(t *testing.T) {
 		"Autopus/.github/workflows/eval-regression-gate.yml",
 		"gh run list",
 		"--workflow eval-regression-producer.yml",
-		"--event pull_request",
-		"--commit <head_sha>",
+		"--event pull_request_target",
 		"--status success",
-		"--json databaseId",
+		"--json databaseId,displayTitle,createdAt",
+		"Eval Regression Producer PR #<pr_number> head <head_sha>",
+		".displayTitle == $expected",
 		"gh run download <selected_run_id>",
-		"eval-regression-report",
+		"eval-regression-report-pr-<pr_number>-<head_sha>",
 		"artifact_missing",
 		"same-SHA",
 	)
@@ -81,47 +101,54 @@ func assertAutopusProducerTrustedCheckout(t *testing.T) {
 	}
 	yaml := string(data)
 	requireContainsAll(t, yaml,
-		"pull_request",
-		"actions/checkout@v4",
-		"Checkout trusted producer code",
-		"repository: ${{ github.repository }}",
-		"ref: ${{ github.event.pull_request.base.sha || github.sha }}",
+		"pull_request_target:",
+		"Checkout trusted base producer code",
+		"ref: ${{ github.event.pull_request.base.sha }}",
+		"persist-credentials: false",
+		"github.event.pull_request.head.repo.full_name == github.repository",
+		"EVAL_REGRESSION_SOURCE_REVISION: ${{ github.event.pull_request.head.sha }}",
 		"go run ./cmd/eval-regression-export",
-		"actions/upload-artifact@v4",
-		"name: eval-regression-report",
+		"name: eval-regression-report-pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}",
 		"eval_regression_report.v1",
-		"eval_regression_attestation.v1",
+		"eval_regression_attestation.v2",
 	)
-	if strings.Contains(yaml, "github.event.pull_request.head.repo.full_name") {
-		t.Fatalf("Autopus producer workflow must not checkout PR-head repository with signing secrets")
-	}
-	if strings.Contains(yaml, "ref: ${{ env.HEAD_SHA }}") {
+	requireImmutableAction(t, yaml, "actions/checkout")
+	requireImmutableAction(t, yaml, "actions/setup-go")
+	requireImmutableAction(t, yaml, "actions/upload-artifact")
+	if strings.Contains(yaml, "ref: ${{ github.event.pull_request.head.sha }}") ||
+		strings.Contains(yaml, "ref: ${{ env.HEAD_SHA }}") {
 		t.Fatalf("Autopus producer workflow must not run PR-head producer code with signing secrets")
 	}
-	if strings.Contains(yaml, "workflow_dispatch") {
-		t.Fatalf("Autopus producer workflow must not expose signing secrets through workflow_dispatch")
+	if strings.Contains(yaml, "workflow_dispatch:") || strings.Contains(yaml, "\n  pull_request:\n") {
+		t.Fatalf("Autopus producer workflow must use only pull_request_target and expose no workflow_dispatch")
 	}
 }
 
 func assertAutopusGateFetchSelection(t *testing.T, yaml string) {
 	t.Helper()
 	requireContainsAll(t, yaml,
-		"pull_request",
-		"actions/checkout@v4",
-		"actions/setup-go@v5",
-		"actions/download-artifact@v4",
-		"go install github.com/insajin/autopus-adk/cmd/auto@",
+		"pull_request_target:",
 		"gh run list",
 		"--workflow eval-regression-producer.yml",
-		"--event pull_request",
-		"--commit",
+		"--event pull_request_target",
+		"--json databaseId,displayTitle,createdAt",
+		"EXPECTED_PRODUCER_RUN:",
+		"Eval Regression Producer PR #${{ github.event.pull_request.number }} head ${{ github.event.pull_request.head.sha }}",
+		".displayTitle == $expected",
 		"github.event.pull_request.head.sha",
 		"--status success",
-		"--json databaseId",
-		"gh run download",
-		"eval-regression-report",
+		"run-id: ${{ steps.trusted-run.outputs.run_id }}",
+		"github-token: ${{ github.token }}",
+		"eval_regression_report.v1",
+		"eval_regression_attestation.v2",
 		"auto check --eval-regression",
 	)
+	requireImmutableAction(t, yaml, "actions/setup-go")
+	requireImmutableAction(t, yaml, "actions/download-artifact")
+	requireImmutableADKRevision(t, yaml)
+	if strings.Contains(yaml, "actions/checkout@") || strings.Contains(yaml, "--commit") {
+		t.Fatalf("Autopus gate must not execute repository code or select pull_request_target runs by base commit")
+	}
 	if strings.Contains(yaml, "--warn-only") {
 		t.Fatalf("Autopus gate workflow must not contain --warn-only")
 	}
