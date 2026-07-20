@@ -30,6 +30,9 @@ func Validate(pack Pack, projectDir string) error {
 	if err := validateMobilePolicy(pack, projectDir); err != nil {
 		return err
 	}
+	if err := validateDesktopObservationPolicy(pack); err != nil {
+		return err
+	}
 	return ValidateCommand(pack.Adapter.ID, pack.Command, pack.Artifacts, projectDir, "qa_journey")
 }
 

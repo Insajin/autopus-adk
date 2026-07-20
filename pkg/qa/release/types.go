@@ -3,6 +3,8 @@ package release
 import (
 	"errors"
 	"time"
+
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 )
 
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-004: schema version strings are persisted in release plan, index, roadmap, and blocker matrix JSON.
@@ -19,16 +21,17 @@ var (
 )
 
 type Options struct {
-	ProjectDir    string
-	Profile       string
-	Output        string
-	RunOutputRoot string
-	Command       string
-	DryRun        bool
-	Roadmap       bool
-	Runner        LaneRunner
-	Now           func() time.Time
-	NewID         func() string
+	ProjectDir      string
+	Profile         string
+	Output          string
+	RunOutputRoot   string
+	Command         string
+	DryRun          bool
+	Roadmap         bool
+	RuntimeProvider desktopobserve.RuntimeProvider
+	Runner          LaneRunner
+	Now             func() time.Time
+	NewID           func() string
 }
 
 type LaneRunner interface {

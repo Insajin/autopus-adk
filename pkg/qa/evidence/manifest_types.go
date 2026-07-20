@@ -1,6 +1,10 @@
 package evidence
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
+)
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-001: QAMESH manifest schema is shared by CLI, browser, and desktop evidence producers.
 // @AX:REASON: Changing schema_version or JSON field contracts breaks cross-surface evidence ingestion and feedback generation.
@@ -44,9 +48,10 @@ type ArtifactRef struct {
 }
 
 type OracleResults struct {
-	A11y    *A11yOracle    `json:"a11y,omitempty"`
-	Desktop *DesktopOracle `json:"desktop,omitempty"`
-	Checks  []CheckResult  `json:"checks,omitempty"`
+	A11y               *A11yOracle                         `json:"a11y,omitempty"`
+	Desktop            *DesktopOracle                      `json:"desktop,omitempty"`
+	DesktopObservation *desktopobserve.ObservationEvidence `json:"desktop_observation,omitempty"`
+	Checks             []CheckResult                       `json:"checks,omitempty"`
 }
 
 type CheckResult struct {

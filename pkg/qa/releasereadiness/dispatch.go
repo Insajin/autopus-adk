@@ -87,7 +87,7 @@ func missingBinary(adapterID string) (string, bool) {
 // exec.LookPath); qarun setup-gap free text is never parsed for reason codes.
 func dispatchLane(opts Options, pack journey.Pack, present []string, runFn runFunc) LaneRow {
 	lane := laneForPack(pack)
-	row := LaneRow{Lane: lane, DeterministicAuthority: true}
+	row := LaneRow{Lane: lane, DeterministicAuthority: true, adapterID: pack.Adapter.ID}
 
 	if !surfacePresent(pack.Surface, present) {
 		row.Status = statusSetupGap
@@ -102,11 +102,12 @@ func dispatchLane(opts Options, pack journey.Pack, present []string, runFn runFu
 	}
 
 	result, err := runFn(qarun.Options{
-		ProjectDir: opts.ProjectDir,
-		Lane:       lane,
-		JourneyID:  pack.ID,
-		AdapterID:  pack.Adapter.ID,
-		Output:     runOutputDir(opts.ProjectDir),
+		ProjectDir:      opts.ProjectDir,
+		Lane:            lane,
+		JourneyID:       pack.ID,
+		AdapterID:       pack.Adapter.ID,
+		Output:          runOutputDir(opts.ProjectDir),
+		RuntimeProvider: opts.RuntimeProvider,
 	})
 	return laneRowFromRun(row, result, err)
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 	qaevidence "github.com/insajin/autopus-adk/pkg/qa/evidence"
 	"github.com/insajin/autopus-adk/pkg/qa/release"
 	qarun "github.com/insajin/autopus-adk/pkg/qa/run"
@@ -39,11 +40,67 @@ func laneRowFromRun(row LaneRow, result qarun.Result, err error) LaneRow {
 	if err != nil && status != release.LaneStatusFailed && status != release.LaneStatusBlocked {
 		status = release.LaneStatusBlocked
 	}
+	if status == release.LaneStatusPassed && desktopObservationDispatch(row, result) &&
+		!validPassingDesktopObservation(result) {
+		status = release.LaneStatusBlocked
+	}
 	row.Status = string(status)
 	if fs := firstFailureSummary(result); fs != "" {
 		row.FailureSummary = fs
 	}
 	return row
+}
+
+func desktopObservationDispatch(row LaneRow, result qarun.Result) bool {
+	if row.adapterID != "" {
+		return row.adapterID == "desktop-accessibility-observe"
+	}
+	for _, adapterResult := range result.AdapterResults {
+		if adapterResult.Adapter == "desktop-accessibility-observe" {
+			return true
+		}
+	}
+	for _, check := range result.Checks {
+		if check.Adapter == "desktop-accessibility-observe" || check.ID == "desktop-semantic-landmarks" {
+			return true
+		}
+	}
+	return row.Lane == "desktop-native"
+}
+
+func validPassingDesktopObservation(result qarun.Result) bool {
+	if result.RedactionStatus.Status != "passed" {
+		return false
+	}
+	adapterPassed := false
+	for _, adapterResult := range result.AdapterResults {
+		if adapterResult.Adapter != "desktop-accessibility-observe" {
+			continue
+		}
+		if adapterResult.Status != "passed" || adapterResult.SetupGap != nil ||
+			adapterResult.DesktopObservation == nil || adapterResult.DesktopObservation.RuntimeReceipt.Validate() != nil {
+			return false
+		}
+		body, err := json.Marshal(adapterResult.DesktopObservation)
+		if err != nil {
+			return false
+		}
+		if _, err := desktopobserve.DecodeObservationEvidence(body); err != nil {
+			return false
+		}
+		adapterPassed = true
+	}
+	checkPassed := false
+	for _, check := range result.Checks {
+		if check.Adapter != "desktop-accessibility-observe" && check.ID != "desktop-semantic-landmarks" {
+			continue
+		}
+		if check.Status != "passed" {
+			return false
+		}
+		checkPassed = true
+	}
+	return adapterPassed && checkPassed
 }
 
 func firstFailureSummary(result qarun.Result) string {

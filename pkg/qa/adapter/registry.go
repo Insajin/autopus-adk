@@ -24,6 +24,7 @@ type Metadata struct {
 	SupportedPlatforms   []string `json:"supported_platforms,omitempty"`
 	DefaultLanes         []string `json:"default_lanes"`
 	ArtifactCapabilities []string `json:"artifact_capabilities"`
+	ReadOnlyOperations   []string `json:"read_only_operations,omitempty"`
 	ReadinessFields      []string `json:"readiness_fields,omitempty"`
 	SetupGapReason       string   `json:"setup_gap_reason,omitempty"`
 	SetupGapReasonCodes  []string `json:"setup_gap_reason_codes,omitempty"`
@@ -46,6 +47,7 @@ func Registry() []Metadata {
 		metadata("auto-verify", []string{"frontend"}, []string{"auto"}),
 		metadata("canary-template", []string{"multi"}, nil),
 		metadata("custom-command", []string{"custom"}, nil),
+		desktopObservationMetadata(),
 	}
 }
 
@@ -135,4 +137,38 @@ func metadata(id string, surfaces, binaries []string) Metadata {
 		item.SetupGapReason = "mobile readiness requires device inventory, simulator/emulator target, app artifact digest, opaque credentials, and cloud lab policy when used"
 	}
 	return item
+}
+
+func desktopObservationMetadata() Metadata {
+	return Metadata{
+		ID:                 "desktop-accessibility-observe",
+		Surfaces:           []string{"desktop"},
+		SupportedPlatforms: []string{"macos"},
+		DefaultLanes:       []string{"desktop-native"},
+		ReadOnlyOperations: []string{
+			"capabilities",
+			"get_state",
+			"list_apps",
+			"list_windows",
+			"permissions",
+		},
+		ArtifactCapabilities: []string{
+			"semantic_projection",
+			"deterministic_checks",
+			"runtime_receipt",
+		},
+		SetupGapReason: "desktop accessibility observation requires the explicitly selected read-only runtime provider",
+		SetupGapReasonCodes: []string{
+			"provider_unavailable",
+			"capability_unsupported",
+			"accessibility_permission_missing",
+			"target_app_not_found",
+			"target_window_not_found",
+			"stale_state",
+			"semantic_projection_unavailable",
+			"redaction_failed",
+			"evidence_quarantined",
+			"provider_protocol_mismatch",
+		},
+	}
 }

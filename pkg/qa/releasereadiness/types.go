@@ -10,7 +10,10 @@
 // deliberately no init() or background trigger here (AC-006).
 package releasereadiness
 
-import "github.com/insajin/autopus-adk/pkg/qa/regen"
+import (
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
+	"github.com/insajin/autopus-adk/pkg/qa/regen"
+)
 
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-011: SchemaVersion is the published payload envelope discriminator — bumping it is a breaking change for any consumer parsing the JSON output.
 // SchemaVersion is the release-readiness payload envelope version.
@@ -39,9 +42,10 @@ const (
 // exclusive operator signals; Decline takes precedence when both are set so a
 // decline never produces side effects.
 type Options struct {
-	ProjectDir string `json:"project_dir"`
-	Approve    bool   `json:"approve"`
-	Decline    bool   `json:"decline"`
+	ProjectDir      string                         `json:"project_dir"`
+	Approve         bool                           `json:"approve"`
+	Decline         bool                           `json:"decline"`
+	RuntimeProvider desktopobserve.RuntimeProvider `json:"runtime_provider,omitempty"`
 }
 
 // LaneRow is the release-readiness view of one dispatched (or gap) lane. Status
@@ -54,6 +58,7 @@ type LaneRow struct {
 	ReasonCode             string `json:"reason_code,omitempty"`
 	FailureSummary         string `json:"failure_summary,omitempty"`
 	DeterministicAuthority bool   `json:"deterministic_authority"`
+	adapterID              string
 }
 
 // Verdict is the aggregated deterministic gate decision over all lane rows.

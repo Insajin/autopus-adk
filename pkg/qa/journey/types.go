@@ -1,21 +1,22 @@
 package journey
 
 type Pack struct {
-	ID                  string              `yaml:"id" json:"id"`
-	Title               string              `yaml:"title" json:"title"`
-	Surface             string              `yaml:"surface" json:"surface"`
-	Lanes               []string            `yaml:"lanes" json:"lanes"`
-	Adapter             AdapterRef          `yaml:"adapter" json:"adapter"`
-	Command             Command             `yaml:"command" json:"command"`
-	Checks              []Check             `yaml:"checks" json:"checks"`
-	Artifacts           []Artifact          `yaml:"artifacts" json:"artifacts"`
-	SourceRefs          SourceRefs          `yaml:"source_refs" json:"source_refs"`
-	ProfileRequirements ProfileRequirements `yaml:"profile_requirements" json:"profile_requirements"`
-	GUI                 GUIPolicy           `yaml:"gui,omitempty" json:"gui,omitempty"`
-	Mobile              MobilePolicy        `yaml:"mobile,omitempty" json:"mobile,omitempty"`
-	PassFailAuthority   string              `yaml:"pass_fail_authority,omitempty" json:"pass_fail_authority,omitempty"`
-	InputSource         string              `yaml:"source,omitempty" json:"input_source,omitempty"`
-	Source              string              `yaml:"-" json:"source"`
+	ID                  string                   `yaml:"id" json:"id"`
+	Title               string                   `yaml:"title" json:"title"`
+	Surface             string                   `yaml:"surface" json:"surface"`
+	Lanes               []string                 `yaml:"lanes" json:"lanes"`
+	Adapter             AdapterRef               `yaml:"adapter" json:"adapter"`
+	Command             Command                  `yaml:"command" json:"command"`
+	Checks              []Check                  `yaml:"checks" json:"checks"`
+	Artifacts           []Artifact               `yaml:"artifacts" json:"artifacts"`
+	SourceRefs          SourceRefs               `yaml:"source_refs" json:"source_refs"`
+	ProfileRequirements ProfileRequirements      `yaml:"profile_requirements" json:"profile_requirements"`
+	GUI                 GUIPolicy                `yaml:"gui,omitempty" json:"gui,omitempty"`
+	Mobile              MobilePolicy             `yaml:"mobile,omitempty" json:"mobile,omitempty"`
+	DesktopObservation  DesktopObservationPolicy `yaml:"desktop_observation,omitempty" json:"desktop_observation,omitempty"`
+	PassFailAuthority   string                   `yaml:"pass_fail_authority,omitempty" json:"pass_fail_authority,omitempty"`
+	InputSource         string                   `yaml:"source,omitempty" json:"input_source,omitempty"`
+	Source              string                   `yaml:"-" json:"source"`
 }
 
 type AdapterRef struct {
@@ -83,6 +84,20 @@ type MobilePolicy struct {
 	DeviceTarget      string   `yaml:"device_target,omitempty" json:"device_target,omitempty"`
 	AppArtifactDigest string   `yaml:"app_artifact_digest,omitempty" json:"app_artifact_digest,omitempty"`
 	ForbiddenActions  []string `yaml:"forbidden_actions,omitempty" json:"forbidden_actions,omitempty"`
+}
+
+type DesktopObservationPolicy struct {
+	Platform          string                       `yaml:"platform" json:"platform"`
+	Operations        []string                     `yaml:"operations" json:"operations"`
+	AppRef            string                       `yaml:"app_ref" json:"app_ref"`
+	WindowRef         string                       `yaml:"window_ref" json:"window_ref"`
+	RequiredLandmarks []DesktopObservationLandmark `yaml:"required_landmarks" json:"required_landmarks"`
+}
+
+type DesktopObservationLandmark struct {
+	Role          string `yaml:"role" json:"role"`
+	Name          string `yaml:"name" json:"name"`
+	RequiredState string `yaml:"required_state" json:"required_state"`
 }
 
 type ValidationError struct {

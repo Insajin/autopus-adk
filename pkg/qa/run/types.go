@@ -2,24 +2,34 @@ package run
 
 import (
 	"github.com/insajin/autopus-adk/pkg/qa/adapter"
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 	"github.com/insajin/autopus-adk/pkg/qa/mobile"
 )
 
 const RunIndexSchemaVersion = "qamesh.run_index.v1"
 
 type Options struct {
-	ProjectDir    string
-	Profile       string
-	Lane          string
-	JourneyID     string
-	AdapterID     string
-	Output        string
-	DryRun        bool
-	FeedbackTo    string
-	ManagedDevice bool
+	ProjectDir      string
+	Profile         string
+	Lane            string
+	JourneyID       string
+	AdapterID       string
+	Output          string
+	DryRun          bool
+	FeedbackTo      string
+	ManagedDevice   bool
+	RuntimeProvider desktopobserve.RuntimeProvider
 	// deviceRunner is the injectable mobile device seam. It is unexported so the
 	// CLI cannot set it; nil resolves to realMobileDeviceRunner at execution.
 	deviceRunner MobileDeviceRunner
+	// desktopRunner is the injectable, provider-neutral native observation seam.
+	desktopRunner *desktopObservationRunner
+	// desktopArtifactPath injects the release-signed local provider artifact in tests.
+	// Production CLI execution resolves the same value from AUTOPUS_RELEASE_SIGNED_ARTIFACT_PATH.
+	desktopArtifactPath string
+	// desktopArtifactVerifier is the test-only seam for release identity verification.
+	// Production always uses the strict macOS code-signing verifier.
+	desktopArtifactVerifier desktopArtifactVerifier
 }
 
 type Plan struct {
@@ -85,13 +95,14 @@ type SetupGap struct {
 }
 
 type AdapterResult struct {
-	Adapter               string    `json:"adapter"`
-	JourneyID             string    `json:"journey_id"`
-	Status                string    `json:"status"`
-	QAMESHManifestPath    string    `json:"qamesh_manifest_path"`
-	RepairPromptAvailable bool      `json:"repair_prompt_available"`
-	SetupGap              *SetupGap `json:"setup_gap"`
-	FailureSummary        string    `json:"failure_summary"`
+	Adapter               string                              `json:"adapter"`
+	JourneyID             string                              `json:"journey_id"`
+	Status                string                              `json:"status"`
+	QAMESHManifestPath    string                              `json:"qamesh_manifest_path"`
+	RepairPromptAvailable bool                                `json:"repair_prompt_available"`
+	SetupGap              *SetupGap                           `json:"setup_gap"`
+	FailureSummary        string                              `json:"failure_summary"`
+	DesktopObservation    *desktopobserve.ObservationEvidence `json:"desktop_observation,omitempty"`
 }
 
 type WorkspaceRef struct {
