@@ -13,6 +13,8 @@ import (
 // the interactive pane backend without hook collection and fell back to screen
 // polling. This closes that gap.
 func applyHookMode(cfg *orchestra.OrchestraConfig) {
+	cfg.HookMode = false
+	cfg.SessionID = ""
 	if !hookCollectionEligible(cfg.Terminal, cfg.SubprocessMode, isHookModeAvailable()) {
 		return
 	}
@@ -21,8 +23,10 @@ func applyHookMode(cfg *orchestra.OrchestraConfig) {
 	// MonitorEnabled/Timeout carry the optional CC21 SignalDetector fast-path; the
 	// FileIPCDetector floor stays active via HookMode regardless of their values.
 	runtime := resolveCC21MonitorRuntime(cfg.Terminal, nil)
-	cfg.MonitorEnabled = runtime.Enabled
-	cfg.MonitorTimeout = runtime.PatternTimeout
+	cfg.MonitorEnabled = cfg.MonitorEnabled || runtime.Enabled
+	if cfg.MonitorTimeout <= 0 {
+		cfg.MonitorTimeout = runtime.PatternTimeout
+	}
 }
 
 // hookCollectionEligible reports whether hook-IPC done-file collection can run:

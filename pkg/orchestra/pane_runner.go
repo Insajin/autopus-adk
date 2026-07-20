@@ -44,17 +44,11 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 		return runRelayPaneOrchestra(ctx, cfg)
 	}
 
-	// Debate always executes its round/judge state machine. Interactive callers
-	// keep pane visibility; non-interactive pane callers use the subprocess state
-	// machine instead of relabeling a one-shot pane fan-out as debate.
+	// Debate always executes its round/judge state machine. A pane-capable
+	// terminal selects pane transport independently of the Interactive flag;
+	// Interactive retains its legacy meaning for non-debate strategies.
 	if cfg.Strategy == StrategyDebate {
-		if cfg.Interactive {
-			return runInteractiveDebate(ctx, cfg)
-		}
-		debateCfg := cfg
-		debateCfg.Terminal = nil
-		debateCfg.SubprocessMode = true
-		return RunOrchestra(ctx, debateCfg)
+		return runInteractiveDebate(ctx, cfg)
 	}
 
 	// Interactive mode: use interactive CLI sessions instead of sentinel-based (SPEC-ORCH-006)
@@ -74,7 +68,7 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 	panes, failed, err := splitProviderPanes(timeoutCtx, cfg)
 	if err != nil {
 		if isPaneProvisioningError(err) {
-			return runFallback(ctx, cfg)
+			return runFallback(ctx, cfg, err)
 		}
 		return nil, fmt.Errorf("pane setup failed after provisioning: %w", err)
 	}
@@ -115,13 +109,14 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 func splitProviderPanes(ctx context.Context, cfg OrchestraConfig) ([]paneInfo, []FailedProvider, error) {
 	panes := make([]paneInfo, 0, len(cfg.Providers))
 	for _, p := range cfg.Providers {
-		paneID, err := splitTrackedPane(ctx, cfg.Terminal, terminal.Horizontal)
+		paneID, err := splitPaneSerialized(ctx, cfg.Terminal, terminal.Horizontal)
 		if paneID == "" {
+			partial := len(panes) > 0
 			cleanupPanes(cfg.Terminal, panes)
 			if err != nil {
-				return nil, nil, newPaneProvisioningError(fmt.Errorf("SplitPane for %s: %w", p.Name, err))
+				return nil, nil, newPaneProvisioningError(fmt.Errorf("SplitPane for %s: %w", p.Name, err), partial)
 			}
-			return nil, nil, newPaneProvisioningError(fmt.Errorf("SplitPane for %s returned an empty pane ID", p.Name))
+			return nil, nil, newPaneProvisioningError(fmt.Errorf("SplitPane for %s returned an empty pane ID", p.Name), partial)
 		}
 		if err != nil {
 			closePaneSurface(cfg.Terminal, paneID)

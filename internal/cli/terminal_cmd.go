@@ -11,7 +11,7 @@ import (
 )
 
 // newTerminalCmd creates the `auto terminal` parent command with subcommands.
-// @AX:NOTE [AUTO] DetectTerminal() is called once per handler invocation — no caching; acceptable for CLI but not for long-running services
+// @AX:NOTE [AUTO] adapters are detected once per handler; workspace management uses installed muxes while pane operations require active context
 func newTerminalCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "terminal",
@@ -63,7 +63,7 @@ func newWorkspaceCreateCmd() *cobra.Command {
 		Short: "Create a terminal workspace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			adapter := terminal.DetectTerminal()
+			adapter := terminal.DetectInstalledTerminal()
 			ctx := context.Background()
 			if err := adapter.CreateWorkspace(ctx, args[0]); err != nil {
 				return fmt.Errorf("create workspace %q: %w", args[0], err)
@@ -81,7 +81,7 @@ func newWorkspaceCloseCmd() *cobra.Command {
 		Short: "Close a terminal workspace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			adapter := terminal.DetectTerminal()
+			adapter := terminal.DetectInstalledTerminal()
 			ctx := context.Background()
 			if err := adapter.Close(ctx, args[0]); err != nil {
 				return fmt.Errorf("close workspace %q: %w", args[0], err)

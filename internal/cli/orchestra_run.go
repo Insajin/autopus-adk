@@ -172,8 +172,12 @@ func runSubprocessPipeline(
 	for i, p := range providerConfigs {
 		names[i] = p.Name
 	}
-	fmt.Fprintf(os.Stderr, "Strategy: %s | Providers: %s | Rounds: %s (%d)\n",
-		strategyStr, strings.Join(names, ", "), roundsPreset, roundCount+1)
+	terminalName := ""
+	if cfg.Terminal != nil {
+		terminalName = cfg.Terminal.Name()
+	}
+	fmt.Fprintf(os.Stderr, "Strategy: %s | Providers: %s | Rounds: %s (%d) | Backend: %s (terminal=%s, hook=%t)\n",
+		strategyStr, strings.Join(names, ", "), roundsPreset, roundCount+1, backend.Name(), terminalName, cfg.HookMode)
 
 	result, err := executeOrchestraRunStrategy(ctx, requestedStrategy, cfg, pipelineCfg)
 	if err != nil {

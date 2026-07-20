@@ -103,6 +103,50 @@ func TestIsHookModeAvailable_NestedWorkingDirectoryFindsAncestorProjectHook(t *t
 	assert.True(t, available, "nested orchestra cwd must discover the ancestor project hook")
 }
 
+// TestIsHookModeAvailable_CodexOnlyProject verifies that a Codex-native Stop
+// hook is sufficient to keep structured orchestra on the pane path. Codex-only
+// installs must not depend on a sibling Claude settings file.
+func TestIsHookModeAvailable_CodexOnlyProject(t *testing.T) {
+	projectRoot := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(projectRoot, "autopus.yaml"),
+		[]byte("project: codex-only-hook-test\n"),
+		0o600,
+	))
+	codexDir := filepath.Join(projectRoot, ".codex")
+	require.NoError(t, os.MkdirAll(codexDir, 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(codexDir, "hooks.json"),
+		[]byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":".codex/hooks/autopus/hook-codex-stop.sh"}]}]}}`),
+		0o600,
+	))
+
+	nestedDir := filepath.Join(projectRoot, "modules", "nested")
+	require.NoError(t, os.MkdirAll(nestedDir, 0o700))
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(nestedDir)
+
+	assert.True(t, isHookModeAvailable(),
+		"Codex Stop hooks must enable pane completion without .claude/settings.json")
+}
+
+// TestIsHookModeAvailable_GlobalCodexHook verifies user-global Codex hooks are
+// detected in the same way as user-global Claude hooks.
+func TestIsHookModeAvailable_GlobalCodexHook(t *testing.T) {
+	home := t.TempDir()
+	codexDir := filepath.Join(home, ".codex")
+	require.NoError(t, os.MkdirAll(codexDir, 0o700))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(codexDir, "hooks.json"),
+		[]byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":".codex/hooks/autopus/hook-codex-stop.sh"}]}]}}`),
+		0o600,
+	))
+	t.Setenv("HOME", home)
+	t.Chdir(t.TempDir())
+
+	assert.True(t, isHookModeAvailable(), "global Codex Stop hook must enable pane completion")
+}
+
 // TestIsHookModeAvailable_StopsAtNearestAutopusProjectRoot verifies that a
 // hook belonging to an unrelated ancestor workspace is not treated as the
 // current project's hook.

@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -239,47 +238,4 @@ func resolveAndValidateThreshold(orchConf *config.OrchestraConf, configErr error
 		return 0, fmt.Errorf("resolved threshold invalid: %w", err)
 	}
 	return resolved, nil
-}
-
-// @AX:NOTE [AUTO]: hook discovery uses ~/.claude/settings.json markers "autopus"/"Stop" and autopus.yaml as the project-root boundary
-func isHookModeAvailable() bool {
-	home, _ := os.UserHomeDir()
-	cwd, err := os.Getwd()
-	globalPath := filepath.Join(home, ".claude", "settings.json")
-	if err != nil {
-		return hookModeAvailableInDirs(globalPath, "")
-	}
-	if hookModeAvailableInDirs(globalPath, "") {
-		return true
-	}
-	if hookModeAvailableInDirs("", filepath.Join(cwd, ".claude", "settings.json")) {
-		return true
-	}
-	for dir := cwd; ; dir = filepath.Dir(dir) {
-		if _, err := os.Stat(filepath.Join(dir, "autopus.yaml")); err == nil {
-			return hookModeAvailableInDirs("", filepath.Join(dir, ".claude", "settings.json"))
-		}
-		if filepath.Dir(dir) == dir {
-			return false
-		}
-	}
-}
-
-// hookModeAvailableInDirs checks injected settings paths for both hook markers.
-// Callers provide fixed paths; user-supplied path segments are not accepted.
-func hookModeAvailableInDirs(globalPath, projectPath string) bool {
-	for _, path := range []string{globalPath, projectPath} {
-		if path == "" {
-			continue
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		s := string(data)
-		if strings.Contains(s, "autopus") && strings.Contains(s, "Stop") {
-			return true
-		}
-	}
-	return false
 }

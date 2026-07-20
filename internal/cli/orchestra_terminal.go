@@ -26,14 +26,14 @@ import (
 // REQ-005/REQ-008 (nested-agent relaxation): when an environment marker or the
 // bounded parent-process scan identifies Claude Code/Codex and no CI env is
 // present, pane execution is permitted if both the hook subsystem is available
-// (isHookModeAvailable) AND a multiplexer (cmux or tmux) is installed.
+// (isHookModeAvailable) AND the process has an active multiplexer context.
 // This allows agent runtimes to drive pane-based orchestra without requiring an
 // interactive TTY. The floor is preserved: if either condition is false the result
 // falls back to plain/subprocess just as before.
 func detectStructuredTerminal() terminal.Terminal {
 	hookAvail := isHookModeAvailable()
 	detected := terminal.DetectTerminal()
-	muxInstalled := detected.Name() != "plain"
+	muxActive := detected.Name() != "plain"
 	codexRuntime := hasCodexRuntimeMarker(
 		os.Getenv("CODEX"),
 		os.Getenv("CODEX_CI"),
@@ -49,7 +49,7 @@ func detectStructuredTerminal() terminal.Terminal {
 		term.IsTerminal(int(os.Stdin.Fd())),
 		term.IsTerminal(int(os.Stdout.Fd())),
 		hookAvail,
-		muxInstalled,
+		muxActive,
 	) {
 		return &terminal.PlainAdapter{}
 	}
@@ -61,22 +61,22 @@ func detectStructuredTerminal() terminal.Terminal {
 // Truth-table (REQ-005/REQ-008):
 //
 //	CI != ""                                         → false  (CI always forces subprocess floor)
-//	CI == "" && nested agent runtime is identified → hookAvailable && muxInstalled
+//	CI == "" && nested agent runtime is identified → hookAvailable && muxActive
 //	CI == "" && no nested agent runtime            → stdinTTY && stdoutTTY  (normal interactive path)
 //
 // hookAvailable: isHookModeAvailable() (project-local OR user-global hook config).
-// muxInstalled:  DetectTerminal().Name() != "plain" (cmux OR tmux present).
+// muxActive:     DetectTerminal().Name() != "plain" (active cmux OR tmux context).
 //
 // Kept as a pure function so the decision is unit-testable without manipulating
 // real file descriptors or environment variables.
-func paneInteractiveContext(claudeCode, codexRuntime, ci string, stdinTTY, stdoutTTY bool, hookAvailable, muxInstalled bool) bool {
+func paneInteractiveContext(claudeCode, codexRuntime, ci string, stdinTTY, stdoutTTY bool, hookAvailable, muxActive bool) bool {
 	// CI always forces the subprocess floor regardless of nested agent runtime.
 	if ci != "" {
 		return false
 	}
 	// Nested-agent relaxation: hook + mux must both be present.
 	if claudeCode != "" || codexRuntime != "" {
-		return hookAvailable && muxInstalled
+		return hookAvailable && muxActive
 	}
 	// Normal interactive context: both stdio file descriptors must be TTYs.
 	return stdinTTY && stdoutTTY
@@ -88,7 +88,7 @@ func paneInteractiveContextWithRuntime(
 	detectedRuntime detect.AgentRuntime,
 	ci string,
 	stdinTTY, stdoutTTY bool,
-	hookAvailable, muxInstalled bool,
+	hookAvailable, muxActive bool,
 ) bool {
 	codexRuntime := ""
 	if codexEnv || detectedRuntime == detect.AgentRuntimeCodex {
@@ -105,7 +105,7 @@ func paneInteractiveContextWithRuntime(
 		stdinTTY,
 		stdoutTTY,
 		hookAvailable,
-		muxInstalled,
+		muxActive,
 	)
 }
 

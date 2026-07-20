@@ -56,7 +56,7 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	term := b.cfg.Terminal
 	start := time.Now()
 
-	paneID, err := splitTrackedPane(ctx, term, terminal.Horizontal)
+	paneID, err := splitPaneSerialized(ctx, term, terminal.Horizontal)
 	if paneID == "" {
 		if err != nil {
 			return paneProvisioningFallback(ctx, b.cfg, req, "interactive pane execution failed: SplitPane error: "+err.Error())

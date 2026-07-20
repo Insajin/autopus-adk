@@ -12,10 +12,10 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
-	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
 var runOrchestraExecute = orchestra.RunOrchestra
+var runOrchestraTerminalDetector = detectStructuredTerminal
 
 // newOrchestraCmd creates the orchestra root command.
 // @AX:ANCHOR: [AUTO] CLI entry point — registers all 7 orchestra subcommands; changes here affect all orchestra routes
@@ -158,7 +158,7 @@ func runOrchestraCommand(
 	resolvedTimeout := resolveOrchestraTimeout(orchConf, timeout, flags.TimeoutChanged, providers)
 	timeout = resolvedTimeout.Seconds
 	providers = applyResolvedProviderTimeouts(providers, resolvedTimeout)
-	term := terminal.DetectTerminal()
+	term := runOrchestraTerminalDetector()
 	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"
 	monitorRuntime := resolveCC21MonitorRuntime(term, harnessCfg)
@@ -199,15 +199,17 @@ func runOrchestraCommand(
 		RequireJudgeFamilySeparation: commandName == "brainstorm" &&
 			s == orchestra.StrategyDebate,
 	}
+	applyHookMode(&cfg)
 
 	providerNames := providerConfigNames(providers)
-	fmt.Fprintf(os.Stderr, "전략: %s, 프로바이더: %s\n", strategyStr, strings.Join(providerNames, ", "))
-
-	// @AX:NOTE [AUTO] REQ-1 auto-detach branch — returns job ID to stdout, status to stderr; skips RunOrchestra
 	termName := ""
 	if cfg.Terminal != nil {
 		termName = cfg.Terminal.Name()
 	}
+	fmt.Fprintf(os.Stderr, "전략: %s, 프로바이더: %s, 백엔드: %s (terminal=%s, hook=%t)\n",
+		strategyStr, strings.Join(providerNames, ", "), orchestra.SelectBackend(cfg).Name(), termName, cfg.HookMode)
+
+	// @AX:NOTE [AUTO] REQ-1 auto-detach branch — returns job ID to stdout, status to stderr; skips RunOrchestra
 	if orchestra.ShouldDetach(termName, isStdoutTTY(), cfg.NoDetach) {
 		jobID, err := orchestra.RunPaneOrchestraDetached(ctx, cfg)
 		if err != nil {

@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -209,9 +210,9 @@ func TestSurfaceManager_ValidateAndRecover_StaleReadScreen(t *testing.T) {
 	assert.NotEqual(t, pi.paneID, newPI.paneID, "new pane should have different ID")
 }
 
-// TestSurfaceManager_ValidateAndRecover_CachedUnhealthy verifies recovery when
-// cached health is false (no live double-check needed).
-func TestSurfaceManager_ValidateAndRecover_CachedUnhealthy(t *testing.T) {
+// TestSurfaceManager_ValidateAndRecover_CachedUnhealthyLiveHealthy preserves a
+// live pane when an asynchronous signal-health sample is a false negative.
+func TestSurfaceManager_ValidateAndRecover_CachedUnhealthyLiveHealthy(t *testing.T) {
 	t.Parallel()
 	mock := &surfaceSignalMock{}
 	mock.name = "cmux"
@@ -227,6 +228,71 @@ func TestSurfaceManager_ValidateAndRecover_CachedUnhealthy(t *testing.T) {
 	pi := paneInfo{paneID: "pane-1", provider: ProviderConfig{Name: "claude", Binary: "echo"}}
 	cfg := OrchestraConfig{Terminal: mock}
 
-	_, _, err := sm.ValidateAndRecover(context.Background(), cfg, pi, 1)
-	assert.Error(t, err, "should return error when recreation fails")
+	newPI, recovered, err := sm.ValidateAndRecover(context.Background(), cfg, pi, 1)
+	require.NoError(t, err)
+	assert.False(t, recovered)
+	assert.Equal(t, pi.paneID, newPI.paneID)
+	assert.Empty(t, mock.splitPaneCalls, "live validation must prevent false-positive replacement")
+}
+
+type recoveryOrderTerminal struct {
+	surfaceSignalMock
+	eventsMu sync.Mutex
+	events   []string
+}
+
+func (m *recoveryOrderTerminal) SendLongText(ctx context.Context, paneID terminal.PaneID, text string) error {
+	m.eventsMu.Lock()
+	m.events = append(m.events, "launch:"+string(paneID))
+	m.eventsMu.Unlock()
+	return m.surfaceSignalMock.mockTerminal.SendLongText(ctx, paneID, text)
+}
+
+func (m *recoveryOrderTerminal) Close(ctx context.Context, ref string) error {
+	m.eventsMu.Lock()
+	m.events = append(m.events, "close:"+ref)
+	m.eventsMu.Unlock()
+	return m.surfaceSignalMock.mockTerminal.Close(ctx, ref)
+}
+
+func (m *recoveryOrderTerminal) eventIndex(want string) int {
+	m.eventsMu.Lock()
+	defer m.eventsMu.Unlock()
+	for i, event := range m.events {
+		if event == want {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestSurfaceManager_ValidateAndRecover_WarmReplacementCommitsBeforeOldClose(t *testing.T) {
+	term := &recoveryOrderTerminal{surfaceSignalMock: surfaceSignalMock{
+		mockTerminal: mockTerminal{name: "cmux", readScreenOutput: "❯\n"},
+		stalePanes:   map[terminal.PaneID]bool{"old-pane": true},
+	}}
+	sm := NewSurfaceManager(term)
+	sm.mu.Lock()
+	sm.health["old-pane"] = terminal.SurfaceStatus{Valid: false}
+	sm.mu.Unlock()
+	sm.warmPool = &WarmPool{
+		term: term,
+		pool: []warmPane{{paneID: "warm-pane", outputFile: t.TempDir() + "/warm-output"}},
+	}
+	pi := paneInfo{
+		paneID:     "old-pane",
+		outputFile: t.TempDir() + "/old-output",
+		provider:   ProviderConfig{Name: "claude", Binary: "echo"},
+	}
+
+	newPI, recovered, err := sm.ValidateAndRecover(context.Background(), OrchestraConfig{Terminal: term}, pi, 1)
+
+	require.NoError(t, err)
+	assert.True(t, recovered)
+	assert.Equal(t, terminal.PaneID("warm-pane"), newPI.paneID)
+	launchIndex := term.eventIndex("launch:warm-pane")
+	closeIndex := term.eventIndex("close:old-pane")
+	require.NotEqual(t, -1, launchIndex)
+	require.NotEqual(t, -1, closeIndex)
+	assert.Less(t, launchIndex, closeIndex, "replacement launch must commit before old pane teardown")
 }

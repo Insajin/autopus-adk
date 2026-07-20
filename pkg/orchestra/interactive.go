@@ -57,7 +57,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 	panes, failed, err := splitProviderPanes(timeoutCtx, cfg)
 	if err != nil {
 		if isPaneProvisioningError(err) {
-			return runFallback(ctx, cfg)
+			return runFallback(ctx, cfg, err)
 		}
 		return nil, fmt.Errorf("interactive pane setup failed after provisioning: %w", err)
 	}

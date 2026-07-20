@@ -133,7 +133,7 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 			_ = cfg.ReliabilityStore.recordEvent(event)
 		}
 		log.Printf("[debate] splitProviderPanes failed: %v -- applying fallback policy", err)
-		return runFallback(ctx, cfg)
+		return runFallback(ctx, cfg, err)
 	}
 	// R5: Skip pane cleanup when yield mode is active — keep panes alive.
 	if !cfg.YieldRounds {

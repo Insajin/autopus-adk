@@ -128,6 +128,9 @@ func TestRecreatePane_SplitPaneError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from recreatePane when SplitPane fails")
 	}
+	if containsString(mock.closeCalls, string(pi.paneID)) {
+		t.Fatalf("old pane %s must remain live when replacement split fails", pi.paneID)
+	}
 }
 
 // TestRecreatePane_PipePaneStartError verifies that recreatePane succeeds even when
@@ -176,6 +179,21 @@ func TestRecreatePane_LaunchError(t *testing.T) {
 	if !strings.Contains(err.Error(), "launch") {
 		t.Errorf("expected 'launch' in error, got: %v", err)
 	}
+	if containsString(mock.closeCalls, string(pi.paneID)) {
+		t.Fatalf("old pane %s must remain live when replacement launch fails", pi.paneID)
+	}
+	if !containsString(mock.closeCalls, "pane-1") {
+		t.Fatal("failed replacement pane must be cleaned up")
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 // TestRecreatePane_RoundEnvSet verifies that SendRoundEnvToPane is called with
