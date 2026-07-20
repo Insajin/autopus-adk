@@ -191,10 +191,10 @@ func TestBuildPlanReportsHarnessContractAndProjectLocalGUIGap(t *testing.T) {
 	assert.Equal(t, "harness", plan.HarnessContract.Role)
 	assert.Equal(t, "project-local", plan.HarnessContract.JourneyPackOwnership)
 	assert.Contains(t, plan.HarnessContract.JourneyPackRoot, ".autopus/qa/journeys")
-	require.NotEmpty(t, plan.SetupGaps)
-	assert.Equal(t, "gui-explore", plan.SetupGaps[0].Adapter)
-	assert.Contains(t, plan.SetupGaps[0].Reason, "ADK is a harness")
-	assert.Contains(t, plan.SetupGaps[0].Reason, ".autopus/qa/journeys")
+	gap := requireSetupGapByJourneyID(t, plan.SetupGaps, "project-local-gui-explore")
+	assert.Equal(t, "gui-explore", gap.Adapter)
+	assert.Contains(t, gap.Reason, "ADK is a harness")
+	assert.Contains(t, gap.Reason, ".autopus/qa/journeys")
 }
 
 func TestBuildPlanReportsDesktopGUIHintWithoutFastLaneSetupGap(t *testing.T) {
@@ -227,8 +227,7 @@ func TestBuildPlanDoesNotUseDetectedFallbackForGUIExploreLane(t *testing.T) {
 	assert.Contains(t, plan.DetectedAdapters, "playwright")
 	assert.Empty(t, plan.SelectedJourneys)
 	assert.Empty(t, plan.SelectedAdapters)
-	require.NotEmpty(t, plan.SetupGaps)
-	assert.Equal(t, "project-local-gui-explore", plan.SetupGaps[0].JourneyID)
+	requireSetupGapByJourneyID(t, plan.SetupGaps, "project-local-gui-explore")
 }
 
 func TestBuildPlanDoesNotReportGUIGapWhenProjectLocalJourneyExists(t *testing.T) {
@@ -270,4 +269,15 @@ gui:
 	for _, gap := range plan.SetupGaps {
 		assert.NotEqual(t, "project-local-gui-explore", gap.JourneyID)
 	}
+}
+
+func requireSetupGapByJourneyID(t *testing.T, gaps []SetupGap, journeyID string) SetupGap {
+	t.Helper()
+	for _, gap := range gaps {
+		if gap.JourneyID == journeyID {
+			return gap
+		}
+	}
+	require.FailNowf(t, "missing setup gap", "journey_id=%q gaps=%+v", journeyID, gaps)
+	return SetupGap{}
 }

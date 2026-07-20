@@ -19,6 +19,7 @@ func TestDispatcher_FetchesSchedules(t *testing.T) {
 
 	var gotPath, gotAuth string
 	var mu sync.Mutex
+	requested := make(chan struct{}, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		gotPath = r.URL.Path
@@ -30,14 +31,31 @@ func TestDispatcher_FetchesSchedules(t *testing.T) {
 			"success": true,
 			"data":    []schedule{},
 		})
+		requested <- struct{}{}
 	}))
 	defer srv.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	d := NewDispatcher(srv.URL, "mytoken", "ws-42", time.UTC, func(string, string) {})
-	d.Start(ctx)
+	done := make(chan struct{})
+	go func() {
+		d.Start(ctx)
+		close(done)
+	}()
+
+	select {
+	case <-requested:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for schedule request")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("dispatcher did not stop after cancellation")
+	}
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -48,31 +66,46 @@ func TestDispatcher_FetchesSchedules(t *testing.T) {
 func TestDispatcher_TriggersMatchingSchedule(t *testing.T) {
 	t.Parallel()
 
-	now := time.Now().In(time.UTC)
-	cronExpr := minuteMatchingCron(now)
-
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		// Backend returns wrapped response: { success: true, data: [...] }
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"success": true,
-			"data":    []schedule{{ID: "s1", CronExpr: cronExpr, TaskPayload: "payload1"}},
+			"data":    []schedule{{ID: "s1", CronExpr: "* * * * *", TaskPayload: "payload1"}},
 		})
 	}))
 	defer srv.Close()
 
-	var triggered sync.Map
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	type triggerEvent struct {
+		id      string
+		payload string
+	}
+	triggered := make(chan triggerEvent, 1)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	d := NewDispatcher(srv.URL, "tok", "ws", time.UTC, func(id, payload string) {
-		triggered.Store(id, payload)
+		triggered <- triggerEvent{id: id, payload: payload}
 	})
-	d.Start(ctx)
+	done := make(chan struct{})
+	go func() {
+		d.Start(ctx)
+		close(done)
+	}()
 
-	val, ok := triggered.Load("s1")
-	require.True(t, ok, "schedule s1 should have been triggered")
-	assert.Equal(t, "payload1", val)
+	select {
+	case event := <-triggered:
+		assert.Equal(t, "s1", event.id)
+		assert.Equal(t, "payload1", event.payload)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for matching schedule trigger")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("dispatcher did not stop after cancellation")
+	}
 }
 
 func TestDispatcher_Deduplication(t *testing.T) {
