@@ -1,11 +1,17 @@
 package setup
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
+
+	"github.com/insajin/autopus-adk/pkg/processprobe"
 )
+
+const providerVersionTimeout = 2 * time.Second
 
 // ProviderStatus describes the installation state of a CLI provider.
 type ProviderStatus struct {
@@ -54,7 +60,9 @@ func DetectProviders() []ProviderStatus {
 
 // detectVersion runs "{binary} --version" and returns the output.
 func detectVersion(binaryPath string) string {
-	out, err := exec.Command(binaryPath, "--version").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), providerVersionTimeout)
+	defer cancel()
+	out, err := processprobe.Output(exec.CommandContext(ctx, binaryPath, "--version"))
 	if err != nil {
 		return "unknown"
 	}

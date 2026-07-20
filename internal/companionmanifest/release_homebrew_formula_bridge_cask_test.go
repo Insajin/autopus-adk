@@ -17,16 +17,16 @@ var frozenFormulaDigests = []string{
 	"8f331702c5d98418b45203d0b7b604f52a36d9e08b2a7dcbb6d5f6fe712ef878",
 }
 
-func TestHomebrewFormulaBridge_A7PinsCaskOnlyTapTransition(t *testing.T) {
+func TestHomebrewFormulaBridge_A8PinsCaskOnlyTapTransition(t *testing.T) {
 	source := readReleaseFile(t, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
 	for _, required := range []string{
-		"readonly RELEASE_TAG='v0.50.78'",
-		"readonly RELEASE_VERSION='0.50.78'",
-		"readonly PRIOR_CASK_BLOB='39b9b77eb51149ff87df7ad4f8fb3c5300b1302c'",
+		"readonly RELEASE_TAG='v0.50.79'",
+		"readonly RELEASE_VERSION='0.50.79'",
+		"readonly PRIOR_CASK_BLOB='a46b37d61bfd62a31fd5f4c6731d4f83fa1c868a'",
 		"COMPANION_HOMEBREW_POLICY", "cask-only",
 	} {
 		if !strings.Contains(source, required) {
-			t.Fatalf("A7 Homebrew policy missing %q", required)
+			t.Fatalf("A8 Homebrew policy missing %q", required)
 		}
 	}
 	for _, forbidden := range []string{
@@ -34,7 +34,7 @@ func TestHomebrewFormulaBridge_A7PinsCaskOnlyTapTransition(t *testing.T) {
 		"reconcile_tap_file formula Formula",
 	} {
 		if strings.Contains(source, forbidden) {
-			t.Fatalf("A7 production path still references the frozen Formula via %q", forbidden)
+			t.Fatalf("A8 production path still references the frozen Formula via %q", forbidden)
 		}
 	}
 }
@@ -44,6 +44,17 @@ func TestHomebrewFormulaBridge_PublishedV05070CaskGolden(t *testing.T) {
 	sum := sha256.Sum256([]byte(publishedV05070Cask))
 	if got := fmt.Sprintf("%x", sum); got != "57d790fb79f8156aa83d5330be98c50b03d85b8a1175396b71bd642c3facc4b2" {
 		t.Fatalf("published v0.50.70 Cask golden digest = %s", got)
+	}
+}
+
+func TestHomebrewFormulaBridge_PublishedV05078TapPins(t *testing.T) {
+	caskSum := sha256.Sum256([]byte(homebrewBridgeCask()))
+	if got := fmt.Sprintf("%x", caskSum); got != "9ebee2d63ead3c92c52160b4d8e90e803de7acc38367b9b62aafa07b2c4d6ac2" {
+		t.Fatalf("published v0.50.78 Cask digest = %s", got)
+	}
+	formulaSum := sha256.Sum256([]byte(homebrewBridgeFormula(t)))
+	if got := fmt.Sprintf("%x", formulaSum); got != "6bc6a0fbf790ee144c74d802a2031ab61f57a2ebd0611b6f15e856c8ed3e8a7c" {
+		t.Fatalf("frozen v0.50.71 Formula digest = %s", got)
 	}
 }
 
@@ -57,7 +68,7 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 			fixture.writeAPIContent(t, "cask.json", strings.Repeat("c", 40), malicious)
 
 			output, err := fixture.run(nil)
-			if err == nil || !strings.Contains(string(output), "published Cask differs from canonical v0.50.77") {
+			if err == nil || !strings.Contains(string(output), "published Cask differs from canonical v0.50.78") {
 				t.Fatalf("%s Cask result: %v\n%s", stanza, err, output)
 			}
 			if got := fixture.updateCount(t, "cask"); got != "0" {
@@ -69,11 +80,11 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 
 func homebrewBridgeCask() string {
 	return strings.NewReplacer(
-		`version "0.50.70"`, `version "0.50.77"`,
-		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "d5e47076c1fc898d2b3f5880b6edfcf9a12e805633dcba2691da22f300d41dc9",
-		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "d6d092177a5406c194eea1de4fbd11b8af92a03814eb143a294541a3a578b9ab",
-		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "30d759af89373df9ecf93cf5ae592c42b7ad51481f07a22f7cb08b2278007eab",
-		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "7a2637f6de5d582f67881857425f5dd9375a0234a258de8b950b4e7f63b021ab",
+		`version "0.50.70"`, `version "0.50.78"`,
+		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "43018046ab37027b7fba3888d288961cb5abc136e478deaa9f878586bcce6629",
+		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "e72653fd3094537caa60398e2017d409796d7ceef88a7662ca93b6299e9d00ec",
+		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "d71203aba91bf8ac5ceb298437e9db16c594890437e8a7b6c850c93a2b70316f",
+		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "f44098eb432d9348181cc65a3937b341706a6b06bcec163debbc82a4275ce095",
 	).Replace(publishedV05070Cask)
 }
 

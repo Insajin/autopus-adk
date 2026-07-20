@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.78'
+      - 'v0.50.79'
 permissions:
   contents: read
 jobs:
@@ -17,7 +17,7 @@ jobs:
 
   release:
     needs: [ci, security]
-    if: github.ref == 'refs/tags/v0.50.78'
+    if: github.ref == 'refs/tags/v0.50.79'
     environment:
       name: adk-companion-release
     permissions:
@@ -296,6 +296,21 @@ jobs:
             COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS="$COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS" \
             goreleaser release --clean
 
+      - name: Verify current immutable release evidence
+        id: release-evidence
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
+        run: |
+          set -euo pipefail
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.79-checksums.txt"
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_TOKEN="$GITHUB_TOKEN" \
+            COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
+            scripts/companion-release/verify-current-release.sh "$checksums_path"
+          printf 'checksums-path=%s\n' "$checksums_path" >> "$GITHUB_OUTPUT"
+
       - name: Create Homebrew tap token
         id: homebrew-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
@@ -309,13 +324,14 @@ jobs:
       - name: Publish Homebrew Cask
         shell: bash
         env:
+          COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.78' \
-            COMPANION_VERSION='0.50.78' \
+            GITHUB_REF_NAME='v0.50.79' \
+            COMPANION_VERSION='0.50.79' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
-            COMPANION_CHECKSUMS_PATH='dist/checksums.txt' \
+            COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
             HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
             scripts/companion-release/publish-homebrew-formula-bridge.sh
@@ -327,6 +343,14 @@ jobs:
           set -u
           cleanup_status=0
           keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
+          if [[ -e "$RUNNER_TEMP/autopus-v0.50.79-checksums.txt" ||
+                -L "$RUNNER_TEMP/autopus-v0.50.79-checksums.txt" ]]; then
+            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.79-checksums.txt"; then
+              :
+            else
+              cleanup_status=$?
+            fi
+          fi
           if [[ -e "$keychain_path" || -L "$keychain_path" ]]; then
             if security delete-keychain "$keychain_path"; then :; else cleanup_status=$?; fi
           fi

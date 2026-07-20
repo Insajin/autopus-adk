@@ -33,6 +33,7 @@ type executableLineageTools struct {
 
 type executableLineagePins struct {
 	commit        string
+	tree          string
 	tagObject     string
 	receipt       string
 	signature     string
@@ -152,6 +153,8 @@ func newExecutableLineageFixture(
 		currentTag = publicKeyReceiptA6Tag
 	case publicKeyReceiptA6Version:
 		currentTag = publicKeyReceiptA7Tag
+	case publicKeyReceiptA7Version:
+		currentTag = publicKeyReceiptA8Tag
 	}
 	fixture := &executableLineageFixture{
 		root: root, tools: tools, evidence: evidence, pins: evidence.pins,

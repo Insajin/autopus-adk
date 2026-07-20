@@ -19,6 +19,7 @@ lineage="$script_dir/verify-public-key-lineage.sh"
 lineage_pins="$script_dir/verify-public-key-lineage-pins.sh"
 producer="$script_dir/produce.sh"
 homebrew_bridge="$script_dir/publish-homebrew-formula-bridge.sh"
+current_release_gate="$script_dir/verify-current-release.sh"
 
 # GoReleaser must render, but never publish, the Cask or mutate tagged source.
 contains "$config" 'skip_upload: true'
@@ -28,15 +29,20 @@ contains "$release" 'go mod tidy -diff'
 
 # A fresh, narrowly scoped tap token must be created after immutable release publish.
 release_index=$(grep -n 'goreleaser release --clean' "$release" | cut -d: -f1)
+evidence_index=$(grep -n 'scripts/companion-release/verify-current-release.sh' "$release" | cut -d: -f1)
 token_index=$(grep -n 'name: Create Homebrew tap token' "$release" | cut -d: -f1)
 bridge_index=$(grep -n 'scripts/companion-release/publish-homebrew-formula-bridge.sh' "$release" | cut -d: -f1)
-(( release_index < token_index && token_index < bridge_index )) || fail 'tap token ordering is unsafe'
-goreleaser_step=$(sed -n '/name: Run GoReleaser/,/name: Create Homebrew tap token/p' "$release")
+(( release_index < evidence_index && evidence_index < token_index && token_index < bridge_index )) \
+  || fail 'release evidence or tap token ordering is unsafe'
+goreleaser_step=$(sed -n '/name: Run GoReleaser/,/name: Verify current immutable release evidence/p' "$release")
 [[ "$goreleaser_step" != *HOMEBREW_TAP_TOKEN* ]] || fail 'GoReleaser receives tap token'
 [[ "$goreleaser_step" != *APPLE_CERTIFICATE_PASSWORD* ]] || fail 'GoReleaser receives certificate password'
 contains "$release" "COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb'"
+contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}'
+contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
+not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
 contains "$producer" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='39b9b77eb51149ff87df7ad4f8fb3c5300b1302c'"
+contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='a46b37d61bfd62a31fd5f4c6731d4f83fa1c868a'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 not_contains "$homebrew_bridge" 'Formula/auto.rb'
 not_contains "$homebrew_bridge" 'FORMULA_PATH'
@@ -50,10 +56,13 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$release" "- 'v0.50.78'"
-contains "$release" "if: github.ref == 'refs/tags/v0.50.78'"
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.78'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.78'
+contains "$release" "- 'v0.50.79'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.79'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.79'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.79'
+not_contains "$release" "'v0.50.78'"
+not_contains "$release" 'refs/tags/v0.50.78'
+not_contains "$recovery" 'refs/tags/v0.50.78'
 not_contains "$release" "'v0.50.77'"
 not_contains "$release" 'refs/tags/v0.50.77'
 not_contains "$recovery" 'refs/tags/v0.50.77'
@@ -65,6 +74,7 @@ not_contains "$release" 'refs/tags/v0.50.76'
 not_contains "$recovery" 'refs/tags/v0.50.76'
 contains "$source_gate" "readonly A6_A5_ANCESTOR_SHA='b27252cb1148192a8ae1a95195c50e5f221453a4'"
 contains "$source_gate" "readonly A7_A6_ANCESTOR_SHA='902f1acfa91f1d0a2ac9471d5cd79117031a2599'"
+contains "$source_gate" "readonly A8_A7_ANCESTOR_SHA='51de6030a69a8e36fcf7e5790ef157eff6fedf00'"
 contains "$lineage" 'source "$pins_helper"'
 contains "$lineage_pins" "A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'"
 contains "$lineage_pins" "A4_CHECKSUMS_SHA256='a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1'"
@@ -85,20 +95,47 @@ contains "$lineage_pins" "A6_AMD64_ARCHIVE_SHA256='d5e47076c1fc898d2b3f5880b6edf
 contains "$lineage_pins" "A6_ARM64_ARCHIVE_SHA256='d6d092177a5406c194eea1de4fbd11b8af92a03814eb143a294541a3a578b9ab'"
 contains "$lineage_pins" "A6_AMD64_MANIFEST_SHA256='64c634130b16a74cbb33f666d316a05d9a7a1012246dc58fde6e15350b71d0c5'"
 contains "$lineage_pins" "A6_ARM64_MANIFEST_SHA256='b6611c04990b048bc5545e37c942bc8e7e4fab8592d546eaab80d7084991bea6'"
-contains "$lineage" "release_phase='A7' prior_phase='A6'"
-contains "$producer" "GITHUB_REF_NAME\" == 'v0.50.78'"
-contains "$producer" "release_phase='A7'"
-contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.78'"
-contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.78'"
+contains "$lineage_pins" "A7_COMMIT_SHA='51de6030a69a8e36fcf7e5790ef157eff6fedf00'"
+contains "$lineage_pins" "A7_TREE_SHA='3cd00b17bd8bd6aa8def213de1c5765c3611765d'"
+contains "$lineage_pins" "A7_TAG_OBJECT_SHA='417a318fb6a11a720e2c4102e92e39ea9ed676e9'"
+contains "$lineage_pins" "A7_CHECKSUMS_SHA256='322d2ef21dff55f02ca36944aba88ee5da92fdae6bcd16a89319f1697efb9733'"
+contains "$lineage_pins" "A7_AMD64_ARCHIVE_SHA256='43018046ab37027b7fba3888d288961cb5abc136e478deaa9f878586bcce6629'"
+contains "$lineage_pins" "A7_ARM64_ARCHIVE_SHA256='e72653fd3094537caa60398e2017d409796d7ceef88a7662ca93b6299e9d00ec'"
+contains "$lineage_pins" "A7_AMD64_MANIFEST_SHA256='3f7c879c93dea0d119805987bef434b65c1a53684e80f78b5d9a0c9c2cd011d5'"
+contains "$lineage_pins" "A7_ARM64_MANIFEST_SHA256='87ef2a30d6ee8c9abe9e679d597d0a4fbe9bb5cdee1266572476ad6a66aef975'"
+contains "$lineage" "release_phase='A8' prior_phase='A7'"
+contains "$lineage" '.commit.tree.sha'
+contains "$producer" "GITHUB_REF_NAME\" == 'v0.50.79'"
+contains "$producer" "release_phase='A8'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.79'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.79'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
+
+# Production and recovery must share one exact, fail-closed current-release gate.
+for workflow in "$release" "$recovery"; do
+  contains "$workflow" 'scripts/companion-release/verify-current-release.sh'
+  workflow_evidence_index=$(grep -n 'scripts/companion-release/verify-current-release.sh' "$workflow" | cut -d: -f1)
+  workflow_token_index=$(grep -n 'name: Create Homebrew tap token' "$workflow" | cut -d: -f1)
+  (( workflow_evidence_index < workflow_token_index )) || fail 'tap token precedes release evidence'
+done
+contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.79'"
+contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.79'"
+contains "$current_release_gate" '.target_commitish == $commit'
+contains "$current_release_gate" '.immutable == true'
+contains "$current_release_gate" '(.assets | length) == ($expected | length)'
+contains "$current_release_gate" '[.assets[].name] | unique | length'
+contains "$current_release_gate" '.state == "uploaded"'
+contains "$current_release_gate" '.size > 0'
+contains "$current_release_gate" '^sha256:[0-9a-f]{64}$'
+contains "$current_release_gate" 'for archive in "${EXPECTED_ARCHIVES[@]}"'
 
 temp=$(mktemp -d "${TMPDIR:-/tmp}/release-hardening-test.XXXXXX")
 trap 'rm -rf -- "$temp"' EXIT
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid
-git -C "$temp/source" tag -am 'A7 fixture' v0.50.78
+git -C "$temp/source" tag -am 'A8 fixture' v0.50.79
 commit=$(git -C "$temp/source" rev-parse HEAD)
 tree=$(git -C "$temp/source" rev-parse 'HEAD^{tree}')
 if [[ "${tree: -1}" == '0' ]]; then
@@ -108,7 +145,7 @@ else
 fi
 run_source_gate() {
   local approved_commit="${1-}" approved_tree="${2-}"
-  env GITHUB_REF_NAME=v0.50.78 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
+  env GITHUB_REF_NAME=v0.50.79 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
     GITHUB_OUTPUT="$temp/source-output" COMPANION_SOURCE_PIN_REQUIRED=1 \
     COMPANION_APPROVED_SOURCE_COMMIT="$approved_commit" \
     COMPANION_APPROVED_SOURCE_TREE="$approved_tree" \
@@ -217,39 +254,39 @@ fi
 contains "$lineage_archive" 'MANIFEST_SIGNATURE_NAME'
 contains "$lineage_archive" 'COMPANION_MANIFEST_VERIFIER'
 
-# A7 updates only the Cask and keeps the exact v0.50.71 Formula frozen.
+# A8 updates only the Cask and keeps the exact v0.50.71 Formula frozen.
 state="$temp/tap-state"
 mkdir -m 0700 "$state" "$temp/bin"
 install -m 0700 "$tests_dir/testdata/mock-tap-gh.sh" "$temp/bin/gh"
 checksums="$temp/checksums.txt"
-printf '%064d  autopus-adk_0.50.78_darwin_amd64.tar.gz\n' 1 >"$checksums"
-printf '%064d  autopus-adk_0.50.78_darwin_arm64.tar.gz\n' 2 >>"$checksums"
-printf '%064d  autopus-adk_0.50.78_linux_amd64.tar.gz\n' 3 >>"$checksums"
-printf '%064d  autopus-adk_0.50.78_linux_arm64.tar.gz\n' 4 >>"$checksums"
+printf '%064d  autopus-adk_0.50.79_darwin_amd64.tar.gz\n' 1 >"$checksums"
+printf '%064d  autopus-adk_0.50.79_darwin_arm64.tar.gz\n' 2 >>"$checksums"
+printf '%064d  autopus-adk_0.50.79_linux_amd64.tar.gz\n' 3 >>"$checksums"
+printf '%064d  autopus-adk_0.50.79_linux_arm64.tar.gz\n' 4 >>"$checksums"
 source "$script_dir/publish-homebrew-formula-bridge-render.sh"
-render_homebrew_cask "$temp/prior-cask.rb" 0.50.77 \
-  'd5e47076c1fc898d2b3f5880b6edfcf9a12e805633dcba2691da22f300d41dc9' \
-  'd6d092177a5406c194eea1de4fbd11b8af92a03814eb143a294541a3a578b9ab' \
-  '30d759af89373df9ecf93cf5ae592c42b7ad51481f07a22f7cb08b2278007eab' \
-  '7a2637f6de5d582f67881857425f5dd9375a0234a258de8b950b4e7f63b021ab'
+render_homebrew_cask "$temp/prior-cask.rb" 0.50.78 \
+  '43018046ab37027b7fba3888d288961cb5abc136e478deaa9f878586bcce6629' \
+  'e72653fd3094537caa60398e2017d409796d7ceef88a7662ca93b6299e9d00ec' \
+  'd71203aba91bf8ac5ceb298437e9db16c594890437e8a7b6c850c93a2b70316f' \
+  'f44098eb432d9348181cc65a3937b341706a6b06bcec163debbc82a4275ce095'
 render_homebrew_formula_bridge "$temp/frozen-formula.rb" v0.50.71 0.50.71 \
   "$(printf '%064d' 1)" "$(printf '%064d' 2)" \
   "$(printf '%064d' 3)" "$(printf '%064d' 4)"
 jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
-  '{sha:"39b9b77eb51149ff87df7ad4f8fb3c5300b1302c",content:$content}' >"$state/cask.json"
+  '{sha:"a46b37d61bfd62a31fd5f4c6731d4f83fa1c868a",content:$content}' >"$state/cask.json"
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
 cp "$state/formula.json" "$temp/formula-before.json"
-bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.78
-  COMPANION_VERSION=0.50.78 COMPANION_HOMEBREW_POLICY=cask-only
+bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.79
+  COMPANION_VERSION=0.50.79 COMPANION_HOMEBREW_POLICY=cask-only
   COMPANION_CHECKSUMS_PATH="$checksums" HOMEBREW_TAP_TOKEN=fixture)
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \
-  || fail 'A7 did not update only the Cask'
+  || fail 'A8 did not update only the Cask'
 cmp -s "$temp/formula-before.json" "$state/formula.json" \
   || fail 'frozen v0.50.71 Formula blob or bytes changed'
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(cat "$state/cask.updates")" == 1 && ! -e "$state/formula.updates" ]] \
-  || fail 'A7 Cask-only reconciler is not idempotent'
+  || fail 'A8 Cask-only reconciler is not idempotent'
 
 printf 'release hardening test: PASS\n'

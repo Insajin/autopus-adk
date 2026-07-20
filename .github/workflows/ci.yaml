@@ -151,6 +151,9 @@ jobs:
       - name: Test Windows self-update runtime contracts
         run: go test -count=1 -timeout=8m ./pkg/selfupdate
 
+      - name: Test Windows process probe subtree cleanup
+        run: go test -count=3 -timeout=2m ./pkg/processprobe -run '^TestOutputWindows'
+
       - name: Test Windows self-update CLI failure boundaries
         run: >-
           go test -count=1 -timeout=5m ./internal/cli

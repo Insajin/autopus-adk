@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/processprobe"
 	"github.com/insajin/autopus-adk/pkg/workflow"
 )
+
+const workflowVersionProbeTimeout = 2 * time.Second
 
 // NewWorkflowCmd builds the `auto workflow` command tree (doctor/render/gate).
 // A nil prober or runner selects the production default; tests inject fakes via
@@ -78,7 +82,10 @@ func newLiveProber() liveProber {
 	if err != nil {
 		return liveProber{}
 	}
-	out, err := exec.Command(path, "--version").Output() //nolint:gosec // fixed binary, no user input
+	ctx, cancel := context.WithTimeout(context.Background(), workflowVersionProbeTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "--version") //nolint:gosec // fixed binary, no user input
+	out, err := processprobe.Output(cmd)
 	if err != nil {
 		return liveProber{present: true}
 	}

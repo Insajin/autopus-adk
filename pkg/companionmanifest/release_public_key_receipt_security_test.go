@@ -41,6 +41,16 @@ func TestReleasePublicKeyReceipt_Workflow_SecretsAreStepScopedAndCleanupFailures
 			t.Fatalf("exact release source %s = %q, want repository variable %q", name, got, want)
 		}
 	}
+	_, evidenceStep := releaseWorkflowStepContaining(t, workflow, "verify-current-release.sh")
+	if got, want := evidenceStep.Env["COMPANION_SOURCE_COMMIT"],
+		"${{ steps.release-source.outputs.source-commit }}"; got != want {
+		t.Fatalf("current release evidence source commit = %q, want validated output %q", got, want)
+	}
+	_, homebrewStep := releaseWorkflowStepContaining(t, workflow, "Publish Homebrew Cask")
+	if got, want := homebrewStep.Env["COMPANION_CHECKSUMS_PATH"],
+		"${{ steps.release-evidence.outputs.checksums-path }}"; got != want {
+		t.Fatalf("Homebrew checksum input = %q, want verified release evidence %q", got, want)
+	}
 	raw := string(releaseSourceFile(t, ".github/workflows/release.yaml"))
 	if strings.Contains(raw, "$GITHUB_ENV") {
 		t.Fatal("release workflow promotes credential state through GITHUB_ENV instead of keeping it step-scoped")
@@ -64,6 +74,7 @@ func TestReleasePublicKeyReceipt_Workflow_SecretsAreStepScopedAndCleanupFailures
 func releaseSensitiveCommand(run string) bool {
 	for _, command := range []string{
 		"validate-environment.sh", "public-key", "goreleaser release --clean",
+		"verify-current-release.sh", "publish-homebrew-formula-bridge.sh",
 	} {
 		if strings.Contains(strings.ToLower(run), strings.ToLower(command)) {
 			return true
@@ -152,6 +163,7 @@ func publicKeyReceiptAllowedStepEnv() map[string]struct{} {
 		"COMPANION_KEY_ID", "COMPANION_RELEASE_PRODUCTION", "COMPANION_SIGNING_KEY_FILE",
 		"ADK_RELEASE_ECDSA_PRIVATE_KEY_FILE",
 		"COMPANION_APPROVED_SOURCE_COMMIT", "COMPANION_APPROVED_SOURCE_TREE",
+		"COMPANION_SOURCE_COMMIT", "COMPANION_CHECKSUMS_PATH",
 		"COMPANION_SIGNER", "COMPANION_MANIFEST_VERIFIER",
 		"COMPANION_RELEASE_TIME_VALIDATION_REQUIRED",
 		"COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT",
