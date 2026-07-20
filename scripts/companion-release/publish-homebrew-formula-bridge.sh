@@ -2,13 +2,16 @@
 set -euo pipefail
 umask 077
 
-readonly RELEASE_TAG='v0.50.79'
-readonly RELEASE_VERSION='0.50.79'
+readonly RELEASE_TAG='v0.50.80'
+readonly RELEASE_VERSION='0.50.80'
 readonly RELEASE_POLICY='cask-only'
 readonly TAP_REPOSITORY='Insajin/homebrew-autopus'
 readonly TAP_BRANCH='main'
+readonly PRIOR_TAP_COMMIT='2838951580d16348e12be39c09553cf6765504cb'
 readonly CASK_PATH='Casks/auto.rb'
-readonly PRIOR_CASK_BLOB='a46b37d61bfd62a31fd5f4c6731d4f83fa1c868a'
+readonly PRIOR_CASK_BLOB='979e62e34124b9f3c68bb2b8e1d0163047ea3ee3'
+readonly FORMULA_PATH='Formula/auto.rb'
+readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'
 
 fail() {
   printf 'homebrew cask publication: %s\n' "$1" >&2
@@ -130,6 +133,37 @@ api_get() {
   fi
 }
 
+api_json() {
+  local method="$1" endpoint="$2" input="$3" output="$4" label="$5"
+  local -a args=(api --method "$method" -H 'Accept: application/vnd.github+json'
+    "repos/${TAP_REPOSITORY}/${endpoint}")
+  [[ -z "$input" ]] || args+=(--input "$input")
+  if ! GH_TOKEN="$tap_token" gh "${args[@]}" >"$output" 2>"$temp_dir/gh-error"; then
+    fail "$label"
+  fi
+}
+
+verify_frozen_formula() {
+  local response="$temp_dir/formula-response.json" blob
+  api_get "$FORMULA_PATH" "$response"
+  blob=$(jq -er '.sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
+    "$response") || fail 'Homebrew tap Formula response has an invalid blob SHA'
+  [[ "$blob" == "$FROZEN_FORMULA_BLOB" ]] \
+    || fail 'published Formula differs from the frozen v0.50.71 blob'
+}
+
+verify_prior_tap_head() {
+  local response="$temp_dir/prior-tap-head.json" head_sha
+  api_json GET "git/ref/heads/${TAP_BRANCH}" '' "$response" \
+    'cannot read the Homebrew tap branch head'
+  head_sha=$(jq -er --arg ref "refs/heads/${TAP_BRANCH}" '
+    select(type == "object" and .ref == $ref and .object.type == "commit") |
+    .object.sha | select(type == "string" and test("^[0-9a-f]{40}$"))
+  ' "$response") || fail 'Homebrew tap branch head response is invalid'
+  [[ "$head_sha" == "$PRIOR_TAP_COMMIT" ]] \
+    || fail 'Homebrew tap branch differs from the pinned v0.50.79 predecessor commit'
+}
+
 decode_api_content() {
   local response="$1" output="$2" encoded
   encoded=$(jq -er '.content | select(type == "string")' "$response") \
@@ -156,14 +190,18 @@ sha256_file() {
   printf '%s' "$digest"
 }
 
-reconcile_tap_file() {
+publish_cask() {
   local stem="$1" label="$2" remote_path="$3" target="$4" prior_blob="$5"
   local commit_message="$6" drift_message="$7"
   local response="$temp_dir/${stem}-response.json"
   local current="$temp_dir/${stem}-current.rb"
-  local request="$temp_dir/${stem}-request.json"
-  local update_response="$temp_dir/${stem}-update-response.json"
-  local target_digest current_digest blob encoded
+  local target_digest current_digest blob encoded prior_tree new_blob new_tree new_commit
+  local prior_commit_response="$temp_dir/prior-commit.json" blob_request="$temp_dir/${stem}-blob-request.json"
+  local blob_response="$temp_dir/${stem}-blob-response.json" tree_request="$temp_dir/${stem}-tree-request.json"
+  local tree_response="$temp_dir/${stem}-tree-response.json" tree_evidence_response="$temp_dir/${stem}-tree-evidence-response.json"
+  local commit_request="$temp_dir/${stem}-commit-request.json" commit_response="$temp_dir/${stem}-commit-response.json"
+  local ref_request="$temp_dir/${stem}-ref-request.json" ref_response="$temp_dir/${stem}-ref-response.json"
+  local final_ref_response="$temp_dir/${stem}-final-ref-response.json"
 
   api_get "$remote_path" "$response"
   decode_api_content "$response" "$current"
@@ -174,29 +212,88 @@ reconcile_tap_file() {
     return 0
   fi
 
+  verify_prior_tap_head
   blob=$(jq -er '.sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
     "$response") || fail "Homebrew tap ${label} response has an invalid blob SHA"
   [[ "$blob" == "$prior_blob" ]] || fail "$drift_message"
+  api_json GET "git/commits/${PRIOR_TAP_COMMIT}" '' "$prior_commit_response" \
+    'cannot read the pinned Homebrew tap predecessor commit'
+  prior_tree=$(jq -er --arg commit "$PRIOR_TAP_COMMIT" '
+    select(type == "object" and .sha == $commit and (.parents | type) == "array" and
+      (.url | type) == "string" and (.url | length) > 0) |
+    .tree.sha | select(type == "string" and test("^[0-9a-f]{40}$"))
+  ' "$prior_commit_response") || fail 'pinned Homebrew predecessor commit response is invalid'
   encoded=$(base64 <"$target" | tr -d '\r\n') \
     || fail "cannot encode target ${label}"
-  jq -n --arg message "$commit_message" --arg content "$encoded" \
-    --arg sha "$blob" --arg branch "$TAP_BRANCH" \
-    '{message: $message, content: $content, sha: $sha, branch: $branch}' \
-    >"$request" || fail "cannot construct ${label} update request"
-  if ! GH_TOKEN="$tap_token" gh api --method PUT \
-    -H 'Accept: application/vnd.github+json' \
-    "repos/${TAP_REPOSITORY}/contents/${remote_path}" --input "$request" \
-    >"$update_response" 2>"$temp_dir/gh-error"; then
-    fail "Homebrew tap ${label} compare-and-swap update failed"
-  fi
+  jq -n --arg content "$encoded" '{content:$content,encoding:"base64"}' \
+    >"$blob_request" || fail "cannot construct ${label} blob request"
+  api_json POST 'git/blobs' "$blob_request" "$blob_response" \
+    "cannot create Homebrew tap ${label} blob"
+  new_blob=$(jq -er '
+    select(type == "object" and (.url | type) == "string" and (.url | length) > 0) |
+    .sha | select(type == "string" and test("^[0-9a-f]{40}$"))
+  ' "$blob_response") || fail "Homebrew tap ${label} blob response is invalid"
+  jq -n --arg base "$prior_tree" --arg path "$remote_path" --arg sha "$new_blob" \
+    '{base_tree:$base,tree:[{path:$path,mode:"100644",type:"blob",sha:$sha}]}' \
+    >"$tree_request" || fail "cannot construct ${label} tree request"
+  api_json POST 'git/trees' "$tree_request" "$tree_response" \
+    "cannot create Homebrew tap ${label} tree"
+  new_tree=$(jq -er '
+    select(type == "object" and .truncated == false and (.tree | type) == "array" and
+      (.url | type) == "string" and (.url | length) > 0) |
+    .sha | select(type == "string" and test("^[0-9a-f]{40}$"))
+  ' "$tree_response") || fail "Homebrew tap ${label} tree response is invalid"
+  api_json GET "git/trees/${new_tree}?recursive=1" '' "$tree_evidence_response" \
+    "cannot verify Homebrew tap ${label} tree"
+  jq -e --arg tree "$new_tree" --arg cask "$remote_path" --arg blob "$new_blob" \
+    --arg formula "$FORMULA_PATH" --arg frozen "$FROZEN_FORMULA_BLOB" '
+    type == "object" and .sha == $tree and .truncated == false and
+    (.tree | type) == "array" and
+    ([.tree[] | select(.path == $cask and .mode == "100644" and
+      .type == "blob" and .sha == $blob)] | length) == 1 and
+    ([.tree[] | select(.path == $formula and .mode == "100644" and
+      .type == "blob" and .sha == $frozen)] | length) == 1
+  ' "$tree_evidence_response" >/dev/null \
+    || fail "Homebrew tap ${label} tree does not preserve exact Cask/Formula blobs"
+  jq -n --arg message "$commit_message" --arg tree "$new_tree" \
+    --arg parent "$PRIOR_TAP_COMMIT" \
+    '{message:$message,tree:$tree,parents:[$parent]}' >"$commit_request" \
+    || fail "cannot construct ${label} commit request"
+  api_json POST 'git/commits' "$commit_request" "$commit_response" \
+    "cannot create Homebrew tap ${label} commit"
+  new_commit=$(jq -er --arg message "$commit_message" --arg tree "$new_tree" \
+    --arg parent "$PRIOR_TAP_COMMIT" '
+    select(type == "object" and (.url | type) == "string" and (.url | length) > 0 and
+      .message == $message and .tree.sha == $tree and
+      (.parents | type) == "array" and (.parents | length) == 1 and
+      .parents[0].sha == $parent) |
+    .sha | select(type == "string" and test("^[0-9a-f]{40}$"))
+  ' "$commit_response") || fail "Homebrew tap ${label} commit response is invalid"
+  jq -n --arg sha "$new_commit" '{sha:$sha,force:false}' >"$ref_request" \
+    || fail "cannot construct ${label} ref request"
+  api_json PATCH "git/refs/heads/${TAP_BRANCH}" "$ref_request" "$ref_response" \
+    "Homebrew tap ${label} expected-head update failed"
+  jq -e --arg ref "refs/heads/${TAP_BRANCH}" --arg commit "$new_commit" '
+    type == "object" and .ref == $ref and .object.type == "commit" and
+    .object.sha == $commit and (.object.url | type) == "string" and
+    (.object.url | length) > 0
+  ' "$ref_response" >/dev/null || fail "Homebrew tap ${label} ref response is invalid"
+  api_json GET "git/ref/heads/${TAP_BRANCH}" '' "$final_ref_response" \
+    'cannot verify the final Homebrew tap branch head'
+  jq -e --arg ref "refs/heads/${TAP_BRANCH}" --arg commit "$new_commit" '
+    type == "object" and .ref == $ref and .object.type == "commit" and
+    .object.sha == $commit and (.object.url | type) == "string" and
+    (.object.url | length) > 0
+  ' "$final_ref_response" >/dev/null || fail "Homebrew tap ${label} head moved after publication"
 
   api_get "$remote_path" "$response"
   decode_api_content "$response" "$current"
-  cmp -s "$target" "$current" \
+  [[ "$(jq -er '.sha' "$response")" == "$new_blob" ]] && cmp -s "$target" "$current" \
     || fail "Homebrew tap ${label} differs after publication"
   printf 'homebrew cask publication: %s published and verified\n' "$label"
 }
 
-reconcile_tap_file cask Cask "$CASK_PATH" "$cask_target" "$PRIOR_CASK_BLOB" \
-  'Publish signed Cask for v0.50.79' \
-  'published Cask differs from canonical v0.50.78 output and its pinned prior blob'
+verify_frozen_formula
+publish_cask cask Cask "$CASK_PATH" "$cask_target" "$PRIOR_CASK_BLOB" \
+  'Publish signed Cask for v0.50.80' \
+  'published Cask differs from canonical v0.50.79 output and its pinned prior blob'

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Test-only GitHub Contents API state machine.
+# Test-only GitHub Git Data/Contents API state machine.
 set -euo pipefail
+
+readonly prior_commit='2838951580d16348e12be39c09553cf6765504cb'
+readonly prior_tree='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+readonly target_blob='1111111111111111111111111111111111111111'
+readonly target_tree='2222222222222222222222222222222222222222'
+readonly target_commit='3333333333333333333333333333333333333333'
 
 [[ "${1-}" == 'api' ]]
 shift
@@ -16,29 +22,100 @@ while (($#)); do
   esac
 done
 
+if [[ "${MOCK_FAIL_WITH_TOKEN-}" == '1' ]]; then
+  printf 'mock diagnostic included %s\n' "${GH_TOKEN-}" >&2
+  exit 72
+fi
+
+increment() {
+  local counter="$MOCK_TAP_STATE/$1.calls" count
+  if [[ -f "$counter" ]]; then count=$(<"$counter"); else count=0; fi
+  printf '%s\n' "$((count + 1))" >"$counter"
+}
+
 case "$endpoint" in
-  *Casks/auto.rb*) name='cask' ;;
-  *Formula/auto.rb*) name='formula' ;;
+  *contents/Casks/auto.rb*)
+    [[ "$method" == 'GET' ]]
+    exec cat "$MOCK_TAP_STATE/cask.json"
+    ;;
+  *contents/Formula/auto.rb*)
+    [[ "$method" == 'GET' ]]
+    increment formula-get
+    exec cat "$MOCK_TAP_STATE/formula.json"
+    ;;
+  *git/ref/heads/main*)
+    [[ "$method" == 'GET' ]]
+    exec cat "$MOCK_TAP_STATE/branch.json"
+    ;;
+  *git/refs/heads/main*)
+    [[ "$method" == 'PATCH' && -f "$input" ]]
+    [[ "$(jq -er '.sha' "$input")" == "$target_commit" ]]
+    [[ "$(jq -er '.force' "$input")" == 'false' ]]
+    if [[ -e "$MOCK_TAP_STATE/race-before-ref" ]]; then
+      jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"4444444444444444444444444444444444444444",url:"https://example.invalid/racer"}}' \
+        >"$MOCK_TAP_STATE/branch.json"
+    elif [[ -e "$MOCK_TAP_STATE/formula-race-before-ref" ]]; then
+      jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"5555555555555555555555555555555555555555",url:"https://example.invalid/formula-racer"}}' \
+        >"$MOCK_TAP_STATE/branch.json"
+      content=$(jq -er '.content' "$MOCK_TAP_STATE/formula.json")
+      jq -n --arg content "$content" \
+        '{sha:"6666666666666666666666666666666666666666",content:$content}' \
+        >"$MOCK_TAP_STATE/formula.json"
+    fi
+    [[ "$(jq -er '.object.sha' "$MOCK_TAP_STATE/branch.json")" == "$prior_commit" ]]
+    content=$(<"$MOCK_TAP_STATE/pending-cask-content")
+    jq -n --arg content "$content" --arg sha "$target_blob" \
+      '{sha:$sha,content:$content}' >"$MOCK_TAP_STATE/cask.json"
+    jq -n --arg sha "$target_commit" \
+      '{ref:"refs/heads/main",object:{type:"commit",sha:$sha,url:"https://example.invalid/target-commit"}}' \
+      >"$MOCK_TAP_STATE/branch.json"
+    increment ref-update
+    cat "$MOCK_TAP_STATE/branch.json"
+    ;;
+  *git/commits/"$prior_commit"*)
+    [[ "$method" == 'GET' ]]
+    jq -n --arg sha "$prior_commit" --arg tree "$prior_tree" \
+      '{sha:$sha,tree:{sha:$tree},parents:[{sha:"7777777777777777777777777777777777777777"}],url:"https://example.invalid/prior-commit"}'
+    ;;
+  *git/blobs*)
+    [[ "$method" == 'POST' && -f "$input" ]]
+    [[ "$(jq -er '.encoding' "$input")" == 'base64' ]]
+    jq -er '.content | select(type == "string" and length > 0)' "$input" \
+      >"$MOCK_TAP_STATE/pending-cask-content"
+    increment blob-create
+    jq -n --arg sha "$target_blob" \
+      '{sha:$sha,url:"https://example.invalid/target-blob"}'
+    ;;
+  *git/trees/"$target_tree"*)
+    [[ "$method" == 'GET' ]]
+    jq -n --arg sha "$target_tree" --arg blob "$target_blob" \
+      '{sha:$sha,truncated:false,tree:[
+        {path:"Casks/auto.rb",mode:"100644",type:"blob",sha:$blob},
+        {path:"Formula/auto.rb",mode:"100644",type:"blob",sha:"4ebc6c38925002dec00759823d4dd847a499818a"}
+      ]}'
+    ;;
+  *git/trees*)
+    [[ "$method" == 'POST' && -f "$input" ]]
+    jq -e --arg base "$prior_tree" --arg blob "$target_blob" '
+      .base_tree == $base and (.tree | length) == 1 and
+      .tree[0] == {path:"Casks/auto.rb",mode:"100644",type:"blob",sha:$blob}
+    ' "$input" >/dev/null
+    increment tree-create
+    jq -n --arg sha "$target_tree" --arg blob "$target_blob" \
+      '{sha:$sha,url:"https://example.invalid/target-tree",truncated:false,
+        tree:[{path:"Casks/auto.rb",mode:"100644",type:"blob",sha:$blob}]}'
+    ;;
+  *git/commits*)
+    [[ "$method" == 'POST' && -f "$input" ]]
+    jq -e --arg tree "$target_tree" --arg parent "$prior_commit" '
+      .message == "Publish signed Cask for v0.50.80" and .tree == $tree and
+      .parents == [$parent]
+    ' "$input" >/dev/null
+    increment commit-create
+    jq -n --arg sha "$target_commit" --arg tree "$target_tree" \
+      --arg parent "$prior_commit" \
+      '{sha:$sha,message:"Publish signed Cask for v0.50.80",tree:{sha:$tree},
+        parents:[{sha:$parent}],url:"https://example.invalid/target-commit"}'
+    ;;
   *) exit 64 ;;
 esac
-state="$MOCK_TAP_STATE/${name}.json"
-
-if [[ "$method" == 'GET' ]]; then
-  exec cat "$state"
-fi
-[[ "$method" == 'PUT' && -f "$input" ]]
-current_sha=$(jq -er '.sha' "$state")
-[[ "$(jq -er '.sha' "$input")" == "$current_sha" ]]
-[[ "$(jq -er '.branch' "$input")" == 'main' ]]
-content=$(jq -er '.content' "$input")
-if [[ "$name" == 'cask' ]]; then
-  new_sha='1111111111111111111111111111111111111111'
-else
-  new_sha='2222222222222222222222222222222222222222'
-fi
-jq -n --arg sha "$new_sha" --arg content "$content" \
-  '{sha:$sha,content:$content}' >"$state"
-count_file="$MOCK_TAP_STATE/${name}.updates"
-count=$(cat "$count_file" 2>/dev/null || printf '0')
-printf '%s\n' "$((count + 1))" >"$count_file"
-printf '{}\n'

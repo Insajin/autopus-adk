@@ -17,24 +17,32 @@ var frozenFormulaDigests = []string{
 	"8f331702c5d98418b45203d0b7b604f52a36d9e08b2a7dcbb6d5f6fe712ef878",
 }
 
-func TestHomebrewFormulaBridge_A8PinsCaskOnlyTapTransition(t *testing.T) {
+func TestHomebrewFormulaBridge_A9PinsCaskOnlyTapTransition(t *testing.T) {
 	source := readReleaseFile(t, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
 	for _, required := range []string{
-		"readonly RELEASE_TAG='v0.50.79'",
-		"readonly RELEASE_VERSION='0.50.79'",
-		"readonly PRIOR_CASK_BLOB='a46b37d61bfd62a31fd5f4c6731d4f83fa1c868a'",
+		"readonly RELEASE_TAG='v0.50.80'",
+		"readonly RELEASE_VERSION='0.50.80'",
+		"readonly PRIOR_TAP_COMMIT='" + a9PriorTapCommit + "'",
+		"readonly PRIOR_CASK_BLOB='" + a9PriorCaskBlob + "'",
+		"readonly FROZEN_FORMULA_BLOB='" + a9FrozenFormulaBlob + "'",
+		"readonly FORMULA_PATH='Formula/auto.rb'",
 		"COMPANION_HOMEBREW_POLICY", "cask-only",
+		"api_json POST 'git/blobs'", "api_json POST 'git/trees'",
+		"api_json POST 'git/commits'", "api_json PATCH \"git/refs/heads/${TAP_BRANCH}\"",
+		"'{base_tree:$base,tree:[{path:$path,mode:\"100644\",type:\"blob\",sha:$sha}]}'",
+		"'{message:$message,tree:$tree,parents:[$parent]}'",
+		"'{sha:$sha,force:false}'",
 	} {
 		if !strings.Contains(source, required) {
-			t.Fatalf("A8 Homebrew policy missing %q", required)
+			t.Fatalf("A9 Homebrew policy missing %q", required)
 		}
 	}
 	for _, forbidden := range []string{
-		"FORMULA_PATH=", "PRIOR_FORMULA_", "verify_frozen_formula",
-		"reconcile_tap_file formula Formula",
+		"reconcile_tap_file formula Formula", "Publish signed Formula",
+		"--method PUT",
 	} {
 		if strings.Contains(source, forbidden) {
-			t.Fatalf("A8 production path still references the frozen Formula via %q", forbidden)
+			t.Fatalf("A9 production path can mutate the frozen Formula via %q", forbidden)
 		}
 	}
 }
@@ -47,10 +55,10 @@ func TestHomebrewFormulaBridge_PublishedV05070CaskGolden(t *testing.T) {
 	}
 }
 
-func TestHomebrewFormulaBridge_PublishedV05078TapPins(t *testing.T) {
+func TestHomebrewFormulaBridge_PublishedV05079TapPins(t *testing.T) {
 	caskSum := sha256.Sum256([]byte(homebrewBridgeCask()))
-	if got := fmt.Sprintf("%x", caskSum); got != "9ebee2d63ead3c92c52160b4d8e90e803de7acc38367b9b62aafa07b2c4d6ac2" {
-		t.Fatalf("published v0.50.78 Cask digest = %s", got)
+	if got := fmt.Sprintf("%x", caskSum); got != "4a2a195dd56fc8b334eeaf46434b1e00139ef4e65fd0c6d4b5d2618222866b02" {
+		t.Fatalf("published v0.50.79 Cask digest = %s", got)
 	}
 	formulaSum := sha256.Sum256([]byte(homebrewBridgeFormula(t)))
 	if got := fmt.Sprintf("%x", formulaSum); got != "6bc6a0fbf790ee144c74d802a2031ab61f57a2ebd0611b6f15e856c8ed3e8a7c" {
@@ -68,7 +76,7 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 			fixture.writeAPIContent(t, "cask.json", strings.Repeat("c", 40), malicious)
 
 			output, err := fixture.run(nil)
-			if err == nil || !strings.Contains(string(output), "published Cask differs from canonical v0.50.78") {
+			if err == nil || !strings.Contains(string(output), "published Cask differs from canonical v0.50.79") {
 				t.Fatalf("%s Cask result: %v\n%s", stanza, err, output)
 			}
 			if got := fixture.updateCount(t, "cask"); got != "0" {
@@ -80,11 +88,11 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 
 func homebrewBridgeCask() string {
 	return strings.NewReplacer(
-		`version "0.50.70"`, `version "0.50.78"`,
-		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "43018046ab37027b7fba3888d288961cb5abc136e478deaa9f878586bcce6629",
-		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "e72653fd3094537caa60398e2017d409796d7ceef88a7662ca93b6299e9d00ec",
-		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "d71203aba91bf8ac5ceb298437e9db16c594890437e8a7b6c850c93a2b70316f",
-		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "f44098eb432d9348181cc65a3937b341706a6b06bcec163debbc82a4275ce095",
+		`version "0.50.70"`, `version "0.50.79"`,
+		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "19e317cdabc9dde976ca772d9ddbbf693b444dd44eefa70c8d0313a32de89a9b",
+		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "41e29ae1c3c48dd6e3e5f4dfe8076472704d00a7d479b5cc8a90f53c0af6ef31",
+		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "14b6ce5ff5bb6974d1855dfc6eaae42cc0563a761eeeca6cb812e1cd5054a082",
+		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "6c9f93a96960ba3126630298ab18f872a57e676488c86e285b2dbfde20b0fe65",
 	).Replace(publishedV05070Cask)
 }
 
