@@ -17,6 +17,7 @@ lineage="$script_dir/verify-public-key-lineage.sh"
 lineage_coordinates="$script_dir/verify-public-key-lineage-coordinates.sh"
 lineage_pins="$script_dir/verify-public-key-lineage-pins.sh"
 producer="$script_dir/produce.sh"
+producer_receipt="$script_dir/produce-public-key-receipt.sh"
 homebrew_bridge="$script_dir/publish-homebrew-formula-bridge.sh"
 homebrew_git_helper="$script_dir/publish-homebrew-formula-bridge-git.sh"
 current_release_gate="$script_dir/verify-current-release.sh"
@@ -41,7 +42,7 @@ contains "$release" "COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb'"
 contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}'
 contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
 not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
-contains "$producer" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
+contains "$producer_receipt" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
 contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='ab9a0e489ee34f8a075019c4acebb2a8ae61c290'"
 contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='c6edb108d821d88914e12d2c1bf943540c63351e'"
 contains "$homebrew_bridge" "readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'"
@@ -147,8 +148,8 @@ contains "$lineage_coordinates" "release_phase='A9' prior_phase='A8'"
 contains "$lineage_coordinates" "release_phase='A10' prior_phase='A9'"
 contains "$lineage_coordinates" "release_phase='A11' prior_phase='A10'"
 contains "$lineage" '.commit.tree.sha'
-contains "$producer" "GITHUB_REF_NAME\" == 'v0.50.82'"
-contains "$producer" "release_phase='A11'"
+contains "$producer_receipt" "GITHUB_REF_NAME\" == 'v0.50.82'"
+contains "$producer_receipt" "release_phase='A11'"
 contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.82'"
 contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.82'"
 contains "$release" 'timeout-minutes: 60'
@@ -174,5 +175,6 @@ contains "$current_release_gate" 'for archive in "${EXPECTED_ARCHIVES[@]}"'
 
 bash "$tests_dir/release-runtime-hardening-test.sh"
 bash "$tests_dir/release-homebrew-hardening-test.sh"
+bash "$tests_dir/release-producer-helper-hardening-test.sh"
 
 printf 'release hardening test: PASS\n'

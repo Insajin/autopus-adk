@@ -3,7 +3,6 @@ package companionmanifest
 import (
 	"bytes"
 	"encoding/base64"
-	"regexp"
 	"strings"
 	"testing"
 )
@@ -121,17 +120,4 @@ func exactA4TagVersionGuard(source string) bool {
 
 func exactA5TagVersionGuard(source string) bool {
 	return exactLineageTagVersionGuard(source, "74")
-}
-
-func exactLineageTagVersionGuard(source, patch string) bool {
-	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`GITHUB_REF_NAME.{0,240}v0\.50\.` + patch + `.{0,400}COMPANION_VERSION.{0,240}0\.50\.` + patch),
-		regexp.MustCompile(`COMPANION_VERSION.{0,240}0\.50\.` + patch + `.{0,400}GITHUB_REF_NAME.{0,240}v0\.50\.` + patch),
-	}
-	for _, pattern := range patterns {
-		if pattern.MatchString(source) {
-			return true
-		}
-	}
-	return false
 }

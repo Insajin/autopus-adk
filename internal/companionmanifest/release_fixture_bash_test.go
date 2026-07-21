@@ -51,6 +51,7 @@ case "${1-}" in
     trap 'rm -rf -- "$fixture_root"' EXIT
     cp -R -- "$(dirname -- "$source_script")" "$fixture_root/companion-release"
     fixture_script="$fixture_root/companion-release/produce.sh"
+    fixture_receipt_helper="$fixture_root/companion-release/produce-public-key-receipt.sh"
     /usr/bin/sed \
       -e 's|uname -s|printf Darwin|' \
       -e 's|codesign_tool=/usr/bin/codesign|codesign_tool="$COMPANION_CODESIGN_TOOL"|' \
@@ -61,6 +62,10 @@ case "${1-}" in
       -e 's|env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}"|env|' \
       "$fixture_script" >"$fixture_script.next"
     mv -- "$fixture_script.next" "$fixture_script"
+    /usr/bin/sed \
+      -e 's|env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}"|env|' \
+      "$fixture_receipt_helper" >"$fixture_receipt_helper.next"
+    mv -- "$fixture_receipt_helper.next" "$fixture_receipt_helper"
     /bin/bash "$fixture_script" "$@"
     ;;
   *) exec /bin/bash "$@" ;;

@@ -30,6 +30,16 @@ for name in COMPANION_ARTIFACT COMPANION_TARGET COMPANION_ARCHITECTURE COMPANION
 done
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+public_key_receipt_helper="$script_dir/produce-public-key-receipt.sh"
+[[ -f "$public_key_receipt_helper" && ! -L "$public_key_receipt_helper" && \
+   -r "$public_key_receipt_helper" ]] \
+  || fail 'public key receipt helper is missing or unsafe'
+# shellcheck source=produce-public-key-receipt.sh
+source "$public_key_receipt_helper"
+for helper_function in resolve_public_key_receipt_release_phase produce_public_key_receipt_bundle; do
+  declare -F "$helper_function" >/dev/null 2>&1 \
+    || fail 'public key receipt helper contract is incomplete'
+done
 "$script_dir/validate-environment.sh"
 
 [[ "$(uname -s)" == 'Darwin' ]] || fail 'Darwin release requires macOS'
@@ -55,33 +65,7 @@ public_key_receipt_enabled=0
 if [[ -n "${COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT-}" ]]; then
   public_key_receipt_enabled=1
   require_environment GITHUB_REF_NAME
-  if [[ "$GITHUB_REF_NAME" == 'v0.50.69' && "$COMPANION_VERSION" == '0.50.69' ]]; then
-    release_phase='A0'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.70' && "$COMPANION_VERSION" == '0.50.70' ]]; then
-    release_phase='A1'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.71' && "$COMPANION_VERSION" == '0.50.71' ]]; then
-    release_phase='A2'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.72' && "$COMPANION_VERSION" == '0.50.72' ]]; then
-    release_phase='A3'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.73' && "$COMPANION_VERSION" == '0.50.73' ]]; then
-    release_phase='A4'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.74' && "$COMPANION_VERSION" == '0.50.74' ]]; then
-    release_phase='A5'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.77' && "$COMPANION_VERSION" == '0.50.77' ]]; then
-    release_phase='A6'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.78' && "$COMPANION_VERSION" == '0.50.78' ]]; then
-    release_phase='A7'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.79' && "$COMPANION_VERSION" == '0.50.79' ]]; then
-    release_phase='A8'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.80' && "$COMPANION_VERSION" == '0.50.80' ]]; then
-    release_phase='A9'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.81' && "$COMPANION_VERSION" == '0.50.81' ]]; then
-    release_phase='A10'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.82' && "$COMPANION_VERSION" == '0.50.82' ]]; then
-    release_phase='A11'
-  else
-    fail 'public_key_receipt_release_identity_mismatch'
-  fi
+  resolve_public_key_receipt_release_phase
 fi
 
 artifact="$COMPANION_ARTIFACT"
@@ -239,60 +223,8 @@ mv -f -- "$receipt_temp" "$receipt_path"
 receipt_temp=''
 
 if [[ "$public_key_receipt_enabled" == '1' ]]; then
-  public_key_receipt_args=(companion-manifest public-key-receipt
-    --key-file "$COMPANION_SIGNING_KEY_FILE"
-    --bundle-output "$public_key_bundle_path"
-    --key-id "$COMPANION_KEY_ID"
-    --issued-at "$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT"
-    --expires-at "$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT"
-    --handoff "$COMPANION_HANDOFF"
-    --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR")
-  env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
-    "$COMPANION_SIGNER" "${public_key_receipt_args[@]}" >/dev/null \
-    || fail 'public key receipt production failed'
-  [[ -d "$public_key_bundle_path" && ! -L "$public_key_bundle_path" ]] \
-    || fail 'public key receipt production failed'
-  bundle_entry_count=$(find "$public_key_bundle_path" -mindepth 1 -maxdepth 1 -print | wc -l)
-  [[ "${bundle_entry_count//[[:space:]]/}" == '2' ]] \
-    || fail 'public key receipt production failed'
-  for entry in public-key-receipt.json public-key-receipt.sig; do
-    [[ -f "$public_key_bundle_path/$entry" && ! -L "$public_key_bundle_path/$entry" ]] \
-      || fail 'public key receipt production failed'
-  done
-  [[ "$(wc -c <"$public_key_bundle_path/public-key-receipt.sig" | tr -d '[:space:]')" == '64' ]] \
-    || fail 'public key receipt production failed'
-  env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
-    "$COMPANION_RECEIPT_VERIFIER" \
-    --receipt "$public_key_bundle_path/public-key-receipt.json" \
-    --signature "$public_key_bundle_path/public-key-receipt.sig" \
-    --signing-key "$COMPANION_SIGNING_KEY_FILE" \
-    --key-id "$COMPANION_KEY_ID" \
-    --issued-at "$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT" \
-    --expires-at "$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
-    --handoff "$COMPANION_HANDOFF" \
-    --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
-    || fail 'public key receipt independent verification failed'
-  if [[ -n "${COMPANION_MANIFEST_VERIFIER-}" ]]; then
-    env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
-      "$COMPANION_MANIFEST_VERIFIER" \
-      --artifact "$artifact_path" \
-      --manifest "$manifest_path" \
-      --signature "$signature_path" \
-      --receipt "$public_key_bundle_path/public-key-receipt.json" \
-      --receipt-signature "$public_key_bundle_path/public-key-receipt.sig" \
-      --signing-key "$COMPANION_SIGNING_KEY_FILE" \
-      --key-id "$COMPANION_KEY_ID" \
-      --version "$COMPANION_VERSION" \
-      --platform "$COMPANION_PLATFORM" \
-      --architecture "$COMPANION_ARCHITECTURE" \
-      --handoff "$COMPANION_HANDOFF" \
-      --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
-      || fail 'manifest and artifact independent verification failed'
-  fi
-  signing_key_digest_after=$(sha256_file "$COMPANION_SIGNING_KEY_FILE") \
-    || fail 'manifest_public_key_digest_mismatch'
-  [[ "$signing_key_digest_before" == "$signing_key_digest_after" ]] \
-    || fail 'manifest_public_key_digest_mismatch'
-  printf 'companion release: public key receipt phase %s produced\n' "$release_phase"
+  produce_public_key_receipt_bundle \
+    "$artifact_path" "$manifest_path" "$signature_path" \
+    "$public_key_bundle_path" "$signing_key_digest_before" "$release_phase"
 fi
 succeeded=1
