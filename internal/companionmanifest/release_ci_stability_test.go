@@ -55,6 +55,9 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 			t.Fatalf("CI coverage contract missing %q", required)
 		}
 	}
+	if !strings.Contains(testRun, "./...") {
+		t.Fatal("CI race coverage gate must cover every Go package")
+	}
 	if strings.Contains(testRun, "-tags integration") {
 		t.Fatal("CI race coverage gate must not run executable release integration fixtures")
 	}
