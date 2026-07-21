@@ -60,7 +60,7 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 	}
 	lineageRun := ciStepRun(t, workflow.Jobs["lineage-integration"], "Test release lineage integration")
 	for _, required := range []string{
-		"-timeout=35m", "-tags integration", "./internal/companionmanifest", "./pkg/companionmanifest",
+		"-timeout=35m", "-tags integration", "./...",
 	} {
 		if !strings.Contains(lineageRun, required) {
 			t.Fatalf("CI release lineage integration contract missing %q", required)
