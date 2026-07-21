@@ -238,10 +238,10 @@ func (f *currentReleaseFixture) writeSignatureMocks() error {
 	bin := filepath.Join(f.root, "bin")
 	cosignMock := fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
-[[ -z "${GITHUB_TOKEN+x}" && -z "${GH_TOKEN+x}" ]]
+if [[ -n "${GITHUB_TOKEN+x}" || -n "${GH_TOKEN+x}" ]]; then exit 90; fi
 printf 'cosign %%s\n' "$*" >> %q
-[[ "${1-}" == verify-blob ]]
-[[ %t != true ]]
+if [[ "${1-}" != verify-blob ]]; then exit 91; fi
+if [[ %t == true ]]; then exit 92; fi
 	`, f.signatureLog, f.cosignFail)
 	if err := os.WriteFile(filepath.Join(bin, "cosign"), []byte(cosignMock), 0o700); err != nil {
 		return err
@@ -252,12 +252,12 @@ printf 'cosign %%s\n' "$*" >> %q
 	}
 	opensslMock := fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
-[[ -z "${GITHUB_TOKEN+x}" && -z "${GH_TOKEN+x}" ]]
+if [[ -n "${GITHUB_TOKEN+x}" || -n "${GH_TOKEN+x}" ]]; then exit 90; fi
 if [[ "${1-}" == dgst ]]; then
   for argument in "$@"; do
     if [[ "$argument" == -verify ]]; then
       printf 'openssl-verify\n' >> %q
-      [[ %t != true ]]
+      if [[ %t == true ]]; then exit 92; fi
       exit 0
     fi
   done
