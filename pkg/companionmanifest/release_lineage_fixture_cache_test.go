@@ -15,19 +15,40 @@ type goReleaserLineageCache struct {
 	evidence  *goReleaserA0Evidence
 }
 
-var goReleaserLineageCaches = map[string]*goReleaserLineageCache{
-	publicKeyReceiptA0Tag:  {version: lineageA0Version},
-	publicKeyReceiptA1Tag:  {version: lineageA1Version, annotated: true},
-	publicKeyReceiptA2Tag:  {version: publicKeyReceiptA2Version, annotated: true},
-	publicKeyReceiptA3Tag:  {version: publicKeyReceiptA3Version, annotated: true},
-	publicKeyReceiptA4Tag:  {version: publicKeyReceiptA4Version, annotated: true},
-	publicKeyReceiptA5Tag:  {version: publicKeyReceiptA5Version, annotated: true},
-	publicKeyReceiptA6Tag:  {version: publicKeyReceiptA6Version, annotated: true},
-	publicKeyReceiptA7Tag:  {version: publicKeyReceiptA7Version, annotated: true},
-	publicKeyReceiptA8Tag:  {version: publicKeyReceiptA8Version, annotated: true},
-	publicKeyReceiptA9Tag:  {version: publicKeyReceiptA9Version, annotated: true},
-	publicKeyReceiptA10Tag: {version: publicKeyReceiptA10Version, annotated: true},
-	publicKeyReceiptA11Tag: {version: publicKeyReceiptA11Version, annotated: true},
+type goReleaserLineageCoordinate struct {
+	tag       string
+	version   string
+	annotated bool
+}
+
+var goReleaserLineageCoordinates = []goReleaserLineageCoordinate{
+	{tag: publicKeyReceiptA0Tag, version: lineageA0Version},
+	{tag: publicKeyReceiptA1Tag, version: lineageA1Version, annotated: true},
+	{tag: publicKeyReceiptA2Tag, version: publicKeyReceiptA2Version, annotated: true},
+	{tag: publicKeyReceiptA3Tag, version: publicKeyReceiptA3Version, annotated: true},
+	{tag: publicKeyReceiptA4Tag, version: publicKeyReceiptA4Version, annotated: true},
+	{tag: publicKeyReceiptA5Tag, version: publicKeyReceiptA5Version, annotated: true},
+	{tag: publicKeyReceiptA6Tag, version: publicKeyReceiptA6Version, annotated: true},
+	{tag: publicKeyReceiptA7Tag, version: publicKeyReceiptA7Version, annotated: true},
+	{tag: publicKeyReceiptA8Tag, version: publicKeyReceiptA8Version, annotated: true},
+	{tag: publicKeyReceiptA9Tag, version: publicKeyReceiptA9Version, annotated: true},
+	{tag: publicKeyReceiptA10Tag, version: publicKeyReceiptA10Version, annotated: true},
+	{tag: publicKeyReceiptA11Tag, version: publicKeyReceiptA11Version, annotated: true},
+}
+
+var goReleaserLineageCaches = newGoReleaserLineageCaches()
+
+func newGoReleaserLineageCaches() map[string]*goReleaserLineageCache {
+	caches := make(map[string]*goReleaserLineageCache, len(goReleaserLineageCoordinates))
+	for _, coordinate := range goReleaserLineageCoordinates {
+		if _, exists := caches[coordinate.tag]; exists {
+			panic("duplicate GoReleaser lineage coordinate: " + coordinate.tag)
+		}
+		caches[coordinate.tag] = &goReleaserLineageCache{
+			version: coordinate.version, annotated: coordinate.annotated,
+		}
+	}
+	return caches
 }
 
 func produceGoReleaserFixtureEvidence(
@@ -43,12 +64,7 @@ func produceGoReleaserFixtureEvidence(
 		t.Fatalf("unsupported GoReleaser lineage cache coordinate %s/%s annotated=%t",
 			releaseTag, releaseVersion, annotated)
 	}
-	cache.once.Do(func() {
-		cache.runs.Add(1)
-		cache.evidence = produceUncachedGoReleaserFixtureEvidence(
-			t, tools, releaseTag, releaseVersion, annotated,
-		)
-	})
+	ensureGoReleaserLineageFixtures(t, tools)
 	if cache.evidence == nil {
 		t.Fatal("GoReleaser lineage cache produced no evidence")
 	}
@@ -69,25 +85,7 @@ func cloneGoReleaserEvidence(source *goReleaserA0Evidence) *goReleaserA0Evidence
 
 func TestGoReleaserLineageFixtures_ProcessCacheBuildsEachCoordinateOnce(t *testing.T) {
 	tools := newExecutableLineageTools(t)
-	cases := []struct {
-		tag       string
-		version   string
-		annotated bool
-	}{
-		{tag: publicKeyReceiptA0Tag, version: lineageA0Version},
-		{tag: publicKeyReceiptA1Tag, version: lineageA1Version, annotated: true},
-		{tag: publicKeyReceiptA2Tag, version: publicKeyReceiptA2Version, annotated: true},
-		{tag: publicKeyReceiptA3Tag, version: publicKeyReceiptA3Version, annotated: true},
-		{tag: publicKeyReceiptA4Tag, version: publicKeyReceiptA4Version, annotated: true},
-		{tag: publicKeyReceiptA5Tag, version: publicKeyReceiptA5Version, annotated: true},
-		{tag: publicKeyReceiptA6Tag, version: publicKeyReceiptA6Version, annotated: true},
-		{tag: publicKeyReceiptA7Tag, version: publicKeyReceiptA7Version, annotated: true},
-		{tag: publicKeyReceiptA8Tag, version: publicKeyReceiptA8Version, annotated: true},
-		{tag: publicKeyReceiptA9Tag, version: publicKeyReceiptA9Version, annotated: true},
-		{tag: publicKeyReceiptA10Tag, version: publicKeyReceiptA10Version, annotated: true},
-		{tag: publicKeyReceiptA11Tag, version: publicKeyReceiptA11Version, annotated: true},
-	}
-	for _, test := range cases {
+	for _, test := range goReleaserLineageCoordinates {
 		first := produceGoReleaserFixtureEvidence(t, tools, test.tag, test.version, test.annotated)
 		second := produceGoReleaserFixtureEvidence(t, tools, test.tag, test.version, test.annotated)
 		if first == second || !bytes.Equal(first.checksums, second.checksums) {
@@ -99,6 +97,20 @@ func TestGoReleaserLineageFixtures_ProcessCacheBuildsEachCoordinateOnce(t *testi
 	}
 	if runs := executableLineageToolsBuildRuns.Load(); runs != 1 {
 		t.Fatalf("executable lineage tool build runs = %d, want 1", runs)
+	}
+}
+
+func TestGoReleaserLineageFixtures_RegistryMatchesCache(t *testing.T) {
+	if len(goReleaserLineageCaches) != len(goReleaserLineageCoordinates) {
+		t.Fatalf("GoReleaser lineage cache size = %d, coordinates = %d",
+			len(goReleaserLineageCaches), len(goReleaserLineageCoordinates))
+	}
+	for _, coordinate := range goReleaserLineageCoordinates {
+		cache := goReleaserLineageCaches[coordinate.tag]
+		if cache == nil || cache.version != coordinate.version ||
+			cache.annotated != coordinate.annotated {
+			t.Fatalf("GoReleaser lineage cache drifted for %s", coordinate.tag)
+		}
 	}
 }
 
