@@ -48,12 +48,36 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 		linter.With["version"] != "v2.12.2" {
 		t.Fatalf("golangci-lint gate drifted: uses=%q version=%v", linter.Uses, linter.With["version"])
 	}
+	hardeningRun := ciStepRun(t, workflow.Jobs["test"], "Test release hardening contract in isolation")
+	for _, required := range []string{
+		"set -euo pipefail",
+		"go test -list '^TestReleaseHardeningBashContract$' ./internal/companionmanifest",
+		`awk '$0 == "TestReleaseHardeningBashContract" { found++ } END { print found + 0 }'`,
+		`[[ "$count" == 1 ]]`, "-race", "-count=1", "-timeout=5m",
+		"-run '^TestReleaseHardeningBashContract$'", "./internal/companionmanifest",
+	} {
+		if !strings.Contains(hardeningRun, required) {
+			t.Fatalf("CI release hardening isolation contract missing %q", required)
+		}
+	}
 	testRun := ciStepRun(t, workflow.Jobs["test"], "Test with Coverage")
-	for _, required := range []string{"-race", "-timeout=20m", "-coverprofile=coverage.out", "COVERAGE_THRESHOLD: \"83\""} {
+	for _, required := range []string{
+		"-race", "-timeout=20m", "-skip '^TestReleaseHardeningBashContract$'",
+		"-coverprofile=coverage.out", "COVERAGE_THRESHOLD: \"83\"",
+	} {
 		if !strings.Contains(readReleaseFile(t, ".github/workflows/ci.yaml"), required) &&
 			!strings.Contains(testRun, required) {
 			t.Fatalf("CI coverage contract missing %q", required)
 		}
+	}
+	if strings.Count(hardeningRun, "-run '^TestReleaseHardeningBashContract$'") != 1 ||
+		strings.Count(testRun, "-skip '^TestReleaseHardeningBashContract$'") != 1 ||
+		strings.Contains(hardeningRun, "-skip") || strings.Contains(testRun, "-run") {
+		t.Fatal("CI release hardening run/skip boundary is not exact")
+	}
+	if ciStepIndex(t, workflow.Jobs["test"], "Test release hardening contract in isolation") >=
+		ciStepIndex(t, workflow.Jobs["test"], "Test with Coverage") {
+		t.Fatal("CI release hardening contract must pass before shared race coverage")
 	}
 	if !strings.Contains(testRun, "./...") {
 		t.Fatal("CI race coverage gate must cover every Go package")
@@ -182,6 +206,17 @@ func readCIStabilityJob(t *testing.T, path, id string) string {
 func ciStepRun(t *testing.T, job ciStabilityJob, name string) string {
 	t.Helper()
 	return ciStep(t, job, name).Run
+}
+
+func ciStepIndex(t *testing.T, job ciStabilityJob, name string) int {
+	t.Helper()
+	for index, step := range job.Steps {
+		if step.Name == name {
+			return index
+		}
+	}
+	t.Fatalf("CI step %q is missing", name)
+	return -1
 }
 
 func ciStep(t *testing.T, job ciStabilityJob, name string) ciStabilityStep {

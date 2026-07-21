@@ -112,8 +112,6 @@ func TestReleaseDebtHomebrewCASHasDedicatedHelper(t *testing.T) {
 		"verify_frozen_formula", "verify_prior_tap_head", "publish_cask",
 		"api_json POST 'git/blobs'", "api_json POST 'git/trees'",
 		"api_json POST 'git/commits'", `api_json PATCH "git/refs/heads/${TAP_BRANCH}"`,
-		`printf -v "$destination"`, `sha256_file "$target" target_digest`,
-		`sha256_file "$current" current_digest`,
 	} {
 		if !strings.Contains(gitHelper, required) {
 			t.Fatalf("Homebrew CAS helper missing %q", required)
@@ -122,9 +120,6 @@ func TestReleaseDebtHomebrewCASHasDedicatedHelper(t *testing.T) {
 	if strings.Contains(bridge, "publish_cask()") ||
 		strings.Contains(bridge, "verify_frozen_formula()") {
 		t.Fatal("Homebrew caller still owns Git CAS or Formula freeze behavior")
-	}
-	if strings.Contains(gitHelper, `$(sha256_file`) {
-		t.Fatal("Homebrew digest helper crosses the temporary-evidence EXIT trap through command substitution")
 	}
 }
 

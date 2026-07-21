@@ -38,9 +38,26 @@ jobs:
           GOOS=darwin GOARCH=arm64 go build ./...
           GOOS=linux GOARCH=arm64 go build ./...
 
+      # @AX:REASON [AUTO]: Keep the process-heavy Bash release fixture off the shared Go package scheduler while preserving its race gate.
+      - name: Test release hardening contract in isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          inventory="$(go test -list '^TestReleaseHardeningBashContract$' ./internal/companionmanifest)"
+          count="$(
+            printf '%s\n' "$inventory" |
+              awk '$0 == "TestReleaseHardeningBashContract" { found++ } END { print found + 0 }'
+          )"
+          [[ "$count" == 1 ]]
+          go test -race -count=1 -timeout=5m \
+            -run '^TestReleaseHardeningBashContract$' \
+            ./internal/companionmanifest
+
       - name: Test with Coverage
         run: |
-          go test -race -count=1 -timeout=20m -coverprofile=coverage.out ./...
+          go test -race -count=1 -timeout=20m \
+            -skip '^TestReleaseHardeningBashContract$' \
+            -coverprofile=coverage.out ./...
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
           THRESHOLD=${COVERAGE_THRESHOLD:-83}
