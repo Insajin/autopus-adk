@@ -100,11 +100,12 @@ decode_api_content() {
 }
 
 sha256_file() {
-  local output digest
-  output=$("${sha256_command[@]}" "$1") || return 1
+  local path="$1" destination="$2" output digest
+  output=$("${sha256_command[@]}" "$path") || return 1
   digest="${output%%[[:space:]]*}"
   [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || return 1
-  printf '%s' "$digest"
+  # @AX:REASON [AUTO]: Keep the caller in the trap-owning shell so temporary evidence cannot outlive its digest boundary.
+  printf -v "$destination" '%s' "$digest"
 }
 
 # @AX:ANCHOR [AUTO]: Preserve the sole compare-and-swap mutation orchestrator for the Homebrew tap.
@@ -128,8 +129,8 @@ publish_cask() {
   decode_api_content "$response" "$current"
   blob=$(jq -er '.sha | select(type == "string" and test("^[0-9a-f]{40}$"))' \
     "$response") || fail "Homebrew tap ${label} response has an invalid blob SHA"
-  target_digest=$(sha256_file "$target") || fail "cannot digest target ${label}"
-  current_digest=$(sha256_file "$current") || fail "cannot digest current ${label}"
+  sha256_file "$target" target_digest || fail "cannot digest target ${label}"
+  sha256_file "$current" current_digest || fail "cannot digest current ${label}"
   if [[ "$target_digest" == "$current_digest" ]] && cmp -s "$target" "$current"; then
     verify_idempotent_head_snapshot "$remote_path" "$blob" "$label"
     printf 'homebrew cask publication: %s is already current\n' "$label"
