@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	a9PriorTapCommit    = "2838951580d16348e12be39c09553cf6765504cb"
-	a9PriorCaskBlob     = "979e62e34124b9f3c68bb2b8e1d0163047ea3ee3"
-	a9FrozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
+	a10PriorTapCommit    = "8acf53e1bea9711ca3063c121b52e5d160f43b67"
+	a10PriorCaskBlob     = "3f3a38e9a2ae556acc0f7d0974895d6189f266dd"
+	a10FrozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
 )
 
 var bridgeDigests = []string{
@@ -22,7 +22,7 @@ var bridgeDigests = []string{
 	strings.Repeat("3", 64), strings.Repeat("4", 64),
 }
 
-func TestHomebrewFormulaBridge_A9UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
+func TestHomebrewFormulaBridge_A10UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
 	fixture := newHomebrewBridgeFixture(t)
 	frozenFormula, err := os.ReadFile(filepath.Join(fixture.state, "formula.json"))
 	if err != nil {
@@ -30,10 +30,10 @@ func TestHomebrewFormulaBridge_A9UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
 	}
 	output, err := fixture.run(nil)
 	if err != nil {
-		t.Fatalf("publish A9 Cask: %v\n%s", err, output)
+		t.Fatalf("publish A10 Cask: %v\n%s", err, output)
 	}
-	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.80"`) {
-		t.Fatalf("published Cask is not v0.50.80:\n%s", cask)
+	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.81"`) {
+		t.Fatalf("published Cask is not v0.50.81:\n%s", cask)
 	}
 	if got := fixture.updateCount(t, "cask"); got != "1" {
 		t.Fatalf("Cask update count = %q, want 1", got)
@@ -148,10 +148,10 @@ func newHomebrewBridgeFixture(t *testing.T) homebrewBridgeFixture {
 	if err := os.WriteFile(fixture.checksums, []byte(fixture.checksumText), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	fixture.writeAPIContent(t, "cask.json", a9PriorCaskBlob, fixture.cask)
-	fixture.writeAPIContent(t, "formula.json", a9FrozenFormulaBlob, homebrewBridgeFormula(t))
+	fixture.writeAPIContent(t, "cask.json", a10PriorCaskBlob, fixture.cask)
+	fixture.writeAPIContent(t, "formula.json", a10FrozenFormulaBlob, homebrewBridgeFormula(t))
 	branch := `{"ref":"refs/heads/main","object":{"type":"commit","sha":"` +
-		a9PriorTapCommit + `","url":"https://example.invalid/prior-commit"}}`
+		a10PriorTapCommit + `","url":"https://example.invalid/prior-commit"}}`
 	if err := os.WriteFile(filepath.Join(state, "branch.json"), []byte(branch), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func (fixture homebrewBridgeFixture) run(overrides map[string]string) ([]byte, e
 	environment := map[string]string{
 		"PATH":   filepath.Join(fixture.root, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"TMPDIR": filepath.Join(fixture.root, "tmp"), "MOCK_TAP_STATE": fixture.state,
-		"GITHUB_REF_NAME": "v0.50.80", "COMPANION_VERSION": "0.50.80",
+		"GITHUB_REF_NAME": "v0.50.81", "COMPANION_VERSION": "0.50.81",
 		"COMPANION_HOMEBREW_POLICY": "cask-only",
 		"COMPANION_CHECKSUMS_PATH":  fixture.checksums,
 		"HOMEBREW_TAP_TOKEN":        "fixture-tap-token", "GH_TOKEN": "",
@@ -272,8 +272,8 @@ func homebrewBridgeChecksums() string {
 	names := []string{"darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"}
 	var output strings.Builder
 	for index, name := range names {
-		fmt.Fprintf(&output, "%s  autopus-adk_0.50.80_%s.tar.gz\n", bridgeDigests[index], name)
+		fmt.Fprintf(&output, "%s  autopus-adk_0.50.81_%s.tar.gz\n", bridgeDigests[index], name)
 	}
-	fmt.Fprintf(&output, "%s  autopus-adk_0.50.80_windows_amd64.zip\n", strings.Repeat("5", 64))
+	fmt.Fprintf(&output, "%s  autopus-adk_0.50.81_windows_amd64.zip\n", strings.Repeat("5", 64))
 	return output.String()
 }

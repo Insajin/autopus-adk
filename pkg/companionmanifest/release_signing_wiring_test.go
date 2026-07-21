@@ -89,6 +89,17 @@ func TestReleaseSigning_ProducerAndPreflightAreFailClosed(t *testing.T) {
 func TestReleaseSigning_WorkflowMaterializesAndPreflightsKeyBeforeGoReleaser(t *testing.T) {
 	workflow := releaseWorkflowContract(t)
 	workflowSource := string(readRepositoryFile(t, ".github/workflows/release.yaml"))
+	for _, required := range []string{
+		"v0.50.81", "autopus-v0.50.81-checksums.txt",
+		"GITHUB_REF_NAME='v0.50.81'", "COMPANION_VERSION='0.50.81'",
+	} {
+		if !strings.Contains(workflowSource, required) {
+			t.Fatalf("v0.50.81 signing workflow missing exact version contract %q", required)
+		}
+	}
+	if strings.Contains(workflowSource, "v0.50.80") {
+		t.Fatal("v0.50.81 signing workflow still exposes the frozen A9 coordinate")
+	}
 	prepareIndex, _ := releaseWorkflowStepContaining(t, workflow, "Prepare release credentials")
 	materializeIndex, materialize := releaseWorkflowStepContaining(t, workflow, "Materialize release signing key")
 	preflightIndex, preflight := releaseWorkflowStepContaining(t, workflow, "Verify release signing key pair")
@@ -133,6 +144,6 @@ func TestReleaseSigning_WorkflowMaterializesAndPreflightsKeyBeforeGoReleaser(t *
 		t.Fatalf("release signing producer is not checked in: %v", err)
 	}
 	if strings.Contains(workflowSource, "release-k2") {
-		t.Fatal("v0.50.80 workflow must keep K2 offline and sign with K1 only")
+		t.Fatal("v0.50.81 workflow must keep K2 offline and sign with K1 only")
 	}
 }

@@ -42,8 +42,8 @@ contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.output
 contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
 not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
 contains "$producer" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='2838951580d16348e12be39c09553cf6765504cb'"
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='979e62e34124b9f3c68bb2b8e1d0163047ea3ee3'"
+contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='8acf53e1bea9711ca3063c121b52e5d160f43b67'"
+contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='3f3a38e9a2ae556acc0f7d0974895d6189f266dd'"
 contains "$homebrew_bridge" "readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 contains "$homebrew_bridge" "readonly FORMULA_PATH='Formula/auto.rb'"
@@ -63,10 +63,13 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$release" "- 'v0.50.80'"
-contains "$release" "if: github.ref == 'refs/tags/v0.50.80'"
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.80'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.80'
+contains "$release" "- 'v0.50.81'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.81'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.81'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.81'
+not_contains "$release" "'v0.50.80'"
+not_contains "$release" 'refs/tags/v0.50.80'
+not_contains "$recovery" 'refs/tags/v0.50.80'
 not_contains "$release" "'v0.50.79'"
 not_contains "$release" 'refs/tags/v0.50.79'
 not_contains "$recovery" 'refs/tags/v0.50.79'
@@ -83,6 +86,7 @@ contains "$source_gate" "readonly A6_A5_ANCESTOR_SHA='b27252cb1148192a8ae1a95195
 contains "$source_gate" "readonly A7_A6_ANCESTOR_SHA='902f1acfa91f1d0a2ac9471d5cd79117031a2599'"
 contains "$source_gate" "readonly A8_A7_ANCESTOR_SHA='51de6030a69a8e36fcf7e5790ef157eff6fedf00'"
 contains "$source_gate" "readonly A9_A8_ANCESTOR_SHA='dd0c2759ed5435d4634011e349caad62ea3df414'"
+contains "$source_gate" "readonly A10_A9_ANCESTOR_SHA='c9c4f49d48022eb0c8d72ee7b520136a4f21f176'"
 contains "$lineage" 'source "$pins_helper"'
 contains "$lineage_pins" "A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'"
 contains "$lineage_pins" "A4_CHECKSUMS_SHA256='a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1'"
@@ -119,13 +123,22 @@ contains "$lineage_pins" "A8_AMD64_ARCHIVE_SHA256='19e317cdabc9dde976ca772d9ddbb
 contains "$lineage_pins" "A8_ARM64_ARCHIVE_SHA256='41e29ae1c3c48dd6e3e5f4dfe8076472704d00a7d479b5cc8a90f53c0af6ef31'"
 contains "$lineage_pins" "A8_AMD64_MANIFEST_SHA256='c5ac37874bac5de87152e781bd82a17c7705894f24be81657ccc907f15ba1f65'"
 contains "$lineage_pins" "A8_ARM64_MANIFEST_SHA256='ebcf563c11f0836be2b2bd4423ea315283eeec12cfa200d479e1a56f5909f5f1'"
+contains "$lineage_pins" "A9_COMMIT_SHA='c9c4f49d48022eb0c8d72ee7b520136a4f21f176'"
+contains "$lineage_pins" "A9_TREE_SHA='3a71fa56bd917f447a6b1705772b6ab99bbcfbc8'"
+contains "$lineage_pins" "A9_TAG_OBJECT_SHA='b7d05fa76eed41b1dfb4eddbd9873525e0aac15f'"
+contains "$lineage_pins" "A9_CHECKSUMS_SHA256='9ed1f99d22a761abb7953c70aab3c7de5ab0b7ec3524cf3798fcd3815c53bde7'"
+contains "$lineage_pins" "A9_AMD64_ARCHIVE_SHA256='48f80577ff2ef40a843dab0a847895ca7b3877e7fb810a30d328cbe8a55fc51e'"
+contains "$lineage_pins" "A9_ARM64_ARCHIVE_SHA256='503c338e1ce122e209b9e74bc883492317144b319b0713943bc299e57447024d'"
+contains "$lineage_pins" "A9_AMD64_MANIFEST_SHA256='589f02503aa02338ed14d67b1eb6b31e2b96a9e83b47c99e5cd5a31b75ede9b7'"
+contains "$lineage_pins" "A9_ARM64_MANIFEST_SHA256='ffdd6ccbecff2b8ea38bc5c5f65ff7f078b229bd4658f90d08bb5e801c184a7f'"
 contains "$lineage" "release_phase='A8' prior_phase='A7'"
 contains "$lineage" "release_phase='A9' prior_phase='A8'"
+contains "$lineage" "release_phase='A10' prior_phase='A9'"
 contains "$lineage" '.commit.tree.sha'
-contains "$producer" "GITHUB_REF_NAME\" == 'v0.50.80'"
-contains "$producer" "release_phase='A9'"
-contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.80'"
-contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.80'"
+contains "$producer" "GITHUB_REF_NAME\" == 'v0.50.81'"
+contains "$producer" "release_phase='A10'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.81'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.81'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -136,8 +149,8 @@ for workflow in "$release" "$recovery"; do
   workflow_token_index=$(grep -n 'name: Create Homebrew tap token' "$workflow" | cut -d: -f1)
   (( workflow_evidence_index < workflow_token_index )) || fail 'tap token precedes release evidence'
 done
-contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.80'"
-contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.80'"
+contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.81'"
+contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.81'"
 contains "$current_release_gate" '.target_commitish == $commit'
 contains "$current_release_gate" '.immutable == true'
 contains "$current_release_gate" '(.assets | length) == ($expected | length)'
@@ -152,7 +165,7 @@ trap 'rm -rf -- "$temp"' EXIT
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid
-git -C "$temp/source" tag -am 'A9 fixture' v0.50.80
+git -C "$temp/source" tag -am 'A10 fixture' v0.50.81
 commit=$(git -C "$temp/source" rev-parse HEAD)
 tree=$(git -C "$temp/source" rev-parse 'HEAD^{tree}')
 if [[ "${tree: -1}" == '0' ]]; then
@@ -162,7 +175,7 @@ else
 fi
 run_source_gate() {
   local approved_commit="${1-}" approved_tree="${2-}"
-  env GITHUB_REF_NAME=v0.50.80 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
+  env GITHUB_REF_NAME=v0.50.81 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
     GITHUB_OUTPUT="$temp/source-output" COMPANION_SOURCE_PIN_REQUIRED=1 \
     COMPANION_APPROVED_SOURCE_COMMIT="$approved_commit" \
     COMPANION_APPROVED_SOURCE_TREE="$approved_tree" \
@@ -271,103 +284,6 @@ fi
 contains "$lineage_archive" 'MANIFEST_SIGNATURE_NAME'
 contains "$lineage_archive" 'COMPANION_MANIFEST_VERIFIER'
 
-# A9 updates only the Cask from the exact A8 tap head and keeps Formula frozen.
-state="$temp/tap-state"
-mkdir -m 0700 "$state" "$temp/bin"
-install -m 0700 "$tests_dir/testdata/mock-tap-gh.sh" "$temp/bin/gh"
-checksums="$temp/checksums.txt"
-printf '%064d  autopus-adk_0.50.80_darwin_amd64.tar.gz\n' 1 >"$checksums"
-printf '%064d  autopus-adk_0.50.80_darwin_arm64.tar.gz\n' 2 >>"$checksums"
-printf '%064d  autopus-adk_0.50.80_linux_amd64.tar.gz\n' 3 >>"$checksums"
-printf '%064d  autopus-adk_0.50.80_linux_arm64.tar.gz\n' 4 >>"$checksums"
-source "$script_dir/publish-homebrew-formula-bridge-render.sh"
-render_homebrew_cask "$temp/prior-cask.rb" 0.50.79 \
-  '19e317cdabc9dde976ca772d9ddbbf693b444dd44eefa70c8d0313a32de89a9b' \
-  '41e29ae1c3c48dd6e3e5f4dfe8076472704d00a7d479b5cc8a90f53c0af6ef31' \
-  '14b6ce5ff5bb6974d1855dfc6eaae42cc0563a761eeeca6cb812e1cd5054a082' \
-  '6c9f93a96960ba3126630298ab18f872a57e676488c86e285b2dbfde20b0fe65'
-render_homebrew_formula_bridge "$temp/frozen-formula.rb" v0.50.71 0.50.71 \
-  "$(printf '%064d' 1)" "$(printf '%064d' 2)" \
-  "$(printf '%064d' 3)" "$(printf '%064d' 4)"
-jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
-  '{sha:"979e62e34124b9f3c68bb2b8e1d0163047ea3ee3",content:$content}' >"$state/cask.json"
-jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
-  '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"2838951580d16348e12be39c09553cf6765504cb",url:"https://example.invalid/prior-commit"}}' \
-  >"$state/branch.json"
-cp "$state/formula.json" "$temp/formula-before.json"
-bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.80
-  COMPANION_VERSION=0.50.80 COMPANION_HOMEBREW_POLICY=cask-only
-  COMPANION_CHECKSUMS_PATH="$checksums" HOMEBREW_TAP_TOKEN=fixture)
-env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
-[[ "$(<"$state/ref-update.calls")" == 1 &&
-   "$(<"$state/blob-create.calls")" == 1 &&
-   "$(<"$state/tree-create.calls")" == 1 &&
-   "$(<"$state/commit-create.calls")" == 1 &&
-   "$(<"$state/formula-get.calls")" == 1 ]] \
-  || fail 'A9 did not update only the Cask'
-cmp -s "$temp/formula-before.json" "$state/formula.json" \
-  || fail 'frozen v0.50.71 Formula blob or bytes changed'
-env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
-[[ "$(<"$state/ref-update.calls")" == 1 &&
-   "$(<"$state/blob-create.calls")" == 1 &&
-   "$(<"$state/tree-create.calls")" == 1 &&
-   "$(<"$state/commit-create.calls")" == 1 &&
-   "$(<"$state/formula-get.calls")" == 2 ]] \
-  || fail 'A9 Cask-only reconciler is not idempotent'
-
-# An update-needed retry must reject pre-existing tap-head or Formula drift.
-jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
-  '{sha:"979e62e34124b9f3c68bb2b8e1d0163047ea3ee3",content:$content}' >"$state/cask.json"
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"4444444444444444444444444444444444444444",url:"https://example.invalid/racer"}}' \
-  >"$state/branch.json"
-if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
-  >/dev/null 2>&1; then
-  fail 'A9 accepted a drifted Homebrew tap predecessor commit'
-fi
-[[ "$(<"$state/ref-update.calls")" == 1 ]] \
-  || fail 'A9 updated Cask after predecessor commit drift'
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"2838951580d16348e12be39c09553cf6765504cb",url:"https://example.invalid/prior-commit"}}' \
-  >"$state/branch.json"
-jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
-  '{sha:"5555555555555555555555555555555555555555",content:$content}' >"$state/formula.json"
-if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
-  >/dev/null 2>&1; then
-  fail 'A9 accepted frozen Formula blob drift'
-fi
-[[ "$(<"$state/ref-update.calls")" == 1 ]] \
-  || fail 'A9 mutated tap state after frozen Formula drift'
-
-# A branch move after the head check must make the non-force ref CAS fail.
-jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
-  '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"2838951580d16348e12be39c09553cf6765504cb",url:"https://example.invalid/prior-commit"}}' \
-  >"$state/branch.json"
-touch "$state/race-before-ref"
-if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
-  >/dev/null 2>&1; then
-  fail 'A9 accepted a concurrent Homebrew branch move'
-fi
-rm -f -- "$state/race-before-ref"
-[[ "$(<"$state/ref-update.calls")" == 1 &&
-   "$(jq -er '.object.sha' "$state/branch.json")" == \
-     '4444444444444444444444444444444444444444' ]] \
-  || fail 'A9 overwrote a concurrent Homebrew branch move'
-
-# A concurrent Formula-changing commit must also win the race and reject A9.
-jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
-  '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"2838951580d16348e12be39c09553cf6765504cb",url:"https://example.invalid/prior-commit"}}' \
-  >"$state/branch.json"
-touch "$state/formula-race-before-ref"
-if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
-  >/dev/null 2>&1; then
-  fail 'A9 accepted a concurrent Formula drift commit'
-fi
-rm -f -- "$state/formula-race-before-ref"
-[[ "$(<"$state/ref-update.calls")" == 1 &&
-   "$(jq -er '.sha' "$state/formula.json")" == \
-     '6666666666666666666666666666666666666666' ]] \
-  || fail 'A9 overwrote a concurrent Formula drift commit'
+bash "$tests_dir/release-homebrew-hardening-test.sh"
 
 printf 'release hardening test: PASS\n'

@@ -2,14 +2,14 @@
 set -euo pipefail
 umask 077
 
-readonly RELEASE_TAG='v0.50.80'
-readonly RELEASE_VERSION='0.50.80'
+readonly RELEASE_TAG='v0.50.81'
+readonly RELEASE_VERSION='0.50.81'
 readonly RELEASE_POLICY='cask-only'
 readonly TAP_REPOSITORY='Insajin/homebrew-autopus'
 readonly TAP_BRANCH='main'
-readonly PRIOR_TAP_COMMIT='2838951580d16348e12be39c09553cf6765504cb'
+readonly PRIOR_TAP_COMMIT='8acf53e1bea9711ca3063c121b52e5d160f43b67'
 readonly CASK_PATH='Casks/auto.rb'
-readonly PRIOR_CASK_BLOB='979e62e34124b9f3c68bb2b8e1d0163047ea3ee3'
+readonly PRIOR_CASK_BLOB='3f3a38e9a2ae556acc0f7d0974895d6189f266dd'
 readonly FORMULA_PATH='Formula/auto.rb'
 readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'
 
@@ -161,7 +161,7 @@ verify_prior_tap_head() {
     .object.sha | select(type == "string" and test("^[0-9a-f]{40}$"))
   ' "$response") || fail 'Homebrew tap branch head response is invalid'
   [[ "$head_sha" == "$PRIOR_TAP_COMMIT" ]] \
-    || fail 'Homebrew tap branch differs from the pinned v0.50.79 predecessor commit'
+    || fail 'Homebrew tap branch differs from the pinned v0.50.80 predecessor commit'
 }
 
 decode_api_content() {
@@ -295,5 +295,5 @@ publish_cask() {
 
 verify_frozen_formula
 publish_cask cask Cask "$CASK_PATH" "$cask_target" "$PRIOR_CASK_BLOB" \
-  'Publish signed Cask for v0.50.80' \
-  'published Cask differs from canonical v0.50.79 output and its pinned prior blob'
+  'Publish signed Cask for v0.50.81' \
+  'published Cask differs from canonical v0.50.80 output and its pinned prior blob'
