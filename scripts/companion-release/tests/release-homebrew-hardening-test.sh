@@ -57,6 +57,35 @@ env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
    "$(<"$state/formula-get.calls")" == 2 ]] \
   || fail 'A11 Cask-only reconciler is not idempotent'
 
+# An already-current Cask must bind to one stable head with the frozen Formula.
+touch "$state/idempotent-formula-race"
+if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
+  >/dev/null 2>&1; then
+  fail 'A11 accepted idempotent Cask bytes across concurrent Formula drift'
+fi
+rm -f -- "$state/idempotent-formula-race"
+[[ "$(<"$state/ref-update.calls")" == 1 &&
+   "$(jq -er '.object.sha' "$state/branch.json")" == \
+     '8888888888888888888888888888888888888888' &&
+   "$(jq -er '.sha' "$state/formula.json")" == \
+     '6666666666666666666666666666666666666666' ]] \
+  || fail 'A11 mutated tap state after idempotent Formula drift'
+jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"3333333333333333333333333333333333333333",url:"https://example.invalid/target-commit"}}' \
+  >"$state/branch.json"
+jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
+  '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
+rm -f -- "$state/branch-get.calls"
+touch "$state/idempotent-ref-race"
+if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
+  >/dev/null 2>&1; then
+  fail 'A11 accepted a branch move after idempotent tree verification'
+fi
+rm -f -- "$state/idempotent-ref-race"
+[[ "$(<"$state/ref-update.calls")" == 1 &&
+   "$(jq -er '.object.sha' "$state/branch.json")" == \
+     '4444444444444444444444444444444444444444' ]] \
+  || fail 'A11 updated Cask during idempotent head verification'
+
 # An update-needed retry must reject pre-existing tap-head or Formula drift.
 jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
   '{sha:"c6edb108d821d88914e12d2c1bf943540c63351e",content:$content}' >"$state/cask.json"

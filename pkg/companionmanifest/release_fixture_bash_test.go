@@ -7,6 +7,10 @@ import (
 	"testing"
 )
 
+// @AX:WARN [AUTO]: TestMain mutates the process-wide lineage fixture cache root.
+// @AX:REASON [AUTO]: Integration fixtures share this immutable cache; assign it before m.Run and remove it only after the suite completes.
+var lineageFixtureCacheRoot string
+
 func TestMain(m *testing.M) {
 	wrapperRoot, err := os.MkdirTemp("", "autopus-release-bash-")
 	if err != nil {
@@ -19,10 +23,17 @@ func TestMain(m *testing.M) {
 		_ = os.RemoveAll(wrapperRoot)
 		os.Exit(2)
 	}
+	lineageFixtureCacheRoot, err = os.MkdirTemp("", "autopus-lineage-cache-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		_ = os.RemoveAll(wrapperRoot)
+		os.Exit(2)
+	}
 	previousPath := os.Getenv("PATH")
 	_ = os.Setenv("PATH", wrapperRoot+string(os.PathListSeparator)+previousPath)
 	code := m.Run()
 	_ = os.Setenv("PATH", previousPath)
+	_ = os.RemoveAll(lineageFixtureCacheRoot)
 	_ = os.RemoveAll(wrapperRoot)
 	os.Exit(code)
 }
@@ -37,6 +48,7 @@ case "${1-}" in
     trap 'rm -rf -- "$fixture_root"' EXIT
     cp -R -- "$(dirname -- "$source_script")" "$fixture_root/companion-release"
     fixture_script="$fixture_root/companion-release/produce.sh"
+    fixture_receipt_helper="$fixture_root/companion-release/produce-public-key-receipt.sh"
     /usr/bin/sed \
       -e 's|uname -s|printf Darwin|' \
       -e 's|codesign_tool=/usr/bin/codesign|codesign_tool="$COMPANION_CODESIGN_TOOL"|' \
@@ -47,6 +59,10 @@ case "${1-}" in
       -e 's|env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}"|env|' \
       "$fixture_script" >"$fixture_script.next"
     mv -- "$fixture_script.next" "$fixture_script"
+    /usr/bin/sed \
+      -e 's|env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}"|env|' \
+      "$fixture_receipt_helper" >"$fixture_receipt_helper.next"
+    mv -- "$fixture_receipt_helper.next" "$fixture_receipt_helper"
     /bin/bash "$fixture_script" "$@"
     ;;
   *) exec /bin/bash "$@" ;;

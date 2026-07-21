@@ -19,6 +19,8 @@ var frozenFormulaDigests = []string{
 
 func TestHomebrewFormulaBridge_A11PinsCaskOnlyTapTransition(t *testing.T) {
 	source := readReleaseFile(t, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
+	gitHelper := readReleaseFile(t,
+		"scripts/companion-release/publish-homebrew-formula-bridge-git.sh")
 	for _, required := range []string{
 		"readonly RELEASE_TAG='v0.50.82'",
 		"readonly RELEASE_VERSION='0.50.82'",
@@ -27,21 +29,33 @@ func TestHomebrewFormulaBridge_A11PinsCaskOnlyTapTransition(t *testing.T) {
 		"readonly FROZEN_FORMULA_BLOB='" + a11FrozenFormulaBlob + "'",
 		"readonly FORMULA_PATH='Formula/auto.rb'",
 		"COMPANION_HOMEBREW_POLICY", "cask-only",
+		`[[ -f "$git_helper" && ! -L "$git_helper" ]]`,
+		`source "$git_helper"`,
+	} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("A11 Homebrew caller policy missing %q", required)
+		}
+	}
+	for _, required := range []string{
+		"verify_frozen_formula", "verify_idempotent_head_snapshot",
+		`api_json GET "git/commits/${head_sha}"`,
+		`api_json GET "git/trees/${tree_sha}?recursive=1"`,
 		"api_json POST 'git/blobs'", "api_json POST 'git/trees'",
 		"api_json POST 'git/commits'", "api_json PATCH \"git/refs/heads/${TAP_BRANCH}\"",
 		"'{base_tree:$base,tree:[{path:$path,mode:\"100644\",type:\"blob\",sha:$sha}]}'",
 		"'{message:$message,tree:$tree,parents:[$parent]}'",
 		"'{sha:$sha,force:false}'",
 	} {
-		if !strings.Contains(source, required) {
-			t.Fatalf("A11 Homebrew policy missing %q", required)
+		if !strings.Contains(gitHelper, required) {
+			t.Fatalf("A11 Homebrew Git CAS policy missing %q", required)
 		}
 	}
+	implementation := source + "\n" + gitHelper
 	for _, forbidden := range []string{
 		"reconcile_tap_file formula Formula", "Publish signed Formula",
 		"--method PUT",
 	} {
-		if strings.Contains(source, forbidden) {
+		if strings.Contains(implementation, forbidden) {
 			t.Fatalf("A11 production path can mutate the frozen Formula via %q", forbidden)
 		}
 	}

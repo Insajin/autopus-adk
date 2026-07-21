@@ -76,13 +76,23 @@ func TestLineageVerifier_A8PinsExactImmutableA7Evidence(t *testing.T) {
 		}
 	}
 	lineage := readReleaseFile(t, "scripts/companion-release/verify-public-key-lineage.sh")
+	coordinates := readReleaseFile(t,
+		"scripts/companion-release/verify-public-key-lineage-coordinates.sh")
 	for _, required := range []string{
 		"release_phase='A8' prior_phase='A7'",
 		`prior_tree="$A7_TREE_SHA"`,
+	} {
+		if !strings.Contains(coordinates, required) {
+			t.Fatalf("A8 lineage coordinate contract missing %q", required)
+		}
+	}
+	for _, required := range []string{
 		`[[ "$(jq -er '.commit.tree.sha' "$commit_json")" == "$prior_tree" ]]`,
+		`[[ -f "$coordinates_helper" && ! -L "$coordinates_helper" ]]`,
+		`source "$coordinates_helper"`,
 	} {
 		if !strings.Contains(lineage, required) {
-			t.Fatalf("A8 lineage contract missing %q", required)
+			t.Fatalf("A8 lineage caller contract missing %q", required)
 		}
 	}
 }

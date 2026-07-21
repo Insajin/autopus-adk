@@ -96,7 +96,7 @@ func TestReleasePublicKeyReceipt_GoReleaserDarwinArchive_MatchesAtomicCLIArtifac
 
 func TestReleasePublicKeyReceipt_Producer_UsesSameKeyWithoutLeakAndSurfacesRollback(t *testing.T) {
 	api := productionPublicKeyReceiptAPI(t)
-	producer := normalizedReleaseText(releaseSourceFile(t, "scripts/companion-release/produce.sh"))
+	producer := normalizedReleaseText(releaseProducerSurface(t))
 	if !strings.Contains(producer, "companion-manifest public-key-receipt") {
 		t.Fatal("missing production contract: produce.sh never invokes the public-key-receipt CLI")
 	}

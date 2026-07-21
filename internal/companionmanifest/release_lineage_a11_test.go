@@ -96,15 +96,25 @@ func TestLineageVerifier_A11PinsExactImmutableA10Evidence(t *testing.T) {
 		}
 	}
 	lineage := readReleaseFile(t, "scripts/companion-release/verify-public-key-lineage.sh")
+	coordinates := readReleaseFile(t,
+		"scripts/companion-release/verify-public-key-lineage-coordinates.sh")
 	for _, required := range []string{
 		"release_phase='A11' prior_phase='A10'",
 		`prior_evidence_source='immutable A10 GitHub release'`,
 		`prior_tree="$A10_TREE_SHA"`,
 		`prior_tag_object="$A10_TAG_OBJECT_SHA" prior_checksums="$A10_CHECKSUMS_SHA256"`,
+	} {
+		if !strings.Contains(coordinates, required) {
+			t.Fatalf("A11 lineage coordinate contract missing %q", required)
+		}
+	}
+	for _, required := range []string{
 		`[[ "$(jq -er '.commit.tree.sha' "$commit_json")" == "$prior_tree" ]]`,
+		`[[ -f "$coordinates_helper" && ! -L "$coordinates_helper" ]]`,
+		`source "$coordinates_helper"`,
 	} {
 		if !strings.Contains(lineage, required) {
-			t.Fatalf("A11 lineage contract missing %q", required)
+			t.Fatalf("A11 lineage caller contract missing %q", required)
 		}
 	}
 }

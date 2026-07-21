@@ -44,7 +44,7 @@ func TestReleasePublicKeyReceipt_GoReleaserA9FixtureProducesCurrentArtifacts(t *
 		t, tools, publicKeyReceiptA9Tag, publicKeyReceiptA9Version, true,
 	)
 	for _, architecture := range []string{"amd64", "arm64"} {
-		entries, err := decodeLineageArchive(evidence.archives[architecture])
+		entries, err := decodeLineageArchiveFile(evidence.archives[architecture])
 		if err != nil {
 			t.Fatalf("decode A9 %s archive: %v", architecture, err)
 		}

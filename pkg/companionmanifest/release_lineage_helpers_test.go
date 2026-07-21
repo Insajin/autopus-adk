@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -77,4 +78,87 @@ func a0LineagePinsProvisioned(t *testing.T, source string, api publicKeyReceiptA
 		}
 	}
 	return allProvisioned
+}
+
+// @AX:ANCHOR [AUTO]: Keep the reviewed release-script aggregation shared by all lineage policy tests.
+// @AX:REASON [AUTO]: Phase tests must inspect the same sorted production surface after helpers are split.
+func releaseScriptsText(t *testing.T) []byte {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join("..", "..", "scripts", "companion-release", "*.sh"))
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("find companion release scripts: %v", err)
+	}
+	sort.Strings(paths)
+	var combined strings.Builder
+	for _, path := range paths {
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("read release script %s: %v", path, readErr)
+		}
+		combined.WriteString("\n# source: " + filepath.Base(path) + "\n")
+		combined.Write(data)
+	}
+	return []byte(combined.String())
+}
+
+func releaseProducerSurface(t *testing.T) []byte {
+	t.Helper()
+	var combined strings.Builder
+	for _, path := range []string{
+		"scripts/companion-release/produce.sh",
+		"scripts/companion-release/produce-public-key-receipt.sh",
+	} {
+		combined.WriteString("\n# source: " + filepath.Base(path) + "\n")
+		combined.Write(releaseSourceFile(t, path))
+	}
+	return []byte(combined.String())
+}
+
+func exactA0TagVersionGuard(source string) bool {
+	return exactLineageTagVersionGuard(source, "69")
+}
+
+func exactA2TagVersionGuard(source string) bool {
+	return exactLineageTagVersionGuard(source, "71")
+}
+
+func exactA3TagVersionGuard(source string) bool {
+	return exactLineageTagVersionGuard(source, "72")
+}
+
+func exactLineageTagVersionGuard(source, patch string) bool {
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`GITHUB_REF_NAME.{0,240}v0\.50\.` + patch + `.{0,400}COMPANION_VERSION.{0,240}0\.50\.` + patch),
+		regexp.MustCompile(`COMPANION_VERSION.{0,240}0\.50\.` + patch + `.{0,400}GITHUB_REF_NAME.{0,240}v0\.50\.` + patch),
+	}
+	for _, pattern := range patterns {
+		if pattern.MatchString(source) {
+			return true
+		}
+	}
+	return false
+}
+
+func publicKeyReceiptLineageStep(t *testing.T, workflow publicKeyReceiptWorkflow) (int, publicKeyReceiptWorkflowStep) {
+	t.Helper()
+	index, step, ok := findPublicKeyReceiptLineageStep(workflow)
+	if !ok {
+		t.Fatal("missing production contract: release workflow has no prior-release receipt lineage preflight")
+	}
+	return index, step
+}
+
+func findPublicKeyReceiptLineageStep(workflow publicKeyReceiptWorkflow) (int, publicKeyReceiptWorkflowStep, bool) {
+	job, ok := workflow.Jobs["release"]
+	if !ok {
+		return -1, publicKeyReceiptWorkflowStep{}, false
+	}
+	for index, step := range job.Steps {
+		surface := strings.ToLower(step.Name + " " + step.Run)
+		if strings.Contains(surface, "public-key") &&
+			(strings.Contains(surface, "lineage") || strings.Contains(surface, "prior")) {
+			return index, step, true
+		}
+	}
+	return -1, publicKeyReceiptWorkflowStep{}, false
 }
