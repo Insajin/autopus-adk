@@ -41,7 +41,7 @@ func validateReviewPrepareContract(contract ReviewPrepareContract) error {
 	seen := make(map[string]struct{}, len(contract.Providers))
 	for _, provider := range contract.Providers {
 		if !reviewAdapterPattern.MatchString(provider.AdapterID) ||
-			reviewProviderAllowed(provider.AdapterID) == false ||
+			!reviewProviderAllowed(provider.AdapterID) ||
 			!reviewModelPattern.MatchString(provider.Model) ||
 			!reviewRolePattern.MatchString(provider.Role) {
 			return ErrReviewPrepareInvalid
