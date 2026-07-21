@@ -28,7 +28,7 @@ func TestReleasePublicKeyReceipt_GoReleaserA6FixtureProducesCurrentArtifacts(t *
 		t, tools, publicKeyReceiptA6Tag, publicKeyReceiptA6Version, true,
 	)
 	for _, architecture := range []string{"amd64", "arm64"} {
-		entries, err := decodeLineageArchive(evidence.archives[architecture])
+		entries, err := decodeLineageArchiveFile(evidence.archives[architecture])
 		if err != nil {
 			t.Fatalf("decode A6 %s archive: %v", architecture, err)
 		}

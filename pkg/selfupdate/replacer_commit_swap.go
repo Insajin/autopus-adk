@@ -27,6 +27,10 @@ func preservesReplacementStage(err error) bool {
 	return errors.As(err, &target)
 }
 
+// @AX:ANCHOR [AUTO]: Preserve the atomic-swap commit contract across Darwin and Linux implementations.
+// @AX:REASON [AUTO]: Nine production and regression call sites depend on pre/post-swap inode verification and rollback behavior.
+// @AX:WARN [AUTO]: This commit path contains more than eight filesystem decision branches.
+// @AX:REASON [AUTO]: Inode identity, directory sync, rollback, and preserved-recovery ordering must remain fail-closed.
 func commitWithAtomicSwap(
 	stagePath, targetPath string,
 	expected os.FileInfo,
@@ -35,12 +39,19 @@ func commitWithAtomicSwap(
 ) error {
 	stageDir := filepath.Dir(stagePath)
 	targetDir := filepath.Dir(targetPath)
+	stagedInfo, err := regularBinaryInfo(os.Lstat, stagePath, "staged")
+	if err != nil {
+		return fmt.Errorf("inspect staged binary before atomic commit: %w", err)
+	}
 	currentInfo, err := os.Lstat(targetPath)
 	if err != nil {
 		return fmt.Errorf("inspect target before atomic commit: %w", err)
 	}
 	if !currentInfo.Mode().IsRegular() || !os.SameFile(expected, currentInfo) {
 		return errors.New("target binary changed before atomic commit")
+	}
+	if os.SameFile(stagedInfo, currentInfo) {
+		return errors.New("staged and target binary resolve to the same file")
 	}
 	if err := syncDir(stageDir); err != nil {
 		return fmt.Errorf("sync staged directory: %w", err)
@@ -49,11 +60,9 @@ func commitWithAtomicSwap(
 		return err
 	}
 
-	swappedInfo, verifyErr := os.Lstat(stagePath)
-	if verifyErr == nil && !os.SameFile(expected, swappedInfo) {
-		verifyErr = errors.New("target binary changed before atomic commit")
-	}
-	if verifyErr != nil {
+	if verifyErr := verifyAtomicSwapState(
+		stagePath, targetPath, expected, stagedInfo,
+	); verifyErr != nil {
 		return rollbackAtomicSwap(stagePath, targetPath, verifyErr, swap, syncDir)
 	}
 	if err := syncDir(targetDir); err != nil {
@@ -65,6 +74,31 @@ func commitWithAtomicSwap(
 	return nil
 }
 
+func verifyAtomicSwapState(
+	stagePath, targetPath string,
+	expectedTarget, expectedStage os.FileInfo,
+) error {
+	committedInfo, err := regularBinaryInfo(os.Lstat, targetPath, "committed target")
+	if err != nil {
+		return fmt.Errorf("inspect target after atomic commit: %w", err)
+	}
+	if !os.SameFile(expectedStage, committedInfo) {
+		return errors.New("staged binary identity changed during atomic commit")
+	}
+
+	recoveryInfo, err := os.Lstat(stagePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect recovery binary after atomic commit: %w", err)
+	}
+	if !recoveryInfo.Mode().IsRegular() || !os.SameFile(expectedTarget, recoveryInfo) {
+		return errors.New("target binary changed before atomic commit")
+	}
+	return nil
+}
+
 func rollbackAtomicSwap(
 	stagePath, targetPath string,
 	cause error,
@@ -72,10 +106,14 @@ func rollbackAtomicSwap(
 	syncDir func(string) error,
 ) error {
 	if err := swap(stagePath, targetPath); err != nil {
-		return &preserveStageError{
-			stagePath: stagePath,
-			err:       errors.Join(cause, fmt.Errorf("swap back: %w", err)),
+		rollbackErr := errors.Join(cause, fmt.Errorf("swap back: %w", err))
+		if info, statErr := os.Lstat(stagePath); statErr == nil && info.Mode().IsRegular() {
+			return &preserveStageError{
+				stagePath: stagePath,
+				err:       rollbackErr,
+			}
 		}
+		return rollbackErr
 	}
 	stageDir := filepath.Dir(stagePath)
 	targetDir := filepath.Dir(targetPath)

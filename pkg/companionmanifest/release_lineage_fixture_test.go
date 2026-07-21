@@ -50,14 +50,18 @@ type goReleaserA0Evidence struct {
 	tag       string
 	version   string
 	commit    string
-	archives  map[string][]byte
+	archives  map[string]string
 	checksums []byte
 	receipt   []byte
 	signature []byte
 	pins      executableLineagePins
 }
 
-type lineageArchiveMutation func(*testing.T, string, []byte) []byte
+type lineageArchiveMutation struct {
+	architecture string
+	entry        string
+	mutate       func(*testing.T, []byte) ([]byte, bool)
+}
 
 type executableLineageFixture struct {
 	root                  string
@@ -75,9 +79,8 @@ type executableLineageFixture struct {
 	currentTag            string
 	token                 string
 	checksums             []byte
-	archiveMutation       lineageArchiveMutation
+	archiveMutation       *lineageArchiveMutation
 	assetDigestOverride   string
-	omitSignatureEntry    bool
 	releaseJSON           string
 	tagJSON               string
 	annotatedTagJSON      string

@@ -29,7 +29,7 @@ func TestReleasePublicKeyReceipt_GoReleaserA5FixtureProducesCurrentArtifacts(t *
 		t, tools, publicKeyReceiptA5Tag, publicKeyReceiptA5Version, true,
 	)
 	for _, architecture := range []string{"amd64", "arm64"} {
-		entries, err := decodeLineageArchive(evidence.archives[architecture])
+		entries, err := decodeLineageArchiveFile(evidence.archives[architecture])
 		if err != nil {
 			t.Fatalf("decode A5 %s archive: %v", architecture, err)
 		}

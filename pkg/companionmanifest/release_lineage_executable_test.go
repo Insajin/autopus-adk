@@ -117,16 +117,12 @@ func tamperLineageReleaseImmutable(t *testing.T, fixture *executableLineageFixtu
 
 func tamperLineageArchiveBytes(t *testing.T, fixture *executableLineageFixture) {
 	t.Helper()
-	fixture.archiveMutation = func(_ *testing.T, architecture string, data []byte) []byte {
-		if architecture == "amd64" {
-			return rewriteLineageArchive(t, data, func(name string, entry []byte) ([]byte, bool) {
-				if name == "README.md" {
-					return append(entry, '\n'), true
-				}
-				return entry, true
-			})
-		}
-		return data
+	fixture.archiveMutation = &lineageArchiveMutation{
+		architecture: "amd64",
+		entry:        "README.md",
+		mutate: func(_ *testing.T, data []byte) ([]byte, bool) {
+			return append(data, '\n'), true
+		},
 	}
 	fixture.writeEvidence(t)
 }
@@ -173,18 +169,16 @@ func replaceLineageArchiveBytes(
 	t *testing.T,
 	entryName string,
 	old, replacement []byte,
-) lineageArchiveMutation {
+) *lineageArchiveMutation {
 	t.Helper()
-	return func(t *testing.T, _ string, data []byte) []byte {
-		return rewriteLineageArchive(t, data, func(name string, entry []byte) ([]byte, bool) {
-			if name != entryName {
-				return entry, true
-			}
+	return &lineageArchiveMutation{
+		entry: entryName,
+		mutate: func(t *testing.T, entry []byte) ([]byte, bool) {
 			if bytes.Count(entry, old) != 1 {
 				t.Fatalf("tamper target %s is not exact", entryName)
 			}
 			return bytes.Replace(entry, old, replacement, 1), true
-		})
+		},
 	}
 }
 
@@ -237,7 +231,12 @@ func tamperLineageTargetCommit(t *testing.T, fixture *executableLineageFixture) 
 
 func tamperLineageArchiveEntry(t *testing.T, fixture *executableLineageFixture) {
 	t.Helper()
-	fixture.omitSignatureEntry = true
+	fixture.archiveMutation = &lineageArchiveMutation{
+		entry: lineageBundleName + "/public-key-receipt.sig",
+		mutate: func(*testing.T, []byte) ([]byte, bool) {
+			return nil, false
+		},
+	}
 	fixture.writeEvidence(t)
 }
 

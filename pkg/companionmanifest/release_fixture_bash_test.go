@@ -7,6 +7,10 @@ import (
 	"testing"
 )
 
+// @AX:WARN [AUTO]: TestMain mutates the process-wide lineage fixture cache root.
+// @AX:REASON [AUTO]: Integration fixtures share this immutable cache; assign it before m.Run and remove it only after the suite completes.
+var lineageFixtureCacheRoot string
+
 func TestMain(m *testing.M) {
 	wrapperRoot, err := os.MkdirTemp("", "autopus-release-bash-")
 	if err != nil {
@@ -19,10 +23,17 @@ func TestMain(m *testing.M) {
 		_ = os.RemoveAll(wrapperRoot)
 		os.Exit(2)
 	}
+	lineageFixtureCacheRoot, err = os.MkdirTemp("", "autopus-lineage-cache-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		_ = os.RemoveAll(wrapperRoot)
+		os.Exit(2)
+	}
 	previousPath := os.Getenv("PATH")
 	_ = os.Setenv("PATH", wrapperRoot+string(os.PathListSeparator)+previousPath)
 	code := m.Run()
 	_ = os.Setenv("PATH", previousPath)
+	_ = os.RemoveAll(lineageFixtureCacheRoot)
 	_ = os.RemoveAll(wrapperRoot)
 	os.Exit(code)
 }

@@ -36,6 +36,8 @@ func NewReplacer() *Replacer {
 }
 
 // Replace safely replaces the target binary with the new one.
+// @AX:ANCHOR [AUTO]: Preserve this public self-update replacement boundary.
+// @AX:REASON [AUTO]: CLI update flows and external consumers rely on its fail-closed replacement contract.
 func (r *Replacer) Replace(newBinaryPath, targetPath string) error {
 	return replaceWithOps(newBinaryPath, targetPath, defaultReplaceOps())
 }
@@ -56,7 +58,11 @@ func defaultReplaceOps() replaceOps {
 	}
 }
 
-func replaceWithOps(newBinaryPath, targetPath string, ops replaceOps) error {
+// @AX:ANCHOR [AUTO]: Preserve the injectable replacement transaction used by production and regression tests.
+// @AX:REASON [AUTO]: Fourteen callers depend on identity checks, cross-device fallback, cleanup, and recovery semantics.
+// @AX:WARN [AUTO]: This transaction contains more than eight filesystem decision branches.
+// @AX:REASON [AUTO]: Target identity, staging, cross-device copy, commit, cleanup, and recovery ordering must remain fail-closed.
+func replaceWithOps(newBinaryPath, targetPath string, ops replaceOps) (retErr error) {
 	targetInfo, err := regularBinaryInfo(ops.lstat, targetPath, "target")
 	if err != nil {
 		return err
@@ -79,7 +85,10 @@ func replaceWithOps(newBinaryPath, targetPath string, ops replaceOps) error {
 	cleanupStage := true
 	defer func() {
 		if cleanupStage {
-			_ = ops.removeAll(stageDir)
+			if cleanupErr := ops.removeAll(stageDir); cleanupErr != nil {
+				retErr = errors.Join(retErr,
+					fmt.Errorf("cleanup replacement directory: %w", cleanupErr))
+			}
 		}
 	}()
 

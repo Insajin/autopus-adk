@@ -57,9 +57,9 @@ func produceGoReleaserFixtureEvidence(
 
 func cloneGoReleaserEvidence(source *goReleaserA0Evidence) *goReleaserA0Evidence {
 	clone := *source
-	clone.archives = make(map[string][]byte, len(source.archives))
+	clone.archives = make(map[string]string, len(source.archives))
 	for architecture, archive := range source.archives {
-		clone.archives[architecture] = bytes.Clone(archive)
+		clone.archives[architecture] = archive
 	}
 	clone.checksums = bytes.Clone(source.checksums)
 	clone.receipt = bytes.Clone(source.receipt)
