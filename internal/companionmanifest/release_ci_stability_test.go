@@ -28,7 +28,8 @@ type ciStabilityWorkflow struct {
 func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 	workflow := readCIStabilityWorkflow(t, ".github/workflows/ci.yaml")
 	want := map[string]int{
-		"test": 45, "e2e": 10, "lint": 10, "static-contracts": 10, "macos-runtime": 15,
+		"test": 35, "lineage-integration": 45, "e2e": 10, "lint": 10,
+		"static-contracts": 10, "macos-runtime": 15,
 	}
 	for id, timeout := range want {
 		job, ok := workflow.Jobs[id]
@@ -48,17 +49,31 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 		t.Fatalf("golangci-lint gate drifted: uses=%q version=%v", linter.Uses, linter.With["version"])
 	}
 	testRun := ciStepRun(t, workflow.Jobs["test"], "Test with Coverage")
-	for _, required := range []string{"-timeout=35m", "-tags integration", "-coverprofile=coverage.out", "COVERAGE_THRESHOLD: \"83\""} {
+	for _, required := range []string{"-race", "-timeout=20m", "-coverprofile=coverage.out", "COVERAGE_THRESHOLD: \"83\""} {
 		if !strings.Contains(readReleaseFile(t, ".github/workflows/ci.yaml"), required) &&
 			!strings.Contains(testRun, required) {
 			t.Fatalf("CI coverage contract missing %q", required)
 		}
 	}
+	if strings.Contains(testRun, "-tags integration") {
+		t.Fatal("CI race coverage gate must not run executable release integration fixtures")
+	}
+	lineageRun := ciStepRun(t, workflow.Jobs["lineage-integration"], "Test release lineage integration")
+	for _, required := range []string{
+		"-timeout=35m", "-tags integration", "./internal/companionmanifest", "./pkg/companionmanifest",
+	} {
+		if !strings.Contains(lineageRun, required) {
+			t.Fatalf("CI release lineage integration contract missing %q", required)
+		}
+	}
+	if strings.Contains(lineageRun, "-race") || strings.Contains(lineageRun, "-coverprofile") {
+		t.Fatal("CI release lineage integration gate must be isolated from race coverage instrumentation")
+	}
 }
 
 func TestCIWorkflow_StaticAndMacOSContractsArePullRequestSafe(t *testing.T) {
 	workflow := readCIStabilityWorkflow(t, ".github/workflows/ci.yaml")
-	for _, id := range []string{"test", "macos-runtime"} {
+	for _, id := range []string{"test", "lineage-integration", "macos-runtime"} {
 		checkout := ciUsesStep(t, workflow.Jobs[id], "actions/checkout@")
 		if checkout.With["fetch-depth"] != 0 {
 			t.Fatalf("CI job %s checkout fetch-depth = %v, want 0 for release ancestry checks",
