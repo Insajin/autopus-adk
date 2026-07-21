@@ -16,12 +16,20 @@ func TestReplaceWithOps_BindMountCommitWithoutStageIsSuccess(t *testing.T) {
 	external := t.TempDir()
 	backupPath := filepath.Join(external, "old-backup")
 	var stagedInfo os.FileInfo
+	committedStageIdentity := false
 	ops := defaultReplaceOps()
 	ops.commit = func(stagePath, gotTargetPath string, expected os.FileInfo) error {
-		var err error
-		stagedInfo, err = os.Lstat(stagePath)
+		stagedFile, err := os.Open(stagePath)
 		if err != nil {
 			return err
+		}
+		stagedInfo, err = stagedFile.Stat()
+		closeErr := stagedFile.Close()
+		if err != nil {
+			return err
+		}
+		if closeErr != nil {
+			return closeErr
 		}
 		calls := 0
 		return commitWithAtomicSwap(stagePath, gotTargetPath, expected,
@@ -33,15 +41,21 @@ func TestReplaceWithOps_BindMountCommitWithoutStageIsSuccess(t *testing.T) {
 				if err := os.Rename(right, backupPath); err != nil {
 					return err
 				}
-				return os.Rename(left, right)
+				if err := os.Rename(left, right); err != nil {
+					return err
+				}
+				committedInfo, err := os.Lstat(right)
+				if err != nil {
+					return err
+				}
+				committedStageIdentity = os.SameFile(stagedInfo, committedInfo)
+				return nil
 			}, func(string) error { return nil })
 	}
 
 	require.NoError(t, replaceWithOps(newBinaryPath, targetPath, ops))
 	assertInstalledBinary(t, targetPath, "new", 0o711)
-	targetInfo, err := os.Lstat(targetPath)
-	require.NoError(t, err)
-	require.True(t, os.SameFile(stagedInfo, targetInfo),
+	require.True(t, committedStageIdentity,
 		"committed target must be the pre-swap staged binary")
 	assertNoReplacementResidue(t, targetPath)
 }
