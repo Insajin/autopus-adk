@@ -4,67 +4,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
-	"github.com/insajin/autopus-adk/templates"
 )
 
 // renderSkillTemplates reads Codex skill templates from embedded FS,
 // renders them, and writes to .codex/skills/.
 func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	var files []adapter.FileMapping
-
-	entries, err := templates.FS.ReadDir("codex/skills")
+	files, err := a.prepareSkillTemplateMappings(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("코덱스 스킬 템플릿 디렉터리 읽기 실패: %w", err)
+		return nil, err
 	}
 
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".tmpl") {
-			continue
+	for _, file := range files {
+		targetPath := filepath.Join(a.root, file.TargetPath)
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+			return nil, fmt.Errorf("코덱스 스킬 디렉터리 생성 실패 %s: %w", filepath.Dir(targetPath), err)
 		}
-
-		name := entry.Name()
-		skillFile := strings.TrimSuffix(name, ".tmpl")
-		emit, err := shouldEmitCodexRepoSkillTemplate(skillFile, cfg)
-		if err != nil {
-			return nil, fmt.Errorf("코덱스 스킬 템플릿 대상 판정 실패 %s: %w", name, err)
-		}
-		if !emit {
-			continue
-		}
-
-		tmplContent, err := templates.FS.ReadFile("codex/skills/" + name)
-		if err != nil {
-			return nil, fmt.Errorf("코덱스 스킬 템플릿 읽기 실패 %s: %w", name, err)
-		}
-
-		rendered, err := a.engine.RenderString(string(tmplContent), cfg)
-		if err != nil {
-			if strings.HasPrefix(skillFile, "auto-") {
-				return nil, fmt.Errorf("코덱스 스킬 템플릿 렌더링 실패 %s: %w", name, err)
-			}
-			// Non-auto skill docs can legitimately contain raw `{{ ... }}` examples
-			// such as GitHub Actions expressions. Preserve the template verbatim.
-			rendered = string(tmplContent)
-		}
-		rendered = normalizeCodexInvocationBody(rendered)
-		rendered = normalizeCodexHelperPaths(rendered)
-		rendered = normalizeCodexToolingBody(rendered)
-
-		targetPath := filepath.Join(a.root, ".codex", "skills", skillFile)
-		if err := os.WriteFile(targetPath, []byte(rendered), 0644); err != nil {
+		if err := os.WriteFile(targetPath, file.Content, 0644); err != nil {
 			return nil, fmt.Errorf("코덱스 스킬 파일 쓰기 실패 %s: %w", targetPath, err)
 		}
-
-		files = append(files, adapter.FileMapping{
-			TargetPath:      filepath.Join(".codex", "skills", skillFile),
-			OverwritePolicy: adapter.OverwriteAlways,
-			Checksum:        checksum(rendered),
-			Content:         []byte(rendered),
-		})
 	}
 
 	// Extended skills from content/skills/ via transformer
