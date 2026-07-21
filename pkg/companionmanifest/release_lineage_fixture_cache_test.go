@@ -16,16 +16,17 @@ type goReleaserLineageCache struct {
 }
 
 var goReleaserLineageCaches = map[string]*goReleaserLineageCache{
-	publicKeyReceiptA0Tag: {version: lineageA0Version},
-	publicKeyReceiptA1Tag: {version: lineageA1Version, annotated: true},
-	publicKeyReceiptA2Tag: {version: publicKeyReceiptA2Version, annotated: true},
-	publicKeyReceiptA3Tag: {version: publicKeyReceiptA3Version, annotated: true},
-	publicKeyReceiptA4Tag: {version: publicKeyReceiptA4Version, annotated: true},
-	publicKeyReceiptA5Tag: {version: publicKeyReceiptA5Version, annotated: true},
-	publicKeyReceiptA6Tag: {version: publicKeyReceiptA6Version, annotated: true},
-	publicKeyReceiptA7Tag: {version: publicKeyReceiptA7Version, annotated: true},
-	publicKeyReceiptA8Tag: {version: publicKeyReceiptA8Version, annotated: true},
-	publicKeyReceiptA9Tag: {version: publicKeyReceiptA9Version, annotated: true},
+	publicKeyReceiptA0Tag:  {version: lineageA0Version},
+	publicKeyReceiptA1Tag:  {version: lineageA1Version, annotated: true},
+	publicKeyReceiptA2Tag:  {version: publicKeyReceiptA2Version, annotated: true},
+	publicKeyReceiptA3Tag:  {version: publicKeyReceiptA3Version, annotated: true},
+	publicKeyReceiptA4Tag:  {version: publicKeyReceiptA4Version, annotated: true},
+	publicKeyReceiptA5Tag:  {version: publicKeyReceiptA5Version, annotated: true},
+	publicKeyReceiptA6Tag:  {version: publicKeyReceiptA6Version, annotated: true},
+	publicKeyReceiptA7Tag:  {version: publicKeyReceiptA7Version, annotated: true},
+	publicKeyReceiptA8Tag:  {version: publicKeyReceiptA8Version, annotated: true},
+	publicKeyReceiptA9Tag:  {version: publicKeyReceiptA9Version, annotated: true},
+	publicKeyReceiptA10Tag: {version: publicKeyReceiptA10Version, annotated: true},
 }
 
 func produceGoReleaserFixtureEvidence(
@@ -82,6 +83,7 @@ func TestGoReleaserLineageFixtures_ProcessCacheBuildsEachCoordinateOnce(t *testi
 		{tag: publicKeyReceiptA7Tag, version: publicKeyReceiptA7Version, annotated: true},
 		{tag: publicKeyReceiptA8Tag, version: publicKeyReceiptA8Version, annotated: true},
 		{tag: publicKeyReceiptA9Tag, version: publicKeyReceiptA9Version, annotated: true},
+		{tag: publicKeyReceiptA10Tag, version: publicKeyReceiptA10Version, annotated: true},
 	}
 	for _, test := range cases {
 		first := produceGoReleaserFixtureEvidence(t, tools, test.tag, test.version, test.annotated)
