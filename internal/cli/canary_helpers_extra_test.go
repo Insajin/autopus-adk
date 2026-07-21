@@ -3,6 +3,9 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,4 +112,133 @@ func TestRunCanaryExternal_EmptyCommand(t *testing.T) {
 	result := runCanaryExternal(ctx, "H-test", "empty command test", t.TempDir())
 	assert.Equal(t, "FAIL", result.Status)
 	assert.Contains(t, result.Detail, "empty command")
+}
+
+func TestRunCanaryEndpointChecks_AcceptsProtectedMetrics(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/health":
+			w.WriteHeader(http.StatusOK)
+		case "/metrics":
+			w.WriteHeader(http.StatusUnauthorized)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	result := canaryResult{}
+	status := runCanaryEndpointChecks(t.Context(), server.URL, &result)
+
+	assert.Equal(t, "PASS", status)
+	require.Len(t, result.Targets, 2)
+	assert.Equal(t, "PASS", result.Targets[0].Status)
+	assert.Contains(t, result.Targets[0].Detail, "HTTP 200")
+	assert.Equal(t, "PASS", result.Targets[1].Status)
+	assert.Contains(t, result.Targets[1].Detail, "HTTP 401")
+	assert.Contains(t, result.Targets[1].Detail, "protected")
+}
+
+func TestRunCanaryEndpointChecks_ReportsIndependentFailures(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/health":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/metrics":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	result := canaryResult{}
+	status := runCanaryEndpointChecks(t.Context(), server.URL, &result)
+
+	assert.Equal(t, "FAIL", status)
+	require.Len(t, result.Targets, 2)
+	assert.Equal(t, "FAIL", result.Targets[0].Status)
+	assert.Contains(t, result.Targets[0].Detail, "HTTP 500")
+	assert.Equal(t, "PASS", result.Targets[1].Status)
+	assert.Contains(t, result.Targets[1].Detail, "HTTP 200")
+}
+
+func TestRunCanaryEndpointChecks_RejectsMetricsErrors(t *testing.T) {
+	t.Parallel()
+
+	for _, code := range []int{http.StatusNotFound, http.StatusInternalServerError} {
+		t.Run(http.StatusText(code), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/health" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.WriteHeader(code)
+			}))
+			t.Cleanup(server.Close)
+
+			result := canaryResult{}
+			status := runCanaryEndpointChecks(t.Context(), server.URL, &result)
+
+			assert.Equal(t, "FAIL", status)
+			require.Len(t, result.Targets, 2)
+			assert.Equal(t, "FAIL", result.Targets[1].Status)
+			assert.Contains(t, result.Targets[1].Detail, fmt.Sprintf("HTTP %d", code))
+		})
+	}
+}
+
+func TestRunCanaryEndpointChecks_LimitsUnauthorizedExceptionToMetrics(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		healthCode   int
+		metricsCode  int
+		failedTarget int
+	}{
+		{name: "health unauthorized", healthCode: http.StatusUnauthorized, metricsCode: http.StatusUnauthorized, failedTarget: 0},
+		{name: "metrics forbidden", healthCode: http.StatusOK, metricsCode: http.StatusForbidden, failedTarget: 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/health" {
+					w.WriteHeader(tc.healthCode)
+					return
+				}
+				w.WriteHeader(tc.metricsCode)
+			}))
+			t.Cleanup(server.Close)
+
+			result := canaryResult{}
+			status := runCanaryEndpointChecks(t.Context(), server.URL, &result)
+
+			assert.Equal(t, "FAIL", status)
+			require.Len(t, result.Targets, 2)
+			assert.Equal(t, "FAIL", result.Targets[tc.failedTarget].Status)
+		})
+	}
+}
+
+func TestRunCanaryEndpointChecks_RejectsTransportErrors(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	baseURL := server.URL
+	server.Close()
+
+	result := canaryResult{}
+	status := runCanaryEndpointChecks(t.Context(), baseURL, &result)
+
+	assert.Equal(t, "FAIL", status)
+	require.Len(t, result.Targets, 2)
+	for _, target := range result.Targets {
+		assert.Equal(t, "FAIL", target.Status)
+		assert.NotEmpty(t, target.Detail)
+	}
 }
