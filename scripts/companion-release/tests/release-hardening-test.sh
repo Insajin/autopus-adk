@@ -42,8 +42,8 @@ contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.output
 contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
 not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
 contains "$producer" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='8acf53e1bea9711ca3063c121b52e5d160f43b67'"
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='3f3a38e9a2ae556acc0f7d0974895d6189f266dd'"
+contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='ab9a0e489ee34f8a075019c4acebb2a8ae61c290'"
+contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='c6edb108d821d88914e12d2c1bf943540c63351e'"
 contains "$homebrew_bridge" "readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 contains "$homebrew_bridge" "readonly FORMULA_PATH='Formula/auto.rb'"
@@ -63,13 +63,13 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$release" "- 'v0.50.81'"
-contains "$release" "if: github.ref == 'refs/tags/v0.50.81'"
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.81'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.81'
-not_contains "$release" "'v0.50.80'"
-not_contains "$release" 'refs/tags/v0.50.80'
-not_contains "$recovery" 'refs/tags/v0.50.80'
+contains "$release" "- 'v0.50.82'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.82'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.82'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.82'
+not_contains "$release" "'v0.50.81'"
+not_contains "$release" 'refs/tags/v0.50.81'
+not_contains "$recovery" 'refs/tags/v0.50.81'
 not_contains "$release" "'v0.50.79'"
 not_contains "$release" 'refs/tags/v0.50.79'
 not_contains "$recovery" 'refs/tags/v0.50.79'
@@ -87,6 +87,7 @@ contains "$source_gate" "readonly A7_A6_ANCESTOR_SHA='902f1acfa91f1d0a2ac9471d5c
 contains "$source_gate" "readonly A8_A7_ANCESTOR_SHA='51de6030a69a8e36fcf7e5790ef157eff6fedf00'"
 contains "$source_gate" "readonly A9_A8_ANCESTOR_SHA='dd0c2759ed5435d4634011e349caad62ea3df414'"
 contains "$source_gate" "readonly A10_A9_ANCESTOR_SHA='c9c4f49d48022eb0c8d72ee7b520136a4f21f176'"
+contains "$source_gate" "readonly A11_A10_ANCESTOR_SHA='54536edc09c37a634532c2c9b51e62869d393db4'"
 contains "$lineage" 'source "$pins_helper"'
 contains "$lineage_pins" "A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'"
 contains "$lineage_pins" "A4_CHECKSUMS_SHA256='a30e0893f1565919e9e90dd7e1f2b19e5487024b0373f66de56729e1d747e7d1'"
@@ -131,14 +132,23 @@ contains "$lineage_pins" "A9_AMD64_ARCHIVE_SHA256='48f80577ff2ef40a843dab0a84789
 contains "$lineage_pins" "A9_ARM64_ARCHIVE_SHA256='503c338e1ce122e209b9e74bc883492317144b319b0713943bc299e57447024d'"
 contains "$lineage_pins" "A9_AMD64_MANIFEST_SHA256='589f02503aa02338ed14d67b1eb6b31e2b96a9e83b47c99e5cd5a31b75ede9b7'"
 contains "$lineage_pins" "A9_ARM64_MANIFEST_SHA256='ffdd6ccbecff2b8ea38bc5c5f65ff7f078b229bd4658f90d08bb5e801c184a7f'"
+contains "$lineage_pins" "A10_COMMIT_SHA='54536edc09c37a634532c2c9b51e62869d393db4'"
+contains "$lineage_pins" "A10_TREE_SHA='e9a30f4530e06c9b62933e7bf97e0056faed259c'"
+contains "$lineage_pins" "A10_TAG_OBJECT_SHA='8b37fccb57255fc24003dc3af2700334f4a8d3c4'"
+contains "$lineage_pins" "A10_CHECKSUMS_SHA256='2e97c1f3c8d0cba0f93dd83c724c71eaa4966c79d4812a6a9cf034144c7b178d'"
+contains "$lineage_pins" "A10_AMD64_ARCHIVE_SHA256='b745eaddd8c70cb415aca42901213ffeb3c1d567f9b889e87a4a895ecfda8134'"
+contains "$lineage_pins" "A10_ARM64_ARCHIVE_SHA256='71a40ee709f34fb29bb562cde4587e2da1db1d6e8bc300d0edb4cfe63f8bec3c'"
+contains "$lineage_pins" "A10_AMD64_MANIFEST_SHA256='98b38d8d59c5d146234e5a5f9bae26e80f8af0f699ac23e3f9fed5e59b32321e'"
+contains "$lineage_pins" "A10_ARM64_MANIFEST_SHA256='976aa2bbeedd4e32b522373f6bf75a93b15f6813c4373c638c27d2cb98e4f00a'"
 contains "$lineage" "release_phase='A8' prior_phase='A7'"
 contains "$lineage" "release_phase='A9' prior_phase='A8'"
 contains "$lineage" "release_phase='A10' prior_phase='A9'"
+contains "$lineage" "release_phase='A11' prior_phase='A10'"
 contains "$lineage" '.commit.tree.sha'
-contains "$producer" "GITHUB_REF_NAME\" == 'v0.50.81'"
-contains "$producer" "release_phase='A10'"
-contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.81'"
-contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.81'"
+contains "$producer" "GITHUB_REF_NAME\" == 'v0.50.82'"
+contains "$producer" "release_phase='A11'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.82'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.82'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -149,8 +159,8 @@ for workflow in "$release" "$recovery"; do
   workflow_token_index=$(grep -n 'name: Create Homebrew tap token' "$workflow" | cut -d: -f1)
   (( workflow_evidence_index < workflow_token_index )) || fail 'tap token precedes release evidence'
 done
-contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.81'"
-contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.81'"
+contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.82'"
+contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.82'"
 contains "$current_release_gate" '.target_commitish == $commit'
 contains "$current_release_gate" '.immutable == true'
 contains "$current_release_gate" '(.assets | length) == ($expected | length)'
@@ -165,7 +175,7 @@ trap 'rm -rf -- "$temp"' EXIT
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid
-git -C "$temp/source" tag -am 'A10 fixture' v0.50.81
+git -C "$temp/source" tag -am 'A11 fixture' v0.50.82
 commit=$(git -C "$temp/source" rev-parse HEAD)
 tree=$(git -C "$temp/source" rev-parse 'HEAD^{tree}')
 if [[ "${tree: -1}" == '0' ]]; then
@@ -175,7 +185,7 @@ else
 fi
 run_source_gate() {
   local approved_commit="${1-}" approved_tree="${2-}"
-  env GITHUB_REF_NAME=v0.50.81 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
+  env GITHUB_REF_NAME=v0.50.82 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
     GITHUB_OUTPUT="$temp/source-output" COMPANION_SOURCE_PIN_REQUIRED=1 \
     COMPANION_APPROVED_SOURCE_COMMIT="$approved_commit" \
     COMPANION_APPROVED_SOURCE_TREE="$approved_tree" \
