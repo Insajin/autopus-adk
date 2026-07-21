@@ -42,7 +42,7 @@ verify_prior_tap_head() {
     .object.sha | select(type == "string" and test("^[0-9a-f]{40}$"))
   ' "$response") || fail 'Homebrew tap branch head response is invalid'
   [[ "$head_sha" == "$PRIOR_TAP_COMMIT" ]] \
-    || fail 'Homebrew tap branch differs from the pinned v0.50.81 predecessor commit'
+    || fail 'Homebrew tap branch differs from the pinned predecessor commit'
 }
 
 # @AX:NOTE [AUTO]: [downgraded from ANCHOR — fan_in=1 under file cap] Bind idempotent success to one stable head, tree, Cask, and Formula snapshot.

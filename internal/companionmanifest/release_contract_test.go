@@ -10,10 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestReleaseWorkflow_ExactA11ProtectedEnvironmentAndImmutableActions(t *testing.T) {
+func TestReleaseWorkflow_ExactA12ProtectedEnvironmentAndImmutableActions(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"v0.50.82", "refs/tags/v0.50.82",
+		"v0.50.83", "refs/tags/v0.50.83",
 		"environment:", "adk-companion-release",
 	} {
 		if !strings.Contains(release, required) {
@@ -24,11 +24,11 @@ func TestReleaseWorkflow_ExactA11ProtectedEnvironmentAndImmutableActions(t *test
 		t.Fatal("arbitrary version tags can enter the protected release job")
 	}
 	for _, forbidden := range []string{
-		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'", "'v0.50.76'", "'v0.50.77'", "'v0.50.78'", "'v0.50.79'", "'v0.50.80'", "'v0.50.81'",
-		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75", "refs/tags/v0.50.76", "refs/tags/v0.50.77", "refs/tags/v0.50.78", "refs/tags/v0.50.79", "refs/tags/v0.50.80", "refs/tags/v0.50.81",
+		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'", "'v0.50.76'", "'v0.50.77'", "'v0.50.78'", "'v0.50.79'", "'v0.50.80'", "'v0.50.81'", "'v0.50.82'",
+		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75", "refs/tags/v0.50.76", "refs/tags/v0.50.77", "refs/tags/v0.50.78", "refs/tags/v0.50.79", "refs/tags/v0.50.80", "refs/tags/v0.50.81", "refs/tags/v0.50.82",
 	} {
 		if strings.Contains(release, forbidden) {
-			t.Fatalf("historical tag %q can enter the A11 release workflow", forbidden)
+			t.Fatalf("historical tag %q can enter the A12 release workflow", forbidden)
 		}
 	}
 	immutable := regexp.MustCompile(`^[^@[:space:]]+@[0-9a-f]{40}$`)
@@ -231,18 +231,20 @@ func TestReleaseSourceValidator_A9PinsAnnotatedTagAndA8Ancestor(t *testing.T) {
 func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	releaseIndex := strings.Index(release, "goreleaser release --clean")
+	signingCleanupIndex := strings.Index(release, "name: Remove release signing credentials")
 	evidenceIndex := strings.Index(release, "scripts/companion-release/verify-current-release.sh")
 	tokenIndex := strings.Index(release, "name: Create Homebrew tap token")
 	bridgeIndex := strings.Index(release, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
 	cleanupIndex := strings.Index(release, "Remove release credentials and keychain")
-	if releaseIndex < 0 || evidenceIndex <= releaseIndex || tokenIndex <= evidenceIndex ||
+	if releaseIndex < 0 || signingCleanupIndex <= releaseIndex ||
+		evidenceIndex <= signingCleanupIndex || tokenIndex <= evidenceIndex ||
 		bridgeIndex <= tokenIndex || cleanupIndex <= bridgeIndex {
-		t.Fatalf("Homebrew ordering release=%d evidence=%d token=%d bridge=%d cleanup=%d",
-			releaseIndex, evidenceIndex, tokenIndex, bridgeIndex, cleanupIndex)
+		t.Fatalf("Homebrew ordering release=%d signing-cleanup=%d evidence=%d token=%d bridge=%d cleanup=%d",
+			releaseIndex, signingCleanupIndex, evidenceIndex, tokenIndex, bridgeIndex, cleanupIndex)
 	}
 	for _, exact := range []string{
-		"GITHUB_REF_NAME='v0.50.82'",
-		"COMPANION_VERSION='0.50.82'",
+		"GITHUB_REF_NAME='v0.50.83'",
+		"COMPANION_VERSION='0.50.83'",
 		"COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}",
 		`COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"`,
 		`HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN"`,

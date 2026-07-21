@@ -55,7 +55,7 @@ func TestReleasePublicKeyReceipt_Workflow_SecretsAreStepScopedAndCleanupFailures
 	if strings.Contains(raw, "$GITHUB_ENV") {
 		t.Fatal("release workflow promotes credential state through GITHUB_ENV instead of keeping it step-scoped")
 	}
-	cleanup := releaseCredentialCleanupStep(t, workflow)
+	cleanup := releaseAlwaysRunCredentialCleanupStep(t, workflow)
 	if !strings.Contains(cleanup.If, "always()") {
 		t.Fatalf("credential cleanup is not always-run: if=%q", cleanup.If)
 	}
@@ -83,7 +83,7 @@ func releaseSensitiveCommand(run string) bool {
 	return false
 }
 
-func releaseCredentialCleanupStep(t *testing.T, workflow publicKeyReceiptWorkflow) publicKeyReceiptWorkflowStep {
+func releaseAlwaysRunCredentialCleanupStep(t *testing.T, workflow publicKeyReceiptWorkflow) publicKeyReceiptWorkflowStep {
 	t.Helper()
 	job, ok := workflow.Jobs["release"]
 	if !ok {
@@ -91,12 +91,12 @@ func releaseCredentialCleanupStep(t *testing.T, workflow publicKeyReceiptWorkflo
 	}
 	for _, step := range job.Steps {
 		name := strings.ToLower(step.Name)
-		if strings.Contains(name, "credentials") &&
+		if strings.Contains(step.If, "always()") && strings.Contains(name, "credentials") &&
 			(strings.Contains(name, "cleanup") || strings.Contains(name, "remove")) {
 			return step
 		}
 	}
-	t.Fatal("release workflow has no explicit credential cleanup step")
+	t.Fatal("release workflow has no explicit always-run credential cleanup step")
 	return publicKeyReceiptWorkflowStep{}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -48,10 +49,34 @@ func TestProbeModelCatalogEnforcesTimeout(t *testing.T) {
 	assert.Less(t, time.Since(started), 5*time.Second)
 }
 
+func TestProbeModelCatalogRetriesTextFileBusy(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose a writable executable with Unix ETXTBSY semantics")
+	}
+
+	payload := `{"models":[{"slug":"gpt-5.6-sol"}]}`
+	binary := writeCatalogProbe(t, fmt.Sprintf("printf '%%s' '%s'", payload))
+	writer, err := os.OpenFile(binary, os.O_WRONLY, 0)
+	require.NoError(t, err)
+	released := make(chan error, 1)
+	go func() {
+		time.Sleep(25 * time.Millisecond)
+		released <- writer.Close()
+	}()
+
+	got, probeErr := ProbeModelCatalog(context.Background(), binary, catalogProbeTestTimeout)
+	require.NoError(t, <-released)
+	require.NoError(t, probeErr)
+	assert.Equal(t, payload, string(got))
+}
+
 func writeCatalogProbe(t *testing.T, command string) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "codex-probe")
-	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\n"+command+"\n"), 0755))
+	temporary := path + ".tmp"
+	require.NoError(t, os.WriteFile(temporary, []byte("#!/bin/sh\n"+command+"\n"), 0755))
+	require.NoError(t, os.Rename(temporary, path))
 	return path
 }

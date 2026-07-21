@@ -34,6 +34,7 @@ var goReleaserLineageCoordinates = []goReleaserLineageCoordinate{
 	{tag: publicKeyReceiptA9Tag, version: publicKeyReceiptA9Version, annotated: true},
 	{tag: publicKeyReceiptA10Tag, version: publicKeyReceiptA10Version, annotated: true},
 	{tag: publicKeyReceiptA11Tag, version: publicKeyReceiptA11Version, annotated: true},
+	{tag: publicKeyReceiptA12Tag, version: publicKeyReceiptA12Version, annotated: true},
 }
 
 var goReleaserLineageCaches = newGoReleaserLineageCaches()

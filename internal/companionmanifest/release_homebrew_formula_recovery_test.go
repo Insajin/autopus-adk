@@ -47,7 +47,7 @@ func readRecoveryWorkflow(t *testing.T) (string, recoveryWorkflow) {
 	return raw, workflow
 }
 
-func TestFormulaRecoveryWorkflow_ManualExactA11LeastPrivilege(t *testing.T) {
+func TestFormulaRecoveryWorkflow_ManualExactA12LeastPrivilege(t *testing.T) {
 	raw, workflow := readRecoveryWorkflow(t)
 	if len(workflow.On) != 1 {
 		t.Fatalf("recovery triggers = %v, want workflow_dispatch only", workflow.On)
@@ -74,15 +74,16 @@ func TestFormulaRecoveryWorkflow_ManualExactA11LeastPrivilege(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"id-token:", "pull_request:", "repository_dispatch:", "schedule:",
-		"${{ inputs.", "github.event.inputs", "refs/tags/v*", "v0.50.69", "v0.50.70", "v0.50.71", "v0.50.72", "v0.50.73", "v0.50.74", "v0.50.75", "v0.50.76", "v0.50.77", "v0.50.78", "v0.50.79", "v0.50.80", "v0.50.81",
+		"${{ inputs.", "github.event.inputs", "refs/tags/v*", "v0.50.69", "v0.50.70", "v0.50.71", "v0.50.72", "v0.50.73", "v0.50.74", "v0.50.75", "v0.50.76", "v0.50.77", "v0.50.78", "v0.50.79", "v0.50.80", "v0.50.81", "v0.50.82",
 	} {
 		if strings.Contains(raw, forbidden) {
 			t.Fatalf("recovery workflow contains forbidden expansion %q", forbidden)
 		}
 	}
 	for _, version := range regexp.MustCompile(`v?[0-9]+\.[0-9]+\.[0-9]+`).FindAllString(raw, -1) {
-		if version != "v0.50.82" && version != "0.50.82" {
-			t.Fatalf("recovery workflow references non-A11 version %q", version)
+		if version != "v0.50.83" && version != "0.50.83" &&
+			version != "v4.1.2" && version != "v3.1.2" {
+			t.Fatalf("recovery workflow references non-A12 version %q", version)
 		}
 	}
 	if regexp.MustCompile(`(?m)^\s+contents:\s+write\s*$`).MatchString(raw) {
@@ -95,6 +96,7 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 	job := workflow.Jobs["recover-formula-bridge"]
 	wantUses := []string{
 		"actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10",
+		"sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6",
 		"actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
 	}
 	var gotUses []string
@@ -130,10 +132,11 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 		}
 	}
 	for _, exact := range []string{
-		"ref: refs/tags/v0.50.82", "fetch-depth: 0", "persist-credentials: false",
+		"ref: refs/tags/v0.50.83", "fetch-depth: 0", "persist-credentials: false",
 		"client-id: ${{ vars.HOMEBREW_APP_CLIENT_ID }}",
 		"private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}",
 		"owner: Insajin", "repositories: homebrew-autopus", "permission-contents: write",
+		"cosign-release: 'v3.1.2'",
 	} {
 		if !strings.Contains(raw, exact) {
 			t.Fatalf("recovery action contract missing %q", exact)
@@ -144,7 +147,7 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *testing.T) {
 	raw, _ := readRecoveryWorkflow(t)
 	for _, required := range []string{
-		"git rev-parse --verify 'HEAD^{commit}'", "mktemp", "GITHUB_REF_NAME='v0.50.82'",
+		"git rev-parse --verify 'HEAD^{commit}'", "mktemp", "GITHUB_REF_NAME='v0.50.83'",
 		"GITHUB_REF_TYPE='tag'", `GITHUB_SHA="$actual_head"`,
 		`GITHUB_OUTPUT="$validation_output"`, "scripts/companion-release/validate-source.sh",
 		"COMPANION_SOURCE_PIN_REQUIRED=1", "ADK_COMPANION_APPROVED_SOURCE_COMMIT",
@@ -164,14 +167,14 @@ func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *t
 		`.prerelease == false`, `.immutable == true`, `length) == ($expected | length)`,
 		`[.assets[].name] | unique`, `.state == "uploaded"`, `.size > 0`,
 		`Accept: application/octet-stream`, `.digest`, `^sha256:[0-9a-f]{64}$`,
-		"shasum -a 256", `"sha256:${downloaded_digest}" == "$checksums_api_digest"`,
+		"shasum -a 256", `"sha256:${downloaded_digest}" == "$api_digest"`,
 	} {
 		if !strings.Contains(helper, required) {
 			t.Fatalf("shared release evidence gate missing %q", required)
 		}
 	}
 	ordered := []string{
-		"actions/checkout@", "scripts/companion-release/validate-source.sh",
+		"actions/checkout@", "sigstore/cosign-installer@", "scripts/companion-release/validate-source.sh",
 		"scripts/companion-release/verify-current-release.sh",
 		"actions/create-github-app-token@", "scripts/companion-release/publish-homebrew-formula-bridge.sh",
 	}
@@ -185,7 +188,7 @@ func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *t
 	}
 }
 
-func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA11CaskWithAllowlistedEnvironment(t *testing.T) {
+func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA12CaskWithAllowlistedEnvironment(t *testing.T) {
 	_, workflow := readRecoveryWorkflow(t)
 	var bridge recoveryStep
 	for _, step := range workflow.Jobs["recover-formula-bridge"].Steps {
@@ -194,8 +197,8 @@ func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA11CaskWithAllowlistedEnviron
 		}
 	}
 	wantBridge := `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-  GITHUB_REF_NAME='v0.50.82' \
-  COMPANION_VERSION='0.50.82' \
+  GITHUB_REF_NAME='v0.50.83' \
+  COMPANION_VERSION='0.50.83' \
   COMPANION_HOMEBREW_POLICY='cask-only' \
   COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
   HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
