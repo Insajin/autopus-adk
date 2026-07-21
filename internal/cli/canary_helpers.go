@@ -52,28 +52,52 @@ func runCanaryExternal(ctx context.Context, id, display, dir string, argv ...str
 
 func runCanaryEndpointChecks(ctx context.Context, baseURL string, result *canaryResult) string {
 	status := "PASS"
-	for _, path := range []string{"/health", "/metrics"} {
-		if !canaryHTTPCheck(ctx, strings.TrimRight(baseURL, "/")+path) {
-			status = "FAIL"
+	endpoints := []struct {
+		path               string
+		acceptUnauthorized bool
+	}{
+		{path: "/health"},
+		{path: "/metrics", acceptUnauthorized: true},
+	}
+	for _, endpoint := range endpoints {
+		code, err := canaryHTTPStatus(ctx, strings.TrimRight(baseURL, "/")+endpoint.path)
+		successResponse := code >= http.StatusOK && code < http.StatusBadRequest
+		protectedResponse := endpoint.acceptUnauthorized && code == http.StatusUnauthorized
+		passed := err == nil && (successResponse || protectedResponse)
+		targetStatus := "PASS"
+		detail := fmt.Sprintf("HTTP %d", code)
+		if protectedResponse {
+			detail += " (protected endpoint)"
 		}
-		result.Targets = append(result.Targets, canaryTargetResult{ID: "endpoint" + path, Status: status})
+		if err != nil {
+			detail = err.Error()
+		}
+		if !passed {
+			status = "FAIL"
+			targetStatus = "FAIL"
+		}
+		result.Targets = append(result.Targets, canaryTargetResult{
+			ID:     "endpoint" + endpoint.path,
+			Status: targetStatus,
+			Detail: detail,
+		})
 	}
 	return status
 }
 
-func canaryHTTPCheck(ctx context.Context, url string) bool {
+func canaryHTTPStatus(ctx context.Context, url string) (int, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
 	if err != nil {
-		return false
+		return 0, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return false
+		return 0, err
 	}
 	defer resp.Body.Close()
-	return resp.StatusCode >= 200 && resp.StatusCode < 400
+	return resp.StatusCode, nil
 }
 
 func writeCanaryLatest(projectDir string, result canaryResult) error {
