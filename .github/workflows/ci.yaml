@@ -67,10 +67,30 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # @AX:REASON [AUTO]: Keep the bounded GoReleaser warm-up off the shared package scheduler so its 23-minute budget is deterministic.
+      - name: Test non-lineage integration packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          lineage_package="$(go list -tags integration ./pkg/companionmanifest)"
+          all_packages="$(go list -tags integration ./...)"
+          packages=()
+          lineage_matches=0
+          while IFS= read -r package; do
+            if [[ "$package" == "$lineage_package" ]]; then
+              lineage_matches=$((lineage_matches + 1))
+            else
+              packages+=("$package")
+            fi
+          done <<<"$all_packages"
+          ((lineage_matches == 1))
+          ((${#packages[@]} > 0))
+          go test -count=1 -timeout=15m -tags integration "${packages[@]}"
+
       - name: Test release lineage integration
         run: >-
-          go test -count=1 -timeout=35m -tags integration
-          ./...
+          go test -count=1 -timeout=23m -tags integration
+          ./pkg/companionmanifest
 
   e2e:
     name: e2e

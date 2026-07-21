@@ -61,15 +61,28 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 	if strings.Contains(testRun, "-tags integration") {
 		t.Fatal("CI race coverage gate must not run executable release integration fixtures")
 	}
+	nonLineageRun := ciStepRun(t, workflow.Jobs["lineage-integration"], "Test non-lineage integration packages")
+	for _, required := range []string{
+		`lineage_package="$(go list -tags integration ./pkg/companionmanifest)"`,
+		`all_packages="$(go list -tags integration ./...)"`,
+		`[[ "$package" == "$lineage_package" ]]`, `done <<<"$all_packages"`,
+		"((lineage_matches == 1))", `"${packages[@]}"`,
+		"-timeout=15m", "-tags integration",
+	} {
+		if !strings.Contains(nonLineageRun, required) {
+			t.Fatalf("CI non-lineage integration contract missing %q", required)
+		}
+	}
 	lineageRun := ciStepRun(t, workflow.Jobs["lineage-integration"], "Test release lineage integration")
 	for _, required := range []string{
-		"-timeout=35m", "-tags integration", "./...",
+		"-timeout=23m", "-tags integration", "./pkg/companionmanifest",
 	} {
 		if !strings.Contains(lineageRun, required) {
 			t.Fatalf("CI release lineage integration contract missing %q", required)
 		}
 	}
-	if strings.Contains(lineageRun, "-race") || strings.Contains(lineageRun, "-coverprofile") {
+	if strings.Contains(nonLineageRun+lineageRun, "-race") ||
+		strings.Contains(nonLineageRun+lineageRun, "-coverprofile") {
 		t.Fatal("CI release lineage integration gate must be isolated from race coverage instrumentation")
 	}
 }
