@@ -13,14 +13,14 @@ import (
 )
 
 var currentReleaseArchives = []string{
-	"autopus-adk_0.50.82_darwin_amd64.tar.gz",
-	"autopus-adk_0.50.82_darwin_arm64.tar.gz",
-	"autopus-adk_0.50.82_linux_amd64.tar.gz",
-	"autopus-adk_0.50.82_linux_arm64.tar.gz",
-	"autopus-adk_0.50.82_windows_amd64.tar.gz",
-	"autopus-adk_0.50.82_windows_amd64.zip",
-	"autopus-adk_0.50.82_windows_arm64.tar.gz",
-	"autopus-adk_0.50.82_windows_arm64.zip",
+	"autopus-adk_0.50.83_darwin_amd64.tar.gz",
+	"autopus-adk_0.50.83_darwin_arm64.tar.gz",
+	"autopus-adk_0.50.83_linux_amd64.tar.gz",
+	"autopus-adk_0.50.83_linux_arm64.tar.gz",
+	"autopus-adk_0.50.83_windows_amd64.tar.gz",
+	"autopus-adk_0.50.83_windows_amd64.zip",
+	"autopus-adk_0.50.83_windows_arm64.tar.gz",
+	"autopus-adk_0.50.83_windows_arm64.zip",
 }
 
 type currentReleaseAsset struct {
@@ -41,11 +41,16 @@ type currentReleaseDocument struct {
 }
 
 type currentReleaseFixture struct {
-	root      string
-	state     string
-	output    string
-	checksums []byte
-	release   currentReleaseDocument
+	root              string
+	state             string
+	output            string
+	signatureLog      string
+	openSSLVerifyFail bool
+	cosignFail        bool
+	checksums         []byte
+	bundle            []byte
+	envelope          []byte
+	release           currentReleaseDocument
 }
 
 func TestCurrentReleaseVerifier_AcceptsExactImmutableRelease(t *testing.T) {
@@ -61,6 +66,7 @@ func TestCurrentReleaseVerifier_AcceptsExactImmutableRelease(t *testing.T) {
 	if !bytes.Equal(got, fixture.checksums) {
 		t.Fatal("materialized checksums differ from server bytes")
 	}
+	assertCurrentReleaseSignatureLog(t, fixture.signatureLog)
 }
 
 func TestCurrentReleaseVerifier_RejectsUntrustedReleaseEvidence(t *testing.T) {
@@ -80,6 +86,12 @@ func TestCurrentReleaseVerifier_RejectsUntrustedReleaseEvidence(t *testing.T) {
 		}, want: "not exact, final, immutable, complete, and digest-bound"},
 		{name: "checksums_server_digest_mismatch", mutate: func(f *currentReleaseFixture) {
 			f.asset("checksums.txt").Digest = "sha256:" + strings.Repeat("f", 64)
+		}, want: "differs from its GitHub API digest"},
+		{name: "bundle_server_digest_mismatch", mutate: func(f *currentReleaseFixture) {
+			f.asset("checksums.txt.bundle").Digest = "sha256:" + strings.Repeat("f", 64)
+		}, want: "differs from its GitHub API digest"},
+		{name: "envelope_server_digest_mismatch", mutate: func(f *currentReleaseFixture) {
+			f.asset("checksums.txt.signatures").Digest = "sha256:" + strings.Repeat("f", 64)
 		}, want: "differs from its GitHub API digest"},
 		{name: "cask_archive_checksum_mismatch", mutate: func(f *currentReleaseFixture) {
 			f.asset(currentReleaseArchives[0]).Digest = "sha256:" + strings.Repeat("e", 64)
@@ -128,25 +140,35 @@ func newCurrentReleaseFixture(t *testing.T) *currentReleaseFixture {
 	}
 	checksumsBytes := checksums.Bytes()
 	checksumsSum := sha256.Sum256(checksumsBytes)
+	bundleBytes := []byte("fixture cosign bundle\n")
+	bundleSum := sha256.Sum256(bundleBytes)
+	envelopeBytes := []byte("AUTOPUS-RELEASE-SIGNATURE-V1\n" +
+		"e1fdfe066484c7eae8ff16fa4b1ee6237b8d06299c2b66ced485f029af77837f\tMAYCAQECAQE=\n")
+	envelopeSum := sha256.Sum256(envelopeBytes)
 	assets = append(assets,
 		currentReleaseAsset{ID: 9, Name: "checksums.txt", State: "uploaded",
 			Size: len(checksumsBytes), Digest: fmt.Sprintf("sha256:%x", checksumsSum)},
 		currentReleaseAsset{ID: 10, Name: "checksums.txt.bundle", State: "uploaded",
-			Size: 1, Digest: "sha256:" + strings.Repeat("a", 64)},
+			Size: len(bundleBytes), Digest: fmt.Sprintf("sha256:%x", bundleSum)},
 		currentReleaseAsset{ID: 11, Name: "checksums.txt.signatures", State: "uploaded",
-			Size: 1, Digest: "sha256:" + strings.Repeat("b", 64)},
+			Size: len(envelopeBytes), Digest: fmt.Sprintf("sha256:%x", envelopeSum)},
 	)
 	fixture := &currentReleaseFixture{
 		root: root, state: state, output: filepath.Join(root, "verified-checksums.txt"),
-		checksums: append([]byte(nil), checksumsBytes...),
+		signatureLog: filepath.Join(state, "signature.log"),
+		checksums:    append([]byte(nil), checksumsBytes...), bundle: bundleBytes, envelope: envelopeBytes,
 		release: currentReleaseDocument{
-			TagName: "v0.50.82", TargetCommitish: strings.Repeat("c", 40),
+			TagName: "v0.50.83", TargetCommitish: strings.Repeat("c", 40),
 			Immutable: true, Assets: assets,
 		},
 	}
 	fixture.writeRelease(t)
-	if err := os.WriteFile(filepath.Join(state, "assets", "9"), checksumsBytes, 0o600); err != nil {
-		t.Fatal(err)
+	for id, data := range map[string][]byte{
+		"9": checksumsBytes, "10": bundleBytes, "11": envelopeBytes,
+	} {
+		if err := os.WriteFile(filepath.Join(state, "assets", id), data, 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 	mock := `#!/usr/bin/env bash
 set -euo pipefail
@@ -160,7 +182,7 @@ while (($#)); do
   esac
 done
 case "$endpoint" in
-  repos/Insajin/autopus-adk/releases/tags/v0.50.82)
+  repos/Insajin/autopus-adk/releases/tags/v0.50.83)
     exec cat "$MOCK_CURRENT_RELEASE_STATE/release.json" ;;
   repos/Insajin/autopus-adk/releases/assets/*)
     exec cat "$MOCK_CURRENT_RELEASE_STATE/assets/${endpoint##*/}" ;;
@@ -197,12 +219,53 @@ func (f *currentReleaseFixture) run() (string, error) {
 	script := filepath.Join(repositoryRootForBridge(),
 		"scripts/companion-release/verify-current-release.sh")
 	command := exec.Command("bash", script, f.output)
+	// Rebuild the cryptographic mocks after a test selects its failure mode.
+	if err := f.writeSignatureMocks(); err != nil {
+		return "", err
+	}
 	command.Env = []string{
 		"PATH=" + filepath.Join(f.root, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
-		"HOME=" + f.root, "TMPDIR=" + f.root, "GITHUB_TOKEN=fixture-token",
+		"HOME=" + f.root, "TMPDIR=" + f.root,
+		"GITHUB_TOKEN=fixture-token", "GH_TOKEN=fixture-fallback-token",
 		"COMPANION_SOURCE_COMMIT=" + strings.Repeat("c", 40),
 		"MOCK_CURRENT_RELEASE_STATE=" + f.state,
 	}
 	output, err := command.CombinedOutput()
 	return string(output), err
+}
+
+func (f *currentReleaseFixture) writeSignatureMocks() error {
+	bin := filepath.Join(f.root, "bin")
+	cosignMock := fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+[[ -z "${GITHUB_TOKEN+x}" && -z "${GH_TOKEN+x}" ]]
+printf 'cosign %%s\n' "$*" >> %q
+[[ "${1-}" == verify-blob ]]
+[[ %t != true ]]
+	`, f.signatureLog, f.cosignFail)
+	if err := os.WriteFile(filepath.Join(bin, "cosign"), []byte(cosignMock), 0o700); err != nil {
+		return err
+	}
+	realOpenSSL, err := exec.LookPath("openssl")
+	if err != nil {
+		return err
+	}
+	opensslMock := fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+[[ -z "${GITHUB_TOKEN+x}" && -z "${GH_TOKEN+x}" ]]
+if [[ "${1-}" == dgst ]]; then
+  for argument in "$@"; do
+    if [[ "$argument" == -verify ]]; then
+      printf 'openssl-verify\n' >> %q
+      [[ %t != true ]]
+      exit 0
+    fi
+  done
+fi
+exec %q "$@"
+	`, f.signatureLog, f.openSSLVerifyFail, realOpenSSL)
+	if err := os.WriteFile(filepath.Join(bin, "openssl"), []byte(opensslMock), 0o700); err != nil {
+		return err
+	}
+	return nil
 }

@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.82'
+      - 'v0.50.83'
 permissions:
   contents: read
 jobs:
@@ -17,7 +17,7 @@ jobs:
 
   release:
     needs: [ci, security]
-    if: github.ref == 'refs/tags/v0.50.82'
+    if: github.ref == 'refs/tags/v0.50.83'
     environment:
       name: adk-companion-release
     permissions:
@@ -60,7 +60,9 @@ jobs:
           install-only: true
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 # v3.5.0
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: 'v3.1.2'
 
       - name: Build companion release verification tools
         shell: bash
@@ -296,6 +298,29 @@ jobs:
             COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS="$COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS" \
             goreleaser release --clean
 
+      - name: Remove release signing credentials
+        shell: bash
+        run: |
+          set -u
+          cleanup_status=0
+          keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
+          if [[ -e "$keychain_path" || -L "$keychain_path" ]]; then
+            if security delete-keychain "$keychain_path"; then
+              :
+            else
+              cleanup_status=$?
+            fi
+          fi
+          if [[ -e "$RUNNER_TEMP/adk-release-credentials" ||
+                -L "$RUNNER_TEMP/adk-release-credentials" ]]; then
+            if rm -rf -- "$RUNNER_TEMP/adk-release-credentials"; then
+              :
+            else
+              cleanup_status=$?
+            fi
+          fi
+          exit "$cleanup_status"
+
       - name: Verify current immutable release evidence
         id: release-evidence
         shell: bash
@@ -304,7 +329,7 @@ jobs:
           COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.82-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.83-checksums.txt"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_TOKEN="$GITHUB_TOKEN" \
             COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
@@ -328,8 +353,8 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.82' \
-            COMPANION_VERSION='0.50.82' \
+            GITHUB_REF_NAME='v0.50.83' \
+            COMPANION_VERSION='0.50.83' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
@@ -343,9 +368,9 @@ jobs:
           set -u
           cleanup_status=0
           keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
-          if [[ -e "$RUNNER_TEMP/autopus-v0.50.82-checksums.txt" ||
-                -L "$RUNNER_TEMP/autopus-v0.50.82-checksums.txt" ]]; then
-            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.82-checksums.txt"; then
+          if [[ -e "$RUNNER_TEMP/autopus-v0.50.83-checksums.txt" ||
+                -L "$RUNNER_TEMP/autopus-v0.50.83-checksums.txt" ]]; then
+            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.83-checksums.txt"; then
               :
             else
               cleanup_status=$?

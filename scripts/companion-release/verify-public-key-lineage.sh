@@ -24,7 +24,7 @@ for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
   "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
   nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
 done
-if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' ]]; then
+if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' || "$release_phase" == 'A12' ]]; then
   nonzero_hex "$prior_tag_object" 40 || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
   for pin in "$prior_amd64_archive" "$prior_arm64_archive"; do
     nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"

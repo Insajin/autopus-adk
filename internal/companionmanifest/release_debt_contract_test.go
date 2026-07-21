@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// @AX:NOTE [AUTO]: The 250-line ceiling preserves A12 expansion headroom below the 300-line source limit.
+// @AX:NOTE [AUTO]: The 250-line ceiling preserves A13 expansion headroom below the 300-line source limit.
 const releaseDebtHeadroomLimit = 250
 
 func TestReleaseDebtSaturatedScriptsHaveExpansionHeadroom(t *testing.T) {
@@ -26,7 +26,7 @@ func TestReleaseDebtSaturatedScriptsHaveExpansionHeadroom(t *testing.T) {
 			t.Fatal(err)
 		}
 		if lines := strings.Count(string(data), "\n") + 1; lines > releaseDebtHeadroomLimit {
-			t.Errorf("%s has %d lines, want <= %d for A12 headroom",
+			t.Errorf("%s has %d lines, want <= %d for A13 headroom",
 				path, lines, releaseDebtHeadroomLimit)
 		}
 	}
@@ -49,7 +49,7 @@ func TestReleaseDebtProducerReceiptHasDedicatedHelper(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"release_phase='A0'", "release_phase='A11'",
+		"release_phase='A0'", "release_phase='A12'",
 		"companion-manifest public-key-receipt",
 		"public key receipt independent verification failed",
 		"manifest_public_key_digest_mismatch",
@@ -58,7 +58,7 @@ func TestReleaseDebtProducerReceiptHasDedicatedHelper(t *testing.T) {
 			t.Fatalf("producer receipt helper missing %q", required)
 		}
 	}
-	if strings.Contains(producer, "release_phase='A11'") ||
+	if strings.Contains(producer, "release_phase='A12'") ||
 		strings.Contains(producer, "companion-manifest public-key-receipt") {
 		t.Fatal("producer caller still owns receipt phase coordinates or publication")
 	}
@@ -80,15 +80,15 @@ func TestReleaseDebtLineageCoordinatesHaveDedicatedHelper(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"release_phase='A0'", "release_phase='A11' prior_phase='A10'",
+		"release_phase='A0'", "release_phase='A12' prior_phase='A11'",
 		"prior_tree=", "prior_release_identity_mismatch",
 	} {
 		if !strings.Contains(coordinates, required) {
 			t.Fatalf("lineage coordinate helper missing %q", required)
 		}
 	}
-	if strings.Contains(lineage, "release_phase='A11' prior_phase='A10'") {
-		t.Fatal("lineage caller still owns the A11 coordinate table")
+	if strings.Contains(lineage, "release_phase='A12' prior_phase='A11'") {
+		t.Fatal("lineage caller still owns the A12 coordinate table")
 	}
 }
 

@@ -8,8 +8,8 @@ fail() {
 }
 
 readonly RELEASE_REPOSITORY='Insajin/autopus-adk'
-readonly RELEASE_TAG='v0.50.82'
-readonly RELEASE_VERSION='0.50.82'
+readonly RELEASE_TAG='v0.50.83'
+readonly RELEASE_VERSION='0.50.83'
 
 EXPECTED_ARCHIVES=(
   "autopus-adk_${RELEASE_VERSION}_darwin_amd64.tar.gz"
@@ -37,6 +37,11 @@ readonly checksums_output=$1
 for tool in gh jq shasum; do
   command -v "$tool" >/dev/null 2>&1 || fail "required tool is unavailable: ${tool}"
 done
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) \
+  || fail 'cannot resolve current release verifier directory'
+signature_helper="$script_dir/verify-current-release-signatures.sh"
+[[ -f "$signature_helper" && ! -L "$signature_helper" && -x "$signature_helper" ]] \
+  || fail 'current release signature helper is missing or unsafe'
 
 output_dir=$(dirname -- "$checksums_output")
 [[ -d "$output_dir" && ! -L "$output_dir" ]] \
@@ -57,18 +62,20 @@ cleanup() {
 trap cleanup EXIT
 release_json="$temp_dir/release.json"
 downloaded_checksums="$temp_dir/checksums.txt"
+downloaded_bundle="$temp_dir/checksums.txt.bundle"
+downloaded_envelope="$temp_dir/checksums.txt.signatures"
 
 if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
   -H 'Accept: application/vnd.github+json' \
   "repos/${RELEASE_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "$release_json"; then
-  fail 'cannot read the exact A11 GitHub release'
+  fail 'cannot read the exact A12 GitHub release'
 fi
 [[ -f "$release_json" && ! -L "$release_json" && -s "$release_json" ]] \
-  || fail 'A11 GitHub release metadata is empty or unsafe'
+  || fail 'A12 GitHub release metadata is empty or unsafe'
 
 expected_assets_json=$(printf '%s\n' "${EXPECTED_ASSETS[@]}" \
   | jq -Rsc 'split("\n") | map(select(length > 0))') \
-  || fail 'cannot construct the expected A11 asset set'
+  || fail 'cannot construct the expected A12 asset set'
 if ! jq -e --arg tag "$RELEASE_TAG" --arg commit "$COMPANION_SOURCE_COMMIT" \
   --argjson expected "$expected_assets_json" '
     type == "object" and
@@ -89,35 +96,43 @@ if ! jq -e --arg tag "$RELEASE_TAG" --arg commit "$COMPANION_SOURCE_COMMIT" \
       (.digest | type) == "string" and
       (.digest | test("^sha256:[0-9a-f]{64}$")))
   ' "$release_json" >/dev/null; then
-  fail 'A11 release is not exact, final, immutable, complete, and digest-bound'
+  fail 'A12 release is not exact, final, immutable, complete, and digest-bound'
 fi
 
-checksums_metadata=$(jq -er '
-  .assets[] | select(.name == "checksums.txt") |
-  [.id, .size, .digest] | @tsv
-' "$release_json") || fail 'checksums.txt metadata is unavailable'
-IFS=$'\t' read -r checksums_id checksums_size checksums_api_digest \
-  <<< "$checksums_metadata"
-[[ "$checksums_id" =~ ^[1-9][0-9]*$ && "$checksums_size" =~ ^[1-9][0-9]*$ ]] \
-  || fail 'checksums.txt identifier or size is malformed'
+# @AX:ANCHOR [AUTO]: Keep all three immutable release asset downloads on one digest-bound path.
+# @AX:REASON [AUTO]: Checksums, the Sigstore bundle, and the K1 envelope must share identical GitHub metadata and byte verification before publication continues.
+download_release_asset() {
+  local asset_name=$1
+  local destination=$2
+  local metadata asset_id asset_size api_digest downloaded_size downloaded_digest
+  metadata=$(jq -er --arg name "$asset_name" '
+    .assets[] | select(.name == $name) | [.id, .size, .digest] | @tsv
+  ' "$release_json") || fail "${asset_name} metadata is unavailable"
+  IFS=$'\t' read -r asset_id asset_size api_digest <<< "$metadata"
+  [[ "$asset_id" =~ ^[1-9][0-9]*$ && "$asset_size" =~ ^[1-9][0-9]*$ ]] \
+    || fail "${asset_name} identifier or size is malformed"
+  [[ ! -e "$destination" && ! -L "$destination" ]] \
+    || fail "${asset_name} destination already exists"
+  if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
+    -H 'Accept: application/octet-stream' \
+    "repos/${RELEASE_REPOSITORY}/releases/assets/${asset_id}" > "$destination"; then
+    fail "cannot download ${asset_name} from the exact A12 release"
+  fi
+  [[ -f "$destination" && ! -L "$destination" && -s "$destination" ]] \
+    || fail "downloaded ${asset_name} is empty or unsafe"
+  downloaded_size=$(wc -c < "$destination" | tr -d '[:space:]')
+  [[ "$downloaded_size" == "$asset_size" ]] \
+    || fail "downloaded ${asset_name} size differs from GitHub metadata"
+  downloaded_digest=$(shasum -a 256 "$destination" | awk '{print $1}') \
+    || fail "cannot digest downloaded ${asset_name}"
+  [[ "$downloaded_digest" =~ ^[0-9a-f]{64}$ \
+     && "sha256:${downloaded_digest}" == "$api_digest" ]] \
+    || fail "downloaded ${asset_name} differs from its GitHub API digest"
+}
 
-if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
-  -H 'Accept: application/octet-stream' \
-  "repos/${RELEASE_REPOSITORY}/releases/assets/${checksums_id}" \
-  > "$downloaded_checksums"; then
-  fail 'cannot download checksums.txt from the exact A11 release'
-fi
-[[ -f "$downloaded_checksums" && ! -L "$downloaded_checksums" \
-   && -s "$downloaded_checksums" ]] \
-  || fail 'downloaded checksums.txt is empty or unsafe'
-downloaded_size=$(wc -c < "$downloaded_checksums" | tr -d '[:space:]')
-[[ "$downloaded_size" == "$checksums_size" ]] \
-  || fail 'downloaded checksums.txt size differs from GitHub metadata'
-downloaded_digest=$(shasum -a 256 "$downloaded_checksums" | awk '{print $1}') \
-  || fail 'cannot digest downloaded checksums.txt'
-[[ "$downloaded_digest" =~ ^[0-9a-f]{64}$ \
-   && "sha256:${downloaded_digest}" == "$checksums_api_digest" ]] \
-  || fail 'downloaded checksums.txt differs from its GitHub API digest'
+download_release_asset 'checksums.txt' "$downloaded_checksums"
+download_release_asset 'checksums.txt.bundle' "$downloaded_bundle"
+download_release_asset 'checksums.txt.signatures' "$downloaded_envelope"
 
 expected_archives_json=$(printf '%s\n' "${EXPECTED_ARCHIVES[@]}" \
   | jq -Rsc 'split("\n") | map(select(length > 0))') \
@@ -133,7 +148,7 @@ if ! printf '%s' "$checksum_entries_json" | jq -e \
     ([.[].name] | sort) == ($expected | sort) and
     ([.[].name] | unique | length) == ($expected | length)
   ' >/dev/null; then
-  fail 'checksums.txt does not describe exactly the eight A11 archives'
+  fail 'checksums.txt does not describe exactly the eight A12 archives'
 fi
 
 for archive in "${EXPECTED_ARCHIVES[@]}"; do
@@ -147,8 +162,15 @@ for archive in "${EXPECTED_ARCHIVES[@]}"; do
     || fail "checksums.txt differs from the API digest for ${archive}"
 done
 
+# @AX:ANCHOR [AUTO]: Drop every release/API credential before parsing signed evidence.
+# @AX:REASON [AUTO]: OpenSSL and Cosign need only local evidence, PATH, HOME, and TMPDIR; repository tokens must not cross this trust boundary.
+env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+  "$signature_helper" \
+  "$downloaded_checksums" "$downloaded_bundle" "$downloaded_envelope" \
+  || fail 'A12 release signature evidence is invalid'
+
 install -m 0600 "$downloaded_checksums" "$checksums_output" \
   || fail 'cannot materialize verified checksums.txt'
 cmp -s "$downloaded_checksums" "$checksums_output" \
   || fail 'materialized checksums.txt differs from verified bytes'
-printf 'current release evidence: exact immutable A11 release verified\n'
+printf 'current release evidence: exact immutable A12 release verified\n'
