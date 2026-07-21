@@ -12,10 +12,9 @@ readonly A6_REPOSITORY='Insajin/autopus-adk' A7_TAG='v0.50.78' A7_VERSION='0.50.
 readonly A7_REPOSITORY='Insajin/autopus-adk' A8_TAG='v0.50.79' A8_VERSION='0.50.79'
 readonly A8_REPOSITORY='Insajin/autopus-adk' A9_TAG='v0.50.80' A9_VERSION='0.50.80'
 readonly A9_REPOSITORY='Insajin/autopus-adk' A10_TAG='v0.50.81' A10_VERSION='0.50.81'
-readonly BUNDLE_NAME='adk-companion-public-key-receipt.bundle' RECEIPT_NAME='public-key-receipt.json'
-readonly SIGNATURE_NAME='public-key-receipt.sig' MANIFEST_NAME='adk-companion-manifest.json'
-readonly MANIFEST_SIGNATURE_NAME='adk-companion-manifest.sig'
-readonly ARTIFACT_NAME='auto' CHECKSUMS_NAME='checksums.txt'
+readonly A10_REPOSITORY='Insajin/autopus-adk' A11_TAG='v0.50.82' A11_VERSION='0.50.82'
+readonly BUNDLE_NAME='adk-companion-public-key-receipt.bundle' RECEIPT_NAME='public-key-receipt.json' SIGNATURE_NAME='public-key-receipt.sig'
+readonly MANIFEST_NAME='adk-companion-manifest.json' MANIFEST_SIGNATURE_NAME='adk-companion-manifest.sig' ARTIFACT_NAME='auto' CHECKSUMS_NAME='checksums.txt'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 readonly LOCAL_EVIDENCE_ERROR='fixture_or_local_evidence_forbidden'
 fail() { printf 'companion release lineage: %s: %s\n' "$1" "$2" >&2; exit 1; }
@@ -68,8 +67,11 @@ elif [[ "$GITHUB_REF_NAME" == "$A9_TAG" && "$COMPANION_VERSION" == "$A9_VERSION"
 elif [[ "$GITHUB_REF_NAME" == "$A10_TAG" && "$COMPANION_VERSION" == "$A10_VERSION" ]]; then
   release_phase='A10' prior_phase='A9' prior_repository="$A9_REPOSITORY" prior_evidence_source='immutable A9 GitHub release' prior_tag="$A9_TAG" prior_version="$A9_VERSION" prior_commit="$A9_COMMIT_SHA" prior_tree="$A9_TREE_SHA"
   prior_tag_object="$A9_TAG_OBJECT_SHA" prior_checksums="$A9_CHECKSUMS_SHA256" prior_amd64_archive="$A9_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A9_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A9_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A9_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A11_TAG" && "$COMPANION_VERSION" == "$A11_VERSION" ]]; then
+  release_phase='A11' prior_phase='A10' prior_repository="$A10_REPOSITORY" prior_evidence_source='immutable A10 GitHub release' prior_tag="$A10_TAG" prior_version="$A10_VERSION" prior_commit="$A10_COMMIT_SHA" prior_tree="$A10_TREE_SHA"
+  prior_tag_object="$A10_TAG_OBJECT_SHA" prior_checksums="$A10_CHECKSUMS_SHA256" prior_amd64_archive="$A10_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A10_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A10_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A10_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11 policy'
 fi
 archive_helper="$script_dir/verify-public-key-lineage-archive.sh"
 [[ -f "$archive_helper" && ! -L "$archive_helper" ]] || fail prior_evidence_unverifiable 'lineage archive verifier is invalid'
@@ -80,7 +82,7 @@ for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
   "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
   nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
 done
-if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' ]]; then
+if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' ]]; then
   nonzero_hex "$prior_tag_object" 40 || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
   for pin in "$prior_amd64_archive" "$prior_arm64_archive"; do
     nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"

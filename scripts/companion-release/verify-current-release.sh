@@ -8,8 +8,8 @@ fail() {
 }
 
 readonly RELEASE_REPOSITORY='Insajin/autopus-adk'
-readonly RELEASE_TAG='v0.50.81'
-readonly RELEASE_VERSION='0.50.81'
+readonly RELEASE_TAG='v0.50.82'
+readonly RELEASE_VERSION='0.50.82'
 
 EXPECTED_ARCHIVES=(
   "autopus-adk_${RELEASE_VERSION}_darwin_amd64.tar.gz"
@@ -61,14 +61,14 @@ downloaded_checksums="$temp_dir/checksums.txt"
 if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
   -H 'Accept: application/vnd.github+json' \
   "repos/${RELEASE_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "$release_json"; then
-  fail 'cannot read the exact A10 GitHub release'
+  fail 'cannot read the exact A11 GitHub release'
 fi
 [[ -f "$release_json" && ! -L "$release_json" && -s "$release_json" ]] \
-  || fail 'A10 GitHub release metadata is empty or unsafe'
+  || fail 'A11 GitHub release metadata is empty or unsafe'
 
 expected_assets_json=$(printf '%s\n' "${EXPECTED_ASSETS[@]}" \
   | jq -Rsc 'split("\n") | map(select(length > 0))') \
-  || fail 'cannot construct the expected A10 asset set'
+  || fail 'cannot construct the expected A11 asset set'
 if ! jq -e --arg tag "$RELEASE_TAG" --arg commit "$COMPANION_SOURCE_COMMIT" \
   --argjson expected "$expected_assets_json" '
     type == "object" and
@@ -89,7 +89,7 @@ if ! jq -e --arg tag "$RELEASE_TAG" --arg commit "$COMPANION_SOURCE_COMMIT" \
       (.digest | type) == "string" and
       (.digest | test("^sha256:[0-9a-f]{64}$")))
   ' "$release_json" >/dev/null; then
-  fail 'A10 release is not exact, final, immutable, complete, and digest-bound'
+  fail 'A11 release is not exact, final, immutable, complete, and digest-bound'
 fi
 
 checksums_metadata=$(jq -er '
@@ -105,7 +105,7 @@ if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
   -H 'Accept: application/octet-stream' \
   "repos/${RELEASE_REPOSITORY}/releases/assets/${checksums_id}" \
   > "$downloaded_checksums"; then
-  fail 'cannot download checksums.txt from the exact A10 release'
+  fail 'cannot download checksums.txt from the exact A11 release'
 fi
 [[ -f "$downloaded_checksums" && ! -L "$downloaded_checksums" \
    && -s "$downloaded_checksums" ]] \
@@ -133,7 +133,7 @@ if ! printf '%s' "$checksum_entries_json" | jq -e \
     ([.[].name] | sort) == ($expected | sort) and
     ([.[].name] | unique | length) == ($expected | length)
   ' >/dev/null; then
-  fail 'checksums.txt does not describe exactly the eight A10 archives'
+  fail 'checksums.txt does not describe exactly the eight A11 archives'
 fi
 
 for archive in "${EXPECTED_ARCHIVES[@]}"; do
@@ -151,4 +151,4 @@ install -m 0600 "$downloaded_checksums" "$checksums_output" \
   || fail 'cannot materialize verified checksums.txt'
 cmp -s "$downloaded_checksums" "$checksums_output" \
   || fail 'materialized checksums.txt differs from verified bytes'
-printf 'current release evidence: exact immutable A10 release verified\n'
+printf 'current release evidence: exact immutable A11 release verified\n'

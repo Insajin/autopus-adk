@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **v0.50.82 companion A11 릴리스 준비** (2026-07-21): 릴리스 진입점을 새 annotated tag `v0.50.82`로만 옮기고 immutable `v0.50.81`을 직접 선행 릴리스로 검증한다. A11은 A10 source commit `54536edc09c37a634532c2c9b51e62869d393db4`, tree `e9a30f4530e06c9b62933e7bf97e0056faed259c`, annotated tag object `8b37fccb57255fc24003dc3af2700334f4a8d3c4`, checksums SHA-256 `2e97c1f3c8d0cba0f93dd83c724c71eaa4966c79d4812a6a9cf034144c7b178d`, Darwin archive와 embedded manifest digest를 직접 고정한다. Homebrew는 live A10 tap commit `ab9a0e489ee34f8a075019c4acebb2a8ae61c290`과 Cask blob `c6edb108d821d88914e12d2c1bf943540c63351e`에서 검증된 A11 Cask로만 CAS 갱신하며, Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 동결한다. 최종 A11 source pin, 보호 환경 승인, K1 서명·공증, immutable GitHub Release와 Homebrew 반영은 태그 게시 단계에서 완결한다.
+
+- **인증으로 보호된 metrics endpoint의 canary 판정 수정** (2026-07-21): `auto canary`가 `/metrics`의 HTTP 401 응답을 서비스 장애로 오판하던 문제를 해결했다. `/metrics`의 401은 보호된 endpoint에 도달한 정상 결과로 처리하되, `/health`의 401과 그 밖의 오류 응답은 계속 실패로 판정한다. 또한 각 endpoint의 상태와 HTTP 결과를 독립적으로 기록해 한 endpoint의 실패가 뒤따르는 정상 결과까지 오염시키지 않도록 했다.
+
 - **Codex update preview와 적용 파일 집합 수렴** (2026-07-21): mixed Codex·OpenCode 하네스에서 실제 update가 유지하는 workflow compatibility skill 10개를 다음 preview가 반복해서 prune 대상으로 표시하던 불일치를 해결했다. Codex `Generate`와 `Update`가 동일한 skill mapping을 사용하므로 `auto update --plan`의 desired file set이 실제 transaction과 일치하며, 적용 직후 preview도 해당 파일을 모두 retain한다.
 
 - **v0.50.81 companion A10 릴리스 준비** (2026-07-21): 릴리스 진입점을 새 annotated tag `v0.50.81`로만 옮기고 immutable `v0.50.80`을 직접 선행 릴리스로 검증한다. A10은 A9 source commit `c9c4f49d48022eb0c8d72ee7b520136a4f21f176`, tree `3a71fa56bd917f447a6b1705772b6ab99bbcfbc8`, annotated tag object `b7d05fa76eed41b1dfb4eddbd9873525e0aac15f`, checksums SHA-256 `9ed1f99d22a761abb7953c70aab3c7de5ab0b7ec3524cf3798fcd3815c53bde7`, Darwin archive와 embedded manifest digest를 직접 고정한다. Homebrew는 live A9 Cask blob `3f3a38e9a2ae556acc0f7d0974895d6189f266dd`에서 검증된 A10 Cask로만 CAS 갱신하고 Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 동결한다. 최종 A10 source pin, 보호 환경 승인, 서명·공증, immutable GitHub Release와 Homebrew 반영은 태그 게시 단계에서 완결한다.
