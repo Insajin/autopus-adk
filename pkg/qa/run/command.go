@@ -53,15 +53,20 @@ func runCommandWithEnv(projectDir string, pack journey.Pack, artifactDir string,
 		return finishCommandResult(result, artifactDir, nil, nil)
 	}
 	result.GUIGuardReadyPath = guiInput.GuardReadyPath
-	timeout := 60 * time.Second
-	if parsed, err := time.ParseDuration(pack.Command.Timeout); err == nil && parsed > 0 {
-		timeout = parsed
+	commandCache, err := prepareCommandGoCache(projectDir)
+	if err != nil {
+		result.Status = "blocked"
+		result.ExitCode = -1
+		result.FailureSummary = "qa go cache setup failed: " + err.Error()
+		return finishCommandResult(result, artifactDir, nil, nil)
 	}
+	defer commandCache.Cleanup()
+	timeout := commandTimeout(pack.Command.Timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = filepath.Join(projectDir, pack.Command.CWD)
-	cmd.Env = appendEnvOverrides(allowedEnv(projectDir, pack.Command.EnvAllowlist), append(append([]string{}, guiInput.Env...), extraEnv...))
+	cmd.Env = authoritativeCommandEnv(commandCache.Paths, pack.Command.EnvAllowlist, append(append([]string{}, guiInput.Env...), extraEnv...))
 	if err := verifyGUIGuardPreflight(ctx, cmd.Dir, cmd.Env, guiInput, args); err != nil {
 		result.Status = "blocked"
 		result.ExitCode = -1
@@ -86,16 +91,19 @@ func runCommandWithEnv(projectDir string, pack journey.Pack, artifactDir string,
 	return finishCommandResult(result, artifactDir, []byte(stdout.String()), []byte(stderr.String()))
 }
 
-func allowedEnv(projectDir string, allowlist []string) []string {
-	absProjectDir, err := filepath.Abs(projectDir)
-	if err == nil {
-		projectDir = absProjectDir
+func commandTimeout(value string) time.Duration {
+	timeout := 60 * time.Second
+	if parsed, err := time.ParseDuration(value); err == nil && parsed > 0 {
+		timeout = parsed
 	}
-	cacheRoot := filepath.Join(projectDir, ".autopus", "qa", "cache")
-	goPath := filepath.Join(cacheRoot, "gopath")
-	goCache := filepath.Join(cacheRoot, "go-build")
-	_ = os.MkdirAll(goCache, 0o755)
-	_ = os.MkdirAll(filepath.Join(goPath, "pkg", "mod"), 0o755)
+	if timeout > journey.MaxCommandTimeout {
+		return journey.MaxCommandTimeout
+	}
+	return timeout
+}
+
+func allowedEnv(paths goCachePaths, allowlist []string) []string {
+	projectDir := paths.ProjectDir
 	home := projectDir
 	if envNameAllowed(allowlist, "HOME") {
 		if value := os.Getenv("HOME"); value != "" {
@@ -104,9 +112,6 @@ func allowedEnv(projectDir string, allowlist []string) []string {
 	}
 	env := []string{
 		"HOME=" + home,
-		"GOCACHE=" + goCache,
-		"GOMODCACHE=" + filepath.Join(goPath, "pkg", "mod"),
-		"GOPATH=" + goPath,
 		"TMPDIR=" + os.TempDir(),
 	}
 	if path := os.Getenv("PATH"); path != "" {
@@ -118,14 +123,40 @@ func allowedEnv(projectDir string, allowlist []string) []string {
 		env = appendDefaultEnv(env, "PLAYWRIGHT_BROWSERS_PATH", defaultPlaywrightBrowsersPath(home))
 	}
 	for _, name := range allowlist {
-		if name == "HOME" {
+		if strings.EqualFold(name, "HOME") || isManagedGoEnvName(name) {
 			continue
 		}
 		if value, ok := os.LookupEnv(name); ok {
 			env = append(env, name+"="+value)
 		}
 	}
-	return env
+	return appendEnvOverrides(env, managedGoEnv(paths))
+}
+
+func authoritativeCommandEnv(paths goCachePaths, allowlist, overrides []string) []string {
+	env := appendEnvOverrides(allowedEnv(paths, allowlist), overrides)
+	return appendEnvOverrides(env, managedGoEnv(paths))
+}
+
+func managedGoEnv(paths goCachePaths) []string {
+	return []string{
+		"GOCACHE=" + paths.GoBuild,
+		"GOMODCACHE=" + paths.GoMod,
+		"GOPATH=" + paths.GoPath,
+	}
+}
+
+func isManagedGoEnvName(name string) bool {
+	switch {
+	case strings.EqualFold(name, "GOCACHE"):
+		return true
+	case strings.EqualFold(name, "GOMODCACHE"):
+		return true
+	case strings.EqualFold(name, "GOPATH"):
+		return true
+	default:
+		return false
+	}
 }
 
 func envNameAllowed(allowlist []string, target string) bool {
