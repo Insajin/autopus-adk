@@ -24,12 +24,15 @@ process_identity() {
 # Snapshot descendants attached at the deadline. Intentionally detached daemons are out of scope.
 capture_process_snapshot() {
     snapshot_root="$1" snapshot_file="$2"
+    # Signal ancestors first so pending TERM prevents child respawn during cleanup.
     snapshot_pids="$(ps -eo pid=,ppid= 2>/dev/null | awk -v root="$snapshot_root" '
         { parent[$1]=$2 }
         END { for (pid in parent) { cursor=pid; depth=0
-            while (cursor != root && cursor in parent && depth++ < 1024) cursor=parent[cursor]
-            if (cursor == root) print pid
-        }}')"
+            while (cursor != root && cursor in parent && depth < 1024) {
+                cursor=parent[cursor]; depth++
+            }
+            if (cursor == root) print depth, pid
+        }}' | sort -k1,1n -k2,2n | awk '{print $2}')"
     : > "$snapshot_file"
     for snapshot_pid in $snapshot_pids "$snapshot_root"; do
         snapshot_identity="$(process_identity "$snapshot_pid")"

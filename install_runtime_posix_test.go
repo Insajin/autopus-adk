@@ -14,6 +14,47 @@ import (
 	"time"
 )
 
+func TestPOSIXInstallerSnapshotOrdersAncestorsBeforeDescendants(t *testing.T) {
+	tempDir := t.TempDir()
+	fakeBin := filepath.Join(tempDir, "bin")
+	if err := os.Mkdir(fakeBin, 0o700); err != nil {
+		t.Fatalf("create fake bin: %v", err)
+	}
+	fakePS := `#!/bin/sh
+if [ "${1:-}" = -eo ]; then
+    printf '%s\n' '103 102' '101 100' '100 1' '102 101'
+    exit 0
+fi
+exit 1
+`
+	if err := os.WriteFile(filepath.Join(fakeBin, "ps"), []byte(fakePS), 0o755); err != nil {
+		t.Fatalf("write fake ps: %v", err)
+	}
+	snapshotPath := filepath.Join(tempDir, "processes.snapshot")
+	command := exec.Command("sh", "-c", `
+set -eu
+. ./scripts/install-runtime-v1.sh
+process_identity() { printf 'identity-%s\n' "$1"; }
+capture_process_snapshot 100 "$1"
+cat "$1"
+`, "snapshot-order-test", snapshotPath)
+	command.Env = append(os.Environ(),
+		"PATH="+fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("capture ordered snapshot: %v\n%s", err, output)
+	}
+	var got []string
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		fields := strings.SplitN(line, "\t", 2)
+		got = append(got, fields[0])
+	}
+	if joined := strings.Join(got, ","); joined != "100,101,102,103,100" {
+		t.Fatalf("snapshot order = %s, want ancestors before descendants", joined)
+	}
+}
+
 func TestPOSIXInstallerSnapshotFailureKeepsLaunchPayloadInCleanup(t *testing.T) {
 	tempDir := t.TempDir()
 	realPS, err := exec.LookPath("ps")

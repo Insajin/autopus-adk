@@ -17,7 +17,7 @@ SIGNING_FLOOR="0.50.73"
 VERIFIER_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/release-signing/verify-checksums-v1.sh"
 VERIFIER_SHA256="d9eeaaa029269d4ed9008e38527e3bbe3229d2f93a44f9d2a63b79109c9dcbf9"
 RUNTIME_HELPER_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/install-runtime-v1.sh"
-RUNTIME_HELPER_SHA256="e9f15a192cf786c4539cc1b525283a99156c33b600f342024fd9e5e12e7ef3e8"
+RUNTIME_HELPER_SHA256="05797a0d62f02687f416f8e1e640543bf48fae74971ff34af0c49650123abf8c"
 
 # 색상 출력
 info()  { printf '\033[1;34m%s\033[0m\n' "$1"; }
