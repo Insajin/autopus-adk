@@ -106,6 +106,9 @@ func TestRecreatePane_Success(t *testing.T) {
 	if newPI.provider.Name != "opencode" {
 		t.Errorf("expected provider opencode, got %s", newPI.provider.Name)
 	}
+	if newPI.directPromptRound != 1 {
+		t.Errorf("expected directPromptRound=1, got %d", newPI.directPromptRound)
+	}
 	// Verify cleanup of old pane was called.
 	if len(mock.closeCalls) < 1 {
 		t.Error("expected Close call for old pane")
@@ -196,21 +199,34 @@ func containsString(values []string, want string) bool {
 	return false
 }
 
-// TestRecreatePane_RoundEnvSet verifies that SendRoundEnvToPane is called with
-// the correct round number when recreating an args-mode provider in round > 1.
-func TestRecreatePane_RoundEnvSet(t *testing.T) {
+// TestRecreatePane_HookRoundEnvSet verifies that a hook-capable replacement
+// inherits the current round before its provider process starts.
+func TestRecreatePane_HookRoundEnvSet(t *testing.T) {
 	ctx := context.Background()
 	mock := newCmuxMock()
 	mock.readScreenOutput = "Ask anything"
+	hasHook := true
 
 	pi := paneInfo{
 		paneID:     "old-pane",
 		outputFile: t.TempDir() + "/old-output.txt",
-		provider:   ProviderConfig{Name: "opencode", Binary: "opencode", InteractiveInput: "args"},
+		provider: ProviderConfig{
+			Name: "opencode", Binary: "opencode", InteractiveInput: "args", HasHook: &hasHook,
+		},
 	}
 
-	cfg := OrchestraConfig{Terminal: mock, Prompt: "test prompt"}
-	_, err := recreatePane(ctx, cfg, pi, 3)
+	cfg := OrchestraConfig{
+		Terminal: mock, Prompt: "test prompt", HookMode: true, SessionID: "recreate-round-env",
+	}
+	session, err := NewHookSession(cfg.SessionID)
+	if err != nil {
+		t.Fatalf("NewHookSession failed: %v", err)
+	}
+	defer session.Cleanup()
+	session.ApplyProviderHooks([]ProviderConfig{pi.provider})
+	cfg.SurfaceMgr = NewSurfaceManager(mock)
+	cfg.SurfaceMgr.setHookSession(session)
+	_, err = recreatePane(ctx, cfg, pi, 3)
 	if err != nil {
 		t.Fatalf("recreatePane failed: %v", err)
 	}

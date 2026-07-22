@@ -16,10 +16,13 @@ type HookResult struct {
 
 // HookSession manages the file-based signal protocol for hook result collection.
 type HookSession struct {
-	sessionID     string
-	sessionDir    string
-	hookProviders map[string]bool
-	storage       *hookSessionStorage
+	sessionID            string
+	sessionDir           string
+	hookProviders        map[string]bool
+	startupHookProviders map[string]bool
+	hookHealth           hookCompletionHealth
+	startupHealth        hookStartupHealth
+	storage              *hookSessionStorage
 }
 
 // defaultHookProviders lists providers that have hooks by default.
@@ -43,18 +46,18 @@ func NewHookSession(sessionID string) (*HookSession, error) {
 	}
 
 	return &HookSession{
-		sessionID:     sessionID,
-		sessionDir:    dir,
-		hookProviders: DefaultHookProviders(),
-		storage:       storage,
+		sessionID:            sessionID,
+		sessionDir:           dir,
+		hookProviders:        DefaultHookProviders(),
+		startupHookProviders: DefaultStartupHookProviders(),
+		storage:              storage,
 	}, nil
 }
 
-// ApplyProviderHooks derives the session's hook-capable provider set from the
-// per-provider ProviderConfig.HasHook overrides. When no provider sets an override
-// the resolved map equals DefaultHookProviders() (INV-003, backward-compatible).
+// ApplyProviderHooks resolves independent completion and startup overrides.
 func (s *HookSession) ApplyProviderHooks(providers []ProviderConfig) {
-	s.hookProviders = resolveHookProviders(providers)
+	s.SetHookProviders(resolveHookProviders(providers))
+	s.SetStartupHookProviders(resolveStartupHookProviders(providers))
 }
 
 // WaitForDone polls for the provider-specific "{provider}-done" file at 200ms intervals.
@@ -73,7 +76,7 @@ func (s *HookSession) WaitForDone(timeout time.Duration, providers ...string) er
 	// Use provider-specific done file if provider name is given (R1 protocol)
 	doneName := "done"
 	if len(providers) > 0 {
-		doneName = providers[0] + "-done"
+		doneName = providerArtifactIdentity(providers[0]) + "-done"
 	}
 
 	for {
@@ -142,7 +145,7 @@ func (s *HookSession) ReadResult(providers ...string) (*HookResult, error) {
 		if err := validateHookArtifactProvider(providers[0]); err != nil {
 			return nil, err
 		}
-		resultName = providers[0] + "-result.json"
+		resultName = providerArtifactIdentity(providers[0]) + "-result.json"
 	}
 	data, err := s.readArtifact(resultName)
 	if err != nil {
@@ -180,7 +183,7 @@ func (s *HookSession) ResetAttempt(provider string, round int) error {
 	if err := validateHookArtifactProvider(provider); err != nil {
 		return err
 	}
-	safeProvider := provider
+	safeProvider := providerArtifactIdentity(provider)
 	doneName := safeProvider + "-done"
 	resultName := safeProvider + "-result.json"
 	if round > 0 {
@@ -229,16 +232,6 @@ func (s *HookSession) Cleanup() {
 	}
 }
 
-// HasHook checks if a provider has hook configuration available.
-func (s *HookSession) HasHook(provider string) bool {
-	return s.hookProviders[provider]
-}
-
-// SetHookProviders overrides which providers have hooks configured.
-func (s *HookSession) SetHookProviders(providers map[string]bool) {
-	s.hookProviders = providers
-}
-
 // Dir returns the session directory path.
 func (s *HookSession) Dir() string {
 	return s.sessionDir
@@ -261,7 +254,7 @@ func (s *HookSession) WriteInputRound(provider string, round int, prompt string)
 		return err
 	}
 	filename := RoundSignalName(provider, round, "input.json")
-	input := HookInput{Provider: provider, Round: round, Prompt: prompt}
+	input := HookInput{Provider: providerArtifactIdentity(provider), Round: round, Prompt: prompt}
 	return s.writeJSONArtifact(filename, input)
 }
 

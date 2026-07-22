@@ -1,9 +1,11 @@
 package gemini
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -23,6 +25,16 @@ func TestPrepareAntigravityHooksJSON_UsesOfficialSchema(t *testing.T) {
 		Type:    "command",
 		Command: "auto check --arch --quiet --warn-only",
 		Timeout: 30,
+	}, {
+		Event:   "PreInvocation",
+		Type:    "command",
+		Command: "auto ready",
+		Timeout: 10,
+	}, {
+		Event:   "Stop",
+		Type:    "command",
+		Command: "hook-gemini-stop.sh",
+		Timeout: 300,
 	}}
 
 	files, err := a.prepareAntigravityHooksJSON(hooks)
@@ -36,6 +48,72 @@ func TestPrepareAntigravityHooksJSON_UsesOfficialSchema(t *testing.T) {
 	entries := autopus["PreToolUse"].([]any)
 	first := entries[0].(map[string]any)
 	assert.Equal(t, "run_command", first["matcher"])
+	assert.Contains(t, first, "hooks")
+
+	for _, event := range []string{"PreInvocation", "Stop"} {
+		entries := autopus[event].([]any)
+		handler := entries[0].(map[string]any)
+		assert.Equal(t, "command", handler["type"])
+		assert.NotContains(t, handler, "matcher")
+		assert.NotContains(t, handler, "hooks")
+	}
+}
+
+func TestGenerate_WritesProviderSpecificCompletionHookEvents(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	_, err := NewWithRoot(dir, WithoutPluginInstall()).Generate(
+		context.Background(), config.DefaultFullConfig("test-project"),
+	)
+	require.NoError(t, err)
+
+	settings := readJSONDocument(t, filepath.Join(dir, ".gemini", "settings.json"))
+	legacyHooks := requireJSONObject(t, settings["hooks"])
+	assert.Contains(t, legacyHooks, "AfterAgent")
+	assert.NotContains(t, legacyHooks, "Stop")
+
+	agents := readJSONDocument(t, filepath.Join(dir, ".agents", "hooks.json"))
+	agyHooks := requireJSONObject(t, agents["autopus"])
+	assert.Contains(t, agyHooks, "Stop")
+	assert.NotContains(t, agyHooks, "AfterAgent")
+	stop := agyHooks["Stop"].([]any)[0].(map[string]any)
+	assert.NotContains(t, stop, "hooks", "Stop must be a flat handler list")
+}
+
+func TestGenerate_AntigravityStopCommandRunsOutsideGit(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	_, err := NewWithRoot(dir, WithoutPluginInstall()).Generate(
+		context.Background(), config.DefaultFullConfig("test-project"),
+	)
+	require.NoError(t, err)
+
+	agents := readJSONDocument(t, filepath.Join(dir, ".agents", "hooks.json"))
+	hooks := requireJSONObject(t, agents["autopus"])
+	handler := hooks["Stop"].([]any)[0].(map[string]any)
+	command := handler["command"].(string)
+	cmd := exec.Command("sh", "-c", command)
+	cmd.Dir = filepath.Join(dir, ".agents")
+	cmd.Env = []string{"PATH=/nonexistent", "AUTOPUS_SESSION_ID="}
+	stdout, err := cmd.Output()
+	require.NoError(t, err)
+	assert.Equal(t, `{"decision":"stop"}`, string(bytes.TrimSpace(stdout)))
+}
+
+func TestApplyGeminiHooks_RemovesStaleManagedCompletionEvents(t *testing.T) {
+	settings := map[string]any{"hooks": map[string]any{
+		"AfterAgent": []any{"stale legacy"},
+		"Stop":       []any{"stale antigravity"},
+		"UserEvent":  []any{"preserve"},
+	}}
+	applyGeminiHooksAndPermissions(settings, []adapter.HookConfig{{
+		Event: "AfterAgent", Type: "command", Command: "legacy-hook", Timeout: 300,
+	}}, nil)
+
+	hooks := settings["hooks"].(map[string]any)
+	assert.Contains(t, hooks, "AfterAgent")
+	assert.NotContains(t, hooks, "Stop")
+	assert.Equal(t, []any{"preserve"}, hooks["UserEvent"])
 }
 
 func TestPrepareAntigravityPluginJSON(t *testing.T) {

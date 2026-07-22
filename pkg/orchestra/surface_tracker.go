@@ -58,14 +58,17 @@ func surfaceTrackerFile(pid int) string {
 	return filepath.Join(surfaceTrackerBase, strconv.Itoa(pid)+".surfaces")
 }
 
-// splitTrackedPane splits a pane via the terminal and records the resulting
-// surface ref for orphan reaping. On the first call in this process it also reaps
-// surfaces left behind by orchestrator processes that are no longer alive.
+// splitTrackedPane owns tracking and cleanup for every non-empty SplitPane
+// result, including a pane ID returned together with an error. On the first call
+// it also reaps surfaces whose orchestrator processes are no longer alive.
 func splitTrackedPane(ctx context.Context, term terminal.Terminal, dir terminal.Direction) (terminal.PaneID, error) {
 	reapOrphanSurfacesOnce.Do(func() { ReapOrphanSurfaces(term) })
 	paneID, err := term.SplitPane(ctx, dir)
-	if err == nil && paneID != "" {
+	if paneID != "" {
 		trackSurfaceForTerminal(term, string(paneID))
+		if err != nil {
+			closePaneSurface(term, paneID)
+		}
 	}
 	return paneID, err
 }

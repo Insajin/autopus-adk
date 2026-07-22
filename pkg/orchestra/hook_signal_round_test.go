@@ -220,8 +220,8 @@ func TestSendRoundEnvToPane(t *testing.T) {
 	assert.Equal(t, "export AUTOPUS_ROUND=3", mock.sendCommandCalls[0].Cmd)
 }
 
-// TestCollectRoundHookResults_ContextCancelled verifies early exit on
-// cancelled context (uses the new ctx.Err() check).
+// TestCollectRoundHookResults_ContextCancelled verifies that cancellation
+// preserves one unavailable result per hook provider without waiting.
 func TestCollectRoundHookResults_ContextCancelled(t *testing.T) {
 	t.Parallel()
 	sess, err := NewHookSession("test-collect-ctx-cancel")
@@ -237,8 +237,13 @@ func TestCollectRoundHookResults_ContextCancelled(t *testing.T) {
 	}
 
 	responses := collectRoundHookResults(ctx, cfg, sess, 1)
-	// Should return empty or partial — context cancelled before iteration.
-	assert.Empty(t, responses)
+	require.Len(t, responses, 2)
+	for _, response := range responses {
+		assert.True(t, response.TimedOut)
+		assert.True(t, response.EmptyOutput)
+		assert.Contains(t, response.Error, context.Canceled.Error())
+		assert.Equal(t, paneBackendName, response.ExecutedBackend)
+	}
 }
 
 // TestCollectRoundHookResults_DefaultTimeout verifies the 60s default timeout

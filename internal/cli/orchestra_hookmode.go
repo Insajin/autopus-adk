@@ -15,7 +15,11 @@ import (
 func applyHookMode(cfg *orchestra.OrchestraConfig) {
 	cfg.HookMode = false
 	cfg.SessionID = ""
-	if !hookCollectionEligible(cfg.Terminal, cfg.SubprocessMode, isHookModeAvailable()) {
+	discovery := discoverHookCapabilities()
+	applyDiscoveredHookCapabilities(cfg.Providers, discovery)
+	if !hookCollectionEligible(
+		cfg.Terminal, cfg.SubprocessMode, selectedProviderHasCompletionHook(cfg.Providers),
+	) {
 		return
 	}
 	cfg.HookMode = true
@@ -27,6 +31,31 @@ func applyHookMode(cfg *orchestra.OrchestraConfig) {
 	if cfg.MonitorTimeout <= 0 {
 		cfg.MonitorTimeout = runtime.PatternTimeout
 	}
+}
+
+func applyDiscoveredHookCapabilities(providers []orchestra.ProviderConfig, discovery hookDiscovery) {
+	for i := range providers {
+		capability := discovery.capabilityFor(providers[i].Name, providers[i].Binary)
+		if providers[i].HasHook == nil {
+			providers[i].HasHook = hookCapabilityOverride(capability.completion)
+		}
+		if providers[i].HasStartupHook == nil {
+			providers[i].HasStartupHook = hookCapabilityOverride(capability.startup)
+		}
+	}
+}
+
+func selectedProviderHasCompletionHook(providers []orchestra.ProviderConfig) bool {
+	for i := range providers {
+		if providers[i].HasHook != nil && *providers[i].HasHook {
+			return true
+		}
+	}
+	return false
+}
+
+func hookCapabilityOverride(value bool) *bool {
+	return &value
 }
 
 // hookCollectionEligible reports whether hook-IPC done-file collection can run:

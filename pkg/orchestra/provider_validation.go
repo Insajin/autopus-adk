@@ -26,7 +26,7 @@ func validateHookSessionID(sessionID string) error {
 }
 
 func providerCanonicalName(name string) string {
-	return strings.ToLower(name)
+	return strings.ToLower(providerArtifactIdentity(strings.TrimSpace(name)))
 }
 
 func validateProviderConfigs(providers []ProviderConfig) error {

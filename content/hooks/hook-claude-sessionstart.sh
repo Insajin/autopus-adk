@@ -1,32 +1,50 @@
 #!/bin/sh
-# hook-claude-sessionstart.sh — Claude Code SessionStart hook for autopus.
-# Writes a ready-signal file so the orchestrator can detect that the interactive
-# provider session is live via file IPC instead of screen scraping the prompt
-# (SPEC-ORCH-022). No-op unless AUTOPUS_SESSION_ID is set by the orchestrator.
-# POSIX shell compatible. Does not read or require stdin.
+# Claude Code SessionStart hook: atomically publishes the round-ready signal.
 set -e
 
 SESSION_ID="${AUTOPUS_SESSION_ID:-}"
 if [ -z "$SESSION_ID" ]; then
   exit 0
 fi
-
-# Validate session ID to prevent path traversal (alphanumeric, hyphen, underscore only).
 case "$SESSION_ID" in
   *[!a-zA-Z0-9_-]*) exit 0 ;;
 esac
 
 SESSION_DIR="${AUTOPUS_SESSION_DIR:-/tmp/autopus/${SESSION_ID}}"
-if [ ! -d "$SESSION_DIR" ]; then
+case "$SESSION_DIR" in
+  /*) ;;
+  *) exit 0 ;;
+esac
+if [ ! -d "$SESSION_DIR" ] || [ -L "$SESSION_DIR" ]; then
   exit 0
 fi
-
-# Round-scoped ready file name. Defaults to round 0 when AUTOPUS_ROUND is unset,
-# matching RoundSignalName(provider, 0, "ready") on the Go side.
 case "${AUTOPUS_ROUND:-}" in *[!0-9]*) AUTOPUS_ROUND="" ;; esac
 ROUND="${AUTOPUS_ROUND:-0}"
-READY_FILE="${SESSION_DIR}/claude-round${ROUND}-ready"
+READY_NAME="claude-round${ROUND}-ready"
 
-: > "${READY_FILE}"
-chmod 600 "${READY_FILE}" 2>/dev/null || true
+python3 -c "
+import os, secrets, sys
+directory_flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0)
+directory_fd = os.open(sys.argv[1], directory_flags)
+temporary = '.autopus-hook-' + secrets.token_hex(12)
+file_fd = -1
+try:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
+    file_fd = os.open(temporary, flags, 0o600, dir_fd=directory_fd)
+    os.fchmod(file_fd, 0o600)
+    os.fsync(file_fd)
+    os.close(file_fd)
+    file_fd = -1
+    os.replace(temporary, sys.argv[2], src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+except Exception:
+    if file_fd >= 0:
+        os.close(file_fd)
+    try:
+        os.unlink(temporary, dir_fd=directory_fd)
+    except Exception:
+        pass
+    raise
+finally:
+    os.close(directory_fd)
+" "$SESSION_DIR" "$READY_NAME" 2>/dev/null || true
 exit 0

@@ -16,15 +16,20 @@ var samePaneRetryBackoffs = []time.Duration{200 * time.Millisecond, 400 * time.M
 // proactive stale detection. Replaces the reactive validateSurface() approach.
 // @AX:ANCHOR [AUTO] coordinator — owns background goroutine, health cache, warm pool, and pane recovery; used by runPaneDebate and executeRound
 type SurfaceManager struct {
-	term     terminal.Terminal
-	signal   terminal.SignalCapable // nil if terminal doesn't support signals
-	interval time.Duration          // health check interval (default 5s)
+	term        terminal.Terminal
+	signal      terminal.SignalCapable // nil if terminal doesn't support signals
+	interval    time.Duration          // health check interval (default 5s)
+	hookSession *HookSession
 
 	mu     sync.RWMutex
 	health map[string]terminal.SurfaceStatus // paneID -> last known health
 	cancel context.CancelFunc
 
 	warmPool *WarmPool // pre-created spare panes for instant recovery
+}
+
+func (sm *SurfaceManager) setHookSession(session *HookSession) {
+	sm.hookSession = session
 }
 
 // NewSurfaceManager creates a SurfaceManager. If the terminal supports
@@ -128,35 +133,30 @@ func (sm *SurfaceManager) ValidateAndRecover(ctx context.Context, cfg OrchestraC
 		}
 		return pi, false, nil // No recovery needed
 	}
+	cfg.SurfaceMgr = sm
+	if _, err := recoveryHookSession(cfg); err != nil {
+		return pi, false, err
+	}
 
 	// Surface is stale — try warm pool first for instant recovery.
 	if w := sm.acquireWarm(); w != nil {
 		log.Printf("[SurfaceManager] using warm spare pane for %s (%s -> %s)", pi.provider.Name, pi.paneID, w.paneID)
 
 		newPI := paneInfo{
-			paneID:     w.paneID,
-			outputFile: w.outputFile,
-			provider:   pi.provider,
-			skipWait:   false,
+			paneID:            w.paneID,
+			outputFile:        w.outputFile,
+			provider:          pi.provider,
+			skipWait:          false,
+			directPromptRound: round,
 		}
 
-		// Launch CLI session on the warm pane
-		cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, "", cfg.WorkingDir)
-		sendErr, enterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, w.paneID, promptRegisterDelay, func() error {
-			return cfg.Terminal.SendLongText(ctx, w.paneID, cmd)
-		})
-		if sendErr != nil {
-			log.Printf("[SurfaceManager] warm pane CLI launch failed, falling back to recreatePane: %v", sendErr)
+		if err := launchRecoveryProvider(ctx, cfg, w.paneID, pi.provider, round); err != nil {
+			log.Printf("[SurfaceManager] warm pane launch preparation failed, falling back to recreatePane: %v", err)
 			sm.warmPool.cleanupPane(ctx, *w)
 			goto coldRecovery
 		}
-		if enterErr != nil {
-			log.Printf("[SurfaceManager] warm pane CLI submit failed, falling back to recreatePane: %v", enterErr)
-			sm.warmPool.cleanupPane(ctx, *w)
-			goto coldRecovery
-		}
-		if !pollUntilSessionReady(ctx, cfg.Terminal, w.paneID, SessionReadyPatterns(), startupTimeoutFor(pi.provider)) {
-			log.Printf("[SurfaceManager] warm pane CLI session did not become ready, falling back to recreatePane")
+		if !waitForRecoveredProviderReady(ctx, cfg, w.paneID, pi.provider, round) {
+			log.Printf("[SurfaceManager] warm pane session did not become stably ready, falling back to recreatePane")
 			sm.warmPool.cleanupPane(ctx, *w)
 			goto coldRecovery
 		}

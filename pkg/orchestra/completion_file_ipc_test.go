@@ -201,7 +201,7 @@ func TestNewCompletionDetectorWithConfig_FallbackPoll(t *testing.T) {
 }
 
 // TestFileIPCDetector_BoundedTimeout_S7 verifies S7: done-file never appears →
-// WaitForCompletion returns completed=false within explicit tolerance (200ms–1s).
+// WaitForCompletion returns completed=false within explicit tolerance.
 // This guards against infinite wait when the hook script never fires.
 func TestFileIPCDetector_BoundedTimeout_S7(t *testing.T) {
 	t.Parallel()
@@ -211,8 +211,10 @@ func TestFileIPCDetector_BoundedTimeout_S7(t *testing.T) {
 	// Use a provider name with no done file in the session dir.
 	pi := paneInfo{provider: ProviderConfig{Name: "codex-notarget"}}
 
-	// 200ms deadline — no done file will be created.
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	const timeout = 200 * time.Millisecond
+	const schedulingTolerance = 25 * time.Millisecond
+	// No done file will be created before the deadline.
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	start := time.Now()
@@ -221,8 +223,9 @@ func TestFileIPCDetector_BoundedTimeout_S7(t *testing.T) {
 
 	assert.NoError(t, err, "S7: WaitForCompletion must not return error on timeout")
 	assert.False(t, completed, "S7: completed must be false when done-file never appears")
-	// Explicit tolerance: must return between 200ms and 1s after context deadline.
-	assert.GreaterOrEqual(t, elapsed, 200*time.Millisecond, "S7: must not return before deadline")
+	// Keep a meaningful lower bound without requiring the timer and elapsed-time
+	// observations to land on the exact same scheduler tick under -race.
+	assert.GreaterOrEqual(t, elapsed, timeout-schedulingTolerance, "S7: must wait for the deadline")
 	assert.Less(t, elapsed, time.Second, "S7: must return within 1s of deadline (no infinite wait)")
 }
 

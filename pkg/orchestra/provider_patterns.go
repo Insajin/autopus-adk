@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+var defaultStartupHookProviders = map[string]bool{
+	"claude": true,
+	"codex":  true,
+}
+
 // provider_patterns.go is the single declarative source for provider pattern
 // defaults (fast-fail rules, hook-capable providers, prompt patterns). The defaults
 // here are exact copies of the previously hardcoded values; when a ProviderConfig
@@ -71,12 +76,35 @@ func DefaultHookProviders() map[string]bool {
 func resolveHookProviders(providers []ProviderConfig) map[string]bool {
 	out := DefaultHookProviders()
 	for _, p := range providers {
+		identity := providerArtifactIdentity(p.Name)
 		if p.HasHook != nil {
-			out[p.Name] = *p.HasHook
+			out[identity] = *p.HasHook
 			continue
 		}
 		if usesAntigravityPromptInteractive(p) {
-			out[p.Name] = false
+			out[identity] = false
+		}
+	}
+	return out
+}
+
+// DefaultStartupHookProviders returns providers whose generated wiring emits a
+// startup-ready artifact. Completion-only hooks are intentionally excluded.
+func DefaultStartupHookProviders() map[string]bool {
+	out := make(map[string]bool, len(defaultStartupHookProviders))
+	for name, has := range defaultStartupHookProviders {
+		out[name] = has
+	}
+	return out
+}
+
+// resolveStartupHookProviders applies startup-specific overrides without
+// inferring startup capability from completion hook configuration.
+func resolveStartupHookProviders(providers []ProviderConfig) map[string]bool {
+	out := DefaultStartupHookProviders()
+	for _, provider := range providers {
+		if provider.HasStartupHook != nil {
+			out[providerArtifactIdentity(provider.Name)] = *provider.HasStartupHook
 		}
 	}
 	return out

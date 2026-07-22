@@ -48,22 +48,29 @@ func isSessionReady(screen string, patterns []CompletionPattern) bool {
 // gate when multiple providers launch concurrently.
 func isProviderSessionReady(screen string, patterns []CompletionPattern, provider string) bool {
 	screen = stripANSI(screen)
-	if isSessionReadyBlocked(screen, provider) {
+	identity := providerArtifactIdentity(provider)
+	if isProviderWorking(screen) || isSessionReadyBlocked(screen, identity) {
 		return false
 	}
+	providerPatternFound := false
 	for _, cp := range patterns {
-		if !strings.EqualFold(strings.TrimSpace(cp.Provider), strings.TrimSpace(provider)) {
+		patternIdentity := providerArtifactIdentity(cp.Provider)
+		if !strings.EqualFold(strings.TrimSpace(patternIdentity), strings.TrimSpace(identity)) {
 			continue
 		}
+		providerPatternFound = true
 		if cp.Pattern != nil && cp.Pattern.MatchString(screen) {
 			return true
 		}
 	}
-	return false
+	// Custom providers have no built-in signature. Keep them extensible by
+	// accepting any known CLI prompt while named providers remain strictly bound
+	// to their own prompt pattern.
+	return !providerPatternFound && isSessionReady(screen, patterns)
 }
 
 func isSessionReadyBlocked(screen, provider string) bool {
-	return strings.EqualFold(strings.TrimSpace(provider), "codex") && codexReadyBlockerPattern.MatchString(screen)
+	return providerArtifactIdentity(provider) == "codex" && codexReadyBlockerPattern.MatchString(screen)
 }
 
 // startupTimeoutFor returns the per-provider startup timeout.
@@ -71,7 +78,7 @@ func startupTimeoutFor(provider ProviderConfig) time.Duration {
 	if provider.StartupTimeout > 0 {
 		return provider.StartupTimeout
 	}
-	switch provider.Name {
+	switch providerArtifactIdentity(provider.Name) {
 	case "claude":
 		return 15 * time.Second
 	case "gemini":

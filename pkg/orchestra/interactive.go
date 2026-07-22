@@ -74,7 +74,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 
 	launchFailed := launchInteractiveSessions(timeoutCtx, cfg, panes)
 	failed = append(failed, launchFailed...)
-	readyFailed := waitForSessionReady(timeoutCtx, cfg.Terminal, panes)
+	readyFailed := waitForSessionReadyWithHook(timeoutCtx, cfg.Terminal, panes, hookSession, 0)
 	failed = append(failed, readyFailed...)
 	promptFailed := sendPrompts(timeoutCtx, cfg, panes)
 	failed = append(failed, promptFailed...)
@@ -84,16 +84,7 @@ func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*Orc
 	time.Sleep(initialDelay)
 
 	patterns := DefaultCompletionPatterns()
-	var responses []ProviderResponse
-	if cfg.HookMode && hookSession != nil {
-		var hookErr error
-		responses, hookErr = WaitAndCollectHookResults(cfg, cfg.SessionID)
-		if hookErr != nil {
-			responses = waitAndCollectResults(timeoutCtx, cfg, panes, patterns, start, nil, hookSession, 0)
-		}
-	} else {
-		responses = waitAndCollectResults(timeoutCtx, cfg, panes, patterns, start, nil, hookSession, 0)
-	}
+	responses := waitAndCollectResults(timeoutCtx, cfg, panes, patterns, start, nil, hookSession, 0)
 	failed = append(failed, responseFailuresFromInteractivePanes(panes, responses, timeout, failed)...)
 
 	// Step 8: Merge by strategy (reuse existing mergeByStrategy)
@@ -128,6 +119,8 @@ func startPipeCapture(ctx context.Context, term terminal.Terminal, panes []paneI
 func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes []paneInfo) []FailedProvider {
 	var wg sync.WaitGroup
 	failedCh := make(chan FailedProvider, len(panes)*2)
+	completionHookProviders := resolveHookProviders(cfg.Providers)
+	startupHookProviders := resolveStartupHookProviders(cfg.Providers)
 	for i := range panes {
 		wg.Add(1)
 		go func(i int) {
@@ -160,14 +153,34 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 			// (they are independent login shells). SendSessionEnvToPane mirrors the pattern
 			// used by SendRoundEnvToPane for AUTOPUS_ROUND. Without this, hook scripts that
 			// guard on AUTOPUS_SESSION_ID (e.g., hook-claude-stop.sh:8) exit 0 as a no-op.
-			if cfg.HookMode && cfg.SessionID != "" {
+			artifactProvider := providerArtifactIdentity(pi.provider.Name)
+			hasHookCapability := completionHookProviders[artifactProvider] || startupHookProviders[artifactProvider]
+			if cfg.HookMode && cfg.SessionID != "" && hasHookCapability {
 				envErr, enterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, pi.paneID, 0, func() error {
 					return SendSessionEnvToPane(ctx, cfg.Terminal, pi.paneID, cfg.SessionID)
 				})
 				if envErr != nil {
-					log.Printf("[interactive] SendSessionEnvToPane for %s failed (non-fatal): %v", pi.provider.Name, envErr)
-				} else if enterErr != nil {
-					log.Printf("[interactive] session-env Enter for %s failed (non-fatal): %v", pi.provider.Name, enterErr)
+					recordFailure(fmt.Sprintf("export hook session failed: %v", envErr))
+					return
+				}
+				if enterErr != nil {
+					recordFailure(fmt.Sprintf("commit hook session export failed: %v", enterErr))
+					return
+				}
+				// Fastest keeps its unscoped round-0 hook contract. Debate collection
+				// is round-scoped, so the provider CLI must inherit round 1 at launch.
+				if cfg.Strategy == StrategyDebate {
+					roundErr, roundEnterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, pi.paneID, 0, func() error {
+						return SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, 1)
+					})
+					if roundErr != nil {
+						recordFailure(fmt.Sprintf("export hook round failed: %v", roundErr))
+						return
+					}
+					if roundEnterErr != nil {
+						recordFailure(fmt.Sprintf("commit hook round export failed: %v", roundEnterErr))
+						return
+					}
 				}
 			}
 

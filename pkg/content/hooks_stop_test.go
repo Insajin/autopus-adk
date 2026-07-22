@@ -1,6 +1,6 @@
 // Package content_test verifies completion hook registration for the orchestra hook-IPC path.
 // S1: claude-code platform emits a Stop event hook pointing to hook-claude-stop.sh.
-// S2: antigravity-cli platform emits AfterAgent, codex platform emits Stop.
+// S2: antigravity-cli and codex emit Stop; legacy Gemini emits AfterAgent.
 package content_test
 
 import (
@@ -55,16 +55,33 @@ func TestGenerateCLIHooks_StopEvent(t *testing.T) {
 				typ:     "command",
 			},
 		},
-		// S2a: antigravity-cli AfterAgent hook
+		// S2a: Antigravity CLI uses its native flat Stop hook contract.
 		{
 			platform: "antigravity-cli",
 			want: wantHook{
-				event:   "AfterAgent",
-				command: ".claude/hooks/autopus/hook-gemini-afteragent.sh",
+				event:   "Stop",
+				command: `"$(cd .. && pwd)/.gemini/hooks/autopus/hook-gemini-stop.sh"`,
 				typ:     "command",
 			},
 		},
-		// S2b: codex Stop hook
+		// S2b: Legacy Gemini CLI keeps the AfterAgent contract.
+		{
+			platform: "gemini",
+			want: wantHook{
+				event:   "AfterAgent",
+				command: `"${GEMINI_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"/.gemini/hooks/autopus/hook-gemini-afteragent.sh`,
+				typ:     "command",
+			},
+		},
+		{
+			platform: "gemini-cli",
+			want: wantHook{
+				event:   "AfterAgent",
+				command: `"${GEMINI_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"/.gemini/hooks/autopus/hook-gemini-afteragent.sh`,
+				typ:     "command",
+			},
+		},
+		// S2c: codex Stop hook
 		{
 			platform: "codex",
 			want: wantHook{
@@ -143,7 +160,8 @@ func TestGenerateCLIHooks_CompletionHookTimeout(t *testing.T) {
 		readyEvent      string // "" when the platform has no SessionStart-equivalent ready hook
 	}{
 		{"claude-code", "Stop", "SessionStart"},
-		{"antigravity-cli", "AfterAgent", ""},
+		{"antigravity-cli", "Stop", ""},
+		{"gemini", "AfterAgent", ""},
 		{"codex", "Stop", "SessionStart"},
 	}
 

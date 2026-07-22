@@ -68,7 +68,7 @@ func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir strin
 }
 
 func interactiveLaunchArgs(p ProviderConfig) []string {
-	if p.Name == "gemini" && p.Binary == "agy" && len(p.PaneArgs) == 0 && p.InteractiveInput != "args" {
+	if usesAntigravityPromptInteractive(p) && len(p.PaneArgs) == 0 && p.InteractiveInput != "args" {
 		return p.PaneArgs
 	}
 	return paneArgs(p)
@@ -82,8 +82,7 @@ func usesAntigravityPromptInteractive(p ProviderConfig) bool {
 	if p.Binary != "agy" && !strings.HasSuffix(p.Binary, "/agy") {
 		return false
 	}
-	name := strings.TrimSpace(p.Name)
-	return name == "gemini" || name == "antigravity" || name == "antigravity-cli"
+	return providerArtifactIdentity(p.Name) == "gemini"
 }
 
 func shellQuoteCommandArg(s string) string {

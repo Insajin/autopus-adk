@@ -3,6 +3,7 @@ package gemini
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -169,7 +170,7 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 	}
 	files = append(files, statusFiles...)
 
-	hookConfigs := a.configuredHooks(cfg)
+	hookConfigs := a.configuredAntigravityHooks(cfg)
 	hookFiles, err := a.writeAntigravityHooksJSON(hookConfigs)
 	if err != nil {
 		return nil, err
@@ -180,6 +181,15 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 	if err != nil {
 		return nil, err
 	}
+	completionHookAssets, err := prepareGeminiCompletionHookAssets()
+	if err != nil {
+		return nil, err
+	}
+	rollbackHooks, err := applyGeminiManagedHookAssets(a.root, completionHookAssets)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, completionHookAssets...)
 
 	a.installAntigravityPluginIfAvailable(ctx)
 
@@ -190,7 +200,7 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 
 	m := adapter.ManifestFromFiles(adapterName, pf)
 	if err := m.Save(a.root); err != nil {
-		return nil, fmt.Errorf("매니페스트 저장 실패: %w", err)
+		return nil, errors.Join(fmt.Errorf("매니페스트 저장 실패: %w", err), rollbackHooks())
 	}
 
 	return pf, nil

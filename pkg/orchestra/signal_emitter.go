@@ -132,7 +132,7 @@ func (e *SignalEmitter) pollAndEmit(ctx context.Context, pi paneInfo, patterns [
 
 // buildSignalName returns the cmux signal name for a provider/round.
 func buildSignalName(providerName string, round int) string {
-	safe := sanitizeProviderName(providerName)
+	safe := sanitizeProviderName(providerArtifactIdentity(providerName))
 	if round > 1 {
 		return fmt.Sprintf("done-%s-round%d", safe, round)
 	}

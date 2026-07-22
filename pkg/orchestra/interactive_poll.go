@@ -2,18 +2,22 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"log"
+	"os"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
+const codexStartupArtifactGrace = time.Second
+
 // waitForPaneReady waits for provider startup evidence and a stable input prompt.
-// Hook-ready proves only process startup, so hook-capable providers also require
-// two consecutive provider-specific ready frames. Hookless providers use the
-// same stable screen gate without waiting for an unavailable hook artifact.
+// Hook-ready proves only process startup, so providers with startup hook wiring
+// also require two consecutive provider-specific ready frames. Other providers
+// use the stable screen gate without waiting for an unavailable artifact.
 func waitForPaneReady(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, patterns []CompletionPattern, timeout time.Duration, hookSession *HookSession, provider string, round int) bool {
-	hookRequired := hookSession != nil && hookSession.HasHook(provider)
+	hookRequired := hookSession != nil && hookSession.HasStartupHook(provider)
 	hookStarted := !hookRequired
 	readyName := ""
 	if hookRequired {
@@ -21,6 +25,8 @@ func waitForPaneReady(ctx context.Context, term terminal.Terminal, paneID termin
 	}
 	const stableReadyFrames = 2
 	readyFrames := 0
+	var stableSince time.Time
+	var artifactMissingSince time.Time
 	deadline := time.After(timeout)
 	ticker := time.NewTicker(sessionReadyPollInterval)
 	defer ticker.Stop()
@@ -31,19 +37,50 @@ func waitForPaneReady(ctx context.Context, term terminal.Terminal, paneID termin
 		case <-deadline:
 			return false
 		case <-ticker.C:
+			now := time.Now()
+			if hookRequired && !hookSession.HasStartupHook(provider) {
+				hookRequired = false
+				hookStarted = true
+			}
 			if !hookStarted {
-				if _, err := hookSession.statArtifact(readyName); err == nil {
+				_, err := hookSession.statArtifact(readyName)
+				switch {
+				case err == nil:
 					hookStarted = true
+					artifactMissingSince = time.Time{}
+				case errors.Is(err, os.ErrNotExist):
+					if artifactMissingSince.IsZero() {
+						artifactMissingSince = now
+					}
+				default:
+					artifactMissingSince = time.Time{}
 				}
 			}
 			screen, err := readScreenBounded(ctx, term, paneID, terminal.ReadScreenOpts{})
 			if err != nil || !isProviderSessionReady(screen, patterns, provider) {
 				readyFrames = 0
+				stableSince = time.Time{}
 				continue
+			}
+			if readyFrames == 0 {
+				stableSince = now
 			}
 			readyFrames++
 			if hookStarted && readyFrames >= stableReadyFrames {
 				return true
+			}
+			if hookRequired && readyFrames >= stableReadyFrames &&
+				providerArtifactIdentity(provider) == "codex" &&
+				!artifactMissingSince.IsZero() {
+				graceStart := stableSince
+				if artifactMissingSince.After(graceStart) {
+					graceStart = artifactMissingSince
+				}
+				if now.Sub(graceStart) >= codexStartupArtifactGrace &&
+					hookSession.deactivateCodexStartupHook(provider, round) {
+					log.Printf("[startup] %s ready artifact inactive after stable prompt grace; using direct readiness for this run", provider)
+					return true
+				}
 			}
 		}
 	}
@@ -105,11 +142,15 @@ func pollUntilSessionReady(ctx context.Context, term terminal.Terminal, paneID t
 	}
 }
 
-// waitForSessionReady polls ReadScreen until a CLI-specific prompt is visible or timeout.
-// Uses SessionReadyPatterns (no shell $ / # patterns) to avoid false positives.
-// Providers that never become ready are marked skipWait so prompts are not sent
-// into a shell or half-launched TUI.
+// waitForSessionReady preserves the hookless startup-gate helper contract.
 func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []paneInfo) []FailedProvider {
+	return waitForSessionReadyWithHook(ctx, term, panes, nil, 0)
+}
+
+// waitForSessionReadyWithHook requires provider-specific, stable screen readiness.
+// Providers with startup hook wiring must also emit their ready artifact. Those
+// that never become ready are marked skipWait so their prompt is never sent.
+func waitForSessionReadyWithHook(ctx context.Context, term terminal.Terminal, panes []paneInfo, hookSession *HookSession, round int) []FailedProvider {
 	patterns := SessionReadyPatterns()
 	var failed []FailedProvider
 	for i, pi := range panes {
@@ -120,7 +161,7 @@ func waitForSessionReady(ctx context.Context, term terminal.Terminal, panes []pa
 			continue
 		}
 		timeout := startupTimeoutFor(pi.provider)
-		if pollUntilSessionReady(ctx, term, pi.paneID, patterns, timeout) {
+		if waitForPaneReady(ctx, term, pi.paneID, patterns, timeout, hookSession, pi.provider.Name, round) {
 			continue
 		}
 		panes[i].skipWait = true

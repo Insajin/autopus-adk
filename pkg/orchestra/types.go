@@ -70,6 +70,9 @@ type ProviderConfig struct {
 	// HasHook overrides whether this provider has hook-based result collection.
 	// When nil, the DefaultHookProviders() membership applies (claude/gemini/codex).
 	HasHook *bool
+	// HasStartupHook independently overrides startup-ready artifact support.
+	// When nil, only providers with generated startup wiring require the artifact.
+	HasStartupHook *bool
 }
 
 // ReliabilityFallbackMode defines deterministic degradation behavior.

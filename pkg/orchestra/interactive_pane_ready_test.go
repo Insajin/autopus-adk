@@ -86,6 +86,15 @@ func TestIsSessionReady_CodexHooksModal_ReturnsFalse(t *testing.T) {
 	assert.False(t, isSessionReady(screen, SessionReadyPatterns()))
 }
 
+func TestIsProviderSessionReady_CustomProviderUsesGenericCLIPrompt(t *testing.T) {
+	t.Parallel()
+
+	patterns := SessionReadyPatterns()
+	assert.True(t, isProviderSessionReady("❯\n", patterns, "custom-provider"))
+	assert.False(t, isProviderSessionReady("❯\n", patterns, "codex"),
+		"a known provider must not accept another provider's prompt")
+}
+
 func TestWaitForPaneReady_TransientPromptFrame_ReturnsFalse(t *testing.T) {
 	t.Parallel()
 
@@ -198,4 +207,77 @@ func TestWaitForPaneReady_ClaudeANSIAndNBSPPrompt_IsStableReady(t *testing.T) {
 
 	assert.True(t, ready)
 	assert.Equal(t, 2, term.readCalls, "Claude prompt must be stable across two frames")
+}
+
+func TestWaitForSessionReady_RequiresProviderSpecificStableFrames(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		screens []string
+	}{
+		{
+			name:    "other provider prompt",
+			screens: []string{"❯\n", "❯\n"},
+		},
+		{
+			name:    "transient provider prompt",
+			screens: []string{"› Summarize recent commits\n", "loading extensions...\n"},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			term := &cancelAfterReadsTerminal{
+				seqScreenMock: &seqScreenMock{name: "cmux", screens: tt.screens},
+				cancel:        cancel,
+				stopAfter:     len(tt.screens),
+			}
+			panes := []paneInfo{{
+				provider: ProviderConfig{Name: "codex", StartupTimeout: time.Second},
+				paneID:   terminal.PaneID("surface:stable-gate"),
+			}}
+
+			failed := waitForSessionReady(ctx, term, panes)
+
+			require.Len(t, failed, 1)
+			assert.Equal(t, "codex", failed[0].Name)
+			assert.True(t, panes[0].skipWait)
+		})
+	}
+}
+
+func TestWaitForSessionReadyWithHook_MissingReadySignalSkipsPrompt(t *testing.T) {
+	t.Parallel()
+
+	session, err := NewHookSession("pane-ready-wrapper-hook-" + NewSessionID())
+	require.NoError(t, err)
+	defer session.Cleanup()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	const screen = "❯ Try \"write a test for <filepath>\"\n"
+	term := &cancelAfterReadsTerminal{
+		seqScreenMock: &seqScreenMock{name: "cmux", screens: []string{screen, screen}},
+		cancel:        cancel,
+		stopAfter:     2,
+	}
+	panes := []paneInfo{{
+		provider: ProviderConfig{Name: "claude", StartupTimeout: time.Second},
+		paneID:   terminal.PaneID("surface:hook-gate"),
+	}}
+
+	failed := waitForSessionReadyWithHook(ctx, term, panes, session, 0)
+	promptFailed := sendPrompts(ctx, OrchestraConfig{Terminal: term, Prompt: "must not send"}, panes)
+
+	require.Len(t, failed, 1)
+	assert.Equal(t, "claude", failed[0].Name)
+	assert.True(t, panes[0].skipWait)
+	assert.Empty(t, promptFailed)
+	assert.Empty(t, term.longTextsSnapshot(), "a readiness failure must block prompt delivery")
 }

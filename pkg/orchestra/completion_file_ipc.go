@@ -39,7 +39,7 @@ func (d *FileIPCDetector) WaitForCompletion(ctx context.Context, pi paneInfo, _ 
 	}
 
 	timeout := fileIPCTimeout(ctx)
-	doneName := sanitizeProviderName(provider) + "-done"
+	doneName := sanitizeProviderName(providerArtifactIdentity(provider)) + "-done"
 	if round > 0 {
 		doneName = RoundSignalName(provider, round, "done")
 	}

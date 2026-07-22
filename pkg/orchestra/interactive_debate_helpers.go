@@ -5,101 +5,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
-// collectRoundHookResults collects hook-based results for a specific round.
-// Each provider waits on its own execution timeout so one missing hook signal
-// does not consume the full round budget for every sibling provider.
-func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *HookSession, round int) []ProviderResponse {
-	if cfg.ReliabilityStore == nil && cfg.RunID != "" {
-		if store, err := newReliabilityStore(cfg.RunID); err == nil {
-			cfg.ReliabilityStore = store
-		}
-	}
-
-	var (
-		mu        sync.Mutex
-		responses []ProviderResponse
-		wg        sync.WaitGroup
-	)
-	for _, p := range cfg.Providers {
-		if ctx.Err() != nil {
-			continue
-		}
-		wg.Add(1)
-		go func(provider ProviderConfig) {
-			defer wg.Done()
-			if !session.HasHook(provider.Name) {
-				return
-			}
-
-			start := time.Now()
-			timeout := providerExecutionTimeout(provider, cfg.TimeoutSeconds)
-			err := session.WaitForDoneRoundCtx(ctx, timeout, provider.Name, round)
-			if err != nil {
-				receiptPath := ""
-				if cfg.ReliabilityStore != nil {
-					receipt := collectionReceipt(cfg.RunID, provider.Name, "hook", "hook", "timeout", err.Error(), "", round, true)
-					receiptPath = cfg.ReliabilityStore.recordCollection(receipt)
-					event := timeoutEvent(cfg.RunID, provider.Name, round, "retry with subprocess fallback")
-					_ = cfg.ReliabilityStore.recordEvent(event)
-					_ = cfg.ReliabilityStore.writeFailureBundle("hook collection timed out", "retry with subprocess fallback", true)
-				}
-				mu.Lock()
-				responses = append(responses, unavailableResponse(ProviderResponse{
-					Provider: provider.Name,
-					Duration: time.Since(start),
-					TimedOut: true,
-					Receipt:  receiptPath,
-				}, usageSourcePane, usageReasonPane))
-				mu.Unlock()
-				return
-			}
-
-			result, readErr := session.ReadResultRound(provider.Name, round)
-			output := ""
-			status := "pass"
-			errMsg := ""
-			partial := false
-			if readErr == nil && result != nil {
-				output = result.Output
-			} else if readErr != nil {
-				status = "read_failed"
-				errMsg = readErr.Error()
-				partial = true
-			}
-			receiptPath := ""
-			if cfg.ReliabilityStore != nil {
-				receipt := collectionReceipt(cfg.RunID, provider.Name, "hook", "hook", status, errMsg, output, round, partial)
-				receiptPath = cfg.ReliabilityStore.recordCollection(receipt)
-			}
-			mu.Lock()
-			responses = append(responses, unavailableResponse(ProviderResponse{
-				Provider: provider.Name,
-				Output:   output,
-				Duration: time.Since(start),
-				Receipt:  receiptPath,
-			}, usageSourcePane, usageReasonPane))
-			mu.Unlock()
-		}(p)
-	}
-	wg.Wait()
-	return responses
-}
-
-// runJudgeRound executes the judge verdict after all debate rounds through the
-// same pane-aware backend selection as the participant providers.
-// Uses a fresh context with 120s timeout since the parent context may be near expiry
-// after debate rounds consumed most of the allotted time.
-// The selected backend owns bounded completion detection; the context timeout
-// remains the outer safety bound and still respects parent cancellation.
+// runJudgeRound uses pane-aware backend selection with a bounded fresh context.
+// The parent context remains the outer cancellation bound.
 func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *HookSession, responses []ProviderResponse, round int) *ProviderResponse {
 	judgment := buildTypedJudgmentPrompt(cfg.Prompt, responses)
 	judgeCfg := findOrBuildJudgeConfig(cfg)
 
-	// Bound the judge with both the parent context and a local timeout.
 	judgeTimeout := time.Duration(cfg.TimeoutSeconds) * time.Second
 	if judgeTimeout < 60*time.Second {
 		judgeTimeout = 60 * time.Second
@@ -148,8 +62,6 @@ func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *Ho
 	return resp
 }
 
-// consensusReached checks if all responses are substantially similar.
-// REQ-7: Uses configurable threshold from OrchestraConfig (default 0.66).
 // @AX:NOTE [AUTO] REQ-7 magic constant 0.66 — default consensus threshold; configurable via ConsensusThreshold field
 func consensusReached(responses []ProviderResponse, cfg OrchestraConfig) bool {
 	if len(responses) < 2 {
@@ -163,7 +75,6 @@ func consensusReached(responses []ProviderResponse, cfg OrchestraConfig) bool {
 	return metrics != nil && metrics.TotalClaims > 0 && metrics.DissentClaims == 0
 }
 
-// countNonEmpty counts responses with non-empty output.
 func countNonEmpty(responses []ProviderResponse) int {
 	n := 0
 	for _, r := range responses {
@@ -174,10 +85,6 @@ func countNonEmpty(responses []ProviderResponse) int {
 	return n
 }
 
-// perRoundTimeout calculates the timeout for each debate round.
-// REQ-5: Enforces a 45-second minimum floor per round.
-// R1: Subtracts judge budget (min 60s) from total before dividing among debate rounds.
-// When noJudge is true, the judge budget is skipped entirely so all time goes to debate.
 // @AX:NOTE [AUTO] REQ-5 magic constant 45s — minimum floor per debate round; lowering risks premature timeout
 func perRoundTimeout(totalSeconds, rounds int, noJudge bool) time.Duration {
 	if totalSeconds <= 0 {
@@ -186,8 +93,7 @@ func perRoundTimeout(totalSeconds, rounds int, noJudge bool) time.Duration {
 	if rounds <= 0 {
 		rounds = 1
 	}
-	// Reserve judge budget (min 60s) from total before dividing among debate rounds.
-	// Skip reservation when --no-judge is set — no judge phase will run.
+	// Reserve the judge budget unless --no-judge is set.
 	judgeReserve := 60
 	if noJudge {
 		judgeReserve = 0
@@ -203,7 +109,6 @@ func perRoundTimeout(totalSeconds, rounds int, noJudge bool) time.Duration {
 	return time.Duration(perRound) * time.Second
 }
 
-// buildDebateResult constructs the final OrchestraResult from debate rounds.
 func buildDebateResult(cfg OrchestraConfig, responses []ProviderResponse, roundHistory [][]ProviderResponse, start time.Time) *OrchestraResult {
 	merged, summary := mergeByStrategy(cfg.Strategy, responses, cfg)
 	if merged == "" {

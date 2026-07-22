@@ -80,27 +80,6 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			}
 			prompt = isolation + buildRebuttalPrompt(cfg.Prompt, others, round)
 		}
-		if round > 1 {
-			// Only send round env to shell-based providers (args mode).
-			if pi.provider.InteractiveInput == "args" {
-				roundErr, roundEnterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, pi.paneID, 0, func() error {
-					return SendRoundEnvToPane(ctx, cfg.Terminal, pi.paneID, round)
-				})
-				if roundErr != nil || roundEnterErr != nil {
-					log.Printf("[Round %d] %s SendRoundEnvToPane failed: send=%v enter=%v", round, pi.provider.Name, roundErr, roundEnterErr)
-				}
-			}
-			if !pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, round2PollTimeout) {
-				log.Printf("[Round %d] %s prompt not ready within timeout -- skipping", round, pi.provider.Name)
-				panes[i].skipWait = true
-				if cfg.ReliabilityStore != nil {
-					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "prompt_ready", prompt, round, "failed", "prompt not ready before round submission")
-					_ = cfg.ReliabilityStore.recordPrompt(receipt)
-				}
-				continue
-			}
-		}
-
 		// Skip direct prompt send for providers that received the prompt at launch (round 1 only).
 		if promptDeliveredAtLaunch(pi.provider) && round == 1 {
 			if cfg.ReliabilityStore != nil {
@@ -110,27 +89,67 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			continue
 		}
 
-		// File IPC for Round 2+ when hook is available (SPEC-ORCH-017 R4)
-		if round > 1 && hookSession != nil && hookSession.HasHook(pi.provider.Name) {
-			if tryFileIPC(ctx, hookSession, pi.provider.Name, round, prompt) {
-				if cfg.ReliabilityStore != nil {
-					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "file_ipc", prompt, round, "pass", "")
-					_ = cfg.ReliabilityStore.recordPrompt(receipt)
-				}
-				continue
-			}
-			if cfg.ReliabilityStore != nil {
-				receipt := promptReceipt(cfg.RunID, pi.provider.Name, "file_ipc", prompt, round, "failed", "file IPC fallback activated before completion wait")
-				_ = cfg.ReliabilityStore.recordPrompt(receipt)
-			}
-		}
-
 		sendPrompt, promptFile, responseFile := panePromptText(cfg, pi.provider, round, prompt)
 		if promptFile != "" {
 			roundPromptFiles = append(roundPromptFiles, promptFile)
 		}
 		if responseFile != "" {
 			roundResponseFiles = append(roundResponseFiles, responseFile)
+		}
+
+		// A recovered pane already received its current-round coordinates before
+		// launch. Submit that one round directly, then restore file IPC next round.
+		directPromptRound := pi.directPromptRound == round
+		// File IPC for Round 2+ when hook is available (SPEC-ORCH-017 R4).
+		if round > 1 && !directPromptRound && hookSession != nil && hookSession.HasHook(pi.provider.Name) {
+			ipcOutcome, ipcErr := tryFileIPC(ctx, hookSession, pi.provider.Name, round, sendPrompt)
+			if ipcOutcome == fileIPCDelivered {
+				if promptFile != "" {
+					pi.promptFiles = append(pi.promptFiles, promptFile)
+					panes[i].promptFiles = pi.promptFiles
+				}
+				if responseFile != "" {
+					pi.responseFile = responseFile
+					panes[i].responseFile = responseFile
+				}
+				if cfg.ReliabilityStore != nil {
+					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "file_ipc", prompt, round, "pass", "")
+					_ = cfg.ReliabilityStore.recordPrompt(receipt)
+				}
+				continue
+			}
+			failureReason := "file IPC fallback activated before completion wait"
+			if ipcErr != nil {
+				failureReason = ipcErr.Error()
+			}
+			if cfg.ReliabilityStore != nil {
+				receipt := promptReceipt(cfg.RunID, pi.provider.Name, "file_ipc", prompt, round, "failed", failureReason)
+				_ = cfg.ReliabilityStore.recordPrompt(receipt)
+			}
+			if ipcOutcome != fileIPCSafeFallback {
+				log.Printf("[Round %d] %s file IPC release failed: %s -- skipping", round, pi.provider.Name, failureReason)
+				panes[i].skipWait = true
+				continue
+			}
+		}
+
+		if round > 1 {
+			if !pollUntilPrompt(ctx, cfg.Terminal, pi.paneID, patterns, round2PollTimeout) {
+				log.Printf("[Round %d] %s prompt not ready within timeout -- skipping", round, pi.provider.Name)
+				panes[i].skipWait = true
+				if cfg.ReliabilityStore != nil {
+					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "prompt_ready", prompt, round, "failed", "prompt not ready before round submission")
+					_ = cfg.ReliabilityStore.recordPrompt(receipt)
+				}
+				continue
+			}
+			if hookSession != nil && hookSession.HasHook(pi.provider.Name) {
+				if err := hookSession.WriteRoundCursor(pi.provider.Name, round); err != nil {
+					log.Printf("[Round %d] %s round cursor failed: %v -- skipping", round, pi.provider.Name, err)
+					panes[i].skipWait = true
+					continue
+				}
+			}
 		}
 
 		// Sendkeys mode: use SendCommand (cmux send) instead of paste-buffer.
@@ -229,7 +248,6 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 
 	var responses []ProviderResponse
 	if cfg.HookMode && hookSession != nil {
-		responses = collectRoundHookResults(pollCtx, cfg, hookSession, round)
 		var pollPanes []paneInfo
 		for _, pi := range panes {
 			if pi.skipWait || hookSession.HasHook(pi.provider.Name) {
@@ -237,6 +255,10 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			}
 			pollPanes = append(pollPanes, pi)
 		}
+		// Snapshot poll ownership before hook collection. Response-file-only
+		// provenance can disable a hook during collection, but the provider must
+		// not be collected a second time until the next round.
+		responses = collectRoundHookResults(pollCtx, cfg, hookSession, round, panes)
 		if len(pollPanes) > 0 {
 			responses = append(responses, waitAndCollectResults(pollCtx, cfg, pollPanes, patterns, time.Now(), baselines, nil, round)...)
 		}

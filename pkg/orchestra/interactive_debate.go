@@ -93,6 +93,7 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 
 // runPaneDebate executes the multi-turn debate loop using terminal panes.
 func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRound time.Duration, start time.Time) (*OrchestraResult, error) {
+	cfg.DebateRounds = rounds
 	cfg.RunID = ensureRunID(&cfg)
 	if cfg.ReliabilityStore == nil {
 		store, err := newReliabilityStore(cfg.RunID)
@@ -150,9 +151,11 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 	}
 
 	launchFailed := launchInteractiveSessions(ctx, cfg, panes)
-	if !cfg.HookMode || hookSession == nil {
-		launchFailed = append(launchFailed, waitForSessionReady(ctx, cfg.Terminal, panes)...)
-	}
+	// Startup cannot consume the whole orchestration deadline: a failed provider
+	// must still reach the round result as skipWait plus FailedProvider evidence.
+	readyCtx, cancelReady := context.WithTimeout(ctx, perRound)
+	launchFailed = append(launchFailed, waitForSessionReadyWithHook(readyCtx, cfg.Terminal, panes, hookSession, 1)...)
+	cancelReady()
 	if cfg.ReliabilityStore != nil {
 		for _, provider := range cfg.Providers {
 			_ = cfg.ReliabilityStore.recordPreflight(preflightReceipt(cfg.RunID, cfg, provider))
@@ -161,6 +164,7 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 	// Create SurfaceManager for proactive health monitoring (R1).
 	surfMgr := NewSurfaceManager(cfg.Terminal)
+	surfMgr.setHookSession(hookSession)
 	surfMgr.Start(ctx, panes)
 	defer surfMgr.Stop()
 	cfg.SurfaceMgr = surfMgr
@@ -199,6 +203,11 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 		if cfg.YieldRounds && round == 1 {
 			fmt.Fprintf(os.Stderr, "[Debate] yield after round 1/%d\n", rounds)
+			if err := releaseYieldHookWaiters(
+				ctx, hookSession, panes, round+1, yieldHookReleaseBudget(perRound),
+			); err != nil {
+				return nil, fmt.Errorf("release hook waiters before yield: %w", err)
+			}
 			sessionID := NewSessionID()
 			session, sessionErr := buildYieldSession(sessionID, cfg.Terminal, panes, roundResponses, time.Now())
 			if sessionErr != nil {

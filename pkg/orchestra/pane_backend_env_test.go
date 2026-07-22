@@ -2,14 +2,55 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/terminal"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type backendHookExportTerminal struct {
+	*seqScreenMock
+	mu            sync.Mutex
+	events        []backendHookExportEvent
+	commandCalls  int
+	failCommandAt int
+}
+
+type backendHookExportEvent struct {
+	kind  string
+	value string
+}
+
+func (m *backendHookExportTerminal) SendCommand(_ context.Context, _ terminal.PaneID, cmd string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.commandCalls++
+	m.events = append(m.events, backendHookExportEvent{kind: "command", value: cmd})
+	if m.commandCalls == m.failCommandAt {
+		return errors.New("injected hook export failure")
+	}
+	return nil
+}
+
+func (m *backendHookExportTerminal) SendLongText(ctx context.Context, paneID terminal.PaneID, text string) error {
+	m.mu.Lock()
+	m.events = append(m.events, backendHookExportEvent{kind: "long_text", value: text})
+	m.mu.Unlock()
+	return m.seqScreenMock.SendLongText(ctx, paneID, text)
+}
+
+func (m *backendHookExportTerminal) eventsSnapshot() []backendHookExportEvent {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]backendHookExportEvent(nil), m.events...)
+}
 
 // TestExecute_ExportsSessionEnvWhenHookMode verifies SPEC-ORCH-022: the
 // structured spec-review / orchestra-run paths drive InteractivePaneBackend.Execute
@@ -53,19 +94,98 @@ func TestExecute_ExportsSessionEnvWhenHookMode(t *testing.T) {
 func TestExecute_NoSessionEnvWhenHookModeOff(t *testing.T) {
 	t.Parallel()
 	mock := &seqScreenMock{name: "cmux", screens: []string{"❯ "}}
-	b := NewInteractivePaneBackend(OrchestraConfig{Terminal: mock})
+	provider := ProviderConfig{Name: "claude", Binary: "claude", InteractiveInput: "args"}
+	b := NewInteractivePaneBackend(OrchestraConfig{
+		Terminal: mock, WorkingDir: t.TempDir(), InitialDelay: time.Millisecond,
+		CompletionDetector: &stubCompletionDetector{completed: true},
+	})
 	req := ProviderRequest{
 		Provider: "claude",
-		Config:   ProviderConfig{Name: "claude", Binary: "claude"},
+		Config:   provider,
 		Prompt:   "review this",
-		Timeout:  1 * time.Second,
+		Timeout:  3 * time.Second,
 	}
-	_, _ = b.Execute(context.Background(), req)
+	resp, err := b.Execute(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotEmpty(t, mock.longTextsSnapshot(), "non-hook execution must still launch the provider")
 
 	for _, c := range mock.commands {
 		require.NotContains(t, c, "export AUTOPUS_SESSION_ID=",
 			"Execute must not export AUTOPUS_SESSION_ID when HookMode is off")
 	}
+}
+
+func TestInteractivePaneBackendExecute_HookExportFailure_ReturnsBeforeLaunchAndCollection(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+
+	tests := []struct {
+		name          string
+		failCommandAt int
+		wantError     string
+	}{
+		{name: "session send", failCommandAt: 1, wantError: "export hook session failed"},
+		{name: "session enter", failCommandAt: 2, wantError: "commit hook session export failed"},
+		{name: "round send", failCommandAt: 3, wantError: "export hook round failed"},
+		{name: "round enter", failCommandAt: 4, wantError: "commit hook round export failed"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sessionID := "pane-backend-export-" + NewSessionID()
+			term := &backendHookExportTerminal{
+				seqScreenMock: &seqScreenMock{name: "cmux", screens: []string{readyScreen}},
+				failCommandAt: tt.failCommandAt,
+			}
+			provider := ProviderConfig{Name: "claude", Binary: "claude", InteractiveInput: "args"}
+			backend := NewInteractivePaneBackend(OrchestraConfig{
+				Terminal: term, HookMode: true, SessionID: sessionID,
+				Providers: []ProviderConfig{provider}, InitialDelay: time.Millisecond,
+				CompletionDetector: &stubCompletionDetector{completed: true},
+			})
+
+			resp, err := backend.Execute(context.Background(), ProviderRequest{
+				Provider: "claude", Config: provider, Prompt: "review this", Round: 2,
+			})
+
+			require.Error(t, err)
+			require.NotNil(t, resp)
+			assert.ErrorContains(t, err, tt.wantError)
+			assert.Contains(t, resp.Error, tt.wantError)
+			assert.Equal(t, paneBackendName, resp.ExecutedBackend)
+			assert.Empty(t, term.longTextsSnapshot(), "provider launch must not run after hook export failure")
+			assert.Zero(t, term.readCalls, "collector and readiness polling must not run after hook export failure")
+		})
+	}
+}
+
+func TestInteractivePaneBackendExecute_HookExports_PrecedeProviderLaunch(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	sessionID := "pane-backend-order-" + NewSessionID()
+	term := &backendHookExportTerminal{
+		seqScreenMock: &seqScreenMock{name: "cmux", screens: []string{readyScreen}},
+	}
+	provider := ProviderConfig{Name: "claude", Binary: "claude", InteractiveInput: "args"}
+	backend := NewInteractivePaneBackend(OrchestraConfig{
+		Terminal: term, HookMode: true, SessionID: sessionID,
+		Providers: []ProviderConfig{provider}, InitialDelay: time.Millisecond,
+		CompletionDetector: &stubCompletionDetector{completed: true},
+	})
+
+	resp, err := backend.Execute(context.Background(), ProviderRequest{
+		Provider: "claude", Config: provider, Prompt: "review this", Round: 2,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	events := term.eventsSnapshot()
+	require.GreaterOrEqual(t, len(events), 5)
+	assert.Equal(t, "command", events[0].kind)
+	assert.Contains(t, events[0].value, "export AUTOPUS_SESSION_ID="+sessionID)
+	assert.Equal(t, backendHookExportEvent{kind: "command", value: "\n"}, events[1])
+	assert.Equal(t, backendHookExportEvent{kind: "command", value: "export AUTOPUS_ROUND=2"}, events[2])
+	assert.Equal(t, backendHookExportEvent{kind: "command", value: "\n"}, events[3])
+	assert.Equal(t, "long_text", events[4].kind, "provider launch must follow both committed hook exports")
 }
 
 func TestExecute_DoesNotCleanupSharedHookSession(t *testing.T) {

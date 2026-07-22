@@ -76,6 +76,47 @@ func TestResolveHookProviders_OverrideBehavior(t *testing.T) {
 	}
 }
 
+func TestDefaultStartupHookProviders_MatchesGeneratedWiring(t *testing.T) {
+	got := DefaultStartupHookProviders()
+	for _, provider := range []string{"claude", "codex"} {
+		if !got[provider] {
+			t.Fatalf("expected %s startup hook to be enabled, got %v", provider, got)
+		}
+	}
+	for _, provider := range []string{"gemini", "opencode", "custom"} {
+		if got[provider] {
+			t.Fatalf("expected %s startup hook to be disabled, got %v", provider, got)
+		}
+	}
+}
+
+func TestResolveStartupHookProviders_OverridesAreIndependentFromCompletionHooks(t *testing.T) {
+	on, off := true, false
+	got := resolveStartupHookProviders([]ProviderConfig{
+		{Name: "claude", HasHook: &off},
+		{Name: "codex", HasStartupHook: &off},
+		{Name: "gemini", HasHook: &on},
+		{Name: "opencode", HasHook: &on},
+		{Name: "custom", HasHook: &on},
+		{Name: "custom-ready", HasStartupHook: &on},
+	})
+
+	if !got["claude"] {
+		t.Fatal("completion override must not erase Claude's independent startup wiring")
+	}
+	if got["codex"] {
+		t.Fatal("explicit startup override must disable Codex startup readiness")
+	}
+	for _, provider := range []string{"gemini", "opencode", "custom"} {
+		if got[provider] {
+			t.Fatalf("completion hook override must not create phantom startup hook for %s", provider)
+		}
+	}
+	if !got["custom-ready"] {
+		t.Fatal("explicit startup override must enable custom startup readiness")
+	}
+}
+
 // S4: DefaultPromptPatterns() exposes exactly the hardcoded defaultPromptPatterns set.
 func TestDefaultPromptPatterns_CountMatchesHardcoded(t *testing.T) {
 	if len(DefaultPromptPatterns()) != len(defaultPromptPatterns) {

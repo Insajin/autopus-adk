@@ -14,8 +14,13 @@ import (
 
 const antigravityHooksTarget = ".agents/hooks.json"
 
-func (a *Adapter) configuredHooks(cfg *config.HarnessConfig) []adapter.HookConfig {
-	hooks, _, _ := pkgcontent.GenerateProjectHookConfigs(cfg, adapterName, a.SupportsHooks())
+func (a *Adapter) configuredAntigravityHooks(cfg *config.HarnessConfig) []adapter.HookConfig {
+	hooks, _, _ := pkgcontent.GenerateProjectHookConfigs(cfg, "antigravity-cli", a.SupportsHooks())
+	return hooks
+}
+
+func (a *Adapter) configuredLegacyGeminiHooks(cfg *config.HarnessConfig) []adapter.HookConfig {
+	hooks, _, _ := pkgcontent.GenerateProjectHookConfigs(cfg, "gemini", a.SupportsHooks())
 	return hooks
 }
 
@@ -58,12 +63,17 @@ func buildAntigravityHookSpec(hooks []adapter.HookConfig) map[string]any {
 			handler["timeout"] = h.Timeout
 		}
 
-		entry := map[string]any{
-			"matcher": h.Matcher,
-			"hooks":   []map[string]any{handler},
-		}
 		entries, _ := spec[h.Event].([]any)
-		spec[h.Event] = append(entries, entry)
+		switch h.Event {
+		case "PreToolUse", "PostToolUse":
+			entry := map[string]any{
+				"matcher": h.Matcher,
+				"hooks":   []map[string]any{handler},
+			}
+			spec[h.Event] = append(entries, entry)
+		default:
+			spec[h.Event] = append(entries, handler)
+		}
 	}
 	return spec
 }

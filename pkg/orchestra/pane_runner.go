@@ -17,14 +17,15 @@ const sentinel = "__AUTOPUS_DONE__"
 
 // paneInfo tracks a provider's pane and output file.
 type paneInfo struct {
-	paneID       terminal.PaneID
-	outputFile   string
-	provider     ProviderConfig
-	role         string
-	skipWait     bool // true when SendCommand failed — skip sentinel wait
-	promptFiles  []string
-	responseFile string
-	launchFiles  []string
+	paneID            terminal.PaneID
+	outputFile        string
+	provider          ProviderConfig
+	role              string
+	skipWait          bool // true when SendCommand failed — skip sentinel wait
+	promptFiles       []string
+	responseFile      string
+	launchFiles       []string
+	directPromptRound int
 }
 
 // RunPaneOrchestra runs orchestration using terminal panes when available.
@@ -122,7 +123,6 @@ func splitProviderPanes(ctx context.Context, cfg OrchestraConfig) ([]paneInfo, [
 			return nil, nil, newPaneProvisioningError(fmt.Errorf("SplitPane for %s returned an empty pane ID", p.Name), partial)
 		}
 		if err != nil {
-			closePaneSurface(cfg.Terminal, paneID)
 			cleanupPanes(cfg.Terminal, panes)
 			return nil, nil, fmt.Errorf("SplitPane for %s committed pane %s and then failed: %w", p.Name, paneID, err)
 		}
