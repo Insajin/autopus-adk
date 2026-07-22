@@ -18,10 +18,7 @@ import (
 const geminiCompletionHookAssetName = "hook-gemini-afteragent.sh"
 
 var (
-	geminiManagedHookDirectory = filepath.Join(".gemini", "hooks", "autopus")
-	geminiCompletionHookTarget = filepath.Join(
-		geminiManagedHookDirectory, geminiCompletionHookAssetName,
-	)
+	geminiManagedHookDirectory     = filepath.Join(".gemini", "hooks", "autopus")
 	geminiCompletionHookAssetNames = []string{
 		geminiCompletionHookAssetName,
 		"hook-gemini-stop.sh",
@@ -56,7 +53,7 @@ func writeGeminiManagedHookAsset(rootPath string, asset adapter.FileMapping, mod
 	if err != nil {
 		return fmt.Errorf("Gemini project root 열기 실패: %w", err)
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 
 	target, err := cleanGeminiManagedHookTarget(asset.TargetPath)
 	if err != nil {
@@ -205,7 +202,7 @@ func snapshotGeminiManagedHookAsset(
 	if err != nil {
 		return snapshot, fmt.Errorf("Gemini project root 열기 실패: %w", err)
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 
 	if err := ensureGeminiHookDirectories(root, filepath.Dir(target), false); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -264,7 +261,7 @@ func removeGeminiManagedHookAsset(rootPath string, asset adapter.FileMapping) er
 	if err != nil {
 		return fmt.Errorf("Gemini project root 열기 실패: %w", err)
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	if err := ensureGeminiHookDirectories(root, filepath.Dir(target), false); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
