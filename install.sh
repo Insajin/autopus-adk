@@ -15,7 +15,7 @@ INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 ALIAS="autopus"
 SIGNING_FLOOR="0.50.73"
 VERIFIER_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/release-signing/verify-checksums-v1.sh"
-VERIFIER_SHA256="d9eeaaa029269d4ed9008e38527e3bbe3229d2f93a44f9d2a63b79109c9dcbf9"
+VERIFIER_SHA256="4c93682b88dad53c547d9d4b180fb5f3ead37f5aa0cf0ab05187fe1107ad38bb"
 RUNTIME_HELPER_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/install-runtime-v1.sh"
 RUNTIME_HELPER_SHA256="05797a0d62f02687f416f8e1e640543bf48fae74971ff34af0c49650123abf8c"
 

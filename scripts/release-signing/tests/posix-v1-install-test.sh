@@ -19,6 +19,10 @@ v1_expect_failure "all keys expired" all_release_signing_keys_expired v1_verify 
 printf '%s\t2099-12-31\t%s\n' "$k1_fp" 'not-base64' > "$V1_WORK/malformed-trust"
 v1_expect_failure "malformed embedded key" malformed_embedded_release_key v1_verify \
     "$V1_WORK/checksums.txt" "$V1_WORK/k1-envelope" "$V1_WORK/malformed-trust" "$V1_NOW"
+upper_k1_fp=$(printf '%s' "$k1_fp" | tr '[:lower:]' '[:upper:]')
+printf '%s\t2099-12-31\t%s\n' "$upper_k1_fp" "$k1_spki" > "$V1_WORK/uppercase-trust"
+v1_expect_failure "uppercase embedded fingerprint" malformed_embedded_release_key v1_verify \
+    "$V1_WORK/checksums.txt" "$V1_WORK/k1-envelope" "$V1_WORK/uppercase-trust" "$V1_NOW"
 
 AUTOPUS_INSTALLER_TEST_SOURCE=1 . "$REPO_ROOT/install.sh"
 OS=$(detect_os)
