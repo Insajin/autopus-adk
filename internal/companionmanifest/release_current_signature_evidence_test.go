@@ -17,7 +17,7 @@ func assertCurrentReleaseSignatureLog(t *testing.T, path string) {
 		t.Fatalf("signature verification order = %s", log)
 	}
 	for _, required := range []string{
-		"--bundle", "checksums.txt.bundle", "--certificate-identity", "refs/tags/v0.50.83",
+		"--bundle", "checksums.txt.bundle", "--certificate-identity", "refs/tags/v0.50.84",
 		"--certificate-oidc-issuer", "https://token.actions.githubusercontent.com",
 	} {
 		if !bytes.Contains(log, []byte(required)) {

@@ -40,9 +40,10 @@ v0.50.80 0.50.80 A9
 v0.50.81 0.50.81 A10
 v0.50.82 0.50.82 A11
 v0.50.83 0.50.83 A12
+v0.50.84 0.50.84 A13
 CASES
 
-for mismatch in 'v0.50.83 0.50.82' 'v0.50.82 0.50.83' 'v0.50.84 0.50.84'; do
+for mismatch in 'v0.50.84 0.50.83' 'v0.50.83 0.50.84' 'v0.50.85 0.50.85'; do
   read -r tag version <<< "$mismatch"
   if resolve_phase "$tag" "$version" >/dev/null 2>&1; then
     fail "mixed or unknown release identity passed: ${tag}/${version}"
@@ -56,7 +57,7 @@ assert_gate_failure() {
   local expected=$1 output
   if output=$(COMPANION_PLATFORM=darwin COMPANION_ARTIFACT="$temp/auto" \
     COMPANION_TARGET=darwin_arm64 COMPANION_ARCHITECTURE=arm64 \
-    COMPANION_VERSION=0.50.83 bash "$temp/produce.sh" 2>&1); then
+    COMPANION_VERSION=0.50.84 bash "$temp/produce.sh" 2>&1); then
     fail "unsafe helper gate passed"
   fi
   [[ "$output" == *"$expected"* ]] || fail "helper gate diagnostic = ${output}"
