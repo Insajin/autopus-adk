@@ -47,7 +47,7 @@ func readRecoveryWorkflow(t *testing.T) (string, recoveryWorkflow) {
 	return raw, workflow
 }
 
-func TestFormulaRecoveryWorkflow_ManualExactA12LeastPrivilege(t *testing.T) {
+func TestFormulaRecoveryWorkflow_ManualExactA13LeastPrivilege(t *testing.T) {
 	raw, workflow := readRecoveryWorkflow(t)
 	if len(workflow.On) != 1 {
 		t.Fatalf("recovery triggers = %v, want workflow_dispatch only", workflow.On)
@@ -74,16 +74,16 @@ func TestFormulaRecoveryWorkflow_ManualExactA12LeastPrivilege(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"id-token:", "pull_request:", "repository_dispatch:", "schedule:",
-		"${{ inputs.", "github.event.inputs", "refs/tags/v*", "v0.50.69", "v0.50.70", "v0.50.71", "v0.50.72", "v0.50.73", "v0.50.74", "v0.50.75", "v0.50.76", "v0.50.77", "v0.50.78", "v0.50.79", "v0.50.80", "v0.50.81", "v0.50.82",
+		"${{ inputs.", "github.event.inputs", "refs/tags/v*", "v0.50.69", "v0.50.70", "v0.50.71", "v0.50.72", "v0.50.73", "v0.50.74", "v0.50.75", "v0.50.76", "v0.50.77", "v0.50.78", "v0.50.79", "v0.50.80", "v0.50.81", "v0.50.82", "v0.50.83",
 	} {
 		if strings.Contains(raw, forbidden) {
 			t.Fatalf("recovery workflow contains forbidden expansion %q", forbidden)
 		}
 	}
 	for _, version := range regexp.MustCompile(`v?[0-9]+\.[0-9]+\.[0-9]+`).FindAllString(raw, -1) {
-		if version != "v0.50.83" && version != "0.50.83" &&
+		if version != "v0.50.84" && version != "0.50.84" &&
 			version != "v4.1.2" && version != "v3.1.2" {
-			t.Fatalf("recovery workflow references non-A12 version %q", version)
+			t.Fatalf("recovery workflow references non-A13 version %q", version)
 		}
 	}
 	if regexp.MustCompile(`(?m)^\s+contents:\s+write\s*$`).MatchString(raw) {
@@ -132,7 +132,7 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 		}
 	}
 	for _, exact := range []string{
-		"ref: refs/tags/v0.50.83", "fetch-depth: 0", "persist-credentials: false",
+		"ref: refs/tags/v0.50.84", "fetch-depth: 0", "persist-credentials: false",
 		"client-id: ${{ vars.HOMEBREW_APP_CLIENT_ID }}",
 		"private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}",
 		"owner: Insajin", "repositories: homebrew-autopus", "permission-contents: write",
@@ -147,7 +147,7 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *testing.T) {
 	raw, _ := readRecoveryWorkflow(t)
 	for _, required := range []string{
-		"git rev-parse --verify 'HEAD^{commit}'", "mktemp", "GITHUB_REF_NAME='v0.50.83'",
+		"git rev-parse --verify 'HEAD^{commit}'", "mktemp", "GITHUB_REF_NAME='v0.50.84'",
 		"GITHUB_REF_TYPE='tag'", `GITHUB_SHA="$actual_head"`,
 		`GITHUB_OUTPUT="$validation_output"`, "scripts/companion-release/validate-source.sh",
 		"COMPANION_SOURCE_PIN_REQUIRED=1", "ADK_COMPANION_APPROVED_SOURCE_COMMIT",
@@ -188,7 +188,7 @@ func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *t
 	}
 }
 
-func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA12CaskWithAllowlistedEnvironment(t *testing.T) {
+func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA13CaskWithAllowlistedEnvironment(t *testing.T) {
 	_, workflow := readRecoveryWorkflow(t)
 	var bridge recoveryStep
 	for _, step := range workflow.Jobs["recover-formula-bridge"].Steps {
@@ -197,8 +197,8 @@ func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA12CaskWithAllowlistedEnviron
 		}
 	}
 	wantBridge := `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-  GITHUB_REF_NAME='v0.50.83' \
-  COMPANION_VERSION='0.50.83' \
+  GITHUB_REF_NAME='v0.50.84' \
+  COMPANION_VERSION='0.50.84' \
   COMPANION_HOMEBREW_POLICY='cask-only' \
   COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
   HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \

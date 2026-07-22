@@ -25,6 +25,8 @@ func directPredecessorPinReplacements(fixture *executableLineageFixture) map[str
 		prefix = "A10"
 	case publicKeyReceiptA12Tag:
 		prefix = "A11"
+	case publicKeyReceiptA13Tag:
+		prefix = "A12"
 	default:
 		return nil
 	}
@@ -37,7 +39,7 @@ func directPredecessorPinReplacements(fixture *executableLineageFixture) map[str
 		prefix + "_AMD64_MANIFEST_SHA256": fixture.pins.amd64Manifest,
 		prefix + "_ARM64_MANIFEST_SHA256": fixture.pins.arm64Manifest,
 	}
-	if prefix == "A7" || prefix == "A8" || prefix == "A9" || prefix == "A10" || prefix == "A11" {
+	if prefix == "A7" || prefix == "A8" || prefix == "A9" || prefix == "A10" || prefix == "A11" || prefix == "A12" {
 		replacements[prefix+"_TREE_SHA"] = fixture.pins.tree
 	}
 	return replacements
@@ -49,6 +51,7 @@ func immutableProductionLineagePin(name string) (string, bool) {
 		immutableA3LineagePins, immutableA4LineagePins, immutableA5LineagePins,
 		immutableA6LineagePins, immutableA7LineagePins, immutableA8LineagePins,
 		immutableA9LineagePins, immutableA10LineagePins, immutableA11LineagePins,
+		immutableA12LineagePins,
 	} {
 		if value, ok := pins[name]; ok {
 			return value, true
