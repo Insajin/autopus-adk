@@ -164,12 +164,14 @@ func (a *CmuxAdapter) SendLongText(ctx context.Context, paneID PaneID, text stri
 	pasteArgs = append(pasteArgs, "--name", cmuxInputBufferName)
 	pasteCmd := execCommandContext(ctx, "cmux", pasteArgs...)
 	if err := pasteCmd.Run(); err != nil {
-		clearCmuxInputBuffer()
+		callerErr := settleAndClearCmuxInputBuffer(ctx)
 		release()
+		if callerErr != nil {
+			return callerErr
+		}
 		return a.sendChunked(ctx, paneID, text)
 	}
-	clearCmuxInputBuffer()
-	return nil
+	return settleAndClearCmuxInputBuffer(ctx)
 }
 
 // sendChunked sends long text in chunks to avoid PTY 4KB truncation.

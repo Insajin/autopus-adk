@@ -36,7 +36,7 @@ func TestCmuxAdapter_SendLongText_ReusesSingleClearedBuffer(t *testing.T) {
 		}, captured.calls[offset].args)
 		assert.Equal(t, "paste-buffer", captured.calls[offset+1].args[0])
 		assert.Equal(t, []string{
-			"set-buffer", "--name", "autopus-input", "--", "",
+			"set-buffer", "--name", "autopus-input", "--", cmuxInputBufferSentinel,
 		}, captured.calls[offset+2].args)
 	}
 }
@@ -51,7 +51,7 @@ func TestCmuxAdapter_SendLongText_ConcurrentCallsAreSerialized(t *testing.T) {
 	var payloadSets atomic.Int32
 
 	buildCommand := func(_ string, args ...string) *exec.Cmd {
-		if len(args) == 5 && args[0] == "set-buffer" && args[4] != "" {
+		if len(args) == 5 && args[0] == "set-buffer" && args[4] != cmuxInputBufferSentinel {
 			switch payloadSets.Add(1) {
 			case 1:
 				close(firstSetEntered)
@@ -114,7 +114,7 @@ func TestCmuxAdapter_SendLongText_ClearFailureDoesNotFailDeliveredInput(t *testi
 	var calls [][]string
 	buildCommand := func(_ string, args ...string) *exec.Cmd {
 		calls = append(calls, args)
-		if len(args) == 5 && args[0] == "set-buffer" && args[4] == "" {
+		if len(args) == 5 && args[0] == "set-buffer" && args[4] == cmuxInputBufferSentinel {
 			return exec.Command("false")
 		}
 		return exec.Command("true")
@@ -135,7 +135,7 @@ func TestCmuxAdapter_SendLongText_ClearFailureDoesNotFailDeliveredInput(t *testi
 	require.NoError(t, err)
 	require.NoError(t, nextErr)
 	require.Len(t, calls, 6)
-	assert.Equal(t, "", calls[2][4])
+	assert.Equal(t, cmuxInputBufferSentinel, calls[2][4])
 	assert.Equal(t, "next", calls[3][4], "the next transaction must overwrite stale buffer content")
 	assert.Contains(t, logs.String(), "cmux: clear input buffer")
 	for _, call := range calls {
@@ -198,7 +198,8 @@ func TestCmuxAdapter_SendLongText_BufferFailureReleasesLockBeforeFallback(t *tes
 						probeRelease()
 					}
 				}
-				if args[0] == failCommand && !(args[0] == "set-buffer" && args[len(args)-1] == "") {
+				if args[0] == failCommand &&
+					!(args[0] == "set-buffer" && args[len(args)-1] == cmuxInputBufferSentinel) {
 					return exec.Command("false")
 				}
 				return exec.Command("true")

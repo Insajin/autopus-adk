@@ -167,7 +167,9 @@ func TestCmuxAdapter_SendLongText_WithWorkspace_AddsContextOnlyToSurfaceCommand(
 		"paste-buffer", "--workspace", "workspace:13", "--surface", "surface:1414",
 		"--name", bufferName,
 	}, captured.calls[1].args)
-	assert.Equal(t, []string{"set-buffer", "--name", bufferName, "--", ""}, captured.calls[2].args)
+	assert.Equal(t, []string{
+		"set-buffer", "--name", bufferName, "--", cmuxInputBufferSentinel,
+	}, captured.calls[2].args)
 }
 
 func TestCmuxAdapter_SendLongTextFallback_WithWorkspace_AddsContextToSend(t *testing.T) {

@@ -26,7 +26,9 @@ func TestCmuxAdapter_SendLongText_LongText_BufferPath(t *testing.T) {
 	assert.Contains(t, strings.Join(captured.calls[0].args, " "), "autopus-")
 	assert.Contains(t, strings.Join(captured.calls[1].args, " "), "paste-buffer")
 	assert.Contains(t, strings.Join(captured.calls[1].args, " "), "surface:7")
-	assert.Equal(t, []string{"set-buffer", "--name", cmuxInputBufferName, "--", ""}, captured.calls[2].args)
+	assert.Equal(t, []string{
+		"set-buffer", "--name", cmuxInputBufferName, "--", cmuxInputBufferSentinel,
+	}, captured.calls[2].args)
 }
 
 // TestCmuxAdapter_SendLongText_ShortText_BufferPath verifies short text also uses
@@ -44,7 +46,9 @@ func TestCmuxAdapter_SendLongText_ShortText_BufferPath(t *testing.T) {
 	assert.Contains(t, strings.Join(captured.calls[0].args, " "), "set-buffer")
 	assert.Contains(t, strings.Join(captured.calls[1].args, " "), "paste-buffer")
 	assert.Contains(t, strings.Join(captured.calls[1].args, " "), "surface:7")
-	assert.Equal(t, []string{"set-buffer", "--name", cmuxInputBufferName, "--", ""}, captured.calls[2].args)
+	assert.Equal(t, []string{
+		"set-buffer", "--name", cmuxInputBufferName, "--", cmuxInputBufferSentinel,
+	}, captured.calls[2].args)
 }
 
 // TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback verifies fallback
@@ -172,7 +176,7 @@ func TestCmuxAdapter_SendLongText_ReusesBufferAcrossPanes(t *testing.T) {
 	var bufNames []string
 	for _, args := range allArgs {
 		combined := strings.Join(args, " ")
-		if strings.Contains(combined, "set-buffer") && args[len(args)-1] != "" {
+		if strings.Contains(combined, "set-buffer") && args[len(args)-1] != cmuxInputBufferSentinel {
 			for _, arg := range args {
 				if strings.HasPrefix(arg, "autopus-") {
 					bufNames = append(bufNames, arg)

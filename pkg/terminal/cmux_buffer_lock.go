@@ -12,8 +12,11 @@ import (
 )
 
 const (
-	cmuxInputBufferName    = "autopus-input"
-	cmuxBufferClearTimeout = 750 * time.Millisecond
+	cmuxInputBufferName         = "autopus-input"
+	cmuxInputBufferSentinel     = "[autopus-cleared]"
+	cmuxBufferPasteSettleDelay  = 250 * time.Millisecond
+	cmuxBufferClearTimeout      = 750 * time.Millisecond
+	cmuxBufferPostPasteMaxDelay = cmuxBufferPasteSettleDelay + cmuxBufferClearTimeout
 )
 
 var (
@@ -104,12 +107,34 @@ func cmuxBufferWaitError(ctx context.Context) error {
 	return fmt.Errorf("%w after %s", errCmuxBufferLockBusy, cmuxBufferLockWaitLimit)
 }
 
-// clearCmuxInputBuffer does not inherit caller cancellation. A later send
+// settleAndClearCmuxInputBuffer lets cmux's async paste queue consume the
+// payload before overwrite. Cleanup survives caller cancellation, but the
+// cancellation is returned after at most cmuxBufferPostPasteMaxDelay.
+func settleAndClearCmuxInputBuffer(callerCtx context.Context) error {
+	timer := time.NewTimer(cmuxBufferPasteSettleDelay)
+	defer timer.Stop()
+	var callerErr error
+	select {
+	case <-timer.C:
+	case <-callerCtx.Done():
+		callerErr = callerCtx.Err()
+		<-timer.C
+	}
+	clearCmuxInputBuffer()
+	if callerErr == nil {
+		callerErr = callerCtx.Err()
+	}
+	return callerErr
+}
+
+// clearCmuxInputBuffer uses an independent bounded context. A later send
 // overwrites the same fixed buffer even when this diagnostic cleanup fails.
 func clearCmuxInputBuffer() {
 	ctx, cancel := context.WithTimeout(context.Background(), cmuxBufferClearTimeout)
 	defer cancel()
-	cmd := execCommandContext(ctx, "cmux", "set-buffer", "--name", cmuxInputBufferName, "--", "")
+	cmd := execCommandContext(
+		ctx, "cmux", "set-buffer", "--name", cmuxInputBufferName, "--", cmuxInputBufferSentinel,
+	)
 	if err := cmd.Run(); err != nil {
 		log.Printf("cmux: clear input buffer: %v", err)
 	}
