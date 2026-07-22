@@ -70,7 +70,6 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 		return paneProvisioningFallback(ctx, b.cfg, req, "interactive pane execution failed: SplitPane returned an empty pane ID")
 	}
 	if err != nil {
-		closePaneSurface(term, paneID)
 		return paneExecutionFailure(req, "interactive pane execution failed after SplitPane committed pane "+string(paneID)+": "+err.Error())
 	}
 	pi := paneInfo{paneID: paneID, provider: req.Config, role: req.Role}
@@ -98,27 +97,32 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	// os.Setenv alone is invisible to it. The structured spec review / orchestra
 	// run paths drive Execute directly (not RunInteractivePaneOrchestra), so the
 	// env injection that path performs in launchInteractiveSessions must be
-	// mirrored here. Non-fatal: a send failure degrades to screen-poll completion.
-	if b.cfg.HookMode && b.cfg.SessionID != "" {
+	// mirrored here. Once hook completion is selected, launch without its session
+	// coordinates would strand the collector, so every export step is fatal.
+	hasHookCapability := hookSession != nil &&
+		(hookSession.HasHook(req.Config.Name) || hookSession.HasStartupHook(req.Config.Name))
+	if b.cfg.HookMode && b.cfg.SessionID != "" && hasHookCapability {
 		envErr, enterErr := sendPaneInputAndEnterSerialized(ctx, term, paneID, 0, func() error {
 			return SendSessionEnvToPane(ctx, term, paneID, b.cfg.SessionID)
 		})
 		if envErr != nil {
-			log.Printf("pane_backend: SendSessionEnvToPane failed for %s (non-fatal): %v", req.Provider, envErr)
-		} else {
-			if enterErr != nil {
-				log.Printf("pane_backend: session-env Enter failed for %s (non-fatal): %v", req.Provider, enterErr)
-			}
-			if req.Round > 0 {
-				roundErr, roundEnterErr := sendPaneInputAndEnterSerialized(ctx, term, paneID, 0, func() error {
-					return SendRoundEnvToPane(ctx, term, paneID, req.Round)
-				})
-				if roundErr != nil || roundEnterErr != nil {
-					log.Printf("pane_backend: round env failed for %s (non-fatal): send=%v enter=%v", req.Provider, roundErr, roundEnterErr)
-				}
-			}
-			time.Sleep(promptRegisterDelay)
+			return paneExecutionFailure(req, "interactive pane execution failed: export hook session failed: "+envErr.Error())
 		}
+		if enterErr != nil {
+			return paneExecutionFailure(req, "interactive pane execution failed: commit hook session export failed: "+enterErr.Error())
+		}
+		if req.Round > 0 {
+			roundErr, roundEnterErr := sendPaneInputAndEnterSerialized(ctx, term, paneID, 0, func() error {
+				return SendRoundEnvToPane(ctx, term, paneID, req.Round)
+			})
+			if roundErr != nil {
+				return paneExecutionFailure(req, "interactive pane execution failed: export hook round failed: "+roundErr.Error())
+			}
+			if roundEnterErr != nil {
+				return paneExecutionFailure(req, "interactive pane execution failed: commit hook round export failed: "+roundEnterErr.Error())
+			}
+		}
+		time.Sleep(promptRegisterDelay)
 	}
 
 	// Launch the provider CLI. For args-based providers the prompt rides on the

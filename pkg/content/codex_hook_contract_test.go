@@ -230,3 +230,11 @@ func TestCodexStopHook_DoesNotFollowTranscriptSymlink(t *testing.T) {
 	assert.Empty(t, result.Output)
 	assert.FileExists(t, filepath.Join(sessionDir, "codex-done"))
 }
+
+func TestCodexStopHook_NextRoundInputUsesBlockJSON(t *testing.T) {
+	assertStopHookNextRoundContract(t, "codex", "hook-codex-stop.sh")
+}
+
+func TestCodexStopHook_NonBlockingPathsEmitNoOutput(t *testing.T) {
+	assertStopHookNonBlockingContract(t, "codex", "hook-codex-stop.sh")
+}

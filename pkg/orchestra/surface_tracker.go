@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -38,17 +39,9 @@ var surfaceTrackerLegacyBase = filepath.Join(os.TempDir(), "autopus", "surfaces"
 // validSurfaceRef matches safe cmux and tmux surface reference formats.
 var validSurfaceRef = regexp.MustCompile(`^([A-Za-z]+:[0-9]+|%[0-9]+)$`)
 
-func surfaceRefCompatible(backend, ref string) bool {
-	if backend == "tmux" {
-		return strings.HasPrefix(ref, "%")
-	}
-	return backend == "cmux" && !strings.HasPrefix(ref, "%")
-}
-
 // surfaceTrackerRoot returns the preferred base directory for surface tracking
 // files. It prefers ~/.autopus/surfaces and falls back to TempDir when the home
-// directory is unavailable. Callers (trackSurface) are responsible for creating
-// the directory with MkdirAll and verifying ownership/mode before writing.
+// directory is unavailable.
 func surfaceTrackerRoot() string {
 	home, err := os.UserHomeDir()
 	if err == nil && home != "" {
@@ -65,40 +58,61 @@ func surfaceTrackerFile(pid int) string {
 	return filepath.Join(surfaceTrackerBase, strconv.Itoa(pid)+".surfaces")
 }
 
-// splitTrackedPane splits a pane via the terminal and records the resulting
-// surface ref for orphan reaping. On the first call in this process it also reaps
-// surfaces left behind by orchestrator processes that are no longer alive.
+// splitTrackedPane owns tracking and cleanup for every non-empty SplitPane
+// result, including a pane ID returned together with an error. On the first call
+// it also reaps surfaces whose orchestrator processes are no longer alive.
 func splitTrackedPane(ctx context.Context, term terminal.Terminal, dir terminal.Direction) (terminal.PaneID, error) {
 	reapOrphanSurfacesOnce.Do(func() { ReapOrphanSurfaces(term) })
 	paneID, err := term.SplitPane(ctx, dir)
-	if err == nil && paneID != "" {
-		trackSurface(string(paneID))
+	if paneID != "" {
+		trackSurfaceForTerminal(term, string(paneID))
+		if err != nil {
+			closePaneSurface(term, paneID)
+		}
 	}
 	return paneID, err
 }
 
-// trackSurface appends a surface ref to this process's tracking file (best-effort;
-// tracking failures must never block pane creation). Before writing, it verifies
-// that the tracking directory is owned by the current user with mode 0700 (no
-// group/other bits). A mismatch indicates a privilege or symlink-swap attack and
-// causes the write to be silently skipped (REQ-007).
+// trackSurface records a legacy surface ref using an atomic replacement. It is
+// best-effort because tracking failures must never block pane creation.
 func trackSurface(ref string) {
-	if ref == "" {
-		return
-	}
-	if err := os.MkdirAll(surfaceTrackerBase, 0o700); err != nil {
-		return
-	}
-	// Security: verify ownership and mode before writing (platform-specific).
-	if !surfaceDirSecure(surfaceTrackerBase) {
-		return
-	}
-	f, err := os.OpenFile(surfaceTrackerFile(os.Getpid()), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	trackSurfaceRecord(trackedSurface{Ref: ref})
+}
+
+func trackSurfaceForTerminal(term terminal.Terminal, ref string) {
+	tracked, err := trackedSurfaceForTerminal(term, ref)
 	if err != nil {
+		if term == nil || term.Name() == "plain" {
+			return
+		}
+		log.Printf("[surface-tracker] recording unresolved %s ref %q: %v", term.Name(), ref, err)
+		tracked = trackedSurface{Ref: ref, TerminalKind: term.Name()}
+	}
+	trackSurfaceRecord(tracked)
+}
+
+func trackSurfaceRecord(tracked trackedSurface) {
+	if tracked.Ref == "" {
 		return
 	}
-	defer func() { _ = f.Close() }()
-	_, _ = f.WriteString(ref + "\n")
+	surfaceTrackerMu.Lock()
+	defer surfaceTrackerMu.Unlock()
+	root, err := openSecureTrackerRoot(surfaceTrackerBase, true)
+	if err != nil {
+		log.Printf("[surface-tracker] refusing tracker write: %v", err)
+		return
+	}
+	defer func() { _ = root.Close() }()
+	name := filepath.Base(surfaceTrackerFile(os.Getpid()))
+	current, _, readErr := readTrackedSurfacesFromRoot(root, name)
+	if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
+		log.Printf("[surface-tracker] refusing tracker update: %v", readErr)
+		return
+	}
+	current = append(current, tracked)
+	if err := writeTrackedSurfacesToRoot(root, name, current, nil); err != nil {
+		log.Printf("[surface-tracker] tracker write failed: %v", err)
+	}
 }
 
 // untrackSurface removes a closed surface ref from this process's tracking file.
@@ -108,32 +122,95 @@ func untrackSurface(ref string) {
 	if ref == "" {
 		return
 	}
-	path := surfaceTrackerFile(os.Getpid())
-	refs := readTrackerRefs(path)
-	if len(refs) == 0 {
-		return
+	if err := untrackSurfaceWithoutTerminal(ref); err != nil {
+		log.Printf("[surface-tracker] untrack ref %q failed: %v", ref, err)
 	}
-	kept := refs[:0]
-	for _, r := range refs {
-		if r != ref {
-			kept = append(kept, r)
+}
+
+// untrackSurfaceForTerminal removes only the exact backend/workspace/server
+// tuple. It returns persistence failures so ownership handoff can fail closed.
+func untrackSurfaceForTerminal(term terminal.Terminal, ref string) error {
+	target, err := trackedSurfaceForTerminal(term, ref)
+	if err != nil {
+		return err
+	}
+	return mutateCurrentTracker(func(item trackedSurface) (bool, error) {
+		return sameTrackedSurface(item, target), nil
+	})
+}
+
+func untrackSurfaceWithoutTerminal(ref string) error {
+	return mutateCurrentTracker(func(item trackedSurface) (bool, error) {
+		return item.Ref == ref, nil
+	})
+}
+
+func mutateCurrentTracker(match func(trackedSurface) (bool, error)) error {
+	surfaceTrackerMu.Lock()
+	defer surfaceTrackerMu.Unlock()
+	root, err := openSecureTrackerRoot(surfaceTrackerBase, false)
+	if errors.Is(err, fs.ErrNotExist) || os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	name := filepath.Base(surfaceTrackerFile(os.Getpid()))
+	tracked, _, err := readTrackedSurfacesFromRoot(root, name)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	matched := make([]bool, len(tracked))
+	identities := make(map[surfaceIdentity]struct{})
+	legacyMatches := 0
+	matchCount := 0
+	for index, item := range tracked {
+		matched[index], err = match(item)
+		if err != nil {
+			return err
+		}
+		if !matched[index] {
+			continue
+		}
+		matchCount++
+		identity, identityErr := trackedSurfaceIdentity(item)
+		if identityErr != nil {
+			legacyMatches++
+			continue
+		}
+		identities[identity] = struct{}{}
+	}
+	if len(identities)+legacyMatches > 1 {
+		return errors.New("surface ref is ambiguous across tracker identities")
+	}
+	if matchCount == 0 {
+		return nil
+	}
+	kept := make([]trackedSurface, 0, len(tracked))
+	for index, item := range tracked {
+		if !matched[index] {
+			kept = append(kept, item)
 		}
 	}
-	writeTrackerRefs(path, kept)
+	return writeTrackedSurfacesToRoot(root, name, kept, nil)
 }
 
 // ReapOrphanSurfaces closes surfaces recorded by orchestrator processes that are
 // no longer alive and removes their tracking files. It never touches the current
 // process's surfaces or those of a live process, so it is safe to run while a
-// concurrent orchestra holds its own panes. It is a no-op for terminals that
-// cannot host surfaces (plain) so cmux tracking files are not discarded without
-// actually closing their surfaces.
+// concurrent orchestra holds its own panes. Structured cmux records can restore
+// their persisted workspace; tmux records require the active server identity to
+// match. Legacy cmux refs remain untouched because their workspace is unknown.
 //
 // Each ref is validated against validSurfaceRef before being passed to Close;
 // refs that fail validation are logged and skipped (REQ-007). The legacy
-// TempDir-based path is also reaped read-only (no MkdirAll).
+// TempDir-based path is also inspected without creating it.
 func ReapOrphanSurfaces(term terminal.Terminal) {
-	if term == nil || term.Name() == "plain" {
+	if term == nil {
 		return
 	}
 	reapOrphanSurfacesFromDir(surfaceTrackerBase, term)
@@ -144,9 +221,16 @@ func ReapOrphanSurfaces(term terminal.Terminal) {
 
 // reapOrphanSurfacesFromDir reaps compatible refs and retains retryable refs.
 func reapOrphanSurfacesFromDir(dir string, term terminal.Terminal) {
-	entries, err := os.ReadDir(dir)
+	surfaceTrackerMu.Lock()
+	defer surfaceTrackerMu.Unlock()
+	root, err := openSecureTrackerRoot(dir, false)
 	if err != nil {
-		return // dir absent or unreadable — silent no-op
+		return
+	}
+	defer func() { _ = root.Close() }()
+	entries, err := fs.ReadDir(root.FS(), ".")
+	if err != nil {
+		return
 	}
 	self := os.Getpid()
 	for _, e := range entries {
@@ -157,48 +241,41 @@ func reapOrphanSurfacesFromDir(dir string, term terminal.Terminal) {
 		if perr != nil || pid == self || processAlive(pid) {
 			continue
 		}
+		// Refresh claims only after the owner is known to be dead. A yielding
+		// process saves its durable session before it exits, so this ordering
+		// closes the snapshot race between session persistence and process exit.
+		claims := loadPersistedSessionSurfaceClaims()
 		path := filepath.Join(dir, e.Name())
-		refs := readTrackerRefs(path)
-		kept := refs[:0]
-		for _, ref := range refs {
+		tracked, _, readErr := readTrackedSurfacesFromRoot(root, e.Name())
+		if readErr != nil {
+			log.Printf("[surface-tracker] refusing entry %s: %v", path, readErr)
+			continue
+		}
+		kept := tracked[:0]
+		for _, item := range tracked {
+			ref := item.Ref
 			if !validSurfaceRef.MatchString(ref) {
-				log.Printf("[surface-tracker] skipping invalid ref %q from %s", ref, path)
+				log.Printf("[surface-tracker] retaining invalid or malformed ref %q from %s", ref, path)
+				kept = append(kept, item)
 				continue
 			}
-			if !surfaceRefCompatible(term.Name(), ref) {
-				kept = append(kept, ref)
+			if claims.owns(item, term) {
 				continue
 			}
-			if err := term.Close(context.Background(), ref); err != nil {
-				kept = append(kept, ref)
+			closeTerminal, resolveErr := resolveTrackedSurfaceTerminal(term, item)
+			if resolveErr != nil {
+				log.Printf("[surface-tracker] retaining ref %q from %s: %v", ref, path, resolveErr)
+				kept = append(kept, item)
+				continue
+			}
+			if err := closeTerminal.Close(context.Background(), ref); err != nil {
+				kept = append(kept, item)
 			}
 		}
-		writeTrackerRefs(path, kept)
-	}
-}
-
-// readTrackerRefs returns the non-empty surface refs recorded in a tracking file.
-func readTrackerRefs(path string) []string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	var refs []string
-	for _, line := range strings.Split(string(data), "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			refs = append(refs, line)
+		if err := writeTrackedSurfacesToRoot(root, e.Name(), kept, nil); err != nil {
+			log.Printf("[surface-tracker] preserving old tracker %s after update failure: %v", path, err)
 		}
 	}
-	return refs
-}
-
-// writeTrackerRefs rewrites a tracking file, removing it entirely when empty.
-func writeTrackerRefs(path string, refs []string) {
-	if len(refs) == 0 {
-		_ = os.Remove(path)
-		return
-	}
-	_ = os.WriteFile(path, []byte(strings.Join(refs, "\n")+"\n"), 0o600)
 }
 
 // processAlive reports whether a process with the given PID currently exists.

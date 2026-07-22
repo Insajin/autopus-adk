@@ -66,6 +66,37 @@ func TestWaitAndCollectResults_SkippedPaneTimedOut(t *testing.T) {
 	assert.Equal(t, "failed-provider", responses[0].Provider)
 }
 
+func TestWaitAndCollectResults_MixedSkippedAndLiveRaceSafe(t *testing.T) {
+	t.Parallel()
+
+	responsePath := filepath.Join(t.TempDir(), "response.md")
+	content := responseBeginMarker + "\nlive output\n" + responseEndMarker + "\n"
+	require.NoError(t, os.WriteFile(responsePath, []byte(content), 0o600))
+
+	panes := make([]paneInfo, 0, 128)
+	for range 64 {
+		panes = append(panes,
+			paneInfo{
+				provider:     ProviderConfig{Name: "live-provider"},
+				paneID:       "live-pane",
+				responseFile: responsePath,
+			},
+			paneInfo{
+				provider: ProviderConfig{Name: "skipped-provider"},
+				paneID:   "skipped-pane",
+				skipWait: true,
+			},
+		)
+	}
+
+	responses := waitAndCollectResults(
+		context.Background(), OrchestraConfig{Terminal: newCmuxMock()}, panes,
+		DefaultCompletionPatterns(), time.Now(), nil, nil, 0,
+	)
+
+	require.Len(t, responses, len(panes))
+}
+
 func TestWaitAndCollectResults_PrefersResponseFile(t *testing.T) {
 	t.Parallel()
 
@@ -199,9 +230,9 @@ func TestSendRoundEnv_SkippedForTUIProvider(t *testing.T) {
 	}
 }
 
-// TestSendRoundEnv_SentForArgsProvider verifies that SendRoundEnvToPane IS called
-// for args-based providers (InteractiveInput == "args").
-func TestSendRoundEnv_SentForArgsProvider(t *testing.T) {
+// TestSendRoundEnv_SkippedForActiveArgsProvider verifies an already-running
+// args provider does not receive a shell export as TUI input in later rounds.
+func TestSendRoundEnv_SkippedForActiveArgsProvider(t *testing.T) {
 	t.Parallel()
 
 	mock := newCmuxMock()
@@ -227,15 +258,8 @@ func TestSendRoundEnv_SentForArgsProvider(t *testing.T) {
 	}
 	_ = executeRound(ctx, cfg, panes, nil, 2, prevResponses)
 
-	// Verify that the export is immediately committed with Enter before any
-	// prompt input can be attached to the shell line.
-	foundCommittedExport := false
-	for i, call := range mock.sendCommandCalls {
-		if call.Cmd == "export AUTOPUS_ROUND=2" && i+1 < len(mock.sendCommandCalls) {
-			next := mock.sendCommandCalls[i+1]
-			foundCommittedExport = next.PaneID == call.PaneID && next.Cmd == "\n"
-			break
-		}
+	for _, call := range mock.sendCommandCalls {
+		assert.NotContains(t, call.Cmd, "AUTOPUS_ROUND",
+			"round cursor and file IPC own active-pane round identity")
 	}
-	assert.True(t, foundCommittedExport, "args provider round env must be committed with an adjacent Enter")
 }

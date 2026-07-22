@@ -2,26 +2,22 @@ package orchestra
 
 import (
 	"regexp"
+	"strings"
 	"time"
 )
 
-// sessionReadyPromptPatterns matches CLI-specific prompts WITHOUT shell patterns ($ and #).
-// Used by waitForSessionReady to avoid premature detection on bare shell prompts.
-var sessionReadyPromptPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?m)^❯(?:\s|\x{00a0})*(?:Try\b.*)?$`), // claude code prompt, including startup suggestion text
-	regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`),      // gemini TUI prompt (> Type your..., > @, bare >)
-	regexp.MustCompile(`(?im)^codex>\s*$`),                    // codex prompt (case-insensitive)
-	regexp.MustCompile(codexSuggestionPromptPattern),          // codex v0.135+ TUI suggestion prompt
-	regexp.MustCompile(`(?im)^Ask anything\s*$`),              // opencode TUI prompt
-	// NOTE: no shell $ or # patterns — this is the key difference from defaultPromptPatterns
-}
+const claudeReadyPromptPattern = `(?m)^[\t ]*❯[ \t\x{00a0}]*(?:Try\b[^\r\n]*)?[ \t\x{00a0}]*$`
+
+var codexReadyBlockerPattern = regexp.MustCompile(
+	`(?im)^\s*(?:PostCompact hooks|Turn hooks on or off.*|Press esc to go back)\s*$`,
+)
 
 // SessionReadyPatterns returns completion patterns for CLI session readiness detection.
 // Unlike DefaultCompletionPatterns, this excludes shell prompts ($ and #) to prevent
 // false positives when detecting whether a CLI tool has finished launching.
 func SessionReadyPatterns() []CompletionPattern {
 	return []CompletionPattern{
-		{Provider: "claude", Pattern: regexp.MustCompile(`(?m)^❯(?:\s|\x{00a0})*(?:Try\b.*)?$`)},
+		{Provider: "claude", Pattern: regexp.MustCompile(claudeReadyPromptPattern)},
 		{Provider: "codex", Pattern: regexp.MustCompile(codexReadyPromptPattern)},
 		{Provider: "gemini", Pattern: regexp.MustCompile(`(?m)^\s*>\s*(Type your|@|\s*$)`)},
 		{Provider: "opencode", Pattern: regexp.MustCompile(`(?im)^Ask anything\s*$`)},
@@ -32,18 +28,49 @@ func SessionReadyPatterns() []CompletionPattern {
 // indicating the provider session has fully launched. Unlike isPromptVisible, this does
 // NOT match shell prompts ($ and #) to avoid false positives during startup.
 func isSessionReady(screen string, patterns []CompletionPattern) bool {
+	if len(patterns) == 0 {
+		patterns = SessionReadyPatterns()
+	}
 	screen = stripANSI(screen)
 	for _, cp := range patterns {
-		if cp.Pattern.MatchString(screen) {
-			return true
+		if isSessionReadyBlocked(screen, cp.Provider) {
+			continue
 		}
-	}
-	for _, p := range sessionReadyPromptPatterns {
-		if p.MatchString(screen) {
+		if cp.Pattern != nil && cp.Pattern.MatchString(screen) {
 			return true
 		}
 	}
 	return false
+}
+
+// isProviderSessionReady matches only the requested provider's input prompt.
+// This prevents one pane's startup chrome from satisfying another provider's
+// gate when multiple providers launch concurrently.
+func isProviderSessionReady(screen string, patterns []CompletionPattern, provider string) bool {
+	screen = stripANSI(screen)
+	identity := providerArtifactIdentity(provider)
+	if isProviderWorking(screen) || isSessionReadyBlocked(screen, identity) {
+		return false
+	}
+	providerPatternFound := false
+	for _, cp := range patterns {
+		patternIdentity := providerArtifactIdentity(cp.Provider)
+		if !strings.EqualFold(strings.TrimSpace(patternIdentity), strings.TrimSpace(identity)) {
+			continue
+		}
+		providerPatternFound = true
+		if cp.Pattern != nil && cp.Pattern.MatchString(screen) {
+			return true
+		}
+	}
+	// Custom providers have no built-in signature. Keep them extensible by
+	// accepting any known CLI prompt while named providers remain strictly bound
+	// to their own prompt pattern.
+	return !providerPatternFound && isSessionReady(screen, patterns)
+}
+
+func isSessionReadyBlocked(screen, provider string) bool {
+	return providerArtifactIdentity(provider) == "codex" && codexReadyBlockerPattern.MatchString(screen)
 }
 
 // startupTimeoutFor returns the per-provider startup timeout.
@@ -51,7 +78,7 @@ func startupTimeoutFor(provider ProviderConfig) time.Duration {
 	if provider.StartupTimeout > 0 {
 		return provider.StartupTimeout
 	}
-	switch provider.Name {
+	switch providerArtifactIdentity(provider.Name) {
 	case "claude":
 		return 15 * time.Second
 	case "gemini":

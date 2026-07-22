@@ -21,6 +21,13 @@ const (
 	// regardless of the hook's spawn cwd. Hook commands run via `sh -c`, so the
 	// parameter expansion resolves at execution time.
 	claudeHookDirPrefix = `"${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/autopus/`
+	// Legacy Gemini CLI exposes GEMINI_PROJECT_DIR. Retain a git/cwd fallback for
+	// older clients while anchoring the managed asset on the project root.
+	geminiHookDirPrefix = `"${GEMINI_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"/.gemini/hooks/autopus/`
+	// Antigravity runs hooks from the directory containing .agents/hooks.json,
+	// so that directory's parent is the canonical project root. Do not consult
+	// Git here: the project may be nested below an unrelated repository root.
+	antigravityHookDirPrefix = `"$(cd .. && pwd)/.gemini/hooks/autopus/`
 	// Codex hooks may run with a subdirectory as cwd. Resolve the checked-out
 	// project root at hook execution time and use assets installed by the Codex
 	// adapter itself, so codex-only harnesses do not depend on Claude surfaces.
@@ -55,9 +62,11 @@ func generateCompletionHooks(platform string) []adapter.HookConfig {
 		// consumer that executes these settings without the variable.
 		completion = entry{"Stop", claudeHookDirPrefix + "hook-claude-stop.sh"}
 		ready = entry{"SessionStart", claudeHookDirPrefix + "hook-claude-sessionstart.sh"}
-	case "antigravity-cli", "gemini", "gemini-cli":
-		// AfterAgent is the Antigravity CLI event fired when the agent session ends.
-		completion = entry{"AfterAgent", ".claude/hooks/autopus/hook-gemini-afteragent.sh"}
+	case "antigravity-cli":
+		completion = entry{"Stop", antigravityHookDirPrefix + "hook-gemini-stop.sh\""}
+	case "gemini", "gemini-cli":
+		// Gemini CLI uses AfterAgent and blocks a stop with decision=block.
+		completion = entry{"AfterAgent", geminiHookDirPrefix + "hook-gemini-afteragent.sh"}
 	case "codex":
 		completion = entry{"Stop", codexHookDirPrefix + "hook-codex-stop.sh\""}
 		ready = entry{"SessionStart", codexHookDirPrefix + "hook-codex-sessionstart.sh\""}

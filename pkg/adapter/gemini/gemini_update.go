@@ -3,6 +3,7 @@ package gemini
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -31,8 +32,12 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 	}
 
 	plan, pf := a.buildUpdateTransactionPlan(oldManifest, newFiles)
-	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
+	rollbackHooks, err := applyGeminiManagedHookAssets(a.root, geminiManagedHookAssets(pf.Files))
+	if err != nil {
 		return nil, err
+	}
+	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
+		return nil, errors.Join(err, rollbackHooks())
 	}
 	a.installAntigravityPluginIfAvailable(ctx)
 
@@ -93,6 +98,12 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		files = append(files, agentMappings...)
 	}
 
+	completionHookAssets, err := prepareGeminiCompletionHookAssets()
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, completionHookAssets...)
+
 	settingsMappings, err := a.generateSettingsWithHooks(cfg)
 	if err != nil {
 		return nil, err
@@ -111,7 +122,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, statusFiles...)
 
-	hookMappings, err := a.prepareAntigravityHooksJSON(a.configuredHooks(cfg))
+	hookMappings, err := a.prepareAntigravityHooksJSON(a.configuredAntigravityHooks(cfg))
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +136,18 @@ func (a *Adapter) buildUpdateTransactionPlan(
 	newFiles []adapter.FileMapping,
 ) (adapter.TransactionPlan, *adapter.PlatformFiles) {
 	finalFiles := make([]adapter.FileMapping, 0, len(newFiles))
+	writes := make([]adapter.TransactionWrite, 0, len(newFiles))
 	for _, file := range newFiles {
-		action := adapter.ResolveAction(a.root, file.TargetPath, file.OverwritePolicy, oldManifest)
-		if action == adapter.ActionSkip {
-			continue
+		if !isGeminiManagedHookAsset(file) {
+			action := adapter.ResolveAction(a.root, file.TargetPath, file.OverwritePolicy, oldManifest)
+			if action == adapter.ActionSkip {
+				continue
+			}
+			writes = append(writes, adapter.TransactionWrite{
+				Path:    file.TargetPath,
+				Content: file.Content,
+				Perm:    geminiFileMode(file.TargetPath),
+			})
 		}
 		finalFiles = append(finalFiles, file)
 	}
@@ -140,9 +159,19 @@ func (a *Adapter) buildUpdateTransactionPlan(
 	}
 
 	return adapter.TransactionPlan{
-		Writes:   adapter.TransactionWritesFromFiles(finalFiles, geminiFileMode),
+		Writes:   writes,
 		Manifest: adapter.ManifestFromFiles(adapterName, pf),
 	}, pf
+}
+
+func geminiManagedHookAssets(files []adapter.FileMapping) []adapter.FileMapping {
+	assets := make([]adapter.FileMapping, 0, len(files))
+	for _, file := range files {
+		if isGeminiManagedHookAsset(file) {
+			assets = append(assets, file)
+		}
+	}
+	return assets
 }
 
 func geminiFileMode(path string) os.FileMode {

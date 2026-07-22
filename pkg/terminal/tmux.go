@@ -218,22 +218,3 @@ func (a *TmuxAdapter) SendLongText(_ context.Context, paneID PaneID, text string
 
 	return nil
 }
-
-// Close kills a global tmux pane ID or the named tmux session.
-func (a *TmuxAdapter) Close(_ context.Context, name string) error {
-	if strings.HasPrefix(name, "%") {
-		if _, err := tmuxPaneTarget("", PaneID(name)); err != nil {
-			return fmt.Errorf("tmux: %w", err)
-		}
-		cmd := execCommand("tmux", "kill-pane", "-t", name)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("tmux: kill pane %q: %w", name, err)
-		}
-		return nil
-	}
-	cmd := execCommand("tmux", "kill-session", "-t", name)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("tmux: kill session %q: %w", name, err)
-	}
-	return nil
-}

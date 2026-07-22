@@ -32,11 +32,14 @@ type sessionWritableFile interface {
 
 // OrchestraSession holds state for a yield-rounds orchestra session.
 type OrchestraSession struct {
-	ID        string                      `json:"id"`
-	Panes     map[string]string           `json:"panes"` // provider name -> pane ID
-	Providers []SessionProviderConfig     `json:"providers"`
-	Rounds    [][]SessionProviderResponse `json:"rounds"`
-	CreatedAt time.Time                   `json:"created_at"`
+	ID            string                      `json:"id"`
+	TerminalKind  string                      `json:"terminal_kind,omitempty"`
+	WorkspaceRef  string                      `json:"workspace_ref,omitempty"`
+	TmuxServerRef string                      `json:"tmux_server_ref,omitempty"`
+	Panes         map[string]string           `json:"panes"` // provider name -> pane ID
+	Providers     []SessionProviderConfig     `json:"providers"`
+	Rounds        [][]SessionProviderResponse `json:"rounds"`
+	CreatedAt     time.Time                   `json:"created_at"`
 }
 
 // SessionProviderConfig is a serializable subset of ProviderConfig.
@@ -199,4 +202,47 @@ func rollbackCreatedSession(root *os.Root, name string, created fs.FileInfo) {
 	if err == nil && current.Mode().IsRegular() && os.SameFile(created, current) {
 		_ = root.Remove(name)
 	}
+}
+
+type sessionCommitFunc func(root *os.Root, temporary, target string) error
+
+// UpdateSession atomically replaces an existing private or legacy session. It
+// never removes the target before the fully synced replacement is ready, so a
+// failed update leaves the previous cleanup handle available for retry.
+func UpdateSession(session OrchestraSession) error {
+	return updateSessionWithCommit(session, func(root *os.Root, temporary, target string) error {
+		return root.Rename(temporary, target)
+	})
+}
+
+func updateSessionWithCommit(session OrchestraSession, commit sessionCommitFunc) error {
+	data, err := json.MarshalIndent(session, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal session update: %w", err)
+	}
+	root, name, originalInfo, err := openSessionUpdateTarget(session.ID)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	temporary := name + "." + NewSessionID() + ".tmp"
+	file, err := root.OpenFile(temporary, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("create session update: %w", err)
+	}
+	if err := persistCreatedSession(root, temporary, file, data); err != nil {
+		return fmt.Errorf("persist session update: %w", err)
+	}
+	defer func() { _ = root.Remove(temporary) }()
+	currentInfo, err := root.Lstat(name)
+	if err != nil || !currentInfo.Mode().IsRegular() || !os.SameFile(originalInfo, currentInfo) {
+		return errors.New("session entry changed before update")
+	}
+	if commit == nil {
+		return errors.New("nil session update commit")
+	}
+	if err := commit(root, temporary, name); err != nil {
+		return fmt.Errorf("commit session update: %w", err)
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,8 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestTryFileIPC_Success verifies that tryFileIPC returns true when
-// WaitForReady succeeds and WriteInputRound succeeds.
+// TestTryFileIPC_Success verifies the delivered outcome when ready and input writes succeed.
 func TestTryFileIPC_Success(t *testing.T) {
 	t.Parallel()
 
@@ -29,10 +29,11 @@ func TestTryFileIPC_Success(t *testing.T) {
 
 	// When: tryFileIPC is called
 	ctx := context.Background()
-	ok := tryFileIPC(ctx, sess, "claude", 2, "debate prompt")
+	outcome, ipcErr := tryFileIPC(ctx, sess, "claude", 2, "debate prompt")
 
-	// Then: returns true (file IPC succeeded)
-	assert.True(t, ok, "tryFileIPC must return true on success")
+	// Then: file IPC was delivered without falling back.
+	require.NoError(t, ipcErr)
+	assert.Equal(t, fileIPCDelivered, outcome)
 
 	// Then: input file was created
 	inputName := RoundSignalName("claude", 2, "input.json")
@@ -40,9 +41,9 @@ func TestTryFileIPC_Success(t *testing.T) {
 	assert.NoError(t, err, "input file must exist after successful IPC")
 }
 
-// TestTryFileIPC_ReadyTimeout_Fallback verifies that tryFileIPC returns false
-// when WaitForReady times out (provider not ready).
-func TestTryFileIPC_ReadyTimeout_Fallback(t *testing.T) {
+// TestTryFileIPC_ContextDeadlineReleaseFailure verifies that a cancelled caller
+// cannot authorize direct fallback without a release acknowledgement.
+func TestTryFileIPC_ContextDeadlineReleaseFailure(t *testing.T) {
 	t.Parallel()
 
 	sess, err := NewHookSession("test-try-file-ipc-timeout")
@@ -53,15 +54,17 @@ func TestTryFileIPC_ReadyTimeout_Fallback(t *testing.T) {
 	// Use a cancelled context to speed up the test
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
-	ok := tryFileIPC(ctx, sess, "claude", 1, "prompt")
+	outcome, ipcErr := tryFileIPC(ctx, sess, "claude", 1, "prompt")
 
-	// Then: returns false (fallback to SendLongText)
-	assert.False(t, ok, "tryFileIPC must return false on ready timeout")
+	// Then: cancellation prevents release acknowledgement and direct fallback.
+	assert.Equal(t, fileIPCReleaseFailure, outcome)
+	require.Error(t, ipcErr)
+	abortPath := filepath.Join(sess.Dir(), RoundSignalName("claude", 1, "abort"))
+	assert.FileExists(t, abortPath, "timeout fallback must release a late hook waiter")
 }
 
-// TestTryFileIPC_ContextCancelled_Fallback verifies that tryFileIPC returns false
-// when context is cancelled during WaitForReady.
-func TestTryFileIPC_ContextCancelled_Fallback(t *testing.T) {
+// TestTryFileIPC_ContextCancelledReleaseFailure covers cancellation before ready wait.
+func TestTryFileIPC_ContextCancelledReleaseFailure(t *testing.T) {
 	t.Parallel()
 
 	sess, err := NewHookSession("test-try-file-ipc-ctx-cancel")
@@ -73,10 +76,13 @@ func TestTryFileIPC_ContextCancelled_Fallback(t *testing.T) {
 	cancel()
 
 	// When: tryFileIPC is called
-	ok := tryFileIPC(ctx, sess, "claude", 1, "prompt")
+	outcome, ipcErr := tryFileIPC(ctx, sess, "claude", 1, "prompt")
 
-	// Then: returns false (fallback)
-	assert.False(t, ok, "tryFileIPC must return false on cancelled context")
+	// Then: direct fallback is not authorized on a cancelled context.
+	assert.Equal(t, fileIPCReleaseFailure, outcome)
+	assert.ErrorIs(t, ipcErr, context.Canceled)
+	assert.FileExists(t, filepath.Join(sess.Dir(), RoundSignalName("claude", 1, "abort")),
+		"cancelled fallback must release the hook waiter")
 }
 
 // TestTryFileIPC_WriteFailure_SendsAbort verifies R5-SAFETY: when WriteInputRound
@@ -92,21 +98,18 @@ func TestTryFileIPC_WriteFailure_SendsAbort(t *testing.T) {
 	readyName := RoundSignalName("claude", 1, "ready")
 	require.NoError(t, os.WriteFile(filepath.Join(sess.Dir(), readyName), []byte("1"), 0o644))
 
-	// Given: make the session dir read-only to cause WriteInputRound failure
-	require.NoError(t, os.Chmod(sess.Dir(), 0o555))
-	defer func() { _ = os.Chmod(sess.Dir(), 0o700) }()
+	// Given: collide with the atomic input temp file while leaving abort writes available.
+	inputName := RoundSignalName("claude", 1, "input.json")
+	require.NoError(t, os.Mkdir(filepath.Join(sess.Dir(), inputName+".tmp"), 0o700))
 
+	consumed := consumeFileIPCAbort(sess, "claude", 1, nil, nil)
 	// When: tryFileIPC is called
-	ok := tryFileIPC(context.Background(), sess, "claude", 1, "prompt")
+	outcome, ipcErr := tryFileIPC(context.Background(), sess, "claude", 1, "prompt")
 
-	// Then: returns false (fallback)
-	assert.False(t, ok, "tryFileIPC must return false on write failure")
-
-	// Restore permissions so we can check abort file and cleanup
-	_ = os.Chmod(sess.Dir(), 0o700)
-
-	// Note: abort signal write also fails due to permissions, but that's
-	// expected — the key behavior is the fallback return value.
+	// Then: fallback is safe only after the waiter consumes abort and ready.
+	assert.Equal(t, fileIPCSafeFallback, outcome)
+	assert.ErrorContains(t, ipcErr, "write input")
+	require.NoError(t, <-consumed)
 }
 
 // TestExecuteRound_FileIPC_Path verifies that executeRound uses file IPC
@@ -115,9 +118,9 @@ func TestExecuteRound_FileIPC_Path(t *testing.T) {
 	t.Parallel()
 
 	mock := newCmuxMock()
-	mock.readScreenOutput = "❯\n"
+	mock.readScreenOutput = "hook is waiting; no prompt is visible\n"
 
-	sess, err := NewHookSession("test-exec-round-fileipc")
+	sess, err := NewHookSession("test-exec-round-fileipc-" + NewSessionID())
 	require.NoError(t, err)
 	defer sess.Cleanup()
 
@@ -173,8 +176,60 @@ func TestExecuteRound_FileIPC_Path(t *testing.T) {
 
 	// Then: input file was created via file IPC (not SendLongText)
 	inputName := RoundSignalName("claude", 2, "input.json")
-	_, err = os.Stat(filepath.Join(sess.Dir(), inputName))
-	assert.NoError(t, err, "file IPC input file must exist")
+	inputData, err := os.ReadFile(filepath.Join(sess.Dir(), inputName))
+	require.NoError(t, err, "file IPC input file must exist")
+	var input HookInput
+	require.NoError(t, json.Unmarshal(inputData, &input))
+	assert.Contains(t, input.Prompt, responseBeginMarker,
+		"file IPC must carry the same response-file fallback contract as direct pane input")
+	assert.NotEmpty(t, panes[0].responseFile)
+}
+
+func TestExecuteRound_FileIPCFallbackPersistsRoundCursor(t *testing.T) {
+	t.Parallel()
+
+	mock := newCmuxMock()
+	mock.readScreenOutput = "❯\n"
+	session, err := NewHookSession("test-exec-round-cursor-" + NewSessionID())
+	require.NoError(t, err)
+	defer session.Cleanup()
+	session.SetHookProviders(map[string]bool{"claude": true})
+
+	inputName := RoundSignalName("claude", 2, "input.json")
+	require.NoError(t, os.Mkdir(filepath.Join(session.Dir(), inputName+".tmp"), 0o700),
+		"the input temp-path collision forces direct pane fallback")
+	require.NoError(t, os.WriteFile(
+		filepath.Join(session.Dir(), RoundSignalName("claude", 2, "ready")), nil, 0o600,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(session.Dir(), RoundSignalName("claude", 2, "result.json")),
+		[]byte(`{"output":"direct fallback response","exit_code":0}`), 0o600,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(session.Dir(), RoundSignalName("claude", 2, "done")), nil, 0o600,
+	))
+	consumed := consumeFileIPCAbort(session, "claude", 2, nil, nil)
+
+	provider := ProviderConfig{Name: "claude", Binary: "echo", InteractiveInput: "stdin"}
+	panes := []paneInfo{{provider: provider, paneID: "pane-1"}}
+	cfg := OrchestraConfig{
+		Providers: []ProviderConfig{provider}, Strategy: StrategyDebate,
+		Prompt: "round 2 fallback", TimeoutSeconds: 5, Terminal: mock,
+		Interactive: true, HookMode: true, InitialDelay: time.Millisecond,
+	}
+
+	responses := executeRound(
+		context.Background(), cfg, panes, session, 2,
+		[]ProviderResponse{{Provider: "claude", Output: "round 1"}},
+	)
+	require.NoError(t, <-consumed)
+
+	require.Len(t, responses, 1)
+	assert.Equal(t, "direct fallback response", responses[0].Output)
+	assert.NotEmpty(t, mock.sendLongTextCalls, "failed file IPC must fall back to pane input")
+	cursor, err := os.ReadFile(filepath.Join(session.Dir(), "claude-round-cursor"))
+	require.NoError(t, err)
+	assert.Equal(t, "2", string(cursor))
 }
 
 // TestWaitForDoneRoundCtx_ZeroRound_FallsBack verifies WaitForDoneRoundCtx

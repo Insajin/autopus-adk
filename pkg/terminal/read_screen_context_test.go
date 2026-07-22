@@ -10,6 +10,7 @@ import (
 )
 
 func TestInteractive_CmuxAdapter_ReadScreen_UsesContextCommand(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	orig := execCommand
 	origCtx := execCommandContext
 	defer func() {
@@ -64,6 +65,7 @@ func TestInteractive_TmuxAdapter_ReadScreen_UsesContextCommand(t *testing.T) {
 }
 
 func TestCmuxAdapter_SendCommandUsesContextCommand(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	orig := execCommand
 	origCtx := execCommandContext
 	defer func() {
@@ -89,6 +91,7 @@ func TestCmuxAdapter_SendCommandUsesContextCommand(t *testing.T) {
 }
 
 func TestCmuxAdapter_SendLongTextUsesContextCommands(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	orig := execCommand
 	origCtx := execCommandContext
 	defer func() {

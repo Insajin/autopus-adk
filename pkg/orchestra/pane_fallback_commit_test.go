@@ -3,6 +3,7 @@ package orchestra
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 )
 
 const committedPaneID terminal.PaneID = "pane-committed"
+const paneCommitWorkspaceRef = "workspace:13"
 
 // paneCommitTerminal models a pane that was provisioned successfully and then
 // fails at a selected post-provisioning I/O boundary.
@@ -30,9 +32,64 @@ type paneCommitTerminal struct {
 	readErr           error
 	closeErr          error
 	closed            []string
+	workspaceRef      string
 }
 
 func (m *paneCommitTerminal) Name() string { return "cmux" }
+
+func (m *paneCommitTerminal) WorkspaceRef() (string, error) {
+	ref := m.workspaceRef
+	if ref == "" {
+		ref = paneCommitWorkspaceRef
+	}
+	if err := validatePaneCommitWorkspaceRef(ref); err != nil {
+		return "", err
+	}
+	return ref, nil
+}
+
+func (m *paneCommitTerminal) WithWorkspaceRef(ref string) (terminal.Terminal, error) {
+	if err := validatePaneCommitWorkspaceRef(ref); err != nil {
+		return nil, err
+	}
+	clone := *m
+	clone.workspaceRef = ref
+	clone.closed = append([]string(nil), m.closed...)
+	return &clone, nil
+}
+
+func validatePaneCommitWorkspaceRef(ref string) error {
+	if _, err := terminal.NewCmuxAdapterWithWorkspace(ref); err != nil {
+		return fmt.Errorf("invalid pane fixture workspace: %w", err)
+	}
+	if ref != paneCommitWorkspaceRef {
+		return fmt.Errorf("pane fixture workspace %q is not %q", ref, paneCommitWorkspaceRef)
+	}
+	return nil
+}
+
+func TestPaneCommitTerminalWorkspaceContext_ValidatedClone(t *testing.T) {
+	original := &paneCommitTerminal{closed: []string{"surface:1"}}
+
+	workspaceRef, err := original.WorkspaceRef()
+	require.NoError(t, err)
+	assert.Equal(t, paneCommitWorkspaceRef, workspaceRef)
+
+	restored, err := original.WithWorkspaceRef(paneCommitWorkspaceRef)
+	require.NoError(t, err)
+	clone, ok := restored.(*paneCommitTerminal)
+	require.True(t, ok)
+	assert.NotSame(t, original, clone)
+	assert.Empty(t, original.workspaceRef)
+	assert.Equal(t, paneCommitWorkspaceRef, clone.workspaceRef)
+	clone.closed[0] = "surface:2"
+	assert.Equal(t, []string{"surface:1"}, original.closed)
+
+	_, err = original.WithWorkspaceRef("workspace:14")
+	assert.Error(t, err)
+	_, err = original.WithWorkspaceRef("../unsafe")
+	assert.Error(t, err)
+}
 
 func (m *paneCommitTerminal) CreateWorkspace(context.Context, string) error { return nil }
 

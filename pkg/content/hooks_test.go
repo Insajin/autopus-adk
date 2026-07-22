@@ -142,13 +142,13 @@ func TestGenerateHookConfigs_AntigravityKeepsOfficialEventNames(t *testing.T) {
 	assert.Contains(t, eventNames, "PostToolUse")
 	assert.NotContains(t, eventNames, "BeforeTool")
 	assert.NotContains(t, eventNames, "AfterTool")
-	// AfterAgent is the completion hook — it must be present.
-	assert.Contains(t, eventNames, "AfterAgent")
+	// Stop is the completion hook in the Antigravity lifecycle.
+	assert.Contains(t, eventNames, "Stop")
 
 	// Tool-use hooks must be wrapped for Antigravity JSON stdout protocol;
-	// the completion AfterAgent hook is a plain command (not tool-use).
+	// the completion Stop hook is a plain command (not tool-use).
 	for _, h := range hooks {
-		if h.Event == "AfterAgent" {
+		if h.Event == "Stop" {
 			// Completion hook: plain command, no run_command matcher.
 			continue
 		}

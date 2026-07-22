@@ -50,6 +50,7 @@ func TestCmuxAdapter_CreateWorkspace_Error(t *testing.T) {
 // TestCmuxAdapter_SplitPane_Error verifies that SplitPane propagates command execution errors.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_SplitPane_Error(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, _ := newCmuxMock(fmt.Errorf("cmux: split failed"))
 	defer restore()
 
@@ -62,6 +63,7 @@ func TestCmuxAdapter_SplitPane_Error(t *testing.T) {
 // TestCmuxAdapter_SendCommand_Error verifies that SendCommand propagates command execution errors.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_SendCommand_Error(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, _ := newCmuxMock(fmt.Errorf("cmux: send failed"))
 	defer restore()
 
@@ -74,6 +76,7 @@ func TestCmuxAdapter_SendCommand_Error(t *testing.T) {
 // TestCmuxAdapter_Notify_Error verifies that Notify propagates command execution errors.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_Notify_Error(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, _ := newCmuxMock(fmt.Errorf("cmux: notify failed"))
 	defer restore()
 
@@ -86,6 +89,7 @@ func TestCmuxAdapter_Notify_Error(t *testing.T) {
 // TestCmuxAdapter_Close_Error verifies that Close propagates errors for surface refs.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_Close_Error(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, _ := newCmuxMock(fmt.Errorf("cmux: remove failed"))
 	defer restore()
 
@@ -137,6 +141,7 @@ func TestCmuxAdapter_CreateWorkspace_ParseFail(t *testing.T) {
 // TestCmuxAdapter_SplitPane_ParseFail verifies SplitPane errors when output has no surface ref.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_SplitPane_ParseFail(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, _ := newCmuxMockV2("OK", nil) // output missing surface ref
 	defer restore()
 

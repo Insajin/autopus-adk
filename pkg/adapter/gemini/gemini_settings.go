@@ -65,7 +65,7 @@ func (a *Adapter) generateSettingsWithHooks(cfg *config.HarnessConfig) ([]adapte
 	if err := json.Unmarshal(files[0].Content, &settings); err != nil {
 		return nil, fmt.Errorf("gemini settings JSON 파싱 실패: %w", err)
 	}
-	applyGeminiHooksAndPermissions(settings, a.configuredHooks(cfg), content.DetectPermissions(a.root, cfg.Hooks.Permissions))
+	applyGeminiHooksAndPermissions(settings, a.configuredLegacyGeminiHooks(cfg), content.DetectPermissions(a.root, cfg.Hooks.Permissions))
 	return buildGeminiSettingsMapping(settings)
 }
 
@@ -111,6 +111,8 @@ func applyGeminiHooksAndPermissions(settings map[string]any, hooks []adapter.Hoo
 			"PostToolUse": true,
 			"BeforeTool":  true,
 			"AfterTool":   true,
+			"AfterAgent":  true,
+			"Stop":        true,
 		}
 		for _, h := range hooks {
 			managedEvents[h.Event] = true

@@ -66,7 +66,7 @@ func TestResolveCC21MonitorRuntime_Enabled(t *testing.T) {
 	require.NoError(t, os.WriteFile(claudePath, []byte("#!/bin/sh\necho 2.1.113\n"), 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(homeDir, ".claude", "settings.json"),
-		[]byte(`{"hooks":{"Stop":[{"command":"autopus"}]}}`),
+		[]byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"autopus hook stop"}]}]}}`),
 		0o644,
 	))
 

@@ -51,6 +51,7 @@ func TestCmuxAdapter_SurfaceHealth_Success(t *testing.T) {
 
 // TestCmuxAdapter_SurfaceHealth_NotInWindow verifies in_window=false parsing.
 func TestCmuxAdapter_SurfaceHealth_NotInWindow(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:2")
 	restore, _ := newCmuxMockV2("surface:3 type=terminal in_window=false", nil)
 	defer restore()
 
@@ -65,6 +66,7 @@ func TestCmuxAdapter_SurfaceHealth_NotInWindow(t *testing.T) {
 // TestCmuxAdapter_SurfaceHealth_MultipleSurfacesSelectsRequested verifies that
 // workspace-wide health output cannot overwrite the requested pane with the last line.
 func TestCmuxAdapter_SurfaceHealth_MultipleSurfacesSelectsRequested(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:2")
 	output := strings.Join([]string{
 		"surface:3 type=terminal in_window=false",
 		"surface:7 type=terminal in_window=true",
@@ -84,6 +86,7 @@ func TestCmuxAdapter_SurfaceHealth_MultipleSurfacesSelectsRequested(t *testing.T
 // TestCmuxAdapter_SurfaceHealth_MissingRequestedSurfaceReturnsError verifies that
 // a different healthy surface cannot make a missing provider pane look healthy.
 func TestCmuxAdapter_SurfaceHealth_MissingRequestedSurfaceReturnsError(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:2")
 	output := strings.Join([]string{
 		"surface:3 type=terminal in_window=true",
 		"surface:70 type=terminal in_window=true",
@@ -110,6 +113,7 @@ func TestCmuxAdapter_SurfaceHealth_InvalidPaneID(t *testing.T) {
 
 // TestCmuxAdapter_SurfaceHealth_CommandError verifies error propagation.
 func TestCmuxAdapter_SurfaceHealth_CommandError(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:2")
 	restore, _ := newCmuxMockV2("", fmt.Errorf("command failed"))
 	defer restore()
 

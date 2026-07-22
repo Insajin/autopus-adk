@@ -30,6 +30,7 @@ type CollectProviderResult struct {
 func newOrchestraCollectCmd() *cobra.Command {
 	var round int
 	var clean bool
+	var workspaceRef string
 
 	cmd := &cobra.Command{
 		Use:   "collect <session-id>",
@@ -49,9 +50,11 @@ func newOrchestraCollectCmd() *cobra.Command {
 				targetRound = len(session.Rounds)
 			}
 
-			term := terminal.DetectTerminal()
-			if term == nil {
-				return fmt.Errorf("no terminal multiplexer detected — collect requires cmux or tmux")
+			term, err := orchestra.ResolveSessionTerminalWithWorkspace(
+				session, orchestraSessionTerminalDetector(), workspaceRef,
+			)
+			if err != nil {
+				return fmt.Errorf("restore session %q terminal: %w", sessionID, err)
 			}
 
 			ctx := cmd.Context()
@@ -107,5 +110,6 @@ func newOrchestraCollectCmd() *cobra.Command {
 
 	cmd.Flags().IntVar(&round, "round", 0, "Round number to collect (0 = latest)")
 	cmd.Flags().BoolVar(&clean, "clean", false, "Apply TUI sanitizer (strip noise, preserve content)")
+	cmd.Flags().StringVar(&workspaceRef, "workspace-ref", "", "legacy cmux session workspace ref")
 	return cmd
 }

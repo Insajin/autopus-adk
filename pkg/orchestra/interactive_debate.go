@@ -93,6 +93,7 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 
 // runPaneDebate executes the multi-turn debate loop using terminal panes.
 func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRound time.Duration, start time.Time) (*OrchestraResult, error) {
+	cfg.DebateRounds = rounds
 	cfg.RunID = ensureRunID(&cfg)
 	if cfg.ReliabilityStore == nil {
 		store, err := newReliabilityStore(cfg.RunID)
@@ -150,9 +151,11 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 	}
 
 	launchFailed := launchInteractiveSessions(ctx, cfg, panes)
-	if !cfg.HookMode || hookSession == nil {
-		launchFailed = append(launchFailed, waitForSessionReady(ctx, cfg.Terminal, panes)...)
-	}
+	// Startup cannot consume the whole orchestration deadline: a failed provider
+	// must still reach the round result as skipWait plus FailedProvider evidence.
+	readyCtx, cancelReady := context.WithTimeout(ctx, perRound)
+	launchFailed = append(launchFailed, waitForSessionReadyWithHook(readyCtx, cfg.Terminal, panes, hookSession, 1)...)
+	cancelReady()
 	if cfg.ReliabilityStore != nil {
 		for _, provider := range cfg.Providers {
 			_ = cfg.ReliabilityStore.recordPreflight(preflightReceipt(cfg.RunID, cfg, provider))
@@ -161,6 +164,7 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 	// Create SurfaceManager for proactive health monitoring (R1).
 	surfMgr := NewSurfaceManager(cfg.Terminal)
+	surfMgr.setHookSession(hookSession)
 	surfMgr.Start(ctx, panes)
 	defer surfMgr.Stop()
 	cfg.SurfaceMgr = surfMgr
@@ -197,18 +201,27 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 		roundHistory = append(roundHistory, roundResponses)
 
-		// R5: Yield mode — output JSON after Round 1 and keep panes alive.
 		if cfg.YieldRounds && round == 1 {
 			fmt.Fprintf(os.Stderr, "[Debate] yield after round 1/%d\n", rounds)
+			if err := releaseYieldHookWaiters(
+				ctx, hookSession, panes, round+1, yieldHookReleaseBudget(perRound),
+			); err != nil {
+				return nil, fmt.Errorf("release hook waiters before yield: %w", err)
+			}
 			sessionID := NewSessionID()
-			session := buildYieldSession(sessionID, panes, roundResponses, time.Now())
+			session, sessionErr := buildYieldSession(sessionID, cfg.Terminal, panes, roundResponses, time.Now())
+			if sessionErr != nil {
+				return nil, fmt.Errorf("persist yield session context: %w", sessionErr)
+			}
 			if err := SaveSession(session); err != nil {
 				return nil, fmt.Errorf("persist yield session: %w", err)
 			}
+			handoffErr := handoffYieldPanes(sessionID, cfg.Terminal, panes)
 			ownsPanes = false
+			if handoffErr != nil {
+				return nil, handoffErr
+			}
 			output := BuildYieldOutput(cfg, panes, roundHistory, sessionID)
-			// surfMgr.Stop() removed — defer at line 115 handles cleanup.
-			// Explicit Stop here caused duplicate WarmPool.Close() calls.
 			result := buildDebateResult(cfg, roundResponses, roundHistory, start)
 			result.Yield = &output
 			result.FailedProviders = append(result.FailedProviders, launchFailed...)
@@ -258,37 +271,6 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 		result.FailedProviders[i].CorrelationRunID = cfg.RunID
 	}
 	return finalizeDebateOutcome(result, cfg)
-}
-
-func buildYieldSession(sessionID string, panes []paneInfo, responses []ProviderResponse, createdAt time.Time) OrchestraSession {
-	session := OrchestraSession{
-		ID:        sessionID,
-		Panes:     make(map[string]string, len(panes)),
-		Providers: make([]SessionProviderConfig, 0, len(panes)),
-		Rounds:    make([][]SessionProviderResponse, 0, 1),
-		CreatedAt: createdAt,
-	}
-	for _, pi := range panes {
-		session.Panes[pi.provider.Name] = string(pi.paneID)
-		session.Providers = append(session.Providers, SessionProviderConfig{
-			Name:   pi.provider.Name,
-			Binary: pi.provider.Binary,
-		})
-	}
-
-	round := make([]SessionProviderResponse, 0, len(responses))
-	for _, response := range responses {
-		round = append(round, SessionProviderResponse{
-			Provider:        response.Provider,
-			Output:          response.Output,
-			DurationMs:      response.Duration.Milliseconds(),
-			TimedOut:        response.TimedOut,
-			Usage:           response.Usage,
-			UsageCapability: response.UsageCapability,
-		})
-	}
-	session.Rounds = append(session.Rounds, round)
-	return session
 }
 
 // executeRound is in interactive_debate_round.go.

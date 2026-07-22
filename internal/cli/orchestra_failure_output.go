@@ -17,6 +17,8 @@ type orchestraFailureReport struct {
 	Strategy         string                     `json:"strategy"`
 	Providers        []string                   `json:"providers"`
 	RunID            string                     `json:"run_id,omitempty"`
+	SessionID        string                     `json:"session_id,omitempty"`
+	CleanupCommand   string                     `json:"cleanup_command,omitempty"`
 	Duration         string                     `json:"duration,omitempty"`
 	Error            string                     `json:"error,omitempty"`
 	Summary          string                     `json:"summary,omitempty"`
@@ -64,6 +66,7 @@ func saveOrchestraDiagnosticsReport(prefix, command, strategy string, providers 
 		report.RunID = result.RunID
 		report.Duration = result.Duration.Round(time.Millisecond).String()
 		report.Summary = result.Summary
+		report.SessionID, report.CleanupCommand = orchestraRecoveryHandle(result)
 		if result.Reliability != nil {
 			report.ArtifactDir = result.Reliability.ArtifactDir
 		}
@@ -102,6 +105,10 @@ func renderOrchestraFailureSummary(timeout ResolvedOrchestraTimeout, result *orc
 		fmt.Fprintf(&sb, "- provider timeout %s: %s (%s)\n", detail.Provider, detail.Duration, detail.Source)
 	}
 	if result != nil {
+		if sessionID, cleanupCommand := orchestraRecoveryHandle(result); sessionID != "" {
+			fmt.Fprintf(&sb, "- session: %s\n", sessionID)
+			fmt.Fprintf(&sb, "- cleanup: %s\n", cleanupCommand)
+		}
 		for _, fp := range result.FailedProviders {
 			fmt.Fprintf(&sb, "- failure %s [%s]: %s\n", fp.Name, fp.FailureClass, fp.Error)
 			if fp.NextRemediation != "" {
@@ -119,6 +126,17 @@ func renderOrchestraFailureSummary(timeout ResolvedOrchestraTimeout, result *orc
 		fmt.Fprintf(&sb, "- diagnostics report: %s\n", reportPath)
 	}
 	return sb.String()
+}
+
+func orchestraRecoveryHandle(result *orchestra.OrchestraResult) (string, string) {
+	if result == nil || result.Yield == nil {
+		return "", ""
+	}
+	sessionID := strings.TrimSpace(result.Yield.SessionID)
+	if sessionID == "" {
+		return "", ""
+	}
+	return sessionID, "auto orchestra cleanup --session-id " + sessionID
 }
 
 func shouldTreatOrchestraResultAsFailure(result *orchestra.OrchestraResult) bool {

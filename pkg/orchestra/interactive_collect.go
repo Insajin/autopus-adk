@@ -23,6 +23,7 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 
 	for _, pi := range panes {
 		if pi.skipWait {
+			mu.Lock()
 			responses = append(responses, unavailableResponse(ProviderResponse{
 				Provider:    pi.provider.Name,
 				Duration:    time.Since(start),
@@ -30,6 +31,7 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 				EmptyOutput: true,
 				Error:       "provider was skipped before completion collection",
 			}, usageSourcePane, usageReasonPane))
+			mu.Unlock()
 			continue
 		}
 		wg.Add(1)
@@ -39,13 +41,23 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 			if baselines != nil {
 				baseline = baselines[pi.provider.Name]
 			}
-			timedOut := !waitForCompletion(ctx, cfg, pi, patterns, baseline, hookSession, round)
+			completionConfirmed := waitForCompletion(ctx, cfg, pi, patterns, baseline, hookSession, round)
+			timedOut := !completionConfirmed
 			output, responseFileOK := readResponseFile(pi.responseFile)
 			if responseFileOK {
 				timedOut = false
 			}
+			hookResultOK := false
+			if !responseFileOK && hookSession != nil && hookSession.HasHook(pi.provider.Name) {
+				if result, err := hookSession.ReadResultRound(pi.provider.Name, round); err == nil && result != nil && result.Output != "" {
+					output = result.Output
+					hookResultOK = true
+					// A result without detector completion is partial evidence, not
+					// authority to turn a timeout or detector failure into success.
+				}
+			}
 
-			if !responseFileOK {
+			if !responseFileOK && !hookResultOK {
 				// Fresh context for final read — original ctx may be cancelled after timeout.
 				readCtx, readCancel := context.WithTimeout(context.Background(), 5*time.Second)
 				screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{
@@ -88,6 +100,8 @@ func waitAndCollectResults(ctx context.Context, cfg OrchestraConfig, panes []pan
 				collectionMode := "poll"
 				if responseFileOK {
 					collectionMode = "response_file"
+				} else if hookResultOK {
+					collectionMode = "hook"
 				}
 				receipt := collectionReceipt(cfg.RunID, pi.provider.Name, collectionMode, collectionMode, status, errMsg, output, round, partial)
 				receiptPath = cfg.ReliabilityStore.recordCollection(receipt)

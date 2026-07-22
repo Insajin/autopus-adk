@@ -87,6 +87,7 @@ func (a *Adapter) Clean(_ context.Context) error {
 		filepath.Join(a.root, ".gemini", "commands"),
 		filepath.Join(a.root, ".gemini", "rules"),
 		filepath.Join(a.root, ".gemini", "agents"),
+		filepath.Join(a.root, ".gemini", "hooks", "autopus"),
 		filepath.Join(a.root, ".agents", "skills"),
 		filepath.Join(a.root, antigravityPluginDir),
 	}

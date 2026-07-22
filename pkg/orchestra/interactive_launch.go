@@ -17,6 +17,8 @@ const launchScriptsDir = ".autopus/orchestra/launch"
 // surface close before giving up and leaving the ref tracked for orphan reaping.
 const closePaneSurfaceAttempts = 3
 
+var closeSurfaceUntracker = untrackSurfaceForTerminal
+
 // buildInteractiveLaunchCmd constructs the launch command for interactive mode.
 // Uses the binary name plus model/variant flags from PaneArgs, excluding print/pipe flags.
 // When the provider supports launch-time input, prompt is a short instruction
@@ -66,7 +68,7 @@ func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir strin
 }
 
 func interactiveLaunchArgs(p ProviderConfig) []string {
-	if p.Name == "gemini" && p.Binary == "agy" && len(p.PaneArgs) == 0 && p.InteractiveInput != "args" {
+	if usesAntigravityPromptInteractive(p) && len(p.PaneArgs) == 0 && p.InteractiveInput != "args" {
 		return p.PaneArgs
 	}
 	return paneArgs(p)
@@ -80,8 +82,7 @@ func usesAntigravityPromptInteractive(p ProviderConfig) bool {
 	if p.Binary != "agy" && !strings.HasSuffix(p.Binary, "/agy") {
 		return false
 	}
-	name := strings.TrimSpace(p.Name)
-	return name == "gemini" || name == "antigravity" || name == "antigravity-cli"
+	return providerArtifactIdentity(p.Name) == "gemini"
 }
 
 func shellQuoteCommandArg(s string) string {
@@ -173,11 +174,14 @@ func cleanupInteractivePanes(term terminal.Terminal, panes []paneInfo) {
 // expires (issue #61: a completed provider pane intermittently lingers). A
 // swallowed close failure silently leaks the surface for the rest of the live
 // session — the orphan reaper only reclaims surfaces of dead processes on a
-// later run, never this process's own refs. Two guarantees keep the leak
+// later run, never this process's own refs. Three guarantees keep the leak
 // recoverable:
 //   - The surface ref is untracked ONLY on a successful close. Untracking after a
 //     failed close (the previous behavior) discarded the ref so even the
 //     next-run orphan reaper could never reclaim it — a permanent leak.
+//   - Tracker removal uses the exact terminal/workspace/server identity. A
+//     tracker persistence failure is logged but does not turn a successful pane
+//     close into a cleanup failure; the stale record remains a recovery handle.
 //   - A persistent failure is logged with the surface ref so the leak is
 //     observable instead of silent.
 func closePaneSurface(term terminal.Terminal, paneID terminal.PaneID) bool {
@@ -189,7 +193,9 @@ func closePaneSurface(term terminal.Terminal, paneID terminal.PaneID) bool {
 	var lastErr error
 	for attempt := 0; attempt < closePaneSurfaceAttempts; attempt++ {
 		if lastErr = term.Close(ctx, ref); lastErr == nil {
-			untrackSurface(ref)
+			if err := closeSurfaceUntracker(term, ref); err != nil {
+				log.Printf("[cleanup] surface %q closed but tracker handoff failed; recovery handle retained: %v", ref, err)
+			}
 			return true
 		}
 	}

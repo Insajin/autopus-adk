@@ -10,14 +10,14 @@ import (
 
 // CmuxAdapter implements Terminal using the cmux terminal multiplexer.
 type CmuxAdapter struct {
-	workspaceRef string // e.g. "workspace:1" — stored from CreateWorkspace or env
+	workspaceRef string // e.g. "workspace:1" or a canonical UUID
 }
 
 // Name returns the adapter name.
 func (a *CmuxAdapter) Name() string { return "cmux" }
 
 // CreateWorkspace creates a new cmux workspace and renames it to the given name.
-// It stores the workspace ref internally for use by Close.
+// It stores the workspace ref internally for later workspace-scoped commands.
 func (a *CmuxAdapter) CreateWorkspace(_ context.Context, name string) error {
 	if err := validateWorkspaceName(name); err != nil {
 		return fmt.Errorf("cmux: %w", err)
@@ -27,10 +27,14 @@ func (a *CmuxAdapter) CreateWorkspace(_ context.Context, name string) error {
 	if err != nil {
 		return fmt.Errorf("cmux: create workspace: %w", err)
 	}
-	a.workspaceRef = parseCmuxRef(string(out), "workspace")
-	if a.workspaceRef == "" {
+	workspaceRef := parseCmuxRef(string(out), "workspace")
+	if workspaceRef == "" {
 		return fmt.Errorf("cmux: create workspace: failed to parse workspace ref from output %q", string(out))
 	}
+	if err := validateCmuxWorkspaceRef(workspaceRef); err != nil {
+		return fmt.Errorf("cmux: create workspace: %w", err)
+	}
+	a.workspaceRef = workspaceRef
 	renameCmd := execCommand("cmux", "rename-workspace", "--workspace", a.workspaceRef, name)
 	if err := renameCmd.Run(); err != nil {
 		return fmt.Errorf("cmux: rename workspace %q: %w", name, err)
@@ -41,7 +45,11 @@ func (a *CmuxAdapter) CreateWorkspace(_ context.Context, name string) error {
 // CreateSurface creates a new independent surface (tab) via cmux new-surface.
 // Each surface gets the full terminal width, avoiding pane width starvation.
 func (a *CmuxAdapter) CreateSurface(_ context.Context) (PaneID, error) {
-	cmd := execCommand("cmux", "new-surface")
+	args, err := a.workspaceCommandArgs("new-surface")
+	if err != nil {
+		return "", fmt.Errorf("cmux: new-surface: %w", err)
+	}
+	cmd := execCommand("cmux", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("cmux: new-surface: %w", err)
@@ -59,7 +67,11 @@ func (a *CmuxAdapter) SplitPane(ctx context.Context, dir Direction) (PaneID, err
 	if dir == Vertical {
 		direction = "down"
 	}
-	cmd := execCommandContext(ctx, "cmux", "new-split", direction)
+	args, err := a.workspaceCommandArgs("new-split", direction)
+	if err != nil {
+		return "", fmt.Errorf("cmux: split pane: %w", err)
+	}
+	cmd := execCommandContext(ctx, "cmux", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("cmux: split pane: %w", err)
@@ -77,7 +89,11 @@ func (a *CmuxAdapter) FocusPane(_ context.Context, paneID PaneID) error {
 	if err := validatePaneID(paneID); err != nil {
 		return fmt.Errorf("cmux: %w", err)
 	}
-	cmd := execCommand("cmux", "move-surface", "--surface", string(paneID), "--focus", "true")
+	args, err := a.surfaceCommandArgs("move-surface", paneID, "--focus", "true")
+	if err != nil {
+		return fmt.Errorf("cmux: focus pane %s: %w", paneID, err)
+	}
+	cmd := execCommand("cmux", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("cmux: focus pane %s: %w", paneID, err)
 	}
@@ -90,20 +106,28 @@ func (a *CmuxAdapter) SendCommand(ctx context.Context, paneID PaneID, command st
 		return fmt.Errorf("cmux: %w", err)
 	}
 	if isEnterCommand(command) {
-		cmd := execCommandContext(ctx, "cmux", "send-key", "--surface", string(paneID), "Enter")
+		args, err := a.surfaceCommandArgs("send-key", paneID, "Enter")
+		if err != nil {
+			return fmt.Errorf("cmux: send enter to pane %s: %w", paneID, err)
+		}
+		cmd := execCommandContext(ctx, "cmux", args...)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("cmux: send enter to pane %s: %w", paneID, err)
 		}
 		return nil
 	}
-	cmd := execCommandContext(ctx, "cmux", "send", "--surface", string(paneID), command)
+	args, err := a.surfaceCommandArgs("send", paneID, "--", command)
+	if err != nil {
+		return fmt.Errorf("cmux: send command to pane %s: %w", paneID, err)
+	}
+	cmd := execCommandContext(ctx, "cmux", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("cmux: send command to pane %s: %w", paneID, err)
 	}
 	return nil
 }
 
-// SendLongText sends text to a pane via set-buffer/paste-buffer/delete-buffer.
+// SendLongText sends text to a pane via a bounded set-buffer/paste-buffer pair.
 // Buffer paste is used for short and long payloads because cmux send goes
 // through the active keyboard input path and can be affected by IME state.
 // @AX:ANCHOR: [AUTO] public API contract — Terminal interface method; fan_in=3 (interactive.go x2, interactive_debate.go)
@@ -114,28 +138,40 @@ func (a *CmuxAdapter) SendLongText(ctx context.Context, paneID PaneID, text stri
 	if text == "" {
 		return nil
 	}
+	pasteArgs, err := a.surfaceCommandArgs("paste-buffer", paneID)
+	if err != nil {
+		return fmt.Errorf("cmux: paste text to pane %s: %w", paneID, err)
+	}
+	releaseBuffer, err := acquireCmuxInputBuffer(ctx)
+	if err != nil {
+		return fmt.Errorf("cmux: paste text to pane %s: %w", paneID, err)
+	}
+	release := func() {
+		if releaseBuffer != nil {
+			releaseBuffer()
+			releaseBuffer = nil
+		}
+	}
+	defer release()
 
-	sanitized := strings.ReplaceAll(string(paneID), ":", "-")
-	bufName := fmt.Sprintf("autopus-%s-%d", sanitized, time.Now().UnixNano())
-
-	// set-buffer
-	setCmd := execCommandContext(ctx, "cmux", "set-buffer", "--name", bufName, text)
+	setCmd := execCommandContext(ctx, "cmux", "set-buffer", "--name", cmuxInputBufferName, "--", text)
 	if err := setCmd.Run(); err != nil {
 		// FR-10: fallback to chunked send on set-buffer failure
+		release()
 		return a.sendChunked(ctx, paneID, text)
 	}
 	// paste-buffer — fall back to chunked send if paste fails (e.g., on recreated surfaces)
-	pasteCmd := execCommandContext(ctx, "cmux", "paste-buffer", "--name", bufName, "--surface", string(paneID))
+	pasteArgs = append(pasteArgs, "--name", cmuxInputBufferName)
+	pasteCmd := execCommandContext(ctx, "cmux", pasteArgs...)
 	if err := pasteCmd.Run(); err != nil {
-		// Clean up buffer before fallback
-		delFallback := execCommandContext(ctx, "cmux", "delete-buffer", "--name", bufName)
-		_ = delFallback.Run()
+		callerErr := settleAndClearCmuxInputBuffer(ctx)
+		release()
+		if callerErr != nil {
+			return callerErr
+		}
 		return a.sendChunked(ctx, paneID, text)
 	}
-	// delete-buffer (best-effort, FR-11)
-	delCmd := execCommandContext(ctx, "cmux", "delete-buffer", "--name", bufName)
-	_ = delCmd.Run()
-	return nil
+	return settleAndClearCmuxInputBuffer(ctx)
 }
 
 // sendChunked sends long text in chunks to avoid PTY 4KB truncation.
@@ -163,52 +199,15 @@ func (a *CmuxAdapter) sendChunked(ctx context.Context, paneID PaneID, text strin
 	return nil
 }
 
-// Notify sends a notification message via cmux notify --title.
-func (a *CmuxAdapter) Notify(_ context.Context, message string) error {
-	cmd := execCommand("cmux", "notify", "--title", message)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("cmux: notify: %w", err)
-	}
-	return nil
-}
-
-// Close closes a surface or workspace by ref or stored workspace name.
-// If name is a cmux ref (surface:N or pane:N), uses close-surface.
-// If name is a workspace ref (workspace:N), uses close-workspace.
-// Otherwise, uses the stored workspaceRef from CreateWorkspace.
-func (a *CmuxAdapter) Close(_ context.Context, name string) error {
-	if isCmuxRef(name) {
-		if strings.HasPrefix(name, "surface:") || strings.HasPrefix(name, "pane:") {
-			cmd := execCommand("cmux", "close-surface", "--surface", name)
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("cmux: close surface %s: %w", name, err)
-			}
-			return nil
-		}
-		cmd := execCommand("cmux", "close-workspace", "--workspace", name)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("cmux: close workspace %s: %w", name, err)
-		}
-		return nil
-	}
-	// Name-based: use stored workspace ref if available.
-	ref := a.workspaceRef
-	if ref == "" {
-		return fmt.Errorf("cmux: close workspace %q: no workspace ref stored (call CreateWorkspace first)", name)
-	}
-	cmd := execCommand("cmux", "close-workspace", "--workspace", ref)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("cmux: close workspace %q: %w", name, err)
-	}
-	return nil
-}
-
 // ReadScreen reads pane content via cmux read-screen.
 func (a *CmuxAdapter) ReadScreen(ctx context.Context, paneID PaneID, opts ReadScreenOpts) (string, error) {
 	if err := validatePaneID(paneID); err != nil {
 		return "", fmt.Errorf("cmux: %w", err)
 	}
-	args := []string{"read-screen", "--surface", string(paneID)}
+	args, err := a.surfaceCommandArgs("read-screen", paneID)
+	if err != nil {
+		return "", fmt.Errorf("cmux: read-screen pane %s: %w", paneID, err)
+	}
 	if opts.Scrollback {
 		args = append(args, "--scrollback")
 	}
@@ -232,7 +231,14 @@ func (a *CmuxAdapter) PipePaneStart(_ context.Context, paneID PaneID, outputFile
 		return fmt.Errorf("cmux: %w", err)
 	}
 	// SEC-007: shell-escape outputFile to prevent command injection via malicious paths
-	cmd := execCommand("cmux", "pipe-pane", "--surface", string(paneID), "--command", "cat >> '"+strings.ReplaceAll(outputFile, "'", "'\\''")+"'")
+	args, err := a.surfaceCommandArgs(
+		"pipe-pane", paneID,
+		"--command", "cat >> '"+strings.ReplaceAll(outputFile, "'", "'\\''")+"'",
+	)
+	if err != nil {
+		return fmt.Errorf("cmux: pipe-pane start pane %s: %w", paneID, err)
+	}
+	cmd := execCommand("cmux", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("cmux: pipe-pane start pane %s: %w", paneID, err)
 	}
@@ -244,25 +250,13 @@ func (a *CmuxAdapter) PipePaneStop(_ context.Context, paneID PaneID) error {
 	if err := validatePaneID(paneID); err != nil {
 		return fmt.Errorf("cmux: %w", err)
 	}
-	cmd := execCommand("cmux", "pipe-pane", "--surface", string(paneID), "--command", "")
+	args, err := a.surfaceCommandArgs("pipe-pane", paneID, "--command", "")
+	if err != nil {
+		return fmt.Errorf("cmux: pipe-pane stop pane %s: %w", paneID, err)
+	}
+	cmd := execCommand("cmux", args...)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("cmux: pipe-pane stop pane %s: %w", paneID, err)
 	}
 	return nil
-}
-
-// parseCmuxRef extracts a typed ref (e.g., "surface:7") from cmux CLI output.
-// Output format: "OK surface:7 workspace:1" or "OK workspace:5".
-func parseCmuxRef(output, refType string) string {
-	for field := range strings.FieldsSeq(strings.TrimSpace(output)) {
-		if strings.HasPrefix(field, refType+":") {
-			return field
-		}
-	}
-	return ""
-}
-
-// isCmuxRef reports whether s is a cmux reference (type:number format).
-func isCmuxRef(s string) bool {
-	return validCmuxRef.MatchString(s)
 }

@@ -12,7 +12,7 @@ import (
 // RoundSignalName generates a round-scoped signal filename.
 // Format: "{provider}-round{N}-{suffix}" (e.g., "claude-round2-done").
 func RoundSignalName(provider string, round int, suffix string) string {
-	return fmt.Sprintf("%s-round%d-%s", sanitizeProviderName(provider), round, suffix)
+	return fmt.Sprintf("%s-round%d-%s", sanitizeProviderName(providerArtifactIdentity(provider)), round, suffix)
 }
 
 // CleanRoundSignals removes signal files for the given round,

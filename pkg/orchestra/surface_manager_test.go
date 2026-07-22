@@ -185,7 +185,7 @@ func TestSurfaceManager_ValidateAndRecover_Healthy(t *testing.T) {
 	newPI, recovered, err := sm.ValidateAndRecover(context.Background(), cfg, pi, 1)
 	require.NoError(t, err)
 	assert.False(t, recovered)
-	assert.Equal(t, pi.paneID, newPI.paneID)
+	assert.Equal(t, pi, newPI, "an existing healthy pane must remain unchanged")
 }
 
 // TestSurfaceManager_ValidateAndRecover_StaleReadScreen verifies recovery when
@@ -208,6 +208,7 @@ func TestSurfaceManager_ValidateAndRecover_StaleReadScreen(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, recovered, "recovery should occur when ReadScreen fails")
 	assert.NotEqual(t, pi.paneID, newPI.paneID, "new pane should have different ID")
+	assert.Equal(t, 1, newPI.directPromptRound)
 }
 
 // TestSurfaceManager_ValidateAndRecover_CachedUnhealthyLiveHealthy preserves a
@@ -290,6 +291,7 @@ func TestSurfaceManager_ValidateAndRecover_WarmReplacementCommitsBeforeOldClose(
 	require.NoError(t, err)
 	assert.True(t, recovered)
 	assert.Equal(t, terminal.PaneID("warm-pane"), newPI.paneID)
+	assert.Equal(t, 1, newPI.directPromptRound)
 	launchIndex := term.eventIndex("launch:warm-pane")
 	closeIndex := term.eventIndex("close:old-pane")
 	require.NotEqual(t, -1, launchIndex)

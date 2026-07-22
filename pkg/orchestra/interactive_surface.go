@@ -34,6 +34,9 @@ func validateSurface(ctx context.Context, term terminal.Terminal, paneID termina
 // success. (R2, R3, R4)
 func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round int) (paneInfo, error) {
 	oldPaneID := pi.paneID
+	if _, err := recoveryHookSession(cfg); err != nil {
+		return pi, fmt.Errorf("recreatePane %s: %w", pi.provider.Name, err)
+	}
 
 	// Prepare a replacement while the old pane remains available. The old pane
 	// is retired only after the new CLI session reaches the commit point.
@@ -79,38 +82,16 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 		outputPath = ""
 	}
 
-	// Set round env on new pane before launching CLI.
-	if round > 1 && pi.provider.InteractiveInput == "args" {
-		roundErr, roundEnterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, newPaneID, 0, func() error {
-			return SendRoundEnvToPane(ctx, cfg.Terminal, newPaneID, round)
-		})
-		if roundErr != nil || roundEnterErr != nil {
-			log.Printf("[recreatePane] %s round env failed (non-fatal): send=%v enter=%v", pi.provider.Name, roundErr, roundEnterErr)
-		}
-	}
-
-	// Relaunch CLI session. For args providers in round > 1, launch in REPL
-	// mode without the original prompt — the round prompt will be sent via
-	// SendLongText later by the caller.
-	cmd := buildInteractiveLaunchCmdWithCWD(pi.provider, "", cfg.WorkingDir)
-	launchErr, launchEnterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, newPaneID, promptRegisterDelay, func() error {
-		return cfg.Terminal.SendLongText(ctx, newPaneID, cmd)
-	})
-	if launchErr != nil {
+	// A fresh shell must receive all hook coordinates before the provider starts.
+	if err := launchRecoveryProvider(ctx, cfg, newPaneID, pi.provider, round); err != nil {
 		closePaneSurface(cfg.Terminal, newPaneID)
 		_ = os.Remove(tmpFile.Name())
-		return pi, fmt.Errorf("recreatePane launch for %s: %w", pi.provider.Name, launchErr)
-	}
-	if launchEnterErr != nil {
-		closePaneSurface(cfg.Terminal, newPaneID)
-		_ = os.Remove(tmpFile.Name())
-		return pi, fmt.Errorf("recreatePane launch enter for %s: %w", pi.provider.Name, launchEnterErr)
+		return pi, fmt.Errorf("recreatePane %s: %w", pi.provider.Name, err)
 	}
 
-	// Wait for session readiness.
-	patterns := SessionReadyPatterns()
+	// Commit only after two consecutive provider-specific ready frames.
 	timeout := startupTimeoutFor(pi.provider)
-	if !pollUntilSessionReady(ctx, cfg.Terminal, newPaneID, patterns, timeout) {
+	if !waitForRecoveredProviderReady(ctx, cfg, newPaneID, pi.provider, round) {
 		closePaneSurface(cfg.Terminal, newPaneID)
 		_ = os.Remove(tmpFile.Name())
 		return pi, fmt.Errorf("recreatePane session for %s did not become ready after %s", pi.provider.Name, timeout)
@@ -127,10 +108,11 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	log.Printf("[Surface] %s pane recreated: %s → %s", pi.provider.Name, oldPaneID, newPaneID)
 
 	return paneInfo{
-		paneID:     newPaneID,
-		outputFile: outputPath,
-		provider:   pi.provider,
-		skipWait:   false,
+		paneID:            newPaneID,
+		outputFile:        outputPath,
+		provider:          pi.provider,
+		skipWait:          false,
+		directPromptRound: round,
 	}, nil
 }
 

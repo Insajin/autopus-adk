@@ -16,23 +16,34 @@ case "$SESSION_ID" in
 esac
 
 SESSION_DIR="${AUTOPUS_SESSION_DIR:-/tmp/autopus/${SESSION_ID}}"
+case "$SESSION_DIR" in
+  /*) ;;
+  *) exit 0 ;;
+esac
 if [ ! -d "$SESSION_DIR" ] || [ -L "$SESSION_DIR" ]; then
   exit 0
 fi
 
-# Atomically replace a signal entry relative to an already-open, non-symlink
-# session directory. The temporary file is mode 0600 and a final symlink at the
-# target name is replaced rather than followed.
-atomic_touch() {
+# Atomically replace an entry relative to an already-open, non-symlink session
+# directory. The temporary file is mode 0600 and target symlinks are replaced.
+atomic_write() {
   python3 -c "
 import os, secrets, sys
 directory_flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0)
 directory_fd = os.open(sys.argv[1], directory_flags)
 temporary = '.autopus-hook-' + secrets.token_hex(12)
+body = sys.argv[3].encode('ascii')
 file_fd = -1
 try:
     file_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, 'O_NOFOLLOW', 0)
     file_fd = os.open(temporary, file_flags, 0o600, dir_fd=directory_fd)
+    os.fchmod(file_fd, 0o600)
+    remaining = memoryview(body)
+    while remaining:
+        written = os.write(file_fd, remaining)
+        if written <= 0:
+            raise OSError('short write')
+        remaining = remaining[written:]
     os.fsync(file_fd)
     os.close(file_fd)
     file_fd = -1
@@ -47,14 +58,50 @@ except Exception:
     raise
 finally:
     os.close(directory_fd)
-" "$SESSION_DIR" "$1" 2>/dev/null
+" "$SESSION_DIR" "$1" "$2" 2>/dev/null
 }
 
-# Determine round-scoped file names when AUTOPUS_ROUND is set (integer-only).
-case "${AUTOPUS_ROUND:-}" in *[!0-9]*) AUTOPUS_ROUND="" ;; esac
-if [ -n "$AUTOPUS_ROUND" ]; then
-  RESULT_NAME="codex-round${AUTOPUS_ROUND}-result.json"
-  DONE_NAME="codex-round${AUTOPUS_ROUND}-done"
+# Resolve the effective round from the environment and confined cursor file.
+CURSOR_NAME="codex-round-cursor"
+EFFECTIVE_ROUND=$(python3 -c "
+import os, stat, sys
+def parse(value, allow_newline=False):
+    if allow_newline:
+        value = value.rstrip('\\r\\n')
+    if not value or any(ch < '0' or ch > '9' for ch in value):
+        return None
+    number = int(value)
+    return number if number <= 2147483646 else None
+env_round = parse(sys.argv[3])
+cursor_round = None
+directory_fd = file_fd = -1
+try:
+    directory_flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0)
+    directory_fd = os.open(sys.argv[1], directory_flags)
+    file_flags = os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_NOFOLLOW', 0)
+    file_fd = os.open(sys.argv[2], file_flags, dir_fd=directory_fd)
+    info = os.fstat(file_fd)
+    if stat.S_ISREG(info.st_mode) and info.st_size <= 64:
+        with os.fdopen(file_fd, 'rb') as source:
+            file_fd = -1
+            raw = source.read(65)
+        if len(raw) <= 64:
+            cursor_round = parse(raw.decode('ascii'), True)
+except Exception:
+    pass
+finally:
+    if file_fd >= 0:
+        os.close(file_fd)
+    if directory_fd >= 0:
+        os.close(directory_fd)
+rounds = [value for value in (env_round, cursor_round) if value is not None]
+if rounds:
+    print(max(rounds))
+" "$SESSION_DIR" "$CURSOR_NAME" "${AUTOPUS_ROUND:-}" 2>/dev/null) || EFFECTIVE_ROUND=""
+
+if [ -n "$EFFECTIVE_ROUND" ]; then
+  RESULT_NAME="codex-round${EFFECTIVE_ROUND}-result.json"
+  DONE_NAME="codex-round${EFFECTIVE_ROUND}-done"
 else
   RESULT_NAME="codex-result.json"
   DONE_NAME="codex-done"
@@ -157,17 +204,17 @@ finally:
 
 # Send cmux completion signal for SignalDetector (SPEC-SURFCOMP-001 R8).
 if command -v cmux >/dev/null 2>&1; then
-  if [ -n "$AUTOPUS_ROUND" ] && [ "$AUTOPUS_ROUND" -gt 1 ] 2>/dev/null; then
-    cmux wait-for -S "done-codex-round${AUTOPUS_ROUND}" 2>/dev/null || true
+  if [ -n "$EFFECTIVE_ROUND" ] && [ "$EFFECTIVE_ROUND" -gt 1 ] 2>/dev/null; then
+    cmux wait-for -S "done-codex-round${EFFECTIVE_ROUND}" >/dev/null 2>&1 || true
   else
-    cmux wait-for -S "done-codex" 2>/dev/null || true
+    cmux wait-for -S "done-codex" >/dev/null 2>&1 || true
   fi
 fi
 
 # --- Bidirectional IPC: Ready signal + Input watch loop (SPEC-ORCH-017) ---
 # Only activate for round-scoped sessions.
-if [ -n "$AUTOPUS_ROUND" ]; then
-  NEXT_ROUND=$((AUTOPUS_ROUND + 1))
+if [ -n "$EFFECTIVE_ROUND" ]; then
+  NEXT_ROUND=$((EFFECTIVE_ROUND + 1))
   READY_NAME="codex-round${NEXT_ROUND}-ready"
   INPUT_NAME="codex-round${NEXT_ROUND}-input.json"
   ABORT_NAME="codex-round${NEXT_ROUND}-abort"
@@ -176,7 +223,7 @@ if [ -n "$AUTOPUS_ROUND" ]; then
   ABORT_FILE="${SESSION_DIR}/${ABORT_NAME}"
 
   # Signal ready for next round input.
-  atomic_touch "$READY_NAME"
+  atomic_write "$READY_NAME" ""
 
   # Poll for input file (200ms intervals, 120s timeout = 600 iterations).
   # @AX:NOTE [AUTO] magic constants 200ms/600 iterations — must match Go-side fileIPCReadyTimeout budget
@@ -188,7 +235,7 @@ if [ -n "$AUTOPUS_ROUND" ]; then
       exit 0
     fi
     if [ -f "$INPUT_FILE" ]; then
-      PROMPT=$(python3 -c "
+      STOP_OUTPUT=$(python3 -c "
 import json, os, stat, sys
 directory_flags = os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0)
 directory_fd = os.open(sys.argv[1], directory_flags)
@@ -202,15 +249,27 @@ try:
     with os.fdopen(file_fd) as source:
         file_fd = -1
         data = json.load(source)
-    print(data.get('prompt', '') if isinstance(data, dict) else '')
+    prompt = data.get('prompt', '') if isinstance(data, dict) else ''
+    provider = data.get('provider') if isinstance(data, dict) else None
+    round_number = data.get('round') if isinstance(data, dict) else None
+    valid_round = isinstance(round_number, int) and not isinstance(round_number, bool)
+    if provider == sys.argv[3] and valid_round and round_number == int(sys.argv[4]) and isinstance(prompt, str) and prompt:
+        sys.stdout.write(json.dumps(
+            {'decision': 'block', 'reason': prompt},
+            ensure_ascii=True,
+            separators=(',', ':'),
+        ))
 finally:
     if file_fd >= 0:
         os.close(file_fd)
     os.close(directory_fd)
-" "$SESSION_DIR" "$INPUT_NAME") || PROMPT=""
-      rm -f "${INPUT_FILE}" "${READY_FILE}"
-      if [ -n "$PROMPT" ]; then
-        printf '%s' "$PROMPT"
+" "$SESSION_DIR" "$INPUT_NAME" "codex" "$NEXT_ROUND") || STOP_OUTPUT=""
+      if [ -n "$STOP_OUTPUT" ]; then
+        atomic_write "$CURSOR_NAME" "$NEXT_ROUND"
+        rm -f "${INPUT_FILE}" "${READY_FILE}"
+        printf '%s' "$STOP_OUTPUT"
+      else
+        rm -f "${INPUT_FILE}" "${READY_FILE}"
       fi
       exit 0
     fi

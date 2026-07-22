@@ -120,6 +120,7 @@ func TestIsHookModeAvailable_CodexOnlyProject(t *testing.T) {
 		[]byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":".codex/hooks/autopus/hook-codex-stop.sh"}]}]}}`),
 		0o600,
 	))
+	writeHookFixture(t, projectRoot, ".codex/hooks/autopus/hook-codex-stop.sh", 0o700)
 
 	nestedDir := filepath.Join(projectRoot, "modules", "nested")
 	require.NoError(t, os.MkdirAll(nestedDir, 0o700))
@@ -134,6 +135,7 @@ func TestIsHookModeAvailable_CodexOnlyProject(t *testing.T) {
 // detected in the same way as user-global Claude hooks.
 func TestIsHookModeAvailable_GlobalCodexHook(t *testing.T) {
 	home := t.TempDir()
+	runtimeRoot := t.TempDir()
 	codexDir := filepath.Join(home, ".codex")
 	require.NoError(t, os.MkdirAll(codexDir, 0o700))
 	require.NoError(t, os.WriteFile(
@@ -141,8 +143,9 @@ func TestIsHookModeAvailable_GlobalCodexHook(t *testing.T) {
 		[]byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":".codex/hooks/autopus/hook-codex-stop.sh"}]}]}}`),
 		0o600,
 	))
+	writeHookFixture(t, runtimeRoot, ".codex/hooks/autopus/hook-codex-stop.sh", 0o700)
 	t.Setenv("HOME", home)
-	t.Chdir(t.TempDir())
+	t.Chdir(runtimeRoot)
 
 	assert.True(t, isHookModeAvailable(), "global Codex Stop hook must enable pane completion")
 }

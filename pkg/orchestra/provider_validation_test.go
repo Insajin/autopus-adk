@@ -21,6 +21,8 @@ func TestValidateProviderConfigs_RejectsUnsafeAndDuplicateNames(t *testing.T) {
 		{name: "unsafe", providers: []ProviderConfig{{Name: "../claude"}}, want: "unsafe"},
 		{name: "raw duplicate", providers: []ProviderConfig{{Name: "claude"}, {Name: "claude"}}, want: "duplicate raw"},
 		{name: "canonical duplicate", providers: []ProviderConfig{{Name: "claude"}, {Name: "Claude"}}, want: "duplicate canonical"},
+		{name: "claude artifact alias", providers: []ProviderConfig{{Name: "claude"}, {Name: "claude-code"}}, want: "duplicate canonical"},
+		{name: "gemini artifact alias", providers: []ProviderConfig{{Name: "gemini"}, {Name: "agy"}}, want: "duplicate canonical"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -36,6 +38,7 @@ func TestValidateProviderConfigs_SingleUppercaseCustomNameIsAllowed(t *testing.T
 	t.Parallel()
 
 	assert.NoError(t, validateProviderConfigs([]ProviderConfig{{Name: "CustomAI"}}))
+	assert.NoError(t, validateProviderConfigs([]ProviderConfig{{Name: "CustomAI"}, {Name: "OtherAI"}}))
 }
 
 func TestValidateHookSessionID_RequiresCanonicalLowercase(t *testing.T) {

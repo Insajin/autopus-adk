@@ -86,6 +86,10 @@ func TestRunPaneDebate_WithJudge(t *testing.T) {
 	mock := &countingScreenMock{
 		mockTerminal: mockTerminal{name: "cmux"},
 		outputs: []string{
+			"❯\n", // Claude startup frame 1
+			"❯\n", // Claude startup frame 2
+			">\n", // Gemini startup frame 1
+			">\n", // Gemini startup frame 2
 			"loading...\n",
 			"loading...\n",
 			"loading...\n",
@@ -106,7 +110,7 @@ func TestRunPaneDebate_WithJudge(t *testing.T) {
 		Interactive:    true,
 		InitialDelay:   time.Millisecond,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	result, err := runPaneDebate(ctx, cfg, 1, 45*time.Second, time.Now())

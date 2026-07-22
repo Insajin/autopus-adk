@@ -154,3 +154,38 @@ func RemoveSession(id string) error {
 	}
 	return nil
 }
+
+func openSessionUpdateTarget(id string) (*os.Root, string, fs.FileInfo, error) {
+	name, err := sessionFilename(id)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	root, err := openSessionRoot(false)
+	if err == nil {
+		_, info, readErr := readSessionEntry(root, name, id)
+		if readErr == nil {
+			return root, name, info, nil
+		}
+		_ = root.Close()
+		if !errors.Is(readErr, fs.ErrNotExist) {
+			return nil, "", nil, fmt.Errorf("read session before update: %w", readErr)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, "", nil, fmt.Errorf("open session update root: %w", err)
+	}
+
+	legacyName, err := legacySessionFilename(id)
+	if err != nil {
+		return nil, "", nil, err
+	}
+	legacyRoot, err := openLegacySessionRoot()
+	if err != nil {
+		return nil, "", nil, err
+	}
+	_, info, err := readSessionEntry(legacyRoot, legacyName, id)
+	if err != nil {
+		_ = legacyRoot.Close()
+		return nil, "", nil, fmt.Errorf("read legacy session before update: %w", err)
+	}
+	return legacyRoot, legacyName, info, nil
+}
