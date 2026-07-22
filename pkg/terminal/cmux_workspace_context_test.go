@@ -167,7 +167,7 @@ func TestCmuxAdapter_SendLongText_WithWorkspace_AddsContextOnlyToSurfaceCommand(
 		"paste-buffer", "--workspace", "workspace:13", "--surface", "surface:1414",
 		"--name", bufferName,
 	}, captured.calls[1].args)
-	assert.Equal(t, []string{"delete-buffer", "--name", bufferName}, captured.calls[2].args)
+	assert.Equal(t, []string{"set-buffer", "--name", bufferName, "--", ""}, captured.calls[2].args)
 }
 
 func TestCmuxAdapter_SendLongTextFallback_WithWorkspace_AddsContextToSend(t *testing.T) {
@@ -196,7 +196,7 @@ func TestCmuxAdapter_SendLongTextFallback_WithWorkspace_AddsContextToSend(t *tes
 				args: []string{"send", "--workspace", "workspace:13", "--surface", "surface:1414", "--", "fallback"},
 			})
 			for _, call := range captured.calls {
-				if call.args[0] == "set-buffer" || call.args[0] == "delete-buffer" {
+				if call.args[0] == "set-buffer" {
 					assert.NotContains(t, call.args, "--workspace")
 				}
 			}

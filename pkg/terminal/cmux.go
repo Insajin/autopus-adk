@@ -127,7 +127,7 @@ func (a *CmuxAdapter) SendCommand(ctx context.Context, paneID PaneID, command st
 	return nil
 }
 
-// SendLongText sends text to a pane via set-buffer/paste-buffer/delete-buffer.
+// SendLongText sends text to a pane via a bounded set-buffer/paste-buffer pair.
 // Buffer paste is used for short and long payloads because cmux send goes
 // through the active keyboard input path and can be affected by IME state.
 // @AX:ANCHOR: [AUTO] public API contract — Terminal interface method; fan_in=3 (interactive.go x2, interactive_debate.go)
@@ -142,28 +142,33 @@ func (a *CmuxAdapter) SendLongText(ctx context.Context, paneID PaneID, text stri
 	if err != nil {
 		return fmt.Errorf("cmux: paste text to pane %s: %w", paneID, err)
 	}
+	releaseBuffer, err := acquireCmuxInputBuffer(ctx)
+	if err != nil {
+		return fmt.Errorf("cmux: paste text to pane %s: %w", paneID, err)
+	}
+	release := func() {
+		if releaseBuffer != nil {
+			releaseBuffer()
+			releaseBuffer = nil
+		}
+	}
+	defer release()
 
-	sanitized := strings.ReplaceAll(string(paneID), ":", "-")
-	bufName := fmt.Sprintf("autopus-%s-%d", sanitized, time.Now().UnixNano())
-
-	// set-buffer
-	setCmd := execCommandContext(ctx, "cmux", "set-buffer", "--name", bufName, "--", text)
+	setCmd := execCommandContext(ctx, "cmux", "set-buffer", "--name", cmuxInputBufferName, "--", text)
 	if err := setCmd.Run(); err != nil {
 		// FR-10: fallback to chunked send on set-buffer failure
+		release()
 		return a.sendChunked(ctx, paneID, text)
 	}
 	// paste-buffer — fall back to chunked send if paste fails (e.g., on recreated surfaces)
-	pasteArgs = append(pasteArgs, "--name", bufName)
+	pasteArgs = append(pasteArgs, "--name", cmuxInputBufferName)
 	pasteCmd := execCommandContext(ctx, "cmux", pasteArgs...)
 	if err := pasteCmd.Run(); err != nil {
-		// Clean up buffer before fallback
-		delFallback := execCommandContext(ctx, "cmux", "delete-buffer", "--name", bufName)
-		_ = delFallback.Run()
+		clearCmuxInputBuffer()
+		release()
 		return a.sendChunked(ctx, paneID, text)
 	}
-	// delete-buffer (best-effort, FR-11)
-	delCmd := execCommandContext(ctx, "cmux", "delete-buffer", "--name", bufName)
-	_ = delCmd.Run()
+	clearCmuxInputBuffer()
 	return nil
 }
 
