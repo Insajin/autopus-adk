@@ -179,6 +179,18 @@ if grep -Fqx 'Signature=adhoc' "$identity_details"; then
   fail 'ad hoc signature is forbidden'
 fi
 
+execution_smoke_digest=$(sha256_file "$artifact_path") \
+  || fail 'cannot digest final signed companion before execution smoke'
+env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+  "$COMPANION_EXEC_SMOKE_GATE" \
+  --artifact "$artifact_path" \
+  --expected-version "$COMPANION_VERSION" \
+  --architecture "$COMPANION_ARCHITECTURE" \
+  --timeout 15s \
+  || fail 'final signed companion execution smoke failed'
+[[ "$(sha256_file "$artifact_path")" == "$execution_smoke_digest" ]] \
+  || fail 'final signed companion changed during execution smoke'
+
 if [[ "$public_key_receipt_enabled" == '1' ]]; then
   signing_key_digest_before=$(sha256_file "$COMPANION_SIGNING_KEY_FILE") \
     || fail 'cannot digest companion signing key'
@@ -210,6 +222,8 @@ if ! artifact_digest=$("$plutil_tool" -extract artifact_digest raw -o - "$manife
   fail 'companion manifest artifact digest is missing'
 fi
 actual_digest=$(sha256_file "$artifact_path") || fail 'cannot digest signed companion artifact'
+[[ "$artifact_digest" == "$execution_smoke_digest" ]] \
+  || fail 'companion manifest does not bind the execution-smoked artifact'
 [[ "$artifact_digest" == "$actual_digest" ]] || fail 'artifact changed after companion manifest digest'
 manifest_digest=$(sha256_file "$manifest_path") || fail 'cannot digest companion manifest'
 signature_digest=$(sha256_file "$signature_path") || fail 'cannot digest companion signature'

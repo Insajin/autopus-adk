@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **실행 심사 고착 감지와 배포 경계 강화** (2026-07-22): 설치 직후와 자가 업데이트 교체 전에 `auto version --short`를 제한 시간 안에 실행하고, 요청한 버전과 출력이 정확히 일치할 때만 다음 단계로 진행한다. macOS 릴리스는 Developer ID 서명·공증을 검증한 최종 바이너리를 arm64와 amd64별로 직접 실행한 뒤 manifest를 생성하며, 설치기와 CI는 timeout 시 남은 프로세스 트리를 정리하고 복구 안내를 제공한다. cmux 오류 테스트가 실제 사용자 pane을 여는 격리 누락도 함께 막았다. ([#100](https://github.com/Insajin/autopus-adk/issues/100))
+
 - **v0.50.84 companion A13 릴리스 준비** (2026-07-22): 릴리스 진입점을 annotated tag `v0.50.84`로만 옮기고 immutable `v0.50.83`을 직접 선행 릴리스로 검증한다. A13은 A12 source commit `e6367b5375cd4cdf09cb1515877bc57323521364`, tree `6c9a22e85d5a8c5f23c0d9e1bb41de270cab85a4`, annotated tag object `080507fceb3b4bf31f0e0887e49013fd65645ac2`, checksums SHA-256 `7d871b077766f3a7dd6859427fa9b1333422312764820243d3bf7af5e935dee0`, Darwin archive와 embedded manifest digest를 직접 고정한다. Homebrew는 검증된 A12 tap commit `192cacd10d0c85d5cc0533356400e697152a551c`과 Cask blob `2ba9ab9caa381c68a276588a7d6ad77de46f1dd5`에서 A13 Cask로만 CAS 갱신하며, Formula blob `4ebc6c38925002dec00759823d4dd847a499818a`는 동결한다. 최종 A13 source pin, 보호 환경 승인, K1 서명·공증, immutable GitHub Release와 Homebrew 반영은 태그 게시 단계에서 완결한다.
 
 - **QAMESH Go 캐시 수명 격리와 정규화 취약점 해소** (2026-07-22): 각 QAMESH 명령에 전용 Go 빌드 캐시를 할당하고 명령이 끝나면 해당 캐시만 정리한다. 프로젝트별 모듈 캐시는 계속 공유하므로 재사용성은 유지하면서 동시 실행 간 캐시 오염과 누적을 막는다. 호출 가능한 정규화 경로에서 무한 루프를 일으킬 수 있는 GO-2026-5970을 해소하도록 `golang.org/x/text`도 수정 버전으로 올렸다.

@@ -171,7 +171,7 @@ jobs:
 
   macos-runtime:
     name: macos-runtime
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -182,10 +182,70 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Build host-native unsigned macOS runtime smoke binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          host_arch="$(uname -m)"
+          go_arch="$(go env GOARCH)"
+          case "${host_arch}:${go_arch}" in
+            arm64:arm64|x86_64:amd64) ;;
+            *)
+              echo "::error::Host architecture ${host_arch} does not match Go architecture ${go_arch}"
+              exit 1
+              ;;
+          esac
+
+          runtime_version="ci-${GITHUB_SHA:0:12}"
+          runtime_commit="${GITHUB_SHA:0:12}"
+          runtime_date="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          runtime_binary="${RUNNER_TEMP}/auto-runtime-smoke"
+          go build -trimpath \
+            -ldflags "-s -w -X github.com/insajin/autopus-adk/pkg/version.version=${runtime_version} -X github.com/insajin/autopus-adk/pkg/version.commit=${runtime_commit} -X github.com/insajin/autopus-adk/pkg/version.date=${runtime_date}" \
+            -o "$runtime_binary" ./cmd/auto
+          {
+            echo "AUTOPUS_CI_RUNTIME_BINARY=${runtime_binary}"
+            echo "AUTOPUS_CI_RUNTIME_VERSION=${runtime_version}"
+          } >> "$GITHUB_ENV"
+
+      - name: Smoke host-native unsigned macOS command admission
+        shell: bash
+        run: |
+          # This source-built smoke does not replace the Developer ID signed and notarized release gate.
+          set -euo pipefail
+          AUTOPUS_INSTALLER_TEST_SOURCE=1
+          export AUTOPUS_INSTALLER_TEST_SOURCE
+          . ./install.sh
+          . ./scripts/install-runtime-v1.sh
+
+          runtime_output_file="${RUNNER_TEMP}/auto-runtime-smoke.version.out"
+          set +e
+          run_version_smoke "$AUTOPUS_CI_RUNTIME_BINARY" "$runtime_output_file"
+          runtime_status=$?
+          set -e
+          if [[ "$runtime_status" -ne 0 ]]; then
+            runtime_output="$(cat "$runtime_output_file")"
+            rm -f "$runtime_output_file"
+            if [[ "$runtime_status" -eq 124 ]]; then
+              echo "::error::Unsigned macOS runtime smoke timed out; the command and observed attached descendants were terminated"
+            else
+              echo "::error::Unsigned macOS runtime smoke failed with status ${runtime_status}: ${runtime_output}"
+            fi
+            exit 1
+          fi
+          if ! version_smoke_output_matches "$AUTOPUS_CI_RUNTIME_VERSION" "$runtime_output_file"; then
+            runtime_output="$(cat "$runtime_output_file")"
+            rm -f "$runtime_output_file"
+            echo "::error::Runtime version output ${runtime_output} does not exactly match ${AUTOPUS_CI_RUNTIME_VERSION}"
+            exit 1
+          fi
+          rm -f "$runtime_output_file"
+
       - name: Test macOS companion runtime contracts
         run: >-
           go test -race -count=1 -timeout=8m
           ./internal/companionmanifest/... ./pkg/companionmanifest/... ./pkg/selfupdate
+          ./scripts/companion-release/execsmoke
 
       - name: Test macOS POSIX installer signing
         run: go test -count=1 -timeout=5m . -run '^TestPOSIXInstaller'
@@ -212,7 +272,7 @@ jobs:
       - name: Test Windows self-update CLI failure boundaries
         run: >-
           go test -count=1 -timeout=5m ./internal/cli
-          -run '^(TestResolveCurrentBinaryPath_FailsClosedWhenSymlinkEvalFails|TestWithSelfUpdateTempDir_DoesNotRunAfterCreateFailure)$'
+          -run '^(TestResolveCurrentBinaryPath_FailsClosedWhenSymlinkEvalFails|TestWithSelfUpdateTempDir_DoesNotRunAfterCreateFailure|TestVerifyAndReplaceSelfUpdate_.*|TestProbeStagedSelfUpdateVersion_.*|TestNormalizeSelfUpdateVersionOutput_.*)$'
 
       - name: Test Windows installer signing on PowerShell 5.1
         run: >-

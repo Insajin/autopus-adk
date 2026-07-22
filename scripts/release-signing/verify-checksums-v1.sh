@@ -14,6 +14,18 @@ release_v1_fail() {
     return 1
 }
 
+release_v1_is_lower_hex() {
+    # Shell bracket ranges follow the caller's locale collation rules.
+    [ "$#" -eq 1 ] && [ -n "$1" ] || return 1
+    while [ -n "$1" ]; do
+        case "${1%"${1#?}"}" in
+            0|1|2|3|4|5|6|7|8|9|a|b|c|d|e|f) : ;;
+            *) return 1 ;;
+        esac
+        set -- "${1#?}"
+    done
+}
+
 release_v1_require_tools() {
     for tool in openssl od awk wc sed tr cmp grep date mkdir; do
         command -v "$tool" >/dev/null 2>&1 || {
@@ -113,7 +125,9 @@ release_v1_parse_envelope() {
             encoded=${line#*"$tab"}
             case "$encoded" in *"$tab"*|'') release_v1_fail malformed_release_signature_envelope; return 1 ;; esac
             [ "${#fingerprint}" -eq 64 ] || { release_v1_fail malformed_release_signature_envelope; return 1; }
-            case "$fingerprint" in *[!0-9a-f]*) release_v1_fail malformed_release_signature_envelope; return 1 ;; esac
+            release_v1_is_lower_hex "$fingerprint" || {
+                release_v1_fail malformed_release_signature_envelope; return 1
+            }
             case "$encoded" in *[!A-Za-z0-9+/=]*) release_v1_fail malformed_release_signature_envelope; return 1 ;; esac
             case "$seen" in *"|$fingerprint|"*) release_v1_fail malformed_release_signature_envelope; return 1 ;; esac
             seen="$seen$fingerprint|"
@@ -155,7 +169,9 @@ release_v1_prepare_trust() {
         [ -z "$extra" ] && [ "${#fingerprint}" -eq 64 ] || {
             release_v1_fail malformed_embedded_release_key; return 1
         }
-        case "$fingerprint" in *[!0-9a-f]*) release_v1_fail malformed_embedded_release_key; return 1 ;; esac
+        release_v1_is_lower_hex "$fingerprint" || {
+            release_v1_fail malformed_embedded_release_key; return 1
+        }
         case "$spki" in ''|*[!A-Za-z0-9+/=]*) release_v1_fail malformed_embedded_release_key; return 1 ;; esac
         release_v1_valid_date "$expiry" || { release_v1_fail malformed_embedded_release_key; return 1; }
         case "$seen" in *"|$fingerprint|"*) release_v1_fail malformed_embedded_release_key; return 1 ;; esac

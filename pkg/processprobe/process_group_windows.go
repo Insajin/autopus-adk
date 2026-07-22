@@ -17,6 +17,7 @@ const windowsProbeTerminationCode = 1
 
 func init() {
 	outputCommand = outputWindowsCommand
+	limitedOutputCommand = outputLimitedWindowsCommand
 }
 
 func configureProcessGroup(cmd *exec.Cmd) {
@@ -45,32 +46,44 @@ func outputWindowsCommand(cmd *exec.Cmd) ([]byte, error) {
 		cmd.Stderr = &stderr
 	}
 
-	job, err := newWindowsProbeJob()
-	if err != nil {
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, joinCleanupError(err, job.close())
-	}
-	if err := job.assign(cmd); err != nil {
-		cleanupErr := abortWindowsProbe(cmd, job, false)
-		return stdout.Bytes(), errors.Join(err, cleanupErr)
-	}
-	if err := resumeWindowsProcess(cmd.Process.Pid); err != nil {
-		cleanupErr := abortWindowsProbe(cmd, job, true)
-		return stdout.Bytes(), errors.Join(err, cleanupErr)
-	}
-
-	waitErr := cmd.Wait()
-	if waitErr != nil && captureStderr {
-		if exitErr, ok := waitErr.(*exec.ExitError); ok {
+	err := runWindowsProbeCommand(cmd, func() bool { return false })
+	if err != nil && captureStderr {
+		if exitErr := (*exec.ExitError)(nil); errors.As(err, &exitErr) {
 			exitErr.Stderr = stderr.Bytes()
 		}
 	}
-	if waitErr != nil {
-		return stdout.Bytes(), joinCleanupError(waitErr, job.terminateAndClose())
+	return stdout.Bytes(), err
+}
+
+func outputLimitedWindowsCommand(cmd *exec.Cmd, outputExceeded func() bool) error {
+	return runWindowsProbeCommand(cmd, outputExceeded)
+}
+
+func runWindowsProbeCommand(cmd *exec.Cmd, outputExceeded func() bool) error {
+	job, err := newWindowsProbeJob()
+	if err != nil {
+		return err
 	}
-	return stdout.Bytes(), job.releaseAndClose()
+	if err := cmd.Start(); err != nil {
+		return joinCleanupError(err, job.close())
+	}
+	if err := job.assign(cmd); err != nil {
+		cleanupErr := abortWindowsProbe(cmd, job, false)
+		return errors.Join(err, cleanupErr)
+	}
+	if err := resumeWindowsProcess(cmd.Process.Pid); err != nil {
+		cleanupErr := abortWindowsProbe(cmd, job, true)
+		return errors.Join(err, cleanupErr)
+	}
+
+	waitErr := cmd.Wait()
+	if waitErr != nil || outputExceeded() {
+		if waitErr == nil {
+			waitErr = ErrOutputLimit
+		}
+		return joinCleanupError(waitErr, job.terminateAndClose())
+	}
+	return job.releaseAndClose()
 }
 
 type windowsProbeJob struct {

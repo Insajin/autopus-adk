@@ -1,20 +1,32 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/processprobe"
 	"github.com/insajin/autopus-adk/pkg/selfupdate"
 	"github.com/insajin/autopus-adk/pkg/version"
 )
 
+const (
+	selfUpdateVersionProbeTimeout   = 15 * time.Second
+	selfUpdateVersionOutputMaxBytes = 4 << 10
+)
+
 var makeSelfUpdateTempDir = os.MkdirTemp
+
+type selfUpdateVersionProbe func(string) (string, error)
+type selfUpdateBinaryReplace func(string, string) error
 
 // @AX:NOTE: [AUTO] linear guard-clause pattern with 7 steps (R2-R12) — complexity is managed via early returns; no refactor needed unless new steps are added
 // targetVersion is accepted for future P2 use (pinned version install); currently unused — checker always fetches latest.
@@ -84,7 +96,7 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 		if err != nil {
 			return fmt.Errorf("다운로드/검증 실패: %w", err)
 		}
-		return selfupdate.NewReplacer().Replace(binaryPath, execPath)
+		return verifyAndReplaceSelfUpdate(binaryPath, execPath, ver)
 	})
 	if err != nil {
 		return err
@@ -106,6 +118,68 @@ func withSelfUpdateTempDir(run func(string) error) error {
 		}
 	}()
 	return run(tmpDir)
+}
+
+func verifyAndReplaceSelfUpdate(binaryPath, targetPath, targetVersion string) error {
+	return verifyAndReplaceSelfUpdateWith(
+		binaryPath,
+		targetPath,
+		targetVersion,
+		probeStagedSelfUpdateVersion,
+		func(source, target string) error {
+			return selfupdate.NewReplacer().Replace(source, target)
+		},
+	)
+}
+
+func verifyAndReplaceSelfUpdateWith(
+	binaryPath, targetPath, targetVersion string,
+	probe selfUpdateVersionProbe,
+	replace selfUpdateBinaryReplace,
+) error {
+	actualVersion, err := probe(binaryPath)
+	if err != nil {
+		return fmt.Errorf("새 바이너리 실행 검증 실패: %w", err)
+	}
+	if actualVersion != targetVersion {
+		return fmt.Errorf(
+			"새 바이너리 버전 불일치: expected %q, got %q",
+			targetVersion,
+			actualVersion,
+		)
+	}
+	return replace(binaryPath, targetPath)
+}
+
+func probeStagedSelfUpdateVersion(binaryPath string) (string, error) {
+	return probeStagedSelfUpdateVersionWithTimeout(binaryPath, selfUpdateVersionProbeTimeout)
+}
+
+func probeStagedSelfUpdateVersionWithTimeout(binaryPath string, timeout time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, binaryPath, "version", "--short") //nolint:gosec // verified archive path, passed without a shell
+	out, err := processprobe.OutputLimited(cmd, selfUpdateVersionOutputMaxBytes)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		return "", err
+	}
+	return normalizeSelfUpdateVersionOutput(out)
+}
+
+func normalizeSelfUpdateVersionOutput(output []byte) (string, error) {
+	value := string(output)
+	if strings.HasSuffix(value, "\r\n") {
+		value = strings.TrimSuffix(value, "\r\n")
+	} else {
+		value = strings.TrimSuffix(value, "\n")
+	}
+	if value == "" || strings.ContainsAny(value, "\r\n") || strings.TrimSpace(value) != value {
+		return "", fmt.Errorf("새 바이너리가 유효한 단일 버전을 출력하지 않음")
+	}
+	return value, nil
 }
 
 func trimPseudoVersion(rawVer string) string {

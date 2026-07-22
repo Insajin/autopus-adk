@@ -45,6 +45,9 @@ func TestMockedDarwinRelease_FailureRemovesTemporaryStaging(t *testing.T) {
 	if err == nil {
 		t.Fatalf("rejected notarization was accepted\n%s", output)
 	}
+	if !bytes.Contains(output, []byte("notarization was not Accepted")) {
+		t.Fatalf("mocked release failed before notarization oracle: %v\n%s", err, output)
+	}
 	entries, readErr := os.ReadDir(artifactDir)
 	if readErr != nil {
 		t.Fatal(readErr)

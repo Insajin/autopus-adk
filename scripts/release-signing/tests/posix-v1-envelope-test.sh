@@ -50,6 +50,25 @@ done
 
 upper_fp=$(printf '%s' "$k1_fp" | tr '[:lower:]' '[:upper:]')
 valid_sig=$(v1_record "$V1_WORK/k1-envelope" | awk -F '\t' '{print $2}')
+release_v1_is_lower_hex "$k1_fp" || {
+    printf '  [FAIL] lowercase fingerprint alphabet was rejected\n' >&2
+    exit 1
+}
+if release_v1_is_lower_hex "$upper_fp"; then
+    printf '  [FAIL] uppercase fingerprint alphabet was accepted\n' >&2
+    exit 1
+fi
+if command -v locale >/dev/null 2>&1; then
+    for v1_locale in en_US.UTF-8 ko_KR.UTF-8; do
+        LC_ALL="$v1_locale" locale charmap >/dev/null 2>&1 || continue
+        if ! (LC_ALL="$v1_locale"; export LC_ALL
+            release_v1_is_lower_hex "$k1_fp" && ! release_v1_is_lower_hex "$upper_fp"); then
+            printf '  [FAIL] fingerprint alphabet changed under %s\n' "$v1_locale" >&2
+            exit 1
+        fi
+    done
+fi
+printf '  [OK] locale-independent lowercase fingerprint alphabet\n'
 printf 'AUTOPUS-RELEASE-SIGNATURE-V1\n%s\t%s\n' "$upper_fp" "$valid_sig" > "$V1_WORK/uppercase-fp"
 printf 'AUTOPUS-RELEASE-SIGNATURE-V1\nabc\t%s\n' "$valid_sig" > "$V1_WORK/short-fp"
 printf 'AUTOPUS-RELEASE-SIGNATURE-V1\n%s %s\n' "$k1_fp" "$valid_sig" > "$V1_WORK/space-separator"

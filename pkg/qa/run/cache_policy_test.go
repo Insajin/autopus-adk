@@ -64,9 +64,11 @@ func TestCommandGoCacheCanonicalizesSymlinkedProjectRoot(t *testing.T) {
 	cache, err := prepareCommandGoCache(linkedProjectDir)
 	require.NoError(t, err)
 	t.Cleanup(cache.Cleanup)
-	assert.Equal(t, realProjectDir, cache.Paths.ProjectDir)
-	assert.True(t, strings.HasPrefix(cache.Paths.Root, realProjectDir+string(filepath.Separator)))
-	assert.True(t, strings.HasPrefix(cache.Paths.GoBuild, realProjectDir+string(filepath.Separator)))
+	canonicalProjectDir, err := filepath.EvalSymlinks(realProjectDir)
+	require.NoError(t, err)
+	assert.Equal(t, canonicalProjectDir, cache.Paths.ProjectDir)
+	assert.True(t, strings.HasPrefix(cache.Paths.Root, canonicalProjectDir+string(filepath.Separator)))
+	assert.True(t, strings.HasPrefix(cache.Paths.GoBuild, canonicalProjectDir+string(filepath.Separator)))
 }
 
 func TestCleanupStaleCommandGoCachesKeepsFreshAndForeignEntries(t *testing.T) {

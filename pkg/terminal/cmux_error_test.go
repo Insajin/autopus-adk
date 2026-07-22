@@ -11,12 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newCmuxMock replaces execCommand with a mock that captures calls.
+// newCmuxMock replaces both command constructors with a mock that captures calls.
 // Used by error-path tests that only need a single call and don't require output.
 func newCmuxMock(returnErr error) (restore func(), captured *capturedCmd) {
 	orig := execCommand
+	origCtx := execCommandContext
 	cap := &capturedCmd{}
-	execCommand = func(name string, args ...string) *exec.Cmd {
+	buildCmd := func(name string, args ...string) *exec.Cmd {
 		cap.name = name
 		cap.args = args
 		cap.err = returnErr
@@ -25,7 +26,14 @@ func newCmuxMock(returnErr error) (restore func(), captured *capturedCmd) {
 		}
 		return exec.Command("true")
 	}
-	return func() { execCommand = orig }, cap
+	execCommand = buildCmd
+	execCommandContext = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		return buildCmd(name, args...)
+	}
+	return func() {
+		execCommand = orig
+		execCommandContext = origCtx
+	}, cap
 }
 
 // TestCmuxAdapter_CreateWorkspace_Error verifies command failures are propagated.

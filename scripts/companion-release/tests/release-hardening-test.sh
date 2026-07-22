@@ -215,6 +215,7 @@ for workflow in "$release" "$recovery"; do
 done
 
 bash "$tests_dir/release-runtime-hardening-test.sh"
+bash "$tests_dir/release-exec-smoke-hardening-test.sh"
 bash "$tests_dir/release-homebrew-hardening-test.sh"
 bash "$tests_dir/release-producer-helper-hardening-test.sh"
 bash "$tests_dir/release-current-signature-hardening-test.sh"

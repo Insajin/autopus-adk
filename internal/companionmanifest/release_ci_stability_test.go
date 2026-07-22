@@ -137,7 +137,7 @@ func TestCIWorkflow_StaticAndMacOSContractsArePullRequestSafe(t *testing.T) {
 	}
 	macOS := workflow.Jobs["macos-runtime"]
 	macOSRaw := readCIStabilityJob(t, ".github/workflows/ci.yaml", "macos-runtime")
-	if macOS.RunsOn != "macos-14" || strings.Contains(macOSRaw, "${{ secrets.") {
+	if macOS.RunsOn != "macos-15" || strings.Contains(macOSRaw, "${{ secrets.") {
 		t.Fatalf("macOS PR runtime boundary runner=%q contains-secrets=%t",
 			macOS.RunsOn, strings.Contains(macOSRaw, "${{ secrets."))
 	}

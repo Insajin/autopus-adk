@@ -19,13 +19,21 @@ v1_expect_failure "all keys expired" all_release_signing_keys_expired v1_verify 
 printf '%s\t2099-12-31\t%s\n' "$k1_fp" 'not-base64' > "$V1_WORK/malformed-trust"
 v1_expect_failure "malformed embedded key" malformed_embedded_release_key v1_verify \
     "$V1_WORK/checksums.txt" "$V1_WORK/k1-envelope" "$V1_WORK/malformed-trust" "$V1_NOW"
+upper_k1_fp=$(printf '%s' "$k1_fp" | tr '[:lower:]' '[:upper:]')
+printf '%s\t2099-12-31\t%s\n' "$upper_k1_fp" "$k1_spki" > "$V1_WORK/uppercase-trust"
+v1_expect_failure "uppercase embedded fingerprint" malformed_embedded_release_key v1_verify \
+    "$V1_WORK/checksums.txt" "$V1_WORK/k1-envelope" "$V1_WORK/uppercase-trust" "$V1_NOW"
 
 AUTOPUS_INSTALLER_TEST_SOURCE=1 . "$REPO_ROOT/install.sh"
 OS=$(detect_os)
 ARCH=$(detect_arch)
 ARCHIVE="autopus-adk_0.50.73_${OS}_${ARCH}.tar.gz"
 mkdir "$V1_WORK/archive-content"
-printf '#!/bin/sh\nexit 0\n' > "$V1_WORK/archive-content/auto"
+printf '%s\n' '#!/bin/sh' \
+    'if [ "${1:-}" = version ] && [ "${2:-}" = --short ]; then' \
+    '    printf '\''0.50.73\n'\''' \
+    'fi' \
+    'exit 0' > "$V1_WORK/archive-content/auto"
 chmod +x "$V1_WORK/archive-content/auto"
 tar -czf "$V1_WORK/$ARCHIVE" -C "$V1_WORK/archive-content" auto
 archive_sha=$(v1_sha256_file "$V1_WORK/$ARCHIVE")
@@ -43,6 +51,7 @@ cp "$V1_HELPER" "$V1_WORK/test-helper.sh"
 } >> "$V1_WORK/test-helper.sh"
 VERIFIER_SHA256=$(v1_sha256_file "$V1_WORK/test-helper.sh")
 DOWNLOAD_HELPER="$V1_WORK/test-helper.sh"
+DOWNLOAD_RUNTIME_HELPER="$REPO_ROOT/scripts/install-runtime-v1.sh"
 DOWNLOAD_CHECKSUMS="$V1_WORK/install-checksums"
 DOWNLOAD_ENVELOPE="$V1_WORK/install-envelope"
 DOWNLOAD_ARCHIVE="$V1_WORK/$ARCHIVE"
@@ -51,6 +60,7 @@ download() {
     source_url=$1
     destination=$2
     case "$source_url" in
+        *install-runtime-v1.sh) /bin/cp "$DOWNLOAD_RUNTIME_HELPER" "$destination" ;;
         *verify-checksums-v1.sh) /bin/cp "$DOWNLOAD_HELPER" "$destination" ;;
         *checksums.txt.signatures) /bin/cp "$DOWNLOAD_ENVELOPE" "$destination" ;;
         *checksums.txt) /bin/cp "$DOWNLOAD_CHECKSUMS" "$destination" ;;

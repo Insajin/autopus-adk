@@ -58,6 +58,23 @@ case "$field" in
   *) exit 1 ;;
 esac
 `)
+	write("exec-smoke-gate", `
+artifact='' expected_version='' architecture='' timeout=''
+while [[ $# -gt 0 ]]; do
+  [[ $# -ge 2 ]] || exit 2
+  case "$1" in
+    --artifact) artifact="$2" ;;
+    --expected-version) expected_version="$2" ;;
+    --architecture) architecture="$2" ;;
+    --timeout) timeout="$2" ;;
+    *) exit 2 ;;
+  esac
+  shift 2
+done
+[[ -f "$artifact" && ! -L "$artifact" && -x "$artifact" ]]
+[[ "$expected_version" == '0.50.69' && "$timeout" == '15s' ]]
+[[ "$architecture" == 'amd64' || "$architecture" == 'arm64' ]]
+`)
 	shasum, err := exec.LookPath("shasum")
 	if err != nil {
 		t.Fatal(err)
@@ -105,6 +122,7 @@ func runMockedRelease(
 		"COMPANION_EXPIRES_AT=2026-07-16T00:00:00Z",
 		"COMPANION_KEY_ID=release-key", "COMPANION_SIGNING_KEY_FILE="+keyPath,
 		"COMPANION_SIGNER="+tools.signer, "COMPANION_RECEIPT_VERIFIER="+tools.verifier,
+		"COMPANION_EXEC_SMOKE_GATE="+tools.tools["exec-smoke-gate"],
 		"COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT=2026-07-14T00:00:00Z",
 		"COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT=2027-07-15T00:00:00Z",
 		"COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS=31536000",
