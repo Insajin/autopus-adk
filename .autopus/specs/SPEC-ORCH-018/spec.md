@@ -135,7 +135,7 @@ The `/auto idea` skill's Step 3 and Step 4 SHALL be updated to:
 THE SYSTEM SHALL provide an `auto orchestra inject --session-id <ID> --provider <name> "prompt"` command that sends a prompt to a specific provider's pane, abstracting the cmux `set-buffer`/`paste-buffer` details.
 
 **R12 (Session persistence file)**:
-WHEN `--yield-rounds` creates a session, THE SYSTEM SHALL write session metadata to `/tmp/autopus-orch-session-{ID}.json` containing pane IDs, provider configs, and round history, for use by `collect`, `inject`, and `cleanup` commands.
+WHEN `--yield-rounds` creates a session, THE SYSTEM SHALL exclusively create session metadata in the private `/tmp/autopus-orchestra-sessions/{ID}.json` path (directory `0700`, file `0600`) containing pane IDs, provider configs, and round history, for use by `collect`, `inject`, and `cleanup` commands. For patch-release compatibility, reads and removals SHALL fall back to the legacy `/tmp/autopus-orch-session-{ID}.json` basename only when the private entry does not exist, and SHALL reject symlinks, non-regular entries, identity changes, or a persisted ID that differs from the requested ID.
 
 ## File Inventory
 

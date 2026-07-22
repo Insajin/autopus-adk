@@ -198,20 +198,23 @@ func TestHookSession_SessionID(t *testing.T) {
 	assert.Equal(t, "test-session-id-check", sess.SessionID())
 }
 
-// TestHookSession_SpecialCharSessionID verifies that session IDs with
-// path traversal characters are sanitized.
+// TestHookSession_SpecialCharSessionID verifies that unsafe session IDs fail closed.
 func TestHookSession_SpecialCharSessionID(t *testing.T) {
 	t.Parallel()
 
 	sess, err := NewHookSession("test/../../../etc/passwd")
-	require.NoError(t, err)
-	defer sess.Cleanup()
+	assert.Nil(t, sess)
+	assert.Error(t, err)
+}
 
-	info, statErr := os.Stat(sess.Dir())
-	require.NoError(t, statErr)
-	assert.True(t, info.IsDir())
-	// Sanitized path must not contain path traversal components.
-	assert.NotContains(t, sess.Dir(), "..")
+func TestHookSession_UppercaseSessionIDFailsBeforeFilesystemMutation(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+
+	sess, err := NewHookSession("Alias-ABC")
+
+	assert.Nil(t, sess)
+	assert.ErrorContains(t, err, "lowercase")
+	assert.NoDirExists(t, filepath.Join(os.TempDir(), "autopus"))
 }
 
 // TestHookSession_ConcurrentWaitForDone verifies that multiple goroutines

@@ -35,6 +35,9 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	if cfg.Backend == nil {
 		return nil, fmt.Errorf("pipeline: backend is nil")
 	}
+	if err := validateSubprocessPipelineProviders(cfg.Providers, cfg.Judge); err != nil {
+		return nil, fmt.Errorf("pipeline: %w", err)
+	}
 	contractCfg := subprocessPipelineContractConfig(cfg)
 	if result, err := preflightJudgeFamilySeparation(contractCfg); err != nil {
 		return result, err

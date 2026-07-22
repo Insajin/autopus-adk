@@ -18,6 +18,9 @@ const promptSubmitDelay = 100 * time.Millisecond
 // RunInteractivePaneOrchestra runs interactive CLI orchestration with ReadScreen polling.
 // @AX:NOTE [AUTO] interactive orchestration entry point — fan_in=1 (pane_runner.go only); downgraded from ANCHOR
 func RunInteractivePaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, error) {
+	if err := validateOrchestraProviderConfig(cfg); err != nil {
+		return nil, err
+	}
 	// R8: plain terminal -> fallback to sentinel mode
 	if cfg.Terminal == nil || cfg.Terminal.Name() == "plain" {
 		cfg.Interactive = false

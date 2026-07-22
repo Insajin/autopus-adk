@@ -3,10 +3,8 @@ package orchestra
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -21,6 +19,7 @@ type HookSession struct {
 	sessionID     string
 	sessionDir    string
 	hookProviders map[string]bool
+	storage       *hookSessionStorage
 }
 
 // defaultHookProviders lists providers that have hooks by default.
@@ -35,16 +34,19 @@ var defaultHookProviders = map[string]bool{
 // Creates /tmp/autopus/{session-id}/ directory with 0o700 permissions.
 // @AX:ANCHOR [AUTO] fan_in=4 — called by interactive.go, interactive_debate.go, relay_pane.go, hook_watcher.go; do not change session dir layout
 func NewHookSession(sessionID string) (*HookSession, error) {
-	dir := filepath.Join(os.TempDir(), "autopus", sanitizeProviderName(sessionID))
-
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, fmt.Errorf("create session dir: %w", err)
+	if err := validateHookSessionID(sessionID); err != nil {
+		return nil, fmt.Errorf("create hook session: %w", err)
+	}
+	storage, dir, err := newHookSessionStorage(sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("create hook session: %w", err)
 	}
 
 	return &HookSession{
 		sessionID:     sessionID,
 		sessionDir:    dir,
 		hookProviders: DefaultHookProviders(),
+		storage:       storage,
 	}, nil
 }
 
@@ -59,23 +61,27 @@ func (s *HookSession) ApplyProviderHooks(providers []ProviderConfig) {
 // Returns nil when the done file is detected, or error on timeout.
 // @AX:NOTE [AUTO] magic constant 200ms polling interval — balances responsiveness vs CPU; adjust with care
 func (s *HookSession) WaitForDone(timeout time.Duration, providers ...string) error {
+	if len(providers) > 0 {
+		if err := validateHookArtifactProvider(providers[0]); err != nil {
+			return err
+		}
+	}
 	deadline := time.After(timeout)
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
 	// Use provider-specific done file if provider name is given (R1 protocol)
 	doneName := "done"
-	if len(providers) > 0 && providers[0] != "" {
-		doneName = sanitizeProviderName(providers[0]) + "-done"
+	if len(providers) > 0 {
+		doneName = providers[0] + "-done"
 	}
-	donePath := filepath.Join(s.sessionDir, doneName)
 
 	for {
 		select {
 		case <-deadline:
 			return fmt.Errorf("timeout waiting for done signal in session %s", s.sessionID)
 		case <-ticker.C:
-			if _, err := os.Stat(donePath); err == nil {
+			if _, err := s.statArtifact(doneName); err == nil {
 				return nil
 			}
 		}
@@ -86,6 +92,9 @@ func (s *HookSession) WaitForDone(timeout time.Duration, providers ...string) er
 // When round > 0, uses RoundSignalName to generate the filename;
 // otherwise falls back to the standard provider-done format.
 func (s *HookSession) WaitForDoneRound(timeout time.Duration, provider string, round int) error {
+	if err := validateHookArtifactProvider(provider); err != nil {
+		return err
+	}
 	if round > 0 {
 		doneName := RoundSignalName(provider, round, "done")
 		return s.waitForFileCtx(context.Background(), timeout, doneName)
@@ -95,6 +104,9 @@ func (s *HookSession) WaitForDoneRound(timeout time.Duration, provider string, r
 
 // WaitForDoneRoundCtx polls for the round-scoped done signal file, respecting context cancellation.
 func (s *HookSession) WaitForDoneRoundCtx(ctx context.Context, timeout time.Duration, provider string, round int) error {
+	if err := validateHookArtifactProvider(provider); err != nil {
+		return err
+	}
 	if round > 0 {
 		doneName := RoundSignalName(provider, round, "done")
 		return s.waitForFileCtx(ctx, timeout, doneName)
@@ -108,7 +120,6 @@ func (s *HookSession) waitForFileCtx(ctx context.Context, timeout time.Duration,
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
-	path := filepath.Join(s.sessionDir, filename)
 	for {
 		select {
 		case <-ctx.Done():
@@ -116,7 +127,7 @@ func (s *HookSession) waitForFileCtx(ctx context.Context, timeout time.Duration,
 		case <-deadline:
 			return fmt.Errorf("timeout waiting for %s in session %s", filename, s.sessionID)
 		case <-ticker.C:
-			if _, err := os.Stat(path); err == nil {
+			if _, err := s.statArtifact(filename); err == nil {
 				return nil
 			}
 		}
@@ -127,10 +138,13 @@ func (s *HookSession) waitForFileCtx(ctx context.Context, timeout time.Duration,
 func (s *HookSession) ReadResult(providers ...string) (*HookResult, error) {
 	// Use provider-specific result file if provider name is given (R1 protocol)
 	resultName := "result.json"
-	if len(providers) > 0 && providers[0] != "" {
-		resultName = sanitizeProviderName(providers[0]) + "-result.json"
+	if len(providers) > 0 {
+		if err := validateHookArtifactProvider(providers[0]); err != nil {
+			return nil, err
+		}
+		resultName = providers[0] + "-result.json"
 	}
-	data, err := os.ReadFile(filepath.Join(s.sessionDir, resultName))
+	data, err := s.readArtifact(resultName)
 	if err != nil {
 		return nil, fmt.Errorf("read result file: %w", err)
 	}
@@ -147,6 +161,9 @@ func (s *HookSession) ReadResult(providers ...string) (*HookResult, error) {
 // When round > 0, uses RoundSignalName to generate the filename;
 // otherwise falls back to the standard provider-result.json format.
 func (s *HookSession) ReadResultRound(provider string, round int) (*HookResult, error) {
+	if err := validateHookArtifactProvider(provider); err != nil {
+		return nil, err
+	}
 	if round > 0 {
 		resultName := RoundSignalName(provider, round, "result.json")
 		return s.readResultFile(resultName)
@@ -179,7 +196,7 @@ func (s *HookSession) ResetAttempt(provider string, round int) error {
 		RoundSignalName(safeProvider, round, "abort"),
 	}
 	for _, name := range names {
-		if err := os.Remove(filepath.Join(s.sessionDir, name)); err != nil && !os.IsNotExist(err) {
+		if err := s.removeArtifact(name); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("reset hook attempt artifact %s: %w", name, err)
 		}
 	}
@@ -187,24 +204,12 @@ func (s *HookSession) ResetAttempt(provider string, round int) error {
 }
 
 func validateHookArtifactProvider(provider string) error {
-	if provider == "" {
-		return errors.New("hook provider name is empty")
-	}
-	for _, char := range provider {
-		if (char >= 'a' && char <= 'z') ||
-			(char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') ||
-			char == '_' || char == '-' {
-			continue
-		}
-		return fmt.Errorf("hook provider name contains unsafe character: %q", provider)
-	}
-	return nil
+	return validateSafeArtifactName("hook provider name", provider)
 }
 
 // readResultFile reads and parses a named result file from the session directory.
 func (s *HookSession) readResultFile(filename string) (*HookResult, error) {
-	data, err := os.ReadFile(filepath.Join(s.sessionDir, filename))
+	data, err := s.readArtifact(filename)
 	if err != nil {
 		return nil, fmt.Errorf("read result file: %w", err)
 	}
@@ -217,9 +222,11 @@ func (s *HookSession) readResultFile(filename string) (*HookResult, error) {
 	return &result, nil
 }
 
-// Cleanup removes the session directory and all its contents.
+// Cleanup removes an owned session directory. Reusers only close their handles.
 func (s *HookSession) Cleanup() {
-	_ = os.RemoveAll(s.sessionDir)
+	if s != nil && s.storage != nil {
+		s.storage.cleanup()
+	}
 }
 
 // HasHook checks if a provider has hook configuration available.
@@ -250,10 +257,12 @@ func (s *HookSession) WriteInput(provider, prompt string) error {
 // WriteInputRound writes a round-scoped input prompt file using atomic write.
 // Creates {provider}-round{N}-input.json with HookInput JSON.
 func (s *HookSession) WriteInputRound(provider string, round int, prompt string) error {
+	if err := validateHookArtifactProvider(provider); err != nil {
+		return err
+	}
 	filename := RoundSignalName(provider, round, "input.json")
-	path := filepath.Join(s.sessionDir, filename)
 	input := HookInput{Provider: provider, Round: round, Prompt: prompt}
-	return atomicWriteJSON(path, input)
+	return s.writeJSONArtifact(filename, input)
 }
 
 // WaitForReady polls for the provider's ready signal file (convenience wrapper).
@@ -264,6 +273,9 @@ func (s *HookSession) WaitForReady(timeout time.Duration, provider string, round
 // WaitForReadyCtx polls for the round-scoped ready signal file, respecting context.
 // Ready file format: {provider}-round{N}-ready
 func (s *HookSession) WaitForReadyCtx(ctx context.Context, timeout time.Duration, provider string, round int) error {
+	if err := validateHookArtifactProvider(provider); err != nil {
+		return err
+	}
 	readyName := RoundSignalName(provider, round, "ready")
 	return s.waitForFileCtx(ctx, timeout, readyName)
 }
@@ -271,7 +283,9 @@ func (s *HookSession) WaitForReadyCtx(ctx context.Context, timeout time.Duration
 // WriteAbortSignal creates an abort signal file to unblock hook input watchers.
 // R5-SAFETY: Prevents deadlock when Orchestra falls back to SendLongText.
 func (s *HookSession) WriteAbortSignal(provider string, round int) error {
+	if err := validateHookArtifactProvider(provider); err != nil {
+		return err
+	}
 	abortName := RoundSignalName(provider, round, "abort")
-	path := filepath.Join(s.sessionDir, abortName)
-	return os.WriteFile(path, []byte{}, 0o600)
+	return s.writeArtifact(abortName, []byte{}, 0o600)
 }
