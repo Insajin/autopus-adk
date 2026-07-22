@@ -131,7 +131,7 @@ func validateMachOArchitecture(path, expectedArchitecture string) error {
 	if err != nil {
 		return fmt.Errorf("open thin Mach-O artifact: %w", err)
 	}
-	defer artifact.Close()
+	defer func() { _ = artifact.Close() }()
 	if artifact.Cpu != expectedCPU {
 		return fmt.Errorf("%w: expected %s, found %s", errArchitectureMismatch,
 			expectedArchitecture, artifact.Cpu.String())
