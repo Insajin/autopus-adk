@@ -213,14 +213,23 @@ func TestExecute_S13_NonHookDetector(t *testing.T) {
 	_, isPoll := resolved.detector.(*ScreenPollDetector)
 	assert.True(t, isPoll, "non-hook mode resolves to ScreenPollDetector")
 
-	// Execution still completes/returns without erroring on the missing hook.
-	mock := &seqScreenMock{name: "cmux", screens: []string{readyScreen}}
-	b := NewInteractivePaneBackend(OrchestraConfig{Terminal: mock, HookMode: false})
+	// Execution still completes through screen polling without a hook. The
+	// sequence separates the post-prompt baseline from the final stable prompt.
+	mock := &seqScreenMock{name: "cmux", screens: []string{
+		readyScreen, readyScreen, readyScreen,
+		"AI is thinking...\n",
+		"answer complete\n❯\n", "answer complete\n❯\n",
+	}}
+	b := NewInteractivePaneBackend(OrchestraConfig{
+		Terminal: mock, HookMode: false, InitialDelay: time.Millisecond,
+	})
 	resp, err := b.Execute(context.Background(), ProviderRequest{
-		Provider: "claude", Prompt: "hi", Timeout: 2 * time.Second, Config: fastStartupClaude(),
+		Provider: "claude", Prompt: "hi", Timeout: 10 * time.Second, Config: fastStartupClaude(),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
+	assert.False(t, resp.TimedOut, "screen polling must complete before the expanded race-safe budget")
+	assert.Equal(t, paneBackendName, resp.ExecutedBackend)
 }
 
 // TestExecute_S14_BothBackendsFail asserts that when the pane fails (SplitPane

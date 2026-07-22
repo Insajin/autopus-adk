@@ -3,25 +3,24 @@ package orchestra
 import (
 	"context"
 	"log"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
-// waitForPaneReady waits until the provider session is ready to receive a prompt,
-// watching two signals in one loop (SPEC-ORCH-022): the SessionStart hook ready
-// file (when a hook session is present) and the screen prompt pattern. Either
-// signal returns ready. The file signal is deterministic and avoids the ANSI /
-// prompt screen-scraping flakiness that made the CLAUDECODE pane path fall back
-// to subprocess before reaching hook-IPC; screen scraping remains the fallback
-// for providers without an installed session-start hook.
+// waitForPaneReady waits for provider startup evidence and a stable input prompt.
+// Hook-ready proves only process startup, so hook-capable providers also require
+// two consecutive provider-specific ready frames. Hookless providers use the
+// same stable screen gate without waiting for an unavailable hook artifact.
 func waitForPaneReady(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, patterns []CompletionPattern, timeout time.Duration, hookSession *HookSession, provider string, round int) bool {
-	readyPath := ""
-	if hookSession != nil {
-		readyPath = filepath.Join(hookSession.Dir(), RoundSignalName(provider, round, "ready"))
+	hookRequired := hookSession != nil && hookSession.HasHook(provider)
+	hookStarted := !hookRequired
+	readyName := ""
+	if hookRequired {
+		readyName = RoundSignalName(provider, round, "ready")
 	}
+	const stableReadyFrames = 2
+	readyFrames := 0
 	deadline := time.After(timeout)
 	ticker := time.NewTicker(sessionReadyPollInterval)
 	defer ticker.Stop()
@@ -32,13 +31,18 @@ func waitForPaneReady(ctx context.Context, term terminal.Terminal, paneID termin
 		case <-deadline:
 			return false
 		case <-ticker.C:
-			if readyPath != "" {
-				if _, err := os.Stat(readyPath); err == nil {
-					return true
+			if !hookStarted {
+				if _, err := hookSession.statArtifact(readyName); err == nil {
+					hookStarted = true
 				}
 			}
 			screen, err := readScreenBounded(ctx, term, paneID, terminal.ReadScreenOpts{})
-			if err == nil && isSessionReady(screen, patterns) {
+			if err != nil || !isProviderSessionReady(screen, patterns, provider) {
+				readyFrames = 0
+				continue
+			}
+			readyFrames++
+			if hookStarted && readyFrames >= stableReadyFrames {
 				return true
 			}
 		}

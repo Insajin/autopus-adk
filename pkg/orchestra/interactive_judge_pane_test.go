@@ -11,7 +11,7 @@ import (
 )
 
 func TestRunJudgeRound_PaneCapableTerminalDoesNotExecuteSubprocess(t *testing.T) {
-	provider, marker := newPaneBoundaryMarkerProvider(t, "judge-fixture", "")
+	provider, marker := newPaneBoundaryMarkerProvider(t, "claude", "")
 	term := &paneCommitTerminal{
 		screen: `{"recommendation":"keep the judge in a pane"}` + "\n❯\n",
 	}

@@ -69,39 +69,47 @@ func TestExecute_NoSessionEnvWhenHookModeOff(t *testing.T) {
 }
 
 func TestExecute_DoesNotCleanupSharedHookSession(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
 	const sid = "orch-test-shared-hook-owner"
-	sessionDir := filepath.Join(os.TempDir(), "autopus", sid)
-	require.NoError(t, os.RemoveAll(sessionDir))
-	defer func() { _ = os.RemoveAll(sessionDir) }()
+	owner, err := NewHookSession(sid)
+	require.NoError(t, err)
+	defer owner.Cleanup()
+	sentinel := filepath.Join(owner.Dir(), "sibling-owner-active")
+	require.NoError(t, os.WriteFile(sentinel, []byte("active"), 0o600))
 
-	provider := ProviderConfig{Name: "gemini", Binary: "agy"}
+	provider := ProviderConfig{Name: "claude", Binary: "claude", InteractiveInput: "args"}
 	mock := &seqScreenMock{name: "cmux", screens: []string{readyScreen}}
 	b := NewInteractivePaneBackend(OrchestraConfig{
-		Terminal:   mock,
-		HookMode:   true,
-		SessionID:  sid,
-		WorkingDir: t.TempDir(),
-		Providers:  []ProviderConfig{provider},
+		Terminal:           mock,
+		HookMode:           true,
+		SessionID:          sid,
+		WorkingDir:         t.TempDir(),
+		Providers:          []ProviderConfig{provider},
+		InitialDelay:       time.Millisecond,
+		CompletionDetector: &stubCompletionDetector{completed: true},
 	})
 	req := ProviderRequest{
-		Provider: "gemini",
+		Provider: "claude",
 		Config:   provider,
 		Prompt:   "review this",
 		Role:     "reviewer",
-		Timeout:  time.Second,
+		Timeout:  5 * time.Second,
 	}
 
 	resp, err := b.Execute(context.Background(), req)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	require.DirExists(t, sessionDir,
+	require.DirExists(t, owner.Dir(),
 		"provider-level Execute must not remove the shared hook session while sibling providers may still be running")
+	require.FileExists(t, sentinel, "provider-level Execute must preserve sibling-owned artifacts")
+	require.NoError(t, owner.WriteInputRound("claude", 2, "sibling still active"),
+		"the outer owner must remain usable after provider-level Execute returns")
 }
 
 func TestExecute_CodexPromptUsesSendkeysAfterReady(t *testing.T) {
 	t.Parallel()
 
-	mock := &seqScreenMock{name: "cmux", screens: []string{readyScreen}}
+	mock := &seqScreenMock{name: "cmux", screens: []string{"› Summarize recent commits\n"}}
 	provider := ProviderConfig{Name: "codex", Binary: "codex", PaneArgs: []string{"-m", "gpt-5.4"}}
 	b := NewInteractivePaneBackend(OrchestraConfig{
 		Terminal:     mock,
