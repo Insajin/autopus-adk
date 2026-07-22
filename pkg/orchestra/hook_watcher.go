@@ -11,6 +11,12 @@ import (
 // For non-hook providers: returns a fallback response with placeholder output.
 // @AX:WARN [AUTO] concurrent goroutine per provider — guarded by mu sync.Mutex; goroutines inherit parent context timeout
 func WaitAndCollectHookResults(cfg OrchestraConfig, sessionID string) ([]ProviderResponse, error) {
+	if err := validateProviderConfigs(cfg.Providers); err != nil {
+		return nil, err
+	}
+	if err := validateHookSessionID(sessionID); err != nil {
+		return nil, err
+	}
 	session, err := NewHookSession(sessionID)
 	if err != nil {
 		return nil, err

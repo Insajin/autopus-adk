@@ -96,6 +96,7 @@ func TestSendSessionEnvToPane_InvalidID_Rejected(t *testing.T) {
 	ctx := context.Background()
 
 	cases := []string{
+		"Orch-ABC",
 		"sid with space",
 		"sid;rm -rf /",
 		"sid$(whoami)",

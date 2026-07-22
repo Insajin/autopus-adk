@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -53,4 +56,22 @@ func TestRunOrchestraCleanup_RemovesSessionFile(t *testing.T) {
 	// Session file should be removed
 	_, loadErr := orchestra.LoadSession(session.ID)
 	assert.Error(t, loadErr, "session should be removed after cleanup")
+}
+
+func TestRunOrchestraCleanup_RemovesLegacySessionFile(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	session := orchestra.OrchestraSession{
+		ID:        "legacy-cleanup",
+		Panes:     map[string]string{},
+		CreatedAt: time.Now(),
+	}
+	data, err := json.Marshal(session)
+	require.NoError(t, err)
+	path := filepath.Join(os.TempDir(), "autopus-orch-session-"+session.ID+".json")
+	require.NoError(t, os.WriteFile(path, data, 0o600))
+
+	require.NoError(t, runOrchestraCleanup(t.Context(), session.ID))
+
+	_, err = os.Lstat(path)
+	assert.ErrorIs(t, err, os.ErrNotExist)
 }

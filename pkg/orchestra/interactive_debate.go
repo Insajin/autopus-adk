@@ -135,10 +135,13 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 		log.Printf("[debate] splitProviderPanes failed: %v -- applying fallback policy", err)
 		return runFallback(ctx, cfg, err)
 	}
-	// R5: Skip pane cleanup when yield mode is active — keep panes alive.
-	if !cfg.YieldRounds {
-		defer cleanupInteractivePanes(cfg.Terminal, panes)
-	}
+	// Pane ownership transfers only after the yield session is durable.
+	ownsPanes := true
+	defer func() {
+		if ownsPanes {
+			cleanupInteractivePanes(cfg.Terminal, panes)
+		}
+	}()
 
 	if err := startPipeCapture(ctx, cfg.Terminal, panes); err != nil {
 		// Pipe-pane is for idle detection (secondary signal) only.
@@ -199,7 +202,10 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 			fmt.Fprintf(os.Stderr, "[Debate] yield after round 1/%d\n", rounds)
 			sessionID := NewSessionID()
 			session := buildYieldSession(sessionID, panes, roundResponses, time.Now())
-			_ = SaveSession(session)
+			if err := SaveSession(session); err != nil {
+				return nil, fmt.Errorf("persist yield session: %w", err)
+			}
+			ownsPanes = false
 			output := BuildYieldOutput(cfg, panes, roundHistory, sessionID)
 			// surfMgr.Stop() removed — defer at line 115 handles cleanup.
 			// Explicit Stop here caused duplicate WarmPool.Close() calls.

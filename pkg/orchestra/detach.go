@@ -11,6 +11,9 @@ import (
 // without waiting for completion. Only works with pane-capable terminals.
 // @AX:NOTE [AUTO] REQ-1 detach entry point — must return in <2s; no collectPaneResults or cleanupPanes; fan_in=2 (orchestra.go auto-detach, tests)
 func RunPaneOrchestraDetached(ctx context.Context, cfg OrchestraConfig) (string, error) {
+	if err := validateOrchestraProviderConfig(cfg); err != nil {
+		return "", err
+	}
 	if cfg.Terminal == nil || cfg.Terminal.Name() == "plain" {
 		return "", fmt.Errorf("detach mode requires a pane-capable terminal")
 	}

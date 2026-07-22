@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
@@ -48,18 +47,14 @@ func SendRoundEnvToPane(ctx context.Context, term terminal.Terminal, paneID term
 	return term.SendCommand(ctx, paneID, cmd)
 }
 
-// validSessionID matches safe session IDs (alphanumeric, hyphens, underscores only).
-// Prevents shell injection when the session ID is interpolated into an export command.
-var validSessionID = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
-
 // SendSessionEnvToPane sends "export AUTOPUS_SESSION_ID=<sid>" to the specified
 // terminal pane. This ensures the hook script (hook-claude-stop.sh) receives the
 // session ID via the pane's shell environment, not just the orchestrator process env.
-// Returns an error if the session ID contains characters outside [a-zA-Z0-9_-] to
-// prevent shell injection.
+// IDs must use the canonical lowercase artifact form to prevent shell injection
+// and case-insensitive filesystem aliases.
 func SendSessionEnvToPane(ctx context.Context, term terminal.Terminal, paneID terminal.PaneID, sessionID string) error {
-	if !validSessionID.MatchString(sessionID) {
-		return fmt.Errorf("SendSessionEnvToPane: invalid session ID %q (must match [a-zA-Z0-9_-]+)", sessionID)
+	if err := validateHookSessionID(sessionID); err != nil {
+		return fmt.Errorf("SendSessionEnvToPane: invalid session ID: %w", err)
 	}
 	// AUTOPUS_SESSION_DIR mirrors NewHookSession's path (os.TempDir based) so the
 	// provider's hooks write the ready/done signals to the exact directory the

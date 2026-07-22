@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"sort"
 	"strings"
 	"time"
 )
@@ -248,5 +249,26 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 			responses[i].EmptyOutput = true
 		}
 	}
+	return orderDebateResponses(responses, cfg.Providers)
+}
+
+func orderDebateResponses(responses []ProviderResponse, providers []ProviderConfig) []ProviderResponse {
+	providerOrder := make(map[string]int, len(providers))
+	for i, provider := range providers {
+		if _, exists := providerOrder[provider.Name]; !exists {
+			providerOrder[provider.Name] = i
+		}
+	}
+	sort.SliceStable(responses, func(i, j int) bool {
+		left, leftKnown := providerOrder[responses[i].Provider]
+		right, rightKnown := providerOrder[responses[j].Provider]
+		if leftKnown != rightKnown {
+			return leftKnown
+		}
+		if leftKnown {
+			return left < right
+		}
+		return responses[i].Provider < responses[j].Provider
+	})
 	return responses
 }

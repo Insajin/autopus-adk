@@ -42,6 +42,12 @@ func (b *InteractivePaneBackend) Name() string { return paneBackendName }
 // @AX:WARN [AUTO]: multi-stage terminal I/O with >=8 sequential failure branches; any new stage MUST preserve the SplitPane commit-point contract.
 // @AX:REASON: only terminal absence and SplitPane failure may invoke subprocess fallback; every failure after a non-empty pane ID must report ExecutedBackend=pane without running a provider subprocess.
 func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderRequest) (*ProviderResponse, error) {
+	if err := validateOrchestraProviderConfig(b.cfg); err != nil {
+		return nil, err
+	}
+	if err := validateProviderRequest(req); err != nil {
+		return nil, err
+	}
 	if b.cfg.Terminal == nil {
 		// Defensive: no terminal means we cannot run a pane at all.
 		return paneProvisioningFallback(ctx, b.cfg, req, "interactive pane execution failed: no terminal attached")
@@ -76,6 +82,9 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 	// reset is intentionally provider-scoped because sibling providers execute in
 	// parallel within the same HookSession directory.
 	hookSession := resolveHookSession(b.cfg)
+	if hookSession != nil {
+		defer hookSession.release()
+	}
 	if hookSession != nil && hookSession.HasHook(req.Config.Name) {
 		if resetErr := hookSession.ResetAttempt(req.Config.Name, req.Round); resetErr != nil {
 			return paneExecutionFailure(req, "interactive pane execution failed: reset hook attempt: "+resetErr.Error())

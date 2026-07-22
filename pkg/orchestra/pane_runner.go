@@ -31,6 +31,9 @@ type paneInfo struct {
 // Falls back to RunOrchestra for plain terminals or when pane creation fails.
 // @AX:NOTE [AUTO] pane-based orchestration entry point — 2 callers (runner.go, tests)
 func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, error) {
+	if err := validateOrchestraProviderConfig(cfg); err != nil {
+		return nil, err
+	}
 	if !cfg.FallbackMode.IsValid() {
 		return nil, fmt.Errorf("unknown fallback mode %q", cfg.FallbackMode)
 	}
