@@ -11,6 +11,9 @@ import (
 
 var unsafeShellTokens = regexp.MustCompile(`[;&|<>$` + "`" + `]|\|\||&&|\r|\n`)
 
+// MaxCommandTimeout is the hard upper bound shared by validation and execution.
+const MaxCommandTimeout = 30 * time.Minute
+
 func Validate(pack Pack, projectDir string) error {
 	if strings.TrimSpace(pack.ID) == "" {
 		return validationError("qa_journey_invalid", "missing journey id")
@@ -233,7 +236,7 @@ func validateTimeout(value string) error {
 		return nil
 	}
 	duration, err := time.ParseDuration(value)
-	if err != nil || duration <= 0 || duration > 30*time.Minute {
+	if err != nil || duration <= 0 || duration > MaxCommandTimeout {
 		return fmt.Errorf("timeout must be between 1ns and 30m")
 	}
 	return nil

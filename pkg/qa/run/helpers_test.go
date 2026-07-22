@@ -2,13 +2,13 @@ package run
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHelperBranches(t *testing.T) {
@@ -25,22 +25,44 @@ func TestHelperBranches(t *testing.T) {
 	assert.Equal(t, []string{"echo", "ok"}, commandArgs(journeyPack("custom-command", "echo ok")))
 	assert.Nil(t, commandArgs(journeyPack("playwright", "")))
 	t.Setenv("QAMESH_ALLOWED", "yes")
+	t.Setenv("GOCACHE", "/host/go-build")
+	t.Setenv("GOMODCACHE", "/host/go-mod")
+	t.Setenv("GOPATH", "/host/go-path")
 	projectDir := t.TempDir()
-	env := allowedEnv(projectDir, []string{"QAMESH_ALLOWED", "QAMESH_MISSING"})
+	commandCache, err := prepareCommandGoCache(projectDir)
+	require.NoError(t, err)
+	t.Cleanup(commandCache.Cleanup)
+	env := allowedEnv(commandCache.Paths, []string{"QAMESH_ALLOWED", "QAMESH_MISSING", "GOCACHE", "GOMODCACHE", "GOPATH"})
 	assert.Contains(t, env, "QAMESH_ALLOWED=yes")
 	assert.Contains(t, env, "HOME="+projectDir)
 	t.Setenv("HOME", "/tmp/qamesh-real-home")
-	assert.Contains(t, allowedEnv(projectDir, []string{"HOME"}), "HOME=/tmp/qamesh-real-home")
-	assert.Contains(t, env, "GOPATH="+filepath.Join(projectDir, ".autopus", "qa", "cache", "gopath"))
-	assert.Contains(t, env, "GOMODCACHE="+filepath.Join(projectDir, ".autopus", "qa", "cache", "gopath", "pkg", "mod"))
-	assert.Contains(t, env, "GOCACHE="+filepath.Join(projectDir, ".autopus", "qa", "cache", "go-build"))
+	assert.Contains(t, allowedEnv(commandCache.Paths, []string{"HOME"}), "HOME=/tmp/qamesh-real-home")
+	assert.Contains(t, env, "GOPATH="+commandCache.Paths.GoPath)
+	assert.Contains(t, env, "GOMODCACHE="+commandCache.Paths.GoMod)
+	assert.Contains(t, env, "GOCACHE="+commandCache.Paths.GoBuild)
+	assert.NotContains(t, strings.Join(env, "\n"), "/host/")
+	overridden := authoritativeCommandEnv(commandCache.Paths, nil, []string{
+		"GOCACHE=/override/go-build",
+		"GOMODCACHE=/override/go-mod",
+		"GOPATH=/override/go-path",
+	})
+	assert.Contains(t, overridden, "GOCACHE="+commandCache.Paths.GoBuild)
+	assert.Contains(t, overridden, "GOMODCACHE="+commandCache.Paths.GoMod)
+	assert.Contains(t, overridden, "GOPATH="+commandCache.Paths.GoPath)
+	assert.NotContains(t, strings.Join(overridden, "\n"), "/override/")
 	assert.Contains(t, strings.Join(env, "\n"), "CARGO_HOME=")
 	assert.Contains(t, strings.Join(env, "\n"), "RUSTUP_HOME=")
 	assert.Contains(t, strings.Join(env, "\n"), "PLAYWRIGHT_BROWSERS_PATH=")
 	wd, err := os.Getwd()
 	assert.NoError(t, err)
-	assert.Contains(t, allowedEnv(".", nil), "HOME="+wd)
-	assert.NotContains(t, strings.Join(allowedEnv(t.TempDir(), nil), "\n"), "OPENAI_API_KEY=")
+	wdCache, err := prepareCommandGoCache(".")
+	require.NoError(t, err)
+	t.Cleanup(wdCache.Cleanup)
+	assert.Contains(t, allowedEnv(wdCache.Paths, nil), "HOME="+wd)
+	privateCache, err := prepareCommandGoCache(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(privateCache.Cleanup)
+	assert.NotContains(t, strings.Join(allowedEnv(privateCache.Paths, nil), "\n"), "OPENAI_API_KEY=")
 	assert.Equal(t, "blocked", aggregateStatus(Result{AdapterResults: []AdapterResult{{Status: "blocked"}}}))
 	assert.Equal(t, "warning", aggregateStatus(Result{SetupGaps: []SetupGap{{Adapter: "playwright", Reason: "missing"}}}))
 	assert.Equal(t, "failed", aggregateStatus(Result{FailedChecks: []string{"unit"}}))

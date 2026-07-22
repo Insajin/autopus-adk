@@ -26,3 +26,8 @@ func TestRunCommandReportsTimeoutDuration(t *testing.T) {
 	assert.Equal(t, -1, result.ExitCode)
 	assert.Contains(t, result.FailureSummary, "timeout after 10ms")
 }
+
+func TestCommandTimeoutCannotOutliveStaleCacheLease(t *testing.T) {
+	assert.Equal(t, journey.MaxCommandTimeout, commandTimeout("48h"))
+	assert.Greater(t, staleCommandGoCacheAge, journey.MaxCommandTimeout)
+}
