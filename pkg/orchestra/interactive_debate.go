@@ -197,18 +197,22 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 
 		roundHistory = append(roundHistory, roundResponses)
 
-		// R5: Yield mode — output JSON after Round 1 and keep panes alive.
 		if cfg.YieldRounds && round == 1 {
 			fmt.Fprintf(os.Stderr, "[Debate] yield after round 1/%d\n", rounds)
 			sessionID := NewSessionID()
-			session := buildYieldSession(sessionID, panes, roundResponses, time.Now())
+			session, sessionErr := buildYieldSession(sessionID, cfg.Terminal, panes, roundResponses, time.Now())
+			if sessionErr != nil {
+				return nil, fmt.Errorf("persist yield session context: %w", sessionErr)
+			}
 			if err := SaveSession(session); err != nil {
 				return nil, fmt.Errorf("persist yield session: %w", err)
 			}
+			handoffErr := handoffYieldPanes(sessionID, cfg.Terminal, panes)
 			ownsPanes = false
+			if handoffErr != nil {
+				return nil, handoffErr
+			}
 			output := BuildYieldOutput(cfg, panes, roundHistory, sessionID)
-			// surfMgr.Stop() removed — defer at line 115 handles cleanup.
-			// Explicit Stop here caused duplicate WarmPool.Close() calls.
 			result := buildDebateResult(cfg, roundResponses, roundHistory, start)
 			result.Yield = &output
 			result.FailedProviders = append(result.FailedProviders, launchFailed...)
@@ -258,37 +262,6 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 		result.FailedProviders[i].CorrelationRunID = cfg.RunID
 	}
 	return finalizeDebateOutcome(result, cfg)
-}
-
-func buildYieldSession(sessionID string, panes []paneInfo, responses []ProviderResponse, createdAt time.Time) OrchestraSession {
-	session := OrchestraSession{
-		ID:        sessionID,
-		Panes:     make(map[string]string, len(panes)),
-		Providers: make([]SessionProviderConfig, 0, len(panes)),
-		Rounds:    make([][]SessionProviderResponse, 0, 1),
-		CreatedAt: createdAt,
-	}
-	for _, pi := range panes {
-		session.Panes[pi.provider.Name] = string(pi.paneID)
-		session.Providers = append(session.Providers, SessionProviderConfig{
-			Name:   pi.provider.Name,
-			Binary: pi.provider.Binary,
-		})
-	}
-
-	round := make([]SessionProviderResponse, 0, len(responses))
-	for _, response := range responses {
-		round = append(round, SessionProviderResponse{
-			Provider:        response.Provider,
-			Output:          response.Output,
-			DurationMs:      response.Duration.Milliseconds(),
-			TimedOut:        response.TimedOut,
-			Usage:           response.Usage,
-			UsageCapability: response.UsageCapability,
-		})
-	}
-	session.Rounds = append(session.Rounds, round)
-	return session
 }
 
 // executeRound is in interactive_debate_round.go.

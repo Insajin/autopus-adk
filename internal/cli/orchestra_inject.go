@@ -11,12 +11,15 @@ import (
 	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
+var orchestraInjectSubmitDelay = 500 * time.Millisecond
+
 // newOrchestraInjectCmd creates the "orchestra inject" subcommand.
 // Sends a prompt to a specific provider's pane in an existing session.
 func newOrchestraInjectCmd() *cobra.Command {
 	var (
-		sessionID string
-		provider  string
+		sessionID    string
+		provider     string
+		workspaceRef string
 	)
 
 	cmd := &cobra.Command{
@@ -31,12 +34,13 @@ func newOrchestraInjectCmd() *cobra.Command {
 			if provider == "" {
 				return fmt.Errorf("--provider is required")
 			}
-			return runOrchestraInject(cmd, sessionID, provider, args[0])
+			return runOrchestraInjectWithWorkspace(cmd, sessionID, provider, workspaceRef, args[0])
 		},
 	}
 
 	cmd.Flags().StringVar(&sessionID, "session-id", "", "세션 ID")
 	cmd.Flags().StringVar(&provider, "provider", "", "프롬프트를 보낼 프로바이더 이름")
+	cmd.Flags().StringVar(&workspaceRef, "workspace-ref", "", "legacy cmux 세션의 원 workspace ref")
 	_ = cmd.MarkFlagRequired("session-id")
 	_ = cmd.MarkFlagRequired("provider")
 
@@ -45,6 +49,10 @@ func newOrchestraInjectCmd() *cobra.Command {
 
 // runOrchestraInject loads a session, finds the provider's pane, and sends the prompt.
 func runOrchestraInject(cmd *cobra.Command, sessionID, provider, prompt string) error {
+	return runOrchestraInjectWithWorkspace(cmd, sessionID, provider, "", prompt)
+}
+
+func runOrchestraInjectWithWorkspace(cmd *cobra.Command, sessionID, provider, workspaceRef, prompt string) error {
 	session, err := orchestra.LoadSession(sessionID)
 	if err != nil {
 		return fmt.Errorf("session %s not found: %w", sessionID, err)
@@ -59,9 +67,11 @@ func runOrchestraInject(cmd *cobra.Command, sessionID, provider, prompt string) 
 		return fmt.Errorf("provider %q not found in session (available: %v)", provider, available)
 	}
 
-	term := terminal.DetectTerminal()
-	if term == nil {
-		return fmt.Errorf("no terminal multiplexer detected — inject requires cmux or tmux")
+	term, err := orchestra.ResolveSessionTerminalWithWorkspace(
+		session, orchestraSessionTerminalDetector(), workspaceRef,
+	)
+	if err != nil {
+		return fmt.Errorf("restore session %s terminal: %w", sessionID, err)
 	}
 
 	ctx := cmd.Context()
@@ -72,7 +82,7 @@ func runOrchestraInject(cmd *cobra.Command, sessionID, provider, prompt string) 
 	}
 
 	// Send Enter to submit the prompt
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(orchestraInjectSubmitDelay)
 	if err := term.SendCommand(ctx, terminal.PaneID(paneID), "\n"); err != nil {
 		fmt.Fprintf(os.Stderr, "[inject] SendCommand (Enter) failed: %v — prompt may need manual submit\n", err)
 	}

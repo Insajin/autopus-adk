@@ -100,6 +100,7 @@ func TestCmuxAdapter_CreateWorkspace(t *testing.T) {
 // TestCmuxAdapter_SplitPane_Horizontal verifies new-split right is called and surface ref is returned.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_SplitPane_Horizontal(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("OK surface:7 workspace:1", nil)
 	defer restore()
 
@@ -116,6 +117,7 @@ func TestCmuxAdapter_SplitPane_Horizontal(t *testing.T) {
 // TestCmuxAdapter_SplitPane_Vertical verifies new-split down is called and surface ref is returned.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_SplitPane_Vertical(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("OK surface:8 workspace:1", nil)
 	defer restore()
 
@@ -128,9 +130,10 @@ func TestCmuxAdapter_SplitPane_Vertical(t *testing.T) {
 	assert.Contains(t, combined, "down")
 }
 
-// TestCmuxAdapter_SendCommand verifies send --surface <ref> <cmd> is issued.
+// TestCmuxAdapter_SendCommand verifies send --surface <ref> -- <cmd> is issued.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_SendCommand(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 
@@ -145,6 +148,7 @@ func TestCmuxAdapter_SendCommand(t *testing.T) {
 }
 
 func TestCmuxAdapter_SendCommand_NewlineUsesEnterKey(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 
@@ -153,12 +157,15 @@ func TestCmuxAdapter_SendCommand_NewlineUsesEnterKey(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "cmux", captured.lastName())
-	assert.Equal(t, []string{"send-key", "--surface", "surface:7", "Enter"}, captured.lastArgs())
+	assert.Equal(t, []string{
+		"send-key", "--workspace", "workspace:1", "--surface", "surface:7", "Enter",
+	}, captured.lastArgs())
 }
 
 // TestCmuxAdapter_Notify verifies notify --title <msg> is issued.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_Notify(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 
@@ -174,6 +181,7 @@ func TestCmuxAdapter_Notify(t *testing.T) {
 // TestCmuxAdapter_Close_SurfaceRef verifies close-surface --surface <ref> for surface refs.
 // Note: cannot use t.Parallel() — this test mutates the package-level execCommand variable.
 func TestCmuxAdapter_Close_SurfaceRef(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 

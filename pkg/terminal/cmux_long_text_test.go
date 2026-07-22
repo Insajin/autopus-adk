@@ -13,6 +13,7 @@ import (
 // TestCmuxAdapter_SendLongText_LongText_BufferPath verifies long text (>=500B) uses
 // set-buffer/paste-buffer/delete-buffer instead of send.
 func TestCmuxAdapter_SendLongText_LongText_BufferPath(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 
@@ -31,6 +32,7 @@ func TestCmuxAdapter_SendLongText_LongText_BufferPath(t *testing.T) {
 // TestCmuxAdapter_SendLongText_ShortText_BufferPath verifies short text also uses
 // buffer paste so cmux input does not pass through the active IME state.
 func TestCmuxAdapter_SendLongText_ShortText_BufferPath(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 
@@ -48,6 +50,7 @@ func TestCmuxAdapter_SendLongText_ShortText_BufferPath(t *testing.T) {
 // TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback verifies fallback
 // to chunked send when set-buffer fails.
 func TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	orig := execCommand
 	origCtx := execCommandContext
 	var calls []string
@@ -79,6 +82,7 @@ func TestCmuxAdapter_SendLongText_SetBufferFails_ChunkedFallback(t *testing.T) {
 // TestCmuxAdapter_SendLongText_PasteBufferFails_ChunkedFallback verifies fallback
 // to chunked send when paste-buffer fails (e.g., Codex ink TUI).
 func TestCmuxAdapter_SendLongText_PasteBufferFails_ChunkedFallback(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	orig := execCommand
 	origCtx := execCommandContext
 	var calls []string
@@ -114,12 +118,13 @@ func TestCmuxAdapter_SendLongText_PasteBufferFails_ChunkedFallback(t *testing.T)
 // TestCmuxAdapter_sendChunked_SplitsCorrectly verifies chunked send splits
 // text at 3500-byte boundaries.
 func TestCmuxAdapter_sendChunked_SplitsCorrectly(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	orig := execCommand
 	origCtx := execCommandContext
 	var sendPayloads []string
 	buildCmd := func(name string, args ...string) *exec.Cmd {
-		if len(args) >= 4 && args[0] == "send" {
-			sendPayloads = append(sendPayloads, args[3])
+		if len(args) >= 2 && args[0] == "send" {
+			sendPayloads = append(sendPayloads, args[len(args)-1])
 		}
 		return exec.Command("true")
 	}
@@ -144,6 +149,7 @@ func TestCmuxAdapter_sendChunked_SplitsCorrectly(t *testing.T) {
 // TestCmuxAdapter_SendLongText_UniqueBufferNames verifies different pane IDs produce
 // different buffer names.
 func TestCmuxAdapter_SendLongText_UniqueBufferNames(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	var allArgs [][]string
 	orig := execCommand
 	origCtx := execCommandContext

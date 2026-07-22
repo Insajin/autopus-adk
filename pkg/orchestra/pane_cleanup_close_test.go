@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,8 +27,21 @@ func isolateSurfaceTracker(t *testing.T) {
 // It records every Close attempt so tests can assert the retry count.
 type flakyCloseTerminal struct {
 	mockTerminal
+	workspaceRef string
 	failUntil    int // number of leading Close calls that return an error
 	closeAttempt int // total Close attempts observed
+}
+
+func (m *flakyCloseTerminal) WorkspaceRef() (string, error) {
+	if m.workspaceRef == "" {
+		return "workspace:13", nil
+	}
+	return m.workspaceRef, nil
+}
+
+func (m *flakyCloseTerminal) WithWorkspaceRef(ref string) (terminal.Terminal, error) {
+	m.workspaceRef = ref
+	return m, nil
 }
 
 func (m *flakyCloseTerminal) Close(_ context.Context, name string) error {
@@ -46,7 +60,7 @@ func (m *flakyCloseTerminal) Close(_ context.Context, name string) error {
 func TestClosePaneSurface_RetriesTransientFailure(t *testing.T) {
 	isolateSurfaceTracker(t)
 
-	term := &flakyCloseTerminal{failUntil: 1}
+	term := &flakyCloseTerminal{mockTerminal: mockTerminal{name: "cmux"}, failUntil: 1}
 	ok := closePaneSurface(term, terminal.PaneID("surface:7"))
 
 	assert.True(t, ok, "surface must be closed after a transient failure is retried")
@@ -58,7 +72,7 @@ func TestClosePaneSurface_RetriesTransientFailure(t *testing.T) {
 func TestClosePaneSurface_SucceedsFirstTry(t *testing.T) {
 	isolateSurfaceTracker(t)
 
-	term := &flakyCloseTerminal{failUntil: 0}
+	term := &flakyCloseTerminal{mockTerminal: mockTerminal{name: "cmux"}}
 	ok := closePaneSurface(term, terminal.PaneID("surface:3"))
 
 	assert.True(t, ok)
@@ -73,9 +87,11 @@ func TestClosePaneSurface_PersistentFailureKeepsRefTracked(t *testing.T) {
 	isolateSurfaceTracker(t)
 
 	ref := "surface:9"
-	trackSurface(ref)
-
-	term := &flakyCloseTerminal{failUntil: closePaneSurfaceAttempts + 1}
+	term := &flakyCloseTerminal{
+		mockTerminal: mockTerminal{name: "cmux"},
+		failUntil:    closePaneSurfaceAttempts + 1,
+	}
+	trackSurfaceForTerminal(term, ref)
 	ok := closePaneSurface(term, terminal.PaneID(ref))
 
 	assert.False(t, ok, "a surface that never closes must report failure")
@@ -91,13 +107,30 @@ func TestClosePaneSurface_SuccessUntracksRef(t *testing.T) {
 	isolateSurfaceTracker(t)
 
 	ref := "surface:11"
-	trackSurface(ref)
-
-	term := &flakyCloseTerminal{failUntil: 0}
+	term := &flakyCloseTerminal{mockTerminal: mockTerminal{name: "cmux"}}
+	trackSurfaceForTerminal(term, ref)
 	assert.True(t, closePaneSurface(term, terminal.PaneID(ref)))
 
 	refs := readTrackerRefs(surfaceTrackerFile(os.Getpid()))
 	assert.NotContains(t, refs, ref, "a successfully closed surface must be untracked")
+}
+
+func TestClosePaneSurface_UntrackFailureKeepsRecoveryHandleWithoutFailingCleanup(t *testing.T) {
+	isolateSurfaceTracker(t)
+
+	ref := "surface:12"
+	term := &flakyCloseTerminal{mockTerminal: mockTerminal{name: "cmux"}}
+	trackSurfaceForTerminal(term, ref)
+	originalUntracker := closeSurfaceUntracker
+	closeSurfaceUntracker = func(terminal.Terminal, string) error {
+		return errors.New("injected tracker persistence failure")
+	}
+	t.Cleanup(func() { closeSurfaceUntracker = originalUntracker })
+
+	assert.True(t, closePaneSurface(term, terminal.PaneID(ref)),
+		"tracker persistence must not turn a successful pane close into cleanup failure")
+	assert.Contains(t, readTrackerRefs(surfaceTrackerFile(os.Getpid())), ref,
+		"failed tracker persistence must retain the recovery handle for a later reap")
 }
 
 // TestClosePaneSurface_EmptyRefNoop guards the idempotency edge: an empty pane id
@@ -115,7 +148,7 @@ func TestClosePaneSurface_EmptyRefNoop(t *testing.T) {
 func TestCleanupInteractivePanes_ClosesEverySurface(t *testing.T) {
 	isolateSurfaceTracker(t)
 
-	term := &flakyCloseTerminal{failUntil: 1}
+	term := &flakyCloseTerminal{mockTerminal: mockTerminal{name: "cmux"}, failUntil: 1}
 	panes := []paneInfo{
 		{paneID: "surface:1"},
 		{paneID: "surface:2"},

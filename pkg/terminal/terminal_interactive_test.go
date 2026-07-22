@@ -38,6 +38,7 @@ func TestInteractive_PipePaneStop_CompileCheck(t *testing.T) {
 
 // TestInteractive_CmuxAdapter_ReadScreen_CallsReadScreenCmd verifies cmux read-screen --surface <ref>.
 func TestInteractive_CmuxAdapter_ReadScreen_CallsReadScreenCmd(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("screen content here", nil)
 	defer restore()
 
@@ -53,6 +54,7 @@ func TestInteractive_CmuxAdapter_ReadScreen_CallsReadScreenCmd(t *testing.T) {
 
 // TestInteractive_CmuxAdapter_ReadScreen_WithScrollback tests scrollback option.
 func TestInteractive_CmuxAdapter_ReadScreen_WithScrollback(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("scrollback content", nil)
 	defer restore()
 
@@ -65,6 +67,7 @@ func TestInteractive_CmuxAdapter_ReadScreen_WithScrollback(t *testing.T) {
 
 // TestInteractive_CmuxAdapter_ReadScreen_WithLines tests --lines N option.
 func TestInteractive_CmuxAdapter_ReadScreen_WithLines(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("last 50 lines", nil)
 	defer restore()
 
@@ -78,6 +81,7 @@ func TestInteractive_CmuxAdapter_ReadScreen_WithLines(t *testing.T) {
 
 // TestInteractive_CmuxAdapter_PipePaneStart_CallsPipePaneCmd tests pipe-pane start.
 func TestInteractive_CmuxAdapter_PipePaneStart_CallsPipePaneCmd(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 
@@ -93,6 +97,7 @@ func TestInteractive_CmuxAdapter_PipePaneStart_CallsPipePaneCmd(t *testing.T) {
 
 // TestInteractive_CmuxAdapter_PipePaneStop_CallsEmptyCommand tests pipe-pane stop.
 func TestInteractive_CmuxAdapter_PipePaneStop_CallsEmptyCommand(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, captured := newCmuxMockV2("", nil)
 	defer restore()
 
@@ -151,6 +156,7 @@ func TestInteractive_TmuxAdapter_PipePaneStop_CallsPipePaneNoArgs(t *testing.T) 
 
 // TestInteractive_CmuxAdapter_ReadScreen_Error verifies error propagation.
 func TestInteractive_CmuxAdapter_ReadScreen_Error(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, _ := newCmuxMockV2("", fmt.Errorf("read-screen failed"))
 	defer restore()
 
@@ -162,6 +168,7 @@ func TestInteractive_CmuxAdapter_ReadScreen_Error(t *testing.T) {
 
 // TestInteractive_CmuxAdapter_PipePaneStart_Error verifies error propagation.
 func TestInteractive_CmuxAdapter_PipePaneStart_Error(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, _ := newCmuxMockV2("", fmt.Errorf("pipe-pane failed"))
 	defer restore()
 
@@ -173,6 +180,7 @@ func TestInteractive_CmuxAdapter_PipePaneStart_Error(t *testing.T) {
 
 // TestInteractive_CmuxAdapter_PipePaneStop_Error verifies error propagation.
 func TestInteractive_CmuxAdapter_PipePaneStop_Error(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	restore, _ := newCmuxMockV2("", fmt.Errorf("pipe-pane stop failed"))
 	defer restore()
 

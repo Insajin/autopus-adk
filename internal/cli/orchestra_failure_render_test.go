@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/orchestra"
+	"github.com/insajin/autopus-adk/pkg/terminal"
 )
 
 func sampleResolvedTimeout() ResolvedOrchestraTimeout {
@@ -70,6 +72,18 @@ func TestRenderOrchestraFailureSummary_NilResultNoPath(t *testing.T) {
 	assert.Contains(t, out, "effective timeout: 540s")
 	assert.NotContains(t, out, "failure")
 	assert.NotContains(t, out, "diagnostics report")
+}
+
+func TestRenderOrchestraFailureSummary_BlockedYield_ExposesCleanupHandle(t *testing.T) {
+	t.Parallel()
+	result := sampleFailedResult()
+	result.TerminalState = orchestra.TerminalBlocked
+	result.Yield = &orchestra.YieldOutput{SessionID: "orch-recover-123"}
+
+	out := renderOrchestraFailureSummary(sampleResolvedTimeout(), result, "/tmp/report.json")
+
+	assert.Contains(t, out, "session: orch-recover-123")
+	assert.Contains(t, out, "cleanup: auto orchestra cleanup --session-id orch-recover-123")
 }
 
 // TestSynthesizeOrchestraFailureError_NilAndPopulated covers both branches.
@@ -170,6 +184,66 @@ func TestSaveOrchestraDiagnosticsReport_WritesJSON(t *testing.T) {
 	require.Len(t, report.FailedProviders, 2)
 	assert.Equal(t, "claude", report.FailedProviders[0].Name)
 	assert.Equal(t, []string{"increase timeout"}, report.RetryHints)
+}
+
+func TestSaveOrchestraFailureReport_BlockedYield_PersistsCleanupHandle(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	result := sampleFailedResult()
+	result.TerminalState = orchestra.TerminalBlocked
+	result.Yield = &orchestra.YieldOutput{SessionID: "orch-report-recover"}
+
+	path, err := saveOrchestraFailureReport(
+		"brainstorm", "debate", []string{"claude", "codex"},
+		sampleResolvedTimeout(), result, assertErr("quorum blocked"),
+	)
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var report orchestraFailureReport
+	require.NoError(t, json.Unmarshal(raw, &report))
+	assert.Equal(t, "orch-report-recover", report.SessionID)
+	assert.Equal(t,
+		"auto orchestra cleanup --session-id orch-report-recover",
+		report.CleanupCommand,
+	)
+}
+
+func TestRunOrchestraCommand_BlockedYield_WritesRecoveryHandleToStderr(t *testing.T) {
+	t.Chdir(t.TempDir())
+	originalRun := runOrchestraExecute
+	originalDetector := runOrchestraTerminalDetector
+	t.Cleanup(func() {
+		runOrchestraExecute = originalRun
+		runOrchestraTerminalDetector = originalDetector
+	})
+	runOrchestraTerminalDetector = func() terminal.Terminal { return stubTerminal{name: "plain"} }
+	runOrchestraExecute = func(context.Context, orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		return &orchestra.OrchestraResult{
+			TerminalState:       orchestra.TerminalBlocked,
+			GateStatus:          "blocked",
+			DegradedReasons:     []string{"provider_quorum"},
+			ConfiguredProviders: []string{"claude", "gemini"},
+			QuorumRequired:      2,
+			Yield:               &orchestra.YieldOutput{SessionID: "orch-command-recover"},
+			FailedProviders: []orchestra.FailedProvider{
+				{Name: "claude", FailureClass: "timeout", Error: "deadline exceeded"},
+				{Name: "gemini", FailureClass: "timeout", Error: "deadline exceeded"},
+			},
+		}, nil
+	}
+	var runErr error
+	stderr := captureSpecReviewStderr(t, func() {
+		runErr = runOrchestraCommand(
+			context.Background(), "brainstorm", "consensus", []string{"claude", "gemini"},
+			30, "", "topic", 0, 0, OrchestraFlags{NoDetach: true},
+		)
+	})
+
+	require.Error(t, runErr)
+	assert.Contains(t, stderr, "session: orch-command-recover")
+	assert.Contains(t, stderr, "cleanup: auto orchestra cleanup --session-id orch-command-recover")
 }
 
 func countSubstr(s, sub string) int {

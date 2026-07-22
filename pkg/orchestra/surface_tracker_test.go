@@ -26,6 +26,7 @@ func TestMain(m *testing.M) {
 	tmp, err := os.MkdirTemp("", "autopus-surface-tracker-test-")
 	if err == nil {
 		surfaceTrackerBase = filepath.Join(tmp, "surfaces")
+		surfaceTrackerLegacyBase = filepath.Join(tmp, "legacy-surfaces")
 		// Isolate the home directory so os.UserHomeDir()-based runtime roots
 		// resolve under the throwaway tree. HOME covers Unix/macOS; the rest
 		// guard alternate resolution paths.
@@ -43,6 +44,15 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+func secureTrackerTestDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0o700); err != nil {
+		t.Fatalf("secure tracker test directory: %v", err)
+	}
+	return dir
+}
+
 func TestProcessAlive(t *testing.T) {
 	t.Parallel()
 
@@ -57,7 +67,7 @@ func TestTrackAndUntrackSurface(t *testing.T) {
 	orig := surfaceTrackerBase
 	// Use a non-existing subdirectory so MkdirAll creates it with mode 0700,
 	// satisfying the ownership/mode security check in trackSurface (REQ-007).
-	surfaceTrackerBase = filepath.Join(t.TempDir(), "surfaces")
+	surfaceTrackerBase = filepath.Join(secureTrackerTestDir(t), "surfaces")
 	defer func() { surfaceTrackerBase = orig }()
 
 	trackSurface("surface:1")
@@ -79,21 +89,25 @@ func TestTrackAndUntrackSurface(t *testing.T) {
 
 func TestReapOrphanSurfaces_ClosesOnlyDeadOwners(t *testing.T) {
 	orig := surfaceTrackerBase
-	surfaceTrackerBase = t.TempDir()
+	surfaceTrackerBase = secureTrackerTestDir(t)
 	defer func() { surfaceTrackerBase = orig }()
 
 	deadPID := 2147480001 // unused high pid → reported dead
-	writeTrackerRefs(surfaceTrackerFile(deadPID), []string{"surface:10", "surface:11"})
+	writeTrackedSurfaces(surfaceTrackerFile(deadPID),
+		trackedCmuxSurfaces("workspace:13", "surface:10", "surface:11"))
 	// A live owner that must NOT be reaped: this process.
 	selfRefs := []string{"surface:20"}
 	writeTrackerRefs(surfaceTrackerFile(os.Getpid()), selfRefs)
 
-	term := &mockTerminal{name: "cmux"}
+	term := newTrackerContextTerminal("workspace:current")
 	ReapOrphanSurfaces(term)
 
-	closed := append([]string(nil), term.closeCalls...)
+	closed := append([]string(nil), term.state.closeCalls...)
 	sort.Strings(closed)
 	assert.Equal(t, []string{"surface:10", "surface:11"}, closed, "only dead owner's surfaces are closed")
+	assert.Equal(t, []string{"workspace:13", "workspace:13"}, term.state.closeWorkspaces)
+	assert.Equal(t, "workspace:current", term.workspaceRef,
+		"orphan cleanup must not mutate the active terminal context")
 
 	_, err := os.Stat(surfaceTrackerFile(deadPID))
 	assert.True(t, os.IsNotExist(err), "dead owner's tracking file must be removed")
@@ -102,7 +116,7 @@ func TestReapOrphanSurfaces_ClosesOnlyDeadOwners(t *testing.T) {
 
 func TestReapOrphanSurfaces_NoOpForPlainOrNilTerm(t *testing.T) {
 	orig := surfaceTrackerBase
-	surfaceTrackerBase = t.TempDir()
+	surfaceTrackerBase = secureTrackerTestDir(t)
 	defer func() { surfaceTrackerBase = orig }()
 
 	deadPID := 2147480002
@@ -175,27 +189,27 @@ func TestReapOrphanSurfaces_RefValidationAndLegacyNoCreate(t *testing.T) {
 		surfaceTrackerLegacyBase = origLegacy
 	}()
 
-	base := t.TempDir()
+	base := secureTrackerTestDir(t)
 	surfaceTrackerBase = base
 
 	// Point legacy base to a path that does not exist; verify it is NOT created.
-	legacyBase := filepath.Join(t.TempDir(), "legacy-never-created")
+	legacyBase := filepath.Join(secureTrackerTestDir(t), "legacy-never-created")
 	surfaceTrackerLegacyBase = legacyBase
 
 	// Write refs including two invalid ones and one valid ref for a dead PID.
 	deadPID := 2147480004
-	writeTrackerRefs(surfaceTrackerFile(deadPID),
-		[]string{"--help", "; rm -rf /", "surface:3"})
+	writeTrackedSurfaces(surfaceTrackerFile(deadPID),
+		trackedCmuxSurfaces("workspace:13", "--help", "; rm -rf /", "surface:3"))
 	// Self entry must not be reaped.
 	writeTrackerRefs(surfaceTrackerFile(os.Getpid()), []string{"surface:99"})
 
-	term := &mockTerminal{name: "cmux"}
+	term := newTrackerContextTerminal("workspace:current")
 	logOutput := captureLog(t, func() {
 		ReapOrphanSurfaces(term)
 	})
 
 	// Only the valid ref "surface:3" must be closed.
-	assert.Equal(t, []string{"surface:3"}, term.closeCalls,
+	assert.Equal(t, []string{"surface:3"}, term.state.closeCalls,
 		"Close must receive exactly {surface:3}")
 
 	// Invalid refs must appear in log output.
@@ -211,8 +225,9 @@ func TestReapOrphanSurfaces_RefValidationAndLegacyNoCreate(t *testing.T) {
 }
 
 func TestReapOrphanSurfaces_TmuxClosesGlobalPaneRef(t *testing.T) {
+	t.Setenv("TMUX", "/tmp/tmux-501/default,12345,1")
 	orig := surfaceTrackerBase
-	surfaceTrackerBase = t.TempDir()
+	surfaceTrackerBase = secureTrackerTestDir(t)
 	defer func() { surfaceTrackerBase = orig }()
 
 	deadPID := 2147480005
@@ -225,36 +240,20 @@ func TestReapOrphanSurfaces_TmuxClosesGlobalPaneRef(t *testing.T) {
 		"tmux Close must receive exactly the valid global pane ref")
 }
 
-func TestReapOrphanSurfaces_CmuxPreservesTmuxGlobalPaneRef(t *testing.T) {
-	orig := surfaceTrackerBase
-	surfaceTrackerBase = t.TempDir()
-	defer func() { surfaceTrackerBase = orig }()
-
-	deadPID := 2147480006
-	trackerFile := surfaceTrackerFile(deadPID)
-	writeTrackerRefs(trackerFile, []string{"%42"})
-
-	term := &mockTerminal{name: "cmux"}
-	ReapOrphanSurfaces(term)
-
-	assert.Empty(t, term.closeCalls, "cmux must not close a tmux global pane ref")
-	assert.Equal(t, []string{"%42"}, readTrackerRefs(trackerFile),
-		"incompatible ref must remain tracked for a later tmux reaper")
-}
-
 func TestReapOrphanSurfaces_CloseErrorPreservesRefForRetry(t *testing.T) {
 	orig := surfaceTrackerBase
-	surfaceTrackerBase = t.TempDir()
+	surfaceTrackerBase = secureTrackerTestDir(t)
 	defer func() { surfaceTrackerBase = orig }()
 
 	deadPID := 2147480007
 	trackerFile := surfaceTrackerFile(deadPID)
-	writeTrackerRefs(trackerFile, []string{"surface:77"})
+	writeTrackedSurfaces(trackerFile, trackedCmuxSurfaces("workspace:13", "surface:77"))
 
-	term := &mockTerminal{name: "cmux", closeErr: errors.New("close failed")}
+	term := newTrackerContextTerminal("workspace:current")
+	term.state.closeErr = errors.New("close failed")
 	ReapOrphanSurfaces(term)
 
-	assert.Equal(t, []string{"surface:77"}, term.closeCalls,
+	assert.Equal(t, []string{"surface:77"}, term.state.closeCalls,
 		"compatible ref must be passed to Close")
 	assert.Equal(t, []string{"surface:77"}, readTrackerRefs(trackerFile),
 		"failed Close ref must remain tracked for retry")
@@ -262,7 +261,7 @@ func TestReapOrphanSurfaces_CloseErrorPreservesRefForRetry(t *testing.T) {
 
 func TestReapOrphanSurfaces_SkipsLivePeerOwner(t *testing.T) {
 	orig := surfaceTrackerBase
-	surfaceTrackerBase = t.TempDir()
+	surfaceTrackerBase = secureTrackerTestDir(t)
 	defer func() { surfaceTrackerBase = orig }()
 
 	// Simulate a concurrent, still-running orchestrator with a real live child

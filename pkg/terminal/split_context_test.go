@@ -10,6 +10,7 @@ import (
 )
 
 func TestCmuxAdapter_SplitPaneUsesContextCommand(t *testing.T) {
+	t.Setenv("CMUX_WORKSPACE_ID", "workspace:1")
 	original := execCommand
 	originalContext := execCommandContext
 	defer func() {

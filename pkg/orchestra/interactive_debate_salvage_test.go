@@ -3,8 +3,10 @@ package orchestra
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 	"time"
 
@@ -19,6 +21,19 @@ type yieldSaveFailureTerminal struct {
 	setTempDir     func(string)
 }
 
+func (m *yieldSaveFailureTerminal) SplitPane(_ context.Context, dir terminal.Direction) (terminal.PaneID, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.splitPaneCalls = append(m.splitPaneCalls, dir)
+	if m.splitPaneErr != nil {
+		return "", m.splitPaneErr
+	}
+	m.nextPaneID++
+	id := terminal.PaneID(fmt.Sprintf("surface:%d", m.nextPaneID))
+	m.createdPanes = append(m.createdPanes, id)
+	return id, nil
+}
+
 func (m *yieldSaveFailureTerminal) SendLongText(_ context.Context, _ terminal.PaneID, _ string) error {
 	return errors.New("force provider launch failure after pane provisioning")
 }
@@ -26,6 +41,14 @@ func (m *yieldSaveFailureTerminal) SendLongText(_ context.Context, _ terminal.Pa
 func (m *yieldSaveFailureTerminal) FocusPane(_ context.Context, _ terminal.PaneID) error {
 	m.setTempDir(m.invalidTempDir)
 	return nil
+}
+
+func (m *yieldSaveFailureTerminal) WorkspaceRef() (string, error) {
+	return "workspace:1", nil
+}
+
+func (m *yieldSaveFailureTerminal) WithWorkspaceRef(string) (terminal.Terminal, error) {
+	return m, nil
 }
 
 func TestRunPaneDebate_YieldSaveFailureCleansOwnedPanes(t *testing.T) {
@@ -57,10 +80,53 @@ func TestRunPaneDebate_YieldSaveFailureCleansOwnedPanes(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, result)
 	assert.ErrorContains(t, err, "persist yield session")
-	assert.Equal(t, []string{"pane-1"}, term.closeCalls,
+	assert.Equal(t, []string{"surface:1"}, term.closeCalls,
 		"the pane stays locally owned and must close when persistence fails")
-	assert.NotContains(t, readTrackerRefs(surfaceTrackerFile(os.Getpid())), "pane-1",
+	assert.NotContains(t, readTrackerRefs(surfaceTrackerFile(os.Getpid())), "surface:1",
 		"a successfully closed pane must be untracked")
+}
+
+func TestRunPaneDebate_YieldHandoffFailureKeepsDurableSessionAndPanes(t *testing.T) {
+	isolateSurfaceTracker(t)
+	t.Setenv("TMPDIR", t.TempDir())
+	term := &yieldSaveFailureTerminal{
+		mockTerminal: mockTerminal{name: "cmux"},
+		setTempDir:   func(string) {},
+	}
+	originalUntracker := yieldSurfaceUntracker
+	yieldSurfaceUntracker = func(terminal.Terminal, string) error {
+		return errors.New("injected tracker handoff failure")
+	}
+	t.Cleanup(func() { yieldSurfaceUntracker = originalUntracker })
+	cfg := OrchestraConfig{
+		Providers:      []ProviderConfig{echoProvider("claude")},
+		Strategy:       StrategyDebate,
+		Prompt:         "keep the durable recovery handle",
+		TimeoutSeconds: 1,
+		Terminal:       term,
+		Interactive:    true,
+		YieldRounds:    true,
+		NoJudge:        true,
+		InitialDelay:   time.Millisecond,
+		WorkingDir:     t.TempDir(),
+	}
+
+	result, err := runPaneDebate(context.Background(), cfg, 1, time.Second, time.Now())
+
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Empty(t, term.closeCalls,
+		"a durable yield session owns the panes even when tracker handoff reports an error")
+	assert.Contains(t, readTrackerRefs(surfaceTrackerFile(os.Getpid())), "surface:1",
+		"the tracker recovery handle must remain when handoff persistence fails")
+	match := regexp.MustCompile(`yield session (orch-[0-9a-f]+)`).FindStringSubmatch(err.Error())
+	require.Len(t, match, 2)
+	sessionID := match[1]
+	t.Cleanup(func() { _ = RemoveSession(sessionID) })
+	assert.ErrorContains(t, err, "auto orchestra cleanup --session-id "+sessionID)
+	loaded, loadErr := LoadSession(sessionID)
+	require.NoError(t, loadErr)
+	assert.Equal(t, map[string]string{"claude": "surface:1"}, loaded.Panes)
 }
 
 func TestExecuteRound_OrdersResponsesAtDebateBoundary(t *testing.T) {

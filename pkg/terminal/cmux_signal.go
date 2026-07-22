@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -32,13 +31,9 @@ func (a *CmuxAdapter) SurfaceHealth(ctx context.Context, paneID PaneID) (Surface
 	if err := validatePaneID(paneID); err != nil {
 		return SurfaceStatus{}, fmt.Errorf("cmux: %w", err)
 	}
-	args := []string{"surface-health"}
-	workspace := a.workspaceRef
-	if workspace == "" {
-		workspace = os.Getenv("CMUX_WORKSPACE_ID")
-	}
-	if workspace != "" {
-		args = append(args, "--workspace", workspace)
+	args, err := a.workspaceCommandArgs("surface-health")
+	if err != nil {
+		return SurfaceStatus{}, fmt.Errorf("cmux: surface-health pane %s: %w", paneID, err)
 	}
 	cmd := execCommandContext(ctx, "cmux", args...)
 	out, err := cmd.Output()
