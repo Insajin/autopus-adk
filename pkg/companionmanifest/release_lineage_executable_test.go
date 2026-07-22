@@ -256,6 +256,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 		immutableA3LineagePins, immutableA4LineagePins, immutableA5LineagePins,
 		immutableA6LineagePins, immutableA7LineagePins, immutableA8LineagePins,
 		immutableA9LineagePins, immutableA10LineagePins, immutableA11LineagePins,
+		immutableA12LineagePins, immutableA13LineagePins,
 	} {
 		for name, value := range pins {
 			declaration := "readonly " + name + "='" + value + "'"
@@ -266,7 +267,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 	}
 	for _, bypass := range []string{
 		"TEST_PIN", "PIN_FILE", "PIN_OVERRIDE", "GO_WANT_LINEAGE",
-		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_", "COMPANION_A4_", "COMPANION_A5_", "COMPANION_A6_", "COMPANION_A7_", "COMPANION_A8_", "COMPANION_A9_", "COMPANION_A10_", "COMPANION_A11_", "COMPANION_A12_", "COMPANION_A13_",
+		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_", "COMPANION_A4_", "COMPANION_A5_", "COMPANION_A6_", "COMPANION_A7_", "COMPANION_A8_", "COMPANION_A9_", "COMPANION_A10_", "COMPANION_A11_", "COMPANION_A12_", "COMPANION_A13_", "COMPANION_A14_",
 	} {
 		if strings.Contains(runtimeSource, bypass) {
 			t.Fatalf("production lineage exposes test pin bypass %q", bypass)

@@ -46,8 +46,8 @@ contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.output
 contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
 not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
 contains "$producer_receipt" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='192cacd10d0c85d5cc0533356400e697152a551c'"
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='2ba9ab9caa381c68a276588a7d6ad77de46f1dd5'"
+contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='d8dc4c78f42a7c5e30176334b607b036be3bd677'"
+contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='524ade82d6466da8ad6d5c173e0b4a214fdbc21f'"
 contains "$homebrew_bridge" "readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 contains "$homebrew_bridge" "readonly FORMULA_PATH='Formula/auto.rb'"
@@ -68,10 +68,13 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$release" "- 'v0.50.84'"
-contains "$release" "if: github.ref == 'refs/tags/v0.50.84'"
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.84'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.84'
+contains "$release" "- 'v0.50.85'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.85'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.85'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.85'
+not_contains "$release" "'v0.50.84'"
+not_contains "$release" 'refs/tags/v0.50.84'
+not_contains "$recovery" 'refs/tags/v0.50.84'
 not_contains "$release" "'v0.50.83'"
 not_contains "$release" 'refs/tags/v0.50.83'
 not_contains "$recovery" 'refs/tags/v0.50.83'
@@ -101,6 +104,7 @@ contains "$source_gate" "readonly A10_A9_ANCESTOR_SHA='c9c4f49d48022eb0c8d72ee7b
 contains "$source_gate" "readonly A11_A10_ANCESTOR_SHA='54536edc09c37a634532c2c9b51e62869d393db4'"
 contains "$source_gate" "readonly A12_A11_ANCESTOR_SHA='a8558ccc36e04125de6b8d84c7ffc9e8ddb5a2c9'"
 contains "$source_gate" "readonly A13_A12_ANCESTOR_SHA='e6367b5375cd4cdf09cb1515877bc57323521364'"
+contains "$source_gate" "readonly A14_A13_ANCESTOR_SHA='2b7aa046bdb7861113dfa57b30489c11715582e9'"
 contains "$lineage" 'source "$pins_helper"'
 contains "$lineage" 'source "$coordinates_helper"'
 contains "$lineage_pins" "A4_TAG_OBJECT_SHA='b1ebab0af82536f8a4bc1ed93f31f82f6c53d008'"
@@ -170,17 +174,26 @@ contains "$lineage_pins" "A12_AMD64_ARCHIVE_SHA256='da92acfa4e8f45a0abea90b0991a
 contains "$lineage_pins" "A12_ARM64_ARCHIVE_SHA256='5b29fdb21b62f8933c1ff0608f9c1dca096be24649fd24ec40bcbe9ff72c4fcc'"
 contains "$lineage_pins" "A12_AMD64_MANIFEST_SHA256='caa1145bc293a125495795914005429694e2a2b98a863d903a40575495ec250a'"
 contains "$lineage_pins" "A12_ARM64_MANIFEST_SHA256='013e7b98bfea64783d932e787609d526d5157801788b90b13cc59990070ab20b'"
+contains "$lineage_pins" "A13_COMMIT_SHA='2b7aa046bdb7861113dfa57b30489c11715582e9'"
+contains "$lineage_pins" "A13_TREE_SHA='95d1b00bcc1cb1bfcca3dd58e1e5e1b94575c367'"
+contains "$lineage_pins" "A13_TAG_OBJECT_SHA='de34e9c1a2a06b27f57235c81a59d1da180eab6d'"
+contains "$lineage_pins" "A13_CHECKSUMS_SHA256='8f00d3b42d71c9e71346bf62cd72f8e1428600cb0795f703d90de64b3b9ba14e'"
+contains "$lineage_pins" "A13_AMD64_ARCHIVE_SHA256='fa60e03ecd39a5fa203be3cca3e8a7010e3af7854195f0e866ef80e7a0e82f0f'"
+contains "$lineage_pins" "A13_ARM64_ARCHIVE_SHA256='f4ed0ef8d6f0274389ada5cebdeb87a2899bf34b7a11bd99318b5914775d84f1'"
+contains "$lineage_pins" "A13_AMD64_MANIFEST_SHA256='ba6f3e92d4a1c0a1a52b7b17e484961cb8640944eae24856652ebe6192210931'"
+contains "$lineage_pins" "A13_ARM64_MANIFEST_SHA256='22660fc029bbcb9ffe312964d9f674ba2587440dba48790e28fb4f35b19dcc69'"
 contains "$lineage_coordinates" "release_phase='A8' prior_phase='A7'"
 contains "$lineage_coordinates" "release_phase='A9' prior_phase='A8'"
 contains "$lineage_coordinates" "release_phase='A10' prior_phase='A9'"
 contains "$lineage_coordinates" "release_phase='A11' prior_phase='A10'"
 contains "$lineage_coordinates" "release_phase='A12' prior_phase='A11'"
 contains "$lineage_coordinates" "release_phase='A13' prior_phase='A12'"
+contains "$lineage_coordinates" "release_phase='A14' prior_phase='A13'"
 contains "$lineage" '.commit.tree.sha'
-contains "$producer_receipt" "GITHUB_REF_NAME\" == 'v0.50.84'"
-contains "$producer_receipt" "release_phase='A13'"
-contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.84'"
-contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.84'"
+contains "$producer_receipt" "GITHUB_REF_NAME\" == 'v0.50.85'"
+contains "$producer_receipt" "release_phase='A14'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.85'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.85'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -191,8 +204,8 @@ for workflow in "$release" "$recovery"; do
   workflow_token_index=$(grep -n 'name: Create Homebrew tap token' "$workflow" | cut -d: -f1)
   (( workflow_evidence_index < workflow_token_index )) || fail 'tap token precedes release evidence'
 done
-contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.84'"
-contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.84'"
+contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.85'"
+contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.85'"
 contains "$current_release_gate" '.target_commitish == $commit'
 contains "$current_release_gate" '.immutable == true'
 contains "$current_release_gate" '(.assets | length) == ($expected | length)'
