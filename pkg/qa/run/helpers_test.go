@@ -1,7 +1,6 @@
 package run
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -34,7 +33,7 @@ func TestHelperBranches(t *testing.T) {
 	t.Cleanup(commandCache.Cleanup)
 	env := allowedEnv(commandCache.Paths, []string{"QAMESH_ALLOWED", "QAMESH_MISSING", "GOCACHE", "GOMODCACHE", "GOPATH"})
 	assert.Contains(t, env, "QAMESH_ALLOWED=yes")
-	assert.Contains(t, env, "HOME="+projectDir)
+	assert.Contains(t, env, "HOME="+commandCache.Paths.ProjectDir)
 	t.Setenv("HOME", "/tmp/qamesh-real-home")
 	assert.Contains(t, allowedEnv(commandCache.Paths, []string{"HOME"}), "HOME=/tmp/qamesh-real-home")
 	assert.Contains(t, env, "GOPATH="+commandCache.Paths.GoPath)
@@ -53,12 +52,10 @@ func TestHelperBranches(t *testing.T) {
 	assert.Contains(t, strings.Join(env, "\n"), "CARGO_HOME=")
 	assert.Contains(t, strings.Join(env, "\n"), "RUSTUP_HOME=")
 	assert.Contains(t, strings.Join(env, "\n"), "PLAYWRIGHT_BROWSERS_PATH=")
-	wd, err := os.Getwd()
-	assert.NoError(t, err)
 	wdCache, err := prepareCommandGoCache(".")
 	require.NoError(t, err)
 	t.Cleanup(wdCache.Cleanup)
-	assert.Contains(t, allowedEnv(wdCache.Paths, nil), "HOME="+wd)
+	assert.Contains(t, allowedEnv(wdCache.Paths, nil), "HOME="+wdCache.Paths.ProjectDir)
 	privateCache, err := prepareCommandGoCache(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(privateCache.Cleanup)

@@ -125,7 +125,7 @@ func TestReleaseWorkflow_RequiresRealKeyAndMetadataBeforeGoReleaser(t *testing.T
 		t.Fatalf("release job id-token permission = %q, want write", got)
 	}
 	required := []string{
-		"runs-on: macos-14",
+		"runs-on: macos-15",
 		"secrets.APPLE_API_ISSUER",
 		"secrets.APPLE_API_KEY",
 		"secrets.APPLE_API_KEY_P8",

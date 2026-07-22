@@ -16,6 +16,8 @@ ALIAS="autopus"
 SIGNING_FLOOR="0.50.73"
 VERIFIER_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/release-signing/verify-checksums-v1.sh"
 VERIFIER_SHA256="d9eeaaa029269d4ed9008e38527e3bbe3229d2f93a44f9d2a63b79109c9dcbf9"
+RUNTIME_HELPER_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/install-runtime-v1.sh"
+RUNTIME_HELPER_SHA256="e9f15a192cf786c4539cc1b525283a99156c33b600f342024fd9e5e12e7ef3e8"
 
 # 색상 출력
 info()  { printf '\033[1;34m%s\033[0m\n' "$1"; }
@@ -182,6 +184,14 @@ main() {
     verify_checksum "$VERIFIER_PATH" "$VERIFIER_SHA256" installer_verifier_integrity_failed
     . "$VERIFIER_PATH"
 
+    RUNTIME_HELPER_PATH="${TMPDIR}/install-runtime-v1.sh"
+    download "$RUNTIME_HELPER_URL" "$RUNTIME_HELPER_PATH" || \
+        err "installer_runtime_helper_download_failed: 실행 검증기를 받을 수 없습니다."
+    [ -f "$RUNTIME_HELPER_PATH" ] && [ ! -L "$RUNTIME_HELPER_PATH" ] || \
+        err "installer_runtime_helper_invalid: 실행 검증기는 regular file이어야 합니다."
+    verify_checksum "$RUNTIME_HELPER_PATH" "$RUNTIME_HELPER_SHA256" installer_runtime_helper_integrity_failed
+    . "$RUNTIME_HELPER_PATH"
+
     download "$CHECKSUMS_URL" "${TMPDIR}/checksums.txt" || \
         err "release_checksum_download_failed: checksums.txt를 받을 수 없습니다."
     download "$SIGNATURES_URL" "${TMPDIR}/checksums.txt.signatures" || \
@@ -217,7 +227,6 @@ main() {
         cp "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
         chmod 755 "${INSTALL_DIR}/${BINARY}"
         ln -sf "${INSTALL_DIR}/${BINARY}" "${INSTALL_DIR}/${ALIAS}"
-        USED_SUDO=""
     else
         echo ""
         echo "  시스템 폴더(${INSTALL_DIR})에 설치하기 위해 관리자 비밀번호가 필요합니다."
@@ -225,13 +234,6 @@ main() {
         sudo cp "${TMPDIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
         sudo chmod 755 "${INSTALL_DIR}/${BINARY}"
         sudo ln -sf "${INSTALL_DIR}/${BINARY}" "${INSTALL_DIR}/${ALIAS}"
-        USED_SUDO="sudo"
-    fi
-
-    # macOS: clear Gatekeeper quarantine/provenance so unsigned binary can run
-    if [ "$OS" = "darwin" ]; then
-        $USED_SUDO xattr -c "${INSTALL_DIR}/${BINARY}" 2>/dev/null || true
-        $USED_SUDO xattr -c "${INSTALL_DIR}/${ALIAS}" 2>/dev/null || true
     fi
 
     ok "autopus-adk v${VERSION} 설치 완료!"
@@ -239,12 +241,38 @@ main() {
     print_path_hint
     echo ""
 
+    # Verify execution admission before invoking the more expensive doctor flow.
+    info "설치된 auto 실행 확인 중..."
+    version_smoke_output="${TMPDIR}/version-smoke.out"
+    if run_version_smoke "${INSTALL_DIR}/${BINARY}" "$version_smoke_output"; then
+        if ! version_smoke_output_matches "$VERSION" "$version_smoke_output"; then
+            rm -f "$version_smoke_output"
+            err "post_install_version_mismatch: auto version --short 출력이 설치 요청 버전 v${VERSION}과 일치하지 않습니다."
+        fi
+        rm -f "$version_smoke_output"
+        ok "auto 실행 확인 완료!"
+    else
+        version_smoke_status=$?
+        rm -f "$version_smoke_output"
+        if [ "$version_smoke_status" -eq 124 ] && [ "$OS" = "darwin" ]; then
+            print_macos_execution_admission_recovery
+            err "post_install_execution_admission_timeout: 설치 파일은 보존했지만 실행 확인에 실패했습니다."
+        fi
+        err "post_install_version_smoke_failed: 설치 파일은 보존했지만 auto version --short 실행에 실패했습니다."
+    fi
+    echo ""
+
     # Post-install: check and auto-install required tools only.
     info "필수 도구 확인 중... (이미 설치된 것은 건너뜀)"
-    if "${INSTALL_DIR}/${BINARY}" doctor --fix --yes --required-only 2>/dev/null; then
+    if run_bounded_command "$DOCTOR_TIMEOUT_SECONDS" "${INSTALL_DIR}/${BINARY}" doctor --fix --yes --required-only 2>/dev/null; then
         ok "필수 도구 점검 완료!"
     else
-        echo "  일부 필수 도구를 자동 설치하지 못했습니다."
+        doctor_status=$?
+        if [ "$doctor_status" -eq 124 ]; then
+            echo "  필수 도구 점검이 ${DOCTOR_TIMEOUT_SECONDS}초를 초과해 관련 프로세스를 종료했습니다."
+        else
+            echo "  일부 필수 도구를 자동 설치하지 못했습니다."
+        fi
         echo "  수동 확인: ${BINARY} doctor"
     fi
     echo ""

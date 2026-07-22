@@ -25,7 +25,11 @@ OS=$(detect_os)
 ARCH=$(detect_arch)
 ARCHIVE="autopus-adk_0.50.73_${OS}_${ARCH}.tar.gz"
 mkdir "$V1_WORK/archive-content"
-printf '#!/bin/sh\nexit 0\n' > "$V1_WORK/archive-content/auto"
+printf '%s\n' '#!/bin/sh' \
+    'if [ "${1:-}" = version ] && [ "${2:-}" = --short ]; then' \
+    '    printf '\''0.50.73\n'\''' \
+    'fi' \
+    'exit 0' > "$V1_WORK/archive-content/auto"
 chmod +x "$V1_WORK/archive-content/auto"
 tar -czf "$V1_WORK/$ARCHIVE" -C "$V1_WORK/archive-content" auto
 archive_sha=$(v1_sha256_file "$V1_WORK/$ARCHIVE")
@@ -43,6 +47,7 @@ cp "$V1_HELPER" "$V1_WORK/test-helper.sh"
 } >> "$V1_WORK/test-helper.sh"
 VERIFIER_SHA256=$(v1_sha256_file "$V1_WORK/test-helper.sh")
 DOWNLOAD_HELPER="$V1_WORK/test-helper.sh"
+DOWNLOAD_RUNTIME_HELPER="$REPO_ROOT/scripts/install-runtime-v1.sh"
 DOWNLOAD_CHECKSUMS="$V1_WORK/install-checksums"
 DOWNLOAD_ENVELOPE="$V1_WORK/install-envelope"
 DOWNLOAD_ARCHIVE="$V1_WORK/$ARCHIVE"
@@ -51,6 +56,7 @@ download() {
     source_url=$1
     destination=$2
     case "$source_url" in
+        *install-runtime-v1.sh) /bin/cp "$DOWNLOAD_RUNTIME_HELPER" "$destination" ;;
         *verify-checksums-v1.sh) /bin/cp "$DOWNLOAD_HELPER" "$destination" ;;
         *checksums.txt.signatures) /bin/cp "$DOWNLOAD_ENVELOPE" "$destination" ;;
         *checksums.txt) /bin/cp "$DOWNLOAD_CHECKSUMS" "$destination" ;;

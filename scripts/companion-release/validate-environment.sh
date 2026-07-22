@@ -42,6 +42,7 @@ for name in \
   COMPANION_KEY_ID \
   COMPANION_SIGNING_KEY_FILE \
   COMPANION_SIGNER \
+  COMPANION_EXEC_SMOKE_GATE \
   APPLE_SIGNING_IDENTITY \
   APPLE_API_KEY \
   APPLE_API_ISSUER \
@@ -76,6 +77,10 @@ secure_regular_file "$COMPANION_SIGNING_KEY_FILE" 'companion signing key'
 secure_regular_file "$APPLE_API_KEY_PATH" 'Apple API key'
 [[ -f "$COMPANION_SIGNER" && ! -L "$COMPANION_SIGNER" && -x "$COMPANION_SIGNER" ]] \
   || fail 'COMPANION_SIGNER is not a regular executable'
+exec_smoke_label='companion execution smoke gate'
+[[ -f "$COMPANION_EXEC_SMOKE_GATE" && ! -L "$COMPANION_EXEC_SMOKE_GATE" &&
+   -x "$COMPANION_EXEC_SMOKE_GATE" ]] \
+  || fail "${exec_smoke_label} is not a regular executable"
 if [[ -n "${COMPANION_MANIFEST_VERIFIER-}" ]]; then
   [[ -f "$COMPANION_MANIFEST_VERIFIER" && ! -L "$COMPANION_MANIFEST_VERIFIER" &&
      -x "$COMPANION_MANIFEST_VERIFIER" ]] \

@@ -107,6 +107,25 @@ func TestOutputWindowsSuccessKeepsDetachedChildAlive(t *testing.T) {
 	requireWindowsProcessExit(t, childPID, 2*time.Second)
 }
 
+func TestOutputWindowsLimitedOverflowTerminatesJob(t *testing.T) {
+	for _, mode := range []string{"oversized-stdout", "oversized-stderr"} {
+		t.Run(mode, func(t *testing.T) {
+			pidFile := filepath.Join(t.TempDir(), "child.pid")
+			cmd, cancel := windowsProbeCommand(t, mode, 2*time.Second)
+			defer cancel()
+			cmd.Env = append(cmd.Env, windowsProbePIDEnv+"="+pidFile)
+
+			out, err := OutputLimited(cmd, 64)
+
+			assert.ErrorIs(t, err, ErrOutputLimit)
+			assert.LessOrEqual(t, len(out), 64)
+			childPID, readErr := readWindowsProbePID(pidFile)
+			require.NoError(t, readErr)
+			requireWindowsProcessExit(t, childPID, 2*time.Second)
+		})
+	}
+}
+
 func TestOutputWindowsHelperProcess(t *testing.T) {
 	mode := os.Getenv(windowsProbeModeEnv)
 	if mode == "" {
@@ -156,6 +175,14 @@ func TestOutputWindowsHelperProcess(t *testing.T) {
 		require.NoError(t, os.WriteFile(os.Getenv(windowsProbePIDEnv),
 			[]byte(strconv.Itoa(cmd.Process.Pid)), 0o600))
 		fmt.Fprintln(os.Stdout, "1.2.3")
+	case "oversized-stdout", "oversized-stderr":
+		startWindowsProbeBackgroundChild(t)
+		writer := os.Stdout
+		if mode == "oversized-stderr" {
+			writer = os.Stderr
+		}
+		fmt.Fprint(writer, strings.Repeat("x", 4096))
+		time.Sleep(5 * time.Second)
 	}
 	// Keep fixture stdout free of the test runner's PASS banner.
 	os.Exit(0)

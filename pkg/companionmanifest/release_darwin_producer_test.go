@@ -25,7 +25,7 @@ func TestDarwinReleaseProducer_TrustGatesPrecedeManifestAndReceipt(t *testing.T)
 	}
 	wantEvents := []string{
 		"developer_id_sign", "notary_container", "accepted_notarization",
-		"identity_verification", "manifest_signature",
+		"identity_verification", "execution_smoke", "manifest_signature",
 	}
 	if got := strings.Fields(string(events)); !reflect.DeepEqual(got, wantEvents) {
 		t.Fatalf("release events = %v, want %v", got, wantEvents)
@@ -41,7 +41,7 @@ func TestDarwinReleaseProducer_InvalidTrustEvidenceFailsClosed(t *testing.T) {
 	}
 	for _, scenario := range cases {
 		t.Run(scenario, func(t *testing.T) {
-			dir, artifact, output, err := runDarwinReleaseProducer(t, scenario, false)
+			_, artifact, output, err := runDarwinReleaseProducer(t, scenario, false)
 			if err == nil {
 				t.Fatalf("producer accepted %s evidence\n%s", scenario, output)
 			}
@@ -49,7 +49,6 @@ func TestDarwinReleaseProducer_InvalidTrustEvidenceFailsClosed(t *testing.T) {
 			if strings.Contains(string(output), "private-release-material") {
 				t.Fatal("failure output leaked signing material")
 			}
-			_ = dir
 		})
 	}
 }
@@ -133,6 +132,7 @@ func runDarwinReleaseProducer(t *testing.T, scenario string, mutate bool) (strin
 		filepath.Join(dir, "signer-args"), filepath.Join(dir, "stdin-digest"),
 	)
 	environment = append(environment, darwinReleaseToolEnv(t, dir)...)
+	writeDarwinReleaseScenario(t, dir, scenario)
 	environment = append(environment, "FAKE_DARWIN_SCENARIO="+scenario)
 	if mutate {
 		environment = append(environment, "FAKE_POST_MANIFEST_MUTATION=1")

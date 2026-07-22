@@ -37,6 +37,22 @@ func darwinReleaseToolEnv(t *testing.T, dir string) []string {
 		}
 		values = append(values, "COMPANION_"+strings.ToUpper(tool)+"_TOOL="+path)
 	}
+	execSmokeGate := filepath.Join(tools, "exec-smoke-gate")
+	execSmokeScript := fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+[[ "$#" -eq 8 && "$1" == '--artifact' && -x "$2" &&
+   "$3" == '--expected-version' && -n "$4" &&
+   "$5" == '--architecture' && "$6" =~ ^(amd64|arm64)$ &&
+   "$7" == '--timeout' && "$8" == '15s' ]] || exit 91
+scenario=''; [[ ! -f %q ]] || scenario="$(cat %q)"
+[[ "$scenario" != 'execution_smoke_failure' ]] || exit 42
+[[ "$scenario" != 'execution_smoke_mutation' ]] || printf mutated >> "$2"
+printf 'execution_smoke\n' >> %q
+`, filepath.Join(dir, "scenario"), filepath.Join(dir, "scenario"), filepath.Join(dir, "events"))
+	if err := os.WriteFile(execSmokeGate, []byte(execSmokeScript), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	values = append(values, "COMPANION_EXEC_SMOKE_GATE="+execSmokeGate)
 	return values
 }
 
@@ -48,6 +64,13 @@ func appendDarwinReleaseEvent(t *testing.T, event string) {
 	}
 	defer file.Close()
 	if _, err := fmt.Fprintln(file, event); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeDarwinReleaseScenario(t *testing.T, dir, scenario string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "scenario"), []byte(scenario), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -59,6 +59,7 @@ validation_env=(
   COMPANION_HANDOFF=v1 COMPANION_ROLLBACK_FLOOR=5069
   COMPANION_KEY_ID=adk-release-2026-q3-b0 COMPANION_SIGNING_KEY_FILE="$temp/key"
   COMPANION_SIGNER="$temp/tool" COMPANION_RECEIPT_VERIFIER="$temp/tool"
+  COMPANION_EXEC_SMOKE_GATE="$temp/tool"
   COMPANION_MANIFEST_VERIFIER="$temp/tool" COMPANION_RELEASE_TIME_VALIDATION_REQUIRED=1
   COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS=31536000
   COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT="$(format_time "$((now - 86400))")"
@@ -69,6 +70,19 @@ validation_env=(
 )
 env "${validation_env[@]}" COMPANION_ISSUED_AT="$(format_time "$((now - 60))")" \
   COMPANION_EXPIRES_AT="$(format_time "$((now + 3600))")" bash "$environment_gate"
+ln -s -- "$temp/tool" "$temp/exec-smoke-link"
+if env "${validation_env[@]}" COMPANION_EXEC_SMOKE_GATE="$temp/exec-smoke-link" \
+  COMPANION_ISSUED_AT="$(format_time "$((now - 60))")" \
+  COMPANION_EXPIRES_AT="$(format_time "$((now + 3600))")" \
+  bash "$environment_gate" >/dev/null 2>&1; then
+  fail 'symlinked execution smoke gate passed'
+fi
+if env "${validation_env[@]}" COMPANION_EXEC_SMOKE_GATE="$temp/key" \
+  COMPANION_ISSUED_AT="$(format_time "$((now - 60))")" \
+  COMPANION_EXPIRES_AT="$(format_time "$((now + 3600))")" \
+  bash "$environment_gate" >/dev/null 2>&1; then
+  fail 'non-executable execution smoke gate passed'
+fi
 if env "${validation_env[@]}" COMPANION_ISSUED_AT="$(format_time "$((now - 7200))")" \
   COMPANION_EXPIRES_AT="$(format_time "$((now - 3600))")" bash "$environment_gate" >/dev/null 2>&1; then
   fail 'expired manifest window passed'
