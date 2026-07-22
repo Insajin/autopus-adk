@@ -47,11 +47,8 @@ func newOrchestraInjectCmd() *cobra.Command {
 	return cmd
 }
 
-// runOrchestraInject loads a session, finds the provider's pane, and sends the prompt.
-func runOrchestraInject(cmd *cobra.Command, sessionID, provider, prompt string) error {
-	return runOrchestraInjectWithWorkspace(cmd, sessionID, provider, "", prompt)
-}
-
+// runOrchestraInjectWithWorkspace loads a session, restores its terminal context,
+// and sends the prompt to the requested provider pane.
 func runOrchestraInjectWithWorkspace(cmd *cobra.Command, sessionID, provider, workspaceRef, prompt string) error {
 	session, err := orchestra.LoadSession(sessionID)
 	if err != nil {
