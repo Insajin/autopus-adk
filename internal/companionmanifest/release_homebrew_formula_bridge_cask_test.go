@@ -17,23 +17,23 @@ var frozenFormulaDigests = []string{
 	"8f331702c5d98418b45203d0b7b604f52a36d9e08b2a7dcbb6d5f6fe712ef878",
 }
 
-func TestHomebrewFormulaBridge_A14PinsCaskOnlyTapTransition(t *testing.T) {
+func TestHomebrewFormulaBridge_A15PinsCaskOnlyTapTransition(t *testing.T) {
 	source := readReleaseFile(t, "scripts/companion-release/publish-homebrew-formula-bridge.sh")
 	gitHelper := readReleaseFile(t,
 		"scripts/companion-release/publish-homebrew-formula-bridge-git.sh")
 	for _, required := range []string{
-		"readonly RELEASE_TAG='v0.50.85'",
-		"readonly RELEASE_VERSION='0.50.85'",
-		"readonly PRIOR_TAP_COMMIT='" + a14PriorTapCommit + "'",
-		"readonly PRIOR_CASK_BLOB='" + a14PriorCaskBlob + "'",
-		"readonly FROZEN_FORMULA_BLOB='" + a14FrozenFormulaBlob + "'",
+		"readonly RELEASE_TAG='v0.50.86'",
+		"readonly RELEASE_VERSION='0.50.86'",
+		"readonly PRIOR_TAP_COMMIT='" + a15PriorTapCommit + "'",
+		"readonly PRIOR_CASK_BLOB='" + a15PriorCaskBlob + "'",
+		"readonly FROZEN_FORMULA_BLOB='" + a15FrozenFormulaBlob + "'",
 		"readonly FORMULA_PATH='Formula/auto.rb'",
 		"COMPANION_HOMEBREW_POLICY", "cask-only",
 		`[[ -f "$git_helper" && ! -L "$git_helper" ]]`,
 		`source "$git_helper"`,
 	} {
 		if !strings.Contains(source, required) {
-			t.Fatalf("A14 Homebrew caller policy missing %q", required)
+			t.Fatalf("A15 Homebrew caller policy missing %q", required)
 		}
 	}
 	for _, required := range []string{
@@ -47,7 +47,7 @@ func TestHomebrewFormulaBridge_A14PinsCaskOnlyTapTransition(t *testing.T) {
 		"'{sha:$sha,force:false}'",
 	} {
 		if !strings.Contains(gitHelper, required) {
-			t.Fatalf("A14 Homebrew Git CAS policy missing %q", required)
+			t.Fatalf("A15 Homebrew Git CAS policy missing %q", required)
 		}
 	}
 	implementation := source + "\n" + gitHelper
@@ -56,7 +56,7 @@ func TestHomebrewFormulaBridge_A14PinsCaskOnlyTapTransition(t *testing.T) {
 		"--method PUT",
 	} {
 		if strings.Contains(implementation, forbidden) {
-			t.Fatalf("A14 production path can mutate the frozen Formula via %q", forbidden)
+			t.Fatalf("A15 production path can mutate the frozen Formula via %q", forbidden)
 		}
 	}
 }
@@ -69,16 +69,16 @@ func TestHomebrewFormulaBridge_PublishedV05070CaskGolden(t *testing.T) {
 	}
 }
 
-func TestHomebrewFormulaBridge_PublishedV05084TapPins(t *testing.T) {
+func TestHomebrewFormulaBridge_PublishedV05085TapPins(t *testing.T) {
 	cask := homebrewBridgeCask()
 	caskSum := sha256.Sum256([]byte(cask))
-	if got := fmt.Sprintf("%x", caskSum); got != "8ed9e34c69487b2604fe72170bb7d023488ed7a08c628fc618ff126ca5c6a74b" {
-		t.Fatalf("published v0.50.84 Cask digest = %s", got)
+	if got := fmt.Sprintf("%x", caskSum); got != "90843baeadc6d8ae232016aefbbded547ccdc05d69979ead9c46900e2eb4f396" {
+		t.Fatalf("published v0.50.85 Cask digest = %s", got)
 	}
 	command := exec.Command("git", "hash-object", "--stdin")
 	command.Stdin = strings.NewReader(cask)
-	if blob, err := command.CombinedOutput(); err != nil || strings.TrimSpace(string(blob)) != a14PriorCaskBlob {
-		t.Fatalf("published v0.50.84 Cask blob = %q: %v", strings.TrimSpace(string(blob)), err)
+	if blob, err := command.CombinedOutput(); err != nil || strings.TrimSpace(string(blob)) != a15PriorCaskBlob {
+		t.Fatalf("published v0.50.85 Cask blob = %q: %v", strings.TrimSpace(string(blob)), err)
 	}
 	formulaSum := sha256.Sum256([]byte(homebrewBridgeFormula(t)))
 	if got := fmt.Sprintf("%x", formulaSum); got != "6bc6a0fbf790ee144c74d802a2031ab61f57a2ebd0611b6f15e856c8ed3e8a7c" {
@@ -96,7 +96,7 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 			fixture.writeAPIContent(t, "cask.json", strings.Repeat("c", 40), malicious)
 
 			output, err := fixture.run(nil)
-			if err == nil || !strings.Contains(string(output), "published Cask differs from canonical v0.50.84") {
+			if err == nil || !strings.Contains(string(output), "published Cask differs from canonical v0.50.85") {
 				t.Fatalf("%s Cask result: %v\n%s", stanza, err, output)
 			}
 			if got := fixture.updateCount(t, "cask"); got != "0" {
@@ -108,11 +108,11 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 
 func homebrewBridgeCask() string {
 	return strings.NewReplacer(
-		`version "0.50.70"`, `version "0.50.84"`,
-		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "fa60e03ecd39a5fa203be3cca3e8a7010e3af7854195f0e866ef80e7a0e82f0f",
-		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "f4ed0ef8d6f0274389ada5cebdeb87a2899bf34b7a11bd99318b5914775d84f1",
-		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "9450edd11fe5622c17fa1e70dbbbff0eb5cd492f8674e78a465a4ffe0686ea46",
-		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "db359808160bc6ec8b41e9216270542dcd2b026f90e193aa348143e1df47c3a4",
+		`version "0.50.70"`, `version "0.50.85"`,
+		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "66834d509309cb09b84f78bb81a97e68a8d03434c9a37f239a2ae04677dbc10b",
+		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "7fe10bc7b03b3df44f803622e3830e5e91f3ea12b47b706cf14f716b076b012e",
+		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "187620011ce035f6bdb09f3f6d5b005f878463c3ba0fd805142cbd3e4f587698",
+		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "654e42612a3f1ee670157cd461b3dff1270f2102b085984951975c0284356172",
 	).Replace(publishedV05070Cask)
 }
 

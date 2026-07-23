@@ -1,13 +1,26 @@
 package companionmanifest
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func (fixture *executableLineageFixture) writeEvidence(t *testing.T) {
+	t.Helper()
+	fixture.writeEvidenceWithChecksumReseal(t, false)
+}
+
+func (fixture *executableLineageFixture) writeResealedEvidence(t *testing.T) {
+	t.Helper()
+	fixture.writeEvidenceWithChecksumReseal(t, true)
+}
+
+func (fixture *executableLineageFixture) writeEvidenceWithChecksumReseal(
+	t *testing.T,
+	reseal bool,
+) {
 	t.Helper()
 	if err := os.RemoveAll(fixture.assetsDir); err != nil {
 		t.Fatal(err)
@@ -15,37 +28,37 @@ func (fixture *executableLineageFixture) writeEvidence(t *testing.T) {
 	if err := os.Mkdir(fixture.assetsDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	assets := make([]executableLineageAsset, 0, 3)
-	for _, architecture := range []string{"amd64", "arm64"} {
-		name := fmt.Sprintf("autopus-adk_%s_darwin_%s.tar.gz",
-			fixture.evidence.version, architecture)
-		source := fixture.evidence.archives[architecture]
-		target := filepath.Join(fixture.assetsDir, name)
-		mutation := fixture.archiveMutation
-		if mutation != nil &&
-			(mutation.architecture == "" || mutation.architecture == architecture) {
-			err := rewriteLineageArchiveTarget(source, target, mutation.entry,
-				func(data []byte) ([]byte, bool) { return mutation.mutate(t, data) })
-			if err != nil {
-				t.Fatalf("rewrite %s lineage archive: %v", architecture, err)
-			}
-		} else if _, err := materializeLineageArchive(source, target, os.Link); err != nil {
-			t.Fatalf("materialize %s lineage archive: %v", architecture, err)
-		}
-		digest, err := lineageArchiveFileDigest(target)
-		if err != nil {
-			t.Fatalf("digest %s lineage archive: %v", architecture, err)
-		}
-		if architecture == "amd64" && fixture.assetDigestOverride != "" {
-			digest = fixture.assetDigestOverride
-		} else {
-			digest = "sha256:" + digest
-		}
-		assets = append(assets, executableLineageAsset{
-			Name: name, State: "uploaded", Digest: digest,
-		})
+	assets := fixture.materializeLineageArchiveAssets(t)
+	if reseal {
+		fixture.resealLineageArchiveChecksums(t)
 	}
 	fixture.writeEvidenceMetadata(t, assets)
+}
+
+func (fixture *executableLineageFixture) resealLineageArchiveChecksums(t *testing.T) {
+	t.Helper()
+	// Preserve the outer checksum layer so inner trust-claim tampering is exercised.
+	lines := strings.Split(string(fixture.checksums), "\n")
+	for _, target := range executableLineageArchiveTargets {
+		name := target.archiveName(fixture.evidence.version)
+		digest, err := lineageArchiveFileDigest(filepath.Join(fixture.assetsDir, name))
+		if err != nil {
+			t.Fatalf("digest resealed %s lineage archive: %v", target.key, err)
+		}
+		matches := 0
+		for index, line := range lines {
+			fields := strings.Fields(line)
+			if len(fields) == 2 && fields[1] == name {
+				lines[index] = digest + "  " + name
+				matches++
+			}
+		}
+		if matches != 1 {
+			t.Fatalf("checksum entries for %s = %d, want 1", name, matches)
+		}
+	}
+	fixture.checksums = []byte(strings.Join(lines, "\n"))
+	fixture.pins.checksums = lineageDigest(fixture.checksums)
 }
 
 func (fixture *executableLineageFixture) writeEvidenceMetadata(

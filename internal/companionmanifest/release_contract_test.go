@@ -10,10 +10,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestReleaseWorkflow_ExactA14ProtectedEnvironmentAndImmutableActions(t *testing.T) {
+func TestReleaseWorkflow_ExactA15ProtectedEnvironmentAndImmutableActions(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"v0.50.85", "refs/tags/v0.50.85",
+		"v0.50.86", "refs/tags/v0.50.86",
 		"environment:", "adk-companion-release",
 	} {
 		if !strings.Contains(release, required) {
@@ -24,11 +24,11 @@ func TestReleaseWorkflow_ExactA14ProtectedEnvironmentAndImmutableActions(t *test
 		t.Fatal("arbitrary version tags can enter the protected release job")
 	}
 	for _, forbidden := range []string{
-		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'", "'v0.50.76'", "'v0.50.77'", "'v0.50.78'", "'v0.50.79'", "'v0.50.80'", "'v0.50.81'", "'v0.50.82'", "'v0.50.83'", "'v0.50.84'",
-		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75", "refs/tags/v0.50.76", "refs/tags/v0.50.77", "refs/tags/v0.50.78", "refs/tags/v0.50.79", "refs/tags/v0.50.80", "refs/tags/v0.50.81", "refs/tags/v0.50.82", "refs/tags/v0.50.83", "refs/tags/v0.50.84",
+		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'", "'v0.50.76'", "'v0.50.77'", "'v0.50.78'", "'v0.50.79'", "'v0.50.80'", "'v0.50.81'", "'v0.50.82'", "'v0.50.83'", "'v0.50.84'", "'v0.50.85'",
+		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75", "refs/tags/v0.50.76", "refs/tags/v0.50.77", "refs/tags/v0.50.78", "refs/tags/v0.50.79", "refs/tags/v0.50.80", "refs/tags/v0.50.81", "refs/tags/v0.50.82", "refs/tags/v0.50.83", "refs/tags/v0.50.84", "refs/tags/v0.50.85",
 	} {
 		if strings.Contains(release, forbidden) {
-			t.Fatalf("historical tag %q can enter the A14 release workflow", forbidden)
+			t.Fatalf("historical tag %q can enter the A15 release workflow", forbidden)
 		}
 	}
 	immutable := regexp.MustCompile(`^[^@[:space:]]+@[0-9a-f]{40}$`)
@@ -243,8 +243,8 @@ func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *t
 			releaseIndex, signingCleanupIndex, evidenceIndex, tokenIndex, bridgeIndex, cleanupIndex)
 	}
 	for _, exact := range []string{
-		"GITHUB_REF_NAME='v0.50.85'",
-		"COMPANION_VERSION='0.50.85'",
+		"GITHUB_REF_NAME='v0.50.86'",
+		"COMPANION_VERSION='0.50.86'",
 		"COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}",
 		`COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"`,
 		`HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN"`,

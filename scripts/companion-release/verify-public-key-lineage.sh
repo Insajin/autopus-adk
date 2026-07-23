@@ -19,16 +19,28 @@ archive_helper="$script_dir/verify-public-key-lineage-archive.sh"
 [[ -f "$archive_helper" && ! -L "$archive_helper" ]] || fail prior_evidence_unverifiable 'lineage archive verifier is invalid'
 # shellcheck source=verify-public-key-lineage-archive.sh
 source "$archive_helper"
+assets_helper="$script_dir/verify-public-key-lineage-assets.sh"
+[[ -f "$assets_helper" && ! -L "$assets_helper" ]] || fail prior_evidence_unverifiable 'lineage asset verifier is invalid'
+# shellcheck source=verify-public-key-lineage-assets.sh
+source "$assets_helper"
 nonzero_hex "$prior_commit" 40 || fail prior_evidence_unverifiable "${prior_phase} commit pin is not provisioned; ${LOCAL_EVIDENCE_ERROR}"
 for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
   "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
   nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
 done
-if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' || "$release_phase" == 'A12' || "$release_phase" == 'A13' || "$release_phase" == 'A14' ]]; then
+if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' || "$release_phase" == 'A12' || "$release_phase" == 'A13' || "$release_phase" == 'A14' || "$release_phase" == 'A15' ]]; then
   nonzero_hex "$prior_tag_object" 40 || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
   for pin in "$prior_amd64_archive" "$prior_arm64_archive"; do
     nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"
   done
+fi
+if [[ "$release_phase" == 'A15' ]]; then
+  for pin in "$prior_linux_amd64_archive" "$prior_linux_arm64_archive"; do
+    nonzero_hex "$pin" 64 \
+      || fail prior_evidence_unverifiable "${prior_phase} Linux archive pins are not provisioned"
+  done
+elif [[ -n "$prior_linux_amd64_archive" || -n "$prior_linux_arm64_archive" ]]; then
+  fail prior_evidence_unverifiable 'historical Linux archive pins must remain empty'
 fi
 if [[ -n "$prior_tree" ]]; then
   nonzero_hex "$prior_tree" 40 \
@@ -121,59 +133,11 @@ else
 fi
 [[ "$tag_commit_sha" == "$prior_commit" ]] \
   || fail prior_release_identity_mismatch "${prior_phase} tag commit differs from the source pin"
-readonly PRIOR_AMD64_ASSET="autopus-adk_${prior_version}_darwin_amd64.tar.gz"
-readonly PRIOR_ARM64_ASSET="autopus-adk_${prior_version}_darwin_arm64.tar.gz"
 jq -e --arg bundle "$BUNDLE_NAME" --arg receipt "$RECEIPT_NAME" --arg signature "$SIGNATURE_NAME" \
   '[.assets[].name | select(. == $bundle or . == $receipt or . == $signature)] | length == 0' \
   "$release_json" >/dev/null \
   || fail prior_evidence_malformed 'independent receipt assets are forbidden'
-download_dir="$temp_dir/downloads"
-install -m 0700 -d "$download_dir"
-for asset in "$PRIOR_AMD64_ASSET" "$PRIOR_ARM64_ASSET" "$CHECKSUMS_NAME"; do
-  asset_digest=$(jq -er --arg name "$asset" \
-    '[.assets[] | select(.name == $name)] | select(length == 1) | .[0] |
-     select(.state == "uploaded") | .digest |
-     select(type == "string" and test("^sha256:[0-9a-f]{64}$"))' "$release_json") \
-    || fail prior_evidence_malformed "exact asset metadata is missing for ${asset}"
-  env -i PATH="$PATH" HOME="${HOME-}" GITHUB_TOKEN="$GITHUB_TOKEN" \
-    gh release download "$prior_tag" --repo "$prior_repository" \
-    --pattern "$asset" --dir "$download_dir" \
-    || fail prior_evidence_absent "exact ${prior_phase} asset is absent: ${asset}"
-  downloaded_asset="$download_dir/$asset"
-  [[ -f "$downloaded_asset" && ! -L "$downloaded_asset" ]] \
-    || fail prior_evidence_absent "downloaded ${prior_phase} asset is invalid: ${asset}"
-  actual_asset_digest=$(sha256_file "$downloaded_asset")
-  [[ "$actual_asset_digest" == "$asset_digest" ]] \
-    || fail prior_evidence_unverifiable "server digest differs for ${asset}"
-  case "$asset" in
-    "$PRIOR_AMD64_ASSET") archive_pin="$prior_amd64_archive" ;;
-    "$PRIOR_ARM64_ASSET") archive_pin="$prior_arm64_archive" ;;
-    *) archive_pin='' ;;
-  esac
-  [[ -z "$archive_pin" || "$actual_asset_digest" == "sha256:$archive_pin" ]] \
-    || fail prior_archive_digest_mismatch "${prior_phase} archive differs from its pin: ${asset}"
-done
-extract_bundle "$download_dir/$PRIOR_AMD64_ASSET" "$temp_dir/amd64" amd64 \
-  "$prior_amd64_manifest"
-extract_bundle "$download_dir/$PRIOR_ARM64_ASSET" "$temp_dir/arm64" arm64 \
-  "$prior_arm64_manifest"
-checksums="$download_dir/$CHECKSUMS_NAME"
-[[ "$(sha256_file "$checksums")" == "sha256:$prior_checksums" ]] \
-  || fail prior_checksums_bytes_mismatch "checksums.txt differs from its ${prior_phase} pin"
-for asset in "$PRIOR_AMD64_ASSET" "$PRIOR_ARM64_ASSET"; do
-  checksum_line=$(grep -E "^[0-9a-f]{64}  ${asset}$" "$checksums") \
-    || fail prior_checksums_malformed "checksum entry is absent for ${asset}"
-  [[ "$(grep -Ec "^[0-9a-f]{64}  ${asset}$" "$checksums")" == '1' ]] \
-    || fail prior_checksums_malformed "checksum entry is not unique for ${asset}"
-  [[ "$(sha256_file "$download_dir/$asset")" == "sha256:${checksum_line%% *}" ]] \
-    || fail prior_archive_checksum_mismatch "archive differs from checksums.txt: ${asset}"
-done
-prior_receipt="$temp_dir/amd64/$RECEIPT_NAME"
-prior_signature="$temp_dir/amd64/$SIGNATURE_NAME"
-cmp -- "$prior_receipt" "$temp_dir/arm64/$RECEIPT_NAME" \
-  || fail prior_receipt_bytes_mismatch "${prior_phase} architecture receipt bytes differ"
-cmp -- "$prior_signature" "$temp_dir/arm64/$SIGNATURE_NAME" \
-  || fail prior_signature_bytes_mismatch "${prior_phase} architecture signature bytes differ"
+verify_public_key_lineage_assets
 receipt_sha256=$(sha256_file "$prior_receipt") \
   || fail prior_evidence_unverifiable 'cannot digest prior receipt'
 signature_sha256=$(sha256_file "$prior_signature") \

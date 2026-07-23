@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 readonly EXPECTED_K1_FINGERPRINT='e1fdfe066484c7eae8ff16fa4b1ee6237b8d06299c2b66ced485f029af77837f'
-readonly COSIGN_IDENTITY='https://github.com/Insajin/autopus-adk/.github/workflows/release.yaml@refs/tags/v0.50.85'
+readonly COSIGN_IDENTITY='https://github.com/Insajin/autopus-adk/.github/workflows/release.yaml@refs/tags/v0.50.86'
 readonly COSIGN_ISSUER='https://token.actions.githubusercontent.com'
 
 fail() {
@@ -96,7 +96,7 @@ verification_dir=$(mktemp -d \
   || fail 'signature verification workspace is unsafe'
 
 # @AX:ANCHOR [AUTO]: This helper is the cryptographic trust boundary between an immutable GitHub release and Homebrew publication.
-# @AX:REASON [AUTO]: Release and recovery workflows must verify both the exact K1 envelope and the A14 GitHub Actions Sigstore identity before creating a tap write token.
+# @AX:REASON [AUTO]: Release and recovery workflows must verify both the exact K1 envelope and the A15 GitHub Actions Sigstore identity before creating a tap write token.
 if ! verify_release_checksums_v1 \
   "$checksums_path" "$envelope_path" "$verification_dir" \
   >/dev/null 2>&1; then
@@ -111,4 +111,4 @@ if ! cosign verify-blob \
   fail 'release keyless signature verification failed'
 fi
 
-printf 'current release signatures: exact A14 ECDSA and keyless signatures verified\n'
+printf 'current release signatures: exact A15 ECDSA and keyless signatures verified\n'

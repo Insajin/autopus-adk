@@ -32,18 +32,20 @@ type executableLineageTools struct {
 }
 
 type executableLineagePins struct {
-	commit        string
-	tree          string
-	tagObject     string
-	receipt       string
-	signature     string
-	record        string
-	publicKey     string
-	checksums     string
-	amd64Archive  string
-	arm64Archive  string
-	amd64Manifest string
-	arm64Manifest string
+	commit            string
+	tree              string
+	tagObject         string
+	receipt           string
+	signature         string
+	record            string
+	publicKey         string
+	checksums         string
+	amd64Archive      string
+	arm64Archive      string
+	linuxAMD64Archive string
+	linuxARM64Archive string
+	amd64Manifest     string
+	arm64Manifest     string
 }
 
 type goReleaserA0Evidence struct {
@@ -170,6 +172,8 @@ func newExecutableLineageFixture(
 		currentTag = publicKeyReceiptA13Tag
 	case publicKeyReceiptA13Version:
 		currentTag = publicKeyReceiptA14Tag
+	case publicKeyReceiptA14Version:
+		currentTag = publicKeyReceiptA15Tag
 	}
 	fixture := &executableLineageFixture{
 		root: root, tools: tools, evidence: evidence, pins: evidence.pins,
