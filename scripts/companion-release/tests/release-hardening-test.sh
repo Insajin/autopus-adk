@@ -41,8 +41,8 @@ contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.output
 contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
 not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
 contains "$producer_receipt" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='d0292d235fd351b1e5f2bcbf5aef213610587e3f'"
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='adce0d92445ca7e39c5afa50c6636d06149cf5ea'"
+contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='bb84d874af4c9187603f36c3ca06460c90b7caea'"
+contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='f9baefd8723dad6afb3d60999bde44d3913ecb10'"
 contains "$homebrew_bridge" "readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 contains "$homebrew_bridge" "readonly FORMULA_PATH='Formula/auto.rb'"
@@ -63,10 +63,13 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
-contains "$release" "- 'v0.50.86'"
-contains "$release" "if: github.ref == 'refs/tags/v0.50.86'"
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.86'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.86'
+contains "$release" "- 'v0.50.87'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.87'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.87'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.87'
+not_contains "$release" "'v0.50.86'"
+not_contains "$release" 'refs/tags/v0.50.86'
+not_contains "$recovery" 'refs/tags/v0.50.86'
 not_contains "$release" "'v0.50.85'"
 not_contains "$release" 'refs/tags/v0.50.85'
 not_contains "$recovery" 'refs/tags/v0.50.85'
@@ -91,10 +94,10 @@ not_contains "$recovery" 'refs/tags/v0.50.75'
 not_contains "$release" "'v0.50.76'"
 not_contains "$release" 'refs/tags/v0.50.76'
 not_contains "$recovery" 'refs/tags/v0.50.76'
-contains "$producer_receipt" "GITHUB_REF_NAME\" == 'v0.50.86'"
-contains "$producer_receipt" "release_phase='A15'"
-contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.86'"
-contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.86'"
+contains "$producer_receipt" "GITHUB_REF_NAME\" == 'v0.50.87'"
+contains "$producer_receipt" "release_phase='A16'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.87'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.87'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -105,8 +108,8 @@ for workflow in "$release" "$recovery"; do
   workflow_token_index=$(grep -n 'name: Create Homebrew tap token' "$workflow" | cut -d: -f1)
   (( workflow_evidence_index < workflow_token_index )) || fail 'tap token precedes release evidence'
 done
-contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.86'"
-contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.86'"
+contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.87'"
+contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.87'"
 contains "$current_release_gate" '.target_commitish == $commit'
 contains "$current_release_gate" '.immutable == true'
 contains "$current_release_gate" '(.assets | length) == ($expected | length)'

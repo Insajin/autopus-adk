@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// @AX:NOTE [AUTO]: The 250-line ceiling preserves A15 expansion headroom below the 300-line source limit.
+// @AX:NOTE [AUTO]: The 250-line ceiling preserves A16 expansion headroom below the 300-line source limit.
 const releaseDebtHeadroomLimit = 250
 
 func TestReleaseDebtSaturatedScriptsHaveExpansionHeadroom(t *testing.T) {
@@ -28,7 +28,7 @@ func TestReleaseDebtSaturatedScriptsHaveExpansionHeadroom(t *testing.T) {
 			t.Fatal(err)
 		}
 		if lines := strings.Count(string(data), "\n") + 1; lines > releaseDebtHeadroomLimit {
-			t.Errorf("%s has %d lines, want <= %d for A15 headroom",
+			t.Errorf("%s has %d lines, want <= %d for A16 headroom",
 				path, lines, releaseDebtHeadroomLimit)
 		}
 	}
@@ -51,7 +51,7 @@ func TestReleaseDebtProducerReceiptHasDedicatedHelper(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"release_phase='A0'", "release_phase='A15'",
+		"release_phase='A0'", "release_phase='A16'",
 		"companion-manifest public-key-receipt",
 		"public key receipt independent verification failed",
 		"manifest_public_key_digest_mismatch",
@@ -60,7 +60,7 @@ func TestReleaseDebtProducerReceiptHasDedicatedHelper(t *testing.T) {
 			t.Fatalf("producer receipt helper missing %q", required)
 		}
 	}
-	if strings.Contains(producer, "release_phase='A15'") ||
+	if strings.Contains(producer, "release_phase='A16'") ||
 		strings.Contains(producer, "companion-manifest public-key-receipt") {
 		t.Fatal("producer caller still owns receipt phase coordinates or publication")
 	}
@@ -82,15 +82,15 @@ func TestReleaseDebtLineageCoordinatesHaveDedicatedHelper(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"release_phase='A0'", "release_phase='A15' prior_phase='A14'",
+		"release_phase='A0'", "release_phase='A16' prior_phase='A15'",
 		"prior_tree=", "prior_release_identity_mismatch",
 	} {
 		if !strings.Contains(coordinates, required) {
 			t.Fatalf("lineage coordinate helper missing %q", required)
 		}
 	}
-	if strings.Contains(lineage, "release_phase='A15' prior_phase='A14'") {
-		t.Fatal("lineage caller still owns the A15 coordinate table")
+	if strings.Contains(lineage, "release_phase='A16' prior_phase='A15'") {
+		t.Fatal("lineage caller still owns the A16 coordinate table")
 	}
 }
 
@@ -138,8 +138,8 @@ func TestReleaseDebtHistoricalPinsHaveDedicatedHardeningScript(t *testing.T) {
 		t.Fatal("release hardening aggregator does not invoke lineage pin assertions")
 	}
 	for _, required := range []string{
-		"A6_A5_ANCESTOR_SHA", "A15_A14_ANCESTOR_SHA",
-		"A4_TAG_OBJECT_SHA", "A14_LINUX_ARM64_ARCHIVE_SHA256",
+		"A6_A5_ANCESTOR_SHA", "A16_A15_ANCESTOR_SHA",
+		"A4_TAG_OBJECT_SHA", "A15_LINUX_ARM64_ARCHIVE_SHA256",
 		"symlinked lineage asset helper passed",
 	} {
 		if !strings.Contains(history, required) {

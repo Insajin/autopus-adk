@@ -54,11 +54,11 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
   esac
   go build -trimpath -o "$gate" "$repo/scripts/companion-release/execsmoke"
   go build -trimpath \
-    -ldflags '-X github.com/insajin/autopus-adk/pkg/version.version=0.50.86' \
+    -ldflags '-X github.com/insajin/autopus-adk/pkg/version.version=0.50.87' \
     -o "$artifact" "$repo/cmd/auto"
-  "$gate" --artifact "$artifact" --expected-version 0.50.86 \
+  "$gate" --artifact "$artifact" --expected-version 0.50.87 \
     --architecture "$architecture" --timeout 15s
-  if "$gate" --artifact "$artifact" --expected-version 0.50.85 \
+  if "$gate" --artifact "$artifact" --expected-version 0.50.86 \
     --architecture "$architecture" --timeout 15s >/dev/null 2>&1; then
     fail 'wrong expected version passed the execution smoke gate'
   fi

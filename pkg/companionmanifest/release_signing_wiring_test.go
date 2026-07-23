@@ -90,15 +90,15 @@ func TestReleaseSigning_WorkflowMaterializesAndPreflightsKeyBeforeGoReleaser(t *
 	workflow := releaseWorkflowContract(t)
 	workflowSource := string(readRepositoryFile(t, ".github/workflows/release.yaml"))
 	for _, required := range []string{
-		"v0.50.86", "autopus-v0.50.86-checksums.txt",
-		"GITHUB_REF_NAME='v0.50.86'", "COMPANION_VERSION='0.50.86'",
+		"v0.50.87", "autopus-v0.50.87-checksums.txt",
+		"GITHUB_REF_NAME='v0.50.87'", "COMPANION_VERSION='0.50.87'",
 	} {
 		if !strings.Contains(workflowSource, required) {
-			t.Fatalf("v0.50.86 signing workflow missing exact version contract %q", required)
+			t.Fatalf("v0.50.87 signing workflow missing exact version contract %q", required)
 		}
 	}
-	if strings.Contains(workflowSource, "v0.50.85") {
-		t.Fatal("v0.50.86 signing workflow still exposes the frozen A14 coordinate")
+	if strings.Contains(workflowSource, "v0.50.86") {
+		t.Fatal("v0.50.87 signing workflow still exposes the frozen A15 coordinate")
 	}
 	prepareIndex, _ := releaseWorkflowStepContaining(t, workflow, "Prepare release credentials")
 	materializeIndex, materialize := releaseWorkflowStepContaining(t, workflow, "Materialize release signing key")
@@ -144,6 +144,6 @@ func TestReleaseSigning_WorkflowMaterializesAndPreflightsKeyBeforeGoReleaser(t *
 		t.Fatalf("release signing producer is not checked in: %v", err)
 	}
 	if strings.Contains(workflowSource, "release-k2") {
-		t.Fatal("v0.50.86 workflow must keep K2 offline and sign with K1 only")
+		t.Fatal("v0.50.87 workflow must keep K2 offline and sign with K1 only")
 	}
 }
