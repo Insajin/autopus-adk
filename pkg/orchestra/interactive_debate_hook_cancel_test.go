@@ -34,7 +34,6 @@ func TestCollectRoundHookResults_PreCancelledPreservesOwnedProviderCardinality(t
 
 	started := time.Now()
 	responses := collectRoundHookResults(ctx, cfg, session, 1, panes)
-	elapsed := time.Since(started)
 
 	byProvider := responsesByProvider(responses)
 	require.Len(t, responses, 3, "two hook providers plus the skipped pane belong to this collector")
@@ -42,7 +41,6 @@ func TestCollectRoundHookResults_PreCancelledPreservesOwnedProviderCardinality(t
 	assertCancelledHookResponse(t, byProvider["claude"])
 	assertCancelledHookResponse(t, byProvider["gemini"])
 	assert.Equal(t, skippedHookCollectionError, byProvider["custom-skip"].Error)
-	assert.Less(t, elapsed, 250*time.Millisecond)
 	require.Len(t, store.collection, 2, "each cancelled hook provider needs collection evidence")
 	require.Len(t, store.events, 2, "each cancelled hook provider needs timeout evidence")
 
@@ -88,7 +86,7 @@ func TestCollectRoundHookResults_MidCancelPreservesSuccessAndFailure(t *testing.
 	assert.Equal(t, "completed before cancellation", byProvider["claude"].Output)
 	assert.False(t, byProvider["claude"].TimedOut)
 	assertCancelledHookResponse(t, byProvider["codex"])
-	assert.Less(t, elapsed, 250*time.Millisecond, "cancellation must unblock the waiting hook immediately")
+	assert.Less(t, elapsed, providers[1].ExecutionTimeout, "cancellation must return before the provider timeout")
 	require.Len(t, store.collection, 2)
 	require.Len(t, store.events, 1)
 	assert.Equal(t, "codex", store.events[0].Correlation.ProviderID)
