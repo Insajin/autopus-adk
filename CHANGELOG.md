@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Fable 5 opt-in 및 최신 effort 전달** (2026-07-23): 기본 Opus/Sonnet 매핑은 유지하면서 `claude-fable-5`와 `fable`/`best`를 명시적 선택으로 지원하고, resolved full ID 가격($10/$50 per MTok), worker·orchestra·route-team `--effort` 전달을 연결했다. model/API effort는 `low`~`max` 다섯 값으로 유지하며 Claude Code session-only `ultracode`는 binding에서 실제 `xhigh`로 정규화한다. Fable 권한·ZDR와 Claude Code `2.1.170`/`2.1.203`/`2.1.210` 버전 경계도 source/generated 가이드에 동기화했다.
+
 ### Fixed
 
 - **v0.50.87 companion A16 릴리스 준비와 doctor 오탐 제거** (2026-07-23): 릴리스 진입점을 annotated tag `v0.50.87`로만 옮기고 immutable `v0.50.86`을 직접 선행 릴리스로 검증한다. A16은 A15 source commit `0fc4f60dac8ff8afe69b680c8bf723bfbced4769`, tree `3daa4aef3528338439acb34f50d3b4a19ababea5`, annotated tag object `bb24ad6a554beee871063070b219b409245c0e93`, checksums SHA-256 `237f985675f866c234a41066735a2bff3ae0b554a2fe1b1b6b57aed125bac8f7`을 고정한다. Darwin amd64·arm64 archive SHA-256은 `41e2a371c89567ff862d5f47179c838cb3aefd83abeb0ff769e58b12579676e3`, `84ea326a10c860af82663db1c87a8a15bdee492143d77a02ad86a0b3ba930f8f`이고 Linux amd64·arm64 archive SHA-256은 `cae69dd8828cb2c12ba0d312c3f4dbc034104c1b4b9cee6cddf18eebe6430cb6`, `9e943908dabf910e9f3072f838a99dec3c9d4952d9058bfbc1b71cd78e3f29eb`이다. 두 Darwin archive의 embedded manifest SHA-256은 `c2398cd51093cb19804ef2d07e1848cc77d16610a4669e78e0e1577a466df300`, `83da7620c878841c06980ad12315023dc2054b71f27cb7dfb53931a4224d0099`로 검증한다. Homebrew는 검증된 A15 tap commit `bb84d874af4c9187603f36c3ca06460c90b7caea`와 Cask raw SHA-256 `ecf3a06b09fb7c900089abc8af7efbe472131469d0b280e949306782ec7d71da`, blob `f9baefd8723dad6afb3d60999bde44d3913ecb10`을 선행 스냅샷으로 사용하고 Cask만 non-force CAS로 갱신한다. Formula는 raw SHA-256 `6bc6a0fbf790ee144c74d802a2031ab61f57a2ebd0611b6f15e856c8ed3e8a7c`, blob `4ebc6c38925002dec00759823d4dd847a499818a`로 동결한다. Codex와 Gemini의 platform-native `agent-teams` 템플릿을 generator 소유로 잘못 분류해 발생하던 `auto doctor` stale-template 오탐도 함께 제거한다. 보호 환경의 승인된 source 변수와 K1 서명·공증·immutable release 검증은 태그 게시 단계에서 유지한다.

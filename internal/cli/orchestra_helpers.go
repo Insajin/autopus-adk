@@ -149,16 +149,58 @@ func buildProviderConfigs(names []string) []orchestra.ProviderConfig {
 	return buildProviderConfigsForRuntime(names, "", "")
 }
 
+func upsertClaudeEffortArg(args []string, effort string) []string {
+	if effort == "" {
+		if args == nil {
+			return nil
+		}
+		return append([]string{}, args...)
+	}
+	result := make([]string, 0, len(args)+2)
+	found := false
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--effort":
+			if !found {
+				result = append(result, "--effort", effort)
+				found = true
+			}
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+			}
+		case strings.HasPrefix(args[i], "--effort="):
+			if !found {
+				result = append(result, "--effort="+effort)
+				found = true
+			}
+		default:
+			result = append(result, args[i])
+		}
+	}
+	if !found {
+		result = append(result, "--effort", effort)
+	}
+	return result
+}
+
+func codexEffortForRuntime(effort string) string {
+	if effort == "ultracode" {
+		return config.CodexEffortXHigh
+	}
+	return effort
+}
+
 func buildProviderConfigsForRuntime(names []string, quality, effort string) []orchestra.ProviderConfig {
 	qualityConf := config.QualityConf{Default: strings.TrimSpace(quality)}
 	codexEntry := config.CodexProviderEntryForQuality(qualityConf)
 	if effort = strings.TrimSpace(effort); effort != "" {
 		profile := qualityConf.CodexOrchestraProfile()
-		profile.Effort = effort
+		profile.Effort = codexEffortForRuntime(effort)
 		codexEntry = config.ApplyCodexProviderProfile(codexEntry, profile)
 	}
+	claudeArgs := []string{"--print", "--model", "opus", "--effort", "high"}
 	knownProviders := map[string]orchestra.ProviderConfig{
-		"claude": {Name: "claude", Binary: "claude", ModelFamily: "anthropic", Args: []string{"--print", "--model", "opus", "--effort", "high"}, PaneArgs: []string{"--print", "--model", "opus", "--effort", "high"}, PromptViaArgs: false},
+		"claude": {Name: "claude", Binary: "claude", ModelFamily: "anthropic", Args: upsertClaudeEffortArg(claudeArgs, effort), PaneArgs: upsertClaudeEffortArg(claudeArgs, effort), PromptViaArgs: false},
 		// SPEC-ORCH-021 REQ-014/015: codex subprocess uses `exec --sandbox workspace-write`
 		// (no deprecated --full-auto) with reasoning effort aligned to autopus.yaml; pane argv
 		// stays interactive (no leading `exec`). SchemaFlag carries the structured schema.

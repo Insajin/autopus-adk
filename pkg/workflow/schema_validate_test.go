@@ -61,14 +61,24 @@ func TestParseSchema_CoverageThresholdBounds(t *testing.T) {
 	}
 }
 
-// TestParseSchema_RejectsInjectionModel locks S6: a model string carrying JS
-// breakout characters is rejected at the parse boundary before it can reach the
-// generated workflow JS.
+// TestParseSchema_RejectsInjectionModel locks SPEC-FABLE5-001 S2: a model string
+// carrying JS breakout characters is rejected at the parse boundary before it
+// can reach the generated workflow JS.
 func TestParseSchema_RejectsInjectionModel(t *testing.T) {
 	t.Parallel()
-	data := []byte(`{"phases":[{"id":"planning","model":"claude-opus-4-8\");evil(("}]}`)
-	if _, err := ParseSchema(data); err == nil {
-		t.Fatal("expected unsafe-model rejection")
+
+	for _, model := range []string{
+		"claude-opus-4-8\");evil((",
+		"claude-fable-5\");evil((",
+		"fable\nawait evil()",
+	} {
+		model := model
+		t.Run(model, func(t *testing.T) {
+			data := []byte(fmt.Sprintf(`{"phases":[{"id":"planning","model":%q}]}`, model))
+			if _, err := ParseSchema(data); err == nil {
+				t.Fatalf("expected unsafe-model rejection for %q", model)
+			}
+		})
 	}
 }
 
@@ -109,8 +119,13 @@ func TestIsSafeAgentModel(t *testing.T) {
 		"claude-sonnet-5":           true,
 		"claude-sonnet-4-6":         true,
 		"claude-haiku-4-5":          true,
+		"claude-fable-5":            true,
+		"fable":                     true,
+		"best":                      true,
 		"gpt-4":                     false,
 		"claude-opus-4-8\");evil((": false,
+		"claude-fable-5\");evil((":  false,
+		"fable\nawait evil()":       false,
 	}
 	for in, want := range cases {
 		if got := isSafeAgentModel(in); got != want {
@@ -121,15 +136,19 @@ func TestIsSafeAgentModel(t *testing.T) {
 
 func TestIsSafeEffort(t *testing.T) {
 	t.Parallel()
+	if got := len(safeEfforts); got != 5 {
+		t.Fatalf("safeEfforts has %d values, want exactly 5", got)
+	}
 	cases := map[string]bool{
-		"":       true,
-		"low":    true,
-		"medium": true,
-		"high":   true,
-		"xhigh":  true,
-		"max":    true,
-		"ultra":  false,
-		"HIGH":   false,
+		"":          true,
+		"low":       true,
+		"medium":    true,
+		"high":      true,
+		"xhigh":     true,
+		"max":       true,
+		"ultra":     false,
+		"ultracode": false,
+		"HIGH":      false,
 	}
 	for in, want := range cases {
 		if got := isSafeEffort(in); got != want {

@@ -88,6 +88,35 @@ hooks:
   react_review: false
 ```
 
+### Claude Fable 5 명시적 선택
+
+Fable 5는 Autopus의 기본 모델이 아닙니다. 조직에 Fable 사용 권한이 있고
+Claude Code `2.1.170` 이상을 사용하는 경우에만 Claude provider에서 명시적으로
+선택하세요.
+
+```yaml
+orchestra:
+  providers:
+    claude:
+      binary: claude
+      args: ["--print", "--model", "fable", "--effort", "high"]
+```
+
+전체 모델 ID는 `claude-fable-5`이며 Claude Code alias는 `fable`과 `best`입니다.
+`best`는 조직에 Fable 권한이 있으면 Fable을, 없으면 최신 Opus를 선택하므로
+결정적 비용 계산에는 resolved full model ID를 사용해야 합니다. Fable은 ZDR
+조직에서 사용할 수 없고, 공식 가격은 입력 $10/MTok·출력 $50/MTok이며 native
+context는 1M tokens, 최대 output은 128k tokens입니다.
+
+모델/API effort는 `low`, `medium`, `high`, `xhigh`, `max` 다섯 값이고 Fable의
+기본값은 `high`입니다. `ultracode`는 여섯 번째 model effort가 아니라 실제
+`xhigh`와 dynamic workflows를 결합한 Claude Code session-only 값입니다.
+main session은 Claude Code `2.1.203` 이상, agent/team 전달은 `2.1.210` 이상을
+사용하세요. 자세한 내용은 [Claude Code model 설정](https://code.claude.com/docs/en/model-config),
+[CLI reference](https://code.claude.com/docs/en/cli-reference),
+[Fable 5 소개](https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5),
+[effort reference](https://platform.claude.com/docs/en/build-with-claude/effort)를 확인하세요.
+
 ## 플랫폼별 설치 위치
 
 | 플랫폼 | 설치 경로 |

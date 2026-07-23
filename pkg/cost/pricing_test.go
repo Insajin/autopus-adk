@@ -9,7 +9,7 @@ import (
 func TestDefaultPricingTable_ContainsAllModels(t *testing.T) {
 	table := cost.DefaultPricingTable()
 
-	required := []string{"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5"}
+	required := []string{"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-fable-5"}
 	for _, model := range required {
 		if _, ok := table[model]; !ok {
 			t.Errorf("pricing table missing model: %s", model)
@@ -30,6 +30,7 @@ func TestDefaultPricingTable_Prices(t *testing.T) {
 		{"claude-sonnet-5", 3.0, 15.0},
 		{"claude-sonnet-4-6", 3.0, 15.0},
 		{"claude-haiku-4-5", 1.0, 5.0},
+		{"claude-fable-5", 10.0, 50.0},
 	}
 
 	for _, tc := range cases {
@@ -42,6 +43,29 @@ func TestDefaultPricingTable_Prices(t *testing.T) {
 		}
 		if p.OutputPricePerMillion != tc.output {
 			t.Errorf("%s output price: want %.2f, got %.2f", tc.model, tc.output, p.OutputPricePerMillion)
+		}
+	}
+}
+
+func TestDefaultPricingTable_FableAliasesRemainUnpriced(t *testing.T) {
+	t.Parallel()
+
+	table := cost.DefaultPricingTable()
+	for _, alias := range []string{"fable", "best"} {
+		if _, ok := table[alias]; ok {
+			t.Errorf("dynamic alias %q must not have deterministic pricing", alias)
+		}
+	}
+}
+
+func TestQualityModeToModels_FableIsNotDefault(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []string{"ultra", "balanced"} {
+		for agent, model := range cost.QualityModeToModels(mode) {
+			if model == "claude-fable-5" || model == "fable" || model == "best" {
+				t.Errorf("%s/%s unexpectedly defaults to Fable model %q", mode, agent, model)
+			}
 		}
 	}
 }

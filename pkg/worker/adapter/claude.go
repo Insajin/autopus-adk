@@ -22,6 +22,8 @@ func NewClaudeAdapter() *ClaudeAdapter {
 // Name returns "claude".
 func (a *ClaudeAdapter) Name() string { return "claude" }
 
+// @AX:ANCHOR [AUTO]: Claude CLI argv boundary; preserve separated flag/value ordering and the session-effort allowlist. @AX:SPEC SPEC-FABLE5-001
+// @AX:REASON [AUTO]: ProviderAdapter consumers execute this command across agent-run, worker-loop, and pipeline paths.
 // BuildCommand constructs the exec.Cmd for Claude Code with stream-json output.
 func (a *ClaudeAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec.Cmd {
 	sessionID := task.SessionID
@@ -44,6 +46,11 @@ func (a *ClaudeAdapter) BuildCommand(ctx context.Context, task TaskConfig) *exec
 
 	if task.Model != "" {
 		args = append(args, "--model", task.Model)
+	}
+
+	switch task.Effort {
+	case "low", "medium", "high", "xhigh", "max", "ultracode":
+		args = append(args, "--effort", task.Effort)
 	}
 
 	if task.ComputerUse {

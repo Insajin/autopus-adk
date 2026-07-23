@@ -15,6 +15,9 @@ var safeAgentModels = map[string]bool{
 	"claude-sonnet-5":   true,
 	"claude-sonnet-4-6": true,
 	"claude-haiku-4-5":  true,
+	"claude-fable-5":    true,
+	"fable":             true,
+	"best":              true,
 }
 
 // isSafeAgentModel reports whether m is a whitelisted model. The empty string is

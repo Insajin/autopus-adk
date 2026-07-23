@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/cost"
 	"github.com/insajin/autopus-adk/pkg/workflow"
@@ -57,6 +58,40 @@ func resolveTeamQualityBinding(quality, complexity string) workflow.QualityBindi
 		phases[phase] = pb
 	}
 
+	return workflow.QualityBinding{Phases: phases}
+}
+
+// @AX:NOTE [AUTO]: ultracode is a Claude Code session mode and must become xhigh before entering the persisted workflow effort enum. @AX:SPEC SPEC-FABLE5-001
+func normalizeWorkflowBindingEffort(value string) (string, bool) {
+	effort := strings.TrimSpace(value)
+	if effort == "" {
+		return "", true
+	}
+	if effort == "ultracode" {
+		return string(EffortXHigh), true
+	}
+	return effort, isValidEffort(EffortValue(effort))
+}
+
+func applyTeamEffortOverride(binding workflow.QualityBinding, effort string) workflow.QualityBinding {
+	phases := make(map[string]workflow.PhaseBinding, len(binding.Phases))
+	for phase, phaseBinding := range binding.Phases {
+		phaseBinding.Effort = effort
+		phases[phase] = phaseBinding
+	}
+	return workflow.QualityBinding{Phases: phases}
+}
+
+func compactUltraQualityBinding() workflow.QualityBinding {
+	canonical := resolveTeamQualityBinding("ultra", "")
+	phases := make(map[string]workflow.PhaseBinding, len(canonical.Phases))
+	for phase, binding := range canonical.Phases {
+		phases[phase] = binding
+	}
+	review := phases["review"]
+	review.VerifyVotes = 1
+	review.Synthesis = false
+	phases["review"] = review
 	return workflow.QualityBinding{Phases: phases}
 }
 

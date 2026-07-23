@@ -17,13 +17,21 @@ func applyRuntimeHarnessOverrides(effective effectiveHarnessConfig, flags global
 	if quality := strings.TrimSpace(flags.Quality); quality != "" {
 		cfg.Quality.Default = quality
 	}
+	// @AX:NOTE [AUTO]: Claude effort must be applied before the Codex-only profile gate so Claude-only configs receive the override. @AX:SPEC SPEC-FABLE5-001
+	if effort := strings.TrimSpace(flags.Effort); effort != "" {
+		if claude, ok := cfg.Orchestra.Providers["claude"]; ok {
+			claude.Args = upsertClaudeEffortArg(claude.Args, effort)
+			claude.PaneArgs = upsertClaudeEffortArg(claude.PaneArgs, effort)
+			cfg.Orchestra.Providers["claude"] = claude
+		}
+	}
 	entry, ok := cfg.Orchestra.Providers["codex"]
 	if !ok || entry.ModelPolicy != config.ProviderModelPolicyQuality {
 		return effective
 	}
 	profile := cfg.Quality.CodexOrchestraProfile()
 	if effort := strings.TrimSpace(flags.Effort); effort != "" {
-		profile.Effort = effort
+		profile.Effort = codexEffortForRuntime(effort)
 	}
 	cfg.Orchestra.Providers["codex"] = config.ApplyCodexProviderProfile(entry, profile)
 	return effective

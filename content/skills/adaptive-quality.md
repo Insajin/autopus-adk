@@ -60,6 +60,26 @@ Platform note:
 - Codex: Balanced uses Sol/`xhigh` for quality-managed strategic and Opus-tier work, Terra with role effort for Sonnet-tier work, and Luna with role effort for Haiku-tier work. Ultra uses Sol/`ultra` for a quality-managed supervisor and orchestra, Sol/`max` for `planner`, `architect`, and `security-auditor`, and Sol/`xhigh` for every other managed agent. An `inherit` supervisor keeps the user's Codex runtime default in either mode.
 - OpenCode: keep the configured default runtime model; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
+## Claude Fable 5 (Explicit Opt-In)
+
+Fable 5 is an explicit Claude Code choice, not an Autopus quality default. Keep the
+Opus/Sonnet mappings above unless the user or provider configuration selects Fable.
+
+| Surface | Value |
+|---------|-------|
+| Full model ID | `claude-fable-5` |
+| Claude Code aliases | `fable`, `best` |
+| `best` behavior | Fable when the organization has access; otherwise the latest Opus |
+| Minimum Claude Code version | `2.1.170` |
+| Price per million tokens | $10 input / $50 output |
+| Native limits | 1M-token context / 128k-token output |
+
+Fable access is entitlement-dependent and is not available for organizations with
+Zero Data Retention (ZDR). The `fable` and `best` aliases are convenient Claude Code
+inputs, but deterministic cost estimates require the resolved full model ID.
+See the official [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
+and [Fable 5 introduction](https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5).
+
 ## Effort Mapping (SPEC-CC21-001)
 
 CC21 adds an explicit `effort` tier alongside model selection. Resolve it with this priority:
@@ -79,6 +99,17 @@ Quality Mode defaults:
 | Ultra | Haiku 4.5 | strip effort |
 | Balanced | HIGH complexity | `high` |
 | Balanced | MEDIUM / LOW complexity | `medium` |
+
+Claude model/API effort is the closed set `low`, `medium`, `high`, `xhigh`, and
+`max`. Fable supports all five and defaults to `high`. Claude Code also exposes
+`ultracode` as a session-only CLI value: it sends actual model effort `xhigh` and
+adds dynamic workflow behavior. It is not a sixth model/API or persisted workflow
+effort. Main-session `ultracode` requires Claude Code `2.1.203` or later; reliable
+propagation to spawned agents and teams requires `2.1.210` or later. Route-team
+binding therefore normalizes explicit `ultracode` to `xhigh`.
+See the official [effort reference](https://platform.claude.com/docs/en/build-with-claude/effort),
+[Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference), and
+[Claude Code v2.1.218 release](https://github.com/anthropics/claude-code/releases/tag/v2.1.218).
 
 Codex-specific rendering:
 

@@ -40,6 +40,11 @@ func DefaultPricingTable() map[string]ModelPricing {
 			InputPricePerMillion:  1.0,
 			OutputPricePerMillion: 5.0,
 		},
+		// @AX:NOTE [AUTO]: Fable pricing is keyed only by the resolved full model ID; dynamic aliases remain intentionally unpriced. @AX:SPEC SPEC-FABLE5-001
+		"claude-fable-5": {
+			InputPricePerMillion:  10.0,
+			OutputPricePerMillion: 50.0,
+		},
 	}
 }
 

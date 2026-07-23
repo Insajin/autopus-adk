@@ -87,6 +87,63 @@ func TestClaudeAdapterBuildCommandEmptyModel(t *testing.T) {
 	assert.False(t, slices.Contains(cmd.Args, "--model"))
 }
 
+func TestClaudeAdapterBuildCommandWithFableModels(t *testing.T) {
+	t.Parallel()
+
+	for _, model := range []string{"fable", "best", "claude-fable-5"} {
+		model := model
+		t.Run(model, func(t *testing.T) {
+			t.Parallel()
+			cmd := NewClaudeAdapter().BuildCommand(context.Background(), TaskConfig{
+				TaskID: "task-fable",
+				Model:  model,
+			})
+			assert.Equal(t, 1, countAdjacentArgs(cmd.Args, "--model", model))
+		})
+	}
+}
+
+func TestClaudeAdapterBuildCommandWithSupportedEffort(t *testing.T) {
+	t.Parallel()
+
+	for _, effort := range []string{"low", "medium", "high", "xhigh", "max", "ultracode"} {
+		effort := effort
+		t.Run(effort, func(t *testing.T) {
+			t.Parallel()
+			cmd := NewClaudeAdapter().BuildCommand(context.Background(), TaskConfig{
+				TaskID: "task-effort",
+				Model:  "fable",
+				Effort: effort,
+			})
+			assert.Equal(t, 1, countAdjacentArgs(cmd.Args, "--model", "fable"))
+			assert.Equal(t, 1, countExactArgs(cmd.Args, "--effort"))
+			assert.Equal(t, 1, countAdjacentArgs(cmd.Args, "--effort", effort))
+		})
+	}
+}
+
+func TestClaudeAdapterBuildCommandOmitsUnsupportedEffort(t *testing.T) {
+	t.Parallel()
+
+	for _, effort := range []string{"", "auto", "ultra", "future-value"} {
+		effort := effort
+		t.Run(effort, func(t *testing.T) {
+			t.Parallel()
+			cmd := NewClaudeAdapter().BuildCommand(context.Background(), TaskConfig{
+				TaskID:    "task-effort",
+				SessionID: "existing-session",
+				MCPConfig: "/tmp/worker-mcp.json",
+				Model:     "fable",
+				Effort:    effort,
+			})
+			assert.NotContains(t, cmd.Args, "--effort")
+			assert.Equal(t, 1, countAdjacentArgs(cmd.Args, "--model", "fable"))
+			assert.Equal(t, 1, countAdjacentArgs(cmd.Args, "--resume", "existing-session"))
+			assert.Equal(t, 1, countAdjacentArgs(cmd.Args, "--mcp-config", "/tmp/worker-mcp.json"))
+		})
+	}
+}
+
 func TestClaudeAdapterParseEvent(t *testing.T) {
 	a := NewClaudeAdapter()
 
@@ -206,4 +263,24 @@ func envContains(t *testing.T, env []string, expected string) {
 	if !slices.Contains(env, expected) {
 		t.Errorf("env does not contain %q", expected)
 	}
+}
+
+func countAdjacentArgs(args []string, flag, value string) int {
+	count := 0
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == flag && args[i+1] == value {
+			count++
+		}
+	}
+	return count
+}
+
+func countExactArgs(args []string, want string) int {
+	count := 0
+	for _, arg := range args {
+		if arg == want {
+			count++
+		}
+	}
+	return count
 }

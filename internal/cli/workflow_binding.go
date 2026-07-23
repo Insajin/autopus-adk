@@ -45,6 +45,7 @@ type workflowBindingReceipt struct {
 
 type workflowBindingOptions struct {
 	quality        string
+	effort         string
 	riskTier       string
 	filesFile      string
 	format         string
@@ -69,6 +70,7 @@ func newWorkflowBindingCmd(discover func() ([]string, error)) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			opts.effort = globalFlagsFromContext(cmd.Context()).Effort
 			receipt := resolveWorkflowBinding(opts, discover)
 			data, err := json.Marshal(receipt)
 			if err != nil {
@@ -91,12 +93,16 @@ func newWorkflowBindingCmd(discover func() ([]string, error)) *cobra.Command {
 func resolveWorkflowBinding(opts workflowBindingOptions, discover func() ([]string, error)) workflowBindingReceipt {
 	risk := resolveBindingRisk(opts.riskTier, opts.filesFile, discover)
 	quality := strings.ToLower(strings.TrimSpace(opts.quality))
+	explicitEffort, effortValid := normalizeWorkflowBindingEffort(opts.effort)
 
 	binding := resolveTeamQualityBinding("ultra", "")
 	reason := risk.reason
 	canary := verifiedCanaryReceipt(opts.rolloutReceipt, risk.tier)
 	contextIntegrity := verifyWorkflowContextManifest(opts.context)
 	switch {
+	// @AX:NOTE [AUTO]: Invalid explicit effort must fail closed before balanced or risk selection so it cannot enter generated bindings. @AX:SPEC SPEC-FABLE5-001
+	case !effortValid:
+		reason = bindingReasonValidationFailed
 	case quality == "balanced":
 		binding = resolveTeamQualityBinding("balanced", "")
 		reason = bindingReasonBalanced
@@ -117,6 +123,9 @@ func resolveWorkflowBinding(opts workflowBindingOptions, discover func() ([]stri
 		reason = bindingReasonShadow
 	default:
 		reason = bindingReasonRiskFull
+	}
+	if explicitEffort != "" && effortValid {
+		binding = applyTeamEffortOverride(binding, explicitEffort)
 	}
 
 	if err := validateWorkflowQualityBinding(binding); err != nil {
@@ -259,19 +268,6 @@ func canonicalReceiptHash(value string) bool {
 		}
 	}
 	return true
-}
-
-func compactUltraQualityBinding() workflow.QualityBinding {
-	canonical := resolveTeamQualityBinding("ultra", "")
-	phases := make(map[string]workflow.PhaseBinding, len(canonical.Phases))
-	for phase, binding := range canonical.Phases {
-		phases[phase] = binding
-	}
-	review := phases["review"]
-	review.VerifyVotes = 1
-	review.Synthesis = false
-	phases["review"] = review
-	return workflow.QualityBinding{Phases: phases}
 }
 
 func validateWorkflowQualityBinding(binding workflow.QualityBinding) error {

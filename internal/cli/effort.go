@@ -35,7 +35,9 @@ func newEffortDetectCmd() *cobra.Command {
 		Long: `Detect the recommended effort level using the priority chain:
   --effort flag > CLAUDE_CODE_EFFORT_LEVEL env > frontmatter > quality_mode > settings_default
 
-Effort values: low | medium | high | xhigh | max
+Model/API effort values: low | medium | high | xhigh | max
+Claude CLI session-only ultracode uses xhigh plus dynamic workflows (Claude Code >= 2.1.203; agent/team propagation >= 2.1.210).
+Fable opt-in identifiers: claude-fable-5 | fable | best (Claude Code >= 2.1.170; entitlement and ZDR restrictions apply).
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			errOut := cmd.ErrOrStderr()
@@ -71,10 +73,10 @@ Effort values: low | medium | high | xhigh | max
 
 	cmd.Flags().StringVar(&quality, "quality", "", "Quality mode preset (ultra|balanced)")
 	cmd.Flags().StringVar(&complexity, "complexity", "", "Task complexity hint (low|medium|high)")
-	cmd.Flags().StringVar(&model, "model", "", "Model identifier (opus-4.8|opus-4.7|sonnet-5|sonnet-4.6|haiku-4.5)")
+	cmd.Flags().StringVar(&model, "model", "", "Model identifier (opus-4.8|opus-4.7|sonnet-5|sonnet-4.6|haiku-4.5|claude-fable-5|fable|best)")
 	cmd.Flags().StringVar(&agent, "agent", "", "Agent name for frontmatter lookup (future use)")
 	cmd.Flags().StringVar(&format, "format", "plain", "Output format (plain|json)")
-	cmd.Flags().StringVar(&effortFlag, "effort", "", "Explicit effort value (overrides quality-mode mapping)")
+	cmd.Flags().StringVar(&effortFlag, "effort", "", "Explicit model effort or Claude CLI session-only ultracode (overrides quality-mode mapping)")
 
 	return cmd
 }
