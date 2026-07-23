@@ -8,8 +8,8 @@ fail() {
 }
 
 readonly RELEASE_REPOSITORY='Insajin/autopus-adk'
-readonly RELEASE_TAG='v0.50.85'
-readonly RELEASE_VERSION='0.50.85'
+readonly RELEASE_TAG='v0.50.86'
+readonly RELEASE_VERSION='0.50.86'
 
 EXPECTED_ARCHIVES=(
   "autopus-adk_${RELEASE_VERSION}_darwin_amd64.tar.gz"
@@ -68,14 +68,14 @@ downloaded_envelope="$temp_dir/checksums.txt.signatures"
 if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
   -H 'Accept: application/vnd.github+json' \
   "repos/${RELEASE_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "$release_json"; then
-  fail 'cannot read the exact A14 GitHub release'
+  fail 'cannot read the exact A15 GitHub release'
 fi
 [[ -f "$release_json" && ! -L "$release_json" && -s "$release_json" ]] \
-  || fail 'A14 GitHub release metadata is empty or unsafe'
+  || fail 'A15 GitHub release metadata is empty or unsafe'
 
 expected_assets_json=$(printf '%s\n' "${EXPECTED_ASSETS[@]}" \
   | jq -Rsc 'split("\n") | map(select(length > 0))') \
-  || fail 'cannot construct the expected A14 asset set'
+  || fail 'cannot construct the expected A15 asset set'
 if ! jq -e --arg tag "$RELEASE_TAG" --arg commit "$COMPANION_SOURCE_COMMIT" \
   --argjson expected "$expected_assets_json" '
     type == "object" and
@@ -96,7 +96,7 @@ if ! jq -e --arg tag "$RELEASE_TAG" --arg commit "$COMPANION_SOURCE_COMMIT" \
       (.digest | type) == "string" and
       (.digest | test("^sha256:[0-9a-f]{64}$")))
   ' "$release_json" >/dev/null; then
-  fail 'A14 release is not exact, final, immutable, complete, and digest-bound'
+  fail 'A15 release is not exact, final, immutable, complete, and digest-bound'
 fi
 
 # @AX:ANCHOR [AUTO]: Keep all three immutable release asset downloads on one digest-bound path.
@@ -116,7 +116,7 @@ download_release_asset() {
   if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
     -H 'Accept: application/octet-stream' \
     "repos/${RELEASE_REPOSITORY}/releases/assets/${asset_id}" > "$destination"; then
-    fail "cannot download ${asset_name} from the exact A14 release"
+    fail "cannot download ${asset_name} from the exact A15 release"
   fi
   [[ -f "$destination" && ! -L "$destination" && -s "$destination" ]] \
     || fail "downloaded ${asset_name} is empty or unsafe"
@@ -148,7 +148,7 @@ if ! printf '%s' "$checksum_entries_json" | jq -e \
     ([.[].name] | sort) == ($expected | sort) and
     ([.[].name] | unique | length) == ($expected | length)
   ' >/dev/null; then
-  fail 'checksums.txt does not describe exactly the eight A14 archives'
+  fail 'checksums.txt does not describe exactly the eight A15 archives'
 fi
 
 for archive in "${EXPECTED_ARCHIVES[@]}"; do
@@ -167,10 +167,10 @@ done
 env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
   "$signature_helper" \
   "$downloaded_checksums" "$downloaded_bundle" "$downloaded_envelope" \
-  || fail 'A14 release signature evidence is invalid'
+  || fail 'A15 release signature evidence is invalid'
 
 install -m 0600 "$downloaded_checksums" "$checksums_output" \
   || fail 'cannot materialize verified checksums.txt'
 cmp -s "$downloaded_checksums" "$checksums_output" \
   || fail 'materialized checksums.txt differs from verified bytes'
-printf 'current release evidence: exact immutable A14 release verified\n'
+printf 'current release evidence: exact immutable A15 release verified\n'

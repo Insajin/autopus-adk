@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,27 +116,7 @@ func produceUncachedGoReleaserFixtureEvidence(
 	if err := os.Mkdir(cacheDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, architecture := range []string{"amd64", "arm64"} {
-		name := fmt.Sprintf("autopus-adk_%s_darwin_%s.tar.gz", releaseVersion, architecture)
-		sourceArchive := filepath.Join(root, "dist", name)
-		cachedArchive := filepath.Join(cacheDirectory, name)
-		if _, err := materializeLineageArchive(sourceArchive, cachedArchive, os.Link); err != nil {
-			t.Fatalf("cache exact %s archive: %v", architecture, err)
-		}
-		evidence.archives[architecture] = cachedArchive
-		entries, err := decodeLineageArchiveFile(cachedArchive)
-		if err != nil {
-			t.Fatalf("decode exact %s archive: %v", architecture, err)
-		}
-		manifestBytes := entries["adk-companion-manifest.json"].data
-		if architecture == "amd64" {
-			evidence.receipt = entries[lineageBundleName+"/public-key-receipt.json"].data
-			evidence.signature = entries[lineageBundleName+"/public-key-receipt.sig"].data
-			evidence.pins.amd64Manifest = lineageDigest(manifestBytes)
-		} else {
-			evidence.pins.arm64Manifest = lineageDigest(manifestBytes)
-		}
-	}
+	cacheGoReleaserLineageArchives(t, root, cacheDirectory, evidence)
 	evidence.checksums = readLineageFile(t, filepath.Join(root, "dist", "checksums.txt"))
 	evidence.pins = captureGoReleaserPins(t, evidence, privateKey, tagObject)
 	evidence.pins.tree = tree
@@ -151,26 +130,18 @@ func captureGoReleaserPins(
 	tagObject string,
 ) executableLineagePins {
 	t.Helper()
-	amd64Digest, err := lineageArchiveFileDigest(evidence.archives["amd64"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	arm64Digest, err := lineageArchiveFileDigest(evidence.archives["arm64"])
-	if err != nil {
-		t.Fatal(err)
-	}
 	receiptDigest, signatureDigest := lineageDigest(evidence.receipt), lineageDigest(evidence.signature)
-	return executableLineagePins{
+	pins := executableLineagePins{
 		commit: evidence.commit, tagObject: tagObject,
 		receipt: receiptDigest, signature: signatureDigest,
 		record:        lineageRecordDigest(receiptDigest, signatureDigest),
 		publicKey:     lineageDigest(privateKey.Public().(ed25519.PublicKey)),
 		checksums:     lineageDigest(evidence.checksums),
-		amd64Archive:  amd64Digest,
-		arm64Archive:  arm64Digest,
 		amd64Manifest: evidence.pins.amd64Manifest,
 		arm64Manifest: evidence.pins.arm64Manifest,
 	}
+	captureGoReleaserArchivePins(t, evidence, &pins)
+	return pins
 }
 
 func (fixture *executableLineageFixture) writeMockGitHub(t *testing.T) {
@@ -249,6 +220,11 @@ func (fixture *executableLineageFixture) writeProvisionedProductionScript(t *tes
 	helper := releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage-archive.sh")
 	helperPath := filepath.Join(filepath.Dir(fixture.provisionedScriptPath), "verify-public-key-lineage-archive.sh")
 	if err := os.WriteFile(helperPath, helper, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	assetsHelper := releaseSourceFile(t, "scripts/companion-release/verify-public-key-lineage-assets.sh")
+	assetsHelperPath := filepath.Join(filepath.Dir(fixture.provisionedScriptPath), "verify-public-key-lineage-assets.sh")
+	if err := os.WriteFile(assetsHelperPath, assetsHelper, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

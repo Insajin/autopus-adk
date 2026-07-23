@@ -15,8 +15,10 @@ func TestReleaseDebtSaturatedScriptsHaveExpansionHeadroom(t *testing.T) {
 
 	for _, path := range []string{
 		"scripts/companion-release/verify-public-key-lineage.sh",
+		"scripts/companion-release/verify-public-key-lineage-assets.sh",
 		"scripts/companion-release/publish-homebrew-formula-bridge.sh",
 		"scripts/companion-release/tests/release-hardening-test.sh",
+		"scripts/companion-release/tests/release-lineage-pins-hardening-test.sh",
 		"scripts/companion-release/produce.sh",
 		"scripts/companion-release/produce-public-key-receipt.sh",
 		"pkg/companionmanifest/release_public_key_receipt_lineage_test.go",
@@ -49,7 +51,7 @@ func TestReleaseDebtProducerReceiptHasDedicatedHelper(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"release_phase='A0'", "release_phase='A14'",
+		"release_phase='A0'", "release_phase='A15'",
 		"companion-manifest public-key-receipt",
 		"public key receipt independent verification failed",
 		"manifest_public_key_digest_mismatch",
@@ -58,7 +60,7 @@ func TestReleaseDebtProducerReceiptHasDedicatedHelper(t *testing.T) {
 			t.Fatalf("producer receipt helper missing %q", required)
 		}
 	}
-	if strings.Contains(producer, "release_phase='A14'") ||
+	if strings.Contains(producer, "release_phase='A15'") ||
 		strings.Contains(producer, "companion-manifest public-key-receipt") {
 		t.Fatal("producer caller still owns receipt phase coordinates or publication")
 	}
@@ -80,15 +82,72 @@ func TestReleaseDebtLineageCoordinatesHaveDedicatedHelper(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"release_phase='A0'", "release_phase='A14' prior_phase='A13'",
+		"release_phase='A0'", "release_phase='A15' prior_phase='A14'",
 		"prior_tree=", "prior_release_identity_mismatch",
 	} {
 		if !strings.Contains(coordinates, required) {
 			t.Fatalf("lineage coordinate helper missing %q", required)
 		}
 	}
-	if strings.Contains(lineage, "release_phase='A14' prior_phase='A13'") {
-		t.Fatal("lineage caller still owns the A14 coordinate table")
+	if strings.Contains(lineage, "release_phase='A15' prior_phase='A14'") {
+		t.Fatal("lineage caller still owns the A15 coordinate table")
+	}
+}
+
+func TestReleaseDebtLineageAssetsHaveDedicatedHelper(t *testing.T) {
+	t.Parallel()
+
+	lineage := readReleaseFile(t, "scripts/companion-release/verify-public-key-lineage.sh")
+	assets := readReleaseFile(t,
+		"scripts/companion-release/verify-public-key-lineage-assets.sh")
+	for _, required := range []string{
+		"verify-public-key-lineage-assets.sh",
+		`[[ -f "$assets_helper" && ! -L "$assets_helper" ]]`,
+		`source "$assets_helper"`, "verify_public_key_lineage_assets",
+	} {
+		if !strings.Contains(lineage, required) {
+			t.Fatalf("lineage asset helper gate missing %q", required)
+		}
+	}
+	for _, required := range []string{
+		"_darwin_amd64.tar.gz", "_darwin_arm64.tar.gz",
+		"_linux_amd64.tar.gz", "_linux_arm64.tar.gz",
+		`actual_asset_digest" == "$asset_digest`,
+		`actual_asset_digest" == "sha256:$archive_pin`,
+		"extract_bundle", "checksums.txt differs from its",
+	} {
+		if !strings.Contains(assets, required) {
+			t.Fatalf("lineage asset helper missing %q", required)
+		}
+	}
+	if strings.Contains(lineage, "gh release download") ||
+		strings.Contains(lineage, "archive differs from checksums.txt") {
+		t.Fatal("lineage caller still owns predecessor asset verification")
+	}
+}
+
+func TestReleaseDebtHistoricalPinsHaveDedicatedHardeningScript(t *testing.T) {
+	t.Parallel()
+
+	aggregator := readReleaseFile(t,
+		"scripts/companion-release/tests/release-hardening-test.sh")
+	history := readReleaseFile(t,
+		"scripts/companion-release/tests/release-lineage-pins-hardening-test.sh")
+	if !strings.Contains(aggregator,
+		`bash "$tests_dir/release-lineage-pins-hardening-test.sh"`) {
+		t.Fatal("release hardening aggregator does not invoke lineage pin assertions")
+	}
+	for _, required := range []string{
+		"A6_A5_ANCESTOR_SHA", "A15_A14_ANCESTOR_SHA",
+		"A4_TAG_OBJECT_SHA", "A14_LINUX_ARM64_ARCHIVE_SHA256",
+		"symlinked lineage asset helper passed",
+	} {
+		if !strings.Contains(history, required) {
+			t.Fatalf("lineage pin hardening helper missing %q", required)
+		}
+	}
+	if strings.Contains(aggregator, "A13_CHECKSUMS_SHA256") {
+		t.Fatal("release hardening aggregator still owns historical pin assertions")
 	}
 }
 

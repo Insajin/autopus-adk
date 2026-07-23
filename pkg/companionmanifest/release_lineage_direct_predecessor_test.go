@@ -1,5 +1,10 @@
 package companionmanifest
 
+import (
+	"strings"
+	"testing"
+)
+
 func directPredecessorPinReplacements(fixture *executableLineageFixture) map[string]string {
 	prefix := ""
 	switch fixture.currentTag {
@@ -29,6 +34,8 @@ func directPredecessorPinReplacements(fixture *executableLineageFixture) map[str
 		prefix = "A12"
 	case publicKeyReceiptA14Tag:
 		prefix = "A13"
+	case publicKeyReceiptA15Tag:
+		prefix = "A14"
 	default:
 		return nil
 	}
@@ -41,7 +48,11 @@ func directPredecessorPinReplacements(fixture *executableLineageFixture) map[str
 		prefix + "_AMD64_MANIFEST_SHA256": fixture.pins.amd64Manifest,
 		prefix + "_ARM64_MANIFEST_SHA256": fixture.pins.arm64Manifest,
 	}
-	if prefix == "A7" || prefix == "A8" || prefix == "A9" || prefix == "A10" || prefix == "A11" || prefix == "A12" || prefix == "A13" {
+	if prefix == "A14" {
+		replacements[prefix+"_LINUX_AMD64_ARCHIVE_SHA256"] = fixture.pins.linuxAMD64Archive
+		replacements[prefix+"_LINUX_ARM64_ARCHIVE_SHA256"] = fixture.pins.linuxARM64Archive
+	}
+	if prefix == "A7" || prefix == "A8" || prefix == "A9" || prefix == "A10" || prefix == "A11" || prefix == "A12" || prefix == "A13" || prefix == "A14" {
 		replacements[prefix+"_TREE_SHA"] = fixture.pins.tree
 	}
 	return replacements
@@ -53,11 +64,40 @@ func immutableProductionLineagePin(name string) (string, bool) {
 		immutableA3LineagePins, immutableA4LineagePins, immutableA5LineagePins,
 		immutableA6LineagePins, immutableA7LineagePins, immutableA8LineagePins,
 		immutableA9LineagePins, immutableA10LineagePins, immutableA11LineagePins,
-		immutableA12LineagePins, immutableA13LineagePins,
+		immutableA12LineagePins, immutableA13LineagePins, immutableA14LineagePins,
 	} {
 		if value, ok := pins[name]; ok {
 			return value, true
 		}
 	}
 	return "", false
+}
+
+func TestDirectPredecessorPinReplacements_LinuxPinsBeginAtA14(t *testing.T) {
+	pins := executableLineagePins{
+		linuxAMD64Archive: "linux-amd64", linuxARM64Archive: "linux-arm64",
+	}
+	for _, tag := range []string{
+		publicKeyReceiptA2Tag, publicKeyReceiptA3Tag, publicKeyReceiptA4Tag,
+		publicKeyReceiptA5Tag, publicKeyReceiptA6Tag, publicKeyReceiptA7Tag,
+		publicKeyReceiptA8Tag, publicKeyReceiptA9Tag, publicKeyReceiptA10Tag,
+		publicKeyReceiptA11Tag, publicKeyReceiptA12Tag, publicKeyReceiptA13Tag,
+		publicKeyReceiptA14Tag,
+	} {
+		replacements := directPredecessorPinReplacements(&executableLineageFixture{
+			currentTag: tag, pins: pins,
+		})
+		for name := range replacements {
+			if strings.Contains(name, "LINUX") {
+				t.Fatalf("legacy predecessor %s unexpectedly replaces %s", tag, name)
+			}
+		}
+	}
+	replacements := directPredecessorPinReplacements(&executableLineageFixture{
+		currentTag: publicKeyReceiptA15Tag, pins: pins,
+	})
+	if replacements["A14_LINUX_AMD64_ARCHIVE_SHA256"] != "linux-amd64" ||
+		replacements["A14_LINUX_ARM64_ARCHIVE_SHA256"] != "linux-arm64" {
+		t.Fatalf("A15 direct predecessor Linux replacements = %#v", replacements)
+	}
 }

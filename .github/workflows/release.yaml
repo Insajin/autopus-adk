@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.85'
+      - 'v0.50.86'
 permissions:
   contents: read
 jobs:
@@ -17,7 +17,7 @@ jobs:
 
   release:
     needs: [ci, security]
-    if: github.ref == 'refs/tags/v0.50.85'
+    if: github.ref == 'refs/tags/v0.50.86'
     environment:
       name: adk-companion-release
     permissions:
@@ -347,7 +347,7 @@ jobs:
           COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.85-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.86-checksums.txt"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_TOKEN="$GITHUB_TOKEN" \
             COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
@@ -371,8 +371,8 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.85' \
-            COMPANION_VERSION='0.50.85' \
+            GITHUB_REF_NAME='v0.50.86' \
+            COMPANION_VERSION='0.50.86' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
@@ -386,9 +386,9 @@ jobs:
           set -u
           cleanup_status=0
           keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
-          if [[ -e "$RUNNER_TEMP/autopus-v0.50.85-checksums.txt" ||
-                -L "$RUNNER_TEMP/autopus-v0.50.85-checksums.txt" ]]; then
-            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.85-checksums.txt"; then
+          if [[ -e "$RUNNER_TEMP/autopus-v0.50.86-checksums.txt" ||
+                -L "$RUNNER_TEMP/autopus-v0.50.86-checksums.txt" ]]; then
+            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.86-checksums.txt"; then
               :
             else
               cleanup_status=$?

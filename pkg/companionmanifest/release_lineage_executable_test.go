@@ -139,7 +139,7 @@ func tamperLineageManifest(t *testing.T, fixture *executableLineageFixture) {
 	fixture.archiveMutation = replaceLineageArchiveBytes(
 		t, "adk-companion-manifest.json", []byte("github-actions:"), []byte("github-actionx:"),
 	)
-	fixture.writeEvidence(t)
+	fixture.writeResealedEvidence(t)
 }
 
 func tamperLineageReceiptKey(t *testing.T, fixture *executableLineageFixture) {
@@ -148,7 +148,7 @@ func tamperLineageReceiptKey(t *testing.T, fixture *executableLineageFixture) {
 		t, lineageBundleName+"/public-key-receipt.json",
 		[]byte(`"key_id":"release-key"`), []byte(`"key_id":"other-key"`),
 	)
-	fixture.writeEvidence(t)
+	fixture.writeResealedEvidence(t)
 }
 
 func tamperLineagePhase(t *testing.T, fixture *executableLineageFixture) {
@@ -162,7 +162,7 @@ func tamperLineageVersion(t *testing.T, fixture *executableLineageFixture) {
 	fixture.archiveMutation = replaceLineageArchiveBytes(
 		t, "adk-companion-manifest.json", []byte(`"version":"0.50.69"`), []byte(`"version":"9.9.9"`),
 	)
-	fixture.writeEvidence(t)
+	fixture.writeResealedEvidence(t)
 }
 
 func replaceLineageArchiveBytes(
@@ -237,7 +237,7 @@ func tamperLineageArchiveEntry(t *testing.T, fixture *executableLineageFixture) 
 			return nil, false
 		},
 	}
-	fixture.writeEvidence(t)
+	fixture.writeResealedEvidence(t)
 }
 
 func differentHex(current string, length int) string {
@@ -256,7 +256,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 		immutableA3LineagePins, immutableA4LineagePins, immutableA5LineagePins,
 		immutableA6LineagePins, immutableA7LineagePins, immutableA8LineagePins,
 		immutableA9LineagePins, immutableA10LineagePins, immutableA11LineagePins,
-		immutableA12LineagePins, immutableA13LineagePins,
+		immutableA12LineagePins, immutableA13LineagePins, immutableA14LineagePins,
 	} {
 		for name, value := range pins {
 			declaration := "readonly " + name + "='" + value + "'"
@@ -267,7 +267,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 	}
 	for _, bypass := range []string{
 		"TEST_PIN", "PIN_FILE", "PIN_OVERRIDE", "GO_WANT_LINEAGE",
-		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_", "COMPANION_A4_", "COMPANION_A5_", "COMPANION_A6_", "COMPANION_A7_", "COMPANION_A8_", "COMPANION_A9_", "COMPANION_A10_", "COMPANION_A11_", "COMPANION_A12_", "COMPANION_A13_", "COMPANION_A14_",
+		"COMPANION_A0_", "COMPANION_A1_", "COMPANION_A2_", "COMPANION_A3_", "COMPANION_A4_", "COMPANION_A5_", "COMPANION_A6_", "COMPANION_A7_", "COMPANION_A8_", "COMPANION_A9_", "COMPANION_A10_", "COMPANION_A11_", "COMPANION_A12_", "COMPANION_A13_", "COMPANION_A14_", "COMPANION_A15_",
 	} {
 		if strings.Contains(runtimeSource, bypass) {
 			t.Fatalf("production lineage exposes test pin bypass %q", bypass)

@@ -38,6 +38,8 @@ resolve_public_key_receipt_release_phase() {
     release_phase='A13'
   elif [[ "$GITHUB_REF_NAME" == 'v0.50.85' && "$COMPANION_VERSION" == '0.50.85' ]]; then
     release_phase='A14'
+  elif [[ "$GITHUB_REF_NAME" == 'v0.50.86' && "$COMPANION_VERSION" == '0.50.86' ]]; then
+    release_phase='A15'
   else
     fail 'public_key_receipt_release_identity_mismatch'
   fi
