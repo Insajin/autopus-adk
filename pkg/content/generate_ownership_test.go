@@ -21,7 +21,9 @@ func TestIsGeneratedTemplatePath(t *testing.T) {
 	static := []string{
 		"codex/prompts/auto-fix.md.tmpl",
 		"codex/skills/auto-fix.md.tmpl",
+		"codex/skills/agent-teams.md.tmpl",
 		"gemini/skills/auto-fix/SKILL.md.tmpl",
+		"gemini/skills/agent-teams/SKILL.md.tmpl",
 		"gemini/rules/autopus/doc-storage.md.tmpl",
 		"shared/autopus.yaml.tmpl",
 		"../templates/codex/agents/executor.toml.tmpl",
