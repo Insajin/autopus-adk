@@ -43,7 +43,7 @@ router:
   tiers:
     fast: gemini-2.0-flash
     smart: claude-sonnet-5
-    ultra: claude-opus-4-8
+    ultra: claude-opus-5
   categories:
     visual: fast
     deep: ultra

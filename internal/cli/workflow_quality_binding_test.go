@@ -34,8 +34,8 @@ func TestResolveTeamQualityBinding_SerializesBarePhaseMap(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing implementation entry in %q", s)
 	}
-	if impl["model"] != "claude-opus-4-8" {
-		t.Fatalf("implementation model = %v, want claude-opus-4-8", impl["model"])
+	if impl["model"] != "claude-opus-5" {
+		t.Fatalf("implementation model = %v, want claude-opus-5", impl["model"])
 	}
 	if impl["effort"] != "max" {
 		t.Fatalf("implementation effort = %v, want max", impl["effort"])

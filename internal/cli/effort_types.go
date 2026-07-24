@@ -9,11 +9,11 @@ const (
 	EffortLow EffortValue = "low"
 	// EffortMedium is the default balanced-mode effort tier.
 	EffortMedium EffortValue = "medium"
-	// EffortHigh is used for high-complexity tasks and ultra mode on non-Opus-4.7 models.
+	// EffortHigh is used for high-complexity tasks and ultra mode on models without max support.
 	EffortHigh EffortValue = "high"
 	// EffortXHigh is a very high effort tier below max.
 	EffortXHigh EffortValue = "xhigh"
-	// EffortMax is the strongest Claude Code effort tier for Opus 4.8/4.7 planning/deep work.
+	// EffortMax is the strongest Claude Code effort tier for max-capable Opus and Fable models.
 	EffortMax EffortValue = "max"
 	// EffortStripped signals that effort must be omitted (Haiku 4.5).
 	EffortStripped EffortValue = ""

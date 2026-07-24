@@ -64,7 +64,7 @@ router:
   tiers:
     fast: gemini-flash
     smart: claude-sonnet-5
-    ultra: claude-opus-4-8
+    ultra: claude-opus-5
   categories:
     visual: fast
     deep: ultra
@@ -77,6 +77,37 @@ hooks:
   react_ci_failure: false
   react_review: false
 ```
+
+### Claude Opus 5 기본 경로
+
+Claude Ultra, Balanced 전략 역할, high-complexity 라우팅은 고정 모델 ID
+`claude-opus-5`를 사용합니다. Claude Code의 `opus` alias가 Opus 5를 선택하려면
+`2.1.219` 이상이 필요합니다. Opus 5를 고정한 `route_team` workflow는
+`auto workflow doctor --route route_team`에서 `2.1.219` 미만을
+fail-closed합니다. 모델을 고정하지 않는 `route_a`는 기존 최소 버전
+`2.1.154`를 유지합니다.
+
+| Claude Code provider | `opus` on v2.1.219+ | Before v2.1.219 |
+|----------------------|---------------------|-----------------|
+| Anthropic API | Opus 5 | Opus 4.8 on v2.1.154–v2.1.218 |
+| Claude Platform on AWS | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.7 before v2.1.207 |
+| Amazon Bedrock | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.6 before v2.1.207 |
+| Google Cloud Agent Platform | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.6 before v2.1.207 |
+| Microsoft Foundry | Opus 4.6 | Opus 4.6 |
+
+Opus 5의 공식 가격은 입력 $5/MTok·출력 $25/MTok이며 native context는 1M
+tokens, 최대 output은 128k tokens입니다. `low`, `medium`, `high`, `xhigh`,
+`max` effort를 지원하고 기본 effort는 `high`입니다. Opus 4.8에서 같은 가격의
+drop-in upgrade이지만 adaptive thinking이 기본 활성화됩니다. 직접 API를 연결할
+때 `thinking: {"type": "disabled"}`와 `xhigh` 또는 `max`를 함께 보내면 HTTP 400이므로,
+Autopus는 Claude Code argv에 thinking-disable flag를 추가하지
+않습니다. Opus 4.8은 명시적으로 계속 선택할 수 있고 Opus 5 사이버보안 거부의
+권장 fallback이므로 호환 모델에서 제거하지 않습니다.
+
+자세한 내용은 [Claude Code model 설정](https://code.claude.com/docs/en/model-config),
+[모델 개요](https://platform.claude.com/docs/en/about-claude/models/overview),
+[Opus 5 migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide)를
+확인하세요.
 
 ### Claude Fable 5 명시적 선택
 

@@ -68,6 +68,7 @@ func TestParseSchema_RejectsInjectionModel(t *testing.T) {
 	t.Parallel()
 
 	for _, model := range []string{
+		"claude-opus-5\");evil((",
 		"claude-opus-4-8\");evil((",
 		"claude-fable-5\");evil((",
 		"fable\nawait evil()",
@@ -115,6 +116,7 @@ func TestIsSafeAgentModel(t *testing.T) {
 	t.Parallel()
 	cases := map[string]bool{
 		"":                          true,
+		"claude-opus-5":             true,
 		"claude-opus-4-8":           true,
 		"claude-sonnet-5":           true,
 		"claude-sonnet-4-6":         true,
@@ -123,6 +125,7 @@ func TestIsSafeAgentModel(t *testing.T) {
 		"fable":                     true,
 		"best":                      true,
 		"gpt-4":                     false,
+		"claude-opus-5\");evil((":   false,
 		"claude-opus-4-8\");evil((": false,
 		"claude-fable-5\");evil((":  false,
 		"fable\nawait evil()":       false,

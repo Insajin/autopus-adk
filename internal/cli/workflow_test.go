@@ -58,7 +58,7 @@ func runWorkflow(prober workflow.Prober, runner workflow.CommandRunner, args ...
 // reports schema unavailable+gating, overall fail.
 func TestWorkflowDoctor_RequiredUnavailableExitsNonZero(t *testing.T) {
 	out, err := runWorkflow(
-		fakeProber{unavailable: map[string]bool{"schema": true}, version: "2.1.154"},
+		fakeProber{unavailable: map[string]bool{"schema": true}, version: "2.1.219"},
 		nil, "workflow", "doctor")
 	if err == nil {
 		t.Fatal("expected non-zero exit (Execute error) when required primitive unavailable")
@@ -74,18 +74,69 @@ func TestWorkflowDoctor_RequiredUnavailableExitsNonZero(t *testing.T) {
 	}
 }
 
-// S12: doctor with a version below the pin exits non-zero with overall fail.
-func TestWorkflowDoctor_BelowMinVersionExitsNonZero(t *testing.T) {
-	out, err := runWorkflow(fakeProber{version: "2.1.140"}, nil, "workflow", "doctor")
+// S12: the default Route A doctor preserves the original compatibility floor.
+func TestWorkflowDoctor_RouteADefaultAcceptsVersionBeforeOpus5(t *testing.T) {
+	out, err := runWorkflow(fakeProber{version: "2.1.218"}, nil, "workflow", "doctor")
+	if err != nil {
+		t.Fatalf("route_a doctor at 2.1.218: %v", err)
+	}
+	report := decodeReport(t, out)
+	if !report.VersionOK || report.Overall != "pass" {
+		t.Fatalf("route_a report = %+v, want version_ok=true overall=pass", report)
+	}
+	if report.Route != workflow.RouteA || report.MinimumVersion != workflow.RouteAMinVersion {
+		t.Fatalf("route_a identity = route %q min %q", report.Route, report.MinimumVersion)
+	}
+}
+
+// S12: Route Team pins Opus 5 and therefore rejects Claude Code 2.1.218.
+func TestWorkflowDoctor_RouteTeamBelowMinVersionExitsNonZero(t *testing.T) {
+	out, err := runWorkflow(
+		fakeProber{version: "2.1.218"},
+		nil,
+		"workflow", "doctor", "--route", "team",
+	)
 	if err == nil {
-		t.Fatal("expected non-zero exit when version below pin")
+		t.Fatal("expected non-zero exit when route_team version is below pin")
 	}
 	report := decodeReport(t, out)
 	if report.VersionOK {
-		t.Fatal("version_ok must be false for 2.1.140")
+		t.Fatal("route_team version_ok must be false for 2.1.218")
 	}
 	if report.Overall != "fail" {
 		t.Fatalf("overall = %q, want fail", report.Overall)
+	}
+	if report.Route != workflow.RouteTeam || report.MinimumVersion != workflow.RouteTeamMinVersion {
+		t.Fatalf("route_team identity = route %q min %q", report.Route, report.MinimumVersion)
+	}
+}
+
+func TestWorkflowDoctor_RouteTeamAtMinVersionPasses(t *testing.T) {
+	out, err := runWorkflow(
+		fakeProber{version: "2.1.219"},
+		nil,
+		"workflow", "doctor", "--route", "route_team",
+	)
+	if err != nil {
+		t.Fatalf("route_team doctor at 2.1.219: %v", err)
+	}
+	report := decodeReport(t, out)
+	if !report.VersionOK || report.Overall != "pass" {
+		t.Fatalf("route_team report = %+v, want version_ok=true overall=pass", report)
+	}
+}
+
+func TestWorkflowDoctor_UnknownRouteFailsClosed(t *testing.T) {
+	out, err := runWorkflow(
+		fakeProber{version: "9.9.9"},
+		nil,
+		"workflow", "doctor", "--route", "other",
+	)
+	if err == nil {
+		t.Fatal("unknown route must fail")
+	}
+	if out != "" {
+		t.Fatalf("unknown route must not emit a capability report, got %q", out)
 	}
 }
 
@@ -94,7 +145,7 @@ func TestWorkflowDoctor_BelowMinVersionExitsNonZero(t *testing.T) {
 // pass.
 func TestWorkflowDoctor_AdvisoryUnavailableExitsZero(t *testing.T) {
 	out, err := runWorkflow(
-		fakeProber{unavailable: map[string]bool{"budget": true}, version: "2.1.154"},
+		fakeProber{unavailable: map[string]bool{"budget": true}, version: "2.1.219"},
 		nil, "workflow", "doctor")
 	if err != nil {
 		t.Fatalf("expected zero exit, got error: %v", err)
@@ -114,7 +165,7 @@ func TestWorkflowDoctor_AdvisoryUnavailableExitsZero(t *testing.T) {
 // rather than crashing mid-launch at parallel(...).
 func TestWorkflowDoctor_ParallelUnavailableFailsGate(t *testing.T) {
 	out, err := runWorkflow(
-		fakeProber{unavailable: map[string]bool{"parallel": true}, version: "2.1.154"},
+		fakeProber{unavailable: map[string]bool{"parallel": true}, version: "2.1.219"},
 		nil, "workflow", "doctor")
 	if err == nil {
 		t.Fatal("expected non-zero exit when required primitive parallel is unavailable")

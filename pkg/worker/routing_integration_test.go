@@ -96,8 +96,8 @@ func TestRoutingIntegration_ComplexPrompt(t *testing.T) {
 	}
 
 	mock.BuildCommand(context.Background(), taskCfg)
-	assert.Equal(t, "claude-opus-4-8", mock.capturedModel,
-		"complex prompt should route to complex model (claude-opus-4-8)")
+	assert.Equal(t, "claude-opus-5", mock.capturedModel,
+		"complex prompt should route to complex model (claude-opus-5)")
 }
 
 // TestRoutingIntegration_Disabled verifies S7 passthrough:

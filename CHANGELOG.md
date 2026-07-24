@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Claude Opus 5 기본 모델 경로 및 Claude Code 2.1.219 경계** (2026-07-25): Anthropic의 고정 모델 ID `claude-opus-5`를 workflow fail-closed whitelist와 $5/$25 per MTok 가격표, Ultra `max` effort에 추가하고 Claude Ultra·Balanced 전략 역할·high-complexity 라우팅·기본 premium 설정을 Opus 5로 승격했다. Claude Code의 `opus` alias는 지원 provider에서 `2.1.219` 이상부터 Opus 5를 선택하므로 `route_team` doctor는 `2.1.219`로 fail-closed하되 model-free `route_a`는 기존 `2.1.154` 호환성을 유지하고, provider별 alias 차이를 source/generated 가이드에 명시했다. `claude-opus-4-8`은 계속 선택 가능한 모델이자 Opus 5 사이버보안 거부의 권장 fallback이므로 whitelist·가격·effort 호환 경로에 보존하고, Fable 5는 기존처럼 명시적 opt-in으로 유지한다.
+
 - **Claude Fable 5 opt-in 및 최신 effort 전달** (2026-07-23): 기본 Opus/Sonnet 매핑은 유지하면서 `claude-fable-5`와 `fable`/`best`를 명시적 선택으로 지원하고, resolved full ID 가격($10/$50 per MTok), worker·orchestra·route-team `--effort` 전달을 연결했다. model/API effort는 `low`~`max` 다섯 값으로 유지하며 Claude Code session-only `ultracode`는 binding에서 실제 `xhigh`로 정규화한다. Fable 권한·ZDR와 Claude Code `2.1.170`/`2.1.203`/`2.1.210` 버전 경계도 source/generated 가이드에 동기화했다.
 
 ### Fixed

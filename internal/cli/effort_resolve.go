@@ -24,7 +24,7 @@ type EffortResolveInput struct {
 }
 
 // defaultModel is the fallback model when no model can be detected.
-const defaultModel = "opus-4.6"
+const defaultModel = "claude-opus-5"
 
 // envEffortKey is the environment variable name for effort override.
 const envEffortKey = "CLAUDE_CODE_EFFORT_LEVEL"
@@ -149,7 +149,7 @@ func resolveUltraMode(model string) (EffortResult, error) {
 			Model:  model,
 			Reason: "effort_stripped_model=haiku-4-5",
 		}, nil
-	case "opus-4-8", "opus-4-7", "fable-5", "fable", "best":
+	case "opus-5", "opus", "opus-4-8", "opus-4-7", "fable-5", "fable", "best":
 		// Top-tier Opus and Fable models support the strongest effort tier.
 		return EffortResult{
 			Effort: EffortMax,
@@ -163,7 +163,7 @@ func resolveUltraMode(model string) (EffortResult, error) {
 			Effort: EffortHigh,
 			Source: EffortSourceQualityMode,
 			Model:  model,
-			Reason: "fallback=max→high, reason=model_tier_not_opus47",
+			Reason: "fallback=max→high, reason=model_tier_not_max_capable",
 		}, nil
 	}
 }

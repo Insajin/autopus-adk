@@ -32,7 +32,7 @@ func findPrimitive(t *testing.T, r CapabilityReport, name string) PrimitiveStatu
 func TestEvaluate_RequiredUnavailableFailsGate(t *testing.T) {
 	r := EvaluateCapabilities(fakeProber{
 		unavailable: map[string]bool{"schema": true},
-		version:     "2.1.154",
+		version:     "2.1.219",
 	})
 
 	schema := findPrimitive(t, r, "schema")
@@ -47,15 +47,47 @@ func TestEvaluate_RequiredUnavailableFailsGate(t *testing.T) {
 	}
 }
 
-// S12: a version below the pin fails the gate.
-func TestEvaluate_BelowMinVersionFailsGate(t *testing.T) {
-	r := EvaluateCapabilities(fakeProber{version: "2.1.140"})
+// S12: the version pin is route-aware. Route A retains its original 2.1.154
+// floor, while Route Team requires the first release that recognizes Opus 5.
+func TestEvaluate_RouteAwareVersionGate(t *testing.T) {
+	t.Parallel()
 
-	if r.VersionOK {
-		t.Fatal("VersionOK must be false for 2.1.140 < 2.1.154")
+	routeA, err := EvaluateCapabilitiesForRoute(fakeProber{version: "2.1.218"}, RouteA)
+	if err != nil {
+		t.Fatalf("EvaluateCapabilitiesForRoute(route_a): %v", err)
 	}
-	if r.Overall != OverallFail {
-		t.Fatalf("overall = %q, want fail", r.Overall)
+	if !routeA.VersionOK || routeA.Overall != OverallPass {
+		t.Fatalf("route_a at 2.1.218 = %+v, want version_ok=true overall=pass", routeA)
+	}
+	if routeA.MinimumVersion != RouteAMinVersion {
+		t.Fatalf("route_a minimum_version = %q, want %q", routeA.MinimumVersion, RouteAMinVersion)
+	}
+
+	routeTeam, err := EvaluateCapabilitiesForRoute(fakeProber{version: "2.1.218"}, RouteTeam)
+	if err != nil {
+		t.Fatalf("EvaluateCapabilitiesForRoute(route_team): %v", err)
+	}
+	if routeTeam.VersionOK || routeTeam.Overall != OverallFail {
+		t.Fatalf("route_team at 2.1.218 = %+v, want version_ok=false overall=fail", routeTeam)
+	}
+	if routeTeam.MinimumVersion != RouteTeamMinVersion {
+		t.Fatalf("route_team minimum_version = %q, want %q", routeTeam.MinimumVersion, RouteTeamMinVersion)
+	}
+
+	routeTeamCurrent, err := EvaluateCapabilitiesForRoute(fakeProber{version: "2.1.219"}, RouteTeam)
+	if err != nil {
+		t.Fatalf("EvaluateCapabilitiesForRoute(route_team current): %v", err)
+	}
+	if !routeTeamCurrent.VersionOK || routeTeamCurrent.Overall != OverallPass {
+		t.Fatalf("route_team at 2.1.219 = %+v, want version_ok=true overall=pass", routeTeamCurrent)
+	}
+}
+
+func TestEvaluate_UnknownRouteFailsClosed(t *testing.T) {
+	t.Parallel()
+
+	if _, err := EvaluateCapabilitiesForRoute(fakeProber{version: "9.9.9"}, "other"); err == nil {
+		t.Fatal("unknown route must return an error")
 	}
 }
 
@@ -64,7 +96,7 @@ func TestEvaluate_BelowMinVersionFailsGate(t *testing.T) {
 func TestEvaluate_AdvisoryUnavailableDoesNotFailGate(t *testing.T) {
 	r := EvaluateCapabilities(fakeProber{
 		unavailable: map[string]bool{"budget": true},
-		version:     "2.1.154",
+		version:     "2.1.219",
 	})
 
 	b := findPrimitive(t, r, "budget")
@@ -87,7 +119,7 @@ func TestEvaluate_ParallelIsolationAreRequiredGating(t *testing.T) {
 	for _, name := range []string{"parallel", "isolation"} {
 		r := EvaluateCapabilities(fakeProber{
 			unavailable: map[string]bool{name: true},
-			version:     "2.1.154",
+			version:     "2.1.219",
 		})
 		p := findPrimitive(t, r, name)
 		if p.Status != StatusUnavailable {
@@ -109,11 +141,14 @@ func TestVersionAtLeast(t *testing.T) {
 		want     bool
 	}{
 		{"2.1.154", "2.1.154", true},
-		{"2.1.155", "2.1.154", true},
-		{"2.2.0", "2.1.154", true},
-		{"2.1.140", "2.1.154", false},
-		{"", "2.1.154", false},
-		{"2.1", "2.1.154", false},
+		{"2.1.218", "2.1.154", true},
+		{"2.1.153", "2.1.154", false},
+		{"2.1.219", "2.1.219", true},
+		{"2.1.220", "2.1.219", true},
+		{"2.2.0", "2.1.219", true},
+		{"2.1.218", "2.1.219", false},
+		{"", "2.1.219", false},
+		{"2.1", "2.1.219", false},
 	}
 	for _, c := range cases {
 		if got := versionAtLeast(c.got, c.min); got != c.want {

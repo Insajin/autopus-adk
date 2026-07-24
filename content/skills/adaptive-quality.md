@@ -60,6 +60,42 @@ Platform note:
 - Codex: Balanced uses Sol/`xhigh` for quality-managed strategic and Opus-tier work, Terra with role effort for Sonnet-tier work, and Luna with role effort for Haiku-tier work. Ultra uses Sol/`ultra` for a quality-managed supervisor and orchestra, Sol/`max` for `planner`, `architect`, and `security-auditor`, and Sol/`xhigh` for every other managed agent. An `inherit` supervisor keeps the user's Codex runtime default in either mode.
 - OpenCode: keep the configured default runtime model; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
 
+## Claude Opus 5 (Default Opus Path)
+
+Autopus uses the fixed `claude-opus-5` model ID for Claude Ultra agents,
+Balanced strategic agents, and high-complexity Claude routing. Claude Code's
+`opus` alias is provider- and version-dependent:
+
+| Claude Code provider | `opus` on v2.1.219+ | Before v2.1.219 |
+|----------------------|---------------------|-----------------|
+| Anthropic API | Opus 5 | Opus 4.8 on v2.1.154–v2.1.218 |
+| Claude Platform on AWS | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.7 before v2.1.207 |
+| Amazon Bedrock | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.6 before v2.1.207 |
+| Google Cloud Agent Platform | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.6 before v2.1.207 |
+| Microsoft Foundry | Opus 4.6 | Opus 4.6 |
+
+| Surface | Value |
+|---------|-------|
+| Full model ID | `claude-opus-5` |
+| Claude Code alias | `opus` |
+| Minimum Claude Code version | `2.1.219` |
+| Price per million tokens | $5 input / $25 output |
+| Native limits | 1M-token context / 128k-token output |
+| Effort levels | `low`, `medium`, `high`, `xhigh`, `max` |
+
+Opus 5 is a drop-in upgrade from Opus 4.8 at the same standard price.
+Adaptive thinking is enabled by default and the default effort is `high`. If a direct API
+integration explicitly sends `thinking: {"type": "disabled"}`, effort must be
+`high` or lower: disabled thinking with `xhigh` or `max` returns HTTP 400.
+Autopus does not add a thinking-disable flag to Claude Code argv.
+
+Opus 4.8 remains a valid explicit model and the recommended cybersecurity
+fallback for Opus 5 refusals, so compatibility entries for
+`claude-opus-4-8` must not be removed. See the official
+[Claude Code model configuration](https://code.claude.com/docs/en/model-config),
+[models overview](https://platform.claude.com/docs/en/about-claude/models/overview),
+and [Opus 5 migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide).
+
 ## Claude Fable 5 (Explicit Opt-In)
 
 Fable 5 is an explicit Claude Code choice, not an Autopus quality default. Keep the
@@ -94,22 +130,23 @@ Quality Mode defaults:
 
 | Mode | Model / Tier | Effort |
 |------|--------------|--------|
-| Ultra | Opus 4.8 / Opus 4.7 | `max` |
+| Ultra | Opus 5 / Opus 4.8 / Opus 4.7 | `max` |
 | Ultra | Opus 4.6 / Sonnet 5 | `high` |
 | Ultra | Haiku 4.5 | strip effort |
 | Balanced | HIGH complexity | `high` |
 | Balanced | MEDIUM / LOW complexity | `medium` |
 
 Claude model/API effort is the closed set `low`, `medium`, `high`, `xhigh`, and
-`max`. Fable supports all five and defaults to `high`. Claude Code also exposes
-`ultracode` as a session-only CLI value: it sends actual model effort `xhigh` and
-adds dynamic workflow behavior. It is not a sixth model/API or persisted workflow
-effort. Main-session `ultracode` requires Claude Code `2.1.203` or later; reliable
-propagation to spawned agents and teams requires `2.1.210` or later. Route-team
-binding therefore normalizes explicit `ultracode` to `xhigh`.
+`max`. Opus 5 and Fable support all five and default to `high`. Claude Code also
+exposes `ultracode` as a session-only CLI value: it sends actual model effort
+`xhigh` and adds dynamic workflow behavior. It is not a sixth model/API or
+persisted workflow effort. Main-session `ultracode` requires Claude Code
+`2.1.203` or later; reliable propagation to spawned agents and teams requires
+`2.1.210` or later. Route-team binding therefore normalizes explicit
+`ultracode` to `xhigh`.
 See the official [effort reference](https://platform.claude.com/docs/en/build-with-claude/effort),
 [Claude Code CLI reference](https://code.claude.com/docs/en/cli-reference), and
-[Claude Code v2.1.218 release](https://github.com/anthropics/claude-code/releases/tag/v2.1.218).
+[Claude Code model configuration](https://code.claude.com/docs/en/model-config).
 
 Codex-specific rendering:
 

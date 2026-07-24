@@ -9,7 +9,7 @@ import (
 func TestDefaultPricingTable_ContainsAllModels(t *testing.T) {
 	table := cost.DefaultPricingTable()
 
-	required := []string{"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-fable-5"}
+	required := []string{"claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-fable-5"}
 	for _, model := range required {
 		if _, ok := table[model]; !ok {
 			t.Errorf("pricing table missing model: %s", model)
@@ -25,6 +25,7 @@ func TestDefaultPricingTable_Prices(t *testing.T) {
 		input  float64
 		output float64
 	}{
+		{"claude-opus-5", 5.0, 25.0},
 		{"claude-opus-4-8", 5.0, 25.0},
 		{"claude-opus-4-7", 5.0, 25.0},
 		{"claude-sonnet-5", 3.0, 15.0},
@@ -78,8 +79,8 @@ func TestQualityModeToModels_Ultra(t *testing.T) {
 
 	expected := []string{"planner", "architect", "executor", "tester", "reviewer", "validator"}
 	for _, agent := range expected {
-		if model, ok := agents[agent]; !ok || model != "claude-opus-4-8" {
-			t.Errorf("ultra/%s: want claude-opus-4-8, got %q", agent, model)
+		if model, ok := agents[agent]; !ok || model != "claude-opus-5" {
+			t.Errorf("ultra/%s: want claude-opus-5, got %q", agent, model)
 		}
 	}
 }
@@ -94,8 +95,8 @@ func TestQualityModeToModels_Balanced(t *testing.T) {
 		agent string
 		model string
 	}{
-		{"planner", "claude-opus-4-8"},
-		{"architect", "claude-opus-4-8"},
+		{"planner", "claude-opus-5"},
+		{"architect", "claude-opus-5"},
 		{"executor", "claude-sonnet-5"},
 		{"tester", "claude-sonnet-5"},
 		{"reviewer", "claude-sonnet-5"},
@@ -121,10 +122,10 @@ func TestModelForAgent_Known(t *testing.T) {
 		agent string
 		want  string
 	}{
-		{"ultra", "executor", "claude-opus-4-8"},
+		{"ultra", "executor", "claude-opus-5"},
 		{"balanced", "executor", "claude-sonnet-5"},
 		{"balanced", "validator", "claude-sonnet-5"},
-		{"balanced", "planner", "claude-opus-4-8"},
+		{"balanced", "planner", "claude-opus-5"},
 	}
 
 	for _, tc := range cases {
@@ -146,13 +147,13 @@ func TestModelForAgent_TeamPhaseRoles(t *testing.T) {
 		want  string
 	}{
 		// Existing roles — regression guard (S3 anchor values).
-		{"ultra", "executor", "claude-opus-4-8"},
+		{"ultra", "executor", "claude-opus-5"},
 		{"balanced", "executor", "claude-sonnet-5"},
-		{"balanced", "planner", "claude-opus-4-8"},
+		{"balanced", "planner", "claude-opus-5"},
 		// New team-phase roles — ultra mode.
-		{"ultra", "annotator", "claude-opus-4-8"},
-		{"ultra", "security_auditor", "claude-opus-4-8"},
-		{"ultra", "test_scaffold", "claude-opus-4-8"},
+		{"ultra", "annotator", "claude-opus-5"},
+		{"ultra", "security_auditor", "claude-opus-5"},
+		{"ultra", "test_scaffold", "claude-opus-5"},
 		// New team-phase roles — balanced mode.
 		{"balanced", "annotator", "claude-sonnet-5"},
 		{"balanced", "security_auditor", "claude-sonnet-5"},

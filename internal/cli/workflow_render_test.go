@@ -76,8 +76,8 @@ func TestWorkflowRender_TeamBaselinePhases(t *testing.T) {
 	lines := renderLines(t, "--route", "team", "--dry-run")
 
 	planning := findLine(lines, "phase planning:")
-	if !strings.Contains(planning, "model=claude-opus-4-8") || !strings.Contains(planning, "effort=medium") {
-		t.Fatalf("planning baseline = %q, want opus-4-8 + medium", planning)
+	if !strings.Contains(planning, "model=claude-opus-5") || !strings.Contains(planning, "effort=medium") {
+		t.Fatalf("planning baseline = %q, want opus-5 + medium", planning)
 	}
 
 	impl := findLine(lines, "phase implementation:")
@@ -97,8 +97,8 @@ func TestWorkflowRender_TeamQualityOverlay(t *testing.T) {
 
 	ultra := renderLines(t, "--route", "team", "--quality", "ultra")
 	implU := findLine(ultra, "phase implementation:")
-	if !strings.Contains(implU, "model=claude-opus-4-8") || !strings.Contains(implU, "effort=max") {
-		t.Fatalf("ultra implementation = %q, want opus-4-8 + max", implU)
+	if !strings.Contains(implU, "model=claude-opus-5") || !strings.Contains(implU, "effort=max") {
+		t.Fatalf("ultra implementation = %q, want opus-5 + max", implU)
 	}
 	reviewU := findLine(ultra, "phase review:")
 	if !strings.Contains(reviewU, "verify_votes=3") || !strings.Contains(reviewU, "synthesis=true") {

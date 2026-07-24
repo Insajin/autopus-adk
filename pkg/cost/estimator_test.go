@@ -31,7 +31,7 @@ func TestNewEstimatorWithPricing_CustomTable(t *testing.T) {
 }
 
 func TestEstimateCost_UltraExecutor(t *testing.T) {
-	// ultra/executor → claude-opus-4-8: input=$5/M, output=$25/M
+	// ultra/executor → claude-opus-5: input=$5/M, output=$25/M
 	// total=4000 → input=3000, output=1000
 	// cost = (3000/1_000_000 * 5) + (1000/1_000_000 * 25) = 0.015 + 0.025 = 0.04
 	e := cost.NewEstimator("ultra")
@@ -113,7 +113,7 @@ func TestEstimatePipelineCost_MultiplePhases(t *testing.T) {
 	// phase2: planner(2000 tokens)
 	// balanced/executor (sonnet-4-6): (3000/1M*3)+(1000/1M*15) = 0.000009+0.000015 = 0.000024
 	// balanced/validator (sonnet-4-6): (750/1M*3)+(250/1M*15) = 0.00000225+0.00000375 = 0.000006
-	// balanced/planner (opus-4-8):    (1500/1M*5)+(500/1M*25) = 0.0000075+0.0000125 = 0.00002
+	// balanced/planner (opus-5):      (1500/1M*5)+(500/1M*25) = 0.0000075+0.0000125 = 0.00002
 	e := cost.NewEstimator("ultra") // estimator mode doesn't matter; pipeline overrides it
 
 	pipeline := telemetry.PipelineRun{

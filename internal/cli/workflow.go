@@ -43,28 +43,38 @@ func newWorkflowCmd() *cobra.Command {
 // newWorkflowDoctorCmd runs the capability gate and exits non-zero when the
 // overall verdict is fail (S4/S12), zero when it passes (S14).
 func newWorkflowDoctorCmd(prober workflow.Prober) *cobra.Command {
-	return &cobra.Command{
+	var route string
+	cmd := &cobra.Command{
 		Use:           "doctor",
-		Short:         "Probe workflow capabilities and version pin (hard-gates required primitives)",
+		Short:         "Probe workflow capabilities and the selected route's version pin",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, routeKey, err := selectRouteEmbed(route)
+			if err != nil {
+				return err
+			}
 			p := prober
 			if p == nil {
 				p = newLiveProber()
 			}
-			report := workflow.EvaluateCapabilities(p)
+			report, err := workflow.EvaluateCapabilitiesForRoute(p, routeKey)
+			if err != nil {
+				return fmt.Errorf("evaluate workflow capabilities: %w", err)
+			}
 			data, err := report.EncodeJSON()
 			if err != nil {
 				return fmt.Errorf("encode capability report: %w", err)
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), string(data))
 			if report.Overall == workflow.OverallFail {
-				return fmt.Errorf("workflow doctor: capability gate failed (overall=fail)")
+				return fmt.Errorf("workflow doctor: capability gate failed (route=%s, overall=fail)", routeKey)
 			}
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&route, "route", workflow.RouteA, "Workflow route to probe (route_a|route_team; shorthands: a|team)")
+	return cmd
 }
 
 // liveProber is the production capability prober. Without access to the closed

@@ -39,23 +39,24 @@ executes. The non-claude adapters produce **zero** `workflow*.js` files, **zero*
 behavior is unchanged (regression-0 guarantee). Adding `--workflow` to the claude
 router template therefore cannot leak to other platforms.
 
-## Capability Gate — `auto workflow doctor`
+## Capability Gate — `auto workflow doctor --route route_a`
 
-Before dispatching, the route runs `auto workflow doctor` to confirm the runtime
-can execute the workflow. The gate distinguishes **required** primitives (a
-missing one fails the gate) from **advisory** primitives (reported, non-fatal).
+Before dispatching, Route A runs `auto workflow doctor --route route_a` to
+confirm the runtime can execute the workflow. The gate distinguishes
+**required** primitives (a missing one fails the gate) from **advisory**
+primitives (reported, non-fatal).
 
 | Requirement | Value | Class |
 |-------------|-------|-------|
-| Claude Code version | **2.1.154** or later (`MinVersion`) | required |
+| Claude Code version | **2.1.154** or later (`RouteAMinVersion`) | required |
 | Platform | `claude` only | required |
 | Workflow JS present | `.claude/workflows/route_a.workflow.js` | required |
 | `auto workflow gate` bridge | resolvable on PATH | required |
 | Resumable checkpoint store | available | advisory |
 
-If `auto workflow doctor` reports `overall: fail` OR the platform is not claude,
-the route emits a `fail-fast` fallback log line and enters Route A **without
-executing any workflow**.
+If `auto workflow doctor --route route_a` reports `overall: fail` OR the
+platform is not claude, the route emits a `fail-fast` fallback log line and
+enters Route A **without executing any workflow**.
 
 Inspect the planned run without executing it:
 
@@ -134,11 +135,15 @@ diverging element.
 
 ### Overview
 
-When `/auto go SPEC-ID --team` is invoked on claude-code and `auto workflow doctor` passes (and no disable flag is active), the pipeline is served by the **deterministic team Workflow substrate** instead of ad-hoc Agent Teams. The substrate is implemented as `.claude/workflows/route_team.workflow.js` — a **generated, edit-forbidden surface** derived from the manifest by `auto generate-templates`. Do not edit the JS by hand.
+When `/auto go SPEC-ID --team` is invoked on claude-code and `auto workflow doctor --route route_team` passes (and no disable flag is active), the pipeline is served by the **deterministic team Workflow substrate** instead of ad-hoc Agent Teams. The substrate is implemented as `.claude/workflows/route_team.workflow.js` — a **generated, edit-forbidden surface** derived from the manifest by `auto generate-templates`. Do not edit the JS by hand.
 
 ### Capability Gate
 
-The team workflow substrate uses the **same `auto workflow doctor` gate** as `route_a`, including the same minimum version (`2.1.154`) and the same required vs advisory primitive classification. Disable paths (pre-route opt-out, not a taxonomy failure):
+The team workflow substrate runs `auto workflow doctor --route route_team`.
+It shares the required vs advisory primitive classification with `route_a`, but
+uses `RouteTeamMinVersion=2.1.219` because its planning model is pinned to Opus
+5. Route A remains compatible with `RouteAMinVersion=2.1.154`. Disable paths
+(pre-route opt-out, not a taxonomy failure):
 - `--no-workflow` flag
 - `autopus.yaml` → `workflow.team_default=false` (maps to the real `WorkflowConf.TeamDefault` config field)
 

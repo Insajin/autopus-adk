@@ -1155,9 +1155,9 @@ Before creating the team, resolve which substrate serves `--team` on this platfo
 
 | Condition | Behavior |
 |-----------|----------|
-| platform=claude-code AND `auto workflow doctor` overall=pass AND `--no-workflow` NOT set AND `workflow.team_default` NOT `false` | Serve via the **deterministic team Workflow substrate** (`route_team`). The installed `.claude/workflows/route_team.workflow.js` runs 8 ordered phases: planning → test_scaffold → implementation → gate_build_test → annotation → testing → review → release_hygiene. See `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`) for the full contract. (Note: `workflow.team_default` maps to the real `WorkflowConf.TeamDefault` config field.) |
+| platform=claude-code AND `auto workflow doctor --route route_team` overall=pass AND `--no-workflow` NOT set AND `workflow.team_default` NOT `false` | Serve via the **deterministic team Workflow substrate** (`route_team`). The installed `.claude/workflows/route_team.workflow.js` runs 8 ordered phases: planning → test_scaffold → implementation → gate_build_test → annotation → testing → review → release_hygiene. See `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`) for the full contract. (Note: `workflow.team_default` maps to the real `WorkflowConf.TeamDefault` config field.) |
 | `--no-workflow` set OR `autopus.yaml` → `workflow.team_default=false` | Skip the workflow substrate and run the existing Claude Code Agent Teams behavior below unchanged. This is a **pre-route opt-out** (distinct from `--no-workflow`) that maps to the real `WorkflowConf.TeamDefault` field. |
-| `auto workflow doctor` overall=fail | Emit `[workflow] fallback-class=fail-fast reason=doctor_fail` and fall back to Route A (subagent pipeline). Do NOT enter the Agent Teams flow or any team workflow. |
+| `auto workflow doctor --route route_team` overall=fail | Emit `[workflow] fallback-class=fail-fast reason=doctor_fail` and fall back to Route A (subagent pipeline). Do NOT enter the Agent Teams flow or any team workflow. |
 | Non-claude platform | The `--team` flag keeps its existing platform-native semantics. This substrate-selection logic is claude-code only and does not affect codex, antigravity-cli, or opencode. |
 
 Team composition stays within the official 3–5 member guidance (see agent-teams.md "Team Constraints"). Default 4-member core fits; phase-dependent members (below) should replace core members, not stack on top, to respect the size limit.
@@ -1333,10 +1333,10 @@ IMPORTANT: This route runs Route A as a deterministic Claude Code Workflow. It i
 Reference: `.claude/skills/autopus/harness-workflow.md`
 
 Preflight check (run before dispatching the workflow):
-1. `auto workflow doctor` — capability gate (required vs advisory primitives; min version 2.1.154)
+1. `auto workflow doctor --route route_a` — capability gate (required vs advisory primitives; min version 2.1.154)
 2. Platform must be `claude`
 
-If `auto workflow doctor` reports `overall: fail` OR the platform is not claude, emit a `fail-fast` fallback log line and enter Route A **without executing any workflow**:
+If `auto workflow doctor --route route_a` reports `overall: fail` OR the platform is not claude, emit a `fail-fast` fallback log line and enter Route A **without executing any workflow**:
 ```
 [workflow] fallback-class=fail-fast reason={doctor_fail|non_claude_platform}: deterministic workflow unavailable, running Route A subagent pipeline.
 ```
@@ -1898,7 +1898,7 @@ Omit `--providers` only when absent. Require
 `schema=orchestration_cli_result.v1` and an embedded
 `receipt.schema=orchestration_run_receipt.v1` before accepting discovery.
 
-`--team --multi` is orthogonal: `--multi` activates risk-tiered provider review only in the review phase at high/critical risk tier and does NOT change substrate selection (the team Workflow substrate is still used when `auto workflow doctor` passes and no disable flag is set).
+`--team --multi` is orthogonal: `--multi` activates risk-tiered provider review only in the review phase at high/critical risk tier and does NOT change substrate selection (the team Workflow substrate is still used when `auto workflow doctor --route route_team` passes and no disable flag is set).
 
 Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent Teams), `/auto go SPEC-ID --solo` (single session), `/auto go SPEC-ID --quality ultra`, `/auto go SPEC-ID --auto --loop`
 
@@ -1910,7 +1910,7 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--loop` | RALF loop mode: auto-retry failed gates with extended iteration limits until PASS or circuit break |
 | `--continue` | Resume an interrupted implementation from a previous session |
 | `--team` | Agent Teams mode: use Claude Code Agent Teams (experimental) for multi-agent collaboration |
-| `--workflow` | Deterministic Route A workflow (claude-code only): run via the generated workflow JS with an exit-code build/test gate; auto fail-fast to Route A if `auto workflow doctor` fails or platform is non-claude |
+| `--workflow` | Deterministic Route A workflow (claude-code only): run via the generated workflow JS with an exit-code build/test gate; auto fail-fast to Route A if `auto workflow doctor --route route_a` fails or platform is non-claude |
 | `--no-workflow` | Disable the team Workflow substrate for `--team`; run Agent Teams directly without the `route_team` workflow JS (pre-route opt-out) |
 | `--solo` | Single session mode: no subagents, main session implements directly |
 | `--multi` | Risk-tiered provider review: high/critical fan out when available, otherwise single-provider fallback |

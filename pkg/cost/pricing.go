@@ -11,13 +11,17 @@ type ModelPricing struct {
 }
 
 // DefaultPricingTable returns the canonical pricing table for supported models.
-// Prices are in USD per 1M tokens. Opus 4.8 is the current default model;
-// Opus 4.7 pricing is retained because it remains a valid selectable model.
-// Opus 4.8 pricing verified against official docs (checked 2026-05-29):
-// $5 input / $25 output per MTok, identical to Opus 4.7.
+// Prices are in USD per 1M tokens. Opus 5 is the current default model;
+// Opus 4.8 and 4.7 pricing is retained because both remain selectable.
+// Opus 5 pricing verified against official docs (checked 2026-07-25):
+// $5 input / $25 output per MTok, identical to Opus 4.8 and 4.7.
 // Source: https://platform.claude.com/docs/en/about-claude/models/overview
 func DefaultPricingTable() map[string]ModelPricing {
 	return map[string]ModelPricing{
+		"claude-opus-5": {
+			InputPricePerMillion:  5.0,
+			OutputPricePerMillion: 25.0,
+		},
 		"claude-opus-4-8": {
 			InputPricePerMillion:  5.0,
 			OutputPricePerMillion: 25.0,
@@ -56,23 +60,23 @@ func QualityModeToModels(qualityMode string) map[string]string {
 	case "ultra":
 		// All agents use the highest-capability model.
 		return map[string]string{
-			"planner":          "claude-opus-4-8",
-			"architect":        "claude-opus-4-8",
-			"executor":         "claude-opus-4-8",
-			"tester":           "claude-opus-4-8",
-			"reviewer":         "claude-opus-4-8",
-			"validator":        "claude-opus-4-8",
-			"test_scaffold":    "claude-opus-4-8",
-			"annotator":        "claude-opus-4-8",
-			"security_auditor": "claude-opus-4-8",
+			"planner":          "claude-opus-5",
+			"architect":        "claude-opus-5",
+			"executor":         "claude-opus-5",
+			"tester":           "claude-opus-5",
+			"reviewer":         "claude-opus-5",
+			"validator":        "claude-opus-5",
+			"test_scaffold":    "claude-opus-5",
+			"annotator":        "claude-opus-5",
+			"security_auditor": "claude-opus-5",
 		}
 	case "balanced":
 		// Strategic agents use opus; execution and validation agents use sonnet-5.
 		// Team-phase roles (test_scaffold, annotator, security_auditor) are
 		// execution/validation-class and therefore mapped to sonnet-5 in balanced mode.
 		return map[string]string{
-			"planner":          "claude-opus-4-8",
-			"architect":        "claude-opus-4-8",
+			"planner":          "claude-opus-5",
+			"architect":        "claude-opus-5",
 			"executor":         "claude-sonnet-5",
 			"tester":           "claude-sonnet-5",
 			"reviewer":         "claude-sonnet-5",

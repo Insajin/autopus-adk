@@ -1,10 +1,27 @@
 package workflow
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
-// MinVersion is the minimum claude-code version this Primary workflow route
-// requires (REQ-006).
-const MinVersion = "2.1.154"
+const (
+	// RouteA is the model-agnostic deterministic workflow route.
+	RouteA = "route_a"
+	// RouteTeam is the deterministic team route whose planning phase pins Opus 5.
+	RouteTeam = "route_team"
+
+	// RouteAMinVersion preserves the original Dynamic Workflows compatibility
+	// floor for the model-agnostic Route A.
+	RouteAMinVersion = "2.1.154"
+	// RouteTeamMinVersion is the first Claude Code release that recognizes the
+	// fixed claude-opus-5 model used by Route Team.
+	RouteTeamMinVersion = "2.1.219"
+
+	// MinVersion is kept as the Route A compatibility floor for callers that use
+	// the original route-agnostic EvaluateCapabilities API.
+	MinVersion = RouteAMinVersion
+)
 
 const (
 	// StatusAvailable / StatusUnavailable are the per-primitive probe states.
@@ -49,22 +66,41 @@ type PrimitiveStatus struct {
 
 // CapabilityReport is the structured `auto workflow doctor` output.
 type CapabilityReport struct {
-	Primitives []PrimitiveStatus `json:"primitives"`
-	Version    string            `json:"version"`
-	VersionOK  bool              `json:"version_ok"`
-	Overall    string            `json:"overall"`
+	Route          string            `json:"route"`
+	MinimumVersion string            `json:"minimum_version"`
+	Primitives     []PrimitiveStatus `json:"primitives"`
+	Version        string            `json:"version"`
+	VersionOK      bool              `json:"version_ok"`
+	Overall        string            `json:"overall"`
 }
 
 // EvaluateCapabilities probes required and advisory primitives plus the version
-// pin and produces the capability report. Overall is "fail" iff any required
-// primitive is unavailable OR the version is below MinVersion. Advisory
-// primitives are reported with Gating=false and never change Overall.
+// pin for the original Route A contract. Call EvaluateCapabilitiesForRoute when
+// the selected route is known.
 //
 // Named EvaluateCapabilities (not Evaluate) because the gate evaluator
 // EvaluateGate shares this package; Go forbids two same-named funcs.
 func EvaluateCapabilities(p Prober) CapabilityReport {
-	report := CapabilityReport{Version: p.Version()}
-	report.VersionOK = versionAtLeast(report.Version, MinVersion)
+	report, _ := EvaluateCapabilitiesForRoute(p, RouteA)
+	return report
+}
+
+// EvaluateCapabilitiesForRoute probes required and advisory primitives plus the
+// selected route's version pin. Overall is "fail" iff any required primitive is
+// unavailable OR the version is below that route's minimum. Advisory primitives
+// are reported with Gating=false and never change Overall.
+func EvaluateCapabilitiesForRoute(p Prober, route string) (CapabilityReport, error) {
+	minimumVersion, err := MinimumVersionForRoute(route)
+	if err != nil {
+		return CapabilityReport{}, err
+	}
+
+	report := CapabilityReport{
+		Route:          route,
+		MinimumVersion: minimumVersion,
+		Version:        p.Version(),
+	}
+	report.VersionOK = versionAtLeast(report.Version, minimumVersion)
 
 	failed := !report.VersionOK
 
@@ -97,7 +133,20 @@ func EvaluateCapabilities(p Prober) CapabilityReport {
 	if failed {
 		report.Overall = OverallFail
 	}
-	return report
+	return report, nil
+}
+
+// MinimumVersionForRoute returns the Claude Code compatibility floor for a
+// canonical workflow route and fails closed for unknown routes.
+func MinimumVersionForRoute(route string) (string, error) {
+	switch route {
+	case RouteA:
+		return RouteAMinVersion, nil
+	case RouteTeam:
+		return RouteTeamMinVersion, nil
+	default:
+		return "", fmt.Errorf("unknown workflow route %q", route)
+	}
 }
 
 // EncodeJSON serializes the capability report for CLI stdout consumption.

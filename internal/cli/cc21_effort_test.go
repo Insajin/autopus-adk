@@ -169,8 +169,8 @@ func TestCC21_TC3b_ResolveEffort_Ultra_Opus48(t *testing.T) {
 
 // --- TC4: ResolveEffort ultra + Opus 4.6 → high downgrade (S2-2) -------------------
 
-// TestCC21_TC4_ResolveEffort_Ultra_Opus46 verifies that ultra quality with non-Opus-4.7
-// downgrades to effort=high.
+// TestCC21_TC4_ResolveEffort_Ultra_Opus46 verifies that ultra quality with a
+// model that does not support max effort downgrades to effort=high.
 // Violation → S2-2.
 func TestCC21_TC4_ResolveEffort_Ultra_Opus46(t *testing.T) {
 	result, err := cli.ResolveEffort(cli.EffortResolveInput{
@@ -180,8 +180,8 @@ func TestCC21_TC4_ResolveEffort_Ultra_Opus46(t *testing.T) {
 	require.NoError(t, err, "S2-2: ResolveEffort returned unexpected error")
 	assert.Equal(t, cli.EffortHigh, result.Effort,
 		"S2-2 violation: ultra+opus-4.6 should downgrade to high, got %q", result.Effort)
-	assert.Contains(t, result.Reason, "model_tier_not_opus47",
-		"S2-2 violation: reason should contain model_tier_not_opus47, got %q", result.Reason)
+	assert.Contains(t, result.Reason, "model_tier_not_max_capable",
+		"S2-2 violation: reason should contain model_tier_not_max_capable, got %q", result.Reason)
 }
 
 // --- TC5: ResolveEffort ultra + Haiku 4.5 → stripped (S2-3) ------------------------

@@ -153,7 +153,7 @@ autopus-adk/
 │   │   ├── binding.go           #     QualityBinding 데이터 타입 (품질→model/effort/depth, 디스패치 주입 seam) (TEAM-001)
 │   │   ├── depth.go             #     ResolveDepth 순수 함수 (bounded fan-out/vote cap) (TEAM-001)
 │   │   ├── doctor.go            #     capability gate (required hard-gate / advisory probe)
-│   │   ├── doctor_version.go    #     claude-code 최소 버전 핀 (>= 2.1.154)
+│   │   ├── doctor_version.go    #     route별 claude-code 최소 버전 핀 (route_a >= 2.1.154, route_team >= 2.1.219)
 │   │   ├── gate.go              #     deterministic Gate — injectable CommandRunner (build/test exit-code)
 │   │   ├── render.go            #     dry-run 렌더 + prompt-manifest 해시 + route/quality overlay (TEAM-001)
 │   │   ├── fallback.go          #     fallback taxonomy 분류기 (fail-fast/fail-closed/resumable/explicit)

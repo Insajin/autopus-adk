@@ -34,8 +34,8 @@ func TestEffortResolve_TC2_UltraOpus46(t *testing.T) {
 	if result.Source != EffortSourceQualityMode {
 		t.Errorf("source: got %q, want %q", result.Source, EffortSourceQualityMode)
 	}
-	if !strings.Contains(result.Reason, "model_tier_not_opus47") {
-		t.Errorf("reason should mention model_tier_not_opus47, got: %q", result.Reason)
+	if !strings.Contains(result.Reason, "model_tier_not_max_capable") {
+		t.Errorf("reason should mention model_tier_not_max_capable, got: %q", result.Reason)
 	}
 }
 

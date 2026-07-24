@@ -44,7 +44,7 @@ router:
     strategy: balanced
     tiers:
         economy: claude-sonnet-5
-        premium: claude-opus-4-8
+        premium: claude-opus-5
         standard: claude-sonnet-5
     categories:
         deep: premium
