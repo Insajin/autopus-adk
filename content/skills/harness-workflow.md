@@ -177,7 +177,10 @@ Edit the manifest files and run `auto generate-templates` to regenerate the JS. 
 
 ### Quality Binding
 
-Per-run `--quality` resolves **three dimensions simultaneously** through the existing resolvers:
+For Claude route-team dispatch, resolve an explicit per-run `--quality` first, then
+`quality.providers.claude`, then `quality.default`, then the `balanced` safety fallback.
+`quality.providers.codex` is independent and must not alter the Claude binding. The effective
+mode resolves **three dimensions simultaneously** through the existing resolvers:
 
 - **Model tier** — `ModelForAgent`: ultra → Opus for all agent phases; balanced → per-agent defaults.
 - **Effort** — `ResolveEffort`: ultra → higher effort ceiling; balanced → per-agent defaults.

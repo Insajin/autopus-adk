@@ -837,9 +837,30 @@ sequenceDiagram
 
 auto quality ultra --apply            # Ultra를 기본값으로 저장하고 현재 프로젝트에 반영
 auto quality balanced --apply         # Balanced를 기본값으로 저장하고 현재 프로젝트에 반영
+auto quality provider claude ultra --apply   # Claude에만 적용 (claude-code alias도 허용)
+auto quality provider codex balanced --apply # Codex에만 적용
+auto quality provider claude inherit --apply # Claude override 제거
 auto quality supervisor inherit --apply  # Codex 주 세션에서 사용자 기본 모델을 사용
 auto quality show                     # 저장된 품질 모드와 주 세션 정책 확인
 ```
+
+Claude Code와 Codex를 함께 쓰는 프로젝트는 품질 모드를 서로 다르게 지정할 수 있습니다.
+
+```yaml
+quality:
+  default: balanced
+  providers:
+    claude: ultra
+    codex: balanced
+```
+
+`quality.providers`의 canonical key는 `claude`, `codex`입니다. override가 없는 provider는
+기존 `quality.default`를 그대로 상속하므로 이전 설정 파일의 동작은 바뀌지 않습니다.
+Custom preset 이름은 1–64자의 ASCII 영숫자로 시작하고, 이후에는 영숫자·하이픈·밑줄만
+사용할 수 있습니다.
+한 번의 실행에 지정한 `--quality`는 YAML을 수정하지 않는 명시적 전역 override이며 저장된
+두 provider 값보다 우선합니다. Provider별 `--apply`는 해당 configured platform만 갱신하고,
+기존 전역 `auto quality <mode> --apply`는 구성된 모든 플랫폼을 계속 갱신합니다.
 
 새 프로젝트의 `supervisor_model_policy` 기본값은 `inherit`입니다. 따라서 Autopus는 Codex 주
 세션의 사용자 기본 모델을 덮어쓰지 않습니다. 품질 모드는 관리형 에이전트와 quality-managed
@@ -865,9 +886,9 @@ Opus 표기는 모델 계층을 지원하는 플랫폼의 동작을 나타내며
 | 모드 | Planner | Executor | Validator | 비용 |
 |------|---------|----------|-----------|------|
 | **Ultra** | Opus | Opus | Opus | $$$ |
-| **Balanced** | Opus | 적응형* | Haiku | $ |
+| **Balanced** | Opus | 적응형* | Sonnet | $ |
 
-\* HIGH 복잡도 → Opus · MEDIUM → Sonnet · LOW → Haiku
+\* HIGH 복잡도 → Opus · MEDIUM/LOW → Sonnet
 
 ### 실행 모드
 

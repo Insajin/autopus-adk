@@ -2,12 +2,37 @@ package config
 
 import "fmt"
 
+// @AX:WARN [AUTO]: This cross-field validator has cyclomatic complexity 15 across preset, provider, tier, and model-policy constraints. @AX:SPEC SPEC-PROVIDER-QUALITY-001
+// @AX:REASON [AUTO]: Every invalid persisted quality combination must remain fail-closed before provider model selection is consumed.
 func (c *HarnessConfig) validateModelSelectionConfig() error {
+	for preset := range c.Quality.Presets {
+		if !IsValidQualityPresetName(preset) {
+			return fmt.Errorf(
+				"quality.presets name %q is invalid: use 1-64 ASCII letters, digits, hyphens, or underscores",
+				preset,
+			)
+		}
+	}
 	if !c.Quality.IsValidSupervisorModelPolicy() {
 		return fmt.Errorf(
 			"quality.supervisor_model_policy %q is invalid: must be inherit or quality",
 			c.Quality.SupervisorModelPolicy,
 		)
+	}
+	for provider, preset := range c.Quality.Providers {
+		if _, ok := NormalizeQualityProvider(provider); !ok || provider != normalizeQualityProviderKey(provider) {
+			return fmt.Errorf(
+				"quality.providers provider %q is invalid: must be claude or codex",
+				provider,
+			)
+		}
+		if !c.Quality.isKnownQualityMode(preset) {
+			return fmt.Errorf(
+				"quality.providers[%s] %q is not defined in quality.presets",
+				provider,
+				preset,
+			)
+		}
 	}
 	validModelTiers := map[string]bool{"opus": true, "sonnet": true, "haiku": true}
 	for presetName, preset := range c.Quality.Presets {

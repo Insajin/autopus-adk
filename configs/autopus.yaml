@@ -103,4 +103,8 @@ orchestra:
 
 quality:
   default: balanced
+  # Optional independent overrides:
+  # providers:
+  #   claude: ultra
+  #   codex: balanced
   supervisor_model_policy: inherit

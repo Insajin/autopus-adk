@@ -135,7 +135,18 @@ Provider fan-out is advisory evidence, not the source of truth for PASS/FAIL. De
 
 ## Quality Mode
 
-The quality mode — determined by the `--quality` flag or interactive selection — controls the execution profile for Agent() calls.
+The effective quality mode controls the execution profile for Agent() calls. Resolve it in this order:
+
+1. explicit per-run global `--quality`
+2. `quality.providers.claude` for Claude Code or `quality.providers.codex` for Codex
+3. `quality.default`
+4. `balanced` safety fallback
+
+The canonical persisted provider keys are `claude` and `codex`. This lets a mixed project keep
+Claude on Ultra while Codex uses Balanced, or the reverse, without changing the existing global
+fallback. `auto quality provider <claude|claude-code|codex> <preset|inherit> --apply` changes one
+provider and refreshes only its configured platform. `auto quality <preset> --apply` keeps its
+legacy behavior and refreshes all configured platforms.
 
 ### Ultra Mode
 

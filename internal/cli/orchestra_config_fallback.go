@@ -110,6 +110,7 @@ func hasReusableHarnessWiring(cfg *config.HarnessConfig) bool {
 		len(cfg.Orchestra.Providers) > 0 ||
 		len(cfg.Orchestra.Commands) > 0 ||
 		cfg.Quality.Default != "" ||
+		len(cfg.Quality.Providers) > 0 ||
 		len(cfg.Quality.Presets) > 0 ||
 		cfg.Verify.Enabled ||
 		cfg.Verify.DefaultViewport != "" ||
@@ -119,6 +120,8 @@ func hasReusableHarnessWiring(cfg *config.HarnessConfig) bool {
 		len(cfg.Design.UIFileGlobs) > 0
 }
 
+// @AX:WARN [AUTO]: This inheritance merge contains eight configuration decision branches. @AX:SPEC SPEC-PROVIDER-QUALITY-001
+// @AX:REASON [AUTO]: Parent defaults, child provider overrides, and supervisor policy must retain their precedence when reusable wiring is inherited.
 func inheritReusableHarnessWiring(child, parent *config.HarnessConfig, missing missingInheritedHarnessSections) {
 	if child == nil || parent == nil {
 		return
@@ -130,7 +133,21 @@ func inheritReusableHarnessWiring(child, parent *config.HarnessConfig, missing m
 		child.Orchestra = parent.Orchestra
 	}
 	if missing.quality && child.Quality.Default == "" && len(child.Quality.Presets) == 0 {
+		providerOverrides := child.Quality.Providers
+		supervisorPolicy := child.Quality.SupervisorModelPolicy
 		child.Quality = parent.Quality
+		if len(parent.Quality.Providers) > 0 || len(providerOverrides) > 0 {
+			child.Quality.Providers = make(map[string]string, len(parent.Quality.Providers)+len(providerOverrides))
+			for provider, mode := range parent.Quality.Providers {
+				child.Quality.Providers[provider] = mode
+			}
+			for provider, mode := range providerOverrides {
+				child.Quality.Providers[provider] = mode
+			}
+		}
+		if supervisorPolicy != "" {
+			child.Quality.SupervisorModelPolicy = supervisorPolicy
+		}
 	}
 	if missing.verify {
 		child.Verify = parent.Verify

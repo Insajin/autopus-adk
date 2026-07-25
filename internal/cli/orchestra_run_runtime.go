@@ -15,7 +15,7 @@ func applyRuntimeHarnessOverrides(effective effectiveHarnessConfig, flags global
 		return effective
 	}
 	if quality := strings.TrimSpace(flags.Quality); quality != "" {
-		cfg.Quality.Default = quality
+		cfg.Quality = cfg.Quality.WithGlobalOverride(quality)
 	}
 	// @AX:NOTE [AUTO]: Claude effort must be applied before the Codex-only profile gate so Claude-only configs receive the override. @AX:SPEC SPEC-FABLE5-001
 	if effort := strings.TrimSpace(flags.Effort); effort != "" {

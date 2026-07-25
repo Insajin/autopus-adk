@@ -924,9 +924,31 @@ sequenceDiagram
 
 auto quality ultra --apply            # Persist Ultra and refresh this project's managed agents
 auto quality balanced --apply         # Persist Balanced and refresh this project's managed agents
+auto quality provider claude ultra --apply   # Claude only (claude-code is also accepted)
+auto quality provider codex balanced --apply # Codex only
+auto quality provider claude inherit --apply # Remove the Claude override
 auto quality supervisor inherit --apply  # Use the user's Codex model for the primary session
 auto quality show                     # Show the persisted mode and supervisor policy
 ```
+
+Projects using both Claude Code and Codex can select their modes independently:
+
+```yaml
+quality:
+  default: balanced
+  providers:
+    claude: ultra
+    codex: balanced
+```
+
+`quality.providers` accepts the canonical keys `claude` and `codex`.
+Custom preset names must be 1–64 ASCII characters, start with a letter or digit,
+and then contain only letters, digits, hyphens, or underscores.
+`quality.default` remains the fallback for providers without an override, so existing
+configuration files keep their behavior. A per-run `--quality` flag is an explicit global
+override and temporarily wins over both persisted provider values without rewriting YAML.
+Provider-specific `--apply` refreshes only that configured platform; the existing global
+`auto quality <mode> --apply` still refreshes every configured platform.
 
 New projects default to `supervisor_model_policy: inherit`, so Autopus does not override the
 user's Codex model for the primary session. Quality mode still controls managed agents and
@@ -957,7 +979,7 @@ flowchart LR
         B1["Planner\nOpus"] --> B2["Executor\nby complexity"]
         B2 -->|HIGH| BH["Opus"]
         B2 -->|MEDIUM| BM["Sonnet"]
-        B2 -->|LOW| BL["Haiku"]
+        B2 -->|LOW| BL["Sonnet"]
     end
 
     style Ultra fill:#fff3bf,stroke:#f08c00
@@ -967,9 +989,9 @@ flowchart LR
 | Mode | Planner | Executor | Validator | Cost |
 |------|---------|----------|-----------|------|
 | **Ultra** | Opus | Opus | Opus | $$$ |
-| **Balanced** | Opus | Adaptive* | Haiku | $ |
+| **Balanced** | Opus | Adaptive* | Sonnet | $ |
 
-\* HIGH complexity → Opus · MEDIUM → Sonnet · LOW → Haiku
+\* HIGH complexity → Opus · MEDIUM/LOW → Sonnet
 
 ### Execution Modes
 

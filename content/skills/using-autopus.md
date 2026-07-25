@@ -86,7 +86,32 @@ hooks:
   pre_commit_lore: true
   react_ci_failure: false
   react_review: false
+
+quality:
+  default: balanced
+  providers:
+    claude: ultra
+    codex: balanced
 ```
+
+### Claude와 Codex 품질 모드 분리
+
+`quality.default`는 기존 전역 fallback입니다. Claude Code와 Codex를 함께 쓰면
+`quality.providers.claude`와 `quality.providers.codex`를 선택적으로 추가해 서로 다른
+Ultra/Balanced 모드를 사용할 수 있습니다.
+
+```bash
+auto quality provider claude ultra --apply
+auto quality provider codex balanced --apply
+auto quality provider claude inherit --apply
+auto quality show
+```
+
+CLI에서는 `claude-code`도 `claude`의 alias로 허용하지만 YAML에는 canonical key
+`claude`를 저장합니다. Provider별 `--apply`는 해당 provider가 `platforms`에 구성된
+경우에만 그 플랫폼을 갱신합니다. 기존 `auto quality ultra|balanced --apply`는
+`quality.default`를 바꾸고 구성된 모든 플랫폼을 갱신합니다. 한 번의 실행에 지정한
+`--quality`는 두 persisted provider override보다 우선하며 YAML은 수정하지 않습니다.
 
 ### Claude Opus 5 기본 경로
 

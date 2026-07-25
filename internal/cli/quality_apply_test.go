@@ -20,7 +20,7 @@ func TestQualityCmdApplyUpdatesConfiguredPlatforms(t *testing.T) {
 	dir := writeQualityTestConfig(t, "balanced")
 	cfg, err := config.LoadPreview(dir)
 	require.NoError(t, err)
-	cfg.Platforms = []string{"codex", "opencode"}
+	cfg.Platforms = []string{"claude-code", "codex", "opencode"}
 	require.NoError(t, config.Save(dir, cfg))
 
 	original := qualityPlatformUpdater
@@ -39,8 +39,8 @@ func TestQualityCmdApplyUpdatesConfiguredPlatforms(t *testing.T) {
 	root.SetErr(buf)
 	root.SetArgs([]string{"--config", filepath.Join(dir, "autopus.yaml"), "quality", "ultra", "--apply"})
 	require.NoError(t, root.Execute())
-	assert.Equal(t, []string{"codex", "opencode"}, applied)
-	assert.Contains(t, buf.String(), "quality.applied_platforms = 2")
+	assert.Equal(t, []string{"claude-code", "codex", "opencode"}, applied)
+	assert.Contains(t, buf.String(), "quality.applied_platforms = 3")
 	assert.Contains(t, buf.String(), "Start a new Codex session")
 	updated, err := config.LoadPreview(dir)
 	require.NoError(t, err)

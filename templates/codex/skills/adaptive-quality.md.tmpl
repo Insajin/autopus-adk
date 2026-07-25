@@ -16,6 +16,33 @@ Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, 
 
 Adaptive Quality is **not** a replacement for Quality Mode — it is a refinement that operates exclusively within Balanced mode.
 
+### Provider-specific mode selection
+
+Mixed Claude Code and Codex projects can select Ultra or Balanced independently while retaining
+the existing global fallback:
+
+```yaml
+quality:
+  default: balanced
+  providers:
+    claude: ultra
+    codex: balanced
+```
+
+Resolve the effective mode in this order: explicit per-run global `--quality`, persisted
+`quality.providers.<claude|codex>`, persisted `quality.default`, then `balanced`. The global
+per-run flag intentionally overrides both providers without rewriting YAML.
+
+```bash
+auto quality provider claude ultra --apply
+auto quality provider codex balanced --apply
+auto quality provider claude inherit --apply
+```
+
+`claude-code` is accepted as a CLI alias for canonical provider key `claude`. Provider-specific
+`--apply` refreshes only that configured platform; `auto quality <mode> --apply` continues to
+refresh every configured platform.
+
 ## Complexity Assessment Criteria
 
 The planner assesses each task before spawning an agent. The assessment considers:
@@ -151,7 +178,7 @@ Codex-specific rendering:
 | Balanced | standard Sonnet-tier worker | Terra + `medium` |
 | Balanced | Haiku-tier worker | Luna + declared effort (capped at `max`) |
 
-Codex custom agent files are loaded when a session starts. Run `auto quality <mode> --apply` to persist a quality profile and refresh the current project's managed agents, then start a new Codex session. `auto quality supervisor inherit --apply` keeps the primary session on the user's configured Codex model. `auto quality supervisor quality --apply` opts an unchanged Autopus-managed root config into the managed Sol profile; user-owned root model or effort assignments remain preserved and take precedence. A per-run `--quality` override can change a managed orchestra launch, but it cannot hot-swap agents already loaded by the current session.
+Codex custom agent files are loaded when a session starts. Run `auto quality provider codex <mode> --apply` to persist a Codex-only profile and refresh the current project's Codex managed agents, or `auto quality <mode> --apply` to change the global fallback and refresh every configured platform. Then start a new Codex session. `auto quality supervisor inherit --apply` keeps the primary session on the user's configured Codex model. `auto quality supervisor quality --apply` opts an unchanged Autopus-managed root config into the managed Sol profile; user-owned root model or effort assignments remain preserved and take precedence. A per-run `--quality` override can change a managed orchestra launch, but it cannot hot-swap agents already loaded by the current session.
 
 Unsupported env values must fail open to Quality Mode defaults. Use `auto effort detect` when the runtime needs the resolved value explicitly.
 

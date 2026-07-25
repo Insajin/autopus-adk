@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -12,7 +13,14 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
-var renameQualityConfig = os.Rename
+var (
+	createTempQualityConfig = os.CreateTemp
+	chmodQualityConfig      = func(file *os.File, mode os.FileMode) error { return file.Chmod(mode) }
+	writeQualityConfig      = func(file *os.File, data []byte) (int, error) { return file.Write(data) }
+	syncQualityConfig       = func(file *os.File) error { return file.Sync() }
+	closeQualityConfig      = func(file *os.File) error { return file.Close() }
+	renameQualityConfig     = os.Rename
+)
 
 func saveQualityDefault(dir string, cfg *config.HarnessConfig, preset string) error {
 	cfg.Quality.Default = preset
@@ -51,7 +59,7 @@ func saveQualityScalar(dir string, cfg *config.HarnessConfig, key, value string)
 	if err != nil {
 		return err
 	}
-	if err := validateQualityYAML(updated); err != nil {
+	if err := validateQualityYAML(updated, cfg); err != nil {
 		return err
 	}
 	if err := atomicWriteQualityConfig(path, updated); err != nil {
@@ -60,7 +68,13 @@ func saveQualityScalar(dir string, cfg *config.HarnessConfig, key, value string)
 	return nil
 }
 
+// @AX:WARN [AUTO]: This YAML-preserving scalar update contains ten format and placement decision branches. @AX:SPEC SPEC-PROVIDER-QUALITY-001
+// @AX:REASON [AUTO]: Encoding, comments, indentation, and insertion order must remain stable while rejecting unsupported YAML shapes.
 func updateQualityScalar(data []byte, key, value string) ([]byte, error) {
+	encodedValue, err := encodeQualityScalar(value)
+	if err != nil {
+		return nil, err
+	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
@@ -72,7 +86,7 @@ func updateQualityScalar(data []byte, key, value string) ([]byte, error) {
 	root := doc.Content[0]
 	qualityKey, quality := yamlMappingPair(root, "quality")
 	if quality == nil {
-		return appendQualitySection(data, key, value), nil
+		return appendQualitySection(data, key, encodedValue), nil
 	}
 	if quality.Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("quality must be a YAML mapping")
@@ -100,7 +114,7 @@ func updateQualityScalar(data []byte, key, value string) ([]byte, error) {
 			indent = lineIndent(lines, defaultKey.Line-1, indent)
 		}
 	}
-	return insertConfigLine(lines, insertAt, indent+key+": "+value+newline), nil
+	return insertConfigLine(lines, insertAt, indent+key+": "+encodedValue+newline), nil
 }
 
 func findQualityDefaultLine(data []byte) (int, bool) {
@@ -138,6 +152,10 @@ func replaceQualityDefaultLine(data []byte, lineIdx int, preset string) ([]byte,
 }
 
 func replaceQualityScalarLine(data []byte, lineIdx int, key, value string) ([]byte, error) {
+	encodedValue, err := encodeQualityScalar(value)
+	if err != nil {
+		return nil, err
+	}
 	lines := strings.SplitAfter(string(data), "\n")
 	if lineIdx < 0 || lineIdx >= len(lines) {
 		return nil, fmt.Errorf("quality.%s line index out of range", key)
@@ -159,17 +177,29 @@ func replaceQualityScalarLine(data []byte, lineIdx int, key, value string) ([]by
 	if matches == nil {
 		return nil, fmt.Errorf("quality.%s line has unsupported format", key)
 	}
-	lines[lineIdx] = matches[1] + value + matches[3] + carriage + newline
+	lines[lineIdx] = matches[1] + encodedValue + matches[3] + carriage + newline
 	return []byte(strings.Join(lines, "")), nil
 }
 
-func appendQualitySection(data []byte, key, value string) []byte {
+func encodeQualityScalar(value string) (string, error) {
+	encoded, err := yaml.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("encode quality scalar: %w", err)
+	}
+	scalar := strings.TrimSuffix(string(encoded), "\n")
+	if strings.ContainsAny(scalar, "\r\n") {
+		return "", fmt.Errorf("quality scalar must encode on one line")
+	}
+	return scalar, nil
+}
+
+func appendQualitySection(data []byte, key, encodedValue string) []byte {
 	content := string(data)
 	newline := detectConfigNewline(data)
 	if content != "" && !strings.HasSuffix(content, "\n") {
 		content += newline
 	}
-	return []byte(content + "quality:" + newline + "  " + key + ": " + value + newline)
+	return []byte(content + "quality:" + newline + "  " + key + ": " + encodedValue + newline)
 }
 
 func insertConfigLine(lines []string, index int, line string) []byte {
@@ -204,14 +234,24 @@ func detectConfigNewline(data []byte) string {
 	return "\n"
 }
 
-func validateQualityYAML(data []byte) error {
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
+func validateQualityYAML(data []byte, expected *config.HarnessConfig) error {
+	var parsed config.HarnessConfig
+	if err := yaml.Unmarshal(data, &parsed); err != nil {
 		return fmt.Errorf("validate written config: %w", err)
+	}
+	candidate := *expected
+	candidate.Quality = parsed.Quality
+	if err := candidate.Validate(); err != nil {
+		return fmt.Errorf("validate written config: %w", err)
+	}
+	if !reflect.DeepEqual(candidate.Quality, expected.Quality) {
+		return fmt.Errorf("validate written config: quality fields changed unexpectedly")
 	}
 	return nil
 }
 
+// @AX:WARN [AUTO]: This atomic persistence path contains nine filesystem and cleanup decision branches. @AX:SPEC SPEC-PROVIDER-QUALITY-001
+// @AX:REASON [AUTO]: File mode preservation, sync, close, rename, and temporary-file cleanup ordering must remain fail-closed.
 func atomicWriteQualityConfig(path string, data []byte) error {
 	mode := os.FileMode(0o644)
 	if info, err := os.Stat(path); err == nil {
@@ -220,7 +260,7 @@ func atomicWriteQualityConfig(path string, data []byte) error {
 		return err
 	}
 
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".autopus-quality-*")
+	tmp, err := createTempQualityConfig(filepath.Dir(path), ".autopus-quality-*")
 	if err != nil {
 		return err
 	}
@@ -231,19 +271,19 @@ func atomicWriteQualityConfig(path string, data []byte) error {
 			_ = os.Remove(tmpPath)
 		}
 	}()
-	if err := tmp.Chmod(mode); err != nil {
-		_ = tmp.Close()
+	if err := chmodQualityConfig(tmp, mode); err != nil {
+		_ = closeQualityConfig(tmp)
 		return err
 	}
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
+	if _, err := writeQualityConfig(tmp, data); err != nil {
+		_ = closeQualityConfig(tmp)
 		return err
 	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
+	if err := syncQualityConfig(tmp); err != nil {
+		_ = closeQualityConfig(tmp)
 		return err
 	}
-	if err := tmp.Close(); err != nil {
+	if err := closeQualityConfig(tmp); err != nil {
 		return err
 	}
 	if err := renameQualityConfig(tmpPath, path); err != nil {

@@ -23,9 +23,10 @@ type QualityPreset struct {
 	Agents      map[string]string `yaml:"agents,omitempty"`
 }
 
-// QualityConf holds quality preset definitions and the default preset name.
+// QualityConf holds quality preset definitions and provider-specific defaults.
 type QualityConf struct {
 	Default               string                   `yaml:"default,omitempty"`
+	Providers             map[string]string        `yaml:"providers,omitempty"`
 	SupervisorModelPolicy string                   `yaml:"supervisor_model_policy,omitempty"`
 	Presets               map[string]QualityPreset `yaml:"presets,omitempty"`
 }

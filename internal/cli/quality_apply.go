@@ -14,12 +14,22 @@ import (
 var qualityPlatformUpdater = updateHarnessPlatform
 
 func applyQualityHarness(cmd *cobra.Command, dir string, cfg *config.HarnessConfig, retryCommand string) error {
+	return applyQualityHarnessPlatforms(cmd, dir, cfg, cfg.Platforms, retryCommand)
+}
+
+func applyQualityHarnessPlatforms(
+	cmd *cobra.Command,
+	dir string,
+	cfg *config.HarnessConfig,
+	platforms []string,
+	retryCommand string,
+) error {
 	out := cmd.OutOrStdout()
 	updated := 0
 	var failures []string
 	codexApplied := false
 
-	for _, platform := range cfg.Platforms {
+	for _, platform := range platforms {
 		supported, err := qualityPlatformUpdater(commandContext(cmd), dir, platform, cfg)
 		if !supported {
 			fmt.Fprintf(out, "  skipped unknown platform: %s\n", platform)

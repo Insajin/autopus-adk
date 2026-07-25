@@ -17,9 +17,11 @@ func newQualityCmd() *cobra.Command {
 	var apply bool
 	cmd := &cobra.Command{
 		Use:   "quality [preset]",
-		Short: "Show or change quality mode and Codex supervisor ownership",
-		Long: "Show or change quality.default and quality.supervisor_model_policy in autopus.yaml.\n\n" +
-			"Use `auto quality <preset> --apply` for a persistent worker mode change, or run without arguments to choose interactively.",
+		Short: "Show or change global/provider quality and Codex supervisor ownership",
+		Long: "Show or change quality.default, quality.providers, and quality.supervisor_model_policy in autopus.yaml.\n\n" +
+			"Use `auto quality <preset> --apply` for the global fallback, " +
+			"`auto quality provider <provider> <preset|inherit> --apply` for one provider, " +
+			"or run without arguments to choose the global fallback interactively.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
@@ -31,6 +33,7 @@ func newQualityCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&apply, "apply", false, "Apply the saved quality or supervisor policy to this project's harness files")
 	cmd.AddCommand(newQualityShowCmd())
 	cmd.AddCommand(newQualitySetCmd(&apply))
+	cmd.AddCommand(newQualityProviderCmd(&apply))
 	cmd.AddCommand(newQualitySupervisorCmd(&apply))
 	return cmd
 }
@@ -77,6 +80,8 @@ func runQualityShow(cmd *cobra.Command, _ []string) error {
 	}
 	out := cmd.OutOrStdout()
 	fmt.Fprintf(out, "quality.default = %s\n", cfg.Quality.Default)
+	writeQualityProviderStatus(out, cfg.Quality, config.QualityProviderClaude)
+	writeQualityProviderStatus(out, cfg.Quality, config.QualityProviderCodex)
 	fmt.Fprintf(out, "quality.supervisor_model_policy = %s\n", cfg.Quality.EffectiveSupervisorModelPolicy())
 	fmt.Fprintf(out, "config = %s\n", filepath.Join(dir, "autopus.yaml"))
 	fmt.Fprintf(out, "available = %s\n", strings.Join(orderedQualityPresets(cfg), ", "))
@@ -198,6 +203,12 @@ func validateQualityConfigPath(configPath string) error {
 }
 
 func validateQualityChoice(cfg *config.HarnessConfig, preset string) error {
+	if !config.IsValidQualityPresetName(preset) {
+		return fmt.Errorf(
+			"invalid quality preset name %q (use 1-64 ASCII letters, digits, hyphens, or underscores)",
+			preset,
+		)
+	}
 	if _, ok := cfg.Quality.Presets[preset]; ok {
 		return nil
 	}

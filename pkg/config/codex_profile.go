@@ -113,14 +113,14 @@ func (q QualityConf) CodexAgentEffort(agentName, fallbackTier, declaredEffort st
 }
 
 func (q QualityConf) codexQualityMode() string {
-	if q.Default == "ultra" {
+	if q.ForProvider(QualityProviderCodex).Default == "ultra" {
 		return "ultra"
 	}
 	return "balanced"
 }
 
 func (q QualityConf) codexAgentTier(agentName, fallbackTier string) string {
-	preset, ok := q.Presets[q.Default]
+	preset, ok := q.Presets[q.ForProvider(QualityProviderCodex).Default]
 	if !ok {
 		preset, ok = q.Presets["balanced"]
 	}
