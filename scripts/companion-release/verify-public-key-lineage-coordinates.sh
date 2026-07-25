@@ -18,6 +18,7 @@ readonly A12_REPOSITORY='Insajin/autopus-adk' A13_TAG='v0.50.84' A13_VERSION='0.
 readonly A13_REPOSITORY='Insajin/autopus-adk' A14_TAG='v0.50.85' A14_VERSION='0.50.85'
 readonly A14_REPOSITORY='Insajin/autopus-adk' A15_TAG='v0.50.86' A15_VERSION='0.50.86'
 readonly A15_REPOSITORY='Insajin/autopus-adk' A16_TAG='v0.50.87' A16_VERSION='0.50.87'
+readonly A16_REPOSITORY='Insajin/autopus-adk' A17_TAG='v0.50.88' A17_VERSION='0.50.88'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 
 require_environment GITHUB_REF_NAME
@@ -81,6 +82,9 @@ elif [[ "$GITHUB_REF_NAME" == "$A15_TAG" && "$COMPANION_VERSION" == "$A15_VERSIO
 elif [[ "$GITHUB_REF_NAME" == "$A16_TAG" && "$COMPANION_VERSION" == "$A16_VERSION" ]]; then
   release_phase='A16' prior_phase='A15' prior_repository="$A15_REPOSITORY" prior_evidence_source='immutable A15 GitHub release' prior_tag="$A15_TAG" prior_version="$A15_VERSION" prior_commit="$A15_COMMIT_SHA" prior_tree="$A15_TREE_SHA"
   prior_tag_object="$A15_TAG_OBJECT_SHA" prior_checksums="$A15_CHECKSUMS_SHA256" prior_amd64_archive="$A15_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A15_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A15_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A15_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A15_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A15_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A17_TAG" && "$COMPANION_VERSION" == "$A17_VERSION" ]]; then
+  release_phase='A17' prior_phase='A16' prior_repository="$A16_REPOSITORY" prior_evidence_source='immutable A16 GitHub release' prior_tag="$A16_TAG" prior_version="$A16_VERSION" prior_commit="$A16_COMMIT_SHA" prior_tree="$A16_TREE_SHA"
+  prior_tag_object="$A16_TAG_OBJECT_SHA" prior_checksums="$A16_CHECKSUMS_SHA256" prior_amd64_archive="$A16_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A16_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A16_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A16_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A16_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A16_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17 policy'
 fi

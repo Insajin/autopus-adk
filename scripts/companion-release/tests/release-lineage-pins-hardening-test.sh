@@ -28,6 +28,7 @@ readonly A13_A12_ANCESTOR_SHA='e6367b5375cd4cdf09cb1515877bc57323521364'
 readonly A14_A13_ANCESTOR_SHA='2b7aa046bdb7861113dfa57b30489c11715582e9'
 readonly A15_A14_ANCESTOR_SHA='4b8eb62200d253b46e022670c482e2f716a992a3'
 readonly A16_A15_ANCESTOR_SHA='0fc4f60dac8ff8afe69b680c8bf723bfbced4769'
+readonly A17_A16_ANCESTOR_SHA='3e02c622af97f74873325ec65940c580e23c580a'
 ANCESTORS
 
 for helper_name in pins coordinates archive assets; do
@@ -138,9 +139,19 @@ A15_LINUX_AMD64_ARCHIVE_SHA256='cae69dd8828cb2c12ba0d312c3f4dbc034104c1b4b9cee6c
 A15_LINUX_ARM64_ARCHIVE_SHA256='9e943908dabf910e9f3072f838a99dec3c9d4952d9058bfbc1b71cd78e3f29eb'
 A15_AMD64_MANIFEST_SHA256='c2398cd51093cb19804ef2d07e1848cc77d16610a4669e78e0e1577a466df300'
 A15_ARM64_MANIFEST_SHA256='83da7620c878841c06980ad12315023dc2054b71f27cb7dfb53931a4224d0099'
+A16_COMMIT_SHA='3e02c622af97f74873325ec65940c580e23c580a'
+A16_TREE_SHA='f041a63af99e2ba82bd6fb573272489fbd101e86'
+A16_TAG_OBJECT_SHA='9fad744950e268fa500812cad0194fa5da47e369'
+A16_CHECKSUMS_SHA256='7c19613a7f441264f90fb6b0c6e975c78cae3db250f2ed279fa44418a022dc7f'
+A16_AMD64_ARCHIVE_SHA256='cc411eb9cc04476d280d272f0e52b7c1a40fad923439180b526a46c38be1b63e'
+A16_ARM64_ARCHIVE_SHA256='b0880ef40f3089168be234a540cfaf1795e0e54168a4ead3f92275a13eb63012'
+A16_LINUX_AMD64_ARCHIVE_SHA256='8da3ec03967fa1b5911708716239bcaa9d0843069e65836f280f986b4cdd1aaa'
+A16_LINUX_ARM64_ARCHIVE_SHA256='9aeca632be6de54d3540e03ad99ba5dc520f3665f7f592bd12b689b844ea8bf3'
+A16_AMD64_MANIFEST_SHA256='93943fafac83eb3090f10f8c48489a96b80d003c5c9f00dfaa2cd59eabf7be42'
+A16_ARM64_MANIFEST_SHA256='4cc59ac1a3194df80a050e4159a6919a01e2bcc69efc575907aedf16aacc4057'
 PINS
 
-for phase in A8 A9 A10 A11 A12 A13 A14 A15 A16; do
+for phase in A8 A9 A10 A11 A12 A13 A14 A15 A16 A17; do
   prior=$((10#${phase#A} - 1))
   contains "$lineage_coordinates" "release_phase='${phase}' prior_phase='A${prior}'"
 done
@@ -159,7 +170,7 @@ for helper in pins coordinates archive; do
 done
 install -m 0700 "$lineage" "$temp/verify-public-key-lineage.sh"
 ln -s -- "$lineage_assets" "$temp/verify-public-key-lineage-assets.sh"
-if output=$(GITHUB_REF_NAME=v0.50.87 PATH="$PATH" \
+if output=$(GITHUB_REF_NAME=v0.50.88 PATH="$PATH" \
   bash "$temp/verify-public-key-lineage.sh" 2>&1); then
   fail 'symlinked lineage asset helper passed'
 fi
