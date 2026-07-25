@@ -32,6 +32,7 @@ type executableLineageTools struct {
 }
 
 type executableLineagePins struct {
+	releaseID         string
 	commit            string
 	tree              string
 	tagObject         string
@@ -77,6 +78,7 @@ type executableLineageFixture struct {
 	targetCommit          string
 	tagCommit             string
 	tagObject             string
+	releaseID             string
 	releaseTag            string
 	currentTag            string
 	token                 string
@@ -178,12 +180,15 @@ func newExecutableLineageFixture(
 		currentTag = publicKeyReceiptA16Tag
 	case publicKeyReceiptA16Version:
 		currentTag = publicKeyReceiptA17Tag
+	case publicKeyReceiptA17Version:
+		currentTag = publicKeyReceiptA18Tag
 	}
 	fixture := &executableLineageFixture{
 		root: root, tools: tools, evidence: evidence, pins: evidence.pins,
 		keyPath: filepath.Join(root, "release-key"), issuedAt: lineageIssuedAt,
 		expiresAt: lineageExpiresAt, targetCommit: evidence.commit, tagCommit: evidence.commit,
 		tagObject:  evidence.pins.tagObject,
+		releaseID:  "1",
 		releaseTag: evidence.tag, currentTag: currentTag, token: "f07-mock-github-token",
 		checksums: append([]byte(nil), evidence.checksums...),
 		assetsDir: filepath.Join(root, "assets"), mockToolsDir: filepath.Join(root, "tools"),
@@ -192,6 +197,7 @@ func newExecutableLineageFixture(
 		commitJSON:            filepath.Join(root, "commit.json"),
 		provisionedScriptPath: filepath.Join(root, "verify-public-key-lineage.sh"),
 	}
+	fixture.pins.releaseID = fixture.releaseID
 	fixture.writeSigningKey(t, seed[:])
 	fixture.writeEvidence(t)
 	return fixture
@@ -209,6 +215,14 @@ func (fixture *executableLineageFixture) writeSigningKey(t *testing.T, seed []by
 
 func (fixture *executableLineageFixture) run(t *testing.T) (string, error) {
 	t.Helper()
+	release := readLineageFile(t, fixture.releaseJSON)
+	if len(release) == 0 || release[len(release)-1] != '}' {
+		t.Fatal("lineage release fixture is malformed")
+	}
+	release = append(release[:len(release)-1], []byte(`,"id":`+fixture.releaseID+`}`)...)
+	if err := os.WriteFile(fixture.releaseJSON, release, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	fixture.writeMockGitHub(t)
 	fixture.writeProvisionedProductionScript(t)
 	home, tmp := filepath.Join(fixture.root, "home"), filepath.Join(fixture.root, "tmp")

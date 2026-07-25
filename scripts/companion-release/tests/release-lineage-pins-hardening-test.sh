@@ -29,6 +29,7 @@ readonly A14_A13_ANCESTOR_SHA='2b7aa046bdb7861113dfa57b30489c11715582e9'
 readonly A15_A14_ANCESTOR_SHA='4b8eb62200d253b46e022670c482e2f716a992a3'
 readonly A16_A15_ANCESTOR_SHA='0fc4f60dac8ff8afe69b680c8bf723bfbced4769'
 readonly A17_A16_ANCESTOR_SHA='3e02c622af97f74873325ec65940c580e23c580a'
+readonly A18_A17_ANCESTOR_SHA='2b062a5e348fbecc414abe9ba5c74c7dc79fe243'
 ANCESTORS
 
 for helper_name in pins coordinates archive assets; do
@@ -149,14 +150,25 @@ A16_LINUX_AMD64_ARCHIVE_SHA256='8da3ec03967fa1b5911708716239bcaa9d0843069e65836f
 A16_LINUX_ARM64_ARCHIVE_SHA256='9aeca632be6de54d3540e03ad99ba5dc520f3665f7f592bd12b689b844ea8bf3'
 A16_AMD64_MANIFEST_SHA256='93943fafac83eb3090f10f8c48489a96b80d003c5c9f00dfaa2cd59eabf7be42'
 A16_ARM64_MANIFEST_SHA256='4cc59ac1a3194df80a050e4159a6919a01e2bcc69efc575907aedf16aacc4057'
+A17_RELEASE_ID='359675749'
+A17_COMMIT_SHA='2b062a5e348fbecc414abe9ba5c74c7dc79fe243'
+A17_TREE_SHA='1e376104c94748a546607abce6667813163d3d61'
+A17_TAG_OBJECT_SHA='8721b6be61a058aa5987727d3bae6d87c5fb38f4'
+A17_CHECKSUMS_SHA256='a4b437c11a5aaad986a4e0b93b0db0e19c3a49a1a801ba25e8b096c462bf3c47'
+A17_AMD64_ARCHIVE_SHA256='3bae06adc5c31281efd8d9fd016af0ab9158da54262e7f17fafd2ed9be6ff1b1'
+A17_ARM64_ARCHIVE_SHA256='bf7a96a4ce34b58a940ab9813c2b797ec8f4a489c794b54d6b54097c5ecc4cce'
+A17_LINUX_AMD64_ARCHIVE_SHA256='e09b66b7a1683ef8764e59ca620242ee7eebbee573c0fec5232f9adb649f6909'
+A17_LINUX_ARM64_ARCHIVE_SHA256='31cc659ae347346204db2dae13368e6277b1e21f7e3a7c16dab160dd2b98176d'
+A17_AMD64_MANIFEST_SHA256='56b4b53840ee7c859077245ff6ddc95ef0ea530f581b3831aa6ee8645b9a9749'
+A17_ARM64_MANIFEST_SHA256='457b6fef8ebcda7b3977a0786f2397a30591225ac5112858aab5ba920176df8c'
 PINS
 
-for phase in A8 A9 A10 A11 A12 A13 A14 A15 A16 A17; do
+for phase in A8 A9 A10 A11 A12 A13 A14 A15 A16 A17 A18; do
   prior=$((10#${phase#A} - 1))
   contains "$lineage_coordinates" "release_phase='${phase}' prior_phase='A${prior}'"
 done
 contains "$lineage_coordinates" \
-  "prior_tree='' prior_linux_amd64_archive='' prior_linux_arm64_archive=''"
+  "prior_release_id='' prior_tree='' prior_linux_amd64_archive='' prior_linux_arm64_archive=''"
 for phase in {0..13}; do
   not_contains "$lineage_pins" "A${phase}_LINUX_"
 done
@@ -170,7 +182,7 @@ for helper in pins coordinates archive; do
 done
 install -m 0700 "$lineage" "$temp/verify-public-key-lineage.sh"
 ln -s -- "$lineage_assets" "$temp/verify-public-key-lineage-assets.sh"
-if output=$(GITHUB_REF_NAME=v0.50.88 PATH="$PATH" \
+if output=$(GITHUB_REF_NAME=v0.50.89 PATH="$PATH" \
   bash "$temp/verify-public-key-lineage.sh" 2>&1); then
   fail 'symlinked lineage asset helper passed'
 fi

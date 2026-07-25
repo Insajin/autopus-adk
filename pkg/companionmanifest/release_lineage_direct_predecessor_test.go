@@ -40,6 +40,8 @@ func directPredecessorPinReplacements(fixture *executableLineageFixture) map[str
 		prefix = "A15"
 	case publicKeyReceiptA17Tag:
 		prefix = "A16"
+	case publicKeyReceiptA18Tag:
+		prefix = "A17"
 	default:
 		return nil
 	}
@@ -52,11 +54,14 @@ func directPredecessorPinReplacements(fixture *executableLineageFixture) map[str
 		prefix + "_AMD64_MANIFEST_SHA256": fixture.pins.amd64Manifest,
 		prefix + "_ARM64_MANIFEST_SHA256": fixture.pins.arm64Manifest,
 	}
-	if prefix == "A14" || prefix == "A15" || prefix == "A16" {
+	if prefix == "A17" {
+		replacements[prefix+"_RELEASE_ID"] = fixture.pins.releaseID
+	}
+	if prefix == "A14" || prefix == "A15" || prefix == "A16" || prefix == "A17" {
 		replacements[prefix+"_LINUX_AMD64_ARCHIVE_SHA256"] = fixture.pins.linuxAMD64Archive
 		replacements[prefix+"_LINUX_ARM64_ARCHIVE_SHA256"] = fixture.pins.linuxARM64Archive
 	}
-	if prefix == "A7" || prefix == "A8" || prefix == "A9" || prefix == "A10" || prefix == "A11" || prefix == "A12" || prefix == "A13" || prefix == "A14" || prefix == "A15" || prefix == "A16" {
+	if prefix == "A7" || prefix == "A8" || prefix == "A9" || prefix == "A10" || prefix == "A11" || prefix == "A12" || prefix == "A13" || prefix == "A14" || prefix == "A15" || prefix == "A16" || prefix == "A17" {
 		replacements[prefix+"_TREE_SHA"] = fixture.pins.tree
 	}
 	return replacements
@@ -69,7 +74,7 @@ func immutableProductionLineagePin(name string) (string, bool) {
 		immutableA6LineagePins, immutableA7LineagePins, immutableA8LineagePins,
 		immutableA9LineagePins, immutableA10LineagePins, immutableA11LineagePins,
 		immutableA12LineagePins, immutableA13LineagePins, immutableA14LineagePins,
-		immutableA15LineagePins, immutableA16LineagePins,
+		immutableA15LineagePins, immutableA16LineagePins, immutableA17LineagePins,
 	} {
 		if value, ok := pins[name]; ok {
 			return value, true
@@ -118,5 +123,12 @@ func TestDirectPredecessorPinReplacements_LinuxPinsBeginAtA14(t *testing.T) {
 	if replacements["A16_LINUX_AMD64_ARCHIVE_SHA256"] != "linux-amd64" ||
 		replacements["A16_LINUX_ARM64_ARCHIVE_SHA256"] != "linux-arm64" {
 		t.Fatalf("A17 direct predecessor Linux replacements = %#v", replacements)
+	}
+	replacements = directPredecessorPinReplacements(&executableLineageFixture{
+		currentTag: publicKeyReceiptA18Tag, pins: pins,
+	})
+	if replacements["A17_LINUX_AMD64_ARCHIVE_SHA256"] != "linux-amd64" ||
+		replacements["A17_LINUX_ARM64_ARCHIVE_SHA256"] != "linux-arm64" {
+		t.Fatalf("A18 direct predecessor Linux replacements = %#v", replacements)
 	}
 }

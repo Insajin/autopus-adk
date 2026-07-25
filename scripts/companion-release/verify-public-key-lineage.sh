@@ -28,13 +28,13 @@ for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
   "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
   nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
 done
-if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' || "$release_phase" == 'A12' || "$release_phase" == 'A13' || "$release_phase" == 'A14' || "$release_phase" == 'A15' || "$release_phase" == 'A16' || "$release_phase" == 'A17' ]]; then
+if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' || "$release_phase" == 'A12' || "$release_phase" == 'A13' || "$release_phase" == 'A14' || "$release_phase" == 'A15' || "$release_phase" == 'A16' || "$release_phase" == 'A17' || "$release_phase" == 'A18' ]]; then
   nonzero_hex "$prior_tag_object" 40 || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
   for pin in "$prior_amd64_archive" "$prior_arm64_archive"; do
     nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"
   done
 fi
-if [[ "$release_phase" == 'A15' || "$release_phase" == 'A16' || "$release_phase" == 'A17' ]]; then
+if [[ "$release_phase" == 'A15' || "$release_phase" == 'A16' || "$release_phase" == 'A17' || "$release_phase" == 'A18' ]]; then
   for pin in "$prior_linux_amd64_archive" "$prior_linux_arm64_archive"; do
     nonzero_hex "$pin" 64 \
       || fail prior_evidence_unverifiable "${prior_phase} Linux archive pins are not provisioned"
@@ -45,6 +45,10 @@ fi
 if [[ -n "$prior_tree" ]]; then
   nonzero_hex "$prior_tree" 40 \
     || fail prior_evidence_unverifiable "${prior_phase} source tree pin is not provisioned"
+fi
+if [[ -n "$prior_release_id" ]]; then
+  [[ "$prior_release_id" =~ ^[1-9][0-9]*$ ]] \
+    || fail prior_evidence_unverifiable "${prior_phase} release ID pin is not provisioned"
 fi
 for name in GITHUB_TOKEN COMPANION_SIGNER COMPANION_RECEIPT_VERIFIER \
   COMPANION_SIGNING_KEY_FILE COMPANION_KEY_ID COMPANION_HANDOFF COMPANION_ROLLBACK_FLOOR \
@@ -100,6 +104,10 @@ target_commitish=$(jq -er '.target_commitish | select(type == "string")' "$relea
 jq -e '.draft == false and .prerelease == false and .immutable == true' \
   "$release_json" >/dev/null \
   || fail prior_evidence_unverifiable "${prior_phase} release is not immutable and final"
+if [[ -n "$prior_release_id" ]]; then
+  [[ "$(jq -er '.id' "$release_json")" == "$prior_release_id" ]] \
+    || fail prior_release_identity_mismatch "${prior_phase} release ID differs from its pin"
+fi
 [[ "$tag_name" == "$prior_tag" && "$target_commitish" == "$prior_commit" ]] \
   || fail prior_release_identity_mismatch 'release/tag/commit coordinates differ'
 [[ "$(jq -er '.sha' "$commit_json")" == "$prior_commit" ]] \
