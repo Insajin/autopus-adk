@@ -117,12 +117,12 @@ func parseProjectDocMaxBytes(content string) (int, bool) {
 }
 
 func validateBundledCodexPlugins(content string, errs *[]adapter.ValidationError) {
-	if sectionHasEnabledTrue(content, `plugins."browser-use@openai-bundled"`) {
+	if sectionHasEnabledTrue(content, `plugins."browser@openai-bundled"`) {
 		return
 	}
 	*errs = append(*errs, adapter.ValidationError{
 		File:    codexConfigRelPath,
-		Message: "Codex bundled browser-use plugin이 enabled 상태가 아님",
+		Message: "Codex bundled browser plugin이 enabled 상태가 아님",
 		Level:   "warning",
 	})
 }

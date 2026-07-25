@@ -219,7 +219,7 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	assert.NotContains(t, content, "features.collab")
 }
 
-func TestGenerateConfig_EnablesBundledBrowserUsePlugin(t *testing.T) {
+func TestGenerateConfig_EnablesBundledBrowserPlugin(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -229,11 +229,11 @@ func TestGenerateConfig_EnablesBundledBrowserUsePlugin(t *testing.T) {
 	require.NoError(t, err)
 	content := string(files[0].Content)
 
-	assert.Contains(t, content, `[plugins."browser-use@openai-bundled"]`)
+	assert.Contains(t, content, `[plugins."browser@openai-bundled"]`)
 	assert.Contains(t, content, "enabled = true")
 }
 
-func TestValidateConfig_WarnsWhenBundledBrowserUsePluginMissing(t *testing.T) {
+func TestValidateConfig_WarnsWhenBundledBrowserPluginMissing(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -252,11 +252,11 @@ project_doc_max_bytes = 262144
 
 	found := false
 	for _, e := range errs {
-		if e.File == codexConfigRelPath && e.Message == "Codex bundled browser-use plugin이 enabled 상태가 아님" {
+		if e.File == codexConfigRelPath && e.Message == "Codex bundled browser plugin이 enabled 상태가 아님" {
 			found = true
 		}
 	}
-	assert.True(t, found, "missing browser-use plugin enablement should warn")
+	assert.True(t, found, "missing browser plugin enablement should warn")
 }
 
 func TestValidateConfig_WarnsWhenGoalOrMultiAgentFeatureMissing(t *testing.T) {
@@ -275,7 +275,7 @@ project_doc_max_bytes = 262144
 [features]
 shell_tool = true
 
-[plugins."browser-use@openai-bundled"]
+[plugins."browser@openai-bundled"]
 enabled = true
 `), 0644))
 

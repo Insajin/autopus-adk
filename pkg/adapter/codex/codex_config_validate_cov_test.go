@@ -103,16 +103,24 @@ func TestContainsConfigKey_MatchesSpaceAndEquals(t *testing.T) {
 func TestValidateBundledCodexPlugins_Enabled(t *testing.T) {
 	t.Parallel()
 	var errs []adapter.ValidationError
-	content := "[plugins.\"browser-use@openai-bundled\"]\nenabled = true\n"
+	content := "[plugins.\"browser@openai-bundled\"]\nenabled = true\n"
 	validateBundledCodexPlugins(content, &errs)
 	assert.Empty(t, errs)
+}
+
+func TestValidateBundledCodexPlugins_RejectsLegacyID(t *testing.T) {
+	t.Parallel()
+	var errs []adapter.ValidationError
+	content := "[plugins.\"browser-use@openai-bundled\"]\nenabled = true\n"
+	validateBundledCodexPlugins(content, &errs)
+	assert.True(t, hasValidationMessage(errs, "browser plugin이 enabled 상태가 아님"))
 }
 
 func TestValidateBundledCodexPlugins_Disabled(t *testing.T) {
 	t.Parallel()
 	var errs []adapter.ValidationError
 	validateBundledCodexPlugins("model = \"gpt\"\n", &errs)
-	assert.True(t, hasValidationMessage(errs, "browser-use plugin이 enabled 상태가 아님"))
+	assert.True(t, hasValidationMessage(errs, "browser plugin이 enabled 상태가 아님"))
 }
 
 func TestValidateCodexFeatureFlags_AllEnabled(t *testing.T) {
