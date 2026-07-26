@@ -54,7 +54,7 @@ func TestGeneratedOrchestration_SemanticContractsMatch(t *testing.T) {
 				"minimum_rounds":                 float64(2),
 				"fallback_minimum_rounds":        float64(2),
 				"blind_separate_judge":           true,
-				"different_model_family":         true,
+				"fresh_judge_session":            true,
 				"preserve_dissent":               true,
 			},
 		},

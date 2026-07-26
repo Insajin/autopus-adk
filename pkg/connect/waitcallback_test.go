@@ -14,16 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// freePort returns an available TCP port for testing.
-func freePort(t *testing.T) int {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := ln.Addr().(*net.TCPAddr).Port
-	_ = ln.Close()
-	return port
-}
-
 func TestWaitForCallback_SuccessPath(t *testing.T) {
 	t.Parallel()
 
@@ -37,7 +27,12 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 	}))
 	defer tokenSrv.Close()
 
-	cfg := OAuthConfig{Port: freePort(t),
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	cfg := OAuthConfig{Port: port,
 		ClientID: "test-client",
 		TokenURL: tokenSrv.URL,
 		AuthURL:  "https://auth.example.com/authorize",
@@ -49,7 +44,7 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 	// First, get the port that WaitForCallback would use
 	flow, err := StartOAuthFlow(ctx, cfg)
 	require.NoError(t, err)
-	port := flow.Port
+	assert.Equal(t, port, flow.Port)
 
 	// Manually set up the same server WaitForCallback would create
 	codeCh := make(chan string, 1)
@@ -62,14 +57,11 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 		Handler: mux,
 	}
 	go func() {
-		if sErr := server.ListenAndServe(); sErr != nil && sErr != http.ErrServerClosed {
+		if sErr := server.Serve(listener); sErr != nil && sErr != http.ErrServerClosed {
 			errCh <- fmt.Errorf("callback server: %w", sErr)
 		}
 	}()
 	defer func() { _ = server.Close() }()
-
-	// Give server time to start
-	time.Sleep(100 * time.Millisecond)
 
 	// When: sending a callback with a code
 	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/auth/callback?code=test-code-xyz&state=%s", port, flow.State))
@@ -102,7 +94,12 @@ func TestWaitForCallback_SuccessPath(t *testing.T) {
 func TestWaitForCallback_ErrorPath(t *testing.T) {
 	t.Parallel()
 
-	cfg := OAuthConfig{Port: freePort(t),
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	cfg := OAuthConfig{Port: port,
 		ClientID: "test-client",
 		AuthURL:  "https://auth.example.com/authorize",
 	}
@@ -113,7 +110,7 @@ func TestWaitForCallback_ErrorPath(t *testing.T) {
 	// Get a port
 	flow, err := StartOAuthFlow(ctx, cfg)
 	require.NoError(t, err)
-	port := flow.Port
+	assert.Equal(t, port, flow.Port)
 
 	// Set up the callback server manually
 	codeCh := make(chan string, 1)
@@ -126,13 +123,11 @@ func TestWaitForCallback_ErrorPath(t *testing.T) {
 		Handler: mux,
 	}
 	go func() {
-		if sErr := server.ListenAndServe(); sErr != nil && sErr != http.ErrServerClosed {
+		if sErr := server.Serve(listener); sErr != nil && sErr != http.ErrServerClosed {
 			errCh <- fmt.Errorf("callback server: %w", sErr)
 		}
 	}()
 	defer func() { _ = server.Close() }()
-
-	time.Sleep(100 * time.Millisecond)
 
 	// When: sending a callback WITHOUT code
 	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/auth/callback?state=%s", port, flow.State))
@@ -152,7 +147,12 @@ func TestWaitForCallback_ErrorPath(t *testing.T) {
 func TestWaitForCallback_ContextCancelled(t *testing.T) {
 	t.Parallel()
 
-	cfg := OAuthConfig{Port: freePort(t),
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = listener.Close() }()
+
+	port := listener.Addr().(*net.TCPAddr).Port
+	cfg := OAuthConfig{Port: port,
 		ClientID: "test-client",
 		AuthURL:  "https://auth.example.com/authorize",
 	}
@@ -161,7 +161,11 @@ func TestWaitForCallback_ContextCancelled(t *testing.T) {
 	defer cancel()
 
 	// When: context expires before callback arrives (REQ-OAUTH-04)
-	_, err := WaitForCallback(ctx, cfg)
+	_, err = waitForCallback(ctx, cfg, func(network, address string) (net.Listener, error) {
+		assert.Equal(t, "tcp", network)
+		assert.Equal(t, fmt.Sprintf("127.0.0.1:%d", port), address)
+		return listener, nil
+	})
 
 	// Then: context deadline error
 	require.Error(t, err)
@@ -187,7 +191,7 @@ func TestExchangeAuthCode_DefaultsUsed(t *testing.T) {
 func TestStartOAuthFlow_PortIsValid(t *testing.T) {
 	t.Parallel()
 
-	cfg := OAuthConfig{Port: freePort(t), ClientID: "test"}
+	cfg := OAuthConfig{Port: openAIPort + 1, ClientID: "test"}
 
 	results := make([]*OAuthFlowResult, 3)
 	for i := range results {

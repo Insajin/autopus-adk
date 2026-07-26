@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -129,6 +130,14 @@ func StartOAuthFlow(ctx context.Context, cfg OAuthConfig) (*OAuthFlowResult, err
 // WaitForCallback starts a local HTTP server and waits for the OAuth callback.
 // It respects the provided context for cancellation/timeout.
 func WaitForCallback(ctx context.Context, cfg OAuthConfig) (*OAuthResult, error) {
+	return waitForCallback(ctx, cfg, net.Listen)
+}
+
+func waitForCallback(
+	ctx context.Context,
+	cfg OAuthConfig,
+	listen func(network, address string) (net.Listener, error),
+) (*OAuthResult, error) {
 	flow, err := StartOAuthFlow(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -140,6 +149,11 @@ func WaitForCallback(ctx context.Context, cfg OAuthConfig) (*OAuthResult, error)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/auth/callback", callbackHandler(flow.State, codeCh, errCh))
 
+	listener, err := listen("tcp", fmt.Sprintf("127.0.0.1:%d", flow.Port))
+	if err != nil {
+		return nil, fmt.Errorf("callback server: %w", err)
+	}
+
 	server := &http.Server{
 		Addr:    fmt.Sprintf("127.0.0.1:%d", flow.Port),
 		Handler: mux,
@@ -147,7 +161,7 @@ func WaitForCallback(ctx context.Context, cfg OAuthConfig) (*OAuthResult, error)
 
 	// @AX:WARN [AUTO] @AX:REASON: goroutine outlives function scope — server.Close in defer handles cleanup
 	go func() {
-		if sErr := server.ListenAndServe(); sErr != nil && !errors.Is(sErr, http.ErrServerClosed) {
+		if sErr := server.Serve(listener); sErr != nil && !errors.Is(sErr, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("callback server: %w", sErr)
 		}
 	}()
