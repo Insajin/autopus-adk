@@ -165,9 +165,9 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 	for _, test := range []struct{ name, tag, sha, message string }{
 		{name: "head_tag", tag: "v0.50.71", sha: headSHA, message: "checked-out source, tag, and release commit differ"},
 		{name: "github_sha", tag: "v0.50.71", sha: taggedSHA, message: "checked-out source, tag, and release commit differ"},
-		{name: "failed_A6_tag_75", tag: "v0.50.75", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18 policy"},
-		{name: "failed_A6_tag_76", tag: "v0.50.76", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18 policy"},
-		{name: "outside", tag: "v0.50.90", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18 policy"},
+		{name: "failed_A6_tag_75", tag: "v0.50.75", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19 policy"},
+		{name: "failed_A6_tag_76", tag: "v0.50.76", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19 policy"},
+		{name: "outside", tag: "v0.50.91", sha: headSHA, message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19 policy"},
 	} {
 		output, err := runReleaseSourceValidator(t, dir, test.tag, test.sha)
 		if err == nil || !strings.Contains(output, test.message) {
@@ -176,7 +176,7 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 	}
 }
 
-func TestLineageVerifier_A0BootstrapsWhileA1ThroughA18WithoutLiveEvidenceFailClosed(t *testing.T) {
+func TestLineageVerifier_A0BootstrapsWhileA1ThroughA19WithoutLiveEvidenceFailClosed(t *testing.T) {
 	script := filepath.Join(repositoryRoot(t), "scripts/companion-release/verify-public-key-lineage.sh")
 	cases := []struct {
 		name    string
@@ -203,9 +203,10 @@ func TestLineageVerifier_A0BootstrapsWhileA1ThroughA18WithoutLiveEvidenceFailClo
 		{name: "A16", tag: "v0.50.87", message: "missing GITHUB_TOKEN"},
 		{name: "A17", tag: "v0.50.88", message: "missing GITHUB_TOKEN"},
 		{name: "A18", tag: "v0.50.89", message: "missing GITHUB_TOKEN"},
-		{name: "failed_A6_tag_75", tag: "v0.50.75", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18 policy"},
-		{name: "failed_A6_tag_76", tag: "v0.50.76", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18 policy"},
-		{name: "outside", tag: "v0.50.90", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18 policy"},
+		{name: "A19", tag: "v0.50.90", message: "missing GITHUB_TOKEN"},
+		{name: "failed_A6_tag_75", tag: "v0.50.75", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19 policy"},
+		{name: "failed_A6_tag_76", tag: "v0.50.76", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19 policy"},
+		{name: "outside", tag: "v0.50.91", message: "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19 policy"},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

@@ -2,7 +2,7 @@
 # Test-only GitHub Git Data/Contents API state machine.
 set -euo pipefail
 
-readonly prior_commit='a2c3e07311b216927225f27d8e7c6f46899cd85c'
+readonly prior_commit='abe9d317503d4bd813328b438ee038b3aaf8767e'
 readonly prior_tree='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 readonly target_blob='1111111111111111111111111111111111111111'
 readonly target_tree='2222222222222222222222222222222222222222'
@@ -149,13 +149,13 @@ case "$endpoint" in
   *git/commits*)
     [[ "$method" == 'POST' && -f "$input" ]] || exit 64
     jq -e --arg tree "$target_tree" --arg parent "$prior_commit" '
-      .message == "Publish signed Cask for v0.50.89" and .tree == $tree and
+      .message == "Publish signed Cask for v0.50.90" and .tree == $tree and
       .parents == [$parent]
     ' "$input" >/dev/null || exit 65
     increment commit-create
     jq -n --arg sha "$target_commit" --arg tree "$target_tree" \
       --arg parent "$prior_commit" \
-      '{sha:$sha,message:"Publish signed Cask for v0.50.89",tree:{sha:$tree},
+      '{sha:$sha,message:"Publish signed Cask for v0.50.90",tree:{sha:$tree},
         parents:[{sha:$parent}],url:"https://example.invalid/target-commit"}'
     ;;
   *) exit 64 ;;

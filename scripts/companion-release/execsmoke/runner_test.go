@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const expectedFixtureVersion = "0.50.89"
+const expectedFixtureVersion = "0.50.90"
 
 func TestMain(testMain *testing.M) {
 	mode := os.Getenv("AUTOPUS_EXEC_SMOKE_FIXTURE")
