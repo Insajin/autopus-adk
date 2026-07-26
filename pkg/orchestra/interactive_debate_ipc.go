@@ -2,6 +2,7 @@ package orchestra
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -18,6 +19,31 @@ const (
 	fileIPCSafeFallback
 	fileIPCReleaseFailure
 )
+
+type fileIPCPromptError struct {
+	code string
+	err  error
+}
+
+func (err *fileIPCPromptError) Error() string {
+	return err.err.Error()
+}
+
+func (err *fileIPCPromptError) Unwrap() error {
+	return err.err
+}
+
+func newFileIPCPromptError(code string, err error) error {
+	return &fileIPCPromptError{code: code, err: err}
+}
+
+func fileIPCPromptFailureCode(err error) string {
+	var promptErr *fileIPCPromptError
+	if errors.As(err, &promptErr) {
+		return promptErr.code
+	}
+	return promptFailureFileIPCFallback
+}
 
 // tryFileIPC attempts to deliver a prompt via file IPC for hook-capable providers.
 // Safe fallback is returned only after the hook acknowledges abort by removing
@@ -39,13 +65,17 @@ func tryFileIPCWithTimeouts(
 ) (fileIPCOutcome, error) {
 	if err := hookSession.WaitForReadyCtx(ctx, readyTimeout, provider, round); err != nil {
 		return releaseFileIPCFallback(
-			ctx, hookSession, provider, round, fmt.Errorf("wait for ready: %w", err), releaseTimeout,
+			ctx, hookSession, provider, round,
+			newFileIPCPromptError(promptFailureFileIPCReady, fmt.Errorf("wait for ready: %w", err)),
+			releaseTimeout,
 		)
 	}
 
 	if err := hookSession.WriteInputRound(provider, round, prompt); err != nil {
 		return releaseFileIPCFallback(
-			ctx, hookSession, provider, round, fmt.Errorf("write input: %w", err), releaseTimeout,
+			ctx, hookSession, provider, round,
+			newFileIPCPromptError(promptFailureFileIPCInput, fmt.Errorf("write input: %w", err)),
+			releaseTimeout,
 		)
 	}
 
@@ -63,13 +93,13 @@ func releaseFileIPCFallback(
 	if err := hookSession.WriteAbortSignal(provider, round); err != nil {
 		releaseErr := fmt.Errorf("file IPC failed (%v); write abort: %w", cause, err)
 		log.Printf("[Round %d] %s release failed: %v", round, provider, releaseErr)
-		return fileIPCReleaseFailure, releaseErr
+		return fileIPCReleaseFailure, newFileIPCPromptError(promptFailureFileIPCAbort, releaseErr)
 	}
 	targets := []hookReleaseTarget{newHookReleaseTarget(provider, round)}
 	if err := waitForHookReleaseAcknowledgement(ctx, hookSession, targets, round, timeout); err != nil {
 		releaseErr := fmt.Errorf("file IPC failed (%v); acknowledge hook release: %w", cause, err)
 		log.Printf("[Round %d] %s release failed: %v", round, provider, releaseErr)
-		return fileIPCReleaseFailure, releaseErr
+		return fileIPCReleaseFailure, newFileIPCPromptError(promptFailureFileIPCReleaseAck, releaseErr)
 	}
 	log.Printf("[Round %d] %s %v — falling back to direct pane input", round, provider, cause)
 	return fileIPCSafeFallback, cause

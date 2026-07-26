@@ -28,6 +28,10 @@ type SubprocessPipelineConfig struct {
 
 // RunSubprocessPipeline executes the full subprocess debate pipeline:
 // prepare → parallel independent → cross-pollinate → judge → merge.
+// @AX:ANCHOR: [AUTO] public multi-phase execution boundary consumed by CLI and orchestration integration paths
+// @AX:REASON: [AUTO] provider rounds, judge freshness, policy transitions, receipts, and merge semantics converge here
+// @AX:WARN: [AUTO] high-branch pipeline — every participant, policy, judge, parse, and freshness failure must preserve evidence
+// @AX:REASON: [AUTO] more than eight conditional branches coordinate externally visible terminal outcomes
 func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*OrchestraResult, error) {
 	if len(cfg.Providers) == 0 {
 		return nil, fmt.Errorf("pipeline: no providers configured")
@@ -44,6 +48,18 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	}
 
 	start := time.Now()
+	if freshConfigErr := freshJudgeConfigError(cfg.Judge); freshConfigErr != nil {
+		runErr := fmt.Errorf("pipeline: %w", freshConfigErr)
+		result := buildSubprocessJudgeFailure(cfg, nil, nil, nil, nil, start, nil, runErr)
+		result.FreshJudgeSession = &FreshJudgeSessionEvidence{
+			Required: true, Mechanism: "fresh_backend_execution",
+			Reason: freshConfigErr.Error(),
+		}
+		appendDegradedReason(result, "fresh_judge_session")
+		failure := &result.FailedProviders[len(result.FailedProviders)-1]
+		failure.PreflightFailed, failure.ExecutedBackend = true, ""
+		return finalizeDebateOutcome(result, contractCfg)
+	}
 	providerNames := make([]string, len(cfg.Providers))
 	for i, p := range cfg.Providers {
 		providerNames[i] = p.Name
@@ -181,8 +197,23 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 	stopJudgeProgress := judgeProgress.StartHeartbeat(ctx, progressHeartbeatInterval)
 	defer stopJudgeProgress()
 	judgeProgress.MarkRunning(cfg.Judge.Name)
+	freshJudgeSession := &FreshJudgeSessionEvidence{
+		Required:  true,
+		Mechanism: "fresh_backend_execution",
+		Reason:    "backend does not verify fresh per-request execution",
+	}
+	freshExecution := pipelineBackendHasFreshExecutionSemantics(cfg.Backend)
+	if freshExecution {
+		freshJudgeSession = newFreshSubprocessJudgeSessionEvidence()
+	}
 	judgeResp, err := cfg.Backend.Execute(ctx, judgeReq)
 	applyProviderRequestEvidence(judgeResp, judgeReq, cfg.Backend.Name())
+	if freshExecution {
+		verifyFreshPipelineJudgeSession(freshJudgeSession, judgeResp, cfg.Backend)
+	}
+	if judgeResp != nil {
+		judgeResp.freshJudgeSession = freshJudgeSession
+	}
 	if judgeResp != nil && (judgeResp.TerminalState == TerminalSkipped || judgeResp.TerminalState == TerminalBlocked) {
 		finalResults := r2Results
 		if len(finalResults) == 0 {
@@ -261,5 +292,5 @@ func RunSubprocessPipeline(ctx context.Context, cfg SubprocessPipelineConfig) (*
 		RoundHistory:    roundHistory,
 		JudgeStatus:     JudgePassed,
 	}
-	return finalizeOrchestraResultForConfig(result, contractCfg), nil
+	return finalizeDebateOutcome(result, contractCfg)
 }

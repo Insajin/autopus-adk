@@ -10,20 +10,58 @@ import (
 
 // runJudgeRound uses pane-aware backend selection with a bounded fresh context.
 // The parent context remains the outer cancellation bound.
-func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *HookSession, responses []ProviderResponse, round int) *ProviderResponse {
-	judgment := buildTypedJudgmentPrompt(cfg.Prompt, responses)
+// @AX:ANCHOR: [AUTO] fresh judge-session boundary — do not reuse the participant HookSession or SessionID
+// @AX:REASON: [AUTO] judge independence and hook-artifact isolation require a new provider-scoped session
+// @AX:WARN: [AUTO] multi-branch provider lifecycle — every terminal path must preserve concrete judge failure evidence
+// @AX:REASON: [AUTO] pane execution, hook setup, timeout, empty output, and parse failures converge here
+func runJudgeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, participantHook *HookSession, responses []ProviderResponse, round int) (judgeResp *ProviderResponse) {
 	judgeCfg := findOrBuildJudgeConfig(cfg)
+	evidence := newFreshJudgeSessionEvidence(cfg, participantHook)
+	defer func() {
+		if judgeResp != nil {
+			judgeResp.freshJudgeSession = evidence
+		}
+	}()
+	if err := terminateParticipantsBeforeJudge(cfg, panes, participantHook); err != nil {
+		evidence.Reason = err.Error()
+		return failedJudgeResponse(judgeCfg, round, noneBackendMarker, err)
+	}
+	evidence.ParticipantsTerminated = true
+	if err := ctx.Err(); err != nil {
+		evidence.Reason = err.Error()
+		return failedJudgeResponse(judgeCfg, round, noneBackendMarker, err)
+	}
+
+	judgment := buildTypedJudgmentPrompt(cfg.Prompt, responses)
 
 	judgeTimeout := time.Duration(cfg.TimeoutSeconds) * time.Second
 	if judgeTimeout < 60*time.Second {
 		judgeTimeout = 60 * time.Second
 	}
+	judgeCfg.StartupTimeout = freshJudgeStartupTimeout(judgeCfg, judgeTimeout)
 	judgeCtx, cancel := context.WithTimeout(ctx, judgeTimeout)
 	defer cancel()
 
 	backendCfg := cfg
-	backendCfg.HookMode = false
-	backendCfg.SessionID = ""
+	backendCfg.Providers = []ProviderConfig{judgeCfg}
+	if cfg.HookMode {
+		judgeHookSession, err := activateFreshJudgeHookSession(evidence)
+		if err != nil {
+			evidence.Reason = err.Error()
+			return failedJudgeResponse(
+				judgeCfg, round, noneBackendMarker,
+				fmt.Errorf("create isolated judge hook session: %w", err),
+			)
+		}
+		judgeHookSession.ApplyProviderHooks(backendCfg.Providers)
+		defer judgeHookSession.Cleanup()
+		backendCfg.SessionID = judgeHookSession.SessionID()
+	} else {
+		backendCfg.SessionID = ""
+		evidence.Isolated = true
+		evidence.Verified = true
+		evidence.Reason = "fresh backend execution"
+	}
 	backend := SelectBackend(backendCfg)
 	fmt.Fprintf(os.Stderr, "[Judge] %s 실행 중 (provider: %s, timeout: %s)...\n", backend.Name(), cfg.JudgeProvider, judgeTimeout)
 	resp, err := backend.Execute(judgeCtx, ProviderRequest{
@@ -40,26 +78,76 @@ func runJudgeRound(ctx context.Context, cfg OrchestraConfig, _ []paneInfo, _ *Ho
 			executedBackend = resp.ExecutedBackend
 		}
 		fmt.Fprintf(os.Stderr, "[Judge] %s 실행 실패: %v\n", executedBackend, err)
-		return nil
+		if resp == nil {
+			return failedJudgeResponse(judgeCfg, round, executedBackend, err)
+		}
+		populateJudgeResponse(resp, judgeCfg, round, executedBackend)
+		if resp.Error == "" {
+			resp.Error = err.Error()
+		}
+		if resp.TerminalState == "" {
+			resp.TerminalState = TerminalBlocked
+		}
+		return resp
 	}
-	if resp == nil || resp.TimedOut {
+	if resp == nil {
+		fmt.Fprintf(os.Stderr, "[Judge] 응답 없이 판정 생략\n")
+		return failedJudgeResponse(
+			judgeCfg, round, backend.Name(),
+			fmt.Errorf("judge execution returned no response"),
+		)
+	}
+	populateJudgeResponse(resp, judgeCfg, round, backend.Name())
+	if resp.TimedOut {
 		fmt.Fprintf(os.Stderr, "[Judge] timeout 또는 취소로 판정 생략\n")
-		return nil
+		if resp.Error == "" {
+			resp.Error = "judge execution timed out"
+		}
+		resp.TerminalState = TerminalBlocked
+		return resp
 	}
 	if resp.EmptyOutput {
 		fmt.Fprintf(os.Stderr, "[Judge] 빈 출력으로 판정 생략\n")
-		return nil
+		if resp.Error == "" {
+			resp.Error = "judge returned empty output"
+		}
+		resp.TerminalState = TerminalBlocked
+		return resp
 	}
 	if _, parseErr := (&OutputParser{}).ParseJudge(resp.Output); parseErr != nil {
 		fmt.Fprintf(os.Stderr, "[Judge] invalid typed output: %v\n", parseErr)
-		return nil
-	}
-	if resp.ExecutedBackend == "" {
-		resp.ExecutedBackend = backend.Name()
+		resp.Error = fmt.Sprintf("invalid typed judge output: %v", parseErr)
+		resp.TerminalState = TerminalBlocked
+		return resp
 	}
 	fmt.Fprintf(os.Stderr, "[Judge] 판정 완료 (backend=%s, %s)\n", resp.ExecutedBackend, resp.Duration.Round(time.Millisecond))
 	resp.Provider = cfg.JudgeProvider + " (judge)"
+	resp.TerminalState = TerminalCompleted
 	return resp
+}
+
+func failedJudgeResponse(judgeCfg ProviderConfig, round int, backend string, err error) *ProviderResponse {
+	return &ProviderResponse{
+		Provider:        judgeCfg.Name,
+		Error:           err.Error(),
+		ExecutedBackend: backend,
+		Role:            "judge",
+		Attempt:         round + 1,
+		ModelFamily:     judgeCfg.ModelFamily,
+		TerminalState:   TerminalBlocked,
+	}
+}
+
+func populateJudgeResponse(resp *ProviderResponse, judgeCfg ProviderConfig, round int, backend string) {
+	if resp.Provider == "" {
+		resp.Provider = judgeCfg.Name
+	}
+	if resp.ExecutedBackend == "" {
+		resp.ExecutedBackend = backend
+	}
+	resp.Role = "judge"
+	resp.Attempt = round + 1
+	resp.ModelFamily = judgeCfg.ModelFamily
 }
 
 // @AX:NOTE [AUTO] REQ-7 magic constant 0.66 — default consensus threshold; configurable via ConsensusThreshold field

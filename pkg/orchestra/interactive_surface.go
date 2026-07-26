@@ -32,7 +32,27 @@ func validateSurface(ctx context.Context, term terminal.Terminal, paneID termina
 // before CLI launch. For args providers in round > 1, the CLI is launched in
 // REPL mode (without the original prompt). Returns the updated paneInfo on
 // success. (R2, R3, R4)
+// @AX:ANCHOR: [AUTO] fan_in>=3 pane replacement contract shared by round, surface-manager, and retry recovery paths
+// @AX:REASON: [AUTO] callers depend on provider readiness as the commit point before retiring the previous pane
 func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round int) (paneInfo, error) {
+	return recreatePaneWithRetirement(ctx, cfg, pi, round, true)
+}
+
+// recreatePaneAfterRetirement uses the normal replacement launch and readiness
+// gates after a caller has already confirmed that the old pane is closed.
+func recreatePaneAfterRetirement(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round int) (paneInfo, error) {
+	return recreatePaneWithRetirement(ctx, cfg, pi, round, false)
+}
+
+// @AX:WARN: [AUTO] high-branch pane lifecycle — allocation, pipe capture, launch, readiness, and retirement converge here
+// @AX:REASON: [AUTO] more than eight conditional branches protect the replacement commit point and cleanup ownership
+func recreatePaneWithRetirement(
+	ctx context.Context,
+	cfg OrchestraConfig,
+	pi paneInfo,
+	round int,
+	retireOld bool,
+) (paneInfo, error) {
 	oldPaneID := pi.paneID
 	if _, err := recoveryHookSession(cfg); err != nil {
 		return pi, fmt.Errorf("recreatePane %s: %w", pi.provider.Name, err)
@@ -102,7 +122,9 @@ func recreatePane(ctx context.Context, cfg OrchestraConfig, pi paneInfo, round i
 	// paste-buffer fails with exit status 1 on newly created surfaces.
 	time.Sleep(recreatePostReadyDelay)
 
-	retirePaneAfterReplacement(ctx, cfg.Terminal, pi)
+	if retireOld {
+		retirePaneAfterReplacement(ctx, cfg.Terminal, pi)
+	}
 
 	// R3: Log successful recreation.
 	log.Printf("[Surface] %s pane recreated: %s → %s", pi.provider.Name, oldPaneID, newPaneID)

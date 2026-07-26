@@ -92,6 +92,8 @@ func runNonInteractiveDebate(ctx context.Context, cfg OrchestraConfig, rounds in
 }
 
 // runPaneDebate executes the multi-turn debate loop using terminal panes.
+// @AX:WARN: [AUTO] high-branch pane lifecycle — launch, hook, yield, recovery, judge, and cleanup states converge here
+// @AX:REASON: [AUTO] more than eight conditional branches coordinate pane ownership and failure evidence
 func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRound time.Duration, start time.Time) (*OrchestraResult, error) {
 	cfg.DebateRounds = rounds
 	cfg.RunID = ensureRunID(&cfg)
@@ -246,16 +248,24 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 	fmt.Fprintf(os.Stderr, "[Debate 완료] %d라운드, %s\n", len(roundHistory), totalDuration)
 
 	finalResponses := roundHistory[len(roundHistory)-1]
+	var freshJudgeSession *FreshJudgeSessionEvidence
 
 	// Judge round if configured and not skipped by --no-judge.
 	if cfg.JudgeProvider != "" && !cfg.NoJudge {
 		judgeResp := runJudgeRound(ctx, cfg, panes, hookSession, finalResponses, rounds)
 		if judgeResp != nil {
+			freshJudgeSession = judgeResp.freshJudgeSession
+		}
+		if judgeResp != nil && judgeResp.Error == "" && !judgeResp.TimedOut && !judgeResp.EmptyOutput {
 			finalResponses = append(finalResponses, *judgeResp)
 		} else {
 			judgeCfg := findOrBuildJudgeConfig(cfg)
+			judgeErr := fmt.Errorf("judge execution failed or returned no usable output")
+			if judgeResp != nil && judgeResp.Error != "" {
+				judgeErr = fmt.Errorf("%s", judgeResp.Error)
+			}
 			failure := buildFailedProviderWithContext(
-				judgeCfg, nil, fmt.Errorf("judge execution failed or returned no usable output"),
+				judgeCfg, judgeResp, judgeErr,
 				cfg.TimeoutSeconds, "judge", len(finalResponses) > 0,
 			)
 			launchFailed = append(launchFailed, failure)
@@ -263,6 +273,7 @@ func runPaneDebate(ctx context.Context, cfg OrchestraConfig, rounds int, perRoun
 	}
 
 	result := buildDebateResult(cfg, finalResponses, roundHistory, start)
+	result.FreshJudgeSession = freshJudgeSession
 	result.FailedProviders = append(result.FailedProviders, launchFailed...)
 	if len(result.FailedProviders) > 0 {
 		result.Degraded = true

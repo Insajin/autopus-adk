@@ -38,6 +38,7 @@ func TestTryFileIPC_ReadyTimeoutLateWaiterAllowsSafeFallback(t *testing.T) {
 
 	assert.Equal(t, fileIPCSafeFallback, outcome)
 	assert.ErrorContains(t, ipcErr, "wait for ready")
+	assert.Equal(t, promptFailureFileIPCReady, fileIPCPromptFailureCode(ipcErr))
 	require.NoError(t, <-consumed)
 }
 
@@ -57,6 +58,7 @@ func TestTryFileIPC_AcknowledgementTimeoutIsReleaseFailure(t *testing.T) {
 	assert.Equal(t, fileIPCReleaseFailure, outcome)
 	assert.ErrorIs(t, ipcErr, context.DeadlineExceeded)
 	assert.ErrorContains(t, ipcErr, "abort consumption")
+	assert.Equal(t, promptFailureFileIPCReleaseAck, fileIPCPromptFailureCode(ipcErr))
 }
 
 func TestExecuteRound_FileIPCFallbackWaitsForAbortAcknowledgement(t *testing.T) {
@@ -91,7 +93,7 @@ func TestExecuteRound_FileIPCFallbackWaitsForAbortAcknowledgement(t *testing.T) 
 	}
 	longCalls, _ = fileIPCDirectCallCounts(fixture.terminal)
 	assert.Positive(t, longCalls)
-	assert.Contains(t, fileIPCPromptFailure(fixture.store), "write input")
+	assert.Equal(t, promptFailureFileIPCInput, fileIPCPromptFailure(fixture.store))
 }
 
 func TestExecuteRound_AbortWriteFailureSkipsDirectInput(t *testing.T) {
@@ -105,7 +107,7 @@ func TestExecuteRound_AbortWriteFailureSkipsDirectInput(t *testing.T) {
 	assert.Equal(t, skippedHookCollectionError, responses[0].Error)
 	longCalls, commandCalls := fileIPCDirectCallCounts(fixture.terminal)
 	assert.Zero(t, longCalls+commandCalls)
-	assert.Contains(t, fileIPCPromptFailure(fixture.store), "write abort")
+	assert.Equal(t, promptFailureFileIPCAbort, fileIPCPromptFailure(fixture.store))
 }
 
 type fileIPCReleaseRoundFixture struct {
@@ -208,7 +210,7 @@ func fileIPCPromptFailure(store *reliabilityStore) string {
 	defer store.mu.Unlock()
 	for _, receipt := range store.prompt {
 		if receipt.TransportMode == "file_ipc" && receipt.Status == "failed" {
-			return receipt.Mismatch
+			return receipt.FailureCode
 		}
 	}
 	return ""

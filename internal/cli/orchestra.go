@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"time"
@@ -18,7 +17,8 @@ var runOrchestraExecute = orchestra.RunOrchestra
 var runOrchestraTerminalDetector = detectStructuredTerminal
 
 // newOrchestraCmd creates the orchestra root command.
-// @AX:ANCHOR: [AUTO] CLI entry point — registers all 7 orchestra subcommands; changes here affect all orchestra routes
+// @AX:ANCHOR: [AUTO] CLI entry point — registers all orchestra subcommands; changes here affect every orchestra route
+// @AX:REASON: [AUTO] root command wiring and command-surface parity tests consume this constructor
 func newOrchestraCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "orchestra",
@@ -47,7 +47,10 @@ func newOrchestraCmd() *cobra.Command {
 // runOrchestraCommand resolves config and runs the orchestration.
 // It loads autopus.yaml first, resolves strategy and providers via config,
 // and falls back to buildProviderConfigs when config is unavailable.
-// @AX:ANCHOR: [AUTO] fan_in=4 CLI callers (review, plan, secure, brainstorm); rounds param added for debate strategy
+// @AX:ANCHOR: [AUTO] fan_in=4 CLI callers — shared strategy, provider, and judge-resolution boundary
+// @AX:REASON: [AUTO] four production command routes depend on this shared resolution and execution contract
+// @AX:WARN: [AUTO] high-branch orchestration path — provider, judge precedence, detach, output, and degraded states converge here
+// @AX:REASON: [AUTO] more than eight conditional branches coordinate externally visible CLI outcomes
 func runOrchestraCommand(
 	ctx context.Context,
 	commandName string,
@@ -60,6 +63,7 @@ func runOrchestraCommand(
 	threshold float64,
 	flags OrchestraFlags,
 ) error {
+	flagJudge := strings.TrimSpace(judge)
 	// @AX:NOTE [AUTO] REQ-11 opportunistic GC — fires on every orchestra invocation; 1h TTL
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
 	if err := validateOrchestraOutputFormat(flags.OutputFormat); err != nil {
@@ -128,9 +132,20 @@ func runOrchestraCommand(
 	if rounds > 10 {
 		return fmt.Errorf("--rounds 값은 1-10 범위여야 합니다 (입력: %d)", rounds)
 	}
+	invokingProvider := ""
+	judgeSelectionSource := ""
+	if s == orchestra.StrategyDebate && !flags.NoJudge {
+		invokingProvider = detectOrchestraInvokingProvider()
+		judge = resolveInvocationJudge(
+			flagJudge,
+			judge,
+			invokingProvider,
+		)
+		judgeSelectionSource = invocationJudgeSelectionSource(flagJudge, invokingProvider)
+	}
 	if commandName == "brainstorm" && s == orchestra.StrategyDebate {
 		if flags.NoJudge {
-			return fmt.Errorf("brainstorm debate: a separate different-family judge is required")
+			return fmt.Errorf("brainstorm debate: a fresh independent judge session is required")
 		}
 		originalProviders := append([]orchestra.ProviderConfig(nil), providers...)
 		var separationErr error
@@ -149,9 +164,9 @@ func runOrchestraCommand(
 	}
 	configuredProviderNames := providerConfigNames(providers)
 
-	nd := flags.NoDetach
 	keepRelay := flags.KeepRelay
 	noJudge := flags.NoJudge || riskTierSingleProvider
+	nd := flags.NoDetach || (s == orchestra.StrategyDebate && judge != "" && !noJudge)
 	yieldRounds := flags.YieldRounds
 	contextAware := flags.ContextAware
 	subprocessMode := flags.SubprocessMode
@@ -171,33 +186,33 @@ func runOrchestraCommand(
 	}
 
 	cfg := orchestra.OrchestraConfig{
-		Providers:           providers,
-		RequestedProviders:  requestedProviderNames,
-		ConfiguredProviders: configuredProviderNames,
-		Strategy:            s,
-		Prompt:              prompt,
-		TimeoutSeconds:      timeout,
-		JudgeProvider:       judge,
-		JudgeConfig:         judgeConfig,
-		DebateRounds:        rounds,
-		ConsensusThreshold:  resolvedThreshold,
-		MinimumProviders:    reviewRiskMinimumProviders(commandName, flags.RiskTier),
-		Terminal:            term,
-		NoDetach:            nd,
-		KeepRelayOutput:     keepRelay,
-		Interactive:         interactive,
-		HookMode:            monitorRuntime.HookMode,
-		SessionID:           sessionID,
-		NoJudge:             noJudge,
-		YieldRounds:         yieldRounds,
-		ContextAware:        contextAware,
-		SubprocessMode:      subprocessMode,
-		MonitorEnabled:      monitorRuntime.Enabled,
-		MonitorTimeout:      monitorRuntime.PatternTimeout,
-		WorkingDir:          workingDir,
-		FallbackMode:        flags.FallbackMode,
-		RequireJudgeFamilySeparation: commandName == "brainstorm" &&
-			s == orchestra.StrategyDebate,
+		Providers:            providers,
+		RequestedProviders:   requestedProviderNames,
+		ConfiguredProviders:  configuredProviderNames,
+		Strategy:             s,
+		Prompt:               prompt,
+		TimeoutSeconds:       timeout,
+		JudgeProvider:        judge,
+		InvokingProvider:     invokingProvider,
+		JudgeSelectionSource: judgeSelectionSource,
+		JudgeConfig:          judgeConfig,
+		DebateRounds:         rounds,
+		ConsensusThreshold:   resolvedThreshold,
+		MinimumProviders:     reviewRiskMinimumProviders(commandName, flags.RiskTier),
+		Terminal:             term,
+		NoDetach:             nd,
+		KeepRelayOutput:      keepRelay,
+		Interactive:          interactive,
+		HookMode:             monitorRuntime.HookMode,
+		SessionID:            sessionID,
+		NoJudge:              noJudge,
+		YieldRounds:          yieldRounds,
+		ContextAware:         contextAware,
+		SubprocessMode:       subprocessMode,
+		MonitorEnabled:       monitorRuntime.Enabled,
+		MonitorTimeout:       monitorRuntime.PatternTimeout,
+		WorkingDir:           workingDir,
+		FallbackMode:         flags.FallbackMode,
 	}
 	applyHookMode(&cfg)
 
@@ -276,15 +291,4 @@ func runOrchestraCommand(
 	}
 	fmt.Fprintf(os.Stderr, "\n요약: %s (총 %s)\n", result.Summary, result.Duration.Round(1e6))
 	return nil
-}
-
-func writeOrchestraPrimaryOutput(w io.Writer, result *orchestra.OrchestraResult, noJudge bool, sessionID string) (bool, error) {
-	if result.Yield != nil {
-		return true, orchestra.WriteYieldOutput(w, *result.Yield)
-	}
-	if noJudge && len(result.RoundHistory) > 0 {
-		output := orchestra.BuildYieldOutputFromResult(result, sessionID)
-		return true, orchestra.WriteYieldOutput(w, output)
-	}
-	return false, nil
 }

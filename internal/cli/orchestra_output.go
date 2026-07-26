@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -9,8 +10,21 @@ import (
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
+func writeOrchestraPrimaryOutput(w io.Writer, result *orchestra.OrchestraResult, noJudge bool, sessionID string) (bool, error) {
+	if result.Yield != nil {
+		return true, orchestra.WriteYieldOutput(w, *result.Yield)
+	}
+	if noJudge && len(result.RoundHistory) > 0 {
+		output := orchestra.BuildYieldOutputFromResult(result, sessionID)
+		return true, orchestra.WriteYieldOutput(w, output)
+	}
+	return false, nil
+}
+
 // saveOrchestraResult writes orchestra results to a timestamped markdown file
 // under .autopus/orchestra/. Returns the file path on success.
+// @AX:WARN: [AUTO] high-branch artifact writer — result, diagnostics, reliability, and receipt projections converge here
+// @AX:REASON: [AUTO] more than eight conditional branches determine which externally visible artifacts are persisted
 func saveOrchestraResult(command, strategy string, providers []string, timeout ResolvedOrchestraTimeout, result *orchestra.OrchestraResult) (string, error) {
 	dir := ".autopus/orchestra"
 	if err := os.MkdirAll(dir, 0o755); err != nil {

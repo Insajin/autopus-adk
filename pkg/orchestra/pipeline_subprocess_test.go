@@ -39,6 +39,9 @@ func (m *mockBackend) Execute(_ context.Context, req ProviderRequest) (*Provider
 
 func (m *mockBackend) Name() string { return m.name }
 
+// freshExecutionPerRequest models built-in backends: the fake keeps no provider session state.
+func (m *mockBackend) freshExecutionPerRequest() bool { return true }
+
 func (m *mockBackend) Requests() []ProviderRequest {
 	m.mu.Lock()
 	defer m.mu.Unlock()

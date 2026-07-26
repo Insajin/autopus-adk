@@ -10,13 +10,17 @@ import (
 type AgentRuntime string
 
 const (
-	AgentRuntimeUnknown    AgentRuntime = "unknown"
-	AgentRuntimeClaudeCode AgentRuntime = "claude-code"
-	AgentRuntimeCodex      AgentRuntime = "codex"
+	AgentRuntimeUnknown        AgentRuntime = "unknown"
+	AgentRuntimeClaudeCode     AgentRuntime = "claude-code"
+	AgentRuntimeCodex          AgentRuntime = "codex"
+	AgentRuntimeAntigravityCLI AgentRuntime = "antigravity-cli"
+	AgentRuntimeOpenCode       AgentRuntime = "opencode"
 )
 
 // DetectAgentRuntime walks the bounded parent process tree looking for a known
 // agent CLI executable.
+// @AX:ANCHOR: [AUTO] public runtime-identity boundary shared by terminal and orchestra invocation detection
+// @AX:REASON: [AUTO] callers rely on bounded ancestry and exact executable identity to avoid ambient marker false positives
 func DetectAgentRuntime() AgentRuntime {
 	return detectAgentRuntimeFromProcessTree(
 		os.Getppid(),
@@ -26,6 +30,7 @@ func DetectAgentRuntime() AgentRuntime {
 	)
 }
 
+// @AX:NOTE: [AUTO] ancestry traversal is depth-bounded and cycle-safe; the nearest exact known runtime wins
 func detectAgentRuntimeFromProcessTree(
 	startPID int,
 	maxDepth int,
@@ -60,6 +65,7 @@ func detectAgentRuntimeFromProcessTree(
 	return AgentRuntimeUnknown
 }
 
+// @AX:NOTE: [AUTO] executable basenames and known Node entrypoint suffixes are matched exactly; do not broaden to substring detection
 func agentRuntimeFromProcessArgs(args string) AgentRuntime {
 	fields := strings.Fields(args)
 	if len(fields) == 0 {
@@ -72,6 +78,10 @@ func agentRuntimeFromProcessArgs(args string) AgentRuntime {
 		return AgentRuntimeCodex
 	case "claude", "claude-code":
 		return AgentRuntimeClaudeCode
+	case "agy", "gemini", "gemini-cli":
+		return AgentRuntimeAntigravityCLI
+	case "opencode":
+		return AgentRuntimeOpenCode
 	case "node":
 		return agentRuntimeFromNodeEntrypoint(fields)
 	default:
@@ -90,6 +100,10 @@ func agentRuntimeFromNodeEntrypoint(fields []string) AgentRuntime {
 		return AgentRuntimeCodex
 	case strings.HasSuffix(entrypoint, "/@anthropic-ai/claude-code/cli.js"):
 		return AgentRuntimeClaudeCode
+	case strings.HasSuffix(entrypoint, "/@google/gemini-cli/bundle/gemini.js"):
+		return AgentRuntimeAntigravityCLI
+	case strings.HasSuffix(entrypoint, "/opencode-ai/bin/opencode"):
+		return AgentRuntimeOpenCode
 	default:
 		return AgentRuntimeUnknown
 	}

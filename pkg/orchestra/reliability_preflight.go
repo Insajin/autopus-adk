@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// @AX:NOTE: [AUTO] configured completion-hook capability is preflight evidence only and must not claim runtime verification
+const completionHookConfiguredUnverifiedReason = "completion hook is configured but not runtime-verified"
+
 func ensureRunID(cfg *OrchestraConfig) string {
 	if cfg.RunID != "" {
 		return cfg.RunID
@@ -42,28 +45,29 @@ func providerCapability(cfg OrchestraConfig, provider ProviderConfig) ProviderCa
 		launchMode = "pane"
 	}
 	transportMode := "stdin_pipe"
-	switch {
-	case cfg.HookMode:
-		transportMode = "file_ipc"
-	case provider.InteractiveInput == "args":
-		transportMode = "cli_args"
-	case provider.InteractiveInput == "sendkeys":
-		transportMode = "sendkeys"
-	case launchMode == "pane":
-		transportMode = "send_long_text"
+	if launchMode == "pane" {
+		switch {
+		case promptDeliveredAtLaunch(provider):
+			transportMode = "cli_args"
+		case shouldUseSendkeysPromptInput(provider, true):
+			transportMode = "sendkeys"
+		default:
+			transportMode = "send_long_text"
+		}
 	}
 	collectionModes := []string{"subprocess_stdout"}
 	if launchMode == "pane" {
 		collectionModes = []string{"poll"}
-		if cfg.HookMode {
-			collectionModes = []string{"hook", "file_ipc"}
+		hookProviders := resolveHookProviders([]ProviderConfig{provider})
+		if cfg.HookMode && hookProviders[providerArtifactIdentity(provider.Name)] {
+			collectionModes = []string{"hook"}
 		}
 	}
 	return ProviderCapabilityReceipt{
 		LaunchMode:                launchMode,
 		PromptTransportMode:       transportMode,
 		CollectionModes:           collectionModes,
-		SupportsPromptReceipt:     transportMode == "file_ipc" || transportMode == "cli_args" || transportMode == "stdin_pipe",
+		SupportsPromptReceipt:     true,
 		SupportsCollectionReceipt: true,
 		SupportsCWDCheck:          resolveWorkingDir(cfg) != "",
 	}
@@ -84,11 +88,14 @@ func preflightReceipt(runID string, cfg OrchestraConfig, provider ProviderConfig
 	}
 	if capability.LaunchMode == "pane" && cfg.HookMode {
 		receipt.EffectiveCWD = receipt.RequestedCWD
+		if len(capability.CollectionModes) == 1 && capability.CollectionModes[0] == "hook" {
+			receipt.Reason = completionHookConfiguredUnverifiedReason
+		}
 	}
 	return receipt
 }
 
-func promptReceipt(runID, provider, transportMode string, prompt string, round int, status, mismatch string) PromptTransportReceipt {
+func promptReceipt(runID, provider, transportMode string, prompt string, round int, status, failureCodeCandidate string) PromptTransportReceipt {
 	return PromptTransportReceipt{
 		SchemaVersion: reliabilitySchemaVersion,
 		Timestamp:     time.Now().UTC(),
@@ -96,8 +103,8 @@ func promptReceipt(runID, provider, transportMode string, prompt string, round i
 		Provider:      provider,
 		TransportMode: transportMode,
 		Status:        status,
-		Mismatch:      mismatch,
-		Prompt:        sanitizeArtifact(prompt),
+		FailureCode:   normalizePromptFailureCode(status, transportMode, failureCodeCandidate),
+		Prompt:        sanitizePromptArtifact(prompt),
 	}
 }
 

@@ -104,10 +104,12 @@ type ProviderResponse struct {
 	TerminalState   string
 	Usage           []telemetry.UsageEnvelope `json:"usage,omitempty"`
 	UsageCapability UsageCapability           `json:"usage_capability"`
+	// @AX:NOTE: [AUTO] internal-only carrier — fresh judge evidence is projected through OrchestraResult, not provider-response JSON
+	freshJudgeSession *FreshJudgeSessionEvidence
 }
 
 // @AX:ANCHOR: [AUTO] failure diagnostics wire schema shared by CLI JSON output, spec health projection, and yield reports.
-// @AX:REASON: JSON field names and timeout/redaction metadata must stay stable for downstream failure summaries and retry hints.
+// @AX:REASON: [AUTO] JSON field names and timeout/redaction metadata must stay stable for downstream failure summaries and retry hints.
 // FailedProvider records a provider that failed during execution.
 type FailedProvider struct {
 	Name                    string                    `json:"provider"`                            // Provider name
@@ -157,26 +159,28 @@ type OrchestraResult struct {
 	// Additive orchestration_run_receipt.v1 projection. Legacy fields above
 	// remain the compatibility API while these fields make execution policy and
 	// terminal evidence machine-readable.
-	ReceiptSchema       string                   `json:"receipt_schema,omitempty"`
-	RequestedStrategy   Strategy                 `json:"requested_strategy,omitempty"`
-	EffectiveStrategy   Strategy                 `json:"effective_strategy,omitempty"`
-	RequestedProviders  []string                 `json:"requested_providers,omitempty"`
-	ConfiguredProviders []string                 `json:"configured_providers,omitempty"`
-	ResolvedProviders   []string                 `json:"resolved_providers,omitempty"`
-	AttemptedProviders  []string                 `json:"attempted_providers,omitempty"`
-	UsableProviders     []string                 `json:"usable_providers,omitempty"`
-	FailedProviderNames []string                 `json:"failed_providers,omitempty"`
-	DegradedReasons     []string                 `json:"degraded_reasons,omitempty"`
-	JudgeStatus         string                   `json:"judge_status,omitempty"`
-	AnalysisVerdict     string                   `json:"analysis_verdict,omitempty"`
-	GateStatus          string                   `json:"gate_status,omitempty"`
-	TerminalState       string                   `json:"terminal_state,omitempty"`
-	DispatchCount       int                      `json:"dispatch_count"`
-	QuorumRequired      int                      `json:"quorum_required,omitempty"`
-	QuorumMet           bool                     `json:"quorum_met"`
-	ConsensusMetrics    *ConsensusMetrics        `json:"consensus_metrics,omitempty"`
-	Veto                bool                     `json:"critical_veto,omitempty"`
-	JudgeSeparation     *JudgeSeparationEvidence `json:"judge_separation,omitempty"`
+	ReceiptSchema          string                          `json:"receipt_schema,omitempty"`
+	RequestedStrategy      Strategy                        `json:"requested_strategy,omitempty"`
+	EffectiveStrategy      Strategy                        `json:"effective_strategy,omitempty"`
+	RequestedProviders     []string                        `json:"requested_providers,omitempty"`
+	ConfiguredProviders    []string                        `json:"configured_providers,omitempty"`
+	ResolvedProviders      []string                        `json:"resolved_providers,omitempty"`
+	AttemptedProviders     []string                        `json:"attempted_providers,omitempty"`
+	UsableProviders        []string                        `json:"usable_providers,omitempty"`
+	FailedProviderNames    []string                        `json:"failed_providers,omitempty"`
+	DegradedReasons        []string                        `json:"degraded_reasons,omitempty"`
+	JudgeStatus            string                          `json:"judge_status,omitempty"`
+	AnalysisVerdict        string                          `json:"analysis_verdict,omitempty"`
+	GateStatus             string                          `json:"gate_status,omitempty"`
+	TerminalState          string                          `json:"terminal_state,omitempty"`
+	DispatchCount          int                             `json:"dispatch_count"`
+	QuorumRequired         int                             `json:"quorum_required,omitempty"`
+	QuorumMet              bool                            `json:"quorum_met"`
+	ConsensusMetrics       *ConsensusMetrics               `json:"consensus_metrics,omitempty"`
+	Veto                   bool                            `json:"critical_veto,omitempty"`
+	JudgeSeparation        *JudgeSeparationEvidence        `json:"judge_separation,omitempty"`
+	FreshJudgeSession      *FreshJudgeSessionEvidence      `json:"fresh_judge_session,omitempty"`
+	JudgeProviderSelection *JudgeProviderSelectionEvidence `json:"judge_provider_selection,omitempty"`
 }
 
 // OrchestraConfig는 오케스트레이션 실행 설정이다.
@@ -188,6 +192,8 @@ type OrchestraConfig struct {
 	Prompt                       string             // 전달할 프롬프트
 	TimeoutSeconds               int                // 타임아웃 (초)
 	JudgeProvider                string             // debate 전략에서 최종 판정 프로바이더
+	InvokingProvider             string             // canonical provider that invoked the orchestration, when known
+	JudgeSelectionSource         string             // explicit, invoking_provider, or configured_fallback
 	JudgeConfig                  *ProviderConfig    // optional judge config when the judge is not a participant
 	RequireJudgeFamilySeparation bool               // fail closed unless required judge uses a known, distinct model family
 	DebateRounds                 int                // Number of debate rounds (1=no rebuttal, 2=with rebuttal). 0 defaults to 1.

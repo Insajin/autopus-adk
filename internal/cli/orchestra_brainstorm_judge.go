@@ -8,6 +8,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
+// @AX:NOTE: [AUTO] the judge provider remains a Round 1 debater; independence comes from a fresh judge session, not family exclusion
 func separateBrainstormJudge(providers []orchestra.ProviderConfig, judge string) ([]orchestra.ProviderConfig, string, error) {
 	judge = strings.TrimSpace(judge)
 	judgeFamily := providerModelFamily(judge)
@@ -15,21 +16,15 @@ func separateBrainstormJudge(providers []orchestra.ProviderConfig, judge string)
 		return nil, "", fmt.Errorf("brainstorm debate: judge %q has no verifiable model family", judge)
 	}
 
-	debaters := make([]orchestra.ProviderConfig, 0, len(providers))
 	for _, provider := range providers {
-		family := providerModelFamily(provider.Name)
-		if family == "" {
+		if providerModelFamily(provider.Name) == "" {
 			return nil, "", fmt.Errorf("brainstorm debate: provider %q has no verifiable model family", provider.Name)
 		}
-		if family == judgeFamily {
-			continue
-		}
-		debaters = append(debaters, provider)
 	}
-	if len(debaters) < 2 {
-		return nil, "", fmt.Errorf("brainstorm debate: at least two debaters from families other than judge family %q are required", judgeFamily)
+	if len(providers) < 2 {
+		return nil, "", fmt.Errorf("brainstorm debate: at least two configured debaters are required")
 	}
-	return debaters, judgeFamily, nil
+	return append([]orchestra.ProviderConfig(nil), providers...), judgeFamily, nil
 }
 
 func resolveBrainstormJudgeConfig(

@@ -74,13 +74,15 @@ func isSessionReadyBlocked(screen, provider string) bool {
 }
 
 // startupTimeoutFor returns the per-provider startup timeout.
+// @AX:ANCHOR: [AUTO] shared provider-readiness budget used by initial, recovery, and isolated pane launches
+// @AX:REASON: [AUTO] four runtime call sites require consistent defaults; Claude needs 30s to avoid premature startup skips
 func startupTimeoutFor(provider ProviderConfig) time.Duration {
 	if provider.StartupTimeout > 0 {
 		return provider.StartupTimeout
 	}
 	switch providerArtifactIdentity(provider.Name) {
 	case "claude":
-		return 15 * time.Second
+		return 30 * time.Second
 	case "gemini":
 		return 10 * time.Second
 	default:

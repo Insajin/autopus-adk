@@ -41,7 +41,7 @@ func collectRoundHookResults(ctx context.Context, cfg OrchestraConfig, session *
 			reliabilityStoreResolved = true
 		}
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			response := hookTimeoutResponse(cfg, provider, round, time.Now(), ctxErr)
+			response := hookTimeoutResponse(cfg, provider, pi, round, time.Now(), ctxErr)
 			mu.Lock()
 			responses = append(responses, response)
 			mu.Unlock()
@@ -93,7 +93,7 @@ func collectRoundHookProvider(ctx context.Context, cfg OrchestraConfig, session 
 
 	completed, detectorErr := (&FileIPCDetector{session: session}).WaitForCompletion(providerCtx, pi, nil, "", round)
 	if !completed {
-		return hookTimeoutResponse(cfg, provider, round, start, completionWaitError(providerCtx, detectorErr))
+		return hookTimeoutResponse(cfg, provider, pi, round, start, completionWaitError(providerCtx, detectorErr))
 	}
 
 	output, responseFileOK := waitForMarkedHookResponse(providerCtx, pi.responseFile)
@@ -104,7 +104,7 @@ func collectRoundHookProvider(ctx context.Context, cfg OrchestraConfig, session 
 		if provenanceErr != nil {
 			log.Printf("[Round %d] %s completion handoff failed closed; retaining hook: %v", round, provider.Name, provenanceErr)
 			return hookTimeoutResponse(
-				cfg, provider, round, start, fmt.Errorf("completion handoff: %w", provenanceErr),
+				cfg, provider, pi, round, start, fmt.Errorf("completion handoff: %w", provenanceErr),
 			)
 		} else if provenance == hookCompletionResponseFileOnly {
 			log.Printf("[Round %d] %s completion hook inactive after stable response-only handoff", round, provider.Name)
@@ -152,14 +152,22 @@ func completionWaitError(ctx context.Context, detectorErr error) error {
 	return context.DeadlineExceeded
 }
 
-func hookTimeoutResponse(cfg OrchestraConfig, provider ProviderConfig, round int, start time.Time, waitErr error) ProviderResponse {
+// @AX:NOTE: [AUTO] timeout screen output stays in-memory only; persisted receipts are preview-free and TimedOut keeps it outside quorum
+func hookTimeoutResponse(cfg OrchestraConfig, provider ProviderConfig, pi paneInfo, round int, start time.Time, waitErr error) ProviderResponse {
 	errMsg := "hook completion timeout before a done signal was collected"
 	if waitErr != nil {
 		errMsg = fmt.Sprintf("%s: %v", errMsg, waitErr)
 	}
+	rawScreen := readFinalPaneScreen(cfg, pi)
+	if isProviderWorking(rawScreen) || isProviderStillWorking(rawScreen, provider.WorkingPatterns) {
+		rawScreen = ""
+	}
+	screenResponse := NewInteractivePaneBackend(cfg).buildResponseFromScreen(provider.Name, rawScreen, true)
+	output := screenResponse.Output
 	receiptPath := ""
 	if cfg.ReliabilityStore != nil {
-		receipt := collectionReceipt(cfg.RunID, provider.Name, "hook", "hook", "timeout", errMsg, "", round, true)
+		receipt := collectionReceipt(cfg.RunID, provider.Name, "hook", "hook", "timeout", errMsg, output, round, true)
+		receipt.Output.Preview = "" // Timeout screens may echo raw prompts; persist integrity metadata only.
 		receiptPath = cfg.ReliabilityStore.recordCollection(receipt)
 		event := timeoutEvent(cfg.RunID, provider.Name, round, "retry with subprocess fallback")
 		_ = cfg.ReliabilityStore.recordEvent(event)
@@ -170,9 +178,10 @@ func hookTimeoutResponse(cfg OrchestraConfig, provider ProviderConfig, round int
 		ModelFamily:     provider.ModelFamily,
 		ExecutedBackend: paneBackendName,
 		Role:            "participant",
+		Output:          output,
 		Duration:        time.Since(start),
 		TimedOut:        true,
-		EmptyOutput:     true,
+		EmptyOutput:     output == "",
 		Error:           errMsg,
 		Receipt:         receiptPath,
 	}, usageSourcePane, usageReasonPane)

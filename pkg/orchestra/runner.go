@@ -102,6 +102,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 		result.DispatchCount = len(cfg.Providers)
 	}
 	if cfg.Strategy == StrategyDebate {
+		result.FreshJudgeSession = freshJudgeSessionFromResponses(responses)
 		return finalizeDebateOutcome(result, cfg)
 	}
 	return finalizeOrchestraResultForConfig(result, cfg), nil

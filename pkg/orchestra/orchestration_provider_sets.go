@@ -45,6 +45,8 @@ func attemptedProviderNames(result *OrchestraResult) []string {
 	return names
 }
 
+// @AX:WARN: [AUTO] high-branch quorum projection — latest participant attempts count while judge outcomes stay excluded
+// @AX:REASON: [AUTO] more than eight conditional branches determine the usable-provider denominator and ordering
 func usableProviderNames(result *OrchestraResult) []string {
 	type outcome struct {
 		attempt int
@@ -53,6 +55,9 @@ func usableProviderNames(result *OrchestraResult) []string {
 	outcomes := make(map[string]outcome)
 	var order []string
 	recordResponse := func(response ProviderResponse, fallbackAttempt int) {
+		if response.Role == "judge" || strings.HasSuffix(strings.TrimSpace(response.Provider), " (judge)") {
+			return
+		}
 		name := trimJudgeRole(response.Provider)
 		if name == "" {
 			return
@@ -77,6 +82,9 @@ func usableProviderNames(result *OrchestraResult) []string {
 		recordResponse(response, 1)
 	}
 	for _, failed := range result.FailedProviders {
+		if failed.Role == "judge" {
+			continue
+		}
 		name := trimJudgeRole(failed.Name)
 		if name == "" || failed.PreflightFailed {
 			continue

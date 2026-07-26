@@ -39,10 +39,13 @@ func runDebate(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, []
 
 	// Phase 3 (optional): judge verdict. A required judge failure remains visible
 	// in the same failed-provider stream as participant failures.
+	// @AX:NOTE: [AUTO] failed-judge freshness evidence rides the last participant response so finalization can still project it
 	if cfg.JudgeProvider != "" && !cfg.NoJudge {
-		judgeResp, judgeFailure := executeDebateJudge(ctx, cfg, responses)
+		judgeResp, judgeFailure, freshJudgeSession := executeDebateJudge(ctx, cfg, responses)
 		if judgeResp != nil {
 			responses = append(responses, *judgeResp)
+		} else if len(responses) > 0 {
+			responses[len(responses)-1].freshJudgeSession = freshJudgeSession
 		}
 		if judgeFailure != nil {
 			round1Failed = append(round1Failed, *judgeFailure)

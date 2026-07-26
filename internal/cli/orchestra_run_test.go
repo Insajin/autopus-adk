@@ -142,6 +142,66 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 	assert.Equal(t, "codex", captured.Providers[0].Name)
 }
 
+func TestRunSubprocessPipeline_ImplicitClaudeConfigUsesCodexInvokerJudge(t *testing.T) {
+	origLoadConfig := orchestraRunLoadConfig
+	origBuildProviders := orchestraRunBuildProviders
+	origBackendFactory := orchestraRunBackendFactory
+	origExecutePipeline := orchestraRunExecutePipeline
+	origInvokerDetector := detectOrchestraInvokingProvider
+	t.Cleanup(func() {
+		orchestraRunLoadConfig = origLoadConfig
+		orchestraRunBuildProviders = origBuildProviders
+		orchestraRunBackendFactory = origBackendFactory
+		orchestraRunExecutePipeline = origExecutePipeline
+		detectOrchestraInvokingProvider = origInvokerDetector
+	})
+
+	orchestraRunLoadConfig = func(globalFlags) (*config.HarnessConfig, error) {
+		return &config.HarnessConfig{
+			Orchestra: config.OrchestraConf{
+				Judge: "claude",
+				Providers: map[string]config.ProviderEntry{
+					"claude": {Binary: "claude"},
+					"codex":  {Binary: "codex", Args: []string{"exec"}},
+				},
+			},
+		}, nil
+	}
+	orchestraRunBuildProviders = buildProviderConfigsForRuntime
+	var capturedRunCfg orchestra.OrchestraConfig
+	orchestraRunBackendFactory = func(cfg orchestra.OrchestraConfig) orchestra.ExecutionBackend {
+		capturedRunCfg = cfg
+		return noopExecutionBackend{}
+	}
+	detectOrchestraInvokingProvider = func() string { return "codex" }
+
+	var captured orchestra.SubprocessPipelineConfig
+	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {
+		captured = cfg
+		return &orchestra.OrchestraResult{
+			Strategy: orchestra.StrategyDebate,
+			Responses: []orchestra.ProviderResponse{
+				{Provider: "claude", Output: "usable claude result"},
+				{Provider: "codex", Output: "usable codex result"},
+			},
+			Merged:      "ok",
+			Summary:     "done",
+			JudgeStatus: orchestra.JudgePassed,
+		}, nil
+	}
+
+	err := runSubprocessPipeline(
+		context.Background(), "topic", "debate", nil, "fast",
+		120, false, "", false, false,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, "codex", captured.Judge.Name)
+	assert.Equal(t, "codex", capturedRunCfg.JudgeProvider)
+	assert.Equal(t, "codex", capturedRunCfg.InvokingProvider)
+	assert.Equal(t, orchestra.JudgeSelectionInvokingProvider, capturedRunCfg.JudgeSelectionSource)
+}
+
 func TestRunSubprocessPipeline_AppliesRuntimeCodexQualityAndEffort(t *testing.T) {
 	installRuntimeCodexCatalogFixture(t)
 	origLoadConfig := orchestraRunLoadConfig

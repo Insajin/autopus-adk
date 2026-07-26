@@ -18,6 +18,8 @@ const (
 	JudgeFailed       = "failed"
 )
 
+// @AX:ANCHOR: [AUTO] fan_in>=3 shared result-projection boundary for provider, judge, quorum, and receipt evidence
+// @AX:REASON: [AUTO] interactive, subprocess, relay, fallback, and sibling package paths consume this contract
 func finalizeOrchestraResultForConfig(result *OrchestraResult, cfg OrchestraConfig) *OrchestraResult {
 	if result == nil {
 		return nil
@@ -34,8 +36,12 @@ func finalizeOrchestraResultForConfig(result *OrchestraResult, cfg OrchestraConf
 		result.RunID = ensureRunID(&cfg)
 	}
 	if cfg.Strategy == StrategyDebate && cfg.JudgeProvider != "" {
+		judge := findOrBuildJudgeConfig(cfg)
 		result.JudgeSeparation = evaluateJudgeFamilySeparation(
-			cfg.Providers, findOrBuildJudgeConfig(cfg), cfg.RequireJudgeFamilySeparation && !cfg.NoJudge,
+			cfg.Providers, judge, cfg.RequireJudgeFamilySeparation && !cfg.NoJudge,
+		)
+		result.JudgeProviderSelection = evaluateJudgeProviderSelection(
+			cfg.InvokingProvider, judge.Name, cfg.JudgeSelectionSource,
 		)
 	}
 	if cfg.Strategy == StrategyConsensus {
@@ -54,6 +60,8 @@ func FinalizeOrchestrationResult(result *OrchestraResult, cfg OrchestraConfig) *
 	return finalizeOrchestraResultForConfig(result, cfg)
 }
 
+// @AX:WARN: [AUTO] high-branch receipt finalizer — provider sets, quorum, veto, judge, terminal, and gate states converge here
+// @AX:REASON: [AUTO] more than eight conditional branches determine the canonical machine-readable outcome
 func finalizeOrchestrationContract(result *OrchestraResult) *OrchestraResult {
 	if result == nil {
 		return nil

@@ -70,6 +70,31 @@ func TestDetectAgentRuntimeFromProcessTree_AgentAncestor_ReturnsRuntime(t *testi
 			agentArgs: "/opt/homebrew/bin/node /opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/cli.js",
 			want:      AgentRuntimeClaudeCode,
 		},
+		{
+			name:      "antigravity native binary ancestor",
+			agentArgs: "/Users/test/.local/bin/agy --print topic",
+			want:      AgentRuntimeAntigravityCLI,
+		},
+		{
+			name:      "gemini binary ancestor",
+			agentArgs: "/opt/homebrew/bin/gemini --model gemini-3.1-pro-preview",
+			want:      AgentRuntimeAntigravityCLI,
+		},
+		{
+			name:      "gemini node entrypoint ancestor",
+			agentArgs: "/opt/homebrew/bin/node /opt/homebrew/lib/node_modules/@google/gemini-cli/bundle/gemini.js",
+			want:      AgentRuntimeAntigravityCLI,
+		},
+		{
+			name:      "opencode binary ancestor",
+			agentArgs: "/opt/homebrew/bin/opencode run",
+			want:      AgentRuntimeOpenCode,
+		},
+		{
+			name:      "opencode node entrypoint ancestor",
+			agentArgs: "/opt/homebrew/bin/node /opt/homebrew/lib/node_modules/opencode-ai/bin/opencode",
+			want:      AgentRuntimeOpenCode,
+		},
 	}
 
 	for _, tt := range tests {

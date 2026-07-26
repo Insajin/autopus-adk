@@ -36,67 +36,73 @@ type WorkerRunReceipt struct {
 }
 
 // OrchestrationRunReceipt is the canonical machine-readable run evidence.
+// @AX:ANCHOR: [AUTO] versioned JSON receipt contract consumed by CLI artifacts and downstream orchestration evidence readers
+// @AX:REASON: [AUTO] field names and additive evidence projections must remain compatible with orchestration_run_receipt.v1
 type OrchestrationRunReceipt struct {
-	Schema              string                    `json:"schema"`
-	RunID               string                    `json:"run_id"`
-	RouteID             string                    `json:"route_id"`
-	RouteVersion        string                    `json:"route_version"`
-	RequestedStrategy   Strategy                  `json:"requested_strategy"`
-	EffectiveStrategy   Strategy                  `json:"effective_strategy"`
-	RequestedProviders  []string                  `json:"requested_providers"`
-	ConfiguredProviders []string                  `json:"configured_providers"`
-	ResolvedProviders   []string                  `json:"resolved_providers"`
-	AttemptedProviders  []string                  `json:"attempted_providers"`
-	UsableProviders     []string                  `json:"usable_providers"`
-	FailedProviders     []string                  `json:"failed_providers"`
-	DegradedReasons     []string                  `json:"degraded_reasons"`
-	CriticalVeto        bool                      `json:"critical_veto"`
-	AnalysisVerdict     string                    `json:"analysis_verdict"`
-	GateStatus          string                    `json:"gate_status"`
-	TerminalState       string                    `json:"terminal_state"`
-	JudgeStatus         string                    `json:"judge_status"`
-	DispatchCount       int                       `json:"dispatch_count"`
-	QuorumRequired      int                       `json:"quorum_required"`
-	QuorumMet           bool                      `json:"quorum_met"`
-	Attempts            int                       `json:"attempts"`
-	ConsensusMetrics    *ConsensusMetrics         `json:"consensus_metrics,omitempty"`
-	JudgeSeparation     *JudgeSeparationEvidence  `json:"judge_separation,omitempty"`
-	ProviderReceipts    []ProviderRunReceipt      `json:"provider_receipts"`
-	WorkerReceipts      []WorkerRunReceipt        `json:"worker_receipts"`
-	Artifacts           []string                  `json:"artifacts"`
-	Transitions         []OrchestrationTransition `json:"transitions"`
+	Schema                 string                          `json:"schema"`
+	RunID                  string                          `json:"run_id"`
+	RouteID                string                          `json:"route_id"`
+	RouteVersion           string                          `json:"route_version"`
+	RequestedStrategy      Strategy                        `json:"requested_strategy"`
+	EffectiveStrategy      Strategy                        `json:"effective_strategy"`
+	RequestedProviders     []string                        `json:"requested_providers"`
+	ConfiguredProviders    []string                        `json:"configured_providers"`
+	ResolvedProviders      []string                        `json:"resolved_providers"`
+	AttemptedProviders     []string                        `json:"attempted_providers"`
+	UsableProviders        []string                        `json:"usable_providers"`
+	FailedProviders        []string                        `json:"failed_providers"`
+	DegradedReasons        []string                        `json:"degraded_reasons"`
+	CriticalVeto           bool                            `json:"critical_veto"`
+	AnalysisVerdict        string                          `json:"analysis_verdict"`
+	GateStatus             string                          `json:"gate_status"`
+	TerminalState          string                          `json:"terminal_state"`
+	JudgeStatus            string                          `json:"judge_status"`
+	DispatchCount          int                             `json:"dispatch_count"`
+	QuorumRequired         int                             `json:"quorum_required"`
+	QuorumMet              bool                            `json:"quorum_met"`
+	Attempts               int                             `json:"attempts"`
+	ConsensusMetrics       *ConsensusMetrics               `json:"consensus_metrics,omitempty"`
+	JudgeSeparation        *JudgeSeparationEvidence        `json:"judge_separation,omitempty"`
+	FreshJudgeSession      *FreshJudgeSessionEvidence      `json:"fresh_judge_session,omitempty"`
+	JudgeProviderSelection *JudgeProviderSelectionEvidence `json:"judge_provider_selection,omitempty"`
+	ProviderReceipts       []ProviderRunReceipt            `json:"provider_receipts"`
+	WorkerReceipts         []WorkerRunReceipt              `json:"worker_receipts"`
+	Artifacts              []string                        `json:"artifacts"`
+	Transitions            []OrchestrationTransition       `json:"transitions"`
 }
 
 func refreshOrchestrationRunReceipt(result *OrchestraResult) {
 	providerReceipts, attempts := buildProviderRunReceipts(result)
 	result.RunReceipt = &OrchestrationRunReceipt{
-		Schema:              OrchestrationReceiptSchema,
-		RunID:               result.RunID,
-		RouteID:             "orchestra:" + string(result.EffectiveStrategy),
-		RouteVersion:        OrchestraRouteVersion,
-		RequestedStrategy:   result.RequestedStrategy,
-		EffectiveStrategy:   result.EffectiveStrategy,
-		RequestedProviders:  cloneProviderNames(result.RequestedProviders),
-		ConfiguredProviders: cloneProviderNames(result.ConfiguredProviders),
-		ResolvedProviders:   cloneProviderNames(result.ResolvedProviders),
-		AttemptedProviders:  cloneProviderNames(result.AttemptedProviders),
-		UsableProviders:     cloneProviderNames(result.UsableProviders),
-		FailedProviders:     cloneProviderNames(result.FailedProviderNames),
-		DegradedReasons:     cloneProviderNames(result.DegradedReasons),
-		CriticalVeto:        result.Veto,
-		AnalysisVerdict:     result.AnalysisVerdict,
-		GateStatus:          result.GateStatus,
-		TerminalState:       result.TerminalState,
-		JudgeStatus:         result.JudgeStatus,
-		DispatchCount:       result.DispatchCount,
-		QuorumRequired:      result.QuorumRequired,
-		QuorumMet:           result.QuorumMet,
-		Attempts:            attempts,
-		ConsensusMetrics:    result.ConsensusMetrics,
-		JudgeSeparation:     result.JudgeSeparation,
-		ProviderReceipts:    providerReceipts,
-		WorkerReceipts:      []WorkerRunReceipt{},
-		Artifacts:           collectRunArtifacts(result),
+		Schema:                 OrchestrationReceiptSchema,
+		RunID:                  result.RunID,
+		RouteID:                "orchestra:" + string(result.EffectiveStrategy),
+		RouteVersion:           OrchestraRouteVersion,
+		RequestedStrategy:      result.RequestedStrategy,
+		EffectiveStrategy:      result.EffectiveStrategy,
+		RequestedProviders:     cloneProviderNames(result.RequestedProviders),
+		ConfiguredProviders:    cloneProviderNames(result.ConfiguredProviders),
+		ResolvedProviders:      cloneProviderNames(result.ResolvedProviders),
+		AttemptedProviders:     cloneProviderNames(result.AttemptedProviders),
+		UsableProviders:        cloneProviderNames(result.UsableProviders),
+		FailedProviders:        cloneProviderNames(result.FailedProviderNames),
+		DegradedReasons:        cloneProviderNames(result.DegradedReasons),
+		CriticalVeto:           result.Veto,
+		AnalysisVerdict:        result.AnalysisVerdict,
+		GateStatus:             result.GateStatus,
+		TerminalState:          result.TerminalState,
+		JudgeStatus:            result.JudgeStatus,
+		DispatchCount:          result.DispatchCount,
+		QuorumRequired:         result.QuorumRequired,
+		QuorumMet:              result.QuorumMet,
+		Attempts:               attempts,
+		ConsensusMetrics:       result.ConsensusMetrics,
+		JudgeSeparation:        result.JudgeSeparation,
+		FreshJudgeSession:      result.FreshJudgeSession,
+		JudgeProviderSelection: result.JudgeProviderSelection,
+		ProviderReceipts:       providerReceipts,
+		WorkerReceipts:         []WorkerRunReceipt{},
+		Artifacts:              collectRunArtifacts(result),
 		Transitions: []OrchestrationTransition{{
 			Sequence: 1, State: result.TerminalState,
 			AnalysisVerdict: result.AnalysisVerdict, GateStatus: result.GateStatus,
@@ -104,6 +110,8 @@ func refreshOrchestrationRunReceipt(result *OrchestraResult) {
 	}
 }
 
+// @AX:WARN: [AUTO] high-branch receipt projection — strategy, role, attempt, and failure paths converge here
+// @AX:REASON: [AUTO] more than eight conditional branches determine externally visible provider receipt evidence
 func buildProviderRunReceipts(result *OrchestraResult) ([]ProviderRunReceipt, int) {
 	receipts := make([]ProviderRunReceipt, 0, result.DispatchCount)
 	maxAttempt := 0

@@ -63,6 +63,9 @@ func (b *contractRoleBackend) Execute(_ context.Context, req ProviderRequest) (*
 
 func (b *contractRoleBackend) Name() string { return "contract-recorder" }
 
+// freshExecutionPerRequest models one independent built-in execution per recorded request.
+func (b *contractRoleBackend) freshExecutionPerRequest() bool { return true }
+
 func (b *contractRoleBackend) count(role string) int {
 	b.mu.Lock()
 	defer b.mu.Unlock()

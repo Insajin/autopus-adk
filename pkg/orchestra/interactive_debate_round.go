@@ -10,6 +10,8 @@ import (
 )
 
 // executeRound sends prompts to all panes and collects responses for one round.
+// @AX:WARN: [AUTO] high-branch round coordinator — surface, file IPC, prompt delivery, recovery, and collection converge here
+// @AX:REASON: [AUTO] more than eight conditional branches must preserve pane ownership and one-response-per-provider semantics
 func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, hookSession *HookSession, round int, prevResponses []ProviderResponse) []ProviderResponse {
 	patterns := DefaultCompletionPatterns()
 	var roundPromptFiles []string
@@ -100,10 +102,13 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		// A recovered pane already received its current-round coordinates before
 		// launch. Submit that one round directly, then restore file IPC next round.
 		directPromptRound := pi.directPromptRound == round
+		fileIPCRecovered := false
 		// File IPC for Round 2+ when hook is available (SPEC-ORCH-017 R4).
 		if round > 1 && !directPromptRound && hookSession != nil && hookSession.HasHook(pi.provider.Name) {
-			ipcOutcome, ipcErr := tryFileIPC(ctx, hookSession, pi.provider.Name, round, sendPrompt)
-			if ipcOutcome == fileIPCDelivered {
+			resolution, resolveErr := resolveRoundFileIPC(
+				ctx, cfg, hookSession, *pi, round, prompt, sendPrompt,
+			)
+			if resolution.delivered {
 				if promptFile != "" {
 					pi.promptFiles = append(pi.promptFiles, promptFile)
 					panes[i].promptFiles = pi.promptFiles
@@ -112,24 +117,18 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 					pi.responseFile = responseFile
 					panes[i].responseFile = responseFile
 				}
-				if cfg.ReliabilityStore != nil {
-					receipt := promptReceipt(cfg.RunID, pi.provider.Name, "file_ipc", prompt, round, "pass", "")
-					_ = cfg.ReliabilityStore.recordPrompt(receipt)
-				}
 				continue
 			}
-			failureReason := "file IPC fallback activated before completion wait"
-			if ipcErr != nil {
-				failureReason = ipcErr.Error()
-			}
-			if cfg.ReliabilityStore != nil {
-				receipt := promptReceipt(cfg.RunID, pi.provider.Name, "file_ipc", prompt, round, "failed", failureReason)
-				_ = cfg.ReliabilityStore.recordPrompt(receipt)
-			}
-			if ipcOutcome != fileIPCSafeFallback {
-				log.Printf("[Round %d] %s file IPC release failed: %s -- skipping", round, pi.provider.Name, failureReason)
+			if resolveErr != nil {
+				panes[i] = resolution.pane
 				panes[i].skipWait = true
+				log.Printf("[Round %d] %s file IPC recovery failed: %v -- skipping", round, pi.provider.Name, resolveErr)
 				continue
+			}
+			if resolution.recovered {
+				panes[i] = resolution.pane
+				pi = &panes[i]
+				fileIPCRecovered = true
 			}
 		}
 
@@ -162,7 +161,12 @@ func executeRound(ctx context.Context, cfg OrchestraConfig, panes []paneInfo, ho
 		if cfg.HookMode && hookSession != nil && !isCodexInteractiveProvider(pi.provider) {
 			submitDelay = 50 * time.Millisecond
 		}
-		if shouldUseSendkeysPromptInput(pi.provider, promptFile != "") {
+		if fileIPCRecovered {
+			sendErr = submitFileIPCRecoveryPromptOnce(
+				ctx, cfg, *pi, sendPrompt, promptFile != "", submitDelay,
+			)
+			newPI = *pi
+		} else if shouldUseSendkeysPromptInput(pi.provider, promptFile != "") {
 			// Normalize newlines to spaces for sendkeys (shell line continuation prevention).
 			normalized := strings.ReplaceAll(sendPrompt, "\n", " ")
 			var enterErr error

@@ -40,6 +40,23 @@ Opportunity-Solution Tree, 다관점 브레인스토밍, 가정 식별을 포함
 | `--auto` | 질문 없이 `assumed`/`deferred` rows 기록 후 `/auto plan --from-idea BS-{ID}` 자동 체이닝 |
 | `--deep-clarify` | 기본 1문항 대신 최대 3문항까지 clarification 허용 |
 
+## Canonical orchestration contract
+
+```json
+{
+  "schema": "orchestration-contract.v1",
+  "idea": {
+    "strategy": "debate",
+    "round_sequence": ["independent_divergence", "informed_revision", "blind_judge"],
+    "minimum_rounds": 2,
+    "fallback_minimum_rounds": 2,
+    "blind_separate_judge": true,
+    "fresh_judge_session": true,
+    "preserve_dissent": true
+  }
+}
+```
+
 ## 5단계 파이프라인
 
 ### Step 1: 입력 파싱
@@ -154,18 +171,38 @@ Intent Brief의 Problem은 가능하면 `double-diamond` 형식으로 씁니다:
 PM/Designer/Engineer 3가지 관점에서 다각적 발산을 유도합니다.
 Step 2의 Intent Brief를 `{structured idea}`에 포함하고, 토론자들이 솔루션을 내기 전에 문제 정의와 미확인 가정을 먼저 검증하도록 지시합니다.
 
-**서브프로세스 모드 (권장 — 모든 터미널에서 작동)**:
+**debate 호출 (기본)**:
 ```bash
-auto orchestra run "{structured idea}" --strategy {strategy} --rounds standard
+auto orchestra brainstorm "{structured idea}" --strategy debate --providers {providers} --rounds 2 --judge {invoking_provider} --no-detach --format json
 ```
 
-**Pane 모드 (cmux/tmux 필요)**:
+**다른 strategy 호출**:
 ```bash
-auto orchestra brainstorm "{structured idea}" --strategy {strategy}
+auto orchestra brainstorm "{structured idea}" --strategy {strategy} --providers {providers} --no-detach --format json
 ```
 
-서브프로세스 모드는 JSON 스키마 기반 구조화 출력으로 더 정확한 결과를 제공합니다.
-프로바이더 실패 시 나머지 결과로 계속 진행합니다.
+명시적 `--providers`가 없을 때만 해당 플래그를 생략합니다. resolved configured debate
+집합의 모든 provider는 Round 1 독립 발산과 Round 2 informed revision에 모두 참여하며
+judge 선택 때문에 제외되지 않습니다. 익명화한 peer 결과만 Round 2에 전달하고, 고유
+아이디어·소수 의견·반대 근거를 dissent appendix에 보존합니다.
+
+blind judge는 invoking provider를 사용하되 참가자와 분리된 fresh isolated provider
+session에서 실행합니다. Round 1/2 참가 세션의 context, history, tool state를
+재사용하거나 공유하면 안 됩니다.
+
+성공으로 진행하기 전에 `schema=orchestration_cli_result.v1`과 중첩된
+`receipt.schema=orchestration_run_receipt.v1`을 확인하고 다음 evidence를 검증합니다:
+
+- resolved provider 집합 전체가 Round 1과 Round 2에 존재
+- `round_history`가 최소 2개
+- judge provider가 invoking provider와 일치
+- `fresh isolated judge session evidence`가 존재하고 참가 세션 ID와 다름
+- judge status가 성공이며 dissent appendix가 보존됨
+
+Fallback은 orchestra 호출이 실제 오류를 반환한 경우에만 허용합니다. 오류를 그대로
+표시하고 같은 provider/strategy/judge에 `--subprocess --no-detach --format json`을
+붙여 동일 엔진을 한 번 재시도합니다. 재시도도 실패하거나 위 evidence가 없으면
+성공으로 축소하지 말고 `orchestra_unavailable` blocker로 종료합니다.
 
 ### Step 4: ICE 스코어링 + Assumption Risk Overlay
 

@@ -27,6 +27,8 @@ func (m *mockFailBackend) Execute(_ context.Context, req ProviderRequest) (*Prov
 
 func (m *mockFailBackend) Name() string { return "mock-fail" }
 
+func (m *mockFailBackend) freshExecutionPerRequest() bool { return true }
+
 func TestIntegration_SubprocessPipeline_FullDebate(t *testing.T) {
 	t.Parallel()
 	backend := &mockBackend{name: "integration"}

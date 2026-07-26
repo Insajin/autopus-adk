@@ -2,13 +2,34 @@ package orchestra
 
 import "fmt"
 
+// @AX:ANCHOR: [AUTO] fan_in>=3 fail-closed debate gate for judge verdict and fresh-session evidence
+// @AX:REASON: [AUTO] interactive, subprocess, pipeline, and runner paths depend on the same blocked outcome contract
 func finalizeDebateOutcome(result *OrchestraResult, cfg OrchestraConfig) (*OrchestraResult, error) {
+	if result != nil && result.FreshJudgeSession == nil {
+		result.FreshJudgeSession = freshJudgeSessionFromResponses(result.Responses)
+	}
 	result = finalizeOrchestraResultForConfig(result, cfg)
 	if result == nil || cfg.Strategy != StrategyDebate || cfg.JudgeProvider == "" || cfg.NoJudge || result.Yield != nil {
 		return result, nil
 	}
-	if result.JudgeStatus == JudgePassed {
+	evidenceErr := freshJudgeSessionError(result.FreshJudgeSession)
+	if configErr := freshJudgeConfigError(findOrBuildJudgeConfig(cfg)); configErr != nil {
+		evidenceErr = configErr
+	}
+	if evidenceErr != nil {
+		appendDegradedReason(result, "fresh_judge_session")
+	}
+	if result.JudgeStatus == JudgePassed && evidenceErr == nil {
 		return result, nil
+	}
+	if result.JudgeStatus == JudgePassed && evidenceErr != nil {
+		result.FailedProviders = append(result.FailedProviders, FailedProvider{
+			Name:            cfg.JudgeProvider,
+			Role:            "judge",
+			Error:           fmt.Sprintf("required fresh judge session evidence failed: %v", evidenceErr),
+			FailureClass:    "execution_error",
+			NextRemediation: "retry the judge in a fresh execution session or use --no-judge explicitly",
+		})
 	}
 	if !hasJudgeFailure(result.FailedProviders) {
 		result.FailedProviders = append(result.FailedProviders, FailedProvider{

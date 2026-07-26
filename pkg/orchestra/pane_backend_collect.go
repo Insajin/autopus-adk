@@ -10,6 +10,7 @@ import (
 
 // finalReadTimeout bounds the scrollback read after completion/timeout so the
 // backend never blocks indefinitely while harvesting the screen (REQ-011).
+// @AX:NOTE: [AUTO] five-second diagnostic-read cap uses a fresh context after the provider deadline is consumed
 const finalReadTimeout = 5 * time.Second
 
 // collectResponse prefers the file-backed response contract, then a structured
@@ -45,12 +46,7 @@ func (b *InteractivePaneBackend) collectResponse(ctx context.Context, req Provid
 	//
 	// Use a fresh, bounded context for the final read: the original ctx may be
 	// cancelled after a completion timeout (mirrors interactive_collect.go).
-	readCtx, cancel := context.WithTimeout(context.Background(), finalReadTimeout)
-	defer cancel()
-	screen, _ := b.cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{
-		Scrollback:      true,
-		ScrollbackLines: scrollbackDepth(b.cfg.ScrollbackLines),
-	})
+	screen := readFinalPaneScreen(b.cfg, pi)
 	resp := b.buildResponseFromScreen(req.Provider, screen, timedOut)
 	// When a timed-out reviewer pane also left an empty screen, restore the
 	// missing-response-file diagnostic so the failure stays attributable.
@@ -77,4 +73,17 @@ func (b *InteractivePaneBackend) buildResponseFromScreen(provider, rawScreen str
 		EmptyOutput:     sanitized == "",
 		ExecutedBackend: paneBackendName,
 	}, usageSourcePane, usageReasonPane)
+}
+
+func readFinalPaneScreen(cfg OrchestraConfig, pi paneInfo) string {
+	if cfg.Terminal == nil || pi.paneID == "" {
+		return ""
+	}
+	readCtx, cancel := context.WithTimeout(context.Background(), finalReadTimeout)
+	defer cancel()
+	screen, _ := cfg.Terminal.ReadScreen(readCtx, pi.paneID, terminal.ReadScreenOpts{
+		Scrollback:      true,
+		ScrollbackLines: scrollbackDepth(cfg.ScrollbackLines),
+	})
+	return screen
 }

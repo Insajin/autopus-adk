@@ -214,6 +214,9 @@ func (r *recordingBackend) Name() string {
 	return "recording"
 }
 
+// freshExecutionPerRequest models a new built-in execution for every recorded request.
+func (r *recordingBackend) freshExecutionPerRequest() bool { return true }
+
 func TestRunSubprocessPipeline_EmbedsPromptSchemaWhenProviderLacksSchemaFlag(t *testing.T) {
 	t.Parallel()
 

@@ -51,11 +51,18 @@ envelope and receipt used by synchronous consumers.
     "minimum_rounds": 2,
     "fallback_minimum_rounds": 2,
     "blind_separate_judge": true,
-    "different_model_family": true,
+    "fresh_judge_session": true,
     "preserve_dissent": true
   }
 }
 ```
+
+Every provider in the resolved configured debate set, including Claude, participates
+in both Round 1 and Round 2. Judge selection never removes a debate participant.
+The debate invocation MUST pass `--judge {invoking_provider}`. The blind judge
+uses that invoking provider in a fresh isolated provider session and MUST NOT
+reuse or share Round 1/2 participant session context, history, or tool state.
+Provider identities remain anonymized and dissent remains preserved.
 
 ## Team
 

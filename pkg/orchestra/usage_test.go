@@ -250,6 +250,9 @@ func (b *usagePipelineBackend) Execute(_ context.Context, req ProviderRequest) (
 
 func (b *usagePipelineBackend) Name() string { return "subprocess" }
 
+// freshExecutionPerRequest models the subprocess backend's isolated process per usage receipt.
+func (b *usagePipelineBackend) freshExecutionPerRequest() bool { return true }
+
 func actualOrchestraUsage(runID, callID, provider string, input, output int64) telemetry.UsageEnvelope {
 	return telemetry.NormalizeUsage(telemetry.UsageInput{
 		RunID: runID, CallID: callID, Provider: provider, Source: telemetry.UsageSourceProvider,

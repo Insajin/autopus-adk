@@ -9,7 +9,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
-func TestSeparateBrainstormJudge_RemovesJudgeFamilyFromDebaters(t *testing.T) {
+func TestSeparateBrainstormJudge_KeepsJudgeProviderAsRoundOneDebater(t *testing.T) {
 	t.Parallel()
 
 	providers := []orchestra.ProviderConfig{
@@ -22,7 +22,8 @@ func TestSeparateBrainstormJudge_RemovesJudgeFamilyFromDebaters(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "anthropic", family)
-	assert.Equal(t, []string{"codex", "gemini"}, providerConfigNames(got))
+	assert.Equal(t, []string{"claude", "codex", "gemini"}, providerConfigNames(got),
+		"judge independence comes from a fresh execution session, not by removing its provider from Round 1")
 }
 
 func TestSeparateBrainstormJudge_FailsClosedForUnknownFamily(t *testing.T) {
@@ -42,7 +43,6 @@ func TestSeparateBrainstormJudge_FailsClosedWithFewerThanTwoDebaters(t *testing.
 
 	_, _, err := separateBrainstormJudge([]orchestra.ProviderConfig{
 		{Name: "claude", Binary: "claude"},
-		{Name: "codex", Binary: "codex"},
 	}, "claude")
 
 	require.Error(t, err)

@@ -17,7 +17,7 @@ name: auto-idea
     "minimum_rounds": 2,
     "fallback_minimum_rounds": 2,
     "blind_separate_judge": true,
-    "different_model_family": true,
+    "fresh_judge_session": true,
     "preserve_dissent": true
   }
 }
@@ -192,7 +192,7 @@ Visual Brief를 `{structured idea}`에 포함합니다. 사용자가 지정한 s
 Debate 호출:
 
 ```bash
-auto orchestra brainstorm "{structured idea}" --strategy debate --providers {providers} --rounds 2 --judge {different_model_family_judge} --context --timeout 300 --no-detach --format json
+auto orchestra brainstorm "{structured idea}" --strategy debate --providers {providers} --rounds 2 --judge {invoking_provider} --context --timeout 300 --no-detach --format json
 ```
 
 다른 strategy 호출:
@@ -205,7 +205,11 @@ auto orchestra brainstorm "{structured idea}" --strategy {strategy} --providers 
 
 - 명시적 `--providers`가 없을 때만 해당 플래그를 생략합니다.
 - debate는 독립 발산과 informed revision을 포함하는 최소 2라운드를 완료합니다.
-- judge는 토론 참가자와 분리하고 다른 모델 계열을 사용합니다.
+- resolved configured debate 집합의 모든 provider는 Claude를 포함해 Round 1과 Round 2에
+  모두 참여하며, judge 선택 때문에 참가자를 제외하지 않습니다.
+- blind judge는 invoking provider를 사용하되 참가자와 분리된 fresh isolated provider
+  session에서 실행합니다. Round 1/2 참가 세션의 context, history, tool state를
+  재사용하거나 공유하면 안 됩니다.
 - 엔진은 토론자 정체를 익명화한 뒤 judge에게 전달합니다.
 - 다수 의견뿐 아니라 고유 아이디어, 소수 의견, 반대 근거를 결과와 BS 부록에 보존합니다.
 - `round_history`가 2개 미만이거나 judge가 실패·timeout·empty output이면 성공으로
@@ -225,7 +229,7 @@ Fallback은 orchestra 호출이 실제 오류를 반환한 경우에만 허용�
 
 1. 서로 독립적인 Round 1 발산
 2. 익명화한 peer 결과를 읽는 Round 2 informed revision
-3. 참가자와 분리된 다른 모델 계열의 blind judge
+3. 참가자와 분리된 fresh isolated provider session의 blind judge
 4. 모든 dissent를 보존한 결과
 
 native worker surface가 위 계약을 실행할 수 없으면 `orchestra_unavailable` blocker로
@@ -245,7 +249,7 @@ native worker surface가 위 계약을 실행할 수 없으면 `orchestra_unavai
   Viability 가정을 Top N 결과에 연결
 
 완료 전 receipt에서 requested/effective strategy, provider 집합, 최소 두 라운드,
-judge status/model family, dissent appendix를 확인합니다. 어느 하나라도 없으면 Step 5로
+judge status/fresh session isolation evidence, dissent appendix를 확인합니다. 어느 하나라도 없으면 Step 5로
 진행하지 않습니다.
 
 ### Step 5: Save and Guide Next Steps

@@ -522,7 +522,7 @@ Brainstorm ideas using multi-provider orchestra, evaluate with ICE scoring, and 
     "minimum_rounds": 2,
     "fallback_minimum_rounds": 2,
     "blind_separate_judge": true,
-    "different_model_family": true,
+    "fresh_judge_session": true,
     "preserve_dissent": true
   }
 }
@@ -623,7 +623,7 @@ IMPORTANT: You MUST execute this step via the Bash tool. Do NOT skip to Step 4 o
 For `STRATEGY=debate`, execute the explicit debate branch:
 
 ```bash
-auto orchestra brainstorm "{structured idea}" --strategy debate --providers {PROVIDERS} --rounds 2 --judge {DIFFERENT_MODEL_FAMILY_JUDGE} --no-detach --format json
+auto orchestra brainstorm "{structured idea}" --strategy debate --providers {PROVIDERS} --rounds 2 --judge {invoking_provider} --no-detach --format json
 ```
 
 For `consensus`, `pipeline`, or `fastest`, execute the requested strategy
@@ -642,20 +642,22 @@ merged brainstorm result.
 - `--ultrathink` combines with orchestra: run orchestra first, then use Sequential Thinking to deepen the judge's analysis
 - `--rounds 2` is debate-only. For another requested strategy, omit this flag and execute the requested strategy without relabeling it.
 - The orchestra engine owns pane collection, informed revision, anonymization, and judge lifecycle. Do not reconstruct those phases in the workflow prompt.
-- The blind judge must be separate from participants, use a different model family, and preserve every dissenting idea in the result appendix.
+- Every provider in the resolved configured debate set, including Claude, must participate in both Round 1 and Round 2; judge selection must not remove a participant.
+- The blind judge must use the invoking provider in a fresh isolated provider session and preserve every dissenting idea in the result appendix. It must not reuse or share Round 1/2 participant session context, history, or tool state.
 
 **Fallback rule**: If the first Bash call returns an error, display the exact
 error and retry the same orchestra engine once with `--subprocess`,
 `--no-detach`, and `--format json`, preserving the selected
 strategy/providers and debate-only
 flags. Only when that same-engine retry also fails may native agents be
-considered. Native fallback requires runtime evidence for at least two
-independent participant workers and a separate blind judge from a different
-configured model family. If that cross-family evidence is unavailable, stop
-with an `orchestra_unavailable` blocker. Never label a same-family or
-single-round fallback as successful multi-provider debate. When native fallback
-is valid, preserve anonymized Round 1 evidence, run informed Round 2 revision,
-retain dissent, and mark the BS file `**Providers**: fallback (orchestra unavailable)`.
+considered. Native fallback requires runtime evidence that every provider in the
+resolved configured debate set, including Claude, participates in both rounds
+and that the invoking provider runs the separate blind judge in a fresh isolated
+provider session without reusing either participant session.
+If that isolation evidence is unavailable, stop with an `orchestra_unavailable`
+blocker. When native fallback is valid, preserve
+anonymized Round 1 evidence, run informed Round 2 revision, retain dissent, and
+mark the BS file `**Providers**: fallback (orchestra unavailable)`.
 
 > **⏭ POST-STEP**: Orchestra returned. NEXT REQUIRED STEP: Step 4: ICE Scoring. Do NOT skip to Step 5.
 

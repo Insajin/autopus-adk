@@ -285,5 +285,11 @@ func TestJudgeTimeout_UsesParentContext(t *testing.T) {
 	resp := runJudgeRound(parentCtx, cfg, nil, nil, []ProviderResponse{
 		{Provider: "claude", Output: "test output"},
 	}, 1)
-	assert.Nil(t, resp, "judge must stop when parent context is already cancelled")
+	require.NotNil(t, resp, "cancelled judge attempts must remain observable")
+	assert.ErrorIs(t, context.Canceled, parentCtx.Err())
+	assert.Equal(t, context.Canceled.Error(), resp.Error)
+	assert.Equal(t, "judge", resp.Role)
+	assert.Equal(t, 2, resp.Attempt)
+	assert.Equal(t, TerminalBlocked, resp.TerminalState)
+	assert.Equal(t, noneBackendMarker, resp.ExecutedBackend)
 }

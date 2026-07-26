@@ -50,7 +50,7 @@ func TestStartupTimeoutFor_KnownAliasesUseCanonicalDefaults(t *testing.T) {
 		provider string
 		want     time.Duration
 	}{
-		{provider: "claude-code", want: 15 * time.Second},
+		{provider: "claude-code", want: 30 * time.Second},
 		{provider: "gemini-cli", want: 10 * time.Second},
 		{provider: "antigravity", want: 10 * time.Second},
 		{provider: "antigravity-cli", want: 10 * time.Second},

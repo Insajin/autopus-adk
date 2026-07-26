@@ -14,7 +14,8 @@ var samePaneRetryBackoffs = []time.Duration{200 * time.Millisecond, 400 * time.M
 
 // SurfaceManager monitors surface health in the background and provides
 // proactive stale detection. Replaces the reactive validateSurface() approach.
-// @AX:ANCHOR [AUTO] coordinator — owns background goroutine, health cache, warm pool, and pane recovery; used by runPaneDebate and executeRound
+// @AX:ANCHOR: [AUTO] coordinator — owns background goroutines, health cache, warm pool, and pane recovery
+// @AX:REASON: [AUTO] runPaneDebate and executeRound depend on its synchronized lifecycle and recovery ownership
 type SurfaceManager struct {
 	term        terminal.Terminal
 	signal      terminal.SignalCapable // nil if terminal doesn't support signals
@@ -25,7 +26,9 @@ type SurfaceManager struct {
 	health map[string]terminal.SurfaceStatus // paneID -> last known health
 	cancel context.CancelFunc
 
-	warmPool *WarmPool // pre-created spare panes for instant recovery
+	monitorDone chan struct{}
+	stopOnce    sync.Once
+	warmPool    *WarmPool // pre-created spare panes for instant recovery
 }
 
 func (sm *SurfaceManager) setHookSession(session *HookSession) {
@@ -56,7 +59,12 @@ func (sm *SurfaceManager) Start(ctx context.Context, panes []paneInfo) {
 	monCtx, cancel := context.WithCancel(ctx)
 	sm.cancel = cancel
 
-	go sm.monitorLoop(monCtx, panes)
+	monitorDone := make(chan struct{})
+	sm.monitorDone = monitorDone
+	go func() {
+		defer close(monitorDone)
+		sm.monitorLoop(monCtx, panes)
+	}()
 
 	// Initialize warm pool with 1 spare pane for instant recovery.
 	sm.warmPool = NewWarmPool(sm.term, 1)
@@ -64,13 +72,19 @@ func (sm *SurfaceManager) Start(ctx context.Context, panes []paneInfo) {
 }
 
 // Stop stops the background monitoring goroutine and cleans up the warm pool.
+// @AX:NOTE: [AUTO] shutdown order is cancel monitor, await monitor exit, then close warm pool to prevent cleanup races
 func (sm *SurfaceManager) Stop() {
-	if sm.cancel != nil {
-		sm.cancel()
-	}
-	if sm.warmPool != nil {
-		sm.warmPool.Close(context.Background())
-	}
+	sm.stopOnce.Do(func() {
+		if sm.cancel != nil {
+			sm.cancel()
+		}
+		if sm.monitorDone != nil {
+			<-sm.monitorDone
+		}
+		if sm.warmPool != nil {
+			sm.warmPool.Close(context.Background())
+		}
+	})
 }
 
 // IsHealthy returns true if the pane's last known health status is valid.

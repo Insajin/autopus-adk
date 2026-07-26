@@ -37,6 +37,9 @@ func (b *receiptEvidenceBackend) Execute(_ context.Context, req ProviderRequest)
 
 func (b *receiptEvidenceBackend) Name() string { return "recording" }
 
+// freshExecutionPerRequest models built-in per-request lifecycle semantics without provider history.
+func (b *receiptEvidenceBackend) freshExecutionPerRequest() bool { return true }
+
 func (b *receiptEvidenceBackend) callCount() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()

@@ -7,9 +7,24 @@ import (
 	"testing"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/terminal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type hookTimeoutScreenTerminal struct {
+	*mockTerminal
+	sawDeadline bool
+}
+
+func (t *hookTimeoutScreenTerminal) ReadScreen(
+	ctx context.Context,
+	paneID terminal.PaneID,
+	opts terminal.ReadScreenOpts,
+) (string, error) {
+	_, t.sawDeadline = ctx.Deadline()
+	return t.mockTerminal.ReadScreen(ctx, paneID, opts)
+}
 
 func TestCollectRoundHookResults_ClaudeResponseFileCompletesWithoutDone(t *testing.T) {
 	session, err := NewHookSession("debate-hook-claude-response")
@@ -153,6 +168,48 @@ func TestCollectRoundHookResults_CodexResponseBeforeGraceKeepsTimeout(t *testing
 	assert.Equal(t, "hook", store.collection[0].CollectionMode)
 	require.Len(t, store.events, 1)
 	assert.Equal(t, "hook_timeout", store.events[0].Kind)
+}
+
+func TestCollectRoundHookResults_TimeoutHarvestsBoundedScreenAsPartialWithoutPromotion(t *testing.T) {
+	const promptSentinel = "ARBITRARY-USER-PROMPT-MUST-NOT-PERSIST"
+	session := newTestHookSession(t)
+	store := &reliabilityStore{runID: "hook-timeout-partial", dir: t.TempDir()}
+	provider := ProviderConfig{Name: "claude", ExecutionTimeout: 50 * time.Millisecond}
+	term := &hookTimeoutScreenTerminal{mockTerminal: newCmuxMock()}
+	term.readScreenOutput = "\x1b[31mpartial terminal response\x1b[0m\n" + promptSentinel + "\n❯\n"
+	panes := []paneInfo{{provider: provider, paneID: "pane-partial"}}
+	cfg := OrchestraConfig{
+		Providers:        []ProviderConfig{provider},
+		Terminal:         term,
+		ReliabilityStore: store,
+		RunID:            "hook-timeout-partial",
+	}
+
+	responses := collectRoundHookResults(context.Background(), cfg, session, 1, panes)
+
+	require.Len(t, responses, 1)
+	response := responses[0]
+	assert.Contains(t, response.Output, "partial terminal response")
+	assert.Contains(t, response.Output, promptSentinel, "in-memory diagnostics may retain the bounded screen")
+	assert.True(t, response.TimedOut, "terminal output cannot replace the missing completion signal")
+	assert.False(t, response.EmptyOutput, "partial diagnostic output should be retained")
+	assert.False(t, responseUsable(response), "timed-out partial output must remain outside quorum")
+	assert.Contains(t, response.Error, "hook completion timeout")
+	assert.Equal(t, 1, term.readScreenCalls)
+	assert.True(t, term.sawDeadline, "the final diagnostic read must be bounded")
+
+	require.Len(t, store.collection, 1)
+	receipt := store.collection[0]
+	assert.Equal(t, "timeout", receipt.Status)
+	assert.True(t, receipt.Partial)
+	assert.Equal(t, "hook", receipt.CollectionMode)
+	assert.Equal(t, len(response.Output), receipt.Output.ByteLength)
+	assert.Empty(t, receipt.Output.Preview, "timeout screens can echo raw prompts")
+	for _, path := range []string{response.Receipt, filepath.Join(store.artifactDir(), "failure-bundle.json")} {
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.NotContains(t, string(data), promptSentinel)
+	}
 }
 
 func TestCollectRoundHookResults_DoneThenDelayedResponsePrefersResponseFile(t *testing.T) {

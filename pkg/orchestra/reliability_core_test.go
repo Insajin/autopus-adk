@@ -22,15 +22,71 @@ func TestSanitizeArtifact_RedactsSecrets(t *testing.T) {
 	assert.NotContains(t, artifact.Preview, "sk-supersecret")
 }
 
-func TestProviderCapability_HookModeUsesFileIPC(t *testing.T) {
+func TestProviderCapability_RoundOneReportsActualTransportAndProviderCollection(t *testing.T) {
 	t.Parallel()
 
-	cfg := OrchestraConfig{HookMode: true, Terminal: newCmuxMock()}
-	cap := providerCapability(cfg, ProviderConfig{Name: "claude"})
+	hasHook := true
+	noHook := false
+	tests := []struct {
+		name           string
+		provider       ProviderConfig
+		wantTransport  string
+		wantCollection string
+	}{
+		{
+			name:           "claude direct pane input",
+			provider:       ProviderConfig{Name: "claude", InteractiveInput: "stdin", HasHook: &hasHook},
+			wantTransport:  "send_long_text",
+			wantCollection: "hook",
+		},
+		{
+			name:           "codex sendkeys input",
+			provider:       ProviderConfig{Name: "codex", InteractiveInput: "", HasHook: &hasHook},
+			wantTransport:  "sendkeys",
+			wantCollection: "hook",
+		},
+		{
+			name:           "gemini launch argument input",
+			provider:       ProviderConfig{Name: "gemini", Binary: "agy", InteractiveInput: "stdin", HasHook: &hasHook},
+			wantTransport:  "cli_args",
+			wantCollection: "hook",
+		},
+		{
+			name:           "hookless provider polling",
+			provider:       ProviderConfig{Name: "opencode", InteractiveInput: "args", HasHook: &noHook},
+			wantTransport:  "cli_args",
+			wantCollection: "poll",
+		},
+	}
 
-	assert.Equal(t, "file_ipc", cap.PromptTransportMode)
-	assert.True(t, cap.SupportsPromptReceipt)
-	assert.Contains(t, cap.CollectionModes, "hook")
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := OrchestraConfig{HookMode: true, Terminal: newCmuxMock()}
+			capability := providerCapability(cfg, tt.provider)
+
+			assert.Equal(t, tt.wantTransport, capability.PromptTransportMode)
+			assert.Equal(t, []string{tt.wantCollection}, capability.CollectionModes)
+			assert.True(t, capability.SupportsPromptReceipt)
+		})
+	}
+}
+
+func TestPreflightReceipt_ConfiguredHookRemainsRuntimeUnverified(t *testing.T) {
+	t.Parallel()
+
+	hasHook := true
+	cfg := OrchestraConfig{HookMode: true, Terminal: newCmuxMock()}
+	receipt := preflightReceipt("run-configured-hook", cfg, ProviderConfig{
+		Name:             "claude",
+		InteractiveInput: "stdin",
+		HasHook:          &hasHook,
+	})
+
+	assert.Equal(t, "pass", receipt.Status, "launch preflight may pass without claiming completion")
+	assert.Equal(t, "completion hook is configured but not runtime-verified", receipt.Reason)
 }
 
 func TestPreflightReceipt_UsesRequestedWorkingDir(t *testing.T) {
