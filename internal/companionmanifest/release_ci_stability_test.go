@@ -28,7 +28,7 @@ type ciStabilityWorkflow struct {
 func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 	workflow := readCIStabilityWorkflow(t, ".github/workflows/ci.yaml")
 	want := map[string]int{
-		"test": 35, "lineage-integration": 45, "e2e": 10, "lint": 10,
+		"test": 35, "lineage-integration": 55, "e2e": 10, "lint": 10,
 		"static-contracts": 10, "macos-runtime": 15,
 	}
 	for id, timeout := range want {
@@ -99,7 +99,7 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 	}
 	lineageRun := ciStepRun(t, workflow.Jobs["lineage-integration"], "Test release lineage integration")
 	for _, required := range []string{
-		"-timeout=23m", "-tags integration", "./pkg/companionmanifest",
+		"-timeout=30m", "-tags integration", "./pkg/companionmanifest",
 	} {
 		if !strings.Contains(lineageRun, required) {
 			t.Fatalf("CI release lineage integration contract missing %q", required)
