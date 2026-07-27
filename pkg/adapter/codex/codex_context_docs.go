@@ -21,11 +21,13 @@ func injectCodexContextProfile(body string) string {
 	var profile string
 	switch {
 	case strings.Contains(body, "# auto-plan"):
-		profile = "## Context Profile: plan\n\n- Load `core + architecture + relevant SPEC`.\n- Load `signature` or `learning` only when independently relevant.\n- Do not load test or canary profiles."
+		profile = "## Context Profile: plan\n\n- Required: core,architecture,relevant_spec\n- Optional: signature,learning\n- Excluded: test,canary"
 	case strings.Contains(body, "# auto-test"):
-		profile = "## Context Profile: test\n\n- Load `core + test`, including `.autopus/project/scenarios.md`.\n- Load `signature` or `learning` only when independently relevant.\n- Do not load the canary profile."
+		profile = "## Context Profile: test\n\n- Required: core,test\n- Optional: signature,learning\n- Excluded: canary\n\n### Test Input\n\nThe `test` profile includes `.autopus/project/scenarios.md`."
 	case strings.Contains(body, "# auto-canary"):
-		profile = "## Context Profile: canary\n\n- Load `core + canary`, including `.autopus/project/canary.md`.\n- Load `learning` only when independently relevant.\n- Do not load test or signature profiles."
+		profile = "## Context Profile: canary\n\n- Required: core,canary\n- Optional: learning\n- Excluded: test,signature\n\n### Canary Input\n\nThe `canary` profile includes `.autopus/project/canary.md`."
+	case strings.Contains(body, "# auto-go"):
+		profile = "## Context Profile: go\n\n- Supervisor Required: core,resolved_spec,plan,acceptance,available_architecture\n- Worker Optional: signature,learning,task_declared_extra\n- Excluded: test,canary"
 	}
 	if profile == "" {
 		return body

@@ -56,6 +56,9 @@ func SyncScenarios(existing *ScenarioSet, commands []Scenario) (*ScenarioSet, er
 				c.Number = nextNumber
 				nextNumber++
 			}
+			if strings.TrimSpace(c.Ref) == "" {
+				c.Ref = c.DisplayRef()
+			}
 			result.Scenarios = append(result.Scenarios, c)
 		}
 	}

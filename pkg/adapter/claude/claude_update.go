@@ -72,9 +72,11 @@ func (a *Adapter) buildUpdateTransactionPlan(
 			}
 		}
 	}
+	diff := adapter.BuildManifestDiff(oldManifest, newFiles, []string{".claude/skills/autopus"})
 
 	return adapter.TransactionPlan{
 		Writes:   adapter.TransactionWritesFromFiles(finalFiles, claudeFileMode),
+		Removes:  adapter.TransactionRemovesFromManifestDiff(diff, false),
 		Manifest: manifest,
 	}, pf
 }

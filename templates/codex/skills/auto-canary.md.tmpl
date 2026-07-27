@@ -2,9 +2,9 @@
 
 ## Context Profile: canary
 
-- `core + canary`만 로드하며 `.autopus/project/canary.md`를 health-check source로 사용합니다.
-- `learning`은 현재 canary 판정에 독립적으로 관련된 경우에만 조건부로 로드합니다.
-- scenarios와 signatures는 로드하지 않습니다.
+- Required: core,canary
+- Optional: learning
+- Excluded: test,signature
 
 **프로젝트**: {{.ProjectName}} | **모드**: {{.Mode}}
 

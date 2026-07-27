@@ -11,9 +11,8 @@ import (
 
 // ---- evaluatePrimitive edge cases ----
 
-// TestEvaluatePrimitive_ExitCodeTwoDigit documents the behavior of exit_code(N)
-// for multi-digit N values. Due to the [:11] slice condition in evaluatePrimitive,
-// exit_code(10) and higher fall through to the default (always PASS) branch.
+// TestEvaluatePrimitive_ExitCodeTwoDigit verifies that multi-digit expected
+// codes are parsed and compared instead of falling through to PASS.
 func TestEvaluatePrimitive_ExitCodeTwoDigit(t *testing.T) {
 	t.Parallel()
 
@@ -22,10 +21,10 @@ func TestEvaluatePrimitive_ExitCodeTwoDigit(t *testing.T) {
 		exitCode   int
 		expectPass bool
 	}{
-		{"exit_code(10)", 0, true},
+		{"exit_code(10)", 0, false},
 		{"exit_code(10)", 10, true},
-		{"exit_code(42)", 0, true},
-		{"exit_code(127)", 0, true},
+		{"exit_code(42)", 0, false},
+		{"exit_code(127)", 0, false},
 	}
 
 	for _, tt := range tests {

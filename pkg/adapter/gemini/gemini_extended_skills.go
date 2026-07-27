@@ -36,6 +36,10 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 
 	var files []adapter.FileMapping
 	for _, s := range skills {
+		entry, ok := catalog.Get(s.Name)
+		if !ok || !pkgcontent.ResolveCatalogSkillState(entry, "gemini", cfg).Compiled {
+			continue
+		}
 		// Gemini convention: each skill gets its own subdirectory
 		relPath := filepath.Join(".gemini", "skills", "autopus", s.Name, "SKILL.md")
 		files = append(files, adapter.FileMapping{

@@ -103,6 +103,8 @@ func newDoctorCmd() *cobra.Command {
 	return cmd
 }
 
+// @AX:WARN [AUTO] @AX:SPEC: SPEC-CONTEXT-ENGINEERING-001: this doctor orchestrator contains more than eight conditional branches.
+// @AX:REASON [AUTO]: platform validation, dependency repair, health gates, and advisory checks converge on the final verdict.
 func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	out := cmd.OutOrStdout()
 	tui.BannerWithInfo(out, "autopus-adk", "doctor")
@@ -236,7 +238,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 		allOK = false
 	}
 
-	// Context weight is advisory: it warns on an over-weight session-load set
+	// Context weight is advisory: it warns on an over-weight context catalog
 	// but never fails harness health, so its result does not touch allOK.
 	checkContextWeight(out, opts.dir)
 

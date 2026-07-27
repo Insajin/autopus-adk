@@ -15,29 +15,31 @@ import (
 // its rotation target.
 const (
 	// contextWeightTotalWarnBytes is the soft cap for the combined byte size of
-	// the seven session-load documents. Above it the doctor warns. The 20000B
+	// the present context catalog documents. Above it the doctor warns. The 20000B
 	// headroom above the 100000B rotation target absorbs normal churn.
 	contextWeightTotalWarnBytes = 120000
 
-	// contextWeightPerDocWarnBytes is the soft cap for any single session-load
+	// contextWeightPerDocWarnBytes is the soft cap for any single context catalog
 	// document, evaluated independently of the combined total.
 	contextWeightPerDocWarnBytes = 20000
 )
 
-// contextLoadDoc is one document injected into the model context at every
-// /auto session start: its path relative to the workspace root and its
-// per-document compression byte cap (REQ-CLD-005).
+// contextLoadDoc is one profile-eligible context catalog entry: its path
+// relative to the workspace root and its per-document rotation cap
+// (REQ-CLD-005). The historical type name is kept for compatibility.
 type contextLoadDoc struct {
 	Name    string
 	RelPath string
 	Cap     int
 }
 
-// ContextLoadSet enumerates the seven session-load context documents in a
-// deterministic order together with each document's per-document compression
-// cap (REQ-CLD-005). The caps sum to 100000 bytes — the combined rotation
-// target the context-weight guard protects. A slice (not a map) keeps iteration
-// order stable so doctor output stays reproducible.
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONTEXT-ENGINEERING-001: preserve the exported context catalog names, order, and rotation caps.
+// @AX:REASON [AUTO]: doctor measurement and contract tests consume this table directly as the context-weight identity.
+// ContextLoadSet enumerates the profile-eligible context catalog in a
+// deterministic order together with each document's per-document rotation cap
+// (REQ-CLD-005). It does not mean every document loads in every session. The
+// caps sum to 100000 bytes, the combined rotation target protected by the
+// context-weight guard. A slice keeps doctor output reproducible.
 var ContextLoadSet = []contextLoadDoc{
 	{Name: "product.md", RelPath: filepath.Join(".autopus", "project", "product.md"), Cap: 18000},
 	{Name: "ARCHITECTURE.md", RelPath: "ARCHITECTURE.md", Cap: 16000},
@@ -48,7 +50,7 @@ var ContextLoadSet = []contextLoadDoc{
 	{Name: "canary.md", RelPath: filepath.Join(".autopus", "project", "canary.md"), Cap: 6000},
 }
 
-// contextDocWeight is the measured byte size of one session-load document.
+// contextDocWeight is the measured byte size of one context catalog document.
 type contextDocWeight struct {
 	Name    string
 	Bytes   int
@@ -56,7 +58,7 @@ type contextDocWeight struct {
 	OverCap bool
 }
 
-// contextWeightReport aggregates the load-set measurement and the guard verdict.
+// contextWeightReport aggregates the context catalog measurement and guard verdict.
 type contextWeightReport struct {
 	Docs         []contextDocWeight
 	TotalBytes   int
@@ -77,9 +79,11 @@ func (r contextWeightReport) warned() bool {
 	return false
 }
 
-// measureContextWeight sizes the seven session-load documents under dir. Absent
-// documents contribute nothing and are marked not present, so the guard stays
-// silent in repositories without the meta-workspace context set.
+// measureContextWeight sizes the present context catalog documents under dir.
+// Absent documents contribute nothing and are marked not present, so the guard
+// stays silent in repositories without the meta-workspace context catalog.
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONTEXT-ENGINEERING-001: keep context catalog measurement centralized.
+// @AX:REASON [AUTO]: text, JSON, and regression-test consumers share this deterministic measurement boundary.
 func measureContextWeight(dir string) contextWeightReport {
 	rep := contextWeightReport{Docs: make([]contextDocWeight, 0, len(ContextLoadSet))}
 	for _, doc := range ContextLoadSet {
@@ -97,7 +101,7 @@ func measureContextWeight(dir string) contextWeightReport {
 	return rep
 }
 
-// renderContextWeight prints the guard section. It is silent when no load-set
+// renderContextWeight prints the guard section. It is silent when no catalog
 // document exists; otherwise it prints one status line for the combined total
 // plus a WARN line for every over-cap document, in ContextLoadSet order.
 func renderContextWeight(w io.Writer, rep contextWeightReport) {
@@ -106,25 +110,27 @@ func renderContextWeight(w io.Writer, rep contextWeightReport) {
 	}
 	tui.SectionHeader(w, "Context Weight")
 	if rep.OverTotal {
-		tui.Warn(w, fmt.Sprintf("context load set %dB exceeds %dB soft cap across %d docs; rotate history per doc-storage",
+		tui.Warn(w, fmt.Sprintf("context catalog %dB exceeds %dB soft cap across %d docs; rotate history per doc-storage",
 			rep.TotalBytes, contextWeightTotalWarnBytes, rep.PresentCount))
 	} else {
-		tui.OK(w, fmt.Sprintf("context load set %dB across %d docs (soft cap %dB)",
+		tui.OK(w, fmt.Sprintf("context catalog %dB across %d docs (soft cap %dB)",
 			rep.TotalBytes, rep.PresentCount, contextWeightTotalWarnBytes))
 	}
 	for _, d := range rep.Docs {
 		if d.OverCap {
-			tui.Warn(w, fmt.Sprintf("context doc %s %dB exceeds %dB soft cap; rotate history per doc-storage",
+			tui.Warn(w, fmt.Sprintf("context catalog: context doc %s %dB exceeds %dB soft cap; rotate history per doc-storage",
 				d.Name, d.Bytes, contextWeightPerDocWarnBytes))
 		}
 	}
 }
 
-// checkContextWeight measures the session-load context documents under dir and
-// emits non-blocking warnings when the load set is over-weight. It is advisory:
-// an over-weight context set degrades session-load quality but never fails
+// checkContextWeight measures the context catalog documents under dir and emits
+// non-blocking warnings when the catalog is over-weight. It is advisory: an
+// over-weight catalog can degrade selected-profile quality but never fails
 // harness health, so callers MUST NOT flip their allOK verdict on the result.
 // The return reports whether a warning fired, for the JSON mirror and tests.
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONTEXT-ENGINEERING-001: preserve the advisory text-check contract.
+// @AX:REASON [AUTO]: doctor output and five regression call sites depend on its warning-only boolean semantics.
 func checkContextWeight(w io.Writer, dir string) bool {
 	rep := measureContextWeight(dir)
 	renderContextWeight(w, rep)

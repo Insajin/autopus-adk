@@ -131,10 +131,17 @@ func TransformAgentForGemini(src AgentSource) string {
 	var sb strings.Builder
 
 	body := NormalizeAgentReferences(src.Body, "gemini")
+	tools := geminiNativeTools(src.Meta.Tools)
 
 	sb.WriteString("---\n")
 	fmt.Fprintf(&sb, "name: auto-agent-%s\n", src.Meta.Name)
 	fmt.Fprintf(&sb, "description: %s\n", src.Meta.Description)
+	if len(tools) > 0 {
+		sb.WriteString("tools:\n")
+		for _, tool := range tools {
+			fmt.Fprintf(&sb, "  - %s\n", tool)
+		}
+	}
 	if len(src.Meta.Skills) > 0 {
 		sb.WriteString("skills:\n")
 		for _, s := range src.Meta.Skills {
@@ -146,6 +153,29 @@ func TransformAgentForGemini(src AgentSource) string {
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// @AX:NOTE [AUTO]: This provider vocabulary allowlist intentionally omits unknown and advisory-only source tools.
+func geminiNativeTools(source string) []string {
+	native := map[string]string{
+		"Read":  "read_file",
+		"Write": "write_file",
+		"Edit":  "replace",
+		"Grep":  "grep_search",
+		"Glob":  "glob",
+		"Bash":  "run_shell_command",
+	}
+	seen := make(map[string]bool, len(native))
+	tools := make([]string, 0, len(native))
+	for _, candidate := range strings.Split(source, ",") {
+		mapped, ok := native[strings.TrimSpace(candidate)]
+		if !ok || seen[mapped] {
+			continue
+		}
+		seen[mapped] = true
+		tools = append(tools, mapped)
+	}
+	return tools
 }
 
 // parseAgentSource parses an agent source .md file into AgentSource.

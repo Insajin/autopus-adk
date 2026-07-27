@@ -152,14 +152,19 @@ func (a *Adapter) buildUpdateTransactionPlan(
 		finalFiles = append(finalFiles, file)
 	}
 
-	// @AX:NOTE: [AUTO] file-count-only checksum — manifest integrity reflects file count only, not content hash; not a tamper-detection mechanism
+	// @AX:NOTE [AUTO]: File-count-only checksum is manifest bookkeeping, not a content integrity or tamper-detection mechanism.
 	pf := &adapter.PlatformFiles{
 		Files:    finalFiles,
 		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
 	}
+	diff := adapter.BuildManifestDiff(oldManifest, newFiles, []string{
+		".gemini/skills/autopus",
+		".agents/plugins/autopus/skills",
+	})
 
 	return adapter.TransactionPlan{
 		Writes:   writes,
+		Removes:  adapter.TransactionRemovesFromManifestDiff(diff, false),
 		Manifest: adapter.ManifestFromFiles(adapterName, pf),
 	}, pf
 }

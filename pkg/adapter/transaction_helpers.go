@@ -105,10 +105,60 @@ func loadTransactionJournals(root, platform string) ([]*TransactionJournal, erro
 
 func safeTransactionPath(root, relPath string) (string, string, error) {
 	clean := filepath.Clean(relPath)
-	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
+	if clean == "." || filepath.IsAbs(clean) || hasWindowsTransactionDrivePrefix(clean) ||
+		strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
 		return "", "", fmt.Errorf("unsafe transaction path %s", relPath)
 	}
+	if err := rejectTransactionSymlinkComponents(root, clean); err != nil {
+		return "", "", err
+	}
 	return filepath.ToSlash(clean), filepath.Join(root, clean), nil
+}
+
+func validateTransactionPlanPaths(root string, plan TransactionPlan) error {
+	paths := []string{
+		filepath.Join(manifestDir, "txns", ".guard"),
+		filepath.Join(manifestDir, "backup", ".guard"),
+	}
+	for _, write := range plan.Writes {
+		paths = append(paths, write.Path)
+	}
+	for _, remove := range plan.Removes {
+		paths = append(paths, remove.Path)
+	}
+	if plan.Manifest != nil {
+		paths = append(paths, filepath.Join(manifestDir, plan.Manifest.Platform+"-"+manifestFile))
+	}
+	for _, path := range paths {
+		if _, _, err := safeTransactionPath(root, path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func rejectTransactionSymlinkComponents(root, relPath string) error {
+	current := filepath.Clean(root)
+	for _, component := range strings.Split(filepath.Clean(relPath), string(os.PathSeparator)) {
+		current = filepath.Join(current, component)
+		info, err := os.Lstat(current)
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("inspect transaction path %s: %w", filepath.ToSlash(relPath), err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("transaction path crosses symlink: %s", filepath.ToSlash(relPath))
+		}
+	}
+	return nil
+}
+
+func hasWindowsTransactionDrivePrefix(value string) bool {
+	return len(value) >= 2 &&
+		((value[0] >= 'A' && value[0] <= 'Z') || (value[0] >= 'a' && value[0] <= 'z')) &&
+		value[1] == ':'
 }
 
 func copyFile(src, dst string, perm os.FileMode) error {

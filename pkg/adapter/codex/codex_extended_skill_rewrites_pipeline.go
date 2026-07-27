@@ -173,6 +173,14 @@ Every spawned worker should receive a prompt that states:
 - expected verification
 - required return fields
 
+Keep ` + "`supervisor verified delivery`" + ` separate from ` + "`delegated-worker optional recall`" + `: complete required document bodies stay verified outside the receipt, while workers recall only selected optional signature, learning, or task-declared extra refs without duplicating required bodies.
+Select one receipt and condensed-return upper-bound budget between 800 and 2,000 estimated tokens, and accept a short correct return without padding.
+For JIT optional retrieval, accept only stable project-relative source refs.
+Reject absolute paths, ` + "`..` traversal" + `, symlinks, and non-regular files.
+Sanitize and redact retrieved content while preserving injection evidence.
+Record selected refs and hashes plus omitted count.
+Do not relay full repeated artifact bodies, and do not replay raw tool results, provider payloads, or any required document body; use stable source refs.
+Use exactly and only the existing five-field worker result schema.
 Required return fields:
 
 - ` + "`owned_paths`" + `
@@ -181,7 +189,7 @@ Required return fields:
 - ` + "`blockers`" + `
 - ` + "`next_required_step`" + `
 
-### Phase 1.5: Test Scaffold
+` + codexContextEvolutionExamples() + `### Phase 1.5: Test Scaffold
 
 When enabled, spawn a tester to write failing tests before implementation. Generated scaffold tests are read-only for later executors unless the plan explicitly reassigns them.
 

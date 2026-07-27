@@ -6,10 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
+	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 	"github.com/insajin/autopus-adk/templates"
 )
 
@@ -126,6 +128,10 @@ func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, tar
 	if err != nil {
 		return nil, fmt.Errorf("컨텐츠 디렉터리 읽기 실패 %s: %w", subDir, err)
 	}
+	catalog, err := claudeSkillCatalog(subDir, cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Create destination directory
 	absTargetDir := filepath.Join(a.root, targetRelDir)
@@ -142,6 +148,9 @@ func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, tar
 		}
 		// file-size-limit.md is rendered from template — skip the static copy.
 		if subDir == "rules" && entry.Name() == "file-size-limit.md" {
+			continue
+		}
+		if !claudeSkillCompiled(catalog, entry.Name(), cfg) {
 			continue
 		}
 
@@ -167,6 +176,27 @@ func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, tar
 	}
 
 	return files, nil
+}
+
+func claudeSkillCatalog(subDir string, cfg *config.HarnessConfig) (*pkgcontent.SkillCatalog, error) {
+	if subDir != "skills" || cfg == nil {
+		return nil, nil
+	}
+	catalog, err := pkgcontent.LoadSkillCatalogFromFS(contentfs.FS, "skills")
+	if err != nil {
+		return nil, fmt.Errorf("Claude skill catalog init: %w", err)
+	}
+	return catalog, nil
+}
+
+// @AX:NOTE [AUTO]: Unknown embedded skills remain compiled for backward compatibility; catalog entries obey bundle state.
+func claudeSkillCompiled(catalog *pkgcontent.SkillCatalog, filename string, cfg *config.HarnessConfig) bool {
+	if catalog == nil {
+		return true
+	}
+	name := strings.TrimSuffix(filename, filepath.Ext(filename))
+	skill, ok := catalog.Get(name)
+	return !ok || pkgcontent.ResolveCatalogSkillState(skill, "claude", cfg).Compiled
 }
 
 func (a *Adapter) copyNamedContentFiles(subDir string, targetRelDir string, names []string) ([]adapter.FileMapping, error) {

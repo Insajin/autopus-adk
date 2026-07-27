@@ -1,6 +1,7 @@
 package gemini
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,7 +17,13 @@ import (
 func sanitizeUnsupportedClaudeTeamMappings(files []adapter.FileMapping) []adapter.FileMapping {
 	sanitized := make([]adapter.FileMapping, len(files))
 	for i, file := range files {
-		file.Content = []byte(sanitizeUnsupportedClaudeTeamSurface(string(file.Content)))
+		body := string(file.Content)
+		if filepath.ToSlash(file.TargetPath) == ".gemini/settings.json" {
+			body = dedupeGeminiSettingsPermissions(body)
+		} else {
+			body = sanitizeUnsupportedClaudeTeamSurface(body)
+		}
+		file.Content = []byte(body)
 		file.Checksum = checksum(string(file.Content))
 		sanitized[i] = file
 	}
@@ -31,6 +38,41 @@ func sanitizeUnsupportedClaudeTeamSurface(body string) string {
 		"agent-teams/SKILL.md", "unsupported-team-mode.md",
 		"skills/autopus/agent-teams.md", "unsupported-team-mode.md",
 	).Replace(body)
+}
+
+func dedupeGeminiSettingsPermissions(body string) string {
+	var settings map[string]any
+	if err := json.Unmarshal([]byte(body), &settings); err != nil {
+		return body
+	}
+	permissions, ok := settings["permissions"].(map[string]any)
+	if !ok {
+		return body
+	}
+	for _, key := range []string{"allow", "deny"} {
+		values, ok := permissions[key].([]any)
+		if !ok {
+			continue
+		}
+		seen := make(map[string]bool, len(values))
+		deduped := make([]any, 0, len(values))
+		for _, value := range values {
+			text, isString := value.(string)
+			if isString && seen[text] {
+				continue
+			}
+			if isString {
+				seen[text] = true
+			}
+			deduped = append(deduped, value)
+		}
+		permissions[key] = deduped
+	}
+	out, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return body
+	}
+	return string(out) + "\n"
 }
 
 func rewriteSanitizedGeminiMappings(root string, files []adapter.FileMapping) ([]adapter.FileMapping, error) {

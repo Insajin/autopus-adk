@@ -11,6 +11,7 @@ import (
 
 // Scenario represents a single E2E test scenario.
 type Scenario struct {
+	Ref          string   // exact scenario reference (e.g., "S1", "S15A", "S-CANARY-1")
 	Number       int      // S{N}
 	ID           string   // unique identifier (e.g., "init", "doctor", "custom-mytest")
 	Description  string   // short description
@@ -42,9 +43,19 @@ var (
 	reBinary      = regexp.MustCompile(`^## Binary: (.+)$`)
 	reBuild       = regexp.MustCompile(`^## Build:\s*(.*)$`)
 	reSection     = regexp.MustCompile(`^## (.+)$`)
-	reScenHeader  = regexp.MustCompile(`^### S(\d+): ([^—]+) — (.+)$`)
+	reScenHeader  = regexp.MustCompile(`^### (S[A-Za-z0-9-]+): ([^—]+) — (.+)$`)
+	reNumericRef  = regexp.MustCompile(`^S(\d+)$`)
 	reField       = regexp.MustCompile(`^- \*\*([^*]+)\*\*: (.*)$`)
 )
+
+// DisplayRef returns the exact parsed reference, falling back to the legacy
+// numeric projection for scenarios created programmatically.
+func (s Scenario) DisplayRef() string {
+	if strings.TrimSpace(s.Ref) != "" {
+		return s.Ref
+	}
+	return fmt.Sprintf("S%d", s.Number)
+}
 
 // @AX:NOTE [AUTO] @AX:REASON: public API boundary — sole entry point for scenarios.md deserialization; fan_in=1 (internal/cli/test.go)
 // ParseScenarios parses scenarios.md content into a ScenarioSet.
@@ -81,12 +92,23 @@ func ParseScenarios(content []byte) (*ScenarioSet, error) {
 			if current != nil {
 				set.Scenarios = append(set.Scenarios, *current)
 			}
-			n, _ := strconv.Atoi(m[1])
+			n := 0
+			if numeric := reNumericRef.FindStringSubmatch(m[1]); numeric != nil {
+				n, _ = strconv.Atoi(numeric[1])
+			}
 			current = &Scenario{
+				Ref:         m[1],
 				Number:      n,
 				ID:          strings.TrimSpace(m[2]),
 				Description: strings.TrimSpace(m[3]),
 				Section:     currentSection,
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "### ") {
+			if current != nil {
+				set.Scenarios = append(set.Scenarios, *current)
+				current = nil
 			}
 			continue
 		}
@@ -106,8 +128,7 @@ func ParseScenarios(content []byte) (*ScenarioSet, error) {
 			case "Expect":
 				current.Expect = val
 			case "Verify":
-				parts := strings.Split(val, ", ")
-				current.Verify = parts
+				current.Verify = SplitVerifyPrimitives(val)
 			case "Depends":
 				current.Depends = val
 			case "Requires":
@@ -138,7 +159,7 @@ func RenderScenarios(set *ScenarioSet) ([]byte, error) {
 
 	for _, s := range set.Scenarios {
 		buf.WriteString("\n")
-		fmt.Fprintf(&buf, "### S%d: %s — %s\n", s.Number, s.ID, s.Description)
+		fmt.Fprintf(&buf, "### %s: %s — %s\n", s.DisplayRef(), s.ID, s.Description)
 		fmt.Fprintf(&buf, "- **Command**: %s\n", s.Command)
 		fmt.Fprintf(&buf, "- **Precondition**: %s\n", s.Precondition)
 		fmt.Fprintf(&buf, "- **Env**: %s\n", s.Env)

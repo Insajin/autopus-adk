@@ -2,9 +2,13 @@
 
 ## Context Profile: plan
 
-- `core + architecture + relevant SPEC`만 로드합니다.
-- `signature`와 `learning`은 현재 계획에 독립적으로 관련된 경우에만 조건부로 로드합니다.
-- test와 canary profile은 로드하지 않습니다.
+- Required: core,architecture,relevant_spec
+- Optional: signature,learning
+- Excluded: test,canary
+
+### Context Mapping
+
+`relevant_spec` means relevant SPEC evidence for the current plan.
 
 **프로젝트**: {{.ProjectName}} | **모드**: {{.Mode}}
 

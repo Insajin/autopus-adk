@@ -46,6 +46,7 @@ func normalizeOpenCodeMarkdown(content string) string {
 		"Codex 런타임이", "OpenCode 런타임이",
 		"spawn_agent(...)", "task(...)",
 		"`spawn_agent`", "`task`",
+		".codex/skills/agent-pipeline.md", ".agents/skills/agent-pipeline/SKILL.md",
 	)
 	return replacer.Replace(content)
 }

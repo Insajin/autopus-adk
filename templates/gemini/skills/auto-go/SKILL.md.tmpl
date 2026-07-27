@@ -18,6 +18,13 @@ triggers:
 ## 설명
 
 SPEC 문서를 기반으로 코드를 구현합니다.
+파이프라인 실행 전에 `.gemini/skills/autopus/agent-pipeline/SKILL.md`를 로드하고 해당 phase/gate 계약을 따릅니다.
+
+## Context Profile
+
+- Supervisor Required: core,resolved_spec,plan,acceptance,available_architecture
+- Worker Optional: signature,learning,task_declared_extra
+- Excluded: test,canary
 
 ## 사용법
 

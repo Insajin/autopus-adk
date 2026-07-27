@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/insajin/autopus-adk/pkg/workerreceipt"
 )
 
 const (
@@ -53,14 +55,8 @@ type ProviderRunReceipt struct {
 	Artifact     string `json:"artifact,omitempty" yaml:"artifact,omitempty"`
 }
 
-// WorkerRunReceipt is the wire-compatible multi-agent worker handoff shape.
-type WorkerRunReceipt struct {
-	OwnedPaths       []string `json:"owned_paths" yaml:"owned_paths"`
-	ChangedFiles     []string `json:"changed_files" yaml:"changed_files"`
-	Verification     []string `json:"verification" yaml:"verification"`
-	Blockers         []string `json:"blockers" yaml:"blockers"`
-	NextRequiredStep string   `json:"next_required_step" yaml:"next_required_step"`
-}
+// WorkerRunReceipt is the canonical multi-agent worker handoff shape.
+type WorkerRunReceipt = workerreceipt.Receipt
 
 // PhaseReceipt is the final observed state for one pipeline phase.
 type PhaseReceipt struct {

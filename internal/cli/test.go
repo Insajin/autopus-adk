@@ -13,50 +13,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/e2e"
 )
 
-// newAutoTestCmd creates the `auto test` parent command with the `run` subcommand.
-func newAutoTestCmd() *cobra.Command {
-	parent := &cobra.Command{
-		Use:           "test",
-		Short:         "Run E2E scenarios against the project",
-		SilenceUsage:  true,
-		SilenceErrors: true,
-	}
-
-	parent.AddCommand(newAutoTestRunCmd())
-	return parent
-}
-
-// newAutoTestRunCmd creates the `auto test run` subcommand.
-func newAutoTestRunCmd() *cobra.Command {
-	var (
-		scenarioID string
-		jsonOut    bool
-		format     string
-		profile    string
-		timeout    time.Duration
-		verbose    bool
-		projectDir string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "run",
-		Short: "Execute E2E scenarios and report PASS/FAIL per scenario",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAutoTest(cmd, scenarioID, jsonOut, format, profile, timeout, verbose, projectDir)
-		},
-	}
-
-	cmd.Flags().StringVarP(&scenarioID, "scenario", "s", "", "Run only a specific scenario by ID")
-	addJSONFlags(cmd, &jsonOut, &format)
-	cmd.Flags().StringVar(&profile, "profile", config.TestProfileStandalone, "Execution profile for scenario requirements (standalone|local|ci|prod)")
-	// @AX:NOTE [AUTO] @AX:REASON: magic constant — 30s default timeout mirrors NewRunner default; keep in sync with pkg/e2e/runner.go
-	cmd.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "Per-scenario timeout")
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show stdout/stderr for each scenario")
-	cmd.Flags().StringVar(&projectDir, "project-dir", ".", "Project root directory")
-
-	return cmd
-}
-
 // scenarioJSONResult is the JSON-serializable result for one scenario.
 type scenarioJSONResult struct {
 	ID      string  `json:"id"`
@@ -65,13 +21,19 @@ type scenarioJSONResult struct {
 	Reason  string  `json:"reason,omitempty"`
 }
 
-// @AX:NOTE [AUTO] @AX:REASON: design choice — command strips markdown backticks from Command field at runtime (line 124); scenarios.md stores commands as inline code e.g. "`auto init`"
+// @AX:NOTE [AUTO]: Commands keep Markdown backticks in scenarios.md and strip them only immediately before runner dispatch.
+// @AX:WARN [AUTO]: This command path has more than eight validation, quarantine, capability, execution, and output branches.
+// @AX:REASON: Scenario admission must complete before runner construction so invalid input cannot trigger build or shell execution.
 // runAutoTest executes the test run logic.
-func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format string, profile string, timeout time.Duration, verbose bool, projectDir string) error {
+func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format string, profile string, timeout time.Duration, verbose bool, projectDir string, validation string) error {
 	out := cmd.OutOrStdout()
 	jsonMode, err := resolveJSONMode(jsonOut, format)
 	if err != nil {
 		return err
+	}
+	validation = strings.ToLower(strings.TrimSpace(validation))
+	if validation != "warn" && validation != "enforce" {
+		return fmt.Errorf("invalid scenario validation mode %q: must be warn or enforce", validation)
 	}
 	profile = strings.ToLower(strings.TrimSpace(profile))
 	if !config.IsValidTestProfile(profile) {
@@ -123,7 +85,7 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format str
 		return fmt.Errorf("read scenarios.md: %w", err)
 	}
 
-	set, err := e2e.ParseScenarios(data)
+	report, err := e2e.ValidateScenarios(data)
 	if err != nil {
 		if jsonMode {
 			return writeJSONResultAndExit(
@@ -138,8 +100,32 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format str
 		}
 		return fmt.Errorf("parse scenarios: %w", err)
 	}
+	set := report.ScenarioSet
+	invalid := report.InvalidCount()
+	if !jsonMode {
+		for _, issue := range report.Issues {
+			fmt.Fprintf(out, "%s %s %s\n", issue.Code, issue.ScenarioRef, issue.Field)
+		}
+	}
+	if validation == "enforce" && len(report.Issues) > 0 {
+		cause := fmt.Errorf("scenario validation failed: %d invalid scenario(s)", invalid)
+		if jsonMode {
+			return writeAutoTestValidationFailureJSON(cmd, invalid, report.Issues, cause)
+		}
+		return cause
+	}
 
 	if len(set.Scenarios) == 0 {
+		if len(report.Issues) > 0 {
+			if jsonMode {
+				return writeAutoTestJSONWithDiagnostics(
+					cmd, nil, 0, 0, 0, invalid, report.Issues, nil,
+					[]jsonMessage{{Code: "scenarios_invalid", Message: "No valid runnable scenarios were found."}},
+				)
+			}
+			fmt.Fprintf(out, "0 runnable scenarios (%d invalid)\n", invalid)
+			return nil
+		}
 		if jsonMode {
 			return writeAutoTestJSON(cmd, nil, 0, 0, 0, nil, []jsonMessage{{
 				Code:    "scenarios_empty",
@@ -147,6 +133,26 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format str
 			}})
 		}
 		fmt.Fprintln(out, "no scenarios found")
+		return nil
+	}
+
+	runnable := make([]e2e.Scenario, 0, len(report.Runnable))
+	for _, scenario := range report.Runnable {
+		if scenarioID == "" || scenario.ID == scenarioID {
+			runnable = append(runnable, scenario)
+		}
+	}
+	if len(runnable) == 0 {
+		warnings := []jsonMessage{{
+			Code:    "scenarios_zero_runnable",
+			Message: "No valid runnable scenarios were found.",
+		}}
+		if jsonMode {
+			return writeAutoTestJSONWithDiagnostics(
+				cmd, nil, 0, 0, 0, invalid, report.Issues, nil, warnings,
+			)
+		}
+		fmt.Fprintf(out, "0 runnable scenarios (%d invalid)\n", invalid)
 		return nil
 	}
 
@@ -169,27 +175,19 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format str
 		passed, run, skipped int
 	)
 
-	for _, s := range set.Scenarios {
-		// Skip non-active or filtered scenarios.
-		if s.Status == "deprecated" || s.Status == "skip" {
-			continue
-		}
-		if scenarioID != "" && s.ID != scenarioID {
-			continue
-		}
-
+	for _, s := range runnable {
 		run++
 		missingRequirements := e2e.MissingScenarioRequirements(s, availableCapabilities)
 		if len(missingRequirements) > 0 {
 			skipped++
 			jr := scenarioJSONResult{
-				ID:     fmt.Sprintf("S%d", s.Number),
+				ID:     s.DisplayRef(),
 				Status: "SKIP",
 				Reason: fmt.Sprintf("requires %s (profile=%s)", strings.Join(missingRequirements, ", "), profile),
 			}
 			results = append(results, jr)
 			if !jsonMode {
-				fmt.Fprintf(out, "%-24s SKIP  %s\n", fmt.Sprintf("S%d: %s", s.Number, s.ID), jr.Reason)
+				fmt.Fprintf(out, "%-24s SKIP  %s\n", fmt.Sprintf("%s: %s", s.DisplayRef(), s.ID), jr.Reason)
 			}
 			continue
 		}
@@ -201,7 +199,7 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format str
 		elapsed := time.Since(start).Seconds()
 
 		jr := scenarioJSONResult{
-			ID:      fmt.Sprintf("S%d", s.Number),
+			ID:      s.DisplayRef(),
 			Elapsed: elapsed,
 		}
 
@@ -219,7 +217,7 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format str
 		results = append(results, jr)
 
 		if !jsonMode {
-			label := fmt.Sprintf("S%d: %s", s.Number, s.ID)
+			label := fmt.Sprintf("%s: %s", s.DisplayRef(), s.ID)
 			if jr.Status == "PASS" {
 				fmt.Fprintf(out, "%-24s PASS  (%.2fs)\n", label, elapsed)
 			} else {
@@ -240,6 +238,12 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format str
 	failed := run - passed - skipped
 	if jsonMode {
 		warnings := make([]jsonMessage, 0)
+		if invalid > 0 {
+			warnings = append(warnings, jsonMessage{
+				Code:    "scenarios_invalid",
+				Message: fmt.Sprintf("%d invalid scenario(s) were quarantined.", invalid),
+			})
+		}
 		if skipped > 0 {
 			warnings = append(warnings, jsonMessage{
 				Code:    "scenarios_skipped",
@@ -251,12 +255,19 @@ func runAutoTest(cmd *cobra.Command, scenarioID string, jsonOut bool, format str
 				Code:    "scenarios_failed",
 				Message: fmt.Sprintf("%d scenario(s) failed.", failed),
 			})
-			return writeAutoTestJSON(cmd, results, passed, failed, skipped, fmt.Errorf("%d scenario(s) failed", failed), warnings)
+			return writeAutoTestJSONWithDiagnostics(
+				cmd, results, passed, failed, skipped, invalid, report.Issues,
+				fmt.Errorf("%d scenario(s) failed", failed), warnings,
+			)
 		}
-		return writeAutoTestJSON(cmd, results, passed, failed, skipped, nil, warnings)
+		return writeAutoTestJSONWithDiagnostics(
+			cmd, results, passed, failed, skipped, invalid, report.Issues, nil, warnings,
+		)
 	}
 
-	if skipped == 0 {
+	if invalid > 0 {
+		fmt.Fprintf(out, "\nResults: %d passed, %d skipped, %d failed, %d invalid\n", passed, skipped, failed, invalid)
+	} else if skipped == 0 {
 		fmt.Fprintf(out, "\nResults: %d/%d passed\n", passed, run)
 	} else {
 		fmt.Fprintf(out, "\nResults: %d passed, %d skipped, %d failed\n", passed, skipped, failed)

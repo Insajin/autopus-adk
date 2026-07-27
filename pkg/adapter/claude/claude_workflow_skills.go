@@ -40,6 +40,8 @@ var claudeWorkflowRoutes = []claudeWorkflowRoute{
 	{name: "doctor", context: "core + workspace", customBody: claudeDoctorContract},
 }
 
+// @AX:ANCHOR [AUTO]: preserve the Claude workflow-skill mapping boundary.
+// @AX:REASON [AUTO]: two generation paths and a regression test consume the same rendered file mappings.
 func (a *Adapter) prepareWorkflowSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	source, err := templates.FS.ReadFile("claude/commands/auto-workflows.md.tmpl")
 	if err != nil {
@@ -70,6 +72,8 @@ func (a *Adapter) prepareWorkflowSkillMappings(cfg *config.HarnessConfig) ([]ada
 	return files, nil
 }
 
+// @AX:ANCHOR [AUTO]: keep Claude workflow section extraction semantics stable.
+// @AX:REASON [AUTO]: the mapping generator and two marker-failure regression call sites depend on its boundary and errors.
 func extractClaudeWorkflowSection(source, startMarker, endMarker string) (string, error) {
 	start := strings.Index(source, startMarker)
 	if start < 0 {
@@ -108,15 +112,37 @@ generated_from: templates/claude/commands/auto-workflows.md.tmpl
 func renderClaudeContextProfile(route claudeWorkflowRoute) string {
 	switch route.name {
 	case "plan":
-		return `- Required: core workspace policy, architecture, and relevant SPEC evidence.
+		return `- Required: core,architecture,relevant_spec
+- Optional: signature,learning
+- Excluded: test,canary
+
+### Context Mapping
+
+- Required: core workspace policy, architecture, and relevant SPEC evidence.
 - Conditional: signatures and learnings only when explicitly declared by the route or task.
 - Excluded by default: scenarios and canary.`
 	case "test":
-		return `- Required: core workspace policy and scenarios.
-- Excluded: canary, signatures, and unrelated learnings.`
+		return `- Required: core,test
+- Optional: signature,learning
+- Excluded: canary
+
+### Context Mapping
+
+- Required: core workspace policy and scenarios.
+- Scenarios map to the test context.`
 	case "canary":
-		return `- Required: core workspace policy, canary, and the declared canary command.
+		return `- Required: core,canary
+- Optional: learning
+- Excluded: test,signature
+
+### Context Mapping
+
+- Required: core workspace policy, canary, and the declared canary command.
 - Excluded: scenarios, signatures, and unrelated learnings.`
+	case "go":
+		return `- Supervisor Required: core,resolved_spec,plan,acceptance,available_architecture
+- Worker Optional: signature,learning,task_declared_extra
+- Excluded: test,canary`
 	default:
 		return fmt.Sprintf("- Required: %s.\n- Load only route-relevant evidence; unrelated optional project documents remain excluded.", route.context)
 	}

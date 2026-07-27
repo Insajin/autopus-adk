@@ -63,3 +63,28 @@ func TestRollbackLatestTransaction_RestoresCommittedTransaction(t *testing.T) {
 	require.NoError(t, RollbackLatestTransaction(root, "codex"))
 	assert.NoFileExists(t, filepath.Join(root, "created.txt"))
 }
+
+func TestTransactionApply_RejectsSymlinkedManagedParentWithoutExternalMutation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	outside := t.TempDir()
+	external := filepath.Join(outside, "metrics.md")
+	require.NoError(t, os.WriteFile(external, []byte("outside-owned\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, ".claude", "skills"), 0o755))
+	if err := os.Symlink(outside, filepath.Join(root, ".claude", "skills", "autopus")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	_, err := ApplyTransaction(root, "claude-code", TransactionPlan{
+		Removes: []TransactionRemove{{
+			Path: filepath.Join(".claude", "skills", "autopus", "metrics.md"),
+		}},
+	})
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "crosses symlink")
+	data, readErr := os.ReadFile(external)
+	require.NoError(t, readErr)
+	assert.Equal(t, "outside-owned\n", string(data))
+}

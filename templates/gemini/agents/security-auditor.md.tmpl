@@ -1,6 +1,11 @@
 ---
 name: auto-agent-security-auditor
 description: 보안 감사 및 취약점 탐지 전문 에이전트. OWASP Top 10 기준으로 코드와 아키텍처의 보안 취약점을 탐지한다.
+tools:
+  - read_file
+  - grep_search
+  - glob
+  - run_shell_command
 skills:
   - security-audit
   - review

@@ -20,10 +20,8 @@ func TestEvaluatePrimitive_StdoutContains_Pass(t *testing.T) {
 	// When: evaluatePrimitive is called with a stdout_contains primitive
 	vr := evaluatePrimitive(`stdout_contains("hello")`, result)
 
-	// Then: result is PASS
-	// Note: evaluatePrimitive falls through to unknown-primitive default (Pass=true)
-	// until stdout_contains is wired in. This test documents current behavior.
-	assert.NotNil(t, vr)
+	// Then: the supported primitive executes its real check.
+	assert.True(t, vr.Pass)
 }
 
 // TestEvaluatePrimitive_ExitCodeNonZero verifies parsing of exit_code(N) for N>1.
@@ -61,14 +59,15 @@ func TestEvaluatePrimitive_StderrEmpty_NotEmpty(t *testing.T) {
 	assert.False(t, vr.Pass)
 }
 
-// TestEvaluatePrimitive_UnknownPrimitive_ReturnsPass verifies that unknown
-// primitives default to PASS (forward-compatible behavior).
-func TestEvaluatePrimitive_UnknownPrimitive_ReturnsPass(t *testing.T) {
+// TestEvaluatePrimitive_UnsafePrimitiveFailsClosed verifies that unsafe or
+// unsupported primitives never default to PASS.
+func TestEvaluatePrimitive_UnsafePrimitiveFailsClosed(t *testing.T) {
 	t.Parallel()
 
 	result := &RunnerResult{ExitCode: 0, Stdout: "", Stderr: ""}
 	vr := evaluatePrimitive("file_exists(\"/some/path\")", result)
-	assert.True(t, vr.Pass, "unknown primitives should default to PASS")
+	assert.False(t, vr.Pass, "unsafe primitives must fail closed")
+	assert.NotEmpty(t, vr.Message)
 }
 
 // TestWorkDirExists_ExistingDir verifies WorkDirExists returns true for a live directory.

@@ -65,7 +65,8 @@ func (a *Adapter) generateSettingsWithHooks(cfg *config.HarnessConfig) ([]adapte
 	if err := json.Unmarshal(files[0].Content, &settings); err != nil {
 		return nil, fmt.Errorf("gemini settings JSON 파싱 실패: %w", err)
 	}
-	applyGeminiHooksAndPermissions(settings, a.configuredLegacyGeminiHooks(cfg), content.DetectPermissions(a.root, cfg.Hooks.Permissions))
+	perms := filterUnsupportedGeminiPermissions(content.DetectPermissions(a.root, cfg.Hooks.Permissions))
+	applyGeminiHooksAndPermissions(settings, a.configuredLegacyGeminiHooks(cfg), perms)
 	return buildGeminiSettingsMapping(settings)
 }
 
@@ -90,13 +91,35 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 	settingsPath := filepath.Join(settingsDir, "settings.json")
 
 	settings := readGeminiSettings(settingsPath)
-	applyGeminiHooksAndPermissions(settings, hooks, perms)
+	applyGeminiHooksAndPermissions(settings, hooks, filterUnsupportedGeminiPermissions(perms))
 	files, err := buildGeminiSettingsMapping(settings)
 	if err != nil {
 		return err
 	}
 	files = sanitizeUnsupportedClaudeTeamMappings(files)
 	return adapter.WriteFileIfChanged(settingsPath, files[0].Content, 0644)
+}
+
+func filterUnsupportedGeminiPermissions(perms *adapter.PermissionSet) *adapter.PermissionSet {
+	if perms == nil {
+		return nil
+	}
+	filter := func(values []string) []string {
+		out := make([]string, 0, len(values))
+		for _, value := range values {
+			switch value {
+			case "TeamCreate", "TeamDelete", "SendMessage":
+				continue
+			default:
+				out = append(out, value)
+			}
+		}
+		return out
+	}
+	return &adapter.PermissionSet{
+		Allow: filter(perms.Allow),
+		Deny:  filter(perms.Deny),
+	}
 }
 
 func applyGeminiHooksAndPermissions(settings map[string]any, hooks []adapter.HookConfig, perms *adapter.PermissionSet) {

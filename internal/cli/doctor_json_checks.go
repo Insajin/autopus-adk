@@ -232,6 +232,8 @@ func (r *doctorJSONReport) collectHookChecks(dir string) {
 	})
 }
 
+// @AX:ANCHOR [AUTO]: keep doctor hygiene projection shared across all JSON collection paths.
+// @AX:REASON [AUTO]: three production and regression call sites depend on the same payload, warnings, checks, and status mutation.
 func (r *doctorJSONReport) collectHygieneChecks(dir string) {
 	hygiene := collectStatusHygiene(dir)
 	payload := hygiene.payload()
@@ -242,7 +244,9 @@ func (r *doctorJSONReport) collectHygieneChecks(dir string) {
 // collectContextWeightChecks mirrors the text context-weight guard (REQ-CLD-007)
 // into the JSON report. It is advisory: over-weight warnings are surfaced as
 // warn-status checks but never flip the envelope status, so overall_ok stays
-// true. The guard is silent in repositories without the meta-workspace docs.
+// true. The guard is silent in repositories without context catalog documents.
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONTEXT-ENGINEERING-001: preserve the advisory context-weight JSON projection.
+// @AX:REASON [AUTO]: doctor JSON and five regression call sites rely on stable check IDs without an overall-status failure.
 func (r *doctorJSONReport) collectContextWeightChecks(dir string) {
 	rep := measureContextWeight(dir)
 	if rep.PresentCount == 0 {
@@ -253,13 +257,13 @@ func (r *doctorJSONReport) collectContextWeightChecks(dir string) {
 		ID:       "doctor.context_weight.total",
 		Severity: "info",
 		Status:   "pass",
-		Detail: fmt.Sprintf("context load set %dB across %d docs (soft cap %dB)",
+		Detail: fmt.Sprintf("context catalog %dB across %d docs (soft cap %dB)",
 			rep.TotalBytes, rep.PresentCount, contextWeightTotalWarnBytes),
 	}
 	if rep.OverTotal {
 		totalCheck.Severity = "warning"
 		totalCheck.Status = "warn"
-		totalCheck.Detail = fmt.Sprintf("context load set %dB exceeds %dB soft cap across %d docs",
+		totalCheck.Detail = fmt.Sprintf("context catalog %dB exceeds %dB soft cap across %d docs",
 			rep.TotalBytes, contextWeightTotalWarnBytes, rep.PresentCount)
 	}
 	r.checks = append(r.checks, totalCheck)
@@ -270,7 +274,7 @@ func (r *doctorJSONReport) collectContextWeightChecks(dir string) {
 				ID:       "doctor.context_weight.doc." + d.Name,
 				Severity: "warning",
 				Status:   "warn",
-				Detail: fmt.Sprintf("context doc %s %dB exceeds %dB soft cap",
+				Detail: fmt.Sprintf("context catalog: context doc %s %dB exceeds %dB soft cap",
 					d.Name, d.Bytes, contextWeightPerDocWarnBytes),
 			})
 		}

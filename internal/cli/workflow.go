@@ -32,6 +32,7 @@ func NewWorkflowCmd(prober workflow.Prober, runner workflow.CommandRunner) *cobr
 	cmd.AddCommand(newWorkflowMergeCmd())
 	cmd.AddCommand(newWorkflowBindingCmd(nil))
 	cmd.AddCommand(newWorkflowContextCmd())
+	cmd.AddCommand(newWorkflowContextPlanCmd())
 	return cmd
 }
 

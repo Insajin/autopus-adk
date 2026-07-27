@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/insajin/autopus-adk/pkg/workerreceipt"
 )
 
 type engineRunState struct {
@@ -14,7 +16,8 @@ type engineRunState struct {
 	previous   map[PhaseID]string
 }
 
-// @AX:ANCHOR: [AUTO] @AX:REASON: architectural boundary — sole orchestration entry point for the five-phase route
+// @AX:ANCHOR [AUTO]: Preserve the sole orchestration entry point for the canonical five-phase route.
+// @AX:REASON: Phase ordering, checkpoint restoration, terminal state, and dispatch evidence converge through this method.
 // Run executes the canonical dependency-ordered pipeline.
 func (e *SubprocessEngine) Run(ctx context.Context) (*PipelineResult, error) {
 	requested, effective, strategyErr := effectivePipelineStrategy(e.cfg.Strategy)
@@ -73,6 +76,8 @@ func (e *SubprocessEngine) Run(ctx context.Context) (*PipelineResult, error) {
 	return state.result, nil
 }
 
+// @AX:WARN [AUTO]: This phase transaction has more than eight retry, receipt, gate, compaction, and persistence branches.
+// @AX:REASON: Worker receipts must be admitted only after response validation and a passing gate, then persisted exactly once.
 func (e *SubprocessEngine) executePhase(ctx context.Context, state *engineRunState, index int, phase Phase, previousOutput string) (string, error) {
 	maxRetries := phase.MaxRetries
 	if maxRetries < 0 {
@@ -96,8 +101,17 @@ func (e *SubprocessEngine) executePhase(ctx context.Context, state *engineRunSta
 		state.result.Receipt.DispatchCount++
 		resp, err := e.cfg.Backend.Execute(ctx, PhaseRequest{Prompt: prompt, PhaseID: phase.ID, Attempt: attempt})
 		evidenceErr := err
+		var output string
+		var workerEnvelope *workerreceipt.Envelope
 		if evidenceErr == nil {
 			evidenceErr = validatePhaseResponse(phase.ID, resp)
+		}
+		if evidenceErr == nil {
+			output = NormalizeOutput(e.cfg.Platform, resp.Output)
+			workerEnvelope, evidenceErr = workerreceipt.ParseMarkedOutput(output)
+			if evidenceErr != nil {
+				evidenceErr = fmt.Errorf("phase %s: worker receipt evidence: %w", phase.ID, evidenceErr)
+			}
 		}
 		state.result.Receipt.recordDispatch(e.cfg.Platform, phase.ID, attempt, resp, evidenceErr)
 		if err != nil {
@@ -114,7 +128,6 @@ func (e *SubprocessEngine) executePhase(ctx context.Context, state *engineRunSta
 				evidenceErr)
 		}
 
-		output := NormalizeOutput(e.cfg.Platform, resp.Output)
 		verdict := EvaluateGate(phase.Gate, output)
 		state.result.PhaseResults[index] = PhaseResult{
 			PhaseID: phase.ID, Output: output, Verdict: verdict,
@@ -127,6 +140,12 @@ func (e *SubprocessEngine) executePhase(ctx context.Context, state *engineRunSta
 			}
 			err := fmt.Errorf("phase %s: gate %s failed after %d attempt(s)", phase.ID, phase.Gate, attempt)
 			return "", e.failPhase(state, index, attempt, CheckpointStatusFailed, TerminalBlocked, err)
+		}
+		if workerEnvelope != nil {
+			state.result.Receipt.WorkerReceipts = append(
+				state.result.Receipt.WorkerReceipts,
+				workerEnvelope.Receipt,
+			)
 		}
 
 		nextOutput, event, err := e.compactPhaseOutput(phase.ID, output)

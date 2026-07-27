@@ -30,7 +30,7 @@ func customWorkflowBodies(spec workflowSpec) (customWorkflowBody, bool) {
 	case "auto-verify":
 		return verifyWorkflowBody(spec.Name, spec.Description), true
 	case "auto-test":
-		return cliWorkflowBody(spec.Name, "E2E Scenario Runner", spec.Description, "auto test run", "scenario별 PASS / FAIL 결과를 정리하고 실패 시 다음 복구 액션을 제안합니다."), true
+		return testWorkflowBody(spec.Name, spec.Description), true
 	case "auto-doctor":
 		return cliWorkflowBody(spec.Name, "Harness Diagnostics", spec.Description, "auto doctor", "platform wiring, rules, plugins, dependencies 상태를 요약하고 fix 필요 시 명시합니다."), true
 	case "auto-map":
@@ -46,6 +46,8 @@ func customWorkflowBodies(spec workflowSpec) (customWorkflowBody, bool) {
 	}
 }
 
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONTEXT-ENGINEERING-001: preserve the shared CLI workflow-body layout.
+// @AX:REASON [AUTO]: status, doctor, and test workflow builders depend on the same invocation and result structure.
 func cliWorkflowBody(name, title, summary, command, result string) customWorkflowBody {
 	skill := compose(
 		"# "+name+" — "+title,
@@ -62,6 +64,23 @@ func cliWorkflowBody(name, title, summary, command, result string) customWorkflo
 	)
 
 	return customWorkflowBody{skill: skill}
+}
+
+func testWorkflowBody(name, summary string) customWorkflowBody {
+	body := cliWorkflowBody(
+		name,
+		"E2E Scenario Runner",
+		summary,
+		"auto test run",
+		"scenario별 PASS / FAIL 결과를 정리하고 실패 시 다음 복구 액션을 제안합니다.",
+	)
+	body.skill = strings.Replace(
+		body.skill,
+		"\n## 실행 순서",
+		"\n## Context Profile: test\n\n- Required: core,test\n- Optional: signature,learning\n- Excluded: canary\n\n## 실행 순서",
+		1,
+	)
+	return body
 }
 
 func goalWorkflowBody(name, summary string) customWorkflowBody {
@@ -170,6 +189,8 @@ func devWorkflowBody(name, summary string) customWorkflowBody {
 	return customWorkflowBody{skill: skill}
 }
 
+// @AX:ANCHOR [AUTO]: preserve the shared ordered-line composition primitive.
+// @AX:REASON [AUTO]: seven workflow builders depend on exact newline ordering in generated skill content.
 func compose(lines ...string) string {
 	return strings.Join(lines, "\n")
 }

@@ -47,11 +47,11 @@ Use `auto sync verify --spec SPEC-ID` to locate exactly one regular, non-symlink
 
 ## Context Document Rotation
 
-IMPORTANT: The session-load context documents MUST stay compact current-state maps, not append-only ledgers. WHEN `/auto sync` updates them, per-SPEC completion history rotates into per-document archive files instead of accumulating. Unbounded history makes every `/auto` session load truncate at the context cap.
+IMPORTANT: The context catalog documents MUST stay compact current-state maps, not append-only ledgers. The catalog lists documents eligible for command-profile selection, rotation, and weight measurement; it does not imply that every document loads in every `/auto` session. WHEN `/auto sync` updates a catalog document, per-SPEC completion history rotates into per-document archive files instead of accumulating.
 
-### Session-Load Set
+### Context Catalog
 
-Seven documents load into the model context at every `/auto` session start. Each has a per-document byte cap; the caps sum to 100000 bytes.
+The context catalog contains seven profile-eligible documents. Each has a per-document byte cap for lossless rotation; the caps sum to 100000 bytes.
 
 | Document | Per-doc cap (bytes) |
 |----------|---------------------|
@@ -65,18 +65,21 @@ Seven documents load into the model context at every `/auto` session start. Each
 
 ### Keep vs Move
 
-Keep only current-state facts in the load-set document. Move completion history and over-detail into that document's archive — losslessly (move, never summarize, rewrite, or delete).
+Keep current-state facts and executable scenario wiring in the context catalog document. Move completion history and over-detail into that document's archive losslessly (move, never summarize, rewrite, or delete).
 
-| Keep (current fact, load-set) | Move (to archive, lossless) |
-|-------------------------------|------------------------------|
+| Keep (current fact, context catalog) | Move (to archive, lossless) |
+|--------------------------------------|------------------------------|
 | Latest-state description of what a capability does now | Completion dates (`completed YYYY-MM-DD`) |
 | Active boundaries, ownership, command routing | Module commit hashes (`@abc1234`), per-SPEC completion attribution |
-| Package-level structure map, active scenario index | Full directory trees, stale or verbose scenario bodies |
+| Package-level structure map | Full directory trees |
+| In `scenarios.md`, top-level `Build` plus every runnable scenario `Command`, `Verify`, and `Status` | Scenario completion history that can move without removing or rewriting the runnable body |
 | Active canary configuration | Verification narrative (follow-up verification, review-loop hardening) |
+
+Runnable scenario bodies MUST remain executable in `scenarios.md`; never replace them with index-only entries. Completion history and full directory trees that rotate to archives MUST remain lossless.
 
 ### Rotation Rules
 
-WHEN `/auto sync` updates a session-load document:
+WHEN `/auto sync` updates a context catalog document:
 
 1. Retain only current-state facts in the document. Append the removed history and over-detail to that document's own archive file at `.autopus/project/archive/<doc>-history-<year>H<half>.md`, where `<doc>` is the document base name without extension (for example, `product` for `product.md`).
 2. Choose the half-year bucket from the record's `completed|implemented YYYY-MM-DD` date tag: H1 covers January–June, H2 covers July–December. An undated record inherits the half-year of the nearest dated record above it.
@@ -91,7 +94,7 @@ WHEN `/auto sync` records a changelog entry:
 
 ### Weight Guard
 
-`auto doctor` sums the seven session-load documents and emits a non-blocking warning when the combined size exceeds 120000 bytes or any single document exceeds 20000 bytes. The warning is advisory — it never fails harness health — and signals that rotation is overdue.
+`auto doctor` measures the present context catalog documents and emits a non-blocking warning when the combined size exceeds 120000 bytes or any single document exceeds 20000 bytes. The warning is advisory — it never fails harness health — and signals that rotation is overdue.
 
 ### Drift Guard
 
@@ -108,5 +111,5 @@ Additionally, the `--spec` query filter can be used with `auto learn query` to r
 - Do NOT store cross-module SPECs inside a single module
 - Do NOT create BS or SPEC IDs without checking global uniqueness first
 - Do NOT commit root documents to a submodule repo (they are outside its git tree)
-- Do NOT append per-SPEC completion history to a session-load document; rotate it into the document's archive file
+- Do NOT append per-SPEC completion history to a context catalog document; rotate it into the document's archive file
 - Do NOT summarize or delete rotated history; move it verbatim so record counts are conserved

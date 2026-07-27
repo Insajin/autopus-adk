@@ -64,6 +64,9 @@ type transaction struct {
 }
 
 func ApplyTransaction(root, platform string, plan TransactionPlan) (*TransactionJournal, error) {
+	if err := validateTransactionPlanPaths(root, plan); err != nil {
+		return nil, err
+	}
 	tx, err := newTransaction(root, platform)
 	if err != nil {
 		return nil, err

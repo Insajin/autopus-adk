@@ -180,7 +180,8 @@ func (r *Runner) runBuild(scenario Scenario) (bool, error) {
 	return builtThisCall, nil
 }
 
-// @AX:WARN [AUTO] @AX:REASON: concurrent map + sync.Once — buildOnceMu guards buildOnceMap/buildErrMap; lock ordering: acquire buildOnceMu, read/init map, release, then call once.Do
+// @AX:WARN [AUTO]: buildOnceMu guards the concurrent buildOnceMap and buildErrMap registries.
+// @AX:REASON: Lock ordering must remain acquire, read or initialize, release, then once.Do to avoid races or deadlock.
 // runLabeledBuild runs a build for a specific label, using per-label Once caching.
 func (r *Runner) runLabeledBuild(entry BuildEntry) (bool, error) {
 	label := entry.Label
@@ -225,17 +226,5 @@ func (r *Runner) runLabeledBuild(entry BuildEntry) (bool, error) {
 
 // evaluatePrimitive evaluates a single verification primitive string against the result.
 func evaluatePrimitive(primitive string, result *RunnerResult) VerifyResult {
-	switch {
-	case primitive == "exit_code(0)":
-		return CheckExitCode(0, result.ExitCode)
-	case len(primitive) > 12 && primitive[:11] == "exit_code(":
-		var code int
-		_, _ = fmt.Sscanf(primitive, "exit_code(%d)", &code)
-		return CheckExitCode(code, result.ExitCode)
-	case primitive == "stderr_empty()":
-		return CheckStderrEmpty(result.Stderr)
-	default:
-		// Return pass for unknown primitives (other agents will implement them).
-		return VerifyResult{Primitive: primitive, Pass: true}
-	}
+	return EvaluateVerifyPrimitive(primitive, result)
 }

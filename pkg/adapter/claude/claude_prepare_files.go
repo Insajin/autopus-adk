@@ -78,7 +78,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	files = append(files, fileSizeRule)
 
 	if cfg.IsFullMode() {
-		skillFiles, err := a.prepareContentFiles("skills", ".claude/skills/autopus")
+		skillFiles, err := a.prepareContentFilesForConfig(cfg, "skills", ".claude/skills/autopus")
 		if err != nil {
 			return nil, fmt.Errorf("스킬 파일 준비 실패: %w", err)
 		}
@@ -103,11 +103,23 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 // prepareContentFiles는 컨텐츠 파일을 읽어 FileMapping 슬라이스로 반환한다 (디스크 쓰기 없음).
 // file-size-limit.md is skipped here; it is rendered dynamically via prepareFileSizeLimitRule.
 func (a *Adapter) prepareContentFiles(subDir string, targetRelDir string) ([]adapter.FileMapping, error) {
+	return a.prepareContentFilesForConfig(nil, subDir, targetRelDir)
+}
+
+func (a *Adapter) prepareContentFilesForConfig(
+	cfg *config.HarnessConfig,
+	subDir string,
+	targetRelDir string,
+) ([]adapter.FileMapping, error) {
 	var files []adapter.FileMapping
 
 	entries, err := contentfs.FS.ReadDir(subDir)
 	if err != nil {
 		return nil, fmt.Errorf("컨텐츠 디렉터리 읽기 실패 %s: %w", subDir, err)
+	}
+	catalog, err := claudeSkillCatalog(subDir, cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, entry := range entries {
@@ -118,6 +130,9 @@ func (a *Adapter) prepareContentFiles(subDir string, targetRelDir string) ([]ada
 			continue
 		}
 		if subDir == "rules" && entry.Name() == "file-size-limit.md" {
+			continue
+		}
+		if !claudeSkillCompiled(catalog, entry.Name(), cfg) {
 			continue
 		}
 
