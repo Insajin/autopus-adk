@@ -21,6 +21,7 @@ readonly A15_REPOSITORY='Insajin/autopus-adk' A16_TAG='v0.50.87' A16_VERSION='0.
 readonly A16_REPOSITORY='Insajin/autopus-adk' A17_TAG='v0.50.88' A17_VERSION='0.50.88'
 readonly A17_REPOSITORY='Insajin/autopus-adk' A18_TAG='v0.50.89' A18_VERSION='0.50.89'
 readonly A18_REPOSITORY='Insajin/autopus-adk' A19_TAG='v0.50.90' A19_VERSION='0.50.90'
+readonly A19_REPOSITORY='Insajin/autopus-adk' A20_TAG='v0.50.91' A20_VERSION='0.50.91'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 
 require_environment GITHUB_REF_NAME
@@ -93,6 +94,9 @@ elif [[ "$GITHUB_REF_NAME" == "$A18_TAG" && "$COMPANION_VERSION" == "$A18_VERSIO
 elif [[ "$GITHUB_REF_NAME" == "$A19_TAG" && "$COMPANION_VERSION" == "$A19_VERSION" ]]; then
   release_phase='A19' prior_phase='A18' prior_repository="$A18_REPOSITORY" prior_evidence_source='immutable A18 GitHub release' prior_tag="$A18_TAG" prior_version="$A18_VERSION" prior_commit="$A18_COMMIT_SHA" prior_release_id="$A18_RELEASE_ID" prior_tree="$A18_TREE_SHA"
   prior_tag_object="$A18_TAG_OBJECT_SHA" prior_checksums="$A18_CHECKSUMS_SHA256" prior_amd64_archive="$A18_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A18_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A18_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A18_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A18_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A18_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A20_TAG" && "$COMPANION_VERSION" == "$A20_VERSION" ]]; then
+  release_phase='A20' prior_phase='A19' prior_repository="$A19_REPOSITORY" prior_evidence_source='immutable A19 GitHub release' prior_tag="$A19_TAG" prior_version="$A19_VERSION" prior_commit="$A19_COMMIT_SHA" prior_release_id="$A19_RELEASE_ID" prior_tree="$A19_TREE_SHA"
+  prior_tag_object="$A19_TAG_OBJECT_SHA" prior_checksums="$A19_CHECKSUMS_SHA256" prior_amd64_archive="$A19_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A19_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A19_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A19_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A19_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A19_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20 policy'
 fi

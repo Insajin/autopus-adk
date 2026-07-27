@@ -54,9 +54,9 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
   esac
   go build -trimpath -o "$gate" "$repo/scripts/companion-release/execsmoke"
   go build -trimpath \
-    -ldflags '-X github.com/insajin/autopus-adk/pkg/version.version=0.50.90' \
+    -ldflags '-X github.com/insajin/autopus-adk/pkg/version.version=0.50.91' \
     -o "$artifact" "$repo/cmd/auto"
-  "$gate" --artifact "$artifact" --expected-version 0.50.90 \
+  "$gate" --artifact "$artifact" --expected-version 0.50.91 \
     --architecture "$architecture" --timeout 15s
   if "$gate" --artifact "$artifact" --expected-version 0.50.88 \
     --architecture "$architecture" --timeout 15s >/dev/null 2>&1; then
