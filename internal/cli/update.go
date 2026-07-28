@@ -12,10 +12,14 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
+// @AX:WARN: [AUTO] newUpdateCmd has at least eight if branches.
+// @AX:REASON: [AUTO] Freshness re-exec, self-update, workspace detection, preview, platform updates, and rollback paths converge in its RunE handler.
 func newUpdateCmd() *cobra.Command {
 	var dir string
 	var selfFlag, checkOnly, force, yesFlag, previewMode, workspaceFlag, localFlag bool
 	var targetVersion, statusLine, workspaceOnly string
+	var freshnessReexec updateFreshnessNonceFlag
+	freshnessGate := newUpdateFreshnessGate()
 
 	cmd := &cobra.Command{
 		Use:   "update [all|repo]",
@@ -26,10 +30,23 @@ func newUpdateCmd() *cobra.Command {
 			if globalFlagsFromContext(cmd.Context()).AutoMode {
 				yesFlag = true
 			}
+			if targetVersion != "" {
+				return unsupportedUpdateVersionError()
+			}
 
 			// R9: Self-update branch
 			if selfFlag {
+				if freshnessReexec.seen {
+					return fmt.Errorf("--%s는 일반 auto update 재실행에만 사용할 수 있습니다", updateFreshnessReexecFlag)
+				}
 				return runSelfUpdate(cmd, checkOnly, force, targetVersion)
+			}
+			freshnessOutcome, freshnessErr := freshnessGate.enforce(cmd, previewMode, freshnessReexec.value)
+			if freshnessErr != nil {
+				return freshnessErr
+			}
+			if freshnessOutcome == updateFreshnessStop {
+				return nil
 			}
 
 			if dir == "" {
@@ -253,6 +270,8 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&workspaceFlag, "workspace", false, "메타 워크스페이스의 하위 Git 리포까지 업데이트")
 	cmd.Flags().StringVar(&workspaceOnly, "only", "", "--workspace 대상 필터 (쉼표 구분 repo path/name)")
 	cmd.Flags().BoolVar(&localFlag, "local", false, "workspace 자동 감지를 끄고 현재 repo만 업데이트")
+	cmd.Flags().Var(&freshnessReexec, updateFreshnessReexecFlag, "internal one-shot freshness re-exec nonce")
+	_ = cmd.Flags().MarkHidden(updateFreshnessReexecFlag)
 	return cmd
 }
 

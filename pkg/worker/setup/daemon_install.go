@@ -6,10 +6,29 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
+	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/version"
 )
+
+const (
+	autoMainPackagePath = "github.com/insajin/autopus-adk/cmd/auto"
+	autoModulePath      = "github.com/insajin/autopus-adk"
+)
+
+type daemonExecutableIdentity struct {
+	PackagePath   string
+	ModulePath    string
+	ModuleVersion string
+	BuildVersion  string
+	BuildCommit   string
+}
 
 // installAndStartDaemon installs the worker daemon for the current OS.
 // It resolves the current binary path and writes OS-specific service config.
+// @AX:ANCHOR: [AUTO] OS daemon installation integration boundary.
+// @AX:REASON: [AUTO] Worker setup must pass executable build identity validation before launchd or systemd configuration can be written.
 func installAndStartDaemon() error {
 	binPath, err := os.Executable()
 	if err != nil {
@@ -19,11 +38,69 @@ func installAndStartDaemon() error {
 	if resolved, err := filepath.EvalSymlinks(binPath); err == nil {
 		binPath = resolved
 	}
+	if err := validateDaemonExecutable(binPath); err != nil {
+		return err
+	}
 
 	if runtime.GOOS == "darwin" {
 		return installLaunchdDaemon(binPath)
 	}
 	return installSystemdDaemon(binPath)
+}
+
+func validateDaemonExecutable(binPath string) error {
+	identity, err := currentDaemonExecutableIdentity()
+	if err != nil {
+		return fmt.Errorf("refusing to install worker daemon: %w", err)
+	}
+	return validateDaemonExecutableIdentity(binPath, identity)
+}
+
+func currentDaemonExecutableIdentity() (daemonExecutableIdentity, error) {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return daemonExecutableIdentity{}, fmt.Errorf("current executable build identity is unavailable")
+	}
+	return daemonExecutableIdentity{
+		PackagePath:   info.Path,
+		ModulePath:    info.Main.Path,
+		ModuleVersion: info.Main.Version,
+		BuildVersion:  version.Version(),
+		BuildCommit:   version.Commit(),
+	}, nil
+}
+
+func validateDaemonExecutableIdentity(binPath string, identity daemonExecutableIdentity) error {
+	if filepath.Base(filepath.Clean(binPath)) != "auto" {
+		return fmt.Errorf("refusing to install worker daemon from non-auto executable %q", binPath)
+	}
+	if identity.PackagePath != autoMainPackagePath ||
+		identity.ModulePath != autoModulePath ||
+		!hasProductionDaemonBuildMetadata(identity) {
+		return fmt.Errorf(
+			"refusing to install worker daemon from untrusted auto build identity %q",
+			identity.PackagePath,
+		)
+	}
+	return nil
+}
+
+func hasProductionDaemonBuildMetadata(identity daemonExecutableIdentity) bool {
+	buildVersion := strings.TrimPrefix(strings.TrimSpace(identity.BuildVersion), "v")
+	if buildVersion == "" ||
+		buildVersion == "dev" ||
+		strings.HasPrefix(buildVersion, "dev-") ||
+		buildVersion == "unknown" ||
+		strings.Contains(buildVersion, "dirty") {
+		return false
+	}
+
+	buildCommit := strings.TrimSpace(identity.BuildCommit)
+	if buildCommit != "" && buildCommit != "none" {
+		return true
+	}
+	moduleVersion := strings.TrimSpace(identity.ModuleVersion)
+	return moduleVersion != "" && moduleVersion != "(devel)"
 }
 
 // installLaunchdDaemon writes a plist and loads it via launchctl (macOS).

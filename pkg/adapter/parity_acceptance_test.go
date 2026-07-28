@@ -90,6 +90,34 @@ func TestAcceptance_S2_GeminiRuleSetMatchesSource(t *testing.T) {
 	assert.Empty(t, platformRuleExclusions["gemini"])
 }
 
+func TestAcceptance_TechstackFreshnessSemanticContractParity(t *testing.T) {
+	t.Parallel()
+
+	expected := []string{
+		"current intended source state",
+		"start and end source SHA",
+		"artifact receipts",
+		"installed older app",
+		"concrete immutable version, SHA, or digest",
+		"`latest-stable`",
+		"`repo-compatible-pin`",
+		"`source-exact`",
+		"fail closed",
+		"explicitly offline development",
+	}
+	for _, platform := range []string{"claude", "codex", "gemini", "opencode"} {
+		platform := platform
+		t.Run(platform, func(t *testing.T) {
+			t.Parallel()
+			rule, ok := generatePlatformRules(t, platform)["techstack-freshness.md"]
+			require.True(t, ok, "%s must generate techstack-freshness.md", platform)
+			for _, phrase := range expected {
+				assert.Contains(t, rule, phrase)
+			}
+		})
+	}
+}
+
 // S5: platform frontmatter 값이 어댑터 식별자와 일치 (Should, REQ-003).
 func TestAcceptance_S5_PlatformFrontmatterValues(t *testing.T) {
 	for name, content := range generatePlatformRules(t, "gemini") {
