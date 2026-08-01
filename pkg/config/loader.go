@@ -129,3 +129,11 @@ func expandEnvVars(s string) string {
 		return match
 	})
 }
+
+// Exists reports whether dir holds an autopus.yaml. Load synthesizes a default
+// config for a missing file rather than returning an error, so a caller that
+// must not act on a synthesized platform list checks this first.
+func Exists(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, configFileName))
+	return err == nil && !info.IsDir()
+}

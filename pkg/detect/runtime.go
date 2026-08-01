@@ -15,6 +15,7 @@ const (
 	AgentRuntimeCodex          AgentRuntime = "codex"
 	AgentRuntimeAntigravityCLI AgentRuntime = "antigravity-cli"
 	AgentRuntimeOpenCode       AgentRuntime = "opencode"
+	AgentRuntimeOMP            AgentRuntime = "omp"
 )
 
 // DetectAgentRuntime walks the bounded parent process tree looking for a known
@@ -82,6 +83,8 @@ func agentRuntimeFromProcessArgs(args string) AgentRuntime {
 		return AgentRuntimeAntigravityCLI
 	case "opencode":
 		return AgentRuntimeOpenCode
+	case "omp":
+		return AgentRuntimeOMP
 	case "node":
 		return agentRuntimeFromNodeEntrypoint(fields)
 	default:
@@ -104,6 +107,8 @@ func agentRuntimeFromNodeEntrypoint(fields []string) AgentRuntime {
 		return AgentRuntimeAntigravityCLI
 	case strings.HasSuffix(entrypoint, "/opencode-ai/bin/opencode"):
 		return AgentRuntimeOpenCode
+	case strings.HasSuffix(entrypoint, "/@oh-my-pi/cli/bin/omp.js"):
+		return AgentRuntimeOMP
 	default:
 		return AgentRuntimeUnknown
 	}

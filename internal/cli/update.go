@@ -275,6 +275,9 @@ func newUpdateCmd() *cobra.Command {
 	return cmd
 }
 
+// appendDetectedPlatforms adds newly detected platforms to the config.
+// Exec surface: detection runs `omp --version` for the REQ-019 identity gate,
+// so this executes one binary from PATH rather than only stat-ing it.
 func appendDetectedPlatforms(cfg *config.HarnessConfig) []string {
 	var added []string
 	for _, platform := range detectInstalledPlatforms() {

@@ -11,6 +11,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/codexruntime"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -94,6 +95,8 @@ func driftAdapterFor(platform, root string, snapshot driftGenerationSnapshot) ad
 		return gemini.NewWithRoot(root, gemini.WithoutPluginInstall())
 	case "opencode":
 		return opencode.NewWithRoot(root)
+	case "omp":
+		return omp.NewWithRoot(root)
 	default:
 		return nil
 	}

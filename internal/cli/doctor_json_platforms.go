@@ -9,6 +9,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
@@ -144,6 +145,8 @@ func validateDoctorPlatform(
 		return gemini.NewWithRoot(dir).Validate(ctx)
 	case "opencode":
 		return opencode.NewWithRoot(dir).Validate(ctx)
+	case "omp":
+		return omp.NewWithRoot(dir).Validate(ctx)
 	default:
 		return nil, fmt.Errorf("unknown platform: %s", platformName)
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -106,7 +107,7 @@ func buildPlatformPreview(ctx context.Context, dir string, cfg *config.HarnessCo
 	items := make([]previewItem, 0, len(files)+1)
 	needsBackup := false
 	willWrite := false
-	diff := adapter.BuildManifestDiff(manifest, files, previewPruneRoots(platform))
+	diff := adapter.BuildManifestDiff(manifest, files, previewPruneRoots(platform, cfg))
 	for _, entry := range diff.Emit {
 		file, ok := lookupPreviewFile(files, entry.Path)
 		if !ok {
@@ -192,6 +193,9 @@ func generatePreviewMappings(ctx context.Context, root string, cfg *config.Harne
 	case "opencode":
 		pf, err := opencode.NewWithRoot(root).Generate(ctx, cfg)
 		return previewMappings(platform, pf, err)
+	case "omp":
+		pf, err := omp.NewWithRoot(root).Generate(ctx, cfg)
+		return previewMappings(platform, pf, err)
 	default:
 		return nil, fmt.Errorf("알 수 없는 플랫폼 %q", platform)
 	}
@@ -216,7 +220,7 @@ func lookupPreviewFile(files []adapter.FileMapping, path string) (adapter.FileMa
 	return adapter.FileMapping{}, false
 }
 
-func previewPruneRoots(platform string) []string {
+func previewPruneRoots(platform string, cfg *config.HarnessConfig) []string {
 	switch platform {
 	case "claude-code":
 		// Delegate rather than restate: an inline copy drifts from the apply
@@ -226,6 +230,10 @@ func previewPruneRoots(platform string) []string {
 		return []string{".codex/skills", filepath.ToSlash(filepath.Join(".autopus", "plugins", "auto", "skills"))}
 	case "opencode":
 		return []string{".agents/skills", ".opencode/skills"}
+	case "omp":
+		// omp gates the skill root on surface ownership, so the preview needs
+		// the same config the apply path sees.
+		return omp.PruneRoots(cfg)
 	default:
 		return nil
 	}

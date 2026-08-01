@@ -2,6 +2,7 @@ package adapter_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -34,6 +36,8 @@ func generatePlatformRules(t *testing.T, platform string) map[string]string {
 		pf, err = gemini.NewWithRoot(dir).Generate(ctx, cfg)
 	case "opencode":
 		pf, err = opencode.NewWithRoot(dir).Generate(ctx, cfg)
+	case "omp":
+		pf, err = omp.NewWithRoot(dir).Generate(ctx, cfg)
 	default:
 		t.Fatalf("unknown platform: %s", platform)
 	}
@@ -102,7 +106,7 @@ func TestAcceptance_TechstackFreshnessSemanticContractParity(t *testing.T) {
 		"fail closed",
 		"explicitly offline development",
 	}
-	for _, platform := range []string{"claude", "codex", "gemini", "opencode"} {
+	for _, platform := range []string{"claude", "codex", "gemini", "opencode", "omp"} {
 		platform := platform
 		t.Run(platform, func(t *testing.T) {
 			t.Parallel()
@@ -130,7 +134,7 @@ func TestAcceptance_S5_PlatformFrontmatterValues(t *testing.T) {
 
 	// Gate reports exactly 0 platform-value mismatch findings.
 	findings, err := runCoverageGate(context.Background(), t.TempDir(), config.DefaultFullConfig("parity-test"),
-		[]string{"claude", "codex", "gemini", "opencode"}, platformRuleExclusions, platformSkillExclusions, nil)
+		[]string{"claude", "codex", "gemini", "opencode", "omp"}, platformRuleExclusions, platformSkillExclusions, nil)
 	require.NoError(t, err)
 	mismatches := 0
 	for _, f := range findings {
@@ -163,15 +167,67 @@ func TestAcceptance_S6_ExistingPlatformsBackwardCompatible(t *testing.T) {
 	assert.Len(t, generatePlatformRules(t, "opencode"), 14, "opencode generates exactly 14 rules")
 }
 
-// TestAcceptance_S8_UnconditionalRulesCarryNoTrigger pins the S8 oracle across
-// the four goldened platforms. TestRules_UnconditionalRulesStayByteIdentical
-// owns the byte-identity clause and
-// TestRules_NoHookEntryReferencesUnconditionalRules owns the hook-entry clause;
-// here the ten rules are pinned by the invariant that keeps them unconditional:
-// no trigger field reaches their emitted frontmatter on any platform
-// (REQ-CONDRULE-SCHEMA-02).
-func TestAcceptance_S8_UnconditionalRulesCarryNoTrigger(t *testing.T) {
+// S9: 파리티 게이트가 omp를 포함한다 (Must, REQ-012).
+//
+// The platform list and the adapter switch case have to land together. A list
+// entry on its own reaches runCoverageGate's default branch and fails the gate
+// with "unknown platform: omp", and generatePlatformRules' t.Fatalf; requiring
+// NoError plus a real rule count is the oracle for that coupling.
+func TestAcceptance_S9_ParityGateCoversOMP(t *testing.T) {
+	ctx := context.Background()
+	cfg := config.DefaultFullConfig("parity-test")
+
+	// REQ-012: omp claims no intended rule or skill gap.
+	assert.Empty(t, platformRuleExclusions["omp"], "omp rule exclusion set must be empty")
+	assert.Empty(t, platformSkillExclusions["omp"], "omp skill exclusion set must be empty")
+
+	// omp covers the full 14-rule source set, and the four incumbents keep the
+	// counts they reported before omp joined the gate, so the addition is
+	// provably non-regressive.
+	ompRules := generatePlatformRules(t, "omp")
+	assert.Len(t, ompRules, 14, "omp generates exactly 14 rules")
 	for _, platform := range []string{"claude", "codex", "gemini", "opencode"} {
+		assert.Len(t, generatePlatformRules(t, platform), 14,
+			"%s still generates exactly 14 rules after omp joins the gate", platform)
+	}
+
+	// TransformRuleForOMP keeps only the seven omp-recognized frontmatter keys,
+	// so no platform key survives into an emitted omp rule. The gate compares
+	// against expectedPlatformValues only when a value is present, which is why
+	// omp contributes zero platform-value findings instead of one per rule.
+	for name, content := range ompRules {
+		_, ok := parsePlatformFromFrontmatter(content)
+		assert.False(t, ok, "omp rule %s must not emit a platform frontmatter key", name)
+	}
+
+	findings, err := runCoverageGate(ctx, t.TempDir(), cfg,
+		[]string{"claude", "codex", "gemini", "opencode", "omp"},
+		platformRuleExclusions, platformSkillExclusions, nil)
+	require.NoError(t, err, "gate must not fail with unknown platform: omp")
+
+	platformValueFindings := 0
+	ompFindings := make([]string, 0)
+	for _, f := range findings {
+		if f.Type == "platform-value" {
+			platformValueFindings++
+		}
+		if f.Platform == "omp" {
+			ompFindings = append(ompFindings, fmt.Sprintf("%s %s: %s", f.Type, f.Item, f.Message))
+		}
+	}
+	assert.Equal(t, 0, platformValueFindings, "platform-value findings must be 0")
+	assert.Empty(t, ompFindings, "omp must report no rule or skill coverage findings")
+}
+
+// TestAcceptance_S8_UnconditionalRulesCarryNoTrigger pins the S8 oracle across
+// every registered platform. TestRules_UnconditionalRulesStayByteIdentical owns
+// the byte-identity clause for the four goldened platforms and
+// TestRules_NoHookEntryReferencesUnconditionalRules owns the hook-entry clause;
+// omp has no pre-change golden, so the ten rules are pinned here by the
+// invariant that keeps them unconditional: no trigger field reaches their
+// emitted frontmatter on any platform (REQ-CONDRULE-SCHEMA-02).
+func TestAcceptance_S8_UnconditionalRulesCarryNoTrigger(t *testing.T) {
+	for _, platform := range []string{"claude", "codex", "gemini", "opencode", "omp"} {
 		platform := platform
 		t.Run(platform, func(t *testing.T) {
 			rules := generatePlatformRules(t, platform)

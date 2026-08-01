@@ -15,6 +15,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
@@ -135,6 +136,9 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 			validationErrs, validateErr = a.Validate(ctx)
 		case "opencode":
 			a := opencode.NewWithRoot(opts.dir)
+			validationErrs, validateErr = a.Validate(ctx)
+		case "omp":
+			a := omp.NewWithRoot(opts.dir)
 			validationErrs, validateErr = a.Validate(ctx)
 		default:
 			tui.SKIP(out, fmt.Sprintf("알 수 없는 플랫폼: %s", p))

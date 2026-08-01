@@ -191,7 +191,7 @@ func preflightWorkspaceUpdateTarget(ctx context.Context, cmd *cobra.Command, tar
 	effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
 	for _, platform := range cfg.Platforms {
 		switch platform {
-		case "claude-code", "codex", "antigravity-cli", "opencode":
+		case "claude-code", "codex", "antigravity-cli", "opencode", "omp":
 			if _, _, previewErr := buildPlatformPreview(ctx, target.AbsPath, effectiveCfg, platform); previewErr != nil {
 				return previewErr
 			}

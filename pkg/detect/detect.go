@@ -31,6 +31,7 @@ var knownCLIs = []struct {
 	{"antigravity-cli", "agy", "--version"},
 	{"opencode", "opencode", "--version"},
 	{"cursor", "cursor", "--version"},
+	{"omp", "omp", "--version"},
 }
 
 const (
@@ -43,6 +44,9 @@ func DetectPlatforms() []Platform {
 	var platforms []Platform
 	for _, cli := range knownCLIs {
 		if v, ok := detectBinary(cli.binary, cli.versionArg); ok {
+			if !platformVersionMatchesIdentity(cli.name, v) {
+				continue
+			}
 			platforms = append(platforms, Platform{
 				Name:    cli.name,
 				Binary:  cli.binary,

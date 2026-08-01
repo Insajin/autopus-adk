@@ -91,7 +91,7 @@ func compileTargetsForSkill(name string) []string {
 	if claudeOnlySkillSet[name] {
 		return []string{"claude"}
 	}
-	return []string{"claude", "codex", "gemini", "opencode"}
+	return []string{"claude", "codex", "gemini", "opencode", "omp"}
 }
 
 // IsCoreSkill reports whether the canonical skill should remain in shared/core surfaces.

@@ -24,7 +24,7 @@ func TestPolicy_NonWorkflowSkillStaysShared(t *testing.T) {
 	}
 
 	targets := compileTargetsForSkill("metrics")
-	want := []string{"claude", "codex", "gemini", "opencode"}
+	want := []string{"claude", "codex", "gemini", "opencode", "omp"}
 	if len(targets) != len(want) {
 		t.Fatalf("compileTargetsForSkill(metrics) = %v, want %v", targets, want)
 	}

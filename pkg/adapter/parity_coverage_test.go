@@ -16,6 +16,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
@@ -76,6 +77,9 @@ func runCoverageGate(
 			pf, genErr = a.Generate(ctx, cfg)
 		case "opencode":
 			a := opencode.NewWithRoot(dir)
+			pf, genErr = a.Generate(ctx, cfg)
+		case "omp":
+			a := omp.NewWithRoot(dir)
 			pf, genErr = a.Generate(ctx, cfg)
 		default:
 			return nil, fmt.Errorf("unknown platform: %s", pName)
@@ -166,7 +170,7 @@ func runCoverageGate(
 func TestParityCoverage(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.DefaultFullConfig("parity-test")
-	platforms := []string{"claude", "codex", "gemini", "opencode"}
+	platforms := []string{"claude", "codex", "gemini", "opencode", "omp"}
 
 	findings, err := runCoverageGate(ctx, t.TempDir(), cfg, platforms, platformRuleExclusions, platformSkillExclusions, nil)
 	require.NoError(t, err)

@@ -242,3 +242,30 @@ func TransactionRemovesFromManifestDiff(diff ManifestDiff, recursive bool) []Tra
 	}
 	return removes
 }
+
+// RejectSymlinkComponents reports an error when any component of relPath under
+// root is a symlink. Adapters call it before reading or backing up a manifest
+// path so a planted link cannot redirect the operation onto a file the adapter
+// does not own.
+func RejectSymlinkComponents(root, relPath string) error {
+	return rejectTransactionSymlinkComponents(root, relPath)
+}
+
+// SafeWorkspacePath resolves relPath under root for writing. It refuses absolute
+// paths, Windows drive prefixes, and `..` segments that escape the workspace, and
+// refuses any path crossing a symlink. Use it before creating or overwriting a
+// managed file so the Generate path enforces what the transaction path already
+// does.
+func SafeWorkspacePath(root, relPath string) (string, error) {
+	_, abs, err := safeTransactionPath(root, relPath)
+	return abs, err
+}
+
+// SafePruneFilePath resolves relPath under root for deletion and returns the
+// absolute target, or an empty string when nothing is there. It refuses escaping
+// paths and, critically, compares the fully resolved target against the resolved
+// workspace root: os.Remove follows PARENT-directory symlinks, so a link planted
+// above a managed file would otherwise delete a file outside the workspace.
+func SafePruneFilePath(root, relPath string) (string, error) {
+	return safePruneFilePath(root, relPath)
+}

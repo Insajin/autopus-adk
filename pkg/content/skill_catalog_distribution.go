@@ -125,7 +125,7 @@ func resolveDefaultSkillTarget(name, platform string) string {
 		return filepath.ToSlash(filepath.Join(".codex", "skills", name+".md"))
 	case "gemini":
 		return filepath.ToSlash(filepath.Join(".gemini", "skills", "autopus", name, "SKILL.md"))
-	case "opencode":
+	case "opencode", "omp":
 		return filepath.ToSlash(filepath.Join(".agents", "skills", name, "SKILL.md"))
 	default:
 		return ""
@@ -138,7 +138,7 @@ func normalizeCatalogPlatform(platform string) string {
 		return "claude"
 	case "gemini", "gemini-cli", "antigravity-cli":
 		return "gemini"
-	case "codex", "opencode":
+	case "codex", "opencode", "omp":
 		return platform
 	default:
 		return ""

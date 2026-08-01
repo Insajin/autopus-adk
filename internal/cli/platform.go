@@ -12,6 +12,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
@@ -114,11 +115,10 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 
 			// Update orchestra config for the new platform
 			providerName := config.PlatformToProvider(platform)
-			if providerName == "" {
-				providerName = platform
-			}
-			if err := config.EnsureOrchestraProvider(cfg, providerName); err != nil {
-				return fmt.Errorf("orchestra 설정 갱신 실패: %w", err)
+			if providerName != "" {
+				if err := config.EnsureOrchestraProvider(cfg, providerName); err != nil {
+					return fmt.Errorf("orchestra 설정 갱신 실패: %w", err)
+				}
 			}
 
 			if err := config.Save(d, cfg); err != nil {
@@ -148,6 +148,11 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 				a := opencode.NewWithRoot(d)
 				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
 					return fmt.Errorf("opencode 파일 생성 실패: %w", err)
+				}
+			case "omp":
+				a := omp.NewWithRoot(d)
+				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
+					return fmt.Errorf("omp 파일 생성 실패: %w", err)
 				}
 			}
 
@@ -217,6 +222,9 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 				_ = a.Clean(ctx)
 			case "opencode":
 				a := opencode.NewWithRoot(d)
+				_ = a.Clean(ctx)
+			case "omp":
+				a := omp.NewWithRoot(d)
 				_ = a.Clean(ctx)
 			}
 

@@ -6,6 +6,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -28,6 +29,9 @@ func updateHarnessPlatform(
 		return true, err
 	case "opencode":
 		_, err := opencode.NewWithRoot(dir).Update(ctx, cfg)
+		return true, err
+	case "omp":
+		_, err := omp.NewWithRoot(dir).Update(ctx, cfg)
 		return true, err
 	default:
 		return false, nil

@@ -72,23 +72,44 @@ exit 0
 		"version probe must terminate its orphan-prone process group")
 }
 
-func TestDetectInstalledPlatformsUsesPresenceOnlyInStableOrder(t *testing.T) {
+// TestDetectInstalledPlatformsExecutesOnlyTheAmbiguousIdentityProbe pins the
+// narrowed contract. Presence alone still decides every platform whose binary
+// name is unambiguous, and their binaries are never executed. `omp` is the
+// exception: `auto init` and `auto update` activate platforms from this list, so
+// an unrelated binary named omp must be rejected here rather than adopted and
+// pointed at a `.omp/` directory it does not own.
+func TestDetectInstalledPlatformsExecutesOnlyTheAmbiguousIdentityProbe(t *testing.T) {
 	dir := t.TempDir()
-	marker := filepath.Join(dir, "executed")
+	markers := make(map[string]string, len(knownCLIs))
 	for _, cli := range knownCLIs {
+		marker := filepath.Join(dir, cli.binary+".executed")
+		markers[cli.name] = marker
 		writeVersionProbeScriptAt(t, filepath.Join(dir, cli.binary),
-			"#!/bin/sh\nprintf executed > \"$AUTOPUS_TEST_EXEC_MARKER\"\n")
+			"#!/bin/sh\nprintf executed > \""+marker+"\"\n")
 	}
-	t.Setenv("AUTOPUS_TEST_EXEC_MARKER", marker)
 	t.Setenv("PATH", dir)
 
 	platforms := DetectInstalledPlatforms()
 
-	require.Len(t, platforms, len(knownCLIs))
-	for i, cli := range knownCLIs {
-		assert.Equal(t, Platform{Name: cli.name, Binary: cli.binary}, platforms[i])
+	names := make([]string, 0, len(platforms))
+	for _, p := range platforms {
+		names = append(names, p.Name)
 	}
-	assert.NoFileExists(t, marker, "presence detection must not execute provider binaries")
+	assert.NotContains(t, names, "omp",
+		"a binary named omp that prints no oh-my-pi version must not be adopted")
+
+	expected := make([]Platform, 0, len(knownCLIs))
+	for _, cli := range knownCLIs {
+		if cli.name == "omp" {
+			assert.FileExists(t, markers[cli.name],
+				"omp is identity-probed, so its version command does run")
+			continue
+		}
+		assert.NoFileExists(t, markers[cli.name],
+			"presence detection must not execute %s", cli.binary)
+		expected = append(expected, Platform{Name: cli.name, Binary: cli.binary})
+	}
+	require.Equal(t, expected, platforms, "remaining platforms keep knownCLIs order")
 }
 
 func writeVersionProbeScript(t *testing.T, content string) string {

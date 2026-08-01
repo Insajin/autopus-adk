@@ -14,6 +14,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
@@ -24,6 +25,7 @@ var initSupportedPlatforms = map[string]bool{
 	"codex":           true,
 	"antigravity-cli": true,
 	"opencode":        true,
+	"omp":             true,
 }
 
 var legacyRootGeneratedGitignorePatterns = map[string]string{
@@ -55,6 +57,9 @@ func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessC
 		case "opencode":
 			a := opencode.NewWithRoot(dir)
 			_, err = a.Generate(ctx, effectiveCfg)
+		case "omp":
+			a := omp.NewWithRoot(dir)
+			_, err = a.Generate(ctx, effectiveCfg)
 		default:
 			tui.Warnf(cmd.OutOrStdout(), "알 수 없는 플랫폼 %q, 건너뜀", p)
 			continue
@@ -81,8 +86,11 @@ func detectDefaultPlatforms() []string {
 }
 
 // detectInstalledPlatforms returns installed, ADK-supported platforms in a stable order.
-// Detection is presence-only and never executes provider binaries.
 // Unlike detectDefaultPlatforms, it does not add any fallback platform.
+//
+// Exec surface: this is not purely passive. detect.DetectInstalledPlatforms runs
+// `omp --version` to satisfy the REQ-019 identity gate, so calling it executes
+// one binary from PATH. Every other platform is decided by presence alone.
 func detectInstalledPlatforms() []string {
 	detected := detect.DetectInstalledPlatforms()
 	platforms := make([]string, 0, len(detected))

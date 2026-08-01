@@ -288,6 +288,7 @@ var validPlatforms = map[string]bool{
 	"antigravity-cli": true,
 	"opencode":        true,
 	"cursor":          true,
+	"omp":             true,
 }
 
 func isValidPlatform(p string) bool {

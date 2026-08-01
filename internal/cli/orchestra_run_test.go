@@ -108,11 +108,13 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 	origBuildProviders := orchestraRunBuildProviders
 	origBackendFactory := orchestraRunBackendFactory
 	origExecutePipeline := orchestraRunExecutePipeline
+	origInvokerDetector := detectOrchestraInvokingProvider
 	t.Cleanup(func() {
 		orchestraRunLoadConfig = origLoadConfig
 		orchestraRunBuildProviders = origBuildProviders
 		orchestraRunBackendFactory = origBackendFactory
 		orchestraRunExecutePipeline = origExecutePipeline
+		detectOrchestraInvokingProvider = origInvokerDetector
 	})
 
 	orchestraRunLoadConfig = func(globalFlags) (*config.HarnessConfig, error) {
@@ -128,6 +130,9 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 	}
 	orchestraRunBuildProviders = buildProviderConfigsForRuntime
 	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend { return noopExecutionBackend{} }
+	// Pin the invoker signal off: this test isolates config-judge exclusion, and an
+	// ambient host runtime would otherwise override the judge with its own provider.
+	detectOrchestraInvokingProvider = func() string { return "" }
 
 	var captured orchestra.SubprocessPipelineConfig
 	orchestraRunExecutePipeline = func(_ context.Context, cfg orchestra.SubprocessPipelineConfig) (*orchestra.OrchestraResult, error) {

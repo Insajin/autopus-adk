@@ -9,11 +9,15 @@ import (
 
 // platformRuleExclusions documents intended per-platform rule gaps.
 // Empty after PARITY-002 closes the Gemini rule gap.
+// SPEC-OMP-001 REQ-012 requires omp to carry empty rule and skill exclusion
+// sets: the adapter emits all 14 source rules and every compatible catalog
+// skill, so it claims no intended gap.
 var platformRuleExclusions = map[string]map[string]bool{
 	"claude":   {},
 	"codex":    {},
 	"gemini":   {},
 	"opencode": {},
+	"omp":      {},
 }
 
 // platformSkillExclusions documents intended per-platform skill gaps.
@@ -22,15 +26,26 @@ var platformSkillExclusions = map[string]map[string]bool{
 	"codex":    {},
 	"gemini":   {},
 	"opencode": {},
+	"omp":      {},
 }
 
 // expectedPlatformValues maps an adapter to the platform frontmatter values it
 // may legitimately emit.
+//
+// The omp entry is defensive rather than load-bearing. TransformRuleForOMP
+// filters rule frontmatter down to the seven omp-recognized keys (description,
+// globs, alwaysApply, condition, astCondition, scope, interruptMode), so no
+// platform key survives into an emitted omp rule. runCoverageGate only compares
+// against this table when parsePlatformFromFrontmatter reports ok, so an absent
+// value is already compliant and produces no finding. The entry exists so that
+// a future omp emitter which does declare platform: omp stays compliant instead
+// of tripping the gate on a missing map key.
 var expectedPlatformValues = map[string][]string{
 	"claude":   {"claude", "claude-code"},
 	"codex":    {"codex"},
 	"gemini":   {"antigravity-cli"},
 	"opencode": {"opencode"},
+	"omp":      {"omp"},
 }
 
 type CoverageFinding struct {

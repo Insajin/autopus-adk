@@ -18,7 +18,7 @@ import (
 // files became permanent orphans that no later run ever proposed again.
 func TestPreviewPruneRoots_MatchClaudeApplyPath(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, claude.PruneRoots(), previewPruneRoots("claude-code"),
+	assert.Equal(t, claude.PruneRoots(), previewPruneRoots("claude-code", nil),
 		"preview must announce exactly the prunes the apply path performs")
 }
 
@@ -45,7 +45,7 @@ func TestPreviewAndApplyComputeSamePruneSet(t *testing.T) {
 		Checksum:        "kept",
 	}}
 
-	previewPrune := prunePaths(adapter.BuildManifestDiff(oldManifest, newFiles, previewPruneRoots("claude-code")))
+	previewPrune := prunePaths(adapter.BuildManifestDiff(oldManifest, newFiles, previewPruneRoots("claude-code", nil)))
 	applyPrune := prunePaths(adapter.BuildManifestDiff(oldManifest, newFiles, claude.PruneRoots()))
 
 	assert.Equal(t, previewPrune, applyPrune, "preview and apply prune sets must match")

@@ -33,6 +33,11 @@ func TestOrchestraInvokerProviderFromSignals(t *testing.T) {
 		{name: "Claude ancestry", runtime: detect.AgentRuntimeClaudeCode, want: "claude"},
 		{name: "Antigravity ancestry", runtime: detect.AgentRuntimeAntigravityCLI, want: "gemini"},
 		{name: "OpenCode ancestry", runtime: detect.AgentRuntimeOpenCode, want: "opencode"},
+		// REQ-018: omp has no orchestra provider and must stay unmapped on BOTH
+		// axes. A future `case AgentRuntimeOMP: return "omp"` would silently
+		// revive the provider registration this SPEC deliberately blocked.
+		{name: "omp platform stays unmapped", platform: "omp", want: ""},
+		{name: "omp ancestry stays unmapped", runtime: detect.AgentRuntimeOMP, want: ""},
 		{name: "Claude marker", claudeCode: true, want: "claude"},
 		{name: "Codex marker", codex: true, want: "codex"},
 		{name: "conflicting markers", claudeCode: true, codex: true, want: ""},

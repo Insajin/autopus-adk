@@ -12,6 +12,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -29,6 +30,13 @@ type platformResult struct {
 
 // classifyFile categorizes a FileMapping into agents, rules, or skills.
 // Returns the category name or empty string if uncategorized.
+//
+// The rule case precedes the agent case because omp writes its rules to
+// .agents/rules/autopus/, which matches the agent substring too. Ordering the
+// agent case first would report omp as 0 rules and count all 14 as agents. No
+// incumbent path is affected: claude, codex, gemini, and opencode emit rules
+// under .claude/, .codex/, .gemini/, and .opencode/, and gemini's mirrored
+// .agents/plugins/autopus/rules/ copies are already dropped by the first case.
 func classifyFile(f adapter.FileMapping) string {
 	p := strings.ToLower(f.TargetPath)
 	switch {
@@ -36,10 +44,10 @@ func classifyFile(f adapter.FileMapping) string {
 		return ""
 	case strings.Contains(p, "skills/") || strings.Contains(p, "skills\\"):
 		return "skills"
-	case strings.Contains(p, "agents/") || strings.Contains(p, "agents\\"):
-		return "agents"
 	case isRuleTargetPath(p):
 		return "rules"
+	case strings.Contains(p, "agents/") || strings.Contains(p, "agents\\"):
+		return "agents"
 	default:
 		return ""
 	}
@@ -120,6 +128,17 @@ func TestParity_CrossPlatformFeatures(t *testing.T) {
 				return pf
 			},
 		},
+		{
+			name: "omp",
+			generate: func(t *testing.T) *adapter.PlatformFiles {
+				t.Helper()
+				dir := t.TempDir()
+				a := omp.NewWithRoot(dir)
+				pf, err := a.Generate(ctx, cfg)
+				require.NoError(t, err)
+				return pf
+			},
+		},
 	}
 
 	results := make([]platformResult, len(platforms))
@@ -159,6 +178,15 @@ func TestParity_CrossPlatformFeatures(t *testing.T) {
 	assert.GreaterOrEqualf(t, codexRulesParity, 95.0,
 		"P0 FAIL: Codex rules parity %.1f%% < 95%%", codexRulesParity)
 
+	// omp joins the report as of SPEC-OMP-001 REQ-012. Its rule count is pinned
+	// against claude rather than a second magic constant, and it is what proves
+	// the classifyFile ordering holds on real generated output: if the agent
+	// case were to win again, .agents/rules/autopus/ would land in the agent
+	// bucket and omp would silently report 0 rules.
+	ompCounts := countsForPlatform(t, results, "omp")
+	assert.Equal(t, claudeCounts.Rules, ompCounts.Rules,
+		"omp must report the same rule count as claude")
+
 	// Skills parity is informational (not gated) but still logged
 	if codexSkillsParity < 95.0 {
 		t.Logf("INFO: Codex skills parity %.1f%% < 95%% (not gated)", codexSkillsParity)
@@ -191,6 +219,10 @@ func TestParity_ClassifyFile(t *testing.T) {
 		{".claude/rules/autopus/branding.md", "rules"},
 		{".codex/rules-autopus-branding.md", "rules"},
 		{".gemini/rules/branding.md", "rules"},
+		// omp writes rules under .agents/, so the path matches the agent
+		// substring as well; the rule case must win (SPEC-OMP-001 REQ-002).
+		{".agents/rules/autopus/branding.md", "rules"},
+		{".omp/agents/planner.md", "agents"},
 		// A relocated hook-fired body is still a rule (REQ-CONDRULE-VERIFY-02);
 		// the compiled manifest beside it is not.
 		{".claude/hooks/autopus/conditional/lore-commit.md", "rules"},

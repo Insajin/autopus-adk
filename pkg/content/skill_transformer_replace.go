@@ -1,26 +1,15 @@
 // Package content provides platform-specific reference replacement for skill content.
+//
+// The replacement pipeline is split by rewrite domain: this file owns path
+// rewrites and the pipeline entry points, skill_transformer_replace_mcp.go owns
+// the Context7/MCP rewrites, and skill_transformer_replace_tools.go owns agent
+// call and tool-name rewrites.
 package content
 
 import (
 	"regexp"
 	"strings"
 )
-
-// mcpResolveRe matches mcp__context7__resolve-library-id(...) calls with arguments.
-var mcpResolveRe = regexp.MustCompile(
-	`mcp__context7__resolve-library-id\(([^)]*)\)`,
-)
-
-// mcpQueryRe matches mcp__context7__query-docs(...) calls with arguments.
-var mcpQueryRe = regexp.MustCompile(
-	`mcp__context7__query-docs\(([^)]*)\)`,
-)
-
-var mcpResolveNameRe = regexp.MustCompile(`mcp__context7__resolve-library-id`)
-var mcpQueryNameRe = regexp.MustCompile(`mcp__context7__query-docs`)
-
-// mcpGenericRe matches any remaining mcp__ references not caught by specific patterns.
-var mcpGenericRe = regexp.MustCompile(`mcp__[\w-]+(?:__[\w-]+)*`)
 
 var openCodeSkillPathRe = regexp.MustCompile(`\.agents/skills/([a-z0-9-]+)\.md`)
 
@@ -49,6 +38,17 @@ var pathReplacements = map[string]map[string]string{
 		".claude/hooks/":          ".opencode/plugins/",
 		".claude/":                ".opencode/",
 	},
+	"omp": {
+		".claude/skills/autopus/": ".agents/skills/",
+		".claude/commands/":       ".agents/commands/",
+		".claude/skills/":         ".agents/skills/",
+		".claude/agents/":         ".omp/agents/",
+		// omp already namespaces its rules under autopus/, so a source that
+		// spells the namespace out must not gain a second one.
+		".claude/rules/autopus/": ".agents/rules/autopus/",
+		".claude/rules/":         ".agents/rules/autopus/",
+		".claude/":               ".omp/",
+	},
 }
 
 // pathOrder ensures specific paths are replaced before the general .claude/ prefix.
@@ -57,6 +57,7 @@ var pathOrder = []string{
 	".claude/skills/autopus/",
 	".claude/skills/",
 	".claude/agents/",
+	".claude/rules/autopus/",
 	".claude/rules/",
 	".claude/hooks/",
 	".claude/",
@@ -99,6 +100,7 @@ func NormalizeAgentReferences(body, platform string) string {
 		"codex":    "`.codex/rules/autopus/branding.md`",
 		"gemini":   "`.gemini/rules/autopus/branding.md`",
 		"opencode": "`.opencode/rules/autopus/branding.md`",
+		"omp":      "`.agents/rules/autopus/branding.md`",
 	}[p]
 	if brandingRule == "" {
 		brandingRule = "`content/rules/branding.md`"
@@ -109,73 +111,6 @@ func NormalizeAgentReferences(body, platform string) string {
 		"`branding-formats.md.tmpl`", "`templates/shared/branding-formats.md.tmpl`",
 	)
 	return replacer.Replace(normalized)
-}
-
-// replaceAgentCalls converts Agent(subagent_type="X", task="Y") to platform syntax.
-// Reuses agentMappingRe from agent_transformer_mapping.go.
-func replaceAgentCalls(line string, platform string) string {
-	return agentMappingRe.ReplaceAllStringFunc(line, func(match string) string {
-		sub := agentMappingRe.FindStringSubmatch(match)
-		if len(sub) < 2 {
-			return match
-		}
-		name := sub[1]
-		task := ""
-		if len(sub) >= 3 {
-			task = sub[2]
-		}
-
-		switch platform {
-		case "codex":
-			if task != "" {
-				return `spawn_agent ` + name + ` --task "` + task + `"`
-			}
-			return `spawn_agent ` + name
-		case "gemini", "gemini-cli", "antigravity-cli":
-			if task != "" {
-				return `@` + name + ` ` + task
-			}
-			return `@` + name
-		case "opencode":
-			if task != "" {
-				return `task tool → subagent_type="` + name + `", prompt="` + task + `"`
-			}
-			return `task tool → subagent_type="` + name + `"`
-		default:
-			return match
-		}
-	})
-}
-
-// replaceMCPCalls converts mcp__context7__ calls into platform-neutral guidance
-// that preserves the intended Context7-first, WebSearch-fallback behavior.
-func replaceMCPCalls(line string, _ string) string {
-	line = mcpResolveRe.ReplaceAllStringFunc(line, func(match string) string {
-		sub := mcpResolveRe.FindStringSubmatch(match)
-		lib := "library"
-		if len(sub) >= 2 && sub[1] != "" {
-			lib = cleanArg(sub[1])
-		}
-		return buildContext7FallbackText(lib, "")
-	})
-
-	line = mcpQueryRe.ReplaceAllStringFunc(line, func(match string) string {
-		sub := mcpQueryRe.FindStringSubmatch(match)
-		lib := "library"
-		topic := ""
-		if len(sub) >= 2 && sub[1] != "" {
-			lib, topic = parseContext7QueryArgs(sub[1])
-		}
-		return buildContext7FallbackText(lib, topic)
-	})
-
-	line = mcpResolveNameRe.ReplaceAllString(line, "Context7 MCP resolve-library-id tool (fallback: web search)")
-	line = mcpQueryNameRe.ReplaceAllString(line, "Context7 MCP query-docs tool (fallback: web search)")
-
-	// Replace any remaining generic mcp__ references
-	line = mcpGenericRe.ReplaceAllString(line, "Context7 MCP with WebSearch fallback")
-
-	return line
 }
 
 // replacePaths converts .claude/ directory references to platform-specific paths.
@@ -191,7 +126,7 @@ func replacePaths(line string, platform string) string {
 			line = strings.ReplaceAll(line, key, repl)
 		}
 	}
-	if p == "opencode" {
+	if p == "opencode" || p == "omp" {
 		line = openCodeSkillPathRe.ReplaceAllString(line, ".agents/skills/$1/SKILL.md")
 	}
 	return line
@@ -201,85 +136,4 @@ func replacePaths(line string, platform string) string {
 // Reuses worktreeIsolationRe from agent_transformer_mapping.go.
 func replaceWorktreeIsolation(line string) string {
 	return worktreeIsolationRe.ReplaceAllString(line, "auto pipeline worktree")
-}
-
-// replaceTodoWrite removes or comments out TodoWrite tool references.
-func replaceTodoWrite(line string, platform string) string {
-	if normalizePlatform(platform) == "opencode" && strings.Contains(line, "TodoWrite") {
-		line = todoWriteRe.ReplaceAllString(line, "todowrite")
-	}
-	if strings.Contains(line, "todowrite") {
-		return line
-	}
-	if todoWriteRe.MatchString(line) {
-		return "// TodoWrite is not available on this platform"
-	}
-	return line
-}
-
-func replaceWorkflowTools(line string, platform string) string {
-	if normalizePlatform(platform) != "opencode" {
-		return line
-	}
-
-	replacer := strings.NewReplacer(
-		"AskUserQuestion", "question",
-		"request_user_input", "question",
-		"TaskCreate", "todowrite",
-		"TaskUpdate", "todowrite",
-		"TaskList", "todowrite",
-		"TaskGet", "todowrite",
-		"TeamCreate", "task",
-		"SendMessage", "task result handoff",
-	)
-	return replacer.Replace(line)
-}
-
-// cleanArg strips quotes and whitespace from a function argument string.
-func cleanArg(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.Trim(s, `"'`)
-	return s
-}
-
-func parseContext7QueryArgs(argString string) (string, string) {
-	parts := strings.Split(argString, ",")
-	if len(parts) == 0 {
-		return "library", ""
-	}
-
-	lib := cleanArg(parts[0])
-	if lib == "" {
-		lib = "library"
-	}
-
-	topic := ""
-	for _, raw := range parts[1:] {
-		part := strings.TrimSpace(raw)
-		if !strings.HasPrefix(part, "topic=") {
-			continue
-		}
-		topic = cleanArg(strings.TrimPrefix(part, "topic="))
-		break
-	}
-
-	return lib, topic
-}
-
-func buildWebSearchQuery(lib, topic string) string {
-	query := lib
-	if topic != "" {
-		query += " " + topic
-	}
-	query += " docs"
-	return strings.TrimSpace(query)
-}
-
-func buildContext7FallbackText(lib, topic string) string {
-	query := buildWebSearchQuery(lib, topic)
-	text := `Context7 MCP first; fallback: WebSearch "` + query + `"`
-	if topic != "" {
-		text += ` (topic: ` + topic + `)`
-	}
-	return text
 }

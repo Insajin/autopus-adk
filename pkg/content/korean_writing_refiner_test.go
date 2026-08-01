@@ -19,13 +19,13 @@ func TestKoreanWritingRefinerCatalogAndTransforms(t *testing.T) {
 	require.True(t, ok, "korean writing refiner must be registered as canonical ADK skill content")
 	assert.Equal(t, "documentation", entry.Category)
 	assert.Equal(t, []string{"research"}, entry.Bundles)
-	assert.ElementsMatch(t, []string{"claude", "codex", "gemini", "opencode"}, entry.CompileTargets)
+	assert.ElementsMatch(t, []string{"claude", "codex", "gemini", "opencode", "omp"}, entry.CompileTargets)
 	assert.False(t, content.IsCoreSkill(entry.Name), "copy refinement is useful long-tail guidance, not a core execution skill")
 
 	transformer, err := content.NewSkillTransformerFromFS(contentfs.FS, "skills")
 	require.NoError(t, err)
 
-	for _, platform := range []string{"claude", "codex", "gemini", "opencode"} {
+	for _, platform := range []string{"claude", "codex", "gemini", "opencode", "omp"} {
 		platform := platform
 		t.Run(platform, func(t *testing.T) {
 			t.Parallel()

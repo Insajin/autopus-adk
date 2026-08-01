@@ -80,6 +80,7 @@ var supportedPlatforms = map[string]bool{
 	"gemini-cli":      true,
 	"antigravity-cli": true,
 	"opencode":        true,
+	"omp":             true,
 }
 
 // NewSkillTransformer creates a transformer by loading all .md files from dir.
