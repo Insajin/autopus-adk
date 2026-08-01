@@ -139,6 +139,11 @@ func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, tar
 		return nil, fmt.Errorf("대상 디렉터리 생성 실패 %s: %w", absTargetDir, err)
 	}
 
+	conditional, err := claudeRuleSurface(subDir)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -147,7 +152,10 @@ func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, tar
 			continue
 		}
 		// file-size-limit.md is rendered from template — skip the static copy.
-		if subDir == "rules" && entry.Name() == "file-size-limit.md" {
+		if subDir == "rules" && entry.Name() == fileSizeLimitRuleFile {
+			continue
+		}
+		if conditional.relocates(entry.Name()) {
 			continue
 		}
 		if !claudeSkillCompiled(catalog, entry.Name(), cfg) {

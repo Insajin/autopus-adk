@@ -1,3 +1,10 @@
+---
+name: worktree-safety
+description: Worktree safety rules for parallel executor agents running in isolated git worktrees
+category: harness
+condition: '\bgit\s+(gc|prune|repack)\b'
+scope: tool:bash
+---
 # Worktree Safety Rules
 
 IMPORTANT: These rules apply whenever parallel executor agents run in isolated worktrees during pipeline Phase 2.

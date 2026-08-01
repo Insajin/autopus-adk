@@ -2,6 +2,7 @@
 package content_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,12 +31,9 @@ func TestGenerateHookConfigs_WithHooks(t *testing.T) {
 	for _, h := range hooks {
 		assert.NotContains(t, h.Command, "--lore", "lore should not be a CLI hook")
 	}
-	var archHook *adapter.HookConfig
-	for i := range hooks {
-		if hooks[i].Event == "PreToolUse" {
-			archHook = &hooks[i]
-		}
-	}
+	// findHook takes the first PreToolUse entry: the arch check is registered
+	// before the SPEC-CONDRULE-001 dispatcher that shares its Bash matcher.
+	archHook := findHook(hooks, "PreToolUse")
 	require.NotNil(t, archHook, "expected a PreToolUse arch hook")
 	assert.Contains(t, archHook.Command, "--hygiene")
 	assert.Contains(t, archHook.Command, "--arch")
@@ -84,15 +82,17 @@ func TestGenerateHookConfigs_AllDisabled(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
-	// All HooksConf fields disabled — the unconditional orchestra hook-IPC hooks
-	// remain: the completion Stop hook and the SessionStart ready hook (SPEC-ORCH-022).
-	require.Len(t, hooks, 2, "completion + session-start ready hooks should be present when all opts disabled")
+	// All HooksConf fields disabled — the unconditional hooks remain: the
+	// completion Stop hook, the SessionStart ready hook (SPEC-ORCH-022), and the
+	// SPEC-CONDRULE-001 rule dispatcher, which no HooksConf option gates.
+	require.Len(t, hooks, 3, "completion, session-start ready, and dispatcher hooks are unconditional")
 	events := map[string]string{}
 	for _, h := range hooks {
 		events[h.Event] = h.Command
 	}
 	assert.Equal(t, `"${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/autopus/hook-claude-stop.sh`, events["Stop"])
 	assert.Equal(t, `"${CLAUDE_PROJECT_DIR:-.}"/.claude/hooks/autopus/hook-claude-sessionstart.sh`, events["SessionStart"])
+	assert.Equal(t, "auto rules fire --event PreToolUse", events["PreToolUse"])
 	assert.Empty(t, gitHooks)
 }
 
@@ -111,15 +111,11 @@ func TestGenerateHookConfigs_GeminiTranslatesEventNames(t *testing.T) {
 	hooks, _, err := content.GenerateHookConfigs(cfg, "gemini", true)
 	require.NoError(t, err)
 
-	eventNames := make([]string, len(hooks))
-	for i, h := range hooks {
-		eventNames[i] = h.Event
-	}
-
-	assert.Contains(t, eventNames, "BeforeTool", "PreToolUse must be translated to BeforeTool for gemini")
-	assert.Contains(t, eventNames, "AfterTool", "PostToolUse must be translated to AfterTool for gemini")
-	assert.NotContains(t, eventNames, "PreToolUse", "gemini hooks must not use Claude Code event names")
-	assert.NotContains(t, eventNames, "PostToolUse", "gemini hooks must not use Claude Code event names")
+	events := eventNames(hooks)
+	assert.Contains(t, events, "BeforeTool", "PreToolUse must be translated to BeforeTool for gemini")
+	assert.Contains(t, events, "AfterTool", "PostToolUse must be translated to AfterTool for gemini")
+	assert.NotContains(t, events, "PreToolUse", "gemini hooks must not use Claude Code event names")
+	assert.NotContains(t, events, "PostToolUse", "gemini hooks must not use Claude Code event names")
 }
 
 func TestGenerateHookConfigs_AntigravityKeepsOfficialEventNames(t *testing.T) {
@@ -133,17 +129,13 @@ func TestGenerateHookConfigs_AntigravityKeepsOfficialEventNames(t *testing.T) {
 	hooks, _, err := content.GenerateHookConfigs(cfg, "antigravity-cli", true)
 	require.NoError(t, err)
 
-	eventNames := make([]string, len(hooks))
-	for i, h := range hooks {
-		eventNames[i] = h.Event
-	}
-
-	assert.Contains(t, eventNames, "PreToolUse")
-	assert.Contains(t, eventNames, "PostToolUse")
-	assert.NotContains(t, eventNames, "BeforeTool")
-	assert.NotContains(t, eventNames, "AfterTool")
+	events := eventNames(hooks)
+	assert.Contains(t, events, "PreToolUse")
+	assert.Contains(t, events, "PostToolUse")
+	assert.NotContains(t, events, "BeforeTool")
+	assert.NotContains(t, events, "AfterTool")
 	// Stop is the completion hook in the Antigravity lifecycle.
-	assert.Contains(t, eventNames, "Stop")
+	assert.Contains(t, events, "Stop")
 
 	// Tool-use hooks must be wrapped for Antigravity JSON stdout protocol;
 	// the completion Stop hook is a plain command (not tool-use).
@@ -177,15 +169,11 @@ func TestGenerateHookConfigs_ClaudeKeepsEventNames(t *testing.T) {
 	hooks, _, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
 
-	eventNames := make([]string, len(hooks))
-	for i, h := range hooks {
-		eventNames[i] = h.Event
-	}
-
-	assert.Contains(t, eventNames, "PreToolUse")
-	assert.Contains(t, eventNames, "PostToolUse")
-	assert.NotContains(t, eventNames, "BeforeTool")
-	assert.NotContains(t, eventNames, "AfterTool")
+	events := eventNames(hooks)
+	assert.Contains(t, events, "PreToolUse")
+	assert.Contains(t, events, "PostToolUse")
+	assert.NotContains(t, events, "BeforeTool")
+	assert.NotContains(t, events, "AfterTool")
 }
 
 func TestGenerateHookConfigs_DeduplicatesReactHooks(t *testing.T) {
@@ -199,14 +187,10 @@ func TestGenerateHookConfigs_DeduplicatesReactHooks(t *testing.T) {
 	hooks, _, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
 	// ReactCIFailure and ReactReview both enabled — dedup keeps only one PostToolUse react hook,
-	// plus the unconditional completion Stop hook and the SessionStart ready hook (SPEC-ORCH-022).
-	require.Len(t, hooks, 3, "expected one deduped react hook plus the completion Stop and SessionStart ready hooks")
-	var reactHook *adapter.HookConfig
-	for i := range hooks {
-		if hooks[i].Event == "PostToolUse" {
-			reactHook = &hooks[i]
-		}
-	}
+	// plus the unconditional completion Stop hook, the SessionStart ready hook
+	// (SPEC-ORCH-022), and the SPEC-CONDRULE-001 dispatcher.
+	require.Len(t, hooks, 4, "expected one deduped react hook plus the Stop, SessionStart, and dispatcher hooks")
+	reactHook := findHook(hooks, "PostToolUse")
 	require.NotNil(t, reactHook, "expected a PostToolUse react hook")
 	assert.Equal(t, "auto react check --quiet", reactHook.Command)
 }
@@ -228,15 +212,11 @@ func TestGenerateProjectHookConfigs_ClaudeTaskCreatedEnabled(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "claude-code", true)
 	require.NoError(t, err)
-	// Expect: completion Stop hook + SessionStart ready hook (SPEC-ORCH-022) + TaskCreated hook.
-	require.Len(t, hooks, 3)
+	// Expect: completion Stop hook + SessionStart ready hook (SPEC-ORCH-022) +
+	// TaskCreated hook + SPEC-CONDRULE-001 dispatcher.
+	require.Len(t, hooks, 4)
 	assert.Empty(t, gitHooks)
-	var taskCreatedHook *adapter.HookConfig
-	for i := range hooks {
-		if hooks[i].Event == "TaskCreated" {
-			taskCreatedHook = &hooks[i]
-		}
-	}
+	taskCreatedHook := findHook(hooks, "TaskCreated")
 	require.NotNil(t, taskCreatedHook, "expected a TaskCreated hook")
 	assert.Equal(t, ".claude/hooks/task-created-validate.sh", taskCreatedHook.Command)
 	assert.Equal(t, "warn", taskCreatedHook.Env["AUTOPUS_TASKCREATED_DEFAULT_MODE"])
@@ -275,4 +255,41 @@ func TestGitHookScript_Content(t *testing.T) {
 
 	// Script uses --staged to only check staged files.
 	assert.Contains(t, gitHooks[0].Content, "auto check --hygiene --arch --quiet --staged")
+}
+
+// TestGenerateHookConfigs_ConditionalDispatcher is the pkg/content half of S10
+// (REQ-CONDRULE-COMPILE-03): the hook-fired rules sharing the PreToolUse/Bash
+// pair collapse into exactly one `auto rules fire` entry on Claude Code, and a
+// platform that cannot consume hookSpecificOutput.additionalContext gets none.
+func TestGenerateHookConfigs_ConditionalDispatcher(t *testing.T) {
+	t.Parallel()
+
+	want := map[string]int{"claude": 1, "claude-code": 1, "gemini": 0,
+		"gemini-cli": 0, "antigravity-cli": 0, "codex": 0, "opencode": 0}
+	// Every option on: the dispatcher must not merge with, duplicate, or displace
+	// the arch and react entries that share its Bash matcher.
+	cfg := config.HooksConf{PreCommitArch: true, PreCommitLore: true, ReactCIFailure: true, ReactReview: true}
+
+	for platform, count := range want {
+		hooks, _, err := content.GenerateHookConfigs(cfg, platform, true)
+		require.NoError(t, err)
+		project, _, err := content.GenerateProjectHookConfigs(config.DefaultFullConfig("demo"), platform, true)
+		require.NoError(t, err)
+
+		for _, set := range [][]adapter.HookConfig{hooks, project} {
+			var fired []adapter.HookConfig
+			for _, h := range set {
+				if strings.Contains(h.Command, "auto rules fire") {
+					fired = append(fired, h)
+				}
+			}
+			require.Len(t, fired, count, platform)
+			for _, h := range fired {
+				assert.Equal(t, adapter.HookConfig{Event: "PreToolUse", Matcher: "Bash",
+					Type: "command", Command: "auto rules fire --event PreToolUse",
+					Timeout: h.Timeout}, h, platform)
+				assert.Positive(t, h.Timeout, `Claude Code rejects "timeout": 0`)
+			}
+		}
+	}
 }

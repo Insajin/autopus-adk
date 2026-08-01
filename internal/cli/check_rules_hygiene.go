@@ -149,6 +149,11 @@ func sourcePrefixesForGenerated(generated string) []string {
 		return []string{"templates/claude/commands/"}
 	case strings.HasPrefix(generated, ".claude/workflows/"):
 		return []string{"content/workflows/", "pkg/content/workflow_", "templates/claude/workflows/"}
+	// Conditional rule bodies and the compiled manifest live under .claude/hooks/
+	// but are produced from the rule source, not the hook source. This case must
+	// stay ahead of the generic .claude/hooks/ case below (SPEC-CONDRULE-001 T9).
+	case strings.HasPrefix(generated, ".claude/hooks/autopus/conditional"):
+		return []string{"content/rules/", "pkg/rulecond/", "pkg/adapter/claude/"}
 	case strings.HasPrefix(generated, ".claude/hooks/"):
 		return []string{"content/hooks/", "pkg/content/hooks", "templates/hooks/"}
 	case strings.HasPrefix(generated, ".gemini/agents/"):

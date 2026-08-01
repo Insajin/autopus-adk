@@ -110,6 +110,9 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newMemCmd())
 	root.AddCommand(newWorkflowCmd())
 	root.AddCommand(newCompanionManifestCmd())
+	// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONDRULE-001: registers the public `auto rules` namespace for conditional rule inspection and PreToolUse dispatch.
+	// @AX:REASON: The generated claude-code PreToolUse hook shells out to `auto rules fire`, so dropping this registration silently stops every hook-fired rule.
+	root.AddCommand(newRulesCmd())
 
 	return root
 }

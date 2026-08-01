@@ -2,6 +2,10 @@
 name: lore-commit
 description: Lore commit format rules for structured, traceable commit messages
 category: workflow
+condition: '\bgit\s+commit\b'
+scope: tool:bash
+interruptMode: tool-only
+astCondition: 'exec.Command("git", "commit", $$$ARGS)'
 ---
 
 # Lore Commit

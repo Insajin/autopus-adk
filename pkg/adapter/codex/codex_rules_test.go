@@ -2,13 +2,16 @@ package codex_test
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -50,6 +53,78 @@ func TestGenerateRuleFiles_ProducesManagedRuleSet(t *testing.T) {
 	entries, err := os.ReadDir(rulesDir)
 	require.NoError(t, err)
 	assert.Len(t, entries, len(expectedRules), "should have the full managed rule set")
+
+	// Codex sources rules from content/rules via contentfs, so relocating a
+	// claude-code rule body under .claude/hooks/autopus/conditional/ cannot
+	// shrink this set (SPEC-CONDRULE-001 S7).
+	sourceEntries, err := fs.ReadDir(contentfs.FS, "rules")
+	require.NoError(t, err)
+	assert.Len(t, sourceEntries, len(expectedRules),
+		"codex rule count must track the content/rules source set")
+}
+
+// triggerFieldKeys are the omp-contract trigger fields that REQ-CONDRULE-SCHEMA-04
+// requires to round-trip through emission uninterpreted.
+var triggerFieldKeys = []string{"condition", "scope", "interruptMode", "astCondition"}
+
+// frontmatterFields maps each top-level frontmatter key to its verbatim value
+// text, without trimming, so byte-level drift is observable.
+func frontmatterFields(t *testing.T, raw string) map[string]string {
+	t.Helper()
+	require.True(t, strings.HasPrefix(raw, "---\n"), "document must open with frontmatter")
+	rest := raw[len("---\n"):]
+	end := strings.Index(rest, "\n---\n")
+	require.GreaterOrEqual(t, end, 0, "frontmatter must be closed")
+
+	fields := map[string]string{}
+	for _, line := range strings.Split(rest[:end], "\n") {
+		if line == "" || strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		fields[key] = strings.TrimPrefix(value, " ")
+	}
+	return fields
+}
+
+// TestGenerateRuleFiles_PreservesTriggerFrontmatter locks SPEC-CONDRULE-001 S7 on
+// the codex path: ensureCodexRulePlatform appends platform to an existing block
+// and preserves every other key, including the trigger fields.
+func TestGenerateRuleFiles_PreservesTriggerFrontmatter(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := codex.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	sourceRaw, err := fs.ReadFile(contentfs.FS, "rules/lore-commit.md")
+	require.NoError(t, err)
+	source := frontmatterFields(t, string(sourceRaw))
+
+	emittedRaw, err := os.ReadFile(filepath.Join(dir, ".codex", "rules", "autopus", "lore-commit.md"))
+	require.NoError(t, err)
+	emitted := frontmatterFields(t, string(emittedRaw))
+
+	for _, key := range triggerFieldKeys {
+		require.Contains(t, source, key,
+			"content/rules/lore-commit.md must declare %s", key)
+		assert.Equal(t, source[key], emitted[key],
+			"codex must preserve the %s value verbatim", key)
+	}
+
+	assert.Equal(t, "codex", emitted["platform"],
+		"codex frontmatter must carry platform: codex")
+	for key, want := range source {
+		assert.Equal(t, want, emitted[key],
+			"codex must preserve frontmatter key %s", key)
+	}
+	assert.Len(t, emitted, len(source)+1,
+		"codex must add only the platform key to the source frontmatter")
 }
 
 func TestGenerateRuleFiles_Content(t *testing.T) {

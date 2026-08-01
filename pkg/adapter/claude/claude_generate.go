@@ -8,6 +8,7 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/rulecond"
 )
 
 // Generate는 하네스 설정에 기반하여 Claude Code 파일을 생성한다.
@@ -18,6 +19,7 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 		filepath.Join(a.root, ".claude", "skills", "autopus"),
 		filepath.Join(a.root, ".claude", "commands"),
 		filepath.Join(a.root, ".claude", "agents", "autopus"),
+		filepath.Join(a.root, filepath.FromSlash(rulecond.BodyRootRelPath)),
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(d, 0755); err != nil {
@@ -106,6 +108,12 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*ada
 		return nil, fmt.Errorf("file-size-limit.md 쓰기 실패: %w", err)
 	}
 	files = append(files, fileSizeRule)
+
+	conditionalFiles, err := a.writeConditionalRuleFiles()
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, conditionalFiles...)
 
 	// Managed hook assets are split between autopus/ and root hook files.
 	hookFiles, err := a.copyContentFiles(cfg, "hooks", filepath.Join(".claude", "hooks", "autopus"))

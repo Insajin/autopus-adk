@@ -2,6 +2,14 @@
 name: file-size-limit
 description: Hard limit of 300 lines per source code file
 category: structure
+globs:
+  - "**/*.go"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.py"
+  - "**/*.rs"
 ---
 
 # File Size Limit

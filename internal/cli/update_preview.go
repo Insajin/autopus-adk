@@ -218,6 +218,10 @@ func lookupPreviewFile(files []adapter.FileMapping, path string) (adapter.FileMa
 
 func previewPruneRoots(platform string) []string {
 	switch platform {
+	case "claude-code":
+		// Delegate rather than restate: an inline copy drifts from the apply
+		// path, and the resulting preview promises prunes that never happen.
+		return claude.PruneRoots()
 	case "codex":
 		return []string{".codex/skills", filepath.ToSlash(filepath.Join(".autopus", "plugins", "auto", "skills"))}
 	case "opencode":

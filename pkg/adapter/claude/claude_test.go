@@ -260,7 +260,10 @@ func TestClaudeAdapter_Generate_InstallsRules(t *testing.T) {
 	_, statErr = os.Stat(filepath.Join(rulesDir, "file-size-limit.md"))
 	require.NoError(t, statErr, "file-size-limit.md가 존재해야 함")
 
-	shellPortabilityData, err := os.ReadFile(filepath.Join(rulesDir, "shell-portability.md"))
+	// shell-portability is hook-fired, so its body lives in the conditional
+	// body root and never loads at session start (REQ-CONDRULE-COMPILE-02).
+	bodyDir := filepath.Join(dir, ".claude", "hooks", "autopus", "conditional")
+	shellPortabilityData, err := os.ReadFile(filepath.Join(bodyDir, "shell-portability.md"))
 	require.NoError(t, err, "shell-portability.md가 존재해야 함")
 	assert.Contains(t, string(shellPortabilityData), "Do NOT prefix commands with GNU `timeout`")
 

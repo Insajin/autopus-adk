@@ -2,7 +2,6 @@ package adapter_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,9 +41,7 @@ func generatePlatformRules(t *testing.T, platform string) map[string]string {
 
 	rules := make(map[string]string)
 	for _, f := range pf.Files {
-		pathLower := strings.ToLower(f.TargetPath)
-		isRule := strings.Contains(pathLower, "rules/") || strings.Contains(pathLower, "rules\\") || strings.Contains(pathLower, "rules-autopus")
-		if isRule {
+		if isRuleTargetPath(f.TargetPath) {
 			rules[extractRuleName(f.TargetPath)] = string(f.Content)
 		}
 	}
@@ -155,9 +152,38 @@ func TestAcceptance_S6_ExistingPlatformsBackwardCompatible(t *testing.T) {
 			codexPlatformCount++
 		}
 	}
-	// @AX:NOTE: [AUTO] magic constant — 8 of 14 codex rules carry platform: codex frontmatter; update when codex rule set changes
-	assert.Equal(t, 8, codexPlatformCount, "8 codex rules retain platform: codex frontmatter")
+	// @AX:NOTE: [AUTO] magic constant — 9 of 14 codex rules carry platform: codex frontmatter; update when codex rule set changes
+	// Was 8 before SPEC-CONDRULE-001: worktree-safety.md had no frontmatter at
+	// all, so ensureCodexRulePlatform had no block to append platform onto.
+	// REQ-CONDRULE-MAP-02 gave it frontmatter, which makes it the ninth.
+	assert.Equal(t, 9, codexPlatformCount, "9 codex rules retain platform: codex frontmatter")
 
+	// claude counts 11 baseline rules plus 3 relocated conditional bodies.
 	assert.Len(t, generatePlatformRules(t, "claude"), 14, "claude generates exactly 14 rules")
 	assert.Len(t, generatePlatformRules(t, "opencode"), 14, "opencode generates exactly 14 rules")
+}
+
+// TestAcceptance_S8_UnconditionalRulesCarryNoTrigger pins the S8 oracle across
+// the four goldened platforms. TestRules_UnconditionalRulesStayByteIdentical
+// owns the byte-identity clause and
+// TestRules_NoHookEntryReferencesUnconditionalRules owns the hook-entry clause;
+// here the ten rules are pinned by the invariant that keeps them unconditional:
+// no trigger field reaches their emitted frontmatter on any platform
+// (REQ-CONDRULE-SCHEMA-02).
+func TestAcceptance_S8_UnconditionalRulesCarryNoTrigger(t *testing.T) {
+	for _, platform := range []string{"claude", "codex", "gemini", "opencode"} {
+		platform := platform
+		t.Run(platform, func(t *testing.T) {
+			rules := generatePlatformRules(t, platform)
+			for name := range alwaysRuleFiles {
+				content, ok := rules[name]
+				require.True(t, ok, "%s must emit %s", platform, name)
+				keys := frontmatterKeySet(content)
+				for _, trigger := range triggerFieldKeys {
+					assert.False(t, keys[trigger],
+						"%s rule %s must stay unconditional but declares %s", platform, name, trigger)
+				}
+			}
+		})
+	}
 }

@@ -52,12 +52,60 @@ func isSkillCompatible(skill pkgcontent.CatalogSkill, platform string) bool {
 	return false
 }
 
+// conditionalBodySegment is the claude-code conditional rule body root.
+// SPEC-CONDRULE-001 relocates hook-fired rule bodies out of baseline context
+// into this directory; REQ-CONDRULE-VERIFY-02 keeps them counted as rules.
+const conditionalBodySegment = "hooks/autopus/conditional/"
+
+// isRuleTargetPath reports whether a generated target path holds a managed
+// rule. classifyFile, runCoverageGate, and generatePlatformRules all route
+// through it so the heuristic cannot drift into three divergent copies.
+//
+// A conditional body under conditionalBodySegment counts; the compiled
+// manifest .claude/hooks/autopus/conditional-rules.json does not, because that
+// filename has no conditional/ segment.
+func isRuleTargetPath(targetPath string) bool {
+	p := strings.ToLower(targetPath)
+	return strings.Contains(p, "rules/") ||
+		strings.Contains(p, `rules\`) ||
+		strings.Contains(p, "rules-autopus") ||
+		strings.Contains(p, conditionalBodySegment) ||
+		strings.Contains(p, `hooks\autopus\conditional\`)
+}
+
+// extractRuleName resolves the source rule filename a generated path maps to.
+// Conditional bodies keep their source basename, so relocation leaves the name
+// unchanged and platformRuleExclusions["claude"] can stay empty.
 func extractRuleName(targetPath string) string {
 	base := filepath.Base(targetPath)
 	if strings.HasPrefix(base, "rules-autopus-") {
 		return strings.TrimPrefix(base, "rules-autopus-")
 	}
 	return base
+}
+
+// frontmatterKeySet returns the top-level frontmatter keys of a rule file.
+// A document without frontmatter yields an empty set rather than failing, since
+// several managed rules ship no frontmatter at all.
+func frontmatterKeySet(content string) map[string]bool {
+	keys := map[string]bool{}
+	if !strings.HasPrefix(content, "---\n") {
+		return keys
+	}
+	rest := strings.TrimPrefix(content, "---\n")
+	idx := strings.Index(rest, "\n---\n")
+	if idx < 0 {
+		return keys
+	}
+	for _, line := range strings.Split(rest[:idx], "\n") {
+		if line == "" || strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
+			continue
+		}
+		if key, _, ok := strings.Cut(line, ":"); ok {
+			keys[key] = true
+		}
+	}
+	return keys
 }
 
 func parsePlatformFromFrontmatter(content string) (string, bool) {

@@ -2,6 +2,8 @@
 name: shell-portability
 description: Portable shell execution rules for macOS/Linux agent runs
 category: harness
+condition: '(^|[;&|]\s)\s*g?timeout\s+[0-9]'
+scope: tool:bash
 ---
 
 # Shell Portability

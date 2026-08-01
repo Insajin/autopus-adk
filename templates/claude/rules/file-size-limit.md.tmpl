@@ -2,7 +2,9 @@
 name: file-size-limit
 description: Hard limit of 300 lines per source code file
 category: structure
----
+{{if .Paths}}paths:
+{{range .Paths}}  - "{{.}}"
+{{end}}{{end}}---
 
 # File Size Limit
 

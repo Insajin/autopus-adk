@@ -77,6 +77,12 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	}
 	files = append(files, fileSizeRule)
 
+	conditional, err := claudeConditionalRules()
+	if err != nil {
+		return nil, fmt.Errorf("조건부 룰 준비 실패: %w", err)
+	}
+	files = append(files, conditional.mappings...)
+
 	if cfg.IsFullMode() {
 		skillFiles, err := a.prepareContentFilesForConfig(cfg, "skills", ".claude/skills/autopus")
 		if err != nil {
@@ -121,6 +127,10 @@ func (a *Adapter) prepareContentFilesForConfig(
 	if err != nil {
 		return nil, err
 	}
+	conditional, err := claudeRuleSurface(subDir)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -129,7 +139,10 @@ func (a *Adapter) prepareContentFilesForConfig(
 		if subDir == "hooks" && isClaudeRootHookFile(entry.Name()) {
 			continue
 		}
-		if subDir == "rules" && entry.Name() == "file-size-limit.md" {
+		if subDir == "rules" && entry.Name() == fileSizeLimitRuleFile {
+			continue
+		}
+		if conditional.relocates(entry.Name()) {
 			continue
 		}
 		if !claudeSkillCompiled(catalog, entry.Name(), cfg) {

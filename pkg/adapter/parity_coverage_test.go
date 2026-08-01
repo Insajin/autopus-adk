@@ -90,7 +90,7 @@ func runCoverageGate(
 
 		for _, f := range pf.Files {
 			pathLower := strings.ToLower(f.TargetPath)
-			isRule := strings.Contains(pathLower, "rules/") || strings.Contains(pathLower, "rules\\") || strings.Contains(pathLower, "rules-autopus")
+			isRule := isRuleTargetPath(f.TargetPath)
 			isSkill := strings.Contains(pathLower, "skills/") || strings.Contains(pathLower, "skills\\")
 
 			if isRule {

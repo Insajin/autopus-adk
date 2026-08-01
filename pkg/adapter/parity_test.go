@@ -38,8 +38,7 @@ func classifyFile(f adapter.FileMapping) string {
 		return "skills"
 	case strings.Contains(p, "agents/") || strings.Contains(p, "agents\\"):
 		return "agents"
-	case strings.Contains(p, "rules/") || strings.Contains(p, "rules\\") ||
-		strings.Contains(p, "rules-autopus"):
+	case isRuleTargetPath(p):
 		return "rules"
 	default:
 		return ""
@@ -192,6 +191,10 @@ func TestParity_ClassifyFile(t *testing.T) {
 		{".claude/rules/autopus/branding.md", "rules"},
 		{".codex/rules-autopus-branding.md", "rules"},
 		{".gemini/rules/branding.md", "rules"},
+		// A relocated hook-fired body is still a rule (REQ-CONDRULE-VERIFY-02);
+		// the compiled manifest beside it is not.
+		{".claude/hooks/autopus/conditional/lore-commit.md", "rules"},
+		{".claude/hooks/autopus/conditional-rules.json", ""},
 		{".claude/skills/auto/SKILL.md", "skills"},
 		{".codex/skills/auto-skill.md", "skills"},
 		{".agents/skills/auto/SKILL.md", "skills"},

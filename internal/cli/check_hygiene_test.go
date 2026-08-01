@@ -165,6 +165,64 @@ func TestCheckCmd_HygieneAllowsGeneratedRuntimeUntrackCleanup(t *testing.T) {
 	}
 }
 
+// conditionalGeneratedPaths are the SPEC-CONDRULE-001 artifacts that live under
+// .claude/hooks/ but are compiled from the rule source.
+var conditionalGeneratedPaths = []string{
+	".claude/hooks/autopus/conditional/lore-commit.md",
+	".claude/hooks/autopus/conditional-rules.json",
+}
+
+func TestCheckCmd_HygieneAllowsConditionalRulesWithRuleSourceChange(t *testing.T) {
+	for _, generated := range conditionalGeneratedPaths {
+		t.Run(generated, func(t *testing.T) {
+			dir := t.TempDir()
+			initHygieneTestGitRepo(t, dir)
+			writeNestedTestFile(t, dir, generated, "# Lore Commit\n")
+			writeNestedTestFile(t, dir, "content/rules/lore-commit.md", "---\nname: lore-commit\n---\n")
+			runHygieneGitCommand(t, dir, "add", generated, "content/rules/lore-commit.md")
+
+			root := newTestRootCmd()
+			var buf bytes.Buffer
+			root.SetOut(&buf)
+			root.SetErr(&buf)
+			root.SetArgs([]string{"check", "--hygiene", "--quiet", "--dir", dir})
+
+			if err := root.Execute(); err != nil {
+				t.Fatalf("conditional artifact with matching rule source should pass: %v\n%s", err, buf.String())
+			}
+		})
+	}
+}
+
+// TestCheckCmd_HygieneBlocksConditionalRulesWithHookSourceChange is the
+// discriminating case: before the conditional case was inserted ahead of the
+// generic .claude/hooks/ case, a content/hooks/ edit wrongly attributed these
+// artifacts and let them through.
+func TestCheckCmd_HygieneBlocksConditionalRulesWithHookSourceChange(t *testing.T) {
+	for _, generated := range conditionalGeneratedPaths {
+		t.Run(generated, func(t *testing.T) {
+			dir := t.TempDir()
+			initHygieneTestGitRepo(t, dir)
+			writeNestedTestFile(t, dir, generated, "# Lore Commit\n")
+			writeNestedTestFile(t, dir, "content/hooks/task-created-validate.sh", "#!/bin/sh\n")
+			runHygieneGitCommand(t, dir, "add", generated, "content/hooks/task-created-validate.sh")
+
+			root := newTestRootCmd()
+			var buf bytes.Buffer
+			root.SetOut(&buf)
+			root.SetErr(&buf)
+			root.SetArgs([]string{"check", "--hygiene", "--quiet", "--dir", dir})
+
+			if err := root.Execute(); err == nil {
+				t.Fatal("expected hook source change not to attribute a conditional rule artifact")
+			}
+			if got := buf.String(); !strings.Contains(got, generated) {
+				t.Fatalf("expected generated drift path in output, got: %s", got)
+			}
+		})
+	}
+}
+
 func initHygieneTestGitRepo(t *testing.T, dir string) {
 	t.Helper()
 

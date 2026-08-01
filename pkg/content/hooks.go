@@ -22,7 +22,10 @@ func GenerateProjectHookConfigs(cfg *config.HarnessConfig, platform string, supp
 		return GenerateHookConfigs(config.HooksConf{}, platform, supportsHooks)
 	}
 	if supportsHooks {
-		hooks := generateCLIHooks(cfg.Hooks, platform)
+		hooks, err := generateCLIHooks(cfg.Hooks, platform)
+		if err != nil {
+			return nil, nil, err
+		}
 		hooks = append(hooks, generateCC21Hooks(cfg.Features.CC21, platform)...)
 		return hooks, nil, nil
 	}
@@ -34,7 +37,8 @@ func GenerateProjectHookConfigs(cfg *config.HarnessConfig, platform string, supp
 // false이면 .git/hooks/ 스크립트를 반환한다.
 func GenerateHookConfigs(cfg config.HooksConf, platform string, supportsHooks bool) ([]adapter.HookConfig, []GitHookScript, error) {
 	if supportsHooks {
-		return generateCLIHooks(cfg, platform), nil, nil
+		hooks, err := generateCLIHooks(cfg, platform)
+		return hooks, nil, err
 	}
 	return nil, generateGitHooks(cfg), nil
 }
@@ -43,7 +47,7 @@ func GenerateHookConfigs(cfg config.HooksConf, platform string, supportsHooks bo
 // Event names and tool matchers are translated per-platform. Claude Code uses
 // PreToolUse/PostToolUse with Bash, Antigravity uses the same event names with
 // run_command, and legacy Gemini CLI used BeforeTool/AfterTool.
-func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfig {
+func generateCLIHooks(cfg config.HooksConf, platform string) ([]adapter.HookConfig, error) {
 	var hooks []adapter.HookConfig
 	pre := translateHookEvent("PreToolUse", platform)
 	post := translateHookEvent("PostToolUse", platform)
@@ -83,8 +87,12 @@ func generateCLIHooks(cfg config.HooksConf, platform string) []adapter.HookConfi
 		})
 	}
 
+	hooks, err := appendConditionalDispatcher(hooks, platform)
+	if err != nil {
+		return nil, err
+	}
 	hooks = append(hooks, generateCompletionHooks(platform)...)
-	return hooks
+	return hooks, nil
 }
 
 func generateCC21Hooks(cfg config.CC21FeaturesConf, platform string) []adapter.HookConfig {

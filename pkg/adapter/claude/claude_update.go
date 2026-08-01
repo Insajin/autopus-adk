@@ -6,7 +6,31 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/rulecond"
 )
+
+// PruneRoots are the compiler-owned directories an update may delete stale
+// managed files from. It is the single source of truth for both the apply path
+// below and the `auto update` preview, which must agree: a preview that
+// promises a prune the apply path cannot perform leaves orphaned files behind
+// forever, because the manifest is rewritten either way and never proposes the
+// prune again.
+//
+// Only compiler-owned directories belong here. Pruning is additionally limited
+// to paths recorded in the previous manifest (see BuildManifestDiff), so a file
+// the user created in one of these directories is never eligible.
+//
+// The rule directory and the conditional body root are both listed because
+// SPEC-CONDRULE-001 moves a hook-fired rule body between them: relocating out
+// of `.claude/rules/autopus` must delete the stale baseline copy, and a rule
+// reclassified back to `always` must delete the stale relocated body.
+func PruneRoots() []string {
+	return []string{
+		".claude/skills/autopus",
+		rulecond.ClaudeRulesRelDir,
+		rulecond.BodyRootRelPath,
+	}
+}
 
 // Update는 매니페스트 기반으로 파일을 업데이트한다.
 // 사용자가 수정한 파일은 백업 후 덮어쓰고, 삭제한 파일은 재생성하지 않는다.
@@ -72,7 +96,7 @@ func (a *Adapter) buildUpdateTransactionPlan(
 			}
 		}
 	}
-	diff := adapter.BuildManifestDiff(oldManifest, newFiles, []string{".claude/skills/autopus"})
+	diff := adapter.BuildManifestDiff(oldManifest, newFiles, PruneRoots())
 
 	return adapter.TransactionPlan{
 		Writes:   adapter.TransactionWritesFromFiles(finalFiles, claudeFileMode),
