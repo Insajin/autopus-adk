@@ -9,6 +9,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
+	"github.com/insajin/autopus-adk/templates"
 )
 
 func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
@@ -28,12 +29,9 @@ func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.Fil
 }
 
 func (a *Adapter) prepareWorkflowSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	var files []adapter.FileMapping
+	files := make([]adapter.FileMapping, 0, len(workflowSpecs))
 	for _, spec := range workflowSpecs {
-		if spec.Name != "auto" {
-			continue
-		}
-		rendered, err := a.renderRouterSkill()
+		rendered, err := a.renderWorkflowSkill(spec, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -47,8 +45,16 @@ func (a *Adapter) prepareWorkflowSkillMappings(cfg *config.HarnessConfig) ([]ada
 	return files, nil
 }
 
-// renderRouterSkill builds the only workflow skill omp emits; the caller filters
-// workflowSpecs down to the router before reaching here.
+func (a *Adapter) renderWorkflowSkill(spec workflowSpec, cfg *config.HarnessConfig) (string, error) {
+	if spec.Name == "auto" {
+		return a.renderRouterSkill()
+	}
+	if spec.SkillPath == "" {
+		return renderOMPCompactWorkflowSkill(spec), nil
+	}
+	return a.renderTemplateWorkflowSkill(spec, cfg)
+}
+
 func (a *Adapter) renderRouterSkill() (string, error) {
 	body := thinRouterSkillBody()
 	frontmatter := ompSkillFrontmatter("auto", "Autopus 명령 라우터 — oh-my-pi helper")
@@ -56,10 +62,25 @@ func (a *Adapter) renderRouterSkill() (string, error) {
 }
 
 func thinRouterSkillBody() string {
-	return `# Autopus 명령 라우터
+	return ompRouterBody("# Autopus 명령 라우터\n\n")
+}
 
-이 스킬은 oh-my-pi 세션에서 Autopus CLI 도구를 호출하는 라우터 역할을 합니다.
-`
+func (a *Adapter) renderTemplateWorkflowSkill(spec workflowSpec, cfg *config.HarnessConfig) (string, error) {
+	raw, err := templates.FS.ReadFile(spec.SkillPath)
+	if err != nil {
+		return "", fmt.Errorf("workflow 템플릿 읽기 실패 %s: %w", spec.SkillPath, err)
+	}
+	rendered, err := a.engine.RenderString(string(raw), cfg)
+	if err != nil {
+		return "", fmt.Errorf("workflow 템플릿 렌더링 실패 %s: %w", spec.SkillPath, err)
+	}
+	_, body := splitOMPFrontmatter(rendered)
+	if strings.TrimSpace(body) == "" {
+		body = rendered
+	}
+	body = normalizeOMPWorkflowBody(body)
+	body = injectOMPInvocation(body, spec.Name)
+	return buildMarkdown(ompSkillFrontmatter(spec.Name, spec.Description), body), nil
 }
 
 func buildMarkdown(frontmatter, body string) string {
@@ -90,7 +111,7 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 
 	files := make([]adapter.FileMapping, 0, len(skills))
 	for _, skill := range skills {
-		if skill.Name == "auto" {
+		if isWorkflowSkillName(skill.Name) {
 			continue
 		}
 		entry, ok := catalog.Get(skill.Name)
@@ -113,6 +134,15 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 		})
 	}
 	return files, nil
+}
+
+func isWorkflowSkillName(name string) bool {
+	for _, spec := range workflowSpecs {
+		if spec.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func skillCompilerExplicitlySelects(cfg *config.HarnessConfig, name string) bool {

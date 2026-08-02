@@ -150,6 +150,12 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 			allOK = false
 			continue
 		}
+		if p == "omp" {
+			if !renderOMPDoctorReadinessText(ctx, out, opts.dir, validationErrs) {
+				allOK = false
+			}
+			continue
+		}
 
 		if len(validationErrs) == 0 {
 			tui.OK(out, p)

@@ -530,6 +530,93 @@ OpenCode note:
 - Helper workflows like `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, and `/auto doctor` are generated as OpenCode-native command wrappers
 - `opencode.json` now registers the managed hook plugin automatically, so `.opencode/plugins/autopus-hooks.js` is live immediately after `auto init` or `auto update`
 
+### OMP role routing and context optimization (opt-in)
+
+OMP policies are provider-neutral and inactive until a named profile is selected. Start with the non-destructive `overlay` mode, then replace the illustrative selectors below with exact, authenticated `provider/model` selectors reported by the installed OMP catalog.
+
+```yaml
+role_model_policy:
+  version: v1
+  profile: omp-balanced
+  profiles:
+    omp-balanced:
+      config_mode: overlay
+      capabilities:
+        deep_reasoning:
+          required: true
+          candidates:
+            - selector: provider-a/reasoner
+              family: family-a
+              thinking: high
+        coding_tool_use:
+          required: true
+          candidates:
+            - selector: provider-a/coder
+              family: family-a
+              thinking: medium
+        fast_validation:
+          required: true
+          candidates:
+            - selector: provider-b/fast
+              family: family-b
+              thinking: medium
+        vision_design:
+          required: true
+          candidates:
+            - selector: provider-b/vision
+              family: family-b
+              thinking: high
+        independent_dissent:
+          required: true
+          candidates:
+            - selector: provider-b/reviewer
+              family: family-b
+              thinking: high
+        deterministic_transform:
+          required: true
+          candidates:
+            - selector: provider-a/transform
+              family: family-a
+              thinking: medium
+      family_diversity:
+        enabled: true
+        roles: [advisor]
+```
+
+- Candidate order is the fallback order. `selector`, `family`, and `thinking` must match the probed catalog; the placeholders above are not model recommendations.
+- `safety` is optional. Add explicit `approval_mode` or `isolation_mode` values only after the installed-version capability probe reports support; omission leaves those keys unclaimed.
+- Use `project-managed` only when the project intentionally owns the target OMP keys. Every claimed key needs the observed `prior_fingerprint` and `complete: true`; an array claim such as `retry.fallbackChains` also needs `full_array_ownership: true`.
+
+Context optimization is separately opt-in. The selected profile below keeps history in `shadow` and memory `off`; the active profile is defined but not selected.
+
+```yaml
+omp_context_policy:
+  profile: omp-safe-shadow
+  profiles:
+    omp-safe-shadow:
+      history_mode: shadow
+      memory_mode: off
+      history_target_tokens: 1000
+      fallback: canonical_full
+      capability_policy: probe_required
+      runtime_root_policy: isolated_task_owned
+      mutation_scope: session_overlay
+    omp-active-probed:
+      history_mode: active
+      memory_mode: off
+      history_target_tokens: 1000
+      fallback: canonical_full
+      capability_policy: probe_required
+      runtime_root_policy: isolated_task_owned
+      mutation_scope: session_overlay
+```
+
+- Select `omp-active-probed` only when an exact capability probe succeeds, the runtime is task-owned (`isolated_task_owned`), and a fresh promotion attestation has been recomputed from at least 20 complete balanced AB/BA raw pairs and bound to the exact policy, session/binding, and canary digest. A missing, stale, mismatched, duplicate, or aggregate-only claim remains in `shadow` or is blocked. Use `no_session` only when no session runtime exists.
+- The generated OMP bridge currently proves hash-only event forwarding, not a long-lived supervisor ACK, authoritative `CanonicalSource`, or real dispatch admission. It therefore cannot activate optimization by itself and remains fail-closed. `canonical_full` rollback may be claimed only after an authoritative new-session rebuild is verified and its delivery dispatch is acknowledged; absent that evidence, rollback remains unverified and blocked.
+- Memory supports `off` or observation-only `shadow`. Shadow memory requires a `memory_namespace`; memory is never actively injected, and active receipts cannot claim memory injections or document omissions.
+- Model resolution evidence is written to the gitignored runtime artifact `.autopus/omp-model-resolution-v1.json`. Task-scoped context evidence uses `.autopus/runtime/omp-context/<task-id>/<session-id>/receipt.json`.
+- Run `auto doctor` (or `auto doctor --json`) to re-probe the installed CLI and configuration. Receipts must contain neither credentials, prompt bodies, nor absolute paths. Live provider transport checks can incur cost and run only with explicit `auto doctor --provider-smoke` opt-in; a stale receipt is not proof that a current canary passed.
+
 ### Codex vs OpenCode
 
 | Topic | Codex | OpenCode |

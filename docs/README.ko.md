@@ -441,6 +441,93 @@ OpenCode 참고:
 - `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, `/auto doctor` 같은 helper workflow도 OpenCode 명령 래퍼로 함께 생성됩니다
 - `opencode.json`이 관리형 hook plugin을 자동 등록하므로 `auto init` 또는 `auto update` 직후 `.opencode/plugins/autopus-hooks.js`가 바로 활성화됩니다
 
+### OMP 역할 라우팅과 컨텍스트 최적화(선택 적용)
+
+OMP 정책은 프로바이더에 종속되지 않으며 이름 있는 프로필을 선택하기 전에는 활성화되지 않습니다. 먼저 기존 설정을 직접 소유하지 않는 `overlay` 모드로 시작하고, 아래 예시 selector는 설치된 OMP 카탈로그가 보고한 정확한 인증 가능 `provider/model` 값으로 바꾸세요.
+
+```yaml
+role_model_policy:
+  version: v1
+  profile: omp-balanced
+  profiles:
+    omp-balanced:
+      config_mode: overlay
+      capabilities:
+        deep_reasoning:
+          required: true
+          candidates:
+            - selector: provider-a/reasoner
+              family: family-a
+              thinking: high
+        coding_tool_use:
+          required: true
+          candidates:
+            - selector: provider-a/coder
+              family: family-a
+              thinking: medium
+        fast_validation:
+          required: true
+          candidates:
+            - selector: provider-b/fast
+              family: family-b
+              thinking: medium
+        vision_design:
+          required: true
+          candidates:
+            - selector: provider-b/vision
+              family: family-b
+              thinking: high
+        independent_dissent:
+          required: true
+          candidates:
+            - selector: provider-b/reviewer
+              family: family-b
+              thinking: high
+        deterministic_transform:
+          required: true
+          candidates:
+            - selector: provider-a/transform
+              family: family-a
+              thinking: medium
+      family_diversity:
+        enabled: true
+        roles: [advisor]
+```
+
+- candidate 순서가 fallback 순서입니다. `selector`, `family`, `thinking`은 probe한 카탈로그와 일치해야 하며, 위 placeholder는 모델 추천이 아닙니다.
+- `safety`는 선택 사항입니다. 설치된 버전의 capability probe가 지원을 확인한 뒤에만 `approval_mode`나 `isolation_mode`를 명시하세요. 생략하면 해당 키를 소유하지 않습니다.
+- 프로젝트가 대상 OMP 키를 의도적으로 소유할 때만 `project-managed`를 사용하세요. 소유를 선언한 모든 키에는 관측한 `prior_fingerprint`와 `complete: true`가 필요하고, `retry.fallbackChains` 같은 배열에는 `full_array_ownership: true`도 필요합니다.
+
+컨텍스트 최적화는 별도로 선택 적용합니다. 아래에서 선택된 프로필은 history를 `shadow`, memory를 `off`로 유지하며, active 프로필은 정의만 하고 선택하지 않습니다.
+
+```yaml
+omp_context_policy:
+  profile: omp-safe-shadow
+  profiles:
+    omp-safe-shadow:
+      history_mode: shadow
+      memory_mode: off
+      history_target_tokens: 1000
+      fallback: canonical_full
+      capability_policy: probe_required
+      runtime_root_policy: isolated_task_owned
+      mutation_scope: session_overlay
+    omp-active-probed:
+      history_mode: active
+      memory_mode: off
+      history_target_tokens: 1000
+      fallback: canonical_full
+      capability_policy: probe_required
+      runtime_root_policy: isolated_task_owned
+      mutation_scope: session_overlay
+```
+
+- 정확한 capability probe가 성공하고 runtime이 task-owned(`isolated_task_owned`)이며, 최소 20개의 완전하고 균형 잡힌 AB/BA raw pair를 재집계한 최신 promotion attestation이 정확한 policy, session/binding, canary digest에 결합된 경우에만 `omp-active-probed`를 선택하세요. attestation이 없거나 오래됐거나 불일치하거나 duplicate/aggregate-only 주장인 경우 `shadow`를 유지하거나 차단합니다. session runtime이 전혀 없을 때만 `no_session`을 사용합니다.
+- 현재 생성된 OMP bridge가 증명하는 것은 hash-only event forwarding까지이며 long-lived supervisor ACK, authoritative `CanonicalSource`, real dispatch admission은 아직 증명하지 못합니다. 따라서 bridge만으로 active optimization을 시작할 수 없고 fail-closed를 유지합니다. `canonical_full` rollback은 authoritative new-session rebuild 검증과 delivery dispatch ACK가 모두 있을 때만 주장할 수 있으며, 그 증거가 없으면 rollback은 unverified 상태로 차단됩니다.
+- memory는 `off` 또는 관측 전용 `shadow`만 지원합니다. memory shadow에는 `memory_namespace`가 필요합니다. memory를 active로 주입하지 않으며, active receipt에는 memory injection이나 문서 생략을 기록할 수 없습니다.
+- 모델 해석 근거는 Git에서 제외되는 runtime artifact `.autopus/omp-model-resolution-v1.json`에 기록됩니다. task-scoped 컨텍스트 근거는 `.autopus/runtime/omp-context/<task-id>/<session-id>/receipt.json`을 사용합니다.
+- `auto doctor`(자동화에서는 `auto doctor --json`)로 설치된 CLI와 설정을 다시 probe하세요. receipt에는 credential, prompt 본문, 절대 경로가 들어가면 안 됩니다. 비용이 발생할 수 있는 live provider transport 확인은 `auto doctor --provider-smoke`로 명시적으로 opt-in한 경우에만 실행되며, 오래된 receipt는 현재 canary 통과 증거가 아닙니다.
+
 ### Codex vs OpenCode 비교
 
 | 항목 | Codex | OpenCode |

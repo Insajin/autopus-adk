@@ -14,6 +14,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/stretchr/testify/assert"
@@ -47,6 +48,12 @@ func generateContextEngineeringSurfaces(t *testing.T) map[string]contextEngineer
 			func(command string) string { return ".agents/skills/auto-" + command + "/SKILL.md" }},
 		{"opencode", func(root string) (*adapter.PlatformFiles, error) {
 			return opencode.NewWithRoot(root).Generate(context.Background(), config.DefaultFullConfig("context-engineering"))
+		}, ".agents/skills/agent-pipeline/SKILL.md",
+			func(command string) string { return ".agents/skills/auto-" + command + "/SKILL.md" }},
+		{"omp", func(root string) (*adapter.PlatformFiles, error) {
+			cfg := config.DefaultFullConfig("context-engineering")
+			cfg.Platforms = []string{"omp"}
+			return omp.NewWithRoot(root).Generate(context.Background(), cfg)
 		}, ".agents/skills/agent-pipeline/SKILL.md",
 			func(command string) string { return ".agents/skills/auto-" + command + "/SKILL.md" }},
 		{"gemini", func(root string) (*adapter.PlatformFiles, error) {

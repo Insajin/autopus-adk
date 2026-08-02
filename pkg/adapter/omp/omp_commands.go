@@ -45,12 +45,12 @@ func (a *Adapter) renderRouterCommand() (string, error) {
 }
 
 func thinRouterCommandBody() string {
-	return strings.TrimSpace("`$ARGUMENTS`\n\nTreat the text above as the full payload passed after `/auto`.\nImmediately load skill `auto` and use it as the canonical router.\nStrip global flags first, resolve the first remaining token as the subcommand, then load the matching `auto-*` skill.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.")
+	return strings.TrimSpace(ompRouterBody(""))
 }
 
 func thinWorkflowCommandBody(name string) string {
 	subcommand := strings.TrimPrefix(name, "auto-")
-	return strings.TrimSpace(fmt.Sprintf("`$ARGUMENTS`\n\nTreat the text above as the full argument payload for `/%s`.\nReinterpret it as `/auto %s ...` payload로 다시 해석하고, `skill` 도구로 `auto`를 로드한 뒤 canonical router 규칙을 따르세요.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.", name, subcommand))
+	return strings.TrimSpace(fmt.Sprintf("`$ARGUMENTS`\n\nTreat the text above as the full argument payload for `/%s`.\nLoad exact detail skill `%s`; this is the same target selected by `/auto %s ...`.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.", name, name, subcommand))
 }
 
 // ompCommandFrontmatter builds command frontmatter with the description escaped

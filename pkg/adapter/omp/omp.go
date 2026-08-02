@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,18 +28,26 @@ const (
 
 // Adapter is the oh-my-pi (omp) platform adapter.
 type Adapter struct {
-	root   string
-	engine *tmpl.Engine
+	root                   string
+	engine                 *tmpl.Engine
+	modelIntegrationRunner OMPModelCatalogRunner
+	modelIntegrationClock  func() time.Time
+	rootedWorkspaceHook    func()
+	rootedRootCreatedHook  func()
 }
 
 // New creates an adapter rooted at the current directory.
 func New() *Adapter {
-	return &Adapter{root: ".", engine: tmpl.New()}
+	return NewWithRoot(".")
 }
 
 // NewWithRoot creates an adapter rooted at the specified path.
 func NewWithRoot(root string) *Adapter {
-	return &Adapter{root: root, engine: tmpl.New()}
+	return &Adapter{
+		root: root, engine: tmpl.New(),
+		modelIntegrationRunner: newOMPModelIntegrationExecRunner(),
+		modelIntegrationClock:  time.Now,
+	}
 }
 
 func (a *Adapter) Name() string        { return adapterName }
@@ -50,8 +57,8 @@ func (a *Adapter) SupportsHooks() bool { return false }
 
 // Detect checks whether the omp binary is installed in PATH.
 // REQ-019: treat it as the omp platform only when its version output matches the oh-my-pi version shape.
-// @AX:NOTE [AUTO]: the "omp/" version prefix is the identity gate, not the binary name — an unrelated
-// binary named omp on PATH must not be adopted as this platform. Keep the prefix check paired with LookPath.
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-002: exact "omp/X.Y.Z" release output is the identity gate,
+// not the binary name; keep the whole-string release check paired with LookPath.
 // The probe is bounded: a binary named omp that never answers --version would
 // otherwise hang `auto doctor` forever, so it inherits the caller's context and
 // adds a timeout plus a WaitDelay for output pipes left open after signalling.
@@ -77,7 +84,7 @@ func (a *Adapter) Detect(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	version := strings.TrimSpace(string(out))
-	if !strings.HasPrefix(version, detect.OMPVersionPrefix) {
+	if !detect.OMPVersionMatchesIdentity(version) {
 		return false, nil
 	}
 	return true, nil
@@ -93,44 +100,83 @@ func (a *Adapter) InstallHooks(_ context.Context, _ []adapter.HookConfig, _ *ada
 // platform update, update preview, doctor text/json, drift) — do not change the signature.
 // @AX:REASON [AUTO]: every caller relies on the manifest being written here; a Generate that skips
 // the manifest leaves Update and Clean with no record of the files it just wrote.
-func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
-	files, err := a.prepareFiles(ctx, cfg)
+func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (pf *adapter.PlatformFiles, returnErr error) {
+	workspace, err := openOrCreateOMPRootedWorkspace(a.root, a.rootedRootCreatedHook)
 	if err != nil {
 		return nil, err
 	}
-	if err := writeMappings(a.root, files); err != nil {
+	defer func() { joinOMPRootedCloseError(&returnErr, workspace.Close()) }()
+	if a.rootedWorkspaceHook != nil {
+		a.rootedWorkspaceHook()
+	}
+	files, err := a.prepareFilesAt(ctx, cfg, workspace)
+	if err != nil {
 		return nil, err
 	}
 
-	pf := &adapter.PlatformFiles{Files: files, Checksum: adapter.Checksum(fmt.Sprintf("%d", len(files)))}
-	m := adapter.ManifestFromFiles(adapterName, pf)
-	if err := m.Save(a.root); err != nil {
-		return nil, fmt.Errorf("매니페스트 저장 실패: %w", err)
+	pf = &adapter.PlatformFiles{Files: files, Checksum: adapter.Checksum(fmt.Sprintf("%d", len(files)))}
+	plan := adapter.TransactionPlan{
+		Writes:   adapter.TransactionWritesFromFiles(files, a.fileModeResolverAt(workspace)),
+		Manifest: adapter.ManifestFromFiles(adapterName, pf),
+	}
+	if _, err := applyOMPTransactionAt(workspace, adapterName, plan); err != nil {
+		return nil, err
 	}
 	return pf, nil
 }
 
 // Update updates omp files based on the manifest diff.
-func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
-	oldManifest, err := adapter.LoadManifest(a.root, adapterName)
+func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (pf *adapter.PlatformFiles, returnErr error) {
+	workspace, err := openOMPRootedWorkspace(a.root)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { joinOMPRootedCloseError(&returnErr, workspace.Close()) }()
+	if a.rootedWorkspaceHook != nil {
+		a.rootedWorkspaceHook()
+	}
+	oldManifest, err := loadOMPManifestAt(workspace, adapterName)
 	if err != nil {
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
 	}
 
-	files, err := a.prepareFiles(ctx, cfg)
+	files, err := a.prepareFilesAt(ctx, cfg, workspace)
 	if err != nil {
 		return nil, err
 	}
-	plan, pf := a.buildUpdateTransactionPlan(oldManifest, files, cfg)
-	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
+	plan, pf, err := a.buildUpdateTransactionPlanAt(workspace, oldManifest, files, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := applyOMPTransactionAt(workspace, adapterName, plan); err != nil {
 		return nil, err
 	}
 	return pf, nil
 }
 
-func (a *Adapter) prepareFiles(ctx context.Context, cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+func (a *Adapter) prepareFiles(ctx context.Context, cfg *config.HarnessConfig) (files []adapter.FileMapping, returnErr error) {
+	workspace, err := openOMPRootedWorkspace(a.root)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { joinOMPRootedCloseError(&returnErr, workspace.Close()) }()
+	return a.prepareFilesAt(ctx, cfg, workspace)
+}
+
+// @AX:WARN [AUTO]: OMP surface preparation contains 12 if branches.
+// @AX:REASON [AUTO]: model integration, generated mappings, context bridge, config merge, and runtime finalization converge here.
+func (a *Adapter) prepareFilesAt(
+	ctx context.Context,
+	cfg *config.HarnessConfig,
+	workspace *ompRootedWorkspace,
+) ([]adapter.FileMapping, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("하네스 설정이 필요합니다")
+	}
+
+	modelIntegration, err := a.prepareModelIntegration(ctx, cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	var files []adapter.FileMapping
@@ -147,7 +193,11 @@ func (a *Adapter) prepareFiles(ctx context.Context, cfg *config.HarnessConfig) (
 		return nil, err
 	}
 	// 2. Agents
-	if err := appendFiles(a.prepareAgentMappings()); err != nil {
+	agentMappings := a.prepareAgentMappings
+	if modelIntegration != nil {
+		agentMappings = modelIntegration.prepareAgentMappings
+	}
+	if err := appendFiles(agentMappings()); err != nil {
 		return nil, err
 	}
 	// 3. Skills
@@ -158,100 +208,30 @@ func (a *Adapter) prepareFiles(ctx context.Context, cfg *config.HarnessConfig) (
 	if err := appendFiles(a.prepareCommandMappings(cfg)); err != nil {
 		return nil, err
 	}
-	// 5. Config
-	configMapping, err := a.prepareConfigMapping(cfg)
+	// 5. Native context bridge (explicit OMP context-policy opt-in only)
+	if err := appendFiles(prepareOMPContextBridgeMappings(cfg)); err != nil {
+		return nil, err
+	}
+	// 6. Config
+	configMapping, err := a.prepareConfigMappingAt(workspace, cfg)
 	if err != nil {
 		return nil, err
 	}
-	files = append(files, configMapping)
+	if modelIntegration != nil {
+		configMapping, runtimeMappings, finalizeErr := modelIntegration.finalize(ctx, a, workspace, configMapping)
+		if finalizeErr != nil {
+			return nil, finalizeErr
+		}
+		files = append(files, configMapping)
+		files = append(files, runtimeMappings...)
+	} else {
+		files = append(files, configMapping)
+	}
 
 	return files, nil
-}
-
-func (a *Adapter) buildUpdateTransactionPlan(
-	oldManifest *adapter.Manifest,
-	files []adapter.FileMapping,
-	cfg *config.HarnessConfig,
-) (adapter.TransactionPlan, *adapter.PlatformFiles) {
-	finalFiles := make([]adapter.FileMapping, 0, len(files))
-	for _, file := range files {
-		action := adapter.ResolveAction(a.root, file.TargetPath, file.OverwritePolicy, oldManifest)
-		if action == adapter.ActionSkip {
-			continue
-		}
-		finalFiles = append(finalFiles, file)
-	}
-
-	pf := &adapter.PlatformFiles{
-		Files:    finalFiles,
-		Checksum: adapter.Checksum(fmt.Sprintf("%d", len(finalFiles))),
-	}
-
-	diff := adapter.BuildManifestDiff(oldManifest, files, PruneRoots(cfg))
-	removes := adapter.TransactionRemovesFromManifestDiff(diff, false)
-
-	return adapter.TransactionPlan{
-		Writes:   adapter.TransactionWritesFromFiles(finalFiles, a.fileModeResolver()),
-		Removes:  removes,
-		Manifest: adapter.ManifestFromFiles(adapterName, pf),
-	}, pf
 }
 
 // ompConfigFileMode is the permission a freshly created .omp/config.yml gets.
 // The file carries provider settings and can hold credentials, so it starts
 // owner-only instead of world readable.
 const ompConfigFileMode = os.FileMode(0600)
-
-// fileModeResolver decides the permission each managed file is written with.
-// Everything except the config keeps the ordinary 0644. The config preserves
-// whatever mode it already has, because the update transaction otherwise
-// rewrote a user-tightened 0600 file back to 0644 and silently widened it.
-func (a *Adapter) fileModeResolver() func(string) os.FileMode {
-	return func(path string) os.FileMode {
-		if filepath.ToSlash(path) != configFile {
-			return 0644
-		}
-		if info, err := os.Stat(filepath.Join(a.root, path)); err == nil {
-			return info.Mode().Perm()
-		}
-		return ompConfigFileMode
-	}
-}
-
-func writeMappings(root string, files []adapter.FileMapping) error {
-	for _, file := range files {
-		if err := writeMapping(root, file); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func writeMapping(root string, file adapter.FileMapping) error {
-	// Contain the write: refuse absolute paths, `..` segments that escape the
-	// workspace, and any path crossing a symlink. Update already enforces this
-	// through the transaction path; Generate writes the same file set and must
-	// not be the weaker door.
-	targetPath, err := adapter.SafeWorkspacePath(root, file.TargetPath)
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		return fmt.Errorf("디렉터리 생성 실패 %s: %w", filepath.Dir(targetPath), err)
-	}
-	perm := os.FileMode(0644)
-	if filepath.ToSlash(file.TargetPath) == configFile {
-		perm = ompConfigFileMode
-		if info, statErr := os.Stat(targetPath); statErr == nil {
-			perm = info.Mode().Perm()
-		}
-	}
-
-	// No marker-policy special case here: prepareConfigMapping already merged the
-	// managed section into file.Content, so both policies write the same bytes.
-	if err := os.WriteFile(targetPath, file.Content, perm); err != nil {
-		return fmt.Errorf("파일 쓰기 실패 %s: %w", file.TargetPath, err)
-	}
-	return nil
-}

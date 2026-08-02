@@ -162,6 +162,8 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 	}
 }
 
+// @AX:WARN [AUTO]: platform-remove orchestration has cyclomatic complexity 18.
+// @AX:REASON [AUTO]: gocyclo reports 18 across adapter cleanup, config migration, persistence, and user-visible convergence branches.
 func newPlatformRemoveCmd(dir *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove <platform>",
@@ -178,7 +180,12 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 				platform = normalized
 			}
 
-			cfg, err := config.Load(d)
+			var cfg *config.HarnessConfig
+			if platform == "omp" {
+				cfg, err = config.LoadPreview(d)
+			} else {
+				cfg, err = config.Load(d)
+			}
 			if err != nil {
 				return fmt.Errorf("설정 로드 실패: %w", err)
 			}
@@ -203,13 +210,32 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 				return fmt.Errorf("최소 하나의 플랫폼이 필요합니다")
 			}
 
+			ctx := context.Background()
+			if platform == "omp" {
+				a := omp.NewWithRoot(d)
+				receipt, cleanErr := a.CleanWithReceipt(ctx)
+				if cleanErr != nil {
+					if len(receipt.ChangedPaths) > 0 {
+						return fmt.Errorf("omp 파일 정리 실패: %w; repair_required=true changed_paths=[%s]",
+							cleanErr, strings.Join(receipt.ChangedPaths, ","))
+					}
+					return fmt.Errorf("omp 파일 정리 사전 검증 실패: %w", cleanErr)
+				}
+				cfg.Platforms = newPlatforms
+				if err := config.Save(d, cfg); err != nil {
+					return fmt.Errorf("설정 저장 실패: %w; repair_required=true changed_paths=[%s]",
+						err, strings.Join(receipt.ChangedPaths, ","))
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "✓ Platform %q removed\n", platform)
+				return nil
+			}
+
 			cfg.Platforms = newPlatforms
 			if err := config.Save(d, cfg); err != nil {
 				return fmt.Errorf("설정 저장 실패: %w", err)
 			}
 
 			// 플랫폼 파일 정리
-			ctx := context.Background()
 			switch platform {
 			case "claude-code":
 				a := claude.NewWithRoot(d)
@@ -222,9 +248,6 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 				_ = a.Clean(ctx)
 			case "opencode":
 				a := opencode.NewWithRoot(d)
-				_ = a.Clean(ctx)
-			case "omp":
-				a := omp.NewWithRoot(d)
 				_ = a.Clean(ctx)
 			}
 

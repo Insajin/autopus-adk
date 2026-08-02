@@ -41,6 +41,10 @@ func ompExclusivePruneRoots() []string {
 		".omp/agents",
 		configFile,
 		".agents/commands",
+		ompContextBridgeTarget,
+		DefaultOMPModelOverlayPath,
+		OMPModelReceiptRelativePath,
+		OMPModelProjectOwnershipRelativePath,
 	}
 }
 

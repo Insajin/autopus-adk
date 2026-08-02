@@ -29,7 +29,8 @@ func TestOMPClean_DoesNotFollowSymlinkedManifestPath(t *testing.T) {
 	require.NoError(t, os.Remove(victim))
 	require.NoError(t, os.Symlink(secret, victim))
 
-	require.NoError(t, NewWithRoot(dir).Clean(context.Background()))
+	require.Error(t, NewWithRoot(dir).Clean(context.Background()),
+		"an unverifiable managed path must fail the whole destructive preflight")
 
 	assert.FileExists(t, secret, "the symlink target itself must never be deleted")
 	data, err := os.ReadFile(secret)
@@ -38,6 +39,7 @@ func TestOMPClean_DoesNotFollowSymlinkedManifestPath(t *testing.T) {
 
 	assert.NotContains(t, strings.Join(backupPaths(t, dir), "\n"), "branding.md",
 		"a symlinked manifest path must not be copied into the backup directory")
+	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
 }
 
 // TestOMPWriteMapping_RejectsSymlinkedTarget covers the write half of L-2: a
@@ -97,18 +99,19 @@ func TestOMPClean_DoesNotDeleteThroughParentDirectorySymlink(t *testing.T) {
 	require.NoError(t, os.RemoveAll(agentsDir))
 	require.NoError(t, os.Symlink(outside, agentsDir))
 
-	require.NoError(t, NewWithRoot(dir).Clean(context.Background()))
+	require.Error(t, NewWithRoot(dir).Clean(context.Background()),
+		"a parent symlink must fail the whole destructive preflight")
 
 	assert.FileExists(t, victim, "a file outside the workspace must survive Clean")
 	data, err := os.ReadFile(victim)
 	require.NoError(t, err)
 	assert.Equal(t, "OUTSIDE-WORKSPACE\n", string(data))
 	assert.DirExists(t, outside, "the linked-to directory must survive too")
+	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
 }
 
 // TestOMPClean_SkipsSymlinkedEntryWithoutUnlinking pins the containment choice:
-// an entry that fails the workspace check is left entirely alone rather than
-// unlinked through an unverified path.
+// an entry that fails the workspace check aborts the complete clean plan.
 func TestOMPClean_SkipsSymlinkedEntryWithoutUnlinking(t *testing.T) {
 	t.Parallel()
 
@@ -121,12 +124,13 @@ func TestOMPClean_SkipsSymlinkedEntryWithoutUnlinking(t *testing.T) {
 	require.NoError(t, os.Remove(link))
 	require.NoError(t, os.Symlink(target, link))
 
-	require.NoError(t, NewWithRoot(dir).Clean(context.Background()))
+	require.Error(t, NewWithRoot(dir).Clean(context.Background()))
 
 	assert.FileExists(t, target, "the link target is never touched")
 	info, err := os.Lstat(link)
 	require.NoError(t, err, "the unverifiable entry is skipped, not unlinked")
 	assert.NotZero(t, info.Mode()&os.ModeSymlink)
+	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
 }
 
 // TestOMPWriteMapping_RejectsEscapingRelativePath is the F-4 regression: the
@@ -175,10 +179,12 @@ func TestOMPClean_DoesNotDeleteManifestThroughSymlinkedParent(t *testing.T) {
 	manifestOutside := filepath.Join(outside, "omp-manifest.json")
 	require.FileExists(t, manifestOutside, "the relocated manifest is the bait")
 
-	require.NoError(t, NewWithRoot(dir).Clean(context.Background()))
+	require.Error(t, NewWithRoot(dir).Clean(context.Background()),
+		"a symlinked manifest parent must fail the whole destructive preflight")
 
 	assert.FileExists(t, manifestOutside,
 		"a manifest reached through a symlinked parent must not be deleted")
+	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
 }
 
 // TestOMPGenerate_RefusesSymlinkedConfigRead covers the read that feeds a write:
@@ -212,8 +218,7 @@ func TestOMPGenerate_RefusesSymlinkedConfigRead(t *testing.T) {
 // parent symlink that stays INSIDE the workspace passes containment (the
 // resolved target is still under the root) but fails the symlink check, and the
 // check previously gated only the backup. The entry was therefore deleted
-// through the link with no backup taken, silently — `auto platform remove omp`
-// discards Clean's error. Skip semantics must be the same for both guards.
+// through the link with no backup taken. Preflight now rejects the complete plan.
 func TestOMPClean_SkipsWorkspaceInternalParentSymlink(t *testing.T) {
 	t.Parallel()
 
@@ -231,10 +236,11 @@ func TestOMPClean_SkipsWorkspaceInternalParentSymlink(t *testing.T) {
 	victim := filepath.Join(realDir, "branding.md")
 	require.NoError(t, os.WriteFile(victim, []byte("USER EDITED CONTENT\n"), 0o644))
 
-	require.NoError(t, NewWithRoot(dir).Clean(context.Background()))
+	require.Error(t, NewWithRoot(dir).Clean(context.Background()))
 
 	data, err := os.ReadFile(victim)
 	require.NoError(t, err,
 		"an entry reached through a symlink must not be deleted without a backup")
 	assert.Equal(t, "USER EDITED CONTENT\n", string(data))
+	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
 }
