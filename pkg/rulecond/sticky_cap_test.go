@@ -14,7 +14,7 @@ import (
 // the frontmatter removed — measures exactly bodyBytes.
 func syntheticStickyFile(name, marker string, bodyBytes int) string {
 	head := "# " + marker + "\n"
-	body := head
+	var body string
 	if len(head) >= bodyBytes {
 		body = head[:bodyBytes]
 	} else {

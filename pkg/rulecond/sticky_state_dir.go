@@ -57,7 +57,7 @@ func openStateRoot(projectRoot string) (*os.Root, bool) {
 			continue
 		}
 		next, ok := descendStateComponent(current, component)
-		current.Close()
+		_ = current.Close()
 		if !ok {
 			return nil, false
 		}

@@ -68,7 +68,7 @@ func nextPromptIndex(root, sessionID string) (int, bool) {
 	if !ok {
 		return 0, false
 	}
-	defer state.Close()
+	defer func() { _ = state.Close() }()
 
 	index, ok := bumpCounter(state, StickyStateKey(sessionID))
 	if !ok {
