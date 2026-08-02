@@ -43,13 +43,21 @@ const maxNoticeBytes = 512
 // cap, so a single block larger than the cap, or a notice large enough on its
 // own, would otherwise be emitted whole.
 //
-// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONDRULE-001: REQ-CONDRULE-FIRE-05 aggregate cap — this is the only place the injected context length is bounded.
-// @AX:REASON: Removing the closing truncateBytes call restores an unbounded injection whenever the drop loop cannot get the total under the cap.
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-STICKYRULE-001: this function now only binds MaxContextBytes; the aggregate cap itself moved to assembleWithCap, which is where the ANCHOR for REQ-CONDRULE-FIRE-05 lives.
 func assembleContext(entries []injected) string {
-	blocks := make([]string, len(entries))
-	for i, entry := range entries {
-		blocks[i] = RuleHeaderPrefix + entry.name + "\n" + entry.body
-	}
+	return assembleWithCap(entries, MaxContextBytes)
+}
+
+// assembleWithCap is assembleContext with the aggregate cap as a parameter, so
+// the SPEC-CONDRULE-001 dispatcher and the SPEC-STICKYRULE-001 sticky runtime
+// share one drop-and-truncate implementation under their own caps. A second copy
+// of this loop is what would let one cap keep the closing truncateBytes call and
+// the other lose it.
+//
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONDRULE-001, SPEC-STICKYRULE-001: REQ-CONDRULE-FIRE-05 aggregate cap — this is the only place the injected context length is bounded, now for both the conditional dispatcher and the sticky runtime.
+// @AX:REASON: Removing the closing truncateBytes call restores an unbounded injection whenever the drop loop cannot get the total under the cap, and it would do so on both injection paths at once.
+func assembleWithCap(entries []injected, maxContext int) string {
+	blocks := injectionBlocks(entries)
 
 	kept := len(blocks)
 	var dropped []string
@@ -58,7 +66,7 @@ func assembleContext(entries []injected) string {
 		if len(dropped) > 0 {
 			total += len(blockSeparator) + len(truncationNotice(dropped))
 		}
-		if total <= MaxContextBytes {
+		if total <= maxContext {
 			break
 		}
 		kept--
@@ -70,7 +78,18 @@ func assembleContext(entries []injected) string {
 	if len(dropped) > 0 {
 		parts = append(parts, truncationNotice(dropped))
 	}
-	return truncateBytes(strings.Join(parts, blockSeparator), MaxContextBytes)
+	return truncateBytes(strings.Join(parts, blockSeparator), maxContext)
+}
+
+// injectionBlocks renders one header-and-body block per entry. The compile-time
+// aggregate check measures exactly these blocks, so the compiler refuses the
+// same set the runtime would have dropped from.
+func injectionBlocks(entries []injected) []string {
+	blocks := make([]string, len(entries))
+	for i, entry := range entries {
+		blocks[i] = RuleHeaderPrefix + entry.name + "\n" + entry.body
+	}
+	return blocks
 }
 
 // truncationNotice names the dropped rules on one line and carries no tool

@@ -2,6 +2,7 @@
 name: language-policy
 description: Language policy for code comments, commit messages, and AI responses
 category: workflow
+alwaysApply: true
 ---
 
 # Language Policy

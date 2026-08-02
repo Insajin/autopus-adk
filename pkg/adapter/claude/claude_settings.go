@@ -55,7 +55,9 @@ func (a *Adapter) prepareSettingsMapping(hooks []adapter.HookConfig, perms *adap
 
 	// Build hooks in Claude Code nested schema, merging with existing user hooks.
 	// Autopus-managed event keys are replaced entirely to prevent duplication;
-	// other event keys set by the user are preserved.
+	// other event keys set by the user are preserved. UserPromptSubmit is the one
+	// exception: it is managed per entry, because the user may hook that event
+	// too (see claude_settings_sticky.go).
 	if len(hooks) > 0 {
 		existingHooks, _ := settings["hooks"].(map[string]any)
 		hooksMap := make(map[string]any)
@@ -63,6 +65,9 @@ func (a *Adapter) prepareSettingsMapping(hooks []adapter.HookConfig, perms *adap
 		// Collect which event keys autopus manages
 		managedEvents := make(map[string]bool)
 		for _, h := range hooks {
+			if h.Event == userPromptSubmitEvent {
+				continue
+			}
 			managedEvents[h.Event] = true
 		}
 		managedEvents["TaskCreated"] = true
@@ -73,6 +78,10 @@ func (a *Adapter) prepareSettingsMapping(hooks []adapter.HookConfig, perms *adap
 				hooksMap[k] = v
 			}
 		}
+		// UserPromptSubmit was carried over whole above, so it still holds any
+		// previously installed autopus entry. Dropping just that one keeps
+		// regeneration idempotent without touching the user's own entries.
+		retractStickyEntry(hooksMap)
 
 		// Set autopus-managed events fresh (no append to existing)
 		for _, h := range hooks {
@@ -88,13 +97,12 @@ func (a *Adapter) prepareSettingsMapping(hooks []adapter.HookConfig, perms *adap
 				"matcher": h.Matcher,
 				"hooks":   []map[string]any{hookEntry},
 			}
-			entries, _ := hooksMap[h.Event].([]any)
-			entries = append(entries, entry)
-			hooksMap[h.Event] = entries
+			hooksMap[h.Event] = appendHookEntry(hooksMap[h.Event], entry)
 		}
 		settings["hooks"] = hooksMap
 	} else if existingHooks, ok := settings["hooks"].(map[string]any); ok {
 		delete(existingHooks, "TaskCreated")
+		retractStickyEntry(existingHooks)
 		settings["hooks"] = existingHooks
 	}
 

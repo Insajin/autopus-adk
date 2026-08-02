@@ -203,6 +203,9 @@ type HooksConf struct {
 	ReactCIFailure bool            `yaml:"react_ci_failure"`
 	ReactReview    bool            `yaml:"react_review"`
 	Permissions    PermissionsConf `yaml:"permissions,omitempty"`
+	// StickyCadence is the SPEC-STICKYRULE-001 prompt interval between sticky
+	// rule re-injections. Read it through StickyCadence, never directly.
+	StickyCadence int `yaml:"sticky_cadence,omitempty"`
 }
 
 // PermissionsConf는 코딩 CLI 권한 설정이다.

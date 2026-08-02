@@ -1,19 +1,12 @@
 package cli
 
 import (
-	"fmt"
 	"io"
-	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
-	"sort"
-	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
-	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/rulecond"
 )
 
@@ -49,6 +42,7 @@ func newRulesCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newRulesFireCmd())
 	cmd.AddCommand(newRulesListCmd())
+	cmd.AddCommand(newRulesStickyCmd())
 	return cmd
 }
 
@@ -121,6 +115,19 @@ func fireConditionalRules(event string, stdin io.Reader, stdout, stderr io.Write
 // exactly the redirection this check removes. The filesystem root and
 // maxRootSearchDepth bound the walk otherwise.
 func resolveProjectRoot(start string) (string, bool) {
+	return resolveRootWithMarkers(start, projectRootMarkers)
+}
+
+// resolveRootWithMarkers is the shared upward walk. The marker set is a
+// parameter because the two dispatchers do not accept the same evidence:
+// SPEC-CONDRULE-001 accepts a bare checkout, while REQ-STICKYRULE-FIRE-12
+// defines the sticky project root as the nearest ancestor holding a `.claude`
+// directory, so that a checkout with no generated harness reports an
+// unresolved root instead of resolving to a root with nothing installed.
+//
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-STICKYRULE-001: the single trust anchor discovery used by both hook dispatchers — resolveProjectRoot and resolveStickyRoot differ only in their marker set.
+// @AX:REASON: The os.Lstat symlink refusal and the home-directory stop below are security decisions; once this walk is shared, weakening either one relocates the containment frame for the conditional dispatcher and the sticky runtime in the same edit.
+func resolveRootWithMarkers(start string, markers []string) (string, bool) {
 	home, _ := os.UserHomeDir()
 	dir := filepath.Clean(start)
 
@@ -128,7 +135,7 @@ func resolveProjectRoot(start string) (string, bool) {
 		if home != "" && dir == filepath.Clean(home) {
 			return "", false
 		}
-		for _, marker := range projectRootMarkers {
+		for _, marker := range markers {
 			// os.Lstat, not os.Stat: a symlinked marker is not evidence of a
 			// project root. A cloned repository can ship `.claude` as a symlink
 			// (git mode 120000 survives the clone), and accepting it here would
@@ -148,127 +155,4 @@ func resolveProjectRoot(start string) (string, bool) {
 		dir = parent
 	}
 	return "", false
-}
-
-// newRulesListCmd builds the REQ-CONDRULE-OBS-01 inspection command.
-func newRulesListCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:           "list",
-		Short:         "List every rule with its classification, trigger, and compiled destination",
-		Args:          cobra.NoArgs,
-		SilenceUsage:  true,
-		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			rows, err := collectRuleListRows()
-			if err != nil {
-				return err
-			}
-			return renderRuleListRows(cmd.OutOrStdout(), rows)
-		},
-	}
-}
-
-// ruleListRow is one printed `auto rules list` row.
-type ruleListRow struct {
-	Name        string
-	Class       string
-	Trigger     string
-	Destination string
-}
-
-// collectRuleListRows parses every embedded rule, validates it, and derives its
-// classification, trigger summary, and compiled claude-code destination.
-func collectRuleListRows() ([]ruleListRow, error) {
-	entries, err := fs.ReadDir(contentfs.FS, contentRuleDir)
-	if err != nil {
-		return nil, fmt.Errorf("read embedded rules: %w", err)
-	}
-
-	rows := make([]ruleListRow, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
-			continue
-		}
-		raw, readErr := fs.ReadFile(contentfs.FS, path.Join(contentRuleDir, entry.Name()))
-		if readErr != nil {
-			return nil, fmt.Errorf("read rule %s: %w", entry.Name(), readErr)
-		}
-		rule, parseErr := rulecond.ParseRule(entry.Name(), raw)
-		if parseErr != nil {
-			return nil, fmt.Errorf("parse rule %s: %w", entry.Name(), parseErr)
-		}
-		if validateErr := rulecond.Validate(rule); validateErr != nil {
-			return nil, fmt.Errorf("invalid rule %s: %w", entry.Name(), validateErr)
-		}
-		rows = append(rows, newRuleListRow(entry.Name(), rule))
-	}
-
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Name < rows[j].Name })
-	return rows, nil
-}
-
-// newRuleListRow derives one row. The rule name follows the source file name,
-// because that is what names the emitted file on every platform.
-func newRuleListRow(sourceFile string, rule *rulecond.Rule) ruleListRow {
-	name := strings.TrimSuffix(sourceFile, ".md")
-	class := rulecond.Classify(rule)
-	label, known := ruleClassLabels[class]
-	if !known {
-		label = "unknown"
-	}
-	return ruleListRow{
-		Name:        name,
-		Class:       label,
-		Trigger:     ruleTriggerSummary(class, rule),
-		Destination: ruleDestination(class, name),
-	}
-}
-
-// ruleTriggerSummary renders what fires a rule: the tool scopes for a hook-fired
-// rule, the path globs for a paths-scoped rule, nothing otherwise.
-func ruleTriggerSummary(class rulecond.Class, rule *rulecond.Rule) string {
-	var fields []string
-	switch class {
-	case rulecond.ClassHookFired:
-		fields = rule.Scopes
-	case rulecond.ClassPathsScoped:
-		fields = rule.Globs
-	}
-	if len(fields) == 0 {
-		return noTriggerSummary
-	}
-	return strings.Join(fields, ",")
-}
-
-// ruleDestination reports where the claude-code compiler writes the rule.
-func ruleDestination(class rulecond.Class, name string) string {
-	if class == rulecond.ClassHookFired {
-		return path.Join(filepath.ToSlash(rulecond.BodyRootRelPath), name+".md")
-	}
-	return path.Join(claudeRuleDir, name+".md")
-}
-
-// renderRuleListRows prints one aligned row per rule followed by the
-// classification totals.
-func renderRuleListRows(out io.Writer, rows []ruleListRow) error {
-	writer := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	if _, err := fmt.Fprintln(writer, "RULE\tCLASS\tTRIGGER\tCLAUDE-CODE-DESTINATION"); err != nil {
-		return err
-	}
-
-	counts := make(map[string]int, len(ruleClassLabels))
-	for _, row := range rows {
-		if _, err := fmt.Fprintf(writer, "%s\t%s\t%s\t%s\n",
-			row.Name, row.Class, row.Trigger, row.Destination); err != nil {
-			return err
-		}
-		counts[row.Class]++
-	}
-	if err := writer.Flush(); err != nil {
-		return err
-	}
-
-	_, err := fmt.Fprintf(out, "\n%d rules: %d always, %d paths-scoped, %d hook-fired\n",
-		len(rows), counts["always"], counts["paths-scoped"], counts["hook-fired"])
-	return err
 }

@@ -48,6 +48,9 @@ autopus-adk/
 │   ├── react.go                #   auto react check/apply: reaction engine
 │   ├── agent_create.go         #   auto agent create: meta-agent builder
 │   ├── skill_create.go         #   auto skill create: meta-skill builder
+│   ├── rules.go                 #   auto rules: 규칙 조회 + auto rules fire (조건부 규칙 주입)
+│   ├── rules_list.go            #   auto rules list: 분류/sticky/트리거/컴파일 대상 표와 유효 주기
+│   ├── rules_sticky.go          #   auto rules sticky: UserPromptSubmit 페이로드로 sticky 본문 재주입
 │   ├── prompts.go               #   대화형 프롬프트 (quality mode, review gate, methodology)
 │   ├── init_helpers.go          #   Init 헬퍼 함수 (gitignore, summary 생성)
 │   ├── doctor_fix.go            #   Doctor 자동 수정 (의존성 설치)
@@ -162,6 +165,18 @@ autopus-adk/
 │   │   ├── context_profile.go   #     command별 core/spec/conditional context profile
 │   │   ├── context_scan.go      #     root 경계, 전체 로드, secret redaction/injection neutralization
 │   │   └── context_delivery.go  #     body-free raw-source/delivered-prompt hash + stale/tamper 검증
+│   ├── rulecond/                #   조건부 규칙 스키마·플랫폼별 컴파일·봉쇄된 훅 디스패처
+│   │   ├── classify.go          #     always/paths-scoped/hook-fired 세 값 분류
+│   │   ├── schema.go            #     컴파일 표면의 고정 project-root 상대 경로 상수
+│   │   ├── trustedroot.go       #     project root 신뢰 앵커 도출 (디스패처와 CLI 공유)
+│   │   ├── contain.go           #     fail-closed 봉쇄/크기 위반 reason code
+│   │   ├── compile_claude.go    #     PreToolUse 디스패처 훅 컴파일 (event+matcher 쌍당 1개)
+│   │   ├── fire.go / inject.go  #     조건부 규칙 본문 주입과 예산 적용
+│   │   ├── sticky.go            #     sticky 이벤트명·상태 위치·주기 기본값·바이트 상한 계약
+│   │   ├── compile_sticky.go    #     UserPromptSubmit 훅 항목 1개 컴파일 (matcher 없음)
+│   │   ├── sticky_manifest.go   #     StickyRule — 재부착 대상 규칙의 컴파일 결과
+│   │   ├── sticky_inject.go     #     UserPromptSubmit 페이로드 해석과 구조화 출력 생성
+│   │   └── sticky_state*.go     #     세션 카운터 영속화, os.Root 봉쇄, 7일/200개 정리
 │   ├── worker/                  #   retained provider worker와 phase-split 실행
 │   │   ├── context_delivery.go  #     최종 worktree에서 GPT/Codex 필수 snapshot 생성·128K admission
 │   │   ├── pipeline_context.go  #     동일 비압축 snapshot 재사용, 후속 phase에 원 태스크 1회 첨부
@@ -254,7 +269,8 @@ autopus-adk/
 ├── .autopus/                    # 프로젝트 워크스페이스
 │   ├── specs/                   #   SPEC 문서
 │   ├── brainstorms/             #   브레인스토밍 결과 (BS-{ID}.md)
-│   └── project/                 #   프로젝트 컨텍스트 문서
+│   ├── project/                 #   프로젝트 컨텍스트 문서
+│   └── runtime/sticky-rules/    #   세션별 sticky 프롬프트 카운터 (gitignore, 파일명=session_id SHA-256)
 ├── scripts/release-signing/     # 게시자 서명 producer/verifier, 공개키 pin, live fixture
 ├── install.sh                   # POSIX 서명 우선 설치기
 ├── install.ps1                  # Windows PowerShell 5.1/7 서명 우선 설치기

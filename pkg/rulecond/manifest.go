@@ -19,6 +19,10 @@ const ManifestVersion = "1"
 type Manifest struct {
 	Version string         `json:"version"`
 	Rules   []ManifestRule `json:"rules"`
+	// Sticky is the SPEC-STICKYRULE-001 sticky rule set. It is omitted entirely
+	// when no rule is sticky, so a harness with no sticky rule keeps producing
+	// the byte-identical manifest SPEC-CONDRULE-001 already ships.
+	Sticky []StickyRule `json:"sticky,omitempty"`
 }
 
 // ManifestRule is one compiled hook-fired rule.
@@ -39,8 +43,11 @@ type ManifestRule struct {
 
 // encodeManifest renders the manifest with rules ordered by rule name and with
 // stable key ordering, so regeneration produces no spurious diff
-// (REQ-CONDRULE-COMPILE-04). Struct field order fixes the key order.
-func encodeManifest(rules []ManifestRule) ([]byte, error) {
+// (REQ-CONDRULE-COMPILE-04, REQ-STICKYRULE-COMPILE-01). Struct field order fixes
+// the key order, and an empty sticky set leaves the `sticky` key absent.
+//
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-STICKYRULE-001: the `omitempty` on Manifest.Sticky is a compatibility contract — a harness with no sticky rule must still emit the byte-identical manifest SPEC-CONDRULE-001 shipped, so emitting an empty `sticky` array here is a regeneration diff on every existing project.
+func encodeManifest(rules []ManifestRule, sticky []StickyRule) ([]byte, error) {
 	sorted := make([]ManifestRule, len(rules))
 	copy(sorted, rules)
 	sort.SliceStable(sorted, func(i, j int) bool {
@@ -50,7 +57,11 @@ func encodeManifest(rules []ManifestRule) ([]byte, error) {
 		return sorted[i].Matcher < sorted[j].Matcher
 	})
 
-	blob, err := json.MarshalIndent(Manifest{Version: ManifestVersion, Rules: sorted}, "", "  ")
+	manifest := Manifest{Version: ManifestVersion, Rules: sorted}
+	if len(sticky) > 0 {
+		manifest.Sticky = sortStickyRules(sticky)
+	}
+	blob, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return nil, err
 	}

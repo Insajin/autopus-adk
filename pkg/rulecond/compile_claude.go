@@ -36,8 +36,15 @@ type CompiledClaude struct {
 	// Manifest is the compiled conditional manifest. It is always produced,
 	// and holds an empty rule list when no rule is hook-fired.
 	Manifest adapter.FileMapping
-	// Hooks holds one dispatcher entry per distinct hook event and matcher.
+	// Hooks holds one dispatcher entry per distinct hook event and matcher,
+	// plus the single SPEC-STICKYRULE-001 UserPromptSubmit entry when the
+	// sticky set is non-empty.
 	Hooks []adapter.HookConfig
+	// Sticky is the SPEC-STICKYRULE-001 sticky rule set, recorded in the same
+	// Manifest above. It carries no file mapping of its own: a sticky rule keeps
+	// its baseline placement, so its body is already installed by the existing
+	// copy path (REQ-STICKYRULE-SCHEMA-01).
+	Sticky []StickyRule
 }
 
 // CompileClaude compiles rules for claude-code. It fails rather than emitting a
@@ -71,12 +78,21 @@ func CompileClaude(rules []*Rule) (*CompiledClaude, error) {
 		}
 	}
 
-	blob, err := encodeManifest(manifestRules)
+	sticky, err := compileSticky(rules)
+	if err != nil {
+		return nil, err
+	}
+	out.Sticky = sticky
+
+	blob, err := encodeManifest(manifestRules, sticky)
 	if err != nil {
 		return nil, err
 	}
 	out.Manifest = mapping(filepath.FromSlash(ManifestRelPath), blob)
 	out.Hooks = dispatcherHooks(triggers)
+	if len(sticky) > 0 {
+		out.Hooks = append(out.Hooks, stickyHook())
+	}
 	sortMappings(out.RuleFiles)
 	sortMappings(out.Bodies)
 	return out, nil

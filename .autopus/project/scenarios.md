@@ -178,6 +178,28 @@ Verification primitives available:
 
 ---
 
+## Rule Inspection Scenarios
+
+### S17: init-claude-sticky-hook — Claude Code init registers the sticky hook
+- **Command**: `auto init --platforms claude-code --yes`
+- **Precondition**: empty project directory
+- **Env**: N/A
+- **Expect**: compiled manifest carries the sticky set and settings.json registers the `UserPromptSubmit` entry invoking the sticky runtime
+- **Verify**: exit_code(0), file_exists(".claude/hooks/autopus/conditional-rules.json"), file_contains(".claude/hooks/autopus/conditional-rules.json", "sticky"), file_contains(".claude/settings.json", "auto rules sticky --event UserPromptSubmit")
+- **Depends**: N/A
+- **Status**: active
+
+### S18: rules-list-sticky — Sticky rules and effective cadence are reported
+- **Command**: `auto rules list`
+- **Precondition**: N/A — rule content is embedded, so the listing needs no installed harness
+- **Env**: N/A
+- **Expect**: table lists every rule with its class and sticky flag; `language-policy` and `objective-reasoning` are sticky; summary reports the effective cadence
+- **Verify**: exit_code(0), stderr_empty(), stdout_contains("STICKY"), stdout_contains("2 sticky, re-attached on an effective cadence of 8 prompts")
+- **Depends**: N/A
+- **Status**: active
+
+---
+
 ## Canary Scenarios
 
 ### S-CANARY-1: canary-basic — Basic canary execution

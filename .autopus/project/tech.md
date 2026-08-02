@@ -96,13 +96,17 @@
 | Required-Context Manifest | `pkg/promptlayer/context_delivery.go` | core/SPEC/available architecture/additional ref를 전체 로드해 secret/injection을 안전 변환하고 raw source hash와 delivered prompt hash를 body-free JSON에 기록; 신규 의존성 없음 |
 | Context-Matched Ultra Binding | `internal/cli/workflow_{context,binding_context}.go` | command/SPEC/root와 supervisor-held 추가 필수-ref 집합이 일치하는 최신 manifest 및 rollout receipt가 함께 검증될 때만 compact Ultra 허용 |
 | Non-Compressible GPT Worker Context | `pkg/worker/context_delivery.go` + `pkg/worker/pipeline_context.go` | 최종 worktree에서 한 번 만든 필수 snapshot을 direct dispatch와 모든 phase가 동일하게 재사용하고, 후속 phase에는 원 태스크를 한 번씩 보존하며 compressor에서 분리 |
+| Conditional / Sticky Rules | `pkg/rulecond/` | 규칙을 always/paths-scoped/hook-fired 세 값으로 분류하고, 그 위에 직교 `alwaysApply` sticky 플래그를 얹어 `.claude/hooks/autopus/conditional-rules.json` 단일 매니페스트로 컴파일 |
+| Sticky Re-Injection | `pkg/rulecond/sticky*.go` + `internal/cli/rules_sticky.go` | claude-code `UserPromptSubmit`에서 프롬프트 주기마다 sticky 규칙 본문 재주입; 본문당 4000바이트·합계 6000바이트 상한, 종료 코드는 항상 0 |
+| Contained Runtime State | `pkg/rulecond/sticky_state*.go` | 세션 카운터를 `.autopus/runtime/sticky-rules/`에 raw session_id의 SHA-256 파일명으로 유지하고, 디렉터리와 leaf를 `os.Root` + 일반 파일/하드링크 검사로 열어 체크아웃 밖 쓰기를 차단 |
 | Complete GPT SPEC Review Admission | `internal/cli/spec_review_context_delivery.go` + `pkg/spec/prompt_{documents,context_delivery*}.go` | all-GPT 각 리비전에서 core/available architecture/declared conditional/extra와 SPEC 4종을 생성·엄격 검증해 각 전문을 한 번씩 provider prompt에 주입하고, 무결성·집합·SPEC identity·128K 실패는 호출 전에 차단; mixed/Claude/Gemini는 legacy prompt 유지 |
 
 ## Configuration
 
 | File | Purpose |
 |------|---------|
-| `autopus.yaml` | 하네스 설정 (mode, platforms, language, spec, lore, orchestra, quality) |
+| `autopus.yaml` | 하네스 설정 (mode, platforms, language, spec, lore, orchestra, quality, hooks) |
+| `hooks.sticky_cadence` | sticky 규칙 재주입 프롬프트 간격. 없거나 0 이하이면 기본 8 |
 | `go.mod` | Go 모듈 의존성 |
 | `.goreleaser.yaml` | 릴리즈 설정 |
 | `Makefile` | 빌드 자동화 |

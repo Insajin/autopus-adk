@@ -40,6 +40,25 @@ func Classify(rule *Rule) Class {
 	return ClassAlways
 }
 
+// IsSticky reports whether a rule is re-attached on the SPEC-STICKYRULE-001
+// prompt cadence.
+//
+// Sticky is an orthogonal boolean on top of the three-value partition, never a
+// fourth Class (REQ-STICKYRULE-SCHEMA-01): an `always` or `paths-scoped` rule
+// keeps its baseline load placement and merely gains a periodic restatement. A
+// hook-fired rule can never be sticky, because SPEC-CONDRULE-001 relocates its
+// body to BodyRootRelPath and this SPEC resolves sticky bodies from
+// ClaudeRulesRelDir only. Validate refuses that combination outright, so this
+// predicate and the validator agree on the same unrepresentable case.
+//
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-STICKYRULE-001: paired invariant — this predicate and the REQ-STICKYRULE-SCHEMA-03 branch of Validate below must exclude the same case; if they drift, a sticky hook-fired rule compiles to a manifest entry whose body the runtime can never resolve.
+func IsSticky(rule *Rule) bool {
+	if rule == nil {
+		return false
+	}
+	return rule.AlwaysApply && Classify(rule) != ClassHookFired
+}
+
 // Triggers returns the parsed tool scopes of a rule, deduplicated by event and
 // matcher pair so a rule contributes one dispatcher entry per distinct pair.
 func Triggers(rule *Rule) []Trigger {
@@ -102,6 +121,18 @@ func Validate(rule *Rule) error {
 	if len(rule.Conditions) > 0 && len(toolTriggers(rule)) == 0 {
 		return fmt.Errorf(
 			"rule %s: field condition requires a tool scope such as `scope: tool:bash`", name)
+	}
+
+	// REQ-STICKYRULE-SCHEMA-03: the combination is unrepresentable rather than
+	// merely undesirable. A hook-fired body lives under BodyRootRelPath, and the
+	// sticky runtime resolves every body under ClaudeRulesRelDir, so a sticky
+	// hook-fired rule would compile to a manifest entry whose body the runtime
+	// can never find. Refusing it here is what keeps that from degrading into a
+	// rule that silently stops re-attaching.
+	if rule.AlwaysApply && Classify(rule) == ClassHookFired {
+		return fmt.Errorf(
+			"rule %s: field alwaysApply cannot combine with the hook-fired classification, "+
+				"because a hook-fired body is relocated out of the sticky body root", name)
 	}
 	return nil
 }

@@ -67,6 +67,8 @@ AI 코딩 CLI 플랫폼(Claude Code, Codex, Gemini CLI, OpenCode, Cursor)에 Aut
 | Executor Profile | `/auto setup` / `/auto go` | 3-tier 프로파일 시스템 — 내장(언어 5개) + 자동 생성(프레임워크) + 커스텀, extends 합성, 스택별 executor 프롬프트 동적 주입 |
 | Framework Detection | `/auto setup` | 14개 프레임워크 시그널 감지 (Next.js, Nuxt, NestJS, FastAPI, Django, Flask, Gin, Echo, Chi, Axum, React, Vue, Svelte) |
 | Deep Worker | `/auto go` (agent) | 장시간 자율 탐색+구현 에이전트 |
+| Rule Inspection | `auto rules list` | 규칙별 분류(always/paths-scoped/hook-fired), sticky 여부, 트리거, 컴파일 대상 경로와 유효 sticky 주기 조회 |
+| Sticky Rule Re-Attach | `auto rules sticky` | `alwaysApply: true` 규칙을 claude-code `UserPromptSubmit` 훅에서 고정 주기마다 재주입해 긴 세션 후반에도 상시 적용 지시를 유지 |
 
 GPT/Codex 문서 전달에서 토큰 예산은 memory/knowledge/index의 선택적 recall에만 적용한다. 필수 문서는 secret redaction과 injection neutralization을 거치며 raw source hash와 전달 prompt hash를 모두 남긴다. 최종 worktree에서 만든 동일 frozen snapshot을 direct worker와 모든 phase가 재사용하고, 후속 phase에는 원 태스크 계약을 한 번씩 다시 붙인다. `context_ack`는 진단용 요청이고 실제 강제는 예상 ref 집합과 해시 검증이다. all-GPT `auto spec review`는 반복 지정할 수 있는 `--required-document`와 `--conditional-profile`을 supervisor-held 옵션에 포함하고, 각 리비전에서 `BuildContextDelivery` 결과를 같은 옵션으로 엄격하게 검증한다. 검증된 core, 존재하는 architecture, 추가 문서 전문과 spec/plan/research/acceptance 전문은 중복 없이 provider prompt에 들어간다. 필수 문서 누락, receipt 변조, ref 집합 불일치, stale snapshot, 잘못된 SPEC 또는 128K 초과는 orchestra/provider 호출 전에 차단한다. mixed/Claude/Gemini review와 provider-neutral pipeline helper의 non-GPT 경로는 기존 동작을 유지한다.
 
@@ -110,6 +112,7 @@ GPT/Codex 문서 전달에서 토큰 예산은 memory/knowledge/index의 선택�
 25. **테스트 러너 자동 감지**: jest/vitest/pytest/cargo 프레임워크 자동 인식
 26. **Deep Worker 에이전트**: 장시간 자율 탐색+구현 지원 에이전트
 27. **맥락 보존형 GPT/Codex 실행**: `auto workflow context` manifest와 post-worktree retained snapshot으로 필수 project/SPEC/available architecture 문서 및 supervisor 추가 ref를 검증하고, optional recall만 토큰 예산에 맞춰 조정
+28. **긴 세션의 상시 규칙 유지**: `alwaysApply: true` 규칙을 `hooks.sticky_cadence` 주기(기본 8 프롬프트)마다 재주입해, 대화가 길어져도 언어 정책이나 추론 원칙 같은 상시 지시가 후반 응답까지 적용됨
 
 ## Modes
 

@@ -83,9 +83,11 @@ func TestGenerateHookConfigs_AllDisabled(t *testing.T) {
 	hooks, gitHooks, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
 	// All HooksConf fields disabled — the unconditional hooks remain: the
-	// completion Stop hook, the SessionStart ready hook (SPEC-ORCH-022), and the
-	// SPEC-CONDRULE-001 rule dispatcher, which no HooksConf option gates.
-	require.Len(t, hooks, 3, "completion, session-start ready, and dispatcher hooks are unconditional")
+	// completion Stop hook, the SessionStart ready hook (SPEC-ORCH-022), the
+	// SPEC-CONDRULE-001 dispatcher, and the SPEC-STICKYRULE-001 UserPromptSubmit
+	// entry, which is gated by the compiled sticky set rather than by HooksConf.
+	require.Len(t, hooks, 4,
+		"completion, session-start ready, dispatcher, and sticky hooks are unconditional")
 	events := map[string]string{}
 	for _, h := range hooks {
 		events[h.Event] = h.Command
@@ -188,8 +190,9 @@ func TestGenerateHookConfigs_DeduplicatesReactHooks(t *testing.T) {
 	require.NoError(t, err)
 	// ReactCIFailure and ReactReview both enabled — dedup keeps only one PostToolUse react hook,
 	// plus the unconditional completion Stop hook, the SessionStart ready hook
-	// (SPEC-ORCH-022), and the SPEC-CONDRULE-001 dispatcher.
-	require.Len(t, hooks, 4, "expected one deduped react hook plus the Stop, SessionStart, and dispatcher hooks")
+	// (SPEC-ORCH-022), the SPEC-CONDRULE-001 dispatcher, and the SPEC-STICKYRULE-001 entry.
+	require.Len(t, hooks, 5,
+		"expected one deduped react hook plus the Stop, SessionStart, dispatcher, and sticky hooks")
 	reactHook := findHook(hooks, "PostToolUse")
 	require.NotNil(t, reactHook, "expected a PostToolUse react hook")
 	assert.Equal(t, "auto react check --quiet", reactHook.Command)
@@ -213,8 +216,8 @@ func TestGenerateProjectHookConfigs_ClaudeTaskCreatedEnabled(t *testing.T) {
 	hooks, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "claude-code", true)
 	require.NoError(t, err)
 	// Expect: completion Stop hook + SessionStart ready hook (SPEC-ORCH-022) +
-	// TaskCreated hook + SPEC-CONDRULE-001 dispatcher.
-	require.Len(t, hooks, 4)
+	// TaskCreated hook + SPEC-CONDRULE-001 dispatcher + SPEC-STICKYRULE-001 entry.
+	require.Len(t, hooks, 5)
 	assert.Empty(t, gitHooks)
 	taskCreatedHook := findHook(hooks, "TaskCreated")
 	require.NotNil(t, taskCreatedHook, "expected a TaskCreated hook")
