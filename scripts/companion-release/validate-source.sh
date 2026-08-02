@@ -21,6 +21,7 @@ readonly A17_A16_ANCESTOR_SHA='3e02c622af97f74873325ec65940c580e23c580a'
 readonly A18_A17_ANCESTOR_SHA='2b062a5e348fbecc414abe9ba5c74c7dc79fe243'
 readonly A19_A18_ANCESTOR_SHA='76f35d990e76511d169e239547d33bfedcea7948'
 readonly A20_A19_ANCESTOR_SHA='5bc41dccc72f8244943fd9e862cba07a36bf09d3'
+readonly A21_A20_ANCESTOR_SHA='7f44e4f143b2348c02553bab2209088c966f81ae'
 
 fail() {
   printf 'companion release source: %s\n' "$1" >&2
@@ -53,7 +54,8 @@ case "$GITHUB_REF_NAME" in
   v0.50.89) release_phase='A18' ;;
   v0.50.90) release_phase='A19' ;;
   v0.50.91) release_phase='A20' ;;
-  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20 policy' ;;
+  v0.50.92) release_phase='A21' ;;
+  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'
 [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || fail 'source commit is not exact 40-hex'
@@ -74,7 +76,7 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
       "$release_phase" == 'A14' || "$release_phase" == 'A15' ||
       "$release_phase" == 'A16' || "$release_phase" == 'A17' ||
       "$release_phase" == 'A18' || "$release_phase" == 'A19' ||
-      "$release_phase" == 'A20' ]]; then
+      "$release_phase" == 'A20' || "$release_phase" == 'A21' ]]; then
   tag_object_type=$(git cat-file -t "refs/tags/$GITHUB_REF_NAME" 2>/dev/null) \
     || fail "cannot resolve exact ${release_phase} tag object"
   [[ "$tag_object_type" == 'tag' ]] \
@@ -135,9 +137,12 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
   elif [[ "$release_phase" == 'A19' ]]; then
     git merge-base --is-ancestor "$A19_A18_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A19 source does not contain the immutable A18 release'
-  else
+  elif [[ "$release_phase" == 'A20' ]]; then
     git merge-base --is-ancestor "$A20_A19_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A20 source does not contain the immutable A19 release'
+  else
+    git merge-base --is-ancestor "$A21_A20_ANCESTOR_SHA" "$GITHUB_SHA" \
+      >/dev/null 2>&1 || fail 'A21 source does not contain the immutable A20 release'
   fi
   case "${COMPANION_SOURCE_PIN_REQUIRED-0}" in
     0) ;;
