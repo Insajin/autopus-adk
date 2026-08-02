@@ -23,7 +23,7 @@ func TestContext7Client_ResolveLibrary_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContext7Client(srv.URL)
+	client := newIsolatedContext7Client(t, srv.URL)
 	result, err := client.ResolveLibrary("cobra")
 
 	require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestContext7Client_FetchPreservesVersionEvidence(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContext7Client(srv.URL)
+	client := newIsolatedContext7Client(t, srv.URL)
 	result, err := client.Fetch("cobra", "commands")
 
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestContext7Client_ResolveLibrary_NotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContext7Client(srv.URL)
+	client := newIsolatedContext7Client(t, srv.URL)
 	_, err := client.ResolveLibrary("nonexistent-lib-xyz")
 
 	require.Error(t, err)
@@ -89,7 +89,7 @@ func TestContext7Client_GetDocs_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContext7Client(srv.URL)
+	client := newIsolatedContext7Client(t, srv.URL)
 	docs, err := client.GetDocs("/spf13/cobra", "commands")
 
 	require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestContext7Client_GetDocs_ServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContext7Client(srv.URL)
+	client := newIsolatedContext7Client(t, srv.URL)
 	_, err := client.GetDocs("/spf13/cobra", "commands")
 
 	require.Error(t, err)
@@ -126,9 +126,24 @@ func TestContext7Client_GetDocs_QuotaExceeded(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewContext7Client(srv.URL)
+	client := newIsolatedContext7Client(t, srv.URL)
 	_, err := client.GetDocs("/spf13/cobra", "commands")
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrQuotaExceeded)
+}
+
+// newIsolatedContext7Client builds a client whose connection pool belongs to this
+// test alone. The production constructor leaves Transport nil, so every client
+// shares http.DefaultTransport; a parallel test closing its own server can then
+// break a pooled connection another test is reading, which surfaces as
+// "CloseIdleConnections called" rather than the error under assertion.
+func newIsolatedContext7Client(t *testing.T, baseURL string) *Context7Client {
+	t.Helper()
+
+	client := NewContext7Client(baseURL)
+	transport := &http.Transport{}
+	client.http.Transport = transport
+	t.Cleanup(transport.CloseIdleConnections)
+	return client
 }
