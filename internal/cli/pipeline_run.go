@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -47,8 +48,8 @@ func newPipelineRunCmdWithConfig(cfg *pipelineRunConfig) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&cfg.Platform, "platform", "", "AI platform to use (claude, codex, gemini). Auto-detected when omitted.")
-	// @AX:NOTE: [AUTO] magic constant — default strategy "sequential" encodes execution policy; change with care
+	cmd.Flags().StringVar(&cfg.Platform, "platform", "", "AI platform to use (claude, codex, gemini, omp). Auto-detected when omitted.")
+	// @AX:NOTE [AUTO]: magic constant — default strategy "sequential" encodes execution policy; change with care
 	cmd.Flags().Var(newStrategyValue("sequential", &cfg.Strategy), "strategy", "Execution strategy: sequential or parallel.")
 	cmd.Flags().BoolVar(&cfg.Continue, "continue", false, "Resume from the last saved checkpoint.")
 	cmd.Flags().BoolVar(&cfg.DryRun, "dry-run", false, "Build prompts without invoking the backend.")
@@ -84,7 +85,7 @@ func (s *strategyValue) Set(v string) error {
 	}
 }
 
-// @AX:NOTE: [AUTO] magic constants — platform probe order ["claude", "codex", "agy"] and fallback "claude" are implicit policy
+// @AX:NOTE [AUTO]: magic constants — platform probe order ["claude", "codex", "agy"] and fallback "claude" are implicit policy
 // resolvePlatform returns the platform to use: the value as-is when non-empty,
 // or the first AI binary found in PATH (claude, codex, agy).
 func resolvePlatform(platform string) string {
@@ -107,8 +108,10 @@ func resolvePlatform(platform string) string {
 	return "claude"
 }
 
-// @AX:ANCHOR: [AUTO] CLI integration boundary — wires cobra command args into pipeline engine (fan-in: CLI + tests)
-// @AX:REASON: Resolves SPEC identity, executable backend, and canonical receipt storage before dispatch.
+// @AX:ANCHOR [AUTO]: CLI integration boundary — wires cobra command args into pipeline engine (fan-in: CLI + tests)
+// @AX:REASON [AUTO]: Resolves SPEC identity, executable backend, and canonical receipt storage before dispatch.
+// @AX:WARN [AUTO]: Pipeline launch has more than eight validation, backend-selection, persistence, and review branches.
+// @AX:REASON [AUTO]: Every preflight failure must persist a blocked receipt before any phase authority is dispatched.
 // runPipeline executes the pipeline for the given SPEC ID.
 func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) error {
 	if err := pipeline.ValidateSpecID(specID); err != nil {
@@ -125,6 +128,12 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	}
 	platform := resolvePlatform(cfg.Platform)
 	flags := globalFlagsFromContext(cmd.Context())
+	projectDir, err := os.Getwd()
+	if err != nil {
+		return pipelineBlockedError(specID, resolvedSpec.SnapshotHash, gitHash, requestedStrategy,
+			fmt.Errorf("pipeline: resolve project directory: %w", err))
+	}
+	projectDir = filepath.Clean(projectDir)
 
 	cp, err := LoadCheckpointIfContinue(specID, cfg.Continue)
 	if err != nil {
@@ -133,7 +142,11 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 
 	var backend pipeline.PhaseBackend
 	if !cfg.DryRun {
-		backend, err = newPipelineProviderBackend(platform)
+		if platform == "omp" {
+			backend, err = newPipelineOMPBackendForRun(projectDir, specID, resolvedSpec, gitHash)
+		} else {
+			backend, err = newPipelineProviderBackend(platform)
+		}
 		if err != nil {
 			return pipelineBlockedError(specID, resolvedSpec.SnapshotHash, gitHash, requestedStrategy, err)
 		}
@@ -147,6 +160,7 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	}
 
 	engineCfg := pipeline.EngineConfig{
+		ProjectDir:    projectDir,
 		SpecID:        specID,
 		SpecDir:       resolvedSpec.Dir,
 		Platform:      platform,
@@ -177,4 +191,34 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 		}
 	}
 	return nil
+}
+
+func newPipelineOMPBackendForRun(
+	projectDir string,
+	specID string,
+	resolvedSpec resolvedPipelineSpec,
+	gitHash string,
+) (*pipelineOMPBackend, error) {
+	executable, err := exec.LookPath("omp")
+	if err != nil {
+		return nil, fmt.Errorf("pipeline: platform %q executable %q is unavailable: %w", "omp", "omp", err)
+	}
+	executable, executableID, err := canonicalPipelineOMPExecutable(executable)
+	if err != nil {
+		return nil, err
+	}
+	environment, err := normalizePipelineOMPEnvironment(os.Environ())
+	if err != nil {
+		return nil, err
+	}
+	phaseModels, err := loadPipelineOMPPhaseModelsWithAuthority(projectDir, executable, executableID, environment)
+	if err != nil {
+		return nil, fmt.Errorf("pipeline: load OMP model routes: %w", err)
+	}
+	return newPipelineOMPBackend(pipelineOMPBackendConfig{
+		Executable: executable, ProjectDir: projectDir, SpecID: specID, SpecDir: resolvedSpec.Dir,
+		SnapshotHash: resolvedSpec.SnapshotHash, GitCommitHash: gitHash,
+		// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: each canonical OMP phase is bounded to 30 minutes.
+		Environment: environment, PhaseModels: phaseModels, MaxTime: 30 * time.Minute, executableID: executableID,
+	})
 }

@@ -29,7 +29,7 @@ func modelReceiptFixture(generatedAt time.Time) OMPModelResolutionReceipt {
 	}
 }
 
-func TestCanonicalOMPModelResolutionReceipt_DigestExcludesGeneratedAt(t *testing.T) {
+func TestCanonicalOMPModelResolutionReceipt_DigestBindsGeneratedAt(t *testing.T) {
 	t.Parallel()
 	first, firstBytes, err := CanonicalOMPModelResolutionReceipt(modelReceiptFixture(time.Date(2026, 8, 2, 1, 2, 3, 0, time.UTC)))
 	if err != nil {
@@ -39,8 +39,8 @@ func TestCanonicalOMPModelResolutionReceipt_DigestExcludesGeneratedAt(t *testing
 	if err != nil {
 		t.Fatalf("canonical second receipt: %v", err)
 	}
-	if first.ResolutionDigest != second.ResolutionDigest {
-		t.Fatalf("generated_at changed digest: %s != %s", first.ResolutionDigest, second.ResolutionDigest)
+	if first.ResolutionDigest == second.ResolutionDigest {
+		t.Fatalf("generated_at did not change digest: %s", first.ResolutionDigest)
 	}
 	if string(firstBytes) == string(secondBytes) {
 		t.Fatal("canonical receipt bytes must retain generated_at metadata")
@@ -60,6 +60,45 @@ func TestCanonicalOMPModelResolutionReceipt_DigestExcludesGeneratedAt(t *testing
 		if _, ok := raw[key]; !ok {
 			t.Fatalf("missing allowlisted field %q", key)
 		}
+	}
+}
+
+func TestCanonicalOMPModelResolutionReceipt_RejectsAuthorityDrift(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		mutate func(*OMPModelResolutionReceipt)
+	}{
+		{"generated at", func(r *OMPModelResolutionReceipt) { r.GeneratedAt = time.Time{} }},
+		{"OMP version", func(r *OMPModelResolutionReceipt) { r.OMPVersion = "other/17" }},
+		{"roles", func(r *OMPModelResolutionReceipt) { r.Roles = nil }},
+		{"project ownership", func(r *OMPModelResolutionReceipt) {
+			r.ConfigSource = "project-managed"
+			for index := range r.Roles {
+				r.Roles[index].ConfigSource = "project-managed"
+			}
+		}},
+		{"config source", func(r *OMPModelResolutionReceipt) { r.ConfigSource = "ambient" }},
+		{"activation hash", func(r *OMPModelResolutionReceipt) { r.Activation.ConfigHash = "bad" }},
+		{"activation argv", func(r *OMPModelResolutionReceipt) { r.Activation.Argv = []string{"../omp"} }},
+		{"role required value", func(r *OMPModelResolutionReceipt) { r.Roles[0].Agent = " bad " }},
+		{"role selector", func(r *OMPModelResolutionReceipt) { r.Roles[0].Selector = "other/model" }},
+		{"fallback attempt", func(r *OMPModelResolutionReceipt) {
+			r.Roles[0].FallbackAttempts = []OMPModelFallbackAttemptReceipt{{Selector: "p/old"}}
+		}},
+		{"secret-like material", func(r *OMPModelResolutionReceipt) { r.Roles[0].DegradedReason = "password=value" }},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			receipt := modelReceiptFixture(time.Date(2026, 8, 3, 4, 5, 6, 0, time.UTC))
+			test.mutate(&receipt)
+			_, _, err := CanonicalOMPModelResolutionReceipt(receipt)
+			if err == nil {
+				t.Fatalf("authority drift %q was accepted", test.name)
+			}
+		})
 	}
 }
 

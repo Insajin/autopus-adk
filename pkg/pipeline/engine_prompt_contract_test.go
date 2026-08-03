@@ -96,6 +96,28 @@ func TestSubprocessEngine_DryRunWithSpecDir_UsesFrozenRequiredDocuments(t *testi
 	}
 }
 
+func TestSubprocessEngine_OMPBlocksResolvedSnapshotDriftBeforeDispatch(t *testing.T) {
+	t.Parallel()
+
+	specDir := writeEnginePromptSpec(t)
+	snapshotHash, err := pipeline.SpecSnapshotHash(specDir)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "plan.md"), []byte("DRIFTED_PLAN_BODY"), 0o600))
+	backend := &FakeBackend{Responses: []string{"must not run"}}
+	engine := pipeline.NewSubprocessEngine(pipeline.EngineConfig{
+		ProjectDir: filepath.Dir(specDir), SpecID: enginePromptSpecID, SpecDir: specDir,
+		Platform: "omp", Strategy: pipeline.StrategySequential, Backend: backend,
+		SnapshotHash: snapshotHash, GitCommitHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	})
+
+	result, err := engine.Run(context.Background())
+
+	require.ErrorContains(t, err, "resolved SPEC snapshot")
+	require.NotNil(t, result)
+	assert.Zero(t, backend.CallCount)
+	assert.Zero(t, result.Receipt.DispatchCount)
+}
+
 func writeEnginePromptSpec(t *testing.T) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), enginePromptSpecID)

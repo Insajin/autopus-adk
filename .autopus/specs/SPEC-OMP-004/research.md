@@ -30,11 +30,12 @@
 5. `pkg/memindex/context_plan.go::BuildContextPlan` returns either verified pinned/selected refs or `status=unavailable`, empty refs, and a reason; both remain body-free shadow-only evidence.
 6. `pkg/worker/context_delivery.go::workerUsesGPTContextDelivery` only gates worker backends named codex/openai/gpt. It is not an OMP platform/session contract.
 7. `pkg/adapter/omp` currently generates rules, agents, skills, commands, config, and manifest. `Adapter.SupportsHooks()` is false for the generic ADK hook interface; that does not prove OMP native extension/compaction event availability.
-8. The installed product direct E2E reports `omp/17.1.8`, provider requests 3, auth header 0, external endpoint 0, correlated pre/post ACK 1/1, native start/end 1/1, same PID/session, provider #3 exact canonical/transient body, real task overlay, cleanup root 0, and OS sandbox true. This proves the process-private path, not native `/auto` production reachability.
+8. The installed product direct E2E reports `omp/17.1.8`, provider requests 3, auth header 0, external endpoint 0, correlated pre/post ACK 1/1, native start/end 1/1, same PID/session, provider #3 exact canonical/transient body, real task overlay, cleanup root 0, and OS sandbox true. This proves the process-private bridge path, not active-history production admission.
 9. `internal/cli/workflow_context_runtime_managed*.go` owns canonical rebuild, nonce/binding/options/session correlation, private stdio `--no-session`, source/extension/environment validation, cleanup lease, cancelable frame reads, preflight cleanup, exact-body dispatch ACK, and managed fallback block with shadow rollback.
 10. `auto lore context pkg/promptlayer` preserves the high-confidence constraint that required GPT/Codex documents and high/critical full review stay complete; required-document summarization or unverified compaction was previously rejected.
 11. External session JSON is now intent-only and rejects authority fields. Installed OMP 17.1.8's project discovery requires exact generated `.omp/extensions`, command/skill/config equality and absent ambient OMP/Claude/Codex/Gemini/OpenCode/GitHub/Pi executable surfaces because its `--no-extensions` also suppresses the explicit bridge.
 12. `auto arch enforce` reports no architecture rule violation before authoring; planned authority/policy/projection/evidence layers keep that dependency direction.
+13. Generated `.omp/extensions/autopus-pipeline.ts` owns exact shell-free `/auto go SPEC-ID` routing; `pipelineOMPBackend` binds sealed SPEC/git/phase authority to one private v2 RPC process, disables retry/compaction, and uses a fresh workspace-bound model receipt. The body-free evidence loader verifies policy, 20-pair canary, history, freshness and workspace/SPEC/snapshot/git/runtime binding, but no production producer supplies it and the backend does not consume it, so active history remains unreachable.
 
 ## Stable / Snapshot / Ephemeral Classification
 
@@ -46,7 +47,6 @@
 | document candidate | `context_plan.v2` pinned/selected refs | shadow-only; active authority 없음 | source hash, selection change |
 | native history | superseded reads, resolved tool results, transcript history | token credit eligible; native selective pinning is not assumed | new tool result, unresolved/error state |
 
-Cache invalidation never authorizes omission of a required layer. It causes rebuild, provider-call block, or canonical full fallback.
 ## Visual Planning Brief
 
 ```mermaid
@@ -67,7 +67,7 @@ flowchart LR
 - OMP `main` settings documents global/project/CLI/runtime precedence, object deep merge, and whole-array replacement: <https://github.com/can1357/oh-my-pi/blob/main/docs/settings.md>.
 - OMP `main` compaction documents pre/post lifecycle, pruning, persistence/reload, and failure paths; persistence makes isolated/no-session mode, permission, path, cleanup proof mandatory: <https://github.com/can1357/oh-my-pi/blob/main/docs/compaction.md>.
 - OMP `main` memory documents a default-off optional backend whose injected guidance is heuristic and subordinate to current repo evidence: <https://github.com/can1357/oh-my-pi/blob/main/docs/memory.md>.
-- These current-main contracts are not assumed for every installed binary. The generated bridge uses body-free correlated `ui.confirm`; denial, timeout, exception, missing confirm, malformed timeout, or hash mismatch fails closed, while notify/sendMessage has no authority. `RunManaged` and the process-private product assembler perform authoritative rebuild and validate a provider-observed dispatch ACK, but the trusted native `/auto` workflow owner that supplies observed authority is still absent.
+- These current-main contracts are not assumed for every installed binary. The generated bridge uses body-free correlated `ui.confirm`; denial, timeout, exception, missing confirm, malformed timeout, or hash mismatch fails closed, while notify/sendMessage has no authority. Native `/auto` now reaches a canonical-full long-lived RPC backend, but that backend deliberately disables compaction. The production evidence producer and provider-bound reusable-session admission oracle required to enable active history are still absent.
 
 ## Semantic Invariant Inventory
 
@@ -92,7 +92,7 @@ flowchart LR
 | existing code/helper/pattern | promptlayer v1 verify, context plan v2, layer kinds, OMP adapter/config/manifest | reuse | existing symbol refs |
 | stdlib/native | Go hash/JSON/path/time + OMP native capability/event/overlay | use | no new storage/runtime |
 | existing dependency | current Go YAML/config, Cobra, test stack | reuse | existing manifest/import evidence |
-| new dependency or abstraction | existing provider-neutral binding/managed bridge is sufficient; only production caller assembly is missing | no new dependency; `[NEW]` caller owning path requires discovery | managed primitive reused |
+| new dependency or abstraction | canonical route exists; production evidence/session admission is missing | no dependency; `[NEW]` active authority owner requires discovery | managed primitive reused |
 | minimum sufficient verification | exact hashes/sets, artifact cleanup, fake runtime, AB/BA, rollback, changed-file 85% + baseline | required checks | S1-S13 + regression gates |
 
 ## Feature Coverage Map
@@ -105,7 +105,7 @@ flowchart LR
 | memory shadow security | REQ-MEMORY/MEMORY-SEC, T6, S6/S8 | covered |
 | 20+ paired promotion/rollback | REQ-CANARY/ROLLOUT, T7/T8, S10-S12 | covered |
 | privacy/runtime cleanup/managed admission | REQ-PRIVACY/RUNTIME-ARTIFACT/LIVE, T2/T5/T8, S5/S7/S13 | covered for bounded managed primitive |
-| user-facing `/auto` production reachability | REQ-OPTIONAL, T5, S13 | completion-debt: trusted workflow owner/probe wiring absent |
+| user-facing `/auto` reachability | REQ-OPTIONAL, T5, S13 | canonical-full implemented; active history blocked on observed producer/provider-bound reusable-session admission |
 | executable OMP workflow boundary | `SPEC-OMP-002` | dependency |
 | model/advisor routing | `SPEC-OMP-003` | independent optional integration |
 
@@ -117,18 +117,18 @@ flowchart LR
 | T6-T8 | memory shadow security, paired canary promotion, rollback, and effective readback are implemented | implemented |
 | Managed bridge/driver | correlated `ui.confirm`, exact authority hashes, canonical rebuild, exact-body dispatch ACK, private stdio, exact/absent discovery guards, success/failure rollback-before-cleanup | implemented, focused-tested, installed direct-tested |
 | Installed lifecycle canary | `omp/17.1.8`, provider requests 3, pre/post ACK 1/1, native start/end 1/1, same PID/session, exact body, cleanup root 0, sandbox true | real managed driver primitive verified |
-| Product active boundary | process-private assembler exists; external CLI is intent-only, but trusted workflow owner/observed promotion-history source/native `/auto` callback is absent | fail-closed/partial; T5 open |
+| Product boundary | native `/auto`, sealed view, bound model receipt and one private RPC implement canonical-full; verified evidence consumer lacks production producer/provider-bound reusable-session gate | canonical-full implemented; active fail-closed/T5 open |
 | T9 integrated gates | installed managed/product live canary; exact aggregate 85.02%; package baseline; four-package race; vet/build/full; hygiene/strict/lore | verified complete |
 
 ## Completion Debt
 
 | Item | Blocks | Required resolution |
 |---|---|---|
-| Trusted native `/auto` workflow owner and observed promotion/history source are absent | Outcome Lock and lifecycle completion | Implement caller-independent cold-start probes and production authority assembly, then rerun the installed same PID/session, correlated ACK, exact-body and rollback/cleanup oracles. |
+| Canonical `/auto` backend has no observed production evidence producer, provider credential/endpoint authority, stable reusable-session binding or multi-compaction admission gate | Outcome Lock and lifecycle completion | Produce 20 balanced AB/BA pairs in real tasks and prove every compaction's canonical re-admission at the provider boundary before active enablement. |
 
 ## Final T9 Verification Evidence
 
-- PASS: installed managed/product live canary; changed production exact aggregate `85.02%` (`3075/3617`); package coverage `promptlayer=88.86%`, `adapter/omp=87.99%`, `config=93.19%`, `internal/cli=79.94%` versus CLI baseline `79.3%`; exact coverage; four-package race (`9.838s` promptlayer, `216.317s` adapter, `1.465s` config, `506.403s` CLI); vet/build; serial full suite exit 0; changed Go gofmt; diff check; production Go max 286; strict SPEC; lore. This closes T9 only, not T5 product reachability.
+- PASS: historical T9 installed canary/exact aggregate `85.02%` (`3075/3617`)/four-package race/vet/build/full/strict/lore; current canonical-full delta installed loopback canaries, package race, vet/build, strict, exact aggregate `85.04%` (`3321/3905`) and package coverage `promptlayer=88.15%`, `adapter/omp=87.70%`, `config=90.99%`, `internal/cli=79.82%` versus T1 baselines. This does not close T5 active-history authority.
 
 ## Evolution Ideas
 
@@ -137,14 +137,14 @@ These are optional improvements and do not block sync completion.
 | Idea | Why not required now | Promotion trigger |
 |---|---|---|
 | provider별 optimal compaction strategy 자동 선택 | model routing은 다른 책임이다. | user requests model-aware integration |
-| 장기 organization-level cost dashboard | required product reachability와 local receipt/canary가 Outcome Lock을 닫는다. | operator requests cross-project reporting |
+| 장기 organization-level cost dashboard | active-history authority와 local receipt/canary가 Outcome Lock을 닫는다. | operator requests cross-project reporting |
 | additional memory backend benchmark | canonical authority와 무관한 확장이다. | supported backend demand and threat review |
 
 ## Sibling SPEC Decision
 
 | Decision | Reason | Sibling SPEC IDs |
 |---|---|---|
-| none | 이 Primary SPEC가 T5 product reachability와 T9 검증까지 소유하며 완료 시 Outcome Lock을 닫는다. OMP-002는 선행 dependency이고 OMP-003은 독립 integration이다. | None |
+| none | 이 Primary SPEC가 T5 active-history authority와 T9 검증까지 소유하며 완료 시 Outcome Lock을 닫는다. OMP-002는 선행 dependency이고 OMP-003은 독립 integration이다. | None |
 
 ## Reference Discipline
 
@@ -165,28 +165,28 @@ These are optional improvements and do not block sync completion.
 | `autopus.omp_context_receipt.v1` fields and managed artifact lifecycle | existing schema | body-free classification/status/cleanup evidence를 tests에서 확인 |
 | `pkg/adapter/omp/omp_context_bridge.go` | existing source | body-free correlated `ui.confirm`, exact authority envelope, fail-closed projection 확인 |
 | `internal/cli/workflow_context_runtime_managed*.go` | existing | canonical rebuild, private driver, exact-body ACK, identity/env/lease/cleanup/rollback 확인 |
-| `internal/cli/workflow_context_runtime_product.go` + `[NEW]` trusted workflow owner | process-private assembler implemented; owner/probe wiring unresolved | direct installed evidence와 native `/auto` production reachability를 구분 |
+| native route/backend/product assembler + `[NEW]` evidence/session admission owner | canonical-full/evidence consumer implemented; producer/admission unresolved | direct installed evidence와 active-history authority를 구분 |
 
 ## Reviewer Brief
 
 - **Intended scope**: OMP consumer에만 completed-history optimization을 적용하고 v1 full authority, transient body rehydration, memory shadow safety, paired promotion/rollback을 증명한다.
 - **Explicit non-goals**: 새로운 제품 scope, model/advisor routing, workflow parity 재설계, orchestra provider, Autopus transcript mutation, canonical memory storage, delivered-document shrink/active JIT/memory injection.
 - **Self-verified evidence**: all REQ→T→S→INV trace, exact hash/set oracles, AB/BA formula, version capability gate, existing/generated reference separation.
-- **Reviewer focus**: treat T9 receipts as closed; review only required data loss, correlated ACK/admission integrity, managed process/root security, config rollback convergence, deterministic pairing, and missing user-facing `/auto` production reachability.
+- **Reviewer focus**: treat T9 and canonical-full reachability as closed; review only data loss, ACK/admission integrity, process/root security, rollback, pairing, and missing active-history production authority.
 ## Self-Verify Summary
 
 - Q-CORR-01 | status: PASS | attempt: 1 | files: spec.md, plan.md, research.md | reason: existing paths and symbols were verified with rg/read.
-- Q-CORR-02 | status: PASS | attempt: 2 | files: spec.md, plan.md, research.md | reason: managed primitive references are existing; only the unresolved production caller is marked NEW.
+- Q-CORR-02 | status: PASS | attempt: 3 | files: spec.md, plan.md, research.md | reason: canonical route references are existing; only production evidence/session admission ownership is marked NEW.
 - Q-CORR-03 | status: PASS | attempt: 1 | files: spec.md, acceptance.md | reason: EARS requirements and bare Given/When/Then scenarios match repository conventions.
 - Q-CORR-04 | status: PASS | attempt: 1 | files: research.md | reason: existing, concurrent dependency, NEW, and generated references are separated.
 - Q-COMP-01 | status: PASS | attempt: 2 | files: spec.md, plan.md, acceptance.md, research.md | reason: four SPEC documents form one complete package.
 - Q-COMP-02 | status: PASS | attempt: 1 | files: spec.md, plan.md, acceptance.md | reason: every REQ maps to tasks, scenarios, and invariants.
 - Q-COMP-03 | status: PASS | attempt: 1 | files: spec.md | reason: every requirement has type, trigger or state, and observability.
-- Q-COMP-04 | status: PASS | attempt: 2 | files: spec.md, plan.md, acceptance.md, research.md | reason: T9 is closed while product reachability remains the sole blocking work.
+- Q-COMP-04 | status: PASS | attempt: 3 | files: spec.md, plan.md, acceptance.md, research.md | reason: T9 and canonical-full product reachability are closed while active-history production authority remains blocking.
 - Q-COMP-05 | status: PASS | attempt: 2 | files: spec.md, plan.md, acceptance.md, research.md | reason: all ten invariants have concrete Must oracles.
 - Q-COMP-06 | status: PASS | attempt: 1 | files: spec.md, research.md | reason: traceability matrix and reviewer brief constrain scope.
-- Q-COMP-07 | status: PASS | attempt: 2 | files: plan.md, acceptance.md, research.md | reason: bounded managed evidence is separated from product reachability debt; Evolution Ideas remain advisory.
-- Q-FEAS-01 | status: PASS | attempt: 2 | files: plan.md, research.md | reason: managed primitive ownership is verified and the undiscovered product owner remains a T5 gate.
+- Q-COMP-07 | status: PASS | attempt: 3 | files: plan.md, acceptance.md, research.md | reason: canonical-full evidence is separated from active-history authority debt; Evolution Ideas remain advisory.
+- Q-FEAS-01 | status: PASS | attempt: 3 | files: plan.md, research.md | reason: canonical route ownership is verified and the undiscovered evidence/session admission owner remains a T5 gate.
 - Q-FEAS-02 | status: PASS | attempt: 1 | files: plan.md, research.md | reason: source of truth and generated/runtime surfaces are distinguished.
 - Q-FEAS-03 | status: PASS | attempt: 1 | files: plan.md, acceptance.md | reason: hermetic commands and focused/full gates are runnable in the Go repo.
 - Q-STYLE-01 | status: PASS | attempt: 1 | files: spec.md | reason: requirement text is unambiguous and mandatory.
@@ -196,5 +196,5 @@ These are optional improvements and do not block sync completion.
 - Q-SEC-02 | status: PASS | attempt: 1 | files: spec.md, acceptance.md | reason: secret and privileged path redaction has explicit zero-leak oracle.
 - Q-SEC-03 | status: PASS | attempt: 1 | files: spec.md, acceptance.md, research.md | reason: receipts are body-free and runtime memory remains untracked.
 - Q-COH-01 | status: PASS | attempt: 1 | files: spec.md, plan.md, acceptance.md, research.md | reason: one OMP context optimization outcome drives all tasks.
-- Q-COH-02 | status: PASS | attempt: 2 | files: plan.md, research.md | reason: T5 product reachability remains the sole explicit completion blocker after T9 closure.
+- Q-COH-02 | status: PASS | attempt: 3 | files: plan.md, research.md | reason: T5 active-history production evidence and reusable-session admission remain the sole explicit completion blocker after canonical-full wiring.
 - Q-COH-03 | status: PASS | attempt: 1 | files: research.md | reason: no sibling SPEC is created.

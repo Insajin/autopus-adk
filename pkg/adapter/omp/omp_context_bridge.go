@@ -185,5 +185,5 @@ func prepareOMPContextBridgeMappings(cfg *config.HarnessConfig) ([]adapter.FileM
 		OverwritePolicy: adapter.OverwriteAlways,
 		Checksum:        adapter.Checksum(ompContextBridgeSource),
 		Content:         []byte(ompContextBridgeSource),
-	}}, nil
+	}, prepareOMPNativePipelineRouteMapping()}, nil
 }

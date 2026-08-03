@@ -14,7 +14,7 @@ sequenceDiagram
   participant B as OMP Context Bridge
   participant O as OMP Runtime
   A-->>S: assemble request + CanonicalSource + managed driver
-  Note over A,S: T5 debt: trusted native workflow owner not wired
+  Note over A,S: canonical-full route wired; active-history authority blocked
   S->>P: Build + Verify(same ContextDeliveryOptions)
   P-->>S: full receipt + exact refs/hashes
   S->>B: bind task/phase + retain transient required bodies
@@ -38,7 +38,7 @@ sequenceDiagram
 - [x] **T2: opt-in config와 capability receipt를 구현한다.** `history_mode(off|shadow|active)`와 독립된 `memory_mode(off|shadow)`, target, TTL/namespace, fallback을 validate한다. version 문자열 외에 pre/post event, post-compaction canonical injection/admission block, `--no-session` 또는 isolated session root, cleanup readback, memory interception을 각각 probe한다. 하나라도 없으면 active admission을 막는다.
 - [x] **T3: provider-neutral history classifier와 session binding을 구현한다.** v1 `RequiredDocuments` 전체를 `full_document_refs`로, ephemeral hashes와 eligible history rows를 별도 set으로 만든다. native selective retention을 가정하지 않고 v2 verified candidate는 shadow로 복사하며 unavailable status/reason은 빈 candidate set으로 보존한다. OMP platform을 worker/provider 이름과 연결하지 않는다.
 - [x] **T4: transient checkpoint·rehydration·receipt engine을 구현한다.** pre-compaction에 full task/decision/frozen findings/ownership/result schema를 supervisor-only process memory에 보관하고 body-free receipt에는 hashes/IDs만 쓴다. post-compaction에 같은 options로 v1 delivery를 재검증하고 transient bodies를 실제 재주입해 body hash를 대조한다. state 부재·불일치 시 provider call 0회 또는 independently rebuilt canonical full fallback을 보장한다.
-- [ ] **T5: OMP native bridge와 artifact lifecycle을 product entrypoint까지 capability-gated로 투영한다.** Process-private assembler, exact two-prompt managed driver, real task overlay, rollback-before-cleanup, intent-only CLI와 installed OMP direct E2E까지 구현했다. Project `.omp/extensions`와 generated command/skill/config는 exact 비교하고 OMP/Claude/Codex/Gemini/OpenCode/GitHub/Pi ambient execution surface는 fail-closed한다. 그러나 native `/auto` workflow owner가 caller-supplied evidence 없이 observed canary/promotion/history를 조립하는 production reachability는 없으므로 T5는 partial이다.
+- [ ] **T5: OMP native bridge와 artifact lifecycle을 product entrypoint까지 capability-gated로 투영한다.** Process-private assembler와 installed direct E2E에 더해 generated native `/auto go SPEC-ID` route, one-shot `auto pipeline run --platform omp`, sealed execution view, run-scoped long-lived OMP RPC backend, per-phase receipt model route, strict v2 frame/lifecycle/readback와 private executable/session runtime을 구현했다. Canonical backend는 automatic retry/compaction을 끄고 active evidence를 소비하지 않는다. Production evidence producer의 observed balanced 20-pair AB/BA, provider credential/endpoint authority, 실제 reusable OMP session binding과 multi-compaction admission oracle이 없으므로 active-history T5는 partial이다.
 - [x] **T6: OMP memory shadow safety를 구현한다.** workspace/SPEC/role/ref/hash/checked_at/TTL/namespace provenance, current-source 재검증, secret redaction, injection neutralization, stale/tampered rejection, deterministic omission reason을 적용한다. memory body/document selection은 active prompt에 주입하지 않고 `.autopus/learnings/pipeline.jsonl`과 canonical docs는 계속 authority다.
 - [x] **T7: shadow→active promotion과 rollback transaction을 구현한다.** gate set을 모두 만족할 때만 active overlay를 만들고, regression 시 shadow/off로 원자적 전환한 뒤 effective config/mode hash를 다시 읽어 receipt에 기록한다. user-owned config와 tracked files는 건드리지 않는다.
 - [x] **T8: paired AB/BA canary와 metrics를 구현한다.** 최소 20개 동일 `task_id`를 full-history/history-compacted로 한 번씩 실행하고 AB/BA order를 균형화한다. pair completeness, full document/ephemeral equality, task oracle, security/integrity, baseline/optimized tokens, formula, fallback/rollback을 집계한다. fake runtime이 기본이며 live provider는 explicit opt-in, bounded cohort다.
@@ -49,10 +49,11 @@ sequenceDiagram
 | Slice | Current evidence | State |
 |---|---|---|
 | T1~T4 | Must oracle, opt-in policy/capabilities, provider-neutral binding, process-private checkpoint/rehydration과 body-free receipt | implemented |
-| T5 managed primitive | Process-private assembler, body-free correlated ACK, exact authority hashes, canonical rebuild, real task overlay, intent-only external input, ambient discovery deny, cleanup convergence | installed direct path verified; trusted production reachability partial |
+| T5 canonical route | Generated `/auto` route → one canonical pipeline run → sealed five-phase long-lived OMP RPC, strict model receipt/workspace binding, private executable/session runtime | production command path implemented; compaction off |
+| T5 active evidence | Body-free evidence store loader verifies policy, 20-pair canary, history refs and workspace/SPEC/snapshot/git/runtime freshness | consumer boundary implemented; production producer/session admission absent |
 | T6~T8 | memory shadow provenance/security, balanced AB/BA metric, promotion/rollback readback | implemented |
 | Installed managed canary | `omp/17.1.8`, provider requests `3`, pre/post ACK `1/1`, native start/end `1/1`, same PID/session, provider #3 exact body, cleanup root `0`, sandbox `true` | real managed driver primitive observed |
-| User active admission | 외부 CLI는 intent-only이며 trusted workflow owner, observed promotion/history source와 native `/auto` callback이 없음 | blocking reachability debt; fail-closed |
+| User active admission | Native `/auto` canonical-full callback은 존재하지만 observed promotion/history producer, provider-bound authority와 reusable multi-compaction binding이 없음 | active-history debt; fail-closed |
 | T9 convergence | installed managed/product live canary; exact coverage `85.02%`; package baseline; four-package race; vet/build/full; gofmt/diff/line cap; strict/lore | verified complete |
 
 ## 파일 영향 분석
@@ -61,10 +62,10 @@ sequenceDiagram
 |---|---|---|---|
 | authority/classification | `pkg/promptlayer/context_*.go`, `pkg/promptlayer/omp_context_*.go` | None | v1 schema/body completeness/hash semantics |
 | OMP projection | `pkg/adapter/omp/omp_context_*.go`, generated bridge | None | generic hook contract, user-owned config |
-| config/CLI | OMP context config, `internal/cli/workflow_context_runtime*.go`, doctor projections | trusted workflow authority/probe wiring `[NEW]` | global OMP config, orchestra provider map |
+| config/CLI | OMP context config, native route, `internal/cli/pipeline_backend_omp*.go`, `workflow_context_runtime*.go` | production evidence producer와 reusable-session admission `[NEW]` | global OMP config, orchestra provider map |
 | verification | existing focused fake-runtime/canary/adversarial tests | production reachability oracle `[NEW]` | external live provider by default |
 
-The process-private product entrypoint is implemented. The workflow-owned authority/probe source and native `/auto` reachability remain `[NEW]`; an injected test context or direct Go call is not production evidence.
+The process-private product entrypoint and native `/auto` canonical-full pipeline reachability are implemented. The observed production evidence producer, provider-bound authority, and reusable-session active admission remain `[NEW]`; a persisted body-free fixture or isolated RPC test is not active-history production evidence.
 
 ## Architecture Alignment
 
@@ -118,10 +119,11 @@ This Primary SPEC owns canonical re-admission, eligible-history credit, transien
 
 | Item | Blocks | Required resolution |
 |---|---|---|
-| Native `/auto` workflow owner가 intent에서 canonical request를 파생하고 observed canary/promotion/history와 결합해 process-private assembler에 진입하지 않음 | user-facing active optimization과 lifecycle completion | caller-supplied evidence를 받지 않는 production probe/authority layer를 구현하고 동일 PID/session, correlated ACK, exact-body, rollback/cleanup oracle로 재검증 |
+| Canonical `/auto` route는 compaction-off로 동작하며 production evidence producer, provider credential/endpoint authority, stable reusable-session binding과 multi-compaction admission gate가 없음 | user-facing active optimization과 lifecycle completion | 실제 task에서 balanced AB/BA 20 pairs를 생산하고 동일 OMP session의 반복 compaction마다 canonical re-admission을 provider boundary에서 검증한 뒤에만 active를 허용 |
 
 ## Final T9 Verification Evidence
 
 - Coverage: changed production exact aggregate `85.02%` (`3075/3617`); `promptlayer=88.86%`, `adapter/omp=87.99%`, `config=93.19%`, `internal/cli=79.94%` with CLI baseline `79.3%` 이상; exact coverage gate PASS.
-- Runtime/quality: installed managed/product live canary PASS; four-package race PASS (`promptlayer=9.838s`, `adapter/omp=216.317s`, `config=1.465s`, `internal/cli=506.403s`); `go vet`, `go build ./...`, `go test -p 1 -count=1 -timeout=15m ./...`, changed Go gofmt, `git diff --check`, production Go max 286 lines, strict SPEC와 lore PASS.
-- Installed managed canary는 bounded primitive의 real driver ACK/admission 증거이며 user-facing `/auto` production reachability로 승격하지 않는다.
+- Current delta: exact aggregate `85.04%` (`3321/3905`), `promptlayer=88.15%`, `adapter/omp=87.70%`, `config=90.99%`, `internal/cli=79.82%`; installed loopback canaries, package race, vet/build, strict SPEC, gofmt/diff/300-line gate PASS.
+- Runtime/quality: historical four-package race PASS (`promptlayer=9.838s`, `adapter/omp=216.317s`, `config=1.465s`, `internal/cli=506.403s`); current code-identical serial suite PASS (`go test -p 1 -count=1 -timeout=20m ./...`, `1089.145s`, failures/timeouts `0`), followed only by this evidence-line update and strict SPEC revalidation.
+- 기존 installed managed canary는 bounded primitive의 real driver ACK/admission 증거다. 이번 native `/auto` canonical-full delta는 active-history 또는 installed provider-bound multi-compaction 증거로 승격하지 않는다.

@@ -3,6 +3,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/insajin/autopus-adk/pkg/worker/compress"
@@ -29,11 +30,17 @@ type PhaseBackend interface {
 	Execute(ctx context.Context, req PhaseRequest) (*PhaseResponse, error)
 }
 
+// PhaseBackendCloser is implemented by backends that own run-scoped resources.
+type PhaseBackendCloser interface {
+	Close() error
+}
+
 // PhaseRequest is the input for PhaseBackend.Execute.
 type PhaseRequest struct {
-	Prompt  string
-	PhaseID PhaseID
-	Attempt int
+	Prompt           string
+	PhaseID          PhaseID
+	Attempt          int
+	OMPExecutionView *OMPExecutionView
 }
 
 // PhaseResponse is the output from PhaseBackend.Execute.
@@ -50,7 +57,9 @@ type PhaseResponse struct {
 
 // EngineConfig is the configuration for SubprocessEngine.
 type EngineConfig struct {
-	SpecID string
+	// ProjectDir is the trusted project root used to bind process-private execution views.
+	ProjectDir string
+	SpecID     string
 	// SpecDir is the resolved, trusted directory containing required SPEC documents.
 	SpecDir    string
 	Platform   string
@@ -91,21 +100,64 @@ type SubprocessEngine struct {
 	promptBuilder *PhasePromptBuilder
 }
 
-// @AX:ANCHOR: [AUTO] @AX:REASON: public API contract — entry point called from CLI and tests (fan-in >= 3)
+func (e *SubprocessEngine) finishBackendLifecycle(
+	state *engineRunState,
+	result *PipelineResult,
+	runErr error,
+	preflight bool,
+	closeErr error,
+) (*PipelineResult, error) {
+	if closeErr == nil {
+		return result, runErr
+	}
+	cleanupErr := fmt.Errorf("pipeline: close phase backend: %w", closeErr)
+	joinedErr := errors.Join(runErr, cleanupErr)
+	state.result.Receipt.DegradedReasons = appendUnique(
+		state.result.Receipt.DegradedReasons,
+		"backend_cleanup_failure",
+	)
+	terminal := state.result.Receipt.Terminal
+	if runErr == nil {
+		terminal = TerminalPartialPreserved
+	} else if terminal == "" {
+		terminal = TerminalBlocked
+	}
+	state.finish(terminal, joinedErr.Error())
+
+	var persistErr error
+	if preflight && e.cfg.Checkpoint != nil {
+		persistErr = e.persistRunStateAt(state, true)
+	} else {
+		persistErr = e.persistRunState(state)
+	}
+	if persistErr != nil {
+		joinedErr = errors.Join(
+			joinedErr,
+			fmt.Errorf("pipeline: persist backend cleanup receipt: %w", persistErr),
+		)
+	}
+	return result, joinedErr
+}
+
+// @AX:ANCHOR [AUTO]: Public engine construction contract used by CLI and 3+ package consumers.
+// @AX:REASON [AUTO]: Constructor defaults and prompt-builder activation affect every canonical pipeline run.
 // NewSubprocessEngine creates a SubprocessEngine with the given config.
 func NewSubprocessEngine(cfg EngineConfig) *SubprocessEngine {
 	if cfg.Compressor == nil {
-		// @AX:NOTE: [AUTO] @AX:SPEC: SPEC-CONTEXT-COMPRESS-001: keepRecent=2 is the default phase-transition compaction policy
+		// @AX:NOTE [AUTO]: @AX:SPEC: SPEC-CONTEXT-COMPRESS-001: keepRecent=2 is the default phase-transition compaction policy
 		cfg.Compressor = compress.NewDefaultCompressor(2)
 	}
 	engine := &SubprocessEngine{cfg: cfg}
 	if cfg.SpecDir != "" {
 		engine.promptBuilder = NewPhasePromptBuilder(cfg.SpecDir)
+		if cfg.Platform == "omp" {
+			engine.promptBuilder.expectedSnapshotHash = cfg.SnapshotHash
+		}
 	}
 	return engine
 }
 
-// @AX:NOTE: [AUTO] magic constant in format string — SPEC/Phase labels are part of prompt contract
+// @AX:NOTE [AUTO]: magic constant in format string — SPEC/Phase labels are part of prompt contract
 // buildPrompt assembles the prompt for a phase, injecting prior output when available.
 func buildPrompt(specID string, phaseID PhaseID, previousOutput string) string {
 	prompt := fmt.Sprintf("SPEC: %s\nPhase: %s", specID, phaseID)
@@ -115,7 +167,7 @@ func buildPrompt(specID string, phaseID PhaseID, previousOutput string) string {
 	return prompt
 }
 
-// @AX:NOTE: [AUTO] @AX:SPEC: SPEC-CONTEXT-COMPRESS-001: compaction blockers abort before the next backend call to avoid lossy prompt handoff
+// @AX:NOTE [AUTO]: @AX:SPEC: SPEC-CONTEXT-COMPRESS-001: compaction blockers abort before the next backend call to avoid lossy prompt handoff
 func (e *SubprocessEngine) compactPhaseOutput(phaseID PhaseID, output string) (string, *compress.CompactionEvent, error) {
 	if e.cfg.Compressor == nil {
 		return output, nil, nil

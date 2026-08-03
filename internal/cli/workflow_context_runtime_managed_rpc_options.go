@@ -18,6 +18,7 @@ var workflowContextManagedReservedEnvironment = map[string]struct{}{
 	"AUTOPUS_OMP_CONTEXT_SESSION_HASH":   {},
 	"AUTOPUS_OMP_CONTEXT_NONCE_HASH":     {},
 	"AUTOPUS_OMP_CONTEXT_ACK_TIMEOUT_MS": {},
+	"AUTOPUS_OMP_MANAGED_INNER":          {},
 }
 
 // @AX:WARN [AUTO]: managed RPC option validation contains path, mode, environment, and generated-source checks.
@@ -222,29 +223,35 @@ func validWorkflowContextManagedEnvironmentKey(key string) bool {
 }
 
 func validateWorkflowContextManagedExtensionAllowlist(workspace string) error {
-	expected := ompadapter.ExpectedOMPContextBridgeSourceIdentity()
+	bridge := ompadapter.ExpectedOMPContextBridgeSourceIdentity()
+	route := ompadapter.ExpectedOMPNativePipelineRouteSourceIdentity()
 	ompDirectory := filepath.Join(workspace, ".omp")
 	ompInfo, err := os.Lstat(ompDirectory)
 	if err != nil || !ompInfo.IsDir() || ompInfo.Mode()&os.ModeSymlink != 0 {
 		return errors.New("managed OMP workspace extension root identity is invalid")
 	}
-	directory := filepath.Join(workspace, filepath.Dir(filepath.FromSlash(expected.TargetPath)))
+	directory := filepath.Join(workspace, filepath.Dir(filepath.FromSlash(bridge.TargetPath)))
 	info, err := os.Lstat(directory)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return errors.New("managed OMP extension directory identity is invalid")
 	}
 	entries, err := os.ReadDir(directory)
-	if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(expected.TargetPath) ||
-		entries[0].Type()&os.ModeSymlink != 0 || !entries[0].Type().IsRegular() {
+	expected := map[string]bool{filepath.Base(bridge.TargetPath): true, filepath.Base(route.TargetPath): true}
+	if err != nil || len(entries) != len(expected) {
 		return errors.New("managed OMP extension allowlist is invalid")
+	}
+	for _, entry := range entries {
+		if !expected[entry.Name()] || entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
+			return errors.New("managed OMP extension allowlist is invalid")
+		}
 	}
 	return nil
 }
 
-// @AX:WARN [AUTO]: project extension denial has cyclomatic complexity 15.
-// @AX:REASON [AUTO]: absent parents are allowed, while symlinked, non-directory, unreadable, or non-empty project extension roots fail closed.
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: product mode admits only the exact embedded bridge and native route identities.
 func validateWorkflowContextManagedProjectExtensions(projectDir string) error {
-	expected := ompadapter.ExpectedOMPContextBridgeSourceIdentity()
+	bridge := ompadapter.ExpectedOMPContextBridgeSourceIdentity()
+	route := ompadapter.ExpectedOMPNativePipelineRouteSourceIdentity()
 	ompDirectory := filepath.Join(projectDir, ".omp")
 	ompInfo, err := os.Lstat(ompDirectory)
 	if err != nil || !ompInfo.IsDir() || ompInfo.Mode()&os.ModeSymlink != 0 {
@@ -256,13 +263,19 @@ func validateWorkflowContextManagedProjectExtensions(projectDir string) error {
 		return errors.New("managed OMP project extension identity is invalid")
 	}
 	entries, err := os.ReadDir(extensions)
-	if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(expected.TargetPath) ||
-		entries[0].Type()&os.ModeSymlink != 0 || !entries[0].Type().IsRegular() {
+	if err != nil || len(entries) != 2 {
 		return errors.New("managed OMP project extension allowlist is invalid")
 	}
-	identity, err := captureWorkflowContextManagedSourceIdentity(filepath.Join(extensions, entries[0].Name()))
-	if err != nil || identity.size != expected.Size || identity.sha256 != expected.SHA256 {
-		return errors.New("managed OMP project extension source is invalid")
+	for _, expected := range []struct {
+		path, hash string
+		size       int64
+	}{
+		{bridge.TargetPath, bridge.SHA256, bridge.Size}, {route.TargetPath, route.SHA256, route.Size},
+	} {
+		identity, captureErr := captureWorkflowContextManagedSourceIdentity(filepath.Join(extensions, filepath.Base(expected.path)))
+		if captureErr != nil || identity.size != expected.size || identity.sha256 != expected.hash {
+			return errors.New("managed OMP project extension source is invalid")
+		}
 	}
 	return nil
 }

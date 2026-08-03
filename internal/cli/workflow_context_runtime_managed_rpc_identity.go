@@ -86,7 +86,10 @@ func captureWorkflowContextManagedSourceIdentities(
 	options WorkflowContextManagedRPCOptions,
 ) ([]workflowContextManagedSourceIdentity, error) {
 	bridge := ompadapter.ExpectedOMPContextBridgeSourceIdentity()
-	paths := []string{options.Executable, options.ConfigPath, filepath.Join(options.Workspace, filepath.FromSlash(bridge.TargetPath))}
+	route := ompadapter.ExpectedOMPNativePipelineRouteSourceIdentity()
+	paths := []string{options.Executable, options.ConfigPath,
+		filepath.Join(options.Workspace, filepath.FromSlash(bridge.TargetPath)),
+		filepath.Join(options.Workspace, filepath.FromSlash(route.TargetPath))}
 	models := filepath.Join(options.RuntimeRoot, "models.yml")
 	if _, err := os.Lstat(models); err == nil {
 		paths = append(paths, models)
@@ -101,9 +104,10 @@ func captureWorkflowContextManagedSourceIdentities(
 		}
 		identities = append(identities, identity)
 	}
-	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: index 2 is the generated bridge after executable and runtime config identities.
-	if identities[2].size != bridge.Size || identities[2].sha256 != bridge.SHA256 {
-		return nil, errors.New("managed OMP generated bridge identity is invalid")
+	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: indices 2 and 3 are exact generated extensions after executable/config.
+	if identities[2].size != bridge.Size || identities[2].sha256 != bridge.SHA256 ||
+		identities[3].size != route.Size || identities[3].sha256 != route.SHA256 {
+		return nil, errors.New("managed OMP generated extension identity is invalid")
 	}
 	return identities, nil
 }

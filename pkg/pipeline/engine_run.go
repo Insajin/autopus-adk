@@ -17,12 +17,20 @@ type engineRunState struct {
 }
 
 // @AX:ANCHOR [AUTO]: Preserve the sole orchestration entry point for the canonical five-phase route.
-// @AX:REASON: Phase ordering, checkpoint restoration, terminal state, and dispatch evidence converge through this method.
+// @AX:REASON [AUTO]: Phase ordering, checkpoint restoration, terminal state, and dispatch evidence converge through this method.
+// @AX:WARN [AUTO]: Canonical pipeline execution has cyclomatic complexity 15 across preflight, restore, dispatch, and persistence gates.
+// @AX:REASON [AUTO]: Backend cleanup must run exactly once while every preflight and terminal path preserves authoritative receipts.
 // Run executes the canonical dependency-ordered pipeline.
-func (e *SubprocessEngine) Run(ctx context.Context) (*PipelineResult, error) {
+func (e *SubprocessEngine) Run(ctx context.Context) (result *PipelineResult, runErr error) {
 	requested, effective, strategyErr := effectivePipelineStrategy(e.cfg.Strategy)
 	checkpointErr := e.validateCheckpoint()
 	state := e.newRunState(requested, effective, checkpointErr == nil)
+	preflight := true
+	if closer, ok := e.cfg.Backend.(PhaseBackendCloser); ok {
+		defer func() {
+			result, runErr = e.finishBackendLifecycle(state, result, runErr, preflight, closer.Close())
+		}()
+	}
 
 	if !e.cfg.DryRun && e.cfg.Backend == nil {
 		err := errors.New("pipeline: backend is required unless dry-run")
@@ -38,6 +46,7 @@ func (e *SubprocessEngine) Run(ctx context.Context) (*PipelineResult, error) {
 	if err := e.cfg.RunConfig.preflightWorkflowAuthenticity(); err != nil {
 		return nil, e.finishPreflightFailure(state, err)
 	}
+	preflight = false
 	if e.cfg.DryRun {
 		return e.runDry(state)
 	}
@@ -77,7 +86,7 @@ func (e *SubprocessEngine) Run(ctx context.Context) (*PipelineResult, error) {
 }
 
 // @AX:WARN [AUTO]: This phase transaction has more than eight retry, receipt, gate, compaction, and persistence branches.
-// @AX:REASON: Worker receipts must be admitted only after response validation and a passing gate, then persisted exactly once.
+// @AX:REASON [AUTO]: Worker receipts must be admitted only after response validation and a passing gate, then persisted exactly once.
 func (e *SubprocessEngine) executePhase(ctx context.Context, state *engineRunState, index int, phase Phase, previousOutput string) (string, error) {
 	maxRetries := phase.MaxRetries
 	if maxRetries < 0 {
@@ -98,8 +107,13 @@ func (e *SubprocessEngine) executePhase(ctx context.Context, state *engineRunSta
 			return "", e.failPhase(state, index, attempt, CheckpointStatusFailed, TerminalBlocked, wrapped)
 		}
 
+		request, err := e.newPhaseRequest(state, phase, attempt, prompt)
+		if err != nil {
+			wrapped := fmt.Errorf("phase %s: %w", phase.ID, err)
+			return "", e.failPhase(state, index, attempt, CheckpointStatusFailed, TerminalBlocked, wrapped)
+		}
 		state.result.Receipt.DispatchCount++
-		resp, err := e.cfg.Backend.Execute(ctx, PhaseRequest{Prompt: prompt, PhaseID: phase.ID, Attempt: attempt})
+		resp, err := e.cfg.Backend.Execute(ctx, request)
 		evidenceErr := err
 		var output string
 		var workerEnvelope *workerreceipt.Envelope

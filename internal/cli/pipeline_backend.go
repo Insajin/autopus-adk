@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -34,22 +32,7 @@ func resolvePipelineSpec(specID string) (resolvedPipelineSpec, error) {
 }
 
 func pipelineSpecSnapshotHash(specDir string) (string, error) {
-	h := sha256.New()
-	for _, name := range []string{"spec.md", "plan.md", "acceptance.md", "research.md"} {
-		path := filepath.Join(specDir, name)
-		body, err := os.ReadFile(path)
-		if err != nil {
-			if os.IsNotExist(err) && name != "spec.md" {
-				continue
-			}
-			return "", err
-		}
-		_, _ = h.Write([]byte(name))
-		_, _ = h.Write([]byte{0})
-		_, _ = h.Write(body)
-		_, _ = h.Write([]byte{0})
-	}
-	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
+	return pipeline.SpecSnapshotHash(specDir)
 }
 
 type pipelineProviderBackend struct {
@@ -58,6 +41,9 @@ type pipelineProviderBackend struct {
 }
 
 func newPipelineProviderBackend(platform string) (pipeline.PhaseBackend, error) {
+	if platform == "omp" {
+		return nil, fmt.Errorf("pipeline: platform %q requires run-scoped OMP authority", platform)
+	}
 	if platform != "claude" && platform != "codex" && platform != "gemini" {
 		return nil, fmt.Errorf("pipeline: unsupported platform %q", platform)
 	}
@@ -72,6 +58,8 @@ func newPipelineProviderBackend(platform string) (pipeline.PhaseBackend, error) 
 	return &pipelineProviderBackend{provider: provider, backend: orchestra.NewSubprocessBackendImpl()}, nil
 }
 
+// @AX:WARN [AUTO]: Provider response admission has eight output, timeout, and failure-class branches.
+// @AX:REASON [AUTO]: Partial provider responses must preserve execution evidence while classifying every fail-closed exit consistently.
 func (b *pipelineProviderBackend) Execute(ctx context.Context, req pipeline.PhaseRequest) (*pipeline.PhaseResponse, error) {
 	resp, err := b.backend.Execute(ctx, orchestra.ProviderRequest{
 		Provider: b.provider.Name,

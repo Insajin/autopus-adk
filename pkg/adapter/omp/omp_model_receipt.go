@@ -92,6 +92,7 @@ type ompModelResolutionBody struct {
 	Activation             OMPModelActivationReceipt `json:"activation"`
 	Roles                  []OMPModelRoleReceipt     `json:"roles"`
 	Safety                 OMPModelSafetyReceipt     `json:"safety"`
+	GeneratedAt            time.Time                 `json:"generated_at"`
 }
 
 func CanonicalOMPModelResolutionReceipt(receipt OMPModelResolutionReceipt) (OMPModelResolutionReceipt, []byte, error) {
@@ -128,6 +129,7 @@ func CanonicalOMPModelResolutionReceipt(receipt OMPModelResolutionReceipt) (OMPM
 		Activation:             receipt.Activation,
 		Roles:                  receipt.Roles,
 		Safety:                 receipt.Safety,
+		GeneratedAt:            receipt.GeneratedAt,
 	}
 	bodyBytes, err := json.Marshal(body)
 	if err != nil {

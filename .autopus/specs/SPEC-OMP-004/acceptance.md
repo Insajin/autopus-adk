@@ -10,8 +10,8 @@
 
 ## Current Acceptance State
 
-- S1-S12와 S13의 installed managed/product live canary·changed-production coverage `85.02%`·four-package race·vet/build/full·strict/lore sub-oracle은 검증돼 T9가 완료됐다.
-- S13의 trusted native `/auto` OMP production reachability만 미충족이므로 Must acceptance는 `12/13`이고 전체 SPEC은 미완료다. Process-private direct E2E나 injected entrypoint는 이 판정을 올리지 않는다.
+- S1-S12와 S13의 installed managed/product live canary·changed-production coverage는 기존 `85.02%` 및 current delta `85.04% (3321/3905)`·package baseline·race·vet/build·strict sub-oracle을 통과했다.
+- Native `/auto` canonical-full production command path는 구현됐지만 S13의 active-history production evidence producer, provider-bound reusable session/multi-compaction admission oracle이 미충족이므로 Must acceptance는 `12/13`이고 전체 SPEC은 미완료다. Compaction-off RPC 성공이나 persisted fixture는 이 판정을 올리지 않는다.
 
 ## Test Scenarios
 
@@ -113,7 +113,8 @@ And OMP 17.1.8 project discovery의 ambient extension/plugin/hook/tool/system/co
 And bounded primitive oracle은 `version=omp/17.1.8`, `provider_requests=3`, `pre_ack=1`, `post_ack=1`, `native_start=1`, `native_end=1`, `same_pid=true`, `same_session=true`, `exact_body=true`, `cleanup_root_count=0`, `sandbox=true`를 정확히 기록한다.
 And provider request #3의 canonical prompt, five-document ordered ref/body set, original task, decision delta, findings, ownership/forbidden paths, five worker-result fields는 assembled authoritative input과 정확히 같고 document omission과 memory injection은 0개다.
 And bridge ACK는 body-free `ui.confirm`으로 correlation hash 네 개를 검증하며 notify/sendMessage 호출은 0개다.
-And direct process-private 호출만 가능하거나 trusted native `/auto` workflow owner, observed promotion/history source, installed binary, required event 중 하나라도 없으면 scenario는 PASS가 아니라 completion debt로 남는다.
+And generated native `/auto go SPEC-ID`는 shell 없이 `auto pipeline run SPEC-ID --platform omp`를 한 번만 호출하고 canonical 다섯 phase는 sealed authority와 동일한 isolated OMP RPC process를 재사용하며 automatic retry/compaction은 false다.
+And production observed promotion/history producer, 20 complete balanced AB/BA pairs, provider credential/endpoint authority, stable reusable OMP session binding, required multi-compaction admission event 중 하나라도 없으면 active-history scenario는 PASS가 아니라 completion debt로 남는다.
 And external live opt-in fixture는 credential 값을 receipt에 기록하지 않고 bounded cohort만 실행한다.
 And T1 package baseline은 감소하지 않으며 T1 base diff의 `pkg/promptlayer`, `pkg/adapter/omp`, `pkg/config`, `internal/cli` 아래 이 SPEC이 수정한 non-test Go file exact set의 aggregate statement coverage는 85% 이상이다.
 And isolated directory/file mode는 최대 `0700/0600`, symlink/path escape는 0건, user-owned root access는 0건이며 completion 후 temporary root 존재 count는 0이다.

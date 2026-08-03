@@ -161,7 +161,7 @@ func TestOMPModelIntegration_S2_ConnectsPolicyCatalogProjectionAgentsAndReceipt(
 	}
 }
 
-func TestOMPModelIntegration_S17_ResolutionDigestExcludesGeneratedAt(t *testing.T) {
+func TestOMPModelIntegration_S17_ResolutionDigestBindsGeneratedAt(t *testing.T) {
 	t.Parallel()
 
 	compile := func(at time.Time) string {
@@ -177,8 +177,8 @@ func TestOMPModelIntegration_S17_ResolutionDigestExcludesGeneratedAt(t *testing.
 		}
 		return receipt.ResolutionDigest
 	}
-	if first, second := compile(time.Unix(1, 0)), compile(time.Unix(999, 0)); first != second {
-		t.Fatalf("generated_at changed digest: %q != %q", first, second)
+	if first, second := compile(time.Unix(1, 0)), compile(time.Unix(999, 0)); first == second {
+		t.Fatalf("generated_at did not change digest: %q", first)
 	}
 }
 

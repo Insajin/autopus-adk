@@ -151,7 +151,7 @@ func (process *workflowContextManagedRPCProcess) errorWithStderr(reason string) 
 func workflowContextManagedRPCEnvironment(
 	base []string, binding WorkflowContextBridgeBinding,
 ) []string {
-	result := make([]string, 0, len(base)+5)
+	result := make([]string, 0, len(base)+6)
 	for _, entry := range base {
 		key, _, found := strings.Cut(entry, "=")
 		if _, denied := workflowContextManagedReservedEnvironment[key]; !found || denied {
@@ -165,6 +165,7 @@ func workflowContextManagedRPCEnvironment(
 		"AUTOPUS_OMP_CONTEXT_SESSION_HASH="+binding.SessionHash,
 		"AUTOPUS_OMP_CONTEXT_NONCE_HASH="+binding.NonceHash,
 		"AUTOPUS_OMP_CONTEXT_ACK_TIMEOUT_MS="+strconv.Itoa(10000),
+		"AUTOPUS_OMP_MANAGED_INNER=1",
 	)
 	return result
 }
