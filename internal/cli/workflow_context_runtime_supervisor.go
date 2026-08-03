@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -24,8 +23,8 @@ func NewWorkflowContextRuntimeSupervisor(store *promptlayer.OMPContextTransientS
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-003: public admission boundary for checkpoint, compaction, rehydration, and dispatch.
 // @AX:REASON [AUTO]: installed-canary and workflow callers depend on the ordered receipt and cleanup contract exposed here.
-// @AX:WARN [AUTO]: the runtime admission state machine has cyclomatic complexity 28.
-// @AX:REASON [AUTO]: gocyclo reports 28 across validation, checkpoint, compaction, rehydration, dispatch, and cleanup outcomes.
+// @AX:WARN [AUTO]: the runtime admission state machine has cyclomatic complexity 30.
+// @AX:REASON [AUTO]: gocyclo reports 30 across validation, checkpoint, compaction, rehydration, dispatch, rollback, and cleanup outcomes.
 // @AX:NOTE [AUTO]: exported Run spans more than 100 lines without a dedicated Go doc contract.
 func (supervisor *WorkflowContextRuntimeSupervisor) Run(
 	ctx context.Context,
@@ -142,13 +141,26 @@ func (supervisor *WorkflowContextRuntimeSupervisor) Run(
 		}
 	})
 
-	maintenance, cancelMaintenance := workflowContextMaintenanceContext()
-	cleanupErr := cleanupWorkflowContextRuntime(maintenance, request.Driver, &receipt)
-	cancelMaintenance()
 	if runErr == nil && stage != 3 {
 		runErr = fmt.Errorf("OMP context runtime event stream ended at stage %d", stage)
 	}
-	if runErr == nil && cleanupErr == nil {
+	if runErr != nil {
+		if terminal.Reason == "required-context-mismatch" {
+			return supervisor.runCanonicalFallback(ctx, request, receipt, dispatch)
+		}
+		receipt.Outcome = WorkflowContextOutcomeBlocked
+		receipt.Fallback.Mode = config.OMPContextFallbackBlock
+		receipt.Fallback.Reason = workflowContextFailureReason(runErr, nil)
+		return supervisor.failWorkflowContextRuntime(request, receipt, binding.BindingHash, runErr)
+	}
+	maintenance, cancelMaintenance := workflowContextMaintenanceContext()
+	rollbackErr := rollbackWorkflowContextOverlay(maintenance, request, &receipt)
+	var cleanupErr error
+	if rollbackErr == nil {
+		cleanupErr = cleanupWorkflowContextRuntime(maintenance, request.Driver, &receipt)
+	}
+	cancelMaintenance()
+	if rollbackErr == nil && cleanupErr == nil {
 		receipt.Outcome = WorkflowContextOutcomeAdmitted
 		receipt.PhaseSequence = append(receipt.PhaseSequence, "admitted")
 		finished, finishErr := finishWorkflowContextRuntime(request, receipt, nil)
@@ -161,15 +173,19 @@ func (supervisor *WorkflowContextRuntimeSupervisor) Run(
 		request.ReceiptWriter = nil
 		return supervisor.failWorkflowContextRuntime(request, finished, "", finishErr)
 	}
-	if terminal.Reason == "required-context-mismatch" && cleanupErr == nil {
-		return supervisor.runCanonicalFallback(ctx, request, receipt, dispatch)
-	}
 	receipt.Outcome = WorkflowContextOutcomeBlocked
 	receipt.Fallback.Mode = config.OMPContextFallbackBlock
-	receipt.Fallback.Reason = workflowContextFailureReason(runErr, cleanupErr)
-	return supervisor.failWorkflowContextRuntime(request, receipt, binding.BindingHash, errors.Join(runErr, cleanupErr))
+	if rollbackErr != nil {
+		receipt.Fallback.Reason = "rollback-readback-mismatch"
+	} else {
+		receipt.Fallback.Reason = workflowContextFailureReason(runErr, cleanupErr)
+	}
+	return supervisor.failWorkflowContextRuntime(request, receipt, binding.BindingHash,
+		errors.Join(runErr, rollbackErr, cleanupErr))
 }
 
+// @AX:WARN [AUTO]: canonical fallback has 11 fail-closed if branches.
+// @AX:REASON [AUTO]: rollback, cleanup, managed-driver rejection, canonical rebuild, rebinding, and independent dispatch must remain ordered.
 func (supervisor *WorkflowContextRuntimeSupervisor) runCanonicalFallback(
 	ctx context.Context,
 	request WorkflowContextRuntimeRequest,
@@ -195,6 +211,18 @@ func (supervisor *WorkflowContextRuntimeSupervisor) runCanonicalFallback(
 		receipt.Fallback.Mode = config.OMPContextFallbackBlock
 		receipt.Fallback.Reason = "rollback-readback-mismatch"
 		return finishWorkflowContextRuntime(request, receipt, err)
+	}
+	var cleanupErr error
+	if request.Driver != nil {
+		maintenance, cancelMaintenance = workflowContextMaintenanceContext()
+		cleanupErr = cleanupWorkflowContextRuntime(maintenance, request.Driver, &receipt)
+		cancelMaintenance()
+	}
+	if cleanupErr != nil {
+		receipt.Outcome = WorkflowContextOutcomeBlocked
+		receipt.Fallback.Mode = config.OMPContextFallbackBlock
+		receipt.Fallback.Reason = "runtime-cleanup-failed"
+		return finishWorkflowContextRuntime(request, receipt, cleanupErr)
 	}
 	if managed {
 		receipt.Outcome = WorkflowContextOutcomeBlocked
@@ -250,46 +278,4 @@ func (supervisor *WorkflowContextRuntimeSupervisor) runCanonicalFallback(
 		FullDocumentRefs: fallbackBinding.FullDocumentRefs,
 	}
 	return finishWorkflowContextRuntime(request, receipt, nil)
-}
-
-func newWorkflowContextRuntimeReceipt(request WorkflowContextRuntimeRequest) WorkflowContextRuntimeReceipt {
-	return WorkflowContextRuntimeReceipt{
-		SchemaVersion: WorkflowContextRuntimeReceiptSchemaVersion, Event: "terminal",
-		WorkspaceID: request.Binding.WorkspaceID, SpecID: request.Binding.SpecID, TaskID: request.Binding.TaskID,
-		Phase: request.Binding.Phase, SessionID: request.Binding.SessionID, Capabilities: request.Capabilities,
-		RootClass: request.RootClass, FullDocumentRefs: []promptlayer.OMPContextDocumentReference{},
-		RequiredEphemeralRefs: []promptlayer.OMPContextHashedReference{}, FrozenFindingIDs: []string{},
-		WorkerResultFields: promptlayer.OMPWorkerResultSchema(), HistoryCreditRows: []WorkflowContextHistoryCredit{},
-		ShadowCandidateRefs: []promptlayer.OMPContextPlanReference{}, DocumentOmissions: []string{},
-		MemoryInjections: []string{}, PhaseSequence: []string{},
-		Mode:     WorkflowContextModeReceipt{RequestedHistoryMode: request.Policy.HistoryMode, EffectiveMemoryMode: request.Policy.MemoryMode},
-		Fallback: WorkflowContextFallbackReceipt{Mode: WorkflowContextFallbackNone},
-	}
-}
-
-func populateWorkflowContextBindingReceipt(receipt *WorkflowContextRuntimeReceipt, request WorkflowContextRuntimeRequest, binding promptlayer.OMPContextBindingReceipt) {
-	receipt.BindingHash = binding.BindingHash
-	receipt.OptionsHash = binding.OptionsHash
-	receipt.SnapshotHash = binding.SnapshotHash
-	receipt.PromptManifestHash = binding.PromptManifestHash
-	receipt.FullDocumentRefs = append([]promptlayer.OMPContextDocumentReference(nil), binding.FullDocumentRefs...)
-	receipt.RequiredEphemeralRefs = append([]promptlayer.OMPContextHashedReference(nil), binding.RequiredEphemeralRefs...)
-	receipt.FrozenFindingIDs = append([]string(nil), request.Binding.Ephemeral.FrozenFindingIDs...)
-	receipt.ShadowCandidateRefs = append([]promptlayer.OMPContextPlanReference(nil), binding.ShadowPlanRefs...)
-}
-
-func workflowContextHistoryCredits(binding promptlayer.OMPContextBindingReceipt, after map[string]int, target int) ([]WorkflowContextHistoryCredit, error) {
-	rows := make([]WorkflowContextHistoryCredit, 0, len(binding.EligibleHistoryRefs))
-	for _, ref := range binding.EligibleHistoryRefs {
-		value, ok := after[ref.ID]
-		if !ok || value <= 0 || value > target || value > ref.TokenEstimate {
-			return nil, fmt.Errorf("unverified OMP history credit: %s", ref.ID)
-		}
-		rows = append(rows, WorkflowContextHistoryCredit{
-			ID: ref.ID, SourceRef: ref.SourceRef, PriorHash: ref.BodyHash, Action: "compact_history",
-			Reason: ref.Reason, TokenBefore: ref.TokenEstimate, TokenAfter: value,
-		})
-	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
-	return rows, nil
 }

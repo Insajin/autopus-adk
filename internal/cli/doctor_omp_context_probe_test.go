@@ -65,6 +65,30 @@ func TestProbeOMPContextCurrentRuntime_InvalidSchemaAndFailuresFailClosed(t *tes
 	}
 }
 
+func TestInspectOMPContextConfigList_AcceptsInstalledFlatSettingSchema(t *testing.T) {
+	t.Parallel()
+
+	valid, compaction, memory := inspectOMPContextConfigList([]byte(`{
+		"compaction.enabled":{"value":true,"type":"boolean"},
+		"memory.backend":{"value":"off","type":"enum"}
+	}`))
+	assert.True(t, valid)
+	assert.True(t, compaction)
+	assert.True(t, memory)
+}
+
+func TestInspectOMPContextConfigList_RejectsPrefixLookalikes(t *testing.T) {
+	t.Parallel()
+
+	valid, compaction, memory := inspectOMPContextConfigList([]byte(`{
+		"compaction.attacker":true,
+		"memory.attacker":true
+	}`))
+	assert.False(t, valid)
+	assert.False(t, compaction)
+	assert.False(t, memory)
+}
+
 func TestBuildOMPContextDoctorInput_NoOptInDoesNotProbe(t *testing.T) {
 	t.Parallel()
 

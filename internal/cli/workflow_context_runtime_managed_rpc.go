@@ -15,6 +15,7 @@ const workflowContextManagedRuntimeMarker = ".autopus-managed-omp-runtime"
 // WorkflowContextManagedRPCOptions identifies one Autopus-owned OMP RPC process.
 type WorkflowContextManagedRPCOptions struct {
 	Executable         string
+	ProjectDir         string
 	Workspace          string
 	RuntimeBase        string
 	RuntimeRoot        string
@@ -25,6 +26,7 @@ type WorkflowContextManagedRPCOptions struct {
 	Environment        []string
 	HistoryAfterTokens map[string]int
 	MaxTime            time.Duration
+	Prompts            []string
 }
 
 // WorkflowContextManagedRPCObservation is body-free live admission evidence.
@@ -57,7 +59,9 @@ type WorkflowContextManagedRPCDriver struct {
 	protocol          *workflowContextManagedRPCProtocol
 	protocolPostID    string
 	protocolSessionID string
+	dispatchState     string
 	sourceIdentities  []workflowContextManagedSourceIdentity
+	projectInfo       fs.FileInfo
 	observation       WorkflowContextManagedRPCObservation
 }
 
@@ -74,6 +78,10 @@ func NewWorkflowContextManagedRPCDriver(
 		return nil, err
 	}
 	identities, err := captureWorkflowContextManagedSourceIdentities(normalized)
+	if err != nil {
+		return nil, err
+	}
+	projectInfo, err := captureWorkflowContextManagedProjectIdentity(normalized.ProjectDir)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +107,7 @@ func NewWorkflowContextManagedRPCDriver(
 	}
 	return &WorkflowContextManagedRPCDriver{
 		options: normalized, baseRoot: baseRoot, directoryRoot: directoryRoot, directoryInfo: directoryInfo,
-		sourceIdentities: identities,
+		sourceIdentities: identities, projectInfo: projectInfo,
 	}, nil
 }
 

@@ -63,6 +63,8 @@ func sameWorkflowContextManagedRuntime(root *os.Root, expected fs.FileInfo) bool
 	return err == nil && current.IsDir() && os.SameFile(current, expected)
 }
 
+// @AX:WARN [AUTO]: initial runtime admission has cyclomatic complexity 32 and 19 fail-closed if branches.
+// @AX:REASON [AUTO]: path ownership, environment-derived directories, lease state, node identity, modes, and the complete artifact walk converge here.
 func validateInitialWorkflowContextManagedRuntime(
 	root *os.Root, options WorkflowContextManagedRPCOptions, leased bool,
 ) error {

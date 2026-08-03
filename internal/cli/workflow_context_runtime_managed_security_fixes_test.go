@@ -27,6 +27,10 @@ func TestWorkflowContextManagedRPCOptions_RejectsAmbiguousEnvironmentAndUnsafeMo
 		{name: "duplicate required", environment: append(validEnvironment, "PI_CODING_AGENT_DIR="+paths.runtime)},
 		{name: "duplicate ambient", environment: append(validEnvironment, "PATH=/untrusted")},
 		{name: "reserved bridge key", environment: append(validEnvironment, "AUTOPUS_OMP_CONTEXT_BINDING_HASH="+runtimeHash("ambient"))},
+		{name: "provider credential", environment: append(validEnvironment, "OPENAI_API_KEY=secret")},
+		{name: "dynamic loader", environment: append(validEnvironment, "DYLD_INSERT_LIBRARIES=/tmp/inject.dylib")},
+		{name: "node options", environment: append(validEnvironment, "NODE_OPTIONS=--require=/tmp/inject.js")},
+		{name: "ambient home", environment: append(validEnvironment, "HOME=/tmp")},
 		{name: "missing config", environment: validEnvironment[:1]},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -44,6 +48,7 @@ func TestWorkflowContextManagedRPCOptions_RejectsAmbiguousEnvironmentAndUnsafeMo
 		bad  os.FileMode
 		good os.FileMode
 	}{
+		{name: "runtime base", path: filepath.Dir(paths.runtime), bad: 0o755, good: 0o700},
 		{name: "runtime root", path: paths.runtime, bad: 0o755, good: 0o700},
 		{name: "session root", path: paths.session, bad: 0o750, good: 0o700},
 		{name: "config", path: paths.config, bad: 0o644, good: 0o600},
@@ -206,6 +211,7 @@ func newWorkflowContextManagedSecurityOptions(
 ) (WorkflowContextManagedRPCOptions, workflowContextManagedSecurityPaths) {
 	t.Helper()
 	base := t.TempDir()
+	require.NoError(t, os.Chmod(base, 0o700))
 	workspace := filepath.Join(base, "workspace")
 	require.NoError(t, os.Mkdir(workspace, 0o700))
 	installWorkflowContextManagedLiveBridge(t, workspace)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -73,6 +74,26 @@ func missingWorkflowContextCapability(request WorkflowContextRuntimeRequest) str
 		return "memory-interception"
 	}
 	return ""
+}
+
+func workflowContextHistoryCredits(
+	binding promptlayer.OMPContextBindingReceipt,
+	after map[string]int,
+	target int,
+) ([]WorkflowContextHistoryCredit, error) {
+	rows := make([]WorkflowContextHistoryCredit, 0, len(binding.EligibleHistoryRefs))
+	for _, ref := range binding.EligibleHistoryRefs {
+		value, ok := after[ref.ID]
+		if !ok || value <= 0 || value > target || value > ref.TokenEstimate {
+			return nil, fmt.Errorf("unverified OMP history credit: %s", ref.ID)
+		}
+		rows = append(rows, WorkflowContextHistoryCredit{
+			ID: ref.ID, SourceRef: ref.SourceRef, PriorHash: ref.BodyHash, Action: "compact_history",
+			Reason: ref.Reason, TokenBefore: ref.TokenEstimate, TokenAfter: value,
+		})
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
+	return rows, nil
 }
 
 func cleanupWorkflowContextRuntime(ctx context.Context, driver WorkflowContextProcessDriver, receipt *WorkflowContextRuntimeReceipt) error {

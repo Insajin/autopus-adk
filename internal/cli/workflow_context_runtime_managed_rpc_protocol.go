@@ -18,20 +18,21 @@ type workflowContextManagedRPCProtocol struct {
 }
 
 type workflowContextManagedRPCFrame struct {
-	ID           string          `json:"id"`
-	Type         string          `json:"type"`
-	Command      string          `json:"command"`
-	Method       string          `json:"method"`
-	Title        string          `json:"title"`
-	Message      json.RawMessage `json:"message"`
-	Reason       string          `json:"reason"`
-	Action       string          `json:"action"`
-	ErrorMessage string          `json:"errorMessage"`
-	Success      *bool           `json:"success"`
-	Aborted      bool            `json:"aborted"`
-	Skipped      bool            `json:"skipped"`
-	Result       json.RawMessage `json:"result"`
-	Data         json.RawMessage `json:"data"`
+	ID           string            `json:"id"`
+	Type         string            `json:"type"`
+	Command      string            `json:"command"`
+	Method       string            `json:"method"`
+	Title        string            `json:"title"`
+	Message      json.RawMessage   `json:"message"`
+	Reason       string            `json:"reason"`
+	Action       string            `json:"action"`
+	ErrorMessage string            `json:"errorMessage"`
+	Success      *bool             `json:"success"`
+	Aborted      bool              `json:"aborted"`
+	Skipped      bool              `json:"skipped"`
+	Result       json.RawMessage   `json:"result"`
+	Data         json.RawMessage   `json:"data"`
+	Commands     []json.RawMessage `json:"commands"`
 }
 
 type workflowContextManagedRPCState struct {
@@ -186,6 +187,25 @@ func (protocol *workflowContextManagedRPCProtocol) confirm(id string) error {
 	return protocol.send(map[string]any{"type": "extension_ui_response", "id": id, "confirmed": true})
 }
 
+func workflowContextManagedProductNotification(method string) bool {
+	switch method {
+	case "notify", "setStatus", "setWidget", "setTitle", "set_editor_text":
+		return true
+	default:
+		return false
+	}
+}
+
+func sendWorkflowContextManagedProductPrompt(
+	protocol *workflowContextManagedRPCProtocol, index int, prompt string,
+) error {
+	return protocol.send(map[string]any{
+		"id": fmt.Sprintf("managed-product-prompt-%d", index+1), "type": "prompt", "message": prompt,
+	})
+}
+
+// @AX:WARN [AUTO]: provider-boundary verification has cyclomatic complexity 15.
+// @AX:REASON [AUTO]: prompt acceptance and agent start, turn end, and agent end must all be observed in order before admission.
 func (protocol *workflowContextManagedRPCProtocol) awaitProviderBoundary(
 	ctx context.Context, id string,
 ) error {

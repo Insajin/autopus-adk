@@ -12,6 +12,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/promptlayer"
 )
 
+// @AX:NOTE [AUTO]: the five-second maintenance deadline bounds rollback and cleanup after admission has already failed.
 const workflowContextMaintenanceTimeout = 5 * time.Second
 
 var workflowContextMetadataPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/+:-]{0,127}$`)
@@ -39,24 +40,26 @@ func workflowContextMaintenanceContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), workflowContextMaintenanceTimeout)
 }
 
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: rollback must precede driver cleanup because cleanup can remove the task-owned overlay source.
 func cleanupUntrustedWorkflowContextRuntime(request WorkflowContextRuntimeRequest) error {
 	maintenance, cancel := workflowContextMaintenanceContext()
 	defer cancel()
 	var result error
-	if request.Driver != nil {
-		if err := request.Driver.Cleanup(maintenance); err != nil {
-			result = errors.Join(result, fmt.Errorf("cleanup rejected OMP context request: %w", err))
-		}
-	}
 	if request.Overlay != nil && validWorkflowContextRollbackMemoryMode(request.Policy.MemoryMode) {
 		_, err := ApplyWorkflowContextOverlay(maintenance, request.Overlay, WorkflowContextOverlayRequest{
 			HistoryMode: config.OMPContextHistoryShadow, MemoryMode: request.Policy.MemoryMode, Reason: "runtime-metadata-invalid",
 		})
 		result = errors.Join(result, err)
 	}
+	if request.Driver != nil {
+		if err := request.Driver.Cleanup(maintenance); err != nil {
+			result = errors.Join(result, fmt.Errorf("cleanup rejected OMP context request: %w", err))
+		}
+	}
 	return result
 }
 
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: terminal failure preserves the same rollback-before-cleanup lifecycle used for rejected metadata.
 func (supervisor *WorkflowContextRuntimeSupervisor) failWorkflowContextRuntime(
 	request WorkflowContextRuntimeRequest,
 	receipt WorkflowContextRuntimeReceipt,
@@ -72,11 +75,11 @@ func (supervisor *WorkflowContextRuntimeSupervisor) failWorkflowContextRuntime(
 			abortErr = nil
 		}
 	}
-	if request.Driver != nil && !receipt.Cleanup.Attempted {
-		cleanupErr = cleanupWorkflowContextRuntime(maintenance, request.Driver, &receipt)
-	}
 	if request.Overlay != nil && validWorkflowContextRollbackMemoryMode(request.Policy.MemoryMode) {
 		rollbackErr = rollbackWorkflowContextOverlay(maintenance, request, &receipt)
+	}
+	if request.Driver != nil && !receipt.Cleanup.Attempted {
+		cleanupErr = cleanupWorkflowContextRuntime(maintenance, request.Driver, &receipt)
 	}
 	if cleanupErr != nil && receipt.Fallback.Reason == "" {
 		receipt.Fallback.Reason = "runtime-cleanup-failed"

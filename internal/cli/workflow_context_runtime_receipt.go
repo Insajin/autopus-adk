@@ -89,6 +89,36 @@ type WorkflowContextRuntimeReceipt struct {
 	PhaseSequence         []string                                  `json:"phase_sequence"`
 }
 
+func newWorkflowContextRuntimeReceipt(request WorkflowContextRuntimeRequest) WorkflowContextRuntimeReceipt {
+	return WorkflowContextRuntimeReceipt{
+		SchemaVersion: WorkflowContextRuntimeReceiptSchemaVersion, Event: "terminal",
+		WorkspaceID: request.Binding.WorkspaceID, SpecID: request.Binding.SpecID, TaskID: request.Binding.TaskID,
+		Phase: request.Binding.Phase, SessionID: request.Binding.SessionID, Capabilities: request.Capabilities,
+		RootClass: request.RootClass, FullDocumentRefs: []promptlayer.OMPContextDocumentReference{},
+		RequiredEphemeralRefs: []promptlayer.OMPContextHashedReference{}, FrozenFindingIDs: []string{},
+		WorkerResultFields: promptlayer.OMPWorkerResultSchema(), HistoryCreditRows: []WorkflowContextHistoryCredit{},
+		ShadowCandidateRefs: []promptlayer.OMPContextPlanReference{}, DocumentOmissions: []string{},
+		MemoryInjections: []string{}, PhaseSequence: []string{},
+		Mode:     WorkflowContextModeReceipt{RequestedHistoryMode: request.Policy.HistoryMode, EffectiveMemoryMode: request.Policy.MemoryMode},
+		Fallback: WorkflowContextFallbackReceipt{Mode: WorkflowContextFallbackNone},
+	}
+}
+
+func populateWorkflowContextBindingReceipt(
+	receipt *WorkflowContextRuntimeReceipt,
+	request WorkflowContextRuntimeRequest,
+	binding promptlayer.OMPContextBindingReceipt,
+) {
+	receipt.BindingHash = binding.BindingHash
+	receipt.OptionsHash = binding.OptionsHash
+	receipt.SnapshotHash = binding.SnapshotHash
+	receipt.PromptManifestHash = binding.PromptManifestHash
+	receipt.FullDocumentRefs = append([]promptlayer.OMPContextDocumentReference(nil), binding.FullDocumentRefs...)
+	receipt.RequiredEphemeralRefs = append([]promptlayer.OMPContextHashedReference(nil), binding.RequiredEphemeralRefs...)
+	receipt.FrozenFindingIDs = append([]string(nil), request.Binding.Ephemeral.FrozenFindingIDs...)
+	receipt.ShadowCandidateRefs = append([]promptlayer.OMPContextPlanReference(nil), binding.ShadowPlanRefs...)
+}
+
 type WorkflowContextReceiptWriter struct {
 	WorkspaceRoot string
 }

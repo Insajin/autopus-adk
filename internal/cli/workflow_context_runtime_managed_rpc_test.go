@@ -14,6 +14,7 @@ import (
 
 func TestWorkflowContextManagedRPCDriver_CleanupRejectsRootRebindAndPreservesExternalSentinel(t *testing.T) {
 	base := t.TempDir()
+	require.NoError(t, os.Chmod(base, 0o700))
 	workspace := filepath.Join(base, "workspace")
 	require.NoError(t, os.Mkdir(workspace, 0o700))
 	installWorkflowContextManagedLiveBridge(t, workspace)
@@ -49,6 +50,7 @@ func TestWorkflowContextManagedRPCDriver_CleanupRejectsRootRebindAndPreservesExt
 func TestWorkflowContextManagedRPCDriver_DuplicateConstructorCannotShareRuntimeLease(t *testing.T) {
 	t.Parallel()
 	base := t.TempDir()
+	require.NoError(t, os.Chmod(base, 0o700))
 	workspace := filepath.Join(base, "workspace")
 	require.NoError(t, os.Mkdir(workspace, 0o700))
 	installWorkflowContextManagedLiveBridge(t, workspace)
@@ -119,6 +121,7 @@ func TestWorkflowContextManagedRPCProtocol_TimeoutEOFAndAfterCloseFailBeforeDisp
 	})
 	t.Run("after close", func(t *testing.T) {
 		base := t.TempDir()
+		require.NoError(t, os.Chmod(base, 0o700))
 		workspace := filepath.Join(base, "workspace")
 		require.NoError(t, os.Mkdir(workspace, 0o700))
 		installWorkflowContextManagedLiveBridge(t, workspace)

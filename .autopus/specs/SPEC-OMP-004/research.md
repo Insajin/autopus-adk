@@ -30,10 +30,11 @@
 5. `pkg/memindex/context_plan.go::BuildContextPlan` returns either verified pinned/selected refs or `status=unavailable`, empty refs, and a reason; both remain body-free shadow-only evidence.
 6. `pkg/worker/context_delivery.go::workerUsesGPTContextDelivery` only gates worker backends named codex/openai/gpt. It is not an OMP platform/session contract.
 7. `pkg/adapter/omp` currently generates rules, agents, skills, commands, config, and manifest. `Adapter.SupportsHooks()` is false for the generic ADK hook interface; that does not prove OMP native extension/compaction event availability.
-8. The installed managed canary reports `omp/17.1.8`, provider requests 3, correlated pre/post ACK 1/1, native start/end 1/1, same PID/session, provider #3 exact canonical/transient body, cleanup root 0, and OS sandbox true. This is bounded primitive evidence, not product reachability.
+8. The installed product direct E2E reports `omp/17.1.8`, provider requests 3, auth header 0, external endpoint 0, correlated pre/post ACK 1/1, native start/end 1/1, same PID/session, provider #3 exact canonical/transient body, real task overlay, cleanup root 0, and OS sandbox true. This proves the process-private path, not native `/auto` production reachability.
 9. `internal/cli/workflow_context_runtime_managed*.go` owns canonical rebuild, nonce/binding/options/session correlation, private stdio `--no-session`, source/extension/environment validation, cleanup lease, cancelable frame reads, preflight cleanup, exact-body dispatch ACK, and managed fallback block with shadow rollback.
 10. `auto lore context pkg/promptlayer` preserves the high-confidence constraint that required GPT/Codex documents and high/critical full review stay complete; required-document summarization or unverified compaction was previously rejected.
-11. `auto arch enforce` reports no architecture rule violation before authoring; planned authority/policy/projection/evidence layers keep that dependency direction.
+11. External session JSON is now intent-only and rejects authority fields. Installed OMP 17.1.8's project discovery requires exact generated `.omp/extensions`, command/skill/config equality and absent ambient OMP/Claude/Codex/Gemini/OpenCode/GitHub/Pi executable surfaces because its `--no-extensions` also suppresses the explicit bridge.
+12. `auto arch enforce` reports no architecture rule violation before authoring; planned authority/policy/projection/evidence layers keep that dependency direction.
 
 ## Stable / Snapshot / Ephemeral Classification
 
@@ -66,7 +67,7 @@ flowchart LR
 - OMP `main` settings documents global/project/CLI/runtime precedence, object deep merge, and whole-array replacement: <https://github.com/can1357/oh-my-pi/blob/main/docs/settings.md>.
 - OMP `main` compaction documents pre/post lifecycle, pruning, persistence/reload, and failure paths; persistence makes isolated/no-session mode, permission, path, cleanup proof mandatory: <https://github.com/can1357/oh-my-pi/blob/main/docs/compaction.md>.
 - OMP `main` memory documents a default-off optional backend whose injected guidance is heuristic and subordinate to current repo evidence: <https://github.com/can1357/oh-my-pi/blob/main/docs/memory.md>.
-- These current-main contracts are not assumed for every installed binary. The generated bridge now uses body-free correlated `ui.confirm`; denial, timeout, exception, missing confirm, malformed timeout, or hash mismatch fails closed, while notify/sendMessage has no authority. `RunManaged` performs authoritative rebuild and validates a provider-observed dispatch ACK, but the user-facing `/auto` OMP session caller/assembler that reaches this primitive is still absent.
+- These current-main contracts are not assumed for every installed binary. The generated bridge uses body-free correlated `ui.confirm`; denial, timeout, exception, missing confirm, malformed timeout, or hash mismatch fails closed, while notify/sendMessage has no authority. `RunManaged` and the process-private product assembler perform authoritative rebuild and validate a provider-observed dispatch ACK, but the trusted native `/auto` workflow owner that supplies observed authority is still absent.
 
 ## Semantic Invariant Inventory
 
@@ -104,7 +105,7 @@ flowchart LR
 | memory shadow security | REQ-MEMORY/MEMORY-SEC, T6, S6/S8 | covered |
 | 20+ paired promotion/rollback | REQ-CANARY/ROLLOUT, T7/T8, S10-S12 | covered |
 | privacy/runtime cleanup/managed admission | REQ-PRIVACY/RUNTIME-ARTIFACT/LIVE, T2/T5/T8, S5/S7/S13 | covered for bounded managed primitive |
-| user-facing `/auto` production reachability | REQ-OPTIONAL, T5, S13 | completion-debt: caller/assembler absent |
+| user-facing `/auto` production reachability | REQ-OPTIONAL, T5, S13 | completion-debt: trusted workflow owner/probe wiring absent |
 | executable OMP workflow boundary | `SPEC-OMP-002` | dependency |
 | model/advisor routing | `SPEC-OMP-003` | independent optional integration |
 
@@ -114,20 +115,20 @@ flowchart LR
 |---|---|---|
 | T1-T4 | provider-neutral classification, capability negotiation, checkpoint, rehydration, and fail-closed paths are implemented | implemented |
 | T6-T8 | memory shadow security, paired canary promotion, rollback, and effective readback are implemented | implemented |
-| Managed bridge/driver | correlated `ui.confirm`, exact authority hashes, canonical rebuild, exact-body dispatch ACK, private stdio, source/extension/env guards, cleanup lease and shadow rollback | implemented and focused-tested |
+| Managed bridge/driver | correlated `ui.confirm`, exact authority hashes, canonical rebuild, exact-body dispatch ACK, private stdio, exact/absent discovery guards, success/failure rollback-before-cleanup | implemented, focused-tested, installed direct-tested |
 | Installed lifecycle canary | `omp/17.1.8`, provider requests 3, pre/post ACK 1/1, native start/end 1/1, same PID/session, exact body, cleanup root 0, sandbox true | real managed driver primitive verified |
-| Product active boundary | user-facing `/auto` caller/assembler does not construct request/`CanonicalSource`/driver or invoke `RunManaged` | fail-closed/partial; T5 open |
-| T9 integrated gates | live canary; exact aggregate 85.15%; package baseline; targeted race; vet/build/full; hygiene/strict/lore | verified complete |
+| Product active boundary | process-private assembler exists; external CLI is intent-only, but trusted workflow owner/observed promotion-history source/native `/auto` callback is absent | fail-closed/partial; T5 open |
+| T9 integrated gates | installed managed/product live canary; exact aggregate 85.02%; package baseline; four-package race; vet/build/full; hygiene/strict/lore | verified complete |
 
 ## Completion Debt
 
 | Item | Blocks | Required resolution |
 |---|---|---|
-| User-facing `/auto` OMP session caller/assembler is absent | Outcome Lock and lifecycle completion | Discover the production owner, assemble request/`CanonicalSource`/managed driver, invoke `RunManaged`, and rerun same PID/session, correlated ACK, exact-body and cleanup oracles. |
+| Trusted native `/auto` workflow owner and observed promotion/history source are absent | Outcome Lock and lifecycle completion | Implement caller-independent cold-start probes and production authority assembly, then rerun the installed same PID/session, correlated ACK, exact-body and rollback/cleanup oracles. |
 
 ## Final T9 Verification Evidence
 
-- PASS: live canary; changed production exact aggregate `85.15%`; package coverage `promptlayer=88.00%`, `adapter/omp=87.81%`, `config=90.99%`, `internal/cli=79.82%` versus CLI baseline `79.3%`; exact coverage; four-package race (`250.125s` adapter, `377.016s` CLI); vet/build; serial full suite exit 0; gofmt 30; diff check; production Go max 295; strict SPEC; lore. This closes T9 only, not T5 product reachability.
+- PASS: installed managed/product live canary; changed production exact aggregate `85.02%` (`3075/3617`); package coverage `promptlayer=88.86%`, `adapter/omp=87.99%`, `config=93.19%`, `internal/cli=79.94%` versus CLI baseline `79.3%`; exact coverage; four-package race (`9.838s` promptlayer, `216.317s` adapter, `1.465s` config, `506.403s` CLI); vet/build; serial full suite exit 0; changed Go gofmt; diff check; production Go max 286; strict SPEC; lore. This closes T9 only, not T5 product reachability.
 
 ## Evolution Ideas
 
@@ -164,7 +165,7 @@ These are optional improvements and do not block sync completion.
 | `autopus.omp_context_receipt.v1` fields and managed artifact lifecycle | existing schema | body-free classification/status/cleanup evidence를 tests에서 확인 |
 | `pkg/adapter/omp/omp_context_bridge.go` | existing source | body-free correlated `ui.confirm`, exact authority envelope, fail-closed projection 확인 |
 | `internal/cli/workflow_context_runtime_managed*.go` | existing | canonical rebuild, private driver, exact-body ACK, identity/env/lease/cleanup/rollback 확인 |
-| `[NEW]` user-facing `/auto` OMP caller/assembler | planned addition, owner unresolved | bounded canary primitive와 구분; production path discovery가 T5 선행 조건 |
+| `internal/cli/workflow_context_runtime_product.go` + `[NEW]` trusted workflow owner | process-private assembler implemented; owner/probe wiring unresolved | direct installed evidence와 native `/auto` production reachability를 구분 |
 
 ## Reviewer Brief
 
@@ -172,7 +173,6 @@ These are optional improvements and do not block sync completion.
 - **Explicit non-goals**: 새로운 제품 scope, model/advisor routing, workflow parity 재설계, orchestra provider, Autopus transcript mutation, canonical memory storage, delivered-document shrink/active JIT/memory injection.
 - **Self-verified evidence**: all REQ→T→S→INV trace, exact hash/set oracles, AB/BA formula, version capability gate, existing/generated reference separation.
 - **Reviewer focus**: treat T9 receipts as closed; review only required data loss, correlated ACK/admission integrity, managed process/root security, config rollback convergence, deterministic pairing, and missing user-facing `/auto` production reachability.
-
 ## Self-Verify Summary
 
 - Q-CORR-01 | status: PASS | attempt: 1 | files: spec.md, plan.md, research.md | reason: existing paths and symbols were verified with rg/read.

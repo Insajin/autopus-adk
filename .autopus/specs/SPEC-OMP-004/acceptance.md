@@ -10,8 +10,8 @@
 
 ## Current Acceptance State
 
-- S1-S12와 S13의 live canary·coverage·race·vet/build/full·strict/lore sub-oracle은 검증돼 T9가 완료됐다.
-- S13의 user-facing `/auto` OMP production reachability만 미충족이므로 Must acceptance는 `12/13`이고 전체 SPEC은 미완료다.
+- S1-S12와 S13의 installed managed/product live canary·changed-production coverage `85.02%`·four-package race·vet/build/full·strict/lore sub-oracle은 검증돼 T9가 완료됐다.
+- S13의 trusted native `/auto` OMP production reachability만 미충족이므로 Must acceptance는 `12/13`이고 전체 SPEC은 미완료다. Process-private direct E2E나 injected entrypoint는 이 판정을 올리지 않는다.
 
 ## Test Scenarios
 
@@ -108,10 +108,12 @@ And user global/project config bytes와 memory effective value는 rollback 전�
 Given user-facing `/auto` OMP 세션이 authoritative request/`CanonicalSource`/managed driver를 조립했고, capability probe를 통과한 installed OMP, loopback fake provider, task-owned temporary session root가 준비됐다.
 When production entrypoint를 통해 기본 acceptance suite와 installed managed lifecycle canary를 실행한다.
 Then unit suite는 fake OMP만 호출하고 external network/provider call count는 0이다.
+And external JSON은 schema/original task/decision delta만 허용하며 project/task/session/capability/promotion/history/model/endpoint 필드는 unknown으로 거부한다.
+And OMP 17.1.8 project discovery의 ambient extension/plugin/hook/tool/system/command/prompt/config source는 exact generated allowlist 외에 process start 전에 거부한다.
 And bounded primitive oracle은 `version=omp/17.1.8`, `provider_requests=3`, `pre_ack=1`, `post_ack=1`, `native_start=1`, `native_end=1`, `same_pid=true`, `same_session=true`, `exact_body=true`, `cleanup_root_count=0`, `sandbox=true`를 정확히 기록한다.
 And provider request #3의 canonical prompt, five-document ordered ref/body set, original task, decision delta, findings, ownership/forbidden paths, five worker-result fields는 assembled authoritative input과 정확히 같고 document omission과 memory injection은 0개다.
 And bridge ACK는 body-free `ui.confirm`으로 correlation hash 네 개를 검증하며 notify/sendMessage 호출은 0개다.
-And direct canary 호출만 가능하거나 user-facing `/auto` caller/assembler, installed binary, required event 중 하나라도 없으면 scenario는 PASS가 아니라 completion debt로 남는다.
+And direct process-private 호출만 가능하거나 trusted native `/auto` workflow owner, observed promotion/history source, installed binary, required event 중 하나라도 없으면 scenario는 PASS가 아니라 completion debt로 남는다.
 And external live opt-in fixture는 credential 값을 receipt에 기록하지 않고 bounded cohort만 실행한다.
 And T1 package baseline은 감소하지 않으며 T1 base diff의 `pkg/promptlayer`, `pkg/adapter/omp`, `pkg/config`, `internal/cli` 아래 이 SPEC이 수정한 non-test Go file exact set의 aggregate statement coverage는 85% 이상이다.
 And isolated directory/file mode는 최대 `0700/0600`, symlink/path escape는 0건, user-owned root access는 0건이며 completion 후 temporary root 존재 count는 0이다.

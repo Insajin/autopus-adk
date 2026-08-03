@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,7 +21,6 @@ type workflowContextManagedRPCProcess struct {
 	frameCancel context.CancelFunc
 	frames      <-chan []byte
 	done        <-chan error
-	stderr      *bytes.Buffer
 	started     bool
 	closed      bool
 }
@@ -34,14 +33,13 @@ func startWorkflowContextManagedRPCProcess(
 	options WorkflowContextManagedRPCOptions,
 	binding WorkflowContextBridgeBinding,
 ) (*workflowContextManagedRPCProcess, bool, error) {
-	args := []string{
-		"--mode", "rpc", "--no-session", "--session-dir", options.SessionDir,
-		"--cwd", options.Workspace, "--model", options.Model, "--config", options.ConfigPath,
-		"--no-tools", "--no-lsp", "--no-pty", "--no-skills", "--no-rules", "--no-title",
-		"--max-time", options.MaxTime.String(),
+	args := workflowContextManagedRPCArgs(options)
+	processDir := options.Workspace
+	if len(options.Prompts) != 0 {
+		processDir = options.ProjectDir
 	}
 	cmd := exec.CommandContext(ctx, options.Executable, args...)
-	cmd.Dir = options.Workspace
+	cmd.Dir = processDir
 	cmd.Env = workflowContextManagedRPCEnvironment(options.Environment, binding)
 	cmd.WaitDelay = 500 * time.Millisecond
 	sandboxed, err := configureWorkflowContextManagedRPCSandbox(cmd, options.AllowedEndpoint)
@@ -59,8 +57,7 @@ func startWorkflowContextManagedRPCProcess(
 	if err != nil {
 		return nil, false, fmt.Errorf("open managed OMP stdout: %w", err)
 	}
-	stderr := &bytes.Buffer{}
-	cmd.Stderr = stderr
+	cmd.Stderr = io.Discard
 	if err := cmd.Start(); err != nil {
 		return nil, false, fmt.Errorf("start managed OMP RPC: %w", err)
 	}
@@ -68,8 +65,36 @@ func startWorkflowContextManagedRPCProcess(
 	frames, done := workflowContextManagedRPCFrames(frameCtx, stdout)
 	return &workflowContextManagedRPCProcess{
 		cmd: cmd, stdin: stdin, stdout: stdout, frameCancel: frameCancel,
-		frames: frames, done: done, stderr: stderr, started: true,
+		frames: frames, done: done, started: true,
 	}, sandboxed, nil
+}
+
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: process argv separates restrictive canary mode from project-aware product mode.
+// @AX:REASON [AUTO]: process startup and protocol tests depend on tools, skills, rules, CWD, and bridge injection staying mode-specific.
+func workflowContextManagedRPCArgs(options WorkflowContextManagedRPCOptions) []string {
+	args := []string{
+		"--mode", "rpc", "--no-session", "--session-dir", options.SessionDir,
+		"--cwd", options.Workspace,
+	}
+	if len(options.Prompts) == 0 {
+		return append(args,
+			"--model", options.Model, "--config", options.ConfigPath,
+			"--no-tools", "--no-lsp", "--no-pty", "--no-skills", "--no-rules", "--no-title",
+			"--max-time", options.MaxTime.String(),
+		)
+	}
+	args[len(args)-1] = options.ProjectDir
+	return append(args,
+		"--model", options.Model, "--config", options.ConfigPath,
+		"--tools", "read,bash,edit,write,grep,glob,task,todo",
+		"--skills", workflowContextManagedProductSkillNames(options), "--approval-mode", "write",
+		"--no-rules", "--no-lsp", "--no-pty", "--no-title",
+		"--max-time", options.MaxTime.String(),
+	)
+}
+
+func workflowContextManagedRPCBridgePath(workspace string) string {
+	return filepath.Join(workspace, ".omp", "extensions", "autopus-context.ts")
 }
 
 func (process *workflowContextManagedRPCProcess) Close() error {

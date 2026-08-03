@@ -26,6 +26,29 @@ type workflowContextManagedSourceIdentity struct {
 	sha256 string
 }
 
+func captureWorkflowContextManagedProjectIdentity(projectDir string) (fs.FileInfo, error) {
+	if projectDir == "" {
+		return nil, nil
+	}
+	info, err := os.Lstat(projectDir)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("managed OMP project directory identity is invalid")
+	}
+	return info, nil
+}
+
+func verifyWorkflowContextManagedProjectIdentity(projectDir string, expected fs.FileInfo) error {
+	if projectDir == "" && expected == nil {
+		return nil
+	}
+	actual, err := os.Lstat(projectDir)
+	if err != nil || expected == nil || !actual.IsDir() || actual.Mode()&os.ModeSymlink != 0 ||
+		!os.SameFile(expected, actual) {
+		return errors.New("managed OMP project directory identity drifted")
+	}
+	return validateWorkflowContextManagedProjectExtensions(projectDir)
+}
+
 func captureWorkflowContextManagedSourceIdentity(path string) (workflowContextManagedSourceIdentity, error) {
 	entry, err := os.Lstat(path)
 	if err != nil || !entry.Mode().IsRegular() || entry.Mode()&os.ModeSymlink != 0 {
@@ -78,6 +101,7 @@ func captureWorkflowContextManagedSourceIdentities(
 		}
 		identities = append(identities, identity)
 	}
+	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: index 2 is the generated bridge after executable and runtime config identities.
 	if identities[2].size != bridge.Size || identities[2].sha256 != bridge.SHA256 {
 		return nil, errors.New("managed OMP generated bridge identity is invalid")
 	}
@@ -91,7 +115,19 @@ func (driver *WorkflowContextManagedRPCDriver) verifyManagedSourceIdentities() e
 	driver.mu.Lock()
 	identities := append([]workflowContextManagedSourceIdentity(nil), driver.sourceIdentities...)
 	workspace := driver.options.Workspace
+	projectDir, projectInfo := driver.options.ProjectDir, driver.projectInfo
 	driver.mu.Unlock()
+	if err := verifyWorkflowContextManagedProjectIdentity(projectDir, projectInfo); err != nil {
+		return err
+	}
+	if projectDir != "" {
+		driver.mu.Lock()
+		options := driver.options
+		driver.mu.Unlock()
+		if err := validateWorkflowContextManagedProductSurface(options); err != nil {
+			return err
+		}
+	}
 	if err := validateWorkflowContextManagedExtensionAllowlist(workspace); err != nil {
 		return err
 	}

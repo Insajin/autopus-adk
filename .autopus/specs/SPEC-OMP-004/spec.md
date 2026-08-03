@@ -23,11 +23,11 @@ OMP 세션이 Autopus의 canonical full-delivery integrity를 그대로 보존�
 
 ## Implementation Status
 
-- **Lifecycle state**: T9 integrated verification은 완료됐지만 T5 product reachability가 열려 있어 `in-progress`다. Bounded managed primitive와 검증 영수증만으로 `implemented` 또는 `completed`로 승격할 수 없다.
+- **Lifecycle state**: T9의 선행 integrated verification은 완료됐지만 T5의 trusted product reachability가 열려 있어 `in-progress`다. Process-private assembler와 installed direct E2E만으로 `implemented` 또는 `completed`로 승격할 수 없다.
 - **Implemented evidence**: T1~T4와 T6~T8에 더해 body-free correlated `ui.confirm` pre/post ACK, nonce/binding/options/session hash, authoritative canonical rebuild, private stdio `--no-session`, task-owned `0700/0600` runtime, source identity/extension allowlist/environment uniqueness, cleanup lease, cancelable frame reader, preflight cleanup, managed-driver reuse block와 overlay shadow rollback primitive가 구현됐다.
 - **Installed evidence**: bounded managed canary가 `omp/17.1.8`, `provider_requests=3`, `pre_ack=1`, `post_ack=1`, `native_start=1`, `native_end=1`, `same_pid=true`, `same_session=true`, provider #3 exact canonical/transient body, `cleanup_root_count=0`, `sandbox=true`를 관측했다.
-- **Active wiring boundary**: ACK와 real managed driver admission은 installed canary primitive에서 증명됐다. 그러나 user-facing `/auto` OMP 세션이 authoritative request/`CanonicalSource`/managed driver를 조립해 `RunManaged`로 진입하는 production caller/assembler는 없으므로 active product reachability는 fail-closed/partial이고 T5는 미완료다.
-- **Final T9 evidence**: live canary PASS; changed production exact aggregate coverage `85.15%`와 package coverage `promptlayer=88.00%`, `adapter/omp=87.81%`, `config=90.99%`, `internal/cli=79.82%`(baseline `79.3%` 이상); exact coverage gate, targeted four-package race, vet, `go build ./...`, serial full test, gofmt 30 files, diff check, production Go max 295 lines, strict SPEC, lore가 모두 PASS했다.
+- **Active wiring boundary**: `RunWorkflowContextProductSession`은 process-private authority, `CanonicalSource`, exact two prompts와 managed driver를 조립하고 installed OMP 17.1.8 direct E2E는 real task overlay에서 동일 PID/session, pre/post ACK, provider #3 admission과 cleanup을 증명한다. 외부 CLI는 intent-only JSON만 허용하고 trusted runtime authority가 없으면 차단한다. 실제 workflow owner가 observed canary/promotion/history를 공급해 native `/auto`에서 이 경계에 도달하는 production caller는 없으므로 T5는 fail-closed/partial이다.
+- **Final T9 evidence**: installed managed/product live canary PASS; changed production exact aggregate coverage `85.02%`(`3075/3617`)와 package coverage `promptlayer=88.86%`, `adapter/omp=87.99%`, `config=93.19%`, `internal/cli=79.94%`(baseline `79.3%` 이상); exact coverage gate, four-package race, vet, `go build ./...`, serial full test, changed Go gofmt, diff check, production Go max 286 lines, strict SPEC, lore가 모두 PASS했다.
 
 ## Context Classification Contract
 
@@ -132,7 +132,7 @@ Observability: opt-in source, bounded cohort, provider attribution, and redacted
 | OMP projection | `pkg/adapter/omp/omp_context_*.go`, generated `.omp/extensions/autopus-context.ts` | Go owns hashes/validation; generated TypeScript emits body-free correlated ACK requests only |
 | config | existing OMP context optimization config/validation fields | opt-in mode, thresholds, TTL/namespace, conflict safety |
 | managed CLI primitive | `internal/cli/workflow_context_runtime_managed*.go` and doctor/canary projection | canonical rebuild, private RPC process, ACK/admission, cleanup and rollback receipts |
-| product entrypoint | `[NEW]` user-facing `/auto` OMP session caller/assembler; owning path unresolved | assemble request, authoritative source and managed driver, then invoke `RunManaged` |
+| product entrypoint | `internal/cli/workflow_context_runtime_product.go` process-private assembler와 intent-only CLI; trusted workflow owner `[NEW]` | caller authority를 역직렬화하지 않고 canonical source/managed driver를 조립; authority 부재 시 차단 |
 | tests | existing focused promptlayer/OMP/config/CLI tests and coverage verifier | deterministic Must oracles, changed-file 85%+, baseline no-regression |
 
 Generated `.omp/**` output is not the source of truth. Managed OMP session/transcript/compaction artifacts obey REQ-RUNTIME-ARTIFACT-001 and are never repo-tracked runtime state.

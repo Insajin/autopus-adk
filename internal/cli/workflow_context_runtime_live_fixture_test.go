@@ -23,6 +23,9 @@ type workflowContextLiveLayout struct {
 }
 
 func newWorkflowContextLiveLayout(base string) (workflowContextLiveLayout, error) {
+	if err := os.Chmod(base, 0o700); err != nil {
+		return workflowContextLiveLayout{}, errors.New("base-mode")
+	}
 	layout := workflowContextLiveLayout{
 		base: base, runtime: filepath.Join(base, "omp-runtime"),
 		workspace: filepath.Join(base, "workspace"), sessions: filepath.Join(base, "omp-runtime", "sessions"),

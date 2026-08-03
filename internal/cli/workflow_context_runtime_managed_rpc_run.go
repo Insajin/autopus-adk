@@ -2,20 +2,22 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
-
-	"github.com/insajin/autopus-adk/pkg/processprobe"
 )
 
-// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: 320-repeat seed and threshold prompts are bounded stimuli for crossing the live compaction threshold within two provider turns.
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: managed driver entrypoint selects the authoritative product path or the bounded canary path.
+// @AX:REASON [AUTO]: the supervisor interface depends on this lifecycle; the canary branch uses 320-repeat prompts to cross the threshold within two turns.
+// @AX:WARN [AUTO]: managed driver startup has cyclomatic complexity 19.
+// @AX:REASON [AUTO]: gocyclo reports 19 across identity, effective configuration, process startup, discovery, negotiation, and initial state gates.
 func (driver *WorkflowContextManagedRPCDriver) Run(
 	ctx context.Context, emit func(WorkflowContextRuntimeEvent) error,
 ) (runErr error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	driver.mu.Lock()
 	if !driver.bound || driver.running || driver.closed {
 		driver.mu.Unlock()
@@ -24,11 +26,13 @@ func (driver *WorkflowContextManagedRPCDriver) Run(
 	binding, options := driver.binding, driver.options
 	driver.running = true
 	driver.mu.Unlock()
+	runCtx, cancelRun := context.WithTimeout(ctx, options.MaxTime+10*time.Second)
+	defer cancelRun()
 	if err := driver.verifyManagedSourceIdentities(); err != nil {
 		driver.finishRun(nil)
 		return err
 	}
-	if err := verifyWorkflowContextManagedRPCConfig(ctx, options); err != nil {
+	if err := verifyWorkflowContextManagedRPCConfig(runCtx, options); err != nil {
 		driver.finishRun(nil)
 		return err
 	}
@@ -36,7 +40,7 @@ func (driver *WorkflowContextManagedRPCDriver) Run(
 		driver.finishRun(nil)
 		return err
 	}
-	process, sandboxed, err := startWorkflowContextManagedRPCProcess(ctx, options, binding)
+	process, sandboxed, err := startWorkflowContextManagedRPCProcess(runCtx, options, binding)
 	if err != nil {
 		driver.finishRun(nil)
 		return err
@@ -53,8 +57,14 @@ func (driver *WorkflowContextManagedRPCDriver) Run(
 		runErr = errors.Join(runErr, closeErr)
 	}()
 
-	if err := protocol.awaitReady(ctx); err != nil {
-		return process.errorWithStderr(err.Error())
+	var readyErr error
+	if len(options.Prompts) != 0 {
+		readyErr = protocol.awaitProductReady(runCtx, options.Prompts[0])
+	} else {
+		readyErr = protocol.awaitReady(runCtx)
+	}
+	if readyErr != nil {
+		return process.errorWithStderr(readyErr.Error())
 	}
 	for _, command := range []map[string]any{
 		{"id": "managed-protocol", "type": "negotiate_protocol", "protocolVersion": 2},
@@ -64,20 +74,26 @@ func (driver *WorkflowContextManagedRPCDriver) Run(
 		if err := protocol.send(command); err != nil {
 			return err
 		}
-		if _, err := protocol.awaitResponse(ctx, command["id"].(string)); err != nil {
+		if _, err := protocol.awaitResponse(runCtx, command["id"].(string)); err != nil {
 			return err
 		}
 	}
-	initial, err := protocol.state(ctx, "managed-state-before")
-	if err != nil || !safeWorkflowContextManagedRPCState(initial) {
-		return errors.New("managed OMP initial state is not admission-safe")
+	initial, err := protocol.state(runCtx, "managed-state-before")
+	if err != nil || !safeWorkflowContextManagedRPCState(initial) || !initial.AutoCompactionEnabled {
+		return fmt.Errorf(
+			"managed OMP initial state is not admission-safe: streaming=%t compacting=%t queued=%d auto=%t",
+			initial.IsStreaming, initial.IsCompacting, initial.QueuedMessageCount, initial.AutoCompactionEnabled,
+		)
+	}
+	if len(options.Prompts) != 0 {
+		return driver.runProduct(runCtx, emit, initial.SessionID, options.Prompts)
 	}
 	if err := protocol.send(map[string]any{
 		"id": "managed-seed", "type": "prompt", "message": strings.Repeat("bounded seed context ", 320),
 	}); err != nil {
 		return err
 	}
-	return driver.runCompaction(ctx, emit, initial.SessionID)
+	return driver.runCompaction(runCtx, emit, initial.SessionID)
 }
 
 // @AX:WARN [AUTO]: managed compaction sequencing contains 15 if branches.
@@ -137,10 +153,7 @@ func (driver *WorkflowContextManagedRPCDriver) runCompaction(
 			if !nativeStarted || !preACKed {
 				return errors.New("managed OMP post-compaction hook is out of order")
 			}
-			driver.mu.Lock()
-			driver.protocolPostID = frame.ID
-			driver.protocolSessionID = sessionID
-			driver.mu.Unlock()
+			driver.setPendingWorkflowContextManagedDispatch(frame.ID, sessionID)
 			if err := emit(WorkflowContextRuntimeEvent{
 				Kind: WorkflowContextEventCompacted, HistoryAfterTokens: driver.historyAfterTokens(),
 			}); err != nil {
@@ -162,84 +175,57 @@ func (driver *WorkflowContextManagedRPCDriver) runCompaction(
 	}
 }
 
-// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: a 5-second probe and 16 KiB read cap bound the preflight configuration readback.
-func verifyWorkflowContextManagedRPCConfig(
-	ctx context.Context, options WorkflowContextManagedRPCOptions,
-) error {
-	probeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(probeCtx, options.Executable,
-		"config", "get", "compaction.autoContinue", "--json")
-	cmd.Dir = options.Workspace
-	cmd.Env = append([]string(nil), options.Environment...)
-	if _, err := configureWorkflowContextManagedRPCSandbox(cmd, options.AllowedEndpoint); err != nil {
-		return err
-	}
-	output, err := processprobe.OutputLimited(cmd, 16<<10)
-	if err != nil {
-		return fmt.Errorf("read managed OMP autoContinue config: %w", err)
-	}
-	var readback struct {
-		Key   string `json:"key"`
-		Value any    `json:"value"`
-	}
-	if json.Unmarshal(output, &readback) != nil || readback.Key != "compaction.autoContinue" || readback.Value != false {
-		return errors.New("managed OMP autoContinue must read back false")
-	}
-	return nil
-}
-
 func (driver *WorkflowContextManagedRPCDriver) Dispatch(
 	ctx context.Context, dispatch WorkflowContextDispatch,
 ) (WorkflowContextDispatchAck, error) {
-	driver.mu.Lock()
-	protocol, process := driver.protocol, driver.process
-	postID, initialSession := driver.protocolPostID, driver.protocolSessionID
-	binding, running := driver.binding, driver.running
-	driver.mu.Unlock()
-	if !running || protocol == nil || process == nil || !process.Active() || postID == "" {
+	lease, err := driver.beginWorkflowContextManagedDispatch()
+	if err != nil || !lease.process.Active() {
 		return WorkflowContextDispatchAck{}, errors.New("managed OMP dispatch is outside the live post hook")
 	}
+	succeeded := false
+	defer func() { driver.finishWorkflowContextManagedDispatch(succeeded) }()
 	message, err := buildWorkflowContextManagedAdmission(dispatch)
 	if err != nil {
 		return WorkflowContextDispatchAck{}, err
 	}
-	if err := protocol.confirm(postID); err != nil {
+	if err := lease.protocol.confirm(lease.postID); err != nil {
 		return WorkflowContextDispatchAck{}, err
 	}
-	if err := protocol.awaitNativeCompactionEnd(ctx); err != nil {
+	if err := lease.protocol.awaitNativeCompactionEnd(ctx); err != nil {
 		return WorkflowContextDispatchAck{}, err
 	}
 	driver.noteNativeEnd()
 	driver.notePostACK()
-	state, err := protocol.state(ctx, "managed-state-after")
-	if err != nil || !safeWorkflowContextManagedRPCState(state) || state.SessionID != initialSession {
+	state, err := lease.protocol.state(ctx, "managed-state-after")
+	if err != nil || !safeWorkflowContextManagedRPCState(state) || !state.AutoCompactionEnabled ||
+		state.SessionID != lease.initialSession {
 		return WorkflowContextDispatchAck{}, errors.New("managed OMP post-compaction state is not admission-safe")
 	}
-	if err := protocol.send(map[string]any{
+	if err := lease.protocol.send(map[string]any{
 		"id": "managed-admission", "type": "prompt", "message": message,
 	}); err != nil {
 		return WorkflowContextDispatchAck{}, err
 	}
-	if err := protocol.awaitProviderBoundary(ctx, "managed-admission"); err != nil {
+	if err := lease.protocol.awaitProviderBoundary(ctx, "managed-admission"); err != nil {
 		return WorkflowContextDispatchAck{}, err
 	}
 	driver.mu.Lock()
 	driver.observation.ProviderTurns++
-	driver.observation.SameProcess = process.PID() == driver.observation.PID && process.Active()
-	driver.observation.SameSession = state.SessionID == initialSession
+	driver.observation.SameProcess = lease.process.PID() == driver.observation.PID && lease.process.Active()
+	driver.observation.SameSession = state.SessionID == lease.initialSession
 	driver.observation.ProviderObserved = true
 	driver.mu.Unlock()
+	succeeded = true
 	return WorkflowContextDispatchAck{
 		SchemaVersion: workflowContextDispatchAckSchemaVersion,
-		BindingHash:   binding.BindingHash, OptionsHash: binding.OptionsHash,
-		SessionHash: binding.SessionHash, NonceHash: binding.NonceHash, ProviderObserved: true,
+		BindingHash:   lease.binding.BindingHash, OptionsHash: lease.binding.OptionsHash,
+		SessionHash: lease.binding.SessionHash, NonceHash: lease.binding.NonceHash, ProviderObserved: true,
 	}, nil
 }
 
 func safeWorkflowContextManagedRPCState(state workflowContextManagedRPCState) bool {
 	return state.SessionID != "" && !state.IsStreaming && !state.IsCompacting &&
-		state.QueuedMessageCount == 0 && state.AutoCompactionEnabled
+		state.QueuedMessageCount == 0
 }
 
 func (driver *WorkflowContextManagedRPCDriver) historyAfterTokens() map[string]int {

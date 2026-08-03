@@ -25,6 +25,10 @@ var workflowContextManagedReservedEnvironment = map[string]struct{}{
 func validateWorkflowContextManagedRPCOptions(
 	options WorkflowContextManagedRPCOptions,
 ) (WorkflowContextManagedRPCOptions, error) {
+	product, err := workflowContextManagedRPCProductMode(options)
+	if err != nil {
+		return options, err
+	}
 	for name, value := range map[string]string{
 		"executable": options.Executable, "workspace": options.Workspace, "runtime base": options.RuntimeBase,
 		"runtime root": options.RuntimeRoot, "session directory": options.SessionDir,
@@ -40,6 +44,12 @@ func validateWorkflowContextManagedRPCOptions(
 	}{
 		{&options.Executable, true}, {&options.Workspace, false}, {&options.RuntimeBase, false},
 		{&options.RuntimeRoot, false}, {&options.SessionDir, false}, {&options.ConfigPath, false},
+	}
+	if product {
+		paths = append(paths, struct {
+			value        *string
+			allowSymlink bool
+		}{&options.ProjectDir, false})
 	}
 	for _, path := range paths {
 		canonical, err := canonicalWorkflowContextManagedPath(*path.value, path.allowSymlink)
@@ -61,6 +71,18 @@ func validateWorkflowContextManagedRPCOptions(
 	options.Environment = environment
 	if err := validateWorkflowContextManagedExtensionAllowlist(options.Workspace); err != nil {
 		return options, err
+	}
+	if product {
+		if err := validateWorkflowContextManagedProjectExtensions(options.ProjectDir); err != nil {
+			return options, err
+		}
+		if err := validateWorkflowContextManagedProductPrompts(options.Prompts); err != nil {
+			return options, err
+		}
+		if err := validateWorkflowContextManagedProductSurface(options); err != nil {
+			return options, err
+		}
+		options.Prompts = append([]string(nil), options.Prompts...)
 	}
 	if options.MaxTime <= 0 || options.MaxTime > 2*time.Minute {
 		options.MaxTime = 45 * time.Second
@@ -104,7 +126,16 @@ func validateWorkflowContextManagedPathLayout(options WorkflowContextManagedRPCO
 	if !workflowContextManagedPathBelow(options.RuntimeRoot, options.ConfigPath) {
 		return errors.New("managed OMP config is not runtime-owned")
 	}
+	if options.ProjectDir != "" && (workflowContextManagedPathsOverlap(options.ProjectDir, options.RuntimeBase) ||
+		workflowContextManagedPathsOverlap(options.ProjectDir, options.RuntimeRoot)) {
+		return errors.New("managed OMP project directory overlaps the task runtime")
+	}
 	return nil
+}
+
+func workflowContextManagedPathsOverlap(first, second string) bool {
+	return first == second || workflowContextManagedPathBelow(first, second) ||
+		workflowContextManagedPathBelow(second, first)
 }
 
 func workflowContextManagedPathBelow(root, path string) bool {
@@ -114,10 +145,10 @@ func workflowContextManagedPathBelow(root, path string) bool {
 }
 
 func validateWorkflowContextManagedPathModes(options WorkflowContextManagedRPCOptions) error {
-	for _, path := range []string{options.Workspace, options.RuntimeRoot, options.SessionDir} {
+	for _, path := range []string{options.RuntimeBase, options.Workspace, options.RuntimeRoot, options.SessionDir} {
 		info, err := os.Lstat(path)
 		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0o077 != 0 {
-			return errors.New("managed OMP directory identity or mode is invalid")
+			return fmt.Errorf("managed OMP directory identity or mode is invalid: %s", filepath.Base(path))
 		}
 	}
 	executable, err := os.Lstat(options.Executable)
@@ -132,6 +163,8 @@ func validateWorkflowContextManagedPathModes(options WorkflowContextManagedRPCOp
 	return nil
 }
 
+// @AX:WARN [AUTO]: managed environment validation has eight fail-closed if branches.
+// @AX:REASON [AUTO]: duplicate, reserved, ambient, and task-runtime-bound variables must be rejected before the child process inherits them.
 func validateWorkflowContextManagedEnvironment(
 	options WorkflowContextManagedRPCOptions,
 ) ([]string, error) {
@@ -150,6 +183,9 @@ func validateWorkflowContextManagedEnvironment(
 		if _, reserved := workflowContextManagedReservedEnvironment[key]; reserved {
 			return nil, fmt.Errorf("managed OMP bridge environment key is reserved: %s", key)
 		}
+		if _, allowed := workflowContextManagedAllowedEnvironment[key]; !allowed {
+			return nil, fmt.Errorf("managed OMP environment key is not allowed: %s", key)
+		}
 		if expected, requiredKey := required[key]; requiredKey {
 			canonical, err := canonicalWorkflowContextManagedPath(value, false)
 			if err != nil || canonical != expected {
@@ -163,9 +199,14 @@ func validateWorkflowContextManagedEnvironment(
 			return nil, errors.New("managed OMP environment is missing a task runtime key")
 		}
 	}
+	if err := validateWorkflowContextManagedEnvironmentIsolation(options, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
+// @AX:WARN [AUTO]: environment-key grammar validation has cyclomatic complexity 15.
+// @AX:REASON [AUTO]: the first rune and every remaining rune use distinct allowlists before variables cross the process boundary.
 func validWorkflowContextManagedEnvironmentKey(key string) bool {
 	if key == "" || !((key[0] >= 'A' && key[0] <= 'Z') || (key[0] >= 'a' && key[0] <= 'z') || key[0] == '_') {
 		return false
@@ -196,6 +237,32 @@ func validateWorkflowContextManagedExtensionAllowlist(workspace string) error {
 	if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(expected.TargetPath) ||
 		entries[0].Type()&os.ModeSymlink != 0 || !entries[0].Type().IsRegular() {
 		return errors.New("managed OMP extension allowlist is invalid")
+	}
+	return nil
+}
+
+// @AX:WARN [AUTO]: project extension denial has cyclomatic complexity 15.
+// @AX:REASON [AUTO]: absent parents are allowed, while symlinked, non-directory, unreadable, or non-empty project extension roots fail closed.
+func validateWorkflowContextManagedProjectExtensions(projectDir string) error {
+	expected := ompadapter.ExpectedOMPContextBridgeSourceIdentity()
+	ompDirectory := filepath.Join(projectDir, ".omp")
+	ompInfo, err := os.Lstat(ompDirectory)
+	if err != nil || !ompInfo.IsDir() || ompInfo.Mode()&os.ModeSymlink != 0 {
+		return errors.New("managed OMP project extension parent identity is invalid")
+	}
+	extensions := filepath.Join(ompDirectory, "extensions")
+	info, err := os.Lstat(extensions)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("managed OMP project extension identity is invalid")
+	}
+	entries, err := os.ReadDir(extensions)
+	if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(expected.TargetPath) ||
+		entries[0].Type()&os.ModeSymlink != 0 || !entries[0].Type().IsRegular() {
+		return errors.New("managed OMP project extension allowlist is invalid")
+	}
+	identity, err := captureWorkflowContextManagedSourceIdentity(filepath.Join(extensions, entries[0].Name()))
+	if err != nil || identity.size != expected.Size || identity.sha256 != expected.SHA256 {
+		return errors.New("managed OMP project extension source is invalid")
 	}
 	return nil
 }

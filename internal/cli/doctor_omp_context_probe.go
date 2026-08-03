@@ -11,6 +11,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
+// @AX:NOTE [AUTO]: 128 KiB output and eight recursive levels bound untrusted OMP config-list evidence.
 const ompContextDoctorProbeOutput = 128 * 1024
 
 type ompContextDoctorRunner interface {
@@ -73,6 +74,8 @@ func inspectOMPContextConfigList(data []byte) (valid, compaction, memory bool) {
 	return compaction && memory, compaction, memory
 }
 
+// @AX:WARN [AUTO]: OMP config schema discovery has cyclomatic complexity 16.
+// @AX:REASON [AUTO]: exact nested and flat keys, bounded recursion, heterogeneous JSON nodes, and installed-version compatibility converge here.
 func findOMPContextConfigSetting(value any, target string, depth int) bool {
 	if depth > 8 {
 		return false
@@ -80,6 +83,10 @@ func findOMPContextConfigSetting(value any, target string, depth int) bool {
 	switch typed := value.(type) {
 	case map[string]any:
 		if setting, ok := typed[target]; ok && validOMPContextConfigSetting(setting) {
+			return true
+		}
+		flatKey := map[string]string{"compaction": "compaction.enabled", "memory": "memory.backend"}[target]
+		if setting, ok := typed[flatKey]; flatKey != "" && ok && validOMPContextConfigSetting(setting) {
 			return true
 		}
 		if key, ok := typed["key"].(string); ok && key == target && validOMPContextConfigSetting(typed["value"]) {
