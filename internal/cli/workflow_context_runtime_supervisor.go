@@ -123,22 +123,18 @@ func (supervisor *WorkflowContextRuntimeSupervisor) Run(
 			return nil
 		case stage == 2 && event.Kind == WorkflowContextEventPostCompaction:
 			var rehydrateErr error
-			terminal, rehydrateErr = supervisor.store.Rehydrate(binding.BindingHash, request.Binding.DeliveryOptions,
-				func(view promptlayer.OMPContextTransientView) error {
+			terminal, rehydrateErr = supervisor.rehydrateWorkflowContextRuntime(ctx, request, binding,
+				func(ctx context.Context, input WorkflowContextDispatch) error {
 					receipt.PhaseSequence = append(receipt.PhaseSequence, "rehydrated")
 					if dispatch == nil {
 						return fmt.Errorf("OMP context provider dispatch callback is required")
 					}
-					return dispatch(ctx, WorkflowContextDispatch{
-						Mode: WorkflowContextDispatchOptimized, Delivery: request.Binding.Delivery, Transient: view,
-					})
+					return dispatch(ctx, input)
 				})
 			if rehydrateErr != nil {
 				return rehydrateErr
 			}
 			receipt.ExactMatch = terminal.ExactMatch
-			receipt.Outcome = WorkflowContextOutcomeAdmitted
-			receipt.PhaseSequence = append(receipt.PhaseSequence, "admitted")
 			stage = 3
 			return nil
 		default:
@@ -153,6 +149,8 @@ func (supervisor *WorkflowContextRuntimeSupervisor) Run(
 		runErr = fmt.Errorf("OMP context runtime event stream ended at stage %d", stage)
 	}
 	if runErr == nil && cleanupErr == nil {
+		receipt.Outcome = WorkflowContextOutcomeAdmitted
+		receipt.PhaseSequence = append(receipt.PhaseSequence, "admitted")
 		finished, finishErr := finishWorkflowContextRuntime(request, receipt, nil)
 		if finishErr == nil {
 			return finished, nil
@@ -184,7 +182,11 @@ func (supervisor *WorkflowContextRuntimeSupervisor) runCanonicalFallback(
 		receipt.Fallback.Reason = "required-source-changed"
 		return finishWorkflowContextRuntime(request, receipt, fmt.Errorf("independent canonical fallback is unavailable"))
 	}
+	_, managed := request.Driver.(WorkflowContextManagedProcessDriver)
 	receipt.Fallback.Reason = "required-source-changed"
+	if managed {
+		receipt.Fallback.Reason = "canonical-full-managed-driver-reuse-blocked"
+	}
 	maintenance, cancelMaintenance := workflowContextMaintenanceContext()
 	err := rollbackWorkflowContextOverlay(maintenance, request, &receipt)
 	cancelMaintenance()
@@ -193,6 +195,12 @@ func (supervisor *WorkflowContextRuntimeSupervisor) runCanonicalFallback(
 		receipt.Fallback.Mode = config.OMPContextFallbackBlock
 		receipt.Fallback.Reason = "rollback-readback-mismatch"
 		return finishWorkflowContextRuntime(request, receipt, err)
+	}
+	if managed {
+		receipt.Outcome = WorkflowContextOutcomeBlocked
+		receipt.Fallback.Mode = config.OMPContextFallbackBlock
+		return finishWorkflowContextRuntime(request, receipt,
+			fmt.Errorf("cleaned managed OMP driver cannot provide an independent canonical fallback"))
 	}
 	delivery, ephemeral, err := request.CanonicalSource.Rebuild(ctx, request.Binding.DeliveryOptions)
 	if err != nil {

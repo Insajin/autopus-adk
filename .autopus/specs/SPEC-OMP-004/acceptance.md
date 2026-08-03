@@ -8,15 +8,20 @@
 - provider-call spy, fake OMP runtime, monotonic phase sequence, effective config readback을 결정적 oracle로 사용한다.
 - 각 Must scenario는 concrete expected output, expected value, 또는 explicit tolerance를 포함한다.
 
+## Current Acceptance State
+
+- S1-S12와 S13의 live canary·coverage·race·vet/build/full·strict/lore sub-oracle은 검증돼 T9가 완료됐다.
+- S13의 user-facing `/auto` OMP production reachability만 미충족이므로 Must acceptance는 `12/13`이고 전체 SPEC은 미완료다.
+
 ## Test Scenarios
 
 ### S1: Stable/snapshot/ephemeral 분류와 disjoint boundary
 Given `go` profile fixture에 core policy, SPEC/plan/acceptance, explicit required ref, original task, open finding, ownership/forbidden paths, selected learning/signature, selected task ref, completed superseded read가 있다.
 When OMP context classifier가 세션 binding을 만든다.
-Then `[NEW] full_document_refs`는 v1 `RequiredDocuments(Complete=true)`의 core policy, SPEC/plan/acceptance, explicit required ref, selected learning/signature/task ref 전체와 정확히 같다.
-And `[NEW] required_ephemeral_hashes`는 original task hash, ordered open finding IDs, ownership/forbidden paths, exact five worker result fields를 포함한다.
-And `context_plan.v2` document candidates는 `[NEW] shadow_candidate_refs`에만 존재한다.
-And `[NEW] eligible_history_rows`는 completed superseded read만 포함하고 모든 full-document/ephemeral 항목의 action은 `rebuild_full`이다.
+Then `full_document_refs`는 v1 `RequiredDocuments(Complete=true)`의 core policy, SPEC/plan/acceptance, explicit required ref, selected learning/signature/task ref 전체와 정확히 같다.
+And `required_ephemeral_hashes`는 original task hash, ordered open finding IDs, ownership/forbidden paths, exact five worker result fields를 포함한다.
+And `context_plan.v2` document candidates는 `shadow_candidate_refs`에만 존재한다.
+And `eligible_history_rows`는 completed superseded read만 포함하고 모든 full-document/ephemeral 항목의 action은 `rebuild_full`이다.
 
 ### S2: Pre/post compaction exact hash와 ref-set equality
 Given pre-checkpoint required tuples가 `[(AGENTS.md,H1,P1),(workspace.md,H2,P2),(spec.md,H3,P3),(plan.md,H4,P4),(acceptance.md,H5,P5)]`이고 snapshot `HS`, manifest `HM`이다.
@@ -37,6 +42,7 @@ When 두 fixture에 post-compaction rehydration을 같은 options로 독립 실�
 Then A는 `VerifyContextDeliveryForOptions` mismatch와 `exact_match=false`, optimized provider-call spy 0을 반환한다.
 And A의 full fallback은 새 canonical tuple에 `H5x`와 integrity=`verified`가 있을 때만 provider call 1회를 허용하고 reason=`required-source-changed`다.
 And B는 optimized provider-call spy 0이며 independently available canonical run state로 full restart할 수 없으면 `ephemeral-state-unavailable`로 fail-closed한다.
+And cleaned managed driver fixture는 재사용하지 않고 reason=`canonical-full-managed-driver-reuse-blocked`, effective history mode=`shadow`, provider-call spy 0, cleanup call 1을 기록한다.
 
 ### S5: Checkpoint schema와 body-free privacy
 Given task `TASK-7`, SPEC `SPEC-OMP-004`, phase `go`, findings `[F-002,F-010]`과 decision delta가 있다.
@@ -46,6 +52,7 @@ And persisted receipt에는 binding fields, original-task/decision/body hashes, 
 And full task/delta/finding/ownership bodies는 session/phase-bound supervisor process memory에만 있으며 verified rehydration 또는 abort 뒤 0개로 지워지고 persisted transient-state file은 0개다.
 And raw prompt/document/tool/memory body, credential, secret, privileged absolute path key/value는 0개다.
 And managed runtime artifact receipt는 root class만 기록하며 user-owned root access count는 0이다.
+And bridge/dispatch ACK envelope는 schema와 nonce/binding/options/session hash만 포함하며 notify/sendMessage authority와 provider body는 0개다.
 
 ### S6: Stale/tampered/cross-namespace memory rejection
 Given memory entries `fresh`, `expired`, `wrong-namespace`, `stale-source`, `tampered`가 있고 fresh만 workspace/SPEC/role/ref/hash/checked_at/TTL/namespace가 현재 authority와 일치한다.
@@ -97,15 +104,18 @@ And OMP effective config readback hash는 rollback overlay hash `HR`과 일치�
 And 새 세션은 optimized history/compaction state를 이어받지 않고 canonical full delivery로 시작한다.
 And user global/project config bytes와 memory effective value는 rollback 전후 동일하다.
 
-### S13: Hermetic 기본, installed lifecycle, live opt-in, coverage와 hygiene
-Given provider credential 환경변수가 존재하더라도 external live opt-in이 없고, capability probe를 통과한 installed OMP와 loopback fake provider, task-owned temporary session root가 준비됐다.
-When 기본 acceptance/canary suite와 actual lifecycle canary를 실행한다.
+### S13: Product reachability, installed managed lifecycle, coverage와 hygiene
+Given user-facing `/auto` OMP 세션이 authoritative request/`CanonicalSource`/managed driver를 조립했고, capability probe를 통과한 installed OMP, loopback fake provider, task-owned temporary session root가 준비됐다.
+When production entrypoint를 통해 기본 acceptance suite와 installed managed lifecycle canary를 실행한다.
 Then unit suite는 fake OMP만 호출하고 external network/provider call count는 0이다.
-And installed binary canary receipt의 version은 observed `^omp/[0-9]+\.[0-9]+\.[0-9]+$`이고 temporary one-shot overlay로 실제 threshold를 넘어 pre/post event를 각각 1회 이상 내며 `exact_match=true`로 끝난다.
-And installed binary 또는 required event가 없으면 scenario는 PASS가 아니라 completion debt로 남는다.
+And bounded primitive oracle은 `version=omp/17.1.8`, `provider_requests=3`, `pre_ack=1`, `post_ack=1`, `native_start=1`, `native_end=1`, `same_pid=true`, `same_session=true`, `exact_body=true`, `cleanup_root_count=0`, `sandbox=true`를 정확히 기록한다.
+And provider request #3의 canonical prompt, five-document ordered ref/body set, original task, decision delta, findings, ownership/forbidden paths, five worker-result fields는 assembled authoritative input과 정확히 같고 document omission과 memory injection은 0개다.
+And bridge ACK는 body-free `ui.confirm`으로 correlation hash 네 개를 검증하며 notify/sendMessage 호출은 0개다.
+And direct canary 호출만 가능하거나 user-facing `/auto` caller/assembler, installed binary, required event 중 하나라도 없으면 scenario는 PASS가 아니라 completion debt로 남는다.
 And external live opt-in fixture는 credential 값을 receipt에 기록하지 않고 bounded cohort만 실행한다.
 And T1 package baseline은 감소하지 않으며 T1 base diff의 `pkg/promptlayer`, `pkg/adapter/omp`, `pkg/config`, `internal/cli` 아래 이 SPEC이 수정한 non-test Go file exact set의 aggregate statement coverage는 85% 이상이다.
 And isolated directory/file mode는 최대 `0700/0600`, symlink/path escape는 0건, user-owned root access는 0건이며 completion 후 temporary root 존재 count는 0이다.
+And source identity drift, ambient extension, duplicate/reserved environment, cleanup lease mismatch, canceled/full frame reader, preflight failure는 provider admission 전에 차단되고 owned root만 cleanup한다.
 And OMP memory body, session transcript, compaction artifact, generated runtime cache는 `git ls-files` 결과에 0개이고 receipt에 exact path/body는 0개다.
 
 ## Regression Gates

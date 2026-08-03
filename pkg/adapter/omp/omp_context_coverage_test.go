@@ -24,6 +24,19 @@ var ompContextCoverageOwnedPaths = []string{
 	"internal/cli/workflow_context_runtime_canary.go",
 	"internal/cli/workflow_context_runtime_command.go",
 	"internal/cli/workflow_context_runtime_helpers.go",
+	"internal/cli/workflow_context_runtime_managed.go",
+	"internal/cli/workflow_context_runtime_managed_rpc.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_admission.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_identity.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_options.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_process.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_process_other.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_process_posix.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_protocol.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_root.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_run.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_sandbox_darwin.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_sandbox_other.go",
 	"internal/cli/workflow_context_runtime_overlay.go",
 	"internal/cli/workflow_context_runtime_promotion.go",
 	"internal/cli/workflow_context_runtime_receipt.go",
@@ -63,7 +76,9 @@ var ompContextCoverageSharedPaths = map[string]bool{
 }
 
 var ompContextCoverageDeclarationOnlyPaths = map[string]bool{
-	"pkg/promptlayer/omp_context_canary.go": true,
+	"internal/cli/workflow_context_runtime_managed_rpc_process_other.go": true,
+	"internal/cli/workflow_context_runtime_managed_rpc_sandbox_other.go": true,
+	"pkg/promptlayer/omp_context_canary.go":                              true,
 }
 
 type ompCoverageTotals struct{ total, covered int }

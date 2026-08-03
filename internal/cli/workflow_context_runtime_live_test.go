@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"reflect"
@@ -9,8 +10,127 @@ import (
 	"testing"
 	"time"
 
+	ompadapter "github.com/insajin/autopus-adk/pkg/adapter/omp"
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/promptlayer"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestWorkflowContextRuntime_InstalledOMPCompactionLifecycleCanary_AdmitsExactBodyOnACKedLiveSession(t *testing.T) {
+	if os.Getenv("AUTOPUS_OMP_CONTEXT_LIVE") != "1" {
+		t.Skip("set AUTOPUS_OMP_CONTEXT_LIVE=1 to run the installed managed OMP context lifecycle canary")
+	}
+	executable, err := exec.LookPath("omp")
+	require.NoError(t, err, "installed OMP executable is required")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	layout, err := newWorkflowContextLiveLayout(t.TempDir())
+	require.NoError(t, err)
+	provider := newWorkflowContextLiveProvider(t)
+	require.NoError(t, layout.writeConfig(provider.URL()))
+	installWorkflowContextManagedLiveBridge(t, layout.workspace)
+	driver, err := NewWorkflowContextManagedRPCDriver(WorkflowContextManagedRPCOptions{
+		Executable: executable, Workspace: layout.workspace, RuntimeBase: layout.base, RuntimeRoot: layout.runtime,
+		SessionDir: layout.sessions, ConfigPath: layout.overlay,
+		Model: "contextfake/" + workflowContextLiveModel, AllowedEndpoint: provider.URL(),
+		Environment: layout.env(), HistoryAfterTokens: map[string]int{"old-read": 2}, MaxTime: 45 * time.Second,
+	})
+	require.NoError(t, err)
+	version, err := probeWorkflowContextLiveVersion(ctx, executable, layout, provider.URL())
+	require.NoError(t, err)
+	require.NoError(t, verifyWorkflowContextLiveOverlay(ctx, executable, layout, provider.URL()))
+
+	request := newWorkflowContextRuntimeFixture(t)
+	request.Capabilities.Version = version
+	request.Capabilities.ProbeSource = "installed-omp-loopback-managed-rpc"
+	request.Capabilities.CheckedAt = time.Now().UTC()
+	request.Overlay = newFakeWorkflowContextOverlay(t, activeOverlayReadback(), shadowOverlayReadback())
+	request.CanonicalSource = workflowContextCanonicalSourceFunc(func(
+		_ context.Context, opts promptlayer.ContextDeliveryOptions,
+	) (promptlayer.ContextDeliveryResult, promptlayer.OMPContextEphemeral, error) {
+		delivery, rebuildErr := promptlayer.BuildContextDelivery(opts)
+		return delivery, request.Binding.Ephemeral, rebuildErr
+	})
+	receipt, err := RunWorkflowContextInstalledManagedCanary(
+		ctx, NewWorkflowContextRuntimeSupervisor(nil), request, driver,
+	)
+	if err != nil {
+		observation := driver.Observation()
+		requests, authHeaders, unexpectedEndpoints, failure := provider.receipt()
+		t.Fatalf("managed installed admission failed closed: reason=%s provider_requests=%d auth=%d endpoints=%d provider_failure=%s pre_ack=%d post_ack=%d native_start=%d native_end=%d provider_observed=%t",
+			liveReason(err), requests, authHeaders, unexpectedEndpoints, failure,
+			observation.PreACKs, observation.PostACKs, observation.NativeStarts,
+			observation.NativeEnds, observation.ProviderObserved)
+	}
+	assert.Equal(t, WorkflowContextOutcomeAdmitted, receipt.Outcome)
+	assert.True(t, receipt.ExactMatch)
+	assert.Equal(t, []string{"checkpointed", "compacted", "rehydrated", "admitted"}, receipt.PhaseSequence)
+
+	observation := driver.Observation()
+	assert.Equal(t, 3, observation.ProviderTurns)
+	assert.Equal(t, 1, observation.PreACKs)
+	assert.Equal(t, 1, observation.PostACKs)
+	assert.Equal(t, 1, observation.NativeStarts)
+	assert.Equal(t, 1, observation.NativeEnds)
+	assert.True(t, observation.SameProcess)
+	assert.True(t, observation.SameSession)
+	assert.True(t, observation.Sandboxed)
+	assert.True(t, observation.ProviderObserved)
+	assert.False(t, observation.ProcessActiveAfterCleanup)
+
+	requests, authHeaders, unexpectedEndpoints, failure := provider.receipt()
+	require.Empty(t, failure)
+	assert.Equal(t, 3, requests)
+	assert.Zero(t, authHeaders)
+	assert.Zero(t, unexpectedEndpoints)
+	assertWorkflowContextManagedAdmissionMessage(t, provider.userMessage(3), request)
+	assert.True(t, receipt.Cleanup.Verified)
+	assert.Zero(t, receipt.ArtifactCounts.AfterCleanup)
+	assert.Zero(t, workflowContextLiveRootCount(layout.runtime))
+	t.Logf("installed_managed_context_canary version=%s provider_requests=%d pre_ack=%d post_ack=%d native_start=%d native_end=%d same_pid=%t same_session=%t exact_body=%t cleanup_root_count=0 sandbox=%t",
+		version, requests, observation.PreACKs, observation.PostACKs, observation.NativeStarts,
+		observation.NativeEnds, observation.SameProcess, observation.SameSession,
+		observation.ProviderObserved, observation.Sandboxed)
+}
+
+func installWorkflowContextManagedLiveBridge(t *testing.T, workspace string) {
+	t.Helper()
+	cfg := config.DefaultFullConfig("managed-context-live")
+	cfg.Platforms = []string{"omp"}
+	cfg.OMPContextPolicy = config.OMPContextPolicyConf{
+		Profile:  "managed",
+		Profiles: map[string]config.OMPContextProfileConf{"managed": {}},
+	}
+	_, err := ompadapter.NewWithRoot(workspace).Generate(context.Background(), cfg)
+	require.NoError(t, err)
+}
+
+func assertWorkflowContextManagedAdmissionMessage(
+	t *testing.T, message string, request WorkflowContextRuntimeRequest,
+) {
+	t.Helper()
+	var admission workflowContextManagedAdmission
+	require.NoError(t, json.Unmarshal([]byte(message), &admission))
+	assert.Equal(t, workflowContextManagedAdmissionSchemaVersion, admission.SchemaVersion)
+	assert.Equal(t, WorkflowContextDispatchOptimized, admission.Mode)
+	assert.Equal(t, request.Binding.Delivery.Prompt, admission.CanonicalPrompt)
+	require.Len(t, admission.Documents, 5, "managed admission must carry the exact canonical five-document set")
+	require.Len(t, admission.Documents, len(request.Binding.Delivery.Layers))
+	for index, layer := range request.Binding.Delivery.Layers {
+		assert.Equal(t, layer.SourceRef, admission.Documents[index].SourceRef)
+		assert.Equal(t, layer.Content, admission.Documents[index].Body)
+	}
+	assert.Equal(t, request.Binding.Ephemeral.OriginalTask, admission.OriginalTask)
+	assert.Equal(t, request.Binding.Ephemeral.DecisionDelta, admission.DecisionDelta)
+	assert.Equal(t, request.Binding.Ephemeral.FrozenFindingIDs, admission.FrozenFindingIDs)
+	assert.Equal(t, request.Binding.Ephemeral.OwnershipPaths, admission.OwnershipPaths)
+	assert.Equal(t, request.Binding.Ephemeral.ForbiddenPaths, admission.ForbiddenPaths)
+	assert.Equal(t, promptlayer.OMPWorkerResultSchema(), admission.WorkerResultFields)
+	assert.Empty(t, admission.DocumentOmissions)
+	assert.Empty(t, admission.MemoryInjections)
+}
 
 func TestWorkflowContextRuntime_InstalledOMPCompactionLifecycleCanary(t *testing.T) {
 	if os.Getenv("AUTOPUS_OMP_CONTEXT_LIVE") != "1" {

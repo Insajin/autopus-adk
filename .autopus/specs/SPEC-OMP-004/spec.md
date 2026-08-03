@@ -4,7 +4,7 @@
 id: SPEC-OMP-004
 title: OMP 네이티브 컨텍스트 최적화
 version: 0.1.0
-status: implemented
+status: in-progress
 priority: HIGH
 created: 2026-08-02
 domain: OMP
@@ -17,17 +17,17 @@ OMP 세션이 Autopus의 canonical full-delivery integrity를 그대로 보존�
 ## Outcome Boundary
 
 - **Outcome Lock**: OMP compaction 뒤 다음 provider call 전에 canonical full document ref/hash 집합과 authoritative ephemeral phase body를 재구성·재주입하고, token reduction credit은 완료된 tool/transcript history에만 귀속하며, shadow→active 승격과 rollback이 결정적 receipt로 증명된다.
-- **Mandatory requirements**: full document delivery 재사용, history eligibility classifier, post-compaction canonical rehydration capability, supervisor-held ephemeral channel과 body-free pre/post receipt, managed runtime artifact lifecycle, shadow-only memory/JIT evidence, provider-neutral binding, AB/BA canary, fail-closed/full fallback, effective rollback readback.
+- **Mandatory requirements**: full document delivery 재사용, history eligibility classifier, post-compaction canonical rehydration capability, supervisor-held ephemeral channel과 body-free correlated ACK, managed runtime artifact lifecycle, user-facing `/auto` OMP session caller/assembler, shadow-only memory/JIT evidence, provider-neutral binding, AB/BA canary, fail-closed/full fallback, effective rollback readback.
 - **Explicit non-goals**: Autopus의 provider transcript 직접 mutation, 새 canonical storage, delivered document 축소, active document JIT, OMP memory body의 active injection, user OMP memory/compaction default 변경, tracked OMP memory, OMP model/advisor routing, OMP workflow parity, orchestra provider 등록.
-- **Completion evidence**: S1-S13 Must oracle, T1 base diff에서 `pkg/promptlayer`, `pkg/adapter/omp`, `pkg/config`, `internal/cli` 아래 이 SPEC이 수정한 non-test Go file coverage 85%+, package baseline no-regression, strict/race/vet/hygiene, hermetic·installed lifecycle canary가 PASS한다.
+- **Completion evidence**: S1-S13 Must oracle, user-facing `/auto` OMP session에서의 production reachability, T1 base diff에서 `pkg/promptlayer`, `pkg/adapter/omp`, `pkg/config`, `internal/cli` 아래 이 SPEC이 수정한 non-test Go file coverage 85%+, package baseline no-regression, strict/race/vet/hygiene, hermetic·installed lifecycle canary가 PASS한다.
 
 ## Implementation Status
 
-- **Lifecycle state**: 기술 구현은 `implemented`이며 commit/push와 lifecycle `completed` 승격은 승인되지 않았다.
-- **Implemented evidence**: T1~T4와 T6~T8의 policy, binding/transient rehydration, memory shadow safety, AB/BA promotion·rollback, body-free receipt와 injected supervisor driver가 구현됐다.
-- **Installed evidence**: `omp/17.1.8`, threshold `7000`, loopback turns/requests `2/2`, external requests `0`, native non-skipped start/end `1/1`, early admission `0`, optimized dispatch `1`, cleanup root count `0`, sandbox `true`를 관측했다.
-- **Active wiring boundary**: generated bridge의 hash-only pre/post notify와 installed native events는 증명됐지만, `session_before_compact` throw/timeout이 `undefined`로 흡수되고 `pi.sendMessage()`가 void이므로 verified long-lived supervisor ACK 전 active admission은 증명되지 않는다. Bridge는 pre notify 뒤 명시적 `{cancel:true}`로 fail-closed해야 하며 T5는 미완료다.
-- **Pending verification**: T9의 doctor와 actual installed canary는 완료됐지만 integrated coverage/full/strict/git hygiene는 parent gate 전이다. Actual canary는 installed native events + injected Go driver 증거이며 generated bridge end-to-end active proof가 아니다.
+- **Lifecycle state**: T9 integrated verification은 완료됐지만 T5 product reachability가 열려 있어 `in-progress`다. Bounded managed primitive와 검증 영수증만으로 `implemented` 또는 `completed`로 승격할 수 없다.
+- **Implemented evidence**: T1~T4와 T6~T8에 더해 body-free correlated `ui.confirm` pre/post ACK, nonce/binding/options/session hash, authoritative canonical rebuild, private stdio `--no-session`, task-owned `0700/0600` runtime, source identity/extension allowlist/environment uniqueness, cleanup lease, cancelable frame reader, preflight cleanup, managed-driver reuse block와 overlay shadow rollback primitive가 구현됐다.
+- **Installed evidence**: bounded managed canary가 `omp/17.1.8`, `provider_requests=3`, `pre_ack=1`, `post_ack=1`, `native_start=1`, `native_end=1`, `same_pid=true`, `same_session=true`, provider #3 exact canonical/transient body, `cleanup_root_count=0`, `sandbox=true`를 관측했다.
+- **Active wiring boundary**: ACK와 real managed driver admission은 installed canary primitive에서 증명됐다. 그러나 user-facing `/auto` OMP 세션이 authoritative request/`CanonicalSource`/managed driver를 조립해 `RunManaged`로 진입하는 production caller/assembler는 없으므로 active product reachability는 fail-closed/partial이고 T5는 미완료다.
+- **Final T9 evidence**: live canary PASS; changed production exact aggregate coverage `85.15%`와 package coverage `promptlayer=88.00%`, `adapter/omp=87.81%`, `config=90.99%`, `internal/cli=79.82%`(baseline `79.3%` 이상); exact coverage gate, targeted four-package race, vet, `go build ./...`, serial full test, gofmt 30 files, diff check, production Go max 295 lines, strict SPEC, lore가 모두 PASS했다.
 
 ## Context Classification Contract
 
@@ -46,12 +46,12 @@ OMP 세션이 Autopus의 canonical full-delivery integrity를 그대로 보존�
 **REQ-CTX-001 — Required context authority**
 Type: Ubiquitous | Priority: Must
 THE SYSTEM SHALL use `BuildContextDelivery` and `VerifyContextDeliveryForOptions` with supervisor-held options as the required-context authority and SHALL preserve complete source refs, source hashes, prompt hashes, snapshot hash, and prompt manifest hash.
-Observability: `autopus.context_delivery.v1` plus `[NEW] autopus.omp_context_receipt.v1` records exact ref/hash equality without bodies.
+Observability: `autopus.context_delivery.v1` plus `autopus.omp_context_receipt.v1` records exact ref/hash equality without bodies.
 
 **REQ-CLASS-001 — Canonical admission boundary**
 Type: Ubiquitous | Priority: Must
 THE SYSTEM SHALL classify stable, snapshot, ephemeral, and eligible history; SHALL never use an OMP-native compacted copy as authority for any document admitted by `BuildContextDelivery`, original task, decision delta, open findings, ownership/forbidden paths, or exact worker result schema; and SHALL reconstruct those canonical bodies before the next provider call.
-Observability: `[NEW] autopus.omp_context_receipt.v1` fields `full_document_refs`, `required_ephemeral_hashes`, `eligible_history_rows`, `shadow_candidate_refs`, and `shadow_plan_status/reason` record the partition without bodies.
+Observability: `autopus.omp_context_receipt.v1` fields `full_document_refs`, `required_ephemeral_hashes`, `eligible_history_rows`, `shadow_candidate_refs`, and `shadow_plan_status/reason` record the partition without bodies.
 
 **REQ-BIND-001 — Provider-neutral OMP session binding**
 Type: Ubiquitous | Priority: Must
@@ -77,8 +77,8 @@ Observability: receipt records version, capability booleans, probe source, check
 
 **REQ-OPTIONAL-001 — Eligible-history credit and canonical re-admission**
 Type: Event-driven | Priority: Must
-WHEN OMP pruning or compaction is applied THEN THE SYSTEM SHALL NOT assume native selective retention or pinning; SHALL attribute optimization only to completed tool/transcript history rows; SHALL rebuild and inject every v1-delivered document and required ephemeral body before the next provider call; and SHALL use `autopus.context_plan.v2` and memory proposals as shadow-only evidence. If post-compaction canonical injection or admission blocking is not proved, active mode SHALL remain unavailable.
-Observability: recomputed token counts match `eligible_history_rows`; active `document_omissions` and `memory_injections` are empty; a verified v2 plan copies its candidates to `shadow_candidate_refs`, while an unavailable v2 plan records an empty set plus exact status/reason without changing active delivery.
+WHEN OMP pruning or compaction is applied by a user-facing `/auto` OMP session THEN THE SYSTEM SHALL assemble an authoritative `CanonicalSource` and managed driver, invoke the supervised managed boundary, attribute optimization only to completed tool/transcript history rows, rebuild and inject every v1-delivered document and required ephemeral body before the next provider call, and use `autopus.context_plan.v2` and memory proposals as shadow-only evidence. If caller reachability, post-compaction canonical injection, correlated ACK, or admission blocking is not proved, active mode SHALL remain unavailable.
+Observability: recomputed token counts match `eligible_history_rows`; active `document_omissions` and `memory_injections` are empty; the body-free binding/dispatch ACK matches nonce/binding/options/session hashes; the admitted provider observes the exact canonical/transient body; and a verified v2 plan changes only shadow candidates.
 
 **REQ-CHECKPOINT-001 — Pre-compaction checkpoint**
 Type: Event-driven | Priority: Must
@@ -124,15 +124,16 @@ Type: Optional | Priority: Should
 WHERE live provider canary is explicitly enabled THE SYSTEM SHALL reuse the hermetic pair schema, isolate credentials from receipts, cap task/provider/model scope, and keep live evidence non-authoritative until the same local integrity gates pass.
 Observability: opt-in source, bounded cohort, provider attribution, and redacted receipt are recorded.
 
-## Planned Source Changes
+## Source Change Inventory
 
-| Area | Planned addition/change | Responsibility |
+| Area | Existing implementation / planned addition | Responsibility |
 |---|---|---|
-| prompt authority | existing `pkg/promptlayer/context_*`; `[NEW]` OMP history classification/checkpoint helpers | preserve v1/v2 authority and add provider-neutral transient phase binding |
-| OMP projection | `[NEW] pkg/adapter/omp/omp_context_*.go`, `[NEW] templates/omp/extensions/autopus-context.ts.tmpl`, generated `.omp/extensions/autopus-context.ts` | Go owns hashes/validation; TypeScript only adapts proved native events |
-| config | `[NEW]` OMP context optimization config/validation fields | opt-in mode, thresholds, TTL/namespace, conflict safety |
-| CLI/doctor | `[NEW] internal/cli/workflow_context_runtime*.go` and doctor projection | probe/checkpoint/rehydrate/canary/rollback receipts |
-| tests | `[NEW]` focused promptlayer/OMP/config/CLI tests, coverage verifier, fake runtime fixtures | deterministic Must oracles, changed-file 85%+, baseline no-regression |
+| prompt authority | `pkg/promptlayer/context_*`, `pkg/promptlayer/omp_context_*.go` | preserve v1/v2 authority and provider-neutral transient phase binding |
+| OMP projection | `pkg/adapter/omp/omp_context_*.go`, generated `.omp/extensions/autopus-context.ts` | Go owns hashes/validation; generated TypeScript emits body-free correlated ACK requests only |
+| config | existing OMP context optimization config/validation fields | opt-in mode, thresholds, TTL/namespace, conflict safety |
+| managed CLI primitive | `internal/cli/workflow_context_runtime_managed*.go` and doctor/canary projection | canonical rebuild, private RPC process, ACK/admission, cleanup and rollback receipts |
+| product entrypoint | `[NEW]` user-facing `/auto` OMP session caller/assembler; owning path unresolved | assemble request, authoritative source and managed driver, then invoke `RunManaged` |
+| tests | existing focused promptlayer/OMP/config/CLI tests and coverage verifier | deterministic Must oracles, changed-file 85%+, baseline no-regression |
 
 Generated `.omp/**` output is not the source of truth. Managed OMP session/transcript/compaction artifacts obey REQ-RUNTIME-ARTIFACT-001 and are never repo-tracked runtime state.
 
@@ -155,7 +156,7 @@ Canonical authoring IDs are `S1` through `S13`. If the review harness renders de
 | REQ-PRIVACY-001 | T4, T6, T9 | S5, S7, S13 | INV-008 |
 | REQ-RUNTIME-ARTIFACT-001 | T2, T5, T9 | S5, S13 | INV-010 |
 | REQ-CAP-001 | T2, T5 | S8 | INV-004 |
-| REQ-OPTIONAL-001 | T3, T5 | S3, S10 | INV-002, INV-007 |
+| REQ-OPTIONAL-001 | T3, T5 | S3, S10, S13 | INV-002, INV-003, INV-007, INV-010 |
 | REQ-CHECKPOINT-001 | T4, T5 | S2, S5 | INV-003, INV-005 |
 | REQ-REHYDRATE-001 | T4, T5 | S2, S4 | INV-001, INV-005 |
 | REQ-MEMORY-001 | T6 | S6 | INV-006 |

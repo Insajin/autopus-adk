@@ -81,6 +81,31 @@ type WorkflowContextProcessDriver interface {
 	Cleanup(context.Context) error
 }
 
+type WorkflowContextBridgeBinding struct {
+	SchemaVersion string `json:"schema_version"`
+	BindingHash   string `json:"binding_hash"`
+	OptionsHash   string `json:"options_hash"`
+	SessionHash   string `json:"session_hash"`
+	NonceHash     string `json:"nonce_hash"`
+}
+
+type WorkflowContextDispatchAck struct {
+	SchemaVersion    string `json:"schema_version"`
+	BindingHash      string `json:"binding_hash"`
+	OptionsHash      string `json:"options_hash"`
+	SessionHash      string `json:"session_hash"`
+	NonceHash        string `json:"nonce_hash"`
+	ProviderObserved bool   `json:"provider_observed"`
+}
+
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: managed drivers extend the process contract with bridge binding and observed dispatch acknowledgement.
+// @AX:REASON [AUTO]: the supervisor wrapper, concrete RPC driver, and live canary depend on this fail-closed admission interface.
+type WorkflowContextManagedProcessDriver interface {
+	WorkflowContextProcessDriver
+	Bind(context.Context, WorkflowContextBridgeBinding) error
+	Dispatch(context.Context, WorkflowContextDispatch) (WorkflowContextDispatchAck, error)
+}
+
 type WorkflowContextOverlayRequest struct {
 	HistoryMode string
 	MemoryMode  string

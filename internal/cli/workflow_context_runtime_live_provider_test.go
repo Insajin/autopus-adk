@@ -20,6 +20,7 @@ type workflowContextLiveProvider struct {
 	authHeaders         int
 	unexpectedEndpoints int
 	failure             string
+	userMessages        []string
 }
 
 func newWorkflowContextLiveProvider(t *testing.T) *workflowContextLiveProvider {
@@ -47,13 +48,25 @@ func (p *workflowContextLiveProvider) handle(w http.ResponseWriter, request *htt
 		return
 	}
 	var body struct {
-		Model  string `json:"model"`
-		Stream bool   `json:"stream"`
+		Model    string `json:"model"`
+		Stream   bool   `json:"stream"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content any    `json:"content"`
+		} `json:"messages"`
 	}
 	decoder := json.NewDecoder(io.LimitReader(request.Body, 4<<20))
 	if decoder.Decode(&body) != nil || body.Model != workflowContextLiveModel || !body.Stream {
 		p.reject(w, "invalid-request-shape")
 		return
+	}
+	for index := len(body.Messages) - 1; index >= 0; index-- {
+		if body.Messages[index].Role == "user" {
+			if content := workflowContextLiveMessageText(body.Messages[index].Content); content != "" {
+				p.userMessages = append(p.userMessages, content)
+			}
+			break
+		}
 	}
 	promptTokens := 4096
 	if p.requests == 2 {
@@ -82,6 +95,36 @@ func (p *workflowContextLiveProvider) handle(w http.ResponseWriter, request *htt
 		_, _ = fmt.Fprintf(w, "data: %s\n\n", encoded)
 	}
 	_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
+}
+
+func workflowContextLiveMessageText(content any) string {
+	if text, ok := content.(string); ok {
+		return text
+	}
+	parts, ok := content.([]any)
+	if !ok {
+		return ""
+	}
+	var result string
+	for _, part := range parts {
+		object, ok := part.(map[string]any)
+		if !ok {
+			continue
+		}
+		if text, ok := object["text"].(string); ok {
+			result += text
+		}
+	}
+	return result
+}
+
+func (p *workflowContextLiveProvider) userMessage(request int) string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if request < 1 || request > len(p.userMessages) {
+		return ""
+	}
+	return p.userMessages[request-1]
 }
 
 func (p *workflowContextLiveProvider) reject(w http.ResponseWriter, reason string) {

@@ -26,44 +26,30 @@ export default function bridgeSmoke(pi: any): void {
   pi.registerCommand("autopus-context-smoke", {
     description: "Exercise the generated bridge without a provider turn.",
     async handler(_args: string, context: any): Promise<void> {
-	const invoke = async (bridgeContext: any): Promise<Array<{ eventName: string; result: unknown }>> => {
-	const results: Array<Promise<{ eventName: string; result: unknown }>> = [];
+	const handlers = new Map<string, Function>();
 	autopusContextBridge({
 	  on(eventName: string, handler: Function): void {
-		results.push(
-		  Promise.resolve(handler(undefined, bridgeContext)).then((result) => ({
-			eventName,
-			result,
-		  })),
-		);
+		handlers.set(eventName, handler);
 	  },
 	} as any);
-	return Promise.all(results);
-	};
-	const assertResults = (resolved: Array<{ eventName: string; result: unknown }>): void => {
-	const pre = resolved.find((entry) => entry.eventName === "session_before_compact");
-	const post = resolved.find((entry) => entry.eventName === "session_compact");
-	if ((pre?.result as { cancel?: boolean } | undefined)?.cancel !== true) {
-	  throw new Error("pre bridge handler did not fail closed");
+	const pre = handlers.get("session_before_compact");
+	if (pre === undefined) throw new Error("pre bridge handler missing");
+	const preResult = await pre(undefined, context);
+	if ((preResult as { cancel?: boolean } | undefined)?.cancel === true) {
+	  return;
 	}
-	if (post?.result !== undefined) {
+	if (preResult !== undefined) throw new Error("pre bridge returned an authority claim");
+	const post = handlers.get("session_compact");
+	if (post === undefined) throw new Error("admitted bridge post handler missing");
+	if (await post(undefined, context) !== undefined) {
 	  throw new Error("post bridge handler returned an authority claim");
-	}
-	};
-	assertResults(await invoke(context));
-	for (const notify of [
-	  () => { throw new Error("notify throw"); },
-	  () => Promise.reject(new Error("notify rejection")),
-	  () => new Promise<void>(() => {}),
-	]) {
-	  assertResults(await invoke({ ui: { notify } }));
 	}
     },
   });
 }
 `
 
-func TestOMPContextBridge_InstalledRPCNotifyIsMachineObservableWithoutProvider(t *testing.T) {
+func TestOMPContextBridge_InstalledRPCConfirmIsCorrelatedWithoutProvider(t *testing.T) {
 	executable, err := exec.LookPath(cliBinary)
 	if err != nil {
 		t.Skip("installed omp binary is required for the bridge load smoke")
@@ -96,11 +82,14 @@ func TestOMPContextBridge_InstalledRPCNotifyIsMachineObservableWithoutProvider(t
 		"binding_hash": "sha256:" + strings.Repeat("a", 64),
 		"options_hash": "sha256:" + strings.Repeat("b", 64),
 		"session_hash": "sha256:" + strings.Repeat("c", 64),
+		"nonce_hash":   "sha256:" + strings.Repeat("d", 64),
 	}
 	validEnv := append(append([]string(nil), baseEnv...),
 		"AUTOPUS_OMP_CONTEXT_BINDING_HASH="+hashes["binding_hash"],
 		"AUTOPUS_OMP_CONTEXT_OPTIONS_HASH="+hashes["options_hash"],
 		"AUTOPUS_OMP_CONTEXT_SESSION_HASH="+hashes["session_hash"],
+		"AUTOPUS_OMP_CONTEXT_NONCE_HASH="+hashes["nonce_hash"],
+		"AUTOPUS_OMP_CONTEXT_ACK_TIMEOUT_MS=500",
 	)
 
 	frames, stderr := runOMPContextBridgeStartup(t, executable, workspace, overlay, provider.URL, validEnv, 2)
@@ -127,7 +116,8 @@ func TestOMPContextBridge_InstalledRPCNotifyIsMachineObservableWithoutProvider(t
 			)
 			assert.NotContains(t, invalidStderr, "Failed to load extension")
 			for _, frame := range invalidFrames {
-				assert.False(t, isOMPContextBridgeNotify(frame), printableOMPFrame(frame))
+				_, bridgeConfirm := parseOMPContextBridgeConfirm(frame)
+				assert.False(t, bridgeConfirm, printableOMPFrame(frame))
 			}
 			assertNoOMPProviderActivity(t, invalidFrames)
 		})
@@ -185,8 +175,10 @@ func runOMPContextBridgeStartup(
 	commandSent := false
 	commandCompleted := false
 	bridgeEvents := 0
+	fenceSent := false
+	fenceCompleted := false
 	encoder := json.NewEncoder(stdin)
-	for !ready || !commandSent || !commandCompleted || bridgeEvents < expectedBridgeEvents {
+	for !ready || !commandSent || !commandCompleted || bridgeEvents < expectedBridgeEvents || !fenceCompleted {
 		frame, readErr := nextOMPRPCFrame(ctx, stream, done)
 		if readErr != nil {
 			t.Fatalf("installed bridge RPC failed: %v stderr=%q frames=%s",
@@ -201,10 +193,24 @@ func runOMPContextBridgeStartup(
 			}))
 			commandSent = true
 		}
-		if isOMPContextBridgeNotify(frame) {
+		if request, isBridgeConfirm := parseOMPContextBridgeConfirm(frame); isBridgeConfirm {
 			bridgeEvents++
+			require.NoError(t, encoder.Encode(map[string]any{
+				"type": "extension_ui_response", "id": "wrong-" + request.ID, "confirmed": false,
+			}))
+			require.NoError(t, encoder.Encode(map[string]any{
+				"type": "extension_ui_response", "id": request.ID, "confirmed": true,
+			}))
+			require.NoError(t, encoder.Encode(map[string]any{
+				"type": "extension_ui_response", "id": request.ID, "confirmed": false,
+			}))
 		}
 		commandCompleted = commandCompleted || ompRPCFrameIsSuccessfulResponse(frame, "bridge-smoke")
+		fenceCompleted = fenceCompleted || ompRPCFrameIsSuccessfulResponse(frame, "bridge-fence")
+		if commandCompleted && bridgeEvents >= expectedBridgeEvents && !fenceSent {
+			require.NoError(t, encoder.Encode(map[string]any{"id": "bridge-fence", "type": "get_state"}))
+			fenceSent = true
+		}
 	}
 	require.NoError(t, stdin.Close())
 	require.NoError(t, cmd.Wait(), "stderr: %s", stderr.String())

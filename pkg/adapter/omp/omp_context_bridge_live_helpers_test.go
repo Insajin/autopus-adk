@@ -60,41 +60,51 @@ func summarizeOMPFrames(frames [][]byte) string {
 	return strings.Join(parts, " | ")
 }
 
-func isOMPContextBridgeNotify(frame []byte) bool {
-	var value struct {
-		Type    string `json:"type"`
-		Method  string `json:"method"`
-		Message string `json:"message"`
-	}
-	if json.Unmarshal(frame, &value) != nil || value.Type != "extension_ui_request" || value.Method != "notify" {
-		return false
-	}
-	return strings.Contains(value.Message, `"schema_version":"autopus.omp-context-bridge.v1"`)
+type ompContextBridgeConfirmRequest struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Method  string `json:"method"`
+	Title   string `json:"title"`
+	Message string `json:"message"`
 }
 
-func assertOMPContextBridgeRPCEnvelopes(t *testing.T, frames [][]byte, hashes map[string]string) {
+func parseOMPContextBridgeConfirm(frame []byte) (ompContextBridgeConfirmRequest, bool) {
+	var value ompContextBridgeConfirmRequest
+	if json.Unmarshal(frame, &value) != nil || value.Type != "extension_ui_request" ||
+		value.Method != "confirm" || value.ID == "" {
+		return ompContextBridgeConfirmRequest{}, false
+	}
+	if !strings.Contains(value.Message, `"schema_version":"autopus.omp-context-bridge.v1"`) {
+		return ompContextBridgeConfirmRequest{}, false
+	}
+	return value, true
+}
+
+func assertOMPContextBridgeRPCEnvelopes(t *testing.T, frames [][]byte, hashes map[string]string) []string {
 	t.Helper()
 	seen := make(map[string]int)
+	ids := make([]string, 0, 2)
 	for _, frame := range frames {
-		if !isOMPContextBridgeNotify(frame) {
+		request, ok := parseOMPContextBridgeConfirm(frame)
+		if !ok {
 			continue
 		}
-		var rpc struct {
-			NotifyType string `json:"notifyType"`
-			Message    string `json:"message"`
-		}
-		require.NoError(t, json.Unmarshal(frame, &rpc))
-		assert.Equal(t, "info", rpc.NotifyType)
 		var envelope map[string]string
-		require.NoError(t, json.Unmarshal([]byte(rpc.Message), &envelope))
-		require.Len(t, envelope, 5, "the body-free envelope has exact keys only")
+		require.NoError(t, json.Unmarshal([]byte(request.Message), &envelope))
+		require.Len(t, envelope, 6, "the body-free envelope has exact keys only")
 		assert.Equal(t, "autopus.omp-context-bridge.v1", envelope["schema_version"])
 		for key, value := range hashes {
 			assert.Equal(t, value, envelope[key])
 		}
-		seen[envelope["event"]]++
+		event := envelope["event"]
+		assert.Equal(t, "Autopus context "+event, request.Title)
+		ids = append(ids, request.ID)
+		seen[event]++
 	}
 	assert.Equal(t, map[string]int{"pre_compaction": 1, "post_compaction": 1}, seen)
+	require.Len(t, ids, 2)
+	assert.NotEqual(t, ids[0], ids[1], "each ACK request ID must be single-use")
+	return ids
 }
 
 func assertNoOMPProviderActivity(t *testing.T, frames [][]byte) {

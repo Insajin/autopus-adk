@@ -16,12 +16,13 @@ type SmokeHandler = (event: unknown, context: unknown) => unknown;
 async function runSecurityCase(
   label: string,
   hashes: Array<string | undefined>,
-  notify: () => unknown,
+  confirm: () => unknown,
 ): Promise<void> {
   const names = [
     "AUTOPUS_OMP_CONTEXT_BINDING_HASH",
     "AUTOPUS_OMP_CONTEXT_OPTIONS_HASH",
     "AUTOPUS_OMP_CONTEXT_SESSION_HASH",
+    "AUTOPUS_OMP_CONTEXT_NONCE_HASH",
   ];
   for (let index = 0; index < names.length; index++) {
     const value = hashes[index];
@@ -31,6 +32,7 @@ async function runSecurityCase(
       process.env[names[index]] = value;
     }
   }
+  process.env.AUTOPUS_OMP_CONTEXT_ACK_TIMEOUT_MS = "50";
   const handlers = new Map<string, SmokeHandler>();
   autopusContextBridge({
     on(eventName: string, handler: SmokeHandler): void {
@@ -42,7 +44,7 @@ async function runSecurityCase(
     throw new Error(label + ": pre canceller missing");
   }
   const result = await Promise.race([
-    Promise.resolve(pre(undefined, { ui: { notify } })),
+    Promise.resolve(pre(undefined, { ui: { confirm } })),
     new Promise((_, reject) => setTimeout(() => reject(new Error(label + ": timeout")), 1000)),
   ]);
   if ((result as { cancel?: boolean } | undefined)?.cancel !== true) {
@@ -55,19 +57,19 @@ async function runSecurityCase(
 }
 
 const good = "sha256:" + "a".repeat(64);
-let invalidNotifyCalls = 0;
-await runSecurityCase("missing", [good, good, undefined], () => { invalidNotifyCalls++; });
-await runSecurityCase("uppercase", [good, "sha256:" + "B".repeat(64), good], () => { invalidNotifyCalls++; });
-await runSecurityCase("throw", [good, good, good], () => { throw new Error("throw"); });
-await runSecurityCase("reject", [good, good, good], () => Promise.reject(new Error("reject")));
-await runSecurityCase("hang", [good, good, good], () => new Promise<void>(() => {}));
-if (invalidNotifyCalls !== 0) {
-  throw new Error("invalid hashes emitted a notification");
+let invalidConfirmCalls = 0;
+await runSecurityCase("missing", [good, good, good, undefined], () => { invalidConfirmCalls++; });
+await runSecurityCase("uppercase", [good, "sha256:" + "B".repeat(64), good, good], () => { invalidConfirmCalls++; });
+await runSecurityCase("throw", [good, good, good, good], () => { throw new Error("throw"); });
+await runSecurityCase("reject", [good, good, good, good], () => Promise.reject(new Error("reject")));
+await runSecurityCase("hang", [good, good, good, good], () => new Promise<void>(() => {}));
+if (invalidConfirmCalls !== 0) {
+  throw new Error("invalid hashes emitted a confirmation request");
 }
-console.log(JSON.stringify({ cases: 5, invalid_notify_calls: invalidNotifyCalls, pre_cancel: true }));
+console.log(JSON.stringify({ cases: 5, invalid_confirm_calls: invalidConfirmCalls, pre_cancel: true }));
 `
 
-func TestOMPContextBridgeSecurity_PreAlwaysCancelsNotifyFailures(t *testing.T) {
+func TestOMPContextBridgeSecurity_PreAlwaysCancelsConfirmFailures(t *testing.T) {
 	bun, err := exec.LookPath("bun")
 	if err != nil {
 		t.Skip("bun is required to execute the generated TypeScript security contract")
@@ -82,12 +84,12 @@ func TestOMPContextBridgeSecurity_PreAlwaysCancelsNotifyFailures(t *testing.T) {
 		t.Fatalf("generated bridge security harness failed: %v", err)
 	}
 	var receipt struct {
-		Cases              int  `json:"cases"`
-		InvalidNotifyCalls int  `json:"invalid_notify_calls"`
-		PreCancel          bool `json:"pre_cancel"`
+		Cases               int  `json:"cases"`
+		InvalidConfirmCalls int  `json:"invalid_confirm_calls"`
+		PreCancel           bool `json:"pre_cancel"`
 	}
 	if json.Unmarshal(output, &receipt) != nil || receipt.Cases != 5 ||
-		receipt.InvalidNotifyCalls != 0 || !receipt.PreCancel {
+		receipt.InvalidConfirmCalls != 0 || !receipt.PreCancel {
 		t.Fatalf("unexpected bridge security receipt: %s", output)
 	}
 }

@@ -47,8 +47,6 @@ func (store *OMPContextTransientStore) Checkpoint(input OMPContextBindingInput) 
 	return cloneOMPContextBinding(binding), nil
 }
 
-// @AX:WARN [AUTO]: transient rehydration contains 8 if branches.
-// @AX:REASON [AUTO]: binding lookup, one-shot state, delivery hash, dispatch, cleanup, and terminal receipt invariants converge here.
 func (store *OMPContextTransientStore) Rehydrate(
 	bindingHash string,
 	opts ContextDeliveryOptions,
@@ -60,7 +58,6 @@ func (store *OMPContextTransientStore) Rehydrate(
 	}
 	defer state.bodies.zeroize()
 	receipt := terminalOMPContextReceipt("rehydrate", state.binding, "required-context-mismatch")
-
 	optionsHash, optionsErr := ompContextOptionsHash(opts)
 	if optionsErr != nil || optionsHash != state.binding.OptionsHash {
 		receipt.Reason = "context-options-mismatch"
@@ -69,6 +66,38 @@ func (store *OMPContextTransientStore) Rehydrate(
 	rebuilt, buildErr := BuildContextDelivery(opts)
 	if buildErr != nil {
 		return receipt, fmt.Errorf("rebuild OMP required context: %w", buildErr)
+	}
+	return rehydrateOMPContextState(state, opts, rebuilt, consume)
+}
+
+// RehydrateCanonical verifies a supervisor-provided canonical rebuild before admission.
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: public boundary for supervisor-provided canonical rehydration.
+// @AX:REASON [AUTO]: managed admission depends on one-shot state consumption, exact delivery verification, and zeroization remaining atomic from the caller's perspective.
+func (store *OMPContextTransientStore) RehydrateCanonical(
+	bindingHash string,
+	opts ContextDeliveryOptions,
+	rebuilt ContextDeliveryResult,
+	consume func(OMPContextTransientView) error,
+) (OMPContextTerminalReceipt, error) {
+	state, err := store.take(bindingHash)
+	if err != nil {
+		return OMPContextTerminalReceipt{}, err
+	}
+	defer state.bodies.zeroize()
+	return rehydrateOMPContextState(state, opts, rebuilt, consume)
+}
+
+func rehydrateOMPContextState(
+	state *ompContextTransientState,
+	opts ContextDeliveryOptions,
+	rebuilt ContextDeliveryResult,
+	consume func(OMPContextTransientView) error,
+) (OMPContextTerminalReceipt, error) {
+	receipt := terminalOMPContextReceipt("rehydrate", state.binding, "required-context-mismatch")
+	optionsHash, optionsErr := ompContextOptionsHash(opts)
+	if optionsErr != nil || optionsHash != state.binding.OptionsHash {
+		receipt.Reason = "context-options-mismatch"
+		return receipt, fmt.Errorf("OMP context options mismatch")
 	}
 	if verifyErr := VerifyContextDeliveryForOptions(opts, rebuilt); verifyErr != nil {
 		return receipt, fmt.Errorf("verify OMP required context: %w", verifyErr)

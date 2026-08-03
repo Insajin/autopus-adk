@@ -18,7 +18,7 @@ const expectedOMPContextBridgeSource = `type BridgeEvent = "pre_compaction" | "p
 
 type BridgeContext = {
   ui: {
-    notify(message: string, level: "info"): void | Promise<void>;
+    confirm(title: string, message: string): boolean | Promise<boolean>;
   };
 };
 
@@ -26,6 +26,12 @@ type BridgeHashes = {
   binding_hash: string;
   options_hash: string;
   session_hash: string;
+  nonce_hash: string;
+};
+
+type BridgeConfig = {
+  hashes: BridgeHashes;
+  ackTimeoutMs: number;
 };
 
 type PreCompactResult = {
@@ -38,7 +44,7 @@ type BridgeAPI = {
     handler: (
       _event: unknown,
       context: BridgeContext,
-    ) => PreCompactResult | Promise<PreCompactResult>,
+    ) => PreCompactResult | undefined | Promise<PreCompactResult | undefined>,
   ): void;
   on(
     event: "session_compact",
@@ -47,71 +53,105 @@ type BridgeAPI = {
 };
 
 const HASH_PATTERN = /^sha256:[0-9a-f]{64}$/;
-const NOTIFY_TIMEOUT_MS = 250;
+const INTEGER_PATTERN = /^[0-9]+$/;
+const DEFAULT_ACK_TIMEOUT_MS = 5000;
+const MIN_ACK_TIMEOUT_MS = 50;
+const MAX_ACK_TIMEOUT_MS = 10000;
 
 function checkedHash(value: string | undefined): string | null {
   return value !== undefined && HASH_PATTERN.test(value) ? value : null;
 }
 
-function readBridgeHashes(): BridgeHashes | null {
+function readACKTimeout(): number | null {
+  const value = process.env.AUTOPUS_OMP_CONTEXT_ACK_TIMEOUT_MS;
+  if (value === undefined) {
+    return DEFAULT_ACK_TIMEOUT_MS;
+  }
+  if (!INTEGER_PATTERN.test(value)) {
+    return null;
+  }
+  const timeout = Number(value);
+  return Number.isSafeInteger(timeout) && timeout >= MIN_ACK_TIMEOUT_MS && timeout <= MAX_ACK_TIMEOUT_MS
+    ? timeout
+    : null;
+}
+
+function readBridgeConfig(): BridgeConfig | null {
   const bindingHash = checkedHash(process.env.AUTOPUS_OMP_CONTEXT_BINDING_HASH);
   const optionsHash = checkedHash(process.env.AUTOPUS_OMP_CONTEXT_OPTIONS_HASH);
   const sessionHash = checkedHash(process.env.AUTOPUS_OMP_CONTEXT_SESSION_HASH);
-  if (bindingHash === null || optionsHash === null || sessionHash === null) {
+  const nonceHash = checkedHash(process.env.AUTOPUS_OMP_CONTEXT_NONCE_HASH);
+  const ackTimeoutMs = readACKTimeout();
+  if (bindingHash === null || optionsHash === null || sessionHash === null ||
+      nonceHash === null || ackTimeoutMs === null) {
     return null;
   }
   return {
-    binding_hash: bindingHash,
-    options_hash: optionsHash,
-    session_hash: sessionHash,
+    hashes: {
+      binding_hash: bindingHash,
+      options_hash: optionsHash,
+      session_hash: sessionHash,
+      nonce_hash: nonceHash,
+    },
+    ackTimeoutMs,
   };
 }
 
-async function notifySafely(
+async function confirmSafely(
   context: BridgeContext,
   event: BridgeEvent,
   hashes: BridgeHashes,
-): Promise<void> {
+  ackTimeoutMs: number,
+): Promise<boolean> {
   const message = JSON.stringify({
     schema_version: "autopus.omp-context-bridge.v1",
     event,
     ...hashes,
   });
-  await new Promise<void>((resolve) => {
+  return new Promise<boolean>((resolve) => {
     let settled = false;
-    const finish = (): void => {
+    const finish = (confirmed: boolean): void => {
       if (settled) {
         return;
       }
       settled = true;
       clearTimeout(timer);
-      resolve();
+      resolve(confirmed);
     };
-    const timer = setTimeout(finish, NOTIFY_TIMEOUT_MS);
+    const timer = setTimeout(() => finish(false), ackTimeoutMs);
     try {
-      Promise.resolve(context.ui.notify(message, "info")).then(finish, finish);
+      if (typeof context.ui.confirm !== "function") {
+        finish(false);
+        return;
+      }
+      Promise.resolve(context.ui.confirm("Autopus context " + event, message)).then(
+        (confirmed) => finish(confirmed === true),
+        () => finish(false),
+      );
     } catch {
-      finish();
+      finish(false);
     }
   });
 }
 
 export default function autopusContextBridge(pi: BridgeAPI): void {
-  const hashes = readBridgeHashes();
+  const config = readBridgeConfig();
   pi.on("session_before_compact", async (_event, context) => {
-    try {
-      if (hashes !== null) {
-        await notifySafely(context, "pre_compaction", hashes);
-      }
-    } finally {
+    if (config === null || !(await confirmSafely(
+      context,
+      "pre_compaction",
+      config.hashes,
+      config.ackTimeoutMs,
+    ))) {
       return { cancel: true } as const;
     }
+    return undefined;
   });
-  if (hashes === null) {
+  if (config === null) {
     return;
   }
   pi.on("session_compact", async (_event, context) => {
-    await notifySafely(context, "post_compaction", hashes);
+    await confirmSafely(context, "post_compaction", config.hashes, config.ackTimeoutMs);
   });
 }
 `
@@ -163,9 +203,15 @@ func TestOMPContextBridge_OptInEmitsExactBodyFreeMapping(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(string(bridge.Content), "process.env.AUTOPUS_OMP_CONTEXT_BINDING_HASH"))
 	assert.Equal(t, 1, strings.Count(string(bridge.Content), "process.env.AUTOPUS_OMP_CONTEXT_OPTIONS_HASH"))
 	assert.Equal(t, 1, strings.Count(string(bridge.Content), "process.env.AUTOPUS_OMP_CONTEXT_SESSION_HASH"))
+	assert.Equal(t, 1, strings.Count(string(bridge.Content), "process.env.AUTOPUS_OMP_CONTEXT_NONCE_HASH"))
+	assert.Equal(t, 1, strings.Count(string(bridge.Content), "process.env.AUTOPUS_OMP_CONTEXT_ACK_TIMEOUT_MS"))
+	assert.Contains(t, string(bridge.Content), "context.ui.confirm(\"Autopus context \" + event, message)")
 	assert.Contains(t, string(bridge.Content), "return { cancel: true } as const;")
-	assert.Contains(t, string(bridge.Content), "const NOTIFY_TIMEOUT_MS = 250;")
-	assert.Contains(t, string(bridge.Content), "} finally {")
+	assert.Contains(t, string(bridge.Content), "const DEFAULT_ACK_TIMEOUT_MS = 5000;")
+	assert.Contains(t, string(bridge.Content), "const MIN_ACK_TIMEOUT_MS = 50;")
+	assert.Contains(t, string(bridge.Content), "const MAX_ACK_TIMEOUT_MS = 10000;")
+	assert.NotContains(t, string(bridge.Content), "notify(")
+	assert.NotContains(t, string(bridge.Content), "} finally {")
 	assert.False(t, NewWithRoot(t.TempDir()).SupportsHooks(), "generic hook semantics remain unsupported")
 }
 
