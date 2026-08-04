@@ -33,6 +33,8 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 	tasks := make(map[string]bool, 20)
 	observationDigests := make(map[string]bool, 40)
 	usageDigests := make(map[string]bool, 40)
+	sessionReceipts := make(map[string]string, 2)
+	sessionSequences := map[string]int{"A": 0, "B": 0}
 	rows := make([]OMPContextCanaryRowV1, 0, 40)
 	var previousCompleted time.Time
 	abCount, baCount := 0, 0
@@ -49,8 +51,10 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 		for pairIndex := 0; pairIndex < 2; pairIndex++ {
 			observation := report.Observations[taskIndex*2+pairIndex]
 			expectedVariant := string(task.Order[pairIndex])
+			sessionSequences[expectedVariant]++
 			if err := validateOMPContextPromotionObservationV1(report, observation, task.TaskIDDigest,
-				expectedVariant, taskIndex*2+pairIndex+1, previousCompleted, observationDigests, usageDigests); err != nil {
+				expectedVariant, taskIndex*2+pairIndex+1, sessionSequences[expectedVariant], previousCompleted,
+				observationDigests, usageDigests, sessionReceipts); err != nil {
 				return nil, 0, 0, err
 			}
 			completed, _ := time.Parse(time.RFC3339Nano, observation.CompletedAt)
@@ -63,26 +67,44 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 			})
 		}
 	}
+	if sessionSequences["A"] != 20 || sessionSequences["B"] != 20 || sessionReceipts["A"] == "" ||
+		sessionReceipts["B"] == "" || sessionReceipts["A"] == sessionReceipts["B"] {
+		return nil, 0, 0, fmt.Errorf("OMP context promotion session projection is invalid")
+	}
 	return rows, abCount, baCount, nil
 }
 
 func validateOMPContextPromotionObservationV1(report OMPContextPromotionReportV1, observation OMPContextPromotionObservationV1,
-	taskDigest, variant string, sequence int, previousCompleted time.Time, observationDigests, usageDigests map[string]bool) error {
+	taskDigest, variant string, sequence, sessionSequence int, previousCompleted time.Time,
+	observationDigests, usageDigests map[string]bool, sessionReceipts map[string]string) error {
 	started, startErr := parseCanonicalOMPContextPromotionTimeV2(observation.StartedAt)
 	completed, completeErr := parseCanonicalOMPContextPromotionTimeV2(observation.CompletedAt)
 	if startErr != nil || completeErr != nil || !started.Before(completed) || (!previousCompleted.IsZero() && started.Before(previousCompleted)) {
 		return fmt.Errorf("OMP context promotion observations are not strictly serial")
 	}
 	if observation.Sequence != sequence || observation.TaskIDDigest != taskDigest || observation.Variant != variant ||
+		!validOMPContextMemoryHashV1(observation.SessionReceiptDigest) || observation.SessionSequence != sessionSequence ||
+		observation.ProcessReused != (sessionSequence > 1) ||
 		observation.Provider != report.Provider || observation.ModelScopeDigest != report.ModelScopeDigest ||
 		observation.EndpointClass != "external-provider" || observation.Transport != "provider-api" ||
 		observation.CredentialMode != "locator-only" || observation.ExecutionMode != "external-live" {
 		return fmt.Errorf("OMP context promotion observation binding is invalid")
 	}
+	if receipt := sessionReceipts[variant]; receipt == "" {
+		sessionReceipts[variant] = observation.SessionReceiptDigest
+	} else if receipt != observation.SessionReceiptDigest {
+		return fmt.Errorf("OMP context promotion session receipt changed")
+	}
 	if observation.InputTokens <= 0 || observation.OutputTokens <= 0 || observation.TotalTokens <= 0 ||
 		observation.InputTokens > 1_000_000_000_000 || observation.OutputTokens > 1_000_000_000_000 ||
-		observation.TotalTokens != observation.InputTokens+observation.OutputTokens || observation.QualityScore <= 0 ||
-		observation.QualityScore > 1_000_000_000 || observation.RetryCount != 0 || observation.MaxConcurrency != 1 {
+		observation.TotalTokens != observation.InputTokens+observation.OutputTokens || observation.QualityScore != 10000 ||
+		observation.SetupProviderRequests < 0 || observation.SetupProviderRequests > 1_000_000 ||
+		observation.CompactionProviderRequests < 0 || observation.CompactionProviderRequests > 1_000_000 ||
+		observation.PrimaryProviderRequests != 1 ||
+		(variant == "A" && observation.CompactionProviderRequests != 0) ||
+		observation.TotalProviderRequests != observation.SetupProviderRequests+
+			observation.CompactionProviderRequests+observation.PrimaryProviderRequests ||
+		observation.RetryCount != 0 || observation.MaxConcurrency != 1 {
 		return fmt.Errorf("OMP context promotion observation facts are invalid")
 	}
 	if !observation.IntegrityPassed || !observation.SecurityPassed || !observation.FallbackVerified ||

@@ -52,13 +52,29 @@ func validateOMPContextPromotionReportMetadataV1(report OMPContextPromotionRepor
 	runtime := report.Runtime
 	if !safeOMPContextMemoryMetadataV1(runtime.AutoVersion) || !validOMPContextMemoryHashV1(runtime.AutoBinarySHA256) ||
 		!safeOMPContextMemoryMetadataV1(runtime.OMPVersion) || !validOMPContextMemoryHashV1(runtime.OMPExecutableSHA256) ||
-		runtime.ExecutionClass != "external-live" || runtime.RuntimeKind != "omp-managed-rpc" {
+		runtime.ExecutionClass != "external-live" || !runtime.ProductionPathEquivalent ||
+		runtime.RuntimeKind != "omp-pipeline-managed-rpc" || !validOMPContextMemoryHashV1(runtime.PipelineImplementationDigest) {
 		return fmt.Errorf("OMP context promotion runtime is invalid")
+	}
+	if report.SessionFacts != (OMPContextPromotionSessionFactsV1{
+		FullProcessStarts: 1, OptimizedProcessStarts: 1,
+		FullSessionCount: 1, OptimizedSessionCount: 1,
+		MaxConcurrency: 1, CrossSessionContamination: 0,
+	}) {
+		return fmt.Errorf("OMP context promotion session facts are invalid")
 	}
 	if !safeOMPContextMemoryMetadataV1(report.Provider) || !validOMPContextMemoryHashV1(report.ModelScopeDigest) ||
 		!validOMPContextMemoryHashV1(report.CohortManifestDigest) || !validOMPContextMemoryHashV1(report.OrderSeed) ||
 		!validOMPContextMemoryHashV1(report.OraclePolicyDigest) {
 		return fmt.Errorf("OMP context promotion scope is invalid")
+	}
+	taskBytes, err := json.Marshal(report.Tasks)
+	if err != nil {
+		return fmt.Errorf("OMP context promotion task manifest is invalid")
+	}
+	taskDigest := promotionSHA256(taskBytes)
+	if report.CohortManifestDigest != taskDigest || report.OrderSeed != taskDigest {
+		return fmt.Errorf("OMP context promotion task manifest digest is invalid")
 	}
 	return nil
 }
@@ -82,6 +98,7 @@ func validateOMPContextPromotionExpectationV2(value OMPContextPromotionExpectati
 		safeOMPContextMemoryMetadataV1(value.PolicyID) && validOMPContextMemoryHashV1(value.PolicyDigest) &&
 		safeOMPContextMemoryMetadataV1(value.AutoVersion) && validOMPContextMemoryHashV1(value.AutoBinarySHA256) &&
 		safeOMPContextMemoryMetadataV1(value.OMPVersion) && validOMPContextMemoryHashV1(value.OMPExecutableSHA256) &&
+		validOMPContextMemoryHashV1(value.PipelineImplementationDigest) &&
 		safeOMPContextMemoryMetadataV1(value.Provider) && validOMPContextMemoryHashV1(value.ModelScopeDigest) &&
 		validOMPContextMemoryHashV1(value.CohortManifestDigest) && validOMPContextMemoryHashV1(value.OrderSeed) &&
 		validOMPContextMemoryHashV1(value.OraclePolicyDigest)
@@ -93,7 +110,8 @@ func matchesOMPContextPromotionExpectationV2(report OMPContextPromotionReportV1,
 		report.Policy.PolicyID == expected.PolicyID &&
 		report.Policy.PolicyDigest == expected.PolicyDigest && report.Runtime.AutoVersion == expected.AutoVersion &&
 		report.Runtime.AutoBinarySHA256 == expected.AutoBinarySHA256 && report.Runtime.OMPVersion == expected.OMPVersion &&
-		report.Runtime.OMPExecutableSHA256 == expected.OMPExecutableSHA256 && report.Provider == expected.Provider &&
+		report.Runtime.OMPExecutableSHA256 == expected.OMPExecutableSHA256 &&
+		report.Runtime.PipelineImplementationDigest == expected.PipelineImplementationDigest && report.Provider == expected.Provider &&
 		report.ModelScopeDigest == expected.ModelScopeDigest && report.CohortManifestDigest == expected.CohortManifestDigest &&
 		report.OrderSeed == expected.OrderSeed && report.OraclePolicyDigest == expected.OraclePolicyDigest
 }

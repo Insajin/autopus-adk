@@ -33,20 +33,21 @@ type ompContextPromotionAttestationStatementV2 struct {
 }
 
 type OMPContextPromotionExpectationV2 struct {
-	ProducerRepository   string
-	ProducerWorkflowRef  string
-	Candidate            OMPContextPromotionCandidateV1
-	PolicyID             string
-	PolicyDigest         string
-	AutoVersion          string
-	AutoBinarySHA256     string
-	OMPVersion           string
-	OMPExecutableSHA256  string
-	Provider             string
-	ModelScopeDigest     string
-	CohortManifestDigest string
-	OrderSeed            string
-	OraclePolicyDigest   string
+	ProducerRepository           string
+	ProducerWorkflowRef          string
+	Candidate                    OMPContextPromotionCandidateV1
+	PolicyID                     string
+	PolicyDigest                 string
+	AutoVersion                  string
+	AutoBinarySHA256             string
+	OMPVersion                   string
+	OMPExecutableSHA256          string
+	PipelineImplementationDigest string
+	Provider                     string
+	ModelScopeDigest             string
+	CohortManifestDigest         string
+	OrderSeed                    string
+	OraclePolicyDigest           string
 }
 
 // VerifiedOMPContextPromotion can only be populated after strict signature,
@@ -75,7 +76,12 @@ type VerifiedOMPContextPromotionHistoricalProof struct {
 }
 
 func (v VerifiedOMPContextPromotion) Valid() bool {
-	return v.reportDigest != "" && v.evidenceID != "" && !v.expiresAt.IsZero()
+	return v.validAt(time.Now().UTC())
+}
+
+func (v VerifiedOMPContextPromotion) validAt(now time.Time) bool {
+	return v.reportDigest != "" && v.evidenceID != "" && !v.expiresAt.IsZero() &&
+		!now.IsZero() && now.Before(v.expiresAt)
 }
 func (v VerifiedOMPContextPromotion) ReportDigest() string { return v.reportDigest }
 func (v VerifiedOMPContextPromotion) EvidenceID() string   { return v.evidenceID }

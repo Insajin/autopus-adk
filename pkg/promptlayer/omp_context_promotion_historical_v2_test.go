@@ -66,3 +66,24 @@ func TestVerifyOMPContextPromotionHistoricalArtifactV2_StillRejectsInvalidTTLSig
 		}
 	})
 }
+
+func TestVerifiedOMPContextPromotion_Valid_RechecksExpiryAtUse(t *testing.T) {
+	fixture := newOMPContextPromotionV2Fixture(t)
+	verified, err := verifyOMPContextPromotionArtifactV2WithTrust(
+		fixture.reportBytes,
+		fixture.attestationBytes,
+		fixture.now,
+		fixture.expectation,
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !verified.validAt(fixture.now) {
+		t.Fatal("fresh grant reported invalid")
+	}
+	if verified.validAt(fixture.now.Add(time.Hour)) {
+		t.Fatal("expired grant remained valid at use")
+	}
+}

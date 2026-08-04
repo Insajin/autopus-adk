@@ -50,6 +50,14 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsFreshnessAndRevocationViolat
 			f.attestation.NotBefore = f.attestation.IssuedAt
 			f.attestation.ExpiresAt = f.now.Add(time.Hour).Format(time.RFC3339Nano)
 		}},
+		{name: "before not-before", mutate: func(f *ompContextPromotionV2Fixture) {
+			f.attestation.IssuedAt = f.now.Add(time.Minute).Format(time.RFC3339Nano)
+			f.attestation.NotBefore = f.attestation.IssuedAt
+			f.attestation.ExpiresAt = f.now.Add(time.Hour).Format(time.RFC3339Nano)
+		}},
+		{name: "excessive not-before backdate", mutate: func(f *ompContextPromotionV2Fixture) {
+			f.attestation.NotBefore = f.now.Add(-7 * time.Minute).Format(time.RFC3339Nano)
+		}},
 		{name: "overlong ttl", mutate: func(f *ompContextPromotionV2Fixture) {
 			f.attestation.ExpiresAt = f.now.Add(25 * time.Hour).Format(time.RFC3339Nano)
 		}},
@@ -75,6 +83,25 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsFreshnessAndRevocationViolat
 	}
 }
 
+func TestVerifyOMPContextPromotionArtifactV2_AcceptsProducerMaximumValidityWindow(t *testing.T) {
+	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture.attestation.IssuedAt = fixture.now.Format(time.RFC3339Nano)
+	fixture.attestation.NotBefore = fixture.now.Add(-5 * time.Minute).Format(time.RFC3339Nano)
+	fixture.attestation.ExpiresAt = fixture.now.Add(24 * time.Hour).Format(time.RFC3339Nano)
+	fixture.signAttestation(t)
+
+	if _, err := verifyOMPContextPromotionArtifactV2WithTrust(
+		fixture.reportBytes,
+		fixture.attestationBytes,
+		fixture.now,
+		fixture.expectation,
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey},
+		nil,
+	); err != nil {
+		t.Fatalf("producer maximum validity window rejected: %v", err)
+	}
+}
+
 func TestVerifyOMPContextPromotionArtifactV2_RejectsReplayCoordinateMismatch(t *testing.T) {
 	tests := map[string]func(*OMPContextPromotionExpectationV2){
 		"producer repository": func(e *OMPContextPromotionExpectationV2) { e.ProducerRepository = "Insajin/other" },
@@ -90,8 +117,11 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsReplayCoordinateMismatch(t *
 		"artifact": func(e *OMPContextPromotionExpectationV2) {
 			e.Candidate.ArtifactSHA256 = promotionSHA256([]byte("other"))
 		},
-		"policy":   func(e *OMPContextPromotionExpectationV2) { e.PolicyDigest = promotionSHA256([]byte("other")) },
-		"runtime":  func(e *OMPContextPromotionExpectationV2) { e.OMPVersion = "omp/17.2.8" },
+		"policy":  func(e *OMPContextPromotionExpectationV2) { e.PolicyDigest = promotionSHA256([]byte("other")) },
+		"runtime": func(e *OMPContextPromotionExpectationV2) { e.OMPVersion = "omp/17.2.8" },
+		"pipeline": func(e *OMPContextPromotionExpectationV2) {
+			e.PipelineImplementationDigest = promotionSHA256([]byte("other"))
+		},
 		"provider": func(e *OMPContextPromotionExpectationV2) { e.Provider = "anthropic" },
 		"cohort":   func(e *OMPContextPromotionExpectationV2) { e.CohortManifestDigest = promotionSHA256([]byte("other")) },
 		"oracle":   func(e *OMPContextPromotionExpectationV2) { e.OraclePolicyDigest = promotionSHA256([]byte("other")) },

@@ -23,7 +23,12 @@ var (
 	ErrOMPContextPromotionStale    = errors.New("OMP context promotion artifact is stale")
 )
 
-func VerifyOMPContextPromotionArtifactV2(reportBytes, attestationBytes []byte, now time.Time,
+func VerifyOMPContextPromotionArtifactV2(reportBytes, attestationBytes []byte,
+	expected OMPContextPromotionExpectationV2) (VerifiedOMPContextPromotion, error) {
+	return verifyOMPContextPromotionArtifactV2At(reportBytes, attestationBytes, time.Now().UTC(), expected)
+}
+
+func verifyOMPContextPromotionArtifactV2At(reportBytes, attestationBytes []byte, now time.Time,
 	expected OMPContextPromotionExpectationV2) (VerifiedOMPContextPromotion, error) {
 	return verifyOMPContextPromotionArtifactV2WithTrust(reportBytes, attestationBytes, now, expected,
 		committedOMPContextPromotionPublicKeysV2(), ompContextPromotionRevokedKeysV2)
@@ -121,7 +126,7 @@ func verifyOMPContextPromotionSignatureV2(reportBytes []byte, attestation OMPCon
 	if err != nil {
 		return time.Time{}, err
 	}
-	if now.Before(notBefore.Add(-ompContextPromotionFutureSkewV2)) || issuedAt.After(now.Add(ompContextPromotionFutureSkewV2)) ||
+	if now.Before(notBefore) || issuedAt.After(now.Add(ompContextPromotionFutureSkewV2)) ||
 		!now.Before(expiresAt) {
 		return time.Time{}, ErrOMPContextPromotionStale
 	}
@@ -137,8 +142,9 @@ func verifyOMPContextPromotionSignatureAndTimesV2(reportBytes []byte, attestatio
 	issuedAt, issueErr := parseCanonicalOMPContextPromotionTimeV2(attestation.IssuedAt)
 	notBefore, beforeErr := parseCanonicalOMPContextPromotionTimeV2(attestation.NotBefore)
 	expiresAt, expiryErr := parseCanonicalOMPContextPromotionTimeV2(attestation.ExpiresAt)
-	if issueErr != nil || beforeErr != nil || expiryErr != nil || issuedAt.Before(notBefore) || !issuedAt.Before(expiresAt) ||
-		expiresAt.Sub(notBefore) > ompContextPromotionMaxTTLV2 {
+	if issueErr != nil || beforeErr != nil || expiryErr != nil || issuedAt.Before(notBefore) ||
+		issuedAt.Sub(notBefore) > ompContextPromotionFutureSkewV2 || !issuedAt.Before(expiresAt) ||
+		expiresAt.Sub(issuedAt) > ompContextPromotionMaxTTLV2 {
 		return time.Time{}, time.Time{}, time.Time{}, ErrOMPContextPromotionStale
 	}
 	publicKey, present := trusted[attestation.KeyID]
