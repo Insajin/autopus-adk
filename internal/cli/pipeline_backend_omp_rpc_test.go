@@ -35,6 +35,15 @@ type pipelineOMPRPCRecord struct {
 }
 
 func TestMain(m *testing.M) {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		_, _ = os.Stdout.WriteString("omp/17.2.7\n")
+		os.Exit(0)
+	}
+	if logPath, unsafe, ok := pipelineOMPActiveNativeFixture(os.Args[1:]); ok {
+		_ = os.Setenv("AUTOPUS_TEST_OMP_ACTIVE_LOG", logPath)
+		_ = os.Setenv("AUTOPUS_TEST_OMP_ACTIVE_UNSAFE", unsafe)
+		os.Exit(runPipelineOMPActiveRPCFixture())
+	}
 	if os.Getenv(pipelineOMPActiveRPCFixtureEnv) == "1" {
 		os.Exit(runPipelineOMPActiveRPCFixture())
 	}

@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -122,7 +121,18 @@ func startPipelineOMPActiveProcess(
 		"--no-skills", "--no-rules", "--no-lsp", "--no-pty", "--no-title",
 		"--max-time", active.backend.MaxTime.String(),
 	}
-	cmd := exec.Command(privateExecutable, args...)
+	privateExecutable, privateIdentity, err := canonicalPipelineOMPExecutable(privateExecutable)
+	if err != nil || privateIdentity.digest != active.backend.executableID.digest {
+		cleanup()
+		return nil, errors.New("managed active OMP child executable identity is invalid")
+	}
+	verifiedCommand, err := newPipelineOMPVerifiedExecCommandWithGate(ctx, privateExecutable, privateIdentity, args...)
+	if err != nil {
+		cleanup()
+		return nil, err
+	}
+	defer verifiedCommand.Close()
+	cmd := verifiedCommand.cmd
 	cmd.Dir, cmd.Env, cmd.Stderr = active.backend.ProjectDir,
 		workflowContextManagedRPCEnvironment(environment, active.binding), io.Discard
 	cmd.WaitDelay = 500 * time.Millisecond
@@ -145,7 +155,7 @@ func startPipelineOMPActiveProcess(
 		cleanup()
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
+	if err := verifiedCommand.Start(); err != nil {
 		_ = stdin.Close()
 		_ = stdout.Close()
 		cleanup()

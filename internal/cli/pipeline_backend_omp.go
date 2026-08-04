@@ -22,6 +22,7 @@ type pipelineOMPBackendConfig struct {
 	GitCommitHash  string
 	RuntimeBase    string
 	Environment    []string
+	canonicalEnv   []string
 	PhaseModels    map[pipeline.PhaseID]string
 	MaxTime        time.Duration
 	ManagedActive  pipelineOMPManagedActiveRunner
@@ -39,12 +40,13 @@ const (
 )
 
 type pipelineOMPBackend struct {
-	mu       sync.Mutex
-	config   pipelineOMPBackendConfig
-	process  *pipelineOMPProcess
-	protocol *pipelineOMPRPCProtocol
-	mode     pipelineOMPRunMode
-	closed   bool
+	mu                   sync.Mutex
+	config               pipelineOMPBackendConfig
+	process              *pipelineOMPProcess
+	protocol             *pipelineOMPRPCProtocol
+	activeExecutableRoot string
+	mode                 pipelineOMPRunMode
+	closed               bool
 }
 
 var _ pipeline.PhaseBackend = (*pipelineOMPBackend)(nil)
@@ -55,10 +57,26 @@ func newPipelineOMPBackend(config pipelineOMPBackendConfig) (*pipelineOMPBackend
 	if err != nil {
 		return nil, err
 	}
-	if coordinator, ok := normalized.ManagedActive.(*pipelineOMPManagedActiveCoordinator); ok && coordinator.start == nil {
-		coordinator.start = newPipelineOMPActiveSessionStart(normalized)
+	backend := &pipelineOMPBackend{config: normalized}
+	if coordinator, ok := normalized.ManagedActive.(*pipelineOMPManagedActiveCoordinator); ok {
+		if coordinator.current == nil {
+			normalized, backend.activeExecutableRoot, err = materializePipelineOMPActiveRuntimeConfig(normalized)
+			if err != nil {
+				if normalized.ownRuntimeBase {
+					_ = os.Remove(normalized.RuntimeBase)
+				}
+				return nil, err
+			}
+			backend.config = normalized
+		}
+		if coordinator.start == nil {
+			coordinator.start = newPipelineOMPActiveSessionStart(normalized)
+		}
+		if coordinator.current == nil {
+			coordinator.current = newPipelineOMPActiveCurrentRuntimeProvider(normalized)
+		}
 	}
-	return &pipelineOMPBackend{config: normalized}, nil
+	return backend, nil
 }
 
 // @AX:WARN [AUTO]: Backend normalization has cyclomatic complexity 19 across authority and runtime checks.
@@ -112,6 +130,7 @@ func normalizePipelineOMPBackendConfig(config pipelineOMPBackendConfig) (pipelin
 	config.SpecDir = filepath.Clean(config.SpecDir)
 	config.Executable, config.executableID = executable, executableID
 	config.Environment = environment
+	config.canonicalEnv = pipelineOMPCanonicalEnvironment(environment)
 	config.PhaseModels = clonePipelineOMPPhaseModels(config.PhaseModels)
 	return config, nil
 }
@@ -243,6 +262,10 @@ func (backend *pipelineOMPBackend) closeLocked() error {
 	if backend.config.ManagedActive != nil {
 		err = errors.Join(err, backend.config.ManagedActive.Close())
 	}
+	if backend.activeExecutableRoot != "" {
+		err = errors.Join(err, os.RemoveAll(backend.activeExecutableRoot))
+		backend.activeExecutableRoot = ""
+	}
 	if backend.config.ownRuntimeBase {
 		err = errors.Join(err, os.Remove(backend.config.RuntimeBase))
 	}
@@ -255,4 +278,16 @@ func clonePipelineOMPPhaseModels(input map[pipeline.PhaseID]string) map[pipeline
 		output[phase] = model
 	}
 	return output
+}
+
+func pipelineOMPCanonicalEnvironment(input []string) []string {
+	result := make([]string, 0, len(input))
+	for _, entry := range input {
+		key, _, _ := strings.Cut(entry, "=")
+		if key == pipelineOMPActiveEndpointKey || key == pipelineOMPActiveCredentialKey {
+			continue
+		}
+		result = append(result, entry)
+	}
+	return result
 }

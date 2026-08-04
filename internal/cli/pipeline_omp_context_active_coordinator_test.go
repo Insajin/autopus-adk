@@ -20,16 +20,24 @@ func TestPipelineOMPManagedActiveCoordinator_NarrowsOpaqueGrantToOneUseLease(t *
 	spawnCalls := 0
 	runner := newPipelineOMPManagedActiveCoordinator()
 	runner.now = func() time.Time { return now }
-	runner.expectation = func(got pipelineOMPManagedActiveCandidate) (promptlayer.OMPContextPromotionExpectationV2, error) {
+	runner.policy = func(got pipelineOMPManagedActiveCandidate) (promptlayer.OMPContextPromotionStaticPolicyV3, error) {
 		assert.Equal(t, candidate.Snapshot.Prompt, got.Snapshot.Prompt)
 		return expected, nil
 	}
+	runner.current = func(_ context.Context, got pipelineOMPManagedActiveCandidate) (
+		promptlayer.OMPContextPromotionCurrentRuntimeV3, error,
+	) {
+		assert.Equal(t, candidate.AutoSourceCommit, got.AutoSourceCommit)
+		return pipelineOMPActiveCurrentRuntimeFixture(expected), nil
+	}
 	runner.loadGrant = func(root string, checkedAt time.Time,
-		got promptlayer.OMPContextPromotionExpectationV2,
+		got promptlayer.OMPContextPromotionStaticPolicyV3,
+		current promptlayer.OMPContextPromotionCurrentRuntimeV3,
 	) (pipelineOMPVerifiedGrant, error) {
 		assert.Equal(t, candidate.Snapshot.ProjectDir, root)
 		assert.Equal(t, now, checkedAt)
 		assert.Equal(t, expected, got)
+		assert.Equal(t, expected.SourceCommit, current.SourceCommit)
 		return grant, nil
 	}
 	runner.spawn = func(_ context.Context, _ pipelineOMPManagedActiveCandidate,
@@ -52,16 +60,56 @@ func TestPipelineOMPManagedActiveCoordinator_NarrowsOpaqueGrantToOneUseLease(t *
 	assert.Equal(t, 1, spawnCalls)
 }
 
+func TestPipelineOMPManagedActiveCoordinator_RejectsGrantThatExpiresBeforeExecute(t *testing.T) {
+	now := time.Date(2026, 8, 4, 10, 0, 0, 0, time.UTC)
+	candidate, expected, grant := pipelineOMPActiveCoordinatorFixture(t, now)
+	grant.expires = now.Add(time.Second)
+	runner := newPipelineOMPManagedActiveCoordinator()
+	runner.now = func() time.Time { return now }
+	runner.policy = func(pipelineOMPManagedActiveCandidate) (promptlayer.OMPContextPromotionStaticPolicyV3, error) {
+		return expected, nil
+	}
+	runner.current = func(context.Context, pipelineOMPManagedActiveCandidate) (
+		promptlayer.OMPContextPromotionCurrentRuntimeV3, error,
+	) {
+		return pipelineOMPActiveCurrentRuntimeFixture(expected), nil
+	}
+	runner.loadGrant = func(string, time.Time, promptlayer.OMPContextPromotionStaticPolicyV3,
+		promptlayer.OMPContextPromotionCurrentRuntimeV3,
+	) (pipelineOMPVerifiedGrant, error) {
+		return grant, nil
+	}
+	runner.spawn = func(context.Context, pipelineOMPManagedActiveCandidate,
+		pipelineOMPManagedActivePrepared,
+	) (string, error) {
+		t.Fatal("expired release-key authority reached provider spawn")
+		return "", nil
+	}
+
+	prepared, err := runner.Prepare(context.Background(), candidate)
+	require.NoError(t, err)
+	now = now.Add(2 * time.Second)
+	_, err = runner.Execute(context.Background(), candidate, prepared)
+	assert.ErrorContains(t, err, "lease expired")
+}
+
 func TestPipelineOMPManagedActiveCoordinator_RejectsCrossCandidateBeforeLease(t *testing.T) {
 	now := time.Date(2026, 8, 4, 10, 0, 0, 0, time.UTC)
 	candidate, expected, grant := pipelineOMPActiveCoordinatorFixture(t, now)
 	grant.candidate.Revision = strings.Repeat("f", 40)
 	runner := newPipelineOMPManagedActiveCoordinator()
 	runner.now = func() time.Time { return now }
-	runner.expectation = func(pipelineOMPManagedActiveCandidate) (promptlayer.OMPContextPromotionExpectationV2, error) {
+	runner.policy = func(pipelineOMPManagedActiveCandidate) (promptlayer.OMPContextPromotionStaticPolicyV3, error) {
 		return expected, nil
 	}
-	runner.loadGrant = func(string, time.Time, promptlayer.OMPContextPromotionExpectationV2) (pipelineOMPVerifiedGrant, error) {
+	runner.current = func(context.Context, pipelineOMPManagedActiveCandidate) (
+		promptlayer.OMPContextPromotionCurrentRuntimeV3, error,
+	) {
+		return pipelineOMPActiveCurrentRuntimeFixture(expected), nil
+	}
+	runner.loadGrant = func(string, time.Time, promptlayer.OMPContextPromotionStaticPolicyV3,
+		promptlayer.OMPContextPromotionCurrentRuntimeV3,
+	) (pipelineOMPVerifiedGrant, error) {
 		return grant, nil
 	}
 	runner.spawn = func(context.Context, pipelineOMPManagedActiveCandidate, pipelineOMPManagedActivePrepared) (string, error) {
@@ -103,7 +151,7 @@ func (grant pipelineOMPVerifiedGrantStub) ProviderScope() (string, string) {
 
 func pipelineOMPActiveCoordinatorFixture(t *testing.T, now time.Time) (
 	pipelineOMPManagedActiveCandidate,
-	promptlayer.OMPContextPromotionExpectationV2,
+	promptlayer.OMPContextPromotionStaticPolicyV3,
 	pipelineOMPVerifiedGrantStub,
 ) {
 	t.Helper()
@@ -140,26 +188,31 @@ func pipelineOMPActiveCoordinatorFixture(t *testing.T, now time.Time) (
 		AutoSourceCommit: strings.Repeat("d", 40),
 		AutoSourceTree:   strings.Repeat("e", 40),
 	}
-	expected := promptlayer.OMPContextPromotionExpectationV2{
+	expected := promptlayer.OMPContextPromotionStaticPolicyV3{
+		SchemaVersion:      promptlayer.OMPContextPromotionRuntimeSchemaV3,
 		ProducerRepository: "Insajin/autopus-adk-evals", ProducerWorkflowRef: "workflow.yml@immutable",
-		Candidate: promptlayer.OMPContextPromotionCandidateV1{
-			Repository: "Insajin/autopus-adk", Revision: candidate.AutoSourceCommit,
-			TreeSHA: candidate.AutoSourceTree, ArtifactSHA256: pipelineOMPContextCohortHash("artifact"),
-		},
+		CandidateRepository: "Insajin/autopus-adk", SourceCommit: candidate.AutoSourceCommit,
+		SourceTree: candidate.AutoSourceTree, Target: "darwin-arm64",
 		PolicyID: "omp-active-v1", PolicyDigest: pipelineOMPContextCohortHash("policy"),
-		AutoVersion: "0.50.93", AutoBinarySHA256: pipelineOMPContextCohortHash("auto"),
-		OMPVersion: "omp/17.2.7", OMPExecutableSHA256: pipelineOMPContextCohortHash("omp"),
+		AutoVersion: "0.50.93",
+		OMPVersion:  "omp/17.2.7", OMPExecutableSHA256: pipelineOMPContextCohortHash("omp"),
 		PipelineImplementationDigest: pipelineOMPActiveImplementationDigest(),
 		Provider:                     candidate.ScopeProvider, ModelScopeDigest: candidate.ModelScopeDigest,
 		CohortManifestDigest: pipelineOMPContextCohortHash("cohort"), OrderSeed: pipelineOMPContextCohortHash("order"),
-		OraclePolicyDigest: pipelineOMPContextCohortHash("oracle"),
+		OraclePolicyDigest:  pipelineOMPContextCohortHash("oracle"),
+		ReleaseLineageKeyID: "release-lineage-2026-q3-k1", ReleaseLineageHandoff: "v1",
+		MinimumRollbackFloor: 5093,
 	}
+	upstream := pipelineOMPContextCohortHash("artifact")
 	grant := pipelineOMPVerifiedGrantStub{
 		digest: pipelineOMPContextCohortHash("report"), evidence: pipelineOMPContextCohortHash("evidence"),
 		policy: expected.PolicyDigest, provider: expected.Provider, modelScope: expected.ModelScopeDigest,
-		expires: now.Add(time.Hour), candidate: expected.Candidate,
+		expires: now.Add(time.Hour), candidate: promptlayer.OMPContextPromotionCandidateV1{
+			Repository: expected.CandidateRepository, Revision: expected.SourceCommit,
+			TreeSHA: expected.SourceTree, ArtifactSHA256: upstream,
+		},
 		runtime: promptlayer.OMPContextPromotionRuntimeV1{
-			AutoVersion: expected.AutoVersion, AutoBinarySHA256: expected.AutoBinarySHA256,
+			AutoVersion: expected.AutoVersion, AutoBinarySHA256: upstream,
 			OMPVersion: expected.OMPVersion, OMPExecutableSHA256: expected.OMPExecutableSHA256,
 			ExecutionClass: "external-live", ProductionPathEquivalent: true,
 			RuntimeKind:                  "omp-pipeline-managed-rpc",
@@ -167,4 +220,16 @@ func pipelineOMPActiveCoordinatorFixture(t *testing.T, now time.Time) (
 		},
 	}
 	return candidate, expected, grant
+}
+
+func pipelineOMPActiveCurrentRuntimeFixture(
+	policy promptlayer.OMPContextPromotionStaticPolicyV3,
+) promptlayer.OMPContextPromotionCurrentRuntimeV3 {
+	return promptlayer.OMPContextPromotionCurrentRuntimeV3{
+		ExecutableSHA256: pipelineOMPContextCohortHash("distributed"),
+		SourceCommit:     policy.SourceCommit, SourceTree: policy.SourceTree, Target: policy.Target,
+		AutoVersion: policy.AutoVersion, OMPVersion: policy.OMPVersion,
+		OMPExecutableSHA256:          policy.OMPExecutableSHA256,
+		PipelineImplementationDigest: policy.PipelineImplementationDigest,
+	}
 }

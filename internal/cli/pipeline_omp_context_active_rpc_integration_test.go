@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,17 +61,14 @@ func pipelineOMPActiveRPCSessionFixture(
 	unsafe bool,
 ) (*pipelineOMPActiveEvaluatorSession, pipelineOMPBackendConfig, string) {
 	t.Helper()
-	config, logPath := pipelineOMPBackendTestConfig(t)
-	unsafeValue := "0"
+	config, _ := pipelineOMPBackendTestConfig(t)
+	config.Executable = os.Args[0]
+	model := "model-a"
 	if unsafe {
-		unsafeValue = "1"
+		model = "model-unsafe"
 	}
-	script := "#!/bin/sh\n" + pipelineOMPActiveRPCFixtureEnv + "=1 " +
-		"AUTOPUS_TEST_OMP_ACTIVE_LOG=" + shellQuotePipelineOMP(logPath) + " " +
-		"AUTOPUS_TEST_OMP_ACTIVE_UNSAFE=" + unsafeValue + " exec " + shellQuotePipelineOMP(os.Args[0]) +
-		" -test.run=^$ -- \"$@\"\n"
-	require.NoError(t, os.WriteFile(config.Executable, []byte(script), 0o700))
-	config.PhaseModels = map[pipeline.PhaseID]string{pipeline.PhasePlan: "provider-a/model-a"}
+	logPath := filepath.Join(config.ProjectDir, "active-native-rpc.jsonl")
+	config.PhaseModels = map[pipeline.PhaseID]string{pipeline.PhasePlan: "provider-a/" + model}
 	config.Environment = append(config.Environment,
 		pipelineOMPActiveEndpointKey+"=http://127.0.0.1:43123",
 		pipelineOMPActiveCredentialKey+"=fixture-token-value",
@@ -95,6 +94,25 @@ func pipelineOMPActiveRPCSessionFixture(
 	)
 	require.NoError(t, err)
 	return session, config, logPath
+}
+
+func pipelineOMPActiveNativeFixture(args []string) (string, string, bool) {
+	values := make(map[string]string)
+	for index := 0; index+1 < len(args); index++ {
+		switch args[index] {
+		case "--mode", "--cwd", "--model":
+			values[args[index]] = args[index+1]
+			index++
+		}
+	}
+	if values["--mode"] != "rpc" || values["--cwd"] == "" || !strings.Contains(values["--model"], "/model-") {
+		return "", "", false
+	}
+	unsafe := "0"
+	if strings.HasSuffix(values["--model"], "/model-unsafe") {
+		unsafe = "1"
+	}
+	return filepath.Join(values["--cwd"], "active-native-rpc.jsonl"), unsafe, true
 }
 
 func runPipelineOMPActiveRPCFixture() int {

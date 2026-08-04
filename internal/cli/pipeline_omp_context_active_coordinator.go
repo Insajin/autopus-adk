@@ -2,10 +2,8 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 	"time"
@@ -26,14 +24,20 @@ type pipelineOMPVerifiedGrant interface {
 	ProviderScope() (string, string)
 }
 
-type pipelineOMPActiveExpectationProvider func(
+type pipelineOMPActivePolicyProvider func(
 	pipelineOMPManagedActiveCandidate,
-) (promptlayer.OMPContextPromotionExpectationV2, error)
+) (promptlayer.OMPContextPromotionStaticPolicyV3, error)
+
+type pipelineOMPActiveCurrentRuntimeProvider func(
+	context.Context,
+	pipelineOMPManagedActiveCandidate,
+) (promptlayer.OMPContextPromotionCurrentRuntimeV3, error)
 
 type pipelineOMPActiveGrantLoader func(
 	string,
 	time.Time,
-	promptlayer.OMPContextPromotionExpectationV2,
+	promptlayer.OMPContextPromotionStaticPolicyV3,
+	promptlayer.OMPContextPromotionCurrentRuntimeV3,
 ) (pipelineOMPVerifiedGrant, error)
 
 // pipelineOMPActiveSessionSpawn consumes a prepared lease and must enter the
@@ -56,27 +60,25 @@ type pipelineOMPActiveSessionStart func(
 ) (pipelineOMPActivePersistentSession, error)
 
 type pipelineOMPManagedActiveCoordinator struct {
-	mu          sync.Mutex
-	now         func() time.Time
-	expectation pipelineOMPActiveExpectationProvider
-	loadGrant   pipelineOMPActiveGrantLoader
-	spawn       pipelineOMPActiveSessionSpawn
-	start       pipelineOMPActiveSessionStart
-	session     pipelineOMPActivePersistentSession
+	mu        sync.Mutex
+	now       func() time.Time
+	policy    pipelineOMPActivePolicyProvider
+	current   pipelineOMPActiveCurrentRuntimeProvider
+	loadGrant pipelineOMPActiveGrantLoader
+	spawn     pipelineOMPActiveSessionSpawn
+	start     pipelineOMPActiveSessionStart
+	session   pipelineOMPActivePersistentSession
 }
-
-// pipelineOMPActiveExpectationJSON is populated only by release ldflags. It is
-// never read from an environment variable or a workspace file.
-var pipelineOMPActiveExpectationJSON string
 
 func newPipelineOMPManagedActiveCoordinator() *pipelineOMPManagedActiveCoordinator {
 	return &pipelineOMPManagedActiveCoordinator{
-		now: time.Now, expectation: compiledPipelineOMPActiveExpectation,
+		now: time.Now, policy: compiledPipelineOMPActiveStaticPolicy,
 		loadGrant: func(root string, now time.Time,
-			expected promptlayer.OMPContextPromotionExpectationV2,
+			expected promptlayer.OMPContextPromotionStaticPolicyV3,
+			current promptlayer.OMPContextPromotionCurrentRuntimeV3,
 		) (pipelineOMPVerifiedGrant, error) {
 			_ = now
-			return promptlayer.LoadVerifiedOMPContextPromotionV2(root, expected)
+			return promptlayer.LoadVerifiedOMPContextPromotionRuntimeV3(root, expected, current)
 		},
 	}
 }
@@ -85,7 +87,8 @@ func (runner *pipelineOMPManagedActiveCoordinator) Prepare(
 	ctx context.Context,
 	candidate pipelineOMPManagedActiveCandidate,
 ) (pipelineOMPManagedActivePrepared, error) {
-	if runner == nil || runner.expectation == nil || runner.loadGrant == nil || (runner.spawn == nil && runner.start == nil) {
+	if runner == nil || runner.policy == nil || runner.current == nil || runner.loadGrant == nil ||
+		(runner.spawn == nil && runner.start == nil) {
 		return pipelineOMPManagedActivePrepared{}, errors.New("pipeline: managed active trust pins are unavailable")
 	}
 	if ctx == nil || ctx.Err() != nil {
@@ -95,12 +98,16 @@ func (runner *pipelineOMPManagedActiveCoordinator) Prepare(
 		!validPipelineOMPActiveGitHash(candidate.AutoSourceTree) {
 		return pipelineOMPManagedActivePrepared{}, errors.New("pipeline: managed active build provenance is unavailable")
 	}
-	expected, err := runner.expectation(candidate)
+	expected, err := runner.policy(candidate)
+	if err != nil {
+		return pipelineOMPManagedActivePrepared{}, err
+	}
+	current, err := runner.current(ctx, candidate)
 	if err != nil {
 		return pipelineOMPManagedActivePrepared{}, err
 	}
 	now := runner.now().UTC()
-	grant, err := runner.loadGrant(candidate.Snapshot.ProjectDir, now, expected)
+	grant, err := runner.loadGrant(candidate.Snapshot.ProjectDir, now, expected, current)
 	if err != nil || grant == nil || !grant.Valid() {
 		return pipelineOMPManagedActivePrepared{}, errors.New("pipeline: signed managed active grant is unavailable")
 	}
@@ -181,29 +188,10 @@ func (runner *pipelineOMPManagedActiveCoordinator) Close() error {
 	return err
 }
 
-func compiledPipelineOMPActiveExpectation(
-	_ pipelineOMPManagedActiveCandidate,
-) (promptlayer.OMPContextPromotionExpectationV2, error) {
-	if strings.TrimSpace(pipelineOMPActiveExpectationJSON) == "" {
-		return promptlayer.OMPContextPromotionExpectationV2{}, errors.New("pipeline: managed active trust policy is not compiled")
-	}
-	decoder := json.NewDecoder(strings.NewReader(pipelineOMPActiveExpectationJSON))
-	decoder.DisallowUnknownFields()
-	var expected promptlayer.OMPContextPromotionExpectationV2
-	if err := decoder.Decode(&expected); err != nil {
-		return expected, errors.New("pipeline: compiled managed active trust policy is invalid")
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		return expected, errors.New("pipeline: compiled managed active trust policy contains trailing JSON")
-	}
-	return expected, nil
-}
-
 func buildPipelineOMPActiveLeaseBinding(
 	candidate pipelineOMPManagedActiveCandidate,
 	grant pipelineOMPVerifiedGrant,
-	expected promptlayer.OMPContextPromotionExpectationV2,
+	expected promptlayer.OMPContextPromotionStaticPolicyV3,
 ) (pipelineOMPActiveLeaseBinding, error) {
 	provider, modelScope := grant.ProviderScope()
 	runtime := grant.RuntimeCoordinates()
@@ -211,10 +199,10 @@ func buildPipelineOMPActiveLeaseBinding(
 	if provider != candidate.ScopeProvider || modelScope != candidate.ModelScopeDigest ||
 		modelScope != expected.ModelScopeDigest ||
 		coordinates.Revision != candidate.AutoSourceCommit || coordinates.TreeSHA != candidate.AutoSourceTree ||
-		coordinates.Repository != expected.Candidate.Repository || coordinates.TreeSHA != expected.Candidate.TreeSHA ||
-		coordinates.ArtifactSHA256 != expected.Candidate.ArtifactSHA256 || grant.PolicyDigest() != expected.PolicyDigest ||
+		coordinates.Repository != expected.CandidateRepository || coordinates.TreeSHA != expected.SourceTree ||
+		grant.PolicyDigest() != expected.PolicyDigest ||
 		runtime.OMPVersion != expected.OMPVersion || runtime.OMPExecutableSHA256 != expected.OMPExecutableSHA256 ||
-		runtime.AutoVersion != expected.AutoVersion || runtime.AutoBinarySHA256 != expected.AutoBinarySHA256 ||
+		runtime.AutoVersion != expected.AutoVersion ||
 		runtime.PipelineImplementationDigest != expected.PipelineImplementationDigest ||
 		runtime.PipelineImplementationDigest != pipelineOMPActiveImplementationDigest() {
 		return pipelineOMPActiveLeaseBinding{}, errors.New("pipeline: signed managed active coordinates mismatch")
@@ -268,10 +256,4 @@ func hashPipelineOMPActiveHistory(rows []promptlayer.OMPContextHistoryReference)
 		parts = append(parts, row.ID, row.SourceRef, row.BodyHash, fmt.Sprintf("%d", row.TokenEstimate), row.Reason)
 	}
 	return pipelineOMPActiveHash([]byte(strings.Join(parts, "\x00")))
-}
-
-func unavailablePipelineOMPActiveExpectation(
-	pipelineOMPManagedActiveCandidate,
-) (promptlayer.OMPContextPromotionExpectationV2, error) {
-	return promptlayer.OMPContextPromotionExpectationV2{}, fmt.Errorf("pipeline: managed active trust policy is not compiled")
 }

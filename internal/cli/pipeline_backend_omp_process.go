@@ -79,7 +79,7 @@ func startPipelineOMPProcess(ctx context.Context, config pipelineOMPBackendConfi
 	}
 	cmd := exec.Command(privateExecutable, "--mode", "rpc", "--no-session", "--no-extensions", "--session-dir", sessionDir)
 	cmd.Dir = config.ProjectDir
-	cmd.Env = append([]string(nil), config.Environment...)
+	cmd.Env = append([]string(nil), config.canonicalEnv...)
 	cmd.Stderr = io.Discard
 	cmd.WaitDelay = 500 * time.Millisecond
 	if err := configureWorkflowContextManagedRPCProcessGroup(cmd); err != nil {

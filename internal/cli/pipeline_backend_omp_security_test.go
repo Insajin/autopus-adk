@@ -135,6 +135,38 @@ func TestPipelineOMPBackend_NormalizesEnvironmentAndRejectsExecutableReplacement
 	assertPipelineOMPRuntimeEmpty(t, normalized.RuntimeBase)
 }
 
+func TestPipelineOMPBackend_CanonicalProcessStripsOnlyActiveBrokerAuthority(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture executable uses a POSIX launcher")
+	}
+	config, logPath := pipelineOMPBackendTestConfig(t)
+	brokerMarker := filepath.Join(t.TempDir(), "canonical-broker-authority")
+	providerMarker := filepath.Join(t.TempDir(), "canonical-provider-env-missing")
+	script := "#!/bin/sh\nif [ -n \"$" + pipelineOMPActiveEndpointKey + "\" ] || [ -n \"$" +
+		pipelineOMPActiveCredentialKey + "\" ]; then printf leak > " + shellQuotePipelineOMP(brokerMarker) +
+		"; fi\nif [ \"$GENERAL_PROVIDER_TOKEN\" != retained ]; then printf missing > " +
+		shellQuotePipelineOMP(providerMarker) + "; fi\nexec " + shellQuotePipelineOMP(os.Args[0]) + " -test.run=^$ -- \"$@\"\n"
+	require.NoError(t, os.WriteFile(config.Executable, []byte(script), 0o700))
+	config.Environment = append(pipelineOMPCanonicalEnvironment(config.Environment),
+		pipelineOMPActiveEndpointKey+"=http://127.0.0.1:43123",
+		pipelineOMPActiveCredentialKey+"=must-not-reach-canonical",
+		"GENERAL_PROVIDER_TOKEN=retained",
+	)
+	backend, err := newPipelineOMPBackend(config)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = backend.Close() })
+
+	_, err = backend.Execute(
+		context.Background(), sealedPipelineOMPRequest(t, config, pipeline.PhasePlan, "PLAN-PHASE-PROMPT", nil),
+	)
+	require.NoError(t, err)
+	_, brokerErr := os.Lstat(brokerMarker)
+	assert.ErrorIs(t, brokerErr, os.ErrNotExist)
+	_, providerErr := os.Lstat(providerMarker)
+	assert.ErrorIs(t, providerErr, os.ErrNotExist)
+	assert.FileExists(t, logPath)
+}
+
 func TestPipelineOMPBackend_CanceledReadinessCleansOwnedRuntime(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fixture executable uses a POSIX script")
