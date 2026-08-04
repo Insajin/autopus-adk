@@ -21,7 +21,7 @@ const (
 	pipelineOMPActiveEndpointKey    = "AUTOPUS_OMP_CONTEXT_PROVIDER_ENDPOINT"
 	pipelineOMPActiveCredentialKey  = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
 	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v2"
-	pipelineOMPActivePolicyIdentity = "manual-compact;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-darwin-v1;tools=read,bash,edit,write,grep,glob,todo"
+	pipelineOMPActivePolicyIdentity = "manual-compact;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v2;tools=read,bash,edit,write,grep,glob,todo"
 )
 
 type pipelineOMPActiveProcessConfig struct {
@@ -142,7 +142,10 @@ func startPipelineOMPActiveProcess(
 		cleanup()
 		return nil, err
 	}
-	verifiedCommand.directDarwinImage = active.sandboxMode == pipelineOMPActiveSandboxInheritedParent
+	if err := configurePipelineOMPVerifiedExecSandboxMode(verifiedCommand, active.sandboxMode, true); err != nil {
+		cleanup()
+		return nil, err
+	}
 	if err := configureWorkflowContextManagedRPCProcessGroup(cmd); err != nil {
 		cleanup()
 		return nil, err

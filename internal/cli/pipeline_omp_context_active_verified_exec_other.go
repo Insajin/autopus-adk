@@ -10,10 +10,21 @@ import (
 )
 
 type pipelineOMPVerifiedExecCommand struct {
-	cmd               *exec.Cmd
-	parentFD          *os.File
-	directDarwinImage bool
+	cmd                    *exec.Cmd
+	parentFD               *os.File
+	inheritedDarwinPath    bool
+	inheritedDarwinPrivate bool
 }
+
+func configurePipelineOMPVerifiedExecSandboxMode(
+	*pipelineOMPVerifiedExecCommand,
+	pipelineOMPActiveSandboxMode,
+	bool,
+) error {
+	return errors.New("verified managed active OMP execution is unsupported")
+}
+
+func pipelineOMPVerifiedExecUsesDarwinPtrace(*pipelineOMPVerifiedExecCommand) bool { return false }
 
 func newPipelineOMPVerifiedExecCommand(
 	string,

@@ -46,7 +46,11 @@ func newWorkflowContextObserveInheritedVersionCommand(
 	); err != nil {
 		return nil, identity, errors.Join(err, command.Close())
 	}
-	command.directDarwinImage = true
+	if err := configurePipelineOMPVerifiedExecSandboxMode(
+		command, pipelineOMPActiveSandboxInheritedParent, false,
+	); err != nil {
+		return nil, identity, errors.Join(err, command.Close())
+	}
 	if err := configureWorkflowContextManagedRPCProcessGroup(command.cmd); err != nil {
 		return nil, identity, errors.Join(err, command.Close())
 	}

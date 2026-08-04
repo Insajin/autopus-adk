@@ -49,7 +49,7 @@ func TestWorkflowContextObserveSessionCommand_InheritedParentSandboxIsExplicitOp
 	require.NoError(t, validateWorkflowContextObserveSessionOptions(options))
 }
 
-func TestWorkflowContextObserveVersion_InheritedModeUsesDirectVerifiedImage(t *testing.T) {
+func TestWorkflowContextObserveVersion_InheritedModeUsesVerifiedPathWithoutInnerWrapper(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("inherited parent sandbox is Darwin-only")
 	}
@@ -61,8 +61,14 @@ func TestWorkflowContextObserveVersion_InheritedModeUsesDirectVerifiedImage(t *t
 	defer cancel()
 	command, _, err := newWorkflowContextObserveInheritedVersionCommand(ctx, options)
 	require.NoError(t, err)
-	assert.True(t, command.directDarwinImage)
-	assert.NotEqual(t, "/usr/bin/sandbox-exec", command.cmd.Path)
+	executable, _, err := canonicalPipelineOMPExecutable(os.Args[0])
+	require.NoError(t, err)
+	assert.True(t, command.inheritedDarwinPath)
+	assert.False(t, command.inheritedDarwinPrivate)
+	assert.Equal(t, executable, command.cmd.Path)
+	assert.Equal(t, executable, command.cmd.Args[0])
+	assert.Empty(t, command.cmd.ExtraFiles)
+	assert.False(t, pipelineOMPVerifiedExecUsesDarwinPtrace(command))
 	require.NoError(t, command.Close())
 
 	got, err := probeWorkflowContextObserveVersion(ctx, options, pipelineOMPActiveSandboxInheritedParent)

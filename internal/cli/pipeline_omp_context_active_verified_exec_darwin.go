@@ -35,19 +35,16 @@ type pipelineOMPVerifiedDarwinRegion struct {
 }
 
 type pipelineOMPVerifiedDarwinVnode struct {
-	Dev                  uint32
-	Mode, Nlink          uint16
-	Ino                  uint64
-	UID, GID             uint32
-	Atime, AtimeNsec     int64
-	Mtime, MtimeNsec     int64
-	Ctime, CtimeNsec     int64
-	Birthtime, BirthNsec int64
-	Size, Blocks         int64
-	BlockSize            int32
-	Flags, Generation    uint32
-	Rdev                 uint32
-	Spare                [2]int64
+	Dev                                                                        uint32
+	Mode, Nlink                                                                uint16
+	Ino                                                                        uint64
+	UID, GID                                                                   uint32
+	Atime, AtimeNsec, Mtime, MtimeNsec, Ctime, CtimeNsec, Birthtime, BirthNsec int64
+	Size, Blocks                                                               int64
+	BlockSize                                                                  int32
+	Flags, Generation                                                          uint32
+	Rdev                                                                       uint32
+	Spare                                                                      [2]int64
 }
 
 type pipelineOMPVerifiedDarwinRegionPath struct {
@@ -101,18 +98,17 @@ func newPipelineOMPVerifiedDarwinCommand(
 }
 
 // @AX:WARN [AUTO]: Darwin verified execution startup contains 17 if branches.
-// @AX:REASON [AUTO]: sandbox and direct-image paths share ptrace stops, executable identity checks, cleanup, timeout, and detach failure handling.
+// @AX:REASON [AUTO]: managed ptrace and inherited private-path gates share startup cleanup and executable identity enforcement.
 func (command *pipelineOMPVerifiedExecCommand) Start() error {
 	if command == nil || command.cmd == nil || command.parentFD == nil || command.expected.info == nil {
 		return errors.New("verified managed active OMP command is unavailable")
 	}
-	firstPath, firstIdentity := command.cmd.Path, command.expected
-	if !command.directDarwinImage {
-		sandboxPath, sandboxIdentity, err := canonicalPipelineOMPExecutable(command.cmd.Path)
-		if err != nil || sandboxPath != "/usr/bin/sandbox-exec" {
-			return errors.Join(errors.New("managed active Darwin sandbox executable is unavailable"), command.Close())
-		}
-		firstPath, firstIdentity = sandboxPath, sandboxIdentity
+	if command.inheritedDarwinPath {
+		return command.startDarwinInheritedPath()
+	}
+	sandboxPath, sandboxIdentity, err := canonicalPipelineOMPExecutable(command.cmd.Path)
+	if err != nil || sandboxPath != "/usr/bin/sandbox-exec" {
+		return errors.Join(errors.New("managed active Darwin sandbox executable is unavailable"), command.Close())
 	}
 	if command.cmd.SysProcAttr == nil {
 		command.cmd.SysProcAttr = &syscall.SysProcAttr{}
@@ -135,7 +131,7 @@ func (command *pipelineOMPVerifiedExecCommand) Start() error {
 	if err := command.waitDarwinExecStop(gateCtx); err != nil {
 		return command.failDarwinGate(errors.New("observe Darwin executable exec stop"), err)
 	}
-	if err := verifyPipelineOMPDarwinLiveExecutable(command.cmd.Process.Pid, firstPath, firstIdentity); err != nil {
+	if err := verifyPipelineOMPDarwinLiveExecutable(command.cmd.Process.Pid, sandboxPath, sandboxIdentity); err != nil {
 		return command.failDarwinGate(errors.New("verify Darwin executable live image"), err)
 	}
 	if command.afterFirstDarwinStop != nil {
@@ -143,12 +139,6 @@ func (command *pipelineOMPVerifiedExecCommand) Start() error {
 	}
 	if gateCtx.Err() != nil {
 		return command.failDarwinGate(errors.New("Darwin executable identity gate canceled"), gateCtx.Err())
-	}
-	if command.directDarwinImage {
-		if err := syscall.PtraceDetach(command.cmd.Process.Pid); err != nil {
-			return command.failDarwinGate(errors.New("detach verified managed active OMP trace"), err)
-		}
-		return nil
 	}
 	if err := continuePipelineOMPDarwinTrace(command.cmd.Process.Pid); err != nil {
 		return command.failDarwinGate(errors.New("continue Darwin sandbox trace"), err)
@@ -165,6 +155,30 @@ func (command *pipelineOMPVerifiedExecCommand) Start() error {
 		return command.failDarwinGate(errors.New("detach verified managed active OMP trace"), err)
 	}
 	return nil
+}
+
+func (command *pipelineOMPVerifiedExecCommand) startDarwinInheritedPath() error {
+	if len(command.cmd.ExtraFiles) != 0 || command.cmd.Path != command.parentFD.Name() ||
+		(command.cmd.SysProcAttr != nil && command.cmd.SysProcAttr.Ptrace) {
+		return errors.Join(errors.New("inherited parent sandbox verified OMP launch changed"), command.Close())
+	}
+	if err := verifyPipelineOMPExecutable(command.cmd.Path, command.expected); err != nil {
+		return errors.Join(err, command.Close())
+	}
+	startErr := command.cmd.Start()
+	if startErr != nil {
+		return errors.Join(startErr, command.Close())
+	}
+	if command.afterInheritedDarwinStart != nil {
+		command.afterInheritedDarwinStart()
+	}
+	postErr := verifyPipelineOMPExecutable(command.cmd.Path, command.expected)
+	closeErr := command.Close()
+	if postErr == nil && closeErr == nil {
+		return nil
+	}
+	return errors.Join(errors.New("inherited parent sandbox verified OMP launch failed"), postErr, closeErr,
+		terminateWorkflowContextManagedRPCProcessGroup(command.cmd), command.cmd.Wait())
 }
 
 func (command *pipelineOMPVerifiedExecCommand) parentTargetPath() string {

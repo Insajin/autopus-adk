@@ -9,17 +9,59 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 
 	"golang.org/x/sys/unix"
 )
 
 type pipelineOMPVerifiedExecCommand struct {
-	cmd                  *exec.Cmd
-	parentFD             *os.File
-	expected             pipelineOMPExecutableIdentity
-	gateContext          context.Context
-	afterFirstDarwinStop func()
-	directDarwinImage    bool
+	cmd                       *exec.Cmd
+	parentFD                  *os.File
+	expected                  pipelineOMPExecutableIdentity
+	gateContext               context.Context
+	afterFirstDarwinStop      func()
+	afterInheritedDarwinStart func()
+	inheritedDarwinPath       bool
+	inheritedDarwinPrivate    bool
+}
+
+func configurePipelineOMPVerifiedExecSandboxMode(
+	command *pipelineOMPVerifiedExecCommand,
+	mode pipelineOMPActiveSandboxMode,
+	requirePrivate bool,
+) error {
+	if mode == pipelineOMPActiveSandboxManaged {
+		return nil
+	}
+	if mode != pipelineOMPActiveSandboxInheritedParent || runtime.GOOS != "darwin" ||
+		command == nil || command.cmd == nil || command.parentFD == nil || command.expected.info == nil ||
+		command.cmd.Path != command.parentFD.Name() || len(command.cmd.Args) == 0 ||
+		command.cmd.Args[0] != command.cmd.Path || len(command.cmd.ExtraFiles) != 0 {
+		return errors.New("inherited parent sandbox verified OMP command is unsafe")
+	}
+	if requirePrivate && !pipelineOMPVerifiedPrivateExecutableRoot(command.cmd.Path) {
+		return errors.New("inherited parent sandbox private OMP root is unsafe")
+	}
+	command.inheritedDarwinPath = true
+	command.inheritedDarwinPrivate = requirePrivate
+	return nil
+}
+
+func pipelineOMPVerifiedPrivateExecutableRoot(path string) bool {
+	root := filepath.Dir(path)
+	resolved, resolveErr := filepath.EvalSymlinks(root)
+	info, statErr := os.Lstat(root)
+	if resolveErr != nil || statErr != nil || filepath.Clean(resolved) != filepath.Clean(root) ||
+		!info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0o700 {
+		return false
+	}
+	owner, ownerErr := pipelineOMPExecutableOwner(info)
+	return ownerErr == nil && owner.uid == uint32(os.Geteuid())
+}
+
+func pipelineOMPVerifiedExecUsesDarwinPtrace(command *pipelineOMPVerifiedExecCommand) bool {
+	return command != nil && command.cmd != nil && command.cmd.SysProcAttr != nil && command.cmd.SysProcAttr.Ptrace
 }
 
 func openPipelineOMPVerifiedExecutable(
