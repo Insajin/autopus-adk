@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -12,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const workflowContextInheritedVersionOuterSandboxFixture = "AUTOPUS_TEST_OMP_VERSION_OUTER_SANDBOX"
 
 func TestWorkflowContextObserveSessionPhaseModels_BindsAllCanonicalPhases(t *testing.T) {
 	t.Parallel()
@@ -69,6 +73,50 @@ func TestWorkflowContextObserveVersion_InheritedModeUsesVerifiedPathWithoutInner
 	assert.Equal(t, executable, command.cmd.Args[0])
 	assert.Empty(t, command.cmd.ExtraFiles)
 	assert.False(t, pipelineOMPVerifiedExecUsesDarwinPtrace(command))
+	require.NoError(t, command.Close())
+
+	got, err := probeWorkflowContextObserveVersion(ctx, options, pipelineOMPActiveSandboxInheritedParent)
+	require.NoError(t, err)
+	assert.Equal(t, "omp/17.2.7", got)
+}
+
+func TestWorkflowContextObserveVersion_InheritedModeStripsSecretsInsideDenyDefaultSandbox(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("inherited parent sandbox is Darwin-only")
+	}
+	if os.Getenv(workflowContextInheritedVersionOuterSandboxFixture) == "" {
+		const profile = `(version 1)
+(deny default)
+(allow file-read*)
+(allow file-write* (literal "/dev/null"))
+(allow process*)
+(allow mach*)
+(allow sysctl-read)
+`
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", "-p", profile, os.Args[0],
+			"-test.run=^TestWorkflowContextObserveVersion_InheritedModeStripsSecretsInsideDenyDefaultSandbox$")
+		cmd.Env = append(os.Environ(), workflowContextInheritedVersionOuterSandboxFixture+"=1")
+		require.NoError(t, cmd.Run())
+		return
+	}
+
+	options := WorkflowContextManagedRPCOptions{
+		Executable: os.Args[0], Workspace: filepath.Dir(os.Args[0]),
+		Environment: []string{
+			"PATH=/sentinel/bin", pipelineOMPActiveCredentialKey + "=pipeline-sentinel",
+			"OPENAI_API_KEY=provider-sentinel", "UNRELATED_SECRET=unrelated-sentinel",
+		},
+		AllowedEndpoint: "http://127.0.0.1:43123",
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	command, _, err := newWorkflowContextObserveInheritedVersionCommand(ctx, options)
+	require.NoError(t, err)
+	if command.cmd.Env == nil || len(command.cmd.Env) != 0 {
+		t.Fatalf("inherited version environment is not empty: entries=%d", len(command.cmd.Env))
+	}
 	require.NoError(t, command.Close())
 
 	got, err := probeWorkflowContextObserveVersion(ctx, options, pipelineOMPActiveSandboxInheritedParent)

@@ -3,28 +3,15 @@
 package cli
 
 import (
-	"context"
 	"crypto/sha256"
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
 	"golang.org/x/sys/unix"
 )
-
-type pipelineOMPVerifiedExecCommand struct {
-	cmd                       *exec.Cmd
-	parentFD                  *os.File
-	expected                  pipelineOMPExecutableIdentity
-	gateContext               context.Context
-	afterFirstDarwinStop      func()
-	afterInheritedDarwinStart func()
-	inheritedDarwinPath       bool
-	inheritedDarwinPrivate    bool
-}
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: build-selected sandbox-mode contract shared by process startup, version probes, and platform tests.
 // @AX:REASON [AUTO]: callers depend on exact command, parent FD, private-root, and Darwin-only invariants before inherited execution.

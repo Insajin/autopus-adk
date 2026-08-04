@@ -9,6 +9,16 @@ import (
 	"os/exec"
 )
 
+type pipelineOMPVerifiedExecCommand struct {
+	cmd                    *exec.Cmd
+	parentFD               *os.File
+	expected               pipelineOMPExecutableIdentity
+	gateContext            context.Context
+	afterFirstDarwinStop   func()
+	inheritedDarwinPath    bool
+	inheritedDarwinPrivate bool
+}
+
 func newPipelineOMPVerifiedExecCommand(
 	path string,
 	expected pipelineOMPExecutableIdentity,

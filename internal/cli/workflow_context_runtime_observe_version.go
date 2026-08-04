@@ -40,7 +40,8 @@ func newWorkflowContextObserveInheritedVersionCommand(
 	if err != nil {
 		return nil, identity, err
 	}
-	command.cmd.Dir, command.cmd.Env = options.Workspace, options.Environment
+	// The absolute verified --version command requires no ambient authority.
+	command.cmd.Dir, command.cmd.Env = options.Workspace, []string{}
 	if err := configurePipelineOMPActiveSandbox(
 		command.cmd, options.AllowedEndpoint, pipelineOMPActiveSandboxInheritedParent,
 	); err != nil {
