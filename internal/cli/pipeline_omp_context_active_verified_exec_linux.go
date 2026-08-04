@@ -9,6 +9,8 @@ import (
 	"os/exec"
 )
 
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: Linux build-selected verified-command state shared by constructors, sandbox validation, and startup.
+// @AX:REASON [AUTO]: common execution code depends on this type and its FD-backed identity fields remaining compatible across platform implementations.
 type pipelineOMPVerifiedExecCommand struct {
 	cmd                    *exec.Cmd
 	parentFD               *os.File
@@ -50,6 +52,7 @@ func newPipelineOMPVerifiedExecCommandContext(
 	if err != nil {
 		return nil, err
 	}
+	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: fd 3 is the first descriptor assigned from exec.Cmd.ExtraFiles to the verified executable.
 	const childPath = "/proc/self/fd/3"
 	var cmd *exec.Cmd
 	if ctx == nil {
