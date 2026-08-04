@@ -60,4 +60,5 @@ type workflowContextObserveSessionOptions struct {
 	CredentialLocator string
 	Executable        string
 	TargetGitCommit   string
+	SandboxMode       pipelineOMPActiveSandboxMode
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -56,9 +57,33 @@ func TestPipelineOMPActiveRPC_UnsafeFirstOutputClosesBeforeSecondProviderCall(t 
 	assert.Zero(t, countPipelineOMPRPCCommand(commands, "compact"))
 }
 
+func TestPipelineOMPActiveRPC_InheritedParentSandboxUsesDirectVerifiedImage(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("inherited parent sandbox is Darwin-only")
+	}
+	session, _, _ := pipelineOMPActiveRPCSessionFixtureWithSandbox(
+		t, false, pipelineOMPActiveSandboxInheritedParent,
+	)
+	t.Cleanup(func() { require.NoError(t, session.Close()) })
+
+	output, receipt, err := session.Execute(context.Background(), "safe inherited prompt")
+
+	require.NoError(t, err)
+	assert.Equal(t, "safe assistant output 1", output)
+	assert.True(t, receipt.SameProcess)
+}
+
 func pipelineOMPActiveRPCSessionFixture(
 	t *testing.T,
 	unsafe bool,
+) (*pipelineOMPActiveEvaluatorSession, pipelineOMPBackendConfig, string) {
+	return pipelineOMPActiveRPCSessionFixtureWithSandbox(t, unsafe, pipelineOMPActiveSandboxManaged)
+}
+
+func pipelineOMPActiveRPCSessionFixtureWithSandbox(
+	t *testing.T,
+	unsafe bool,
+	sandboxMode pipelineOMPActiveSandboxMode,
 ) (*pipelineOMPActiveEvaluatorSession, pipelineOMPBackendConfig, string) {
 	t.Helper()
 	requireDarwinManagedOMPSandboxForTest(t)
@@ -91,7 +116,7 @@ func pipelineOMPActiveRPCSessionFixture(
 		ModelScopeDigest: candidate.ModelScopeDigest,
 	}}
 	session, err := startPipelineOMPActiveEvaluatorSession(
-		context.Background(), config, candidate, prepared, true,
+		context.Background(), config, candidate, prepared, true, sandboxMode,
 	)
 	require.NoError(t, err)
 	return session, config, logPath
@@ -166,8 +191,9 @@ func runPipelineOMPActiveRPCFixture() int {
 				json.RawMessage(fmt.Sprintf(`{"role":"user","content":%q}`, command.Message)),
 				json.RawMessage(fmt.Sprintf(`{"role":"assistant","content":%q}`, assistant)),
 			)
-			writePipelineOMPActiveResponse(output, command, map[string]any{"agentInvoked": true})
+			writePipelineOMPActiveResponse(output, command, nil)
 			_ = output.Encode(map[string]any{"type": "agent_start"})
+			_ = output.Encode(map[string]any{"type": "turn_start"})
 			_ = output.Encode(map[string]any{"type": "turn_end"})
 			_ = output.Encode(map[string]any{"type": "agent_end", "isTerminal": true})
 		case "get_last_assistant_text":

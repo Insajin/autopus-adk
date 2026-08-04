@@ -28,35 +28,51 @@ func newWorkflowContextProductOverlay(
 	runtimeRoot string,
 	memoryMode string,
 ) (WorkflowContextOverlayController, string, error) {
-	if memoryMode != config.OMPContextMemoryOff && memoryMode != config.OMPContextMemoryShadow {
-		return nil, "", errors.New("product OMP overlay memory mode is invalid")
-	}
-	root, err := filepath.Abs(runtimeRoot)
+	path, body, activeInfo, err := prepareWorkflowContextProductOverlay(runtimeRoot, memoryMode, true)
 	if err != nil {
-		return nil, "", fmt.Errorf("resolve product OMP overlay root: %w", err)
-	}
-	root = filepath.Clean(root)
-	info, err := os.Lstat(root)
-	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return nil, "", errors.New("product OMP overlay root is unsafe")
-	}
-	if err := os.Chmod(root, 0o700); err != nil {
-		return nil, "", fmt.Errorf("secure product OMP overlay root: %w", err)
-	}
-	path := filepath.Join(root, "context-product.yml")
-	body := workflowContextProductOverlayBody(true)
-	if err := writeWorkflowContextProductOverlay(path, body); err != nil {
 		return nil, "", err
-	}
-	activeInfo, err := os.Lstat(path)
-	if err != nil {
-		return nil, "", fmt.Errorf("inspect product OMP overlay: %w", err)
 	}
 	return &workflowContextProductOverlay{
 		path: path, memoryMode: memoryMode, activeBody: body,
 		activeHash: workflowContextProductOverlayHash(body), activeInfo: activeInfo,
 		effectiveMode: config.OMPContextHistoryActive,
 	}, path, nil
+}
+
+func newWorkflowContextManagedManualCompactionOverlay(runtimeRoot, memoryMode string) (string, error) {
+	path, _, _, err := prepareWorkflowContextProductOverlay(runtimeRoot, memoryMode, false)
+	return path, err
+}
+
+func prepareWorkflowContextProductOverlay(
+	runtimeRoot, memoryMode string,
+	automaticCompaction bool,
+) (string, []byte, fs.FileInfo, error) {
+	if memoryMode != config.OMPContextMemoryOff && memoryMode != config.OMPContextMemoryShadow {
+		return "", nil, nil, errors.New("product OMP overlay memory mode is invalid")
+	}
+	root, err := filepath.Abs(runtimeRoot)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("resolve product OMP overlay root: %w", err)
+	}
+	root = filepath.Clean(root)
+	info, err := os.Lstat(root)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", nil, nil, errors.New("product OMP overlay root is unsafe")
+	}
+	if err := os.Chmod(root, 0o700); err != nil {
+		return "", nil, nil, fmt.Errorf("secure product OMP overlay root: %w", err)
+	}
+	path := filepath.Join(root, "context-product.yml")
+	body := workflowContextProductOverlayBody(automaticCompaction)
+	if err := writeWorkflowContextProductOverlay(path, body); err != nil {
+		return "", nil, nil, err
+	}
+	activeInfo, err := os.Lstat(path)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("inspect product OMP overlay: %w", err)
+	}
+	return path, body, activeInfo, nil
 }
 
 func (overlay *workflowContextProductOverlay) Apply(

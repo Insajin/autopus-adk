@@ -81,6 +81,25 @@ func TestWorkflowContextProductOverlay_ActiveReuseAndShadowRollbackStayTaskOwned
 	assert.Equal(t, projectBefore, snapshotWorkflowContextProductOverlayTree(t, filepath.Join(input.ProjectDir, ".omp")))
 }
 
+func TestWorkflowContextManagedManualCompactionOverlay_DisablesAutomaticCompactionOnly(t *testing.T) {
+	t.Parallel()
+	productRoot, managedRoot := t.TempDir(), t.TempDir()
+	_, productPath, err := newWorkflowContextProductOverlay(productRoot, config.OMPContextMemoryOff)
+	require.NoError(t, err)
+	managedPath, err := newWorkflowContextManagedManualCompactionOverlay(managedRoot, config.OMPContextMemoryOff)
+	require.NoError(t, err)
+
+	productBody, err := os.ReadFile(productPath)
+	require.NoError(t, err)
+	managedBody, err := os.ReadFile(managedPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(productBody), "compaction:\n  enabled: true\n")
+	assert.Contains(t, string(managedBody), "compaction:\n  enabled: false\n")
+	assert.NotEqual(t, productBody, managedBody)
+	assertWorkflowContextProductOverlayPath(t, managedRoot, managedPath)
+	assertWorkflowContextProductOverlayOnlyFile(t, managedRoot, managedPath)
+}
+
 func TestWorkflowContextProductOverlay_FailsClosedOnUnsafeInputsAndStateDrift(t *testing.T) {
 	t.Run("invalid memory mode", func(t *testing.T) {
 		_, _, err := newWorkflowContextProductOverlay(t.TempDir(), "active")

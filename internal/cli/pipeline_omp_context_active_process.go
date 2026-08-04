@@ -20,17 +20,17 @@ import (
 const (
 	pipelineOMPActiveEndpointKey    = "AUTOPUS_OMP_CONTEXT_PROVIDER_ENDPOINT"
 	pipelineOMPActiveCredentialKey  = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
-	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v1"
-	pipelineOMPActivePolicyIdentity = "manual-compact;retry-off;ambient-off;tools=read,bash,edit,write,grep,glob,todo"
+	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v2"
+	pipelineOMPActivePolicyIdentity = "manual-compact;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-darwin-v1;tools=read,bash,edit,write,grep,glob,todo"
 )
 
 type pipelineOMPActiveProcessConfig struct {
-	backend    pipelineOMPBackendConfig
-	candidate  pipelineOMPManagedActiveCandidate
-	prepared   pipelineOMPManagedActivePrepared
-	binding    WorkflowContextBridgeBinding
-	endpoint   string
-	credential string
+	backend              pipelineOMPBackendConfig
+	candidate            pipelineOMPManagedActiveCandidate
+	prepared             pipelineOMPManagedActivePrepared
+	binding              WorkflowContextBridgeBinding
+	endpoint, credential string
+	sandboxMode          pipelineOMPActiveSandboxMode
 }
 
 func preparePipelineOMPActiveProcessConfig(
@@ -64,6 +64,8 @@ func preparePipelineOMPActiveProcessConfig(
 	}, nil
 }
 
+// @AX:WARN [AUTO]: managed active process startup contains 17 if branches.
+// @AX:REASON [AUTO]: runtime ownership, executable identity, overlay, sandbox, process group, pipes, and readiness gates converge before admission.
 func startPipelineOMPActiveProcess(
 	ctx context.Context,
 	active pipelineOMPActiveProcessConfig,
@@ -99,7 +101,7 @@ func startPipelineOMPActiveProcess(
 		cleanup()
 		return nil, err
 	}
-	_, configPath, err := newWorkflowContextProductOverlay(runtimeRoot, config.OMPContextMemoryOff)
+	configPath, err := newWorkflowContextManagedManualCompactionOverlay(runtimeRoot, config.OMPContextMemoryOff)
 	if err != nil {
 		cleanup()
 		return nil, err
@@ -119,7 +121,7 @@ func startPipelineOMPActiveProcess(
 		"--cwd", active.backend.ProjectDir, "--model", active.candidate.Provider + "/" + active.candidate.Model,
 		"--config", configPath, "--tools", "read,bash,edit,write,grep,glob,todo",
 		"--no-skills", "--no-rules", "--no-lsp", "--no-pty", "--no-title",
-		"--max-time", active.backend.MaxTime.String(),
+		"--max-time", pipelineOMPMaxTimeSeconds(active.backend.MaxTime),
 	}
 	privateExecutable, privateIdentity, err := canonicalPipelineOMPExecutable(privateExecutable)
 	if err != nil || privateIdentity.digest != active.backend.executableID.digest {
@@ -136,10 +138,11 @@ func startPipelineOMPActiveProcess(
 	cmd.Dir, cmd.Env, cmd.Stderr = active.backend.ProjectDir,
 		workflowContextManagedRPCEnvironment(environment, active.binding), io.Discard
 	cmd.WaitDelay = 500 * time.Millisecond
-	if _, err := configureWorkflowContextManagedRPCSandbox(cmd, active.endpoint); err != nil {
+	if err := configurePipelineOMPActiveSandbox(cmd, active.endpoint, active.sandboxMode); err != nil {
 		cleanup()
 		return nil, err
 	}
+	verifiedCommand.directDarwinImage = active.sandboxMode == pipelineOMPActiveSandboxInheritedParent
 	if err := configureWorkflowContextManagedRPCProcessGroup(cmd); err != nil {
 		cleanup()
 		return nil, err
