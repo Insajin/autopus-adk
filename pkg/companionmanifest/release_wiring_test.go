@@ -57,10 +57,24 @@ func TestGoReleaser_CompanionProducerIsAssociatedWithEveryDarwinBuild(t *testing
 	for _, value := range []string{"amd64", "arm64"} {
 		assertContains(t, build.Goarch, value)
 	}
-	if len(build.Hooks.Post) != 1 || build.Hooks.Post[0].Command != "scripts/companion-release/produce.sh" {
+	if len(build.Hooks.Post) != 2 ||
+		build.Hooks.Post[0].Command != "scripts/companion-release/verify-omp-context-release-binary.sh" ||
+		build.Hooks.Post[1].Command != "scripts/companion-release/produce.sh" {
 		t.Fatalf("auto post hooks = %#v", build.Hooks.Post)
 	}
-	environment := strings.Join(build.Hooks.Post[0].Env, "\n")
+	verificationEnvironment := strings.Join(build.Hooks.Post[0].Env, "\n")
+	for _, binding := range []string{
+		"COMPANION_ARTIFACT={{ .Path }}",
+		"COMPANION_PLATFORM={{ .Os }}",
+		"COMPANION_ARCHITECTURE={{ .Arch }}",
+		"COMPANION_RELEASE_TAG={{ .Env.GITHUB_REF_NAME }}",
+		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256={{ .Env.OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256 }}",
+	} {
+		if !strings.Contains(verificationEnvironment, binding) {
+			t.Fatalf("A22 candidate verification environment missing %q", binding)
+		}
+	}
+	environment := strings.Join(build.Hooks.Post[1].Env, "\n")
 	for _, binding := range []string{
 		"COMPANION_ARTIFACT={{ .Path }}",
 		"COMPANION_TARGET={{ .Target }}",
@@ -279,14 +293,4 @@ func archiveMapsCompanionFile(files []struct {
 		}
 	}
 	return false
-}
-
-func assertContains(t *testing.T, values []string, want string) {
-	t.Helper()
-	for _, value := range values {
-		if value == want {
-			return
-		}
-	}
-	t.Fatalf("%q not found in %v", want, values)
 }

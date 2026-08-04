@@ -5,6 +5,10 @@ builds:
   - id: auto
     binary: auto
     main: ./cmd/auto
+    flags:
+      - -trimpath
+      - -buildvcs=false
+    mod_timestamp: "{{ .CommitTimestamp }}"
     env:
       - CGO_ENABLED=0
     goos:
@@ -18,9 +22,20 @@ builds:
       - -s -w
       - -X github.com/insajin/autopus-adk/pkg/version.version={{.Version}}
       - -X github.com/insajin/autopus-adk/pkg/version.commit={{.ShortCommit}}
-      - -X github.com/insajin/autopus-adk/pkg/version.date={{.Date}}
+      - -X github.com/insajin/autopus-adk/pkg/version.date={{.CommitDate}}
+      - -X github.com/insajin/autopus-adk/pkg/version.sourceCommit={{.Env.COMPANION_SOURCE_COMMIT}}
+      - -X github.com/insajin/autopus-adk/pkg/version.sourceTree={{.Env.COMPANION_SOURCE_TREE}}
+      - -X github.com/insajin/autopus-adk/internal/cli.pipelineOMPActiveStaticPolicyB64={{.Env.OMP_CONTEXT_STATIC_POLICY_B64}}
     hooks:
       post:
+        # Compare reproducible unsigned bytes before the producer applies Developer ID signing.
+        - cmd: scripts/companion-release/verify-omp-context-release-binary.sh
+          env:
+            - COMPANION_ARTIFACT={{ .Path }}
+            - COMPANION_PLATFORM={{ .Os }}
+            - COMPANION_ARCHITECTURE={{ .Arch }}
+            - COMPANION_RELEASE_TAG={{ .Env.GITHUB_REF_NAME }}
+            - OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256={{ .Env.OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256 }}
         - cmd: scripts/companion-release/produce.sh
           env:
             - COMPANION_ARTIFACT={{ .Path }}
@@ -54,10 +69,19 @@ archives:
       - src: '{{ if eq .Os "darwin" }}dist/auto_{{ .Target }}/adk-companion-public-key-receipt.bundle/**{{ else }}scripts/companion-release/no-files-*{{ end }}'
         dst: adk-companion-public-key-receipt.bundle
         strip_parent: true
+      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") }}dist/auto_{{ .Target }}/release-lineage-v1.json{{ else }}scripts/companion-release/no-files-*{{ end }}'
+        dst: release-lineage-v1.json
+      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") }}dist/auto_{{ .Target }}/release-lineage-v1.sig{{ else }}scripts/companion-release/no-files-*{{ end }}'
+        dst: release-lineage-v1.sig
 
 release:
   replace_existing_artifacts: true
   target_commitish: "{{ .Env.COMPANION_SOURCE_COMMIT }}"
+  extra_files:
+    - glob: "{{ .Env.OMP_CONTEXT_PROMOTION_REPORT_PATH }}"
+    - glob: "{{ .Env.OMP_CONTEXT_PROMOTION_ATTESTATION_PATH }}"
+    - glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_PATH }}"
+    - glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH }}"
 
 checksum:
   name_template: 'checksums.txt'

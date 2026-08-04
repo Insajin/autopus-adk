@@ -131,7 +131,7 @@ func runDarwinReleaseProducer(t *testing.T, scenario string, mutate bool) (strin
 		artifact, "arm64", keyFile, writeSignerWrapper(t, dir),
 		filepath.Join(dir, "signer-args"), filepath.Join(dir, "stdin-digest"),
 	)
-	environment = append(environment, darwinReleaseToolEnv(t, dir)...)
+	environment = append(environment, append(darwinReleaseToolEnv(t, dir), releaseCanaryGateEnv(t, dir, "arm64")...)...)
 	writeDarwinReleaseScenario(t, dir, scenario)
 	environment = append(environment, "FAKE_DARWIN_SCENARIO="+scenario)
 	if mutate {

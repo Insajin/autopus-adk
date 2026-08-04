@@ -80,6 +80,8 @@ func newWorkflowContextRuntimeCmd() *cobra.Command {
 	cmd.AddCommand(newWorkflowContextObservationCmd())
 	cmd.AddCommand(newWorkflowContextObserveCallCmd())
 	cmd.AddCommand(newWorkflowContextObserveSessionCmd())
+	cmd.AddCommand(newWorkflowContextImplementationIdentityCmd())
+	cmd.AddCommand(newWorkflowContextVerifiedExecSmokeCmd())
 	return cmd
 }
 
