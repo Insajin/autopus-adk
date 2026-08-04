@@ -17,6 +17,7 @@ type OMPExecutionViewInput struct {
 	PhaseID          PhaseID
 	Attempt          int
 	Prompt           string
+	ActivePrompt     string
 	CompletedHistory []string
 }
 
@@ -39,6 +40,7 @@ type OMPExecutionSnapshot struct {
 	PhaseID          PhaseID
 	Attempt          int
 	Prompt           string
+	ActivePrompt     string
 	CompletedHistory []string
 }
 
@@ -70,6 +72,7 @@ func NewOMPExecutionView(input OMPExecutionViewInput) (*OMPExecutionView, error)
 		ProjectDir: input.ProjectDir, SpecID: input.SpecID, SpecDir: input.SpecDir,
 		SnapshotHash: input.SnapshotHash, GitCommitHash: input.GitCommitHash,
 		PhaseID: input.PhaseID, Attempt: input.Attempt, Prompt: input.Prompt,
+		ActivePrompt:     input.ActivePrompt,
 		CompletedHistory: cloneOMPHistory(input.CompletedHistory),
 	}
 	return &OMPExecutionView{
@@ -126,10 +129,14 @@ func (e *SubprocessEngine) newPhaseRequest(
 	if e.cfg.Platform != "omp" {
 		return request, nil
 	}
+	activePrompt, err := e.buildOMPActivePhasePrompt(phase)
+	if err != nil {
+		return PhaseRequest{}, fmt.Errorf("build OMP active phase prompt: %w", err)
+	}
 	view, err := NewOMPExecutionView(OMPExecutionViewInput{
 		ProjectDir: e.cfg.ProjectDir, SpecID: e.cfg.SpecID, SpecDir: e.cfg.SpecDir,
 		SnapshotHash: e.cfg.SnapshotHash, GitCommitHash: e.cfg.GitCommitHash,
-		PhaseID: phase.ID, Attempt: attempt, Prompt: prompt,
+		PhaseID: phase.ID, Attempt: attempt, Prompt: prompt, ActivePrompt: activePrompt,
 		CompletedHistory: completedOMPHistory(state.phases, phase.ID, state.previous),
 	})
 	if err != nil {
@@ -181,6 +188,12 @@ func validateOMPExecutionViewInput(input OMPExecutionViewInput) error {
 	}
 	if strings.TrimSpace(input.Prompt) == "" || strings.IndexByte(input.Prompt, 0) >= 0 {
 		return errors.New("OMP execution view: prompt is required and must not contain NUL")
+	}
+	if strings.TrimSpace(input.ActivePrompt) == "" || strings.IndexByte(input.ActivePrompt, 0) >= 0 {
+		return errors.New("OMP execution view: active prompt is required and must not contain NUL")
+	}
+	if strings.HasPrefix(strings.TrimSpace(input.ActivePrompt), "/auto") {
+		return errors.New("OMP execution view: active prompt must not reissue /auto")
 	}
 	for i, output := range input.CompletedHistory {
 		if strings.TrimSpace(output) == "" || strings.IndexByte(output, 0) >= 0 {

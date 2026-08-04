@@ -19,6 +19,7 @@ func TestOMPExecutionView_IsSealedAndBoundToTheExactPhase(t *testing.T) {
 		PhaseID:       pipeline.PhaseImplement,
 		Attempt:       2,
 		Prompt:        "authoritative phase prompt",
+		ActivePrompt:  "active phase admission prompt",
 		CompletedHistory: []string{
 			"completed planner output",
 		},
@@ -36,6 +37,8 @@ func TestOMPExecutionView_IsSealedAndBoundToTheExactPhase(t *testing.T) {
 	snapshot, err := view.Open(binding)
 	require.NoError(t, err)
 	require.Equal(t, "completed planner output", snapshot.CompletedHistory[0])
+	require.Equal(t, "authoritative phase prompt", snapshot.Prompt)
+	require.Equal(t, "active phase admission prompt", snapshot.ActivePrompt)
 	snapshot.CompletedHistory[0] = "mutated reader history"
 
 	again, err := view.Open(pipeline.OMPExecutionViewBinding{
@@ -44,6 +47,7 @@ func TestOMPExecutionView_IsSealedAndBoundToTheExactPhase(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "completed planner output", again.CompletedHistory[0])
+	require.Equal(t, "active phase admission prompt", again.ActivePrompt)
 
 	_, err = view.Open(pipeline.OMPExecutionViewBinding{
 		SpecID: input.SpecID, SnapshotHash: "sha256:" + repeatHex("c"),
@@ -51,6 +55,8 @@ func TestOMPExecutionView_IsSealedAndBoundToTheExactPhase(t *testing.T) {
 	})
 	require.ErrorContains(t, err, "binding")
 	_, err = json.Marshal(view)
+	require.ErrorContains(t, err, "sealed")
+	_, err = json.Marshal(snapshot)
 	require.ErrorContains(t, err, "sealed")
 }
 
@@ -63,6 +69,26 @@ func TestOMPExecutionView_RejectsIncompleteAuthority(t *testing.T) {
 	require.ErrorContains(t, err, "unavailable")
 	_, err = (&pipeline.OMPExecutionView{}).Binding()
 	require.ErrorContains(t, err, "unavailable")
+}
+
+func TestOMPExecutionView_RejectsInvalidActivePrompt(t *testing.T) {
+	valid := pipeline.OMPExecutionViewInput{
+		ProjectDir: "/workspace", SpecID: "SPEC-OMP-004",
+		SpecDir:      ".autopus/specs/SPEC-OMP-004",
+		SnapshotHash: "sha256:" + repeatHex("a"), GitCommitHash: repeatN("b", 40),
+		PhaseID: pipeline.PhasePlan, Attempt: 1, Prompt: "canonical phase prompt",
+	}
+
+	_, err := pipeline.NewOMPExecutionView(valid)
+	require.ErrorContains(t, err, "active prompt")
+
+	valid.ActivePrompt = "/auto go SPEC-OMP-004"
+	_, err = pipeline.NewOMPExecutionView(valid)
+	require.ErrorContains(t, err, "must not reissue /auto")
+
+	valid.ActivePrompt = "active\x00prompt"
+	_, err = pipeline.NewOMPExecutionView(valid)
+	require.ErrorContains(t, err, "active prompt")
 }
 
 func repeatHex(value string) string { return repeatN(value, 64) }
