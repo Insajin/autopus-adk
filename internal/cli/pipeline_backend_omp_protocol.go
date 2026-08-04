@@ -13,13 +13,17 @@ import (
 const pipelineOMPRPCProtocolVersion = 2
 
 type pipelineOMPRPCCommand struct {
-	ID              string `json:"id"`
-	Type            string `json:"type"`
-	ProtocolVersion int    `json:"protocolVersion,omitempty"`
-	Enabled         *bool  `json:"enabled,omitempty"`
-	Provider        string `json:"provider,omitempty"`
-	ModelID         string `json:"modelId,omitempty"`
-	Message         string `json:"message,omitempty"`
+	ID                 string `json:"id"`
+	Type               string `json:"type"`
+	ProtocolVersion    int    `json:"protocolVersion,omitempty"`
+	Enabled            *bool  `json:"enabled,omitempty"`
+	Provider           string `json:"provider,omitempty"`
+	ModelID            string `json:"modelId,omitempty"`
+	Message            string `json:"message,omitempty"`
+	CustomInstructions string `json:"customInstructions,omitempty"`
+	Confirmed          *bool  `json:"confirmed,omitempty"`
+	Cursor             string `json:"cursor,omitempty"`
+	Limit              int    `json:"limit,omitempty"`
 }
 
 type pipelineOMPRPCFrame struct {
@@ -30,23 +34,35 @@ type pipelineOMPRPCFrame struct {
 	Error        string          `json:"error,omitempty"`
 	AgentInvoked *bool           `json:"agentInvoked,omitempty"`
 	Data         json.RawMessage `json:"data,omitempty"`
+	Method       string          `json:"method,omitempty"`
+	Title        string          `json:"title,omitempty"`
+	Message      json.RawMessage `json:"message,omitempty"`
+	Reason       string          `json:"reason,omitempty"`
+	Action       string          `json:"action,omitempty"`
+	ErrorMessage string          `json:"errorMessage,omitempty"`
+	Result       json.RawMessage `json:"result,omitempty"`
+	Aborted      bool            `json:"aborted,omitempty"`
+	Skipped      bool            `json:"skipped,omitempty"`
+	IsTerminal   *bool           `json:"isTerminal,omitempty"`
 }
 
 type pipelineOMPRPCProtocol struct {
-	process *pipelineOMPProcess
-	nextID  int
+	process              *pipelineOMPProcess
+	nextID               int
+	safeCompactionImages map[string]struct{}
 }
 
 type pipelineOMPState struct {
-	SessionID          string `json:"sessionId"`
-	IsStreaming        *bool  `json:"isStreaming"`
-	IsCompacting       *bool  `json:"isCompacting"`
-	MessageCount       *int   `json:"messageCount"`
-	QueuedMessageCount *int   `json:"queuedMessageCount"`
+	SessionID             string `json:"sessionId"`
+	IsStreaming           *bool  `json:"isStreaming"`
+	IsCompacting          *bool  `json:"isCompacting"`
+	MessageCount          *int   `json:"messageCount"`
+	QueuedMessageCount    *int   `json:"queuedMessageCount"`
+	AutoCompactionEnabled *bool  `json:"autoCompactionEnabled"`
 }
 
 func newPipelineOMPRPCProtocol(process *pipelineOMPProcess) *pipelineOMPRPCProtocol {
-	return &pipelineOMPRPCProtocol{process: process}
+	return &pipelineOMPRPCProtocol{process: process, safeCompactionImages: make(map[string]struct{})}
 }
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: negotiation disables OMP retry and automatic compaction before phase prompts.
@@ -189,7 +205,7 @@ func (protocol *pipelineOMPRPCProtocol) call(
 				}
 				started = true
 			case "agent_end":
-				if !started || ended {
+				if !started || ended || frame.IsTerminal != nil && !*frame.IsTerminal {
 					return nil, errors.New("OMP pipeline RPC agent lifecycle is out of order")
 				}
 				ended = true

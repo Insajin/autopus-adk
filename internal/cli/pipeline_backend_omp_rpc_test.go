@@ -19,6 +19,7 @@ import (
 )
 
 const pipelineOMPRPCFixtureEnv = "AUTOPUS_TEST_OMP_PIPELINE_RPC"
+const pipelineOMPActiveRPCFixtureEnv = "AUTOPUS_TEST_OMP_ACTIVE_RPC"
 
 type pipelineOMPRPCRecord struct {
 	Kind     string   `json:"kind"`
@@ -34,6 +35,9 @@ type pipelineOMPRPCRecord struct {
 }
 
 func TestMain(m *testing.M) {
+	if os.Getenv(pipelineOMPActiveRPCFixtureEnv) == "1" {
+		os.Exit(runPipelineOMPActiveRPCFixture())
+	}
 	if os.Getenv(pipelineOMPRPCFixtureEnv) == "1" {
 		os.Exit(runPipelineOMPRPCFixture())
 	}
@@ -142,10 +146,14 @@ func sealedPipelineOMPRequest(
 	t *testing.T, config pipelineOMPBackendConfig, phase pipeline.PhaseID, prompt string, history []string,
 ) pipeline.PhaseRequest {
 	t.Helper()
+	activePrompt := prompt
+	if strings.HasPrefix(strings.TrimSpace(activePrompt), "/auto") {
+		activePrompt = "active phase prompt"
+	}
 	view, err := pipeline.NewOMPExecutionView(pipeline.OMPExecutionViewInput{
 		ProjectDir: config.ProjectDir, SpecID: config.SpecID, SpecDir: config.SpecDir,
 		SnapshotHash: config.SnapshotHash, GitCommitHash: config.GitCommitHash,
-		PhaseID: phase, Attempt: 1, Prompt: prompt, CompletedHistory: history,
+		PhaseID: phase, Attempt: 1, Prompt: prompt, ActivePrompt: activePrompt, CompletedHistory: history,
 	})
 	require.NoError(t, err)
 	return pipeline.PhaseRequest{PhaseID: phase, Attempt: 1, Prompt: "untrusted duplicate", OMPExecutionView: view}

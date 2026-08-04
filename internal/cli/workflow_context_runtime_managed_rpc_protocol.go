@@ -15,6 +15,7 @@ type workflowContextManagedRPCProtocol struct {
 	frames  <-chan []byte
 	done    <-chan error
 	usedUI  map[string]struct{}
+	pending *workflowContextManagedRPCFrame
 }
 
 type workflowContextManagedRPCFrame struct {
@@ -30,6 +31,7 @@ type workflowContextManagedRPCFrame struct {
 	Success      *bool             `json:"success"`
 	Aborted      bool              `json:"aborted"`
 	Skipped      bool              `json:"skipped"`
+	IsTerminal   *bool             `json:"isTerminal"`
 	Result       json.RawMessage   `json:"result"`
 	Data         json.RawMessage   `json:"data"`
 	Commands     []json.RawMessage `json:"commands"`
@@ -41,6 +43,7 @@ type workflowContextManagedRPCState struct {
 	SessionID             string `json:"sessionId"`
 	AutoCompactionEnabled bool   `json:"autoCompactionEnabled"`
 	QueuedMessageCount    int    `json:"queuedMessageCount"`
+	MessageCount          int    `json:"messageCount"`
 }
 
 type workflowContextManagedBridgeEnvelope struct {
@@ -70,6 +73,11 @@ func (protocol *workflowContextManagedRPCProtocol) send(value any) error {
 func (protocol *workflowContextManagedRPCProtocol) next(
 	ctx context.Context,
 ) (workflowContextManagedRPCFrame, error) {
+	if protocol.pending != nil {
+		frame := *protocol.pending
+		protocol.pending = nil
+		return frame, nil
+	}
 	select {
 	case <-ctx.Done():
 		return workflowContextManagedRPCFrame{}, ctx.Err()
@@ -90,6 +98,14 @@ func (protocol *workflowContextManagedRPCProtocol) next(
 		}
 		return parsed, nil
 	}
+}
+
+func (protocol *workflowContextManagedRPCProtocol) putBack(frame workflowContextManagedRPCFrame) error {
+	if protocol.pending != nil {
+		return errors.New("managed OMP RPC pushback buffer is occupied")
+	}
+	protocol.pending = &frame
+	return nil
 }
 
 func (protocol *workflowContextManagedRPCProtocol) awaitReady(ctx context.Context) error {
@@ -120,6 +136,9 @@ func (protocol *workflowContextManagedRPCProtocol) awaitResponse(
 		}
 		if frame.Type == "extension_ui_request" && frame.Method == "confirm" {
 			return workflowContextManagedRPCFrame{}, errors.New("managed OMP bridge confirmation arrived outside its lifecycle stage")
+		}
+		if frame.Type == "auto_compaction_start" || frame.Type == "auto_compaction_end" {
+			return workflowContextManagedRPCFrame{}, errors.New("managed OMP compaction lifecycle arrived outside its completion stage")
 		}
 		if frame.Type != "response" || frame.ID != id {
 			continue
@@ -204,57 +223,11 @@ func sendWorkflowContextManagedProductPrompt(
 	})
 }
 
-// @AX:WARN [AUTO]: provider-boundary verification has cyclomatic complexity 15.
-// @AX:REASON [AUTO]: prompt acceptance and agent start, turn end, and agent end must all be observed in order before admission.
 func (protocol *workflowContextManagedRPCProtocol) awaitProviderBoundary(
 	ctx context.Context, id string,
 ) error {
-	accepted, started, turned, ended := false, false, false, false
-	for !(accepted && started && turned && ended) {
-		frame, err := protocol.next(ctx)
-		if err != nil {
-			return fmt.Errorf("await managed OMP provider boundary: %w", err)
-		}
-		if frame.Type == "extension_error" {
-			return errors.New("managed OMP extension failed during provider admission")
-		}
-		if frame.Type == "response" && frame.ID == id {
-			if frame.Success == nil || !*frame.Success || frame.Command != "prompt" {
-				return errors.New("managed OMP admission prompt was rejected")
-			}
-			accepted = true
-		}
-		switch frame.Type {
-		case "agent_start":
-			started = true
-		case "turn_end":
-			turned = started
-		case "agent_end":
-			ended = turned
-		}
-	}
-	return nil
-}
-
-func (protocol *workflowContextManagedRPCProtocol) awaitNativeCompactionEnd(ctx context.Context) error {
-	for {
-		frame, err := protocol.next(ctx)
-		if err != nil {
-			return fmt.Errorf("await managed OMP native compaction end: %w", err)
-		}
-		if frame.Type == "extension_error" || frame.Type == "extension_ui_request" {
-			return errors.New("managed OMP emitted unexpected activity before native completion")
-		}
-		if frame.Type != "auto_compaction_end" {
-			continue
-		}
-		missingResult := len(frame.Result) == 0 || string(frame.Result) == "null"
-		if frame.Action != "snapcompact" || frame.Aborted || frame.Skipped ||
-			frame.ErrorMessage != "" || missingResult {
-			return errors.New("managed OMP native compaction end is invalid")
-		}
-		return nil
-	}
+	_, err := protocol.awaitProviderBoundaryState(ctx, id, false)
+	return err
 }
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: the RPC frame reader is bounded by both process-pipe closure and caller cancellation.

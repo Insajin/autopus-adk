@@ -127,10 +127,29 @@ func TestWorkflowContextManagedRPCProduct_RequiresNativeCommandDiscovery(t *test
 	}
 }
 
-func TestWorkflowContextManagedRPCProduct_ModelConfigBindsAuthNoneLoopback(t *testing.T) {
+func TestWorkflowContextManagedRPCProduct_ProviderBoundaryRejectsStaleLifecycle(t *testing.T) {
+	success := true
+	for _, frames := range [][]workflowContextManagedRPCFrame{
+		{{Type: "agent_start"}, {ID: "admission", Type: "response", Command: "prompt", Success: &success}},
+		{{ID: "admission", Type: "response", Command: "prompt", Success: &success}, {Type: "turn_end"}},
+		{{ID: "admission", Type: "response", Command: "prompt", Success: &success}, {Type: "agent_start"}, {Type: "agent_start"}},
+	} {
+		input := make(chan []byte, len(frames))
+		for _, frame := range frames {
+			managedProductPushFrame(t, input, frame)
+		}
+		close(input)
+		protocol := newWorkflowContextManagedRPCProtocol(&bytes.Buffer{}, input, make(chan error))
+		if err := protocol.awaitProviderBoundary(context.Background(), "admission"); err == nil {
+			t.Fatal("stale or out-of-order provider lifecycle was admitted")
+		}
+	}
+}
+
+func TestWorkflowContextManagedRPCProduct_ModelConfigBindsCredentialAuthority(t *testing.T) {
 	options := managedProductTestOptions(t)
 	path := filepath.Join(options.RuntimeRoot, "models.yml")
-	valid := fmt.Sprintf("providers:\n  fake:\n    baseUrl: %s/v1\n    auth: none\n    models:\n      - id: product\n", options.AllowedEndpoint)
+	valid := fmt.Sprintf("providers:\n  fake:\n    baseUrl: %s/v1\n    apiKey: AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN\n    authHeader: true\n    api: openai-completions\n    models:\n      - id: product\n", options.AllowedEndpoint)
 	if err := os.WriteFile(path, []byte(valid), 0o600); err != nil {
 		t.Fatalf("write model config: %v", err)
 	}
@@ -138,9 +157,13 @@ func TestWorkflowContextManagedRPCProduct_ModelConfigBindsAuthNoneLoopback(t *te
 		t.Fatalf("valid model authority rejected: %v", err)
 	}
 	for _, body := range []string{
-		strings.Replace(valid, "auth: none", "auth: api-key", 1),
+		strings.Replace(valid, "authHeader: true", "authHeader: false", 1),
+		strings.Replace(valid, "apiKey: AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN", "apiKey: OTHER_TOKEN", 1),
 		strings.Replace(valid, options.AllowedEndpoint, "http://127.0.0.1:2", 1),
 		strings.Replace(valid, "id: product", "id: other", 1),
+		strings.Replace(valid, "api: openai-completions", "api: openai-responses", 1),
+		strings.Replace(valid, "  fake:", "  other:", 1),
+		strings.Replace(valid, "    models:", "    headers:\n      Authorization: leaked\n    models:", 1),
 	} {
 		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 			t.Fatalf("mutate model config: %v", err)
@@ -148,6 +171,86 @@ func TestWorkflowContextManagedRPCProduct_ModelConfigBindsAuthNoneLoopback(t *te
 		if err := verifyWorkflowContextManagedRPCModelConfig(options); err == nil {
 			t.Fatal("mismatched model authority was accepted")
 		}
+	}
+}
+
+func TestWorkflowContextManagedRPCProduct_CompactionCycleBoundsAndDefault(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		cycles, want int
+		wantErr      bool
+	}{
+		{name: "zero defaults to one", cycles: 0, want: 1},
+		{name: "one is accepted", cycles: 1, want: 1},
+		{name: "upper bound is accepted", cycles: 8, want: 8},
+		{name: "above upper bound is rejected", cycles: 9, wantErr: true},
+		{name: "negative count is rejected", cycles: -1, wantErr: true},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			options := managedProductTestOptions(t)
+			options.CompactionCycles = test.cycles
+			normalized, err := validateWorkflowContextManagedRPCOptions(options)
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("compaction cycles %d were accepted as %d", test.cycles, normalized.CompactionCycles)
+				}
+				return
+			}
+			if err != nil || normalized.CompactionCycles != test.want {
+				t.Fatalf("compaction cycles %d normalized to %d, err=%v; want %d", test.cycles, normalized.CompactionCycles, err, test.want)
+			}
+		})
+	}
+}
+
+func TestWorkflowContextManagedRPCProduct_CredentialEnvironmentFailsClosed(t *testing.T) {
+	const key = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
+	for _, test := range []struct {
+		name   string
+		mutate func(*WorkflowContextManagedRPCOptions)
+	}{
+		{name: "duplicate", mutate: func(options *WorkflowContextManagedRPCOptions) {
+			options.Environment = append(options.Environment, key+"=duplicate")
+		}},
+		{name: "missing", mutate: func(options *WorkflowContextManagedRPCOptions) {
+			options.Environment = options.Environment[:2]
+		}},
+		{name: "empty", mutate: func(options *WorkflowContextManagedRPCOptions) {
+			options.Environment[2] = key + "="
+		}},
+		{name: "ambient key", mutate: func(options *WorkflowContextManagedRPCOptions) {
+			path := filepath.Join(options.RuntimeRoot, "models.yml")
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(strings.Replace(string(body), "apiKey: "+key, "apiKey: PATH", 1)), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "process control key", mutate: func(options *WorkflowContextManagedRPCOptions) {
+			path := filepath.Join(options.RuntimeRoot, "models.yml")
+			body, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(strings.Replace(string(body), "apiKey: "+key, "apiKey: NODE_OPTIONS", 1)), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			options.Environment = append(options.Environment, "NODE_OPTIONS=--require=malicious")
+		}},
+	} {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			options := managedProductTestOptions(t)
+			test.mutate(&options)
+			if _, err := validateWorkflowContextManagedRPCOptions(options); err == nil {
+				t.Fatal("invalid credential authority was accepted")
+			}
+		})
 	}
 }
 

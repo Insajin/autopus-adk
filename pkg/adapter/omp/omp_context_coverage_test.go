@@ -20,6 +20,8 @@ var ompContextCoverageOwnedPaths = []string{
 	"internal/cli/doctor_omp_context_projection.go",
 	"internal/cli/doctor_omp_context_receipt.go",
 	"internal/cli/doctor_omp_readiness.go",
+	"internal/cli/pipeline_backend_omp.go",
+	"internal/cli/pipeline_omp_context_cohort.go",
 	"internal/cli/workflow.go",
 	"internal/cli/workflow_context_runtime_canary.go",
 	"internal/cli/workflow_context_runtime_command.go",
@@ -27,6 +29,10 @@ var ompContextCoverageOwnedPaths = []string{
 	"internal/cli/workflow_context_runtime_managed.go",
 	"internal/cli/workflow_context_runtime_managed_rpc.go",
 	"internal/cli/workflow_context_runtime_managed_rpc_admission.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_authority.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_barrier.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_boundary.go",
+	"internal/cli/workflow_context_runtime_managed_rpc_completion.go",
 	"internal/cli/workflow_context_runtime_managed_rpc_discovery.go",
 	"internal/cli/workflow_context_runtime_managed_rpc_environment.go",
 	"internal/cli/workflow_context_runtime_managed_rpc_identity.go",
@@ -78,6 +84,7 @@ var ompContextCoverageOwnedPaths = []string{
 
 var ompContextCoverageSharedPaths = map[string]bool{
 	"internal/cli/doctor_omp_readiness.go":    true,
+	"internal/cli/pipeline_backend_omp.go":    true,
 	"internal/cli/workflow.go":                true,
 	"pkg/adapter/omp/omp.go":                  true,
 	"pkg/adapter/omp/omp_ownership.go":        true,
@@ -151,6 +158,7 @@ func ompContextChangedProductionPaths(t *testing.T, root, base string) []string 
 			strings.HasPrefix(path, "pkg/promptlayer/omp_context_") ||
 			strings.HasPrefix(path, "pkg/config/omp_context_") ||
 			strings.HasPrefix(path, "internal/cli/doctor_omp_context") ||
+			strings.HasPrefix(path, "internal/cli/pipeline_omp_context_") ||
 			strings.HasPrefix(path, "internal/cli/workflow_context_runtime_") ||
 			ompContextCoverageSharedPaths[path] {
 			set[path] = true

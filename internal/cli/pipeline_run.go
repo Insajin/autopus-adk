@@ -220,5 +220,6 @@ func newPipelineOMPBackendForRun(
 		SnapshotHash: resolvedSpec.SnapshotHash, GitCommitHash: gitHash,
 		// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: each canonical OMP phase is bounded to 30 minutes.
 		Environment: environment, PhaseModels: phaseModels, MaxTime: 30 * time.Minute, executableID: executableID,
+		ManagedActive: newPipelineOMPManagedActiveCoordinator(),
 	})
 }

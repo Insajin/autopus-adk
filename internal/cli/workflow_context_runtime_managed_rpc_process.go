@@ -83,6 +83,14 @@ func workflowContextManagedRPCArgs(options WorkflowContextManagedRPCOptions) []s
 			"--max-time", options.MaxTime.String(),
 		)
 	}
+	if options.ObserveOnly {
+		args[len(args)-1] = options.ProjectDir
+		return append(args,
+			"--model", options.Model, "--config", options.ConfigPath,
+			"--no-tools", "--no-skills", "--no-rules", "--no-lsp", "--no-pty", "--no-title",
+			"--max-time", options.MaxTime.String(),
+		)
+	}
 	args[len(args)-1] = options.ProjectDir
 	return append(args,
 		"--model", options.Model, "--config", options.ConfigPath,

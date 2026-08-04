@@ -24,15 +24,26 @@ type pipelineOMPBackendConfig struct {
 	Environment    []string
 	PhaseModels    map[pipeline.PhaseID]string
 	MaxTime        time.Duration
+	ManagedActive  pipelineOMPManagedActiveRunner
+	managedInner   bool
 	ownRuntimeBase bool
 	executableID   pipelineOMPExecutableIdentity
 }
+
+type pipelineOMPRunMode uint8
+
+const (
+	pipelineOMPRunModeUnknown pipelineOMPRunMode = iota
+	pipelineOMPRunModeCanonical
+	pipelineOMPRunModeActive
+)
 
 type pipelineOMPBackend struct {
 	mu       sync.Mutex
 	config   pipelineOMPBackendConfig
 	process  *pipelineOMPProcess
 	protocol *pipelineOMPRPCProtocol
+	mode     pipelineOMPRunMode
 	closed   bool
 }
 
@@ -43,6 +54,9 @@ func newPipelineOMPBackend(config pipelineOMPBackendConfig) (*pipelineOMPBackend
 	normalized, err := normalizePipelineOMPBackendConfig(config)
 	if err != nil {
 		return nil, err
+	}
+	if coordinator, ok := normalized.ManagedActive.(*pipelineOMPManagedActiveCoordinator); ok && coordinator.start == nil {
+		coordinator.start = newPipelineOMPActiveSessionStart(normalized)
 	}
 	return &pipelineOMPBackend{config: normalized}, nil
 }
@@ -69,6 +83,7 @@ func normalizePipelineOMPBackendConfig(config pipelineOMPBackendConfig) (pipelin
 	} else if err := verifyPipelineOMPExecutable(executable, executableID); err != nil {
 		return config, err
 	}
+	config.managedInner = pipelineOMPManagedInner(config.Environment)
 	environment, err := normalizePipelineOMPEnvironment(config.Environment)
 	if err != nil {
 		return config, err
@@ -139,6 +154,52 @@ func (backend *pipelineOMPBackend) Execute(
 	if backend.closed {
 		return response, errors.New("pipeline: OMP backend is closed")
 	}
+	if backend.mode != pipelineOMPRunModeCanonical && backend.config.ManagedActive != nil && !backend.config.managedInner {
+		candidate, candidateErr := newPipelineOMPManagedActiveCandidate(
+			snapshot, backend.config.PhaseModels[request.PhaseID], backend.config.PhaseModels,
+		)
+		var prepared pipelineOMPManagedActivePrepared
+		prepareErr := candidateErr
+		if prepareErr == nil {
+			prepared, prepareErr = backend.config.ManagedActive.Prepare(ctx, candidate)
+			if prepareErr == nil {
+				prepareErr = validatePipelineOMPManagedActivePrepared(candidate, prepared)
+			}
+		}
+		if prepareErr == nil && backend.mode == pipelineOMPRunModeUnknown {
+			if activator, ok := backend.config.ManagedActive.(interface {
+				Activate(context.Context, pipelineOMPManagedActiveCandidate, pipelineOMPManagedActivePrepared) error
+			}); ok {
+				prepareErr = activator.Activate(ctx, candidate, prepared)
+			}
+			if prepareErr == nil {
+				backend.mode = pipelineOMPRunModeActive
+			}
+		}
+		if prepareErr != nil {
+			if backend.mode == pipelineOMPRunModeActive {
+				response.FailureClass = "execution_error"
+				_ = backend.closeLocked()
+				return response, fmt.Errorf("pipeline: managed active run preflight drifted: %w", prepareErr)
+			}
+			backend.mode = pipelineOMPRunModeCanonical
+		} else {
+			response.Backend = "rpc-managed-active-history"
+			response.Output, err = backend.config.ManagedActive.Execute(ctx, candidate, prepared)
+			if err != nil || strings.TrimSpace(response.Output) == "" {
+				if err == nil {
+					err = errors.New("pipeline: managed active OMP returned empty assistant output")
+				}
+				response.FailureClass = "execution_error"
+				_ = backend.closeLocked()
+				return response, err
+			}
+			return response, nil
+		}
+	}
+	if backend.mode == pipelineOMPRunModeUnknown {
+		backend.mode = pipelineOMPRunModeCanonical
+	}
 	if backend.process == nil {
 		backend.process, err = startPipelineOMPProcess(ctx, backend.config)
 		if err == nil {
@@ -178,6 +239,9 @@ func (backend *pipelineOMPBackend) closeLocked() error {
 	var err error
 	if backend.process != nil {
 		err = backend.process.Close()
+	}
+	if backend.config.ManagedActive != nil {
+		err = errors.Join(err, backend.config.ManagedActive.Close())
 	}
 	if backend.config.ownRuntimeBase {
 		err = errors.Join(err, os.Remove(backend.config.RuntimeBase))

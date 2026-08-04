@@ -93,7 +93,7 @@ func validWorkflowContextCapabilities() WorkflowContextCapabilities {
 		Version: "omp/17.1.8", ExecutableIdentity: true, SettingsSchema: true, OverlayReadback: true,
 		PreCompactionEvent: true, PostCompactionEvent: true, CanonicalInjection: true,
 		AdmissionBlocking: true, IsolatedTaskRoot: true, CleanupReadback: true,
-		MemoryInterception: true, AuthNoneLoopback: true, ProbeSource: "fake-runtime",
+		MemoryInterception: true, AuthNoneLoopback: true, ProviderCredentialAuthority: true, ProbeSource: "fake-runtime",
 		CheckedAt: time.Date(2026, 8, 2, 0, 0, 0, 0, time.UTC),
 	}
 }

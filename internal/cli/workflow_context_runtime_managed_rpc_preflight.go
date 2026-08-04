@@ -5,16 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/processprobe"
-	"gopkg.in/yaml.v3"
 )
 
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: each effective-setting probe is capped at five seconds and 16 KiB.
@@ -47,34 +42,8 @@ func verifyWorkflowContextManagedRPCConfig(
 }
 
 func verifyWorkflowContextManagedRPCModelConfig(options WorkflowContextManagedRPCOptions) error {
-	providerID, modelID, ok := strings.Cut(options.Model, "/")
-	endpoint, err := url.Parse(options.AllowedEndpoint)
-	if !ok || providerID == "" || modelID == "" || err != nil {
-		return errors.New("managed OMP product model authority is invalid")
-	}
-	data, err := os.ReadFile(filepath.Join(options.RuntimeRoot, "models.yml"))
-	if err != nil || len(data) > 1<<20 {
-		return errors.New("managed OMP product model config is unavailable")
-	}
-	var config struct {
-		Providers map[string]struct {
-			BaseURL string `yaml:"baseUrl"`
-			Auth    string `yaml:"auth"`
-			Models  []struct {
-				ID string `yaml:"id"`
-			} `yaml:"models"`
-		} `yaml:"providers"`
-	}
-	if yaml.Unmarshal(data, &config) != nil || len(config.Providers) != 1 {
-		return errors.New("managed OMP product model config is invalid")
-	}
-	provider, found := config.Providers[providerID]
-	wantBase := strings.TrimSuffix(endpoint.String(), "/") + "/v1"
-	if !found || provider.Auth != "none" || provider.BaseURL != wantBase || len(provider.Models) != 1 ||
-		provider.Models[0].ID != modelID {
-		return errors.New("managed OMP product model config does not match loopback authority")
-	}
-	return nil
+	_, err := loadWorkflowContextManagedRPCCredentialAuthority(options)
+	return err
 }
 
 func verifyWorkflowContextManagedRPCSetting(

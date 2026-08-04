@@ -98,7 +98,8 @@ func (supervisor *WorkflowContextRuntimeSupervisor) Run(
 
 	var binding promptlayer.OMPContextBindingReceipt
 	var terminal promptlayer.OMPContextTerminalReceipt
-	stage := 0
+	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: each complete event triplet re-enters stage zero; rollback and cleanup run once per driver stream.
+	stage, completedCycles := 0, 0
 	runErr := request.Driver.Run(ctx, func(event WorkflowContextRuntimeEvent) error {
 		switch {
 		case stage == 0 && event.Kind == WorkflowContextEventPreCompaction:
@@ -134,14 +135,15 @@ func (supervisor *WorkflowContextRuntimeSupervisor) Run(
 				return rehydrateErr
 			}
 			receipt.ExactMatch = terminal.ExactMatch
-			stage = 3
+			completedCycles++
+			stage = 0
 			return nil
 		default:
 			return fmt.Errorf("unexpected OMP context runtime event %q at stage %d", event.Kind, stage)
 		}
 	})
 
-	if runErr == nil && stage != 3 {
+	if runErr == nil && (stage != 0 || completedCycles == 0) {
 		runErr = fmt.Errorf("OMP context runtime event stream ended at stage %d", stage)
 	}
 	if runErr != nil {

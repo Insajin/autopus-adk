@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -51,6 +52,7 @@ func TestWorkflowContextManagedRPCProduct_ArgsSeparateProjectFromTaskRuntime(t *
 
 func TestWorkflowContextManagedRPCProduct_Validation(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
+		t.Parallel()
 		if _, err := validateWorkflowContextManagedRPCOptions(managedProductTestOptions(t)); err != nil {
 			t.Fatalf("valid product options rejected: %v", err)
 		}
@@ -145,7 +147,9 @@ func TestWorkflowContextManagedRPCProduct_Validation(t *testing.T) {
 		}},
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			options := managedProductTestOptions(t)
 			test.setup(t, &options)
 			if _, err := validateWorkflowContextManagedRPCOptions(options); err == nil {
@@ -167,6 +171,17 @@ func managedProductTestOptions(t *testing.T) WorkflowContextManagedRPCOptions {
 	}
 	configPath := filepath.Join(runtimeRoot, "config.json")
 	managedProductWriteFile(t, configPath, []byte("{}\n"), 0o600)
+	const credentialKey = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
+	models := fmt.Sprintf(`providers:
+  fake:
+    baseUrl: http://127.0.0.1:1/v1
+    apiKey: %s
+    authHeader: true
+    api: openai-completions
+    models:
+      - id: product
+`, credentialKey)
+	managedProductWriteFile(t, filepath.Join(runtimeRoot, "models.yml"), []byte(models), 0o600)
 	executable := filepath.Join(base, "omp")
 	managedProductWriteFile(t, executable, []byte("#!/bin/sh\nexit 0\n"), 0o700)
 	installWorkflowContextManagedLiveBridge(t, workspace)
@@ -187,8 +202,11 @@ func managedProductTestOptions(t *testing.T) WorkflowContextManagedRPCOptions {
 		Executable: executable, ProjectDir: projectDir, Workspace: workspace,
 		RuntimeBase: base, RuntimeRoot: runtimeRoot, SessionDir: sessionDir,
 		ConfigPath: configPath, Model: "fake/product", AllowedEndpoint: "http://127.0.0.1:1",
-		Environment: []string{"PI_CODING_AGENT_DIR=" + runtimeRoot, "PI_CONFIG_FILES=" + configPath},
-		MaxTime:     time.Second, Prompts: []string{
+		Environment: []string{
+			"PI_CODING_AGENT_DIR=" + runtimeRoot, "PI_CONFIG_FILES=" + configPath,
+			credentialKey + "=task-owned-test-token",
+		},
+		MaxTime: time.Second, Prompts: []string{
 			"/auto go SPEC-OMP-004 --auto", "continue with the authoritative task",
 		},
 	}

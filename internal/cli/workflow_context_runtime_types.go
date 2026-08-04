@@ -53,21 +53,22 @@ func workflowContextPolicyFromConfig(cfg *config.HarnessConfig) (WorkflowContext
 }
 
 type WorkflowContextCapabilities struct {
-	Version             string    `json:"version"`
-	ExecutableIdentity  bool      `json:"executable_identity"`
-	SettingsSchema      bool      `json:"settings_schema"`
-	OverlayReadback     bool      `json:"overlay_readback"`
-	PreCompactionEvent  bool      `json:"pre_compaction_event"`
-	PostCompactionEvent bool      `json:"post_compaction_event"`
-	CanonicalInjection  bool      `json:"canonical_injection"`
-	AdmissionBlocking   bool      `json:"admission_blocking"`
-	NoSession           bool      `json:"no_session"`
-	IsolatedTaskRoot    bool      `json:"isolated_task_root"`
-	CleanupReadback     bool      `json:"cleanup_readback"`
-	MemoryInterception  bool      `json:"memory_interception"`
-	AuthNoneLoopback    bool      `json:"auth_none_loopback"`
-	ProbeSource         string    `json:"probe_source"`
-	CheckedAt           time.Time `json:"checked_at"`
+	Version                     string    `json:"version"`
+	ExecutableIdentity          bool      `json:"executable_identity"`
+	SettingsSchema              bool      `json:"settings_schema"`
+	OverlayReadback             bool      `json:"overlay_readback"`
+	PreCompactionEvent          bool      `json:"pre_compaction_event"`
+	PostCompactionEvent         bool      `json:"post_compaction_event"`
+	CanonicalInjection          bool      `json:"canonical_injection"`
+	AdmissionBlocking           bool      `json:"admission_blocking"`
+	NoSession                   bool      `json:"no_session"`
+	IsolatedTaskRoot            bool      `json:"isolated_task_root"`
+	CleanupReadback             bool      `json:"cleanup_readback"`
+	MemoryInterception          bool      `json:"memory_interception"`
+	AuthNoneLoopback            bool      `json:"auth_none_loopback"`
+	ProviderCredentialAuthority bool      `json:"provider_credential_authority"`
+	ProbeSource                 string    `json:"probe_source"`
+	CheckedAt                   time.Time `json:"checked_at"`
 }
 
 type WorkflowContextRuntimeEvent struct {
@@ -96,6 +97,18 @@ type WorkflowContextDispatchAck struct {
 	SessionHash      string `json:"session_hash"`
 	NonceHash        string `json:"nonce_hash"`
 	ProviderObserved bool   `json:"provider_observed"`
+	providerOutput   string
+	providerUsage    WorkflowContextProviderUsage
+}
+
+// WorkflowContextProviderUsage is process-private token evidence for one
+// post-compaction primary provider call and its preceding maintenance work.
+type WorkflowContextProviderUsage struct {
+	PrimaryInputTokens      int64
+	PrimaryOutputTokens     int64
+	MaintenanceInputTokens  int64
+	MaintenanceOutputTokens int64
+	TotalTokens             int64
 }
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: managed drivers extend the process contract with bridge binding and observed dispatch acknowledgement.
@@ -140,6 +153,8 @@ type WorkflowContextRuntimeRequest struct {
 	CanonicalSource WorkflowContextCanonicalSource
 	Promotion       promptlayer.OMPContextPromotionEvidenceV1
 	ReceiptWriter   *WorkflowContextReceiptWriter
+	ProviderOutput  func(string) error
+	ProviderUsage   func(WorkflowContextProviderUsage) error
 }
 
 type WorkflowContextDispatch struct {

@@ -62,7 +62,20 @@ func (supervisor *WorkflowContextRuntimeSupervisor) RunManaged(
 		if dispatchErr != nil {
 			return fmt.Errorf("dispatch managed OMP context: %w", dispatchErr)
 		}
-		return validateWorkflowContextDispatchAck(bound.binding, ack)
+		if err := validateWorkflowContextDispatchAck(bound.binding, ack); err != nil {
+			return err
+		}
+		if request.ProviderOutput != nil && ack.providerOutput != "" {
+			if err := request.ProviderOutput(ack.providerOutput); err != nil {
+				return fmt.Errorf("capture managed OMP provider output: %w", err)
+			}
+		}
+		if request.ProviderUsage != nil && ack.providerUsage.TotalTokens > 0 {
+			if err := request.ProviderUsage(ack.providerUsage); err != nil {
+				return fmt.Errorf("capture managed OMP provider usage: %w", err)
+			}
+		}
+		return nil
 	})
 }
 

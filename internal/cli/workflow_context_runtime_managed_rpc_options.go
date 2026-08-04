@@ -65,7 +65,15 @@ func validateWorkflowContextManagedRPCOptions(
 	if err := validateWorkflowContextManagedPathModes(options); err != nil {
 		return options, err
 	}
-	environment, err := validateWorkflowContextManagedEnvironment(options)
+	credentialKey := ""
+	if product {
+		authority, authorityErr := loadWorkflowContextManagedRPCCredentialAuthority(options)
+		if authorityErr != nil {
+			return options, authorityErr
+		}
+		credentialKey = authority.environmentKey
+	}
+	environment, err := validateWorkflowContextManagedEnvironment(options, credentialKey)
 	if err != nil {
 		return options, err
 	}
@@ -77,20 +85,29 @@ func validateWorkflowContextManagedRPCOptions(
 		if err := validateWorkflowContextManagedProjectExtensions(options.ProjectDir); err != nil {
 			return options, err
 		}
-		if err := validateWorkflowContextManagedProductPrompts(options.Prompts); err != nil {
+		if err := validateWorkflowContextManagedProductPromptsForOptions(options); err != nil {
 			return options, err
 		}
 		if err := validateWorkflowContextManagedProductSurface(options); err != nil {
 			return options, err
 		}
 		options.Prompts = append([]string(nil), options.Prompts...)
+		if options.CompactionCycles < 0 {
+			return options, errors.New("managed OMP product compaction cycle count is invalid")
+		}
+		if options.CompactionCycles == 0 {
+			options.CompactionCycles = 1
+		}
+		// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: one managed product stream admits at most eight compaction cycles.
+		if options.CompactionCycles > 8 {
+			return options, errors.New("managed OMP product compaction cycle count is invalid")
+		}
 	}
 	if options.MaxTime <= 0 || options.MaxTime > 2*time.Minute {
 		options.MaxTime = 45 * time.Second
 	}
 	return options, nil
 }
-
 func canonicalWorkflowContextManagedPath(path string, allowFinalSymlink bool) (string, error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
@@ -167,7 +184,7 @@ func validateWorkflowContextManagedPathModes(options WorkflowContextManagedRPCOp
 // @AX:WARN [AUTO]: managed environment validation has eight fail-closed if branches.
 // @AX:REASON [AUTO]: duplicate, reserved, ambient, and task-runtime-bound variables must be rejected before the child process inherits them.
 func validateWorkflowContextManagedEnvironment(
-	options WorkflowContextManagedRPCOptions,
+	options WorkflowContextManagedRPCOptions, credentialKey string,
 ) ([]string, error) {
 	seen := make(map[string]struct{}, len(options.Environment))
 	result := append([]string(nil), options.Environment...)
@@ -184,7 +201,8 @@ func validateWorkflowContextManagedEnvironment(
 		if _, reserved := workflowContextManagedReservedEnvironment[key]; reserved {
 			return nil, fmt.Errorf("managed OMP bridge environment key is reserved: %s", key)
 		}
-		if _, allowed := workflowContextManagedAllowedEnvironment[key]; !allowed {
+		_, allowed := workflowContextManagedAllowedEnvironment[key]
+		if !allowed && key != credentialKey {
 			return nil, fmt.Errorf("managed OMP environment key is not allowed: %s", key)
 		}
 		if expected, requiredKey := required[key]; requiredKey {
@@ -200,26 +218,15 @@ func validateWorkflowContextManagedEnvironment(
 			return nil, errors.New("managed OMP environment is missing a task runtime key")
 		}
 	}
+	if credentialKey != "" {
+		if _, err := workflowContextManagedRPCCredentialValue(result, credentialKey); err != nil {
+			return nil, err
+		}
+	}
 	if err := validateWorkflowContextManagedEnvironmentIsolation(options, result); err != nil {
 		return nil, err
 	}
 	return result, nil
-}
-
-// @AX:WARN [AUTO]: environment-key grammar validation has cyclomatic complexity 15.
-// @AX:REASON [AUTO]: the first rune and every remaining rune use distinct allowlists before variables cross the process boundary.
-func validWorkflowContextManagedEnvironmentKey(key string) bool {
-	if key == "" || !((key[0] >= 'A' && key[0] <= 'Z') || (key[0] >= 'a' && key[0] <= 'z') || key[0] == '_') {
-		return false
-	}
-	for index := 1; index < len(key); index++ {
-		char := key[index]
-		if !((char >= 'A' && char <= 'Z') || (char >= 'a' && char <= 'z') ||
-			(char >= '0' && char <= '9') || char == '_') {
-			return false
-		}
-	}
-	return true
 }
 
 func validateWorkflowContextManagedExtensionAllowlist(workspace string) error {

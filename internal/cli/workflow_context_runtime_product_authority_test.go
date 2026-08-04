@@ -156,9 +156,6 @@ func TestWorkflowContextProductSession_RejectsUnverifiedDriverAndCapabilities(t 
 		{name: "unobserved version", mutate: func(capabilities *WorkflowContextCapabilities) {
 			capabilities.Version = "OMP version unknown"
 		}},
-		{name: "loopback auth missing", mutate: func(capabilities *WorkflowContextCapabilities) {
-			capabilities.AuthNoneLoopback = false
-		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input, runtime, _, factory := newWorkflowContextProductFixture(t)

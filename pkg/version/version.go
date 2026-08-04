@@ -11,9 +11,11 @@ func contains(s, substr string) bool { return strings.Contains(s, substr) }
 
 // Injected at build time via ldflags. Empty string means not set.
 var (
-	version string
-	commit  string
-	date    string
+	version      string
+	commit       string
+	date         string
+	sourceCommit string
+	sourceTree   string
 )
 
 func init() {
@@ -34,6 +36,9 @@ func init() {
 	for _, s := range info.Settings {
 		switch s.Key {
 		case "vcs.revision":
+			if sourceCommit == "" {
+				sourceCommit = s.Value
+			}
 			if len(s.Value) > 7 {
 				commit = s.Value[:7]
 			} else {
@@ -64,6 +69,14 @@ func Commit() string { return commit }
 
 // Date returns the build date.
 func Date() string { return date }
+
+// SourceCommit returns the immutable full source revision injected for signed
+// candidate binding. It intentionally differs from the display-only Commit.
+func SourceCommit() string { return sourceCommit }
+
+// SourceTree returns the immutable full source tree injected for signed
+// candidate binding. Development builds normally leave it empty.
+func SourceTree() string { return sourceTree }
 
 // String returns the full version string.
 func String() string {

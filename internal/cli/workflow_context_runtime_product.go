@@ -18,6 +18,7 @@ import (
 type WorkflowContextProductSessionInput struct {
 	ProjectDir       string
 	Command          string
+	DeliveryCommand  string
 	SpecDir          string
 	SpecID           string
 	TaskID           string
@@ -49,6 +50,8 @@ type WorkflowContextProductRuntimeInputs struct {
 	ReceiptWriter    *WorkflowContextReceiptWriter
 	DriverOptions    WorkflowContextManagedRPCOptions
 	NewManagedDriver WorkflowContextManagedDriverFactory
+	ProviderOutput   func(string) error
+	ProviderUsage    func(WorkflowContextProviderUsage) error
 }
 
 // RunWorkflowContextProductSession assembles canonical product authority and
@@ -72,10 +75,6 @@ func RunWorkflowContextProductSession(
 	if !installedOMPVersionPattern.MatchString(runtime.Capabilities.Version) {
 		return WorkflowContextRuntimeReceipt{}, fmt.Errorf("workflow context product session: installed OMP identity was not observed")
 	}
-	if !runtime.Capabilities.AuthNoneLoopback {
-		return WorkflowContextRuntimeReceipt{}, fmt.Errorf("workflow context product session: installed OMP auth:none loopback was not proved")
-	}
-
 	cfg, err := loadHarnessConfigForDir(input.ProjectDir, globalFlags{})
 	if err != nil {
 		return WorkflowContextRuntimeReceipt{}, fmt.Errorf("workflow context product session: load harness config: %w", err)
@@ -89,7 +88,7 @@ func RunWorkflowContextProductSession(
 	}
 
 	options := promptlayer.ContextDeliveryOptions{
-		Root: input.ProjectDir, Command: input.Command, SpecDir: input.SpecDir,
+		Root: input.ProjectDir, Command: input.DeliveryCommand, SpecDir: input.SpecDir,
 	}
 	delivery, err := promptlayer.BuildContextDelivery(options)
 	if err != nil {
@@ -133,6 +132,7 @@ func RunWorkflowContextProductSession(
 		RootClass: policy.RuntimeRootPolicy, Driver: driver, Overlay: runtime.Overlay,
 		CanonicalSource: workflowContextProductCanonicalSource{options: options, ephemeral: ephemeral},
 		Promotion:       runtime.Promotion, ReceiptWriter: runtime.ReceiptWriter,
+		ProviderOutput: runtime.ProviderOutput, ProviderUsage: runtime.ProviderUsage,
 	}
 	return runtime.Supervisor.RunManaged(ctx, request)
 }
@@ -159,6 +159,13 @@ func canonicalWorkflowContextProductInput(
 	}
 	input.ProjectDir = filepath.Clean(canonical)
 	input.Command = strings.ToLower(strings.TrimSpace(input.Command))
+	input.DeliveryCommand = strings.ToLower(strings.TrimSpace(input.DeliveryCommand))
+	if input.DeliveryCommand == "" {
+		input.DeliveryCommand = input.Command
+	}
+	if input.Command != "go" || !validWorkflowContextDeliveryCommand(input.DeliveryCommand) {
+		return input, fmt.Errorf("workflow context product session: original or delivery command is invalid")
+	}
 	input.SpecID = strings.TrimSpace(input.SpecID)
 	prompts := []string{input.OriginalTask, input.DecisionDelta}
 	if err := validateWorkflowContextManagedProductPrompts(prompts); err != nil {
@@ -172,6 +179,15 @@ func canonicalWorkflowContextProductInput(
 		return input, err
 	}
 	return input, nil
+}
+
+func validWorkflowContextDeliveryCommand(command string) bool {
+	switch command {
+	case "plan", "go", "test", "review":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateWorkflowContextProductPromptAuthority(input WorkflowContextProductSessionInput) error {

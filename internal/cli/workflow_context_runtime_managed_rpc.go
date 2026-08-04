@@ -14,19 +14,24 @@ const workflowContextManagedRuntimeMarker = ".autopus-managed-omp-runtime"
 
 // WorkflowContextManagedRPCOptions identifies one Autopus-owned OMP RPC process.
 type WorkflowContextManagedRPCOptions struct {
-	Executable         string
-	ProjectDir         string
-	Workspace          string
-	RuntimeBase        string
-	RuntimeRoot        string
-	SessionDir         string
-	ConfigPath         string
-	Model              string
-	AllowedEndpoint    string
-	Environment        []string
-	HistoryAfterTokens map[string]int
-	MaxTime            time.Duration
-	Prompts            []string
+	Executable              string
+	ProjectDir              string
+	Workspace               string
+	RuntimeBase             string
+	RuntimeRoot             string
+	SessionDir              string
+	ConfigPath              string
+	Model                   string
+	AllowedEndpoint         string
+	Environment             []string
+	HistoryAfterTokens      map[string]int
+	MaxTime                 time.Duration
+	Prompts                 []string
+	CompactionCycles        int
+	CaptureOutput           bool
+	CaptureStats            bool
+	InitialManualCompaction bool
+	ObserveOnly             bool
 }
 
 // WorkflowContextManagedRPCObservation is body-free live admission evidence.
@@ -46,23 +51,27 @@ type WorkflowContextManagedRPCObservation struct {
 
 // WorkflowContextManagedRPCDriver owns a single private OMP stdio session.
 type WorkflowContextManagedRPCDriver struct {
-	mu                sync.Mutex
-	options           WorkflowContextManagedRPCOptions
-	baseRoot          *os.Root
-	directoryRoot     *os.Root
-	directoryInfo     fs.FileInfo
-	binding           WorkflowContextBridgeBinding
-	bound             bool
-	running           bool
-	closed            bool
-	process           *workflowContextManagedRPCProcess
-	protocol          *workflowContextManagedRPCProtocol
-	protocolPostID    string
-	protocolSessionID string
-	dispatchState     string
-	sourceIdentities  []workflowContextManagedSourceIdentity
-	projectInfo       fs.FileInfo
-	observation       WorkflowContextManagedRPCObservation
+	mu                  sync.Mutex
+	options             WorkflowContextManagedRPCOptions
+	baseRoot            *os.Root
+	directoryRoot       *os.Root
+	directoryInfo       fs.FileInfo
+	binding             WorkflowContextBridgeBinding
+	bound               bool
+	running             bool
+	closed              bool
+	process             *workflowContextManagedRPCProcess
+	protocol            *workflowContextManagedRPCProtocol
+	protocolPostID      string
+	protocolSessionID   string
+	dispatchState       string
+	dispatchSequence    int
+	protocolManual      bool
+	protocolPostReplay  bool
+	usedProtocolPostIDs map[string]struct{}
+	sourceIdentities    []workflowContextManagedSourceIdentity
+	projectInfo         fs.FileInfo
+	observation         WorkflowContextManagedRPCObservation
 }
 
 var _ WorkflowContextManagedProcessDriver = (*WorkflowContextManagedRPCDriver)(nil)

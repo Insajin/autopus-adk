@@ -24,6 +24,7 @@ func TestWorkflowContextPipelineAuthority_LoadsVerifiedStoreWithoutCallerEvidenc
 		ProjectDir: root, SpecID: "SPEC-OMP-004", SpecDir: specDir,
 		SnapshotHash: "sha256:" + strings.Repeat("a", 64), GitCommitHash: strings.Repeat("b", 40),
 		PhaseID: pipeline.PhaseImplement, Attempt: 1, Prompt: "/auto go SPEC-OMP-004",
+		ActivePrompt: "implement active phase",
 	})
 	require.NoError(t, err)
 
@@ -51,6 +52,7 @@ func TestWorkflowContextPipelineAuthority_FailsClosedBeforeEvidenceAdmission(t *
 		ProjectDir: root, SpecID: "SPEC-OMP-004", SpecDir: request.Binding.DeliveryOptions.SpecDir,
 		SnapshotHash: "sha256:" + strings.Repeat("a", 64), GitCommitHash: strings.Repeat("b", 40),
 		PhaseID: pipeline.PhaseImplement, Attempt: 1, Prompt: "implement canonical phase",
+		ActivePrompt: "implement active phase",
 	})
 	require.NoError(t, err)
 	evidencePath := promptlayer.OMPContextEvidenceStorePath(root)
@@ -98,6 +100,7 @@ func TestWorkflowContextPipelineAuthority_AssemblesBoundProductionEvidence(t *te
 		ProjectDir: root, SpecID: "SPEC-OMP-004", SpecDir: request.Binding.DeliveryOptions.SpecDir,
 		SnapshotHash: "sha256:" + strings.Repeat("a", 64), GitCommitHash: strings.Repeat("b", 40),
 		PhaseID: pipeline.PhaseImplement, Attempt: 1, Prompt: "implement canonical phase",
+		ActivePrompt:     "implement active phase",
 		CompletedHistory: []string{"completed superseded phase output"},
 	})
 	require.NoError(t, err)

@@ -13,6 +13,22 @@ var workflowContextManagedAllowedEnvironment = map[string]struct{}{
 	"PATH": {}, "NO_PROXY": {}, "no_proxy": {}, "HTTP_PROXY": {}, "HTTPS_PROXY": {}, "ALL_PROXY": {},
 }
 
+// @AX:WARN [AUTO]: environment-key grammar validation has cyclomatic complexity 15.
+// @AX:REASON [AUTO]: the first rune and every remaining rune use distinct allowlists before variables cross the process boundary.
+func validWorkflowContextManagedEnvironmentKey(key string) bool {
+	if key == "" || !((key[0] >= 'A' && key[0] <= 'Z') || (key[0] >= 'a' && key[0] <= 'z') || key[0] == '_') {
+		return false
+	}
+	for index := 1; index < len(key); index++ {
+		char := key[index]
+		if !((char >= 'A' && char <= 'Z') || (char >= 'a' && char <= 'z') ||
+			(char >= '0' && char <= '9') || char == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 func validateWorkflowContextManagedEnvironmentIsolation(
 	options WorkflowContextManagedRPCOptions, environment []string,
 ) error {

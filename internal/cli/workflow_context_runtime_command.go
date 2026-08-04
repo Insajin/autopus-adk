@@ -77,6 +77,9 @@ func newWorkflowContextRuntimeCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.projectDir, "project-dir", ".", "Project root containing autopus.yaml")
 	cmd.Flags().StringVar(&opts.format, "format", "json", "Output format (json)")
 	cmd.AddCommand(newWorkflowContextProductSessionCmd())
+	cmd.AddCommand(newWorkflowContextObservationCmd())
+	cmd.AddCommand(newWorkflowContextObserveCallCmd())
+	cmd.AddCommand(newWorkflowContextObserveSessionCmd())
 	return cmd
 }
 

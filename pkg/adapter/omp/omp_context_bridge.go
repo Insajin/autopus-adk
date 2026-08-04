@@ -171,6 +171,13 @@ func ExpectedOMPContextBridgeSourceIdentity() OMPContextBridgeSourceIdentity {
 	}
 }
 
+// ExpectedOMPContextBridgeSource returns an isolated copy of the immutable
+// embedded bridge. Managed runtimes materialize this copy instead of trusting
+// a project-discovered extension.
+func ExpectedOMPContextBridgeSource() []byte {
+	return append([]byte(nil), ompContextBridgeSource...)
+}
+
 func prepareOMPContextBridgeMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	_, _, selected, err := cfg.OMPContextPolicy.SelectedOMPContextProfile()
 	if err != nil {

@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -78,7 +75,8 @@ func TestWorkflowContextProductSession_InstalledOMPWithRealOverlay_AdmitsExactPr
 			Executable: executable, Workspace: layout.workspace, RuntimeBase: layout.base,
 			RuntimeRoot: layout.runtime, SessionDir: layout.sessions, ConfigPath: configPath,
 			Model: "contextfake/" + workflowContextLiveModel, AllowedEndpoint: provider.URL(),
-			Environment: layout.env(), HistoryAfterTokens: map[string]int{"old-read": 2}, MaxTime: 45 * time.Second,
+			Environment:        append(layout.env(), workflowContextProductLiveCredentialKey+"="+workflowContextProductLiveCredential),
+			HistoryAfterTokens: map[string]int{"old-read": 2}, MaxTime: 55 * time.Second, CompactionCycles: 2,
 		},
 		NewManagedDriver: func(options WorkflowContextManagedRPCOptions) (WorkflowContextManagedProcessDriver, error) {
 			managed, createErr := NewWorkflowContextManagedRPCDriver(options)
@@ -101,14 +99,17 @@ func TestWorkflowContextProductSession_InstalledOMPWithRealOverlay_AdmitsExactPr
 	require.NotNil(t, driver)
 	assert.Equal(t, WorkflowContextOutcomeAdmitted, receipt.Outcome)
 	assert.True(t, receipt.ExactMatch)
-	assert.Equal(t, []string{"checkpointed", "compacted", "rehydrated", "admitted"}, receipt.PhaseSequence)
+	assert.Equal(t, []string{
+		"checkpointed", "compacted", "rehydrated",
+		"checkpointed", "compacted", "rehydrated", "admitted",
+	}, receipt.PhaseSequence)
 
 	observation := driver.Observation()
-	assert.Equal(t, 3, observation.ProviderTurns)
-	assert.Equal(t, 1, observation.PreACKs)
-	assert.Equal(t, 1, observation.PostACKs)
-	assert.Equal(t, 1, observation.NativeStarts)
-	assert.Equal(t, 1, observation.NativeEnds)
+	assert.Equal(t, 5, observation.ProviderTurns)
+	assert.Equal(t, 2, observation.PreACKs)
+	assert.Equal(t, 2, observation.PostACKs)
+	assert.Equal(t, 2, observation.NativeStarts)
+	assert.Equal(t, 2, observation.NativeEnds)
 	assert.True(t, observation.SameProcess)
 	assert.True(t, observation.SameSession)
 	assert.True(t, observation.Sandboxed)
@@ -117,13 +118,15 @@ func TestWorkflowContextProductSession_InstalledOMPWithRealOverlay_AdmitsExactPr
 
 	requests, authHeaders, unexpectedEndpoints, failure := provider.receipt()
 	require.Empty(t, failure)
-	assert.Equal(t, 3, requests)
-	assert.Zero(t, authHeaders)
+	assert.Equal(t, 5, requests)
+	assert.Equal(t, 5, authHeaders)
 	assert.Zero(t, unexpectedEndpoints)
 	assert.Contains(t, provider.userMessage(1), "## Router Contract")
 	assert.Contains(t, provider.userMessage(1), "go SPEC-OMP-004 --auto")
 	assert.Equal(t, input.DecisionDelta, provider.userMessage(2))
 	assertWorkflowContextManagedAdmissionMessage(t, provider.userMessage(3), request)
+	assertWorkflowContextManagedAdmissionMessage(t, provider.userMessage(4), request)
+	assertWorkflowContextManagedAdmissionMessage(t, provider.userMessage(5), request)
 	assert.True(t, receipt.Cleanup.Verified)
 	assert.Zero(t, receipt.Cleanup.UserRootAccessCount)
 	assert.Zero(t, receipt.ArtifactCounts.AfterCleanup)
@@ -139,12 +142,18 @@ func TestWorkflowContextProductSession_InstalledOMPWithRealOverlay_AdmitsExactPr
 	for _, private := range []string{
 		input.OriginalTask, input.DecisionDelta, input.ProjectDir, layout.base,
 		request.Binding.Delivery.Prompt, request.Binding.Delivery.Layers[0].Content,
+		workflowContextProductLiveCredential,
 	} {
 		assert.NotContains(t, string(serialized), private)
 	}
-	t.Logf("installed_product_context version=%s real_overlay=true provider_requests=%d auth=0 external_endpoints=0 pre_ack=1 post_ack=1 native_start=1 native_end=1 same_pid=%t same_session=%t cleanup_root_count=0 sandbox=%t",
+	t.Logf("installed_product_context version=%s real_overlay=true provider_requests=%d auth=5 external_endpoints=0 pre_ack=2 post_ack=2 native_start=2 native_end=2 same_pid=%t same_session=%t cleanup_root_count=0 sandbox=%t",
 		version, requests, observation.SameProcess, observation.SameSession, observation.Sandboxed)
 }
+
+const (
+	workflowContextProductLiveCredentialKey = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
+	workflowContextProductLiveCredential    = "task-owned-product-live-token"
+)
 
 func newWorkflowContextProductLiveAuthority(
 	t *testing.T,
@@ -215,6 +224,19 @@ func writeWorkflowContextProductLiveConfig(layout workflowContextLiveLayout, end
 			return err
 		}
 	}
+	modelsPath := filepath.Join(layout.runtime, "models.yml")
+	models, err := os.ReadFile(modelsPath)
+	if err != nil {
+		return err
+	}
+	credentialAuthority := "apiKey: " + workflowContextProductLiveCredentialKey + "\n    authHeader: true"
+	updatedModels := strings.Replace(string(models), "auth: none", credentialAuthority, 1)
+	if updatedModels == string(models) {
+		return fmt.Errorf("product credential authority was not applied")
+	}
+	if err := os.WriteFile(modelsPath, []byte(updatedModels), 0o600); err != nil {
+		return err
+	}
 	overlay, err := os.ReadFile(layout.overlay)
 	if err != nil {
 		return err
@@ -225,61 +247,4 @@ func writeWorkflowContextProductLiveConfig(layout workflowContextLiveLayout, end
 		return fmt.Errorf("product skill discovery config was not applied")
 	}
 	return os.WriteFile(layout.overlay, []byte(updated), 0o600)
-}
-
-func newWorkflowContextProductLiveProvider(t *testing.T) *workflowContextLiveProvider {
-	t.Helper()
-	provider := &workflowContextLiveProvider{}
-	provider.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		provider.mu.Lock()
-		defer provider.mu.Unlock()
-		provider.requests++
-		if request.Method != http.MethodPost || request.URL.Path != "/v1/chat/completions" {
-			provider.unexpectedEndpoints++
-			provider.reject(w, "unexpected-endpoint")
-			return
-		}
-		if request.Header.Get("Authorization") != "" {
-			provider.authHeaders++
-			provider.reject(w, "unexpected-auth")
-			return
-		}
-		var body struct {
-			Model    string `json:"model"`
-			Stream   bool   `json:"stream"`
-			Messages []struct {
-				Role    string `json:"role"`
-				Content any    `json:"content"`
-			} `json:"messages"`
-		}
-		if json.NewDecoder(io.LimitReader(request.Body, 4<<20)).Decode(&body) != nil ||
-			body.Model != workflowContextLiveModel || !body.Stream {
-			provider.reject(w, "invalid-request-shape")
-			return
-		}
-		for index := len(body.Messages) - 1; index >= 0; index-- {
-			if body.Messages[index].Role == "user" {
-				provider.userMessages = append(provider.userMessages, workflowContextLiveMessageText(body.Messages[index].Content))
-				break
-			}
-		}
-		promptTokens := 4096
-		if provider.requests%3 == 2 {
-			promptTokens = 110000
-		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		for _, value := range []map[string]any{
-			{"id": "product-live", "object": "chat.completion.chunk", "created": 1, "model": workflowContextLiveModel,
-				"choices": []any{map[string]any{"index": 0, "delta": map[string]any{"role": "assistant", "content": "completed"}}}},
-			{"id": "product-live", "object": "chat.completion.chunk", "created": 1, "model": workflowContextLiveModel,
-				"choices": []any{map[string]any{"index": 0, "delta": map[string]any{}, "finish_reason": "stop"}},
-				"usage":   map[string]int{"prompt_tokens": promptTokens, "completion_tokens": 8, "total_tokens": promptTokens + 8}},
-		} {
-			encoded, _ := json.Marshal(value)
-			_, _ = fmt.Fprintf(w, "data: %s\n\n", encoded)
-		}
-		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
-	}))
-	t.Cleanup(provider.server.Close)
-	return provider
 }
