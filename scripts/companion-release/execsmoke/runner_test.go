@@ -207,6 +207,8 @@ func testArtifact(t *testing.T) string {
 
 func runFixture(mode string) int {
 	switch mode {
+	case "verified-exec-output", "verified-exec-output-limit", "verified-exec-timeout":
+		return runVerifiedExecFixture(mode)
 	case "success":
 		if len(os.Args) != 3 || os.Args[1] != "version" || os.Args[2] != "--short" {
 			return 91

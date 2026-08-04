@@ -14,11 +14,13 @@ import (
 func TestRunVerifiedExecSmoke_ExactBodyFreeOutput_Succeeds(t *testing.T) {
 	t.Parallel()
 	policy := ompCanaryPolicy{version: pinnedOMPVersion, sha256: "sha256:" + strings.Repeat("a", 64)}
-	artifact := writeVerifiedExecFixture(t, `printf '%s\n' "$AUTOPUS_VERIFIED_EXEC_OUTPUT"`)
 	err := runVerifiedExecSmoke(verifiedExecSmokeConfig{
-		artifact: artifact, ompExecutable: "/absolute/omp", policy: policy,
+		artifact: testArtifact(t), ompExecutable: "/absolute/omp", policy: policy,
 		timeout: 2 * time.Second, pipeWait: 100 * time.Millisecond,
-		extraEnvironment: []string{`AUTOPUS_VERIFIED_EXEC_OUTPUT={"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"uid_isolated":true,"effective_user":"nobody"}`},
+		extraEnvironment: []string{
+			"AUTOPUS_EXEC_SMOKE_FIXTURE=verified-exec-output",
+			`AUTOPUS_VERIFIED_EXEC_OUTPUT={"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"uid_isolated":true,"effective_user":"nobody"}`,
+		},
 	})
 	if err != nil {
 		t.Fatalf("runVerifiedExecSmoke() error = %v", err)
@@ -50,19 +52,19 @@ func TestRunVerifiedExecSmoke_OutputLimitAndTimeout_FailClosed(t *testing.T) {
 	policy := ompCanaryPolicy{version: pinnedOMPVersion, sha256: "sha256:" + strings.Repeat("a", 64)}
 	tests := []struct {
 		name    string
-		body    string
+		mode    string
 		timeout time.Duration
 		want    error
 	}{
-		{name: "output limit", body: `yes x`, timeout: 2 * time.Second, want: errOutputLimit},
-		{name: "timeout", body: `sleep 10`, timeout: 100 * time.Millisecond, want: errExecutionTimeout},
+		{name: "output limit", mode: "verified-exec-output-limit", timeout: 2 * time.Second, want: errOutputLimit},
+		{name: "timeout", mode: "verified-exec-timeout", timeout: 100 * time.Millisecond, want: errExecutionTimeout},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			artifact := writeVerifiedExecFixture(t, test.body)
 			err := runVerifiedExecSmoke(verifiedExecSmokeConfig{
-				artifact: artifact, ompExecutable: "/absolute/omp", policy: policy,
+				artifact: testArtifact(t), ompExecutable: "/absolute/omp", policy: policy,
 				timeout: test.timeout, pipeWait: 100 * time.Millisecond,
+				extraEnvironment: []string{"AUTOPUS_EXEC_SMOKE_FIXTURE=" + test.mode},
 			})
 			if !errors.Is(err, test.want) {
 				t.Fatalf("runVerifiedExecSmoke() error = %v, want %v", err, test.want)
@@ -73,7 +75,7 @@ func TestRunVerifiedExecSmoke_OutputLimitAndTimeout_FailClosed(t *testing.T) {
 
 func TestValidatePinnedOMPExecutable_RejectsMissingSymlinkAndWrongDigest(t *testing.T) {
 	t.Parallel()
-	executable := writeVerifiedExecFixture(t, `exit 0`)
+	executable := writePinnedOMPExecutableFixture(t)
 	resolved, err := filepath.EvalSymlinks(executable)
 	if err != nil {
 		t.Fatalf("filepath.EvalSymlinks() error = %v", err)
@@ -90,12 +92,30 @@ func TestValidatePinnedOMPExecutable_RejectsMissingSymlinkAndWrongDigest(t *test
 	}
 }
 
-func writeVerifiedExecFixture(t *testing.T, body string) string {
+func writePinnedOMPExecutableFixture(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "auto")
-	contents := "#!/bin/sh\n" + body + "\n"
-	if err := os.WriteFile(path, []byte(contents), 0o700); err != nil {
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
 		t.Fatalf("os.WriteFile() error = %v", err)
 	}
 	return path
+}
+
+func runVerifiedExecFixture(mode string) int {
+	if len(os.Args) != 10 || os.Args[1] != "workflow" || os.Args[2] != "context-runtime" ||
+		os.Args[3] != "verified-exec-smoke" || os.Args[4] != "--omp-executable" ||
+		os.Args[6] != "--canary-root" || os.Args[8] != "--format" || os.Args[9] != "json" {
+		return 97
+	}
+	switch mode {
+	case "verified-exec-output":
+		_, _ = os.Stdout.WriteString(os.Getenv("AUTOPUS_VERIFIED_EXEC_OUTPUT") + "\n")
+	case "verified-exec-output-limit":
+		_, _ = os.Stdout.WriteString(strings.Repeat("x", maximumOutput+1))
+	case "verified-exec-timeout":
+		time.Sleep(10 * time.Second)
+	default:
+		return 97
+	}
+	return 0
 }
