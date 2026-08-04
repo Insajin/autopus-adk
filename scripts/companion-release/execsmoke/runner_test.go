@@ -3,12 +3,13 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -24,6 +25,22 @@ func TestMain(testMain *testing.M) {
 	if filepath.Base(os.Args[0]) == "auto" && len(os.Args) == 3 &&
 		os.Args[1] == "version" && os.Args[2] == "--short" {
 		_, _ = os.Stdout.WriteString(expectedFixtureVersion + "\n")
+		os.Exit(0)
+	}
+	if filepath.Base(os.Args[0]) == "auto" && len(os.Args) == 10 &&
+		os.Args[1] == "workflow" && os.Args[2] == "context-runtime" &&
+		os.Args[3] == "verified-exec-smoke" && os.Args[4] == "--omp-executable" &&
+		os.Args[6] == "--canary-root" && os.Args[8] == "--format" && os.Args[9] == "json" {
+		body, err := os.ReadFile(os.Args[5])
+		if err != nil {
+			os.Exit(98)
+		}
+		digest := sha256.Sum256(body)
+		_ = json.NewEncoder(os.Stdout).Encode(verifiedExecSmokeOutput{
+			SchemaVersion: verifiedExecSmokeSchemaV1, OMPVersion: pinnedOMPVersion,
+			OMPExecutableSHA256: "sha256:" + fmtDigest(digest[:]), RPCReady: true, ProviderCalls: 0,
+			UIDIsolated: true, EffectiveUser: "nobody",
+		})
 		os.Exit(0)
 	}
 	os.Exit(testMain.Run())
@@ -190,6 +207,8 @@ func testArtifact(t *testing.T) string {
 
 func runFixture(mode string) int {
 	switch mode {
+	case "verified-exec-output", "verified-exec-output-limit", "verified-exec-timeout":
+		return runVerifiedExecFixture(mode)
 	case "success":
 		if len(os.Args) != 3 || os.Args[1] != "version" || os.Args[2] != "--short" {
 			return 91
@@ -259,38 +278,4 @@ func startFixtureDescendant() (*exec.Cmd, error) {
 		return nil, err
 	}
 	return command, nil
-}
-
-func replaceEnvironment(environment []string, name, value string) []string {
-	prefix := name + "="
-	result := make([]string, 0, len(environment)+1)
-	for _, entry := range environment {
-		if !strings.HasPrefix(entry, prefix) {
-			result = append(result, entry)
-		}
-	}
-	return append(result, prefix+value)
-}
-
-func assertRecordedProcessGone(t *testing.T, pidPath string) {
-	t.Helper()
-	contents, err := os.ReadFile(pidPath)
-	if err != nil {
-		t.Fatalf("os.ReadFile(%q) error = %v", pidPath, err)
-	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(contents)))
-	if err != nil {
-		t.Fatalf("recorded PID = %q: %v", contents, err)
-	}
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		err = syscall.Kill(pid, 0)
-		if errors.Is(err, syscall.ESRCH) {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("descendant PID %d still exists after process-group cleanup", pid)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
 }

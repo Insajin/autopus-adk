@@ -21,6 +21,8 @@ import "github.com/insajin/autopus-adk/pkg/config"
 // .agents/skills is the opposite case: opencode and codex rewrite
 // .agents/skills/auto/SKILL.md in place, so once omp yields that surface the
 // file on disk belongs to them and omp must not delete it.
+// @AX:ANCHOR [AUTO]: Public prune-root contract shared by update, clean, preview, and manifest reconciliation.
+// @AX:REASON [AUTO]: Removing or narrowing this function can orphan generated OMP surfaces or delete another platform's ownership.
 func PruneRoots(cfg *config.HarnessConfig) []string {
 	roots := ompExclusivePruneRoots()
 	if ompOwnsSharedSkillSurface(cfg) {
@@ -41,6 +43,11 @@ func ompExclusivePruneRoots() []string {
 		".omp/agents",
 		configFile,
 		".agents/commands",
+		ompContextBridgeTarget,
+		ompNativePipelineRouteTarget,
+		DefaultOMPModelOverlayPath,
+		OMPModelReceiptRelativePath,
+		OMPModelProjectOwnershipRelativePath,
 	}
 }
 

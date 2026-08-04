@@ -259,6 +259,7 @@ func TestReleasePublicKeyReceipt_ProductionPinsHaveNoRuntimeTestOverride(t *test
 		immutableA12LineagePins, immutableA13LineagePins, immutableA14LineagePins,
 		immutableA15LineagePins, immutableA16LineagePins, immutableA17LineagePins,
 		immutableA18LineagePins, immutableA19LineagePins, immutableA20LineagePins,
+		immutableA21LineagePins,
 	} {
 		for name, value := range pins {
 			declaration := "readonly " + name + "='" + value + "'"

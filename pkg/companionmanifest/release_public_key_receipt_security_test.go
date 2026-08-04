@@ -21,7 +21,7 @@ func TestReleasePublicKeyReceipt_Workflow_SecretsAreStepScopedAndCleanupFailures
 				t.Fatalf("step %q expands a secret directly inside a command instead of step env", step.Name)
 			}
 			for name := range step.Env {
-				if _, ok := allowed[name]; !ok {
+				if !publicKeyReceiptStepEnvAllowed(step.Name, name, allowed) {
 					t.Fatalf("step %q receives non-allowlisted environment %q", step.Name, name)
 				}
 			}
@@ -71,6 +71,17 @@ func TestReleasePublicKeyReceipt_Workflow_SecretsAreStepScopedAndCleanupFailures
 	}
 }
 
+func publicKeyReceiptStepEnvAllowed(
+	stepName, name string,
+	common map[string]struct{},
+) bool {
+	if _, ok := common[name]; ok {
+		return true
+	}
+	return stepName == "Run GoReleaser" &&
+		(name == "OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE" || name == "OMP_CONTEXT_RELEASE_CANARY_ROOT")
+}
+
 func releaseSensitiveCommand(run string) bool {
 	for _, command := range []string{
 		"validate-environment.sh", "public-key", "goreleaser release --clean",
@@ -114,6 +125,87 @@ func TestReleasePublicKeyReceipt_Workflow_ExternalActionsAreImmutableSHAPinned(t
 			if !pin.MatchString(step.Uses) {
 				t.Fatalf("external Action in step %q uses mutable ref %q; exact 40-hex SHA required", step.Name, step.Uses)
 			}
+		}
+	}
+}
+
+func TestReleasePublicKeyReceipt_Workflow_NobodyPrivilegeBoundaryFailsClosed(t *testing.T) {
+	workflow := releaseWorkflowContract(t)
+	releaseJob, ok := workflow.Jobs["release"]
+	if !ok {
+		t.Fatal("release workflow has no protected release job")
+	}
+	credentialIndex, boundaryIndex, goReleaserIndex := -1, -1, -1
+	var boundary publicKeyReceiptWorkflowStep
+	for index, step := range releaseJob.Steps {
+		switch step.Name {
+		case "Prepare release credentials":
+			credentialIndex = index
+		case "Verify release nobody privilege boundary":
+			boundaryIndex, boundary = index, step
+		case "Run GoReleaser":
+			goReleaserIndex = index
+		}
+	}
+	if credentialIndex < 0 || boundaryIndex <= credentialIndex || goReleaserIndex <= boundaryIndex {
+		t.Fatalf("nobody boundary ordering = credentials:%d boundary:%d goreleaser:%d",
+			credentialIndex, boundaryIndex, goReleaserIndex)
+	}
+	for _, required := range []string{
+		`[[ "$runner_uid" != "$nobody_uid" ]]`,
+		`[[ "$isolated_uid" == "$nobody_uid" ]]`,
+		`AuthKey_*.p8`,
+		`companion-ed25519-private-key`,
+		`release-ecdsa-private-key`,
+		`keychain-password`,
+		`protected_modes=(600 600 600 600 600 600 700)`,
+		`/usr/bin/test "$permission" "$protected_path"`,
+		`/usr/bin/sudo -n -u root /usr/bin/true >/dev/null 2>&1`,
+	} {
+		if !strings.Contains(boundary.Run, required) {
+			t.Fatalf("nobody privilege boundary is missing fail-closed probe %q", required)
+		}
+	}
+	for _, forbidden := range []string{"set +e", "|| true", "/bin/cat", "GITHUB_OUTPUT"} {
+		if strings.Contains(boundary.Run, forbidden) {
+			t.Fatalf("nobody privilege boundary contains unsafe construct %q", forbidden)
+		}
+	}
+}
+
+func TestReleasePublicKeyReceipt_Workflow_CanaryTrustRootIdentityIsImmutable(t *testing.T) {
+	workflow := releaseWorkflowContract(t)
+	releaseJob := workflow.Jobs["release"]
+	var materialize, cleanup publicKeyReceiptWorkflowStep
+	for _, step := range releaseJob.Steps {
+		switch step.Name {
+		case "Materialize exact arm64 OMP release canary":
+			materialize = step
+		case "Remove isolated OMP release canary":
+			cleanup = step
+		}
+	}
+	for _, required := range []string{
+		`/usr/bin/install -d -m 0755 -o root -g wheel "$root"`,
+		`/usr/bin/install -d -m 0700 -o nobody -g nobody`,
+		`/usr/bin/install -m 0555 -o root -g wheel`,
+		`omp-canary-cleanup-identity`,
+	} {
+		if !strings.Contains(materialize.Run, required) {
+			t.Fatalf("canary materialization is missing immutable identity contract %q", required)
+		}
+	}
+	if !strings.Contains(cleanup.If, "always()") {
+		t.Fatalf("canary cleanup is not always-run: if=%q", cleanup.If)
+	}
+	for _, required := range []string{
+		`[[ "$(/usr/bin/stat -f '%u:%Lp' "$root")" == '0:755' ]]`,
+		`root_identity=$(/usr/bin/stat -f '%d:%i' "$root")`,
+		`[[ "$(/usr/bin/stat -f '%d:%i' /private/tmp)" == "$parent_identity" ]]`,
+		`[[ ! -e "$root" && ! -L "$root" ]]`,
+	} {
+		if !strings.Contains(cleanup.Run, required) {
+			t.Fatalf("canary cleanup is missing identity check %q", required)
 		}
 	}
 }
@@ -163,12 +255,21 @@ func publicKeyReceiptAllowedStepEnv() map[string]struct{} {
 		"COMPANION_KEY_ID", "COMPANION_RELEASE_PRODUCTION", "COMPANION_SIGNING_KEY_FILE",
 		"ADK_RELEASE_ECDSA_PRIVATE_KEY_FILE",
 		"COMPANION_APPROVED_SOURCE_COMMIT", "COMPANION_APPROVED_SOURCE_TREE",
-		"COMPANION_SOURCE_COMMIT", "COMPANION_CHECKSUMS_PATH",
+		"COMPANION_SOURCE_COMMIT", "COMPANION_SOURCE_TREE", "COMPANION_CHECKSUMS_PATH",
 		"COMPANION_SIGNER", "COMPANION_MANIFEST_VERIFIER", "COMPANION_EXEC_SMOKE_GATE",
 		"COMPANION_RELEASE_TIME_VALIDATION_REQUIRED",
 		"COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT",
 		"COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT",
 		"COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS",
+		"OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA", "OMP_CONTEXT_EVIDENCE_COMMIT_SHA",
+		"OMP_CONTEXT_EVIDENCE_TREE_SHA", "OMP_CONTEXT_EVIDENCE_REPORT_SHA256",
+		"OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256", "OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256",
+		"CANDIDATE_ARTIFACT_SHA256",
+		"OMP_CONTEXT_PROMOTION_REPORT_PATH", "OMP_CONTEXT_PROMOTION_ATTESTATION_PATH",
+		"OMP_CONTEXT_STATIC_POLICY_B64", "OMP_CONTEXT_STATIC_POLICY_SHA256",
+		"OMP_CONTEXT_RELEASE_LINEAGE_PATH", "OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH",
+		"OMP_CONTEXT_EVIDENCE_VERIFIER", "OMP_CONTEXT_LINEAGE_VERIFIER",
+		"COMPANION_PUBLIC_KEY_SHA256",
 	}
 	allowed := make(map[string]struct{}, len(names))
 	for _, name := range names {

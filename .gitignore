@@ -28,6 +28,7 @@ coverage.out
 .autopus/qa/releases/
 .autopus/runtime/
 .autopus/state.json
+.autopus/omp-model-resolution-v1.json
 .autopus/telemetry/
 .autopus/audit.jsonl
 **/.autopus/specs/**/review.md

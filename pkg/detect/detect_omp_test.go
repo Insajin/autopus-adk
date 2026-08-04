@@ -20,8 +20,8 @@ var opencodeProbePlatform = Platform{Name: "opencode", Binary: "opencode", Versi
 
 // TestDetectPlatformsOMPRequiresOhMyPiVersionShape pins SPEC-OMP-001 REQ-019 (S15).
 // `omp` is a short binary name that collides with unrelated executables, so
-// DetectPlatforms accepts it only when the version probe reports the oh-my-pi
-// shape (`omp/<version>`). Every case runs against a PATH holding both the fake
+// DetectPlatforms accepts it only when the version probe reports the exact
+// release shape (`omp/x.y.z`). Every case runs against a PATH holding both the fake
 // omp binary and an unrelated CLI to prove the gate is scoped to omp alone.
 func TestDetectPlatformsOMPRequiresOhMyPiVersionShape(t *testing.T) {
 	skipWithoutPOSIXShell(t)
@@ -41,12 +41,11 @@ printf 'omp/17.1.8\n'
 			wantVersion:  "omp/17.1.8",
 		},
 		{
-			name: "oh-my-pi prerelease keeps the shape",
+			name: "oh-my-pi prerelease is not an exact release",
 			script: `#!/bin/sh
 printf 'omp/18.0.0-rc.1\n'
 `,
-			wantAccepted: true,
-			wantVersion:  "omp/18.0.0-rc.1",
+			wantAccepted: false,
 		},
 		{
 			name: "unrelated binary that merely starts with the name is rejected",

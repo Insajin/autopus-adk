@@ -133,7 +133,7 @@ func TestOMPAdapter_Validate_EmptyWorkspaceReportsAllSurfaces(t *testing.T) {
 
 // TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape pins the identity gate
 // at the adapter boundary. `omp` is a short name that collides with unrelated
-// executables, so the adapter adopts the platform only on the `omp/` shape.
+// executables, so the adapter adopts only an exact `omp/x.y.z` release shape.
 func TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape(t *testing.T) {
 	skipWithoutPOSIXShellOMP(t)
 
@@ -143,7 +143,7 @@ func TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape(t *testing.T) {
 		want    bool
 	}{
 		{name: "oh-my-pi release", version: "omp/17.1.8", want: true},
-		{name: "oh-my-pi prerelease", version: "omp/18.0.0-rc.1", want: true},
+		{name: "oh-my-pi prerelease", version: "omp/18.0.0-rc.1", want: false},
 		{name: "space separated impostor", version: "omp 1.4.2", want: false},
 		{name: "unrelated openmp helper", version: "openmp wrapper 4.5", want: false},
 		{name: "empty output", version: "", want: false},

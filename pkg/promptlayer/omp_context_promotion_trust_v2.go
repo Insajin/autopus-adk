@@ -1,0 +1,31 @@
+package promptlayer
+
+import (
+	"crypto/ed25519"
+	"encoding/base64"
+)
+
+const ompContextPromotionPublicKey2026Q3K1Base64 = "t2lWmiRdd03NTG4zpzlpDnRUdp9e/ItDGxoHR05aVQk="
+
+func mustOMPContextPromotionPublicKeyV2(encoded string) ed25519.PublicKey {
+	encoding := base64.StdEncoding.Strict()
+	raw, err := encoding.DecodeString(encoded)
+	if err != nil || len(raw) != ed25519.PublicKeySize || encoding.EncodeToString(raw) != encoded {
+		panic("invalid committed OMP context promotion public key")
+	}
+	return ed25519.PublicKey(raw)
+}
+
+var ompContextPromotionPublicKeysV2 = map[string]ed25519.PublicKey{
+	OMPContextPromotionKeyID2026Q3K1: mustOMPContextPromotionPublicKeyV2(ompContextPromotionPublicKey2026Q3K1Base64),
+}
+
+var ompContextPromotionRevokedKeysV2 = map[string]bool{}
+
+func committedOMPContextPromotionPublicKeysV2() map[string]ed25519.PublicKey {
+	result := make(map[string]ed25519.PublicKey, len(ompContextPromotionPublicKeysV2))
+	for keyID, publicKey := range ompContextPromotionPublicKeysV2 {
+		result[keyID] = append(ed25519.PublicKey(nil), publicKey...)
+	}
+	return result
+}

@@ -1,6 +1,7 @@
 package content
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -22,8 +23,31 @@ var ompToolMap = map[string]string{
 	"WebFetch":  "web_search",
 }
 
+// OMPAgentModelSelection is the validated model tuple rendered for an opt-in
+// OMP role-model policy. Model must be a native @role alias.
+type OMPAgentModelSelection struct {
+	Model    string
+	Thinking string
+}
+
 // TransformAgentForOMP produces an OMP markdown template from an agent source.
 func TransformAgentForOMP(src AgentSource) string {
+	return renderAgentForOMP(src, src.Meta.Model, "")
+}
+
+// TransformAgentForOMPWithModel produces an OMP agent using an explicitly
+// compiled native role alias. The legacy transformer stays byte-identical when
+// no role-model profile is selected.
+func TransformAgentForOMPWithModel(src AgentSource, selection OMPAgentModelSelection) (string, error) {
+	if err := validateOMPAgentModelSelection(selection); err != nil {
+		return "", err
+	}
+	return renderAgentForOMP(src, selection.Model, selection.Thinking), nil
+}
+
+// @AX:WARN [AUTO]: OMP agent rendering contains 10 if branches.
+// @AX:REASON [AUTO]: optional metadata, tools, permissions, model, thinking, and body sections jointly define emitted frontmatter.
+func renderAgentForOMP(src AgentSource, model, thinking string) string {
 	var sb strings.Builder
 
 	body := NormalizeAgentReferences(src.Body, "omp")
@@ -59,8 +83,11 @@ func TransformAgentForOMP(src AgentSource) string {
 	if src.Meta.Description != "" {
 		fmt.Fprintf(&sb, "description: %s\n", OMPYAMLScalar(src.Meta.Description))
 	}
-	if src.Meta.Model != "" {
-		fmt.Fprintf(&sb, "model: %s\n", OMPYAMLScalar(src.Meta.Model))
+	if model != "" {
+		fmt.Fprintf(&sb, "model: %s\n", OMPYAMLScalar(model))
+	}
+	if thinking != "" {
+		fmt.Fprintf(&sb, "thinking: %s\n", OMPYAMLScalar(thinking))
 	}
 	if len(tools) > 0 {
 		sb.WriteString("tools:\n")
@@ -73,6 +100,40 @@ func TransformAgentForOMP(src AgentSource) string {
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+func validateOMPAgentModelSelection(selection OMPAgentModelSelection) error {
+	role := strings.TrimPrefix(selection.Model, "@")
+	if selection.Model == "" || role == selection.Model || !isOMPSafeIdentifier(role) {
+		return errors.New("OMP agent model must be a safe native @role alias")
+	}
+	if !isOMPThinkingLevel(selection.Thinking) {
+		return fmt.Errorf("unsupported OMP thinking level %q", selection.Thinking)
+	}
+	return nil
+}
+
+func isOMPSafeIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+	for i, char := range value {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') ||
+			(i > 0 && (char == '-' || char == '_')) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func isOMPThinkingLevel(value string) bool {
+	switch value {
+	case "minimal", "low", "medium", "high", "xhigh":
+		return true
+	default:
+		return false
+	}
 }
 
 // OMPYAMLScalar renders a value as a YAML scalar for omp frontmatter. Emitting the raw

@@ -27,8 +27,7 @@ const (
 )
 
 type executableLineageTools struct {
-	signer   string
-	verifier string
+	signer, verifier string
 }
 
 type executableLineagePins struct {
@@ -188,6 +187,8 @@ func newExecutableLineageFixture(
 		currentTag = publicKeyReceiptA20Tag
 	case publicKeyReceiptA20Version:
 		currentTag = publicKeyReceiptA21Tag
+	case publicKeyReceiptA21Version:
+		currentTag = publicKeyReceiptA22Tag
 	}
 	fixture := &executableLineageFixture{
 		root: root, tools: tools, evidence: evidence, pins: evidence.pins,

@@ -13,34 +13,34 @@ mkdir -m 0700 "$state" "$temp/bin"
 install -m 0700 "$tests_dir/testdata/mock-tap-gh.sh" "$temp/bin/gh"
 checksums="$temp/checksums.txt"
 {
-  printf '%064d  autopus-adk_0.50.92_darwin_amd64.tar.gz\n' 1
-  printf '%064d  autopus-adk_0.50.92_darwin_arm64.tar.gz\n' 2
-  printf '%064d  autopus-adk_0.50.92_linux_amd64.tar.gz\n' 3
-  printf '%064d  autopus-adk_0.50.92_linux_arm64.tar.gz\n' 4
+  printf '%064d  autopus-adk_0.50.93_darwin_amd64.tar.gz\n' 1
+  printf '%064d  autopus-adk_0.50.93_darwin_arm64.tar.gz\n' 2
+  printf '%064d  autopus-adk_0.50.93_linux_amd64.tar.gz\n' 3
+  printf '%064d  autopus-adk_0.50.93_linux_arm64.tar.gz\n' 4
 } >"$checksums"
 
-# A21 updates only the Cask from the exact A20 tap head and keeps Formula frozen.
+# A22 updates only the Cask from the exact A21 tap head and keeps Formula frozen.
 source "$script_dir/publish-homebrew-formula-bridge-render.sh"
-render_homebrew_cask "$temp/prior-cask.rb" 0.50.91 \
-  '97a9fc7c6da9348709e3dbc48cb8587551e9980d61a33566103c844abdd3f05c' \
-  'baff6e099c8debc97bdf61bf0ea98813e2bcdef58f5171cad67edb84bd64b548' \
-  '1011d88f66658f2b9ebe2caefb536038266005f229f846de2f1e597b17e25ea6' \
-  '2905bc851e4637c60fd198f42331a7a6bf13180ee917ca67d9f20affce436c5d'
+render_homebrew_cask "$temp/prior-cask.rb" 0.50.92 \
+  '027587eb7e7a73a33541ac4e9aaed1d36b446298ecf48ca78292ee87dc589f58' \
+  '4364bb3e3db09df8ba63927c8f8f64978fd63d880831dfc154f4ac9a92484492' \
+  '3058d0eec967a341c5eb9a176315f5093ba8a3763db6bb88d78df69ad2e4c961' \
+  'a259b171cb5da9ad7ff6bae2d23f7e222297ff443456530928741bae118dbdc7'
 [[ "$(git -C "$temp" hash-object "$temp/prior-cask.rb")" == \
-   '82ff9d98e40d82ff88c04e22a2ce99c5534a449a' ]] \
-  || fail 'rendered A20 Cask bytes differ from the pinned predecessor blob'
+   '49123ecd55d52e58da64a70f8432086e3f45dd8b' ]] \
+  || fail 'rendered A21 Cask bytes differ from the pinned predecessor blob'
 render_homebrew_formula_bridge "$temp/frozen-formula.rb" v0.50.71 0.50.71 \
   "$(printf '%064d' 1)" "$(printf '%064d' 2)" \
   "$(printf '%064d' 3)" "$(printf '%064d' 4)"
 jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
-  '{sha:"82ff9d98e40d82ff88c04e22a2ce99c5534a449a",content:$content}' >"$state/cask.json"
+  '{sha:"49123ecd55d52e58da64a70f8432086e3f45dd8b",content:$content}' >"$state/cask.json"
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"6f4b8d585f028ea746c183f0666f9129e75b1937",url:"https://example.invalid/prior-commit"}}' \
+jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"a030dbe6566030dcbbbb7d3206abe4debdd0cc51",url:"https://example.invalid/prior-commit"}}' \
   >"$state/branch.json"
 cp "$state/formula.json" "$temp/formula-before.json"
-bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.92
-  COMPANION_VERSION=0.50.92 COMPANION_HOMEBREW_POLICY=cask-only
+bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.93
+  COMPANION_VERSION=0.50.93 COMPANION_HOMEBREW_POLICY=cask-only
   COMPANION_CHECKSUMS_PATH="$checksums" HOMEBREW_TAP_TOKEN=fixture)
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(<"$state/ref-update.calls")" == 1 &&
@@ -48,7 +48,7 @@ env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
    "$(<"$state/tree-create.calls")" == 1 &&
    "$(<"$state/commit-create.calls")" == 1 &&
    "$(<"$state/formula-get.calls")" == 1 ]] \
-  || fail 'A21 did not update only the Cask'
+  || fail 'A22 did not update only the Cask'
 cmp -s "$temp/formula-before.json" "$state/formula.json" \
   || fail 'frozen v0.50.71 Formula blob or bytes changed'
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
@@ -57,13 +57,13 @@ env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
    "$(<"$state/tree-create.calls")" == 1 &&
    "$(<"$state/commit-create.calls")" == 1 &&
    "$(<"$state/formula-get.calls")" == 2 ]] \
-  || fail 'A21 Cask-only reconciler is not idempotent'
+  || fail 'A22 Cask-only reconciler is not idempotent'
 
 # An already-current Cask must bind to one stable head with the frozen Formula.
 touch "$state/idempotent-formula-race"
 if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
   >/dev/null 2>&1; then
-  fail 'A21 accepted idempotent Cask bytes across concurrent Formula drift'
+  fail 'A22 accepted idempotent Cask bytes across concurrent Formula drift'
 fi
 rm -f -- "$state/idempotent-formula-race"
 [[ "$(<"$state/ref-update.calls")" == 1 &&
@@ -71,7 +71,7 @@ rm -f -- "$state/idempotent-formula-race"
      '8888888888888888888888888888888888888888' &&
    "$(jq -er '.sha' "$state/formula.json")" == \
      '6666666666666666666666666666666666666666' ]] \
-  || fail 'A21 mutated tap state after idempotent Formula drift'
+  || fail 'A22 mutated tap state after idempotent Formula drift'
 jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"3333333333333333333333333333333333333333",url:"https://example.invalid/target-commit"}}' \
   >"$state/branch.json"
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
@@ -80,66 +80,66 @@ rm -f -- "$state/branch-get.calls"
 touch "$state/idempotent-ref-race"
 if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
   >/dev/null 2>&1; then
-  fail 'A21 accepted a branch move after idempotent tree verification'
+  fail 'A22 accepted a branch move after idempotent tree verification'
 fi
 rm -f -- "$state/idempotent-ref-race"
 [[ "$(<"$state/ref-update.calls")" == 1 &&
    "$(jq -er '.object.sha' "$state/branch.json")" == \
      '4444444444444444444444444444444444444444' ]] \
-  || fail 'A21 updated Cask during idempotent head verification'
+  || fail 'A22 updated Cask during idempotent head verification'
 
 # An update-needed retry must reject pre-existing tap-head or Formula drift.
 jq -n --arg content "$(base64 <"$temp/prior-cask.rb" | tr -d '\r\n')" \
-  '{sha:"82ff9d98e40d82ff88c04e22a2ce99c5534a449a",content:$content}' >"$state/cask.json"
+  '{sha:"49123ecd55d52e58da64a70f8432086e3f45dd8b",content:$content}' >"$state/cask.json"
 jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"4444444444444444444444444444444444444444",url:"https://example.invalid/racer"}}' \
   >"$state/branch.json"
 if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
   >/dev/null 2>&1; then
-  fail 'A21 accepted a drifted Homebrew tap predecessor commit'
+  fail 'A22 accepted a drifted Homebrew tap predecessor commit'
 fi
 [[ "$(<"$state/ref-update.calls")" == 1 ]] \
-  || fail 'A21 updated Cask after predecessor commit drift'
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"6f4b8d585f028ea746c183f0666f9129e75b1937",url:"https://example.invalid/prior-commit"}}' \
+  || fail 'A22 updated Cask after predecessor commit drift'
+jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"a030dbe6566030dcbbbb7d3206abe4debdd0cc51",url:"https://example.invalid/prior-commit"}}' \
   >"$state/branch.json"
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"5555555555555555555555555555555555555555",content:$content}' >"$state/formula.json"
 if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
   >/dev/null 2>&1; then
-  fail 'A21 accepted frozen Formula blob drift'
+  fail 'A22 accepted frozen Formula blob drift'
 fi
 [[ "$(<"$state/ref-update.calls")" == 1 ]] \
-  || fail 'A21 mutated tap state after frozen Formula drift'
+  || fail 'A22 mutated tap state after frozen Formula drift'
 
 # A branch move after the head check must make the non-force ref CAS fail.
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"6f4b8d585f028ea746c183f0666f9129e75b1937",url:"https://example.invalid/prior-commit"}}' \
+jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"a030dbe6566030dcbbbb7d3206abe4debdd0cc51",url:"https://example.invalid/prior-commit"}}' \
   >"$state/branch.json"
 touch "$state/race-before-ref"
 if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
   >/dev/null 2>&1; then
-  fail 'A21 accepted a concurrent Homebrew branch move'
+  fail 'A22 accepted a concurrent Homebrew branch move'
 fi
 rm -f -- "$state/race-before-ref"
 [[ "$(<"$state/ref-update.calls")" == 1 &&
    "$(jq -er '.object.sha' "$state/branch.json")" == \
      '4444444444444444444444444444444444444444' ]] \
-  || fail 'A21 overwrote a concurrent Homebrew branch move'
+  || fail 'A22 overwrote a concurrent Homebrew branch move'
 
-# A concurrent Formula-changing commit must also win the race and reject A21.
+# A concurrent Formula-changing commit must also win the race and reject A22.
 jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
   '{sha:"4ebc6c38925002dec00759823d4dd847a499818a",content:$content}' >"$state/formula.json"
-jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"6f4b8d585f028ea746c183f0666f9129e75b1937",url:"https://example.invalid/prior-commit"}}' \
+jq -n '{ref:"refs/heads/main",object:{type:"commit",sha:"a030dbe6566030dcbbbb7d3206abe4debdd0cc51",url:"https://example.invalid/prior-commit"}}' \
   >"$state/branch.json"
 touch "$state/formula-race-before-ref"
 if env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh" \
   >/dev/null 2>&1; then
-  fail 'A21 accepted a concurrent Formula drift commit'
+  fail 'A22 accepted a concurrent Formula drift commit'
 fi
 rm -f -- "$state/formula-race-before-ref"
 [[ "$(<"$state/ref-update.calls")" == 1 &&
    "$(jq -er '.sha' "$state/formula.json")" == \
      '6666666666666666666666666666666666666666' ]] \
-  || fail 'A21 overwrote a concurrent Formula drift commit'
+  || fail 'A22 overwrote a concurrent Formula drift commit'
 
 printf 'release homebrew hardening test: PASS\n'

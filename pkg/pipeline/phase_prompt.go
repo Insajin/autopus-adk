@@ -30,6 +30,7 @@ type PhasePromptBuilder struct {
 	requiredSnapshotLayers        []promptlayer.Layer
 	requiredSnapshotLoadErr       error
 	requiredSnapshotFirstPassHook func()
+	expectedSnapshotHash          string
 }
 
 // NewPhasePromptBuilder creates a PhasePromptBuilder that reads files from specDir.
@@ -37,7 +38,7 @@ func NewPhasePromptBuilder(specDir string) *PhasePromptBuilder {
 	return &PhasePromptBuilder{specDir: specDir}
 }
 
-// @AX:NOTE: [AUTO] hardcoded section headers — "## SPEC", "## Plan" etc. are implicit prompt contract with the AI backend
+// @AX:NOTE [AUTO]: hardcoded section headers — "## SPEC", "## Plan" etc. are implicit prompt contract with the AI backend
 // BuildPrompt constructs the prompt for the given phase using the spec directory
 // contents and any prior phase results available in ctx.
 func (b *PhasePromptBuilder) BuildPrompt(phaseID PhaseID, ctx PhaseContext) (string, error) {
@@ -46,6 +47,10 @@ func (b *PhasePromptBuilder) BuildPrompt(phaseID PhaseID, ctx PhaseContext) (str
 }
 
 // BuildPromptWithManifest constructs a phase prompt and diagnostic layer manifest.
+// @AX:ANCHOR [AUTO]: Public prompt-manifest contract consumed by the engine and pipeline context receipts.
+// @AX:REASON [AUTO]: Layer ordering, frozen SPEC authority, and rendered manifest identities cross the AI backend boundary.
+// @AX:WARN [AUTO]: Prompt construction has cyclomatic complexity 21 across frozen-document and phase-specific injection paths.
+// @AX:REASON [AUTO]: Each phase must receive the exact required snapshot and only its admitted prior outputs.
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-AGENT-PROMPT-001: phase:* layer IDs mirror prompt sections and prior-phase injections.
 func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseContext) (string, PromptManifest, error) {
 	receiptMode := ctx.ContextResult != nil && strings.TrimSpace(ctx.ContextResult.Prompt) != ""
@@ -59,7 +64,7 @@ func (b *PhasePromptBuilder) BuildPromptWithManifest(phaseID PhaseID, ctx PhaseC
 		}
 		layers = append(layers, requiredLayers...)
 	} else {
-		// @AX:NOTE: [AUTO] magic constant — "spec.md" filename is a hardcoded filesystem contract
+		// @AX:NOTE [AUTO]: magic constant — "spec.md" filename is a hardcoded filesystem contract
 		// Always include spec.md when it exists.
 		specContent, err := b.readFile("spec.md")
 		if err != nil && !os.IsNotExist(err) {

@@ -74,6 +74,7 @@ func produceUncachedGoReleaserFixtureEvidence(
 	if err := os.Mkdir(credentialRoot, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	writeReleaseCanaryFixture(t, credentialRoot)
 	seed := sha256.Sum256([]byte("autopus-f07-lineage-ed25519-seed"))
 	privateKey := ed25519.NewKeyFromSeed(seed[:])
 	keyPath := filepath.Join(credentialRoot, "release-key")
@@ -89,6 +90,11 @@ func produceUncachedGoReleaserFixtureEvidence(
 	environment = append(environment,
 		"GO_WANT_COMPANION_SIGNER_HELPER=1", "TMPDIR="+tmpDir,
 		"GITHUB_REF_NAME="+releaseTag, "COMPANION_SOURCE_COMMIT="+commit,
+		"COMPANION_SOURCE_TREE="+tree,
+		"OMP_CONTEXT_STATIC_POLICY_B64=eyJzY2hlbWEiOiJmaXh0dXJlIn0",
+		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="+strings.Repeat("0", 64),
+		"OMP_CONTEXT_RELEASE_CANARY_ROOT="+filepath.Join(credentialRoot, "omp-release-canary-root"),
+		"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="+filepath.Join(credentialRoot, "omp-release-canary-root", "omp-darwin-arm64"),
 		"COMPANION_BUILD_PROVENANCE=github-actions:Insajin/autopus-adk@"+commit,
 		"COMPANION_HANDOFF="+lineageHandoff, "COMPANION_ROLLBACK_FLOOR=5069",
 		"COMPANION_ISSUED_AT=2026-07-15T00:00:00Z",

@@ -19,6 +19,20 @@ func (e *SubprocessEngine) buildPhasePrompt(phase Phase, previous map[PhaseID]st
 	return appendGateContract(prompt, phase.Gate), nil
 }
 
+func (e *SubprocessEngine) buildOMPActivePhasePrompt(phase Phase) (string, error) {
+	prompt := buildPrompt(e.cfg.SpecID, phase.ID, "")
+	if e.promptBuilder != nil {
+		built, err := e.promptBuilder.BuildPrompt(phase.ID, PhaseContext{
+			FrozenRequiredDocuments: true,
+		})
+		if err != nil {
+			return "", err
+		}
+		prompt = built
+	}
+	return appendGateContract(prompt, phase.Gate), nil
+}
+
 func appendGateContract(prompt string, gate GateType) string {
 	switch gate {
 	case GateValidation:

@@ -22,6 +22,7 @@ readonly A18_A17_ANCESTOR_SHA='2b062a5e348fbecc414abe9ba5c74c7dc79fe243'
 readonly A19_A18_ANCESTOR_SHA='76f35d990e76511d169e239547d33bfedcea7948'
 readonly A20_A19_ANCESTOR_SHA='5bc41dccc72f8244943fd9e862cba07a36bf09d3'
 readonly A21_A20_ANCESTOR_SHA='7f44e4f143b2348c02553bab2209088c966f81ae'
+readonly A22_A21_ANCESTOR_SHA='b86fab067599f457261287552c5a9dd86460d7f4'
 
 fail() {
   printf 'companion release source: %s\n' "$1" >&2
@@ -55,7 +56,8 @@ case "$GITHUB_REF_NAME" in
   v0.50.90) release_phase='A19' ;;
   v0.50.91) release_phase='A20' ;;
   v0.50.92) release_phase='A21' ;;
-  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21 policy' ;;
+  v0.50.93) release_phase='A22' ;;
+  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'
 [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || fail 'source commit is not exact 40-hex'
@@ -66,6 +68,8 @@ tag_commit=$(git rev-parse --verify "${GITHUB_REF_NAME}^{commit}") \
   || fail 'cannot resolve release tag commit'
 [[ "$head_commit" == "$GITHUB_SHA" && "$tag_commit" == "$GITHUB_SHA" ]] \
   || fail 'checked-out source, tag, and release commit differ'
+source_tree=$(git rev-parse --verify 'HEAD^{tree}') \
+  || fail 'cannot resolve checked-out source tree'
 
 if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
       "$release_phase" == 'A4' || "$release_phase" == 'A5' ||
@@ -76,7 +80,8 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
       "$release_phase" == 'A14' || "$release_phase" == 'A15' ||
       "$release_phase" == 'A16' || "$release_phase" == 'A17' ||
       "$release_phase" == 'A18' || "$release_phase" == 'A19' ||
-      "$release_phase" == 'A20' || "$release_phase" == 'A21' ]]; then
+      "$release_phase" == 'A20' || "$release_phase" == 'A21' ||
+      "$release_phase" == 'A22' ]]; then
   tag_object_type=$(git cat-file -t "refs/tags/$GITHUB_REF_NAME" 2>/dev/null) \
     || fail "cannot resolve exact ${release_phase} tag object"
   [[ "$tag_object_type" == 'tag' ]] \
@@ -140,9 +145,12 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
   elif [[ "$release_phase" == 'A20' ]]; then
     git merge-base --is-ancestor "$A20_A19_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A20 source does not contain the immutable A19 release'
-  else
+  elif [[ "$release_phase" == 'A21' ]]; then
     git merge-base --is-ancestor "$A21_A20_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A21 source does not contain the immutable A20 release'
+  else
+    git merge-base --is-ancestor "$A22_A21_ANCESTOR_SHA" "$GITHUB_SHA" \
+      >/dev/null 2>&1 || fail 'A22 source does not contain the immutable A21 release'
   fi
   case "${COMPANION_SOURCE_PIN_REQUIRED-0}" in
     0) ;;
@@ -151,8 +159,6 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
         [[ -n "${!name-}" ]] || fail "required approved source pin ${name} is missing"
         [[ "${!name}" =~ ^[0-9a-f]{40}$ ]] || fail "approved source pin ${name} is malformed"
       done
-      source_tree=$(git rev-parse --verify 'HEAD^{tree}') \
-        || fail 'cannot resolve checked-out source tree'
       [[ "$GITHUB_SHA" == "$COMPANION_APPROVED_SOURCE_COMMIT" ]] \
         || fail 'release commit differs from the approved exact source commit'
       [[ "$source_tree" == "$COMPANION_APPROVED_SOURCE_TREE" ]] \
@@ -162,5 +168,6 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
   esac
 fi
 
-printf 'release-phase=%s\nsource-commit=%s\n' "$release_phase" "$GITHUB_SHA" \
+printf 'release-phase=%s\nsource-commit=%s\nsource-tree=%s\n' \
+  "$release_phase" "$GITHUB_SHA" "$source_tree" \
   >>"$GITHUB_OUTPUT"

@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091,SC2154
 set -euo pipefail
 umask 077
-
 fail() {
   printf 'companion release: %s\n' "$1" >&2
   exit 1
 }
-
 require_environment() {
   local name="$1"
   [[ -n "${!name-}" ]] || fail "required environment variable ${name} is missing"
 }
-
 sha256_file() {
   local output digest
   output=$("$shasum_tool" -a 256 "$1") || return 1
@@ -31,23 +29,25 @@ done
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 public_key_receipt_helper="$script_dir/produce-public-key-receipt.sh"
+omp_context_lineage_helper="$script_dir/produce-omp-context-lineage.sh"
 [[ -f "$public_key_receipt_helper" && ! -L "$public_key_receipt_helper" && \
    -r "$public_key_receipt_helper" ]] \
   || fail 'public key receipt helper is missing or unsafe'
+[[ -f "$omp_context_lineage_helper" && ! -L "$omp_context_lineage_helper" && \
+   -r "$omp_context_lineage_helper" ]] || fail 'OMP context lineage helper is missing or unsafe'
 # shellcheck source=produce-public-key-receipt.sh
 source "$public_key_receipt_helper"
-for helper_function in resolve_public_key_receipt_release_phase produce_public_key_receipt_bundle; do
+# shellcheck source=produce-omp-context-lineage.sh
+source "$omp_context_lineage_helper"
+for helper_function in resolve_public_key_receipt_release_phase produce_public_key_receipt_bundle \
+  prepare_omp_context_release_lineage produce_omp_context_release_lineage cleanup_omp_context_release_lineage; do
   declare -F "$helper_function" >/dev/null 2>&1 \
-    || fail 'public key receipt helper contract is incomplete'
+    || fail 'release helper contract is incomplete'
 done
 "$script_dir/validate-environment.sh"
 
 [[ "$(uname -s)" == 'Darwin' ]] || fail 'Darwin release requires macOS'
-codesign_tool=/usr/bin/codesign
-ditto_tool=/usr/bin/ditto
-xcrun_tool=/usr/bin/xcrun
-plutil_tool=/usr/bin/plutil
-shasum_tool=/usr/bin/shasum
+codesign_tool=/usr/bin/codesign ditto_tool=/usr/bin/ditto xcrun_tool=/usr/bin/xcrun plutil_tool=/usr/bin/plutil shasum_tool=/usr/bin/shasum
 for tool in "$codesign_tool" "$ditto_tool" "$xcrun_tool" "$plutil_tool" "$shasum_tool"; do
   [[ -f "$tool" && ! -L "$tool" && -x "$tool" ]] || fail 'required Darwin release tool is unavailable'
 done
@@ -61,13 +61,12 @@ esac
 [[ "$COMPANION_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,255}$ ]] \
   || fail 'COMPANION_VERSION is invalid'
 
-public_key_receipt_enabled=0
+public_key_receipt_enabled=0 release_phase='' omp_context_lineage_enabled=0
 if [[ -n "${COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT-}" ]]; then
   public_key_receipt_enabled=1
   require_environment GITHUB_REF_NAME
   resolve_public_key_receipt_release_phase
 fi
-
 artifact="$COMPANION_ARTIFACT"
 [[ -f "$artifact" && ! -L "$artifact" && -x "$artifact" ]] \
   || fail 'COMPANION_ARTIFACT is not a regular executable'
@@ -79,6 +78,7 @@ manifest_path="$artifact_dir/adk-companion-manifest.json"
 signature_path="$artifact_dir/adk-companion-manifest.sig"
 receipt_path="$artifact_dir/adk-companion-darwin-receipt.json"
 public_key_bundle_path="$artifact_dir/adk-companion-public-key-receipt.bundle"
+prepare_omp_context_release_lineage "$artifact_dir"
 for output in "$manifest_path" "$signature_path" "$receipt_path" "$public_key_bundle_path"; do
   [[ ! -e "$output" && ! -L "$output" ]] || fail 'Darwin release output already exists'
 done
@@ -96,7 +96,8 @@ cleanup() {
     if rm -rf -- "$temp_dir"; then :; else rollback_status=$?; fi
   fi
   if [[ "$succeeded" != '1' ]]; then
-    if rm -f -- "$manifest_path" "$signature_path" "$receipt_path"; then
+    if rm -f -- "$manifest_path" "$signature_path" "$receipt_path" &&
+      cleanup_omp_context_release_lineage; then
       :
     else
       rollback_status=$?
@@ -181,17 +182,19 @@ fi
 
 execution_smoke_digest=$(sha256_file "$artifact_path") \
   || fail 'cannot digest final signed companion before execution smoke'
-env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
-  "$COMPANION_EXEC_SMOKE_GATE" \
-  --artifact "$artifact_path" \
-  --expected-version "$COMPANION_VERSION" \
-  --architecture "$COMPANION_ARCHITECTURE" \
-  --timeout 15s \
+execution_smoke_env=(PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}")
+if [[ "$COMPANION_ARCHITECTURE" == 'arm64' ]]; then
+  for name in OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE OMP_CONTEXT_RELEASE_CANARY_ROOT; do require_environment "$name"; done
+  execution_smoke_env+=(OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE" OMP_CONTEXT_RELEASE_CANARY_ROOT="$OMP_CONTEXT_RELEASE_CANARY_ROOT")
+fi
+env -i "${execution_smoke_env[@]}" "$COMPANION_EXEC_SMOKE_GATE" \
+  --artifact "$artifact_path" --expected-version "$COMPANION_VERSION" \
+  --architecture "$COMPANION_ARCHITECTURE" --timeout 15s \
   || fail 'final signed companion execution smoke failed'
 [[ "$(sha256_file "$artifact_path")" == "$execution_smoke_digest" ]] \
   || fail 'final signed companion changed during execution smoke'
 
-if [[ "$public_key_receipt_enabled" == '1' ]]; then
+if [[ "$public_key_receipt_enabled" == '1' || "$omp_context_lineage_enabled" == '1' ]]; then
   signing_key_digest_before=$(sha256_file "$COMPANION_SIGNING_KEY_FILE") \
     || fail 'cannot digest companion signing key'
 fi
@@ -241,4 +244,5 @@ if [[ "$public_key_receipt_enabled" == '1' ]]; then
     "$artifact_path" "$manifest_path" "$signature_path" \
     "$public_key_bundle_path" "$signing_key_digest_before" "$release_phase"
 fi
+produce_omp_context_release_lineage "$actual_digest" "${signing_key_digest_before-}"
 succeeded=1

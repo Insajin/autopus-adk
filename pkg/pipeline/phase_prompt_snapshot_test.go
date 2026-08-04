@@ -55,3 +55,37 @@ func TestPhasePromptBuilder_InitialSnapshotRejectsFirstPassMutation(t *testing.T
 		t.Fatalf("failed initial freeze must remain fail-closed: err=%v prompt=%q manifest=%+v", err, prompt, manifest)
 	}
 }
+
+func TestPhasePromptBuilder_RejectsDocumentsThatDriftedAfterRunResolution(t *testing.T) {
+	const specID = "SPEC-PIPELINE-SNAPSHOT-001"
+	dir := filepath.Join(t.TempDir(), specID)
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{
+		"spec.md":       "# " + specID + ": snapshot test\nrequired outcome",
+		"plan.md":       "original plan",
+		"acceptance.md": "Given the original plan\nThen the binding matches",
+		"research.md":   "original research",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	expected, err := SpecSnapshotHash(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "plan.md"), []byte("mutated plan"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	builder := NewPhasePromptBuilder(dir)
+	builder.expectedSnapshotHash = expected
+	prompt, manifest, err := builder.BuildPromptWithManifest(PhasePlan, PhaseContext{FrozenRequiredDocuments: true})
+	if err == nil || !strings.Contains(err.Error(), "resolved SPEC snapshot") {
+		t.Fatalf("expected resolved snapshot mismatch, got %v", err)
+	}
+	if prompt != "" || len(manifest.Entries) != 0 {
+		t.Fatalf("drifted snapshot must not publish prompt or manifest: %q %+v", prompt, manifest)
+	}
+}

@@ -1,6 +1,7 @@
 package companionmanifest
 
 import (
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -47,7 +48,18 @@ func readRecoveryWorkflow(t *testing.T) (string, recoveryWorkflow) {
 	return raw, workflow
 }
 
-func TestFormulaRecoveryWorkflow_ManualExactA21LeastPrivilege(t *testing.T) {
+func recoveryStepNamed(t *testing.T, workflow recoveryWorkflow, name string) recoveryStep {
+	t.Helper()
+	for _, step := range workflow.Jobs["recover-formula-bridge"].Steps {
+		if step.Name == name {
+			return step
+		}
+	}
+	t.Fatalf("recovery step %q is missing", name)
+	return recoveryStep{}
+}
+
+func TestFormulaRecoveryWorkflow_ManualExactA22LeastPrivilege(t *testing.T) {
 	raw, workflow := readRecoveryWorkflow(t)
 	if len(workflow.On) != 1 {
 		t.Fatalf("recovery triggers = %v, want workflow_dispatch only", workflow.On)
@@ -74,16 +86,17 @@ func TestFormulaRecoveryWorkflow_ManualExactA21LeastPrivilege(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"id-token:", "pull_request:", "repository_dispatch:", "schedule:",
-		"${{ inputs.", "github.event.inputs", "refs/tags/v*", "v0.50.69", "v0.50.70", "v0.50.71", "v0.50.72", "v0.50.73", "v0.50.74", "v0.50.75", "v0.50.76", "v0.50.77", "v0.50.78", "v0.50.79", "v0.50.80", "v0.50.81", "v0.50.82", "v0.50.83", "v0.50.84", "v0.50.85", "v0.50.86", "v0.50.87", "v0.50.88", "v0.50.89", "v0.50.90", "v0.50.91",
+		"ADK_RELEASE_ECDSA_PRIVATE_KEY", "COMPANION_SIGNING_KEY", "COMPANION_SIGNER", "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+		"${{ inputs.", "github.event.inputs", "refs/tags/v*", "v0.50.69", "v0.50.70", "v0.50.71", "v0.50.72", "v0.50.73", "v0.50.74", "v0.50.75", "v0.50.76", "v0.50.77", "v0.50.78", "v0.50.79", "v0.50.80", "v0.50.81", "v0.50.82", "v0.50.83", "v0.50.84", "v0.50.85", "v0.50.86", "v0.50.87", "v0.50.88", "v0.50.89", "v0.50.90", "v0.50.91", "v0.50.92",
 	} {
 		if strings.Contains(raw, forbidden) {
 			t.Fatalf("recovery workflow contains forbidden expansion %q", forbidden)
 		}
 	}
 	for _, version := range regexp.MustCompile(`v?[0-9]+\.[0-9]+\.[0-9]+`).FindAllString(raw, -1) {
-		if version != "v0.50.92" && version != "0.50.92" &&
+		if version != "v0.50.93" && version != "0.50.93" &&
 			version != "v4.1.2" && version != "v3.1.2" {
-			t.Fatalf("recovery workflow references non-A21 version %q", version)
+			t.Fatalf("recovery workflow references non-A22 version %q", version)
 		}
 	}
 	if regexp.MustCompile(`(?m)^\s+contents:\s+write\s*$`).MatchString(raw) {
@@ -97,6 +110,7 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 	wantUses := []string{
 		"actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10",
 		"sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6",
+		"actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16",
 		"actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1",
 	}
 	var gotUses []string
@@ -132,7 +146,7 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 		}
 	}
 	for _, exact := range []string{
-		"ref: refs/tags/v0.50.92", "fetch-depth: 0", "persist-credentials: false",
+		"ref: refs/tags/v0.50.93", "fetch-depth: 0", "persist-credentials: false",
 		"client-id: ${{ vars.HOMEBREW_APP_CLIENT_ID }}",
 		"private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}",
 		"owner: Insajin", "repositories: homebrew-autopus", "permission-contents: write",
@@ -145,10 +159,10 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 }
 
 func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *testing.T) {
-	raw, _ := readRecoveryWorkflow(t)
+	raw, workflow := readRecoveryWorkflow(t)
 	for _, required := range []string{
-		"git rev-parse --verify 'HEAD^{commit}'", "mktemp", "GITHUB_REF_NAME='v0.50.92'",
-		"autopus-v0.50.92-checksums.txt",
+		"git rev-parse --verify 'HEAD^{commit}'", "mktemp", "GITHUB_REF_NAME='v0.50.93'",
+		"autopus-v0.50.93-checksums.txt",
 		"GITHUB_REF_TYPE='tag'", `GITHUB_SHA="$actual_head"`,
 		`GITHUB_OUTPUT="$validation_output"`, "scripts/companion-release/validate-source.sh",
 		"COMPANION_SOURCE_PIN_REQUIRED=1", "ADK_COMPANION_APPROVED_SOURCE_COMMIT",
@@ -160,6 +174,58 @@ func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *t
 		if !strings.Contains(raw, required) {
 			t.Fatalf("recovery evidence gate missing %q", required)
 		}
+	}
+	build := recoveryStepNamed(t, workflow, "Build trusted current-release verifiers")
+	for _, required := range []string{
+		`evidence_verifier="$RUNNER_TEMP/auto-omp-context-evidence-verifier"`,
+		`lineage_verifier="$RUNNER_TEMP/auto-omp-context-lineage-verifier"`,
+		`manifest_verifier="$RUNNER_TEMP/auto-companion-manifest-verifier"`,
+		"./scripts/companion-release/ompcontextverify",
+		"./scripts/companion-release/ompcontextlineageverify",
+		"./scripts/companion-release/manifestverify",
+		`chmod 0700 "$evidence_verifier" "$lineage_verifier" "$manifest_verifier"`,
+		`[[ -f "$verifier" && ! -L "$verifier" && -x "$verifier" ]]`,
+		`[[ "$(stat -f '%Lp' "$verifier")" == '700' ]]`,
+	} {
+		if !strings.Contains(build.Run, required) {
+			t.Fatalf("recovery verifier build contract missing %q", required)
+		}
+	}
+	if strings.Count(build.Run, `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP"`) != 3 {
+		t.Fatalf("recovery verifier builds escaped env -i isolation:\n%s", build.Run)
+	}
+	evidence := recoveryStepNamed(t, workflow, "Verify current immutable release evidence")
+	wantEnv := map[string]any{
+		"GITHUB_TOKEN":                            "${{ secrets.GITHUB_TOKEN }}",
+		"COMPANION_SOURCE_COMMIT":                 "${{ steps.release-source.outputs.source-commit }}",
+		"COMPANION_SOURCE_TREE":                   "${{ steps.release-source.outputs.source-tree }}",
+		"OMP_CONTEXT_EVIDENCE_REPORT_SHA256":      "${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}",
+		"OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256": "${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}",
+		"OMP_CONTEXT_STATIC_POLICY_B64":           "${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}",
+		"COMPANION_KEY_ID":                        "${{ vars.ADK_COMPANION_KEY_ID }}",
+		"COMPANION_HANDOFF":                       "${{ vars.ADK_COMPANION_HANDOFF }}",
+		"COMPANION_ROLLBACK_FLOOR":                "${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}",
+		"COMPANION_PUBLIC_KEY_SHA256":             "${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}",
+	}
+	if !reflect.DeepEqual(evidence.Env, wantEnv) {
+		t.Fatalf("recovery evidence environment = %#v, want exact repository bindings %#v", evidence.Env, wantEnv)
+	}
+	wantInvocation := `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+  GITHUB_TOKEN="$GITHUB_TOKEN" \
+  COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
+  COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
+  OMP_CONTEXT_EVIDENCE_REPORT_SHA256="$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+  OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256="$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+  OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
+  OMP_CONTEXT_EVIDENCE_VERIFIER="$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
+  OMP_CONTEXT_LINEAGE_VERIFIER="$RUNNER_TEMP/auto-omp-context-lineage-verifier" \
+  COMPANION_MANIFEST_VERIFIER="$RUNNER_TEMP/auto-companion-manifest-verifier" \
+  COMPANION_KEY_ID="$COMPANION_KEY_ID" COMPANION_HANDOFF="$COMPANION_HANDOFF" \
+  COMPANION_ROLLBACK_FLOOR="$COMPANION_ROLLBACK_FLOOR" \
+  COMPANION_PUBLIC_KEY_SHA256="$COMPANION_PUBLIC_KEY_SHA256" \
+  scripts/companion-release/verify-current-release.sh "$checksums_path"`
+	if !strings.Contains(evidence.Run, wantInvocation) {
+		t.Fatalf("recovery current-release verifier invocation is incomplete:\n%s", evidence.Run)
 	}
 	helper := readReleaseFile(t, "scripts/companion-release/verify-current-release.sh")
 	for _, required := range []string{
@@ -189,7 +255,7 @@ func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *t
 	}
 }
 
-func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA21CaskWithAllowlistedEnvironment(t *testing.T) {
+func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA22CaskWithAllowlistedEnvironment(t *testing.T) {
 	_, workflow := readRecoveryWorkflow(t)
 	var bridge recoveryStep
 	for _, step := range workflow.Jobs["recover-formula-bridge"].Steps {
@@ -198,8 +264,8 @@ func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA21CaskWithAllowlistedEnviron
 		}
 	}
 	wantBridge := `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-  GITHUB_REF_NAME='v0.50.92' \
-  COMPANION_VERSION='0.50.92' \
+  GITHUB_REF_NAME='v0.50.93' \
+  COMPANION_VERSION='0.50.93' \
   COMPANION_HOMEBREW_POLICY='cask-only' \
   COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
   HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \

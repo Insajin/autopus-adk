@@ -6,10 +6,14 @@ tests_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 script_dir=$(cd -- "$tests_dir/.." && pwd)
 producer="$script_dir/produce.sh"
 receipt_helper="$script_dir/produce-public-key-receipt.sh"
+lineage_helper="$script_dir/produce-omp-context-lineage.sh"
 fail() { printf 'release producer helper hardening test: %s\n' "$1" >&2; exit 1; }
 
 if bash "$receipt_helper" >/dev/null 2>&1; then
   fail 'source-only receipt helper executed directly'
+fi
+if bash "$lineage_helper" >/dev/null 2>&1; then
+  fail 'source-only lineage helper executed directly'
 fi
 
 resolve_phase() {
@@ -49,9 +53,10 @@ v0.50.89 0.50.89 A18
 v0.50.90 0.50.90 A19
 v0.50.91 0.50.91 A20
 v0.50.92 0.50.92 A21
+v0.50.93 0.50.93 A22
 CASES
 
-for mismatch in 'v0.50.92 0.50.91' 'v0.50.91 0.50.92' 'v0.50.93 0.50.93'; do
+for mismatch in 'v0.50.92 0.50.91' 'v0.50.91 0.50.92' 'v0.50.93 0.50.92' 'v0.50.92 0.50.93'; do
   read -r tag version <<< "$mismatch"
   if resolve_phase "$tag" "$version" >/dev/null 2>&1; then
     fail "mixed or unknown release identity passed: ${tag}/${version}"
@@ -61,11 +66,12 @@ done
 temp=$(mktemp -d "${TMPDIR:-/tmp}/adk-producer-helper-gate.XXXXXX")
 trap 'rm -rf -- "$temp"' EXIT
 cp -- "$producer" "$temp/produce.sh"
+cp -- "$lineage_helper" "$temp/produce-omp-context-lineage.sh"
 assert_gate_failure() {
   local expected=$1 output
   if output=$(COMPANION_PLATFORM=darwin COMPANION_ARTIFACT="$temp/auto" \
     COMPANION_TARGET=darwin_arm64 COMPANION_ARCHITECTURE=arm64 \
-    COMPANION_VERSION=0.50.92 bash "$temp/produce.sh" 2>&1); then
+    COMPANION_VERSION=0.50.93 bash "$temp/produce.sh" 2>&1); then
     fail "unsafe helper gate passed"
   fi
   [[ "$output" == *"$expected"* ]] || fail "helper gate diagnostic = ${output}"
@@ -76,6 +82,15 @@ ln -s -- "$receipt_helper" "$temp/produce-public-key-receipt.sh"
 assert_gate_failure 'public key receipt helper is missing or unsafe'
 rm -- "$temp/produce-public-key-receipt.sh"
 printf ':\n' > "$temp/produce-public-key-receipt.sh"
-assert_gate_failure 'public key receipt helper contract is incomplete'
+assert_gate_failure 'release helper contract is incomplete'
+
+cp -- "$receipt_helper" "$temp/produce-public-key-receipt.sh"
+rm -- "$temp/produce-omp-context-lineage.sh"
+assert_gate_failure 'OMP context lineage helper is missing or unsafe'
+ln -s -- "$lineage_helper" "$temp/produce-omp-context-lineage.sh"
+assert_gate_failure 'OMP context lineage helper is missing or unsafe'
+rm -- "$temp/produce-omp-context-lineage.sh"
+printf ':\n' > "$temp/produce-omp-context-lineage.sh"
+assert_gate_failure 'release helper contract is incomplete'
 
 printf 'release producer helper hardening test: PASS\n'

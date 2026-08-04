@@ -58,8 +58,18 @@ func validateCompanionPostHook(hooks []struct {
 	Command string   `yaml:"cmd"`
 	Env     []string `yaml:"env"`
 }) error {
-	if len(hooks) != 1 || hooks[0].Command != "scripts/companion-release/produce.sh" {
+	if len(hooks) != 2 || hooks[0].Command != "scripts/companion-release/verify-omp-context-release-binary.sh" ||
+		hooks[1].Command != "scripts/companion-release/produce.sh" {
 		return errors.New("companion producer post-hook differs")
+	}
+	for _, expected := range []string{
+		"COMPANION_ARTIFACT={{ .Path }}", "COMPANION_PLATFORM={{ .Os }}",
+		"COMPANION_ARCHITECTURE={{ .Arch }}", "COMPANION_RELEASE_TAG={{ .Env.GITHUB_REF_NAME }}",
+		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256={{ .Env.OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256 }}",
+	} {
+		if countString(hooks[0].Env, expected) != 1 {
+			return fmt.Errorf("OMP release binary hook environment %q differs", expected)
+		}
 	}
 	want := []string{
 		"COMPANION_ARTIFACT={{ .Path }}", "COMPANION_TARGET={{ .Target }}",
@@ -67,7 +77,7 @@ func validateCompanionPostHook(hooks []struct {
 		"COMPANION_VERSION={{ .Version }}",
 	}
 	for _, expected := range want {
-		if countString(hooks[0].Env, expected) != 1 {
+		if countString(hooks[1].Env, expected) != 1 {
 			return fmt.Errorf("post-hook environment %q differs", expected)
 		}
 	}

@@ -18,10 +18,12 @@ import (
 )
 
 const (
-	defaultTimeout  = 15 * time.Second
-	maximumTimeout  = 60 * time.Second
-	defaultPipeWait = 250 * time.Millisecond
-	maximumOutput   = 4096
+	defaultTimeout   = 15 * time.Second
+	maximumTimeout   = 60 * time.Second
+	defaultPipeWait  = 250 * time.Millisecond
+	maximumOutput    = 4096
+	pinnedOMPVersion = "omp/17.2.7"
+	pinnedOMPSHA256  = "sha256:cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0"
 )
 
 var (
@@ -39,20 +41,30 @@ type smokeConfig struct {
 	timeout          time.Duration
 	pipeWait         time.Duration
 	extraEnvironment []string
+	isolation        *canaryUIDIsolation
+}
+
+type ompCanaryPolicy struct {
+	version   string
+	sha256    string
+	isolation canaryUIDIsolationPolicy
 }
 
 type limitedBuffer struct {
-	buffer bytes.Buffer
-	limit  int
+	buffer   bytes.Buffer
+	limit    int
+	exceeded bool
 }
 
 func (b *limitedBuffer) Write(data []byte) (int, error) {
 	remaining := b.limit - b.buffer.Len()
 	if remaining <= 0 {
+		b.exceeded = true
 		return 0, errOutputLimit
 	}
 	if len(data) > remaining {
 		written, _ := b.buffer.Write(data[:remaining])
+		b.exceeded = true
 		return written, errOutputLimit
 	}
 	return b.buffer.Write(data)
@@ -66,7 +78,10 @@ func runVersionSmoke(config smokeConfig) error {
 	ctx, cancel := context.WithTimeout(context.Background(), config.timeout)
 	defer cancel()
 
-	command := exec.CommandContext(ctx, config.artifact, "version", "--short")
+	command, err := newCanaryCommand(ctx, config.artifact, config.isolation, "version", "--short")
+	if err != nil {
+		return err
+	}
 	command.Env = append([]string{"LANG=C", "LC_ALL=C", "PATH=/usr/bin:/bin"},
 		config.extraEnvironment...)
 	command.Stdin = strings.NewReader("")
@@ -97,6 +112,9 @@ func runVersionSmoke(config smokeConfig) error {
 	}
 	if errors.Is(runErr, exec.ErrWaitDelay) {
 		return fmt.Errorf("%w after %s", errInheritedPipe, config.pipeWait)
+	}
+	if stdout.exceeded || stderr.exceeded {
+		return errOutputLimit
 	}
 	if runErr != nil {
 		return fmt.Errorf("artifact command failed: %w%s", runErr, stderrDiagnostic(stderr.String()))
@@ -161,9 +179,23 @@ func validateArtifact(path string) (string, error) {
 }
 
 func runCLI(args []string, stderr io.Writer) error {
+	isolation, err := productionCanaryUIDIsolationPolicy()
+	if err != nil {
+		return err
+	}
+	return runCLIWithPolicy(args, stderr, ompCanaryPolicy{
+		version: pinnedOMPVersion, sha256: pinnedOMPSHA256, isolation: isolation,
+	})
+}
+
+func runCLIWithPolicy(args []string, stderr io.Writer, policy ompCanaryPolicy) error {
 	flags := flag.NewFlagSet("companion-release-exec-smoke", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	artifactFlag := flags.String("artifact", "", "final signed auto artifact")
+	ompExecutableFlag := flags.String("omp-executable",
+		os.Getenv("OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE"), "pinned arm64 OMP executable")
+	canaryRootFlag := flags.String("canary-root",
+		os.Getenv("OMP_CONTEXT_RELEASE_CANARY_ROOT"), "nobody-owned arm64 canary root")
 	versionFlag := flags.String("expected-version", "", "exact expected version")
 	architectureFlag := flags.String("architecture", "", "Darwin artifact architecture")
 	timeoutFlag := flags.Duration("timeout", defaultTimeout, "execution deadline")
@@ -189,12 +221,30 @@ func runCLI(args []string, stderr io.Writer) error {
 	if err := validateMachOArchitecture(artifact, *architectureFlag); err != nil {
 		return err
 	}
-	return runVersionSmoke(smokeConfig{
-		artifact:        artifact,
-		expectedVersion: *versionFlag,
-		timeout:         *timeoutFlag,
-		pipeWait:        defaultPipeWait,
-	})
+	if *architectureFlag != "arm64" {
+		if *ompExecutableFlag != "" || *canaryRootFlag != "" {
+			return errors.New("OMP UID-isolated canary is arm64-only")
+		}
+		return runVersionSmoke(smokeConfig{artifact: artifact, expectedVersion: *versionFlag,
+			timeout: *timeoutFlag, pipeWait: defaultPipeWait})
+	}
+	isolation, err := validateCanaryUIDIsolation(
+		*canaryRootFlag, *ompExecutableFlag, artifact, policy.isolation,
+	)
+	if err != nil {
+		return err
+	}
+	if err := runVersionSmoke(smokeConfig{artifact: artifact, expectedVersion: *versionFlag,
+		timeout: *timeoutFlag, pipeWait: defaultPipeWait, isolation: isolation}); err != nil {
+		return err
+	}
+	if err := runVerifiedExecSmoke(verifiedExecSmokeConfig{
+		artifact: artifact, ompExecutable: *ompExecutableFlag, canaryRoot: *canaryRootFlag,
+		policy: policy, timeout: *timeoutFlag, pipeWait: defaultPipeWait, isolation: isolation,
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func main() {

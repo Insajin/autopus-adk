@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -15,19 +14,6 @@ const (
 	markerEndYml   = "# AUTOPUS:END"
 	configFile     = ".omp/config.yml"
 )
-
-func (a *Adapter) prepareConfigMapping(cfg *config.HarnessConfig) (adapter.FileMapping, error) {
-	configDoc, err := a.renderConfigDocument(cfg)
-	if err != nil {
-		return adapter.FileMapping{}, err
-	}
-	return adapter.FileMapping{
-		TargetPath:      configFile,
-		OverwritePolicy: adapter.OverwriteMarker,
-		Checksum:        adapter.Checksum(configDoc),
-		Content:         []byte(configDoc),
-	}, nil
-}
 
 func (a *Adapter) renderConfigDocument(cfg *config.HarnessConfig) (string, error) {
 	// This read feeds the document that gets written back and checksummed, so a
@@ -42,24 +28,9 @@ func (a *Adapter) renderConfigDocument(cfg *config.HarnessConfig) (string, error
 	var existing string
 	if data, err := os.ReadFile(path); err == nil {
 		existing = string(data)
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("%s 읽기 실패: %w", configFile, err)
 	}
 
-	if err := validateMarkerBalance(existing); err != nil {
-		return "", err
-	}
-
-	sectionContent := `skills:
-  customDirectories:
-    - .agents/skills`
-
-	newSection := markerBeginYml + "\n" + sectionContent + "\n" + markerEndYml
-
-	if markerReYml.MatchString(existing) {
-		return strings.TrimRight(markerReYml.ReplaceAllString(existing, newSection+"\n"), "\n") + "\n", nil
-	}
-
-	if existing == "" {
-		return newSection + "\n", nil
-	}
-	return strings.TrimSpace(existing) + "\n\n" + newSection + "\n", nil
+	return mergeOMPConfigDocument(existing)
 }

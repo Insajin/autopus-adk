@@ -59,34 +59,36 @@ type IssueReportConf struct {
 
 // HarnessConfig는 autopus.yaml의 최상위 설정 구조이다.
 type HarnessConfig struct {
-	Mode         Mode             `yaml:"mode"`
-	ProjectName  string           `yaml:"project_name"`
-	Platforms    []string         `yaml:"platforms"`
-	IsolateRules bool             `yaml:"isolate_rules,omitempty"`
-	Stack        string           `yaml:"stack,omitempty"`     // detected stack: go, typescript, python, rust
-	Framework    string           `yaml:"framework,omitempty"` // detected framework: nextjs, django, gin, etc.
-	Language     LanguageConf     `yaml:"language,omitempty"`
-	Architecture ArchitectureConf `yaml:"architecture"`
-	Lore         LoreConf         `yaml:"lore"`
-	Spec         SpecConf         `yaml:"spec"`
-	Methodology  MethodologyConf  `yaml:"methodology,omitempty"`
-	Router       RouterConf       `yaml:"router,omitempty"`
-	Hooks        HooksConf        `yaml:"hooks"`
-	Session      SessionConf      `yaml:"session,omitempty"`
-	Orchestra    OrchestraConf    `yaml:"orchestra,omitempty"`
-	Quality      QualityConf      `yaml:"quality,omitempty"`
-	Skills       SkillsConf       `yaml:"skills,omitempty"`
-	Verify       VerifyConf       `yaml:"verify,omitempty"`
-	Design       DesignConf       `yaml:"design,omitempty"`
-	Constraints  ConstraintConf   `yaml:"constraints,omitempty"`
-	Context      ContextConf      `yaml:"context,omitempty"`
-	Features     FeaturesConf     `yaml:"features,omitempty"`
-	IssueReport  IssueReportConf  `yaml:"issue_report,omitempty"`
-	Profiles     ProfilesConf     `yaml:"profiles,omitempty"`
-	UsageProfile UsageProfile     `yaml:"usage_profile,omitempty"` // developer (default) or fullstack
-	Hints        HintsConf        `yaml:"hints,omitempty"`
-	Workflow     WorkflowConf     `yaml:"workflow,omitempty"`
-	Runtime      RuntimeConf      `yaml:"-"`
+	Mode             Mode                 `yaml:"mode"`
+	ProjectName      string               `yaml:"project_name"`
+	Platforms        []string             `yaml:"platforms"`
+	IsolateRules     bool                 `yaml:"isolate_rules,omitempty"`
+	Stack            string               `yaml:"stack,omitempty"`     // detected stack: go, typescript, python, rust
+	Framework        string               `yaml:"framework,omitempty"` // detected framework: nextjs, django, gin, etc.
+	Language         LanguageConf         `yaml:"language,omitempty"`
+	Architecture     ArchitectureConf     `yaml:"architecture"`
+	Lore             LoreConf             `yaml:"lore"`
+	Spec             SpecConf             `yaml:"spec"`
+	Methodology      MethodologyConf      `yaml:"methodology,omitempty"`
+	Router           RouterConf           `yaml:"router,omitempty"`
+	Hooks            HooksConf            `yaml:"hooks"`
+	Session          SessionConf          `yaml:"session,omitempty"`
+	Orchestra        OrchestraConf        `yaml:"orchestra,omitempty"`
+	Quality          QualityConf          `yaml:"quality,omitempty"`
+	RoleModelPolicy  RoleModelPolicyConf  `yaml:"role_model_policy,omitempty"`
+	OMPContextPolicy OMPContextPolicyConf `yaml:"omp_context_policy,omitempty"`
+	Skills           SkillsConf           `yaml:"skills,omitempty"`
+	Verify           VerifyConf           `yaml:"verify,omitempty"`
+	Design           DesignConf           `yaml:"design,omitempty"`
+	Constraints      ConstraintConf       `yaml:"constraints,omitempty"`
+	Context          ContextConf          `yaml:"context,omitempty"`
+	Features         FeaturesConf         `yaml:"features,omitempty"`
+	IssueReport      IssueReportConf      `yaml:"issue_report,omitempty"`
+	Profiles         ProfilesConf         `yaml:"profiles,omitempty"`
+	UsageProfile     UsageProfile         `yaml:"usage_profile,omitempty"` // developer (default) or fullstack
+	Hints            HintsConf            `yaml:"hints,omitempty"`
+	Workflow         WorkflowConf         `yaml:"workflow,omitempty"`
+	Runtime          RuntimeConf          `yaml:"-"`
 }
 
 // FeaturesConf holds feature-flag namespaces.
@@ -229,12 +231,9 @@ type ConstraintConf struct {
 	Path    string `yaml:"path,omitempty"`
 }
 
-// ContextConf is the agent context enrichment configuration.
-type ContextConf struct {
-	SignatureMap bool `yaml:"signature_map"`
-}
-
 // Validate는 설정의 유효성을 검증한다.
+// @AX:WARN [AUTO]: harness validation has cyclomatic complexity 15.
+// @AX:REASON [AUTO]: gocyclo reports 15 across mode, platform, context, role-model, and provider configuration invariants.
 func (c *HarnessConfig) Validate() error {
 	if c.Mode != ModeFull {
 		return fmt.Errorf("invalid mode %q: must be 'full'", c.Mode)
@@ -262,7 +261,7 @@ func (c *HarnessConfig) Validate() error {
 			return fmt.Errorf("features.cc21.task_created_mode %q is invalid", c.Features.CC21.TaskCreatedMode)
 		}
 	}
-	if err := c.validateModelSelectionConfig(); err != nil {
+	if err := c.validateModelSelectionRoleAndOMPContextPolicy(); err != nil {
 		return err
 	}
 	if err := c.validateSkillsConfig(); err != nil {

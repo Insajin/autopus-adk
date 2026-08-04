@@ -6,11 +6,14 @@ fail() {
   printf 'current release evidence: %s\n' "$1" >&2
   exit 1
 }
-
 readonly RELEASE_REPOSITORY='Insajin/autopus-adk'
-readonly RELEASE_TAG='v0.50.92'
-readonly RELEASE_VERSION='0.50.92'
-
+readonly RELEASE_VERSION='0.50.93'
+readonly RELEASE_TAG='v0.50.93'
+readonly REPORT_NAME='omp-context-promotion-report.v1.json'
+readonly ATTESTATION_NAME='omp-context-promotion-attestation.v2.json'
+readonly LINEAGE_NAME='release-lineage-v1.json'
+readonly LINEAGE_SIGNATURE_NAME='release-lineage-v1.sig'
+readonly ARM64_ARCHIVE_NAME="autopus-adk_${RELEASE_VERSION}_darwin_arm64.tar.gz"
 EXPECTED_ARCHIVES=(
   "autopus-adk_${RELEASE_VERSION}_darwin_amd64.tar.gz"
   "autopus-adk_${RELEASE_VERSION}_darwin_arm64.tar.gz"
@@ -27,6 +30,10 @@ EXPECTED_ASSETS=(
   'checksums.txt'
   'checksums.txt.bundle'
   'checksums.txt.signatures'
+  "$REPORT_NAME"
+  "$ATTESTATION_NAME"
+  "$LINEAGE_NAME"
+  "$LINEAGE_SIGNATURE_NAME"
 )
 readonly EXPECTED_ASSETS
 [[ $# == 1 ]] || fail 'usage: verify-current-release.sh CHECKSUMS_OUTPUT'
@@ -34,7 +41,29 @@ readonly checksums_output=$1
 [[ -n "${GITHUB_TOKEN:-}" ]] || fail 'missing GITHUB_TOKEN'
 [[ "${COMPANION_SOURCE_COMMIT:-}" =~ ^[0-9a-f]{40}$ ]] \
   || fail 'exact source commit is missing or malformed'
-for tool in gh jq shasum; do
+[[ "${COMPANION_SOURCE_TREE:-}" =~ ^[0-9a-f]{40}$ ]] \
+  || fail 'exact source tree is missing or malformed'
+[[ "${OMP_CONTEXT_EVIDENCE_REPORT_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] \
+  || fail 'exact OMP report digest is missing or malformed'
+[[ "${OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256:-}" =~ ^[0-9a-f]{64}$ ]] \
+  || fail 'exact OMP attestation digest is missing or malformed'
+[[ "${OMP_CONTEXT_STATIC_POLICY_B64:-}" =~ ^[A-Za-z0-9_-]+$ &&
+   "${#OMP_CONTEXT_STATIC_POLICY_B64}" -le 21846 ]] \
+  || fail 'exact compiled OMP static policy is missing or malformed'
+[[ -f "${OMP_CONTEXT_EVIDENCE_VERIFIER:-}" &&
+   ! -L "$OMP_CONTEXT_EVIDENCE_VERIFIER" && -x "$OMP_CONTEXT_EVIDENCE_VERIFIER" ]] \
+  || fail 'OMP_CONTEXT_EVIDENCE_VERIFIER is missing or unsafe'
+[[ -f "${OMP_CONTEXT_LINEAGE_VERIFIER:-}" &&
+   ! -L "$OMP_CONTEXT_LINEAGE_VERIFIER" && -x "$OMP_CONTEXT_LINEAGE_VERIFIER" ]] \
+  || fail 'OMP_CONTEXT_LINEAGE_VERIFIER is missing or unsafe'
+[[ -f "${COMPANION_MANIFEST_VERIFIER:-}" &&
+   ! -L "$COMPANION_MANIFEST_VERIFIER" && -x "$COMPANION_MANIFEST_VERIFIER" ]] \
+  || fail 'COMPANION_MANIFEST_VERIFIER is missing or unsafe'
+[[ "${COMPANION_KEY_ID:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._:@/+\-]{0,255}$ &&
+   "${COMPANION_HANDOFF:-}" == 'v1' && "${COMPANION_ROLLBACK_FLOOR:-}" =~ ^[1-9][0-9]*$ &&
+   "${COMPANION_PUBLIC_KEY_SHA256:-}" =~ ^sha256:[0-9a-f]{64}$ ]] \
+  || fail 'current release-key policy is missing or malformed'
+for tool in cmp gh jq shasum tar; do
   command -v "$tool" >/dev/null 2>&1 || fail "required tool is unavailable: ${tool}"
 done
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) \
@@ -64,18 +93,23 @@ release_json="$temp_dir/release.json"
 downloaded_checksums="$temp_dir/checksums.txt"
 downloaded_bundle="$temp_dir/checksums.txt.bundle"
 downloaded_envelope="$temp_dir/checksums.txt.signatures"
+downloaded_report="$temp_dir/$REPORT_NAME"
+downloaded_attestation="$temp_dir/$ATTESTATION_NAME"
+downloaded_lineage="$temp_dir/$LINEAGE_NAME"
+downloaded_lineage_signature="$temp_dir/$LINEAGE_SIGNATURE_NAME"
+downloaded_arm64_archive="$temp_dir/$ARM64_ARCHIVE_NAME"
 
 if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
   -H 'Accept: application/vnd.github+json' \
   "repos/${RELEASE_REPOSITORY}/releases/tags/${RELEASE_TAG}" > "$release_json"; then
-  fail 'cannot read the exact A21 GitHub release'
+  fail 'cannot read the exact A22 GitHub release'
 fi
 [[ -f "$release_json" && ! -L "$release_json" && -s "$release_json" ]] \
-  || fail 'A21 GitHub release metadata is empty or unsafe'
+  || fail 'A22 GitHub release metadata is empty or unsafe'
 
 expected_assets_json=$(printf '%s\n' "${EXPECTED_ASSETS[@]}" \
   | jq -Rsc 'split("\n") | map(select(length > 0))') \
-  || fail 'cannot construct the expected A21 asset set'
+  || fail 'cannot construct the expected A22 asset set'
 if ! jq -e --arg tag "$RELEASE_TAG" --arg commit "$COMPANION_SOURCE_COMMIT" \
   --argjson expected "$expected_assets_json" '
     type == "object" and
@@ -96,7 +130,7 @@ if ! jq -e --arg tag "$RELEASE_TAG" --arg commit "$COMPANION_SOURCE_COMMIT" \
       (.digest | type) == "string" and
       (.digest | test("^sha256:[0-9a-f]{64}$")))
   ' "$release_json" >/dev/null; then
-  fail 'A21 release is not exact, final, immutable, complete, and digest-bound'
+  fail 'A22 release is not exact, final, immutable, complete, and digest-bound'
 fi
 
 # @AX:ANCHOR [AUTO]: Keep all three immutable release asset downloads on one digest-bound path.
@@ -116,7 +150,7 @@ download_release_asset() {
   if ! GH_TOKEN="$GITHUB_TOKEN" gh api \
     -H 'Accept: application/octet-stream' \
     "repos/${RELEASE_REPOSITORY}/releases/assets/${asset_id}" > "$destination"; then
-    fail "cannot download ${asset_name} from the exact A21 release"
+    fail "cannot download ${asset_name} from the exact A22 release"
   fi
   [[ -f "$destination" && ! -L "$destination" && -s "$destination" ]] \
     || fail "downloaded ${asset_name} is empty or unsafe"
@@ -133,6 +167,65 @@ download_release_asset() {
 download_release_asset 'checksums.txt' "$downloaded_checksums"
 download_release_asset 'checksums.txt.bundle' "$downloaded_bundle"
 download_release_asset 'checksums.txt.signatures' "$downloaded_envelope"
+download_release_asset "$REPORT_NAME" "$downloaded_report"
+download_release_asset "$ATTESTATION_NAME" "$downloaded_attestation"
+download_release_asset "$LINEAGE_NAME" "$downloaded_lineage"
+download_release_asset "$LINEAGE_SIGNATURE_NAME" "$downloaded_lineage_signature"
+download_release_asset "$ARM64_ARCHIVE_NAME" "$downloaded_arm64_archive"
+[[ "$(wc -c <"$downloaded_lineage_signature" | tr -d '[:space:]')" == '64' ]] \
+  || fail 'released OMP context lineage signature is not raw Ed25519 bytes'
+archive_listing="$temp_dir/arm64-archive-entries"
+tar -tzf "$downloaded_arm64_archive" >"$archive_listing" \
+  || fail 'released Darwin arm64 archive cannot be listed'
+if grep -Eq '(^/|(^|/)\.\.(/|$)|//)' "$archive_listing"; then
+  fail 'released Darwin arm64 archive contains an unsafe path'
+fi
+bundle_dir="$temp_dir/adk-companion-public-key-receipt.bundle"
+install -m 0700 -d "$bundle_dir"
+extract_archive_entry() {
+  local name=$1 output=$2
+  [[ "$(grep -Fxc "$name" "$archive_listing")" == '1' ]] \
+    || fail "released archive entry is absent or duplicate: ${name}"
+  tar -xOzf "$downloaded_arm64_archive" "$name" >"$output" \
+    || fail "cannot extract released archive entry: ${name}"
+  chmod 0600 "$output"
+}
+archive_auto="$temp_dir/auto"
+archive_manifest="$temp_dir/adk-companion-manifest.json"
+archive_manifest_signature="$temp_dir/adk-companion-manifest.sig"
+archive_lineage="$temp_dir/archive-release-lineage-v1.json"
+archive_lineage_signature="$temp_dir/archive-release-lineage-v1.sig"
+extract_archive_entry auto "$archive_auto"
+extract_archive_entry adk-companion-manifest.json "$archive_manifest"
+extract_archive_entry adk-companion-manifest.sig "$archive_manifest_signature"
+extract_archive_entry adk-companion-public-key-receipt.bundle/public-key-receipt.json \
+  "$bundle_dir/public-key-receipt.json"
+extract_archive_entry adk-companion-public-key-receipt.bundle/public-key-receipt.sig \
+  "$bundle_dir/public-key-receipt.sig"
+extract_archive_entry "$LINEAGE_NAME" "$archive_lineage"
+extract_archive_entry "$LINEAGE_SIGNATURE_NAME" "$archive_lineage_signature"
+cmp -s "$downloaded_lineage" "$archive_lineage" \
+  || fail 'standalone and archived OMP context lineage bytes differ'
+cmp -s "$downloaded_lineage_signature" "$archive_lineage_signature" \
+  || fail 'standalone and archived OMP context lineage signatures differ'
+chmod 0700 "$archive_auto"
+env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+  "$COMPANION_MANIFEST_VERIFIER" \
+  --artifact "$archive_auto" --manifest "$archive_manifest" \
+  --signature "$archive_manifest_signature" \
+  --receipt "$bundle_dir/public-key-receipt.json" \
+  --receipt-signature "$bundle_dir/public-key-receipt.sig" \
+  --key-id "$COMPANION_KEY_ID" --version "$RELEASE_VERSION" \
+  --platform darwin --architecture arm64 --handoff "$COMPANION_HANDOFF" \
+  --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+  --public-key-sha256 "$COMPANION_PUBLIC_KEY_SHA256" \
+  || fail 'released Darwin arm64 companion authority is invalid'
+[[ "$(shasum -a 256 "$downloaded_report" | awk '{print $1}')" == \
+   "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" ]] \
+  || fail 'released OMP report differs from the exact evidence pin'
+[[ "$(shasum -a 256 "$downloaded_attestation" | awk '{print $1}')" == \
+   "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" ]] \
+  || fail 'released OMP attestation differs from the exact evidence pin'
 
 expected_archives_json=$(printf '%s\n' "${EXPECTED_ARCHIVES[@]}" \
   | jq -Rsc 'split("\n") | map(select(length > 0))') \
@@ -148,7 +241,7 @@ if ! printf '%s' "$checksum_entries_json" | jq -e \
     ([.[].name] | sort) == ($expected | sort) and
     ([.[].name] | unique | length) == ($expected | length)
   ' >/dev/null; then
-  fail 'checksums.txt does not describe exactly the eight A21 archives'
+  fail 'checksums.txt does not describe exactly the eight A22 archives'
 fi
 
 for archive in "${EXPECTED_ARCHIVES[@]}"; do
@@ -167,10 +260,40 @@ done
 env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
   "$signature_helper" \
   "$downloaded_checksums" "$downloaded_bundle" "$downloaded_envelope" \
-  || fail 'A21 release signature evidence is invalid'
+  || fail 'A22 release signature evidence is invalid'
+
+candidate_artifact_sha=$(jq -er '.candidate.artifact_sha256 |
+  select(type == "string" and test("^[0-9a-f]{64}$"))' "$downloaded_report") \
+  || fail 'released OMP candidate artifact digest is malformed'
+distributed_artifact_sha=$(jq -er '.artifact_digest |
+  select(type == "string" and test("^sha256:[0-9a-f]{64}$"))' "$archive_manifest") \
+  || fail 'released Darwin arm64 manifest digest is malformed'
+env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+  "$OMP_CONTEXT_LINEAGE_VERIFIER" \
+  --lineage "$downloaded_lineage" --signature "$downloaded_lineage_signature" \
+  --receipt-bundle "$bundle_dir" --key-id "$COMPANION_KEY_ID" \
+  --handoff "$COMPANION_HANDOFF" --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+  --upstream-sha256 "sha256:$candidate_artifact_sha" \
+  --executable-sha256 "$distributed_artifact_sha" \
+  --source-repository "$RELEASE_REPOSITORY" --source-commit "$COMPANION_SOURCE_COMMIT" \
+  --source-tree "$COMPANION_SOURCE_TREE" --target darwin-arm64 --version "$RELEASE_VERSION" \
+  || fail 'released OMP context U-to-D lineage is invalid'
+env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
+  "$OMP_CONTEXT_EVIDENCE_VERIFIER" \
+  --mode historical \
+  --report "$downloaded_report" \
+  --attestation "$downloaded_attestation" \
+  --report-sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+  --attestation-sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+  --candidate-repository "$RELEASE_REPOSITORY" \
+  --candidate-revision "$COMPANION_SOURCE_COMMIT" \
+  --candidate-tree "$COMPANION_SOURCE_TREE" \
+  --candidate-artifact-sha256 "$candidate_artifact_sha" \
+  --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64" \
+  || fail 'A22 historical OMP production evidence is invalid'
 
 install -m 0600 "$downloaded_checksums" "$checksums_output" \
   || fail 'cannot materialize verified checksums.txt'
 cmp -s "$downloaded_checksums" "$checksums_output" \
   || fail 'materialized checksums.txt differs from verified bytes'
-printf 'current release evidence: exact immutable A21 release verified\n'
+printf 'current release evidence: exactly fifteen A22 release assets verified\n'

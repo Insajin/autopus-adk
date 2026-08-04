@@ -31,6 +31,7 @@ func TestGitignorePatternsUseNarrowAutopusPolicy(t *testing.T) {
 
 	required := []string{
 		".autopus/*-manifest.json",
+		".autopus/omp-model-resolution-v1.json",
 		".autopus/plugins/",
 		".autopus/txns/",
 		".autopus/qa/runs/",
@@ -46,6 +47,28 @@ func TestGitignorePatternsUseNarrowAutopusPolicy(t *testing.T) {
 	for _, pattern := range required {
 		if !patterns[pattern] {
 			t.Fatalf("missing generated/runtime gitignore pattern %q", pattern)
+		}
+	}
+}
+
+func TestUpdateGitignoreAddsExactOMPModelReceiptRule(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := updateGitignore(dir); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := gitignoreLineSet(string(data))
+	if !lines[".autopus/omp-model-resolution-v1.json"] {
+		t.Fatal("missing exact OMP model resolution receipt ignore rule")
+	}
+	for _, broad := range []string{".autopus/", ".autopus/project/", ".autopus/specs/"} {
+		if lines[broad] {
+			t.Fatalf("receipt rule must not add broad human-doc ignore %q", broad)
 		}
 	}
 }

@@ -23,6 +23,7 @@ readonly A17_REPOSITORY='Insajin/autopus-adk' A18_TAG='v0.50.89' A18_VERSION='0.
 readonly A18_REPOSITORY='Insajin/autopus-adk' A19_TAG='v0.50.90' A19_VERSION='0.50.90'
 readonly A19_REPOSITORY='Insajin/autopus-adk' A20_TAG='v0.50.91' A20_VERSION='0.50.91'
 readonly A20_REPOSITORY='Insajin/autopus-adk' A21_TAG='v0.50.92' A21_VERSION='0.50.92'
+readonly A21_REPOSITORY='Insajin/autopus-adk' A22_TAG='v0.50.93' A22_VERSION='0.50.93'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 
 require_environment GITHUB_REF_NAME
@@ -101,6 +102,9 @@ elif [[ "$GITHUB_REF_NAME" == "$A20_TAG" && "$COMPANION_VERSION" == "$A20_VERSIO
 elif [[ "$GITHUB_REF_NAME" == "$A21_TAG" && "$COMPANION_VERSION" == "$A21_VERSION" ]]; then
   release_phase='A21' prior_phase='A20' prior_repository="$A20_REPOSITORY" prior_evidence_source='immutable A20 GitHub release' prior_tag="$A20_TAG" prior_version="$A20_VERSION" prior_commit="$A20_COMMIT_SHA" prior_release_id="$A20_RELEASE_ID" prior_tree="$A20_TREE_SHA"
   prior_tag_object="$A20_TAG_OBJECT_SHA" prior_checksums="$A20_CHECKSUMS_SHA256" prior_amd64_archive="$A20_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A20_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A20_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A20_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A20_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A20_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A22_TAG" && "$COMPANION_VERSION" == "$A22_VERSION" ]]; then
+  release_phase='A22' prior_phase='A21' prior_repository="$A21_REPOSITORY" prior_evidence_source='immutable A21 GitHub release' prior_tag="$A21_TAG" prior_version="$A21_VERSION" prior_commit="$A21_COMMIT_SHA" prior_release_id="$A21_RELEASE_ID" prior_tree="$A21_TREE_SHA"
+  prior_tag_object="$A21_TAG_OBJECT_SHA" prior_checksums="$A21_CHECKSUMS_SHA256" prior_amd64_archive="$A21_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A21_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A21_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A21_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A21_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A21_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22 policy'
 fi

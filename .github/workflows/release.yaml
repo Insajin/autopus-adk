@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.92'
+      - 'v0.50.93'
 permissions:
   contents: read
 jobs:
@@ -15,9 +15,119 @@ jobs:
   security:
     uses: ./.github/workflows/security.yml
 
+  omp-production-evidence:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      candidate-artifact-sha256: ${{ steps.candidate.outputs.candidate-artifact-sha256 }}
+      static-policy-sha256: ${{ steps.candidate.outputs.static-policy-sha256 }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+
+      - name: Validate exact A22 source
+        id: release-source
+        shell: bash
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" GITHUB_REF_NAME="$GITHUB_REF_NAME" \
+            GITHUB_REF_TYPE="$GITHUB_REF_TYPE" GITHUB_SHA="$GITHUB_SHA" \
+            GITHUB_OUTPUT="$GITHUB_OUTPUT" COMPANION_SOURCE_PIN_REQUIRED=0 \
+            scripts/companion-release/validate-source.sh
+
+      - name: Extract pinned orphan production evidence
+        shell: bash
+        env:
+          OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA }}
+          OMP_CONTEXT_EVIDENCE_COMMIT_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_COMMIT_SHA }}
+          OMP_CONTEXT_EVIDENCE_TREE_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_TREE_SHA }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA="$OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA" \
+            OMP_CONTEXT_EVIDENCE_COMMIT_SHA="$OMP_CONTEXT_EVIDENCE_COMMIT_SHA" \
+            OMP_CONTEXT_EVIDENCE_TREE_SHA="$OMP_CONTEXT_EVIDENCE_TREE_SHA" \
+            OMP_CONTEXT_EVIDENCE_REPORT_SHA256="$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256="$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            scripts/companion-release/verify-omp-context-evidence-tag.sh \
+            "$RUNNER_TEMP/omp-context-production-evidence"
+
+      - name: Build trusted A22 evidence verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          verifier="$RUNNER_TEMP/auto-omp-context-evidence-verifier"
+          [[ ! -e "$verifier" && ! -L "$verifier" ]]
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$verifier" \
+            ./scripts/companion-release/ompcontextverify
+          chmod 0700 "$verifier"
+
+      - name: Build canonical production candidate
+        id: candidate
+        shell: bash
+        env:
+          COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+        run: |
+          set -euo pipefail
+          candidate="$RUNNER_TEMP/auto-darwin-arm64-production-candidate"
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_SHA="$GITHUB_SHA" \
+            COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
+            OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
+            scripts/companion-release/build-omp-context-candidate.sh "$candidate"
+          candidate_sha=$(shasum -a 256 "$candidate" | awk '{print $1}')
+          [[ "$candidate_sha" =~ ^[0-9a-f]{64}$ ]]
+          printf 'candidate-artifact-sha256=%s\n' "$candidate_sha" >> "$GITHUB_OUTPUT"
+          static_policy_sha=$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" | shasum -a 256 | awk '{print $1}')
+          [[ "$static_policy_sha" =~ ^[0-9a-f]{64}$ ]]
+          printf 'static-policy-sha256=%s\n' "$static_policy_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Verify fresh signed production evidence
+        shell: bash
+        env:
+          COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
+          CANDIDATE_ARTIFACT_SHA256: ${{ steps.candidate.outputs.candidate-artifact-sha256 }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+        run: |
+          evidence="$RUNNER_TEMP/omp-context-production-evidence"
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            "$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
+            --mode active \
+            --report "$evidence/omp-context-promotion-report.v1.json" \
+            --attestation "$evidence/omp-context-promotion-attestation.v2.json" \
+            --report-sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            --attestation-sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            --candidate-repository 'Insajin/autopus-adk' \
+            --candidate-revision "$GITHUB_SHA" \
+            --candidate-tree "$COMPANION_SOURCE_TREE" \
+            --candidate-artifact-sha256 "$CANDIDATE_ARTIFACT_SHA256" \
+            --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64"
+
+      - name: Carry verified evidence into the protected release job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: omp-context-production-evidence-v0.50.93
+          path: |
+            ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-report.v1.json
+            ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-attestation.v2.json
+          if-no-files-found: error
+          retention-days: 1
+
   release:
-    needs: [ci, security]
-    if: github.ref == 'refs/tags/v0.50.92'
+    needs: [ci, security, omp-production-evidence]
+    if: github.ref == 'refs/tags/v0.50.93'
     environment:
       name: adk-companion-release
     permissions:
@@ -57,6 +167,48 @@ jobs:
           [[ "$(uname -m)" == 'arm64' ]]
           /usr/bin/arch -arm64 /usr/bin/true
           /usr/bin/arch -x86_64 /usr/bin/true
+          /usr/bin/sudo -n -u nobody /usr/bin/true
+
+      - name: Materialize exact arm64 OMP release canary
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          root="/private/tmp/autopus-adk-omp-canary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          [[ "$(/usr/bin/stat -f '%u:%Sp' /private/tmp)" == '0:drwxrwxrwt' ]]
+          [[ ! -e "$root" && ! -L "$root" ]]
+          /usr/bin/sudo -n /usr/bin/install -d -m 0755 -o root -g wheel "$root"
+          /usr/bin/sudo -n /usr/bin/install -d -m 0700 -o nobody -g nobody \
+            "$root/home" "$root/tmp"
+          destination="$root/omp-darwin-arm64"
+          staging="$RUNNER_TEMP/omp-v17.2.7-darwin-arm64.download"
+          [[ ! -e "$staging" && ! -L "$staging" ]]
+          /usr/bin/curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --fail --location --silent --show-error \
+            --output "$staging" \
+            'https://github.com/can1357/oh-my-pi/releases/download/v17.2.7/omp-darwin-arm64'
+          expected='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
+          actual=$(/usr/bin/shasum -a 256 "$staging" | /usr/bin/awk '{print $1}')
+          [[ "$actual" == "$expected" ]]
+          /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$staging" "$destination"
+          rm -f -- "$staging"
+          nobody_uid=$(/usr/bin/id -u nobody)
+          [[ "$(/usr/bin/stat -f '%u:%Lp' "$root")" == '0:755' ]]
+          [[ "$(/usr/bin/stat -f '%u:%Lp' "$root/home")" == "$nobody_uid:700" ]]
+          [[ "$(/usr/bin/stat -f '%u:%Lp' "$root/tmp")" == "$nobody_uid:700" ]]
+          [[ "$(/usr/bin/stat -f '%u:%Lp' "$destination")" == '0:555' ]]
+          /usr/bin/sudo -n -u nobody /usr/bin/test -x "$destination"
+          [[ "$(/usr/bin/sudo -n -u nobody /usr/bin/shasum -a 256 "$destination" | /usr/bin/awk '{print $1}')" == "$expected" ]]
+          receipt_staging="$RUNNER_TEMP/omp-canary-cleanup-identity"
+          [[ ! -e "$receipt_staging" && ! -L "$receipt_staging" ]]
+          /usr/bin/printf 'parent=%s\nroot=%s\nomp=%s\n' \
+            "$(/usr/bin/stat -f '%d:%i' /private/tmp)" \
+            "$(/usr/bin/stat -f '%d:%i' "$root")" \
+            "$(/usr/bin/stat -f '%d:%i' "$destination")" > "$receipt_staging"
+          /usr/bin/sudo -n /usr/bin/install -m 0444 -o root -g wheel \
+            "$receipt_staging" "$root/.cleanup-identity"
+          rm -f -- "$receipt_staging"
 
       - name: Verify tidy source without mutation
         shell: bash
@@ -82,10 +234,14 @@ jobs:
           verifier="$RUNNER_TEMP/auto-companion-receipt-verifier"
           manifest_verifier="$RUNNER_TEMP/auto-companion-manifest-verifier"
           exec_smoke_gate="$RUNNER_TEMP/auto-companion-exec-smoke-gate"
+          omp_evidence_verifier="$RUNNER_TEMP/auto-omp-context-evidence-verifier"
+          omp_lineage_verifier="$RUNNER_TEMP/auto-omp-context-lineage-verifier"
           [[ ! -e "$signer" && ! -L "$signer" &&
              ! -e "$verifier" && ! -L "$verifier" &&
              ! -e "$manifest_verifier" && ! -L "$manifest_verifier" &&
-             ! -e "$exec_smoke_gate" && ! -L "$exec_smoke_gate" ]]
+             ! -e "$exec_smoke_gate" && ! -L "$exec_smoke_gate" &&
+             ! -e "$omp_evidence_verifier" && ! -L "$omp_evidence_verifier" &&
+             ! -e "$omp_lineage_verifier" && ! -L "$omp_lineage_verifier" ]]
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             go build -trimpath -o "$signer" ./cmd/auto
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
@@ -97,7 +253,49 @@ jobs:
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             go build -trimpath -o "$exec_smoke_gate" \
             ./scripts/companion-release/execsmoke
-          chmod 0700 "$signer" "$verifier" "$manifest_verifier" "$exec_smoke_gate"
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$omp_evidence_verifier" \
+            ./scripts/companion-release/ompcontextverify
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$omp_lineage_verifier" \
+            ./scripts/companion-release/ompcontextlineageverify
+          chmod 0700 "$signer" "$verifier" "$manifest_verifier" \
+            "$exec_smoke_gate" "$omp_evidence_verifier" "$omp_lineage_verifier"
+
+      - name: Download same-run production evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: omp-context-production-evidence-v0.50.93
+          path: ${{ runner.temp }}/omp-context-production-evidence
+
+      - name: Reverify immutable historical production evidence
+        shell: bash
+        env:
+          COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
+          CANDIDATE_ARTIFACT_SHA256: ${{ needs.omp-production-evidence.outputs.candidate-artifact-sha256 }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+          OMP_CONTEXT_STATIC_POLICY_SHA256: ${{ needs.omp-production-evidence.outputs.static-policy-sha256 }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/omp-context-production-evidence"
+          chmod 0600 "$evidence/omp-context-promotion-report.v1.json" \
+            "$evidence/omp-context-promotion-attestation.v2.json"
+          [[ "$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" | shasum -a 256 | awk '{print $1}')" == \
+             "$OMP_CONTEXT_STATIC_POLICY_SHA256" ]]
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            "$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
+            --mode historical \
+            --report "$evidence/omp-context-promotion-report.v1.json" \
+            --attestation "$evidence/omp-context-promotion-attestation.v2.json" \
+            --report-sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            --attestation-sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            --candidate-repository 'Insajin/autopus-adk' \
+            --candidate-revision "$GITHUB_SHA" \
+            --candidate-tree "$COMPANION_SOURCE_TREE" \
+            --candidate-artifact-sha256 "$CANDIDATE_ARTIFACT_SHA256" \
+            --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64"
 
       - name: Prepare release credentials
         id: release-credentials
@@ -185,6 +383,52 @@ jobs:
             "$RUNNER_TEMP/adk-release-credentials/release-ecdsa-private-key" \
             scripts/release-signing/release-k1-public.pem \
             scripts/release-signing/release-k1.fingerprint
+
+      - name: Verify release nobody privilege boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner_uid=$(/usr/bin/id -u)
+          nobody_uid=$(/usr/bin/id -u nobody)
+          [[ "$runner_uid" =~ ^[0-9]+$ && "$nobody_uid" =~ ^[0-9]+$ ]]
+          [[ "$runner_uid" != "$nobody_uid" ]]
+          isolated_uid=$(/usr/bin/sudo -n -u nobody /usr/bin/env -i \
+            PATH=/usr/bin:/bin /usr/bin/id -u)
+          [[ "$isolated_uid" == "$nobody_uid" ]]
+          credential_dir="$RUNNER_TEMP/adk-release-credentials"
+          sentinel="$credential_dir/nobody-boundary-sentinel"
+          keychain="$RUNNER_TEMP/adk-release.keychain-db"
+          helper="$RUNNER_TEMP/auto-companion-exec-smoke-gate"
+          [[ -d "$credential_dir" && ! -L "$credential_dir" ]]
+          [[ "$(/usr/bin/stat -f '%u:%Lp' "$credential_dir")" == "$runner_uid:700" ]]
+          [[ ! -e "$sentinel" && ! -L "$sentinel" ]]
+          /usr/bin/printf 'release privilege boundary probe\n' > "$sentinel"
+          /bin/chmod 0600 "$sentinel"
+          api_key_paths=("$credential_dir"/AuthKey_*.p8)
+          [[ "${#api_key_paths[@]}" -eq 1 && -f "${api_key_paths[0]}" && ! -L "${api_key_paths[0]}" ]]
+          protected_paths=("$sentinel" "${api_key_paths[0]}" \
+            "$credential_dir/companion-ed25519-private-key" \
+            "$credential_dir/release-ecdsa-private-key" \
+            "$credential_dir/keychain-password" "$keychain" "$helper")
+          protected_modes=(600 600 600 600 600 600 700)
+          for index in "${!protected_paths[@]}"; do
+            protected_path="${protected_paths[$index]}"
+            expected_mode="${protected_modes[$index]}"
+            [[ -f "$protected_path" && ! -L "$protected_path" ]]
+            [[ "$(/usr/bin/stat -f '%u:%Lp' "$protected_path")" == "$runner_uid:$expected_mode" ]]
+            for permission in -r -w -x; do
+              if /usr/bin/sudo -n -u nobody /usr/bin/env -i PATH=/usr/bin:/bin \
+                /usr/bin/test "$permission" "$protected_path"; then
+                echo "::error::nobody unexpectedly has $permission access to protected release state"
+                exit 1
+              fi
+            done
+          done
+          if /usr/bin/sudo -n -u nobody /usr/bin/env -i PATH=/usr/bin:/bin \
+            /usr/bin/sudo -n -u root /usr/bin/true >/dev/null 2>&1; then
+            echo '::error::nobody unexpectedly regained root through sudo'
+            exit 1
+          fi
 
       - name: Validate companion release inputs
         shell: bash
@@ -287,6 +531,14 @@ jobs:
           COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT }}
           COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT }}
           COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS: "31536000"
+          OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256: ${{ needs.omp-production-evidence.outputs.candidate-artifact-sha256 }}
+          OMP_CONTEXT_PROMOTION_REPORT_PATH: ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-report.v1.json
+          OMP_CONTEXT_PROMOTION_ATTESTATION_PATH: ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-attestation.v2.json
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+          OMP_CONTEXT_RELEASE_CANARY_ROOT: /private/tmp/autopus-adk-omp-canary-${{ github.run_id }}-${{ github.run_attempt }}
+          OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE: /private/tmp/autopus-adk-omp-canary-${{ github.run_id }}-${{ github.run_attempt }}/omp-darwin-arm64
+          OMP_CONTEXT_RELEASE_LINEAGE_PATH: dist/auto_darwin_arm64_v8.0/release-lineage-v1.json
+          OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH: dist/auto_darwin_arm64_v8.0/release-lineage-v1.sig
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_TOKEN="$GITHUB_TOKEN" \
@@ -311,10 +563,51 @@ jobs:
             COMPANION_EXEC_SMOKE_GATE="$COMPANION_EXEC_SMOKE_GATE" \
             COMPANION_RELEASE_TIME_VALIDATION_REQUIRED="$COMPANION_RELEASE_TIME_VALIDATION_REQUIRED" \
             COMPANION_SOURCE_COMMIT="${{ steps.release-source.outputs.source-commit }}" \
+            COMPANION_SOURCE_TREE="${{ steps.release-source.outputs.source-tree }}" \
+            OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="$OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256" \
+            OMP_CONTEXT_PROMOTION_REPORT_PATH="$OMP_CONTEXT_PROMOTION_REPORT_PATH" \
+            OMP_CONTEXT_PROMOTION_ATTESTATION_PATH="$OMP_CONTEXT_PROMOTION_ATTESTATION_PATH" \
+            OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
+            OMP_CONTEXT_RELEASE_CANARY_ROOT="$OMP_CONTEXT_RELEASE_CANARY_ROOT" \
+            OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE" \
+            OMP_CONTEXT_RELEASE_LINEAGE_PATH="$OMP_CONTEXT_RELEASE_LINEAGE_PATH" \
+            OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH="$OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH" \
             COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT="$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT" \
             COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT="$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
             COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS="$COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS" \
             goreleaser release --clean
+
+      - name: Remove isolated OMP release canary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="/private/tmp/autopus-adk-omp-canary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          destination="$root/omp-darwin-arm64"
+          receipt="$root/.cleanup-identity"
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
+          if [[ -e "$root" || -L "$root" ]]; then
+            [[ -d "$root" && ! -L "$root" ]]
+            [[ "$(/usr/bin/stat -f '%u:%Lp' "$root")" == '0:755' ]]
+            parent_identity=$(/usr/bin/stat -f '%d:%i' /private/tmp)
+            root_identity=$(/usr/bin/stat -f '%d:%i' "$root")
+            if [[ -e "$destination" || -L "$destination" ]]; then
+              [[ -f "$destination" && ! -L "$destination" ]]
+              [[ "$(/usr/bin/stat -f '%u:%Lp' "$destination")" == '0:555' ]]
+            fi
+            if [[ -e "$receipt" || -L "$receipt" ]]; then
+              [[ -f "$receipt" && ! -L "$receipt" ]]
+              [[ "$(/usr/bin/stat -f '%u:%Lp' "$receipt")" == '0:444' ]]
+              [[ "$(/usr/bin/sed -n '1p' "$receipt")" == "parent=$parent_identity" ]]
+              [[ "$(/usr/bin/sed -n '2p' "$receipt")" == "root=$root_identity" ]]
+              [[ "$(/usr/bin/sed -n '3p' "$receipt")" == \
+                 "omp=$(/usr/bin/stat -f '%d:%i' "$destination")" ]]
+              [[ "$(/usr/bin/wc -l < "$receipt" | /usr/bin/tr -d ' ')" == '3' ]]
+            fi
+            /usr/bin/sudo -n /bin/rm -rf -- "$root"
+            [[ "$(/usr/bin/stat -f '%d:%i' /private/tmp)" == "$parent_identity" ]]
+          fi
+          [[ ! -e "$root" && ! -L "$root" ]]
 
       - name: Remove release signing credentials
         shell: bash
@@ -345,12 +638,33 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
+          COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+          OMP_CONTEXT_STATIC_POLICY_SHA256: ${{ needs.omp-production-evidence.outputs.static-policy-sha256 }}
+          COMPANION_KEY_ID: ${{ vars.ADK_COMPANION_KEY_ID }}
+          COMPANION_HANDOFF: ${{ vars.ADK_COMPANION_HANDOFF }}
+          COMPANION_ROLLBACK_FLOOR: ${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}
+          COMPANION_PUBLIC_KEY_SHA256: ${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.92-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.93-checksums.txt"
+          [[ "$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" | shasum -a 256 | awk '{print $1}')" == \
+             "$OMP_CONTEXT_STATIC_POLICY_SHA256" ]]
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_TOKEN="$GITHUB_TOKEN" \
             COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
+            COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
+            OMP_CONTEXT_EVIDENCE_REPORT_SHA256="$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256="$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
+            OMP_CONTEXT_EVIDENCE_VERIFIER="$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
+            OMP_CONTEXT_LINEAGE_VERIFIER="$RUNNER_TEMP/auto-omp-context-lineage-verifier" \
+            COMPANION_MANIFEST_VERIFIER="$RUNNER_TEMP/auto-companion-manifest-verifier" \
+            COMPANION_KEY_ID="$COMPANION_KEY_ID" COMPANION_HANDOFF="$COMPANION_HANDOFF" \
+            COMPANION_ROLLBACK_FLOOR="$COMPANION_ROLLBACK_FLOOR" \
+            COMPANION_PUBLIC_KEY_SHA256="$COMPANION_PUBLIC_KEY_SHA256" \
             scripts/companion-release/verify-current-release.sh "$checksums_path"
           printf 'checksums-path=%s\n' "$checksums_path" >> "$GITHUB_OUTPUT"
 
@@ -371,8 +685,8 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.92' \
-            COMPANION_VERSION='0.50.92' \
+            GITHUB_REF_NAME='v0.50.93' \
+            COMPANION_VERSION='0.50.93' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
@@ -386,9 +700,9 @@ jobs:
           set -u
           cleanup_status=0
           keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
-          if [[ -e "$RUNNER_TEMP/autopus-v0.50.92-checksums.txt" ||
-                -L "$RUNNER_TEMP/autopus-v0.50.92-checksums.txt" ]]; then
-            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.92-checksums.txt"; then
+          if [[ -e "$RUNNER_TEMP/autopus-v0.50.93-checksums.txt" ||
+                -L "$RUNNER_TEMP/autopus-v0.50.93-checksums.txt" ]]; then
+            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.93-checksums.txt"; then
               :
             else
               cleanup_status=$?

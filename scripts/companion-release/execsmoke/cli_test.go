@@ -54,13 +54,44 @@ func TestValidateMachOArchitecture_InvalidOrUnsupportedArtifact_Fails(t *testing
 	}
 }
 
+func TestValidatePinnedOMPExecutable_WrongDigestFails(t *testing.T) {
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+		t.Skip("pinned arm64 OMP digest validation is Darwin arm64 only")
+	}
+	executable := linkTestArtifact(t, "omp")
+	_, err := validatePinnedOMPExecutable(executable, ompCanaryPolicy{
+		version: pinnedOMPVersion,
+		sha256:  "sha256:" + strings.Repeat("0", 64),
+	})
+	if err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
+		t.Fatalf("validatePinnedOMPExecutable() error = %v, want SHA-256 mismatch", err)
+	}
+}
+
 func TestRunCLI_ValidMachOAndExactVersion_Succeeds(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("execution smoke CLI is Darwin-only")
 	}
 	artifact := linkTestArtifact(t, "auto")
+	isolation, ompExecutable := testCanaryUIDIsolation(t)
+	info, err := os.Lstat(ompExecutable)
+	if err != nil {
+		t.Fatalf("os.Lstat() error = %v", err)
+	}
+	digest, err := stableExecutableSHA256(ompExecutable, info)
+	if err != nil {
+		t.Fatalf("stableExecutableSHA256() error = %v", err)
+	}
 
-	err := runCLI(validCLIArgs(artifact, runtime.GOARCH), io.Discard)
+	args := validCLIArgs(artifact, runtime.GOARCH)
+	if runtime.GOARCH == "arm64" {
+		t.Setenv("OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE", ompExecutable)
+		t.Setenv("OMP_CONTEXT_RELEASE_CANARY_ROOT", isolation.root)
+	}
+	err = runCLIWithPolicy(
+		args, io.Discard,
+		ompCanaryPolicy{version: pinnedOMPVersion, sha256: digest, isolation: isolation.policy},
+	)
 
 	if err != nil {
 		t.Fatalf("runCLI() error = %v", err)
@@ -95,6 +126,7 @@ func TestRunCLI_InvalidInputs_FailClosed(t *testing.T) {
 		{name: "wrong artifact name", args: validCLIArgs(wrongName, runtime.GOARCH)},
 		{name: "symlink artifact", args: validCLIArgs(symlink, runtime.GOARCH)},
 		{name: "unsupported architecture", args: validCLIArgs(validArtifact, "mips64")},
+		{name: "missing arm64 OMP", args: validCLIArgs(validArtifact, "arm64")},
 	}
 
 	for _, test := range tests {

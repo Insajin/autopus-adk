@@ -33,11 +33,11 @@ func TestCompanionReleaseProducer_DarwinTargets_UseExactAssociatedFiles(t *testi
 			argsFile := filepath.Join(dir, "signer-args")
 			stdinDigestFile := filepath.Join(dir, "stdin-digest")
 			signer := writeSignerWrapper(t, dir)
-
 			command := exec.Command("bash", releaseProducerPath(t))
 			command.Env = append(companionProducerEnv(
 				artifact, architecture, keyFile, signer, argsFile, stdinDigestFile,
 			), darwinReleaseToolEnv(t, dir)...)
+			command.Env = append(command.Env, releaseCanaryGateEnv(t, dir, architecture)...)
 			output, err := command.CombinedOutput()
 			if err != nil {
 				t.Fatalf("producer failed: %v\n%s", err, output)
@@ -47,10 +47,10 @@ func TestCompanionReleaseProducer_DarwinTargets_UseExactAssociatedFiles(t *testi
 			}
 			assertProducerOutputs(t, artifactDir, architecture)
 			assertSignerTransport(t, argsFile, stdinDigestFile, artifact, secret)
+			assertReleaseCanaryExecuted(t, dir, architecture == "arm64")
 		})
 	}
 }
-
 func TestCompanionReleaseProducer_MissingKeyID_FailsWithoutSecretDisclosure(t *testing.T) {
 	dir := t.TempDir()
 	artifact := filepath.Join(dir, "auto")
@@ -78,7 +78,6 @@ func TestCompanionReleaseProducer_MissingKeyID_FailsWithoutSecretDisclosure(t *t
 		t.Fatalf("manifest exists after rejected input: %v", statErr)
 	}
 }
-
 func TestCompanionSignerHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_COMPANION_SIGNER_HELPER") != "1" {
 		return
@@ -132,9 +131,8 @@ func TestCompanionSignerHelperProcess(t *testing.T) {
 		}
 	}
 }
-
 func companionProducerEnv(artifact, architecture, keyFile, signer, argsFile, digestFile string) []string {
-	return append(os.Environ(),
+	environment := append(os.Environ(),
 		"GO_WANT_COMPANION_SIGNER_HELPER=1",
 		"FAKE_ARGS_OUT="+argsFile,
 		"FAKE_STDIN_DIGEST="+digestFile,
@@ -152,8 +150,14 @@ func companionProducerEnv(artifact, architecture, keyFile, signer, argsFile, dig
 		"COMPANION_SIGNING_KEY_FILE="+keyFile,
 		"COMPANION_SIGNER="+signer,
 	)
+	if architecture == "arm64" {
+		root := filepath.Join(filepath.Dir(keyFile), "omp-release-canary-root")
+		environment = append(environment,
+			"OMP_CONTEXT_RELEASE_CANARY_ROOT="+root,
+			"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="+filepath.Join(root, "omp-darwin-arm64"))
+	}
+	return environment
 }
-
 func writeSignerWrapper(t *testing.T, dir string) string {
 	t.Helper()
 	executable, err := os.Executable()
@@ -165,9 +169,9 @@ func writeSignerWrapper(t *testing.T, dir string) string {
 	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	writeReleaseCanaryFixture(t, dir)
 	return path
 }
-
 func releaseProducerPath(t *testing.T) string {
 	t.Helper()
 	path, err := filepath.Abs(filepath.Join("..", "..", "scripts", "companion-release", "produce.sh"))
@@ -176,7 +180,6 @@ func releaseProducerPath(t *testing.T) string {
 	}
 	return path
 }
-
 func assertProducerOutputs(t *testing.T, dir, architecture string) {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -202,7 +205,6 @@ func assertProducerOutputs(t *testing.T, dir, architecture string) {
 		t.Fatalf("%s signature length = %d, error = %v", architecture, len(signature), err)
 	}
 }
-
 func assertSignerTransport(t *testing.T, argsFile, digestFile, artifact, secret string) {
 	t.Helper()
 	args, err := os.ReadFile(argsFile)
@@ -225,7 +227,6 @@ func assertSignerTransport(t *testing.T, argsFile, digestFile, artifact, secret 
 		t.Fatal("signer did not receive key bytes through stdin")
 	}
 }
-
 func helperArguments(args []string) []string {
 	for index, arg := range args {
 		if arg == "--" {
@@ -234,7 +235,6 @@ func helperArguments(args []string) []string {
 	}
 	return nil
 }
-
 func flagValue(t *testing.T, args []string, name string) string {
 	t.Helper()
 	for index := 0; index < len(args)-1; index++ {
@@ -245,7 +245,6 @@ func flagValue(t *testing.T, args []string, name string) string {
 	t.Fatalf("missing helper flag %s in %v", name, args)
 	return ""
 }
-
 func removeEnvironment(environment []string, name string) []string {
 	prefix := name + "="
 	filtered := make([]string, 0, len(environment))

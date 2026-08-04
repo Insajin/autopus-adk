@@ -217,7 +217,7 @@ func TestOMPUpdate_ReplacesStaleManagedSection(t *testing.T) {
 
 	dir := t.TempDir()
 	stale := "disabledProviders:\n  - anthropic\n\n" + markerBeginYml +
-		"\nskills:\n  customDirectories:\n    - .agents/OLD-PATH\nlegacyKey: from-an-older-adapter\n" +
+		"\nskills:\n  customDirectories:\n    - .agents/OLD-PATH\n  legacyKey: from-an-older-adapter\n" +
 		markerEndYml + "\n"
 	cfgPath := writeOMPConfig(t, dir, stale)
 

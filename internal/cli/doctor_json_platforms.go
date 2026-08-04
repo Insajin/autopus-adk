@@ -35,6 +35,10 @@ func (r *doctorJSONReport) collectPlatformChecks(ctx context.Context, dir string
 			r.data.Platforms = append(r.data.Platforms, payload)
 			continue
 		}
+		if platformName == "omp" {
+			r.collectOMPReadinessChecks(ctx, dir, validationErrs, payload)
+			continue
+		}
 
 		if len(validationErrs) == 0 {
 			r.checks = append(r.checks, jsonCheck{
