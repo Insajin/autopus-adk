@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -62,6 +63,9 @@ func TestOMPRPCProcessGroup_TerminationKillsDescendant(t *testing.T) {
 }
 
 func TestOMPRPCProcessGroup_RunTimeoutKillsDescendant(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("managed OMP RPC network isolation is only implemented on Darwin")
+	}
 	root := t.TempDir()
 	scratch := filepath.Join(root, "scratch")
 	profile := filepath.Join(root, "profile")
