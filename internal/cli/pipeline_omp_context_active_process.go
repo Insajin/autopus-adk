@@ -21,7 +21,7 @@ const (
 	pipelineOMPActiveEndpointKey    = "AUTOPUS_OMP_CONTEXT_PROVIDER_ENDPOINT"
 	pipelineOMPActiveCredentialKey  = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
 	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v2"
-	pipelineOMPActivePolicyIdentity = "manual-compact;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-darwin-v1;tools=read,bash,edit,write,grep,glob,todo"
+	pipelineOMPActivePolicyIdentity = "manual-compact;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v2;tools=read,bash,edit,write,grep,glob,todo"
 )
 
 type pipelineOMPActiveProcessConfig struct {
@@ -64,7 +64,7 @@ func preparePipelineOMPActiveProcessConfig(
 	}, nil
 }
 
-// @AX:WARN [AUTO]: managed active process startup contains 17 if branches.
+// @AX:WARN [AUTO]: managed active process startup contains 18 if branches.
 // @AX:REASON [AUTO]: runtime ownership, executable identity, overlay, sandbox, process group, pipes, and readiness gates converge before admission.
 func startPipelineOMPActiveProcess(
 	ctx context.Context,
@@ -142,7 +142,10 @@ func startPipelineOMPActiveProcess(
 		cleanup()
 		return nil, err
 	}
-	verifiedCommand.directDarwinImage = active.sandboxMode == pipelineOMPActiveSandboxInheritedParent
+	if err := configurePipelineOMPVerifiedExecSandboxMode(verifiedCommand, active.sandboxMode, true); err != nil {
+		cleanup()
+		return nil, err
+	}
 	if err := configureWorkflowContextManagedRPCProcessGroup(cmd); err != nil {
 		cleanup()
 		return nil, err

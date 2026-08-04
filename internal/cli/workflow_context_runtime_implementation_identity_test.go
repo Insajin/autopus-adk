@@ -18,7 +18,7 @@ func TestWorkflowContextImplementationIdentityCommand(t *testing.T) {
 	var identity workflowContextImplementationIdentityV1
 	require.NoError(t, json.Unmarshal(output.Bytes(), &identity))
 	require.Equal(t, workflowContextImplementationIdentitySchemaV1, identity.SchemaVersion)
-	require.Equal(t, "sha256:280d2623208d375520db86e4e4ac45d8a22f2395376f996a92fe059cc1767d2f",
+	require.Equal(t, "sha256:b338d5c6ee2a681e7c67555f1dee4743837c30ed347af5867412966de50e0b9e",
 		identity.PipelineImplementationDigest)
 	require.Equal(t, "autopus.omp-pipeline-managed-rpc.v2", identity.RPCIdentity)
 	require.Equal(t, pipelineOMPActivePolicyIdentity, identity.PolicyIdentity)

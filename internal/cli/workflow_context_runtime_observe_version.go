@@ -40,13 +40,18 @@ func newWorkflowContextObserveInheritedVersionCommand(
 	if err != nil {
 		return nil, identity, err
 	}
-	command.cmd.Dir, command.cmd.Env = options.Workspace, options.Environment
+	// The absolute verified --version command requires no ambient authority.
+	command.cmd.Dir, command.cmd.Env = options.Workspace, []string{}
 	if err := configurePipelineOMPActiveSandbox(
 		command.cmd, options.AllowedEndpoint, pipelineOMPActiveSandboxInheritedParent,
 	); err != nil {
 		return nil, identity, errors.Join(err, command.Close())
 	}
-	command.directDarwinImage = true
+	if err := configurePipelineOMPVerifiedExecSandboxMode(
+		command, pipelineOMPActiveSandboxInheritedParent, false,
+	); err != nil {
+		return nil, identity, errors.Join(err, command.Close())
+	}
 	if err := configureWorkflowContextManagedRPCProcessGroup(command.cmd); err != nil {
 		return nil, identity, errors.Join(err, command.Close())
 	}
