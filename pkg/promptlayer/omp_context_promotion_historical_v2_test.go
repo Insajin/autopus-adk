@@ -9,6 +9,21 @@ import (
 
 func TestVerifyOMPContextPromotionHistoricalArtifactV2_AcceptsExpiredImmutableProofWithoutActiveGrant(t *testing.T) {
 	fixture := newOMPContextPromotionV2Fixture(t)
+	for index := range fixture.report.Observations {
+		observation := &fixture.report.Observations[index]
+		started, err := time.Parse(time.RFC3339Nano, observation.StartedAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		completed, err := time.Parse(time.RFC3339Nano, observation.CompletedAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		observation.StartedAt = started.Add(-365 * 24 * time.Hour).Format(time.RFC3339Nano)
+		observation.CompletedAt = completed.Add(-365 * 24 * time.Hour).Format(time.RFC3339Nano)
+	}
+	fixture.report.EvidenceID, _ = computeOMPContextPromotionEvidenceIDV1(fixture.report)
+	fixture.resign(t)
 	fixture.attestation.IssuedAt = "2025-08-04T02:59:00Z"
 	fixture.attestation.NotBefore = "2025-08-04T02:59:00Z"
 	fixture.attestation.ExpiresAt = "2025-08-04T03:59:00Z"

@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -99,6 +100,48 @@ func TestVerifyOMPContextPromotionArtifactV2_AcceptsProducerMaximumValidityWindo
 		nil,
 	); err != nil {
 		t.Fatalf("producer maximum validity window rejected: %v", err)
+	}
+}
+
+func TestVerifyOMPContextPromotionArtifactV2_RejectsFutureAndStaleCohorts(t *testing.T) {
+	tests := []struct {
+		name  string
+		shift time.Duration
+	}{
+		{name: "future observations", shift: 3 * time.Hour},
+		{name: "stale observations", shift: -time.Hour},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newOMPContextPromotionV2Fixture(t)
+			for index := range fixture.report.Observations {
+				observation := &fixture.report.Observations[index]
+				started, err := time.Parse(time.RFC3339Nano, observation.StartedAt)
+				if err != nil {
+					t.Fatal(err)
+				}
+				completed, err := time.Parse(time.RFC3339Nano, observation.CompletedAt)
+				if err != nil {
+					t.Fatal(err)
+				}
+				observation.StartedAt = started.Add(test.shift).Format(time.RFC3339Nano)
+				observation.CompletedAt = completed.Add(test.shift).Format(time.RFC3339Nano)
+			}
+			fixture.report.EvidenceID, _ = computeOMPContextPromotionEvidenceIDV1(fixture.report)
+			fixture.resign(t)
+
+			_, err := verifyOMPContextPromotionArtifactV2WithTrust(
+				fixture.reportBytes,
+				fixture.attestationBytes,
+				fixture.now,
+				fixture.expectation,
+				map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey},
+				nil,
+			)
+			if !errors.Is(err, ErrOMPContextPromotionStale) {
+				t.Fatalf("cohort time violation returned %v, want stale", err)
+			}
+		})
 	}
 }
 

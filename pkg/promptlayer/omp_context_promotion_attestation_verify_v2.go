@@ -14,6 +14,7 @@ const (
 	ompContextPromotionAttestationMaxBytesV2 = 16 * 1024
 	ompContextPromotionFutureSkewV2          = 5 * time.Minute
 	ompContextPromotionMaxTTLV2              = 24 * time.Hour
+	ompContextPromotionMaxCohortAgeV2        = 2 * time.Hour
 )
 
 var (
@@ -53,7 +54,7 @@ func verifyOMPContextPromotionArtifactV2WithTrust(reportBytes, attestationBytes 
 	if err != nil {
 		return VerifiedOMPContextPromotion{}, err
 	}
-	expiresAt, err := verifyOMPContextPromotionSignatureV2(reportBytes, attestation, now.UTC(), trusted, revoked)
+	issuedAt, expiresAt, err := verifyOMPContextPromotionSignatureV2(reportBytes, attestation, now.UTC(), trusted, revoked)
 	if err != nil {
 		return VerifiedOMPContextPromotion{}, err
 	}
@@ -63,6 +64,9 @@ func verifyOMPContextPromotionArtifactV2WithTrust(reportBytes, attestationBytes 
 	}
 	if report.TrustLane != attestation.TrustLane || !matchesOMPContextPromotionExpectationV2(report, expected) {
 		return VerifiedOMPContextPromotion{}, ErrOMPContextPromotionMismatch
+	}
+	if err := validateOMPContextPromotionCohortAttestationTimeV2(report, issuedAt); err != nil {
+		return VerifiedOMPContextPromotion{}, err
 	}
 	return VerifiedOMPContextPromotion{
 		reportDigest: attestation.ReportSHA256, evidenceID: report.EvidenceID, expiresAt: expiresAt,
@@ -95,6 +99,9 @@ func verifyOMPContextPromotionHistoricalArtifactV2WithTrust(reportBytes, attesta
 	if report.TrustLane != attestation.TrustLane || !matchesOMPContextPromotionExpectationV2(report, expected) {
 		return VerifiedOMPContextPromotionHistoricalProof{}, ErrOMPContextPromotionMismatch
 	}
+	if err := validateOMPContextPromotionCohortAttestationTimeV2(report, issuedAt); err != nil {
+		return VerifiedOMPContextPromotionHistoricalProof{}, err
+	}
 	return VerifiedOMPContextPromotionHistoricalProof{
 		reportDigest: attestation.ReportSHA256, evidenceID: report.EvidenceID, issuedAt: issuedAt, expiresAt: expiresAt,
 		producer: report.Producer, candidate: report.Candidate,
@@ -121,16 +128,34 @@ func decodeOMPContextPromotionAttestationV2(body []byte) (OMPContextPromotionAtt
 }
 
 func verifyOMPContextPromotionSignatureV2(reportBytes []byte, attestation OMPContextPromotionAttestationV2,
-	now time.Time, trusted map[string]ed25519.PublicKey, revoked map[string]bool) (time.Time, error) {
+	now time.Time, trusted map[string]ed25519.PublicKey, revoked map[string]bool) (time.Time, time.Time, error) {
 	issuedAt, notBefore, expiresAt, err := verifyOMPContextPromotionSignatureAndTimesV2(reportBytes, attestation, trusted, revoked)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, time.Time{}, err
 	}
 	if now.Before(notBefore) || issuedAt.After(now.Add(ompContextPromotionFutureSkewV2)) ||
 		!now.Before(expiresAt) {
-		return time.Time{}, ErrOMPContextPromotionStale
+		return time.Time{}, time.Time{}, ErrOMPContextPromotionStale
 	}
-	return expiresAt, nil
+	return issuedAt, expiresAt, nil
+}
+
+func validateOMPContextPromotionCohortAttestationTimeV2(
+	report OMPContextPromotionReportV1,
+	issuedAt time.Time,
+) error {
+	if issuedAt.IsZero() || len(report.Observations) != 40 {
+		return ErrOMPContextPromotionStale
+	}
+	firstStarted, firstErr := parseCanonicalOMPContextPromotionTimeV2(report.Observations[0].StartedAt)
+	lastCompleted, lastErr := parseCanonicalOMPContextPromotionTimeV2(
+		report.Observations[len(report.Observations)-1].CompletedAt,
+	)
+	if firstErr != nil || lastErr != nil || firstStarted.After(issuedAt) || lastCompleted.After(issuedAt) ||
+		issuedAt.Sub(firstStarted) > ompContextPromotionMaxCohortAgeV2 {
+		return ErrOMPContextPromotionStale
+	}
+	return nil
 }
 
 func verifyOMPContextPromotionSignatureAndTimesV2(reportBytes []byte, attestation OMPContextPromotionAttestationV2,
