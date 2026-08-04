@@ -134,7 +134,7 @@ func probePipelineOMPActiveVersion(
 	ctx context.Context,
 	config pipelineOMPBackendConfig,
 	hooks pipelineOMPActiveCurrentRuntimeHooks,
-) (string, error) {
+) (version string, resultErr error) {
 	probeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	verifiedCommand, err := newPipelineOMPVerifiedExecCommandContext(
@@ -143,7 +143,7 @@ func probePipelineOMPActiveVersion(
 	if err != nil {
 		return "", err
 	}
-	defer verifiedCommand.Close()
+	defer func() { resultErr = errors.Join(resultErr, verifiedCommand.Close()) }()
 	if hooks.afterVerifiedVersionFD != nil {
 		hooks.afterVerifiedVersionFD()
 	}

@@ -68,6 +68,7 @@ func TestPipelineOMPActivePinnedRuntime_ReplacementHookKeepsProbeAndSessionOnVer
 	if runtime.GOOS == "windows" {
 		t.Skip("fixture executable replacement uses a POSIX script")
 	}
+	requireDarwinManagedOMPSandboxForTest(t)
 	config, _ := pipelineOMPBackendTestConfig(t)
 	marker := filepath.Join(t.TempDir(), "unverified-executable-ran")
 	replacement := "#!/bin/sh\nprintf unsafe > " + shellQuotePipelineOMP(marker) + "\nprintf 'omp/17.2.7\\n'\n"
@@ -220,7 +221,7 @@ func TestPipelineOMPVerifiedExecCommand_DarwinGateCancelKillsAndReapsBeforeTarge
 	require.NoError(t, err)
 	require.NoError(t, configurePipelineOMPActiveVersionProbeSandbox(command.cmd, executable))
 	require.NoError(t, configureWorkflowContextManagedRPCProcessGroup(command.cmd))
-	command.afterFirstDarwinStop = cancel
+	require.True(t, configurePipelineOMPVerifiedExecDarwinStopForTest(command, cancel))
 
 	err = command.Start()
 	require.ErrorContains(t, err, "identity gate canceled")

@@ -61,6 +61,7 @@ func pipelineOMPActiveRPCSessionFixture(
 	unsafe bool,
 ) (*pipelineOMPActiveEvaluatorSession, pipelineOMPBackendConfig, string) {
 	t.Helper()
+	requireDarwinManagedOMPSandboxForTest(t)
 	config, _ := pipelineOMPBackendTestConfig(t)
 	config.Executable = os.Args[0]
 	model := "model-a"

@@ -60,14 +60,6 @@ type pipelineOMPVerifiedDarwinRegionPath struct {
 	}
 }
 
-func newPipelineOMPVerifiedExecCommand(
-	path string,
-	expected pipelineOMPExecutableIdentity,
-	args ...string,
-) (*pipelineOMPVerifiedExecCommand, error) {
-	return newPipelineOMPVerifiedDarwinCommand(context.Background(), false, path, expected, args...)
-}
-
 func newPipelineOMPVerifiedExecCommandWithGate(
 	ctx context.Context,
 	path string,
@@ -260,6 +252,7 @@ func pipelineOMPDarwinLiveExecutableRegion(pid int) (
 	var address uint64
 	for range pipelineOMPVerifiedDarwinMaxRegions {
 		var info pipelineOMPVerifiedDarwinRegionPath
+		//nolint:staticcheck // x/sys/unix has no libproc wrapper; live-image identity requires proc_pidinfo.
 		written, _, errno := unix.Syscall6(
 			unix.SYS_PROC_INFO, pipelineOMPVerifiedDarwinProcInfoCallPIDInfo, uintptr(pid),
 			pipelineOMPVerifiedDarwinRegionPathInfo, uintptr(address), uintptr(unsafe.Pointer(&info)), unsafe.Sizeof(info),

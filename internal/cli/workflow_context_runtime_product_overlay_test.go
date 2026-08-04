@@ -102,6 +102,7 @@ func TestWorkflowContextProductOverlay_FailsClosedOnUnsafeInputsAndStateDrift(t 
 		controller, path, err := newWorkflowContextProductOverlay(t.TempDir(), config.OMPContextMemoryShadow)
 		require.NoError(t, err)
 		overlay := controller.(*workflowContextProductOverlay)
+		//nolint:staticcheck // The nil context intentionally verifies the fail-closed API contract.
 		_, err = overlay.Apply(nil, WorkflowContextOverlayRequest{
 			HistoryMode: config.OMPContextHistoryActive, MemoryMode: config.OMPContextMemoryShadow,
 		})

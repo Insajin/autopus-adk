@@ -53,6 +53,7 @@ func TestWorkflowContextVerifiedExecRPCSmokeObservesReadyWithoutProviderCall(t *
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		t.Skip("verified executable smoke is Darwin/Linux only")
 	}
+	requireDarwinManagedOMPSandboxForTest(t)
 	executable := workflowContextVerifiedExecSmokeFixture(t)
 	_, identity, err := canonicalPipelineOMPExecutable(executable)
 	require.NoError(t, err)

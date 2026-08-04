@@ -25,13 +25,6 @@ type workflowContextObserveCallEntrypoint func(
 
 type workflowContextObserveCallEntrypointKey struct{}
 
-func withWorkflowContextObserveCallEntrypoint(
-	ctx context.Context,
-	entrypoint workflowContextObserveCallEntrypoint,
-) context.Context {
-	return context.WithValue(ctx, workflowContextObserveCallEntrypointKey{}, entrypoint)
-}
-
 func newWorkflowContextObserveCallCmd() *cobra.Command {
 	var requestJSON, output, format string
 	options := workflowContextObserveCallOptions{}

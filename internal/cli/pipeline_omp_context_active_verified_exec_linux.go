@@ -14,7 +14,7 @@ func newPipelineOMPVerifiedExecCommand(
 	expected pipelineOMPExecutableIdentity,
 	args ...string,
 ) (*pipelineOMPVerifiedExecCommand, error) {
-	return newPipelineOMPVerifiedExecCommandContext(nil, path, expected, args...)
+	return newPipelineOMPVerifiedExecCommandContext(context.Background(), path, expected, args...)
 }
 
 func newPipelineOMPVerifiedExecCommandWithGate(

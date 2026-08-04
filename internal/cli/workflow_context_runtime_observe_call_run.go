@@ -71,12 +71,8 @@ func RunWorkflowContextObserveCall(
 		Variant: request.Variant, Provider: options.Provider, Model: options.Model,
 		ExecutionClass: "observer-canary", ProductionPathEquivalent: false,
 		StartedAt: started.Format(time.RFC3339Nano), CompletedAt: completed.Format(time.RFC3339Nano),
-		AssistantText: output,
-		TokenUsage: workflowContextObserveCallTokenUsage{
-			PrimaryInputTokens: usage.PrimaryInputTokens, PrimaryOutputTokens: usage.PrimaryOutputTokens,
-			MaintenanceInputTokens:  usage.MaintenanceInputTokens,
-			MaintenanceOutputTokens: usage.MaintenanceOutputTokens, TotalTokens: usage.TotalTokens,
-		},
+		AssistantText:  output,
+		TokenUsage:     workflowContextObserveCallTokenUsage(usage),
 		LifecycleFacts: lifecycle,
 		CleanupFacts: workflowContextObserveCallCleanupFacts{
 			OwnedRootsCreated: 1, OwnedRootsRemain: 0,

@@ -68,6 +68,7 @@ func TestReleaseWorkflow_A22CarriesSameRunEvidenceIntoExactFifteenAssets(t *test
 		`glob: "{{ .Env.OMP_CONTEXT_PROMOTION_ATTESTATION_PATH }}"`,
 		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_PATH }}"`,
 		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH }}"`,
+		`eq .Version "0.50.93"`,
 		"dst: release-lineage-v1.json",
 		"dst: release-lineage-v1.sig",
 	} {

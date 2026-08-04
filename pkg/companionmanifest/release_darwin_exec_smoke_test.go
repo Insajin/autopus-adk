@@ -48,7 +48,8 @@ scenario=''; [[ ! -f %q ]] || scenario="$(cat %q)"
 if [[ "$6" == 'arm64' ]]; then
   root="${OMP_CONTEXT_RELEASE_CANARY_ROOT-}"
   canary="${OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE-}"
-  root_mode=$(stat -f '%%Lp' "$root" 2>/dev/null || stat -c '%%a' "$root")
+  root_mode=$(stat -f '%%Lp' "$root" 2>/dev/null || true)
+  [[ "$root_mode" =~ ^[0-7]{3,4}$ ]] || root_mode=$(stat -c '%%a' "$root")
   [[ "$root" == %q && -d "$root" && ! -L "$root" && "$root_mode" == '755' &&
      "$canary" == %q && -f "$canary" && ! -L "$canary" && -x "$canary" &&
      "$(shasum -a 256 "$canary" | awk '{print $1}')" == %q && "$("$canary" --version)" == 'omp/17.2.7' ]] || exit 92

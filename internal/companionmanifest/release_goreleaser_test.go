@@ -76,6 +76,7 @@ func runGoReleaserFixture(
 	runFixtureCommand(t, root, "git", "commit", "-qm", "F07 archive fixture")
 	runFixtureCommand(t, root, "git", "tag", "v0.50.69")
 	commit := strings.TrimSpace(runFixtureCommand(t, root, "git", "rev-parse", "HEAD"))
+	tree := strings.TrimSpace(runFixtureCommand(t, root, "git", "rev-parse", "HEAD^{tree}"))
 
 	credentials := filepath.Join(filepath.Dir(root), "credentials")
 	if err := os.Mkdir(credentials, 0o700); err != nil {
@@ -93,12 +94,20 @@ func runGoReleaserFixture(
 	if err := os.Mkdir(tmpDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
+	canaryRoot := filepath.Join(filepath.Dir(root), "omp-release-canary-root")
+	if err := os.Mkdir(canaryRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	canaryExecutable := filepath.Join(canaryRoot, "omp-darwin-arm64")
+	if err := os.WriteFile(canaryExecutable, []byte("#!/bin/sh\nexit 0\n"), 0o555); err != nil {
+		t.Fatal(err)
+	}
 
 	command := exactGoReleaserCommand("release", "--clean", "--parallelism=2",
 		"--skip=announce,publish,sign,homebrew")
 	command.Dir = root
 	command.Env = append(os.Environ(), goReleaserReleaseEnv(
-		tools, keyPath, apiKeyPath, tmpDir, commit,
+		tools, keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable,
 	)...)
 	productionGoReleaserFixtureRuns.Add(1)
 	output, err := command.CombinedOutput()
@@ -131,12 +140,17 @@ func exactGoReleaserCommand(arguments ...string) *exec.Cmd {
 
 func goReleaserReleaseEnv(
 	tools mockReleaseTools,
-	keyPath, apiKeyPath, tmpDir, commit string,
+	keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable string,
 ) []string {
 	return []string{
 		"TMPDIR=" + tmpDir,
 		"GITHUB_REF_NAME=v0.50.69",
 		"COMPANION_SOURCE_COMMIT=" + commit,
+		"COMPANION_SOURCE_TREE=" + tree,
+		"OMP_CONTEXT_STATIC_POLICY_B64=eyJzY2hlbWEiOiJmaXh0dXJlIn0",
+		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256=" + strings.Repeat("0", 64),
+		"OMP_CONTEXT_RELEASE_CANARY_ROOT=" + canaryRoot,
+		"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE=" + canaryExecutable,
 		"COMPANION_BUILD_PROVENANCE=github-actions:Insajin/autopus-adk@" + commit,
 		"COMPANION_HANDOFF=v1", "COMPANION_ROLLBACK_FLOOR=5069",
 		"COMPANION_ISSUED_AT=2026-07-15T00:00:00Z",

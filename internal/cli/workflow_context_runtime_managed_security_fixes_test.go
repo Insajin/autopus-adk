@@ -2,11 +2,9 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -232,10 +230,4 @@ func newWorkflowContextManagedSecurityOptions(
 			"PATH=" + os.Getenv("PATH"),
 		},
 	}, paths
-}
-
-func assertNoManagedMarker(t *testing.T, runtime string) {
-	t.Helper()
-	_, err := os.Lstat(filepath.Join(runtime, workflowContextManagedRuntimeMarker))
-	assert.True(t, errors.Is(err, os.ErrNotExist), strings.TrimSpace(err.Error()))
 }

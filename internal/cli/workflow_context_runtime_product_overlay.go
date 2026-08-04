@@ -141,14 +141,18 @@ func workflowContextProductOverlayBody(active bool) []byte {
 		"  customDirectories: [.agents/skills]\n")
 }
 
-func writeWorkflowContextProductOverlay(path string, body []byte) error {
+func writeWorkflowContextProductOverlay(path string, body []byte) (resultErr error) {
 	directory := filepath.Dir(path)
 	temp, err := os.CreateTemp(directory, ".context-product-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create product OMP overlay: %w", err)
 	}
 	tempPath := temp.Name()
-	defer os.Remove(tempPath)
+	defer func() {
+		if removeErr := os.Remove(tempPath); !errors.Is(removeErr, os.ErrNotExist) {
+			resultErr = errors.Join(resultErr, removeErr)
+		}
+	}()
 	if err := temp.Chmod(0o600); err != nil {
 		_ = temp.Close()
 		return err

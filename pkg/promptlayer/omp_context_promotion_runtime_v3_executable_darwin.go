@@ -114,6 +114,7 @@ func currentDarwinOMPContextPromotionExecutableRegionV3() (
 ) {
 	var info darwinOMPContextPromotionRegionPathInfoV3
 	address := reflect.ValueOf(currentOMPContextPromotionExecutableSHA256V3).Pointer()
+	//nolint:staticcheck // x/sys/unix has no libproc wrapper; live-image identity requires proc_pidinfo.
 	written, _, errno := unix.Syscall6(
 		unix.SYS_PROC_INFO,
 		darwinOMPContextPromotionProcInfoCallPIDInfoV3,

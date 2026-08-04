@@ -67,7 +67,7 @@ func preparePipelineOMPActiveProcessConfig(
 func startPipelineOMPActiveProcess(
 	ctx context.Context,
 	active pipelineOMPActiveProcessConfig,
-) (*pipelineOMPProcess, error) {
+) (result *pipelineOMPProcess, resultErr error) {
 	runtimeRoot, err := os.MkdirTemp(active.backend.RuntimeBase, "pipeline-active-")
 	if err != nil {
 		return nil, fmt.Errorf("create managed active runtime: %w", err)
@@ -131,7 +131,7 @@ func startPipelineOMPActiveProcess(
 		cleanup()
 		return nil, err
 	}
-	defer verifiedCommand.Close()
+	defer func() { resultErr = errors.Join(resultErr, verifiedCommand.Close()) }()
 	cmd := verifiedCommand.cmd
 	cmd.Dir, cmd.Env, cmd.Stderr = active.backend.ProjectDir,
 		workflowContextManagedRPCEnvironment(environment, active.binding), io.Discard

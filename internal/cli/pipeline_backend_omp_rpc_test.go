@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -286,7 +285,7 @@ func assertPipelineOMPRuntimeEmpty(t *testing.T, root string) {
 }
 
 func pipelineOMPProcessExists(pid int) bool {
-	return pid > 0 && syscall.Kill(pid, 0) == nil
+	return pid > 0 && processAliveForTest(pid)
 }
 
 func shellQuotePipelineOMP(value string) string {

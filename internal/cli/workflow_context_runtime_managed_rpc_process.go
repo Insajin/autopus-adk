@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -99,10 +98,6 @@ func workflowContextManagedRPCArgs(options WorkflowContextManagedRPCOptions) []s
 		"--no-rules", "--no-lsp", "--no-pty", "--no-title",
 		"--max-time", options.MaxTime.String(),
 	)
-}
-
-func workflowContextManagedRPCBridgePath(workspace string) string {
-	return filepath.Join(workspace, ".omp", "extensions", "autopus-context.ts")
 }
 
 func (process *workflowContextManagedRPCProcess) Close() error {

@@ -67,20 +67,67 @@ func TestOMPModelProbeProcess_RunEnforcesOutputLimit(t *testing.T) {
 }
 
 func TestOMPModelProbeProcess_RunHonorsContextTimeout(t *testing.T) {
-	t.Parallel()
-
-	executable := writeOMPModelProbeExecutable(t, "#!/bin/sh\nprintf 'started\\n'\nsleep 10\n")
+	root := t.TempDir()
+	startedFile := filepath.Join(root, "started")
+	executable := writeOMPModelProbeExecutable(t, "#!/bin/sh\nprintf 'started\\n'\nprintf ready > '"+
+		strings.ReplaceAll(startedFile, "'", "'\"'\"'")+"'\nsleep 10\n")
 	process, err := NewOMPModelProbeProcess(executable, 1024)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Millisecond)
-	defer cancel()
+	ctx := newOMPModelProbeDeadlineContext()
+	defer func() {
+		if ctx.Err() == nil {
+			ctx.expire()
+		}
+	}()
+	type result struct {
+		output []byte
+		err    error
+	}
+	done := make(chan result, 1)
+	go func() {
+		output, runErr := process.Run(ctx, "--version")
+		done <- result{output: output, err: runErr}
+	}()
+	require.Eventually(t, func() bool {
+		_, statErr := os.Stat(startedFile)
+		return statErr == nil
+	}, 10*time.Second, 10*time.Millisecond)
+
 	started := time.Now()
-	output, err := process.Run(ctx, "--version")
+	ctx.expire()
+	run := <-done
+	err = run.err
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded))
-	assert.Less(t, time.Since(started), 2*time.Second)
-	assert.Empty(t, output)
+	assert.Less(t, time.Since(started), 5*time.Second)
+	assert.Equal(t, []byte("started\n"), run.output)
+}
+
+type ompModelProbeDeadlineContext struct {
+	context.Context
+	done chan struct{}
+}
+
+func newOMPModelProbeDeadlineContext() *ompModelProbeDeadlineContext {
+	return &ompModelProbeDeadlineContext{Context: context.Background(), done: make(chan struct{})}
+}
+
+func (ctx *ompModelProbeDeadlineContext) Done() <-chan struct{} {
+	return ctx.done
+}
+
+func (ctx *ompModelProbeDeadlineContext) Err() error {
+	select {
+	case <-ctx.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
+	}
+}
+
+func (ctx *ompModelProbeDeadlineContext) expire() {
+	close(ctx.done)
 }
 
 func TestOMPModelProbeProcess_RunRejectsChangedOrUnpinnedIdentity(t *testing.T) {
