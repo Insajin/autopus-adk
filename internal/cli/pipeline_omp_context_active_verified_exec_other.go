@@ -10,8 +10,9 @@ import (
 )
 
 type pipelineOMPVerifiedExecCommand struct {
-	cmd      *exec.Cmd
-	parentFD *os.File
+	cmd               *exec.Cmd
+	parentFD          *os.File
+	directDarwinImage bool
 }
 
 func newPipelineOMPVerifiedExecCommand(

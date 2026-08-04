@@ -23,6 +23,7 @@ type workflowContextObserveSessionSetup struct {
 	optimized           *pipelineOMPActiveEvaluatorSession
 	ompVersion          string
 	ompExecutableSHA256 string
+	sandboxMode         pipelineOMPActiveSandboxMode
 }
 
 func validateWorkflowContextObserveSessionOptions(options workflowContextObserveSessionOptions) error {
@@ -31,12 +32,16 @@ func validateWorkflowContextObserveSessionOptions(options workflowContextObserve
 		!workflowContextMetadataPattern.MatchString(options.SpecID) ||
 		!pipelineOMPContextCohortLocatorPattern.MatchString(options.CredentialLocator) ||
 		!validPipelineOMPActiveGitHash(options.TargetGitCommit) ||
+		(options.SandboxMode != pipelineOMPActiveSandboxManaged &&
+			options.SandboxMode != pipelineOMPActiveSandboxInheritedParent) ||
 		strings.TrimSpace(options.Endpoint) == "" || strings.TrimSpace(options.Executable) == "" {
 		return errors.New("workflow context-runtime observe-session coordinates are invalid")
 	}
 	return nil
 }
 
+// @AX:WARN [AUTO]: observe-session setup contains 13 if branches.
+// @AX:REASON [AUTO]: provider authority, executable provenance, isolated runtime, phase scope, version proof, lease binding, and cleanup converge here.
 func prepareWorkflowContextObserveSession(
 	ctx context.Context,
 	options workflowContextObserveSessionOptions,
@@ -83,7 +88,7 @@ func prepareWorkflowContextObserveSession(
 	if err := os.Mkdir(runtimeBase, 0o700); err != nil {
 		return setup, err
 	}
-	phaseModels := map[pipeline.PhaseID]string{pipeline.PhasePlan: options.Provider + "/" + options.Model}
+	phaseModels := workflowContextObserveSessionPhaseModels(options.Provider + "/" + options.Model)
 	backend, err := normalizePipelineOMPBackendConfig(pipelineOMPBackendConfig{
 		Executable: executable, executableID: executableID, ProjectDir: projectDir,
 		SpecID: options.SpecID, SpecDir: filepath.Join(projectDir, ".autopus", "specs", options.SpecID),
@@ -99,7 +104,7 @@ func prepareWorkflowContextObserveSession(
 	}
 	ompVersion, err := probeWorkflowContextObserveVersion(ctx, WorkflowContextManagedRPCOptions{
 		Executable: executable, Workspace: projectDir, Environment: backend.Environment, AllowedEndpoint: endpoint,
-	})
+	}, options.SandboxMode)
 	if err != nil || verifyPipelineOMPExecutable(executable, executableID) != nil {
 		return setup, errors.New("observe-session OMP identity probe failed")
 	}
@@ -121,16 +126,21 @@ func prepareWorkflowContextObserveSession(
 	setup.backend, setup.candidate, setup.prepared = backend, candidate, prepared
 	setup.ompVersion = ompVersion
 	setup.ompExecutableSHA256 = fmt.Sprintf("sha256:%x", executableID.digest[:])
+	setup.sandboxMode = options.SandboxMode
 	failed = false
 	return setup, nil
 }
 
 func (setup *workflowContextObserveSessionSetup) start(ctx context.Context) error {
-	full, err := startPipelineOMPActiveEvaluatorSession(ctx, setup.backend, setup.candidate, setup.prepared, false)
+	full, err := startPipelineOMPActiveEvaluatorSession(
+		ctx, setup.backend, setup.candidate, setup.prepared, false, setup.sandboxMode,
+	)
 	if err != nil {
 		return err
 	}
-	optimized, err := startPipelineOMPActiveEvaluatorSession(ctx, setup.backend, setup.candidate, setup.prepared, true)
+	optimized, err := startPipelineOMPActiveEvaluatorSession(
+		ctx, setup.backend, setup.candidate, setup.prepared, true, setup.sandboxMode,
+	)
 	if err != nil {
 		_ = full.Close()
 		return err
@@ -147,4 +157,14 @@ func (setup *workflowContextObserveSessionSetup) close() error {
 	err = errors.Join(err, os.RemoveAll(setup.taskRoot))
 	setup.taskRoot = ""
 	return err
+}
+
+func workflowContextObserveSessionPhaseModels(selector string) map[pipeline.PhaseID]string {
+	return map[pipeline.PhaseID]string{
+		pipeline.PhasePlan:         selector,
+		pipeline.PhaseTestScaffold: selector,
+		pipeline.PhaseImplement:    selector,
+		pipeline.PhaseValidate:     selector,
+		pipeline.PhaseReview:       selector,
+	}
 }

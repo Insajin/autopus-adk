@@ -19,6 +19,7 @@ type pipelineOMPVerifiedExecCommand struct {
 	expected             pipelineOMPExecutableIdentity
 	gateContext          context.Context
 	afterFirstDarwinStop func()
+	directDarwinImage    bool
 }
 
 func openPipelineOMPVerifiedExecutable(

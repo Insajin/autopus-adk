@@ -96,39 +96,50 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 	return nil
 }
 
+// @AX:WARN [AUTO]: managed prompt lifecycle validation contains 11 if branches.
+// @AX:REASON [AUTO]: response correlation, safe widget filtering, provider start/turn/end order, and prompt-result proof must fail closed together.
 func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, prompt string) error {
 	protocol.nextID++
 	id := fmt.Sprintf("pipeline-active-prompt-%d", protocol.nextID)
 	if err := protocol.process.send(pipelineOMPRPCCommand{ID: id, Type: "prompt", Message: prompt}); err != nil {
 		return err
 	}
-	responded, started, turned, ended := false, false, false, false
+	responded, resultSeen := false, false
+	started, turnStarted, turned, ended := false, false, false, false
 	for !(responded && started && turned && ended) {
 		frame, err := protocol.process.next(ctx)
 		if err != nil {
 			return err
 		}
-		if frame.Type == "extension_error" || frame.Type == "extension_ui_request" ||
+		if frame.Type == "extension_ui_request" {
+			if frame.Method == "setWidget" && frame.ID != "" && responded && started && !ended {
+				continue
+			}
+			return errors.New("managed active OMP maintenance crossed the primary provider boundary")
+		}
+		if frame.Type == "extension_error" ||
 			frame.Type == "auto_compaction_start" || frame.Type == "auto_compaction_end" {
 			return errors.New("managed active OMP maintenance crossed the primary provider boundary")
 		}
 		switch frame.Type {
 		case "response":
-			var result struct {
-				AgentInvoked *bool `json:"agentInvoked"`
-			}
 			if frame.ID != id || responded || started || !frame.Success || frame.Command != "prompt" ||
-				json.Unmarshal(frame.Data, &result) != nil || result.AgentInvoked == nil || !*result.AgentInvoked {
+				!validPipelineOMPActivePromptResponseData(frame.Data) {
 				return errors.New("managed active OMP prompt was rejected")
 			}
 			responded = true
 		case "agent_start":
-			if !responded || started || turned || ended {
+			if !responded || started || turnStarted || turned || ended {
 				return errors.New("managed active OMP primary start is out of order")
 			}
 			started = true
+		case "turn_start":
+			if !started || turnStarted || turned || ended {
+				return errors.New("managed active OMP primary turn start is out of order")
+			}
+			turnStarted = true
 		case "turn_end":
-			if !started || turned || ended {
+			if !turnStarted || turned || ended {
 				return errors.New("managed active OMP primary turn is out of order")
 			}
 			turned = true
@@ -138,12 +149,30 @@ func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, p
 			}
 			ended = true
 		case "prompt_result":
-			if frame.ID != id || frame.AgentInvoked == nil || !*frame.AgentInvoked {
+			if !responded || resultSeen || frame.ID != id || frame.AgentInvoked == nil || !*frame.AgentInvoked {
 				return errors.New("managed active OMP prompt did not invoke the agent")
 			}
+			resultSeen = true
 		}
 	}
 	return nil
+}
+
+func validPipelineOMPActivePromptResponseData(data json.RawMessage) bool {
+	body := bytes.TrimSpace(data)
+	if len(body) == 0 || bytes.Equal(body, []byte("null")) {
+		return true
+	}
+	if rejectDuplicatePipelineOMPJSON(body) != nil {
+		return false
+	}
+	var exact map[string]json.RawMessage
+	if json.Unmarshal(body, &exact) != nil || len(exact) != 1 {
+		return false
+	}
+	var invoked bool
+	value, ok := exact["agentInvoked"]
+	return ok && json.Unmarshal(value, &invoked) == nil && invoked
 }
 
 func (protocol *pipelineOMPRPCProtocol) confirmPipelineOMPActiveBridge(id string) error {

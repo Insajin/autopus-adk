@@ -6,6 +6,13 @@ import (
 	"strings"
 )
 
+type pipelineOMPActiveSandboxMode uint8
+
+const (
+	pipelineOMPActiveSandboxManaged pipelineOMPActiveSandboxMode = iota
+	pipelineOMPActiveSandboxInheritedParent
+)
+
 // pipelineOMPActiveEvaluatorSession uses the production process and protocol
 // implementation without consuming promotion authority. Only the explicit-live
 // observe-session command may construct it.
@@ -19,17 +26,21 @@ type pipelineOMPActiveEvaluatorSession struct {
 	sequence  int
 }
 
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: evaluator startup is the shared full and optimized live-session boundary.
+// @AX:REASON [AUTO]: observe-session and RPC integration callers depend on identical process, protocol, binding, and sandbox-mode construction.
 func startPipelineOMPActiveEvaluatorSession(
 	ctx context.Context,
 	backend pipelineOMPBackendConfig,
 	candidate pipelineOMPManagedActiveCandidate,
 	prepared pipelineOMPManagedActivePrepared,
 	optimized bool,
+	sandboxMode pipelineOMPActiveSandboxMode,
 ) (*pipelineOMPActiveEvaluatorSession, error) {
 	active, err := preparePipelineOMPActiveProcessConfig(backend, candidate, prepared)
 	if err != nil {
 		return nil, err
 	}
+	active.sandboxMode = sandboxMode
 	process, err := startPipelineOMPActiveProcess(ctx, active)
 	if err != nil {
 		return nil, err

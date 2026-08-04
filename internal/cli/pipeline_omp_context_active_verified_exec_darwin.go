@@ -100,13 +100,19 @@ func newPipelineOMPVerifiedDarwinCommand(
 	}, nil
 }
 
+// @AX:WARN [AUTO]: Darwin verified execution startup contains 17 if branches.
+// @AX:REASON [AUTO]: sandbox and direct-image paths share ptrace stops, executable identity checks, cleanup, timeout, and detach failure handling.
 func (command *pipelineOMPVerifiedExecCommand) Start() error {
 	if command == nil || command.cmd == nil || command.parentFD == nil || command.expected.info == nil {
 		return errors.New("verified managed active OMP command is unavailable")
 	}
-	sandboxPath, sandboxIdentity, err := canonicalPipelineOMPExecutable(command.cmd.Path)
-	if err != nil || sandboxPath != "/usr/bin/sandbox-exec" {
-		return errors.Join(errors.New("managed active Darwin sandbox executable is unavailable"), command.Close())
+	firstPath, firstIdentity := command.cmd.Path, command.expected
+	if !command.directDarwinImage {
+		sandboxPath, sandboxIdentity, err := canonicalPipelineOMPExecutable(command.cmd.Path)
+		if err != nil || sandboxPath != "/usr/bin/sandbox-exec" {
+			return errors.Join(errors.New("managed active Darwin sandbox executable is unavailable"), command.Close())
+		}
+		firstPath, firstIdentity = sandboxPath, sandboxIdentity
 	}
 	if command.cmd.SysProcAttr == nil {
 		command.cmd.SysProcAttr = &syscall.SysProcAttr{}
@@ -127,16 +133,22 @@ func (command *pipelineOMPVerifiedExecCommand) Start() error {
 	gateCtx, cancel := context.WithTimeout(gateCtx, pipelineOMPVerifiedDarwinGateTimeout)
 	defer cancel()
 	if err := command.waitDarwinExecStop(gateCtx); err != nil {
-		return command.failDarwinGate(errors.New("observe Darwin sandbox exec stop"), err)
+		return command.failDarwinGate(errors.New("observe Darwin executable exec stop"), err)
 	}
-	if err := verifyPipelineOMPDarwinLiveExecutable(command.cmd.Process.Pid, sandboxPath, sandboxIdentity); err != nil {
-		return command.failDarwinGate(errors.New("verify Darwin sandbox live image"), err)
+	if err := verifyPipelineOMPDarwinLiveExecutable(command.cmd.Process.Pid, firstPath, firstIdentity); err != nil {
+		return command.failDarwinGate(errors.New("verify Darwin executable live image"), err)
 	}
 	if command.afterFirstDarwinStop != nil {
 		command.afterFirstDarwinStop()
 	}
 	if gateCtx.Err() != nil {
 		return command.failDarwinGate(errors.New("Darwin executable identity gate canceled"), gateCtx.Err())
+	}
+	if command.directDarwinImage {
+		if err := syscall.PtraceDetach(command.cmd.Process.Pid); err != nil {
+			return command.failDarwinGate(errors.New("detach verified managed active OMP trace"), err)
+		}
+		return nil
 	}
 	if err := continuePipelineOMPDarwinTrace(command.cmd.Process.Pid); err != nil {
 		return command.failDarwinGate(errors.New("continue Darwin sandbox trace"), err)

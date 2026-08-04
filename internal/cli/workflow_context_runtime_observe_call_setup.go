@@ -27,6 +27,8 @@ type workflowContextObserveCallSetup struct {
 	version    string
 }
 
+// @AX:WARN [AUTO]: observe-call setup contains 20 if branches.
+// @AX:REASON [AUTO]: canonical delivery, credential, isolated roots, generated surfaces, overlay, model authority, identity probe, and cleanup converge here.
 func prepareWorkflowContextObserveCall(
 	ctx context.Context,
 	request workflowContextObserveCallRequest,
@@ -125,7 +127,7 @@ func prepareWorkflowContextObserveCall(
 		Model: options.Provider + "/" + options.Model, AllowedEndpoint: endpoint,
 		Environment: environment, MaxTime: 2 * time.Minute, CaptureOutput: true, CaptureStats: true,
 	}
-	version, err := probeWorkflowContextObserveVersion(ctx, managed)
+	version, err := probeWorkflowContextObserveVersion(ctx, managed, pipelineOMPActiveSandboxManaged)
 	if err != nil {
 		return setup, err
 	}
@@ -223,12 +225,30 @@ func writeWorkflowContextObserveModels(
 	return os.Chmod(path, 0o600)
 }
 
-func probeWorkflowContextObserveVersion(ctx context.Context, options WorkflowContextManagedRPCOptions) (string, error) {
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: shared installed-version evidence boundary for observe-call and observe-session.
+// @AX:REASON [AUTO]: managed and inherited-sandbox callers depend on bounded output and verified executable identity before provider execution.
+func probeWorkflowContextObserveVersion(
+	ctx context.Context,
+	options WorkflowContextManagedRPCOptions,
+	sandboxMode pipelineOMPActiveSandboxMode,
+) (string, error) {
 	probeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	if sandboxMode == pipelineOMPActiveSandboxInheritedParent {
+		command, identity, err := newWorkflowContextObserveInheritedVersionCommand(probeCtx, options)
+		if err != nil {
+			return "", err
+		}
+		output, err := outputWorkflowContextObserveInheritedVersion(command, identity)
+		version := strings.TrimSpace(string(output))
+		if err != nil || !installedOMPVersionPattern.MatchString(version) {
+			return "", errors.New("observe-call OMP identity probe failed")
+		}
+		return version, nil
+	}
 	cmd := exec.CommandContext(probeCtx, options.Executable, "--version")
 	cmd.Dir, cmd.Env = options.Workspace, options.Environment
-	if _, err := configureWorkflowContextManagedRPCSandbox(cmd, options.AllowedEndpoint); err != nil {
+	if err := configurePipelineOMPActiveSandbox(cmd, options.AllowedEndpoint, sandboxMode); err != nil {
 		return "", err
 	}
 	output, err := processprobe.OutputLimited(cmd, 4<<10)

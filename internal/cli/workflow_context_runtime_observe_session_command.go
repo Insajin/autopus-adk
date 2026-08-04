@@ -9,7 +9,7 @@ import (
 
 func newWorkflowContextObserveSessionCmd() *cobra.Command {
 	var input, output, format string
-	var explicitLive bool
+	var explicitLive, inheritParentSandbox bool
 	options := workflowContextObserveSessionOptions{}
 	cmd := &cobra.Command{
 		Use:           "observe-session",
@@ -24,6 +24,7 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 			if input != "-" || output != "-" || strings.ToLower(strings.TrimSpace(format)) != "jsonl" {
 				return errors.New("workflow context-runtime observe-session requires --input-jsonl - --output - --format jsonl")
 			}
+			options.SandboxMode = workflowContextObserveSessionSandboxMode(inheritParentSandbox)
 			if err := validateWorkflowContextObserveSessionOptions(options); err != nil {
 				return err
 			}
@@ -31,6 +32,7 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&explicitLive, "explicit-live", false, "Acknowledge external provider execution")
+	cmd.Flags().BoolVar(&inheritParentSandbox, "inherit-parent-sandbox", false, "Reuse the producer-owned Darwin sandbox")
 	cmd.Flags().StringVar(&input, "input-jsonl", "", "Read strict handshake/call/shutdown JSONL from stdin (-)")
 	cmd.Flags().StringVar(&output, "output", "", "Write strict response JSONL (-)")
 	cmd.Flags().StringVar(&format, "format", "jsonl", "Output format (jsonl)")
@@ -43,4 +45,11 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 	cmd.Flags().StringVar(&options.Executable, "omp", "omp", "OMP executable")
 	cmd.Flags().StringVar(&options.TargetGitCommit, "target-git-commit", "", "Exact target project commit")
 	return cmd
+}
+
+func workflowContextObserveSessionSandboxMode(inheritParent bool) pipelineOMPActiveSandboxMode {
+	if inheritParent {
+		return pipelineOMPActiveSandboxInheritedParent
+	}
+	return pipelineOMPActiveSandboxManaged
 }

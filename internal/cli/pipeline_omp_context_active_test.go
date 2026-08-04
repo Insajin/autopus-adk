@@ -2,8 +2,11 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
@@ -131,6 +134,97 @@ func TestPipelineOMPBackend_ActiveRunNeverFallsBackAfterPreflightDrift(t *testin
 	assert.Equal(t, 1, runner.closeCalls)
 	_, statErr := os.Stat(logPath)
 	assert.ErrorIs(t, statErr, os.ErrNotExist, "active drift must not start canonical RPC")
+}
+
+func TestPipelineOMPMaxTimeSeconds_UsesPositiveWholeSeconds(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		maxTime time.Duration
+		want    string
+	}{
+		{name: "ten minutes", maxTime: 10 * time.Minute, want: "600"},
+		{name: "subsecond", maxTime: time.Nanosecond, want: "1"},
+		{name: "fractional second", maxTime: 1500 * time.Millisecond, want: "2"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, test.want, pipelineOMPMaxTimeSeconds(test.maxTime))
+		})
+	}
+}
+
+func TestConfigurePipelineOMPActiveSandbox_InheritedParentSkipsInnerWrapperOnDarwin(t *testing.T) {
+	t.Parallel()
+	cmd := exec.Command("/usr/bin/true")
+	originalPath := cmd.Path
+	err := configurePipelineOMPActiveSandbox(
+		cmd, "http://127.0.0.1:43123", pipelineOMPActiveSandboxInheritedParent,
+	)
+	if runtime.GOOS != "darwin" {
+		require.ErrorContains(t, err, "Darwin")
+		return
+	}
+	require.NoError(t, err)
+	assert.Equal(t, originalPath, cmd.Path)
+	assert.Equal(t, []string{"/usr/bin/true"}, cmd.Args)
+}
+
+func TestPipelineOMPActiveManagedPrompt_AcceptsNullResponseLifecycleAndSafeWidget(t *testing.T) {
+	t.Parallel()
+	terminal := true
+	frames := []pipelineOMPRPCFrame{
+		{ID: "pipeline-active-prompt-1", Type: "response", Command: "prompt", Success: true, Data: json.RawMessage(`null`)},
+		{ID: "pipeline-active-prompt-1", Type: "prompt_result", AgentInvoked: boolPointer(true)},
+		{Type: "agent_start"},
+		{Type: "turn_start"},
+		{Type: "turn_end"},
+		{ID: "widget-1", Type: "extension_ui_request", Method: "setWidget"},
+		{Type: "agent_end", IsTerminal: &terminal},
+	}
+	protocol, sent := pipelineOMPProtocolFixture(frames)
+
+	err := protocol.callManagedPrompt(context.Background(), "safe prompt")
+
+	require.NoError(t, err)
+	assert.NotContains(t, sent.String(), "extension_ui_response")
+}
+
+func TestPipelineOMPActiveManagedPrompt_RejectsInteractiveOrUncorrelatedActivity(t *testing.T) {
+	t.Parallel()
+	success := pipelineOMPRPCFrame{
+		ID: "pipeline-active-prompt-1", Type: "response", Command: "prompt", Success: true, Data: json.RawMessage(`null`),
+	}
+	tests := []struct {
+		name, want string
+		frames     []pipelineOMPRPCFrame
+	}{
+		{name: "interactive confirm", want: "maintenance crossed", frames: []pipelineOMPRPCFrame{
+			success, {Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"},
+			{ID: "confirm-1", Type: "extension_ui_request", Method: "confirm"},
+		}},
+		{name: "fire and forget notify remains closed", want: "maintenance crossed", frames: []pipelineOMPRPCFrame{
+			success, {Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"},
+			{ID: "notify-1", Type: "extension_ui_request", Method: "notify"},
+		}},
+		{name: "uncorrelated result", want: "did not invoke", frames: []pipelineOMPRPCFrame{
+			success, {ID: "other", Type: "prompt_result", AgentInvoked: boolPointer(true)},
+		}},
+		{name: "local only result", want: "did not invoke", frames: []pipelineOMPRPCFrame{
+			success, {ID: "pipeline-active-prompt-1", Type: "prompt_result", AgentInvoked: boolPointer(false)},
+		}},
+		{name: "lifecycle before response", want: "out of order", frames: []pipelineOMPRPCFrame{
+			{Type: "agent_start"}, success,
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			protocol, _ := pipelineOMPProtocolFixture(test.frames)
+			err := protocol.callManagedPrompt(context.Background(), "safe prompt")
+			require.ErrorContains(t, err, test.want)
+		})
+	}
 }
 
 type pipelineOMPManagedActiveRunnerSpy struct {
