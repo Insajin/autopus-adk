@@ -97,8 +97,8 @@ func newPipelineOMPVerifiedDarwinCommand(
 	}, nil
 }
 
-// @AX:WARN [AUTO]: Darwin verified execution startup contains 17 if branches.
-// @AX:REASON [AUTO]: managed ptrace and inherited private-path gates share startup cleanup and executable identity enforcement.
+// @AX:WARN [AUTO]: Darwin verified execution startup contains 15 if branches.
+// @AX:REASON [AUTO]: sandbox ptrace startup coordinates executable identity, two exec stops, timeout, cleanup, continuation, and detach failures.
 func (command *pipelineOMPVerifiedExecCommand) Start() error {
 	if command == nil || command.cmd == nil || command.parentFD == nil || command.expected.info == nil {
 		return errors.New("verified managed active OMP command is unavailable")

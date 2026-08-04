@@ -64,7 +64,7 @@ func preparePipelineOMPActiveProcessConfig(
 	}, nil
 }
 
-// @AX:WARN [AUTO]: managed active process startup contains 17 if branches.
+// @AX:WARN [AUTO]: managed active process startup contains 18 if branches.
 // @AX:REASON [AUTO]: runtime ownership, executable identity, overlay, sandbox, process group, pipes, and readiness gates converge before admission.
 func startPipelineOMPActiveProcess(
 	ctx context.Context,

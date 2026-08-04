@@ -16,6 +16,8 @@ type pipelineOMPVerifiedExecCommand struct {
 	inheritedDarwinPrivate bool
 }
 
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: build-selected sandbox-mode contract shared by process startup, version probes, and platform tests.
+// @AX:REASON [AUTO]: unsupported platforms must preserve the common signature while rejecting inherited execution fail closed.
 func configurePipelineOMPVerifiedExecSandboxMode(
 	*pipelineOMPVerifiedExecCommand,
 	pipelineOMPActiveSandboxMode,

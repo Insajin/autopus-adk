@@ -26,6 +26,8 @@ type pipelineOMPVerifiedExecCommand struct {
 	inheritedDarwinPrivate    bool
 }
 
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: build-selected sandbox-mode contract shared by process startup, version probes, and platform tests.
+// @AX:REASON [AUTO]: callers depend on exact command, parent FD, private-root, and Darwin-only invariants before inherited execution.
 func configurePipelineOMPVerifiedExecSandboxMode(
 	command *pipelineOMPVerifiedExecCommand,
 	mode pipelineOMPActiveSandboxMode,
@@ -64,6 +66,8 @@ func pipelineOMPVerifiedExecUsesDarwinPtrace(command *pipelineOMPVerifiedExecCom
 	return command != nil && command.cmd != nil && command.cmd.SysProcAttr != nil && command.cmd.SysProcAttr.Ptrace
 }
 
+// @AX:WARN [AUTO]: executable FD verification contains 8 if branches.
+// @AX:REASON [AUTO]: no-follow open, pre/post identity, ownership, digest, mutation detection, and rewind checks must fail closed together.
 func openPipelineOMPVerifiedExecutable(
 	path string,
 	expected pipelineOMPExecutableIdentity,
