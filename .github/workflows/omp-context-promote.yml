@@ -29,7 +29,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: omp-context-evidence-v0.50.94
+  group: omp-context-evidence-v0.50.95
   cancel-in-progress: false
 
 jobs:
@@ -68,7 +68,7 @@ jobs:
             exit 1
           }
 
-          readonly evidence_tag='omp-context-evidence-v0.50.94'
+          readonly evidence_tag='omp-context-evidence-v0.50.95'
           readonly tag_ref="refs/tags/${evidence_tag}"
           readonly report_name='omp-context-promotion-report.v1.json'
           readonly attestation_name='omp-context-promotion-attestation.v2.json'
@@ -172,7 +172,7 @@ jobs:
             [[ "$entry" =~ ^100644\ blob\ [0-9a-f]{40}$'\t'"$name"$ ]] || fail "published evidence entry ${name} is unsafe"
           done
 
-          published_evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.94' |
+          published_evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.95' |
             git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit-tree "$evidence_tree")
@@ -199,7 +199,7 @@ jobs:
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             -c tag.gpgSign=false \
-            tag -a "$evidence_tag" "$published_evidence_commit" -m 'OMP context promotion evidence v0.50.94'
+            tag -a "$evidence_tag" "$published_evidence_commit" -m 'OMP context promotion evidence v0.50.95'
           [[ "$(git cat-file -t "$tag_ref")" == 'tag' ]] || fail 'promotion tag is not annotated'
           tag_object=$(git rev-parse --verify "$tag_ref")
           readonly tag_object

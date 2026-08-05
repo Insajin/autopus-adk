@@ -34,6 +34,49 @@ func TestVerifyOMPContextPromotionArtifactV2_AcceptsSignedExternalCohort(t *test
 	}
 }
 
+func TestVerifiedOMPContextPromotion_AccessorsPreserveCoordinatesAndDefensiveCopy(t *testing.T) {
+	fixture := newOMPContextPromotionV2Fixture(t)
+	verified, err := verifyOMPContextPromotionArtifactV2WithTrust(
+		fixture.reportBytes, fixture.attestationBytes, fixture.now, fixture.expectation,
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if verified.ProducerCoordinates() != fixture.report.Producer ||
+		verified.CandidateCoordinates() != fixture.report.Candidate ||
+		verified.RuntimeCoordinates() != fixture.report.Runtime ||
+		verified.PolicyDigest() != fixture.report.Policy.PolicyDigest {
+		t.Fatal("verified promotion did not preserve signed coordinates")
+	}
+	provider, modelScopeDigest := verified.ProviderScope()
+	if provider != fixture.report.Provider || modelScopeDigest != fixture.report.ModelScopeDigest {
+		t.Fatalf("provider scope = (%q, %q)", provider, modelScopeDigest)
+	}
+	if verified.ProviderAuthorityDigest() != OMPContextPromotionProviderAuthorityDigestV1(fixture.report) ||
+		verified.SessionAuthorityDigest() != OMPContextPromotionSessionAuthorityDigestV1(fixture.report) {
+		t.Fatal("verified promotion authority digests do not match signed cohort")
+	}
+
+	wantRows := ompContextPromotionCanaryRowsV1(fixture.report)
+	rows := verified.CanaryRows()
+	if len(rows) != len(wantRows) {
+		t.Fatalf("canary row count = %d, want %d", len(rows), len(wantRows))
+	}
+	for index := range wantRows {
+		if rows[index] != wantRows[index] {
+			t.Fatalf("canary row %d does not match signed cohort", index)
+		}
+	}
+
+	rows[0] = OMPContextCanaryRowV1{}
+	refreshed := verified.CanaryRows()
+	if refreshed[0] != wantRows[0] {
+		t.Fatal("caller mutation aliased verified canary rows")
+	}
+}
+
 func TestVerifyOMPContextPromotionArtifactV2_RejectsUnsignedDowngradeAndTamper(t *testing.T) {
 	fixture := newOMPContextPromotionV2Fixture(t)
 	tests := []struct {

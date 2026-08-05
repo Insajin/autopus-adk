@@ -106,3 +106,86 @@ func equalOMPContextCanaryAggregate(a, b OMPContextCanaryAggregateV1) bool {
 	}
 	return true
 }
+
+func TestOMPContextPromotionPolicyDigestV1_IsDeterministicAndFieldSensitive(t *testing.T) {
+	t.Parallel()
+	policy := OMPContextPromotionPolicyV1{
+		Profile: "active", HistoryMode: "active", MemoryMode: "off", HistoryTargetTokens: 1000,
+		Fallback: "canonical_full", CapabilityPolicy: "probe_required",
+		RuntimeRootPolicy: "isolated_task_owned", MutationScope: "session_overlay",
+	}
+
+	const want = "sha256:f50f5d4d2781c746d87eb375c52c92a5341d3adcede5f1cb06d61995c52f4d2a"
+	first, err := OMPContextPromotionPolicyDigestV1(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := OMPContextPromotionPolicyDigestV1(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != want || second != want {
+		t.Fatalf("policy digest is not deterministic: first=%q second=%q", first, second)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*OMPContextPromotionPolicyV1)
+	}{
+		{name: "profile", mutate: func(value *OMPContextPromotionPolicyV1) { value.Profile = "history-v1" }},
+		{name: "memory mode", mutate: func(value *OMPContextPromotionPolicyV1) { value.MemoryMode = "shadow" }},
+		{name: "target tokens", mutate: func(value *OMPContextPromotionPolicyV1) { value.HistoryTargetTokens++ }},
+		{name: "fallback", mutate: func(value *OMPContextPromotionPolicyV1) { value.Fallback = "canonical_restart" }},
+		{name: "capability policy", mutate: func(value *OMPContextPromotionPolicyV1) { value.CapabilityPolicy = "probe_cached" }},
+		{name: "runtime root policy", mutate: func(value *OMPContextPromotionPolicyV1) { value.RuntimeRootPolicy = "workspace_owned" }},
+		{name: "mutation scope", mutate: func(value *OMPContextPromotionPolicyV1) { value.MutationScope = "task_overlay" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mutated := policy
+			test.mutate(&mutated)
+			digest, err := OMPContextPromotionPolicyDigestV1(mutated)
+			if err != nil {
+				t.Fatalf("valid policy mutation rejected: %v", err)
+			}
+			if digest == first {
+				t.Fatalf("policy mutation did not change digest: %+v", mutated)
+			}
+		})
+	}
+}
+
+func TestOMPContextPromotionPolicyDigestV1_RejectsInvalidPolicy(t *testing.T) {
+	t.Parallel()
+	valid := OMPContextPromotionPolicyV1{
+		Profile: "active", HistoryMode: "active", MemoryMode: "off", HistoryTargetTokens: 1000,
+		Fallback: "canonical_full", CapabilityPolicy: "probe_required",
+		RuntimeRootPolicy: "isolated_task_owned", MutationScope: "session_overlay",
+	}
+	tests := []struct {
+		name   string
+		mutate func(*OMPContextPromotionPolicyV1)
+	}{
+		{name: "missing profile", mutate: func(value *OMPContextPromotionPolicyV1) { value.Profile = "" }},
+		{name: "inactive history", mutate: func(value *OMPContextPromotionPolicyV1) { value.HistoryMode = "shadow" }},
+		{name: "unknown memory mode", mutate: func(value *OMPContextPromotionPolicyV1) { value.MemoryMode = "unknown" }},
+		{name: "zero target", mutate: func(value *OMPContextPromotionPolicyV1) { value.HistoryTargetTokens = 0 }},
+		{name: "missing fallback", mutate: func(value *OMPContextPromotionPolicyV1) { value.Fallback = "" }},
+		{name: "missing capability policy", mutate: func(value *OMPContextPromotionPolicyV1) { value.CapabilityPolicy = "" }},
+		{name: "missing runtime root policy", mutate: func(value *OMPContextPromotionPolicyV1) { value.RuntimeRootPolicy = "" }},
+		{name: "missing mutation scope", mutate: func(value *OMPContextPromotionPolicyV1) { value.MutationScope = "" }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			policy := valid
+			test.mutate(&policy)
+			digest, err := OMPContextPromotionPolicyDigestV1(policy)
+			if err == nil {
+				t.Fatalf("invalid policy produced digest %q", digest)
+			}
+			if digest != "" {
+				t.Fatalf("invalid policy leaked digest %q", digest)
+			}
+		})
+	}
+}

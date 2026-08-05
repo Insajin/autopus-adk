@@ -1,8 +1,11 @@
 package promptlayer
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -68,6 +71,72 @@ func withOMPContextPromotionV3FixtureKey(t *testing.T, key ed25519.PublicKey) {
 		ompContextPromotionPublicKeysV2 = original
 		ompContextPromotionRevokedKeysV2 = originalRevoked
 	})
+}
+
+func TestOMPContextPromotionRuntimeBundleV3_ReadsFixedPrivateFiles(t *testing.T) {
+	requireSecureOMPContextPromotionArtifactPlatformV2(t)
+	fixture := newOMPContextPromotionV2Fixture(t)
+	lineage := []byte(`{"schema_version":"autopus.omp_context_release_lineage.v1"}`)
+	signature := bytes.Repeat([]byte{0x5a}, ompContextPromotionReleaseLineageSignatureSizeV3)
+
+	root := prepareOMPContextPromotionArtifactRootV2(t)
+	writeOMPContextPromotionArtifactPairV2(t, root, fixture.reportBytes, fixture.attestationBytes)
+	artifactRoot := filepath.Join(root, ".autopus", "runtime", "omp-context")
+	writePrivateOMPContextPromotionArtifactV2(
+		t, filepath.Join(artifactRoot, ompContextPromotionReleaseLineageFileNameV3), lineage,
+	)
+	writePrivateOMPContextPromotionArtifactV2(
+		t, filepath.Join(artifactRoot, ompContextPromotionReleaseLineageSignatureV3), signature,
+	)
+
+	reportBytes, attestationBytes, lineageBytes, signatureBytes, releaseKeyBundle, err :=
+		readOMPContextPromotionRuntimeBundleV3(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(reportBytes, fixture.reportBytes) ||
+		!bytes.Equal(attestationBytes, fixture.attestationBytes) ||
+		!bytes.Equal(lineageBytes, lineage) ||
+		!bytes.Equal(signatureBytes, signature) {
+		t.Fatal("runtime bundle bytes changed")
+	}
+	wantReleaseKeyBundle := filepath.Join(
+		artifactRoot, ompContextPromotionReleaseKeyBundleDirectoryV3,
+	)
+	if releaseKeyBundle != wantReleaseKeyBundle {
+		t.Fatalf("release key bundle = %q; want %q", releaseKeyBundle, wantReleaseKeyBundle)
+	}
+
+	for _, test := range []struct {
+		name    string
+		remove  string
+		rewrite []byte
+	}{
+		{name: "missing lineage", remove: ompContextPromotionReleaseLineageFileNameV3},
+		{name: "missing signature", remove: ompContextPromotionReleaseLineageSignatureV3},
+		{name: "short signature", remove: ompContextPromotionReleaseLineageSignatureV3, rewrite: signature[:32]},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := prepareOMPContextPromotionArtifactRootV2(t)
+			writeOMPContextPromotionArtifactPairV2(t, root, fixture.reportBytes, fixture.attestationBytes)
+			artifactRoot := filepath.Join(root, ".autopus", "runtime", "omp-context")
+			writePrivateOMPContextPromotionArtifactV2(
+				t, filepath.Join(artifactRoot, ompContextPromotionReleaseLineageFileNameV3), lineage,
+			)
+			writePrivateOMPContextPromotionArtifactV2(
+				t, filepath.Join(artifactRoot, ompContextPromotionReleaseLineageSignatureV3), signature,
+			)
+			if err := os.Remove(filepath.Join(artifactRoot, test.remove)); err != nil {
+				t.Fatal(err)
+			}
+			if test.rewrite != nil {
+				writePrivateOMPContextPromotionArtifactV2(t, filepath.Join(artifactRoot, test.remove), test.rewrite)
+			}
+			if _, _, _, _, _, err := readOMPContextPromotionRuntimeBundleV3(root); err == nil {
+				t.Fatal("incomplete runtime bundle was accepted")
+			}
+		})
+	}
 }
 
 func TestVerifyOMPContextPromotionRuntimeV3_BindsSignedUToCurrentD(t *testing.T) {
