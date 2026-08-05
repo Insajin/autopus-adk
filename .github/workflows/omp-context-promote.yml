@@ -426,7 +426,7 @@ jobs:
           GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
           GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}" \
             git push --atomic --force-with-lease="${lock_ref}:${EVIDENCE_COMMIT}" origin \
-              "$tag_ref:$tag_ref" "$published_commit:$lock_ref"
+              "$tag_ref:$tag_ref" "$EVIDENCE_COMMIT:$lock_ref"
           unset auth_header
           remote_state=$(git ls-remote --refs origin "$tag_ref" "$lock_ref")
           [[ "$(awk -v ref="$tag_ref" '$2 == ref { print $0 }' <<<"$remote_state")" == "$tag_object"$'\t'"$tag_ref" ]] || fail 'published evidence tag differs'

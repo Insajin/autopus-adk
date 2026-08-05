@@ -161,7 +161,7 @@ func TestOMPContextPromoteWorkflow_SeparatesSigningVerificationAndWriteAuthority
 		`--cacheinfo "100644,$report_blob,omp-context-promotion-report.v1.json"`,
 		`--cacheinfo "100644,$attestation_blob,omp-context-promotion-attestation.v2.json"`,
 		`commit-tree "$evidence_tree"`,
-		`git rev-list --parents -n 1 "$evidence_commit"`,
+		`git rev-list --parents -n 1 "$published_commit"`,
 		`tag -a omp-context-evidence-v0.50.96`,
 		`git push --atomic --force-with-lease="${lock_ref}:${EVIDENCE_COMMIT}"`,
 		`"$tag_ref:$tag_ref" "$EVIDENCE_COMMIT:$lock_ref"`,
