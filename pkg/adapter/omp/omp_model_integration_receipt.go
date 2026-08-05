@@ -73,12 +73,17 @@ func reusableOMPModelReceiptMapping(
 	root string,
 	candidate OMPModelResolutionReceipt,
 	now time.Time,
-) ([]byte, bool) {
+) (data []byte, ok bool) {
 	workspace, err := openOMPRootedWorkspace(root)
 	if err != nil {
 		return nil, false
 	}
-	defer workspace.Close()
+	defer func() {
+		if workspace.Close() != nil {
+			data = nil
+			ok = false
+		}
+	}()
 	return reusableOMPModelReceiptAt(workspace, candidate, now)
 }
 

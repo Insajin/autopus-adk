@@ -17,7 +17,12 @@ func readOMPModelDoctorReceipt(root string) (receipt OMPModelResolutionReceipt, 
 	if err != nil {
 		return OMPModelResolutionReceipt{}, "receipt_invalid"
 	}
-	defer workspace.Close()
+	defer func() {
+		if workspace.Close() != nil {
+			receipt = OMPModelResolutionReceipt{}
+			reason = "receipt_invalid"
+		}
+	}()
 	return readOMPModelDoctorReceiptAt(workspace)
 }
 
@@ -105,12 +110,18 @@ func ompModelDoctorProjectionMatches(receipt OMPModelResolutionReceipt, input OM
 
 // OMPModelDoctorReceiptConfigSource returns only the fixed config-source enum
 // and the secret-free ownership digest needed to select a doctor readback path.
-func OMPModelDoctorReceiptConfigSource(root string) (string, string, string) {
+func OMPModelDoctorReceiptConfigSource(root string) (configSource string, ownershipDigest string, reason string) {
 	workspace, err := openOMPRootedWorkspace(root)
 	if err != nil {
 		return "", "", "receipt_invalid"
 	}
-	defer workspace.Close()
+	defer func() {
+		if workspace.Close() != nil {
+			configSource = ""
+			ownershipDigest = ""
+			reason = "receipt_invalid"
+		}
+	}()
 	receipt, reason := readOMPModelDoctorReceiptAt(workspace)
 	if reason != "" {
 		return "", "", reason
