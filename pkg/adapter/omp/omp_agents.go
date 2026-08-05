@@ -45,20 +45,26 @@ func (a *Adapter) prepareAgentMappingsWithProjection(
 	if err != nil {
 		return nil, err
 	}
-	if len(projected) != len(sources) {
-		return nil, fmt.Errorf("agent_role_set_mismatch: projected=%d source=%d", len(projected), len(sources))
-	}
 
 	files := make([]adapter.FileMapping, 0, len(sources))
 	for _, src := range sources {
-		selection, ok := projected[src.Meta.Name]
-		if !ok {
-			return nil, fmt.Errorf("agent_role_unmapped: %q", src.Meta.Name)
+		selection, selected := projected[src.Meta.Name]
+		if !selected {
+			role, roleErr := config.OMPAgentRole(src.Meta.Name)
+			if roleErr != nil {
+				return nil, roleErr
+			}
+			if _, roleSelected := roleSelectors[role]; roleSelected {
+				return nil, fmt.Errorf("agent_role_set_mismatch: missing=%s", src.Meta.Name)
+			}
 		}
-		content, transformErr := pkgcontent.TransformAgentForOMPWithModel(src,
-			pkgcontent.OMPAgentModelSelection{Model: selection.Model, Thinking: selection.Thinking})
-		if transformErr != nil {
-			return nil, fmt.Errorf("agent %s projection invalid: %w", src.Meta.Name, transformErr)
+		content := pkgcontent.TransformAgentForOMP(src)
+		if selected {
+			content, err = pkgcontent.TransformAgentForOMPWithModel(src,
+				pkgcontent.OMPAgentModelSelection{Model: selection.Model, Thinking: selection.Thinking})
+			if err != nil {
+				return nil, fmt.Errorf("agent %s projection invalid: %w", src.Meta.Name, err)
+			}
 		}
 		files = append(files, adapter.FileMapping{
 			TargetPath:      filepath.Join(".omp", "agents", src.Meta.Name+".md"),
@@ -99,16 +105,21 @@ func indexOMPAgentProjection(
 func indexOMPModelRoleProjection(
 	roles []OMPModelRoleProjection,
 ) (map[string]string, error) {
-	if len(roles) != len(ompProjectionRoleSpecs) {
-		return nil, fmt.Errorf("model_role_set_mismatch: projected=%d expected=%d",
+	if len(roles) > len(ompProjectionRoleSpecs) {
+		return nil, fmt.Errorf("model_role_set_mismatch: projected=%d expected_at_most=%d",
 			len(roles), len(ompProjectionRoleSpecs))
 	}
 	result := make(map[string]string, len(roles))
-	for index, role := range roles {
-		expected := ompProjectionRoleSpecs[index]
-		if role.Role != expected.role || role.Capability != expected.capability {
-			return nil, fmt.Errorf("model_role_order_mismatch: index=%d role=%s", index, role.Role)
+	nextSpec := 0
+	for _, role := range roles {
+		for nextSpec < len(ompProjectionRoleSpecs) && ompProjectionRoleSpecs[nextSpec].role != role.Role {
+			nextSpec++
 		}
+		if nextSpec == len(ompProjectionRoleSpecs) ||
+			role.Capability != ompProjectionRoleSpecs[nextSpec].capability {
+			return nil, fmt.Errorf("model_role_order_mismatch: role=%s", role.Role)
+		}
+		nextSpec++
 		selector, thinking, splitErr := splitOMPProjectedSelector(role.Selector)
 		if splitErr != nil {
 			return nil, splitErr

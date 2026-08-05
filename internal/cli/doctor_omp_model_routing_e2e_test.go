@@ -66,9 +66,9 @@ type ompModelDoctorE2ERunner struct{}
 func (*ompModelDoctorE2ERunner) Run(_ context.Context, _ string, args ...string) ([]byte, error) {
 	joined := strings.Join(args, " ")
 	if joined == "--version" {
-		return []byte("omp/17.1.8\n"), nil
+		return []byte("omp/17.2.6\n"), nil
 	}
-	if joined == "models --json" {
+	if joined == "models --json --no-extensions" {
 		return []byte(`{"models":[{"provider":"acme","id":"model","family":"acme","capabilities":["coding_tool_use","deep_reasoning","deterministic_transform","fast_validation","independent_dissent","vision_design"],"thinking":["high"],"auth_enabled":true}]}`), nil
 	}
 	key := ompModelDoctorConfigGetKey(args)

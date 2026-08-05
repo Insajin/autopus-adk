@@ -1,6 +1,7 @@
 package promptlayer
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"testing"
 	"time"
@@ -24,6 +25,12 @@ func TestVerifyOMPContextPromotionArtifactV2_AcceptsSignedExternalCohort(t *test
 		verified.CandidateCoordinates() != fixture.report.Candidate ||
 		verified.PolicyDigest() != fixture.report.Policy.PolicyDigest {
 		t.Fatalf("verified coordinates do not match report")
+	}
+	if bytes.Contains(fixture.reportBytes, []byte("credential_locator")) ||
+		bytes.Contains(fixture.reportBytes, []byte("credential_value")) ||
+		bytes.Contains(fixture.reportBytes, []byte("assistant_text")) ||
+		bytes.Contains(fixture.reportBytes, []byte("prompt_body")) {
+		t.Fatal("promotion evidence contains credential or body-bearing fields")
 	}
 }
 
@@ -78,6 +85,9 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 		{name: "retry", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].RetryCount = 1 }},
 		{name: "synthetic", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].ExecutionMode = "synthetic" }},
 		{name: "loopback", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].EndpointClass = "loopback" }},
+		{name: "provider authority drift", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[1].ProviderAuthorityDigest = promotionSHA256([]byte("other-provider-authority"))
+		}},
 		{name: "shadow", mutate: func(r *OMPContextPromotionReportV1) { r.Runtime.ExecutionClass = "shadow" }},
 		{name: "non-production path", mutate: func(r *OMPContextPromotionReportV1) { r.Runtime.ProductionPathEquivalent = false }},
 		{name: "wrong pipeline runtime", mutate: func(r *OMPContextPromotionReportV1) { r.Runtime.RuntimeKind = "omp-managed-rpc" }},
@@ -107,6 +117,19 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 		{name: "full compaction request", mutate: func(r *OMPContextPromotionReportV1) {
 			r.Observations[0].CompactionProviderRequests = 1
 			r.Observations[0].TotalProviderRequests++
+		}},
+		{name: "optimized compaction request missing", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[1].CompactionProviderRequests = 0
+			r.Observations[1].TotalProviderRequests--
+		}},
+		{name: "optimized pre ACK missing", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[1].PreCompactionACKs = 0
+		}},
+		{name: "optimized canonical readmission missing", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[1].CanonicalReadmissions = 0
+		}},
+		{name: "optimized ephemeral readmission missing", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[1].EphemeralReadmissions = 0
 		}},
 		{name: "provider request total mismatch", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].TotalProviderRequests++ }},
 		{name: "integrity failure", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].IntegrityPassed = false }},
@@ -142,22 +165,16 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 	}
 }
 
-func TestVerifyOMPContextPromotionArtifactV2_AcceptsObservedProviderRequestCounts(t *testing.T) {
+func TestVerifyOMPContextPromotionArtifactV2_AcceptsObservedSetupProviderRequestCounts(t *testing.T) {
 	fixture := newOMPContextPromotionV2Fixture(t)
 	fixture.report.Observations[0].SetupProviderRequests = 1
 	fixture.report.Observations[0].TotalProviderRequests = 2
-	for index := range fixture.report.Observations {
-		if fixture.report.Observations[index].Variant == "B" {
-			fixture.report.Observations[index].CompactionProviderRequests = 0
-			fixture.report.Observations[index].TotalProviderRequests = 1
-		}
-	}
 	fixture.resign(t)
 
 	if _, err := verifyOMPContextPromotionArtifactV2WithTrust(
 		fixture.reportBytes, fixture.attestationBytes, fixture.now, fixture.expectation,
 		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil,
 	); err != nil {
-		t.Fatalf("observed optimized request count rejected: %v", err)
+		t.Fatalf("observed setup request count rejected: %v", err)
 	}
 }

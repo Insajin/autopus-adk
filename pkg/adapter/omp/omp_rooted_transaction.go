@@ -14,14 +14,41 @@ import (
 )
 
 type ompRootedTransaction struct {
-	workspace  *ompRootedWorkspace
-	platform   string
-	id         string
-	journalRel string
-	backupRel  string
-	journal    *adapter.TransactionJournal
-	snapshots  map[string]bool
+	workspace       *ompRootedWorkspace
+	platform        string
+	id              string
+	journalRel      string
+	backupRel       string
+	journal         *adapter.TransactionJournal
+	snapshots       map[string]bool
+	configPreimages map[string]ompConfigRollbackPreimage
 }
+
+type ompConfigRollbackPreimage struct {
+	data []byte
+	mode os.FileMode
+}
+
+type ompConfigRollbackArtifact struct {
+	Schema         string                  `json:"schema"`
+	BeforeChecksum string                  `json:"before_checksum"`
+	AfterChecksum  string                  `json:"after_checksum"`
+	Hunks          []ompConfigRollbackHunk `json:"hunks"`
+}
+
+type ompConfigRollbackHunk struct {
+	Offset      int    `json:"offset"`
+	AfterLength int    `json:"after_length"`
+	Before      []byte `json:"before,omitempty"`
+}
+
+const (
+	ompConfigRollbackSchema          = "autopus.omp-config-rollback.v1"
+	maxOMPConfigRollbackInputBytes   = 4 << 20
+	maxOMPConfigRollbackArtifact     = 8 << 20
+	maxOMPConfigRollbackDiffBlock    = 1 << 20
+	maxOMPConfigRollbackEditDistance = 1024
+)
 
 func applyOMPTransactionAt(
 	workspace *ompRootedWorkspace,
@@ -30,6 +57,11 @@ func applyOMPTransactionAt(
 ) (*adapter.TransactionJournal, error) {
 	if err := validateOMPRootedTransactionPlan(plan); err != nil {
 		return nil, err
+	}
+	if len(plan.Writes) == 0 && len(plan.Removes) == 0 && plan.Manifest == nil {
+		return &adapter.TransactionJournal{
+			Platform: platform, Status: adapter.TransactionStatusCommitted,
+		}, nil
 	}
 	tx, err := newOMPRootedTransaction(workspace, platform)
 	if err != nil {
@@ -71,22 +103,19 @@ func newOMPRootedTransaction(workspace *ompRootedWorkspace, platform string) (*o
 	id := time.Now().UTC().Format("20060102T150405.000000000")
 	safePlatform := strings.NewReplacer("/", "-", string(os.PathSeparator), "-").Replace(platform)
 	dirRel := filepath.Join(".autopus", "txns", id+"-"+safePlatform)
-	root, err := workspace.openDir(dirRel, true, 0o755)
+	root, err := workspace.openDir(dirRel, true, 0o700)
 	if err != nil {
 		return nil, fmt.Errorf("transaction dir: %w", err)
 	}
 	_ = root.Close()
 	journalRel := filepath.Join(dirRel, "journal.json")
-	journalPath, err := workspace.absolute(journalRel)
-	if err != nil {
-		return nil, err
-	}
 	tx := &ompRootedTransaction{
 		workspace: workspace, platform: platform, id: id, journalRel: journalRel,
 		backupRel: filepath.Join(".autopus", "backup", id, "transaction", safePlatform),
 		journal: &adapter.TransactionJournal{ID: id, Platform: platform,
-			Status: adapter.TransactionStatusPending, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano), Path: journalPath},
-		snapshots: make(map[string]bool),
+			Status: adapter.TransactionStatusPending, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano),
+			Path: filepath.ToSlash(journalRel)},
+		snapshots: make(map[string]bool), configPreimages: make(map[string]ompConfigRollbackPreimage),
 	}
 	return tx, tx.saveJournal()
 }
@@ -116,7 +145,7 @@ func (tx *ompRootedTransaction) writeFile(write adapter.TransactionWrite) error 
 	if write.Perm == 0 {
 		write.Perm = 0o644
 	}
-	if err := tx.snapshot(rel, "write"); err != nil {
+	if err := tx.snapshot(rel, "write", write.Content); err != nil {
 		return err
 	}
 	if info, statErr := tx.workspace.lstat(rel); statErr == nil && info.IsDir() {
@@ -141,7 +170,7 @@ func (tx *ompRootedTransaction) removePath(remove adapter.TransactionRemove) err
 	} else if err != nil {
 		return err
 	}
-	if err := tx.snapshot(rel, "remove"); err != nil {
+	if err := tx.snapshot(rel, "remove", nil); err != nil {
 		return err
 	}
 	if err := tx.workspace.remove(rel, remove.Recursive); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -162,7 +191,7 @@ func (tx *ompRootedTransaction) writeManifest(manifest *adapter.Manifest) error 
 	})
 }
 
-func (tx *ompRootedTransaction) snapshot(rel, operation string) error {
+func (tx *ompRootedTransaction) snapshot(rel, operation string, after []byte) error {
 	if tx.snapshots[rel] {
 		return nil
 	}
@@ -180,13 +209,50 @@ func (tx *ompRootedTransaction) snapshot(rel, operation string) error {
 		return fmt.Errorf("transaction directory snapshots are unsupported for %s", rel)
 	}
 	entry.Mode = uint32(info.Mode().Perm())
+	if filepath.ToSlash(rel) == configFile {
+		before, _, err := tx.workspace.readFile(rel, maxOMPConfigRollbackInputBytes)
+		if err != nil {
+			return fmt.Errorf("transaction read %s preimage: %w", rel, err)
+		}
+		tx.configPreimages[entry.Path] = ompConfigRollbackPreimage{
+			data: append([]byte(nil), before...), mode: info.Mode().Perm(),
+		}
+		if operation == "write" {
+			artifact, err := encodeOMPConfigRollbackArtifact(before, after)
+			if err != nil {
+				return fmt.Errorf("transaction config rollback artifact: %w", err)
+			}
+			backupRel := filepath.Join(tx.backupRel, rel+".rollback.json")
+			if err := tx.writeOwnerOnlyBackup(backupRel, artifact); err != nil {
+				return fmt.Errorf("transaction backup %s: %w", rel, err)
+			}
+			entry.BackupPath = filepath.ToSlash(backupRel)
+		}
+		tx.addSnapshot(entry)
+		return tx.saveJournal()
+	}
 	backupRel := filepath.Join(tx.backupRel, rel)
-	if err := tx.workspace.copyFile(rel, backupRel, info.Mode().Perm()); err != nil {
+	data, _, err := tx.workspace.readFile(rel, 0)
+	if err != nil {
+		return fmt.Errorf("transaction read %s preimage: %w", rel, err)
+	}
+	if err := tx.writeOwnerOnlyBackup(backupRel, data); err != nil {
 		return fmt.Errorf("transaction backup %s: %w", rel, err)
 	}
 	entry.BackupPath = filepath.ToSlash(backupRel)
 	tx.addSnapshot(entry)
 	return tx.saveJournal()
+}
+
+func (tx *ompRootedTransaction) writeOwnerOnlyBackup(path string, data []byte) error {
+	root, err := tx.workspace.openDir(filepath.Dir(path), true, 0o700)
+	if err != nil {
+		return err
+	}
+	if err := root.Close(); err != nil {
+		return err
+	}
+	return tx.workspace.atomicWrite(path, data, 0o600)
 }
 
 func (tx *ompRootedTransaction) addSnapshot(entry adapter.TransactionJournalEntry) {
@@ -209,31 +275,6 @@ func (tx *ompRootedTransaction) saveJournal() error {
 		return fmt.Errorf("transaction journal encode: %w", err)
 	}
 	return tx.workspace.atomicWrite(tx.journalRel, append(data, '\n'), 0o600)
-}
-
-func (tx *ompRootedTransaction) rollback() error {
-	for index := len(tx.journal.Entries) - 1; index >= 0; index-- {
-		entry := tx.journal.Entries[index]
-		if entry.MissingBefore {
-			if err := tx.workspace.remove(entry.Path, true); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return fmt.Errorf("rollback remove %s: %w", entry.Path, err)
-			}
-			_ = tx.workspace.removeEmptyParents(filepath.Dir(entry.Path))
-			continue
-		}
-		if entry.BackupPath == "" || entry.Directory {
-			return fmt.Errorf("rollback backup missing for %s", entry.Path)
-		}
-		data, _, err := tx.workspace.readFile(entry.BackupPath, 0)
-		if err != nil {
-			return err
-		}
-		if err := tx.workspace.atomicWrite(entry.Path, data, os.FileMode(entry.Mode)); err != nil {
-			return err
-		}
-	}
-	tx.journal.Status = adapter.TransactionStatusRolledBack
-	return tx.saveJournal()
 }
 
 func loadOMPManifestAt(workspace *ompRootedWorkspace, platform string) (*adapter.Manifest, error) {

@@ -20,9 +20,16 @@ type pipelineOMPActiveCallReceipt struct {
 	MaintenanceOutputTokens int64
 	TotalTokens             int64
 	CompactionCycles        int
+	PreCompactionACKs       int
+	PostCompactionACKs      int
+	CanonicalReadmissions   int
+	EphemeralReadmissions   int
 	SameProcess             bool
 	SameSession             bool
 	TerminalIdle            bool
+	BridgeBindingHash       string
+	SessionBindingHash      string
+	ContextBindingHash      string
 	ImplementationHash      string
 }
 
@@ -41,6 +48,7 @@ type pipelineOMPActiveRPCSession struct {
 	allowedModels map[string]struct{}
 	sessionID     string
 	sequence      int
+	compactions   int
 	closed        bool
 	last          pipelineOMPActiveCallReceipt
 }
@@ -109,13 +117,23 @@ func (session *pipelineOMPActiveRPCSession) Execute(
 		return prompt, nil
 	}
 	output, receipt, err := session.protocol.executeManaged(
-		ctx, selector, session.binding, session.sessionID, session.sequence > 0, preparePrompt,
+		ctx, selector, session.binding, session.sessionID, true, preparePrompt,
 	)
 	if err != nil {
 		_ = session.closeLocked()
 		return "", err
 	}
+	receipt.ContextBindingHash = prepared.Binding.BindingHash
+	if receipt.CompactionCycles != 1 || receipt.PreCompactionACKs != 1 ||
+		receipt.PostCompactionACKs != 1 || receipt.CanonicalReadmissions != 1 ||
+		receipt.EphemeralReadmissions != 1 ||
+		receipt.SessionBindingHash != workflowContextRuntimeHash(session.sessionID+"\x00"+session.binding.NonceHash) ||
+		receipt.ContextBindingHash == "" || !receipt.SameProcess || !receipt.SameSession || !receipt.TerminalIdle {
+		_ = session.closeLocked()
+		return "", errors.New("pipeline: managed active compaction admission evidence is incomplete")
+	}
 	session.sequence++
+	session.compactions += receipt.CompactionCycles
 	receipt.Sequence = session.sequence
 	receipt.ImplementationHash = pipelineOMPActiveImplementationDigest()
 	session.last = receipt
@@ -144,10 +162,14 @@ func (session *pipelineOMPActiveRPCSession) closeLocked() error {
 		return nil
 	}
 	session.closed = true
-	if session.process == nil {
-		return nil
+	var evidenceErr error
+	if session.sequence > 0 && session.compactions != 0 && session.compactions != session.sequence {
+		evidenceErr = errors.New("pipeline: managed active multi-compaction session gate failed")
 	}
-	return session.process.Close()
+	if session.process == nil {
+		return evidenceErr
+	}
+	return errors.Join(evidenceErr, session.process.Close())
 }
 
 func (protocol *pipelineOMPRPCProtocol) initializeManaged(ctx context.Context) (string, error) {
@@ -176,106 +198,4 @@ func (protocol *pipelineOMPRPCProtocol) initializeManaged(ctx context.Context) (
 		return "", errors.New("managed active OMP compaction setting is unavailable")
 	}
 	return state.SessionID, nil
-}
-
-func (protocol *pipelineOMPRPCProtocol) executeManaged(
-	ctx context.Context,
-	model string,
-	binding WorkflowContextBridgeBinding,
-	expectedSession string,
-	compactBefore bool,
-	preparePrompt func() (string, error),
-) (string, pipelineOMPActiveCallReceipt, error) {
-	provider, modelID, ok := strings.Cut(model, "/")
-	if !ok || !safePipelineOMPToken(provider) || !safePipelineOMPToken(modelID) || preparePrompt == nil {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP phase authority is invalid")
-	}
-	if _, err := protocol.call(ctx, pipelineOMPRPCCommand{Type: "set_model", Provider: provider, ModelID: modelID}, false); err != nil {
-		return "", pipelineOMPActiveCallReceipt{}, err
-	}
-	beforeState, err := protocol.readIdleState(ctx, "managed-pre-prompt")
-	if err != nil || beforeState.SessionID != expectedSession {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP pre-prompt session changed")
-	}
-	var preparedPrompt string
-	promptReady := false
-	rehydrate := func() (string, error) {
-		if promptReady {
-			return preparedPrompt, nil
-		}
-		body, prepareErr := preparePrompt()
-		if prepareErr != nil {
-			return "", prepareErr
-		}
-		preparedPrompt, promptReady = body, true
-		return preparedPrompt, nil
-	}
-	maintenanceInput, maintenanceOutput := int64(0), int64(0)
-	maintenanceTotal := int64(0)
-	if compactBefore {
-		beforeMaintenance, statsErr := protocol.sessionStats(ctx, expectedSession)
-		if statsErr != nil {
-			return "", pipelineOMPActiveCallReceipt{}, statsErr
-		}
-		if err := protocol.manualCompact(ctx, binding, expectedSession, rehydrate); err != nil {
-			return "", pipelineOMPActiveCallReceipt{}, err
-		}
-		afterMaintenance, statsErr := protocol.sessionStats(ctx, expectedSession)
-		if statsErr != nil || afterMaintenance.Input < beforeMaintenance.Input ||
-			afterMaintenance.Output < beforeMaintenance.Output || afterMaintenance.Total < beforeMaintenance.Total {
-			return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP maintenance usage is not monotonic")
-		}
-		maintenanceInput = afterMaintenance.Input - beforeMaintenance.Input
-		maintenanceOutput = afterMaintenance.Output - beforeMaintenance.Output
-		maintenanceTotal = afterMaintenance.Total - beforeMaintenance.Total
-	}
-	prompt, err := rehydrate()
-	if err != nil {
-		return "", pipelineOMPActiveCallReceipt{}, err
-	}
-	beforeStats, err := protocol.sessionStats(ctx, expectedSession)
-	if err != nil {
-		return "", pipelineOMPActiveCallReceipt{}, err
-	}
-	err = protocol.callManagedPrompt(ctx, prompt)
-	if err != nil {
-		return "", pipelineOMPActiveCallReceipt{}, err
-	}
-	afterState, err := protocol.readIdleState(ctx, "managed-post-prompt")
-	if err != nil || afterState.SessionID != expectedSession || *afterState.MessageCount <= *beforeState.MessageCount {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP primary did not settle in the same session")
-	}
-	afterStats, err := protocol.sessionStats(ctx, expectedSession)
-	if err != nil || afterStats.Input < beforeStats.Input || afterStats.Output < beforeStats.Output ||
-		afterStats.Total < beforeStats.Total {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP usage is not monotonic")
-	}
-	data, err := protocol.call(ctx, pipelineOMPRPCCommand{Type: "get_last_assistant_text"}, false)
-	if err != nil {
-		return "", pipelineOMPActiveCallReceipt{}, err
-	}
-	var output struct {
-		Text string `json:"text"`
-	}
-	if json.Unmarshal(data, &output) != nil || strings.TrimSpace(output.Text) == "" {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP returned empty assistant output")
-	}
-	if err := validatePipelineOMPActiveText(output.Text); err != nil {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP returned unsafe assistant output")
-	}
-	if _, _, err := protocol.validatePipelineOMPActiveTranscript(ctx, false); err != nil {
-		return "", pipelineOMPActiveCallReceipt{}, err
-	}
-	inputDelta, outputDelta := afterStats.Input-beforeStats.Input, afterStats.Output-beforeStats.Output
-	totalDelta := afterStats.Total - beforeStats.Total
-	if inputDelta <= 0 || outputDelta <= 0 || totalDelta < inputDelta+outputDelta {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP usage delta is empty")
-	}
-	return output.Text, pipelineOMPActiveCallReceipt{
-		SessionID: expectedSession, InputTokens: inputDelta, OutputTokens: outputDelta,
-		MaintenanceInputTokens: maintenanceInput, MaintenanceOutputTokens: maintenanceOutput,
-		TotalTokens:      totalDelta + maintenanceTotal,
-		CompactionCycles: boolToPipelineOMPCount(compactBefore),
-		SameProcess:      true, SameSession: true, TerminalIdle: true,
-	}, nil
 }

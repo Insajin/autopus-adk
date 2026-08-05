@@ -25,6 +25,7 @@ printf 'home=%s\n' "$HOME"
 printf 'tmp=%s\n' "$TMPDIR"
 printf 'config=%s\n' "$XDG_CONFIG_HOME"
 printf 'data=%s\n' "$XDG_DATA_HOME"
+printf 'state=%s\n' "$XDG_STATE_HOME"
 printf 'cache=%s\n' "$XDG_CACHE_HOME"
 printf 'lang=%s/%s\n' "$LANG" "$LC_ALL"
 printf 'secret=%s/%s\n' "${OMP_MODEL_PROBE_SECRET-unset}" "${OPENAI_API_KEY-unset}"
@@ -42,12 +43,70 @@ printf 'cwd=%s\n' "$PWD"
 	assert.Contains(t, text, "lang=C/C\n")
 	assert.Contains(t, text, "secret=unset/unset\n")
 	assert.NotContains(t, text, secret)
-	for _, name := range []string{"home", "tmp", "config", "data", "cache"} {
+	for _, name := range []string{"home", "tmp", "config", "data", "state", "cache"} {
 		line := ompModelProbeOutputValue(t, text, name)
 		assert.Contains(t, line, "autopus-omp-model-probe-")
 		assert.True(t, filepath.IsAbs(line))
 	}
 	assert.Contains(t, ompModelProbeOutputValue(t, text, "cwd"), "autopus-omp-model-probe-")
+}
+
+func TestOMPInstalledModelProbeProcess_RunUsesOnlyInstalledProfileLocators(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home")
+	profile := filepath.Join(root, "profile")
+	require.NoError(t, os.Mkdir(home, 0o700))
+	require.NoError(t, os.Mkdir(profile, 0o700))
+	canonicalHome, err := filepath.EvalSymlinks(home)
+	require.NoError(t, err)
+	canonicalProfile, err := filepath.EvalSymlinks(profile)
+	require.NoError(t, err)
+	t.Setenv("HOME", home)
+	t.Setenv("PI_CODING_AGENT_DIR", profile)
+	t.Setenv("OPENAI_API_KEY", "blocked-api-key")
+	t.Setenv("ANTHROPIC_API_KEY", "blocked-api-key")
+	t.Setenv("OMP_ACCESS_TOKEN", "blocked-token")
+	t.Setenv("AUTOPUS_GENERAL_ENV", "blocked-general")
+	t.Setenv("PI_CONFIG_FILES", filepath.Join(root, "project.yml"))
+
+	executable := writeOMPModelProbeExecutable(t, `#!/bin/sh
+printf 'args=%s\n' "$*"
+printf 'home=%s\n' "$HOME"
+printf 'profile=%s\n' "$PI_CODING_AGENT_DIR"
+printf 'tmp=%s\n' "$TMPDIR"
+printf 'config=%s\n' "$XDG_CONFIG_HOME"
+printf 'data=%s\n' "$XDG_DATA_HOME"
+printf 'state=%s\n' "$XDG_STATE_HOME"
+printf 'cache=%s\n' "$XDG_CACHE_HOME"
+printf 'secrets=%s/%s/%s/%s/%s\n' "${OPENAI_API_KEY-unset}" "${ANTHROPIC_API_KEY-unset}" "${OMP_ACCESS_TOKEN-unset}" "${AUTOPUS_GENERAL_ENV-unset}" "${PI_CONFIG_FILES-unset}"
+printf 'cwd=%s\n' "$PWD"
+`)
+	process, err := NewOMPInstalledModelProbeProcess(executable, 4096)
+	require.NoError(t, err)
+	output, err := process.Run(context.Background(), "models", "--json", "--no-extensions")
+	require.NoError(t, err)
+
+	text := string(output)
+	assert.Contains(t, text, "args=models --json --no-extensions\n")
+	assert.Equal(t, canonicalHome, ompModelProbeOutputValue(t, text, "home"))
+	assert.Equal(t, canonicalProfile, ompModelProbeOutputValue(t, text, "profile"))
+	assert.Equal(t, "unset/unset/unset/unset/unset", ompModelProbeOutputValue(t, text, "secrets"))
+	assert.NotContains(t, text, "blocked-api-key")
+	assert.NotContains(t, text, "blocked-token")
+	assert.NotContains(t, text, "blocked-general")
+	for _, name := range []string{"tmp", "config", "data", "state", "cache", "cwd"} {
+		assert.Contains(t, ompModelProbeOutputValue(t, text, name), "autopus-omp-model-probe-")
+	}
+}
+
+func TestNewOMPInstalledModelProbeProcess_RejectsUnsafeProfileLocator(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PI_CODING_AGENT_DIR", "relative-profile")
+
+	process, err := NewOMPInstalledModelProbeProcess("/bin/sh", 1024)
+	assert.Nil(t, process)
+	assert.ErrorContains(t, err, "PI_CODING_AGENT_DIR locator is invalid")
 }
 
 func TestOMPModelProbeProcess_RunEnforcesOutputLimit(t *testing.T) {

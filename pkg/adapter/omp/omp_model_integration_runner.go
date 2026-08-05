@@ -12,7 +12,7 @@ type ompModelIntegrationExecRunner struct {
 }
 
 func newOMPModelIntegrationExecRunner() *ompModelIntegrationExecRunner {
-	process, err := NewOMPModelProbeProcess(cliBinary, defaultOMPModelProbeOutput)
+	process, err := NewOMPInstalledModelProbeProcess(cliBinary, defaultOMPModelProbeOutput)
 	return &ompModelIntegrationExecRunner{process: process, pinErr: err}
 }
 
@@ -32,7 +32,7 @@ func (r ompModelIntegrationExecRunner) Run(
 
 func safeOMPModelIntegrationArgs(args []string) bool {
 	joined := strings.Join(args, " ")
-	if joined == "--version" || joined == "models --json" {
+	if joined == "--version" || joined == "models --json --no-extensions" {
 		return true
 	}
 	keyIndex := 2

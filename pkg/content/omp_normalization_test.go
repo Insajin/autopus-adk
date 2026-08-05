@@ -21,6 +21,18 @@ var flatSkillRefRe = regexp.MustCompile(`\.agents/skills/[a-z0-9-]+\.md`)
 // a second time. omp emits rules at `.agents/rules/autopus/<name>.md` only.
 var doubledRuleNamespaceRe = regexp.MustCompile(`\.agents/rules/autopus/autopus/`)
 
+var ompForbiddenCoordinationTokens = []string{
+	"Agent(", "subagent_type", "prompt =", "prompt=", "task tool", "task(...)", "spawn_agent", "multi_agent",
+	"send_input", "wait_agent", "close_agent", "TodoWrite",
+	"TaskCreate", "TaskUpdate", "TaskList", "TaskGet",
+	"TeamCreate", "TeamDelete", "SendMessage", "ToolSearch",
+	"AskUserQuestion", "request_user_input", "auto pipeline worktree",
+}
+
+func stripOMPTestInventoryGlobs(body string) string {
+	return ompRootGlobInventoryRe.ReplaceAllString(body, "${2}")
+}
+
 // TestOMPNormalization_S12_PathPrefixes covers REQ-015 stage-1 prefix mapping.
 func TestOMPNormalization_S12_PathPrefixes(t *testing.T) {
 	raw, err := fs.ReadFile(contentfs.FS, "rules/doc-storage.md")
@@ -99,12 +111,20 @@ func TestOMPNormalization_S12_WorkflowToolNames(t *testing.T) {
 	}
 }
 
-// TestOMPNormalization_S12_AgentInvocationSyntax covers REQ-015 agent-call rewriting.
+// TestOMPNormalization_S12_AgentInvocationSyntax covers the native batch
+// contract and rejects the legacy single-agent pseudo-call fields.
 func TestOMPNormalization_S12_AgentInvocationSyntax(t *testing.T) {
 	got := ReplacePlatformReferences(`Agent(subagent_type="executor", task="build")`, "omp")
-	assert.Contains(t, got, `subagent_type="executor"`)
-	assert.NotContains(t, got, "Agent(subagent_type=",
-		"Claude Agent() invocation syntax must be rewritten for omp")
+	for _, field := range []string{
+		`"context"`, `"tasks"`, `"agent"`, `"task"`, `"outputSchema"`,
+		`"schemaMode"`, `"isolated"`, `"owned_paths"`, `"changed_files"`,
+		`"verification"`, `"blockers"`, `"next_required_step"`,
+	} {
+		assert.Contains(t, got, field)
+	}
+	for _, token := range ompForbiddenCoordinationTokens {
+		assert.NotContains(t, got, token)
+	}
 }
 
 // TestOMPNormalization_S12_EmittedSkillBodies covers REQ-015 across the catalog.
@@ -116,14 +136,19 @@ func TestOMPNormalization_S12_EmittedSkillBodies(t *testing.T) {
 	require.NotEmpty(t, skills, "omp must compile at least one catalog skill")
 
 	for _, skill := range skills {
-		assert.NotContains(t, skill.Content, ".claude/",
-			"skill %s must not reference a Claude-native path", skill.Name)
+		for _, token := range ompForbiddenCoordinationTokens {
+			assert.NotContains(t, skill.Content, token,
+				"skill %s retained legacy coordination token %q", skill.Name, token)
+		}
+		sweepContent := stripOMPTestInventoryGlobs(skill.Content)
+		for _, token := range []string{".claude/", ".codex/", ".opencode/", ".gemini/"} {
+			assert.NotContains(t, sweepContent, token,
+				"skill %s retained operational foreign platform path %q", skill.Name, token)
+		}
 		assert.Empty(t, flatSkillRefRe.FindAllString(skill.Content, -1),
 			"skill %s must not reference .agents/skills/<name>.md", skill.Name)
 		assert.Empty(t, doubledRuleNamespaceRe.FindAllString(skill.Content, -1),
 			"skill %s must reference .agents/rules/autopus/<name>.md, not a doubled namespace", skill.Name)
-		assert.False(t, strings.Contains(skill.Content, "TodoWrite"),
-			"skill %s must use the omp tool name todo", skill.Name)
 	}
 }
 

@@ -27,11 +27,13 @@ func replaceAgentCalls(line string, platform string) string {
 				return `@` + name + ` ` + task
 			}
 			return `@` + name
-		case "opencode", "omp":
+		case "opencode":
 			if task != "" {
 				return `task tool → subagent_type="` + name + `", prompt="` + task + `"`
 			}
 			return `task tool → subagent_type="` + name + `"`
+		case "omp":
+			return renderOMPTaskBatch([]ompLegacyDispatch{{agent: name, task: task}})
 		default:
 			return match
 		}
@@ -60,20 +62,20 @@ func replaceTodoWrite(line string, platform string) string {
 	return line
 }
 
-// ompWorkflowToolReplacer rewrites Claude-only workflow tool names for omp.
-// Only `todo` is an omp canonical tool name (REQ-006 mapping table); the omp
-// tool surface measured for this SPEC has no counterpart for the interactive
-// question and team-messaging tools, so those become neutral prose instead of
-// an invented tool name.
+// ompWorkflowToolReplacer is the line-level fallback for OMP bodies that do
+// not require the full semantic contract. Coordination-heavy bodies are
+// normalized as a whole by NormalizeOMPSemanticReferences.
 var ompWorkflowToolReplacer = strings.NewReplacer(
-	"AskUserQuestion", "user prompt",
-	"request_user_input", "user prompt",
-	"TaskCreate", "todo",
-	"TaskUpdate", "todo",
-	"TaskList", "todo",
-	"TaskGet", "todo",
-	"TeamCreate", "parallel agent run",
-	"SendMessage", "agent result handoff",
+	"AskUserQuestion", "ask the user directly",
+	"request_user_input", "ask the user directly",
+	"TaskCreate", "todo append operation",
+	"TaskUpdate", "todo state operation",
+	"TaskList", "todo view operation",
+	"TaskGet", "todo view operation",
+	"TeamCreate", "task batch",
+	"TeamDelete", "hub cancellation",
+	"SendMessage", "hub message",
+	"ToolSearch", "available tool discovery",
 )
 
 var openCodeWorkflowToolReplacer = strings.NewReplacer(

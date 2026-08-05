@@ -155,7 +155,7 @@ export default function autopusContextBridge(pi: BridgeAPI): void {
 `
 )
 
-// OMPContextBridgeSourceIdentity describes the only generated extension admitted by a managed runtime.
+// OMPContextBridgeSourceIdentity describes the generated context bridge admitted by a managed runtime.
 type OMPContextBridgeSourceIdentity struct {
 	TargetPath string
 	SHA256     string
@@ -186,6 +186,9 @@ func prepareOMPContextBridgeMappings(cfg *config.HarnessConfig) ([]adapter.FileM
 	if !selected {
 		return nil, nil
 	}
+	// The context-policy opt-in owns both managed extensions: the bridge and
+	// the explicit /autopus-pipeline headless entrypoint. Neither is emitted
+	// for the default interactive Markdown command surface.
 	return []adapter.FileMapping{{
 		SourceTemplate:  "embedded:omp-context-bridge-v1",
 		TargetPath:      ompContextBridgeTarget,

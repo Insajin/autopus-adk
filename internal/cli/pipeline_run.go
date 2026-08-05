@@ -50,7 +50,7 @@ func newPipelineRunCmdWithConfig(cfg *pipelineRunConfig) *cobra.Command {
 
 	cmd.Flags().StringVar(&cfg.Platform, "platform", "", "AI platform to use (claude, codex, gemini, omp). Auto-detected when omitted.")
 	// @AX:NOTE [AUTO]: magic constant — default strategy "sequential" encodes execution policy; change with care
-	cmd.Flags().Var(newStrategyValue("sequential", &cfg.Strategy), "strategy", "Execution strategy: sequential or parallel.")
+	cmd.Flags().Var(newStrategyValue("sequential", &cfg.Strategy), "strategy", "Execution strategy: sequential.")
 	cmd.Flags().BoolVar(&cfg.Continue, "continue", false, "Resume from the last saved checkpoint.")
 	cmd.Flags().BoolVar(&cfg.DryRun, "dry-run", false, "Build prompts without invoking the backend.")
 
@@ -76,13 +76,11 @@ func (s *strategyValue) Type() string { return "strategy" }
 
 // Set validates and stores the strategy value.
 func (s *strategyValue) Set(v string) error {
-	switch v {
-	case "sequential", "parallel":
-		*s.val = v
-		return nil
-	default:
-		return fmt.Errorf("invalid strategy %q: must be sequential or parallel", v)
+	if v != "sequential" {
+		return fmt.Errorf("invalid strategy %q: must be sequential", v)
 	}
+	*s.val = v
+	return nil
 }
 
 // @AX:NOTE [AUTO]: magic constants — platform probe order ["claude", "codex", "agy"] and fallback "claude" are implicit policy

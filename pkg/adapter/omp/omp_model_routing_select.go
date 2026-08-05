@@ -4,7 +4,7 @@ func selectOMPRoutingCandidate(
 	evaluated []evaluatedOMPRoutingCandidate,
 	request OMPModelRouteRequest,
 ) *evaluatedOMPRoutingCandidate {
-	if request.Role == "advisor" && request.ExecutorFamily != "" {
+	if request.ExecutorFamily != "" {
 		for index := range evaluated {
 			candidate := &evaluated[index]
 			if candidate.reason == "compatible" && candidate.model.Family != request.ExecutorFamily {
@@ -44,7 +44,7 @@ func routingAttemptsThroughSelection(
 		switch {
 		case selected != nil && candidate.index == selected.index:
 			attempt.Status, attempt.Reason = "selected", "selected"
-		case candidate.reason == "compatible" && request.Role == "advisor" && request.ExecutorFamily != "":
+		case candidate.reason == "compatible" && request.ExecutorFamily != "":
 			attempt.Reason = "same_family_deprioritized"
 		default:
 			attempt.Reason = candidate.reason
@@ -55,7 +55,7 @@ func routingAttemptsThroughSelection(
 }
 
 func resolveOMPFamilyDiversity(request OMPModelRouteRequest, selectedFamily string) OMPFamilyDiversity {
-	if request.Role != "advisor" || request.ExecutorFamily == "" {
+	if request.ExecutorFamily == "" {
 		return OMPFamilyDiversity{}
 	}
 	diversity := OMPFamilyDiversity{

@@ -114,6 +114,7 @@ type recordingManagedWorkflowContextDriver struct {
 	dispatchMode           string
 	dispatchedPrompt       string
 	dispatchedOriginalTask string
+	observation            *WorkflowContextManagedRPCObservation
 }
 
 var _ WorkflowContextManagedProcessDriver = (*recordingManagedWorkflowContextDriver)(nil)
@@ -176,6 +177,21 @@ func (driver *recordingManagedWorkflowContextDriver) ArtifactCount(context.Conte
 	driver.mu.Lock()
 	defer driver.mu.Unlock()
 	return driver.artifacts, nil
+}
+func (driver *recordingManagedWorkflowContextDriver) Observation() WorkflowContextManagedRPCObservation {
+	driver.mu.Lock()
+	defer driver.mu.Unlock()
+	if driver.observation != nil {
+		return *driver.observation
+	}
+	cycles := driver.dispatchCalls
+	return WorkflowContextManagedRPCObservation{
+		ProviderTurns: 2 + cycles, PreACKs: cycles, PostACKs: cycles,
+		NativeStarts: cycles, NativeEnds: cycles,
+		CanonicalReadmissions: cycles, EphemeralReadmissions: cycles,
+		SameProcess: true, SameSession: true, Sandboxed: true, ProviderObserved: cycles > 0,
+		ProviderAuthorityDigest: workflowContextRuntimeHash("recording-loopback-authority"),
+	}
 }
 
 func (driver *recordingManagedWorkflowContextDriver) isRunActive() bool {

@@ -68,12 +68,20 @@ func (session *pipelineOMPActiveEvaluatorSession) Execute(
 	}
 	output, receipt, err := session.protocol.executeManaged(
 		ctx, session.selector, session.binding, session.sessionID,
-		session.optimized && session.sequence > 0,
+		session.optimized,
 		func() (string, error) { return prompt, nil },
 	)
 	if err != nil {
 		_ = session.Close()
 		return "", pipelineOMPActiveCallReceipt{}, err
+	}
+	receipt.ContextBindingHash = session.binding.BindingHash
+	if session.optimized && (receipt.CompactionCycles != 1 || receipt.PreCompactionACKs != 1 ||
+		receipt.PostCompactionACKs != 1 || receipt.CanonicalReadmissions != 1 ||
+		receipt.EphemeralReadmissions != 1) ||
+		!session.optimized && receipt.CompactionCycles != 0 {
+		_ = session.Close()
+		return "", pipelineOMPActiveCallReceipt{}, errors.New("pipeline: active evaluator compaction evidence is incomplete")
 	}
 	session.sequence++
 	receipt.Sequence = session.sequence

@@ -17,6 +17,7 @@ func TestOMPContextBridgeLifecycle_ManifestUpdateAndCleanOwnOnlyExactFile(t *tes
 	ctx := context.Background()
 	root := t.TempDir()
 	bridgePath := filepath.Join(root, filepath.FromSlash(ompContextBridgeTarget))
+	routePath := filepath.Join(root, filepath.FromSlash(ompNativePipelineRouteTarget))
 	userExtension := filepath.Join(root, ".omp", "extensions", "user-owned.ts")
 	userSurface := filepath.Join(root, ".omp", "user-owned.json")
 	const userExtensionBody = "export default function userExtension() {}\n"
@@ -27,7 +28,9 @@ func TestOMPContextBridgeLifecycle_ManifestUpdateAndCleanOwnOnlyExactFile(t *tes
 	generated, err := NewWithRoot(root).Generate(ctx, optedIn)
 	require.NoError(t, err)
 	require.Contains(t, ompMappingTargets(generated.Files), ompContextBridgeTarget)
+	require.Contains(t, ompMappingTargets(generated.Files), ompNativePipelineRouteTarget)
 	assertFileBytesOMP(t, bridgePath, expectedOMPContextBridgeSource)
+	assertFileBytesOMP(t, routePath, ompNativePipelineRouteSource)
 	bridgeInfo, err := os.Stat(bridgePath)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o644), bridgeInfo.Mode().Perm())
@@ -41,7 +44,9 @@ func TestOMPContextBridgeLifecycle_ManifestUpdateAndCleanOwnOnlyExactFile(t *tes
 	updated, err := NewWithRoot(root).Update(ctx, noOptIn)
 	require.NoError(t, err)
 	assert.NotContains(t, ompMappingTargets(updated.Files), ompContextBridgeTarget)
+	assert.NotContains(t, ompMappingTargets(updated.Files), ompNativePipelineRouteTarget)
 	assert.NoFileExists(t, bridgePath)
+	assert.NoFileExists(t, routePath)
 	assertFileBytesOMP(t, userExtension, userExtensionBody)
 	assertFileBytesOMP(t, userSurface, userSurfaceBody)
 	manifest, err := adapter.LoadManifest(root, adapterName)
@@ -49,6 +54,8 @@ func TestOMPContextBridgeLifecycle_ManifestUpdateAndCleanOwnOnlyExactFile(t *tes
 	require.NotNil(t, manifest)
 	_, stillManaged := manifest.Files[ompContextBridgeTarget]
 	assert.False(t, stillManaged)
+	_, routeStillManaged := manifest.Files[ompNativePipelineRouteTarget]
+	assert.False(t, routeStillManaged)
 
 	require.NoError(t, config.Save(root, optedIn))
 	_, err = NewWithRoot(root).Update(ctx, optedIn)
@@ -56,6 +63,7 @@ func TestOMPContextBridgeLifecycle_ManifestUpdateAndCleanOwnOnlyExactFile(t *tes
 	assertBridgeManifestEntry(t, root)
 	require.NoError(t, NewWithRoot(root).Clean(ctx))
 	assert.NoFileExists(t, bridgePath)
+	assert.NoFileExists(t, routePath)
 	assert.NoFileExists(t, filepath.Join(root, ".autopus", "omp-manifest.json"))
 	assertFileBytesOMP(t, userExtension, userExtensionBody)
 	assertFileBytesOMP(t, userSurface, userSurfaceBody)
@@ -70,6 +78,7 @@ func TestOMPContextBridgeLifecycle_RejectsExtensionDirectorySymlink(t *testing.T
 	_, err := NewWithRoot(root).Generate(context.Background(), optedInOMPContextBridgeConfig())
 	require.Error(t, err)
 	assert.NoFileExists(t, filepath.Join(outside, "autopus-context.ts"))
+	assert.NoFileExists(t, filepath.Join(outside, "autopus-pipeline.ts"))
 	entries, readErr := os.ReadDir(outside)
 	require.NoError(t, readErr)
 	assert.Empty(t, entries)
@@ -96,4 +105,8 @@ func assertBridgeManifestEntry(t *testing.T, root string) {
 		Checksum: adapter.Checksum(expectedOMPContextBridgeSource),
 		Policy:   adapter.OverwriteAlways,
 	}, manifest.Files[ompContextBridgeTarget])
+	assert.Equal(t, adapter.ManifestFile{
+		Checksum: adapter.Checksum(ompNativePipelineRouteSource),
+		Policy:   adapter.OverwriteAlways,
+	}, manifest.Files[ompNativePipelineRouteTarget])
 }

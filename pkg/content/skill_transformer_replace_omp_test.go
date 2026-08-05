@@ -21,6 +21,27 @@ var ompFlatSkillPathRe = regexp.MustCompile(`\.agents/skills/[a-z0-9-]+\.md`)
 // already says .claude/rules/autopus/ and the prefix map appends autopus/ again.
 var ompDoubledRuleNamespaceRe = regexp.MustCompile(`\.agents/rules/autopus/autopus/`)
 
+var ompLegacyCoordinationTokens = []string{
+	"Agent(", "subagent_type", "prompt =", "prompt=", "task tool", "task(...)", "spawn_agent", "multi_agent",
+	"send_input", "wait_agent", "close_agent",
+	"TodoWrite", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet",
+	"TeamCreate", "TeamDelete", "SendMessage", "ToolSearch",
+	"AskUserQuestion", "request_user_input", "auto pipeline worktree",
+}
+
+var ompForeignSurfaceTokens = []string{
+	".claude/", ".codex/", ".opencode/", ".gemini/",
+	"Claude Code", "Claude", "Codex", "OpenCode", "Gemini",
+}
+
+var ompRootGlobInventoryTestRe = regexp.MustCompile(
+	`\.(codex|claude|gemini|opencode)/\*\*([^/A-Za-z0-9_-]|$)`,
+)
+
+func stripOMPTestRootGlobInventory(body string) string {
+	return ompRootGlobInventoryTestRe.ReplaceAllString(body, "${2}")
+}
+
 func ompContentBodies(t *testing.T, dir string) map[string]string {
 	t.Helper()
 
@@ -73,6 +94,9 @@ func TestReplacePlatformReferencesOMP_S12_PathPrefixes(t *testing.T) {
 		{"commands", "See `.claude/commands/auto.md`.", "`.agents/commands/auto.md`"},
 		{"agents", "See `.claude/agents/autopus/executor.md`.", "`.omp/agents/autopus/executor.md`"},
 		{"generic claude dir", "Config lives in `.claude/settings.json`.", "`.omp/settings.json`"},
+		{"codex skill root", "See `.codex/skills/autopus/verification.md`.", "`.agents/skills/verification/SKILL.md`"},
+		{"opencode command root", "See `.opencode/commands/auto.md`.", "`.agents/commands/auto.md`"},
+		{"gemini agent root", "See `.gemini/agents/autopus/reviewer.md`.", "`.omp/agents/autopus/reviewer.md`"},
 	}
 
 	for _, tt := range tests {
@@ -86,6 +110,34 @@ func TestReplacePlatformReferencesOMP_S12_PathPrefixes(t *testing.T) {
 				"the rule namespace must not double")
 		})
 	}
+}
+
+func TestReplacePlatformReferencesOMP_PreservesRootGlobInventoryOnly(t *testing.T) {
+	t.Parallel()
+
+	input := "Exclude `.codex/**`, `.claude/**`, `.gemini/**`, `.opencode/**`; " +
+		"load `.codex/skills/autopus/verification.md`, `.claude/commands/auto.md`, " +
+		"`.gemini/agents/autopus/reviewer.md`, `.opencode/rules/branding.md`, " +
+		"and operational glob `.codex/**/runtime.json`."
+	got := content.ReplacePlatformReferences(input, "omp")
+
+	for _, glob := range []string{".codex/**", ".claude/**", ".gemini/**", ".opencode/**"} {
+		assert.Equal(t, 1, strings.Count(got, glob), "intentional root inventory glob %s must survive exactly", glob)
+	}
+	for _, operational := range []string{
+		".agents/skills/verification/SKILL.md",
+		".agents/commands/auto.md",
+		".omp/agents/autopus/reviewer.md",
+		".agents/rules/autopus/branding.md",
+		".omp/**/runtime.json",
+	} {
+		assert.Contains(t, got, operational)
+	}
+	assert.NotContains(t, got, ".codex/skills/")
+	assert.NotContains(t, got, ".codex/**/runtime.json")
+	assert.NotContains(t, got, ".claude/commands/")
+	assert.NotContains(t, got, ".gemini/agents/")
+	assert.NotContains(t, got, ".opencode/rules/")
 }
 
 // TestReplacePlatformReferencesOMP_S12_SkillRefFinalForm pins the REQ-015
@@ -120,7 +172,7 @@ func TestReplacePlatformReferencesOMP_S12_ToolNames(t *testing.T) {
 
 	got := content.ReplacePlatformReferences("Track progress with the TodoWrite tool.", "omp")
 
-	assert.Contains(t, got, "Track progress with the todo tool.")
+	assert.Contains(t, got, "Track progress with the todo operation tool.")
 	assert.NotContains(t, got, "TodoWrite")
 	assert.NotContains(t, got, "todowrite", "todowrite is the opencode name, not the omp name")
 }
@@ -142,13 +194,15 @@ func TestReplacePlatformReferencesOMP_S12_ToolNameIsolation(t *testing.T) {
 	assert.NotContains(t, opencode, "TodoWrite")
 }
 
-// TestReplacePlatformReferencesOMP_S12_WorkflowToolNames pins REQ-015 for the
-// Claude-only workflow tools. omp exposes none of them under these names, so
-// none may survive into an omp surface.
+// TestReplacePlatformReferencesOMP_S12_WorkflowToolNames pins the clean
+// cutover from legacy coordination names to the native OMP field contracts.
 func TestReplacePlatformReferencesOMP_S12_WorkflowToolNames(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{"AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet", "TeamCreate", "SendMessage"} {
+	for _, name := range []string{
+		"AskUserQuestion", "TaskCreate", "TaskUpdate", "TaskList", "TaskGet",
+		"TeamCreate", "TeamDelete", "SendMessage", "ToolSearch",
+	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -160,43 +214,62 @@ func TestReplacePlatformReferencesOMP_S12_WorkflowToolNames(t *testing.T) {
 	}
 }
 
-// TestReplacePlatformReferencesOMP_S12_AgentInvocation pins REQ-015 for the
-// Claude agent-invocation syntax.
-func TestReplacePlatformReferencesOMP_S12_AgentInvocation(t *testing.T) {
+func TestReplacePlatformReferencesOMP_S12_TeamTodoHubCalls(t *testing.T) {
 	t.Parallel()
 
-	got := content.ReplacePlatformReferences(`Agent(subagent_type="executor", task="build")`, "omp")
+	input := `TeamCreate(name="delivery")
+TaskCreate(subject="Implement the slice")
+SendMessage(recipient="executor", content="Apply the review feedback")`
+	got := content.ReplacePlatformReferences(input, "omp")
 
-	assert.Contains(t, got, `subagent_type="executor"`)
-	assert.Contains(t, got, `prompt="build"`)
-	assert.NotContains(t, got, "Agent(subagent_type=")
+	assert.Contains(t, got, `"context"`)
+	assert.Contains(t, got, `"tasks"`)
+	assert.Contains(t, got, `todo with {"op":"append","phase":"Implementation","items":["<task>"]}`)
+	assert.NotContains(t, got, `"agent":`, "default general workers must omit the optional agent field")
+	assert.Contains(t, got, `hub with {"op":"send","to":"<same agent id>","message":"<follow-up>"}`)
+	for _, token := range ompLegacyCoordinationTokens {
+		assert.NotContains(t, got, token)
+	}
 }
 
-// TestReplacePlatformReferencesOMP_S12_EmittedBodies sweeps the real rule and
-// skill sources so no Claude-native path, stage-1-only skill path, or doubled
-// rule namespace reaches an omp surface.
-func TestReplacePlatformReferencesOMP_S12_EmittedBodies(t *testing.T) {
+func TestReplacePlatformReferencesOMP_S12_MultilineTaskBatch(t *testing.T) {
 	t.Parallel()
 
-	bodies := ompContentBodies(t, "rules")
-	for name, body := range ompContentBodies(t, "skills") {
-		bodies[name] = body
+	input := `Agent(
+  subagent_type = "executor",
+  prompt = """Implement the assigned slice.""",
+  isolation = "worktree"
+)
+Agent(
+  task = "Review the implementation.",
+  subagent_type = "reviewer"
+)`
+	got := content.ReplacePlatformReferences(input, "omp")
+
+	for _, field := range []string{
+		`"context"`, `"tasks"`, `"name"`, `"agent"`, `"task"`,
+		`"outputSchema"`, `"schemaMode"`, `"isolated"`,
+		`"owned_paths"`, `"changed_files"`, `"verification"`,
+		`"blockers"`, `"next_required_step"`,
+	} {
+		assert.Contains(t, got, field)
 	}
-
-	for name, body := range bodies {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			out := content.ReplacePlatformReferences(body, "omp")
-
-			assert.NotContains(t, out, ".claude/",
-				"%s must not reference a Claude-native path", name)
-			assert.Empty(t, ompFlatSkillPathRe.FindAllString(out, -1),
-				"%s must reference .agents/skills/<name>/SKILL.md", name)
-			assert.Empty(t, ompDoubledRuleNamespaceRe.FindAllString(out, -1),
-				"%s must reference .agents/rules/autopus/<name>.md", name)
-			assert.NotContains(t, out, "TodoWrite",
-				"%s must use the omp tool name todo", name)
-		})
+	assert.Contains(t, got, `"isolated": true`)
+	assert.Contains(t, got, `"agent": "executor"`)
+	assert.Contains(t, got, `"agent": "reviewer"`)
+	assert.Contains(t, got, `"name": "executor-1"`)
+	assert.Contains(t, got, `"name": "reviewer-2"`)
+	assert.Contains(t, got, "same agent")
+	assert.Contains(t, got, "non-isolated or otherwise revivable")
+	assert.Contains(t, got, "isolated worker is terminal")
+	assert.Contains(t, got, "new explicitly named `task` item")
+	assert.Contains(t, got, `{"op":"send","to":"<same agent id>","message":"<follow-up>"}`)
+	assert.Contains(t, got, `{"op":"init","list"`)
+	assert.Contains(t, got, "single DAG owner invariant")
+	assert.Contains(t, got, "OMP-local")
+	assert.Contains(t, got, "Orca-supervised")
+	assert.Contains(t, got, "orca skills get orchestration --full")
+	for _, token := range ompLegacyCoordinationTokens {
+		assert.NotContains(t, got, token)
 	}
 }

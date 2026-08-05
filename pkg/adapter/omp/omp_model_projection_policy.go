@@ -30,14 +30,6 @@ var ompProjectionCapabilities = func() map[string]struct{} {
 	return result
 }()
 
-var ompProjectionThinkingLevels = map[string]bool{
-	"minimal": true,
-	"low":     true,
-	"medium":  true,
-	"high":    true,
-	"xhigh":   true,
-}
-
 func validateOMPProjectionAgentSet(agentNames []string) error {
 	return config.ValidateOMPAgentRoleSet(agentNames)
 }

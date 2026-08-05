@@ -56,8 +56,8 @@ type OMPAgentModelProjection struct {
 	EffectiveSelector string
 }
 
-// CompileOMPModelProjection deterministically expands six semantic capability
-// resolutions into all ten OMP roles and the exact current Autopus agent set.
+// CompileOMPModelProjection deterministically expands selected semantic
+// capabilities; unresolved optional roles and agents intentionally inherit.
 func CompileOMPModelProjection(input OMPModelProjectionInput) (OMPModelProjection, error) {
 	capabilities, err := validateOMPProjectionCapabilities(input.Capabilities)
 	if err != nil {
@@ -74,7 +74,11 @@ func CompileOMPModelProjection(input OMPModelProjectionInput) (OMPModelProjectio
 	roleResults := make(map[string]OMPProjectionCapability, len(ompProjectionRoleSpecs))
 	fallbacksBySelector := make(map[string][]string)
 	for _, spec := range ompProjectionRoleSpecs {
-		resolved := capabilities[spec.capability]
+		resolved, selected := capabilities[spec.capability]
+		if !selected {
+			continue
+		}
+		// Selected capabilities alone receive native role overrides.
 		selector := formatOMPProjectedSelector(resolved.Selector, resolved.Thinking)
 		projection.ModelRoles = append(projection.ModelRoles, OMPModelRoleProjection{
 			Role: spec.role, Capability: spec.capability, Selector: selector,
@@ -104,7 +108,10 @@ func CompileOMPModelProjection(input OMPModelProjectionInput) (OMPModelProjectio
 		if roleErr != nil {
 			return OMPModelProjection{}, roleErr
 		}
-		resolved := roleResults[role]
+		resolved, selected := roleResults[role]
+		if !selected {
+			continue
+		}
 		projection.Agents = append(projection.Agents, OMPAgentModelProjection{
 			Agent:             agent,
 			Role:              role,
@@ -137,11 +144,6 @@ func validateOMPProjectionCapabilities(
 		}
 		capabilities[input.Capability] = input
 	}
-	for capability := range ompProjectionCapabilities {
-		if _, ok := capabilities[capability]; !ok {
-			return nil, fmt.Errorf("capability_missing: %s", capability)
-		}
-	}
 	return capabilities, nil
 }
 
@@ -150,7 +152,7 @@ func validateOMPProjectedSelector(selector, thinking string) error {
 	if len(parts) != 2 || !isOMPProjectionIdentifier(parts[0]) || !isOMPProjectionIdentifier(parts[1]) {
 		return fmt.Errorf("selector_invalid: %q", selector)
 	}
-	if !ompProjectionThinkingLevels[thinking] {
+	if !config.IsOMPNativeThinkingLevel(thinking) {
 		return fmt.Errorf("thinking_unsupported: %q", thinking)
 	}
 	return nil

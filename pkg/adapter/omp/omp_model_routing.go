@@ -26,13 +26,14 @@ type OMPRoutingCandidate struct {
 }
 
 type OMPModelRouteRequest struct {
-	Agent          string                `json:"agent,omitempty"`
-	Role           string                `json:"role"`
-	Capability     string                `json:"capability"`
-	Candidates     []OMPRoutingCandidate `json:"candidates"`
-	Required       bool                  `json:"required"`
-	DegradedAction string                `json:"degraded_action,omitempty"`
-	ExecutorFamily string                `json:"executor_family,omitempty"`
+	Agent                        string                `json:"agent,omitempty"`
+	Role                         string                `json:"role"`
+	Capability                   string                `json:"capability"`
+	Candidates                   []OMPRoutingCandidate `json:"candidates"`
+	Required                     bool                  `json:"required"`
+	DegradedAction               string                `json:"degraded_action,omitempty"`
+	ExecutorFamily               string                `json:"executor_family,omitempty"`
+	PreferDistinctExecutorFamily bool                  `json:"prefer_distinct_executor_family,omitempty"`
 }
 
 type OMPRoutingAttempt struct {
@@ -110,10 +111,14 @@ func ResolveOMPModelRoute(
 	selected := selectOMPRoutingCandidate(evaluated, request)
 	result.FallbackAttempts = routingAttemptsThroughSelection(evaluated, selected, request)
 	if selected == nil {
-		if request.DegradedAction != "" {
+		if request.DegradedAction != "" || !request.Required {
 			result.Status = "degraded"
 			result.Reason = "explicit_degraded"
-			result.DegradedReason = "explicit_" + request.DegradedAction
+			if request.DegradedAction != "" {
+				result.DegradedReason = "explicit_" + request.DegradedAction
+			} else {
+				result.DegradedReason = "optional_runtime_default"
+			}
 			return result
 		}
 		result.Reason = "no_compatible_candidate"

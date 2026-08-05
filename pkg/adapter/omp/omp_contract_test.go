@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -161,6 +162,71 @@ func TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape(t *testing.T) {
 	}
 }
 
+func TestOMPAdapter_REQ019_DetectUsesCredentialFreeCanonicalEnvironment(t *testing.T) {
+	skipWithoutPOSIXShellOMP(t)
+
+	base := t.TempDir()
+	home := filepath.Join(base, "home")
+	profile := filepath.Join(base, "profile")
+	require.NoError(t, os.Mkdir(home, 0o700))
+	require.NoError(t, os.Mkdir(profile, 0o700))
+	homeLink := filepath.Join(base, "home-link")
+	profileLink := filepath.Join(base, "profile-link")
+	require.NoError(t, os.Symlink(home, homeLink))
+	require.NoError(t, os.Symlink(profile, profileLink))
+	canonicalHome, err := filepath.EvalSymlinks(homeLink)
+	require.NoError(t, err)
+	canonicalProfile, err := filepath.EvalSymlinks(profileLink)
+	require.NoError(t, err)
+
+	const sentinel = "OMP-DETECT-PROVIDER-CREDENTIAL-SENTINEL"
+	for _, key := range []string{
+		"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY",
+		"OMP_ACCESS_TOKEN", "PI_PROVIDER_TOKEN",
+	} {
+		t.Setenv(key, sentinel)
+	}
+	t.Setenv("HOME", homeLink)
+	t.Setenv("PI_CODING_AGENT_DIR", profileLink)
+
+	marker := filepath.Join(base, "probe-environment")
+	binDir := t.TempDir()
+	script := `#!/bin/sh
+{
+printf 'home=%s\n' "$HOME"
+printf 'profile=%s\n' "$PI_CODING_AGENT_DIR"
+printf 'tmp=%s\n' "$TMPDIR"
+printf 'config=%s\n' "$XDG_CONFIG_HOME"
+printf 'data=%s\n' "$XDG_DATA_HOME"
+printf 'state=%s\n' "$XDG_STATE_HOME"
+printf 'cache=%s\n' "$XDG_CACHE_HOME"
+printf 'locale=%s/%s\n' "$LANG" "$LC_ALL"
+printf 'credentials=%s/%s/%s/%s/%s\n' "${OPENAI_API_KEY-unset}" "${ANTHROPIC_API_KEY-unset}" "${GOOGLE_API_KEY-unset}" "${OMP_ACCESS_TOKEN-unset}" "${PI_PROVIDER_TOKEN-unset}"
+} > ` + strconv.Quote(marker) + `
+printf 'omp/17.2.6\n'
+`
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, cliBinary), []byte(script), 0o755))
+	t.Setenv("PATH", binDir)
+
+	detected, err := NewWithRoot(t.TempDir()).Detect(context.Background())
+	require.NoError(t, err)
+	require.True(t, detected)
+	recorded, err := os.ReadFile(marker)
+	require.NoError(t, err)
+	environment := string(recorded)
+	assert.Contains(t, environment, "home="+canonicalHome+"\n")
+	assert.Contains(t, environment, "profile="+canonicalProfile+"\n")
+	assert.Contains(t, environment, "credentials=unset/unset/unset/unset/unset\n")
+	assert.NotContains(t, environment, sentinel)
+	for _, locator := range []struct{ key, leaf string }{
+		{"tmp", "tmp"}, {"config", "config"}, {"data", "data"},
+		{"state", "state"}, {"cache", "cache"},
+	} {
+		assert.Regexp(t, `(?m)^`+locator.key+`=.*/autopus-omp-detect-[^/]+/`+locator.leaf+`$`, environment)
+	}
+	assert.Contains(t, environment, "locale=C/C\n")
+}
+
 // TestOMPAdapter_REQ019_DetectAbsentBinary covers the no-binary case: detection
 // returns false without an error so `auto doctor` reports omp as unavailable
 // rather than failing the whole run.
@@ -217,30 +283,4 @@ func TestOMPAdapter_GenerateRejectsNilConfig(t *testing.T) {
 	entries, readErr := os.ReadDir(dir)
 	require.NoError(t, readErr)
 	assert.Empty(t, entries, "a rejected Generate must not leave partial output behind")
-}
-
-// snapshotTreeContract records every regular file path and its bytes under root.
-func snapshotTreeContract(t *testing.T, root string) map[string]string {
-	t.Helper()
-	out := map[string]string{}
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return readErr
-		}
-		rel, relErr := filepath.Rel(root, path)
-		if relErr != nil {
-			return relErr
-		}
-		out[filepath.ToSlash(rel)] = string(data)
-		return nil
-	})
-	require.NoError(t, err)
-	return out
 }

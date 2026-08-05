@@ -11,7 +11,7 @@ func routingCatalogC1(t *testing.T) OMPModelCatalog {
 	t.Helper()
 	raw := []byte(`{"models":[
 		{"provider":"anthropic","id":"alpha-reasoner","family":"anthropic","capabilities":["deep_reasoning","independent_dissent"],"thinking":["high","xhigh"],"auth_enabled":true},
-		{"provider":"openai","id":"beta-coder","family":"openai","capabilities":["coding_tool_use","fast_validation","deterministic_transform","independent_dissent"],"thinking":["medium","high"],"auth_enabled":true},
+		{"provider":"openai","id":"beta-coder","family":"openai","capabilities":["coding_tool_use","fast_validation","deterministic_transform","independent_dissent","deep_reasoning"],"thinking":["medium","high"],"auth_enabled":true},
 		{"provider":"google","id":"gamma-vision","family":"google","capabilities":["vision_design"],"thinking":["high"],"auth_enabled":true},
 		{"provider":"openai","id":"unauthorized-coder","family":"openai","capabilities":["coding_tool_use"],"thinking":["high"],"auth_enabled":false}
 	]}`)
@@ -123,6 +123,14 @@ func TestResolveOMPModelRoute_WithBlockedOrExplicitDegraded_FailsClosed(t *testi
 	require.Equal(t, "explicit_runtime_default", degraded.DegradedReason)
 	require.Empty(t, degraded.EffectiveSelector)
 
+	request.Required = false
+	request.DegradedAction = ""
+	optional := ResolveOMPModelRoute(catalog, "catalog_ready", request)
+	require.Equal(t, "degraded", optional.Status)
+	require.Equal(t, "optional_runtime_default", optional.DegradedReason)
+	require.Empty(t, optional.EffectiveSelector)
+
+	request.Required = true
 	request.DegradedAction = "invented"
 	invalid := ResolveOMPModelRoute(catalog, "catalog_ready", request)
 	require.Equal(t, "blocked", invalid.Status)
@@ -184,11 +192,48 @@ func TestResolveOMPModelRoute_WithSameFamilyOnly_EmitsDegradedDiversity(t *testi
 	require.False(t, got.ConsensusEvidence)
 }
 
+func TestCompileOMPModelRouting_FamilyDiversityAppliesOnlyToConfiguredRoles(t *testing.T) {
+	t.Parallel()
+	catalog := routingCatalogC1(t)
+	routes := map[string]OMPModelRouteRequest{
+		"executor": {
+			Agent: "executor", Role: "task", Capability: "coding_tool_use", Required: true,
+			Candidates: []OMPRoutingCandidate{{Selector: "openai/beta-coder", Thinking: "high"}},
+		},
+		"planner": {
+			Agent: "planner", Role: "plan", Capability: "deep_reasoning", Required: true,
+			PreferDistinctExecutorFamily: true,
+			Candidates: []OMPRoutingCandidate{
+				{Selector: "openai/beta-coder", Thinking: "high"},
+				{Selector: "anthropic/alpha-reasoner", Thinking: "high"},
+			},
+		},
+		"reviewer": {
+			Agent: "reviewer", Role: "advisor", Capability: "independent_dissent", Required: true,
+			Candidates: []OMPRoutingCandidate{
+				{Selector: "openai/beta-coder", Thinking: "high"},
+				{Selector: "anthropic/alpha-reasoner", Thinking: "high"},
+			},
+		},
+	}
+	got := CompileOMPModelRouting(OMPModelRoutingInput{
+		Catalog: catalog, CatalogReason: "catalog_ready", Routes: routes,
+	})
+	byRoute := make(map[string]OMPModelRouteResolution, len(got.Resolutions))
+	for _, resolution := range got.Resolutions {
+		byRoute[resolution.RouteID] = resolution
+	}
+	require.Equal(t, "anthropic/alpha-reasoner:high", byRoute["planner"].EffectiveSelector)
+	require.Equal(t, "satisfied", byRoute["planner"].FamilyDiversity.Status)
+	require.Equal(t, "openai/beta-coder:high", byRoute["reviewer"].EffectiveSelector)
+	require.Empty(t, byRoute["reviewer"].FamilyDiversity.Status)
+}
+
 func TestCompileOMPModelRouting_WithMapInsertionVariance_ReturnsStableOrderAndDigest(t *testing.T) {
 	t.Parallel()
 	catalog := routingCatalogC1(t)
 	base := map[string]OMPModelRouteRequest{
-		"reviewer": {Agent: "reviewer", Role: "advisor", Capability: "independent_dissent", Required: true, Candidates: []OMPRoutingCandidate{{Selector: "openai/beta-coder", Thinking: "high"}, {Selector: "anthropic/alpha-reasoner", Thinking: "high"}}},
+		"reviewer": {Agent: "reviewer", Role: "advisor", Capability: "independent_dissent", Required: true, PreferDistinctExecutorFamily: true, Candidates: []OMPRoutingCandidate{{Selector: "openai/beta-coder", Thinking: "high"}, {Selector: "anthropic/alpha-reasoner", Thinking: "high"}}},
 		"planner":  {Agent: "planner", Role: "plan", Capability: "deep_reasoning", Required: true, Candidates: []OMPRoutingCandidate{{Selector: "anthropic/alpha-reasoner", Thinking: "xhigh"}}},
 		"executor": {Agent: "executor", Role: "task", Capability: "coding_tool_use", Required: true, Candidates: []OMPRoutingCandidate{{Selector: "openai/beta-coder", Thinking: "high"}}},
 	}

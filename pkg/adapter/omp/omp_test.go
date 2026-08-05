@@ -53,7 +53,7 @@ func TestOMP_S3_E2_AgentTransformation(t *testing.T) {
 
 	transformed := pkgcontent.TransformAgentForOMP(src)
 	assert.Contains(t, transformed, "name: executor")
-	assert.Contains(t, transformed, "model: sonnet")
+	assert.NotContains(t, transformed, "model:")
 	assert.Contains(t, transformed, "tools:")
 	assert.Contains(t, transformed, "- bash")
 	assert.Contains(t, transformed, "- edit")

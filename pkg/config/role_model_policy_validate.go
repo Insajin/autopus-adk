@@ -115,7 +115,7 @@ func validateCapabilityRoute(profile, capability string, route RoleCapabilityRou
 		if !validSelector(candidate.Selector) {
 			return fmt.Errorf("role_model_policy.profiles[%s].capabilities[%s].candidates[%d].selector_invalid: %q", profile, capability, index, candidate.Selector)
 		}
-		if !validPolicyToken(candidate.Thinking) || !validPolicyToken(candidate.Family) {
+		if !IsOMPNativeThinkingLevel(candidate.Thinking) || !validPolicyToken(candidate.Family) {
 			return fmt.Errorf("role_model_policy.profiles[%s].capabilities[%s].candidates[%d].metadata_invalid", profile, capability, index)
 		}
 	}
@@ -123,10 +123,15 @@ func validateCapabilityRoute(profile, capability string, route RoleCapabilityRou
 }
 
 func validateFamilyDiversity(profile string, policy FamilyDiversityPolicyConf) error {
+	seen := make(map[string]struct{}, len(policy.Roles))
 	for _, role := range policy.Roles {
 		if _, err := OMPNativeRoleCapability(role); err != nil {
 			return fmt.Errorf("role_model_policy.profiles[%s].family_diversity.%w", profile, err)
 		}
+		if _, duplicate := seen[role]; duplicate {
+			return fmt.Errorf("role_model_policy.profiles[%s].family_diversity.role_duplicate: %q", profile, role)
+		}
+		seen[role] = struct{}{}
 	}
 	return nil
 }

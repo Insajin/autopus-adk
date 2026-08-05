@@ -12,6 +12,11 @@ import (
 	"github.com/insajin/autopus-adk/templates"
 )
 
+var ompNativeExtendedSkillTemplates = map[string]string{
+	"agent-pipeline":     "shared/omp-agent-pipeline.md.tmpl",
+	"worktree-isolation": "shared/omp-worktree-isolation.md.tmpl",
+}
+
 func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	if !ompOwnsSharedSkillSurface(cfg) {
 		return nil, nil
@@ -122,9 +127,17 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 		if !state.Compiled || state.TargetPath == "" {
 			continue
 		}
+		body := skill.Content
+		if templatePath, native := ompNativeExtendedSkillTemplates[skill.Name]; native {
+			raw, readErr := templates.FS.ReadFile(templatePath)
+			if readErr != nil {
+				return nil, fmt.Errorf("read OMP native skill %s: %w", skill.Name, readErr)
+			}
+			body = pkgcontent.NormalizeOMPSemanticReferences(string(raw))
+		}
 		content := buildMarkdown(
 			ompSkillFrontmatter(skill.Name, skill.Description),
-			skill.Content,
+			body,
 		)
 		files = append(files, adapter.FileMapping{
 			TargetPath:      filepath.FromSlash(state.TargetPath),

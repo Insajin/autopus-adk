@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/config"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -30,14 +32,20 @@ type OMPAgentModelSelection struct {
 	Thinking string
 }
 
-// TransformAgentForOMP produces an OMP markdown template from an agent source.
+// TransformAgentForOMP produces an OMP markdown template without selecting a
+// child model. Legacy Claude sonnet/opus labels are not OMP selectors, so their
+// omission intentionally inherits the parent session model.
 func TransformAgentForOMP(src AgentSource) string {
-	return renderAgentForOMP(src, src.Meta.Model, "")
+	model := src.Meta.Model
+	if model == "sonnet" || model == "opus" {
+		model = ""
+	}
+	return renderAgentForOMP(src, model, "")
 }
 
 // TransformAgentForOMPWithModel produces an OMP agent using an explicitly
-// compiled native role alias. The legacy transformer stays byte-identical when
-// no role-model profile is selected.
+// compiled native role alias. Only a validated opt-in selection emits both the
+// @role model and thinking fields.
 func TransformAgentForOMPWithModel(src AgentSource, selection OMPAgentModelSelection) (string, error) {
 	if err := validateOMPAgentModelSelection(selection); err != nil {
 		return "", err
@@ -128,12 +136,7 @@ func isOMPSafeIdentifier(value string) bool {
 }
 
 func isOMPThinkingLevel(value string) bool {
-	switch value {
-	case "minimal", "low", "medium", "high", "xhigh":
-		return true
-	default:
-		return false
-	}
+	return config.IsOMPNativeThinkingLevel(value)
 }
 
 // OMPYAMLScalar renders a value as a YAML scalar for omp frontmatter. Emitting the raw

@@ -43,8 +43,13 @@ type workflowContextObserveSessionResponse struct {
 	AssistantText            string                              `json:"assistant_text,omitempty"`
 	OutputDigest             string                              `json:"output_digest,omitempty"`
 	SessionDigest            string                              `json:"session_digest,omitempty"`
+	ProviderAuthorityDigest  string                              `json:"provider_authority_digest,omitempty"`
 	ProcessReused            bool                                `json:"process_reused,omitempty"`
 	CompactionCycles         int                                 `json:"compaction_cycles,omitempty"`
+	PreCompactionACKs        int                                 `json:"pre_compaction_acks,omitempty"`
+	PostCompactionACKs       int                                 `json:"post_compaction_acks,omitempty"`
+	CanonicalReadmissions    int                                 `json:"canonical_readmissions,omitempty"`
+	EphemeralReadmissions    int                                 `json:"ephemeral_readmissions,omitempty"`
 	Usage                    *workflowContextObserveSessionUsage `json:"usage,omitempty"`
 	CallsCompleted           int                                 `json:"calls_completed,omitempty"`
 	OwnedRootsRemaining      int                                 `json:"owned_roots_remaining,omitempty"`

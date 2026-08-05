@@ -88,7 +88,8 @@ func TestOMPAcceptance_S3_AgentFrontmatterContract(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal([]byte(fm), &parsed))
 	assert.Equal(t, "executor", parsed["name"])
 	assert.Equal(t, src.Meta.Description, parsed["description"])
-	assert.Equal(t, "sonnet", parsed["model"])
+	assert.NotContains(t, parsed, "model", "legacy Claude tiers must inherit the parent OMP model")
+	assert.NotContains(t, parsed, "thinking", "thinking is emitted only by an explicit OMP role profile")
 
 	// yield and spawns are filled in by the omp parser and must not be emitted.
 	for _, agent := range []string{"executor", "architect", "spec-writer", "annotator", "frontend-specialist"} {

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -31,70 +30,32 @@ func (runner *ompModelDoctorFakeRunner) Run(
 	return append([]byte(nil), runner.outputs[key]...), runner.errors[key]
 }
 
-func TestBuildOMPModelDoctorInput_EnrichesActualAvailableCatalogWithoutModelCall(t *testing.T) {
+func TestBuildOMPModelDoctorInput_AvailableOnlyCatalogFailsClosed(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
 	available := []byte(`{"models":[{"provider":"acme","id":"model","selector":"acme/model","reasoning":true,"input":["text","image"],"thinking":["high"]}]}`)
-	cfg := ompDoctorPolicyConfig("acme")
-	declarations := make([]omp.OMPModelCatalogDeclaration, 0, len(config.OMPProviderNeutralCapabilities()))
-	for _, capability := range config.OMPProviderNeutralCapabilities() {
-		declarations = append(declarations, omp.OMPModelCatalogDeclaration{
-			Selector: "acme/model", Family: "acme", Capability: capability,
-		})
-	}
-	catalog, reason := omp.NormalizeOMPAvailableCatalog(available, ompModelDoctorProbeOutput, declarations)
-	require.Equal(t, "catalog_ready", reason)
-	expectation, err := omp.CompileOMPModelDoctorActivationExpectation(cfg.RoleModelPolicy.Profiles["balanced"], catalog)
-	require.NoError(t, err)
-	overlay := expectation.ConfigBytes
-	overlayPath := filepath.Join(root, filepath.FromSlash(omp.DefaultOMPModelOverlayPath))
-	require.NoError(t, os.MkdirAll(filepath.Dir(overlayPath), 0o700))
-	require.NoError(t, os.WriteFile(overlayPath, overlay, 0o600))
-	canonicalOverlayPath, err := filepath.EvalSymlinks(overlayPath)
-	require.NoError(t, err)
 	runner := &ompModelDoctorFakeRunner{outputs: map[string][]byte{
-		"--version":     []byte("omp/17.1.8\n"),
-		"models --json": available,
+		"--version": []byte("omp/17.2.6\n"), "models --json --no-extensions": available,
 	}, errors: map[string]error{}}
-	for key, value := range expectation.ExpectedValues {
-		readback, marshalErr := json.Marshal(map[string]any{"key": key, "value": value})
-		require.NoError(t, marshalErr)
-		runner.outputs["--config "+canonicalOverlayPath+" config get "+key+" --json"] = readback
-	}
 
-	input := buildOMPModelDoctorInput(context.Background(), root, cfg, runner)
+	input := buildOMPModelDoctorInput(
+		context.Background(), t.TempDir(), ompDoctorPolicyConfig("acme"), runner,
+	)
 	assert.True(t, input.Enabled)
-	assert.Equal(t, "ready", input.Probe.Status)
-	assert.Equal(t, "catalog_ready", input.Probe.Reason)
-	assert.Equal(t, "omp/17.1.8", input.Probe.Version)
-	assert.Equal(t, omp.OMPModelSHA256(overlay), input.Activation.ConfigHash)
-	canonicalReadback, err := json.Marshal(expectation.ExpectedValues)
-	require.NoError(t, err)
-	assert.Equal(t, omp.OMPModelSHA256(canonicalReadback), input.Activation.ReadbackHash)
-	assert.Len(t, input.Compilation.Resolutions, 16)
-	for _, resolution := range input.Compilation.Resolutions {
-		assert.Equal(t, "selected", resolution.Status, resolution.RouteID)
-		assert.Equal(t, "availability", resolution.EvidenceClass, resolution.RouteID)
-		assert.False(t, resolution.QuorumEvidence, resolution.RouteID)
-	}
-	assert.Equal(t, []string{
-		"--version", "models --json", "models --json",
-		"--config " + canonicalOverlayPath + " config get modelRoles --json",
-		"--config " + canonicalOverlayPath + " config get retry.fallbackChains --json",
-		"--config " + canonicalOverlayPath + " config get retry.modelFallback --json",
-	}, runner.calls)
-	for _, call := range runner.calls {
-		assert.NotContains(t, call, "prompt")
-	}
+	assert.Equal(t, "blocked", input.Probe.Status)
+	assert.Equal(t, "catalog_metadata_insufficient", input.Probe.Reason)
+	assert.Empty(t, input.Probe.Catalog.Models)
+	assert.Empty(t, input.Compilation.Resolutions)
+	assert.Empty(t, input.Activation.ConfigHash)
+	assert.Equal(t, []string{"--version", "models --json --no-extensions"}, runner.calls)
 }
 
 func TestBuildOMPModelDoctorInput_MetadataGapStaysExactBlockedReason(t *testing.T) {
 	t.Parallel()
 
 	runner := &ompModelDoctorFakeRunner{outputs: map[string][]byte{
-		"--version":     []byte("omp/17.1.8\n"),
-		"models --json": []byte(`{"models":[{"provider":"acme","id":"model","selector":"acme/model"}]}`),
+		"--version":                     []byte("omp/17.2.6\n"),
+		"models --json --no-extensions": []byte(`{"models":[{"provider":"acme","id":"model","selector":"acme/model"}]}`),
 	}, errors: map[string]error{}}
 	cfg := ompDoctorPolicyConfig("")
 	input := buildOMPModelDoctorInput(context.Background(), t.TempDir(), cfg, runner)
@@ -137,17 +98,17 @@ func TestBuildOMPModelDoctorInput_StrictCatalogAndFailureBranches(t *testing.T) 
 	assert.Equal(t, "identity_unverified", missingRunner.Probe.Reason)
 
 	rich := &ompModelDoctorFakeRunner{outputs: map[string][]byte{
-		"--version":     []byte("omp/17.1.8\n"),
-		"models --json": []byte(`{"models":[{"provider":"acme","id":"model","family":"acme","capabilities":["coding_tool_use","deep_reasoning","deterministic_transform","fast_validation","independent_dissent","vision_design"],"thinking":["high"],"auth_enabled":true}]}`),
+		"--version":                     []byte("omp/17.2.6\n"),
+		"models --json --no-extensions": []byte(`{"models":[{"provider":"acme","id":"model","family":"acme","capabilities":["coding_tool_use","deep_reasoning","deterministic_transform","fast_validation","independent_dissent","vision_design"],"thinking":["high"],"auth_enabled":true}]}`),
 	}, errors: map[string]error{}}
 	strict := buildOMPModelDoctorInput(context.Background(), t.TempDir(), ompDoctorPolicyConfig("acme"), rich)
 	assert.Equal(t, "ready", strict.Probe.Status)
-	assert.Equal(t, []string{"--version", "models --json"}, rich.calls)
+	assert.Equal(t, []string{"--version", "models --json --no-extensions"}, rich.calls)
 	assert.Empty(t, strict.Activation.ConfigHash)
 
 	failed := &ompModelDoctorFakeRunner{outputs: map[string][]byte{
-		"--version": []byte("omp/17.1.8\n"),
-	}, errors: map[string]error{"models --json": errors.New("catalog unavailable")}}
+		"--version": []byte("omp/17.2.6\n"),
+	}, errors: map[string]error{"models --json --no-extensions": errors.New("catalog unavailable")}}
 	blocked := buildOMPModelDoctorInput(context.Background(), t.TempDir(), ompDoctorPolicyConfig("acme"), failed)
 	assert.Equal(t, "blocked", blocked.Probe.Status)
 	assert.Equal(t, "catalog_invalid", blocked.Probe.Reason)
@@ -159,6 +120,9 @@ func TestOMPModelDoctorExecRunner_LocalBoundedCommandAndNoOptProbe(t *testing.T)
 	runner := ompModelDoctorExecRunner{}
 	_, err := runner.Run(context.Background(), "go", "version")
 	require.ErrorContains(t, err, "unsafe OMP model doctor command")
+	assert.True(t, safeOMPModelDoctorProbeArgs([]string{"models", "--json", "--no-extensions"}))
+	assert.False(t, safeOMPModelDoctorProbeArgs([]string{"models", "--json"}))
+	assert.False(t, safeOMPModelDoctorProbeArgs([]string{"models", "--json", "--extensions"}))
 
 	root := t.TempDir()
 	require.NoError(t, config.Save(root, config.DefaultFullConfig("no-opt-doctor")))

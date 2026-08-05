@@ -156,6 +156,9 @@ func TestWorkflowContextProductSession_RejectsUnverifiedDriverAndCapabilities(t 
 		{name: "unobserved version", mutate: func(capabilities *WorkflowContextCapabilities) {
 			capabilities.Version = "OMP version unknown"
 		}},
+		{name: "provider credential authority unproved", mutate: func(capabilities *WorkflowContextCapabilities) {
+			capabilities.ProviderCredentialAuthority = false
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input, runtime, _, factory := newWorkflowContextProductFixture(t)

@@ -26,10 +26,6 @@ func TestCompileOMPModelProjection_InvalidContractsFailClosed(t *testing.T) {
 			},
 		},
 		{
-			name: "missing capability", code: "capability_missing",
-			edit: func(input *OMPModelProjectionInput) { input.Capabilities = input.Capabilities[:5] },
-		},
-		{
 			name: "invalid fallback", code: "selector_invalid",
 			edit: func(input *OMPModelProjectionInput) {
 				input.Capabilities[1].Fallbacks[0].Selector = "sonnet"
@@ -76,12 +72,6 @@ func TestOMPModelOverlayFromProjection_InvalidCompiledShapeFailsClosed(t *testin
 		code string
 		edit func(*OMPModelProjection)
 	}{
-		{
-			name: "missing role", code: "model_role_set_mismatch",
-			edit: func(projection *OMPModelProjection) {
-				projection.ModelRoles = projection.ModelRoles[:len(projection.ModelRoles)-1]
-			},
-		},
 		{
 			name: "role order", code: "model_role_order_mismatch",
 			edit: func(projection *OMPModelProjection) {

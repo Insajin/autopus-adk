@@ -42,10 +42,13 @@ type WorkflowContextManagedRPCObservation struct {
 	PostACKs                  int
 	NativeStarts              int
 	NativeEnds                int
+	CanonicalReadmissions     int
+	EphemeralReadmissions     int
 	SameProcess               bool
 	SameSession               bool
 	Sandboxed                 bool
 	ProviderObserved          bool
+	ProviderAuthorityDigest   string
 	ProcessActiveAfterCleanup bool
 }
 
@@ -117,6 +120,9 @@ func NewWorkflowContextManagedRPCDriver(
 	return &WorkflowContextManagedRPCDriver{
 		options: normalized, baseRoot: baseRoot, directoryRoot: directoryRoot, directoryInfo: directoryInfo,
 		sourceIdentities: identities, projectInfo: projectInfo,
+		observation: WorkflowContextManagedRPCObservation{
+			ProviderAuthorityDigest: workflowContextRuntimeHash(normalized.AllowedEndpoint + "\x00" + normalized.Model),
+		},
 	}, nil
 }
 

@@ -22,6 +22,7 @@ func TestOMPModelIntegrationCatalog_MetadataRunnerRejectsUnownedReads(t *testing
 	t.Parallel()
 
 	accepted := [][]string{
+		{"models", "--json", "--no-extensions"},
 		{"config", "get", "retry.modelFallback", "--json"},
 		{"--config", "/tmp/owned.yml", "config", "get", "modelRoles", "--json"},
 	}
@@ -31,6 +32,8 @@ func TestOMPModelIntegrationCatalog_MetadataRunnerRejectsUnownedReads(t *testing
 		}
 	}
 	rejected := [][]string{
+		{"models", "--json"},
+		{"models", "--json", "--extensions"},
 		{"config", "get", "provider.apiKey", "--json"},
 		{"--other", "value", "config", "get", "modelRoles", "--json"},
 		{"--config", "bad\npath", "config", "get", "modelRoles", "--json"},

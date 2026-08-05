@@ -34,6 +34,11 @@ var providerNeutralCapabilities = []string{
 	CapabilityDeterministicTransform,
 }
 
+var ompNativeThinkingLevels = map[string]struct{}{
+	"off": {}, "none": {}, "minimal": {}, "low": {}, "medium": {},
+	"high": {}, "xhigh": {}, "max": {}, "auto": {},
+}
+
 var canonicalRoleByCapability = map[string]string{
 	CapabilityDeepReasoning:          OMPRolePlan,
 	CapabilityCodingToolUse:          OMPRoleTask,
@@ -78,6 +83,13 @@ var roleBySourceAgent = map[string]string{
 // OMPProviderNeutralCapabilities returns the canonical v1 capability order.
 func OMPProviderNeutralCapabilities() []string {
 	return append([]string(nil), providerNeutralCapabilities...)
+}
+
+// IsOMPNativeThinkingLevel reports whether OMP accepts a thinking value in
+// model catalogs, role projections, and agent frontmatter.
+func IsOMPNativeThinkingLevel(value string) bool {
+	_, ok := ompNativeThinkingLevels[value]
+	return ok
 }
 
 // CanonicalOMPRoleForCapability maps a semantic capability to its default native role.

@@ -271,6 +271,8 @@ func (driver *WorkflowContextManagedRPCDriver) notePreACK() {
 func (driver *WorkflowContextManagedRPCDriver) notePostACK() {
 	driver.mu.Lock()
 	driver.observation.PostACKs++
+	driver.observation.CanonicalReadmissions++
+	driver.observation.EphemeralReadmissions++
 	driver.mu.Unlock()
 }
 

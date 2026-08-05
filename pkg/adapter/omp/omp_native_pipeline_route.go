@@ -4,8 +4,8 @@ import "github.com/insajin/autopus-adk/pkg/adapter"
 
 const (
 	ompNativePipelineRouteTarget = ".omp/extensions/autopus-pipeline.ts"
-	// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: embedded native /auto is the external OMP-to-pipeline command boundary.
-	// @AX:REASON [AUTO]: Argument admission, shell-free spawning, managed-inner recursion denial, and generated identity must stay aligned.
+	// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: embedded /autopus-pipeline is the explicit external OMP-to-pipeline command boundary.
+	// @AX:REASON [AUTO]: Argument admission, shell-free spawning, managed-inner recursion denial, and generated identity must stay aligned without claiming interactive /auto ownership.
 	// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: arguments, captured output, and notices are bounded to 512, 4096, and 320 characters.
 	ompNativePipelineRouteSource = `import { spawn } from "node:child_process";
 
@@ -40,7 +40,7 @@ const SPEC_ID_PATTERN = /^SPEC-[A-Z0-9]+(?:-[A-Z0-9]+)+$/;
 const MAX_ARGUMENT_LENGTH = 512;
 const MAX_CAPTURE_LENGTH = 4096;
 const MAX_NOTICE_LENGTH = 320;
-const USAGE = "Usage: /auto go SPEC-ID [--continue] [--dry-run] [--strategy sequential|parallel] [--auto] [--loop] [--multi] [--quality balanced|ultra] [--effort low|medium|high|xhigh|max|ultra]";
+const USAGE = "Usage: /autopus-pipeline go SPEC-ID [--continue] [--dry-run] [--strategy sequential] [--auto] [--loop] [--multi] [--quality balanced|ultra] [--effort low|medium|high|xhigh|max|ultra]";
 
 const BOOLEAN_FLAGS = new Set([
   "--continue",
@@ -51,7 +51,7 @@ const BOOLEAN_FLAGS = new Set([
 ]);
 
 const VALUE_FLAGS = new Map<string, ReadonlySet<string>>([
-  ["--strategy", new Set(["sequential", "parallel"])],
+  ["--strategy", new Set(["sequential"])],
   ["--quality", new Set(["balanced", "ultra"])],
   ["--effort", new Set(["low", "medium", "high", "xhigh", "max", "ultra"])],
 ]);
@@ -71,7 +71,7 @@ function parseRoute(args: string): ParsedRoute {
   for (let index = 2; index < tokens.length; index++) {
     const flag = tokens[index];
     if (seen.has(flag)) {
-      return { ok: false, message: "Duplicate or unsupported /auto argument. " + USAGE };
+      return { ok: false, message: "Duplicate or unsupported /autopus-pipeline argument. " + USAGE };
     }
     if (BOOLEAN_FLAGS.has(flag)) {
       seen.add(flag);
@@ -81,7 +81,7 @@ function parseRoute(args: string): ParsedRoute {
     const allowedValues = VALUE_FLAGS.get(flag);
     const value = tokens[index + 1];
     if (allowedValues === undefined || value === undefined || !allowedValues.has(value)) {
-      return { ok: false, message: "Unsupported /auto argument. " + USAGE };
+      return { ok: false, message: "Unsupported /autopus-pipeline argument. " + USAGE };
     }
     seen.add(flag);
     forwardedFlags.push(flag, value);
@@ -140,8 +140,8 @@ export default function autopusPipelineRoute(pi: CommandAPI): void {
   if (process.env.AUTOPUS_OMP_MANAGED_INNER === "1") {
     return;
   }
-  pi.registerCommand("auto", {
-    description: "Run an Autopus SPEC through the native OMP pipeline",
+  pi.registerCommand("autopus-pipeline", {
+    description: "Explicitly run an Autopus SPEC through the headless OMP pipeline",
     handler: async (args, context) => {
       const parsed = parseRoute(args);
       if (!parsed.ok) {

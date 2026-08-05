@@ -32,6 +32,8 @@ func (a *Adapter) prepareCommandMappings(cfg *config.HarnessConfig) ([]adapter.F
 }
 
 func (a *Adapter) renderWorkflowCommand(spec workflowSpec, _ *config.HarnessConfig) (string, error) {
+	// The Markdown router is the sole interactive /auto owner. Opt-in native
+	// extensions must use a distinct explicit command name.
 	if spec.Name == "auto" {
 		return a.renderRouterCommand()
 	}

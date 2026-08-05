@@ -165,6 +165,17 @@ func TestOMPDoctorProjection_SelectorFailuresSeparateWarningsFromErrors(t *testi
 	}
 }
 
+func TestOMPDoctorProjection_CatalogIsNotRequiredWithoutGeneratedSelectors(t *testing.T) {
+	report := healthyOMPDoctorReport()
+	report.CatalogReason = "catalog_empty"
+	report.SelectorResolutions = nil
+
+	check := ompDoctorCheckByID(t, projectOMPDoctorChecks(nil, report), "doctor.platform.omp.catalog")
+	assert.Equal(t, "skip", check.Status)
+	assert.Equal(t, "info", check.Severity)
+	assert.Equal(t, "catalog reason=catalog_empty", check.Detail)
+}
+
 func TestOMPDoctorProjection_DropsRawCredentialAndAbsoluteRootFields(t *testing.T) {
 	root := t.TempDir()
 	credential := "sk-doctor-projection-secret"

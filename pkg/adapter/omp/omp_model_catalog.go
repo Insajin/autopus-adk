@@ -27,7 +27,7 @@ var ompRoutingSettingAllowlist = map[string]struct{}{
 	"tools.approvalMode":   {},
 }
 
-// OMPModelCatalogRunner makes identity, setting, and model discovery hermetic.
+// OMPModelCatalogRunner constrains identity, setting, and model metadata discovery.
 type OMPModelCatalogRunner interface {
 	Run(ctx context.Context, executable string, args ...string) ([]byte, error)
 }
@@ -89,7 +89,7 @@ func ProbeOMPModelCatalog(ctx context.Context, opts OMPModelCatalogProbeOptions)
 	result.Version = strings.TrimSpace(string(version))
 	result.Settings = probeOMPModelSettings(ctx, opts)
 
-	output, probeReason := runOMPModelCatalogProbe(ctx, opts, "models", "--json")
+	output, probeReason := runOMPModelCatalogProbe(ctx, opts, "models", "--json", "--no-extensions")
 	if probeReason != "" {
 		result.Reason = catalogReasonForProbeFailure(probeReason)
 		return result

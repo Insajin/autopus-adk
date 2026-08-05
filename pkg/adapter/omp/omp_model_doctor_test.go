@@ -105,7 +105,15 @@ func TestCheckOMPModelRoutingDoctor_MissingInvalidAndMetadataGapFailClosed(t *te
 func TestCheckOMPModelRoutingDoctor_DegradedAndBlockedRolesRemainAvailabilityOnly(t *testing.T) {
 	t.Parallel()
 
-	input := writeOMPModelDoctorFixture(t)
+	root := t.TempDir()
+	receipt := modelReceiptFixture(time.Date(2026, 8, 2, 1, 2, 3, 0, time.UTC))
+	receipt.Roles = receipt.Roles[:1]
+	_, err := WriteOMPModelResolutionReceipt(OMPModelReceiptWriteInput{
+		WorkspaceRoot: root,
+		Receipt:       receipt,
+	})
+	require.NoError(t, err)
+	input := modelDoctorInput(root)
 	input.Compilation.Resolutions[0].Status = "degraded"
 	input.Compilation.Resolutions[0].Reason = "explicit_degraded"
 	input.Compilation.Resolutions[0].DegradedReason = "explicit_runtime_default"

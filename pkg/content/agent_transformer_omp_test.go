@@ -123,18 +123,19 @@ func TestTransformAgentForOMP_S3_WebSearchEmittedOnce(t *testing.T) {
 	assert.Equal(t, 1, count, "WebSearch and WebFetch must collapse to one web_search entry")
 }
 
-// TestTransformAgentForOMP_S3_FrontmatterFields pins REQ-005: name, description,
-// and model are emitted, and no omp-foreign key (yield, spawns) is invented.
+// TestTransformAgentForOMP_S3_FrontmatterFields pins REQ-005: name and
+// description are emitted, while legacy model labels and OMP-foreign keys are omitted.
 func TestTransformAgentForOMP_S3_FrontmatterFields(t *testing.T) {
 	t.Parallel()
 
 	sources := ompAgentSources(t)
 	executor := sources["executor"]
-	fm, _, _ := parseOMPAgentOutput(t, content.TransformAgentForOMP(executor))
+	fm, executorKeys, _ := parseOMPAgentOutput(t, content.TransformAgentForOMP(executor))
 
 	assert.Equal(t, "executor", fm.Name)
 	assert.Equal(t, executor.Meta.Description, fm.Description)
-	assert.Equal(t, "sonnet", fm.Model)
+	assert.Empty(t, fm.Model)
+	assert.NotContains(t, executorKeys, "model")
 
 	for _, name := range []string{"executor", "architect", "spec-writer", "annotator", "frontend-specialist"} {
 		src, ok := sources[name]
@@ -168,6 +169,7 @@ func TestTransformAgentForOMP_S3_ToollessSourceOmitsToolsKey(t *testing.T) {
 	assert.NotContains(t, out, "tools:")
 	assert.Contains(t, keys, "name")
 	assert.Contains(t, keys, "description")
+	assert.NotContains(t, keys, "model")
 }
 
 // TestTransformAgentForOMP_S3_SkillReferenceFinalForm pins the REQ-015 two-stage

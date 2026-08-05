@@ -13,6 +13,22 @@ import (
 
 var openCodeSkillPathRe = regexp.MustCompile(`\.agents/skills/([a-z0-9-]+)\.md`)
 
+var ompForeignPathRootReplacer = strings.NewReplacer(
+	".codex/", ".claude/",
+	".opencode/", ".claude/",
+	".gemini/", ".claude/",
+)
+
+var ompRootGlobInventoryRe = regexp.MustCompile(
+	`\.(codex|claude|gemini|opencode)/\*\*([^/A-Za-z0-9_-]|$)`,
+)
+var ompRootGlobInventoryRestorer = strings.NewReplacer(
+	"{{OMP_codex_ROOT_GLOB}}", ".codex/**",
+	"{{OMP_claude_ROOT_GLOB}}", ".claude/**",
+	"{{OMP_gemini_ROOT_GLOB}}", ".gemini/**",
+	"{{OMP_opencode_ROOT_GLOB}}", ".opencode/**",
+)
+
 // pathReplacements maps Claude-specific directory prefixes to platform equivalents.
 var pathReplacements = map[string]map[string]string{
 	"codex": {
@@ -70,6 +86,11 @@ func ReplacePlatformReferences(body string, platform string) string {
 		return body
 	}
 
+	p := normalizePlatform(platform)
+	if p == "omp" && hasOMPLegacyCoordination(body) {
+		body = NormalizeOMPSemanticReferences(body)
+	}
+
 	lines := strings.Split(body, "\n")
 	result := make([]string, 0, len(lines))
 
@@ -77,13 +98,17 @@ func ReplacePlatformReferences(body string, platform string) string {
 		line = replaceAgentCalls(line, platform)
 		line = replaceMCPCalls(line, platform)
 		line = replacePaths(line, platform)
-		line = replaceWorktreeIsolation(line)
+		line = replaceWorktreeIsolation(line, platform)
 		line = replaceTodoWrite(line, platform)
 		line = replaceWorkflowTools(line, platform)
 		result = append(result, line)
 	}
 
-	return strings.Join(result, "\n")
+	normalized := strings.Join(result, "\n")
+	if p == "omp" {
+		normalized = normalizeOMPBranding(normalized)
+	}
+	return normalized
 }
 
 // NormalizeAgentReferences applies platform-specific path fixes that should be
@@ -116,6 +141,10 @@ func NormalizeAgentReferences(body, platform string) string {
 // replacePaths converts .claude/ directory references to platform-specific paths.
 func replacePaths(line string, platform string) string {
 	p := normalizePlatform(platform)
+	if p == "omp" {
+		line = ompRootGlobInventoryRe.ReplaceAllString(line, "{{OMP_${1}_ROOT_GLOB}}${2}")
+		line = ompForeignPathRootReplacer.Replace(line)
+	}
 	paths, ok := pathReplacements[p]
 	if !ok {
 		return line
@@ -129,11 +158,17 @@ func replacePaths(line string, platform string) string {
 	if p == "opencode" || p == "omp" {
 		line = openCodeSkillPathRe.ReplaceAllString(line, ".agents/skills/$1/SKILL.md")
 	}
+	if p == "omp" {
+		line = ompRootGlobInventoryRestorer.Replace(line)
+	}
 	return line
 }
 
-// replaceWorktreeIsolation converts isolation: "worktree" references.
-// Reuses worktreeIsolationRe from agent_transformer_mapping.go.
-func replaceWorktreeIsolation(line string) string {
+// replaceWorktreeIsolation preserves legacy platform behavior while ensuring
+// OMP never emits the external auto-pipeline worktree pseudo-syntax.
+func replaceWorktreeIsolation(line, platform string) string {
+	if normalizePlatform(platform) == "omp" {
+		return worktreeIsolationRe.ReplaceAllString(line, `"isolated": true`)
+	}
 	return worktreeIsolationRe.ReplaceAllString(line, "auto pipeline worktree")
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,10 +21,12 @@ const (
 	cliBinary   = "omp"
 	adapterVer  = "1.0.0"
 
-	// Bounds for the --version identity probe, matching pkg/detect's limits so
-	// a wedged binary cannot stall a detection sweep.
+	// Timeout and pipe-drain bounds match pkg/detect; the output budget matches
+	// the metadata-only OMP probe policy so detection cannot buffer unbounded
+	// output from an unverified PATH executable.
 	ompVersionTimeout   = 5 * time.Second
 	ompVersionWaitDelay = 250 * time.Millisecond
+	ompVersionMaxOutput = 64 * 1024
 )
 
 // Adapter is the oh-my-pi (omp) platform adapter.
@@ -59,9 +62,9 @@ func (a *Adapter) SupportsHooks() bool { return false }
 // REQ-019: treat it as the omp platform only when its version output matches the oh-my-pi version shape.
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-002: exact "omp/X.Y.Z" release output is the identity gate,
 // not the binary name; keep the whole-string release check paired with LookPath.
-// The probe is bounded: a binary named omp that never answers --version would
-// otherwise hang `auto doctor` forever, so it inherits the caller's context and
-// adds a timeout plus a WaitDelay for output pipes left open after signalling.
+// The probe is bounded and credential-free: a binary named omp that never
+// answers --version cannot stall detection, and an impostor cannot inherit
+// provider credentials before its version output proves its identity.
 func (a *Adapter) Detect(ctx context.Context) (bool, error) {
 	path, err := exec.LookPath(cliBinary)
 	if err != nil {
@@ -73,13 +76,46 @@ func (a *Adapter) Detect(ctx context.Context) (bool, error) {
 
 	probeCtx, cancel := context.WithTimeout(ctx, ompVersionTimeout)
 	defer cancel()
+	sandbox, err := os.MkdirTemp("", "autopus-omp-detect-*")
+	if err != nil {
+		return false, nil
+	}
+	defer func() { _ = os.RemoveAll(sandbox) }()
+	for _, name := range []string{"tmp", "config", "data", "state", "cache"} {
+		if err := os.Mkdir(filepath.Join(sandbox, name), 0o700); err != nil {
+			return false, nil
+		}
+	}
+	home, err := safeOMPModelProbeDirectory(os.Getenv("HOME"), "HOME")
+	if err != nil {
+		return false, nil
+	}
+	profile := ""
+	if locator := os.Getenv("PI_CODING_AGENT_DIR"); locator != "" {
+		profile, err = safeOMPModelProbeDirectory(locator, "PI_CODING_AGENT_DIR")
+		if err != nil {
+			return false, nil
+		}
+	}
 
 	cmd := exec.CommandContext(probeCtx, path, "--version")
 	cmd.WaitDelay = ompVersionWaitDelay
-	// processprobe.Output, not cmd.Output: a probe that leaks its stdout pipe to
-	// a grandchild keeps Wait blocked past process exit, and only this helper
-	// bounds that drain and terminates the leftover process group.
-	out, err := processprobe.Output(cmd)
+	cmd.Dir = sandbox
+	cmd.Env = []string{
+		"HOME=" + home,
+		"TMPDIR=" + filepath.Join(sandbox, "tmp"),
+		"XDG_CONFIG_HOME=" + filepath.Join(sandbox, "config"),
+		"XDG_DATA_HOME=" + filepath.Join(sandbox, "data"),
+		"XDG_STATE_HOME=" + filepath.Join(sandbox, "state"),
+		"XDG_CACHE_HOME=" + filepath.Join(sandbox, "cache"),
+		"LANG=C", "LC_ALL=C",
+	}
+	if profile != "" {
+		cmd.Env = append(cmd.Env, "PI_CODING_AGENT_DIR="+profile)
+	}
+	// OutputLimited also terminates a leaked process group when either stream
+	// exceeds the version probe budget or remains open after the child exits.
+	out, err := processprobe.OutputLimited(cmd, ompVersionMaxOutput)
 	if err != nil {
 		return false, nil
 	}
@@ -115,10 +151,29 @@ func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (pf *
 	}
 
 	pf = &adapter.PlatformFiles{Files: files, Checksum: adapter.Checksum(fmt.Sprintf("%d", len(files)))}
-	plan := adapter.TransactionPlan{
-		Writes:   adapter.TransactionWritesFromFiles(files, a.fileModeResolverAt(workspace)),
-		Manifest: adapter.ManifestFromFiles(adapterName, pf),
+	resolveMode := a.fileModeResolverAt(workspace)
+	writes := make([]adapter.TransactionWrite, 0, len(files))
+	for _, file := range files {
+		perm := resolveMode(file.TargetPath)
+		unchanged, err := ompRootedMappingUnchanged(workspace, file, perm)
+		if err != nil {
+			return nil, err
+		}
+		if !unchanged {
+			writes = append(writes, adapter.TransactionWrite{
+				Path: file.TargetPath, Content: file.Content, Perm: perm,
+			})
+		}
 	}
+	manifest := adapter.ManifestFromFiles(adapterName, pf)
+	oldManifest, err := loadOMPManifestAt(workspace, adapterName)
+	if err != nil {
+		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
+	}
+	if len(writes) == 0 && ompRootedManifestUnchanged(workspace, oldManifest, manifest) {
+		manifest = nil
+	}
+	plan := adapter.TransactionPlan{Writes: writes, Manifest: manifest}
 	if _, err := applyOMPTransactionAt(workspace, adapterName, plan); err != nil {
 		return nil, err
 	}
