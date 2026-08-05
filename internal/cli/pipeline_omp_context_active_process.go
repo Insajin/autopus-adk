@@ -41,7 +41,7 @@ func preparePipelineOMPActiveProcessConfig(
 	endpointRaw, endpointFound := pipelineOMPEnvironmentValue(backend.Environment, pipelineOMPActiveEndpointKey)
 	credential, credentialFound := pipelineOMPEnvironmentValue(backend.Environment, pipelineOMPActiveCredentialKey)
 	endpoint, err := validatePipelineOMPActiveEndpoint(endpointRaw)
-	if !endpointFound || !credentialFound || err != nil || credential == "" || strings.ContainsRune(credential, 0) {
+	if !endpointFound || !credentialFound || err != nil {
 		return pipelineOMPActiveProcessConfig{}, errors.New("pipeline: managed active broker authority is unavailable")
 	}
 	nonce, err := newWorkflowContextRunNonceHash()
@@ -49,6 +49,12 @@ func preparePipelineOMPActiveProcessConfig(
 		return pipelineOMPActiveProcessConfig{}, err
 	}
 	implementation := pipelineOMPActiveImplementationDigest()
+	providerAuthority, err := pipelineOMPActiveProviderAuthorityDigest(
+		prepared.Binding.PolicyDigest, implementation, candidate.ModelScopeDigest, endpoint, credential,
+	)
+	if err != nil {
+		return pipelineOMPActiveProcessConfig{}, err
+	}
 	return pipelineOMPActiveProcessConfig{
 		backend: backend, candidate: candidate, prepared: prepared, endpoint: endpoint, credential: credential,
 		binding: WorkflowContextBridgeBinding{
@@ -56,11 +62,9 @@ func preparePipelineOMPActiveProcessConfig(
 			BindingHash: workflowContextRuntimeHash(strings.Join([]string{
 				prepared.Binding.GrantDigest, prepared.Binding.WorkspaceID, prepared.Binding.SpecID,
 				prepared.Binding.GitCommitHash, prepared.Binding.AutoSourceCommit, prepared.Binding.AutoSourceTree,
-				candidate.ScopeProvider, candidate.ModelScopeDigest, endpoint,
+				candidate.ScopeProvider, candidate.ModelScopeDigest, providerAuthority,
 			}, "\x00")),
-			OptionsHash: workflowContextRuntimeHash(strings.Join([]string{
-				prepared.Binding.PolicyDigest, implementation, candidate.ModelScopeDigest, endpoint,
-			}, "\x00")),
+			OptionsHash: providerAuthority,
 			SessionHash: workflowContextRuntimeHash(prepared.Binding.WorkspaceID + "\x00" + prepared.Binding.SpecID + "\x00" + prepared.Binding.GitCommitHash),
 			NonceHash:   nonce,
 		},

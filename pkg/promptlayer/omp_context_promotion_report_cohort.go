@@ -1,6 +1,7 @@
 package promptlayer
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -130,6 +131,78 @@ func validateOMPContextPromotionObservationV1(report OMPContextPromotionReportV1
 	observationDigests[observation.ObservationDigest] = true
 	usageDigests[observation.UsageDigest] = true
 	return nil
+}
+
+func ompContextPromotionCanaryRowsV1(report OMPContextPromotionReportV1) []OMPContextCanaryRowV1 {
+	if len(report.Tasks) != 20 || len(report.Observations) != 40 {
+		return nil
+	}
+	rows := make([]OMPContextCanaryRowV1, 0, len(report.Observations))
+	for taskIndex, task := range report.Tasks {
+		for pairIndex := range 2 {
+			observation := report.Observations[taskIndex*2+pairIndex]
+			if observation.TaskIDDigest != task.TaskIDDigest {
+				return nil
+			}
+			rows = append(rows, OMPContextCanaryRowV1{
+				TaskID: observation.TaskIDDigest, Variant: OMPContextCanaryVariantV1(observation.Variant),
+				Order: pairIndex + 1, Tokens: observation.InputTokens,
+				IntegrityPassed: observation.IntegrityPassed, SecurityPassed: observation.SecurityPassed,
+				QualityScore: observation.QualityScore, FallbackVerified: observation.FallbackVerified,
+				RollbackVerified: observation.RollbackVerified,
+			})
+		}
+	}
+	return rows
+}
+
+func ompContextPromotionProviderAuthorityDigestV1(report OMPContextPromotionReportV1) string {
+	if len(report.Observations) != 40 {
+		return ""
+	}
+	digest := report.Observations[0].ProviderAuthorityDigest
+	for _, observation := range report.Observations[1:] {
+		if observation.ProviderAuthorityDigest != digest {
+			return ""
+		}
+	}
+	return digest
+}
+
+func ompContextPromotionSessionAuthorityDigestV1(report OMPContextPromotionReportV1) string {
+	receipts := map[string]string{"A": "", "B": ""}
+	for _, observation := range report.Observations {
+		if _, ok := receipts[observation.Variant]; !ok {
+			return ""
+		}
+		if receipts[observation.Variant] == "" {
+			receipts[observation.Variant] = observation.SessionReceiptDigest
+		} else if receipts[observation.Variant] != observation.SessionReceiptDigest {
+			return ""
+		}
+	}
+	providerAuthority := ompContextPromotionProviderAuthorityDigestV1(report)
+	if receipts["A"] == "" || receipts["B"] == "" || receipts["A"] == receipts["B"] ||
+		!validOMPContextMemoryHashV1(providerAuthority) {
+		return ""
+	}
+	body, err := json.Marshal(struct {
+		Producer          OMPContextPromotionProducerV1     `json:"producer"`
+		SessionFacts      OMPContextPromotionSessionFactsV1 `json:"session_facts"`
+		Provider          string                            `json:"provider"`
+		ModelScopeDigest  string                            `json:"model_scope_digest"`
+		ProviderAuthority string                            `json:"provider_authority_digest"`
+		FullSession       string                            `json:"full_session_receipt_digest"`
+		OptimizedSession  string                            `json:"optimized_session_receipt_digest"`
+		CohortDigest      string                            `json:"cohort_manifest_digest"`
+	}{
+		report.Producer, report.SessionFacts, report.Provider, report.ModelScopeDigest, providerAuthority,
+		receipts["A"], receipts["B"], report.CohortManifestDigest,
+	})
+	if err != nil {
+		return ""
+	}
+	return promotionSHA256(body)
 }
 
 func expectedOMPContextPromotionGatesV1(medianBasisPoints int64) []OMPContextPromotionGateResultV1 {

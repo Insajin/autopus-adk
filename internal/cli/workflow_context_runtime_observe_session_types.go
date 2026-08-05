@@ -1,5 +1,11 @@
 package cli
 
+import (
+	"time"
+
+	"github.com/insajin/autopus-adk/pkg/promptlayer"
+)
+
 const (
 	workflowContextObserveSessionCommandSchema  = "autopus.omp_context_observe_session_command.v1"
 	workflowContextObserveSessionResponseSchema = "autopus.omp_context_observe_session_response.v1"
@@ -38,6 +44,8 @@ type workflowContextObserveSessionResponse struct {
 	OMPExecutableSHA256      string                              `json:"omp_executable_sha256,omitempty"`
 	Sequence                 int                                 `json:"sequence,omitempty"`
 	PairSequence             int                                 `json:"pair_sequence,omitempty"`
+	EvidenceID               string                              `json:"evidence_id,omitempty"`
+	ReportDigest             string                              `json:"report_digest,omitempty"`
 	TaskIDDigest             string                              `json:"task_id_digest,omitempty"`
 	Variant                  string                              `json:"variant,omitempty"`
 	AssistantText            string                              `json:"assistant_text,omitempty"`
@@ -53,17 +61,28 @@ type workflowContextObserveSessionResponse struct {
 	Usage                    *workflowContextObserveSessionUsage `json:"usage,omitempty"`
 	CallsCompleted           int                                 `json:"calls_completed,omitempty"`
 	OwnedRootsRemaining      int                                 `json:"owned_roots_remaining,omitempty"`
+	CleanupVerified          bool                                `json:"cleanup_verified,omitempty"`
 	ProcessesRemaining       int                                 `json:"processes_remaining,omitempty"`
 }
 
 type workflowContextObserveSessionOptions struct {
-	ProjectDir        string
-	SpecID            string
-	Provider          string
-	Model             string
-	Endpoint          string
-	CredentialLocator string
-	Executable        string
-	TargetGitCommit   string
-	SandboxMode       pipelineOMPActiveSandboxMode
+	ProjectDir          string
+	SpecID              string
+	Provider            string
+	Model               string
+	Endpoint            string
+	CredentialLocator   string
+	Executable          string
+	TargetGitCommit     string
+	SandboxMode         pipelineOMPActiveSandboxMode
+	WorkspaceID         string
+	ProducerRepository  string
+	ProducerWorkflowRef string
+	ProducerRunID       string
+	ProducerRunAttempt  int
+	CandidateRepository string
+	PolicyID            string
+	OraclePolicyDigest  string
+	PromotionPolicy     promptlayer.OMPContextPromotionPolicyV1
+	EvidenceValidFor    time.Duration
 }

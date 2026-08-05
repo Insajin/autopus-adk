@@ -4,14 +4,14 @@
 
 ### 에이전트*로 이루어진*, 에이전트*에 의해 운영되는*, 에이전트*를 위한* 하네스.
 
-AI 코딩 도구(Claude Code, Codex, Antigravity CLI, OpenCode)가 진짜 개발팀처럼 일하게 만듭니다 — 기획, 테스트, 코드 리뷰, 보안 감사까지 자동으로.
+AI 코딩 도구(Claude Code, Codex, Antigravity CLI, OpenCode, Oh My Pi)가 진짜 개발팀처럼 일하게 만듭니다 — 기획, 테스트, 코드 리뷰, 보안 감사까지 자동으로.
 
 **16개 에이전트. 40개 스킬. 하나의 설정. 모든 플랫폼.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://golang.org)
-[![Platforms](https://img.shields.io/badge/Platforms-4-orange)](#-하나의-설정-네-개-플랫폼)
+[![Platforms](https://img.shields.io/badge/Platforms-5-orange)](#-하나의-설정-다섯-개-플랫폼)
 [![Agents](https://img.shields.io/badge/Agents-16-blueviolet)](#-16개-전문-에이전트)
 [![Skills](https://img.shields.io/badge/Skills-40-ff69b4)](#-전체-명령어)
 
@@ -411,7 +411,7 @@ Autopus가 코드베이스(Cobra 커맨드, API 라우트, 프론트엔드 페�
 | **시그니처 맵** | `auto setup` | AST 분석으로 exported API 시그니처 추출 (Go + TypeScript) |
 | **테스트 러너 감지** | `auto init` | jest, vitest, pytest, cargo 테스트 프레임워크 자동 감지 |
 
-### 🌐 하나의 설정, 네 개 플랫폼
+### 🌐 하나의 설정, 다섯 개 플랫폼
 
 ```bash
 auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
@@ -425,6 +425,7 @@ auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Antigravity CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
+| **Oh My Pi (OMP)** | `.omp/agents/`, `.omp/skills/`, `.omp/commands/`, `.omp/extensions/autopus-context.ts`, `.omp/config.yml`, `.agents/skills/` |
 동일한 16개 에이전트. 동일한 규칙. 공유 스킬은 기본적으로 전체가 생성됩니다. 기존 호환성을 유지하면서 mixed Codex + OpenCode 표면을 더 작게 만들고 싶다면 `skills.shared_surface`를 건드리는 대신 `skills.compiler.mode: split`을 opt-in 하세요.
 
 Codex 참고:
@@ -443,7 +444,20 @@ OpenCode 참고:
 
 ### OMP 역할 라우팅과 컨텍스트 최적화(선택 적용)
 
-OMP 정책은 프로바이더에 종속되지 않으며 이름 있는 프로필을 선택하기 전에는 활성화되지 않습니다. 먼저 기존 설정을 직접 소유하지 않는 `overlay` 모드로 시작하고, 아래 예시 selector는 설치된 OMP 카탈로그가 보고한 정확한 인증 가능 `provider/model` 값으로 바꾸세요.
+운영자 명령:
+
+```bash
+auto platform omp models                 # 설치된 모델 카탈로그
+auto platform omp profile init --name omp-balanced --plan
+auto platform omp profile apply omp-balanced
+auto platform omp explain
+auto status --platform omp
+```
+
+현재 upstream OMP 17.2.7 카탈로그에서는 `models`가 정확한 native selector, context window, reasoning 여부, thinking 단계, input mode를 성공적인 `degraded`/조회 전용 결과로 표시합니다. OMP가 안전한 자동 라우팅에 필요한 family, Autopus capability, 인증 가능 여부 메타데이터를 아직 제공하지 않으므로 `strict_routing_ready`는 `false`이고 profile init/apply는 `catalog_metadata_insufficient`로 차단됩니다. Autopus는 이 값을 추측하거나 credential을 읽지 않습니다.
+
+
+OMP 정책은 프로바이더에 종속되지 않으며 이름 있는 프로필을 선택하기 전에는 활성화되지 않습니다. strict catalog가 준비된 뒤에만 기존 설정을 직접 소유하지 않는 `overlay` 모드로 시작하고, 아래 예시 selector는 정확한 인증 가능 `provider/model` 값으로 바꾸세요.
 
 ```yaml
 role_model_policy:
@@ -606,7 +620,7 @@ auto init
 
 Windows에서 `powershell -c ...`를 Git Bash 안에서 실행한 경우에는, 부모 Bash 프로세스의 `PATH`가 즉시 갱신되지 않으므로 설치 후 Git Bash를 다시 열어야 합니다. 이 경우 설치 스크립트가 실제 설치 경로와 `export PATH=...` 안내를 함께 출력합니다.
 
-`auto init`은 설치된 AI 코딩 CLI(Claude Code, Codex, Antigravity CLI, OpenCode)를 자동 감지하고, 각 플랫폼에 맞는 **네이티브 설정** — 규칙, 스킬, 에이전트 — 을 하나의 `autopus.yaml`에서 생성합니다.
+`auto init`은 설치된 AI 코딩 CLI(Claude Code, Codex, Antigravity CLI, OpenCode, Oh My Pi)를 자동 감지하고, 각 플랫폼에 맞는 **네이티브 설정** — 규칙, 스킬, 에이전트, 명령 — 을 하나의 `autopus.yaml`에서 생성합니다.
 
 Claude Code statusline 참고:
 - `.claude/settings.json`에 기존 `statusLine.command`가 있으면, `auto init` / `auto update` 인터랙티브 실행 시 `keep`, `merge`, `replace` 중 하나를 고를 수 있습니다.
@@ -615,14 +629,15 @@ Claude Code statusline 참고:
 플랫폼별 명령 문법:
 - Codex: 생성된 로컬 플러그인을 설치한 뒤 `@auto ...`를 사용하고, 그 전에는 `$auto ...`를 사용합니다
 - OpenCode: `/auto ...` 또는 `/auto-<subcommand> ...`를 사용합니다
-- Claude Code / Antigravity CLI: `/auto ...`를 사용합니다
+- Claude Code / Antigravity CLI / Oh My Pi: `/auto ...`를 사용합니다
 
 ```
-✓ 감지됨: claude-code, codex, antigravity-cli, opencode
+✓ 감지됨: claude-code, codex, antigravity-cli, opencode, omp
 ✓ 생성됨: .claude/rules/, .claude/skills/, .claude/agents/, CLAUDE.md
 ✓ 생성됨: .codex/, AGENTS.md
 ✓ 생성됨: .gemini/, GEMINI.md
 ✓ 생성됨: .opencode/, .agents/skills/, AGENTS.md, opencode.json
+✓ 생성됨: .omp/agents/, .omp/skills/, .omp/commands/, .omp/extensions/, .omp/config.yml
 ✓ 생성됨: autopus.yaml
 ```
 

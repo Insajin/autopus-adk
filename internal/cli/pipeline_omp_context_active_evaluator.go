@@ -17,13 +17,14 @@ const (
 // implementation without consuming promotion authority. Only the explicit-live
 // observe-session command may construct it.
 type pipelineOMPActiveEvaluatorSession struct {
-	process   *pipelineOMPProcess
-	protocol  *pipelineOMPRPCProtocol
-	binding   WorkflowContextBridgeBinding
-	selector  string
-	sessionID string
-	optimized bool
-	sequence  int
+	process     *pipelineOMPProcess
+	protocol    *pipelineOMPRPCProtocol
+	binding     WorkflowContextBridgeBinding
+	selector    string
+	sessionID   string
+	optimized   bool
+	sequence    int
+	compactions int
 }
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: evaluator startup is the shared full and optimized live-session boundary.
@@ -84,6 +85,7 @@ func (session *pipelineOMPActiveEvaluatorSession) Execute(
 		return "", pipelineOMPActiveCallReceipt{}, errors.New("pipeline: active evaluator compaction evidence is incomplete")
 	}
 	session.sequence++
+	session.compactions += receipt.CompactionCycles
 	receipt.Sequence = session.sequence
 	receipt.ImplementationHash = pipelineOMPActiveImplementationDigest()
 	return output, receipt, nil

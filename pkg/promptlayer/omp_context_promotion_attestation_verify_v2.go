@@ -68,11 +68,7 @@ func verifyOMPContextPromotionArtifactV2WithTrust(reportBytes, attestationBytes 
 	if err := validateOMPContextPromotionCohortAttestationTimeV2(report, issuedAt); err != nil {
 		return VerifiedOMPContextPromotion{}, err
 	}
-	return VerifiedOMPContextPromotion{
-		reportDigest: attestation.ReportSHA256, evidenceID: report.EvidenceID, expiresAt: expiresAt,
-		producer: report.Producer, candidate: report.Candidate, policyDigest: report.Policy.PolicyDigest,
-		runtime: report.Runtime, provider: report.Provider, modelScopeDigest: report.ModelScopeDigest,
-	}, nil
+	return verifiedOMPContextPromotionFromReportV2(report, attestation.ReportSHA256, expiresAt), nil
 }
 
 func verifyOMPContextPromotionHistoricalArtifactV2WithTrust(reportBytes, attestationBytes []byte,

@@ -156,7 +156,8 @@ func pipelineOMPActiveRPCSessionFixtureWithSandbox(
 	)
 	require.NoError(t, err)
 	prepared := pipelineOMPManagedActivePrepared{Binding: pipelineOMPActiveLeaseBinding{
-		GrantDigest: workflowContextRuntimeHash("grant"), WorkspaceID: "autopus-adk",
+		GrantDigest:  workflowContextRuntimeHash("grant"),
+		PolicyDigest: workflowContextRuntimeHash("active-rpc-policy"), WorkspaceID: "autopus-adk",
 		SpecID: config.SpecID, GitCommitHash: config.GitCommitHash,
 		ModelScopeDigest: candidate.ModelScopeDigest,
 	}}
@@ -195,7 +196,7 @@ func runPipelineOMPActiveRPCFixture() int {
 	logEncoder, output := json.NewEncoder(logFile), json.NewEncoder(os.Stdout)
 	_ = logEncoder.Encode(pipelineOMPRPCRecord{Kind: "start", PID: os.Getpid(), Args: os.Args})
 	_ = output.Encode(map[string]any{"type": "ready"})
-	messageCount, promptCount := 0, 0
+	messageCount, promptCount, compactionCount := 0, 0, 0
 	inputTokens, outputTokens := int64(0), int64(0)
 	transcript := []json.RawMessage{json.RawMessage(`{"role":"system","content":"safe system context"}`)}
 	scanner := bufio.NewScanner(os.Stdin)
@@ -205,7 +206,7 @@ func runPipelineOMPActiveRPCFixture() int {
 			return 82
 		}
 		_ = logEncoder.Encode(pipelineOMPRPCRecord{
-			Kind: "command", ID: command.ID, Type: command.Type, Enabled: command.Enabled,
+			Kind: "command", PID: os.Getpid(), ID: command.ID, Type: command.Type, Enabled: command.Enabled,
 			Provider: command.Provider, ModelID: command.ModelID, Message: command.Message,
 			Protocol: command.ProtocolVersion,
 		})
@@ -225,7 +226,11 @@ func runPipelineOMPActiveRPCFixture() int {
 			})
 		case "prompt":
 			promptCount++
-			inputTokens += int64(100 - promptCount*10)
+			inputDelta := int64(100)
+			if compactionCount > 0 {
+				inputDelta = 40
+			}
+			inputTokens += inputDelta
 			outputTokens += 10
 			messageCount += 2
 			assistant := fmt.Sprintf("safe assistant output %d", promptCount)
@@ -252,6 +257,7 @@ func runPipelineOMPActiveRPCFixture() int {
 				Messages: transcript, TotalMessages: len(transcript), NextCursor: nil,
 			})
 		case "compact":
+			compactionCount++
 			inputTokens += 20
 			outputTokens += 5
 			writePipelineOMPActiveCompaction(output, command)

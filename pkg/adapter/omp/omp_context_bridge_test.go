@@ -169,7 +169,7 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	catalogFiles, err := adapterUnderTest.prepareFiles(context.Background(), catalogOnly)
 	require.NoError(t, err)
 
-	const priorPreparedFilesFingerprint = "5c3dc5888c4f0aa5866176dea90e14435bdb6c66fda117688a37e7172c661ad9"
+	const priorPreparedFilesFingerprint = "637c407b6541c185502687a7e72ed58155d4a793c10440193a0a37647102aced"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

@@ -20,13 +20,14 @@ func TestPipelineOMPManagedActiveCoordinator_NarrowsOpaqueGrantToOneUseLease(t *
 	spawnCalls := 0
 	runner := newPipelineOMPManagedActiveCoordinator()
 	runner.now = func() time.Time { return now }
+	runner.verifyEvidence = pipelineOMPActiveEvidenceVerifierFixture(grant.expires)
 	runner.policy = func(got pipelineOMPManagedActiveCandidate) (promptlayer.OMPContextPromotionStaticPolicyV3, error) {
 		assert.Equal(t, candidate.Snapshot.Prompt, got.Snapshot.Prompt)
 		return expected, nil
 	}
-	runner.current = func(_ context.Context, got pipelineOMPManagedActiveCandidate) (
-		promptlayer.OMPContextPromotionCurrentRuntimeV3, error,
-	) {
+	runner.current = func(_ context.Context, got pipelineOMPManagedActiveCandidate,
+		_ promptlayer.OMPContextPromotionStaticPolicyV3,
+	) (promptlayer.OMPContextPromotionCurrentRuntimeV3, error) {
 		assert.Equal(t, candidate.AutoSourceCommit, got.AutoSourceCommit)
 		return pipelineOMPActiveCurrentRuntimeFixture(expected), nil
 	}
@@ -66,12 +67,13 @@ func TestPipelineOMPManagedActiveCoordinator_RejectsGrantThatExpiresBeforeExecut
 	grant.expires = now.Add(time.Second)
 	runner := newPipelineOMPManagedActiveCoordinator()
 	runner.now = func() time.Time { return now }
+	runner.verifyEvidence = pipelineOMPActiveEvidenceVerifierFixture(grant.expires)
 	runner.policy = func(pipelineOMPManagedActiveCandidate) (promptlayer.OMPContextPromotionStaticPolicyV3, error) {
 		return expected, nil
 	}
-	runner.current = func(context.Context, pipelineOMPManagedActiveCandidate) (
-		promptlayer.OMPContextPromotionCurrentRuntimeV3, error,
-	) {
+	runner.current = func(context.Context, pipelineOMPManagedActiveCandidate,
+		promptlayer.OMPContextPromotionStaticPolicyV3,
+	) (promptlayer.OMPContextPromotionCurrentRuntimeV3, error) {
 		return pipelineOMPActiveCurrentRuntimeFixture(expected), nil
 	}
 	runner.loadGrant = func(string, time.Time, promptlayer.OMPContextPromotionStaticPolicyV3,
@@ -102,9 +104,9 @@ func TestPipelineOMPManagedActiveCoordinator_RejectsCrossCandidateBeforeLease(t 
 	runner.policy = func(pipelineOMPManagedActiveCandidate) (promptlayer.OMPContextPromotionStaticPolicyV3, error) {
 		return expected, nil
 	}
-	runner.current = func(context.Context, pipelineOMPManagedActiveCandidate) (
-		promptlayer.OMPContextPromotionCurrentRuntimeV3, error,
-	) {
+	runner.current = func(context.Context, pipelineOMPManagedActiveCandidate,
+		promptlayer.OMPContextPromotionStaticPolicyV3,
+	) (promptlayer.OMPContextPromotionCurrentRuntimeV3, error) {
 		return pipelineOMPActiveCurrentRuntimeFixture(expected), nil
 	}
 	runner.loadGrant = func(string, time.Time, promptlayer.OMPContextPromotionStaticPolicyV3,
@@ -123,10 +125,12 @@ func TestPipelineOMPManagedActiveCoordinator_RejectsCrossCandidateBeforeLease(t 
 
 type pipelineOMPVerifiedGrantStub struct {
 	digest, evidence, policy, provider, modelScope string
+	providerAuthority, sessionAuthority            string
 	expires                                        time.Time
 	producer                                       promptlayer.OMPContextPromotionProducerV1
 	candidate                                      promptlayer.OMPContextPromotionCandidateV1
 	runtime                                        promptlayer.OMPContextPromotionRuntimeV1
+	rows                                           []promptlayer.OMPContextCanaryRowV1
 }
 
 func (grant pipelineOMPVerifiedGrantStub) Valid() bool {
@@ -147,6 +151,15 @@ func (grant pipelineOMPVerifiedGrantStub) RuntimeCoordinates() promptlayer.OMPCo
 }
 func (grant pipelineOMPVerifiedGrantStub) ProviderScope() (string, string) {
 	return grant.provider, grant.modelScope
+}
+func (grant pipelineOMPVerifiedGrantStub) ProviderAuthorityDigest() string {
+	return grant.providerAuthority
+}
+func (grant pipelineOMPVerifiedGrantStub) SessionAuthorityDigest() string {
+	return grant.sessionAuthority
+}
+func (grant pipelineOMPVerifiedGrantStub) CanaryRows() []promptlayer.OMPContextCanaryRowV1 {
+	return append([]promptlayer.OMPContextCanaryRowV1(nil), grant.rows...)
 }
 
 func pipelineOMPActiveCoordinatorFixture(t *testing.T, now time.Time) (
@@ -231,5 +244,18 @@ func pipelineOMPActiveCurrentRuntimeFixture(
 		AutoVersion: policy.AutoVersion, OMPVersion: policy.OMPVersion,
 		OMPExecutableSHA256:          policy.OMPExecutableSHA256,
 		PipelineImplementationDigest: policy.PipelineImplementationDigest,
+	}
+}
+
+func pipelineOMPActiveEvidenceVerifierFixture(expires time.Time) pipelineOMPActiveEvidenceVerifier {
+	return func(
+		pipelineOMPManagedActiveCandidate,
+		pipelineOMPVerifiedGrant,
+		promptlayer.OMPContextPromotionPolicyV1,
+		promptlayer.OMPContextBindingReceipt,
+		string, string, string,
+		time.Time,
+	) (time.Time, error) {
+		return expires, nil
 	}
 }

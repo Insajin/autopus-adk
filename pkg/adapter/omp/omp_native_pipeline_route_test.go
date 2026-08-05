@@ -28,6 +28,11 @@ func TestOMPNativePipelineRoute_MarkdownAutoOwnsInteractiveAndExplicitRouteOwnsH
 	require.NotContains(t, source, `registerCommand("auto"`)
 	require.Equal(t, 1, countLiteral(source, `registerCommand("autopus-pipeline"`))
 	require.Contains(t, source, `Usage: /autopus-pipeline go SPEC-ID`)
+	require.Contains(t, source, `[--execution-owner omp|orca]`)
+	require.Contains(t, source, `["--execution-owner", new Set(["omp", "orca"])]`)
+	require.NotContains(t, source, `"OMP"`)
+	require.NotContains(t, source, `"local"`)
+	require.NotContains(t, source, `"supervised"`)
 	require.Contains(t, source, `process.env.AUTOPUS_OMP_MANAGED_INNER === "1"`)
 	require.Equal(t, 1, countLiteral(source, `["pipeline", "run", specID, "--platform", "omp"]`))
 	require.Equal(t, 1, countLiteral(source, `spawn("auto", argv`))
@@ -95,6 +100,15 @@ const sequential = parseRoute("go SPEC-TEST-001 --strategy sequential");
 if (!sequential.ok) throw new Error("sequential headless strategy was rejected");
 const parallel = parseRoute("go SPEC-TEST-001 --strategy parallel");
 if (parallel.ok) throw new Error("parallel remained in the headless allowlist");
+const ompOwner = parseRoute("go SPEC-TEST-001 --execution-owner omp");
+if (!ompOwner.ok || ompOwner.forwardedFlags.join(" ") !== "--execution-owner omp") throw new Error("exact omp owner was not forwarded");
+const orcaOwner = parseRoute("go SPEC-TEST-001 --execution-owner orca");
+if (!orcaOwner.ok || orcaOwner.forwardedFlags.join(" ") !== "--execution-owner orca") throw new Error("exact orca owner was not forwarded");
+for (const invalidOwner of ["OMP", "Orca", "omp,orca", "local", "supervised"]) {
+  if (parseRoute("go SPEC-TEST-001 --execution-owner " + invalidOwner).ok) throw new Error("invalid owner was accepted: " + invalidOwner);
+}
+const mixedOwner = parseRoute("go SPEC-TEST-001 --execution-owner omp --execution-owner orca");
+if (mixedOwner.ok) throw new Error("mixed owner selection was accepted");
 registrations = 0;
 process.env.AUTOPUS_OMP_MANAGED_INNER = "1";
 autopusPipelineRoute(api as any);

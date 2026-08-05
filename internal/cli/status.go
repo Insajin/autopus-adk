@@ -143,8 +143,13 @@ func scanSpecs(specsDir string) ([]specEntry, error) {
 }
 
 func newStatusCmd() *cobra.Command {
+	return newStatusCmdWithOMPDependencies(defaultOMPPlatformDependencies())
+}
+
+func newStatusCmdWithOMPDependencies(deps ompPlatformDependencies) *cobra.Command {
 	var (
 		dir        string
+		platform   string
 		jsonOutput bool
 		format     string
 	)
@@ -186,6 +191,20 @@ func newStatusCmd() *cobra.Command {
 					return fmt.Errorf("현재 디렉터리를 가져올 수 없음: %w", err)
 				}
 			}
+			selectedPlatform := strings.ToLower(strings.TrimSpace(platform))
+			if selectedPlatform != "" {
+				if selectedPlatform != "omp" {
+					err := fmt.Errorf("unsupported status platform %q: must be omp", platform)
+					if jsonMode {
+						return writeJSONResultAndExit(
+							cmd, jsonStatusError, err, "unsupported_platform",
+							map[string]any{"platform": selectedPlatform}, nil, nil,
+						)
+					}
+					return err
+				}
+				return runOMPPlatformStatus(cmd, dir, jsonMode, deps)
+			}
 
 			if jsonMode {
 				return runStatusJSON(cmd, dir)
@@ -195,6 +214,7 @@ func newStatusCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&dir, "dir", "", "프로젝트 루트 디렉터리 (기본값: 현재 디렉터리)")
+	cmd.Flags().StringVar(&platform, "platform", "", "Platform operator view (omp)")
 	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
 }

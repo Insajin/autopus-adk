@@ -48,6 +48,7 @@ func ompContextPromotionRuntimeV3Fixture(t *testing.T) (
 		AutoVersion: policy.AutoVersion, OMPVersion: policy.OMPVersion,
 		OMPExecutableSHA256:          policy.OMPExecutableSHA256,
 		PipelineImplementationDigest: policy.PipelineImplementationDigest,
+		ProviderAuthorityDigest:      ompContextPromotionProviderAuthorityDigestV1(fixture.report),
 	}
 	return fixture, OMPContextPromotionRuntimeBundleV3{
 		ReportBytes: fixture.reportBytes, AttestationBytes: fixture.attestationBytes,
@@ -128,6 +129,9 @@ func TestVerifyOMPContextPromotionRuntimeV3_StaticAndSignedCoordinatesFailClosed
 		"implementation": func(policy *OMPContextPromotionStaticPolicyV3, current *OMPContextPromotionCurrentRuntimeV3) {
 			policy.PipelineImplementationDigest = promotionSHA256([]byte("other-implementation"))
 			current.PipelineImplementationDigest = policy.PipelineImplementationDigest
+		},
+		"provider authority": func(_ *OMPContextPromotionStaticPolicyV3, current *OMPContextPromotionCurrentRuntimeV3) {
+			current.ProviderAuthorityDigest = promotionSHA256([]byte("other-provider-authority"))
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

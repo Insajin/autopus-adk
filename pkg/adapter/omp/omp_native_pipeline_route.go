@@ -40,7 +40,7 @@ const SPEC_ID_PATTERN = /^SPEC-[A-Z0-9]+(?:-[A-Z0-9]+)+$/;
 const MAX_ARGUMENT_LENGTH = 512;
 const MAX_CAPTURE_LENGTH = 4096;
 const MAX_NOTICE_LENGTH = 320;
-const USAGE = "Usage: /autopus-pipeline go SPEC-ID [--continue] [--dry-run] [--strategy sequential] [--auto] [--loop] [--multi] [--quality balanced|ultra] [--effort low|medium|high|xhigh|max|ultra]";
+const USAGE = "Usage: /autopus-pipeline go SPEC-ID [--execution-owner omp|orca] [--continue] [--dry-run] [--strategy sequential] [--auto] [--loop] [--multi] [--quality balanced|ultra] [--effort low|medium|high|xhigh|max|ultra]";
 
 const BOOLEAN_FLAGS = new Set([
   "--continue",
@@ -52,6 +52,7 @@ const BOOLEAN_FLAGS = new Set([
 
 const VALUE_FLAGS = new Map<string, ReadonlySet<string>>([
   ["--strategy", new Set(["sequential"])],
+  ["--execution-owner", new Set(["omp", "orca"])],
   ["--quality", new Set(["balanced", "ultra"])],
   ["--effort", new Set(["low", "medium", "high", "xhigh", "max", "ultra"])],
 ]);

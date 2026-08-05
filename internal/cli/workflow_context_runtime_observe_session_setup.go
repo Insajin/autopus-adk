@@ -10,29 +10,57 @@ import (
 	"strings"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/pipeline"
+	"github.com/insajin/autopus-adk/pkg/promptlayer"
 	"github.com/insajin/autopus-adk/pkg/version"
 )
 
 type workflowContextObserveSessionSetup struct {
 	taskRoot                string
+	projectDir              string
+	endpoint                string
+	credential              string
 	backend                 pipelineOMPBackendConfig
 	candidate               pipelineOMPManagedActiveCandidate
 	prepared                pipelineOMPManagedActivePrepared
 	full                    *pipelineOMPActiveEvaluatorSession
+	deliveryOptions         promptlayer.ContextDeliveryOptions
+	delivery                promptlayer.ContextDeliveryResult
+	canonicalPromptHash     string
 	optimized               *pipelineOMPActiveEvaluatorSession
 	ompVersion              string
 	ompExecutableSHA256     string
+	autoVersion             string
+	autoExecutableSHA256    string
+	candidateTree           string
 	providerAuthorityDigest string
 	sandboxMode             pipelineOMPActiveSandboxMode
 }
 
 func validateWorkflowContextObserveSessionOptions(options workflowContextObserveSessionOptions) error {
+	_, policyErr := promptlayer.OMPContextPromotionPolicyDigestV1(options.PromotionPolicy)
+	metadata := []string{
+		options.WorkspaceID, options.ProducerRepository, options.ProducerWorkflowRef,
+		options.CandidateRepository, options.PolicyID,
+	}
+	metadataValid := true
+	for _, value := range metadata {
+		if strings.TrimSpace(value) == "" || strings.TrimSpace(value) != value ||
+			len(value) > 256 || strings.ContainsRune(value, 0) {
+			metadataValid = false
+		}
+	}
 	if !workflowContextObserveProviderPattern.MatchString(options.Provider) ||
 		!workflowContextObserveProviderPattern.MatchString(options.Model) ||
 		!workflowContextMetadataPattern.MatchString(options.SpecID) ||
 		!pipelineOMPContextCohortLocatorPattern.MatchString(options.CredentialLocator) ||
-		!validPipelineOMPActiveGitHash(options.TargetGitCommit) ||
+		!pipelineOMPContextObservationRunID.MatchString(options.ProducerRunID) ||
+		options.ProducerRunAttempt <= 0 || !metadataValid || !validPipelineOMPActiveHash(options.OraclePolicyDigest) ||
+		!validPipelineOMPActiveGitHash(options.TargetGitCommit) || policyErr != nil ||
+		options.PromotionPolicy.HistoryMode != config.OMPContextHistoryActive ||
+		options.PromotionPolicy.MemoryMode != config.OMPContextMemoryOff ||
+		options.EvidenceValidFor <= 0 || options.EvidenceValidFor > 24*time.Hour ||
 		(options.SandboxMode != pipelineOMPActiveSandboxManaged &&
 			options.SandboxMode != pipelineOMPActiveSandboxInheritedParent) ||
 		strings.TrimSpace(options.Endpoint) == "" || strings.TrimSpace(options.Executable) == "" {
@@ -57,7 +85,8 @@ func prepareWorkflowContextObserveSession(
 		return workflowContextObserveSessionSetup{}, errors.New("observe-session endpoint is invalid")
 	}
 	credential, found := os.LookupEnv(options.CredentialLocator)
-	if !found || strings.TrimSpace(credential) == "" || strings.ContainsRune(credential, 0) {
+	if !found || strings.TrimSpace(credential) == "" || len(credential) > pipelineOMPActiveCredentialMaxBytes ||
+		strings.ContainsRune(credential, 0) {
 		return workflowContextObserveSessionSetup{}, errors.New("observe-session credential is unavailable")
 	}
 	executable, err := exec.LookPath(options.Executable)
@@ -68,14 +97,40 @@ func prepareWorkflowContextObserveSession(
 	if err != nil {
 		return workflowContextObserveSessionSetup{}, err
 	}
-	if !validPipelineOMPActiveGitHash(version.SourceCommit()) || !validPipelineOMPActiveGitHash(version.SourceTree()) {
+	if !validPipelineOMPActiveGitHash(version.SourceCommit()) || !validPipelineOMPActiveGitHash(version.SourceTree()) ||
+		options.TargetGitCommit != version.SourceCommit() {
 		return workflowContextObserveSessionSetup{}, errors.New("observe-session candidate build provenance is unavailable")
+	}
+	autoExecutableSHA256, err := workflowContextObserveCurrentExecutableSHA256()
+	if err != nil {
+		return workflowContextObserveSessionSetup{}, err
+	}
+	policyDigest, err := promptlayer.OMPContextPromotionPolicyDigestV1(options.PromotionPolicy)
+	if err != nil {
+		return workflowContextObserveSessionSetup{}, err
+	}
+	specDirRef := filepath.ToSlash(filepath.Join(".autopus", "specs", options.SpecID))
+	specDir := filepath.Join(projectDir, filepath.FromSlash(specDirRef))
+	snapshotHash, err := pipeline.SpecSnapshotHash(specDir)
+	if err != nil {
+		return workflowContextObserveSessionSetup{}, errors.New("observe-session SPEC snapshot is unavailable")
+	}
+	deliveryOptions := promptlayer.ContextDeliveryOptions{
+		Root: projectDir, Command: "go", SpecDir: specDirRef,
+	}
+	delivery, err := promptlayer.BuildContextDelivery(deliveryOptions)
+	if err != nil || promptlayer.VerifyContextDeliveryForOptions(deliveryOptions, delivery) != nil {
+		return workflowContextObserveSessionSetup{}, errors.New("observe-session canonical context is unavailable")
 	}
 	taskRoot, err := os.MkdirTemp("", "autopus-omp-observe-session-")
 	if err != nil {
 		return workflowContextObserveSessionSetup{}, err
 	}
-	setup := workflowContextObserveSessionSetup{taskRoot: taskRoot}
+	setup := workflowContextObserveSessionSetup{
+		taskRoot: taskRoot, projectDir: projectDir, endpoint: endpoint, credential: credential,
+		deliveryOptions: deliveryOptions, delivery: delivery,
+		canonicalPromptHash: workflowContextRuntimeHash(delivery.Prompt),
+	}
 	failed := true
 	defer func() {
 		if failed {
@@ -92,8 +147,8 @@ func prepareWorkflowContextObserveSession(
 	phaseModels := workflowContextObserveSessionPhaseModels(options.Provider + "/" + options.Model)
 	backend, err := normalizePipelineOMPBackendConfig(pipelineOMPBackendConfig{
 		Executable: executable, executableID: executableID, ProjectDir: projectDir,
-		SpecID: options.SpecID, SpecDir: filepath.Join(projectDir, ".autopus", "specs", options.SpecID),
-		SnapshotHash: challenge, GitCommitHash: options.TargetGitCommit, RuntimeBase: runtimeBase,
+		SpecID: options.SpecID, SpecDir: specDir,
+		SnapshotHash: snapshotHash, GitCommitHash: options.TargetGitCommit, RuntimeBase: runtimeBase,
 		Environment: []string{
 			"PATH=" + os.Getenv("PATH"), pipelineOMPActiveEndpointKey + "=" + endpoint,
 			pipelineOMPActiveCredentialKey + "=" + credential,
@@ -111,22 +166,24 @@ func prepareWorkflowContextObserveSession(
 	}
 	snapshot := pipeline.OMPExecutionSnapshot{
 		ProjectDir: projectDir, SpecID: options.SpecID, SpecDir: backend.SpecDir,
-		SnapshotHash: challenge, GitCommitHash: options.TargetGitCommit, PhaseID: pipeline.PhasePlan,
+		SnapshotHash: snapshotHash, GitCommitHash: options.TargetGitCommit, PhaseID: pipeline.PhaseImplement,
 		Attempt: 1, Prompt: "observe-session", ActivePrompt: "observe-session",
 	}
-	candidate, err := newPipelineOMPManagedActiveCandidate(snapshot, phaseModels[pipeline.PhasePlan], phaseModels)
+	candidate, err := newPipelineOMPManagedActiveCandidate(snapshot, phaseModels[pipeline.PhaseImplement], phaseModels)
 	if err != nil {
 		return setup, err
 	}
 	prepared := pipelineOMPManagedActivePrepared{Binding: pipelineOMPActiveLeaseBinding{
-		GrantDigest: challenge, PolicyDigest: workflowContextRuntimeHash("observe-session-policy-v1"),
-		WorkspaceID: filepath.Base(projectDir), SpecID: options.SpecID,
+		GrantDigest: challenge, PolicyDigest: policyDigest,
+		WorkspaceID: options.WorkspaceID, SpecID: options.SpecID,
 		GitCommitHash: options.TargetGitCommit, AutoSourceCommit: candidate.AutoSourceCommit,
 		AutoSourceTree: candidate.AutoSourceTree, ModelScopeDigest: candidate.ModelScopeDigest,
 	}}
 	setup.backend, setup.candidate, setup.prepared = backend, candidate, prepared
 	setup.ompVersion = ompVersion
 	setup.ompExecutableSHA256 = fmt.Sprintf("sha256:%x", executableID.digest[:])
+	setup.autoVersion, setup.autoExecutableSHA256 = version.Version(), autoExecutableSHA256
+	setup.candidateTree = version.SourceTree()
 	setup.sandboxMode = options.SandboxMode
 	failed = false
 	return setup, nil

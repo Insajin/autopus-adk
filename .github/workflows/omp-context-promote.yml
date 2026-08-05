@@ -1,0 +1,208 @@
+name: Promote OMP context evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      evidence_commit:
+        description: Exact commit containing only promotion-report-v1.json
+        required: true
+        type: string
+      source_commit:
+        description: Exact Autopus ADK source commit
+        required: true
+        type: string
+      source_tree:
+        description: Exact Autopus ADK source tree
+        required: true
+        type: string
+      candidate_sha256:
+        description: Exact promoted candidate SHA-256
+        required: true
+        type: string
+      static_policy_b64:
+        description: Canonical raw-base64url OMP context static policy
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: omp-context-evidence-v0.50.93
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact source commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_commit }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Set up pinned Go toolchain
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Verify, sign, and publish exact evidence
+        shell: bash
+        env:
+          EVIDENCE_COMMIT: ${{ inputs.evidence_commit }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          SOURCE_TREE: ${{ inputs.source_tree }}
+          CANDIDATE_SHA256: ${{ inputs.candidate_sha256 }}
+          STATIC_POLICY_B64: ${{ inputs.static_policy_b64 }}
+          OMP_CONTEXT_EVIDENCE_SIGNING_KEY: ${{ secrets.OMP_CONTEXT_EVIDENCE_SIGNING_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          fail() {
+            printf 'OMP context promotion: %s\n' "$1" >&2
+            exit 1
+          }
+
+          readonly evidence_tag='omp-context-evidence-v0.50.93'
+          readonly tag_ref="refs/tags/${evidence_tag}"
+          readonly report_name='promotion-report-v1.json'
+          readonly attestation_name='omp-context-promotion-attestation.v2.json'
+          readonly candidate_repository='Insajin/autopus-adk'
+
+          [[ "$EVIDENCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail 'evidence_commit must be exact lowercase 40-hex'
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail 'source_commit must be exact lowercase 40-hex'
+          [[ "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]] || fail 'source_tree must be exact lowercase 40-hex'
+          [[ "$CANDIDATE_SHA256" =~ ^[0-9a-f]{64}$ ]] || fail 'candidate_sha256 must be exact lowercase 64-hex'
+          [[ "$STATIC_POLICY_B64" =~ ^[A-Za-z0-9_-]+$ ]] || fail 'static_policy_b64 is malformed'
+          [[ "$GITHUB_REPOSITORY" == "$candidate_repository" ]] || fail 'workflow repository is not the production candidate repository'
+          [[ -n "${OMP_CONTEXT_EVIDENCE_SIGNING_KEY:-}" ]] || fail 'promotion signing key is unavailable'
+          [[ "$(git rev-parse --verify 'HEAD^{commit}')" == "$SOURCE_COMMIT" ]] || fail 'checkout differs from source_commit'
+          [[ "$(git rev-parse --verify 'HEAD^{tree}')" == "$SOURCE_TREE" ]] || fail 'checkout differs from source_tree'
+
+          if git show-ref --verify --quiet "$tag_ref"; then
+            fail 'fixed promotion tag already exists locally'
+          fi
+          remote_tag_status=0
+          git ls-remote --exit-code --refs origin "$tag_ref" >/dev/null 2>&1 || remote_tag_status=$?
+          case "$remote_tag_status" in
+            0) fail 'fixed promotion tag already exists remotely' ;;
+            2) ;;
+            *) fail 'cannot inspect fixed promotion tag' ;;
+          esac
+
+          readonly work_root="${RUNNER_TEMP}/omp-context-promote-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          [[ ! -e "$work_root" && ! -L "$work_root" ]] || fail 'isolated promotion root already exists'
+          install -d -m 0700 "$work_root"
+          trap 'rm -rf -- "$work_root"' EXIT
+          readonly report_dir="$work_root/fetched-evidence"
+          readonly output_dir="$work_root/signed-evidence"
+          readonly verify_dir="$work_root/verified-tree"
+          readonly tools_dir="$work_root/tools"
+          install -d -m 0700 "$report_dir" "$output_dir" "$verify_dir" "$tools_dir"
+          readonly report_path="$report_dir/$report_name"
+          readonly attestation_path="$output_dir/$attestation_name"
+
+          go build -trimpath -o "$tools_dir/auto" ./cmd/auto
+          go build -trimpath -o "$tools_dir/ompcontextverify" ./scripts/companion-release/ompcontextverify
+
+          git fetch --no-tags --depth=1 origin "$EVIDENCE_COMMIT"
+          [[ "$(git rev-parse --verify "${EVIDENCE_COMMIT}^{commit}")" == "$EVIDENCE_COMMIT" ]] || fail 'fetched evidence commit identity differs'
+          mapfile -d '' -t evidence_entries < <(git ls-tree -z "$EVIDENCE_COMMIT")
+          [[ "${#evidence_entries[@]}" -eq 1 ]] || fail 'evidence commit tree must contain exactly one entry'
+          evidence_metadata=${evidence_entries[0]%%$'\t'*}
+          evidence_path=${evidence_entries[0]#*$'\t'}
+          [[ "$evidence_path" == "$report_name" ]] || fail 'evidence commit contains an unsafe path'
+          [[ "$evidence_metadata" =~ ^100644\ blob\ ([0-9a-f]{40})$ ]] || fail 'promotion report is not one regular 100644 blob'
+          readonly report_blob=${BASH_REMATCH[1]}
+          git cat-file blob "$report_blob" >"$report_path"
+          chmod 0600 "$report_path"
+          shopt -s nullglob dotglob
+          fetched_files=("$report_dir"/*)
+          [[ "${#fetched_files[@]}" -eq 1 && "${fetched_files[0]}" == "$report_path" ]] || fail 'isolated evidence directory contains unexpected files'
+          shopt -u nullglob dotglob
+
+          readonly issued_epoch=$(date -u +%s)
+          readonly issued_at=$(date -u --date="@${issued_epoch}" '+%Y-%m-%dT%H:%M:%SZ')
+          readonly not_before="$issued_at"
+          readonly expires_at=$(date -u --date="@$((issued_epoch + 86400))" '+%Y-%m-%dT%H:%M:%SZ')
+          printf '%s' "$OMP_CONTEXT_EVIDENCE_SIGNING_KEY" |
+            env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+              "$tools_dir/auto" companion-manifest omp-context-promotion-attestation \
+                --report "$report_path" \
+                --issued-at "$issued_at" \
+                --not-before "$not_before" \
+                --expires-at "$expires_at" \
+                --output "$attestation_path"
+          unset OMP_CONTEXT_EVIDENCE_SIGNING_KEY
+          [[ -f "$attestation_path" && ! -L "$attestation_path" ]] || fail 'signer did not produce a safe attestation'
+          [[ "$(stat -c '%a' "$attestation_path")" == '600' ]] || fail 'attestation permissions are not private'
+
+          report_sha256=$(sha256sum "$report_path")
+          readonly report_sha256=${report_sha256%% *}
+          attestation_sha256=$(sha256sum "$attestation_path")
+          readonly attestation_sha256=${attestation_sha256%% *}
+          [[ "$report_sha256" =~ ^[0-9a-f]{64}$ ]] || fail 'report digest is malformed'
+          [[ "$attestation_sha256" =~ ^[0-9a-f]{64}$ ]] || fail 'attestation digest is malformed'
+
+          readonly published_report_blob=$(git hash-object -w -- "$report_path")
+          readonly published_attestation_blob=$(git hash-object -w -- "$attestation_path")
+          [[ "$published_report_blob" == "$report_blob" ]] || fail 'promotion report bytes changed after fetch'
+          readonly evidence_index="$work_root/evidence.index"
+          GIT_INDEX_FILE="$evidence_index" git read-tree --empty
+          GIT_INDEX_FILE="$evidence_index" git update-index --add \
+            --cacheinfo "100644,$published_report_blob,$report_name"
+          GIT_INDEX_FILE="$evidence_index" git update-index --add \
+            --cacheinfo "100644,$published_attestation_blob,$attestation_name"
+          readonly evidence_tree=$(GIT_INDEX_FILE="$evidence_index" git write-tree)
+          mapfile -d '' -t published_entries < <(git ls-tree -z "$evidence_tree")
+          [[ "${#published_entries[@]}" -eq 2 ]] || fail 'published evidence tree does not contain exactly two entries'
+          for name in "$report_name" "$attestation_name"; do
+            entry=$(git ls-tree "$evidence_tree" -- "$name")
+            [[ "$entry" =~ ^100644\ blob\ [0-9a-f]{40}$'\t'"$name"$ ]] || fail "published evidence entry ${name} is unsafe"
+          done
+
+          readonly evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.93' |
+            git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit-tree "$evidence_tree")
+          [[ "$(git rev-list --parents -n 1 "$evidence_commit")" == "$evidence_commit" ]] || fail 'published evidence commit is not zero-parent'
+          git cat-file blob "$evidence_commit:$report_name" >"$verify_dir/$report_name"
+          git cat-file blob "$evidence_commit:$attestation_name" >"$verify_dir/$attestation_name"
+          chmod 0600 "$verify_dir/$report_name" "$verify_dir/$attestation_name"
+          cmp "$report_path" "$verify_dir/$report_name" || fail 'published report bytes differ from fetched evidence'
+          cmp "$attestation_path" "$verify_dir/$attestation_name" || fail 'published attestation bytes differ from signer output'
+
+          "$tools_dir/ompcontextverify" \
+            --mode historical \
+            --report "$verify_dir/$report_name" \
+            --attestation "$verify_dir/$attestation_name" \
+            --report-sha256 "$report_sha256" \
+            --attestation-sha256 "$attestation_sha256" \
+            --candidate-repository "$candidate_repository" \
+            --candidate-revision "$SOURCE_COMMIT" \
+            --candidate-tree "$SOURCE_TREE" \
+            --candidate-artifact-sha256 "$CANDIDATE_SHA256" \
+            --static-policy-b64 "$STATIC_POLICY_B64"
+
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            -c tag.gpgSign=false \
+            tag -a "$evidence_tag" "$evidence_commit" -m 'OMP context promotion evidence v0.50.93'
+          [[ "$(git cat-file -t "$tag_ref")" == 'tag' ]] || fail 'promotion tag is not annotated'
+          readonly tag_object=$(git rev-parse --verify "$tag_ref")
+          git push origin "$tag_ref:$tag_ref"
+          remote_tag_line=$(git ls-remote --refs origin "$tag_ref")
+          remote_tag_object=${remote_tag_line%%$'\t'*}
+          remote_tag_ref=${remote_tag_line#*$'\t'}
+          [[ "$remote_tag_object" == "$tag_object" && "$remote_tag_ref" == "$tag_ref" ]] || fail 'remote promotion tag differs after push'
+
+          gh variable set OMP_CONTEXT_EVIDENCE_TAG --repo "$GITHUB_REPOSITORY" --body "$evidence_tag"
+          gh variable set OMP_CONTEXT_EVIDENCE_REPORT_SHA256 --repo "$GITHUB_REPOSITORY" --body "$report_sha256"
+          gh variable set OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 --repo "$GITHUB_REPOSITORY" --body "$attestation_sha256"
+          gh variable set OMP_CONTEXT_STATIC_POLICY_B64 --repo "$GITHUB_REPOSITORY" --body "$STATIC_POLICY_B64"

@@ -31,14 +31,23 @@ type pipelineOMPActivePolicyProvider func(
 type pipelineOMPActiveCurrentRuntimeProvider func(
 	context.Context,
 	pipelineOMPManagedActiveCandidate,
+	promptlayer.OMPContextPromotionStaticPolicyV3,
 ) (promptlayer.OMPContextPromotionCurrentRuntimeV3, error)
-
 type pipelineOMPActiveGrantLoader func(
 	string,
 	time.Time,
 	promptlayer.OMPContextPromotionStaticPolicyV3,
 	promptlayer.OMPContextPromotionCurrentRuntimeV3,
 ) (pipelineOMPVerifiedGrant, error)
+
+type pipelineOMPActiveEvidenceVerifier func(
+	pipelineOMPManagedActiveCandidate,
+	pipelineOMPVerifiedGrant,
+	promptlayer.OMPContextPromotionPolicyV1,
+	promptlayer.OMPContextBindingReceipt,
+	string, string, string,
+	time.Time,
+) (time.Time, error)
 
 // pipelineOMPActiveSessionSpawn consumes a prepared lease and must enter the
 // managed child spawn without another caller-controlled authority lookup.
@@ -60,14 +69,15 @@ type pipelineOMPActiveSessionStart func(
 ) (pipelineOMPActivePersistentSession, error)
 
 type pipelineOMPManagedActiveCoordinator struct {
-	mu        sync.Mutex
-	now       func() time.Time
-	policy    pipelineOMPActivePolicyProvider
-	current   pipelineOMPActiveCurrentRuntimeProvider
-	loadGrant pipelineOMPActiveGrantLoader
-	spawn     pipelineOMPActiveSessionSpawn
-	start     pipelineOMPActiveSessionStart
-	session   pipelineOMPActivePersistentSession
+	mu             sync.Mutex
+	now            func() time.Time
+	policy         pipelineOMPActivePolicyProvider
+	current        pipelineOMPActiveCurrentRuntimeProvider
+	loadGrant      pipelineOMPActiveGrantLoader
+	verifyEvidence pipelineOMPActiveEvidenceVerifier
+	spawn          pipelineOMPActiveSessionSpawn
+	start          pipelineOMPActiveSessionStart
+	session        pipelineOMPActivePersistentSession
 }
 
 func newPipelineOMPManagedActiveCoordinator() *pipelineOMPManagedActiveCoordinator {
@@ -80,6 +90,7 @@ func newPipelineOMPManagedActiveCoordinator() *pipelineOMPManagedActiveCoordinat
 			_ = now
 			return promptlayer.LoadVerifiedOMPContextPromotionRuntimeV3(root, expected, current)
 		},
+		verifyEvidence: verifyPipelineOMPActiveRunEvidence,
 	}
 }
 
@@ -88,7 +99,7 @@ func (runner *pipelineOMPManagedActiveCoordinator) Prepare(
 	candidate pipelineOMPManagedActiveCandidate,
 ) (pipelineOMPManagedActivePrepared, error) {
 	if runner == nil || runner.policy == nil || runner.current == nil || runner.loadGrant == nil ||
-		(runner.spawn == nil && runner.start == nil) {
+		runner.verifyEvidence == nil || (runner.spawn == nil && runner.start == nil) {
 		return pipelineOMPManagedActivePrepared{}, errors.New("pipeline: managed active trust pins are unavailable")
 	}
 	if ctx == nil || ctx.Err() != nil {
@@ -102,7 +113,7 @@ func (runner *pipelineOMPManagedActiveCoordinator) Prepare(
 	if err != nil {
 		return pipelineOMPManagedActivePrepared{}, err
 	}
-	current, err := runner.current(ctx, candidate)
+	current, err := runner.current(ctx, candidate, expected)
 	if err != nil {
 		return pipelineOMPManagedActivePrepared{}, err
 	}
@@ -111,11 +122,14 @@ func (runner *pipelineOMPManagedActiveCoordinator) Prepare(
 	if err != nil || grant == nil || !grant.Valid() {
 		return pipelineOMPManagedActivePrepared{}, errors.New("pipeline: signed managed active grant is unavailable")
 	}
-	binding, err := buildPipelineOMPActiveLeaseBinding(candidate, grant, expected)
+	binding, evidenceExpiresAt, err := buildPipelineOMPActiveLeaseBinding(candidate, grant, expected, now, runner.verifyEvidence)
 	if err != nil {
 		return pipelineOMPManagedActivePrepared{}, err
 	}
 	validFor := grant.ExpiresAt().Sub(now)
+	if evidenceValidFor := evidenceExpiresAt.Sub(now); evidenceValidFor < validFor {
+		validFor = evidenceValidFor
+	}
 	if validFor > pipelineOMPActiveLeaseMaxValidity {
 		validFor = pipelineOMPActiveLeaseMaxValidity
 	}
@@ -192,7 +206,9 @@ func buildPipelineOMPActiveLeaseBinding(
 	candidate pipelineOMPManagedActiveCandidate,
 	grant pipelineOMPVerifiedGrant,
 	expected promptlayer.OMPContextPromotionStaticPolicyV3,
-) (pipelineOMPActiveLeaseBinding, error) {
+	now time.Time,
+	verifyEvidence pipelineOMPActiveEvidenceVerifier,
+) (pipelineOMPActiveLeaseBinding, time.Time, error) {
 	provider, modelScope := grant.ProviderScope()
 	runtime := grant.RuntimeCoordinates()
 	coordinates := grant.CandidateCoordinates()
@@ -205,23 +221,23 @@ func buildPipelineOMPActiveLeaseBinding(
 		runtime.AutoVersion != expected.AutoVersion ||
 		runtime.PipelineImplementationDigest != expected.PipelineImplementationDigest ||
 		runtime.PipelineImplementationDigest != pipelineOMPActiveImplementationDigest() {
-		return pipelineOMPActiveLeaseBinding{}, errors.New("pipeline: signed managed active coordinates mismatch")
+		return pipelineOMPActiveLeaseBinding{}, time.Time{}, errors.New("pipeline: signed managed active coordinates mismatch")
 	}
 	cfg, err := loadHarnessConfigForDir(candidate.Snapshot.ProjectDir, globalFlags{})
 	if err != nil {
-		return pipelineOMPActiveLeaseBinding{}, err
+		return pipelineOMPActiveLeaseBinding{}, time.Time{}, err
 	}
 	policy, selected, err := workflowContextPolicyFromConfig(cfg)
 	if err != nil || !selected || policy.HistoryMode != config.OMPContextHistoryActive ||
 		policy.MemoryMode != config.OMPContextMemoryOff {
-		return pipelineOMPActiveLeaseBinding{}, errors.New("pipeline: managed active policy is unavailable")
+		return pipelineOMPActiveLeaseBinding{}, time.Time{}, errors.New("pipeline: managed active policy is unavailable")
 	}
 	options := promptlayer.ContextDeliveryOptions{
 		Root: candidate.Snapshot.ProjectDir, Command: candidate.DeliveryCommand, SpecDir: candidate.Snapshot.SpecDir,
 	}
 	delivery, err := promptlayer.BuildContextDelivery(options)
 	if err != nil || promptlayer.VerifyContextDeliveryForOptions(options, delivery) != nil {
-		return pipelineOMPActiveLeaseBinding{}, errors.New("pipeline: managed active canonical delivery is unavailable")
+		return pipelineOMPActiveLeaseBinding{}, time.Time{}, errors.New("pipeline: managed active canonical delivery is unavailable")
 	}
 	identity := pipelineOMPContextIdentity(candidate.Snapshot)
 	history := pipelineOMPContextHistory(candidate.Snapshot.CompletedHistory)
@@ -233,7 +249,19 @@ func buildPipelineOMPActiveLeaseBinding(
 		}, History: history,
 	})
 	if err != nil {
-		return pipelineOMPActiveLeaseBinding{}, err
+		return pipelineOMPActiveLeaseBinding{}, time.Time{}, err
+	}
+	evidencePolicy := promptlayer.OMPContextPromotionPolicyV1{
+		Profile: policy.Profile, HistoryMode: policy.HistoryMode, MemoryMode: policy.MemoryMode,
+		HistoryTargetTokens: policy.HistoryTargetTokens, Fallback: policy.Fallback,
+		CapabilityPolicy: policy.CapabilityPolicy, RuntimeRootPolicy: policy.RuntimeRootPolicy,
+		MutationScope: policy.MutationScope,
+	}
+	evidenceExpiresAt, err := verifyEvidence(
+		candidate, grant, evidencePolicy, receipt, cfg.ProjectName, identity[0], identity[1], now,
+	)
+	if err != nil {
+		return pipelineOMPActiveLeaseBinding{}, time.Time{}, err
 	}
 	return pipelineOMPActiveLeaseBinding{
 		GrantDigest: grant.ReportDigest(), PolicyDigest: grant.PolicyDigest(), WorkspaceID: cfg.ProjectName,
@@ -247,7 +275,7 @@ func buildPipelineOMPActiveLeaseBinding(
 		AutoSourceCommit: candidate.AutoSourceCommit, AutoSourceTree: candidate.AutoSourceTree,
 		CohortDigest: expected.CohortManifestDigest, OracleDigest: expected.OraclePolicyDigest,
 		EligibleHistoryHash: hashPipelineOMPActiveHistory(receipt.EligibleHistoryRefs),
-	}, nil
+	}, evidenceExpiresAt, nil
 }
 
 func hashPipelineOMPActiveHistory(rows []promptlayer.OMPContextHistoryReference) string {

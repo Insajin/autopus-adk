@@ -108,14 +108,15 @@ func ompWorkflowBodyContracts() []ompWorkflowBodyContract {
 	return []ompWorkflowBodyContract{
 		template("auto-setup", "codex/skills/auto-setup.md.tmpl",
 			[]string{"## Workspace Folder Boundary", "## 실행 순서", "## Completion Message"}, []string{"ARCHITECTURE.md", ".autopus/project/"}),
-		compact("auto-status", "SPEC lifecycle", "module 상태"),
+		compact("auto-status", "SPEC lifecycle", "module 상태", "execution-owner.json", "native `hub`", "user-session roots"),
 		compact("auto-goal", "goal surface", "persisted state"),
 		compact("auto-update", "harness surface", "source-of-truth 경계"),
 		template("auto-plan", "codex/skills/auto-plan.md.tmpl",
 			[]string{"## Context Profile: plan", "## 실행 순서", "## 요구사항 형식 (EARS)"}, []string{"Clarification Ledger", "auto spec validate"}),
 		template("auto-go", "codex/skills/auto-go.md.tmpl",
-			[]string{"## Context Profile: go", "## 구현 절차", "## 실행 계약", "## 품질 기준"},
-			[]string{"RED: 실패 테스트", ".agents/skills/agent-pipeline/SKILL.md", `"outputSchema"`, "single DAG owner invariant"}),
+			[]string{"## Context Profile: go", "## 구현 절차", "## 실행 계약", "## 품질 기준", "## Execution Owner Control Plane"},
+			[]string{"RED: 실패 테스트", ".agents/skills/agent-pipeline/SKILL.md", `"outputSchema"`, "single DAG owner invariant",
+				"--execution-owner omp|orca", "pipeline_execution_owner_receipt.v1", "pipeline_execution_owner_result.v1", "status=handoff_required"}),
 		template("auto-fix", "codex/skills/auto-fix.md.tmpl",
 			[]string{"## 절차", "## 규칙"}, []string{"버그 재현 테스트", "최소 코드 변경"}),
 		template("auto-review", "codex/skills/auto-review.md.tmpl",
@@ -189,10 +190,13 @@ func assertOMPNativeCoordinationContract(t *testing.T, body string) {
 	assert.Contains(t, body, `{"op":"init","list":[{"phase":"Implementation","items":["..."]}]}`)
 	assert.Contains(t, body, `{"op":"start","task":"<exact task content>"}`)
 	assert.Contains(t, body, "that same agent")
-	assert.Contains(t, body, "OMP-local")
-	assert.Contains(t, body, "Orca-supervised")
+	assert.Contains(t, body, "owner `omp`")
+	assert.Contains(t, body, "owner `orca`")
+	assert.Contains(t, body, "--execution-owner orca")
 	assert.Contains(t, body, "orca skills get orchestration --full")
 	assert.Contains(t, body, "single DAG owner invariant")
+	assert.NotContains(t, body, "OMP-local")
+	assert.NotContains(t, body, "Orca-supervised")
 }
 
 func ompIntentionalPlatformRootGlobs() []string {

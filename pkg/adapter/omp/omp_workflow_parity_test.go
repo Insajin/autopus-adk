@@ -38,6 +38,7 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 	}
 
 	commands := map[string]bool{}
+	commandBodies := map[string]string{}
 	skills := map[string]string{}
 	seen := map[string]int{}
 	coordinationBodies := map[string]bool{
@@ -52,6 +53,7 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 			name := strings.TrimSuffix(strings.TrimPrefix(target, ".agents/commands/"), ".md")
 			if !strings.Contains(name, "/") {
 				commands[name] = true
+				commandBodies[name] = string(file.Content)
 			}
 		}
 		const skillPrefix, skillSuffix = ".agents/skills/", "/SKILL.md"
@@ -110,6 +112,7 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 	assert.Equal(t, want, commands, "command basenames must equal workflowSpecs")
 	assert.Equal(t, want, mappingContentKeys(skills),
 		"workflow skill basenames must equal workflowSpecs; extended skills are excluded")
+	assertOMPExecutionOwnerSurfaceParity(t, commandBodies, skills)
 
 	router, ok := skills["auto"]
 	if assert.True(t, ok, "the thin auto router skill must be emitted") {
@@ -128,6 +131,34 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 		assert.NotEmpty(t, strings.TrimSpace(body))
 		assert.Contains(t, body, "## ", "%s needs structured execution sections", spec.Name)
 		assert.NotContains(t, body, "# Autopus 명령 라우터")
+	}
+}
+
+func assertOMPExecutionOwnerSurfaceParity(t *testing.T, commands, skills map[string]string) {
+	t.Helper()
+	for _, surface := range []struct {
+		name string
+		body string
+	}{
+		{name: "auto router command", body: commands["auto"]},
+		{name: "auto router skill", body: skills["auto"]},
+		{name: "auto-go command", body: commands["auto-go"]},
+		{name: "auto-go skill", body: skills["auto-go"]},
+	} {
+		assert.Contains(t, surface.body, "--execution-owner omp|orca", "%s lost the exact owner flag", surface.name)
+		assert.NotContains(t, surface.body, "OMP-local", "%s retained a deprecated owner spelling", surface.name)
+		assert.NotContains(t, surface.body, "Orca-supervised", "%s retained a deprecated owner spelling", surface.name)
+	}
+	for _, surface := range []struct {
+		name string
+		body string
+	}{
+		{name: "auto-status command", body: commands["auto-status"]},
+		{name: "auto-status skill", body: skills["auto-status"]},
+	} {
+		assert.Contains(t, surface.body, "execution-owner", "%s lost receipt guidance", surface.name)
+		assert.Contains(t, surface.body, "`hub`", "%s lost OMP-native hub guidance", surface.name)
+		assert.Contains(t, surface.body, "user-session roots", "%s claims external session-root visibility", surface.name)
 	}
 }
 

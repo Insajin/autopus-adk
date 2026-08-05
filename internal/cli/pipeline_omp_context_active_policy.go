@@ -69,12 +69,24 @@ func newPipelineOMPActiveCurrentRuntimeProviderWithHooks(
 	config pipelineOMPBackendConfig,
 	hooks pipelineOMPActiveCurrentRuntimeHooks,
 ) pipelineOMPActiveCurrentRuntimeProvider {
-	return func(ctx context.Context, candidate pipelineOMPManagedActiveCandidate) (
-		promptlayer.OMPContextPromotionCurrentRuntimeV3, error,
-	) {
-		_, found := pipelineOMPEnvironmentValue(config.Environment, pipelineOMPActiveEndpointKey)
-		if !found {
-			return promptlayer.OMPContextPromotionCurrentRuntimeV3{}, errors.New("pipeline: active OMP endpoint is unavailable")
+	return func(ctx context.Context, candidate pipelineOMPManagedActiveCandidate,
+		expected promptlayer.OMPContextPromotionStaticPolicyV3,
+	) (promptlayer.OMPContextPromotionCurrentRuntimeV3, error) {
+		autoExecutableSHA256, err := pipelineOMPActiveCurrentAutoExecutableSHA256()
+		if err != nil {
+			return promptlayer.OMPContextPromotionCurrentRuntimeV3{}, err
+		}
+		endpoint, endpointFound := pipelineOMPEnvironmentValue(config.Environment, pipelineOMPActiveEndpointKey)
+		credential, credentialFound := pipelineOMPEnvironmentValue(config.Environment, pipelineOMPActiveCredentialKey)
+		if !endpointFound || !credentialFound {
+			return promptlayer.OMPContextPromotionCurrentRuntimeV3{}, errors.New("pipeline: active OMP provider authority is unavailable")
+		}
+		providerAuthority, err := pipelineOMPActiveProviderAuthorityDigest(
+			expected.PolicyDigest, expected.PipelineImplementationDigest,
+			candidate.ModelScopeDigest, endpoint, credential,
+		)
+		if err != nil {
+			return promptlayer.OMPContextPromotionCurrentRuntimeV3{}, err
 		}
 		if err := verifyPipelineOMPExecutable(config.Executable, config.executableID); err != nil {
 			return promptlayer.OMPContextPromotionCurrentRuntimeV3{}, err
@@ -88,11 +100,12 @@ func newPipelineOMPActiveCurrentRuntimeProviderWithHooks(
 			return promptlayer.OMPContextPromotionCurrentRuntimeV3{}, errors.New("pipeline: active OMP identity probe failed")
 		}
 		return promptlayer.OMPContextPromotionCurrentRuntimeV3{
-			SourceCommit: candidate.AutoSourceCommit, SourceTree: candidate.AutoSourceTree,
+			ExecutableSHA256: autoExecutableSHA256,
+			SourceCommit:     candidate.AutoSourceCommit, SourceTree: candidate.AutoSourceTree,
 			Target: runtime.GOOS + "-" + runtime.GOARCH, AutoVersion: version.Version(),
-			OMPVersion:                   ompVersion,
-			OMPExecutableSHA256:          fmt.Sprintf("sha256:%x", config.executableID.digest[:]),
-			PipelineImplementationDigest: pipelineOMPActiveImplementationDigest(),
+			OMPVersion: ompVersion, OMPExecutableSHA256: fmt.Sprintf("sha256:%x", config.executableID.digest[:]),
+			PipelineImplementationDigest: expected.PipelineImplementationDigest,
+			ProviderAuthorityDigest:      providerAuthority,
 		}, nil
 	}
 }
@@ -234,4 +247,16 @@ func materializePipelineOMPActiveRuntimeConfig(
 	config.Executable, config.executableID = privateExecutable, privateIdentity
 	failed = false
 	return config, runtimeRoot, nil
+}
+
+func pipelineOMPActiveCurrentAutoExecutableSHA256() (string, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return "", errors.New("pipeline: active auto executable is unavailable")
+	}
+	_, identity, err := canonicalPipelineOMPExecutable(executable)
+	if err != nil {
+		return "", errors.New("pipeline: active auto executable identity is unavailable")
+	}
+	return fmt.Sprintf("sha256:%x", identity.digest[:]), nil
 }

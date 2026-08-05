@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/pipeline"
+	"github.com/insajin/autopus-adk/pkg/promptlayer"
 )
 
 func TestCompiledPipelineOMPActiveStaticPolicy_ExactCanonicalBase64URLPasses(t *testing.T) {
@@ -101,11 +102,19 @@ func TestPipelineOMPActivePinnedRuntime_ReplacementHookKeepsProbeAndSessionOnVer
 		},
 	})
 	candidate := pipelineOMPActivePinnedRuntimeCandidate(t, pinned)
-	current, err := provider(context.Background(), candidate)
+	staticPolicy := pipelineOMPActivePinnedRuntimePolicy()
+	current, err := provider(context.Background(), candidate, staticPolicy)
 	require.NoError(t, err)
 	assert.Equal(t, 1, hookCalls)
 	assert.Equal(t, "omp/17.2.7", current.OMPVersion)
 	assert.Equal(t, fmt.Sprintf("sha256:%x", pinned.executableID.digest[:]), current.OMPExecutableSHA256)
+	assert.True(t, validPipelineOMPActiveHash(current.ExecutableSHA256))
+	expectedAuthority, err := pipelineOMPActiveProviderAuthorityDigest(
+		staticPolicy.PolicyDigest, staticPolicy.PipelineImplementationDigest, candidate.ModelScopeDigest,
+		"http://127.0.0.1:43123", "fixture-token-value",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, expectedAuthority, current.ProviderAuthorityDigest)
 
 	session, err := newPipelineOMPActiveSessionStart(pinned)(
 		context.Background(), candidate, pipelineOMPActivePinnedRuntimePrepared(candidate),
@@ -145,7 +154,7 @@ func TestPipelineOMPActivePinnedRuntime_PinnedPathSwapFailsClosedWithoutProbeAut
 			require.NoError(t, os.Rename(next, pinned.Executable))
 		},
 	})
-	_, err = provider(context.Background(), pipelineOMPActivePinnedRuntimeCandidate(t, pinned))
+	_, err = provider(context.Background(), pipelineOMPActivePinnedRuntimeCandidate(t, pinned), pipelineOMPActivePinnedRuntimePolicy())
 	require.ErrorContains(t, err, "identity probe failed")
 	assert.Equal(t, 1, hookCalls)
 	_, statErr := os.Lstat(marker)
@@ -253,8 +262,10 @@ func pipelineOMPActivePinnedRuntimePrepared(
 	candidate pipelineOMPManagedActiveCandidate,
 ) pipelineOMPManagedActivePrepared {
 	return pipelineOMPManagedActivePrepared{Binding: pipelineOMPActiveLeaseBinding{
-		GrantDigest: pipelineOMPContextCohortHash("grant"), WorkspaceID: "autopus-adk",
-		SpecID: candidate.Snapshot.SpecID, GitCommitHash: candidate.Snapshot.GitCommitHash,
+		GrantDigest:  pipelineOMPContextCohortHash("grant"),
+		PolicyDigest: pipelineOMPActivePinnedRuntimePolicy().PolicyDigest,
+		WorkspaceID:  "autopus-adk", SpecID: candidate.Snapshot.SpecID,
+		GitCommitHash:    candidate.Snapshot.GitCommitHash,
 		ModelScopeDigest: candidate.ModelScopeDigest,
 	}}
 }
@@ -271,4 +282,11 @@ func copyPipelineOMPActiveNativeFixture(t *testing.T, destination string) {
 	closeErr := output.Close()
 	require.NoError(t, errors.Join(copyErr, syncErr, closeErr))
 	require.NoError(t, os.Chmod(destination, 0o700))
+}
+
+func pipelineOMPActivePinnedRuntimePolicy() promptlayer.OMPContextPromotionStaticPolicyV3 {
+	return promptlayer.OMPContextPromotionStaticPolicyV3{
+		PolicyDigest:                 workflowContextRuntimeHash("pinned-runtime-policy"),
+		PipelineImplementationDigest: pipelineOMPActiveImplementationDigest(),
+	}
 }

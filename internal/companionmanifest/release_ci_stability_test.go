@@ -30,6 +30,7 @@ func TestCIWorkflow_StableChecksHaveBoundedTimeouts(t *testing.T) {
 	want := map[string]int{
 		"test": 35, "lineage-integration": 55, "e2e": 10, "lint": 10,
 		"static-contracts": 10, "macos-runtime": 15,
+		"omp-native-smoke": 5,
 	}
 	for id, timeout := range want {
 		job, ok := workflow.Jobs[id]
