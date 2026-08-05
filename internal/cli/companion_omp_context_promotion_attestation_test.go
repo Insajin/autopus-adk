@@ -38,7 +38,7 @@ func TestCompanionOMPContextPromotionAttestation_RejectsExistingOrSymlinkOutput(
 		}
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
-			report := filepath.Join(dir, "promotion-report-v1.json")
+			report := filepath.Join(dir, "omp-context-promotion-report.v1.json")
 			output := filepath.Join(dir, "omp-context-promotion-attestation.v2.json")
 			protected := filepath.Join(dir, "protected")
 			if err := os.WriteFile(report, []byte(`{}`), 0o600); err != nil {

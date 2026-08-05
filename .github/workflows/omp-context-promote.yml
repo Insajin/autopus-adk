@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       evidence_commit:
-        description: Exact commit containing only promotion-report-v1.json
+        description: Exact commit containing only omp-context-promotion-report.v1.json
         required: true
         type: string
       source_commit:
@@ -29,7 +29,7 @@ permissions:
   actions: write
 
 concurrency:
-  group: omp-context-evidence-v0.50.93
+  group: omp-context-evidence-v0.50.94
   cancel-in-progress: false
 
 jobs:
@@ -59,7 +59,6 @@ jobs:
           CANDIDATE_SHA256: ${{ inputs.candidate_sha256 }}
           STATIC_POLICY_B64: ${{ inputs.static_policy_b64 }}
           OMP_CONTEXT_EVIDENCE_SIGNING_KEY: ${{ secrets.OMP_CONTEXT_EVIDENCE_SIGNING_KEY }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           umask 077
@@ -69,9 +68,9 @@ jobs:
             exit 1
           }
 
-          readonly evidence_tag='omp-context-evidence-v0.50.93'
+          readonly evidence_tag='omp-context-evidence-v0.50.94'
           readonly tag_ref="refs/tags/${evidence_tag}"
-          readonly report_name='promotion-report-v1.json'
+          readonly report_name='omp-context-promotion-report.v1.json'
           readonly attestation_name='omp-context-promotion-attestation.v2.json'
           readonly candidate_repository='Insajin/autopus-adk'
 
@@ -173,7 +172,7 @@ jobs:
             [[ "$entry" =~ ^100644\ blob\ [0-9a-f]{40}$'\t'"$name"$ ]] || fail "published evidence entry ${name} is unsafe"
           done
 
-          published_evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.93' |
+          published_evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.94' |
             git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit-tree "$evidence_tree")
@@ -200,7 +199,7 @@ jobs:
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             -c tag.gpgSign=false \
-            tag -a "$evidence_tag" "$published_evidence_commit" -m 'OMP context promotion evidence v0.50.93'
+            tag -a "$evidence_tag" "$published_evidence_commit" -m 'OMP context promotion evidence v0.50.94'
           [[ "$(git cat-file -t "$tag_ref")" == 'tag' ]] || fail 'promotion tag is not annotated'
           tag_object=$(git rev-parse --verify "$tag_ref")
           readonly tag_object
@@ -209,8 +208,3 @@ jobs:
           remote_tag_object=${remote_tag_line%%$'\t'*}
           remote_tag_ref=${remote_tag_line#*$'\t'}
           [[ "$remote_tag_object" == "$tag_object" && "$remote_tag_ref" == "$tag_ref" ]] || fail 'remote promotion tag differs after push'
-
-          gh variable set OMP_CONTEXT_EVIDENCE_TAG --repo "$GITHUB_REPOSITORY" --body "$evidence_tag"
-          gh variable set OMP_CONTEXT_EVIDENCE_REPORT_SHA256 --repo "$GITHUB_REPOSITORY" --body "$report_sha256"
-          gh variable set OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 --repo "$GITHUB_REPOSITORY" --body "$attestation_sha256"
-          gh variable set OMP_CONTEXT_STATIC_POLICY_B64 --repo "$GITHUB_REPOSITORY" --body "$STATIC_POLICY_B64"

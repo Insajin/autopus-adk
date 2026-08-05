@@ -15,7 +15,7 @@ func ompContextReleaseLineageFixture() OMPContextReleaseLineageV1 {
 		ExecutableSHA256: "sha256:" + strings.Repeat("2", 64),
 		SourceRepository: "Insajin/autopus-adk",
 		SourceCommit:     strings.Repeat("3", 40), SourceTree: strings.Repeat("4", 40),
-		Target: "darwin-arm64", Version: "v0.50.93",
+		Target: "darwin-arm64", Version: "v0.50.94",
 	}
 }
 
