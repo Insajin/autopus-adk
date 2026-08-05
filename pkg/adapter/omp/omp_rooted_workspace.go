@@ -55,7 +55,8 @@ func (workspace *ompRootedWorkspace) Close() error {
 	if workspace == nil || workspace.root == nil {
 		return nil
 	}
-	return workspace.root.Close()
+	cleanupErr := workspace.cleanupOMPConfigRollbackArtifactsIfUnowned()
+	return errors.Join(cleanupErr, workspace.root.Close())
 }
 
 func cleanOMPRootedPath(path string) (string, error) {
@@ -197,6 +198,17 @@ func (workspace *ompRootedWorkspace) readFile(path string, limit int64) ([]byte,
 	data, err := io.ReadAll(reader)
 	if err != nil || limit > 0 && int64(len(data)) > limit {
 		return nil, nil, fmt.Errorf("read OMP path %s: size or IO failure", path)
+	}
+	return data, info, nil
+}
+
+func (workspace *ompRootedWorkspace) readOwnerOnlyFile(path string, limit int64) ([]byte, fs.FileInfo, error) {
+	data, info, err := workspace.readFile(path, limit)
+	if err != nil {
+		return nil, nil, err
+	}
+	if info.Mode().Perm() != 0o600 {
+		return nil, nil, fmt.Errorf("OMP path %s must have mode 0600", path)
 	}
 	return data, info, nil
 }

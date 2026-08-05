@@ -37,6 +37,7 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 	sessionSequences := map[string]int{"A": 0, "B": 0}
 	rows := make([]OMPContextCanaryRowV1, 0, 40)
 	var previousCompleted time.Time
+	providerAuthority := ""
 	abCount, baCount := 0, 0
 	for taskIndex, task := range report.Tasks {
 		if !validOMPContextMemoryHashV1(task.TaskIDDigest) || tasks[task.TaskIDDigest] || (task.Order != "AB" && task.Order != "BA") {
@@ -54,7 +55,7 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 			sessionSequences[expectedVariant]++
 			if err := validateOMPContextPromotionObservationV1(report, observation, task.TaskIDDigest,
 				expectedVariant, taskIndex*2+pairIndex+1, sessionSequences[expectedVariant], previousCompleted,
-				observationDigests, usageDigests, sessionReceipts); err != nil {
+				observationDigests, usageDigests, sessionReceipts, &providerAuthority); err != nil {
 				return nil, 0, 0, err
 			}
 			completed, _ := time.Parse(time.RFC3339Nano, observation.CompletedAt)
@@ -68,7 +69,7 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 		}
 	}
 	if sessionSequences["A"] != 20 || sessionSequences["B"] != 20 || sessionReceipts["A"] == "" ||
-		sessionReceipts["B"] == "" || sessionReceipts["A"] == sessionReceipts["B"] {
+		sessionReceipts["B"] == "" || sessionReceipts["A"] == sessionReceipts["B"] || providerAuthority == "" {
 		return nil, 0, 0, fmt.Errorf("OMP context promotion session projection is invalid")
 	}
 	return rows, abCount, baCount, nil
@@ -76,7 +77,8 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 
 func validateOMPContextPromotionObservationV1(report OMPContextPromotionReportV1, observation OMPContextPromotionObservationV1,
 	taskDigest, variant string, sequence, sessionSequence int, previousCompleted time.Time,
-	observationDigests, usageDigests map[string]bool, sessionReceipts map[string]string) error {
+	observationDigests, usageDigests map[string]bool, sessionReceipts map[string]string,
+	providerAuthority *string) error {
 	started, startErr := parseCanonicalOMPContextPromotionTimeV2(observation.StartedAt)
 	completed, completeErr := parseCanonicalOMPContextPromotionTimeV2(observation.CompletedAt)
 	if startErr != nil || completeErr != nil || !started.Before(completed) || (!previousCompleted.IsZero() && started.Before(previousCompleted)) {
@@ -87,7 +89,9 @@ func validateOMPContextPromotionObservationV1(report OMPContextPromotionReportV1
 		observation.ProcessReused != (sessionSequence > 1) ||
 		observation.Provider != report.Provider || observation.ModelScopeDigest != report.ModelScopeDigest ||
 		observation.EndpointClass != "external-provider" || observation.Transport != "provider-api" ||
-		observation.CredentialMode != "locator-only" || observation.ExecutionMode != "external-live" {
+		observation.CredentialMode != "locator-only" ||
+		!validOMPContextMemoryHashV1(observation.ProviderAuthorityDigest) ||
+		observation.ExecutionMode != "external-live" {
 		return fmt.Errorf("OMP context promotion observation binding is invalid")
 	}
 	if receipt := sessionReceipts[variant]; receipt == "" {
@@ -95,13 +99,23 @@ func validateOMPContextPromotionObservationV1(report OMPContextPromotionReportV1
 	} else if receipt != observation.SessionReceiptDigest {
 		return fmt.Errorf("OMP context promotion session receipt changed")
 	}
+	if *providerAuthority == "" {
+		*providerAuthority = observation.ProviderAuthorityDigest
+	} else if *providerAuthority != observation.ProviderAuthorityDigest {
+		return fmt.Errorf("OMP context promotion provider authority changed")
+	}
 	if observation.InputTokens <= 0 || observation.OutputTokens <= 0 || observation.TotalTokens <= 0 ||
 		observation.InputTokens > 1_000_000_000_000 || observation.OutputTokens > 1_000_000_000_000 ||
 		observation.TotalTokens != observation.InputTokens+observation.OutputTokens || observation.QualityScore != 10000 ||
 		observation.SetupProviderRequests < 0 || observation.SetupProviderRequests > 1_000_000 ||
 		observation.CompactionProviderRequests < 0 || observation.CompactionProviderRequests > 1_000_000 ||
 		observation.PrimaryProviderRequests != 1 ||
-		(variant == "A" && observation.CompactionProviderRequests != 0) ||
+		(variant == "A" && (observation.CompactionProviderRequests != 0 ||
+			observation.PreCompactionACKs != 0 || observation.PostCompactionACKs != 0 ||
+			observation.CanonicalReadmissions != 0 || observation.EphemeralReadmissions != 0)) ||
+		(variant == "B" && (observation.CompactionProviderRequests != 1 ||
+			observation.PreCompactionACKs != 1 || observation.PostCompactionACKs != 1 ||
+			observation.CanonicalReadmissions != 1 || observation.EphemeralReadmissions != 1)) ||
 		observation.TotalProviderRequests != observation.SetupProviderRequests+
 			observation.CompactionProviderRequests+observation.PrimaryProviderRequests ||
 		observation.RetryCount != 0 || observation.MaxConcurrency != 1 {
@@ -125,6 +139,8 @@ func expectedOMPContextPromotionGatesV1(medianBasisPoints int64) []OMPContextPro
 	return []OMPContextPromotionGateResultV1{
 		pass("integrity", "40/40", "40/40"), pass("security", "40/40", "40/40"), pass("quality", "0", "0"),
 		pass("pair-count", "20", "20"), pass("balanced-order", "10:10", "10:10"),
+		pass("provider-authority", "40/40", "40/40"), pass("reusable-session", "38/38", "38/38"),
+		pass("multi-compaction-admission", "20/20", "20/20"),
 		pass("token-reduction", strconv.FormatInt(medianBasisPoints, 10), "2000"),
 		pass("fallback", "40/40", "40/40"), pass("rollback", "40/40", "40/40"), pass("cleanup", "40/40", "40/40"),
 		pass("serial-execution", "40/40", "40/40"), pass("no-retry", "0", "0"),

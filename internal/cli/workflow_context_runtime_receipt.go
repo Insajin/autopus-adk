@@ -53,6 +53,20 @@ type WorkflowContextModeReceipt struct {
 	OverlayHash          string `json:"overlay_hash,omitempty"`
 	ReadbackHash         string `json:"readback_hash,omitempty"`
 }
+type WorkflowContextLifecycleReceipt struct {
+	RequiredCompactionCycles int    `json:"required_compaction_cycles"`
+	PreCompactionACKs        int    `json:"pre_compaction_acks"`
+	PostCompactionACKs       int    `json:"post_compaction_acks"`
+	NativeStarts             int    `json:"native_starts"`
+	NativeEnds               int    `json:"native_ends"`
+	CanonicalReadmissions    int    `json:"canonical_readmissions"`
+	EphemeralReadmissions    int    `json:"ephemeral_readmissions"`
+	ProviderTurns            int    `json:"provider_turns"`
+	ProviderAuthorityDigest  string `json:"provider_authority_digest,omitempty"`
+	SameProcess              bool   `json:"same_process"`
+	SameSession              bool   `json:"same_session"`
+	ProviderObserved         bool   `json:"provider_observed"`
+}
 
 type WorkflowContextRuntimeReceipt struct {
 	SchemaVersion         string                                    `json:"schema_version"`
@@ -85,6 +99,7 @@ type WorkflowContextRuntimeReceipt struct {
 	Cleanup               WorkflowContextCleanupReceipt             `json:"cleanup"`
 	Mode                  WorkflowContextModeReceipt                `json:"mode"`
 	Fallback              WorkflowContextFallbackReceipt            `json:"fallback"`
+	Lifecycle             WorkflowContextLifecycleReceipt           `json:"lifecycle"`
 	ExactMatch            bool                                      `json:"exact_match"`
 	PhaseSequence         []string                                  `json:"phase_sequence"`
 }

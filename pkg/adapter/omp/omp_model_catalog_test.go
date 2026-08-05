@@ -25,11 +25,11 @@ func (runner *modelCatalogFakeRunner) Run(_ context.Context, _ string, args ...s
 func TestProbeOMPModelCatalog_WithAllowedMetadata_ReturnsCanonicalSecretFreeFingerprint(t *testing.T) {
 	t.Parallel()
 	runner := &modelCatalogFakeRunner{outputs: map[string][]byte{
-		"--version":                    []byte("omp/17.1.8\n"),
+		"--version":                    []byte("omp/17.2.6\n"),
 		"config get modelRoles --json": []byte(`{"key":"modelRoles","value":{}}`),
-		"models --json": []byte(`{"models":[
+		"models --json --no-extensions": []byte(`{"models":[
 			{"provider":"openai","id":"beta-coder","family":"openai","capabilities":["fast_validation","coding_tool_use"],"thinking":["high","medium"],"auth_enabled":true,"token":"never-fingerprint"},
-			{"provider":"anthropic","id":"alpha-reasoner","family":"anthropic","capabilities":["independent_dissent","deep_reasoning"],"thinking":["xhigh","high"],"available":true}
+			{"provider":"anthropic","id":"alpha-reasoner","family":"anthropic","capabilities":["independent_dissent","deep_reasoning"],"thinking":["max","xhigh","high","off","none","auto"],"available":true}
 		]}`),
 	}, errors: map[string]error{}}
 
@@ -40,17 +40,17 @@ func TestProbeOMPModelCatalog_WithAllowedMetadata_ReturnsCanonicalSecretFreeFing
 
 	require.Equal(t, "ready", got.Status)
 	require.Equal(t, "catalog_ready", got.Reason)
-	require.Equal(t, "omp/17.1.8", got.Version)
+	require.Equal(t, "omp/17.2.6", got.Version)
 	require.Regexp(t, `^sha256:[0-9a-f]{64}$`, got.Catalog.Fingerprint)
 	require.Equal(t, []string{"anthropic/alpha-reasoner", "openai/beta-coder"}, []string{
 		got.Catalog.Models[0].Provider + "/" + got.Catalog.Models[0].Model,
 		got.Catalog.Models[1].Provider + "/" + got.Catalog.Models[1].Model,
 	})
 	require.Equal(t, []string{"deep_reasoning", "independent_dissent"}, got.Catalog.Models[0].Capabilities)
-	require.Equal(t, []string{"high", "xhigh"}, got.Catalog.Models[0].Thinking)
+	require.Equal(t, []string{"auto", "high", "max", "none", "off", "xhigh"}, got.Catalog.Models[0].Thinking)
 	require.Equal(t, []OMPModelSettingSupport{{Key: "modelRoles", Supported: true, Reason: "observed"}}, got.Settings)
 
-	withoutSecret := strings.ReplaceAll(string(runner.outputs["models --json"]), `,"token":"never-fingerprint"`, "")
+	withoutSecret := strings.ReplaceAll(string(runner.outputs["models --json --no-extensions"]), `,"token":"never-fingerprint"`, "")
 	wantCatalog, reason := NormalizeOMPModelCatalog([]byte(withoutSecret), 4096)
 	require.Equal(t, "catalog_ready", reason)
 	require.Equal(t, got.Catalog.Fingerprint, wantCatalog.Fingerprint)
@@ -111,8 +111,8 @@ func TestProbeOMPModelCatalog_WithBoundFailures_ReturnsCatalogReasons(t *testing
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			runner := &modelCatalogFakeRunner{outputs: map[string][]byte{
-				"--version": []byte("omp/17.1.8"), "models --json": tc.output,
-			}, errors: map[string]error{"models --json": tc.err}}
+				"--version": []byte("omp/17.2.6"), "models --json --no-extensions": tc.output,
+			}, errors: map[string]error{"models --json --no-extensions": tc.err}}
 			got := ProbeOMPModelCatalog(context.Background(), OMPModelCatalogProbeOptions{
 				Runner: runner, Timeout: time.Second, MaxOutput: 64,
 			})
@@ -125,7 +125,7 @@ func TestProbeOMPModelCatalog_WithBoundFailures_ReturnsCatalogReasons(t *testing
 func TestProbeOMPModelCatalog_WithUnsupportedSetting_ReportsItWithoutReadingUnknownKeys(t *testing.T) {
 	t.Parallel()
 	runner := &modelCatalogFakeRunner{outputs: map[string][]byte{
-		"--version": []byte("omp/17.1.8"), "models --json": []byte(`{"models":[{"provider":"p","id":"m","family":"f","capabilities":["coding_tool_use"],"thinking":["high"],"keyless":true}]}`),
+		"--version": []byte("omp/17.2.6"), "models --json --no-extensions": []byte(`{"models":[{"provider":"p","id":"m","family":"f","capabilities":["coding_tool_use"],"thinking":["high"],"keyless":true}]}`),
 	}, errors: map[string]error{"config get retry.fallbackChains --json": errors.New("unsupported")}}
 
 	got := ProbeOMPModelCatalog(context.Background(), OMPModelCatalogProbeOptions{
@@ -141,60 +141,16 @@ func TestProbeOMPModelCatalog_WithUnsupportedSetting_ReportsItWithoutReadingUnkn
 	require.NotContains(t, runner.calls, "config get credential.token --json")
 }
 
-func TestNormalizeOMPAvailableCatalog_WithExactDeclarations_ConservativelyEnrichesObservedRows(t *testing.T) {
+func TestNormalizeOMPAvailableCatalog_ProfileDeclarationsAreNotRuntimeEvidence(t *testing.T) {
 	t.Parallel()
-	raw := []byte(`{"models":[
-		{"provider":"p","id":"reasoner","selector":"p/reasoner","reasoning":true,"input":["text","image"],"thinking":["xhigh","high"],"cost":{"input":99},"apiKey":"discard"},
-		{"provider":"p","id":"undeclared","selector":"p/undeclared","reasoning":true,"input":["text"],"thinking":["high"]}
-	]}`)
-	declarations := []OMPModelCatalogDeclaration{
-		{Selector: "p/reasoner", Family: "family-p", Capability: "vision_design"},
-		{Selector: "p/reasoner", Family: "family-p", Capability: "coding_tool_use"},
-		{Selector: "p/reasoner", Family: "family-p", Capability: "deep_reasoning"},
-	}
-
-	got, reason := NormalizeOMPAvailableCatalog(raw, 4096, declarations)
-
-	require.Equal(t, "catalog_ready", reason)
-	require.Len(t, got.Models, 1)
-	require.Equal(t, OMPModelMetadata{
-		Provider: "p", Model: "reasoner", Family: "family-p",
-		Capabilities: []string{"coding_tool_use", "deep_reasoning", "vision_design"},
-		Thinking:     []string{"high", "xhigh"}, AuthEnabled: true,
-	}, got.Models[0])
-	require.Regexp(t, `^sha256:[0-9a-f]{64}$`, got.Fingerprint)
-
-	reversed := []OMPModelCatalogDeclaration{declarations[2], declarations[1], declarations[0]}
-	again, againReason := NormalizeOMPAvailableCatalog(raw, 4096, reversed)
-	require.Equal(t, "catalog_ready", againReason)
-	require.Equal(t, got, again)
-	withoutUnknowns := []byte(`{"models":[
-		{"provider":"p","id":"reasoner","selector":"p/reasoner","reasoning":true,"input":["text","image"],"thinking":["high","xhigh"]},
-		{"provider":"p","id":"undeclared","selector":"p/undeclared","reasoning":true,"input":["text"],"thinking":["high"]}
-	]}`)
-	withoutUnknownCatalog, withoutUnknownReason := NormalizeOMPAvailableCatalog(withoutUnknowns, 4096, declarations)
-	require.Equal(t, "catalog_ready", withoutUnknownReason)
-	require.Equal(t, got.Fingerprint, withoutUnknownCatalog.Fingerprint)
-}
-
-func TestNormalizeOMPAvailableCatalog_WithUnsupportedObservedCapabilities_DoesNotInventThem(t *testing.T) {
-	t.Parallel()
-	raw := []byte(`{"models":[{"provider":"p","id":"plain","selector":"p/plain","reasoning":false,"input":["text"],"thinking":["medium","unknown-level"]}]}`)
+	raw := []byte(`{"models":[{"provider":"p","id":"reasoner","selector":"p/reasoner","reasoning":true,"input":["text","image"],"thinking":["max","high"],"apiKey":"discard"}]}`)
 	got, reason := NormalizeOMPAvailableCatalog(raw, 4096, []OMPModelCatalogDeclaration{
-		{Selector: "p/plain", Family: "family-p", Capability: "deep_reasoning"},
-		{Selector: "p/plain", Family: "family-p", Capability: "vision_design"},
+		{Selector: "p/reasoner", Family: "family-p", Capability: "deep_reasoning"},
 	})
 
-	require.Equal(t, "catalog_ready", reason)
-	require.Len(t, got.Models, 1)
-	require.Empty(t, got.Models[0].Capabilities)
-	require.Equal(t, []string{"medium"}, got.Models[0].Thinking)
-
-	missing, missingReason := NormalizeOMPAvailableCatalog(raw, 4096, []OMPModelCatalogDeclaration{
-		{Selector: "p/missing", Family: "family-p", Capability: "coding_tool_use"},
-	})
-	require.Equal(t, "catalog_empty", missingReason)
-	require.Empty(t, missing.Models)
+	require.Equal(t, "catalog_metadata_insufficient", reason)
+	require.Empty(t, got.Models)
+	require.Empty(t, got.Fingerprint)
 }
 
 func TestSafeOMPModelToken_RejectsStructuralAndControlCharacters(t *testing.T) {

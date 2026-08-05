@@ -44,12 +44,9 @@ func LoadOMPModelResolutionReceiptAt(
 		}
 	}()
 
-	data, info, err := workspace.readFile(OMPModelReceiptRelativePath, maxOMPModelReceiptBytes)
+	data, _, err := workspace.readOwnerOnlyFile(OMPModelReceiptRelativePath, maxOMPModelReceiptBytes)
 	if err != nil {
 		return OMPModelResolutionReceipt{}, fmt.Errorf("read OMP model receipt: %w", err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		return OMPModelResolutionReceipt{}, fmt.Errorf("OMP model receipt must have mode 0600")
 	}
 	if err := rejectDuplicateOMPModelReceiptJSON(data); err != nil {
 		return OMPModelResolutionReceipt{}, err

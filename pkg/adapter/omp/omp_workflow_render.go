@@ -46,22 +46,8 @@ func splitOMPFrontmatter(content string) (string, string) {
 
 func normalizeOMPWorkflowBody(body string) string {
 	body = strings.NewReplacer(
-		".codex/", ".claude/",
-		".opencode/", ".claude/",
-		".gemini/", ".claude/",
 		"@auto ", "/auto ",
 		"@auto-", "/auto-",
-		"## Codex Notes", "## OMP Notes",
-		"## Codex 기본 실행 모델", "## OMP 기본 실행 모델",
-		"Codex runtime", "OMP runtime",
-		"Codex 런타임", "OMP 런타임",
-		"Codex에서는", "OMP에서는",
-		"Codex의", "OMP의",
-		"Codex는", "OMP는",
-		"Codex에서", "OMP에서",
-		"spawn_agent(...)", "task tool",
-		"spawn_agent", "task tool",
-		"request_user_input", "user prompt",
 	).Replace(body)
 	body = pkgcontent.ReplacePlatformReferences(body, "omp")
 	body = dedupeOMPReference(body, ".agents/skills/agent-pipeline/SKILL.md")

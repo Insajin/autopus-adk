@@ -31,6 +31,14 @@ func TestRoleModelPolicy_Helpers_FailClosedBranches(t *testing.T) {
 	if err := ValidateOMPAgentRoleSet(append(exactAgents, exactAgents[0])); err == nil || !strings.Contains(err.Error(), "agent_role_duplicate") {
 		t.Fatalf("duplicate agent error = %v", err)
 	}
+	for _, thinking := range []string{"off", "none", "minimal", "low", "medium", "high", "xhigh", "max", "auto"} {
+		if !IsOMPNativeThinkingLevel(thinking) {
+			t.Fatalf("native thinking level rejected: %s", thinking)
+		}
+	}
+	if IsOMPNativeThinkingLevel("turbo") {
+		t.Fatal("unknown thinking level accepted")
+	}
 }
 
 func TestRoleModelPolicy_Validation_RejectsInvalidProfileFields(t *testing.T) {
@@ -68,9 +76,17 @@ func TestRoleModelPolicy_Validation_RejectsInvalidProfileFields(t *testing.T) {
 			route.Candidates[0].Thinking = "high value"
 			p.Capabilities[CapabilityVisionDesign] = route
 		}), "metadata_invalid"},
+		{"unknown thinking", mutateProfile(func(p *RoleModelProfileConf) {
+			route := p.Capabilities[CapabilityVisionDesign]
+			route.Candidates[0].Thinking = "turbo"
+			p.Capabilities[CapabilityVisionDesign] = route
+		}), "metadata_invalid"},
 		{"bad diversity role", mutateProfile(func(p *RoleModelProfileConf) {
 			p.FamilyDiversity.Roles = []string{"future"}
 		}), "role_unknown"},
+		{"duplicate diversity role", mutateProfile(func(p *RoleModelProfileConf) {
+			p.FamilyDiversity.Roles = []string{OMPRoleAdvisor, OMPRoleAdvisor}
+		}), "role_duplicate"},
 		{"bad approval", mutateProfile(func(p *RoleModelProfileConf) { p.Safety.ApprovalMode = "bad value" }), "approval_mode_invalid"},
 		{"bad isolation", mutateProfile(func(p *RoleModelProfileConf) { p.Safety.IsolationMode = "bad value" }), "isolation_mode_invalid"},
 	}

@@ -29,16 +29,22 @@ func TestPipelineOMPActiveRPC_ReusesOneSessionAcrossManualCompaction(t *testing.
 	assert.Equal(t, "safe assistant output 1", first)
 	assert.Equal(t, "safe assistant output 2", second)
 	assert.Equal(t, firstReceipt.SessionID, secondReceipt.SessionID)
-	assert.Equal(t, 0, firstReceipt.CompactionCycles)
+	assert.Equal(t, 1, firstReceipt.CompactionCycles)
 	assert.Equal(t, 1, secondReceipt.CompactionCycles)
+	assert.Equal(t, 1, firstReceipt.PreCompactionACKs)
+	assert.Equal(t, 1, firstReceipt.PostCompactionACKs)
+	assert.Equal(t, 1, firstReceipt.CanonicalReadmissions)
+	assert.Equal(t, 1, firstReceipt.EphemeralReadmissions)
+	assert.Equal(t, firstReceipt.SessionBindingHash, secondReceipt.SessionBindingHash)
+	assert.NotEmpty(t, firstReceipt.BridgeBindingHash)
 	assert.True(t, secondReceipt.SameProcess)
 	assert.True(t, secondReceipt.SameSession)
 	records := readPipelineOMPRPCRecords(t, logPath)
 	starts, commands := pipelineOMPRPCRecordsByKind(records)
 	require.Len(t, starts, 1)
 	assert.Equal(t, 2, countPipelineOMPRPCCommand(commands, "prompt"))
-	assert.Equal(t, 1, countPipelineOMPRPCCommand(commands, "compact"))
-	assert.GreaterOrEqual(t, countPipelineOMPRPCCommand(commands, "get_messages_page"), 4)
+	assert.Equal(t, 2, countPipelineOMPRPCCommand(commands, "compact"))
+	assert.Equal(t, 6, countPipelineOMPRPCCommand(commands, "get_messages_page"))
 	assertPipelineOMPRPCBooleanCommand(t, commands, "set_auto_compaction", false)
 	require.NoError(t, session.Close())
 	assertPipelineOMPRuntimeEmpty(t, config.RuntimeBase)
@@ -54,7 +60,46 @@ func TestPipelineOMPActiveRPC_UnsafeFirstOutputClosesBeforeSecondProviderCall(t 
 
 	_, commands := pipelineOMPRPCRecordsByKind(readPipelineOMPRPCRecords(t, logPath))
 	assert.Equal(t, 1, countPipelineOMPRPCCommand(commands, "prompt"))
-	assert.Zero(t, countPipelineOMPRPCCommand(commands, "compact"))
+	assert.Equal(t, 1, countPipelineOMPRPCCommand(commands, "compact"))
+}
+func TestPipelineOMPActiveProcessConfig_BindsProviderEndpointWithoutCredentialMaterial(t *testing.T) {
+	config, _ := pipelineOMPBackendTestConfig(t)
+	config.PhaseModels = map[pipeline.PhaseID]string{pipeline.PhasePlan: "provider-a/model-a"}
+	config.Environment = append(pipelineOMPCanonicalEnvironment(config.Environment),
+		pipelineOMPActiveEndpointKey+"=http://127.0.0.1:43123",
+		pipelineOMPActiveCredentialKey+"=private-provider-credential",
+	)
+	config, err := normalizePipelineOMPBackendConfig(config)
+	require.NoError(t, err)
+	snapshot := pipeline.OMPExecutionSnapshot{
+		ProjectDir: config.ProjectDir, SpecID: config.SpecID, SpecDir: config.SpecDir,
+		SnapshotHash: config.SnapshotHash, GitCommitHash: config.GitCommitHash,
+		PhaseID: pipeline.PhasePlan, Attempt: 1, Prompt: "canonical", ActivePrompt: "active",
+	}
+	candidate, err := newPipelineOMPManagedActiveCandidate(
+		snapshot, config.PhaseModels[pipeline.PhasePlan], config.PhaseModels,
+	)
+	require.NoError(t, err)
+	prepared := pipelineOMPManagedActivePrepared{Binding: pipelineOMPActiveLeaseBinding{
+		GrantDigest: workflowContextRuntimeHash("grant"), PolicyDigest: workflowContextRuntimeHash("policy"),
+		WorkspaceID: "autopus-adk", SpecID: config.SpecID, GitCommitHash: config.GitCommitHash,
+		ModelScopeDigest: candidate.ModelScopeDigest,
+	}}
+	first, err := preparePipelineOMPActiveProcessConfig(config, candidate, prepared)
+	require.NoError(t, err)
+	config.Environment = append(pipelineOMPCanonicalEnvironment(config.Environment),
+		pipelineOMPActiveEndpointKey+"=http://127.0.0.1:43124",
+		pipelineOMPActiveCredentialKey+"=private-provider-credential",
+	)
+	second, err := preparePipelineOMPActiveProcessConfig(config, candidate, prepared)
+	require.NoError(t, err)
+
+	assert.NotEqual(t, first.binding.BindingHash, second.binding.BindingHash)
+	assert.NotEqual(t, first.binding.OptionsHash, second.binding.OptionsHash)
+	serialized, err := json.Marshal([]WorkflowContextBridgeBinding{first.binding, second.binding})
+	require.NoError(t, err)
+	assert.NotContains(t, string(serialized), "private-provider-credential")
+	assert.NotContains(t, string(serialized), "127.0.0.1")
 }
 
 func TestPipelineOMPActiveRPC_InheritedParentSandboxUsesDirectVerifiedImage(t *testing.T) {

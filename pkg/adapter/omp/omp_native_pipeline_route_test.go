@@ -14,27 +14,54 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
-func TestOMPNativePipelineRoute_GeneratesSingleShellFreeAutoOwner(t *testing.T) {
+func TestOMPNativePipelineRoute_MarkdownAutoOwnsInteractiveAndExplicitRouteOwnsHeadless(t *testing.T) {
 	root := t.TempDir()
 	cfg := optedInOMPContextBridgeConfig()
 	require.NoError(t, config.Save(root, cfg))
-	_, err := NewWithRoot(root).Generate(context.Background(), cfg)
+	generated, err := NewWithRoot(root).Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
 	path := filepath.Join(root, ".omp", "extensions", "autopus-pipeline.ts")
 	body, err := os.ReadFile(path)
 	require.NoError(t, err)
 	source := string(body)
-	require.Contains(t, source, `registerCommand("auto"`)
-	require.Equal(t, 1, countLiteral(source, `registerCommand("auto"`))
+	require.NotContains(t, source, `registerCommand("auto"`)
+	require.Equal(t, 1, countLiteral(source, `registerCommand("autopus-pipeline"`))
+	require.Contains(t, source, `Usage: /autopus-pipeline go SPEC-ID`)
 	require.Contains(t, source, `process.env.AUTOPUS_OMP_MANAGED_INNER === "1"`)
-	require.Contains(t, source, `["pipeline", "run", specID, "--platform", "omp"]`)
+	require.Equal(t, 1, countLiteral(source, `["pipeline", "run", specID, "--platform", "omp"]`))
+	require.Equal(t, 1, countLiteral(source, `spawn("auto", argv`))
+	require.NotContains(t, source, `"parallel"`)
 	require.Contains(t, source, "shell: false")
 	require.NotContains(t, source, "promotion")
 	require.NotContains(t, source, "history_rows")
 	require.NotContains(t, source, "capabilities")
 	require.NotContains(t, source, "exec(")
 	require.NotContains(t, source, "sh -c")
+
+	autoPath := filepath.Join(root, ".agents", "commands", "auto.md")
+	autoBody, err := os.ReadFile(autoPath)
+	require.NoError(t, err)
+	require.Equal(t, 0, countLiteral(string(autoBody), `spawn(`),
+		"interactive /auto must dispatch through the current OMP session without spawning a child")
+	require.Equal(t, 0, countLiteral(string(autoBody), `["pipeline", "run"`),
+		"interactive /auto must not enter the headless RPC backend")
+	require.Len(t, commandFileNames(t, root), 20)
+
+	var headlessCallOwners []string
+	nativeAutoRegistrations := 0
+	for _, file := range generated.Files {
+		content := string(file.Content)
+		nativeAutoRegistrations += strings.Count(content, `registerCommand("auto"`)
+		if strings.Contains(content, `["pipeline", "run", specID, "--platform", "omp"]`) {
+			headlessCallOwners = append(headlessCallOwners, filepath.ToSlash(file.TargetPath))
+		}
+	}
+	require.Zero(t, nativeAutoRegistrations,
+		".agents/commands/auto.md must remain the only interactive /auto owner")
+	require.Equal(t, []string{ompNativePipelineRouteTarget}, headlessCallOwners,
+		"only the explicit /autopus-pipeline extension may invoke the headless OMP backend")
+
 	require.NoError(t, NewWithRoot(root).Clean(context.Background()))
 	require.NoFileExists(t, path)
 }
@@ -51,17 +78,23 @@ func TestOMPNativePipelineRoute_IdentityIsGeneratedSourceOfTruth(t *testing.T) {
 	require.Positive(t, bridge.Size)
 }
 
-func TestOMPNativePipelineRoute_RegistersOnlyOutsideManagedInnerRuntime(t *testing.T) {
+func TestOMPNativePipelineRoute_RegistersExplicitCommandOnlyOutsideManagedInnerRuntime(t *testing.T) {
 	bun, err := exec.LookPath("bun")
 	if err != nil {
 		t.Skip("bun is required to execute the generated TypeScript route contract")
 	}
 	harness := `
 let registrations = 0;
-const api = { registerCommand() { registrations++; } };
+let registeredName = "";
+const api = { registerCommand(name: string) { registrations++; registeredName = name; } };
 delete process.env.AUTOPUS_OMP_MANAGED_INNER;
 autopusPipelineRoute(api as any);
 if (registrations !== 1) throw new Error("outer route was not registered exactly once");
+if (registeredName !== "autopus-pipeline") throw new Error("outer route claimed interactive /auto");
+const sequential = parseRoute("go SPEC-TEST-001 --strategy sequential");
+if (!sequential.ok) throw new Error("sequential headless strategy was rejected");
+const parallel = parseRoute("go SPEC-TEST-001 --strategy parallel");
+if (parallel.ok) throw new Error("parallel remained in the headless allowlist");
 registrations = 0;
 process.env.AUTOPUS_OMP_MANAGED_INNER = "1";
 autopusPipelineRoute(api as any);

@@ -45,6 +45,13 @@ func TestWorkflowContextProductSession_AssemblesAuthorityAndRunsManagedHermetica
 	assert.Equal(t, expectedBinding.BindingHash, driver.binding.BindingHash)
 	assert.Equal(t, expectedBinding.OptionsHash, driver.binding.OptionsHash)
 	assert.Equal(t, expectedBinding.FullDocumentRefs, receipt.FullDocumentRefs)
+	assert.Equal(t, WorkflowContextLifecycleReceipt{
+		RequiredCompactionCycles: 1, PreCompactionACKs: 1, PostCompactionACKs: 1,
+		NativeStarts: 1, NativeEnds: 1, CanonicalReadmissions: 1, EphemeralReadmissions: 1,
+		ProviderTurns:           3,
+		ProviderAuthorityDigest: workflowContextRuntimeHash("recording-loopback-authority"),
+		SameProcess:             true, SameSession: true, ProviderObserved: true,
+	}, receipt.Lifecycle)
 	assert.Equal(t, expectedDelivery.Prompt, driver.dispatchedPrompt)
 	assert.Equal(t, input.OriginalTask, driver.dispatchedOriginalTask)
 	assert.Equal(t, 1, factory.calls)
@@ -80,6 +87,26 @@ func TestWorkflowContextProductSession_AssemblesAuthorityAndRunsManagedHermetica
 	assertProductOMPConfigsUnchanged(t, input.ProjectDir)
 	assert.Equal(t, "/missing/hermetic-omp", factory.options.Executable,
 		"the default test must use the injected managed seam, not exec or an external provider")
+}
+func TestWorkflowContextProductSession_RejectsIncompleteCorrelatedMultiCompactionEvidence(t *testing.T) {
+	input, runtime, driver, _ := newWorkflowContextProductFixture(t)
+	runtime.DriverOptions.CompactionCycles = 2
+	driver.events = append(driver.events, driver.events...)
+	driver.observation = &WorkflowContextManagedRPCObservation{
+		ProviderTurns: 4, PreACKs: 2, PostACKs: 1, NativeStarts: 2, NativeEnds: 2,
+		CanonicalReadmissions: 2, EphemeralReadmissions: 2,
+		SameProcess: true, SameSession: true, Sandboxed: true, ProviderObserved: true,
+		ProviderAuthorityDigest: workflowContextRuntimeHash("recording-loopback-authority"),
+	}
+
+	receipt, err := RunWorkflowContextProductSession(context.Background(), input, runtime)
+
+	require.ErrorContains(t, err, "multi-compaction lifecycle evidence is incomplete")
+	assert.Equal(t, WorkflowContextOutcomeBlocked, receipt.Outcome)
+	assert.Equal(t, "managed-lifecycle-evidence-incomplete", receipt.Fallback.Reason)
+	assert.Equal(t, 2, receipt.Lifecycle.RequiredCompactionCycles)
+	assert.Equal(t, 1, receipt.Lifecycle.PostCompactionACKs)
+	assert.True(t, receipt.Cleanup.Verified)
 }
 
 func TestWorkflowContextProductSession_SourceMutationFailsClosedOnChangedBinding(t *testing.T) {

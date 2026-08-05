@@ -8,6 +8,8 @@ import (
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 var ompModelCapabilityAllowlist = map[string]struct{}{
@@ -17,10 +19,6 @@ var ompModelCapabilityAllowlist = map[string]struct{}{
 	"fast_validation":         {},
 	"independent_dissent":     {},
 	"vision_design":           {},
-}
-
-var ompThinkingAllowlist = map[string]struct{}{
-	"off": {}, "none": {}, "minimal": {}, "low": {}, "medium": {}, "high": {}, "xhigh": {},
 }
 
 type rawOMPModelCatalog struct {
@@ -116,7 +114,7 @@ func normalizeOMPModelMetadata(raw rawOMPModelMetadata) (OMPModelMetadata, strin
 	if !ok {
 		return OMPModelMetadata{}, "catalog_invalid"
 	}
-	thinking, ok := normalizeOMPAllowlistedValues(*raw.Thinking, ompThinkingAllowlist)
+	thinking, ok := normalizeOMPNativeThinking(*raw.Thinking)
 	if !ok {
 		return OMPModelMetadata{}, "catalog_invalid"
 	}
@@ -137,6 +135,21 @@ func normalizeOMPAllowlistedValues(values []string, allowed map[string]struct{})
 	result := normalized[:0]
 	for _, value := range normalized {
 		if _, ok := allowed[value]; !ok {
+			return nil, false
+		}
+		if len(result) == 0 || result[len(result)-1] != value {
+			result = append(result, value)
+		}
+	}
+	return result, true
+}
+
+func normalizeOMPNativeThinking(values []string) ([]string, bool) {
+	normalized := append([]string(nil), values...)
+	sort.Strings(normalized)
+	result := normalized[:0]
+	for _, value := range normalized {
+		if !config.IsOMPNativeThinkingLevel(value) {
 			return nil, false
 		}
 		if len(result) == 0 || result[len(result)-1] != value {

@@ -39,7 +39,8 @@ func TestOMP002_S10_DoctorCLIProjectsStableOMPChecksInTextAndJSON(t *testing.T) 
 	require.NoError(t, config.Save(root, cfg))
 	_, err := omp.NewWithRoot(root).Generate(context.Background(), cfg)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"opus", "sonnet"}, generatedOMPDoctorSelectors(t, root))
+	assert.Empty(t, generatedOMPDoctorSelectors(t, root),
+		"default OMP agents inherit the parent session model without forced selectors")
 
 	logPath := installHermeticOMPDoctorCLI(t)
 	healthyText, healthyEnvelope := runOMPDoctorEntrypoints(t, root)

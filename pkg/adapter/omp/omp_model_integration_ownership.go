@@ -1,12 +1,10 @@
 package omp
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 
@@ -117,27 +115,13 @@ func canonicalOMPModelProjectOwnership(
 	return ownership, append(data, '\n'), nil
 }
 
-func readOMPModelProjectOwnership(root string) (ompModelProjectOwnership, bool, error) {
-	path := filepath.Join(root, filepath.FromSlash(OMPModelProjectOwnershipRelativePath))
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return ompModelProjectOwnership{}, false, nil
-	}
+func readOMPModelProjectOwnership(root string) (ownership ompModelProjectOwnership, exists bool, returnErr error) {
+	workspace, err := openOMPRootedWorkspace(root)
 	if err != nil {
-		return ompModelProjectOwnership{}, false, fmt.Errorf("read project ownership ledger: %w", err)
+		return ompModelProjectOwnership{}, false, err
 	}
-	var ownership ompModelProjectOwnership
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&ownership); err != nil || requireOMPModelDoctorJSONEOF(decoder) != nil {
-		return ompModelProjectOwnership{}, false, fmt.Errorf("project ownership ledger invalid")
-	}
-	wantDigest := ownership.LedgerDigest
-	canonical, _, err := canonicalOMPModelProjectOwnership(ownership)
-	if err != nil || canonical.LedgerDigest != wantDigest {
-		return ompModelProjectOwnership{}, false, fmt.Errorf("project ownership ledger invalid")
-	}
-	return canonical, true, nil
+	defer func() { joinOMPRootedCloseError(&returnErr, workspace.Close()) }()
+	return readOMPModelProjectOwnershipAt(workspace)
 }
 
 func ompModelProjectOriginLedgerBytes(ownership ompModelProjectOwnership) ([]byte, error) {

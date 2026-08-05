@@ -31,25 +31,30 @@ func CompileOMPModelRouting(input OMPModelRoutingInput) OMPModelRoutingCompilati
 	items := canonicalOMPRoutingWorkItems(input.Routes)
 	resolutions := make([]OMPModelRouteResolution, 0, len(items))
 	executorFamily := input.ExecutorFamily
+	preResolved := make(map[string]OMPModelRouteResolution, 1)
 
-	for _, item := range items {
-		if item.request.Role == "advisor" {
-			continue
-		}
-		resolved := ResolveOMPModelRoute(input.Catalog, input.CatalogReason, item.request)
-		resolved.RouteID = item.routeID
-		resolutions = append(resolutions, resolved)
-		if executorFamily == "" && (item.request.Agent == "executor" || item.routeID == "executor") &&
-			resolved.Status == "selected" {
-			executorFamily = resolved.EffectiveFamily
+	if executorFamily == "" {
+		for _, item := range items {
+			if item.request.Agent != "executor" && item.routeID != "executor" {
+				continue
+			}
+			resolved := ResolveOMPModelRoute(input.Catalog, input.CatalogReason, item.request)
+			resolved.RouteID = item.routeID
+			preResolved[item.routeID] = resolved
+			if resolved.Status == "selected" {
+				executorFamily = resolved.EffectiveFamily
+			}
+			break
 		}
 	}
+
 	for _, item := range items {
-		if item.request.Role != "advisor" {
+		if resolved, ok := preResolved[item.routeID]; ok {
+			resolutions = append(resolutions, resolved)
 			continue
 		}
 		request := item.request
-		if request.ExecutorFamily == "" {
+		if request.PreferDistinctExecutorFamily && request.ExecutorFamily == "" {
 			request.ExecutorFamily = executorFamily
 		}
 		resolved := ResolveOMPModelRoute(input.Catalog, input.CatalogReason, request)

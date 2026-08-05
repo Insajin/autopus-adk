@@ -56,6 +56,7 @@ func missingWorkflowContextCapability(request WorkflowContextRuntimeRequest) str
 		{"canonical-injection", capabilities.CanonicalInjection},
 		{"admission-blocking", capabilities.AdmissionBlocking},
 		{"cleanup-readback", capabilities.CleanupReadback},
+		{"provider-credential-authority", capabilities.ProviderCredentialAuthority},
 		{"probe-source", strings.TrimSpace(capabilities.ProbeSource) != ""},
 		{"checked-at", !capabilities.CheckedAt.IsZero()},
 	}
@@ -151,6 +152,9 @@ func workflowContextFailureReason(runErr, cleanupErr error) string {
 	}
 	if runErr != nil && strings.Contains(runErr.Error(), "history credit") {
 		return "history-credit-unverified"
+	}
+	if runErr != nil && strings.Contains(runErr.Error(), "lifecycle") {
+		return "managed-lifecycle-evidence-incomplete"
 	}
 	return "rehydration-verification-failed"
 }

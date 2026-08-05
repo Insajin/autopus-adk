@@ -27,6 +27,12 @@ func bridgeOMPIntegrationRoutes(
 	profile config.RoleModelProfileConf,
 ) (map[string]OMPModelRouteRequest, error) {
 	routes := make(map[string]OMPModelRouteRequest, len(profile.Capabilities))
+	diverseRoles := make(map[string]struct{}, len(profile.FamilyDiversity.Roles))
+	if profile.FamilyDiversity.Enabled {
+		for _, role := range profile.FamilyDiversity.Roles {
+			diverseRoles[role] = struct{}{}
+		}
+	}
 	for _, capability := range config.OMPProviderNeutralCapabilities() {
 		route, ok := profile.Capabilities[capability]
 		if !ok {
@@ -36,10 +42,12 @@ func bridgeOMPIntegrationRoutes(
 		if err != nil {
 			return nil, err
 		}
+		_, preferDistinctFamily := diverseRoles[role]
 		request := OMPModelRouteRequest{
 			Role: role, Capability: capability, Required: route.Required,
-			DegradedAction: route.DegradedAction,
-			Candidates:     make([]OMPRoutingCandidate, 0, len(route.Candidates)),
+			DegradedAction:               route.DegradedAction,
+			PreferDistinctExecutorFamily: preferDistinctFamily,
+			Candidates:                   make([]OMPRoutingCandidate, 0, len(route.Candidates)),
 		}
 		switch capability {
 		case config.CapabilityCodingToolUse:
@@ -64,16 +72,23 @@ func projectOMPIntegrationCapabilities(
 ) ([]OMPProjectionCapability, error) {
 	resolved := make(map[string]OMPModelRouteResolution, len(compilation.Resolutions))
 	for _, resolution := range compilation.Resolutions {
-		if resolution.Status != "selected" || resolution.EffectiveSelector == "" {
+		route, exists := routes[resolution.Capability]
+		if !exists {
+			return nil, fmt.Errorf("route_missing: %s", resolution.Capability)
+		}
+		if resolution.Status == "selected" && resolution.EffectiveSelector != "" {
+			resolved[resolution.Capability] = resolution
+			continue
+		}
+		if route.Required && route.DegradedAction != "runtime_default" {
 			return nil, fmt.Errorf("required_route_unresolved: %s: %s", resolution.Capability, resolution.Reason)
 		}
-		resolved[resolution.Capability] = resolution
 	}
 	result := make([]OMPProjectionCapability, 0, len(config.OMPProviderNeutralCapabilities()))
 	for _, capability := range config.OMPProviderNeutralCapabilities() {
 		resolution, ok := resolved[capability]
 		if !ok {
-			return nil, fmt.Errorf("required_route_unresolved: %s", capability)
+			continue
 		}
 		projection := OMPProjectionCapability{
 			Capability: capability, Selector: resolution.EffectiveProvider + "/" + resolution.EffectiveModel,

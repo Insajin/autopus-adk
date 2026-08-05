@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
@@ -21,7 +20,7 @@ type ompModelDoctorExecRunner struct {
 }
 
 func newOMPModelDoctorExecRunner() *ompModelDoctorExecRunner {
-	process, err := omp.NewOMPModelProbeProcess("omp", ompModelDoctorProbeOutput)
+	process, err := omp.NewOMPInstalledModelProbeProcess("omp", ompModelDoctorProbeOutput)
 	return &ompModelDoctorExecRunner{process: process, pinErr: err}
 }
 
@@ -41,7 +40,7 @@ func (runner ompModelDoctorExecRunner) Run(
 
 func safeOMPModelDoctorProbeArgs(args []string) bool {
 	joined := strings.Join(args, " ")
-	if joined == "--version" || joined == "models --json" {
+	if joined == "--version" || joined == "models --json --no-extensions" {
 		return true
 	}
 	keyIndex := 2
@@ -89,7 +88,6 @@ func buildOMPModelDoctorInput(
 		Executable: "omp", Runner: runner, Timeout: ompDoctorProbeTimeout,
 		MaxOutput: ompModelDoctorProbeOutput,
 	})
-	input.Probe = enrichOMPModelDoctorCatalog(ctx, runner, profile, input.Probe)
 	if input.Probe.Status != "ready" || input.Probe.Reason != "catalog_ready" {
 		return input
 	}
@@ -105,57 +103,17 @@ func buildOMPModelDoctorInput(
 	return input
 }
 
-func enrichOMPModelDoctorCatalog(
-	ctx context.Context,
-	runner omp.OMPModelCatalogRunner,
-	profile config.RoleModelProfileConf,
-	probe omp.OMPModelCatalogProbeResult,
-) omp.OMPModelCatalogProbeResult {
-	if probe.Reason != "catalog_metadata_insufficient" {
-		return probe
-	}
-	declarations := ompModelDoctorDeclarations(profile)
-	if len(declarations) == 0 {
-		return probe
-	}
-	raw, err := runner.Run(ctx, "omp", "models", "--json")
-	if err != nil || len(raw) > ompModelDoctorProbeOutput {
-		return probe
-	}
-	catalog, reason := omp.NormalizeOMPAvailableCatalog(raw, ompModelDoctorProbeOutput, declarations)
-	if reason != "catalog_ready" {
-		return probe
-	}
-	probe.Status, probe.Reason, probe.Catalog = "ready", reason, catalog
-	return probe
-}
-
-func ompModelDoctorDeclarations(profile config.RoleModelProfileConf) []omp.OMPModelCatalogDeclaration {
-	var declarations []omp.OMPModelCatalogDeclaration
-	for capability, route := range profile.Capabilities {
-		for _, candidate := range route.Candidates {
-			if candidate.Family == "" {
-				continue
-			}
-			declarations = append(declarations, omp.OMPModelCatalogDeclaration{
-				Selector: candidate.Selector, Family: candidate.Family, Capability: capability,
-			})
-		}
-	}
-	sort.Slice(declarations, func(i, j int) bool {
-		if declarations[i].Selector == declarations[j].Selector {
-			return declarations[i].Capability < declarations[j].Capability
-		}
-		return declarations[i].Selector < declarations[j].Selector
-	})
-	return declarations
-}
-
 func compileOMPModelDoctorRouting(
 	profile config.RoleModelProfileConf,
 	catalog omp.OMPModelCatalog,
 ) omp.OMPModelRoutingCompilation {
 	routes := make(map[string]omp.OMPModelRouteRequest)
+	diverseRoles := make(map[string]struct{}, len(profile.FamilyDiversity.Roles))
+	if profile.FamilyDiversity.Enabled {
+		for _, role := range profile.FamilyDiversity.Roles {
+			diverseRoles[role] = struct{}{}
+		}
+	}
 	for agent, defaultRole := range config.OMPAgentRoleMapping() {
 		role := defaultRole
 		capability, err := config.OMPNativeRoleCapability(role)
@@ -169,9 +127,11 @@ func compileOMPModelDoctorRouting(
 		if !ok {
 			continue
 		}
+		_, preferDistinctFamily := diverseRoles[role]
 		request := omp.OMPModelRouteRequest{
 			Agent: agent, Role: role, Capability: capability,
 			Required: route.Required, DegradedAction: route.DegradedAction,
+			PreferDistinctExecutorFamily: preferDistinctFamily,
 		}
 		for _, candidate := range route.Candidates {
 			request.Candidates = append(request.Candidates, omp.OMPRoutingCandidate{

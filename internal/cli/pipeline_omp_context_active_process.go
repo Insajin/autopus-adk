@@ -20,8 +20,8 @@ import (
 const (
 	pipelineOMPActiveEndpointKey    = "AUTOPUS_OMP_CONTEXT_PROVIDER_ENDPOINT"
 	pipelineOMPActiveCredentialKey  = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
-	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v2"
-	pipelineOMPActivePolicyIdentity = "manual-compact;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v2;tools=read,bash,edit,write,grep,glob,todo"
+	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v3"
+	pipelineOMPActivePolicyIdentity = "manual-compact-every-call;canonical-ephemeral-readmission;correlated-ack;provider-bound-endpoint;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v3;tools=read,bash,edit,write,grep,glob,todo"
 )
 
 type pipelineOMPActiveProcessConfig struct {
@@ -56,8 +56,11 @@ func preparePipelineOMPActiveProcessConfig(
 			BindingHash: workflowContextRuntimeHash(strings.Join([]string{
 				prepared.Binding.GrantDigest, prepared.Binding.WorkspaceID, prepared.Binding.SpecID,
 				prepared.Binding.GitCommitHash, prepared.Binding.AutoSourceCommit, prepared.Binding.AutoSourceTree,
+				candidate.ScopeProvider, candidate.ModelScopeDigest, endpoint,
 			}, "\x00")),
-			OptionsHash: workflowContextRuntimeHash(prepared.Binding.PolicyDigest + "\x00" + implementation),
+			OptionsHash: workflowContextRuntimeHash(strings.Join([]string{
+				prepared.Binding.PolicyDigest, implementation, candidate.ModelScopeDigest, endpoint,
+			}, "\x00")),
 			SessionHash: workflowContextRuntimeHash(prepared.Binding.WorkspaceID + "\x00" + prepared.Binding.SpecID + "\x00" + prepared.Binding.GitCommitHash),
 			NonceHash:   nonce,
 		},
@@ -286,13 +289,4 @@ func pipelineOMPEnvironmentValue(environment []string, key string) (string, bool
 		}
 	}
 	return "", false
-}
-
-func pipelineOMPActiveImplementationDigest() string {
-	bridge := ompadapter.ExpectedOMPContextBridgeSourceIdentity()
-	route := ompadapter.ExpectedOMPNativePipelineRouteSourceIdentity()
-	return pipelineOMPActiveHash([]byte(strings.Join([]string{
-		pipelineOMPActiveRPCIdentity, pipelineOMPActivePolicyIdentity, bridge.TargetPath, bridge.SHA256,
-		route.TargetPath, route.SHA256,
-	}, "\x00")))
 }

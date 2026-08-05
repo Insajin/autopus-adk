@@ -1,6 +1,7 @@
 package omp
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -157,22 +158,70 @@ func (a *Adapter) buildUpdateTransactionPlanAt(
 	cfg *config.HarnessConfig,
 ) (adapter.TransactionPlan, *adapter.PlatformFiles, error) {
 	finalFiles := make([]adapter.FileMapping, 0, len(files))
+	writes := make([]adapter.TransactionWrite, 0, len(files))
+	resolveMode := a.fileModeResolverAt(workspace)
 	for _, file := range files {
 		action, err := resolveOMPUpdateActionAt(workspace, file, oldManifest)
 		if err != nil {
 			return adapter.TransactionPlan{}, nil, err
 		}
-		if action != adapter.ActionSkip {
-			finalFiles = append(finalFiles, file)
+		if action == adapter.ActionSkip {
+			continue
+		}
+		finalFiles = append(finalFiles, file)
+		perm := resolveMode(file.TargetPath)
+		unchanged, err := ompRootedMappingUnchanged(workspace, file, perm)
+		if err != nil {
+			return adapter.TransactionPlan{}, nil, err
+		}
+		if !unchanged {
+			writes = append(writes, adapter.TransactionWrite{
+				Path: file.TargetPath, Content: file.Content, Perm: perm,
+			})
 		}
 	}
 	pf := &adapter.PlatformFiles{
 		Files: finalFiles, Checksum: adapter.Checksum(fmt.Sprintf("%d", len(finalFiles))),
 	}
 	diff := adapter.BuildManifestDiff(oldManifest, files, PruneRoots(cfg))
-	return adapter.TransactionPlan{
-		Writes:   adapter.TransactionWritesFromFiles(finalFiles, a.fileModeResolverAt(workspace)),
-		Removes:  adapter.TransactionRemovesFromManifestDiff(diff, false),
-		Manifest: adapter.ManifestFromFiles(adapterName, pf),
-	}, pf, nil
+	removes := adapter.TransactionRemovesFromManifestDiff(diff, false)
+	manifest := adapter.ManifestFromFiles(adapterName, pf)
+	if len(writes) == 0 && len(removes) == 0 &&
+		ompRootedManifestUnchanged(workspace, oldManifest, manifest) {
+		manifest = nil
+	}
+	return adapter.TransactionPlan{Writes: writes, Removes: removes, Manifest: manifest}, pf, nil
+}
+
+func ompRootedMappingUnchanged(
+	workspace *ompRootedWorkspace,
+	file adapter.FileMapping,
+	perm os.FileMode,
+) (bool, error) {
+	data, info, err := workspace.readFile(file.TargetPath, 0)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, nil
+	}
+	return info.Mode().Perm() == perm && bytes.Equal(data, file.Content), nil
+}
+
+func ompRootedManifestUnchanged(
+	workspace *ompRootedWorkspace,
+	oldManifest *adapter.Manifest,
+	next *adapter.Manifest,
+) bool {
+	if oldManifest == nil || oldManifest.Version != next.Version ||
+		oldManifest.Platform != next.Platform || len(oldManifest.Files) != len(next.Files) {
+		return false
+	}
+	for path, file := range next.Files {
+		if oldManifest.Files[path] != file {
+			return false
+		}
+	}
+	info, err := workspace.lstat(filepath.Join(".autopus", next.Platform+"-manifest.json"))
+	return err == nil && info.Mode().IsRegular() && info.Mode().Perm() == 0o600
 }

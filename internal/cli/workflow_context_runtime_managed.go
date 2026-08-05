@@ -83,6 +83,43 @@ type boundWorkflowContextManagedDriver struct {
 	WorkflowContextManagedProcessDriver
 	binding WorkflowContextBridgeBinding
 }
+type workflowContextManagedLifecycleObserver interface {
+	Observation() WorkflowContextManagedRPCObservation
+}
+
+func validateWorkflowContextManagedLifecycle(
+	driver WorkflowContextProcessDriver,
+	requiredCycles int,
+) (WorkflowContextLifecycleReceipt, error) {
+	bound, ok := driver.(*boundWorkflowContextManagedDriver)
+	if !ok || bound == nil {
+		return WorkflowContextLifecycleReceipt{}, errors.New("managed OMP lifecycle observer is unavailable")
+	}
+	observer, ok := bound.WorkflowContextManagedProcessDriver.(workflowContextManagedLifecycleObserver)
+	if !ok {
+		return WorkflowContextLifecycleReceipt{}, errors.New("managed OMP lifecycle observer is unavailable")
+	}
+	observation := observer.Observation()
+	receipt := WorkflowContextLifecycleReceipt{
+		RequiredCompactionCycles: requiredCycles,
+		PreCompactionACKs:        observation.PreACKs, PostCompactionACKs: observation.PostACKs,
+		NativeStarts: observation.NativeStarts, NativeEnds: observation.NativeEnds,
+		CanonicalReadmissions: observation.CanonicalReadmissions,
+		EphemeralReadmissions: observation.EphemeralReadmissions, ProviderTurns: observation.ProviderTurns,
+		ProviderAuthorityDigest: observation.ProviderAuthorityDigest,
+		SameProcess:             observation.SameProcess, SameSession: observation.SameSession,
+		ProviderObserved: observation.ProviderObserved,
+	}
+	if requiredCycles < 1 || observation.PreACKs != requiredCycles || observation.PostACKs != requiredCycles ||
+		observation.NativeStarts != requiredCycles || observation.NativeEnds != requiredCycles ||
+		observation.CanonicalReadmissions != requiredCycles ||
+		observation.EphemeralReadmissions != requiredCycles || !observation.SameProcess ||
+		!observation.SameSession || !observation.Sandboxed || !observation.ProviderObserved ||
+		!validPipelineOMPActiveHash(observation.ProviderAuthorityDigest) {
+		return receipt, errors.New("managed OMP correlated multi-compaction lifecycle evidence is incomplete")
+	}
+	return receipt, nil
+}
 
 func (driver *boundWorkflowContextManagedDriver) Run(
 	ctx context.Context,

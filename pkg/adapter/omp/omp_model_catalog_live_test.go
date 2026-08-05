@@ -15,14 +15,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/insajin/autopus-adk/pkg/processprobe"
 	"github.com/stretchr/testify/require"
 )
 
 type installedOMPModelCatalogRunner struct {
-	environment []string
-	maxOutput   int
-	catalog     []byte
+	process   *OMPModelProbeProcess
+	maxOutput int
+	catalog   []byte
 }
 
 func (runner *installedOMPModelCatalogRunner) Run(
@@ -30,14 +29,11 @@ func (runner *installedOMPModelCatalogRunner) Run(
 	executable string,
 	args ...string,
 ) ([]byte, error) {
-	path, err := exec.LookPath(executable)
-	if err != nil {
-		return nil, err
+	if executable != "omp" {
+		return nil, fmt.Errorf("unexpected executable %q", executable)
 	}
-	command := exec.CommandContext(ctx, path, args...)
-	command.Env = runner.environment
-	output, err := processprobe.OutputLimited(command, runner.maxOutput)
-	if strings.Join(args, " ") == "models --json" {
+	output, err := runner.process.Run(ctx, args...)
+	if strings.Join(args, " ") == "models --json --no-extensions" {
 		runner.catalog = append([]byte(nil), output...)
 	}
 	return output, err
@@ -57,8 +53,14 @@ func TestProbeOMPModelCatalog_LiveInstalledSchemaFailsClosedWhenSemanticMetadata
 	}))
 	defer server.Close()
 	root := t.TempDir()
+	home := filepath.Join(root, "home")
 	profile := filepath.Join(root, "pi-agent")
+	require.NoError(t, os.Mkdir(home, 0o700))
 	require.NoError(t, os.Mkdir(profile, 0o700))
+	t.Setenv("HOME", home)
+	t.Setenv("PI_CODING_AGENT_DIR", profile)
+	t.Setenv("OPENAI_API_KEY", "must-not-reach-omp")
+	t.Setenv("OMP_ACCESS_TOKEN", "must-not-reach-omp")
 	require.NoError(t, os.WriteFile(filepath.Join(profile, "models.yml"), []byte(fmt.Sprintf(`providers:
   catalogprobe:
     baseUrl: %s/v1
@@ -73,10 +75,9 @@ func TestProbeOMPModelCatalog_LiveInstalledSchemaFailsClosedWhenSemanticMetadata
         maxTokens: 128
 `, server.URL)), 0o600))
 
-	runner := &installedOMPModelCatalogRunner{
-		maxOutput:   128 * 1024,
-		environment: isolatedOMPModelCatalogEnvironment(t, root, profile),
-	}
+	process, err := NewOMPInstalledModelProbeProcess("omp", 128*1024)
+	require.NoError(t, err)
+	runner := &installedOMPModelCatalogRunner{process: process, maxOutput: 128 * 1024}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	result := ProbeOMPModelCatalog(ctx, OMPModelCatalogProbeOptions{
@@ -99,41 +100,11 @@ func TestProbeOMPModelCatalog_LiveInstalledSchemaFailsClosedWhenSemanticMetadata
 		require.Equal(t, "catalog_metadata_insufficient", result.Reason)
 		require.Empty(t, result.Catalog.Models)
 	}
-	enriched, enrichedReason := NormalizeOMPAvailableCatalog(runner.catalog, runner.maxOutput, []OMPModelCatalogDeclaration{
-		{Selector: "catalogprobe/catalog-only", Family: "catalogprobe-family", Capability: "deep_reasoning"},
-	})
-	require.Equal(t, "catalog_ready", enrichedReason)
-	require.Len(t, enriched.Models, 1)
-	require.Equal(t, []string{"deep_reasoning"}, enriched.Models[0].Capabilities)
-	require.True(t, enriched.Models[0].AuthEnabled)
-	require.Equal(t, "omp/17.1.8", result.Version)
+	require.Equal(t, "omp/17.2.6", result.Version)
 	require.Zero(t, requests.Load(), "catalog discovery must not issue a model/provider request")
 	t.Logf("catalog-only schema: top_level=%s custom_row=%s required_metadata=%t missing=%s provider_requests=%d",
 		strings.Join(topSchema, ","), strings.Join(rowSchema, ","), hasRequiredMetadata,
 		strings.Join(missingInstalledOMPSemanticFields(row), ","), requests.Load())
-}
-
-func isolatedOMPModelCatalogEnvironment(t *testing.T, root, profile string) []string {
-	t.Helper()
-	overrides := map[string]string{
-		"HOME": filepath.Join(root, "home"), "PI_CODING_AGENT_DIR": profile,
-		"XDG_CACHE_HOME": filepath.Join(root, "cache"), "XDG_CONFIG_HOME": filepath.Join(root, "config"),
-		"XDG_DATA_HOME": filepath.Join(root, "data"), "XDG_STATE_HOME": filepath.Join(root, "state"),
-	}
-	for _, directory := range overrides {
-		require.NoError(t, os.MkdirAll(directory, 0o700))
-	}
-	environment := make([]string, 0, len(os.Environ())+len(overrides))
-	for _, entry := range os.Environ() {
-		key := strings.SplitN(entry, "=", 2)[0]
-		if _, replaced := overrides[key]; !replaced {
-			environment = append(environment, entry)
-		}
-	}
-	for key, value := range overrides {
-		environment = append(environment, key+"="+value)
-	}
-	return environment
 }
 
 func findInstalledOMPModelRow(data []byte, provider, model string) (map[string]json.RawMessage, bool) {

@@ -9,10 +9,9 @@ import (
 	"time"
 )
 
-func TestCompileOMPModelOverlay_RejectsIncompleteOrUnsafeProjection(t *testing.T) {
+func TestCompileOMPModelOverlay_RejectsUnsafeProjection(t *testing.T) {
 	t.Parallel()
 	cases := []OMPModelOverlayProjection{
-		{},
 		{ModelRoles: map[string]string{" task": "p/m"}},
 		{ModelRoles: map[string]string{"task": "p/m\nother"}},
 		{ModelRoles: map[string]string{"task": "p/m"}, FallbackChains: map[string][]string{"p/m\n": {"q/f"}}},

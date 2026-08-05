@@ -48,7 +48,9 @@ func collectOMPDoctorSelectors(root string) ompDoctorSelectorCollection {
 			result.findings = append(result.findings, ompDoctorSelectorFinding(rel, reason))
 			continue
 		}
-		seen[selector] = true
+		if selector != "" {
+			seen[selector] = true
+		}
 	}
 	for selector := range seen {
 		result.selectors = append(result.selectors, selector)
@@ -106,7 +108,7 @@ func parseOMPDoctorFrontmatterModel(data []byte) (string, string) {
 	}
 	selector := strings.TrimSpace(frontmatter.Model)
 	if selector == "" {
-		return "", "model_missing"
+		return "", ""
 	}
 	if !ompDoctorSafeToken.MatchString(selector) || strings.Contains(selector, "//") ||
 		strings.HasSuffix(selector, "/") {

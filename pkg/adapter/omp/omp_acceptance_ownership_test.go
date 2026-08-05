@@ -111,7 +111,15 @@ func TestOMPAcceptance_S11_CommandSurfaceOwnership(t *testing.T) {
 		require.NoError(t, err)
 		_, body := splitEmittedFrontmatter(t, string(data))
 		assert.NotEmpty(t, strings.TrimSpace(body), "command %s must carry a body", name)
+		if name == "auto.md" {
+			assert.NotContains(t, body, "auto pipeline run",
+				"interactive /auto must not invoke the headless RPC backend")
+			assert.NotContains(t, body, "spawn(",
+				"interactive /auto must use the current OMP session")
+		}
 	}
+	assert.NoFileExists(t, filepath.Join(dirA, filepath.FromSlash(ompNativePipelineRouteTarget)),
+		"the explicit /autopus-pipeline extension must remain opt-in")
 
 	// Config B: opencode owns commands via .opencode/commands/.
 	dirB := generateForPlatforms(t, "opencode", "omp")

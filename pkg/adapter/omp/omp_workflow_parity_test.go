@@ -4,15 +4,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/insajin/autopus-adk/pkg/adapter"
 )
 
 func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testing.T) {
@@ -43,6 +40,11 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 	commands := map[string]bool{}
 	skills := map[string]string{}
 	seen := map[string]int{}
+	coordinationBodies := map[string]bool{
+		"agent-pipeline":     false,
+		"auto-go":            false,
+		"worktree-isolation": false,
+	}
 	for _, file := range pf.Files {
 		target := filepath.ToSlash(file.TargetPath)
 		seen[target]++
@@ -59,10 +61,52 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 				skills[name] = string(file.Content)
 			}
 		}
+		if strings.HasPrefix(target, skillPrefix) && strings.HasSuffix(target, skillSuffix) {
+			_, body := splitEmittedFrontmatter(t, string(file.Content))
+			sweepBody := stripOMPIntentionalPlatformRootGlobs(body)
+			for _, token := range ompWorkflowForbiddenTokens() {
+				assert.NotContains(t, sweepBody, token, "generated body %s retained token %q", target, token)
+			}
+			assert.NotContains(t, body, "````json", "generated body %s contains a malformed nested JSON fence", target)
+			if name := strings.TrimSuffix(strings.TrimPrefix(target, skillPrefix), skillSuffix); name == "agent-pipeline" || name == "auto-go" || name == "worktree-isolation" {
+				coordinationBodies[name] = true
+				assertOMPNativeCoordinationContract(t, body)
+				if name == "auto-go" {
+					assert.Contains(t, body, `"agent"`, "custom legacy roles must map to the per-item agent field")
+				}
+				if name == "agent-pipeline" || name == "worktree-isolation" {
+					assert.LessOrEqual(t, strings.Count(body, "\n"), 320,
+						"OMP-native core coordination skills must stay bounded")
+					for _, token := range []string{
+						"sonnet", "haiku", `model: "opus"`, "Opus-tier",
+						"bypassPermissions", "acceptEdits", "--dangerously-skip-permissions", "Agent tool",
+					} {
+						assert.NotContains(t, body, token,
+							"OMP-native core skill %s retained foreign execution policy %q", name, token)
+					}
+				}
+				if name == "agent-pipeline" {
+					assert.Contains(t, body, "inherits the current OMP parent-session model")
+					assert.Contains(t, body, "task_dispatch_count")
+					assert.Contains(t, body, "non-isolated or otherwise")
+					assert.Contains(t, body, "isolated worker is terminal")
+					assert.Contains(t, body, "new explicitly named task")
+				}
+				if name == "worktree-isolation" {
+					assert.Contains(t, body, "native `task` tool")
+					assert.Contains(t, body, "must not run manual worktree creation")
+				}
+			}
+		}
 	}
 	for target, count := range seen {
 		assert.Equal(t, 1, count, "emitted target %q must have duplicate count zero", target)
 	}
+	assert.Equal(t, map[string]bool{
+		"agent-pipeline":     true,
+		"auto-go":            true,
+		"worktree-isolation": true,
+	}, coordinationBodies, "all coordination-heavy generated bodies must be swept")
 	assert.Equal(t, want, commands, "command basenames must equal workflowSpecs")
 	assert.Equal(t, want, mappingContentKeys(skills),
 		"workflow skill basenames must equal workflowSpecs; extended skills are excluded")
@@ -248,36 +292,4 @@ func TestOMP002_S9_DetectRequiresExactSemverAndHonorsCallerDeadline(t *testing.T
 	require.NoError(t, err)
 	assert.False(t, got)
 	assert.Less(t, time.Since(started), time.Second, "readiness identity probe must be bounded")
-}
-
-func mappingTargetSet(files []adapter.FileMapping) map[string]bool {
-	out := make(map[string]bool, len(files))
-	for _, file := range files {
-		out[filepath.ToSlash(file.TargetPath)] = true
-	}
-	return out
-}
-
-func removeStableMapping(t *testing.T, root string, files []adapter.FileMapping) {
-	t.Helper()
-	require.NotEmpty(t, files)
-	paths := make([]string, 0, len(files))
-	for _, file := range files {
-		paths = append(paths, file.TargetPath)
-	}
-	sort.Strings(paths)
-	require.NoError(t, os.Remove(filepath.Join(root, paths[0])))
-}
-
-func itoa(value int) string {
-	const digits = "0123456789"
-	if value == 0 {
-		return "0"
-	}
-	var out []byte
-	for value > 0 {
-		out = append([]byte{digits[value%10]}, out...)
-		value /= 10
-	}
-	return string(out)
 }

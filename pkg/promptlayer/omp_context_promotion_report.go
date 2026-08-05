@@ -62,6 +62,7 @@ type OMPContextPromotionObservationV1 struct {
 	EndpointClass              string `json:"endpoint_class"`
 	Transport                  string `json:"transport"`
 	CredentialMode             string `json:"credential_mode"`
+	ProviderAuthorityDigest    string `json:"provider_authority_digest"`
 	ExecutionMode              string `json:"execution_mode"`
 	StartedAt                  string `json:"started_at"`
 	CompletedAt                string `json:"completed_at"`
@@ -71,6 +72,10 @@ type OMPContextPromotionObservationV1 struct {
 	SetupProviderRequests      int    `json:"setup_provider_requests"`
 	CompactionProviderRequests int    `json:"compaction_provider_requests"`
 	PrimaryProviderRequests    int    `json:"primary_provider_requests"`
+	PreCompactionACKs          int    `json:"pre_compaction_acks"`
+	PostCompactionACKs         int    `json:"post_compaction_acks"`
+	CanonicalReadmissions      int    `json:"canonical_readmissions"`
+	EphemeralReadmissions      int    `json:"ephemeral_readmissions"`
 	TotalProviderRequests      int    `json:"total_provider_requests"`
 	ObservationDigest          string `json:"observation_digest"`
 	UsageDigest                string `json:"usage_digest"`

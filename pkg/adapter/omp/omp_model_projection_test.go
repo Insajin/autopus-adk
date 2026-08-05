@@ -56,6 +56,45 @@ func TestCompileOMPModelProjection_S2_ProjectsCanonicalRolesAndAgents(t *testing
 	}, projection.FallbackChains)
 }
 
+func TestCompileOMPModelProjection_OptionalCapabilityInheritsRuntimeDefaults(t *testing.T) {
+	t.Parallel()
+
+	input := ompProjectionFixture(t)
+	input.Capabilities = append(input.Capabilities[:4], input.Capabilities[5:]...)
+	projection, err := CompileOMPModelProjection(input)
+	require.NoError(t, err)
+
+	for _, role := range projection.ModelRoles {
+		assert.NotEqual(t, "advisor", role.Role)
+	}
+	for _, agent := range projection.Agents {
+		assert.NotEqual(t, "reviewer", agent.Agent)
+		assert.NotEqual(t, "security-auditor", agent.Agent)
+	}
+	mappings, err := NewWithRoot(t.TempDir()).prepareAgentMappingsWithProjection(projection)
+	require.NoError(t, err)
+	require.Len(t, mappings, 16)
+	for _, mapping := range mappings {
+		if strings.HasSuffix(mapping.TargetPath, "/reviewer.md") ||
+			strings.HasSuffix(mapping.TargetPath, "/security-auditor.md") {
+			assert.NotContains(t, string(mapping.Content), "model:")
+			assert.NotContains(t, string(mapping.Content), "thinking:")
+		}
+	}
+}
+
+func TestCompileOMPModelProjection_AcceptsNativeThinkingLevels(t *testing.T) {
+	t.Parallel()
+
+	for _, thinking := range []string{"off", "none", "minimal", "low", "medium", "high", "xhigh", "max", "auto"} {
+		input := ompProjectionFixture(t)
+		input.Capabilities[0].Thinking = thinking
+		projection, err := CompileOMPModelProjection(input)
+		require.NoError(t, err, thinking)
+		assert.Equal(t, "openai/beta-coder:"+thinking, projection.ModelRoles[0].Selector)
+	}
+}
+
 func TestOMPModelOverlayFromProjection_S10_ReturnsDetachedCanonicalMaps(t *testing.T) {
 	t.Parallel()
 

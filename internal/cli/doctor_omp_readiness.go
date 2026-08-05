@@ -66,7 +66,9 @@ func projectOMPDoctorChecks(
 
 	catalogReady := report.CatalogReason == "catalog_ready"
 	catalogSeverity, catalogStatus := "info", "pass"
-	if !catalogReady {
+	if !catalogReady && len(report.SelectorResolutions) == 0 {
+		catalogStatus = "skip"
+	} else if !catalogReady {
 		catalogSeverity, catalogStatus = "error", "fail"
 	}
 	checks = append(checks, jsonCheck{

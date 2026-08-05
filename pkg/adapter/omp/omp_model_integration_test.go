@@ -27,9 +27,9 @@ func (r *modelIntegrationFakeRunner) Run(_ context.Context, _ string, args ...st
 	r.calls = append(r.calls, append([]string(nil), args...))
 	joined := strings.Join(args, " ")
 	if joined == "--version" {
-		return []byte("omp/17.1.8\n"), nil
+		return []byte("omp/17.2.6\n"), nil
 	}
-	if joined == "models --json" {
+	if joined == "models --json --no-extensions" {
 		return append([]byte(nil), r.catalog...), nil
 	}
 	if strings.Contains(joined, " prompt") || strings.Contains(joined, " agent") {
@@ -158,6 +158,72 @@ func TestOMPModelIntegration_S2_ConnectsPolicyCatalogProjectionAgentsAndReceipt(
 	}
 	if !validOMPModelHash(receipt.ResolutionDigest) {
 		t.Fatalf("invalid resolution digest %q", receipt.ResolutionDigest)
+	}
+}
+
+func TestOMPModelIntegration_OptionalAndRuntimeDefaultRoutesInherit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		required       bool
+		degradedAction string
+	}{
+		{name: "optional", required: false},
+		{name: "optional explicit runtime default", required: false, degradedAction: "runtime_default"},
+		{name: "required explicit runtime default", required: true, degradedAction: "runtime_default"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := integrationHarnessConfig("overlay")
+			profile := cfg.RoleModelPolicy.Profiles["p1"]
+			route := profile.Capabilities[config.CapabilityIndependentDissent]
+			route.Required = test.required
+			route.DegradedAction = test.degradedAction
+			for index := range route.Candidates {
+				route.Candidates[index].Selector = fmt.Sprintf("missing/reviewer-%d", index)
+			}
+			profile.Capabilities[config.CapabilityIndependentDissent] = route
+			cfg.RoleModelPolicy.Profiles["p1"] = profile
+
+			runner := newModelIntegrationRunner()
+			files, err := NewWithRoot(t.TempDir()).WithModelIntegrationRunner(runner).
+				prepareFiles(context.Background(), cfg)
+			if err != nil {
+				t.Fatalf("prepare optional route: %v", err)
+			}
+			byPath := integrationMappingsByPath(files)
+			overlay := string(byPath[DefaultOMPModelOverlayPath].Content)
+			if strings.Contains(overlay, "advisor:") || strings.Contains(overlay, "missing/reviewer") {
+				t.Fatalf("optional route leaked into overlay:\n%s", overlay)
+			}
+			for _, agent := range []string{"reviewer", "security-auditor"} {
+				content := string(byPath[".omp/agents/"+agent+".md"].Content)
+				if strings.Contains(content, "model:") || strings.Contains(content, "thinking:") {
+					t.Fatalf("%s did not inherit runtime defaults:\n%s", agent, content)
+				}
+			}
+			if runner.modelRequests != 0 {
+				t.Fatalf("model request count = %d", runner.modelRequests)
+			}
+		})
+	}
+}
+
+func TestBridgeOMPIntegrationRoutes_FamilyDiversityRolesAreExact(t *testing.T) {
+	t.Parallel()
+
+	profile := integrationHarnessConfig("overlay").RoleModelPolicy.Profiles["p1"]
+	profile.FamilyDiversity.Roles = []string{config.OMPRolePlan}
+	routes, err := bridgeOMPIntegrationRoutes(profile)
+	if err != nil {
+		t.Fatalf("bridge routes: %v", err)
+	}
+	if !routes[config.CapabilityDeepReasoning].PreferDistinctExecutorFamily {
+		t.Fatal("configured plan role did not request family diversity")
+	}
+	if routes[config.CapabilityIndependentDissent].PreferDistinctExecutorFamily {
+		t.Fatal("unconfigured advisor role requested family diversity")
 	}
 }
 

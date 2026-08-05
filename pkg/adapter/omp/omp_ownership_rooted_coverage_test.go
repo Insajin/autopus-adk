@@ -1,7 +1,6 @@
 package omp
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,6 +47,21 @@ func TestReadOMPModelProjectOwnershipAt_MissingInvalidAndCanonical(t *testing.T)
 		_, exists, err := readOMPModelProjectOwnershipAt(workspace)
 		assert.False(t, exists)
 		assert.ErrorContains(t, err, "ledger invalid")
+	})
+	t.Run("non-owner-only ledger", func(t *testing.T) {
+		ownership, data, err := newOMPModelProjectOwnership(
+			nil, true, []byte("emitted"), map[string]string{},
+		)
+		require.NoError(t, err)
+		require.NotEmpty(t, ownership.LedgerDigest)
+		workspace := withWorkspace(t, func(root string) {
+			writeOMPOwnershipCoverageFile(
+				t, root, OMPModelProjectOwnershipRelativePath, data, 0o644,
+			)
+		})
+		_, exists, err := readOMPModelProjectOwnershipAt(workspace)
+		assert.False(t, exists)
+		assert.ErrorContains(t, err, "mode 0600")
 	})
 }
 
@@ -142,6 +156,8 @@ func TestLoadOMPTransactionJournalsAt_FiltersUnsafeOrIrrelevantEntries(t *testin
 		require.Len(t, journals, 2)
 		assert.Equal(t, "newer", journals[0].ID)
 		assert.Equal(t, "older", journals[1].ID)
+		assert.False(t, filepath.IsAbs(journals[0].Path))
+		assert.Equal(t, filepath.ToSlash(journals[0].Path), journals[0].Path)
 	})
 }
 
@@ -245,46 +261,4 @@ func TestOMPModelProjectOwnership_PureValidationBranches(t *testing.T) {
 	}
 	_, err = decodeOMPModelProjectSalt("xyz")
 	assert.ErrorContains(t, err, "salt invalid")
-}
-
-func openOMPWorkspaceForCoverage(t *testing.T) *ompRootedWorkspace {
-	t.Helper()
-	workspace, err := openOMPRootedWorkspace(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, workspace.Close()) })
-	return workspace
-}
-
-func newOMPProjectOwnershipForCoverage(t *testing.T, missing bool, original, emitted []byte) ompModelProjectOwnership {
-	t.Helper()
-	ownership, _, err := newOMPModelProjectOwnership(original, missing, emitted, map[string]string{})
-	require.NoError(t, err)
-	return ownership
-}
-
-func writeOMPTransactionJournalForCoverage(t *testing.T, workspace *ompRootedWorkspace, id string, journal *adapter.TransactionJournal) {
-	t.Helper()
-	data, err := json.Marshal(journal)
-	require.NoError(t, err)
-	require.NoError(t, workspace.atomicWrite(filepath.Join(".autopus", "txns", id, "journal.json"), data, 0o600))
-}
-
-func writeOMPOriginJournalForCoverage(t *testing.T, workspace *ompRootedWorkspace, ownership ompModelProjectOwnership, configEntry adapter.TransactionJournalEntry) {
-	t.Helper()
-	originData, err := ompModelProjectOriginLedgerBytes(ownership)
-	require.NoError(t, err)
-	writeOMPTransactionJournalForCoverage(t, workspace, "origin", &adapter.TransactionJournal{
-		Platform: adapterName, Status: adapter.TransactionStatusCommitted, CreatedAt: "2026-08-02T00:00:00Z",
-		Entries: []adapter.TransactionJournalEntry{
-			{Path: OMPModelProjectOwnershipRelativePath, MissingBefore: true, AfterChecksum: adapter.Checksum(string(originData))},
-			configEntry,
-		},
-	})
-}
-
-func writeOMPOwnershipCoverageFile(t *testing.T, root, relative string, data []byte, mode os.FileMode) {
-	t.Helper()
-	path := filepath.Join(root, filepath.FromSlash(relative))
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
-	require.NoError(t, os.WriteFile(path, data, mode))
 }

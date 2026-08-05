@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -75,6 +74,9 @@ func RunWorkflowContextProductSession(
 	if !installedOMPVersionPattern.MatchString(runtime.Capabilities.Version) {
 		return WorkflowContextRuntimeReceipt{}, fmt.Errorf("workflow context product session: installed OMP identity was not observed")
 	}
+	if !runtime.Capabilities.ProviderCredentialAuthority {
+		return WorkflowContextRuntimeReceipt{}, fmt.Errorf("workflow context product session: provider credential authority was not observed")
+	}
 	cfg, err := loadHarnessConfigForDir(input.ProjectDir, globalFlags{})
 	if err != nil {
 		return WorkflowContextRuntimeReceipt{}, fmt.Errorf("workflow context product session: load harness config: %w", err)
@@ -110,6 +112,13 @@ func RunWorkflowContextProductSession(
 	driverOptions := runtime.DriverOptions
 	driverOptions.ProjectDir = input.ProjectDir
 	driverOptions.Prompts = []string{input.OriginalTask, input.DecisionDelta}
+	requiredCompactionCycles := driverOptions.CompactionCycles
+	if requiredCompactionCycles == 0 {
+		requiredCompactionCycles = 1
+	}
+	if requiredCompactionCycles < 1 || requiredCompactionCycles > 8 {
+		return WorkflowContextRuntimeReceipt{}, fmt.Errorf("workflow context product session: managed compaction cycle count is invalid")
+	}
 	driver, err := runtime.NewManagedDriver(driverOptions)
 	if err != nil {
 		return WorkflowContextRuntimeReceipt{}, fmt.Errorf("workflow context product session: construct managed driver: %w", err)
@@ -133,6 +142,7 @@ func RunWorkflowContextProductSession(
 		CanonicalSource: workflowContextProductCanonicalSource{options: options, ephemeral: ephemeral},
 		Promotion:       runtime.Promotion, ReceiptWriter: runtime.ReceiptWriter,
 		ProviderOutput: runtime.ProviderOutput, ProviderUsage: runtime.ProviderUsage,
+		RequiredCompactionCycles: requiredCompactionCycles,
 	}
 	return runtime.Supervisor.RunManaged(ctx, request)
 }
@@ -270,31 +280,4 @@ func workflowContextProductEphemeral(input WorkflowContextProductSessionInput) p
 
 func cloneWorkflowContextProductHistory(rows []promptlayer.OMPContextHistoryRow) []promptlayer.OMPContextHistoryRow {
 	return append([]promptlayer.OMPContextHistoryRow(nil), rows...)
-}
-
-type workflowContextProductCanonicalSource struct {
-	options   promptlayer.ContextDeliveryOptions
-	ephemeral promptlayer.OMPContextEphemeral
-}
-
-func (source workflowContextProductCanonicalSource) Rebuild(
-	_ context.Context,
-	options promptlayer.ContextDeliveryOptions,
-) (promptlayer.ContextDeliveryResult, promptlayer.OMPContextEphemeral, error) {
-	if !reflect.DeepEqual(source.options, options) {
-		return promptlayer.ContextDeliveryResult{}, promptlayer.OMPContextEphemeral{},
-			fmt.Errorf("authoritative OMP context options changed")
-	}
-	delivery, err := promptlayer.BuildContextDelivery(source.options)
-	if err != nil {
-		return promptlayer.ContextDeliveryResult{}, promptlayer.OMPContextEphemeral{}, err
-	}
-	if err := promptlayer.VerifyContextDeliveryForOptions(source.options, delivery); err != nil {
-		return promptlayer.ContextDeliveryResult{}, promptlayer.OMPContextEphemeral{}, err
-	}
-	ephemeral := source.ephemeral
-	ephemeral.FrozenFindingIDs = append([]string(nil), source.ephemeral.FrozenFindingIDs...)
-	ephemeral.OwnershipPaths = append([]string(nil), source.ephemeral.OwnershipPaths...)
-	ephemeral.ForbiddenPaths = append([]string(nil), source.ephemeral.ForbiddenPaths...)
-	return delivery, ephemeral, nil
 }

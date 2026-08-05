@@ -15,15 +15,16 @@ import (
 )
 
 type workflowContextObserveSessionSetup struct {
-	taskRoot            string
-	backend             pipelineOMPBackendConfig
-	candidate           pipelineOMPManagedActiveCandidate
-	prepared            pipelineOMPManagedActivePrepared
-	full                *pipelineOMPActiveEvaluatorSession
-	optimized           *pipelineOMPActiveEvaluatorSession
-	ompVersion          string
-	ompExecutableSHA256 string
-	sandboxMode         pipelineOMPActiveSandboxMode
+	taskRoot                string
+	backend                 pipelineOMPBackendConfig
+	candidate               pipelineOMPManagedActiveCandidate
+	prepared                pipelineOMPManagedActivePrepared
+	full                    *pipelineOMPActiveEvaluatorSession
+	optimized               *pipelineOMPActiveEvaluatorSession
+	ompVersion              string
+	ompExecutableSHA256     string
+	providerAuthorityDigest string
+	sandboxMode             pipelineOMPActiveSandboxMode
 }
 
 func validateWorkflowContextObserveSessionOptions(options workflowContextObserveSessionOptions) error {
@@ -145,7 +146,12 @@ func (setup *workflowContextObserveSessionSetup) start(ctx context.Context) erro
 		_ = full.Close()
 		return err
 	}
+	if full.binding.OptionsHash != optimized.binding.OptionsHash {
+		_ = errors.Join(full.Close(), optimized.Close())
+		return errors.New("observe-session provider authority changed across variants")
+	}
 	setup.full, setup.optimized = full, optimized
+	setup.providerAuthorityDigest = full.binding.OptionsHash
 	return nil
 }
 
@@ -153,8 +159,15 @@ func (setup *workflowContextObserveSessionSetup) close() error {
 	if setup == nil || setup.taskRoot == "" {
 		return nil
 	}
+	root := setup.taskRoot
 	err := errors.Join(setup.full.Close(), setup.optimized.Close())
-	err = errors.Join(err, os.RemoveAll(setup.taskRoot))
+	err = errors.Join(err, os.RemoveAll(root))
+	if setup.full.PID() != 0 || setup.optimized.PID() != 0 {
+		err = errors.Join(err, errors.New("observe-session process cleanup is incomplete"))
+	}
+	if _, statErr := os.Lstat(root); !errors.Is(statErr, os.ErrNotExist) {
+		err = errors.Join(err, errors.New("observe-session runtime cleanup is incomplete"))
+	}
 	setup.taskRoot = ""
 	return err
 }

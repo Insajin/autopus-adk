@@ -144,17 +144,18 @@ type WorkflowContextCanonicalSource interface {
 }
 
 type WorkflowContextRuntimeRequest struct {
-	Policy          WorkflowContextEffectivePolicy
-	Capabilities    WorkflowContextCapabilities
-	Binding         promptlayer.OMPContextBindingInput
-	RootClass       string
-	Driver          WorkflowContextProcessDriver
-	Overlay         WorkflowContextOverlayController
-	CanonicalSource WorkflowContextCanonicalSource
-	Promotion       promptlayer.OMPContextPromotionEvidenceV1
-	ReceiptWriter   *WorkflowContextReceiptWriter
-	ProviderOutput  func(string) error
-	ProviderUsage   func(WorkflowContextProviderUsage) error
+	Policy                   WorkflowContextEffectivePolicy
+	Capabilities             WorkflowContextCapabilities
+	Binding                  promptlayer.OMPContextBindingInput
+	RootClass                string
+	Driver                   WorkflowContextProcessDriver
+	Overlay                  WorkflowContextOverlayController
+	CanonicalSource          WorkflowContextCanonicalSource
+	Promotion                promptlayer.OMPContextPromotionEvidenceV1
+	ReceiptWriter            *WorkflowContextReceiptWriter
+	ProviderOutput           func(string) error
+	ProviderUsage            func(WorkflowContextProviderUsage) error
+	RequiredCompactionCycles int
 }
 
 type WorkflowContextDispatch struct {

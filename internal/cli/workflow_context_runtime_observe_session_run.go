@@ -43,10 +43,17 @@ func RunWorkflowContextObserveSession(
 	}
 	handshake := workflowContextObserveSessionBaseResponse("handshake", setup.candidate.ModelScopeDigest)
 	handshake.OMPVersion, handshake.OMPExecutableSHA256 = setup.ompVersion, setup.ompExecutableSHA256
+	handshake.ProviderAuthorityDigest = setup.providerAuthorityDigest
 	if err := encoder.Encode(handshake); err != nil {
 		return err
 	}
 	seenTasks := make(map[string]struct{}, 20)
+	variantCalls := map[string]int{"A": 0, "B": 0}
+	sessionBindings := map[string]string{"A": "", "B": ""}
+	providerAuthority := setup.providerAuthorityDigest
+	if !validPipelineOMPActiveHash(providerAuthority) {
+		return errors.New("observe-session provider authority binding is unstable")
+	}
 	var pairTask, pairPromptHash string
 	for sequence := 1; sequence <= 40; sequence++ {
 		command, err := nextWorkflowContextObserveSessionCommand(scanner)
@@ -74,23 +81,45 @@ func RunWorkflowContextObserveSession(
 		response.Sequence, response.PairSequence = command.Sequence, command.PairSequence
 		response.TaskIDDigest, response.Variant = command.TaskIDDigest, command.Variant
 		response.AssistantText, response.OutputDigest = assistant, workflowContextRuntimeHash(assistant)
-		response.SessionDigest = workflowContextRuntimeHash(receipt.SessionID)
-		response.ProcessReused = session.PID() == expectedPID && receipt.SameProcess && receipt.SameSession
+		response.SessionDigest = receipt.SessionBindingHash
+		response.ProviderAuthorityDigest = providerAuthority
+		response.ProcessReused = variantCalls[command.Variant] > 0
 		response.CompactionCycles = receipt.CompactionCycles
+		response.PreCompactionACKs = receipt.PreCompactionACKs
+		response.PostCompactionACKs = receipt.PostCompactionACKs
+		response.CanonicalReadmissions = receipt.CanonicalReadmissions
+		response.EphemeralReadmissions = receipt.EphemeralReadmissions
 		response.Usage = &workflowContextObserveSessionUsage{
 			PrimaryInputTokens: receipt.InputTokens, PrimaryOutputTokens: receipt.OutputTokens,
 			MaintenanceInputTokens:  receipt.MaintenanceInputTokens,
 			MaintenanceOutputTokens: receipt.MaintenanceOutputTokens, TotalTokens: receipt.TotalTokens,
 		}
-		if !response.ProcessReused || (command.Variant == "A" && response.CompactionCycles != 0) {
+		lifecycleValid := session.PID() == expectedPID && receipt.SameProcess && receipt.SameSession &&
+			receipt.TerminalIdle && receipt.SessionBindingHash != "" &&
+			receipt.BridgeBindingHash == providerAuthority
+		if prior := sessionBindings[command.Variant]; prior == "" {
+			sessionBindings[command.Variant] = receipt.SessionBindingHash
+		} else if prior != receipt.SessionBindingHash {
+			lifecycleValid = false
+		}
+		variantCalls[command.Variant]++
+		fullValid := command.Variant == "A" && response.CompactionCycles == 0 &&
+			response.PreCompactionACKs == 0 && response.PostCompactionACKs == 0 &&
+			response.CanonicalReadmissions == 0 && response.EphemeralReadmissions == 0
+		optimizedValid := command.Variant == "B" && response.CompactionCycles == 1 &&
+			response.PreCompactionACKs == 1 && response.PostCompactionACKs == 1 &&
+			response.CanonicalReadmissions == 1 && response.EphemeralReadmissions == 1
+		if !lifecycleValid || !fullValid && !optimizedValid {
 			return fmt.Errorf("observe-session call %d process lifecycle changed", sequence)
 		}
 		if err := encoder.Encode(response); err != nil {
 			return err
 		}
 	}
-	if len(seenTasks) != 20 {
-		return errors.New("observe-session task cardinality is invalid")
+	if len(seenTasks) != 20 || variantCalls["A"] != 20 || variantCalls["B"] != 20 ||
+		sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
+		sessionBindings["A"] == sessionBindings["B"] {
+		return errors.New("observe-session task or reusable-session cardinality is invalid")
 	}
 	shutdown, err := nextWorkflowContextObserveSessionCommand(scanner)
 	if err != nil || !validWorkflowContextObserveShutdown(shutdown) {
@@ -105,6 +134,12 @@ func RunWorkflowContextObserveSession(
 	setup.taskRoot = ""
 	response := workflowContextObserveSessionBaseResponse("shutdown", setup.candidate.ModelScopeDigest)
 	response.CallsCompleted = 40
+	response.ProviderAuthorityDigest = providerAuthority
+	response.CompactionCycles = variantCalls["B"]
+	response.PreCompactionACKs = variantCalls["B"]
+	response.PostCompactionACKs = variantCalls["B"]
+	response.CanonicalReadmissions = variantCalls["B"]
+	response.EphemeralReadmissions = variantCalls["B"]
 	return encoder.Encode(response)
 }
 

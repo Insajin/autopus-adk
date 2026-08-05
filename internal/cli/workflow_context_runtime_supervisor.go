@@ -146,6 +146,16 @@ func (supervisor *WorkflowContextRuntimeSupervisor) Run(
 	if runErr == nil && (stage != 0 || completedCycles == 0) {
 		runErr = fmt.Errorf("OMP context runtime event stream ended at stage %d", stage)
 	}
+	if runErr == nil && request.RequiredCompactionCycles > 0 {
+		if completedCycles != request.RequiredCompactionCycles {
+			runErr = fmt.Errorf("managed OMP lifecycle completed %d compactions; required %d",
+				completedCycles, request.RequiredCompactionCycles)
+		} else {
+			receipt.Lifecycle, runErr = validateWorkflowContextManagedLifecycle(
+				request.Driver, request.RequiredCompactionCycles,
+			)
+		}
+	}
 	if runErr != nil {
 		if terminal.Reason == "required-context-mismatch" {
 			return supervisor.runCanonicalFallback(ctx, request, receipt, dispatch)

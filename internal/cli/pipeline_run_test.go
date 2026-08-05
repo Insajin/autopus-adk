@@ -45,8 +45,8 @@ func TestPipelineRunCmd_DefaultPlatform(t *testing.T) {
 	assert.NotEmpty(t, resolved)
 }
 
-// TestPipelineRunCmd_StrategyFlag verifies that --strategy flag is parsed
-// correctly for both "sequential" and "parallel" values (REQ-4/REQ-5).
+// TestPipelineRunCmd_StrategyFlag verifies that the only executable strategy,
+// "sequential", is accepted while rejected strategies never reach the engine.
 func TestPipelineRunCmd_StrategyFlag(t *testing.T) {
 	t.Parallel()
 
@@ -56,7 +56,7 @@ func TestPipelineRunCmd_StrategyFlag(t *testing.T) {
 		wantErr  bool
 	}{
 		{"sequential strategy", "sequential", false},
-		{"parallel strategy", "parallel", false},
+		{"parallel strategy", "parallel", true},
 		{"invalid strategy", "invalid", true},
 	}
 
@@ -72,9 +72,9 @@ func TestPipelineRunCmd_StrategyFlag(t *testing.T) {
 			// When: the command flags are parsed
 			err := cmd.ParseFlags(args)
 
-			// Then: valid strategies parse without error
+			// Then: only the executable strategy parses without error
 			if tt.wantErr {
-				assert.Error(t, err)
+				assert.ErrorContains(t, err, "must be sequential")
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.strategy, cfg.Strategy)
