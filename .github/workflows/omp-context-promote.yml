@@ -407,14 +407,14 @@ jobs:
           GIT_INDEX_FILE="$evidence_index" git update-index --add \
             --cacheinfo "100644,$attestation_blob,omp-context-promotion-attestation.v2.json"
           evidence_tree=$(GIT_INDEX_FILE="$evidence_index" git write-tree)
-          evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.96' |
+          published_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.96' |
             git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit-tree "$evidence_tree")
-          [[ "$(git rev-list --parents -n 1 "$evidence_commit")" == "$evidence_commit" ]] || fail 'published evidence is not an orphan'
+          [[ "$(git rev-list --parents -n 1 "$published_commit")" == "$published_commit" ]] || fail 'published evidence is not an orphan'
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            -c tag.gpgSign=false tag -a omp-context-evidence-v0.50.96 "$evidence_commit" \
+            -c tag.gpgSign=false tag -a omp-context-evidence-v0.50.96 "$published_commit" \
               -m 'OMP context promotion evidence v0.50.96'
           tag_object=$(git rev-parse --verify "$tag_ref")
 
@@ -426,7 +426,7 @@ jobs:
           GIT_CONFIG_KEY_0='http.https://github.com/.extraheader' \
           GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}" \
             git push --atomic --force-with-lease="${lock_ref}:${EVIDENCE_COMMIT}" origin \
-              "$tag_ref:$tag_ref" "$EVIDENCE_COMMIT:$lock_ref"
+              "$tag_ref:$tag_ref" "$published_commit:$lock_ref"
           unset auth_header
           remote_state=$(git ls-remote --refs origin "$tag_ref" "$lock_ref")
           [[ "$(awk -v ref="$tag_ref" '$2 == ref { print $0 }' <<<"$remote_state")" == "$tag_object"$'\t'"$tag_ref" ]] || fail 'published evidence tag differs'

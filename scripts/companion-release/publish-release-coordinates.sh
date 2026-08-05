@@ -41,8 +41,15 @@ IFS= read -r static_policy_b64 <"$static_policy_file" || fail 'read static polic
 [[ "$static_policy_b64" =~ ^[A-Za-z0-9_-]+$ && ${#static_policy_b64} -le 21846 ]] || fail 'static policy is malformed'
 [[ "$(wc -l <"$static_policy_file" | tr -d ' ')" == '1' ]] || fail 'static policy file is not canonical'
 [[ -f "$tag_signing_key" && ! -L "$tag_signing_key" ]] || fail 'release tag signing key is unsafe'
-[[ "$(/usr/bin/stat -f '%u:%Lp' "$tag_signing_key")" == "$(id -u):600" ]] || fail 'release tag signing key ownership or mode is unsafe'
-for tool in awk gh git jq mktemp shasum ssh-keygen; do command -v "$tool" >/dev/null || fail "$tool is unavailable"; done
+for tool in awk gh git jq mktemp shasum ssh-keygen stat uname; do command -v "$tool" >/dev/null || fail "$tool is unavailable"; done
+tag_signing_key_owner_mode=''
+case "$(uname -s)" in
+  Darwin) tag_signing_key_owner_mode=$(/usr/bin/stat -f '%u:%Lp' "$tag_signing_key") ;;
+  Linux) tag_signing_key_owner_mode=$(stat -c '%u:%a' "$tag_signing_key") ;;
+  *) fail 'release tag signing key platform is unsupported' ;;
+esac
+readonly tag_signing_key_owner_mode
+[[ "$tag_signing_key_owner_mode" == "$(id -u):600" ]] || fail 'release tag signing key ownership or mode is unsafe'
 
 repo_root=$(git rev-parse --show-toplevel)
 [[ "$(pwd -P)" == "$repo_root" ]] || fail 'publisher must run at the repository root'
