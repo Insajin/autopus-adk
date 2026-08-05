@@ -39,11 +39,41 @@ func main() {
 	}
 }
 
+type promotionArtifactVerifier func(
+	reportBytes, attestationBytes []byte,
+	expected promptlayer.OMPContextPromotionExpectationV2,
+) (bool, error)
+
 func run(arguments []string) error {
+	return runWithVerifiers(arguments, verifyActivePromotionArtifact, verifyHistoricalPromotionArtifact)
+}
+
+func verifyActivePromotionArtifact(
+	reportBytes, attestationBytes []byte,
+	expected promptlayer.OMPContextPromotionExpectationV2,
+) (bool, error) {
+	verified, err := promptlayer.VerifyOMPContextPromotionArtifactV2(reportBytes, attestationBytes, expected)
+	return verified.Valid(), err
+}
+
+func verifyHistoricalPromotionArtifact(
+	reportBytes, attestationBytes []byte,
+	expected promptlayer.OMPContextPromotionExpectationV2,
+) (bool, error) {
+	verified, err := promptlayer.VerifyOMPContextPromotionHistoricalArtifactV2(
+		reportBytes, attestationBytes, expected)
+	return verified.Valid(), err
+}
+
+func runWithVerifiers(
+	arguments []string,
+	activeVerifier, historicalVerifier promotionArtifactVerifier,
+) error {
 	opts, err := parseOptions(arguments)
 	if err != nil {
 		return err
 	}
+	candidateArtifactSHA := "sha256:" + opts.candidateArtifactSHA
 	reportBytes, err := readArtifact(opts.reportPath, maxReportBytes)
 	if err != nil {
 		return fmt.Errorf("report: %w", err)
@@ -68,24 +98,22 @@ func run(arguments []string) error {
 		report.Candidate.Repository != opts.candidateRepository ||
 		report.Candidate.Revision != opts.candidateRevision ||
 		report.Candidate.TreeSHA != opts.candidateTree ||
-		report.Candidate.ArtifactSHA256 != opts.candidateArtifactSHA {
+		report.Candidate.ArtifactSHA256 != candidateArtifactSHA {
 		return errors.New("candidate coordinates differ from exact release source")
 	}
 	if report.Candidate.ArtifactSHA256 != report.Runtime.AutoBinarySHA256 {
 		return errors.New("candidate artifact digest differs from runtime binary digest")
 	}
-	expected := expectationFromStaticPolicy(policy, opts.candidateArtifactSHA)
+	expected := expectationFromStaticPolicy(policy, candidateArtifactSHA)
 	switch opts.mode {
 	case "active":
-		verified, verifyErr := promptlayer.VerifyOMPContextPromotionArtifactV2(
-			reportBytes, attestationBytes, expected)
-		if verifyErr != nil || !verified.Valid() {
+		valid, verifyErr := activeVerifier(reportBytes, attestationBytes, expected)
+		if verifyErr != nil || !valid {
 			return fmt.Errorf("active evidence verification failed: %w", verifyErr)
 		}
 	case "historical":
-		verified, verifyErr := promptlayer.VerifyOMPContextPromotionHistoricalArtifactV2(
-			reportBytes, attestationBytes, expected)
-		if verifyErr != nil || !verified.Valid() {
+		valid, verifyErr := historicalVerifier(reportBytes, attestationBytes, expected)
+		if verifyErr != nil || !valid {
 			return fmt.Errorf("historical evidence verification failed: %w", verifyErr)
 		}
 	default:

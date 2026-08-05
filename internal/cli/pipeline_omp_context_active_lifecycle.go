@@ -6,84 +6,104 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
+
+const pipelineOMPActiveCompactionNoopMessage = "Nothing to compact (session too small)"
 
 func (protocol *pipelineOMPRPCProtocol) manualCompact(
 	ctx context.Context,
 	binding WorkflowContextBridgeBinding,
 	expectedSession string,
 	preparePrompt func() (string, error),
-) error {
+) (bool, error) {
 	preProof, _, err := protocol.validatePipelineOMPActiveTranscript(ctx, false)
 	if err != nil {
-		return err
+		return false, err
 	}
 	protocol.nextID++
 	id := fmt.Sprintf("pipeline-active-compact-%d", protocol.nextID)
 	if err := protocol.process.send(pipelineOMPRPCCommand{ID: id, Type: "compact"}); err != nil {
-		return err
+		return false, err
 	}
 	started, preACKed, postACKed, responded, ended := false, false, false, false, false
 	var nativeResult []byte
 	for !ended {
 		frame, err := protocol.process.next(ctx)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if frame.Type == "extension_error" {
-			return errors.New("managed active OMP extension failed during manual compaction")
+			return false, errors.New("managed active OMP extension failed during manual compaction")
 		}
 		switch frame.Type {
 		case "auto_compaction_start":
 			if started || postACKed || frame.Action != "snapcompact" || frame.Reason != "manual" {
-				return errors.New("managed active OMP manual compaction start is invalid")
+				return false, errors.New("managed active OMP manual compaction start is invalid")
 			}
 			started = true
 		case "extension_ui_request":
 			event, bridgeErr := validatePipelineOMPActiveBridgeFrame(frame, binding)
 			if bridgeErr != nil {
-				return bridgeErr
+				return false, bridgeErr
 			}
 			if event == WorkflowContextEventPreCompaction {
 				if preACKed || postACKed || responded {
-					return errors.New("managed active OMP pre-compaction checkpoint is out of order")
+					return false, errors.New("managed active OMP pre-compaction checkpoint is out of order")
 				}
 				preACKed = true
 			} else {
-				if !started || !preACKed || postACKed || responded {
-					return errors.New("managed active OMP post-compaction rehydration is out of order")
+				if !preACKed || postACKed || responded {
+					return false, errors.New("managed active OMP post-compaction rehydration is out of order")
 				}
 				if _, err := preparePrompt(); err != nil {
-					return err
+					return false, err
 				}
 				postACKed = true
 			}
 			if err := protocol.confirmPipelineOMPActiveBridge(frame.ID); err != nil {
-				return err
+				return false, err
 			}
 		case "response":
+			if frame.ID == id && frame.Command == "compact" && !frame.Success && !started &&
+				!preACKed && !postACKed && !responded &&
+				frame.Error == pipelineOMPActiveCompactionNoopMessage {
+				postProof, _, proofErr := protocol.validatePipelineOMPActiveTranscript(ctx, false)
+				state, stateErr := protocol.readIdleState(ctx, "managed-compaction-noop")
+				if proofErr != nil || postProof != preProof || stateErr != nil ||
+					state.SessionID != expectedSession || state.AutoCompactionEnabled == nil ||
+					*state.AutoCompactionEnabled {
+					return false, errors.New("managed active OMP no-op compaction proof is invalid")
+				}
+				return false, nil
+			}
 			if frame.ID != id || frame.Command != "compact" || !frame.Success || responded ||
-				!started || !preACKed || !postACKed {
-				return errors.New("managed active OMP manual compaction response is invalid")
+				!preACKed || !postACKed || !validPipelineOMPActiveManualResult(frame.Data) {
+				return false, errors.New("managed active OMP manual compaction response is invalid")
 			}
 			responded = true
-		case "auto_compaction_end":
-			if !responded || ended || !validPipelineOMPActiveNativeEnd(frame) {
-				return errors.New("managed active OMP manual compaction completion is invalid")
+			nativeResult = frame.Data
+			if !started {
+				ended = true
 			}
-			nativeResult = append([]byte(nil), frame.Result...)
+		case "auto_compaction_end":
+			if !started || !responded || ended || !validPipelineOMPActiveNativeEnd(frame) {
+				return false, errors.New("managed active OMP manual compaction completion is invalid")
+			}
+			nativeResult = append(nativeResult, 0)
+			nativeResult = append(nativeResult, frame.Result...)
 			ended = true
 		case "agent_start", "turn_end", "agent_end", "prompt_result":
-			return errors.New("managed active OMP provider activity crossed the compaction barrier")
+			return false, errors.New("managed active OMP provider activity crossed the compaction barrier")
 		}
 	}
 	postProof, images, err := protocol.validatePipelineOMPActiveTranscript(ctx, true)
 	if err != nil {
-		return err
+		return false, err
 	}
 	provenance := pipelineOMPActiveHash([]byte(preProof + "\x00" + pipelineOMPActiveHash(nativeResult) + "\x00" + postProof))
 	if !validPipelineOMPActiveHash(provenance) {
-		return errors.New("managed active OMP compaction provenance is invalid")
+		return false, errors.New("managed active OMP compaction provenance is invalid")
 	}
 	for _, digest := range images {
 		protocol.safeCompactionImages[digest] = struct{}{}
@@ -91,9 +111,9 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 	state, err := protocol.readIdleState(ctx, "managed-post-compaction")
 	if err != nil || state.SessionID != expectedSession || state.AutoCompactionEnabled == nil ||
 		*state.AutoCompactionEnabled {
-		return errors.New("managed active OMP post-compaction state is invalid")
+		return false, errors.New("managed active OMP post-compaction state is invalid")
 	}
-	return nil
+	return true, nil
 }
 
 // @AX:WARN [AUTO]: managed prompt lifecycle validation contains 11 if branches.
@@ -180,6 +200,13 @@ func (protocol *pipelineOMPRPCProtocol) confirmPipelineOMPActiveBridge(id string
 	return protocol.process.send(pipelineOMPRPCCommand{
 		ID: id, Type: "extension_ui_response", Confirmed: &confirmed,
 	})
+}
+
+func validPipelineOMPActiveManualResult(data json.RawMessage) bool {
+	var result struct {
+		Summary string `json:"summary"`
+	}
+	return json.Unmarshal(data, &result) == nil && strings.TrimSpace(result.Summary) != ""
 }
 
 func validPipelineOMPActiveNativeEnd(frame pipelineOMPRPCFrame) bool {

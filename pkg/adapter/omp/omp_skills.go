@@ -84,6 +84,7 @@ func (a *Adapter) renderTemplateWorkflowSkill(spec workflowSpec, cfg *config.Har
 		body = rendered
 	}
 	body = normalizeOMPWorkflowBody(body)
+	body = injectOMPExecutionOwnerControl(body, spec.Name)
 	body = injectOMPInvocation(body, spec.Name)
 	return buildMarkdown(ompSkillFrontmatter(spec.Name, spec.Description), body), nil
 }
@@ -135,6 +136,7 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 			}
 			body = pkgcontent.NormalizeOMPSemanticReferences(string(raw))
 		}
+		body = normalizeOMPExecutionOwnerContract(body)
 		content := buildMarkdown(
 			ompSkillFrontmatter(skill.Name, skill.Description),
 			body,

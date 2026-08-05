@@ -43,6 +43,16 @@ func TestPipelineOMPActiveTranscript_AcceptsExactSanitizedPage(t *testing.T) {
 	assert.Empty(t, images)
 }
 
+func TestPipelineOMPActiveTranscript_AcceptsEmptyFreshSession(t *testing.T) {
+	protocol := pipelineOMPActiveTranscriptFixture(t, nil)
+
+	proof, images, err := protocol.validatePipelineOMPActiveTranscript(context.Background(), false)
+
+	require.NoError(t, err)
+	assert.True(t, validPipelineOMPActiveHash(proof))
+	assert.Empty(t, images)
+}
+
 func pipelineOMPActiveTranscriptFixture(
 	t *testing.T,
 	messages []json.RawMessage,

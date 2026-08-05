@@ -169,6 +169,48 @@ jobs:
             bash -n "$script"
           done < <(git ls-files -z '*.sh')
 
+  omp-native-smoke:
+    name: omp-native-smoke
+    permissions:
+      contents: read
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+
+      - name: Run pinned OMP native task hub smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$(uname -s)" == 'Darwin' ]]
+          [[ "$(uname -m)" == 'arm64' ]]
+          omp_binary="${RUNNER_TEMP}/omp-v17.2.7-darwin-arm64"
+          [[ ! -e "$omp_binary" && ! -L "$omp_binary" ]]
+          cleanup_omp() {
+            rm -f -- "$omp_binary"
+          }
+          trap cleanup_omp EXIT
+          /usr/bin/curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --fail --location --silent --show-error \
+            --output "$omp_binary" \
+            'https://github.com/can1357/oh-my-pi/releases/download/v17.2.7/omp-darwin-arm64'
+          expected='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
+          actual=$(/usr/bin/shasum -a 256 "$omp_binary" | /usr/bin/awk '{print $1}')
+          [[ "$actual" == "$expected" ]]
+          /bin/chmod 0555 "$omp_binary"
+          [[ "$("$omp_binary" --version)" == 'omp/17.2.7' ]]
+          AUTOPUS_OMP_NATIVE_LIVE=1 \
+          AUTOPUS_OMP_LIVE_EXECUTABLE="$omp_binary" \
+            go test -count=1 -timeout=90s \
+            -run '^TestOMPNativeTaskHubLiveSmoke$' ./pkg/adapter/omp
+
   macos-runtime:
     name: macos-runtime
     runs-on: macos-15

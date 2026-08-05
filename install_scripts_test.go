@@ -165,6 +165,48 @@ func TestMacOSRuntimeCIExecutesUnsignedBoundedVersionSmoke(t *testing.T) {
 	}
 }
 
+func TestOMPNativeSmokeCIPinsExactBinaryAndTest(t *testing.T) {
+	workflow := readInstallerFile(t, ".github/workflows/ci.yaml")
+	nativeJob := strings.Index(workflow, "  omp-native-smoke:")
+	macOSJob := strings.Index(workflow, "  macos-runtime:")
+	if nativeJob < 0 || macOSJob <= nativeJob {
+		t.Fatal("cannot isolate omp-native-smoke job")
+	}
+	section := workflow[nativeJob:macOSJob]
+	required := []string{
+		`name: omp-native-smoke`,
+		`runs-on: macos-15`,
+		`timeout-minutes: 5`,
+		`persist-credentials: false`,
+		`set -euo pipefail`,
+		`[[ "$(uname -m)" == 'arm64' ]]`,
+		`trap cleanup_omp EXIT`,
+		`https://github.com/can1357/oh-my-pi/releases/download/v17.2.7/omp-darwin-arm64`,
+		`expected='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'`,
+		`/usr/bin/shasum -a 256 "$omp_binary"`,
+		`/bin/chmod 0555 "$omp_binary"`,
+		`[[ "$("$omp_binary" --version)" == 'omp/17.2.7' ]]`,
+		`AUTOPUS_OMP_NATIVE_LIVE=1`,
+		`AUTOPUS_OMP_LIVE_EXECUTABLE="$omp_binary"`,
+		`go test -count=1 -timeout=90s`,
+		`-run '^TestOMPNativeTaskHubLiveSmoke$' ./pkg/adapter/omp`,
+	}
+	for _, fragment := range required {
+		if !strings.Contains(section, fragment) {
+			t.Fatalf("omp-native-smoke must contain %q", fragment)
+		}
+	}
+	if strings.Count(section, "go test ") != 1 ||
+		strings.Count(section, "-run '^TestOMPNativeTaskHubLiveSmoke$'") != 1 {
+		t.Fatal("omp-native-smoke must run one exactly anchored Go smoke")
+	}
+	for _, forbidden := range []string{"./...", "${{ secrets.", "AUTOPUS_OMP_LIVE=1"} {
+		if strings.Contains(section, forbidden) {
+			t.Fatalf("omp-native-smoke widened or gained credentials through %q", forbidden)
+		}
+	}
+}
+
 func TestWindowsRuntimeRunsSelfUpdateAdmissionContracts(t *testing.T) {
 	workflow := readInstallerFile(t, ".github/workflows/ci.yaml")
 	windowsJob := strings.Index(workflow, "  windows-runtime:")

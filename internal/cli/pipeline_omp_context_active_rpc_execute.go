@@ -41,31 +41,25 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 		preparedPrompt, promptReady = body, true
 		return preparedPrompt, nil
 	}
-	maintenanceInput, maintenanceOutput := int64(0), int64(0)
-	maintenanceTotal := int64(0)
+	compactionPerformed := false
 	if compactBefore {
-		beforeMaintenance, statsErr := protocol.sessionStats(ctx, expectedSession)
-		if statsErr != nil {
-			return "", pipelineOMPActiveCallReceipt{}, statsErr
-		}
-		if err := protocol.manualCompact(ctx, binding, expectedSession, rehydrate); err != nil {
+		compactionPerformed, err = protocol.manualCompact(ctx, binding, expectedSession, rehydrate)
+		if err != nil {
 			return "", pipelineOMPActiveCallReceipt{}, err
 		}
-		if !promptReady || rehydrationCalls != 1 {
+		if compactionPerformed && (!promptReady || rehydrationCalls != 1) {
 			return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP post-compaction re-admission is incomplete")
 		}
-		afterMaintenance, statsErr := protocol.sessionStats(ctx, expectedSession)
-		if statsErr != nil || afterMaintenance.Input < beforeMaintenance.Input ||
-			afterMaintenance.Output < beforeMaintenance.Output || afterMaintenance.Total < beforeMaintenance.Total {
-			return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP maintenance usage is not monotonic")
-		}
-		maintenanceInput = afterMaintenance.Input - beforeMaintenance.Input
-		maintenanceOutput = afterMaintenance.Output - beforeMaintenance.Output
-		maintenanceTotal = afterMaintenance.Total - beforeMaintenance.Total
+		// get_session_stats aggregates the rewritten active history, not cumulative
+		// provider billing. Its totals may decrease after a successful compaction.
 	}
 	prompt, err := rehydrate()
 	if err != nil {
 		return "", pipelineOMPActiveCallReceipt{}, err
+	}
+	beforePromptState, err := protocol.readIdleState(ctx, "managed-pre-provider")
+	if err != nil || beforePromptState.SessionID != expectedSession {
+		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP pre-provider session changed")
 	}
 	beforeStats, err := protocol.sessionStats(ctx, expectedSession)
 	if err != nil {
@@ -76,7 +70,7 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 		return "", pipelineOMPActiveCallReceipt{}, err
 	}
 	afterState, err := protocol.readIdleState(ctx, "managed-post-prompt")
-	if err != nil || afterState.SessionID != expectedSession || *afterState.MessageCount <= *beforeState.MessageCount {
+	if err != nil || afterState.SessionID != expectedSession || *afterState.MessageCount <= *beforePromptState.MessageCount {
 		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP primary did not settle in the same session")
 	}
 	afterStats, err := protocol.sessionStats(ctx, expectedSession)
@@ -107,13 +101,12 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 	}
 	return output.Text, pipelineOMPActiveCallReceipt{
 		SessionID: expectedSession, InputTokens: inputDelta, OutputTokens: outputDelta,
-		MaintenanceInputTokens: maintenanceInput, MaintenanceOutputTokens: maintenanceOutput,
-		TotalTokens:           totalDelta + maintenanceTotal,
-		CompactionCycles:      boolToPipelineOMPCount(compactBefore),
-		PreCompactionACKs:     boolToPipelineOMPCount(compactBefore),
-		PostCompactionACKs:    boolToPipelineOMPCount(compactBefore),
-		CanonicalReadmissions: boolToPipelineOMPCount(compactBefore),
-		EphemeralReadmissions: boolToPipelineOMPCount(compactBefore),
+		TotalTokens:           totalDelta,
+		CompactionCycles:      boolToPipelineOMPCount(compactionPerformed),
+		PreCompactionACKs:     boolToPipelineOMPCount(compactionPerformed),
+		PostCompactionACKs:    boolToPipelineOMPCount(compactionPerformed),
+		CanonicalReadmissions: boolToPipelineOMPCount(compactionPerformed),
+		EphemeralReadmissions: boolToPipelineOMPCount(compactionPerformed),
 		SameProcess:           true, SameSession: true, TerminalIdle: true,
 		BridgeBindingHash:  binding.BindingHash,
 		SessionBindingHash: workflowContextRuntimeHash(expectedSession + "\x00" + binding.NonceHash),

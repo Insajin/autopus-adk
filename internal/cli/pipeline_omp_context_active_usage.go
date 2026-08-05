@@ -16,9 +16,11 @@ func boolToPipelineOMPCount(value bool) int {
 type pipelineOMPActiveSessionStats struct {
 	SessionID string `json:"sessionId"`
 	Tokens    struct {
-		Input  int64 `json:"input"`
-		Output int64 `json:"output"`
-		Total  int64 `json:"total"`
+		Input      int64 `json:"input"`
+		Output     int64 `json:"output"`
+		CacheRead  int64 `json:"cacheRead"`
+		CacheWrite int64 `json:"cacheWrite"`
+		Total      int64 `json:"total"`
 	} `json:"tokens"`
 }
 
@@ -37,9 +39,20 @@ func (protocol *pipelineOMPRPCProtocol) sessionStats(
 		return pipelineOMPActiveUsage{}, err
 	}
 	var stats pipelineOMPActiveSessionStats
-	if json.Unmarshal(data, &stats) != nil || stats.SessionID != expectedSession || stats.Tokens.Input < 0 ||
-		stats.Tokens.Output < 0 || stats.Tokens.Total < 0 || stats.Tokens.Total < stats.Tokens.Input+stats.Tokens.Output {
+	if json.Unmarshal(data, &stats) != nil || stats.SessionID != expectedSession {
 		return pipelineOMPActiveUsage{}, errors.New("managed active OMP session stats are invalid")
 	}
-	return pipelineOMPActiveUsage{Input: stats.Tokens.Input, Output: stats.Tokens.Output, Total: stats.Tokens.Total}, nil
+	tokens := stats.Tokens
+	effectiveInput := tokens.Input + tokens.CacheRead
+	if tokens.Input < 0 || tokens.Output < 0 || tokens.CacheRead < 0 || tokens.CacheWrite < 0 ||
+		tokens.Total < 0 || effectiveInput < tokens.Input {
+		return pipelineOMPActiveUsage{}, errors.New("managed active OMP session stats are invalid")
+	}
+	effectiveInputWithWrite := effectiveInput + tokens.CacheWrite
+	minimumTotal := effectiveInputWithWrite + tokens.Output
+	if effectiveInputWithWrite < effectiveInput || minimumTotal < effectiveInputWithWrite ||
+		tokens.Total < minimumTotal {
+		return pipelineOMPActiveUsage{}, errors.New("managed active OMP session stats are invalid")
+	}
+	return pipelineOMPActiveUsage{Input: effectiveInputWithWrite, Output: tokens.Output, Total: tokens.Total}, nil
 }

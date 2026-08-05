@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 )
 
-const ompContextPromotionPublicKey2026Q3K1Base64 = "t2lWmiRdd03NTG4zpzlpDnRUdp9e/ItDGxoHR05aVQk="
+const ompContextPromotionPublicKey2026Q3K1Base64 = "2ZO4NEHN+2yUw3huo8ZIXp/ITGd6WMN+EyiQVc9a3y8="
 
 func mustOMPContextPromotionPublicKeyV2(encoded string) ed25519.PublicKey {
 	encoding := base64.StdEncoding.Strict()

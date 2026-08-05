@@ -1,33 +1,54 @@
 # OMP Native Agent Pipeline
 
-This is the default multi-agent execution contract for `/auto go SPEC-ID` on OMP.
-Autopus owns the phase and quality policy; OMP owns subagent lifecycle through its native
-`task`, `hub`, and `todo` tools.
+This is the default multi-agent execution contract for
+`/auto go SPEC-ID [--execution-owner omp|orca]` on OMP.
+Autopus owns phase and quality policy; exactly one selected owner owns the task DAG.
 
 ## Activation
 
 | Flag | Execution |
 |---|---|
-| default | OMP-local task DAG |
-| `--solo` | current session performs the work directly |
-| `--team` | OMP-local task batch with explicit Lead/Builder/Guardian responsibilities |
-| `--multi` | normal gates plus risk-tiered provider dissent review |
+| omitted `--execution-owner` | owner `omp`, receipt source `default` |
+| `--execution-owner omp` | owner `omp`, receipt source `explicit` |
+| `--execution-owner orca` | owner `orca`, receipt source `explicit` |
+| `--solo` | owner `omp` current session performs the work directly |
+| `--team` | owner `omp` task batch with explicit Lead/Builder/Guardian responsibilities |
+| `--multi` | selected owner's normal gates plus risk-tiered provider dissent review |
 
-Choose one DAG owner before dispatch. OMP-local is the default. Orca-supervised execution
-is allowed only when the user explicitly asks for a supervised or durable cross-worktree run;
-in that case run and read `orca skills get orchestration --full` first and do not start a
-competing OMP DAG.
+Parse the owner exactly once before any `task`, DAG-owning `todo`, OMP subprocess, or Orca
+Run effect. Reject repeated, mixed, case-shifted, whitespace-padded, and aliased values; never
+fuzzy-correct or silently fall back. Omission alone selects `omp`. `--solo` and `--team` are
+OMP-only topology flags and conflict with owner `orca`.
+
+Persist `.autopus/pipeline-state/<SPEC-ID>.execution-owner.json` as a body-free
+`pipeline_execution_owner_receipt.v1`: owner, `default|explicit` source, reason, SPEC/run
+identity, `checked_at`, and `verification_status` only.
+
+- Owner `omp` uses native OMP `task`, `hub`, and `todo` and must not create an Orca Run.
+- Owner `orca` must not create an OMP task/todo DAG. Run and read
+  `orca skills get orchestration --full`, then use that current contract to create and supervise
+  one durable cross-worktree Run. A plain full handoff does not satisfy this topology.
+- `auto pipeline run SPEC-ID --platform omp --execution-owner orca` must return structured
+  `pipeline_execution_owner_result.v1` with `status=handoff_required` before any OMP
+  process/task creation. Act on that result; never retry it as owner `omp`.
 
 ## Native Tool Preflight
 
-Before Phase 1:
+Only owner `omp` executes this section. Owner `orca` skips it completely and follows the loaded
+Orca orchestration contract without initializing an OMP checklist or task DAG.
+
+Before Phase 1 for owner `omp`:
 
 1. Confirm that `task`, `hub`, and `todo` are available.
 2. Confirm whether batch mode and per-item isolation are present in the current `task` schema.
 3. Initialize the phase checklist with one top-level `todo` operation.
 4. Set `task_dispatch_count = 0`, `task_roles_dispatched = []`, and `degraded_mode = none`.
 5. If the selected topology cannot create and observe a native task, stop before implementation;
-   never silently fall back to a fake or prompt-only multi-agent run.
+   never silently fall back to a fake, prompt-only, or Orca-owned run.
+
+Every remaining native `task`/`hub`/`todo` instruction through the Completion Gate applies only
+to owner `omp`. Owner `orca` carries the same policy gates inside its one loaded-contract Run
+without creating this OMP DAG.
 
 Use one `task` call for each independent fan-out wave. Put shared goals, constraints, frozen
 context references, owned-path rules, and cross-task interfaces in top-level `context` once.
@@ -207,9 +228,18 @@ security findings, or failed tests. Preserve dissent and report degraded provide
 
 ## Progress and Ownership
 
-Only the main session owns `todo`. Workers report receipts and use `hub`; they do not mutate the
-parent checklist. Advance phases only after the prior phase receipt and gate are verified.
-Record `task_dispatch_count`, `task_roles_dispatched`, `degraded_mode`, and every blocker.
+For owner `omp`, only the main session owns `todo`. Workers report receipts and use `hub`; they
+do not mutate the parent checklist. Advance phases only after the prior phase receipt and gate are
+verified. Record `task_dispatch_count`, `task_roles_dispatched`, `degraded_mode`, and every
+blocker. For owner `orca`, the loaded orchestration Run is the only progress/DAG authority and
+the OMP session creates no parallel `todo` or `task` graph.
+
+## Status Evidence
+
+Generated `/auto status` first uses external `auto status` for project/SPEC lifecycle, then reads
+the current workspace execution-owner receipt and current-session OMP-native `hub` jobs state.
+Combine those sources to detect a competing DAG. The external CLI cannot inspect OMP user-session
+roots and must never pretend to replace native `hub` evidence.
 
 ## Completion Gate
 

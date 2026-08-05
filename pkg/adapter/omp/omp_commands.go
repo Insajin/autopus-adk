@@ -52,7 +52,14 @@ func thinRouterCommandBody() string {
 
 func thinWorkflowCommandBody(name string) string {
 	subcommand := strings.TrimPrefix(name, "auto-")
-	return strings.TrimSpace(fmt.Sprintf("`$ARGUMENTS`\n\nTreat the text above as the full argument payload for `/%s`.\nLoad exact detail skill `%s`; this is the same target selected by `/auto %s ...`.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.", name, name, subcommand))
+	body := fmt.Sprintf("`$ARGUMENTS`\n\nTreat the text above as the full argument payload for `/%s`.\nLoad exact detail skill `%s`; this is the same target selected by `/auto %s ...`.\nPreserve `--model <provider/model>` and `--variant <value>` when present.\nDo not restate or expand the arguments unless needed for execution.", name, name, subcommand)
+	switch name {
+	case "auto-go":
+		body += "\nAccept at most one exact `--execution-owner omp|orca` pair; omission defaults to `omp`, with no aliases or fuzzy fallback."
+	case "auto-status":
+		body += "\nCombine the workspace execution-owner receipt with current-session OMP-native `hub` state; external `auto status` cannot inspect OMP user-session roots."
+	}
+	return strings.TrimSpace(body)
 }
 
 // ompCommandFrontmatter builds command frontmatter with the description escaped

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/version"
 )
@@ -29,7 +30,7 @@ func RunWorkflowContextObserveSession(
 	if err != nil || !validWorkflowContextObserveHandshake(first) {
 		return errors.New("observe-session handshake is invalid")
 	}
-	setup, err := prepareWorkflowContextObserveSession(ctx, options, first.ChallengeDigest)
+	setup, err := prepareWorkflowContextObserveSessionForRun(ctx, options, first.ChallengeDigest)
 	if err != nil {
 		return err
 	}
@@ -50,12 +51,17 @@ func RunWorkflowContextObserveSession(
 	seenTasks := make(map[string]struct{}, 20)
 	variantCalls := map[string]int{"A": 0, "B": 0}
 	sessionBindings := map[string]string{"A": "", "B": ""}
+	compactionCycles, preCompactionACKs := 0, 0
+	postCompactionACKs, canonicalReadmissions, ephemeralReadmissions := 0, 0, 0
 	providerAuthority := setup.providerAuthorityDigest
 	if !validPipelineOMPActiveHash(providerAuthority) {
 		return errors.New("observe-session provider authority binding is unstable")
 	}
-	var pairTask, pairPromptHash string
-	for sequence := 1; sequence <= 40; sequence++ {
+	calls := make([]workflowContextObserveSessionCallEvidence, 0, 40)
+	var pairTask, pairPromptHash, pairOutputDigest string
+	var lastCompleted time.Time
+	for index := range 40 {
+		sequence := index + 1
 		command, err := nextWorkflowContextObserveSessionCommand(scanner)
 		if err != nil || validateWorkflowContextObserveSessionCall(command, sequence) != nil {
 			return fmt.Errorf("observe-session call %d is invalid", sequence)
@@ -73,14 +79,34 @@ func RunWorkflowContextObserveSession(
 		if command.Variant == "B" {
 			session, expectedPID = setup.optimized, optimizedPID
 		}
-		assistant, receipt, err := session.Execute(ctx, command.Prompt)
+		providerPrompt, providerPromptHash, err := setup.sealPrompt(command.Prompt)
+		if err != nil {
+			return fmt.Errorf("observe-session call %d canonical admission failed: %w", sequence, err)
+		}
+		startedAt := time.Now().UTC()
+		if !lastCompleted.IsZero() && !startedAt.After(lastCompleted) {
+			startedAt = lastCompleted.Add(time.Nanosecond)
+		}
+		assistant, receipt, err := session.Execute(ctx, providerPrompt)
+		endedAt := time.Now().UTC()
+		if !endedAt.After(startedAt) {
+			endedAt = startedAt.Add(time.Nanosecond)
+		}
 		if err != nil {
 			return fmt.Errorf("observe-session call %d failed closed: %w", sequence, err)
+		}
+		if !safeWorkflowContextObserveSessionOutput(setup, assistant) {
+			return fmt.Errorf("observe-session call %d returned private or unsafe output", sequence)
 		}
 		response := workflowContextObserveSessionBaseResponse("call", setup.candidate.ModelScopeDigest)
 		response.Sequence, response.PairSequence = command.Sequence, command.PairSequence
 		response.TaskIDDigest, response.Variant = command.TaskIDDigest, command.Variant
 		response.AssistantText, response.OutputDigest = assistant, workflowContextRuntimeHash(assistant)
+		if command.PairSequence == 1 {
+			pairOutputDigest = response.OutputDigest
+		} else if response.OutputDigest != pairOutputDigest {
+			return fmt.Errorf("observe-session call %d quality oracle changed across the pair", sequence)
+		}
 		response.SessionDigest = receipt.SessionBindingHash
 		response.ProviderAuthorityDigest = providerAuthority
 		response.ProcessReused = variantCalls[command.Variant] > 0
@@ -96,28 +122,50 @@ func RunWorkflowContextObserveSession(
 		}
 		lifecycleValid := session.PID() == expectedPID && receipt.SameProcess && receipt.SameSession &&
 			receipt.TerminalIdle && receipt.SessionBindingHash != "" &&
-			receipt.BridgeBindingHash == providerAuthority
+			receipt.BridgeBindingHash == session.binding.BindingHash
 		if prior := sessionBindings[command.Variant]; prior == "" {
 			sessionBindings[command.Variant] = receipt.SessionBindingHash
 		} else if prior != receipt.SessionBindingHash {
 			lifecycleValid = false
 		}
+		expectedCompactions := response.CompactionCycles
+		freshOptimized := command.Variant == "B" && variantCalls["B"] == 0
 		variantCalls[command.Variant]++
-		fullValid := command.Variant == "A" && response.CompactionCycles == 0 &&
+		fullValid := command.Variant == "A" && expectedCompactions == 0 &&
 			response.PreCompactionACKs == 0 && response.PostCompactionACKs == 0 &&
 			response.CanonicalReadmissions == 0 && response.EphemeralReadmissions == 0
-		optimizedValid := command.Variant == "B" && response.CompactionCycles == 1 &&
-			response.PreCompactionACKs == 1 && response.PostCompactionACKs == 1 &&
-			response.CanonicalReadmissions == 1 && response.EphemeralReadmissions == 1
+		optimizedValid := command.Variant == "B" && expectedCompactions >= 0 && expectedCompactions <= 1 &&
+			(!freshOptimized || expectedCompactions == 0) &&
+			response.PreCompactionACKs == expectedCompactions &&
+			response.PostCompactionACKs == expectedCompactions &&
+			response.CanonicalReadmissions == expectedCompactions &&
+			response.EphemeralReadmissions == expectedCompactions
 		if !lifecycleValid || !fullValid && !optimizedValid {
 			return fmt.Errorf("observe-session call %d process lifecycle changed", sequence)
+		}
+		compactionCycles += response.CompactionCycles
+		preCompactionACKs += response.PreCompactionACKs
+		postCompactionACKs += response.PostCompactionACKs
+		canonicalReadmissions += response.CanonicalReadmissions
+		ephemeralReadmissions += response.EphemeralReadmissions
+		calls = append(calls, workflowContextObserveSessionCallEvidence{
+			command: command, response: response, providerPromptHash: providerPromptHash,
+			startedAt: startedAt, endedAt: endedAt,
+		})
+		lastCompleted = endedAt
+		if command.PairSequence == 2 {
+			if err := verifyWorkflowContextObserveSessionReadback(
+				ctx, &setup, variantCalls["A"], variantCalls["B"],
+			); err != nil {
+				return fmt.Errorf("observe-session pair %d failed readback: %w", (sequence+1)/2, err)
+			}
 		}
 		if err := encoder.Encode(response); err != nil {
 			return err
 		}
 	}
 	if len(seenTasks) != 20 || variantCalls["A"] != 20 || variantCalls["B"] != 20 ||
-		sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
+		compactionCycles < 2 || sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
 		sessionBindings["A"] == sessionBindings["B"] {
 		return errors.New("observe-session task or reusable-session cardinality is invalid")
 	}
@@ -128,18 +176,31 @@ func RunWorkflowContextObserveSession(
 	if scanner.Scan() || scanner.Err() != nil {
 		return errors.New("observe-session input continued after shutdown")
 	}
+	evidenceSetup := setup
 	if err := setup.close(); err != nil {
 		return err
 	}
 	setup.taskRoot = ""
+	checkedAt := time.Now().UTC()
+	if !checkedAt.After(lastCompleted) {
+		checkedAt = lastCompleted.Add(time.Nanosecond)
+	}
+	evidenceID, reportDigest, err := writeWorkflowContextObserveSessionEvidence(
+		options, evidenceSetup, first.ChallengeDigest, calls, checkedAt,
+	)
+	if err != nil {
+		return err
+	}
 	response := workflowContextObserveSessionBaseResponse("shutdown", setup.candidate.ModelScopeDigest)
 	response.CallsCompleted = 40
 	response.ProviderAuthorityDigest = providerAuthority
-	response.CompactionCycles = variantCalls["B"]
-	response.PreCompactionACKs = variantCalls["B"]
-	response.PostCompactionACKs = variantCalls["B"]
-	response.CanonicalReadmissions = variantCalls["B"]
-	response.EphemeralReadmissions = variantCalls["B"]
+	response.EvidenceID, response.ReportDigest = evidenceID, reportDigest
+	response.CleanupVerified = true
+	response.CompactionCycles = compactionCycles
+	response.PreCompactionACKs = preCompactionACKs
+	response.PostCompactionACKs = postCompactionACKs
+	response.CanonicalReadmissions = canonicalReadmissions
+	response.EphemeralReadmissions = ephemeralReadmissions
 	return encoder.Encode(response)
 }
 

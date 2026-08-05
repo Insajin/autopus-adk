@@ -40,6 +40,13 @@ type OMPContextPromotionPolicyV1 struct {
 	MutationScope       string `json:"mutation_scope"`
 }
 
+func OMPContextPromotionPolicyDigestV1(policy OMPContextPromotionPolicyV1) (string, error) {
+	if err := validateOMPContextPromotionPolicyV1(policy); err != nil {
+		return "", err
+	}
+	return hashOMPContextPromotionValueV1(policy), nil
+}
+
 type OMPContextPromotionAttestationInputV1 struct {
 	Subject   OMPContextPromotionSubjectV1
 	Policy    OMPContextPromotionPolicyV1
@@ -148,6 +155,10 @@ func (attestation OMPContextPromotionAttestationV1) PolicyDigest() string {
 
 func (attestation OMPContextPromotionAttestationV1) CheckedAt() time.Time {
 	return attestation.checkedAt
+}
+
+func (attestation OMPContextPromotionAttestationV1) ExpiresAt() time.Time {
+	return attestation.expiresAt
 }
 
 func validateOMPContextPromotionSubjectV1(subject OMPContextPromotionSubjectV1) error {

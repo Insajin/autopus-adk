@@ -118,18 +118,38 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 			r.Observations[0].CompactionProviderRequests = 1
 			r.Observations[0].TotalProviderRequests++
 		}},
-		{name: "optimized compaction request missing", mutate: func(r *OMPContextPromotionReportV1) {
-			r.Observations[1].CompactionProviderRequests = 0
-			r.Observations[1].TotalProviderRequests--
+		{name: "fresh optimized compaction request", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[1].CompactionProviderRequests = 1
+			r.Observations[1].PreCompactionACKs = 1
+			r.Observations[1].PostCompactionACKs = 1
+			r.Observations[1].CanonicalReadmissions = 1
+			r.Observations[1].EphemeralReadmissions = 1
+			r.Observations[1].TotalProviderRequests++
+		}},
+		{name: "optimized compaction request overflow", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[2].CompactionProviderRequests = 2
+			r.Observations[2].TotalProviderRequests++
 		}},
 		{name: "optimized pre ACK missing", mutate: func(r *OMPContextPromotionReportV1) {
-			r.Observations[1].PreCompactionACKs = 0
+			r.Observations[2].PreCompactionACKs = 0
 		}},
 		{name: "optimized canonical readmission missing", mutate: func(r *OMPContextPromotionReportV1) {
-			r.Observations[1].CanonicalReadmissions = 0
+			r.Observations[2].CanonicalReadmissions = 0
 		}},
 		{name: "optimized ephemeral readmission missing", mutate: func(r *OMPContextPromotionReportV1) {
-			r.Observations[1].EphemeralReadmissions = 0
+			r.Observations[2].EphemeralReadmissions = 0
+		}},
+		{name: "insufficient multi-compaction evidence", mutate: func(r *OMPContextPromotionReportV1) {
+			for index := range r.Observations {
+				if r.Observations[index].Variant == "B" {
+					r.Observations[index].CompactionProviderRequests = 0
+					r.Observations[index].PreCompactionACKs = 0
+					r.Observations[index].PostCompactionACKs = 0
+					r.Observations[index].CanonicalReadmissions = 0
+					r.Observations[index].EphemeralReadmissions = 0
+					r.Observations[index].TotalProviderRequests = 1
+				}
+			}
 		}},
 		{name: "provider request total mismatch", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].TotalProviderRequests++ }},
 		{name: "integrity failure", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].IntegrityPassed = false }},

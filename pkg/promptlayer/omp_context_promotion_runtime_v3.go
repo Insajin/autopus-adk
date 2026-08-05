@@ -48,6 +48,7 @@ type OMPContextPromotionCurrentRuntimeV3 struct {
 	OMPVersion                   string
 	OMPExecutableSHA256          string
 	PipelineImplementationDigest string
+	ProviderAuthorityDigest      string
 }
 
 // OMPContextPromotionRuntimeBundleV3 is a local, signed promotion authority.
@@ -174,11 +175,7 @@ func verifyOMPContextPromotionRuntimeV3WithLineageAt(bundle OMPContextPromotionR
 	if lineageExpiresAt.Before(expiresAt) {
 		expiresAt = lineageExpiresAt
 	}
-	return VerifiedOMPContextPromotion{
-		reportDigest: attestation.ReportSHA256, evidenceID: report.EvidenceID, expiresAt: expiresAt,
-		producer: report.Producer, candidate: report.Candidate, policyDigest: report.Policy.PolicyDigest,
-		runtime: report.Runtime, provider: report.Provider, modelScopeDigest: report.ModelScopeDigest,
-	}, nil
+	return verifiedOMPContextPromotionFromReportV2(report, attestation.ReportSHA256, expiresAt), nil
 }
 
 func validOMPContextPromotionStaticPolicyV3(value OMPContextPromotionStaticPolicyV3) bool {
@@ -200,8 +197,10 @@ func validOMPContextPromotionStaticPolicyV3(value OMPContextPromotionStaticPolic
 func matchesOMPContextPromotionCurrentRuntimeV3(expected OMPContextPromotionStaticPolicyV3,
 	current OMPContextPromotionCurrentRuntimeV3,
 ) bool {
-	return validOMPContextMemoryHashV1(current.ExecutableSHA256) && current.SourceCommit == expected.SourceCommit &&
-		current.SourceTree == expected.SourceTree && current.Target == expected.Target && current.AutoVersion == expected.AutoVersion &&
+	return validOMPContextMemoryHashV1(current.ExecutableSHA256) &&
+		validOMPContextMemoryHashV1(current.ProviderAuthorityDigest) &&
+		current.SourceCommit == expected.SourceCommit && current.SourceTree == expected.SourceTree &&
+		current.Target == expected.Target && current.AutoVersion == expected.AutoVersion &&
 		current.OMPVersion == expected.OMPVersion && current.OMPExecutableSHA256 == expected.OMPExecutableSHA256 &&
 		current.PipelineImplementationDigest == expected.PipelineImplementationDigest
 }
@@ -217,11 +216,15 @@ func matchesOMPContextPromotionStaticPolicyV3(report OMPContextPromotionReportV1
 		report.Runtime.AutoVersion == current.AutoVersion && report.Runtime.OMPVersion == current.OMPVersion &&
 		report.Runtime.OMPExecutableSHA256 == current.OMPExecutableSHA256 &&
 		report.Runtime.PipelineImplementationDigest == current.PipelineImplementationDigest &&
+		ompContextPromotionProviderAuthorityDigestV1(report) == current.ProviderAuthorityDigest &&
 		report.Provider == expected.Provider && report.ModelScopeDigest == expected.ModelScopeDigest &&
 		report.CohortManifestDigest == expected.CohortManifestDigest && report.OrderSeed == expected.OrderSeed &&
 		report.OraclePolicyDigest == expected.OraclePolicyDigest
 }
 
 func sameOMPContextPromotionHashV3(left, right string) bool {
-	return len(left) == len(right) && subtle.ConstantTimeCompare([]byte(left), []byte(right)) == 1
+	if len(left) != len(right) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(left), []byte(right)) == 1
 }

@@ -17,13 +17,14 @@ const (
 // implementation without consuming promotion authority. Only the explicit-live
 // observe-session command may construct it.
 type pipelineOMPActiveEvaluatorSession struct {
-	process   *pipelineOMPProcess
-	protocol  *pipelineOMPRPCProtocol
-	binding   WorkflowContextBridgeBinding
-	selector  string
-	sessionID string
-	optimized bool
-	sequence  int
+	process     *pipelineOMPProcess
+	protocol    *pipelineOMPRPCProtocol
+	binding     WorkflowContextBridgeBinding
+	selector    string
+	sessionID   string
+	optimized   bool
+	sequence    int
+	compactions int
 }
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: evaluator startup is the shared full and optimized live-session boundary.
@@ -66,9 +67,10 @@ func (session *pipelineOMPActiveEvaluatorSession) Execute(
 		strings.TrimSpace(prompt) == "" || strings.HasPrefix(strings.TrimSpace(prompt), "/auto") {
 		return "", pipelineOMPActiveCallReceipt{}, errors.New("pipeline: active evaluator input is invalid")
 	}
+	compactBefore := session.optimized && session.sequence > 0
 	output, receipt, err := session.protocol.executeManaged(
 		ctx, session.selector, session.binding, session.sessionID,
-		session.optimized,
+		compactBefore,
 		func() (string, error) { return prompt, nil },
 	)
 	if err != nil {
@@ -76,14 +78,18 @@ func (session *pipelineOMPActiveEvaluatorSession) Execute(
 		return "", pipelineOMPActiveCallReceipt{}, err
 	}
 	receipt.ContextBindingHash = session.binding.BindingHash
-	if session.optimized && (receipt.CompactionCycles != 1 || receipt.PreCompactionACKs != 1 ||
-		receipt.PostCompactionACKs != 1 || receipt.CanonicalReadmissions != 1 ||
-		receipt.EphemeralReadmissions != 1) ||
-		!session.optimized && receipt.CompactionCycles != 0 {
+	expectedCompactions := receipt.CompactionCycles
+	if expectedCompactions < 0 || expectedCompactions > 1 ||
+		!compactBefore && expectedCompactions != 0 ||
+		receipt.PreCompactionACKs != expectedCompactions ||
+		receipt.PostCompactionACKs != expectedCompactions ||
+		receipt.CanonicalReadmissions != expectedCompactions ||
+		receipt.EphemeralReadmissions != expectedCompactions {
 		_ = session.Close()
 		return "", pipelineOMPActiveCallReceipt{}, errors.New("pipeline: active evaluator compaction evidence is incomplete")
 	}
 	session.sequence++
+	session.compactions += receipt.CompactionCycles
 	receipt.Sequence = session.sequence
 	receipt.ImplementationHash = pipelineOMPActiveImplementationDigest()
 	return output, receipt, nil

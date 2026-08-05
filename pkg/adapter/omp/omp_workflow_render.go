@@ -16,6 +16,7 @@ func ompRouterBody(prefix string) string {
 		"Treat the payload above as the complete text supplied after `/auto`.",
 		"Route to exactly one matching detail skill from this exact map: " + ompWorkflowTargets() + ".",
 		"Preserve `--model <provider/model>` and `--variant <value>` exactly as supplied.",
+		"For `go`, preserve at most one `--execution-owner omp|orca` pair exactly; omission defaults to `omp`, and aliases or fuzzy correction are forbidden.",
 		"Do not fuzzy-correct an unknown subcommand; report it as unsupported and show the exact map.",
 		"This is an emitted routing contract, not an OMP runtime parser or model-quality claim.",
 	}, "\n")
@@ -50,6 +51,7 @@ func normalizeOMPWorkflowBody(body string) string {
 		"@auto-", "/auto-",
 	).Replace(body)
 	body = pkgcontent.ReplacePlatformReferences(body, "omp")
+	body = normalizeOMPExecutionOwnerContract(body)
 	body = dedupeOMPReference(body, ".agents/skills/agent-pipeline/SKILL.md")
 	return strings.TrimSpace(body)
 }
@@ -62,6 +64,42 @@ func dedupeOMPReference(body, ref string) string {
 	head := body[:first+len(ref)]
 	tail := strings.ReplaceAll(body[first+len(ref):], ref, "the pipeline reference above")
 	return head + tail
+}
+
+func normalizeOMPExecutionOwnerContract(body string) string {
+	body = strings.NewReplacer(
+		"- Choose exactly one topology before dispatch: `OMP-local` or `Orca-supervised`.",
+		"- Choose exactly one DAG owner with `--execution-owner omp|orca` before dispatch; omission selects owner `omp`.",
+		"- `OMP-local` is the default. The current OMP session is the sole DAG owner and uses its native `task`, `hub`, and `todo` tools.",
+		"- Owner `omp` is the default. The current OMP session is the sole DAG owner and uses its native `task`, `hub`, and `todo` tools.",
+		"- `Orca-supervised` is allowed only when the user explicitly selects a supervised or durable topology. Before any Orca orchestration, run and read `orca skills get orchestration --full`.",
+		"- Owner `orca` is allowed only when `--execution-owner orca` is explicit. Before any Orca orchestration, run and read `orca skills get orchestration --full`.",
+		"- The single DAG owner invariant is mandatory: when Orca owns the DAG, the OMP session does not dispatch a competing DAG; when OMP owns it, Orca does not dispatch one.",
+		"- The single DAG owner invariant is mandatory: owner `orca` creates no OMP task DAG, and owner `omp` creates no Orca Run.",
+	).Replace(body)
+	return strings.NewReplacer(
+		"`OMP-local`", "owner `omp`",
+		"`Orca-supervised`", "owner `orca`",
+		"OMP-local", "owner `omp`",
+		"Orca-supervised", "owner `orca`",
+	).Replace(body)
+}
+
+func injectOMPExecutionOwnerControl(body, name string) string {
+	if name != "auto-go" {
+		return body
+	}
+	block := strings.Join([]string{
+		"## Execution Owner Control Plane",
+		"",
+		"- Invocation: `/auto go SPEC-ID [--execution-owner omp|orca]`. Omission selects `omp` with receipt source `default`; a supplied exact value has source `explicit`.",
+		"- Parse the flag exactly once before any `task`, DAG-owning `todo`, OMP subprocess, or Orca Run effect. Reject repeated, mixed, case-shifted, whitespace-padded, or aliased values without fallback.",
+		"- Persist the body-free receipt `.autopus/pipeline-state/<SPEC-ID>.execution-owner.json` with schema `pipeline_execution_owner_receipt.v1` and only owner, source, reason, SPEC/run identity, `checked_at`, and `verification_status` evidence.",
+		"- Owner `omp`: the current OMP session is the sole DAG owner, uses native `task`, `hub`, and `todo`, and must not create an Orca Run.",
+		"- Owner `orca`: do not initialize an OMP task/todo DAG or call `task`. Run and read `orca skills get orchestration --full`, then use its supervised durable cross-worktree Run contract.",
+		"- At `auto pipeline run SPEC-ID --platform omp --execution-owner <owner>`, owner `orca` returns `pipeline_execution_owner_result.v1` with `status=handoff_required` before any OMP process/task creation. Act on that result; never retry as owner `omp`.",
+	}, "\n")
+	return injectOMPAfterHeading(body, block)
 }
 
 func injectOMPInvocation(body, name string) string {
@@ -111,7 +149,7 @@ func renderOMPCompactWorkflowSkill(spec workflowSpec) string {
 func ompCompactWorkflowContract(name string) (string, string) {
 	switch name {
 	case "auto-status":
-		return "Bash tool로 `auto status`를 실행해 SPEC lifecycle과 module 상태를 수집합니다.", "SPEC별 status와 다음 실행 가능한 명령을 보고합니다."
+		return "Bash tool로 `auto status`를 실행해 SPEC lifecycle과 module 상태를 수집한 뒤 현재 workspace의 `.autopus/pipeline-state/<SPEC-ID>.execution-owner.json` receipt와 현재 OMP 세션의 native `hub` jobs 상태를 읽습니다. 외부 CLI가 OMP user-session roots를 검사할 수 있다고 가정하지 않습니다.", "receipt의 owner/source/verification과 OMP-native `hub` 상태를 결합해 단일 DAG owner 위반 여부, SPEC별 status, 다음 실행 가능한 명령을 보고합니다."
 	case "auto-update":
 		return "Bash tool로 `auto update`를 실행해 현재 repo 또는 meta workspace의 harness surface를 갱신합니다.", "변경된 generated surface와 source-of-truth 경계를 보고합니다."
 	case "auto-map":

@@ -4,14 +4,14 @@
 
 ### A harness *of* the agents, *by* the agents, *for* the agents.
 
-Make your AI coding tools (Claude Code, Codex, Antigravity CLI, OpenCode) work like a real engineering team — with planning, testing, code review, and security audits built in.
+Make your AI coding tools (Claude Code, Codex, Antigravity CLI, OpenCode, Oh My Pi) work like a real engineering team — with planning, testing, code review, and security audits built in.
 
 **16 agents. 40 skills. One config. Every platform.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://golang.org)
-[![Platforms](https://img.shields.io/badge/Platforms-4-orange)](#-one-config-four-platforms)
+[![Platforms](https://img.shields.io/badge/Platforms-5-orange)](#-one-config-five-platforms)
 [![Agents](https://img.shields.io/badge/Agents-16-blueviolet)](#-16-specialized-agents)
 [![Skills](https://img.shields.io/badge/Skills-40-ff69b4)](#-all-commands)
 
@@ -500,7 +500,7 @@ Fallback: providers without hooks use ReadScreen + idle detection (SPEC-ORCH-006
 | **Signature Map** | `auto setup` | Extract exported API signatures (Go + TypeScript) via AST analysis |
 | **Test Runner Detection** | `auto init` | Auto-detect jest, vitest, pytest, cargo test frameworks |
 
-### 🌐 One Config, Four Platforms
+### 🌐 One Config, Five Platforms
 
 ```bash
 auto init   # auto-detects supported installed AI coding CLIs
@@ -514,6 +514,7 @@ One `autopus.yaml` generates **native configuration** for every detected support
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Antigravity CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
+| **Oh My Pi (OMP)** | `.omp/agents/`, `.omp/skills/`, `.omp/commands/`, `.omp/extensions/autopus-context.ts`, `.omp/config.yml`, `.agents/skills/` |
 Same 16 agents. Same rules. Shared skills stay full by default. If you want a smaller mixed Codex + OpenCode surface without breaking backward-compatible defaults, keep `skills.shared_surface` as-is and opt into `skills.compiler.mode: split`.
 
 Codex note:
@@ -532,7 +533,20 @@ OpenCode note:
 
 ### OMP role routing and context optimization (opt-in)
 
-OMP policies are provider-neutral and inactive until a named profile is selected. Start with the non-destructive `overlay` mode, then replace the illustrative selectors below with exact, authenticated `provider/model` selectors reported by the installed OMP catalog.
+Operator commands:
+
+```bash
+auto platform omp models                 # installed model catalog
+auto platform omp profile init --name omp-balanced --plan
+auto platform omp profile apply omp-balanced
+auto platform omp explain
+auto status --platform omp
+```
+
+With the current upstream OMP 17.2.7 catalog, `models` returns the exact native selector, context window, reasoning flag, thinking levels, and input modes as a successful `degraded`/display-only result. OMP does not yet expose the family, Autopus capability, or authorization metadata required for safe automatic routing, so `strict_routing_ready` remains `false` and profile init/apply stays blocked with `catalog_metadata_insufficient`. Autopus does not guess those fields or inspect credentials.
+
+
+OMP policies are provider-neutral and inactive until a named profile is selected. Start with the non-destructive `overlay` mode only after the strict catalog is ready, then replace the illustrative selectors below with exact, authenticated `provider/model` selectors.
 
 ```yaml
 role_model_policy:
@@ -713,18 +727,19 @@ cd your-project
 auto init
 ```
 
-`auto init` scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Antigravity CLI, OpenCode) and generates **native configuration** for each one — rules, skills, agents, and platform-specific settings — all from a single `autopus.yaml`.
+`auto init` scans your machine for supported installed AI coding CLIs (Claude Code, Codex, Antigravity CLI, OpenCode, Oh My Pi) and generates **native configuration** for each one — rules, skills, agents, commands, and platform-specific settings — all from a single `autopus.yaml`.
 
 Claude Code statusline note:
 - If `.claude/settings.json` already has a `statusLine.command`, `auto init` / `auto update` now lets you choose `keep`, `merge`, or `replace` in interactive mode.
 - You can force the same behavior non-interactively with `--statusline-mode keep|merge|replace`.
 
 ```
-✓ Detected: claude-code, codex, antigravity-cli, opencode
+✓ Detected: claude-code, codex, antigravity-cli, opencode, omp
 ✓ Generated: .claude/rules/, .claude/skills/, .claude/agents/, CLAUDE.md
 ✓ Generated: .codex/, AGENTS.md
 ✓ Generated: .gemini/, GEMINI.md
 ✓ Generated: .opencode/, .agents/skills/, AGENTS.md, opencode.json
+✓ Generated: .omp/agents/, .omp/skills/, .omp/commands/, .omp/extensions/, .omp/config.yml
 ✓ Created: autopus.yaml
 ```
 
@@ -733,7 +748,7 @@ Claude Code statusline note:
 This is the most important step. **AI agents lose all memory between sessions** — every conversation is their first day on the job. `/auto setup` creates the "onboarding documents" that let agents understand your project instantly.
 
 ```bash
-/auto setup     # Claude Code, Antigravity CLI, OpenCode
+/auto setup     # Claude Code, Antigravity CLI, OpenCode, Oh My Pi
 @auto setup     # Codex after local plugin install
 $auto setup     # Codex fallback before plugin install
 ```

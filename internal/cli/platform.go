@@ -32,6 +32,7 @@ func newPlatformCmd() *cobra.Command {
 	cmd.AddCommand(newPlatformListCmd(&dir))
 	cmd.AddCommand(newPlatformAddCmd(&dir))
 	cmd.AddCommand(newPlatformRemoveCmd(&dir))
+	cmd.AddCommand(newPlatformOMPCmd(&dir))
 
 	return cmd
 }

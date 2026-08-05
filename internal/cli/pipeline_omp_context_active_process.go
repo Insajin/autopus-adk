@@ -21,8 +21,10 @@ const (
 	pipelineOMPActiveEndpointKey    = "AUTOPUS_OMP_CONTEXT_PROVIDER_ENDPOINT"
 	pipelineOMPActiveCredentialKey  = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
 	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v3"
-	pipelineOMPActivePolicyIdentity = "manual-compact-every-call;canonical-ephemeral-readmission;correlated-ack;provider-bound-endpoint;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v3;tools=read,bash,edit,write,grep,glob,todo"
+	pipelineOMPActivePolicyIdentity = "manual-compact-completed-history-before-reused-call;canonical-ephemeral-readmission;correlated-ack;provider-bound-endpoint;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v3;tools=read,bash,edit,write,grep,glob,todo"
 )
+
+const pipelineOMPActiveDefaultContextWindow = 262144
 
 type pipelineOMPActiveProcessConfig struct {
 	backend              pipelineOMPBackendConfig
@@ -41,7 +43,7 @@ func preparePipelineOMPActiveProcessConfig(
 	endpointRaw, endpointFound := pipelineOMPEnvironmentValue(backend.Environment, pipelineOMPActiveEndpointKey)
 	credential, credentialFound := pipelineOMPEnvironmentValue(backend.Environment, pipelineOMPActiveCredentialKey)
 	endpoint, err := validatePipelineOMPActiveEndpoint(endpointRaw)
-	if !endpointFound || !credentialFound || err != nil || credential == "" || strings.ContainsRune(credential, 0) {
+	if !endpointFound || !credentialFound || err != nil {
 		return pipelineOMPActiveProcessConfig{}, errors.New("pipeline: managed active broker authority is unavailable")
 	}
 	nonce, err := newWorkflowContextRunNonceHash()
@@ -49,6 +51,13 @@ func preparePipelineOMPActiveProcessConfig(
 		return pipelineOMPActiveProcessConfig{}, err
 	}
 	implementation := pipelineOMPActiveImplementationDigest()
+	providerAuthority, err := pipelineOMPActiveProviderAuthorityDigest(
+		prepared.Binding.PolicyDigest, implementation, candidate.ModelScopeDigest,
+		backend.ModelContextWindow, endpoint, credential,
+	)
+	if err != nil {
+		return pipelineOMPActiveProcessConfig{}, err
+	}
 	return pipelineOMPActiveProcessConfig{
 		backend: backend, candidate: candidate, prepared: prepared, endpoint: endpoint, credential: credential,
 		binding: WorkflowContextBridgeBinding{
@@ -56,11 +65,9 @@ func preparePipelineOMPActiveProcessConfig(
 			BindingHash: workflowContextRuntimeHash(strings.Join([]string{
 				prepared.Binding.GrantDigest, prepared.Binding.WorkspaceID, prepared.Binding.SpecID,
 				prepared.Binding.GitCommitHash, prepared.Binding.AutoSourceCommit, prepared.Binding.AutoSourceTree,
-				candidate.ScopeProvider, candidate.ModelScopeDigest, endpoint,
+				candidate.ScopeProvider, candidate.ModelScopeDigest, providerAuthority,
 			}, "\x00")),
-			OptionsHash: workflowContextRuntimeHash(strings.Join([]string{
-				prepared.Binding.PolicyDigest, implementation, candidate.ModelScopeDigest, endpoint,
-			}, "\x00")),
+			OptionsHash: providerAuthority,
 			SessionHash: workflowContextRuntimeHash(prepared.Binding.WorkspaceID + "\x00" + prepared.Binding.SpecID + "\x00" + prepared.Binding.GitCommitHash),
 			NonceHash:   nonce,
 		},
@@ -258,7 +265,8 @@ func writePipelineOMPActiveModels(runtimeRoot string, active pipelineOMPActivePr
 		}
 		sort.Strings(ids)
 		for _, id := range ids {
-			fmt.Fprintf(&body, "      - id: %s\n        name: Managed Active\n        reasoning: true\n        input: [text]\n        contextWindow: 262144\n        maxTokens: 32768\n", id)
+			fmt.Fprintf(&body, "      - id: %s\n        name: Managed Active\n        reasoning: true\n        input: [text]\n        contextWindow: %d\n        maxTokens: 32768\n",
+				id, active.backend.ModelContextWindow)
 		}
 	}
 	path := filepath.Join(runtimeRoot, "models.yml")

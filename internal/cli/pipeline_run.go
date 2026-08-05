@@ -15,10 +15,12 @@ import (
 
 // pipelineRunConfig holds parsed flag values for the pipeline run command.
 type pipelineRunConfig struct {
-	Platform string
-	Strategy string
-	Continue bool
-	DryRun   bool
+	Platform               string
+	Strategy               string
+	ExecutionOwner         string
+	executionOwnerExplicit bool
+	Continue               bool
+	DryRun                 bool
 }
 
 // newPipelineRunCmd creates the `auto pipeline run <spec-id>` subcommand.
@@ -31,8 +33,9 @@ func newPipelineRunCmd() *cobra.Command {
 // given config pointer, allowing tests to inspect parsed flag values.
 func newPipelineRunCmdWithConfig(cfg *pipelineRunConfig) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run <spec-id>",
-		Short: "Execute a full pipeline for a SPEC",
+		Use:          "run <spec-id>",
+		Short:        "Execute a full pipeline for a SPEC",
+		SilenceUsage: true,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				return fmt.Errorf("spec-id argument is required: auto pipeline run <spec-id>")
@@ -49,6 +52,11 @@ func newPipelineRunCmdWithConfig(cfg *pipelineRunConfig) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&cfg.Platform, "platform", "", "AI platform to use (claude, codex, gemini, omp). Auto-detected when omitted.")
+	cmd.Flags().Var(
+		newExecutionOwnerValue(&cfg.ExecutionOwner, &cfg.executionOwnerExplicit),
+		"execution-owner",
+		"OMP DAG owner: exact value omp or orca. Defaults to omp.",
+	)
 	// @AX:NOTE [AUTO]: magic constant — default strategy "sequential" encodes execution policy; change with care
 	cmd.Flags().Var(newStrategyValue("sequential", &cfg.Strategy), "strategy", "Execution strategy: sequential.")
 	cmd.Flags().BoolVar(&cfg.Continue, "continue", false, "Resume from the last saved checkpoint.")
@@ -115,6 +123,10 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	if err := pipeline.ValidateSpecID(specID); err != nil {
 		return err
 	}
+	ownerDecision, err := resolvePipelineExecutionOwner(cfg)
+	if err != nil {
+		return err
+	}
 	gitHash, _ := getCurrentGitHash()
 	requestedStrategy := pipeline.Strategy(cfg.Strategy)
 	resolvedSpec, err := resolvePipelineSpec(specID)
@@ -132,6 +144,17 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 			fmt.Errorf("pipeline: resolve project directory: %w", err))
 	}
 	projectDir = filepath.Clean(projectDir)
+	if platform == "omp" {
+		ownerReceipt, ownerReceiptPath, receiptErr := persistPipelineExecutionOwnerReceipt(
+			specID, ownerDecision,
+		)
+		if receiptErr != nil {
+			return receiptErr
+		}
+		if ownerDecision.Owner == pipelineExecutionOwnerOrca {
+			return emitPipelineExecutionOwnerHandoff(cmd, ownerReceipt, ownerReceiptPath)
+		}
+	}
 
 	cp, err := LoadCheckpointIfContinue(specID, cfg.Continue)
 	if err != nil {

@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/pipeline"
+	"github.com/insajin/autopus-adk/pkg/promptlayer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,6 +38,11 @@ func TestWorkflowContextObserveSessionPhaseModels_BindsAllCanonicalPhases(t *tes
 	assert.Equal(t, "sha256:386816349ebf9b5c2a113889fb3160662121a4fd4fa4085d2bdef97660142adf", digest)
 }
 
+func TestWorkflowContextObserveSession_RuntimeBudgetCoversFullCohort(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, 30*time.Minute, workflowContextObserveSessionMaxTime)
+}
+
 func TestWorkflowContextObserveSessionCommand_InheritedParentSandboxIsExplicitOptIn(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, pipelineOMPActiveSandboxManaged, workflowContextObserveSessionSandboxMode(false))
@@ -43,14 +50,57 @@ func TestWorkflowContextObserveSessionCommand_InheritedParentSandboxIsExplicitOp
 	flag := newWorkflowContextObserveSessionCmd().Flags().Lookup("inherit-parent-sandbox")
 	require.NotNil(t, flag)
 	assert.Equal(t, "false", flag.DefValue)
+	contextWindow := newWorkflowContextObserveSessionCmd().Flags().Lookup("model-context-window")
+	require.NotNil(t, contextWindow)
+	assert.Equal(t, "262144", contextWindow.DefValue)
 	assert.Nil(t, newWorkflowContextObserveCallCmd().Flags().Lookup("inherit-parent-sandbox"))
 
 	options := workflowContextObserveSessionOptions{
-		Provider: "openai", Model: "gpt-5.6-sol", SpecID: "SPEC-OMP-004",
+		Provider: "openai", Model: "gpt-5.6-sol", ModelContextWindow: 272000, SpecID: "SPEC-OMP-004",
 		CredentialLocator: "AUTOPUS_OMP_CONTEXT_PROVIDER_OPENAI", TargetGitCommit: strings.Repeat("a", 40),
-		Endpoint: "http://127.0.0.1:43123", Executable: "omp",
+		Endpoint: "http://127.0.0.1:43123", Executable: "omp", WorkspaceID: "autopus-adk",
+		ProducerRepository:  "insajin/omp-evals",
+		ProducerWorkflowRef: "refs/heads/main@" + strings.Repeat("a", 40),
+		ProducerRunID:       "123456", ProducerRunAttempt: 1, CandidateRepository: "insajin/autopus-adk",
+		PolicyID: "omp-context-active-v1", OraclePolicyDigest: workflowContextRuntimeHash("oracle"),
+		PromotionPolicy: promptlayer.OMPContextPromotionPolicyV1{
+			Profile: "active", HistoryMode: config.OMPContextHistoryActive, MemoryMode: config.OMPContextMemoryOff,
+			HistoryTargetTokens: 1000, Fallback: config.OMPContextFallbackCanonicalFull,
+			CapabilityPolicy:  config.OMPContextCapabilityProbeRequired,
+			RuntimeRootPolicy: config.OMPContextRuntimeIsolatedTaskOwned,
+			MutationScope:     config.OMPContextMutationSessionOverlay,
+		},
+		EvidenceValidFor: time.Hour, SandboxMode: pipelineOMPActiveSandboxManaged,
 	}
 	require.NoError(t, validateWorkflowContextObserveSessionOptions(options))
+}
+
+func TestPopulateWorkflowContextObserveSessionPolicy_DoesNotInspectOrMutateUserOMPState(t *testing.T) {
+	root := t.TempDir()
+	cfg := config.DefaultFullConfig("evidence-workspace")
+	cfg.OMPContextPolicy = config.OMPContextPolicyConf{
+		Profile: "active",
+		Profiles: map[string]config.OMPContextProfileConf{"active": {
+			HistoryMode: config.OMPContextHistoryActive, MemoryMode: config.OMPContextMemoryOff,
+			HistoryTargetTokens: 1000, Fallback: config.OMPContextFallbackCanonicalFull,
+			CapabilityPolicy:  config.OMPContextCapabilityProbeRequired,
+			RuntimeRootPolicy: config.OMPContextRuntimeIsolatedTaskOwned,
+			MutationScope:     config.OMPContextMutationSessionOverlay,
+		}},
+	}
+	require.NoError(t, config.Save(root, cfg))
+	userOMPPath := filepath.Join(root, ".omp", "config.yml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(userOMPPath), 0o700))
+	require.NoError(t, os.WriteFile(userOMPPath, []byte("USER-OWNED-OMP-CONFIG"), 0o600))
+
+	options := workflowContextObserveSessionOptions{ProjectDir: root}
+	require.NoError(t, populateWorkflowContextObserveSessionPolicy(&options))
+	assert.Equal(t, "evidence-workspace", options.WorkspaceID)
+	assert.Equal(t, config.OMPContextHistoryActive, options.PromotionPolicy.HistoryMode)
+	assert.Equal(t, config.OMPContextMemoryOff, options.PromotionPolicy.MemoryMode)
+	body, err := os.ReadFile(userOMPPath)
+	require.NoError(t, err)
+	assert.Equal(t, "USER-OWNED-OMP-CONFIG", string(body))
 }
 
 func TestWorkflowContextObserveVersion_InheritedModeUsesVerifiedPathWithoutInnerWrapper(t *testing.T) {

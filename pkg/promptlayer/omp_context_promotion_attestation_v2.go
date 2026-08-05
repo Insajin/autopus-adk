@@ -53,15 +53,18 @@ type OMPContextPromotionExpectationV2 struct {
 // VerifiedOMPContextPromotion can only be populated after strict signature,
 // provenance, freshness, and cohort verification succeeds.
 type VerifiedOMPContextPromotion struct {
-	reportDigest     string
-	evidenceID       string
-	expiresAt        time.Time
-	producer         OMPContextPromotionProducerV1
-	candidate        OMPContextPromotionCandidateV1
-	policyDigest     string
-	runtime          OMPContextPromotionRuntimeV1
-	provider         string
-	modelScopeDigest string
+	reportDigest            string
+	evidenceID              string
+	expiresAt               time.Time
+	producer                OMPContextPromotionProducerV1
+	candidate               OMPContextPromotionCandidateV1
+	policyDigest            string
+	runtime                 OMPContextPromotionRuntimeV1
+	provider                string
+	modelScopeDigest        string
+	providerAuthorityDigest string
+	sessionAuthorityDigest  string
+	canaryRows              []OMPContextCanaryRowV1
 }
 
 // VerifiedOMPContextPromotionHistoricalProof proves an immutable artifact was
@@ -80,8 +83,10 @@ func (v VerifiedOMPContextPromotion) Valid() bool {
 }
 
 func (v VerifiedOMPContextPromotion) validAt(now time.Time) bool {
-	return v.reportDigest != "" && v.evidenceID != "" && !v.expiresAt.IsZero() &&
-		!now.IsZero() && now.Before(v.expiresAt)
+	return validOMPContextMemoryHashV1(v.reportDigest) && validOMPContextMemoryHashV1(v.evidenceID) &&
+		validOMPContextMemoryHashV1(v.providerAuthorityDigest) &&
+		validOMPContextMemoryHashV1(v.sessionAuthorityDigest) && len(v.canaryRows) == 40 &&
+		!v.expiresAt.IsZero() && !now.IsZero() && now.Before(v.expiresAt)
 }
 func (v VerifiedOMPContextPromotion) ReportDigest() string { return v.reportDigest }
 func (v VerifiedOMPContextPromotion) EvidenceID() string   { return v.evidenceID }
@@ -98,6 +103,29 @@ func (v VerifiedOMPContextPromotion) RuntimeCoordinates() OMPContextPromotionRun
 }
 func (v VerifiedOMPContextPromotion) ProviderScope() (string, string) {
 	return v.provider, v.modelScopeDigest
+}
+func (v VerifiedOMPContextPromotion) ProviderAuthorityDigest() string {
+	return v.providerAuthorityDigest
+}
+func (v VerifiedOMPContextPromotion) SessionAuthorityDigest() string {
+	return v.sessionAuthorityDigest
+}
+func (v VerifiedOMPContextPromotion) CanaryRows() []OMPContextCanaryRowV1 {
+	return append([]OMPContextCanaryRowV1(nil), v.canaryRows...)
+}
+func verifiedOMPContextPromotionFromReportV2(
+	report OMPContextPromotionReportV1,
+	reportDigest string,
+	expiresAt time.Time,
+) VerifiedOMPContextPromotion {
+	return VerifiedOMPContextPromotion{
+		reportDigest: reportDigest, evidenceID: report.EvidenceID, expiresAt: expiresAt,
+		producer: report.Producer, candidate: report.Candidate, policyDigest: report.Policy.PolicyDigest,
+		runtime: report.Runtime, provider: report.Provider, modelScopeDigest: report.ModelScopeDigest,
+		providerAuthorityDigest: ompContextPromotionProviderAuthorityDigestV1(report),
+		sessionAuthorityDigest:  ompContextPromotionSessionAuthorityDigestV1(report),
+		canaryRows:              ompContextPromotionCanaryRowsV1(report),
+	}
 }
 
 func (v VerifiedOMPContextPromotionHistoricalProof) Valid() bool {
