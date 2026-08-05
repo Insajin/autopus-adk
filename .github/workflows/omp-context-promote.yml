@@ -407,14 +407,14 @@ jobs:
           GIT_INDEX_FILE="$evidence_index" git update-index --add \
             --cacheinfo "100644,$attestation_blob,omp-context-promotion-attestation.v2.json"
           evidence_tree=$(GIT_INDEX_FILE="$evidence_index" git write-tree)
-          evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.96' |
+          published_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.96' |
             git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit-tree "$evidence_tree")
-          [[ "$(git rev-list --parents -n 1 "$evidence_commit")" == "$evidence_commit" ]] || fail 'published evidence is not an orphan'
+          [[ "$(git rev-list --parents -n 1 "$published_commit")" == "$published_commit" ]] || fail 'published evidence is not an orphan'
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            -c tag.gpgSign=false tag -a omp-context-evidence-v0.50.96 "$evidence_commit" \
+            -c tag.gpgSign=false tag -a omp-context-evidence-v0.50.96 "$published_commit" \
               -m 'OMP context promotion evidence v0.50.96'
           tag_object=$(git rev-parse --verify "$tag_ref")
 
