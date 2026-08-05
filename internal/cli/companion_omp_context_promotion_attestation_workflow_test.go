@@ -84,8 +84,8 @@ func TestOMPContextPromoteWorkflow_PinsActionsAndExactPromotionCoordinates(t *te
 		}
 	}
 	for _, required := range []string{
-		"omp-context-evidence-v0.50.93",
-		"promotion-report-v1.json",
+		"omp-context-evidence-v0.50.94",
+		"omp-context-promotion-report.v1.json",
 		"omp-context-promotion-attestation.v2.json",
 		"Insajin/autopus-adk",
 		`[[ "$EVIDENCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]`,
@@ -102,9 +102,36 @@ func TestOMPContextPromoteWorkflow_PinsActionsAndExactPromotionCoordinates(t *te
 			t.Fatalf("workflow is missing exact coordinate contract %q", required)
 		}
 	}
+	releaseBody, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", "release.yaml"))
+	if err != nil {
+		t.Fatalf("read release workflow: %v", err)
+	}
+	evidenceFilenamePattern := regexp.MustCompile(`[A-Za-z0-9_.-]*promotion-(report|attestation)[A-Za-z0-9_.-]*\.json`)
+	for workflowName, workflowSource := range map[string]string{
+		"promotion": source,
+		"release":   string(releaseBody),
+	} {
+		filenameSet := make(map[string]struct{})
+		for _, filename := range evidenceFilenamePattern.FindAllString(workflowSource, -1) {
+			filenameSet[filename] = struct{}{}
+		}
+		gotFilenames := make([]string, 0, len(filenameSet))
+		for filename := range filenameSet {
+			gotFilenames = append(gotFilenames, filename)
+		}
+		sort.Strings(gotFilenames)
+		wantFilenames := []string{
+			"omp-context-promotion-attestation.v2.json",
+			"omp-context-promotion-report.v1.json",
+		}
+		if strings.Join(gotFilenames, ",") != strings.Join(wantFilenames, ",") {
+			t.Fatalf("%s workflow promotion evidence filenames=%v, want exactly %v",
+				workflowName, gotFilenames, wantFilenames)
+		}
+	}
 }
 
-func TestOMPContextPromoteWorkflow_SecretStdinHistoricalVerifyAndOrphanTreePrecedePush(t *testing.T) {
+func TestOMPContextPromoteWorkflow_VerifiesOrphanTreeBeforePushAndLeavesVariablesToOperator(t *testing.T) {
 	source := readOMPContextPromoteWorkflow(t)
 	for _, required := range []string{
 		`git fetch --no-tags --depth=1 origin "$EVIDENCE_COMMIT"`,
@@ -134,24 +161,11 @@ func TestOMPContextPromoteWorkflow_SecretStdinHistoricalVerifyAndOrphanTreePrece
 	}
 	verifyIndex := strings.Index(source, `--mode historical`)
 	pushIndex := strings.Index(source, `git push origin "$tag_ref:$tag_ref"`)
-	variableIndex := strings.Index(source, `gh variable set OMP_CONTEXT_EVIDENCE_TAG`)
-	if verifyIndex < 0 || pushIndex <= verifyIndex || variableIndex <= pushIndex {
-		t.Fatalf("workflow order verify=%d push=%d variables=%d", verifyIndex, pushIndex, variableIndex)
+	if verifyIndex < 0 || pushIndex <= verifyIndex {
+		t.Fatalf("workflow order verify=%d push=%d", verifyIndex, pushIndex)
 	}
-	variablePattern := regexp.MustCompile(`gh variable set ([A-Z0-9_]+) `)
-	matches := variablePattern.FindAllStringSubmatch(source[variableIndex:], -1)
-	gotVariables := make([]string, 0, len(matches))
-	for _, match := range matches {
-		gotVariables = append(gotVariables, match[1])
-	}
-	wantVariables := []string{
-		"OMP_CONTEXT_EVIDENCE_TAG",
-		"OMP_CONTEXT_EVIDENCE_REPORT_SHA256",
-		"OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256",
-		"OMP_CONTEXT_STATIC_POLICY_B64",
-	}
-	if strings.Join(gotVariables, ",") != strings.Join(wantVariables, ",") {
-		t.Fatalf("repository variables=%v, want %v", gotVariables, wantVariables)
+	if strings.Contains(source, "gh variable set") {
+		t.Fatal("promotion workflow writes repository variables instead of leaving publication to the operator")
 	}
 }
 

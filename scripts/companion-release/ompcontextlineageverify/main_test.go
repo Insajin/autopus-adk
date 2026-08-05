@@ -16,7 +16,7 @@ func TestParseOptions_RejectsMissingAndTrailingInputs(t *testing.T) {
 		"--upstream-sha256", "sha256:" + strings.Repeat("1", 64),
 		"--executable-sha256", "sha256:" + strings.Repeat("2", 64),
 		"--source-repository", "Insajin/autopus-adk", "--source-commit", strings.Repeat("3", 40),
-		"--source-tree", strings.Repeat("4", 40), "--target", "darwin-arm64", "--version", "0.50.93",
+		"--source-tree", strings.Repeat("4", 40), "--target", "darwin-arm64", "--version", "0.50.94",
 	}
 	if _, err := parseOptions(append(arguments, "trailing")); err == nil {
 		t.Fatal("trailing argument passed")

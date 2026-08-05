@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.93'
+      - 'v0.50.94'
 permissions:
   contents: read
 jobs:
@@ -118,7 +118,7 @@ jobs:
       - name: Carry verified evidence into the protected release job
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: omp-context-production-evidence-v0.50.93
+          name: omp-context-production-evidence-v0.50.94
           path: |
             ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-report.v1.json
             ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-attestation.v2.json
@@ -127,7 +127,7 @@ jobs:
 
   release:
     needs: [ci, security, omp-production-evidence]
-    if: github.ref == 'refs/tags/v0.50.93'
+    if: github.ref == 'refs/tags/v0.50.94'
     environment:
       name: adk-companion-release
     permissions:
@@ -265,7 +265,7 @@ jobs:
       - name: Download same-run production evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: omp-context-production-evidence-v0.50.93
+          name: omp-context-production-evidence-v0.50.94
           path: ${{ runner.temp }}/omp-context-production-evidence
 
       - name: Reverify immutable historical production evidence
@@ -649,7 +649,7 @@ jobs:
           COMPANION_PUBLIC_KEY_SHA256: ${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.93-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.94-checksums.txt"
           [[ "$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" | shasum -a 256 | awk '{print $1}')" == \
              "$OMP_CONTEXT_STATIC_POLICY_SHA256" ]]
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
@@ -685,8 +685,8 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.93' \
-            COMPANION_VERSION='0.50.93' \
+            GITHUB_REF_NAME='v0.50.94' \
+            COMPANION_VERSION='0.50.94' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
@@ -700,9 +700,9 @@ jobs:
           set -u
           cleanup_status=0
           keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
-          if [[ -e "$RUNNER_TEMP/autopus-v0.50.93-checksums.txt" ||
-                -L "$RUNNER_TEMP/autopus-v0.50.93-checksums.txt" ]]; then
-            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.93-checksums.txt"; then
+          if [[ -e "$RUNNER_TEMP/autopus-v0.50.94-checksums.txt" ||
+                -L "$RUNNER_TEMP/autopus-v0.50.94-checksums.txt" ]]; then
+            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.94-checksums.txt"; then
               :
             else
               cleanup_status=$?
