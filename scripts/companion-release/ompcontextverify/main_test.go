@@ -161,7 +161,10 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 			sessionSequences[variant]++
 			inputTokens, compactionRequests := int64(10000), 0
 			if variant == "B" {
-				inputTokens, compactionRequests = 7500, 1
+				inputTokens = 7500
+				if sessionSequences[variant] > 1 {
+					compactionRequests = 1
+				}
 			}
 			began := startedAt.Add(time.Duration(sequence*2) * time.Second)
 			report.Observations = append(report.Observations, promptlayer.OMPContextPromotionObservationV1{

@@ -90,10 +90,12 @@ func verifyWorkflowContextObserveSessionReadback(
 	fullCalls int,
 	optimizedCalls int,
 ) error {
+	maxCompactions := max(optimizedCalls-1, 0)
 	if setup == nil || setup.full == nil || setup.optimized == nil || setup.full.PID() <= 0 ||
 		setup.optimized.PID() <= 0 || setup.full.PID() == setup.optimized.PID() ||
 		setup.full.sequence != fullCalls || setup.optimized.sequence != optimizedCalls ||
-		setup.full.compactions != 0 || setup.optimized.compactions != optimizedCalls {
+		setup.full.compactions != 0 || setup.optimized.compactions < 0 ||
+		setup.optimized.compactions > maxCompactions {
 		return errors.New("observe-session reusable session readback is invalid")
 	}
 	for _, session := range []*pipelineOMPActiveEvaluatorSession{setup.full, setup.optimized} {
@@ -183,10 +185,7 @@ func buildWorkflowContextObserveSessionReport(
 			call.response.OutputDigest, call.response.SessionDigest, call.response.ProviderAuthorityDigest,
 			workflowContextRuntimeHash(string(usageBody)), call.providerPromptHash,
 		})
-		compactionCalls := 0
-		if call.command.Variant == "B" {
-			compactionCalls = 1
-		}
+		compactionCalls := call.response.CompactionCycles
 		report.Observations = append(report.Observations, promptlayer.OMPContextPromotionObservationV1{
 			Sequence: call.command.Sequence, TaskIDDigest: call.command.TaskIDDigest, Variant: call.command.Variant,
 			SessionReceiptDigest: call.response.SessionDigest, SessionSequence: sessionSequence[call.command.Variant],

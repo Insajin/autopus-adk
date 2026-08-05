@@ -120,7 +120,7 @@ func TestOMPContextPromoteWorkflow_SecretStdinHistoricalVerifyAndOrphanTreePrece
 		`--cacheinfo "100644,$published_attestation_blob,$attestation_name"`,
 		`[[ "${#published_entries[@]}" -eq 2 ]]`,
 		`commit-tree "$evidence_tree"`,
-		`git rev-list --parents -n 1 "$evidence_commit"`,
+		`git rev-list --parents -n 1 "$published_evidence_commit"`,
 		`tag -a "$evidence_tag"`,
 		`cmp "$report_path" "$verify_dir/$report_name"`,
 	} {

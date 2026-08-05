@@ -38,6 +38,8 @@ type workflowContextObserveSessionSetup struct {
 	sandboxMode             pipelineOMPActiveSandboxMode
 }
 
+const workflowContextObserveSessionMaxTime = 30 * time.Minute
+
 func validateWorkflowContextObserveSessionOptions(options workflowContextObserveSessionOptions) error {
 	_, policyErr := promptlayer.OMPContextPromotionPolicyDigestV1(options.PromotionPolicy)
 	metadata := []string{
@@ -56,8 +58,9 @@ func validateWorkflowContextObserveSessionOptions(options workflowContextObserve
 		!workflowContextMetadataPattern.MatchString(options.SpecID) ||
 		!pipelineOMPContextCohortLocatorPattern.MatchString(options.CredentialLocator) ||
 		!pipelineOMPContextObservationRunID.MatchString(options.ProducerRunID) ||
-		options.ProducerRunAttempt <= 0 || !metadataValid || !validPipelineOMPActiveHash(options.OraclePolicyDigest) ||
-		!validPipelineOMPActiveGitHash(options.TargetGitCommit) || policyErr != nil ||
+		options.ProducerRunAttempt <= 0 || options.ModelContextWindow < 8192 ||
+		options.ModelContextWindow > 1<<30 || !metadataValid || policyErr != nil ||
+		!validPipelineOMPActiveHash(options.OraclePolicyDigest) ||
 		options.PromotionPolicy.HistoryMode != config.OMPContextHistoryActive ||
 		options.PromotionPolicy.MemoryMode != config.OMPContextMemoryOff ||
 		options.EvidenceValidFor <= 0 || options.EvidenceValidFor > 24*time.Hour ||
@@ -149,11 +152,12 @@ func prepareWorkflowContextObserveSession(
 		Executable: executable, executableID: executableID, ProjectDir: projectDir,
 		SpecID: options.SpecID, SpecDir: specDir,
 		SnapshotHash: snapshotHash, GitCommitHash: options.TargetGitCommit, RuntimeBase: runtimeBase,
+		ModelContextWindow: options.ModelContextWindow,
 		Environment: []string{
 			"PATH=" + os.Getenv("PATH"), pipelineOMPActiveEndpointKey + "=" + endpoint,
 			pipelineOMPActiveCredentialKey + "=" + credential,
 		},
-		PhaseModels: phaseModels, MaxTime: 10 * time.Minute,
+		PhaseModels: phaseModels, MaxTime: workflowContextObserveSessionMaxTime,
 	})
 	if err != nil {
 		return setup, err

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -153,6 +154,24 @@ func TestPipelineOMPMaxTimeSeconds_UsesPositiveWholeSeconds(t *testing.T) {
 			assert.Equal(t, test.want, pipelineOMPMaxTimeSeconds(test.maxTime))
 		})
 	}
+}
+
+func TestWritePipelineOMPActiveModels_BindsConfiguredContextWindow(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	active := pipelineOMPActiveProcessConfig{
+		backend: pipelineOMPBackendConfig{
+			PhaseModels:        map[pipeline.PhaseID]string{pipeline.PhaseImplement: "openai/model-a"},
+			ModelContextWindow: 1_000_000,
+		},
+		endpoint: "http://127.0.0.1:43123",
+	}
+
+	require.NoError(t, writePipelineOMPActiveModels(root, active))
+	body, err := os.ReadFile(filepath.Join(root, "models.yml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "contextWindow: 1000000")
+	assert.NotContains(t, string(body), "contextWindow: 262144")
 }
 
 func TestConfigurePipelineOMPActiveSandbox_InheritedParentSkipsInnerWrapperOnDarwin(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 func newWorkflowContextObserveSessionCmd() *cobra.Command {
 	var input, output, format string
 	var explicitLive, inheritParentSandbox bool
-	options := workflowContextObserveSessionOptions{}
+	options := workflowContextObserveSessionOptions{ModelContextWindow: pipelineOMPActiveDefaultContextWindow}
 	cmd := &cobra.Command{
 		Use:   "observe-session",
 		Short: "Run a production explicit-live OMP cohort and write body-free promotion evidence",
@@ -21,7 +21,8 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 			"The report remains inactive until a trusted promotion-attestation.v2 and release lineage are installed.",
 		Example: "  auto workflow context-runtime observe-session --explicit-live --input-jsonl - --output - --format jsonl \\\n" +
 			"    --project-dir . --spec-id SPEC-OMP-004 --provider openai --model gpt-5.6-sol \\\n" +
-			"    --endpoint http://127.0.0.1:43123 --credential-locator AUTOPUS_OMP_CONTEXT_PROVIDER_OPENAI \\\n" +
+			"    --model-context-window 272000 --endpoint http://127.0.0.1:43123 \\\n" +
+			"    --credential-locator AUTOPUS_OMP_CONTEXT_PROVIDER_OPENAI \\\n" +
 			"    --producer-repository org/omp-evals --producer-workflow-ref refs/heads/main@REV \\\n" +
 			"    --producer-run-id 123 --producer-run-attempt 1 --candidate-repository org/autopus-adk \\\n" +
 			"    --policy-id omp-context-active-v1 --oracle-policy-digest sha256:DIGEST --target-git-commit REV",
@@ -53,6 +54,8 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 	cmd.Flags().StringVar(&options.SpecID, "spec-id", "", "SPEC identity")
 	cmd.Flags().StringVar(&options.Provider, "provider", "", "Signed cohort provider identity")
 	cmd.Flags().StringVar(&options.Model, "model", "", "Signed cohort model identity")
+	cmd.Flags().IntVar(&options.ModelContextWindow, "model-context-window",
+		pipelineOMPActiveDefaultContextWindow, "Provider model context window bound into runtime authority")
 	cmd.Flags().StringVar(&options.Endpoint, "endpoint", "", "Task-owned loopback broker endpoint")
 	cmd.Flags().StringVar(&options.CredentialLocator, "credential-locator", "", "Dedicated credential environment key")
 	cmd.Flags().StringVar(&options.Executable, "omp", "omp", "OMP executable")

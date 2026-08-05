@@ -116,17 +116,22 @@ func (session *pipelineOMPActiveRPCSession) Execute(
 		}
 		return prompt, nil
 	}
+	compactBefore := session.sequence > 0
 	output, receipt, err := session.protocol.executeManaged(
-		ctx, selector, session.binding, session.sessionID, true, preparePrompt,
+		ctx, selector, session.binding, session.sessionID, compactBefore, preparePrompt,
 	)
 	if err != nil {
 		_ = session.closeLocked()
 		return "", err
 	}
 	receipt.ContextBindingHash = prepared.Binding.BindingHash
-	if receipt.CompactionCycles != 1 || receipt.PreCompactionACKs != 1 ||
-		receipt.PostCompactionACKs != 1 || receipt.CanonicalReadmissions != 1 ||
-		receipt.EphemeralReadmissions != 1 ||
+	expectedCompactions := receipt.CompactionCycles
+	if expectedCompactions < 0 || expectedCompactions > 1 ||
+		!compactBefore && expectedCompactions != 0 ||
+		receipt.PreCompactionACKs != expectedCompactions ||
+		receipt.PostCompactionACKs != expectedCompactions ||
+		receipt.CanonicalReadmissions != expectedCompactions ||
+		receipt.EphemeralReadmissions != expectedCompactions ||
 		receipt.SessionBindingHash != workflowContextRuntimeHash(session.sessionID+"\x00"+session.binding.NonceHash) ||
 		receipt.ContextBindingHash == "" || !receipt.SameProcess || !receipt.SameSession || !receipt.TerminalIdle {
 		_ = session.closeLocked()
@@ -161,9 +166,9 @@ func (session *pipelineOMPActiveRPCSession) closeLocked() error {
 	if session.closed {
 		return nil
 	}
-	session.closed = true
 	var evidenceErr error
-	if session.sequence > 0 && session.compactions != 0 && session.compactions != session.sequence {
+	maxCompactions := max(session.sequence-1, 0)
+	if session.compactions < 0 || session.compactions > maxCompactions {
 		evidenceErr = errors.New("pipeline: managed active multi-compaction session gate failed")
 	}
 	if session.process == nil {

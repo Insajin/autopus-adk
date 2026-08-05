@@ -35,7 +35,10 @@ func BuildOMPContextPromotionReportV1(
 	if err != nil {
 		return report, nil, fmt.Errorf("reduce OMP context promotion cohort: %w", err)
 	}
-	report.Gates = expectedOMPContextPromotionGatesV1(aggregate.MedianReductionBasisPoints)
+	report.Gates = expectedOMPContextPromotionGatesV1(
+		aggregate.MedianReductionBasisPoints,
+		ompContextPromotionCompactionCountV1(report),
+	)
 	report.EvidenceID, err = computeOMPContextPromotionEvidenceIDV1(report)
 	if err != nil {
 		return report, nil, fmt.Errorf("compute OMP context promotion evidence ID: %w", err)

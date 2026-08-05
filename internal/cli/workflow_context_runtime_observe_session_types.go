@@ -70,6 +70,7 @@ type workflowContextObserveSessionOptions struct {
 	SpecID              string
 	Provider            string
 	Model               string
+	ModelContextWindow  int
 	Endpoint            string
 	CredentialLocator   string
 	Executable          string

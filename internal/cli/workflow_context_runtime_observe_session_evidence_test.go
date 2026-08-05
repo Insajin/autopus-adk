@@ -38,7 +38,7 @@ func TestWorkflowContextObserveSession_WritesObservedBodyFreePromotionEvidence(t
 	shutdown := responses[len(responses)-1]
 	assert.Equal(t, "shutdown", shutdown.Type)
 	assert.Equal(t, 40, shutdown.CallsCompleted)
-	assert.Equal(t, 20, shutdown.CompactionCycles)
+	assert.Equal(t, 19, shutdown.CompactionCycles)
 	assert.True(t, shutdown.CleanupVerified)
 	assert.NotEmpty(t, shutdown.EvidenceID)
 	assert.NotEmpty(t, shutdown.ReportDigest)
@@ -76,7 +76,11 @@ func TestWorkflowContextObserveSession_WritesObservedBodyFreePromotionEvidence(t
 			full, optimized = optimized, full
 		}
 		assert.Equal(t, int64(100), full.Tokens)
-		assert.Equal(t, int64(40), optimized.Tokens)
+		expectedOptimizedTokens := int64(40)
+		if index == 0 {
+			expectedOptimizedTokens = 100
+		}
+		assert.Equal(t, expectedOptimizedTokens, optimized.Tokens)
 		assert.True(t, optimized.FallbackVerified)
 		assert.True(t, optimized.RollbackVerified)
 	}
@@ -182,7 +186,8 @@ func workflowContextObserveEvidenceFixture(t *testing.T, challenge string) (
 	}
 	options := workflowContextObserveSessionOptions{
 		ProjectDir: backend.ProjectDir, SpecID: backend.SpecID, Provider: "openai", Model: "model-a",
-		Endpoint: endpoint, CredentialLocator: "AUTOPUS_TEST_PROVIDER_TOKEN", Executable: os.Args[0],
+		ModelContextWindow: pipelineOMPActiveDefaultContextWindow,
+		Endpoint:           endpoint, CredentialLocator: "AUTOPUS_TEST_PROVIDER_TOKEN", Executable: os.Args[0],
 		TargetGitCommit: commit, SandboxMode: pipelineOMPActiveSandboxManaged,
 		WorkspaceID: "autopus-adk", ProducerRepository: "insajin/omp-evals",
 		ProducerWorkflowRef: "refs/heads/main@" + commit, ProducerRunID: "123456", ProducerRunAttempt: 1,
@@ -308,7 +313,7 @@ func verifyWorkflowContextObserveProviderLog(t *testing.T, path string, taskBodi
 	for _, count := range compactions {
 		if count > 0 {
 			optimizedPIDs++
-			assert.Equal(t, 20, count)
+			assert.Equal(t, 19, count)
 		}
 	}
 	assert.Equal(t, 1, optimizedPIDs)

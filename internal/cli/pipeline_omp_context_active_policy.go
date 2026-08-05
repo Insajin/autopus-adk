@@ -83,7 +83,7 @@ func newPipelineOMPActiveCurrentRuntimeProviderWithHooks(
 		}
 		providerAuthority, err := pipelineOMPActiveProviderAuthorityDigest(
 			expected.PolicyDigest, expected.PipelineImplementationDigest,
-			candidate.ModelScopeDigest, endpoint, credential,
+			candidate.ModelScopeDigest, config.ModelContextWindow, endpoint, credential,
 		)
 		if err != nil {
 			return promptlayer.OMPContextPromotionCurrentRuntimeV3{}, err

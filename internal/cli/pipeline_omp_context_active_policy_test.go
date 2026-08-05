@@ -111,7 +111,7 @@ func TestPipelineOMPActivePinnedRuntime_ReplacementHookKeepsProbeAndSessionOnVer
 	assert.True(t, validPipelineOMPActiveHash(current.ExecutableSHA256))
 	expectedAuthority, err := pipelineOMPActiveProviderAuthorityDigest(
 		staticPolicy.PolicyDigest, staticPolicy.PipelineImplementationDigest, candidate.ModelScopeDigest,
-		"http://127.0.0.1:43123", "fixture-token-value",
+		pinned.ModelContextWindow, "http://127.0.0.1:43123", "fixture-token-value",
 	)
 	require.NoError(t, err)
 	assert.Equal(t, expectedAuthority, current.ProviderAuthorityDigest)

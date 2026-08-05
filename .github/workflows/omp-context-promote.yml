@@ -127,10 +127,13 @@ jobs:
           [[ "${#fetched_files[@]}" -eq 1 && "${fetched_files[0]}" == "$report_path" ]] || fail 'isolated evidence directory contains unexpected files'
           shopt -u nullglob dotglob
 
-          readonly issued_epoch=$(date -u +%s)
-          readonly issued_at=$(date -u --date="@${issued_epoch}" '+%Y-%m-%dT%H:%M:%SZ')
+          issued_epoch=$(date -u +%s)
+          readonly issued_epoch
+          issued_at=$(date -u --date="@${issued_epoch}" '+%Y-%m-%dT%H:%M:%SZ')
+          readonly issued_at
           readonly not_before="$issued_at"
-          readonly expires_at=$(date -u --date="@$((issued_epoch + 86400))" '+%Y-%m-%dT%H:%M:%SZ')
+          expires_at=$(date -u --date="@$((issued_epoch + 86400))" '+%Y-%m-%dT%H:%M:%SZ')
+          readonly expires_at
           printf '%s' "$OMP_CONTEXT_EVIDENCE_SIGNING_KEY" |
             env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
               "$tools_dir/auto" companion-manifest omp-context-promotion-attestation \
@@ -150,8 +153,10 @@ jobs:
           [[ "$report_sha256" =~ ^[0-9a-f]{64}$ ]] || fail 'report digest is malformed'
           [[ "$attestation_sha256" =~ ^[0-9a-f]{64}$ ]] || fail 'attestation digest is malformed'
 
-          readonly published_report_blob=$(git hash-object -w -- "$report_path")
-          readonly published_attestation_blob=$(git hash-object -w -- "$attestation_path")
+          published_report_blob=$(git hash-object -w -- "$report_path")
+          readonly published_report_blob
+          published_attestation_blob=$(git hash-object -w -- "$attestation_path")
+          readonly published_attestation_blob
           [[ "$published_report_blob" == "$report_blob" ]] || fail 'promotion report bytes changed after fetch'
           readonly evidence_index="$work_root/evidence.index"
           GIT_INDEX_FILE="$evidence_index" git read-tree --empty
@@ -159,7 +164,8 @@ jobs:
             --cacheinfo "100644,$published_report_blob,$report_name"
           GIT_INDEX_FILE="$evidence_index" git update-index --add \
             --cacheinfo "100644,$published_attestation_blob,$attestation_name"
-          readonly evidence_tree=$(GIT_INDEX_FILE="$evidence_index" git write-tree)
+          evidence_tree=$(GIT_INDEX_FILE="$evidence_index" git write-tree)
+          readonly evidence_tree
           mapfile -d '' -t published_entries < <(git ls-tree -z "$evidence_tree")
           [[ "${#published_entries[@]}" -eq 2 ]] || fail 'published evidence tree does not contain exactly two entries'
           for name in "$report_name" "$attestation_name"; do
@@ -167,13 +173,14 @@ jobs:
             [[ "$entry" =~ ^100644\ blob\ [0-9a-f]{40}$'\t'"$name"$ ]] || fail "published evidence entry ${name} is unsafe"
           done
 
-          readonly evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.93' |
+          published_evidence_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.93' |
             git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit-tree "$evidence_tree")
-          [[ "$(git rev-list --parents -n 1 "$evidence_commit")" == "$evidence_commit" ]] || fail 'published evidence commit is not zero-parent'
-          git cat-file blob "$evidence_commit:$report_name" >"$verify_dir/$report_name"
-          git cat-file blob "$evidence_commit:$attestation_name" >"$verify_dir/$attestation_name"
+          readonly published_evidence_commit
+          [[ "$(git rev-list --parents -n 1 "$published_evidence_commit")" == "$published_evidence_commit" ]] || fail 'published evidence commit is not zero-parent'
+          git cat-file blob "$published_evidence_commit:$report_name" >"$verify_dir/$report_name"
+          git cat-file blob "$published_evidence_commit:$attestation_name" >"$verify_dir/$attestation_name"
           chmod 0600 "$verify_dir/$report_name" "$verify_dir/$attestation_name"
           cmp "$report_path" "$verify_dir/$report_name" || fail 'published report bytes differ from fetched evidence'
           cmp "$attestation_path" "$verify_dir/$attestation_name" || fail 'published attestation bytes differ from signer output'
@@ -193,9 +200,10 @@ jobs:
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             -c tag.gpgSign=false \
-            tag -a "$evidence_tag" "$evidence_commit" -m 'OMP context promotion evidence v0.50.93'
+            tag -a "$evidence_tag" "$published_evidence_commit" -m 'OMP context promotion evidence v0.50.93'
           [[ "$(git cat-file -t "$tag_ref")" == 'tag' ]] || fail 'promotion tag is not annotated'
-          readonly tag_object=$(git rev-parse --verify "$tag_ref")
+          tag_object=$(git rev-parse --verify "$tag_ref")
+          readonly tag_object
           git push origin "$tag_ref:$tag_ref"
           remote_tag_line=$(git ls-remote --refs origin "$tag_ref")
           remote_tag_object=${remote_tag_line%%$'\t'*}

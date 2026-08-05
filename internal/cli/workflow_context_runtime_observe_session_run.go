@@ -51,6 +51,8 @@ func RunWorkflowContextObserveSession(
 	seenTasks := make(map[string]struct{}, 20)
 	variantCalls := map[string]int{"A": 0, "B": 0}
 	sessionBindings := map[string]string{"A": "", "B": ""}
+	compactionCycles, preCompactionACKs := 0, 0
+	postCompactionACKs, canonicalReadmissions, ephemeralReadmissions := 0, 0, 0
 	providerAuthority := setup.providerAuthorityDigest
 	if !validPipelineOMPActiveHash(providerAuthority) {
 		return errors.New("observe-session provider authority binding is unstable")
@@ -126,16 +128,26 @@ func RunWorkflowContextObserveSession(
 		} else if prior != receipt.SessionBindingHash {
 			lifecycleValid = false
 		}
+		expectedCompactions := response.CompactionCycles
+		freshOptimized := command.Variant == "B" && variantCalls["B"] == 0
 		variantCalls[command.Variant]++
-		fullValid := command.Variant == "A" && response.CompactionCycles == 0 &&
+		fullValid := command.Variant == "A" && expectedCompactions == 0 &&
 			response.PreCompactionACKs == 0 && response.PostCompactionACKs == 0 &&
 			response.CanonicalReadmissions == 0 && response.EphemeralReadmissions == 0
-		optimizedValid := command.Variant == "B" && response.CompactionCycles == 1 &&
-			response.PreCompactionACKs == 1 && response.PostCompactionACKs == 1 &&
-			response.CanonicalReadmissions == 1 && response.EphemeralReadmissions == 1
+		optimizedValid := command.Variant == "B" && expectedCompactions >= 0 && expectedCompactions <= 1 &&
+			(!freshOptimized || expectedCompactions == 0) &&
+			response.PreCompactionACKs == expectedCompactions &&
+			response.PostCompactionACKs == expectedCompactions &&
+			response.CanonicalReadmissions == expectedCompactions &&
+			response.EphemeralReadmissions == expectedCompactions
 		if !lifecycleValid || !fullValid && !optimizedValid {
 			return fmt.Errorf("observe-session call %d process lifecycle changed", sequence)
 		}
+		compactionCycles += response.CompactionCycles
+		preCompactionACKs += response.PreCompactionACKs
+		postCompactionACKs += response.PostCompactionACKs
+		canonicalReadmissions += response.CanonicalReadmissions
+		ephemeralReadmissions += response.EphemeralReadmissions
 		calls = append(calls, workflowContextObserveSessionCallEvidence{
 			command: command, response: response, providerPromptHash: providerPromptHash,
 			startedAt: startedAt, endedAt: endedAt,
@@ -153,7 +165,7 @@ func RunWorkflowContextObserveSession(
 		}
 	}
 	if len(seenTasks) != 20 || variantCalls["A"] != 20 || variantCalls["B"] != 20 ||
-		sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
+		compactionCycles < 2 || sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
 		sessionBindings["A"] == sessionBindings["B"] {
 		return errors.New("observe-session task or reusable-session cardinality is invalid")
 	}
@@ -184,11 +196,11 @@ func RunWorkflowContextObserveSession(
 	response.ProviderAuthorityDigest = providerAuthority
 	response.EvidenceID, response.ReportDigest = evidenceID, reportDigest
 	response.CleanupVerified = true
-	response.CompactionCycles = variantCalls["B"]
-	response.PreCompactionACKs = variantCalls["B"]
-	response.PostCompactionACKs = variantCalls["B"]
-	response.CanonicalReadmissions = variantCalls["B"]
-	response.EphemeralReadmissions = variantCalls["B"]
+	response.CompactionCycles = compactionCycles
+	response.PreCompactionACKs = preCompactionACKs
+	response.PostCompactionACKs = postCompactionACKs
+	response.CanonicalReadmissions = canonicalReadmissions
+	response.EphemeralReadmissions = ephemeralReadmissions
 	return encoder.Encode(response)
 }
 

@@ -21,8 +21,10 @@ const (
 	pipelineOMPActiveEndpointKey    = "AUTOPUS_OMP_CONTEXT_PROVIDER_ENDPOINT"
 	pipelineOMPActiveCredentialKey  = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
 	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v3"
-	pipelineOMPActivePolicyIdentity = "manual-compact-every-call;canonical-ephemeral-readmission;correlated-ack;provider-bound-endpoint;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v3;tools=read,bash,edit,write,grep,glob,todo"
+	pipelineOMPActivePolicyIdentity = "manual-compact-completed-history-before-reused-call;canonical-ephemeral-readmission;correlated-ack;provider-bound-endpoint;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v3;tools=read,bash,edit,write,grep,glob,todo"
 )
+
+const pipelineOMPActiveDefaultContextWindow = 262144
 
 type pipelineOMPActiveProcessConfig struct {
 	backend              pipelineOMPBackendConfig
@@ -50,7 +52,8 @@ func preparePipelineOMPActiveProcessConfig(
 	}
 	implementation := pipelineOMPActiveImplementationDigest()
 	providerAuthority, err := pipelineOMPActiveProviderAuthorityDigest(
-		prepared.Binding.PolicyDigest, implementation, candidate.ModelScopeDigest, endpoint, credential,
+		prepared.Binding.PolicyDigest, implementation, candidate.ModelScopeDigest,
+		backend.ModelContextWindow, endpoint, credential,
 	)
 	if err != nil {
 		return pipelineOMPActiveProcessConfig{}, err
@@ -262,7 +265,8 @@ func writePipelineOMPActiveModels(runtimeRoot string, active pipelineOMPActivePr
 		}
 		sort.Strings(ids)
 		for _, id := range ids {
-			fmt.Fprintf(&body, "      - id: %s\n        name: Managed Active\n        reasoning: true\n        input: [text]\n        contextWindow: 262144\n        maxTokens: 32768\n", id)
+			fmt.Fprintf(&body, "      - id: %s\n        name: Managed Active\n        reasoning: true\n        input: [text]\n        contextWindow: %d\n        maxTokens: 32768\n",
+				id, active.backend.ModelContextWindow)
 		}
 	}
 	path := filepath.Join(runtimeRoot, "models.yml")

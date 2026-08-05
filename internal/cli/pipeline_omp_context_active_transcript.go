@@ -82,7 +82,7 @@ func (protocol *pipelineOMPRPCProtocol) validatePipelineOMPActiveTranscript(
 		seenCursors[*page.NextCursor] = struct{}{}
 		cursor = *page.NextCursor
 	}
-	if count == 0 || count != expectedTotal {
+	if count != expectedTotal {
 		return "", nil, errors.New("managed active OMP transcript page count is incomplete")
 	}
 	return pipelineOMPActiveHash(all), newImages, nil

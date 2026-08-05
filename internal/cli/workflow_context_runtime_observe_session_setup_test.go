@@ -38,6 +38,11 @@ func TestWorkflowContextObserveSessionPhaseModels_BindsAllCanonicalPhases(t *tes
 	assert.Equal(t, "sha256:386816349ebf9b5c2a113889fb3160662121a4fd4fa4085d2bdef97660142adf", digest)
 }
 
+func TestWorkflowContextObserveSession_RuntimeBudgetCoversFullCohort(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, 30*time.Minute, workflowContextObserveSessionMaxTime)
+}
+
 func TestWorkflowContextObserveSessionCommand_InheritedParentSandboxIsExplicitOptIn(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, pipelineOMPActiveSandboxManaged, workflowContextObserveSessionSandboxMode(false))
@@ -45,10 +50,13 @@ func TestWorkflowContextObserveSessionCommand_InheritedParentSandboxIsExplicitOp
 	flag := newWorkflowContextObserveSessionCmd().Flags().Lookup("inherit-parent-sandbox")
 	require.NotNil(t, flag)
 	assert.Equal(t, "false", flag.DefValue)
+	contextWindow := newWorkflowContextObserveSessionCmd().Flags().Lookup("model-context-window")
+	require.NotNil(t, contextWindow)
+	assert.Equal(t, "262144", contextWindow.DefValue)
 	assert.Nil(t, newWorkflowContextObserveCallCmd().Flags().Lookup("inherit-parent-sandbox"))
 
 	options := workflowContextObserveSessionOptions{
-		Provider: "openai", Model: "gpt-5.6-sol", SpecID: "SPEC-OMP-004",
+		Provider: "openai", Model: "gpt-5.6-sol", ModelContextWindow: 272000, SpecID: "SPEC-OMP-004",
 		CredentialLocator: "AUTOPUS_OMP_CONTEXT_PROVIDER_OPENAI", TargetGitCommit: strings.Repeat("a", 40),
 		Endpoint: "http://127.0.0.1:43123", Executable: "omp", WorkspaceID: "autopus-adk",
 		ProducerRepository:  "insajin/omp-evals",

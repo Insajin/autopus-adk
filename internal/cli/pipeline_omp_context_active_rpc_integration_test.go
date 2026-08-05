@@ -29,25 +29,44 @@ func TestPipelineOMPActiveRPC_ReusesOneSessionAcrossManualCompaction(t *testing.
 	assert.Equal(t, "safe assistant output 1", first)
 	assert.Equal(t, "safe assistant output 2", second)
 	assert.Equal(t, firstReceipt.SessionID, secondReceipt.SessionID)
-	assert.Equal(t, 1, firstReceipt.CompactionCycles)
+	assert.Zero(t, firstReceipt.CompactionCycles)
 	assert.Equal(t, 1, secondReceipt.CompactionCycles)
-	assert.Equal(t, 1, firstReceipt.PreCompactionACKs)
-	assert.Equal(t, 1, firstReceipt.PostCompactionACKs)
-	assert.Equal(t, 1, firstReceipt.CanonicalReadmissions)
-	assert.Equal(t, 1, firstReceipt.EphemeralReadmissions)
+	assert.Zero(t, firstReceipt.PreCompactionACKs)
+	assert.Zero(t, firstReceipt.PostCompactionACKs)
+	assert.Zero(t, firstReceipt.CanonicalReadmissions)
+	assert.Zero(t, firstReceipt.EphemeralReadmissions)
 	assert.Equal(t, firstReceipt.SessionBindingHash, secondReceipt.SessionBindingHash)
 	assert.NotEmpty(t, firstReceipt.BridgeBindingHash)
 	assert.True(t, secondReceipt.SameProcess)
 	assert.True(t, secondReceipt.SameSession)
+	assert.Equal(t, int64(40), secondReceipt.InputTokens)
+	assert.Equal(t, int64(10), secondReceipt.OutputTokens)
+	assert.Zero(t, secondReceipt.MaintenanceInputTokens)
+	assert.Zero(t, secondReceipt.MaintenanceOutputTokens)
+	assert.Equal(t, int64(50), secondReceipt.TotalTokens)
 	records := readPipelineOMPRPCRecords(t, logPath)
 	starts, commands := pipelineOMPRPCRecordsByKind(records)
 	require.Len(t, starts, 1)
 	assert.Equal(t, 2, countPipelineOMPRPCCommand(commands, "prompt"))
-	assert.Equal(t, 2, countPipelineOMPRPCCommand(commands, "compact"))
-	assert.Equal(t, 6, countPipelineOMPRPCCommand(commands, "get_messages_page"))
+	assert.Equal(t, 1, countPipelineOMPRPCCommand(commands, "compact"))
+	assert.Equal(t, 4, countPipelineOMPRPCCommand(commands, "get_messages_page"))
 	assertPipelineOMPRPCBooleanCommand(t, commands, "set_auto_compaction", false)
 	require.NoError(t, session.Close())
 	assertPipelineOMPRuntimeEmpty(t, config.RuntimeBase)
+}
+
+func TestPipelineOMPActiveRPC_AcceptsLegacyManualCompactionLifecycle(t *testing.T) {
+	t.Setenv("AUTOPUS_TEST_OMP_ACTIVE_LEGACY_COMPACTION", "1")
+	session, _, _ := pipelineOMPActiveRPCSessionFixture(t, false)
+	t.Cleanup(func() { require.NoError(t, session.Close()) })
+
+	_, firstReceipt, err := session.Execute(context.Background(), "safe plan phase")
+	require.NoError(t, err)
+	_, secondReceipt, err := session.Execute(context.Background(), "safe implementation phase")
+
+	require.NoError(t, err)
+	assert.Zero(t, firstReceipt.CompactionCycles)
+	assert.Equal(t, 1, secondReceipt.CompactionCycles)
 }
 
 func TestPipelineOMPActiveRPC_UnsafeFirstOutputClosesBeforeSecondProviderCall(t *testing.T) {
@@ -60,8 +79,40 @@ func TestPipelineOMPActiveRPC_UnsafeFirstOutputClosesBeforeSecondProviderCall(t 
 
 	_, commands := pipelineOMPRPCRecordsByKind(readPipelineOMPRPCRecords(t, logPath))
 	assert.Equal(t, 1, countPipelineOMPRPCCommand(commands, "prompt"))
-	assert.Equal(t, 1, countPipelineOMPRPCCommand(commands, "compact"))
+	assert.Zero(t, countPipelineOMPRPCCommand(commands, "compact"))
 }
+
+func TestPipelineOMPActiveRPC_AcceptsProvenEmptyNoopCompaction(t *testing.T) {
+	page, err := json.Marshal(pipelineOMPActiveMessagesPage{
+		Messages: nil, TotalMessages: 0, NextCursor: nil,
+	})
+	require.NoError(t, err)
+	idle, err := json.Marshal(map[string]any{
+		"sessionId": "active-session", "isStreaming": false, "isCompacting": false,
+		"messageCount": 0, "queuedMessageCount": 0, "autoCompactionEnabled": false,
+	})
+	require.NoError(t, err)
+	protocol, _ := pipelineOMPProtocolFixture([]pipelineOMPRPCFrame{
+		{ID: "pipeline-1", Type: "response", Command: "get_messages_page", Success: true, Data: page},
+		{ID: "pipeline-active-compact-2", Type: "response", Command: "compact", Error: pipelineOMPActiveCompactionNoopMessage},
+		{ID: "pipeline-3", Type: "response", Command: "get_messages_page", Success: true, Data: page},
+		{ID: "pipeline-4", Type: "response", Command: "get_state", Success: true, Data: idle},
+	})
+	prepareCalls := 0
+
+	compacted, err := protocol.manualCompact(
+		context.Background(), WorkflowContextBridgeBinding{}, "active-session",
+		func() (string, error) {
+			prepareCalls++
+			return "unused", nil
+		},
+	)
+
+	require.NoError(t, err)
+	assert.False(t, compacted)
+	assert.Zero(t, prepareCalls)
+}
+
 func TestPipelineOMPActiveProcessConfig_BindsProviderEndpointWithoutCredentialMaterial(t *testing.T) {
 	config, _ := pipelineOMPBackendTestConfig(t)
 	config.PhaseModels = map[pipeline.PhaseID]string{pipeline.PhasePlan: "provider-a/model-a"}
@@ -197,7 +248,7 @@ func runPipelineOMPActiveRPCFixture() int {
 	_ = logEncoder.Encode(pipelineOMPRPCRecord{Kind: "start", PID: os.Getpid(), Args: os.Args})
 	_ = output.Encode(map[string]any{"type": "ready"})
 	messageCount, promptCount, compactionCount := 0, 0, 0
-	inputTokens, outputTokens := int64(0), int64(0)
+	inputTokens, outputTokens, cacheReadTokens := int64(0), int64(0), int64(0)
 	transcript := []json.RawMessage{json.RawMessage(`{"role":"system","content":"safe system context"}`)}
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
@@ -221,16 +272,17 @@ func runPipelineOMPActiveRPCFixture() int {
 		case "get_session_stats":
 			writePipelineOMPActiveResponse(output, command, map[string]any{
 				"sessionId": "active-session", "tokens": map[string]any{
-					"input": inputTokens, "output": outputTokens, "total": inputTokens + outputTokens,
+					"input": inputTokens, "output": outputTokens, "cacheRead": cacheReadTokens,
+					"cacheWrite": 0, "total": inputTokens + outputTokens + cacheReadTokens,
 				},
 			})
 		case "prompt":
 			promptCount++
-			inputDelta := int64(100)
 			if compactionCount > 0 {
-				inputDelta = 40
+				cacheReadTokens += 40
+			} else {
+				inputTokens += 100
 			}
-			inputTokens += inputDelta
 			outputTokens += 10
 			messageCount += 2
 			assistant := fmt.Sprintf("safe assistant output %d", promptCount)
@@ -258,8 +310,10 @@ func runPipelineOMPActiveRPCFixture() int {
 			})
 		case "compact":
 			compactionCount++
-			inputTokens += 20
-			outputTokens += 5
+			inputTokens = 0
+			outputTokens = 0
+			cacheReadTokens = 0
+			messageCount = 0
 			writePipelineOMPActiveCompaction(output, command)
 		default:
 			writePipelineOMPActiveResponse(output, command, nil)
@@ -285,7 +339,10 @@ func writePipelineOMPActiveCompaction(output *json.Encoder, command pipelineOMPR
 		SessionHash:   os.Getenv("AUTOPUS_OMP_CONTEXT_SESSION_HASH"),
 		NonceHash:     os.Getenv("AUTOPUS_OMP_CONTEXT_NONCE_HASH"),
 	}
-	_ = output.Encode(map[string]any{"type": "auto_compaction_start", "reason": "manual", "action": "snapcompact"})
+	legacyLifecycle := os.Getenv("AUTOPUS_TEST_OMP_ACTIVE_LEGACY_COMPACTION") == "1"
+	if legacyLifecycle {
+		_ = output.Encode(map[string]any{"type": "auto_compaction_start", "reason": "manual", "action": "snapcompact"})
+	}
 	for index, event := range []string{WorkflowContextEventPreCompaction, WorkflowContextEventPostCompaction} {
 		envelope, _ := json.Marshal(workflowContextManagedBridgeEnvelope{
 			SchemaVersion: binding.SchemaVersion, Event: event, BindingHash: binding.BindingHash,
@@ -297,9 +354,11 @@ func writePipelineOMPActiveCompaction(output *json.Encoder, command pipelineOMPR
 			"title": "Autopus context " + event, "message": json.RawMessage(message),
 		})
 	}
-	writePipelineOMPActiveResponse(output, command, map[string]any{})
-	_ = output.Encode(map[string]any{
-		"type": "auto_compaction_end", "reason": "manual", "action": "snapcompact",
-		"result": map[string]any{"summary": "safe compacted context"},
-	})
+	writePipelineOMPActiveResponse(output, command, map[string]any{"summary": "safe compacted context"})
+	if legacyLifecycle {
+		_ = output.Encode(map[string]any{
+			"type": "auto_compaction_end", "reason": "manual", "action": "snapcompact",
+			"result": map[string]any{"summary": "safe compacted context"},
+		})
+	}
 }

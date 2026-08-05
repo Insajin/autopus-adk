@@ -113,7 +113,7 @@ func validOMPContextPromotionReportV1() OMPContextPromotionReportV1 {
 			sequence := len(report.Observations) + 1
 			sessionSequences[variant]++
 			input, compactionRequests := int64(10000), 0
-			if variant == "B" {
+			if variant == "B" && sessionSequences[variant] > 1 {
 				input, compactionRequests = 7500, 1
 			}
 			began := start.Add(time.Duration(sequence*2) * time.Second)
@@ -137,7 +137,7 @@ func validOMPContextPromotionReportV1() OMPContextPromotionReportV1 {
 	taskBytes, _ := json.Marshal(report.Tasks)
 	report.CohortManifestDigest = promotionSHA256(taskBytes)
 	report.OrderSeed = report.CohortManifestDigest
-	report.Gates = expectedOMPContextPromotionGatesV1(2500)
+	report.Gates = expectedOMPContextPromotionGatesV1(2500, 19)
 	return report
 }
 

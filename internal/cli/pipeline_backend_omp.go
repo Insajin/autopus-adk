@@ -14,21 +14,22 @@ import (
 )
 
 type pipelineOMPBackendConfig struct {
-	Executable     string
-	ProjectDir     string
-	SpecID         string
-	SpecDir        string
-	SnapshotHash   string
-	GitCommitHash  string
-	RuntimeBase    string
-	Environment    []string
-	canonicalEnv   []string
-	PhaseModels    map[pipeline.PhaseID]string
-	MaxTime        time.Duration
-	ManagedActive  pipelineOMPManagedActiveRunner
-	managedInner   bool
-	ownRuntimeBase bool
-	executableID   pipelineOMPExecutableIdentity
+	Executable         string
+	ProjectDir         string
+	SpecID             string
+	SpecDir            string
+	SnapshotHash       string
+	GitCommitHash      string
+	RuntimeBase        string
+	Environment        []string
+	canonicalEnv       []string
+	PhaseModels        map[pipeline.PhaseID]string
+	ModelContextWindow int
+	MaxTime            time.Duration
+	ManagedActive      pipelineOMPManagedActiveRunner
+	managedInner       bool
+	ownRuntimeBase     bool
+	executableID       pipelineOMPExecutableIdentity
 }
 
 type pipelineOMPRunMode uint8
@@ -122,6 +123,12 @@ func normalizePipelineOMPBackendConfig(config pipelineOMPBackendConfig) (pipelin
 			_ = os.Remove(config.RuntimeBase)
 		}
 		return config, errors.New("OMP pipeline runtime base is unsafe")
+	}
+	if config.ModelContextWindow == 0 {
+		config.ModelContextWindow = pipelineOMPActiveDefaultContextWindow
+	}
+	if config.ModelContextWindow < 8192 || config.ModelContextWindow > 1<<30 {
+		return config, errors.New("OMP pipeline model context window is invalid")
 	}
 	if config.MaxTime <= 0 {
 		config.MaxTime = 15 * time.Minute
