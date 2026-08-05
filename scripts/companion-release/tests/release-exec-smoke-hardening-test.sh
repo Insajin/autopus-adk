@@ -11,6 +11,8 @@ environment_gate="$script_dir/validate-environment.sh"
 exec_smoke_package="$script_dir/execsmoke"
 uid_isolation="$exec_smoke_package/uid_isolation.go"
 workflow="$repo/.github/workflows/release.yaml"
+materializer="$script_dir/materialize-omp-release-canary.sh"
+remover="$script_dir/remove-omp-release-canary.sh"
 goreleaser_config="$repo/.goreleaser.yaml"
 
 fail() {
@@ -20,6 +22,10 @@ fail() {
 
 contains() {
   grep -Fq -- "$2" "$1" || fail "$1 missing $2"
+}
+
+not_contains() {
+  ! grep -Fq -- "$2" "$1" || fail "$1 unexpectedly contains $2"
 }
 
 [[ -d "$exec_smoke_package" && ! -L "$exec_smoke_package" ]] \
@@ -35,9 +41,10 @@ contains "$producer" 'OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE OMP_CONTEXT_RELEASE_
 contains "$producer" 'OMP_CONTEXT_RELEASE_CANARY_ROOT="$OMP_CONTEXT_RELEASE_CANARY_ROOT"'
 contains "$workflow" 'Materialize exact arm64 OMP release canary'
 contains "$workflow" '/usr/bin/sudo -n -u nobody /usr/bin/true'
-contains "$workflow" '/usr/bin/install -d -m 0755 -o root -g wheel'
-contains "$workflow" '/usr/bin/install -d -m 0700 -o nobody -g nobody'
-contains "$workflow" '/usr/bin/install -m 0555 -o root -g wheel'
+contains "$workflow" 'run: scripts/companion-release/materialize-omp-release-canary.sh'
+contains "$materializer" '/usr/bin/install -d -m 0755 -o root -g wheel'
+contains "$materializer" '/usr/bin/install -d -m 0700 -o nobody -g nobody'
+contains "$materializer" '/usr/bin/install -m 0555 -o root -g wheel'
 contains "$workflow" 'Verify release nobody privilege boundary'
 contains "$workflow" '[[ "$runner_uid" != "$nobody_uid" ]]'
 contains "$workflow" '[[ "$isolated_uid" == "$nobody_uid" ]]'
@@ -45,14 +52,18 @@ contains "$workflow" 'companion-ed25519-private-key'
 contains "$workflow" 'release-ecdsa-private-key'
 contains "$workflow" 'keychain-password'
 contains "$workflow" 'protected_modes=(600 600 600 600 600 600 700)'
-contains "$workflow" '/usr/bin/test "$permission" "$protected_path"'
+contains "$workflow" '/bin/test "$permission" "$protected_path"'
+contains "$materializer" '/usr/bin/sudo -n -u nobody /bin/test -x "$destination"'
+not_contains "$workflow" '/usr/bin/test'
+not_contains "$materializer" '/usr/bin/test'
 contains "$workflow" '/usr/bin/sudo -n -u root /usr/bin/true >/dev/null 2>&1'
-contains "$workflow" 'omp-canary-cleanup-identity'
-contains "$workflow" '[[ "$(/usr/bin/stat -f '"'"'%d:%i'"'"' /private/tmp)" == "$parent_identity" ]]'
+contains "$materializer" 'omp-canary-cleanup-identity'
+contains "$remover" '[[ "$(/usr/bin/stat -f '"'"'%d:%i'"'"' /private/tmp)" == "$parent_identity" ]]'
 contains "$workflow" 'Remove isolated OMP release canary'
+contains "$workflow" 'run: scripts/companion-release/remove-omp-release-canary.sh'
 contains "$workflow" 'if: always()'
-contains "$workflow" 'https://github.com/can1357/oh-my-pi/releases/download/v17.2.7/omp-darwin-arm64'
-contains "$workflow" 'cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
+contains "$materializer" 'https://github.com/can1357/oh-my-pi/releases/download/v17.2.7/omp-darwin-arm64'
+contains "$materializer" 'cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
 contains "$workflow" 'OMP_CONTEXT_RELEASE_CANARY_ROOT: /private/tmp/autopus-adk-omp-canary-${{ github.run_id }}-${{ github.run_attempt }}'
 contains "$workflow" 'OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE"'
 contains "$uid_isolation" 'uid == targetUID'

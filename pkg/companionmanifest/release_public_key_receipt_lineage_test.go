@@ -163,6 +163,7 @@ func TestReleasePublicKeyReceipt_NonBootstrapPriorEvidence_VerifiesDirectPredece
 	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.76", "prior_release_identity_mismatch")
 	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.93", "prior_release_identity_mismatch")
 	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.94", "prior_release_identity_mismatch")
+	requirePublicKeyReceiptLineagePhaseFailure(t, "v0.50.95", "prior_release_identity_mismatch")
 	for _, tag := range []string{
 		publicKeyReceiptA22Tag, publicKeyReceiptA21Tag, publicKeyReceiptA20Tag, publicKeyReceiptA19Tag, publicKeyReceiptA18Tag, publicKeyReceiptA17Tag, publicKeyReceiptA16Tag, publicKeyReceiptA15Tag, publicKeyReceiptA14Tag, publicKeyReceiptA13Tag, publicKeyReceiptA12Tag, publicKeyReceiptA11Tag, publicKeyReceiptA10Tag, publicKeyReceiptA9Tag, publicKeyReceiptA8Tag, publicKeyReceiptA7Tag,
 		publicKeyReceiptA6Tag, publicKeyReceiptA5Tag, publicKeyReceiptA4Tag, publicKeyReceiptA3Tag, publicKeyReceiptA2Tag,
