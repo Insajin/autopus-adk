@@ -84,7 +84,7 @@ func TestOMPContextPromoteWorkflow_PinsActionsAndExactPromotionCoordinates(t *te
 		}
 	}
 	for _, required := range []string{
-		"omp-context-evidence-v0.50.94",
+		"omp-context-evidence-v0.50.95",
 		"omp-context-promotion-report.v1.json",
 		"omp-context-promotion-attestation.v2.json",
 		"Insajin/autopus-adk",

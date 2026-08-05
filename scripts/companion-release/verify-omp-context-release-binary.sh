@@ -3,7 +3,7 @@ set -euo pipefail
 
 fail() { printf 'OMP context release binary: %s\n' "$1" >&2; exit 1; }
 
-[[ "${COMPANION_RELEASE_TAG:-}" == 'v0.50.94' ]] || exit 0
+[[ "${COMPANION_RELEASE_TAG:-}" == 'v0.50.95' ]] || exit 0
 for name in COMPANION_ARTIFACT COMPANION_PLATFORM COMPANION_ARCHITECTURE \
   OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256
 do

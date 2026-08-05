@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -132,7 +133,7 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 			HistoryMode: "active", MemoryMode: "off", MinPairCount: 20, MinReductionBasisPoints: 2000,
 		},
 		Runtime: promptlayer.OMPContextPromotionRuntimeV1{
-			AutoVersion: "v0.50.94", AutoBinarySHA256: candidateArtifactSHA,
+			AutoVersion: "v0.50.95", AutoBinarySHA256: candidateArtifactSHA,
 			OMPVersion: "omp/17.2.7", OMPExecutableSHA256: promotionTestHash("omp"),
 			ExecutionClass: "external-live", ProductionPathEquivalent: true,
 			RuntimeKind:                  "omp-pipeline-managed-rpc",
@@ -224,6 +225,73 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 		reportPath: reportPath, attestationPath: attestationPath,
 		reportSHA: digest(reportBytes), attestationSHA: digest(attestationBytes),
 		staticPolicyB64: base64.RawURLEncoding.EncodeToString(policyBytes),
+	}
+}
+
+func promotionVerifierInputs(
+	t *testing.T,
+	fixture historicalVerifierFixture,
+) ([]byte, promptlayer.OMPContextPromotionExpectationV2) {
+	t.Helper()
+	reportBytes, err := os.ReadFile(fixture.reportPath)
+	if err != nil {
+		t.Fatalf("read report fixture: %v", err)
+	}
+	policy, err := decodeStaticPolicy(fixture.staticPolicyB64)
+	if err != nil {
+		t.Fatalf("decode fixture policy: %v", err)
+	}
+	return reportBytes, expectationFromStaticPolicy(
+		policy,
+		"sha256:"+strings.Repeat("e", 64),
+	)
+}
+
+func stalePromotionAttestation(t *testing.T, reportBytes []byte) []byte {
+	t.Helper()
+	issuedAt := time.Date(2026, 8, 4, 3, 0, 0, 0, time.UTC)
+	body, err := json.Marshal(promptlayer.OMPContextPromotionAttestationV2{
+		SchemaVersion:   promptlayer.OMPContextPromotionAttestationSchemaV2,
+		KeyID:           promptlayer.OMPContextPromotionKeyID2026Q3K1,
+		Algorithm:       "ed25519",
+		ReportSHA256:    "sha256:" + digest(reportBytes),
+		IssuedAt:        issuedAt.Format(time.RFC3339Nano),
+		NotBefore:       issuedAt.Format(time.RFC3339Nano),
+		ExpiresAt:       issuedAt.Add(25 * time.Hour).Format(time.RFC3339Nano),
+		TrustLane:       promptlayer.OMPContextPromotionTrustLaneV2,
+		SignatureBase64: base64.StdEncoding.EncodeToString(make([]byte, 64)),
+	})
+	if err != nil {
+		t.Fatalf("marshal stale attestation: %v", err)
+	}
+	return body
+}
+
+func TestPromotionVerifierWrappers_RejectMalformedTamperedAndStaleEvidence(t *testing.T) {
+	fixture := newHistoricalVerifierFixture(t)
+	reportBytes, expected := promotionVerifierInputs(t, fixture)
+
+	for name, verifier := range map[string]promotionArtifactVerifier{
+		"active":     verifyActivePromotionArtifact,
+		"historical": verifyHistoricalPromotionArtifact,
+	} {
+		t.Run(name+" malformed attestation", func(t *testing.T) {
+			if valid, err := verifier(reportBytes, []byte("{}"), expected); err == nil || valid {
+				t.Fatalf("%s wrapper accepted malformed attestation: valid=%v error=%v", name, valid, err)
+			}
+		})
+		t.Run(name+" intrinsically stale attestation", func(t *testing.T) {
+			valid, err := verifier(reportBytes, stalePromotionAttestation(t, reportBytes), expected)
+			if valid || !errors.Is(err, promptlayer.ErrOMPContextPromotionStale) {
+				t.Fatalf("%s wrapper stale result: valid=%v error=%v", name, valid, err)
+			}
+		})
+	}
+
+	attestation := stalePromotionAttestation(t, reportBytes)
+	tamperedReport := append(append([]byte(nil), reportBytes...), ' ')
+	if valid, err := verifyHistoricalPromotionArtifact(tamperedReport, attestation, expected); err == nil || valid {
+		t.Fatalf("historical wrapper accepted modified report: valid=%v error=%v", valid, err)
 	}
 }
 
