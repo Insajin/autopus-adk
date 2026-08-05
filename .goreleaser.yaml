@@ -69,14 +69,18 @@ archives:
       - src: '{{ if eq .Os "darwin" }}dist/auto_{{ .Target }}/adk-companion-public-key-receipt.bundle/**{{ else }}scripts/companion-release/no-files-*{{ end }}'
         dst: adk-companion-public-key-receipt.bundle
         strip_parent: true
-      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") (eq .Version "0.50.95") }}dist/auto_{{ .Target }}/release-lineage-v1.json{{ else }}scripts/companion-release/no-files-*{{ end }}'
+      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") (eq .Version "0.50.96") }}dist/auto_{{ .Target }}/release-lineage-v1.json{{ else }}scripts/companion-release/no-files-*{{ end }}'
         dst: release-lineage-v1.json
-      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") (eq .Version "0.50.95") }}dist/auto_{{ .Target }}/release-lineage-v1.sig{{ else }}scripts/companion-release/no-files-*{{ end }}'
+      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") (eq .Version "0.50.96") }}dist/auto_{{ .Target }}/release-lineage-v1.sig{{ else }}scripts/companion-release/no-files-*{{ end }}'
         dst: release-lineage-v1.sig
 
 release:
   replace_existing_artifacts: true
   target_commitish: "{{ .Env.COMPANION_SOURCE_COMMIT }}"
+  use_existing_draft: true
+  # Publish the operator-reserved draft and replace its machine-only marker
+  # with the generated release notes.
+  mode: replace
   extra_files:
     - glob: "{{ .Env.OMP_CONTEXT_PROMOTION_REPORT_PATH }}"
     - glob: "{{ .Env.OMP_CONTEXT_PROMOTION_ATTESTATION_PATH }}"
@@ -110,6 +114,7 @@ signs:
       - "{{ .Env.ADK_RELEASE_ECDSA_PRIVATE_KEY_FILE }}"
     signature: "${artifact}.signatures"
     output: true
+
 
 changelog:
   sort: asc

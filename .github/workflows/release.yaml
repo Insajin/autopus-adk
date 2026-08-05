@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.95'
+      - 'v0.50.96'
 permissions:
   contents: read
 jobs:
@@ -118,7 +118,7 @@ jobs:
       - name: Carry verified evidence into the protected release job
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: omp-context-production-evidence-v0.50.95
+          name: omp-context-production-evidence-v0.50.96
           path: |
             ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-report.v1.json
             ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-attestation.v2.json
@@ -127,7 +127,7 @@ jobs:
 
   release:
     needs: [ci, security, omp-production-evidence]
-    if: github.ref == 'refs/tags/v0.50.95'
+    if: github.ref == 'refs/tags/v0.50.96'
     environment:
       name: adk-companion-release
     permissions:
@@ -151,9 +151,71 @@ jobs:
           env -i PATH="$PATH" HOME="$HOME" GITHUB_REF_NAME="$GITHUB_REF_NAME" \
             GITHUB_REF_TYPE="$GITHUB_REF_TYPE" GITHUB_SHA="$GITHUB_SHA" \
             GITHUB_OUTPUT="$GITHUB_OUTPUT" COMPANION_SOURCE_PIN_REQUIRED=1 \
+            COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1 \
             COMPANION_APPROVED_SOURCE_COMMIT="$COMPANION_APPROVED_SOURCE_COMMIT" \
             COMPANION_APPROVED_SOURCE_TREE="$COMPANION_APPROVED_SOURCE_TREE" \
             scripts/companion-release/validate-source.sh
+
+      - name: Verify operator-owned draft release reservation
+        id: release-reservation
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
+          OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA }}
+          OMP_CONTEXT_EVIDENCE_COMMIT_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_COMMIT_SHA }}
+          OMP_CONTEXT_EVIDENCE_TREE_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_TREE_SHA }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+        run: |
+          set -euo pipefail
+          releases=$(gh api --paginate --slurp \
+            'repos/Insajin/autopus-adk/releases?per_page=100')
+          reservation=$(jq -ce \
+            '[.[][]] as $all |
+             [$all[] | select(.tag_name == "v0.50.96")] as $tagged |
+             [$all[] | select(.draft == true and .name == "v0.50.96")] as $named |
+             if ($tagged | length) == 1 and ($named | length) == 1 and
+                $tagged[0].id == $named[0].id
+             then $tagged[0]
+             else error("release reservation is missing, duplicated, or name-colliding")
+             end' <<<"$releases")
+          static_policy_sha=$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" |
+            shasum -a 256 | awk '{print $1}')
+          jq -e --arg source "$GITHUB_SHA" --arg tree "$COMPANION_SOURCE_TREE" \
+            --arg evidence_tag_object "$OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA" \
+            --arg evidence_commit "$OMP_CONTEXT_EVIDENCE_COMMIT_SHA" \
+            --arg evidence_tree "$OMP_CONTEXT_EVIDENCE_TREE_SHA" \
+            --arg report_sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            --arg attestation_sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            --arg static_policy_sha256 "$static_policy_sha" \
+            '.id | type == "number"' <<<"$reservation" >/dev/null
+          jq -e --arg source "$GITHUB_SHA" --arg tree "$COMPANION_SOURCE_TREE" \
+            --arg evidence_tag_object "$OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA" \
+            --arg evidence_commit "$OMP_CONTEXT_EVIDENCE_COMMIT_SHA" \
+            --arg evidence_tree "$OMP_CONTEXT_EVIDENCE_TREE_SHA" \
+            --arg report_sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            --arg attestation_sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            --arg static_policy_sha256 "$static_policy_sha" \
+            '.draft == true and .prerelease == false and .author.id == 204883817 and
+             .target_commitish == $source and .name == "v0.50.96" and
+             (.assets | type == "array" and length == 0) and
+             ((.body | fromjson) == {
+               schema_version:"autopus.adk_release_reservation.v1",
+               release_tag:"v0.50.96",
+               source_commit:$source,
+               source_tree:$tree,
+               evidence_tag_object:$evidence_tag_object,
+               evidence_commit:$evidence_commit,
+               evidence_tree:$evidence_tree,
+               report_sha256:$report_sha256,
+               attestation_sha256:$attestation_sha256,
+               static_policy_sha256:$static_policy_sha256
+             })' <<<"$reservation" >/dev/null
+          release_id=$(jq -r '.id' <<<"$reservation")
+          [[ "$release_id" =~ ^[0-9]+$ ]]
+          printf 'release-id=%s\n' "$release_id" >>"$GITHUB_OUTPUT"
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -171,44 +233,7 @@ jobs:
 
       - name: Materialize exact arm64 OMP release canary
         shell: bash
-        run: |
-          set -euo pipefail
-          umask 077
-          root="/private/tmp/autopus-adk-omp-canary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
-          [[ "$(/usr/bin/stat -f '%u:%Sp' /private/tmp)" == '0:drwxrwxrwt' ]]
-          [[ ! -e "$root" && ! -L "$root" ]]
-          /usr/bin/sudo -n /usr/bin/install -d -m 0755 -o root -g wheel "$root"
-          /usr/bin/sudo -n /usr/bin/install -d -m 0700 -o nobody -g nobody \
-            "$root/home" "$root/tmp"
-          destination="$root/omp-darwin-arm64"
-          staging="$RUNNER_TEMP/omp-v17.2.7-darwin-arm64.download"
-          [[ ! -e "$staging" && ! -L "$staging" ]]
-          /usr/bin/curl --proto '=https' --proto-redir '=https' --tlsv1.2 \
-            --fail --location --silent --show-error \
-            --output "$staging" \
-            'https://github.com/can1357/oh-my-pi/releases/download/v17.2.7/omp-darwin-arm64'
-          expected='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
-          actual=$(/usr/bin/shasum -a 256 "$staging" | /usr/bin/awk '{print $1}')
-          [[ "$actual" == "$expected" ]]
-          /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$staging" "$destination"
-          rm -f -- "$staging"
-          nobody_uid=$(/usr/bin/id -u nobody)
-          [[ "$(/usr/bin/stat -f '%u:%Lp' "$root")" == '0:755' ]]
-          [[ "$(/usr/bin/stat -f '%u:%Lp' "$root/home")" == "$nobody_uid:700" ]]
-          [[ "$(/usr/bin/stat -f '%u:%Lp' "$root/tmp")" == "$nobody_uid:700" ]]
-          [[ "$(/usr/bin/stat -f '%u:%Lp' "$destination")" == '0:555' ]]
-          /usr/bin/sudo -n -u nobody /usr/bin/test -x "$destination"
-          [[ "$(/usr/bin/sudo -n -u nobody /usr/bin/shasum -a 256 "$destination" | /usr/bin/awk '{print $1}')" == "$expected" ]]
-          receipt_staging="$RUNNER_TEMP/omp-canary-cleanup-identity"
-          [[ ! -e "$receipt_staging" && ! -L "$receipt_staging" ]]
-          /usr/bin/printf 'parent=%s\nroot=%s\nomp=%s\n' \
-            "$(/usr/bin/stat -f '%d:%i' /private/tmp)" \
-            "$(/usr/bin/stat -f '%d:%i' "$root")" \
-            "$(/usr/bin/stat -f '%d:%i' "$destination")" > "$receipt_staging"
-          /usr/bin/sudo -n /usr/bin/install -m 0444 -o root -g wheel \
-            "$receipt_staging" "$root/.cleanup-identity"
-          rm -f -- "$receipt_staging"
+        run: scripts/companion-release/materialize-omp-release-canary.sh
 
       - name: Verify tidy source without mutation
         shell: bash
@@ -265,7 +290,7 @@ jobs:
       - name: Download same-run production evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: omp-context-production-evidence-v0.50.95
+          name: omp-context-production-evidence-v0.50.96
           path: ${{ runner.temp }}/omp-context-production-evidence
 
       - name: Reverify immutable historical production evidence
@@ -418,7 +443,7 @@ jobs:
             [[ "$(/usr/bin/stat -f '%u:%Lp' "$protected_path")" == "$runner_uid:$expected_mode" ]]
             for permission in -r -w -x; do
               if /usr/bin/sudo -n -u nobody /usr/bin/env -i PATH=/usr/bin:/bin \
-                /usr/bin/test "$permission" "$protected_path"; then
+                /bin/test "$permission" "$protected_path"; then
                 echo "::error::nobody unexpectedly has $permission access to protected release state"
                 exit 1
               fi
@@ -577,37 +602,46 @@ jobs:
             COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS="$COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS" \
             goreleaser release --clean
 
+      - name: Verify reserved release was published
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ steps.release-reservation.outputs.release-id }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]
+          expected_assets=$(printf '%s\n' \
+            'autopus-adk_0.50.96_darwin_amd64.tar.gz' \
+            'autopus-adk_0.50.96_darwin_arm64.tar.gz' \
+            'autopus-adk_0.50.96_linux_amd64.tar.gz' \
+            'autopus-adk_0.50.96_linux_arm64.tar.gz' \
+            'autopus-adk_0.50.96_windows_amd64.tar.gz' \
+            'autopus-adk_0.50.96_windows_amd64.zip' \
+            'autopus-adk_0.50.96_windows_arm64.tar.gz' \
+            'autopus-adk_0.50.96_windows_arm64.zip' \
+            'checksums.txt' 'checksums.txt.bundle' 'checksums.txt.signatures' \
+            'omp-context-promotion-report.v1.json' \
+            'omp-context-promotion-attestation.v2.json' \
+            'release-lineage-v1.json' 'release-lineage-v1.sig' |
+            jq -Rsc 'split("\n") | map(select(length > 0))')
+          release=$(gh api "repos/Insajin/autopus-adk/releases/${RELEASE_ID}")
+          jq -e --argjson release_id "$RELEASE_ID" --arg commit "$GITHUB_SHA" \
+            --argjson expected "$expected_assets" \
+            '.id == $release_id and .tag_name == "v0.50.96" and
+             .target_commitish == $commit and .author.id == 204883817 and
+             .draft == false and .prerelease == false and .immutable == true and
+             (.assets | type == "array" and length == ($expected | length)) and
+             ([.assets[].name] | sort) == ($expected | sort) and
+             ([.assets[].name] | unique | length) == ($expected | length) and
+             all(.assets[];
+               .state == "uploaded" and (.size | type == "number" and . > 0) and
+               (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")))' \
+            <<<"$release" >/dev/null
+
       - name: Remove isolated OMP release canary
         if: always()
         shell: bash
-        run: |
-          set -euo pipefail
-          root="/private/tmp/autopus-adk-omp-canary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          destination="$root/omp-darwin-arm64"
-          receipt="$root/.cleanup-identity"
-          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]]
-          if [[ -e "$root" || -L "$root" ]]; then
-            [[ -d "$root" && ! -L "$root" ]]
-            [[ "$(/usr/bin/stat -f '%u:%Lp' "$root")" == '0:755' ]]
-            parent_identity=$(/usr/bin/stat -f '%d:%i' /private/tmp)
-            root_identity=$(/usr/bin/stat -f '%d:%i' "$root")
-            if [[ -e "$destination" || -L "$destination" ]]; then
-              [[ -f "$destination" && ! -L "$destination" ]]
-              [[ "$(/usr/bin/stat -f '%u:%Lp' "$destination")" == '0:555' ]]
-            fi
-            if [[ -e "$receipt" || -L "$receipt" ]]; then
-              [[ -f "$receipt" && ! -L "$receipt" ]]
-              [[ "$(/usr/bin/stat -f '%u:%Lp' "$receipt")" == '0:444' ]]
-              [[ "$(/usr/bin/sed -n '1p' "$receipt")" == "parent=$parent_identity" ]]
-              [[ "$(/usr/bin/sed -n '2p' "$receipt")" == "root=$root_identity" ]]
-              [[ "$(/usr/bin/sed -n '3p' "$receipt")" == \
-                 "omp=$(/usr/bin/stat -f '%d:%i' "$destination")" ]]
-              [[ "$(/usr/bin/wc -l < "$receipt" | /usr/bin/tr -d ' ')" == '3' ]]
-            fi
-            /usr/bin/sudo -n /bin/rm -rf -- "$root"
-            [[ "$(/usr/bin/stat -f '%d:%i' /private/tmp)" == "$parent_identity" ]]
-          fi
-          [[ ! -e "$root" && ! -L "$root" ]]
+        run: scripts/companion-release/remove-omp-release-canary.sh
 
       - name: Remove release signing credentials
         shell: bash
@@ -649,7 +683,7 @@ jobs:
           COMPANION_PUBLIC_KEY_SHA256: ${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.95-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.96-checksums.txt"
           [[ "$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" | shasum -a 256 | awk '{print $1}')" == \
              "$OMP_CONTEXT_STATIC_POLICY_SHA256" ]]
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
@@ -685,8 +719,8 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.95' \
-            COMPANION_VERSION='0.50.95' \
+            GITHUB_REF_NAME='v0.50.96' \
+            COMPANION_VERSION='0.50.96' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
@@ -700,9 +734,9 @@ jobs:
           set -u
           cleanup_status=0
           keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
-          if [[ -e "$RUNNER_TEMP/autopus-v0.50.95-checksums.txt" ||
-                -L "$RUNNER_TEMP/autopus-v0.50.95-checksums.txt" ]]; then
-            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.95-checksums.txt"; then
+          if [[ -e "$RUNNER_TEMP/autopus-v0.50.96-checksums.txt" ||
+                -L "$RUNNER_TEMP/autopus-v0.50.96-checksums.txt" ]]; then
+            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.96-checksums.txt"; then
               :
             else
               cleanup_status=$?

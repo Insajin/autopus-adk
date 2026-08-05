@@ -56,7 +56,7 @@ case "$GITHUB_REF_NAME" in
   v0.50.90) release_phase='A19' ;;
   v0.50.91) release_phase='A20' ;;
   v0.50.92) release_phase='A21' ;;
-  v0.50.95) release_phase='A22' ;;
+  v0.50.96) release_phase='A22' ;;
   *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'
@@ -151,6 +151,36 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
   else
     git merge-base --is-ancestor "$A22_A21_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A22 source does not contain the immutable A21 release'
+  fi
+  if [[ "$release_phase" == 'A22' ]]; then
+    case "${COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED-0}" in
+      0) ;;
+      1)
+        script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) ||
+          fail 'cannot resolve release signer trust root'
+        tag_public_key="$script_dir/release-tag-signing-2026-q3.pub"
+        tag_fingerprint="$script_dir/release-tag-signing-2026-q3.fingerprint"
+        [[ -f "$tag_public_key" && ! -L "$tag_public_key" &&
+           -f "$tag_fingerprint" && ! -L "$tag_fingerprint" ]] ||
+          fail 'release signer trust root is missing or unsafe'
+        expected_fingerprint=$(<"$tag_fingerprint")
+        [[ "$expected_fingerprint" =~ ^SHA256:[A-Za-z0-9+/]{43}$ &&
+           "$(ssh-keygen -lf "$tag_public_key" -E sha256 | awk '{print $2}')" == "$expected_fingerprint" ]] ||
+          fail 'release signer trust root fingerprint differs'
+        allowed_signers=$(mktemp "${TMPDIR:-/tmp}/adk-release-tag-signers.XXXXXX") ||
+          fail 'cannot create release tag verifier state'
+        trap 'rm -f -- "$allowed_signers"' EXIT
+        awk 'NF >= 2 { print "autopus-adk-release-tag " $1 " " $2; exit }' \
+          "$tag_public_key" >"$allowed_signers"
+        chmod 0600 "$allowed_signers"
+        git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$allowed_signers" \
+          verify-tag "refs/tags/$GITHUB_REF_NAME" >/dev/null ||
+          fail 'A22 release tag signature or signer differs'
+        rm -f -- "$allowed_signers"
+        trap - EXIT
+        ;;
+      *) fail 'COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED must be 0 or 1' ;;
+    esac
   fi
   case "${COMPANION_SOURCE_PIN_REQUIRED-0}" in
     0) ;;

@@ -78,6 +78,9 @@ func publicKeyReceiptStepEnvAllowed(
 	if _, ok := common[name]; ok {
 		return true
 	}
+	if stepName == "Verify reserved release was published" && name == "RELEASE_ID" {
+		return true
+	}
 	return stepName == "Run GoReleaser" &&
 		(name == "OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE" || name == "OMP_CONTEXT_RELEASE_CANARY_ROOT")
 }
@@ -159,7 +162,7 @@ func TestReleasePublicKeyReceipt_Workflow_NobodyPrivilegeBoundaryFailsClosed(t *
 		`release-ecdsa-private-key`,
 		`keychain-password`,
 		`protected_modes=(600 600 600 600 600 600 700)`,
-		`/usr/bin/test "$permission" "$protected_path"`,
+		`/bin/test "$permission" "$protected_path"`,
 		`/usr/bin/sudo -n -u root /usr/bin/true >/dev/null 2>&1`,
 	} {
 		if !strings.Contains(boundary.Run, required) {
@@ -185,14 +188,22 @@ func TestReleasePublicKeyReceipt_Workflow_CanaryTrustRootIdentityIsImmutable(t *
 			cleanup = step
 		}
 	}
+	if strings.TrimSpace(materialize.Run) != "scripts/companion-release/materialize-omp-release-canary.sh" {
+		t.Fatalf("release canary materialization does not use the reviewed helper: %q", materialize.Run)
+	}
+	if strings.TrimSpace(cleanup.Run) != "scripts/companion-release/remove-omp-release-canary.sh" {
+		t.Fatalf("release canary cleanup does not use the reviewed helper: %q", cleanup.Run)
+	}
+	materializer := string(releaseSourceFile(t, "scripts/companion-release/materialize-omp-release-canary.sh"))
+	remover := string(releaseSourceFile(t, "scripts/companion-release/remove-omp-release-canary.sh"))
 	for _, required := range []string{
 		`/usr/bin/install -d -m 0755 -o root -g wheel "$root"`,
 		`/usr/bin/install -d -m 0700 -o nobody -g nobody`,
 		`/usr/bin/install -m 0555 -o root -g wheel`,
 		`omp-canary-cleanup-identity`,
 	} {
-		if !strings.Contains(materialize.Run, required) {
-			t.Fatalf("canary materialization is missing immutable identity contract %q", required)
+		if !strings.Contains(materializer, required) {
+			t.Fatalf("canary materialization helper is missing immutable identity contract %q", required)
 		}
 	}
 	if !strings.Contains(cleanup.If, "always()") {
@@ -204,8 +215,8 @@ func TestReleasePublicKeyReceipt_Workflow_CanaryTrustRootIdentityIsImmutable(t *
 		`[[ "$(/usr/bin/stat -f '%d:%i' /private/tmp)" == "$parent_identity" ]]`,
 		`[[ ! -e "$root" && ! -L "$root" ]]`,
 	} {
-		if !strings.Contains(cleanup.Run, required) {
-			t.Fatalf("canary cleanup is missing identity check %q", required)
+		if !strings.Contains(remover, required) {
+			t.Fatalf("canary cleanup helper is missing identity check %q", required)
 		}
 	}
 }
