@@ -5,7 +5,19 @@ platforms:
     - codex
     - antigravity-cli
     - opencode
+    - omp
 isolate_rules: true
+omp_context_policy:
+    profile: omp-active-probed
+    profiles:
+        omp-active-probed:
+            history_mode: active
+            memory_mode: off
+            history_target_tokens: 1000
+            fallback: canonical_full
+            capability_policy: probe_required
+            runtime_root_policy: isolated_task_owned
+            mutation_scope: session_overlay
 language:
     comments: en
     commits: ko
