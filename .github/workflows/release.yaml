@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v0.50.96'
+      - 'v0.50.97'
 permissions:
   contents: read
 jobs:
@@ -118,7 +118,7 @@ jobs:
       - name: Carry verified evidence into the protected release job
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: omp-context-production-evidence-v0.50.96
+          name: omp-context-production-evidence-v0.50.97
           path: |
             ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-report.v1.json
             ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-attestation.v2.json
@@ -127,7 +127,7 @@ jobs:
 
   release:
     needs: [ci, security, omp-production-evidence]
-    if: github.ref == 'refs/tags/v0.50.96'
+    if: github.ref == 'refs/tags/v0.50.97'
     environment:
       name: adk-companion-release
     permissions:
@@ -174,8 +174,8 @@ jobs:
             'repos/Insajin/autopus-adk/releases?per_page=100')
           reservation=$(jq -ce \
             '[.[][]] as $all |
-             [$all[] | select(.tag_name == "v0.50.96")] as $tagged |
-             [$all[] | select(.draft == true and .name == "v0.50.96")] as $named |
+             [$all[] | select(.tag_name == "v0.50.97")] as $tagged |
+             [$all[] | select(.draft == true and .name == "v0.50.97")] as $named |
              if ($tagged | length) == 1 and ($named | length) == 1 and
                 $tagged[0].id == $named[0].id
              then $tagged[0]
@@ -199,11 +199,11 @@ jobs:
             --arg attestation_sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
             --arg static_policy_sha256 "$static_policy_sha" \
             '.draft == true and .prerelease == false and .author.id == 204883817 and
-             .target_commitish == $source and .name == "v0.50.96" and
+             .target_commitish == $source and .name == "v0.50.97" and
              (.assets | type == "array" and length == 0) and
              ((.body | fromjson) == {
                schema_version:"autopus.adk_release_reservation.v1",
-               release_tag:"v0.50.96",
+               release_tag:"v0.50.97",
                source_commit:$source,
                source_tree:$tree,
                evidence_tag_object:$evidence_tag_object,
@@ -290,7 +290,7 @@ jobs:
       - name: Download same-run production evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: omp-context-production-evidence-v0.50.96
+          name: omp-context-production-evidence-v0.50.97
           path: ${{ runner.temp }}/omp-context-production-evidence
 
       - name: Reverify immutable historical production evidence
@@ -611,14 +611,14 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]
           expected_assets=$(printf '%s\n' \
-            'autopus-adk_0.50.96_darwin_amd64.tar.gz' \
-            'autopus-adk_0.50.96_darwin_arm64.tar.gz' \
-            'autopus-adk_0.50.96_linux_amd64.tar.gz' \
-            'autopus-adk_0.50.96_linux_arm64.tar.gz' \
-            'autopus-adk_0.50.96_windows_amd64.tar.gz' \
-            'autopus-adk_0.50.96_windows_amd64.zip' \
-            'autopus-adk_0.50.96_windows_arm64.tar.gz' \
-            'autopus-adk_0.50.96_windows_arm64.zip' \
+            'autopus-adk_0.50.97_darwin_amd64.tar.gz' \
+            'autopus-adk_0.50.97_darwin_arm64.tar.gz' \
+            'autopus-adk_0.50.97_linux_amd64.tar.gz' \
+            'autopus-adk_0.50.97_linux_arm64.tar.gz' \
+            'autopus-adk_0.50.97_windows_amd64.tar.gz' \
+            'autopus-adk_0.50.97_windows_amd64.zip' \
+            'autopus-adk_0.50.97_windows_arm64.tar.gz' \
+            'autopus-adk_0.50.97_windows_arm64.zip' \
             'checksums.txt' 'checksums.txt.bundle' 'checksums.txt.signatures' \
             'omp-context-promotion-report.v1.json' \
             'omp-context-promotion-attestation.v2.json' \
@@ -627,7 +627,7 @@ jobs:
           release=$(gh api "repos/Insajin/autopus-adk/releases/${RELEASE_ID}")
           jq -e --argjson release_id "$RELEASE_ID" --arg commit "$GITHUB_SHA" \
             --argjson expected "$expected_assets" \
-            '.id == $release_id and .tag_name == "v0.50.96" and
+            '.id == $release_id and .tag_name == "v0.50.97" and
              .target_commitish == $commit and .author.id == 204883817 and
              .draft == false and .prerelease == false and .immutable == true and
              (.assets | type == "array" and length == ($expected | length)) and
@@ -683,7 +683,7 @@ jobs:
           COMPANION_PUBLIC_KEY_SHA256: ${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.96-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.97-checksums.txt"
           [[ "$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" | shasum -a 256 | awk '{print $1}')" == \
              "$OMP_CONTEXT_STATIC_POLICY_SHA256" ]]
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
@@ -719,8 +719,8 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.96' \
-            COMPANION_VERSION='0.50.96' \
+            GITHUB_REF_NAME='v0.50.97' \
+            COMPANION_VERSION='0.50.97' \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
@@ -734,9 +734,9 @@ jobs:
           set -u
           cleanup_status=0
           keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
-          if [[ -e "$RUNNER_TEMP/autopus-v0.50.96-checksums.txt" ||
-                -L "$RUNNER_TEMP/autopus-v0.50.96-checksums.txt" ]]; then
-            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.96-checksums.txt"; then
+          if [[ -e "$RUNNER_TEMP/autopus-v0.50.97-checksums.txt" ||
+                -L "$RUNNER_TEMP/autopus-v0.50.97-checksums.txt" ]]; then
+            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.97-checksums.txt"; then
               :
             else
               cleanup_status=$?
