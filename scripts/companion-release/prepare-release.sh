@@ -51,7 +51,6 @@ done
 readonly runner_uid=$(/usr/bin/id -u)
 readonly runner_gid=$(/usr/bin/id -g)
 readonly nobody_uid=$(/usr/bin/id -u nobody)
-readonly nobody_gid=$(/usr/bin/id -g nobody)
 [[ "$runner_uid" != "$nobody_uid" ]] || fail 'release operator and canary identities must differ'
 /usr/bin/sudo -n -u nobody /usr/bin/true || fail 'passwordless nobody execution is unavailable'
 readonly private_tmp_identity=$(/usr/bin/stat -f '%d:%i' /private/tmp)
