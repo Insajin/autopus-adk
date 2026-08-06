@@ -12,7 +12,6 @@ import (
 )
 
 func TestRunVerifiedExecSmoke_ExactBodyFreeOutput_Succeeds(t *testing.T) {
-	t.Parallel()
 	policy := ompCanaryPolicy{version: pinnedOMPVersion, sha256: "sha256:" + strings.Repeat("a", 64)}
 	err := runVerifiedExecSmoke(verifiedExecSmokeConfig{
 		artifact: testArtifact(t), ompExecutable: "/absolute/omp", policy: policy,
@@ -48,7 +47,6 @@ func TestRunVerifiedExecSmoke_MalformedOrMismatchedOutput_Fails(t *testing.T) {
 }
 
 func TestRunVerifiedExecSmoke_OutputLimitAndTimeout_FailClosed(t *testing.T) {
-	t.Parallel()
 	policy := ompCanaryPolicy{version: pinnedOMPVersion, sha256: "sha256:" + strings.Repeat("a", 64)}
 	tests := []struct {
 		name    string
