@@ -8,7 +8,7 @@ fail() { printf 'OMP context candidate build: %s\n' "$1" >&2; exit 1; }
 readonly output=$1
 readonly expected_tag='v0.50.96'
 readonly expected_version='0.50.96'
-[[ "${GITHUB_REF_NAME:-}" == "$expected_tag" ]] || fail 'release tag is not exact A22'
+[[ "${COMPANION_RELEASE_TAG:-}" == "$expected_tag" ]] || fail 'release tag is not exact A22'
 [[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail 'source commit is malformed'
 [[ "${COMPANION_SOURCE_TREE:-}" =~ ^[0-9a-f]{40}$ ]] || fail 'source tree is malformed'
 [[ "${OMP_CONTEXT_STATIC_POLICY_B64:-}" =~ ^[A-Za-z0-9_-]+$ &&

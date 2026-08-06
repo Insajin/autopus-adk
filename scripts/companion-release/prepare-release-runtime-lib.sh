@@ -57,7 +57,7 @@ matched_variable() {
 
 build_candidate() {
   local policy=$1 output=$2
-  env GITHUB_REF_NAME="$release_tag" GITHUB_SHA="$source_commit" COMPANION_SOURCE_TREE="$source_tree" OMP_CONTEXT_STATIC_POLICY_B64="$policy" \
+  env COMPANION_RELEASE_TAG="$release_tag" GITHUB_SHA="$source_commit" COMPANION_SOURCE_TREE="$source_tree" OMP_CONTEXT_STATIC_POLICY_B64="$policy" \
     scripts/companion-release/build-omp-context-candidate.sh "$output"
 }
 extract_project() {

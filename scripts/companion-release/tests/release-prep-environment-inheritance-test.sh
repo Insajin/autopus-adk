@@ -6,6 +6,7 @@ tests_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 script_dir=$(cd -- "$tests_dir/.." && pwd)
 runtime_lib="$script_dir/prepare-release-runtime-lib.sh"
 prep="$script_dir/prepare-release.sh"
+candidate_builder="$script_dir/build-omp-context-candidate.sh"
 mock_gh="$tests_dir/testdata/mock-release-prep-gh.sh"
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/release-prep-environment.XXXXXX")
 trap 'rm -rf -- "$temp_dir"' EXIT
@@ -25,6 +26,22 @@ environment_name='adk-companion-release'
 source "$runtime_lib"
 grep -Fq "trap 'cleanup \$?' EXIT" "$prep" ||
   fail 'release prep does not pass the original exit status into cleanup'
+
+builder_error="$temp_dir/builder-error"
+if env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+  GITHUB_REF_NAME=v0.50.96 GITHUB_SHA=bad COMPANION_SOURCE_TREE=bad OMP_CONTEXT_STATIC_POLICY_B64=eA \
+  /bin/bash "$candidate_builder" "$temp_dir/builder-output" >/dev/null 2>"$builder_error"; then
+  fail 'candidate builder accepted the reserved GitHub tag variable'
+fi
+grep -Fq 'release tag is not exact A22' "$builder_error" ||
+  fail 'candidate builder still reads the reserved GitHub tag variable'
+if env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+  COMPANION_RELEASE_TAG=v0.50.96 GITHUB_SHA=bad COMPANION_SOURCE_TREE=bad OMP_CONTEXT_STATIC_POLICY_B64=eA \
+  /bin/bash "$candidate_builder" "$temp_dir/builder-output" >/dev/null 2>"$builder_error"; then
+  fail 'candidate builder accepted a malformed source commit'
+fi
+grep -Fq 'source commit is malformed' "$builder_error" ||
+  fail 'candidate builder rejected its dedicated release tag variable'
 
 validation_error="$temp_dir/validation-error"
 if (validate_canary "$temp_dir/missing-project" "$temp_dir/missing-output" "$temp_dir/missing-candidate") 2>"$validation_error"; then

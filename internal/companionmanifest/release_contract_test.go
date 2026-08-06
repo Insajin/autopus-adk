@@ -76,6 +76,10 @@ func TestCompanionReleasePreflight_IsReadOnlyExactMacOSGate(t *testing.T) {
 		"dispatch_nonce:", "run-name: Companion release preflight",
 		"runs-on: macos-15", "timeout-minutes: 20", "v0.50.96",
 		"scripts/companion-release/build-omp-context-candidate.sh",
+		`candidate_root="/Library/autopus-adk-release-preflight-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"`,
+		`/usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$staging" "$candidate"`,
+		`"$(/usr/bin/stat -f '%u:%Lp' /Library)" == '0:755'`,
+		"name: Remove preflight candidate",
 		"scripts/companion-release/materialize-omp-release-canary.sh",
 		"scripts/companion-release/remove-omp-release-canary.sh",
 		"./scripts/companion-release/execsmoke",
@@ -84,17 +88,20 @@ func TestCompanionReleasePreflight_IsReadOnlyExactMacOSGate(t *testing.T) {
 			t.Fatalf("companion release preflight missing %q", required)
 		}
 	}
-	for _, forbidden := range []string{"environment:", "contents: write", "id-token: write", "git push", "gh variable set"} {
+	for _, forbidden := range []string{"environment:", "contents: write", "id-token: write", "git push", "gh variable set", "auto-darwin-arm64-release-preflight", `candidate="$RUNNER_TEMP/auto"`, ".release-preflight-artifact"} {
 		if strings.Contains(preflight, forbidden) {
 			t.Fatalf("companion release preflight exposes mutation authority %q", forbidden)
 		}
 	}
 	materialize := strings.Index(preflight, "name: Materialize exact arm64 OMP release canary")
 	execute := strings.Index(preflight, "name: Execute exact candidate with isolated OMP canary")
-	remove := strings.Index(preflight, "name: Remove isolated OMP release canary")
-	if materialize < 0 || execute <= materialize || remove <= execute ||
-		!strings.Contains(preflight[remove:], "if: always()") {
-		t.Fatal("companion release preflight canary ordering or cleanup is unsafe")
+	removeCandidate := strings.Index(preflight, "name: Remove preflight candidate")
+	removeCanary := strings.Index(preflight, "name: Remove isolated OMP release canary")
+	if materialize < 0 || execute <= materialize || removeCandidate <= execute ||
+		removeCanary <= removeCandidate ||
+		!strings.Contains(preflight[removeCandidate:removeCanary], "if: always()") ||
+		!strings.Contains(preflight[removeCanary:], "if: always()") {
+		t.Fatal("companion release preflight candidate or canary cleanup ordering is unsafe")
 	}
 }
 
