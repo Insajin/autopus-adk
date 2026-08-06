@@ -64,13 +64,13 @@ func runVerifiedExecSmoke(config verifiedExecSmokeConfig) error {
 		return killProcessGroup(command.Process.Pid)
 	}
 	runErr := command.Run()
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return fmt.Errorf("%w after %s", errExecutionTimeout, config.timeout)
+	}
 	if command.Process != nil {
 		if cleanupErr := killProcessGroup(command.Process.Pid); cleanupErr != nil {
 			return fmt.Errorf("clean verified OMP smoke process group: %w", cleanupErr)
 		}
-	}
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return fmt.Errorf("%w after %s", errExecutionTimeout, config.timeout)
 	}
 	if errors.Is(runErr, exec.ErrWaitDelay) {
 		return fmt.Errorf("%w after %s", errInheritedPipe, config.pipeWait)

@@ -47,7 +47,6 @@ func TestMain(testMain *testing.M) {
 }
 
 func TestRunVersionSmoke_ExactVersionAndArguments_Succeeds(t *testing.T) {
-	t.Parallel()
 	artifact := testArtifact(t)
 
 	err := runVersionSmoke(smokeConfig{
@@ -64,7 +63,6 @@ func TestRunVersionSmoke_ExactVersionAndArguments_Succeeds(t *testing.T) {
 }
 
 func TestRunVersionSmoke_WrongOrMalformedVersion_Fails(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name string
 		mode string
@@ -78,7 +76,6 @@ func TestRunVersionSmoke_WrongOrMalformedVersion_Fails(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			artifact := testArtifact(t)
 
 			err := runVersionSmoke(smokeConfig{
@@ -97,7 +94,6 @@ func TestRunVersionSmoke_WrongOrMalformedVersion_Fails(t *testing.T) {
 }
 
 func TestRunVersionSmoke_NonzeroOrSignal_Fails(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name string
 		mode string
@@ -109,7 +105,6 @@ func TestRunVersionSmoke_NonzeroOrSignal_Fails(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			artifact := testArtifact(t)
 
 			err := runVersionSmoke(smokeConfig{
@@ -128,7 +123,6 @@ func TestRunVersionSmoke_NonzeroOrSignal_Fails(t *testing.T) {
 }
 
 func TestRunVersionSmoke_Timeout_KillsProcessGroup(t *testing.T) {
-	t.Parallel()
 	childPIDPath := filepath.Join(t.TempDir(), "child.pid")
 	artifact := testArtifact(t)
 	started := time.Now()
@@ -154,7 +148,6 @@ func TestRunVersionSmoke_Timeout_KillsProcessGroup(t *testing.T) {
 }
 
 func TestRunVersionSmoke_InheritedPipeHang_FailsAndKillsProcessGroup(t *testing.T) {
-	t.Parallel()
 	childPIDPath := filepath.Join(t.TempDir(), "child.pid")
 	artifact := testArtifact(t)
 	started := time.Now()

@@ -184,6 +184,6 @@ func validCLIArgs(artifact, architecture string) []string {
 		"--artifact", artifact,
 		"--expected-version", expectedFixtureVersion,
 		"--architecture", architecture,
-		"--timeout", "2s",
+		"--timeout", "10s",
 	}
 }

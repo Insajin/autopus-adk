@@ -38,6 +38,8 @@ All notable changes to this project will be documented in this file.
 
 - **v0.50.96 verified-exec OMP 기동 경계 수정** (2026-08-06): authority-free smoke가 생성하던 synthetic model catalog의 `contextWindow: 0` 때문에 OMP 17.2.7이 RPC ready 전에 설정을 거부하던 문제를 수정했다. catalog에는 managed active 기본값 `262144`를 명시하고, root-owned binary의 cold start가 기존 8초를 넘는 macOS runner에서도 바깥 30초 gate 안에서 완료되도록 내부 readiness 한도를 20초로 조정했다. 테스트 OMP fixture도 0 이하 context window를 거부해 같은 회귀를 차단한다.
 
+- **v0.50.96 macOS execsmoke process-group 종료 순서 수정** (2026-08-06): timeout 시 `exec.Cmd.Cancel`이 격리 process group을 이미 종료한 뒤 reaped leader PID로 동일한 group에 두 번째 `SIGKILL`을 보내, 빠르게 재사용된 PGID에서 `EPERM`을 반환하며 원래 timeout 결과를 덮던 경쟁을 제거했다. deadline은 cancel 완료 직후 `errExecutionTimeout`으로 확정하고, 정상 종료·inherited-pipe 경로만 후속 group cleanup을 수행한다. subprocess 기반 smoke 테스트는 직렬화하고 UID-isolated CLI fixture 한도를 10초로 넓혀 race build의 cold start 부하에도 결정적으로 검증한다.
+
 - **v0.50.95 실패·미게시 릴리스 시도 보존** (2026-08-05): production evidence, 전체 CI·보안·`83.2%` coverage는 통과했고 protected environment의 exact tag allowlist와 environment-level source pin도 수렴했지만, `macos-15` release job이 존재하지 않는 `/usr/bin/test`를 호출해 root-owned OMP canary materialization 단계에서 중단되었다. `v0.50.95` source tag와 zero-parent annotated `omp-context-evidence-v0.50.95` tag는 immutable 실패 기록으로 보존하며 삭제·이동·재사용하지 않는다. GitHub Release는 생성되지 않았고 Homebrew Formula/Cask도 변경되지 않았다.
 
 - **v0.50.94 실패·미게시 릴리스 시도 보존** (2026-08-04): A22 재시도는 변경하지 않은 전체 커버리지 기준 `83.0%`에 대해 `82.9%`가 두 차례 관측되어 게시 전에 중단되었다. `v0.50.94` source tag와 `omp-context-evidence-v0.50.94` tag/ref는 이 실패 시도의 immutable 기록이며 current release 좌표가 아니고 삭제·이동·재사용하지 않는다. 이 시도에서는 GitHub Release가 생성·게시되지 않았고 Homebrew Formula/Cask도 변경되지 않았다.
