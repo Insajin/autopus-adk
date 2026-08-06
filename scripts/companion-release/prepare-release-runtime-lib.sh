@@ -87,7 +87,7 @@ run_canary() {
   /usr/bin/sudo -n /usr/bin/install -d -m 0700 -o nobody -g nobody \
     "$isolated_project" "$isolated_home" "$isolated_tmp"
   /usr/bin/sudo -n /bin/cp -R "$project/." "$isolated_project/"
-  /usr/bin/sudo -n /usr/sbin/chown -R "${nobody_uid}:${nobody_gid}" "$isolated_project"
+  /usr/bin/sudo -n /usr/sbin/chown -R nobody:nobody "$isolated_project"
   /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$candidate" "$isolated_candidate"
   /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$omp_executable" "$isolated_omp"
   (umask 077; printf '%s\n' "${!credential_locator}" >"$credential_staging")
