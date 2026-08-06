@@ -25,6 +25,8 @@ contains "$prep" 'run_canary "$final_candidate"'
 contains "$prep" "cmp \"\$static_policy_file\" \"\$final_static_policy_file\""
 contains "$prep" 'watch_dispatch omp-context-promote.yml'
 contains "$prep_lib" '/usr/bin/sudo -n -u nobody /usr/bin/env -i'
+contains "$prep_lib" '/usr/sbin/chown -R nobody:nobody "$isolated_project"'
+not_contains "$prep_lib" '"${nobody_uid}:${nobody_gid}"'
 contains "$prep_lib" '/usr/bin/install -m 0440 -o root -g nobody'
 contains "$prep_lib" 'IFS= read -r credential <"$credential_file"'
 not_contains "$prep_lib" '"$credential_locator=${!credential_locator}"'
