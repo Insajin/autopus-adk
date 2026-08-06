@@ -151,5 +151,6 @@ bash "$tests_dir/release-current-signature-hardening-test.sh"
 bash "$tests_dir/release-lineage-pins-hardening-test.sh"
 bash "$tests_dir/release-omp-context-evidence-hardening-test.sh"
 bash "$tests_dir/release-prep-hardening-test.sh"
+bash "$tests_dir/release-prep-environment-inheritance-test.sh"
 
 printf 'release hardening test: PASS\n'

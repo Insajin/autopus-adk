@@ -146,14 +146,11 @@ tag_git_config=(
 env "${tag_git_config[@]}" git -C "$signing_probe" tag -s release-signing-probe HEAD -m 'release signing probe'
 env "${tag_git_config[@]}" git -C "$signing_probe" verify-tag refs/tags/release-signing-probe >/dev/null
 
-
-matched_variable() {
-  local name=$1 repository_value environment_value
-  repository_value=$(gh variable get "$name" --repo "$repository") || fail "repository variable ${name} is unavailable"
-  environment_value=$(gh variable get "$name" --repo "$repository" --env "$environment_name") || fail "environment variable ${name} is unavailable"
-  [[ -n "$repository_value" && "$repository_value" == "$environment_value" ]] || fail "repository/environment variable ${name} differs"
-  printf '%s' "$repository_value"
-}
+environment_variables=$(gh variable list --repo "$repository" --env "$environment_name" --json name,value) ||
+  fail 'protected environment variables are unavailable'
+jq -e 'type == "array" and all(.[]; (.name | type) == "string" and (.value | type) == "string") and (([.[].name] | length) == ([.[].name] | unique | length))' \
+  <<<"$environment_variables" >/dev/null || fail 'protected environment variable inventory is malformed'
+readonly environment_variables
 lineage_key_id=$(matched_variable ADK_COMPANION_KEY_ID)
 lineage_handoff=$(matched_variable ADK_COMPANION_HANDOFF)
 rollback_floor=$(matched_variable ADK_COMPANION_ROLLBACK_FLOOR)

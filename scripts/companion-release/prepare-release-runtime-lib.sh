@@ -24,7 +24,8 @@ cleanup() {
       printf 'companion release prep: warning: prep lock ownership could not be inspected\n' >&2
     fi
   fi
-  for record in "${isolation_roots[@]}"; do
+  for record in "${isolation_roots[@]-}"; do
+    [[ -n "$record" ]] || continue
     if ! remove_isolation_root "$record"; then
       printf 'companion release prep: isolated canary cleanup failed for %s\n' "${record%%|*}" >&2
       cleanup_failed=1
@@ -34,6 +35,26 @@ cleanup() {
   if [[ "$status" -eq 0 && "$cleanup_failed" -ne 0 ]]; then status=1; fi
   exit "$status"
 }
+matched_variable() {
+  local name=$1 repository_value environment_count environment_value
+  repository_value=$(gh variable get "$name" --repo "$repository") ||
+    fail "repository variable ${name} is unavailable"
+  environment_count=$(jq --arg name "$name" '[.[] | select(.name == $name)] | length' \
+    <<<"$environment_variables")
+  case "$environment_count" in
+    0) ;;
+    1)
+      environment_value=$(jq -r --arg name "$name" '.[] | select(.name == $name) | .value' \
+        <<<"$environment_variables")
+      [[ "$repository_value" == "$environment_value" ]] ||
+        fail "repository/environment variable ${name} differs"
+      ;;
+    *) fail "environment variable ${name} is ambiguous" ;;
+  esac
+  [[ -n "$repository_value" ]] || fail "repository variable ${name} is unavailable"
+  printf '%s' "$repository_value"
+}
+
 build_candidate() {
   local policy=$1 output=$2
   env GITHUB_REF_NAME="$release_tag" GITHUB_SHA="$source_commit" COMPANION_SOURCE_TREE="$source_tree" OMP_CONTEXT_STATIC_POLICY_B64="$policy" \
