@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/insajin/autopus-adk/pkg/pipeline"
 )
@@ -239,6 +240,32 @@ func pipelineOMPActiveNativeFixture(args []string) (string, string, bool) {
 }
 
 func runPipelineOMPActiveRPCFixture() int {
+	body, err := os.ReadFile(filepath.Join(os.Getenv("PI_CODING_AGENT_DIR"), "models.yml"))
+	if err != nil {
+		return 80
+	}
+	var catalog struct {
+		Providers map[string]struct {
+			Models []struct {
+				ContextWindow int `yaml:"contextWindow"`
+			} `yaml:"models"`
+		} `yaml:"providers"`
+	}
+	if err := yaml.Unmarshal(body, &catalog); err != nil {
+		return 80
+	}
+	modelCount := 0
+	for _, provider := range catalog.Providers {
+		for _, model := range provider.Models {
+			if model.ContextWindow <= 0 {
+				return 80
+			}
+			modelCount++
+		}
+	}
+	if modelCount == 0 {
+		return 80
+	}
 	logFile, err := os.OpenFile(os.Getenv("AUTOPUS_TEST_OMP_ACTIVE_LOG"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return 81
