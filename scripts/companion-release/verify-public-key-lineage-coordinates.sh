@@ -23,7 +23,7 @@ readonly A17_REPOSITORY='Insajin/autopus-adk' A18_TAG='v0.50.89' A18_VERSION='0.
 readonly A18_REPOSITORY='Insajin/autopus-adk' A19_TAG='v0.50.90' A19_VERSION='0.50.90'
 readonly A19_REPOSITORY='Insajin/autopus-adk' A20_TAG='v0.50.91' A20_VERSION='0.50.91'
 readonly A20_REPOSITORY='Insajin/autopus-adk' A21_TAG='v0.50.92' A21_VERSION='0.50.92'
-readonly A21_REPOSITORY='Insajin/autopus-adk' A22_TAG='v0.50.96' A22_VERSION='0.50.96'
+readonly A21_REPOSITORY='Insajin/autopus-adk' A22_TAG='v0.50.97' A22_VERSION='0.50.97'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 
 require_environment GITHUB_REF_NAME

@@ -88,7 +88,7 @@ func validOMPContextPromotionReportV1() OMPContextPromotionReportV1 {
 		Candidate: OMPContextPromotionCandidateV1{Repository: "Insajin/autopus-adk", Revision: "0123456789abcdef0123456789abcdef01234567", TreeSHA: "1123456789abcdef0123456789abcdef01234567", ArtifactSHA256: hash("artifact")},
 		Policy:    OMPContextPromotionPolicyReportV1{PolicyID: "omp-context-active-v1", PolicyDigest: hash("policy"), HistoryMode: "active", MemoryMode: "off", MinPairCount: 20, MinReductionBasisPoints: 2000},
 		Runtime: OMPContextPromotionRuntimeV1{
-			AutoVersion: "v0.50.96", AutoBinarySHA256: hash("auto"), OMPVersion: "omp/17.2.7",
+			AutoVersion: "v0.50.97", AutoBinarySHA256: hash("auto"), OMPVersion: "omp/17.2.7",
 			OMPExecutableSHA256: hash("omp"), ExecutionClass: "external-live", ProductionPathEquivalent: true,
 			RuntimeKind: "omp-pipeline-managed-rpc", PipelineImplementationDigest: hash("pipeline-implementation"),
 		},

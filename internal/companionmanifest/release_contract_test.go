@@ -13,11 +13,11 @@ import (
 func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"v0.50.96", "refs/tags/v0.50.96",
+		"v0.50.97", "refs/tags/v0.50.97",
 		"environment:", "adk-companion-release",
 		"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
 		"Verify operator-owned draft release reservation",
-		`[$all[] | select(.draft == true and .name == "v0.50.96")]`,
+		`[$all[] | select(.draft == true and .name == "v0.50.97")]`,
 		"$tagged[0].id == $named[0].id",
 		"Verify reserved release was published",
 		".author.id == 204883817", ".immutable == true",
@@ -30,8 +30,8 @@ func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *test
 		t.Fatal("arbitrary version tags can enter the protected release job")
 	}
 	for _, forbidden := range []string{
-		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'", "'v0.50.76'", "'v0.50.77'", "'v0.50.78'", "'v0.50.79'", "'v0.50.80'", "'v0.50.81'", "'v0.50.82'", "'v0.50.83'", "'v0.50.84'", "'v0.50.85'", "'v0.50.86'", "'v0.50.87'", "'v0.50.88'", "'v0.50.89'", "'v0.50.90'", "'v0.50.91'", "'v0.50.92'", "'v0.50.93'", "'v0.50.94'", "'v0.50.95'",
-		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75", "refs/tags/v0.50.76", "refs/tags/v0.50.77", "refs/tags/v0.50.78", "refs/tags/v0.50.79", "refs/tags/v0.50.80", "refs/tags/v0.50.81", "refs/tags/v0.50.82", "refs/tags/v0.50.83", "refs/tags/v0.50.84", "refs/tags/v0.50.85", "refs/tags/v0.50.86", "refs/tags/v0.50.87", "refs/tags/v0.50.88", "refs/tags/v0.50.89", "refs/tags/v0.50.90", "refs/tags/v0.50.91", "refs/tags/v0.50.92", "refs/tags/v0.50.93", "refs/tags/v0.50.94", "refs/tags/v0.50.95",
+		"'v0.50.69'", "'v0.50.70'", "'v0.50.71'", "'v0.50.72'", "'v0.50.73'", "'v0.50.74'", "'v0.50.75'", "'v0.50.76'", "'v0.50.77'", "'v0.50.78'", "'v0.50.79'", "'v0.50.80'", "'v0.50.81'", "'v0.50.82'", "'v0.50.83'", "'v0.50.84'", "'v0.50.85'", "'v0.50.86'", "'v0.50.87'", "'v0.50.88'", "'v0.50.89'", "'v0.50.90'", "'v0.50.91'", "'v0.50.92'", "'v0.50.93'", "'v0.50.94'", "'v0.50.95'", "'v0.50.96'",
+		"refs/tags/v0.50.69", "refs/tags/v0.50.70", "refs/tags/v0.50.71", "refs/tags/v0.50.72", "refs/tags/v0.50.73", "refs/tags/v0.50.74", "refs/tags/v0.50.75", "refs/tags/v0.50.76", "refs/tags/v0.50.77", "refs/tags/v0.50.78", "refs/tags/v0.50.79", "refs/tags/v0.50.80", "refs/tags/v0.50.81", "refs/tags/v0.50.82", "refs/tags/v0.50.83", "refs/tags/v0.50.84", "refs/tags/v0.50.85", "refs/tags/v0.50.86", "refs/tags/v0.50.87", "refs/tags/v0.50.88", "refs/tags/v0.50.89", "refs/tags/v0.50.90", "refs/tags/v0.50.91", "refs/tags/v0.50.92", "refs/tags/v0.50.93", "refs/tags/v0.50.94", "refs/tags/v0.50.95", "refs/tags/v0.50.96",
 	} {
 		if strings.Contains(release, forbidden) {
 			t.Fatalf("historical tag %q can enter the A22 release workflow", forbidden)
@@ -74,7 +74,7 @@ func TestCompanionReleasePreflight_IsReadOnlyExactMacOSGate(t *testing.T) {
 	for _, required := range []string{
 		"workflow_dispatch:", "release_tag:", "source_commit:", "source_tree:", "static_policy_b64:",
 		"dispatch_nonce:", "run-name: Companion release preflight",
-		"runs-on: macos-15", "timeout-minutes: 20", "v0.50.96",
+		"runs-on: macos-15", "timeout-minutes: 20", "v0.50.97",
 		"scripts/companion-release/build-omp-context-candidate.sh",
 		`candidate_root="/Library/autopus-adk-release-preflight-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"`,
 		`/usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$staging" "$candidate"`,
@@ -292,8 +292,8 @@ func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *t
 			releaseIndex, signingCleanupIndex, evidenceIndex, tokenIndex, bridgeIndex, cleanupIndex)
 	}
 	for _, exact := range []string{
-		"GITHUB_REF_NAME='v0.50.96'",
-		"COMPANION_VERSION='0.50.96'",
+		"GITHUB_REF_NAME='v0.50.97'",
+		"COMPANION_VERSION='0.50.97'",
 		"COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}",
 		`COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"`,
 		`HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN"`,
