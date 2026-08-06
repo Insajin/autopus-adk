@@ -218,7 +218,7 @@ jq -cn --arg challenge "$challenge_digest" '{schema_version:"autopus.omp_context
 sequence=0
 for task_index in $(seq 0 19); do
   task_id="sha256:$(printf '%s' "${challenge_digest}:task:${task_index}" | shasum -a 256 | awk '{print $1}')"
-  prompt=$(printf 'identical evaluation task %02d requiring safe deterministic output %d' "$task_index" "$((task_index % 7))")
+  prompt=$(printf 'Return exactly EVALUATION-%02d-%d on one line. Do not call tools, execute commands, or add any other text.' "$task_index" "$((task_index % 7))")
   if (( task_index % 2 == 0 )); then variants=(A B); else variants=(B A); fi
   pair_sequence=0
   for variant in "${variants[@]}"; do
