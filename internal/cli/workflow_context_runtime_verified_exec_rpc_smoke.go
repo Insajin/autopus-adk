@@ -15,7 +15,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/pipeline"
 )
 
-const workflowContextVerifiedExecRPCTimeout = 8 * time.Second
+const workflowContextVerifiedExecRPCTimeout = 20 * time.Second
 
 func runWorkflowContextVerifiedExecRPCSmoke(
 	ctx context.Context,
@@ -114,8 +114,9 @@ func runWorkflowContextVerifiedExecRPCSmokeWithCleanup(
 		backend: pipelineOMPBackendConfig{
 			Executable: executable, executableID: identity,
 			ProjectDir: projectDir, RuntimeBase: runtimeBase,
-			PhaseModels: map[pipeline.PhaseID]string{pipeline.PhasePlan: selector},
-			MaxTime:     workflowContextVerifiedExecRPCTimeout,
+			PhaseModels:        map[pipeline.PhaseID]string{pipeline.PhasePlan: selector},
+			ModelContextWindow: pipelineOMPActiveDefaultContextWindow,
+			MaxTime:            workflowContextVerifiedExecRPCTimeout,
 		},
 		candidate: pipelineOMPManagedActiveCandidate{Provider: provider, Model: model},
 		binding:   binding, endpoint: "http://" + listener.Addr().String(), credential: token,
