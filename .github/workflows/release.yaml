@@ -81,7 +81,7 @@ jobs:
           set -euo pipefail
           candidate="$RUNNER_TEMP/auto-darwin-arm64-production-candidate"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_SHA="$GITHUB_SHA" \
+            COMPANION_RELEASE_TAG="$GITHUB_REF_NAME" GITHUB_SHA="$GITHUB_SHA" \
             COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
             OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
             scripts/companion-release/build-omp-context-candidate.sh "$candidate"

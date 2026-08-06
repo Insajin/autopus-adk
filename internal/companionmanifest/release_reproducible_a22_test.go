@@ -25,8 +25,16 @@ func TestGoReleaser_A22UsesCommitTimeTrimmedReproducibleBuilds(t *testing.T) {
 
 func TestReleaseWorkflow_A22BuildsCanonicalCandidateBeforeAuthority(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
+	preflight := readReleaseFile(t, ".github/workflows/companion-release-preflight.yml")
+	runtime := readReleaseFile(t, "scripts/companion-release/prepare-release-runtime-lib.sh")
+	builder := readReleaseFile(t, "scripts/companion-release/build-omp-context-candidate.sh")
+	surface := strings.Join([]string{release, preflight, runtime, builder}, "\n")
 	for _, required := range []string{
 		"scripts/companion-release/build-omp-context-candidate.sh",
+		`"${COMPANION_RELEASE_TAG:-}" == "$expected_tag"`,
+		`COMPANION_RELEASE_TAG="$GITHUB_REF_NAME"`,
+		"COMPANION_RELEASE_TAG: ${{ inputs.release_tag }}",
+		`COMPANION_RELEASE_TAG="$release_tag"`,
 		"go build -trimpath -buildvcs=false",
 		"CGO_ENABLED=0",
 		"GOOS=darwin",
@@ -35,9 +43,11 @@ func TestReleaseWorkflow_A22BuildsCanonicalCandidateBeforeAuthority(t *testing.T
 		"pkg/version.sourceCommit=${GITHUB_SHA}",
 		"pkg/version.sourceTree=${COMPANION_SOURCE_TREE}",
 	} {
-		if !strings.Contains(release+"\n"+
-			readReleaseFile(t, "scripts/companion-release/build-omp-context-candidate.sh"), required) {
+		if !strings.Contains(surface, required) {
 			t.Fatalf("canonical candidate build contract missing %q", required)
 		}
+	}
+	if strings.Contains(preflight, "GITHUB_REF_NAME: ${{ inputs.release_tag }}") {
+		t.Fatal("preflight attempts to override a reserved GitHub environment variable")
 	}
 }

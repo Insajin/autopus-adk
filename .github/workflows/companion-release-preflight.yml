@@ -78,15 +78,25 @@ jobs:
         id: candidate
         shell: bash
         env:
-          GITHUB_REF_NAME: ${{ inputs.release_tag }}
+          COMPANION_RELEASE_TAG: ${{ inputs.release_tag }}
           GITHUB_SHA: ${{ inputs.source_commit }}
           COMPANION_SOURCE_TREE: ${{ inputs.source_tree }}
           OMP_CONTEXT_STATIC_POLICY_B64: ${{ inputs.static_policy_b64 }}
         run: |
           set -euo pipefail
-          candidate="$RUNNER_TEMP/auto-darwin-arm64-release-preflight"
-          scripts/companion-release/build-omp-context-candidate.sh "$candidate"
+          [[ "$(/usr/bin/stat -f '%u:%Lp' /Library)" == '0:755' ]]
+          staging="$RUNNER_TEMP/auto-release-preflight"
+          candidate_root="/Library/autopus-adk-release-preflight-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          [[ "$candidate_root" =~ ^/Library/autopus-adk-release-preflight-[0-9]+-[0-9]+$ &&
+             ! -e "$candidate_root" && ! -L "$candidate_root" ]]
+          scripts/companion-release/build-omp-context-candidate.sh "$staging"
+          /usr/bin/sudo -n /usr/bin/install -d -m 0755 -o root -g wheel "$candidate_root"
+          candidate="$candidate_root/auto"
+          /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$staging" "$candidate"
+          rm -f -- "$staging"
           [[ "$("$candidate" version --short)" == '0.50.96' ]]
+          [[ "$(/usr/bin/stat -f '%u:%Lp' "$candidate_root")" == '0:755' &&
+             "$(/usr/bin/stat -f '%u:%Lp' "$candidate")" == '0:555' ]]
           printf 'path=%s\n' "$candidate" >> "$GITHUB_OUTPUT"
 
       - name: Verify Darwin release execution support
@@ -114,6 +124,26 @@ jobs:
           go build -trimpath -o "$gate" ./scripts/companion-release/execsmoke
           "$gate" --artifact "$CANDIDATE" --expected-version 0.50.96 \
             --architecture arm64 --timeout 30s
+
+      - name: Remove preflight candidate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f -- "$RUNNER_TEMP/auto-release-preflight"
+          candidate_root="/Library/autopus-adk-release-preflight-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          [[ "$candidate_root" =~ ^/Library/autopus-adk-release-preflight-[0-9]+-[0-9]+$ ]]
+          if [[ ! -e "$candidate_root" && ! -L "$candidate_root" ]]; then exit 0; fi
+          [[ ! -L "$candidate_root" &&
+             "$(/usr/bin/stat -f '%u:%Lp' /Library)" == '0:755' &&
+             "$(/usr/bin/stat -f '%u:%Lp' "$candidate_root")" == '0:755' ]]
+          candidate="$candidate_root/auto"
+          [[ ! -L "$candidate" ]]
+          if [[ -e "$candidate" ]]; then
+            [[ "$(/usr/bin/stat -f '%u:%Lp' "$candidate")" == '0:555' ]]
+          fi
+          /usr/bin/sudo -n /bin/rm -rf -- "$candidate_root"
+          [[ ! -e "$candidate_root" && ! -L "$candidate_root" ]]
 
       - name: Remove isolated OMP release canary
         if: always()
