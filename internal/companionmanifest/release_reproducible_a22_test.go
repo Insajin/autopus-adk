@@ -42,9 +42,16 @@ func TestReleaseWorkflow_A22BuildsCanonicalCandidateBeforeAuthority(t *testing.T
 		"GOARM64=v8.0",
 		"pkg/version.sourceCommit=${GITHUB_SHA}",
 		"pkg/version.sourceTree=${COMPANION_SOURCE_TREE}",
+		`TZ=UTC git show -s --date='format-local:%Y-%m-%dT%H:%M:%SZ'`,
+		`short_commit=${GITHUB_SHA:0:8}`,
 	} {
 		if !strings.Contains(surface, required) {
 			t.Fatalf("canonical candidate build contract missing %q", required)
+		}
+	}
+	for _, obsolete := range []string{`--format=%cI`, `${GITHUB_SHA:0:7}`} {
+		if strings.Contains(builder, obsolete) {
+			t.Fatalf("canonical candidate builder retains GoReleaser-incompatible input %q", obsolete)
 		}
 	}
 	if strings.Contains(preflight, "GITHUB_REF_NAME: ${{ inputs.release_tag }}") {

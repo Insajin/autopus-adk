@@ -99,6 +99,22 @@ func TestWorkflowContextObserveSession_WritesObservedBodyFreePromotionEvidence(t
 	verifyWorkflowContextObserveProviderLog(t, logPath, taskBodies)
 }
 
+func TestWorkflowContextObserveSession_WritesBodyFreeErrorFrame(t *testing.T) {
+	var output bytes.Buffer
+	err := RunWorkflowContextObserveSession(
+		context.Background(), strings.NewReader("{}\n"), &output, workflowContextObserveSessionOptions{},
+	)
+	require.ErrorContains(t, err, "handshake is invalid")
+	responses := decodeWorkflowContextObserveResponses(t, output.Bytes())
+	require.Len(t, responses, 1)
+	assert.Equal(t, workflowContextObserveSessionResponseSchema, responses[0].SchemaVersion)
+	assert.Equal(t, "error", responses[0].Type)
+	assert.Equal(t, "input_invalid", responses[0].ErrorCode)
+	assert.NotContains(t, output.String(), err.Error())
+	assert.Equal(t, "network_transport",
+		workflowContextObserveSessionErrorCode(fmt.Errorf("provider timed out")))
+}
+
 func TestWorkflowContextObserveSessionHelp_DocumentsExplicitLiveLoopbackCanary(t *testing.T) {
 	cmd := newWorkflowContextObserveSessionCmd()
 	var output bytes.Buffer
@@ -181,7 +197,7 @@ func workflowContextObserveEvidenceFixture(t *testing.T, challenge string) (
 		}},
 		deliveryOptions: deliveryOptions, delivery: delivery, canonicalPromptHash: workflowContextRuntimeHash(delivery.Prompt),
 		ompVersion: "omp/17.2.7", ompExecutableSHA256: fmt.Sprintf("sha256:%x", backend.executableID.digest[:]),
-		autoVersion: "0.50.97", autoExecutableSHA256: autoSHA, candidateTree: tree,
+		autoVersion: "0.50.98", autoExecutableSHA256: autoSHA, candidateTree: tree,
 		sandboxMode: pipelineOMPActiveSandboxManaged,
 	}
 	options := workflowContextObserveSessionOptions{

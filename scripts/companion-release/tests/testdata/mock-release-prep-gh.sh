@@ -81,14 +81,28 @@ case "$command" in
     case "$method:$endpoint" in
       GET:repos/Insajin/autopus-adk) printf '%s\n' '{"permissions":{"admin":true}}' ;;
       'GET:repos/Insajin/autopus-adk/releases?per_page=100')
+        visibility_delay=${MOCK_RELEASE_PREP_RELEASE_VISIBILITY_DELAY:-0}
+        if [[ -f "$state/release-created.json" && "$visibility_delay" -gt 0 ]]; then
+          visibility_delay_file="$state/release-visibility-delay"
+          if [[ ! -f "$visibility_delay_file" ]]; then
+            printf '%s\n' "$visibility_delay" >"$visibility_delay_file"
+          fi
+          remaining_visibility_delay=$(<"$visibility_delay_file")
+          if [[ "$remaining_visibility_delay" -gt 0 ]]; then
+            printf '%s\n' "$((remaining_visibility_delay - 1))" >"$visibility_delay_file"
+            printf '%s\n' 'release-reservation-not-yet-visible' >>"$log"
+            jq -c '[[.[] | select(.id != 996)]]' "$state/releases.json"
+            exit 0
+          fi
+        fi
         jq -c '[.]' "$state/releases.json"
         ;;
-      GET:repos/Insajin/autopus-adk/releases/tags/v0.50.97)
-        jq -ce '.[] | select(.tag_name == "v0.50.97")' "$state/releases.json"
+      GET:repos/Insajin/autopus-adk/releases/tags/v0.50.98)
+        jq -ce '.[] | select(.tag_name == "v0.50.98")' "$state/releases.json"
         ;;
       POST:repos/Insajin/autopus-adk/releases)
-        [[ "$field_tag" == 'v0.50.97' && "$field_target" =~ ^[0-9a-f]{40}$ &&
-           "$field_release_name" == 'v0.50.97' &&
+        [[ "$field_tag" == 'v0.50.98' && "$field_target" =~ ^[0-9a-f]{40}$ &&
+           "$field_release_name" == 'v0.50.98' &&
            "$field_draft" == 'true' && "$field_prerelease" == 'false' ]] || exit 65
         jq -e --arg tag "$field_tag" 'all(.[]; .tag_name != $tag)' \
           "$state/releases.json" >/dev/null || exit 65
@@ -118,16 +132,16 @@ case "$command" in
         jq -n --slurpfile policies "$state/deployment-policies.json" '{branch_policies:$policies[0]}'
         ;;
       POST:repos/Insajin/autopus-adk/environments/adk-companion-release/deployment-branch-policies)
-        [[ "$field_name" == 'v0.50.97' && "$field_type" == 'tag' ]] || exit 65
+        [[ "$field_name" == 'v0.50.98' && "$field_type" == 'tag' ]] || exit 65
         write_count
-        jq '[.[] | select(.name != "v0.50.97")] + [{id:596,type:"tag",name:"v0.50.97"}]' \
+        jq '[.[] | select(.name != "v0.50.98")] + [{id:596,type:"tag",name:"v0.50.98"}]' \
           "$state/deployment-policies.json" >"$state/deployment-policies.json.next"
         mv "$state/deployment-policies.json.next" "$state/deployment-policies.json"
         printf '%s\n' 'policy-create' >>"$log"
         if [[ "${MOCK_RELEASE_PREP_POLICY_RESPONSE_LOST:-0}" -eq 1 ]]; then
           exit 75
         fi
-        printf '%s\n' '{"id":596,"type":"tag","name":"v0.50.97"}'
+        printf '%s\n' '{"id":596,"type":"tag","name":"v0.50.98"}'
         ;;
       DELETE:repos/Insajin/autopus-adk/environments/adk-companion-release/deployment-branch-policies/596)
         write_count

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/promptlayer"
@@ -63,6 +64,7 @@ type workflowContextObserveSessionResponse struct {
 	OwnedRootsRemaining      int                                 `json:"owned_roots_remaining,omitempty"`
 	CleanupVerified          bool                                `json:"cleanup_verified,omitempty"`
 	ProcessesRemaining       int                                 `json:"processes_remaining,omitempty"`
+	ErrorCode                string                              `json:"error_code,omitempty"`
 }
 
 type workflowContextObserveSessionOptions struct {
@@ -86,4 +88,36 @@ type workflowContextObserveSessionOptions struct {
 	OraclePolicyDigest  string
 	PromotionPolicy     promptlayer.OMPContextPromotionPolicyV1
 	EvidenceValidFor    time.Duration
+}
+
+func workflowContextObserveSessionErrorCode(runErr error) string {
+	if runErr == nil {
+		return ""
+	}
+	message := strings.ToLower(runErr.Error())
+	switch {
+	case strings.Contains(message, "handshake is invalid"),
+		strings.Contains(message, "shutdown is invalid"),
+		strings.Contains(message, "input continued after shutdown"),
+		strings.Contains(message, "call ") &&
+			(containsAny(message, " is invalid", "repeats a task", "pair authority changed")):
+		return "input_invalid"
+	case containsAny(message,
+		"private or unsafe output",
+		"quality oracle changed",
+		"process lifecycle changed",
+		"persistent process pair is invalid",
+		"provider authority binding is unstable",
+		"task or reusable-session cardinality is invalid"):
+		return "runtime_invariant_failed"
+	case strings.Contains(message, "failed readback"):
+		return "runtime_readback_failed"
+	case strings.Contains(message, "canonical admission failed"):
+		return "runtime_admission_failed"
+	}
+	class, _ := classifyOperationalError("", runErr)
+	if class == "unknown" {
+		return "runtime_failed"
+	}
+	return class
 }
