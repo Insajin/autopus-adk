@@ -5,6 +5,7 @@ umask 077
 tests_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 script_dir=$(cd -- "$tests_dir/.." && pwd)
 runtime_lib="$script_dir/prepare-release-runtime-lib.sh"
+prep="$script_dir/prepare-release.sh"
 mock_gh="$tests_dir/testdata/mock-release-prep-gh.sh"
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/release-prep-environment.XXXXXX")
 trap 'rm -rf -- "$temp_dir"' EXIT
@@ -22,6 +23,17 @@ repository='Insajin/autopus-adk'
 environment_name='adk-companion-release'
 # shellcheck source=../prepare-release-runtime-lib.sh
 source "$runtime_lib"
+grep -Fq "trap 'cleanup \$?' EXIT" "$prep" ||
+  fail 'release prep does not pass the original exit status into cleanup'
+
+validation_error="$temp_dir/validation-error"
+if (validate_canary "$temp_dir/missing-project" "$temp_dir/missing-output" "$temp_dir/missing-candidate") 2>"$validation_error"; then
+  fail 'missing production report validation succeeded'
+fi
+grep -Fq 'production report is absent' "$validation_error" ||
+  fail 'canary validation failed before deriving its report path'
+! grep -Fq 'unbound variable' "$validation_error" ||
+  fail 'canary validation derived its report path before binding project'
 
 printf '%s\n' '[]' >"$state/environment-variables.json"
 environment_variables=$(gh variable list --repo "$repository" --env "$environment_name" --json name,value)
@@ -45,8 +57,22 @@ mkdir -p "$empty_cleanup_dir"
   retain_prep_lock=0
   isolation_roots=()
   temp_dir="$empty_cleanup_dir"
-  cleanup
+  cleanup 0
 ) || fail 'empty isolation cleanup failed'
 [[ ! -e "$empty_cleanup_dir" ]] || fail 'empty isolation cleanup left temporary state'
+
+failure_cleanup_dir="$temp_dir/failure-cleanup"
+mkdir -p "$failure_cleanup_dir"
+if (
+  evidence_source_commit=''
+  retain_prep_lock=0
+  isolation_roots=()
+  temp_dir="$failure_cleanup_dir"
+  trap 'cleanup $?' EXIT
+  false
+); then
+  fail 'cleanup erased a failing release-prep status'
+fi
+[[ ! -e "$failure_cleanup_dir" ]] || fail 'failing cleanup left temporary state'
 [[ "$(<"$state/write-count")" == '0' ]] || fail 'read-only checks mutated release state'
 printf 'release prep environment test: PASS\n'

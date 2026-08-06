@@ -110,7 +110,7 @@ rm -f -- "$runtime_lib"
 # shellcheck source=/dev/null
 source /dev/fd/9
 exec 9<&-
-trap cleanup EXIT
+trap 'cleanup $?' EXIT
 
 readonly staged_omp="$temp_dir/omp-v17.2.7"
 cp "$omp_executable" "$staged_omp"

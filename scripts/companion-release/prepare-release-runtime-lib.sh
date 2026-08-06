@@ -14,7 +14,7 @@ remove_isolation_root() {
   [[ ! -e "$root" && ! -L "$root" ]]
 }
 cleanup() {
-  local status=$? remote_status=0 remote_source='' record cleanup_failed=0
+  local status=$1 remote_status=0 remote_source='' record cleanup_failed=0
   if [[ -n "$evidence_source_commit" && "$retain_prep_lock" -eq 0 ]]; then
     remote_source=$(git ls-remote --exit-code --refs origin "$evidence_source_ref" 2>/dev/null) || remote_status=$?
     if [[ "$remote_status" -eq 0 && "$remote_source" == "$evidence_source_commit"$'\t'"$evidence_source_ref" ]]; then
@@ -126,7 +126,8 @@ run_canary() {
   assert_source_identity
 }
 validate_canary() {
-  local project=$1 output=$2 candidate=$3 report="$project/.autopus/runtime/omp-context/promotion-report-v1.json" candidate_sha
+  local project=$1 output=$2 candidate=$3 candidate_sha
+  local report="$project/.autopus/runtime/omp-context/promotion-report-v1.json"
   [[ -f "$report" && ! -L "$report" ]] || fail 'production report is absent'
   candidate_sha=$(shasum -a 256 "$candidate" | awk '{print $1}')
   jq -s -e '([.[] | select(.type == "handshake")] | length) == 1 and ([.[] | select(.type == "call")] | length) == 40 and ([.[] | select(.type == "call") | .task_id_digest] | unique | length) == 20 and ([.[] | select(.type == "shutdown")] | length) == 1 and .[-1].cleanup_verified == true and .[-1].calls_completed == 40' "$output" >/dev/null || fail 'production canary transcript is invalid'
