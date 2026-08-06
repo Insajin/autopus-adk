@@ -1,5 +1,5 @@
 name: Promote OMP context evidence
-run-name: Promote OMP context evidence v0.50.97 ${{ inputs.dispatch_nonce }}
+run-name: Promote OMP context evidence v0.50.98 ${{ inputs.dispatch_nonce }}
 
 on:
   workflow_dispatch:
@@ -33,7 +33,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: omp-context-evidence-v0.50.97
+  group: omp-context-evidence-v0.50.98
   cancel-in-progress: false
 
 jobs:
@@ -65,7 +65,7 @@ jobs:
           [[ "$DISPATCH_NONCE" =~ ^[0-9a-f]{32}$ ]]
           repository_url="https://github.com/${GITHUB_REPOSITORY}.git"
           main_ref='refs/heads/main'
-          lock_ref='refs/heads/omp-context-evidence-v0.50.97-source'
+          lock_ref='refs/heads/omp-context-evidence-v0.50.98-source'
           [[ "$(git ls-remote --refs "$repository_url" "$main_ref")" == \
              "$SOURCE_COMMIT"$'\t'"$main_ref" ]]
           [[ "$(git ls-remote --refs "$repository_url" "$lock_ref")" == \
@@ -94,7 +94,7 @@ jobs:
           [[ "$(git rev-parse --verify 'HEAD^{tree}')" == "$SOURCE_TREE" ]] || fail 'checkout tree differs'
           repository_url="https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --depth=1 "$repository_url" \
-            refs/heads/omp-context-evidence-v0.50.97-source
+            refs/heads/omp-context-evidence-v0.50.98-source
           [[ "$(git rev-parse --verify FETCH_HEAD)" == "$EVIDENCE_COMMIT" ]] || fail 'prep lock changed before extraction'
           [[ "$(git rev-list --parents -n 1 "$EVIDENCE_COMMIT")" == "$EVIDENCE_COMMIT" ]] || fail 'prep lock is not an orphan'
           mapfile -d '' -t entries < <(git ls-tree -z "$EVIDENCE_COMMIT")
@@ -113,7 +113,7 @@ jobs:
             --arg tree "$SOURCE_TREE" --arg artifact "sha256:${CANDIDATE_SHA256}" \
             '.candidate.repository == $repository and .candidate.revision == $revision and
              .candidate.tree_sha == $tree and .candidate.artifact_sha256 == $artifact and
-             .runtime.auto_version == "0.50.97" and (.observations | length) == 40 and
+             .runtime.auto_version == "0.50.98" and (.observations | length) == 40 and
              (.gates | length) == 14 and all(.gates[]; .status == "passed")' \
             "$report_path" >/dev/null || fail 'report coordinates or gates differ'
           report_sha256=$(sha256sum "$report_path" | awk '{print $1}')
@@ -124,7 +124,7 @@ jobs:
       - name: Upload immutable promotion report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: omp-context-promotion-report-v0.50.97
+          name: omp-context-promotion-report-v0.50.98
           path: ${{ runner.temp }}/omp-context-promotion-report/omp-context-promotion-report.v1.json
           if-no-files-found: error
           retention-days: 1
@@ -141,7 +141,7 @@ jobs:
       - name: Download immutable promotion report
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: omp-context-promotion-report-v0.50.97
+          name: omp-context-promotion-report-v0.50.98
           path: ${{ runner.temp }}/omp-context-promotion-sign
 
       - name: Sign exact report without source execution
@@ -221,7 +221,7 @@ jobs:
       - name: Upload signed promotion evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: omp-context-signed-evidence-v0.50.97
+          name: omp-context-signed-evidence-v0.50.98
           path: ${{ runner.temp }}/omp-context-promotion-sign
           if-no-files-found: error
           retention-days: 1
@@ -249,7 +249,7 @@ jobs:
       - name: Download signed promotion evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: omp-context-signed-evidence-v0.50.97
+          name: omp-context-signed-evidence-v0.50.98
           path: ${{ runner.temp }}/omp-context-promotion-verify
 
       - name: Verify signed evidence without credentials
@@ -279,7 +279,7 @@ jobs:
       - name: Upload verified promotion evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: omp-context-verified-evidence-v0.50.97
+          name: omp-context-verified-evidence-v0.50.98
           path: ${{ runner.temp }}/omp-context-promotion-verify
           if-no-files-found: error
           retention-days: 1
@@ -294,7 +294,7 @@ jobs:
       - name: Download verified promotion evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: omp-context-verified-evidence-v0.50.97
+          name: omp-context-verified-evidence-v0.50.98
           path: ${{ runner.temp }}/omp-context-promotion-publish
 
       - name: Publish exact evidence tag without source execution
@@ -325,7 +325,7 @@ jobs:
             --arg tree "$SOURCE_TREE" --arg artifact "sha256:${CANDIDATE_SHA256}" \
             '.candidate.repository == $repository and .candidate.revision == $revision and
              .candidate.tree_sha == $tree and .candidate.artifact_sha256 == $artifact and
-             .runtime.auto_version == "0.50.97"' "$REPORT_PATH" >/dev/null || fail 'report coordinate differs'
+             .runtime.auto_version == "0.50.98"' "$REPORT_PATH" >/dev/null || fail 'report coordinate differs'
           node <<'NODE'
           const crypto = require('crypto');
           const fs = require('fs');
@@ -375,8 +375,8 @@ jobs:
 
           repository_url="https://github.com/${GITHUB_REPOSITORY}.git"
           main_ref='refs/heads/main'
-          lock_ref='refs/heads/omp-context-evidence-v0.50.97-source'
-          tag_ref='refs/tags/omp-context-evidence-v0.50.97'
+          lock_ref='refs/heads/omp-context-evidence-v0.50.98-source'
+          tag_ref='refs/tags/omp-context-evidence-v0.50.98'
           [[ "$(git ls-remote --refs "$repository_url" "$main_ref")" == "$SOURCE_COMMIT"$'\t'"$main_ref" ]] || fail 'main advanced'
           [[ "$(git ls-remote --refs "$repository_url" "$lock_ref")" == "$EVIDENCE_COMMIT"$'\t'"$lock_ref" ]] || fail 'prep lock changed'
           remote_tag_status=0
@@ -407,15 +407,15 @@ jobs:
           GIT_INDEX_FILE="$evidence_index" git update-index --add \
             --cacheinfo "100644,$attestation_blob,omp-context-promotion-attestation.v2.json"
           evidence_tree=$(GIT_INDEX_FILE="$evidence_index" git write-tree)
-          published_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.97' |
+          published_commit=$(printf '%s\n' 'OMP context promotion evidence v0.50.98' |
             git -c user.name='github-actions[bot]' \
               -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
               commit-tree "$evidence_tree")
           [[ "$(git rev-list --parents -n 1 "$published_commit")" == "$published_commit" ]] || fail 'published evidence is not an orphan'
           git -c user.name='github-actions[bot]' \
             -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            -c tag.gpgSign=false tag -a omp-context-evidence-v0.50.97 "$published_commit" \
-              -m 'OMP context promotion evidence v0.50.97'
+            -c tag.gpgSign=false tag -a omp-context-evidence-v0.50.98 "$published_commit" \
+              -m 'OMP context promotion evidence v0.50.98'
           tag_object=$(git rev-parse --verify "$tag_ref")
 
           [[ "$(git ls-remote --refs origin "$main_ref")" == "$SOURCE_COMMIT"$'\t'"$main_ref" ]] || fail 'main advanced before push'

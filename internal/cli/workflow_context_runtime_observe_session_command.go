@@ -18,6 +18,7 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 		Long: "Run exactly 20 balanced AB/BA task pairs through two reusable installed OMP sessions. " +
 			"The endpoint must be an exact loopback gateway; the upstream credential stays in the named environment variable. " +
 			"On success the command writes .autopus/runtime/omp-context/promotion-report-v1.json and evidence-v1.json. " +
+			"On failure it writes one body-free error frame and returns non-zero. " +
 			"The report remains inactive until a trusted promotion-attestation.v2 and release lineage are installed.",
 		Example: "  auto workflow context-runtime observe-session --explicit-live --input-jsonl - --output - --format jsonl \\\n" +
 			"    --project-dir . --spec-id SPEC-OMP-004 --provider openai --model gpt-5.6-sol \\\n" +

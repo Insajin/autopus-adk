@@ -14,10 +14,29 @@ lineage_archive="$script_dir/verify-public-key-lineage-archive.sh"
 
 temp=$(mktemp -d "${TMPDIR:-/tmp}/release-hardening-test.XXXXXX")
 trap 'rm -rf -- "$temp"' EXIT
+runtime_lib="$script_dir/prepare-release-runtime-lib.sh"
+source "$runtime_lib"
+printf '%s\n' \
+  '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"handshake"}' \
+  '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"error","error_code":"network_transport"}' \
+  >"$temp/canary-input.jsonl"
+canary_progress=$(capture_canary_progress "$temp/canary-output.jsonl" bootstrap \
+  <"$temp/canary-input.jsonl" 2>&1)
+cmp "$temp/canary-input.jsonl" "$temp/canary-output.jsonl" ||
+  fail 'canary progress capture changed transcript bytes'
+[[ "$canary_progress" == *'bootstrap production canary progress (1/42 records)'* &&
+   "$canary_progress" == *'bootstrap production canary progress (2/42 records)'* ]] ||
+  fail 'canary progress did not report each completed record'
+failure_status=0
+failure_receipt=$(canary_failure_receipt final 42 "$temp/canary-output.jsonl" 2>&1) ||
+  failure_status=$?
+[[ "$failure_status" -eq 42 ]] || fail 'canary failure receipt did not preserve exit status'
+[[ "$failure_receipt" == *'final production canary execution failed: exit=42 transcript_records=2/42 error_code=network_transport'* ]] ||
+  fail 'canary failure receipt omitted structured diagnostics'
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid
-git -C "$temp/source" tag -am 'A22 fixture' v0.50.97
+git -C "$temp/source" tag -am 'A22 fixture' v0.50.98
 commit=$(git -C "$temp/source" rev-parse HEAD)
 tree=$(git -C "$temp/source" rev-parse 'HEAD^{tree}')
 if [[ "${tree: -1}" == '0' ]]; then
@@ -27,7 +46,7 @@ else
 fi
 run_source_gate() {
   local approved_commit="${1-}" approved_tree="${2-}"
-  env GITHUB_REF_NAME=v0.50.97 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
+  env GITHUB_REF_NAME=v0.50.98 GITHUB_REF_TYPE=tag GITHUB_SHA="$commit" \
     GITHUB_OUTPUT="$temp/source-output" COMPANION_SOURCE_PIN_REQUIRED=1 \
     COMPANION_APPROVED_SOURCE_COMMIT="$approved_commit" \
     COMPANION_APPROVED_SOURCE_TREE="$approved_tree" \

@@ -61,14 +61,14 @@ jobs:
           [[ "$GITHUB_REPOSITORY" == 'Insajin/autopus-adk' ]]
           [[ "$GITHUB_ACTOR_ID" == '204883817' ]]
           [[ "$GITHUB_REF" == 'refs/heads/main' && "$GITHUB_SHA" == "$SOURCE_COMMIT" ]]
-          [[ "$RELEASE_TAG" == 'v0.50.97' ]]
+          [[ "$RELEASE_TAG" == 'v0.50.98' ]]
           [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ && "$SOURCE_TREE" =~ ^[0-9a-f]{40}$ ]]
           [[ "$(git rev-parse --verify 'HEAD^{commit}')" == "$SOURCE_COMMIT" ]]
           [[ "$(git rev-parse --verify 'HEAD^{tree}')" == "$SOURCE_TREE" ]]
           [[ "$STATIC_POLICY_B64" =~ ^[A-Za-z0-9_-]+$ && ${#STATIC_POLICY_B64} -le 21846 ]]
           [[ "$DISPATCH_NONCE" =~ ^[0-9a-f]{32}$ ]]
-          grep -Fq -- "- 'v0.50.97'" .github/workflows/release.yaml
-          grep -Fq -- "omp-context-evidence-v0.50.97" .github/workflows/omp-context-promote.yml
+          grep -Fq -- "- 'v0.50.98'" .github/workflows/release.yaml
+          grep -Fq -- "omp-context-evidence-v0.50.98" .github/workflows/omp-context-promote.yml
 
       - name: Verify tidy source without mutation
         shell: bash
@@ -94,7 +94,7 @@ jobs:
           candidate="$candidate_root/auto"
           /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$staging" "$candidate"
           rm -f -- "$staging"
-          [[ "$("$candidate" version --short)" == '0.50.97' ]]
+          [[ "$("$candidate" version --short)" == '0.50.98' ]]
           [[ "$(/usr/bin/stat -f '%u:%Lp' "$candidate_root")" == '0:755' &&
              "$(/usr/bin/stat -f '%u:%Lp' "$candidate")" == '0:555' ]]
           printf 'path=%s\n' "$candidate" >> "$GITHUB_OUTPUT"
@@ -122,7 +122,7 @@ jobs:
           set -euo pipefail
           gate="$RUNNER_TEMP/auto-companion-exec-smoke"
           go build -trimpath -o "$gate" ./scripts/companion-release/execsmoke
-          "$gate" --artifact "$CANDIDATE" --expected-version 0.50.97 \
+          "$gate" --artifact "$CANDIDATE" --expected-version 0.50.98 \
             --architecture arm64 --timeout 30s
 
       - name: Remove preflight candidate

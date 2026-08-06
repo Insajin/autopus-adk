@@ -26,6 +26,17 @@ func RunWorkflowContextObserveSession(
 	scanner.Buffer(make([]byte, 64<<10), workflowContextObserveSessionMaxLine)
 	encoder := json.NewEncoder(output)
 	encoder.SetEscapeHTML(false)
+	errorModelScope := ""
+	defer func() {
+		if runErr == nil {
+			return
+		}
+		response := workflowContextObserveSessionBaseResponse("error", errorModelScope)
+		response.ErrorCode = workflowContextObserveSessionErrorCode(runErr)
+		if err := encoder.Encode(response); err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("observe-session error response: %w", err))
+		}
+	}()
 	first, err := nextWorkflowContextObserveSessionCommand(scanner)
 	if err != nil || !validWorkflowContextObserveHandshake(first) {
 		return errors.New("observe-session handshake is invalid")
@@ -34,6 +45,7 @@ func RunWorkflowContextObserveSession(
 	if err != nil {
 		return err
 	}
+	errorModelScope = setup.candidate.ModelScopeDigest
 	defer func() { runErr = errors.Join(runErr, setup.close()) }()
 	if err := setup.start(ctx); err != nil {
 		return err

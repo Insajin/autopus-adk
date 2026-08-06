@@ -15,14 +15,14 @@ import (
 )
 
 var currentReleaseArchives = []string{
-	"autopus-adk_0.50.97_darwin_amd64.tar.gz",
-	"autopus-adk_0.50.97_darwin_arm64.tar.gz",
-	"autopus-adk_0.50.97_linux_amd64.tar.gz",
-	"autopus-adk_0.50.97_linux_arm64.tar.gz",
-	"autopus-adk_0.50.97_windows_amd64.tar.gz",
-	"autopus-adk_0.50.97_windows_amd64.zip",
-	"autopus-adk_0.50.97_windows_arm64.tar.gz",
-	"autopus-adk_0.50.97_windows_arm64.zip",
+	"autopus-adk_0.50.98_darwin_amd64.tar.gz",
+	"autopus-adk_0.50.98_darwin_arm64.tar.gz",
+	"autopus-adk_0.50.98_linux_amd64.tar.gz",
+	"autopus-adk_0.50.98_linux_arm64.tar.gz",
+	"autopus-adk_0.50.98_windows_amd64.tar.gz",
+	"autopus-adk_0.50.98_windows_amd64.zip",
+	"autopus-adk_0.50.98_windows_arm64.tar.gz",
+	"autopus-adk_0.50.98_windows_arm64.zip",
 }
 
 type currentReleaseAsset struct {
@@ -120,7 +120,7 @@ func newCurrentReleaseFixture(t *testing.T) *currentReleaseFixture {
 		signatureLog: filepath.Join(state, "signature.log"),
 		verifierLog:  filepath.Join(state, "verifier.log"),
 		checksums:    assetBodies["checksums.txt"],
-		release: currentReleaseDocument{TagName: "v0.50.97",
+		release: currentReleaseDocument{TagName: "v0.50.98",
 			TargetCommitish: strings.Repeat("c", 40), Immutable: true, Assets: assets},
 	}
 	fixture.writeRelease(t)
@@ -225,7 +225,7 @@ set -euo pipefail
 endpoint=''
 while (($#)); do case "$1" in -H) shift 2 ;; *) endpoint=$1; shift ;; esac; done
 case "$endpoint" in
-  repos/Insajin/autopus-adk/releases/tags/v0.50.97) exec cat "$MOCK_CURRENT_RELEASE_STATE/release.json" ;;
+  repos/Insajin/autopus-adk/releases/tags/v0.50.98) exec cat "$MOCK_CURRENT_RELEASE_STATE/release.json" ;;
   repos/Insajin/autopus-adk/releases/assets/*) exec cat "$MOCK_CURRENT_RELEASE_STATE/assets/${endpoint##*/}" ;;
   *) exit 64 ;;
 esac

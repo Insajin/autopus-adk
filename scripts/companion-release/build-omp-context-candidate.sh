@@ -6,8 +6,8 @@ fail() { printf 'OMP context candidate build: %s\n' "$1" >&2; exit 1; }
 
 [[ $# == 1 ]] || fail 'usage: build-omp-context-candidate.sh OUTPUT'
 readonly output=$1
-readonly expected_tag='v0.50.97'
-readonly expected_version='0.50.97'
+readonly expected_tag='v0.50.98'
+readonly expected_version='0.50.98'
 [[ "${COMPANION_RELEASE_TAG:-}" == "$expected_tag" ]] || fail 'release tag is not exact A22'
 [[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail 'source commit is malformed'
 [[ "${COMPANION_SOURCE_TREE:-}" =~ ^[0-9a-f]{40}$ ]] || fail 'source tree is malformed'
@@ -20,10 +20,12 @@ for tool in git go; do command -v "$tool" >/dev/null || fail "${tool} is unavail
   || fail 'checked-out commit differs from release source'
 [[ "$(git rev-parse --verify 'HEAD^{tree}')" == "$COMPANION_SOURCE_TREE" ]] \
   || fail 'checked-out tree differs from release source'
-commit_date=$(git show -s --format=%cI "$GITHUB_SHA") \
+commit_date=$(TZ=UTC git show -s --date='format-local:%Y-%m-%dT%H:%M:%SZ' \
+  --format=%cd "$GITHUB_SHA") \
   || fail 'cannot resolve source commit date'
-[[ "$commit_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]] || fail 'commit date is malformed'
-short_commit=${GITHUB_SHA:0:7}
+[[ "$commit_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] \
+  || fail 'commit date is malformed'
+short_commit=${GITHUB_SHA:0:8}
 ldflags="-s -w -X github.com/insajin/autopus-adk/pkg/version.version=${expected_version}"
 ldflags+=" -X github.com/insajin/autopus-adk/pkg/version.commit=${short_commit}"
 ldflags+=" -X github.com/insajin/autopus-adk/pkg/version.date=${commit_date}"

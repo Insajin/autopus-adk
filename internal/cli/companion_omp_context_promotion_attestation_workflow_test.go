@@ -97,7 +97,7 @@ func TestOMPContextPromoteWorkflow_PinsActionsAndExactPromotionCoordinates(t *te
 		}
 	}
 	for _, required := range []string{
-		"omp-context-evidence-v0.50.97",
+		"omp-context-evidence-v0.50.98",
 		"omp-context-promotion-report.v1.json",
 		"omp-context-promotion-attestation.v2.json",
 		"Insajin/autopus-adk",
@@ -111,7 +111,7 @@ func TestOMPContextPromoteWorkflow_PinsActionsAndExactPromotionCoordinates(t *te
 		`--static-policy-b64 "$STATIC_POLICY_B64"`,
 		`[[ "$GITHUB_ACTOR_ID" == '204883817' ]]`,
 		`[[ "$GITHUB_REF" == 'refs/heads/main' && "$GITHUB_SHA" == "$SOURCE_COMMIT" ]]`,
-		`refs/heads/omp-context-evidence-v0.50.97-source`,
+		`refs/heads/omp-context-evidence-v0.50.98-source`,
 		`"$EVIDENCE_COMMIT"$'\t'"$lock_ref"`,
 		`persist-credentials: false`,
 	} {
@@ -162,7 +162,7 @@ func TestOMPContextPromoteWorkflow_SeparatesSigningVerificationAndWriteAuthority
 		`--cacheinfo "100644,$attestation_blob,omp-context-promotion-attestation.v2.json"`,
 		`commit-tree "$evidence_tree"`,
 		`git rev-list --parents -n 1 "$published_commit"`,
-		`tag -a omp-context-evidence-v0.50.97`,
+		`tag -a omp-context-evidence-v0.50.98`,
 		`git push --atomic --force-with-lease="${lock_ref}:${EVIDENCE_COMMIT}"`,
 		`"$tag_ref:$tag_ref" "$EVIDENCE_COMMIT:$lock_ref"`,
 	} {

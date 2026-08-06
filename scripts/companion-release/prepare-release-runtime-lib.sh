@@ -65,11 +65,42 @@ extract_project() {
   install -d -m 0700 "$destination"
   git archive "$source_commit" | tar -x -C "$destination"
 }
+capture_canary_progress() {
+  local output=$1 label=$2
+  [[ "$label" == 'bootstrap' || "$label" == 'final' ]] || return 1
+  [[ "$output" == /* && ! -e "$output" && ! -L "$output" ]] || return 1
+  : >"$output" || return 1
+  LC_ALL=C /usr/bin/awk -v output="$output" -v label="$label" '
+    {
+      print $0 >> output
+      close(output)
+      printf "companion release prep: %s production canary progress (%d/42 records)\n", label, NR > "/dev/stderr"
+      fflush("/dev/stderr")
+    }
+  '
+}
+canary_failure_receipt() {
+  local label=$1 canary_status=$2 output=$3 transcript_records failure_code
+  if [[ ! "$canary_status" =~ ^[1-9][0-9]*$ ]] || (( canary_status > 255 )); then
+    canary_status=1
+  fi
+  transcript_records=$(wc -l <"$output" | tr -d ' ')
+  [[ "$transcript_records" =~ ^[0-9]+$ ]] || transcript_records=unknown
+  failure_code=$(jq -rs \
+    '[.[] | select(.type? == "error") | .error_code? // empty] |
+     if length == 0 then "unclassified" else .[-1] end' "$output" 2>/dev/null) ||
+    failure_code=unparseable
+  [[ "$failure_code" =~ ^[A-Za-z0-9_.:-]{1,128}$ ]] || failure_code=unparseable
+  printf 'companion release prep: %s production canary execution failed: exit=%s transcript_records=%s/42 error_code=%s\n' \
+    "$label" "$canary_status" "$transcript_records" "$failure_code" >&2
+  return "$canary_status"
+}
 run_canary() {
   local candidate=$1 project=$2 output=$3 label=$4
   local sandbox_args=() root isolated_project isolated_home isolated_tmp
   local isolated_candidate isolated_omp isolated_credential credential_staging
   local root_identity record candidate_sha isolated_candidate_sha
+  local canary_status started_at
   root="/private/tmp/autopus-adk-release-prep-${dispatch_nonce}-${label}"
   [[ "$root" =~ ^/private/tmp/autopus-adk-release-prep-[0-9a-f]{32}-(bootstrap|final)$ &&
      ! -e "$root" && ! -L "$root" ]] || fail 'isolated canary root is unsafe'
@@ -100,7 +131,10 @@ run_canary() {
      "$(shasum -a 256 "$isolated_omp" | awk '{print $1}')" == "$expected_omp_sha256" ]] ||
     fail 'root-owned canary executable bytes differ'
   if [[ "$inherit_parent_sandbox" -eq 1 ]]; then sandbox_args=(--inherit-parent-sandbox); fi
-  /usr/bin/sudo -n -u nobody /usr/bin/env -i PATH='/usr/bin:/bin:/usr/sbin:/sbin' \
+  printf 'companion release prep: %s production canary started (40 sequential provider calls)\n' \
+    "$label" >&2
+  started_at=$SECONDS
+  if /usr/bin/sudo -n -u nobody /usr/bin/env -i PATH='/usr/bin:/bin:/usr/sbin:/sbin' \
     HOME="$isolated_home" TMPDIR="$isolated_tmp" LC_ALL=C /bin/sh -c '
       credential_locator=$1
       credential_file=$2
@@ -118,7 +152,15 @@ run_canary() {
     --credential-locator "$credential_locator" --producer-repository "$repository" --producer-workflow-ref "$producer_workflow_ref" \
     --producer-run-id "$producer_run_id" --producer-run-attempt 1 --candidate-repository "$repository" \
     --policy-id omp-context-active-v1 --oracle-policy-digest "$oracle_policy_digest" --target-git-commit "$source_commit" \
-    --omp "$isolated_omp" "${sandbox_args[@]}" <"$input_jsonl" >"$output"
+    --omp "$isolated_omp" "${sandbox_args[@]}" <"$input_jsonl" |
+    capture_canary_progress "$output" "$label"; then
+    :
+  else
+    canary_status=$?
+    canary_failure_receipt "$label" "$canary_status" "$output"
+  fi
+  printf 'companion release prep: %s production canary completed (42/42 records, %ss)\n' \
+    "$label" "$((SECONDS - started_at))" >&2
   rm -rf -- "$project"
   /usr/bin/sudo -n /usr/sbin/chown -R "${runner_uid}:${runner_gid}" "$isolated_project"
   /usr/bin/sudo -n /bin/mv "$isolated_project" "$project"
