@@ -21,7 +21,7 @@ for file in "$publisher" "$publisher_lib" "$prep" "$prep_lib" "$lock_verifier" "
 done
 contains "$prep_lib" 'watch_dispatch companion-release-preflight.yml'
 contains "$prep" 'run_canary "$bootstrap_candidate"'
-contains "$prep" 'run_canary "$final_candidate"'
+contains "$prep" 'run_canary "$final_candidate"'; contains "$prep" 'Return exactly EVALUATION-%02d-%d on one line. Do not call tools, execute commands, or add any other text.'; not_contains "$prep" 'identical evaluation task'
 contains "$prep" "cmp \"\$static_policy_file\" \"\$final_static_policy_file\""
 contains "$prep" 'watch_dispatch omp-context-promote.yml'
 contains "$prep_lib" '/usr/bin/sudo -n -u nobody /usr/bin/env -i'

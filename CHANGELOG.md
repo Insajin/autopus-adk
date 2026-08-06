@@ -30,6 +30,8 @@ All notable changes to this project will be documented in this file.
 
 - **v0.50.96 release-prep 환경 상속·cleanup 경계** (2026-08-05): protected environment에 명시적 override가 없으면 GitHub Actions와 같은 repository variable 상속 의미를 사용하고, override가 있으면 repository 값과 exact-match하지 않을 때 차단한다. 빈 root-owned canary 목록의 cleanup은 macOS 기본 Bash 3.2에서 `set -u` 오류 없이 종료하며, `nobody`의 unsigned ID 표현 `4294967294`를 `chown` operand로 재해석하지 않고 canonical account/group name으로 소유권을 설정한다.
 
+- **v0.50.96 live canary 결정성 복구** (2026-08-06): 20-pair release-prep cohort가 모호한 평가 문구로 모델의 tool 호출을 허용해 단일-turn lifecycle gate를 깨뜨리던 문제를 수정했다. 각 pair는 이제 tool·command 실행과 부가 텍스트를 명시적으로 금지하고 task index에 바인딩된 정확한 한 줄 출력을 요구해, AB/BA variant가 동일한 observable oracle을 결정적으로 비교한다.
+
 - **v0.50.95 실패·미게시 릴리스 시도 보존** (2026-08-05): production evidence, 전체 CI·보안·`83.2%` coverage는 통과했고 protected environment의 exact tag allowlist와 environment-level source pin도 수렴했지만, `macos-15` release job이 존재하지 않는 `/usr/bin/test`를 호출해 root-owned OMP canary materialization 단계에서 중단되었다. `v0.50.95` source tag와 zero-parent annotated `omp-context-evidence-v0.50.95` tag는 immutable 실패 기록으로 보존하며 삭제·이동·재사용하지 않는다. GitHub Release는 생성되지 않았고 Homebrew Formula/Cask도 변경되지 않았다.
 
 - **v0.50.94 실패·미게시 릴리스 시도 보존** (2026-08-04): A22 재시도는 변경하지 않은 전체 커버리지 기준 `83.0%`에 대해 `82.9%`가 두 차례 관측되어 게시 전에 중단되었다. `v0.50.94` source tag와 `omp-context-evidence-v0.50.94` tag/ref는 이 실패 시도의 immutable 기록이며 current release 좌표가 아니고 삭제·이동·재사용하지 않는다. 이 시도에서는 GitHub Release가 생성·게시되지 않았고 Homebrew Formula/Cask도 변경되지 않았다.
