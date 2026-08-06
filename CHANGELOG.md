@@ -32,6 +32,8 @@ All notable changes to this project will be documented in this file.
 
 - **v0.50.96 live canary 결정성 복구** (2026-08-06): 20-pair release-prep cohort가 모호한 평가 문구로 모델의 tool 호출을 허용해 단일-turn lifecycle gate를 깨뜨리던 문제를 수정했다. 각 pair는 이제 tool·command 실행과 부가 텍스트를 명시적으로 금지하고 task index에 바인딩된 정확한 한 줄 출력을 요구해, AB/BA variant가 동일한 observable oracle을 결정적으로 비교한다.
 
+- **v0.50.96 canary 검증·cleanup의 Bash 3.2 상태 보존 수정** (2026-08-06): production canary 완료 후 `validate_canary`가 하나의 `local` 명령에서 `project`를 바인딩하면서 동시에 `$project` 기반 report 경로를 확장해 `set -u`에서 중단되던 문제와, `EXIT` trap 함수 진입 후 `$?`를 읽어 그 실패 상태를 `0`으로 덮던 문제를 수정했다. positional 인자를 먼저 바인딩한 뒤 report 경로를 별도 선언에서 파생하고, trap이 원래 status를 명시적 인자로 전달한다. 누락 report가 의도한 fail-closed 오류에 도달하고 cleanup이 실패 상태와 임시 디렉터리 삭제를 함께 보존하는 회귀 테스트를 추가했다.
+
 - **v0.50.95 실패·미게시 릴리스 시도 보존** (2026-08-05): production evidence, 전체 CI·보안·`83.2%` coverage는 통과했고 protected environment의 exact tag allowlist와 environment-level source pin도 수렴했지만, `macos-15` release job이 존재하지 않는 `/usr/bin/test`를 호출해 root-owned OMP canary materialization 단계에서 중단되었다. `v0.50.95` source tag와 zero-parent annotated `omp-context-evidence-v0.50.95` tag는 immutable 실패 기록으로 보존하며 삭제·이동·재사용하지 않는다. GitHub Release는 생성되지 않았고 Homebrew Formula/Cask도 변경되지 않았다.
 
 - **v0.50.94 실패·미게시 릴리스 시도 보존** (2026-08-04): A22 재시도는 변경하지 않은 전체 커버리지 기준 `83.0%`에 대해 `82.9%`가 두 차례 관측되어 게시 전에 중단되었다. `v0.50.94` source tag와 `omp-context-evidence-v0.50.94` tag/ref는 이 실패 시도의 immutable 기록이며 current release 좌표가 아니고 삭제·이동·재사용하지 않는다. 이 시도에서는 GitHub Release가 생성·게시되지 않았고 Homebrew Formula/Cask도 변경되지 않았다.
