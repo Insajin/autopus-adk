@@ -143,8 +143,8 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 			PipelineImplementationDigest: promotionTestHash("pipeline-implementation"),
 		},
 		SessionFacts: promptlayer.OMPContextPromotionSessionFactsV1{
-			FullProcessStarts: 3, OptimizedProcessStarts: 3, FullSessionCount: 3,
-			OptimizedSessionCount: 3, MaxConcurrency: 1,
+			FullProcessStarts: 2, OptimizedProcessStarts: 2, FullSessionCount: 2,
+			OptimizedSessionCount: 2, MaxConcurrency: 1,
 		},
 		Provider: "openai", ModelScopeDigest: promotionTestHash("models"),
 		OraclePolicyDigest: promotionTestHash("oracle"),
@@ -164,8 +164,8 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 			sequence := len(report.Observations) + 1
 			sessionSequences[variant]++
 			variantSequence := sessionSequences[variant]
-			sessionSegment := (variantSequence - 1) / 9
-			sessionSequence := (variantSequence-1)%9 + 1
+			sessionSegment := (variantSequence - 1) / 10
+			sessionSequence := (variantSequence-1)%10 + 1
 			inputTokens, compactionRequests := int64(10000), 0
 			if variant == "B" && sessionSequence > 1 {
 				inputTokens, compactionRequests = 7500, 1

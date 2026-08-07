@@ -38,7 +38,7 @@ func TestWorkflowContextObserveSession_WritesObservedBodyFreePromotionEvidence(t
 	shutdown := responses[len(responses)-1]
 	assert.Equal(t, "shutdown", shutdown.Type)
 	assert.Equal(t, 40, shutdown.CallsCompleted)
-	assert.Equal(t, 17, shutdown.CompactionCycles)
+	assert.Equal(t, 18, shutdown.CompactionCycles)
 	assert.True(t, shutdown.CleanupVerified)
 	assert.NotEmpty(t, shutdown.EvidenceID)
 	assert.NotEmpty(t, shutdown.ReportDigest)
@@ -327,7 +327,7 @@ func verifyWorkflowContextObserveProviderLog(t *testing.T, path string, taskBodi
 		}
 	}
 	assert.Equal(t, workflowContextObserveSessionSegmentCount, optimizedPIDs)
-	assert.Equal(t, map[int]int{1: 1, 8: 2}, compactionFrequencies)
+	assert.Equal(t, map[int]int{9: 2}, compactionFrequencies)
 	for pair := range workflowContextObserveSessionPairCount {
 		assert.Equal(t, prompts[pair*2].Message, prompts[pair*2+1].Message)
 		assert.Contains(t, prompts[pair*2].Message, taskBodies[pair])

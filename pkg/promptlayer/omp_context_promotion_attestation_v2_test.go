@@ -149,13 +149,13 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 		}},
 		{name: "session sequence skip", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].SessionSequence = 2 }},
 		{name: "segment sequence not reset", mutate: func(r *OMPContextPromotionReportV1) {
-			r.Observations[18].SessionSequence = 10
+			r.Observations[20].SessionSequence = 11
 		}},
 		{name: "segment first process reused", mutate: func(r *OMPContextPromotionReportV1) {
-			r.Observations[18].ProcessReused = true
+			r.Observations[20].ProcessReused = true
 		}},
 		{name: "receipt reused across segments", mutate: func(r *OMPContextPromotionReportV1) {
-			r.Observations[18].SessionReceiptDigest = r.Observations[1].SessionReceiptDigest
+			r.Observations[20].SessionReceiptDigest = r.Observations[0].SessionReceiptDigest
 		}},
 		{name: "first process reused", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].ProcessReused = true }},
 		{name: "negative setup request", mutate: func(r *OMPContextPromotionReportV1) {

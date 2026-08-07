@@ -16,7 +16,7 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "observe-session",
 		Short: "Run a production explicit-live OMP cohort and write body-free promotion evidence",
-		Long: "Run exactly 20 balanced AB/BA task pairs through synchronized 9/9/2 full/optimized OMP session segments. " +
+		Long: "Run exactly 20 balanced AB/BA task pairs through synchronized 10/10 full/optimized OMP session segments. " +
 			"The endpoint must be an exact loopback gateway; the upstream credential stays in the named environment variable. " +
 			"On success the command writes .autopus/runtime/omp-context/promotion-report-v1.json and evidence-v1.json. " +
 			"On failure it writes one body-free error frame and returns non-zero. " +

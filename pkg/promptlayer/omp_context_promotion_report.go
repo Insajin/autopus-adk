@@ -3,7 +3,7 @@ package promptlayer
 const (
 	OMPContextPromotionReportSchemaV1       = "autopus.omp_context_promotion_report.v1"
 	ompContextPromotionTaskCountV1          = 20
-	ompContextPromotionSessionSegmentSizeV1 = 9
+	ompContextPromotionSessionSegmentSizeV1 = 10
 	ompContextPromotionSessionCountV1       = (ompContextPromotionTaskCountV1 +
 		ompContextPromotionSessionSegmentSizeV1 - 1) / ompContextPromotionSessionSegmentSizeV1
 )
