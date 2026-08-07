@@ -90,13 +90,20 @@ func verifyWorkflowContextObserveSessionReadback(
 	fullCalls int,
 	optimizedCalls int,
 ) error {
-	maxCompactions := max(optimizedCalls-1, 0)
-	if setup == nil || setup.full == nil || setup.optimized == nil || setup.full.PID() <= 0 ||
+	if fullCalls <= 0 || fullCalls != optimizedCalls ||
+		fullCalls > workflowContextObserveSessionPairCount {
+		return errors.New("observe-session paired segment call count is invalid")
+	}
+	currentCalls := (fullCalls-1)%workflowContextObserveSessionSegmentPairs + 1
+	expectedSegments := (fullCalls-1)/workflowContextObserveSessionSegmentPairs + 1
+	maxCompactions := max(currentCalls-1, 0)
+	if setup == nil || setup.full == nil || setup.optimized == nil ||
+		setup.segmentsStarted != expectedSegments || setup.full.PID() <= 0 ||
 		setup.optimized.PID() <= 0 || setup.full.PID() == setup.optimized.PID() ||
-		setup.full.sequence != fullCalls || setup.optimized.sequence != optimizedCalls ||
+		setup.full.sequence != currentCalls || setup.optimized.sequence != currentCalls ||
 		setup.full.compactions != 0 || setup.optimized.compactions < 0 ||
 		setup.optimized.compactions > maxCompactions {
-		return errors.New("observe-session reusable session readback is invalid")
+		return errors.New("observe-session paired segment readback is invalid")
 	}
 	for _, session := range []*pipelineOMPActiveEvaluatorSession{setup.full, setup.optimized} {
 		state, err := session.protocol.readIdleState(ctx, "observe-session-readback")
@@ -129,7 +136,8 @@ func buildWorkflowContextObserveSessionReport(
 	challenge string,
 	calls []workflowContextObserveSessionCallEvidence,
 ) (promptlayer.OMPContextPromotionReportV1, []byte, []promptlayer.OMPContextCanaryRowV1, error) {
-	if len(calls) != 40 {
+	if len(calls) != workflowContextObserveSessionPairCount*2 ||
+		setup.segmentsStarted != workflowContextObserveSessionSegmentCount {
 		return promptlayer.OMPContextPromotionReportV1{}, nil, nil, errors.New("observe-session cohort is incomplete")
 	}
 	policyDigest, err := promptlayer.OMPContextPromotionPolicyDigestV1(options.PromotionPolicy)
@@ -158,13 +166,14 @@ func buildWorkflowContextObserveSessionReport(
 			RuntimeKind: "omp-pipeline-managed-rpc", PipelineImplementationDigest: pipelineOMPActiveImplementationDigest(),
 		},
 		SessionFacts: promptlayer.OMPContextPromotionSessionFactsV1{
-			FullProcessStarts: 1, OptimizedProcessStarts: 1, FullSessionCount: 1,
-			OptimizedSessionCount: 1, MaxConcurrency: 1, CrossSessionContamination: 0,
+			FullProcessStarts: setup.segmentsStarted, OptimizedProcessStarts: setup.segmentsStarted,
+			FullSessionCount: setup.segmentsStarted, OptimizedSessionCount: setup.segmentsStarted,
+			MaxConcurrency: 1, CrossSessionContamination: 0,
 		},
 		Provider: options.Provider, ModelScopeDigest: setup.candidate.ModelScopeDigest,
 		OraclePolicyDigest: options.OraclePolicyDigest,
 	}
-	sessionSequence := map[string]int{"A": 0, "B": 0}
+	variantCalls := map[string]int{"A": 0, "B": 0}
 	for index, call := range calls {
 		if index%2 == 0 {
 			report.Tasks = append(report.Tasks, promptlayer.OMPContextPromotionTaskV1{
@@ -172,7 +181,8 @@ func buildWorkflowContextObserveSessionReport(
 				Order:        call.command.Variant + calls[index+1].command.Variant,
 			})
 		}
-		sessionSequence[call.command.Variant]++
+		variantCalls[call.command.Variant]++
+		sessionSequence := (variantCalls[call.command.Variant]-1)%workflowContextObserveSessionSegmentPairs + 1
 		usageBody, _ := json.Marshal(struct {
 			Sequence int                                 `json:"sequence"`
 			Usage    *workflowContextObserveSessionUsage `json:"usage"`
@@ -188,7 +198,7 @@ func buildWorkflowContextObserveSessionReport(
 		compactionCalls := call.response.CompactionCycles
 		report.Observations = append(report.Observations, promptlayer.OMPContextPromotionObservationV1{
 			Sequence: call.command.Sequence, TaskIDDigest: call.command.TaskIDDigest, Variant: call.command.Variant,
-			SessionReceiptDigest: call.response.SessionDigest, SessionSequence: sessionSequence[call.command.Variant],
+			SessionReceiptDigest: call.response.SessionDigest, SessionSequence: sessionSequence,
 			ProcessReused: call.response.ProcessReused, Provider: options.Provider,
 			ModelScopeDigest: setup.candidate.ModelScopeDigest, EndpointClass: "external-provider",
 			Transport: "provider-api", CredentialMode: "locator-only",

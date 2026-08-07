@@ -35,10 +35,15 @@ type workflowContextObserveSessionSetup struct {
 	autoExecutableSHA256    string
 	candidateTree           string
 	providerAuthorityDigest string
+	segmentsStarted         int
 	sandboxMode             pipelineOMPActiveSandboxMode
 }
 
 const (
+	workflowContextObserveSessionPairCount    = 20
+	workflowContextObserveSessionSegmentPairs = 9
+	workflowContextObserveSessionSegmentCount = (workflowContextObserveSessionPairCount +
+		workflowContextObserveSessionSegmentPairs - 1) / workflowContextObserveSessionSegmentPairs
 	workflowContextObserveSessionMaxTime      = 2 * time.Minute
 	workflowContextObserveSessionTotalMaxTime = 30 * time.Minute
 )
@@ -197,6 +202,10 @@ func prepareWorkflowContextObserveSession(
 }
 
 func (setup *workflowContextObserveSessionSetup) start(ctx context.Context) error {
+	if setup == nil || setup.full != nil || setup.optimized != nil ||
+		setup.segmentsStarted >= workflowContextObserveSessionSegmentCount {
+		return errors.New("observe-session segment startup is invalid")
+	}
 	full, err := startPipelineOMPActiveEvaluatorSession(
 		ctx, setup.backend, setup.candidate, setup.prepared, false, setup.sandboxMode,
 	)
@@ -210,13 +219,39 @@ func (setup *workflowContextObserveSessionSetup) start(ctx context.Context) erro
 		_ = full.Close()
 		return err
 	}
-	if full.binding.OptionsHash != optimized.binding.OptionsHash {
+	authority := full.binding.OptionsHash
+	if authority != optimized.binding.OptionsHash ||
+		setup.providerAuthorityDigest != "" && setup.providerAuthorityDigest != authority {
 		_ = errors.Join(full.Close(), optimized.Close())
-		return errors.New("observe-session provider authority changed across variants")
+		return errors.New("observe-session provider authority changed across segments or variants")
 	}
 	setup.full, setup.optimized = full, optimized
-	setup.providerAuthorityDigest = full.binding.OptionsHash
+	setup.providerAuthorityDigest = authority
+	setup.segmentsStarted++
 	return nil
+}
+
+func (setup *workflowContextObserveSessionSetup) closePair() error {
+	if setup == nil {
+		return nil
+	}
+	full, optimized := setup.full, setup.optimized
+	err := errors.Join(full.Close(), optimized.Close())
+	if full.PID() != 0 || optimized.PID() != 0 {
+		err = errors.Join(err, errors.New("observe-session process cleanup is incomplete"))
+	}
+	setup.full, setup.optimized = nil, nil
+	return err
+}
+
+func (setup *workflowContextObserveSessionSetup) rotate(ctx context.Context) error {
+	if setup == nil || setup.full == nil || setup.optimized == nil {
+		return errors.New("observe-session segment rotation is invalid")
+	}
+	if err := setup.closePair(); err != nil {
+		return err
+	}
+	return setup.start(ctx)
 }
 
 func (setup *workflowContextObserveSessionSetup) close() error {
@@ -224,11 +259,7 @@ func (setup *workflowContextObserveSessionSetup) close() error {
 		return nil
 	}
 	root := setup.taskRoot
-	err := errors.Join(setup.full.Close(), setup.optimized.Close())
-	err = errors.Join(err, os.RemoveAll(root))
-	if setup.full.PID() != 0 || setup.optimized.PID() != 0 {
-		err = errors.Join(err, errors.New("observe-session process cleanup is incomplete"))
-	}
+	err := errors.Join(setup.closePair(), os.RemoveAll(root))
 	if _, statErr := os.Lstat(root); !errors.Is(statErr, os.ErrNotExist) {
 		err = errors.Join(err, errors.New("observe-session runtime cleanup is incomplete"))
 	}

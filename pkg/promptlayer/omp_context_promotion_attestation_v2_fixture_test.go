@@ -93,8 +93,9 @@ func validOMPContextPromotionReportV1() OMPContextPromotionReportV1 {
 			RuntimeKind: "omp-pipeline-managed-rpc", PipelineImplementationDigest: hash("pipeline-implementation"),
 		},
 		SessionFacts: OMPContextPromotionSessionFactsV1{
-			FullProcessStarts: 1, OptimizedProcessStarts: 1, FullSessionCount: 1,
-			OptimizedSessionCount: 1, MaxConcurrency: 1, CrossSessionContamination: 0,
+			FullProcessStarts: ompContextPromotionSessionCountV1, OptimizedProcessStarts: ompContextPromotionSessionCountV1,
+			FullSessionCount: ompContextPromotionSessionCountV1, OptimizedSessionCount: ompContextPromotionSessionCountV1,
+			MaxConcurrency: 1, CrossSessionContamination: 0,
 		},
 		Provider: "openai", ModelScopeDigest: hash("models"), CohortManifestDigest: hash("cohort"), OrderSeed: hash("seed"), OraclePolicyDigest: hash("oracle"),
 	}
@@ -112,15 +113,18 @@ func validOMPContextPromotionReportV1() OMPContextPromotionReportV1 {
 		for _, variant := range variants {
 			sequence := len(report.Observations) + 1
 			sessionSequences[variant]++
+			variantSequence := sessionSequences[variant]
+			sessionSegment := (variantSequence - 1) / ompContextPromotionSessionSegmentSizeV1
+			sessionSequence := (variantSequence-1)%ompContextPromotionSessionSegmentSizeV1 + 1
 			input, compactionRequests := int64(10000), 0
-			if variant == "B" && sessionSequences[variant] > 1 {
+			if variant == "B" && sessionSequence > 1 {
 				input, compactionRequests = 7500, 1
 			}
 			began := start.Add(time.Duration(sequence*2) * time.Second)
 			report.Observations = append(report.Observations, OMPContextPromotionObservationV1{
 				Sequence: sequence, TaskIDDigest: taskDigest, Variant: variant,
-				SessionReceiptDigest: hash("session-" + variant), SessionSequence: sessionSequences[variant],
-				ProcessReused: sessionSequences[variant] > 1, Provider: report.Provider,
+				SessionReceiptDigest: hash(fmt.Sprintf("session-%s-%d", variant, sessionSegment)),
+				SessionSequence:      sessionSequence, ProcessReused: sessionSequence > 1, Provider: report.Provider,
 				ModelScopeDigest: report.ModelScopeDigest, EndpointClass: "external-provider", Transport: "provider-api",
 				CredentialMode: "locator-only", ProviderAuthorityDigest: hash("provider-authority"),
 				ExecutionMode: "external-live", StartedAt: began.Format(time.RFC3339Nano), CompletedAt: began.Add(time.Second).Format(time.RFC3339Nano),
@@ -137,7 +141,7 @@ func validOMPContextPromotionReportV1() OMPContextPromotionReportV1 {
 	taskBytes, _ := json.Marshal(report.Tasks)
 	report.CohortManifestDigest = promotionSHA256(taskBytes)
 	report.OrderSeed = report.CohortManifestDigest
-	report.Gates = expectedOMPContextPromotionGatesV1(2500, 19)
+	report.Gates = expectedOMPContextPromotionGatesV1(2500, 17)
 	return report
 }
 
