@@ -55,10 +55,10 @@ func TestCompanionOMPContextCanaryPlan_BindsInputAndStaticPolicyToOnePlan(t *tes
 		projectDir: root, inputOutput: inputPath, challengeDigest: challenge,
 		producerRepository: "Insajin/autopus-adk", producerWorkflowRef: "local-release-prep@" + strings.Repeat("a", 40),
 		candidateRepository: "Insajin/autopus-adk", sourceCommit: strings.Repeat("a", 40), sourceTree: strings.Repeat("b", 40),
-		target: "darwin-arm64", autoVersion: "0.50.100", provider: "openai-codex", model: "gpt-5.6-sol",
+		target: "darwin-arm64", autoVersion: "0.50.101", provider: "openai-codex", model: "gpt-5.6-sol",
 		policyID: "omp-context-active-v1", oraclePolicyDigest: workflowContextRuntimeHash("oracle"),
 		ompVersion: "omp/17.2.7", ompExecutableSHA256: workflowContextRuntimeHash("omp"),
-		releaseLineageKeyID: "release-lineage-2026-q3-k1", releaseLineageHandoff: "v1", minimumRollbackFloor: 5100,
+		releaseLineageKeyID: "release-lineage-2026-q3-k1", releaseLineageHandoff: "v1", minimumRollbackFloor: 5101,
 	}
 	var output bytes.Buffer
 	command := newCompanionOMPContextCanaryPlanCmd()

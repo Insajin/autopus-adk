@@ -97,12 +97,12 @@ case "$command" in
         fi
         jq -c '[.]' "$state/releases.json"
         ;;
-      GET:repos/Insajin/autopus-adk/releases/tags/v0.50.100)
-        jq -ce '.[] | select(.tag_name == "v0.50.100")' "$state/releases.json"
+      GET:repos/Insajin/autopus-adk/releases/tags/v0.50.101)
+        jq -ce '.[] | select(.tag_name == "v0.50.101")' "$state/releases.json"
         ;;
       POST:repos/Insajin/autopus-adk/releases)
-        [[ "$field_tag" == 'v0.50.100' && "$field_target" =~ ^[0-9a-f]{40}$ &&
-           "$field_release_name" == 'v0.50.100' &&
+        [[ "$field_tag" == 'v0.50.101' && "$field_target" =~ ^[0-9a-f]{40}$ &&
+           "$field_release_name" == 'v0.50.101' &&
            "$field_draft" == 'true' && "$field_prerelease" == 'false' ]] || exit 65
         jq -e --arg tag "$field_tag" 'all(.[]; .tag_name != $tag)' \
           "$state/releases.json" >/dev/null || exit 65
@@ -132,16 +132,16 @@ case "$command" in
         jq -n --slurpfile policies "$state/deployment-policies.json" '{branch_policies:$policies[0]}'
         ;;
       POST:repos/Insajin/autopus-adk/environments/adk-companion-release/deployment-branch-policies)
-        [[ "$field_name" == 'v0.50.100' && "$field_type" == 'tag' ]] || exit 65
+        [[ "$field_name" == 'v0.50.101' && "$field_type" == 'tag' ]] || exit 65
         write_count
-        jq '[.[] | select(.name != "v0.50.100")] + [{id:596,type:"tag",name:"v0.50.100"}]' \
+        jq '[.[] | select(.name != "v0.50.101")] + [{id:596,type:"tag",name:"v0.50.101"}]' \
           "$state/deployment-policies.json" >"$state/deployment-policies.json.next"
         mv "$state/deployment-policies.json.next" "$state/deployment-policies.json"
         printf '%s\n' 'policy-create' >>"$log"
         if [[ "${MOCK_RELEASE_PREP_POLICY_RESPONSE_LOST:-0}" -eq 1 ]]; then
           exit 75
         fi
-        printf '%s\n' '{"id":596,"type":"tag","name":"v0.50.100"}'
+        printf '%s\n' '{"id":596,"type":"tag","name":"v0.50.101"}'
         ;;
       DELETE:repos/Insajin/autopus-adk/environments/adk-companion-release/deployment-branch-policies/596)
         write_count
