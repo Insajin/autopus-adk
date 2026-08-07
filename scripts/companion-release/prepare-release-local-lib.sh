@@ -79,7 +79,7 @@ verify_evidence() {
 }
 
 publish_local_evidence() {
-  local report=$1 attestation publish_root evidence_index evidence_tree published_commit
+  local report=$1 attestation publish_root evidence_index published_tree published_commit
   local report_blob attestation_blob remote_state remote_tag_status=0
   attestation="$temp_dir/omp-context-promotion-attestation.v2.json"
   sign_promotion_report "$report" "$attestation"
@@ -116,9 +116,9 @@ publish_local_evidence() {
   GIT_INDEX_FILE="$evidence_index" git -C "$publish_root" update-index --add \
     --cacheinfo "100644,$report_blob,omp-context-promotion-report.v1.json" \
     --cacheinfo "100644,$attestation_blob,omp-context-promotion-attestation.v2.json"
-  evidence_tree=$(GIT_INDEX_FILE="$evidence_index" git -C "$publish_root" write-tree)
+  published_tree=$(GIT_INDEX_FILE="$evidence_index" git -C "$publish_root" write-tree)
   published_commit=$(printf 'OMP context promotion evidence %s\n' "$release_tag" | \
-    git -C "$publish_root" -c user.name='Joseph' -c user.email='joseph@Josephui-MacBookPro.local' commit-tree "$evidence_tree")
+    git -C "$publish_root" -c user.name='Joseph' -c user.email='joseph@Josephui-MacBookPro.local' commit-tree "$published_tree")
   [[ "$(git -C "$publish_root" rev-list --parents -n 1 "$published_commit")" == "$published_commit" ]] ||
     fail 'locally published evidence is not an orphan'
   git -C "$publish_root" -c user.name='Joseph' -c user.email='joseph@Josephui-MacBookPro.local' \

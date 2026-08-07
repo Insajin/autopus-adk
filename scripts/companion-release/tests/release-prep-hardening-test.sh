@@ -40,7 +40,7 @@ contains "$prep" 'assert_source_identity'
 contains "$prep" 'expected_tag_signer_fingerprint'
 contains "$prep" 'sudo_keepalive_pid=$!'; contains "$prep_lib" '/usr/bin/sudo -k'
 contains "$prep" 'omp-context-promotion-key-id'; contains "$prep" 'staged_promotion_signing_key='; contains "$prep" 'evidence_verification_mode=active'; contains "$prep" '/usr/bin/install -m 0600 "$tag_signing_key"'; contains "$prep" '^AUTOPUS_OMP_CONTEXT_PROVIDER_[A-Z0-9_]{1,96}$'; trap_line=$(grep -nF 'trap bootstrap_cleanup EXIT' "$prep" | cut -d: -f1); key_stage_line=$(grep -nF 'staged_tag_signing_key=' "$prep" | cut -d: -f1); [[ "$trap_line" -lt "$key_stage_line" ]] || fail 'release prep stages keys before installing cleanup trap'
-contains "$prep_local_lib" 'ensure_prep_lock "$report"'; not_contains "$prep_local_lib" "--no-tags --depth=1 'https://github.com/Insajin/autopus-adk.git'"
+contains "$prep_local_lib" 'ensure_prep_lock "$report"'; not_contains "$prep_local_lib" "--no-tags --depth=1 'https://github.com/Insajin/autopus-adk.git'"; contains "$prep_local_lib" 'local report=$1 attestation publish_root evidence_index published_tree published_commit'; contains "$prep_local_lib" 'published_tree=$(GIT_INDEX_FILE="$evidence_index"'; contains "$prep_local_lib" 'commit-tree "$published_tree"'; not_contains "$prep_local_lib" 'evidence_index evidence_tree published_commit'
 contains "$prep_lib" 'publish-release-coordinates.sh'
 contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository"'
 contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository" --env "$environment_name"'
@@ -98,12 +98,12 @@ setup_fixture() {
   evidence_tree=$(printf '100644 blob %s\tomp-context-promotion-report.v1.json\n100644 blob %s\tomp-context-promotion-attestation.v2.json\n' \
     "$report_blob" "$attestation_blob" | git -C "$work" mktree)
   evidence_commit=$(printf 'evidence\n' | env "${git_env[@]}" git -C "$work" commit-tree "$evidence_tree")
-  env "${git_env[@]}" git -C "$work" tag -s omp-context-evidence-v0.50.98 \
+  env "${git_env[@]}" git -C "$work" tag -s omp-context-evidence-v0.50.99 \
     "$evidence_commit" -m evidence
-  evidence_tag_object=$(git -C "$work" rev-parse refs/tags/omp-context-evidence-v0.50.98)
-  git -C "$work" push --quiet origin refs/tags/omp-context-evidence-v0.50.98
+  evidence_tag_object=$(git -C "$work" rev-parse refs/tags/omp-context-evidence-v0.50.99)
+  git -C "$work" push --quiet origin refs/tags/omp-context-evidence-v0.50.99
   git -C "$work" push --quiet origin \
-    "$prep_lock_commit:refs/heads/omp-context-evidence-v0.50.98-source"
+    "$prep_lock_commit:refs/heads/omp-context-evidence-v0.50.99-source"
   printf 'report\n' >"$fixture/report"; chmod 0600 "$fixture/report"
   printf 'abc\n' >"$fixture/static-policy.b64"; chmod 0600 "$fixture/static-policy.b64"
   mkdir -p "$remote/hooks"
@@ -111,7 +111,7 @@ setup_fixture() {
 #!/usr/bin/env bash
 set -euo pipefail
 while read -r _ _ ref; do
-  if [[ "$ref" == 'refs/tags/v0.50.98' ]]; then
+  if [[ "$ref" == 'refs/tags/v0.50.99' ]]; then
     printf '%s\n' 'release-tag-push' >>"$MOCK_RELEASE_PREP_STATE/calls.log"
     if [[ "${MOCK_RELEASE_PREP_REJECT_TAG:-0}" -eq 1 ]]; then
       printf '%s\n' 'injected release tag rejection' >&2
@@ -132,7 +132,7 @@ run_publisher() {
     MOCK_RELEASE_PREP_RELEASE_VISIBILITY_DELAY="${MOCK_RELEASE_PREP_RELEASE_VISIBILITY_DELAY:-0}" \
     MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL="${MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL:-0}" \
     MOCK_RELEASE_PREP_REJECT_TAG="${MOCK_RELEASE_PREP_REJECT_TAG:-0}" \
-    bash "$publisher" Insajin/autopus-adk adk-companion-release v0.50.98 \
+    bash "$publisher" Insajin/autopus-adk adk-companion-release v0.50.99 \
     "$source_commit" "$source_tree" "$fixture/static-policy.b64" \
     "$evidence_tag_object" "$evidence_commit" "$evidence_tree" \
     "$(printf 'a%.0s' {1..64})" "$(printf 'b%.0s' {1..64})" "$lock_argument" \
@@ -140,29 +140,29 @@ run_publisher() {
 }
 setup_fixture success
 [[ "$(cd "$work" && "$lock_verifier" \
-  refs/heads/omp-context-evidence-v0.50.98-source "$prep_lock_commit" "$fixture/report")" == \
+  refs/heads/omp-context-evidence-v0.50.99-source "$prep_lock_commit" "$fixture/report")" == \
   "$prep_lock_commit" ]] || fail 'retained prep lock verifier did not adopt the exact lock'
 printf 'tampered\n' >"$fixture/report"
 if (cd "$work" && "$lock_verifier" \
-  refs/heads/omp-context-evidence-v0.50.98-source "$prep_lock_commit" "$fixture/report" \
+  refs/heads/omp-context-evidence-v0.50.99-source "$prep_lock_commit" "$fixture/report" \
   >/dev/null 2>&1); then
   fail 'retained prep lock verifier accepted different report bytes'
 fi
 printf 'report\n' >"$fixture/report"
 (cd "$work" && run_publisher >"$fixture/result.json")
-jq -e '.mode == "committed" and .release_tag == "v0.50.98" and .source_commit == $source and .github_release_id == 996' --arg source "$source_commit" "$fixture/result.json" >/dev/null || fail 'success receipt differs'
-[[ "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.98 | cut -f2)" == 'refs/tags/v0.50.98' ]] || fail 'success did not publish release tag'
+jq -e '.mode == "committed" and .release_tag == "v0.50.99" and .source_commit == $source and .github_release_id == 996' --arg source "$source_commit" "$fixture/result.json" >/dev/null || fail 'success receipt differs'
+[[ "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.99 | cut -f2)" == 'refs/tags/v0.50.99' ]] || fail 'success did not publish release tag'
 [[ "$(jq 'length' "$state/repository-variables.json")" == '9' &&
    "$(jq 'length' "$state/environment-variables.json")" == '9' ]] || fail 'success did not converge both variable scopes'
-jq -e 'any(.[]; .type == "tag" and .name == "v0.50.98")' "$state/deployment-policies.json" >/dev/null || fail 'success did not install exact tag deployment policy'
+jq -e 'any(.[]; .type == "tag" and .name == "v0.50.99")' "$state/deployment-policies.json" >/dev/null || fail 'success did not install exact tag deployment policy'
 jq -e 'length == 1 and .[0].id == 996 and .[0].draft == true and .[0].author.id == 204883817 and
   (.[0].body | fromjson | .schema_version == "autopus.adk_release_reservation.v1")' "$state/releases.json" >/dev/null || fail 'success did not retain the owned draft reservation'
 [[ "$(sed -n '$p' "$state/calls.log")" == 'release-tag-push' ]] || fail 'release tag was not the final external mutation'
 [[ -z "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source)" ]] || fail 'success did not atomically retire the prep lock'
+  refs/heads/omp-context-evidence-v0.50.99-source)" ]] || fail 'success did not atomically retire the prep lock'
 calls_before_reconcile=$(wc -l <"$state/calls.log" | tr -d ' ')
 (cd "$work" && RELEASE_PREP_LOCK_ARGUMENT=reconcile run_publisher >"$fixture/reconciled.json")
-jq -e '.mode == "reconciled" and .release_tag == "v0.50.98"' "$fixture/reconciled.json" >/dev/null || fail 'committed release did not reconcile'
+jq -e '.mode == "reconciled" and .release_tag == "v0.50.99"' "$fixture/reconciled.json" >/dev/null || fail 'committed release did not reconcile'
 [[ "$(wc -l <"$state/calls.log" | tr -d ' ')" == "$calls_before_reconcile" ]] || fail 'reconciliation performed a remote mutation'
 
 setup_fixture rollback
@@ -177,10 +177,10 @@ cmp "$fixture/environment-before.json" "$state/environment-variables.json" ||
   fail 'environment variables were not rolled back'
 [[ "$(jq 'length' "$state/deployment-policies.json")" == '0' ]] ||
   fail 'failed publish left a deployment policy'
-[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.98)" ]] ||
+[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.99)" ]] ||
   fail 'failed publish created release tag'
 [[ -z "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source)" ]] ||
+  refs/heads/omp-context-evidence-v0.50.99-source)" ]] ||
   fail 'successful rollback retained the prep lock'
 
 setup_fixture rollback_incomplete
@@ -189,9 +189,9 @@ if (cd "$work" && MOCK_RELEASE_PREP_FAIL_AT=5 MOCK_RELEASE_PREP_FAIL_FROM=6 \
   fail 'persistent rollback failure succeeded'
 fi
 [[ "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source | cut -f1)" == "$prep_lock_commit" ]] ||
+  refs/heads/omp-context-evidence-v0.50.99-source | cut -f1)" == "$prep_lock_commit" ]] ||
   fail 'incomplete rollback did not retain its owned prep lock'
-[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.98)" ]] ||
+[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.99)" ]] ||
   fail 'incomplete rollback created a release tag'
 
 setup_fixture policy_response_lost
@@ -200,9 +200,9 @@ if (cd "$work" && MOCK_RELEASE_PREP_POLICY_RESPONSE_LOST=1 \
   fail 'lost deployment-policy response succeeded'
 fi
 [[ "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source | cut -f1)" == "$prep_lock_commit" ]] ||
+  refs/heads/omp-context-evidence-v0.50.99-source | cut -f1)" == "$prep_lock_commit" ]] ||
   fail 'ambiguous policy creation did not retain its owned prep lock'
-jq -e 'any(.[]; .type == "tag" and .name == "v0.50.98")' \
+jq -e 'any(.[]; .type == "tag" and .name == "v0.50.99")' \
   "$state/deployment-policies.json" >/dev/null ||
   fail 'lost policy response fixture did not create the remote policy'
 
@@ -215,7 +215,7 @@ jq -e '.mode == "committed" and .github_release_id == 996' \
 [[ "$(jq 'length' "$state/releases.json")" == '1' ]] ||
   fail 'lost release-create response duplicated the reservation'
 [[ -z "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source)" ]] ||
+  refs/heads/omp-context-evidence-v0.50.99-source)" ]] ||
   fail 'lost release-create response retained the prep lock after commit'
 
 setup_fixture release_eventual_consistency
@@ -224,7 +224,7 @@ jq -e '.mode == "committed" and .github_release_id == 996' "$fixture/result.json
 [[ "$(grep -c '^release-reservation-not-yet-visible$' "$state/calls.log")" == '2' ]] || fail 'release reservation verification did not retry delayed visibility'
 [[ "$(jq 'length' "$state/releases.json")" == '1' ]] || fail 'eventual-consistency retry duplicated the release reservation'
 [[ -z "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source)" ]] || fail 'successful eventual-consistency retry retained the prep lock'
+  refs/heads/omp-context-evidence-v0.50.99-source)" ]] || fail 'successful eventual-consistency retry retained the prep lock'
 
 setup_fixture release_push_rejected
 if (cd "$work" && MOCK_RELEASE_PREP_REJECT_TAG=1 \
@@ -234,7 +234,7 @@ fi
 [[ "$(jq 'length' "$state/releases.json")" == '0' ]] ||
   fail 'rejected tag push did not delete its owned draft reservation'
 [[ -z "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source)" ]] ||
+  refs/heads/omp-context-evidence-v0.50.99-source)" ]] ||
   fail 'rejected tag push retained its lock after complete rollback'
 
 setup_fixture release_delete_failed
@@ -246,7 +246,7 @@ delete_failure_status=0
 [[ "$(jq 'length' "$state/releases.json")" == '1' ]] ||
   fail 'draft deletion failure did not retain its reservation'
 [[ "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source | cut -f1)" == "$prep_lock_commit" ]] ||
+  refs/heads/omp-context-evidence-v0.50.99-source | cut -f1)" == "$prep_lock_commit" ]] ||
   fail 'draft deletion failure did not retain its prep lock'
 (cd "$work" && RELEASE_PREP_LOCK_ARGUMENT="retained:$prep_lock_commit" \
   run_publisher >"$fixture/retry-result.json")
@@ -256,13 +256,13 @@ jq -e '.mode == "committed" and .github_release_id == 996' \
 
 setup_fixture release_name_collision
 jq -n --arg source "$source_commit" \
-  '[{id:995,tag_name:"v0.50.95-collision",target_commitish:$source,name:"v0.50.98",body:"collision",draft:true,prerelease:false,author:{id:204883817},assets:[]}]' \
+  '[{id:995,tag_name:"v0.50.95-collision",target_commitish:$source,name:"v0.50.99",body:"collision",draft:true,prerelease:false,author:{id:204883817},assets:[]}]' \
   >"$state/releases.json"
 if (cd "$work" && run_publisher >/dev/null 2>&1); then
   fail 'publisher accepted a GoReleaser draft-name collision'
 fi
 [[ "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source | cut -f1)" == "$prep_lock_commit" ]] ||
+  refs/heads/omp-context-evidence-v0.50.99-source | cut -f1)" == "$prep_lock_commit" ]] ||
   fail 'draft-name collision did not retain the prep lock'
 [[ "$(jq 'length' "$state/repository-variables.json")" == '1' &&
    "$(jq 'length' "$state/environment-variables.json")" == '1' ]] ||
@@ -270,20 +270,20 @@ fi
 
 setup_fixture release_ownership_mismatch
 jq -n --arg source "$source_commit" \
-  '[{id:997,tag_name:"v0.50.98",target_commitish:$source,name:"v0.50.98",body:"unowned",draft:true,prerelease:false,author:{id:42},assets:[]}]' \
+  '[{id:997,tag_name:"v0.50.99",target_commitish:$source,name:"v0.50.99",body:"unowned",draft:true,prerelease:false,author:{id:42},assets:[]}]' \
   >"$state/releases.json"
 if (cd "$work" && run_publisher >/dev/null 2>&1); then
   fail 'publisher adopted an unowned draft release'
 fi
 [[ "$(git -C "$work" ls-remote --refs origin \
-  refs/heads/omp-context-evidence-v0.50.98-source | cut -f1)" == "$prep_lock_commit" ]] ||
+  refs/heads/omp-context-evidence-v0.50.99-source | cut -f1)" == "$prep_lock_commit" ]] ||
   fail 'unowned draft did not retain the prep lock for operator recovery'
 [[ "$(jq 'length' "$state/repository-variables.json")" == '1' &&
    "$(jq 'length' "$state/environment-variables.json")" == '1' ]] ||
   fail 'unowned draft mutated release coordinates'
 
 setup_fixture lock_missing
-git -C "$work" push --quiet origin :refs/heads/omp-context-evidence-v0.50.98-source
+git -C "$work" push --quiet origin :refs/heads/omp-context-evidence-v0.50.99-source
 cp "$state/repository-variables.json" "$fixture/repository-before.json"
 cp "$state/environment-variables.json" "$fixture/environment-before.json"
 if (cd "$work" && run_publisher >/dev/null 2>&1); then
@@ -293,7 +293,7 @@ cmp "$fixture/repository-before.json" "$state/repository-variables.json" ||
   fail 'lock failure mutated repository variables'
 cmp "$fixture/environment-before.json" "$state/environment-variables.json" ||
   fail 'lock failure mutated environment variables'
-[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.98)" ]] ||
+[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.99)" ]] ||
   fail 'lock failure created release tag'
 
 printf 'release prep hardening test: PASS\n'
