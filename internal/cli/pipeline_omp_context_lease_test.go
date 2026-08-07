@@ -54,7 +54,7 @@ func pipelineOMPActiveLeaseBindingFixture() pipelineOMPActiveLeaseBinding {
 		DecisionDeltaHash: workflowContextRuntimeHash("implement phase"), RuntimeVersion: "omp/17.2.7",
 		ExecutableSHA256: workflowContextRuntimeHash("omp executable"), Provider: "openai",
 		ModelScopeDigest: workflowContextRuntimeHash("model scope"),
-		AutoVersion:      "0.50.99", AutoExecutableSHA256: workflowContextRuntimeHash("auto executable"),
+		AutoVersion:      "0.50.100", AutoExecutableSHA256: workflowContextRuntimeHash("auto executable"),
 		AutoSourceCommit: strings.Repeat("d", 40), AutoSourceTree: strings.Repeat("e", 40),
 		Model: "gpt-5.4", CohortDigest: workflowContextRuntimeHash("20-pair cohort"),
 		OracleDigest:        workflowContextRuntimeHash("quality oracle"),

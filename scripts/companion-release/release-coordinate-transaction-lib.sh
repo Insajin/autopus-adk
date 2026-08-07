@@ -16,7 +16,7 @@ load_release_for_tag() {
     "repos/Insajin/autopus-adk/releases?per_page=100") || return 1
   jq -e 'type == "array" and all(.[]; type == "array")' <<<"$releases" >/dev/null ||
     return 1
-  release_matches=$(jq -c '[.[][] | select(.tag_name == "v0.50.99")]' <<<"$releases") ||
+  release_matches=$(jq -c '[.[][] | select(.tag_name == "v0.50.100")]' <<<"$releases") ||
     return 1
   draft_name_matches=$(jq -c --arg name "$reservation_name" \
     '[.[][] | select(.draft == true and .name == $name)]' <<<"$releases") ||
@@ -35,7 +35,7 @@ verify_owned_draft_reservation() {
     '.id | type == "number"' <<<"$release_json" >/dev/null || return 1
   jq -e --arg name "$reservation_name" --arg body "$reservation_body" \
     --arg source "$source_commit" \
-    '.tag_name == "v0.50.99" and .draft == true and .prerelease == false and
+    '.tag_name == "v0.50.100" and .draft == true and .prerelease == false and
      .author.id == 204883817 and .name == $name and .body == $body and
      .target_commitish == $source and (.assets | type == "array" and length == 0)' \
     <<<"$release_json" >/dev/null || return 1
@@ -47,7 +47,7 @@ verify_owned_draft_reservation() {
 verify_owned_release_record() {
   load_release_for_tag || return $?
   jq -e '.id | type == "number"' <<<"$release_json" >/dev/null || return 1
-  jq -e '.tag_name == "v0.50.99" and .author.id == 204883817' \
+  jq -e '.tag_name == "v0.50.100" and .author.id == 204883817' \
     <<<"$release_json" >/dev/null || return 1
   if jq -e '.draft == true' <<<"$release_json" >/dev/null; then
     jq -e --arg name "$reservation_name" --arg body "$reservation_body" \
