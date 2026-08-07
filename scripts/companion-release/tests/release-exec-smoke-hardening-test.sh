@@ -67,10 +67,12 @@ contains "$materializer" 'cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e2948
 contains "$workflow" 'OMP_CONTEXT_RELEASE_CANARY_ROOT: /private/tmp/autopus-adk-omp-canary-${{ github.run_id }}-${{ github.run_attempt }}'
 contains "$workflow" 'OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE"'
 contains "$uid_isolation" 'uid == targetUID'
-contains "$uid_isolation" 'return validateArtifactAncestorUIDAccess(filepath.Dir(path), targetUID, targetGIDs)'
+contains "$uid_isolation" 'return validateArtifactAncestorUIDAccess(filepath.Dir(path), targetUID, targetGIDs, trustedOwnerUID)'
 contains "$uid_isolation" 'for parent := path; ; parent = filepath.Dir(parent)'
 contains "$uid_isolation" 'identityErr != nil || uid == targetUID'
 contains "$uid_isolation" 'canaryTargetMode(info, targetUID, targetGIDs, 0o200, 0o020, 0o002)'
+contains "$uid_isolation" 'policy.expectedGIDs, policy.runnerOwnerUID'
+contains "$uid_isolation" 'uid != trustedOwnerUID || info.Mode()&os.ModeSticky == 0'
 if grep -Fq 'OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE' "$goreleaser_config"; then
   fail 'release canary executable leaked into the GoReleaser archive configuration'
 fi
