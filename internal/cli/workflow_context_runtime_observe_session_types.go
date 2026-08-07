@@ -101,8 +101,9 @@ func workflowContextObserveSessionErrorCode(runErr error) string {
 	case strings.Contains(message, "handshake is invalid"),
 		strings.Contains(message, "shutdown is invalid"),
 		strings.Contains(message, "input continued after shutdown"),
-		strings.Contains(message, "call ") &&
-			(containsAny(message, " is invalid", "repeats a task", "pair authority changed")):
+		strings.HasPrefix(message, "observe-session call ") &&
+			!strings.Contains(message, " failed closed:") &&
+			containsAny(message, " is invalid", " repeats a task", " pair authority changed"):
 		return "input_invalid"
 	case containsAny(message,
 		"private or unsafe output",
