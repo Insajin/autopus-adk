@@ -41,7 +41,7 @@ done
 
 [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'arm64' ]] || fail 'release prep requires Darwin arm64'
 [[ "$endpoint" =~ ^http://127\.0\.0\.1:[1-9][0-9]{0,4}$ ]] || fail 'endpoint is not exact loopback HTTP'
-[[ "$credential_locator" =~ ^[A-Z][A-Z0-9_]{2,127}$ ]] || fail 'credential locator is malformed'
+[[ "$credential_locator" =~ ^AUTOPUS_OMP_CONTEXT_PROVIDER_[A-Z0-9_]{1,96}$ ]] || fail 'credential locator is malformed'
 [[ -n "${!credential_locator-}" && "${!credential_locator}" != *$'\n'* ]] ||
   fail 'provider credential is unavailable or not single-line'
 [[ "$provider" =~ ^[A-Za-z0-9_.-]+$ && "$model" =~ ^[A-Za-z0-9_.:/-]+$ ]] || fail 'provider or model is malformed'
