@@ -28,7 +28,7 @@ readonly hex40='^[0-9a-f]{40}$' hex64='^[0-9a-f]{64}$'
 
 [[ "$repository" == 'Insajin/autopus-adk' ]] || fail 'repository is not production authority'
 [[ "$environment_name" == 'adk-companion-release' ]] || fail 'environment is not protected release authority'
-[[ "$release_tag" == 'v0.50.98' ]] || fail 'release tag is not exact A22'
+[[ "$release_tag" == 'v0.50.99' ]] || fail 'release tag is not exact A22'
 for value in "$source_commit" "$source_tree" "$evidence_tag_object" "$evidence_commit" "$evidence_tree"; do
   [[ "$value" =~ $hex40 ]] || fail 'Git coordinate is malformed'
 done

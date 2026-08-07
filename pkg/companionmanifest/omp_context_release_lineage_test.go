@@ -16,7 +16,7 @@ func ompContextReleaseLineageFixture() OMPContextReleaseLineageV1 {
 		ExecutableSHA256: "sha256:" + strings.Repeat("2", 64),
 		SourceRepository: "Insajin/autopus-adk",
 		SourceCommit:     strings.Repeat("3", 40), SourceTree: strings.Repeat("4", 40),
-		Target: "darwin-arm64", Version: "v0.50.98",
+		Target: "darwin-arm64", Version: "v0.50.99",
 	}
 }
 
@@ -57,7 +57,7 @@ func TestSignCanonicalOMPContextReleaseLineage_ExactBytesAndSignatureRoundTrip(t
 		`{"schema_version":"autopus.omp_context_release_lineage.v1","key_id":"rfc8032-vector-1","algorithm":"ed25519",` +
 			`"upstream_sha256":"sha256:` + strings.Repeat("1", 64) + `","executable_sha256":"sha256:` + strings.Repeat("2", 64) + `",` +
 			`"source_repository":"Insajin/autopus-adk","source_commit":"` + strings.Repeat("3", 40) + `","source_tree":"` + strings.Repeat("4", 40) + `",` +
-			`"target":"darwin-arm64","version":"v0.50.98"}`,
+			`"target":"darwin-arm64","version":"v0.50.99"}`,
 	)
 	if !bytes.Equal(body, wantBody) {
 		t.Fatalf("canonical body = %q, want %q", body, wantBody)
@@ -86,7 +86,7 @@ func TestSignCanonicalOMPContextReleaseLineage_ExactBytesAndSignatureRoundTrip(t
 	}
 
 	tampered := lineage
-	tampered.Version = "v0.50.99"
+	tampered.Version = "v0.50.100"
 	tamperedBody, err := CanonicalOMPContextReleaseLineageBytes(tampered)
 	if err != nil {
 		t.Fatal(err)

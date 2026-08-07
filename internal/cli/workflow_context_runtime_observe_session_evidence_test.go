@@ -206,7 +206,7 @@ func workflowContextObserveEvidenceFixture(t *testing.T, challenge string) (
 		}},
 		deliveryOptions: deliveryOptions, delivery: delivery, canonicalPromptHash: workflowContextRuntimeHash(delivery.Prompt),
 		ompVersion: "omp/17.2.7", ompExecutableSHA256: fmt.Sprintf("sha256:%x", backend.executableID.digest[:]),
-		autoVersion: "0.50.98", autoExecutableSHA256: autoSHA, candidateTree: tree,
+		autoVersion: "0.50.99", autoExecutableSHA256: autoSHA, candidateTree: tree,
 		sandboxMode: pipelineOMPActiveSandboxManaged,
 	}
 	options := workflowContextObserveSessionOptions{
