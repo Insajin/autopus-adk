@@ -23,7 +23,7 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 			"The report remains inactive until a trusted promotion-attestation.v2 and release lineage are installed.",
 		Example: "  auto workflow context-runtime observe-session --explicit-live --input-jsonl - --output - --format jsonl \\\n" +
 			"    --project-dir . --spec-id SPEC-OMP-004 --provider openai --model gpt-5.6-sol \\\n" +
-			"    --model-context-window 272000 --endpoint http://127.0.0.1:43123 \\\n" +
+			"    --model-context-window 320000 --endpoint http://127.0.0.1:43123 \\\n" +
 			"    --credential-locator AUTOPUS_OMP_CONTEXT_PROVIDER_OPENAI \\\n" +
 			"    --producer-repository org/omp-evals --producer-workflow-ref refs/heads/main@REV \\\n" +
 			"    --producer-run-id 123 --producer-run-attempt 1 --candidate-repository org/autopus-adk \\\n" +
