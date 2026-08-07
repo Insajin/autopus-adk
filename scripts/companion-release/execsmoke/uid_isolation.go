@@ -95,7 +95,7 @@ func validateCanaryUIDIsolation(
 		return nil, errors.New("release canary OMP ownership or mode is unsafe")
 	}
 	if policy.requireArtifactOtherExec &&
-		validateArtifactUIDAccess(artifact, policy.expectedUID, policy.expectedGIDs) != nil {
+		validateArtifactUIDAccess(artifact, policy.expectedUID, policy.expectedGIDs, policy.runnerOwnerUID) != nil {
 		return nil, errors.New("signed artifact or parent path is unsafe for nobody execution")
 	}
 	return &canaryUIDIsolation{
@@ -128,7 +128,12 @@ func validateCanaryRunner(path string, ownerUID uint32, requireSetUID bool) erro
 	return nil
 }
 
-func validateArtifactUIDAccess(path string, targetUID uint32, targetGIDs map[uint32]struct{}) error {
+func validateArtifactUIDAccess(
+	path string,
+	targetUID uint32,
+	targetGIDs map[uint32]struct{},
+	trustedOwnerUID uint32,
+) error {
 	info, err := os.Lstat(path)
 	uid, _, identityErr := canaryFileIdentity(info)
 	if err != nil || identityErr != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() ||
@@ -137,21 +142,25 @@ func validateArtifactUIDAccess(path string, targetUID uint32, targetGIDs map[uin
 		canaryTargetMode(info, targetUID, targetGIDs, 0o200, 0o020, 0o002) {
 		return errors.New("artifact identity or target access mode is unsafe")
 	}
-	return validateArtifactAncestorUIDAccess(filepath.Dir(path), targetUID, targetGIDs)
+	return validateArtifactAncestorUIDAccess(filepath.Dir(path), targetUID, targetGIDs, trustedOwnerUID)
 }
 
 func validateArtifactAncestorUIDAccess(
 	path string,
 	targetUID uint32,
 	targetGIDs map[uint32]struct{},
+	trustedOwnerUID uint32,
 ) error {
 	for parent := path; ; parent = filepath.Dir(parent) {
 		info, err := os.Lstat(parent)
 		uid, _, identityErr := canaryFileIdentity(info)
 		if err != nil || identityErr != nil || uid == targetUID || !info.IsDir() ||
 			info.Mode()&os.ModeSymlink != 0 ||
-			!canaryTargetMode(info, targetUID, targetGIDs, 0o100, 0o010, 0o001) ||
-			canaryTargetMode(info, targetUID, targetGIDs, 0o200, 0o020, 0o002) {
+			!canaryTargetMode(info, targetUID, targetGIDs, 0o100, 0o010, 0o001) {
+			return errors.New("artifact parent is not immutable and traversable by nobody")
+		}
+		if canaryTargetMode(info, targetUID, targetGIDs, 0o200, 0o020, 0o002) &&
+			(uid != trustedOwnerUID || info.Mode()&os.ModeSticky == 0) {
 			return errors.New("artifact parent is not immutable and traversable by nobody")
 		}
 		if parent == filepath.Dir(parent) {

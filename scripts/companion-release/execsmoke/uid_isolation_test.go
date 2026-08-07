@@ -122,7 +122,7 @@ func TestValidateArtifactUIDAccessRejectsTargetOwnerAndWritablePaths(t *testing.
 		t.Fatal(err)
 	}
 	targetUID := uid + 1
-	if err := validateArtifactUIDAccess(artifact, uid, nil); err == nil {
+	if err := validateArtifactUIDAccess(artifact, uid, nil, uid); err == nil {
 		t.Fatal("target-owned artifact passed access validation")
 	}
 	if err := os.Chmod(root, 0o757); err != nil {
@@ -131,7 +131,7 @@ func TestValidateArtifactUIDAccessRejectsTargetOwnerAndWritablePaths(t *testing.
 	if !canaryTargetMode(mustLstat(t, root), targetUID, nil, 0o200, 0o020, 0o002) {
 		t.Fatal("target-writable parent mode was not detected")
 	}
-	if err := validateArtifactUIDAccess(artifact, targetUID, nil); err == nil {
+	if err := validateArtifactUIDAccess(artifact, targetUID, nil, uid); err == nil {
 		t.Fatal("target-writable artifact parent passed access validation")
 	}
 	if err := os.Chmod(root, 0o755); err != nil {
@@ -143,8 +143,55 @@ func TestValidateArtifactUIDAccessRejectsTargetOwnerAndWritablePaths(t *testing.
 	if !canaryTargetMode(mustLstat(t, artifact), targetUID, nil, 0o200, 0o020, 0o002) {
 		t.Fatal("target-writable artifact mode was not detected")
 	}
-	if err := validateArtifactUIDAccess(artifact, targetUID, nil); err == nil {
+	if err := validateArtifactUIDAccess(artifact, targetUID, nil, uid); err == nil {
 		t.Fatal("target-writable artifact passed access validation")
+	}
+}
+
+func TestValidateArtifactUIDAccessAcceptsTrustedStickyAncestor(t *testing.T) {
+	uid, gid, err := canaryFileIdentity(mustLstat(t, testArtifact(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ancestor, err := os.MkdirTemp(".", ".uid-sticky-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(ancestor) })
+	if err := os.Chmod(ancestor, 0o777|os.ModeSticky); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(ancestor, "root")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	artifact := filepath.Join(root, "auto")
+	body, err := os.ReadFile(testArtifact(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(artifact, body, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(artifact, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	targetUID := uid + 1
+	targetGIDs := map[uint32]struct{}{gid: {}}
+	if err := validateArtifactUIDAccess(artifact, targetUID, targetGIDs, uid+2); err == nil {
+		t.Fatal("sticky ancestor owned by an untrusted identity passed access validation")
+	}
+	if err := validateArtifactUIDAccess(artifact, targetUID, targetGIDs, uid); err != nil {
+		t.Fatalf("trusted sticky ancestor failed access validation: %v", err)
+	}
+	if err := os.Chmod(ancestor, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateArtifactUIDAccess(artifact, targetUID, targetGIDs, uid); err == nil {
+		t.Fatal("trusted writable ancestor without sticky mode passed access validation")
 	}
 }
 
@@ -158,7 +205,7 @@ func TestValidateArtifactAncestorUIDAccessRejectsTargetOwnedReadOnlyDirectory(t 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(ancestor, 0o700) })
-	if err := validateArtifactAncestorUIDAccess(ancestor, uid, nil); err == nil {
+	if err := validateArtifactAncestorUIDAccess(ancestor, uid, nil, uid); err == nil {
 		t.Fatal("target-owned 0555 artifact ancestor passed access validation")
 	}
 }
