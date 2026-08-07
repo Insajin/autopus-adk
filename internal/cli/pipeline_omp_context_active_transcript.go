@@ -126,7 +126,22 @@ func (protocol *pipelineOMPRPCProtocol) validatePipelineOMPActiveMessageValue(
 					return err
 				}
 				if strings.Contains(strings.ToLower(key), "image") {
-					return errors.New("managed active OMP transcript contains unsupported image content")
+					imageList, ok := item.([]any)
+					role, _ := typed["role"].(string)
+					if key != "images" || role != "compactionSummary" || !ok {
+						return errors.New("managed active OMP transcript contains unsupported image content")
+					}
+					for _, imageValue := range imageList {
+						image, imageOK := imageValue.(map[string]any)
+						imageType, _ := image["type"].(string)
+						if !imageOK || imageType != "image" {
+							return errors.New("managed active OMP transcript contains unsupported image content")
+						}
+						if err := walk(image); err != nil {
+							return err
+						}
+					}
+					continue
 				}
 				if err := walk(item); err != nil {
 					return err
@@ -147,12 +162,15 @@ func pipelineOMPActiveImageDigest(value map[string]any) (string, bool) {
 	}
 	data, dataOK := value["data"].(string)
 	mime, mimeOK := value["mimeType"].(string)
-	if len(value) != 3 || !dataOK || !mimeOK || data == "" || mime != "image/png" ||
-		len(data) > pipelineOMPActiveTranscriptMaxBytes {
+	detailValue, hasDetail := value["detail"]
+	detail, detailOK := detailValue.(string)
+	if len(value) != 3+boolToPipelineOMPCount(hasDetail) || !dataOK || !mimeOK ||
+		data == "" || mime != "image/png" || len(data) > pipelineOMPActiveTranscriptMaxBytes ||
+		hasDetail && (!detailOK || !validPipelineOMPActiveImageDetail(detail)) {
 		return "", false
 	}
 	for key := range value {
-		if key != "type" && key != "data" && key != "mimeType" {
+		if key != "type" && key != "data" && key != "mimeType" && key != "detail" {
 			return "", false
 		}
 	}
@@ -161,6 +179,15 @@ func pipelineOMPActiveImageDigest(value map[string]any) (string, bool) {
 		return "", false
 	}
 	return pipelineOMPActiveHash(encoded), true
+}
+
+func validPipelineOMPActiveImageDetail(detail string) bool {
+	switch detail {
+	case "auto", "low", "high", "original":
+		return true
+	default:
+		return false
+	}
 }
 
 func validatePipelineOMPActiveText(value string) error {

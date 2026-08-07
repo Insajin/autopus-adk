@@ -115,6 +115,9 @@ func TestWorkflowContextObserveSession_WritesBodyFreeErrorFrame(t *testing.T) {
 	assert.NotContains(t, output.String(), err.Error())
 	assert.Equal(t, "network_transport",
 		workflowContextObserveSessionErrorCode(fmt.Errorf("provider timed out")))
+	assert.Equal(t, "runtime_failed", workflowContextObserveSessionErrorCode(
+		fmt.Errorf("observe-session call 6 failed closed: managed active OMP transcript image is invalid"),
+	))
 }
 
 func TestWorkflowContextObserveSessionHelp_DocumentsExplicitLiveLoopbackCanary(t *testing.T) {
