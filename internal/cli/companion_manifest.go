@@ -54,6 +54,8 @@ func newCompanionManifestCmd() *cobra.Command {
 	command.AddCommand(newCompanionOMPContextReleaseLineageCmd())
 	command.AddCommand(newCompanionOMPContextPromotionAttestationCmd())
 	command.AddCommand(newCompanionOMPContextStaticPolicyCmd())
+	command.AddCommand(newCompanionOMPContextCanaryPlanCmd())
+	command.AddCommand(newCompanionOMPContextPromotionKeyIDCmd())
 	return command
 }
 

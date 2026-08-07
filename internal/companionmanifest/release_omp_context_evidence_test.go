@@ -25,6 +25,7 @@ func TestReleaseWorkflow_A22GatesOnPinnedOMPProductionEvidence(t *testing.T) {
 		"./scripts/companion-release/ompcontextverify",
 		"--mode active",
 		"--mode historical",
+		"--expected-signing-key-id 'omp-context-promotion-2026-q3-k2'",
 		"omp-context-promotion-report.v1.json",
 		"omp-context-promotion-attestation.v2.json",
 	} {
@@ -87,6 +88,8 @@ func TestReleaseWorkflow_A22CarriesSameRunEvidenceIntoExactFifteenAssets(t *test
 		"release-lineage-v1.sig",
 		"standalone and archived OMP context lineage bytes differ",
 		"--static-policy-b64",
+		"--expected-signing-key-id",
+		"omp-context-promotion-2026-q3-k2",
 	} {
 		if !strings.Contains(current, required) {
 			t.Fatalf("current release verifier missing V3/fifteen-asset contract %q", required)

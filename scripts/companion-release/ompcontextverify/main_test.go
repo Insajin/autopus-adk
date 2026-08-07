@@ -50,6 +50,7 @@ func TestRun_RejectsUnpinnedEvidenceBeforeSignatureVerification(t *testing.T) {
 		"--candidate-tree", strings.Repeat("d", 40),
 		"--candidate-artifact-sha256", strings.Repeat("e", 64),
 		"--static-policy-b64", testStaticPolicyB64(t),
+		"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K1,
 	})
 	if err == nil || !strings.Contains(err.Error(), "artifact digest differs") {
 		t.Fatalf("unpinned evidence result = %v", err)
@@ -66,6 +67,7 @@ func TestParseOptions_RejectsMalformedCoordinates(t *testing.T) {
 		"--candidate-tree", strings.Repeat("d", 40),
 		"--candidate-artifact-sha256", strings.Repeat("e", 64),
 		"--static-policy-b64", testStaticPolicyB64(t),
+		"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K1,
 	})
 	if err == nil || !strings.Contains(err.Error(), "candidate revision") {
 		t.Fatalf("malformed coordinate result = %v", err)
@@ -106,6 +108,7 @@ func (f historicalVerifierFixture) arguments(candidateArtifactSHA string) []stri
 		"--candidate-tree", strings.Repeat("d", 40),
 		"--candidate-artifact-sha256", candidateArtifactSHA,
 		"--static-policy-b64", f.staticPolicyB64,
+		"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K1,
 	}
 }
 
@@ -244,6 +247,7 @@ func promotionVerifierInputs(
 	return reportBytes, expectationFromStaticPolicy(
 		policy,
 		"sha256:"+strings.Repeat("e", 64),
+		promptlayer.OMPContextPromotionKeyID2026Q3K1,
 	)
 }
 
@@ -360,6 +364,7 @@ func TestParseOptions_RejectsNonCanonicalCandidateArtifactDigest(t *testing.T) {
 				"--candidate-tree", strings.Repeat("d", 40),
 				"--candidate-artifact-sha256", test.value,
 				"--static-policy-b64", testStaticPolicyB64(t),
+				"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K1,
 			})
 			if err == nil || err.Error() != "candidate artifact digest is malformed" {
 				t.Fatalf("non-canonical candidate digest result = %v", err)

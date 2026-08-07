@@ -158,7 +158,8 @@ func replaceJSONField(t *testing.T, body []byte, key string, value any) []byte {
 func expectationFromOMPContextPromotionReportV1(report OMPContextPromotionReportV1) OMPContextPromotionExpectationV2 {
 	return OMPContextPromotionExpectationV2{
 		ProducerRepository: report.Producer.Repository, ProducerWorkflowRef: report.Producer.WorkflowRef,
-		Candidate: report.Candidate, PolicyID: report.Policy.PolicyID, PolicyDigest: report.Policy.PolicyDigest,
+		SigningKeyID: OMPContextPromotionKeyID2026Q3K1,
+		Candidate:    report.Candidate, PolicyID: report.Policy.PolicyID, PolicyDigest: report.Policy.PolicyDigest,
 		AutoVersion: report.Runtime.AutoVersion, AutoBinarySHA256: report.Runtime.AutoBinarySHA256,
 		OMPVersion: report.Runtime.OMPVersion, OMPExecutableSHA256: report.Runtime.OMPExecutableSHA256,
 		PipelineImplementationDigest: report.Runtime.PipelineImplementationDigest,

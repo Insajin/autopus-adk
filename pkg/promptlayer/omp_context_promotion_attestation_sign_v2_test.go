@@ -51,6 +51,47 @@ func TestSignOMPContextPromotionAttestationV2_RoundTripsAgainstCommittedTrust(t 
 	}
 }
 
+func TestSignOMPContextPromotionAttestationV2_SelectsMatchingRotationKey(t *testing.T) {
+	fixture := newOMPContextPromotionV2Fixture(t)
+	otherSeed := sha256.Sum256([]byte("other-production-promotion-key"))
+	otherKey := ed25519.NewKeyFromSeed(otherSeed[:])
+	originalKeys := ompContextPromotionPublicKeysV2
+	originalRevoked := ompContextPromotionRevokedKeysV2
+	ompContextPromotionPublicKeysV2 = map[string]ed25519.PublicKey{
+		OMPContextPromotionKeyID2026Q3K1: append(ed25519.PublicKey(nil), otherKey[ed25519.SeedSize:]...),
+		OMPContextPromotionKeyID2026Q3K2: append(ed25519.PublicKey(nil), fixture.publicKey...),
+	}
+	ompContextPromotionRevokedKeysV2 = map[string]bool{}
+	t.Cleanup(func() {
+		ompContextPromotionPublicKeysV2 = originalKeys
+		ompContextPromotionRevokedKeysV2 = originalRevoked
+	})
+	fixture.expectation.SigningKeyID = OMPContextPromotionKeyID2026Q3K2
+	body, err := SignOMPContextPromotionAttestationV2(
+		validOMPContextPromotionAttestationSignInputV2(fixture),
+		fixture.privateKey,
+	)
+	if err != nil {
+		t.Fatalf("sign with rotation key: %v", err)
+	}
+	var attestation OMPContextPromotionAttestationV2
+	if err := json.Unmarshal(body, &attestation); err != nil {
+		t.Fatalf("decode rotation attestation: %v", err)
+	}
+	if attestation.KeyID != OMPContextPromotionKeyID2026Q3K2 {
+		t.Fatalf("rotation key id=%q", attestation.KeyID)
+	}
+	verified, err := verifyOMPContextPromotionArtifactV2At(
+		fixture.reportBytes,
+		body,
+		fixture.now,
+		fixture.expectation,
+	)
+	if err != nil || !verified.validAt(fixture.now) {
+		t.Fatalf("rotation attestation did not verify: verified=%#v error=%v", verified, err)
+	}
+}
+
 func TestSignOMPContextPromotionAttestationV2_RejectsWrongOrMalformedKey(t *testing.T) {
 	fixture := newOMPContextPromotionV2Fixture(t)
 	withOMPContextPromotionV3FixtureKey(t, fixture.publicKey)

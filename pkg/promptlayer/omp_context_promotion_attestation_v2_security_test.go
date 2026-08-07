@@ -151,6 +151,9 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsReplayCoordinateMismatch(t *
 		"producer workflow": func(e *OMPContextPromotionExpectationV2) {
 			e.ProducerWorkflowRef = "refs/heads/main@1123456789abcdef0123456789abcdef01234567"
 		},
+		"signing key": func(e *OMPContextPromotionExpectationV2) {
+			e.SigningKeyID = OMPContextPromotionKeyID2026Q3K2
+		},
 		"candidate": func(e *OMPContextPromotionExpectationV2) {
 			e.Candidate.Revision = "2123456789abcdef0123456789abcdef01234567"
 		},

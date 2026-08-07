@@ -38,7 +38,10 @@ type workflowContextObserveSessionSetup struct {
 	sandboxMode             pipelineOMPActiveSandboxMode
 }
 
-const workflowContextObserveSessionMaxTime = 30 * time.Minute
+const (
+	workflowContextObserveSessionMaxTime      = 2 * time.Minute
+	workflowContextObserveSessionTotalMaxTime = 30 * time.Minute
+)
 
 func validateWorkflowContextObserveSessionOptions(options workflowContextObserveSessionOptions) error {
 	_, policyErr := promptlayer.OMPContextPromotionPolicyDigestV1(options.PromotionPolicy)

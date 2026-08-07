@@ -65,6 +65,8 @@ type workflowContextObserveSessionResponse struct {
 	CleanupVerified          bool                                `json:"cleanup_verified,omitempty"`
 	ProcessesRemaining       int                                 `json:"processes_remaining,omitempty"`
 	ErrorCode                string                              `json:"error_code,omitempty"`
+	FailedSequence           int                                 `json:"failed_sequence,omitempty"`
+	ErrorStage               string                              `json:"error_stage,omitempty"`
 }
 
 type workflowContextObserveSessionOptions struct {

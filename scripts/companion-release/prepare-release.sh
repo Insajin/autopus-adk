@@ -5,7 +5,7 @@ umask 077
 fail() { printf 'companion release prep: %s\n' "$1" >&2; exit 1; }
 usage() {
   cat >&2 <<'USAGE'
-usage: prepare-release.sh --endpoint URL --credential-locator ENV --provider NAME --model NAME --model-context-window N --omp PATH --oracle-policy-digest sha256:HEX --tag-signing-key PATH [--inherit-parent-sandbox] [--apply]
+usage: prepare-release.sh --endpoint URL --credential-locator ENV --provider NAME --model NAME --model-context-window N --omp PATH --oracle-policy-digest sha256:HEX --tag-signing-key PATH --promotion-signing-key PATH [--inherit-parent-sandbox] [--apply]
 USAGE
   exit 64
 }
@@ -14,12 +14,13 @@ readonly environment_name='adk-companion-release'
 readonly release_tag='v0.50.98'
 readonly spec_id='SPEC-OMP-004'
 readonly expected_omp_sha256='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
+readonly expected_promotion_key_id='omp-context-promotion-2026-q3-k2'
 readonly release_ref="refs/tags/${release_tag}"
 readonly evidence_tag="omp-context-evidence-${release_tag}"
 readonly evidence_ref="refs/tags/${evidence_tag}"
 readonly evidence_source_ref="refs/heads/${evidence_tag}-source"
 endpoint='' credential_locator='' provider='' model='' model_context_window=''
-omp_executable='' oracle_policy_digest='' tag_signing_key=''
+omp_executable='' oracle_policy_digest='' tag_signing_key='' promotion_signing_key=''
 apply=0 inherit_parent_sandbox=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -31,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     --omp) [[ $# -ge 2 ]] || usage; omp_executable=$2; shift 2 ;;
     --oracle-policy-digest) [[ $# -ge 2 ]] || usage; oracle_policy_digest=$2; shift 2 ;;
     --tag-signing-key) [[ $# -ge 2 ]] || usage; tag_signing_key=$2; shift 2 ;;
+    --promotion-signing-key) [[ $# -ge 2 ]] || usage; promotion_signing_key=$2; shift 2 ;;
     --inherit-parent-sandbox) inherit_parent_sandbox=1; shift ;;
     --apply) apply=1; shift ;;
     *) usage ;;
@@ -61,6 +63,10 @@ omp_executable=$(cd -- "$(dirname -- "$omp_executable")" && pwd)/$(basename -- "
 [[ -f "$tag_signing_key" && ! -L "$tag_signing_key" ]] || fail 'release tag signing key is unsafe'
 tag_signing_key=$(cd -- "$(dirname -- "$tag_signing_key")" && pwd)/$(basename -- "$tag_signing_key")
 [[ "$(/usr/bin/stat -f '%u:%Lp' "$tag_signing_key")" == "$(id -u):600" ]] || fail 'release tag signing key ownership or mode is unsafe'
+[[ -f "$promotion_signing_key" && ! -L "$promotion_signing_key" ]] || fail 'promotion signing key is unsafe'
+promotion_signing_key=$(cd -- "$(dirname -- "$promotion_signing_key")" && pwd)/$(basename -- "$promotion_signing_key")
+[[ "$(/usr/bin/stat -f '%u:%Lp' "$promotion_signing_key")" == "$(id -u):600" ]] ||
+  fail 'promotion signing key ownership or mode is unsafe'
 
 repo_root=$(git rev-parse --show-toplevel)
 [[ "$(pwd -P)" == "$repo_root" ]] || fail 'release prep must run at the repository root'
@@ -91,26 +97,44 @@ bootstrap_cleanup() { rm -rf -- "$temp_dir"; }
 readonly temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/companion-release-prep.XXXXXX")
 chmod 0700 "$temp_dir"
 trap bootstrap_cleanup EXIT
+staged_tag_signing_key="$temp_dir/release-tag-signing-key"
+staged_promotion_signing_key="$temp_dir/omp-context-promotion-signing-key"
+/usr/bin/install -m 0600 "$tag_signing_key" "$staged_tag_signing_key"
+/usr/bin/install -m 0400 "$promotion_signing_key" "$staged_promotion_signing_key"
+[[ "$(/usr/bin/stat -f '%u:%Lp' "$staged_tag_signing_key")" == "$(id -u):600" &&
+   "$(/usr/bin/stat -f '%u:%Lp' "$staged_promotion_signing_key")" == "$(id -u):400" ]] ||
+  fail 'staged release signing key ownership or mode is unsafe'
+tag_signing_key=$staged_tag_signing_key
+promotion_signing_key=$staged_promotion_signing_key
 evidence_source_commit=''
 retain_prep_lock=0
 prep_lock_mode='fresh'
 isolation_roots=()
-readonly runtime_lib="$temp_dir/prepare-release-runtime-lib.sh"
-runtime_lib_blob=$(git rev-parse --verify \
-  "${source_commit}:scripts/companion-release/prepare-release-runtime-lib.sh") ||
-  fail 'release prep runtime helper is absent from the exact source'
-[[ "$(git cat-file -t "$runtime_lib_blob")" == 'blob' ]] ||
-  fail 'release prep runtime helper is not a source blob'
-git cat-file blob "$runtime_lib_blob" >"$runtime_lib"
-chmod 0400 "$runtime_lib"
-[[ "$(git hash-object "$runtime_lib")" == "$runtime_lib_blob" ]] ||
-  fail 'staged release prep runtime helper differs from the exact source'
-exec 9<"$runtime_lib"
-rm -f -- "$runtime_lib"
-# shellcheck source=/dev/null
-source /dev/fd/9
-exec 9<&-
+sudo_keepalive_pid=''
+for runtime_lib_name in prepare-release-runtime-lib.sh prepare-release-local-lib.sh; do
+  staged_runtime_lib="$temp_dir/$runtime_lib_name"
+  runtime_lib_blob=$(git rev-parse --verify \
+    "${source_commit}:scripts/companion-release/${runtime_lib_name}") ||
+    fail "release prep runtime helper ${runtime_lib_name} is absent from the exact source"
+  [[ "$(git cat-file -t "$runtime_lib_blob")" == 'blob' ]] ||
+    fail "release prep runtime helper ${runtime_lib_name} is not a source blob"
+  git cat-file blob "$runtime_lib_blob" >"$staged_runtime_lib"
+  chmod 0400 "$staged_runtime_lib"
+  [[ "$(git hash-object "$staged_runtime_lib")" == "$runtime_lib_blob" ]] ||
+    fail "staged release prep runtime helper ${runtime_lib_name} differs from the exact source"
+  exec 9<"$staged_runtime_lib"
+  rm -f -- "$staged_runtime_lib"
+  # shellcheck source=/dev/null
+  source /dev/fd/9
+  exec 9<&-
+done
 trap 'cleanup $?' EXIT
+(
+  while /bin/sleep 30; do
+    /usr/bin/sudo -n -v || exit 1
+  done
+) &
+sudo_keepalive_pid=$!
 
 readonly staged_omp="$temp_dir/omp-v17.2.7"
 cp "$omp_executable" "$staged_omp"
@@ -153,7 +177,6 @@ readonly environment_variables
 lineage_key_id=$(matched_variable ADK_COMPANION_KEY_ID)
 lineage_handoff=$(matched_variable ADK_COMPANION_HANDOFF)
 rollback_floor=$(matched_variable ADK_COMPANION_ROLLBACK_FLOOR)
-bootstrap_policy=$(matched_variable OMP_CONTEXT_STATIC_POLICY_B64)
 [[ "$lineage_key_id" =~ ^[A-Za-z0-9_.-]+$ && "$lineage_handoff" =~ ^[A-Za-z0-9_.-]+$ && "$rollback_floor" =~ ^[1-9][0-9]*$ ]] || fail 'release lineage policy is unavailable'
 github_release_state() {
   local releases matches
@@ -172,7 +195,6 @@ github_release_state() {
 authenticated_actor_id=$(gh api user --jq .id) || fail 'cannot authenticate release operator'
 [[ "$authenticated_actor_id" == "$operator_actor_id" ]] ||
   fail 'authenticated GitHub actor is not the release operator'
-[[ "$bootstrap_policy" =~ ^[A-Za-z0-9_-]+$ && ${#bootstrap_policy} -le 21846 ]] || fail 'bootstrap static policy is unavailable'
 
 release_remote=$(git ls-remote --refs origin "$release_ref") || fail 'cannot inspect release ref'
 evidence_remote=$(git ls-remote --refs origin "$evidence_ref") || fail 'cannot inspect evidence ref'
@@ -204,7 +226,7 @@ fi
 readonly input_jsonl="$temp_dir/observe-session-input.jsonl"
 readonly policy_tool="$temp_dir/auto-policy"
 readonly verifier="$temp_dir/ompcontextverify"
-readonly bootstrap_candidate="$temp_dir/auto-bootstrap"
+readonly execsmoke="$temp_dir/execsmoke"
 readonly final_candidate="$temp_dir/auto-final"
 readonly static_policy_file="$temp_dir/static-policy.b64"
 readonly final_static_policy_file="$temp_dir/final-static-policy.b64"
@@ -214,24 +236,12 @@ dispatch_nonce=$(printf '%s' "${source_commit}:${producer_run_id}:$$:${temp_dir}
 [[ "$dispatch_nonce" =~ ^[0-9a-f]{32}$ ]] || fail 'dispatch nonce is malformed'
 challenge_digest="sha256:$(printf '%s' "${release_tag}:${source_commit}:${source_tree}" | shasum -a 256 | awk '{print $1}')"
 
-jq -cn --arg challenge "$challenge_digest" '{schema_version:"autopus.omp_context_observe_session_command.v1",type:"handshake",challenge_digest:$challenge}' >"$input_jsonl"
-sequence=0
-for task_index in $(seq 0 19); do
-  task_id="sha256:$(printf '%s' "${challenge_digest}:task:${task_index}" | shasum -a 256 | awk '{print $1}')"
-  prompt=$(printf 'Return exactly EVALUATION-%02d-%d on one line. Do not call tools, execute commands, or add any other text.' "$task_index" "$((task_index % 7))")
-  if (( task_index % 2 == 0 )); then variants=(A B); else variants=(B A); fi
-  pair_sequence=0
-  for variant in "${variants[@]}"; do
-    sequence=$((sequence + 1)); pair_sequence=$((pair_sequence + 1))
-    jq -cn --argjson sequence "$sequence" --argjson pair_sequence "$pair_sequence" --arg task_id "$task_id" --arg variant "$variant" --arg prompt "$prompt" \
-      '{schema_version:"autopus.omp_context_observe_session_command.v1",type:"call",sequence:$sequence,pair_sequence:$pair_sequence,task_id_digest:$task_id,variant:$variant,prompt:$prompt}' >>"$input_jsonl"
-  done
-done
-jq -cn '{schema_version:"autopus.omp_context_observe_session_command.v1",type:"shutdown"}' >>"$input_jsonl"
-[[ "$(wc -l <"$input_jsonl" | tr -d ' ')" == '42' ]] || fail 'canary input cardinality differs'
-
+go mod tidy -diff
 go build -trimpath -o "$policy_tool" ./cmd/auto
 go build -trimpath -o "$verifier" ./scripts/companion-release/ompcontextverify
+go build -trimpath -o "$execsmoke" ./scripts/companion-release/execsmoke
+[[ "$("$policy_tool" companion-manifest omp-context-promotion-key-id <"$promotion_signing_key")" == \
+   "$expected_promotion_key_id" ]] || fail 'promotion signing key differs from pinned local release key'
 
 if [[ "$evidence_present" -eq 1 ]]; then
   load_evidence
@@ -239,23 +249,19 @@ if [[ "$evidence_present" -eq 1 ]]; then
   IFS= read -r static_policy_b64 <"$static_policy_file"
   build_candidate "$static_policy_b64" "$final_candidate"
   candidate_sha256=$(shasum -a 256 "$final_candidate" | awk '{print $1}')
-  verify_evidence
+  evidence_verification_mode=active
+  if [[ "$release_present" -eq 1 ]]; then evidence_verification_mode=historical; fi
+  verify_evidence "$evidence_verification_mode"
   if [[ "$release_present" -eq 1 ]]; then
     publish_coordinates reconcile
     exit 0
   fi
-  dispatch_preflight
   ensure_prep_lock "$verified_report"
   publish_coordinates "$evidence_source_commit"
   exit 0
 fi
 
-build_candidate "$bootstrap_policy" "$bootstrap_candidate"
-bootstrap_project="$temp_dir/bootstrap-project"; bootstrap_output="$temp_dir/bootstrap-output.jsonl"
-extract_project "$bootstrap_project"
-run_canary "$bootstrap_candidate" "$bootstrap_project" "$bootstrap_output" bootstrap
-validate_canary "$bootstrap_project" "$bootstrap_output" "$bootstrap_candidate"
-derive_policy "$bootstrap_project/.autopus/runtime/omp-context/promotion-report-v1.json" "$static_policy_file"
+create_canary_plan "$static_policy_file"
 IFS= read -r static_policy_b64 <"$static_policy_file"
 build_candidate "$static_policy_b64" "$final_candidate"
 final_project="$temp_dir/final-project"; final_output="$temp_dir/final-output.jsonl"
@@ -264,22 +270,11 @@ run_canary "$final_candidate" "$final_project" "$final_output" final
 validate_canary "$final_project" "$final_output" "$final_candidate"
 readonly final_report="$final_project/.autopus/runtime/omp-context/promotion-report-v1.json"
 derive_policy "$final_report" "$final_static_policy_file"
-cmp "$static_policy_file" "$final_static_policy_file" || fail 'cohort-bound static policy changed after final canary'
+cmp "$static_policy_file" "$final_static_policy_file" || fail 'planned static policy changed after final canary'
 candidate_sha256=$(shasum -a 256 "$final_candidate" | awk '{print $1}')
 
 git fetch --no-tags origin main
 [[ "$(git rev-parse --verify origin/main)" == "$source_commit" ]] || fail 'origin/main advanced during release prep'
 assert_source_identity
-dispatch_preflight
-ensure_prep_lock "$final_report"
-watch_dispatch omp-context-promote.yml "Promote OMP context evidence ${release_tag} ${dispatch_nonce}" \
-  -f evidence_commit="$evidence_source_commit" -f source_commit="$source_commit" -f source_tree="$source_tree" \
-  -f candidate_sha256="$candidate_sha256" -f static_policy_b64="$static_policy_b64" -f dispatch_nonce="$dispatch_nonce"
-evidence_remote=$(git ls-remote --refs origin "$evidence_ref") || fail 'cannot inspect promoted evidence ref'
-[[ -n "$evidence_remote" ]] || fail 'promotion workflow did not create evidence tag'
-load_evidence
-cmp "$final_report" "$verified_report" || fail 'promoted report differs from final production canary'
-derive_policy "$verified_report" "$final_static_policy_file"
-cmp "$static_policy_file" "$final_static_policy_file" || fail 'promoted report policy differs'
-verify_evidence
+publish_local_evidence "$final_report"
 publish_coordinates "$evidence_source_commit"

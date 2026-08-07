@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-
 fail() {
   printf 'current release evidence: %s\n' "$1" >&2
   exit 1
@@ -11,6 +10,7 @@ readonly RELEASE_VERSION='0.50.98'
 readonly RELEASE_TAG='v0.50.98'
 readonly REPORT_NAME='omp-context-promotion-report.v1.json'
 readonly ATTESTATION_NAME='omp-context-promotion-attestation.v2.json'
+readonly OMP_PROMOTION_SIGNING_KEY_ID='omp-context-promotion-2026-q3-k2'
 readonly LINEAGE_NAME='release-lineage-v1.json'
 readonly LINEAGE_SIGNATURE_NAME='release-lineage-v1.sig'
 readonly ARM64_ARCHIVE_NAME="autopus-adk_${RELEASE_VERSION}_darwin_arm64.tar.gz"
@@ -71,7 +71,6 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) \
 signature_helper="$script_dir/verify-current-release-signatures.sh"
 [[ -f "$signature_helper" && ! -L "$signature_helper" && -x "$signature_helper" ]] \
   || fail 'current release signature helper is missing or unsafe'
-
 output_dir=$(dirname -- "$checksums_output")
 [[ -d "$output_dir" && ! -L "$output_dir" ]] \
   || fail 'checksums output parent must be a non-symlink directory'
@@ -290,6 +289,7 @@ env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
   --candidate-tree "$COMPANION_SOURCE_TREE" \
   --candidate-artifact-sha256 "$candidate_artifact_sha" \
   --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64" \
+  --expected-signing-key-id "$OMP_PROMOTION_SIGNING_KEY_ID" \
   || fail 'A22 historical OMP production evidence is invalid'
 
 install -m 0600 "$downloaded_checksums" "$checksums_output" \

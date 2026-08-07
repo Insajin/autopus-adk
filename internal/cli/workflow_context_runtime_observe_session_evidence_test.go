@@ -110,6 +110,8 @@ func TestWorkflowContextObserveSession_WritesBodyFreeErrorFrame(t *testing.T) {
 	assert.Equal(t, workflowContextObserveSessionResponseSchema, responses[0].SchemaVersion)
 	assert.Equal(t, "error", responses[0].Type)
 	assert.Equal(t, "input_invalid", responses[0].ErrorCode)
+	assert.Equal(t, "handshake", responses[0].ErrorStage)
+	assert.Zero(t, responses[0].FailedSequence)
 	assert.NotContains(t, output.String(), err.Error())
 	assert.Equal(t, "network_transport",
 		workflowContextObserveSessionErrorCode(fmt.Errorf("provider timed out")))
@@ -216,33 +218,17 @@ func workflowContextObserveEvidenceFixture(t *testing.T, challenge string) (
 
 func workflowContextObserveEvidenceInput(t *testing.T, challenge string) (*bytes.Buffer, []string) {
 	t.Helper()
+	commands, _, err := workflowContextObserveSessionCanaryPlan(challenge)
+	require.NoError(t, err)
 	var input bytes.Buffer
 	encoder := json.NewEncoder(&input)
-	require.NoError(t, encoder.Encode(workflowContextObserveSessionCommand{
-		SchemaVersion: workflowContextObserveSessionCommandSchema, Type: "handshake", ChallengeDigest: challenge,
-	}))
 	tasks := make([]string, 0, 20)
-	sequence := 0
-	for pair := range 20 {
-		taskDigest := workflowContextRuntimeHash(fmt.Sprintf("observed-task-%02d", pair))
-		prompt := fmt.Sprintf("identical evaluation task %02d requiring safe deterministic output", pair)
-		tasks = append(tasks, prompt)
-		order := []string{"A", "B"}
-		if pair%2 == 1 {
-			order = []string{"B", "A"}
-		}
-		for pairIndex, variant := range order {
-			sequence++
-			require.NoError(t, encoder.Encode(workflowContextObserveSessionCommand{
-				SchemaVersion: workflowContextObserveSessionCommandSchema, Type: "call",
-				TaskIDDigest: taskDigest, Variant: variant, Sequence: sequence,
-				PairSequence: pairIndex + 1, Prompt: prompt,
-			}))
+	for _, command := range commands {
+		require.NoError(t, encoder.Encode(command))
+		if command.Type == "call" && command.PairSequence == 1 {
+			tasks = append(tasks, command.Prompt)
 		}
 	}
-	require.NoError(t, encoder.Encode(workflowContextObserveSessionCommand{
-		SchemaVersion: workflowContextObserveSessionCommandSchema, Type: "shutdown",
-	}))
 	return &input, tasks
 }
 

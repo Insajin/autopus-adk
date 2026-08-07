@@ -141,14 +141,22 @@ func TestOMPContextPromotionArtifactLoaderV2_RejectsDirectoryAndFileSwapAfterRoo
 	})
 }
 
-func TestOMPContextPromotionTrustV2_ContainsOnlyCommittedPublicKey(t *testing.T) {
+func TestOMPContextPromotionTrustV2_ContainsCommittedRotationKeys(t *testing.T) {
 	keys := committedOMPContextPromotionPublicKeysV2()
-	if len(keys) != 1 || len(keys[OMPContextPromotionKeyID2026Q3K1]) != ed25519.PublicKeySize {
-		t.Fatalf("unexpected production trust root: %#v", keys)
+	for _, keyID := range []string{
+		OMPContextPromotionKeyID2026Q3K1,
+		OMPContextPromotionKeyID2026Q3K2,
+	} {
+		if len(keys[keyID]) != ed25519.PublicKeySize {
+			t.Fatalf("production trust root %q is unavailable: %#v", keyID, keys)
+		}
+		keys[keyID][0] ^= 0xff
+		if keys[keyID][0] == committedOMPContextPromotionPublicKeysV2()[keyID][0] {
+			t.Fatalf("trust root %q returned mutable backing storage", keyID)
+		}
 	}
-	keys[OMPContextPromotionKeyID2026Q3K1][0] ^= 0xff
-	if keys[OMPContextPromotionKeyID2026Q3K1][0] == committedOMPContextPromotionPublicKeysV2()[OMPContextPromotionKeyID2026Q3K1][0] {
-		t.Fatal("trust root returned mutable backing storage")
+	if len(keys) != 2 {
+		t.Fatalf("unexpected production trust root: %#v", keys)
 	}
 }
 

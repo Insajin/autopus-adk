@@ -27,12 +27,16 @@ func RunWorkflowContextObserveSession(
 	encoder := json.NewEncoder(output)
 	encoder.SetEscapeHTML(false)
 	errorModelScope := ""
+	errorStage := "handshake"
+	errorSequence := 0
 	defer func() {
 		if runErr == nil {
 			return
 		}
 		response := workflowContextObserveSessionBaseResponse("error", errorModelScope)
 		response.ErrorCode = workflowContextObserveSessionErrorCode(runErr)
+		response.ErrorStage = errorStage
+		response.FailedSequence = errorSequence
 		if err := encoder.Encode(response); err != nil {
 			runErr = errors.Join(runErr, fmt.Errorf("observe-session error response: %w", err))
 		}
@@ -41,12 +45,14 @@ func RunWorkflowContextObserveSession(
 	if err != nil || !validWorkflowContextObserveHandshake(first) {
 		return errors.New("observe-session handshake is invalid")
 	}
+	errorStage = "setup"
 	setup, err := prepareWorkflowContextObserveSessionForRun(ctx, options, first.ChallengeDigest)
 	if err != nil {
 		return err
 	}
 	errorModelScope = setup.candidate.ModelScopeDigest
 	defer func() { runErr = errors.Join(runErr, setup.close()) }()
+	errorStage = "startup"
 	if err := setup.start(ctx); err != nil {
 		return err
 	}
@@ -60,6 +66,7 @@ func RunWorkflowContextObserveSession(
 	if err := encoder.Encode(handshake); err != nil {
 		return err
 	}
+	errorStage = "call"
 	seenTasks := make(map[string]struct{}, 20)
 	variantCalls := map[string]int{"A": 0, "B": 0}
 	sessionBindings := map[string]string{"A": "", "B": ""}
@@ -74,6 +81,7 @@ func RunWorkflowContextObserveSession(
 	var lastCompleted time.Time
 	for index := range 40 {
 		sequence := index + 1
+		errorSequence = sequence
 		command, err := nextWorkflowContextObserveSessionCommand(scanner)
 		if err != nil || validateWorkflowContextObserveSessionCall(command, sequence) != nil {
 			return fmt.Errorf("observe-session call %d is invalid", sequence)
@@ -176,11 +184,14 @@ func RunWorkflowContextObserveSession(
 			return err
 		}
 	}
+	errorSequence = 0
+	errorStage = "cohort"
 	if len(seenTasks) != 20 || variantCalls["A"] != 20 || variantCalls["B"] != 20 ||
 		compactionCycles < 2 || sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
 		sessionBindings["A"] == sessionBindings["B"] {
 		return errors.New("observe-session task or reusable-session cardinality is invalid")
 	}
+	errorStage = "shutdown"
 	shutdown, err := nextWorkflowContextObserveSessionCommand(scanner)
 	if err != nil || !validWorkflowContextObserveShutdown(shutdown) {
 		return errors.New("observe-session shutdown is invalid")
@@ -188,11 +199,13 @@ func RunWorkflowContextObserveSession(
 	if scanner.Scan() || scanner.Err() != nil {
 		return errors.New("observe-session input continued after shutdown")
 	}
+	errorStage = "cleanup"
 	evidenceSetup := setup
 	if err := setup.close(); err != nil {
 		return err
 	}
 	setup.taskRoot = ""
+	errorStage = "evidence"
 	checkedAt := time.Now().UTC()
 	if !checkedAt.After(lastCompleted) {
 		checkedAt = lastCompleted.Add(time.Nanosecond)
@@ -203,6 +216,7 @@ func RunWorkflowContextObserveSession(
 	if err != nil {
 		return err
 	}
+	errorStage = "response"
 	response := workflowContextObserveSessionBaseResponse("shutdown", setup.candidate.ModelScopeDigest)
 	response.CallsCompleted = 40
 	response.ProviderAuthorityDigest = providerAuthority

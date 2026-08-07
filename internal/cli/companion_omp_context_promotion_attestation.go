@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -21,6 +22,7 @@ type companionOMPContextPromotionAttestationOptions struct {
 	issuedAt   string
 	notBefore  string
 	expiresAt  string
+	validFor   time.Duration
 	outputPath string
 }
 
@@ -40,8 +42,9 @@ func newCompanionOMPContextPromotionAttestationCmd() *cobra.Command {
 	flags.StringVar(&options.issuedAt, "issued-at", "", "Canonical UTC issuance time")
 	flags.StringVar(&options.notBefore, "not-before", "", "Canonical UTC validity start")
 	flags.StringVar(&options.expiresAt, "expires-at", "", "Canonical UTC expiry time")
+	flags.DurationVar(&options.validFor, "valid-for", 0, "Validity duration derived from one current UTC timestamp")
 	flags.StringVar(&options.outputPath, "output", "", "New canonical promotion attestation output file")
-	for _, name := range []string{"report", "issued-at", "not-before", "expires-at", "output"} {
+	for _, name := range []string{"report", "output"} {
 		_ = command.MarkFlagRequired(name)
 	}
 	return command
@@ -62,6 +65,10 @@ func runCompanionOMPContextPromotionAttestation(
 	if err != nil {
 		return err
 	}
+	issuedAt, notBefore, expiresAt, err := resolveOMPContextPromotionAttestationWindow(options, time.Now())
+	if err != nil {
+		return err
+	}
 	privateKey, err := readPrivateKey(command.InOrStdin())
 	if err != nil {
 		return err
@@ -70,9 +77,9 @@ func runCompanionOMPContextPromotionAttestation(
 	attestationBytes, err := promptlayer.SignOMPContextPromotionAttestationV2(
 		promptlayer.OMPContextPromotionAttestationSignInputV2{
 			ReportBytes: reportBytes,
-			IssuedAt:    options.issuedAt,
-			NotBefore:   options.notBefore,
-			ExpiresAt:   options.expiresAt,
+			IssuedAt:    issuedAt,
+			NotBefore:   notBefore,
+			ExpiresAt:   expiresAt,
 		},
 		privateKey,
 	)
@@ -80,6 +87,25 @@ func runCompanionOMPContextPromotionAttestation(
 		return err
 	}
 	return writeNewPrivateOMPContextPromotionAttestation(outputPath, attestationBytes)
+}
+func resolveOMPContextPromotionAttestationWindow(
+	options companionOMPContextPromotionAttestationOptions,
+	now time.Time,
+) (string, string, string, error) {
+	explicit := options.issuedAt != "" || options.notBefore != "" || options.expiresAt != ""
+	if options.validFor > 0 {
+		if explicit || options.validFor > 24*time.Hour || now.IsZero() {
+			return "", "", "", errors.New("OMP context promotion attestation validity window is invalid")
+		}
+		issuedAt := now.UTC()
+		return issuedAt.Format(time.RFC3339Nano), issuedAt.Format(time.RFC3339Nano),
+			issuedAt.Add(options.validFor).Format(time.RFC3339Nano), nil
+	}
+	if options.validFor < 0 || !explicit ||
+		options.issuedAt == "" || options.notBefore == "" || options.expiresAt == "" {
+		return "", "", "", errors.New("OMP context promotion attestation validity window is incomplete")
+	}
+	return options.issuedAt, options.notBefore, options.expiresAt, nil
 }
 
 func resolveOMPContextPromotionAttestationPaths(reportPath, outputPath string) (string, string, error) {

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCompanionOMPContextPromotionAttestationCommand_IsRegisteredWithoutSecretFlags(t *testing.T) {
@@ -17,7 +18,7 @@ func TestCompanionOMPContextPromotionAttestationCommand_IsRegisteredWithoutSecre
 	if err != nil || command.Name() != "omp-context-promotion-attestation" {
 		t.Fatalf("registered command=%v error=%v", command, err)
 	}
-	for _, required := range []string{"report", "issued-at", "not-before", "expires-at", "output"} {
+	for _, required := range []string{"report", "issued-at", "not-before", "expires-at", "valid-for", "output"} {
 		flag := command.Flags().Lookup(required)
 		if flag == nil {
 			t.Fatalf("required flag %q is not registered", required)
@@ -27,6 +28,20 @@ func TestCompanionOMPContextPromotionAttestationCommand_IsRegisteredWithoutSecre
 		if command.Flags().Lookup(forbidden) != nil {
 			t.Fatalf("secret-bearing flag %q is registered", forbidden)
 		}
+	}
+}
+func TestCompanionOMPContextPromotionAttestation_ValidityDurationUsesOnePreciseTimestamp(t *testing.T) {
+	now := time.Date(2026, 8, 4, 12, 0, 0, 500_000_123, time.UTC)
+	issuedAt, notBefore, expiresAt, err := resolveOMPContextPromotionAttestationWindow(
+		companionOMPContextPromotionAttestationOptions{validFor: 24 * time.Hour},
+		now,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if issuedAt != "2026-08-04T12:00:00.500000123Z" || notBefore != issuedAt ||
+		expiresAt != "2026-08-05T12:00:00.500000123Z" {
+		t.Fatalf("validity window=%q %q %q", issuedAt, notBefore, expiresAt)
 	}
 }
 

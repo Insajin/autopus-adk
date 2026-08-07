@@ -90,6 +90,7 @@ func assertCurrentReleaseVerifierLog(t *testing.T, path string) {
 		"companion-manifest-verifier --artifact ", "--platform darwin --architecture arm64",
 		"omp-context-lineage-verifier --lineage ", "--target darwin-arm64 --version 0.50.98",
 		"omp-context-verifier --mode historical ", "--static-policy-b64 eyJzY2hlbWEiOiJmaXh0dXJlIn0",
+		"--expected-signing-key-id omp-context-promotion-2026-q3-k2",
 	} {
 		if !bytes.Contains(log, []byte(required)) {
 			t.Fatalf("release verifier invocation missing %q: %s", required, log)
