@@ -41,14 +41,22 @@ func BuildOMPContextPromotionStaticPolicyV3(
 		ReleaseLineageHandoff:        releaseLineageHandoff,
 		MinimumRollbackFloor:         minimumRollbackFloor,
 	}
+	body, err := MarshalOMPContextPromotionStaticPolicyV3(policy)
+	if err != nil {
+		return OMPContextPromotionStaticPolicyV3{}, nil, err
+	}
+	return policy, body, nil
+}
+
+// MarshalOMPContextPromotionStaticPolicyV3 validates and canonically encodes a
+// policy assembled from deterministic pre-canary release coordinates.
+func MarshalOMPContextPromotionStaticPolicyV3(policy OMPContextPromotionStaticPolicyV3) ([]byte, error) {
 	if !validOMPContextPromotionStaticPolicyV3(policy) {
-		return OMPContextPromotionStaticPolicyV3{}, nil,
-			errors.New("OMP context promotion static policy is invalid")
+		return nil, errors.New("OMP context promotion static policy is invalid")
 	}
 	body, err := json.Marshal(policy)
 	if err != nil {
-		return OMPContextPromotionStaticPolicyV3{}, nil,
-			errors.New("marshal OMP context promotion static policy")
+		return nil, errors.New("marshal OMP context promotion static policy")
 	}
-	return policy, body, nil
+	return body, nil
 }

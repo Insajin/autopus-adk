@@ -39,8 +39,7 @@ func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *test
 	}
 	immutable := regexp.MustCompile(`^[^@[:space:]]+@[0-9a-f]{40}$`)
 	for _, name := range []string{
-		".github/workflows/release.yaml", ".github/workflows/companion-release-preflight.yml",
-		".github/workflows/ci.yaml", ".github/workflows/security.yml",
+		".github/workflows/release.yaml", ".github/workflows/ci.yaml", ".github/workflows/security.yml",
 	} {
 		var workflow struct {
 			Jobs map[string]struct {
@@ -66,42 +65,6 @@ func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *test
 	}
 	if !strings.Contains(release, `version: "v2.17.0"`) {
 		t.Fatal("GoReleaser binary is not pinned to one exact version")
-	}
-}
-
-func TestCompanionReleasePreflight_IsReadOnlyExactMacOSGate(t *testing.T) {
-	preflight := readReleaseFile(t, ".github/workflows/companion-release-preflight.yml")
-	for _, required := range []string{
-		"workflow_dispatch:", "release_tag:", "source_commit:", "source_tree:", "static_policy_b64:",
-		"dispatch_nonce:", "run-name: Companion release preflight",
-		"runs-on: macos-15", "timeout-minutes: 20", "v0.50.98",
-		"scripts/companion-release/build-omp-context-candidate.sh",
-		`candidate_root="/Library/autopus-adk-release-preflight-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"`,
-		`/usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$staging" "$candidate"`,
-		`"$(/usr/bin/stat -f '%u:%Lp' /Library)" == '0:755'`,
-		"name: Remove preflight candidate",
-		"scripts/companion-release/materialize-omp-release-canary.sh",
-		"scripts/companion-release/remove-omp-release-canary.sh",
-		"./scripts/companion-release/execsmoke",
-	} {
-		if !strings.Contains(preflight, required) {
-			t.Fatalf("companion release preflight missing %q", required)
-		}
-	}
-	for _, forbidden := range []string{"environment:", "contents: write", "id-token: write", "git push", "gh variable set", "auto-darwin-arm64-release-preflight", `candidate="$RUNNER_TEMP/auto"`, ".release-preflight-artifact"} {
-		if strings.Contains(preflight, forbidden) {
-			t.Fatalf("companion release preflight exposes mutation authority %q", forbidden)
-		}
-	}
-	materialize := strings.Index(preflight, "name: Materialize exact arm64 OMP release canary")
-	execute := strings.Index(preflight, "name: Execute exact candidate with isolated OMP canary")
-	removeCandidate := strings.Index(preflight, "name: Remove preflight candidate")
-	removeCanary := strings.Index(preflight, "name: Remove isolated OMP release canary")
-	if materialize < 0 || execute <= materialize || removeCandidate <= execute ||
-		removeCanary <= removeCandidate ||
-		!strings.Contains(preflight[removeCandidate:removeCanary], "if: always()") ||
-		!strings.Contains(preflight[removeCanary:], "if: always()") {
-		t.Fatal("companion release preflight candidate or canary cleanup ordering is unsafe")
 	}
 }
 

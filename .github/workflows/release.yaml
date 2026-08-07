@@ -113,7 +113,8 @@ jobs:
             --candidate-revision "$GITHUB_SHA" \
             --candidate-tree "$COMPANION_SOURCE_TREE" \
             --candidate-artifact-sha256 "$CANDIDATE_ARTIFACT_SHA256" \
-            --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64"
+            --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64" \
+            --expected-signing-key-id 'omp-context-promotion-2026-q3-k2'
 
       - name: Carry verified evidence into the protected release job
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -320,7 +321,8 @@ jobs:
             --candidate-revision "$GITHUB_SHA" \
             --candidate-tree "$COMPANION_SOURCE_TREE" \
             --candidate-artifact-sha256 "$CANDIDATE_ARTIFACT_SHA256" \
-            --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64"
+            --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64" \
+            --expected-signing-key-id 'omp-context-promotion-2026-q3-k2'
 
       - name: Prepare release credentials
         id: release-credentials

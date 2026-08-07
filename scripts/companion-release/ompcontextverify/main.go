@@ -22,14 +22,17 @@ const (
 	maxStaticPolicyBytes = 16 * 1024
 )
 
-var lowerHex = regexp.MustCompile(`^[0-9a-f]+$`)
+var (
+	lowerHex            = regexp.MustCompile(`^[0-9a-f]+$`)
+	promotionSigningKey = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
+)
 
 type options struct {
 	mode, reportPath, attestationPath      string
 	reportSHA, attestationSHA              string
 	candidateRepository, candidateRevision string
 	candidateTree, candidateArtifactSHA    string
-	staticPolicyB64                        string
+	staticPolicyB64, expectedSigningKeyID  string
 }
 
 func main() {
@@ -104,7 +107,7 @@ func runWithVerifiers(
 	if report.Candidate.ArtifactSHA256 != report.Runtime.AutoBinarySHA256 {
 		return errors.New("candidate artifact digest differs from runtime binary digest")
 	}
-	expected := expectationFromStaticPolicy(policy, candidateArtifactSHA)
+	expected := expectationFromStaticPolicy(policy, candidateArtifactSHA, opts.expectedSigningKeyID)
 	switch opts.mode {
 	case "active":
 		valid, verifyErr := activeVerifier(reportBytes, attestationBytes, expected)
@@ -137,11 +140,13 @@ func parseOptions(arguments []string) (options, error) {
 	set.StringVar(&result.candidateTree, "candidate-tree", "", "candidate tree")
 	set.StringVar(&result.candidateArtifactSHA, "candidate-artifact-sha256", "", "candidate binary digest")
 	set.StringVar(&result.staticPolicyB64, "static-policy-b64", "", "canonical raw-base64url static policy")
+	set.StringVar(&result.expectedSigningKeyID, "expected-signing-key-id", "", "exact promotion signing key identity")
 	if err := set.Parse(arguments); err != nil || set.NArg() != 0 {
 		return result, errors.New("invalid arguments")
 	}
 	if result.mode == "" || result.reportPath == "" || result.attestationPath == "" ||
-		result.candidateRepository == "" || result.staticPolicyB64 == "" {
+		result.candidateRepository == "" || result.staticPolicyB64 == "" ||
+		result.expectedSigningKeyID == "" {
 		return result, errors.New("required argument is missing")
 	}
 	for _, value := range []struct {
@@ -156,6 +161,9 @@ func parseOptions(arguments []string) (options, error) {
 		if len(value.body) != value.size || !lowerHex.MatchString(value.body) {
 			return result, fmt.Errorf("%s is malformed", value.name)
 		}
+	}
+	if !promotionSigningKey.MatchString(result.expectedSigningKeyID) {
+		return result, errors.New("expected signing key identity is malformed")
 	}
 	return result, nil
 }
@@ -222,12 +230,13 @@ func decodeStaticPolicy(encoded string) (promptlayer.OMPContextPromotionStaticPo
 
 func expectationFromStaticPolicy(
 	policy promptlayer.OMPContextPromotionStaticPolicyV3,
-	candidateArtifactSHA string,
+	candidateArtifactSHA, expectedSigningKeyID string,
 ) promptlayer.OMPContextPromotionExpectationV2 {
 	return promptlayer.OMPContextPromotionExpectationV2{
 		ProducerRepository: policy.ProducerRepository, ProducerWorkflowRef: policy.ProducerWorkflowRef,
-		Candidate: ompContextPromotionCandidateFromStaticPolicy(policy, candidateArtifactSHA),
-		PolicyID:  policy.PolicyID, PolicyDigest: policy.PolicyDigest,
+		SigningKeyID: expectedSigningKeyID,
+		Candidate:    ompContextPromotionCandidateFromStaticPolicy(policy, candidateArtifactSHA),
+		PolicyID:     policy.PolicyID, PolicyDigest: policy.PolicyDigest,
 		AutoVersion: policy.AutoVersion, AutoBinarySHA256: candidateArtifactSHA,
 		OMPVersion: policy.OMPVersion, OMPExecutableSHA256: policy.OMPExecutableSHA256,
 		PipelineImplementationDigest: policy.PipelineImplementationDigest,

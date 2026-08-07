@@ -93,7 +93,9 @@ func validOMPContextPromotionCandidateV1(value OMPContextPromotionCandidateV1) b
 }
 
 func validateOMPContextPromotionExpectationV2(value OMPContextPromotionExpectationV2) bool {
-	return safeOMPContextMemoryMetadataV1(value.ProducerRepository) && safeOMPContextMemoryMetadataV1(value.ProducerWorkflowRef) &&
+	return safeOMPContextMemoryMetadataV1(value.ProducerRepository) &&
+		safeOMPContextMemoryMetadataV1(value.ProducerWorkflowRef) &&
+		safeOMPContextMemoryMetadataV1(value.SigningKeyID) &&
 		validOMPContextPromotionCandidateV1(value.Candidate) &&
 		safeOMPContextMemoryMetadataV1(value.PolicyID) && validOMPContextMemoryHashV1(value.PolicyDigest) &&
 		safeOMPContextMemoryMetadataV1(value.AutoVersion) && validOMPContextMemoryHashV1(value.AutoBinarySHA256) &&

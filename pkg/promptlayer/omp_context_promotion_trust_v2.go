@@ -5,7 +5,10 @@ import (
 	"encoding/base64"
 )
 
-const ompContextPromotionPublicKey2026Q3K1Base64 = "2ZO4NEHN+2yUw3huo8ZIXp/ITGd6WMN+EyiQVc9a3y8="
+const (
+	ompContextPromotionPublicKey2026Q3K1Base64 = "2ZO4NEHN+2yUw3huo8ZIXp/ITGd6WMN+EyiQVc9a3y8="
+	ompContextPromotionPublicKey2026Q3K2Base64 = "vYEuNBwZoVzxi2WcRFUbYvdCXrY0s7XGy8K2qDilDPs="
+)
 
 func mustOMPContextPromotionPublicKeyV2(encoded string) ed25519.PublicKey {
 	encoding := base64.StdEncoding.Strict()
@@ -18,6 +21,7 @@ func mustOMPContextPromotionPublicKeyV2(encoded string) ed25519.PublicKey {
 
 var ompContextPromotionPublicKeysV2 = map[string]ed25519.PublicKey{
 	OMPContextPromotionKeyID2026Q3K1: mustOMPContextPromotionPublicKeyV2(ompContextPromotionPublicKey2026Q3K1Base64),
+	OMPContextPromotionKeyID2026Q3K2: mustOMPContextPromotionPublicKeyV2(ompContextPromotionPublicKey2026Q3K2Base64),
 }
 
 var ompContextPromotionRevokedKeysV2 = map[string]bool{}

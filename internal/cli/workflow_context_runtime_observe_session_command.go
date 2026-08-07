@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -43,7 +44,9 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 			if err := validateWorkflowContextObserveSessionOptions(options); err != nil {
 				return err
 			}
-			return RunWorkflowContextObserveSession(cmd.Context(), cmd.InOrStdin(), cmd.OutOrStdout(), options)
+			ctx, cancel := context.WithTimeout(cmd.Context(), workflowContextObserveSessionTotalMaxTime)
+			defer cancel()
+			return RunWorkflowContextObserveSession(ctx, cmd.InOrStdin(), cmd.OutOrStdout(), options)
 		},
 	}
 	cmd.Flags().BoolVar(&explicitLive, "explicit-live", false, "Acknowledge external provider execution")

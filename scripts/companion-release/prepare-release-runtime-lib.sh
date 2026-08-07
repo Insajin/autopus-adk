@@ -15,14 +15,10 @@ remove_isolation_root() {
 }
 cleanup() {
   local status=$1 remote_status=0 remote_source='' record cleanup_failed=0
-  if [[ -n "$evidence_source_commit" && "$retain_prep_lock" -eq 0 ]]; then
-    remote_source=$(git ls-remote --exit-code --refs origin "$evidence_source_ref" 2>/dev/null) || remote_status=$?
-    if [[ "$remote_status" -eq 0 && "$remote_source" == "$evidence_source_commit"$'\t'"$evidence_source_ref" ]]; then
-      git push --force-with-lease="${evidence_source_ref}:${evidence_source_commit}" origin ":${evidence_source_ref}" >/dev/null 2>&1 ||
-        printf 'companion release prep: warning: owned prep lock cleanup failed\n' >&2
-    elif [[ "$remote_status" -ne 2 ]]; then
-      printf 'companion release prep: warning: prep lock ownership could not be inspected\n' >&2
-    fi
+  if [[ -n "${sudo_keepalive_pid:-}" ]]; then
+    kill "$sudo_keepalive_pid" >/dev/null 2>&1 || true
+    wait "$sudo_keepalive_pid" >/dev/null 2>&1 || true
+    sudo_keepalive_pid=''
   fi
   for record in "${isolation_roots[@]-}"; do
     [[ -n "$record" ]] || continue
@@ -31,6 +27,22 @@ cleanup() {
       cleanup_failed=1
     fi
   done
+  if ! /usr/bin/sudo -k; then
+    printf 'companion release prep: sudo authorization invalidation failed\n' >&2
+    cleanup_failed=1
+  fi
+  if [[ -n "$evidence_source_commit" && "$retain_prep_lock" -eq 0 ]]; then
+    remote_source=$(GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1 GIT_HTTP_LOW_SPEED_TIME=10 \
+      git ls-remote --exit-code --refs origin "$evidence_source_ref" 2>/dev/null) || remote_status=$?
+    if [[ "$remote_status" -eq 0 && "$remote_source" == "$evidence_source_commit"$'\t'"$evidence_source_ref" ]]; then
+      GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1 GIT_HTTP_LOW_SPEED_TIME=10 \
+        git push --force-with-lease="${evidence_source_ref}:${evidence_source_commit}" \
+        origin ":${evidence_source_ref}" >/dev/null 2>&1 ||
+        printf 'companion release prep: warning: owned prep lock cleanup failed\n' >&2
+    elif [[ "$remote_status" -ne 2 ]]; then
+      printf 'companion release prep: warning: prep lock ownership could not be inspected\n' >&2
+    fi
+  fi
   rm -rf -- "$temp_dir"
   if [[ "$status" -eq 0 && "$cleanup_failed" -ne 0 ]]; then status=1; fi
   exit "$status"
@@ -67,7 +79,7 @@ extract_project() {
 }
 capture_canary_progress() {
   local output=$1 label=$2
-  [[ "$label" == 'bootstrap' || "$label" == 'final' ]] || return 1
+  [[ "$label" == 'final' ]] || return 1
   [[ "$output" == /* && ! -e "$output" && ! -L "$output" ]] || return 1
   : >"$output" || return 1
   LC_ALL=C /usr/bin/awk -v output="$output" -v label="$label" '
@@ -80,19 +92,25 @@ capture_canary_progress() {
   '
 }
 canary_failure_receipt() {
-  local label=$1 canary_status=$2 output=$3 transcript_records failure_code
+  local label=$1 canary_status=$2 output=$3 transcript_records failure_fields
+  local failure_code failure_stage failed_sequence
   if [[ ! "$canary_status" =~ ^[1-9][0-9]*$ ]] || (( canary_status > 255 )); then
     canary_status=1
   fi
   transcript_records=$(wc -l <"$output" | tr -d ' ')
   [[ "$transcript_records" =~ ^[0-9]+$ ]] || transcript_records=unknown
-  failure_code=$(jq -rs \
-    '[.[] | select(.type? == "error") | .error_code? // empty] |
-     if length == 0 then "unclassified" else .[-1] end' "$output" 2>/dev/null) ||
-    failure_code=unparseable
+  failure_fields=$(jq -s -r \
+    '[.[] | select(.type? == "error")] | if length == 0 then
+       ["unclassified", "unknown", "0"] else
+       [(.[-1].error_code? // "unclassified"), (.[-1].error_stage? // "unknown"),
+        ((.[-1].failed_sequence? // 0) | tostring)] end | @tsv' "$output" 2>/dev/null) ||
+    failure_fields=$'unparseable\tunknown\t0'
+  IFS=$'\t' read -r failure_code failure_stage failed_sequence <<<"$failure_fields"
   [[ "$failure_code" =~ ^[A-Za-z0-9_.:-]{1,128}$ ]] || failure_code=unparseable
-  printf 'companion release prep: %s production canary execution failed: exit=%s transcript_records=%s/42 error_code=%s\n' \
-    "$label" "$canary_status" "$transcript_records" "$failure_code" >&2
+  [[ "$failure_stage" =~ ^[a-z]{1,32}$ ]] || failure_stage=unknown
+  [[ "$failed_sequence" =~ ^[0-9]+$ ]] || failed_sequence=0
+  printf 'companion release prep: %s production canary execution failed: exit=%s transcript_records=%s/42 error_code=%s error_stage=%s failed_sequence=%s\n' \
+    "$label" "$canary_status" "$transcript_records" "$failure_code" "$failure_stage" "$failed_sequence" >&2
   return "$canary_status"
 }
 run_canary() {
@@ -101,8 +119,9 @@ run_canary() {
   local isolated_candidate isolated_omp isolated_credential credential_staging
   local root_identity record candidate_sha isolated_candidate_sha
   local canary_status started_at
-  root="/private/tmp/autopus-adk-release-prep-${dispatch_nonce}-${label}"
-  [[ "$root" =~ ^/private/tmp/autopus-adk-release-prep-[0-9a-f]{32}-(bootstrap|final)$ &&
+  root="/private/tmp/autopus-adk-release-prep-${dispatch_nonce}-final"
+  [[ "$label" == 'final' &&
+     "$root" =~ ^/private/tmp/autopus-adk-release-prep-[0-9a-f]{32}-final$ &&
      ! -e "$root" && ! -L "$root" ]] || fail 'isolated canary root is unsafe'
   /usr/bin/sudo -n /usr/bin/install -d -m 0755 -o root -g wheel "$root"
   root_identity=$(/usr/bin/stat -f '%d:%i' "$root")
@@ -111,7 +130,7 @@ run_canary() {
   isolated_project="$root/project"
   isolated_home="$root/home"
   isolated_tmp="$root/tmp"
-  isolated_candidate="$root/auto-darwin-arm64"
+  isolated_candidate="$root/auto"
   isolated_omp="$root/omp-darwin-arm64"
   isolated_credential="$root/provider-credential"
   credential_staging="$temp_dir/${label}-provider-credential"
@@ -131,6 +150,7 @@ run_canary() {
      "$(shasum -a 256 "$isolated_omp" | awk '{print $1}')" == "$expected_omp_sha256" ]] ||
     fail 'root-owned canary executable bytes differ'
   if [[ "$inherit_parent_sandbox" -eq 1 ]]; then sandbox_args=(--inherit-parent-sandbox); fi
+  kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped before production canary'
   printf 'companion release prep: %s production canary started (40 sequential provider calls)\n' \
     "$label" >&2
   started_at=$SECONDS
@@ -159,6 +179,10 @@ run_canary() {
     canary_status=$?
     canary_failure_receipt "$label" "$canary_status" "$output"
   fi
+  kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped during production canary'
+  OMP_CONTEXT_RELEASE_CANARY_ROOT="$root" OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$isolated_omp" \
+    "$execsmoke" --artifact "$isolated_candidate" --expected-version "${release_tag#v}" \
+    --architecture arm64 --timeout 30s
   printf 'companion release prep: %s production canary completed (42/42 records, %ss)\n' \
     "$label" "$((SECONDS - started_at))" >&2
   rm -rf -- "$project"
@@ -181,29 +205,6 @@ derive_policy() {
   "$policy_tool" companion-manifest omp-context-static-policy --report "$report" --target darwin-arm64 \
     --release-lineage-key-id "$lineage_key_id" --release-lineage-handoff "$lineage_handoff" --minimum-rollback-floor "$rollback_floor" >"$output"
   chmod 0600 "$output"
-}
-watch_dispatch() {
-  local workflow=$1 title=$2 runs_json; shift 2
-  gh workflow run "$workflow" --repo "$repository" --ref main "$@"
-  local run_id=''
-  for _ in $(seq 1 90); do
-    runs_json=$(gh api \
-      "repos/${repository}/actions/workflows/${workflow}/runs?event=workflow_dispatch&branch=main&per_page=100") ||
-      fail "cannot inspect ${workflow} dispatches"
-    run_id=$(jq -r --arg title "$title" --arg source "$source_commit" \
-      --argjson actor "$operator_actor_id" \
-      '[.workflow_runs[] | select(.actor.id == $actor and .display_title == $title and
-        .head_sha == $source)] | sort_by(.id) | last | .id // empty' <<<"$runs_json")
-    [[ "$run_id" =~ ^[0-9]+$ ]] && break
-    sleep 2
-  done
-  [[ "$run_id" =~ ^[0-9]+$ ]] || fail "cannot identify trusted ${workflow} run by nonce"
-  gh run watch "$run_id" --repo "$repository" --exit-status
-}
-dispatch_preflight() {
-  watch_dispatch companion-release-preflight.yml "Companion release preflight ${release_tag} ${dispatch_nonce}" \
-    -f release_tag="$release_tag" -f source_commit="$source_commit" -f source_tree="$source_tree" \
-    -f static_policy_b64="$static_policy_b64" -f dispatch_nonce="$dispatch_nonce"
 }
 create_prep_lock() {
   local report=$1 report_name='omp-context-promotion-report.v1.json' report_blob evidence_index evidence_tree
@@ -238,34 +239,6 @@ ensure_prep_lock() {
   else
     create_prep_lock "$report"
   fi
-}
-load_evidence() {
-  local local_tag_object verified_dir
-  if git show-ref --verify --quiet "$evidence_ref"; then
-    local_tag_object=$(git rev-parse --verify "$evidence_ref")
-    [[ "$evidence_remote" == "$local_tag_object"$'\t'"$evidence_ref" ]] || fail 'local and remote evidence tag differ'
-  else
-    git fetch origin "$evidence_ref:$evidence_ref"
-  fi
-  evidence_tag_object=$(git rev-parse --verify "$evidence_ref")
-  evidence_commit=$(git rev-parse --verify "${evidence_ref}^{commit}")
-  evidence_tree=$(git rev-parse --verify "${evidence_ref}^{tree}")
-  report_sha256=$(git cat-file blob "${evidence_commit}:omp-context-promotion-report.v1.json" | shasum -a 256 | awk '{print $1}')
-  attestation_sha256=$(git cat-file blob "${evidence_commit}:omp-context-promotion-attestation.v2.json" | shasum -a 256 | awk '{print $1}')
-  verified_dir="$temp_dir/verified-evidence"
-  rm -rf -- "$verified_dir"
-  env OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA="$evidence_tag_object" OMP_CONTEXT_EVIDENCE_COMMIT_SHA="$evidence_commit" \
-    OMP_CONTEXT_EVIDENCE_TREE_SHA="$evidence_tree" OMP_CONTEXT_EVIDENCE_REPORT_SHA256="$report_sha256" \
-    OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256="$attestation_sha256" \
-    scripts/companion-release/verify-omp-context-evidence-tag.sh "$verified_dir"
-  verified_report="$verified_dir/omp-context-promotion-report.v1.json"
-  verified_attestation="$verified_dir/omp-context-promotion-attestation.v2.json"
-}
-verify_evidence() {
-  "$verifier" --mode historical --report "$verified_report" --attestation "$verified_attestation" \
-    --report-sha256 "$report_sha256" --attestation-sha256 "$attestation_sha256" \
-    --candidate-repository "$repository" --candidate-revision "$source_commit" --candidate-tree "$source_tree" \
-    --candidate-artifact-sha256 "$candidate_sha256" --static-policy-b64 "$static_policy_b64"
 }
 publish_coordinates() {
   local lock_argument=$1 coordinates status

@@ -62,7 +62,8 @@ func verifyOMPContextPromotionArtifactV2WithTrust(reportBytes, attestationBytes 
 	if err != nil {
 		return VerifiedOMPContextPromotion{}, fmt.Errorf("%w: %v", ErrOMPContextPromotionInvalid, err)
 	}
-	if report.TrustLane != attestation.TrustLane || !matchesOMPContextPromotionExpectationV2(report, expected) {
+	if report.TrustLane != attestation.TrustLane || attestation.KeyID != expected.SigningKeyID ||
+		!matchesOMPContextPromotionExpectationV2(report, expected) {
 		return VerifiedOMPContextPromotion{}, ErrOMPContextPromotionMismatch
 	}
 	if err := validateOMPContextPromotionCohortAttestationTimeV2(report, issuedAt); err != nil {
@@ -92,7 +93,8 @@ func verifyOMPContextPromotionHistoricalArtifactV2WithTrust(reportBytes, attesta
 	if err != nil {
 		return VerifiedOMPContextPromotionHistoricalProof{}, fmt.Errorf("%w: %v", ErrOMPContextPromotionInvalid, err)
 	}
-	if report.TrustLane != attestation.TrustLane || !matchesOMPContextPromotionExpectationV2(report, expected) {
+	if report.TrustLane != attestation.TrustLane || attestation.KeyID != expected.SigningKeyID ||
+		!matchesOMPContextPromotionExpectationV2(report, expected) {
 		return VerifiedOMPContextPromotionHistoricalProof{}, ErrOMPContextPromotionMismatch
 	}
 	if err := validateOMPContextPromotionCohortAttestationTimeV2(report, issuedAt); err != nil {
@@ -116,8 +118,9 @@ func decodeOMPContextPromotionAttestationV2(body []byte) (OMPContextPromotionAtt
 	if err != nil || !bytes.Equal(canonical, body) {
 		return attestation, fmt.Errorf("%w: non-canonical attestation", ErrOMPContextPromotionInvalid)
 	}
+	_, committedKey := ompContextPromotionPublicKeysV2[attestation.KeyID]
 	if attestation.SchemaVersion != OMPContextPromotionAttestationSchemaV2 || attestation.Algorithm != "ed25519" ||
-		attestation.KeyID != OMPContextPromotionKeyID2026Q3K1 || attestation.TrustLane != OMPContextPromotionTrustLaneV2 {
+		!committedKey || attestation.TrustLane != OMPContextPromotionTrustLaneV2 {
 		return attestation, fmt.Errorf("%w: attestation identity", ErrOMPContextPromotionInvalid)
 	}
 	return attestation, nil

@@ -18,20 +18,20 @@ runtime_lib="$script_dir/prepare-release-runtime-lib.sh"
 source "$runtime_lib"
 printf '%s\n' \
   '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"handshake"}' \
-  '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"error","error_code":"network_transport"}' \
+  '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"error","error_code":"network_transport","error_stage":"call","failed_sequence":17}' \
   >"$temp/canary-input.jsonl"
-canary_progress=$(capture_canary_progress "$temp/canary-output.jsonl" bootstrap \
+canary_progress=$(capture_canary_progress "$temp/canary-output.jsonl" final \
   <"$temp/canary-input.jsonl" 2>&1)
 cmp "$temp/canary-input.jsonl" "$temp/canary-output.jsonl" ||
   fail 'canary progress capture changed transcript bytes'
-[[ "$canary_progress" == *'bootstrap production canary progress (1/42 records)'* &&
-   "$canary_progress" == *'bootstrap production canary progress (2/42 records)'* ]] ||
+[[ "$canary_progress" == *'final production canary progress (1/42 records)'* &&
+   "$canary_progress" == *'final production canary progress (2/42 records)'* ]] ||
   fail 'canary progress did not report each completed record'
 failure_status=0
 failure_receipt=$(canary_failure_receipt final 42 "$temp/canary-output.jsonl" 2>&1) ||
   failure_status=$?
 [[ "$failure_status" -eq 42 ]] || fail 'canary failure receipt did not preserve exit status'
-[[ "$failure_receipt" == *'final production canary execution failed: exit=42 transcript_records=2/42 error_code=network_transport'* ]] ||
+[[ "$failure_receipt" == *'final production canary execution failed: exit=42 transcript_records=2/42 error_code=network_transport error_stage=call failed_sequence=17'* ]] ||
   fail 'canary failure receipt omitted structured diagnostics'
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'

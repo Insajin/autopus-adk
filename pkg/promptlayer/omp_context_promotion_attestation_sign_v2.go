@@ -38,7 +38,7 @@ func SignOMPContextPromotionAttestationV2(
 	if err := validateOMPContextPromotionCohortAttestationTimeV2(report, issuedAt); err != nil {
 		return nil, err
 	}
-	normalizedKey, err := validatedOMPContextPromotionSigningKeyV2(privateKey)
+	keyID, normalizedKey, err := validatedOMPContextPromotionSigningKeyV2(privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func SignOMPContextPromotionAttestationV2(
 
 	attestation := OMPContextPromotionAttestationV2{
 		SchemaVersion: OMPContextPromotionAttestationSchemaV2,
-		KeyID:         OMPContextPromotionKeyID2026Q3K1,
+		KeyID:         keyID,
 		Algorithm:     "ed25519",
 		ReportSHA256:  promotionSHA256(input.ReportBytes),
 		IssuedAt:      input.IssuedAt,
@@ -66,25 +66,43 @@ func SignOMPContextPromotionAttestationV2(
 	return body, nil
 }
 
-func validatedOMPContextPromotionSigningKeyV2(privateKey ed25519.PrivateKey) (ed25519.PrivateKey, error) {
+// OMPContextPromotionSigningKeyIDV2 returns the committed, non-revoked
+// identity selected by an exact production private key.
+func OMPContextPromotionSigningKeyIDV2(privateKey ed25519.PrivateKey) (string, error) {
+	keyID, normalizedKey, err := validatedOMPContextPromotionSigningKeyV2(privateKey)
+	if normalizedKey != nil {
+		clear(normalizedKey)
+	}
+	return keyID, err
+}
+
+func validatedOMPContextPromotionSigningKeyV2(privateKey ed25519.PrivateKey) (string, ed25519.PrivateKey, error) {
 	if len(privateKey) != ed25519.PrivateKeySize {
-		return nil, fmt.Errorf("%w: signing key", ErrOMPContextPromotionInvalid)
+		return "", nil, fmt.Errorf("%w: signing key", ErrOMPContextPromotionInvalid)
 	}
 	seed := privateKey.Seed()
 	defer clear(seed)
 	normalizedKey := ed25519.NewKeyFromSeed(seed)
 	if subtle.ConstantTimeCompare(privateKey, normalizedKey) != 1 {
 		clear(normalizedKey)
-		return nil, fmt.Errorf("%w: signing key", ErrOMPContextPromotionInvalid)
+		return "", nil, fmt.Errorf("%w: signing key", ErrOMPContextPromotionInvalid)
 	}
-	trusted := committedOMPContextPromotionPublicKeysV2()
-	publicKey, present := trusted[OMPContextPromotionKeyID2026Q3K1]
 	derivedPublicKey := normalizedKey[ed25519.SeedSize:]
-	if !present || len(publicKey) != ed25519.PublicKeySize ||
-		ompContextPromotionRevokedKeysV2[OMPContextPromotionKeyID2026Q3K1] ||
-		subtle.ConstantTimeCompare(derivedPublicKey, publicKey) != 1 {
-		clear(normalizedKey)
-		return nil, fmt.Errorf("%w: signing key", ErrOMPContextPromotionInvalid)
+	keyID := ""
+	for candidateID, publicKey := range committedOMPContextPromotionPublicKeysV2() {
+		if len(publicKey) == ed25519.PublicKeySize &&
+			!ompContextPromotionRevokedKeysV2[candidateID] &&
+			subtle.ConstantTimeCompare(derivedPublicKey, publicKey) == 1 {
+			if keyID != "" {
+				clear(normalizedKey)
+				return "", nil, fmt.Errorf("%w: ambiguous signing key", ErrOMPContextPromotionInvalid)
+			}
+			keyID = candidateID
+		}
 	}
-	return normalizedKey, nil
+	if keyID == "" {
+		clear(normalizedKey)
+		return "", nil, fmt.Errorf("%w: signing key", ErrOMPContextPromotionInvalid)
+	}
+	return keyID, normalizedKey, nil
 }

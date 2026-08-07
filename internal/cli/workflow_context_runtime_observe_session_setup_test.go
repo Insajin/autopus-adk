@@ -38,9 +38,10 @@ func TestWorkflowContextObserveSessionPhaseModels_BindsAllCanonicalPhases(t *tes
 	assert.Equal(t, "sha256:386816349ebf9b5c2a113889fb3160662121a4fd4fa4085d2bdef97660142adf", digest)
 }
 
-func TestWorkflowContextObserveSession_RuntimeBudgetCoversFullCohort(t *testing.T) {
+func TestWorkflowContextObserveSession_RuntimeBudgetsFailFast(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, 30*time.Minute, workflowContextObserveSessionMaxTime)
+	assert.Equal(t, 2*time.Minute, workflowContextObserveSessionMaxTime)
+	assert.Equal(t, 30*time.Minute, workflowContextObserveSessionTotalMaxTime)
 }
 
 func TestWorkflowContextObserveSessionCommand_InheritedParentSandboxIsExplicitOptIn(t *testing.T) {

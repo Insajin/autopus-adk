@@ -1,32 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-
 tests_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 script_dir=$(cd -- "$tests_dir/.." && pwd)
 publisher="$script_dir/publish-release-coordinates.sh"
 prep="$script_dir/prepare-release.sh"
 publisher_lib="$script_dir/release-coordinate-transaction-lib.sh"
 prep_lib="$script_dir/prepare-release-runtime-lib.sh"
+prep_local_lib="$script_dir/prepare-release-local-lib.sh"
 lock_verifier="$script_dir/verify-release-prep-lock.sh"
 mock_gh="$tests_dir/testdata/mock-release-prep-gh.sh"
 fail() { printf 'release prep hardening test: %s\n' "$1" >&2; exit 1; }
 contains() { grep -Fq -- "$2" "$1" || fail "$1 missing $2"; }
 not_contains() { ! grep -Fq -- "$2" "$1" || fail "$1 unexpectedly contains $2"; }
-
-for file in "$publisher" "$publisher_lib" "$prep" "$prep_lib" "$lock_verifier" "$mock_gh" \
+for file in "$publisher" "$publisher_lib" "$prep" "$prep_lib" "$prep_local_lib" "$lock_verifier" "$mock_gh" \
   "$script_dir/materialize-omp-release-canary.sh" "$script_dir/remove-omp-release-canary.sh" \
   "$script_dir/release-tag-signing-2026-q3.pub" "$script_dir/release-tag-signing-2026-q3.fingerprint"; do
   [[ -f "$file" && ! -L "$file" ]] || fail "missing or unsafe release-prep component $file"
 done
-contains "$prep_lib" 'watch_dispatch companion-release-preflight.yml'
-contains "$prep" 'run_canary "$bootstrap_candidate"'
-contains "$prep" 'run_canary "$final_candidate"'; contains "$prep" 'Return exactly EVALUATION-%02d-%d on one line. Do not call tools, execute commands, or add any other text.'; not_contains "$prep" 'identical evaluation task'
+not_contains "$prep_lib" 'watch_dispatch'
+not_contains "$prep" 'bootstrap_candidate'
+contains "$prep" 'run_canary "$final_candidate"'
+contains "$prep_local_lib" 'omp-context-canary-plan'
 contains "$prep" "cmp \"\$static_policy_file\" \"\$final_static_policy_file\""
-contains "$prep" 'watch_dispatch omp-context-promote.yml'
+not_contains "$prep" 'omp-context-promote.yml'
+not_contains "$prep" 'companion-release-preflight.yml'
+contains "$prep_local_lib" 'omp-context-promotion-attestation'; contains "$prep_local_lib" '--valid-for 24h'; contains "$prep_local_lib" '--expected-signing-key-id "$expected_promotion_key_id"'
+contains "$prep_local_lib" 'push --atomic --force-with-lease='; contains "$prep_local_lib" 'https://github.com/Insajin/autopus-adk.git'; contains "$prep_local_lib" 'verify_evidence active'
 contains "$prep_lib" '/usr/bin/sudo -n -u nobody /usr/bin/env -i'
 contains "$prep_lib" 'production canary started (40 sequential provider calls)'
-contains "$prep_lib" 'production canary execution failed: exit=%s transcript_records=%s/42 error_code=%s'; contains "$prep_lib" 'select(.type? == "error")'; contains "$prep_lib" 'return "$canary_status"'
+contains "$prep_lib" 'error_code=%s error_stage=%s failed_sequence=%s'; contains "$prep_lib" 'select(.type? == "error")'; contains "$prep_lib" 'return "$canary_status"'
 contains "$prep_lib" '/usr/sbin/chown -R nobody:nobody "$isolated_project"'
 not_contains "$prep_lib" '"${nobody_uid}:${nobody_gid}"'
 contains "$prep_lib" '/usr/bin/install -m 0440 -o root -g nobody'
@@ -35,9 +38,9 @@ not_contains "$prep_lib" '"$credential_locator=${!credential_locator}"'
 contains "$prep_lib" '/usr/bin/install -m 0555 -o root -g wheel "$candidate"'
 contains "$prep" 'assert_source_identity'
 contains "$prep" 'expected_tag_signer_fingerprint'
-contains "$prep" 'dispatch_nonce="$dispatch_nonce"'
-contains "$prep_lib" '.actor.id == $actor'
-contains "$prep" 'ensure_prep_lock "$final_report"'
+contains "$prep" 'sudo_keepalive_pid=$!'; contains "$prep_lib" '/usr/bin/sudo -k'
+contains "$prep" 'omp-context-promotion-key-id'; contains "$prep" 'staged_promotion_signing_key='; contains "$prep" 'evidence_verification_mode=active'; contains "$prep" '/usr/bin/install -m 0600 "$tag_signing_key"'; trap_line=$(grep -nF 'trap bootstrap_cleanup EXIT' "$prep" | cut -d: -f1); key_stage_line=$(grep -nF 'staged_tag_signing_key=' "$prep" | cut -d: -f1); [[ "$trap_line" -lt "$key_stage_line" ]] || fail 'release prep stages keys before installing cleanup trap'
+contains "$prep_local_lib" 'ensure_prep_lock "$report"'; not_contains "$prep_local_lib" "--no-tags --depth=1 'https://github.com/Insajin/autopus-adk.git'"
 contains "$prep_lib" 'publish-release-coordinates.sh'
 contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository"'
 contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository" --env "$environment_name"'
@@ -46,13 +49,11 @@ contains "$publisher" 'git push --atomic --force-with-lease='
 contains "$publisher_lib" 'gh variable list "$@" --json name,value'; not_contains "$publisher_lib" 'gh variable list "$@" --limit'
 contains "$publisher_lib" 'retry verify_owned_draft_reservation'
 contains "$publisher" 'policy_creation_ambiguous=1'
-
 temp=$(mktemp -d "${TMPDIR:-/tmp}/release-prep-hardening.XXXXXX")
 cleanup() { rm -rf -- "$temp"; }
 trap cleanup EXIT
 ssh-keygen -q -t ed25519 -N '' -f "$temp/signing-key"
 printf 'release-test %s\n' "$(<"$temp/signing-key.pub")" >"$temp/allowed-signers"
-
 git_env=(
   GIT_CONFIG_COUNT=5
   GIT_CONFIG_KEY_0=gpg.format GIT_CONFIG_VALUE_0=ssh
@@ -137,7 +138,6 @@ run_publisher() {
     "$(printf 'a%.0s' {1..64})" "$(printf 'b%.0s' {1..64})" "$lock_argument" \
     "$temp/signing-key"
 }
-
 setup_fixture success
 [[ "$(cd "$work" && "$lock_verifier" \
   refs/heads/omp-context-evidence-v0.50.98-source "$prep_lock_commit" "$fixture/report")" == \
