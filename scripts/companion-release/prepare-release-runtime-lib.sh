@@ -149,7 +149,8 @@ run_canary() {
   [[ "$candidate_sha" == "$isolated_candidate_sha" &&
      "$(shasum -a 256 "$isolated_omp" | awk '{print $1}')" == "$expected_omp_sha256" ]] ||
     fail 'root-owned canary executable bytes differ'
-  if [[ "$inherit_parent_sandbox" -eq 1 ]]; then sandbox_args=(--inherit-parent-sandbox); fi
+  sandbox_args=(--omp "$isolated_omp")
+  if [[ "$inherit_parent_sandbox" -eq 1 ]]; then sandbox_args+=(--inherit-parent-sandbox); fi
   kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped before production canary'
   printf 'companion release prep: %s production canary started (40 sequential provider calls)\n' \
     "$label" >&2
@@ -172,7 +173,7 @@ run_canary() {
     --credential-locator "$credential_locator" --producer-repository "$repository" --producer-workflow-ref "$producer_workflow_ref" \
     --producer-run-id "$producer_run_id" --producer-run-attempt 1 --candidate-repository "$repository" \
     --policy-id omp-context-active-v1 --oracle-policy-digest "$oracle_policy_digest" --target-git-commit "$source_commit" \
-    --omp "$isolated_omp" "${sandbox_args[@]}" <"$input_jsonl" |
+    "${sandbox_args[@]}" <"$input_jsonl" |
     capture_canary_progress "$output" "$label"; then
     :
   else

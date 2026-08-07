@@ -16,6 +16,8 @@ temp=$(mktemp -d "${TMPDIR:-/tmp}/release-hardening-test.XXXXXX")
 trap 'rm -rf -- "$temp"' EXIT
 runtime_lib="$script_dir/prepare-release-runtime-lib.sh"
 source "$runtime_lib"
+contains "$runtime_lib" 'sandbox_args=(--omp "$isolated_omp")'
+contains "$runtime_lib" '"${sandbox_args[@]}" <"$input_jsonl"'
 printf '%s\n' \
   '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"handshake"}' \
   '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"error","error_code":"network_transport","error_stage":"call","failed_sequence":17}' \
