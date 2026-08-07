@@ -28,7 +28,7 @@ readonly hex40='^[0-9a-f]{40}$' hex64='^[0-9a-f]{64}$'
 
 [[ "$repository" == 'Insajin/autopus-adk' ]] || fail 'repository is not production authority'
 [[ "$environment_name" == 'adk-companion-release' ]] || fail 'environment is not protected release authority'
-[[ "$release_tag" == 'v0.50.99' ]] || fail 'release tag is not exact A22'
+[[ "$release_tag" == 'v0.50.100' ]] || fail 'release tag is not exact A22'
 for value in "$source_commit" "$source_tree" "$evidence_tag_object" "$evidence_commit" "$evidence_tree"; do
   [[ "$value" =~ $hex40 ]] || fail 'Git coordinate is malformed'
 done
@@ -61,12 +61,12 @@ readonly tag_fingerprint_file="$repo_root/scripts/companion-release/release-tag-
   fail 'pinned release tag signer identity is unavailable'
 [[ "$(git rev-parse --verify 'HEAD^{commit}')" == "$source_commit" ]] || fail 'HEAD differs from source commit'
 [[ "$(git rev-parse --verify 'HEAD^{tree}')" == "$source_tree" ]] || fail 'HEAD differs from source tree'
-[[ "$(git cat-file -t "$evidence_ref")" == 'tag' ]] || fail 'local evidence tag is not annotated'
-[[ "$(git rev-parse --verify "$evidence_ref")" == "$evidence_tag_object" ]] || fail 'local evidence tag object differs'
-[[ "$(git rev-parse --verify "${evidence_ref}^{commit}")" == "$evidence_commit" ]] || fail 'local evidence commit differs'
-[[ "$(git rev-parse --verify "${evidence_ref}^{tree}")" == "$evidence_tree" ]] || fail 'local evidence tree differs'
 remote_evidence=$(git ls-remote --refs origin "$evidence_ref") || fail 'cannot inspect remote evidence tag'
 [[ "$remote_evidence" == "$evidence_tag_object"$'\t'"$evidence_ref" ]] || fail 'remote evidence tag differs'
+git fetch --no-tags origin "$evidence_ref" || fail 'cannot fetch remote evidence tag'
+[[ "$(git cat-file -t "$evidence_tag_object")" == 'tag' ]] || fail 'fetched evidence tag is not annotated'
+[[ "$(git rev-parse --verify "${evidence_tag_object}^{commit}")" == "$evidence_commit" ]] || fail 'fetched evidence commit differs'
+[[ "$(git rev-parse --verify "${evidence_tag_object}^{tree}")" == "$evidence_tree" ]] || fail 'fetched evidence tree differs'
 
 bootstrap_cleanup() { rm -rf -- "$temp_dir"; }
 readonly temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/release-coordinate-publish.XXXXXX")

@@ -11,7 +11,7 @@ USAGE
 }
 readonly repository='Insajin/autopus-adk'
 readonly environment_name='adk-companion-release'
-readonly release_tag='v0.50.99'
+readonly release_tag='v0.50.100'
 readonly spec_id='SPEC-OMP-004'
 readonly expected_omp_sha256='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
 readonly expected_promotion_key_id='omp-context-promotion-2026-q3-k2'
@@ -184,7 +184,7 @@ github_release_state() {
     "repos/Insajin/autopus-adk/releases?per_page=100") || return 1
   jq -e 'type == "array" and all(.[]; type == "array")' <<<"$releases" >/dev/null ||
     return 1
-  matches=$(jq '[.[][] | select(.tag_name == "v0.50.99")] | length' <<<"$releases") ||
+  matches=$(jq '[.[][] | select(.tag_name == "v0.50.100")] | length' <<<"$releases") ||
     return 1
   case "$matches" in
     0) printf 'absent\n' ;;
