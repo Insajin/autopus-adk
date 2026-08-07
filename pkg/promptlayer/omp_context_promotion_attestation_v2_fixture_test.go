@@ -141,7 +141,7 @@ func validOMPContextPromotionReportV1() OMPContextPromotionReportV1 {
 	taskBytes, _ := json.Marshal(report.Tasks)
 	report.CohortManifestDigest = promotionSHA256(taskBytes)
 	report.OrderSeed = report.CohortManifestDigest
-	report.Gates = expectedOMPContextPromotionGatesV1(2500, 17)
+	report.Gates = expectedOMPContextPromotionGatesV1(2500, 18)
 	return report
 }
 

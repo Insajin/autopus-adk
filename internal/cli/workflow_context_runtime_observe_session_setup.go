@@ -41,7 +41,7 @@ type workflowContextObserveSessionSetup struct {
 
 const (
 	workflowContextObserveSessionPairCount    = 20
-	workflowContextObserveSessionSegmentPairs = 9
+	workflowContextObserveSessionSegmentPairs = 10
 	workflowContextObserveSessionSegmentCount = (workflowContextObserveSessionPairCount +
 		workflowContextObserveSessionSegmentPairs - 1) / workflowContextObserveSessionSegmentPairs
 	workflowContextObserveSessionMaxTime      = 2 * time.Minute
