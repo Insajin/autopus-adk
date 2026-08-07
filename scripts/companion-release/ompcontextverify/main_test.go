@@ -143,8 +143,8 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 			PipelineImplementationDigest: promotionTestHash("pipeline-implementation"),
 		},
 		SessionFacts: promptlayer.OMPContextPromotionSessionFactsV1{
-			FullProcessStarts: 1, OptimizedProcessStarts: 1, FullSessionCount: 1,
-			OptimizedSessionCount: 1, MaxConcurrency: 1,
+			FullProcessStarts: 3, OptimizedProcessStarts: 3, FullSessionCount: 3,
+			OptimizedSessionCount: 3, MaxConcurrency: 1,
 		},
 		Provider: "openai", ModelScopeDigest: promotionTestHash("models"),
 		OraclePolicyDigest: promotionTestHash("oracle"),
@@ -163,18 +163,18 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 		for _, variant := range variants {
 			sequence := len(report.Observations) + 1
 			sessionSequences[variant]++
+			variantSequence := sessionSequences[variant]
+			sessionSegment := (variantSequence - 1) / 9
+			sessionSequence := (variantSequence-1)%9 + 1
 			inputTokens, compactionRequests := int64(10000), 0
-			if variant == "B" {
-				inputTokens = 7500
-				if sessionSequences[variant] > 1 {
-					compactionRequests = 1
-				}
+			if variant == "B" && sessionSequence > 1 {
+				inputTokens, compactionRequests = 7500, 1
 			}
 			began := startedAt.Add(time.Duration(sequence*2) * time.Second)
 			report.Observations = append(report.Observations, promptlayer.OMPContextPromotionObservationV1{
 				Sequence: sequence, TaskIDDigest: taskDigest, Variant: variant,
-				SessionReceiptDigest: promotionTestHash("session-" + variant),
-				SessionSequence:      sessionSequences[variant], ProcessReused: sessionSequences[variant] > 1,
+				SessionReceiptDigest: promotionTestHash(fmt.Sprintf("session-%s-%d", variant, sessionSegment)),
+				SessionSequence:      sessionSequence, ProcessReused: sessionSequence > 1,
 				Provider: report.Provider, ModelScopeDigest: report.ModelScopeDigest,
 				EndpointClass: "external-provider", Transport: "provider-api", CredentialMode: "locator-only",
 				ProviderAuthorityDigest: promotionTestHash("provider-authority"), ExecutionMode: "external-live",

@@ -57,8 +57,8 @@ func validateOMPContextPromotionReportMetadataV1(report OMPContextPromotionRepor
 		return fmt.Errorf("OMP context promotion runtime is invalid")
 	}
 	if report.SessionFacts != (OMPContextPromotionSessionFactsV1{
-		FullProcessStarts: 1, OptimizedProcessStarts: 1,
-		FullSessionCount: 1, OptimizedSessionCount: 1,
+		FullProcessStarts: ompContextPromotionSessionCountV1, OptimizedProcessStarts: ompContextPromotionSessionCountV1,
+		FullSessionCount: ompContextPromotionSessionCountV1, OptimizedSessionCount: ompContextPromotionSessionCountV1,
 		MaxConcurrency: 1, CrossSessionContamination: 0,
 	}) {
 		return fmt.Errorf("OMP context promotion session facts are invalid")

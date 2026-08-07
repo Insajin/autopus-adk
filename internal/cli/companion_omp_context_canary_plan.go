@@ -147,9 +147,9 @@ func workflowContextObserveSessionCanaryPlan(challenge string) (
 		SchemaVersion: workflowContextObserveSessionCommandSchema,
 		Type:          "handshake", ChallengeDigest: challenge,
 	}}
-	tasks := make([]promptlayer.OMPContextPromotionTaskV1, 0, 20)
+	tasks := make([]promptlayer.OMPContextPromotionTaskV1, 0, workflowContextObserveSessionPairCount)
 	sequence := 0
-	for taskIndex := range 20 {
+	for taskIndex := range workflowContextObserveSessionPairCount {
 		taskID := workflowContextRuntimeHash(challenge + ":task:" + strconv.Itoa(taskIndex))
 		prompt := fmt.Sprintf(
 			"Return exactly EVALUATION-%02d-%d on one line. Do not call tools, execute commands, or add any other text.",

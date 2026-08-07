@@ -9,7 +9,8 @@ import (
 )
 
 func validateOMPContextPromotionCohortV1(report OMPContextPromotionReportV1) error {
-	if len(report.Tasks) != 20 || len(report.Observations) != 40 {
+	if len(report.Tasks) != ompContextPromotionTaskCountV1 ||
+		len(report.Observations) != ompContextPromotionTaskCountV1*2 {
 		return fmt.Errorf("OMP context promotion cohort must contain exactly 20 tasks and 40 observations")
 	}
 	rows, abCount, baCount, err := validateOMPContextPromotionObservationsV1(report)
@@ -18,7 +19,8 @@ func validateOMPContextPromotionCohortV1(report OMPContextPromotionReportV1) err
 	}
 	compactionCount := ompContextPromotionCompactionCountV1(report)
 	aggregate, err := ReduceOMPContextCanaryPairsV1(rows)
-	if err != nil || aggregate.PairCount != 20 || aggregate.ABCount != 10 || aggregate.BACount != 10 ||
+	if err != nil || aggregate.PairCount != ompContextPromotionTaskCountV1 ||
+		aggregate.ABCount != 10 || aggregate.BACount != 10 ||
 		abCount != 10 || baCount != 10 || compactionCount < 2 ||
 		aggregate.IntegrityFailures != 0 || aggregate.SecurityFailures != 0 ||
 		aggregate.QualityRegressions != 0 || !aggregate.FallbackVerified || !aggregate.RollbackVerified ||
@@ -33,12 +35,16 @@ func validateOMPContextPromotionCohortV1(report OMPContextPromotionReportV1) err
 }
 
 func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV1) ([]OMPContextCanaryRowV1, int, int, error) {
-	tasks := make(map[string]bool, 20)
-	observationDigests := make(map[string]bool, 40)
-	usageDigests := make(map[string]bool, 40)
-	sessionReceipts := make(map[string]string, 2)
+	tasks := make(map[string]bool, ompContextPromotionTaskCountV1)
+	observationDigests := make(map[string]bool, ompContextPromotionTaskCountV1*2)
+	usageDigests := make(map[string]bool, ompContextPromotionTaskCountV1*2)
+	sessionReceipts := map[string][]string{
+		"A": make([]string, ompContextPromotionSessionCountV1),
+		"B": make([]string, ompContextPromotionSessionCountV1),
+	}
+	allSessionReceipts := make(map[string]bool, ompContextPromotionSessionCountV1*2)
 	sessionSequences := map[string]int{"A": 0, "B": 0}
-	rows := make([]OMPContextCanaryRowV1, 0, 40)
+	rows := make([]OMPContextCanaryRowV1, 0, ompContextPromotionTaskCountV1*2)
 	var previousCompleted time.Time
 	providerAuthority := ""
 	abCount, baCount := 0, 0
@@ -56,9 +62,12 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 			observation := report.Observations[taskIndex*2+pairIndex]
 			expectedVariant := string(task.Order[pairIndex])
 			sessionSequences[expectedVariant]++
+			variantSequence := sessionSequences[expectedVariant]
+			sessionSegment := (variantSequence - 1) / ompContextPromotionSessionSegmentSizeV1
+			sessionSequence := (variantSequence-1)%ompContextPromotionSessionSegmentSizeV1 + 1
 			if err := validateOMPContextPromotionObservationV1(report, observation, task.TaskIDDigest,
-				expectedVariant, taskIndex*2+pairIndex+1, sessionSequences[expectedVariant], previousCompleted,
-				observationDigests, usageDigests, sessionReceipts, &providerAuthority); err != nil {
+				expectedVariant, taskIndex*2+pairIndex+1, sessionSegment, sessionSequence, previousCompleted,
+				observationDigests, usageDigests, sessionReceipts, allSessionReceipts, &providerAuthority); err != nil {
 				return nil, 0, 0, err
 			}
 			completed, _ := time.Parse(time.RFC3339Nano, observation.CompletedAt)
@@ -71,17 +80,18 @@ func validateOMPContextPromotionObservationsV1(report OMPContextPromotionReportV
 			})
 		}
 	}
-	if sessionSequences["A"] != 20 || sessionSequences["B"] != 20 || sessionReceipts["A"] == "" ||
-		sessionReceipts["B"] == "" || sessionReceipts["A"] == sessionReceipts["B"] || providerAuthority == "" {
+	if sessionSequences["A"] != ompContextPromotionTaskCountV1 ||
+		sessionSequences["B"] != ompContextPromotionTaskCountV1 ||
+		len(allSessionReceipts) != ompContextPromotionSessionCountV1*2 || providerAuthority == "" {
 		return nil, 0, 0, fmt.Errorf("OMP context promotion session projection is invalid")
 	}
 	return rows, abCount, baCount, nil
 }
 
 func validateOMPContextPromotionObservationV1(report OMPContextPromotionReportV1, observation OMPContextPromotionObservationV1,
-	taskDigest, variant string, sequence, sessionSequence int, previousCompleted time.Time,
-	observationDigests, usageDigests map[string]bool, sessionReceipts map[string]string,
-	providerAuthority *string) error {
+	taskDigest, variant string, sequence, sessionSegment, sessionSequence int, previousCompleted time.Time,
+	observationDigests, usageDigests map[string]bool, sessionReceipts map[string][]string,
+	allSessionReceipts map[string]bool, providerAuthority *string) error {
 	started, startErr := parseCanonicalOMPContextPromotionTimeV2(observation.StartedAt)
 	completed, completeErr := parseCanonicalOMPContextPromotionTimeV2(observation.CompletedAt)
 	if startErr != nil || completeErr != nil || !started.Before(completed) || (!previousCompleted.IsZero() && started.Before(previousCompleted)) {
@@ -97,8 +107,16 @@ func validateOMPContextPromotionObservationV1(report OMPContextPromotionReportV1
 		observation.ExecutionMode != "external-live" {
 		return fmt.Errorf("OMP context promotion observation binding is invalid")
 	}
-	if receipt := sessionReceipts[variant]; receipt == "" {
-		sessionReceipts[variant] = observation.SessionReceiptDigest
+	if sessionSegment < 0 || sessionSegment >= ompContextPromotionSessionCountV1 {
+		return fmt.Errorf("OMP context promotion session segment is invalid")
+	}
+	receipts := sessionReceipts[variant]
+	if receipt := receipts[sessionSegment]; receipt == "" {
+		if allSessionReceipts[observation.SessionReceiptDigest] {
+			return fmt.Errorf("OMP context promotion session receipt was reused")
+		}
+		receipts[sessionSegment] = observation.SessionReceiptDigest
+		allSessionReceipts[observation.SessionReceiptDigest] = true
 	} else if receipt != observation.SessionReceiptDigest {
 		return fmt.Errorf("OMP context promotion session receipt changed")
 	}
@@ -139,7 +157,8 @@ func validateOMPContextPromotionObservationV1(report OMPContextPromotionReportV1
 }
 
 func ompContextPromotionCanaryRowsV1(report OMPContextPromotionReportV1) []OMPContextCanaryRowV1 {
-	if len(report.Tasks) != 20 || len(report.Observations) != 40 {
+	if len(report.Tasks) != ompContextPromotionTaskCountV1 ||
+		len(report.Observations) != ompContextPromotionTaskCountV1*2 {
 		return nil
 	}
 	rows := make([]OMPContextCanaryRowV1, 0, len(report.Observations))
@@ -172,7 +191,7 @@ func ompContextPromotionCompactionCountV1(report OMPContextPromotionReportV1) in
 }
 
 func ompContextPromotionProviderAuthorityDigestV1(report OMPContextPromotionReportV1) string {
-	if len(report.Observations) != 40 {
+	if len(report.Observations) != ompContextPromotionTaskCountV1*2 {
 		return ""
 	}
 	digest := report.Observations[0].ProviderAuthorityDigest
@@ -185,19 +204,38 @@ func ompContextPromotionProviderAuthorityDigestV1(report OMPContextPromotionRepo
 }
 
 func ompContextPromotionSessionAuthorityDigestV1(report OMPContextPromotionReportV1) string {
-	receipts := map[string]string{"A": "", "B": ""}
+	receipts := map[string][]string{
+		"A": make([]string, ompContextPromotionSessionCountV1),
+		"B": make([]string, ompContextPromotionSessionCountV1),
+	}
+	variantSequences := map[string]int{"A": 0, "B": 0}
+	allReceipts := make(map[string]bool, ompContextPromotionSessionCountV1*2)
 	for _, observation := range report.Observations {
-		if _, ok := receipts[observation.Variant]; !ok {
+		variantReceipts, ok := receipts[observation.Variant]
+		if !ok {
 			return ""
 		}
-		if receipts[observation.Variant] == "" {
-			receipts[observation.Variant] = observation.SessionReceiptDigest
-		} else if receipts[observation.Variant] != observation.SessionReceiptDigest {
+		variantSequences[observation.Variant]++
+		variantSequence := variantSequences[observation.Variant]
+		segment := (variantSequence - 1) / ompContextPromotionSessionSegmentSizeV1
+		sessionSequence := (variantSequence-1)%ompContextPromotionSessionSegmentSizeV1 + 1
+		if segment >= len(variantReceipts) || observation.SessionSequence != sessionSequence {
+			return ""
+		}
+		if variantReceipts[segment] == "" {
+			if allReceipts[observation.SessionReceiptDigest] {
+				return ""
+			}
+			variantReceipts[segment] = observation.SessionReceiptDigest
+			allReceipts[observation.SessionReceiptDigest] = true
+		} else if variantReceipts[segment] != observation.SessionReceiptDigest {
 			return ""
 		}
 	}
 	providerAuthority := ompContextPromotionProviderAuthorityDigestV1(report)
-	if receipts["A"] == "" || receipts["B"] == "" || receipts["A"] == receipts["B"] ||
+	if variantSequences["A"] != ompContextPromotionTaskCountV1 ||
+		variantSequences["B"] != ompContextPromotionTaskCountV1 ||
+		len(allReceipts) != ompContextPromotionSessionCountV1*2 ||
 		!validOMPContextMemoryHashV1(providerAuthority) {
 		return ""
 	}
@@ -207,8 +245,8 @@ func ompContextPromotionSessionAuthorityDigestV1(report OMPContextPromotionRepor
 		Provider          string                            `json:"provider"`
 		ModelScopeDigest  string                            `json:"model_scope_digest"`
 		ProviderAuthority string                            `json:"provider_authority_digest"`
-		FullSession       string                            `json:"full_session_receipt_digest"`
-		OptimizedSession  string                            `json:"optimized_session_receipt_digest"`
+		FullSessions      []string                          `json:"full_session_receipt_digests"`
+		OptimizedSessions []string                          `json:"optimized_session_receipt_digests"`
 		CohortDigest      string                            `json:"cohort_manifest_digest"`
 	}{
 		report.Producer, report.SessionFacts, report.Provider, report.ModelScopeDigest, providerAuthority,

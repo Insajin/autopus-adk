@@ -135,7 +135,7 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 		{name: "non-production path", mutate: func(r *OMPContextPromotionReportV1) { r.Runtime.ProductionPathEquivalent = false }},
 		{name: "wrong pipeline runtime", mutate: func(r *OMPContextPromotionReportV1) { r.Runtime.RuntimeKind = "omp-managed-rpc" }},
 		{name: "pipeline digest missing", mutate: func(r *OMPContextPromotionReportV1) { r.Runtime.PipelineImplementationDigest = "" }},
-		{name: "extra full process", mutate: func(r *OMPContextPromotionReportV1) { r.SessionFacts.FullProcessStarts = 2 }},
+		{name: "extra full process", mutate: func(r *OMPContextPromotionReportV1) { r.SessionFacts.FullProcessStarts = 4 }},
 		{name: "session receipt drift", mutate: func(r *OMPContextPromotionReportV1) {
 			r.Observations[2].SessionReceiptDigest = promotionSHA256([]byte("other-session"))
 		}},
@@ -148,6 +148,15 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 			}
 		}},
 		{name: "session sequence skip", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].SessionSequence = 2 }},
+		{name: "segment sequence not reset", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[18].SessionSequence = 10
+		}},
+		{name: "segment first process reused", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[18].ProcessReused = true
+		}},
+		{name: "receipt reused across segments", mutate: func(r *OMPContextPromotionReportV1) {
+			r.Observations[18].SessionReceiptDigest = r.Observations[1].SessionReceiptDigest
+		}},
 		{name: "first process reused", mutate: func(r *OMPContextPromotionReportV1) { r.Observations[0].ProcessReused = true }},
 		{name: "negative setup request", mutate: func(r *OMPContextPromotionReportV1) {
 			r.Observations[0].SetupProviderRequests = -1

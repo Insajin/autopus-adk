@@ -67,24 +67,38 @@ func RunWorkflowContextObserveSession(
 		return err
 	}
 	errorStage = "call"
-	seenTasks := make(map[string]struct{}, 20)
+	seenTasks := make(map[string]struct{}, workflowContextObserveSessionPairCount)
 	variantCalls := map[string]int{"A": 0, "B": 0}
+	segmentVariantCalls := map[string]int{"A": 0, "B": 0}
 	sessionBindings := map[string]string{"A": "", "B": ""}
+	allSessionBindings := make(map[string]struct{}, workflowContextObserveSessionSegmentCount*2)
 	compactionCycles, preCompactionACKs := 0, 0
 	postCompactionACKs, canonicalReadmissions, ephemeralReadmissions := 0, 0, 0
 	providerAuthority := setup.providerAuthorityDigest
 	if !validPipelineOMPActiveHash(providerAuthority) {
 		return errors.New("observe-session provider authority binding is unstable")
 	}
-	calls := make([]workflowContextObserveSessionCallEvidence, 0, 40)
+	calls := make([]workflowContextObserveSessionCallEvidence, 0, workflowContextObserveSessionPairCount*2)
 	var pairTask, pairPromptHash, pairOutputDigest string
 	var lastCompleted time.Time
-	for index := range 40 {
+	for index := range workflowContextObserveSessionPairCount * 2 {
 		sequence := index + 1
 		errorSequence = sequence
 		command, err := nextWorkflowContextObserveSessionCommand(scanner)
 		if err != nil || validateWorkflowContextObserveSessionCall(command, sequence) != nil {
 			return fmt.Errorf("observe-session call %d is invalid", sequence)
+		}
+		if command.PairSequence == 1 && len(seenTasks) > 0 &&
+			len(seenTasks)%workflowContextObserveSessionSegmentPairs == 0 {
+			if err := setup.rotate(ctx); err != nil {
+				return fmt.Errorf("observe-session call %d segment rotation failed: %w", sequence, err)
+			}
+			fullPID, optimizedPID = setup.full.PID(), setup.optimized.PID()
+			if fullPID <= 0 || optimizedPID <= 0 || fullPID == optimizedPID {
+				return errors.New("observe-session persistent process pair is invalid")
+			}
+			segmentVariantCalls = map[string]int{"A": 0, "B": 0}
+			sessionBindings = map[string]string{"A": "", "B": ""}
 		}
 		if command.PairSequence == 1 {
 			if _, duplicate := seenTasks[command.TaskIDDigest]; duplicate {
@@ -129,7 +143,7 @@ func RunWorkflowContextObserveSession(
 		}
 		response.SessionDigest = receipt.SessionBindingHash
 		response.ProviderAuthorityDigest = providerAuthority
-		response.ProcessReused = variantCalls[command.Variant] > 0
+		response.ProcessReused = segmentVariantCalls[command.Variant] > 0
 		response.CompactionCycles = receipt.CompactionCycles
 		response.PreCompactionACKs = receipt.PreCompactionACKs
 		response.PostCompactionACKs = receipt.PostCompactionACKs
@@ -144,13 +158,19 @@ func RunWorkflowContextObserveSession(
 			receipt.TerminalIdle && receipt.SessionBindingHash != "" &&
 			receipt.BridgeBindingHash == session.binding.BindingHash
 		if prior := sessionBindings[command.Variant]; prior == "" {
-			sessionBindings[command.Variant] = receipt.SessionBindingHash
+			if _, duplicate := allSessionBindings[receipt.SessionBindingHash]; duplicate {
+				lifecycleValid = false
+			} else {
+				sessionBindings[command.Variant] = receipt.SessionBindingHash
+				allSessionBindings[receipt.SessionBindingHash] = struct{}{}
+			}
 		} else if prior != receipt.SessionBindingHash {
 			lifecycleValid = false
 		}
 		expectedCompactions := response.CompactionCycles
-		freshOptimized := command.Variant == "B" && variantCalls["B"] == 0
+		freshOptimized := command.Variant == "B" && segmentVariantCalls["B"] == 0
 		variantCalls[command.Variant]++
+		segmentVariantCalls[command.Variant]++
 		fullValid := command.Variant == "A" && expectedCompactions == 0 &&
 			response.PreCompactionACKs == 0 && response.PostCompactionACKs == 0 &&
 			response.CanonicalReadmissions == 0 && response.EphemeralReadmissions == 0
@@ -186,7 +206,11 @@ func RunWorkflowContextObserveSession(
 	}
 	errorSequence = 0
 	errorStage = "cohort"
-	if len(seenTasks) != 20 || variantCalls["A"] != 20 || variantCalls["B"] != 20 ||
+	if len(seenTasks) != workflowContextObserveSessionPairCount ||
+		variantCalls["A"] != workflowContextObserveSessionPairCount ||
+		variantCalls["B"] != workflowContextObserveSessionPairCount ||
+		setup.segmentsStarted != workflowContextObserveSessionSegmentCount ||
+		len(allSessionBindings) != workflowContextObserveSessionSegmentCount*2 ||
 		compactionCycles < 2 || sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
 		sessionBindings["A"] == sessionBindings["B"] {
 		return errors.New("observe-session task or reusable-session cardinality is invalid")

@@ -38,7 +38,7 @@ func TestWorkflowContextObserveSession_WritesObservedBodyFreePromotionEvidence(t
 	shutdown := responses[len(responses)-1]
 	assert.Equal(t, "shutdown", shutdown.Type)
 	assert.Equal(t, 40, shutdown.CallsCompleted)
-	assert.Equal(t, 19, shutdown.CompactionCycles)
+	assert.Equal(t, 17, shutdown.CompactionCycles)
 	assert.True(t, shutdown.CleanupVerified)
 	assert.NotEmpty(t, shutdown.EvidenceID)
 	assert.NotEmpty(t, shutdown.ReportDigest)
@@ -65,6 +65,10 @@ func TestWorkflowContextObserveSession_WritesObservedBodyFreePromotionEvidence(t
 	assert.Equal(t, challenge, report.ChallengeDigest)
 	assert.Len(t, report.Tasks, 20)
 	assert.Len(t, report.Observations, 40)
+	assert.Equal(t, workflowContextObserveSessionSegmentCount, report.SessionFacts.FullProcessStarts)
+	assert.Equal(t, workflowContextObserveSessionSegmentCount, report.SessionFacts.OptimizedProcessStarts)
+	assert.Equal(t, workflowContextObserveSessionSegmentCount, report.SessionFacts.FullSessionCount)
+	assert.Equal(t, workflowContextObserveSessionSegmentCount, report.SessionFacts.OptimizedSessionCount)
 	assert.Equal(t, 10, countWorkflowContextObserveOrders(report.Tasks, "AB"))
 	assert.Equal(t, 10, countWorkflowContextObserveOrders(report.Tasks, "BA"))
 	rows, err := promptlayer.OMPContextPromotionReportCanaryRowsV1(report)
@@ -77,7 +81,7 @@ func TestWorkflowContextObserveSession_WritesObservedBodyFreePromotionEvidence(t
 		}
 		assert.Equal(t, int64(100), full.Tokens)
 		expectedOptimizedTokens := int64(40)
-		if index == 0 {
+		if (index/2)%workflowContextObserveSessionSegmentPairs == 0 {
 			expectedOptimizedTokens = 100
 		}
 		assert.Equal(t, expectedOptimizedTokens, optimized.Tokens)
@@ -312,17 +316,19 @@ func verifyWorkflowContextObserveProviderLog(t *testing.T, path string, taskBodi
 			}
 		}
 	}
-	assert.Len(t, starts, 2)
-	assert.Len(t, prompts, 40)
+	assert.Len(t, starts, workflowContextObserveSessionSegmentCount*2)
+	assert.Len(t, prompts, workflowContextObserveSessionPairCount*2)
 	optimizedPIDs := 0
+	compactionFrequencies := make(map[int]int)
 	for _, count := range compactions {
 		if count > 0 {
 			optimizedPIDs++
-			assert.Equal(t, 19, count)
+			compactionFrequencies[count]++
 		}
 	}
-	assert.Equal(t, 1, optimizedPIDs)
-	for pair := range 20 {
+	assert.Equal(t, workflowContextObserveSessionSegmentCount, optimizedPIDs)
+	assert.Equal(t, map[int]int{1: 1, 8: 2}, compactionFrequencies)
+	for pair := range workflowContextObserveSessionPairCount {
 		assert.Equal(t, prompts[pair*2].Message, prompts[pair*2+1].Message)
 		assert.Contains(t, prompts[pair*2].Message, taskBodies[pair])
 	}
