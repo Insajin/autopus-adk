@@ -64,6 +64,21 @@ func validateCanaryUIDIsolation(
 	root, ompExecutable, artifact string,
 	policy canaryUIDIsolationPolicy,
 ) (*canaryUIDIsolation, error) {
+	isolation, err := validateCanaryUIDIsolationRoot(root, ompExecutable, policy)
+	if err != nil {
+		return nil, err
+	}
+	if policy.requireArtifactOtherExec &&
+		validateArtifactUIDAccess(artifact, policy.expectedUID, policy.expectedGIDs, policy.runnerOwnerUID) != nil {
+		return nil, errors.New("signed artifact or parent path is unsafe for nobody execution")
+	}
+	return isolation, nil
+}
+
+func validateCanaryUIDIsolationRoot(
+	root, ompExecutable string,
+	policy canaryUIDIsolationPolicy,
+) (*canaryUIDIsolation, error) {
 	if policy.user != productionUser || policy.runnerPath == "" || policy.envPath == "" {
 		return nil, errors.New("release canary UID isolation policy is invalid")
 	}
@@ -93,10 +108,6 @@ func validateCanaryUIDIsolation(
 	}
 	if err := validateCanaryPath(ompExecutable, false, 0o555, policy.runnerOwnerUID); err != nil {
 		return nil, errors.New("release canary OMP ownership or mode is unsafe")
-	}
-	if policy.requireArtifactOtherExec &&
-		validateArtifactUIDAccess(artifact, policy.expectedUID, policy.expectedGIDs, policy.runnerOwnerUID) != nil {
-		return nil, errors.New("signed artifact or parent path is unsafe for nobody execution")
 	}
 	return &canaryUIDIsolation{
 		root: root, home: filepath.Join(root, "home"), temporary: filepath.Join(root, "tmp"), policy: policy,

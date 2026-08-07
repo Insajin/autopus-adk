@@ -210,6 +210,58 @@ func TestValidateArtifactAncestorUIDAccessRejectsTargetOwnedReadOnlyDirectory(t 
 	}
 }
 
+func TestStageSignedArtifactCopiesIntoCanaryRootAndRemoves(t *testing.T) {
+	isolation, _ := testCanaryUIDIsolation(t)
+	source := linkTestArtifact(t, "auto")
+	staged, err := stageSignedArtifact(source, isolation)
+	if err != nil {
+		t.Fatalf("stageSignedArtifact() error = %v", err)
+	}
+	if staged.path != filepath.Join(isolation.root, "auto") {
+		t.Fatalf("stageSignedArtifact() path = %q", staged.path)
+	}
+	if os.SameFile(mustLstat(t, source), mustLstat(t, staged.path)) {
+		t.Fatal("staged signed artifact aliases its runner-owned source")
+	}
+	if err := staged.finish(nil); err != nil {
+		t.Fatalf("staged.finish(nil) error = %v", err)
+	}
+	if _, err := os.Lstat(staged.path); !os.IsNotExist(err) {
+		t.Fatalf("staged artifact remains after cleanup: %v", err)
+	}
+}
+
+func TestStagedSignedArtifactMutationFailsAndCleans(t *testing.T) {
+	isolation, _ := testCanaryUIDIsolation(t)
+	staged, err := stageSignedArtifact(linkTestArtifact(t, "auto"), isolation)
+	if err != nil {
+		t.Fatalf("stageSignedArtifact() error = %v", err)
+	}
+	if err := os.Chmod(staged.path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(staged.path, []byte("mutated"), 0o555); err != nil {
+		t.Fatal(err)
+	}
+	if err := staged.finish(nil); err == nil {
+		t.Fatal("mutated staged signed artifact passed final verification")
+	}
+	if _, err := os.Lstat(staged.path); !os.IsNotExist(err) {
+		t.Fatalf("mutated staged artifact remains after cleanup: %v", err)
+	}
+}
+
+func TestNewSignedArtifactInstallCommandUsesPinnedInstallContract(t *testing.T) {
+	isolation, _ := testCanaryUIDIsolation(t)
+	command := newSignedArtifactInstallCommand("/runner/auto", "/canary/auto", isolation.policy)
+	want := []string{isolation.policy.runnerPath, "-n", productionInstallPath,
+		"-m", "0555", "-o", "root", "-g", "wheel", "/runner/auto", "/canary/auto"}
+	if command.Path != isolation.policy.runnerPath || !reflect.DeepEqual(command.Args, want) {
+		t.Fatalf("newSignedArtifactInstallCommand() = (%q, %q), want (%q, %q)",
+			command.Path, command.Args, isolation.policy.runnerPath, want)
+	}
+}
+
 func TestNewCanaryCommandUsesDirectEmptyEnvironmentRunner(t *testing.T) {
 	isolation, _ := testCanaryUIDIsolation(t)
 	command, err := newCanaryCommand(context.Background(), "/public/auto", isolation, "version", "--short")

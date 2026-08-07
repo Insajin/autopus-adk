@@ -10,6 +10,7 @@ producer="$script_dir/produce.sh"
 environment_gate="$script_dir/validate-environment.sh"
 exec_smoke_package="$script_dir/execsmoke"
 uid_isolation="$exec_smoke_package/uid_isolation.go"
+artifact_staging="$exec_smoke_package/artifact_staging.go"
 workflow="$repo/.github/workflows/release.yaml"
 materializer="$script_dir/materialize-omp-release-canary.sh"
 remover="$script_dir/remove-omp-release-canary.sh"
@@ -73,6 +74,12 @@ contains "$uid_isolation" 'identityErr != nil || uid == targetUID'
 contains "$uid_isolation" 'canaryTargetMode(info, targetUID, targetGIDs, 0o200, 0o020, 0o002)'
 contains "$uid_isolation" 'policy.expectedGIDs, policy.runnerOwnerUID'
 contains "$uid_isolation" 'uid != trustedOwnerUID || info.Mode()&os.ModeSticky == 0'
+contains "$artifact_staging" 'destination := filepath.Join(isolation.root, "auto")'
+contains "$artifact_staging" 'productionInstallPath = "/usr/bin/install"'
+contains "$artifact_staging" '"-m", "0555", "-o", "root", "-g", "wheel"'
+contains "$artifact_staging" 'staged signed artifact changed during execution smoke'
+contains "$exec_smoke_package/main.go" 'stageSignedArtifact(artifact, isolation)'
+contains "$exec_smoke_package/main.go" 'return staged.finish(smokeErr)'
 if grep -Fq 'OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE' "$goreleaser_config"; then
   fail 'release canary executable leaked into the GoReleaser archive configuration'
 fi
@@ -94,7 +101,7 @@ go test -count=1 "$repo/scripts/companion-release/execsmoke"
 if [[ "$(uname -s)" == 'Darwin' ]]; then
   temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/release-exec-smoke-test.XXXXXX")
   public_dir=$(mktemp -d "$repo/.release-exec-smoke-artifact.XXXXXX")
-  chmod 0755 "$public_dir"
+  chmod 0700 "$public_dir"
   uid_root=''
   cleanup() {
     local status=$?
@@ -140,6 +147,8 @@ if [[ "$(uname -s)" == 'Darwin' ]]; then
         OMP_CONTEXT_RELEASE_CANARY_ROOT="$uid_root" \
           OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$uid_root/omp-darwin-arm64" \
           "$gate" "${gate_args[@]}"
+        [[ ! -e "$uid_root/auto" && ! -L "$uid_root/auto" ]] \
+          || fail 'root-owned signed artifact staging was not removed'
         gate_args=()
       else
         if "$gate" "${gate_args[@]}" >/dev/null 2>&1; then
