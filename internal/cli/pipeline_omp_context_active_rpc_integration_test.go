@@ -154,6 +154,30 @@ func TestPipelineOMPActiveProcessConfig_BindsProviderEndpointWithoutCredentialMa
 	assert.NotContains(t, string(serialized), "127.0.0.1")
 }
 
+func TestPipelineOMPActiveRPC_RejectsTextOnlyPhaseModelBeforeProviderCall(t *testing.T) {
+	session, _, logPath := pipelineOMPActiveRPCSessionFixture(t, false)
+	session.selector = "provider-a/model-text-only"
+
+	_, _, err := session.Execute(context.Background(), "safe plan phase")
+
+	require.ErrorContains(t, err, "native image compaction capability is unavailable")
+	_, commands := pipelineOMPRPCRecordsByKind(readPipelineOMPRPCRecords(t, logPath))
+	assert.Zero(t, countPipelineOMPRPCCommand(commands, "prompt"))
+	assert.Zero(t, countPipelineOMPRPCCommand(commands, "compact"))
+}
+
+func TestPipelineOMPActiveRPC_RejectsTextOnlyModelBeforeProviderCall(t *testing.T) {
+	session, _, logPath, err := pipelineOMPActiveRPCSessionFixtureWithModel(
+		t, "model-text-only", pipelineOMPActiveSandboxManaged,
+	)
+
+	require.ErrorContains(t, err, "native image compaction capability is unavailable")
+	assert.Nil(t, session)
+	_, commands := pipelineOMPRPCRecordsByKind(readPipelineOMPRPCRecords(t, logPath))
+	assert.Zero(t, countPipelineOMPRPCCommand(commands, "prompt"))
+	assert.Zero(t, countPipelineOMPRPCCommand(commands, "compact"))
+}
+
 func TestPipelineOMPActiveRPC_InheritedParentSandboxUsesDirectVerifiedImage(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("inherited parent sandbox is Darwin-only")
@@ -183,13 +207,24 @@ func pipelineOMPActiveRPCSessionFixtureWithSandbox(
 	sandboxMode pipelineOMPActiveSandboxMode,
 ) (*pipelineOMPActiveEvaluatorSession, pipelineOMPBackendConfig, string) {
 	t.Helper()
-	requireDarwinManagedOMPSandboxForTest(t)
-	config, _ := pipelineOMPBackendTestConfig(t)
-	config.Executable = os.Args[0]
 	model := "model-a"
 	if unsafe {
 		model = "model-unsafe"
 	}
+	session, config, logPath, err := pipelineOMPActiveRPCSessionFixtureWithModel(t, model, sandboxMode)
+	require.NoError(t, err)
+	return session, config, logPath
+}
+
+func pipelineOMPActiveRPCSessionFixtureWithModel(
+	t *testing.T,
+	model string,
+	sandboxMode pipelineOMPActiveSandboxMode,
+) (*pipelineOMPActiveEvaluatorSession, pipelineOMPBackendConfig, string, error) {
+	t.Helper()
+	requireDarwinManagedOMPSandboxForTest(t)
+	config, _ := pipelineOMPBackendTestConfig(t)
+	config.Executable = os.Args[0]
 	logPath := filepath.Join(config.ProjectDir, "active-native-rpc.jsonl")
 	config.PhaseModels = map[pipeline.PhaseID]string{pipeline.PhasePlan: "provider-a/" + model}
 	config.Environment = append(config.Environment,
@@ -216,8 +251,7 @@ func pipelineOMPActiveRPCSessionFixtureWithSandbox(
 	session, err := startPipelineOMPActiveEvaluatorSession(
 		context.Background(), config, candidate, prepared, true, sandboxMode,
 	)
-	require.NoError(t, err)
-	return session, config, logPath
+	return session, config, logPath, err
 }
 
 func pipelineOMPActiveNativeFixture(args []string) (string, string, bool) {
@@ -277,6 +311,21 @@ func runPipelineOMPActiveRPCFixture() int {
 	messageCount, promptCount, compactionCount := 0, 0, 0
 	inputTokens, outputTokens, cacheReadTokens := int64(0), int64(0), int64(0)
 	transcript := []json.RawMessage{json.RawMessage(`{"role":"system","content":"safe system context"}`)}
+	provider, modelID := "", ""
+	for index := 0; index+1 < len(os.Args); index++ {
+		if os.Args[index] != "--model" {
+			continue
+		}
+		provider, modelID, _ = strings.Cut(os.Args[index+1], "/")
+		break
+	}
+	if provider == "" || modelID == "" {
+		return 80
+	}
+	modelInput := []string{"text", "image"}
+	if modelID == "model-text-only" {
+		modelInput = []string{"text"}
+	}
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		var command pipelineOMPRPCCommand
@@ -291,10 +340,18 @@ func runPipelineOMPActiveRPCFixture() int {
 		switch command.Type {
 		case "negotiate_protocol":
 			writePipelineOMPActiveResponse(output, command, map[string]any{"protocolVersion": 2})
+		case "set_model":
+			provider, modelID = command.Provider, command.ModelID
+			modelInput = []string{"text", "image"}
+			if modelID == "model-text-only" {
+				modelInput = []string{"text"}
+			}
+			writePipelineOMPActiveResponse(output, command, nil)
 		case "get_state":
 			writePipelineOMPActiveResponse(output, command, map[string]any{
 				"sessionId": "active-session", "isStreaming": false, "isCompacting": false,
 				"messageCount": messageCount, "queuedMessageCount": 0, "autoCompactionEnabled": false,
+				"model": map[string]any{"provider": provider, "id": modelID, "input": modelInput},
 			})
 		case "get_session_stats":
 			writePipelineOMPActiveResponse(output, command, map[string]any{

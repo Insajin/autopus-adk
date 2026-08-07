@@ -52,13 +52,33 @@ type pipelineOMPRPCProtocol struct {
 	safeCompactionImages map[string]struct{}
 }
 
+type pipelineOMPModelState struct {
+	Provider string   `json:"provider"`
+	ID       string   `json:"id"`
+	Input    []string `json:"input"`
+}
+
 type pipelineOMPState struct {
-	SessionID             string `json:"sessionId"`
-	IsStreaming           *bool  `json:"isStreaming"`
-	IsCompacting          *bool  `json:"isCompacting"`
-	MessageCount          *int   `json:"messageCount"`
-	QueuedMessageCount    *int   `json:"queuedMessageCount"`
-	AutoCompactionEnabled *bool  `json:"autoCompactionEnabled"`
+	SessionID             string                 `json:"sessionId"`
+	IsStreaming           *bool                  `json:"isStreaming"`
+	IsCompacting          *bool                  `json:"isCompacting"`
+	MessageCount          *int                   `json:"messageCount"`
+	QueuedMessageCount    *int                   `json:"queuedMessageCount"`
+	AutoCompactionEnabled *bool                  `json:"autoCompactionEnabled"`
+	Model                 *pipelineOMPModelState `json:"model"`
+}
+
+func (state pipelineOMPState) supportsNativeImageCompaction(selector string) bool {
+	provider, modelID, ok := strings.Cut(selector, "/")
+	if !ok || state.Model == nil || state.Model.Provider != provider || state.Model.ID != modelID {
+		return false
+	}
+	text, image := false, false
+	for _, input := range state.Model.Input {
+		text = text || input == "text"
+		image = image || input == "image"
+	}
+	return text && image
 }
 
 func newPipelineOMPRPCProtocol(process *pipelineOMPProcess) *pipelineOMPRPCProtocol {

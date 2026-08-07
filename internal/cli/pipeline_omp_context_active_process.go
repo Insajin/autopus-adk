@@ -21,7 +21,7 @@ const (
 	pipelineOMPActiveEndpointKey    = "AUTOPUS_OMP_CONTEXT_PROVIDER_ENDPOINT"
 	pipelineOMPActiveCredentialKey  = "AUTOPUS_OMP_CONTEXT_PROVIDER_TOKEN"
 	pipelineOMPActiveRPCIdentity    = "autopus.omp-pipeline-managed-rpc.v3"
-	pipelineOMPActivePolicyIdentity = "manual-compact-completed-history-before-reused-call;canonical-ephemeral-readmission;correlated-ack;provider-bound-endpoint;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v3;tools=read,bash,edit,write,grep,glob,todo"
+	pipelineOMPActivePolicyIdentity = "manual-compact-completed-history-before-reused-call;canonical-ephemeral-readmission;correlated-ack;provider-bound-endpoint;model-image-capability=required;auto-compaction=off;retry-off;ambient-off;sandbox=candidate-managed|producer-inherited-external-live-image-darwin-v3;tools=read,bash,edit,write,grep,glob,todo"
 )
 
 const pipelineOMPActiveDefaultContextWindow = 262144
@@ -265,7 +265,9 @@ func writePipelineOMPActiveModels(runtimeRoot string, active pipelineOMPActivePr
 		}
 		sort.Strings(ids)
 		for _, id := range ids {
-			fmt.Fprintf(&body, "      - id: %s\n        name: Managed Active\n        reasoning: true\n        input: [text]\n        contextWindow: %d\n        maxTokens: 32768\n",
+			// Preserve capabilities from the pinned OMP catalog for known models; OMP defaults
+			// unknown custom models to text-only, which the managed startup gate rejects.
+			fmt.Fprintf(&body, "      - id: %s\n        name: Managed Active\n        reasoning: true\n        contextWindow: %d\n        maxTokens: 32768\n",
 				id, active.backend.ModelContextWindow)
 		}
 	}

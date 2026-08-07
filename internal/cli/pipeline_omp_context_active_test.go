@@ -172,6 +172,7 @@ func TestWritePipelineOMPActiveModels_BindsConfiguredContextWindow(t *testing.T)
 	require.NoError(t, err)
 	assert.Contains(t, string(body), "contextWindow: 1000000")
 	assert.NotContains(t, string(body), "contextWindow: 262144")
+	assert.NotContains(t, string(body), "input:")
 }
 
 func TestConfigurePipelineOMPActiveSandbox_InheritedParentSkipsInnerWrapperOnDarwin(t *testing.T) {

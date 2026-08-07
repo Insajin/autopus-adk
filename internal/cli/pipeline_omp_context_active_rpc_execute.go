@@ -26,6 +26,9 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 	if err != nil || beforeState.SessionID != expectedSession {
 		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP pre-prompt session changed")
 	}
+	if !beforeState.supportsNativeImageCompaction(model) {
+		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP native image compaction capability is unavailable")
+	}
 	var preparedPrompt string
 	promptReady := false
 	rehydrationCalls := 0

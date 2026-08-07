@@ -70,7 +70,7 @@ func newPipelineOMPActiveSessionStart(
 		protocol := newPipelineOMPRPCProtocol(process)
 		initializeCtx, cancel := context.WithTimeout(ctx, backend.MaxTime)
 		defer cancel()
-		sessionID, err := protocol.initializeManaged(initializeCtx)
+		sessionID, err := protocol.initializeManaged(initializeCtx, candidate.Provider+"/"+candidate.Model)
 		if err != nil {
 			_ = process.Close()
 			return nil, err
@@ -177,7 +177,7 @@ func (session *pipelineOMPActiveRPCSession) closeLocked() error {
 	return errors.Join(evidenceErr, session.process.Close())
 }
 
-func (protocol *pipelineOMPRPCProtocol) initializeManaged(ctx context.Context) (string, error) {
+func (protocol *pipelineOMPRPCProtocol) initializeManaged(ctx context.Context, selector string) (string, error) {
 	data, err := protocol.call(ctx, pipelineOMPRPCCommand{
 		Type: "negotiate_protocol", ProtocolVersion: pipelineOMPRPCProtocolVersion,
 	}, false)
@@ -201,6 +201,9 @@ func (protocol *pipelineOMPRPCProtocol) initializeManaged(ctx context.Context) (
 	state, err := protocol.readIdleState(ctx, "managed-start")
 	if err != nil || state.AutoCompactionEnabled == nil || *state.AutoCompactionEnabled {
 		return "", errors.New("managed active OMP compaction setting is unavailable")
+	}
+	if !state.supportsNativeImageCompaction(selector) {
+		return "", errors.New("managed active OMP native image compaction capability is unavailable")
 	}
 	return state.SessionID, nil
 }

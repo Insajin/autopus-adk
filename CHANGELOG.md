@@ -28,6 +28,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **v0.50.98 native snapcompact 모델 capability 보존** (2026-08-04): production OMP catalog가 모든 provider 모델을 `input: [text]`로 덮어써 image-capable `openai-codex/gpt-5.6-sol`까지 LLM summary fallback으로 밀어내던 경계를 수정했다. 격리 catalog는 pinned OMP 17.2.7의 exact provider/model capability를 상속하고 unknown 모델은 OMP의 text-only 기본값을 유지한다. managed active startup은 선택된 모델 identity와 `text,image` input capability를 실제 `get_state`에서 확인하므로 native snapcompact를 수행할 수 없는 모델은 첫 provider call 전에 차단된다.
+
 - **v0.50.98 A22 결정적 재빌드·예약 수렴·canary 진단 강화** (2026-08-06): `v0.50.97` release job에서 pinned GoReleaser v2.17.0이 재생성한 unsigned binary와 preflight signed candidate의 서명 전 byte가 달랐으므로 실패 좌표를 재사용하지 않고 active A22 좌표를 `v0.50.98`로 전환했다. canonical candidate builder는 GoReleaser가 주입하는 8자리 short commit과 UTC `YYYY-MM-DDTHH:MM:SSZ` commit timestamp를 정확히 재현하며, operator-owned draft 생성 직후 GitHub Release 목록의 eventual consistency를 bounded retry로 흡수한다. bootstrap/final 40-call production canary는 시작·완료 진행률을 기록하고 실패 시 label, transcript record 수, exit status와 구조화된 `error_code`를 보존해 장시간 무출력과 원인 불명 실패를 구분한다.
 
 - **v0.50.97 A22 릴리스 좌표 재수렴** (2026-08-06): immutable `omp-context-evidence-v0.50.96`이 이미 v0.50.96 source에 바인딩된 뒤 publisher의 지원되지 않는 `gh variable list --limit` 옵션이 coordinate transaction을 차단했으므로, 증거 태그를 이동하거나 exact-source 실행 경계를 우회하지 않고 current A22 좌표를 `v0.50.97`로 전환했다. publisher는 공식 GitHub CLI list 계약으로 repository·protected environment snapshot을 읽고, workflow·preflight·promotion·lineage·Homebrew·current-release verifier와 회귀 fixture를 모두 새 tag/version에 원자적으로 맞춘다.
