@@ -228,23 +228,34 @@ func runCLIWithPolicy(args []string, stderr io.Writer, policy ompCanaryPolicy) e
 		return runVersionSmoke(smokeConfig{artifact: artifact, expectedVersion: *versionFlag,
 			timeout: *timeoutFlag, pipeWait: defaultPipeWait})
 	}
-	isolation, err := validateCanaryUIDIsolation(
-		*canaryRootFlag, *ompExecutableFlag, artifact, policy.isolation,
+	isolation, err := validateCanaryUIDIsolationRoot(
+		*canaryRootFlag, *ompExecutableFlag, policy.isolation,
 	)
 	if err != nil {
 		return err
 	}
-	if err := runVersionSmoke(smokeConfig{artifact: artifact, expectedVersion: *versionFlag,
-		timeout: *timeoutFlag, pipeWait: defaultPipeWait, isolation: isolation}); err != nil {
+	staged, err := stageSignedArtifact(artifact, isolation)
+	if err != nil {
 		return err
 	}
-	if err := runVerifiedExecSmoke(verifiedExecSmokeConfig{
-		artifact: artifact, ompExecutable: *ompExecutableFlag, canaryRoot: *canaryRootFlag,
-		policy: policy, timeout: *timeoutFlag, pipeWait: defaultPipeWait, isolation: isolation,
-	}); err != nil {
-		return err
-	}
-	return nil
+	artifact = staged.path
+	smokeErr := func() error {
+		isolation, err = validateCanaryUIDIsolation(
+			*canaryRootFlag, *ompExecutableFlag, artifact, policy.isolation,
+		)
+		if err != nil {
+			return err
+		}
+		if err = runVersionSmoke(smokeConfig{artifact: artifact, expectedVersion: *versionFlag,
+			timeout: *timeoutFlag, pipeWait: defaultPipeWait, isolation: isolation}); err != nil {
+			return err
+		}
+		return runVerifiedExecSmoke(verifiedExecSmokeConfig{
+			artifact: artifact, ompExecutable: *ompExecutableFlag, canaryRoot: *canaryRootFlag,
+			policy: policy, timeout: *timeoutFlag, pipeWait: defaultPipeWait, isolation: isolation,
+		})
+	}()
+	return staged.finish(smokeErr)
 }
 
 func main() {
