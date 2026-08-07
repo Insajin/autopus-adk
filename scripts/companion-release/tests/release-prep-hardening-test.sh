@@ -39,7 +39,7 @@ contains "$prep_lib" '/usr/bin/install -m 0555 -o root -g wheel "$candidate"'
 contains "$prep" 'assert_source_identity'
 contains "$prep" 'expected_tag_signer_fingerprint'
 contains "$prep" 'sudo_keepalive_pid=$!'; contains "$prep_lib" '/usr/bin/sudo -k'
-contains "$prep" 'omp-context-promotion-key-id'; contains "$prep" 'staged_promotion_signing_key='; contains "$prep" 'evidence_verification_mode=active'; contains "$prep" '/usr/bin/install -m 0600 "$tag_signing_key"'; trap_line=$(grep -nF 'trap bootstrap_cleanup EXIT' "$prep" | cut -d: -f1); key_stage_line=$(grep -nF 'staged_tag_signing_key=' "$prep" | cut -d: -f1); [[ "$trap_line" -lt "$key_stage_line" ]] || fail 'release prep stages keys before installing cleanup trap'
+contains "$prep" 'omp-context-promotion-key-id'; contains "$prep" 'staged_promotion_signing_key='; contains "$prep" 'evidence_verification_mode=active'; contains "$prep" '/usr/bin/install -m 0600 "$tag_signing_key"'; contains "$prep" '^AUTOPUS_OMP_CONTEXT_PROVIDER_[A-Z0-9_]{1,96}$'; trap_line=$(grep -nF 'trap bootstrap_cleanup EXIT' "$prep" | cut -d: -f1); key_stage_line=$(grep -nF 'staged_tag_signing_key=' "$prep" | cut -d: -f1); [[ "$trap_line" -lt "$key_stage_line" ]] || fail 'release prep stages keys before installing cleanup trap'
 contains "$prep_local_lib" 'ensure_prep_lock "$report"'; not_contains "$prep_local_lib" "--no-tags --depth=1 'https://github.com/Insajin/autopus-adk.git'"
 contains "$prep_lib" 'publish-release-coordinates.sh'
 contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository"'
