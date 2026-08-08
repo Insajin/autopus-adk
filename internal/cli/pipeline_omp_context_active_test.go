@@ -211,6 +211,26 @@ func TestPipelineOMPActiveManagedPrompt_AcceptsNullResponseLifecycleAndSafeWidge
 	assert.NotContains(t, sent.String(), "extension_ui_response")
 }
 
+func TestPipelineOMPActiveManagedPrompt_AcceptsLifecycleStartBeforeResponse(t *testing.T) {
+	t.Parallel()
+	terminal := true
+	frames := []pipelineOMPRPCFrame{
+		{Type: "agent_start"},
+		{Type: "turn_start"},
+		{ID: "widget-1", Type: "extension_ui_request", Method: "setWidget"},
+		{ID: "pipeline-active-prompt-1", Type: "prompt_result", AgentInvoked: boolPointer(true)},
+		{ID: "pipeline-active-prompt-1", Type: "response", Command: "prompt", Success: true, Data: json.RawMessage(`null`)},
+		{Type: "turn_end"},
+		{Type: "agent_end", IsTerminal: &terminal},
+	}
+	protocol, sent := pipelineOMPProtocolFixture(frames)
+
+	err := protocol.callManagedPrompt(context.Background(), "safe prompt")
+
+	require.NoError(t, err)
+	assert.NotContains(t, sent.String(), "extension_ui_response")
+}
+
 func TestPipelineOMPActiveManagedPrompt_RejectsInteractiveOrUncorrelatedActivity(t *testing.T) {
 	t.Parallel()
 	success := pipelineOMPRPCFrame{
@@ -234,8 +254,8 @@ func TestPipelineOMPActiveManagedPrompt_RejectsInteractiveOrUncorrelatedActivity
 		{name: "local only result", want: "did not invoke", frames: []pipelineOMPRPCFrame{
 			success, {ID: "pipeline-active-prompt-1", Type: "prompt_result", AgentInvoked: boolPointer(false)},
 		}},
-		{name: "lifecycle before response", want: "out of order", frames: []pipelineOMPRPCFrame{
-			{Type: "agent_start"}, success,
+		{name: "response after turn end", want: "rejected", frames: []pipelineOMPRPCFrame{
+			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"}, success,
 		}},
 	}
 	for _, test := range tests {

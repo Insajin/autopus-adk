@@ -126,13 +126,16 @@ func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, p
 	}
 	responded, resultSeen := false, false
 	started, turnStarted, turned, ended := false, false, false, false
+	// OMP starts session.prompt before the RPC dispatcher writes its success response.
+	// agent_start and turn_start may therefore race ahead of that response; correlate
+	// the command and validate the provider lifecycle as independent ordered streams.
 	for !(responded && started && turned && ended) {
 		frame, err := protocol.process.next(ctx)
 		if err != nil {
 			return err
 		}
 		if frame.Type == "extension_ui_request" {
-			if frame.Method == "setWidget" && frame.ID != "" && responded && started && !ended {
+			if frame.Method == "setWidget" && frame.ID != "" && started && !ended {
 				continue
 			}
 			return errors.New("managed active OMP maintenance crossed the primary provider boundary")
@@ -143,13 +146,13 @@ func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, p
 		}
 		switch frame.Type {
 		case "response":
-			if frame.ID != id || responded || started || !frame.Success || frame.Command != "prompt" ||
-				!validPipelineOMPActivePromptResponseData(frame.Data) {
+			if frame.ID != id || responded || turned || ended || !frame.Success ||
+				frame.Command != "prompt" || !validPipelineOMPActivePromptResponseData(frame.Data) {
 				return errors.New("managed active OMP prompt was rejected")
 			}
 			responded = true
 		case "agent_start":
-			if !responded || started || turnStarted || turned || ended {
+			if started || turnStarted || turned || ended {
 				return errors.New("managed active OMP primary start is out of order")
 			}
 			started = true
@@ -169,7 +172,7 @@ func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, p
 			}
 			ended = true
 		case "prompt_result":
-			if !responded || resultSeen || frame.ID != id || frame.AgentInvoked == nil || !*frame.AgentInvoked {
+			if resultSeen || frame.ID != id || frame.AgentInvoked == nil || !*frame.AgentInvoked {
 				return errors.New("managed active OMP prompt did not invoke the agent")
 			}
 			resultSeen = true

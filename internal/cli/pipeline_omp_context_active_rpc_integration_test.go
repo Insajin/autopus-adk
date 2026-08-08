@@ -377,9 +377,9 @@ func runPipelineOMPActiveRPCFixture() int {
 				json.RawMessage(fmt.Sprintf(`{"role":"user","content":%q}`, command.Message)),
 				json.RawMessage(fmt.Sprintf(`{"role":"assistant","content":%q}`, assistant)),
 			)
-			writePipelineOMPActiveResponse(output, command, nil)
 			_ = output.Encode(map[string]any{"type": "agent_start"})
 			_ = output.Encode(map[string]any{"type": "turn_start"})
+			writePipelineOMPActiveResponse(output, command, nil)
 			_ = output.Encode(map[string]any{"type": "turn_end"})
 			_ = output.Encode(map[string]any{"type": "agent_end", "isTerminal": true})
 		case "get_last_assistant_text":
