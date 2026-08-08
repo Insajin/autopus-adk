@@ -38,10 +38,17 @@ func TestWorkflowContextObserveSessionPhaseModels_BindsAllCanonicalPhases(t *tes
 	assert.Equal(t, "sha256:386816349ebf9b5c2a113889fb3160662121a4fd4fa4085d2bdef97660142adf", digest)
 }
 
-func TestWorkflowContextObserveSession_RuntimeBudgetsFailFast(t *testing.T) {
+func TestWorkflowContextObserveSession_RuntimeBudgetsCoverSegmentWorkload(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, 2*time.Minute, workflowContextObserveSessionMaxTime)
-	assert.Equal(t, 30*time.Minute, workflowContextObserveSessionTotalMaxTime)
+	// An evaluator child must outlive its whole segment: every pair costs one primary
+	// turn and the optimized variant adds a compaction turn to each reused call.
+	segmentTurns := workflowContextObserveSessionSegmentPairs * 2
+	assert.GreaterOrEqual(t, workflowContextObserveSessionMaxTime,
+		time.Duration(segmentTurns)*workflowContextObserveSessionCallBudget)
+	assert.GreaterOrEqual(t, workflowContextObserveSessionTotalMaxTime,
+		workflowContextObserveSessionMaxTime*workflowContextObserveSessionSegmentCount)
+	assert.Equal(t, 15*time.Minute, workflowContextObserveSessionMaxTime)
+	assert.Equal(t, 60*time.Minute, workflowContextObserveSessionTotalMaxTime)
 }
 
 func TestWorkflowContextObserveSessionCommand_InheritedParentSandboxIsExplicitOptIn(t *testing.T) {
