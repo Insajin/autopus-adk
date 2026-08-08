@@ -98,6 +98,38 @@ func TestRunCLI_ValidMachOAndExactVersion_Succeeds(t *testing.T) {
 	}
 }
 
+func TestRunCLI_PreStagedCanonicalArtifact_SucceedsAndRemains(t *testing.T) {
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+		t.Skip("pre-staged execution smoke contract is Darwin arm64 only")
+	}
+	isolation, ompExecutable := testCanaryUIDIsolation(t)
+	artifact := filepath.Join(isolation.root, "auto")
+	if err := copySignedArtifact(linkTestArtifact(t, "auto"), artifact); err != nil {
+		t.Fatalf("copySignedArtifact() error = %v", err)
+	}
+	info, err := os.Lstat(ompExecutable)
+	if err != nil {
+		t.Fatalf("os.Lstat() error = %v", err)
+	}
+	digest, err := stableExecutableSHA256(ompExecutable, info)
+	if err != nil {
+		t.Fatalf("stableExecutableSHA256() error = %v", err)
+	}
+	t.Setenv("OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE", ompExecutable)
+	t.Setenv("OMP_CONTEXT_RELEASE_CANARY_ROOT", isolation.root)
+
+	err = runCLIWithPolicy(
+		validCLIArgs(artifact, runtime.GOARCH), io.Discard,
+		ompCanaryPolicy{version: pinnedOMPVersion, sha256: digest, isolation: isolation.policy},
+	)
+	if err != nil {
+		t.Fatalf("runCLI() error = %v", err)
+	}
+	if _, err := os.Lstat(artifact); err != nil {
+		t.Fatalf("pre-staged artifact was removed: %v", err)
+	}
+}
+
 func TestRunCLI_InvalidInputs_FailClosed(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("execution smoke CLI is Darwin-only")

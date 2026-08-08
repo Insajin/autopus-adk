@@ -19,6 +19,7 @@ type stagedSignedArtifact struct {
 	source, path, digest string
 	info                 os.FileInfo
 	policy               canaryUIDIsolationPolicy
+	removeOnFinish       bool
 }
 
 func stageSignedArtifact(source string, isolation *canaryUIDIsolation) (*stagedSignedArtifact, error) {
@@ -26,6 +27,19 @@ func stageSignedArtifact(source string, isolation *canaryUIDIsolation) (*stagedS
 		return nil, errors.New("signed artifact execution staging inputs are invalid")
 	}
 	destination := filepath.Join(isolation.root, "auto")
+	if source == destination {
+		digest, info, err := stableSignedArtifactSHA256(source)
+		if err != nil || validateCanaryPath(source, false, 0o555, isolation.policy.runnerOwnerUID) != nil {
+			return nil, errors.New("pre-staged signed artifact execution identity differs")
+		}
+		staged := &stagedSignedArtifact{
+			source: source, path: destination, digest: digest, info: info, policy: isolation.policy,
+		}
+		if err := staged.verify(); err != nil {
+			return nil, staged.finish(err)
+		}
+		return staged, nil
+	}
 	if _, err := os.Lstat(destination); !os.IsNotExist(err) {
 		return nil, errors.New("signed artifact execution staging path already exists or is unavailable")
 	}
@@ -62,6 +76,7 @@ func stageSignedArtifact(source string, isolation *canaryUIDIsolation) (*stagedS
 	}
 	staged := &stagedSignedArtifact{
 		source: source, path: destination, digest: digest, info: info, policy: isolation.policy,
+		removeOnFinish: true,
 	}
 	if err := staged.verify(); err != nil {
 		return nil, staged.finish(err)
@@ -143,7 +158,10 @@ func (staged *stagedSignedArtifact) verify() error {
 
 func (staged *stagedSignedArtifact) finish(smokeErr error) error {
 	verificationErr := staged.verify()
-	cleanupErr := removeSignedArtifactPath(staged.path, staged.policy)
+	var cleanupErr error
+	if staged.removeOnFinish {
+		cleanupErr = removeSignedArtifactPath(staged.path, staged.policy)
+	}
 	if smokeErr != nil {
 		if verificationErr != nil || cleanupErr != nil {
 			return fmt.Errorf("%w; staged artifact verification or cleanup failed", smokeErr)
@@ -158,6 +176,9 @@ func (staged *stagedSignedArtifact) finish(smokeErr error) error {
 	}
 	if cleanupErr != nil {
 		return errors.New("signed artifact execution staging cleanup failed")
+	}
+	if !staged.removeOnFinish {
+		return nil
 	}
 	if _, err := os.Lstat(staged.path); !os.IsNotExist(err) {
 		return errors.New("signed artifact execution staging cleanup is incomplete")
