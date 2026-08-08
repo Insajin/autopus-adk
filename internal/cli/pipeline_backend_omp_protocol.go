@@ -220,15 +220,16 @@ func (protocol *pipelineOMPRPCProtocol) call(
 			}
 			switch frame.Type {
 			case "agent_start":
-				if started || ended {
+				if ended {
 					return nil, errors.New("OMP pipeline RPC agent lifecycle is ambiguous")
 				}
 				started = true
 			case "agent_end":
-				if !started || ended || frame.IsTerminal != nil && !*frame.IsTerminal {
+				if !started || ended {
 					return nil, errors.New("OMP pipeline RPC agent lifecycle is out of order")
 				}
-				ended = true
+				// A retry re-enters the agent loop, so only a terminal end settles the prompt.
+				ended = frame.IsTerminal == nil || *frame.IsTerminal
 			}
 			if responded && started && ended {
 				return data, nil

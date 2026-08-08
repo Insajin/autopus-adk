@@ -231,6 +231,41 @@ func TestPipelineOMPActiveManagedPrompt_AcceptsLifecycleStartBeforeResponse(t *t
 	assert.NotContains(t, sent.String(), "extension_ui_response")
 }
 
+func TestPipelineOMPActiveManagedPrompt_AcceptsRetryCyclesBeforeTerminalEnd(t *testing.T) {
+	t.Parallel()
+	terminal, nonTerminal := true, false
+	success := pipelineOMPRPCFrame{
+		ID: "pipeline-active-prompt-1", Type: "response", Command: "prompt", Success: true, Data: json.RawMessage(`null`),
+	}
+	accepted := map[string][]pipelineOMPRPCFrame{
+		"held agent end": {
+			success,
+			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"},
+			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"},
+			{Type: "agent_end", IsTerminal: &terminal},
+		},
+		"explicit non-terminal end": {
+			success,
+			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"},
+			{Type: "agent_end", IsTerminal: &nonTerminal},
+			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"},
+			{Type: "agent_end", IsTerminal: &terminal},
+		},
+		"response after first turn": {
+			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"}, success,
+			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"},
+			{Type: "agent_end", IsTerminal: &terminal},
+		},
+	}
+	for name, frames := range accepted {
+		t.Run(name, func(t *testing.T) {
+			protocol, _ := pipelineOMPProtocolFixture(frames)
+
+			require.NoError(t, protocol.callManagedPrompt(context.Background(), "safe prompt"))
+		})
+	}
+}
+
 func TestPipelineOMPActiveManagedPrompt_RejectsInteractiveOrUncorrelatedActivity(t *testing.T) {
 	t.Parallel()
 	success := pipelineOMPRPCFrame{
@@ -254,8 +289,15 @@ func TestPipelineOMPActiveManagedPrompt_RejectsInteractiveOrUncorrelatedActivity
 		{name: "local only result", want: "did not invoke", frames: []pipelineOMPRPCFrame{
 			success, {ID: "pipeline-active-prompt-1", Type: "prompt_result", AgentInvoked: boolPointer(false)},
 		}},
-		{name: "response after turn end", want: "rejected", frames: []pipelineOMPRPCFrame{
-			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"}, success,
+		{name: "response after terminal end", want: "rejected", frames: []pipelineOMPRPCFrame{
+			{Type: "agent_start"}, {Type: "turn_start"}, {Type: "turn_end"},
+			{Type: "agent_end", IsTerminal: boolPointer(true)}, success,
+		}},
+		{name: "start inside an open turn", want: "primary start is out of order", frames: []pipelineOMPRPCFrame{
+			success, {Type: "agent_start"}, {Type: "turn_start"}, {Type: "agent_start"},
+		}},
+		{name: "terminal end without a completed turn", want: "terminal event is invalid", frames: []pipelineOMPRPCFrame{
+			success, {Type: "agent_start"}, {Type: "agent_end", IsTerminal: boolPointer(true)},
 		}},
 	}
 	for _, test := range tests {

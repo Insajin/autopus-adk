@@ -125,11 +125,15 @@ func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, p
 		return err
 	}
 	responded, resultSeen := false, false
-	started, turnStarted, turned, ended := false, false, false, false
-	// OMP starts session.prompt before the RPC dispatcher writes its success response.
-	// agent_start and turn_start may therefore race ahead of that response; correlate
-	// the command and validate the provider lifecycle as independent ordered streams.
-	for !(responded && started && turned && ended) {
+	started, inTurn, ended := false, false, false
+	turns := 0
+	// OMP starts session.prompt before the RPC dispatcher writes its success response,
+	// so agent_start and turn_start may race ahead of that response. One prompt can
+	// also drive several agent cycles: a retry re-enters through agentLoopContinue and
+	// emits another agent_start, while the wire-level agent_end stays held until the
+	// prompt settles. Completion is the terminal agent_end (isTerminal != false), not
+	// the first start/turn cycle.
+	for !(responded && ended) {
 		frame, err := protocol.process.next(ctx)
 		if err != nil {
 			return err
@@ -146,31 +150,31 @@ func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, p
 		}
 		switch frame.Type {
 		case "response":
-			if frame.ID != id || responded || turned || ended || !frame.Success ||
+			if frame.ID != id || responded || ended || !frame.Success ||
 				frame.Command != "prompt" || !validPipelineOMPActivePromptResponseData(frame.Data) {
 				return errors.New("managed active OMP prompt was rejected")
 			}
 			responded = true
 		case "agent_start":
-			if started || turnStarted || turned || ended {
+			if inTurn || ended {
 				return errors.New("managed active OMP primary start is out of order")
 			}
 			started = true
 		case "turn_start":
-			if !started || turnStarted || turned || ended {
+			if !started || inTurn || ended {
 				return errors.New("managed active OMP primary turn start is out of order")
 			}
-			turnStarted = true
+			inTurn = true
 		case "turn_end":
-			if !turnStarted || turned || ended {
+			if !inTurn || ended {
 				return errors.New("managed active OMP primary turn is out of order")
 			}
-			turned = true
+			inTurn, turns = false, turns+1
 		case "agent_end":
-			if !turned || ended || frame.IsTerminal != nil && !*frame.IsTerminal {
+			if !started || inTurn || turns == 0 || ended {
 				return errors.New("managed active OMP primary terminal event is invalid")
 			}
-			ended = true
+			ended = frame.IsTerminal == nil || *frame.IsTerminal
 		case "prompt_result":
 			if resultSeen || frame.ID != id || frame.AgentInvoked == nil || !*frame.AgentInvoked {
 				return errors.New("managed active OMP prompt did not invoke the agent")
