@@ -96,7 +96,7 @@ func newCurrentReleaseFixture(t *testing.T) *currentReleaseFixture {
 	assetBodies["checksums.txt.signatures"] = []byte("AUTOPUS-RELEASE-SIGNATURE-V1\n" +
 		"e1fdfe066484c7eae8ff16fa4b1ee6237b8d06299c2b66ced485f029af77837f\tMAYCAQECAQE=\n")
 	assetBodies["omp-context-promotion-report.v1.json"] = []byte(
-		`{"candidate":{"artifact_sha256":"` + strings.Repeat("a", 64) + `"}}`)
+		`{"candidate":{"artifact_sha256":"sha256:` + strings.Repeat("a", 64) + `"}}`)
 	assetBodies["omp-context-promotion-attestation.v2.json"] = []byte("fixture attestation\n")
 	assetBodies["release-lineage-v1.json"] = lineage
 	assetBodies["release-lineage-v1.sig"] = lineageSignature

@@ -262,7 +262,7 @@ env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
   || fail 'A22 release signature evidence is invalid'
 
 candidate_artifact_sha=$(jq -er '.candidate.artifact_sha256 |
-  select(type == "string" and test("^[0-9a-f]{64}$"))' "$downloaded_report") \
+  select(type == "string" and test("^sha256:[0-9a-f]{64}$")) | ltrimstr("sha256:")' "$downloaded_report") \
   || fail 'released OMP candidate artifact digest is malformed'
 distributed_artifact_sha=$(jq -er '.artifact_digest |
   select(type == "string" and test("^sha256:[0-9a-f]{64}$"))' "$archive_manifest") \
