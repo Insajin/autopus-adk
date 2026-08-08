@@ -44,8 +44,14 @@ const (
 	workflowContextObserveSessionSegmentPairs = 10
 	workflowContextObserveSessionSegmentCount = (workflowContextObserveSessionPairCount +
 		workflowContextObserveSessionSegmentPairs - 1) / workflowContextObserveSessionSegmentPairs
-	workflowContextObserveSessionMaxTime      = 2 * time.Minute
-	workflowContextObserveSessionTotalMaxTime = 30 * time.Minute
+	// `--max-time` stops the whole OMP session, so an evaluator child must outlive its
+	// entire segment: 10 pairs per segment, and the optimized variant adds a compaction
+	// turn to every reused call, so the budget covers ~19 provider turns plus startup.
+	workflowContextObserveSessionCallBudget = 45 * time.Second
+	workflowContextObserveSessionMaxTime    = workflowContextObserveSessionCallBudget *
+		workflowContextObserveSessionSegmentPairs * 2
+	workflowContextObserveSessionTotalMaxTime = workflowContextObserveSessionMaxTime *
+		workflowContextObserveSessionSegmentCount * 2
 )
 
 func validateWorkflowContextObserveSessionOptions(options workflowContextObserveSessionOptions) error {
