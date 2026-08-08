@@ -207,7 +207,7 @@ func pipelineOMPActiveCoordinatorFixture(t *testing.T, now time.Time) (
 		CandidateRepository: "Insajin/autopus-adk", SourceCommit: candidate.AutoSourceCommit,
 		SourceTree: candidate.AutoSourceTree, Target: "darwin-arm64",
 		PolicyID: "omp-active-v1", PolicyDigest: pipelineOMPContextCohortHash("policy"),
-		AutoVersion: "0.50.101",
+		AutoVersion: "0.50.102",
 		OMPVersion:  "omp/17.2.7", OMPExecutableSHA256: pipelineOMPContextCohortHash("omp"),
 		PipelineImplementationDigest: pipelineOMPActiveImplementationDigest(),
 		Provider:                     candidate.ScopeProvider, ModelScopeDigest: candidate.ModelScopeDigest,

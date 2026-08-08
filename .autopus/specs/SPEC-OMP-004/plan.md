@@ -65,7 +65,7 @@ sequenceDiagram
 | config/CLI | OMP context config, native route, `internal/cli/pipeline_backend_omp*.go`, `workflow_context_runtime*.go`, local production evidence producer | None | global OMP config, orchestra provider map |
 | verification | existing focused fake-runtime/canary/adversarial tests, local release transaction gates | production provider observation `[NEW evidence]` | external live provider by default |
 
-The process-private product entrypoint, native `/auto` canonical-full pipeline, and explicit local production evidence producer are implemented. Provider-bound v0.50.101 observation and reusable-session active admission remain runtime evidence debt; a persisted body-free fixture or isolated RPC test is not active-history production evidence.
+The process-private product entrypoint, native `/auto` canonical-full pipeline, and explicit local production evidence producer are implemented. Provider-bound v0.50.102 observation and reusable-session active admission remain runtime evidence debt; a persisted body-free fixture or isolated RPC test is not active-history production evidence.
 
 ## Architecture Alignment
 
@@ -119,7 +119,7 @@ This Primary SPEC owns canonical re-admission, eligible-history credit, transien
 
 | Item | Blocks | Required resolution |
 |---|---|---|
-| K2-signed immutable release-source v0.50.101 40-call evidence와 active readback이 아직 없음 | user-facing active optimization과 lifecycle completion | local release producer로 balanced AB/BA 20 pairs를 동일한 10/10 full/optimized segment에서 관측·K2 서명·공개 검증하고, 각 segment 내부의 반복 compaction마다 canonical re-admission과 segment 간 receipt 격리를 provider boundary에서 검증한 뒤에만 active를 허용 |
+| K2-signed immutable release-source v0.50.102 40-call evidence와 active readback이 아직 없음 | user-facing active optimization과 lifecycle completion | local release producer로 balanced AB/BA 20 pairs를 동일한 10/10 full/optimized segment에서 관측·K2 서명·공개 검증하고, 각 segment 내부의 반복 compaction마다 canonical re-admission과 segment 간 receipt 격리를 provider boundary에서 검증한 뒤에만 active를 허용 |
 
 ## Final T9 Verification Evidence
 
