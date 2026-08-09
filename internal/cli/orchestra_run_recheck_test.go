@@ -69,6 +69,7 @@ func TestRunSubprocessPipeline_RecheckRoutesToEngineNotPipeline(t *testing.T) {
 	err := runSubprocessPipeline(
 		orchestraRunTestCmd(context.Background()),
 		"topic", "recheck", []string{"claude"}, "standard", 120, false, "", false, false, false,
+		0,
 	)
 	require.NoError(t, err)
 	assert.False(t, pipelineCalled, "recheck must not invoke the debate subprocess pipeline")
@@ -87,7 +88,75 @@ func TestRunSubprocessPipeline_RejectsUnknownStrategy(t *testing.T) {
 	err := runSubprocessPipeline(
 		orchestraRunTestCmd(context.Background()),
 		"topic", "recheckk", []string{"claude"}, "standard", 120, false, "", false, false, false,
+		0,
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "recheck")
+}
+
+// The flag value must actually reach the engine config; a plumbing gap would
+// leave the gate silently disabled while the CLI reports success.
+func TestRunSubprocessPipeline_RequireAgreementReachesEngineConfig(t *testing.T) {
+	origLoadConfig := orchestraRunLoadConfig
+	origBuildProviders := orchestraRunBuildProviders
+	origBackendFactory := orchestraRunBackendFactory
+	origExecute := runOrchestraExecute
+	t.Cleanup(func() {
+		orchestraRunLoadConfig = origLoadConfig
+		orchestraRunBuildProviders = origBuildProviders
+		orchestraRunBackendFactory = origBackendFactory
+		runOrchestraExecute = origExecute
+	})
+
+	orchestraRunLoadConfig = recheckHarnessConfig
+	orchestraRunBuildProviders = buildProviderConfigsForRuntime
+	orchestraRunBackendFactory = func(orchestra.OrchestraConfig) orchestra.ExecutionBackend {
+		return noopExecutionBackend{}
+	}
+
+	var captured orchestra.OrchestraConfig
+	runOrchestraExecute = func(_ context.Context, cfg orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		captured = cfg
+		return &orchestra.OrchestraResult{
+			Strategy:  orchestra.StrategyConsensus,
+			Responses: []orchestra.ProviderResponse{{Provider: "claude", Output: "ok"}},
+			Merged:    "ok",
+			Summary:   "done",
+		}, nil
+	}
+
+	err := runSubprocessPipeline(
+		orchestraRunTestCmd(context.Background()),
+		"topic", "consensus", []string{"claude", "codex"}, "fast", 30, false, "", true, false, false, 0.9,
+	)
+	require.NoError(t, err)
+	assert.InDelta(t, 0.9, captured.MinimumAgreementRatio, 1e-9)
+}
+
+// A ratio outside [0,1] can never bind as a policy, so it is a typo; and only
+// consensus produces the ratio the gate reads.
+func TestRunSubprocessPipeline_RejectsUnusableAgreementFloors(t *testing.T) {
+	origLoadConfig := orchestraRunLoadConfig
+	t.Cleanup(func() { orchestraRunLoadConfig = origLoadConfig })
+	orchestraRunLoadConfig = recheckHarnessConfig
+
+	for name, tc := range map[string]struct {
+		strategy string
+		floor    float64
+		wantMsg  string
+	}{
+		"above one":       {"consensus", 1.5, "between 0 and 1"},
+		"negative":        {"consensus", -0.1, "between 0 and 1"},
+		"needs consensus": {"debate", 0.9, "needs --strategy consensus"},
+	} {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			err := runSubprocessPipeline(
+				orchestraRunTestCmd(context.Background()),
+				"topic", tc.strategy, []string{"claude"}, "fast", 30, false, "", true, false, false, tc.floor,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.wantMsg)
+		})
+	}
 }
