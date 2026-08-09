@@ -206,6 +206,7 @@ type OrchestraConfig struct {
 	SessionID                    string             // unique session ID for hook file signal directory
 	ConsensusThreshold           float64            // consensus threshold (0 uses default 0.66)
 	MinimumProviders             int                // policy floor for quorum; 0 uses configured-provider majority
+	MinimumAgreementRatio        float64            // consensus gate floor on ConsensusMetrics.AgreementRatio; 0 disables the gate
 	InitialDelay                 time.Duration      // delay before completion polling starts (0 uses default 20s)
 	CompletionDetector           CompletionDetector // completion detection strategy (nil = auto-detect from Terminal)
 	ScrollbackLines              int                // R3: ReadScreen scrollback depth (default 500, 0 = use terminal default)

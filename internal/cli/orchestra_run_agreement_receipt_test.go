@@ -87,6 +87,7 @@ func TestOrchestraRunJSON_EmitsRunReceiptOnSuccess(t *testing.T) {
 	err := runSubprocessPipeline(
 		orchestraRunJSONCmd(context.Background(), &out), "topic", "consensus",
 		[]string{"claude", "codex"}, "fast", 30, true, "", true, false, true,
+		0,
 	)
 
 	require.NoError(t, err)
@@ -115,6 +116,7 @@ func TestOrchestraRunJSON_EmitsReceiptWhenGateBlocks(t *testing.T) {
 	err := runSubprocessPipeline(
 		orchestraRunJSONCmd(context.Background(), &out), "topic", "consensus",
 		[]string{"claude"}, "fast", 30, true, "", true, false, true,
+		0,
 	)
 
 	require.Error(t, err, "a blocked gate must still fail the command")
@@ -142,6 +144,7 @@ func TestOrchestraRunJSON_DegradedRunSurfacesAsWarnStatus(t *testing.T) {
 	err := runSubprocessPipeline(
 		orchestraRunJSONCmd(context.Background(), &out), "topic", "consensus",
 		[]string{"claude", "codex", "gemini"}, "fast", 30, true, "", true, false, true,
+		0,
 	)
 
 	require.NoError(t, err)

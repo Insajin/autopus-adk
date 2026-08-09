@@ -15,15 +15,16 @@ import (
 // This is the entry point for the subprocess-based orchestration pipeline.
 func newOrchestraRunCmd() *cobra.Command {
 	var (
-		strategy   string
-		providers  []string
-		rounds     string
-		timeout    int
-		judge      string
-		subprocess bool
-		dryRun     bool
-		jsonOut    bool
-		format     string
+		strategy         string
+		providers        []string
+		rounds           string
+		timeout          int
+		judge            string
+		subprocess       bool
+		dryRun           bool
+		jsonOut          bool
+		format           string
+		requireAgreement float64
 	)
 
 	cmd := &cobra.Command{
@@ -38,7 +39,7 @@ func newOrchestraRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runSubprocessPipeline(cmd, topic, strategy, providers, rounds, timeout, timeoutChanged, judge, subprocess, dryRun, jsonMode)
+			return runSubprocessPipeline(cmd, topic, strategy, providers, rounds, timeout, timeoutChanged, judge, subprocess, dryRun, jsonMode, requireAgreement)
 		},
 	}
 
@@ -49,6 +50,8 @@ func newOrchestraRunCmd() *cobra.Command {
 	cmd.Flags().StringVar(&judge, "judge", "", "Judge provider name")
 	cmd.Flags().BoolVar(&subprocess, "subprocess", false, "Force subprocess backend (default: auto-detect)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output prompts to files without executing")
+	cmd.Flags().Float64Var(&requireAgreement, "require-agreement", 0,
+		"Block a consensus run whose provider agreement ratio falls below this floor (0-1; 0 disables)")
 	addJSONFlags(cmd, &jsonOut, &format)
 
 	return cmd
@@ -68,6 +71,7 @@ func runSubprocessPipeline(
 	forceSubprocess bool,
 	dryRun bool,
 	jsonMode bool,
+	requireAgreement float64,
 ) error {
 	ctx := cmd.Context()
 	requestedStrategy := orchestra.Strategy(strings.ToLower(strings.TrimSpace(strategyStr)))
@@ -75,6 +79,12 @@ func runSubprocessPipeline(
 		requestedStrategy != orchestra.StrategyConsensus &&
 		requestedStrategy != orchestra.StrategyRecheck {
 		return fmt.Errorf("unsupported orchestra run strategy %q (use debate, consensus, or recheck)", strategyStr)
+	}
+	if requireAgreement < 0 || requireAgreement > 1 {
+		return fmt.Errorf("--require-agreement must be between 0 and 1, got %v", requireAgreement)
+	}
+	if requireAgreement > 0 && requestedStrategy != orchestra.StrategyConsensus {
+		return fmt.Errorf("--require-agreement needs --strategy consensus; %q produces no agreement ratio", strategyStr)
 	}
 	explicitProviderSelection := len(providerNames) > 0
 	flagJudge := strings.TrimSpace(judgeName)
@@ -165,18 +175,19 @@ func runSubprocessPipeline(
 	// returns the interactive pane backend on cmux/tmux terminals and the headless
 	// subprocess backend on plain/CI terminals or when --subprocess is forced.
 	cfg := orchestra.OrchestraConfig{
-		Providers:            providerConfigs,
-		RequestedProviders:   append([]string(nil), configuredNames...),
-		ConfiguredProviders:  append([]string(nil), configuredNames...),
-		Strategy:             requestedStrategy,
-		Prompt:               topic,
-		JudgeProvider:        judgeName,
-		InvokingProvider:     invokingProvider,
-		JudgeSelectionSource: judgeSelectionSource,
-		SubprocessMode:       forceSubprocess,
-		TimeoutSeconds:       timeout,
-		Terminal:             detectStructuredTerminal(),
-		FallbackMode:         orchestra.FallbackModeSubprocess,
+		Providers:             providerConfigs,
+		RequestedProviders:    append([]string(nil), configuredNames...),
+		ConfiguredProviders:   append([]string(nil), configuredNames...),
+		Strategy:              requestedStrategy,
+		Prompt:                topic,
+		JudgeProvider:         judgeName,
+		InvokingProvider:      invokingProvider,
+		JudgeSelectionSource:  judgeSelectionSource,
+		SubprocessMode:        forceSubprocess,
+		TimeoutSeconds:        timeout,
+		Terminal:              detectStructuredTerminal(),
+		FallbackMode:          orchestra.FallbackModeSubprocess,
+		MinimumAgreementRatio: requireAgreement,
 	}
 	// SPEC-ORCH-022 T8: enable hook-IPC collection before backend selection so a
 	// pane-capable, hook-installed context collects via done-file instead of
