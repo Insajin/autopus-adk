@@ -185,6 +185,22 @@ func (c CodexModelCatalog) Supports(model, effort string) bool {
 	return ok && entry.supportsEffort(effort)
 }
 
+// codexModelFallbackCandidates lists substitutes to try, best first, when the
+// requested model is absent from the runtime catalog.
+//
+// Only the frontier tier gains a same-generation step. An account that is not
+// entitled to the frontier model still has the current-generation balanced
+// model, which is a closer substitute than skipping a whole generation down to
+// the legacy slug. The balanced and small tiers keep legacy-only behaviour: the
+// small tier is explicitly the cheap model and is not a defensible stand-in for
+// a larger one.
+func codexModelFallbackCandidates(requested string) []string {
+	if requested == CodexSolModel {
+		return []string{CodexTerraModel, CodexLegacyModel}
+	}
+	return []string{CodexLegacyModel}
+}
+
 // ResolveCodexProfile resolves a requested profile against a runtime catalog.
 func ResolveCodexProfile(requested CodexProfile, catalogJSON []byte) CodexProfileResolution {
 	catalog, err := ParseCodexModelCatalog(catalogJSON)
@@ -203,27 +219,30 @@ func ResolveCodexProfile(requested CodexProfile, catalogJSON []byte) CodexProfil
 
 	model, ok := catalog.findModel(requested.Model)
 	if !ok {
-		legacy, legacyOK := catalog.findModel(CodexLegacyModel)
-		if !legacyOK {
-			return CodexProfileResolution{
-				Requested: requested,
-				Fallback:  true,
-				Reason:    CodexResolutionRuntimeDefault,
+		for _, candidate := range codexModelFallbackCandidates(requested.Model) {
+			entry, entryOK := catalog.findModel(candidate)
+			if !entryOK {
+				continue
 			}
-		}
-		legacyEffort, effortOK := legacy.highestCompatibleEffort(capLegacyCodexEffort(requested.Effort))
-		if !effortOK {
+			wanted := requested.Effort
+			if candidate == CodexLegacyModel {
+				wanted = capLegacyCodexEffort(wanted)
+			}
+			effort, effortOK := entry.highestCompatibleEffort(wanted)
+			if !effortOK {
+				continue
+			}
 			return CodexProfileResolution{
 				Requested: requested,
+				Effective: CodexProfile{Model: candidate, Effort: effort},
 				Fallback:  true,
-				Reason:    CodexResolutionRuntimeDefault,
+				Reason:    CodexResolutionModelUnavailable,
 			}
 		}
 		return CodexProfileResolution{
 			Requested: requested,
-			Effective: CodexProfile{Model: CodexLegacyModel, Effort: legacyEffort},
 			Fallback:  true,
-			Reason:    CodexResolutionModelUnavailable,
+			Reason:    CodexResolutionRuntimeDefault,
 		}
 	}
 	if model.supportsEffort(requested.Effort) {
