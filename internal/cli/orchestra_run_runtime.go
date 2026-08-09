@@ -62,7 +62,9 @@ func executeOrchestraRunStrategy(
 	pipelineCfg orchestra.SubprocessPipelineConfig,
 ) (*orchestra.OrchestraResult, error) {
 	switch strategy {
-	case orchestra.StrategyConsensus:
+	// recheck reuses the legacy engine: a single provider over two rounds needs
+	// no schema-guided subprocess pipeline.
+	case orchestra.StrategyConsensus, orchestra.StrategyRecheck:
 		return runOrchestraExecute(ctx, cfg)
 	case orchestra.StrategyDebate:
 		result, err := orchestraRunExecutePipeline(ctx, pipelineCfg)

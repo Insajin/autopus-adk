@@ -32,7 +32,7 @@ func TestStrategy_IsValid(t *testing.T) {
 
 func TestValidStrategies_Count(t *testing.T) {
 	t.Parallel()
-	assert.Len(t, ValidStrategies, 5)
+	assert.Len(t, ValidStrategies, 6)
 }
 
 func TestOrchestraConfig_Fields(t *testing.T) {

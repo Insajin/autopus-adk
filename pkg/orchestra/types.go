@@ -19,6 +19,7 @@ const (
 	StrategyDebate    Strategy = "debate"
 	StrategyFastest   Strategy = "fastest"
 	StrategyRelay     Strategy = "relay"
+	StrategyRecheck   Strategy = "recheck"
 )
 
 // IsValid reports whether the fallback policy is supported. The empty value
@@ -38,7 +39,7 @@ type UsageCapability struct {
 }
 
 // ValidStrategies는 유효한 전략 목록이다.
-var ValidStrategies = []Strategy{StrategyConsensus, StrategyPipeline, StrategyDebate, StrategyFastest, StrategyRelay}
+var ValidStrategies = []Strategy{StrategyConsensus, StrategyPipeline, StrategyDebate, StrategyFastest, StrategyRelay, StrategyRecheck}
 
 // IsValid는 전략의 유효성을 검증한다.
 func (s Strategy) IsValid() bool {
