@@ -62,7 +62,7 @@ func TestRunSubprocessPipeline_UsesConfigTimeoutWhenFlagUnchanged(t *testing.T) 
 		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
-	err := runSubprocessPipeline(context.Background(), "topic", "debate", []string{"claude"}, "standard", 120, false, "", false, false)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), "topic", "debate", []string{"claude"}, "standard", 120, false, "", false, false, false)
 	require.NoError(t, err)
 	assert.Equal(t, 240, captured.TimeoutSeconds)
 }
@@ -98,7 +98,7 @@ func TestRunSubprocessPipeline_CLITimeoutOverridesConfig(t *testing.T) {
 		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
-	err := runSubprocessPipeline(context.Background(), "topic", "debate", []string{"claude"}, "standard", 90, true, "", false, false)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), "topic", "debate", []string{"claude"}, "standard", 90, true, "", false, false, false)
 	require.NoError(t, err)
 	assert.Equal(t, 90, captured.TimeoutSeconds)
 }
@@ -140,7 +140,7 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
-	err := runSubprocessPipeline(context.Background(), "topic", "debate", []string{"codex"}, "fast", 120, false, "", false, false)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), "topic", "debate", []string{"codex"}, "fast", 120, false, "", false, false, false)
 	require.NoError(t, err)
 	assert.Equal(t, "codex", captured.Judge.Name)
 	require.Len(t, captured.Providers, 1)
@@ -196,8 +196,8 @@ func TestRunSubprocessPipeline_ImplicitClaudeConfigUsesCodexInvokerJudge(t *test
 	}
 
 	err := runSubprocessPipeline(
-		context.Background(), "topic", "debate", nil, "fast",
-		120, false, "", false, false,
+		orchestraRunTestCmd(context.Background()), "topic", "debate", nil, "fast",
+		120, false, "", false, false, false,
 	)
 
 	require.NoError(t, err)
@@ -238,7 +238,7 @@ func TestRunSubprocessPipeline_AppliesRuntimeCodexQualityAndEffort(t *testing.T)
 	}
 
 	ctx := withGlobalFlags(context.Background(), globalFlags{Quality: "ultra", Effort: config.CodexEffortMax})
-	err := runSubprocessPipeline(ctx, "topic", "debate", []string{"codex"}, "fast", 120, false, "", false, false)
+	err := runSubprocessPipeline(orchestraRunTestCmd(ctx), "topic", "debate", []string{"codex"}, "fast", 120, false, "", false, false, false)
 	require.NoError(t, err)
 	require.Len(t, captured.Providers, 1)
 	assertCodexProfileInArgs(t, captured.Providers[0].Args, config.CodexSolModel, config.CodexEffortMax)

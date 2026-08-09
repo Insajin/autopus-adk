@@ -97,8 +97,8 @@ func TestRunSubprocessPipeline_BlockedReceiptFailsClosed(t *testing.T) {
 	}
 
 	err := runSubprocessPipeline(
-		context.Background(), "contract", "consensus", []string{"claude"},
-		"standard", 5, true, "", true, false,
+		orchestraRunTestCmd(context.Background()), "contract", "consensus", []string{"claude"},
+		"standard", 5, true, "", true, false, false,
 	)
 
 	require.Error(t, err)

@@ -11,11 +11,26 @@ import (
 // ConsensusMetrics reports typed claim counts independently from the rendered
 // markdown summary.
 type ConsensusMetrics struct {
-	TotalClaims   int                     `json:"total_claims"`
-	AgreedClaims  int                     `json:"agreed_claims"`
-	DissentClaims int                     `json:"dissent_claims"`
-	CriticalVeto  bool                    `json:"critical_veto"`
-	FindingClaims []FindingConsensusClaim `json:"finding_claims,omitempty"`
+	TotalClaims   int `json:"total_claims"`
+	AgreedClaims  int `json:"agreed_claims"`
+	DissentClaims int `json:"dissent_claims"`
+	// AgreementRatio is AgreedClaims/TotalClaims, or 1 when no claim was made at
+	// all. Callers gate on this value, so the zero-claim case is defined here
+	// rather than left to each caller's division.
+	AgreementRatio float64                 `json:"agreement_ratio"`
+	CriticalVeto   bool                    `json:"critical_veto"`
+	FindingClaims  []FindingConsensusClaim `json:"finding_claims,omitempty"`
+}
+
+func (m *ConsensusMetrics) applyAgreementRatio() {
+	if m == nil {
+		return
+	}
+	if m.TotalClaims <= 0 {
+		m.AgreementRatio = 1
+		return
+	}
+	m.AgreementRatio = float64(m.AgreedClaims) / float64(m.TotalClaims)
 }
 
 // FindingClaimEvidence preserves one provider's typed view of a clustered finding.
@@ -141,6 +156,7 @@ func deriveConsensusMetrics(responses []ProviderResponse, threshold float64) *Co
 	if claims, ok := collectReviewerFindingClaims(responses); ok {
 		metrics := metricsFromFindingClaims(claims, len(responses), threshold)
 		metrics.CriticalVeto = metrics.CriticalVeto || criticalVeto
+		metrics.applyAgreementRatio()
 		return &metrics
 	}
 	claims := collectTextConsensusClaims(responses)
@@ -148,10 +164,13 @@ func deriveConsensusMetrics(responses []ProviderResponse, threshold float64) *Co
 		if !criticalVeto {
 			return nil
 		}
-		return &ConsensusMetrics{CriticalVeto: true}
+		metrics := ConsensusMetrics{CriticalVeto: true}
+		metrics.applyAgreementRatio()
+		return &metrics
 	}
 	metrics := metricsFromClaimCounts(claims, len(responses), threshold)
 	metrics.CriticalVeto = criticalVeto
+	metrics.applyAgreementRatio()
 	return &metrics
 }
 

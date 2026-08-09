@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -23,6 +22,8 @@ func newOrchestraRunCmd() *cobra.Command {
 		judge      string
 		subprocess bool
 		dryRun     bool
+		jsonOut    bool
+		format     string
 	)
 
 	cmd := &cobra.Command{
@@ -33,7 +34,11 @@ func newOrchestraRunCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			topic := strings.Join(args, " ")
 			timeoutChanged := cmd.Flags().Changed("timeout")
-			return runSubprocessPipeline(cmd.Context(), topic, strategy, providers, rounds, timeout, timeoutChanged, judge, subprocess, dryRun)
+			jsonMode, err := resolveJSONMode(jsonOut, format)
+			if err != nil {
+				return err
+			}
+			return runSubprocessPipeline(cmd, topic, strategy, providers, rounds, timeout, timeoutChanged, judge, subprocess, dryRun, jsonMode)
 		},
 	}
 
@@ -44,6 +49,7 @@ func newOrchestraRunCmd() *cobra.Command {
 	cmd.Flags().StringVar(&judge, "judge", "", "Judge provider name")
 	cmd.Flags().BoolVar(&subprocess, "subprocess", false, "Force subprocess backend (default: auto-detect)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Output prompts to files without executing")
+	addJSONFlags(cmd, &jsonOut, &format)
 
 	return cmd
 }
@@ -52,7 +58,7 @@ func newOrchestraRunCmd() *cobra.Command {
 // @AX:WARN: [AUTO] high-branch CLI pipeline — config, invoker judge, backend, dry-run, and failure gates converge here
 // @AX:REASON: [AUTO] more than eight conditional branches determine externally visible run behavior
 func runSubprocessPipeline(
-	ctx context.Context,
+	cmd *cobra.Command,
 	topic, strategyStr string,
 	providerNames []string,
 	roundsPreset string,
@@ -61,7 +67,9 @@ func runSubprocessPipeline(
 	judgeName string,
 	forceSubprocess bool,
 	dryRun bool,
+	jsonMode bool,
 ) error {
+	ctx := cmd.Context()
 	requestedStrategy := orchestra.Strategy(strings.ToLower(strings.TrimSpace(strategyStr)))
 	if requestedStrategy != orchestra.StrategyDebate && requestedStrategy != orchestra.StrategyConsensus {
 		return fmt.Errorf("unsupported orchestra run strategy %q (use debate or consensus)", strategyStr)
@@ -202,8 +210,16 @@ func runSubprocessPipeline(
 	if result == nil {
 		return fmt.Errorf("subprocess pipeline failed: orchestration returned no result")
 	}
+	// A blocked gate is the case a caller most needs evidence for, so the receipt
+	// is emitted before the command fails rather than discarded with the error.
 	if shouldTreatOrchestraResultAsFailure(result) {
-		return fmt.Errorf("subprocess pipeline failed: %w", synthesizeOrchestraFailureError(result))
+		blocked := fmt.Errorf("subprocess pipeline failed: %w", synthesizeOrchestraFailureError(result))
+		if jsonMode {
+			return writeJSONResultAndExit(
+				cmd, jsonStatusError, blocked, "orchestra_run_blocked", result.RunReceipt, nil, nil,
+			)
+		}
+		return blocked
 	}
 
 	// REQ-009: when all providers failed and no usable responses were collected,
@@ -214,9 +230,21 @@ func runSubprocessPipeline(
 		)
 	}
 
+	if jsonMode {
+		return writeJSONResult(cmd, orchestraRunJSONStatus(result), result.RunReceipt, nil, nil)
+	}
 	fmt.Println(result.Merged)
 	fmt.Fprintf(os.Stderr, "\nSummary: %s (total %s)\n", result.Summary, result.Duration.Round(1e6))
 	return nil
+}
+
+// orchestraRunJSONStatus maps a completed run onto the shared CLI envelope status
+// so a caller can gate on provider disagreement without parsing rendered markdown.
+func orchestraRunJSONStatus(result *orchestra.OrchestraResult) jsonEnvelopeStatus {
+	if result.Degraded || result.GateStatus == "degraded" {
+		return jsonStatusWarn
+	}
+	return jsonStatusOK
 }
 
 func hasProviderConfig(providers []orchestra.ProviderConfig, name string) bool {
