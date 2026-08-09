@@ -149,11 +149,19 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 					},
 				},
 				"balanced": {
-					Description: "핵심 분석은 Opus, 기본 작업은 Sonnet. Haiku 미사용.",
+					// The executor carries the top tier on measured grounds: on the
+					// one Go-semantics family with headroom the frontier tier scored
+					// 42/45 against 36/45 for the mid tier, and no multi-agent
+					// arrangement closed that gap (best apparatus 40/45 at five
+					// provider calls). Those questions are executor-shaped — predict
+					// exactly what the code does — and the executor's artifact is
+					// what every later role reviews. Planning roles keep their tier:
+					// open judgment was never graded either way.
+					Description: "실행과 핵심 분석은 Opus, 나머지 작업은 Sonnet. Haiku 미사용.",
 					Agents: map[string]string{
 						"planner": "opus", "architect": "opus",
 						"spec-writer": "opus", "security-auditor": "opus",
-						"executor": "sonnet", "tester": "sonnet",
+						"executor": "opus", "tester": "sonnet",
 						"reviewer": "sonnet", "debugger": "sonnet", "devops": "sonnet",
 						"validator": "sonnet", "explorer": "sonnet",
 					},
