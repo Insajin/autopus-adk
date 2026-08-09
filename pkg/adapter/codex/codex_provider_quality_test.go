@@ -14,32 +14,34 @@ import (
 func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 	t.Parallel()
 
+	// tester is the mid-tier witness: under balanced it stays on the mid model,
+	// under ultra it rises, so each row still proves which preset was applied.
 	tests := []struct {
-		name               string
-		global             string
-		codex              string
-		wantRootEffort     string
-		wantPlannerEffort  string
-		wantExecutorModel  string
-		wantExecutorEffort string
+		name              string
+		global            string
+		codex             string
+		wantRootEffort    string
+		wantPlannerEffort string
+		wantMidModel      string
+		wantMidEffort     string
 	}{
 		{
-			name:               "global ultra codex balanced",
-			global:             "ultra",
-			codex:              "balanced",
-			wantRootEffort:     config.CodexEffortXHigh,
-			wantPlannerEffort:  config.CodexEffortXHigh,
-			wantExecutorModel:  config.CodexTerraModel,
-			wantExecutorEffort: config.CodexEffortMedium,
+			name:              "global ultra codex balanced",
+			global:            "ultra",
+			codex:             "balanced",
+			wantRootEffort:    config.CodexEffortXHigh,
+			wantPlannerEffort: config.CodexEffortXHigh,
+			wantMidModel:      config.CodexTerraModel,
+			wantMidEffort:     config.CodexEffortMedium,
 		},
 		{
-			name:               "global balanced codex ultra",
-			global:             "balanced",
-			codex:              "ultra",
-			wantRootEffort:     config.CodexEffortUltra,
-			wantPlannerEffort:  config.CodexEffortMax,
-			wantExecutorModel:  config.CodexSolModel,
-			wantExecutorEffort: config.CodexEffortXHigh,
+			name:              "global balanced codex ultra",
+			global:            "balanced",
+			codex:             "ultra",
+			wantRootEffort:    config.CodexEffortUltra,
+			wantPlannerEffort: config.CodexEffortMax,
+			wantMidModel:      config.CodexSolModel,
+			wantMidEffort:     config.CodexEffortXHigh,
 		},
 	}
 
@@ -71,11 +73,11 @@ func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 				byPath[file.TargetPath] = string(file.Content)
 			}
 			planner := byPath[filepath.Join(".codex", "agents", "planner.toml")]
-			executor := byPath[filepath.Join(".codex", "agents", "executor.toml")]
+			tester := byPath[filepath.Join(".codex", "agents", "tester.toml")]
 			assert.Contains(t, planner, `model = "`+config.CodexSolModel+`"`)
 			assert.Contains(t, planner, `model_reasoning_effort = "`+tt.wantPlannerEffort+`"`)
-			assert.Contains(t, executor, `model = "`+tt.wantExecutorModel+`"`)
-			assert.Contains(t, executor, `model_reasoning_effort = "`+tt.wantExecutorEffort+`"`)
+			assert.Contains(t, tester, `model = "`+tt.wantMidModel+`"`)
+			assert.Contains(t, tester, `model_reasoning_effort = "`+tt.wantMidEffort+`"`)
 		})
 	}
 }

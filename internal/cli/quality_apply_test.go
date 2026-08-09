@@ -148,7 +148,9 @@ func TestQualitySupervisorApplyUpdatesActualCodexRootAndAgents(t *testing.T) {
 	rootSection := strings.SplitN(string(configData), "[agents]", 2)[0]
 	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
 	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
-	agentData, err := os.ReadFile(filepath.Join(dir, ".codex", "agents", "executor.toml"))
+	// tester is still a mid-tier role under balanced, so it shows that pinning the
+	// supervisor does not leak into agent models.
+	agentData, err := os.ReadFile(filepath.Join(dir, ".codex", "agents", "tester.toml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(agentData), `model = "gpt-5.6-terra"`)
 

@@ -73,8 +73,10 @@ func TestGenerateAgents_BalancedQualityUsesRoleEffort(t *testing.T) {
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model = "gpt-5.6-sol"`)
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model_reasoning_effort = "high"`)
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model = "gpt-5.6-terra"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model_reasoning_effort = "medium"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model = "gpt-5.6-terra"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model = "gpt-5.6-sol"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "tester.toml")], `model_reasoning_effort = "medium"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "tester.toml")], `model = "gpt-5.6-terra"`)
 }
 
 func TestGenerateAgents_UltraQualityUsesSelectiveSolEffort(t *testing.T) {
