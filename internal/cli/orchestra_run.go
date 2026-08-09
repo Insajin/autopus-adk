@@ -42,7 +42,7 @@ func newOrchestraRunCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&strategy, "strategy", "s", "debate", "Orchestration strategy (debate|consensus)")
+	cmd.Flags().StringVarP(&strategy, "strategy", "s", "debate", "Orchestration strategy (debate|consensus|recheck)")
 	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "Provider list (default: all configured)")
 	cmd.Flags().StringVar(&rounds, "rounds", "standard", "Round preset: fast, standard, deep")
 	cmd.Flags().IntVarP(&timeout, "timeout", "t", 120, "Per-provider timeout (seconds)")
@@ -71,8 +71,10 @@ func runSubprocessPipeline(
 ) error {
 	ctx := cmd.Context()
 	requestedStrategy := orchestra.Strategy(strings.ToLower(strings.TrimSpace(strategyStr)))
-	if requestedStrategy != orchestra.StrategyDebate && requestedStrategy != orchestra.StrategyConsensus {
-		return fmt.Errorf("unsupported orchestra run strategy %q (use debate or consensus)", strategyStr)
+	if requestedStrategy != orchestra.StrategyDebate &&
+		requestedStrategy != orchestra.StrategyConsensus &&
+		requestedStrategy != orchestra.StrategyRecheck {
+		return fmt.Errorf("unsupported orchestra run strategy %q (use debate, consensus, or recheck)", strategyStr)
 	}
 	explicitProviderSelection := len(providerNames) > 0
 	flagJudge := strings.TrimSpace(judgeName)

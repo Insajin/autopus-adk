@@ -17,6 +17,7 @@ var strategyHandlers = map[Strategy]StrategyFunc{
 	StrategyDebate:    handleDebate,
 	StrategyFastest:   handleFastest,
 	StrategyRelay:     handleRelay,
+	StrategyRecheck:   handleRecheck,
 }
 
 // GetStrategyFunc는 전략에 맞는 StrategyFunc를 반환한다.

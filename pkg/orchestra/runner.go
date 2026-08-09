@@ -60,6 +60,8 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	case StrategyRelay:
 		responses, err = runRelay(timeoutCtx, &cfg)
 		failed = decorateRelayExecutionEvidence(responses, cfg)
+	case StrategyRecheck:
+		responses, roundHistory, failed, err = runRecheck(timeoutCtx, cfg)
 	default:
 		// consensus: prepend structured prompt prefix, then run parallel with graceful degradation
 		consensusCfg := cfg
