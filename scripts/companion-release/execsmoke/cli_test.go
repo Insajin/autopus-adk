@@ -216,6 +216,9 @@ func validCLIArgs(artifact, architecture string) []string {
 		"--artifact", artifact,
 		"--expected-version", expectedFixtureVersion,
 		"--architecture", architecture,
-		"--timeout", "10s",
+		// maximumTimeout, not a measured budget: the fixture exits immediately, so
+		// any smaller value only measures how busy the machine is. The deadline
+		// boundary itself is covered by the zero/excessive timeout cases.
+		"--timeout", "60s",
 	}
 }

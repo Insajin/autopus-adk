@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,9 +26,7 @@ printf 'args=%s\n' "$*"
 	t.Setenv("PATH", binDir)
 
 	runner := commandOMPProbeRunner{maxOutput: 4096}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	output, err := runner.Run(ctx, filepath.Base(executable),
+	output, err := runner.Run(t.Context(), filepath.Base(executable),
 		"--config", filepath.Join(profile, "config.yml"), "models", "--json")
 	require.NoError(t, err)
 	assert.Equal(t,

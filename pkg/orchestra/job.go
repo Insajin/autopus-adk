@@ -125,9 +125,11 @@ func (j *Job) Cleanup() error {
 	return os.RemoveAll(j.Dir)
 }
 
-// CleanupStaleJobs scans baseDir for job subdirectories containing JSON files
-// and removes those whose CreatedAt + ttl is in the past. Returns the count removed.
+// CleanupStaleJobs scans baseDir for orchestra job records and removes the ones
+// whose CreatedAt + ttl is in the past. Returns the count removed.
 // @AX:NOTE [AUTO] REQ-11 opportunistic GC — called at start of every orchestra command; scans both flat and nested job dirs
+// SEC: baseDir is the shared system temp dir, so a removal target is only ever a
+// directory that an owned job record claims — never a path named by foreign JSON.
 func CleanupStaleJobs(baseDir string, ttl time.Duration) (int, error) {
 	entries, err := os.ReadDir(baseDir)
 	if err != nil {
@@ -138,51 +140,68 @@ func CleanupStaleJobs(baseDir string, ttl time.Duration) (int, error) {
 	for _, e := range entries {
 		if e.IsDir() {
 			// Scan subdirectory for job JSON files
-			subDir := filepath.Join(baseDir, e.Name())
-			n, _ := cleanupJobsInDir(subDir, cutoff)
+			n, _ := cleanupJobsInDir(filepath.Join(baseDir, e.Name()), cutoff)
 			removed += n
 			continue
 		}
-		if !strings.HasSuffix(e.Name(), ".json") {
+		job, ok := staleJobRecord(baseDir, e.Name(), cutoff)
+		if !ok {
 			continue
 		}
-		id := strings.TrimSuffix(e.Name(), ".json")
-		job, err := LoadJob(baseDir, id)
-		if err != nil {
-			continue
+		if ownedJobDir(baseDir, job.Dir) {
+			_ = os.RemoveAll(job.Dir)
 		}
-		if job.CreatedAt.Before(cutoff) {
-			if job.Dir != "" {
-				_ = os.RemoveAll(job.Dir)
-			}
-			_ = os.Remove(filepath.Join(baseDir, e.Name()))
-			removed++
-		}
+		_ = os.Remove(filepath.Join(baseDir, e.Name()))
+		removed++
 	}
 	return removed, nil
 }
 
-// cleanupJobsInDir removes stale jobs found as JSON files in dir.
+// cleanupJobsInDir removes dir when it holds a stale job record that claims it.
 func cleanupJobsInDir(dir string, cutoff time.Time) (int, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return 0, err
 	}
-	removed := 0
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+		if e.IsDir() {
 			continue
 		}
-		id := strings.TrimSuffix(e.Name(), ".json")
-		job, err := LoadJob(dir, id)
-		if err != nil {
+		job, ok := staleJobRecord(dir, e.Name(), cutoff)
+		if !ok || filepath.Clean(job.Dir) != dir {
 			continue
 		}
-		if job.CreatedAt.Before(cutoff) {
-			_ = os.RemoveAll(dir)
-			removed++
-			break // directory removed, no more files to check
+		if err := os.RemoveAll(dir); err != nil {
+			return 0, err
 		}
+		return 1, nil
 	}
-	return removed, nil
+	return 0, nil
+}
+
+// staleJobRecord loads dir/name as a job record and reports whether it is an
+// orchestra-owned record that has outlived cutoff. Ownership needs the round
+// trip Save() guarantees: the file stem is the job ID and CreatedAt is set.
+// Without that check any foreign JSON object sharing the temp dir decodes into
+// a zero Job whose zero CreatedAt reads as infinitely stale.
+func staleJobRecord(dir, name string, cutoff time.Time) (*Job, bool) {
+	id, isJSON := strings.CutSuffix(name, ".json")
+	if !isJSON {
+		return nil, false
+	}
+	job, err := LoadJob(dir, id)
+	if err != nil || job.ID != id || job.CreatedAt.IsZero() || !job.CreatedAt.Before(cutoff) {
+		return nil, false
+	}
+	return job, true
+}
+
+// ownedJobDir reports whether target is a path strictly inside baseDir, which
+// keeps a removal from escaping the scanned root or wiping the root itself.
+func ownedJobDir(baseDir, target string) bool {
+	if target == "" {
+		return false
+	}
+	rel, err := filepath.Rel(baseDir, filepath.Clean(target))
+	return err == nil && rel != "." && filepath.IsLocal(rel)
 }

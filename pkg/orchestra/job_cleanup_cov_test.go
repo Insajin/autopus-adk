@@ -90,3 +90,97 @@ func TestCleanupStaleJobs_FreshFlatRetained(t *testing.T) {
 	assert.Equal(t, 0, removed)
 	assert.FileExists(t, filepath.Join(baseDir, "recent.json"))
 }
+
+// TestCleanupStaleJobs_KeepsForeignJSONDirectory pins the shared-temp-dir
+// invariant: the GC scans os.TempDir(), where unrelated tools keep working
+// directories full of JSON. A foreign JSON object decodes into a zero Job whose
+// zero CreatedAt otherwise reads as infinitely stale, so the GC used to delete
+// the whole directory out from under a live process.
+func TestCleanupStaleJobs_KeepsForeignJSONDirectory(t *testing.T) {
+	t.Parallel()
+	baseDir := t.TempDir()
+	foreign := filepath.Join(baseDir, "release-coordinate-publish.WgKtut")
+	require.NoError(t, os.MkdirAll(foreign, 0o700))
+	policies := filepath.Join(foreign, "deployment-policies.json")
+	require.NoError(t, os.WriteFile(policies, []byte(`{"branch_policies":[]}`), 0o600))
+	variables := filepath.Join(foreign, "repository-variables.json")
+	require.NoError(t, os.WriteFile(variables, []byte(`[{"name":"UNRELATED"}]`), 0o600))
+
+	removed, err := CleanupStaleJobs(baseDir, 1*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 0, removed, "foreign JSON is not an orchestra job record")
+	assert.FileExists(t, policies)
+	assert.FileExists(t, variables)
+}
+
+// TestCleanupStaleJobs_KeepsRecordWithoutCreatedAt verifies that a job record
+// missing CreatedAt is never treated as stale, even when its ID matches.
+func TestCleanupStaleJobs_KeepsRecordWithoutCreatedAt(t *testing.T) {
+	t.Parallel()
+	baseDir := t.TempDir()
+	subDir := filepath.Join(baseDir, "autopus-orch-undated")
+	require.NoError(t, os.MkdirAll(subDir, 0o700))
+	require.NoError(t, (&Job{ID: "undated", Dir: subDir}).Save())
+
+	removed, err := CleanupStaleJobs(baseDir, 1*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 0, removed)
+	assert.DirExists(t, subDir)
+}
+
+// TestCleanupStaleJobs_KeepsDirectoryNotClaimedByRecord verifies a nested stale
+// record only authorizes removal of the directory it actually lives in.
+func TestCleanupStaleJobs_KeepsDirectoryNotClaimedByRecord(t *testing.T) {
+	t.Parallel()
+	baseDir := t.TempDir()
+	host := filepath.Join(baseDir, "unrelated-workdir")
+	victim := filepath.Join(baseDir, "victim")
+	require.NoError(t, os.MkdirAll(host, 0o700))
+	require.NoError(t, os.MkdirAll(victim, 0o700))
+	stale := &Job{ID: "misplaced", Dir: victim, CreatedAt: time.Now().Add(-2 * time.Hour)}
+	require.NoError(t, writeFlatJobManifest(host, stale))
+
+	removed, err := CleanupStaleJobs(baseDir, 1*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 0, removed)
+	assert.DirExists(t, host)
+	assert.DirExists(t, victim)
+}
+
+// TestCleanupStaleJobs_KeepsFlatTargetOutsideBaseDir verifies a flat manifest
+// cannot direct the GC at a path outside the scanned root; the manifest itself
+// is still reclaimed.
+func TestCleanupStaleJobs_KeepsFlatTargetOutsideBaseDir(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	baseDir := filepath.Join(root, "base")
+	outside := filepath.Join(root, "outside")
+	require.NoError(t, os.MkdirAll(baseDir, 0o700))
+	require.NoError(t, os.MkdirAll(outside, 0o700))
+	stale := &Job{ID: "escaping", Dir: outside, CreatedAt: time.Now().Add(-2 * time.Hour)}
+	require.NoError(t, writeFlatJobManifest(baseDir, stale))
+
+	removed, err := CleanupStaleJobs(baseDir, 1*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 1, removed)
+	assert.DirExists(t, outside, "removal must not escape the scanned root")
+	assert.NoFileExists(t, filepath.Join(baseDir, "escaping.json"))
+}
+
+// TestCleanupStaleJobs_NeverRemovesBaseDir verifies a stale flat record whose
+// Dir is the scanned root reclaims only its own manifest.
+func TestCleanupStaleJobs_NeverRemovesBaseDir(t *testing.T) {
+	t.Parallel()
+	baseDir := t.TempDir()
+	stale := &Job{ID: "rooted", Dir: baseDir, CreatedAt: time.Now().Add(-2 * time.Hour)}
+	require.NoError(t, stale.Save())
+	keeper := filepath.Join(baseDir, "keeper.txt")
+	require.NoError(t, os.WriteFile(keeper, []byte("keep"), 0o600))
+
+	removed, err := CleanupStaleJobs(baseDir, 1*time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 1, removed)
+	assert.DirExists(t, baseDir)
+	assert.FileExists(t, keeper)
+	assert.NoFileExists(t, filepath.Join(baseDir, "rooted.json"))
+}
