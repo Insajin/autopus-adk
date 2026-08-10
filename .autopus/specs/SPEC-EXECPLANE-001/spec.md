@@ -30,14 +30,18 @@ autopus-adk·omp·orca 셋을 동시에 쓰되 서로의 어휘를 복제하지 
 
 접합면은 둘이다. **J1(티어 -> 모델)은 PR #154로 닫혔다** — `quality.default`가 내장 role-model 프로파일을 거쳐 omp `modelRoles`에 도달한다. **J2(티어 -> 실행 계정)는 끊겨 있다.**
 
-끊김의 형태는 research.md F1·F2·F8에 실측으로 기록되어 있다. 이 워크스테이션에는 provider 계정이 셋 있다 — orca 관리 Codex 활성 계정 `bitgapnam@gmail.com`, 로컬 codex CLI 계정 `gnkong@alipeople.kr`(orca가 `codex.systemDefault`로 같은 값을 보고한다), 로컬 claude CLI 계정 `jroad1049@gmail.com`. autopus의 카탈로그 프로브는 PATH 바이너리를 실행하므로(`pkg/codexruntime/probe.go:39`) **`gnkong` 계정의 카탈로그로 검증하고, orca는 `bitgapnam` 계정으로 실행한다**. `codex debug models`는 계정별 카탈로그이므로 두 집합은 다를 수 있다.
+끊김의 형태는 research.md F1·F2·F8·F9에 실측으로 기록되어 있다. 이 워크스테이션에는 provider 계정이 셋 있다 — orca 관리 Codex 활성 계정 `bitgapnam@gmail.com`, 로컬 codex CLI 계정 `gnkong@alipeople.kr`(orca가 `codex.systemDefault`로 같은 값을 보고한다), 로컬 claude CLI 계정 `jroad1049@gmail.com`. orca는 계정별 `CODEX_HOME`을 실제로 갈아끼우고(`codex-accounts/<accountId>/home/.orca-managed-home`), autopus의 카탈로그 프로브는 PATH 바이너리를 실행한다(`pkg/codexruntime/probe.go:39`). 즉 **`gnkong` 계정의 카탈로그로 검증하고 `bitgapnam` 계정으로 실행한다**.
 
-이 실패 양식은 가설이 아니다. PR #151에서 실제로 발생해 티어 승격이 세대 강등으로 뒤집혔고, 조용했기 때문에 근거와 결과가 어긋난 채 결론까지 갔다(research.md F3).
+이 위험은 자격에 종속된 카탈로그에서 나온다. `codex debug models`를 인증 없이 프로브하면 슬러그 집합이 달라진다 — 인증 시에만 `gpt-5.6-sol-wm`과 `gpt-5.3-codex-spark`가 나오고 미인증에서는 `gpt-5.2`가 대신 나온다(research.md F9). 서버가 호출자의 자격을 보고 목록을 바꾼다.
+
+다만 **위험 조건은 계정 신원 차이가 아니라 자격 등급 차이다.** 위 두 Codex 계정은 조직이 다르지만 자격 등급이 같아(`chatgpt_plan_type: "pro"`) 판정에 쓰이는 필드가 하나도 다르지 않았다 — 슬러그 집합과 `supported_reasoning_levels`가 동일하고, 갈리는 것은 `ResolveCodexProfile`이 읽지 않는 `base_instructions`·`model_messages`뿐이다. 따라서 게이트의 기본 경로는 카탈로그 재프로브가 아니라 **자격 등급 비교**다.
+
+PR #151의 세대 강등은 이 SPEC이 다루는 실패가 **아니다**. 그것은 한 계정 안에서 카탈로그 폴백 로직이 만든 버그였고 PR #152가 고쳤다(research.md F3). 계정 불일치로 인한 손해는 아직 관측된 적이 없다. #151이 이 SPEC에 주는 것은 사례가 아니라 비용의 크기다 — 티어 판정이 틀리면 조용히 틀리고, 조용하면 근거와 결과가 어긋난 채로 결론까지 간다.
 
 ## Outcome Boundary
 
-- **Outcome Lock**: 세 평면의 소유 표면이 문서로 배타적으로 고정되고, autopus가 결정한 모델 티어는 그 워크로드를 실제로 실행할 계정의 카탈로그로 검증된 뒤에만 실행 단계로 넘어간다. 검증에 실패하면 조용히 강등되지 않고 원한 티어·실행 계정·실제 제공 모델 셋을 모두 지목하는 영수증을 남긴 뒤 멈추거나 명시적으로 강등한다.
-- **Mandatory requirements**: 평면 배타성 선언(REQ-001), orca 티어 어휘 무증식(REQ-002), 실행 계정 확인과 해석 규칙(REQ-003), 실행 계정 기준 카탈로그 검증(REQ-004), 정합 영수증 방출(REQ-005), 불일치 시 fail-loud(REQ-006), 부작용 이전 배치(REQ-007), handoff 경계 배치(REQ-008), 검증 불가 항목의 명시적 표기(REQ-009).
+- **Outcome Lock**: 세 평면의 소유 표면이 문서로 배타적으로 고정되고, autopus가 결정한 모델 티어는 그 워크로드를 실제로 실행할 계정과 **같은 자격으로** 검증된 뒤에만 실행 단계로 넘어간다. 자격 등급이 같으면 기존 카탈로그 판정을 신뢰하고, 다르면 실행 계정 기준으로 다시 판정하거나 검증 불가로 표기한다. 어느 경우에도 조용히 강등되지 않고 원한 티어·실행 계정·실제 제공 모델을 지목하는 영수증을 남긴다.
+- **Mandatory requirements**: 평면 배타성 선언(REQ-001), orca 티어 어휘 무증식(REQ-002), 실행 계정 확인과 해석 규칙(REQ-003), 자격 등급 동일성 검증과 불일치 시 재판정(REQ-004), 정합 영수증 방출(REQ-005), 불일치 시 fail-loud(REQ-006), 부작용 이전 배치(REQ-007), handoff 경계 배치(REQ-008), 검증 불가 항목의 명시적 표기(REQ-009).
 - **Explicit non-goals**: 정합 게이트의 구현(별도 SPEC), `--execution-owner orca` handoff 스텁을 실제 Run으로 대체하는 일(별도 SPEC), 여러 계정 사이의 자동 라우팅, 티어 강등 시 대안 provider 폴백, 실행 원장 통합, J1 재설계(PR #154 결과 불변), omp `modelRoles` 어휘 변경, orca CLI 표면 변경.
 - **Completion evidence**: 4개 SPEC 문서가 `auto spec validate`를 통과하고, 착수 시점의 Completion Debt 3건이 해소되며(research.md F8의 실측과 결정 표 — 현재 `none remaining`, 후속 이관 0건), 세 평면 경계에 대한 리뷰 합의가 기록된다. 구현 증거는 요구하지 않는다.
 
@@ -65,16 +69,18 @@ WHEN the policy plane prepares a workload for execution, THEN THE SYSTEM SHALL d
 - Observability: 정합 영수증에 실행 계정 식별자가 기록되고, 그 값이 로컬 CLI 로그인 계정과 다를 수 있음을 S3의 분기 계정 픽스처로 확인한다. 활성 계정이 없고 등록 계정이 0개이거나 2개 이상이면 영수증이 실행 계정을 특정하지 않고 REQ-009의 unverified 경로로 분기함을 S9로 확인한다.
 - 해소된 설계 결정: 조회 소스는 `orca account list --json`이다. 실행 계정은 `activeAccountId`, 비교 대상인 프로브 계정은 `systemDefault`(codex) 또는 provider CLI 신원이며, 한 번의 호출로 두 값을 모두 얻는다(research.md F1, F8). 활성 계정이 없을 때 추측하지 않는 이유는 잘못 특정한 계정이 조용한 강등을 만들기 때문이다.
 
-### REQ-004 — 카탈로그 검증은 실행 계정 기준으로 수행한다
-THE SYSTEM SHALL validate a requested model tier against the model catalog of the execution account identified in REQ-003, and SHALL NOT treat a catalog probed under a different account as evidence for that tier.
+### REQ-004 — 티어는 실행 계정과 같은 자격으로 얻은 카탈로그로만 검증된다
+THE SYSTEM SHALL treat a probed catalog as evidence for a requested tier only when the probing account and the execution account identified in REQ-003 carry the same entitlement grade, SHALL re-probe under the execution account when the grades differ, and SHALL fall back to REQ-009 when neither is possible.
 - EARS type: Ubiquitous
 - Priority: Must
 - Trigger/Condition: 요청 티어를 provider 모델로 해석할 때.
-- Observability: 검증에 사용한 카탈로그의 출처 계정이 영수증의 실행 계정과 일치함을 S3로 확인한다. 두 값이 다르면 검증은 성립하지 않은 것으로 처리된다.
-- 해소된 설계 결정: Codex는 `codex debug models`가 계정별 카탈로그를 주므로 완전 검증이 가능하다. Claude는 등가물이 없어(research.md F8) **신원까지만 검증한다** — `claude auth status --json`의 `orgId`를 프로세스 평면의 `organizationUuid`와 대조해 실행 계정이 검증 대상 계정과 같은지 확인하고, 모델 가용성은 REQ-009의 unverified로 남긴다. `subscriptionType`으로 플랜→모델을 매핑하는 선택은 기각했다: 하드코딩 티어 테이블을 되살리는 일이며 PR #154가 제거한 것과 같은 종류다.
+- Observability: 영수증의 카탈로그 출처가 프로브 계정과 그 자격 등급을 함께 담고, 그 등급이 실행 계정의 등급과 같음을 S3로 확인한다. 등급이 다른데 재프로브 없이 통과한 판정은 위반이다. 카탈로그가 자격에 종속된다는 전제 자체는 S10으로 고정한다 — 자격과 무관하게 카탈로그를 캐시하거나 재사용하는 구현은 등급 비교를 무의미하게 만든다.
+- 해소된 설계 결정 1 — 기본 경로는 자격 비교다. 조직만 다르고 자격 등급이 같은 두 Codex 계정은 판정 필드(슬러그 집합, `supported_reasoning_levels`)가 완전히 동일했다(research.md F9). 반면 인증 자체를 제거하면 슬러그 집합이 달라진다. 따라서 판정을 무효화하는 것은 신원 차이가 아니라 자격 차이이며, Codex의 자격 등급은 `auth.json` id_token의 `https://api.openai.com/auth.chatgpt_plan_type` 클레임에서 **네트워크 호출 없이** 읽힌다. 등급이 같으면 카탈로그를 다시 받지 않는다.
+- 해소된 설계 결정 2 — 이 비교는 자격에서 모델을 유추하지 않는다. 두 등급이 같은지만 본다. 그래서 하드코딩 매핑 표가 필요 없고, Claude `subscriptionType` 게이트를 기각한 근거(플랜 -> 모델 매핑은 추정이다)와 충돌하지 않는다.
+- 해소된 설계 결정 3 — provider별 깊이는 그대로다. Codex는 자격 비교 후 필요 시 카탈로그 재프로브까지 가능하다. Claude는 계정별 카탈로그 프로브가 없어 `claude auth status --json`의 `orgId`를 프로세스 평면의 `organizationUuid`와 대조하는 신원 검증까지만 하고, 모델 가용성은 REQ-009의 unverified로 남긴다.
 
 ### REQ-005 — 정합 결과를 영수증으로 방출한다
-THE SYSTEM SHALL emit an integrity receipt carrying the requested tier, the resolved provider model, the execution account identifier, the catalog source, the resolution reason, and the verification status, so a later reader can reconstruct why a workload ran at the tier it ran at.
+THE SYSTEM SHALL emit an integrity receipt carrying the requested tier, the resolved provider model, the execution account identifier, the catalog source with the entitlement grade it was probed under, the resolution reason, and the verification status, so a later reader can reconstruct why a workload ran at the tier it ran at.
 - EARS type: Ubiquitous
 - Priority: Must
 - Trigger/Condition: 정합 점검이 끝난 시점.
@@ -128,7 +134,7 @@ IF the execution account cannot be determined, or the account that will run the 
 | REQ-001 | T1 | S1 | INV-001 |
 | REQ-002 | T1 | S2 | INV-001 |
 | REQ-003 | T2 | S3, S9 | INV-003 |
-| REQ-004 | T2 | S3 | INV-003 |
+| REQ-004 | T2 | S3, S10 | INV-003 |
 | REQ-005 | T3 | S4 | INV-004 |
 | REQ-006 | T3 | S5 | INV-004 |
 | REQ-007 | T4 | S6 | INV-005 |
@@ -152,7 +158,7 @@ IF the execution account cannot be determined, or the account that will run the 
 | REQ-001 | S1 | pending |
 | REQ-002 | S2 | pending |
 | REQ-003 | S3, S9 | pending |
-| REQ-004 | S3 | pending |
+| REQ-004 | S3, S10 | pending |
 | REQ-005 | S4 | pending |
 | REQ-006 | S5 | pending |
 | REQ-007 | S6 | pending |
