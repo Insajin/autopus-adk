@@ -132,7 +132,9 @@ func runOMPContextBridgeStartup(
 	expectedBridgeEvents int,
 ) ([][]byte, string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	// Backstop only. omp enforces its own --max-time below; a Go-side deadline
+	// close to it preempts the tool under load and reports a false rpc_timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, executable,
 		"--mode", "rpc",

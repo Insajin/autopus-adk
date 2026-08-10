@@ -178,7 +178,10 @@ func runCursorHookAtRound(
 			t.Skip("bun is required for the OpenCode hook contract test")
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// Backstop only. Each hook run forks python3 several times, so a tight bound
+	// measures machine load; a hook that wrongly enters its ready/abort wait loop
+	// blocks for MAX_WAIT (120s) and still trips this deadline.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, command, script)
 	payload, err := json.Marshal(map[string]string{hook.payloadKey: output})

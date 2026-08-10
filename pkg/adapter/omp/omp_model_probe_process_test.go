@@ -34,9 +34,7 @@ printf 'cwd=%s\n' "$PWD"
 	process, err := NewOMPModelProbeProcess(executable, 4096)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	output, err := process.Run(ctx, "models", "--json")
+	output, err := process.Run(t.Context(), "models", "--json")
 	require.NoError(t, err)
 	text := string(output)
 	assert.Contains(t, text, "args=models --json\n")
@@ -116,12 +114,14 @@ func TestOMPModelProbeProcess_RunEnforcesOutputLimit(t *testing.T) {
 	process, err := NewOMPModelProbeProcess(executable, 64)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// The ceiling only bounds a broken limiter. The contract is that the overflow,
+	// not the deadline, ends the run — so ctx must still be live on return. An
+	// absolute wall-clock bound here instead measures machine load.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	started := time.Now()
 	output, err := process.Run(ctx, "models", "--json")
 	assert.ErrorIs(t, err, processprobe.ErrOutputLimit)
-	assert.Less(t, time.Since(started), 2*time.Second)
+	assert.NoError(t, ctx.Err(), "overflow must terminate the run before the deadline")
 	assert.LessOrEqual(t, len(output), 64)
 }
 
