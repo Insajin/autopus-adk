@@ -59,18 +59,6 @@ methodology:
   enforce: true
   review_gate: true
 
-router:
-  strategy: category
-  tiers:
-    fast: gemini-flash
-    smart: claude-sonnet-5
-    ultra: claude-opus-5
-  categories:
-    visual: fast
-    deep: ultra
-    quick: fast
-  intent_gate: true
-
 hooks:
   pre_commit_arch: true
   pre_commit_lore: true

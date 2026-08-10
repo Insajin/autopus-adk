@@ -62,7 +62,7 @@ func buildOMPModelOperatorProjection(
 		CatalogReason: "profile_not_selected", ReceiptStatus: "not_applicable",
 		Models: []ompEffectiveModelProjection{},
 	}
-	profileName, profile, selected := cfg.RoleModelPolicy.SelectedRoleModelProfile()
+	profileName, profile, selected := cfg.RoleModelPolicy.SelectedRoleModelProfileForQuality(cfg.Quality)
 	if !selected {
 		return result
 	}

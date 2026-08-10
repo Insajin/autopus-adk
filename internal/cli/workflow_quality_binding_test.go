@@ -74,8 +74,10 @@ func TestResolveTeamQualityBinding_ReusesCanonicalResolvers(t *testing.T) {
 
 	balanced := resolveTeamQualityBinding("balanced", "")
 	bi := balanced.Phases["implementation"]
-	if bi.Model != "claude-sonnet-5" || bi.Effort != "medium" {
-		t.Fatalf("balanced implementation = %+v, want sonnet-5 + medium", bi)
+	// The executor carries the top tier in balanced mode, so the implementation
+	// phase resolves to opus-5 through cost.ModelForAgent (PR #151).
+	if bi.Model != "claude-opus-5" || bi.Effort != "medium" {
+		t.Fatalf("balanced implementation = %+v, want opus-5 + medium", bi)
 	}
 	br := balanced.Phases["review"]
 	if br.VerifyVotes != 1 || br.Synthesis {

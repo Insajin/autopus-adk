@@ -22,7 +22,9 @@ func (c RoleModelPolicyConf) Validate() error {
 		return fmt.Errorf("role_model_policy.policy_version_unknown: %q", c.Version)
 	}
 	if c.Profile != "" {
-		if _, ok := c.Profiles[c.Profile]; !ok {
+		// A built-in name needs no explicit definition: it is derived from the
+		// quality presets at lookup time.
+		if _, ok := c.Profiles[c.Profile]; !ok && !IsBuiltinRoleModelProfileName(c.Profile) {
 			return fmt.Errorf("role_model_policy.profile_unknown: %q", c.Profile)
 		}
 	}

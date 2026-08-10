@@ -54,7 +54,7 @@ await phase('test_scaffold');
 await agent(`Scaffold tests for SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`, { agentType: 'tester', model: (RT.test_scaffold && RT.test_scaffold.model) || 'claude-sonnet-5', effort: (RT.test_scaffold && RT.test_scaffold.effort) || 'medium' });
 
 await phase('implementation');
-// route_team baseline implementation: model=claude-sonnet-5 effort=medium fan_out_cap=5 retry: 2 budget: 120000
+// route_team baseline implementation: model=claude-opus-5 effort=medium fan_out_cap=5 retry: 2 budget: 120000
 const FANOUT_implementation = (RT.implementation && RT.implementation.fan_out_cap) || 5;
 const tasks_implementation = (plan && plan.tasks) || [];
 const limit_implementation = Math.min(tasks_implementation.length, FANOUT_implementation);
@@ -62,10 +62,10 @@ const executors_implementation = [];
 for (let i = 0; i < limit_implementation; i++) {
   const task = tasks_implementation[i];
   const taskPrompt = `Implement task ${task.id}: ${task.description}. You own ONLY these files: ${task.files ? task.files.join(', ') : ''} — create or modify only files in that set; every other file belongs to a parallel executor and must not be created or touched. SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`;
-  executors_implementation.push(() => agent(taskPrompt, { agentType: 'executor', isolation: 'worktree', model: (RT.implementation && RT.implementation.model) || 'claude-sonnet-5', effort: (RT.implementation && RT.implementation.effort) || 'medium' }));
+  executors_implementation.push(() => agent(taskPrompt, { agentType: 'executor', isolation: 'worktree', model: (RT.implementation && RT.implementation.model) || 'claude-opus-5', effort: (RT.implementation && RT.implementation.effort) || 'medium' }));
 }
 if (executors_implementation.length === 0) {
-  executors_implementation.push(() => agent(`Implement SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''} (no planner task breakdown; implement the full SPEC)`, { agentType: 'executor', isolation: 'worktree', model: (RT.implementation && RT.implementation.model) || 'claude-sonnet-5', effort: (RT.implementation && RT.implementation.effort) || 'medium' }));
+  executors_implementation.push(() => agent(`Implement SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''} (no planner task breakdown; implement the full SPEC)`, { agentType: 'executor', isolation: 'worktree', model: (RT.implementation && RT.implementation.model) || 'claude-opus-5', effort: (RT.implementation && RT.implementation.effort) || 'medium' }));
 }
 await parallel(executors_implementation);
 

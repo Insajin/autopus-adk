@@ -167,7 +167,7 @@ func (a *Adapter) copyContentFiles(cfg *config.HarnessConfig, subDir string, tar
 		if err != nil {
 			return nil, fmt.Errorf("컨텐츠 파일 읽기 실패 %s: %w", srcPath, err)
 		}
-		data = normalizeClaudeContent(subDir, data)
+		data = normalizeClaudeContent(cfg, subDir, entry.Name(), data)
 
 		destPath := filepath.Join(absTargetDir, entry.Name())
 		if err := os.WriteFile(destPath, data, contentFileMode(entry.Name())); err != nil {

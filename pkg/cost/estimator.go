@@ -2,6 +2,7 @@
 package cost
 
 import (
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/telemetry"
 )
 
@@ -71,18 +72,32 @@ func (e *Estimator) EstimatePipelineCost(run telemetry.PipelineRun) float64 {
 	return total
 }
 
-// EstimateQualityComparison estimates costs for both ultra and balanced modes
-// given a total token count, assuming a single generic agent named "executor".
-// Used by the comparison UI (R7) to show cost trade-offs before pipeline execution.
+// EstimateQualityComparison estimates the cost of both ultra and balanced
+// modes for a token budget spread evenly across the canonical agent roster.
+// Used by the comparison UI (R7) to show cost trade-offs before pipeline
+// execution.
+//
+// A single synthetic "executor" run used to stand in for the whole pipeline,
+// but the balanced preset now runs the executor at the top tier, so that proxy
+// reports an identical cost for both modes. Spreading the same budget over the
+// roster keeps the token total intact and lets the agents whose tiers actually
+// differ carry the comparison.
 func (e *Estimator) EstimateQualityComparison(totalTokens int) (ultraCost, balancedCost float64) {
-	// @AX:NOTE: [AUTO] synthetic agent "executor" used as representative for comparison — not a real run
-	syntheticRun := telemetry.AgentRun{
-		AgentName:       "executor",
-		EstimatedTokens: totalTokens,
-	}
+	agents := config.CanonicalAgentNames()
+	perAgent := totalTokens / len(agents)
+	remainder := totalTokens % len(agents)
 
 	ultraEst := &Estimator{qualityMode: "ultra", pricing: e.pricing}
 	balancedEst := &Estimator{qualityMode: "balanced", pricing: e.pricing}
 
-	return ultraEst.EstimateCost(syntheticRun), balancedEst.EstimateCost(syntheticRun)
+	for i, name := range agents {
+		tokens := perAgent
+		if i < remainder {
+			tokens++
+		}
+		run := telemetry.AgentRun{AgentName: name, EstimatedTokens: tokens}
+		ultraCost += ultraEst.EstimateCost(run)
+		balancedCost += balancedEst.EstimateCost(run)
+	}
+	return ultraCost, balancedCost
 }

@@ -24,7 +24,7 @@ func TestClaudeProviderQualityFeedsRouteTeamBinding(t *testing.T) {
 	)
 	assert.Equal(t, "claude-opus-5", persisted.Phases["planning"].Model)
 	assert.Equal(t, "medium", persisted.Phases["planning"].Effort)
-	assert.Equal(t, "claude-sonnet-5", persisted.Phases["implementation"].Model)
+	assert.Equal(t, "claude-opus-5", persisted.Phases["implementation"].Model)
 	assert.Equal(t, "medium", persisted.Phases["implementation"].Effort)
 
 	explicitGlobal := quality.WithGlobalOverride("ultra")
