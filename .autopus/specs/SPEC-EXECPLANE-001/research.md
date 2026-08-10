@@ -5,7 +5,7 @@
 
 ## Outcome Lock
 
-autopus-adk가 결정한 모델 티어가 **실제로 그 워크로드를 실행할 계정의 카탈로그로 검증된 뒤에만** 실행이 시작된다. 검증에 실패하면 조용히 강등되지 않고, 실행 전에 정확히 무엇이 어긋났는지(원한 티어 / 실행 계정 / 그 계정이 제공하는 모델)를 지목하며 멈추거나 명시적 강등 영수증을 남긴다.
+autopus-adk가 결정한 모델 티어가 **그 워크로드를 실제로 실행할 계정과 같은 자격으로 검증된 뒤에만** 실행이 시작된다. 검증 계정과 실행 계정의 자격 등급이 같으면 기존 카탈로그 판정을 그대로 신뢰하고, 다르면 실행 계정 기준으로 다시 판정하거나 검증 불가로 표기한다. 어느 경우에도 조용히 강등되지 않고, 원한 티어 / 실행 계정 / 실제 제공 모델을 지목하는 영수증을 남긴다.
 
 그리고 orca·omp·autopus-adk가 겹치지 않는 세 평면으로 고정되어, 어느 한 평면에 기능을 추가할 때 나머지 두 곳에 같은 어휘가 복제되지 않는다.
 
@@ -41,7 +41,7 @@ autopus-adk가 결정한 모델 티어가 **실제로 그 워크로드를 실행
 | --- | --- | --- | --- |
 | INV-001 | 한 평면의 어휘는 다른 평면에 복제되지 않는다. orca는 티어 어휘를 갖지 않고 opaque model id만 받는다 | 구조 | `orca agent-context --json`에 tier/quality 토큰 0건 |
 | INV-002 | DAG 소유자는 정확히 하나다. 소유자 `orca`는 OMP task DAG를 만들지 않고, 소유자 `omp`는 orca Run을 만들지 않는다 | 배타 | `pipeline_execution_owner_receipt.v1` |
-| INV-003 | 티어 약속은 그것을 실행할 계정의 카탈로그로 검증된 뒤에만 유효하다 | 정합 | 정합 영수증의 `verified_against` 계정 식별자 |
+| INV-003 | 티어 약속은 실행 계정과 같은 자격으로 얻은 카탈로그로 검증된 뒤에만 유효하다. 자격이 같음을 확인하지 못하면 판정은 성립하지 않는다 | 정합 | 정합 영수증의 카탈로그 출처 계정과 그 자격 등급 |
 | INV-004 | 강등은 조용할 수 없다. 요청 티어와 실제 제공 모델이 다르면 영수증에 사유와 두 값이 모두 남는다 | fail-loud | 영수증의 `resolution.reason` |
 | INV-005 | 정합 점검은 실행 부작용을 만들지 않는다. 워크트리·Run·세션을 생성하기 전에 끝난다 | 순서 | 점검 실패 시 생성된 리소스 0건 |
 
@@ -93,11 +93,13 @@ cmd := exec.CommandContext(probeCtx, binary, "debug", "models")
 
 `internal/cli/codex_catalog_runtime.go:48-58`가 이 결과를 `config.ResolveCodexProviderProfile(entry, catalogJSON)`에 넘긴다. `codex debug models`는 **계정별로 서버가 내려주는 카탈로그**이므로, 프로브 결과는 로컬 로그인 계정의 것이다. F1과 합치면 검증 대상과 실행 대상이 서로 다른 계정이다.
 
-### F3 — 이 실패 양식은 이미 잘못된 결론을 만들었다
+### F3 — 조용한 강등은 실제로 일어났다. 다만 원인은 계정 불일치가 아니었다
 
 `ResolveCodexProfile`이 요청 모델을 카탈로그에서 못 찾으면 하드코딩 레거시 슬러그로 직행했다(PR #152 이전). 이 머신에서 PR #151의 실제 효과는 `gpt-5.6-terra/medium` -> `gpt-5.5/xhigh`, 즉 **세대 강등**이었다. 측정 근거(sol 42 vs sonnet-5 36)는 5.5 대 5.6-terra에 대해 아무 말도 하지 않으므로 그 상태의 #151은 근거가 없었다. PR #152가 같은 세대 폴백을 추가해 해소했다.
 
-교훈: 강등이 조용하면 근거와 결과가 어긋난 채로 티어 결정이 누적된다. INV-004의 출처다.
+**이 사건은 한 계정 안에서 벌어졌다.** 원인은 카탈로그 폴백 로직의 버그이지 검증 계정과 실행 계정의 불일치가 아니다. 두 실패 양식을 인과로 엮으면 안 된다. 이 SPEC이 다루는 계정 불일치로 인한 손해는 **아직 관측된 적이 없다**(F9).
+
+F3이 이 SPEC에 주는 것은 사고 사례가 아니라 **비용의 크기**다. 티어 판정이 틀리면 조용히 틀리고, 조용하면 근거와 결과가 어긋난 채로 결론까지 간다. 그래서 INV-004(fail-loud)가 필요하다.
 
 ### F4 — orca에는 티어 어휘가 없다
 
@@ -166,6 +168,43 @@ Owner `orca`: do not initialize an OMP task/todo DAG or call `task`.
 
 **원격 환경.** `orca environment list --json`은 이 머신에서 `{"environments": []}`를 반환한다. 저장된 원격 환경이 0건이므로 원격 경로는 현재 미사용이다. `orchestration worker-list`는 터미널 리소스 회계만 보고하고 계정을 노출하지 않아 사후 검증 경로도 없다.
 
+### F9 — 카탈로그는 자격에 종속된다. 계정 신원에는 종속되지 않았다
+
+"`codex debug models`가 계정별 카탈로그"라는 전제를 직접 검증했다. 세 번 프로브했다 — `CODEX_HOME`을 임시 디렉터리로 두고 각 계정의 `auth.json`만 복사해 orca 관리 홈을 건드리지 않았다.
+
+**자격 종속성은 참이다.** 인증을 빼면 슬러그 집합이 달라진다.
+
+| 프로브 | 슬러그 집합 |
+| --- | --- |
+| 인증(두 계정 공통) | `gpt-5.6-sol` `gpt-5.6-sol-wm` `gpt-5.6-terra` `gpt-5.6-luna` `gpt-5.5` `gpt-5.4` `gpt-5.4-mini` `gpt-5.3-codex-spark` `codex-auto-review` |
+| 미인증 | `gpt-5.6-sol` `gpt-5.6-terra` `gpt-5.6-luna` `gpt-5.5` `gpt-5.4` `gpt-5.4-mini` `gpt-5.2` `codex-auto-review` |
+
+인증 시에만 `gpt-5.6-sol-wm`과 `gpt-5.3-codex-spark`가 나오고, 미인증에서는 대신 `gpt-5.2`가 나온다. 즉 서버는 호출자의 자격을 보고 목록을 바꾼다.
+
+**그러나 두 계정 사이에서는 판정 필드가 동일하다.**
+
+| 비교 항목 | `bitgapnam@gmail.com` vs `gnkong@alipeople.kr` |
+| --- | --- |
+| 슬러그 집합 | 동일 |
+| `supported_reasoning_levels` | 모든 모델에서 동일 |
+| 페이로드 전체(354131 bytes) | 다름 |
+| 실제로 갈리는 키 | `base_instructions`, `model_messages` 둘뿐 |
+
+갈리는 두 키는 시스템 프롬프트 텍스트이고 `ResolveCodexProfile`이 읽지 않는다. **티어 판정에 쓰이는 필드는 하나도 다르지 않다.**
+
+이유는 자격 등급이 같기 때문이다. 두 계정의 id_token `https://api.openai.com/auth` 클레임이 모두 `chatgpt_plan_type: "pro"`이고, 다른 것은 조직뿐이다(`org-HPIVIN3REM0LDCuu56Y8bEWe` "Autopus" vs `org-PwLx2gQdz2XBgqkf5EafQJ3s` "Personal").
+
+**따라서 위험 조건은 "계정이 다름"이 아니라 "자격 등급이 다름"이다.** 조직만 다른 계정 쌍은 무해하다. 다른 플랜 등급의 계정 쌍이 이 워크스테이션에 없어 그 경우는 여전히 미검증이지만, 미인증 프로브가 자격 종속성 자체를 증명하므로 위험은 실재한다.
+
+**설계 귀결.** `chatgpt_plan_type`은 `auth.json`의 id_token 클레임이므로 네트워크 호출 없이 읽힌다. 게이트의 기본 경로가 카탈로그 재프로브에서 **자격 등급 비교**로 내려간다.
+
+```
+실행 계정 plan == 프로브 계정 plan   -> 기존 카탈로그 판정을 그대로 신뢰
+                !=                   -> 실행 계정 기준 재프로브, 불가하면 unverified
+```
+
+이 비교는 플랜에서 모델을 유추하지 않는다. 두 값이 같은지만 본다. 따라서 하드코딩 매핑 표가 필요 없고, F8에서 Claude `subscriptionType` 게이트를 기각한 근거와 충돌하지 않는다 — 기각한 것은 "플랜 -> 모델 매핑"이고 여기서 쓰는 것은 "플랜 동일성 비교"다.
+
 ### 결정
 
 | 질문 | 결정 | 근거 |
@@ -174,10 +213,11 @@ Owner `orca`: do not initialize an OMP task/todo DAG or call `task`.
 | Claude 검증 깊이 | **신원만 검증**. `claude auth status --json`의 `orgId`를 orca `organizationUuid`와 대조하고, 모델 가용성은 unverified로 표기 | `subscriptionType`으로 플랜→모델을 매핑하면 하드코딩 티어 테이블이 되살아난다. PR #154가 제거한 것과 같은 종류다 |
 | Claude `activeAccountId`가 null | 등록 계정이 **정확히 1개**면 그것을 실행 계정으로 보고, 0개이거나 2개 이상이면 unverified | 추측하지 않는다. 현재 상태(1개 등록)에서 동작하고, 모호해지면 모호하다고 보고한다 |
 | 원격 환경 | 별도 요구를 만들지 않고 **REQ-009에 흡수**. 원격 대상이면 "계정 조회 수단 없음"의 인스턴스이므로 unverified | `account list`가 원격을 구조적으로 거부하고, 저장된 환경이 0건이라 당장 영향도 없다 |
+| Codex 검증 방식 | **자격 등급 비교가 기본 경로**. 실행 계정과 프로브 계정의 `chatgpt_plan_type`이 같으면 기존 카탈로그 판정을 신뢰하고, 다르면 실행 계정 기준 재프로브 또는 unverified | F9 — 조직만 다른 두 pro 계정은 판정 필드가 동일했다. 위험은 신원 차이가 아니라 자격 차이이며, 플랜 클레임은 네트워크 없이 읽힌다 |
 
 ## Completion Debt
 
-none remaining. 착수 시점의 미결 3건은 F8에서 실측으로 해소되어 결정 표에 반영됐고, 그 결정은 spec.md REQ-003·REQ-004·REQ-009 본문에 계약으로 들어갔다.
+none remaining. 착수 시점의 미결 3건은 F8에서, 카탈로그의 계정 종속성 전제는 F9에서 실측으로 해소되어 결정 표에 반영됐다. 그 결정은 spec.md REQ-003·REQ-004·REQ-009 본문에 계약으로 들어갔다. 다른 자격 등급의 계정 쌍은 이 워크스테이션에 없어 미검증으로 남지만, F9의 미인증 프로브가 자격 종속성 자체를 증명하므로 계약을 막지 않는다.
 
 ## Evolution Ideas
 
@@ -196,6 +236,9 @@ none remaining. 착수 시점의 미결 3건은 F8에서 실측으로 해소되�
 | `omp models --json` 엔트리 구조 | 실측 | 직접 실행, 계정 스코프 아님 확인 |
 | `orca environment list --json` | 실측 | 직접 실행, `environments: []` |
 | `~/.codex/auth.json` id_token 클레임 | 실측 | 직접 디코드 |
+| 계정별 `codex debug models` 3회 프로브(bitgapnam / gnkong / 미인증) | 실측 | 임시 `CODEX_HOME`에 각 `auth.json`만 복사해 실행. 슬러그 집합·`supported_reasoning_levels`·전체 페이로드 해시를 비교 |
+| 두 계정의 `chatgpt_plan_type`과 조직 | 실측 | id_token `https://api.openai.com/auth` 클레임 디코드. 둘 다 `pro`, 조직만 상이 |
+| orca 계정별 `CODEX_HOME` 스왑 | 실측 | `codex-accounts/<accountId>/home/.orca-managed-home` 존재 확인 |
 | `orca agent-context --json` | 실측 | 223 command 스키마 전수 검색 |
 | `omp config list`의 `modelRoles` | 실측 | 직접 실행 |
 | `pkg/codexruntime/probe.go:39` | 코드 | 직접 읽음 |
@@ -205,7 +248,7 @@ none remaining. 착수 시점의 미결 3건은 F8에서 실측으로 해소되�
 | `pkg/config/role_model_policy_matrix.go:8-81` | 코드 | 직접 읽음 |
 | PR #151 / #152 / #154 | 이력 | 이 저장소 머지 커밋 |
 
-추측은 없다. 위 표에 없는 주장은 이 문서에 담지 않았다.
+추측은 없다. 위 표에 없는 주장은 이 문서에 담지 않았다. 초안에서 인용 출처를 실측으로 잘못 표기한 항목이 두 건 있었고(로컬 codex 계정 신원, 카탈로그의 계정 종속성) 둘 다 직접 프로브해 정정했다 — F1과 F9다.
 
 ## Reviewer Brief
 
