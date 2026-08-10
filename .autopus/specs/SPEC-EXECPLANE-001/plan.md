@@ -27,6 +27,19 @@ orca가 게이트를 소유하면 orca가 "요청 티어"를 이해해야 한다
 
 omp가 게이트를 소유하면 omp가 "이 워크로드를 실제로 실행할 provider 계정"을 알아야 한다. 계정 소유와 활성 계정 선택은 프로세스 평면의 독점 표면(`orca account list`, research.md Feature Coverage Map)이다. omp의 어휘는 role -> `provider/model:thinking` 10종(`default/plan/slow/smol/designer/vision/commit/tiny/task/advisor`, F5)이며 계정 축이 아예 없다. 계정 축을 omp에 도입하는 것은 프로세스 평면 표면의 **평면 침범**이고, 동시에 정책 평면이 이미 소유한 티어 판정 책임을 모델 평면으로 옮기는 이중 이관이 된다. 기각한다.
 
+### 기각한 대안 (c) — Claude 검증을 `subscriptionType` 플랜 게이트로 한다
+
+Claude에는 `codex debug models` 등가물이 없다. F8의 확인 결과 `claude` CLI 명령 집합은 `agents`/`auth`/`auto-mode`/`doctor`/`gateway`/`import`/`install`/`mcp`/`plugin`/`project`/`setup-token`/`ultrareview`이고 모델 열거 명령이 없으며, `omp models --json`은 계정 스코프가 아닌 **정적 레지스트리**라 특정 계정의 자격을 증명하지 못한다. 대신 `claude auth status --json`이 신원과 플랜을 준다.
+
+```json
+{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty",
+ "email":"jroad1049@gmail.com","orgId":"0e61c3e2-...","subscriptionType":"max"}
+```
+
+여기서 `subscriptionType`(`max`/`pro`/`free`)을 게이트 입력으로 삼아 "이 플랜이면 이 티어까지 허용"으로 판정하자는 안이 있었다. 기각한다. 판정이 성립하려면 플랜 -> 모델 매핑 표를 정책 평면에 하드코딩해야 하는데, 그 표는 계정이 실제로 무엇을 제공받는지에 대한 증거가 아니라 **우리 쪽의 추정**이다. provider가 플랜 정책을 바꾸면 표는 조용히 틀리고, 게이트는 틀린 표를 근거로 `verified`를 찍는다 — REQ-009가 금지하는 상태이자 INV-004가 막으려는 조용한 어긋남이다.
+
+형태로 보면 이 안은 PR #154가 제거한 하드코딩 티어 테이블을 provider 축에 되살리는 일이다. 같은 것을 다른 이름으로 되돌리지 않는다. Claude는 `orgId` 신원 대조까지만 검증하고 모델 가용성은 REQ-009의 `unverified`로 남긴다. 모르는 것을 모른다고 적는 편이 짐작해서 맞히는 것보다 싸다.
+
 ### 배치 지점 — handoff 직전, 부작용 이전
 
 `--execution-owner orca` 경로는 현재 실행이 없다. `internal/cli/pipeline_run_owner.go:160-164`은 소유자를 기록하고 반환하며 끝난다.
@@ -45,15 +58,19 @@ result := pipelineExecutionOwnerResult{
 
 ### 왜 이 SPEC은 설계만 고정하고 구현을 분리하는가
 
-research.md Completion Debt 3건이 **미해결인 채로는 구현 선택이 정해지지 않는다.** 세 건 모두 계약이 아니라 구현 형태를 바꾸는 질문이다.
+착수 시점의 이유는 "미결 3건이 열려 있어 구현 선택이 정해지지 않는다"였다. 그 이유는 더 이상 유효하지 않다. research.md F8이 3건을 모두 실측으로 닫았고, 결정은 `### 결정` 표에, 계약은 spec.md REQ-003·REQ-004·REQ-009 본문에 들어갔다. `## Completion Debt`는 `none remaining`이다.
 
-| Completion Debt | 미해결이면 바뀌는 구현 선택 |
-| --- | --- |
-| 계정 정보의 정확한 소스 (`orca account list`는 사람이 읽는 텍스트, `--json` 유무 미확인) | 계정 조회를 구조화 출력 파싱으로 할지 `orca agent-context --json` 스키마 경유로 할지 |
-| Claude 쪽 카탈로그 프로브 부재 (Codex는 `codex debug models`, Claude 등가물 미확인) | Claude 티어를 어떤 신호로 검증할지, 아니면 REQ-009의 `unverified` 경로로 보낼지 |
-| 원격 orca 환경(`--on <saved-environment>`)의 계정 조회 | 계정 조회가 로컬 단일 호출인지 원격 host 축을 갖는지 |
+| 닫힌 질문 | 확정된 결정 | 계약이 앉는 자리 |
+| --- | --- | --- |
+| 계정 조회 소스 | `orca account list --json` 한 호출. 실행 계정은 `result.<provider>.activeAccountId`, 비교 대상 프로브 계정은 `result.codex.systemDefault`(codex) 또는 provider CLI 신원 | REQ-003 / T2 |
+| Claude 카탈로그 부재 | 신원만 검증. `claude auth status --json`의 `orgId`를 orca `claude.accounts[].organizationUuid`와 대조하고, 모델 가용성은 `unverified`로 남긴다 | REQ-004 / T2, REQ-009 / T3 |
+| 원격 orca 환경 계정 조회 | 새 요구를 만들지 않고 REQ-009에 흡수. `orca account list`가 `--environment`를 구조적으로 거부하므로 "계정 조회 수단 없음"의 인스턴스다 | REQ-009 / T3 |
 
-계약(요구 9건 · 불변식 5건 · 영수증 6필드)은 세 질문의 답과 무관하게 고정된다. 반대로 구현은 답에 따라 달라진다. 그래서 계약을 먼저 얼리고 구현을 분리했다. 이 분리는 spec.md `## Out of Scope` 첫 항목("정합 게이트의 구현 코드")과 일치한다.
+그렇다면 왜 여전히 구현을 분리하는가. 이유가 바뀌었기 때문이다 — "질문이 열려 있어서"가 아니라 **계약이 먼저 합의되어야 구현이 바로잡힐 수 있어서**다.
+
+F3의 실패는 구현이 없어서 생긴 것이 아니다. `ResolveCodexProfile`은 있었고 동작했다. 없었던 것은 "어느 계정의 카탈로그가 증거로 인정되는가"에 대한 합의였고, 그 공백을 코드가 하드코딩 레거시 폴백으로 메우면서 세대 강등이 조용히 통과했다. 계약 없이 구현부터 손대면 같은 종류의 암묵 가정 — 이번에는 "로컬 CLI 로그인이 곧 실행 계정", "플랜을 알면 모델을 안다" — 이 다른 자리에 다시 자리잡는다. 위의 기각한 대안 (c)가 실제로 검토되고 기각됐다는 사실이 그 위험이 가설이 아님을 보여준다.
+
+분리가 남기는 부채도 작아졌다. 요구 9건·불변식 5건·영수증 6필드는 이제 열린 질문에 기대지 않고 단독으로 판정 가능하므로, 후속 구현 SPEC이 발명할 것은 없고 이 문서를 참조 구현하면 된다. 이 분리는 spec.md `## Out of Scope` 첫 항목("정합 게이트의 구현 코드")과 일치한다.
 
 ## File Impact Analysis
 
@@ -62,9 +79,9 @@ research.md Completion Debt 3건이 **미해결인 채로는 구현 선택이 �
 | 파일 | 작업 | 설명 |
 |------|------|------|
 | `.autopus/specs/SPEC-EXECPLANE-001/spec.md` | 생성 | 요구 9건, Outcome Boundary, Traceability Matrix, Out of Scope |
-| `.autopus/specs/SPEC-EXECPLANE-001/research.md` | 생성 | 실측 근거 F1~F7, 불변식 5건, Completion Debt 3건, Reference Discipline |
+| `.autopus/specs/SPEC-EXECPLANE-001/research.md` | 생성 | 실측 근거 F1~F8, 불변식 5건, 해소된 결정 표(Completion Debt `none remaining`), Reference Discipline |
 | `.autopus/specs/SPEC-EXECPLANE-001/plan.md` | 생성 | 이 문서. 게이트 배치 논증과 T1~T4 설계 태스크 |
-| `.autopus/specs/SPEC-EXECPLANE-001/acceptance.md` | 생성 | S1~S8 시나리오와 Oracle Acceptance Notes |
+| `.autopus/specs/SPEC-EXECPLANE-001/acceptance.md` | 생성 | S1~S9 시나리오와 Oracle Acceptance Notes |
 
 아래 코드는 **참조 대상**이며 이 SPEC에서 수정하지 않는다: `pkg/codexruntime/probe.go`, `internal/cli/codex_catalog_runtime.go`, `internal/cli/pipeline_run_owner.go`, `pkg/adapter/omp/omp_workflow_render.go`, `pkg/config/role_model_policy_matrix.go`.
 
@@ -94,25 +111,31 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
   | (1) 실행 계정 조회            REQ-003 / INV-003 |
   |     프로세스 평면에 질의                        |
   |     "이 워크로드를 실제로 실행할 계정은?"       |
+  |     해석: active -> 단일 등록 -> unverified     |
   |     ! 로컬 CLI 로그인 계정으로 가정하지 않는다  |
-  |       F1: orca active = bitgapnam@gmail.com     |
-  |           local codex = jroad1049@gmail.com     |
+  |       F1: orca active  = bitgapnam@gmail.com    |
+  |           local codex  = gnkong@alipeople.kr    |
+  |           local claude = jroad1049@gmail.com    |
   +-------------------------------------------------+
-        | account_id
+        | account_id (또는 미특정)
         v
   +-------------------------------------------------+
   | (2) 그 계정의 카탈로그 확보    REQ-004 / INV-003|
   |     catalog_source := account_id 기준           |
+  |     Codex : codex debug models = 계정별 카탈로그|
+  |     Claude: 등가물 없음 -> orgId 신원 대조까지만|
   |     ! F2: PATH 바이너리 프로브는 로컬 로그인    |
   |       계정 기준 -> 실행 계정과 다르면 증거 아님 |
   +--------------------+----------------------------+
                        |
           +------------+------------+
-          | 프로브 있음            | 프로브 없음
+          | 계정별 카탈로그 있음   | 카탈로그 없음 · 계정 미특정
+          |   (Codex 축)           |   (Claude 가용성 · 원격 환경)
           v                        v
   (3a) 해석 / 검증          (3b) unverified 표기
        요청 티어 in 카탈로그?      REQ-009 / INV-004
-       INV-003                     사유 기록, verified 금지
+       출처 계정 == 실행 계정      사유 기록, verified 금지
+       INV-003                     신원만 대조, 가용성 미검증
           |                        |
           +------------+-----------+
                        v
@@ -142,11 +165,12 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
    티어 어휘는 경계에서 소멸
 ```
 
-읽는 법 세 가지.
+읽는 법 네 가지.
 
 1. **부작용 경계**는 (5)와 프로세스 평면 사이에 정확히 한 번 그어진다. (1)~(4)와 (6)은 전부 경계 위에 있으므로 실패 경로에 롤백이 필요 없다 — REQ-007이 배치로 충족된다.
 2. **handoff 지점**은 (5)다. `internal/cli/pipeline_run_owner.go:160-164`이 `handoff_required`를 반환하기 직전이며, 게이트가 그 앞에 있으므로 handoff를 받는 쪽은 이미 검증된 티어 계약을 들고 출발한다(REQ-008).
-3. **(1)과 (2)의 계정이 반드시 같아야 한다.** 두 값이 갈라지면 (3a)의 판정은 성립하지 않은 것으로 처리된다(REQ-004). F1·F2가 이 갈라짐이 이 워크스테이션에 이미 존재함을 보여준다.
+3. **(1)과 (2)의 계정이 반드시 같아야 한다.** 두 값이 갈라지면 (3a)의 판정은 성립하지 않은 것으로 처리된다(REQ-004). F1·F2가 이 갈라짐이 이 워크스테이션에 이미 존재함을 보여준다 — Codex 축에서 orca 활성 계정은 `bitgapnam@gmail.com`이고 PATH의 `codex`가 쓰는 계정은 `gnkong@alipeople.kr`이다.
+4. **(2)의 분기는 provider 속성이지 실행 시점의 운이 아니다.** Codex는 계정별 카탈로그 프로브가 있으므로 (3a)로 가고, Claude는 등가물이 없으므로 `orgId` 신원 대조를 통과하더라도 가용성 축에서는 항상 (3b)로 간다. (3b)에 모이는 세 인스턴스 — Claude 가용성, 원격 환경, 실행 계정 미특정 — 는 REQ-009 하나가 같은 규칙으로 다룬다.
 
 ## Feature Completion Scope
 
@@ -155,7 +179,7 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
 완료 조건은 spec.md `## Outcome Boundary`의 Completion evidence와 동일하게 셋이다.
 
 1. 4개 SPEC 문서(`spec.md`·`plan.md`·`acceptance.md`·`research.md`)가 `auto spec validate`를 통과한다.
-2. research.md Completion Debt 3건이 해소되거나 후속 SPEC으로 이관된다. 3건 중 2건(계정 조회 소스, Claude 카탈로그 부재)은 T2가 해소 대상으로 안고 간다.
+2. research.md Completion Debt 3건이 해소되거나 후속 SPEC으로 이관된다. **이미 충족됐다** — 3건 모두 F8에서 실측으로 해소되어 `### 결정` 표에 남았고 `## Completion Debt`는 `none remaining`이다. 후속 SPEC 이관은 한 건도 발생하지 않았다. 남은 일은 이관 기록이 아니라 그 결정을 인터페이스 계약으로 고정하는 것이며, T2와 T3가 그 자리다.
 3. 세 평면 경계에 대한 리뷰 합의가 기록된다 — research.md `## Reviewer Brief`의 4개 질문에 대한 판단이 남아야 한다.
 
 | 구분 | 항목 |
@@ -168,7 +192,7 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
 | | fail-loud 판정 규칙과 강등 기록 규칙 (REQ-006) |
 | | 게이트 배치 지점과 부작용 경계의 확정 (REQ-007, REQ-008) |
 | | 검증 불가 provider의 `unverified` 표기 규칙 (REQ-009) |
-| | S1~S8 시나리오와 그 관측 지점 |
+| | S1~S9 시나리오와 그 관측 지점 |
 | **범위 밖** | 정합 게이트의 구현 코드. 이 SPEC은 계약만 고정한다 |
 | | `--execution-owner orca`의 handoff 스텁을 실제 orca Run 생성으로 대체하는 작업 |
 | | 요청 티어를 제공 가능한 계정을 자동 선택하는 다계정 라우팅 |
@@ -187,14 +211,18 @@ T1~T4는 모두 **설계·문서·합의 산출물**이다. 코드 작성 태스
   - 산출물: research.md Feature Coverage Map의 각 표면에 소유 평면을 정확히 하나 지정한 확정판, 그리고 정책 -> 프로세스 경계에서 금지되는 티어 토큰 목록(`balanced`/`ultra`/`opus`/`sonnet`/`haiku`)과 허용되는 통과 값(opaque provider model id, effort)의 명시.
   - 완료 판정: 같은 어휘가 둘 이상의 평면에 나타나지 않고(S1), 경계 통과 값 정의에 금지 토큰이 하나도 포함되지 않음이 문서로 확인된다(S2). F4의 orca 티어 어휘 0건 실측이 기준선이다.
 
-- [ ] **T2 — 실행 계정 조회와 계정 기준 카탈로그 검증의 인터페이스 계약 확정** (REQ-003, REQ-004 / INV-003 / S3)
+- [ ] **T2 — 실행 계정 조회와 계정 기준 카탈로그 검증의 인터페이스 계약 확정** (REQ-003, REQ-004 / INV-003 / S3, S9)
   - 산출물: (i) 실행 계정 식별자를 프로세스 평면에서 얻는 조회의 입력·출력·실패 모드 계약, (ii) 그 계정 식별자를 기준으로 카탈로그를 확보하는 계약과 "카탈로그 출처 계정 ≠ 실행 계정이면 검증 미성립"이라는 판정 규칙.
-  - **이 태스크가 research.md Completion Debt 2건을 해소해야 한다**: ① orca account 조회 소스 — `orca account list`는 사람이 읽는 텍스트이므로 `--json` 유무를 확인하고, 없으면 `orca agent-context --json` 스키마로 대체 가능한지 확정한다. ② Claude 카탈로그 부재 — Codex는 `codex debug models`가 있으나 Claude 등가물이 확인되지 않았으므로, Claude 티어를 어떤 신호로 검증할지 또는 REQ-009의 `unverified` 경로로 보낼지 결정한다. 남은 1건(원격 `--on <saved-environment>` 계정 조회)은 해소하거나 후속 SPEC으로 이관 기록한다.
-  - 완료 판정: 두 계약이 파라미터 수준으로 적혀 있고, S3의 분기 계정 픽스처(orca 활성 `bitgapnam@gmail.com` vs 로컬 codex `jroad1049@gmail.com`, F1)에 대해 판정 결과가 유일하게 결정된다. Completion Debt 2건이 체크 해제 상태로 남아 있지 않다.
+  - **이 태스크는 미결을 해소하는 것이 아니라 이미 해소된 결정을 계약으로 고정한다**(research.md F8 `### 결정`). 계약에 반드시 들어갈 세 가지:
+    - **조회 소스** — `orca account list --json` 단일 호출. 실행 계정은 `result.<provider>.activeAccountId`, 비교 대상 프로브 계정은 `result.codex.systemDefault`(codex) 또는 provider CLI 신원(`claude auth status --json`의 `orgId`를 `claude.accounts[].organizationUuid`에 조인). 한 호출로 두 값을 모두 얻으므로 비교에 추가 조회가 필요 없다. `--environment`는 구조적으로 거부되므로 이 계약은 로컬 호스트 축만 갖는다.
+    - **실행 계정 해석 규칙** — `activeAccountId`가 있으면 그 값, 없고 등록 계정이 **정확히 1개**면 그 계정, 그 외(0개 또는 2개 이상)는 특정하지 않고 REQ-009의 `unverified`로 분기. 세 단계가 이 우선순위 그대로 계약에 적혀야 하고, 마지막 단계에서 추측으로 하나를 고르는 경로는 금지된다.
+    - **provider별 검증 깊이** — Codex는 `codex debug models`가 계정별 카탈로그를 주므로 카탈로그 완전 검증. Claude는 등가물이 없으므로 신원 대조까지만 하고 모델 가용성은 `unverified`. 검증 깊이가 provider의 고정 속성이지 실행 시점의 재량이 아님을 계약이 못 박는다.
+  - 완료 판정: 세 요소가 모두 파라미터 수준으로 적혀 있고, S3의 분기 계정 픽스처(orca 활성 Codex `bitgapnam@gmail.com` vs 로컬 codex CLI `gnkong@alipeople.kr`, F1)와 S9의 계정 미특정 픽스처 각각에 대해 판정 결과가 유일하게 결정된다. research.md `## Completion Debt`가 `none remaining` 상태로 유지된다.
 
-- [ ] **T3 — 정합 영수증 스키마 확정** (REQ-005, REQ-006, REQ-009 / INV-004 / S4, S5, S8)
-  - 산출물: 6필드(요청 티어 / 해석된 provider 모델 / 실행 계정 식별자 / 카탈로그 출처 / resolution reason / verification status) 각각의 타입·필수 여부·허용값을 담은 스키마 정의와 스키마 버전 이름. `verification status`의 허용값에 `unverified`가 포함되고 그 경우 사유 필드가 필수임을 규정한다. 명시적 강등 시 요청 값과 실제 값이 **둘 다** 남아야 한다는 제약도 스키마에 표현한다.
-  - 완료 판정: S4에서 6필드와 스키마 버전이 모두 존재하고, S5에서 강등 경로의 `reason`이 비어 있을 수 없으며 요청·실제 두 값이 모두 요구되고, S8에서 프로브 없는 provider가 `verified`로 표기될 수 없음이 스키마만 보고 판정된다. 기존 `pipeline_execution_owner_receipt.v1`과 같은 스키마-버전 방식을 따른다.
+- [ ] **T3 — 정합 영수증 스키마 확정** (REQ-005, REQ-006, REQ-009 / INV-004 / S4, S5, S8, S9)
+  - 산출물: 6필드(요청 티어 / 해석된 provider 모델 / 실행 계정 식별자 / 카탈로그 출처 / resolution reason / verification status) 각각의 타입·필수 여부·허용값을 담은 스키마 정의와 스키마 버전 이름. `verification status`의 허용값에 `unverified`가 포함되고 그 경우 사유 필드가 필수임을 규정한다. 명시적 강등 시 요청 값과 실제 값이 **둘 다** 남아야 한다는 제약도 스키마에 표현한다. 실행 계정 식별자는 미특정일 수 있으므로 그 표현(빈 값이 아니라 명시적 미특정 상태)도 스키마가 정의한다.
+  - **REQ-009가 흡수하는 세 인스턴스를 같은 fail-loud 규칙으로 다뤄야 한다**: ① Claude 모델 가용성 — 계정별 카탈로그 프로브가 없다, ② 원격 orca 환경 — `orca account list`가 `--environment`를 거부해 원격 호스트의 계정을 조회할 수 없다, ③ 실행 계정 미특정 — 활성 계정이 없고 등록 계정이 0개이거나 2개 이상이다(REQ-003). 셋은 사유 문자열만 다르고 상태값(`unverified`)·사유 필수·`verified` 금지는 동일하다. 셋을 구분하는 별도 상태값이나 예외 경로를 만들지 않는다.
+  - 완료 판정: S4에서 6필드와 스키마 버전이 모두 존재하고, S5에서 강등 경로의 `reason`이 비어 있을 수 없으며 요청·실제 두 값이 모두 요구되고, S8에서 프로브 없는 provider가, S9에서 실행 계정이 미특정인 워크로드가 각각 `verified`로 표기될 수 없음이 스키마만 보고 판정된다. 기존 `pipeline_execution_owner_receipt.v1`과 같은 스키마-버전 방식을 따른다.
 
 - [ ] **T4 — 게이트 배치 지점과 부작용 경계 확정** (REQ-007, REQ-008 / INV-002, INV-005 / S6, S7)
   - 산출물: 게이트가 실행되는 지점을 `internal/cli/pipeline_run_owner.go:160-164`의 `handoff_required` 반환 직전으로 확정한 배치 결정문, 그 지점 이전에 생성되지 않아야 하는 리소스 목록(워크트리·Run·워커·provider 세션), 그리고 점검 실패 시 handoff 결과 대신 정합 실패를 반환한다는 반환값 규칙. INV-002와의 양립 근거(F7 — 금지 대상은 OMP task DAG이지 omp 실행 자체가 아님, `pkg/adapter/omp/omp_workflow_render.go:99`)를 함께 기록한다.
@@ -206,10 +234,10 @@ REQ 커버리지: REQ-001·002(T1), REQ-003·004(T2), REQ-005·006·009(T3), REQ
 
 | 리스크 | 영향도 | 대응 |
 |--------|--------|------|
-| Completion Debt ①(계정 조회 소스)이 T2에서 해소되지 않으면 REQ-003의 계약이 추상 수준에 머문다 | 높음 | T2의 완료 판정에 명시적으로 묶었다. 해소 불가로 판단되면 후속 SPEC 이관을 기록하고 REQ-003 계약을 "조회 결과의 형태"까지만 고정한다 |
-| Claude 카탈로그 등가물이 없어 Claude 티어가 전부 `unverified`로 떨어진다 | 중간 | 이는 결함이 아니라 REQ-009가 설계한 정직한 상태다. 은폐 대신 표기하는 것이 INV-004의 요지다. 대안 신호 탐색은 T2의 판단 사항 |
-| 원격 orca 환경(`--on <saved-environment>`)에서 계정 축이 하나 더 늘어난다 | 중간 | Completion Debt ③으로 분리되어 있다. 계약을 계정 식별자 기준으로 쓰면 조회 경로가 로컬이든 원격이든 판정 규칙은 불변이다 |
-| 설계만 고정하고 구현을 분리한 결과, 후속 SPEC이 나오지 않으면 J2가 계속 끊긴 채 남는다 | 중간 | 구현 분리는 spec.md `## Out of Scope`에 명시된 결정이다. 완료 판정 2번(Completion Debt 해소 또는 후속 SPEC 이관)이 이관 기록을 강제한다 |
+| 해소된 결정 3건이 T2·T3의 계약 문장으로 옮겨지지 않고 research.md 결정 표에만 남는다 | 중간 | 리스크가 "미결"에서 "결정이 계약에 미반영"으로 이동했다. T2 완료 판정이 조회 소스·해석 규칙·검증 깊이 세 요소를 파라미터 수준으로 요구하고, T3 완료 판정이 REQ-009의 세 인스턴스를 요구한다 |
+| Claude 카탈로그 등가물이 없어 Claude 티어의 모델 가용성이 전부 `unverified`로 떨어진다 | 중간 | 이는 결함이 아니라 REQ-009가 설계한 정직한 상태다. 은폐 대신 표기하는 것이 INV-004의 요지다. `subscriptionType` 플랜 게이트로 메우는 안은 기각한 대안 (c)로 기록됐다 |
+| 원격 orca 환경(`--on <saved-environment>`)에서 계정 축이 하나 더 늘어난다 | 낮음 | REQ-009에 흡수됐다. `orca account list`가 `--environment`를 거부하므로 원격은 "조회 수단 없음"의 인스턴스이고, `orca environment list --json`이 `{"environments": []}`라 현재 영향도 0건이다 |
+| 설계만 고정하고 구현을 분리한 결과, 후속 SPEC이 나오지 않으면 J2가 계속 끊긴 채 남는다 | 중간 | 구현 분리는 spec.md `## Out of Scope`에 명시된 결정이다. 결정이 모두 닫혔으므로 후속 SPEC은 발명이 아니라 이 문서의 참조 구현이며, 착수 장벽이 그만큼 낮다 |
 | 게이트를 정책 평면에 두면 정책 평면이 프로세스 평면 상태를 읽는 결합이 생긴다 | 낮음 | 방향이 기존 의존 방향(정책 -> 프로세스)과 같고, 읽는 값은 계정 식별자 하나다. 역방향 참조는 만들지 않는다 |
 
 ## Dependencies
@@ -226,7 +254,7 @@ REQ 커버리지: REQ-001·002(T1), REQ-003·004(T2), REQ-005·006·009(T3), REQ
 
 - [ ] `auto spec validate .autopus/specs/SPEC-EXECPLANE-001`이 4개 문서에 대해 통과한다
 - [ ] T1~T4의 산출물이 모두 존재하고 REQ 9건을 빠짐없이 덮는다
-- [ ] research.md Completion Debt 3건이 각각 해소 또는 후속 SPEC 이관으로 처리됐다
+- [ ] research.md Completion Debt 3건이 각각 해소 또는 후속 SPEC 이관으로 처리됐다 — 3건 모두 F8에서 해소됐고 `## Completion Debt`는 `none remaining`이다. 남은 확인은 그 결정이 T2·T3 산출물에 계약으로 들어갔는지다
 - [ ] research.md `## Reviewer Brief`의 4개 질문에 대한 리뷰 판단이 기록됐다
 - [ ] 범위 밖 항목 목록이 spec.md `## Out of Scope`와 모순되지 않는다
 

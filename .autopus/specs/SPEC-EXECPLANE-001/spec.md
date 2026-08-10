@@ -30,16 +30,16 @@ autopus-adk·omp·orca 셋을 동시에 쓰되 서로의 어휘를 복제하지 
 
 접합면은 둘이다. **J1(티어 -> 모델)은 PR #154로 닫혔다** — `quality.default`가 내장 role-model 프로파일을 거쳐 omp `modelRoles`에 도달한다. **J2(티어 -> 실행 계정)는 끊겨 있다.**
 
-끊김의 형태는 research.md F1·F2에 실측으로 기록되어 있다. 이 워크스테이션에서 orca의 활성 Codex 계정은 `bitgapnam@gmail.com`인데 로컬 `codex` CLI 로그인은 `jroad1049@gmail.com`이다. autopus의 카탈로그 프로브는 PATH 바이너리를 실행하므로(`pkg/codexruntime/probe.go:39`) **로컬 로그인 계정의 카탈로그로 검증하고, orca는 다른 계정으로 실행한다**. `codex debug models`는 계정별 카탈로그이므로 두 집합은 다를 수 있다.
+끊김의 형태는 research.md F1·F2·F8에 실측으로 기록되어 있다. 이 워크스테이션에는 provider 계정이 셋 있다 — orca 관리 Codex 활성 계정 `bitgapnam@gmail.com`, 로컬 codex CLI 계정 `gnkong@alipeople.kr`(orca가 `codex.systemDefault`로 같은 값을 보고한다), 로컬 claude CLI 계정 `jroad1049@gmail.com`. autopus의 카탈로그 프로브는 PATH 바이너리를 실행하므로(`pkg/codexruntime/probe.go:39`) **`gnkong` 계정의 카탈로그로 검증하고, orca는 `bitgapnam` 계정으로 실행한다**. `codex debug models`는 계정별 카탈로그이므로 두 집합은 다를 수 있다.
 
 이 실패 양식은 가설이 아니다. PR #151에서 실제로 발생해 티어 승격이 세대 강등으로 뒤집혔고, 조용했기 때문에 근거와 결과가 어긋난 채 결론까지 갔다(research.md F3).
 
 ## Outcome Boundary
 
 - **Outcome Lock**: 세 평면의 소유 표면이 문서로 배타적으로 고정되고, autopus가 결정한 모델 티어는 그 워크로드를 실제로 실행할 계정의 카탈로그로 검증된 뒤에만 실행 단계로 넘어간다. 검증에 실패하면 조용히 강등되지 않고 원한 티어·실행 계정·실제 제공 모델 셋을 모두 지목하는 영수증을 남긴 뒤 멈추거나 명시적으로 강등한다.
-- **Mandatory requirements**: 평면 배타성 선언(REQ-001), orca 티어 어휘 무증식(REQ-002), 실행 계정 확인(REQ-003), 실행 계정 기준 카탈로그 검증(REQ-004), 정합 영수증 방출(REQ-005), 불일치 시 fail-loud(REQ-006), 부작용 이전 배치(REQ-007), handoff 경계 배치(REQ-008), 검증 불가 provider의 명시적 표기(REQ-009).
+- **Mandatory requirements**: 평면 배타성 선언(REQ-001), orca 티어 어휘 무증식(REQ-002), 실행 계정 확인과 해석 규칙(REQ-003), 실행 계정 기준 카탈로그 검증(REQ-004), 정합 영수증 방출(REQ-005), 불일치 시 fail-loud(REQ-006), 부작용 이전 배치(REQ-007), handoff 경계 배치(REQ-008), 검증 불가 항목의 명시적 표기(REQ-009).
 - **Explicit non-goals**: 정합 게이트의 구현(별도 SPEC), `--execution-owner orca` handoff 스텁을 실제 Run으로 대체하는 일(별도 SPEC), 여러 계정 사이의 자동 라우팅, 티어 강등 시 대안 provider 폴백, 실행 원장 통합, J1 재설계(PR #154 결과 불변), omp `modelRoles` 어휘 변경, orca CLI 표면 변경.
-- **Completion evidence**: 4개 SPEC 문서가 `auto spec validate`를 통과하고, research.md의 Completion Debt 3건이 해소 또는 후속 SPEC으로 이관되며, 세 평면 경계에 대한 리뷰 합의가 기록된다. 구현 증거는 요구하지 않는다.
+- **Completion evidence**: 4개 SPEC 문서가 `auto spec validate`를 통과하고, 착수 시점의 Completion Debt 3건이 해소되며(research.md F8의 실측과 결정 표 — 현재 `none remaining`, 후속 이관 0건), 세 평면 경계에 대한 리뷰 합의가 기록된다. 구현 증거는 요구하지 않는다.
 
 ## Requirements
 
@@ -58,11 +58,12 @@ THE SYSTEM SHALL keep the process plane free of tier vocabulary, passing only op
 - Observability: 경계를 넘는 값에 `balanced`/`ultra`/`opus`/`sonnet`/`haiku` 토큰이 없고 provider 고유 model id와 effort만 있음을 S2로 확인한다.
 
 ### REQ-003 — 실행 전에 실제 실행 계정을 확인한다
-WHEN the policy plane prepares a workload for execution, THEN THE SYSTEM SHALL determine the provider account that will actually run it from the process plane rather than assuming the account the local CLI is logged in as.
+WHEN the policy plane prepares a workload for execution, THEN THE SYSTEM SHALL determine the provider account that will actually run it from the process plane rather than assuming the account the local CLI is logged in as, resolving it as the process plane's active account for that provider, or — when no active account is selected — the single registered account when exactly one exists, and otherwise marking the account as indeterminate.
 - EARS type: Event-driven
 - Priority: Must
 - Trigger/Condition: 파이프라인·워크플로가 provider 프로파일을 확정하는 시점.
-- Observability: 정합 영수증에 실행 계정 식별자가 기록되고, 그 값이 로컬 CLI 로그인 계정과 다를 수 있음을 S3의 분기 계정 픽스처로 확인한다.
+- Observability: 정합 영수증에 실행 계정 식별자가 기록되고, 그 값이 로컬 CLI 로그인 계정과 다를 수 있음을 S3의 분기 계정 픽스처로 확인한다. 활성 계정이 없고 등록 계정이 0개이거나 2개 이상이면 영수증이 실행 계정을 특정하지 않고 REQ-009의 unverified 경로로 분기함을 S9로 확인한다.
+- 해소된 설계 결정: 조회 소스는 `orca account list --json`이다. 실행 계정은 `activeAccountId`, 비교 대상인 프로브 계정은 `systemDefault`(codex) 또는 provider CLI 신원이며, 한 번의 호출로 두 값을 모두 얻는다(research.md F1, F8). 활성 계정이 없을 때 추측하지 않는 이유는 잘못 특정한 계정이 조용한 강등을 만들기 때문이다.
 
 ### REQ-004 — 카탈로그 검증은 실행 계정 기준으로 수행한다
 THE SYSTEM SHALL validate a requested model tier against the model catalog of the execution account identified in REQ-003, and SHALL NOT treat a catalog probed under a different account as evidence for that tier.
@@ -70,6 +71,7 @@ THE SYSTEM SHALL validate a requested model tier against the model catalog of th
 - Priority: Must
 - Trigger/Condition: 요청 티어를 provider 모델로 해석할 때.
 - Observability: 검증에 사용한 카탈로그의 출처 계정이 영수증의 실행 계정과 일치함을 S3로 확인한다. 두 값이 다르면 검증은 성립하지 않은 것으로 처리된다.
+- 해소된 설계 결정: Codex는 `codex debug models`가 계정별 카탈로그를 주므로 완전 검증이 가능하다. Claude는 등가물이 없어(research.md F8) **신원까지만 검증한다** — `claude auth status --json`의 `orgId`를 프로세스 평면의 `organizationUuid`와 대조해 실행 계정이 검증 대상 계정과 같은지 확인하고, 모델 가용성은 REQ-009의 unverified로 남긴다. `subscriptionType`으로 플랜→모델을 매핑하는 선택은 기각했다: 하드코딩 티어 테이블을 되살리는 일이며 PR #154가 제거한 것과 같은 종류다.
 
 ### REQ-005 — 정합 결과를 영수증으로 방출한다
 THE SYSTEM SHALL emit an integrity receipt carrying the requested tier, the resolved provider model, the execution account identifier, the catalog source, the resolution reason, and the verification status, so a later reader can reconstruct why a workload ran at the tier it ran at.
@@ -99,12 +101,13 @@ WHERE the execution owner is the process plane, THE SYSTEM SHALL run the integri
 - Trigger/Condition: `--execution-owner orca` 경로가 handoff 결과를 반환하기 직전.
 - Observability: handoff 결과에 정합 영수증 참조가 포함되고, 점검 실패 시 handoff 결과 대신 정합 실패가 반환됨을 S7로 확인한다.
 
-### REQ-009 — 검증 수단이 없는 provider는 검증됨으로 표기하지 않는다
-IF a provider exposes no account-scoped catalog probe, THEN THE SYSTEM SHALL mark that provider's tier as unverified in the receipt rather than reporting it as verified.
+### REQ-009 — 검증할 수 없는 것은 검증됨으로 표기하지 않는다
+IF the execution account cannot be determined, or the account that will run the workload exposes no account-scoped catalog probe, THEN THE SYSTEM SHALL mark that provider's tier as unverified in the receipt with a reason rather than reporting it as verified.
 - EARS type: Unwanted
 - Priority: Must
-- Trigger/Condition: provider가 카탈로그 조회 수단을 제공하지 않을 때.
-- Observability: 해당 provider의 영수증 항목이 `unverified` 상태와 사유를 갖고, `verified`로 표기되지 않음을 S8로 확인한다.
+- Trigger/Condition: 계정을 특정할 수 없거나 그 계정의 카탈로그를 조회할 수단이 없을 때.
+- Observability: 해당 provider의 영수증 항목이 `unverified` 상태와 비어 있지 않은 사유를 갖고, `verified`로 표기되지 않음을 S8로 확인한다. 실행 계정을 특정할 수 없는 경우는 S9로 확인한다.
+- 이 요구가 흡수하는 세 인스턴스: (1) Claude 모델 가용성 — 계정별 카탈로그 프로브가 없다, (2) 원격 orca 환경 — `orca account list`가 `--environment`를 구조적으로 거부하므로 원격 호스트의 계정을 조회할 수 없다, (3) 활성 계정 부재 + 등록 계정이 1개가 아닌 경우(REQ-003). 셋 다 별도 요구를 만들지 않고 같은 fail-loud 규칙으로 다룬다.
 
 ## Acceptance Criteria
 
@@ -115,7 +118,8 @@ IF a provider exposes no account-scoped catalog probe, THEN THE SYSTEM SHALL mar
 - [ ] 티어 불일치가 조용히 강등되지 않는다
 - [ ] 점검 실패가 리소스를 남기지 않는다
 - [ ] handoff 결과가 정합 영수증을 참조한다
-- [ ] 검증 불가 provider가 `unverified`로 표기된다
+- [ ] 검증할 수 없는 항목이 `unverified`로 표기된다
+- [ ] 실행 계정을 특정할 수 없으면 추측하지 않고 unverified로 분기한다
 
 ## Traceability Matrix
 
@@ -123,13 +127,13 @@ IF a provider exposes no account-scoped catalog probe, THEN THE SYSTEM SHALL mar
 |-------------|-----------|---------------------|--------------------|
 | REQ-001 | T1 | S1 | INV-001 |
 | REQ-002 | T1 | S2 | INV-001 |
-| REQ-003 | T2 | S3 | INV-003 |
+| REQ-003 | T2 | S3, S9 | INV-003 |
 | REQ-004 | T2 | S3 | INV-003 |
 | REQ-005 | T3 | S4 | INV-004 |
 | REQ-006 | T3 | S5 | INV-004 |
 | REQ-007 | T4 | S6 | INV-005 |
 | REQ-008 | T4 | S7 | INV-002, INV-005 |
-| REQ-009 | T3 | S8 | INV-004 |
+| REQ-009 | T3 | S8, S9 | INV-004 |
 
 ## Out of Scope
 
@@ -147,10 +151,10 @@ IF a provider exposes no account-scoped catalog probe, THEN THE SYSTEM SHALL mar
 |-------------|------|--------|
 | REQ-001 | S1 | pending |
 | REQ-002 | S2 | pending |
-| REQ-003 | S3 | pending |
+| REQ-003 | S3, S9 | pending |
 | REQ-004 | S3 | pending |
 | REQ-005 | S4 | pending |
 | REQ-006 | S5 | pending |
 | REQ-007 | S6 | pending |
 | REQ-008 | S7 | pending |
-| REQ-009 | S8 | pending |
+| REQ-009 | S8, S9 | pending |
