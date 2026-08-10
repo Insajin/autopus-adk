@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Codex 최상위 모델 부재 시 세대를 건너뛰던 폴백** (2026-08-09): 요청한 Codex 모델이 런타임 카탈로그에 없으면 해결기가 카탈로그의 나머지를 무시하고 하드코딩된 `gpt-5.5`로 직행했다. 프론티어 모델 권한이 없는 ChatGPT 계정도 같은 세대의 균형 모델(`gpt-5.6-terra`)은 광고하므로, 최상위 티어 요청이 오히려 한 세대 낮은 모델로 떨어졌다 — 티어를 올리지 않았을 때보다 나쁜 결과다. 이제 프론티어 요청은 같은 세대 균형 모델을 먼저 시도한 뒤에만 legacy로 내려간다. 균형·소형 티어의 폴백은 바뀌지 않는다: 소형 티어는 명시적으로 싼 모델이므로 더 큰 모델의 대체재로 승격하지 않는다. 카탈로그에 아는 모델이 하나도 없으면 종전대로 런타임 기본값에 위임한다. 폴백은 이미 `Codex model fallback: requested=... selected=... reason=model_unavailable`로 stderr에 보고되고 있었고 그 형식도 그대로다.
+
 ### Added
 
 - **`balanced` 프리셋에서 executor를 최상위 티어로 승격** (2026-08-09): 기본 품질 프리셋이 `planner`·`architect`·`spec-writer`·`security-auditor`에만 주던 최상위 티어를 `executor`에도 준다. 근거: 여유가 남아 있던 유일한 Go 시맨틱 과제군에서 프론티어 티어가 42/45, 중간 티어가 36/45였고 어떤 멀티에이전트 구성도 그 격차를 메우지 못했다(최선의 논증 장치는 5콜에 40/45). 그 문항들은 "코드가 정확히 무엇을 하는지 예측"하는 executor형 과제이며, executor의 산출물은 이후 모든 역할이 검토하는 대상이다. 측정된 적 없는 열린 판단 역할(planner·architect·spec-writer)의 티어는 근거 부재를 강등 사유로 삼지 않고 그대로 둔다. Codex 매핑에서 최상위 티어는 모델과 reasoning effort를 함께 올리므로 executor는 `gpt-5.6-terra`/`medium`에서 `gpt-5.6-sol`/`xhigh`로 바뀌며, 카탈로그가 해당 모델을 광고하지 않는 환경에서는 기존 opus 역할과 동일하게 `gpt-5.5`로 폴백한다. `tester`·`reviewer`·`debugger`·`devops`·`validator`·`explorer`는 중간 티어로 남고 `ultra` 프리셋은 바뀌지 않는다.
