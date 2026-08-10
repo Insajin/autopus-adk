@@ -61,17 +61,28 @@ autopus-adk가 결정한 모델 티어가 **실제로 그 워크로드를 실행
 
 모두 2026-08-10 이 워크스테이션에서 직접 실행해 확인했다.
 
-### F1 — orca 활성 계정과 로컬 CLI 로그인이 이미 갈라져 있다
+### F1 — 실행 계정과 프로브 계정이 이미 갈라져 있다
+
+`orca account list --json`이 구조화된 페이로드를 준다.
 
 ```
-$ orca account list
-Managed Claude accounts (1):
-  jroad1049@gmail.com
-Managed Codex accounts (1):
-  bitgapnam@gmail.com (active)
+result.<provider>.accounts[]   { id, email, organizationUuid | providerAccountId, ... }
+result.<provider>.activeAccountId
+result.<provider>.activeAccountIdsByRuntime  { host, wsl }
+result.codex.systemDefault     { hasAuth, authKind, email, providerAccountId }   // codex에만 존재
 ```
 
-반면 로컬 `~/.codex/auth.json`의 `id_token`은 `jroad1049@gmail.com`(Google OAuth, `auth_mode: chatgpt`)이다. 즉 **orca가 워커를 띄울 Codex 계정과 이 머신의 codex CLI 로그인 계정이 다르다**.
+이 워크스테이션의 실측값은 계정 **셋**이다.
+
+| 축 | 계정 | 출처 |
+| --- | --- | --- |
+| orca 관리 Codex `activeAccountId` | `bitgapnam@gmail.com` | `orca account list --json` |
+| 로컬 codex CLI = orca `codex.systemDefault` | `gnkong@alipeople.kr` | `~/.codex/auth.json` id_token, `systemDefault.email` |
+| 로컬 claude CLI = orca 관리 Claude | `jroad1049@gmail.com` | `claude auth status --json`, `claude.accounts[0]` |
+
+Codex 축에서 **orca가 워커를 띄울 계정과 PATH의 codex가 쓰는 계정이 다르다**. 한 번의 `orca account list --json` 호출이 두 값을 모두 반환하므로 비교는 추가 조회 없이 가능하다.
+
+Claude 축에서는 `claude auth status --json`의 `orgId`가 orca `claude.accounts[0].organizationUuid`와 같은 값(`0e61c3e2-35c8-4bf8-91bc-40848f4dc147`)이라 두 소스를 신원으로 조인할 수 있다. 다만 `claude.activeAccountId`는 `null`이고 Claude 블록에는 `systemDefault` 필드가 없다 — provider 사이의 비대칭이다.
 
 ### F2 — autopus의 카탈로그 프로브는 PATH 바이너리, 즉 로컬 로그인 계정 기준이다
 
@@ -135,11 +146,38 @@ Owner `orca`: do not initialize an OMP task/todo DAG or call `task`.
 
 금지 대상은 **OMP task DAG**이지 omp 실행 자체가 아니다. orca Run이 소유하는 워커 안에서 omp가 모델 평면 역할만 수행하고 자기 DAG를 만들지 않으면 INV-002를 준수한다. 세 평면 합성은 기존 불변식과 양립한다.
 
+### F8 — 세 미결 질문의 실측 답
+
+**계정 조회 소스.** `orca account list --json`이 존재하고 F1의 스키마를 반환한다. `--environment`/`--pairing-code`는 무시가 아니라 **거부**된다. 헬프 노트: *"Lists the accounts on this machine. `--environment` / `--pairing-code` are rejected rather than ignored; run it on the host whose accounts you want to see."*
+
+**Claude 카탈로그.** `codex debug models` 등가물이 없다. `claude` CLI 명령 집합은 `agents`, `auth`, `auto-mode`, `doctor`, `gateway`, `import`, `install`, `mcp`, `plugin`, `project`, `setup-token`, `ultrareview`이며 모델 열거 명령이 없다. `omp models --json`은 있으나 **정적 레지스트리**다 — 계정 스코프가 아니라 provider별 모델 메타데이터를 반환하므로 특정 계정의 자격을 증명하지 못한다.
+
+```json
+{"provider":"anthropic","id":"claude-opus-5","selector":"anthropic/claude-opus-5",
+ "thinking":["low","medium","high","xhigh","max"],"cost":{"input":5,"output":25}}
+```
+
+대신 `claude auth status --json`이 신원과 플랜을 준다.
+
+```json
+{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty",
+ "email":"jroad1049@gmail.com","orgId":"0e61c3e2-...","subscriptionType":"max"}
+```
+
+**원격 환경.** `orca environment list --json`은 이 머신에서 `{"environments": []}`를 반환한다. 저장된 원격 환경이 0건이므로 원격 경로는 현재 미사용이다. `orchestration worker-list`는 터미널 리소스 회계만 보고하고 계정을 노출하지 않아 사후 검증 경로도 없다.
+
+### 결정
+
+| 질문 | 결정 | 근거 |
+| --- | --- | --- |
+| 계정 조회 소스 | `orca account list --json`. 실행 계정은 `activeAccountId`, 프로브 계정은 `systemDefault`(codex) 또는 provider CLI 신원 | 한 호출로 두 값을 모두 얻어 비교 가능 |
+| Claude 검증 깊이 | **신원만 검증**. `claude auth status --json`의 `orgId`를 orca `organizationUuid`와 대조하고, 모델 가용성은 unverified로 표기 | `subscriptionType`으로 플랜→모델을 매핑하면 하드코딩 티어 테이블이 되살아난다. PR #154가 제거한 것과 같은 종류다 |
+| Claude `activeAccountId`가 null | 등록 계정이 **정확히 1개**면 그것을 실행 계정으로 보고, 0개이거나 2개 이상이면 unverified | 추측하지 않는다. 현재 상태(1개 등록)에서 동작하고, 모호해지면 모호하다고 보고한다 |
+| 원격 환경 | 별도 요구를 만들지 않고 **REQ-009에 흡수**. 원격 대상이면 "계정 조회 수단 없음"의 인스턴스이므로 unverified | `account list`가 원격을 구조적으로 거부하고, 저장된 환경이 0건이라 당장 영향도 없다 |
+
 ## Completion Debt
 
-- [ ] 정합 점검이 조회할 계정 정보의 정확한 소스. `orca account list`는 사람이 읽는 텍스트다. `--json`이 있는지, 없으면 `orca agent-context --json`의 스키마로 대체 가능한지 구현 전에 확정해야 한다.
-- [ ] Claude 쪽 카탈로그 프로브의 부재. Codex는 `codex debug models`가 있지만 Claude는 등가물이 확인되지 않았다. Claude 티어 검증을 어떤 신호로 할지(또는 검증 불가로 명시할지) 결정이 필요하다.
-- [ ] 원격 orca 환경(`--on <saved-environment>`)에서의 계정 조회. 로컬 host와 원격 worker server의 계정이 또 다를 수 있다.
+none remaining. 착수 시점의 미결 3건은 F8에서 실측으로 해소되어 결정 표에 반영됐고, 그 결정은 spec.md REQ-003·REQ-004·REQ-009 본문에 계약으로 들어갔다.
 
 ## Evolution Ideas
 
@@ -152,7 +190,12 @@ Owner `orca`: do not initialize an OMP task/todo DAG or call `task`.
 
 | 참조 | 유형 | 확인 방법 |
 | --- | --- | --- |
-| `orca account list` 출력 | 실측 | 이 워크스테이션에서 직접 실행 |
+| `orca account list --json` 페이로드 | 실측 | 이 워크스테이션에서 직접 실행 |
+| `claude auth status --json` 페이로드 | 실측 | 직접 실행 |
+| `claude --help` 명령 집합 | 실측 | 직접 실행, 모델 열거 명령 부재 확인 |
+| `omp models --json` 엔트리 구조 | 실측 | 직접 실행, 계정 스코프 아님 확인 |
+| `orca environment list --json` | 실측 | 직접 실행, `environments: []` |
+| `~/.codex/auth.json` id_token 클레임 | 실측 | 직접 디코드 |
 | `orca agent-context --json` | 실측 | 223 command 스키마 전수 검색 |
 | `omp config list`의 `modelRoles` | 실측 | 직접 실행 |
 | `pkg/codexruntime/probe.go:39` | 코드 | 직접 읽음 |
