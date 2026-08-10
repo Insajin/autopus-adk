@@ -70,7 +70,6 @@ type HarnessConfig struct {
 	Lore             LoreConf             `yaml:"lore"`
 	Spec             SpecConf             `yaml:"spec"`
 	Methodology      MethodologyConf      `yaml:"methodology,omitempty"`
-	Router           RouterConf           `yaml:"router,omitempty"`
 	Hooks            HooksConf            `yaml:"hooks"`
 	Session          SessionConf          `yaml:"session,omitempty"`
 	Orchestra        OrchestraConf        `yaml:"orchestra,omitempty"`
@@ -188,14 +187,6 @@ type MethodologyConf struct {
 	Mode       string `yaml:"mode"`
 	Enforce    bool   `yaml:"enforce"`
 	ReviewGate bool   `yaml:"review_gate"`
-}
-
-// RouterConf는 Category-based 모델 라우팅 설정이다 (Full 전용).
-type RouterConf struct {
-	Strategy   string            `yaml:"strategy"`
-	Tiers      map[string]string `yaml:"tiers"`
-	Categories map[string]string `yaml:"categories"`
-	IntentGate bool              `yaml:"intent_gate"`
 }
 
 // HooksConf는 훅 설정이다.

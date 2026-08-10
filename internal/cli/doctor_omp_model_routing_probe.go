@@ -68,7 +68,7 @@ func buildOMPModelDoctorInput(
 	if cfg == nil {
 		return omp.OMPModelDoctorInput{}
 	}
-	profileName, profile, selected := cfg.RoleModelPolicy.SelectedRoleModelProfile()
+	profileName, profile, selected := cfg.RoleModelPolicy.SelectedRoleModelProfileForQuality(cfg.Quality)
 	if !selected {
 		return omp.OMPModelDoctorInput{}
 	}

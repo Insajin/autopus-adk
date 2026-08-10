@@ -90,7 +90,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		}
 		files = append(files, skillFiles...)
 
-		agentFiles, err := a.prepareContentFiles("agents", ".claude/agents/autopus")
+		agentFiles, err := a.prepareContentFilesForConfig(cfg, "agents", ".claude/agents/autopus")
 		if err != nil {
 			return nil, fmt.Errorf("에이전트 파일 준비 실패: %w", err)
 		}
@@ -154,7 +154,7 @@ func (a *Adapter) prepareContentFilesForConfig(
 		if err != nil {
 			return nil, fmt.Errorf("컨텐츠 파일 읽기 실패 %s: %w", srcPath, err)
 		}
-		data = normalizeClaudeContent(subDir, data)
+		data = normalizeClaudeContent(cfg, subDir, entry.Name(), data)
 		files = append(files, adapter.FileMapping{
 			TargetPath:      filepath.Join(targetRelDir, entry.Name()),
 			OverwritePolicy: adapter.OverwriteAlways,

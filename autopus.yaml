@@ -52,20 +52,6 @@ methodology:
     mode: tdd
     enforce: true
     review_gate: true
-router:
-    strategy: balanced
-    tiers:
-        economy: claude-sonnet-5
-        premium: claude-opus-5
-        standard: claude-sonnet-5
-    categories:
-        deep: premium
-        git: economy
-        quick: economy
-        ultrabrain: premium
-        visual: standard
-        writing: standard
-    intent_gate: true
 hooks:
     pre_commit_arch: true
     pre_commit_lore: true

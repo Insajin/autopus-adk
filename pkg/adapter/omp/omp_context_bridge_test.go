@@ -169,7 +169,10 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	catalogFiles, err := adapterUnderTest.prepareFiles(context.Background(), catalogOnly)
 	require.NoError(t, err)
 
-	const priorPreparedFilesFingerprint = "637c407b6541c185502687a7e72ed58155d4a793c10440193a0a37647102aced"
+	// Content tripwire over the whole prepared set, so it moves whenever a shipped
+	// content file changes. Last moved when the stale `router:` block left
+	// content/skills/using-autopus.md; the mapping structure is unchanged.
+	const priorPreparedFilesFingerprint = "c6e38dcdd069e8e89b26299af073b7f71a8ad5bc1e8e2bcf6eed3951fec0fffa"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

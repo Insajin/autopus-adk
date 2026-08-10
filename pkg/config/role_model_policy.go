@@ -86,3 +86,15 @@ func (c RoleModelPolicyConf) SelectedRoleModelProfile() (string, RoleModelProfil
 	profile, ok := c.Profiles[c.Profile]
 	return c.Profile, profile, ok
 }
+
+// SelectedRoleModelProfileForQuality resolves the selected profile, falling
+// back to the quality-derived built-in profile of the same name when the
+// config defines none. An explicit definition always wins.
+func (c RoleModelPolicyConf) SelectedRoleModelProfileForQuality(quality QualityConf) (string, RoleModelProfileConf, bool) {
+	name, profile, ok := c.SelectedRoleModelProfile()
+	if ok || name == "" {
+		return name, profile, ok
+	}
+	profile, ok = BuiltinRoleModelProfile(name, quality)
+	return name, profile, ok
+}

@@ -161,27 +161,3 @@ func TestValidateName(t *testing.T) {
 		}
 	}
 }
-
-// --- router helpers ---
-
-func TestTierToModel(t *testing.T) {
-	tiers := map[string]string{"fast": "gpt-4o-mini", "smart": "o3"}
-	if got := tierToModel(tiers, "fast"); got != "gpt-4o-mini" {
-		t.Errorf("tierToModel(fast) = %q", got)
-	}
-	// Unknown tier returns the tier name itself.
-	if got := tierToModel(tiers, "unknown"); got != "unknown" {
-		t.Errorf("tierToModel(unknown) = %q", got)
-	}
-}
-
-func TestIsKnownCategory(t *testing.T) {
-	for _, known := range []string{"visual", "deep", "quick", "ultrabrain", "writing", "git", "adaptive"} {
-		if !isKnownCategory(known) {
-			t.Errorf("isKnownCategory(%q) = false, want true", known)
-		}
-	}
-	if isKnownCategory("nonexistent") {
-		t.Error("isKnownCategory(nonexistent) = true, want false")
-	}
-}

@@ -34,15 +34,6 @@ methodology:
   enforce: {{.Methodology.Enforce}}
   review_gate: {{.Methodology.ReviewGate}}
 
-router:
-  strategy: {{.Router.Strategy}}
-  intent_gate: {{.Router.IntentGate}}
-{{if .Router.Tiers}}  tiers:
-{{range $k, $v := .Router.Tiers}}    {{$k}}: {{$v}}
-{{end}}{{end}}
-{{if .Router.Categories}}  categories:
-{{range $k, $v := .Router.Categories}}    {{$k}}: {{$v}}
-{{end}}{{end}}
 session:
   handoff_enabled: {{.Session.HandoffEnabled}}
   continue_file: "{{.Session.ContinueFile}}"

@@ -81,23 +81,6 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			Enforce:    true,
 			ReviewGate: true,
 		},
-		Router: RouterConf{
-			Strategy: "balanced",
-			Tiers: map[string]string{
-				"premium":  "claude-opus-5",
-				"standard": "claude-sonnet-5",
-				"economy":  "claude-sonnet-5",
-			},
-			Categories: map[string]string{
-				"visual":     "standard",
-				"deep":       "premium",
-				"quick":      "economy",
-				"ultrabrain": "premium",
-				"writing":    "standard",
-				"git":        "economy",
-			},
-			IntentGate: true,
-		},
 		Hooks: HooksConf{
 			PreCommitArch:  true,
 			PreCommitLore:  true,
@@ -133,8 +116,10 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				"brainstorm": {Strategy: "debate", Providers: []string{"claude", "codex", "gemini"}},
 			},
 		},
-		// Quality presets map agent roles to model tiers.
-		// "ultra" uses Opus for all agents; "balanced" is the cost-effective default.
+		// Quality presets map every canonical source agent to a relative tier.
+		// This is the single tier source: Claude frontmatter, Codex profiles, cost
+		// accounting, and the OMP role-model profiles all project from it, so the
+		// preset must stay exhaustive over config.CanonicalAgentNames().
 		Quality: QualityConf{
 			Default:               "balanced",
 			SupervisorModelPolicy: SupervisorModelPolicyInherit,
@@ -142,10 +127,12 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				"ultra": {
 					Description: "모든 에이전트를 Opus로 실행. 최고 품질.",
 					Agents: map[string]string{
-						"planner": "opus", "executor": "opus", "validator": "opus",
-						"tester": "opus", "reviewer": "opus", "architect": "opus",
-						"spec-writer": "opus", "security-auditor": "opus",
-						"debugger": "opus", "explorer": "opus", "devops": "opus",
+						"annotator": "opus", "architect": "opus", "debugger": "opus",
+						"deep-worker": "opus", "devops": "opus", "executor": "opus",
+						"explorer": "opus", "frontend-specialist": "opus",
+						"perf-engineer": "opus", "planner": "opus", "reviewer": "opus",
+						"security-auditor": "opus", "spec-writer": "opus",
+						"tester": "opus", "ux-validator": "opus", "validator": "opus",
 					},
 				},
 				"balanced": {
@@ -159,11 +146,12 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 					// open judgment was never graded either way.
 					Description: "실행과 핵심 분석은 Opus, 나머지 작업은 Sonnet. Haiku 미사용.",
 					Agents: map[string]string{
-						"planner": "opus", "architect": "opus",
-						"spec-writer": "opus", "security-auditor": "opus",
-						"executor": "opus", "tester": "sonnet",
-						"reviewer": "sonnet", "debugger": "sonnet", "devops": "sonnet",
-						"validator": "sonnet", "explorer": "sonnet",
+						"architect": "opus", "deep-worker": "opus", "executor": "opus",
+						"planner": "opus", "security-auditor": "opus", "spec-writer": "opus",
+						"annotator": "sonnet", "debugger": "sonnet", "devops": "sonnet",
+						"explorer": "sonnet", "frontend-specialist": "sonnet",
+						"perf-engineer": "sonnet", "reviewer": "sonnet",
+						"tester": "sonnet", "ux-validator": "sonnet", "validator": "sonnet",
 					},
 				},
 			},

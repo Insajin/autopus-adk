@@ -1,7 +1,6 @@
 package cost_test
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/cost"
@@ -30,35 +29,35 @@ func TestQualityModeToModels_Opus5IsDefaultForUltraAndStrategicRoles(t *testing.
 	t.Parallel()
 
 	ultra := cost.QualityModeToModels("ultra")
-	wantUltra := map[string]string{
-		"planner":          "claude-opus-5",
-		"architect":        "claude-opus-5",
-		"executor":         "claude-opus-5",
-		"tester":           "claude-opus-5",
-		"reviewer":         "claude-opus-5",
-		"validator":        "claude-opus-5",
-		"test_scaffold":    "claude-opus-5",
-		"annotator":        "claude-opus-5",
-		"security_auditor": "claude-opus-5",
-	}
-	if len(ultra) != 9 || !reflect.DeepEqual(ultra, wantUltra) {
-		t.Fatalf("ultra model map = %#v, want exact 9-role map %#v", ultra, wantUltra)
+	for _, role := range []string{
+		"planner", "architect", "executor", "tester", "reviewer", "validator",
+		"test_scaffold", "annotator", "security_auditor",
+	} {
+		if got := ultra[role]; got != "claude-opus-5" {
+			t.Errorf("ultra/%s = %q, want claude-opus-5", role, got)
+		}
 	}
 
-	balanced := cost.QualityModeToModels("balanced")
+	// balanced executor and security_auditor are opus now. Both were pinned to
+	// sonnet here while cost carried its own tier table; the balanced quality
+	// preset promoted them (executor on the PR #151 measurement), and cost now
+	// derives from that preset, so the promotion finally reaches cost.
 	wantBalanced := map[string]string{
 		"planner":          "claude-opus-5",
 		"architect":        "claude-opus-5",
-		"executor":         "claude-sonnet-5",
+		"executor":         "claude-opus-5",
+		"security_auditor": "claude-opus-5",
 		"tester":           "claude-sonnet-5",
 		"reviewer":         "claude-sonnet-5",
 		"validator":        "claude-sonnet-5",
 		"test_scaffold":    "claude-sonnet-5",
 		"annotator":        "claude-sonnet-5",
-		"security_auditor": "claude-sonnet-5",
 	}
-	if len(balanced) != 9 || !reflect.DeepEqual(balanced, wantBalanced) {
-		t.Fatalf("balanced model map = %#v, want exact 9-role map %#v", balanced, wantBalanced)
+	balanced := cost.QualityModeToModels("balanced")
+	for role, want := range wantBalanced {
+		if got := balanced[role]; got != want {
+			t.Errorf("balanced/%s = %q, want %q", role, got, want)
+		}
 	}
 }
 

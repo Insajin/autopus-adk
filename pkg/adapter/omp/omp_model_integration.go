@@ -44,7 +44,7 @@ func (a *Adapter) prepareModelIntegration(
 	if err := cfg.RoleModelPolicy.Validate(); err != nil {
 		return nil, err
 	}
-	profileName, profile, ok := cfg.RoleModelPolicy.SelectedRoleModelProfile()
+	profileName, profile, ok := cfg.RoleModelPolicy.SelectedRoleModelProfileForQuality(cfg.Quality)
 	if !ok {
 		return nil, fmt.Errorf("role_model_policy.profile_unknown: %q", profileName)
 	}

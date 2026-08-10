@@ -60,7 +60,16 @@ func DetectProviders() []ProviderStatus {
 
 // detectVersion runs "{binary} --version" and returns the output.
 func detectVersion(binaryPath string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), providerVersionTimeout)
+	return detectVersionWithin(binaryPath, providerVersionTimeout)
+}
+
+// detectVersionWithin is detectVersion with an explicit ceiling. The ceiling is
+// the last-resort bound: processprobe.Output stops draining an inherited pipe
+// shortly after the probed process exits, so a healthy probe returns long
+// before it. Tests widen the ceiling to tell those two bounds apart without
+// timing the machine.
+func detectVersionWithin(binaryPath string, timeout time.Duration) string {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	out, err := processprobe.Output(exec.CommandContext(ctx, binaryPath, "--version"))
 	if err != nil {

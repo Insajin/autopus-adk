@@ -97,7 +97,9 @@ func TestQualityModeToModels_Balanced(t *testing.T) {
 	}{
 		{"planner", "claude-opus-5"},
 		{"architect", "claude-opus-5"},
-		{"executor", "claude-sonnet-5"},
+		// executor and security-auditor sit at opus in the balanced preset,
+		// which is now the only tier source for cost.
+		{"executor", "claude-opus-5"},
 		{"tester", "claude-sonnet-5"},
 		{"reviewer", "claude-sonnet-5"},
 		{"validator", "claude-sonnet-5"},
@@ -123,7 +125,7 @@ func TestModelForAgent_Known(t *testing.T) {
 		want  string
 	}{
 		{"ultra", "executor", "claude-opus-5"},
-		{"balanced", "executor", "claude-sonnet-5"},
+		{"balanced", "executor", "claude-opus-5"},
 		{"balanced", "validator", "claude-sonnet-5"},
 		{"balanced", "planner", "claude-opus-5"},
 	}
@@ -136,8 +138,10 @@ func TestModelForAgent_Known(t *testing.T) {
 	}
 }
 
-// TestModelForAgent_TeamPhaseRoles verifies S3 acceptance values for the three
-// team-phase roles added in SPEC-HARNESS-WORKFLOW-TEAM-001 T8.
+// TestModelForAgent_TeamPhaseRoles covers the workflow phase roles added in
+// SPEC-HARNESS-WORKFLOW-TEAM-001 T8. The S3 tier shape still holds (ultra is
+// uniformly opus); the balanced values now follow the config quality preset,
+// which promoted executor and security-auditor to opus.
 func TestModelForAgent_TeamPhaseRoles(t *testing.T) {
 	t.Parallel()
 
@@ -146,9 +150,9 @@ func TestModelForAgent_TeamPhaseRoles(t *testing.T) {
 		agent string
 		want  string
 	}{
-		// Existing roles — regression guard (S3 anchor values).
+		// Core roles — regression guard.
 		{"ultra", "executor", "claude-opus-5"},
-		{"balanced", "executor", "claude-sonnet-5"},
+		{"balanced", "executor", "claude-opus-5"},
 		{"balanced", "planner", "claude-opus-5"},
 		// New team-phase roles — ultra mode.
 		{"ultra", "annotator", "claude-opus-5"},
@@ -156,7 +160,7 @@ func TestModelForAgent_TeamPhaseRoles(t *testing.T) {
 		{"ultra", "test_scaffold", "claude-opus-5"},
 		// New team-phase roles — balanced mode.
 		{"balanced", "annotator", "claude-sonnet-5"},
-		{"balanced", "security_auditor", "claude-sonnet-5"},
+		{"balanced", "security_auditor", "claude-opus-5"},
 		{"balanced", "test_scaffold", "claude-sonnet-5"},
 	}
 
