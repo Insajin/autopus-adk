@@ -30,16 +30,26 @@ func TestDetectBinaryFailureDegradesToUnknown(t *testing.T) {
 	assert.Equal(t, "unknown", version)
 }
 
+// probeFixtureLifetime is how long a probe fixture stays alive — the hung child
+// below, and the backgrounded grandchild that holds the inherited stdout pipe.
+// It doubles as the ceiling the elapsed assertions divide by. Every bound under
+// test returns far sooner, so the assertions keep a wide margin instead of
+// measuring how busy the machine is: the healthy paths finish in a few hundred
+// milliseconds, while every regression — no context deadline, no pipe-drain
+// bound — runs for the full lifetime. The contract is that those bounds are
+// alive, not that the probe is quick.
+const probeFixtureLifetime = 30 * time.Second
+
 func TestDetectBinaryHungChildReturnsWithinBound(t *testing.T) {
-	script := writeVersionProbeScript(t, "#!/bin/sh\n/bin/sleep 5\n")
+	script := writeVersionProbeScript(t, "#!/bin/sh\n/bin/sleep 30\n")
 	started := time.Now()
 
 	version, installed := detectBinaryWithLimits(script, "--version", 100*time.Millisecond, 100*time.Millisecond)
 
 	assert.True(t, installed)
 	assert.Equal(t, "unknown", version)
-	assert.Less(t, time.Since(started), 2*time.Second,
-		"version probe must return after its context and pipe-drain bounds")
+	assert.Less(t, time.Since(started), probeFixtureLifetime/3,
+		"version probe must return on its context and pipe-drain bounds, not when the child exits")
 }
 
 func TestDetectBinaryGrandchildPipeReturnsAndCleansProcessGroup(t *testing.T) {
@@ -47,10 +57,13 @@ func TestDetectBinaryGrandchildPipeReturnsAndCleansProcessGroup(t *testing.T) {
 	heartbeat := filepath.Join(dir, "heartbeat")
 	t.Setenv("AUTOPUS_TEST_PROBE_HEARTBEAT", heartbeat)
 	t.Setenv("PATH", dir)
+	// The grandchild ticks for probeFixtureLifetime while holding stdout. The
+	// production ceiling stays untouched here: without the pipe-drain bound the
+	// probe blocks on the inherited pipe for the full lifetime regardless.
 	writeVersionProbeScriptAt(t, filepath.Join(dir, "opencode"), `#!/bin/sh
 (
   count=0
-  while [ "$count" -lt 50 ]; do
+  while [ "$count" -lt 300 ]; do
     printf x >> "$AUTOPUS_TEST_PROBE_HEARTBEAT"
     /bin/sleep 0.1
     count=$((count + 1))
@@ -65,11 +78,13 @@ exit 0
 	sizeAfterReturn := fileSize(t, heartbeat)
 	time.Sleep(350 * time.Millisecond)
 
-	require.Equal(t, []Platform{{Name: "opencode", Binary: "opencode", Version: "unknown"}}, platforms)
-	assert.Less(t, elapsed, 2*time.Second,
+	// The bounds come first: a fatal require on the degraded value would mask
+	// which bound actually broke.
+	assert.Less(t, elapsed, probeFixtureLifetime/3,
 		"version probe must not wait for a grandchild that inherited stdout")
 	assert.Equal(t, sizeAfterReturn, fileSize(t, heartbeat),
 		"version probe must terminate its orphan-prone process group")
+	require.Equal(t, []Platform{{Name: "opencode", Binary: "opencode", Version: "unknown"}}, platforms)
 }
 
 // TestDetectInstalledPlatformsExecutesOnlyTheAmbiguousIdentityProbe pins the

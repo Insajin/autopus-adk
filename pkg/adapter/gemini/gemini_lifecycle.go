@@ -18,6 +18,15 @@ const antigravityPluginListTimeout = 2 * time.Second
 
 // Validate checks the validity of installed files.
 func (a *Adapter) Validate(ctx context.Context) ([]adapter.ValidationError, error) {
+	return a.validateWithin(ctx, antigravityPluginListTimeout)
+}
+
+// validateWithin is Validate with an explicit ceiling on the best-effort
+// `agy plugin list` probe. That ceiling is the last-resort bound: the caller
+// deadline and processprobe.Output's inherited-pipe bound both return long
+// before it. Tests widen the ceiling to tell those bounds apart without timing
+// the machine.
+func (a *Adapter) validateWithin(ctx context.Context, pluginListTimeout time.Duration) ([]adapter.ValidationError, error) {
 	var errs []adapter.ValidationError
 
 	geminiMDPath := filepath.Join(a.root, "GEMINI.md")
@@ -64,7 +73,7 @@ func (a *Adapter) Validate(ctx context.Context) ([]adapter.ValidationError, erro
 		if ctx == nil {
 			ctx = context.Background()
 		}
-		probeCtx, cancel := context.WithTimeout(ctx, antigravityPluginListTimeout)
+		probeCtx, cancel := context.WithTimeout(ctx, pluginListTimeout)
 		cmd := exec.CommandContext(probeCtx, binary, "plugin", "list")
 		output, err := processprobe.Output(cmd)
 		cancel()

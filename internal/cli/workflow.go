@@ -90,11 +90,20 @@ type liveProber struct {
 }
 
 func newLiveProber() liveProber {
+	return newLiveProberWithin(workflowVersionProbeTimeout)
+}
+
+// newLiveProberWithin is newLiveProber with an explicit ceiling. The ceiling is
+// the last-resort bound: processprobe.Output stops draining an inherited pipe
+// shortly after the probed process exits, so a healthy probe returns long
+// before it. Tests widen the ceiling to tell those two bounds apart without
+// timing the machine.
+func newLiveProberWithin(timeout time.Duration) liveProber {
 	path, err := exec.LookPath("claude")
 	if err != nil {
 		return liveProber{}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), workflowVersionProbeTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path, "--version") //nolint:gosec // fixed binary, no user input
 	out, err := processprobe.Output(cmd)

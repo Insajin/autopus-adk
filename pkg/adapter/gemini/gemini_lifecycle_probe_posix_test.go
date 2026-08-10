@@ -16,32 +16,43 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
+// probeGrandchildLifetime is how long a probe fixture stays alive — the
+// backgrounded grandchild that holds the inherited stdout pipe, and the hung
+// child below. It doubles as the plugin-probe ceiling injected through
+// validateWithin. Every bound under test returns far sooner, so the elapsed
+// assertions keep a wide margin instead of measuring how busy the machine is:
+// the healthy paths finish in well under a second, while either regression —
+// draining until the grandchild closes the pipe, or ignoring the caller
+// deadline — runs to the full lifetime. The contract is that those bounds are
+// alive, not that validation is quick.
+const probeGrandchildLifetime = 30 * time.Second
+
 func TestValidatePluginListInheritedPipeDegradesWithinBound(t *testing.T) {
 	a := generatedGeminiAdapterForProbe(t)
-	installAgyProbe(t, "#!/bin/sh\n(/bin/sleep 5) &\nprintf '{\"plugins\":[]}\\n'\n")
+	installAgyProbe(t, "#!/bin/sh\n(/bin/sleep 30) &\nprintf '{\"plugins\":[]}\\n'\n")
 	started := time.Now()
 
-	errs, err := a.Validate(context.Background())
+	errs, err := a.validateWithin(context.Background(), probeGrandchildLifetime)
 
 	require.NoError(t, err)
 	assert.Empty(t, errs, "a failed best-effort plugin probe must not create a validation finding")
-	assert.Less(t, time.Since(started), 2*time.Second,
-		"validation must not wait for a grandchild that inherited the probe pipes")
+	assert.Less(t, time.Since(started), probeGrandchildLifetime/3,
+		"validation must return on the inherited-pipe bound, not on a grandchild that inherited the probe pipes")
 }
 
 func TestValidatePluginListHonorsCallerContext(t *testing.T) {
 	a := generatedGeminiAdapterForProbe(t)
-	installAgyProbe(t, "#!/bin/sh\n/bin/sleep 5\n")
+	installAgyProbe(t, "#!/bin/sh\n/bin/sleep 30\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	started := time.Now()
 
-	errs, err := a.Validate(ctx)
+	errs, err := a.validateWithin(ctx, probeGrandchildLifetime)
 
 	require.NoError(t, err)
 	assert.Empty(t, errs)
-	assert.Less(t, time.Since(started), time.Second,
-		"the caller deadline must stop the plugin probe before its child timeout")
+	assert.Less(t, time.Since(started), probeGrandchildLifetime/3,
+		"the caller deadline must stop the plugin probe well before its own ceiling")
 }
 
 func TestValidatePluginListPreservesSuccessfulProbeSemantics(t *testing.T) {
