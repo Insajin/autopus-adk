@@ -29,6 +29,12 @@ const (
 	ompVersionMaxOutput = 64 * 1024
 )
 
+// ompVersionCeiling is the deadline Detect actually enforces. A test widens it
+// so a saturated machine cannot preempt the identity contract under test: the
+// probe spawns a process and the production bound, not the assertion, becomes
+// what a tight run measures. The shipped default never moves.
+var ompVersionCeiling = ompVersionTimeout
+
 // Adapter is the oh-my-pi (omp) platform adapter.
 type Adapter struct {
 	root                   string
@@ -74,7 +80,7 @@ func (a *Adapter) Detect(ctx context.Context) (bool, error) {
 		ctx = context.Background()
 	}
 
-	probeCtx, cancel := context.WithTimeout(ctx, ompVersionTimeout)
+	probeCtx, cancel := context.WithTimeout(ctx, ompVersionCeiling)
 	defer cancel()
 	sandbox, err := os.MkdirTemp("", "autopus-omp-detect-*")
 	if err != nil {
