@@ -185,12 +185,7 @@ func (c Client) settle(ctx context.Context, command, dispatchID string) (Settlem
 	if err != nil {
 		return Settlement{}, err
 	}
-	return Settlement{
-		DispatchID:    payload.DispatchID,
-		State:         payload.State,
-		Reason:        payload.Reason,
-		ProcessAction: payload.ProcessAction,
-	}, nil
+	return Settlement(payload), nil
 }
 
 // CloseTerminal kills a terminal by handle. This is the cleanup for residual
@@ -203,7 +198,7 @@ func (c Client) CloseTerminal(ctx context.Context, handle string) error {
 }
 
 func toLaunch(payload launchPayload) Launch {
-	return Launch{Agent: payload.Agent, Model: payload.Model, Effort: payload.Effort}
+	return Launch(payload)
 }
 
 func toResources(payloads []resourcePayload) []Resource {
@@ -212,12 +207,7 @@ func toResources(payloads []resourcePayload) []Resource {
 	}
 	resources := make([]Resource, len(payloads))
 	for index, payload := range payloads {
-		resources[index] = Resource{
-			Kind:   payload.Kind,
-			Role:   payload.Role,
-			ID:     payload.ID,
-			Action: payload.Action,
-		}
+		resources[index] = Resource(payload)
 	}
 	return resources
 }
