@@ -36,8 +36,11 @@ func TestInspectWithoutOrcaYieldsReceiptReadyUnverifiedEvidence(t *testing.T) {
 	assert.False(t, evidence.Resolution.Determined())
 	assert.NotEmpty(t, evidence.Resolution.Reason)
 
+	// The pipeline still holds a probed catalog; what is missing is the account
+	// it would be evidence for, so the receipt stays complete and unverified.
 	receipt := Evaluate(
-		TierRequest{Provider: ProviderCodex, RequestedTier: "ultra", ResolvedModel: "gpt-5.6-sol"},
+		TierRequest{Provider: ProviderCodex, RequestedTier: "ultra",
+			ResolvedModel: "gpt-5.6-sol", Evidence: EvidenceProbedCatalog},
 		evidence.Resolution, evidence.ExecEntitlement, evidence.ProbeEntitlement, time.Now())
 	assert.Equal(t, StatusUnverified, receipt.VerificationStatus)
 	assert.NotEmpty(t, receipt.ResolutionReason)
@@ -77,7 +80,8 @@ func TestInspectKeepsManagedAccountIDOutOfTheReceipt(t *testing.T) {
 	evidence, err := prober.Inspect(context.Background(), ProviderCodex)
 	require.NoError(t, err)
 	receipt := Evaluate(
-		TierRequest{Provider: ProviderCodex, RequestedTier: "ultra", ResolvedModel: "gpt-5.6-sol"},
+		TierRequest{Provider: ProviderCodex, RequestedTier: "ultra",
+			ResolvedModel: "gpt-5.6-sol", Evidence: EvidenceProbedCatalog},
 		evidence.Resolution, evidence.ExecEntitlement, evidence.ProbeEntitlement, time.Now())
 	encoded, err := json.Marshal(receipt)
 	require.NoError(t, err)
@@ -103,31 +107,28 @@ func TestInspectDegradesWhenExecutionCredentialIsMissing(t *testing.T) {
 	assert.NotEmpty(t, reason)
 }
 
-// Claude has no per-account entitlement source, so the credential seams must
-// not be consulted and both grades stay unknown without a provider branch.
-func TestInspectLeavesClaudeEntitlementsUnknown(t *testing.T) {
+// A provider the credential table does not name has nothing on disk to read,
+// so the seams stay untouched and both grades stay unknown.
+func TestInspectSkipsCredentialsForUnnamedProvider(t *testing.T) {
 	t.Parallel()
 
 	prober := Prober{
-		AccountListing: func(context.Context) ([]byte, error) { return probeClaudeListing(), nil },
-		Credential: func(string) ([]byte, error) {
-			t.Error("claude must not read a codex credential")
+		AccountListing: func(context.Context) ([]byte, error) { return probeCodexListing(), nil },
+		Credential: func(string, string) ([]byte, error) {
+			t.Error("an unnamed provider must not read a credential")
 			return nil, nil
 		},
-		HostCredential: func() ([]byte, error) {
-			t.Error("claude must not read a codex credential")
+		HostCredential: func(string) ([]byte, error) {
+			t.Error("an unnamed provider must not read a credential")
 			return nil, nil
 		},
 	}
 
-	evidence, err := prober.Inspect(context.Background(), ProviderClaude)
+	evidence, err := prober.Inspect(context.Background(), "gemini")
 	require.NoError(t, err)
-	assert.Equal(t, AccountSoleRegistered, evidence.Resolution.Status)
+	assert.False(t, evidence.Resolution.Determined())
 	assert.False(t, evidence.ExecEntitlement.Known())
 	assert.False(t, evidence.ProbeEntitlement.Known())
-
-	verdict, _ := CompareEntitlement(evidence.ExecEntitlement, evidence.ProbeEntitlement)
-	assert.Equal(t, VerdictUnverified, verdict)
 }
 
 func TestInspectReportsUnparsableListing(t *testing.T) {
@@ -150,19 +151,21 @@ func probeFilesystemProber(t *testing.T, supportRoot, localHome string, listing 
 
 	return Prober{
 		AccountListing: func(context.Context) ([]byte, error) { return listing, nil },
-		Credential: func(accountID string) ([]byte, error) {
+		Credential: func(provider, accountID string) ([]byte, error) {
+			assert.Equal(t, ProviderCodex, provider)
 			path, err := managedCodexAuthPath(supportRoot, accountID)
 			if err != nil {
 				return nil, err
 			}
-			return readCredentialFile(path, executionCredentialScope)
+			return readCredentialFile(path, codexExecutionScope, maxCredentialBytes)
 		},
-		HostCredential: func() ([]byte, error) {
+		HostCredential: func(provider string) ([]byte, error) {
+			assert.Equal(t, ProviderCodex, provider)
 			path, err := localCodexAuthPath(localHome, "")
 			if err != nil {
 				return nil, err
 			}
-			return readCredentialFile(path, probeCredentialScope)
+			return readCredentialFile(path, codexProbeScope, maxCredentialBytes)
 		},
 	}
 }
@@ -173,12 +176,6 @@ func probeCodexListing() []byte {
 		"activeAccountId":%q,
 		"systemDefault":{"hasAuth":true,"email":%q,"providerAccountId":"org-host"}}}}`,
 		probeExecAccountID, probeExecEmail, probeExecAccountID, probeHostEmail))
-}
-
-func probeClaudeListing() []byte {
-	return []byte(fmt.Sprintf(`{"ok":true,"result":{"claude":{
-		"accounts":[{"id":%q,"email":%q,"organizationUuid":"org-claude"}],
-		"activeAccountId":null}}}`, probeExecAccountID, probeExecEmail))
 }
 
 func probeWriteManagedAuth(t *testing.T, supportRoot, accountID, grade string) {

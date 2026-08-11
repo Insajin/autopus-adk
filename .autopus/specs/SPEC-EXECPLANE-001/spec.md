@@ -74,17 +74,18 @@ THE SYSTEM SHALL treat a probed catalog as evidence for a requested tier only wh
 - EARS type: Ubiquitous
 - Priority: Must
 - Trigger/Condition: 요청 티어를 provider 모델로 해석할 때.
-- Observability: 영수증의 카탈로그 출처가 프로브 계정과 그 자격 등급을 함께 담고, 그 등급이 실행 계정의 등급과 같음을 S3로 확인한다. 등급이 다른데 재프로브 없이 통과한 판정은 위반이다. 카탈로그가 자격에 종속된다는 전제 자체는 S10으로 고정한다 — 자격과 무관하게 카탈로그를 캐시하거나 재사용하는 구현은 등급 비교를 무의미하게 만든다.
+- Observability: 영수증의 카탈로그 출처가 프로브 계정과 그 자격 등급을 함께 담고, 그 등급이 실행 계정의 등급과 같음을 S3로 확인한다. 등급이 다른데 재프로브 없이 통과한 판정은 위반이다. 재프로브 경로 자체 — 등급 동일 시 호출 0회, 상이 시 실행 계정 기준 1회, 실패 시 unverified — 는 S12로 고정한다. 카탈로그가 자격에 종속된다는 전제는 S10으로 고정한다: 자격과 무관하게 카탈로그를 캐시하거나 재사용하는 구현은 등급 비교를 무의미하게 만든다.
 - 해소된 설계 결정 1 — 기본 경로는 자격 비교다. 조직만 다르고 자격 등급이 같은 두 Codex 계정은 판정 필드(슬러그 집합, `supported_reasoning_levels`)가 완전히 동일했다(research.md F9). 반면 인증 자체를 제거하면 슬러그 집합이 달라진다. 따라서 판정을 무효화하는 것은 신원 차이가 아니라 자격 차이이며, Codex의 자격 등급은 `auth.json` id_token의 `https://api.openai.com/auth.chatgpt_plan_type` 클레임에서 **네트워크 호출 없이** 읽힌다. 등급이 같으면 카탈로그를 다시 받지 않는다.
 - 해소된 설계 결정 2 — 이 비교는 자격에서 모델을 유추하지 않는다. 두 등급이 같은지만 본다. 그래서 하드코딩 매핑 표가 필요 없고, Claude `subscriptionType` 게이트를 기각한 근거(플랜 -> 모델 매핑은 추정이다)와 충돌하지 않는다.
-- 해소된 설계 결정 3 — provider별 깊이는 그대로다. Codex는 자격 비교 후 필요 시 카탈로그 재프로브까지 가능하다. Claude는 계정별 카탈로그 프로브가 없어 `claude auth status --json`의 `orgId`를 프로세스 평면의 `organizationUuid`와 대조하는 신원 검증까지만 하고, 모델 가용성은 REQ-009의 unverified로 남긴다.
+- 해소된 설계 결정 3 — provider별 깊이는 자격 등급을 어디서 읽느냐가 아니라 **등급 동일성이 무엇을 옮기느냐**로 갈린다. 두 provider 모두 관리 계정과 호스트 계정의 등급을 로컬에서 읽는다: Codex는 id_token의 `chatgpt_plan_type`, Claude는 자격증명의 `organizationType`(orca 관리본은 최상위, 호스트 `~/.claude.json`은 `oauthAccount` 아래 — 같은 필드명이다). 차이는 Codex에는 provider가 내려준 카탈로그가 있어 등급 동일성이 **그 카탈로그**를 옮기는 반면, Claude에는 카탈로그가 없어 기준 세션의 작업 가정만 옮긴다는 점이다. 그 차이는 REQ-005의 `evidence_kind`로 영수증에 남는다.
+- 해소된 설계 결정 4 — Claude 등급은 조직 플랜(`organizationType`)이지 rate-limit 티어가 아니다. `default_claude_max_20x`와 `..._5x`는 같은 모델 집합을 throttle할 뿐이라, 이를 등급에 섞으면 실제로 동등한 계정 사이에 불필요한 재프로브가 발생한다.
 
 ### REQ-005 — 정합 결과를 영수증으로 방출한다
-THE SYSTEM SHALL emit an integrity receipt carrying the requested tier, the resolved provider model, the execution account identifier, the catalog source with the entitlement grade it was probed under, the resolution reason, and the verification status, so a later reader can reconstruct why a workload ran at the tier it ran at.
+THE SYSTEM SHALL emit an integrity receipt carrying the requested tier, the resolved provider model, the execution account identifier, the catalog source with the entitlement grade it was probed under, the resolution reason, the verification status, and the kind of evidence the verdict rests on, so a later reader can reconstruct both why a workload ran at the tier it ran at and how strong that basis was.
 - EARS type: Ubiquitous
 - Priority: Must
 - Trigger/Condition: 정합 점검이 끝난 시점.
-- Observability: 영수증이 위 6개 필드를 모두 담고 스키마 버전을 갖는지 S4로 확인한다.
+- Observability: 영수증이 위 7개 필드를 모두 담고 스키마 버전을 갖는지 S4로 확인한다. 같은 `verified` 판정 안에서도 `evidence_kind`가 provider별 근거 강도를 구분해 남기는지는 S11로 확인한다.
 
 ### REQ-006 — 티어 불일치는 조용히 강등되지 않는다
 IF the execution account cannot serve the requested tier, THEN THE SYSTEM SHALL fail closed or record an explicit downgrade that names both the requested tier and the model actually available, and SHALL NOT substitute a lower model with no record.
@@ -113,14 +114,16 @@ IF the execution account cannot be determined, or the account that will run the 
 - Priority: Must
 - Trigger/Condition: 계정을 특정할 수 없거나 그 계정의 카탈로그를 조회할 수단이 없을 때.
 - Observability: 해당 provider의 영수증 항목이 `unverified` 상태와 비어 있지 않은 사유를 갖고, `verified`로 표기되지 않음을 S8로 확인한다. 실행 계정을 특정할 수 없는 경우는 S9로 확인한다.
-- 이 요구가 흡수하는 세 인스턴스: (1) Claude 모델 가용성 — 계정별 카탈로그 프로브가 없다, (2) 원격 orca 환경 — `orca account list`가 `--environment`를 구조적으로 거부하므로 원격 호스트의 계정을 조회할 수 없다, (3) 활성 계정 부재 + 등록 계정이 1개가 아닌 경우(REQ-003). 셋 다 별도 요구를 만들지 않고 같은 fail-loud 규칙으로 다룬다.
+- 이 요구가 흡수하는 인스턴스: (1) 원격 orca 환경 — `orca account list`가 `--environment`를 구조적으로 거부하므로 원격 호스트의 계정을 조회할 수 없다, (2) 활성 계정 부재 + 등록 계정이 1개가 아닌 경우(REQ-003), (3) 자격증명이 없거나 등급 클레임을 담지 않아 등급 비교 자체가 성립하지 않는 경우, (4) 보유 증거가 없는 provider — 등급이 아무리 깨끗이 맞아도 parity는 증거를 옮길 뿐 만들지 않으므로 verified가 될 수 없다. 넷 다 별도 요구를 만들지 않고 같은 fail-loud 규칙으로 다룬다. Claude 모델 가용성은 더 이상 여기 속하지 않는다 — `organizationType`이 등급 소스를 제공하므로 `entitlement_parity` 증거로 검증된다.
 
 ## Acceptance Criteria
 
 - [ ] 세 평면의 소유 표면이 배타적으로 열거되고 중복 어휘가 없다
 - [ ] 프로세스 평면 경계를 넘는 값에 티어 어휘가 없다
 - [ ] 정합 점검이 로컬 로그인 계정이 아니라 실행 계정을 사용한다
-- [ ] 정합 영수증이 6개 필드를 모두 담는다
+- [ ] 정합 영수증이 7개 필드를 모두 담는다
+- [ ] 같은 `verified` 안에서도 `evidence_kind`가 근거 강도를 구분해 남긴다
+- [ ] 자격 등급이 같으면 재프로브하지 않고, 다르면 실행 계정 기준으로 다시 프로브한다
 - [ ] 티어 불일치가 조용히 강등되지 않는다
 - [ ] 점검 실패가 리소스를 남기지 않는다
 - [ ] handoff 결과가 정합 영수증을 참조한다
@@ -134,8 +137,8 @@ IF the execution account cannot be determined, or the account that will run the 
 | REQ-001 | T1 | S1 | INV-001 |
 | REQ-002 | T1 | S2 | INV-001 |
 | REQ-003 | T2 | S3, S9 | INV-003 |
-| REQ-004 | T2 | S3, S10 | INV-003 |
-| REQ-005 | T3 | S4 | INV-004 |
+| REQ-004 | T2 | S3, S10, S12 | INV-003 |
+| REQ-005 | T3 | S4, S11 | INV-004 |
 | REQ-006 | T3 | S5 | INV-004 |
 | REQ-007 | T4 | S6 | INV-005 |
 | REQ-008 | T4 | S7 | INV-002, INV-005 |
@@ -158,8 +161,8 @@ IF the execution account cannot be determined, or the account that will run the 
 | REQ-001 | S1 | pending |
 | REQ-002 | S2 | pending |
 | REQ-003 | S3, S9 | pending |
-| REQ-004 | S3, S10 | pending |
-| REQ-005 | S4 | pending |
+| REQ-004 | S3, S10, S12 | pending |
+| REQ-005 | S4, S11 | pending |
 | REQ-006 | S5 | pending |
 | REQ-007 | S6 | pending |
 | REQ-008 | S7 | pending |

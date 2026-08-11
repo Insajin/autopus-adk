@@ -68,33 +68,35 @@ type Evidence struct {
 type Prober struct {
 	// AccountListing returns a raw `orca account list --json` payload.
 	AccountListing func(ctx context.Context) ([]byte, error)
-	// Credential returns the raw auth.json of one orca-managed account.
-	Credential func(accountID string) ([]byte, error)
-	// HostCredential returns the raw auth.json of the local CLI home.
-	HostCredential func() ([]byte, error)
+	// Credential returns the raw credential of one orca-managed account. It
+	// takes the provider because one Prober serves every provider in a run,
+	// and each keeps its managed credential in its own layout.
+	Credential func(provider, accountID string) ([]byte, error)
+	// HostCredential returns the raw credential of the provider's local CLI.
+	HostCredential func(provider string) ([]byte, error)
 }
 
 // NewProber returns a Prober wired to the real process plane and filesystem.
 func NewProber() Prober {
 	return Prober{
 		AccountListing: ListOrcaAccounts,
-		Credential:     readManagedCodexAuth,
-		HostCredential: readLocalCodexAuth,
+		Credential:     readManagedCredential,
+		HostCredential: readLocalCredential,
 	}
 }
 
 // Inspect resolves the execution account for one provider and recovers both
-// entitlement grades, without a single network call: the grade lives in a claim
-// of a credential already on disk.
+// entitlement grades, without a single network call: both providers already
+// record the grade in a credential on disk.
 //
 // The returned Evidence is always safe to hand to Evaluate, including alongside
 // an error. A probe that fails yields an indeterminate resolution with a
 // non-empty reason, which is the unverified branch rather than a guess.
 //
-// Claude carries no per-account entitlement source, so both entitlements stay
-// zero and CompareEntitlement degrades to unverified on its own. That is the
-// intended path, not an omission — a provider-specific branch here would be a
-// second place where "unverified" is decided.
+// Both providers record the grade on disk, in different places and shapes, so
+// the credential table decides where to read and how to parse it. A provider
+// absent from that table leaves both entitlements zero, which CompareEntitlement
+// degrades to unverified on its own.
 func (p Prober) Inspect(ctx context.Context, provider string) (Evidence, error) {
 	listing, err := p.listAccounts(ctx)
 	if err != nil {
@@ -108,37 +110,40 @@ func (p Prober) Inspect(ctx context.Context, provider string) (Evidence, error) 
 	}
 
 	evidence := Evidence{Resolution: resolution}
-	if provider != ProviderCodex {
+	source, known := credentialSourceFor(provider)
+	if !known {
 		return evidence, nil
 	}
 	// An unreadable credential is a degradation, not a failure: the grade stays
 	// unknown, CompareEntitlement reports why, and the receipt says unverified.
 	// Surfacing it as an error here would turn a reportable state into an abort.
 	if resolution.Determined() {
-		evidence.ExecEntitlement, _ = p.executionEntitlement(resolution.Account)
+		evidence.ExecEntitlement, _ = p.executionEntitlement(source, resolution.Account)
 	}
-	evidence.ProbeEntitlement, _ = p.hostEntitlement(resolution.Probe)
+	evidence.ProbeEntitlement, _ = p.hostEntitlement(source, resolution.Probe)
 	return evidence, nil
 }
 
 // executionEntitlement reads the grade of the account that will run the
 // workload, from the credential orca swaps in for it.
-func (p Prober) executionEntitlement(account Account) (Entitlement, error) {
-	payload, err := p.readCredential(account.ID)
+func (p Prober) executionEntitlement(source credentialSource, account Account) (Entitlement, error) {
+	payload, err := p.readCredential(source, account.ID)
 	if err != nil {
 		return Entitlement{}, err
 	}
-	return ParseCodexEntitlement(payload, accountLabel(account, executionCredentialScope))
+	return source.parse(payload,
+		credentialLabel(source, account, payload, source.executionScope))
 }
 
 // hostEntitlement reads the grade the held catalog was probed under, which is
 // the local CLI login and not necessarily the execution account.
-func (p Prober) hostEntitlement(probe Account) (Entitlement, error) {
-	payload, err := p.readHostCredential()
+func (p Prober) hostEntitlement(source credentialSource, probe Account) (Entitlement, error) {
+	payload, err := p.readHostCredential(source)
 	if err != nil {
 		return Entitlement{}, err
 	}
-	return ParseCodexEntitlement(payload, accountLabel(probe, probeCredentialScope))
+	return source.parse(payload,
+		credentialLabel(source, probe, payload, source.probeScope))
 }
 
 func (p Prober) listAccounts(ctx context.Context) ([]byte, error) {
@@ -148,18 +153,18 @@ func (p Prober) listAccounts(ctx context.Context) ([]byte, error) {
 	return ListOrcaAccounts(ctx)
 }
 
-func (p Prober) readCredential(accountID string) ([]byte, error) {
+func (p Prober) readCredential(source credentialSource, accountID string) ([]byte, error) {
 	if p.Credential != nil {
-		return p.Credential(accountID)
+		return p.Credential(source.provider, accountID)
 	}
-	return readManagedCodexAuth(accountID)
+	return source.readManaged(accountID)
 }
 
-func (p Prober) readHostCredential() ([]byte, error) {
+func (p Prober) readHostCredential(source credentialSource) ([]byte, error) {
 	if p.HostCredential != nil {
-		return p.HostCredential()
+		return p.HostCredential(source.provider)
 	}
-	return readLocalCodexAuth()
+	return source.readHost()
 }
 
 // indeterminate builds the resolution used when the process plane could not be
@@ -170,14 +175,4 @@ func indeterminate(provider, reason string) AccountResolution {
 		Status:   AccountIndeterminate,
 		Reason:   reason,
 	}
-}
-
-// accountLabel names an account for the receipt without leaking its internal
-// identifier. The email is what a later reader recognizes; the managed account
-// UUID stays out of receipts, logs, and errors.
-func accountLabel(account Account, fallback string) string {
-	if account.Email != "" {
-		return account.Email
-	}
-	return fallback
 }

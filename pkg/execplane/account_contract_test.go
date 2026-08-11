@@ -163,11 +163,14 @@ func TestEvaluateLeavesExecutionAccountEmptyWhenIndeterminate(t *testing.T) {
 	}
 	matched := execplane.Entitlement{Grade: "pro", Source: "host-cli@example.test"}
 
+	// A held catalog, so the receipt can only fall to unverified because nobody
+	// was named as the executor.
 	receipt := execplane.Evaluate(
 		execplane.TierRequest{
 			Provider:      execplane.ProviderCodex,
 			RequestedTier: "ultra",
 			ResolvedModel: "gpt-5.6-sol",
+			Evidence:      execplane.EvidenceProbedCatalog,
 		},
 		resolution, matched, matched, time.Now(),
 	)
@@ -176,4 +179,6 @@ func TestEvaluateLeavesExecutionAccountEmptyWhenIndeterminate(t *testing.T) {
 		"an unresolved account must stay unnamed rather than borrow the probe account")
 	assert.Equal(t, execplane.StatusUnverified, receipt.VerificationStatus)
 	assert.Equal(t, resolution.Reason, receipt.ResolutionReason)
+	assert.Equal(t, execplane.EvidenceProbedCatalog, receipt.EvidenceKind,
+		"the held evidence is still recorded; it just covers nobody in particular")
 }

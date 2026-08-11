@@ -69,6 +69,37 @@ func ParseCodexEntitlement(authJSON []byte, source string) (Entitlement, error) 
 	return Entitlement{Grade: grade, Source: source}, nil
 }
 
+// claudeCredential mirrors the entitlement fields Claude records for the signed
+// in account. The orca-managed copy stores the object at the top level while
+// the host CLI nests it under `oauthAccount`; both carry identical field names,
+// so one shape covers both sources.
+type claudeCredential struct {
+	OrganizationType string `json:"organizationType"`
+	OAuthAccount     *struct {
+		OrganizationType string `json:"organizationType"`
+	} `json:"oauthAccount"`
+}
+
+// ParseClaudeEntitlement recovers the plan grade from a Claude credential.
+//
+// The grade is the organization plan, not the rate-limit tier: capacity tiers
+// such as 5x versus 20x throttle the same model set, so comparing them would
+// force a needless re-probe between accounts that are in fact equivalent.
+func ParseClaudeEntitlement(payload []byte, source string) (Entitlement, error) {
+	var credential claudeCredential
+	if err := json.Unmarshal(payload, &credential); err != nil {
+		return Entitlement{}, fmt.Errorf("parse claude credential: %w", err)
+	}
+	grade := credential.OrganizationType
+	if grade == "" && credential.OAuthAccount != nil {
+		grade = credential.OAuthAccount.OrganizationType
+	}
+	if grade == "" {
+		return Entitlement{}, ErrNoEntitlementClaim
+	}
+	return Entitlement{Grade: grade, Source: source}, nil
+}
+
 // decodeJWTClaims decodes the payload segment without verifying the signature.
 // The token already authenticated the local CLI; this only reads a self-report
 // of the grade, and a forged grade would only make the gate re-probe or refuse.

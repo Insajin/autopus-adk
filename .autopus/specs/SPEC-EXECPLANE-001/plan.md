@@ -23,7 +23,30 @@
 
 이것이 기각한 대안 (c)와 충돌하지 않는 이유는 하는 일이 매핑이 아니라 비교이기 때문이다. 두 등급이 같은지만 보고 등급에서 모델을 유추하지 않으므로 하드코딩 매핑 표가 생기지 않는다. (c)를 기각한 근거 — 플랜 -> 모델 표는 증거가 아니라 우리 쪽 추정이다 — 는 그대로 유효하다.
 
-남은 미검증은 하나다. 자격 등급이 **다른** 계정 쌍이 이 워크스테이션에 없어, 등급이 갈릴 때 판정 필드가 실제로 어떻게 달라지는지는 확인하지 못했다. 미인증 프로브가 자격 종속성 자체를 증명하므로 계약은 성립하지만, 등급 불일치의 구체적 형태는 관측이 아니라 추론이다.
+남은 미검증은 하나다. 자격 등급이 **다른** 계정 쌍이 이 워크스테이션에 없어, 등급이 갈릴 때 판정 필드가 실제로 어떻게 달라지는지는 확인하지 못했다. 미인증 프로브가 자격 종속성 자체를 증명하므로 계약은 성립하지만, 등급 불일치의 구체적 형태는 관측이 아니라 추론이다. 따라서 아래에서 규정하는 재프로브 경로도 실기기에서 한 번도 구동된 적이 없고, 그 자리는 stub 기반 계약 테스트가 메운다.
+
+### 두 provider 모두 등급을 로컬에서 읽는다 — 갈리는 것은 등급 동일성이 무엇을 옮기느냐다
+
+F8은 "Claude에 계정별 카탈로그 프로브가 없다"에서 멈춰 Claude를 신원 검증까지로 묶고 모델 가용성을 영구 `unverified`로 결론지었다. **그 결론은 틀렸다.** 카탈로그가 없다는 사실을 등급이 없다는 사실로 오인한 것이다. 게이트가 요구하는 입력은 카탈로그가 아니라 **등급**이고, 등급은 이미 자격증명 파일 안에 있다(F10).
+
+| provider | 등급 필드 | 읽는 위치 |
+| --- | --- | --- |
+| codex | `chatgpt_plan_type` | `auth.json` id_token의 `https://api.openai.com/auth` 클레임 |
+| claude | `organizationType` | orca 관리 계정은 `<support>/orca/claude-accounts/<accountId>/auth/oauth-account.json` 최상위, 호스트 CLI는 `~/.claude.json`의 `oauthAccount` 아래 |
+
+Claude 쪽 두 위치는 **필드명이 같다**. 어휘 매핑 없이 파서 하나가 양쪽을 읽고, 이 워크스테이션 실측은 양쪽 다 `claude_max`다(F10). 등급은 조직 플랜(`organizationType`)으로 잡고 rate-limit 티어(`organizationRateLimitTier`의 `default_claude_max_20x` 대 `..._5x`)는 뺀다 — 후자는 같은 모델 집합을 throttle할 뿐이라, 등급에 섞으면 실제로 동등한 계정 사이에 불필요한 재프로브가 생긴다.
+
+그러므로 provider별 검증 깊이의 차이는 "누가 등급을 갖고 있느냐"가 아니다. 둘 다 갖고 있고, 둘 다 파일 읽기로 얻으므로 네트워크 호출이 0회다. 갈리는 것은 **등급 동일성이 무엇을 옮기느냐**다. Codex에는 provider가 내려준 카탈로그가 있어 등급 동일성이 그 카탈로그를 실행 계정으로 옮긴다. Claude에는 카탈로그가 없어 옮길 것이 기준 세션의 작업 가정뿐이다. 두 판정이 영수증에서 똑같이 `verified`로 읽히면 증거 강도가 조용히 뭉개진다 — 이 SPEC이 막으려던 실패가 게이트 자신 안에서 재발한다. 그래서 영수증에 `evidence_kind`를 둔다(REQ-005).
+
+| 값 | 뜻 | 이 워크스테이션 |
+| --- | --- | --- |
+| `probed_catalog` | provider가 내려준 카탈로그를 보유하고, 등급 동일성이 그것을 실행 계정으로 옮긴다 | codex |
+| `entitlement_parity` | 카탈로그가 없고, 등급 동일성이 기준 세션의 작업 가정만 옮긴다 | claude |
+| `none` | 옮길 증거가 없다. 등급이 아무리 맞아도 `verified`가 될 수 없다 | 해당 계정 없음 |
+
+**parity는 증거를 옮길 뿐 만들지 않는다.** 이것이 판정이 `verified`에 세 조건을 동시에 요구하는 이유다 — 실행 계정 determined + 등급 동일 + 증거 보유. 셋 중 하나라도 빠지면 REQ-009의 `unverified`이며, 특히 등급이 깨끗하게 일치해도 `evidence_kind`가 `none`이면 `verified`가 될 수 없다.
+
+등급이 갈리는 예외 경로에서 provider가 다시 갈린다. Codex는 실행 계정의 `CODEX_HOME`을 기준으로 `codex debug models`를 다시 프로브한다 — 성공하면 카탈로그 출처가 실행 계정을 가리키므로 `verified`가 가능하고, 실패하면 `unverified`이며 사유에 재프로브 실패를 명시한다. Claude는 프로브할 카탈로그가 아예 없으므로 재프로브하지 않고 곧바로 `unverified`다. 등급이 같은 기본 경로에서는 **재프로브가 0회**이고, 따라서 네트워크 호출도 0회로 유지된다(REQ-004).
 
 ### 기각한 대안 (a) — orca(프로세스 평면)에 둔다
 
@@ -51,7 +74,7 @@ Claude에는 `codex debug models` 등가물이 없다. F8의 확인 결과 `clau
 
 여기서 `subscriptionType`(`max`/`pro`/`free`)을 게이트 입력으로 삼아 "이 플랜이면 이 티어까지 허용"으로 판정하자는 안이 있었다. 기각한다. 판정이 성립하려면 플랜 -> 모델 매핑 표를 정책 평면에 하드코딩해야 하는데, 그 표는 계정이 실제로 무엇을 제공받는지에 대한 증거가 아니라 **우리 쪽의 추정**이다. provider가 플랜 정책을 바꾸면 표는 조용히 틀리고, 게이트는 틀린 표를 근거로 `verified`를 찍는다 — REQ-009가 금지하는 상태이자 INV-004가 막으려는 조용한 어긋남이다.
 
-형태로 보면 이 안은 PR #154가 제거한 하드코딩 티어 테이블을 provider 축에 되살리는 일이다. 같은 것을 다른 이름으로 되돌리지 않는다. Claude는 `orgId` 신원 대조까지만 검증하고 모델 가용성은 REQ-009의 `unverified`로 남긴다. 모르는 것을 모른다고 적는 편이 짐작해서 맞히는 것보다 싸다.
+형태로 보면 이 안은 PR #154가 제거한 하드코딩 티어 테이블을 provider 축에 되살리는 일이다. 같은 것을 다른 이름으로 되돌리지 않는다. 기각한 것은 어디까지나 **플랜 -> 모델 매핑**이지 플랜 값을 읽는 행위 자체가 아니다. 채택한 것은 위 절의 **등급 동일성 비교** — `organizationType` 두 값이 같은지만 보고 등급에서 모델을 유추하지 않으므로 하드코딩 표가 생기지 않는다. 둘은 다른 것이다. 매핑은 우리 쪽 추정을 증거로 승격시키고, 동일성 비교는 이미 가진 증거를 다른 계정으로 옮길 자격이 있는지만 확인한다. 그래서 Claude도 등급 축에서는 검증되고, 다만 옮긴 증거가 카탈로그가 아니라는 사실이 `evidence_kind: entitlement_parity`로 영수증에 남는다.
 
 ### 배치 지점 — handoff 직전, 부작용 이전
 
@@ -71,12 +94,13 @@ result := pipelineExecutionOwnerResult{
 
 ### 왜 이 SPEC은 설계만 고정하고 구현을 분리하는가
 
-착수 시점의 이유는 "미결 3건이 열려 있어 구현 선택이 정해지지 않는다"였다. 그 이유는 더 이상 유효하지 않다. research.md F8이 3건을 모두 실측으로 닫았고, 결정은 `### 결정` 표에, 계약은 spec.md REQ-003·REQ-004·REQ-009 본문에 들어갔다. `## Completion Debt`는 `none remaining`이다.
+착수 시점의 이유는 "미결 3건이 열려 있어 구현 선택이 정해지지 않는다"였다. 그 이유는 더 이상 유효하지 않다. research.md F8이 3건을 모두 실측으로 닫았고, F10이 그중 Claude 항목의 결론을 정정했으며, 결정은 `### 결정` 표에, 계약은 spec.md REQ-003·REQ-004·REQ-005·REQ-009 본문에 들어갔다. `## Completion Debt`는 `none remaining`이다.
 
 | 닫힌 질문 | 확정된 결정 | 계약이 앉는 자리 |
 | --- | --- | --- |
 | 계정 조회 소스 | `orca account list --json` 한 호출. 실행 계정은 `result.<provider>.activeAccountId`, 비교 대상 프로브 계정은 `result.codex.systemDefault`(codex) 또는 provider CLI 신원 | REQ-003 / T2 |
-| Claude 카탈로그 부재 | 신원만 검증. `claude auth status --json`의 `orgId`를 orca `claude.accounts[].organizationUuid`와 대조하고, 모델 가용성은 `unverified`로 남긴다 | REQ-004 / T2, REQ-009 / T3 |
+| Claude 카탈로그 부재 | Codex와 같은 **등급 동일성 비교**. orca 관리 계정과 호스트 CLI의 `organizationType`을 대조하고(`claude auth status --json`의 `orgId` 신원 대조는 계정 조인 수단으로만 쓴다), 옮긴 증거가 카탈로그가 아니므로 `evidence_kind: entitlement_parity`로 기록한다. 카탈로그가 없어 재프로브 경로는 두지 않는다 | REQ-004 / T2, REQ-005 / T3 |
+| 증거 강도 표기 | 영수증에 `evidence_kind`(`probed_catalog` \| `entitlement_parity` \| `none`). `verified`는 실행 계정 determined + 등급 동일 + 증거 보유 셋을 모두 요구하고, `none`이면 등급이 같아도 `unverified`다 | REQ-005 / T3, REQ-009 / T3 |
 | 원격 orca 환경 계정 조회 | 새 요구를 만들지 않고 REQ-009에 흡수. `orca account list`가 `--environment`를 구조적으로 거부하므로 "계정 조회 수단 없음"의 인스턴스다 | REQ-009 / T3 |
 
 그렇다면 왜 여전히 구현을 분리하는가. 이유가 바뀌었기 때문이다 — "질문이 열려 있어서"가 아니라 **계약이 먼저 합의되어야 구현이 바로잡힐 수 있어서**다.
@@ -87,7 +111,7 @@ F3이 주는 것은 사례가 아니라 **비용의 크기**다. #151은 측정 
 
 계약을 먼저 고정하는 이유는 따로 있다. 암묵 가정은 코드가 공백을 만나는 자리마다 새로 생기고, 이 접합면에서는 후보가 이미 셋 나왔다 — "로컬 CLI 로그인이 곧 실행 계정"(F1·F2가 반증), "플랜을 알면 모델을 안다"(기각한 대안 (c)), 그리고 새로 좁혀진 축에서 "계정이 다르면 무조건 재프로브해야 한다"(F9가 반증). 셋 다 실제로 검토됐고, 실측이 없었다면 셋 다 그럴듯했다. 계약 없이 구현부터 손대면 같은 종류의 가정이 다른 자리에 다시 자리잡는다.
 
-분리가 남기는 부채도 작아졌다. 요구 9건·불변식 5건·영수증 6필드는 이제 열린 질문에 기대지 않고 단독으로 판정 가능하므로, 후속 구현 SPEC이 발명할 것은 없고 이 문서를 참조 구현하면 된다. 이 분리는 spec.md `## Out of Scope` 첫 항목("정합 게이트의 구현 코드")과 일치한다.
+분리가 남기는 부채도 작아졌다. 요구 9건·불변식 5건·영수증 7필드는 이제 열린 질문에 기대지 않고 단독으로 판정 가능하므로, 후속 구현 SPEC이 발명할 것은 없고 이 문서를 참조 구현하면 된다. 이 분리는 spec.md `## Out of Scope` 첫 항목("정합 게이트의 구현 코드")과 일치한다.
 
 ## File Impact Analysis
 
@@ -96,9 +120,9 @@ F3이 주는 것은 사례가 아니라 **비용의 크기**다. #151은 측정 
 | 파일 | 작업 | 설명 |
 |------|------|------|
 | `.autopus/specs/SPEC-EXECPLANE-001/spec.md` | 생성 | 요구 9건, Outcome Boundary, Traceability Matrix, Out of Scope |
-| `.autopus/specs/SPEC-EXECPLANE-001/research.md` | 생성 | 실측 근거 F1~F9, 불변식 5건, 해소된 결정 표(Completion Debt `none remaining`), Reference Discipline |
+| `.autopus/specs/SPEC-EXECPLANE-001/research.md` | 생성 | 실측 근거 F1~F10, 불변식 5건, 해소된 결정 표(Completion Debt `none remaining`), Reference Discipline |
 | `.autopus/specs/SPEC-EXECPLANE-001/plan.md` | 생성 | 이 문서. 게이트 배치 논증과 T1~T4 설계 태스크 |
-| `.autopus/specs/SPEC-EXECPLANE-001/acceptance.md` | 생성 | S1~S10 시나리오와 Oracle Acceptance Notes |
+| `.autopus/specs/SPEC-EXECPLANE-001/acceptance.md` | 생성 | S1~S12 시나리오와 Oracle Acceptance Notes |
 
 아래 코드는 **참조 대상**이며 이 SPEC에서 수정하지 않는다: `pkg/codexruntime/probe.go`, `internal/cli/codex_catalog_runtime.go`, `internal/cli/pipeline_run_owner.go`, `pkg/adapter/omp/omp_workflow_render.go`, `pkg/config/role_model_policy_matrix.go`.
 
@@ -106,7 +130,7 @@ F3이 주는 것은 사례가 아니라 **비용의 크기**다. #151은 측정 
 
 - **의존 방향**: 정책 -> 모델, 정책 -> 프로세스 단방향만 허용한다. 모델 -> 프로세스, 프로세스 -> 정책 방향의 참조를 만들면 INV-001이 깨진다.
 - **경계 통과 값의 형태**: 정책 -> 프로세스 경계를 넘는 것은 opaque provider model id와 effort뿐이다(F4의 `worker-start` 계약과 동일한 형태). 티어 문자열은 경계에서 소멸한다.
-- **게이트가 읽어 오는 값의 형태**: 정책 평면이 프로세스 평면에서 가져오는 것은 계정 식별자와 그 계정의 자격 등급 둘뿐이고, 둘 다 로컬 상태 조회(`orca account list --json`, `auth.json` id_token 클레임)로 얻어진다. 기본 경로에 provider 네트워크 호출이 없고, 카탈로그 프로브는 두 등급이 갈릴 때만 발생하는 예외 비용이다(REQ-004).
+- **게이트가 읽어 오는 값의 형태**: 정책 평면이 프로세스 평면에서 가져오는 것은 계정 식별자와 그 계정의 자격 등급 둘뿐이고, 둘 다 로컬 상태 조회로 얻어진다 — `orca account list --json`, codex는 `auth.json` id_token의 `chatgpt_plan_type`, claude는 자격증명의 `organizationType`. 두 provider 모두 기본 경로에 네트워크 호출이 없고, 카탈로그 재프로브는 두 등급이 갈릴 때만 발생하는 codex 한정 예외 비용이다(REQ-004).
 - **J1 불변**: PR #154가 닫은 `quality.default` -> 내장 role-model 프로파일 -> omp `modelRoles` 경로는 이 SPEC에서 손대지 않는다. J2는 J1 결과를 입력으로 받는 후단 검증이다.
 - **기존 패턴 재사용**: 영수증은 이미 존재하는 `pipeline_execution_owner_receipt.v1`(INV-002 관측 지점)과 같은 스키마-버전 방식을 따른다. 새 관측 메커니즘을 발명하지 않는다.
 
@@ -139,27 +163,53 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
         v
   +-------------------------------------------------+
   | (2) 자격 등급 비교            REQ-004 / INV-003 |
-  |     P_exec == P_probe ?                         |
-  |     (chatgpt_plan_type, 네트워크 0회)           |
-  |       같음 -> 기존 카탈로그 판정 신뢰           |
-  |       다름 -> 실행 계정 기준 재프로브           |
-  |       불가 -> (3b) unverified                   |
-  |     P := auth.json id_token 클레임              |
-  |          https://api.openai.com/auth            |
-  |     Claude: 물려받을 카탈로그 없음              |
-  |             -> orgId 신원 대조까지만            |
+  |     G_exec == G_probe ?  — 두 provider 모두     |
+  |     로컬 파일 읽기, 네트워크 0회                |
+  |     codex : chatgpt_plan_type                   |
+  |             auth.json id_token 클레임           |
+  |             (https://api.openai.com/auth)       |
+  |     claude: organizationType                    |
+  |             orca: oauth-account.json 최상위     |
+  |             호스트: ~/.claude.json 의           |
+  |                     oauthAccount 아래           |
+  |     ! 두 위치가 같은 필드명 -> 파서 하나        |
+  |     ! rate-limit 티어는 등급이 아니다           |
+  |       (20x/5x는 같은 모델 집합을 throttle)      |
   |     ! F9: 조직만 다른 두 pro 계정은 판정 필드   |
   |       (슬러그·reasoning levels) 전부 동일       |
   +--------------------+----------------------------+
                        |
+        +--------------+-------------------------------+
+        | 등급 상이 (codex 축)                         | 등급 동일 · 비교 불가 -> 재프로브 없음
+        v                                              |
+  +-------------------------------------------------+  |
+  | (2b) 실행 계정 기준 재프로브  REQ-004 / INV-003 |  |
+  |      codex 한정. 실행 계정의 CODEX_HOME 으로    |  |
+  |      codex debug models 를 다시 실행한다.       |  |
+  |      *** 이 그림에서 유일한 네트워크 호출 ***   |  |
+  |      성공 -> 카탈로그 출처 = 실행 계정          |  |
+  |              evidence_kind = probed_catalog     |  |
+  |      실패 -> (3b). 사유에 재프로브 실패 명시    |  |
+  |      claude: 카탈로그가 없어 재프로브하지 않고  |  |
+  |              곧바로 (3b)                        |  |
+  +------------------------+------------------------+  |
+                           |                           |
+                       +---+---------------------------+
+                       |
           +------------+------------+
-          | 등급 동일 · 재프로브   | 등급 비교 불가 · 카탈로그 부재
-          |   성공 (Codex 축)      |   (Claude 가용성 · 원격 · 미특정)
+          | 등급 동일 or 재프로브  | 증거 없음(none) — verified 불가
+          | 성공 & 증거 보유       |   · 재프로브 실패
+          |  probed_catalog        |   · 원격 환경 · 실행 계정 미특정
+          |  entitlement_parity    |   · 등급 비교 불가
           v                        v
-  (3a) 해석 / 검증          (3b) unverified 표기
-       요청 티어 in 카탈로그?      REQ-009 / INV-004
-       출처 자격 == 실행 자격      사유 기록, verified 금지
-       INV-003                     신원만 대조, 가용성 미검증
+  (3a) 해석 / 검증              (3b) unverified 표기
+       요청 티어 in 카탈로그?   REQ-009 / INV-004
+       출처 자격 == 실행 자격   사유 기록, verified 금지
+       INV-003                  parity는 증거를 옮길 뿐
+       verified 세 조건:        만들지 않는다 — none이면
+         계정 determined        등급이 같아도 verified 불가
+         + 등급 동일
+         + 증거 보유
           |                        |
           +------------+-----------+
                        v
@@ -168,6 +218,8 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
   |   요청 티어 | 해석된 provider 모델              |
   |   실행 계정 식별자 | 카탈로그 출처(+자격 등급)  |
   |   resolution reason | verification status       |
+  |   evidence_kind: probed_catalog |               |
+  |                  entitlement_parity | none      |
   |   (+ schema version)                            |
   +--------------------+----------------------------+
                        |
@@ -189,13 +241,14 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
    티어 어휘는 경계에서 소멸
 ```
 
-읽는 법 다섯 가지.
+읽는 법 여섯 가지.
 
 1. **부작용 경계**는 (5)와 프로세스 평면 사이에 정확히 한 번 그어진다. (1)~(4)와 (6)은 전부 경계 위에 있으므로 실패 경로에 롤백이 필요 없다 — REQ-007이 배치로 충족된다.
 2. **handoff 지점**은 (5)다. `internal/cli/pipeline_run_owner.go:160-164`이 `handoff_required`를 반환하기 직전이며, 게이트가 그 앞에 있으므로 handoff를 받는 쪽은 이미 검증된 티어 계약을 들고 출발한다(REQ-008).
-3. **(2)의 기본 경로는 자격 등급 비교이고 네트워크 호출이 0회다.** 이 경로는 카탈로그를 다시 받지 않는다. `auth.json` id_token의 `chatgpt_plan_type` 두 값을 읽어 같은지 보는 것이 전부이며, 같으면 기존 카탈로그 판정을 그대로 증거로 인정한다. 카탈로그 재프로브는 등급이 갈릴 때만 발생하는 예외 경로다.
+3. **(2)의 기본 경로는 자격 등급 비교이고 네트워크 호출이 0회다.** 두 provider 모두 카탈로그를 다시 받지 않는다. codex는 `auth.json` id_token의 `chatgpt_plan_type`, claude는 자격증명의 `organizationType` — 각각 두 값을 파일에서 읽어 같은지 보는 것이 전부다. 등급이 같으면 재프로브가 0회이므로 (2b)가 통째로 건너뛰어진다.
 4. **판정을 무효화하는 것은 신원 차이가 아니라 자격 차이다.** (1)의 실행 계정과 (2)의 프로브 계정이 서로 다른 계정이어도 자격 등급이 같으면 (3a)의 판정은 성립한다. 이 워크스테이션이 정확히 그 경우다 — Codex 축에서 orca 활성 계정은 `bitgapnam@gmail.com`, PATH의 `codex`가 쓰는 계정은 `gnkong@alipeople.kr`로 신원은 갈라지지만(F1·F2), 둘 다 `pro`라 판정에 쓰이는 필드가 하나도 다르지 않다(F9). 등급이 다르거나 등급을 비교할 수 없을 때만 판정이 무너진다(REQ-004).
-5. **(2)의 분기는 provider 속성이지 실행 시점의 운이 아니다.** Codex는 자격 클레임과 계정별 카탈로그 프로브를 둘 다 갖고 있으므로 등급 비교 -> (필요 시) 재프로브 -> (3a)로 간다. Claude는 물려받을 카탈로그 자체가 없어 등급이 같은지 따지는 것이 무의미하고, `orgId` 신원 대조를 통과하더라도 가용성 축에서는 항상 (3b)로 간다. (3b)에 모이는 세 인스턴스 — Claude 가용성, 원격 환경, 실행 계정 미특정 — 는 REQ-009 하나가 같은 규칙으로 다룬다.
+5. **(2b)는 이 그림의 유일한 네트워크 경로이고 codex 전용이다.** 등급이 갈릴 때만 진입하며, 실행 계정의 `CODEX_HOME`으로 `codex debug models`를 다시 실행한다. 성공하면 카탈로그 출처가 실행 계정을 가리키므로 (3a)에서 `verified`가 가능하고, 실패하면 (3b)로 떨어지며 사유에 재프로브 실패를 명시한다. Claude는 프로브할 카탈로그가 없어 이 블록에 들어가지 않고 곧바로 (3b)다. 등급 동일 경로에서는 이 화살표가 아예 그려지지 않는다는 점이 REQ-004의 비용 주장(기본 경로 네트워크 0회)의 그림 상 근거다.
+6. **(3a)로 들어가도 증거 종류가 판정을 한 번 더 가른다.** (2)와 (2b)를 통과한 뒤 남는 질문은 "옮길 증거를 실제로 갖고 있는가"다. `probed_catalog`(provider가 내려준 카탈로그 보유 — codex)와 `entitlement_parity`(카탈로그 없이 기준 세션의 작업 가정만 이전 — claude)는 둘 다 증거이므로 `verified`로 갈 수 있지만, 영수증에서 서로 구분돼 남는다. `none`은 등급이 아무리 깨끗이 맞아도 `verified`가 될 수 없다 — parity는 증거를 옮길 뿐 만들지 않기 때문이다. (3b)에 모이는 인스턴스는 넷이다: 원격 환경, 실행 계정 미특정, 등급 비교 불가, 보유 증거 없음. Claude 모델 가용성은 더 이상 여기 속하지 않는다. REQ-009 하나가 넷을 같은 규칙으로 다룬다.
 
 ## Feature Completion Scope
 
@@ -213,11 +266,11 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
 | | 정책 -> 프로세스 경계의 티어 어휘 금지 목록 (REQ-002) |
 | | 실행 계정 조회의 인터페이스 계약 (REQ-003) |
 | | 자격 등급 동일성 검증과 불일치 시 재프로브의 인터페이스 계약 (REQ-004) |
-| | 정합 영수증 6필드 스키마와 스키마 버전 (REQ-005) |
+| | 정합 영수증 7필드 스키마와 스키마 버전, 증거 종류(`evidence_kind`) 표기 규칙 (REQ-005) |
 | | fail-loud 판정 규칙과 강등 기록 규칙 (REQ-006) |
 | | 게이트 배치 지점과 부작용 경계의 확정 (REQ-007, REQ-008) |
 | | 검증 불가 provider의 `unverified` 표기 규칙 (REQ-009) |
-| | S1~S10 시나리오와 그 관측 지점 |
+| | S1~S12 시나리오와 그 관측 지점 |
 | **범위 밖** | 정합 게이트의 구현 코드. 이 SPEC은 계약만 고정한다 |
 | | `--execution-owner orca`의 handoff 스텁을 실제 orca Run 생성으로 대체하는 작업 |
 | | 요청 티어를 제공 가능한 계정을 자동 선택하는 다계정 라우팅 |
@@ -228,7 +281,7 @@ J2 접합면의 런타임 흐름. research.md의 세 평면 정적 다이어그�
 
 범위 밖 목록은 spec.md `## Out of Scope`와 항목 대응이 1:1이다. 새 항목을 추가하지 않았다.
 
-관측 한계 하나를 제약으로 명시해 둔다. 자격 등급이 **다른** Codex 계정 쌍이 이 워크스테이션에 없어, 등급이 갈릴 때 판정 필드가 실제로 어떻게 달라지는지는 실측되지 않았다. 이것은 완료를 막지 않는다 — F9의 미인증 프로브가 자격 종속성 자체를 이미 증명했고, 계약이 요구하는 것은 "등급이 다르면 재프로브하거나 unverified로 표기한다"는 규칙이지 등급별 카탈로그 내용의 목록이 아니기 때문이다. 따라서 Completion Debt로 되돌리지 않고 관측 한계로 기록하며, research.md `## Completion Debt`는 `none remaining`으로 유지된다.
+관측 한계 하나를 제약으로 명시해 둔다. 자격 등급이 **다른** 계정 쌍이 이 워크스테이션에 없다. 두 provider 모두 실행 계정과 프로브 계정의 등급이 같은 상태(codex `pro`/`pro`, claude `claude_max`/`claude_max`)라서, 등급이 갈릴 때 판정 필드가 어떻게 달라지는지, 그리고 codex 재프로브 경로가 실제로 어떤 결과를 내는지는 실측되지 않았다 — **재프로브 경로는 실기기에서 한 번도 구동된 적이 없다.** 이것은 완료를 막지 않는다. F9의 미인증 프로브가 자격 종속성 자체를 이미 증명했고, 계약이 요구하는 것은 "등급이 다르면 재프로브하고, 재프로브도 불가하면 unverified로 표기한다"는 규칙이지 등급별 카탈로그 내용의 목록이 아니기 때문이다. 그 규칙은 실행 계정 등급을 주입한 stub 픽스처로 판정 가능하다. 따라서 Completion Debt로 되돌리지 않고 관측 한계로 기록하며, research.md `## Completion Debt`는 `none remaining`으로 유지된다. Claude 모델 가용성은 더 이상 이 한계 목록에 없다 — F10이 `organizationType` 등급 소스를 실측으로 확인해 `entitlement_parity` 증거로 검증되기 때문이다.
 
 ## Tasks
 
@@ -238,18 +291,18 @@ T1~T4는 모두 **설계·문서·합의 산출물**이다. 코드 작성 태스
   - 산출물: research.md Feature Coverage Map의 각 표면에 소유 평면을 정확히 하나 지정한 확정판, 그리고 정책 -> 프로세스 경계에서 금지되는 티어 토큰 목록(`balanced`/`ultra`/`opus`/`sonnet`/`haiku`)과 허용되는 통과 값(opaque provider model id, effort)의 명시.
   - 완료 판정: 같은 어휘가 둘 이상의 평면에 나타나지 않고(S1), 경계 통과 값 정의에 금지 토큰이 하나도 포함되지 않음이 문서로 확인된다(S2). F4의 orca 티어 어휘 0건 실측이 기준선이다.
 
-- [ ] **T2 — 실행 계정 조회와 자격 등급 기준 카탈로그 검증의 인터페이스 계약 확정** (REQ-003, REQ-004 / INV-003 / S3, S9, S10)
+- [ ] **T2 — 실행 계정 조회와 자격 등급 기준 카탈로그 검증의 인터페이스 계약 확정** (REQ-003, REQ-004 / INV-003 / S3, S9, S10, S12)
   - 산출물: (i) 실행 계정 식별자를 프로세스 평면에서 얻는 조회의 입력·출력·실패 모드 계약, (ii) 그 실행 계정의 자격 등급을 프로브 계정의 자격 등급과 대조하는 계약과 "두 등급이 같음을 확인하지 못하면 그 카탈로그는 증거가 아니다"라는 판정 규칙, 그리고 등급이 다를 때의 재프로브 경로와 재프로브도 불가할 때의 REQ-009 분기.
-  - **이 태스크는 미결을 해소하는 것이 아니라 이미 해소된 결정을 계약으로 고정한다**(research.md F8 `### 결정`). 계약에 반드시 들어갈 세 가지:
+  - **이 태스크는 미결을 해소하는 것이 아니라 이미 해소된 결정을 계약으로 고정한다**(research.md F8·F10 `### 결정`). 계약에 반드시 들어갈 세 가지:
     - **조회 소스** — `orca account list --json` 단일 호출. 실행 계정은 `result.<provider>.activeAccountId`, 비교 대상 프로브 계정은 `result.codex.systemDefault`(codex) 또는 provider CLI 신원(`claude auth status --json`의 `orgId`를 `claude.accounts[].organizationUuid`에 조인). 한 호출로 두 값을 모두 얻으므로 비교에 추가 조회가 필요 없다. `--environment`는 구조적으로 거부되므로 이 계약은 로컬 호스트 축만 갖는다.
     - **실행 계정 해석 규칙** — `activeAccountId`가 있으면 그 값, 없고 등록 계정이 **정확히 1개**면 그 계정, 그 외(0개 또는 2개 이상)는 특정하지 않고 REQ-009의 `unverified`로 분기. 세 단계가 이 우선순위 그대로 계약에 적혀야 하고, 마지막 단계에서 추측으로 하나를 고르는 경로는 금지된다.
-    - **provider별 검증 깊이** — Codex는 **자격 등급 비교가 기본 경로**이고, 카탈로그 재프로브는 등급이 다를 때만 수행하는 예외 경로다. 자격 등급은 `auth.json` id_token의 `https://api.openai.com/auth.chatgpt_plan_type` 클레임에서 읽으며 네트워크 호출을 요구하지 않는다. 세 분기가 계약에 그대로 적혀야 한다 — 등급이 같으면 기존 카탈로그 판정을 증거로 인정하고, 다르면 실행 계정 기준으로 재프로브하며, 둘 다 불가하면 REQ-009의 `unverified`로 떨어진다. 이 비교는 동일성 판정이며 등급에서 모델을 유추하지 않는다는 단서도 함께 박는다(하드코딩 매핑 표 금지). Claude는 계정별 카탈로그 프로브가 없어 물려받을 판정 자체가 없으므로 등급 비교 경로를 두지 않고 `orgId` 신원 대조까지만 하며, 모델 가용성은 `unverified`로 남긴다. 검증 깊이가 provider의 고정 속성이지 실행 시점의 재량이 아님을 계약이 못 박는다.
-  - 완료 판정: 세 요소가 모두 파라미터 수준으로 적혀 있고, 세 픽스처 각각에 대해 판정 결과가 유일하게 결정된다 — S3의 신원 분기·등급 동일 픽스처(orca 활성 Codex `bitgapnam@gmail.com` vs 로컬 codex CLI `gnkong@alipeople.kr`, 둘 다 `chatgpt_plan_type: "pro"`, F1·F9)에서는 재프로브 없이 판정이 성립하고, S10의 자격 종속성 픽스처에서는 자격이 다른 카탈로그의 재사용이 위반으로 판정되며, S9의 계정 미특정 픽스처에서는 unverified로 분기한다. research.md `## Completion Debt`가 `none remaining` 상태로 유지된다.
+    - **provider별 검증 깊이** — 두 provider 모두 **자격 등급 비교가 기본 경로**이고, 갈리는 것은 등급 동일성이 무엇을 옮기느냐다. 등급을 읽는 위치 두 곳을 계약에 그대로 박는다: codex는 `auth.json` id_token의 `https://api.openai.com/auth.chatgpt_plan_type` 클레임, claude는 자격증명의 `organizationType` — orca 관리 계정은 `<support>/orca/claude-accounts/<accountId>/auth/oauth-account.json` 최상위, 호스트 CLI는 `~/.claude.json`의 `oauthAccount` 아래이며 **두 위치가 같은 필드명을 쓰므로 파서 하나가 양쪽을 읽는다**(F10). 어느 쪽도 네트워크 호출을 요구하지 않는다. Claude 등급은 조직 플랜(`organizationType`)이지 rate-limit 티어가 아님을 계약이 명시한다 — `organizationRateLimitTier`의 `default_claude_max_20x`와 `..._5x`는 같은 모델 집합을 throttle할 뿐이라, 등급에 섞으면 실제로 동등한 계정 사이에 불필요한 재프로브가 발생한다. 세 분기가 계약에 그대로 적혀야 한다 — 등급이 같으면 기존 판정을 증거로 인정하고, 다르면 실행 계정 기준으로 재프로브하며, 재프로브도 불가하면 REQ-009의 `unverified`로 떨어진다. 재프로브는 **codex 한정**이다: 실행 계정의 `CODEX_HOME`으로 `codex debug models`를 다시 실행하고, 성공하면 카탈로그 출처가 실행 계정을 가리켜 `verified`가 가능하며, 실패하면 `unverified`이고 사유에 재프로브 실패를 명시한다. Claude는 프로브할 카탈로그가 없으므로 재프로브 경로를 두지 않고 등급 불일치 시 곧바로 `unverified`다. 등급이 같은 기본 경로에서 재프로브 횟수가 0회, 따라서 네트워크 호출도 0회임을 계약이 비용 조항으로 못 박는다. 이 비교는 동일성 판정이며 등급에서 모델을 유추하지 않는다는 단서도 함께 박는다(하드코딩 매핑 표 금지). 옮긴 증거의 종류 차이 — codex는 provider가 내려준 카탈로그, claude는 기준 세션의 작업 가정 — 는 REQ-005의 `evidence_kind`로 영수증에 남기며, 검증 깊이가 provider의 고정 속성이지 실행 시점의 재량이 아님을 계약이 못 박는다.
+  - 완료 판정: 세 요소가 모두 파라미터 수준으로 적혀 있고, 네 픽스처 각각에 대해 판정 결과가 유일하게 결정된다 — S3의 신원 분기·등급 동일 픽스처(orca 활성 Codex `bitgapnam@gmail.com` vs 로컬 codex CLI `gnkong@alipeople.kr`, 둘 다 `chatgpt_plan_type: "pro"`, F1·F9)에서는 재프로브 없이 판정이 성립하고, S12의 등급 상이 픽스처에서는 codex가 실행 계정 `CODEX_HOME` 기준으로 정확히 1회 재프로브하며 실패 시 두 사유가 함께 기록되고 claude는 재프로브 없이 분기하며, S10의 자격 종속성 픽스처에서는 자격이 다른 카탈로그의 재사용이 위반으로 판정되고, S9의 계정 미특정 픽스처에서는 unverified로 분기한다. research.md `## Completion Debt`가 `none remaining` 상태로 유지된다.
 
-- [ ] **T3 — 정합 영수증 스키마 확정** (REQ-005, REQ-006, REQ-009 / INV-004 / S4, S5, S8, S9)
-  - 산출물: 6필드(요청 티어 / 해석된 provider 모델 / 실행 계정 식별자 / 카탈로그 출처 / resolution reason / verification status) 각각의 타입·필수 여부·허용값을 담은 스키마 정의와 스키마 버전 이름. **카탈로그 출처 필드는 프로브 계정 식별자와 그 계정의 자격 등급을 함께 담는다** — 계정 식별자만으로는 INV-003("실행 계정과 같은 자격으로 얻은 카탈로그인가")을 나중에 되짚을 수 없기 때문이며, 따라서 등급 값이 빠진 출처는 스키마 위반이다. `verification status`의 허용값에 `unverified`가 포함되고 그 경우 사유 필드가 필수임을 규정한다. 명시적 강등 시 요청 값과 실제 값이 **둘 다** 남아야 한다는 제약도 스키마에 표현한다. 실행 계정 식별자와 자격 등급은 각각 미특정일 수 있으므로 그 표현(빈 값이 아니라 명시적 미특정 상태)도 스키마가 정의한다.
-  - **REQ-009가 흡수하는 세 인스턴스를 같은 fail-loud 규칙으로 다뤄야 한다**: ① Claude 모델 가용성 — 계정별 카탈로그 프로브가 없다, ② 원격 orca 환경 — `orca account list`가 `--environment`를 거부해 원격 호스트의 계정을 조회할 수 없다, ③ 실행 계정 미특정 — 활성 계정이 없고 등록 계정이 0개이거나 2개 이상이다(REQ-003). 셋은 사유 문자열만 다르고 상태값(`unverified`)·사유 필수·`verified` 금지는 동일하다. 셋을 구분하는 별도 상태값이나 예외 경로를 만들지 않는다.
-  - 완료 판정: S4에서 6필드와 스키마 버전이 모두 존재하고 카탈로그 출처가 프로브 계정과 그 자격 등급을 함께 담으며, S5에서 강등 경로의 `reason`이 비어 있을 수 없고 요청·실제 두 값이 모두 요구되며, S8에서 프로브 없는 provider가, S9에서 실행 계정이 미특정인 워크로드가 각각 `verified`로 표기될 수 없음이 스키마만 보고 판정된다. 기존 `pipeline_execution_owner_receipt.v1`과 같은 스키마-버전 방식을 따른다.
+- [ ] **T3 — 정합 영수증 스키마 확정** (REQ-005, REQ-006, REQ-009 / INV-004 / S4, S5, S8, S9, S11)
+  - 산출물: 7필드(요청 티어 / 해석된 provider 모델 / 실행 계정 식별자 / 카탈로그 출처 / resolution reason / verification status / `evidence_kind`) 각각의 타입·필수 여부·허용값을 담은 스키마 정의와 스키마 버전 이름. **카탈로그 출처 필드는 프로브 계정 식별자와 그 계정의 자격 등급을 함께 담는다** — 계정 식별자만으로는 INV-003("실행 계정과 같은 자격으로 얻은 카탈로그인가")을 나중에 되짚을 수 없기 때문이며, 따라서 등급 값이 빠진 출처는 스키마 위반이다. **`evidence_kind`의 허용값은 `probed_catalog`·`entitlement_parity`·`none` 셋뿐이고**, `verified`는 실행 계정 determined + 등급 동일 + **증거 보유** 세 조건을 모두 요구한다 — `none`이면 등급이 아무리 깨끗이 맞아도 `verified`가 될 수 없다. parity는 증거를 옮길 뿐 만들지 않기 때문이다. `evidence_kind`가 없는 영수증은 불완전한 영수증이며 스키마 위반이다. 두 provider가 똑같이 `verified`로 읽히면서 증거 강도가 뭉개지는 것을 막는 것이 이 필드의 존재 이유다. `verification status`의 허용값에 `unverified`가 포함되고 그 경우 사유 필드가 필수임을 규정한다. 명시적 강등 시 요청 값과 실제 값이 **둘 다** 남아야 한다는 제약도 스키마에 표현한다. 실행 계정 식별자와 자격 등급은 각각 미특정일 수 있으므로 그 표현(빈 값이 아니라 명시적 미특정 상태)도 스키마가 정의한다.
+  - **REQ-009가 흡수하는 네 인스턴스를 같은 fail-loud 규칙으로 다뤄야 한다**: ① 원격 orca 환경 — `orca account list`가 `--environment`를 거부해 원격 호스트의 계정을 조회할 수 없다, ② 실행 계정 미특정 — 활성 계정이 없고 등록 계정이 0개이거나 2개 이상이다(REQ-003), ③ 자격증명이 없거나 등급 클레임을 담지 않아 등급 비교 자체가 성립하지 않는다, ④ 보유 증거가 없는 provider — `evidence_kind`가 `none`이면 등급이 맞아도 `verified`가 될 수 없다. 넷은 사유 문자열만 다르고 상태값(`unverified`)·사유 필수·`verified` 금지는 동일하다. 넷을 구분하는 별도 상태값이나 예외 경로를 만들지 않는다. Claude 모델 가용성은 더 이상 이 목록에 속하지 않는다 — `organizationType` 등급 소스가 있어 `entitlement_parity` 증거로 검증된다(F10).
+  - 완료 판정: S4에서 7필드와 스키마 버전이 모두 존재하고 카탈로그 출처가 프로브 계정과 그 자격 등급을 함께 담으며 `evidence_kind`가 누락된 영수증이 불완전으로 판정되고, S11에서 둘 다 `verified`인 두 provider 항목이 `probed_catalog`와 `entitlement_parity`로 구분돼 기록됨이 스키마로 강제되며, S5에서 강등 경로의 `reason`이 비어 있을 수 없고 요청·실제 두 값이 모두 요구되며, S8에서 증거를 보유하지 못한 provider가, S9에서 실행 계정이 미특정인 워크로드가 각각 `verified`로 표기될 수 없음이 스키마만 보고 판정된다. 기존 `pipeline_execution_owner_receipt.v1`과 같은 스키마-버전 방식을 따른다.
 
 - [ ] **T4 — 게이트 배치 지점과 부작용 경계 확정** (REQ-007, REQ-008 / INV-002, INV-005 / S6, S7)
   - 산출물: 게이트가 실행되는 지점을 `internal/cli/pipeline_run_owner.go:160-164`의 `handoff_required` 반환 직전으로 확정한 배치 결정문, 그 지점 이전에 생성되지 않아야 하는 리소스 목록(워크트리·Run·워커·provider 세션), 그리고 점검 실패 시 handoff 결과 대신 정합 실패를 반환한다는 반환값 규칙. INV-002와의 양립 근거(F7 — 금지 대상은 OMP task DAG이지 omp 실행 자체가 아님, `pkg/adapter/omp/omp_workflow_render.go:99`)를 함께 기록한다.
@@ -261,13 +314,15 @@ REQ 커버리지: REQ-001·002(T1), REQ-003·004(T2), REQ-005·006·009(T3), REQ
 
 | 리스크 | 영향도 | 대응 |
 |--------|--------|------|
-| 해소된 결정 3건이 T2·T3의 계약 문장으로 옮겨지지 않고 research.md 결정 표에만 남는다 | 중간 | 리스크가 "미결"에서 "결정이 계약에 미반영"으로 이동했다. T2 완료 판정이 조회 소스·해석 규칙·검증 깊이 세 요소를 파라미터 수준으로 요구하고, T3 완료 판정이 REQ-009의 세 인스턴스를 요구한다 |
-| Claude 카탈로그 등가물이 없어 Claude 티어의 모델 가용성이 전부 `unverified`로 떨어진다 | 중간 | 이는 결함이 아니라 REQ-009가 설계한 정직한 상태다. 은폐 대신 표기하는 것이 INV-004의 요지다. `subscriptionType` 플랜 게이트로 메우는 안은 기각한 대안 (c)로 기록됐다 |
+| 해소된 결정이 T2·T3의 계약 문장으로 옮겨지지 않고 research.md 결정 표에만 남는다 | 중간 | 리스크가 "미결"에서 "결정이 계약에 미반영"으로 이동했다. T2 완료 판정이 조회 소스·해석 규칙·검증 깊이(등급 추출 위치 두 곳 포함) 세 요소를 파라미터 수준으로 요구하고, T3 완료 판정이 7필드와 `evidence_kind` 3종, REQ-009의 네 인스턴스를 요구한다 |
+| ~~Claude 모델 가용성이 영구 `unverified`로 남는다~~ **해소됨** | — | F10이 `organizationType` 등급 소스를 실측으로 확인해 Claude도 Codex와 같은 등급 동일성 비교를 받는다. F8의 영구 unverified 결론은 카탈로그 부재를 등급 부재로 오인한 것이었다. 남는 것은 증거 강도의 차이뿐이고, 그 차이는 은폐되지 않고 `evidence_kind: entitlement_parity`로 영수증에 명시된다. `subscriptionType` 플랜 게이트로 메우는 안(플랜 -> 모델 매핑)은 여전히 기각한 대안 (c)이며, 채택한 등급 동일성 비교와 다른 것이다 |
+| 두 provider가 똑같이 `verified`로 읽혀 증거 강도가 조용히 뭉개진다 | 중간 | 이 SPEC이 막으려던 실패가 게이트 자신 안에서 재발하는 형태다. `evidence_kind` 3종(`probed_catalog`/`entitlement_parity`/`none`)을 영수증 필수 필드로 두고, `verified`에 실행 계정 determined + 등급 동일 + 증거 보유 세 조건을 모두 요구해 막는다. `none`이면 등급이 맞아도 `verified`가 불가하다(T3, S4·S11) |
+| 등급 불일치 시의 재프로브 경로가 실기기에서 한 번도 구동된 적이 없다 | 중간 | 자격 등급이 다른 계정 쌍이 이 워크스테이션에 없다(codex `pro`/`pro`, claude `claude_max`/`claude_max`). 실행 계정 등급과 재프로브 결과를 주입한 **stub 기반 계약 테스트**로 판정을 고정한다 — 등급 상이 시 codex 재프로브 정확히 1회, 성공 시 출처가 실행 계정, 실패 시 `unverified` + 재프로브 실패 사유, claude는 재프로브 0회(S12). 계약이 요구하는 것은 등급별 카탈로그 내용의 목록이 아니라 이 분기 규칙이므로 stub으로 충분하다 |
 | 원격 orca 환경(`--on <saved-environment>`)에서 계정 축이 하나 더 늘어난다 | 낮음 | REQ-009에 흡수됐다. `orca account list`가 `--environment`를 거부하므로 원격은 "조회 수단 없음"의 인스턴스이고, `orca environment list --json`이 `{"environments": []}`라 현재 영향도 0건이다 |
 | 설계만 고정하고 구현을 분리한 결과, 후속 SPEC이 나오지 않으면 J2가 계속 끊긴 채 남는다 | 중간 | 구현 분리는 spec.md `## Out of Scope`에 명시된 결정이다. 결정이 모두 닫혔으므로 후속 SPEC은 발명이 아니라 이 문서의 참조 구현이며, 착수 장벽이 그만큼 낮다 |
 | 게이트를 정책 평면에 두면 정책 평면이 프로세스 평면 상태를 읽는 결합이 생긴다 | 낮음 | 방향이 기존 의존 방향(정책 -> 프로세스)과 같고, 읽는 값은 계정 식별자와 그 자격 등급 둘뿐이다. 역방향 참조는 만들지 않는다 |
 | 실행 계정과 프로브 계정이 갈라진 채로 티어 판정이 통과한다 | 낮음 (착수 시점 중간에서 하향) | F9가 위험 조건을 신원 차이에서 **자격 등급 차이**로 좁혔다. 이 워크스테이션의 분기 쌍(`bitgapnam@gmail.com` vs `gnkong@alipeople.kr`)은 둘 다 `chatgpt_plan_type: "pro"`라 판정 필드가 하나도 다르지 않다. REQ-004의 기본 경로가 등급 비교이므로 신원 분기 자체는 판정을 무효화하지 않고, 무효화 조건은 등급 불일치 하나로 남는다 |
-| 자격 등급 클레임이 없거나 provider가 다른 형식으로 노출해 비교 자체가 불가능하다 | 중간 | 비교 불가는 "판정 성립"이 아니라 "판정 미성립"이다. REQ-009의 `unverified`로 떨어지고 사유에 비교 불가를 남긴다. Codex는 `auth.json` id_token 클레임이 실측으로 확인됐고(F9), Claude는 물려받을 카탈로그가 없어 이미 unverified 경로다. 새 provider가 붙을 때 클레임이 없으면 기본값은 `verified`가 아니라 `unverified`이며, 이 기본값을 계약이 명시한다 |
+| 자격 등급 클레임이 없거나 provider가 다른 형식으로 노출해 비교 자체가 불가능하다 | 중간 | 비교 불가는 "판정 성립"이 아니라 "판정 미성립"이다. REQ-009의 `unverified`로 떨어지고 사유에 비교 불가를 남긴다. Codex는 `auth.json` id_token 클레임이(F9), Claude는 두 자격증명의 `organizationType`이(F10) 실측으로 확인됐다. 새 provider가 붙을 때 클레임이 없으면 기본값은 `verified`가 아니라 `unverified`이고 `evidence_kind`는 `none`이며, 이 기본값을 계약이 명시한다 |
 
 ## Dependencies
 
@@ -275,6 +330,7 @@ REQ 커버리지: REQ-001·002(T1), REQ-003·004(T2), REQ-005·006·009(T3), REQ
 - **PR #152** — 한 계정 안에서 일어난 F3의 조용한 세대 강등을 같은 세대 폴백 추가로 해소했다. 계정·자격 불일치 사례가 아니라 **조용한 오판정의 비용**을 보여주는 근거이며, 그 비용이 INV-004의 출처다.
 - **orca CLI** — 계정 조회의 사실상 유일한 소스(`account list`). 표면 변경은 요구하지 않고 소비자로만 취급한다(spec.md `## Out of Scope`).
 - **`codex debug models`** — Codex 카탈로그의 유일한 확인된 프로브(`pkg/codexruntime/probe.go:39`). F9에서 이 카탈로그가 계정 신원이 아니라 **호출자의 자격**에 종속됨이 확인됐다.
+- **Claude 자격증명 파일** — Claude 등급의 유일한 소스. orca 관리본 `<support>/orca/claude-accounts/<accountId>/auth/oauth-account.json`과 호스트 `~/.claude.json`이 같은 필드명(`organizationType`)으로 등급을 노출한다(F10). 둘 다 읽기 전용으로 취급하고, provider CLI에 새 표면을 요구하지 않는다.
 - **`auto spec validate`** — 완료 판정 1번의 검증 수단.
 
 새 외부 라이브러리 의존은 없다. 설계 문서이므로 코드 의존도 추가하지 않는다.
@@ -283,7 +339,7 @@ REQ 커버리지: REQ-001·002(T1), REQ-003·004(T2), REQ-005·006·009(T3), REQ
 
 - [ ] `auto spec validate .autopus/specs/SPEC-EXECPLANE-001`이 4개 문서에 대해 통과한다
 - [ ] T1~T4의 산출물이 모두 존재하고 REQ 9건을 빠짐없이 덮는다
-- [ ] research.md Completion Debt 3건이 각각 해소 또는 후속 SPEC 이관으로 처리됐다 — 3건 모두 F8에서 해소됐고 `## Completion Debt`는 `none remaining`이다. 남은 확인은 그 결정이 T2·T3 산출물에 계약으로 들어갔는지다
+- [ ] research.md Completion Debt 3건이 각각 해소 또는 후속 SPEC 이관으로 처리됐다 — 3건 모두 F8에서 해소됐고(그중 Claude 항목의 결론은 F10이 정정했다) `## Completion Debt`는 `none remaining`이다. 남은 확인은 그 결정이 T2·T3 산출물에 계약으로 들어갔는지다
 - [ ] research.md `## Reviewer Brief`의 4개 질문에 대한 리뷰 판단이 기록됐다
 - [ ] 범위 밖 항목 목록이 spec.md `## Out of Scope`와 모순되지 않는다
 
