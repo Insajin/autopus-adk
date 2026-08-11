@@ -80,10 +80,8 @@ func runPipelineTierIntegrityGate(ctx context.Context, projectDir, specID string
 		// reason lands in the receipt, which is REQ-009's unverified branch and
 		// not a pipeline abort. That covers orca missing from PATH.
 		evidence, _ := runtimeExecplaneTierProbe(ctx, provider)
-		receipts = append(receipts, execplane.Evaluate(
-			tierRequestForProvider(cfg.Quality, provider),
-			evidence.Resolution, evidence.ExecEntitlement, evidence.ProbeEntitlement, checkedAt,
-		))
+		receipts = append(receipts, evaluateProviderTierIntegrity(
+			ctx, cfg, tierRequestForProvider(cfg.Quality, provider), evidence, checkedAt))
 	}
 	status, reason := foldPipelineTierIntegrity(receipts)
 	path, err := persistPipelineTierIntegrityReceipt(specID, pipelineTierIntegrityReceipt{
@@ -99,6 +97,25 @@ func runPipelineTierIntegrityGate(ctx context.Context, projectDir, specID string
 		}
 	}
 	return pipelineTierIntegrityResult{Status: status, Reason: reason, ReceiptPath: path}
+}
+
+// evaluateProviderTierIntegrity turns one provider's evidence into a receipt,
+// taking REQ-004's re-probe branch before the verdict is formed. Matching
+// grades never reach it, so the ordinary path stays free of subprocesses.
+func evaluateProviderTierIntegrity(
+	ctx context.Context,
+	cfg *config.HarnessConfig,
+	request execplane.TierRequest,
+	evidence execplane.Evidence,
+	checkedAt time.Time,
+) execplane.IntegrityReceipt {
+	catalog, note := reprobeCatalogUnderExecutionAccount(ctx, cfg, request.Provider, evidence)
+	receipt := execplane.Evaluate(
+		request, evidence.Resolution, evidence.ExecEntitlement, catalog, checkedAt)
+	if note != "" {
+		receipt.ResolutionReason += "; " + note
+	}
+	return receipt
 }
 
 // pipelineTierIntegritySkipped is the outcome recorded when no gate ran. REQ-008
@@ -175,6 +192,9 @@ func tierRequestForProvider(quality config.QualityConf, provider string) execpla
 	request := execplane.TierRequest{
 		Provider:      provider,
 		RequestedTier: quality.EffectiveMode(provider),
+		// A provider this gate does not own holds nothing, and Evidence says so
+		// rather than leaving a reader to infer it from a missing field.
+		Evidence: execplane.EvidenceNone,
 	}
 	switch provider {
 	case execplane.ProviderCodex:
@@ -185,10 +205,19 @@ func tierRequestForProvider(quality config.QualityConf, provider string) execpla
 		if profile.Effort != "" {
 			request.ResolvedModel += "/" + profile.Effort
 		}
+		// The pipeline holds a codex catalog the provider itself served, and a
+		// mismatched entitlement is answered by re-probing rather than by
+		// weakening the claim.
+		request.Evidence = execplane.EvidenceProbedCatalog
 	case execplane.ProviderClaude:
 		request.ResolvedModel = topClaudeModelForRun(quality)
+		// No account-scoped catalog probe exists for claude, so parity carries
+		// only the weaker claim that the executor runs on the same plan as the
+		// reference session. The receipt names that weakness instead of letting
+		// it read like a probed catalog.
+		request.Evidence = execplane.EvidenceEntitlementParity
 	}
-	// An unknown provider leaves the resolved model empty, which fails the
+	// An unknown provider also leaves the resolved model empty, which fails the
 	// receipt's completeness check instead of guessing a model on its behalf.
 	return request
 }

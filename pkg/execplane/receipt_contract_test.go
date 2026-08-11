@@ -9,9 +9,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fixtureTierRequest is the policy plane's ask, carried into the gate unchanged.
-func fixtureTierRequest(provider, tier, model string) execplane.TierRequest {
-	return execplane.TierRequest{Provider: provider, RequestedTier: tier, ResolvedModel: model}
+// fixtureTierRequest is the policy plane's ask, carried into the gate
+// unchanged. Evidence is a required argument rather than a defaulted field:
+// what the pipeline actually holds for a provider now decides whether the
+// receipt can reach verified, so no caller may leave it implicit.
+func fixtureTierRequest(
+	provider, tier, model string, evidence execplane.EvidenceKind,
+) execplane.TierRequest {
+	return execplane.TierRequest{
+		Provider:      provider,
+		RequestedTier: tier,
+		ResolvedModel: model,
+		Evidence:      evidence,
+	}
 }
 
 // fixtureDeterminedAccount is a resolution that names exactly one execution account.
@@ -26,12 +36,14 @@ func fixtureDeterminedAccount(provider, email string) execplane.AccountResolutio
 
 // fixtureVerifiedReceipt is the only receipt shape that may carry
 // StatusVerified: a determined account whose grade equals the grade the held
-// catalog was probed under.
+// catalog was probed under, backed by evidence that grade equality can carry
+// across.
 func fixtureVerifiedReceipt(t *testing.T) execplane.IntegrityReceipt {
 	t.Helper()
 
 	receipt := execplane.Evaluate(
-		fixtureTierRequest(execplane.ProviderCodex, "ultra", "gpt-5.6-sol"),
+		fixtureTierRequest(execplane.ProviderCodex, "ultra", "gpt-5.6-sol",
+			execplane.EvidenceProbedCatalog),
 		fixtureDeterminedAccount(execplane.ProviderCodex, "execution@example.test"),
 		execplane.Entitlement{Grade: "pro", Source: "execution@example.test"},
 		execplane.Entitlement{Grade: "pro", Source: "host-cli@example.test"},
@@ -61,6 +73,7 @@ func TestVerifiedReceiptCarriesAllSixFields(t *testing.T) {
 	assert.Equal(t, "host-cli@example.test", receipt.CatalogSource.Account)
 	assert.Equal(t, "pro", receipt.CatalogSource.Entitlement)
 	assert.NotEmpty(t, receipt.ResolutionReason)
+	assert.Equal(t, execplane.EvidenceProbedCatalog, receipt.EvidenceKind)
 	assert.Equal(t, time.UTC, receipt.CheckedAt.Location())
 	assert.True(t, receipt.Complete())
 }
@@ -86,6 +99,10 @@ func TestIncompleteReceiptIsRejectedFieldByField(t *testing.T) {
 		{"catalog grade missing", func(r *execplane.IntegrityReceipt) { r.CatalogSource.Entitlement = "" }},
 		{"resolution reason missing", func(r *execplane.IntegrityReceipt) { r.ResolutionReason = "" }},
 		{"status missing", func(r *execplane.IntegrityReceipt) { r.VerificationStatus = "" }},
+		{"evidence kind missing", func(r *execplane.IntegrityReceipt) { r.EvidenceKind = "" }},
+		{"evidence kind is none", func(r *execplane.IntegrityReceipt) {
+			r.EvidenceKind = execplane.EvidenceNone
+		}},
 	}
 
 	for _, tc := range cases {
@@ -129,7 +146,8 @@ func TestResolutionReasonIsNeverEmpty(t *testing.T) {
 
 			for name, resolution := range resolutions {
 				receipt := execplane.Evaluate(
-					fixtureTierRequest(execplane.ProviderCodex, "ultra", "gpt-5.6-sol"),
+					fixtureTierRequest(execplane.ProviderCodex, "ultra", "gpt-5.6-sol",
+						execplane.EvidenceProbedCatalog),
 					resolution, execution, probe, time.Now(),
 				)
 				assert.NotEmpty(t, receipt.ResolutionReason,
@@ -148,7 +166,8 @@ func TestReceiptNamesRequestedTierAndServedModelSeparately(t *testing.T) {
 	t.Parallel()
 
 	receipt := execplane.Evaluate(
-		fixtureTierRequest(execplane.ProviderCodex, "ultra", "gpt-5.5"),
+		fixtureTierRequest(execplane.ProviderCodex, "ultra", "gpt-5.5",
+			execplane.EvidenceProbedCatalog),
 		fixtureDeterminedAccount(execplane.ProviderCodex, "execution@example.test"),
 		execplane.Entitlement{Grade: "pro", Source: "execution@example.test"},
 		execplane.Entitlement{Grade: "plus", Source: "host-cli@example.test"},
@@ -180,7 +199,8 @@ func TestDeterminedIdentityWithoutCatalogProbeStaysUnverified(t *testing.T) {
 	}
 	require.True(t, resolution.Determined())
 
-	request := fixtureTierRequest(execplane.ProviderClaude, "ultra", "claude-opus-5")
+	request := fixtureTierRequest(
+		execplane.ProviderClaude, "ultra", "claude-opus-5", execplane.EvidenceNone)
 	receipt := execplane.Evaluate(
 		request, resolution, execplane.Entitlement{}, execplane.Entitlement{}, time.Now())
 
@@ -188,6 +208,7 @@ func TestDeterminedIdentityWithoutCatalogProbeStaysUnverified(t *testing.T) {
 		"identity is settled even though availability is not")
 	assert.Equal(t, execplane.StatusUnverified, receipt.VerificationStatus)
 	assert.NotEmpty(t, receipt.ResolutionReason)
+	assert.Equal(t, execplane.EvidenceNone, receipt.EvidenceKind)
 	assert.True(t, receipt.Complete())
 
 	// S8 (no probe available) and S9 (no account resolved) share the status but
@@ -203,19 +224,27 @@ func TestDeterminedIdentityWithoutCatalogProbeStaysUnverified(t *testing.T) {
 	assert.NotEqual(t, receipt.ResolutionReason, unresolved.ResolutionReason)
 }
 
-// TestVerifiedRequiresDeterminedAccountAndEqualKnownGrades covers S8 / REQ-009
-// as a property over the whole input space: verified is reachable only from a
-// determined account whose known grade equals the known grade the catalog was
-// probed under, and it never appears without a reason. This is what blocks the
-// optimistic shortcuts — deriving a grade from a subscription type, treating a
-// missing probe as harmless, or trusting a catalog whose grade is unknown.
-func TestVerifiedRequiresDeterminedAccountAndEqualKnownGrades(t *testing.T) {
+// TestVerifiedRequiresDeterminedAccountEqualGradesAndEvidence covers S8 /
+// REQ-009 as a property over the whole input space: verified is reachable only
+// when all three hold together — a determined account, a known grade equal to
+// the known grade the catalog was probed under, and evidence for parity to
+// carry across — and it never appears without a reason. This is what blocks
+// the optimistic shortcuts: deriving a grade from a subscription type,
+// treating a missing probe as harmless, trusting a catalog whose grade is
+// unknown, or reading clean grade parity as if it were itself evidence.
+func TestVerifiedRequiresDeterminedAccountEqualGradesAndEvidence(t *testing.T) {
 	t.Parallel()
 
 	entitlements := []execplane.Entitlement{
 		{},
 		{Grade: "pro", Source: "host-cli@example.test"},
 		{Grade: "plus", Source: "host-cli@example.test"},
+	}
+	evidences := []execplane.EvidenceKind{
+		"",
+		execplane.EvidenceNone,
+		execplane.EvidenceProbedCatalog,
+		execplane.EvidenceEntitlementParity,
 	}
 	resolutions := []execplane.AccountResolution{
 		fixtureDeterminedAccount(execplane.ProviderCodex, "execution@example.test"),
@@ -235,23 +264,31 @@ func TestVerifiedRequiresDeterminedAccountAndEqualKnownGrades(t *testing.T) {
 	for _, resolution := range resolutions {
 		for _, execution := range entitlements {
 			for _, probe := range entitlements {
-				receipt := execplane.Evaluate(
-					fixtureTierRequest(execplane.ProviderCodex, "ultra", "gpt-5.6-sol"),
-					resolution, execution, probe, time.Now(),
-				)
-				where := []any{"%s / exec %q / probe %q",
-					resolution.Status, execution.Grade, probe.Grade}
+				for _, evidence := range evidences {
+					receipt := execplane.Evaluate(
+						fixtureTierRequest(
+							execplane.ProviderCodex, "ultra", "gpt-5.6-sol", evidence),
+						resolution, execution, probe, time.Now(),
+					)
+					where := []any{"%s / exec %q / probe %q / evidence %q",
+						resolution.Status, execution.Grade, probe.Grade, evidence}
 
-				require.NotEmpty(t, receipt.ResolutionReason, where...)
-				wantVerified := resolution.Determined() &&
-					execution.Known() && probe.Known() && execution.Grade == probe.Grade
-				if !wantVerified {
-					assert.Equal(t, execplane.StatusUnverified, receipt.VerificationStatus, where...)
-					continue
+					require.NotEmpty(t, receipt.ResolutionReason, where...)
+					assert.Equal(t, evidence, receipt.EvidenceKind, where...)
+
+					wantVerified := resolution.Determined() &&
+						execution.Known() && probe.Known() && execution.Grade == probe.Grade &&
+						evidence != "" && evidence != execplane.EvidenceNone
+					if !wantVerified {
+						assert.Equal(t, execplane.StatusUnverified,
+							receipt.VerificationStatus, where...)
+						continue
+					}
+					assert.Equal(t, execplane.StatusVerified,
+						receipt.VerificationStatus, where...)
+					assert.NotEmpty(t, receipt.ExecutionAccount, where...)
+					assert.True(t, receipt.Complete(), where...)
 				}
-				assert.Equal(t, execplane.StatusVerified, receipt.VerificationStatus, where...)
-				assert.NotEmpty(t, receipt.ExecutionAccount, where...)
-				assert.True(t, receipt.Complete(), where...)
 			}
 		}
 	}

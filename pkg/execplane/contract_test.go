@@ -103,6 +103,58 @@ func fixtureGradedAuth(t *testing.T, grade string) []byte {
 	})
 }
 
+// fixtureOrgUUIDClaim and fixtureAccountUUIDClaim are the account identifiers
+// a real Claude credential carries beside the plan grade. Fixtures include
+// them so tests can prove the parser leaves them behind: an org or account
+// UUID reaching a receipt is a credential leak, not a richer record.
+const (
+	fixtureOrgUUIDClaim     = "fixture-organization-uuid"
+	fixtureAccountUUIDClaim = "fixture-account-uuid"
+)
+
+// fixtureClaudeAccount builds the entitlement block both Claude credential
+// sources expose under identical field names. rateLimitTier is a capacity
+// knob, not a plan, and is present so tests can hold it against the grade.
+func fixtureClaudeAccount(orgType, rateLimitTier string) map[string]any {
+	return map[string]any{
+		"organizationType":          orgType,
+		"organizationUuid":          fixtureOrgUUIDClaim,
+		"accountUuid":               fixtureAccountUUIDClaim,
+		"emailAddress":              "claude-owner@example.test",
+		"organizationRateLimitTier": rateLimitTier,
+		"billingType":               "subscription",
+		"seatTier":                  "standard",
+	}
+}
+
+// claudeCredentialShape selects which of the two on-disk layouts to render.
+type claudeCredentialShape bool
+
+const (
+	// claudeManagedShape is the orca-managed oauth-account.json, which stores
+	// the entitlement fields at the top level.
+	claudeManagedShape claudeCredentialShape = false
+	// claudeHostShape is ~/.claude.json, which nests the same field names one
+	// level down under `oauthAccount`.
+	claudeHostShape claudeCredentialShape = true
+)
+
+// fixtureClaudeCredential renders one account block in the requested layout.
+func fixtureClaudeCredential(t *testing.T, shape claudeCredentialShape, account map[string]any) []byte {
+	t.Helper()
+
+	document := any(account)
+	if shape == claudeHostShape {
+		document = map[string]any{
+			"numStartups":  7,
+			"oauthAccount": account,
+		}
+	}
+	payload, err := json.Marshal(document)
+	require.NoError(t, err)
+	return payload
+}
+
 // mentionsGrade reports whether reason names grade as a whole word. Plain
 // substring matching would accept the word "probe" as evidence that the grade
 // "pro" was recorded, hiding a reason that only ever names one side of the

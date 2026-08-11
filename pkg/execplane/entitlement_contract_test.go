@@ -33,6 +33,7 @@ func TestCompareEntitlementTrustsEqualGradesAcrossDifferentAccounts(t *testing.T
 			Provider:      execplane.ProviderCodex,
 			RequestedTier: "ultra",
 			ResolvedModel: "gpt-5.6-sol",
+			Evidence:      execplane.EvidenceProbedCatalog,
 		},
 		execplane.AccountResolution{
 			Provider: execplane.ProviderCodex,
@@ -90,11 +91,14 @@ func TestCompareEntitlementDemandsReprobeWhenGradesDiffer(t *testing.T) {
 	assert.True(t, mentionsGrade(reason, "pro"), "reason must name the execution grade: %q", reason)
 	assert.True(t, mentionsGrade(reason, "plus"), "reason must name the probe grade: %q", reason)
 
+	// The catalog is held, so only the grade mismatch can sink this receipt and
+	// the assertions below cannot pass for the wrong reason.
 	receipt := execplane.Evaluate(
 		execplane.TierRequest{
 			Provider:      execplane.ProviderCodex,
 			RequestedTier: "ultra",
 			ResolvedModel: "gpt-5.6-sol",
+			Evidence:      execplane.EvidenceProbedCatalog,
 		},
 		execplane.AccountResolution{
 			Provider: execplane.ProviderCodex,

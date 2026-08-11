@@ -205,19 +205,43 @@ Owner `orca`: do not initialize an OMP task/todo DAG or call `task`.
 
 이 비교는 플랜에서 모델을 유추하지 않는다. 두 값이 같은지만 본다. 따라서 하드코딩 매핑 표가 필요 없고, F8에서 Claude `subscriptionType` 게이트를 기각한 근거와 충돌하지 않는다 — 기각한 것은 "플랜 -> 모델 매핑"이고 여기서 쓰는 것은 "플랜 동일성 비교"다.
 
+### F10 — Claude에도 자격 등급 소스가 있다
+
+F8은 "Claude에 계정별 카탈로그 프로브가 없다"에서 멈춰 모델 가용성을 영구 unverified로 두었다. 그 결론이 성급했다. 게이트가 필요한 것은 카탈로그가 아니라 **등급**이고, 등급은 자격증명에 있다.
+
+| 위치 | 경로 | 형태 |
+| --- | --- | --- |
+| orca 관리 계정 | `<support>/orca/claude-accounts/<accountId>/auth/oauth-account.json` | `organizationType` 최상위 |
+| 호스트 CLI | `~/.claude.json` | `oauthAccount.organizationType` |
+
+두 곳이 **동일한 필드명**을 쓴다(`organizationType`, `organizationUuid`, `emailAddress`, `organizationRateLimitTier`, `billingType`, `seatTier`). 어휘 매핑 없이 한 파서로 양쪽을 읽는다. 이 워크스테이션 실측은 양쪽 다 `claude_max`이고 `organizationUuid`도 같다.
+
+등급은 조직 플랜(`organizationType`)으로 잡았고 rate-limit 티어는 뺐다. `default_claude_max_20x`와 `..._5x`는 같은 모델 집합을 throttle할 뿐이라, 등급에 섞으면 동등한 계정 사이에 불필요한 재프로브가 생긴다.
+
+**다만 Codex와 같은 강도가 아니다.** Codex는 provider가 내려준 카탈로그를 보유하므로 등급 동일성이 그 카탈로그를 실행 계정으로 옮긴다. Claude는 카탈로그가 없어 옮길 것이 기준 세션의 작업 가정뿐이다. 두 판정이 영수증에서 똑같이 `verified`로 읽히면, 이 SPEC이 막으려던 증거 강도의 조용한 뭉갬이 그대로 재발한다. 그래서 영수증에 `evidence_kind`를 두었다.
+
+| 값 | 뜻 |
+| --- | --- |
+| `probed_catalog` | provider가 내려준 카탈로그를 보유하고, 등급 동일성이 그것을 실행 계정으로 옮긴다 |
+| `entitlement_parity` | 카탈로그가 없고, 등급 동일성이 기준 세션의 작업 가정만 옮긴다 |
+| `none` | 옮길 증거가 없다. 등급이 아무리 맞아도 verified가 될 수 없다 |
+
+parity는 증거를 **옮길** 뿐 만들지 않는다. 이것이 `Evaluate`가 verified에 세 조건(실행 계정 determined + 등급 동일 + 증거 보유)을 모두 요구하는 이유다.
+
 ### 결정
 
 | 질문 | 결정 | 근거 |
 | --- | --- | --- |
 | 계정 조회 소스 | `orca account list --json`. 실행 계정은 `activeAccountId`, 프로브 계정은 `systemDefault`(codex) 또는 provider CLI 신원 | 한 호출로 두 값을 모두 얻어 비교 가능 |
-| Claude 검증 깊이 | **신원만 검증**. `claude auth status --json`의 `orgId`를 orca `organizationUuid`와 대조하고, 모델 가용성은 unverified로 표기 | `subscriptionType`으로 플랜→모델을 매핑하면 하드코딩 티어 테이블이 되살아난다. PR #154가 제거한 것과 같은 종류다 |
+| Claude 검증 깊이 | **Codex와 같은 자격 등급 비교**. 관리 계정과 호스트 계정의 `organizationType`을 대조한다. 다만 카탈로그가 없으므로 증거 종류는 `entitlement_parity`로 기록한다 | F10 — 두 자격증명이 동일 필드명으로 등급을 노출한다. F8의 "신원만 검증" 결론은 카탈로그 부재를 등급 부재로 오인한 것이었다. 기각한 것은 여전히 "플랜 -> 모델 매핑"이고, 여기서 쓰는 것은 "등급 동일성 비교"다 |
+| 증거 강도 표기 | 영수증에 `evidence_kind`(`probed_catalog` \| `entitlement_parity` \| `none`). `verified`는 실행 계정 determined + 등급 동일 + 증거 보유 셋을 모두 요구한다 | 두 provider가 똑같이 `verified`로 읽히면 증거 강도가 조용히 뭉개진다 — 이 SPEC이 막으려던 바로 그 실패다 |
 | Claude `activeAccountId`가 null | 등록 계정이 **정확히 1개**면 그것을 실행 계정으로 보고, 0개이거나 2개 이상이면 unverified | 추측하지 않는다. 현재 상태(1개 등록)에서 동작하고, 모호해지면 모호하다고 보고한다 |
 | 원격 환경 | 별도 요구를 만들지 않고 **REQ-009에 흡수**. 원격 대상이면 "계정 조회 수단 없음"의 인스턴스이므로 unverified | `account list`가 원격을 구조적으로 거부하고, 저장된 환경이 0건이라 당장 영향도 없다 |
 | Codex 검증 방식 | **자격 등급 비교가 기본 경로**. 실행 계정과 프로브 계정의 `chatgpt_plan_type`이 같으면 기존 카탈로그 판정을 신뢰하고, 다르면 실행 계정 기준 재프로브 또는 unverified | F9 — 조직만 다른 두 pro 계정은 판정 필드가 동일했다. 위험은 신원 차이가 아니라 자격 차이이며, 플랜 클레임은 네트워크 없이 읽힌다 |
 
 ## Completion Debt
 
-none remaining. 착수 시점의 미결 3건은 F8에서, 카탈로그의 계정 종속성 전제는 F9에서 실측으로 해소되어 결정 표에 반영됐다. 그 결정은 spec.md REQ-003·REQ-004·REQ-009 본문에 계약으로 들어갔다. 다른 자격 등급의 계정 쌍은 이 워크스테이션에 없어 미검증으로 남지만, F9의 미인증 프로브가 자격 종속성 자체를 증명하므로 계약을 막지 않는다.
+none remaining. 착수 시점의 미결 3건은 F8에서, 카탈로그의 계정 종속성 전제는 F9에서, Claude 자격 등급 소스는 F10에서 실측으로 해소되어 결정 표에 반영됐다. 그 결정은 spec.md REQ-003·REQ-004·REQ-005·REQ-009 본문에 계약으로 들어갔다. 다른 자격 등급의 계정 쌍은 이 워크스테이션에 없어 미검증으로 남지만, F9의 미인증 프로브가 자격 종속성 자체를 증명하므로 계약을 막지 않는다.
 
 ## Evolution Ideas
 

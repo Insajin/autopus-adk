@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,9 +35,9 @@ func stubExecplaneTierProbe(t *testing.T, probe execplaneTierProbeFunc) {
 // that differs from the probe account but shares its entitlement grade — the
 // S3 shape in which the held catalog stands as evidence with no re-probe.
 //
-// It answers for claude too, which production never does (claude exposes no
-// per-account grade source). That is deliberate: this fixture exercises the
-// handoff wiring for a verified verdict, not a claim about claude.
+// Both providers answer with a grade, which the prober now recovers for claude
+// as well; what differs between them is not the grade but what the grade
+// licenses, and the evidence kind on each receipt is where that shows.
 func verifiedExecplaneTierEvidence(_ context.Context, provider string) (execplane.Evidence, error) {
 	return execplane.Evidence{
 		Resolution: execplane.AccountResolution{
@@ -92,8 +93,10 @@ func readPipelineTierIntegrityReceipt(t *testing.T, path string) pipelineTierInt
 		require.NoError(t, statErr)
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	}
-	assert.NotContains(t, string(body), execplaneTierProbeAccountID,
-		"a managed account id must never reach a receipt")
+	for _, accountID := range []string{execplaneTierProbeAccountID, execplaneReprobeAccountID} {
+		assert.NotContains(t, string(body), accountID,
+			"a managed account id must never reach a receipt")
+	}
 	var receipt pipelineTierIntegrityReceipt
 	require.NoError(t, json.Unmarshal(body, &receipt))
 	return receipt
@@ -109,7 +112,11 @@ func readPipelineExecutionOwnerReceipt(t *testing.T, path string) pipelineExecut
 }
 
 func TestPipelineTierIntegrityGate_VerifiedHandoffReferencesTheReceipt(t *testing.T) {
+	reprobes := noExecplaneCatalogReprobe(t)
 	specID, result, err := runPipelineOrcaHandoffWithProbe(t, verifiedExecplaneTierEvidence)
+
+	// REQ-004's point: matching grades reuse the held catalog for free.
+	assert.Zero(t, *reprobes)
 
 	assert.ErrorIs(t, err, errPipelineExecutionOwnerHandoffRequired)
 	assert.Equal(t, "handoff_required", result.Status)
@@ -128,6 +135,11 @@ func TestPipelineTierIntegrityGate_VerifiedHandoffReferencesTheReceipt(t *testin
 	assert.Equal(t, result.VerificationReason, receipt.Reason)
 	assert.False(t, receipt.CheckedAt.IsZero())
 	require.Len(t, receipt.Providers, len(pipelineTierIntegrityProviders))
+	// Both verify, but not on the same footing: only codex holds a served catalog.
+	wantEvidence := map[string]execplane.EvidenceKind{
+		execplane.ProviderCodex:  execplane.EvidenceProbedCatalog,
+		execplane.ProviderClaude: execplane.EvidenceEntitlementParity,
+	}
 	for _, provider := range receipt.Providers {
 		where := []any{"provider=%s", provider.Provider}
 		assert.Equal(t, execplane.IntegrityReceiptSchema, provider.Schema, where...)
@@ -137,11 +149,13 @@ func TestPipelineTierIntegrityGate_VerifiedHandoffReferencesTheReceipt(t *testin
 		assert.Equal(t, "probe@example.test", provider.CatalogSource.Account, where...)
 		assert.Equal(t, "pro", provider.CatalogSource.Entitlement, where...)
 		assert.Contains(t, result.VerificationReason, provider.Provider+": ", where...)
+		assert.Equal(t, wantEvidence[provider.Provider], provider.EvidenceKind, where...)
 	}
 }
 
 func TestPipelineTierIntegrityGate_UnverifiedSurfacesStatusAndReason(t *testing.T) {
 	const reason = "two registered accounts and no active selection"
+	noExecplaneCatalogReprobe(t)
 	_, result, err := runPipelineOrcaHandoffWithProbe(t,
 		func(_ context.Context, provider string) (execplane.Evidence, error) {
 			return execplane.Evidence{Resolution: execplane.AccountResolution{
@@ -175,6 +189,7 @@ func TestPipelineTierIntegrityGate_UnverifiedSurfacesStatusAndReason(t *testing.
 
 func TestPipelineTierIntegrityGate_OrcaProbeFailureStillHandsOffUnverified(t *testing.T) {
 	const reason = "process plane account listing is unavailable"
+	noExecplaneCatalogReprobe(t)
 	_, result, err := runPipelineOrcaHandoffWithProbe(t,
 		func(_ context.Context, provider string) (execplane.Evidence, error) {
 			// The prober's documented failure shape: an indeterminate
@@ -205,18 +220,37 @@ func TestTierRequestForProvider_NamesTierAndModelWithoutInferringOne(t *testing.
 	t.Parallel()
 
 	quality := config.DefaultFullConfig("tier-request").Quality
+	// Each owned provider names its evidence kind, so a bare "verified" can
+	// never hide which of two very different verifications produced it.
+	wantEvidence := map[string]execplane.EvidenceKind{
+		execplane.ProviderCodex:  execplane.EvidenceProbedCatalog,
+		execplane.ProviderClaude: execplane.EvidenceEntitlementParity,
+	}
 	for _, provider := range pipelineTierIntegrityProviders {
 		request := tierRequestForProvider(quality, provider)
 		assert.Equal(t, provider, request.Provider)
 		assert.NotEmpty(t, request.RequestedTier, provider)
 		assert.NotEmpty(t, request.ResolvedModel, provider)
+		assert.Equal(t, wantEvidence[provider], request.Evidence, provider)
 	}
 	assert.Equal(t, config.QualityProviderCodex, execplane.ProviderCodex,
 		"the gate and the quality plane must name providers identically")
 
-	// An unowned provider is not guessed at: the empty model fails the
-	// receipt's completeness check rather than inventing a tier contract.
-	assert.Empty(t, tierRequestForProvider(quality, "gemini").ResolvedModel)
+	// An unowned provider is not guessed at: no model and no evidence.
+	unowned := tierRequestForProvider(quality, "gemini")
+	assert.Empty(t, unowned.ResolvedModel)
+	assert.Equal(t, execplane.EvidenceNone, unowned.Evidence)
+
+	// Even a spotless entitlement match cannot verify it: parity transfers
+	// evidence across accounts, it never manufactures any.
+	unownedReceipt := execplane.Evaluate(unowned,
+		execplane.AccountResolution{Provider: "gemini", Status: execplane.AccountActive,
+			Account: execplane.Account{Email: "exec@example.test"}},
+		execplane.Entitlement{Grade: "pro", Source: "exec@example.test"},
+		execplane.Entitlement{Grade: "pro", Source: "probe@example.test"},
+		time.Now().UTC())
+	assert.Equal(t, execplane.EvidenceNone, unownedReceipt.EvidenceKind)
+	assert.Equal(t, execplane.StatusUnverified, unownedReceipt.VerificationStatus)
 }
 
 func TestFoldPipelineTierIntegrity_DemandsEveryProviderAndAlwaysGivesAReason(t *testing.T) {
@@ -231,6 +265,9 @@ func TestFoldPipelineTierIntegrity_DemandsEveryProviderAndAlwaysGivesAReason(t *
 		},
 		ResolutionReason:   "execution and probe accounts share entitlement pro",
 		VerificationStatus: execplane.StatusVerified,
+		// Expectation change: Complete() now demands an evidence kind, so a
+		// fixture that omits it is no longer a verified receipt.
+		EvidenceKind: execplane.EvidenceProbedCatalog,
 	}
 	status, reason := foldPipelineTierIntegrity([]execplane.IntegrityReceipt{verified})
 	assert.Equal(t, execplane.StatusVerified, status)
