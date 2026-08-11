@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/pkg/learn"
+	"github.com/insajin/autopus-adk/pkg/orcarun"
 	"github.com/insajin/autopus-adk/pkg/pipeline"
 )
 
@@ -145,21 +147,24 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	}
 	projectDir = filepath.Clean(projectDir)
 	if platform == "omp" {
-		// REQ-007/REQ-008: the read-only tier integrity gate completes here,
+		// REQ-106/INV-105: the read-only tier integrity gate completes here,
 		// before any checkpoint, worktree, Run, worker, or provider session
-		// exists, and before the handoff result is emitted.
+		// exists, so no worker can start under an unverified tier contract.
 		integrity := pipelineTierIntegritySkipped()
 		if ownerDecision.Owner == pipelineExecutionOwnerOrca {
 			integrity = runPipelineTierIntegrityGate(cmd.Context(), projectDir, specID)
 		}
-		ownerReceipt, ownerReceiptPath, receiptErr := persistPipelineExecutionOwnerReceipt(
+		if _, _, receiptErr := persistPipelineExecutionOwnerReceipt(
 			specID, ownerDecision, integrity.Status,
-		)
-		if receiptErr != nil {
+		); receiptErr != nil {
 			return receiptErr
 		}
 		if ownerDecision.Owner == pipelineExecutionOwnerOrca {
-			return emitPipelineExecutionOwnerHandoff(cmd, ownerReceipt, ownerReceiptPath, integrity)
+			// The verdict used to travel inside the handoff payload this path no
+			// longer emits. An unverified contract degrades the run instead of
+			// stopping it (SPEC-EXECPLANE-001 REQ-009), so the reason has to
+			// reach the operator on the run's own diagnostic stream.
+			reportPipelineTierIntegrity(cmd.ErrOrStderr(), integrity)
 		}
 	}
 
@@ -170,9 +175,16 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 
 	var backend pipeline.PhaseBackend
 	if !cfg.DryRun {
-		if platform == "omp" {
+		switch {
+		case platform == "omp" && ownerDecision.Owner == pipelineExecutionOwnerOrca:
+			// REQ-101: the orca path differs from the omp path in exactly one
+			// place — the injected backend. Ordering, gates, retry accounting,
+			// and checkpointing stay with the engine below.
+			backend, err = newPipelineOrcaBackendForRun(projectDir, specID, resolvedSpec, gitHash)
+			err = explainPipelineOrcaUnavailable(err)
+		case platform == "omp":
 			backend, err = newPipelineOMPBackendForRun(projectDir, specID, resolvedSpec, gitHash)
-		} else {
+		default:
 			backend, err = newPipelineProviderBackend(platform)
 		}
 		if err != nil {
@@ -219,6 +231,19 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 		}
 	}
 	return nil
+}
+
+// explainPipelineOrcaUnavailable names the remedy for a missing orca CLI. The
+// operator selected supervised execution by name, so falling back to the native
+// OMP DAG would run the workload under an execution owner they declined; the run
+// stops instead and says what would let it proceed.
+func explainPipelineOrcaUnavailable(err error) error {
+	if !errors.Is(err, orcarun.ErrOrcaUnavailable) {
+		return err
+	}
+	return fmt.Errorf(
+		"%w: --execution-owner orca runs every phase in a supervised orca worker; "+
+			"install the orca CLI on PATH or rerun with --execution-owner omp", err)
 }
 
 func newPipelineOMPBackendForRun(

@@ -45,6 +45,7 @@ Priority: Must
 Given phase attempt가 (a) 실패로 끝나는 경로, (b) `ctx` 취소로 끊기는 경로, (c) 백엔드 `Close()`로 정리되는 경로 세 가지
 When 각 경로가 끝난다
 Then 세 경로 각각에서 이 Run에 속한 `worker-list --terminal-state active` 결과가 0건이다
+And 시작이 실패해 응답이 잔여 리소스를 보고한 경로에서는 그 리소스가 각각 명시적으로 정리되어 남지 않는다. `active` 집계 0건만으로는 이 조건을 대신하지 못한다
 And 백엔드가 시작한 Dispatch 전부가 release·stop·abandon 중 하나로 종결 상태를 갖고, 종결되지 않은 Dispatch가 0건이다
 And 워커 프로세스가 실제로 멈췄다고 주장할 수 없는 경로에서는 release 대신 `worker-abandon`으로 펜싱하고, abandon을 택한 사유가 실행 기록에 남는다
 And 취소 경로에서 `PhaseResponse`가 없고 오류만 있어도 정리 책임은 백엔드에 있다. 엔진이 실패를 반환했다는 사실이 정리 누락의 사유가 되지 않는다
@@ -82,7 +83,7 @@ And 비지원 구성(원격 환경 등)은 이 SPEC의 비목표이므로 그 �
 - **S102** — 예상 값: task deps 길이 = 0, `--deps` 출현 횟수 = 0, 프로세스 평면의 phase 순서 자료구조 수 = 0, 관측된 phase 순서 = plan, test_scaffold, implement, validate, review.
 - **S103** — 예상 값: attempt 1회당 시작 Dispatch = 1, 종결 = 1. 클린 런 총 Dispatch = 5. validate 최대 4, review 최대 3(각각 `MaxRetries + 1`). 영수증 `dispatch_count`와 워커 시작 수의 차이 = 0.
 - **S104** — 예상 값: 무응답 워커에서 `TimedOut` = true, 백엔드 보유 출력 바이트 = 설정 상한 이하, 잘림이 발생한 실행의 `FailureClass` = 비어 있지 않음. deadline 값과 읽기 상한 값 자체는 구현 시 확정하되, 둘 다 유한해야 한다는 점이 판정 조건이다.
-- **S105** — 예상 값: 세 경로 각각에서 `worker-list --terminal-state active` 행 수 = 0, 미종결 Dispatch = 0. abandon으로 펜싱한 건에는 사유가 1건씩 남는다.
+- **S105** — 예상 값: 세 경로 각각에서 `worker-list --terminal-state active` 행 수 = 0, 미종결 Dispatch = 0, 보고된 잔여 리소스 중 정리되지 않은 것 = 0. abandon으로 펜싱한 건에는 사유가 1건씩 남는다. 세 번째 값이 따로 필요한 이유는 실측에서 확인됐다 — readiness가 실패하면 터미널이 만들어져도 dispatch가 소유하지 않아 `active`에 잡히지 않고, `worker-release`는 `no_owned_resource`로 지나가며, 터미널은 살아남는다.
 - **S106** — 예상 값: `checked_at` < Run 생성 시각(부호는 엄격 부등호). 게이트 미통과 실행의 `run-create` 호출 = 0, `worker-start` 호출 = 0.
 - **S107** — 예상 값: 경계 argv에서 `balanced` = 0, `ultra` = 0, `opus` = 0, `sonnet` = 0, `haiku` = 0. 판정 규칙은 인자 값 전체의 완전 일치이며, 이 규칙을 부분 문자열 검색으로 바꾸면 정상적인 provider model id가 오탐된다.
 - **S108** — 예상 값: 지원 구성에서 `status == "handoff_required"`인 최종 결과 수 = 0, 체크포인트에 기록된 완료 phase 수 = 5, omp 경로와 다른 결과 필드 수 = 0.

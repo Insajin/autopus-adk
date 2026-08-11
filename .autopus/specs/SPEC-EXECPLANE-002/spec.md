@@ -83,7 +83,7 @@ IF a phase attempt fails, is cancelled, or the backend is closed, THEN THE SYSTE
 - EARS type: Unwanted
 - Priority: Must
 - Trigger/Condition: 실행 실패·취소·백엔드 종료.
-- Observability: 실행 종료 후 이 Run에 속한 `active` 상태 terminal이 0건임을 S105로 확인한다. 프로세스 정지를 주장할 수 없는 경우에는 release 대신 abandon으로 펜싱한다.
+- Observability: 실행 종료 후 이 Run에 속한 `active` 상태 terminal이 0건이고, 시작 실패 응답이 보고한 잔여 리소스도 남지 않았음을 S105로 확인한다. 두 조건이 모두 필요하다 — 실측에서 readiness 실패로 만들어진 터미널은 dispatch 소유가 아니어서 `active` 집계에 잡히지 않으면서도 살아있었다. 프로세스 정지를 주장할 수 없는 경우에는 release 대신 abandon으로 펜싱한다.
 
 ### REQ-106 — 티어 정합 게이트는 Run 생성 이전에 끝난다
 WHERE the execution owner is orca, THE SYSTEM SHALL complete the tier integrity gate of SPEC-EXECPLANE-001 before creating the orca Run, so no worker starts under an unverified tier contract.

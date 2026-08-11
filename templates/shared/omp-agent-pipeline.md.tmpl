@@ -28,9 +28,10 @@ identity, `checked_at`, and `verification_status` only.
 - Owner `orca` must not create an OMP task/todo DAG. Run and read
   `orca skills get orchestration --full`, then use that current contract to create and supervise
   one durable cross-worktree Run. A plain full handoff does not satisfy this topology.
-- `auto pipeline run SPEC-ID --platform omp --execution-owner orca` must return structured
-  `pipeline_execution_owner_result.v1` with `status=handoff_required` before any OMP
-  process/task creation. Act on that result; never retry it as owner `omp`.
+- `auto pipeline run SPEC-ID --platform omp --execution-owner orca` runs the tier integrity gate
+  and persists `pipeline_execution_owner_receipt.v1` before any Run, worker, or provider session
+  exists, then executes the pipeline phases on supervised Orca workers. Never retry a failure as
+  owner `omp`.
 
 ## Native Tool Preflight
 

@@ -6,11 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -19,11 +18,6 @@ const (
 	pipelineExecutionOwnerSourceDefault  = "default"
 	pipelineExecutionOwnerSourceExplicit = "explicit"
 	pipelineExecutionOwnerReceiptSchema  = "pipeline_execution_owner_receipt.v1"
-	pipelineExecutionOwnerResultSchema   = "pipeline_execution_owner_result.v1"
-)
-
-var errPipelineExecutionOwnerHandoffRequired = errors.New(
-	"pipeline: execution owner orca requires a supervised Orca orchestration handoff",
 )
 
 type executionOwnerValue struct {
@@ -104,24 +98,6 @@ type pipelineExecutionOwnerReceipt struct {
 	VerificationStatus string    `json:"verification_status"`
 }
 
-type pipelineExecutionOwnerResult struct {
-	Schema         string `json:"schema"`
-	Status         string `json:"status"`
-	Owner          string `json:"owner"`
-	Source         string `json:"source"`
-	Reason         string `json:"reason"`
-	SpecID         string `json:"spec_id"`
-	RunID          string `json:"run_id"`
-	ReceiptPath    string `json:"receipt_path"`
-	RequiredAction string `json:"required_action"`
-	// REQ-008: the receiving side starts from an already-checked tier contract,
-	// so the handoff carries the integrity verdict, its reason, and a reference
-	// to the receipt that reconstructs it.
-	VerificationStatus   string `json:"verification_status"`
-	VerificationReason   string `json:"verification_reason"`
-	IntegrityReceiptPath string `json:"integrity_receipt_path"`
-}
-
 func persistPipelineExecutionOwnerReceipt(
 	specID string,
 	decision pipelineExecutionOwnerDecision,
@@ -161,23 +137,14 @@ func newPipelineExecutionOwnerRunID() string {
 	return fmt.Sprintf("pipeline-owner-%d", time.Now().UTC().UnixNano())
 }
 
-func emitPipelineExecutionOwnerHandoff(
-	cmd *cobra.Command,
-	receipt pipelineExecutionOwnerReceipt,
-	receiptPath string,
-	integrity pipelineTierIntegrityResult,
-) error {
-	result := pipelineExecutionOwnerResult{
-		Schema: pipelineExecutionOwnerResultSchema, Status: "handoff_required",
-		Owner: receipt.Owner, Source: receipt.Source, Reason: receipt.Reason,
-		SpecID: receipt.SpecID, RunID: receipt.RunID, ReceiptPath: receiptPath,
-		RequiredAction:       "orca skills get orchestration --full",
-		VerificationStatus:   receipt.VerificationStatus,
-		VerificationReason:   integrity.Reason,
-		IntegrityReceiptPath: integrity.ReceiptPath,
+// reportPipelineTierIntegrity writes the gate's verdict to the run's diagnostic
+// stream. The verdict is not fatal — an unverified tier contract degrades the
+// run rather than stopping it — so this report is the only thing standing
+// between a degraded contract and a silent one. The receipt path travels with it
+// because the per-provider record is what makes the verdict reconstructible.
+func reportPipelineTierIntegrity(w io.Writer, integrity pipelineTierIntegrityResult) {
+	fmt.Fprintf(w, "Tier integrity %s: %s\n", integrity.Status, integrity.Reason)
+	if integrity.ReceiptPath != "" {
+		fmt.Fprintf(w, "Tier integrity receipt: %s\n", integrity.ReceiptPath)
 	}
-	if err := json.NewEncoder(cmd.OutOrStdout()).Encode(result); err != nil {
-		return fmt.Errorf("encode execution owner handoff result: %w", err)
-	}
-	return &jsonFatalError{cause: errPipelineExecutionOwnerHandoffRequired}
 }

@@ -139,10 +139,16 @@ orca에는 `task-create --deps`가 있어 **자기 DAG를 가질 수 있다**. �
 
 ## Completion Debt
 
-- [ ] `worker-start`의 `--agent` 값 집합. `worktree create --agent <id>`와 같은 어휘인지, 어떤 id가 유효한지 구현 전에 확정해야 한다.
-- [ ] 워커 settled 판정 방법. `worker-show`의 상태 필드 이름과 종료 상태 집합을 확인해야 폴링 루프를 쓸 수 있다.
-- [ ] 워커 출력에서 phase 결과를 추출하는 규약. `worker-read`는 터미널/트랜스크립트 텍스트를 주는데, 엔진은 `PhaseResponse.Output` 문자열을 기대한다. 구조화된 결과가 필요하면 `orchestration send --outcome --report-path` 경로를 워커 쪽에서 써야 할 수 있다.
-- [ ] 재개(`--continue`) 시 기존 Run에 재바인딩할지 새 Run을 만들지. `run-use`가 있으나 체크포인트와의 결합 규칙이 미정이다.
+네 건 모두 이 머신에서 orca를 실제로 구동해 해소했다(2026-08-11). 프로브는 Run 하나·task 둘·워커 둘을 만들고 전부 회수했으며, 종료 후 잔여 터미널과 레포 변경이 각각 0건임을 확인했다.
+
+- [x] `--agent` 값 집합 — `claude`, `codex`, `opencode`, `gemini`, `droid`, `grok`, `cursor`. 이 머신에서 `claude`는 정상 기동했고 `codex`는 `Agent startup blocked: codex-interactive-prompt`로 readiness에 실패했다. 즉 값 집합은 고정이되 가용성은 머신마다 다르므로 시작 실패를 정상 경로로 다뤄야 한다.
+- [x] settled 판정 방법 — 폴링이 아니다. `check --wait --types worker_done,escalation,question --timeout-ms <n>`이 이벤트로 준다. 유효한 `worker_done`이 도착하면 dispatch가 자동으로 `completed`, worker가 `succeeded`/`settled`가 된다. 공식 가이드는 sleep/poll 루프를 명시적으로 금지하고, `check --wait`의 타임아웃과 `count:0`을 실패가 아닌 체크포인트로 규정한다. 따라서 대기는 롤링 윈도이고 유한성은 phase 전체 마감이 책임진다.
+- [x] 출력에서 phase 결과를 추출하는 규약 — 두 층이다. 판정은 `worker_done`의 `payload`(JSON 안의 JSON 문자열)에 담긴 `outcome`이 주고, 본문은 `worker-read --source auto`의 트랜스크립트가 준다. 트랜스크립트는 `messages[].blocks[].text`를 평탄화하면 `PhaseResponse.Output`에 그대로 들어간다. release 후에도 아카이브가 보존되어 계속 읽힌다.
+- [x] 재개 시 Run 재바인딩 — Run은 코디네이터 터미널에 바인딩되고, 바인딩이 없는 터미널이 그 Run을 읽으면 `consumer_fenced`로 거부된다. 그러므로 재개는 이전 Run을 물려받을 수 없고 실행마다 Run을 새로 만들어야 한다. 체크포인트는 정책 평면이 계속 소유하므로 이 선택이 재개 의미론을 바꾸지 않는다.
+
+### 프로브가 SPEC 결함을 하나 찾았다
+
+`worker-start`의 readiness가 실패하면 터미널은 생성되지만 dispatch가 소유하지 못한다. 그 상태에서 `worker-release`는 `no_owned_resource`로 통과하고, `worker-list --terminal-state active`도 0건을 보고하는데, `terminal list`에는 그 터미널이 살아있었다. 원래 S105는 `active == 0`만 요구했으므로 이 누수를 통과시켰을 것이다. 유일한 핸들은 `worker-start` 응답의 `residualResources`이며, S105와 REQ-105를 두 조건 모두 요구하도록 고쳤다.
 
 ## Evolution Ideas
 
