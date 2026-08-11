@@ -68,13 +68,16 @@ Then 점검은 워크트리·Run·워커·provider 세션 중 어느 것도 생�
 And 실행 후 새로 생성된 워크트리 0건, Run 0건, 워커 0건, provider 세션 0건이다
 And 호출자에게 정합 실패가 반환된다
 
-### S7: handoff 결과가 영수증을 참조하고 실패 시 handoff를 대체한다
+### S7: handoff 결과가 영수증과 판정 상태를 함께 드러낸다
 
 Priority: Must
 Given `--execution-owner orca` 경로가 `status: handoff_required`와 `required_action`을 담은 handoff 결과를 반환하는 스텁이다(`internal/cli/pipeline_run_owner.go:160-164`)
+And 검증 수단이 없는 provider가 하나라도 있으면 집계 판정은 `unverified`가 되며, 이는 REQ-009가 인정한 정상 상태다
 When 정합 점검이 handoff 결과 방출 직전에 실행된다
-Then 점검이 통과하면 handoff 결과에 S4 영수증에 대한 참조가 포함되어, 받는 쪽이 이미 검증된 티어 계약에서 출발한다
-And 점검이 실패하면 `handoff_required` 결과 대신 정합 실패가 반환되고 handoff 결과는 방출되지 않는다
+Then handoff 결과가 정합 영수증 경로와 verification status와 사유를 모두 담아, 받는 쪽이 티어 계약의 근거 강도를 알고 출발한다
+And 판정이 `unverified`여도 handoff는 그대로 방출된다. 게이트는 판정을 기록하고 드러낼 뿐 기존 경로를 차단하지 않는다 — 검증 불가를 치명적으로 다루면 근거 없이 회귀를 만든다
+And 사유는 비어 있지 않고 어느 provider가 왜 강등됐는지 지목하므로, 판정이 통과하지 못했다는 사실이 조용히 넘어가지 않는다
+And fail-closed는 REQ-006의 더 강한 조건(실행 계정이 요청 티어를 제공할 수 없음)에 속하며 이 시나리오의 범위가 아니다
 And 이 경로는 OMP task DAG를 만들지 않으므로 DAG 소유자는 하나로 유지된다(`pkg/adapter/omp/omp_workflow_render.go:99`)
 
 ### S8: 검증 수단이 없는 항목은 unverified로 표기된다

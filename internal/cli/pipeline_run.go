@@ -145,14 +145,21 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	}
 	projectDir = filepath.Clean(projectDir)
 	if platform == "omp" {
+		// REQ-007/REQ-008: the read-only tier integrity gate completes here,
+		// before any checkpoint, worktree, Run, worker, or provider session
+		// exists, and before the handoff result is emitted.
+		integrity := pipelineTierIntegritySkipped()
+		if ownerDecision.Owner == pipelineExecutionOwnerOrca {
+			integrity = runPipelineTierIntegrityGate(cmd.Context(), projectDir, specID)
+		}
 		ownerReceipt, ownerReceiptPath, receiptErr := persistPipelineExecutionOwnerReceipt(
-			specID, ownerDecision,
+			specID, ownerDecision, integrity.Status,
 		)
 		if receiptErr != nil {
 			return receiptErr
 		}
 		if ownerDecision.Owner == pipelineExecutionOwnerOrca {
-			return emitPipelineExecutionOwnerHandoff(cmd, ownerReceipt, ownerReceiptPath)
+			return emitPipelineExecutionOwnerHandoff(cmd, ownerReceipt, ownerReceiptPath, integrity)
 		}
 	}
 
