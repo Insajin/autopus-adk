@@ -26,15 +26,27 @@ const brokenPayloadResponse = `{"id":"req_6","ok":true,"error":null,"result":{` 
 	`"payload":"{\"taskId\":\"task_a38759fca084\",\"dispatchId\":\"ctx_532647ebc127\",\"outcome\":\"failed\"}"}],` +
 	`"count":3,"timedOut":false},"_meta":{"runtimeId":"rt_1"}}`
 
+// Shaped after a live dispatch: the injected preamble is a long user message,
+// and the assistant contributes tool calls plus a short line of text.
 const transcriptResponse = `{"id":"req_7","ok":true,"error":null,"result":{` +
 	`"dispatchId":"ctx_532647ebc127","source":"transcript","sourceIdentity":"claude-session",` +
 	`"provider":"claude","transcript":{"messages":[` +
-	`{"id":"m1","role":"user","blocks":[{"type":"text","text":"run the plan phase"}]},` +
+	`{"id":"m1","role":"user","blocks":[{"type":"text","text":"You are a dispatched worker. run the plan phase"}]},` +
 	`{"id":"m2","role":"assistant","blocks":[` +
 	`{"type":"thinking","text":"internal deliberation"},` +
 	`{"type":"tool_use","name":"bash","input":{"command":"ls"}},` +
-	`{"type":"text","text":"plan written"}]}]},` +
+	`{"type":"text","text":"plan written"}]},` +
+	`{"id":"m3","role":"tool","blocks":[{"type":"text","text":"tool stdout"}]}]},` +
 	`"cursor":83,"status":"complete","fallbackReason":null,"warnings":[]},"_meta":{"runtimeId":"rt_1"}}`
+
+// Every message whose blocks are entirely tool calls, which is what a worker
+// that reports through worker_done actually produces.
+const toolOnlyTranscriptResponse = `{"id":"req_8","ok":true,"error":null,"result":{` +
+	`"dispatchId":"ctx_532647ebc127","source":"transcript","sourceIdentity":"claude-session",` +
+	`"provider":"claude","transcript":{"messages":[` +
+	`{"id":"m1","role":"user","blocks":[{"type":"text","text":"You are a dispatched worker. run validate"}]},` +
+	`{"id":"m2","role":"assistant","blocks":[{"type":"tool-call","name":"bash"}]}]},` +
+	`"cursor":9,"status":"complete","fallbackReason":null,"warnings":[]},"_meta":{"runtimeId":"rt_1"}}`
 
 // The payload is a JSON document transported as a JSON string. Without the
 // second decoding the caller cannot tell whose dispatch settled, or how.
@@ -112,20 +124,26 @@ func TestWaitOmitsNonPositiveWindow(t *testing.T) {
 	}
 }
 
-// Only text blocks carry the phase result. Thinking and tool blocks would
-// otherwise be spliced into the output the engine reads.
-func TestReadTranscriptFlattensTextBlocks(t *testing.T) {
+// Transcript text is the worker's own text and nothing else. Two things must
+// stay out: non-text blocks, which carry no result, and non-assistant
+// messages, because the dispatched preamble arrives as a user message and
+// echoing it back would feed a phase its own prompt.
+func TestReadTranscriptKeepsOnlyAssistantText(t *testing.T) {
 	client, recorder := stubbedClient(transcriptResponse)
 
 	transcript, err := client.ReadTranscript(context.Background(), "ctx_532647ebc127", 200)
 	if err != nil {
 		t.Fatalf("read transcript: %v", err)
 	}
-	if transcript.Text != "run the plan phase\nplan written" {
+	if transcript.Text != "plan written" {
 		t.Fatalf("unexpected transcript text %q", transcript.Text)
 	}
-	if strings.Contains(transcript.Text, "internal deliberation") {
-		t.Fatal("non-text blocks leaked into the transcript")
+	if strings.Contains(transcript.Text, "dispatched worker") {
+		t.Fatal("the injected preamble was returned as worker output")
+	}
+	if strings.Contains(transcript.Text, "internal deliberation") ||
+		strings.Contains(transcript.Text, "tool stdout") {
+		t.Fatal("non-text blocks or tool messages leaked into the transcript")
 	}
 	if transcript.Provider != "claude" || transcript.Source != "transcript" {
 		t.Fatalf("unexpected transcript %+v", transcript)
@@ -137,6 +155,21 @@ func TestReadTranscriptFlattensTextBlocks(t *testing.T) {
 	want := "orchestration worker-read --dispatch ctx_532647ebc127 --limit 200 --json"
 	if got := strings.Join(recorder.lastArgs(t), " "); got != want {
 		t.Fatalf("unexpected argv: %s", got)
+	}
+}
+
+// A worker that reports through worker_done leaves no assistant text at all.
+// The transcript must then be empty rather than the preamble, so the caller
+// can tell there is no detail to add and fall back to the report.
+func TestReadTranscriptIsEmptyWhenWorkerOnlyCalledTools(t *testing.T) {
+	client, _ := stubbedClient(toolOnlyTranscriptResponse)
+
+	transcript, err := client.ReadTranscript(context.Background(), "ctx_532647ebc127", 200)
+	if err != nil {
+		t.Fatalf("read transcript: %v", err)
+	}
+	if transcript.Text != "" {
+		t.Fatalf("expected no worker text, got %q", transcript.Text)
 	}
 }
 

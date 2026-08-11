@@ -95,7 +95,8 @@ func TestPipelineOrcaBackend_KeepsWaitingThroughEscalations(t *testing.T) {
 	require.Contains(t, response.FailureClass, "worker_awaiting_human")
 	require.Contains(t, response.Output, "needs a decision")
 	require.Equal(t, []string{"delivery_escalation"}, fake.acks)
-	require.Equal(t, []string{"ctx_1"}, fake.abandoned)
+	require.Equal(t, []string{"ctx_1"}, fake.stopped)
+	require.Empty(t, fake.abandoned)
 }
 
 // TestPipelineOrcaBackend_FallsBackToWorkerDoneBody covers REQ-104: an
@@ -112,6 +113,39 @@ func TestPipelineOrcaBackend_FallsBackToWorkerDoneBody(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, response.ExitCode)
 	require.Equal(t, "body of record", response.Output)
+}
+
+// TestPipelineOrcaBackend_LeadsWithTheWorkerReport covers REQ-108: worker_done
+// is the only channel orca guarantees a conclusion on, so it leads the phase
+// output and the transcript follows as detail. A live run made the ordering
+// matter — most phases produced no assistant text at all, and reading the
+// transcript first handed the gate a phase's own prompt back.
+func TestPipelineOrcaBackend_LeadsWithTheWorkerReport(t *testing.T) {
+	fake := newOrcaFakeClient()
+	fake.transcript = orcarun.Transcript{Source: "transcript", Status: "complete", Text: "ran the checks"}
+	fake.deliveries = []orcarun.Delivery{
+		orcaWorkerDoneDelivery("delivery_1", "ctx_1", orcarun.OutcomeSucceeded, "validated: 3 tests pass"),
+	}
+	backend := newOrcaTestBackend(t, fake, nil)
+
+	response, err := backend.Execute(context.Background(), orcaPhaseRequest(pipeline.PhaseValidate, 1))
+	require.NoError(t, err)
+	require.Equal(t, "validated: 3 tests pass\n\nran the checks", response.Output)
+}
+
+// A report that the transcript merely repeats must not be pasted twice: the
+// gate reads this string, and a doubled conclusion reads like two verdicts.
+func TestPipelineOrcaBackend_DoesNotRepeatAnEchoedReport(t *testing.T) {
+	fake := newOrcaFakeClient()
+	fake.transcript = orcarun.Transcript{Source: "transcript", Status: "complete", Text: "done"}
+	fake.deliveries = []orcarun.Delivery{
+		orcaWorkerDoneDelivery("delivery_1", "ctx_1", orcarun.OutcomeSucceeded, "done"),
+	}
+	backend := newOrcaTestBackend(t, fake, nil)
+
+	response, err := backend.Execute(context.Background(), orcaPhaseRequest(pipeline.PhasePlan, 1))
+	require.NoError(t, err)
+	require.Equal(t, "done", response.Output)
 }
 
 // TestPipelineOrcaBackend_ReportedFailureStillReleases covers REQ-105: a worker
@@ -143,7 +177,8 @@ func TestPipelineOrcaBackend_WaitFailureAbandonsDispatch(t *testing.T) {
 	response, err := backend.Execute(context.Background(), orcaPhaseRequest(pipeline.PhasePlan, 1))
 	require.ErrorContains(t, err, "consumer_fenced")
 	require.Contains(t, response.FailureClass, "worker_wait_error")
-	require.Equal(t, []string{"ctx_1"}, fake.abandoned)
+	require.Equal(t, []string{"ctx_1"}, fake.stopped)
+	require.Empty(t, fake.abandoned)
 	require.Empty(t, fake.released)
 }
 
@@ -176,6 +211,7 @@ func TestPipelineOrcaBackend_CancelledContextStillSettles(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("cancellation did not end the attempt")
 	}
-	require.Equal(t, []string{"ctx_1"}, fake.abandoned)
+	require.Equal(t, []string{"ctx_1"}, fake.stopped)
+	require.Empty(t, fake.abandoned)
 	require.Empty(t, fake.released)
 }

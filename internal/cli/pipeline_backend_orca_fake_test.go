@@ -26,6 +26,8 @@ type orcaFakeClient struct {
 	closedTerms []string
 	released    []string
 	abandoned   []string
+	stopped     []string
+	stopErr     error
 
 	runID      string
 	runErr     error
@@ -170,6 +172,17 @@ func (f *orcaFakeClient) Abandon(_ context.Context, dispatchID string) (orcarun.
 	f.record("worker-abandon")
 	f.abandoned = append(f.abandoned, dispatchID)
 	return orcarun.Settlement{DispatchID: dispatchID, State: "abandoned"}, nil
+}
+
+func (f *orcaFakeClient) Stop(_ context.Context, dispatchID string) (orcarun.Settlement, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record("worker-stop")
+	if f.stopErr != nil {
+		return orcarun.Settlement{}, f.stopErr
+	}
+	f.stopped = append(f.stopped, dispatchID)
+	return orcarun.Settlement{DispatchID: dispatchID, State: "stopped"}, nil
 }
 
 func (f *orcaFakeClient) CloseTerminal(_ context.Context, handle string) error {

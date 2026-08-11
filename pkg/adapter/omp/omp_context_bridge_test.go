@@ -170,9 +170,11 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Content tripwire over the whole prepared set, so it moves whenever a shipped
-	// content file changes. Last moved when the stale `router:` block left
-	// content/skills/using-autopus.md; the mapping structure is unchanged.
-	const priorPreparedFilesFingerprint = "c6e38dcdd069e8e89b26299af073b7f71a8ad5bc1e8e2bcf6eed3951fec0fffa"
+	// content file changes. Last moved when the auto-go execution-owner block
+	// stopped describing owner `orca` as a `handoff_required` result and started
+	// describing it as supervised execution (SPEC-EXECPLANE-002 REQ-108); the
+	// mapping structure is unchanged.
+	const priorPreparedFilesFingerprint = "0859c0121a3a4109447a05b8a1aa56226c220150d3ed3fb54069bf71fa880f50"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

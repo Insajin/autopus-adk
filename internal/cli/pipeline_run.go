@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -129,6 +131,13 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	if err != nil {
 		return err
 	}
+	// A run holds resources that outlive this process: with owner orca the
+	// phase worker is a supervised agent terminal, and nothing reaps it if the
+	// CLI is killed outright. Turning the interrupt into a cancelled context is
+	// what lets the backend settle its dispatches on Ctrl-C, which is the
+	// cancellation branch of SPEC-EXECPLANE-002 REQ-105.
+	ctx, stopSignals := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
 	gitHash, _ := getCurrentGitHash()
 	requestedStrategy := pipeline.Strategy(cfg.Strategy)
 	resolvedSpec, err := resolvePipelineSpec(specID)
@@ -152,7 +161,7 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 		// exists, so no worker can start under an unverified tier contract.
 		integrity := pipelineTierIntegritySkipped()
 		if ownerDecision.Owner == pipelineExecutionOwnerOrca {
-			integrity = runPipelineTierIntegrityGate(cmd.Context(), projectDir, specID)
+			integrity = runPipelineTierIntegrityGate(ctx, projectDir, specID)
 		}
 		if _, _, receiptErr := persistPipelineExecutionOwnerReceipt(
 			specID, ownerDecision, integrity.Status,
@@ -218,7 +227,7 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	}
 
 	engine := pipeline.NewSubprocessEngine(engineCfg)
-	result, err := engine.Run(cmd.Context())
+	result, err := engine.Run(ctx)
 	if err != nil {
 		return fmt.Errorf("pipeline run failed: %w", err)
 	}
@@ -226,7 +235,7 @@ func runPipeline(cmd *cobra.Command, specID string, cfg *pipelineRunConfig) erro
 	fmt.Fprintf(cmd.OutOrStdout(), "Pipeline complete: %d phases executed\n", len(result.PhaseResults))
 	if flags.MultiMode && !cfg.DryRun {
 		fmt.Fprintf(cmd.ErrOrStderr(), "Running multi-provider review for %s\n", specID)
-		if err := runSpecReview(cmd.Context(), specID, "", 0); err != nil {
+		if err := runSpecReview(ctx, specID, "", 0); err != nil {
 			return fmt.Errorf("pipeline multi review failed: %w", err)
 		}
 	}

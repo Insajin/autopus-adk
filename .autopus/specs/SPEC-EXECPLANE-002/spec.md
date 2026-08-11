@@ -44,9 +44,9 @@ type PhaseBackend interface {
 ## Outcome Boundary
 
 - **Outcome Lock**: `auto pipeline run --platform omp --execution-owner orca`가 orca 감독 워커에서 5-phase를 완주하고, 정책 평면의 게이트·재시도·체크포인트가 omp 경로와 동일하게 적용되며, 실행이 끝나거나 실패해도 orca에 살아있는 Dispatch가 남지 않는다.
-- **Mandatory requirements**: PhaseBackend 구현으로 접합(REQ-101), orca task는 deps 없이 생성(REQ-102), phase 하나당 Dispatch 하나(REQ-103), 워커 출력과 대기의 바운드(REQ-104), 실패 경로 리소스 정리(REQ-105), 티어 정합 게이트를 Run 이전에 유지(REQ-106), 프로세스 평면 경계에 티어 어휘 무증식(REQ-107), handoff 스텁 대체와 관측 가능한 실행 결과(REQ-108).
-- **Explicit non-goals**: 이 SPEC의 구현 코드(별도 작업), phase 내부 executor 병렬 fan-out, 사람 결정 게이트(`gate-create`) 도입, 원격 환경(`worker-start --on`) 지원, 5-phase 집합 변경, 게이트·재시도 semantics 변경, omp 경로 동작 변경(regression-0), 실행 원장 통합.
-- **Completion evidence**: 4개 SPEC 문서가 `auto spec validate`를 통과하고, DAG 소유권 선택에 대한 리뷰 합의가 기록되며, Completion Debt가 해소되거나 착수 중 해소 가능한 항목으로 분류된다. 구현 증거는 요구하지 않는다.
+- **Mandatory requirements**: PhaseBackend 구현으로 접합(REQ-101), orca task는 deps 없이 생성(REQ-102), phase 하나당 Dispatch 하나(REQ-103), 워커 출력과 대기의 바운드(REQ-104), 실패 경로 리소스 정리(REQ-105), 티어 정합 게이트를 Run 이전에 유지(REQ-106), 프로세스 평면 경계에 티어 어휘 무증식(REQ-107), handoff 스텁 대체와 관측 가능한 실행 결과(REQ-108), 워커 보고에서 나오는 phase 출력(REQ-109), 중단 시 워커 정지(REQ-110).
+- **Explicit non-goals**: phase 내부 executor 병렬 fan-out, 사람 결정 게이트(`gate-create`) 도입, 원격 환경(`worker-start --on`) 지원, 5-phase 집합 변경, 게이트·재시도 semantics 변경, omp 경로 동작 변경(regression-0), 실행 원장 통합.
+- **Completion evidence**: 이 머신에서 `auto pipeline run SPEC-... --platform omp --execution-owner orca`가 실제 orca 감독 워커로 phase를 실행하고, 정합 게이트가 Run 생성보다 앞서며, 생성된 task 전부의 deps가 비어 있고, 영수증의 dispatch 수와 실제 워커 수가 일치하며, 종료 후 살아있는 Dispatch가 0건이다. REQ-109와 REQ-110은 실행 중 관측된 결함에서 나왔으므로 회귀 테스트와 실측 양쪽으로 고정한다.
 
 ## Requirements
 
@@ -106,6 +106,20 @@ WHEN the orca path completes or fails, THEN THE SYSTEM SHALL report the outcome 
 - Trigger/Condition: orca 경로의 실행 종료.
 - Observability: 지원되는 구성에서 `status=handoff_required`가 최종 결과로 반환되지 않고, phase 결과와 체크포인트가 omp 경로와 같은 형태로 남음을 S108로 확인한다.
 
+### REQ-109 — phase 출력은 워커의 보고에서 나온다
+THE SYSTEM SHALL build a phase result from the worker's own report, and SHALL NOT return the dispatched prompt as that phase's output.
+- EARS type: Ubiquitous
+- Priority: Must
+- Trigger/Condition: 백엔드가 종결된 워커의 출력을 모을 때.
+- Observability: 실행된 phase의 출력에 그 phase로 보낸 프롬프트가 다시 담겨 있지 않고, 워커가 보고한 결론이 담겨 있음을 S109로 확인한다. 실측 근거가 있다 — 전사는 역할별로 나뉘어 있고 주입된 preamble이 user 메시지로 들어오며, 7개 dispatch 실행에서 phase당 preamble 1214바이트 대 assistant 텍스트 0바이트가 여섯 번 나왔다. 역할을 구분하지 않고 전사를 이으면 게이트는 워커의 결론 대신 자기 프롬프트를 읽는다.
+
+### REQ-110 — 중단은 워커를 세우고 끝난다
+WHEN the operator interrupts a run, THEN THE SYSTEM SHALL settle its live dispatches before exiting, and SHALL prefer stopping a worker over fencing it while leaving the process alive.
+- EARS type: Event-driven
+- Priority: Must
+- Trigger/Condition: SIGINT 또는 SIGTERM 수신.
+- Observability: 중단 후 이 Run의 `active` 워커가 0건이고 에이전트 터미널이 살아있지 않음을 S110으로 확인한다. 중단을 컨텍스트 취소로 바꾸지 않으면 REQ-105의 취소 분기 자체가 도달 불가다 — 프로세스가 즉시 죽어 정리 코드가 실행되지 않고, orca 워커는 다른 프로세스라 OS가 회수하지 않는다.
+
 ## Acceptance Criteria
 
 - [ ] orca 실행이 PhaseBackend 구현 하나로 접합된다
@@ -116,6 +130,8 @@ WHEN the orca path completes or fails, THEN THE SYSTEM SHALL report the outcome 
 - [ ] 티어 정합 게이트가 Run 생성보다 앞선다
 - [ ] 프로세스 평면 경계에 티어 어휘가 없다
 - [ ] 지원 구성에서 `handoff_required`가 최종 상태로 남지 않는다
+- [ ] phase 출력이 워커 보고에서 나오고 프롬프트를 되먹이지 않는다
+- [ ] 중단이 워커를 세우고 살아있는 에이전트를 남기지 않는다
 
 ## Traceability Matrix
 
@@ -129,10 +145,11 @@ WHEN the orca path completes or fails, THEN THE SYSTEM SHALL report the outcome 
 | REQ-106 | T104 | S106 | INV-105 |
 | REQ-107 | T104 | S107 | INV-101 |
 | REQ-108 | T103 | S108 | INV-102, INV-104 |
+| REQ-109 | T103 | S109 | INV-102 |
+| REQ-110 | T103 | S110 | INV-104 |
 
 ## Out of Scope
 
-- 이 SPEC의 구현 코드. 계약만 고정한다.
 - phase 내부에서 executor를 여러 워커로 병렬 fan-out하는 일.
 - `gate-create`/`gate-resolve`로 사람 결정을 파이프라인에 끼우는 일.
 - 원격 환경(`worker-start --on <saved-environment>`) 지원. 계정 조회가 원격을 지원하지 않아 티어 검증이 unverified로 떨어진다.
@@ -152,3 +169,5 @@ WHEN the orca path completes or fails, THEN THE SYSTEM SHALL report the outcome 
 | REQ-106 | S106 | pending |
 | REQ-107 | S107 | pending |
 | REQ-108 | S108 | pending |
+| REQ-109 | S109 | pending |
+| REQ-110 | S110 | pending |

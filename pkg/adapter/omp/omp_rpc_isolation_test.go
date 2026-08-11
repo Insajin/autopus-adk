@@ -149,12 +149,18 @@ func isolatedOMPLiveEnv(profile, overlay string) ([]string, error) {
 	}, nil
 }
 
+// ompLiveVersionProbeCeiling bounds the identity probe these live tests run
+// before dialling. It is a variable because the assertion is on the shape of
+// the version string, not on how fast omp prints it: a machine saturated by a
+// parallel suite would otherwise preempt the probe and fail the test for load.
+var ompLiveVersionProbeCeiling = 60 * time.Second
+
 func probeOMPLiveVersion(t *testing.T, executable, profile, overlay string) string {
 	t.Helper()
 	isolatedEnv, err := isolatedOMPLiveEnv(profile, overlay)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), ompLiveVersionProbeCeiling)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, executable, "--version")
 	cmd.Dir = profile

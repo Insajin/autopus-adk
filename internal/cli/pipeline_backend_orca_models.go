@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os/exec"
 	"strings"
 
@@ -50,6 +51,17 @@ func pipelineOrcaPhaseRole(phase pipeline.PhaseID) string {
 func loadPipelineOrcaPhaseLaunch(projectDir string) (map[pipeline.PhaseID]orcarun.Launch, error) {
 	receipt, err := ompadapter.LoadOMPModelResolutionReceipt(projectDir)
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			// The omp owner tolerates an absent receipt because the OMP process
+			// picks its own default model. Orca cannot: worker-start requires an
+			// explicit --agent, and no agent name exists for the "omp" platform.
+			// Guessing one would invent a routing decision in the process plane,
+			// which is exactly what INV-101 forbids, so this fails closed.
+			return nil, errors.New(
+				"no model routing receipt at .autopus/omp-model-resolution-v1.json: " +
+					"set role_model_policy.profile in autopus.yaml and rerun auto update, " +
+					"because the orca path needs an explicit agent for every phase")
+		}
 		return nil, err
 	}
 	launches := make(map[pipeline.PhaseID]orcarun.Launch, len(pipelineOrcaPhaseRoles))

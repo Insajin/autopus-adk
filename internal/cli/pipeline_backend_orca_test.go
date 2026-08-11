@@ -26,7 +26,7 @@ func TestPipelineOrcaBackend_CreatesTaskWithoutDependencies(t *testing.T) {
 	response, err := backend.Execute(context.Background(), orcaPhaseRequest(pipeline.PhasePlan, 2))
 	require.NoError(t, err)
 	require.Equal(t, 0, response.ExitCode)
-	require.Equal(t, "PHASE OUTPUT", response.Output)
+	require.Equal(t, "body\n\nPHASE OUTPUT", response.Output, "the report leads, the transcript follows")
 	require.Equal(t, "orca", response.Backend)
 	require.Equal(t, "claude", response.Provider)
 	require.Equal(t, "planner", response.Role)
@@ -105,7 +105,8 @@ func TestPipelineOrcaBackend_SettlementDependsOnWorkerDone(t *testing.T) {
 		response, err := backend.Execute(context.Background(), orcaPhaseRequest(pipeline.PhasePlan, 1))
 		require.NoError(t, err)
 		require.True(t, response.TimedOut)
-		require.Equal(t, []string{"ctx_1"}, fake.abandoned)
+		require.Equal(t, []string{"ctx_1"}, fake.stopped)
+		require.Empty(t, fake.abandoned)
 		require.Empty(t, fake.released)
 	})
 }
@@ -132,7 +133,7 @@ func TestPipelineOrcaBackend_ClosesResidualTerminals(t *testing.T) {
 	require.Contains(t, response.FailureClass, "stage=agent_readiness")
 	require.Contains(t, response.FailureClass, "codex-interactive-prompt")
 	require.Equal(t, []string{"term_leaked"}, fake.closedTerms)
-	require.Equal(t, []string{"ctx_start_failed"}, fake.abandoned)
+	require.Equal(t, []string{"ctx_start_failed"}, fake.stopped)
 	require.Empty(t, fake.released)
 }
 
@@ -163,10 +164,12 @@ func TestPipelineOrcaBackend_CloseSettlesInFlightDispatch(t *testing.T) {
 	close(fake.waitGate)
 	<-finished
 
-	require.Equal(t, []string{"ctx_1"}, fake.abandoned)
+	require.Equal(t, []string{"ctx_1"}, fake.stopped)
+	require.Empty(t, fake.abandoned)
 	require.Empty(t, fake.released)
 	require.NoError(t, backend.Close(), "Close must be idempotent")
-	require.Equal(t, []string{"ctx_1"}, fake.abandoned)
+	require.Equal(t, []string{"ctx_1"}, fake.stopped)
+	require.Empty(t, fake.abandoned)
 }
 
 // TestPipelineOrcaBackend_SettlesDispatchWhenStartFails covers REQ-105 for a
@@ -180,7 +183,27 @@ func TestPipelineOrcaBackend_SettlesDispatchWhenStartFails(t *testing.T) {
 	response, err := backend.Execute(context.Background(), orcaPhaseRequest(pipeline.PhasePlan, 1))
 	require.ErrorContains(t, err, "transport failure")
 	require.Contains(t, response.FailureClass, "worker_start_error")
-	require.Equal(t, []string{"ctx_partial"}, fake.abandoned)
+	require.Equal(t, []string{"ctx_partial"}, fake.stopped)
+}
+
+// TestPipelineOrcaBackend_AbandonRemainsTheFloorWhenStopFails covers REQ-105:
+// stopping is preferred because it actually ends the agent, but a stop that
+// fails must not leave the dispatch unsettled — orca would keep accounting it
+// as a live supervised worker.
+func TestPipelineOrcaBackend_AbandonRemainsTheFloorWhenStopFails(t *testing.T) {
+	fake := newOrcaFakeClient()
+	fake.stopErr = errors.New("stop refused")
+	fake.deliveries = []orcarun.Delivery{}
+	backend := newOrcaTestBackend(t, fake, func(cfg *pipelineOrcaBackendConfig) {
+		cfg.PhaseTimeout = time.Millisecond
+		cfg.WaitWindow = time.Millisecond
+	})
+
+	response, err := backend.Execute(context.Background(), orcaPhaseRequest(pipeline.PhasePlan, 1))
+	require.NoError(t, err)
+	require.True(t, response.TimedOut)
+	require.Equal(t, []string{"ctx_1"}, fake.abandoned)
+	require.Empty(t, fake.released)
 }
 
 // TestPipelineOrcaBackend_NeverPassesTierNames covers S107: only opaque

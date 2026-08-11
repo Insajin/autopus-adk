@@ -27,6 +27,9 @@ const (
 	// WorktreeCurrent starts a worker in the worktree the coordinator already
 	// occupies, rather than provisioning a new one per phase.
 	WorktreeCurrent = "current"
+	// transcriptRoleAssistant is the only transcript role that is worker
+	// output. User messages are the dispatched preamble.
+	transcriptRoleAssistant = "assistant"
 )
 
 // ErrOrcaUnavailable reports that the orca CLI could not be located on PATH.
@@ -241,6 +244,10 @@ type workerReadPayload struct {
 	Cursor     json.RawMessage `json:"cursor"`
 	Transcript struct {
 		Messages []struct {
+			// Role separates what the worker produced from what was dispatched
+			// into it. The injected preamble arrives as a user message, so a
+			// role-blind read would hand the caller back its own prompt.
+			Role   string         `json:"role"`
 			Blocks []blockPayload `json:"blocks"`
 		} `json:"messages"`
 	} `json:"transcript"`

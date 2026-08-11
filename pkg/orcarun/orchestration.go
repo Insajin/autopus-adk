@@ -166,6 +166,13 @@ func (c Client) Release(ctx context.Context, dispatchID string) (Settlement, err
 	return c.settle(ctx, "worker-release", dispatchID)
 }
 
+// Stop fences a dispatch and closes the exact agent terminal it started. Unlike
+// Abandon it actually stops the worker, which is what a give-up path wants: an
+// abandoned agent keeps running in the caller's worktree and keeps spending.
+func (c Client) Stop(ctx context.Context, dispatchID string) (Settlement, error) {
+	return c.settle(ctx, "worker-stop", dispatchID)
+}
+
 // Abandon fences a dispatch without touching its processes or files. It is the
 // settlement for every case where the worker cannot be claimed to have stopped.
 func (c Client) Abandon(ctx context.Context, dispatchID string) (Settlement, error) {
@@ -242,12 +249,20 @@ func toMessages(payloads []messagePayload) []Message {
 	return messages
 }
 
-// flattenTranscript joins the text blocks in order. Non-text blocks are dropped
-// because the engine consumes one output string and tool or image blocks carry
-// no phase result.
+// flattenTranscript joins the worker's own text in order.
+//
+// Two things are dropped. Non-text blocks carry no phase result: on a real run
+// the agent's substantive report leaves as a tool call, not as text. Non-
+// assistant messages are not output at all — the dispatched preamble arrives
+// as a user message, and echoing it back would feed a phase its own prompt.
+// Measured on a live 7-dispatch run, that preamble was 1214 bytes per phase
+// against 0 bytes of assistant text in six of seven phases.
 func flattenTranscript(payload workerReadPayload) string {
 	var builder strings.Builder
 	for _, message := range payload.Transcript.Messages {
+		if message.Role != transcriptRoleAssistant {
+			continue
+		}
 		for _, block := range message.Blocks {
 			if block.Type != "text" || block.Text == "" {
 				continue

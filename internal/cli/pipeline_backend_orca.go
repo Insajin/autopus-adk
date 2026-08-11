@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +34,7 @@ type orcaOrchestrator interface {
 	Ack(ctx context.Context, deliveryID string) error
 	ReadTranscript(ctx context.Context, dispatchID string, limit int) (orcarun.Transcript, error)
 	Release(ctx context.Context, dispatchID string) (orcarun.Settlement, error)
+	Stop(ctx context.Context, dispatchID string) (orcarun.Settlement, error)
 	Abandon(ctx context.Context, dispatchID string) (orcarun.Settlement, error)
 	CloseTerminal(ctx context.Context, handle string) error
 }
@@ -156,32 +156,6 @@ func (backend *pipelineOrcaBackend) Execute(
 	return backend.superviseWorker(ctx, worker.DispatchID, response)
 }
 
-// Close settles every dispatch this backend started and never settled. It is
-// idempotent and keeps going after an individual settlement failure.
-func (backend *pipelineOrcaBackend) Close() error {
-	backend.mu.Lock()
-	if backend.closed {
-		backend.mu.Unlock()
-		return nil
-	}
-	backend.closed = true
-	pending := make([]string, 0, len(backend.pending))
-	for dispatchID := range backend.pending {
-		pending = append(pending, dispatchID)
-	}
-	backend.pending = map[string]struct{}{}
-	backend.mu.Unlock()
-	sort.Strings(pending)
-	settleCtx, cancel := pipelineOrcaCleanupContext(context.Background())
-	defer cancel()
-	var err error
-	for _, dispatchID := range pending {
-		_, abandonErr := backend.config.Client.Abandon(settleCtx, dispatchID)
-		err = errors.Join(err, abandonErr)
-	}
-	return err
-}
-
 // ensureRun creates the orca Run once per backend so every phase attempt of a
 // pipeline run shares one supervision scope.
 func (backend *pipelineOrcaBackend) ensureRun(ctx context.Context) (string, error) {
@@ -232,64 +206,31 @@ func (backend *pipelineOrcaBackend) startWorker(
 	return worker, err
 }
 
-// settleDispatch closes one dispatch exactly once. A worker that reported
-// worker_done is released; anything else is abandoned, because a timed-out or
-// cancelled worker may still be live and release would falsely claim its
-// process was stopped.
-func (backend *pipelineOrcaBackend) settleDispatch(
-	ctx context.Context,
-	dispatchID string,
-	settled bool,
-) error {
-	if !backend.claimDispatch(dispatchID) {
-		return nil
-	}
-	settleCtx, cancel := pipelineOrcaCleanupContext(ctx)
-	defer cancel()
-	var err error
-	if settled {
-		_, err = backend.config.Client.Release(settleCtx, dispatchID)
-	} else {
-		_, err = backend.config.Client.Abandon(settleCtx, dispatchID)
-	}
-	return err
-}
-
-// readWorkerOutput prefers the bounded transcript and falls back to the
-// worker_done body. A transcript read failure never kills the attempt.
+// readWorkerOutput builds the phase output from the worker's report first and
+// the transcript second.
+//
+// The report leads because orca requires every worker to send exactly one
+// worker_done carrying an executive summary; that is the only channel with a
+// guaranteed conclusion. The transcript is supplementary: it is delivered as
+// tool calls far more often than as text, so on a live run six of seven phases
+// had no assistant text at all. Both are kept when both exist, since the
+// summary is deliberately short and the gate reads whatever is here.
 func (backend *pipelineOrcaBackend) readWorkerOutput(
 	ctx context.Context,
-	dispatchID, fallback string,
+	dispatchID, report string,
 ) string {
+	report = strings.TrimSpace(report)
 	transcript, err := backend.config.Client.ReadTranscript(ctx, dispatchID, backend.config.ReadLimit)
-	if err == nil && strings.TrimSpace(transcript.Text) != "" {
-		return transcript.Text
+	if err != nil {
+		return report
 	}
-	return fallback
-}
-
-func (backend *pipelineOrcaBackend) trackDispatch(dispatchID string) {
-	if dispatchID == "" {
-		return
+	detail := strings.TrimSpace(transcript.Text)
+	switch {
+	case report == "":
+		return detail
+	case detail == "" || detail == report:
+		return report
+	default:
+		return report + "\n\n" + detail
 	}
-	backend.mu.Lock()
-	defer backend.mu.Unlock()
-	backend.pending[dispatchID] = struct{}{}
-}
-
-// claimDispatch takes ownership of settling one dispatch. It succeeds for
-// exactly one caller, so a Close racing an in-flight attempt cannot settle the
-// same dispatch twice.
-func (backend *pipelineOrcaBackend) claimDispatch(dispatchID string) bool {
-	backend.mu.Lock()
-	defer backend.mu.Unlock()
-	if _, tracked := backend.pending[dispatchID]; !tracked {
-		return false
-	}
-	delete(backend.pending, dispatchID)
-	return true
-}
-
-func pipelineOrcaCleanupContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.WithoutCancel(ctx), pipelineOrcaSettleTimeout)
 }
