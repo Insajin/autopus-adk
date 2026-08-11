@@ -16,7 +16,23 @@ import (
 	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 )
 
+// widenDesktopObservationCeiling raises the observation ceiling for one test and
+// restores it afterwards. Tests that assert on behaviour rather than latency use
+// it so the production bound cannot preempt them on a loaded machine.
+func widenDesktopObservationCeiling(t *testing.T) {
+	t.Helper()
+	previous := desktopObservationCeiling
+	desktopObservationCeiling = 60 * time.Second
+	t.Cleanup(func() { desktopObservationCeiling = previous })
+}
+
+// TestOrcaProductionResolver_ExplicitSelectionInvokesInstalledCLIOnly pins the
+// exact CLI call sequence an explicit Orca selection issues. The ceiling is
+// widened because this observation spawns five provider processes: at the
+// production 2s bound a busy machine preempts the run and the assertion below
+// measures load instead of the call sequence.
 func TestOrcaProductionResolver_ExplicitSelectionInvokesInstalledCLIOnly(t *testing.T) {
+	widenDesktopObservationCeiling(t)
 	directory := t.TempDir()
 	callPath := filepath.Join(directory, "calls")
 	executable := filepath.Join(directory, orcaExecutableName)
