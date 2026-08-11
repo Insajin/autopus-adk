@@ -114,17 +114,26 @@ type pipelineExecutionOwnerResult struct {
 	RunID          string `json:"run_id"`
 	ReceiptPath    string `json:"receipt_path"`
 	RequiredAction string `json:"required_action"`
+	// REQ-008: the receiving side starts from an already-checked tier contract,
+	// so the handoff carries the integrity verdict, its reason, and a reference
+	// to the receipt that reconstructs it.
+	VerificationStatus   string `json:"verification_status"`
+	VerificationReason   string `json:"verification_reason"`
+	IntegrityReceiptPath string `json:"integrity_receipt_path"`
 }
 
 func persistPipelineExecutionOwnerReceipt(
 	specID string,
 	decision pipelineExecutionOwnerDecision,
+	verificationStatus string,
 ) (pipelineExecutionOwnerReceipt, string, error) {
 	receipt := pipelineExecutionOwnerReceipt{
 		Schema: pipelineExecutionOwnerReceiptSchema, Owner: decision.Owner,
 		Source: decision.Source, Reason: decision.Reason, SpecID: specID,
 		RunID: newPipelineExecutionOwnerRunID(), CheckedAt: time.Now().UTC(),
-		VerificationStatus: "verified",
+		// Derived from the tier integrity gate. It used to be a hardcoded
+		// "verified" that asserted a check nobody had run.
+		VerificationStatus: verificationStatus,
 	}
 	data, err := json.MarshalIndent(receipt, "", "  ")
 	if err != nil {
@@ -156,12 +165,16 @@ func emitPipelineExecutionOwnerHandoff(
 	cmd *cobra.Command,
 	receipt pipelineExecutionOwnerReceipt,
 	receiptPath string,
+	integrity pipelineTierIntegrityResult,
 ) error {
 	result := pipelineExecutionOwnerResult{
 		Schema: pipelineExecutionOwnerResultSchema, Status: "handoff_required",
 		Owner: receipt.Owner, Source: receipt.Source, Reason: receipt.Reason,
 		SpecID: receipt.SpecID, RunID: receipt.RunID, ReceiptPath: receiptPath,
-		RequiredAction: "orca skills get orchestration --full",
+		RequiredAction:       "orca skills get orchestration --full",
+		VerificationStatus:   receipt.VerificationStatus,
+		VerificationReason:   integrity.Reason,
+		IntegrityReceiptPath: integrity.ReceiptPath,
 	}
 	if err := json.NewEncoder(cmd.OutOrStdout()).Encode(result); err != nil {
 		return fmt.Errorf("encode execution owner handoff result: %w", err)

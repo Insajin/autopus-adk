@@ -8,7 +8,15 @@ import (
 	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 )
 
+// maxDesktopObservationDuration is the production ceiling for one observation.
 const maxDesktopObservationDuration = 2 * time.Second
+
+// desktopObservationCeiling is the ceiling operationContext actually enforces.
+// It exists so a test can widen the bound while the production default stays
+// put: one observation spawns several provider CLI calls, and on a saturated
+// machine the ceiling — not the contract under test — becomes what a test
+// measures. Config-supplied timeouts still only ever shorten it.
+var desktopObservationCeiling = maxDesktopObservationDuration
 
 type desktopProviderClient interface {
 	Handshake(context.Context) (desktopobserve.ProviderIdentity, error)
@@ -56,7 +64,7 @@ func newDesktopObservationRunner(local, orca desktopProviderClient) *desktopObse
 }
 
 func (runner *desktopObservationRunner) operationContext(parent context.Context) (context.Context, context.CancelFunc) {
-	timeout := maxDesktopObservationDuration
+	timeout := desktopObservationCeiling
 	if runner != nil && runner.timeout > 0 && runner.timeout < timeout {
 		timeout = runner.timeout
 	}

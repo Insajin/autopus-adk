@@ -105,7 +105,7 @@ WHERE the execution owner is the process plane, THE SYSTEM SHALL run the integri
 - EARS type: State-driven
 - Priority: Must
 - Trigger/Condition: `--execution-owner orca` 경로가 handoff 결과를 반환하기 직전.
-- Observability: handoff 결과에 정합 영수증 참조가 포함되고, 점검 실패 시 handoff 결과 대신 정합 실패가 반환됨을 S7로 확인한다.
+- Observability: handoff 결과에 정합 영수증 참조와 verification status·reason이 모두 포함됨을 S7로 확인한다. `unverified` 판정은 handoff를 막지 않는다 — 검증 수단이 없는 provider가 존재하는 것은 REQ-009가 인정한 정상 상태이므로, 그것을 치명적으로 다루면 게이트가 기존 경로를 근거 없이 차단한다. fail-closed는 REQ-006의 더 강한 조건(실행 계정이 요청 티어를 제공할 수 없음)에 속하지 "검증하지 못했음"에 속하지 않는다.
 
 ### REQ-009 — 검증할 수 없는 것은 검증됨으로 표기하지 않는다
 IF the execution account cannot be determined, or the account that will run the workload exposes no account-scoped catalog probe, THEN THE SYSTEM SHALL mark that provider's tier as unverified in the receipt with a reason rather than reporting it as verified.

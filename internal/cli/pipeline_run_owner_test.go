@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/insajin/autopus-adk/pkg/execplane"
 )
 
 func TestPipelineRunCmd_ExecutionOwnerAcceptsOnlyExactSingleValues(t *testing.T) {
@@ -130,6 +132,11 @@ func TestPipelineRun_OrcaOwnerEmitsHandoffBeforeOMPProcess(t *testing.T) {
 	specID := "SPEC-OWNER-ORCA-001"
 	writePipelineOwnerSpec(t, root, specID)
 	marker := installPipelineOwnerProcessTrap(t, root, "omp")
+	// verification_status is now derived from the tier integrity gate instead of
+	// being hardcoded, so this test pins the gate's only outside-world seam.
+	// Without the stub the expectation below would depend on whichever provider
+	// accounts the workstation running the suite happens to have registered.
+	stubExecplaneTierProbe(t, verifiedExecplaneTierEvidence)
 
 	var stdout bytes.Buffer
 	cmd := newPipelineRunCmd()
@@ -162,7 +169,8 @@ func TestPipelineRun_OrcaOwnerEmitsHandoffBeforeOMPProcess(t *testing.T) {
 	var receipt pipelineExecutionOwnerReceipt
 	require.NoError(t, json.Unmarshal(receiptBytes, &receipt))
 	assert.Equal(t, result.RunID, receipt.RunID)
-	assert.Equal(t, "verified", receipt.VerificationStatus)
+	assert.Equal(t, execplane.StatusVerified, receipt.VerificationStatus,
+		"a verified gate is what puts verified in the receipt")
 	assertPipelineExecutionOwnerReceiptIsBodyFree(t, receiptBytes)
 	if runtime.GOOS != "windows" {
 		info, statErr := os.Stat(filepath.FromSlash(result.ReceiptPath))
@@ -206,6 +214,13 @@ func TestPipelineRun_OMPOwnerPreservesDryRunForDefaultAndExplicitSelection(t *te
 			assert.Equal(t, specID, receipt.SpecID)
 			assert.NotEmpty(t, receipt.RunID)
 			assert.False(t, receipt.CheckedAt.IsZero())
+			// REQ-008 scopes the tier integrity gate to the process-plane
+			// handoff, so the OMP-owned path probes nothing — and a receipt
+			// that claims "verified" without a check is the silent downgrade
+			// SPEC-EXECPLANE-001 exists to prevent.
+			assert.Equal(t, execplane.StatusUnverified, receipt.VerificationStatus)
+			assert.NoFileExists(t, filepath.Join(pipelineStateDir, specID+".tier-integrity.json"),
+				"no gate ran, so there is no integrity receipt to read")
 			assertPipelineExecutionOwnerReceiptIsBodyFree(t, body)
 		})
 	}
