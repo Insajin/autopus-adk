@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -132,11 +133,22 @@ func TestOMPAdapter_Validate_EmptyWorkspaceReportsAllSurfaces(t *testing.T) {
 	}, files)
 }
 
+// widenOMPVersionCeiling raises the Detect deadline for one test and restores it
+// afterwards. Identity tests assert on what a version string resolves to, not on
+// how fast the probe returns, so the production bound must not preempt them.
+func widenOMPVersionCeiling(t *testing.T) {
+	t.Helper()
+	previous := ompVersionCeiling
+	ompVersionCeiling = 60 * time.Second
+	t.Cleanup(func() { ompVersionCeiling = previous })
+}
+
 // TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape pins the identity gate
 // at the adapter boundary. `omp` is a short name that collides with unrelated
 // executables, so the adapter adopts only an exact `omp/x.y.z` release shape.
 func TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape(t *testing.T) {
 	skipWithoutPOSIXShellOMP(t)
+	widenOMPVersionCeiling(t)
 
 	tests := []struct {
 		name    string
@@ -164,6 +176,7 @@ func TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape(t *testing.T) {
 
 func TestOMPAdapter_REQ019_DetectUsesCredentialFreeCanonicalEnvironment(t *testing.T) {
 	skipWithoutPOSIXShellOMP(t)
+	widenOMPVersionCeiling(t)
 
 	base := t.TempDir()
 	home := filepath.Join(base, "home")

@@ -55,7 +55,7 @@ func newDesktopObservationRunner(local, orca desktopProviderClient) *desktopObse
 	return &desktopObservationRunner{
 		local:   local,
 		orca:    orca,
-		timeout: maxDesktopObservationDuration,
+		timeout: desktopObservationCeiling,
 		ledgers: map[desktopobserve.RuntimeProvider]*desktopobserve.StateLedger{
 			desktopobserve.RuntimeProviderLocal: desktopobserve.NewStateLedger(),
 			desktopobserve.RuntimeProviderOrca:  desktopobserve.NewStateLedger(),
