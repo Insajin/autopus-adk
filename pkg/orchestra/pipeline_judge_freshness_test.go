@@ -93,7 +93,6 @@ func TestPipelineBackendHasFreshExecutionSemantics_RecognizesOnlyBuiltInsAndExpl
 		want    bool
 	}{
 		{name: "subprocess", backend: NewSubprocessBackendImpl(), want: true},
-		{name: "legacy pane", backend: NewPaneBackend(), want: true},
 		{name: "interactive pane", backend: NewInteractivePaneBackend(OrchestraConfig{}), want: true},
 		{name: "explicit test model", backend: &pipelineFreshExecutionBackend{name: "subprocess"}, want: true},
 		{name: "custom name spoof", backend: &pipelineUnverifiedCustomBackend{}, want: false},

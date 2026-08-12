@@ -8,7 +8,7 @@ type freshPipelineExecutionBackend interface {
 
 func pipelineBackendHasFreshExecutionSemantics(backend ExecutionBackend) bool {
 	switch backend.(type) {
-	case *subprocessBackend, *PaneBackend, *InteractivePaneBackend:
+	case *subprocessBackend, *InteractivePaneBackend:
 		return true
 	}
 	declared, ok := backend.(freshPipelineExecutionBackend)

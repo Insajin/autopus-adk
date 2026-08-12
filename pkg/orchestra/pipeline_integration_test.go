@@ -131,7 +131,7 @@ func TestIntegration_DeepMode(t *testing.T) {
 
 func TestIntegration_BackendSelection_Default(t *testing.T) {
 	t.Parallel()
-	// Terminal present, no SubprocessMode → PaneBackend
+	// Terminal present, no SubprocessMode → InteractivePaneBackend
 	cfg := OrchestraConfig{Terminal: &mockTerminal{name: "cmux"}}
 	backend := SelectBackend(cfg)
 	require.NotNil(t, backend)
