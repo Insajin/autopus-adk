@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- **pane 터미널에서 `recheck`가 재유도 없이 끝나던 라우팅** (2026-08-09): `RunOrchestra`는 전략 분기보다 먼저 pane 러너로 위임하므로, cmux·tmux 같은 pane 지원 터미널에서 `--strategy recheck`가 relay·debate·interactive 분기를 모두 비껴가 일반 pane 팬아웃으로 떨어졌다. 그 경로는 프로바이더당 1라운드만 실행하므로 재유도가 일어나지 않은 1라운드 답변이 `recheck` 결과로 반환됐다. 이제 `recheck`는 터미널 종류와 무관하게 헤드리스 2라운드 경로를 사용한다. 두 진입점(`RunOrchestra`, `RunPaneOrchestra`) 모두에 가드를 두되 서로 위임하지 않아 순환하지 않는다. `auto orchestra`의 전략 목록 오류 메시지에도 빠져 있던 `recheck`를 추가했다.
+
 - **Codex 최상위 모델 부재 시 세대를 건너뛰던 폴백** (2026-08-09): 요청한 Codex 모델이 런타임 카탈로그에 없으면 해결기가 카탈로그의 나머지를 무시하고 하드코딩된 `gpt-5.5`로 직행했다. 프론티어 모델 권한이 없는 ChatGPT 계정도 같은 세대의 균형 모델(`gpt-5.6-terra`)은 광고하므로, 최상위 티어 요청이 오히려 한 세대 낮은 모델로 떨어졌다 — 티어를 올리지 않았을 때보다 나쁜 결과다. 이제 프론티어 요청은 같은 세대 균형 모델을 먼저 시도한 뒤에만 legacy로 내려간다. 균형·소형 티어의 폴백은 바뀌지 않는다: 소형 티어는 명시적으로 싼 모델이므로 더 큰 모델의 대체재로 승격하지 않는다. 카탈로그에 아는 모델이 하나도 없으면 종전대로 런타임 기본값에 위임한다. 폴백은 이미 `Codex model fallback: requested=... selected=... reason=model_unavailable`로 stderr에 보고되고 있었고 그 형식도 그대로다.
 
 ### Added

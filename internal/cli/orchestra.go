@@ -116,7 +116,7 @@ func runOrchestraCommand(
 
 	s := orchestra.Strategy(strategyStr)
 	if !s.IsValid() {
-		return fmt.Errorf("유효하지 않은 전략: %q (가능한 값: consensus, pipeline, debate, fastest, relay)", strategyStr)
+		return fmt.Errorf("유효하지 않은 전략: %q (가능한 값: consensus, pipeline, debate, fastest, relay, recheck)", strategyStr)
 	}
 
 	if len(providers) == 0 {
