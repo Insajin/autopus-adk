@@ -31,9 +31,9 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	}
 
 	// Delegate to pane runner for non-plain terminals (REQ-007 shared predicate).
-	// recheck is excluded: it is a headless two-round flow over one provider, and
-	// the generic pane path would fan out a single round instead — silently
-	// returning something that is not a re-derivation.
+	// recheck is excluded from that wrapper only because it fans providers out
+	// one round each; recheck still runs in panes when the terminal supports
+	// them — runRecheck selects the pane transport itself.
 	if paneCapable(cfg.Terminal, cfg.SubprocessMode) && cfg.Strategy != StrategyRecheck {
 		return RunPaneOrchestra(ctx, cfg)
 	}

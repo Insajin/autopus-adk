@@ -213,7 +213,7 @@ type OrchestraConfig struct {
 	NoJudge                      bool               // R4: skip judge verdict phase when true
 	YieldRounds                  bool               // R5: yield after round 1 with JSON output, keep panes alive
 	ContextAware                 bool               // R8: when true, skip topic isolation so providers can read project files
-	SubprocessMode               bool               // when true, use SubprocessBackend instead of PaneBackend
+	SubprocessMode               bool               // when true, use the subprocess backend instead of an interactive pane
 	RoundPreset                  string             // round preset: "fast", "standard", "deep" (for T8)
 	MonitorEnabled               bool               // when true, prefer CC21 monitor-style completion over polling
 	MonitorTimeout               time.Duration      // max wait for monitor-style completion before polling fallback

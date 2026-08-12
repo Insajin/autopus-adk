@@ -8,26 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPaneBackend_Execute(t *testing.T) {
-	t.Parallel()
-	backend := NewPaneBackend()
-	req := ProviderRequest{
-		Provider: "test",
-		Prompt:   "hello",
-		Config:   echoProvider("test"),
-	}
-	resp, err := backend.Execute(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, "test", resp.Provider)
-	assert.Contains(t, resp.Output, "hello")
-}
-
-func TestPaneBackend_Name(t *testing.T) {
-	t.Parallel()
-	backend := NewPaneBackend()
-	assert.Equal(t, "pane", backend.Name())
-}
-
 func TestSubprocessBackend_Execute_WithEcho(t *testing.T) {
 	t.Parallel()
 	backend := NewSubprocessBackendImpl()

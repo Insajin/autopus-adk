@@ -24,6 +24,28 @@ func buildRecheckPrompt(task, own string) string {
 	)
 }
 
+// recheckRunner executes one recheck round. The signature matches
+// ExecutionBackend.Execute so a backend's method value can be used directly.
+type recheckRunner func(context.Context, ProviderRequest) (*ProviderResponse, error)
+
+// recheckTransport picks how each round reaches the provider, and the backend
+// name recorded in evidence. A pane-capable terminal (cmux, tmux, and the Orca
+// terminals built on them) drives the provider in a pane; a plain terminal,
+// forced subprocess mode, and agent runtimes such as OMP spawn it directly.
+//
+// SelectBackend is deliberately not used here. It returns the schema-enforcing
+// subprocess backend, and recheck exchanges free text with the provider the
+// same way consensus, pipeline, and relay do.
+func recheckTransport(cfg OrchestraConfig) (recheckRunner, string) {
+	if paneCapable(cfg.Terminal, cfg.SubprocessMode) {
+		backend := NewInteractivePaneBackend(cfg)
+		return backend.Execute, backend.Name()
+	}
+	return func(ctx context.Context, req ProviderRequest) (*ProviderResponse, error) {
+		return runProvider(ctx, req.Config, req.Prompt)
+	}, "subprocess"
+}
+
 // runRecheck executes a single provider twice: an independent first pass, then
 // a re-derivation that sees only its own prior answer.
 func runRecheck(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, [][]ProviderResponse, []FailedProvider, error) {
@@ -32,6 +54,7 @@ func runRecheck(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, [
 			"recheck 전략은 프로바이더를 정확히 1개만 사용합니다 (현재 %d개)", len(cfg.Providers))
 	}
 	provider := cfg.Providers[0]
+	run, backendName := recheckTransport(cfg)
 	responses := make([]ProviderResponse, 0, recheckRoundCount)
 	history := make([][]ProviderResponse, 0, recheckRoundCount)
 	prompt := cfg.Prompt
@@ -44,18 +67,20 @@ func runRecheck(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, [
 		// Bound each round by the per-provider timeout so a stalled first pass
 		// cannot consume the budget the re-derivation still needs.
 		perTimeout := providerExecutionTimeout(provider, cfg.TimeoutSeconds)
+		req := ProviderRequest{
+			Provider: provider.Name, Prompt: prompt, Role: role,
+			Round: round, Timeout: perTimeout, Config: provider,
+		}
 		roundCtx, roundCancel := context.WithTimeout(ctx, perTimeout)
-		response, err := runProvider(roundCtx, provider, prompt)
+		response, err := run(roundCtx, req)
 		roundCancel()
-		applyProviderRequestEvidence(response, ProviderRequest{
-			Provider: provider.Name, Config: provider, Role: role, Round: round,
-		}, "subprocess")
+		applyProviderRequestEvidence(response, req, backendName)
 		if err != nil {
 			failure := buildFailedProviderWithContext(
 				provider, response, err, cfg.TimeoutSeconds, role, len(responses) > 0,
 			)
 			failure.Attempt = round
-			failure.ExecutedBackend = "subprocess"
+			failure.ExecutedBackend = backendName
 			if response != nil && response.ExecutedBackend != "" {
 				failure.ExecutedBackend = response.ExecutedBackend
 			}

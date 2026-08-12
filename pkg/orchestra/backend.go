@@ -5,8 +5,9 @@ import (
 	"time"
 )
 
-// ExecutionBackend abstracts how a provider is executed.
-// PaneBackend runs via terminal panes; SubprocessBackend runs as a child process.
+// ExecutionBackend abstracts how a provider is executed. InteractivePaneBackend
+// drives a terminal pane; subprocessBackend spawns a child process with
+// schema-enforced JSON I/O.
 type ExecutionBackend interface {
 	// Execute runs a single provider and returns its response.
 	Execute(ctx context.Context, req ProviderRequest) (*ProviderResponse, error)
@@ -25,28 +26,13 @@ type ProviderRequest struct {
 	Config     ProviderConfig // full provider configuration
 }
 
-// PaneBackend implements ExecutionBackend by delegating to runProvider().
-type PaneBackend struct{}
-
-// NewPaneBackend creates a PaneBackend instance.
-func NewPaneBackend() *PaneBackend {
-	return &PaneBackend{}
-}
-
-// Execute runs the provider via the existing runProvider function.
-func (b *PaneBackend) Execute(ctx context.Context, req ProviderRequest) (*ProviderResponse, error) {
-	return runProvider(ctx, req.Config, req.Prompt)
-}
-
-// Name returns "pane".
-func (b *PaneBackend) Name() string {
-	return "pane"
-}
-
 // SelectBackend chooses the appropriate ExecutionBackend based on config (REQ-002/003).
 // Interactive-pane execution is the default when the terminal is pane-capable
 // (cmux/tmux-style, non-plain) and subprocess mode is not forced. Plain, nil, or
 // subprocess-forced configs use the subprocess backend (F-001).
+//
+// Callers that exchange free text rather than schema-guided JSON must not use
+// this: the subprocess backend validates JSON output.
 func SelectBackend(cfg OrchestraConfig) ExecutionBackend {
 	if paneCapable(cfg.Terminal, cfg.SubprocessMode) {
 		return NewInteractivePaneBackend(cfg)

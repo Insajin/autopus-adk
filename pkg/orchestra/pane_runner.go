@@ -43,8 +43,9 @@ func RunPaneOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResul
 		return RunOrchestra(ctx, cfg)
 	}
 
-	// recheck never uses panes; hand it back to the headless runner, which does
-	// not delegate here for this strategy, so the handoff cannot loop.
+	// recheck owns its own two-round loop and picks the pane transport inside
+	// runRecheck, so it skips this fan-out wrapper. RunOrchestra does not
+	// delegate here for this strategy, so the handoff cannot loop.
 	if cfg.Strategy == StrategyRecheck {
 		return RunOrchestra(ctx, cfg)
 	}

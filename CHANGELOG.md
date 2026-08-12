@@ -4,9 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+
+- **프로덕션에서 쓰이지 않던 `PaneBackend`** (2026-08-09): 이름은 pane인데 실제로는 `runProvider`로 자식 프로세스를 띄우는 타입이었고, 프로덕션 참조는 없이 자기 자신을 검증하는 테스트와 fresh-judge 허용목록 항목만 남아 있었다. 이 오해를 부르는 이름 때문에 전송 선택 seam을 잘못 고를 뻔했으므로 제거한다. `pipelineBackendHasFreshExecutionSemantics`의 허용목록에서도 빠지며, 남은 두 내장 백엔드(`subprocessBackend`, `InteractivePaneBackend`)의 판정은 그대로다. `SelectBackend`의 주석에 자유 텍스트 호출자는 이 백엔드를 쓰면 안 된다는 계약을 명시했다.
+
 ### Fixed
 
-- **pane 터미널에서 `recheck`가 재유도 없이 끝나던 라우팅** (2026-08-09): `RunOrchestra`는 전략 분기보다 먼저 pane 러너로 위임하므로, cmux·tmux 같은 pane 지원 터미널에서 `--strategy recheck`가 relay·debate·interactive 분기를 모두 비껴가 일반 pane 팬아웃으로 떨어졌다. 그 경로는 프로바이더당 1라운드만 실행하므로 재유도가 일어나지 않은 1라운드 답변이 `recheck` 결과로 반환됐다. 이제 `recheck`는 터미널 종류와 무관하게 헤드리스 2라운드 경로를 사용한다. 두 진입점(`RunOrchestra`, `RunPaneOrchestra`) 모두에 가드를 두되 서로 위임하지 않아 순환하지 않는다. `auto orchestra`의 전략 목록 오류 메시지에도 빠져 있던 `recheck`를 추가했다.
+- **`recheck`가 pane 터미널에서 자식 프로세스로 떨어지던 전송 선택** (2026-08-09): `runRecheck`가 `runProvider`를 직접 호출해 전송 계층을 통째로 우회했다. 그래서 cmux·tmux와 그 위에 올라간 Orca 터미널에서도 두 라운드가 pane이 아닌 자식 프로세스로 실행됐고, receipt의 `backend`는 실제 실행과 무관하게 항상 `subprocess`로 보고됐다. 이제 라운드마다 터미널에 맞는 전송을 고른다 — pane 지원 터미널은 `InteractivePaneBackend`, plain 터미널·강제 subprocess 모드·OMP 같은 에이전트 런타임은 직접 실행 — 그리고 evidence의 backend 이름은 실제로 실행한 전송을 따른다. `SelectBackend`는 쓰지 않는다: 그것이 돌려주는 subprocess 백엔드는 JSON 스키마를 강제하는데 `recheck`는 consensus·pipeline·relay와 같은 자유 텍스트 전략이다. pane 팬아웃 래퍼를 건너뛰는 가드는 유지되지만, 이제 전송이 아니라 래퍼만 건너뛴다.
+
+- **pane 터미널에서 `recheck`가 재유도 없이 끝나던 라우팅** (2026-08-09): `RunOrchestra`는 전략 분기보다 먼저 pane 러너로 위임하므로, cmux·tmux 같은 pane 지원 터미널에서 `--strategy recheck`가 relay·debate·interactive 분기를 모두 비껴가 일반 pane 팬아웃으로 떨어졌다. 그 경로는 프로바이더당 1라운드만 실행하므로 재유도가 일어나지 않은 1라운드 답변이 `recheck` 결과로 반환됐다. 이제 `recheck`는 터미널 종류와 무관하게 자신의 2라운드 루프를 소유하며, 각 라운드의 전송은 위 항목대로 터미널에 맞춰 고른다. 두 진입점(`RunOrchestra`, `RunPaneOrchestra`) 모두에 가드를 두되 서로 위임하지 않아 순환하지 않는다. `auto orchestra`의 전략 목록 오류 메시지에도 빠져 있던 `recheck`를 추가했다.
 
 - **Codex 최상위 모델 부재 시 세대를 건너뛰던 폴백** (2026-08-09): 요청한 Codex 모델이 런타임 카탈로그에 없으면 해결기가 카탈로그의 나머지를 무시하고 하드코딩된 `gpt-5.5`로 직행했다. 프론티어 모델 권한이 없는 ChatGPT 계정도 같은 세대의 균형 모델(`gpt-5.6-terra`)은 광고하므로, 최상위 티어 요청이 오히려 한 세대 낮은 모델로 떨어졌다 — 티어를 올리지 않았을 때보다 나쁜 결과다. 이제 프론티어 요청은 같은 세대 균형 모델을 먼저 시도한 뒤에만 legacy로 내려간다. 균형·소형 티어의 폴백은 바뀌지 않는다: 소형 티어는 명시적으로 싼 모델이므로 더 큰 모델의 대체재로 승격하지 않는다. 카탈로그에 아는 모델이 하나도 없으면 종전대로 런타임 기본값에 위임한다. 폴백은 이미 `Codex model fallback: requested=... selected=... reason=model_unavailable`로 stderr에 보고되고 있었고 그 형식도 그대로다.
 
