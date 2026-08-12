@@ -84,11 +84,19 @@ func TestOrchestraRunJSON_EmitsRunReceiptOnSuccess(t *testing.T) {
 	})
 	var out bytes.Buffer
 
-	err := runSubprocessPipeline(
-		orchestraRunJSONCmd(context.Background(), &out), "topic", "consensus",
-		[]string{"claude", "codex"}, "fast", 30, true, "", true, false, true,
-		0,
-	)
+	err := runSubprocessPipeline(orchestraRunJSONCmd(context.Background(), &out), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "consensus",
+		Providers:        []string{"claude", "codex"},
+		RoundsPreset:     "fast",
+		Timeout:          30,
+		TimeoutChanged:   true,
+		Judge:            "",
+		ForceSubprocess:  true,
+		DryRun:           false,
+		JSONMode:         true,
+		RequireAgreement: 0,
+	})
 
 	require.NoError(t, err)
 	require.NotNil(t, captured)
@@ -113,11 +121,19 @@ func TestOrchestraRunJSON_EmitsReceiptWhenGateBlocks(t *testing.T) {
 	})
 	var out bytes.Buffer
 
-	err := runSubprocessPipeline(
-		orchestraRunJSONCmd(context.Background(), &out), "topic", "consensus",
-		[]string{"claude"}, "fast", 30, true, "", true, false, true,
-		0,
-	)
+	err := runSubprocessPipeline(orchestraRunJSONCmd(context.Background(), &out), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "consensus",
+		Providers:        []string{"claude"},
+		RoundsPreset:     "fast",
+		Timeout:          30,
+		TimeoutChanged:   true,
+		Judge:            "",
+		ForceSubprocess:  true,
+		DryRun:           false,
+		JSONMode:         true,
+		RequireAgreement: 0,
+	})
 
 	require.Error(t, err, "a blocked gate must still fail the command")
 	payload := decodeJSONMap(t, out.Bytes())
@@ -141,11 +157,19 @@ func TestOrchestraRunJSON_DegradedRunSurfacesAsWarnStatus(t *testing.T) {
 	})
 	var out bytes.Buffer
 
-	err := runSubprocessPipeline(
-		orchestraRunJSONCmd(context.Background(), &out), "topic", "consensus",
-		[]string{"claude", "codex", "gemini"}, "fast", 30, true, "", true, false, true,
-		0,
-	)
+	err := runSubprocessPipeline(orchestraRunJSONCmd(context.Background(), &out), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "consensus",
+		Providers:        []string{"claude", "codex", "gemini"},
+		RoundsPreset:     "fast",
+		Timeout:          30,
+		TimeoutChanged:   true,
+		Judge:            "",
+		ForceSubprocess:  true,
+		DryRun:           false,
+		JSONMode:         true,
+		RequireAgreement: 0,
+	})
 
 	require.NoError(t, err)
 	payload := decodeJSONMap(t, out.Bytes())

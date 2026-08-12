@@ -96,11 +96,19 @@ func TestRunSubprocessPipeline_BlockedReceiptFailsClosed(t *testing.T) {
 		}, cfg), nil
 	}
 
-	err := runSubprocessPipeline(
-		orchestraRunTestCmd(context.Background()), "contract", "consensus", []string{"claude"},
-		"standard", 5, true, "", true, false, false,
-		0,
-	)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+		Topic:            "contract",
+		Strategy:         "consensus",
+		Providers:        []string{"claude"},
+		RoundsPreset:     "standard",
+		Timeout:          5,
+		TimeoutChanged:   true,
+		Judge:            "",
+		ForceSubprocess:  true,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0,
+	})
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Critical finding")

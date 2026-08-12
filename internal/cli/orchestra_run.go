@@ -39,7 +39,19 @@ func newOrchestraRunCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runSubprocessPipeline(cmd, topic, strategy, providers, rounds, timeout, timeoutChanged, judge, subprocess, dryRun, jsonMode, requireAgreement)
+			return runSubprocessPipeline(cmd, orchestraRunOptions{
+				Topic:            topic,
+				Strategy:         strategy,
+				Providers:        providers,
+				RoundsPreset:     rounds,
+				Timeout:          timeout,
+				TimeoutChanged:   timeoutChanged,
+				Judge:            judge,
+				ForceSubprocess:  subprocess,
+				DryRun:           dryRun,
+				JSONMode:         jsonMode,
+				RequireAgreement: requireAgreement,
+			})
 		},
 	}
 
@@ -57,37 +69,42 @@ func newOrchestraRunCmd() *cobra.Command {
 	return cmd
 }
 
+// orchestraRunOptions carries the `auto orchestra run` flag set. It exists so
+// callers name what they pass: the positional form had three adjacent booleans
+// and a trailing float, where any transposition still compiled.
+type orchestraRunOptions struct {
+	Topic            string
+	Strategy         string
+	Providers        []string
+	RoundsPreset     string
+	Timeout          int
+	TimeoutChanged   bool
+	Judge            string
+	ForceSubprocess  bool
+	DryRun           bool
+	JSONMode         bool
+	RequireAgreement float64
+}
+
 // runSubprocessPipeline executes the subprocess-based orchestration pipeline.
 // @AX:WARN: [AUTO] high-branch CLI pipeline — config, invoker judge, backend, dry-run, and failure gates converge here
 // @AX:REASON: [AUTO] more than eight conditional branches determine externally visible run behavior
-func runSubprocessPipeline(
-	cmd *cobra.Command,
-	topic, strategyStr string,
-	providerNames []string,
-	roundsPreset string,
-	timeout int,
-	timeoutChanged bool,
-	judgeName string,
-	forceSubprocess bool,
-	dryRun bool,
-	jsonMode bool,
-	requireAgreement float64,
-) error {
+func runSubprocessPipeline(cmd *cobra.Command, opts orchestraRunOptions) error {
 	ctx := cmd.Context()
-	requestedStrategy := orchestra.Strategy(strings.ToLower(strings.TrimSpace(strategyStr)))
+	requestedStrategy := orchestra.Strategy(strings.ToLower(strings.TrimSpace(opts.Strategy)))
 	if requestedStrategy != orchestra.StrategyDebate &&
 		requestedStrategy != orchestra.StrategyConsensus &&
 		requestedStrategy != orchestra.StrategyRecheck {
-		return fmt.Errorf("unsupported orchestra run strategy %q (use debate, consensus, or recheck)", strategyStr)
+		return fmt.Errorf("unsupported orchestra run strategy %q (use debate, consensus, or recheck)", opts.Strategy)
 	}
-	if requireAgreement < 0 || requireAgreement > 1 {
-		return fmt.Errorf("--require-agreement must be between 0 and 1, got %v", requireAgreement)
+	if opts.RequireAgreement < 0 || opts.RequireAgreement > 1 {
+		return fmt.Errorf("--require-agreement must be between 0 and 1, got %v", opts.RequireAgreement)
 	}
-	if requireAgreement > 0 && requestedStrategy != orchestra.StrategyConsensus {
-		return fmt.Errorf("--require-agreement needs --strategy consensus; %q produces no agreement ratio", strategyStr)
+	if opts.RequireAgreement > 0 && requestedStrategy != orchestra.StrategyConsensus {
+		return fmt.Errorf("--require-agreement needs --strategy consensus; %q produces no agreement ratio", opts.Strategy)
 	}
-	explicitProviderSelection := len(providerNames) > 0
-	flagJudge := strings.TrimSpace(judgeName)
+	explicitProviderSelection := len(opts.Providers) > 0
+	flagJudge := strings.TrimSpace(opts.Judge)
 	explicitJudge := flagJudge != ""
 	runtimeFlags := globalFlagsFromContext(ctx)
 	harnessCfg, configErr := orchestraRunLoadConfig(runtimeFlags)
@@ -98,23 +115,23 @@ func runSubprocessPipeline(
 
 	var providerConfigs []orchestra.ProviderConfig
 	if configErr != nil || orchConf == nil {
-		if len(providerNames) == 0 {
-			providerNames = defaultProviders()
+		if len(opts.Providers) == 0 {
+			opts.Providers = defaultProviders()
 		}
-		providerConfigs = orchestraRunBuildProviders(providerNames, runtimeFlags.Quality, runtimeFlags.Effort)
+		providerConfigs = orchestraRunBuildProviders(opts.Providers, runtimeFlags.Quality, runtimeFlags.Effort)
 	} else {
-		providerConfigs = resolveProviders(orchConf, "run", providerNames)
-		if judgeName == "" {
-			judgeName = resolveJudge(orchConf, "run", "")
+		providerConfigs = resolveProviders(orchConf, "run", opts.Providers)
+		if opts.Judge == "" {
+			opts.Judge = resolveJudge(orchConf, "run", "")
 		}
-		if explicitProviderSelection && !explicitJudge && judgeName != "" && !hasProviderConfig(providerConfigs, judgeName) && len(providerConfigs) > 0 {
-			judgeName = providerConfigs[0].Name
+		if explicitProviderSelection && !explicitJudge && opts.Judge != "" && !hasProviderConfig(providerConfigs, opts.Judge) && len(providerConfigs) > 0 {
+			opts.Judge = providerConfigs[0].Name
 		}
-		timeout = resolveCommandTimeout(orchConf, timeout, timeoutChanged)
+		opts.Timeout = resolveCommandTimeout(orchConf, opts.Timeout, opts.TimeoutChanged)
 	}
 
 	if configErr != nil || orchConf == nil {
-		timeout = resolveCommandTimeout(nil, timeout, timeoutChanged)
+		opts.Timeout = resolveCommandTimeout(nil, opts.Timeout, opts.TimeoutChanged)
 	}
 	providerConfigs = resolveCodexProviderCapabilities(ctx, providerConfigs)
 
@@ -125,9 +142,9 @@ func runSubprocessPipeline(
 	judgeSelectionSource := ""
 	if requestedStrategy == orchestra.StrategyDebate {
 		invokingProvider = detectOrchestraInvokingProvider()
-		judgeName = resolveInvocationJudge(
+		opts.Judge = resolveInvocationJudge(
 			flagJudge,
-			judgeName,
+			opts.Judge,
 			invokingProvider,
 		)
 		judgeSelectionSource = invocationJudgeSelectionSource(flagJudge, invokingProvider)
@@ -135,22 +152,22 @@ func runSubprocessPipeline(
 	configuredNames := providerConfigNames(providerConfigs)
 
 	// Resolve round preset.
-	roundCount, ok := orchestra.RoundPresets[roundsPreset]
+	roundCount, ok := orchestra.RoundPresets[opts.RoundsPreset]
 	if !ok {
-		return fmt.Errorf("unknown round preset %q (use fast, standard, or deep)", roundsPreset)
+		return fmt.Errorf("unknown round preset %q (use fast, standard, or deep)", opts.RoundsPreset)
 	}
 
 	// Resolve judge config.
 	var judgeCfg orchestra.ProviderConfig
-	if judgeName != "" {
+	if opts.Judge != "" {
 		for _, p := range providerConfigs {
-			if p.Name == judgeName {
+			if p.Name == opts.Judge {
 				judgeCfg = p
 				break
 			}
 		}
 		if judgeCfg.Name == "" {
-			judgeCfg = orchestra.ProviderConfig{Name: judgeName, Binary: judgeName}
+			judgeCfg = orchestra.ProviderConfig{Name: opts.Judge, Binary: opts.Judge}
 		}
 	} else if len(providerConfigs) > 0 {
 		judgeCfg = providerConfigs[0] // default: first provider
@@ -162,13 +179,13 @@ func runSubprocessPipeline(
 		ProjectSummary: "Agentic Development Kit CLI",
 		TechStack:      "Go",
 		MustReadFiles:  []string{"ARCHITECTURE.md", "go.mod"},
-		Topic:          topic,
+		Topic:          opts.Topic,
 		MaxTurns:       10,
 		TargetModule:   ".",
 	}
 
-	if dryRun {
-		return executeDryRun(topic, promptData, providerConfigs, roundCount)
+	if opts.DryRun {
+		return executeDryRun(opts.Topic, promptData, providerConfigs, roundCount)
 	}
 
 	// Choose backend (REQ-003). Inject the detected terminal so SelectBackend
@@ -179,15 +196,15 @@ func runSubprocessPipeline(
 		RequestedProviders:    append([]string(nil), configuredNames...),
 		ConfiguredProviders:   append([]string(nil), configuredNames...),
 		Strategy:              requestedStrategy,
-		Prompt:                topic,
-		JudgeProvider:         judgeName,
+		Prompt:                opts.Topic,
+		JudgeProvider:         opts.Judge,
 		InvokingProvider:      invokingProvider,
 		JudgeSelectionSource:  judgeSelectionSource,
-		SubprocessMode:        forceSubprocess,
-		TimeoutSeconds:        timeout,
+		SubprocessMode:        opts.ForceSubprocess,
+		TimeoutSeconds:        opts.Timeout,
 		Terminal:              detectStructuredTerminal(),
 		FallbackMode:          orchestra.FallbackModeSubprocess,
-		MinimumAgreementRatio: requireAgreement,
+		MinimumAgreementRatio: opts.RequireAgreement,
 	}
 	// SPEC-ORCH-022 T8: enable hook-IPC collection before backend selection so a
 	// pane-capable, hook-installed context collects via done-file instead of
@@ -198,11 +215,11 @@ func runSubprocessPipeline(
 	pipelineCfg := orchestra.SubprocessPipelineConfig{
 		Backend:        backend,
 		Providers:      providerConfigs,
-		Topic:          topic,
+		Topic:          opts.Topic,
 		PromptData:     promptData,
 		Rounds:         roundCount,
 		Judge:          judgeCfg,
-		TimeoutSeconds: timeout,
+		TimeoutSeconds: opts.Timeout,
 	}
 
 	names := make([]string, len(providerConfigs))
@@ -214,7 +231,7 @@ func runSubprocessPipeline(
 		terminalName = cfg.Terminal.Name()
 	}
 	fmt.Fprintf(os.Stderr, "Strategy: %s | Providers: %s | Rounds: %s (%d) | Backend: %s (terminal=%s, hook=%t)\n",
-		strategyStr, strings.Join(names, ", "), roundsPreset, roundCount+1, backend.Name(), terminalName, cfg.HookMode)
+		opts.Strategy, strings.Join(names, ", "), opts.RoundsPreset, roundCount+1, backend.Name(), terminalName, cfg.HookMode)
 
 	result, err := executeOrchestraRunStrategy(ctx, requestedStrategy, cfg, pipelineCfg)
 	if err != nil {
@@ -227,7 +244,7 @@ func runSubprocessPipeline(
 	// is emitted before the command fails rather than discarded with the error.
 	if shouldTreatOrchestraResultAsFailure(result) {
 		blocked := fmt.Errorf("subprocess pipeline failed: %w", synthesizeOrchestraFailureError(result))
-		if jsonMode {
+		if opts.JSONMode {
 			return writeJSONResultAndExit(
 				cmd, jsonStatusError, blocked, "orchestra_run_blocked", result.RunReceipt, nil, nil,
 			)
@@ -243,7 +260,7 @@ func runSubprocessPipeline(
 		)
 	}
 
-	if jsonMode {
+	if opts.JSONMode {
 		return writeJSONResult(cmd, orchestraRunJSONStatus(result), result.RunReceipt, nil, nil)
 	}
 	fmt.Println(result.Merged)
