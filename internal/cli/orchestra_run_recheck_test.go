@@ -66,11 +66,19 @@ func TestRunSubprocessPipeline_RecheckRoutesToEngineNotPipeline(t *testing.T) {
 		}, nil
 	}
 
-	err := runSubprocessPipeline(
-		orchestraRunTestCmd(context.Background()),
-		"topic", "recheck", []string{"claude"}, "standard", 120, false, "", false, false, false,
-		0,
-	)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "recheck",
+		Providers:        []string{"claude"},
+		RoundsPreset:     "standard",
+		Timeout:          120,
+		TimeoutChanged:   false,
+		Judge:            "",
+		ForceSubprocess:  false,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0,
+	})
 	require.NoError(t, err)
 	assert.False(t, pipelineCalled, "recheck must not invoke the debate subprocess pipeline")
 	assert.Equal(t, orchestra.StrategyRecheck, captured.Strategy)
@@ -85,11 +93,19 @@ func TestRunSubprocessPipeline_RejectsUnknownStrategy(t *testing.T) {
 	t.Cleanup(func() { orchestraRunLoadConfig = origLoadConfig })
 	orchestraRunLoadConfig = recheckHarnessConfig
 
-	err := runSubprocessPipeline(
-		orchestraRunTestCmd(context.Background()),
-		"topic", "recheckk", []string{"claude"}, "standard", 120, false, "", false, false, false,
-		0,
-	)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "recheckk",
+		Providers:        []string{"claude"},
+		RoundsPreset:     "standard",
+		Timeout:          120,
+		TimeoutChanged:   false,
+		Judge:            "",
+		ForceSubprocess:  false,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0,
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "recheck")
 }
@@ -125,10 +141,19 @@ func TestRunSubprocessPipeline_RequireAgreementReachesEngineConfig(t *testing.T)
 		}, nil
 	}
 
-	err := runSubprocessPipeline(
-		orchestraRunTestCmd(context.Background()),
-		"topic", "consensus", []string{"claude", "codex"}, "fast", 30, false, "", true, false, false, 0.9,
-	)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "consensus",
+		Providers:        []string{"claude", "codex"},
+		RoundsPreset:     "fast",
+		Timeout:          30,
+		TimeoutChanged:   false,
+		Judge:            "",
+		ForceSubprocess:  true,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0.9,
+	})
 	require.NoError(t, err)
 	assert.InDelta(t, 0.9, captured.MinimumAgreementRatio, 1e-9)
 }
@@ -151,10 +176,19 @@ func TestRunSubprocessPipeline_RejectsUnusableAgreementFloors(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			err := runSubprocessPipeline(
-				orchestraRunTestCmd(context.Background()),
-				"topic", tc.strategy, []string{"claude"}, "fast", 30, false, "", true, false, false, tc.floor,
-			)
+			err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+				Topic:            "topic",
+				Strategy:         tc.strategy,
+				Providers:        []string{"claude"},
+				RoundsPreset:     "fast",
+				Timeout:          30,
+				TimeoutChanged:   false,
+				Judge:            "",
+				ForceSubprocess:  true,
+				DryRun:           false,
+				JSONMode:         false,
+				RequireAgreement: tc.floor,
+			})
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantMsg)
 		})

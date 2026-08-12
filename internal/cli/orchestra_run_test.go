@@ -62,7 +62,19 @@ func TestRunSubprocessPipeline_UsesConfigTimeoutWhenFlagUnchanged(t *testing.T) 
 		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
-	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), "topic", "debate", []string{"claude"}, "standard", 120, false, "", false, false, false, 0)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "debate",
+		Providers:        []string{"claude"},
+		RoundsPreset:     "standard",
+		Timeout:          120,
+		TimeoutChanged:   false,
+		Judge:            "",
+		ForceSubprocess:  false,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0,
+	})
 	require.NoError(t, err)
 	assert.Equal(t, 240, captured.TimeoutSeconds)
 }
@@ -98,7 +110,19 @@ func TestRunSubprocessPipeline_CLITimeoutOverridesConfig(t *testing.T) {
 		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
-	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), "topic", "debate", []string{"claude"}, "standard", 90, true, "", false, false, false, 0)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "debate",
+		Providers:        []string{"claude"},
+		RoundsPreset:     "standard",
+		Timeout:          90,
+		TimeoutChanged:   true,
+		Judge:            "",
+		ForceSubprocess:  false,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0,
+	})
 	require.NoError(t, err)
 	assert.Equal(t, 90, captured.TimeoutSeconds)
 }
@@ -140,7 +164,19 @@ func TestRunSubprocessPipeline_ExplicitProvidersDoNotUseExcludedConfigJudge(t *t
 		return successfulDebateRunResult(cfg.Providers[0].Name), nil
 	}
 
-	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), "topic", "debate", []string{"codex"}, "fast", 120, false, "", false, false, false, 0)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "debate",
+		Providers:        []string{"codex"},
+		RoundsPreset:     "fast",
+		Timeout:          120,
+		TimeoutChanged:   false,
+		Judge:            "",
+		ForceSubprocess:  false,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0,
+	})
 	require.NoError(t, err)
 	assert.Equal(t, "codex", captured.Judge.Name)
 	require.Len(t, captured.Providers, 1)
@@ -195,11 +231,19 @@ func TestRunSubprocessPipeline_ImplicitClaudeConfigUsesCodexInvokerJudge(t *test
 		}, nil
 	}
 
-	err := runSubprocessPipeline(
-		orchestraRunTestCmd(context.Background()), "topic", "debate", nil, "fast",
-		120, false, "", false, false, false,
-		0,
-	)
+	err := runSubprocessPipeline(orchestraRunTestCmd(context.Background()), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "debate",
+		Providers:        nil,
+		RoundsPreset:     "fast",
+		Timeout:          120,
+		TimeoutChanged:   false,
+		Judge:            "",
+		ForceSubprocess:  false,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0,
+	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "codex", captured.Judge.Name)
@@ -239,7 +283,19 @@ func TestRunSubprocessPipeline_AppliesRuntimeCodexQualityAndEffort(t *testing.T)
 	}
 
 	ctx := withGlobalFlags(context.Background(), globalFlags{Quality: "ultra", Effort: config.CodexEffortMax})
-	err := runSubprocessPipeline(orchestraRunTestCmd(ctx), "topic", "debate", []string{"codex"}, "fast", 120, false, "", false, false, false, 0)
+	err := runSubprocessPipeline(orchestraRunTestCmd(ctx), orchestraRunOptions{
+		Topic:            "topic",
+		Strategy:         "debate",
+		Providers:        []string{"codex"},
+		RoundsPreset:     "fast",
+		Timeout:          120,
+		TimeoutChanged:   false,
+		Judge:            "",
+		ForceSubprocess:  false,
+		DryRun:           false,
+		JSONMode:         false,
+		RequireAgreement: 0,
+	})
 	require.NoError(t, err)
 	require.Len(t, captured.Providers, 1)
 	assertCodexProfileInArgs(t, captured.Providers[0].Args, config.CodexSolModel, config.CodexEffortMax)
