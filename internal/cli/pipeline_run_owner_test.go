@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/execplane"
+	"github.com/insajin/autopus-adk/pkg/orcarun"
 )
 
 func TestPipelineRunCmd_ExecutionOwnerAcceptsOnlyExactSingleValues(t *testing.T) {
@@ -126,22 +127,25 @@ func TestResolvePipelineExecutionOwner_IsMutuallyExclusiveAndRequiresOMPBoundary
 	}
 }
 
-func TestPipelineRun_OrcaOwnerEmitsHandoffBeforeOMPProcess(t *testing.T) {
+func TestPipelineRun_OrcaOwnerRecordsTheGateThenRefusesToFallBackToOMP(t *testing.T) {
 	root := t.TempDir()
 	chdirForTest(t, root)
 	specID := "SPEC-OWNER-ORCA-001"
 	writePipelineOwnerSpec(t, root, specID)
-	marker := installPipelineOwnerProcessTrap(t, root, "omp")
-	// verification_status is now derived from the tier integrity gate instead of
+	// PATH carries an omp trap and no orca at all: the run must reach for the
+	// supervised backend the operator named and stop there, never for the native
+	// OMP one they declined.
+	markers := isolatePipelineOwnerPath(t, root, "omp")
+	// verification_status is derived from the tier integrity gate instead of
 	// being hardcoded, so this test pins the gate's only outside-world seam.
 	// Without the stub the expectation below would depend on whichever provider
 	// accounts the workstation running the suite happens to have registered.
 	stubExecplaneTierProbe(t, verifiedExecplaneTierEvidence)
 
-	var stdout bytes.Buffer
+	var stdout, stderr bytes.Buffer
 	cmd := newPipelineRunCmd()
 	cmd.SetOut(&stdout)
-	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetErr(&stderr)
 	cmd.SetArgs([]string{
 		specID, "--platform", "omp", "--execution-owner", "orca",
 	})
@@ -149,34 +153,37 @@ func TestPipelineRun_OrcaOwnerEmitsHandoffBeforeOMPProcess(t *testing.T) {
 	err := cmd.Execute()
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errPipelineExecutionOwnerHandoffRequired)
-	assert.True(t, isJSONFatalError(err), "structured handoff must not add an unstructured stderr error")
-	assert.NoFileExists(t, marker, "Orca ownership must fail closed before starting OMP")
-	assert.NoFileExists(t, specCheckpointPath(specID), "handoff must not create an OMP checkpoint")
+	assert.ErrorIs(t, err, orcarun.ErrOrcaUnavailable,
+		"an absent process plane is an environment failure, not a handoff")
+	assert.Contains(t, err.Error(), "--execution-owner omp",
+		"a blocked run must name what the operator can do about it")
+	assert.NoFileExists(t, markers["omp"],
+		"an absent orca must not silently fall back to the execution owner the operator declined")
+	assert.NotContains(t, stdout.String(), "handoff_required",
+		"REQ-108: handoff_required is no longer a terminal state")
+	// REQ-108: the outcome lands on the same blocked-receipt surface every other
+	// preflight failure uses, with no phase progress behind it.
+	assert.Contains(t, assertPipelineRunBlockedBeforeAnyPhase(t, specID).Blocker, "orca")
 
-	var result pipelineExecutionOwnerResult
-	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result), "stdout=%q err=%v", stdout.String(), err)
-	assert.Equal(t, pipelineExecutionOwnerResultSchema, result.Schema)
-	assert.Equal(t, "handoff_required", result.Status)
-	assert.Equal(t, pipelineExecutionOwnerOrca, result.Owner)
-	assert.Equal(t, pipelineExecutionOwnerSourceExplicit, result.Source)
-	assert.Equal(t, specID, result.SpecID)
-	assert.NotEmpty(t, result.RunID)
-	assert.Equal(t, "orca skills get orchestration --full", result.RequiredAction)
-
-	receiptBytes, readErr := os.ReadFile(filepath.FromSlash(result.ReceiptPath))
+	ownerPath := filepath.Join(pipelineStateDir, specID+".execution-owner.json")
+	body, readErr := os.ReadFile(ownerPath)
 	require.NoError(t, readErr)
 	var receipt pipelineExecutionOwnerReceipt
-	require.NoError(t, json.Unmarshal(receiptBytes, &receipt))
-	assert.Equal(t, result.RunID, receipt.RunID)
+	require.NoError(t, json.Unmarshal(body, &receipt))
+	assert.Equal(t, pipelineExecutionOwnerOrca, receipt.Owner)
+	assert.Equal(t, pipelineExecutionOwnerSourceExplicit, receipt.Source)
+	assert.Equal(t, specID, receipt.SpecID)
+	assert.NotEmpty(t, receipt.RunID)
 	assert.Equal(t, execplane.StatusVerified, receipt.VerificationStatus,
 		"a verified gate is what puts verified in the receipt")
-	assertPipelineExecutionOwnerReceiptIsBodyFree(t, receiptBytes)
+	assertPipelineExecutionOwnerReceiptIsBodyFree(t, body)
 	if runtime.GOOS != "windows" {
-		info, statErr := os.Stat(filepath.FromSlash(result.ReceiptPath))
+		info, statErr := os.Stat(ownerPath)
 		require.NoError(t, statErr)
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	}
+	assert.Contains(t, stderr.String(), "Tier integrity "+execplane.StatusVerified,
+		"no handoff payload carries the verdict any more, so the run must report it")
 }
 
 func TestPipelineRun_OMPOwnerPreservesDryRunForDefaultAndExplicitSelection(t *testing.T) {
@@ -214,9 +221,9 @@ func TestPipelineRun_OMPOwnerPreservesDryRunForDefaultAndExplicitSelection(t *te
 			assert.Equal(t, specID, receipt.SpecID)
 			assert.NotEmpty(t, receipt.RunID)
 			assert.False(t, receipt.CheckedAt.IsZero())
-			// REQ-008 scopes the tier integrity gate to the process-plane
-			// handoff, so the OMP-owned path probes nothing — and a receipt
-			// that claims "verified" without a check is the silent downgrade
+			// REQ-008 scopes the tier integrity gate to the orca-owned path, so
+			// the OMP-owned path probes nothing — and a receipt that claims
+			// "verified" without a check is the silent downgrade
 			// SPEC-EXECPLANE-001 exists to prevent.
 			assert.Equal(t, execplane.StatusUnverified, receipt.VerificationStatus)
 			assert.NoFileExists(t, filepath.Join(pipelineStateDir, specID+".tier-integrity.json"),
@@ -224,51 +231,4 @@ func TestPipelineRun_OMPOwnerPreservesDryRunForDefaultAndExplicitSelection(t *te
 			assertPipelineExecutionOwnerReceiptIsBodyFree(t, body)
 		})
 	}
-}
-
-func assertPipelineExecutionOwnerReceiptIsBodyFree(t *testing.T, body []byte) {
-	t.Helper()
-	var fields map[string]json.RawMessage
-	require.NoError(t, json.Unmarshal(body, &fields))
-	assert.ElementsMatch(t, []string{
-		"schema", "owner", "source", "reason", "spec_id", "run_id", "checked_at", "verification_status",
-	}, mapKeys(fields))
-	for _, forbidden := range []string{"body", "prompt", "output", "task_body", "spec_body"} {
-		assert.NotContains(t, fields, forbidden)
-	}
-}
-
-func writePipelineOwnerSpec(t *testing.T, root, specID string) {
-	t.Helper()
-	dir := filepath.Join(root, ".autopus", "specs", specID)
-	require.NoError(t, os.MkdirAll(dir, 0o700))
-	for name, body := range map[string]string{
-		"spec.md":       "# " + specID + ": execution owner contract\n",
-		"plan.md":       "# Plan\nPreserve one execution owner.\n",
-		"acceptance.md": "# Acceptance\nExactly one owner is active.\n",
-	} {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600))
-	}
-}
-
-func installPipelineOwnerProcessTrap(t *testing.T, root, name string) string {
-	t.Helper()
-	marker := filepath.Join(root, name+"-started")
-	if runtime.GOOS == "windows" {
-		return marker
-	}
-	binDir := filepath.Join(root, "bin-"+name)
-	require.NoError(t, os.MkdirAll(binDir, 0o700))
-	script := "#!/bin/sh\nprintf started > \"" + marker + "\"\nexit 97\n"
-	require.NoError(t, os.WriteFile(filepath.Join(binDir, name), []byte(script), 0o700))
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return marker
-}
-
-func mapKeys[V any](values map[string]V) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	return keys
 }

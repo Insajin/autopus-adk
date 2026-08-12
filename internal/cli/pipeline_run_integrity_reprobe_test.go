@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/execplane"
+	"github.com/insajin/autopus-adk/pkg/orcarun"
 )
 
 // execplaneReprobeAccountID is the managed account the mismatch fixture resolves
@@ -87,17 +88,17 @@ func TestPipelineTierIntegrityGate_MismatchedEntitlementReprobesUnderTheExecutio
 			return []byte(`{"models":[{"slug":"gpt-5.6-sol"}]}`), nil
 		})
 
-	_, result, err := runPipelineOrcaHandoffWithProbe(t, mismatchedCodexTierEvidence)
+	outcome := runPipelineOrcaGateWithProbe(t, mismatchedCodexTierEvidence)
 
-	assert.ErrorIs(t, err, errPipelineExecutionOwnerHandoffRequired)
+	assert.ErrorIs(t, outcome.Err, orcarun.ErrOrcaUnavailable)
 	assert.Equal(t, 1, *calls, "only the mismatched provider may spend a subprocess")
 	require.Len(t, homes, 1)
 	assert.Contains(t, homes[0], execplaneReprobeAccountID,
 		"the catalog must be re-read under the execution account's own home")
-	assert.Equal(t, execplane.StatusVerified, result.VerificationStatus,
+	assert.Equal(t, execplane.StatusVerified, outcome.VerificationStatus,
 		"a successful re-probe restores the evidence the mismatch destroyed")
 
-	receipt := readPipelineTierIntegrityReceipt(t, result.IntegrityReceiptPath)
+	receipt := readPipelineTierIntegrityReceipt(t, outcome.IntegrityReceiptPath)
 	codex := providerTierIntegrityReceipt(t, receipt, execplane.ProviderCodex)
 	assert.Equal(t, execplane.StatusVerified, codex.VerificationStatus)
 	assert.Equal(t, "exec@example.test", codex.CatalogSource.Account,
@@ -122,19 +123,20 @@ func TestPipelineTierIntegrityGate_FailedReprobeIsUnverifiedAndNamesTheFailure(t
 			return nil, errors.New(probeFailure)
 		})
 
-	_, result, err := runPipelineOrcaHandoffWithProbe(t, mismatchedCodexTierEvidence)
+	outcome := runPipelineOrcaGateWithProbe(t, mismatchedCodexTierEvidence)
 
 	// REQ-004's last branch: neither the held catalog nor a fresh one is
-	// evidence, so the run degrades to REQ-009 instead of blocking the handoff.
-	assert.ErrorIs(t, err, errPipelineExecutionOwnerHandoffRequired)
+	// evidence, so the verdict degrades to REQ-009 instead of stopping the run.
+	// What stops this run is the missing orca CLI the executor needs.
+	assert.ErrorIs(t, outcome.Err, orcarun.ErrOrcaUnavailable)
 	assert.Equal(t, 1, *calls)
-	assert.Equal(t, execplane.StatusUnverified, result.VerificationStatus)
-	assert.Contains(t, result.VerificationReason,
+	assert.Equal(t, execplane.StatusUnverified, outcome.VerificationStatus)
+	assert.Contains(t, outcome.VerificationReason,
 		"catalog re-probe under the execution account failed")
-	assert.NotContains(t, result.VerificationReason, probeFailure,
+	assert.NotContains(t, outcome.VerificationReason, probeFailure,
 		"the probe error can name a managed home, so only the failed step is reported")
 
-	receipt := readPipelineTierIntegrityReceipt(t, result.IntegrityReceiptPath)
+	receipt := readPipelineTierIntegrityReceipt(t, outcome.IntegrityReceiptPath)
 	codex := providerTierIntegrityReceipt(t, receipt, execplane.ProviderCodex)
 	assert.Equal(t, execplane.StatusUnverified, codex.VerificationStatus)
 	assert.Contains(t, codex.ResolutionReason, "entitlement differs",

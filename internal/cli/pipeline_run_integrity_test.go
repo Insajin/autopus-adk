@@ -1,12 +1,8 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -15,124 +11,30 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/execplane"
+	"github.com/insajin/autopus-adk/pkg/orcarun"
 )
 
-// execplaneTierProbeAccountID is a managed account id the fixtures carry so the
-// receipts can be checked for leaking it. Only the entitlement grade and the
-// recognizable email may leave the process plane.
-const execplaneTierProbeAccountID = "acct-3f9c1d20-managed"
-
-// stubExecplaneTierProbe pins the gate's only outside-world seam, so the wiring
-// is exercised without an orca binary or this workstation's account roster.
-func stubExecplaneTierProbe(t *testing.T, probe execplaneTierProbeFunc) {
-	t.Helper()
-	original := runtimeExecplaneTierProbe
-	t.Cleanup(func() { runtimeExecplaneTierProbe = original })
-	runtimeExecplaneTierProbe = probe
-}
-
-// verifiedExecplaneTierEvidence resolves both providers to an execution account
-// that differs from the probe account but shares its entitlement grade — the
-// S3 shape in which the held catalog stands as evidence with no re-probe.
-//
-// Both providers answer with a grade, which the prober now recovers for claude
-// as well; what differs between them is not the grade but what the grade
-// licenses, and the evidence kind on each receipt is where that shows.
-func verifiedExecplaneTierEvidence(_ context.Context, provider string) (execplane.Evidence, error) {
-	return execplane.Evidence{
-		Resolution: execplane.AccountResolution{
-			Provider: provider, Status: execplane.AccountActive,
-			Account: execplane.Account{ID: execplaneTierProbeAccountID, Email: "exec@example.test"},
-			Probe:   execplane.Account{ID: execplaneTierProbeAccountID, Email: "probe@example.test"},
-		},
-		ExecEntitlement:  execplane.Entitlement{Grade: "pro", Source: "exec@example.test"},
-		ProbeEntitlement: execplane.Entitlement{Grade: "pro", Source: "probe@example.test"},
-	}, nil
-}
-
-// runPipelineOrcaHandoffWithProbe drives the orca handoff under one probe stub
-// and asserts REQ-007 on every path: the gate completes before anything can be
-// created, so no OMP process, no Orca Run, and no checkpoint exist afterwards.
-func runPipelineOrcaHandoffWithProbe(
-	t *testing.T,
-	probe execplaneTierProbeFunc,
-) (string, pipelineExecutionOwnerResult, error) {
-	t.Helper()
-	root := t.TempDir()
-	chdirForTest(t, root)
-	specID := "SPEC-INTEGRITY-GATE-001"
-	writePipelineOwnerSpec(t, root, specID)
-	ompMarker := installPipelineOwnerProcessTrap(t, root, "omp")
-	orcaMarker := installPipelineOwnerProcessTrap(t, root, "orca")
-	stubExecplaneTierProbe(t, probe)
-
-	var stdout bytes.Buffer
-	cmd := newPipelineRunCmd()
-	cmd.SetOut(&stdout)
-	cmd.SetErr(&bytes.Buffer{})
-	cmd.SetArgs([]string{specID, "--platform", "omp", "--execution-owner", "orca"})
-
-	err := cmd.Execute()
-
-	assert.NoFileExists(t, ompMarker, "the gate must finish before any OMP process starts")
-	assert.NoFileExists(t, orcaMarker, "the gate must not create an Orca Run, worker, or session")
-	assert.NoFileExists(t, specCheckpointPath(specID), "the gate must not write a checkpoint")
-
-	var result pipelineExecutionOwnerResult
-	require.NoError(t, json.Unmarshal(stdout.Bytes(), &result), "stdout=%q err=%v", stdout.String(), err)
-	return specID, result, err
-}
-
-func readPipelineTierIntegrityReceipt(t *testing.T, path string) pipelineTierIntegrityReceipt {
-	t.Helper()
-	require.NotEmpty(t, path, "the handoff must reference a persisted integrity receipt")
-	body, err := os.ReadFile(filepath.FromSlash(path))
-	require.NoError(t, err)
-	if runtime.GOOS != "windows" {
-		info, statErr := os.Stat(filepath.FromSlash(path))
-		require.NoError(t, statErr)
-		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-	}
-	for _, accountID := range []string{execplaneTierProbeAccountID, execplaneReprobeAccountID} {
-		assert.NotContains(t, string(body), accountID,
-			"a managed account id must never reach a receipt")
-	}
-	var receipt pipelineTierIntegrityReceipt
-	require.NoError(t, json.Unmarshal(body, &receipt))
-	return receipt
-}
-
-func readPipelineExecutionOwnerReceipt(t *testing.T, path string) pipelineExecutionOwnerReceipt {
-	t.Helper()
-	body, err := os.ReadFile(filepath.FromSlash(path))
-	require.NoError(t, err)
-	var receipt pipelineExecutionOwnerReceipt
-	require.NoError(t, json.Unmarshal(body, &receipt))
-	return receipt
-}
-
-func TestPipelineTierIntegrityGate_VerifiedHandoffReferencesTheReceipt(t *testing.T) {
+func TestPipelineTierIntegrityGate_VerifiedVerdictIsReportedAndReferencesTheReceipt(t *testing.T) {
 	reprobes := noExecplaneCatalogReprobe(t)
-	specID, result, err := runPipelineOrcaHandoffWithProbe(t, verifiedExecplaneTierEvidence)
+	outcome := runPipelineOrcaGateWithProbe(t, verifiedExecplaneTierEvidence)
 
 	// REQ-004's point: matching grades reuse the held catalog for free.
 	assert.Zero(t, *reprobes)
 
-	assert.ErrorIs(t, err, errPipelineExecutionOwnerHandoffRequired)
-	assert.Equal(t, "handoff_required", result.Status)
-	assert.Equal(t, execplane.StatusVerified, result.VerificationStatus)
-	assert.NotEmpty(t, result.VerificationReason, "a verdict without a reason cannot be acted on")
+	// The gate itself never stops a run; the absent process plane does.
+	assert.ErrorIs(t, outcome.Err, orcarun.ErrOrcaUnavailable)
+	assert.Equal(t, execplane.StatusVerified, outcome.VerificationStatus)
+	assert.NotEmpty(t, outcome.VerificationReason, "a verdict without a reason cannot be acted on")
 	assert.Equal(t,
-		filepath.ToSlash(filepath.Join(pipelineStateDir, specID+".tier-integrity.json")),
-		result.IntegrityReceiptPath)
+		filepath.ToSlash(filepath.Join(pipelineStateDir, outcome.SpecID+".tier-integrity.json")),
+		outcome.IntegrityReceiptPath)
 	assert.Equal(t, execplane.StatusVerified,
-		readPipelineExecutionOwnerReceipt(t, result.ReceiptPath).VerificationStatus)
+		readPipelineExecutionOwnerReceipt(t, outcome.OwnerReceiptPath).VerificationStatus)
 
-	receipt := readPipelineTierIntegrityReceipt(t, result.IntegrityReceiptPath)
+	receipt := readPipelineTierIntegrityReceipt(t, outcome.IntegrityReceiptPath)
 	assert.Equal(t, pipelineTierIntegrityReceiptSchema, receipt.Schema)
-	assert.Equal(t, specID, receipt.SpecID)
+	assert.Equal(t, outcome.SpecID, receipt.SpecID)
 	assert.Equal(t, execplane.StatusVerified, receipt.VerificationStatus)
-	assert.Equal(t, result.VerificationReason, receipt.Reason)
 	assert.False(t, receipt.CheckedAt.IsZero())
 	require.Len(t, receipt.Providers, len(pipelineTierIntegrityProviders))
 	// Both verify, but not on the same footing: only codex holds a served catalog.
@@ -148,7 +50,7 @@ func TestPipelineTierIntegrityGate_VerifiedHandoffReferencesTheReceipt(t *testin
 		assert.Equal(t, "exec@example.test", provider.ExecutionAccount, where...)
 		assert.Equal(t, "probe@example.test", provider.CatalogSource.Account, where...)
 		assert.Equal(t, "pro", provider.CatalogSource.Entitlement, where...)
-		assert.Contains(t, result.VerificationReason, provider.Provider+": ", where...)
+		assert.Contains(t, outcome.VerificationReason, provider.Provider+": ", where...)
 		assert.Equal(t, wantEvidence[provider.Provider], provider.EvidenceKind, where...)
 	}
 }
@@ -156,27 +58,27 @@ func TestPipelineTierIntegrityGate_VerifiedHandoffReferencesTheReceipt(t *testin
 func TestPipelineTierIntegrityGate_UnverifiedSurfacesStatusAndReason(t *testing.T) {
 	const reason = "two registered accounts and no active selection"
 	noExecplaneCatalogReprobe(t)
-	_, result, err := runPipelineOrcaHandoffWithProbe(t,
+	outcome := runPipelineOrcaGateWithProbe(t,
 		func(_ context.Context, provider string) (execplane.Evidence, error) {
 			return execplane.Evidence{Resolution: execplane.AccountResolution{
 				Provider: provider, Status: execplane.AccountIndeterminate, Reason: reason,
 			}}, nil
 		})
 
-	// An unverified verdict is recorded, not fatal: the handoff still happens
-	// and the run still stops at the same handoff boundary as before the gate.
-	assert.ErrorIs(t, err, errPipelineExecutionOwnerHandoffRequired)
-	assert.Equal(t, "handoff_required", result.Status)
-	assert.Equal(t, execplane.StatusUnverified, result.VerificationStatus)
+	// An unverified verdict is recorded, not fatal: the run proceeds to the
+	// execution boundary exactly as a verified one does, and stops there for the
+	// unrelated reason that this workstation has no orca CLI.
+	assert.ErrorIs(t, outcome.Err, orcarun.ErrOrcaUnavailable)
+	assert.Equal(t, execplane.StatusUnverified, outcome.VerificationStatus)
 	for _, provider := range pipelineTierIntegrityProviders {
-		assert.Contains(t, result.VerificationReason, provider+": "+reason,
+		assert.Contains(t, outcome.VerificationReason, provider+": "+reason,
 			"the output must name which provider degraded and why")
 	}
 	assert.Equal(t, execplane.StatusUnverified,
-		readPipelineExecutionOwnerReceipt(t, result.ReceiptPath).VerificationStatus,
+		readPipelineExecutionOwnerReceipt(t, outcome.OwnerReceiptPath).VerificationStatus,
 		"the owner receipt must not claim a verification the gate refused")
 
-	receipt := readPipelineTierIntegrityReceipt(t, result.IntegrityReceiptPath)
+	receipt := readPipelineTierIntegrityReceipt(t, outcome.IntegrityReceiptPath)
 	assert.Equal(t, execplane.StatusUnverified, receipt.VerificationStatus)
 	require.Len(t, receipt.Providers, len(pipelineTierIntegrityProviders))
 	for _, provider := range receipt.Providers {
@@ -187,10 +89,10 @@ func TestPipelineTierIntegrityGate_UnverifiedSurfacesStatusAndReason(t *testing.
 	}
 }
 
-func TestPipelineTierIntegrityGate_OrcaProbeFailureStillHandsOffUnverified(t *testing.T) {
+func TestPipelineTierIntegrityGate_OrcaProbeFailureDegradesWithoutBlockingTheGate(t *testing.T) {
 	const reason = "process plane account listing is unavailable"
 	noExecplaneCatalogReprobe(t)
-	_, result, err := runPipelineOrcaHandoffWithProbe(t,
+	outcome := runPipelineOrcaGateWithProbe(t,
 		func(_ context.Context, provider string) (execplane.Evidence, error) {
 			// The prober's documented failure shape: an indeterminate
 			// resolution with a non-empty reason, returned with the error.
@@ -199,14 +101,16 @@ func TestPipelineTierIntegrityGate_OrcaProbeFailureStillHandsOffUnverified(t *te
 			}}, execplane.ErrOrcaUnavailable
 		})
 
-	assert.ErrorIs(t, err, errPipelineExecutionOwnerHandoffRequired,
-		"a missing orca must degrade the verdict, not block the handoff")
-	assert.NotErrorIs(t, err, execplane.ErrOrcaUnavailable)
-	assert.Equal(t, "handoff_required", result.Status)
-	assert.Equal(t, execplane.StatusUnverified, result.VerificationStatus)
-	assert.Contains(t, result.VerificationReason, reason)
+	// A missing orca degrades the verdict without the gate itself blocking. What
+	// stops this run is the executor: it needs the orca CLI to supervise a phase
+	// and says so with its own sentinel. The gate's probe error, a distinct
+	// sentinel, must not travel with it — the gate swallowed it into a reason.
+	assert.ErrorIs(t, outcome.Err, orcarun.ErrOrcaUnavailable)
+	assert.NotErrorIs(t, outcome.Err, execplane.ErrOrcaUnavailable)
+	assert.Equal(t, execplane.StatusUnverified, outcome.VerificationStatus)
+	assert.Contains(t, outcome.VerificationReason, reason)
 
-	receipt := readPipelineTierIntegrityReceipt(t, result.IntegrityReceiptPath)
+	receipt := readPipelineTierIntegrityReceipt(t, outcome.IntegrityReceiptPath)
 	require.Len(t, receipt.Providers, len(pipelineTierIntegrityProviders))
 	for _, provider := range receipt.Providers {
 		assert.Equal(t, execplane.StatusUnverified, provider.VerificationStatus, provider.Provider)

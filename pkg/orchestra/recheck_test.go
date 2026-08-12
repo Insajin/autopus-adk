@@ -121,3 +121,47 @@ func TestRunOrchestraRecheck_SecondRoundSeesOwnFirstAnswer(t *testing.T) {
 	assert.Equal(t, StrategyRecheck, result.Strategy)
 	assert.False(t, result.Degraded)
 }
+
+// A pane-capable terminal must not divert recheck into the generic pane
+// fan-out: that path runs one round per provider, so it would return a first
+// answer labelled as a re-derivation and split no panes for a second round.
+func TestRunOrchestraRecheck_IgnoresPaneCapableTerminal(t *testing.T) {
+	t.Parallel()
+	term := &mockTerminal{name: "cmux"}
+
+	result, err := RunOrchestra(context.Background(), OrchestraConfig{
+		Strategy:       StrategyRecheck,
+		Providers:      []ProviderConfig{{Name: "cat", Binary: "cat", ExecutionTimeout: 20 * time.Second}},
+		Prompt:         "PANE-ROUTED-TASK",
+		TimeoutSeconds: 30,
+		Terminal:       term,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	require.Len(t, result.Responses, 2, "recheck must still run both rounds on a pane terminal")
+	assert.Contains(t, result.Responses[1].Output, "Round 2: Reconsider")
+	assert.Equal(t, result.Responses[1].Output, result.Merged)
+	assert.Empty(t, term.splitPaneCalls, "recheck must not open panes")
+}
+
+// The pane runner is also a public entry point, so entering through it must
+// land on the same headless two-round flow rather than looping or fanning out.
+func TestRunPaneOrchestraRecheck_HandsBackToHeadlessRunner(t *testing.T) {
+	t.Parallel()
+	term := &mockTerminal{name: "cmux"}
+
+	result, err := RunPaneOrchestra(context.Background(), OrchestraConfig{
+		Strategy:       StrategyRecheck,
+		Providers:      []ProviderConfig{{Name: "cat", Binary: "cat", ExecutionTimeout: 20 * time.Second}},
+		Prompt:         "DIRECT-PANE-ENTRY",
+		TimeoutSeconds: 30,
+		Terminal:       term,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	require.Len(t, result.Responses, 2)
+	assert.Contains(t, result.Responses[1].Output, "DIRECT-PANE-ENTRY")
+	assert.Empty(t, term.splitPaneCalls)
+}

@@ -45,6 +45,7 @@ Priority: Must
 Given phase attempt가 (a) 실패로 끝나는 경로, (b) `ctx` 취소로 끊기는 경로, (c) 백엔드 `Close()`로 정리되는 경로 세 가지
 When 각 경로가 끝난다
 Then 세 경로 각각에서 이 Run에 속한 `worker-list --terminal-state active` 결과가 0건이다
+And 시작이 실패해 응답이 잔여 리소스를 보고한 경로에서는 그 리소스가 각각 명시적으로 정리되어 남지 않는다. `active` 집계 0건만으로는 이 조건을 대신하지 못한다
 And 백엔드가 시작한 Dispatch 전부가 release·stop·abandon 중 하나로 종결 상태를 갖고, 종결되지 않은 Dispatch가 0건이다
 And 워커 프로세스가 실제로 멈췄다고 주장할 수 없는 경로에서는 release 대신 `worker-abandon`으로 펜싱하고, abandon을 택한 사유가 실행 기록에 남는다
 And 취소 경로에서 `PhaseResponse`가 없고 오류만 있어도 정리 책임은 백엔드에 있다. 엔진이 실패를 반환했다는 사실이 정리 누락의 사유가 되지 않는다
@@ -76,19 +77,38 @@ And 5개 phase 결과와 체크포인트가 omp 경로와 같은 스키마로 �
 And 실패로 끝난 경우에도 terminal 상태와 실패 phase가 omp 경로와 같은 필드로 관측되고, 사람이 손으로 이어받으라는 안내가 최종 결과에 없다
 And 비지원 구성(원격 환경 등)은 이 SPEC의 비목표이므로 그 경로가 `handoff_required`를 반환하는 것은 위반이 아니다. 판정 범위는 지원 구성으로 한정한다
 
+### S109: phase 출력이 워커의 보고에서 나온다
+Priority: Must
+Given 워커가 결론을 `worker_done` 보고로 남기고 전사에는 도구 호출만 남긴 phase attempt
+When 백엔드가 그 attempt의 출력을 모은다
+Then 출력에 워커가 보고한 결론이 담긴다
+And 그 phase로 보낸 프롬프트가 출력에 다시 담기지 않는다
+And 전사가 보고를 그대로 되풀이할 뿐이면 같은 문장이 두 번 담기지 않는다
+And 전사를 읽지 못해도 보고만으로 출력이 성립하고 attempt는 실패하지 않는다
+
+### S110: 중단이 워커를 세우고 끝난다
+Priority: Must
+Given 워커 하나가 살아있는 상태로 진행 중인 실행
+When 조작자가 SIGINT 또는 SIGTERM으로 중단한다
+Then 프로세스가 종료된 뒤 이 Run의 `active` 워커가 0건이다
+And 그 워커의 에이전트 터미널이 살아있지 않다
+And 종결 수단이 abandon이 아니라 stop이다. 프로세스를 세우지 못하는 경우에만 abandon으로 내려간다
+
 ## Oracle Acceptance Notes
 
 - **S101** — 예상 값: orca 전용 러너·순서 테이블·게이트 판정 구현 수 = 0, 백엔드가 엔진에 노출하는 메서드 수 = 1(`Execute`). 두 경로의 `EngineConfig` 비교에서 다른 필드 = `Backend` 1개. "같은 결과가 나오면 통과"는 오라클이 아니다.
 - **S102** — 예상 값: task deps 길이 = 0, `--deps` 출현 횟수 = 0, 프로세스 평면의 phase 순서 자료구조 수 = 0, 관측된 phase 순서 = plan, test_scaffold, implement, validate, review.
 - **S103** — 예상 값: attempt 1회당 시작 Dispatch = 1, 종결 = 1. 클린 런 총 Dispatch = 5. validate 최대 4, review 최대 3(각각 `MaxRetries + 1`). 영수증 `dispatch_count`와 워커 시작 수의 차이 = 0.
 - **S104** — 예상 값: 무응답 워커에서 `TimedOut` = true, 백엔드 보유 출력 바이트 = 설정 상한 이하, 잘림이 발생한 실행의 `FailureClass` = 비어 있지 않음. deadline 값과 읽기 상한 값 자체는 구현 시 확정하되, 둘 다 유한해야 한다는 점이 판정 조건이다.
-- **S105** — 예상 값: 세 경로 각각에서 `worker-list --terminal-state active` 행 수 = 0, 미종결 Dispatch = 0. abandon으로 펜싱한 건에는 사유가 1건씩 남는다.
+- **S105** — 예상 값: 세 경로 각각에서 `worker-list --terminal-state active` 행 수 = 0, 미종결 Dispatch = 0, 보고된 잔여 리소스 중 정리되지 않은 것 = 0. abandon으로 펜싱한 건에는 사유가 1건씩 남는다. 세 번째 값이 따로 필요한 이유는 실측에서 확인됐다 — readiness가 실패하면 터미널이 만들어져도 dispatch가 소유하지 않아 `active`에 잡히지 않고, `worker-release`는 `no_owned_resource`로 지나가며, 터미널은 살아남는다.
 - **S106** — 예상 값: `checked_at` < Run 생성 시각(부호는 엄격 부등호). 게이트 미통과 실행의 `run-create` 호출 = 0, `worker-start` 호출 = 0.
 - **S107** — 예상 값: 경계 argv에서 `balanced` = 0, `ultra` = 0, `opus` = 0, `sonnet` = 0, `haiku` = 0. 판정 규칙은 인자 값 전체의 완전 일치이며, 이 규칙을 부분 문자열 검색으로 바꾸면 정상적인 provider model id가 오탐된다.
 - **S108** — 예상 값: 지원 구성에서 `status == "handoff_required"`인 최종 결과 수 = 0, 체크포인트에 기록된 완료 phase 수 = 5, omp 경로와 다른 결과 필드 수 = 0.
-- **자동화 이월**: 이 SPEC은 설계 고정 문서이고 구현을 포함하지 않는다. 따라서 S101~S108은 지금 자동 테스트로 닫히지 않고, T101~T104 구현 작업의 오라클로 이월된다. 이 SPEC의 통과 조건은 4개 문서의 `auto spec validate` 통과와 DAG 소유권 선택에 대한 리뷰 합의다.
+- **S109** — 예상 값: 출력에 담긴 워커 보고 = 1건, 출력에 다시 담긴 프롬프트 바이트 = 0, 보고와 전사가 같은 문장일 때 중복 = 0, 전사 읽기 실패 시에도 실패한 attempt = 0. 이 시나리오는 실행 관측에서 나왔다 — 7개 dispatch 실행에서 phase당 preamble이 1214바이트였고 assistant 텍스트는 여섯 번 0바이트였다.
+- **S110** — 예상 값: 중단 후 `active` 워커 = 0, 살아있는 에이전트 터미널 = 0, 종결에 쓰인 수단 = stop(정지 불가 시에만 abandon). 신호를 컨텍스트 취소로 바꾸기 전 같은 중단에서 `active` = 1이 남았다는 것이 이 시나리오의 변이 근거다.
+- **자동화 상태**: S101~S105와 S107, S109, S110은 seam 스텁 단위 테스트로 닫혀 있다. S102·S103·S105·S106·S107은 이 머신의 실제 실행에서도 관측했다 — task 7건 전부 deps 비어 있음, 영수증 dispatch 수와 워커 수가 7로 일치, 종료 후 `active` 0, 정합 영수증이 Run 생성보다 앞섬. S104의 무응답 경로는 단위 테스트로만 닫는다. 실제 정체 워커를 재현하려면 phase 마감을 통째로 소진해야 한다.
 - **오류 경로 위치**: 별도 Edge Cases 절을 두지 않았다. 실패·취소·종료 경로는 S105가, 무응답·과다 출력 경로는 S104가, 비지원 구성 경로는 S108이 각각 담당한다.
-- **Completion Debt와 자동화 가능 범위**: `--agent` 값 집합이 미정이므로 S107의 argv 전수 검사는 `--agent` 값을 판정 대상에서 제외한 상태로만 고정된다. 워커 settled 판정 방법이 미정이므로 S103과 S104는 stub 백엔드 수준에서만 고정 가능하고, 실제 orca 런타임 기준 자동화는 상태 필드 이름과 종료 상태 집합이 확정된 뒤에 가능하다. 워커 출력에서 phase 결과를 뽑는 규약이 미정이므로 S108의 결과 형태 일치 판정은 스키마 비교까지만 가능하고 내용 추출 경로는 규약 확정 후에 붙는다. 재개 시 Run 재바인딩 정책이 미정이므로 S106의 시각 비교는 신규 실행 기준으로만 고정되며, `--continue` 경로의 기준 Run 시각은 정책 확정 후 S106에 추가된다.
+- **해소된 Completion Debt**: 네 건 모두 실제 구동으로 확정됐고, 그에 따라 판정 범위가 넓어졌다. `--agent` 값 집합이 확정되어 S107은 `--agent`를 포함한 경계 인자 전수를 검사한다. settled 판정이 `check --wait`의 `worker_done` 이벤트로 확정되어 S103은 실제 런타임에서 관측된다. 출력 추출 규약이 확정되어 S108의 내용 경로가 붙었고, 그 과정에서 S109가 새로 필요해졌다. Run 재바인딩은 코디네이터 터미널 단위 바인딩으로 확정되어 실행마다 새 Run을 만든다. 자세한 근거는 `research.md`의 Completion Debt 절에 있다.
 - **주의: S101과 S102는 같은 불변식의 두 각도다**. S102는 프로세스 평면에 DAG가 생기지 않았음을, S101은 정책 평면에 순서·게이트·재시도 구현이 하나뿐임을 잰다. 한쪽만 통과해도 평면 분리는 깨질 수 있다. `--deps` 없이 orca task를 만들면서 autopus 쪽에 orca 전용 러너를 따로 두면 S102는 통과하고 S101이 실패한다. 반대로 엔진을 그대로 쓰면서 task에 deps를 채우면 S101은 통과하고 S102가 실패한다. 두 시나리오는 함께 통과해야 의미가 있고, 하나라도 실패하면 REQ-101·REQ-102를 함께 미달로 판정한다.
 
 ## Definition of Done

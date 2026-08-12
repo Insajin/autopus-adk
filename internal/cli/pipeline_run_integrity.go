@@ -125,7 +125,7 @@ func evaluateProviderTierIntegrity(
 func pipelineTierIntegritySkipped() pipelineTierIntegrityResult {
 	return pipelineTierIntegrityResult{
 		Status: execplane.StatusUnverified,
-		Reason: "tier integrity is checked at the process-plane handoff only",
+		Reason: "tier integrity is checked only on the orca-owned path",
 	}
 }
 

@@ -97,7 +97,7 @@ func injectOMPExecutionOwnerControl(body, name string) string {
 		"- Persist the body-free receipt `.autopus/pipeline-state/<SPEC-ID>.execution-owner.json` with schema `pipeline_execution_owner_receipt.v1` and only owner, source, reason, SPEC/run identity, `checked_at`, and `verification_status` evidence.",
 		"- Owner `omp`: the current OMP session is the sole DAG owner, uses native `task`, `hub`, and `todo`, and must not create an Orca Run.",
 		"- Owner `orca`: do not initialize an OMP task/todo DAG or call `task`. Run and read `orca skills get orchestration --full`, then use its supervised durable cross-worktree Run contract.",
-		"- At `auto pipeline run SPEC-ID --platform omp --execution-owner <owner>`, owner `orca` returns `pipeline_execution_owner_result.v1` with `status=handoff_required` before any OMP process/task creation. Act on that result; never retry as owner `omp`.",
+		"- At `auto pipeline run SPEC-ID --platform omp --execution-owner orca`, the tier integrity gate runs and the receipt is persisted before any Run, worker, or provider session exists, and the pipeline then executes its phases on supervised Orca workers. Never retry a failure as owner `omp`.",
 	}, "\n")
 	return injectOMPAfterHeading(body, block)
 }
