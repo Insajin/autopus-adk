@@ -145,7 +145,7 @@ func TestRunOrchestraRecheck_RunsBothRoundsInPanes(t *testing.T) {
 
 	result, err := RunOrchestra(context.Background(), OrchestraConfig{
 		Strategy:       StrategyRecheck,
-		Providers:      []ProviderConfig{{Name: "claude", Binary: "claude", ExecutionTimeout: 20 * time.Second}},
+		Providers:      []ProviderConfig{{Name: "claude", Binary: "cat", ExecutionTimeout: 20 * time.Second}},
 		Prompt:         "PANE-ROUTED-TASK",
 		TimeoutSeconds: 30,
 		Terminal:       term,
@@ -178,7 +178,7 @@ func TestRunPaneOrchestraRecheck_EntersTwoRoundPaneFlow(t *testing.T) {
 
 	result, err := RunPaneOrchestra(context.Background(), OrchestraConfig{
 		Strategy:       StrategyRecheck,
-		Providers:      []ProviderConfig{{Name: "claude", Binary: "claude", ExecutionTimeout: 20 * time.Second}},
+		Providers:      []ProviderConfig{{Name: "claude", Binary: "cat", ExecutionTimeout: 20 * time.Second}},
 		Prompt:         "DIRECT-PANE-ENTRY",
 		TimeoutSeconds: 30,
 		Terminal:       term,
