@@ -13,6 +13,17 @@ readonly repository='Insajin/autopus-adk'
 readonly environment_name='adk-companion-release'
 readonly release_tag='v0.50.104'
 readonly spec_id='SPEC-OMP-004'
+# The OMP oracle is pinned by digest AND version string (see the conjunctive
+# gate below). It has not moved since v0.50.96 and must not be advanced to make
+# a release run on whatever OMP happens to be installed: shipped behaviour is
+# defined against this exact build.
+#   - v0.50.96 tuned RPC readiness limits to this build's cold-start timing.
+#   - v0.50.98 has the isolated catalog inherit this build's exact provider and
+#     model capability surface.
+#   - README.md and docs/README.ko.md document strict_routing_ready=false and
+#     catalog_metadata_insufficient as consequences of this build's catalog.
+# Advancing the pin invalidates all three and requires re-establishing them with
+# evidence, not a digest edit.
 readonly expected_omp_sha256='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
 readonly expected_promotion_key_id='omp-context-promotion-2026-q3-k2'
 readonly release_ref="refs/tags/${release_tag}"
