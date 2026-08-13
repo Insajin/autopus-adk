@@ -24,8 +24,8 @@ commit=$(printf 'fixture orphan evidence\n' | \
   GIT_AUTHOR_DATE='2026-08-04T00:00:00Z' GIT_COMMITTER_DATE='2026-08-04T00:00:00Z' \
   git -C "$repo" commit-tree "$tree")
 GIT_COMMITTER_DATE='2026-08-04T00:00:01Z' \
-  git -C "$repo" tag -am 'fixture evidence' omp-context-evidence-v0.50.103 "$commit"
-tag_object=$(git -C "$repo" rev-parse refs/tags/omp-context-evidence-v0.50.103)
+  git -C "$repo" tag -am 'fixture evidence' omp-context-evidence-v0.50.104 "$commit"
+tag_object=$(git -C "$repo" rev-parse refs/tags/omp-context-evidence-v0.50.104)
 report_sha=$(shasum -a 256 "$report" | awk '{print $1}')
 attestation_sha=$(shasum -a 256 "$attestation" | awk '{print $1}')
 
@@ -50,7 +50,7 @@ if (cd "$repo" && run_helper "$temp/bad-digest" \
   exit 1
 fi
 
-git -C "$repo" update-ref refs/tags/omp-context-evidence-v0.50.103 "$commit"
+git -C "$repo" update-ref refs/tags/omp-context-evidence-v0.50.104 "$commit"
 if (cd "$repo" && run_helper "$temp/lightweight" \
   OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA="$commit"); then
   printf 'lightweight evidence tag passed\n' >&2
@@ -59,8 +59,8 @@ fi
 
 parent=$(printf 'parent\n' | git -C "$repo" commit-tree "$tree")
 child=$(printf 'child\n' | git -C "$repo" commit-tree "$tree" -p "$parent")
-git -C "$repo" tag -fam 'parented evidence' omp-context-evidence-v0.50.103 "$child"
-parented_tag=$(git -C "$repo" rev-parse refs/tags/omp-context-evidence-v0.50.103)
+git -C "$repo" tag -fam 'parented evidence' omp-context-evidence-v0.50.104 "$child"
+parented_tag=$(git -C "$repo" rev-parse refs/tags/omp-context-evidence-v0.50.104)
 if (cd "$repo" && run_helper "$temp/parented" \
   OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA="$parented_tag" \
   OMP_CONTEXT_EVIDENCE_COMMIT_SHA="$child"); then
@@ -71,11 +71,11 @@ fi
 artifact="$temp/auto"
 printf 'canonical candidate bytes' >"$artifact"
 artifact_sha=$(shasum -a 256 "$artifact" | awk '{print $1}')
-env COMPANION_RELEASE_TAG='v0.50.103' COMPANION_ARTIFACT="$artifact" \
+env COMPANION_RELEASE_TAG='v0.50.104' COMPANION_ARTIFACT="$artifact" \
   COMPANION_PLATFORM='darwin' COMPANION_ARCHITECTURE='arm64' \
   OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="$artifact_sha" \
   bash "$binary_helper"
-if env COMPANION_RELEASE_TAG='v0.50.103' COMPANION_ARTIFACT="$artifact" \
+if env COMPANION_RELEASE_TAG='v0.50.104' COMPANION_ARTIFACT="$artifact" \
   COMPANION_PLATFORM='darwin' COMPANION_ARCHITECTURE='arm64' \
   OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="$(printf '0%.0s' {1..64})" \
   bash "$binary_helper"; then
