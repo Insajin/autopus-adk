@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **A22 좌표를 v0.50.104로 전환** (2026-08-09): 릴리즈 워크플로·GoReleaser·Homebrew 브리지·좌표 트랜잭션·하드닝 스위트의 좌표를 `v0.50.104`로 옮긴다. A21 predecessor 핀과 lineage 세대 구조는 그대로다. 하드닝 스위트의 금지 좌표 창은 한 칸 밀려 `v0.50.103`·`v0.50.102`·`v0.50.101`을 거부한다.
+
 ### Removed
 
 - **프로덕션에서 쓰이지 않던 `PaneBackend`** (2026-08-09): 이름은 pane인데 실제로는 `runProvider`로 자식 프로세스를 띄우는 타입이었고, 프로덕션 참조는 없이 자기 자신을 검증하는 테스트와 fresh-judge 허용목록 항목만 남아 있었다. 이 오해를 부르는 이름 때문에 전송 선택 seam을 잘못 고를 뻔했으므로 제거한다. `pipelineBackendHasFreshExecutionSemantics`의 허용목록에서도 빠지며, 남은 두 내장 백엔드(`subprocessBackend`, `InteractivePaneBackend`)의 판정은 그대로다. `SelectBackend`의 주석에 자유 텍스트 호출자는 이 백엔드를 쓰면 안 된다는 계약을 명시했다.

@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	publicKeyReceiptA22Tag     = "v0.50.103"
-	publicKeyReceiptA22Version = "0.50.103"
+	publicKeyReceiptA22Tag     = "v0.50.104"
+	publicKeyReceiptA22Version = "0.50.104"
 )
 
 var immutableA21LineagePins = map[string]string{
@@ -26,8 +26,8 @@ var immutableA21LineagePins = map[string]string{
 
 func TestReleasePublicKeyReceipt_A22PolicyPinsExactA21Coordinate(t *testing.T) {
 	scripts := normalizedReleaseText(releaseScriptsText(t))
-	if !exactLineageTagVersionGuard(scripts, "103") {
-		t.Fatal("A22 release is not conjunctively restricted to tag v0.50.103 and version 0.50.103")
+	if !exactLineageTagVersionGuard(scripts, "104") {
+		t.Fatal("A22 release is not conjunctively restricted to tag v0.50.104 and version 0.50.104")
 	}
 	for _, required := range []string{
 		"release_phase='A22'", "prior_phase='A21'",

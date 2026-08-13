@@ -136,7 +136,7 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 			HistoryMode: "active", MemoryMode: "off", MinPairCount: 20, MinReductionBasisPoints: 2000,
 		},
 		Runtime: promptlayer.OMPContextPromotionRuntimeV1{
-			AutoVersion: "v0.50.103", AutoBinarySHA256: candidateArtifactSHA,
+			AutoVersion: "v0.50.104", AutoBinarySHA256: candidateArtifactSHA,
 			OMPVersion: "omp/17.2.7", OMPExecutableSHA256: promotionTestHash("omp"),
 			ExecutionClass: "external-live", ProductionPathEquivalent: true,
 			RuntimeKind:                  "omp-pipeline-managed-rpc",
