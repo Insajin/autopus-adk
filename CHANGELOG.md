@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- **A22 좌표를 v0.50.104로 전환** (2026-08-09): 릴리즈 워크플로·GoReleaser·Homebrew 브리지·좌표 트랜잭션·하드닝 스위트의 좌표를 `v0.50.104`로 옮긴다. A21 predecessor 핀과 lineage 세대 구조는 그대로다. 하드닝 스위트의 금지 좌표 창은 한 칸 밀려 `v0.50.103`·`v0.50.102`·`v0.50.101`을 거부한다.
+- **A22 좌표를 v0.50.105로 전환하고 서명 스모크 데드라인을 교정** (2026-08-09): 좌표를 `v0.50.105`로 옮기고 금지 좌표 창을 `v0.50.104`·`v0.50.103`·`v0.50.102`로 민다. v0.50.104는 canary 40콜과 서명·증거 태그까지 통과한 뒤 GoReleaser post hook의 실행 스모크가 15초 데드라인에 걸려 자산 업로드 전에 중단됐다. 스모크가 시간을 재는 명령은 `version --short` 하나뿐이고 가변 비용은 갓 서명된 바이너리를 `nobody` UID 격리에서 처음 실행할 때의 macOS 평가 지연이므로, 증거 임계가 아니라 liveness 한계다. 도구 상한(60초) 안에서 45초로 올린다. A21 predecessor 핀과 lineage 세대 구조는 그대로다.
 
 ### Removed
 

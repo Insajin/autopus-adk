@@ -72,7 +72,7 @@ while [[ $# -gt 0 ]]; do
   shift 2
 done
 [[ -f "$artifact" && ! -L "$artifact" && -x "$artifact" ]]
-[[ "$expected_version" == '0.50.69' && "$timeout" == '15s' ]]
+[[ "$expected_version" == '0.50.69' && "$timeout" == '45s' ]]
 [[ "$architecture" == 'amd64' || "$architecture" == 'arm64' ]]
 `)
 	shasum, err := exec.LookPath("shasum")
