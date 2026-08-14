@@ -42,7 +42,7 @@ func releaseCanaryGateEnv(t *testing.T, dir, architecture string) []string {
 	script := fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
 [[ "$#" -eq 8 && "$1" == '--artifact' && -x "$2" && "$3" == '--expected-version' && -n "$4" &&
-   "$5" == '--architecture' && "$6" == %q && "$7" == '--timeout' && "$8" == '15s' ]] || exit 91
+   "$5" == '--architecture' && "$6" == %q && "$7" == '--timeout' && "$8" == '45s' ]] || exit 91
 scenario=''; [[ ! -f %q ]] || scenario="$(cat %q)"
 [[ "$scenario" != 'execution_smoke_failure' ]] || exit 42
 if [[ "$6" == 'arm64' ]]; then

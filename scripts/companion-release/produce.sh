@@ -187,9 +187,10 @@ if [[ "$COMPANION_ARCHITECTURE" == 'arm64' ]]; then
   for name in OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE OMP_CONTEXT_RELEASE_CANARY_ROOT; do require_environment "$name"; done
   execution_smoke_env+=(OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE" OMP_CONTEXT_RELEASE_CANARY_ROOT="$OMP_CONTEXT_RELEASE_CANARY_ROOT")
 fi
+# Liveness bound: macOS first-run assessment of a freshly signed binary under nobody isolation exceeded 15s in v0.50.104.
 env -i "${execution_smoke_env[@]}" "$COMPANION_EXEC_SMOKE_GATE" \
   --artifact "$artifact_path" --expected-version "$COMPANION_VERSION" \
-  --architecture "$COMPANION_ARCHITECTURE" --timeout 15s \
+  --architecture "$COMPANION_ARCHITECTURE" --timeout 45s \
   || fail 'final signed companion execution smoke failed'
 [[ "$(sha256_file "$artifact_path")" == "$execution_smoke_digest" ]] \
   || fail 'final signed companion changed during execution smoke'

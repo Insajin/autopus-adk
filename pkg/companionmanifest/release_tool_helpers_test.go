@@ -43,7 +43,7 @@ set -euo pipefail
 [[ "$#" -eq 8 && "$1" == '--artifact' && -x "$2" &&
    "$3" == '--expected-version' && -n "$4" &&
    "$5" == '--architecture' && "$6" =~ ^(amd64|arm64)$ &&
-   "$7" == '--timeout' && "$8" == '15s' ]] || exit 91
+   "$7" == '--timeout' && "$8" == '45s' ]] || exit 91
 scenario=''; [[ ! -f %q ]] || scenario="$(cat %q)"
 [[ "$scenario" != 'execution_smoke_failure' ]] || exit 42
 [[ "$scenario" != 'execution_smoke_mutation' ]] || printf mutated >> "$2"

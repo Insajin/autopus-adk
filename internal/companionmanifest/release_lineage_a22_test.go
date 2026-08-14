@@ -11,8 +11,8 @@ func TestReleaseSourceValidator_A22AcceptsAnnotatedA21DescendantAndExactPins(t *
 	dir := cloneCurrentReleaseRepository(t)
 	sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
 	tree := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD^{tree}"))
-	runGit(t, dir, "tag", "-am", "A22 release candidate", "v0.50.104")
-	output, err := runReleaseSourceValidator(t, dir, "v0.50.104", sha,
+	runGit(t, dir, "tag", "-am", "A22 release candidate", "v0.50.105")
+	output, err := runReleaseSourceValidator(t, dir, "v0.50.105", sha,
 		"COMPANION_SOURCE_PIN_REQUIRED=1",
 		"COMPANION_APPROVED_SOURCE_COMMIT="+sha,
 		"COMPANION_APPROVED_SOURCE_TREE="+tree,
@@ -30,8 +30,8 @@ func TestReleaseSourceValidator_A22RejectsUnsignedTagWhenProductionSignatureIsRe
 	dir := cloneCurrentReleaseRepository(t)
 	sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
 	tree := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD^{tree}"))
-	runGit(t, dir, "tag", "-am", "unsigned A22 release candidate", "v0.50.104")
-	output, err := runReleaseSourceValidator(t, dir, "v0.50.104", sha,
+	runGit(t, dir, "tag", "-am", "unsigned A22 release candidate", "v0.50.105")
+	output, err := runReleaseSourceValidator(t, dir, "v0.50.105", sha,
 		"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
 		"COMPANION_SOURCE_PIN_REQUIRED=1",
 		"COMPANION_APPROVED_SOURCE_COMMIT="+sha,
@@ -49,7 +49,7 @@ func TestReleaseSourceValidator_A22PinsDirectA21Ancestor(t *testing.T) {
 		t.Fatalf("A22 immutable A21 ancestry pin drifted: %s", declaration)
 	}
 	for _, required := range []string{
-		`v0.50.104) release_phase='A22'`,
+		`v0.50.105) release_phase='A22'`,
 		`git merge-base --is-ancestor "$A22_A21_ANCESTOR_SHA" "$GITHUB_SHA"`,
 		`fail 'A22 source does not contain the immutable A21 release'`,
 		`COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED`,
@@ -87,7 +87,7 @@ func TestLineageVerifier_A22UsesExactA21ReleaseCoordinate(t *testing.T) {
 	coordinates := readReleaseFile(t,
 		"scripts/companion-release/verify-public-key-lineage-coordinates.sh")
 	for _, required := range []string{
-		"A21_REPOSITORY='Insajin/autopus-adk' A22_TAG='v0.50.104' A22_VERSION='0.50.104'",
+		"A21_REPOSITORY='Insajin/autopus-adk' A22_TAG='v0.50.105' A22_VERSION='0.50.105'",
 		"release_phase='A22' prior_phase='A21'",
 		`prior_release_id="$A21_RELEASE_ID"`,
 		`prior_tree="$A21_TREE_SHA"`,
