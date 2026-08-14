@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -79,7 +80,10 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 	afterStats, err := protocol.sessionStats(ctx, expectedSession)
 	if err != nil || afterStats.Input < beforeStats.Input || afterStats.Output < beforeStats.Output ||
 		afterStats.Total < beforeStats.Total {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP usage is not monotonic")
+		return "", pipelineOMPActiveCallReceipt{}, fmt.Errorf(
+			"managed active OMP usage is not monotonic (before in/out/total=%d/%d/%d after=%d/%d/%d)",
+			beforeStats.Input, beforeStats.Output, beforeStats.Total,
+			afterStats.Input, afterStats.Output, afterStats.Total)
 	}
 	data, err := protocol.call(ctx, pipelineOMPRPCCommand{Type: "get_last_assistant_text"}, false)
 	if err != nil {
@@ -99,8 +103,14 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 	}
 	inputDelta, outputDelta := afterStats.Input-beforeStats.Input, afterStats.Output-beforeStats.Output
 	totalDelta := afterStats.Total - beforeStats.Total
+	// A fail-closed usage gate has to report the observation it rejected;
+	// otherwise a stalled cohort gives no way to tell which axis went flat.
 	if inputDelta <= 0 || outputDelta <= 0 || totalDelta < inputDelta+outputDelta {
-		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP usage delta is empty")
+		return "", pipelineOMPActiveCallReceipt{}, fmt.Errorf(
+			"managed active OMP usage delta is empty (in/out/total delta=%d/%d/%d, before=%d/%d/%d after=%d/%d/%d)",
+			inputDelta, outputDelta, totalDelta,
+			beforeStats.Input, beforeStats.Output, beforeStats.Total,
+			afterStats.Input, afterStats.Output, afterStats.Total)
 	}
 	return output.Text, pipelineOMPActiveCallReceipt{
 		SessionID: expectedSession, InputTokens: inputDelta, OutputTokens: outputDelta,
