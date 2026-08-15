@@ -103,14 +103,10 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 	}
 	inputDelta, outputDelta := afterStats.Input-beforeStats.Input, afterStats.Output-beforeStats.Output
 	totalDelta := afterStats.Total - beforeStats.Total
-	// A fail-closed usage gate has to report the observation it rejected;
-	// otherwise a stalled cohort gives no way to tell which axis went flat.
-	if inputDelta <= 0 || outputDelta <= 0 || totalDelta < inputDelta+outputDelta {
-		return "", pipelineOMPActiveCallReceipt{}, fmt.Errorf(
-			"managed active OMP usage delta is empty (in/out/total delta=%d/%d/%d, before=%d/%d/%d after=%d/%d/%d)",
-			inputDelta, outputDelta, totalDelta,
-			beforeStats.Input, beforeStats.Output, beforeStats.Total,
-			afterStats.Input, afterStats.Output, afterStats.Total)
+	if err := pipelineOMPActiveUsageVerdict(
+		beforeStats, afterStats, protocol.declaredContextWindow,
+	); err != nil {
+		return "", pipelineOMPActiveCallReceipt{}, err
 	}
 	return output.Text, pipelineOMPActiveCallReceipt{
 		SessionID: expectedSession, InputTokens: inputDelta, OutputTokens: outputDelta,
