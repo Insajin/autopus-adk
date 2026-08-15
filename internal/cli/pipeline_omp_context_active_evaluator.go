@@ -47,6 +47,7 @@ func startPipelineOMPActiveEvaluatorSession(
 		return nil, err
 	}
 	protocol := newPipelineOMPRPCProtocol(process)
+	protocol.declaredContextWindow = backend.ModelContextWindow
 	sessionID, err := protocol.initializeManaged(ctx, candidate.Provider+"/"+candidate.Model)
 	if err != nil {
 		_ = process.Close()

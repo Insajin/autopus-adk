@@ -230,6 +230,7 @@ func (backend *pipelineOMPBackend) Execute(
 		backend.process, err = startPipelineOMPProcess(ctx, backend.config)
 		if err == nil {
 			backend.protocol = newPipelineOMPRPCProtocol(backend.process)
+			backend.protocol.declaredContextWindow = backend.config.ModelContextWindow
 			initCtx, cancel := context.WithTimeout(ctx, backend.config.MaxTime)
 			err = backend.protocol.initialize(initCtx)
 			cancel()

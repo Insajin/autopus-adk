@@ -68,6 +68,7 @@ func newPipelineOMPActiveSessionStart(
 			return nil, err
 		}
 		protocol := newPipelineOMPRPCProtocol(process)
+		protocol.declaredContextWindow = backend.ModelContextWindow
 		initializeCtx, cancel := context.WithTimeout(ctx, backend.MaxTime)
 		defer cancel()
 		sessionID, err := protocol.initializeManaged(initializeCtx, candidate.Provider+"/"+candidate.Model)

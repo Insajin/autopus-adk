@@ -50,6 +50,9 @@ type pipelineOMPRPCProtocol struct {
 	process              *pipelineOMPProcess
 	nextID               int
 	safeCompactionImages map[string]struct{}
+	// declaredContextWindow is the window the caller asserted for this model.
+	// Zero means unknown and disables the exhaustion diagnosis in executeManaged.
+	declaredContextWindow int
 }
 
 type pipelineOMPModelState struct {
