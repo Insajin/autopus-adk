@@ -31,11 +31,11 @@ checksums="$temp/checksums.txt"
 
 # A22 updates only the Cask from the exact A21 tap head and keeps Formula frozen.
 source "$script_dir/publish-homebrew-formula-bridge-render.sh"
-render_homebrew_cask "$temp/prior-cask.rb" 0.50.103 \
-  '78fff23a4fbc0aedacfe8c7f85f37199106e3f1b738244d6077afededcf98c0e' \
-  'bd7d7873b93e6349b06a5b66c34b982e1dffc8a1e6829635324a298b59a88fea' \
-  '7a9112538b341d049e2707f40eb502260b4c58bc767388299da9253e8585dde1' \
-  'b47541721189d2f2afbc9778d842dd566496a951704fccd2c5b5ddabdd193d1a'
+render_homebrew_cask "$temp/prior-cask.rb" 0.50.106 \
+  '113b319911150083d6384fbaa50786ddd55f8113d580946078f5f6561384d382' \
+  '5cdd342416bb4b8feeac403f53761b5b0a2572269a5881afeb90a3306365f744' \
+  '7d8cd1fd01dfc32dd06bc3b8223321eaa1b1d8ee483944e36759c400b1e8b619' \
+  'e7914d063227bc8a7acba5668e9bb09d30ee1f7e4807117c089575b63c96e573'
 [[ "$(git -C "$temp" hash-object "$temp/prior-cask.rb")" == \
    "$prior_cask_blob" ]] \
   || fail 'rendered A21 Cask bytes differ from the pinned predecessor blob'

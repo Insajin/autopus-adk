@@ -8,6 +8,8 @@ All notable changes to this project will be documented in this file.
 
 - **A22 좌표를 v0.50.106으로 전환** (2026-08-10): 좌표를 `v0.50.106`으로 옮기고 금지 좌표 창을 `v0.50.105`·`v0.50.104`·`v0.50.103`으로 민다. v0.50.105는 canary 40콜과 GoReleaser 자산 업로드까지 처음으로 통과했지만, Homebrew cask 게시가 predecessor 핀 불일치로 멈췄다. 릴리즈 자체는 immutable로 게시된 상태이므로 되돌릴 수 없고, 태그 트리에는 핀 수정이 없어 태그 기준 복구 워크플로로도 되살릴 수 없다. 따라서 핀이 교정된 main에서 새 좌표로 재발행한다. cask는 v0.50.92에서 v0.50.106으로 건너뛴다 — cask는 최신만 유지하면 되므로 사용자 영향은 없다.
 
+- **v0.50.106 게시 후 Homebrew predecessor를 실제 tap 상태로 동기화** (2026-08-10): v0.50.106이 게시되며 tap이 `9484e41a`로 전진했고 Cask blob은 `c1f90dc1`이 됐다. 게시가 성공하면 핀은 반드시 한 세대 낡으므로, 다음 릴리즈가 그 사실을 발견하게 두지 않고 지금 맞춘다. v0.50.105가 막힌 원인이 정확히 이 지연이었다 — 핀이 v0.50.92에 머문 채 11개 릴리즈를 통과했다. 렌더러가 게시된 Cask를 바이트 단위로 재현함을 확인해 핀 값을 검증했고(`git hash-object` = `c1f90dc1`), `prepare-release.sh`의 tap 핀 preflight가 실제 tap과 일치함을 실행해 확인했다.
+
 ### Removed
 
 - **프로덕션에서 쓰이지 않던 `PaneBackend`** (2026-08-09): 이름은 pane인데 실제로는 `runProvider`로 자식 프로세스를 띄우는 타입이었고, 프로덕션 참조는 없이 자기 자신을 검증하는 테스트와 fresh-judge 허용목록 항목만 남아 있었다. 이 오해를 부르는 이름 때문에 전송 선택 seam을 잘못 고를 뻔했으므로 제거한다. `pipelineBackendHasFreshExecutionSemantics`의 허용목록에서도 빠지며, 남은 두 내장 백엔드(`subprocessBackend`, `InteractivePaneBackend`)의 판정은 그대로다. `SelectBackend`의 주석에 자유 텍스트 호출자는 이 백엔드를 쓰면 안 된다는 계약을 명시했다.
