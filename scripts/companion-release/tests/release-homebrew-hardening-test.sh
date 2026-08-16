@@ -153,14 +153,22 @@ rm -f -- "$state/formula-race-before-ref"
      '6666666666666666666666666666666666666666' ]] \
   || fail 'A22 overwrote a concurrent Formula drift commit'
 
-# Tap drift must fail in prep, before the canary; behind it the stale pin still
-# costs a full production run and a GoReleaser publish before anyone learns.
+# Tap drift must fail before anything irreversible exists. In prep that means
+# before the canary; in the release workflow it means before GoReleaser, because
+# a published immutable release can never get its Cask afterwards.
 prep="$script_dir/prepare-release.sh"
 prep_lib="$script_dir/prepare-release-runtime-lib.sh"
-grep -Fq 'verify_homebrew_tap_pins()' "$prep_lib" || fail 'prep cannot verify tap pins'
-grep -Fq 'pin_from_bridge()' "$prep_lib" || fail 'prep duplicates the tap pins'
+gate="$script_dir/verify-homebrew-tap-pins.sh"
+release_workflow="$script_dir/../../.github/workflows/release.yaml"
+[[ -f "$gate" && ! -L "$gate" && -x "$gate" ]] || fail 'missing or unsafe tap pin gate'
+grep -Fq 'verify-homebrew-tap-pins.sh' "$prep_lib" || fail 'prep does not delegate to the gate'
+grep -Fq "PRIOR_TAP_COMMIT" "$gate" || fail 'gate does not read the tap head pin'
+grep -Fq "PRIOR_CASK_BLOB" "$gate" || fail 'gate does not read the Cask blob pin'
 (( $(grep -n 'verify_homebrew_tap_pins' "$prep" | cut -d: -f1) < \
    $(grep -n 'run_canary "$final_candidate"' "$prep" | cut -d: -f1) )) \
   || fail 'Homebrew tap pins are checked after the canary'
+(( $(grep -n 'verify-homebrew-tap-pins.sh' "$release_workflow" | tail -1 | cut -d: -f1) < \
+   $(grep -n 'goreleaser release --clean' "$release_workflow" | cut -d: -f1) )) \
+  || fail 'Homebrew tap pins are checked after GoReleaser publishes'
 
 printf 'release homebrew hardening test: PASS\n'

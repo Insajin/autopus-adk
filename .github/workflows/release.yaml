@@ -562,6 +562,21 @@ jobs:
             COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT="$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
             scripts/companion-release/verify-public-key-lineage.sh
 
+      - name: Verify Homebrew tap predecessor pins
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Last gate before an immutable release exists. The Cask publication at
+        # the end of this job enforces the same pins; failing there leaves a
+        # published release that can never get its Cask, because recovery reruns
+        # the tag's own stale scripts. The tap is public, so this reads it with
+        # no write credential and cannot widen what GoReleaser is trusted with.
+        shell: bash
+        run: |
+          set -euo pipefail
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            GITHUB_TOKEN="$GITHUB_TOKEN" \
+            scripts/companion-release/verify-homebrew-tap-pins.sh
+
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
