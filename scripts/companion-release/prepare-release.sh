@@ -260,6 +260,8 @@ go build -trimpath -o "$execsmoke" ./scripts/companion-release/execsmoke
 [[ "$("$policy_tool" companion-manifest omp-context-promotion-key-id <"$promotion_signing_key")" == \
    "$expected_promotion_key_id" ]] || fail 'promotion signing key differs from pinned local release key'
 
+verify_homebrew_tap_pins # two API calls, not a post-canary/post-GoReleaser failure
+
 if [[ "$evidence_present" -eq 1 ]]; then
   load_evidence
   derive_policy "$verified_report" "$static_policy_file"

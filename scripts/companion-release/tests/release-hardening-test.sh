@@ -8,6 +8,7 @@ repo=$(cd -- "$script_dir/../.." && pwd)
 fail() { printf 'release hardening test: %s\n' "$1" >&2; exit 1; }
 contains() { grep -Fq -- "$2" "$1" || fail "$1 missing $2"; }
 not_contains() { ! grep -Fq -- "$2" "$1" || fail "$1 unexpectedly contains $2"; }
+matches() { grep -Eq -- "$2" "$1" || fail "$1 missing pattern $2"; }
 
 config="$repo/.goreleaser.yaml"
 release="$repo/.github/workflows/release.yaml"
@@ -41,8 +42,11 @@ contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.output
 contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
 not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
 contains "$producer_receipt" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-contains "$homebrew_bridge" "readonly PRIOR_TAP_COMMIT='a030dbe6566030dcbbbb7d3206abe4debdd0cc51'"
-contains "$homebrew_bridge" "readonly PRIOR_CASK_BLOB='49123ecd55d52e58da64a70f8432086e3f45dd8b'"
+# The tap coordinates advance with every publication, so pinning their exact
+# value here only forces a second edit; the publisher already enforces them
+# against the live tap. Assert the shape that keeps that enforcement possible.
+matches "$homebrew_bridge" "^readonly PRIOR_TAP_COMMIT='[0-9a-f]{40}'$"
+matches "$homebrew_bridge" "^readonly PRIOR_CASK_BLOB='[0-9a-f]{40}'$"
 contains "$homebrew_bridge" "readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'"
 contains "$homebrew_bridge" 'COMPANION_HOMEBREW_POLICY'
 contains "$homebrew_bridge" "readonly FORMULA_PATH='Formula/auto.rb'"

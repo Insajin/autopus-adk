@@ -41,8 +41,11 @@ verify_prior_tap_head() {
     select(type == "object" and .ref == $ref and .object.type == "commit") |
     .object.sha | select(type == "string" and test("^[0-9a-f]{40}$"))
   ' "$response") || fail 'Homebrew tap branch head response is invalid'
+  # A successful publication advances the tap, so the pin has to be bumped in the
+  # same PR that ships the next release. Naming both SHAs turns that bump into a
+  # copy-paste instead of a mid-release investigation.
   [[ "$head_sha" == "$PRIOR_TAP_COMMIT" ]] \
-    || fail 'Homebrew tap branch differs from the pinned predecessor commit'
+    || fail "Homebrew tap branch differs from the pinned predecessor commit (tap head ${head_sha}, pinned ${PRIOR_TAP_COMMIT}); update PRIOR_TAP_COMMIT to the tap head"
 }
 
 # @AX:NOTE [AUTO]: [downgraded from ANCHOR — fan_in=1 under file cap] Bind idempotent success to one stable head, tree, Cask, and Formula snapshot.

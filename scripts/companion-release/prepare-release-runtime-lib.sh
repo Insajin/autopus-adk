@@ -259,3 +259,32 @@ publish_coordinates() {
     exit "$status"
   fi
 }
+
+# The Homebrew publisher refuses to commit unless the tap sits exactly where the
+# previous publication left it. That check runs after the canary and GoReleaser,
+# so drift used to surface 40 minutes in. Reading the pins from the publisher
+# keeps one source of truth; the tap is the fact they must match.
+verify_homebrew_tap_pins() {
+  local bridge='scripts/companion-release/publish-homebrew-formula-bridge.sh'
+  local pinned_commit pinned_blob tap_repository tap_branch cask_path head_sha blob_sha
+  pinned_commit=$(pin_from_bridge "$bridge" PRIOR_TAP_COMMIT)
+  pinned_blob=$(pin_from_bridge "$bridge" PRIOR_CASK_BLOB)
+  tap_repository=$(pin_from_bridge "$bridge" TAP_REPOSITORY '[^'"'"']+')
+  tap_branch=$(pin_from_bridge "$bridge" TAP_BRANCH '[^'"'"']+')
+  cask_path=$(pin_from_bridge "$bridge" CASK_PATH '[^'"'"']+')
+  head_sha=$(gh api "repos/${tap_repository}/git/ref/heads/${tap_branch}" --jq .object.sha) ||
+    fail 'cannot read the Homebrew tap branch head'
+  [[ "$head_sha" == "$pinned_commit" ]] || fail \
+    "Homebrew tap head ${head_sha} differs from pinned PRIOR_TAP_COMMIT ${pinned_commit}; bump the pin in ${bridge}"
+  blob_sha=$(gh api "repos/${tap_repository}/contents/${cask_path}?ref=${tap_branch}" --jq .sha) ||
+    fail 'cannot read the Homebrew tap Cask'
+  [[ "$blob_sha" == "$pinned_blob" ]] || fail \
+    "Homebrew tap Cask blob ${blob_sha} differs from pinned PRIOR_CASK_BLOB ${pinned_blob}; bump the pin in ${bridge}"
+}
+
+pin_from_bridge() {
+  local file=$1 name=$2 pattern=${3:-'[0-9a-f]{40}'} value
+  value=$(sed -nE "s/^readonly ${name}='(${pattern})'\$/\1/p" "$file")
+  [[ -n "$value" ]] || fail "cannot read ${name} from ${file}"
+  printf '%s\n' "$value"
+}
