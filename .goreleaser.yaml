@@ -69,9 +69,9 @@ archives:
       - src: '{{ if eq .Os "darwin" }}dist/auto_{{ .Target }}/adk-companion-public-key-receipt.bundle/**{{ else }}scripts/companion-release/no-files-*{{ end }}'
         dst: adk-companion-public-key-receipt.bundle
         strip_parent: true
-      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") (eq .Version "0.50.105") }}dist/auto_{{ .Target }}/release-lineage-v1.json{{ else }}scripts/companion-release/no-files-*{{ end }}'
+      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") (eq .Version "0.50.106") }}dist/auto_{{ .Target }}/release-lineage-v1.json{{ else }}scripts/companion-release/no-files-*{{ end }}'
         dst: release-lineage-v1.json
-      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") (eq .Version "0.50.105") }}dist/auto_{{ .Target }}/release-lineage-v1.sig{{ else }}scripts/companion-release/no-files-*{{ end }}'
+      - src: '{{ if and (eq .Os "darwin") (eq .Arch "arm64") (eq .Version "0.50.106") }}dist/auto_{{ .Target }}/release-lineage-v1.sig{{ else }}scripts/companion-release/no-files-*{{ end }}'
         dst: release-lineage-v1.sig
 
 release:

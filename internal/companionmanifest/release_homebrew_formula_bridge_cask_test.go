@@ -22,8 +22,8 @@ func TestHomebrewFormulaBridge_A22PinsCaskOnlyTapTransition(t *testing.T) {
 	gitHelper := readReleaseFile(t,
 		"scripts/companion-release/publish-homebrew-formula-bridge-git.sh")
 	for _, required := range []string{
-		"readonly RELEASE_TAG='v0.50.105'",
-		"readonly RELEASE_VERSION='0.50.105'",
+		"readonly RELEASE_TAG='v0.50.106'",
+		"readonly RELEASE_VERSION='0.50.106'",
 		"readonly PRIOR_TAP_COMMIT='" + a21TapPin(t, "PRIOR_TAP_COMMIT") + "'",
 		"readonly PRIOR_CASK_BLOB='" + a21TapPin(t, "PRIOR_CASK_BLOB") + "'",
 		"readonly FROZEN_FORMULA_BLOB='" + a21FrozenFormulaBlob + "'",

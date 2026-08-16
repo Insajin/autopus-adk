@@ -181,7 +181,7 @@ func newManifestVerifierFixture(t *testing.T) manifestVerifierFixture {
 	dir := t.TempDir()
 	privateKey := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x42}, ed25519.SeedSize))
 	publicKey := privateKey.Public().(ed25519.PublicKey)
-	artifact := []byte("signed darwin arm64 release artifact v0.50.105")
+	artifact := []byte("signed darwin arm64 release artifact v0.50.106")
 	artifactDigest := manifestVerifierDigest(artifact)
 	publicKeyDigest := manifestVerifierDigest(publicKey)
 
@@ -198,7 +198,7 @@ func newManifestVerifierFixture(t *testing.T) manifestVerifierFixture {
 		t.Fatal(err)
 	}
 	manifest := manifestClaims{
-		SchemaVersion: manifestSchema, ArtifactDigest: artifactDigest, Version: "0.50.105",
+		SchemaVersion: manifestSchema, ArtifactDigest: artifactDigest, Version: "0.50.106",
 		Platform: "darwin", Architecture: "arm64",
 		BuildProvenance: "github.com/Insajin/autopus-adk/actions/runs/123",
 		Handoff:         "v1", RollbackFloor: 5069,
