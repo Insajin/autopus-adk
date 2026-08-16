@@ -15,7 +15,7 @@ func TestReleaseWorkflow_A22GatesOnPinnedOMPProductionEvidence(t *testing.T) {
 		"omp-production-evidence:",
 		"permissions:\n      contents: read",
 		"needs: [ci, security, omp-production-evidence]",
-		"omp-context-evidence-v0.50.105",
+		"omp-context-evidence-v0.50.106",
 		"OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA",
 		"OMP_CONTEXT_EVIDENCE_COMMIT_SHA",
 		"OMP_CONTEXT_EVIDENCE_TREE_SHA",
@@ -69,7 +69,7 @@ func TestReleaseWorkflow_A22CarriesSameRunEvidenceIntoExactFifteenAssets(t *test
 		`glob: "{{ .Env.OMP_CONTEXT_PROMOTION_ATTESTATION_PATH }}"`,
 		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_PATH }}"`,
 		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH }}"`,
-		`eq .Version "0.50.105"`,
+		`eq .Version "0.50.106"`,
 		"dst: release-lineage-v1.json",
 		"dst: release-lineage-v1.sig",
 	} {

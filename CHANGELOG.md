@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 - **A22 좌표를 v0.50.105로 전환하고 서명 스모크 데드라인을 교정** (2026-08-09): 좌표를 `v0.50.105`로 옮기고 금지 좌표 창을 `v0.50.104`·`v0.50.103`·`v0.50.102`로 민다. v0.50.104는 canary 40콜과 서명·증거 태그까지 통과한 뒤 GoReleaser post hook의 실행 스모크가 15초 데드라인에 걸려 자산 업로드 전에 중단됐다. 스모크가 시간을 재는 명령은 `version --short` 하나뿐이고 가변 비용은 갓 서명된 바이너리를 `nobody` UID 격리에서 처음 실행할 때의 macOS 평가 지연이므로, 증거 임계가 아니라 liveness 한계다. 도구 상한(60초) 안에서 45초로 올린다. A21 predecessor 핀과 lineage 세대 구조는 그대로다.
 
+- **A22 좌표를 v0.50.106으로 전환** (2026-08-10): 좌표를 `v0.50.106`으로 옮기고 금지 좌표 창을 `v0.50.105`·`v0.50.104`·`v0.50.103`으로 민다. v0.50.105는 canary 40콜과 GoReleaser 자산 업로드까지 처음으로 통과했지만, Homebrew cask 게시가 predecessor 핀 불일치로 멈췄다. 릴리즈 자체는 immutable로 게시된 상태이므로 되돌릴 수 없고, 태그 트리에는 핀 수정이 없어 태그 기준 복구 워크플로로도 되살릴 수 없다. 따라서 핀이 교정된 main에서 새 좌표로 재발행한다. cask는 v0.50.92에서 v0.50.106으로 건너뛴다 — cask는 최신만 유지하면 되므로 사용자 영향은 없다.
+
 ### Removed
 
 - **프로덕션에서 쓰이지 않던 `PaneBackend`** (2026-08-09): 이름은 pane인데 실제로는 `runProvider`로 자식 프로세스를 띄우는 타입이었고, 프로덕션 참조는 없이 자기 자신을 검증하는 테스트와 fresh-judge 허용목록 항목만 남아 있었다. 이 오해를 부르는 이름 때문에 전송 선택 seam을 잘못 고를 뻔했으므로 제거한다. `pipelineBackendHasFreshExecutionSemantics`의 허용목록에서도 빠지며, 남은 두 내장 백엔드(`subprocessBackend`, `InteractivePaneBackend`)의 판정은 그대로다. `SelectBackend`의 주석에 자유 텍스트 호출자는 이 백엔드를 쓰면 안 된다는 계약을 명시했다.
