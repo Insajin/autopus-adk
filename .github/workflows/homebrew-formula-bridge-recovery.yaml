@@ -5,6 +5,19 @@ on:
 
 # Canonical invocation after the immutable release exists:
 # gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.106
+#
+# Scope: a tap write that failed for a transient reason — expired token, network
+# error, or a concurrent tap move. The tag's scripts are correct in that case and
+# rerunning them is the fix.
+#
+# Out of scope: a tag whose publishing scripts are themselves wrong, such as a
+# stale predecessor pin. This job runs the tag's own scripts, so it would repeat
+# the same failure, and the release is immutable so it cannot be revised. The fix
+# there is a new coordinate. Do not try to make this job run scripts from another
+# ref: validate-source.sh binds GITHUB_SHA to the approved source commit and
+# verifies the tag signature, so a different tree either breaks those gates or
+# needs a second, separately approved trust anchor. verify-homebrew-tap-pins.sh
+# runs before GoReleaser precisely so that case never reaches this workflow.
 
 permissions:
   contents: read
