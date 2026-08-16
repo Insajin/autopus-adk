@@ -7,15 +7,29 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
 
-const (
-	a21PriorTapCommit    = "a030dbe6566030dcbbbb7d3206abe4debdd0cc51"
-	a21PriorCaskBlob     = "49123ecd55d52e58da64a70f8432086e3f45dd8b"
-	a21FrozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
-)
+// The tap coordinates advance with every publication. Reading them from the
+// publisher keeps these fixtures from silently drifting out of the head check
+// and testing nothing; the frozen Formula blob is a real constant, so it stays.
+const a21FrozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
+
+func a21TapPin(t *testing.T, name string) string {
+	t.Helper()
+	const bridge = "scripts/companion-release/publish-homebrew-formula-bridge.sh"
+	data, err := os.ReadFile(filepath.Join(repositoryRoot(t), filepath.FromSlash(bridge)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	match := regexp.MustCompile(`(?m)^readonly ` + name + `='([0-9a-f]{40})'$`).FindSubmatch(data)
+	if match == nil {
+		t.Fatalf("%s does not pin %s", bridge, name)
+	}
+	return string(match[1])
+}
 
 var bridgeDigests = []string{
 	strings.Repeat("1", 64), strings.Repeat("2", 64),
@@ -129,6 +143,9 @@ func TestHomebrewFormulaBridge_RejectsIdentityMismatchWithoutCredentialLeak(t *t
 
 type homebrewBridgeFixture struct {
 	root, state, checksums, checksumText, cask string
+	// priorCommit mirrors the publisher's tap-head pin so the relocated mock
+	// fixture answers with the same coordinate the publisher enforces.
+	priorCommit string
 }
 
 func newHomebrewBridgeFixture(t *testing.T) homebrewBridgeFixture {
@@ -141,17 +158,18 @@ func newHomebrewBridgeFixture(t *testing.T) homebrewBridgeFixture {
 			t.Fatal(err)
 		}
 	}
-	fixture := homebrewBridgeFixture{root: root, state: state}
+	fixture := homebrewBridgeFixture{root: root, state: state,
+		priorCommit: a21TapPin(t, "PRIOR_TAP_COMMIT")}
 	fixture.cask = homebrewBridgeCask()
 	fixture.checksumText = homebrewBridgeChecksums()
 	fixture.checksums = filepath.Join(root, "checksums.txt")
 	if err := os.WriteFile(fixture.checksums, []byte(fixture.checksumText), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	fixture.writeAPIContent(t, "cask.json", a21PriorCaskBlob, fixture.cask)
+	fixture.writeAPIContent(t, "cask.json", a21TapPin(t, "PRIOR_CASK_BLOB"), fixture.cask)
 	fixture.writeAPIContent(t, "formula.json", a21FrozenFormulaBlob, homebrewBridgeFormula(t))
 	branch := `{"ref":"refs/heads/main","object":{"type":"commit","sha":"` +
-		a21PriorTapCommit + `","url":"https://example.invalid/prior-commit"}}`
+		a21TapPin(t, "PRIOR_TAP_COMMIT") + `","url":"https://example.invalid/prior-commit"}}`
 	if err := os.WriteFile(filepath.Join(state, "branch.json"), []byte(branch), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -171,6 +189,7 @@ func (fixture homebrewBridgeFixture) run(overrides map[string]string) ([]byte, e
 		"TMPDIR": filepath.Join(fixture.root, "tmp"), "MOCK_TAP_STATE": fixture.state,
 		"GITHUB_REF_NAME": "v0.50.105", "COMPANION_VERSION": "0.50.105",
 		"COMPANION_HOMEBREW_POLICY": "cask-only",
+		"MOCK_TAP_PRIOR_COMMIT":     fixture.priorCommit,
 		"COMPANION_CHECKSUMS_PATH":  fixture.checksums,
 		"HOMEBREW_TAP_TOKEN":        "fixture-tap-token", "GH_TOKEN": "",
 	}

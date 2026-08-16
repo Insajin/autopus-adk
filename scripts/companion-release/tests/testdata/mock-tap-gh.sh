@@ -2,7 +2,10 @@
 # Test-only GitHub Git Data/Contents API state machine.
 set -euo pipefail
 
-readonly prior_commit='a030dbe6566030dcbbbb7d3206abe4debdd0cc51'
+# Injected, never duplicated: the publisher owns the tap coordinates and a
+# release bumps them. This fixture is installed outside the repo, so the
+# caller passes the pin instead of a literal that would stop matching.
+readonly prior_commit="${MOCK_TAP_PRIOR_COMMIT:?mock tap gh: MOCK_TAP_PRIOR_COMMIT is required}"
 readonly prior_tree='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 readonly target_blob='1111111111111111111111111111111111111111'
 readonly target_tree='2222222222222222222222222222222222222222'
