@@ -7,9 +7,9 @@ readonly RELEASE_VERSION='0.50.106'
 readonly RELEASE_POLICY='cask-only'
 readonly TAP_REPOSITORY='Insajin/homebrew-autopus'
 readonly TAP_BRANCH='main'
-readonly PRIOR_TAP_COMMIT='98e1f8c9c58ff863efab3c9789e372f0f4d11820'
+readonly PRIOR_TAP_COMMIT='9484e41ad6f241f866a8a22164abef417780b527'
 readonly CASK_PATH='Casks/auto.rb'
-readonly PRIOR_CASK_BLOB='e7cd7c6257e6f55ee61ee37a1779d0aa6fa0cd1f'
+readonly PRIOR_CASK_BLOB='c1f90dc1be31f8bb6885389da08f568ac4ed5ee3'
 readonly FORMULA_PATH='Formula/auto.rb'
 readonly FROZEN_FORMULA_BLOB='4ebc6c38925002dec00759823d4dd847a499818a'
 
@@ -147,4 +147,4 @@ fi
 verify_frozen_formula
 publish_cask cask Cask "$CASK_PATH" "$cask_target" "$PRIOR_CASK_BLOB" \
   'Publish signed Cask for v0.50.106' \
-  'published Cask differs from canonical v0.50.103 output and its pinned prior blob'
+  'published Cask differs from canonical v0.50.106 output and its pinned prior blob'
