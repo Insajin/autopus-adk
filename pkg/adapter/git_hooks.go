@@ -7,17 +7,27 @@ import (
 )
 
 // SupportsRootGitHooks reports whether .git/hooks can be addressed under root.
-// Linked worktrees store .git as a gitdir file, so root-local .git/hooks is not
-// a valid path there.
+// Only a real root-local gitdir qualifies, proven by a readable .git/HEAD:
+//
+//   - Linked worktrees store .git as a gitdir file, so root-local .git/hooks is
+//     not a valid path there.
+//   - When .git is absent, writing .git/hooks/* would MkdirAll a .git directory
+//     and fabricate a repository marker in a checkout that is not a repository
+//     (meta workspaces hosting sibling repos). Git never honors those hooks, and
+//     the fabricated directory makes the root look like a repo to other tooling.
+//   - A .git directory without HEAD is that same residue, not a repository.
+//
+// A root that is initialized later picks the hooks up on the next `auto update`.
 func SupportsRootGitHooks(root string) bool {
-	info, err := os.Stat(filepath.Join(root, ".git"))
-	if os.IsNotExist(err) {
-		return true
+	gitPath := filepath.Join(root, ".git")
+	info, err := os.Stat(gitPath)
+	if err != nil || !info.IsDir() {
+		return false
 	}
-	if err != nil {
-		return true
+	if _, err := os.Stat(filepath.Join(gitPath, "HEAD")); err != nil {
+		return false
 	}
-	return info.IsDir()
+	return true
 }
 
 // IsRootGitHookPath reports whether path targets root-local .git/hooks.

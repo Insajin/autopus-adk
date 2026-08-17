@@ -68,6 +68,11 @@ func TestCodexAdapter_Generate_CreatesAgentsMD(t *testing.T) {
 func TestCodexAdapter_Generate_CreatesSkillsDirectory(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
+	// Root-local git hooks require a real gitdir, proven by HEAD.
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0o644,
+	))
 	a := codex.NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 
@@ -124,6 +129,11 @@ func TestCodexAdapter_Generate_PreservesUserContent(t *testing.T) {
 func TestCodexAdapter_Update(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
+	// Root-local git hooks are only installed into a real gitdir, proven by HEAD.
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0o644,
+	))
 	a := codex.NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 
@@ -139,6 +149,23 @@ func TestCodexAdapter_Update(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "auto check --lore --quiet --message")
 	assert.Contains(t, string(data), "auto lore validate \"$1\"")
+}
+
+func TestCodexAdapter_Update_DoesNotFabricateGitDirOutsideRepo(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := codex.NewWithRoot(dir)
+	cfg := config.DefaultFullConfig("test-project")
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+	_, err = a.Update(context.Background(), cfg)
+	require.NoError(t, err)
+
+	// A meta workspace hosting sibling repos is not itself a repository; writing
+	// hooks here would leave an inert .git that misleads other tooling.
+	_, err = os.Stat(filepath.Join(dir, ".git"))
+	assert.True(t, os.IsNotExist(err), ".git must not be fabricated outside a repository")
 }
 
 func TestCodexAdapter_InstallHooks_NoOp(t *testing.T) {

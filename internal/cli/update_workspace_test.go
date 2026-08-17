@@ -260,7 +260,14 @@ func TestUpdateCmd_LocalConflictsWithWorkspaceTarget(t *testing.T) {
 
 func makeWorkspaceRepo(t *testing.T, dir string) {
 	t.Helper()
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0755))
+	gitDir := filepath.Join(dir, ".git")
+	require.NoError(t, os.MkdirAll(gitDir, 0755))
+	// A gitdir is only real once HEAD is readable; adapters refuse to install
+	// root-local git hooks otherwise, so a HEAD-less fixture would not exercise
+	// the hook install path at all.
+	require.NoError(t, os.WriteFile(
+		filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0644,
+	))
 }
 
 func writeWorkspaceHarnessConfig(t *testing.T, dir, projectName string) {

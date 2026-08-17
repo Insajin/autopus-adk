@@ -59,6 +59,11 @@ func TestPrepareHooksFile_NoDiskWrite(t *testing.T) {
 func TestPrepareGitHookFiles_NoDiskWrite(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
+	// Root-local git hooks require a real gitdir, proven by HEAD.
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0o644,
+	))
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 
