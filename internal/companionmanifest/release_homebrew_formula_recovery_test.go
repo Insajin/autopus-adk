@@ -94,7 +94,7 @@ func TestFormulaRecoveryWorkflow_ManualExactA22LeastPrivilege(t *testing.T) {
 		}
 	}
 	for _, version := range regexp.MustCompile(`v?[0-9]+\.[0-9]+\.[0-9]+`).FindAllString(raw, -1) {
-		if version != "v0.50.106" && version != "0.50.106" &&
+		if version != "v0.50.107" && version != "0.50.107" &&
 			version != "v4.1.2" && version != "v3.1.2" {
 			t.Fatalf("recovery workflow references non-A22 version %q", version)
 		}
@@ -146,7 +146,7 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 		}
 	}
 	for _, exact := range []string{
-		"ref: refs/tags/v0.50.106", "fetch-depth: 0", "persist-credentials: false",
+		"ref: refs/tags/v0.50.107", "fetch-depth: 0", "persist-credentials: false",
 		"client-id: ${{ vars.HOMEBREW_APP_CLIENT_ID }}",
 		"private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}",
 		"owner: Insajin", "repositories: homebrew-autopus", "permission-contents: write",
@@ -161,8 +161,8 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *testing.T) {
 	raw, workflow := readRecoveryWorkflow(t)
 	for _, required := range []string{
-		"git rev-parse --verify 'HEAD^{commit}'", "mktemp", "GITHUB_REF_NAME='v0.50.106'",
-		"autopus-v0.50.106-checksums.txt",
+		"git rev-parse --verify 'HEAD^{commit}'", "mktemp", "GITHUB_REF_NAME='v0.50.107'",
+		"autopus-v0.50.107-checksums.txt",
 		"GITHUB_REF_TYPE='tag'", `GITHUB_SHA="$actual_head"`,
 		`GITHUB_OUTPUT="$validation_output"`, "scripts/companion-release/validate-source.sh",
 		"COMPANION_SOURCE_PIN_REQUIRED=1", "ADK_COMPANION_APPROVED_SOURCE_COMMIT",
@@ -264,8 +264,8 @@ func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA22CaskWithAllowlistedEnviron
 		}
 	}
 	wantBridge := `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-  GITHUB_REF_NAME='v0.50.106' \
-  COMPANION_VERSION='0.50.106' \
+  GITHUB_REF_NAME='v0.50.107' \
+  COMPANION_VERSION='0.50.107' \
   COMPANION_HOMEBREW_POLICY='cask-only' \
   COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
   HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
