@@ -190,15 +190,23 @@ func TestOMPNativeSmokeCIPinsExactBinaryAndTest(t *testing.T) {
 		`AUTOPUS_OMP_LIVE_EXECUTABLE="$omp_binary"`,
 		`go test -count=1 -timeout=90s`,
 		`-run '^TestOMPNativeTaskHubLiveSmoke$' ./pkg/adapter/omp`,
+		// The rule-delivery oracle resolves `omp` from PATH, so the job publishes
+		// the already-verified pinned binary under its plain name and removes the
+		// shim in the same trap instead of downloading a second copy.
+		`rm -rf -- "$omp_bin_dir"`,
+		`/bin/ln -s "$omp_binary" "$omp_bin_dir/omp"`,
+		`AUTOPUS_OMP_RULES_LIVE=1 PATH="$omp_bin_dir:$PATH"`,
+		`-run '^TestOMPRules_LiveSessionReceivesEverySourceRule$' ./pkg/adapter/omp`,
 	}
 	for _, fragment := range required {
 		if !strings.Contains(section, fragment) {
 			t.Fatalf("omp-native-smoke must contain %q", fragment)
 		}
 	}
-	if strings.Count(section, "go test ") != 1 ||
-		strings.Count(section, "-run '^TestOMPNativeTaskHubLiveSmoke$'") != 1 {
-		t.Fatal("omp-native-smoke must run one exactly anchored Go smoke")
+	if strings.Count(section, "go test ") != 2 ||
+		strings.Count(section, "-run '^TestOMPNativeTaskHubLiveSmoke$'") != 1 ||
+		strings.Count(section, "-run '^TestOMPRules_LiveSessionReceivesEverySourceRule$'") != 1 {
+		t.Fatal("omp-native-smoke must run exactly the two anchored Go smokes")
 	}
 	for _, forbidden := range []string{"./...", "${{ secrets.", "AUTOPUS_OMP_LIVE=1"} {
 		if strings.Contains(section, forbidden) {

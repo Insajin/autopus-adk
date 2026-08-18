@@ -150,8 +150,9 @@ func TestUpdateCmd_WithDir(t *testing.T) {
 	assert.Contains(t, buf.String(), "Update complete")
 }
 
-// TestUpdateCmd_DefaultDir는 기본 디렉터리에서 update를 테스트한다.
-// config.Load는 파일 없으면 기본 설정을 반환하므로 오류 없이 실행된다.
+// TestUpdateCmd_DefaultDir는 설정 파일이 없는 디렉터리의 update를 테스트한다.
+// config.Load는 파일이 없으면 기본 설정을 반환하지만, update는 그 합성 설정으로
+// 표면을 생성하지 않고 실행 가능한 오류로 끝난다.
 func TestUpdateCmd_DefaultDir(t *testing.T) {
 	t.Parallel()
 
@@ -162,6 +163,7 @@ func TestUpdateCmd_DefaultDir(t *testing.T) {
 	cmd.SetOut(&buf)
 	cmd.SetArgs([]string{"update", "--dir", dir})
 	err := cmd.Execute()
-	// 설정 파일 없어도 기본값으로 실행됨
-	require.NoError(t, err)
+	require.Error(t, err, buf.String())
+	assert.Contains(t, err.Error(), "auto init")
+	assert.NotContains(t, buf.String(), "Update complete")
 }

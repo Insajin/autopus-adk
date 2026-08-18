@@ -99,7 +99,7 @@ func TestOMPClean_FailsClosedWithoutHarnessConfig(t *testing.T) {
 		"a skipped surface must not be backed up either")
 
 	// Surfaces omp owns unconditionally are still cleaned.
-	assert.NoFileExists(t, filepath.Join(dir, ".agents", "rules", "autopus", "branding.md"))
+	assert.NoFileExists(t, filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md"))
 	assert.NoFileExists(t, filepath.Join(dir, ".omp", "agents", "executor.md"))
 }
 

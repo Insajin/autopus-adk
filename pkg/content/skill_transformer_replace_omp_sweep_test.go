@@ -34,7 +34,7 @@ func TestReplacePlatformReferencesOMP_S12_EmittedBodies(t *testing.T) {
 			assert.Empty(t, ompFlatSkillPathRe.FindAllString(out, -1),
 				"%s must reference .agents/skills/<name>/SKILL.md", name)
 			assert.Empty(t, ompDoubledRuleNamespaceRe.FindAllString(out, -1),
-				"%s must reference .agents/rules/autopus/<name>.md", name)
+				"%s must reference .omp/rules/autopus-<name>.md", name)
 			assert.NotContains(t, out, `isolation: "worktree"`)
 			assert.NotContains(t, out, `isolation = "worktree"`)
 			if name == "skills/agent-pipeline.md" || name == "skills/worktree-isolation.md" {

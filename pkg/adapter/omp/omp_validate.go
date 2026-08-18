@@ -45,7 +45,7 @@ func (a *Adapter) validateInstalledSurface(ctx context.Context) ([]adapter.Valid
 		return findings, err
 	}
 	sets := []ompSurfaceSet{
-		mappingSurfaceSet(a.root, ".agents/rules/autopus", "rules", rules),
+		ompRuleSurfaceSet(a.root, rules),
 		mappingSurfaceSet(a.root, ".omp/agents", "agents", agents),
 	}
 
@@ -82,7 +82,7 @@ func (a *Adapter) validateBaseSurface() ([]adapter.ValidationError, bool) {
 	checks := []struct{ path, message string }{
 		{configFile, ".omp/config.yml이 없음"},
 		{filepath.Join(".omp", "agents"), "omp agent 디렉터리가 없음"},
-		{filepath.Join(".agents", "rules", "autopus"), "omp rule 디렉터리가 없음"},
+		{filepath.FromSlash(ompRuleDir), "omp rule 디렉터리가 없음"},
 	}
 	var findings []adapter.ValidationError
 	for _, check := range checks {
@@ -154,6 +154,21 @@ func mappingSurfaceSet(root, prefix, label string, mappings []adapter.FileMappin
 		file: filepath.FromSlash(prefix), label: label, expected: expected,
 		actual: collectOMPRegularFiles(filepath.Join(root, filepath.FromSlash(prefix))),
 	}
+}
+
+// ompRuleSurfaceSet compares only the rule files omp generated. oh-my-pi scans
+// .omp/rules non-recursively, so generated rules share that directory with
+// whatever rules the user keeps there; reporting those unprefixed files as
+// unexpected extras would make doctor fail on a healthy workspace. Missing or
+// stale autopus-prefixed files are still reported.
+func ompRuleSurfaceSet(root string, rules []adapter.FileMapping) ompSurfaceSet {
+	set := mappingSurfaceSet(root, ompRuleDir, "rules", rules)
+	for name := range set.actual {
+		if !strings.HasPrefix(name, ompRuleFilePrefix) {
+			delete(set.actual, name)
+		}
+	}
+	return set
 }
 
 func splitOMPSkillSurface(root string, workflow, extended []adapter.FileMapping) (ompSurfaceSet, ompSurfaceSet) {

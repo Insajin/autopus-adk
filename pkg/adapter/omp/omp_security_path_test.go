@@ -25,7 +25,7 @@ func TestOMPClean_DoesNotFollowSymlinkedManifestPath(t *testing.T) {
 	secret := filepath.Join(dir, "outside-secret.txt")
 	require.NoError(t, os.WriteFile(secret, []byte("SUPER-SECRET-VALUE\n"), 0o600))
 
-	victim := filepath.Join(dir, ".agents", "rules", "autopus", "branding.md")
+	victim := filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md")
 	require.NoError(t, os.Remove(victim))
 	require.NoError(t, os.Symlink(secret, victim))
 
@@ -52,13 +52,13 @@ func TestOMPWriteMapping_RejectsSymlinkedTarget(t *testing.T) {
 	outside := filepath.Join(root, "outside.txt")
 	require.NoError(t, os.WriteFile(outside, []byte("original\n"), 0o600))
 
-	linkDir := filepath.Join(root, ".agents", "rules", "autopus")
+	linkDir := filepath.Join(root, ompRuleDir)
 	require.NoError(t, os.MkdirAll(linkDir, 0o755))
-	link := filepath.Join(linkDir, "branding.md")
+	link := filepath.Join(linkDir, ompRuleFilePrefix+"branding.md")
 	require.NoError(t, os.Symlink(outside, link))
 
 	err := writeMapping(root, adapter.FileMapping{
-		TargetPath:      filepath.Join(".agents", "rules", "autopus", "branding.md"),
+		TargetPath:      filepath.Join(ompRuleDir, ompRuleFilePrefix+"branding.md"),
 		OverwritePolicy: adapter.OverwriteAlways,
 		Content:         []byte("managed body\n"),
 	})
@@ -120,7 +120,7 @@ func TestOMPClean_SkipsSymlinkedEntryWithoutUnlinking(t *testing.T) {
 	target := filepath.Join(outside, "secret.md")
 	require.NoError(t, os.WriteFile(target, []byte("secret\n"), 0o600))
 
-	link := filepath.Join(dir, ".agents", "rules", "autopus", "branding.md")
+	link := filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md")
 	require.NoError(t, os.Remove(link))
 	require.NoError(t, os.Symlink(target, link))
 
@@ -226,14 +226,14 @@ func TestOMPClean_SkipsWorkspaceInternalParentSymlink(t *testing.T) {
 
 	// Move the managed rule directory aside, still inside the workspace, and
 	// leave a link where the manifest expects it.
-	rulesDir := filepath.Join(dir, ".agents", "rules", "autopus")
-	realDir := filepath.Join(dir, ".agents", "rules", "real-autopus")
+	rulesDir := filepath.Join(dir, ompRuleDir)
+	realDir := filepath.Join(dir, ".omp", "real-rules")
 	require.NoError(t, os.Rename(rulesDir, realDir))
 	require.NoError(t, os.Symlink(realDir, rulesDir))
 
 	// Make one entry checksum-mismatched so the old code would have wanted a
 	// backup, then skipped it and deleted anyway.
-	victim := filepath.Join(realDir, "branding.md")
+	victim := filepath.Join(realDir, ompRuleFilePrefix+"branding.md")
 	require.NoError(t, os.WriteFile(victim, []byte("USER EDITED CONTENT\n"), 0o644))
 
 	require.Error(t, NewWithRoot(dir).Clean(context.Background()))

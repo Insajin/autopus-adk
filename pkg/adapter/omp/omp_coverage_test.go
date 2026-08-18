@@ -74,18 +74,28 @@ func TestOMPRenderConfigDocument_AppendsToUnmarkedConfig(t *testing.T) {
 // TestOMPIsPruneEligible_RejectsEscapingPaths pins the containment guard. A
 // manifest path that escapes the workspace must never be deleted, and an empty
 // root set means "no restriction" rather than "nothing eligible".
+//
+// The predicate is a directory-containment test, not an ownership test: every
+// path below `.omp/rules` is eligible, including a user file that shares the
+// directory. What protects that user file is the manifest restriction — prune
+// only ever considers paths a previous manifest recorded (see
+// TestOMPAcceptance_S13_UserOwnedOMPSurfacePreserved, which drives Clean over a
+// workspace holding .omp/rules/mine.md).
 func TestOMPIsPruneEligible_RejectsEscapingPaths(t *testing.T) {
 	t.Parallel()
 
-	roots := []string{".agents/rules/autopus"}
+	roots := []string{ompRuleDir}
 	for _, path := range []string{".", "../escape.md", "/etc/passwd"} {
 		assert.False(t, isPruneEligible(path, roots),
 			"%q escapes the workspace and must not be prunable", path)
 	}
 	assert.True(t, isPruneEligible("anything/at/all.md", nil),
 		"an empty root set imposes no restriction")
-	assert.True(t, isPruneEligible(".agents/rules/autopus/branding.md", roots))
-	assert.False(t, isPruneEligible(".agents/rules/user.md", roots))
+	assert.True(t, isPruneEligible(ompRuleDir+"/"+ompRuleFilePrefix+"branding.md", roots))
+	assert.True(t, isPruneEligible(ompRuleDir+"/mine.md", roots),
+		"containment is prefix-blind: the manifest, not this predicate, spares user files")
+	assert.False(t, isPruneEligible(".omp/RULES.md", roots),
+		"a sibling outside the root is never eligible")
 }
 
 // TestOMPRemoveEmptyParents covers the walk-up: empty directories collapse, a
@@ -139,7 +149,7 @@ func TestOMPClean_WithoutHarnessConfig(t *testing.T) {
 	require.NoError(t, os.Remove(filepath.Join(dir, "autopus.yaml")))
 
 	require.NoError(t, NewWithRoot(dir).Clean(context.Background()))
-	assert.NoFileExists(t, filepath.Join(dir, ".agents", "rules", "autopus", "branding.md"))
+	assert.NoFileExists(t, filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md"))
 	assert.NoFileExists(t, filepath.Join(dir, ".omp", "agents", "executor.md"))
 }
 
@@ -149,7 +159,7 @@ func TestOMPClean_SkipsAlreadyDeletedManifestPath(t *testing.T) {
 	t.Parallel()
 
 	dir := generateOMPOnly(t)
-	victim := filepath.Join(dir, ".agents", "rules", "autopus", "branding.md")
+	victim := filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md")
 	require.FileExists(t, victim)
 	require.NoError(t, os.Remove(victim))
 
@@ -191,4 +201,26 @@ func TestOMPWriteMapping_UnwritableTargetDirectory(t *testing.T) {
 		Content:         []byte("body\n"),
 	}}
 	require.Error(t, writeMappings(root, markerFiles))
+}
+
+// TestOMPValidate_IgnoresUserFilesInRuleDirectory pins the doctor half of the
+// shared-directory contract. `.omp/rules` holds ADK rules and the user's own
+// rules side by side, so a surface comparison that claimed every file there was
+// managed would report the user's file as an unexpected extra and fail
+// `auto doctor` on a healthy workspace.
+func TestOMPValidate_IgnoresUserFilesInRuleDirectory(t *testing.T) {
+	dir := generateOMPOnly(t)
+
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ompRuleDir, "mine.md"), []byte("# my rule\n"), 0o644))
+	nested := filepath.Join(dir, ompRuleDir, "nested")
+	require.NoError(t, os.MkdirAll(nested, 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(nested, "deep.md"), []byte("# nested\n"), 0o644))
+
+	errs, err := NewWithRoot(dir).Validate(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, errs,
+		"files without the %q prefix belong to the user and must not be reported, got %+v",
+		ompRuleFilePrefix, errs)
 }

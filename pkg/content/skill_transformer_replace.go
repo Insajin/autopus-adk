@@ -59,10 +59,11 @@ var pathReplacements = map[string]map[string]string{
 		".claude/commands/":       ".agents/commands/",
 		".claude/skills/":         ".agents/skills/",
 		".claude/agents/":         ".omp/agents/",
-		// omp already namespaces its rules under autopus/, so a source that
-		// spells the namespace out must not gain a second one.
-		".claude/rules/autopus/": ".agents/rules/autopus/",
-		".claude/rules/":         ".agents/rules/autopus/",
+		// omp discovers rules non-recursively, so every autopus rule lands
+		// flat in .omp/rules under an autopus- filename prefix. A source that
+		// already spells the namespace out must not gain a second one.
+		".claude/rules/autopus/": ".omp/rules/autopus-",
+		".claude/rules/":         ".omp/rules/autopus-",
 		".claude/":               ".omp/",
 	},
 }
@@ -125,7 +126,7 @@ func NormalizeAgentReferences(body, platform string) string {
 		"codex":    "`.codex/rules/autopus/branding.md`",
 		"gemini":   "`.gemini/rules/autopus/branding.md`",
 		"opencode": "`.opencode/rules/autopus/branding.md`",
-		"omp":      "`.agents/rules/autopus/branding.md`",
+		"omp":      "`.omp/rules/autopus-branding.md`",
 	}[p]
 	if brandingRule == "" {
 		brandingRule = "`content/rules/branding.md`"

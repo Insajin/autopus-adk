@@ -5,19 +5,9 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
-
-	"github.com/insajin/autopus-adk/internal/cli/tui"
-	"github.com/insajin/autopus-adk/pkg/adapter"
-	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
-	"github.com/insajin/autopus-adk/pkg/adapter/omp"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
-	"github.com/insajin/autopus-adk/pkg/detect"
 )
 
 type doctorOptions struct {
@@ -78,6 +68,20 @@ func newDoctorCmd() *cobra.Command {
 					return fmt.Errorf("현재 디렉터리를 가져올 수 없음: %w", err)
 				}
 			}
+			if projectErr := requireHarnessProject(dir); projectErr != nil {
+				if jsonMode {
+					return writeJSONResultAndExit(
+						cmd,
+						jsonStatusError,
+						projectErr,
+						"project_missing",
+						map[string]any{"dir": harnessProjectDisplayDir(dir)},
+						nil,
+						nil,
+					)
+				}
+				return projectErr
+			}
 
 			opts := doctorOptions{
 				dir:                  dir,
@@ -102,177 +106,6 @@ func newDoctorCmd() *cobra.Command {
 	cmd.Flags().DurationVar(&providerSmokeTimeout, "provider-smoke-timeout", 30*time.Second, "Timeout per provider smoke check")
 	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
-}
-
-// @AX:WARN [AUTO] @AX:SPEC: SPEC-CONTEXT-ENGINEERING-001: this doctor orchestrator contains more than eight conditional branches.
-// @AX:REASON [AUTO]: platform validation, dependency repair, health gates, and advisory checks converge on the final verdict.
-func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
-	out := cmd.OutOrStdout()
-	tui.BannerWithInfo(out, "autopus-adk", "doctor")
-
-	cfg, err := loadHarnessConfigForDir(opts.dir, globalFlags{})
-	if err != nil {
-		tui.FAIL(out, fmt.Sprintf("autopus.yaml 로드 실패: %v", err))
-		renderHygieneText(out, collectStatusHygiene(opts.dir))
-		return nil
-	}
-	tui.OK(out, fmt.Sprintf("autopus.yaml (mode: %s)", cfg.Mode))
-
-	ctx := doctorCommandContext(cmd)
-	allOK := true
-	for _, p := range cfg.Platforms {
-		var validationErrs []adapter.ValidationError
-		var validateErr error
-
-		switch p {
-		case "claude-code":
-			a := claude.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		case "codex":
-			a := codex.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		case "antigravity-cli":
-			a := gemini.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		case "opencode":
-			a := opencode.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		case "omp":
-			a := omp.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		default:
-			tui.SKIP(out, fmt.Sprintf("알 수 없는 플랫폼: %s", p))
-			continue
-		}
-
-		if validateErr != nil {
-			tui.FAIL(out, fmt.Sprintf("%s 검증 실패: %v", p, validateErr))
-			allOK = false
-			continue
-		}
-		if p == "omp" {
-			if !renderOMPDoctorReadinessText(ctx, out, opts.dir, validationErrs) {
-				allOK = false
-			}
-			continue
-		}
-
-		if len(validationErrs) == 0 {
-			tui.OK(out, p)
-		} else {
-			for _, ve := range validationErrs {
-				level := strings.ToUpper(ve.Level)
-				switch level {
-				case "ERROR":
-					tui.FAIL(out, fmt.Sprintf("%s: %s", p, ve.Message))
-					allOK = false
-				case "WARN":
-					tui.SKIP(out, fmt.Sprintf("%s: %s", p, ve.Message))
-				default:
-					tui.Info(out, fmt.Sprintf("%s: %s", p, ve.Message))
-				}
-			}
-		}
-	}
-
-	tui.SectionHeader(out, "Dependencies")
-	statuses := detect.CheckDependencies(detect.FullModeDeps)
-	for _, s := range statuses {
-		if s.Installed {
-			tui.OK(out, s.Name)
-		} else if s.Required {
-			tui.FAIL(out, fmt.Sprintf("%s not installed (install: %s)", s.Name, s.InstallCmd))
-			allOK = false
-		} else {
-			tui.SKIP(out, fmt.Sprintf("%s not installed (optional, install: %s)", s.Name, s.InstallCmd))
-		}
-	}
-
-	if opts.fix {
-		missingDeps := filterMissing(statuses)
-		if opts.requiredOnly {
-			missingDeps = filterRequired(missingDeps)
-		}
-		if len(missingDeps) > 0 {
-			if err := runDoctorFix(cmd.OutOrStdout(), missingDeps, opts.yes); err != nil {
-				tui.FAIL(out, fmt.Sprintf("Auto-install failed: %v", err))
-			}
-		}
-	}
-
-	if !checkRuntimeProcessesText(out, opts) {
-		allOK = false
-	}
-
-	conflicts := detect.CheckParentRuleConflicts(opts.dir)
-	if len(conflicts) > 0 {
-		tui.SectionHeader(out, "Rule Conflicts")
-		if cfg.IsolateRules {
-			tui.OK(out, "isolate_rules: true (parent rules ignored)")
-		}
-		for _, c := range conflicts {
-			if cfg.IsolateRules {
-				tui.Info(out, fmt.Sprintf("%s/.claude/rules/%s/ (ignored)", c.ParentDir, c.Namespace))
-			} else {
-				tui.SKIP(out, fmt.Sprintf("Parent rules: %s/.claude/rules/%s/", c.ParentDir, c.Namespace))
-				tui.Bullet(out, "Run 'auto init' or 'auto update' to configure rule isolation.")
-				allOK = false
-			}
-		}
-	}
-
-	tui.SectionHeader(out, "Installed CLIs")
-	detected := detect.DetectPlatforms()
-	if len(detected) == 0 {
-		tui.SKIP(out, "No coding CLIs detected in PATH")
-	} else {
-		for _, p := range detected {
-			tui.OK(out, fmt.Sprintf("%s (%s)", p.Name, p.Version))
-		}
-	}
-
-	tui.SectionHeader(out, "Quality Gate")
-	if !checkQualityGate(out, cfg) {
-		allOK = false
-	}
-	if !checkCodexModelOwnershipText(out, opts.dir, cfg) {
-		allOK = false
-	}
-
-	if !checkProviderTransportSmokeText(out, cfg, opts) {
-		allOK = false
-	}
-
-	tui.SectionHeader(out, "Hooks & Permissions")
-	if !checkHooksPermissions(out, opts.dir) {
-		allOK = false
-	}
-
-	// Context weight is advisory: it warns on an over-weight context catalog
-	// but never fails harness health, so its result does not touch allOK.
-	checkContextWeight(out, opts.dir)
-
-	hygiene := collectStatusHygiene(opts.dir)
-	renderHygieneText(out, hygiene)
-	if hygiene.hasWarning() {
-		allOK = false
-	}
-
-	// Drift observation is advisory: it mirrors the JSON drift checks but never
-	// touches allOK, so a project with a pending update is not reported as failed.
-	renderDriftTextContext(ctx, out, opts.dir, cfg)
-
-	renderEvidenceFreshnessText(out, opts.dir, cfg)
-
-	fmt.Fprintln(out)
-	tui.ResultBox(out, allOK, func() string {
-		if allOK {
-			return "All checks passed"
-		}
-		return "Issues found — review warnings or run 'auto doctor --fix' where offered"
-	}())
-
-	return nil
 }
 
 func doctorCommandContext(cmd *cobra.Command) context.Context {

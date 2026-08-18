@@ -2,14 +2,14 @@
 
 **Status**: completed
 **Created**: 2026-07-30
-**Revision**: 2 (debate review REVISE 23건 반영)
+**Revision**: 4 (omp 17.3.5 실측이 규칙 배치 전제를 반증 — 방출 경로 이전)
 **Domain**: OMP
 
 ## 목적
 
 omp(oh-my-pi) CLI 사용자는 현재 Autopus ADK 하네스를 받지 못한다. `omp`는 `validPlatforms`에 없고 어댑터도 없어서 `auto init`이 어떤 omp 표면도 만들지 않는다.
 
-omp는 규칙을 `.claude/rules/`에서 읽지 않는다. 실측된 omp 17.1.8의 규칙 소스는 native `.omp/rules/`, omp-plugins, 그리고 `agents` provider(`.agent/rules`, `.agents/rules` ancestor walk-up)이며, task agent는 `.omp/agents/`에서만 읽는다. 기존 어댑터 표면 중 omp에 도달하는 것은 `.agents/skills/`(codex·opencode), `.agents/commands/auto*`(antigravity), `.opencode/commands/`(opencode)뿐이고 규칙과 에이전트는 전달 경로 자체가 없다.
+omp는 규칙을 `.claude/rules/`에서 읽지 않는다. 실측된 omp 규칙 소스는 native `.omp/rules/`, omp-plugins, 그리고 `agents` provider(`.agent/rules`, `.agents/rules` ancestor walk-up)이며, task agent는 `.omp/agents/`에서만 읽는다. **각 규칙 루트 탐색은 비재귀다**(omp 17.3.5 실측): 루트 바로 아래의 `*.md`만 읽고 하위 디렉터리로 내려가지 않는다. 기존 어댑터 표면 중 omp에 도달하는 것은 `.agents/skills/`(codex·opencode), `.agents/commands/auto*`(antigravity), `.opencode/commands/`(opencode)뿐이고 규칙과 에이전트는 전달 경로 자체가 없다.
 
 이 SPEC은 omp 사용자가 ADK 하네스를 발견하고 **omp에서 올바르게 동작하도록** 하는 최소 착륙 지점을 정의한다. 발견만으로는 부족하다. 방출되는 본문이 omp가 읽지 않는 경로(`.claude/...`)를 지시하면 하네스는 오작동한다.
 
@@ -24,10 +24,10 @@ omp는 규칙을 `.claude/rules/`에서 읽지 않는다. 실측된 omp 17.1.8�
 - omp orchestra provider 실행 배선(subprocess 호출, 모델 라우팅). REQ-018은 그 반대로 **자동 등록을 막는** 요구사항이다
 - worker `ProviderAdapter` 구현 및 interactive pane 주입
 - 루트 컨텍스트 문서 신규 생성 — 루트 `AGENTS.md`가 omp agents-md provider로 이미 주입된다
-- omp native `.omp/rules/`, `.omp/RULES.md` sticky 규칙 활용
+- omp native sticky 규칙(`.omp/RULES.md`) 활용 — 규칙 방출은 `.omp/rules/`를 쓰지만(REQ-002) sticky re-attach 기계장치는 다루지 않는다
 - 기존 플랫폼 manifest 스키마 메이저 버전 변경 및 마이그레이션
 
-**Completion evidence**: `go test ./...` green, `auto doctor` omp 통과, 그리고 무인증 omp RPC 실측(`omp --mode rpc --no-session` + `/context`, `get_available_commands`)에서 규칙 14종·에이전트 16종·스킬 카탈로그·커맨드 20종 발견과 정규화된 경로 참조 확인.
+**Completion evidence**: `go test ./...` green, `auto doctor` omp 통과, 그리고 무인증 omp RPC 실측(`omp --mode rpc --no-session` + `/dump` 시스템 프롬프트, `available_commands_update` 프레임, `omp ttsr list --json`)에서 규칙 14종이 `<domain-rules>` 목록·TTSR 등록·`<generic-rules>` 본문 주입 세 경로의 합집합으로 세션에 도달함을 확인하고, 에이전트 16종·스킬 카탈로그·커맨드 20종 발견과 정규화된 경로 참조를 확인.
 
 ## Requirements
 
@@ -39,13 +39,16 @@ THE SYSTEM SHALL provide an `omp` platform adapter that implements all ten `Plat
 - manifest 범위는 omp가 실제로 만든 파일 전체다. `.agents/` 소유권 제한(REQ-009)은 어느 경로를 만들 수 있는지의 제약이지 manifest 기록 대상의 제약이 아니다
 - 관측 지점: `.autopus/omp-manifest.json` 파일 목록
 
-### REQ-002 — 규칙 방출 (네임스페이스)
+### REQ-002 — 규칙 방출 (파일명 네임스페이스)
 
-WHEN platform file generation runs for a configuration that lists `omp`, THEN THE SYSTEM SHALL write all 14 ADK rules to `.agents/rules/autopus/<rule-name>.md`.
+WHEN platform file generation runs for a configuration that lists `omp`, THEN THE SYSTEM SHALL write all 14 ADK rules to `.omp/rules/autopus-<rule-name>.md`.
 
 - EARS type: Event-driven / Priority: Must
-- 네임스페이스 근거: omp 17.1.8 실측에서 `.agents/rules/` 하위 디렉터리의 규칙이 발견된다(플랫 전용이 아니다). 기존 4개 어댑터가 모두 `rules/autopus/`로 네임스페이스하는 관례와도 맞고, `.agents/rules/` 최상단의 사용자 규칙과 충돌하지 않는다
-- 관측 지점: `.agents/rules/autopus/` 디렉터리 내용과 omp 세션 규칙 목록
+- 네임스페이스 요구: 규칙은 omp가 실제로 탐색하는 **비재귀** 디렉터리에 방출되며 파일명 접두사 `autopus-`로 네임스페이스한다. 하위 디렉터리를 만들지 않는다
+- 반증된 전제(Revision 2까지의 계약): 이 요구는 `.agents/rules/autopus/<rule-name>.md`였고 근거는 "omp 17.1.8 실측에서 `.agents/rules/` 하위 디렉터리의 규칙이 발견된다"였다. 이 전제는 omp 17.3.5 라이브 실측으로 반증됐다. 같은 14개 파일을 하위 디렉터리에 둔 배치에서는 `<domain-rules>` 블록이 아예 없고 규칙 본문도, TTSR 등록도 0건이다(도달 0/14). 같은 파일을 비재귀 루트인 `.omp/rules/`로 옮기고 파일명에 `autopus-`를 붙이면 `<domain-rules>` 9건(`autopus-branding` 등 접두사 그대로 표시) + TTSR 등록 3건(`shell-portability`, `lore-commit`, `worktree-safety`) + `alwaysApply` 본문 주입 2건(`objective-reasoning`, `language-policy`) = 14/14가 도달한다. 초기 근거로 쓴 디스크 형태 확인(`omp ttsr list`, 파일 존재)은 세션 도달의 증거가 아니었다
+- 설정으로 우회 불가: omp에는 규칙 탐색 디렉터리를 추가하는 설정 키가 없다. `ttsr.builtinRules`와 `ttsr.disabledRules`만 존재하고 `rules.customDirectories` 계열 키는 없으므로, 하위 디렉터리 네임스페이스를 설정으로 살릴 방법이 없고 파일명 접두사가 유일한 네임스페이스 수단이다
+- 사용자 파일 공존: 같은 디렉터리의 사용자 규칙(`.omp/rules/mine.md`)은 실측에서 별도 항목으로 정상 공존한다. 소유 경계는 디렉터리가 아니라 manifest에 기록된 `autopus-` 접두사 파일 집합이다(REQ-009, REQ-017)
+- 관측 지점과 창구: `.omp/rules/` 디렉터리 내용, 그리고 세 주입 경로의 합집합 — `<domain-rules>` 목록 행(`/dump`), TTSR 등록(`omp ttsr list --json`; TTSR 규칙은 시스템 프롬프트에 이름도 본문도 나타나지 않는다), `alwaysApply` 본문 주입(`/dump`의 `<generic-rules>` 블록, 이름 미표시)
 
 ### REQ-003 — 규칙 frontmatter passthrough
 
@@ -102,7 +105,7 @@ IF an omp code path would create `.claude/CLAUDE.md`, THEN THE SYSTEM SHALL refu
 WHERE a path is not one that omp created and recorded in its own manifest, THEN THE SYSTEM SHALL leave that path byte-identical during `Generate`, `Update`, and `Clean`.
 
 - EARS type: State-driven / Priority: Must
-- 특히 `.agents/plugins/`, `.agents/hooks.json`, 그리고 양보된 `.agents/skills/`·`.agents/commands/`는 omp가 만들지 않으므로 건드리지 않는다
+- 특히 `.agents/plugins/`, `.agents/hooks.json`, 그리고 양보된 `.agents/skills/`·`.agents/commands/`는 omp가 만들지 않으므로 건드리지 않는다. `.omp/rules/`에서도 manifest에 기록된 `autopus-` 접두사 파일만 ADK 소유이고 그 밖의 파일은 사용자 소유다
 - 관측 지점: omp manifest 경로 집합과 작업 전후 바이트 비교
 
 ### REQ-010 — 식별자와 디스패치 일관성
@@ -114,12 +117,20 @@ THE SYSTEM SHALL register `omp` in the five platform identifier tables and the t
 
 ### REQ-011 — 생성 표면 위생
 
-WHEN `auto init` writes `.gitignore` patterns, THEN THE SYSTEM SHALL add only directory-form patterns that cover ADK-authored omp paths, and shall not add any file-name-form pattern under a discovery root.
+WHEN `auto init` writes `.gitignore` patterns, THEN THE SYSTEM SHALL add only directory-form patterns that cover ADK-authored omp paths, SHALL NOT add any file-name-form or wildcard pattern under a discovery root, and SHALL ignore the generated rule surface with a directory-form pattern only.
 
 - EARS type: Event-driven / Priority: Must
-- 추가 패턴: `.agents/rules/autopus/`, `.omp/agents/`, `.omp/config.yml`. `/.omp/` 전체는 사용자 소유 native 표면(`.omp/rules/`, `.omp/RULES.md`)을 포함하므로 쓰지 않는다
-- 실측 제약: omp 발견 글롭은 `gitignore: true`로 동작한다. 디렉터리형 패턴(`.agents/rules/`)은 발견을 막지 않지만 파일명형 패턴(`ignored-rule.md`)은 해당 규칙을 발견 목록에서 제거한다. `.omp/config.yml`은 발견 글롭 루트가 아니라 settings 직접 읽기 대상이므로 파일형 패턴이 안전하다
-- 관측 지점: `.gitignore` 내용, `git status --porcelain`, 그리고 gitignore 적용 후의 omp 발견 결과
+- 추가 패턴: `.omp/rules/`, `.omp/agents/`, `.omp/config.yml`. `/.omp/` 전체는 사용자 소유 native 표면(`.omp/RULES.md`, 사용자 provider 설정)을 포함하므로 쓰지 않는다. 규칙 표면은 `.omp/rules/` 디렉터리 패턴 하나로만 무시하고, ADK 소유 집합에 정확히 맞춘 파일명 글롭(`.omp/rules/autopus-*.md`)은 금지한다
+- 패턴을 아예 빼지도 않는다: 생성 규칙이 gitignore 대상에서 빠지면 `auto doctor`의 runtime/generated unignored-file 위생 점검이 실패한다. 즉 "무시하지 않기"는 선택지가 아니고, 형태만 디렉터리로 고정된다
+- 실측 비대칭(omp 17.3.5, 같은 워크스페이스에서 `.gitignore` 한 줄만 바꿔 4회 측정. `.omp/rules/`에 `autopus-` 접두사 14개 + 사용자 파일 `mine.md` 1개):
+  - `.omp/rules/` → TTSR 3건, `<domain-rules>` 10건(autopus 9 + `mine` 1). 규칙 14/14 도달 유지
+  - `/.omp/rules/` → TTSR 3건, `<domain-rules>` 10건. 루트 고정 형태도 동일하게 억제하지 않음
+  - `.omp/rules/autopus-*.md` → TTSR 0건, `<domain-rules>` 1건(`mine`만). ADK 규칙 14개 전부 발견 소실
+  - `.omp/rules/*` → TTSR 0건, `<domain-rules>` 0건. 사용자 파일까지 소실
+- 그러므로 `agents` provider 글롭에서 관측된 기존 제약(디렉터리형은 발견을 막지 않고 파일명형은 해당 규칙을 발견 목록에서 제거한다)은 native 루트 `.omp/rules`에도 그대로 성립한다. 이 제약은 완화하지 않는다
+- 사용자 규칙 추적: `.omp/rules/`가 디렉터리째 무시되므로 negation은 탈출구가 아니다. git은 부모 디렉터리가 제외되면 그 안의 파일 패턴을 다시 포함하지 못하므로 `!/.omp/rules/mine.md`는 실측에서 동작하지 않는다(`git check-ignore` rc=0, `status`에 미출현). negation이 먹는 유일한 형태는 contents glob `.omp/rules/*` + negation이고 그 형태는 위 실측에서 omp 발견을 죽인다. 실제 탈출구는 두 가지다 — `git add -f .omp/rules/mine.md`로 강제 추적(실측 rc=0, `A  .omp/rules/mine.md`), 또는 사용자 규칙을 `.omp/rules/` 밖(예: `.agents/rules/`)에 두기
+- `.omp/config.yml`은 발견 글롭 루트가 아니라 settings 직접 읽기 대상이므로 파일형 패턴이 안전하다
+- 관측 지점: `.gitignore` 내용, `git status --porcelain`, 그리고 gitignore 적용 후 omp 세션의 규칙 도달 집합
 
 ### REQ-012 — 파리티 커버리지 포함
 
@@ -152,7 +163,7 @@ WHERE generated rule, agent, or skill content contains Claude-specific path refe
 
 - EARS type: State-driven / Priority: Must
 - 현재 `pathReplacements`, `brandingRule`, `replaceAgentCalls`, `replaceTodoWrite`, `replaceWorkflowTools`에 omp 키가 없어 `ReplacePlatformReferences(body, "omp")`는 전면 no-op이고 `NormalizeAgentReferences`는 저장소 내부 경로 `content/rules/branding.md`로 폴백한다
-- 1단계 접두사 매핑: `.claude/skills/autopus/`와 `.claude/skills/` → `.agents/skills/`, `.claude/commands/` → `.agents/commands/`, `.claude/agents/` → `.omp/agents/`, `.claude/rules/` → `.agents/rules/autopus/`, `.claude/` → `.omp/`. branding 규칙 참조는 `.agents/rules/autopus/branding.md`
+- 1단계 접두사 매핑: `.claude/skills/autopus/`와 `.claude/skills/` → `.agents/skills/`, `.claude/commands/` → `.agents/commands/`, `.claude/agents/` → `.omp/agents/`, `.claude/rules/autopus/`와 `.claude/rules/` → `.omp/rules/autopus-`, `.claude/` → `.omp/`. 규칙 매핑은 문자열 접두사 치환만으로 `.claude/rules/autopus/branding.md` → `.omp/rules/autopus-branding.md`가 되며, 더 긴 접두사가 먼저 적용되는 기존 순서를 깨지 않는다. branding 규칙 참조는 `.omp/rules/autopus-branding.md`
 - 2단계 스킬 경로 보정 필수: 1단계만 적용하면 `.claude/skills/autopus/ax-annotation.md`가 `.agents/skills/ax-annotation.md`가 되는데 실제 방출 경로는 `.agents/skills/ax-annotation/SKILL.md`이므로 존재하지 않는 파일을 지시한다. `skill_transformer_replace.go:195`가 opencode에만 적용하는 `.agents/skills/<name>.md` → `.agents/skills/<name>/SKILL.md` 재작성을 omp에도 적용한다. 이 최종 형태는 omp가 스킬 표면을 소유하든 양보하든 동일하다
 - 관측 지점: 생성된 규칙·에이전트·스킬 본문의 경로 문자열
 
@@ -169,7 +180,7 @@ THE SYSTEM SHALL include `omp` in the default skill compile-target set so that c
 WHERE `Clean` or `auto platform remove omp` runs, THEN THE SYSTEM SHALL re-evaluate surface ownership first, skip every surface omp no longer owns without removing or backing up anything under it, remove only the remaining manifest-recorded paths, back up any such file whose current checksum differs from the manifest checksum, and shall not remove the `.omp/` or `.agents/` directories wholesale.
 
 - EARS type: State-driven / Priority: Must
-- `.omp/`는 omp의 사용자 소유 native 루트다(`.omp/rules/`, `.omp/RULES.md`, 사용자 설정). 디렉터리 통째 삭제는 사용자 데이터 손실이다
+- `.omp/`는 omp의 사용자 소유 native 루트다(`.omp/RULES.md`, `.omp/rules/`의 비-`autopus-` 파일, 사용자 설정). 디렉터리 통째 삭제는 사용자 데이터 손실이다
 - 구현 위치: `adapter.PruneManagedPaths`는 같은 계약을 담지만 호출자 없는 orphan이라 omp `Clean`이 체크섬 불일치 백업 → 제거 → 빈 부모 정리를 직접 구현한다
 - 소유권 재평가가 먼저인 이유: `auto platform add opencode`는 새 어댑터만 Generate하므로 omp manifest는 갱신되지 않은 채 `.agents/skills/` 경로를 계속 담는다. 체크섬만 보면 opencode가 덮어쓴 파일이 불일치로 판정돼 백업 후 삭제되어 타 플랫폼의 활성 파일이 사라진다. 양보한 표면은 아예 건드리지 않아야 한다
 - 관측 지점: `Clean` 전후 `.omp/`와 `.agents/`의 비관리 파일
@@ -196,7 +207,7 @@ WHERE platform detection finds an executable named `omp` on PATH, THEN THE SYSTE
 | 경로 | 역할 | Overwrite |
 |------|------|-----------|
 | `[NEW] pkg/adapter/omp/omp.go` | 식별자, `New`/`NewWithRoot`, `Detect`, `Generate`, `Update` | - |
-| `[NEW] pkg/adapter/omp/omp_rules.go` | 규칙 14종을 `.agents/rules/autopus/`로 방출 | always |
+| `[NEW] pkg/adapter/omp/omp_rules.go` | 규칙 14종을 `.omp/rules/autopus-<name>.md`로 방출 | always |
 | `[NEW] pkg/adapter/omp/omp_agents.go` | 에이전트 16종을 `.omp/agents/`로 방출 | always |
 | `[NEW] pkg/adapter/omp/omp_config.go` | `.omp/config.yml` 마커 섹션 방출 | marker |
 | `[NEW] pkg/adapter/omp/omp_skills.go` | 소유 시 스킬 카탈로그 방출, 미소유 시 양보 | always |
@@ -222,7 +233,7 @@ Sibling SPEC은 없다.
 | Requirement | Plan Task | Acceptance Scenario | Semantic Invariant |
 |-------------|-----------|---------------------|--------------------|
 | REQ-001 | T2 | S4, S7 | INV-014 |
-| REQ-002 | T3 | S1, S6 | INV-006 |
+| REQ-002 | T3, T21 | S1, S6, S7, E7 | INV-006 |
 | REQ-003 | T3 | S1, S2 | INV-001 |
 | REQ-004 | T3 | S1 | INV-002 |
 | REQ-005 | T4, T5 | S3, S6 | INV-003, INV-006 |
@@ -231,13 +242,13 @@ Sibling SPEC은 없다.
 | REQ-008 | T7 | S5 | INV-009 |
 | REQ-009 | T7 | S4, S10, S11 | INV-007 |
 | REQ-010 | T1, T8 | S8 | INV-010 |
-| REQ-011 | T9 | S8 | INV-011 |
+| REQ-011 | T9, T21 | S8 | INV-011 |
 | REQ-012 | T10 | S9 | INV-006 |
 | REQ-013 | T13 | S10 | INV-012 |
 | REQ-014 | T14 | S11 | INV-013 |
 | REQ-015 | T15 | S12, S3 | INV-015 |
 | REQ-016 | T16 | S10 | INV-016 |
-| REQ-017 | T17 | S13, S4, E4, E6 | INV-017 |
+| REQ-017 | T17, T21 | S13, S4, E4, E6, E7 | INV-017 |
 | REQ-018 | T18 | S14 | INV-018 |
 | REQ-019 | T19 | S15 | INV-019 |
 

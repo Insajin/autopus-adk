@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	setuppkg "github.com/insajin/autopus-adk/pkg/setup"
 	"github.com/insajin/autopus-adk/pkg/telemetry"
 )
@@ -86,6 +87,11 @@ func makeJSONContractWorkspace(t *testing.T) string {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/jsoncontract\n\ngo 1.24.0\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644))
+
+	// The workspace-shaped commands refuse a directory with no autopus.yaml, so
+	// the envelope contract is exercised against a real project rather than a
+	// synthesized default config.
+	require.NoError(t, config.Save(dir, config.DefaultFullConfig("jsoncontract")))
 
 	specPath := filepath.Join(dir, ".autopus", "specs", "SPEC-JSON-001", "spec.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(specPath), 0o755))

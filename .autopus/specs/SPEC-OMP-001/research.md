@@ -15,7 +15,7 @@
 
 ## Visual Planning Brief
 
-데이터 흐름: `content/{rules,agents,skills}` 소스 → omp 정규화(`.claude/*` → omp 경로) → 소유권 판정(스킬은 codex·opencode 부재 시, 커맨드는 opencode 부재 시) → 방출(`.agents/rules/autopus/`, `.omp/agents/`, `.omp/config.yml` 마커 섹션, 조건부 `.agents/skills/`·`.agents/commands/`) → manifest 전량 기록 → omp 세션 발견(rules walk-up, `.omp/agents` nearest-wins, 루트 `AGENTS.md`) → 제거는 manifest 경로만 개별, 체크섬 불일치는 백업. 단계별 분기 도식은 `plan.md`의 `## Visual Planning Brief` mermaid flowchart에 있다.
+데이터 흐름: `content/{rules,agents,skills}` 소스 → omp 정규화(`.claude/*` → omp 경로) → 소유권 판정(스킬은 codex·opencode 부재 시, 커맨드는 opencode 부재 시) → 방출(`.omp/rules/autopus-<name>.md`, `.omp/agents/`, `.omp/config.yml` 마커 섹션, 조건부 `.agents/skills/`·`.agents/commands/`) → manifest 전량 기록 → omp 세션 발견(규칙은 비재귀 native 루트 탐색, `.omp/agents` nearest-wins, 루트 `AGENTS.md`) → 제거는 manifest 경로만 개별, 체크섬 불일치는 백업. 단계별 분기 도식은 `plan.md`의 `## Visual Planning Brief` mermaid flowchart에 있다.
 
 ## Plan Intent Ledger
 
@@ -38,12 +38,12 @@
 
 ## 설계 결정
 
-- **계약 검증 방법**: omp 17.1.8 바이너리에 번들된 JS를 `strings`로 추출해 파서를 직접 읽고, 임시 git 워크스페이스 + `omp ttsr list`로 발견 동작을 실측했다.
+- **계약 검증 방법**: omp 17.1.8 바이너리에 번들된 JS를 `strings`로 추출해 파서를 직접 읽고, 임시 git 워크스페이스 + `omp ttsr list`로 동작을 살폈다. 이후 실측에서 파일 존재 확인은 **세션 도달의 증거가 아님**이 확인됐다(같은 파일 집합이 배치에 따라 14/14와 0/14로 갈렸다). 도달 판정은 라이브 세션의 `/dump` 시스템 프롬프트(`<domain-rules>` 행 + `<generic-rules>` 본문)와 `omp ttsr list --json`(TTSR 등록)을 함께 봐야 성립한다 — `/dump` 단독으로는 TTSR 3종이 보이지 않는다.
 - **에이전트 계약**: 필수 frontmatter는 `name`과 `description` 둘뿐이고 `systemPrompt`는 본문이 대입되는 결과 필드다. 도구명 정규화기는 소문자화와 `search→grep`·`find→glob` 두 별칭뿐이라 `TodoWrite→todo`, `WebFetch→web_search` 매핑은 어댑터 몫이다. `tools` 생략 시 기본값은 `ak6 = Set(["read","grep","glob"])` 읽기 전용 집합이다.
-- **규칙 네임스페이스**: `.agents/rules/autopus/nested-rule.md`가 실측에서 발견됐다. 하위 디렉터리가 지원되므로 기존 4개 어댑터의 `rules/autopus/` 관례를 따르고 `.agents/rules/` 최상단의 사용자 규칙과 충돌하지 않는다.
-- **gitignore 상호작용**: omp 발견 글롭은 `gitignore: true`로 동작한다. 실측 결과 디렉터리형 패턴(`.agents/rules/`, `.agents/`, `/.agents/rules/`)은 발견을 막지 않지만 파일명형 패턴(`ignored-rule.md`, `.agents/rules/ignored-rule.md`)은 해당 규칙을 발견 목록에서 제거한다. 발견 루트 아래에서는 파일명형 패턴을 만들면 안 된다(REQ-011).
+- **규칙 네임스페이스(omp 17.3.5 실측으로 재확정)**: omp는 각 규칙 루트를 **비재귀**로만 탐색한다. 초기 판단은 `.agents/rules/autopus/nested-rule.md`가 "발견됐다"는 관측을 근거로 디렉터리 네임스페이스를 택했지만, 그 관측은 디스크 형태 확인이었고 세션 도달과 무관했다. 라이브 대조: 규칙 14개를 `.agents/rules/autopus/`에 두면 `<domain-rules>` 블록 자체가 없고 규칙 본문·TTSR 등록도 0건(도달 0/14)이며, 같은 파일을 비재귀 루트 `.omp/rules/`로 옮겨 파일명에 `autopus-` 접두사를 붙이면 `<domain-rules>` 9 + TTSR 3 + `alwaysApply` 본문 주입 2 = 14/14가 도달한다. 하위 디렉터리를 등록하는 설정 키는 없다 — omp 설정에는 `ttsr.builtinRules`와 `ttsr.disabledRules`만 있고 `rules.customDirectories` 계열 키가 없다. 따라서 네임스페이스는 디렉터리가 아니라 파일명 접두사로 하고, 같은 디렉터리의 사용자 규칙(`.omp/rules/mine.md`)과는 별도 항목으로 공존한다.
+- **gitignore 상호작용**: omp 발견 글롭은 `gitignore: true`로 동작하고, 이 억제는 **git 저장소 안에서만** 성립한다(`git init` 없는 디렉터리에서는 파일명 글롭을 넣어도 14/14 발견). 실측 결과 디렉터리형 패턴(`.agents/rules/`, `.agents/`, `/.agents/rules/`)은 발견을 막지 않지만 파일명형 패턴(`ignored-rule.md`, `.agents/rules/ignored-rule.md`)은 해당 규칙을 발견 목록에서 제거한다. 이 비대칭은 native 루트 `.omp/rules`에도 그대로 성립한다(omp 17.3.5, 같은 저장소에서 `.gitignore` 한 줄만 바꿔 측정 — `autopus-` 14개 + 사용자 `mine.md` 1개): `.omp/rules/` → TTSR 3 + `<domain-rules>` 10(autopus 9 + `mine`) + `alwaysApply` 2, `/.omp/rules/` → 동일, `.omp/rules/autopus-*.md` → TTSR 0 + `<domain-rules>` 1(`mine`만) + `alwaysApply` 0(ADK 14개 전멸), `.omp/rules/*` → 세 경로 전부 0(사용자 파일까지 소실). 그러므로 발견 루트 아래에서는 파일명형·와일드카드 패턴을 만들지 않고 디렉터리 패턴만 쓴다(REQ-011). 패턴을 아예 빼는 것도 불가하다 — doctor의 generated-unignored 위생 점검이 실패한다. 부모 디렉터리가 무시되면 git이 negation을 무시하므로(`!/.omp/rules/mine.md` 실측 무효, `check-ignore` rc=0) 사용자 규칙 추적은 `git add -f` 또는 `.omp/rules/` 밖 배치로만 가능하다.
 - **소유권**: 스킬은 opencode > codex > omp 전순서로 양보한다. 커맨드는 opencode에만 양보하고 antigravity와는 확장자 분리(`md` vs `toml`)로 공존한다. 양보하면 omp가 읽지 못하는 `.toml`만 남아 커맨드가 0개가 되기 때문이다.
-- **규칙 노출 조건(2026-08-01 추가 실측)**: omp는 frontmatter `description:`이 있는 규칙만 세션 `<domain-rules>`에 등록하고, `condition`·`scope` 같은 trigger 키가 있으면 TTSR 엔진에 등록한다. frontmatter가 없는 규칙은 디스크에만 남고 세션에 도달하지 않는다.
+- **규칙 노출 조건과 관측 창구(2026-08-01 최초 실측 + 17.3.5 갱신)**: omp는 frontmatter `description:`이 있는 규칙을 세션 `<domain-rules>`에 `- <name> (globs): description` 행으로 등록하고, `condition`·`scope` 같은 trigger 키가 있으면 TTSR 엔진에 등록하며, `alwaysApply`가 참인 규칙은 본문을 `<generic-rules>` 블록에 주입한다. 세 경로의 합집합이 도달 집합이다. **창구가 서로 다르다**: TTSR 등록 규칙은 시스템 프롬프트에 이름도 본문도 나타나지 않아 `omp ttsr list --json`(항목의 `name`과 `path`)으로만 확인되고, `alwaysApply` 규칙은 이름 없이 본문만 주입돼 본문 매칭으로 식별한다. 따라서 `/dump` 단독 관측은 도달을 과소 집계한다. 파일 존재·개수·경로 모양은 도달의 증거가 아니다.
 
 ## Minimality Decision Matrix
 
@@ -99,7 +99,7 @@
 
 | Item | Blocks | Required resolution |
 |------|--------|---------------------|
-| None | - | 초안의 스킬·커맨드 갭은 REQ-013·REQ-014로, 리뷰가 지적한 정규화·컴파일 게이트·안전성 갭은 REQ-015~REQ-019로 승격되어 닫혔다. 1차 라이브 실측이 드러낸 규칙 노출 갭(8/14)은 옵션 B 합성으로 닫혔고 재실측 14/14로 확인했다(`## Implementation Evidence`, checked_at 2026-08-01) |
+| None | - | 초안의 스킬·커맨드 갭은 REQ-013·REQ-014로, 리뷰가 지적한 정규화·컴파일 게이트·안전성 갭은 REQ-015~REQ-019로 승격되어 닫혔다. 1차 라이브 실측이 드러낸 규칙 노출 갭(8/14)은 옵션 B 합성으로 닫혔다. omp 17.3.5 재실측이 드러낸 배치 갭(하위 디렉터리 도달 0/14)은 규칙 방출 경로를 비재귀 루트 `.omp/rules/`로 이전하고 파일명 접두사로 네임스페이스해 닫는다(REQ-002, plan T21, E7) |
 
 ## Evolution Ideas
 
@@ -108,13 +108,13 @@
 | Idea | Why not required now | Promotion trigger |
 |------|----------------------|-------------------|
 | omp orchestra provider 실행 배선 | Outcome Lock은 발견과 동작이며 provider 실행과 무관 | 사용자가 명시 요청 |
-| omp worker ProviderAdapter, interactive pane, native sticky `.omp/RULES.md` 활용 | 이번 착륙 지점 밖이며 `.agents/rules/autopus/`로 발견 계약이 충족됨 | 사용자가 명시 요청 |
+| omp worker ProviderAdapter, interactive pane, native sticky `.omp/RULES.md` 활용 | 이번 착륙 지점 밖이며 `.omp/rules/autopus-*.md`로 발견 계약이 충족됨 | 사용자가 명시 요청 |
 | `workflowSpecs` 공용 패키지 승격 | 기존 두 어댑터 회귀 위험을 끌어옴 | 네 번째 복사본이 필요해질 때 |
 | Generate 쓰기 경로의 `MkdirAll`+`WriteFile`를 O_NOFOLLOW 또는 temp+rename으로 교체하고, `BackupFile`/`CreateBackupDir` 백업 목적지에도 봉쇄 적용 | 심링크 거부 가드는 이미 적용했고, 남은 TOCTOU 창과 백업 목적지 심링크 절반은 5개 어댑터가 공유하는 기존 관행이라 omp 단독 변경은 표면만 갈라놓는다(traversal 절반은 `SafePruneFilePath` 선행으로 omp에서 도달 불가) | adapter-common 쓰기 경로를 한 번에 다룰 때 |
 
 ## Sibling SPEC Decision
 
-Decision: **none** (Sibling SPEC IDs: None). Primary SPEC 하나가 Outcome Lock을 닫는다. 태스크 20개와 신규 소스 13개로 sibling 임계(25 태스크와 40 파일 동시 초과)에 미달한다. Completion Debt는 None이므로 sibling으로 분리할 잔여 작업도 없다.
+Decision: **none** (Sibling SPEC IDs: None). Primary SPEC 하나가 Outcome Lock을 닫는다. 태스크 21개와 신규 소스 13개로 sibling 임계(25 태스크와 40 파일 동시 초과)에 미달한다. Completion Debt는 None이므로 sibling으로 분리할 잔여 작업도 없다.
 
 ## Reference Discipline
 
@@ -140,17 +140,19 @@ Revision 2는 debate review 23건에 대응했다. 20건 수용, 3건 반박.
 - **F-008 반박** (tools 생략이 무제한 권한을 준다): omp는 `u.tools === undefined ? ak6 : new Set(u.tools)`를 쓰고 `ak6 = new Set(["read","grep","glob"])`이다. 생략은 권한 확대가 아니라 읽기 전용 축소이며 fail-closed다. 다만 능력 손실은 실재하므로 E5로 의미를 고정했다.
 - **F-019 부분 반박** (antigravity가 `.agents/skills/`를 미러링한다): 커맨드 주장은 옳아 REQ-014를 고쳤다. 스킬 주장은 틀렸다. `antigravity_plugin.go:108-112`의 `.agents/skills/`는 `rewriteAntigravityGlobalCommandContent`의 **본문 문자열 치환**이고 실제 target은 `antigravityPluginTarget`이 만드는 `.agents/plugins/autopus/skills/`다. REQ-013의 양보 대상에서 antigravity 제외를 유지한다.
 - **F-023 반박** (research 363행의 9곳 서술): 개정 전 research.md는 198행이라 363행이 없다. 팀 인계의 "9곳"을 실측 "10곳"으로 정정한 문장이었고, 혼동을 없애려 그 대조 문구를 삭제하고 10곳만 남겼다.
-- **F-003 수용** (규칙 네임스페이스): 팀 리드의 "flat 전용일 수 있으니 파일명 접두사를 쓰라"는 주의는 실측으로 뒤집혔다. `.agents/rules/autopus/nested-rule.md`가 실제로 발견되므로 디렉터리 네임스페이스를 쓴다.
+- **F-003 수용 후 반증**(규칙 네임스페이스): 팀 리드의 "flat 전용일 수 있으니 파일명 접두사를 쓰라"는 주의를 Revision 2에서 실측으로 뒤집고 디렉터리 네임스페이스를 택했다. 그 판단이 틀렸다 — `.agents/rules/autopus/nested-rule.md`가 "발견됐다"는 근거는 디스크 형태 확인이었고 세션 도달을 측정하지 않았다. omp 17.3.5 라이브 대조에서 하위 디렉터리 배치는 도달 0/14였고, 비재귀 루트 + 파일명 접두사 배치가 14/14였다. 결과적으로 팀 리드의 원래 주의가 옳았고 계약은 파일명 접두사로 되돌아갔다(REQ-002).
 - **Revision 3**: 재리뷰의 잔여 checklist FAIL 5건을 수용했다. 스킬 참조의 최종 경로 형태(`.agents/skills/<name>/SKILL.md`)를 REQ-015 2단계 매핑과 S3·S12 오라클에 고정했고, plan.md flowchart의 커맨드 양보 라벨을 REQ-014와 맞췄으며, 혼합 설정의 커맨드 20종 전체 발견(S11)과 omp Update 없이 소유권이 바뀐 stale manifest 상태의 Clean(E6, REQ-017)을 concrete oracle로 추가했다.
+- **Revision 4**: omp 17.3.5 라이브 실측이 규칙 배치 전제를 반증했다. 규칙 방출 경로를 `.agents/rules/autopus/<name>.md`에서 비재귀 루트 + 파일명 접두사인 `.omp/rules/autopus-<name>.md`로 이전하고(REQ-002), 소유 경계를 "매니페스트에 기록된 `autopus-` 접두사 파일"로 다시 정의했으며(REQ-009·017), gitignore 패턴을 디렉터리 형태 `.omp/rules/`로 고정했다(REQ-011, 파일명 글롭은 발견을 죽인다). S7 오라클은 디스크 형태 검사를 버리고 `<domain-rules>`·TTSR·`alwaysApply` 세 주입 경로의 합집합으로 바뀌었고, 레거시 경로 정리는 E7로 고정했다.
 
 ## Implementation Evidence
 
 2026-08-01 실측, omp 17.1.8. `go build -o <scratch>/auto-dev ./cmd/auto` → `auto-dev init --dir <ws> --platforms omp --yes` → 격리 프로필(인증 없는 더미 provider `models.yml`)로 `omp --mode rpc --no-session --cwd <ws> --model s7dummy/s7-probe` 세션을 열고, 시작 시 방출되는 `available_commands_update` 프레임과 `/dump`가 반환하는 실제 시스템 프롬프트를 증거로 수집했다. 이 버전의 `/context`는 토큰 사용량만 반환하고 `omp read rule://<name>`은 `Available: none`을 반환하므로 둘 다 발견 증거로 쓸 수 없다. 1차 실측에서 규칙 8/14 FAIL이 나왔고, 아래 옵션 B 수정 후 재실측에서 14/14로 닫혔다.
 
-- **S7 규칙 14종 — PASS(14/14, 재실측)**: `<domain-rules>` 11종과 TTSR 등록 3종(lore-commit, shell-portability, worktree-safety — 디버그 로그 `TTSR rule registered`로 확인)의 합집합이 `content/rules/` 이름 집합과 같고 두 경로 중복 등록은 0건이다. 1차 실측에서 미노출이던 branding·context7-docs·deferred-tools·doc-storage·project-identity·spec-quality 6종이 합성 description으로 노출된다.
+- **S7 규칙 14종 — PASS(14/14, 재실측) — 이후 반증됨(아래 17.3.5 항목)**: omp 17.1.8 + `.agents/rules/autopus/` 배치 기준 기록이다. `<domain-rules>` 11종과 TTSR 등록 3종(lore-commit, shell-portability, worktree-safety — 디버그 로그 `TTSR rule registered`로 확인)의 합집합이 `content/rules/` 이름 집합과 같고 두 경로 중복 등록은 0건이었다. 1차 실측에서 미노출이던 branding·context7-docs·deferred-tools·doc-storage·project-identity·spec-quality 6종이 합성 description으로 노출됐다. omp 17.3.5에서 같은 배치는 도달 0/14이므로 이 항목은 현재 계약의 근거가 아니다.
 - **폐쇄 방식(옵션 B)과 옵션 A 기각**: 대조 실험으로 omp가 frontmatter `description:`이 있는 규칙만 세션에 등록하고 trigger 키가 있으면 TTSR 엔진으로 보낸다는 것을 확정했다(사본에서 `branding.md`에 description을 넣자 `<domain-rules>`에 나타났고, `lore-commit.md`의 `condition`·`scope`를 지우자 TTSR에서 `<domain-rules>`로 옮겨갔다). 옵션 A인 `content/rules/` 소스에 description 추가는 기존 4개 플랫폼의 방출 바이트를 바꿔 `rules_golden_test.go`의 byte-identity 골든과 템플릿 재생성까지 건드리므로 기각했다. 대신 omp 전용 경로인 `TransformRuleForOMP`가 인식 키를 하나도 얻지 못했을 때만 본문 H1(없으면 첫 산문 줄)에서 description을 결정적으로 합성한다. 120 rune 상한, 인라인 마크업 평탄화, 펜스 코드 제외를 적용하고, 인식 키가 하나라도 살아남으면 합성하지 않아 trigger 규칙의 TTSR 라우팅이 바뀌지 않는다. 공유 콘텐츠는 한 바이트도 바뀌지 않았고 `TestRules_UnconditionalRulesStayByteIdentical`이 4개 플랫폼 byte-identity를 그대로 통과한다.
-- **S7 나머지와 S8 — PASS**: `## Available Agents`가 ADK 16종 전부를 담고(총 20 = ADK 16 + omp 내장 designer·librarian·sonic·task), `source:"file"` 커맨드 21종이 방출 20종을 전부 포함하며(나머지 1종은 omp 내장 `init`), `<skills>` 52종에 `auto`가 있다. 방출 표면 전체에 `.claude/` 잔존 0건이고 `doc-storage`는 `.omp/`, `executor`는 `.agents/rules/autopus/branding.md`로 정규화됐다. `auto doctor`의 omp 항목 3건이 전부 `[OK]`이고 `--json`의 `data.platforms`는 `[{"name":"omp","valid":true}]`다.
-- **E4 prune root 결정**: Update와 Clean이 별도 집합을 갖는 대신 `omp.PruneRoots(cfg)` 하나를 공유한다. 분기 축이 operation이 아니라 surface이기 때문이다. `.agents/commands`는 양보 후에도 항상 포함한다 — opencode는 `.opencode/commands/`로 커맨드를 제공하므로 omp가 쓴 `.md`를 아무도 덮어쓰지 않아 그대로 고아가 된다. `.agents/skills`는 `ompOwnsSharedSkillSurface(cfg)`가 참일 때만 포함한다 — opencode·codex가 `.agents/skills/auto/SKILL.md`를 제자리에서 덮어쓰므로 양보 후 그 파일은 그들 소유다. prune은 manifest 기록 경로에만 적용되어 antigravity `.toml`과 사용자 파일은 애초에 대상이 아니다. plan.md T17은 Clean·remove만 말하지만 Update도 같은 규칙을 쓴다. `internal/cli/update_preview.go`의 `previewPruneRoots`도 하드코딩을 버리고 이 함수에 위임해 preview/apply 비대칭을 없앴다.
+- **S7 나머지와 S8 — PASS**: `## Available Agents`가 ADK 16종 전부를 담고(총 20 = ADK 16 + omp 내장 designer·librarian·sonic·task), `source:"file"` 커맨드 21종이 방출 20종을 전부 포함하며(나머지 1종은 omp 내장 `init`), `<skills>` 52종에 `auto`가 있다. 방출 표면 전체에 `.claude/` 잔존 0건이고 `doc-storage`는 `.omp/`로 정규화됐다. `executor`의 branding 참조는 당시 `.agents/rules/autopus/branding.md`였고, 규칙 표면 이전 후 기대 문자열은 `.omp/rules/autopus-branding.md`다(REQ-015, S12). `auto doctor`의 omp 항목 3건이 전부 `[OK]`이고 `--json`의 `data.platforms`는 `[{"name":"omp","valid":true}]`다.
+- **S7 규칙 재실측(omp 17.3.5) — 배치 이전으로 닫음**: `.agents/rules/autopus/*.md` 배치는 `<domain-rules>` 블록 부재, 규칙 본문 0건, TTSR 등록 0건으로 도달 0/14였다. 같은 14개 파일을 `.omp/rules/autopus-<name>.md`로 옮긴 배치는 14/14 도달이고, 창구별 관측은 이렇다 — `/dump`의 `<domain-rules>`에 `- autopus-<name> (globs): description` 9행(같은 블록에 사용자 파일 `mine` 1행이 공존해 총 10행), `omp ttsr list --json`에 3건(`autopus-lore-commit`·`autopus-shell-portability`·`autopus-worktree-safety`, `path`가 `<ws>/.omp/rules/autopus-*.md`), `/dump`의 `<generic-rules>`에 `alwaysApply` 2건 본문 주입(`objective-reasoning`, `language-policy`, 이름은 표시되지 않음). TTSR 3종은 시스템 프롬프트에 이름도 본문도 나타나지 않으므로 `/dump` 단독 관측은 도달을 3건 과소 집계한다. `.agents/rules/<name>.md` 평면 배치도 동작하지만 공유 디렉터리 오염과 파일명 접두사 기반 prune 도입이 동시에 필요해 채택하지 않았다. 설정 우회는 불가능하다 — omp에는 `rules.customDirectories` 계열 키가 없고 `ttsr.builtinRules`·`ttsr.disabledRules`만 있다.
+- **E4 prune root 결정**: Update와 Clean이 별도 집합을 갖는 대신 `omp.PruneRoots(cfg)` 하나를 공유한다. 분기 축이 operation이 아니라 surface이기 때문이다. 규칙 표면 이전 후 배타 루트는 `.omp/rules`를 담고 레거시 `.agents/rules/autopus`도 계속 담는다 — 구버전 매니페스트가 기록한 경로를 업그레이드 시 정리해야 하기 때문이다(E7). prune은 이전 매니페스트에 기록된 경로에만 적용되므로(`adapter.BuildManifestDiff`, `prepareCleanAt`) `.omp/rules`를 루트로 올려도 사용자 파일은 대상이 되지 않고, ADK 소유는 매니페스트에 기록된 `autopus-` 접두사 파일 집합으로만 정의된다. `.agents/commands`는 양보 후에도 항상 포함한다 — opencode는 `.opencode/commands/`로 커맨드를 제공하므로 omp가 쓴 `.md`를 아무도 덮어쓰지 않아 그대로 고아가 된다. `.agents/skills`는 `ompOwnsSharedSkillSurface(cfg)`가 참일 때만 포함한다 — opencode·codex가 `.agents/skills/auto/SKILL.md`를 제자리에서 덮어쓰므로 양보 후 그 파일은 그들 소유다. antigravity `.toml`과 사용자 파일은 애초에 대상이 아니다. plan.md T17은 Clean·remove만 말하지만 Update도 같은 규칙을 쓴다. `internal/cli/update_preview.go`의 `previewPruneRoots`도 하드코딩을 버리고 이 함수에 위임해 preview/apply 비대칭을 없앴다.
 - **파일 분할**: `pkg/content/skill_transformer_replace.go`가 326행으로 300행 한도를 넘겨 rewrite domain 기준으로 순수 이동 분할했다 — `skill_transformer_replace.go`(139, 경로와 진입점), `[NEW] skill_transformer_replace_mcp.go`(102, Context7/MCP), `[NEW] skill_transformer_replace_tools.go`(99, agent call과 도구명). 최상위 선언 22개의 이름·시그니처가 분할 전후 동일하고 exported API는 불변이다.
 
 ## Security Analysis
@@ -165,8 +167,8 @@ Revision 2는 debate review 23건에 대응했다. 20건 수용, 3건 반박.
 
 - **Intended scope**: omp 플랫폼 착륙 — 규칙·에이전트·설정 표면, 조건부 스킬·커맨드 표면, omp 콘텐츠 정규화, 식별자 5곳과 디스패치 10곳, 그리고 데이터 안전(사용자 파일 보존·orchestra 경계·바이너리 신원).
 - **Explicit non-goals**: orchestra 실행 배선, worker ProviderAdapter, interactive pane, 루트 컨텍스트 문서 신규 생성, omp native sticky 규칙. 이 항목들로 범위를 넓히지 않는다.
-- **Self-verified**: REQ 19건 전건이 Traceability Matrix에서 태스크·시나리오·불변식에 연결됨. INV 19건 전건이 Must 오라클로 추적됨. 태스크 T1~T20, 신규 소스 13개(분할로 2개 추가). omp 계약은 바이너리 추출과 라이브 RPC 세션 실측이며, 2026-08-01 실측과 재실측 결과는 `## Implementation Evidence`에 있다. 라이브 단언 전건 PASS이고 Completion Debt는 None이다.
-- **Reviewer should focus on**: (1) description 합성이 결정적이고 trigger 규칙의 TTSR 라우팅을 건드리지 않는지, 그리고 공유 콘텐츠 무변경이 4개 플랫폼 byte-identity를 실제로 보장하는지. (2) 소유권 판정 두 함수의 조건이 S10·S11 네 설정과 일치하는지. (3) `omp.PruneRoots(cfg)` 단일 집합이 Update와 Clean 양쪽에서 안전한지. (4) REQ-018 변경이 `cursor`에 주는 파급.
+- **Self-verified**: REQ 19건 전건이 Traceability Matrix에서 태스크·시나리오·불변식에 연결됨. INV 19건 전건이 Must 오라클로 추적됨. 태스크 T1~T21(T21은 omp 17.3.5 재실측 후 추가된 규칙 배치 이전), 신규 소스 13개(분할로 2개 추가). omp 계약은 바이너리 추출과 라이브 RPC 세션 실측이며, 실측 결과는 `## Implementation Evidence`에 있다. Completion Debt는 None이다.
+- **Reviewer should focus on**: (1) description 합성이 결정적이고 trigger 규칙의 TTSR 라우팅을 건드리지 않는지, 그리고 공유 콘텐츠 무변경이 4개 플랫폼 byte-identity를 실제로 보장하는지. (2) 소유권 판정 두 함수의 조건이 S10·S11 네 설정과 일치하는지. (3) `omp.PruneRoots(cfg)` 단일 집합이 Update와 Clean 양쪽에서 안전한지, 특히 `.omp/rules`가 루트로 올라간 뒤에도 사용자 파일이 매니페스트 제한으로만 보호되는 것이 충분한지. (4) REQ-018 변경이 `cursor`에 주는 파급. (5) 규칙 도달 오라클이 `<domain-rules>`·TTSR·`alwaysApply` 세 경로를 모두 보는지, 그리고 gitignore 패턴이 디렉터리 형태로 유지되는지.
 
 ## Self-Verify Summary
 
@@ -198,3 +200,6 @@ Revision 2는 debate review 23건에 대응했다. 20건 수용, 3건 반박.
 - Q-COH-01 | status: PASS | attempt: 3 | files: spec.md | reason: omp 플랫폼 착륙 하나의 변경 스토리로 수렴함
 - Q-COH-02 | status: PASS | attempt: 6 | files: research.md | reason: 규칙 노출 갭을 같은 iteration 안에서 실제로 닫고 재실측으로 확인해 필수 후속 작업이 없으며, 선택 개선만 Evolution Ideas에 남음
 - Q-COH-03 | status: PASS | attempt: 3 | files: research.md | reason: sibling SPEC 없음을 근거와 함께 기록함
+- Q-CORR-01 | status: FAIL | attempt: 7 | files: spec.md, acceptance.md, plan.md, research.md | reason: omp 17.3.5 라이브 실측이 `.agents/rules/autopus/` 배치의 세션 도달을 0/14로 반증함. 기존 근거는 디스크 형태 확인이어서 도달을 측정하지 않았음
+- Q-CORR-01 | status: PASS | attempt: 8 | files: 4개 전부 | reason: 방출 경로를 `.omp/rules/autopus-<name>.md`로 이전하고 반증 근거·수치·설정 우회 불가(`rules.customDirectories` 부재)를 기록하며, S7 오라클을 세 주입 경로 합집합으로 교체함
+- Q-COMP-05 | status: PASS | attempt: 5 | files: acceptance.md | reason: 규칙 오라클에서 디스크 형태 단정을 제거하고 세션 도달 단정으로 교체, 레거시 경로 업그레이드(E7)와 gitignore 형태 대조(S8)를 concrete oracle로 추가함

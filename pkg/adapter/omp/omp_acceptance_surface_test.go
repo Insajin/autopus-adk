@@ -62,8 +62,8 @@ func TestOMPAcceptance_S6_RuleAndAgentCounts(t *testing.T) {
 	dir := generateOMPOnly(t)
 	paths := manifestPaths(t, dir)
 
-	assert.Equal(t, 14, countPathsWithPrefix(paths, ".agents/rules/autopus/"),
-		"manifest must record 14 rules")
+	assert.Equal(t, 14, countPathsWithPrefix(paths, ompRuleDir+"/"+ompRuleFilePrefix),
+		"manifest must record 14 rules as .omp/rules/autopus-*.md")
 	assert.Equal(t, 16, countPathsWithPrefix(paths, ".omp/agents/"),
 		"manifest must record 16 agents")
 	assert.Contains(t, paths, configFile, "manifest must record .omp/config.yml")
@@ -144,7 +144,9 @@ func TestOMPAcceptance_S4_OwnershipBoundaryAndManifestScope(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(opencodeSkill), 0o755))
 	require.NoError(t, os.WriteFile(opencodeSkill, []byte("opencode owned skill\n"), 0o644))
 
-	// User-authored rules that omp never created.
+	// User-authored rules that omp never creates. `.agents/rules/` is no longer an
+	// omp target at all; `.agents/rules/autopus/` is a legacy prune root kept only
+	// so an upgrade removes what an older manifest recorded there.
 	userRule := filepath.Join(dir, ".agents", "rules", "my-own-rule.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(userRule), 0o755))
 	require.NoError(t, os.WriteFile(userRule, []byte("user rule\n"), 0o644))
@@ -158,7 +160,7 @@ func TestOMPAcceptance_S4_OwnershipBoundaryAndManifestScope(t *testing.T) {
 	require.NoError(t, err)
 
 	paths := manifestPaths(t, dir)
-	assert.Equal(t, 14, countPathsWithPrefix(paths, ".agents/rules/autopus/"))
+	assert.Equal(t, 14, countPathsWithPrefix(paths, ompRuleDir+"/"+ompRuleFilePrefix))
 	assert.Equal(t, 16, countPathsWithPrefix(paths, ".omp/agents/"))
 	assert.Contains(t, paths, configFile)
 	for _, forbidden := range []string{".agents/skills/", ".agents/commands/", ".agents/plugins/", ".agents/hooks.json"} {

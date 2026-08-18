@@ -18,6 +18,11 @@ import (
 // or command from omp's own discovery output, so only directory-form patterns
 // are safe here. .omp/config.yml is deliberately absent: omp reads it directly
 // as settings rather than through a discovery glob (REQ-011).
+//
+// Measured on omp 17.3.5: a .gitignore holding `.omp/rules/autopus-*.md` drops
+// all 14 relocated rules from the session (domain rules 9 -> 0, TTSR 3 -> 0),
+// while `.omp/rules/` keeps all 14. The rule surface therefore has to be
+// ignored by directory, never by file-name glob.
 var ompDiscoveryRoots = []string{
 	".agents/rules/",
 	".agents/skills/",
@@ -35,15 +40,20 @@ func TestGitignorePatterns_OMPUsesDirectoryFormsOnly(t *testing.T) {
 		patterns[pattern] = true
 	}
 
-	for _, required := range []string{".agents/rules/autopus/", ".omp/agents/", ".omp/config.yml"} {
+	// The rule surface is ignored by directory, not by file-name glob: the glob
+	// form suppresses omp's own rule discovery (measured, omp 17.3.5), and
+	// omitting the pattern entirely leaves generated files unignored, which the
+	// doctor hygiene check reports.
+	for _, required := range []string{".omp/rules/", ".omp/agents/", ".omp/config.yml"} {
 		assert.True(t, patterns[required], "missing ADK-authored omp gitignore pattern %q", required)
 	}
 
-	// `/.omp/` would swallow the user-owned native surface (.omp/rules/,
-	// .omp/RULES.md) that omp Clean is required to preserve.
-	for _, forbidden := range []string{"/.omp/", ".omp/", ".omp/rules/", ".omp/RULES.md"} {
+	// `/.omp/` would swallow .omp/RULES.md, the user-owned native sticky rule
+	// file that omp Clean is required to preserve. A file-name glob scoped to
+	// the ADK prefix is forbidden for the discovery reason above.
+	for _, forbidden := range []string{"/.omp/", ".omp/", ".omp/RULES.md", ".omp/rules/autopus-*.md"} {
 		assert.False(t, patterns[forbidden],
-			"gitignore pattern %q would hide the user-owned omp surface", forbidden)
+			"gitignore pattern %q is not a legal omp pattern", forbidden)
 	}
 
 	for _, pattern := range gitignorePatterns {
@@ -69,23 +79,31 @@ func TestUpdateGitignore_OMPIgnoresGeneratedButNotUserSurface(t *testing.T) {
 	}
 
 	generated := []string{
-		".agents/rules/autopus/branding.md",
+		".omp/rules/autopus-branding.md",
 		".omp/agents/executor.md",
 		".omp/config.yml",
 	}
+	// Collateral of the directory-form rule pattern: omp scans .omp/rules/
+	// non-recursively, so ADK rules share the directory with the user's own
+	// files and `.omp/rules/` ignores both. This is the accepted trade — the
+	// file-name glob that would spare mine.md also hides the ADK rules from omp
+	// itself. Negation cannot narrow it back: git never re-includes a file whose
+	// parent directory is excluded (verified), so the escape hatch is `git add
+	// -f`, asserted below, or keeping personal rules outside .omp/rules/.
+	ignoredUserRules := []string{".omp/rules/mine.md"}
 	userOwned := []string{
-		".omp/rules/my-rule.md",
 		".omp/RULES.md",
 		".agents/rules/my-own-rule.md",
 	}
-	for _, rel := range append(append([]string{}, generated...), userOwned...) {
+	mustBeIgnored := append(append([]string{}, generated...), ignoredUserRules...)
+	for _, rel := range append(append([]string{}, mustBeIgnored...), userOwned...) {
 		writeOMPBoundaryFile(t, dir, rel)
 	}
 
-	for _, rel := range generated {
+	for _, rel := range mustBeIgnored {
 		cmd := exec.Command("git", "-C", dir, "check-ignore", "--no-index", "--quiet", rel)
 		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("expected ADK-authored omp path %s to be ignored: %v\n%s", rel, err, out)
+			t.Fatalf("expected %s to be ignored by the directory-form rule pattern: %v\n%s", rel, err, out)
 		}
 	}
 	for _, rel := range userOwned {
@@ -94,6 +112,17 @@ func TestUpdateGitignore_OMPIgnoresGeneratedButNotUserSurface(t *testing.T) {
 			t.Fatalf("user-owned omp path %s must not be ignored", rel)
 		}
 	}
+
+	// The documented escape hatch has to keep working, otherwise a user with
+	// tracked rules under .omp/rules/ has no recourse at all.
+	forced := ".omp/rules/mine.md"
+	if out, err := exec.Command("git", "-C", dir, "add", "-f", forced).CombinedOutput(); err != nil {
+		t.Fatalf("git add -f %s failed: %v\n%s", forced, err, out)
+	}
+	tracked, err := exec.Command("git", "-C", dir, "ls-files", "--cached").Output()
+	require.NoError(t, err)
+	assert.Contains(t, strings.Split(strings.TrimSpace(string(tracked)), "\n"), forced,
+		"git add -f must still track a user rule inside the ignored directory")
 }
 
 // TestPlatformAddOMP_RegistersNoOrchestraProvider covers REQ-018/S14. omp has

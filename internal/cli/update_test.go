@@ -17,13 +17,16 @@ func TestUpdateCmd_RequiresExistingConfig(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	// autopus.yaml이 없으면 에러
+	// autopus.yaml이 없으면 합성 기본값으로 진행하지 않고 실패한다.
+	var out bytes.Buffer
 	cmd := newTestRootCmd()
+	cmd.SetOut(&out)
 	cmd.SetArgs([]string{"update", "--dir", dir})
 	err := cmd.Execute()
-	// config가 없으면 기본값으로 처리하거나 에러 — 동작 확인
-	// 기본 구현에서는 기본 설정 로드 후 진행
-	_ = err // 에러 여부는 구현에 따름
+	require.Error(t, err, out.String())
+	assert.Contains(t, err.Error(), "autopus.yaml")
+	assert.NoFileExists(t, filepath.Join(dir, "autopus.yaml"),
+		"거부된 update는 설정 파일을 만들지 않는다")
 }
 
 func TestUpdateCmd_UpdatesAfterInit(t *testing.T) {

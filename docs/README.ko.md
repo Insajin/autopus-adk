@@ -425,7 +425,7 @@ auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Antigravity CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
-| **Oh My Pi (OMP)** | `.omp/agents/`, `.omp/skills/`, `.omp/commands/`, `.omp/extensions/autopus-context.ts`, `.omp/config.yml`, `.agents/skills/` |
+| **Oh My Pi (OMP)** | `.omp/rules/autopus-*.md`, `.omp/agents/`, `.omp/skills/`, `.omp/commands/`, `.omp/extensions/autopus-context.ts`, `.omp/config.yml`, `.agents/skills/` |
 동일한 16개 에이전트. 동일한 규칙. 공유 스킬은 기본적으로 전체가 생성됩니다. 기존 호환성을 유지하면서 mixed Codex + OpenCode 표면을 더 작게 만들고 싶다면 `skills.shared_surface`를 건드리는 대신 `skills.compiler.mode: split`을 opt-in 하세요.
 
 Codex 참고:
@@ -441,6 +441,11 @@ OpenCode 참고:
 - `skills.compiler.mode: split`을 켜면 shared/core skill은 `.agents/skills/`에 남고, OpenCode long-tail skill은 `.opencode/skills/`로 이동합니다
 - `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, `/auto doctor` 같은 helper workflow도 OpenCode 명령 래퍼로 함께 생성됩니다
 - `opencode.json`이 관리형 hook plugin을 자동 등록하므로 `auto init` 또는 `auto update` 직후 `.opencode/plugins/autopus-hooks.js`가 바로 활성화됩니다
+
+Oh My Pi 참고:
+- 규칙은 `.omp/rules/autopus-<name>.md` 평면 구조로 생성됩니다. OMP는 각 규칙 루트를 비재귀로만 탐색하므로 `rules/autopus/` 같은 하위 디렉터리는 세션에 도달하지 않습니다. 네임스페이스는 디렉터리가 아니라 `autopus-` 파일명 접두사입니다
+- ADK 소유는 manifest에 기록된 `autopus-` 접두사 파일뿐입니다. 같은 디렉터리에 둔 사용자 규칙(`.omp/rules/mine.md`)은 `auto update`와 `auto platform remove omp`가 건드리지 않습니다
+- `auto init`은 `.omp/rules/`를 디렉터리 패턴으로 gitignore에 넣습니다. `.omp/rules/autopus-*.md` 같은 파일명 글롭을 쓰면 생성된 규칙이 OMP 발견에서 전부 사라지기 때문에 디렉터리 형태를 씁니다. 무시된 상태에서도 자기 규칙을 추적하려면 `git add -f .omp/rules/mine.md`를 쓰거나(무시된 디렉터리 안에서는 gitignore negation이 동작하지 않습니다) 규칙을 `.omp/rules/` 밖에 두세요
 
 ### OMP 역할 라우팅과 컨텍스트 최적화(선택 적용)
 
@@ -637,7 +642,7 @@ Claude Code statusline 참고:
 ✓ 생성됨: .codex/, AGENTS.md
 ✓ 생성됨: .gemini/, GEMINI.md
 ✓ 생성됨: .opencode/, .agents/skills/, AGENTS.md, opencode.json
-✓ 생성됨: .omp/agents/, .omp/skills/, .omp/commands/, .omp/extensions/, .omp/config.yml
+✓ 생성됨: .omp/rules/, .omp/agents/, .omp/skills/, .omp/commands/, .omp/extensions/, .omp/config.yml
 ✓ 생성됨: autopus.yaml
 ```
 

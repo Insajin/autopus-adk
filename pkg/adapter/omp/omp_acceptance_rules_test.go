@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	contentfs "github.com/insajin/autopus-adk/content"
+	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 )
@@ -57,13 +58,13 @@ func sourceRuleNames(t *testing.T) []string {
 // TestOMPAcceptance_S1_RuleFrontmatterPassthrough covers REQ-002/REQ-003/REQ-004.
 func TestOMPAcceptance_S1_RuleFrontmatterPassthrough(t *testing.T) {
 	dir := generateOMPOnly(t)
-	ruleDir := filepath.Join(dir, ".agents", "rules", "autopus")
+	ruleDir := filepath.Join(dir, ompRuleDir)
 
-	loreRaw, err := os.ReadFile(filepath.Join(ruleDir, "lore-commit.md"))
+	loreRaw, err := os.ReadFile(filepath.Join(ruleDir, ompRuleFilePrefix+"lore-commit.md"))
 	require.NoError(t, err)
 	lore := string(loreRaw)
 	assert.True(t, strings.HasPrefix(lore, "---\n"),
-		"lore-commit.md must open with a frontmatter delimiter, got first line %q",
+		"autopus-lore-commit.md must open with a frontmatter delimiter, got first line %q",
 		strings.SplitN(lore, "\n", 2)[0])
 
 	loreFM, loreBody := splitEmittedFrontmatter(t, lore)
@@ -76,7 +77,7 @@ func TestOMPAcceptance_S1_RuleFrontmatterPassthrough(t *testing.T) {
 	// branding.md carries no frontmatter at source, so the emitted copy gains a
 	// synthesized description from its title. Without one omp writes the file
 	// but never surfaces the rule in a session.
-	brandingRaw, err := os.ReadFile(filepath.Join(ruleDir, "branding.md"))
+	brandingRaw, err := os.ReadFile(filepath.Join(ruleDir, ompRuleFilePrefix+"branding.md"))
 	require.NoError(t, err)
 	branding := string(brandingRaw)
 	brandingFM, brandingBody := splitEmittedFrontmatter(t, branding)
@@ -91,7 +92,7 @@ func TestOMPAcceptance_S1_RuleFrontmatterPassthrough(t *testing.T) {
 	names := sourceRuleNames(t)
 	assert.Len(t, names, 14, "content/rules must hold exactly 14 rule sources")
 	for _, name := range names {
-		data, readErr := os.ReadFile(filepath.Join(ruleDir, name))
+		data, readErr := os.ReadFile(filepath.Join(ruleDir, ompRuleFilePrefix+name))
 		require.NoError(t, readErr, "rule %s must be emitted", name)
 		fm, body := splitEmittedFrontmatter(t, string(data))
 		hasContentLine := false
@@ -111,12 +112,24 @@ func TestOMPAcceptance_S1_RuleFrontmatterPassthrough(t *testing.T) {
 			"rule %s must be discoverable by an omp session, frontmatter was %q", name, fm)
 	}
 
-	// Nothing is written at the `.agents/rules/` top level (REQ-002 namespace).
-	topLevel, err := os.ReadDir(filepath.Join(dir, ".agents", "rules"))
+	// The rule surface is one flat, prefixed namespace inside `.omp/rules`
+	// (REQ-002). omp discovers rules non-recursively, so a subdirectory would
+	// hide every rule it holds, and `.agents/rules/` is not an omp target at all.
+	assert.NoDirExists(t, filepath.Join(dir, ".agents", "rules"),
+		"omp must not create .agents/rules/")
+
+	entries, err := os.ReadDir(ruleDir)
 	require.NoError(t, err)
-	for _, e := range topLevel {
-		assert.True(t, e.IsDir(), "omp must not write %q at .agents/rules/ top level", e.Name())
+	emitted := make([]string, 0, len(entries))
+	for _, e := range entries {
+		require.False(t, e.IsDir(),
+			"%q: .omp/rules must stay flat or omp finds nothing", e.Name())
+		require.True(t, strings.HasPrefix(e.Name(), ompRuleFilePrefix),
+			"%q must carry the %q ownership prefix", e.Name(), ompRuleFilePrefix)
+		emitted = append(emitted, strings.TrimPrefix(e.Name(), ompRuleFilePrefix))
 	}
+	assert.ElementsMatch(t, names, emitted,
+		"emitted rule files map 1:1 onto the content/rules sources")
 }
 
 // TestOMPAcceptance_S2_ConditionalFieldPassthrough covers REQ-003 trigger fields.
@@ -193,4 +206,72 @@ func TestOMPAcceptance_S1_EmptyBodyRejected(t *testing.T) {
 	_, err := pkgcontent.TransformRuleForOMP("---\ndescription: Empty\n---\n")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty")
+}
+
+// TestOMPAcceptance_LegacyRuleNamespaceUpgraded pins the upgrade path out of the
+// pre-relocation layout. An older ADK wrote rules to `.agents/rules/autopus/`,
+// where omp — which discovers rules non-recursively — never saw them. Update
+// must re-emit the surface into the flat `.omp/rules/autopus-*.md` namespace and
+// take the stale legacy file with it, while a user file sharing the legacy tree
+// survives because no manifest ever recorded it.
+func TestOMPAcceptance_LegacyRuleNamespaceUpgraded(t *testing.T) {
+	dir := generateOMPOnly(t)
+
+	// Rewind the workspace to what the previous release left behind: the rule
+	// bodies live under `.agents/rules/autopus/`, `.omp/rules` does not exist,
+	// and the manifest records the legacy paths.
+	manifest, err := adapter.LoadManifest(dir, adapterName)
+	require.NoError(t, err)
+	require.NotNil(t, manifest)
+
+	const legacyDir = ".agents/rules/autopus"
+	legacyRules := make(map[string]string)
+	for path := range manifest.Files {
+		slash := filepath.ToSlash(path)
+		if !strings.HasPrefix(slash, ompRuleDir+"/") {
+			continue
+		}
+		body, readErr := os.ReadFile(filepath.Join(dir, filepath.FromSlash(slash)))
+		require.NoError(t, readErr)
+		name := strings.TrimPrefix(strings.TrimPrefix(slash, ompRuleDir+"/"), ompRuleFilePrefix)
+		legacyRules[legacyDir+"/"+name] = string(body)
+		delete(manifest.Files, path)
+	}
+	require.Len(t, legacyRules, 14, "the fixture must rewind all 14 rules")
+
+	require.NoError(t, os.RemoveAll(filepath.Join(dir, filepath.FromSlash(ompRuleDir))))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, filepath.FromSlash(legacyDir)), 0o755))
+	for path, body := range legacyRules {
+		require.NoError(t, os.WriteFile(
+			filepath.Join(dir, filepath.FromSlash(path)), []byte(body), 0o644))
+		manifest.Files[path] = adapter.ManifestFile{
+			Checksum: adapter.Checksum(body),
+			Policy:   adapter.OverwriteAlways,
+		}
+	}
+	require.NoError(t, manifest.Save(dir))
+
+	// A user rule the ADK never recorded, sharing the legacy directory tree.
+	userRule := filepath.Join(dir, ".agents", "rules", "my-own-rule.md")
+	require.NoError(t, os.WriteFile(userRule, []byte("user rule\n"), 0o644))
+
+	cfg := config.DefaultFullConfig("omp-acceptance")
+	cfg.Platforms = []string{"omp"}
+	_, err = NewWithRoot(dir).Update(context.Background(), cfg)
+	require.NoError(t, err)
+
+	legacyBranding := filepath.Join(dir, filepath.FromSlash(legacyDir), "branding.md")
+	assert.NoFileExists(t, legacyBranding,
+		"a legacy rule the previous manifest recorded must be pruned")
+	assert.FileExists(t, filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md"),
+		"the rule must be re-emitted into the flat .omp/rules namespace")
+
+	survivingUser, err := os.ReadFile(userRule)
+	require.NoError(t, err, "a user file in the legacy tree must survive the upgrade")
+	assert.Equal(t, "user rule\n", string(survivingUser))
+
+	for _, p := range manifestPaths(t, dir) {
+		assert.False(t, strings.HasPrefix(p, ".agents/rules/"),
+			"the rewritten manifest must record no legacy rule path, found %q", p)
+	}
 }

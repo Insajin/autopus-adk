@@ -89,8 +89,8 @@ func TestOMPAdapter_Validate_NamesEachMissingSurface(t *testing.T) {
 		},
 		{
 			name:        "rule directory removed",
-			remove:      filepath.Join(".agents", "rules", "autopus"),
-			wantFile:    filepath.Join(".agents", "rules", "autopus"),
+			remove:      filepath.FromSlash(ompRuleDir),
+			wantFile:    filepath.FromSlash(ompRuleDir),
 			wantMessage: "omp rule 디렉터리가 없음",
 		},
 	}
@@ -129,7 +129,7 @@ func TestOMPAdapter_Validate_EmptyWorkspaceReportsAllSurfaces(t *testing.T) {
 	assert.ElementsMatch(t, []string{
 		configFile,
 		filepath.Join(".omp", "agents"),
-		filepath.Join(".agents", "rules", "autopus"),
+		filepath.FromSlash(ompRuleDir),
 	}, files)
 }
 

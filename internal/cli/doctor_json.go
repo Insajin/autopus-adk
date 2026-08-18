@@ -114,12 +114,18 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 	report.collectPlatformChecks(ctx, opts.dir, cfg)
 	report.collectDependencyChecks(cmd, opts)
 	report.collectRuntimeProcessChecks(opts)
-	report.collectRuleConflictChecks(opts.dir, cfg)
+	// Both of these read `.claude/**`; see configuresClaudeCode for why an
+	// unconfigured claude-code makes them unresolvable noise rather than signal.
+	if configuresClaudeCode(cfg) {
+		report.collectRuleConflictChecks(opts.dir, cfg)
+	}
 	report.collectCLIChecks()
 	report.collectQualityGateChecks(cfg)
 	report.collectCodexModelOwnershipCheck(opts.dir, cfg)
 	report.collectProviderTransportSmokeChecks(cfg, opts)
-	report.collectHookChecks(opts.dir)
+	if configuresClaudeCode(cfg) {
+		report.collectHookChecks(opts.dir)
+	}
 	report.collectContextWeightChecks(opts.dir)
 	report.collectHygieneChecks(opts.dir)
 	report.collectDriftGateChecksContext(ctx, opts.dir, cfg)

@@ -80,6 +80,13 @@ func newUpdateCmd() *cobra.Command {
 				return runWorkspaceUpdate(cmd, dir, workspaceOnly, yesFlag, previewMode, statusLine)
 			}
 
+			// Guard the single-repo path only. A meta-workspace root legitimately
+			// carries no autopus.yaml of its own; each child repo below it is
+			// re-checked by runWorkspaceUpdate's own per-repo update.
+			if projectErr := requireHarnessProject(dir); projectErr != nil {
+				return projectErr
+			}
+
 			var (
 				cfg                   *config.HarnessConfig
 				err                   error
@@ -93,19 +100,9 @@ func newUpdateCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("설정 로드 실패: %w", err)
 			}
-			configExists := true
-			if _, statErr := os.Stat(filepath.Join(dir, "autopus.yaml")); os.IsNotExist(statErr) {
-				configExists = false
-			} else if statErr != nil {
-				return fmt.Errorf("autopus.yaml 확인 실패: %w", statErr)
-			}
-			designConfigMissing := false
-			if configExists {
-				var missingErr error
-				designConfigMissing, missingErr = config.MissingTopLevelKey(dir, "design")
-				if missingErr != nil {
-					return fmt.Errorf("design 설정 확인 실패: %w", missingErr)
-				}
+			designConfigMissing, missingErr := config.MissingTopLevelKey(dir, "design")
+			if missingErr != nil {
+				return fmt.Errorf("design 설정 확인 실패: %w", missingErr)
 			}
 
 			if err := validateStatusLineMode(statusLine); err != nil {
@@ -193,7 +190,7 @@ func newUpdateCmd() *cobra.Command {
 				return statusLineErr
 			}
 			warnParentRuleConflicts(cmd, dir, cfg, yesFlag)
-			if configExists && cfg.Design.Enabled {
+			if cfg.Design.Enabled {
 				designPath, created, designErr := ensureStarterDesignFile(dir)
 				if designErr != nil {
 					return fmt.Errorf("DESIGN.md 생성 실패: %w", designErr)

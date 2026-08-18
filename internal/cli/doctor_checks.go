@@ -58,6 +58,24 @@ func checkQualityGate(out io.Writer, cfg *config.HarnessConfig) bool {
 	return allOK
 }
 
+// configuresClaudeCode reports whether the harness targets Claude Code.
+//
+// Checks that read or repair `.claude/**` must ask this first. No other
+// adapter writes that tree — the omp adapter's contract forbids it outright —
+// so on a project without claude-code the finding is unresolvable noise: the
+// remedy it prints ("run 'auto init'") can never make it go away.
+func configuresClaudeCode(cfg *config.HarnessConfig) bool {
+	if cfg == nil {
+		return false
+	}
+	for _, platform := range cfg.Platforms {
+		if platform == "claude-code" {
+			return true
+		}
+	}
+	return false
+}
+
 // checkHooksPermissions parses .claude/settings.json and validates hooks and permissions config.
 // Returns true if all checks passed, false if any issue was found.
 func checkHooksPermissions(out io.Writer, dir string) bool {

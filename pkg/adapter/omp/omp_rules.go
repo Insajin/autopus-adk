@@ -18,6 +18,19 @@ absent, stop that route with an unsupported-tool diagnostic. Persistent Claude
 team lifecycle is unavailable here; use the ordinary OMP task pipeline.
 `
 
+const (
+	// ompRuleDir is the only directory oh-my-pi scans for project rules. Rule
+	// discovery is non-recursive (measured against omp 17.3.5: rules written to
+	// a nested namespace directory reached zero sessions), so generated rules
+	// live directly in the shared directory.
+	ompRuleDir = ".omp/rules"
+	// ompRuleFilePrefix namespaces ADK-owned rule files inside that shared
+	// directory. The prefix, not a subdirectory, is what separates generated
+	// rules from the user's own files in .omp/rules; ownership checks and
+	// pruning key off it.
+	ompRuleFilePrefix = "autopus-"
+)
+
 func (a *Adapter) prepareRuleMappings() ([]adapter.FileMapping, error) {
 	entries, err := contentfs.FS.ReadDir("rules")
 	if err != nil {
@@ -44,7 +57,7 @@ func (a *Adapter) prepareRuleMappings() ([]adapter.FileMapping, error) {
 		}
 		content = transformed
 
-		relPath := filepath.Join(".agents", "rules", "autopus", entry.Name())
+		relPath := filepath.Join(filepath.FromSlash(ompRuleDir), ompRuleFilePrefix+entry.Name())
 		files = append(files, adapter.FileMapping{
 			TargetPath:      relPath,
 			OverwritePolicy: adapter.OverwriteAlways,

@@ -514,7 +514,7 @@ One `autopus.yaml` generates **native configuration** for every detected support
 | **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Antigravity CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
-| **Oh My Pi (OMP)** | `.omp/agents/`, `.omp/skills/`, `.omp/commands/`, `.omp/extensions/autopus-context.ts`, `.omp/config.yml`, `.agents/skills/` |
+| **Oh My Pi (OMP)** | `.omp/rules/autopus-*.md`, `.omp/agents/`, `.omp/skills/`, `.omp/commands/`, `.omp/extensions/autopus-context.ts`, `.omp/config.yml`, `.agents/skills/` |
 Same 16 agents. Same rules. Shared skills stay full by default. If you want a smaller mixed Codex + OpenCode surface without breaking backward-compatible defaults, keep `skills.shared_surface` as-is and opt into `skills.compiler.mode: split`.
 
 Codex note:
@@ -530,6 +530,11 @@ OpenCode note:
 - With `skills.compiler.mode: split`, shared/core skills stay under `.agents/skills/` while OpenCode long-tail skills move to `.opencode/skills/`
 - Helper workflows like `/auto status`, `/auto map`, `/auto why`, `/auto verify`, `/auto secure`, `/auto test`, `/auto dev`, and `/auto doctor` are generated as OpenCode-native command wrappers
 - `opencode.json` now registers the managed hook plugin automatically, so `.opencode/plugins/autopus-hooks.js` is live immediately after `auto init` or `auto update`
+
+Oh My Pi note:
+- Rules are written flat as `.omp/rules/autopus-<name>.md`. OMP scans each rule root non-recursively, so a nested `rules/autopus/` directory would never reach the session; the `autopus-` filename prefix is the namespace instead
+- Only the manifest-recorded `autopus-` files are ADK-owned. Your own rules in the same directory (`.omp/rules/mine.md`) are left untouched by `auto update` and `auto platform remove omp`
+- `auto init` ignores `.omp/rules/` as a directory pattern. A filename glob such as `.omp/rules/autopus-*.md` would silently remove every generated rule from OMP discovery, which is why the directory form is used. To track your own rule despite the ignore, run `git add -f .omp/rules/mine.md` (gitignore negation does not work inside an ignored directory) or keep it outside `.omp/rules/`
 
 ### OMP role routing and context optimization (opt-in)
 
@@ -739,7 +744,7 @@ Claude Code statusline note:
 ✓ Generated: .codex/, AGENTS.md
 ✓ Generated: .gemini/, GEMINI.md
 ✓ Generated: .opencode/, .agents/skills/, AGENTS.md, opencode.json
-✓ Generated: .omp/agents/, .omp/skills/, .omp/commands/, .omp/extensions/, .omp/config.yml
+✓ Generated: .omp/rules/, .omp/agents/, .omp/skills/, .omp/commands/, .omp/extensions/, .omp/config.yml
 ✓ Created: autopus.yaml
 ```
 

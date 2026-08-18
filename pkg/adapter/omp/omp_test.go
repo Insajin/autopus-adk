@@ -89,7 +89,7 @@ func TestOMP_S4_S5_S6_Lifecycle(t *testing.T) {
 	// Check S6: generated files
 	assert.FileExists(t, filepath.Join(dir, configFile))
 	assert.FileExists(t, filepath.Join(dir, ".omp", "agents", "executor.md"))
-	assert.FileExists(t, filepath.Join(dir, ".agents", "rules", "autopus", "branding.md"))
+	assert.FileExists(t, filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md"))
 
 	// Check S5: no CLAUDE.md shadowed
 	assert.NoFileExists(t, filepath.Join(dir, ".claude", "CLAUDE.md"))
@@ -98,7 +98,7 @@ func TestOMP_S4_S5_S6_Lifecycle(t *testing.T) {
 	err = a.Clean(context.Background())
 	require.NoError(t, err)
 	assert.NoFileExists(t, filepath.Join(dir, ".omp", "agents", "executor.md"))
-	assert.NoFileExists(t, filepath.Join(dir, ".agents", "rules", "autopus", "branding.md"))
+	assert.NoFileExists(t, filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md"))
 }
 
 func TestOMP_S10_S11_Ownership(t *testing.T) {
@@ -157,6 +157,6 @@ func TestOMP_E6_StaleManifestClean(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(dir, ".autopus", "backup"))
 
 	// Surfaces omp still owns are removed as usual.
-	assert.NoFileExists(t, filepath.Join(dir, ".agents", "rules", "autopus", "branding.md"))
+	assert.NoFileExists(t, filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md"))
 	assert.NoFileExists(t, filepath.Join(dir, ".omp", "agents", "executor.md"))
 }
