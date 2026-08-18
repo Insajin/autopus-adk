@@ -1,0 +1,21 @@
+deny:
+    - pattern: context.Background()
+      reason: always propagate parent context
+      suggest: add ctx context.Context parameter
+      category: convention
+    - pattern: context.TODO()
+      reason: TODO context is temporary
+      suggest: pass proper context
+      category: convention
+    - pattern: fmt.Sprintf("SELECT
+      reason: SQL injection risk
+      suggest: 'use parameterized queries: db.Query(query, args...)'
+      category: security
+    - pattern: time.Sleep(
+      reason: slows tests, non-deterministic
+      suggest: use ticker, timer, or channel
+      category: testing
+    - pattern: os.Exit(
+      reason: prevents defer execution and testing
+      suggest: return error to caller
+      category: convention

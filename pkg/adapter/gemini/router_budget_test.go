@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -42,6 +43,35 @@ func TestRouterBudget_FullGenerate_RootIsThinAndAllDetailsExist(t *testing.T) {
 		assert.Contains(t, router, alias, "legacy alias %q must remain routable", alias)
 	}
 	assert.NotContains(t, router, "Triage Process")
+}
+
+func TestRouterBudget_FullGenerate_CommandSurfaceCoversEveryFrozenRoute(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	_, err := NewWithRoot(root).Generate(context.Background(), config.DefaultFullConfig("command-surface"))
+	require.NoError(t, err)
+
+	entries, err := os.ReadDir(filepath.Join(root, ".gemini", "commands", "auto"))
+	require.NoError(t, err)
+
+	emitted := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		require.False(t, entry.IsDir(), "command surface must stay flat: %s", entry.Name())
+		emitted = append(emitted, strings.TrimSuffix(entry.Name(), ".toml"))
+	}
+	assert.ElementsMatch(t, frozenGeminiAutoRoutes, emitted,
+		"every frozen /auto route must have exactly one .gemini/commands/auto/<route>.toml")
+
+	for _, route := range frozenGeminiAutoRoutes {
+		command := readGeneratedGeminiSurface(t, root, filepath.Join(".gemini", "commands", "auto", route+".toml"))
+		assert.Contains(t, command, "prompt", "route %q command must declare a prompt", route)
+		assert.Contains(t, command, ".gemini/skills/autopus/auto-"+route+"/SKILL.md",
+			"route %q command must load exactly its own detail", route)
+	}
+
+	rootCommand := readGeneratedGeminiSurface(t, root, filepath.Join(".gemini", "commands", "auto.toml"))
+	assert.Contains(t, rootCommand, ".gemini/skills/auto/SKILL.md",
+		"auto.toml must keep routing through the thin router skill")
 }
 
 func TestWorkflowSkills_MissingElevenRoutes_AreBoundedContracts(t *testing.T) {

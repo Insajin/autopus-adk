@@ -11,7 +11,7 @@ USAGE
 }
 readonly repository='Insajin/autopus-adk'
 readonly environment_name='adk-companion-release'
-readonly release_tag='v0.50.106'
+readonly release_tag='v0.50.107'
 readonly spec_id='SPEC-OMP-004'
 # The OMP oracle is pinned by digest AND version string (conjunctive gate
 # below). It has not moved since v0.50.96 and must not be advanced so a release
@@ -201,7 +201,7 @@ github_release_state() {
     "repos/Insajin/autopus-adk/releases?per_page=100") || return 1
   jq -e 'type == "array" and all(.[]; type == "array")' <<<"$releases" >/dev/null ||
     return 1
-  matches=$(jq '[.[][] | select(.tag_name == "v0.50.106")] | length' <<<"$releases") ||
+  matches=$(jq '[.[][] | select(.tag_name == "v0.50.107")] | length' <<<"$releases") ||
     return 1
   case "$matches" in
     0) printf 'absent\n' ;;

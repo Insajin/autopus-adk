@@ -27,7 +27,8 @@ func TestGeminiGenerateCommands(t *testing.T) {
 	_, autoErr := os.Stat(autoPath)
 	assert.NoError(t, autoErr, "auto.toml should exist")
 
-	// Verify all 6 command TOML files are created
+	// Spot-check core command TOML files; the exhaustive route set is pinned by
+	// TestRouterBudget_FullGenerate_CommandSurfaceCoversEveryFrozenRoute.
 	commands := []string{"plan", "go", "fix", "review", "sync", "idea"}
 	for _, cmd := range commands {
 		cmdPath := filepath.Join(dir, ".gemini", "commands", "auto", cmd+".toml")
