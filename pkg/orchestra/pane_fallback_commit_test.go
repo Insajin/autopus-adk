@@ -280,11 +280,19 @@ func TestInteractivePaneBackend_CompletionCollectionAndCleanupFailuresStayPane(t
 		CompletionDetector: &stubCompletionDetector{completed: false},
 	})
 
+	// The budget must clear the two mandatory production sleeps inside Execute — the
+	// promptRegisterDelay timer between paste and Enter plus the post-launch
+	// registration sleep — before the completion wait can consume the rest of it.
+	// A 300ms budget left only 100ms of slack for those 200ms of real sleeps, so a
+	// loaded runner failed launch with "launch enter error: context deadline
+	// exceeded" instead of reaching the TimedOut assertion below. 2s matches
+	// TestExecute_S12_TimeoutDeterministic and keeps every assertion identical:
+	// the stub detector never completes, so the request still times out.
 	resp, err := backend.Execute(context.Background(), ProviderRequest{
 		Provider: provider.Name,
 		Config:   provider,
 		Prompt:   "exercise terminal-only failure stages",
-		Timeout:  300 * time.Millisecond,
+		Timeout:  2 * time.Second,
 	})
 
 	require.NoError(t, err)
