@@ -47,7 +47,8 @@ func TestOMP002_S10_DoctorCLIProjectsStableOMPChecksInTextAndJSON(t *testing.T) 
 	healthyChecks := ompPlatformDoctorChecks(healthyEnvelope.Checks)
 	require.NotEmpty(t, healthyChecks)
 	assert.Empty(t, failingOMPDoctorChecks(healthyChecks),
-		"healthy behavioral fixture must produce a 10/10 OMP readiness receipt")
+		"healthy behavioral fixture must produce a 10/10 OMP readiness receipt; fixture invocations:\n"+
+			ompDoctorFixtureLog(t, logPath))
 	assert.Equal(t, jsonStatusWarn, healthyEnvelope.Status,
 		"missing non-OMP dependencies may warn without changing OMP check outcomes")
 	assert.NotEmpty(t, failingNonOMPDoctorChecks(healthyEnvelope.Checks),
@@ -124,6 +125,15 @@ func installHermeticOMPDoctorCLI(t *testing.T) string {
 	return logPath
 }
 
+func ompDoctorFixtureLog(t *testing.T, logPath string) string {
+	t.Helper()
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		return "fixture log unreadable: " + err.Error()
+	}
+	return string(content)
+}
+
 func TestOMPDoctorBehaviorFixtureProcess(t *testing.T) {
 	separator := slices.Index(os.Args, "--")
 	if separator < 0 {
@@ -198,13 +208,24 @@ func runOMPDoctorBehaviorRPC(args []string, logPath string) int {
 	if os.WriteFile(filepath.Join(root, "readiness-receipt.json"), []byte("readiness-ok\n"), 0o600) != nil {
 		return 66
 	}
+	emitted := 0
+	for _, frame := range []string{
+		`{"type":"available_commands_update"}`,
+		`{"type":"tool_execution_start","toolCallId":"doctor-1"}`,
+		`{"type":"tool_execution_end","toolCallId":"doctor-1"}`,
+		`{"type":"message_end"}`,
+	} {
+		if _, err := fmt.Println(frame); err == nil {
+			emitted++
+		}
+	}
+	// The marker is appended after the frames so its presence proves the writes
+	// themselves succeeded. A CI receipt of rpc.* reason=event_missing means the
+	// probe saw a clean exit with no recognized frames, which this line separates
+	// into "child never emitted" versus "emitted but the parent captured nothing".
 	log, _ := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY, 0o600)
-	_, _ = fmt.Fprintln(log, "loopback-provider-requests=2")
+	_, _ = fmt.Fprintf(log, "loopback-provider-requests=2 emitted-frames=%d\n", emitted)
 	_ = log.Close()
-	fmt.Println(`{"type":"available_commands_update"}`)
-	fmt.Println(`{"type":"tool_execution_start","toolCallId":"doctor-1"}`)
-	fmt.Println(`{"type":"tool_execution_end","toolCallId":"doctor-1"}`)
-	fmt.Println(`{"type":"message_end"}`)
 	return 0
 }
 
