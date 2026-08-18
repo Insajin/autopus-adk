@@ -69,16 +69,16 @@ func TestHomebrewFormulaBridge_PublishedV05070CaskGolden(t *testing.T) {
 	}
 }
 
-func TestHomebrewFormulaBridge_PublishedV050106TapPins(t *testing.T) {
+func TestHomebrewFormulaBridge_PublishedV050107TapPins(t *testing.T) {
 	cask := homebrewBridgeCask()
 	caskSum := sha256.Sum256([]byte(cask))
-	if got := fmt.Sprintf("%x", caskSum); got != "75abe4fc1485d95f29aead695f002e119e850a49499f1916fb34ff3bf6a71912" {
-		t.Fatalf("published v0.50.106 Cask digest = %s", got)
+	if got := fmt.Sprintf("%x", caskSum); got != "7bbb0763de4542a9b646b2f190248a966d93575d353426f403d5b56b5e10fcc6" {
+		t.Fatalf("published v0.50.107 Cask digest = %s", got)
 	}
 	command := exec.Command("git", "hash-object", "--stdin")
 	command.Stdin = strings.NewReader(cask)
 	if blob, err := command.CombinedOutput(); err != nil || strings.TrimSpace(string(blob)) != a21TapPin(t, "PRIOR_CASK_BLOB") {
-		t.Fatalf("published v0.50.106 Cask blob = %q: %v", strings.TrimSpace(string(blob)), err)
+		t.Fatalf("published v0.50.107 Cask blob = %q: %v", strings.TrimSpace(string(blob)), err)
 	}
 	formulaSum := sha256.Sum256([]byte(homebrewBridgeFormula(t)))
 	if got := fmt.Sprintf("%x", formulaSum); got != "6bc6a0fbf790ee144c74d802a2031ab61f57a2ebd0611b6f15e856c8ed3e8a7c" {
@@ -108,11 +108,11 @@ func TestHomebrewFormulaBridge_RejectsExecutableCaskStanzas(t *testing.T) {
 
 func homebrewBridgeCask() string {
 	return strings.NewReplacer(
-		`version "0.50.70"`, `version "0.50.106"`,
-		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "113b319911150083d6384fbaa50786ddd55f8113d580946078f5f6561384d382",
-		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "5cdd342416bb4b8feeac403f53761b5b0a2572269a5881afeb90a3306365f744",
-		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "7d8cd1fd01dfc32dd06bc3b8223321eaa1b1d8ee483944e36759c400b1e8b619",
-		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "e7914d063227bc8a7acba5668e9bb09d30ee1f7e4807117c089575b63c96e573",
+		`version "0.50.70"`, `version "0.50.107"`,
+		"9728aec2f36bb43b4fbb658ca8550527d371a4c570ee7fbd2aee2b6fe011e8bd", "af52a08b6d5d809506e75643888b5752245a3d31ed6843f438c1cd0407a35807",
+		"a57c0c180c0d2bb8ef013b9ae706752c432ff43466e13314b8b6f9279761fe4c", "4cce7bad50005d3d74b4470f34edb1e6685d66daf9a0b0a56d9a9e08ddb38896",
+		"f6ff6aba2ce96831b33570c07c2ec33353c8ee1cbfe9a53a2c62227f82bcf69b", "8092cfbefad047661177a57d917c1bca1cf2dd0665639ae62e8c9a9d120d4e20",
+		"027f26f0bc2d3f052b28bbc2da80b15063f42f818be30bea132a78a601fc1822", "f3eba688d48ce011a474efbf629d2ef130b2fdbc853d9a4b3570b1803e02ba0b",
 	).Replace(publishedV05070Cask)
 }
 
