@@ -46,8 +46,8 @@ func TestHomebrewFormulaBridge_A22UpdatesOnlyCaskThenIsIdempotent(t *testing.T) 
 	if err != nil {
 		t.Fatalf("publish A22 Cask: %v\n%s", err, output)
 	}
-	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.107"`) {
-		t.Fatalf("published Cask is not v0.50.107:\n%s", cask)
+	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.108"`) {
+		t.Fatalf("published Cask is not v0.50.108:\n%s", cask)
 	}
 	if got := fixture.updateCount(t, "cask"); got != "1" {
 		t.Fatalf("Cask update count = %q, want 1", got)
@@ -187,7 +187,7 @@ func (fixture homebrewBridgeFixture) run(overrides map[string]string) ([]byte, e
 	environment := map[string]string{
 		"PATH":   filepath.Join(fixture.root, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"TMPDIR": filepath.Join(fixture.root, "tmp"), "MOCK_TAP_STATE": fixture.state,
-		"GITHUB_REF_NAME": "v0.50.107", "COMPANION_VERSION": "0.50.107",
+		"GITHUB_REF_NAME": "v0.50.108", "COMPANION_VERSION": "0.50.108",
 		"COMPANION_HOMEBREW_POLICY": "cask-only",
 		"MOCK_TAP_PRIOR_COMMIT":     fixture.priorCommit,
 		"COMPANION_CHECKSUMS_PATH":  fixture.checksums,
@@ -291,8 +291,8 @@ func homebrewBridgeChecksums() string {
 	names := []string{"darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"}
 	var output strings.Builder
 	for index, name := range names {
-		fmt.Fprintf(&output, "%s  autopus-adk_0.50.107_%s.tar.gz\n", bridgeDigests[index], name)
+		fmt.Fprintf(&output, "%s  autopus-adk_0.50.108_%s.tar.gz\n", bridgeDigests[index], name)
 	}
-	fmt.Fprintf(&output, "%s  autopus-adk_0.50.107_windows_amd64.zip\n", strings.Repeat("5", 64))
+	fmt.Fprintf(&output, "%s  autopus-adk_0.50.108_windows_amd64.zip\n", strings.Repeat("5", 64))
 	return output.String()
 }
