@@ -18,8 +18,10 @@ import (
 var ompFlatSkillPathRe = regexp.MustCompile(`\.agents/skills/[a-z0-9-]+\.md`)
 
 // ompDoubledRuleNamespaceRe matches the doubled namespace produced when a source
-// already says .claude/rules/autopus/ and the prefix map appends autopus/ again.
-var ompDoubledRuleNamespaceRe = regexp.MustCompile(`\.agents/rules/autopus/autopus/`)
+// already carries the autopus namespace and the prefix map prepends the
+// `autopus-` filename prefix again. omp reads .omp/rules non-recursively, so the
+// only valid form is .omp/rules/autopus-<name>.md.
+var ompDoubledRuleNamespaceRe = regexp.MustCompile(`\.omp/rules/autopus-autopus[-/]`)
 
 var ompLegacyCoordinationTokens = []string{
 	"Agent(", "subagent_type", "prompt =", "prompt=", "task tool", "task(...)", "spawn_agent", "multi_agent",
@@ -89,8 +91,8 @@ func TestReplacePlatformReferencesOMP_S12_PathPrefixes(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"rules bare", "See `.claude/rules/branding.md`.", "`.agents/rules/autopus/branding.md`"},
-		{"rules already namespaced", "See `.claude/rules/autopus/branding.md`.", "`.agents/rules/autopus/branding.md`"},
+		{"rules bare", "See `.claude/rules/branding.md`.", "`.omp/rules/autopus-branding.md`"},
+		{"rules already namespaced", "See `.claude/rules/autopus/branding.md`.", "`.omp/rules/autopus-branding.md`"},
 		{"commands", "See `.claude/commands/auto.md`.", "`.agents/commands/auto.md`"},
 		{"agents", "See `.claude/agents/autopus/executor.md`.", "`.omp/agents/autopus/executor.md`"},
 		{"generic claude dir", "Config lives in `.claude/settings.json`.", "`.omp/settings.json`"},
@@ -128,7 +130,7 @@ func TestReplacePlatformReferencesOMP_PreservesRootGlobInventoryOnly(t *testing.
 		".agents/skills/verification/SKILL.md",
 		".agents/commands/auto.md",
 		".omp/agents/autopus/reviewer.md",
-		".agents/rules/autopus/branding.md",
+		".omp/rules/autopus-branding.md",
 		".omp/**/runtime.json",
 	} {
 		assert.Contains(t, got, operational)
@@ -161,7 +163,7 @@ func TestNormalizeAgentReferencesOMP_S12_BrandingRule(t *testing.T) {
 	input := "- **브랜딩**: `content/rules/branding.md` 준수"
 	got := content.NormalizeAgentReferences(input, "omp")
 
-	assert.Contains(t, got, "`.agents/rules/autopus/branding.md`")
+	assert.Contains(t, got, "`.omp/rules/autopus-branding.md`")
 	assert.NotContains(t, got, "`content/rules/branding.md`",
 		"omp must not fall back to the repository-internal source path")
 }

@@ -106,6 +106,61 @@ func detectInstalledPlatforms() []string {
 	return platforms
 }
 
+// gitignorePatterns는 autopus 관련 .gitignore 패턴 목록이다.
+var gitignorePatterns = []string{
+	".autopus/*-manifest.json",
+	".autopus/context/signatures.md",
+	".autopus/plugins/",
+	".autopus/orchestra/",
+	".autopus/brainstorms/",
+	".autopus/txns/",
+	".autopus/design/imports/",
+	".autopus/design/verify/",
+	".autopus/canary/",
+	".autopus/backup/",
+	".autopus/cache/",
+	".autopus/docs/",
+	".autopus/qa/runs/",
+	".autopus/qa/cache/",
+	".autopus/qa/gui/",
+	".autopus/qa/feedback/",
+	".autopus/qa/evidence/",
+	".autopus/qa/releases/",
+	".autopus/runtime/",
+	".autopus/omp-model-resolution-v1.json",
+	".autopus/state.json",
+	".autopus/telemetry/",
+	".autopus/audit.jsonl",
+	"**/.autopus/specs/**/review.md",
+	"**/.autopus/specs/**/review-findings.json",
+	"**/.autopus/specs/**/.self-verify.log",
+	"/.claude/",
+	"/.claude.json",
+	"/.codex/",
+	"/.gemini/",
+	"/.opencode/",
+	".agents/skills/",
+	".agents/plugins/",
+	".agents/commands/",
+	".agents/hooks.json",
+	// Directory form, never a file-name glob. omp discovers rules with a
+	// gitignore-aware glob, and measured on omp 17.3.5 a `.omp/rules/autopus-*.md`
+	// entry drops all 14 generated rules from the session (domain rules 9 -> 0,
+	// TTSR 3 -> 0) while `.omp/rules/` keeps all 14 discoverable. Omitting the
+	// entry is not an option either: doctor's hygiene check fails on untracked
+	// runtime/generated files left visible to git.
+	//
+	// A user who wants their own rule in this tree tracked runs
+	// `git add -f .omp/rules/mine.md` or keeps the rule outside `.omp/rules/`.
+	// A `!` negation cannot re-include a file whose parent directory is excluded.
+	".omp/rules/",
+	".omp/agents/",
+	".omp/config.yml",
+	".symphony/artifacts/",
+	"/.mcp.json",
+	"/config.toml",
+}
+
 // updateGitignore는 .gitignore에 autopus 패턴을 추가한다.
 func updateGitignore(dir string) error {
 	gitignorePath := filepath.Join(dir, ".gitignore")

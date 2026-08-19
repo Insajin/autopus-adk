@@ -15,51 +15,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
 
-// gitignorePatterns는 autopus 관련 .gitignore 패턴 목록이다.
-var gitignorePatterns = []string{
-	".autopus/*-manifest.json",
-	".autopus/context/signatures.md",
-	".autopus/plugins/",
-	".autopus/orchestra/",
-	".autopus/brainstorms/",
-	".autopus/txns/",
-	".autopus/design/imports/",
-	".autopus/design/verify/",
-	".autopus/canary/",
-	".autopus/backup/",
-	".autopus/cache/",
-	".autopus/docs/",
-	".autopus/qa/runs/",
-	".autopus/qa/cache/",
-	".autopus/qa/gui/",
-	".autopus/qa/feedback/",
-	".autopus/qa/evidence/",
-	".autopus/qa/releases/",
-	".autopus/runtime/",
-	".autopus/omp-model-resolution-v1.json",
-	".autopus/state.json",
-	".autopus/telemetry/",
-	".autopus/audit.jsonl",
-	"**/.autopus/specs/**/review.md",
-	"**/.autopus/specs/**/review-findings.json",
-	"**/.autopus/specs/**/.self-verify.log",
-	"/.claude/",
-	"/.claude.json",
-	"/.codex/",
-	"/.gemini/",
-	"/.opencode/",
-	".agents/skills/",
-	".agents/plugins/",
-	".agents/commands/",
-	".agents/hooks.json",
-	".agents/rules/autopus/",
-	".omp/agents/",
-	".omp/config.yml",
-	".symphony/artifacts/",
-	"/.mcp.json",
-	"/config.toml",
-}
-
 func newInitCmd() *cobra.Command {
 	var (
 		dir          string

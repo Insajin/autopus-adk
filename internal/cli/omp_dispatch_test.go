@@ -35,7 +35,7 @@ func TestGeneratePreviewMappings_OMPResolvesToAdapter(t *testing.T) {
 	for _, file := range files {
 		target := filepath.ToSlash(file.TargetPath)
 		switch {
-		case strings.HasPrefix(target, ".agents/rules/autopus/"):
+		case strings.HasPrefix(target, ".omp/rules/autopus-"):
 			surfaces["rules"]++
 		case strings.HasPrefix(target, ".omp/agents/"):
 			surfaces["agents"]++
@@ -79,19 +79,26 @@ func TestPreviewPruneRoots_MatchOMPApplyPath(t *testing.T) {
 // .md commands omp wrote under .agents/commands are orphans (opencode serves
 // commands from .opencode/commands/), while .agents/skills/auto/SKILL.md now
 // belongs to opencode and must survive.
+//
+// The legacy .agents/rules/autopus/branding.md entry pins the upgrade path:
+// rules now live at .omp/rules/autopus-<name>.md, so a path a pre-relocation
+// manifest recorded is no longer emitted and must be pruned. That only works
+// while the legacy directory stays in the prune root list, which is why
+// relocation adds .omp/rules instead of replacing .agents/rules/autopus.
 func TestPreviewAndApplyComputeSameOMPPruneSet(t *testing.T) {
 	t.Parallel()
 
 	cfg := ompDispatchConfig("opencode", "omp")
 	oldManifest := &adapter.Manifest{Platform: "omp", Files: map[string]adapter.ManifestFile{
-		".agents/rules/autopus/branding.md": {Checksum: "kept", Policy: adapter.OverwriteAlways},
+		".omp/rules/autopus-branding.md":    {Checksum: "kept", Policy: adapter.OverwriteAlways},
+		".agents/rules/autopus/branding.md": {Checksum: "legacy", Policy: adapter.OverwriteAlways},
 		".agents/commands/auto.md":          {Checksum: "stale", Policy: adapter.OverwriteAlways},
 		".agents/commands/auto-plan.md":     {Checksum: "stale", Policy: adapter.OverwriteAlways},
 		".agents/skills/auto/SKILL.md":      {Checksum: "yielded", Policy: adapter.OverwriteAlways},
 		"AGENTS.md":                         {Checksum: "outside", Policy: adapter.OverwriteMarker},
 	}}
 	newFiles := []adapter.FileMapping{{
-		TargetPath:      ".agents/rules/autopus/branding.md",
+		TargetPath:      ".omp/rules/autopus-branding.md",
 		OverwritePolicy: adapter.OverwriteAlways,
 		Checksum:        "kept",
 	}}
@@ -103,9 +110,12 @@ func TestPreviewAndApplyComputeSameOMPPruneSet(t *testing.T) {
 	assert.Equal(t, []string{
 		".agents/commands/auto-plan.md",
 		".agents/commands/auto.md",
+		".agents/rules/autopus/branding.md",
 	}, applyPrune)
 	assert.NotContains(t, applyPrune, ".agents/skills/auto/SKILL.md",
 		"a surface omp yielded in place must never be pruned by omp")
 	assert.NotContains(t, applyPrune, "AGENTS.md",
 		"a managed file outside the compiler-owned roots is never pruned")
+	assert.NotContains(t, applyPrune, ".omp/rules/autopus-branding.md",
+		"a rule the current run still emits is never pruned")
 }

@@ -184,7 +184,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Run pinned OMP native task hub smoke
+      - name: Run pinned OMP native task hub and rule delivery smokes
         shell: bash
         run: |
           set -euo pipefail
@@ -192,8 +192,11 @@ jobs:
           [[ "$(uname -s)" == 'Darwin' ]]
           [[ "$(uname -m)" == 'arm64' ]]
           omp_binary="${RUNNER_TEMP}/omp-v17.2.7-darwin-arm64"
+          omp_bin_dir="${RUNNER_TEMP}/omp-path-shim"
           [[ ! -e "$omp_binary" && ! -L "$omp_binary" ]]
+          [[ ! -e "$omp_bin_dir" && ! -L "$omp_bin_dir" ]]
           cleanup_omp() {
+            rm -rf -- "$omp_bin_dir"
             rm -f -- "$omp_binary"
           }
           trap cleanup_omp EXIT
@@ -210,6 +213,13 @@ jobs:
           AUTOPUS_OMP_LIVE_EXECUTABLE="$omp_binary" \
             go test -count=1 -timeout=90s \
             -run '^TestOMPNativeTaskHubLiveSmoke$' ./pkg/adapter/omp
+          # The rule-delivery oracle resolves `omp` from PATH, so publish the same
+          # verified binary under its plain name instead of downloading it twice.
+          /bin/mkdir -m 0755 "$omp_bin_dir"
+          /bin/ln -s "$omp_binary" "$omp_bin_dir/omp"
+          AUTOPUS_OMP_RULES_LIVE=1 PATH="$omp_bin_dir:$PATH" \
+            go test -count=1 -timeout=90s \
+            -run '^TestOMPRules_LiveSessionReceivesEverySourceRule$' ./pkg/adapter/omp
 
   macos-runtime:
     name: macos-runtime

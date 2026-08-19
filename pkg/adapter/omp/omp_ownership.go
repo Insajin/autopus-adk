@@ -11,8 +11,10 @@ import "github.com/insajin/autopus-adk/pkg/config"
 //
 // Pruning is additionally limited to paths recorded in the previous manifest
 // (see adapter.BuildManifestDiff and Clean), so a file omp never wrote is never
-// eligible: antigravity's .agents/commands/*.toml and a user's own
-// .agents/rules/*.md survive because omp never records them.
+// eligible: antigravity's .agents/commands/*.toml survives because omp never
+// records it, and so does every file under .omp/rules that lacks the
+// ompRuleFilePrefix namespace — generated rules share that directory with the
+// user's own rules, and only the prefixed files omp recorded are ever pruned.
 //
 // Eligibility is decided per surface, not per operation. .agents/commands stays
 // listed even after omp yields the command surface, because opencode serves
@@ -39,6 +41,14 @@ func PruneRoots(cfg *config.HarnessConfig) []string {
 // leaving an omp file behind, so unprovable ownership fails closed.
 func ompExclusivePruneRoots() []string {
 	return []string{
+		// Generated rules live directly in the shared, non-recursively scanned
+		// .omp/rules; the manifest restriction above is what keeps a user's
+		// unprefixed files in the same directory safe.
+		ompRuleDir,
+		// Legacy root: rules used to be written to .agents/rules/autopus/.
+		// It stays listed so an update whose previous manifest still records
+		// those paths prunes them (and collapses the emptied directories);
+		// nothing is written there anymore.
 		".agents/rules/autopus",
 		".omp/agents",
 		configFile,

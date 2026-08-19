@@ -45,6 +45,9 @@ coverage.out
 .agents/plugins/
 .agents/commands/
 .agents/hooks.json
+.omp/rules/
+.omp/agents/
+.omp/config.yml
 .symphony/artifacts/
 /.mcp.json
 /config.toml

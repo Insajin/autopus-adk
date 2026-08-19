@@ -47,15 +47,21 @@ func backupCopies(t *testing.T, root string) map[string]bool {
 	return found
 }
 
-// TestOMPAcceptance_S13_UserOwnedOMPSurfacePreserved covers REQ-017.
+// TestOMPAcceptance_S13_UserOwnedOMPSurfacePreserved covers REQ-017. Ownership
+// inside `.omp/rules` is per file, not per directory: only the `autopus-`
+// prefixed files the manifest records belong to the ADK, everything else in that
+// directory is the user's.
 func TestOMPAcceptance_S13_UserOwnedOMPSurfacePreserved(t *testing.T) {
 	dir := generateOMPOnly(t)
 
-	userRule := filepath.Join(dir, ".omp", "rules", "my-rule.md")
+	userRule := filepath.Join(dir, ompRuleDir, "mine.md")
 	require.NoError(t, os.MkdirAll(filepath.Dir(userRule), 0o755))
 	require.NoError(t, os.WriteFile(userRule, []byte("# user rule\n"), 0o644))
 	userRulesMD := filepath.Join(dir, ".omp", "RULES.md")
 	require.NoError(t, os.WriteFile(userRulesMD, []byte("# sticky rules\n"), 0o644))
+
+	managedRule := filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md")
+	require.FileExists(t, managedRule, "the managed rule must exist before Clean")
 
 	// User keys added outside the managed marker section.
 	cfgPath := filepath.Join(dir, configFile)
@@ -77,9 +83,18 @@ func TestOMPAcceptance_S13_UserOwnedOMPSurfacePreserved(t *testing.T) {
 
 	require.NoError(t, NewWithRoot(dir).Clean(context.Background()))
 
-	assert.FileExists(t, userRule, ".omp/rules/my-rule.md must survive")
-	assert.FileExists(t, userRulesMD, ".omp/RULES.md must survive")
+	survivingRule, err := os.ReadFile(userRule)
+	require.NoError(t, err, ".omp/rules/mine.md must survive")
+	assert.Equal(t, "# user rule\n", string(survivingRule),
+		"a user file sharing the rule directory survives byte-identically")
+	survivingRulesMD, err := os.ReadFile(userRulesMD)
+	require.NoError(t, err, ".omp/RULES.md must survive")
+	assert.Equal(t, "# sticky rules\n", string(survivingRulesMD))
+	assert.NoFileExists(t, managedRule,
+		"a manifest-recorded .omp/rules/autopus-*.md must be removed")
 	assert.DirExists(t, filepath.Join(dir, ".omp"), ".omp/ must not be removed wholesale")
+	assert.DirExists(t, filepath.Join(dir, ompRuleDir),
+		".omp/rules/ survives while it still holds a user file")
 
 	backups := backupCopies(t, dir)
 	assert.True(t, backups[".omp/agents/executor.md"],

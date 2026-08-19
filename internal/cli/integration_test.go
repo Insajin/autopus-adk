@@ -159,12 +159,12 @@ func TestDoctor_ReportsHealth(t *testing.T) {
 		// autopus.yaml 없이 doctor 실행
 
 		out, err := runCmd(t, "doctor", "--dir", dir)
-		// doctor는 오류를 반환하지 않고 출력으로 보고함
-		require.NoError(t, err)
-
-		// 설정 로드 실패 메시지 확인
-		assert.Contains(t, out, "Autopus")
-		assert.Contains(t, out, "ERROR")
+		// 합성 기본값으로 점검하지 않고 실행 가능한 오류로 끝난다.
+		require.Error(t, err, out)
+		assert.Contains(t, err.Error(), "autopus.yaml")
+		assert.Contains(t, err.Error(), "auto init")
+		// 설정을 읽기 전이므로 배너도 점검 결과도 출력되지 않는다.
+		assert.NotContains(t, out, "[OK] autopus.yaml")
 	})
 }
 

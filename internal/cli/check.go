@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/evalregression"
 )
 
@@ -56,7 +57,16 @@ func newCheckCmd() *cobra.Command {
 
 			out := cmd.OutOrStdout()
 			if !quietFlag {
-				tui.BannerWithInfo(out, "autopus-adk", "check")
+				// Same defect as doctor's banner: the literal "autopus-adk"
+				// named this repository no matter where the command ran. check
+				// runs from hooks in projects that may not be initialized, so a
+				// missing or unreadable config degrades to the directory name
+				// instead of failing the check.
+				var cfg *config.HarnessConfig
+				if config.Exists(dir) {
+					cfg, _ = config.LoadPreview(dir)
+				}
+				tui.BannerWithInfo(out, harnessProjectLabel(dir, cfg), "check")
 			}
 			policy := evalregression.EvalRegressionAttestationPolicyV2{
 				ExpectedKeyID:     evalRegressionExpectedKeyIDFlag,

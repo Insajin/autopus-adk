@@ -34,15 +34,32 @@ func TestCLI_Help(t *testing.T) {
 	assert.True(t, strings.Contains(combined, "auto"), "--help output should mention 'auto'")
 }
 
-func TestCLI_Doctor_Basic(t *testing.T) {
+func TestCLI_Doctor_RequiresProject(t *testing.T) {
 	t.Parallel()
 
 	bin := buildBinary(t)
-	// doctor requires a valid project dir; run in t.TempDir to avoid side effects.
-	// It will fail to load autopus.yaml which is expected.
+	// A directory without autopus.yaml is not a project: doctor must refuse
+	// instead of synthesizing a default claude-code project and reporting
+	// findings against surfaces the caller never configured.
 	r := runBinary(t, bin, "doctor", "--dir", t.TempDir())
 
-	// doctor exits 0 even when checks fail (it reports but does not error).
+	assert.NotEqual(t, 0, r.ExitCode, "doctor must fail without autopus.yaml")
+	combined := r.Stdout + r.Stderr
+	assert.Contains(t, combined, "autopus.yaml")
+	assert.Contains(t, combined, "auto init")
+}
+
+func TestCLI_Doctor_InitializedProjectExitsZero(t *testing.T) {
+	t.Parallel()
+
+	bin := buildBinary(t)
+	dir := t.TempDir()
+	init := runBinary(t, bin, "init", "--dir", dir, "--platforms", "claude-code", "--yes")
+	assert.Equal(t, 0, init.ExitCode, "init should establish the project")
+
+	r := runBinary(t, bin, "doctor", "--dir", dir)
+
+	// doctor reports findings but exits 0 once the project exists.
 	assert.Equal(t, 0, r.ExitCode, "doctor should exit 0 even with warnings")
 	combined := r.Stdout + r.Stderr
 	assert.True(t, len(combined) > 0, "doctor should produce output")

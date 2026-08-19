@@ -114,17 +114,21 @@ func TestDoctorCmd_WithConfig(t *testing.T) {
 }
 
 // TestDoctorCmd_NoConfig는 설정 파일 없는 doctor 커맨드를 테스트한다.
+// 합성 기본값으로 점검을 진행하지 않고 실행 가능한 오류로 끝나며, 배너를 포함한
+// 어떤 점검 출력도 나오지 않는다.
 func TestDoctorCmd_NoConfig(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 
-	var buf bytes.Buffer
+	var buf, errBuf bytes.Buffer
 	doctorCmd := newTestRootCmd()
 	doctorCmd.SetOut(&buf)
+	doctorCmd.SetErr(&errBuf)
 	doctorCmd.SetArgs([]string{"doctor", "--dir", dir})
-	// 설정 파일 없어도 오류 없이 실행됨 (내부에서 처리)
-	_ = doctorCmd.Execute()
-	output := buf.String()
-	assert.Contains(t, output, "Autopus")
+	err := doctorCmd.Execute()
+	require.Error(t, err, buf.String())
+	assert.Contains(t, err.Error(), "autopus.yaml")
+	assert.Empty(t, buf.String(),
+		"설정을 읽기 전에는 배너도 점검 결과도 출력하지 않는다")
 }

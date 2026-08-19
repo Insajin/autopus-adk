@@ -5,7 +5,7 @@
 
 - **프로젝트**: autopus-adk
 - **모드**: full
-- **플랫폼**: claude-code, codex, antigravity-cli, opencode
+- **플랫폼**: claude-code, codex, antigravity-cli, opencode, omp
 
 ## 설치된 구성 요소
 

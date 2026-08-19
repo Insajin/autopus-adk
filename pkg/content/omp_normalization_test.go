@@ -17,9 +17,10 @@ import (
 var flatSkillRefRe = regexp.MustCompile(`\.agents/skills/[a-z0-9-]+\.md`)
 
 // doubledRuleNamespaceRe matches the doubled namespace produced when a source
-// already says `.claude/rules/autopus/` and the prefix map appends `autopus/`
-// a second time. omp emits rules at `.agents/rules/autopus/<name>.md` only.
-var doubledRuleNamespaceRe = regexp.MustCompile(`\.agents/rules/autopus/autopus/`)
+// already carries the autopus namespace and the prefix map prepends the
+// `autopus-` filename prefix a second time. omp emits rules at
+// `.omp/rules/autopus-<name>.md` only, flat and non-recursive.
+var doubledRuleNamespaceRe = regexp.MustCompile(`\.omp/rules/autopus-autopus[-/]`)
 
 var ompForbiddenCoordinationTokens = []string{
 	"Agent(", "subagent_type", "prompt =", "prompt=", "task tool", "task(...)", "spawn_agent", "multi_agent",
@@ -60,8 +61,8 @@ func TestOMPNormalization_S12_PrefixTable(t *testing.T) {
 		{"skills autopus namespace", "See `.claude/skills/autopus/prd.md`.", "`.agents/skills/prd/SKILL.md`"},
 		{"commands", "See `.claude/commands/auto.md`.", "`.agents/commands/auto.md`"},
 		{"agents", "See `.claude/agents/autopus/executor.md`.", "`.omp/agents/autopus/executor.md`"},
-		{"rules already namespaced", "See `.claude/rules/autopus/branding.md`.", "`.agents/rules/autopus/branding.md`"},
-		{"rules bare", "See `.claude/rules/branding.md`.", "`.agents/rules/autopus/branding.md`"},
+		{"rules already namespaced", "See `.claude/rules/autopus/branding.md`.", "`.omp/rules/autopus-branding.md`"},
+		{"rules bare", "See `.claude/rules/branding.md`.", "`.omp/rules/autopus-branding.md`"},
 		{"generic claude dir", "Config lives in `.claude/settings.json`.", "`.omp/settings.json`"},
 	}
 
@@ -85,7 +86,7 @@ func TestOMPNormalization_S12_SkillRefStageTwo(t *testing.T) {
 // TestOMPNormalization_S12_BrandingRuleReference covers REQ-015 branding fallback.
 func TestOMPNormalization_S12_BrandingRuleReference(t *testing.T) {
 	got := NormalizeAgentReferences("Follow `content/rules/branding.md` for output format.", "omp")
-	assert.Contains(t, got, "`.agents/rules/autopus/branding.md`")
+	assert.Contains(t, got, "`.omp/rules/autopus-branding.md`")
 	assert.NotContains(t, got, "`content/rules/branding.md`",
 		"omp must not fall back to the repository-internal source path")
 }
@@ -148,7 +149,7 @@ func TestOMPNormalization_S12_EmittedSkillBodies(t *testing.T) {
 		assert.Empty(t, flatSkillRefRe.FindAllString(skill.Content, -1),
 			"skill %s must not reference .agents/skills/<name>.md", skill.Name)
 		assert.Empty(t, doubledRuleNamespaceRe.FindAllString(skill.Content, -1),
-			"skill %s must reference .agents/rules/autopus/<name>.md, not a doubled namespace", skill.Name)
+			"skill %s must reference .omp/rules/autopus-<name>.md, not a doubled namespace", skill.Name)
 	}
 }
 

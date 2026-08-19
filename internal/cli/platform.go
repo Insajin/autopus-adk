@@ -42,7 +42,7 @@ func newPlatformListCmd(dir *string) *cobra.Command {
 		Use:   "list",
 		Short: "List configured and detected platforms",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			d, err := resolveDir(*dir)
+			d, err := resolveProjectDir(*dir)
 			if err != nil {
 				return err
 			}
@@ -79,7 +79,7 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 		Short: "Add a platform to autopus.yaml",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			d, err := resolveDir(*dir)
+			d, err := resolveProjectDir(*dir)
 			if err != nil {
 				return err
 			}
@@ -171,7 +171,7 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 		Short: "Remove a platform from autopus.yaml",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			d, err := resolveDir(*dir)
+			d, err := resolveProjectDir(*dir)
 			if err != nil {
 				return err
 			}

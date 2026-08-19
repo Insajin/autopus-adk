@@ -88,15 +88,33 @@ func isRuleTargetPath(targetPath string) bool {
 		strings.Contains(p, `hooks\autopus\conditional\`)
 }
 
+// ompRuleDirSegment and ompRuleFilePrefix mirror the constants of the same
+// meaning in pkg/adapter/omp, which are unexported and unreachable from this
+// external test package. omp scans .omp/rules non-recursively, so the adapter
+// namespaces its rules by file-name prefix instead of a subdirectory.
+const (
+	ompRuleDirSegment = ".omp/rules/"
+	ompRuleFilePrefix = "autopus-"
+)
+
 // extractRuleName resolves the source rule filename a generated path maps to.
 // Conditional bodies keep their source basename, so relocation leaves the name
 // unchanged and platformRuleExclusions["claude"] can stay empty.
+//
+// codex flattens rules into .codex/rules-autopus-<name>.md and omp into
+// .omp/rules/autopus-<name>.md; both prefixes have to come off, or the coverage
+// gate reports all 14 source rules as missing for that platform.
 func extractRuleName(targetPath string) string {
-	base := filepath.Base(targetPath)
-	if strings.HasPrefix(base, "rules-autopus-") {
+	path := filepath.ToSlash(targetPath)
+	base := filepath.Base(path)
+	switch {
+	case strings.HasPrefix(base, "rules-autopus-"):
 		return strings.TrimPrefix(base, "rules-autopus-")
+	case strings.Contains(path, ompRuleDirSegment):
+		return strings.TrimPrefix(base, ompRuleFilePrefix)
+	default:
+		return base
 	}
-	return base
 }
 
 // frontmatterKeySet returns the top-level frontmatter keys of a rule file.
