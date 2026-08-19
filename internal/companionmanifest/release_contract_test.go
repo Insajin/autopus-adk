@@ -13,11 +13,11 @@ import (
 func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"v0.50.107", "refs/tags/v0.50.107",
+		"v0.50.108", "refs/tags/v0.50.108",
 		"environment:", "adk-companion-release",
 		"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
 		"Verify operator-owned draft release reservation",
-		`[$all[] | select(.draft == true and .name == "v0.50.107")]`,
+		`[$all[] | select(.draft == true and .name == "v0.50.108")]`,
 		"$tagged[0].id == $named[0].id",
 		"Verify reserved release was published",
 		".author.id == 204883817", ".immutable == true",
@@ -255,8 +255,8 @@ func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *t
 			releaseIndex, signingCleanupIndex, evidenceIndex, tokenIndex, bridgeIndex, cleanupIndex)
 	}
 	for _, exact := range []string{
-		"GITHUB_REF_NAME='v0.50.107'",
-		"COMPANION_VERSION='0.50.107'",
+		"GITHUB_REF_NAME='v0.50.108'",
+		"COMPANION_VERSION='0.50.108'",
 		"COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}",
 		`COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"`,
 		`HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN"`,
