@@ -156,6 +156,10 @@ var gitignorePatterns = []string{
 	".omp/rules/",
 	".omp/agents/",
 	".omp/config.yml",
+	// Extensions load through the same gitignore-aware discovery: measured on
+	// omp 17.3.5, `.omp/extensions/autopus-*.ts` stops autopus-pipeline.ts from
+	// registering its command, while `.omp/extensions/` leaves it registered.
+	".omp/extensions/",
 	".symphony/artifacts/",
 	"/.mcp.json",
 	"/config.toml",

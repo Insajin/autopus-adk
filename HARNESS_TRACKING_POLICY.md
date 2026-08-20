@@ -26,6 +26,7 @@ Autopus-ADK is the source of truth for harness templates, content, adapters, and
 - `.omp/rules/` — ADK-owned rules are the `autopus-` prefixed files; ignore the directory, never a file-name glob, because omp drops gitignored rule files from session discovery
 - `.omp/agents/`
 - `.omp/config.yml`
+- `.omp/extensions/` — same directory-only rule: a file-name glob stops the generated extensions from registering in a session
 - `.autopus/plugins/**`
 - `.autopus/*-manifest.json`
 - `.autopus/context/signatures.md`

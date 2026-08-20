@@ -15,20 +15,23 @@ import (
 
 // ompDiscoveryRoots are the directories omp scans with a gitignore-aware glob.
 // A file-name-form pattern under one of these removes the matching rule, skill,
-// or command from omp's own discovery output, so only directory-form patterns
-// are safe here. .omp/config.yml is deliberately absent: omp reads it directly
-// as settings rather than through a discovery glob (REQ-011).
+// command, or extension from omp's own discovery output, so only directory-form
+// patterns are safe here. .omp/config.yml is deliberately absent: omp reads it
+// directly as settings rather than through a discovery glob (REQ-011).
 //
 // Measured on omp 17.3.5: a .gitignore holding `.omp/rules/autopus-*.md` drops
 // all 14 relocated rules from the session (domain rules 9 -> 0, TTSR 3 -> 0),
 // while `.omp/rules/` keeps all 14. The rule surface therefore has to be
-// ignored by directory, never by file-name glob.
+// ignored by directory, never by file-name glob. The extension surface behaves
+// the same way: `.omp/extensions/autopus-*.ts` stops autopus-pipeline.ts from
+// registering its command while `.omp/extensions/` leaves it registered.
 var ompDiscoveryRoots = []string{
 	".agents/rules/",
 	".agents/skills/",
 	".agents/commands/",
 	".omp/agents/",
 	".omp/rules/",
+	".omp/extensions/",
 }
 
 // TestGitignorePatterns_OMPUsesDirectoryFormsOnly covers REQ-011/S8.
@@ -44,14 +47,19 @@ func TestGitignorePatterns_OMPUsesDirectoryFormsOnly(t *testing.T) {
 	// form suppresses omp's own rule discovery (measured, omp 17.3.5), and
 	// omitting the pattern entirely leaves generated files unignored, which the
 	// doctor hygiene check reports.
-	for _, required := range []string{".omp/rules/", ".omp/agents/", ".omp/config.yml"} {
+	for _, required := range []string{
+		".omp/rules/", ".omp/agents/", ".omp/config.yml", ".omp/extensions/",
+	} {
 		assert.True(t, patterns[required], "missing ADK-authored omp gitignore pattern %q", required)
 	}
 
 	// `/.omp/` would swallow .omp/RULES.md, the user-owned native sticky rule
 	// file that omp Clean is required to preserve. A file-name glob scoped to
 	// the ADK prefix is forbidden for the discovery reason above.
-	for _, forbidden := range []string{"/.omp/", ".omp/", ".omp/RULES.md", ".omp/rules/autopus-*.md"} {
+	for _, forbidden := range []string{
+		"/.omp/", ".omp/", ".omp/RULES.md",
+		".omp/rules/autopus-*.md", ".omp/extensions/autopus-*.ts",
+	} {
 		assert.False(t, patterns[forbidden],
 			"gitignore pattern %q is not a legal omp pattern", forbidden)
 	}
