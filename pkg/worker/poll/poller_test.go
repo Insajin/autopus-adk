@@ -54,8 +54,11 @@ func TestTaskPoller_OnTaskCallback(t *testing.T) {
 	var receivedData atomic.Value
 	ctx, cancel := context.WithCancel(context.Background())
 	p := NewTaskPoller(srv.URL, "tok", "ws", func(data []byte) {
-		called.Store(true)
+		// Publish the payload before the flag the test waits on: the reverse
+		// order let Eventually observe called=true while receivedData was still
+		// empty, and the assertion below panicked on a nil interface.
 		receivedData.Store(string(data))
+		called.Store(true)
 	})
 	p.backoff = &AdaptiveBackoff{min: time.Millisecond, max: time.Millisecond, factor: 1, current: time.Millisecond}
 
@@ -64,7 +67,9 @@ func TestTaskPoller_OnTaskCallback(t *testing.T) {
 	require.Eventually(t, func() bool { return called.Load() }, 200*time.Millisecond, 5*time.Millisecond)
 	cancel()
 
-	assert.Contains(t, receivedData.Load().(string), "task-1")
+	payload, ok := receivedData.Load().(string)
+	require.True(t, ok, "callback must publish the payload before signalling")
+	assert.Contains(t, payload, "task-1")
 }
 
 func TestTaskPoller_BackoffResetOnTask(t *testing.T) {
