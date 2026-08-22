@@ -55,7 +55,7 @@ func TestUpdateGitignoreAddsExactOMPModelReceiptRule(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	if err := updateGitignore(dir); err != nil {
+	if _, err := updateGitignore(dir); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
@@ -83,7 +83,7 @@ func TestUpdateGitignoreMatchesExactPatternLines(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := updateGitignore(dir); err != nil {
+	if _, err := updateGitignore(dir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -110,7 +110,7 @@ func TestUpdateGitignoreMigratesLegacyUnanchoredGeneratedPatterns(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	if err := updateGitignore(dir); err != nil {
+	if _, err := updateGitignore(dir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -134,7 +134,7 @@ func TestUpdateGitignoreAnchorsPlatformDogfoodSurface(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	if err := updateGitignore(dir); err != nil {
+	if _, err := updateGitignore(dir); err != nil {
 		t.Fatal(err)
 	}
 	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {

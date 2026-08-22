@@ -129,6 +129,7 @@ func newUpdateCmd() *cobra.Command {
 						"detected platforms: "+strings.Join(addedPlatforms, ", "),
 					)
 				}
+				configReasons = appendGitignorePreviewReason(configReasons, dir)
 
 				migrated, migrateErr := config.MigrateOrchestraConfig(previewCfg)
 				if migrateErr != nil {
@@ -179,6 +180,11 @@ func newUpdateCmd() *cobra.Command {
 			}
 			if designConfigMissing && cfg.Design.Enabled {
 				fmt.Fprintln(cmd.OutOrStdout(), "  + design defaults added to autopus.yaml")
+			}
+			// Before any platform writes: an ignore entry that lands after the
+			// generated surface leaves it visible to git in between.
+			if gitignoreErr := applyGitignoreUpdate(cmd.OutOrStdout(), dir); gitignoreErr != nil {
+				return gitignoreErr
 			}
 
 			// 프로젝트 설정 프롬프트 (미설정 항목만, --yes 시 스킵)

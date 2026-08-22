@@ -81,7 +81,8 @@ func TestUpdateGitignore_OMPIgnoresGeneratedButNotUserSurface(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	require.NoError(t, updateGitignore(dir))
+	_, gitignoreErr := updateGitignore(dir)
+	require.NoError(t, gitignoreErr)
 	if out, err := exec.Command("git", "-C", dir, "init").CombinedOutput(); err != nil {
 		t.Fatalf("git init failed: %v\n%s", err, out)
 	}

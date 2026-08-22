@@ -4,6 +4,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,49 +166,105 @@ var gitignorePatterns = []string{
 	"/config.toml",
 }
 
-// updateGitignore는 .gitignore에 autopus 패턴을 추가한다.
-func updateGitignore(dir string) error {
-	gitignorePath := filepath.Join(dir, ".gitignore")
+// gitignoreUpdatePlan is the .gitignore work a project still needs: the managed
+// patterns it is missing, plus whether a legacy pattern has to be rewritten.
+type gitignoreUpdatePlan struct {
+	Missing  []string
+	Migrated bool
+}
 
+func (plan gitignoreUpdatePlan) Empty() bool {
+	return len(plan.Missing) == 0 && !plan.Migrated
+}
+
+// Summary is tense-free so that both the writer and the update preview can wrap
+// it in their own phrasing without restating the case analysis.
+func (plan gitignoreUpdatePlan) Summary() string {
+	switch {
+	case len(plan.Missing) > 0 && plan.Migrated:
+		return fmt.Sprintf("%d pattern(s), legacy rewrite", len(plan.Missing))
+	case len(plan.Missing) > 0:
+		return fmt.Sprintf("%d pattern(s)", len(plan.Missing))
+	case plan.Migrated:
+		return "legacy rewrite"
+	}
+	return ""
+}
+
+// planGitignoreUpdate reports what updateGitignore would change without writing.
+// The update preview and the writer must agree, so both read this one function.
+func planGitignoreUpdate(dir string) (gitignoreUpdatePlan, string) {
 	var existing string
-	if data, err := os.ReadFile(gitignorePath); err == nil {
+	if data, err := os.ReadFile(filepath.Join(dir, ".gitignore")); err == nil {
 		existing = string(data)
 	}
 	existing, migrated := migrateLegacyRootGeneratedGitignorePatterns(existing)
-	existingLines := make(map[string]bool)
+	present := make(map[string]bool)
 	for _, line := range strings.Split(existing, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		existingLines[line] = true
+		present[line] = true
 	}
 
-	var toAdd []string
+	var missing []string
 	for _, pattern := range gitignorePatterns {
-		if !existingLines[pattern] {
-			toAdd = append(toAdd, pattern)
+		if !present[pattern] {
+			missing = append(missing, pattern)
 		}
 	}
+	return gitignoreUpdatePlan{Missing: missing, Migrated: migrated}, existing
+}
 
-	if len(toAdd) == 0 && !migrated {
-		return nil
+// updateGitignore는 .gitignore에 autopus 패턴을 추가한다.
+func updateGitignore(dir string) (gitignoreUpdatePlan, error) {
+	plan, existing := planGitignoreUpdate(dir)
+	if plan.Empty() {
+		return plan, nil
 	}
 
 	var sb strings.Builder
 	sb.WriteString(existing)
-	if len(toAdd) > 0 {
+	if len(plan.Missing) > 0 {
 		if existing != "" && !strings.HasSuffix(existing, "\n") {
 			sb.WriteString("\n")
 		}
 		sb.WriteString("\n# Autopus-ADK generated files\n")
-		for _, p := range toAdd {
-			sb.WriteString(p)
+		for _, pattern := range plan.Missing {
+			sb.WriteString(pattern)
 			sb.WriteString("\n")
 		}
 	}
 
-	return os.WriteFile(gitignorePath, []byte(sb.String()), 0644)
+	return plan, os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(sb.String()), 0644)
+}
+
+// applyGitignoreUpdate keeps the ignore surface in step with the pattern list on
+// every entry point, not just init. Patterns added by a release reach an existing
+// project only through update, and omp's rule and extension discovery is
+// gitignore-aware: an unignored generated surface also fails doctor's hygiene
+// check, so update owning this write is what makes the two entry points agree.
+func applyGitignoreUpdate(out io.Writer, dir string) error {
+	plan, err := updateGitignore(dir)
+	if err != nil {
+		return fmt.Errorf(".gitignore 업데이트 실패: %w", err)
+	}
+	if !plan.Empty() {
+		fmt.Fprintf(out, "  + .gitignore updated (%s)\n", plan.Summary())
+	}
+	return nil
+}
+
+// appendGitignorePreviewReason is applyGitignoreUpdate's read-only twin: the
+// preview and the write derive the same decision from planGitignoreUpdate, so a
+// plan the preview omits cannot appear as a surprise write.
+func appendGitignorePreviewReason(reasons []string, dir string) []string {
+	plan, _ := planGitignoreUpdate(dir)
+	if plan.Empty() {
+		return reasons
+	}
+	return appendConfigPreviewReason(reasons, ".gitignore would be updated ("+plan.Summary()+")")
 }
 
 func migrateLegacyRootGeneratedGitignorePatterns(existing string) (string, bool) {

@@ -197,7 +197,7 @@ func newInitCmd() *cobra.Command {
 
 			// Step 4: Gitignore
 			tui.Step(out, 4, 5, "Gitignore")
-			if err := updateGitignore(dir); err != nil {
+			if _, err := updateGitignore(dir); err != nil {
 				return fmt.Errorf(".gitignore 업데이트 실패: %w", err)
 			}
 

@@ -62,9 +62,7 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly, force bool, targetVersion stri
 	}
 
 	if checkOnly {
-		if info != nil {
-			fmt.Fprintf(cmd.OutOrStdout(), "업데이트 가능: v%s → %s\n", currentVer, info.TagName)
-		}
+		reportSelfUpdateAvailability(cmd, currentVer, info)
 		return nil
 	}
 
