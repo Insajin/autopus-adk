@@ -18,7 +18,7 @@ func TestParseOptions_RejectsMissingAndTrailingInputs(t *testing.T) {
 		"--upstream-sha256", "sha256:" + strings.Repeat("1", 64),
 		"--executable-sha256", "sha256:" + strings.Repeat("2", 64),
 		"--source-repository", "Insajin/autopus-adk", "--source-commit", strings.Repeat("3", 40),
-		"--source-tree", strings.Repeat("4", 40), "--target", "darwin-arm64", "--version", "0.50.108",
+		"--source-tree", strings.Repeat("4", 40), "--target", "darwin-arm64", "--version", "0.50.109",
 	}
 	if _, err := parseOptions(append(arguments, "trailing")); err == nil {
 		t.Fatal("trailing argument passed")
@@ -40,7 +40,7 @@ func TestRun_RejectsUnsafeLineageAtUserVisibleReadBoundary(t *testing.T) {
 		"--upstream-sha256", "sha256:" + strings.Repeat("1", 64),
 		"--executable-sha256", "sha256:" + strings.Repeat("2", 64),
 		"--source-repository", "Insajin/autopus-adk", "--source-commit", strings.Repeat("3", 40),
-		"--source-tree", strings.Repeat("4", 40), "--target", "darwin-arm64", "--version", "v0.50.108",
+		"--source-tree", strings.Repeat("4", 40), "--target", "darwin-arm64", "--version", "v0.50.109",
 	}
 	err := run(arguments, time.Date(2026, 8, 5, 0, 0, 0, 0, time.UTC))
 	if err == nil || err.Error() != "lineage input is unsafe" {

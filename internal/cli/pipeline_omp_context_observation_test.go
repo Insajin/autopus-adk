@@ -80,7 +80,7 @@ func pipelineOMPContextObservationFixture() pipelineOMPContextObservationV1 {
 		},
 		Runtime: pipelineOMPContextObservationRuntime{
 			OMPExecutableSHA256: hash("omp"), OMPVersion: "omp/17.2.7",
-			AutoBinarySHA256: hash("auto"), AutoVersion: "0.50.108",
+			AutoBinarySHA256: hash("auto"), AutoVersion: "0.50.109",
 			ExecutionClass: "external-live", RuntimeKind: "omp-pipeline-managed-rpc",
 			ProductionPathEquivalent: true, PipelineImplementationDigest: pipelineOMPActiveImplementationDigest(),
 		},

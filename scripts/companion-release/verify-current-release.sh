@@ -6,8 +6,8 @@ fail() {
   exit 1
 }
 readonly RELEASE_REPOSITORY='Insajin/autopus-adk'
-readonly RELEASE_VERSION='0.50.108'
-readonly RELEASE_TAG='v0.50.108'
+readonly RELEASE_VERSION='0.50.109'
+readonly RELEASE_TAG='v0.50.109'
 readonly REPORT_NAME='omp-context-promotion-report.v1.json'
 readonly ATTESTATION_NAME='omp-context-promotion-attestation.v2.json'
 readonly OMP_PROMOTION_SIGNING_KEY_ID='omp-context-promotion-2026-q3-k2'

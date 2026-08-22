@@ -10,7 +10,7 @@ prepare_omp_context_release_lineage() {
   omp_context_lineage_enabled=0
   lineage_path="$artifact_dir/release-lineage-v1.json"
   lineage_signature_path="$artifact_dir/release-lineage-v1.sig"
-  if [[ "$COMPANION_ARCHITECTURE" != 'arm64' || "$COMPANION_VERSION" != '0.50.108' ]]; then
+  if [[ "$COMPANION_ARCHITECTURE" != 'arm64' || "$COMPANION_VERSION" != '0.50.109' ]]; then
     return 0
   fi
   omp_context_lineage_enabled=1
