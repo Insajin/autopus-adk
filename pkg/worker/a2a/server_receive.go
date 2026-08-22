@@ -25,9 +25,11 @@ func (s *Server) messageLoop(ctx context.Context) {
 		default:
 		}
 
+		generation := s.transportGeneration()
 		data, err := s.transport.Receive()
 		if err != nil {
-			backoff, exhaustedFired = s.handleReceiveError(ctx, err, backoff, exhaustedFired, maxBackoff)
+			backoff, exhaustedFired = s.handleReceiveError(
+				ctx, err, generation, backoff, exhaustedFired, maxBackoff)
 			if ctx.Err() != nil {
 				return
 			}
@@ -46,13 +48,22 @@ func (s *Server) messageLoop(ctx context.Context) {
 	}
 }
 
-func (s *Server) handleReceiveError(ctx context.Context, err error, backoff time.Duration, exhaustedFired bool, maxBackoff time.Duration) (time.Duration, bool) {
+// handleReceiveError reconnects the generation the failed Receive was reading,
+// so a connection another driver already replaced is not torn down again.
+func (s *Server) handleReceiveError(
+	ctx context.Context,
+	err error,
+	generation uint64,
+	backoff time.Duration,
+	exhaustedFired bool,
+	maxBackoff time.Duration,
+) (time.Duration, bool) {
 	if ctx.Err() != nil {
 		return 0, exhaustedFired
 	}
 
 	log.Printf("[a2a] receive error: %v", err)
-	if reconnectErr := s.ReconnectTransport(ctx); reconnectErr == nil {
+	if reconnectErr := s.reconnectTransportFrom(ctx, generation); reconnectErr == nil {
 		log.Printf("[a2a] transport recovered after receive error")
 		return s.resetReceiveBackoff(backoff, exhaustedFired)
 	} else {

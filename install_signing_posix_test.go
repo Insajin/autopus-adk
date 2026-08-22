@@ -55,7 +55,9 @@ export AUTOPUS_INSTALLER_TEST_SOURCE
 PROCESS_TERMINATION_GRACE_SECONDS=1
 TMPDIR=$1
 export TMPDIR
-run_bounded_command 3 "$2" "$3"
+# Same slack as the reparented case below: the helper hangs forever, so the
+# bound always fires; 6s only lets the helper reach its pid write.
+run_bounded_command 6 "$2" "$3"
 `, "bounded-installer-test", tempDir, helperPath, childPIDPath)
 	started := time.Now()
 	output, err := command.CombinedOutput()
@@ -66,8 +68,8 @@ run_bounded_command 3 "$2" "$3"
 	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 124 {
 		t.Fatalf("bounded command exit = %v, want 124; output: %s", err, output)
 	}
-	if elapsed := time.Since(started); elapsed > 8*time.Second {
-		t.Fatalf("bounded command took %s, want at most 8s", elapsed)
+	if elapsed := time.Since(started); elapsed > 12*time.Second {
+		t.Fatalf("bounded command took %s, want at most 12s", elapsed)
 	}
 
 	rawPID, err := os.ReadFile(childPIDPath)
@@ -155,12 +157,20 @@ export AUTOPUS_INSTALLER_TEST_SOURCE
 PROCESS_TERMINATION_GRACE_SECONDS=1
 TMPDIR=$1
 export TMPDIR
-run_bounded_command 3 "$2" "$3"
+# The helper loops forever, so the bound always fires and both the exit 124
+# assertion and the reparented-child kill assertion are unchanged by this
+# value. What a 3s budget did not buy was room for the helper's own startup —
+# sh exec plus two process spawns — to publish "$3" before the bound killed
+# the tree, so a saturated runner read a missing child.pid instead of the
+# behavior under test (2/2 failures under the full parallel module run, while
+# the isolated run passed). 6s keeps the same proportional headroom below the
+# elapsed cap.
+run_bounded_command 6 "$2" "$3"
 `, "reparented-installer-test", tempDir, helperPath, childPIDPath)
 	started := time.Now()
 	output, err := command.CombinedOutput()
-	if elapsed := time.Since(started); elapsed > 8*time.Second {
-		t.Fatalf("reparent cleanup took %s, want at most 8s; output: %s", elapsed, output)
+	if elapsed := time.Since(started); elapsed > 12*time.Second {
+		t.Fatalf("reparent cleanup took %s, want at most 12s; output: %s", elapsed, output)
 	}
 	var exitErr *exec.ExitError
 	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 124 {

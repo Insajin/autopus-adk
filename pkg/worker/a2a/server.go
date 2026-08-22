@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // TaskHandler is invoked when a new task is received.
@@ -48,6 +49,16 @@ type Server struct {
 	heartbeat       *Heartbeat
 	restPoller      *RESTPoller
 	reconnectMu     sync.Mutex
+	// reconnectGen counts completed transport reconnects. Three drivers call
+	// ReconnectTransport for the same connection loss — the receive loop, the
+	// heartbeat timeout, and external callers — and reconnectMu only serializes
+	// them, so each in turn tore down the connection its predecessor had just
+	// established and re-registered the card again. That produced a duplicate
+	// registration per loss and, on a backend that accepts one connection at a
+	// time, `ws write: websocket: close sent` or `dial: connection refused` for
+	// whoever ran second. The generation lets a waiter recognize that the
+	// reconnect it wanted already happened.
+	reconnectGen atomic.Uint64
 }
 
 // toWebSocketURL converts an http/https URL to a ws/wss URL for WebSocket dialing.
@@ -195,13 +206,35 @@ func (s *Server) SetRESTPoller(p *RESTPoller) {
 	s.mu.Unlock()
 }
 
-// ReconnectTransport attempts to reconnect the WebSocket transport.
+// transportGeneration identifies the connection a caller is holding. Pair it
+// with reconnectTransportFrom so a driver asks to replace the exact connection
+// it saw fail rather than whatever is current by the time it acquires the lock.
+func (s *Server) transportGeneration() uint64 {
+	return s.reconnectGen.Load()
+}
+
+// ReconnectTransport attempts to reconnect the WebSocket transport. External
+// callers hold no generation, so they reconnect the current one.
 func (s *Server) ReconnectTransport(ctx context.Context) error {
+	return s.reconnectTransportFrom(ctx, s.transportGeneration())
+}
+
+// reconnectTransportFrom replaces the connection identified by observed.
+//
+// Drivers are coalesced, not queued: if the generation moved past observed, the
+// connection this caller wanted replaced is already gone and reconnecting again
+// would only tear down its fresh replacement. Coalescing can at worst defer
+// recovery of a connection that broke again inside the same window by one
+// receive-loop iteration, which the loop's backoff already handles.
+func (s *Server) reconnectTransportFrom(ctx context.Context, observed uint64) error {
 	s.reconnectMu.Lock()
 	defer s.reconnectMu.Unlock()
 
 	if s.transport == nil {
 		return fmt.Errorf("transport not initialized")
+	}
+	if s.reconnectGen.Load() != observed {
+		return nil
 	}
 	if err := s.transport.Reconnect(ctx); err != nil {
 		return err
@@ -215,6 +248,7 @@ func (s *Server) ReconnectTransport(ctx context.Context) error {
 	if s.restPoller != nil {
 		s.restPoller.Stop()
 	}
+	s.reconnectGen.Add(1)
 	return nil
 }
 
