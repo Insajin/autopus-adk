@@ -135,7 +135,11 @@ func checkTaskCreatedModePrecedence(dir string, flags globalFlags, out io.Writer
 	var cfg *config.HarnessConfig
 	configPath := filepath.Join(dir, "autopus.yaml")
 	if _, err := os.Stat(configPath); err == nil {
-		loaded, loadErr := config.Load(dir)
+		// LoadPreview, not Load: `auto check` 는 pre-commit 훅에서 돌고,
+		// Load 는 플랫폼 이름 정규화 결과를 autopus.yaml 에 기록한다.
+		// 검사 명령이 검사 대상을 커밋 도중에 수정해서는 안 된다.
+		// rules_sticky.go 가 같은 이유로 이미 이 규칙을 세워 두었다.
+		loaded, loadErr := config.LoadPreview(dir)
 		if loadErr != nil {
 			tui.FAIL(out, "cannot load autopus.yaml for TaskCreated mode: "+loadErr.Error())
 			return false

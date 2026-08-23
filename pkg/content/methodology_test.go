@@ -2,7 +2,6 @@
 package content_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -53,46 +52,6 @@ func TestLoadMethodology_NotFound(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGenerateInstruction_TDD(t *testing.T) {
-	t.Parallel()
-
-	def := &content.MethodologyDef{
-		Name:         "tdd",
-		ReviewGate:   true,
-		EnforceRules: []string{"테스트 없이 코드 작성 금지"},
-		Stages: []content.Stage{
-			{Name: "red", Description: "실패하는 테스트 작성", Rules: []string{"테스트 전 코드 작성 시 거부"}},
-			{Name: "green", Description: "최소 구현으로 테스트 통과"},
-			{Name: "refactor", Description: "코드 정리"},
-		},
-	}
-
-	instruction := content.GenerateInstruction(def)
-	// TDD: "테스트 전 코드 작성 시 거부" 규칙 포함 필수
-	assert.Contains(t, instruction, "테스트 전 코드 작성 시 거부")
-	assert.Contains(t, instruction, "RED")
-	assert.Contains(t, instruction, "GREEN")
-	assert.Contains(t, instruction, "REFACTOR")
-}
-
-func TestGenerateInstruction_DDD(t *testing.T) {
-	t.Parallel()
-
-	def := &content.MethodologyDef{
-		Name: "ddd",
-		Stages: []content.Stage{
-			{Name: "analyze", Description: "현재 동작 분석"},
-			{Name: "preserve", Description: "기존 동작 보존"},
-			{Name: "improve", Description: "개선"},
-		},
-	}
-
-	instruction := content.GenerateInstruction(def)
-	assert.Contains(t, instruction, "ANALYZE")
-	assert.Contains(t, instruction, "PRESERVE")
-	assert.Contains(t, instruction, "IMPROVE")
-}
-
 func TestLoadMethodologyFromFS(t *testing.T) {
 	t.Parallel()
 
@@ -127,44 +86,4 @@ func TestLoadMethodologyFromFS_NotFound(t *testing.T) {
 	fsys := fstest.MapFS{}
 	_, err := content.LoadMethodologyFromFS(fsys, "methodology/nonexistent.yaml")
 	assert.Error(t, err)
-}
-
-func TestGenerateInstruction_DoubleDiamond(t *testing.T) {
-	t.Parallel()
-
-	def := &content.MethodologyDef{
-		Name: "double-diamond",
-		Stages: []content.Stage{
-			{Name: "discover", Description: "문제 발견"},
-			{Name: "define", Description: "문제 정의"},
-			{Name: "develop", Description: "해결책 개발"},
-			{Name: "deliver", Description: "최종 산출물"},
-		},
-	}
-
-	instruction := content.GenerateInstruction(def)
-	// 단계는 정의된 순서대로, 번호가 붙은 제목으로 전달된다.
-	for i, name := range []string{"discover", "define", "develop", "deliver"} {
-		assert.Contains(t, instruction, fmt.Sprintf("### Phase %d: %s", i+1, name))
-	}
-	assert.Contains(t, instruction, "DISCOVER → DEFINE → DEVELOP → DELIVER")
-	assert.Contains(t, instruction, "문제 발견")
-}
-
-func TestGenerateInstruction_Generic(t *testing.T) {
-	t.Parallel()
-
-	def := &content.MethodologyDef{
-		Name: "custom-method",
-		Stages: []content.Stage{
-			{Name: "stage1", Description: "첫 번째 단계", Rules: []string{"규칙 A"}},
-			{Name: "stage2", Description: "두 번째 단계"},
-		},
-	}
-
-	instruction := content.GenerateInstruction(def)
-	assert.Contains(t, instruction, "custom-method")
-	assert.Contains(t, instruction, "stage1")
-	assert.Contains(t, instruction, "첫 번째 단계")
-	assert.Contains(t, instruction, "규칙 A")
 }

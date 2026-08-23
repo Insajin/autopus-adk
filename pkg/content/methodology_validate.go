@@ -72,6 +72,10 @@ const (
 	// DefectAmbiguousOrder는 같은 선행 단계를 요구하는 단계가 둘 이상이어서
 	// 선형 순서가 결정되지 않는 경우이다.
 	DefectAmbiguousOrder MethodologyDefect = "ambiguous_order"
+	// DefectMissingDelivery는 방법론이 정의돼 있으나 에이전트에게 전달할 표면이
+	// 없는 경우이다. 교리는 content/skills/<name>.md 로 전달되며, 그 파일이
+	// 없으면 설정은 아무도 읽지 않는 규칙을 선언하는 셈이 된다.
+	DefectMissingDelivery MethodologyDefect = "missing_delivery_surface"
 )
 
 // MethodologyError는 방법론 해석·검증 실패이다.
@@ -122,6 +126,9 @@ func (e *MethodologyError) Error() string {
 	case DefectAmbiguousOrder:
 		return fmt.Sprintf("methodology[%s] %s: 단계 %q와 %q가 같은 선행 단계 %q를 요구해 순서가 결정되지 않습니다",
 			e.Defect, subject, e.Conflicts, e.Stage, e.Requires)
+	case DefectMissingDelivery:
+		return fmt.Sprintf("methodology[%s] %s: 정의는 있으나 전달 표면이 없습니다 (content/skills/%s.md)",
+			e.Defect, subject, subject)
 	default:
 		return fmt.Sprintf("methodology[%s] %s: 정의 검증 실패", e.Defect, subject)
 	}

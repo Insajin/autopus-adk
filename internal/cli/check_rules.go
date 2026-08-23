@@ -203,15 +203,19 @@ func isExperimentBranch(dir string) bool {
 }
 
 func validateLoreMessage(msg, dir string, out io.Writer) bool {
-	cfg, err := config.Load(dir)
+	// 전체 설정이 아니라 lore 블록만 읽는다. 검증 대상은 커밋 메시지이고,
+	// 설정 유효성은 auto doctor 가 소유한다. 예전에는 config.Load 를 불러
+	// 전체 Validate 를 통과해야 했으므로 lore 와 무관한 필드 하나가 커밋
+	// 훅을 브릭했다.
+	loreConf, err := config.LoadLoreSection(dir)
 	if err != nil {
 		tui.Error(out, fmt.Sprintf("cannot load lore config: %v", err))
 		return false
 	}
 
 	loreConfig := lore.LoreConfig{
-		RequiredTrailers:   append([]string(nil), cfg.Lore.RequiredTrailers...),
-		StaleThresholdDays: cfg.Lore.StaleThresholdDays,
+		RequiredTrailers:   append([]string(nil), loreConf.RequiredTrailers...),
+		StaleThresholdDays: loreConf.StaleThresholdDays,
 	}
 
 	errs := lore.Validate(msg, loreConfig)

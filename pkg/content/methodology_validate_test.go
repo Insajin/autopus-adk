@@ -3,6 +3,7 @@ package content_test
 
 import (
 	"errors"
+	"io/fs"
 	"testing"
 	"testing/fstest"
 
@@ -234,27 +235,34 @@ func TestResolveMethodology_ShippedDefinitions(t *testing.T) {
 			}
 			assert.Equal(t, tc.wantOrder, order)
 
-			instruction := content.GenerateInstruction(def)
-			for _, rule := range def.EnforceRules {
-				assert.Contains(t, instruction, rule, "enforce_rules는 전문이 전달되어야 한다")
-			}
-			for _, stage := range def.Stages {
-				assert.Contains(t, instruction, stage.Description)
-				for _, rule := range stage.Rules {
-					assert.Contains(t, instruction, rule, "단계 규칙은 전문이 전달되어야 한다")
-				}
-			}
-			// 관측하지 않는 게이트를 주장하지 않는다.
-			assert.Contains(t, instruction, "준수 여부는 관측하지 않습니다")
-			assert.NotContains(t, instruction, "리뷰 게이트를 통과해야")
+			// 교리 전달은 이제 렌더러가 아니라 같은 이름의 스킬이 담당하고,
+			// 리졸버가 그 표면의 존재를 요구한다. 위 ResolveEnforcedMethodology
+			// 성공이 곧 content/skills/<mode>.md 가 있다는 뜻이므로, 여기서는
+			// 그 파일이 규칙을 실을 만큼 비어 있지 않은지만 확인한다.
+			delivery, err := contentfs.FS.Open("skills/" + tc.mode + ".md")
+			require.NoError(t, err, "방법론 교리의 전달 표면이 있어야 한다")
+			t.Cleanup(func() { _ = delivery.Close() })
+			info, err := fs.Stat(contentfs.FS, "skills/"+tc.mode+".md")
+			require.NoError(t, err)
+			assert.Greater(t, info.Size(), int64(0), "전달 표면이 비어 있다")
 		})
 	}
 }
 
-// TestGenerateInstruction_NilDefinition은 정의가 없으면 아무 텍스트도 쓰지
-// 않음을 고정한다.
-func TestGenerateInstruction_NilDefinition(t *testing.T) {
+// TestResolveMethodology_MissingDeliverySurfaceFails는 정의만 있고 전달 표면이
+// 없으면 실패함을 고정한다. 그 조합은 아무도 읽지 않는 규칙을 선언하는 셈이다.
+func TestResolveMethodology_MissingDeliverySurfaceFails(t *testing.T) {
 	t.Parallel()
 
-	assert.Empty(t, content.GenerateInstruction(nil))
+	fsys := fstest.MapFS{
+		"methodology/orphan.yaml": &fstest.MapFile{Data: []byte(
+			"name: orphan\nstages:\n  - name: only\n    description: d\n    required_before: \"\"\n",
+		)},
+	}
+	_, err := content.ResolveEnforcedMethodology(fsys, "orphan", false)
+	require.Error(t, err)
+	var defect *content.MethodologyError
+	require.ErrorAs(t, err, &defect)
+	assert.Equal(t, content.DefectMissingDelivery, defect.Defect)
+	assert.Contains(t, err.Error(), "content/skills/orphan.md")
 }
