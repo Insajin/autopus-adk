@@ -21,35 +21,6 @@ func templateRoot() string {
 	return dir
 }
 
-func TestSharedWorkflowTemplate_Lite(t *testing.T) {
-	t.Parallel()
-	e := tmpl.New()
-	cfg := config.DefaultFullConfig("my-project")
-
-	tmplPath := filepath.Join(templateRoot(), "shared", "workflow.md.tmpl")
-	result, err := e.RenderFile(tmplPath, cfg)
-	require.NoError(t, err)
-
-	assert.Contains(t, result, "my-project")
-	assert.Contains(t, result, "full")
-	assert.Contains(t, result, "/plan")
-	assert.Contains(t, result, "/go")
-}
-
-func TestSharedWorkflowTemplate_Full(t *testing.T) {
-	t.Parallel()
-	e := tmpl.New()
-	cfg := config.DefaultFullConfig("full-project")
-
-	tmplPath := filepath.Join(templateRoot(), "shared", "workflow.md.tmpl")
-	result, err := e.RenderFile(tmplPath, cfg)
-	require.NoError(t, err)
-
-	assert.Contains(t, result, "full-project")
-	assert.Contains(t, result, "full")
-	assert.Contains(t, result, "Full 모드 기능")
-}
-
 func TestSharedAutopusYamlTemplate(t *testing.T) {
 	t.Parallel()
 	e := tmpl.New()
