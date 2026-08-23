@@ -17,7 +17,7 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -38,8 +38,19 @@ jobs:
           GOOS=darwin GOARCH=arm64 go build ./...
           GOOS=linux GOARCH=arm64 go build ./...
 
-      # @AX:REASON [AUTO]: Keep the process-heavy Bash release fixture off the shared Go package scheduler while preserving its race gate.
-      - name: Test release hardening contract in isolation
+      # 프로세스 중량 테스트 목록은 Makefile 의 PROCESS_HEAVY_TESTS 가 단일
+      # 출처다. CI 가 정규식을 복사해 두면 로컬 게이트와 CI 게이트가 조용히
+      # 갈라지므로, 값을 그대로 읽어 오고 파싱 실패는 즉시 에러로 만든다.
+      - name: Resolve process-heavy test selector
+        shell: bash
+        run: |
+          set -euo pipefail
+          selector="$(sed -n 's/^PROCESS_HEAVY_TESTS ?= //p' Makefile)"
+          [[ -n "$selector" ]]
+          printf 'PROCESS_HEAVY_TESTS=%s\n' "$selector" >> "$GITHUB_ENV"
+
+      # @AX:REASON [AUTO]: Keep every process-heavy fixture off the shared Go package scheduler while preserving its race gate.
+      - name: Test process-heavy contracts in isolation
         shell: bash
         run: |
           set -euo pipefail
@@ -49,15 +60,28 @@ jobs:
               awk '$0 == "TestReleaseHardeningBashContract" { found++ } END { print found + 0 }'
           )"
           [[ "$count" == 1 ]]
-          go test -race -count=1 -timeout=5m \
-            -run '^TestReleaseHardeningBashContract$' \
-            ./internal/companionmanifest
+          [[ "$PROCESS_HEAVY_TESTS" == *'TestReleaseHardeningBashContract'* ]]
+          go test -race -count=1 -timeout=10m -p 1 \
+            -run "$PROCESS_HEAVY_TESTS" \
+            -coverprofile=coverage-isolated.out ./...
 
+      # 공유 레인은 격리 레인과 정확히 같은 집합을 건너뛴다. 건너뛴 테스트의
+      # 커버리지는 격리 레인이 남긴 프로파일에 그대로 있으므로 두 프로파일을
+      # 합쳐 총계를 유지한다 - 임계값은 건드리지 않는다.
       - name: Test with Coverage
+        shell: bash
         run: |
+          set -euo pipefail
           go test -race -count=1 -timeout=20m \
-            -skip '^TestReleaseHardeningBashContract$' \
-            -coverprofile=coverage.out ./...
+            -skip "$PROCESS_HEAVY_TESTS" \
+            -coverprofile=coverage-shared.out ./...
+          mode="$(head -n 1 coverage-shared.out)"
+          [[ "$mode" == "$(head -n 1 coverage-isolated.out)" ]]
+          {
+            printf '%s\n' "$mode"
+            tail -n +2 coverage-shared.out
+            tail -n +2 coverage-isolated.out
+          } > coverage.out
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
           echo "Total coverage: ${COVERAGE}%"
           THRESHOLD=${COVERAGE_THRESHOLD:-83}

@@ -34,11 +34,14 @@ var knownCLIs = []struct {
 	{"omp", "omp", "--version"},
 }
 
-// cliVersionTimeout은 CLI가 --version에 응답할 상한이다. 파이프 배수 유예는
-// 이 패키지가 정하지 않는다 - processprobe.DefaultWaitDelay가 유일한 소유자이며,
-// 여기서 250ms를 재기술하던 상수가 그 소유권을 갈라 두 패키지가 같은 경계를
-// 서로 다른 값으로 들고 있었다.
-const cliVersionTimeout = 5 * time.Second
+// cliVersionTimeout은 CLI가 --version에 응답할 상한이다. 배수 유예는 이 패키지가
+// 정하지 않는다 - processprobe.DefaultWaitDelay가 유일한 소유자다.
+//
+// 리터럴이 아니라 유예에서 도출하는 이유: 프로브는 종료 후 배수에 유예만큼을
+// 쓸 수 있어, 유예가 오르면 리터럴 상한의 실제 응답 여유가 조용히 줄어든다
+// (250ms→2s로 올렸을 때 5초 리터럴의 여유가 4.75초→3초). 더하기로 적으면
+// 유예와 무관하게 응답 예산이 유지된다. antigravity 플러그인 프로브도 같은 형태다.
+const cliVersionTimeout = processprobe.DefaultWaitDelay + 5*time.Second
 
 // DetectPlatforms는 PATH에서 코딩 CLI를 감지한다.
 func DetectPlatforms() []Platform {

@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/design"
@@ -10,11 +11,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testdataDirForTest는 이 패키지의 testdata 경로를 테스트 파일 위치에서 해석한다.
+// 상대 경로를 쓰면 안 되는 이유가 있다: 이 패키지의 다른 테스트들이 os.Chdir로
+// 프로세스 전역 작업 디렉터리를 바꾸는데, 아래 두 테스트는 t.Parallel이다.
+// 그래서 상대 경로 fixture 읽기는 형제 테스트의 스케줄링에 따라 실패한다.
+// moduleRootForTest와 같은 방식으로 앵커를 고정한다.
+func testdataDirForTest(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	require.True(t, ok, "runtime.Caller failed to resolve test file location")
+	return filepath.Join(filepath.Dir(file), "testdata")
+}
+
 // The JSONL fixture is a verbatim Playwright 1.58.2 blob report captured with ignoreSnapshots=true.
 func TestActualPlaywright158IgnoredSnapshotsBlobRemainsUnproven(t *testing.T) {
 	t.Parallel()
 
-	report, err := os.ReadFile(filepath.Join("testdata", "playwright-1.58.2-ignore-snapshots.jsonl"))
+	report, err := os.ReadFile(filepath.Join(testdataDirForTest(t), "playwright-1.58.2-ignore-snapshots.jsonl"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(report), "ignoreSnapshots")
 	evidence := collectVisualEvidence(buildBlobReportBytes(t, report, nil))
@@ -54,7 +67,7 @@ func TestActualPlaywright158IgnoredSnapshotsBlobRemainsUnproven(t *testing.T) {
 func TestActualPlaywright158LegacyEnabledProofRemainsUnproven(t *testing.T) {
 	t.Parallel()
 
-	report, err := os.ReadFile(filepath.Join("testdata", "playwright-1.58.2-normal-snapshots.jsonl"))
+	report, err := os.ReadFile(filepath.Join(testdataDirForTest(t), "playwright-1.58.2-normal-snapshots.jsonl"))
 	require.NoError(t, err)
 	blob := buildBlobReportBytes(t, report, nil)
 	blob, err = appendSnapshotProofToBlob(blob, snapshotComparisonProof{
