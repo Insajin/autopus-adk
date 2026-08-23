@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -33,7 +33,7 @@ func generatePlatformRules(t *testing.T, platform string) map[string]string {
 	case "codex":
 		pf, err = codex.NewWithRoot(dir).Generate(ctx, cfg)
 	case "gemini":
-		pf, err = gemini.NewWithRoot(dir).Generate(ctx, cfg)
+		pf, err = antigravity.NewWithRoot(dir).Generate(ctx, cfg)
 	case "opencode":
 		pf, err = opencode.NewWithRoot(dir).Generate(ctx, cfg)
 	case "omp":

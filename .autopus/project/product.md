@@ -78,7 +78,7 @@ GPT/Codex 문서 전달에서 토큰 예산은 memory/knowledge/index의 선택�
 |----------|---------|--------|--------|
 | Claude Code | `pkg/adapter/claude/` | `claude` | implemented |
 | Codex | `pkg/adapter/codex/` | `codex` | implemented |
-| Antigravity CLI (구 Gemini CLI) | `pkg/adapter/gemini/` | `gemini` | implemented |
+| Antigravity CLI (구 Gemini CLI) | `pkg/adapter/antigravity/` | `gemini` | implemented |
 | OpenCode | `pkg/adapter/opencode/` | `opencode` | planned |
 | Cursor | `pkg/adapter/cursor/` | `cursor` | planned |
 

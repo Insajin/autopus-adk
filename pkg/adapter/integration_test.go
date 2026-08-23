@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -80,7 +80,7 @@ func TestE2EInitCodex(t *testing.T) {
 func TestE2EInitGemini(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	a := gemini.NewWithRoot(dir)
+	a := antigravity.NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("e2e-gemini")
 
 	pf, err := a.Generate(context.Background(), cfg)
@@ -141,7 +141,7 @@ func TestE2EUpdatePreservation_Codex(t *testing.T) {
 func TestE2EUpdatePreservation_Gemini(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	a := gemini.NewWithRoot(dir)
+	a := antigravity.NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("e2e-update-gemini")
 
 	_, err := a.Generate(context.Background(), cfg)

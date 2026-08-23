@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -57,7 +57,7 @@ func generateContextEngineeringSurfaces(t *testing.T) map[string]contextEngineer
 		}, ".agents/skills/agent-pipeline/SKILL.md",
 			func(command string) string { return ".agents/skills/auto-" + command + "/SKILL.md" }},
 		{"gemini", func(root string) (*adapter.PlatformFiles, error) {
-			return gemini.NewWithRoot(root, gemini.WithoutPluginInstall()).Generate(
+			return antigravity.NewWithRoot(root, antigravity.WithoutPluginInstall()).Generate(
 				context.Background(), config.DefaultFullConfig("context-engineering"))
 		}, ".gemini/skills/autopus/agent-pipeline/SKILL.md",
 			func(command string) string { return ".gemini/skills/autopus/auto-" + command + "/SKILL.md" }},

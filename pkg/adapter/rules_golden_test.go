@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -52,7 +52,7 @@ func generatePlatform(t *testing.T, platform string) string {
 	case "codex":
 		_, err = codex.NewWithRoot(dir).Generate(ctx, cfg)
 	case "gemini":
-		_, err = gemini.NewWithRoot(dir).Generate(ctx, cfg)
+		_, err = antigravity.NewWithRoot(dir).Generate(ctx, cfg)
 	case "opencode":
 		_, err = opencode.NewWithRoot(dir).Generate(ctx, cfg)
 	default:

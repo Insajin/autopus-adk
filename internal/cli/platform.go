@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -141,7 +141,7 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 					return fmt.Errorf("codex 파일 생성 실패: %w", err)
 				}
 			case "antigravity-cli":
-				a := gemini.NewWithRoot(d)
+				a := antigravity.NewWithRoot(d)
 				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
 					return fmt.Errorf("antigravity-cli 파일 생성 실패: %w", err)
 				}
@@ -245,7 +245,7 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 				a := codex.NewWithRoot(d)
 				_ = a.Clean(ctx)
 			case "antigravity-cli":
-				a := gemini.NewWithRoot(d)
+				a := antigravity.NewWithRoot(d)
 				_ = a.Clean(ctx)
 			case "opencode":
 				a := opencode.NewWithRoot(d)

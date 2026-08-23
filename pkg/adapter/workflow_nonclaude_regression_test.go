@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -30,7 +30,7 @@ func TestNonClaudeAdaptersNeverEmitTeamWorkflow(t *testing.T) {
 		make func(root string) generator
 	}{
 		{"codex", func(root string) generator { return codex.NewWithRoot(root) }},
-		{"gemini", func(root string) generator { return gemini.NewWithRoot(root) }},
+		{"gemini", func(root string) generator { return antigravity.NewWithRoot(root) }},
 		{"opencode", func(root string) generator { return opencode.NewWithRoot(root) }},
 	}
 

@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -176,7 +176,7 @@ func TestGeneratedOrchestration_UnsupportedPlatformsContainNoClaudeTeamPrimitive
 	cfg := config.DefaultFullConfig("unsupported-team-contract")
 	geminiRoot := t.TempDir()
 	opencodeRoot := t.TempDir()
-	_, err := gemini.NewWithRoot(geminiRoot).Generate(context.Background(), cfg)
+	_, err := antigravity.NewWithRoot(geminiRoot).Generate(context.Background(), cfg)
 	require.NoError(t, err)
 	_, err = opencode.NewWithRoot(opencodeRoot).Generate(context.Background(), cfg)
 	require.NoError(t, err)

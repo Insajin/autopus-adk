@@ -12,9 +12,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -53,7 +53,7 @@ func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessC
 			a := codex.NewWithRoot(dir)
 			_, err = a.Generate(ctx, effectiveCfg)
 		case "antigravity-cli":
-			a := gemini.NewWithRoot(dir)
+			a := antigravity.NewWithRoot(dir)
 			_, err = a.Generate(ctx, effectiveCfg)
 		case "opencode":
 			a := opencode.NewWithRoot(dir)

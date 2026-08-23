@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -146,7 +146,7 @@ func validateDoctorPlatform(
 	case "codex":
 		return codex.NewWithRoot(dir).Validate(ctx)
 	case "antigravity-cli":
-		return gemini.NewWithRoot(dir).Validate(ctx)
+		return antigravity.NewWithRoot(dir).Validate(ctx)
 	case "opencode":
 		return opencode.NewWithRoot(dir).Validate(ctx)
 	case "omp":

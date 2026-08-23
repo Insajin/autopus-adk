@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -128,7 +128,7 @@ func TestParity_CrossPlatformFeatures(t *testing.T) {
 			generate: func(t *testing.T) *adapter.PlatformFiles {
 				t.Helper()
 				dir := t.TempDir()
-				a := gemini.NewWithRoot(dir)
+				a := antigravity.NewWithRoot(dir)
 				pf, err := a.Generate(ctx, cfg)
 				require.NoError(t, err)
 				return pf

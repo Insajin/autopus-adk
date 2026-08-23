@@ -157,15 +157,15 @@ func sourcePrefixesForGenerated(generated string) []string {
 	case strings.HasPrefix(generated, ".claude/hooks/"):
 		return []string{"content/hooks/", "pkg/content/hooks", "templates/hooks/"}
 	case strings.HasPrefix(generated, ".gemini/agents/"):
-		return []string{"content/agents/", "pkg/adapter/gemini/gemini_agents", "pkg/content/agent_transformer", "templates/gemini/agents/"}
+		return []string{"content/agents/", "pkg/adapter/antigravity/antigravity_agents", "pkg/content/agent_transformer", "templates/gemini/agents/"}
 	case strings.HasPrefix(generated, ".gemini/skills/"):
-		return []string{"content/skills/", "pkg/adapter/gemini/gemini_skills", "pkg/content/skill_", "templates/gemini/skills/"}
+		return []string{"content/skills/", "pkg/adapter/antigravity/antigravity_skills", "pkg/content/skill_", "templates/gemini/skills/"}
 	case strings.HasPrefix(generated, ".gemini/rules/"):
-		return []string{"content/rules/", "pkg/adapter/gemini/gemini_rules", "templates/gemini/rules/"}
+		return []string{"content/rules/", "pkg/adapter/antigravity/antigravity_rules", "templates/gemini/rules/"}
 	case strings.HasPrefix(generated, ".gemini/commands/"):
 		return []string{"templates/gemini/commands/"}
 	case generated == ".gemini/settings.json":
-		return []string{"pkg/adapter/gemini/", "templates/gemini/settings/"}
+		return []string{"pkg/adapter/antigravity/", "templates/gemini/settings/"}
 	case strings.HasPrefix(generated, ".opencode/agents/"):
 		return []string{"content/agents/", "pkg/adapter/opencode/", "pkg/content/agent_transformer", "templates/opencode/agents/"}
 	case strings.HasPrefix(generated, ".opencode/skills/") || strings.HasPrefix(generated, ".opencode/commands/"):

@@ -8,9 +8,9 @@ import (
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/detect"
@@ -48,7 +48,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 			a := codex.NewWithRoot(opts.dir)
 			validationErrs, validateErr = a.Validate(ctx)
 		case "antigravity-cli":
-			a := gemini.NewWithRoot(opts.dir)
+			a := antigravity.NewWithRoot(opts.dir)
 			validationErrs, validateErr = a.Validate(ctx)
 		case "opencode":
 			a := opencode.NewWithRoot(opts.dir)

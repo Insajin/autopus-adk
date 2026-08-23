@@ -9,9 +9,9 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -188,7 +188,7 @@ func generatePreviewMappings(ctx context.Context, root string, cfg *config.Harne
 		pf, err := codex.NewWithRoot(root).Generate(ctx, cfg)
 		return previewMappings(platform, pf, err)
 	case "antigravity-cli":
-		pf, err := gemini.NewWithRoot(root).Generate(ctx, cfg)
+		pf, err := antigravity.NewWithRoot(root).Generate(ctx, cfg)
 		return previewMappings(platform, pf, err)
 	case "opencode":
 		pf, err := opencode.NewWithRoot(root).Generate(ctx, cfg)

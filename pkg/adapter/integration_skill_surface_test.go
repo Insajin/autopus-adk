@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -49,7 +49,7 @@ func TestE2EInitMakeInterfacesFeelBetterSkill_AllPlatforms(t *testing.T) {
 			generate: func(ctx context.Context, dir string) error {
 				cfg := config.DefaultFullConfig("polish-gemini")
 				cfg.Platforms = []string{"gemini-cli"}
-				_, err := gemini.NewWithRoot(dir).Generate(ctx, cfg)
+				_, err := antigravity.NewWithRoot(dir).Generate(ctx, cfg)
 				return err
 			},
 			path: filepath.Join(".gemini", "skills", "autopus", "make-interfaces-feel-better", "SKILL.md"),

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/codexruntime"
@@ -92,7 +92,7 @@ func driftAdapterFor(platform, root string, snapshot driftGenerationSnapshot) ad
 		}
 		return codex.NewWithRoot(root)
 	case "antigravity-cli":
-		return gemini.NewWithRoot(root, gemini.WithoutPluginInstall())
+		return antigravity.NewWithRoot(root, antigravity.WithoutPluginInstall())
 	case "opencode":
 		return opencode.NewWithRoot(root)
 	case "omp":

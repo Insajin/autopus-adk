@@ -3,9 +3,9 @@ package cli
 import (
 	"context"
 
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -25,7 +25,7 @@ func updateHarnessPlatform(
 		_, err := codex.NewWithRoot(dir).Update(ctx, cfg)
 		return true, err
 	case "antigravity-cli":
-		_, err := gemini.NewWithRoot(dir).Update(ctx, cfg)
+		_, err := antigravity.NewWithRoot(dir).Update(ctx, cfg)
 		return true, err
 	case "opencode":
 		_, err := opencode.NewWithRoot(dir).Update(ctx, cfg)

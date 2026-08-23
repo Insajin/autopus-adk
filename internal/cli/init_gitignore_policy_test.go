@@ -146,7 +146,7 @@ func TestUpdateGitignoreAnchorsPlatformDogfoodSurface(t *testing.T) {
 	writePolicyTestFile(t, dir, ".mcp.json")
 	writePolicyTestFile(t, dir, "config.toml")
 	writePolicyTestFile(t, dir, ".autopus/txns/20260620T010203-codex/journal.json")
-	writePolicyTestFile(t, dir, "pkg/adapter/gemini/.gemini/settings.json")
+	writePolicyTestFile(t, dir, "pkg/adapter/antigravity/.gemini/settings.json")
 	writePolicyTestFile(t, dir, "pkg/fixtures/.claude.json")
 	writePolicyTestFile(t, dir, "pkg/fixtures/.mcp.json")
 	writePolicyTestFile(t, dir, "pkg/fixtures/config.toml")
@@ -167,7 +167,7 @@ func TestUpdateGitignoreAnchorsPlatformDogfoodSurface(t *testing.T) {
 		t.Fatalf("expected root runtime transaction journal to be ignored: %v\n%s", err, out)
 	}
 
-	nestedFixture := exec.Command("git", "-C", dir, "check-ignore", "--no-index", "--quiet", "pkg/adapter/gemini/.gemini/settings.json")
+	nestedFixture := exec.Command("git", "-C", dir, "check-ignore", "--no-index", "--quiet", "pkg/adapter/antigravity/.gemini/settings.json")
 	if err := nestedFixture.Run(); err == nil {
 		t.Fatal("nested source fixture .gemini directory must not be ignored by root dogfood pattern")
 	}

@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/gemini"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -53,7 +53,7 @@ func TestParity_RelocationConservesRuleCount(t *testing.T) {
 	require.NoError(t, err)
 	codexFiles, err := codex.NewWithRoot(t.TempDir()).Generate(ctx, cfg)
 	require.NoError(t, err)
-	geminiFiles, err := gemini.NewWithRoot(t.TempDir()).Generate(ctx, cfg)
+	geminiFiles, err := antigravity.NewWithRoot(t.TempDir()).Generate(ctx, cfg)
 	require.NoError(t, err)
 
 	claudeCounts := countFeatures(claudeFiles)
