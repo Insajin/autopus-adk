@@ -22,12 +22,17 @@ ISOLATED_TIMEOUT    ?= 10m
 # TestReleaseHardeningBashContract 에 대해 이미 세운 규칙이고
 # (@AX:REASON: "Keep the process-heavy Bash release fixture off the shared Go
 # package scheduler while preserving its race gate"), 같은 이유가 나머지에도
-#그대로 적용된다: 이들은 프로세스 그룹 종료, 상속된 파이프 배수, 실제 바이너리
+# 그대로 적용된다: 이들은 프로세스 그룹 종료, 상속된 파이프 배수, 실제 바이너리
 # 프로브를 재므로 스케줄러 지연을 측정 대상에 섞는다. 코어 수만큼 패키지를
 # 병렬로 돌리면서 -race 계측까지 얹으면 예산이 아니라 부하를 재게 된다.
 # 예산을 키우는 방식은 이 저장소에서 이미 세 번 실패했다. 격리는 억제가
 # 아니다 - 같은 테스트를 같은 -race 게이트로, 다만 -p 1 로 돌린다.
-PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetectBinary|TestPOSIXInstaller)
+#
+# TestDetect 는 접두사 전체를 잡는다. pkg/detect 는 개별 테스트가 아니라
+# 패키지 자체가 PATH 의 실제 CLI 를 실행하는 프로브이고, 이름을 하나씩
+# 추가하는 방식은 세 번 연속 다음 테스트에서 실패했다. 순수한 두어 개가
+# 함께 격리되는 비용은 없다 - 같은 -race 게이트로 돌아간다.
+PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetect|TestPOSIXInstaller)
 
 test:
 	go test -race -count=1 -timeout=$(INTEGRATION_TIMEOUT) -tags integration -skip '$(PROCESS_HEAVY_TESTS)' ./...
