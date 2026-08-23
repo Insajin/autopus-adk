@@ -126,17 +126,16 @@ func exactA3TagVersionGuard(source string) bool {
 	return exactLineageTagVersionGuard(source, "72")
 }
 
+// @AX:ANCHOR [AUTO]: Keep one conjunctive tag/version restriction proof for every shipped coordinate.
+// @AX:REASON [AUTO]: The producer resolves the phase from a data table, so the proof is one exact row
+// plus the single lookup that requires both the tag and the version to match that same row.
 func exactLineageTagVersionGuard(source, patch string) bool {
-	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`GITHUB_REF_NAME.{0,240}v0\.50\.` + patch + `.{0,400}COMPANION_VERSION.{0,240}0\.50\.` + patch),
-		regexp.MustCompile(`COMPANION_VERSION.{0,240}0\.50\.` + patch + `.{0,400}GITHUB_REF_NAME.{0,240}v0\.50\.` + patch),
+	row := regexp.MustCompile(`(?:^| )v0\.50\.` + patch + ` 0\.50\.` + patch + ` A[0-9]+(?: |$)`)
+	if !row.MatchString(source) {
+		return false
 	}
-	for _, pattern := range patterns {
-		if pattern.MatchString(source) {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(source,
+		`[[ "$GITHUB_REF_NAME" == "$coordinate_tag" && "$COMPANION_VERSION" == "$coordinate_version" ]]`)
 }
 
 func publicKeyReceiptLineageStep(t *testing.T, workflow publicKeyReceiptWorkflow) (int, publicKeyReceiptWorkflowStep) {

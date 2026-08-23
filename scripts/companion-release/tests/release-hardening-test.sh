@@ -67,67 +67,29 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
 done
+# 좌표는 각 워크플로에서 무장 지점 한 곳에만 산다. 나머지는 모두 GITHUB_REF_NAME 파생이므로
+# 좌표 이동은 워크플로마다 한 줄이고, 옛 좌표 금지 목록을 매 릴리즈마다 늘릴 필요가 없다.
+exactly_one_coordinate() {
+  local count
+  count=$({ grep -Eo 'v?0\.50\.[0-9]+' "$1" || true; } | wc -l | tr -d '[:space:]')
+  [[ "$count" == '1' ]] || fail "$1 names a release coordinate ${count} times, want exactly 1"
+}
 contains "$release" "- 'v0.50.109'"
-contains "$release" "if: github.ref == 'refs/tags/v0.50.109'"
+contains "$release" "if: github.ref_type == 'tag'"
 contains "$recovery" "if: github.ref == 'refs/tags/v0.50.109'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.109'
-not_contains "$release" "'v0.50.108'"
-not_contains "$release" "'v0.50.107'"
-not_contains "$release" "'v0.50.106'"
-not_contains "$release" 'refs/tags/v0.50.108'
-not_contains "$release" 'refs/tags/v0.50.107'
-not_contains "$release" 'refs/tags/v0.50.106'
-not_contains "$recovery" 'refs/tags/v0.50.108'
-not_contains "$recovery" 'refs/tags/v0.50.107'
-not_contains "$recovery" 'refs/tags/v0.50.106'
-not_contains "$recovery" 'refs/tags/v0.50.105'
-not_contains "$release" "'v0.50.99'"
-not_contains "$release" 'refs/tags/v0.50.99'
-not_contains "$recovery" 'refs/tags/v0.50.99'
-not_contains "$release" "'v0.50.98'"
-not_contains "$release" 'refs/tags/v0.50.98'
-not_contains "$recovery" 'refs/tags/v0.50.98'
-not_contains "$release" "'v0.50.93'"
-not_contains "$release" 'refs/tags/v0.50.93'
-not_contains "$recovery" 'refs/tags/v0.50.93'
-not_contains "$release" "'v0.50.94'"
-not_contains "$release" 'refs/tags/v0.50.94'
-not_contains "$recovery" 'refs/tags/v0.50.94'
-not_contains "$release" "'v0.50.95'"
-not_contains "$release" 'refs/tags/v0.50.95'
-not_contains "$recovery" 'refs/tags/v0.50.95'
-not_contains "$release" "'v0.50.92'"
-not_contains "$release" 'refs/tags/v0.50.92'
-not_contains "$recovery" 'refs/tags/v0.50.92'
-not_contains "$release" "'v0.50.91'"
-not_contains "$release" 'refs/tags/v0.50.91'
-not_contains "$recovery" 'refs/tags/v0.50.91'
-not_contains "$release" "'v0.50.85'"
-not_contains "$release" 'refs/tags/v0.50.85'
-not_contains "$recovery" 'refs/tags/v0.50.85'
-not_contains "$release" "'v0.50.83'"
-not_contains "$release" 'refs/tags/v0.50.83'
-not_contains "$recovery" 'refs/tags/v0.50.83'
-not_contains "$release" "'v0.50.82'"
-not_contains "$release" 'refs/tags/v0.50.82'
-not_contains "$recovery" 'refs/tags/v0.50.82'
-not_contains "$release" "'v0.50.81'"
-not_contains "$release" 'refs/tags/v0.50.81'
-not_contains "$recovery" 'refs/tags/v0.50.81'
-not_contains "$release" "'v0.50.79'"
-not_contains "$release" 'refs/tags/v0.50.79'
-not_contains "$recovery" 'refs/tags/v0.50.79'
-not_contains "$release" "'v0.50.77'"
-not_contains "$release" 'refs/tags/v0.50.77'
-not_contains "$recovery" 'refs/tags/v0.50.77'
-not_contains "$release" "'v0.50.75'"
-not_contains "$release" 'refs/tags/v0.50.75'
-not_contains "$recovery" 'refs/tags/v0.50.75'
-not_contains "$release" "'v0.50.76'"
-not_contains "$release" 'refs/tags/v0.50.76'
-not_contains "$recovery" 'refs/tags/v0.50.76'
-contains "$producer_receipt" "GITHUB_REF_NAME\" == 'v0.50.109'"
-contains "$producer_receipt" "release_phase='A22'"
+contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref <current release tag>'
+exactly_one_coordinate "$release"
+exactly_one_coordinate "$recovery"
+for workflow in "$release" "$recovery"; do
+  contains "$workflow" 'autopus-$GITHUB_REF_NAME-checksums.txt'
+  contains "$workflow" 'GITHUB_REF_NAME="$GITHUB_REF_NAME"'
+  contains "$workflow" 'COMPANION_VERSION="${GITHUB_REF_NAME#v}"'
+done
+contains "$release" 'release_version="${GITHUB_REF_NAME#v}"'
+contains "$release" 'autopus-adk_${release_version}_darwin_arm64.tar.gz'
+contains "$producer_receipt" 'v0.50.69 0.50.69 A0'
+contains "$producer_receipt" 'v0.50.109 0.50.109 A22'
+contains "$producer_receipt" "fail 'public_key_receipt_release_identity_mismatch'"
 contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.109'"
 contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.109'"
 contains "$release" 'timeout-minutes: 60'

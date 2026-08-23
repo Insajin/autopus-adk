@@ -7,56 +7,45 @@
 
 # @AX:ANCHOR [AUTO]: Keep every shipped tag/version pair in one exact receipt-phase resolver.
 # @AX:REASON [AUTO]: The producer must reject mixed or unknown release coordinates before signing artifacts.
+# 릴리즈 좌표의 단일 원본이다. 각 행은 "<tag> <version> <phase>"이며, 새 릴리즈는 여기에 한 행만 더한다.
+# 세 열은 한 행 안에서만 짝지어지므로, tag와 version이 섞인 조합은 어떤 행과도 일치하지 않는다.
+readonly PUBLIC_KEY_RECEIPT_RELEASE_COORDINATES='
+v0.50.69 0.50.69 A0
+v0.50.70 0.50.70 A1
+v0.50.71 0.50.71 A2
+v0.50.72 0.50.72 A3
+v0.50.73 0.50.73 A4
+v0.50.74 0.50.74 A5
+v0.50.77 0.50.77 A6
+v0.50.78 0.50.78 A7
+v0.50.79 0.50.79 A8
+v0.50.80 0.50.80 A9
+v0.50.81 0.50.81 A10
+v0.50.82 0.50.82 A11
+v0.50.83 0.50.83 A12
+v0.50.84 0.50.84 A13
+v0.50.85 0.50.85 A14
+v0.50.86 0.50.86 A15
+v0.50.87 0.50.87 A16
+v0.50.88 0.50.88 A17
+v0.50.89 0.50.89 A18
+v0.50.90 0.50.90 A19
+v0.50.91 0.50.91 A20
+v0.50.92 0.50.92 A21
+v0.50.109 0.50.109 A22
+'
+
 resolve_public_key_receipt_release_phase() {
-  if [[ "$GITHUB_REF_NAME" == 'v0.50.69' && "$COMPANION_VERSION" == '0.50.69' ]]; then
-    release_phase='A0'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.70' && "$COMPANION_VERSION" == '0.50.70' ]]; then
-    release_phase='A1'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.71' && "$COMPANION_VERSION" == '0.50.71' ]]; then
-    release_phase='A2'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.72' && "$COMPANION_VERSION" == '0.50.72' ]]; then
-    release_phase='A3'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.73' && "$COMPANION_VERSION" == '0.50.73' ]]; then
-    release_phase='A4'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.74' && "$COMPANION_VERSION" == '0.50.74' ]]; then
-    release_phase='A5'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.77' && "$COMPANION_VERSION" == '0.50.77' ]]; then
-    release_phase='A6'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.78' && "$COMPANION_VERSION" == '0.50.78' ]]; then
-    release_phase='A7'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.79' && "$COMPANION_VERSION" == '0.50.79' ]]; then
-    release_phase='A8'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.80' && "$COMPANION_VERSION" == '0.50.80' ]]; then
-    release_phase='A9'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.81' && "$COMPANION_VERSION" == '0.50.81' ]]; then
-    release_phase='A10'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.82' && "$COMPANION_VERSION" == '0.50.82' ]]; then
-    release_phase='A11'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.83' && "$COMPANION_VERSION" == '0.50.83' ]]; then
-    release_phase='A12'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.84' && "$COMPANION_VERSION" == '0.50.84' ]]; then
-    release_phase='A13'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.85' && "$COMPANION_VERSION" == '0.50.85' ]]; then
-    release_phase='A14'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.86' && "$COMPANION_VERSION" == '0.50.86' ]]; then
-    release_phase='A15'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.87' && "$COMPANION_VERSION" == '0.50.87' ]]; then
-    release_phase='A16'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.88' && "$COMPANION_VERSION" == '0.50.88' ]]; then
-    release_phase='A17'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.89' && "$COMPANION_VERSION" == '0.50.89' ]]; then
-    release_phase='A18'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.90' && "$COMPANION_VERSION" == '0.50.90' ]]; then
-    release_phase='A19'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.91' && "$COMPANION_VERSION" == '0.50.91' ]]; then
-    release_phase='A20'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.92' && "$COMPANION_VERSION" == '0.50.92' ]]; then
-    release_phase='A21'
-  elif [[ "$GITHUB_REF_NAME" == 'v0.50.109' && "$COMPANION_VERSION" == '0.50.109' ]]; then
-    release_phase='A22'
-  else
-    fail 'public_key_receipt_release_identity_mismatch'
-  fi
+  local coordinate_tag coordinate_version coordinate_phase
+  release_phase=''
+  while read -r coordinate_tag coordinate_version coordinate_phase; do
+    [[ -n "$coordinate_tag" ]] || continue
+    [[ "$GITHUB_REF_NAME" == "$coordinate_tag" && "$COMPANION_VERSION" == "$coordinate_version" ]] \
+      || continue
+    release_phase="$coordinate_phase"
+    break
+  done <<<"$PUBLIC_KEY_RECEIPT_RELEASE_COORDINATES"
+  [[ -n "$release_phase" ]] || fail 'public_key_receipt_release_identity_mismatch'
 }
 
 produce_public_key_receipt_bundle() {

@@ -90,17 +90,16 @@ func TestReleaseSigning_WorkflowMaterializesAndPreflightsKeyBeforeGoReleaser(t *
 	workflow := releaseWorkflowContract(t)
 	workflowSource := string(readRepositoryFile(t, ".github/workflows/release.yaml"))
 	for _, required := range []string{
-		"v0.50.109", "autopus-v0.50.109-checksums.txt",
-		"GITHUB_REF_NAME='v0.50.109'", "COMPANION_VERSION='0.50.109'",
+		"- 'v0.50.109'", `autopus-$GITHUB_REF_NAME-checksums.txt`,
+		`GITHUB_REF_NAME="$GITHUB_REF_NAME"`, `COMPANION_VERSION="${GITHUB_REF_NAME#v}"`,
 	} {
 		if !strings.Contains(workflowSource, required) {
-			t.Fatalf("v0.50.109 signing workflow missing exact version contract %q", required)
+			t.Fatalf("signing workflow missing derived coordinate contract %q", required)
 		}
 	}
-	for _, historical := range []string{"v0.50.92", "v0.50.93", "v0.50.94", "v0.50.95", "v0.50.96", "v0.50.97", "v0.50.98", "v0.50.99", "v0.50.100"} {
-		if strings.Contains(workflowSource, historical) {
-			t.Fatalf("v0.50.109 signing workflow exposes non-current coordinate %s", historical)
-		}
+	// 좌표는 on.push.tags 한 줄에만 산다. 옛 좌표 목록을 늘리는 대신 좌표 리터럴 수를 고정한다.
+	if got := strings.Count(workflowSource, "0.50."); got != 1 {
+		t.Fatalf("signing workflow names a release coordinate %d times, want exactly 1", got)
 	}
 	prepareIndex, _ := releaseWorkflowStepContaining(t, workflow, "Prepare release credentials")
 	materializeIndex, materialize := releaseWorkflowStepContaining(t, workflow, "Materialize release signing key")

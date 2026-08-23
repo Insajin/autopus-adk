@@ -10,7 +10,10 @@ prepare_omp_context_release_lineage() {
   omp_context_lineage_enabled=0
   lineage_path="$artifact_dir/release-lineage-v1.json"
   lineage_signature_path="$artifact_dir/release-lineage-v1.sig"
-  if [[ "$COMPANION_ARCHITECTURE" != 'arm64' || "$COMPANION_VERSION" != '0.50.109' ]]; then
+  # produce.sh는 darwin 이외 플랫폼에서 이미 종료하므로 이 검사는 darwin/arm64 하나만 남긴다.
+  # 좌표별 무장은 없다 — lineage 쌍은 모든 darwin/arm64 릴리즈가 반드시 내보내야 하는 자산이고,
+  # .goreleaser.yaml의 release.extra_files가 이 두 경로를 무조건 glob하므로 누락은 곧 릴리즈 실패다.
+  if [[ "$COMPANION_ARCHITECTURE" != 'arm64' ]]; then
     return 0
   fi
   omp_context_lineage_enabled=1

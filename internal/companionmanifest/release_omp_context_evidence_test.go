@@ -69,13 +69,18 @@ func TestReleaseWorkflow_A22CarriesSameRunEvidenceIntoExactFifteenAssets(t *test
 		`glob: "{{ .Env.OMP_CONTEXT_PROMOTION_ATTESTATION_PATH }}"`,
 		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_PATH }}"`,
 		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH }}"`,
-		`eq .Version "0.50.109"`,
+		`{{ if and (eq .Os "darwin") (eq .Arch "arm64") }}dist/auto_{{ .Target }}/release-lineage-v1.json`,
+		`{{ if and (eq .Os "darwin") (eq .Arch "arm64") }}dist/auto_{{ .Target }}/release-lineage-v1.sig`,
 		"dst: release-lineage-v1.json",
 		"dst: release-lineage-v1.sig",
 	} {
 		if !strings.Contains(config, required) {
 			t.Fatalf("GoReleaser extra evidence asset missing %q", required)
 		}
+	}
+	// lineage 쌍은 좌표가 아니라 os/arch로만 무장한다 — 버전 항이 돌아오면 새 좌표에서 조용히 자산이 빠진다.
+	if strings.Contains(config, "eq .Version") {
+		t.Fatal("GoReleaser gates a release asset on a per-release version coordinate")
 	}
 	current := readReleaseFile(t, "scripts/companion-release/verify-current-release.sh")
 	for _, required := range []string{

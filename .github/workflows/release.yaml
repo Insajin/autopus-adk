@@ -1,6 +1,9 @@
 name: Release
 on:
   push:
+    # 이 워크플로에서 릴리즈 좌표가 등장하는 유일한 지점이다. 나머지 전부는
+    # GITHUB_REF_NAME과 그 v 접두어를 뗀 형태에서 파생하므로, 좌표 이동은 이 한 줄만 바꾼다.
+    # 와일드카드(`v*`)는 금지다 — 보호된 릴리즈 잡에 임의 태그가 들어오면 안 된다.
     tags:
       - 'v0.50.109'
 permissions:
@@ -119,7 +122,7 @@ jobs:
       - name: Carry verified evidence into the protected release job
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: omp-context-production-evidence-v0.50.109
+          name: omp-context-production-evidence-${{ github.ref_name }}
           path: |
             ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-report.v1.json
             ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-attestation.v2.json
@@ -128,7 +131,10 @@ jobs:
 
   release:
     needs: [ci, security, omp-production-evidence]
-    if: github.ref == 'refs/tags/v0.50.109'
+    # 무장 좌표는 이 워크플로에서 위쪽 on.push.tags 한 곳에만 산다. 이 가드는 tag 이외의
+    # ref가 보호된 릴리즈 잡에 들어오지 못하게 막고, 정확한 좌표는 첫 스텝의
+    # validate-source.sh가 frozen 표로 검증한다.
+    if: github.ref_type == 'tag'
     environment:
       name: adk-companion-release
     permissions:
@@ -173,10 +179,10 @@ jobs:
           set -euo pipefail
           releases=$(gh api --paginate --slurp \
             'repos/Insajin/autopus-adk/releases?per_page=100')
-          reservation=$(jq -ce \
+          reservation=$(jq -ce --arg tag "$GITHUB_REF_NAME" \
             '[.[][]] as $all |
-             [$all[] | select(.tag_name == "v0.50.109")] as $tagged |
-             [$all[] | select(.draft == true and .name == "v0.50.109")] as $named |
+             [$all[] | select(.tag_name == $tag)] as $tagged |
+             [$all[] | select(.draft == true and .name == $tag)] as $named |
              if ($tagged | length) == 1 and ($named | length) == 1 and
                 $tagged[0].id == $named[0].id
              then $tagged[0]
@@ -192,7 +198,8 @@ jobs:
             --arg attestation_sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
             --arg static_policy_sha256 "$static_policy_sha" \
             '.id | type == "number"' <<<"$reservation" >/dev/null
-          jq -e --arg source "$GITHUB_SHA" --arg tree "$COMPANION_SOURCE_TREE" \
+          jq -e --arg tag "$GITHUB_REF_NAME" \
+            --arg source "$GITHUB_SHA" --arg tree "$COMPANION_SOURCE_TREE" \
             --arg evidence_tag_object "$OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA" \
             --arg evidence_commit "$OMP_CONTEXT_EVIDENCE_COMMIT_SHA" \
             --arg evidence_tree "$OMP_CONTEXT_EVIDENCE_TREE_SHA" \
@@ -200,11 +207,11 @@ jobs:
             --arg attestation_sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
             --arg static_policy_sha256 "$static_policy_sha" \
             '.draft == true and .prerelease == false and .author.id == 204883817 and
-             .target_commitish == $source and .name == "v0.50.109" and
+             .target_commitish == $source and .name == $tag and
              (.assets | type == "array" and length == 0) and
              ((.body | fromjson) == {
                schema_version:"autopus.adk_release_reservation.v1",
-               release_tag:"v0.50.109",
+               release_tag:$tag,
                source_commit:$source,
                source_tree:$tree,
                evidence_tag_object:$evidence_tag_object,
@@ -291,7 +298,7 @@ jobs:
       - name: Download same-run production evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: omp-context-production-evidence-v0.50.109
+          name: omp-context-production-evidence-${{ github.ref_name }}
           path: ${{ runner.temp }}/omp-context-production-evidence
 
       - name: Reverify immutable historical production evidence
@@ -655,15 +662,18 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]
+          # 자산 이름은 트리거 태그에서 파생한다 — GoReleaser의 name_template과 동일한 좌표다.
+          release_version="${GITHUB_REF_NAME#v}"
+          [[ -n "$release_version" && "$release_version" != "$GITHUB_REF_NAME" ]]
           expected_assets=$(printf '%s\n' \
-            'autopus-adk_0.50.109_darwin_amd64.tar.gz' \
-            'autopus-adk_0.50.109_darwin_arm64.tar.gz' \
-            'autopus-adk_0.50.109_linux_amd64.tar.gz' \
-            'autopus-adk_0.50.109_linux_arm64.tar.gz' \
-            'autopus-adk_0.50.109_windows_amd64.tar.gz' \
-            'autopus-adk_0.50.109_windows_amd64.zip' \
-            'autopus-adk_0.50.109_windows_arm64.tar.gz' \
-            'autopus-adk_0.50.109_windows_arm64.zip' \
+            "autopus-adk_${release_version}_darwin_amd64.tar.gz" \
+            "autopus-adk_${release_version}_darwin_arm64.tar.gz" \
+            "autopus-adk_${release_version}_linux_amd64.tar.gz" \
+            "autopus-adk_${release_version}_linux_arm64.tar.gz" \
+            "autopus-adk_${release_version}_windows_amd64.tar.gz" \
+            "autopus-adk_${release_version}_windows_amd64.zip" \
+            "autopus-adk_${release_version}_windows_arm64.tar.gz" \
+            "autopus-adk_${release_version}_windows_arm64.zip" \
             'checksums.txt' 'checksums.txt.bundle' 'checksums.txt.signatures' \
             'omp-context-promotion-report.v1.json' \
             'omp-context-promotion-attestation.v2.json' \
@@ -671,8 +681,8 @@ jobs:
             jq -Rsc 'split("\n") | map(select(length > 0))')
           release=$(gh api "repos/Insajin/autopus-adk/releases/${RELEASE_ID}")
           jq -e --argjson release_id "$RELEASE_ID" --arg commit "$GITHUB_SHA" \
-            --argjson expected "$expected_assets" \
-            '.id == $release_id and .tag_name == "v0.50.109" and
+            --arg tag "$GITHUB_REF_NAME" --argjson expected "$expected_assets" \
+            '.id == $release_id and .tag_name == $tag and
              .target_commitish == $commit and .author.id == 204883817 and
              .draft == false and .prerelease == false and .immutable == true and
              (.assets | type == "array" and length == ($expected | length)) and
@@ -728,7 +738,7 @@ jobs:
           COMPANION_PUBLIC_KEY_SHA256: ${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.109-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-$GITHUB_REF_NAME-checksums.txt"
           [[ "$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" | shasum -a 256 | awk '{print $1}')" == \
              "$OMP_CONTEXT_STATIC_POLICY_SHA256" ]]
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
@@ -764,8 +774,8 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.109' \
-            COMPANION_VERSION='0.50.109' \
+            GITHUB_REF_NAME="$GITHUB_REF_NAME" \
+            COMPANION_VERSION="${GITHUB_REF_NAME#v}" \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             COMPANION_CASK_PATH='dist/homebrew/Casks/auto.rb' \
@@ -779,9 +789,9 @@ jobs:
           set -u
           cleanup_status=0
           keychain_path="$RUNNER_TEMP/adk-release.keychain-db"
-          if [[ -e "$RUNNER_TEMP/autopus-v0.50.109-checksums.txt" ||
-                -L "$RUNNER_TEMP/autopus-v0.50.109-checksums.txt" ]]; then
-            if rm -f -- "$RUNNER_TEMP/autopus-v0.50.109-checksums.txt"; then
+          checksums_path="$RUNNER_TEMP/autopus-$GITHUB_REF_NAME-checksums.txt"
+          if [[ -e "$checksums_path" || -L "$checksums_path" ]]; then
+            if rm -f -- "$checksums_path"; then
               :
             else
               cleanup_status=$?

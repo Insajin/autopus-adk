@@ -4,7 +4,7 @@ on:
   workflow_dispatch: {}
 
 # Canonical invocation after the immutable release exists:
-# gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.109
+# gh workflow run homebrew-formula-bridge-recovery.yaml --ref <current release tag>
 #
 # Scope: a tap write that failed for a transient reason — expired token, network
 # error, or a concurrent tap move. The tag's scripts are correct in that case and
@@ -24,6 +24,9 @@ permissions:
 
 jobs:
   recover-formula-bridge:
+    # 이 파일에서 릴리즈 좌표가 등장하는 유일한 지점이다. workflow_dispatch에는 태그 필터가
+    # 없으므로 이 가드가 유일한 무장이며, 이미 게시된 옛 좌표로 tap을 되돌리는 실행을 막는다.
+    # 아래 스텝들은 전부 GITHUB_REF_NAME에서 파생하므로 좌표 이동은 이 한 줄만 바꾼다.
     if: github.ref == 'refs/tags/v0.50.109'
     environment:
       name: adk-companion-release
@@ -32,10 +35,10 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 20
     steps:
-      - name: Check out exact A22 release tag
+      - name: Check out the exact dispatched release tag
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: refs/tags/v0.50.109
+          ref: ${{ github.ref }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -88,7 +91,7 @@ jobs:
           validation_output=$(mktemp "$RUNNER_TEMP/formula-recovery-source.XXXXXX")
           trap 'rm -f -- "$validation_output"' EXIT
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.109' GITHUB_REF_TYPE='tag' \
+            GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_REF_TYPE='tag' \
             GITHUB_SHA="$actual_head" GITHUB_OUTPUT="$validation_output" \
             COMPANION_SOURCE_PIN_REQUIRED=1 \
             COMPANION_APPROVED_SOURCE_COMMIT="$COMPANION_APPROVED_SOURCE_COMMIT" \
@@ -118,7 +121,7 @@ jobs:
           COMPANION_PUBLIC_KEY_SHA256: ${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-v0.50.109-checksums.txt"
+          checksums_path="$RUNNER_TEMP/autopus-$GITHUB_REF_NAME-checksums.txt"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_TOKEN="$GITHUB_TOKEN" \
             COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
@@ -153,8 +156,8 @@ jobs:
         run: |
           set -euo pipefail
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_REF_NAME='v0.50.109' \
-            COMPANION_VERSION='0.50.109' \
+            GITHUB_REF_NAME="$GITHUB_REF_NAME" \
+            COMPANION_VERSION="${GITHUB_REF_NAME#v}" \
             COMPANION_HOMEBREW_POLICY='cask-only' \
             COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
             HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
@@ -163,4 +166,4 @@ jobs:
       - name: Remove downloaded release evidence
         if: always()
         shell: bash
-        run: rm -f -- "$RUNNER_TEMP/autopus-v0.50.109-checksums.txt"
+        run: rm -f -- "$RUNNER_TEMP/autopus-$GITHUB_REF_NAME-checksums.txt"

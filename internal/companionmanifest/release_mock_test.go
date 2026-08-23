@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -117,6 +118,13 @@ func runMockedRelease(
 		"COMPANION_PLATFORM=darwin", "COMPANION_ARCHITECTURE="+architecture,
 		"COMPANION_TARGET=darwin_"+architecture, "COMPANION_VERSION=0.50.69",
 		"COMPANION_BUILD_PROVENANCE=github-actions:Insajin/autopus-adk@0123456789012345678901234567890123456789",
+		// lineage 쌍은 이제 모든 darwin/arm64 릴리즈가 내보내는 자산이다. 좌표
+		// 리터럴로 무장되던 동안 mocked 릴리즈는 이 경로를 한 번도 지나지
+		// 않았다. 서명자는 스텁이 아니라 실제 cmd/auto 이므로 이 입력을 주면
+		// omp-context-release-lineage 서브커맨드가 그대로 실행된다.
+		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256=" + strings.Repeat("0", 64),
+		"COMPANION_SOURCE_COMMIT=" + strings.Repeat("1", 40),
+		"COMPANION_SOURCE_TREE=" + strings.Repeat("2", 40),
 		"COMPANION_HANDOFF=v1", "COMPANION_ROLLBACK_FLOOR=5069",
 		"COMPANION_ISSUED_AT=2026-07-15T00:00:00Z",
 		"COMPANION_EXPIRES_AT=2026-07-16T00:00:00Z",

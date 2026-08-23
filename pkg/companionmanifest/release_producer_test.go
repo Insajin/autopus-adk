@@ -1,14 +1,11 @@
 package companionmanifest
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -78,59 +75,6 @@ func TestCompanionReleaseProducer_MissingKeyID_FailsWithoutSecretDisclosure(t *t
 		t.Fatalf("manifest exists after rejected input: %v", statErr)
 	}
 }
-func TestCompanionSignerHelperProcess(t *testing.T) {
-	if os.Getenv("GO_WANT_COMPANION_SIGNER_HELPER") != "1" {
-		return
-	}
-	args := helperArguments(os.Args)
-	input, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sum := sha256.Sum256(input)
-	if err := os.WriteFile(os.Getenv("FAKE_STDIN_DIGEST"), []byte(hex.EncodeToString(sum[:])), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(os.Getenv("FAKE_ARGS_OUT"), []byte(strings.Join(args, "\x00")), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	manifest := flagValue(t, args, "--manifest-output")
-	signature := flagValue(t, args, "--signature-output")
-	artifact := flagValue(t, args, "--artifact")
-	artifactBytes, err := os.ReadFile(artifact)
-	if err != nil {
-		t.Fatal(err)
-	}
-	artifactSum := sha256.Sum256(artifactBytes)
-	rollbackFloor, err := strconv.ParseUint(flagValue(t, args, "--rollback-floor"), 10, 64)
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifestBytes, err := CanonicalBytes(Manifest{
-		SchemaVersion: SchemaVersion, ArtifactDigest: "sha256:" + hex.EncodeToString(artifactSum[:]),
-		Version: flagValue(t, args, "--version"), Platform: flagValue(t, args, "--platform"),
-		Architecture:    flagValue(t, args, "--architecture"),
-		BuildProvenance: flagValue(t, args, "--build-provenance"),
-		Handoff:         flagValue(t, args, "--handoff"), RollbackFloor: rollbackFloor,
-		IssuedAt: flagValue(t, args, "--issued-at"), ExpiresAt: flagValue(t, args, "--expires-at"),
-		KeyID: flagValue(t, args, "--key-id"),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	appendDarwinReleaseEvent(t, "manifest_signature")
-	if err := os.WriteFile(manifest, manifestBytes, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(signature, bytes.Repeat([]byte{0x5a}, 64), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if os.Getenv("FAKE_POST_MANIFEST_MUTATION") == "1" {
-		if err := os.WriteFile(artifact, append(artifactBytes, []byte("-mutated")...), 0o700); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
 func companionProducerEnv(artifact, architecture, keyFile, signer, argsFile, digestFile string) []string {
 	environment := append(os.Environ(),
 		"GO_WANT_COMPANION_SIGNER_HELPER=1",
@@ -153,11 +97,18 @@ func companionProducerEnv(artifact, architecture, keyFile, signer, argsFile, dig
 	if architecture == "arm64" {
 		root := filepath.Join(filepath.Dir(keyFile), "omp-release-canary-root")
 		environment = append(environment,
+			// lineage 쌍은 좌표 무장이 사라진 뒤 모든 darwin/arm64 릴리즈가
+			// 내보내는 자산이 됐다. 이 하네스도 그 경로를 지나므로 입력을
+			// 준다 - internal/companionmanifest의 mocked 릴리즈와 같은 이유다.
+			"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="+strings.Repeat("0", 64),
+			"COMPANION_SOURCE_COMMIT="+strings.Repeat("1", 40),
+			"COMPANION_SOURCE_TREE="+strings.Repeat("2", 40),
 			"OMP_CONTEXT_RELEASE_CANARY_ROOT="+root,
 			"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="+filepath.Join(root, "omp-darwin-arm64"))
 	}
 	return environment
 }
+
 func writeSignerWrapper(t *testing.T, dir string) string {
 	t.Helper()
 	executable, err := os.Executable()
@@ -165,7 +116,11 @@ func writeSignerWrapper(t *testing.T, dir string) string {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "signer")
-	script := "#!/usr/bin/env bash\nexec \"" + executable + "\" -test.run=TestCompanionSignerHelperProcess -- \"$@\"\n"
+	// 래퍼가 활성 플래그를 직접 들고 간다. producer는 lineage 서명만 `env -i`
+	// 로 격리 호출하므로, 상속에 의존하면 그 호출에서 헬퍼가 잠들어 아무
+	// 산출물도 남기지 않는다.
+	script := "#!/usr/bin/env bash\nexec env GO_WANT_COMPANION_SIGNER_HELPER=1 \"" +
+		executable + "\" -test.run=TestCompanionSignerHelperProcess -- \"$@\"\n"
 	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -191,6 +146,13 @@ func assertProducerOutputs(t *testing.T, dir, architecture string) {
 		"adk-companion-manifest.json",
 		"adk-companion-manifest.sig",
 		"auto",
+	}
+	// lineage 쌍은 darwin/arm64 전용이고, 좌표 무장이 사라진 뒤로는 그 타깃의
+	// 모든 릴리즈가 반드시 내보낸다. autopus-desktop의 아카이브 allowlist가
+	// 정확히 11개를 요구하므로 누락은 소비자 거절로 이어진다. 여기서 아키텍처를
+	// 구분해 그 불변식을 golden 에 박는다. ReadDir는 이름 정렬이므로 뒤에 온다.
+	if architecture == "arm64" {
+		want = append(want, "release-lineage-v1.json", "release-lineage-v1.sig")
 	}
 	if len(entries) != len(want) {
 		t.Fatalf("artifact directory entries = %v", entries)
@@ -227,24 +189,8 @@ func assertSignerTransport(t *testing.T, argsFile, digestFile, artifact, secret 
 		t.Fatal("signer did not receive key bytes through stdin")
 	}
 }
-func helperArguments(args []string) []string {
-	for index, arg := range args {
-		if arg == "--" {
-			return args[index+1:]
-		}
-	}
-	return nil
-}
-func flagValue(t *testing.T, args []string, name string) string {
-	t.Helper()
-	for index := 0; index < len(args)-1; index++ {
-		if args[index] == name {
-			return args[index+1]
-		}
-	}
-	t.Fatalf("missing helper flag %s in %v", name, args)
-	return ""
-}
+
+// removeEnvironment는 상속 환경에서 이름 하나를 걷어낸다.
 func removeEnvironment(environment []string, name string) []string {
 	prefix := name + "="
 	filtered := make([]string, 0, len(environment))
