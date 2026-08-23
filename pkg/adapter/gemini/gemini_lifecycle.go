@@ -14,7 +14,16 @@ import (
 	"github.com/insajin/autopus-adk/pkg/processprobe"
 )
 
-const antigravityPluginListTimeout = 2 * time.Second
+// antigravityPluginListTimeout은 best-effort `agy plugin list` 프로브의
+// 마지막 상한이다.
+//
+// processprobe.DefaultWaitDelay보다 반드시 커야 한다. 주석(:24-28)이 말하는
+// "inherited-pipe bound가 이 상한보다 먼저 반환한다"는 성질이 그 순서에
+// 달려 있는데, 두 값이 같아지면 유예가 실제로 필요해진 순간 상한 안에서
+// 끝날 수 없다. 그러면 프로브가 실패하고, best-effort 저하가 경고를 조용히
+// 삼켜서 결과가 뒤집힌다 - -race 계측이 붙었을 때 실제로 그렇게 깨졌다.
+// 순서는 gemini_lifecycle_bounds_test.go가 고정한다.
+const antigravityPluginListTimeout = processprobe.DefaultWaitDelay + 2*time.Second
 
 // Validate checks the validity of installed files.
 func (a *Adapter) Validate(ctx context.Context) ([]adapter.ValidationError, error) {

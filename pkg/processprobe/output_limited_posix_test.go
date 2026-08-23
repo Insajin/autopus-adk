@@ -42,7 +42,9 @@ else
   while :; do printf '0123456789abcdef0123456789abcdef' >&2; done
 fi
 `), 0o755))
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			// 컨텍스트는 "제한이 아니라 컨텍스트로 반환했다"는 대안 가설을
+			// 구별할 수 있을 만큼만 멀리 둔다. 유예의 4배.
+			ctx, cancel := context.WithTimeout(context.Background(), 4*DefaultWaitDelay)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, script, stream)
 			cmd.Env = append(os.Environ(), "AUTOPUS_OUTPUT_LIMIT_PID_FILE="+pidFile)
@@ -52,7 +54,13 @@ fi
 
 			assert.ErrorIs(t, err, ErrOutputLimit)
 			assert.LessOrEqual(t, len(out), 64)
-			assert.Less(t, time.Since(started), 3*time.Second)
+			// 계약은 두 가지다: 제한에 걸려 반환했다는 것(컨텍스트를 기다리지
+			// 않았다), 그리고 상속된 파이프 대기가 유한하다는 것. 두 상한을
+			// 모두 소유 상수에서 유도하고 2배 간격으로 벌려, 유예로 반환한
+			// 실행(약 1배)과 컨텍스트로 반환한 실행(4배)이 부하에서도 섞이지
+			// 않게 한다. 3초 리터럴은 옛 250ms에 여유를 더해 굳힌 값이라
+			// 유예가 움직이는 순간 계약과 무관하게 깨졌다.
+			assert.Less(t, time.Since(started), 2*DefaultWaitDelay)
 			childPID := readPOSIXProbePID(t, pidFile)
 			require.Eventually(t, func() bool {
 				return errors.Is(syscall.Kill(childPID, 0), syscall.ESRCH)

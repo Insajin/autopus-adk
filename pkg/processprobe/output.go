@@ -10,7 +10,19 @@ import (
 	"time"
 )
 
-const defaultWaitDelay = 250 * time.Millisecond
+// DefaultWaitDelay는 프로세스가 종료한 뒤 상속된 파이프를 배수할 유예이다.
+//
+// 이 값이 재는 대상은 "매달린 손자 프로세스"이며, "리더 고루틴이 스케줄되기까지
+// 걸리는 시간"이 아니다. 250ms였을 때 두 성질이 뒤섞였다. `go test ./...`가
+// 패키지를 코어 수만큼 병렬로 돌리면 종료 직후의 배수가 250ms를 넘기고,
+// exec는 ErrWaitDelay로 출력을 잘라낸다. 그래서 타이밍 단정이 전혀 없는
+// TestDetectBinaryFastVersion 같은 테스트까지 부하에서만 깨졌다.
+//
+// 2초는 여전히 상한이다. 매달린 파이프는 사용자가 체감하기 전에 끊기고,
+// 이 값을 쓰는 모든 테스트의 elapsed 단정(probeFixtureLifetime/3 = 10초)
+// 안쪽에 넉넉히 들어간다. 소유자는 이 패키지 하나이며, 호출자는 값을
+// 재기술하지 말고 이 상수를 전달한다.
+const DefaultWaitDelay = 2 * time.Second
 
 var outputCommand = func(cmd *exec.Cmd) ([]byte, error) {
 	return cmd.Output()
@@ -28,7 +40,7 @@ var ErrOutputLimit = errors.New("process probe output limit exceeded")
 func Output(cmd *exec.Cmd) ([]byte, error) {
 	configureProcessGroup(cmd)
 	if cmd.WaitDelay <= 0 {
-		cmd.WaitDelay = defaultWaitDelay
+		cmd.WaitDelay = DefaultWaitDelay
 	}
 	out, err := outputCommand(cmd)
 	if err != nil {
@@ -53,7 +65,7 @@ func OutputLimited(cmd *exec.Cmd, maxBytes int) ([]byte, error) {
 
 	configureProcessGroup(cmd)
 	if cmd.WaitDelay <= 0 {
-		cmd.WaitDelay = defaultWaitDelay
+		cmd.WaitDelay = DefaultWaitDelay
 	}
 	var stopOnce sync.Once
 	stop := func() {

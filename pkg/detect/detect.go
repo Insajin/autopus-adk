@@ -34,10 +34,11 @@ var knownCLIs = []struct {
 	{"omp", "omp", "--version"},
 }
 
-const (
-	cliVersionTimeout   = 5 * time.Second
-	cliVersionWaitDelay = 250 * time.Millisecond
-)
+// cliVersionTimeout은 CLI가 --version에 응답할 상한이다. 파이프 배수 유예는
+// 이 패키지가 정하지 않는다 - processprobe.DefaultWaitDelay가 유일한 소유자이며,
+// 여기서 250ms를 재기술하던 상수가 그 소유권을 갈라 두 패키지가 같은 경계를
+// 서로 다른 값으로 들고 있었다.
+const cliVersionTimeout = 5 * time.Second
 
 // DetectPlatforms는 PATH에서 코딩 CLI를 감지한다.
 func DetectPlatforms() []Platform {
@@ -66,7 +67,7 @@ func IsInstalled(binary string) bool {
 }
 
 func detectBinary(binary, versionArg string) (string, bool) {
-	return detectBinaryWithLimits(binary, versionArg, cliVersionTimeout, cliVersionWaitDelay)
+	return detectBinaryWithLimits(binary, versionArg, cliVersionTimeout, processprobe.DefaultWaitDelay)
 }
 
 func detectBinaryWithLimits(binary, versionArg string, timeout, waitDelay time.Duration) (string, bool) {
