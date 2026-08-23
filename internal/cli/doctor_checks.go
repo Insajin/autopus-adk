@@ -52,8 +52,12 @@ func checkQualityGate(out io.Writer, cfg *config.HarnessConfig) bool {
 		tui.SKIP(out, "review gate: disabled")
 	}
 
-	// Show methodology
-	tui.OK(out, fmt.Sprintf("methodology: %s (enforce: %v)", cfg.Methodology.Mode, cfg.Methodology.Enforce))
+	// 방법론: 값 표시가 아니라 auto check와 동일한 게이트 판정을 보고한다.
+	methodology := evaluateMethodologyGate(cfg)
+	methodology.report(out)
+	if methodology.Status == methodologyGateFail {
+		allOK = false
+	}
 
 	return allOK
 }

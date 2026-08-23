@@ -81,8 +81,8 @@ autopus-adk/
 │   │   ├── agents.go            #     에이전트 마크다운 생성
 │   │   ├── skills.go            #     스킬 마크다운 생성
 │   │   ├── hooks.go             #     훅 생성
-│   │   ├── workflow.go          #     워크플로우 콘텐츠
-│   │   ├── methodology.go       #     TDD/DDD 가이드
+│   │   ├── methodology.go       #     방법론 정의 로드 (mode → content/methodology/*.yaml)
+│   │   ├── methodology_validate.go #  방법론 단계 체인 검증 (순환/미해결 참조/중복 이름)
 │   │   ├── session.go           #     세션 관리
 │   │   ├── ax.go                #     @AX 어노테이션
 │   │   ├── intent.go            #     인텐트 라우팅

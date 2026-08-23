@@ -140,12 +140,23 @@ func (r *doctorJSONReport) collectQualityGateChecks(cfg *config.HarnessConfig) {
 		})
 	}
 
-	r.checks = append(r.checks, jsonCheck{
+	// 방법론: text 표면과 같은 게이트 판정을 그대로 옮긴다.
+	methodology := evaluateMethodologyGate(cfg)
+	methodologyCheck := jsonCheck{
 		ID:       "doctor.methodology.mode",
 		Severity: "info",
 		Status:   "pass",
-		Detail:   fmt.Sprintf("methodology: %s (enforce: %v)", cfg.Methodology.Mode, cfg.Methodology.Enforce),
-	})
+		Detail:   methodology.Detail,
+	}
+	switch methodology.Status {
+	case methodologyGateFail:
+		methodologyCheck.Severity = "error"
+		methodologyCheck.Status = "fail"
+		r.status = jsonStatusWarn
+	case methodologyGateSkip:
+		methodologyCheck.Status = "skip"
+	}
+	r.checks = append(r.checks, methodologyCheck)
 }
 
 func (r *doctorJSONReport) collectHookChecks(dir string) {

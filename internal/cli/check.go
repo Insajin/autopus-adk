@@ -23,6 +23,7 @@ func newCheckCmd() *cobra.Command {
 		hygieneFlag         bool
 		initialPromptFlag   bool
 		monitorCommandsFlag bool
+		methodologyFlag     bool
 		quietFlag           bool
 		warnOnlyFlag        bool
 		stagedFlag          bool
@@ -111,7 +112,7 @@ func newCheckCmd() *cobra.Command {
 			}
 
 			flags := globalFlagsFromContext(cmd.Context())
-			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag, evalRegressionArtifactFlag, evalRegressionAttestationFlag, evalRegressionMaxAgeFlag, policy, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
+			allOK := runChecks(flags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, methodologyFlag, evalRegressionFlag, evalRegressionArtifactFlag, evalRegressionAttestationFlag, evalRegressionMaxAgeFlag, policy, dir, out, quietFlag, warnOnlyFlag, stagedFlag, messageFlag)
 			if !allOK {
 				return fmt.Errorf("check failed")
 			}
@@ -125,6 +126,7 @@ func newCheckCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&hygieneFlag, "hygiene", false, "Check staged generated/runtime drift")
 	cmd.Flags().BoolVar(&initialPromptFlag, "initial-prompt-guard", false, "Check subagent files for forbidden initialPrompt field (SPEC-CC21-001 R11b)")
 	cmd.Flags().BoolVar(&monitorCommandsFlag, "monitor-commands", false, "Lint Monitor commands for line-buffered grep guards")
+	cmd.Flags().BoolVar(&methodologyFlag, "methodology", false, "Validate the configured methodology (fail-closed when methodology.enforce is true)")
 	cmd.Flags().BoolVar(&quietFlag, "quiet", false, "Suppress non-error output")
 	cmd.Flags().BoolVar(&warnOnlyFlag, "warn-only", false, "Exit 0 even if checks fail (advisory mode)")
 	cmd.Flags().BoolVar(&stagedFlag, "staged", false, "Check only git-staged files (for pre-commit hook)")
@@ -151,8 +153,10 @@ func newCheckCmd() *cobra.Command {
 // policy, which remains mandatory and fail-closed.
 // When staged is true, arch check only examines git-staged files.
 // When messageFile is non-empty, lore check validates that file instead of the last commit.
-func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, evalRegressionFlag bool, evalRegressionArtifact, evalRegressionAttestation string, evalRegressionMaxAge time.Duration, evalRegressionPolicy evalregression.EvalRegressionAttestationPolicyV2, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
-	runAll := !archFlag && !cc21Flag && !loreFlag && !hygieneFlag && !initialPromptFlag && !monitorCommandsFlag && !evalRegressionFlag
+// The methodology gate resolves and validates the configured methodology; it is
+// the same judgement auto doctor reports for `doctor.methodology.mode`.
+func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, initialPromptFlag, monitorCommandsFlag, methodologyFlag, evalRegressionFlag bool, evalRegressionArtifact, evalRegressionAttestation string, evalRegressionMaxAge time.Duration, evalRegressionPolicy evalregression.EvalRegressionAttestationPolicyV2, dir string, out io.Writer, quiet, warnOnly, staged bool, messageFile string) bool {
+	runAll := !archFlag && !cc21Flag && !loreFlag && !hygieneFlag && !initialPromptFlag && !monitorCommandsFlag && !methodologyFlag && !evalRegressionFlag
 	allOK := true
 	evalRegressionPolicyOK := true
 
@@ -201,6 +205,11 @@ func runChecks(flags globalFlags, archFlag, cc21Flag, loreFlag, hygieneFlag, ini
 	}
 	if monitorCommandsFlag {
 		if !checkMonitorCommands(dir, out, quiet) {
+			allOK = false
+		}
+	}
+	if methodologyFlag || runAll {
+		if !checkMethodology(dir, out, quiet) {
 			allOK = false
 		}
 	}

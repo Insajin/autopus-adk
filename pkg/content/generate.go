@@ -19,6 +19,11 @@ func validateName(name string) error {
 // contentDir is the path to the content/ directory (agents/, skills/ subdirs).
 // templateDir is the path to the templates/ directory (codex/, gemini/ subdirs).
 func GenerateAllTemplates(contentDir, templateDir string) error {
+	// 방법론 정의는 생성 이전에 검증한다. 검증되지 않은 단계 체인이 하네스로
+	// 나가면, 전달되는 지침의 순서를 아무도 보장하지 못한다.
+	if err := ValidateMethodologyContent(contentDir); err != nil {
+		return fmt.Errorf("methodology definitions: %w", err)
+	}
 	if err := generateAgentTemplates(contentDir, templateDir); err != nil {
 		return fmt.Errorf("agent templates: %w", err)
 	}

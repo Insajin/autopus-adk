@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
-
-	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 // --- skills.go: convertSkillCodex / convertSkillGemini ---
@@ -85,91 +83,5 @@ func TestLoadSkillCatalogFromFS_ReadError(t *testing.T) {
 	_, err := LoadSkillCatalogFromFS(fstest.MapFS{}, "nonexistent")
 	if err == nil {
 		t.Error("missing directory must return error")
-	}
-}
-
-// --- workflow.go: GenerateWorkflow ---
-
-func TestGenerateWorkflow_NilConfig(t *testing.T) {
-	_, err := GenerateWorkflow(nil)
-	if err == nil {
-		t.Error("nil config must return error")
-	}
-}
-
-func TestGenerateWorkflow_TDDMode(t *testing.T) {
-	cfg := &config.HarnessConfig{ProjectName: "TestProject"}
-	cfg.Methodology.Mode = "tdd"
-	cfg.Methodology.Enforce = true
-	cfg.Hooks.PreCommitLore = true
-	cfg.Hooks.PreCommitArch = true
-	cfg.Methodology.ReviewGate = true
-	cfg.Platforms = []string{"claude-code", "codex"}
-
-	out, err := GenerateWorkflow(cfg)
-	if err != nil {
-		t.Fatalf("GenerateWorkflow: %v", err)
-	}
-	if !strings.Contains(out, "# TestProject Workflow") {
-		t.Errorf("title missing: %q", out[:60])
-	}
-	if !strings.Contains(out, "tdd") {
-		t.Errorf("methodology missing: %q", out)
-	}
-	if !strings.Contains(out, "Phase 1: Red") {
-		t.Errorf("TDD phase missing: %q", out)
-	}
-	if !strings.Contains(out, "Phase 3: Refactor") {
-		t.Errorf("TDD refactor phase missing: %q", out)
-	}
-	if !strings.Contains(out, "Lore") {
-		t.Errorf("lore policy missing: %q", out)
-	}
-	if !strings.Contains(out, "아키텍처") {
-		t.Errorf("arch policy missing: %q", out)
-	}
-	if !strings.Contains(out, "리뷰 게이트") {
-		t.Errorf("review gate missing: %q", out)
-	}
-	if !strings.Contains(out, "claude-code") {
-		t.Errorf("platform list missing: %q", out)
-	}
-}
-
-func TestGenerateWorkflow_DDDMode(t *testing.T) {
-	cfg := &config.HarnessConfig{ProjectName: "P"}
-	cfg.Methodology.Mode = "ddd"
-	out, err := GenerateWorkflow(cfg)
-	if err != nil {
-		t.Fatalf("GenerateWorkflow ddd: %v", err)
-	}
-	if !strings.Contains(out, "Phase 1: Analyze") {
-		t.Errorf("DDD analyze phase missing: %q", out)
-	}
-	if !strings.Contains(out, "Phase 3: Improve") {
-		t.Errorf("DDD improve phase missing: %q", out)
-	}
-}
-
-func TestGenerateWorkflow_DefaultMode(t *testing.T) {
-	cfg := &config.HarnessConfig{ProjectName: "P"}
-	out, err := GenerateWorkflow(cfg)
-	if err != nil {
-		t.Fatalf("GenerateWorkflow default: %v", err)
-	}
-	if !strings.Contains(out, "Phase 1: Planning") {
-		t.Errorf("default planning phase missing: %q", out)
-	}
-}
-
-func TestGenerateWorkflow_NoPlatforms(t *testing.T) {
-	cfg := &config.HarnessConfig{ProjectName: "P"}
-	out, err := GenerateWorkflow(cfg)
-	if err != nil {
-		t.Fatalf("GenerateWorkflow no platforms: %v", err)
-	}
-	// No platforms section when platforms list is empty.
-	if strings.Contains(out, "Supported Platforms") {
-		t.Errorf("empty platforms should omit section: %q", out)
 	}
 }

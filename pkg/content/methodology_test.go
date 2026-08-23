@@ -2,6 +2,7 @@
 package content_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -142,10 +143,12 @@ func TestGenerateInstruction_DoubleDiamond(t *testing.T) {
 	}
 
 	instruction := content.GenerateInstruction(def)
-	assert.Contains(t, instruction, "Discover")
-	assert.Contains(t, instruction, "Define")
-	assert.Contains(t, instruction, "Develop")
-	assert.Contains(t, instruction, "Deliver")
+	// 단계는 정의된 순서대로, 번호가 붙은 제목으로 전달된다.
+	for i, name := range []string{"discover", "define", "develop", "deliver"} {
+		assert.Contains(t, instruction, fmt.Sprintf("### Phase %d: %s", i+1, name))
+	}
+	assert.Contains(t, instruction, "DISCOVER → DEFINE → DEVELOP → DELIVER")
+	assert.Contains(t, instruction, "문제 발견")
 }
 
 func TestGenerateInstruction_Generic(t *testing.T) {
