@@ -1,0 +1,156 @@
+name: Receive signed ADK channel
+
+on:
+  workflow_dispatch:
+    inputs:
+      document_base64:
+        description: Canonical base64 of the signed channel document
+        required: true
+        type: string
+      signature_base64:
+        description: Canonical base64 of the raw Ed25519 signature
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: adk-channel-receive
+  cancel-in-progress: false
+
+jobs:
+  receive:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the dispatched receiver
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.3.0
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Build the trusted channel receiver
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$(/usr/bin/git rev-parse --verify HEAD)" == "$GITHUB_SHA" ]]
+          verifier="$RUNNER_TEMP/adk-channel-receiver"
+          [[ ! -e "$verifier" && ! -L "$verifier" ]]
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$verifier" ./internal/adkchannel/cmd
+          chmod 0700 "$verifier"
+          [[ -f "$verifier" && ! -L "$verifier" && -x "$verifier" ]]
+
+      - name: Decode bounded dispatch inputs
+        shell: bash
+        env:
+          ADK_CHANNEL_DOCUMENT_BASE64: ${{ inputs.document_base64 }}
+          ADK_CHANNEL_SIGNATURE_BASE64: ${{ inputs.signature_base64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          incoming="$RUNNER_TEMP/adk-channel-incoming"
+          [[ ! -e "$incoming" && ! -L "$incoming" ]]
+          mkdir -m 0700 "$incoming"
+          "$RUNNER_TEMP/adk-channel-receiver" decode \
+            --document-out "$incoming/adk-channel.json" \
+            --signature-out "$incoming/adk-channel.json.sig"
+
+      - name: Verify and fast-forward the public channel
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GIT_TERMINAL_PROMPT: "0"
+          AUTOPUS_ADK_CHANNEL_KEY_ID: ${{ vars.AUTOPUS_ADK_CHANNEL_KEY_ID }}
+          AUTOPUS_ADK_CHANNEL_PUBLIC_KEY: ${{ vars.AUTOPUS_ADK_CHANNEL_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          incoming="$RUNNER_TEMP/adk-channel-incoming"
+          channel_root="$RUNNER_TEMP/adk-channel-publication"
+          staged_root="$RUNNER_TEMP/adk-channel-staged"
+          verifier="$RUNNER_TEMP/adk-channel-receiver"
+          [[ -d "$incoming" && ! -L "$incoming" ]]
+          [[ ! -e "$channel_root" && ! -L "$channel_root" ]]
+          [[ ! -e "$staged_root" && ! -L "$staged_root" ]]
+          mkdir -m 0700 "$channel_root"
+          mkdir -m 0700 "$staged_root"
+
+          /usr/bin/git init -q "$channel_root"
+          /usr/bin/git -C "$channel_root" config --local --add credential.helper ""
+          # shellcheck disable=SC2016
+          # The helper is stored literally and reads GITHUB_TOKEN only when Git
+          # invokes it; expanding here would persist the token in .git/config.
+          /usr/bin/git -C "$channel_root" config --local --add credential.helper \
+            '!f() { printf "username=x-access-token\npassword=%s\n" "$GITHUB_TOKEN"; }; f'
+          /usr/bin/git -C "$channel_root" config --local user.name "github-actions[bot]"
+          /usr/bin/git -C "$channel_root" config --local user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          /usr/bin/git -C "$channel_root" config --local core.autocrlf false
+          /usr/bin/git -C "$channel_root" config --local core.hooksPath /dev/null
+          /usr/bin/git -C "$channel_root" config --local commit.gpgSign false
+          /usr/bin/git -C "$channel_root" remote add origin \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+
+          current_args=()
+          if /usr/bin/git -C "$channel_root" ls-remote --exit-code --refs origin \
+              "refs/heads/release-channel" >/dev/null; then
+            /usr/bin/git -C "$channel_root" fetch -q --no-tags --depth=1 origin \
+              "refs/heads/release-channel:refs/remotes/origin/release-channel"
+            /usr/bin/git -C "$channel_root" checkout -q -b release-channel \
+              refs/remotes/origin/release-channel
+            current_args=(
+              --current-document "$channel_root/adk-channel.json"
+              --current-signature "$channel_root/adk-channel.json.sig"
+            )
+          else
+            status=$?
+            [[ "$status" -eq 2 ]] || exit "$status"
+            /usr/bin/git -C "$channel_root" checkout -q --orphan release-channel
+          fi
+
+          env -u GITHUB_TOKEN "$verifier" verify-update \
+            --document "$incoming/adk-channel.json" \
+            --signature "$incoming/adk-channel.json.sig" \
+            "${current_args[@]}"
+
+          rm -f -- "$channel_root/adk-channel.json" "$channel_root/adk-channel.json.sig"
+          cp -- "$incoming/adk-channel.json" "$channel_root/adk-channel.json"
+          cp -- "$incoming/adk-channel.json.sig" "$channel_root/adk-channel.json.sig"
+
+          /usr/bin/git -C "$channel_root" add -- adk-channel.json adk-channel.json.sig
+          /usr/bin/git -C "$channel_root" cat-file blob :adk-channel.json \
+            > "$staged_root/adk-channel.json"
+          /usr/bin/git -C "$channel_root" cat-file blob :adk-channel.json.sig \
+            > "$staged_root/adk-channel.json.sig"
+          cmp -s -- "$incoming/adk-channel.json" "$staged_root/adk-channel.json"
+          cmp -s -- "$incoming/adk-channel.json.sig" "$staged_root/adk-channel.json.sig"
+          version=$(env -u GITHUB_TOKEN "$verifier" verify \
+            --document "$staged_root/adk-channel.json" \
+            --signature "$staged_root/adk-channel.json.sig")
+          /usr/bin/git -C "$channel_root" commit -q \
+            -m "adk-channel: publish signed ADK $version"
+          /usr/bin/git -C "$channel_root" push origin \
+            "HEAD:refs/heads/release-channel"
+          printf 'Published signed ADK channel %s to release-channel.\n' \
+            "$version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove receiver files
+        if: always()
+        shell: bash
+        run: |
+          rm -rf -- "$RUNNER_TEMP/adk-channel-incoming" \
+            "$RUNNER_TEMP/adk-channel-publication" \
+            "$RUNNER_TEMP/adk-channel-staged"
+          rm -f -- "$RUNNER_TEMP/adk-channel-receiver"
