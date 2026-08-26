@@ -121,6 +121,7 @@ func TestOMPModelDoctorExecRunner_LocalBoundedCommandAndNoOptProbe(t *testing.T)
 	_, err := runner.Run(context.Background(), "go", "version")
 	require.ErrorContains(t, err, "unsafe OMP model doctor command")
 	assert.True(t, safeOMPModelDoctorProbeArgs([]string{"models", "--json", "--no-extensions"}))
+	assert.True(t, safeOMPModelDoctorProbeArgs([]string{"config", "list", "--json"}))
 	assert.False(t, safeOMPModelDoctorProbeArgs([]string{"models", "--json"}))
 	assert.False(t, safeOMPModelDoctorProbeArgs([]string{"models", "--json", "--extensions"}))
 

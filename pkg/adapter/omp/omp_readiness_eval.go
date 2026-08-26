@@ -3,19 +3,10 @@ package omp
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"io"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/detect"
-	"github.com/insajin/autopus-adk/pkg/processprobe"
 )
-
-type ompCatalogModel struct {
-	provider  string
-	id        string
-	available *bool
-}
 
 func evaluateOMPVersion(result ompProbeResult) (OMPCapabilityResult, string) {
 	capability := OMPCapabilityResult{ID: "identity.version", Reason: result.reason}
@@ -52,216 +43,248 @@ func evaluateOMPHelpCapability(id string, result ompProbeResult, needles ...stri
 	return capability
 }
 
-func evaluateOMPConfigCapability(result ompProbeResult) OMPCapabilityResult {
-	capability := OMPCapabilityResult{ID: "config.overlay_readback", Reason: result.reason}
+func evaluateOMPIntentTracing(result ompProbeResult) OMPCapabilityResult {
+	capability := OMPCapabilityResult{ID: "config.intent_tracing", Reason: result.reason}
 	if result.reason != "" {
 		if result.reason == "output_oversized" {
 			capability.Reason = "output_invalid"
 		}
 		return capability
 	}
-	directories, ok := parseOMPConfigDirectories(result.output)
-	if !ok || len(directories) != 1 || directories[0] != ".agents/skills" {
+	enabled, ok := parseOMPIntentTracing(result.output)
+	if !ok {
 		capability.Reason = "output_invalid"
 		return capability
 	}
+	if !enabled {
+		capability.Reason = "effective_intent_tracing_disabled"
+		return capability
+	}
 	capability.Supported = true
-	capability.Reason = "output_valid"
+	capability.Reason = "effective_intent_tracing_enabled"
 	return capability
 }
 
-func parseOMPConfigDirectories(data []byte) ([]string, bool) {
-	var direct []string
+func parseOMPIntentTracing(data []byte) (bool, bool) {
+	var direct bool
 	if decodeOMPExactJSON(data, &direct) {
 		return direct, true
 	}
-
-	var wrapper map[string]json.RawMessage
-	if !decodeOMPExactJSON(data, &wrapper) || len(wrapper) != 4 {
-		return nil, false
+	var wrapper struct {
+		Key         string `json:"key"`
+		Value       *bool  `json:"value"`
+		Type        string `json:"type"`
+		Description string `json:"description"`
 	}
-	for _, key := range []string{"key", "value", "type", "description"} {
-		if _, exists := wrapper[key]; !exists {
-			return nil, false
-		}
+	if !decodeOMPExactJSON(data, &wrapper) || wrapper.Key != "tools.intentTracing" ||
+		wrapper.Value == nil || wrapper.Type != "boolean" {
+		return false, false
 	}
-	var key, valueType, description string
-	var directories []string
-	if !decodeOMPExactJSON(wrapper["key"], &key) || key != "skills.customDirectories" ||
-		!decodeOMPExactJSON(wrapper["type"], &valueType) || valueType != "array" ||
-		!decodeOMPExactJSON(wrapper["description"], &description) || description != "" ||
-		!decodeOMPExactJSON(wrapper["value"], &directories) {
-		return nil, false
-	}
-	return directories, true
+	return *wrapper.Value, true
 }
 
-func evaluateOMPCatalog(result ompProbeResult) ([]ompCatalogModel, string, OMPCapabilityResult) {
-	capability := OMPCapabilityResult{ID: "catalog.models_json", Reason: result.reason}
+type ompReadinessRPCFrame struct {
+	ID                        string          `json:"id"`
+	Type                      string          `json:"type"`
+	Method                    string          `json:"method"`
+	Command                   string          `json:"command"`
+	Success                   bool            `json:"success"`
+	ProtocolVersion           int             `json:"protocolVersion"`
+	SupportedProtocolVersions []int           `json:"supportedProtocolVersions"`
+	Data                      json.RawMessage `json:"data"`
+}
+
+type ompReadinessRPCObservation struct {
+	ready, negotiated, state, commands, dumpTools, subscribed bool
+}
+
+func evaluateOMPProviderFreeRPC(result ompProbeResult) []OMPCapabilityResult {
+	ids := []string{
+		"rpc.protocol_v2", "rpc.state", "rpc.commands",
+		"rpc.dump_tools_pre_intent", "rpc.subagent_subscription",
+	}
 	if result.reason != "" {
-		switch result.reason {
-		case "timeout":
-			return nil, "catalog_timeout", capability
-		case "exit_nonzero":
-			return nil, "catalog_exit_nonzero", capability
-		default:
-			capability.Reason = "output_invalid"
-			return nil, "catalog_oversized", capability
-		}
-	}
-	models, ok := parseOMPModelCatalog(result.output)
-	if !ok {
-		capability.Reason = "output_invalid"
-		return nil, "catalog_invalid", capability
-	}
-	capability.Supported = true
-	capability.Reason = "output_valid"
-	if len(models) == 0 {
-		return nil, "catalog_empty", capability
-	}
-	return models, "catalog_ready", capability
-}
-
-func parseOMPModelCatalog(data []byte) ([]ompCatalogModel, bool) {
-	var top map[string]json.RawMessage
-	if !decodeOMPExactJSON(data, &top) || len(top) != 1 {
-		return nil, false
-	}
-	rawModels, ok := top["models"]
-	if !ok {
-		return nil, false
-	}
-	var entries []map[string]json.RawMessage
-	if !decodeOMPExactJSON(rawModels, &entries) {
-		return nil, false
-	}
-	models := make([]ompCatalogModel, 0, len(entries))
-	for _, entry := range entries {
-		var provider, id string
-		if raw, found := entry["provider"]; !found || json.Unmarshal(raw, &provider) != nil || provider == "" {
-			return nil, false
-		}
-		if raw, found := entry["id"]; !found || json.Unmarshal(raw, &id) != nil || id == "" {
-			return nil, false
-		}
-		model := ompCatalogModel{provider: provider, id: id}
-		if raw, found := entry["available"]; found {
-			var available bool
-			if json.Unmarshal(raw, &available) != nil {
-				return nil, false
-			}
-			model.available = &available
-		}
-		models = append(models, model)
-	}
-	return models, true
-}
-
-func resolveOMPSelectors(selectors []string, models []ompCatalogModel, catalogReason string) []OMPSelectorResolution {
-	results := make([]OMPSelectorResolution, 0, len(selectors))
-	for _, selector := range selectors {
-		result := OMPSelectorResolution{Selector: selector, Status: "unresolved", Reason: "selector_unresolved"}
-		if strings.HasPrefix(selector, "/") || strings.HasSuffix(selector, "/") || strings.Count(selector, "/") > 1 {
-			result.Status, result.Reason = "invalid", "selector_malformed"
-			results = append(results, result)
-			continue
-		}
-		for _, model := range models {
-			canonical := model.provider + "/" + model.id
-			if selector != canonical && selector != model.id {
-				continue
-			}
-			result.ResolvedModel, result.Status, result.Reason = canonical, "resolved", "available"
-			if model.available != nil && !*model.available {
-				result.Reason = "credential_unavailable"
-			}
-			break
-		}
-		if result.Status == "unresolved" && catalogReason != "catalog_ready" {
-			result.Reason = catalogReason
-		}
-		results = append(results, result)
-	}
-	return results
-}
-
-func evaluateOMPRPCCapabilities(result ompProbeResult) []OMPCapabilityResult {
-	ids := []string{"rpc.command_discovery", "rpc.tool_events", "rpc.terminal"}
-	capabilities := make([]OMPCapabilityResult, 0, len(ids))
-	if result.reason != "" && result.reason != "timeout" && result.reason != "exit_nonzero" {
 		reason := result.reason
 		if reason == "output_oversized" {
 			reason = "output_invalid"
 		}
-		for _, id := range ids {
-			capabilities = append(capabilities, OMPCapabilityResult{ID: id, Reason: reason})
-		}
-		return capabilities
+		return ompUnsupportedCapabilities(ids, reason)
 	}
-	discovery, pairedTools, terminal, valid := parseOMPRPCEvents(result.output)
-	if !valid {
-		for _, id := range ids {
-			capabilities = append(capabilities, OMPCapabilityResult{ID: id, Reason: "output_invalid"})
-		}
-		return capabilities
+	observed, ok := parseOMPProviderFreeRPC(result.output)
+	if !ok {
+		return ompUnsupportedCapabilities(ids, "output_invalid")
 	}
-	for index, observed := range []bool{discovery, pairedTools, terminal} {
-		reason := "event_missing"
-		if observed {
-			reason = "event_observed"
-			if result.reason != "" {
-				reason += "_partial_" + result.reason
-			}
-		} else if result.reason != "" {
-			reason = result.reason
+	values := []struct {
+		ok     bool
+		reason string
+	}{
+		{observed.ready && observed.negotiated, "protocol_v2_negotiated"},
+		{observed.state, "idle_state_observed"},
+		{observed.commands, "commands_observed"},
+		{observed.dumpTools, "pre_intent_schema_observed"},
+		{observed.subscribed, "subscription_round_trip_observed"},
+	}
+	capabilities := make([]OMPCapabilityResult, 0, len(ids))
+	for index, value := range values {
+		reason := "response_missing"
+		if value.ok {
+			reason = value.reason
 		}
 		capabilities = append(capabilities, OMPCapabilityResult{
-			ID: ids[index], Supported: observed && result.reason == "", Reason: reason,
+			ID: ids[index], Supported: value.ok, Reason: reason,
 		})
 	}
 	return capabilities
 }
 
-func parseOMPRPCEvents(data []byte) (discovery, pairedTools, terminal, valid bool) {
-	valid = true
-	starts := make(map[string]bool)
+func parseOMPProviderFreeRPC(data []byte) (ompReadinessRPCObservation, bool) {
+	observation := ompReadinessRPCObservation{}
+	responses := make(map[string]ompReadinessRPCFrame)
 	for _, line := range bytes.Split(data, []byte{'\n'}) {
 		if len(bytes.TrimSpace(line)) == 0 {
 			continue
 		}
-		var event struct {
-			Type       string `json:"type"`
-			ToolCallID string `json:"toolCallId"`
+		var frame ompReadinessRPCFrame
+		if json.Unmarshal(line, &frame) != nil || frame.Type == "" {
+			return observation, false
 		}
-		if json.Unmarshal(line, &event) != nil || event.Type == "" {
-			valid = false
-			continue
-		}
-		switch event.Type {
-		case "available_commands_update":
-			discovery = true
-		case "tool_execution_start":
-			if event.ToolCallID != "" {
-				starts[event.ToolCallID] = true
+		switch frame.Type {
+		case "ready":
+			if observation.ready || frame.ProtocolVersion != 1 ||
+				!containsOMPProtocol(frame.SupportedProtocolVersions, 2) {
+				return observation, false
 			}
-		case "tool_execution_end":
-			pairedTools = pairedTools || starts[event.ToolCallID]
-		case "message_end":
-			terminal = terminal || pairedTools
+			observation.ready = true
+		case "available_commands_update":
+		case "extension_ui_request":
+			if frame.ID == "" || frame.Method != "setStatus" && frame.Method != "setWidget" && frame.Method != "setTitle" {
+				return observation, false
+			}
+		case "response":
+			var command string
+			switch frame.ID {
+			case ompReadinessNegotiateID:
+				command = "negotiate_protocol"
+			case ompReadinessStateID:
+				command = "get_state"
+			case ompReadinessCommandsID:
+				command = "get_available_commands"
+			case ompReadinessSubscribeID, ompReadinessUnsubscribeID:
+				command = "set_subagent_subscription"
+			default:
+				return observation, false
+			}
+			if frame.Command != command || responses[frame.ID].Type != "" {
+				return observation, false
+			}
+			responses[frame.ID] = frame
+		default:
+			return observation, false
 		}
 	}
-	return discovery, pairedTools, terminal, valid
+	negotiation, ok := successfulOMPResponse(responses, ompReadinessNegotiateID, "negotiate_protocol")
+	if ok {
+		var payload struct {
+			ProtocolVersion int `json:"protocolVersion"`
+		}
+		observation.negotiated = json.Unmarshal(negotiation.Data, &payload) == nil && payload.ProtocolVersion == 2
+	}
+	state, ok := successfulOMPResponse(responses, ompReadinessStateID, "get_state")
+	if ok {
+		observation.state, observation.dumpTools = parseOMPReadinessState(state.Data)
+	}
+	commands, ok := successfulOMPResponse(responses, ompReadinessCommandsID, "get_available_commands")
+	observation.commands = ok && parseOMPReadinessCommands(commands.Data)
+	_, subscribed := successfulOMPResponse(responses, ompReadinessSubscribeID, "set_subagent_subscription")
+	_, unsubscribed := successfulOMPResponse(responses, ompReadinessUnsubscribeID, "set_subagent_subscription")
+	observation.subscribed = subscribed && unsubscribed
+	return observation, true
 }
 
-func decodeOMPExactJSON(data []byte, target any) bool {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	if decoder.Decode(target) != nil {
+func successfulOMPResponse(
+	responses map[string]ompReadinessRPCFrame,
+	id, command string,
+) (ompReadinessRPCFrame, bool) {
+	frame, ok := responses[id]
+	return frame, ok && frame.Success && frame.Command == command
+}
+
+func parseOMPReadinessState(data []byte) (bool, bool) {
+	var state struct {
+		SessionID          string            `json:"sessionId"`
+		IsStreaming        *bool             `json:"isStreaming"`
+		IsCompacting       *bool             `json:"isCompacting"`
+		MessageCount       *int              `json:"messageCount"`
+		QueuedMessageCount *int              `json:"queuedMessageCount"`
+		DumpTools          []json.RawMessage `json:"dumpTools"`
+	}
+	if json.Unmarshal(data, &state) != nil || strings.TrimSpace(state.SessionID) == "" ||
+		state.IsStreaming == nil || state.IsCompacting == nil || state.MessageCount == nil ||
+		state.QueuedMessageCount == nil || *state.IsStreaming || *state.IsCompacting ||
+		*state.MessageCount != 0 || *state.QueuedMessageCount != 0 {
+		return false, false
+	}
+	return true, parseOMPPreIntentTools(state.DumpTools)
+}
+
+func parseOMPPreIntentTools(rawTools []json.RawMessage) bool {
+	found := map[string]bool{}
+	for _, raw := range rawTools {
+		var tool struct {
+			Name       string         `json:"name"`
+			Parameters map[string]any `json:"parameters"`
+		}
+		if json.Unmarshal(raw, &tool) != nil || tool.Name == "" || tool.Parameters == nil {
+			return false
+		}
+		found[tool.Name] = true
+		if tool.Name == "task" {
+			properties, ok := tool.Parameters["properties"].(map[string]any)
+			if !ok || properties["i"] != nil {
+				return false
+			}
+			_, batchContext := properties["context"]
+			_, batchTasks := properties["tasks"]
+			_, flatTask := properties["task"]
+			if !(batchContext && batchTasks) && !flatTask {
+				return false
+			}
+		}
+	}
+	return found["task"] && found["hub"] && found["todo"]
+}
+
+func parseOMPReadinessCommands(data []byte) bool {
+	var payload struct {
+		Commands []struct {
+			Name   string `json:"name"`
+			Source string `json:"source"`
+		} `json:"commands"`
+	}
+	if json.Unmarshal(data, &payload) != nil || len(payload.Commands) == 0 {
 		return false
 	}
-	var extra any
-	return errors.Is(decoder.Decode(&extra), io.EOF)
+	for _, command := range payload.Commands {
+		if strings.TrimSpace(command.Name) == "" || strings.TrimSpace(command.Source) == "" {
+			return false
+		}
+	}
+	return true
 }
 
-func isOMPOutputLimitError(err error) bool {
-	return errors.Is(err, processprobe.ErrOutputLimit)
+func ompUnsupportedCapabilities(ids []string, reason string) []OMPCapabilityResult {
+	capabilities := make([]OMPCapabilityResult, 0, len(ids))
+	for _, id := range ids {
+		capabilities = append(capabilities, OMPCapabilityResult{ID: id, Reason: reason})
+	}
+	return capabilities
+}
+
+func containsOMPProtocol(values []int, want int) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

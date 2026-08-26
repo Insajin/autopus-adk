@@ -10,8 +10,8 @@
 ## 설치된 구성 요소
 
 - Rules: .claude/rules/autopus/
-- Skills: .claude/skills/autopus/
-- Commands: .claude/skills/auto/SKILL.md
+- Skills: .claude/skills/<name>/SKILL.md
+- Router: .claude/skills/auto/SKILL.md
 - Agents: .claude/agents/autopus/
 
 ## Rule Isolation

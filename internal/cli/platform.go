@@ -9,11 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
-	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/omp"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
@@ -74,6 +69,12 @@ func newPlatformListCmd(dir *string) *cobra.Command {
 }
 
 func newPlatformAddCmd(dir *string) *cobra.Command {
+	return newPlatformAddCmdWithLookup(dir, lookupPlatformDescriptor)
+}
+
+// @AX:WARN [AUTO]: platform-add contains more than eight conditional branches.
+// @AX:REASON [AUTO]: platform normalization, catalog admission, config cloning, provider migration, generation, persistence, and lifecycle-stage errors converge here.
+func newPlatformAddCmdWithLookup(dir *string, lookup platformDescriptorLookup) *cobra.Command {
 	return &cobra.Command{
 		Use:   "add <platform>",
 		Short: "Add a platform to autopus.yaml",
@@ -88,73 +89,42 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 			if normalized := config.ProviderToPlatform(platform); normalized != "" {
 				platform = normalized
 			}
-
-			// 유효한 플랫폼 확인 (임시 config로 검증)
-			testCfg := &config.HarnessConfig{
-				Mode:        config.ModeFull,
-				ProjectName: "test",
-				Platforms:   []string{platform},
-			}
-			if err := testCfg.Validate(); err != nil {
-				return fmt.Errorf("잘못된 플랫폼 %q: %w", platform, err)
+			descriptor, ok := lookup(platform)
+			if !ok {
+				return fmt.Errorf("잘못된 플랫폼 %q", platform)
 			}
 
-			cfg, err := config.Load(d)
+			cfg, err := config.LoadPreview(d)
 			if err != nil {
 				return fmt.Errorf("설정 로드 실패: %w", err)
 			}
-
-			// 이미 존재하는지 확인
-			for _, p := range cfg.Platforms {
-				if p == platform {
-					fmt.Fprintf(cmd.OutOrStdout(), "플랫폼 %q는 이미 추가되어 있습니다\n", platform)
-					return nil
-				}
+			if containsPlatform(cfg.Platforms, platform) {
+				fmt.Fprintf(cmd.OutOrStdout(), "플랫폼 %q는 이미 추가되어 있습니다\n", platform)
+				return nil
 			}
 
-			cfg.Platforms = append(cfg.Platforms, platform)
-
-			// Update orchestra config for the new platform
+			candidateCfg, err := cloneHarnessConfig(cfg)
+			if err != nil {
+				return fmt.Errorf("설정 준비 실패: %w", err)
+			}
+			candidateCfg.Platforms = append(candidateCfg.Platforms, platform)
 			providerName := config.PlatformToProvider(platform)
 			if providerName != "" {
-				if err := config.EnsureOrchestraProvider(cfg, providerName); err != nil {
+				if err := config.EnsureOrchestraProvider(candidateCfg, providerName); err != nil {
 					return fmt.Errorf("orchestra 설정 갱신 실패: %w", err)
 				}
 			}
 
-			if err := config.Save(d, cfg); err != nil {
-				return fmt.Errorf("설정 저장 실패: %w", err)
-			}
-
-			// 플랫폼 파일 생성
-			ctx := context.Background()
-			effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
-			switch platform {
-			case "claude-code":
-				a := claude.NewWithRoot(d)
-				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
-					return fmt.Errorf("claude-code 파일 생성 실패: %w", err)
+			effectiveCfg := applyFlagCC21Overrides(candidateCfg, globalFlagsFromContext(cmd.Context()))
+			descriptor = withPlatformAddOwnershipHandoff(descriptor, effectiveCfg, lookup)
+			err = generatePlatformThenSave(
+				context.Background(), d, descriptor, effectiveCfg, candidateCfg, config.Save,
+			)
+			if err != nil {
+				if lifecycleErr, ok := err.(*platformLifecycleError); ok && lifecycleErr.stage == platformStageSave {
+					return fmt.Errorf("설정 저장 실패: %w", err)
 				}
-			case "codex":
-				a := codex.NewWithRoot(d)
-				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
-					return fmt.Errorf("codex 파일 생성 실패: %w", err)
-				}
-			case "antigravity-cli":
-				a := antigravity.NewWithRoot(d)
-				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
-					return fmt.Errorf("antigravity-cli 파일 생성 실패: %w", err)
-				}
-			case "opencode":
-				a := opencode.NewWithRoot(d)
-				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
-					return fmt.Errorf("opencode 파일 생성 실패: %w", err)
-				}
-			case "omp":
-				a := omp.NewWithRoot(d)
-				if _, err := a.Generate(ctx, effectiveCfg); err != nil {
-					return fmt.Errorf("omp 파일 생성 실패: %w", err)
-				}
+				return fmt.Errorf("%s 파일 생성 실패: %w", platform, err)
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "✓ Platform %q added\n", platform)
@@ -163,9 +133,13 @@ func newPlatformAddCmd(dir *string) *cobra.Command {
 	}
 }
 
-// @AX:WARN [AUTO]: platform-remove orchestration has cyclomatic complexity 18.
-// @AX:REASON [AUTO]: gocyclo reports 18 across adapter cleanup, config migration, persistence, and user-visible convergence branches.
 func newPlatformRemoveCmd(dir *string) *cobra.Command {
+	return newPlatformRemoveCmdWithLookup(dir, lookupPlatformDescriptor)
+}
+
+// @AX:WARN [AUTO]: platform-remove contains more than eight conditional branches.
+// @AX:REASON [AUTO]: platform admission, config cloning, manifest cleanup, persistence, and repair-required receipt handling converge here.
+func newPlatformRemoveCmdWithLookup(dir *string, lookup platformDescriptorLookup) *cobra.Command {
 	return &cobra.Command{
 		Use:   "remove <platform>",
 		Short: "Remove a platform from autopus.yaml",
@@ -180,76 +154,63 @@ func newPlatformRemoveCmd(dir *string) *cobra.Command {
 			if normalized := config.ProviderToPlatform(platform); normalized != "" {
 				platform = normalized
 			}
-
-			var cfg *config.HarnessConfig
-			if platform == "omp" {
-				cfg, err = config.LoadPreview(d)
-			} else {
-				cfg, err = config.Load(d)
+			descriptor, ok := lookup(platform)
+			if !ok {
+				return fmt.Errorf("잘못된 플랫폼 %q", platform)
 			}
+
+			cfg, err := config.LoadPreview(d)
 			if err != nil {
 				return fmt.Errorf("설정 로드 실패: %w", err)
 			}
 
-			// 플랫폼 제거
-			var newPlatforms []string
+			newPlatforms := make([]string, 0, len(cfg.Platforms)-1)
 			found := false
-			for _, p := range cfg.Platforms {
-				if p == platform {
+			for _, configured := range cfg.Platforms {
+				if configured == platform {
 					found = true
 					continue
 				}
-				newPlatforms = append(newPlatforms, p)
+				newPlatforms = append(newPlatforms, configured)
 			}
-
 			if !found {
 				fmt.Fprintf(cmd.OutOrStdout(), "플랫폼 %q를 찾을 수 없습니다\n", platform)
 				return nil
 			}
-
 			if len(newPlatforms) == 0 {
 				return fmt.Errorf("최소 하나의 플랫폼이 필요합니다")
 			}
 
-			ctx := context.Background()
-			if platform == "omp" {
-				a := omp.NewWithRoot(d)
-				receipt, cleanErr := a.CleanWithReceipt(ctx)
-				if cleanErr != nil {
-					if len(receipt.ChangedPaths) > 0 {
-						return fmt.Errorf("omp 파일 정리 실패: %w; repair_required=true changed_paths=[%s]",
-							cleanErr, strings.Join(receipt.ChangedPaths, ","))
+			candidateCfg, err := cloneHarnessConfig(cfg)
+			if err != nil {
+				return fmt.Errorf("설정 준비 실패: %w", err)
+			}
+			candidateCfg.Platforms = newPlatforms
+			descriptor = withPlatformRemoveOwnershipHandoff(descriptor, candidateCfg, lookup)
+			receipt, lifecycleErr := cleanPlatformThenSave(
+				context.Background(), d, descriptor, candidateCfg, config.Save,
+			)
+			if lifecycleErr != nil {
+				stage := platformStageClean
+				detail, hasDetail := lifecycleErr.(*platformLifecycleError)
+				if hasDetail {
+					stage = detail.stage
+				}
+				if stage == platformStageSave && hasDetail && detail.rolledBack {
+					return fmt.Errorf("설정 저장 실패(플랫폼 변경 rollback 완료): %w", lifecycleErr)
+				}
+				if descriptor.repairDetail {
+					paths := strings.Join(receipt.changedPaths, ",")
+					if stage == platformStageSave || len(receipt.changedPaths) > 0 {
+						return fmt.Errorf("%s 파일 정리 실패: %w; repair_required=true changed_paths=[%s]",
+							platform, lifecycleErr, paths)
 					}
-					return fmt.Errorf("omp 파일 정리 사전 검증 실패: %w", cleanErr)
+					return fmt.Errorf("%s 파일 정리 사전 검증 실패: %w", platform, lifecycleErr)
 				}
-				cfg.Platforms = newPlatforms
-				if err := config.Save(d, cfg); err != nil {
-					return fmt.Errorf("설정 저장 실패: %w; repair_required=true changed_paths=[%s]",
-						err, strings.Join(receipt.ChangedPaths, ","))
+				if stage == platformStageSave {
+					return fmt.Errorf("설정 저장 실패: %w", lifecycleErr)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "✓ Platform %q removed\n", platform)
-				return nil
-			}
-
-			cfg.Platforms = newPlatforms
-			if err := config.Save(d, cfg); err != nil {
-				return fmt.Errorf("설정 저장 실패: %w", err)
-			}
-
-			// 플랫폼 파일 정리
-			switch platform {
-			case "claude-code":
-				a := claude.NewWithRoot(d)
-				_ = a.Clean(ctx) // 정리 실패는 무시
-			case "codex":
-				a := codex.NewWithRoot(d)
-				_ = a.Clean(ctx)
-			case "antigravity-cli":
-				a := antigravity.NewWithRoot(d)
-				_ = a.Clean(ctx)
-			case "opencode":
-				a := opencode.NewWithRoot(d)
-				_ = a.Clean(ctx)
+				return fmt.Errorf("%s 파일 정리 실패: %w", platform, lifecycleErr)
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "✓ Platform %q removed\n", platform)

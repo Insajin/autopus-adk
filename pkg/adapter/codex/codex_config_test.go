@@ -12,17 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateConfig(t *testing.T) {
+func TestPrepareConfigFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	assert.Len(t, files, 1)
 	assert.Equal(t, codexConfigRelPath, files[0].TargetPath)
-	assert.FileExists(t, filepath.Join(dir, ".codex", "config.toml"))
+	assert.NoFileExists(t, filepath.Join(dir, ".codex", "config.toml"))
 	assert.Contains(t, string(files[0].Content), "test-project")
 	assert.Contains(t, string(files[0].Content), "context7")
 	rootSection := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
@@ -44,7 +44,7 @@ model_verbosity = "high"
 approval_policy = "never"
 `), 0644))
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	content := string(files[0].Content)
 
@@ -64,7 +64,7 @@ func TestGenerateConfig_PreservesUserModelValueLiteral(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
 	require.NoError(t, os.WriteFile(configPath, []byte("model='custom/model' # keep\nmodel_reasoning_effort='ultra' # keep\n"), 0644))
 
-	files, err := a.generateConfig(config.DefaultFullConfig("literal-project"))
+	files, err := a.prepareConfigFile(config.DefaultFullConfig("literal-project"))
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.Contains(t, root, "model = 'custom/model' # keep")
@@ -82,7 +82,7 @@ func TestGenerateConfig_PreservesQuotedUserModelKey(t *testing.T) {
 'model_reasoning_effort' = 'high'
 `), 0o644))
 
-	files, err := a.generateConfig(config.DefaultFullConfig("quoted-key-project"))
+	files, err := a.prepareConfigFile(config.DefaultFullConfig("quoted-key-project"))
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.Contains(t, root, `model = "custom-model"`)
@@ -103,12 +103,13 @@ model = "spoofed-model"
 approval_policy = "never"
 `), 0o644))
 
-	files, err := a.generateConfig(config.DefaultFullConfig("multiline-project"))
+	files, err := a.prepareConfigFile(config.DefaultFullConfig("multiline-project"))
 	require.NoError(t, err)
-	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
-	assert.NotContains(t, root, "spoofed-model")
-	assert.NotContains(t, root, codexUserModelMarker)
-	assert.NotContains(t, root, "\nmodel =")
+	root := strings.SplitN(string(files[0].Content), "[features]", 2)[0]
+	assert.Contains(t, root, "spoofed-model", "unknown user TOML content must be preserved")
+	assert.Contains(t, root, codexUserModelMarker, "the multiline comment remains user data")
+	assert.False(t, hasStandaloneCodexComment(root, codexUserModelMarker))
+	assert.NotContains(t, collectCodexConfigOverrides(root), ".model")
 }
 
 func TestGenerateConfig_TOMLCommentCannotSpoofMultilineString(t *testing.T) {
@@ -121,7 +122,7 @@ func TestGenerateConfig_TOMLCommentCannotSpoofMultilineString(t *testing.T) {
 "model" = "custom-after-comment"
 `), 0o644))
 
-	files, err := a.generateConfig(config.DefaultFullConfig("comment-project"))
+	files, err := a.prepareConfigFile(config.DefaultFullConfig("comment-project"))
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.Contains(t, root, `model = "custom-after-comment"`)
@@ -136,7 +137,7 @@ func TestGenerateConfig_PreservesUntrackedUserConfigEvenWhenValuesMatchManagedPr
 	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
 	require.NoError(t, os.WriteFile(configPath, []byte("model = \"gpt-5.5\"\nmodel_reasoning_effort = \"xhigh\"\n"), 0644))
 
-	files, err := a.generateConfig(config.DefaultFullConfig("user-config"))
+	files, err := a.prepareConfigFile(config.DefaultFullConfig("user-config"))
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.Contains(t, root, `model = "gpt-5.5"`)
@@ -152,11 +153,11 @@ func TestGenerateConfig_UsesUltraQualityProfile(t *testing.T) {
 	cfg.Quality.Default = "ultra"
 	cfg.Quality.SupervisorModelPolicy = "quality"
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	content := string(files[0].Content)
 
-	rootSection := strings.SplitN(content, "[agents]", 2)[0]
+	rootSection := strings.SplitN(content, "[features]", 2)[0]
 	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
 	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
 }
@@ -167,13 +168,14 @@ func TestGenerateConfig_DefaultSupervisorPolicyInheritsCodexRuntimeModel(t *test
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("inherit-project")
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
-	rootSection := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
+	rootSection := strings.SplitN(string(files[0].Content), "[features]", 2)[0]
 
 	assert.NotContains(t, rootSection, "\nmodel =")
 	assert.NotContains(t, rootSection, "model_reasoning_effort")
-	assert.Contains(t, string(files[0].Content), "[agents]")
+	assert.Contains(t, string(files[0].Content), "[features.multi_agent_v2]")
+	assert.NotContains(t, string(files[0].Content), "[agents]")
 }
 
 func TestPrepareConfigFile_NoDiskWrite(t *testing.T) {
@@ -196,7 +198,7 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	content := string(files[0].Content)
 	assert.NotContains(t, content, "[mcp_servers.autopus]")
@@ -205,18 +207,22 @@ func TestGenerateConfig_MCPServers(t *testing.T) {
 	assert.Contains(t, content, `command = "npx"`)
 	assert.Contains(t, content, `args = ["-y", "@upstash/context7-mcp@latest"]`)
 	assert.NotContains(t, content, "@anthropic-ai/context7-mcp")
-	assert.NotContains(t, strings.SplitN(content, "[agents]", 2)[0], "\nmodel =")
+	assert.NotContains(t, strings.SplitN(content, "[features]", 2)[0], "\nmodel =")
 	assert.Contains(t, content, `approval_policy = "on-request"`)
 	assert.Contains(t, content, `sandbox_mode = "workspace-write"`)
 	assert.Contains(t, content, `web_search = "cached"`)
 	assert.Contains(t, content, "project_doc_max_bytes = 262144")
-	assert.Contains(t, content, "[agents]")
-	assert.Contains(t, content, "max_threads = 6")
-	assert.Contains(t, content, "max_depth = 1")
 	assert.Contains(t, content, "[features]")
 	assert.Contains(t, content, "goals = true")
-	assert.Contains(t, content, "multi_agent = true")
-	assert.NotContains(t, content, "features.collab")
+	assert.Contains(t, content, "hooks = true")
+	assert.Contains(t, content, "shell_tool = true")
+	assert.Contains(t, content, "unified_exec = true")
+	assert.Contains(t, content, "[features.multi_agent_v2]")
+	assert.Contains(t, content, "max_concurrent_threads_per_session = 4")
+	assert.NotContains(t, content, "max_threads")
+	assert.NotContains(t, content, "max_depth")
+	assert.NotContains(t, content, "job_max_runtime_seconds")
+	assert.NotContains(t, content, "\nmulti_agent =")
 }
 
 func TestGenerateConfig_EnablesBundledBrowserPlugin(t *testing.T) {
@@ -225,7 +231,7 @@ func TestGenerateConfig_EnablesBundledBrowserPlugin(t *testing.T) {
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	content := string(files[0].Content)
 
@@ -259,7 +265,7 @@ project_doc_max_bytes = 262144
 	assert.True(t, found, "missing browser plugin enablement should warn")
 }
 
-func TestValidateConfig_WarnsWhenGoalOrMultiAgentFeatureMissing(t *testing.T) {
+func TestValidateConfig_WarnsWhenGoalOrMultiAgentV2FeatureMissing(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -287,5 +293,5 @@ enabled = true
 		messages[e.Message] = true
 	}
 	assert.True(t, messages["Codex goals feature가 enabled 상태가 아님"])
-	assert.True(t, messages["Codex multi_agent feature가 enabled 상태가 아님"])
+	assert.True(t, messages["Codex multi_agent_v2 feature 또는 session concurrency 설정이 올바르지 않음"])
 }

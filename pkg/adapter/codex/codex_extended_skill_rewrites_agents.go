@@ -1,110 +1,62 @@
 package codex
 
+// @AX:NOTE [AUTO]: the hardcoded 0.149.1 contract records the exact six-tool Multi-Agent V2 surface; update it with native collaboration schema changes.
 func codexAgentTeamsSkillBody() string {
 	return `
-# Codex Team Mode Skill
+# Codex Multi-Agent V2 Team Skill
 
-## Overview
+## Activation
 
-Codex ` + "`--team`" + ` mode is a first-class Autopus team profile built on the native Codex multi-agent tool surface.
+Use ` + "`@auto go SPEC-ID --team`" + ` or ` + "`$codex-auto-go SPEC-ID --team`" + `.
 
-**Activation flag**: ` + "`@auto go SPEC-ID --team`" + `
+## Runtime Contract
 
-## Canonical Semantic Contract
+Codex 0.149.1 team mode requires ` + "`[features.multi_agent_v2]`" + ` with
+` + "`enabled = true`" + ` and ` + "`max_concurrent_threads_per_session = 4`" + `.
+The current V2 collaboration surface has exactly six tools:
 
-` + "```json" + `
-{
-  "schema": "orchestration-contract.v1",
-  "workflow": "team",
-  "semantics": {
-    "supervisor": "main_session",
-    "dispatch_evidence": true,
-    "disjoint_ownership": true,
-    "integration_gate": true,
-    "teardown": true,
-    "worker_receipt_fields": [
-      "owned_paths",
-      "changed_files",
-      "verification",
-      "blockers",
-      "next_required_step"
-    ]
-  }
-}
-` + "```" + `
+- ` + "`spawn_agent(task_name, message, ...)`" + ` starts a worker with an explicit role and task.
+- ` + "`send_message(...)`" + ` sends coordination without changing the assigned task.
+- ` + "`followup_task(...)`" + ` gives a completed or idle worker additional work.
+- ` + "`wait_agent()`" + ` waits without a target and returns the next available event.
+- ` + "`interrupt_agent(...)`" + ` stops work that is unsafe, obsolete, or blocked.
+- ` + "`list_agents()`" + ` inspects current worker state.
 
-This mode does not use Claude Code Team APIs. It uses ` + "`spawn_agent(...)`" + `, ` + "`send_input(...)`" + `, ` + "`wait_agent(...)`" + `, and ` + "`close_agent(...)`" + ` from the Codex ` + "`multi_agent`" + ` feature.
+Do not use legacy collaboration names or invent lifecycle tools.
 
-## Prerequisites
+## Shared Workspace
 
-- Codex CLI exposes ` + "`multi_agent`" + ` and ` + "`goals`" + ` as enabled features. Verify with ` + "`codex features list`" + ` when in doubt.
-- ` + "`.codex/config.toml`" + ` should contain ` + "`[features] multi_agent = true`" + ` and ` + "`goals = true`" + `.
-- The current session must expose ` + "`spawn_agent`" + `. If it does not, stop before Phase 1 with a workflow authenticity blocker and ask for a working multi-agent surface or ` + "`--solo`" + `.
+All workers use the same shared cwd and filesystem. ` + "`fork_turns`" + ` changes
+conversation context only; it does not create another filesystem, worktree, or
+branch. Before parallel dispatch, assign disjoint write ownership. If ownership
+overlaps, run the writers sequentially.
 
-## Mode Semantics
-
-| Invocation | Behavior |
-|------------|----------|
-| ` + "`@auto go`" + ` | Default subagent pipeline: phase-by-phase specialist spawning |
-| ` + "`@auto go --auto`" + ` | Skip confirmation gates and treat subagent spawning as explicitly approved |
-| ` + "`@auto go --solo`" + ` | Disable subagents; main session implements directly |
-| ` + "`@auto go --team`" + ` | Use the Codex team profile: main session as Lead, Builder/Guardian workers, explicit coordination and teardown |
-
-## Team Composition (Lead/Builder/Guardian)
-
-The main session is always the Lead. Do not spawn a separate lead worker.
-
-- **Lead**: main session. Owns phase/gate state, worker prompts, result integration, final handoff, and goal status.
-- **Builder**: one or more ` + "`executor`" + `/` + "`tester`" + ` workers with disjoint write ownership.
-- **Guardian**: ` + "`validator`" + `, ` + "`reviewer`" + `, and security-focused workers that verify and review the Builder output.
-
-## Goal Integration
-
-` + "`/goal`" + ` is a Codex thread feature. ` + "`@auto goal`" + ` is only a thin Autopus wrapper over that same thread state.
-
-- Do not create a thread goal for ordinary ` + "`@auto`" + ` requests.
-- If the user explicitly starts or asks for a goal, prefer the ` + "`@auto goal \"<objective>\" [--budget N]`" + ` wrapper or use ` + "`create_goal`" + ` with only the objective and any explicit token budget.
-- If an active goal exists, call ` + "`get_goal`" + ` at the start of a long ` + "`@auto go`" + ` / ` + "`@auto dev`" + ` run and include the objective in worker prompts.
-- Only call ` + "`update_goal(status=\"complete\")`" + ` after the objective is actually achieved.
-- Only call ` + "`update_goal(status=\"blocked\")`" + ` when the same blocking condition has repeated for the required consecutive goal turns.
-
-## Spawn Pattern
+The main session is the Lead. Builders implement within their owned paths and
+Guardians verify after the write phase. Never spawn another Lead.
 
 ` + "```python" + `
 spawn_agent(
     task_name="builder",
-    fork_turns="all",
     message="""
     Role: Builder.
+    Shared cwd/filesystem: edit only the disjoint owned paths below.
     Own only: <paths>.
     Do not edit: <paths>.
-    Completion: implement the assigned task and run focused tests.
-    Return: owned_paths, changed_files, verification, blockers, next_required_step.
-    """,
-)
-
-spawn_agent(
-    task_name="guardian",
-    fork_turns="all",
-    message="""
-    Role: Guardian.
-    Verify the Builder-owned paths only.
-    Return: owned_paths, changed_files, verification, blockers, next_required_step.
+    Return exactly: owned_paths, changed_files, verification, blockers,
+    next_required_step.
     """,
 )
 ` + "```" + `
 
-Use ` + "`send_input(...)`" + ` only from the Lead/main session when a worker needs follow-up instructions. Use ` + "`wait_agent(...)`" + ` sparingly, and ` + "`close_agent(...)`" + ` once a worker is no longer needed.
+Use ` + "`send_message(...)`" + ` for clarification, ` + "`followup_task(...)`" + `
+for a new task, target-less ` + "`wait_agent()`" + ` for the next event,
+` + "`list_agents()`" + ` for status, and ` + "`interrupt_agent(...)`" + ` only
+when work must stop.
 
-## Completion Evidence
+## Completion Receipt
 
-Team mode final output must include:
-
-- ` + "`team_mode: codex_multi_agent`" + `
-- ` + "`subagent_dispatch_count`" + `
-- ` + "`subagent_roles_dispatched`" + `
-- ` + "`goal_status`" + ` when a Codex goal is active, otherwise ` + "`goal_status: none`" + `
-- ` + "`degraded-mode`" + ` and ` + "`degraded_mode`" + `
-- ` + "`next_required_step`" + `
-	`
+Every worker returns exactly these five fields:
+` + "`owned_paths`" + `, ` + "`changed_files`" + `, ` + "`verification`" + `,
+` + "`blockers`" + `, and ` + "`next_required_step`" + `.
+`
 }

@@ -73,15 +73,3 @@ func TestOMPSecurityHelpers_FailClosedOnInvalidParentClosedRootAndTempRoot(t *te
 	assert.Nil(t, cleanup)
 	assert.ErrorContains(t, err, "create activation staging root")
 }
-
-func TestMarkOMPReadinessOverlayCleanupFailure_DowngradesExactCapability(t *testing.T) {
-	report := OMPReadinessReport{Capabilities: []OMPCapabilityResult{
-		{ID: "identity.version", Supported: true, Reason: "version_verified"},
-		{ID: "config.overlay_readback", Supported: true, Reason: "output_valid"},
-	}}
-
-	got := markOMPReadinessOverlayCleanupFailure(report)
-	assert.True(t, got.Capabilities[0].Supported)
-	assert.False(t, got.Capabilities[1].Supported)
-	assert.Equal(t, "output_invalid", got.Capabilities[1].Reason)
-}

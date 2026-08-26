@@ -99,14 +99,8 @@ func TestUpdate_UserModifiedFile_BackedUp(t *testing.T) {
 	require.NoError(t, err)
 
 	// Modify managed files to trigger backup
-	skillsDir := filepath.Join(dir, ".codex", "skills")
-	entries, _ := os.ReadDir(skillsDir)
-	if len(entries) > 0 {
-		targetFile := filepath.Join(skillsDir, entries[0].Name())
-		require.NoError(t, os.WriteFile(targetFile, []byte("user modified content"), 0644))
-	}
-	configPath := filepath.Join(dir, ".codex", "config.toml")
-	require.NoError(t, os.WriteFile(configPath, []byte("user changed config"), 0644))
+	targetFile := filepath.Join(dir, codexProjectSkillPath("adaptive-quality"))
+	require.NoError(t, os.WriteFile(targetFile, []byte("user modified content"), 0644))
 
 	pf, err := a.Update(context.Background(), cfg)
 	require.NoError(t, err)

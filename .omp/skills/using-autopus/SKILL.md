@@ -1,0 +1,190 @@
+---
+name: using-autopus
+description: Autopus-ADK 설치 및 활용 가이드 스킬
+compatibility: omp
+---
+
+# Using Autopus-ADK Skill
+
+Autopus-ADK를 사용하여 코딩 CLI에 하네스를 설치하는 방법입니다.
+
+## 설치 모드
+
+### Full Mode
+모든 기능을 포함하는 완전한 하네스:
+- 방법론 (TDD/DDD/Double Diamond)
+- 모델 라우터
+- 인텐트 게이트
+- 세션 연속성
+- 훅 시스템
+
+### Lite Mode
+핵심 기능만 포함하는 경량 하네스:
+- 아키텍처 문서
+- Lore 커밋 시스템
+- SPEC 엔진
+- 기본 훅
+
+## CLI 명령어
+
+```bash
+# 하네스 설치 (인터랙티브)
+auto init
+
+# 특정 모드로 설치
+auto init --mode full
+auto init --mode lite
+
+# 특정 플랫폼에 설치
+auto init --platforms claude-code
+auto init --platforms codex,antigravity-cli
+
+# 설치 상태 확인
+auto doctor
+
+# 하네스 업데이트
+auto update
+
+# 설치 제거
+auto clean
+```
+
+## 설정 파일 (autopus.yaml)
+
+```yaml
+mode: full
+project_name: my-project
+platforms:
+  - claude-code
+  - codex
+
+methodology:
+  mode: tdd
+  enforce: true
+  review_gate: true
+
+hooks:
+  pre_commit_arch: true
+  pre_commit_lore: true
+  react_ci_failure: false
+  react_review: false
+
+quality:
+  default: balanced
+  providers:
+    claude: ultra
+    codex: balanced
+```
+
+### OMP와 OMP 품질 모드 분리
+
+`quality.default`는 기존 전역 fallback입니다. OMP와 OMP를 함께 쓰면
+`quality.providers.claude`와 `quality.providers.codex`를 선택적으로 추가해 서로 다른
+Ultra/Balanced 모드를 사용할 수 있습니다.
+
+```bash
+auto quality provider claude ultra --apply
+auto quality provider codex balanced --apply
+auto quality provider claude inherit --apply
+auto quality show
+```
+
+CLI에서는 `claude-code`도 `claude`의 alias로 허용하지만 YAML에는 canonical key
+`claude`를 저장합니다. Provider별 `--apply`는 해당 provider가 `platforms`에 구성된
+경우에만 그 플랫폼을 갱신합니다. 기존 `auto quality ultra|balanced --apply`는
+`quality.default`를 바꾸고 구성된 모든 플랫폼을 갱신합니다. 한 번의 실행에 지정한
+`--quality`는 두 persisted provider override보다 우선하며 YAML은 수정하지 않습니다.
+
+### OMP Opus 5 기본 경로
+
+OMP Ultra, Balanced 전략 역할, high-complexity 라우팅은 고정 모델 ID
+`claude-opus-5`를 사용합니다. OMP의 `opus` alias가 Opus 5를 선택하려면
+`2.1.219` 이상이 필요합니다. Opus 5를 고정한 `route_team` workflow는
+`auto workflow doctor --route route_team`에서 `2.1.219` 미만을
+fail-closed합니다. 모델을 고정하지 않는 `route_a`는 기존 최소 버전
+`2.1.154`를 유지합니다.
+
+| OMP provider | `opus` on v2.1.219+ | Before v2.1.219 |
+|----------------------|---------------------|-----------------|
+| Anthropic API | Opus 5 | Opus 4.8 on v2.1.154–v2.1.218 |
+| OMP Platform on AWS | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.7 before v2.1.207 |
+| Amazon Bedrock | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.6 before v2.1.207 |
+| Google Cloud Agent Platform | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.6 before v2.1.207 |
+| Microsoft Foundry | Opus 4.6 | Opus 4.6 |
+
+Opus 5의 공식 가격은 입력 $5/MTok·출력 $25/MTok이며 native context는 1M
+tokens, 최대 output은 128k tokens입니다. `low`, `medium`, `high`, `xhigh`,
+`max` effort를 지원하고 기본 effort는 `high`입니다. Opus 4.8에서 같은 가격의
+drop-in upgrade이지만 adaptive thinking이 기본 활성화됩니다. 직접 API를 연결할
+때 `thinking: {"type": "disabled"}`와 `xhigh` 또는 `max`를 함께 보내면 HTTP 400이므로,
+Autopus는 OMP argv에 thinking-disable flag를 추가하지
+않습니다. Opus 4.8은 명시적으로 계속 선택할 수 있고 Opus 5 사이버보안 거부의
+권장 fallback이므로 호환 모델에서 제거하지 않습니다.
+
+자세한 내용은 [OMP model 설정](https://code.claude.com/docs/en/model-config),
+[모델 개요](https://platform.claude.com/docs/en/about-claude/models/overview),
+[Opus 5 migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide)를
+확인하세요.
+
+### OMP Fable 5 명시적 선택
+
+Fable 5는 Autopus의 기본 모델이 아닙니다. 조직에 Fable 사용 권한이 있고
+OMP `2.1.170` 이상을 사용하는 경우에만 OMP provider에서 명시적으로
+선택하세요.
+
+```yaml
+orchestra:
+  providers:
+    claude:
+      binary: claude
+      args: ["--print", "--model", "fable", "--effort", "high"]
+```
+
+전체 모델 ID는 `claude-fable-5`이며 OMP alias는 `fable`과 `best`입니다.
+`best`는 조직에 Fable 권한이 있으면 Fable을, 없으면 최신 Opus를 선택하므로
+결정적 비용 계산에는 resolved full model ID를 사용해야 합니다. Fable은 ZDR
+조직에서 사용할 수 없고, 공식 가격은 입력 $10/MTok·출력 $50/MTok이며 native
+context는 1M tokens, 최대 output은 128k tokens입니다.
+
+모델/API effort는 `low`, `medium`, `high`, `xhigh`, `max` 다섯 값이고 Fable의
+기본값은 `high`입니다. `ultracode`는 여섯 번째 model effort가 아니라 실제
+`xhigh`와 dynamic workflows를 결합한 OMP session-only 값입니다.
+main session은 OMP `2.1.203` 이상, agent/team 전달은 `2.1.210` 이상을
+사용하세요. 자세한 내용은 [OMP model 설정](https://code.claude.com/docs/en/model-config),
+[CLI reference](https://code.claude.com/docs/en/cli-reference),
+[Fable 5 소개](https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5),
+[effort reference](https://platform.claude.com/docs/en/build-with-claude/effort)를 확인하세요.
+
+## 플랫폼별 설치 위치
+
+| 플랫폼 | 설치 경로 |
+|--------|----------|
+| claude-code | `.omp/` |
+| codex | `AGENTS.md`, `.omp/` |
+| antigravity-cli | `GEMINI.md`, `.omp/`, `.agents/plugins/autopus/`, `.agents/hooks.json` |
+
+## 스킬 관리
+
+```bash
+# 스킬 목록 보기
+auto skill list
+
+# 특정 스킬 상세 정보
+auto skill info tdd
+
+# 카테고리별 스킬 목록
+auto skill list --category methodology
+```
+
+## 트러블슈팅
+
+```bash
+# 설치 상태 진단
+auto doctor --verbose
+
+# 설정 유효성 검증
+auto doctor --check config
+
+# 재설치 (사용자 수정 보존)
+auto update --preserve-user-edits
+```

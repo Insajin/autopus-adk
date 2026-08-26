@@ -57,17 +57,16 @@ const agentsMDTemplate = `# Autopus-ADK Harness
 
 ## Installed Components
 
-{{if contains (join ", " .Platforms) "codex"}}- Codex Rules: .codex/rules/autopus/
-- Codex Skills: .codex/skills/
-- Codex Agents: .codex/agents/
+{{if contains (join ", " .Platforms) "codex"}}- Codex Skills: .codex/skills/codex-*/SKILL.md
+- Codex Agents: .codex/agents/*.toml
+- Codex Hooks: .codex/hooks.json
 - Codex Config: .codex/config.toml
+- Plugin Marketplace: .agents/plugins/marketplace.json
 {{end}}{{if contains (join ", " .Platforms) "opencode"}}- OpenCode Rules: .opencode/rules/autopus/
 - OpenCode Commands: .opencode/commands/
 - OpenCode Agents: .opencode/agents/
 - OpenCode Plugins: .opencode/plugins/
-{{end}}{{if contains (join ", " .Platforms) "codex"}}- Shared Agent Skills: .agents/skills/
-- Plugin Marketplace: .agents/plugins/marketplace.json
-{{else if contains (join ", " .Platforms) "opencode"}}- Shared Skills: .agents/skills/
+- OpenCode Skills: .agents/skills/
 {{end}}
 
 ## Language Policy
@@ -80,11 +79,12 @@ IMPORTANT: Follow these language settings strictly for all work in this project.
 
 ## Execution Model
 
-{{if contains (join ", " .Platforms) "codex"}}- **Codex**: 하네스 기본값은 spawn_agent(...) 기반 subagent-first 입니다.
-- **Codex --auto**: @auto ... --auto 가 포함되면, 기본 subagent pipeline 진행에 대한 명시적 승인으로 해석합니다.
-- **Codex /goal**: Codex goals feature를 사용합니다. @auto goal은 이 기능의 thin wrapper이며, active goal이 있으면 get_goal로 목표를 반영하고 create_goal/update_goal은 Codex goal tool contract를 만족할 때만 사용하세요.
-- **Codex Runtime Caveat**: 현재 세션의 Codex 런타임 정책이 암묵적 spawn_agent(...) 호출을 제한하면, 조용히 단일 세션으로 폴백하지 말고 그 제약을 명시적으로 알린 뒤 사용자의 서브에이전트 opt-in 또는 --solo 선택을 받으세요.
-- **Codex --team**: native multi_agent 도구(spawn_agent/send_input/wait_agent/close_agent) 기반 Lead/Builder/Guardian 팀 프로파일입니다.
+{{if contains (join ", " .Platforms) "codex"}}- **Codex Invocation**: use ` + "`@auto <route> ...`" + ` or ` + "`$codex-auto <route> ...`" + `; load detailed ` + "`$codex-auto-<route>`" + ` and ` + "`$codex-<skill>`" + ` skills.
+- **Codex V2**: use only spawn_agent, send_message, followup_task, target-less wait_agent, interrupt_agent, and list_agents.
+- **Codex Shared Workspace**: every worker uses the same cwd/filesystem. Parallel writers require disjoint write ownership; overlapping writers run sequentially.
+- **Codex --auto**: ` + "`@auto ... --auto`" + ` explicitly approves the default subagent pipeline.
+- **Codex /goal**: use the native Codex goals feature; ` + "`@auto goal`" + ` is only a thin wrapper.
+- **Codex --team**: use the Multi-Agent V2 Lead/Builder/Guardian profile.
 {{end}}{{if contains (join ", " .Platforms) "opencode"}}- **OpenCode**: 기본 실행 모델은 task(...) 기반 subagent-first 입니다.
 - **OpenCode Invocation**: /auto <subcommand> ... 또는 /auto-<subcommand> ... alias를 사용합니다.
 {{end}}
@@ -111,15 +111,13 @@ IMPORTANT: 리뷰는 discovery와 verification을 분리하세요. 첫 리뷰는
 
 IMPORTANT: 300줄 제한은 소스 코드 파일에만 적용합니다. SPEC Markdown files under .autopus/specs/** are documentation and exempt from the 300-line source code limit. prd.md, spec.md, plan.md, acceptance.md, research.md, review.md는 300줄 초과만으로 분할하거나 거절하지 마세요.
 
-### Prompting Notes
+### Mandatory Compact Policy
 
-IMPORTANT: 사용자가 계획만 요구한 경우를 제외하면, 긴 선행 계획만 출력하고 멈추지 마세요. 먼저 코드베이스를 확인하고, 필요한 경우 서브에이전트를 스폰한 뒤, 검증까지 이어서 진행하세요.
+IMPORTANT: Write tests before implementation when behavior changes. New code comments are English. Source and test files MUST stay at or below 300 lines. Do not edit outside assigned ownership. Every spawned worker returns exactly ` + "`owned_paths`, `changed_files`, `verification`, `blockers`, `next_required_step`" + `.
 
-## Rules
+### Native Skill Routing
 
-See .codex/rules/autopus/ for Codex rule definitions.
-See .codex/skills/agent-pipeline.md for phase and gate contracts.
-See .codex/agents/ for Codex agent definitions.
+Use ` + "`@auto`" + ` or ` + "`$codex-auto`" + ` for routing. Load detailed ` + "`$codex-auto-<route>`" + ` and ` + "`$codex-<skill>`" + ` contracts before execution. Agent definitions live in ` + "`.codex/agents/`" + `.
 {{end}}{{if contains (join ", " .Platforms) "opencode"}}See .opencode/rules/autopus/ for OpenCode rule definitions.
 {{end}}
 `

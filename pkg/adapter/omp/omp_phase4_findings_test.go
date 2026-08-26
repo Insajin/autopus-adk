@@ -41,7 +41,7 @@ func TestOMPConfigMarkerSpan_RejectsUserTopLevelKeyAndValueOutsideSpan(t *testin
 	}
 }
 
-func TestOMPConfigMarkerSpan_LifecycleFailsBeforeMutation(t *testing.T) {
+func TestOMPConfigMarkerSpan_PlainLifecyclePreservesUserConfig(t *testing.T) {
 	hostile := markerBeginYml + "\nskills:\n  customDirectories:\n    - .agents/skills\n" +
 		"model: keep-me\n" + markerEndYml + "\n"
 
@@ -49,7 +49,7 @@ func TestOMPConfigMarkerSpan_LifecycleFailsBeforeMutation(t *testing.T) {
 		root := t.TempDir()
 		configPath := writeOMPConfig(t, root, hostile)
 		_, err := NewWithRoot(root).Generate(context.Background(), configForOMP())
-		require.Error(t, err)
+		require.NoError(t, err)
 		assertFileBytesOMP(t, configPath, hostile)
 	})
 
@@ -58,7 +58,7 @@ func TestOMPConfigMarkerSpan_LifecycleFailsBeforeMutation(t *testing.T) {
 			root := generateOMPOnly(t)
 			configPath := filepath.Join(root, configFile)
 			require.NoError(t, os.WriteFile(configPath, []byte(hostile), 0o600))
-			preserved := filepath.Join(root, ".omp", "agents", "executor.md")
+			managedAgent := filepath.Join(root, ".omp", "agents", "executor.md")
 
 			var err error
 			if operation == "update" {
@@ -66,9 +66,13 @@ func TestOMPConfigMarkerSpan_LifecycleFailsBeforeMutation(t *testing.T) {
 			} else {
 				err = NewWithRoot(root).Clean(context.Background())
 			}
-			require.Error(t, err)
+			require.NoError(t, err)
 			assertFileBytesOMP(t, configPath, hostile)
-			assert.FileExists(t, preserved, "preflight failure must precede managed-file removal")
+			if operation == "clean" {
+				assert.NoFileExists(t, managedAgent)
+			} else {
+				assert.FileExists(t, managedAgent)
+			}
 		})
 	}
 }
@@ -149,7 +153,7 @@ func TestOMPClean_BackupPreparationPrecedesEveryMutation(t *testing.T) {
 		require.Error(t, err)
 		assert.FileExists(t, first, "a later backup failure must not follow an earlier deletion")
 		assertFileBytesOMP(t, second, "user changed\n")
-		assert.FileExists(t, filepath.Join(root, configFile))
+		assert.FileExists(t, filepath.Join(root, ".omp", "commands", "auto.md"))
 		assert.FileExists(t, filepath.Join(root, ".autopus", "omp-manifest.json"))
 	})
 

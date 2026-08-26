@@ -11,10 +11,6 @@ import (
 )
 
 func (a *Adapter) prepareCommandMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	if !ompOwnsCommandSurface(cfg) {
-		return nil, nil
-	}
-
 	files := make([]adapter.FileMapping, 0, len(workflowSpecs))
 	for _, spec := range workflowSpecs {
 		rendered, err := a.renderWorkflowCommand(spec, cfg)
@@ -22,7 +18,7 @@ func (a *Adapter) prepareCommandMappings(cfg *config.HarnessConfig) ([]adapter.F
 			return nil, err
 		}
 		files = append(files, adapter.FileMapping{
-			TargetPath:      filepath.Join(".agents", "commands", spec.Name+".md"),
+			TargetPath:      filepath.Join(".omp", "commands", spec.Name+".md"),
 			OverwritePolicy: adapter.OverwriteAlways,
 			Checksum:        adapter.Checksum(rendered),
 			Content:         []byte(rendered),
@@ -66,7 +62,7 @@ func thinWorkflowCommandBody(name string) string {
 // so it cannot close its field and add sibling keys.
 func ompCommandFrontmatter(description string) string {
 	return fmt.Sprintf("description: %s\nagent: build",
-		pkgcontent.OMPYAMLScalar(ompDescriptionNormalizer.Replace(description)))
+		pkgcontent.OMPYAMLScalar(normalizeOMPDescription(description)))
 }
 
 // ompDescriptionNormalizer rewrites product names that workflowSpecs inherited
@@ -78,3 +74,7 @@ var ompDescriptionNormalizer = strings.NewReplacer(
 	"Codex goal tool", "goal tool",
 	"OpenCode helper", "oh-my-pi helper",
 )
+
+func normalizeOMPDescription(description string) string {
+	return ompDescriptionNormalizer.Replace(description)
+}

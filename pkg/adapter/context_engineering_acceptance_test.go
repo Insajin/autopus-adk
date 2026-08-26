@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	contentfs "github.com/insajin/autopus-adk/content"
 	templatefs "github.com/insajin/autopus-adk/templates"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +46,7 @@ func TestContextEngineering_GeneratedSurfacesMatchCanonicalContract(t *testing.T
 		})
 	}
 	t.Run("S2 codex native go mirror", func(t *testing.T) {
-		body := readContextEngineeringFile(t, surfaces["codex"].root, ".codex/skills/auto-go.md")
+		body := readContextEngineeringFile(t, surfaces["codex"].root, ".codex/skills/codex-auto-go/SKILL.md")
 		actual, err := parseContextEngineeringMatrix(body)
 		require.NoError(t, err)
 		assert.Equal(t, expectedMatrix["go"], actual)
@@ -55,9 +54,7 @@ func TestContextEngineering_GeneratedSurfacesMatchCanonicalContract(t *testing.T
 
 	expectedFields := []string{"blockers", "changed_files", "next_required_step", "owned_paths", "verification"}
 	for name, source := range map[string][]byte{
-		"content agent-teams": readEmbeddedContextEngineeringFile(t, contentfs.FS, "skills/agent-teams.md"),
-		"shared contract":     readEmbeddedContextEngineeringFile(t, templatefs.FS, "shared/orchestration-contract.md.tmpl"),
-		"codex agent-teams":   readEmbeddedContextEngineeringFile(t, templatefs.FS, "codex/skills/agent-teams.md.tmpl"),
+		"shared contract": readEmbeddedContextEngineeringFile(t, templatefs.FS, "shared/orchestration-contract.md.tmpl"),
 	} {
 		name, source := name, source
 		t.Run("S3 canonical owner "+name, func(t *testing.T) {

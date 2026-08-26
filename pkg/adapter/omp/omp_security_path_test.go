@@ -39,7 +39,7 @@ func TestOMPClean_DoesNotFollowSymlinkedManifestPath(t *testing.T) {
 
 	assert.NotContains(t, strings.Join(backupPaths(t, dir), "\n"), "branding.md",
 		"a symlinked manifest path must not be copied into the backup directory")
-	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
+	assert.FileExists(t, filepath.Join(dir, ".omp", "commands", "auto.md"), "preflight failure must precede every mutation")
 }
 
 // TestOMPWriteMapping_RejectsSymlinkedTarget covers the write half of L-2: a
@@ -107,7 +107,7 @@ func TestOMPClean_DoesNotDeleteThroughParentDirectorySymlink(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "OUTSIDE-WORKSPACE\n", string(data))
 	assert.DirExists(t, outside, "the linked-to directory must survive too")
-	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
+	assert.FileExists(t, filepath.Join(dir, ".omp", "commands", "auto.md"), "preflight failure must precede every mutation")
 }
 
 // TestOMPClean_SkipsSymlinkedEntryWithoutUnlinking pins the containment choice:
@@ -130,7 +130,7 @@ func TestOMPClean_SkipsSymlinkedEntryWithoutUnlinking(t *testing.T) {
 	info, err := os.Lstat(link)
 	require.NoError(t, err, "the unverifiable entry is skipped, not unlinked")
 	assert.NotZero(t, info.Mode()&os.ModeSymlink)
-	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
+	assert.FileExists(t, filepath.Join(dir, ".omp", "commands", "auto.md"), "preflight failure must precede every mutation")
 }
 
 // TestOMPWriteMapping_RejectsEscapingRelativePath is the F-4 regression: the
@@ -184,14 +184,12 @@ func TestOMPClean_DoesNotDeleteManifestThroughSymlinkedParent(t *testing.T) {
 
 	assert.FileExists(t, manifestOutside,
 		"a manifest reached through a symlinked parent must not be deleted")
-	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
+	assert.FileExists(t, filepath.Join(dir, ".omp", "commands", "auto.md"), "preflight failure must precede every mutation")
 }
 
-// TestOMPGenerate_RefusesSymlinkedConfigRead covers the read that feeds a write:
-// renderConfigDocument merges the existing .omp/config.yml into the document it
-// emits, so following a link there would pull an unrelated file's contents into
-// the managed output and its checksum.
-func TestOMPGenerate_RefusesSymlinkedConfigRead(t *testing.T) {
+// TestOMPGenerate_IgnoresSymlinkedUserConfig proves a plain OMP install does
+// not read or rewrite user config, including a symlinked config path.
+func TestOMPGenerate_IgnoresSymlinkedUserConfig(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -206,7 +204,7 @@ func TestOMPGenerate_RefusesSymlinkedConfigRead(t *testing.T) {
 	require.NoError(t, config.Save(dir, harness))
 
 	_, err := NewWithRoot(dir).Generate(context.Background(), harness)
-	require.Error(t, err, "a symlinked config must fail closed instead of being merged")
+	require.NoError(t, err)
 
 	data, readErr := os.ReadFile(secret)
 	require.NoError(t, readErr)
@@ -242,5 +240,5 @@ func TestOMPClean_SkipsWorkspaceInternalParentSymlink(t *testing.T) {
 	require.NoError(t, err,
 		"an entry reached through a symlink must not be deleted without a backup")
 	assert.Equal(t, "USER EDITED CONTENT\n", string(data))
-	assert.FileExists(t, filepath.Join(dir, configFile), "preflight failure must precede every mutation")
+	assert.FileExists(t, filepath.Join(dir, ".omp", "commands", "auto.md"), "preflight failure must precede every mutation")
 }

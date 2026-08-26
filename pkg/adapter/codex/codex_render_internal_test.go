@@ -25,7 +25,7 @@ func TestPrepareFiles_ReturnsAllCategories(t *testing.T) {
 
 	hasAgentsMD := false
 	hasSkills := false
-	hasRules := false
+	hasAgents := false
 	hasHooks := false
 	hasConfig := false
 
@@ -35,8 +35,8 @@ func TestPrepareFiles_ReturnsAllCategories(t *testing.T) {
 			hasAgentsMD = true
 		case strings.Contains(f.TargetPath, "skills"):
 			hasSkills = true
-		case strings.Contains(f.TargetPath, "rules"):
-			hasRules = true
+		case strings.HasPrefix(filepath.ToSlash(f.TargetPath), ".codex/agents/"):
+			hasAgents = true
 		case strings.Contains(f.TargetPath, "hooks"):
 			hasHooks = true
 		case f.TargetPath == codexConfigRelPath:
@@ -46,7 +46,7 @@ func TestPrepareFiles_ReturnsAllCategories(t *testing.T) {
 
 	assert.True(t, hasAgentsMD, "should have AGENTS.md")
 	assert.True(t, hasSkills, "should have skill files")
-	assert.True(t, hasRules, "should have rule files")
+	assert.True(t, hasAgents, "should have native agent files")
 	assert.True(t, hasHooks, "should have hooks file")
 	assert.True(t, hasConfig, "should have config file")
 }
@@ -60,28 +60,6 @@ func TestRenderSkillTemplates_WritesAndReturns(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".codex", "skills"), 0755))
 
 	files, err := a.renderSkillTemplates(cfg)
-	require.NoError(t, err)
-	assert.NotEmpty(t, files)
-}
-
-func TestRenderPromptTemplates_WritesAllPrompts(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	files, err := a.renderPromptTemplates(cfg)
-	require.NoError(t, err)
-	assert.NotEmpty(t, files)
-}
-
-func TestGenerateRuleFiles_WritesToDisk(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	files, err := a.generateRuleFiles(cfg)
 	require.NoError(t, err)
 	assert.NotEmpty(t, files)
 }

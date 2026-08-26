@@ -51,12 +51,8 @@ func validateWorkflowContextManagedProductPrompts(prompts []string) error {
 			return errors.New("managed OMP product prompts exceed the input limit")
 		}
 	}
-	first := prompts[0]
-	validAuto := first == "/auto" ||
-		(strings.HasPrefix(first, "/auto ") && strings.TrimSpace(first[len("/auto "):]) != "") ||
-		(strings.HasPrefix(first, "/auto-") && len(strings.Fields(first)[0]) > len("/auto-"))
-	if !validAuto {
-		return errors.New("managed OMP first product prompt must be an exact /auto command")
+	if _, err := workflowContextManagedProductCommandNames(prompts[0]); err != nil {
+		return errors.New("managed OMP first product prompt must be a valid /auto router command")
 	}
 	return nil
 }

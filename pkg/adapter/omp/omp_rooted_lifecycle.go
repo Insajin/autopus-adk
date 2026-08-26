@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -82,19 +83,16 @@ func (a *Adapter) prepareConfigMappingAt(
 	workspace *ompRootedWorkspace,
 	_ *config.HarnessConfig,
 ) (adapter.FileMapping, error) {
+	// @AX:NOTE [AUTO]: 4 MiB is the shared bound for rooted OMP config and update-target reads in this lifecycle.
 	data, _, err := workspace.readFile(configFile, 4<<20)
 	if errors.Is(err, fs.ErrNotExist) {
 		data = nil
 	} else if err != nil {
 		return adapter.FileMapping{}, fmt.Errorf("%s 읽기 실패: %w", configFile, err)
 	}
-	configDoc, err := mergeOMPConfigDocument(string(data))
-	if err != nil {
-		return adapter.FileMapping{}, err
-	}
 	return adapter.FileMapping{
-		TargetPath: configFile, OverwritePolicy: adapter.OverwriteMarker,
-		Checksum: adapter.Checksum(configDoc), Content: []byte(configDoc),
+		TargetPath: configFile, OverwritePolicy: adapter.OverwriteAlways,
+		Checksum: adapter.Checksum(string(data)), Content: data,
 	}, nil
 }
 
@@ -159,6 +157,7 @@ func (a *Adapter) buildUpdateTransactionPlanAt(
 ) (adapter.TransactionPlan, *adapter.PlatformFiles, error) {
 	finalFiles := make([]adapter.FileMapping, 0, len(files))
 	writes := make([]adapter.TransactionWrite, 0, len(files))
+	var skippedPaths []string
 	resolveMode := a.fileModeResolverAt(workspace)
 	for _, file := range files {
 		action, err := resolveOMPUpdateActionAt(workspace, file, oldManifest)
@@ -166,6 +165,7 @@ func (a *Adapter) buildUpdateTransactionPlanAt(
 			return adapter.TransactionPlan{}, nil, err
 		}
 		if action == adapter.ActionSkip {
+			skippedPaths = append(skippedPaths, file.TargetPath)
 			continue
 		}
 		finalFiles = append(finalFiles, file)
@@ -180,12 +180,24 @@ func (a *Adapter) buildUpdateTransactionPlanAt(
 			})
 		}
 	}
-	pf := &adapter.PlatformFiles{
-		Files: finalFiles, Checksum: adapter.Checksum(fmt.Sprintf("%d", len(finalFiles))),
-	}
+	pf := &adapter.PlatformFiles{Files: finalFiles, Checksum: adapter.Checksum(fmt.Sprintf("%d", len(finalFiles)))}
 	diff := adapter.BuildManifestDiff(oldManifest, files, PruneRoots(cfg))
 	removes := adapter.TransactionRemovesFromManifestDiff(diff, false)
+	var err error
+	writes, removes, err = migrateOMPLegacyBridgeConfigAt(
+		workspace, oldManifest, files, writes, removes,
+	)
+	if err != nil {
+		return adapter.TransactionPlan{}, nil, err
+	}
 	manifest := adapter.ManifestFromFiles(adapterName, pf)
+	if oldManifest != nil {
+		for _, path := range skippedPaths {
+			if previous, ok := oldManifest.Files[path]; ok {
+				manifest.Files[path] = previous
+			}
+		}
+	}
 	if len(writes) == 0 && len(removes) == 0 &&
 		ompRootedManifestUnchanged(workspace, oldManifest, manifest) {
 		manifest = nil
@@ -208,11 +220,7 @@ func ompRootedMappingUnchanged(
 	return info.Mode().Perm() == perm && bytes.Equal(data, file.Content), nil
 }
 
-func ompRootedManifestUnchanged(
-	workspace *ompRootedWorkspace,
-	oldManifest *adapter.Manifest,
-	next *adapter.Manifest,
-) bool {
+func ompRootedManifestUnchanged(workspace *ompRootedWorkspace, oldManifest, next *adapter.Manifest) bool {
 	if oldManifest == nil || oldManifest.Version != next.Version ||
 		oldManifest.Platform != next.Platform || len(oldManifest.Files) != len(next.Files) {
 		return false
@@ -224,4 +232,67 @@ func ompRootedManifestUnchanged(
 	}
 	info, err := workspace.lstat(filepath.Join(".autopus", next.Platform+"-manifest.json"))
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm() == 0o600
+}
+
+// @AX:WARN [AUTO]: legacy bridge migration contains eight conditional branches.
+// @AX:REASON [AUTO]: manifest ownership, marker policy, bounded rooted reads, managed-section parsing, removal, and user-remainder preservation must fail closed.
+func migrateOMPLegacyBridgeConfigAt(
+	workspace *ompRootedWorkspace,
+	oldManifest *adapter.Manifest,
+	files []adapter.FileMapping,
+	writes []adapter.TransactionWrite,
+	removes []adapter.TransactionRemove,
+) ([]adapter.TransactionWrite, []adapter.TransactionRemove, error) {
+	if oldManifest == nil || ompMappingsContainPath(files, configFile) {
+		return writes, removes, nil
+	}
+	previous, managed := oldManifest.Files[configFile]
+	if !managed {
+		return writes, removes, nil
+	}
+	removes = filterOMPTransactionRemove(removes, configFile)
+	if previous.Policy != adapter.OverwriteMarker {
+		return writes, removes, nil
+	}
+	data, info, err := workspace.readFile(configFile, 4<<20)
+	if errors.Is(err, fs.ErrNotExist) {
+		return writes, removes, nil
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("read legacy %s: %w", configFile, err)
+	}
+	remainder, found, err := stripOMPManagedDocument(string(data))
+	if err != nil {
+		return nil, nil, err
+	}
+	if !found {
+		return writes, removes, nil
+	}
+	if strings.TrimSpace(remainder) == "" {
+		removes = append(removes, adapter.TransactionRemove{Path: configFile})
+		return writes, removes, nil
+	}
+	writes = append(writes, adapter.TransactionWrite{
+		Path: configFile, Content: []byte(remainder), Perm: info.Mode().Perm(),
+	})
+	return writes, removes, nil
+}
+
+func ompMappingsContainPath(files []adapter.FileMapping, path string) bool {
+	for _, file := range files {
+		if filepath.ToSlash(file.TargetPath) == path {
+			return true
+		}
+	}
+	return false
+}
+
+func filterOMPTransactionRemove(removes []adapter.TransactionRemove, path string) []adapter.TransactionRemove {
+	filtered := removes[:0]
+	for _, remove := range removes {
+		if filepath.ToSlash(remove.Path) != path {
+			filtered = append(filtered, remove)
+		}
+	}
+	return filtered
 }

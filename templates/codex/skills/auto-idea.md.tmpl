@@ -203,9 +203,11 @@ blocks Step 4.
 1. 정확한 에러 메시지를 사용자에게 보여줍니다.
 2. pane transport 실패이면 같은 provider/strategy/judge로 `--subprocess --no-detach --format json`을 붙여 동일 엔진을 한 번 재시도합니다.
 3. 동일 엔진도 실패한 뒤에만 사용자에게 "Codex native worker fallback으로 진행할까요?"를 확인합니다. 이 승인은 검증 가능한 fresh isolated judge session을 갖춘 native fallback에만 유효합니다.
-4. 사용자가 승인했거나 `--auto` 모드여도 native surface가 resolved configured debate 집합의 모든 provider(Claude 포함)의 Round 1/2 참여와 invoking provider의 fresh isolated provider session 별도 judge를 machine evidence로 증명할 때만 `spawn_agent(...)` Round 1 → 익명화한 `send_input(...)` Round 2 → 별도 judge를 실행합니다.
+4. 사용자가 승인했거나 `--auto` 모드여도 native surface가 resolved configured debate 집합의 모든 provider(Claude 포함)의 Round 1/2 참여와 invoking provider의 fresh isolated provider session 별도 judge를 machine evidence로 증명할 때만 `spawn_agent(task_name, message, ...)` Round 1 → 익명화한 `send_message(...)` Round 2 → 별도 judge를 실행합니다. Worker는 같은 shared cwd/filesystem을 사용하며 병렬 writer가 필요하면 disjoint write ownership을 명시합니다.
 5. BS 파일에 `**Providers**: fallback (orchestra unavailable)`와 participant/judge session isolation evidence를 기록합니다.
 6. native multi-agent surface 또는 invoking provider의 fresh isolated judge session evidence가 없으면 성공으로 축소하지 말고 `orchestra_unavailable` blocker로 종료합니다.
+
+Codex Multi-Agent V2 coordination surface는 `spawn_agent(task_name, message, ...)`, `send_message(...)`, `followup_task(...)`, target-less `wait_agent()`, `interrupt_agent(...)`, `list_agents()` 여섯 도구로 제한합니다.
 
 ### Step 4: ICE 스코어링 + Assumption Risk Overlay
 

@@ -39,15 +39,15 @@ For parallel tasks in Phase 2, add `isolation: "worktree"` to Agent() calls:
 ```python
 # Parallel execution with worktree isolation
 result_t1 = Agent(
-    subagent_type = "executor",
+    description = "Implement task T1 in its isolated owned paths",
     prompt = "Implement T1: ...",
-    mode = "bypassPermissions",
-    isolation = "worktree"   # R1: each executor gets an independent worktree
+    subagent_type = "executor",
+    isolation = "worktree"
 )
 result_t2 = Agent(
-    subagent_type = "executor",
+    description = "Implement task T2 in its isolated owned paths",
     prompt = "Implement T2: ...",
-    mode = "bypassPermissions",
+    subagent_type = "executor",
     isolation = "worktree"
 )
 ```
@@ -63,7 +63,7 @@ Sequential tasks do NOT use `isolation: "worktree"`:
 
 ```python
 # Sequential — main worktree
-result_t3 = Agent(subagent_type="executor", prompt="Implement T3 using T1 result: ...")
+result_t3 = Agent(description="Implement dependent task T3", subagent_type="executor", prompt="Implement T3 using T1 result: ...")
 ```
 
 ## File Ownership Conflict Detection (R2)

@@ -52,7 +52,7 @@ func TestWorkflowContextProfiles_GeneratedDetails_MatchS8Matrix(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.route, func(t *testing.T) {
-			detail := readClaudeSurface(t, root, filepath.Join(".claude", "skills", "autopus", "auto-"+tt.route+".md"))
+			detail := readClaudeSurface(t, root, filepath.Join(".claude", "skills", "auto-"+tt.route, "SKILL.md"))
 			profile := contextProfileSection(t, detail)
 			for _, token := range tt.required {
 				assert.Contains(t, profile, token)

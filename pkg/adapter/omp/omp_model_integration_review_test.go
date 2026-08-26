@@ -123,7 +123,7 @@ func TestOMPGenerate_TransactionRollsBackLateWriteAndConfigReadFailure(t *testin
 
 	t.Run("late write", func(t *testing.T) {
 		root := t.TempDir()
-		blocker := filepath.Join(root, ".agents", "skills")
+		blocker := filepath.Join(root, ".omp", "skills")
 		require.NoError(t, os.MkdirAll(filepath.Dir(blocker), 0o755))
 		require.NoError(t, os.WriteFile(blocker, []byte("user blocker\n"), 0o600))
 		_, err := NewWithRoot(root).Generate(context.Background(), configForOMP())
@@ -138,7 +138,8 @@ func TestOMPGenerate_TransactionRollsBackLateWriteAndConfigReadFailure(t *testin
 		root := t.TempDir()
 		path := filepath.Join(root, configFile)
 		require.NoError(t, os.MkdirAll(path, 0o700))
-		_, err := NewWithRoot(root).Generate(context.Background(), configForOMP())
+		_, err := NewWithRoot(root).WithModelIntegrationRunner(newModelIntegrationRunner()).
+			Generate(context.Background(), integrationHarnessConfig(config.RoleModelConfigModeProjectManaged))
 		require.ErrorContains(t, err, "config.yml")
 		assert.DirExists(t, path)
 		assert.NoDirExists(t, filepath.Join(root, ".omp", "rules"))

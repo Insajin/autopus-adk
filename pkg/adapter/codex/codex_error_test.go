@@ -43,7 +43,7 @@ func TestGenerate_FailsOnSkillTemplateWriteBlocked(t *testing.T) {
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, ".codex", "skills")
 	require.NoError(t, os.MkdirAll(skillsDir, 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(skillsDir, "auto-plan.md"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(skillsDir, "codex-auto-plan", "SKILL.md"), 0755))
 
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
@@ -51,7 +51,7 @@ func TestGenerate_FailsOnSkillTemplateWriteBlocked(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGenerate_FailsOnRulesDirBlocked(t *testing.T) {
+func TestGenerate_IgnoresObsoleteRulesBlocker(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".codex", "skills"), 0755))
@@ -62,10 +62,10 @@ func TestGenerate_FailsOnRulesDirBlocked(t *testing.T) {
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 	_, err := a.Generate(context.Background(), cfg)
-	assert.Error(t, err)
+	require.NoError(t, err)
 }
 
-func TestGenerate_FailsOnPromptWriteBlocked(t *testing.T) {
+func TestGenerate_IgnoresObsoletePromptsBlocker(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".codex", "skills"), 0755))
@@ -75,7 +75,7 @@ func TestGenerate_FailsOnPromptWriteBlocked(t *testing.T) {
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 	_, err := a.Generate(context.Background(), cfg)
-	assert.Error(t, err)
+	require.NoError(t, err)
 }
 
 func TestGenerate_FailsOnAgentWriteBlocked(t *testing.T) {
@@ -119,58 +119,6 @@ func TestGenerate_FailsOnConfigWriteBlocked(t *testing.T) {
 
 // --- Sub-function error paths ---
 
-func TestGenerateRuleFiles_FailsOnReadOnlyTarget(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	rulesParent := filepath.Join(dir, ".codex", "rules", "autopus")
-	require.NoError(t, os.MkdirAll(filepath.Dir(rulesParent), 0755))
-	require.NoError(t, os.WriteFile(rulesParent, []byte("blocker"), 0444))
-
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-	_, err := a.generateRuleFiles(cfg)
-	assert.Error(t, err)
-}
-
-func TestGenerateRuleFiles_WriteFileBlocked(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	rulesDir := filepath.Join(dir, ".codex", "rules", "autopus")
-	require.NoError(t, os.MkdirAll(rulesDir, 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(rulesDir, "lore-commit.md"), 0755))
-
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-	_, err := a.generateRuleFiles(cfg)
-	assert.Error(t, err)
-}
-
-func TestRenderPromptTemplates_FailsOnReadOnlyDir(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	promptsParent := filepath.Join(dir, ".codex", "prompts")
-	require.NoError(t, os.MkdirAll(filepath.Dir(promptsParent), 0755))
-	require.NoError(t, os.WriteFile(promptsParent, []byte("blocker"), 0444))
-
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-	_, err := a.renderPromptTemplates(cfg)
-	assert.Error(t, err)
-}
-
-func TestRenderPromptTemplates_WriteFileBlocked(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	promptsDir := filepath.Join(dir, ".codex", "prompts")
-	require.NoError(t, os.MkdirAll(promptsDir, 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(promptsDir, "auto-plan.md"), 0755))
-
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-	_, err := a.renderPromptTemplates(cfg)
-	assert.Error(t, err)
-}
-
 func TestGenerateAgents_FailsOnReadOnlyDir(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -202,7 +150,7 @@ func TestRenderSkillTemplates_WriteFileBlocked(t *testing.T) {
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, ".codex", "skills")
 	require.NoError(t, os.MkdirAll(skillsDir, 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(skillsDir, "auto-plan.md"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(skillsDir, "codex-auto-plan", "SKILL.md"), 0755))
 
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
@@ -210,14 +158,14 @@ func TestRenderSkillTemplates_WriteFileBlocked(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGenerateConfig_WriteFileBlocked(t *testing.T) {
+func TestPrepareConfigFile_ReadBlocked(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".codex", "config.toml"), 0755))
 
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
-	_, err := a.generateConfig(cfg)
+	_, err := a.prepareConfigFile(cfg)
 	assert.Error(t, err)
 }
 

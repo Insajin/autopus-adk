@@ -19,14 +19,12 @@ package detect
 func DetectInstalledPlatforms() []Platform {
 	platforms := make([]Platform, 0, len(knownCLIs))
 	for _, cli := range knownCLIs {
-		if !IsInstalled(cli.binary) {
-			continue
-		}
-		if platformNeedsIdentityProbe(cli.name) {
-			version, ok := detectBinary(cli.binary, cli.versionArg)
-			if !ok || !platformVersionMatchesIdentity(cli.name, version) {
+		if cli.name == "omp" {
+			if _, ok := ProbeOMPIdentity(nil, cli.binary); !ok {
 				continue
 			}
+		} else if !IsInstalled(cli.binary) {
+			continue
 		}
 		platforms = append(platforms, Platform{Name: cli.name, Binary: cli.binary})
 	}

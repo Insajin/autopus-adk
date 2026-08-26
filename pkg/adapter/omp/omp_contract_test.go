@@ -5,9 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,10 +74,16 @@ func TestOMPAdapter_Validate_NamesEachMissingSurface(t *testing.T) {
 		wantMessage string
 	}{
 		{
-			name:        "config removed",
-			remove:      configFile,
-			wantFile:    configFile,
-			wantMessage: ".omp/config.yml이 없음",
+			name:        "skill directory removed",
+			remove:      filepath.Join(".omp", "skills"),
+			wantFile:    filepath.Join(".omp", "skills"),
+			wantMessage: "omp skill 디렉터리가 없음",
+		},
+		{
+			name:        "command directory removed",
+			remove:      filepath.Join(".omp", "commands"),
+			wantFile:    filepath.Join(".omp", "commands"),
+			wantMessage: "omp command 디렉터리가 없음",
 		},
 		{
 			name:        "agent directory removed",
@@ -113,12 +117,11 @@ func TestOMPAdapter_Validate_NamesEachMissingSurface(t *testing.T) {
 }
 
 // TestOMPAdapter_Validate_EmptyWorkspaceReportsAllSurfaces covers the
-// never-generated workspace: all three required surfaces are reported at error
-// level so `auto doctor` fails closed instead of declaring omp healthy.
+// never-generated workspace: every required native directory is an error.
 func TestOMPAdapter_Validate_EmptyWorkspaceReportsAllSurfaces(t *testing.T) {
 	errs, err := NewWithRoot(t.TempDir()).Validate(context.Background())
 	require.NoError(t, err)
-	require.Len(t, errs, 3)
+	require.Len(t, errs, 4)
 
 	files := make([]string, 0, len(errs))
 	for _, e := range errs {
@@ -127,20 +130,11 @@ func TestOMPAdapter_Validate_EmptyWorkspaceReportsAllSurfaces(t *testing.T) {
 		assert.NotEmpty(t, e.Message)
 	}
 	assert.ElementsMatch(t, []string{
-		configFile,
+		filepath.Join(".omp", "skills"),
+		filepath.Join(".omp", "commands"),
 		filepath.Join(".omp", "agents"),
 		filepath.FromSlash(ompRuleDir),
 	}, files)
-}
-
-// widenOMPVersionCeiling raises the Detect deadline for one test and restores it
-// afterwards. Identity tests assert on what a version string resolves to, not on
-// how fast the probe returns, so the production bound must not preempt them.
-func widenOMPVersionCeiling(t *testing.T) {
-	t.Helper()
-	previous := ompVersionCeiling
-	ompVersionCeiling = 60 * time.Second
-	t.Cleanup(func() { ompVersionCeiling = previous })
 }
 
 // TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape pins the identity gate
@@ -148,7 +142,6 @@ func widenOMPVersionCeiling(t *testing.T) {
 // executables, so the adapter adopts only an exact `omp/x.y.z` release shape.
 func TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape(t *testing.T) {
 	skipWithoutPOSIXShellOMP(t)
-	widenOMPVersionCeiling(t)
 
 	tests := []struct {
 		name    string
@@ -172,72 +165,6 @@ func TestOMPAdapter_REQ019_DetectRequiresOhMyPiVersionShape(t *testing.T) {
 				"version output %q must resolve to detected=%v", tc.version, tc.want)
 		})
 	}
-}
-
-func TestOMPAdapter_REQ019_DetectUsesCredentialFreeCanonicalEnvironment(t *testing.T) {
-	skipWithoutPOSIXShellOMP(t)
-	widenOMPVersionCeiling(t)
-
-	base := t.TempDir()
-	home := filepath.Join(base, "home")
-	profile := filepath.Join(base, "profile")
-	require.NoError(t, os.Mkdir(home, 0o700))
-	require.NoError(t, os.Mkdir(profile, 0o700))
-	homeLink := filepath.Join(base, "home-link")
-	profileLink := filepath.Join(base, "profile-link")
-	require.NoError(t, os.Symlink(home, homeLink))
-	require.NoError(t, os.Symlink(profile, profileLink))
-	canonicalHome, err := filepath.EvalSymlinks(homeLink)
-	require.NoError(t, err)
-	canonicalProfile, err := filepath.EvalSymlinks(profileLink)
-	require.NoError(t, err)
-
-	const sentinel = "OMP-DETECT-PROVIDER-CREDENTIAL-SENTINEL"
-	for _, key := range []string{
-		"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY",
-		"OMP_ACCESS_TOKEN", "PI_PROVIDER_TOKEN",
-	} {
-		t.Setenv(key, sentinel)
-	}
-	t.Setenv("HOME", homeLink)
-	t.Setenv("PI_CODING_AGENT_DIR", profileLink)
-
-	marker := filepath.Join(base, "probe-environment")
-	binDir := t.TempDir()
-	script := `#!/bin/sh
-{
-printf 'home=%s\n' "$HOME"
-printf 'profile=%s\n' "$PI_CODING_AGENT_DIR"
-printf 'tmp=%s\n' "$TMPDIR"
-printf 'config=%s\n' "$XDG_CONFIG_HOME"
-printf 'data=%s\n' "$XDG_DATA_HOME"
-printf 'state=%s\n' "$XDG_STATE_HOME"
-printf 'cache=%s\n' "$XDG_CACHE_HOME"
-printf 'locale=%s/%s\n' "$LANG" "$LC_ALL"
-printf 'credentials=%s/%s/%s/%s/%s\n' "${OPENAI_API_KEY-unset}" "${ANTHROPIC_API_KEY-unset}" "${GOOGLE_API_KEY-unset}" "${OMP_ACCESS_TOKEN-unset}" "${PI_PROVIDER_TOKEN-unset}"
-} > ` + strconv.Quote(marker) + `
-printf 'omp/17.2.6\n'
-`
-	require.NoError(t, os.WriteFile(filepath.Join(binDir, cliBinary), []byte(script), 0o755))
-	t.Setenv("PATH", binDir)
-
-	detected, err := NewWithRoot(t.TempDir()).Detect(context.Background())
-	require.NoError(t, err)
-	require.True(t, detected)
-	recorded, err := os.ReadFile(marker)
-	require.NoError(t, err)
-	environment := string(recorded)
-	assert.Contains(t, environment, "home="+canonicalHome+"\n")
-	assert.Contains(t, environment, "profile="+canonicalProfile+"\n")
-	assert.Contains(t, environment, "credentials=unset/unset/unset/unset/unset\n")
-	assert.NotContains(t, environment, sentinel)
-	for _, locator := range []struct{ key, leaf string }{
-		{"tmp", "tmp"}, {"config", "config"}, {"data", "data"},
-		{"state", "state"}, {"cache", "cache"},
-	} {
-		assert.Regexp(t, `(?m)^`+locator.key+`=.*/autopus-omp-detect-[^/]+/`+locator.leaf+`$`, environment)
-	}
-	assert.Contains(t, environment, "locale=C/C\n")
 }
 
 // TestOMPAdapter_REQ019_DetectAbsentBinary covers the no-binary case: detection

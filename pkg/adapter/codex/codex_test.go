@@ -59,7 +59,7 @@ func TestCodexAdapter_Generate_CreatesAgentsMD(t *testing.T) {
 	assert.Contains(t, content, "<!-- AUTOPUS:BEGIN -->")
 	assert.Contains(t, content, "<!-- AUTOPUS:END -->")
 	assert.Contains(t, content, "## Execution Model")
-	assert.Contains(t, content, "spawn_agent(...)")
+	assert.Contains(t, content, "spawn_agent")
 	assert.Contains(t, content, "Codex --auto")
 	assert.Contains(t, content, "## Core Guidelines")
 	assert.Contains(t, content, "### Worker Contracts")
@@ -79,15 +79,15 @@ func TestCodexAdapter_Generate_CreatesSkillsDirectory(t *testing.T) {
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	// .codex/skills/auto-* 디렉터리 확인
+	// Native project router skill is directory-based and uniquely prefixed.
 	skillsDir := filepath.Join(dir, ".codex", "skills")
 	info, statErr := os.Stat(skillsDir)
 	require.NoError(t, statErr, ".codex/skills 디렉터리가 존재해야 함")
 	assert.True(t, info.IsDir())
 
-	repoSkill := filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md")
+	repoSkill := filepath.Join(dir, ".codex", "skills", "codex-auto", "SKILL.md")
 	_, statErr = os.Stat(repoSkill)
-	require.NoError(t, statErr, ".agents/skills/auto/SKILL.md가 존재해야 함")
+	require.NoError(t, statErr, "native codex-auto/SKILL.md가 존재해야 함")
 
 	marketplace := filepath.Join(dir, ".agents", "plugins", "marketplace.json")
 	_, statErr = os.Stat(marketplace)
@@ -204,15 +204,11 @@ func TestCodexAdapter_Clean(t *testing.T) {
 	err = a.Clean(context.Background())
 	require.NoError(t, err)
 
-	// .codex/skills 디렉터리가 제거되어야 함
-	_, statErr := os.Stat(filepath.Join(dir, ".codex", "skills"))
-	assert.True(t, os.IsNotExist(statErr))
-
-	_, statErr = os.Stat(filepath.Join(dir, ".agents", "skills", "auto"))
-	assert.True(t, os.IsNotExist(statErr))
+	assert.NoFileExists(t, filepath.Join(dir, ".codex", "skills", "codex-auto", "SKILL.md"))
+	assert.NoDirExists(t, filepath.Join(dir, ".agents", "skills", "auto"))
 
 	for _, name := range []string{"hook-codex-stop.sh", "hook-codex-sessionstart.sh"} {
-		_, statErr = os.Stat(filepath.Join(dir, ".codex", "hooks", "autopus", name))
+		_, statErr := os.Stat(filepath.Join(dir, ".codex", "hooks", "autopus", name))
 		assert.ErrorIs(t, statErr, os.ErrNotExist, "managed Codex hook asset must be removed")
 	}
 	userHookData, readErr := os.ReadFile(userHook)

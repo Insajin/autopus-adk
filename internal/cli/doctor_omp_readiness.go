@@ -17,10 +17,11 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 )
 
+// @AX:NOTE [AUTO]: OMP 18 RPC state and command frames exceed 64 KiB; 256 KiB bounds the provider-free transcript.
 const (
 	ompDoctorProbeTimeout = 3 * time.Second
 	ompDoctorTotalTimeout = 20 * time.Second
-	ompDoctorMaxOutput    = 64 * 1024
+	ompDoctorMaxOutput    = 256 * 1024
 )
 
 var (

@@ -223,9 +223,8 @@ func writeOMPLiveOverlay(t *testing.T, profile string) string {
   enablePiUser: false
   enablePiProject: false
   enableAgentsUser: false
-  enableAgentsProject: true
+  enableAgentsProject: false
   enableSkillCommands: true
-  customDirectories: [.agents/skills]
 `
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 	return path

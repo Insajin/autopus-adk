@@ -3,9 +3,7 @@ package detect
 
 import (
 	"context"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -47,18 +45,24 @@ const cliVersionTimeout = processprobe.DefaultWaitDelay + 5*time.Second
 func DetectPlatforms() []Platform {
 	var platforms []Platform
 	for _, cli := range knownCLIs {
-		if v, ok := detectBinary(cli.binary, cli.versionArg); ok {
-			if !platformVersionMatchesIdentity(cli.name, v) {
-				continue
-			}
-			platforms = append(platforms, Platform{
-				Name:    cli.name,
-				Binary:  cli.binary,
-				Version: v,
-			})
+		version, ok := detectPlatformVersion(cli.name, cli.binary, cli.versionArg)
+		if !ok {
+			continue
 		}
+		platforms = append(platforms, Platform{
+			Name:    cli.name,
+			Binary:  cli.binary,
+			Version: version,
+		})
 	}
 	return platforms
+}
+
+func detectPlatformVersion(name, binary, versionArg string) (string, bool) {
+	if name == "omp" {
+		return ProbeOMPIdentity(context.Background(), binary)
+	}
+	return detectBinary(binary, versionArg)
 }
 
 // @AX:ANCHOR [AUTO]: Do not rename or change the signature of IsInstalled
@@ -250,48 +254,4 @@ func CheckDependencies(deps []Dependency) []DependencyStatus {
 type DependencyStatus struct {
 	Dependency
 	Installed bool
-}
-
-// ParentRuleConflict는 부모 디렉터리에서 발견된 규칙 충돌 정보이다.
-type ParentRuleConflict struct {
-	ParentDir string // 충돌이 발견된 부모 디렉터리
-	RulesDir  string // 부모의 .claude/rules/ 경로
-	Namespace string // 규칙 네임스페이스 (예: "moai")
-}
-
-// CheckParentRuleConflicts는 부모 디렉터리에 상속될 .claude/rules/ 네임스페이스가 있는지 탐지한다.
-// Claude Code는 상위 디렉터리를 탐색하며 규칙을 로드하므로,
-// 부모에 어떤 규칙 네임스페이스라도 있으면 현재 프로젝트에 의도치 않게 중첩 적용될 수 있다.
-func CheckParentRuleConflicts(projectDir string) []ParentRuleConflict {
-	absDir, err := filepath.Abs(projectDir)
-	if err != nil {
-		return nil
-	}
-
-	var conflicts []ParentRuleConflict
-	current := filepath.Dir(absDir) // 부모부터 시작
-
-	for {
-		parent := filepath.Dir(current)
-		if parent == current {
-			// Reached filesystem root (Unix: /, Windows: C:\).
-			break
-		}
-		rulesDir := filepath.Join(current, ".claude", "rules")
-		entries, err := os.ReadDir(rulesDir)
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					conflicts = append(conflicts, ParentRuleConflict{
-						ParentDir: current,
-						RulesDir:  rulesDir,
-						Namespace: entry.Name(),
-					})
-				}
-			}
-		}
-		current = parent
-	}
-
-	return conflicts
 }

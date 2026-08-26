@@ -146,9 +146,8 @@ func writeOMPNativeLiveOverlay(t *testing.T, profile string) string {
   enablePiUser: false
   enablePiProject: false
   enableAgentsUser: false
-  enableAgentsProject: true
+  enableAgentsProject: false
   enableSkillCommands: true
-  customDirectories: [.agents/skills]
 async:
   enabled: true
   maxJobs: 2

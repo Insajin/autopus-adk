@@ -20,9 +20,17 @@ var ompToolMap = map[string]string{
 	"Grep":      "grep",
 	"Glob":      "glob",
 	"Bash":      "bash",
-	"TodoWrite": "todo",
 	"WebSearch": "web_search",
 	"WebFetch":  "web_search",
+}
+
+var ompNativeAgentTools = map[string][]string{
+	"debugger":            {"lsp"},
+	"executor":            {"lsp"},
+	"frontend-specialist": {"browser", "inspect_image", "lsp"},
+	"reviewer":            {"lsp"},
+	"ux-validator":        {"browser", "inspect_image"},
+	"validator":           {"lsp"},
 }
 
 // OMPAgentModelSelection is the validated model tuple rendered for an opt-in
@@ -53,38 +61,41 @@ func TransformAgentForOMPWithModel(src AgentSource, selection OMPAgentModelSelec
 	return renderAgentForOMP(src, selection.Model, selection.Thinking), nil
 }
 
-// @AX:WARN [AUTO]: OMP agent rendering contains 10 if branches.
-// @AX:REASON [AUTO]: optional metadata, tools, permissions, model, thinking, and body sections jointly define emitted frontmatter.
+// @AX:WARN [AUTO]: OMP agent rendering contains more than eight conditional branches.
+// @AX:REASON [AUTO]: portable and native tool deduplication, optional metadata, model, thinking, and emitted frontmatter sections converge here.
 func renderAgentForOMP(src AgentSource, model, thinking string) string {
 	var sb strings.Builder
 
-	body := NormalizeAgentReferences(src.Body, "omp")
+	body := NormalizeOMPResourcePaths(NormalizeAgentReferences(src.Body, "omp"))
 
-	// tools mapping
+	// Tool mapping starts from canonical portable tools, then adds only the
+	// native capabilities required by the generated role.
 	var tools []string
-	if src.Meta.Tools != "" {
-		seen := make(map[string]bool)
-		for _, t := range strings.Split(src.Meta.Tools, ",") {
-			t = strings.TrimSpace(t)
-			if t == "" {
-				continue
-			}
-			if strings.HasPrefix(t, "mcp__") {
-				if !seen[t] {
-					seen[t] = true
-					tools = append(tools, t)
-				}
-				continue
-			}
-			if mapped, ok := ompToolMap[t]; ok {
-				if !seen[mapped] {
-					seen[mapped] = true
-					tools = append(tools, mapped)
-				}
-			}
+	seen := make(map[string]bool)
+	for _, tool := range strings.Split(src.Meta.Tools, ",") {
+		tool = strings.TrimSpace(tool)
+		if tool == "" || tool == "TodoWrite" {
+			continue
 		}
-		sort.Strings(tools)
+		if strings.HasPrefix(tool, "mcp__") {
+			if !seen[tool] {
+				seen[tool] = true
+				tools = append(tools, tool)
+			}
+			continue
+		}
+		if mapped, ok := ompToolMap[tool]; ok && !seen[mapped] {
+			seen[mapped] = true
+			tools = append(tools, mapped)
+		}
 	}
+	for _, tool := range ompNativeAgentTools[src.Meta.Name] {
+		if !seen[tool] {
+			seen[tool] = true
+			tools = append(tools, tool)
+		}
+	}
+	sort.Strings(tools)
 
 	sb.WriteString("---\n")
 	fmt.Fprintf(&sb, "name: %s\n", OMPYAMLScalar(src.Meta.Name))

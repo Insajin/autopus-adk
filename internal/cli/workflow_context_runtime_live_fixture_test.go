@@ -63,13 +63,12 @@ func (l workflowContextLiveLayout) writeConfig(endpoint string) error {
   enabled: false
 compaction:
   enabled: true
-  strategy: snapcompact
+  methodOrder: [snapcompact]
   midTurnEnabled: false
   thresholdTokens: 7000
   thresholdPercent: -1
   reserveTokens: 128
   keepRecentTokens: 256
-  remoteEnabled: false
   autoContinue: false
 memory:
   backend: off
@@ -122,7 +121,7 @@ func verifyWorkflowContextLiveOverlay(
 	ctx context.Context, executable string, layout workflowContextLiveLayout, endpoint string,
 ) error {
 	expected := map[string]any{
-		"compaction.enabled": true, "compaction.strategy": "snapcompact",
+		"compaction.enabled": true, "compaction.methodOrder": []any{"snapcompact"},
 		"compaction.thresholdTokens": float64(7000), "compaction.autoContinue": false,
 		"memory.backend": "off",
 	}

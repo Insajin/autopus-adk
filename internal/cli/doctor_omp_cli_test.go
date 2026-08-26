@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,7 +46,7 @@ func TestOMP002_S10_DoctorCLIProjectsStableOMPChecksInTextAndJSON(t *testing.T) 
 	healthyChecks := ompPlatformDoctorChecks(healthyEnvelope.Checks)
 	require.NotEmpty(t, healthyChecks)
 	assert.Empty(t, failingOMPDoctorChecks(healthyChecks),
-		"healthy behavioral fixture must produce a 10/10 OMP readiness receipt; fixture invocations:\n"+
+		"healthy behavioral fixture must produce a complete provider-free OMP readiness receipt; fixture invocations:\n"+
 			ompDoctorFixtureLog(t, logPath))
 	assert.Equal(t, jsonStatusWarn, healthyEnvelope.Status,
 		"missing non-OMP dependencies may warn without changing OMP check outcomes")
@@ -55,39 +54,45 @@ func TestOMP002_S10_DoctorCLIProjectsStableOMPChecksInTextAndJSON(t *testing.T) 
 		"the fixture deliberately keeps unrelated dependency warnings separate")
 	assertOMPDoctorProjectionIsRedacted(t, root, healthyText, healthyChecks)
 
-	configPath := filepath.Join(root, ".omp", "config.yml")
-	configured, err := os.ReadFile(configPath)
+	skillPath := filepath.Join(root, ".omp", "skills", "auto", "SKILL.md")
+	generated, err := os.ReadFile(skillPath)
 	require.NoError(t, err)
-	broken := strings.Replace(string(configured), ".agents/skills", "wrong/path", 1)
-	require.NotEqual(t, string(configured), broken)
-	require.NoError(t, os.WriteFile(configPath, []byte(broken), 0o600))
+	require.NoError(t, os.WriteFile(skillPath, append(generated, []byte("\ncorrupted\n")...), 0o600))
 
 	failedText, failedEnvelope := runOMPDoctorEntrypoints(t, root)
 	validationChecks := ompValidationDoctorChecks(failedEnvelope.Checks)
-	require.Len(t, validationChecks, 1)
-	check := validationChecks[0]
-	assert.True(t, strings.HasPrefix(check.ID, "doctor.platform.omp.validation."))
-	assert.Equal(t, "error", check.Severity)
-	assert.Equal(t, "fail", check.Status)
-	assert.Equal(t, "skills.customDirectories expected=[.agents/skills] got=[wrong/path]", check.Detail)
+	require.NotEmpty(t, validationChecks)
+	var checksumCheck jsonCheck
+	for _, candidate := range validationChecks {
+		if strings.Contains(candidate.Detail, "managed content checksum mismatch") {
+			checksumCheck = candidate
+			break
+		}
+	}
+	require.NotEmpty(t, checksumCheck.ID)
+	assert.Equal(t, "error", checksumCheck.Severity)
+	assert.Equal(t, "fail", checksumCheck.Status)
 
-	textLine := lineContainingOMPDoctorCheck(t, failedText, check.ID)
+	textLine := lineContainingOMPDoctorCheck(t, failedText, checksumCheck.ID)
 	assert.Contains(t, textLine, "ERROR", "text status must mirror JSON status=fail")
-	assert.Contains(t, textLine, check.ID)
-	assert.Contains(t, textLine, check.Detail)
+	assert.Contains(t, textLine, checksumCheck.ID)
+	assert.Contains(t, textLine, checksumCheck.Detail)
 	assertOMPDoctorProjectionIsRedacted(t, root, failedText, validationChecks)
 
 	invocations, err := os.ReadFile(logPath)
 	require.NoError(t, err)
 	log := string(invocations)
 	for _, expected := range []string{
-		"--version", "--help", "config get skills.customDirectories --json",
-		"models --json", "--mode rpc", "--model autopus-readiness/readiness-probe",
-		"--tools write", "loopback-provider-requests=2",
+		"--version", "--help", "config get tools.intentTracing --json",
+		"--mode rpc", "--model openai-codex/gpt-5.6-sol",
+		"--tools task,hub,todo", "provider-requests=0",
 	} {
 		assert.Contains(t, log, expected)
 	}
-	for _, forbidden := range []string{ompDoctorSecretSentinel, ompDoctorRawPayload, "Authorization"} {
+	for _, forbidden := range []string{
+		ompDoctorSecretSentinel, ompDoctorRawPayload, "Authorization",
+		"models --json", `"type":"prompt"`, "--tools write",
+	} {
 		assert.NotContains(t, log, forbidden)
 	}
 }
@@ -154,77 +159,67 @@ func runOMPDoctorBehaviorFixture(args []string) int {
 	joined := strings.Join(args, " ")
 	switch {
 	case joined == "--version":
-		fmt.Println("omp/17.1.8")
+		fmt.Println("omp/18.0.5")
 	case joined == "--help":
-		fmt.Println("--mode rpc --no-session --cwd DIR --model MODEL")
-	case joined == "config get skills.customDirectories --json":
-		fmt.Println(`{"key":"skills.customDirectories","value":[".agents/skills"],"type":"array","description":""}`)
-	case strings.Contains(joined, "models --json"):
-		fmt.Println(`{"models":[{"provider":"legacy","id":"opus","available":true},{"provider":"legacy","id":"sonnet","available":true}]}`)
+		fmt.Println("--mode rpc --no-session --cwd DIR --model MODEL --tools TOOLS --no-extensions --no-rules --no-lsp --no-pty")
+	case joined == "config get tools.intentTracing --json":
+		fmt.Println("true")
 	case strings.Contains(joined, "--mode rpc"):
-		return runOMPDoctorBehaviorRPC(args, logPath)
+		return runOMPDoctorBehaviorRPC(logPath)
 	default:
 		return 62
 	}
 	return 0
 }
 
-func runOMPDoctorBehaviorRPC(args []string, logPath string) int {
+func runOMPDoctorBehaviorRPC(logPath string) int {
 	scanner := bufio.NewScanner(io.LimitReader(os.Stdin, 2049))
 	var input bytes.Buffer
-	for range 3 {
-		if !scanner.Scan() {
-			return 63
-		}
+	for scanner.Scan() {
 		input.Write(scanner.Bytes())
 		input.WriteByte('\n')
 	}
-	if scanner.Err() != nil || input.Len() > 2048 || !bytes.Contains(input.Bytes(), []byte(`"type":"set_auto_retry"`)) ||
-		!bytes.Contains(input.Bytes(), []byte(`"type":"set_auto_compaction"`)) || !bytes.Contains(input.Bytes(), []byte(`"type":"prompt"`)) {
+	wire := input.String()
+	if scanner.Err() != nil || input.Len() > 2048 {
 		return 63
 	}
-	modelConfig, err := os.ReadFile(filepath.Join(os.Getenv("PI_CODING_AGENT_DIR"), "models.yml"))
-	if err != nil {
-		return 64
-	}
-	baseURL := ""
-	for _, line := range strings.Split(string(modelConfig), "\n") {
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "baseUrl:") {
-			baseURL = strings.TrimSpace(strings.TrimPrefix(trimmed, "baseUrl:"))
-		}
-	}
-	for _, stage := range []string{"first", "second readiness-receipt.json"} {
-		body, _ := json.Marshal(map[string]any{"model": "readiness-probe", "stream": true,
-			"tools":    []any{map[string]any{"type": "function", "function": map[string]any{"name": "write"}}},
-			"messages": []any{map[string]string{"role": "user", "content": stage}}})
-		response, postErr := http.Post(baseURL+"/chat/completions", "application/json", bytes.NewReader(body))
-		if postErr != nil || response.StatusCode != http.StatusOK {
-			return 65
-		}
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 8193))
-		_ = response.Body.Close()
-	}
-	root := args[slices.Index(args, "--cwd")+1]
-	if os.WriteFile(filepath.Join(root, "readiness-receipt.json"), []byte("readiness-ok\n"), 0o600) != nil {
-		return 66
-	}
-	emitted := 0
-	for _, frame := range []string{
-		`{"type":"available_commands_update"}`,
-		`{"type":"tool_execution_start","toolCallId":"doctor-1"}`,
-		`{"type":"tool_execution_end","toolCallId":"doctor-1"}`,
-		`{"type":"message_end"}`,
+	for _, required := range []string{
+		`"type":"negotiate_protocol"`, `"type":"get_state"`,
+		`"type":"get_available_commands"`, `"type":"set_subagent_subscription"`,
 	} {
-		if _, err := fmt.Println(frame); err == nil {
-			emitted++
+		if !strings.Contains(wire, required) {
+			return 63
 		}
 	}
-	// The marker is appended after the frames so its presence proves the writes
-	// themselves succeeded. A CI receipt of rpc.* reason=event_missing means the
-	// probe saw a clean exit with no recognized frames, which this line separates
-	// into "child never emitted" versus "emitted but the parent captured nothing".
+	frames := []map[string]any{
+		{"type": "ready", "protocolVersion": 1, "supportedProtocolVersions": []int{1, 2}},
+		{"id": "readiness-negotiate", "type": "response", "command": "negotiate_protocol", "success": true, "data": map[string]any{"protocolVersion": 2}},
+		{"id": "readiness-state", "type": "response", "command": "get_state", "success": true, "data": map[string]any{
+			"sessionId": "provider-free-readiness", "isStreaming": false, "isCompacting": false,
+			"messageCount": 0, "queuedMessageCount": 0,
+			"dumpTools": []any{
+				map[string]any{"name": "task", "parameters": map[string]any{"type": "object", "properties": map[string]any{
+					"context": map[string]any{"type": "string"},
+					"tasks":   map[string]any{"type": "array"},
+				}}},
+				map[string]any{"name": "hub", "parameters": map[string]any{"type": "object"}},
+				map[string]any{"name": "todo", "parameters": map[string]any{"type": "object"}},
+			},
+		}},
+		{"id": "readiness-commands", "type": "response", "command": "get_available_commands", "success": true,
+			"data": map[string]any{"commands": []any{map[string]any{"name": "auto", "source": "project"}}}},
+		{"id": "readiness-subscribe", "type": "response", "command": "set_subagent_subscription", "success": true},
+		{"id": "readiness-unsubscribe", "type": "response", "command": "set_subagent_subscription", "success": true},
+	}
+	for _, frame := range frames {
+		encoded, err := json.Marshal(frame)
+		if err != nil {
+			return 64
+		}
+		fmt.Println(string(encoded))
+	}
 	log, _ := os.OpenFile(logPath, os.O_APPEND|os.O_WRONLY, 0o600)
-	_, _ = fmt.Fprintf(log, "loopback-provider-requests=2 emitted-frames=%d\n", emitted)
+	_, _ = fmt.Fprintf(log, "provider-requests=0 emitted-frames=%d\n", len(frames))
 	_ = log.Close()
 	return 0
 }

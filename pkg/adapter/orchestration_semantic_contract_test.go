@@ -35,8 +35,8 @@ func TestGeneratedOrchestration_SemanticContractsMatch(t *testing.T) {
 	}{
 		{
 			name:       "review",
-			claudePath: ".claude/skills/autopus/auto-review.md",
-			codexPath:  ".codex/skills/auto-review.md",
+			claudePath: ".claude/skills/auto-review/SKILL.md",
+			codexPath:  ".codex/skills/codex-auto-review/SKILL.md",
 			requiredFields: map[string]any{
 				"risk_tiered_review":             true,
 				"forward_strategy_and_providers": true,
@@ -47,8 +47,8 @@ func TestGeneratedOrchestration_SemanticContractsMatch(t *testing.T) {
 		},
 		{
 			name:       "idea",
-			claudePath: ".claude/skills/autopus/auto-idea.md",
-			codexPath:  ".codex/skills/auto-idea.md",
+			claudePath: ".claude/skills/auto-idea/SKILL.md",
+			codexPath:  ".codex/skills/codex-auto-idea/SKILL.md",
 			requiredFields: map[string]any{
 				"forward_strategy_and_providers": true,
 				"minimum_rounds":                 float64(2),
@@ -56,19 +56,6 @@ func TestGeneratedOrchestration_SemanticContractsMatch(t *testing.T) {
 				"blind_separate_judge":           true,
 				"fresh_judge_session":            true,
 				"preserve_dissent":               true,
-			},
-		},
-		{
-			name:       "team",
-			claudePath: ".claude/skills/autopus/agent-teams.md",
-			codexPath:  ".codex/skills/agent-teams.md",
-			requiredFields: map[string]any{
-				"supervisor":            "main_session",
-				"dispatch_evidence":     true,
-				"disjoint_ownership":    true,
-				"integration_gate":      true,
-				"teardown":              true,
-				"worker_receipt_fields": []any{"owned_paths", "changed_files", "verification", "blockers", "next_required_step"},
 			},
 		},
 	}
@@ -95,24 +82,26 @@ func TestGeneratedOrchestration_SemanticContractsMatch(t *testing.T) {
 func TestGeneratedOrchestration_UsesOnlyNativePlatformPrimitives(t *testing.T) {
 	claudeRoot, codexRoot := generateContractSurfaces(t)
 	claudeBody := readSurfaces(t, claudeRoot, []string{
-		".claude/skills/autopus/auto-review.md",
-		".claude/skills/autopus/auto-idea.md",
-		".claude/skills/autopus/agent-teams.md",
+		".claude/skills/auto-review/SKILL.md",
+		".claude/skills/auto-idea/SKILL.md",
+		".claude/skills/agent-teams/SKILL.md",
 	})
 	codexBody := readSurfaces(t, codexRoot, []string{
-		".codex/skills/auto-review.md",
-		".codex/skills/auto-idea.md",
-		".codex/skills/agent-teams.md",
+		".codex/skills/codex-auto-review/SKILL.md",
+		".codex/skills/codex-auto-idea/SKILL.md",
+		".codex/skills/codex-agent-teams/SKILL.md",
 	})
 
-	for _, foreign := range []string{"spawn_agent(", "send_input(", "wait_agent(", "close_agent("} {
+	for _, foreign := range []string{"spawn_agent(", "send_input(", "close_agent("} {
 		assert.Zero(t, strings.Count(claudeBody, foreign), "Claude contains Codex primitive %q", foreign)
 	}
 	for _, foreign := range []string{"TeamCreate(", "TeamDelete(", "SendMessage(", "Agent("} {
 		assert.Zero(t, strings.Count(codexBody, foreign), "Codex contains Claude primitive %q", foreign)
 	}
-	assert.Contains(t, claudeBody, "TeamCreate(")
+	assert.NotContains(t, claudeBody, "TeamCreate(")
+	assert.NotContains(t, claudeBody, "TeamDelete(")
 	assert.Contains(t, claudeBody, "Agent(")
+	assert.Contains(t, claudeBody, "SendMessage")
 	assert.Contains(t, codexBody, "spawn_agent(")
 }
 
@@ -120,14 +109,14 @@ func TestGeneratedOrchestration_S18BehavioralBindings(t *testing.T) {
 	t.Parallel()
 
 	claudeRoot, codexRoot := generateContractSurfaces(t)
-	claudeGo := readSurfaces(t, claudeRoot, []string{".claude/skills/autopus/auto-go.md"})
-	codexGo := readSurfaces(t, codexRoot, []string{".codex/skills/auto-go.md"})
-	claudeIdea := readSurfaces(t, claudeRoot, []string{".claude/skills/autopus/auto-idea.md"})
-	codexIdea := readSurfaces(t, codexRoot, []string{".codex/skills/auto-idea.md"})
-	claudeReview := readSurfaces(t, claudeRoot, []string{".claude/skills/autopus/auto-review.md"})
-	codexReview := readSurfaces(t, codexRoot, []string{".codex/skills/auto-review.md"})
-	claudeTeam := readSurfaces(t, claudeRoot, []string{".claude/skills/autopus/agent-teams.md"})
-	codexTeam := readSurfaces(t, codexRoot, []string{".codex/skills/agent-teams.md"})
+	claudeGo := readSurfaces(t, claudeRoot, []string{".claude/skills/auto-go/SKILL.md"})
+	codexGo := readSurfaces(t, codexRoot, []string{".codex/skills/codex-auto-go/SKILL.md"})
+	claudeIdea := readSurfaces(t, claudeRoot, []string{".claude/skills/auto-idea/SKILL.md"})
+	codexIdea := readSurfaces(t, codexRoot, []string{".codex/skills/codex-auto-idea/SKILL.md"})
+	claudeReview := readSurfaces(t, claudeRoot, []string{".claude/skills/auto-review/SKILL.md"})
+	codexReview := readSurfaces(t, codexRoot, []string{".codex/skills/codex-auto-review/SKILL.md"})
+	claudeTeam := readSurfaces(t, claudeRoot, []string{".claude/skills/agent-teams/SKILL.md"})
+	codexTeam := readSurfaces(t, codexRoot, []string{".codex/skills/codex-agent-teams/SKILL.md"})
 
 	for name, surface := range map[string]string{"claude-go": claudeGo, "codex-go": codexGo} {
 		assert.Contains(t, surface, "--providers", "%s must parse and forward explicit providers", name)
@@ -164,9 +153,11 @@ func TestGeneratedOrchestration_S18BehavioralBindings(t *testing.T) {
 			assert.GreaterOrEqual(t, strings.Count(surface, field), 2,
 				"%s must bind worker receipt field %s outside the semantic manifest", name, field)
 		}
-		assert.Contains(t, surface, "dispatch_count", "%s must record observed dispatches", name)
-		assert.Contains(t, surface, "teardown", "%s must record teardown evidence", name)
 	}
+	assert.Contains(t, claudeTeam, "automatic team cleanup")
+	assert.Contains(t, claudeTeam, "shutdown acknowledgements")
+	assert.Contains(t, codexTeam, "list_agents()")
+	assert.Contains(t, codexTeam, "interrupt_agent")
 	assert.NotContains(t, claudeTeam, `to="builder"`, "Claude must address the spawned builder-1 handle")
 }
 

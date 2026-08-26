@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,7 +47,7 @@ func TestOMPGenerate_ExplicitSkillSelectionReachesAllowSkill(t *testing.T) {
 	pf, err := NewWithRoot(dir).Generate(context.Background(), cfg)
 	require.NoError(t, err)
 	require.NotNil(t, pf)
-	assert.DirExists(t, filepath.Join(dir, ".agents", "skills"))
+	assert.FileExists(t, filepath.Join(dir, ".omp", "skills", "spec-review", "SKILL.md"))
 }
 
 // TestOMPRenderConfigDocument_AppendsToUnmarkedConfig covers the branch where a
@@ -64,11 +63,8 @@ func TestOMPRenderConfigDocument_AppendsToUnmarkedConfig(t *testing.T) {
 
 	doc, err := NewWithRoot(dir).renderConfigDocument(config.DefaultFullConfig("omp-cov"))
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(doc, "disabledProviders:"),
-		"user keys stay ahead of the managed block")
-	assert.Contains(t, doc, markerBeginYml)
-	assert.Contains(t, doc, markerEndYml)
-	assert.Equal(t, 1, strings.Count(doc, markerBeginYml))
+	assert.Equal(t, "disabledProviders:\n  - anthropic\n", doc)
+	assert.NotContains(t, doc, "customDirectories")
 }
 
 // TestOMPIsPruneEligible_RejectsEscapingPaths pins the containment guard. A

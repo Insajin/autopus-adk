@@ -6,11 +6,6 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
-	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
-	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/omp"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
@@ -140,18 +135,9 @@ func validateDoctorPlatform(
 	dir string,
 	platformName string,
 ) ([]adapter.ValidationError, error) {
-	switch platformName {
-	case "claude-code":
-		return claude.NewWithRoot(dir).Validate(ctx)
-	case "codex":
-		return codex.NewWithRoot(dir).Validate(ctx)
-	case "antigravity-cli":
-		return antigravity.NewWithRoot(dir).Validate(ctx)
-	case "opencode":
-		return opencode.NewWithRoot(dir).Validate(ctx)
-	case "omp":
-		return omp.NewWithRoot(dir).Validate(ctx)
-	default:
+	descriptor, ok := lookupPlatformDescriptor(platformName)
+	if !ok {
 		return nil, fmt.Errorf("unknown platform: %s", platformName)
 	}
+	return descriptor.Validate(ctx, dir)
 }

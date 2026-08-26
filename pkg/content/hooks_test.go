@@ -25,9 +25,9 @@ func TestGenerateHookConfigs_WithHooks(t *testing.T) {
 
 	hooks, gitHooks, err := content.GenerateHookConfigs(cfg, "claude", true)
 	require.NoError(t, err)
-	// CLI hooks: arch check (PreToolUse) + completion Stop hook.
+	// CLI hooks carry the arch check; lore remains a commit-msg hook because
+	// Claude has no equivalent event.
 	assert.NotEmpty(t, hooks)
-	// Lore is NOT a CLI hook — it runs via git commit-msg hook.
 	for _, h := range hooks {
 		assert.NotContains(t, h.Command, "--lore", "lore should not be a CLI hook")
 	}
@@ -39,7 +39,8 @@ func TestGenerateHookConfigs_WithHooks(t *testing.T) {
 	assert.Contains(t, archHook.Command, "--arch")
 	assert.Contains(t, archHook.Command, "--staged")
 	assert.Contains(t, archHook.Command, "--warn-only")
-	assert.Empty(t, gitHooks)
+	require.Len(t, gitHooks, 1)
+	assert.Equal(t, ".git/hooks/commit-msg", gitHooks[0].Path)
 }
 
 func TestGenerateHookConfigs_WithoutHooks(t *testing.T) {
@@ -221,8 +222,8 @@ func TestGenerateProjectHookConfigs_ClaudeTaskCreatedEnabled(t *testing.T) {
 	assert.Empty(t, gitHooks)
 	taskCreatedHook := findHook(hooks, "TaskCreated")
 	require.NotNil(t, taskCreatedHook, "expected a TaskCreated hook")
-	assert.Equal(t, ".claude/hooks/task-created-validate.sh", taskCreatedHook.Command)
-	assert.Equal(t, "warn", taskCreatedHook.Env["AUTOPUS_TASKCREATED_DEFAULT_MODE"])
+	assert.Equal(t, "AUTOPUS_TASKCREATED_DEFAULT_MODE=warn .claude/hooks/task-created-validate.sh", taskCreatedHook.Command)
+	assert.Empty(t, taskCreatedHook.Env)
 }
 
 func TestGenerateProjectHookConfigs_TaskCreatedDisabledOutsideClaude(t *testing.T) {

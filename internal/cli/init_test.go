@@ -222,9 +222,8 @@ func TestUpdateCmd_TaskCreatedModeFlagOverridesGeneratedSettings(t *testing.T) {
 
 	hookEntry, ok := hooks[0].(map[string]any)
 	require.True(t, ok)
-	env, ok := hookEntry["env"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "enforce", env["AUTOPUS_TASKCREATED_DEFAULT_MODE"])
+	assert.Equal(t, "AUTOPUS_TASKCREATED_DEFAULT_MODE=enforce .claude/hooks/task-created-validate.sh", hookEntry["command"])
+	assert.NotContains(t, entry, "env")
 }
 
 // TestInitCmd_PlatformNormalization verifies provider names are normalized to platform names.

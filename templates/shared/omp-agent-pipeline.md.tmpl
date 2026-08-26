@@ -41,27 +41,32 @@ Orca orchestration contract without initializing an OMP checklist or task DAG.
 Before Phase 1 for owner `omp`:
 
 1. Confirm that `task`, `hub`, and `todo` are available.
-2. Confirm whether batch mode and per-item isolation are present in the current `task` schema.
-3. Initialize the phase checklist with one top-level `todo` operation.
-4. Set `task_dispatch_count = 0`, `task_roles_dispatched = []`, and `degraded_mode = none`.
-5. If the selected topology cannot create and observe a native task, stop before implementation;
+2. Inspect the current `task` schema for batch mode and the conditional `isolated` and `effort`
+   fields; never infer them from a static example.
+3. Confirm `tools.intentTracing`; while enabled, every model-authored `task`, `hub`, and `todo`
+   call includes a concise top-level `i`.
+4. Initialize the phase checklist with one top-level `todo` operation and `i`.
+5. Set `task_dispatch_count = 0`, `task_roles_dispatched = []`, and `degraded_mode = none`.
+6. If the selected topology cannot create and observe a native task, stop before implementation;
    never silently fall back to a fake, prompt-only, or Orca-owned run.
 
 Every remaining native `task`/`hub`/`todo` instruction through the Completion Gate applies only
 to owner `omp`. Owner `orca` carries the same policy gates inside its one loaded-contract Run
 without creating this OMP DAG.
 
-Use one `task` call for each independent fan-out wave. Put shared goals, constraints, frozen
-context references, owned-path rules, and cross-task interfaces in top-level `context` once.
-Every item has a stable `name`, a complete `task`, the strict receipt `outputSchema`, and
-`schemaMode: strict`. Set `agent` only for a discovered custom role. Omit `agent` for the
-default general worker.
+When the current schema exposes batch mode, use one `task` call for each independent fan-out wave.
+Put shared goals, constraints, frozen context references, owned-path rules, and cross-task
+interfaces in top-level `context` once. Every item has a stable `name`, a complete `task`, the
+strict receipt `outputSchema`, and `schemaMode: strict`. Set `agent` only for a discovered custom
+role. Omit `agent` for the default general worker. When the schema exposes only the flat form,
+dispatch one item per call and reference one shared `local://` context artifact from each task.
 
 Retain every returned agent id. Follow-up or correction work for a non-isolated or otherwise
-revivable worker goes to that same id with `hub` send. Use `hub` wait only when blocked, and use
-`hub` cancel for abandoned jobs. Do not spawn a replacement merely to ask a follow-up question.
-An isolated worker is terminal after workspace cleanup and cannot be revived; its correction is
-a new explicitly named task with freshly declared ownership and context.
+revivable worker goes to that same id with `hub` send and top-level `i`. Use `hub` wait only when
+blocked, and use `hub` cancel for abandoned jobs; both include `i`. Do not spawn a replacement
+merely to ask a follow-up question. An isolated worker is terminal after workspace cleanup and
+cannot be revived; its correction is a new explicitly named task with freshly declared ownership
+and context.
 
 ## Context Delivery
 

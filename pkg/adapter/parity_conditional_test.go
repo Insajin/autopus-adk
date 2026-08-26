@@ -58,12 +58,9 @@ func TestParity_RelocationConservesRuleCount(t *testing.T) {
 
 	claudeCounts := countFeatures(claudeFiles)
 	assert.Equal(t, 14, claudeCounts.Rules, "relocation must conserve the claude rule count")
-	assert.Equal(t, 14, countFeatures(codexFiles).Rules)
+	assert.Zero(t, countFeatures(codexFiles).Rules,
+		"Codex 0.149.1 must not receive inert markdown under .codex/rules")
 	assert.Equal(t, 14, countFeatures(geminiFiles).Rules)
-
-	codexRulesParity := parityPct(claudeCounts.Rules, countFeatures(codexFiles).Rules)
-	assert.InDelta(t, 100.0, codexRulesParity, 0.05,
-		"Codex rules parity must stay at 100%%, not fall to 78.6%%")
 
 	var baseline, relocated int
 	for _, file := range claudeFiles.Files {

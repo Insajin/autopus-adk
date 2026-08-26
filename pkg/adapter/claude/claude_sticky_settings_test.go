@@ -210,7 +210,7 @@ func TestPrepareSettingsMapping_StickyHookReplacesOnlyTheAutopusEntry(t *testing
 
 	autopus, ok := entries[1].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "", autopus["matcher"])
+	assert.NotContains(t, autopus, "matcher")
 	inner, ok := autopus["hooks"].([]any)
 	require.True(t, ok)
 	require.Len(t, inner, 1)
@@ -273,9 +273,9 @@ func TestPrepareSettingsMapping_StickyRetractionRemovesAnEmptiedEventKey(t *test
 
 	_, settings := mapSettings(t, seed, nil)
 
-	_, exists := hooksOf(t, settings)[stickyEvent]
-	assert.False(t, exists,
-		"the event key is deleted once the autopus entry was the only thing in it")
+	_, hooksExist := settings["hooks"]
+	assert.False(t, hooksExist,
+		"the hooks object is deleted once the managed entry was the only hook")
 }
 
 // Regeneration is a fixed point: entry-level ownership must not accumulate a

@@ -151,7 +151,7 @@ func TestClaudeGenerate_StickyAndConditionalEntriesCoexistExactly(t *testing.T) 
 
 	sticky := hookEntries(t, dir, userPromptSubmit)
 	require.Len(t, sticky, 1, "exactly one UserPromptSubmit entry reaches settings.json")
-	assert.Equal(t, "", sticky[0]["matcher"], "UserPromptSubmit takes no matcher")
+	assert.NotContains(t, sticky[0], "matcher", "matcher-less events omit the unsupported empty matcher")
 
 	stickyHooks := entryHookObjects(t, sticky[0])
 	require.Len(t, stickyHooks, 1)

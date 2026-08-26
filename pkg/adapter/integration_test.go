@@ -40,8 +40,8 @@ func TestE2EInitCodex(t *testing.T) {
 	// .codex/skills/ directory must exist with files.
 	assertDirNotEmpty(t, filepath.Join(dir, ".codex", "skills"))
 
-	// .agents/skills/ router must exist for Codex standard skills.
-	assertFileExists(t, filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"))
+	// Codex-native skills must not collide with OpenCode's shared skill surface.
+	assertNoFileExists(t, filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md"))
 
 	// Local plugin marketplace and plugin manifest must exist for @auto flow.
 	assertFileExists(t, filepath.Join(dir, ".agents", "plugins", "marketplace.json"))
@@ -49,8 +49,8 @@ func TestE2EInitCodex(t *testing.T) {
 	assertFileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"))
 	assertNoFileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto-plan", "SKILL.md"))
 
-	// .codex/prompts/ directory must exist with QAMESH, goal, and update prompts included.
-	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "prompts"), 20)
+	// Repository-scoped custom prompts were removed from current Codex.
+	assertNoFileExists(t, filepath.Join(dir, ".codex", "prompts"))
 
 	// .codex/agents/ directory must exist with 16 TOML agents (SPEC-PARITY-001: all agents).
 	assertDirHasNFiles(t, filepath.Join(dir, ".codex", "agents"), 16)
@@ -64,10 +64,9 @@ func TestE2EInitCodex(t *testing.T) {
 	// Manifest must be saved.
 	assertFileExists(t, filepath.Join(dir, ".autopus", "codex-manifest.json"))
 
-	// Manifest file count stays high because Codex still emits repo skills,
-	// prompts, agents, hooks, config, git hooks, and the local plugin router.
+	// The native surface includes skills, agents, hooks, config, and plugin data.
 	assert.GreaterOrEqual(t, len(pf.Files), 65,
-		"Codex should produce at least 65 file mappings, got %d", len(pf.Files))
+		"Codex should produce a complete native surface, got %d mappings", len(pf.Files))
 
 	// Validate should pass after Generate.
 	errs, err := a.Validate(context.Background())
@@ -175,7 +174,7 @@ func TestE2EClean_Codex(t *testing.T) {
 	_, err = os.Stat(filepath.Join(dir, ".codex", "skills"))
 	assert.True(t, os.IsNotExist(err))
 
-	_, err = os.Stat(filepath.Join(dir, ".agents", "skills", "auto"))
+	_, err = os.Stat(filepath.Join(dir, ".codex", "prompts"))
 	assert.True(t, os.IsNotExist(err))
 
 	// AGENTS.md marker section should be removed.
@@ -210,8 +209,8 @@ func TestE2ECodex_FileCount(t *testing.T) {
 		}
 	}
 
-	assert.GreaterOrEqual(t, skills, 6, "should have at least 6 skill files (6 template + extended)")
-	assert.Equal(t, 20, prompts, "should have 20 prompt files")
+	assert.GreaterOrEqual(t, skills, 6, "should have native skill directories")
+	assert.Zero(t, prompts, "current Codex must not generate repository custom prompts")
 	assert.Equal(t, 16, agents, "should have 16 agent files (SPEC-PARITY-001)")
 	assert.GreaterOrEqual(t, other, 3, "should have AGENTS.md + hooks.json + .codex/config.toml")
 }

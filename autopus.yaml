@@ -8,8 +8,16 @@ platforms:
     - omp
 isolate_rules: true
 omp_context_policy:
-    profile: omp-active-probed
+    profile: omp-safe-default
     profiles:
+        omp-safe-default:
+            history_mode: off
+            memory_mode: off
+            history_target_tokens: 1000
+            fallback: canonical_full
+            capability_policy: probe_required
+            runtime_root_policy: isolated_task_owned
+            mutation_scope: session_overlay
         omp-active-probed:
             history_mode: active
             memory_mode: off
@@ -141,5 +149,4 @@ design:
     inject_on_verify: true
     external_imports: false
 workflow:
-    team_default: true
     coverage_threshold: 85

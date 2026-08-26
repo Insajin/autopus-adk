@@ -148,13 +148,13 @@ func workflowContextProductOverlayBody(active bool) []byte {
 		"extensions: []\nmcp:\n  enableProjectConfig: false\n" +
 		"commands:\n  enableClaudeProject: false\n  enableClaudeUser: false\n" +
 		"  enableOpencodeProject: false\n  enableOpencodeUser: false\n" +
-		"compaction:\n  enabled: " + enabled + "\n  strategy: snapcompact\n  midTurnEnabled: false\n" +
+		"compaction:\n  enabled: " + enabled + "\n  methodOrder: [snapcompact]\n  midTurnEnabled: false\n" +
 		"  thresholdTokens: 100000\n  thresholdPercent: -1\n  reserveTokens: 128\n" +
-		"  keepRecentTokens: 256\n  remoteEnabled: false\n  autoContinue: false\n" +
+		"  keepRecentTokens: 256\n  autoContinue: false\n" +
 		"memory:\n  backend: off\nskills:\n  enableCodexUser: false\n  enableClaudeUser: false\n" +
-		"  enableClaudeProject: false\n  enablePiUser: false\n  enablePiProject: false\n" +
-		"  enableAgentsUser: false\n  enableAgentsProject: true\n  enableSkillCommands: true\n" +
-		"  customDirectories: [.agents/skills]\n")
+		"  enableClaudeProject: false\n  enablePiUser: false\n  enablePiProject: true\n" +
+		"  enableAgentsUser: false\n  enableAgentsProject: false\n  enableSkillCommands: true\n" +
+		"  customDirectories: []\n")
 }
 
 func writeWorkflowContextProductOverlay(path string, body []byte) (resultErr error) {

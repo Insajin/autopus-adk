@@ -26,8 +26,8 @@ func TestOMPClean_PreservesUserConfigKeys(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, configFile)
 	require.NoError(t, os.MkdirAll(filepath.Dir(cfgPath), 0o755))
-	require.NoError(t, os.WriteFile(cfgPath, []byte(
-		"disabledProviders:\n  - anthropic\nmodel: my-local-model\n"), 0o644))
+	original := []byte("disabledProviders:\n  - anthropic\nmodel: my-local-model\n")
+	require.NoError(t, os.WriteFile(cfgPath, original, 0o644))
 
 	harness := config.DefaultFullConfig("omp-sec")
 	harness.Platforms = []string{"omp"}
@@ -35,10 +35,10 @@ func TestOMPClean_PreservesUserConfigKeys(t *testing.T) {
 	_, err := NewWithRoot(dir).Generate(context.Background(), harness)
 	require.NoError(t, err)
 
-	merged, err := os.ReadFile(cfgPath)
+	generated, err := os.ReadFile(cfgPath)
 	require.NoError(t, err)
-	require.Contains(t, string(merged), markerBeginYml, "Generate must add the managed section")
-	require.Contains(t, string(merged), "disabledProviders:", "user keys survive Generate")
+	require.Equal(t, original, generated, "plain OMP generation must not own user config")
+	require.NotContains(t, string(generated), markerBeginYml)
 
 	// `auto platform remove omp` drops omp before Clean runs.
 	remaining := config.DefaultFullConfig("omp-sec")
@@ -61,32 +61,14 @@ func TestOMPClean_PreservesUserConfigKeys(t *testing.T) {
 	assert.NotContains(t, string(after), "customDirectories", "managed content is gone")
 }
 
-// TestOMPClean_RemovesConfigWithNoUserContent complements H-1: when the file
-// holds nothing but the managed section, stripping it leaves an empty husk, so
-// the file is removed rather than left behind as litter.
-func TestOMPClean_RemovesConfigWithNoUserContent(t *testing.T) {
-	t.Parallel()
-
-	dir := generateOMPOnly(t)
-	require.FileExists(t, filepath.Join(dir, configFile))
-
-	require.NoError(t, NewWithRoot(dir).Clean(context.Background()))
-	assert.NoFileExists(t, filepath.Join(dir, configFile),
-		"a config file with only managed content carries nothing worth keeping")
-}
-
-// TestOMPClean_FailsClosedWithoutHarnessConfig is the M-1 regression. Falling
-// back to Platforms:["omp"] claims maximal ownership, which puts .agents/skills
-// back into the prune roots and deletes the SKILL.md that opencode now owns.
-// Without a readable platform list omp must not touch shared surfaces.
+// TestOMPClean_FailsClosedWithoutHarnessConfig verifies that OMP never claims
+// the lower-priority shared Agent Skills surface, even without harness config.
 func TestOMPClean_FailsClosedWithoutHarnessConfig(t *testing.T) {
 	t.Parallel()
 
 	dir := generateOMPOnly(t)
 	skillPath := filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md")
-	require.FileExists(t, skillPath, "omp-only Generate owns the shared skill surface")
-
-	// opencode takes the surface over and rewrites the file in place.
+	require.NoError(t, os.MkdirAll(filepath.Dir(skillPath), 0o755))
 	require.NoError(t, os.WriteFile(skillPath, []byte("opencode owned skill\n"), 0o644))
 	require.NoError(t, os.Remove(filepath.Join(dir, "autopus.yaml")))
 
@@ -218,25 +200,6 @@ func TestOMPGenerate_RefusesMarkerInsideBlockScalar(t *testing.T) {
 		"failing closed must leave the file exactly as the user wrote it")
 }
 
-// TestOMPGenerate_AcceptsMarkerTextInPlainValue guards the opposite direction:
-// the fail-closed check keys on markers embedded in YAML values, so an ordinary
-// config with a real managed section still regenerates.
-func TestOMPGenerate_AcceptsMarkerTextInPlainValue(t *testing.T) {
-	t.Parallel()
-
-	dir := generateOMPOnly(t)
-	harness := config.DefaultFullConfig("omp-o4")
-	harness.Platforms = []string{"omp"}
-
-	_, err := NewWithRoot(dir).Generate(context.Background(), harness)
-	require.NoError(t, err, "a normal managed section must still regenerate")
-
-	data, readErr := os.ReadFile(filepath.Join(dir, configFile))
-	require.NoError(t, readErr)
-	assert.Equal(t, 1, strings.Count(string(data), markerBeginYml),
-		"regeneration must not duplicate the managed section")
-}
-
 // TestOMPUpdate_PreservesConfigFileMode is the O-5 regression. The update
 // transaction wrote every managed file at 0644, so a config the user had
 // tightened to 0600 was silently widened — and .omp/config.yml is exactly where
@@ -246,7 +209,7 @@ func TestOMPUpdate_PreservesConfigFileMode(t *testing.T) {
 
 	dir := generateOMPOnly(t)
 	cfgPath := filepath.Join(dir, configFile)
-	require.NoError(t, os.Chmod(cfgPath, 0o600))
+	require.NoError(t, os.WriteFile(cfgPath, []byte("provider: user-owned\n"), 0o600))
 
 	harness := config.DefaultFullConfig("omp-o5")
 	harness.Platforms = []string{"omp"}
@@ -257,17 +220,4 @@ func TestOMPUpdate_PreservesConfigFileMode(t *testing.T) {
 	require.NoError(t, statErr)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(),
 		"update must not widen a config the user tightened")
-}
-
-// TestOMPGenerate_CreatesConfigWithTightMode pins the companion default: a
-// config created from scratch starts at 0600 rather than being born world
-// readable and only then preserved.
-func TestOMPGenerate_CreatesConfigWithTightMode(t *testing.T) {
-	t.Parallel()
-
-	dir := generateOMPOnly(t)
-
-	info, err := os.Stat(filepath.Join(dir, configFile))
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }

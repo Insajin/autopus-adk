@@ -18,4 +18,5 @@ Load core workspace policy plus architecture and repository-boundary evidence. D
 2. Generate or update `ARCHITECTURE.md` and `.autopus/project/{product,structure,tech,workspace}.md` from evidence.
 3. Generate `scenarios.md`, then `canary.md`, in that order; record unavailable deploy signals instead of inventing them.
 4. Keep source-of-truth, tracked/generated/runtime paths, nested repos, and QA target commands explicit in `workspace.md`.
-5. Verify every required document and report its path. Do not edit installed generated platform surfaces.
+5. Keep `structure.md` at or below 18,000 bytes by summarizing package families and boundaries instead of enumerating files; never exceed the 20,000-byte doctor warning boundary.
+6. Verify every required document and report its path. Do not edit installed generated platform surfaces.

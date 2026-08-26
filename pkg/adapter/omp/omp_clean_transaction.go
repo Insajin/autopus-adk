@@ -56,8 +56,8 @@ func (a *Adapter) CleanWithReceipt(_ context.Context) (receipt CleanReceipt, ret
 	return a.applyCleanAt(workspace, plan)
 }
 
-// @AX:WARN [AUTO]: transactional cleanup planning has cyclomatic complexity 19.
-// @AX:REASON [AUTO]: gocyclo reports 19 across manifest trust, ownership, checksum, path, and preimage checks.
+// @AX:WARN [AUTO]: transactional cleanup planning has high branch complexity.
+// @AX:REASON [AUTO]: manifest trust, ownership, checksum, legacy shared-surface admission, path, and preimage checks converge here.
 func (a *Adapter) prepareCleanAt(workspace *ompRootedWorkspace) (ompCleanPlan, error) {
 	manifest, err := loadOMPManifestAt(workspace, adapterName)
 	if err != nil || manifest == nil {
@@ -96,6 +96,9 @@ func (a *Adapter) prepareCleanAt(workspace *ompRootedWorkspace) (ompCleanPlan, e
 		}
 		if !validOMPManifestChecksum(previous.Checksum) {
 			return ompCleanPlan{}, fmt.Errorf("%s 매니페스트 checksum이 올바르지 않습니다", path)
+		}
+		if !a.shouldCleanLegacySharedPath(path, previous, data) {
+			continue
 		}
 
 		step := ompCleanStep{

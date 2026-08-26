@@ -68,21 +68,29 @@ func TestClaudeAgentModelFollowsUltraPreset(t *testing.T) {
 	assert.Contains(t, agentFrontmatterLines(t, agentDir, "tester.md"), "model: opus")
 }
 
-// TestClaudeAgentModelRewriteKeepsFrontmatter guards the in-place line swap:
-// only the model value may differ from the source, so effort and every sibling
-// key keep their authored order.
-func TestClaudeAgentModelRewriteKeepsFrontmatter(t *testing.T) {
+// TestClaudeAgentProfileRewriteKeepsFrontmatter verifies model and effort move
+// together while every unrelated sibling key keeps its authored order.
+func TestClaudeAgentProfileRewriteKeepsFrontmatter(t *testing.T) {
 	t.Parallel()
 	agentDir := generateClaudeAgentsForMode(t, "balanced")
 
 	want := sourceFrontmatterLines(t, "executor.md")
 	for i, line := range want {
-		if strings.HasPrefix(line, "model:") {
+		switch {
+		case strings.HasPrefix(line, "model:"):
 			want[i] = "model: opus"
+		case strings.HasPrefix(line, "effort:"):
+			want[i] = "effort: high"
 		}
 	}
 
 	got := agentFrontmatterLines(t, agentDir, "executor.md")
 	assert.Equal(t, want, got)
-	assert.Contains(t, got, "effort: medium", "effort is out of scope and must survive")
+	assert.Contains(t, got, "effort: high")
+}
+
+func TestClaudeAgentProfileUltraProjectsMaximumEffort(t *testing.T) {
+	t.Parallel()
+	agentDir := generateClaudeAgentsForMode(t, "ultra")
+	assert.Contains(t, agentFrontmatterLines(t, agentDir, "tester.md"), "effort: max")
 }

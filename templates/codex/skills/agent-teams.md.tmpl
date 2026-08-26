@@ -1,71 +1,37 @@
-# Codex Team Mode
+# Codex Multi-Agent V2 Team
 
-Codex `--team` uses the native multi-agent surface. The main session remains
-the Lead and owns the phase graph, gates, integration, and final handoff.
-
-## Canonical Semantic Contract
-
-```json
-{
-  "schema": "orchestration-contract.v1",
-  "workflow": "team",
-  "semantics": {
-    "supervisor": "main_session",
-    "dispatch_evidence": true,
-    "disjoint_ownership": true,
-    "integration_gate": true,
-    "teardown": true,
-    "worker_receipt_fields": [
-      "owned_paths",
-      "changed_files",
-      "verification",
-      "blockers",
-      "next_required_step"
-    ]
-  }
-}
-```
+Use `@auto go SPEC-ID --team` or `$codex-auto-go SPEC-ID --team`.
 
 ## Native Binding
 
-- Create Builder and Guardian workers with `spawn_agent(...)`.
-- Send focused follow-up instructions with `send_input(...)`.
-- Observe completion with `wait_agent(...)`.
-- Release every finished worker with `close_agent(...)`.
-- If the native surface is unavailable, stop before Phase 1 or use explicit
-  `--solo`; do not report a degraded team run as successful.
+Codex 0.149.1 exposes exactly these collaboration tools:
+
+- `spawn_agent(task_name, message, ...)`
+- `send_message(...)`
+- `followup_task(...)`
+- target-less `wait_agent()`
+- `interrupt_agent(...)`
+- `list_agents()`
+
+All workers use the same shared cwd and filesystem. Context forking changes
+conversation history only. It does not create another checkout, worktree, or
+branch. Parallel writers require disjoint write ownership; overlapping writers
+run sequentially.
 
 ```python
-builder = spawn_agent(
+spawn_agent(
     task_name="builder",
-    fork_turns="all",
     message="""
-    Role: Builder
-    Own only: <paths>
-    Do not edit: <forbidden paths>
-    Completion: implement the task and run focused tests
-    Return: owned_paths, changed_files, verification, blockers, next_required_step
-    """,
-)
-guardian = spawn_agent(
-    task_name="guardian",
-    fork_turns="all",
-    message="""
-    Role: Guardian
-    Verify Builder-owned paths without editing them
-    Return: owned_paths, changed_files, verification, blockers, next_required_step
+    Shared cwd/filesystem.
+    Own only: <paths>.
+    Do not edit: <forbidden paths>.
+    Return exactly: owned_paths, changed_files, verification, blockers,
+    next_required_step.
     """,
 )
 ```
 
-## Ownership and Integration
-
-- Every write worker receives disjoint `owned_paths` and explicit forbidden
-  paths. An overlap forces sequential execution.
-- The Lead records every successful dispatch in `dispatch_count` and
-  `subagent_roles_dispatched`.
-- Worker output is accepted only when all five receipt fields are present.
-- The Lead integrates in task order, runs the deterministic validation gate,
-  and keeps discovery separate from verification.
-- On success, blocker, cancellation, or retry exhaustion, the Lead closes all
-  workers and records teardown in `orchestration_run_receipt.v1`.
+The main session remains the Lead and owns gates, integration, and the final
+receipt. Use `send_message` for coordination, `followup_task` for additional
+work, `wait_agent()` for the next event, `list_agents` for state, and
+`interrupt_agent` only when work must stop.

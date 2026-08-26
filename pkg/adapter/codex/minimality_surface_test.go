@@ -34,19 +34,11 @@ func TestCodexAdapter_Generate_MinimalityDisciplineRenderedSurfaces(t *testing.T
 		path   string
 		tokens []string
 	}{
-		{filepath.Join(".agents", "skills", "auto-plan", "SKILL.md"), []string{"Minimality Decision Matrix", "new dependency", "new abstraction", "minimum sufficient verification", "receipt"}},
-		{filepath.Join(".agents", "skills", "auto-go", "SKILL.md"), []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"}},
-		{filepath.Join(".agents", "skills", "auto-fix", "SKILL.md"), []string{"caller", "shared root-cause", "revise-target", "receipt"}},
-		{filepath.Join(".agents", "skills", "auto-review", "SKILL.md"), append(reviewTokens, "receipt")},
-		{filepath.Join(".codex", "skills", "auto-plan.md"), []string{"Minimality Decision Matrix", "new dependency", "new abstraction", "minimum sufficient verification", "receipt"}},
-		{filepath.Join(".codex", "skills", "auto-go.md"), []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"}},
-		{filepath.Join(".codex", "skills", "auto-fix.md"), []string{"caller", "shared root-cause", "revise-target", "receipt"}},
-		{filepath.Join(".codex", "skills", "auto-review.md"), append(reviewTokens, "receipt")},
-		{filepath.Join(".codex", "prompts", "auto-plan.md"), []string{"Minimality Decision Matrix", "new dependency", "new abstraction", "minimum sufficient verification", "receipt"}},
-		{filepath.Join(".codex", "prompts", "auto-go.md"), []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"}},
-		{filepath.Join(".codex", "prompts", "auto-fix.md"), []string{"caller", "shared root-cause", "revise-target", "receipt"}},
-		{filepath.Join(".codex", "prompts", "auto-review.md"), append(reviewTokens, "receipt")},
-		{filepath.Join(".codex", "skills", "agent-pipeline.md"), []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"}},
+		{filepath.Join(".codex", "skills", "codex-auto-plan", "SKILL.md"), []string{"Minimality Decision Matrix", "new dependency", "new abstraction", "minimum sufficient verification", "receipt"}},
+		{filepath.Join(".codex", "skills", "codex-auto-go", "SKILL.md"), []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"}},
+		{filepath.Join(".codex", "skills", "codex-auto-fix", "SKILL.md"), []string{"caller", "shared root-cause", "revise-target", "receipt"}},
+		{filepath.Join(".codex", "skills", "codex-auto-review", "SKILL.md"), append(reviewTokens, "receipt")},
+		{filepath.Join(".codex", "skills", "codex-agent-pipeline", "SKILL.md"), []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"}},
 	}
 
 	for _, tc := range cases {

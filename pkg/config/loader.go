@@ -31,7 +31,10 @@ func LoadPreviewWithMetadata(dir string) (*HarnessConfig, bool, error) {
 
 // MissingTopLevelKey reports whether an existing autopus.yaml lacks a top-level key.
 func MissingTopLevelKey(dir string, key string) (bool, error) {
-	path := filepath.Join(dir, configFileName)
+	path, err := checkedConfigPath(dir)
+	if err != nil {
+		return false, err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -49,7 +52,10 @@ func MissingTopLevelKey(dir string, key string) (bool, error) {
 }
 
 func loadConfig(dir string, persistNormalization bool) (*HarnessConfig, bool, error) {
-	path := filepath.Join(dir, configFileName)
+	path, err := checkedConfigPath(dir)
+	if err != nil {
+		return nil, false, err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -70,7 +76,10 @@ func loadConfig(dir string, persistNormalization bool) (*HarnessConfig, bool, er
 	normalized := MigratePlatformNames(&cfg)
 	if persistNormalization && normalized {
 		// Persist the corrected config so subsequent loads don't repeat the migration.
-		if corrected, marshalErr := yaml.Marshal(&cfg); marshalErr == nil {
+		if corrected, marshalErr := marshalConfigPreservingPlaceholders(&cfg, data); marshalErr == nil {
+			if err := rejectSymlinkComponents(path); err != nil {
+				return nil, false, err
+			}
 			_ = os.WriteFile(path, corrected, 0644)
 		}
 	}
@@ -91,22 +100,19 @@ func applyMissingDefaults(cfg *HarnessConfig, data []byte) {
 	if _, ok := raw["design"]; !ok {
 		cfg.Design = defaults.Design
 	}
-	// Backfill workflow defaults when the section is omitted entirely. When the
-	// key IS present, the explicit unmarshalled values are preserved (e.g.
-	// team_default: false stays false).
+	// Backfill workflow defaults only when the section is omitted entirely.
+	// Present workflow sections preserve their explicit supported fields.
 	if _, ok := raw["workflow"]; !ok {
 		cfg.Workflow = defaults.Workflow
-	} else {
-		if rawWf, ok := raw["workflow"].(map[string]any); ok {
-			if _, hasTeamDefault := rawWf["team_default"]; !hasTeamDefault {
-				cfg.Workflow.TeamDefault = true
-			}
-		}
 	}
 }
 
 // Save validates and writes the config to autopus.yaml.
 func Save(dir string, cfg *HarnessConfig) error {
+	path, err := checkedConfigPath(dir)
+	if err != nil {
+		return err
+	}
 	if err := cfg.Validate(); err != nil {
 		return fmt.Errorf("validate config: %w", err)
 	}
@@ -114,7 +120,18 @@ func Save(dir string, cfg *HarnessConfig) error {
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	path := filepath.Join(dir, configFileName)
+	raw, err := os.ReadFile(path)
+	if err == nil {
+		data, err = preserveRawPlaceholders(raw, data)
+		if err != nil {
+			return fmt.Errorf("preserve config placeholders: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("read existing config: %w", err)
+	}
+	if err := rejectSymlinkComponents(path); err != nil {
+		return err
+	}
 	return os.WriteFile(path, data, 0644)
 }
 
@@ -130,10 +147,120 @@ func expandEnvVars(s string) string {
 	})
 }
 
+func marshalConfigPreservingPlaceholders(cfg *HarnessConfig, raw []byte) ([]byte, error) {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return preserveRawPlaceholders(raw, data)
+}
+
+func preserveRawPlaceholders(raw, marshaled []byte) ([]byte, error) {
+	if !envVarPattern.Match(raw) {
+		return marshaled, nil
+	}
+
+	var rawNode, marshaledNode yaml.Node
+	if err := yaml.Unmarshal(raw, &rawNode); err != nil {
+		return nil, err
+	}
+	if err := yaml.Unmarshal(marshaled, &marshaledNode); err != nil {
+		return nil, err
+	}
+	restoreRawPlaceholders(&rawNode, &marshaledNode)
+	return yaml.Marshal(&marshaledNode)
+}
+
+func restoreRawPlaceholders(raw, marshaled *yaml.Node) {
+	if raw.Kind != marshaled.Kind {
+		return
+	}
+	switch raw.Kind {
+	case yaml.DocumentNode:
+		if len(raw.Content) == 1 && len(marshaled.Content) == 1 {
+			restoreRawPlaceholders(raw.Content[0], marshaled.Content[0])
+		}
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(marshaled.Content); i += 2 {
+			for j := 0; j+1 < len(raw.Content); j += 2 {
+				if yamlMapKeysMatch(raw.Content[j], marshaled.Content[i]) {
+					restoreRawPlaceholders(raw.Content[j], marshaled.Content[i])
+					restoreRawPlaceholders(raw.Content[j+1], marshaled.Content[i+1])
+					break
+				}
+			}
+		}
+	case yaml.SequenceNode:
+		for i := 0; i < len(raw.Content) && i < len(marshaled.Content); i++ {
+			restoreRawPlaceholders(raw.Content[i], marshaled.Content[i])
+		}
+	case yaml.ScalarNode:
+		if envVarPattern.MatchString(raw.Value) && expandEnvVars(raw.Value) == marshaled.Value {
+			marshaled.Value = raw.Value
+			marshaled.Tag = raw.Tag
+			marshaled.Style = raw.Style
+		}
+	}
+}
+
+func yamlMapKeysMatch(raw, marshaled *yaml.Node) bool {
+	if raw.Kind != yaml.ScalarNode || marshaled.Kind != yaml.ScalarNode {
+		return raw.Value == marshaled.Value
+	}
+	return raw.Value == marshaled.Value ||
+		envVarPattern.MatchString(raw.Value) && expandEnvVars(raw.Value) == marshaled.Value
+}
+
+func checkedConfigPath(dir string) (string, error) {
+	absoluteDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("resolve config directory: %w", err)
+	}
+	info, err := os.Lstat(absoluteDir)
+	if os.IsNotExist(err) {
+		return filepath.Join(absoluteDir, configFileName), nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("inspect config directory: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("config path crosses symlink: %s", absoluteDir)
+	}
+	canonicalDir, err := filepath.EvalSymlinks(absoluteDir)
+	if err != nil {
+		return "", fmt.Errorf("resolve config directory: %w", err)
+	}
+	path := filepath.Join(canonicalDir, configFileName)
+	if err := rejectSymlinkComponents(path); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func rejectSymlinkComponents(path string) error {
+	for _, component := range []string{filepath.Dir(path), path} {
+		info, err := os.Lstat(component)
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("inspect config path: %w", err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("config path crosses symlink: %s", component)
+		}
+	}
+	return nil
+}
+
 // Exists reports whether dir holds an autopus.yaml. Load synthesizes a default
 // config for a missing file rather than returning an error, so a caller that
 // must not act on a synthesized platform list checks this first.
 func Exists(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, configFileName))
-	return err == nil && !info.IsDir()
+	path, err := checkedConfigPath(dir)
+	if err != nil {
+		return false
+	}
+	info, err := os.Lstat(path)
+	return err == nil && info.Mode().IsRegular()
 }

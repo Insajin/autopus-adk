@@ -85,7 +85,7 @@ func TestTransformAgentForOMP_S3_ToolLists(t *testing.T) {
 		agent string
 		want  []string
 	}{
-		{"executor", []string{"bash", "edit", "glob", "grep", "read", "todo", "write"}},
+		{"executor", []string{"bash", "edit", "glob", "grep", "lsp", "read", "write"}},
 		{"architect", []string{"bash", "glob", "grep", "mcp__sequential-thinking__sequentialthinking", "read"}},
 		{"spec-writer", []string{"bash", "glob", "grep", "read", "web_search"}},
 	}
@@ -183,8 +183,8 @@ func TestTransformAgentForOMP_S3_SkillReferenceFinalForm(t *testing.T) {
 		wantRef string
 		flatRef string
 	}{
-		{"annotator", "`.agents/skills/ax-annotation/SKILL.md`", ".agents/skills/ax-annotation.md"},
-		{"frontend-specialist", "`.agents/skills/frontend-verify/SKILL.md`", ".agents/skills/frontend-verify.md"},
+		{"annotator", "`.omp/skills/ax-annotation/SKILL.md`", ".agents/skills/ax-annotation.md"},
+		{"frontend-specialist", "`.omp/skills/frontend-verify/SKILL.md`", ".agents/skills/frontend-verify.md"},
 	}
 
 	for _, tt := range tests {
@@ -283,7 +283,7 @@ func TestTransformAgentForOMP_L1_EscapesAdversarialMetadata(t *testing.T) {
 		"the description round-trips as one scalar instead of spawning sibling keys")
 	assert.Equal(t, "sonnet: injected", parsed["model"])
 	assert.Equal(t, "executor", parsed["name"])
-	assert.NotContains(t, parsed, "tools",
-		"the source declared no tools, so injected content must not create the key")
-	assert.Len(t, parsed, 3, "exactly name, description and model are emitted")
+	assert.Equal(t, []any{"lsp"}, parsed["tools"],
+		"only the executor's native role tool is emitted; hostile metadata cannot add tools")
+	assert.Len(t, parsed, 4, "exactly name, description, model, and native role tools are emitted")
 }

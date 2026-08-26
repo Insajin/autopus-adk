@@ -190,17 +190,22 @@ func TestClaudeAdapter_InstallHooks_InvalidJSON(t *testing.T) {
 
 	// 잘못된 JSON 파일 생성
 	settingsDir := filepath.Join(dir, ".claude")
+	settingsPath := filepath.Join(settingsDir, "settings.json")
+	original := []byte("{invalid json}")
 	require.NoError(t, os.MkdirAll(settingsDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(settingsDir, "settings.json"), []byte("{invalid json}"), 0644))
+	require.NoError(t, os.WriteFile(settingsPath, original, 0644))
 
 	a := claude.NewWithRoot(dir)
 	hooks := []adapter.HookConfig{
 		{Event: "PreToolUse", Matcher: "Bash", Type: "command", Command: "auto check --arch --quiet", Timeout: 30},
 	}
 
-	// 잘못된 JSON이어도 오류 없이 처리되어야 함 (기본 맵으로 초기화)
+	// Malformed user settings fail closed instead of being replaced.
 	err := a.InstallHooks(context.Background(), hooks, nil)
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	data, readErr := os.ReadFile(settingsPath)
+	require.NoError(t, readErr)
+	assert.Equal(t, original, data)
 }
 
 // TestClaudeAdapter_Clean_RemovesMarker는 Clean이 CLAUDE.md 마커 섹션을 제거하는지 테스트한다.

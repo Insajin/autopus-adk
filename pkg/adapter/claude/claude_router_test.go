@@ -97,7 +97,7 @@ func TestRouter_Generate_SkillsUnchanged(t *testing.T) {
 	// 스킬/룰/에이전트 디렉터리는 정상 생성
 	for _, d := range []string{
 		".claude/rules/autopus",
-		".claude/skills/autopus",
+		".claude/skills",
 		".claude/agents/autopus",
 	} {
 		info, statErr := os.Stat(filepath.Join(dir, d))
@@ -121,8 +121,8 @@ func TestRouter_ClaudeMD_ShowsAutoMDPath(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 
-	assert.Contains(t, content, "Commands: .claude/skills/auto/SKILL.md")
-	assert.NotContains(t, content, "Commands: .claude/commands/autopus/")
+	assert.Contains(t, content, "Router: .claude/skills/auto/SKILL.md")
+	assert.NotContains(t, content, ".claude/commands/autopus/")
 }
 
 // TestRouter_Validate_ChecksAutoMDFile는 Validate가 auto.md 파일을 검증하는지 테스트한다.
@@ -189,9 +189,9 @@ func TestRouter_Clean_RemovesAutoMD(t *testing.T) {
 	assert.True(t, os.IsNotExist(statErr), "SKILL.md가 삭제되어야 함")
 }
 
-// TestRouter_Clean_RemovesLegacyAutopusDir는 Clean이 구 autopus/ 디렉터리도 삭제하는지 테스트한다.
-// AC-9: 구 디렉터리 함께 삭제
-func TestRouter_Clean_RemovesLegacyAutopusDir(t *testing.T) {
+// TestRouter_Clean_PreservesUnmanifestedLegacyContent verifies Clean is
+// manifest-driven and does not claim arbitrary legacy-looking user paths.
+func TestRouter_Clean_PreservesUnmanifestedLegacyContent(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := claude.NewWithRoot(dir)
@@ -211,13 +211,8 @@ func TestRouter_Clean_RemovesLegacyAutopusDir(t *testing.T) {
 	err := a.Clean(context.Background())
 	require.NoError(t, err)
 
-	// 구 디렉터리도 삭제되어야 함
-	_, statErr := os.Stat(legacyDir)
-	assert.True(t, os.IsNotExist(statErr), "구 autopus/ 디렉터리가 삭제되어야 함")
-
-	// auto.md도 삭제되어야 함
-	_, statErr = os.Stat(filepath.Join(dir, ".claude", "commands", "auto.md"))
-	assert.True(t, os.IsNotExist(statErr), "auto.md가 삭제되어야 함")
+	assert.DirExists(t, legacyDir)
+	assert.FileExists(t, filepath.Join(dir, ".claude", "commands", "auto.md"))
 }
 
 // TestRouter_Generate_FileMappingPath는 FileMapping의 TargetPath가 올바른지 테스트한다.

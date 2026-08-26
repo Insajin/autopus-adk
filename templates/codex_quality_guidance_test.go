@@ -37,7 +37,6 @@ func TestCodexQualityGuidanceDocumentsLoadedAgentBoundary(t *testing.T) {
 
 	pipelinePaths := []string{
 		filepath.Join(root, "..", "content", "skills", "agent-pipeline.md"),
-		filepath.Join(root, "codex", "skills", "agent-pipeline.md.tmpl"),
 		filepath.Join(root, "gemini", "skills", "agent-pipeline", "SKILL.md.tmpl"),
 	}
 	for _, path := range pipelinePaths {
@@ -45,8 +44,10 @@ func TestCodexQualityGuidanceDocumentsLoadedAgentBoundary(t *testing.T) {
 		require.NoError(t, err)
 		content := string(data)
 		assert.Contains(t, content, "quality-managed depth-0 supervisor")
-		assert.Contains(t, content, "`inherit` supervisor keeps the user's Codex runtime default")
-		assert.Contains(t, content, "User-owned root model or effort assignments remain preserved and take precedence")
+		assert.Contains(t, content, "An `inherit` supervisor keeps the")
+		assert.Contains(t, content, "user's Codex runtime default")
+		assert.Contains(t, content, "User-owned root model or effort assignments remain")
+		assert.Contains(t, content, "preserved and take precedence")
 		assert.Contains(t, content, "`planner`, `architect`, and `security-auditor` use Sol/`max`")
 		assert.Contains(t, content, "every other managed agent uses Sol/`xhigh`")
 		assert.NotContains(t, content, "the depth-0 supervisor and orchestra use Sol/`ultra`")

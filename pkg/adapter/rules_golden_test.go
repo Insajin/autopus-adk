@@ -15,7 +15,6 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -49,8 +48,6 @@ func generatePlatform(t *testing.T, platform string) string {
 	switch platform {
 	case "claude":
 		_, err = claude.NewWithRoot(dir).Generate(ctx, cfg)
-	case "codex":
-		_, err = codex.NewWithRoot(dir).Generate(ctx, cfg)
 	case "gemini":
 		_, err = antigravity.NewWithRoot(dir).Generate(ctx, cfg)
 	case "opencode":
@@ -118,21 +115,19 @@ func digestWithoutStickyKey(t *testing.T, path string) string {
 // REQ-CONDRULE-SCHEMA-02 and INV-005, extended by SPEC-STICKYRULE-001's
 // REQ-STICKYRULE-SCHEMA-02.
 //
-// Characterization test: the goldens were captured before SPEC-CONDRULE-001 and
-// are never re-baselined. Eight of the ten unconditional rules must still digest
-// to their pre-change bytes exactly. The two sticky rules are compared with the
-// added `alwaysApply: true` line removed, which holds them to the same standard:
-// one known line differs and every other byte is identical, on all four
-// platforms, so the key is verified to be preserved verbatim rather than merely
-// present.
+// Characterization test: the historical goldens are not re-baselined. The
+// Claude deferred-tools rule is version-sensitive and has a dedicated latest
+// CLI contract; Codex is excluded because current Codex uses native skills and
+// AGENTS.md rather than inert repository markdown rules. Every other active
+// unconditional rule remains byte-pinned.
 func TestRules_UnconditionalRulesStayByteIdentical(t *testing.T) {
 	t.Parallel()
 
 	golden := loadGolden(t)
-	require.Len(t, golden, 4, "goldens cover claude, codex, gemini, opencode")
+	require.Len(t, golden, 4, "historical goldens include the retired Codex rule surface")
 
 	checked, sticky := 0, 0
-	for _, platform := range []string{"claude", "codex", "gemini", "opencode"} {
+	for _, platform := range []string{"claude", "gemini", "opencode"} {
 		paths := golden[platform]
 		require.NotEmpty(t, paths, "no goldens for %s", platform)
 
@@ -140,6 +135,9 @@ func TestRules_UnconditionalRulesStayByteIdentical(t *testing.T) {
 		for target, want := range paths {
 			base := filepath.Base(target)
 			if !alwaysRuleFiles[base] {
+				continue
+			}
+			if platform == "claude" && base == "deferred-tools.md" {
 				continue
 			}
 			emitted := filepath.Join(dir, filepath.FromSlash(target))
@@ -153,9 +151,9 @@ func TestRules_UnconditionalRulesStayByteIdentical(t *testing.T) {
 			checked++
 		}
 	}
-	assert.Equal(t, 50, checked, "10 unconditional rules across 4 platform surfaces")
-	assert.Equal(t, 10, sticky,
-		"the 2 sticky rules across 4 platform surfaces, gemini emitting 2 each")
+	assert.Equal(t, 39, checked, "version-stable unconditional rule emissions checked")
+	assert.Equal(t, 8, sticky,
+		"the 2 sticky rules across active surfaces, gemini emitting 2 each")
 }
 
 // TestRules_NoHookEntryReferencesUnconditionalRules completes S8: none of the

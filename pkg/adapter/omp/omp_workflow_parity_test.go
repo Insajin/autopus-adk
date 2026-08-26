@@ -23,7 +23,7 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 	wantWorkflowTargets := make(map[string]bool, len(workflowSpecs))
 	for _, spec := range workflowSpecs {
 		want[spec.Name] = true
-		wantWorkflowTargets[filepath.ToSlash(filepath.Join(".agents", "skills", spec.Name, "SKILL.md"))] = true
+		wantWorkflowTargets[filepath.ToSlash(filepath.Join(".omp", "skills", spec.Name, "SKILL.md"))] = true
 	}
 	require.Len(t, want, 20, "workflowSpecs is the canonical twenty-name authority")
 	workflow, err := a.prepareWorkflowSkillMappings(configForOMP())
@@ -49,14 +49,14 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 	for _, file := range pf.Files {
 		target := filepath.ToSlash(file.TargetPath)
 		seen[target]++
-		if strings.HasPrefix(target, ".agents/commands/") && strings.HasSuffix(target, ".md") {
-			name := strings.TrimSuffix(strings.TrimPrefix(target, ".agents/commands/"), ".md")
+		if strings.HasPrefix(target, ".omp/commands/") && strings.HasSuffix(target, ".md") {
+			name := strings.TrimSuffix(strings.TrimPrefix(target, ".omp/commands/"), ".md")
 			if !strings.Contains(name, "/") {
 				commands[name] = true
 				commandBodies[name] = string(file.Content)
 			}
 		}
-		const skillPrefix, skillSuffix = ".agents/skills/", "/SKILL.md"
+		const skillPrefix, skillSuffix = ".omp/skills/", "/SKILL.md"
 		if strings.HasPrefix(target, skillPrefix) && strings.HasSuffix(target, skillSuffix) {
 			name := strings.TrimSuffix(strings.TrimPrefix(target, skillPrefix), skillSuffix)
 			if want[name] {
@@ -210,59 +210,22 @@ func mappingContentKeys(files map[string]string) map[string]bool {
 	return out
 }
 
-func TestOMP002_S5_ConfigUsesBothStructuralMarkerFormsAndFailsClosed(t *testing.T) {
-	tests := []struct {
-		name     string
-		original string
-		want     []string
-	}{
-		{
-			name:     "no user skills mapping owns top-level subtree",
-			original: "model: user-model\n",
-			want:     []string{"model: user-model\n", "# AUTOPUS:BEGIN\nskills:\n  customDirectories:\n    - .agents/skills\n# AUTOPUS:END"},
-		},
-		{
-			name:     "existing user skills mapping owns only indented entry",
-			original: "model: user-model\nskills:\n  userDirectory: ./private\n",
-			want: []string{
-				"model: user-model\nskills:\n  userDirectory: ./private\n",
-				"  # AUTOPUS:BEGIN\n  customDirectories:\n    - .agents/skills\n  # AUTOPUS:END",
-			},
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			path := filepath.Join(dir, configFile)
-			require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-			require.NoError(t, os.WriteFile(path, []byte(tc.original), 0o600))
-
-			_, err := NewWithRoot(dir).Generate(context.Background(), configForOMP())
-			require.NoError(t, err)
-			after, err := os.ReadFile(path)
-			require.NoError(t, err)
-			for _, fragment := range tc.want {
-				assert.Contains(t, string(after), fragment)
-			}
-			info, err := os.Stat(path)
-			require.NoError(t, err)
-			assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-		})
-	}
-
-	conflicts := []string{
+func TestOMP002_S5_PlainConfigRemainsByteIdentical(t *testing.T) {
+	for _, original := range []string{
+		"model: user-model\n",
+		"model: user-model\nskills:\n  userDirectory: ./private\n",
 		"skills: scalar-owned-by-user\n",
 		"skills:\n  customDirectories:\n    - ./user-owned\n",
-	}
-	for _, original := range conflicts {
-		t.Run("conflict remains byte identical", func(t *testing.T) {
+	} {
+		original := original
+		t.Run(strings.ReplaceAll(strings.TrimSpace(original), "\n", "_"), func(t *testing.T) {
 			dir := t.TempDir()
 			path := filepath.Join(dir, configFile)
 			require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 			require.NoError(t, os.WriteFile(path, []byte(original), 0o600))
 
 			_, err := NewWithRoot(dir).Generate(context.Background(), configForOMP())
-			require.Error(t, err)
+			require.NoError(t, err)
 			after, readErr := os.ReadFile(path)
 			require.NoError(t, readErr)
 			assert.Equal(t, original, string(after))
@@ -273,7 +236,7 @@ func TestOMP002_S5_ConfigUsesBothStructuralMarkerFormsAndFailsClosed(t *testing.
 	}
 }
 
-func TestOMP002_S7_ValidateReportsMalformedValuesAndSourceDerivedMissingSets(t *testing.T) {
+func TestOMP002_S7_ValidateReportsMissingAndTamperedManagedSets(t *testing.T) {
 	dir := generateOMPOnly(t)
 	a := NewWithRoot(dir)
 	cfg := configForOMP()
@@ -284,11 +247,14 @@ func TestOMP002_S7_ValidateReportsMalformedValuesAndSourceDerivedMissingSets(t *
 	require.NoError(t, err)
 	commands, err := a.prepareCommandMappings(cfg)
 	require.NoError(t, err)
-	removeStableMapping(t, dir, rules)
-	removeStableMapping(t, dir, agents)
-	removeStableMapping(t, dir, commands)
-	_ = os.Remove(filepath.Join(dir, ".agents", "skills", "auto-plan", "SKILL.md"))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, configFile), []byte("skills: [\n"), 0o600))
+	removedRule := removeStableMapping(t, dir, rules)
+	removedAgent := removeStableMapping(t, dir, agents)
+	removedCommand := removeStableMapping(t, dir, commands)
+	require.NoError(t, os.Remove(filepath.Join(dir, ".omp", "skills", "auto-plan", "SKILL.md")))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ".omp", "skills", "auto-go", "SKILL.md"),
+		[]byte("tampered\n"), 0o600,
+	))
 
 	findings, err := a.Validate(context.Background())
 	require.NoError(t, err)
@@ -297,12 +263,14 @@ func TestOMP002_S7_ValidateReportsMalformedValuesAndSourceDerivedMissingSets(t *
 		details = append(details, finding.File+" "+finding.Message)
 	}
 	joined := strings.Join(details, "\n")
-	assert.Contains(t, strings.ToLower(joined), "yaml")
 	assert.Contains(t, joined, "expected="+itoa(len(rules))+" got="+itoa(len(rules)-1))
-	assert.Contains(t, joined, "expected="+itoa(len(agents))+" got="+itoa(len(agents)-1))
-	assert.GreaterOrEqual(t, strings.Count(joined, "expected=20 got=19"), 2,
-		"commands and workflow skills require separate source-derived findings")
-	assert.Contains(t, joined, "auto-plan")
+	for _, path := range []string{
+		removedRule, removedAgent, removedCommand, ".omp/skills/auto-plan/SKILL.md",
+	} {
+		assert.Contains(t, joined, path)
+	}
+	assert.Contains(t, joined, "managed path must be a regular file")
+	assert.Contains(t, joined, "managed content checksum mismatch")
 }
 
 func TestOMP002_S9_DetectRequiresExactSemverAndHonorsCallerDeadline(t *testing.T) {

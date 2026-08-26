@@ -214,7 +214,7 @@ func TestUpdateCmd_PlanKeepsFullCompatibleSharedSkillPathWithoutSplitOptIn(t *te
 	assert.NotContains(t, output, ".autopus/plugins/auto/skills/metrics/SKILL.md", "acceptance S2: default full mode must not route shared long-tail skills to split Codex plugin targets")
 }
 
-func TestUpdateCmd_PlanRetainsCodexWorkflowCompatibilitySkills(t *testing.T) {
+func TestUpdateCmd_PlanRetainsCodexNativeWorkflowSkills(t *testing.T) {
 	dir := t.TempDir()
 	configurePreviewBinaries(t, "codex", "opencode")
 	initMixedPreviewHarness(t, dir)
@@ -235,7 +235,7 @@ func TestUpdateCmd_PlanRetainsCodexWorkflowCompatibilitySkills(t *testing.T) {
 		"auto-dev", "auto-doctor", "auto-goal", "auto-map", "auto-secure",
 		"auto-status", "auto-test", "auto-update", "auto-verify", "auto-why",
 	} {
-		path := ".codex/skills/" + name + ".md"
+		path := ".codex/skills/codex-" + name + "/SKILL.md"
 		assert.Contains(t, output, "retain "+path)
 		assert.NotContains(t, output, "prune "+path)
 	}

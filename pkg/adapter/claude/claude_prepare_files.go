@@ -4,14 +4,18 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"strings"
 
 	contentfs "github.com/insajin/autopus-adk/content"
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
+	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 	"github.com/insajin/autopus-adk/templates"
 )
 
 // prepareFiles는 Generate와 동일한 파일을 준비하되, 디스크에 쓰지 않고 내용만 반환한다.
+// @AX:WARN [AUTO]: Claude surface preparation contains more than eight conditional branches.
+// @AX:REASON [AUTO]: root docs, router, MCP, status line, hooks, rules, skills, agents, permissions, and full-mode workflow mappings converge here.
 func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	var files []adapter.FileMapping
 
@@ -84,7 +88,7 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	files = append(files, conditional.mappings...)
 
 	if cfg.IsFullMode() {
-		skillFiles, err := a.prepareContentFilesForConfig(cfg, "skills", ".claude/skills/autopus")
+		skillFiles, err := a.prepareContentFilesForConfig(cfg, "skills", ".claude/skills")
 		if err != nil {
 			return nil, fmt.Errorf("스킬 파일 준비 실패: %w", err)
 		}
@@ -101,6 +105,12 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 			return nil, fmt.Errorf("상세 workflow 스킬 준비 실패: %w", err)
 		}
 		files = append(files, workflowSkillFiles...)
+
+		workflowFiles, err := a.workflowFiles(cfg)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, workflowFiles...)
 	}
 
 	return files, nil
@@ -112,6 +122,8 @@ func (a *Adapter) prepareContentFiles(subDir string, targetRelDir string) ([]ada
 	return a.prepareContentFilesForConfig(nil, subDir, targetRelDir)
 }
 
+// @AX:WARN [AUTO]: embedded content preparation contains more than eight conditional branches.
+// @AX:REASON [AUTO]: source admission, relocated-rule exclusion, workflow-skill ownership, catalog state, normalization, and native directory naming converge here.
 func (a *Adapter) prepareContentFilesForConfig(
 	cfg *config.HarnessConfig,
 	subDir string,
@@ -139,6 +151,9 @@ func (a *Adapter) prepareContentFilesForConfig(
 		if subDir == "hooks" && isClaudeRootHookFile(entry.Name()) {
 			continue
 		}
+		if subDir == "skills" && isClaudeWorkflowDetailSource(entry.Name()) {
+			continue
+		}
 		if subDir == "rules" && entry.Name() == fileSizeLimitRuleFile {
 			continue
 		}
@@ -155,8 +170,14 @@ func (a *Adapter) prepareContentFilesForConfig(
 			return nil, fmt.Errorf("컨텐츠 파일 읽기 실패 %s: %w", srcPath, err)
 		}
 		data = normalizeClaudeContent(cfg, subDir, entry.Name(), data)
+		targetPath := filepath.Join(targetRelDir, entry.Name())
+		if subDir == "skills" {
+			name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+			outputName := pkgcontent.ResolveCatalogSkillOutputName(name, "claude")
+			targetPath = filepath.Join(targetRelDir, outputName, "SKILL.md")
+		}
 		files = append(files, adapter.FileMapping{
-			TargetPath:      filepath.Join(targetRelDir, entry.Name()),
+			TargetPath:      targetPath,
 			OverwritePolicy: adapter.OverwriteAlways,
 			Checksum:        checksum(string(data)),
 			Content:         data,

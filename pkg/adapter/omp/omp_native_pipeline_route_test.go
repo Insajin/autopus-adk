@@ -44,7 +44,7 @@ func TestOMPNativePipelineRoute_MarkdownAutoOwnsInteractiveAndExplicitRouteOwnsH
 	require.NotContains(t, source, "exec(")
 	require.NotContains(t, source, "sh -c")
 
-	autoPath := filepath.Join(root, ".agents", "commands", "auto.md")
+	autoPath := filepath.Join(root, ".omp", "commands", "auto.md")
 	autoBody, err := os.ReadFile(autoPath)
 	require.NoError(t, err)
 	require.Equal(t, 0, countLiteral(string(autoBody), `spawn(`),
@@ -63,7 +63,7 @@ func TestOMPNativePipelineRoute_MarkdownAutoOwnsInteractiveAndExplicitRouteOwnsH
 		}
 	}
 	require.Zero(t, nativeAutoRegistrations,
-		".agents/commands/auto.md must remain the only interactive /auto owner")
+		".omp/commands/auto.md must remain the only interactive /auto owner")
 	require.Equal(t, []string{ompNativePipelineRouteTarget}, headlessCallOwners,
 		"only the explicit /autopus-pipeline extension may invoke the headless OMP backend")
 

@@ -22,7 +22,7 @@ func TestClaudeWorkflowUsesClaudeProviderQualityBeforeGlobalDefault(t *testing.T
 
 	var goSkill string
 	for _, file := range files {
-		if file.TargetPath == ".claude/skills/autopus/auto-go.md" {
+		if file.TargetPath == ".claude/skills/auto-go/SKILL.md" {
 			goSkill = string(file.Content)
 			break
 		}

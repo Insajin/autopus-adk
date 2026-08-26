@@ -140,6 +140,7 @@ func probeOMPContextDoctor(ctx context.Context, root string) ompContextDoctorRep
 	if err != nil {
 		return ompContextDoctorReport{}
 	}
-	input := buildOMPContextDoctorInput(ctx, root, cfg, ompModelDoctorExecRunner{root: root})
+	runner := newOMPModelDoctorExecRunner()
+	input := buildOMPContextDoctorInput(ctx, root, cfg, runner)
 	return checkOMPContextDoctor(input)
 }

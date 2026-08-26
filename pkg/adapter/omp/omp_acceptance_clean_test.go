@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -63,13 +62,6 @@ func TestOMPAcceptance_S13_UserOwnedOMPSurfacePreserved(t *testing.T) {
 	managedRule := filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md")
 	require.FileExists(t, managedRule, "the managed rule must exist before Clean")
 
-	// User keys added outside the managed marker section.
-	cfgPath := filepath.Join(dir, configFile)
-	original, err := os.ReadFile(cfgPath)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(cfgPath,
-		append([]byte("disabledProviders:\n  - anthropic\n\n"), original...), 0o644))
-
 	// User edits one managed agent; another stays untouched.
 	editedAgent := filepath.Join(dir, ".omp", "agents", "executor.md")
 	require.NoError(t, os.WriteFile(editedAgent, []byte("# hand edited\n"), 0o644))
@@ -106,35 +98,19 @@ func TestOMPAcceptance_S13_UserOwnedOMPSurfacePreserved(t *testing.T) {
 	assert.NoFileExists(t, untouchedAgent)
 }
 
-// TestOMPAcceptance_E3_ConfigUserKeysSurviveUpdate covers REQ-007.
-func TestOMPAcceptance_E3_ConfigUserKeysSurviveUpdate(t *testing.T) {
+func TestOMPAcceptance_UserBaseConfigSurvivesUpdateUnchanged(t *testing.T) {
 	dir := generateOMPOnly(t)
 	cfgPath := filepath.Join(dir, configFile)
-
-	original, err := os.ReadFile(cfgPath)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(cfgPath,
-		append([]byte("disabledProviders:\n  - anthropic\n\n"), original...), 0o644))
+	original := []byte("disabledProviders:\n  - anthropic\n")
+	require.NoError(t, os.WriteFile(cfgPath, original, 0o600))
 
 	cfg := config.DefaultFullConfig("omp-acceptance")
 	cfg.Platforms = []string{"omp"}
-	_, err = NewWithRoot(dir).Update(context.Background(), cfg)
+	_, err := NewWithRoot(dir).Update(context.Background(), cfg)
 	require.NoError(t, err)
 
 	updated, err := os.ReadFile(cfgPath)
 	require.NoError(t, err)
-
-	var parsed struct {
-		DisabledProviders []string `yaml:"disabledProviders"`
-		Skills            struct {
-			CustomDirectories []string `yaml:"customDirectories"`
-		} `yaml:"skills"`
-	}
-	require.NoError(t, yaml.Unmarshal(updated, &parsed),
-		"the merged config must still parse as YAML")
-	assert.Equal(t, []string{"anthropic"}, parsed.DisabledProviders,
-		"user keys outside the marker section must survive regeneration")
-	assert.Equal(t, []string{".agents/skills"}, parsed.Skills.CustomDirectories)
-	assert.Equal(t, 1, strings.Count(string(updated), markerBeginYml),
-		"regeneration must not duplicate the managed section")
+	assert.Equal(t, original, updated)
+	assert.NotContains(t, manifestPaths(t, dir), configFile)
 }

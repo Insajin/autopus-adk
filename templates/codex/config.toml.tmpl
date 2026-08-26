@@ -11,17 +11,15 @@ sandbox_mode = "workspace-write"
 web_search = "cached"
 project_doc_max_bytes = 262144
 
-[agents]
-max_threads = 6
-max_depth = 1
-job_max_runtime_seconds = 1800
-
 [features]
 goals = true
 hooks = true
-multi_agent = true
 shell_tool = true
 unified_exec = true
+
+[features.multi_agent_v2]
+enabled = true
+max_concurrent_threads_per_session = 4
 
 [plugins."browser@openai-bundled"]
 enabled = true

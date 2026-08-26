@@ -59,13 +59,13 @@ func assertFidelityContract(js string) error {
 		return fmt.Errorf("review phase missing security-auditor role")
 	}
 
-	// 4. Executor fan-out parallel + isolation + Math.min over plan.tasks
+	// 4. Executor fan-out uses parallel shared-tree calls with disjoint ownership.
 	implBlock := phaseJSBlock(js, "implementation")
 	if !strings.Contains(implBlock, "parallel(") {
 		return fmt.Errorf("implementation phase missing parallel execution")
 	}
-	if !strings.Contains(implBlock, "isolation: 'worktree'") {
-		return fmt.Errorf("executor missing isolation: 'worktree'")
+	if strings.Contains(implBlock, "isolation:") || !strings.Contains(implBlock, "shared working tree") {
+		return fmt.Errorf("executor must use disjoint ownership in the shared working tree")
 	}
 	if !strings.Contains(implBlock, "Math.min(") || !strings.Contains(implBlock, "plan.tasks") {
 		return fmt.Errorf("executor fan-out count not dynamically bounded over plan.tasks via Math.min")

@@ -2,6 +2,7 @@ package omp
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
-// generateForPlatforms persists the platform list and runs omp Generate.
 func generateForPlatforms(t *testing.T, platforms ...string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -27,205 +28,82 @@ func generateForPlatforms(t *testing.T, platforms ...string) string {
 
 func skillDirNames(t *testing.T, root string) map[string]bool {
 	t.Helper()
-	entries, err := os.ReadDir(filepath.Join(root, ".agents", "skills"))
-	if os.IsNotExist(err) {
-		return map[string]bool{}
-	}
+	entries, err := os.ReadDir(filepath.Join(root, ".omp", "skills"))
 	require.NoError(t, err)
-	names := make(map[string]bool, len(entries))
-	for _, e := range entries {
-		if e.IsDir() {
-			names[e.Name()] = true
+	result := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			result[entry.Name()] = true
 		}
 	}
-	return names
+	return result
 }
 
 func commandFileNames(t *testing.T, root string) map[string]bool {
 	t.Helper()
-	entries, err := os.ReadDir(filepath.Join(root, ".agents", "commands"))
-	if os.IsNotExist(err) {
-		return map[string]bool{}
-	}
+	entries, err := os.ReadDir(filepath.Join(root, ".omp", "commands"))
 	require.NoError(t, err)
-	names := make(map[string]bool, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
-			names[e.Name()] = true
+	result := make(map[string]bool, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
+			result[entry.Name()] = true
 		}
 	}
-	return names
+	return result
 }
 
-// TestOMPAcceptance_S10_SkillSurfaceYield covers REQ-013 across four configurations.
-func TestOMPAcceptance_S10_SkillSurfaceYield(t *testing.T) {
-	dirA := generateForPlatforms(t, "omp")
-	namesA := skillDirNames(t, dirA)
-	assert.True(t, namesA["auto"], "config A must emit the auto skill")
-	assert.False(t, namesA["harness-workflow"],
-		"harness-workflow declares platforms without omp")
-	assert.False(t, namesA["agent-teams"],
-		"agent-teams declares platforms without omp")
+func TestOMPAcceptance_NativeSurfacesDoNotYieldToOtherPlatforms(t *testing.T) {
+	baseline := generateForPlatforms(t, "omp")
+	wantSkills := skillDirNames(t, baseline)
+	wantCommands := commandFileNames(t, baseline)
+	require.True(t, wantSkills["auto"])
+	require.Len(t, wantCommands, len(workflowSpecs))
 
-	dirD := generateForPlatforms(t, "antigravity-cli", "omp")
-	assert.Equal(t, namesA, skillDirNames(t, dirD),
-		"gemini mirrors skills elsewhere, so config D must match config A")
-
-	for _, owner := range []string{"opencode", "codex"} {
-		t.Run("yield to "+owner, func(t *testing.T) {
-			dir := t.TempDir()
-			cfg := config.DefaultFullConfig("omp-acceptance")
-			cfg.Platforms = []string{owner, "omp"}
-			require.NoError(t, config.Save(dir, cfg))
-
-			existing := filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md")
-			require.NoError(t, os.MkdirAll(filepath.Dir(existing), 0o755))
-			require.NoError(t, os.WriteFile(existing, []byte(owner+" owned skill\n"), 0o644))
-
-			_, err := NewWithRoot(dir).Generate(context.Background(), cfg)
-			require.NoError(t, err)
-
-			assert.Equal(t, 0, countPathsWithPrefix(manifestPaths(t, dir), ".agents/skills/"),
-				"omp manifest must not record a yielded skill path")
-			after, err := os.ReadFile(existing)
-			require.NoError(t, err)
-			assert.Equal(t, owner+" owned skill\n", string(after))
-		})
-	}
-}
-
-// TestOMPAcceptance_S11_CommandSurfaceOwnership covers REQ-014.
-func TestOMPAcceptance_S11_CommandSurfaceOwnership(t *testing.T) {
-	dirA := generateForPlatforms(t, "omp")
-	namesA := commandFileNames(t, dirA)
-
-	want := make(map[string]bool, len(workflowSpecs))
-	for _, spec := range workflowSpecs {
-		want[spec.Name+".md"] = true
-	}
-	assert.Len(t, want, 20, "workflowSpecs must hold exactly 20 commands")
-	assert.Equal(t, want, namesA, ".agents/commands/ name set must equal workflowSpecs")
-
-	for name := range namesA {
-		data, err := os.ReadFile(filepath.Join(dirA, ".agents", "commands", name))
-		require.NoError(t, err)
-		_, body := splitEmittedFrontmatter(t, string(data))
-		assert.NotEmpty(t, strings.TrimSpace(body), "command %s must carry a body", name)
-		if name == "auto.md" {
-			assert.NotContains(t, body, "auto pipeline run",
-				"interactive /auto must not invoke the headless RPC backend")
-			assert.NotContains(t, body, "spawn(",
-				"interactive /auto must use the current OMP session")
+	for _, platforms := range [][]string{
+		{"opencode", "omp"}, {"codex", "omp"}, {"antigravity-cli", "omp"},
+	} {
+		root := generateForPlatforms(t, platforms...)
+		assert.Equal(t, wantSkills, skillDirNames(t, root))
+		assert.Equal(t, wantCommands, commandFileNames(t, root))
+		for _, path := range manifestPaths(t, root) {
+			assert.False(t, strings.HasPrefix(path, ".agents/skills/"), path)
+			assert.False(t, strings.HasPrefix(path, ".agents/commands/"), path)
 		}
 	}
-	assert.NoFileExists(t, filepath.Join(dirA, filepath.FromSlash(ompNativePipelineRouteTarget)),
-		"the explicit /autopus-pipeline extension must remain opt-in")
-
-	// Config B: opencode owns commands via .opencode/commands/.
-	dirB := generateForPlatforms(t, "opencode", "omp")
-	assert.Equal(t, 0, countPathsWithPrefix(manifestPaths(t, dirB), ".agents/commands/"),
-		"omp must yield the command surface to opencode")
-	assert.Empty(t, commandFileNames(t, dirB))
 }
 
-// TestOMPAcceptance_S11_AntigravityCoexistence covers REQ-014 md/toml coexistence.
-func TestOMPAcceptance_S11_AntigravityCoexistence(t *testing.T) {
-	dir := t.TempDir()
-	cfg := config.DefaultFullConfig("omp-acceptance")
-	cfg.Platforms = []string{"antigravity-cli", "omp"}
-	require.NoError(t, config.Save(dir, cfg))
+func TestOMPAcceptance_LegacyManifestPathsArePrunedWithoutDeletingUserConfig(t *testing.T) {
+	root := generateForPlatforms(t, "omp")
+	legacySkill := ".agents/skills/legacy/SKILL.md"
+	legacyCommand := ".agents/commands/auto.md"
+	legacyConfig := markerBeginYml + "\nskills:\n  customDirectories:\n    - .agents/skills\n" + markerEndYml + "\n"
+	userConfig := "theme:\n  dark: user-theme\n\n" + legacyConfig
+	for path, body := range map[string]string{
+		legacySkill: "legacy skill\n", legacyCommand: "legacy command\n", configFile: userConfig,
+	} {
+		full := filepath.Join(root, filepath.FromSlash(path))
+		require.NoError(t, os.MkdirAll(filepath.Dir(full), 0o700))
+		require.NoError(t, os.WriteFile(full, []byte(body), 0o600))
+	}
+	manifest, err := adapter.LoadManifest(root, adapterName)
+	require.NoError(t, err)
+	manifest.Files[legacySkill] = adapter.ManifestFile{Checksum: adapter.Checksum("legacy skill\n"), Policy: adapter.OverwriteAlways}
+	manifest.Files[legacyCommand] = adapter.ManifestFile{Checksum: adapter.Checksum("legacy command\n"), Policy: adapter.OverwriteAlways}
+	manifest.Files[configFile] = adapter.ManifestFile{Checksum: adapter.Checksum(userConfig), Policy: adapter.OverwriteMarker}
+	encoded, err := json.MarshalIndent(manifest, "", "  ")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(root, ".autopus", "omp-manifest.json"), encoded, 0o600))
 
-	// gemini writes .toml plus an auto/ subtree in the same directory.
-	geminiToml := filepath.Join(dir, ".agents", "commands", "auto.toml")
-	require.NoError(t, os.MkdirAll(filepath.Dir(geminiToml), 0o755))
-	require.NoError(t, os.WriteFile(geminiToml, []byte("prompt = \"gemini\"\n"), 0o644))
-	geminiSub := filepath.Join(dir, ".agents", "commands", "auto", "plan.toml")
-	require.NoError(t, os.MkdirAll(filepath.Dir(geminiSub), 0o755))
-	require.NoError(t, os.WriteFile(geminiSub, []byte("prompt = \"plan\"\n"), 0o644))
-
-	a := NewWithRoot(dir)
-	ctx := context.Background()
-	_, err := a.Generate(ctx, cfg)
+	cfg, err := config.LoadPreview(root)
+	require.NoError(t, err)
+	_, err = NewWithRoot(root).Update(context.Background(), cfg)
 	require.NoError(t, err)
 
-	assert.Len(t, commandFileNames(t, dir), 20,
-		"omp must still emit 20 .md commands alongside gemini .toml files")
-	for _, p := range manifestPaths(t, dir) {
-		assert.False(t, strings.HasSuffix(p, ".toml"),
-			"omp manifest must not record a .toml path, found %q", p)
-	}
-
-	require.NoError(t, a.Clean(ctx))
-
-	tomlAfter, err := os.ReadFile(geminiToml)
-	require.NoError(t, err, "gemini auto.toml must survive omp Clean")
-	assert.Equal(t, "prompt = \"gemini\"\n", string(tomlAfter))
-	subAfter, err := os.ReadFile(geminiSub)
-	require.NoError(t, err, "gemini auto/plan.toml must survive omp Clean")
-	assert.Equal(t, "prompt = \"plan\"\n", string(subAfter))
-}
-
-// TestOMPAcceptance_E4_OwnershipTransitionUpdate covers REQ-017 orphan removal
-// when a newly added platform takes over a surface omp previously owned.
-func TestOMPAcceptance_E4_OwnershipTransitionUpdate(t *testing.T) {
-	dir := generateForPlatforms(t, "omp")
-
-	before := manifestPaths(t, dir)
-	require.Equal(t, 20, countPathsWithPrefix(before, ".agents/commands/"))
-	require.Greater(t, countPathsWithPrefix(before, ".agents/skills/"), 0)
-
-	cfg := config.DefaultFullConfig("omp-acceptance")
-	cfg.Platforms = []string{"opencode", "omp"}
-	require.NoError(t, config.Save(dir, cfg))
-
-	a := NewWithRoot(dir)
-	ctx := context.Background()
-	_, err := a.Update(ctx, cfg)
+	assert.NoFileExists(t, filepath.Join(root, filepath.FromSlash(legacySkill)))
+	assert.NoFileExists(t, filepath.Join(root, filepath.FromSlash(legacyCommand)))
+	actual, err := os.ReadFile(filepath.Join(root, configFile))
 	require.NoError(t, err)
-
-	after := manifestPaths(t, dir)
-	assert.Equal(t, 0, countPathsWithPrefix(after, ".agents/skills/"),
-		"manifest must drop yielded skill paths")
-	assert.Equal(t, 0, countPathsWithPrefix(after, ".agents/commands/"),
-		"manifest must drop yielded command paths")
-
-	// opencode serves commands from .opencode/commands/, so the .agents/commands/
-	// files omp created are orphans and must be removed.
-	assert.Empty(t, commandFileNames(t, dir),
-		"omp-created and unmodified .agents/commands/*.md must be removed on ownership transfer")
-
-	// opencode does write .agents/skills/, so omp Clean must leave that surface alone.
-	skillsBefore := snapshotSkillFiles(t, dir)
-	require.NoError(t, a.Clean(ctx))
-	assert.Equal(t, skillsBefore, snapshotSkillFiles(t, dir),
-		"omp Clean must not delete any .agents/skills/ file after yielding")
-}
-
-func snapshotSkillFiles(t *testing.T, root string) map[string]string {
-	t.Helper()
-	base := filepath.Join(root, ".agents", "skills")
-	out := make(map[string]string)
-	err := filepath.Walk(base, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil
-			}
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		data, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return readErr
-		}
-		rel, relErr := filepath.Rel(base, path)
-		if relErr != nil {
-			return relErr
-		}
-		out[filepath.ToSlash(rel)] = string(data)
-		return nil
-	})
-	require.NoError(t, err)
-	return out
+	assert.Equal(t, "theme:\n  dark: user-theme\n\n", string(actual))
+	assert.NotContains(t, string(actual), "customDirectories")
+	assert.NotContains(t, manifestPaths(t, root), configFile)
 }

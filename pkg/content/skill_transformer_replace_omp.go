@@ -12,17 +12,18 @@ type ompLegacyDispatch struct {
 }
 
 var (
-	ompFencedCodeRe         = regexp.MustCompile("(?s)```[^\\n]*\\n.*?\\n```")
-	ompInlineDispatchCodeRe = regexp.MustCompile("`(?:Agent|task|spawn_agent)\\s*\\([^`\\n]*\\)`")
-	ompLegacyCallRe         = regexp.MustCompile(`(?s)\b(?:Agent|task)\s*\((.*?)\)`)
-	ompLegacyRoleRe         = regexp.MustCompile(`(?i)\b(?:subagent_type|agent)\s*[:=]\s*(?:"([^"]+)"|'([^']+)')`)
-	ompLegacyTaskRe         = regexp.MustCompile(`(?s)\b(?:task|prompt)\s*[:=]\s*(?:"""(.*?)"""|"([^"]*)"|'([^']*)')`)
-	ompSpawnStartRe         = regexp.MustCompile(`(?m)^\s*spawn_agent\s+([A-Za-z0-9_-]+)[^\n]*`)
-	ompSpawnTaskRe          = regexp.MustCompile(`(?s)--task\s+(?:"([^"]*)"|'([^']*)'|([^\s\\]+))`)
-	ompIsolationRe          = regexp.MustCompile(`(?i)\b(?:isolation|isolated)\s*[:=]\s*(?:"worktree"|'worktree'|true)`)
-	ompLegacySpawnCallRe    = regexp.MustCompile(`(?s)\bspawn_agent\s*\((.*?)\)`)
-	ompLegacyNamedCallRe    = regexp.MustCompile(`(?s)\b(TodoWrite|TaskCreate|TaskUpdate|TaskList|TaskGet|TeamCreate|TeamDelete|SendMessage|ToolSearch|AskUserQuestion|request_user_input|send_input|wait_agent|close_agent)\s*\((.*?)\)`)
-	ompLegacyTaskToolRe     = regexp.MustCompile(`task tool\s*→\s*(?:subagent_type|agent)="([^"]+)"(?:,\s*prompt="([^"]*)")?`)
+	ompFencedCodeRe           = regexp.MustCompile("(?s)```[^\\n]*\\n.*?\\n```")
+	ompInlineDispatchCodeRe   = regexp.MustCompile("`(?:Agent|task|spawn_agent)\\s*\\([^`\\n]*\\)`")
+	ompCodexNativeSkillPathRe = regexp.MustCompile(`\.omp/skills/codex-([a-z0-9-]+)/SKILL\.md`)
+	ompLegacyCallRe           = regexp.MustCompile(`(?s)\b(?:Agent|task)\s*\((.*?)\)`)
+	ompLegacyRoleRe           = regexp.MustCompile(`(?i)\b(?:subagent_type|agent)\s*[:=]\s*(?:"([^"]+)"|'([^']+)')`)
+	ompLegacyTaskRe           = regexp.MustCompile(`(?s)\b(?:task|prompt)\s*[:=]\s*(?:"""(.*?)"""|"([^"]*)"|'([^']*)')`)
+	ompSpawnStartRe           = regexp.MustCompile(`(?m)^\s*spawn_agent\s+([A-Za-z0-9_-]+)[^\n]*`)
+	ompSpawnTaskRe            = regexp.MustCompile(`(?s)--task\s+(?:"([^"]*)"|'([^']*)'|([^\s\\]+))`)
+	ompIsolationRe            = regexp.MustCompile(`(?i)\b(?:isolation|isolated)\s*[:=]\s*(?:"worktree"|'worktree'|true)`)
+	ompLegacySpawnCallRe      = regexp.MustCompile(`(?s)\bspawn_agent\s*\((.*?)\)`)
+	ompLegacyNamedCallRe      = regexp.MustCompile(`(?s)\b(TodoWrite|TaskCreate|TaskUpdate|TaskList|TaskGet|TeamCreate|TeamDelete|SendMessage|ToolSearch|AskUserQuestion|request_user_input|send_input|wait_agent|close_agent)\s*\((.*?)\)`)
+	ompLegacyTaskToolRe       = regexp.MustCompile(`task tool\s*→\s*(?:subagent_type|agent)="([^"]+)"(?:,\s*prompt="([^"]*)")?`)
 )
 
 var ompLegacyCoordinationTokens = []string{
@@ -61,10 +62,11 @@ var ompForeignBrandingReplacer = strings.NewReplacer(
 )
 
 // NormalizeOMPSemanticReferences performs the OMP-only clean cutover from
-// legacy coordination examples to the OMP 17.2.6 task, hub, and todo wire
+// legacy coordination examples to the OMP 18.0.5 task, hub, and todo wire
 // contracts. It is intentionally idempotent so workflow renderers may require
 // the contract even when the canonical source did not contain a legacy call.
 func NormalizeOMPSemanticReferences(body string) string {
+	body = NormalizeOMPResourcePaths(body)
 	body = normalizeOMPLegacyDispatchBlocks(body)
 	body = ompInlineDispatchCodeRe.ReplaceAllStringFunc(body, normalizeOMPInlineDispatchCode)
 	body = strings.NewReplacer(
@@ -97,9 +99,9 @@ func NormalizeOMPSemanticReferences(body string) string {
 		return renderOMPTaskBatch([]ompLegacyDispatch{dispatch})
 	})
 	body = normalizeOMPInlineLegacyCalls(body)
-	body = ompIsolationRe.ReplaceAllString(body, `"isolated": true`)
+	body = ompIsolationRe.ReplaceAllString(body, `conditional per-item isolation`)
 	body = strings.NewReplacer(
-		"auto pipeline worktree", `task batch item with "isolated": true`,
+		"auto pipeline worktree", `task item with conditional isolation after schema inspection`,
 		"spawn_agent(...)", "task batch",
 		"spawn_agent", "task batch",
 		"multi_agent", "task batch",
@@ -125,6 +127,18 @@ func NormalizeOMPSemanticReferences(body string) string {
 	).Replace(body)
 	body = ompForeignBrandingReplacer.Replace(body)
 	return appendOMPCoordinationContract(body)
+}
+
+// NormalizeOMPResourcePaths completes the native OMP resource cutover after
+// the shared first-stage platform rewrite.
+// @AX:ANCHOR [AUTO]: keep OMP resource-path cutover centralized in this normalization boundary.
+// @AX:REASON [AUTO]: agent rendering and two skill transformation paths depend on identical native resource references.
+func NormalizeOMPResourcePaths(body string) string {
+	body = strings.NewReplacer(
+		".agents/skills/", ".omp/skills/",
+		".agents/commands/", ".omp/commands/",
+	).Replace(body)
+	return ompCodexNativeSkillPathRe.ReplaceAllString(body, ".omp/skills/$1/SKILL.md")
 }
 
 func hasOMPLegacyCoordination(body string) bool {
@@ -184,19 +198,19 @@ func normalizeOMPNamedLegacyCall(call string) string {
 	}
 	switch match[1] {
 	case "TodoWrite", "TaskCreate":
-		return `todo with {"op":"append","phase":"Implementation","items":["<task>"]}`
+		return `todo with {"i":"Updating parent-owned progress","op":"append","phase":"Implementation","items":["<task>"]}`
 	case "TaskUpdate":
-		return `todo with one top-level state operation such as {"op":"done","task":"<exact task content>"}`
+		return `todo with one top-level state operation such as {"i":"Updating parent-owned progress","op":"done","task":"<exact task content>"}`
 	case "TaskList", "TaskGet":
-		return `todo with {"op":"view"}`
+		return `todo with {"i":"Inspecting parent-owned progress","op":"view"}`
 	case "TeamCreate":
 		return renderOMPTaskBatch([]ompLegacyDispatch{{}})
 	case "TeamDelete", "close_agent":
-		return `hub with {"op":"cancel","ids":["<job id>"]}`
+		return `hub with {"i":"Cancelling abandoned work","op":"cancel","ids":["<job id>"]}`
 	case "SendMessage", "send_input":
-		return `hub with {"op":"send","to":"<same agent id>","message":"<follow-up>"}`
+		return `hub with {"i":"Following up with an existing worker","op":"send","to":"<same agent id>","message":"<follow-up>"}`
 	case "wait_agent":
-		return `hub with {"op":"wait","ids":["<job id>"]}`
+		return `hub with {"i":"Waiting for blocked work","op":"wait","ids":["<job id>"]}`
 	case "ToolSearch":
 		return "available tool discovery"
 	case "AskUserQuestion", "request_user_input":

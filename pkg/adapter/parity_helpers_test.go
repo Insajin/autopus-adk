@@ -7,14 +7,19 @@ import (
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 )
 
-// platformRuleExclusions documents intended per-platform rule gaps.
-// Empty after PARITY-002 closes the Gemini rule gap.
-// SPEC-OMP-001 REQ-012 requires omp to carry empty rule and skill exclusion
-// sets: the adapter emits all 14 source rules and every compatible catalog
-// skill, so it claims no intended gap.
+// platformRuleExclusions documents intended per-platform rule gaps. Codex
+// 0.149.1 has no repository markdown-rule surface: .codex/rules is reserved
+// for Starlark execpolicy files, so policy is carried by native skills and
+// AGENTS.md instead of generating inert markdown there.
 var platformRuleExclusions = map[string]map[string]bool{
-	"claude":   {},
-	"codex":    {},
+	"claude": {},
+	"codex": {
+		"branding.md": true, "context7-docs.md": true, "deferred-tools.md": true,
+		"doc-storage.md": true, "file-size-limit.md": true, "language-policy.md": true,
+		"lore-commit.md": true, "objective-reasoning.md": true, "project-identity.md": true,
+		"shell-portability.md": true, "spec-quality.md": true, "subagent-delegation.md": true,
+		"techstack-freshness.md": true, "worktree-safety.md": true,
+	},
 	"gemini":   {},
 	"opencode": {},
 	"omp":      {},
@@ -98,12 +103,8 @@ const (
 )
 
 // extractRuleName resolves the source rule filename a generated path maps to.
-// Conditional bodies keep their source basename, so relocation leaves the name
-// unchanged and platformRuleExclusions["claude"] can stay empty.
-//
-// codex flattens rules into .codex/rules-autopus-<name>.md and omp into
-// .omp/rules/autopus-<name>.md; both prefixes have to come off, or the coverage
-// gate reports all 14 source rules as missing for that platform.
+// Conditional bodies keep their source basename. OMP namespaces rules by file
+// prefix because its rule directory is non-recursive.
 func extractRuleName(targetPath string) string {
 	path := filepath.ToSlash(targetPath)
 	base := filepath.Base(path)
@@ -176,7 +177,7 @@ func parseSkillNameFromContent(content string) string {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, "name:") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "name:"))
+			return strings.Trim(strings.TrimSpace(strings.TrimPrefix(line, "name:")), `"'`)
 		}
 	}
 	return ""

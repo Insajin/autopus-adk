@@ -78,7 +78,7 @@ func deriveTeamWorkflowJS(schema workflow.Schema) string {
 	// meta literal with ordered phase titles.
 	sb.WriteString("export const meta = {\n")
 	sb.WriteString("  name: 'route-team',\n")
-	sb.WriteString("  description: 'Deterministic opt-in team Workflow substrate (claude-code --team): full team phase orchestration.',\n")
+	sb.WriteString("  description: 'Deterministic explicit retained Workflow; not the native claude-code --team substrate.',\n")
 	sb.WriteString("  phases: [\n")
 	for _, p := range schema.Phases {
 		fmt.Fprintf(&sb, "    {title:'%s'},\n", p.ID)
@@ -184,16 +184,12 @@ func writeTeamPhaseBlock(sb *strings.Builder, p workflow.PhaseDef, model, effort
 	sb.WriteString("\n")
 }
 
-// writeTeamPlanningBlock emits the structured-output planner call. The prompt
-// constrains task decomposition for parallel isolated-worktree execution: each
-// task must own a DISJOINT set of files, and files that depend on each other to
-// compile (an implementation and its test, a type and its consumers) MUST be
-// grouped into the SAME task. This prevents the cross-task-dependency overlap
-// where a test-only task's executor recreates the implementation file already
-// owned by another task — which the merge would then flag as a conflict and skip.
+// writeTeamPlanningBlock emits the structured-output planner call. Each task
+// owns a disjoint file set in the shared working tree, and interdependent files
+// stay with one executor so concurrent edits cannot overlap.
 func writeTeamPlanningBlock(sb *strings.Builder, id, model, effort string, extra string) {
 	writeTeamBaselineComment(sb, id, model, effort, extra)
-	prompt := "Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}. Decompose into independently-implementable tasks for parallel isolated-worktree execution: every task owns a DISJOINT set of files, and files that depend on each other to compile (e.g. an implementation and its test, or a type and its consumers) MUST be grouped into the SAME task so a single executor owns them — never split inter-dependent files across tasks. Produce the task assignment table (id, description, file ownership)"
+	prompt := "Plan SPEC ${ctx.spec || ''} at ${ctx.workingDir || ''}. Decompose into independently-implementable tasks for parallel shared-working-tree execution: every task owns a DISJOINT set of files in the shared working tree, and files that depend on each other to compile (e.g. an implementation and its test, or a type and its consumers) MUST be grouped into the SAME task so a single executor owns them — never split inter-dependent files across tasks. Produce the task assignment table (id, description, file ownership)"
 	opt := fmt.Sprintf("{ agentType: 'planner', schema: PLAN_SCHEMA, model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
 		id, id, model, id, id, effort)
 	// Assigns the top-level `plan` (declared in the preamble) so it can be both
@@ -201,9 +197,8 @@ func writeTeamPlanningBlock(sb *strings.Builder, id, model, effort string, extra
 	fmt.Fprintf(sb, "plan = await agent(`%s`, %s);\n", prompt, opt)
 }
 
-// writeTeamFanOutBlock emits the bounded executor fan-out loop for the
-// implementation phase. The fan-out count is RT-overridable but falls back to
-// the schema fan_out_cap.
+// writeTeamFanOutBlock emits a bounded executor fan-out over disjoint paths in
+// the shared working tree. The fan-out count is RT-overridable.
 //
 // The real Workflow runtime contract is parallel(thunks: Array<() => Promise>):
 // it takes a single array of deferred call thunks, not spread already-invoked
@@ -212,7 +207,7 @@ func writeTeamPlanningBlock(sb *strings.Builder, id, model, effort string, extra
 // one executor when the planner produces no tasks (FIDELITY-001 F2).
 func writeTeamFanOutBlock(sb *strings.Builder, id, model, effort string, fanOut int, extra string) {
 	writeTeamBaselineComment(sb, id, model, effort, fmt.Sprintf("fan_out_cap=%d %s", fanOut, extra))
-	opt := fmt.Sprintf("{ agentType: 'executor', isolation: 'worktree', model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
+	opt := fmt.Sprintf("{ agentType: 'executor', model: (RT.%s && RT.%s.model) || '%s', effort: (RT.%s && RT.%s.effort) || '%s' }",
 		id, id, model, id, id, effort)
 	fmt.Fprintf(sb, "const FANOUT_%s = (RT.%s && RT.%s.fan_out_cap) || %d;\n", id, id, id, fanOut)
 	fmt.Fprintf(sb, "const tasks_%s = (plan && plan.tasks) || [];\n", id)
@@ -220,7 +215,7 @@ func writeTeamFanOutBlock(sb *strings.Builder, id, model, effort string, fanOut 
 	fmt.Fprintf(sb, "const executors_%s = [];\n", id)
 	fmt.Fprintf(sb, "for (let i = 0; i < limit_%s; i++) {\n", id)
 	fmt.Fprintf(sb, "  const task = tasks_%s[i];\n", id)
-	fmt.Fprintf(sb, "  const taskPrompt = `Implement task ${task.id}: ${task.description}. You own ONLY these files: ${task.files ? task.files.join(', ') : ''} — create or modify only files in that set; every other file belongs to a parallel executor and must not be created or touched. SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`;\n")
+	fmt.Fprintf(sb, "  const taskPrompt = `Implement task ${task.id}: ${task.description}. Work in the shared working tree and own ONLY these files: ${task.files ? task.files.join(', ') : ''} — create or modify only files in that DISJOINT set; every other file belongs to a parallel executor and must not be created or touched. SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}`;\n")
 	fmt.Fprintf(sb, "  executors_%s.push(() => agent(taskPrompt, %s));\n", id, opt)
 	sb.WriteString("}\n")
 	// Degenerate floor: an empty/failed plan.tasks would otherwise leave zero

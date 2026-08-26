@@ -6,17 +6,7 @@ import (
 )
 
 type customWorkflowBody struct {
-	prompt string
-	skill  string
-}
-
-func renderCustomWorkflowPrompt(spec workflowSpec) (string, bool) {
-	body, ok := customWorkflowBodies(spec)
-	if !ok {
-		return "", false
-	}
-	frontmatter := fmt.Sprintf("---\ndescription: %q\n---", spec.Description)
-	return frontmatter + "\n\n" + strings.TrimSpace(injectCodexBrandingBlock(body.prompt, false)) + "\n", true
+	skill string
 }
 
 func renderCustomWorkflowSkill(spec workflowSpec) (string, bool) {

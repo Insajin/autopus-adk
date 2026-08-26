@@ -9,8 +9,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -73,148 +71,37 @@ func (a *Adapter) Detect(_ context.Context) (bool, error) {
 	return err == nil, nil
 }
 
-// Generate creates Codex platform files based on harness config.
+// Generate prepares all Codex mappings before applying one transaction.
 func (a *Adapter) Generate(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
-	a.prepareCodexCatalog(ctx)
-	skillsDir := filepath.Join(a.root, ".codex", "skills")
-	if err := os.MkdirAll(skillsDir, 0755); err != nil {
-		return nil, fmt.Errorf(".codex/skills 디렉터리 생성 실패: %w", err)
-	}
-	agentSkillsDir := filepath.Join(a.root, ".agents", "skills")
-	if err := os.MkdirAll(agentSkillsDir, 0755); err != nil {
-		return nil, fmt.Errorf(".agents/skills 디렉터리 생성 실패: %w", err)
-	}
-	pluginDir := filepath.Join(a.root, ".autopus", "plugins", "auto")
-	if err := os.MkdirAll(pluginDir, 0755); err != nil {
-		return nil, fmt.Errorf(".autopus/plugins/auto 디렉터리 생성 실패: %w", err)
-	}
-	marketplaceDir := filepath.Join(a.root, ".agents", "plugins")
-	if err := os.MkdirAll(marketplaceDir, 0755); err != nil {
-		return nil, fmt.Errorf(".agents/plugins 디렉터리 생성 실패: %w", err)
-	}
-
-	files := make([]adapter.FileMapping, 0)
-	if codexOwnsSharedSurface(cfg) {
-		agentsMD, err := a.injectMarkerSection(cfg)
-		if err != nil {
-			return nil, fmt.Errorf("AGENTS.md 마커 주입 실패: %w", err)
-		}
-
-		agentsPath := filepath.Join(a.root, "AGENTS.md")
-		if err := os.WriteFile(agentsPath, []byte(agentsMD), 0644); err != nil {
-			return nil, fmt.Errorf("AGENTS.md 쓰기 실패: %w", err)
-		}
-
-		files = append(files, adapter.FileMapping{
-			TargetPath:      "AGENTS.md",
-			OverwritePolicy: adapter.OverwriteMarker,
-			Checksum:        checksum(agentsMD),
-			Content:         []byte(agentsMD),
-		})
-	}
-
-	skillFiles, err := a.renderSkillTemplates(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("스킬 템플릿 렌더링 실패: %w", err)
-	}
-	files = append(files, skillFiles...)
-
-	if codexOwnsSharedSurface(cfg) {
-		standardSkillFiles, err := a.renderStandardSkills(cfg)
-		if err != nil {
-			return nil, fmt.Errorf("표준 codex skill 생성 실패: %w", err)
-		}
-		files = append(files, standardSkillFiles...)
-	}
-
-	promptFiles, err := a.renderPromptTemplates(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("프롬프트 템플릿 렌더링 실패: %w", err)
-	}
-	files = append(files, promptFiles...)
-
-	pluginFiles, err := a.renderPluginFiles(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("codex plugin 생성 실패: %w", err)
-	}
-	files = append(files, pluginFiles...)
-
-	// Agents (TOML files)
-	agentFiles, err := a.generateAgents(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("agent 생성 실패: %w", err)
-	}
-	files = append(files, agentFiles...)
-
-	// Rules (separate files)
-	ruleFiles, err := a.generateRuleFiles(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("rule 파일 생성 실패: %w", err)
-	}
-	files = append(files, ruleFiles...)
-
-	// Hooks (hooks.json)
-	hookFiles, err := a.generateHooks(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("hooks 생성 실패: %w", err)
-	}
-	files = append(files, hookFiles...)
-
-	// Config (.codex/config.toml)
-	configFiles, err := a.generateConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("config 생성 실패: %w", err)
-	}
-	files = append(files, configFiles...)
-
-	// Git hooks fallback
-	if err := a.installGitHooks(cfg); err != nil {
-		return nil, fmt.Errorf("git hooks 설치 실패: %w", err)
-	}
-	gitHookFiles, err := a.prepareGitHookFiles(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("git hooks 준비 실패: %w", err)
-	}
-	files = append(files, gitHookFiles...)
-
-	if err := a.cleanupDeprecatedSurface(files); err != nil {
-		return nil, err
-	}
-
-	pf := &adapter.PlatformFiles{
-		Files:    files,
-		Checksum: checksum(fmt.Sprintf("%d", len(files))),
-	}
-
-	m := adapter.ManifestFromFiles(adapterName, filterCodexManifestFiles(cfg, pf))
-	if err := m.Save(a.root); err != nil {
-		return nil, fmt.Errorf("매니페스트 저장 실패: %w", err)
-	}
-
-	return pf, nil
+	return a.applyPreparedFiles(ctx, cfg)
 }
 
-// Update updates files based on manifest diff.
+// Update applies the same prepared transaction path as Generate.
 func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
+	return a.applyPreparedFiles(ctx, cfg)
+}
+
+func (a *Adapter) applyPreparedFiles(
+	ctx context.Context,
+	cfg *config.HarnessConfig,
+) (*adapter.PlatformFiles, error) {
 	a.prepareCodexCatalog(ctx)
 	oldManifest, err := adapter.LoadManifest(a.root, adapterName)
 	if err != nil {
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
 	}
-
 	newFiles, err := a.prepareFilesWithManifest(cfg, oldManifest)
 	if err != nil {
 		return nil, err
 	}
-	plan, pf, err := a.buildUpdateTransactionPlan(cfg, oldManifest, newFiles)
+	plan, files, err := a.buildUpdateTransactionPlan(cfg, oldManifest, newFiles)
 	if err != nil {
 		return nil, err
 	}
 	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
 		return nil, err
 	}
-
-	return pf, nil
+	return files, nil
 }
 
 func checksum(s string) string {
@@ -222,31 +109,19 @@ func checksum(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func codexOwnsSharedSurface(cfg *config.HarnessConfig) bool {
+func codexOwnsRootDoc(cfg *config.HarnessConfig) bool {
 	return cfg == nil || !containsPlatform(cfg.Platforms, "opencode")
 }
 
 func filterCodexManifestFiles(cfg *config.HarnessConfig, pf *adapter.PlatformFiles) *adapter.PlatformFiles {
-	if pf == nil || cfg == nil {
+	if pf == nil || codexOwnsRootDoc(cfg) {
 		return pf
 	}
-	if !containsPlatform(cfg.Platforms, "opencode") {
-		return pf
-	}
-
 	filtered := make([]adapter.FileMapping, 0, len(pf.Files))
-	for _, f := range pf.Files {
-		if f.TargetPath == "AGENTS.md" {
-			continue
+	for _, file := range pf.Files {
+		if file.TargetPath != "AGENTS.md" {
+			filtered = append(filtered, file)
 		}
-		if strings.HasPrefix(f.TargetPath, filepath.Join(".agents", "skills")+string(os.PathSeparator)) {
-			continue
-		}
-		filtered = append(filtered, f)
 	}
-
-	return &adapter.PlatformFiles{
-		Files:    filtered,
-		Checksum: pf.Checksum,
-	}
+	return &adapter.PlatformFiles{Files: filtered, Checksum: pf.Checksum}
 }

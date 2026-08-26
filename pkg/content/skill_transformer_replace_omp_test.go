@@ -93,11 +93,12 @@ func TestReplacePlatformReferencesOMP_S12_PathPrefixes(t *testing.T) {
 	}{
 		{"rules bare", "See `.claude/rules/branding.md`.", "`.omp/rules/autopus-branding.md`"},
 		{"rules already namespaced", "See `.claude/rules/autopus/branding.md`.", "`.omp/rules/autopus-branding.md`"},
-		{"commands", "See `.claude/commands/auto.md`.", "`.agents/commands/auto.md`"},
+		{"commands", "See `.claude/commands/auto.md`.", "`.omp/commands/auto.md`"},
 		{"agents", "See `.claude/agents/autopus/executor.md`.", "`.omp/agents/autopus/executor.md`"},
 		{"generic claude dir", "Config lives in `.claude/settings.json`.", "`.omp/settings.json`"},
-		{"codex skill root", "See `.codex/skills/autopus/verification.md`.", "`.agents/skills/verification/SKILL.md`"},
-		{"opencode command root", "See `.opencode/commands/auto.md`.", "`.agents/commands/auto.md`"},
+		{"codex skill root", "See `.codex/skills/autopus/verification.md`.", "`.omp/skills/verification/SKILL.md`"},
+		{"codex native skill", "See `.codex/skills/codex-agent-pipeline/SKILL.md`.", "`.omp/skills/agent-pipeline/SKILL.md`"},
+		{"opencode command root", "See `.opencode/commands/auto.md`.", "`.omp/commands/auto.md`"},
 		{"gemini agent root", "See `.gemini/agents/autopus/reviewer.md`.", "`.omp/agents/autopus/reviewer.md`"},
 	}
 
@@ -127,8 +128,8 @@ func TestReplacePlatformReferencesOMP_PreservesRootGlobInventoryOnly(t *testing.
 		assert.Equal(t, 1, strings.Count(got, glob), "intentional root inventory glob %s must survive exactly", glob)
 	}
 	for _, operational := range []string{
-		".agents/skills/verification/SKILL.md",
-		".agents/commands/auto.md",
+		".omp/skills/verification/SKILL.md",
+		".omp/commands/auto.md",
 		".omp/agents/autopus/reviewer.md",
 		".omp/rules/autopus-branding.md",
 		".omp/**/runtime.json",
@@ -149,7 +150,7 @@ func TestReplacePlatformReferencesOMP_S12_SkillRefFinalForm(t *testing.T) {
 
 	got := content.ReplacePlatformReferences("Reference: `.claude/skills/autopus/ax-annotation.md`", "omp")
 
-	assert.Contains(t, got, "`.agents/skills/ax-annotation/SKILL.md`")
+	assert.Contains(t, got, "`.omp/skills/ax-annotation/SKILL.md`")
 	assert.Empty(t, ompFlatSkillPathRe.FindAllString(got, -1),
 		"the stage-1-only form .agents/skills/<name>.md must not survive")
 }
@@ -224,11 +225,12 @@ TaskCreate(subject="Implement the slice")
 SendMessage(recipient="executor", content="Apply the review feedback")`
 	got := content.ReplacePlatformReferences(input, "omp")
 
+	assert.Contains(t, got, `"i"`)
 	assert.Contains(t, got, `"context"`)
 	assert.Contains(t, got, `"tasks"`)
-	assert.Contains(t, got, `todo with {"op":"append","phase":"Implementation","items":["<task>"]}`)
+	assert.Contains(t, got, `todo with {"i":"Updating parent-owned progress","op":"append"`)
 	assert.NotContains(t, got, `"agent":`, "default general workers must omit the optional agent field")
-	assert.Contains(t, got, `hub with {"op":"send","to":"<same agent id>","message":"<follow-up>"}`)
+	assert.Contains(t, got, `hub with {"i":"Following up with an existing worker","op":"send"`)
 	for _, token := range ompLegacyCoordinationTokens {
 		assert.NotContains(t, got, token)
 	}
@@ -249,14 +251,14 @@ Agent(
 	got := content.ReplacePlatformReferences(input, "omp")
 
 	for _, field := range []string{
-		`"context"`, `"tasks"`, `"name"`, `"agent"`, `"task"`,
-		`"outputSchema"`, `"schemaMode"`, `"isolated"`,
+		`"i"`, `"context"`, `"tasks"`, `"name"`, `"agent"`, `"task"`,
+		`"outputSchema"`, `"schemaMode"`,
 		`"owned_paths"`, `"changed_files"`, `"verification"`,
 		`"blockers"`, `"next_required_step"`,
 	} {
 		assert.Contains(t, got, field)
 	}
-	assert.Contains(t, got, `"isolated": true`)
+	assert.NotContains(t, got, `"isolated": true`)
 	assert.Contains(t, got, `"agent": "executor"`)
 	assert.Contains(t, got, `"agent": "reviewer"`)
 	assert.Contains(t, got, `"name": "executor-1"`)
@@ -265,8 +267,8 @@ Agent(
 	assert.Contains(t, got, "non-isolated or otherwise revivable")
 	assert.Contains(t, got, "isolated worker is terminal")
 	assert.Contains(t, got, "new explicitly named `task` item")
-	assert.Contains(t, got, `{"op":"send","to":"<same agent id>","message":"<follow-up>"}`)
-	assert.Contains(t, got, `{"op":"init","list"`)
+	assert.Contains(t, got, `{"i":"Following up with an existing worker","op":"send"`)
+	assert.Contains(t, got, `{"i":"Updating parent-owned progress","op":"init"`)
 	assert.Contains(t, got, "single DAG owner invariant")
 	assert.Contains(t, got, "OMP-local")
 	assert.Contains(t, got, "Orca-supervised")

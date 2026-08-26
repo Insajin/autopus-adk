@@ -16,12 +16,8 @@ import (
 	"github.com/insajin/autopus-adk/pkg/processprobe"
 )
 
-func supportsOMPReadinessBehaviorProcessGroup() bool {
-	return true
-}
-
-// @AX:WARN [AUTO]: bounded RPC process supervision has cyclomatic complexity 16.
-// @AX:REASON [AUTO]: gocyclo reports 16 across pipe setup, process-group termination, stream limits, terminal frames, and context cancellation.
+// @AX:WARN [AUTO]: bounded RPC process supervision has high branch and concurrency complexity.
+// @AX:REASON [AUTO]: pipe setup, process-group termination, stream limits, stdin closure, terminal frames, and context cancellation converge here.
 func runOMPReadinessRPCCommand(
 	ctx context.Context,
 	cmd *exec.Cmd,
@@ -77,6 +73,13 @@ func runOMPReadinessRPCCommand(
 	}()
 	if _, err := stdin.Write(input); err != nil {
 		_ = stdin.Close()
+		terminate()
+		_ = cmd.Wait()
+		<-stdoutDone
+		<-stderrDone
+		return capture.Bytes(), err
+	}
+	if err := stdin.Close(); err != nil {
 		terminate()
 		_ = cmd.Wait()
 		<-stdoutDone

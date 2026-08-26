@@ -16,16 +16,20 @@ export const meta = {
 
 // Workflow API globals: agent, phase, log, args.
 const ARGV = (typeof args === 'string') ? (args ? JSON.parse(args) : {}) : (args || {});
+const ctx = ARGV;
 const SEGMENT = (ARGV && ARGV.segment) || 'A';
+let planningResult = null;
 
 if (SEGMENT === 'A') {
 await phase('planning');
 // route_a baseline planning: retry: 0, budget: 60000
-log('phase', 'planning');
+planningResult = await agent(`Plan SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}. Return an implementation plan with disjoint file ownership.`, { agentType: 'planner' });
+log('planning_result', planningResult);
 
 await phase('implementation');
 // route_a baseline implementation: retry: 0, budget: 120000
-log('phase', 'implementation');
+const implementationResult = await agent(`Implement SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}. Planning result: ${JSON.stringify(planningResult)}`, { agentType: 'executor' });
+log('implementation_result', implementationResult);
 
 await phase('gate_build_test');
 // route_a baseline gate_build_test: retry: 0, budget: 40000
@@ -43,3 +47,5 @@ await phase('release_hygiene');
 log('release_hygiene', 'release_hygiene');
 
 }
+
+return { planningResult };

@@ -47,9 +47,9 @@ func sourceRuleFrontmatter(t *testing.T, name string) string {
 	return frontmatterBlock(t, string(raw))
 }
 
-// TestRules_TriggerFieldsSurviveCodexAndOpencode is the S7 oracle for
-// REQ-CONDRULE-SCHEMA-04 and REQ-CONDRULE-COMPILE-05.
-func TestRules_TriggerFieldsSurviveCodexAndOpencode(t *testing.T) {
+// TestRules_TriggerFieldsSurviveOpencode is the S7 oracle for the remaining
+// markdown-rule platform.
+func TestRules_TriggerFieldsSurviveOpencode(t *testing.T) {
 	t.Parallel()
 
 	sourceLines := triggerLines(t, sourceRuleFrontmatter(t, "lore-commit.md"))
@@ -63,13 +63,6 @@ func TestRules_TriggerFieldsSurviveCodexAndOpencode(t *testing.T) {
 		target      string
 		extraAssert func(t *testing.T, frontmatter string)
 	}{
-		{
-			name:   "codex",
-			target: ".codex/rules/autopus/lore-commit.md",
-			extraAssert: func(t *testing.T, frontmatter string) {
-				assert.Contains(t, frontmatter, "platform: codex")
-			},
-		},
 		{
 			name:        "opencode",
 			target:      ".opencode/rules/autopus/lore-commit.md",

@@ -1,5 +1,6 @@
 package codex
 
+// @AX:NOTE [AUTO]: the hardcoded 0.149.1 contract records the exact six-tool Multi-Agent V2 surface; update it with native collaboration schema changes.
 func codexAgentPipelineSkillBody() string {
 	return `
 # Agent Pipeline Skill
@@ -13,11 +14,11 @@ This skill is the default for ` + "`@auto go SPEC-ID`" + `.
 | Flag | Mode | Codex meaning |
 |------|------|---------------|
 | none | Subagent pipeline | Main session orchestrates specialists phase-by-phase |
-| ` + "`--team`" + ` | Codex team profile | Use native ` + "`multi_agent`" + ` tools with Lead/Builder/Guardian coordination |
+| ` + "`--team`" + ` | Codex team profile | Use native Multi-Agent V2 tools with Lead/Builder/Guardian coordination |
 | ` + "`--solo`" + ` | Single session | No worker spawning; implement directly in the main session |
 | ` + "`--multi`" + ` | Risk-tiered provider review | Run additional dissent review only for high/critical risk when configured; fall back to a single provider when only one is available |
 
-See .codex/skills/agent-teams.md for the Codex ` + "`--team`" + ` policy and .codex/skills/worktree-isolation.md for parallel ownership rules.
+See ` + "`$codex-agent-teams`" + ` for the Codex ` + "`--team`" + ` policy and ` + "`$codex-worktree-isolation`" + ` for parallel ownership rules.
 
 ## Risk-Tiered Review Policy
 Provider fan-out is advisory evidence, not the source of truth for PASS/FAIL. Deterministic checks, QAMESH evidence, build/test results, canary evidence, and reviewer/security findings remain authoritative.
@@ -45,7 +46,6 @@ Codex goals are thread-level state. The harness is goal-aware but does not inven
 - If the user explicitly asks to start a goal, prefer ` + "`@auto goal \"<objective>\" [--budget N]`" + ` or use ` + "`create_goal`" + ` once, with a token budget only when the user supplied one.
 - At the terminal handoff, report ` + "`goal_status`" + `. Use ` + "`update_goal`" + ` only when its completion or blocked contract is genuinely satisfied.
 - Do not call goal tools from spawned workers unless the parent prompt explicitly delegates that responsibility.
-
 ## Supervisor Contract
 
 Treat the main session as a state-machine supervisor, not a passive router.
@@ -55,7 +55,10 @@ Treat the main session as a state-machine supervisor, not a passive router.
 - Spawn only workers with explicit ownership.
 - Keep the main thread focused on requirements, decisions, and final synthesis.
 - Do not treat subagents as autonomous teammates that negotiate among themselves.
+### Multi-Agent V2 Collaboration
 
+Codex 0.149.1 exposes exactly ` + "`spawn_agent`" + `, ` + "`send_message`" + `, ` + "`followup_task`" + `, target-less ` + "`wait_agent()`" + `, ` + "`interrupt_agent`" + `, and ` + "`list_agents`" + `.
+All workers use the same shared cwd and filesystem. Parallel writers require disjoint write ownership; overlapping writers run sequentially.
 ## Prompt Layer Discipline
 
 Keep prompt authority explicit. When routing or spawning workers, preserve this layer order:
@@ -104,7 +107,7 @@ Quality mode influences model choice, not platform semantics:
 - Balanced: use each role's default model
 - Adaptive: choose stronger models only for high-complexity tasks
 
-Reference: .codex/skills/adaptive-quality.md
+Reference: .codex/skills/codex-adaptive-quality/SKILL.md
 
 ## Triage Pattern
 
@@ -134,7 +137,6 @@ Spawn a planner when the task has enough scope to justify decomposition.
 ` + "```python" + `
 spawn_agent(
     task_name="planner",
-    fork_turns="all",
     message="""
     Read SPEC-XXX.
     Produce an execution table with task id, owner role, mode, and file ownership.
@@ -189,7 +191,7 @@ Required return fields:
 - ` + "`blockers`" + `
 - ` + "`next_required_step`" + `
 
-` + codexContextEvolutionExamples() + `### Phase 1.5: Test Scaffold
+` + codexContextEvolutionExamples() + codexAgentPipelinePolicyContract() + `### Phase 1.5: Test Scaffold
 
 When enabled, spawn a tester to write failing tests before implementation. Generated scaffold tests are read-only for later executors unless the plan explicitly reassigns them.
 
@@ -212,7 +214,6 @@ Parallel implementation is valid only with disjoint ownership. Prefer narrow wor
 ` + "```python" + `
 spawn_agent(
     task_name="executor",
-    fork_turns="all",
     message="""
     Own only: pkg/auth/*.
     Follow TDD for task T1.
@@ -221,13 +222,13 @@ spawn_agent(
 )
 ` + "```" + `
 
-When workers return, review and integrate their results in the main session. Do not assume Codex auto-merges worktree branches.
+Worker changes are already visible in the shared filesystem. Review their five-field receipts; do not copy, merge, or reapply their edits.
 
 Write-heavy rules:
 
 - Parallel writes are allowed only when owned paths do not overlap.
 - If two workers touch the same file or migration chain, switch to sequential execution.
-- If two workers may create SQL migrations in the same owning repo and migration directory, switch to sequential execution and assign numbers only after earlier branches are merged or rebased.
+- If two workers may create SQL migrations in the same owning repo and migration directory, switch to sequential execution and assign numbers after the earlier writer finishes.
 - If a worker returns blockers that change scope, re-plan before spawning more writers.
 
 ### Phase 2.1: Integration
@@ -290,7 +291,6 @@ If discovery returns actionable findings and the review retry budget is not exha
 ### Phase 4B: Review Verification
 
 After fixes land, do a diff-only verification pass against the frozen checklist.
-
 - Verify whether each open finding is resolved.
 - Do not restart full discovery unless the patch meaningfully changed scope.
 - Stop review retries when the same unresolved finding repeats without material code change.

@@ -89,9 +89,9 @@ func TestWorkflowDoctorGuidance_UsesRouteAwarePins(t *testing.T) {
 	files := map[string][]string{
 		"content/skills/harness-workflow.md": {
 			"`auto workflow doctor --route route_a`",
-			"`RouteAMinVersion=2.1.154`",
+			"`RouteAMinVersion=2.1.246`",
 			"`auto workflow doctor --route route_team`",
-			"`RouteTeamMinVersion=2.1.219`",
+			"`RouteTeamMinVersion=2.1.246`",
 		},
 		"content/skills/using-autopus.md": {
 			"`auto workflow doctor --route route_team`",

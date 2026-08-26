@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
-	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 // Validate checks the validity of installed OMP files.
@@ -22,25 +21,10 @@ func (a *Adapter) Clean(ctx context.Context) error {
 	return err
 }
 
-// cleanPruneRoots resolves ownership from the on-disk platform list. When that
-// list is missing or unreadable, ownership of shared surfaces is unprovable, so
-// Clean falls back to the surfaces omp owns unconditionally instead of assuming
-// the maximal set.
-//
-// The existence check is load-bearing and easy to miss: config.Load returns a
-// synthesized default (Platforms: ["claude-code"]) with a nil error when
-// autopus.yaml is absent, and that default names neither codex nor opencode, so
-// trusting it would put the shared skill surface back into the prune roots and
-// delete a SKILL.md another platform now owns.
+// cleanPruneRoots includes current native roots and legacy roots. Clean still
+// selects only paths recorded in the OMP manifest, so foreign files are safe.
 func (a *Adapter) cleanPruneRoots() []string {
-	if !config.Exists(a.root) {
-		return ompExclusivePruneRoots()
-	}
-	cfg, err := config.LoadPreview(a.root)
-	if err != nil {
-		return ompExclusivePruneRoots()
-	}
-	return PruneRoots(cfg)
+	return ompExclusivePruneRoots()
 }
 
 func isPruneEligible(path string, roots []string) bool {

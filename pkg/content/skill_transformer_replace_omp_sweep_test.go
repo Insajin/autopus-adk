@@ -39,12 +39,14 @@ func TestReplacePlatformReferencesOMP_S12_EmittedBodies(t *testing.T) {
 			assert.NotContains(t, out, `isolation = "worktree"`)
 			if name == "skills/agent-pipeline.md" || name == "skills/worktree-isolation.md" {
 				for _, field := range []string{
-					`"context"`, `"tasks"`, `"agent"`, `"task"`, `"outputSchema"`,
-					`"schemaMode"`, `"isolated"`, `"owned_paths"`, `"changed_files"`,
+					`"i"`, `"context"`, `"tasks"`, `"agent"`, `"task"`, `"outputSchema"`,
+					`"schemaMode"`, `"owned_paths"`, `"changed_files"`,
 					`"verification"`, `"blockers"`, `"next_required_step"`,
 				} {
 					assert.Contains(t, out, field, "%s missing OMP field %s", name, field)
 				}
+				assert.NotContains(t, out, `"isolated"`, "%s must not emit a conditional field statically", name)
+				assert.Contains(t, out, "`isolated`", "%s must document dynamic isolation", name)
 				assert.Contains(t, out, "single DAG owner invariant")
 				assert.Contains(t, out, "orca skills get orchestration --full")
 			}

@@ -1,30 +1,69 @@
 package claude
 
 import (
+	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
+	"gopkg.in/yaml.v3"
 )
 
-// normalizeClaudeContent projects one embedded content file onto its installed
-// Claude form. Only agents are rewritten: references are retargeted at
-// claude-code, and the frontmatter `model:` tier is resolved from the active
-// quality preset so Quality.Presets stays the single tier source.
+var legacyClaudeSkillReference = regexp.MustCompile(`\.claude/skills/autopus/([A-Za-z0-9_-]+)\.md`)
+
+// normalizeClaudeContent projects embedded content onto Claude's native
+// frontmatter and path contracts.
 func normalizeClaudeContent(cfg *config.HarnessConfig, subDir, filename string, data []byte) []byte {
-	if subDir != "agents" {
-		return data
+	content := rewriteClaudeSkillReferences(string(data))
+	switch subDir {
+	case "skills":
+		return []byte(normalizeClaudeSkillFrontmatter(content))
+	case "agents":
+		normalized := pkgcontent.NormalizeAgentReferences(content, "claude-code")
+		return []byte(applyClaudeAgentProfile(cfg, filename, rewriteClaudeSkillReferences(normalized)))
+	default:
+		return []byte(content)
 	}
-	normalized := pkgcontent.NormalizeAgentReferences(string(data), "claude-code")
-	return []byte(applyClaudeAgentTier(cfg, filename, normalized))
 }
 
-// applyClaudeAgentTier rewrites the frontmatter `model:` value in place, so the
-// surrounding keys keep their source order. The shipped value is the fallback
-// tier, which leaves an agent that no preset mentions exactly as authored.
-// Documents without frontmatter or without a `model:` key pass through
-// untouched — the key is never inserted.
-func applyClaudeAgentTier(cfg *config.HarnessConfig, filename, content string) string {
+func rewriteClaudeSkillReferences(content string) string {
+	return legacyClaudeSkillReference.ReplaceAllString(content, `.claude/skills/$1/SKILL.md`)
+}
+
+func normalizeClaudeSkillFrontmatter(content string) string {
+	lines := strings.Split(content, "\n")
+	if len(lines) == 0 || lines[0] != "---" {
+		return content
+	}
+	end := -1
+	for i := 1; i < len(lines); i++ {
+		if lines[i] == "---" {
+			end = i
+			break
+		}
+	}
+	if end < 0 {
+		return content
+	}
+	var metadata struct {
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+	}
+	if err := yaml.Unmarshal([]byte(strings.Join(lines[1:end], "\n")), &metadata); err != nil ||
+		strings.TrimSpace(metadata.Name) == "" {
+		return content
+	}
+	body := strings.Join(lines[end+1:], "\n")
+	return fmt.Sprintf("---\nname: %s\ndescription: %s\n---\n%s",
+		strconv.Quote(metadata.Name), strconv.Quote(strings.TrimSpace(metadata.Description)), body)
+}
+
+// applyClaudeAgentProfile rewrites model and effort as one quality projection.
+// @AX:WARN [AUTO]: agent profile projection contains more than eight conditional branches.
+// @AX:REASON [AUTO]: frontmatter admission, model replacement, and tier-dependent effort insertion or removal must preserve one coherent profile.
+func applyClaudeAgentProfile(cfg *config.HarnessConfig, filename, content string) string {
 	if cfg == nil {
 		return content
 	}
@@ -32,22 +71,52 @@ func applyClaudeAgentTier(cfg *config.HarnessConfig, filename, content string) s
 	if len(lines) == 0 || lines[0] != "---" {
 		return content
 	}
+	end, modelIndex, effortIndex := -1, -1, -1
+	currentModel := ""
 	for i := 1; i < len(lines); i++ {
 		if lines[i] == "---" {
-			return content
+			end = i
+			break
 		}
-		value, isModel := strings.CutPrefix(lines[i], "model:")
-		if !isModel {
-			continue
+		if value, ok := strings.CutPrefix(lines[i], "model:"); ok {
+			modelIndex = i
+			currentModel = strings.TrimSpace(value)
 		}
-		current := strings.TrimSpace(value)
-		agent := config.NormalizeAgentName(strings.TrimSuffix(filename, ".md"))
-		tier := cfg.Quality.AgentTier(config.QualityProviderClaude, agent, current)
-		if tier == current {
-			return content
+		if _, ok := strings.CutPrefix(lines[i], "effort:"); ok {
+			effortIndex = i
 		}
-		lines[i] = "model: " + tier
-		return strings.Join(lines, "\n")
 	}
-	return content
+	if end < 0 || modelIndex < 0 {
+		return content
+	}
+	agent := config.NormalizeAgentName(strings.TrimSuffix(filename, ".md"))
+	tier := cfg.Quality.AgentTier(config.QualityProviderClaude, agent, currentModel)
+	lines[modelIndex] = "model: " + tier
+	effort := claudeAgentEffort(cfg.Quality.EffectiveMode(config.QualityProviderClaude), tier)
+	if effortIndex >= 0 {
+		if effort == "" {
+			lines = append(lines[:effortIndex], lines[effortIndex+1:]...)
+		} else {
+			lines[effortIndex] = "effort: " + effort
+		}
+	} else if effort != "" {
+		lines = append(lines[:modelIndex+1], append([]string{"effort: " + effort}, lines[modelIndex+1:]...)...)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func claudeAgentEffort(mode, tier string) string {
+	if tier == "haiku" {
+		return ""
+	}
+	if mode == "ultra" {
+		if tier == "opus" {
+			return "max"
+		}
+		return "high"
+	}
+	if tier == "opus" {
+		return "high"
+	}
+	return "medium"
 }

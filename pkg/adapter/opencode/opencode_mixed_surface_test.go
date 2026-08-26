@@ -31,6 +31,48 @@ func TestAdapter_Generate_MixedMode_DefaultsToFullSharedSurface(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, ".agents", "skills", "metrics", "SKILL.md"))
 }
 
+func TestAdapter_Generate_MarksOnlyMixedSharedSkillsAsOpenCodeOnly(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		platforms []string
+		wantMark  bool
+	}{
+		{name: "mixed Codex and OpenCode", platforms: []string{"codex", "opencode"}, wantMark: true},
+		{name: "single OpenCode", platforms: []string{"opencode"}, wantMark: false},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			cfg := config.DefaultFullConfig("demo")
+			cfg.Platforms = test.platforms
+
+			_, err := NewWithRoot(dir).Generate(context.Background(), cfg)
+			require.NoError(t, err)
+
+			for _, name := range []string{"auto", "auto-status", "auto-go", "planning"} {
+				path := filepath.Join(dir, ".agents", "skills", name, "SKILL.md")
+				content, readErr := os.ReadFile(path)
+				require.NoError(t, readErr, path)
+				if test.wantMark {
+					assert.Contains(t, string(content), `description: "[OpenCode-only] `, path)
+				} else {
+					assert.NotContains(t, string(content), "[OpenCode-only]", path)
+				}
+			}
+
+			commandPath := filepath.Join(dir, ".opencode", "commands", "auto.md")
+			command, readErr := os.ReadFile(commandPath)
+			require.NoError(t, readErr)
+			assert.NotContains(t, string(command), "[OpenCode-only]")
+			assert.Contains(t, string(command), "/auto")
+		})
+	}
+}
+
 func TestAdapter_Update_AutoSharedSurfacePrunesLegacyExtendedSkills(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

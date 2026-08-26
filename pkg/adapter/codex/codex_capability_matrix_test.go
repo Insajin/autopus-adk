@@ -74,7 +74,7 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 			cfg.Quality.Default = "ultra"
 			cfg.Quality.SupervisorModelPolicy = "quality"
 
-			rootFiles, err := a.generateConfig(cfg)
+			rootFiles, err := a.prepareConfigFile(cfg)
 			require.NoError(t, err)
 			agentFiles, err := a.generateAgents(cfg)
 			require.NoError(t, err)

@@ -29,7 +29,7 @@ The platform adapter owns the `--team` binding. It must load its dedicated team
 contract only when native lifecycle support exists; otherwise it must stop with
 an unsupported-mode diagnostic instead of emitting foreign tool calls.
 
-@.claude/skills/autopus/worktree-isolation.md
+@.claude/skills/worktree-isolation/SKILL.md
 
 ## Permission Mode Detection
 
@@ -179,24 +179,32 @@ legacy behavior and refreshes all configured platforms.
 
 ### Ultra Mode
 
-Use the premium path for all Agent() calls.
+Use the premium model-and-effort projection for every installed agent definition.
 
-On model-tiered platforms, this means adding `model: "opus"`. Codex uses a role-selective Ultra profile: a quality-managed depth-0 supervisor and orchestra use Sol/`ultra`; `planner`, `architect`, and `security-auditor` use Sol/`max`; every other managed agent uses Sol/`xhigh`. An `inherit` supervisor keeps the user's Codex runtime default. User-owned root model or effort assignments remain preserved and take precedence. OpenCode should keep its configured default model and increase reasoning effort.
+Claude projects Ultra into agent frontmatter (`model:` plus `effort:`) before
+the session starts. Ordinary Agent calls inherit that pair. Codex uses a
+role-selective Ultra profile: a quality-managed depth-0 supervisor and orchestra
+use Sol/`ultra`; `planner`, `architect`, and `security-auditor` use Sol/`max`;
+every other managed agent uses Sol/`xhigh`. An `inherit` supervisor keeps the
+user's Codex runtime default. User-owned root model or effort assignments remain
+preserved and take precedence. OpenCode keeps its configured default model and
+projects reasoning effort through its agent definition.
 
 ```
 Agent(
+  description = "Implement the assigned task with the Ultra agent profile",
   subagent_type = "executor",
-  model = "opus",
   prompt = "..."
 )
 ```
 
 ### Balanced Mode
 
-Omit the `model` parameter in Agent() calls to use each agent definition's frontmatter model:
+Use each installed agent definition's frontmatter model-and-effort pair:
 
 ```
 Agent(
+  description = "Implement the assigned task with the Balanced agent profile",
   subagent_type = "executor",
   prompt = "..."
 )
@@ -204,31 +212,30 @@ Agent(
 
 ### Effort Override
 
-CC21 adds `effort` as a separate reasoning control. Keep the model/frontmatter behavior above, then apply:
-
-- `--effort` when the supervisor needs an explicit override
-- `CLAUDE_CODE_EFFORT_LEVEL` for environment-level override
-- agent frontmatter `effort:` as the default when neither override is present
+CC21 exposes session-level effort controls, while ordinary Agent calls do not
+accept a per-call effort field. Resolve `--effort` and
+`CLAUDE_CODE_EFFORT_LEVEL` before generation, then project the result into agent
+frontmatter `effort:` alongside `model:`.
 
 Example:
 
 ```python
 Agent(
+  description = "Implement using the generated frontmatter effort",
   subagent_type = "executor",
-  effort = "high",
   prompt = "..."
 )
 ```
 
 ### Adaptive Quality (Balanced Mode Only)
 
-In Balanced mode, task complexity determines the profile per Agent() call:
+In Balanced mode, task complexity determines the generated agent profile:
 
-| Complexity | Model Parameter |
-|-----------|----------------|
-| HIGH | `model: "opus"` |
-| MEDIUM | omit (sonnet default) |
-| LOW | omit (sonnet default) |
+| Complexity | Agent definition projection |
+|-----------|-----------------------------|
+| HIGH | premium `model:` plus mapped `effort:` |
+| MEDIUM | standard `model:` plus mapped `effort:` |
+| LOW | standard `model:` plus mapped `effort:` |
 
 Current workspace policy:
 - Claude never uses `haiku`; LOW stays on `sonnet`
@@ -237,11 +244,11 @@ Current workspace policy:
 
 In Ultra mode, complexity is IGNORED — all agents use the premium path.
 
-Reference: `.claude/skills/autopus/adaptive-quality.md`
+Reference: `.claude/skills/adaptive-quality/SKILL.md`
 
 ### Agents Not in Preset
 
-If an agent is not defined in the selected preset, omit the `model` parameter (use frontmatter default).
+If an agent is not defined in the selected preset, retain its authored frontmatter model-and-effort defaults.
 
 ## Agent Spawning per Phase
 
@@ -249,6 +256,7 @@ If an agent is not defined in the selected preset, omit the `model` parameter (u
 
 ```
 Agent(
+  description = "Plan the SPEC and assign disjoint file ownership",
   subagent_type = "planner",
   prompt = """
     Load the SPEC file and decompose tasks.
@@ -269,6 +277,7 @@ WHEN Phase 1 completes, THE SYSTEM SHALL spawn a tester agent to create failing 
 
 ```
 Agent(
+  description = "Write failing P0 and P1 test scaffolds",
   subagent_type = "tester",
   prompt = """
     Phase: Test Scaffold (Phase 1.5)
@@ -280,7 +289,6 @@ Agent(
 
     Return: list of generated test files and FAIL verification result.
   """,
-  mode = "bypassPermissions"
 )
 ```
 
@@ -342,15 +350,9 @@ Tasks that can run in parallel are spawned with multiple Agent() calls in a sing
 Parallel tasks use `isolation: "worktree"` so each executor works in an independent git worktree (R1). Max 5 concurrent worktrees; overflow tasks are queued.
 
 ```
-# Parallel execution example — with worktree isolation
-# Premium-path handling varies by platform:
-# - Claude/Gemini: add model="opus"
-# - Codex: use the generated quality-aware Sol/Terra/Luna worker profile
-# - OpenCode: keep the default model and increase reasoning effort
-Agent(subagent_type="executor", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Balanced
-Agent(subagent_type="executor", model="opus", prompt="Implement T1: ...", mode="bypassPermissions", isolation="worktree")  # Ultra
-Agent(subagent_type="executor", prompt="Implement T2: ...", mode="bypassPermissions", isolation="worktree")  # Balanced
-Agent(subagent_type="executor", model="opus", prompt="Implement T2: ...", mode="bypassPermissions", isolation="worktree")  # Ultra
+# Agent definitions own the provider-specific model-and-effort projection.
+Agent(description="Implement T1 in isolated owned paths", subagent_type="executor", prompt="Implement T1: ...", isolation="worktree")
+Agent(description="Implement T2 in isolated owned paths", subagent_type="executor", prompt="Implement T2: ...", isolation="worktree")
 ```
 
 Collect `worktree_path` and `branch` from each return value for Phase 2.1 merge.
@@ -361,9 +363,9 @@ Migration numbering rule: any task that creates SQL migration files in the same 
 
 ```
 # Sequential execution example — immediate merge after each task
-result_t1 = Agent(subagent_type="executor", prompt="Implement T1: ...")
+result_t1 = Agent(description="Implement sequential task T1", subagent_type="executor", prompt="Implement T1: ...")
 # merge T1 worktree branch immediately (if isolation was used), then spawn T2
-Agent(subagent_type="executor", prompt="Implement T2. T1 result: {result_t1}")
+Agent(description="Implement dependent sequential task T2", subagent_type="executor", prompt="Implement T2. T1 result: {result_t1}")
 ```
 
 ### Phase 2 Profile Injection
@@ -378,6 +380,7 @@ WHEN executor agents are spawned in Phase 2, THE SYSTEM SHALL inject the assigne
 
 ```
 Agent(
+  description = "Implement the profiled task with current reference documentation",
   subagent_type = "executor",
   prompt = """
     ## Reference Documentation
@@ -419,12 +422,13 @@ WHEN all parallel executors complete, THE SYSTEM SHALL merge their worktree bran
 3. For each branch: `git -c gc.auto=0 merge <branch>` → on success: `git worktree remove <path>`
 4. On merge conflict: `git merge --abort` → abort pipeline → report error
 
-See @.claude/skills/autopus/worktree-isolation.md for full merge strategy and safety rules.
+See @.claude/skills/worktree-isolation/SKILL.md for full merge strategy and safety rules.
 
 ### Gate 2: Validation
 
 ```
 Agent(
+  description = "Validate the integrated implementation without editing",
   subagent_type = "validator",
   prompt = """
     Validate the implementation result.
@@ -457,6 +461,7 @@ A dedicated annotator agent is spawned to apply @AX tags:
 
 ```
 Agent(
+  description = "Apply required AX annotations to modified files",
   subagent_type = "annotator",
   prompt = """
     Apply @AX tags to modified files based on the ax-annotation skill.
@@ -474,7 +479,6 @@ Agent(
 
     All tags MUST include the [AUTO] prefix.
   """,
-  mode = "bypassPermissions"
 )
 ```
 
@@ -486,10 +490,11 @@ WHEN the target project contains UI-related changes (`.tsx`, `.jsx`, CSS-family 
 
 ```
 Agent(
+  description = "Verify the changed frontend UX surface",
   subagent_type = "frontend-specialist",
   prompt = """
     Run frontend UX verification on all modified frontend components.
-    Reference: .claude/skills/autopus/frontend-verify.md for the full pipeline.
+    Reference: .claude/skills/frontend-verify/SKILL.md for the full pipeline.
 
     1. Analyze git diff to identify changed UI-related files
     2. If a safe DESIGN.md or configured baseline exists, include this compact section before screenshot analysis:
@@ -514,7 +519,6 @@ Agent(
     Issues: <list of issues with file references>
     Fixes: <list of auto-applied fixes>
   """,
-  mode = "bypassPermissions"
 )
 ```
 
@@ -529,6 +533,7 @@ Phase 3.5 does NOT renumber existing phases. Testing remains Phase 3, Review rem
 
 ```
 Agent(
+  description = "Raise coverage and verify affected tests",
   subagent_type = "tester",
   prompt = """
     ## Reference Documentation
@@ -538,7 +543,6 @@ Agent(
     Raise coverage to 85%+.
     Add missing edge case tests.
   """,
-  mode = "bypassPermissions"
 )
 ```
 
@@ -552,7 +556,7 @@ QAMESH scope budget inside `/auto go`:
 reviewer and security-auditor run in parallel:
 
 ```
-Agent(subagent_type = "reviewer", prompt = """
+Agent(description = "Review the integrated diff against TRUST 5", subagent_type = "reviewer", prompt = """
     Perform a code review using TRUST 5 criteria. Return format:
     Separate Correctness/Security Findings from Complexity Findings. Complexity tags:
     delete, stdlib, native, yagni, shrink, existing-helper, existing-dependency.
@@ -565,7 +569,7 @@ Agent(subagent_type = "reviewer", prompt = """
     Verdict: APPROVE | REQUEST_CHANGES
     Issues: <list of issues>
 """)
-Agent(subagent_type = "security-auditor", prompt = """
+Agent(description = "Audit the integrated diff for security vulnerabilities", subagent_type = "security-auditor", prompt = """
     Perform a security audit. Return format:
     Verdict: PASS | FAIL
     Issues: <list of security issues>
@@ -642,6 +646,7 @@ Write structured log entries: [timestamp] [your-role] [phase] message
 ```python
 logger = PipelineLogger(log_dir)
 Agent(
+  description = "Implement the assigned task with pipeline monitoring",
   subagent_type = "executor",
   prompt = f"""
     {logger.prompt_injection()}

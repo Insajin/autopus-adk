@@ -26,7 +26,11 @@ import (
 // reclassified back to `always` must delete the stale relocated body.
 func PruneRoots() []string {
 	return []string{
-		".claude/skills/autopus",
+		".claude/skills",
+		".claude/agents/autopus",
+		".claude/workflows",
+		".claude/commands",
+		".git/hooks",
 		rulecond.ClaudeRulesRelDir,
 		rulecond.BodyRootRelPath,
 	}
@@ -34,7 +38,7 @@ func PruneRoots() []string {
 
 // Update는 매니페스트 기반으로 파일을 업데이트한다.
 // 사용자가 수정한 파일은 백업 후 덮어쓰고, 삭제한 파일은 재생성하지 않는다.
-func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
+func (a *Adapter) Update(_ context.Context, cfg *config.HarnessConfig) (*adapter.PlatformFiles, error) {
 	oldManifest, err := adapter.LoadManifest(a.root, adapterName)
 	if err != nil {
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
@@ -49,16 +53,6 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (*adapt
 		return nil, err
 	}
 	newFiles = append(newFiles, hookFiles...)
-
-	// REQ-004: keep Update in parity with Generate — the generated Route A
-	// workflow JS is a full-mode surface, so it must be re-emitted on update too.
-	if cfg.IsFullMode() {
-		workflowFiles, err := a.workflowFiles(cfg)
-		if err != nil {
-			return nil, err
-		}
-		newFiles = append(newFiles, workflowFiles...)
-	}
 
 	plan, pf := a.buildUpdateTransactionPlan(oldManifest, newFiles)
 	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {

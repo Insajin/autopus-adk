@@ -48,7 +48,7 @@ primitives (reported, non-fatal).
 
 | Requirement | Value | Class |
 |-------------|-------|-------|
-| Claude Code version | **2.1.154** or later (`RouteAMinVersion`) | required |
+| Claude Code version | **2.1.246** or later (`RouteAMinVersion=2.1.246`) | required |
 | Platform | `claude` only | required |
 | Workflow JS present | `.claude/workflows/route_a.workflow.js` | required |
 | `auto workflow gate` bridge | resolvable on PATH | required |
@@ -129,131 +129,43 @@ diverging element.
 
 ---
 
-## Team Workflow Substrate — route_team
+## Retained Route Team Workflow
 
-> **claude-code only.** The team workflow substrate (`route_team`) is scoped to the claude-code platform by the same platform constraint that governs `route_a`. codex, antigravity-cli, and opencode never emit `route_team.workflow.js` and are unaffected (regression-0 guarantee).
+`route_team` remains a Claude-only generated Workflow for explicit internal use.
+It is not the substrate behind `--team`; native named teammates own that flag.
 
-### Overview
+The retained script runs eight manifest-defined phases and uses bounded
+`parallel()` executor calls in one shared working tree. Planner tasks must have
+disjoint file ownership and keep interdependent implementation and test files in
+one task. The script does not request worktree isolation or a merge lifecycle.
 
-When `/auto go SPEC-ID --team` is invoked on claude-code and `auto workflow doctor --route route_team` passes (and no disable flag is active), the pipeline is served by the **deterministic team Workflow substrate** instead of ad-hoc Agent Teams. The substrate is implemented as `.claude/workflows/route_team.workflow.js` — a **generated, edit-forbidden surface** derived from the manifest by `auto generate-templates`. Do not edit the JS by hand.
+Before an explicit retained launch, run
+`auto workflow doctor --route route_team`. The route-aware pin is
+`RouteTeamMinVersion=2.1.246`; a failed doctor blocks this internal launch and
+does not change native `--team` routing.
 
-### Capability Gate
+Launch each required segment with the current Workflow input shape:
 
-The team workflow substrate runs `auto workflow doctor --route route_team`.
-It shares the required vs advisory primitive classification with `route_a`, but
-uses `RouteTeamMinVersion=2.1.219` because its planning model is pinned to Opus
-5. Route A remains compatible with `RouteAMinVersion=2.1.154`. Disable paths
-(pre-route opt-out, not a taxonomy failure):
-- `--no-workflow` flag
-- `autopus.yaml` → `workflow.team_default=false` (maps to the real `WorkflowConf.TeamDefault` config field)
-
-Doctor-fail path: emit `[workflow] fallback-class=fail-fast reason=doctor_fail` and fall back to Route A **without** entering Agent Teams.
-
-### 8 Ordered Phases
-
-The `route_team` workflow runs exactly eight ordered phases. Phase IDs are authoritative and match `content/workflows/route_team.schema.json`.
-
-| Phase | Type | Description |
-|-------|------|-------------|
-| **planning** | `agent()` | Produces the implementation plan and task breakdown; does not mutate the working tree beyond plan artifacts. |
-| **test_scaffold** | `agent()` | Writes failing test skeletons for P0/P1 requirements (RED state). |
-| **implementation** | `agent()` — task-threaded parallel executors | Runs executor agents concurrently via `parallel()` with `isolation: 'worktree'`, threading them over task assignments (`plan.tasks[i]`) produced by the planner. Each executor owns a **disjoint** file set; the planner groups inter-dependent files (impl + its test) into one task so isolated executors never recreate each other's files (overlap → merge conflict → skip). Fan-out count is dynamically bounded by `min(tasks.length, cap)` with `cap ≤ 5`. |
-| **gate_build_test** | **deterministic Go gate** | Verdict derives from build/test **exit codes** (`verdict_source: exit_code`), not from an LLM verdict. Executed outside the JS via Go runtime (calling `auto workflow gate` execution bridge) which emits `{verdict, verdict_source, build_exit, test_exit}` JSON. A non-zero exit yields `verdict: fail`. Failed verdicts trigger a RALF remediation fixer loop. |
-| **annotation** | `agent()` | Applies `@AX` annotation tags to all files modified during implementation. |
-| **testing** | `agent()` | Raises test coverage to 85%+; runs `go test -race -cover ./...` and affected QAMESH lanes, evaluated by the coverage gate. |
-| **review** | `agent()` — dual-role verify-vote loop | Runs specialized `reviewer` (for verify-vote and optional synthesis) and `security-auditor` in parallel. Verify votes are bounded: **verify_votes ≤ 3**. Undergoes review barrier fixing loops on REQUEST_CHANGES/security-FAIL. |
-| **release_hygiene** | **deterministic Go gate** | Executed outside the JS via Go runtime (calling `auto check --hygiene --arch --quiet --staged`) which enforces the 300-line source limit and generated-surface drift gate. Commit-msg hooks enforce Lore format via `auto check --lore --message <msgfile>`. |
-
-### Manifest Source of Truth
-
-| Artifact | Role |
-|----------|------|
-| `content/workflows/route_team.md` | Human-authoritative manifest |
-| `content/workflows/route_team.schema.json` | Machine-authoritative manifest |
-| `templates/claude/workflows/route_team.workflow.js.tmpl` | Template — generated surface, edit-forbidden |
-| `.claude/workflows/route_team.workflow.js` | Installed generated surface — edit-forbidden |
-
-Edit the manifest files and run `auto generate-templates` to regenerate the JS. The parity gate compares phase-id, retry, budget, and result-type sets across the markdown, schema, and JS; any divergence fails generation closed.
-
-### Quality Binding
-
-For Claude route-team dispatch, resolve an explicit per-run `--quality` first, then
-`quality.providers.claude`, then `quality.default`, then the `balanced` safety fallback.
-`quality.providers.codex` is independent and must not alter the Claude binding. The effective
-mode resolves **three dimensions simultaneously** through the existing resolvers:
-
-- **Model tier** — `ModelForAgent`: ultra → Opus for all agent phases; balanced → per-agent defaults.
-- **Effort** — `ResolveEffort`: ultra → higher effort ceiling; balanced → per-agent defaults.
-- **Orchestration depth** — `ResolveDepth`: ultra = 3-vote adversarial verify + synthesis in the review phase; balanced = single-vote. Hard caps: verify_votes ≤ 3, fan_out_cap ≤ 5, retry ≤ 3.
-
-The resolved quality is delivered through the Workflow `args` input (`args.quality`). The workflow JS reads `RT.<phase>` from `args.quality` to override the schema baseline literal for each phase.
-
-### Workflow input args Schema
-
-The per-run context is passed via the `args` global with the following schema:
-- `spec`: target SPEC ID (string)
-- `workingDir`: absolute path to the workspace directory (string)
-- `quality`: serialized per-phase quality binding (JSON object)
-- `segment`: which segment to execute — one of `'A'`, `'B'`, `'C'`, `'D'`; defaults to `'A'` when absent. A segment ends after every phase that needs a deterministic dispatcher interposition before the next phase:
-  - `'A'`: planning, test_scaffold, implementation, gate_build_test
-  - `'B'`: annotation, testing (ends at the coverage gate)
-  - `'C'`: review (ends at the review barrier)
-  - `'D'`: release_hygiene
-
-### Segmented Dispatch Contract
-
-The dispatcher (main session) launches the workflow in **four segments** (`'A'`, `'B'`, `'C'`, `'D'`) separated by the deterministic interpositions. This is required because a single `workflow({scriptPath}, args)` launch runs all phases unconditionally — there is no re-entry point to block a downstream phase from within JS. A segment ends after every phase that needs a dispatcher adjudication before the next phase: `gate_build_test` (segment A), the coverage-gated `testing` phase (segment B), and the `review` phase (segment C); `release_hygiene` is segment D.
-
-**Dispatcher sequence:**
-1. Launch segment A: `workflow({scriptPath}, {spec, workingDir, quality, segment:'A'})`
-   — executes planning, test_scaffold, implementation, and the gate_build_test boundary marker.
-   Executor agents run with `isolation: 'worktree'`; their changes are **uncommitted**
-   working-tree edits stranded in separate worktrees under `.claude/worktrees/`.
-   Segment A **returns `{ plan }`** (the planner's task assignment); capture it.
-1b. Persist the returned plan to a temp JSON file, e.g.
-   `<workingDir>/.claude/workflows/run-<runid>-plan.json` (the dispatcher can write
-   files; the workflow JS cannot). This drives ownership enforcement in step 1c.
-1c. Run `auto workflow merge --run <segment-A-runid> --ownership <plan.json>` (Go
-   runtime, worktree consolidation). With `--ownership`, each worktree is assigned
-   1:1 to the task it performed and **only files within that task's ownership are
-   merged** — files an executor created outside its assigned set (overlap into
-   another task's files) are reported in `skipped_out_of_scope` and never copied,
-   giving a hard guarantee against executor overlap. Merge then copies the owned
-   uncommitted changes into `workingDir`, stages them with `git add`, and removes
-   the worktrees. This step is required before the gate: without it, `auto workflow
-   gate` would build/test the unchanged main tree (vacuous pass). Any residual
-   same-file conflict is reported in the JSON but is not a hard failure — the
-   operator/gate decides. Exit non-zero only on a hard infrastructure error.
-   (Without `--ownership`, merge falls back to the plain conflict-skip behavior.)
-1d. After merge, run `auto workflow gate` (Go runtime, exit-code verdict).
-   — If `verdict != pass`: the dispatcher runs a RALF remediation loop computed by `pkg/workflow.RunGateRemediation`. It spawns a fixer (executor) agent and re-runs the failed segment. The retry budget is capped by `MaxRetry` (3) from `pkg/workflow/depth.go`. If two consecutive gate evaluations produce the same signature, the loop aborts early with `AbortReason="circuit_break_no_progress"`. Pass → continue.
-2. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality, segment:'B'})`
-   — executes annotation and testing.
-   After the testing phase, the dispatcher evaluates the coverage gate using `pkg/workflow.EvaluateCoverageGate` with the schema threshold (default 85). It runs the coverage command, parses stdout from `CoverageRunner.RunOutput` (LLM-free), and compares it to the threshold. If coverage is below the threshold, it yields `verdict: fail` (exit-code style) and runs the same fixer remediation loop. Pass → continue to segment C.
-3. Launch segment C: `workflow({scriptPath}, {spec, workingDir, quality, segment:'C'})`
-   — executes the review phase.
-   When the review phase completes, the dispatcher consolidates findings using `pkg/workflow.ConsolidateReviewVerdict`. A security FAIL (`Barrier=true`, `Reason="security_fail"`) outranks a code-quality REQUEST_CHANGES. If a barrier is triggered, the dispatcher runs the review barrier loop computed by `pkg/workflow.RunReviewBarrier` (budget capped by `MaxRetry`), spawning an executor to fix the findings and re-running review. On budget exhaustion it aborts with `review_budget_exhausted` and does **not** proceed to release_hygiene. Pass → continue to segment D.
-4. Launch segment D: `workflow({scriptPath}, {spec, workingDir, quality, segment:'D'})`
-   — executes the release_hygiene boundary marker, then run `auto check --hygiene --arch --quiet --staged`.
-
-The gate phases (`gate_build_test`, `release_hygiene`) are **segment-boundary markers** in the JS — they emit `phase(id)` + `log(...)` but contain no shell-out logic and no LLM verdict. All exit-code/barrier adjudication is performed by the dispatcher between segment launches (`verdict_source: exit_code` is preserved).
-
-Inspect resolved per-phase model/effort/depth without executing agents:
-
-```
-auto workflow render --route team [--quality <mode>]
+```javascript
+Workflow({
+  scriptPath: ".claude/workflows/route_team.workflow.js",
+  args: { spec, workingDir, quality, segment: "A" },
+})
 ```
 
-### Fallback Taxonomy
+Subsequent segments use `segment: "B"`, `"C"`, and `"D"`. Deterministic Go
+gates still run between segments. `route_team.md` and
+`route_team.schema.json` remain authoritative; generated JS must pass parity.
 
-The `route_team` substrate shares the same fallback taxonomy as `route_a` — silent opt-out is forbidden.
+The public `/auto go SPEC-ID --workflow` path launches Route A with the same
+object shape:
 
-| Failure kind | Class | Behavior |
-|--------------|-------|----------|
-| `non_claude_platform` | `fail-fast` | Abort immediately, fall back to Route A |
-| `doctor_fail` | `fail-fast` | Abort immediately, fall back to Route A |
-| `parity_drift` | `fail-closed` | Refuse to proceed and block |
-| `execution_abort` | `resumable` | Resume from a recorded checkpoint |
-| `api_unavailable` | `explicit` | Surface to the operator for a decision |
+```javascript
+Workflow({
+  scriptPath: ".claude/workflows/route_a.workflow.js",
+  args: { spec, workingDir, quality, segment: "A" },
+})
+```
 
-**Ref**: SPEC-HARNESS-WORKFLOW-TEAM-001
+`--workflow` is explicit. There is no workflow-default configuration field or
+negative workflow flag, and team routing never implies a Workflow launch.

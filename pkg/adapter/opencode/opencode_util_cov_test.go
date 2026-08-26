@@ -72,6 +72,17 @@ func TestInjectAfterFirstHeading_WithHeading(t *testing.T) {
 	assert.Equal(t, "# H\n\nBLOCK\n\nrest", out)
 }
 
+func TestNormalizeOpenCodeMarkdown_RewritesCurrentCodexNativeSkillPaths(t *testing.T) {
+	t.Parallel()
+	input := "Load `.codex/skills/codex-agent-pipeline/SKILL.md`.\n" +
+		"- `--team`: `.codex/skills/codex-agent-teams/SKILL.md`의 Codex team profile 적용"
+	output := normalizeOpenCodeMarkdown(input)
+	assert.Contains(t, output, ".agents/skills/agent-pipeline/SKILL.md")
+	assert.Contains(t, output, "OpenCode task-based pipeline")
+	assert.NotContains(t, output, ".codex/skills/")
+	assert.NotContains(t, output, "codex-agent-teams")
+}
+
 func TestReadJSONObject_Missing(t *testing.T) {
 	t.Parallel()
 	obj, err := readJSONObject(filepath.Join(t.TempDir(), "nope.json"))

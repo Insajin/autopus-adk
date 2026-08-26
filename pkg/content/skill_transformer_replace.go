@@ -39,11 +39,12 @@ var pathReplacements = map[string]map[string]string{
 		".claude/":          ".codex/",
 	},
 	"gemini": {
-		".claude/commands/": ".gemini/commands/",
-		".claude/skills/":   ".gemini/skills/",
-		".claude/agents/":   ".gemini/agents/",
-		".claude/rules/":    ".gemini/rules/",
-		".claude/":          ".gemini/",
+		".claude/skills/autopus/": ".gemini/skills/autopus/",
+		".claude/commands/":       ".gemini/commands/",
+		".claude/skills/":         ".gemini/skills/autopus/",
+		".claude/agents/":         ".gemini/agents/",
+		".claude/rules/":          ".gemini/rules/",
+		".claude/":                ".gemini/",
 	},
 	"opencode": {
 		".claude/skills/autopus/": ".agents/skills/",
@@ -107,6 +108,7 @@ func ReplacePlatformReferences(body string, platform string) string {
 
 	normalized := strings.Join(result, "\n")
 	if p == "omp" {
+		normalized = NormalizeOMPResourcePaths(normalized)
 		normalized = normalizeOMPBranding(normalized)
 	}
 	return normalized

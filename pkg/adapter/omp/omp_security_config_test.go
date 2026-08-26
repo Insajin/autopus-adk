@@ -4,13 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
+	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -29,12 +29,9 @@ func writeOMPConfig(t *testing.T, dir, contents string) string {
 	return cfgPath
 }
 
-// TestOMPGenerate_RefusesMarkerInsideAnyDocumentScalar closes the multi-document
-// hole. yaml.Unmarshal into a yaml.Node decodes only the FIRST document, so
-// marker text sitting in a scalar of document 2+ slipped past the guard while
-// the raw-text regex still matched it — and the rewrite then replaced a literal
-// block scalar the user owned.
-func TestOMPGenerate_RefusesMarkerInsideAnyDocumentScalar(t *testing.T) {
+// TestOMPGenerate_PreservesUserScalarConfig proves a plain install never parses
+// or rewrites user-owned config, including multi-document scalar content.
+func TestOMPGenerate_PreservesUserScalarConfig(t *testing.T) {
 	t.Parallel()
 
 	scalarDoc := "notes: |\n  " + markerBeginYml + "\n  CANARY-KEEP-THIS\n  " + markerEndYml + "\n"
@@ -53,23 +50,19 @@ func TestOMPGenerate_RefusesMarkerInsideAnyDocumentScalar(t *testing.T) {
 			cfgPath := writeOMPConfig(t, dir, original)
 
 			_, genErr := NewWithRoot(dir).Generate(context.Background(), configForOMP())
+			require.NoError(t, genErr)
 
 			after, readErr := os.ReadFile(cfgPath)
 			require.NoError(t, readErr)
-			assert.Contains(t, string(after), "CANARY-KEEP-THIS",
-				"a marker inside any document's scalar must never be rewritten away")
-			if genErr != nil {
-				assert.Equal(t, original, string(after),
-					"failing closed must leave the file exactly as the user wrote it")
-			}
+			assert.Equal(t, original, string(after))
+			assert.Contains(t, string(after), "CANARY-KEEP-THIS")
 		})
 	}
 }
 
-// TestOMPGenerate_RefusesUnparseableConfig pins the companion rule: without a
-// node tree there is no way to tell structure from content, so guessing is
-// refused rather than risking the same data loss.
-func TestOMPGenerate_RefusesUnparseableConfig(t *testing.T) {
+// TestOMPGenerate_PreservesUnparseableUserConfig proves a plain install does
+// not need to parse config it does not own.
+func TestOMPGenerate_PreservesUnparseableUserConfig(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -77,7 +70,7 @@ func TestOMPGenerate_RefusesUnparseableConfig(t *testing.T) {
 	cfgPath := writeOMPConfig(t, dir, original)
 
 	_, genErr := NewWithRoot(dir).Generate(context.Background(), configForOMP())
-	require.Error(t, genErr, "an unparseable document must fail closed")
+	require.NoError(t, genErr)
 
 	after, readErr := os.ReadFile(cfgPath)
 	require.NoError(t, readErr)
@@ -93,11 +86,8 @@ func TestOMPClean_PreservesMarkerTextInsideUserScalar(t *testing.T) {
 
 	dir := generateOMPOnly(t)
 	cfgPath := filepath.Join(dir, configFile)
-	generated, err := os.ReadFile(cfgPath)
-	require.NoError(t, err)
-
 	userBlock := "notes: |\n  " + markerBeginYml + "\n  CANARY-KEEP-THIS\n  " + markerEndYml + "\n"
-	require.NoError(t, os.WriteFile(cfgPath, append([]byte(userBlock), generated...), 0o600))
+	require.NoError(t, os.WriteFile(cfgPath, []byte(userBlock), 0o600))
 
 	// `auto platform remove omp` drops omp before Clean runs.
 	remaining := config.DefaultFullConfig("omp-cfg")
@@ -119,21 +109,20 @@ func configForOMP() *config.HarnessConfig {
 	return cfg
 }
 
-// TestOMPGenerate_StillAcceptsOrdinaryConfig guards against the fail-closed
-// checks degenerating into refusing everything.
-func TestOMPGenerate_StillAcceptsOrdinaryConfig(t *testing.T) {
+// TestOMPGenerate_PreservesOrdinaryUserConfig guards the default no-ownership contract.
+func TestOMPGenerate_PreservesOrdinaryUserConfig(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	cfgPath := writeOMPConfig(t, dir, "disabledProviders:\n  - anthropic\nmodel: local\n")
 
 	_, err := NewWithRoot(dir).Generate(context.Background(), configForOMP())
-	require.NoError(t, err, "an ordinary config must still regenerate")
+	require.NoError(t, err)
 
 	after, readErr := os.ReadFile(cfgPath)
 	require.NoError(t, readErr)
-	assert.Contains(t, string(after), "disabledProviders:")
-	assert.Equal(t, 1, strings.Count(string(after), markerBeginYml))
+	assert.Equal(t, "disabledProviders:\n  - anthropic\nmodel: local\n", string(after))
+	assert.NotContains(t, string(after), markerBeginYml)
 }
 
 // TestOMPGenerate_RefusesMarkerCommentNestedInCollection closes the nested-
@@ -164,19 +153,21 @@ func TestOMPGenerate_RefusesMarkerCommentNestedInCollection(t *testing.T) {
 			dir := t.TempDir()
 			cfgPath := writeOMPConfig(t, dir, original)
 
-			_, genErr := NewWithRoot(dir).Generate(context.Background(), configForOMP())
+			_, genErr := NewWithRoot(dir).WithModelIntegrationRunner(newModelIntegrationRunner()).
+				Generate(context.Background(), integrationHarnessConfig(config.RoleModelConfigModeProjectManaged))
 
 			after, readErr := os.ReadFile(cfgPath)
 			require.NoError(t, readErr)
+			if name == "root sequence" {
+				require.Error(t, genErr, "project-managed keys require a mapping document")
+				assert.Equal(t, original, string(after))
+				return
+			}
+			require.NoError(t, genErr)
 			assert.Contains(t, string(after), "CANARY-KEEP-THIS",
-				"a marker comment nested in a collection must never be treated as a section")
-			require.Error(t, genErr, "the rewrite must fail closed")
-			assert.Equal(t, original, string(after),
-				"failing closed must leave the file exactly as the user wrote it")
-
+				"a nested marker comment remains ordinary user data")
 			var parsed any
-			assert.NoError(t, yaml.Unmarshal(after, &parsed),
-				"the file must still parse; the old rewrite corrupted it")
+			assert.NoError(t, yaml.Unmarshal(after, &parsed))
 		})
 	}
 }
@@ -188,12 +179,18 @@ func TestOMPClean_PreservesMarkerCommentNestedInCollection(t *testing.T) {
 
 	dir := generateOMPOnly(t)
 	cfgPath := filepath.Join(dir, configFile)
-	generated, err := os.ReadFile(cfgPath)
-	require.NoError(t, err)
-
 	userBlock := "notes: [\n  aaa,\n" + markerBeginYml +
 		"\n  CANARY-KEEP-THIS,\n" + markerEndYml + "\n  zzz,\n]\n"
-	require.NoError(t, os.WriteFile(cfgPath, append([]byte(userBlock), generated...), 0o600))
+	legacyManaged := markerBeginYml + "\nskills:\n  customDirectories:\n    - .agents/skills\n" + markerEndYml + "\n"
+	contents := userBlock + legacyManaged
+	require.NoError(t, os.WriteFile(cfgPath, []byte(contents), 0o600))
+	manifest, err := adapter.LoadManifest(dir, adapterName)
+	require.NoError(t, err)
+	require.NotNil(t, manifest)
+	manifest.Files[configFile] = adapter.ManifestFile{
+		Checksum: adapter.Checksum(contents), Policy: adapter.OverwriteMarker,
+	}
+	require.NoError(t, manifest.Save(dir))
 
 	remaining := config.DefaultFullConfig("omp-cfg")
 	remaining.Platforms = []string{"claude-code"}
@@ -229,9 +226,6 @@ func TestOMPUpdate_ReplacesStaleManagedSection(t *testing.T) {
 
 	after, readErr := os.ReadFile(cfgPath)
 	require.NoError(t, readErr)
-	assert.Contains(t, string(after), "disabledProviders:", "user keys survive the upgrade")
-	assert.Contains(t, string(after), ".agents/skills", "the current managed content is written")
-	assert.NotContains(t, string(after), "OLD-PATH", "the stale managed content is replaced")
-	assert.NotContains(t, string(after), "legacyKey", "stale managed keys do not linger")
-	assert.Equal(t, 1, strings.Count(string(after), markerBeginYml))
+	assert.Equal(t, []byte(stale), after,
+		"without a legacy manifest entry, generation must not claim or rewrite the base config")
 }

@@ -14,9 +14,9 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
-// TestClaudeAdapter_Generate_CleansLegacyCommandDir verifies that Generate
-// removes a pre-existing legacy .claude/commands/autopus directory.
-func TestClaudeAdapter_Generate_CleansLegacyCommandDir(t *testing.T) {
+// TestClaudeAdapter_Generate_PreservesUnmanifestedLegacyPaths verifies the
+// transactional generator never deletes paths it cannot prove it owns.
+func TestClaudeAdapter_Generate_PreservesUnmanifestedLegacyPaths(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -34,13 +34,8 @@ func TestClaudeAdapter_Generate_CleansLegacyCommandDir(t *testing.T) {
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	// Legacy directory must be removed.
-	_, statErr := os.Stat(legacyDir)
-	assert.True(t, os.IsNotExist(statErr), "legacy commands/autopus dir must be cleaned up")
-
-	// Legacy auto.md must be removed.
-	_, statErr = os.Stat(legacyMD)
-	assert.True(t, os.IsNotExist(statErr), "legacy auto.md must be cleaned up")
+	assert.DirExists(t, legacyDir)
+	assert.FileExists(t, legacyMD)
 }
 
 // TestClaudeAdapter_Generate_ProducesFileSizeLimitRule verifies the dynamic

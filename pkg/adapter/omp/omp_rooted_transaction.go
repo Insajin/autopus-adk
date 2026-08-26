@@ -279,7 +279,7 @@ func (tx *ompRootedTransaction) saveJournal() error {
 
 func loadOMPManifestAt(workspace *ompRootedWorkspace, platform string) (*adapter.Manifest, error) {
 	path := filepath.Join(".autopus", platform+"-manifest.json")
-	data, _, err := workspace.readFile(path, 4<<20)
+	data, _, err := workspace.readOwnerOnlyFile(path, 4<<20)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}

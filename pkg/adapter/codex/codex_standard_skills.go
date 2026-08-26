@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -29,27 +30,13 @@ func (a *Adapter) renderStandardSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 }
 
 func (a *Adapter) prepareStandardSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	files := make([]adapter.FileMapping, 0, len(workflowSpecs)*2)
-
 	routerContent, err := a.renderRouterSkill(cfg)
 	if err != nil {
 		return nil, err
 	}
-	files = append(files, newSkillMapping(filepath.Join(".agents", "skills", "auto", "SKILL.md"), routerContent))
-
-	for _, spec := range workflowSpecs {
-		if spec.Name == "auto" {
-			continue
-		}
-
-		content, err := a.renderWorkflowSkill(cfg, spec)
-		if err != nil {
-			return nil, err
-		}
-		files = append(files, newSkillMapping(filepath.Join(".agents", "skills", spec.Name, "SKILL.md"), content))
-	}
-
-	return files, nil
+	return []adapter.FileMapping{
+		newSkillMapping(codexProjectSkillPath("auto"), routerContent),
+	}, nil
 }
 
 func (a *Adapter) renderPluginFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
@@ -78,9 +65,13 @@ func (a *Adapter) preparePluginMappings(cfg *config.HarnessConfig) ([]adapter.Fi
 	if err != nil {
 		return nil, err
 	}
-	files = append(files, newSkillMapping(filepath.Join(".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"), routerContent))
+	pluginRouterContent := strings.Replace(routerContent, "name: codex-auto", "name: auto", 1)
+	files = append(files, newSkillMapping(
+		filepath.Join(".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"),
+		pluginRouterContent,
+	))
 
-	pluginJSON, err := a.renderPluginManifestJSON(cfg, routerContent)
+	pluginJSON, err := a.renderPluginManifestJSON(cfg, pluginRouterContent)
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +88,10 @@ func (a *Adapter) preparePluginMappings(cfg *config.HarnessConfig) ([]adapter.Fi
 	}
 	files = append(files, adapter.FileMapping{
 		TargetPath:      filepath.Join(".agents", "plugins", "marketplace.json"),
-		OverwritePolicy: adapter.OverwriteAlways,
+		OverwritePolicy: adapter.OverwriteMerge,
 		Checksum:        checksum(marketplaceJSON),
 		Content:         []byte(marketplaceJSON),
 	})
-
 	return files, nil
 }
 

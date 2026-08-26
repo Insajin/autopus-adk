@@ -79,39 +79,6 @@ func TestPrepareGitHookFiles_NoDiskWrite(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 }
 
-func TestGenerateRuleFiles_Internal(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	files, err := a.generateRuleFiles(cfg)
-	require.NoError(t, err)
-	assert.Len(t, files, 14, "should produce the full managed rule set")
-
-	// Verify file-size-limit content
-	for _, f := range files {
-		if filepath.Base(f.TargetPath) == "file-size-limit.md" {
-			assert.Contains(t, string(f.Content), "300 lines")
-		}
-	}
-}
-
-func TestPrepareRuleMappings_NoDiskWrite(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	files, err := a.prepareRuleMappings(cfg)
-	require.NoError(t, err)
-	assert.Len(t, files, 14)
-
-	// Should not write to disk
-	_, err = os.Stat(filepath.Join(dir, ".codex", "rules", "autopus"))
-	assert.True(t, os.IsNotExist(err))
-}
-
 func TestStripFrontmatter(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -143,17 +110,6 @@ func TestStripFrontmatter(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-}
-
-func TestEnsureCodexRulePlatform(t *testing.T) {
-	t.Parallel()
-
-	input := "---\nname: demo\ndescription: test\n---\n\n# Demo\n"
-	output := ensureCodexRulePlatform(input)
-	assert.Contains(t, output, "platform: codex")
-
-	alreadyTagged := "---\nname: demo\nplatform: codex\n---\n\n# Demo\n"
-	assert.Equal(t, alreadyTagged, ensureCodexRulePlatform(alreadyTagged))
 }
 
 func TestInjectMarkerSection_EmptyFile(t *testing.T) {
@@ -234,7 +190,7 @@ func TestGenerateHooks_ValidJSON(t *testing.T) {
 	assert.Contains(t, hooks, "Stop")
 }
 
-func TestRulesReferenceInAgentsMD(t *testing.T) {
+func TestNativeSkillRoutingInAgentsMD(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -250,9 +206,10 @@ func TestRulesReferenceInAgentsMD(t *testing.T) {
 	assert.Contains(t, content, "## Core Guidelines")
 	assert.Contains(t, content, "### Subagent Delegation")
 	assert.Contains(t, content, "### Review Convergence")
-	assert.Contains(t, content, "## Rules")
-	assert.Contains(t, content, "See .codex/rules/autopus/ for Codex rule definitions.")
-	assert.Contains(t, content, ".codex/skills/agent-pipeline.md")
+	assert.Contains(t, content, "### Mandatory Compact Policy")
+	assert.Contains(t, content, "$codex-auto-<route>")
+	assert.Contains(t, content, "$codex-<skill>")
+	assert.NotContains(t, content, ".codex/rules/autopus/")
 }
 
 func TestMarkerSection_Under32KB(t *testing.T) {

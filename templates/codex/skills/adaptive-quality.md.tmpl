@@ -182,35 +182,39 @@ Codex custom agent files are loaded when a session starts. Run `auto quality pro
 
 Unsupported env values must fail open to Quality Mode defaults. Use `auto effort detect` when the runtime needs the resolved value explicitly.
 
-## Agent() Call Pattern
+## Agent Call Pattern
+
+Claude Code 2.1.246 agent calls inherit the model-and-effort projection from the
+installed agent definition. Complexity changes that definition or the selected
+role; ordinary calls do not send per-call effort.
 
 ### HIGH complexity
 
 ```python
 Agent(
+    description="Implement the high-complexity assigned task",
+    prompt=task_prompt,
     subagent_type="executor",
-    model="opus",
-    prompt=task_prompt
 )
 ```
 
 ### MEDIUM complexity
 
 ```python
-# No model param — uses pipeline default (sonnet)
 Agent(
+    description="Implement the medium-complexity assigned task",
+    prompt=task_prompt,
     subagent_type="executor",
-    prompt=task_prompt
 )
 ```
 
 ### LOW complexity
 
 ```python
-# Use the standard model. Lower reasoning effort only on platforms that support it.
 Agent(
+    description="Implement the low-complexity assigned task",
+    prompt=task_prompt,
     subagent_type="executor",
-    prompt=task_prompt
 )
 ```
 

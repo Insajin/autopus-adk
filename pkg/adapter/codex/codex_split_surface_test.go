@@ -22,7 +22,7 @@ func TestAdapter_Update_SplitCompilerPrunesRepoVisibleLongTailWhenMovingToPlugin
 
 	_, err := a.Generate(context.Background(), fullCfg)
 	require.NoError(t, err)
-	assert.FileExists(t, filepath.Join(a.root, ".codex", "skills", "metrics.md"), "acceptance S2: full mode must start with the existing repo-visible Codex skill path")
+	assert.FileExists(t, filepath.Join(a.root, ".codex", "skills", "codex-metrics", "SKILL.md"), "full mode must start with the native repo-visible Codex skill path")
 
 	splitCfg := config.DefaultFullConfig("split-codex")
 	splitCfg.Platforms = []string{"codex", "opencode"}
@@ -33,9 +33,9 @@ func TestAdapter_Update_SplitCompilerPrunesRepoVisibleLongTailWhenMovingToPlugin
 	_, err = a.Update(context.Background(), splitCfg)
 	require.NoError(t, err)
 
-	assert.FileExists(t, filepath.Join(a.root, ".codex", "skills", "make-interfaces-feel-better.md"), "core polish skill must remain repo-visible for Codex even when long-tail skills move to the plugin surface")
-	assert.FileExists(t, filepath.Join(a.root, ".autopus", "plugins", "auto", "skills", "metrics", "SKILL.md"), "acceptance S7: split compiler must materialize Codex long-tail skills in the plugin-scoped target")
-	assert.NoFileExists(t, filepath.Join(a.root, ".codex", "skills", "metrics.md"), "acceptance S4/S7: stale repo-visible Codex long-tail artifact must be pruned when ownership moves to the plugin surface")
+	assert.FileExists(t, filepath.Join(a.root, ".codex", "skills", "codex-make-interfaces-feel-better", "SKILL.md"), "core polish skill must remain repo-visible for Codex even when long-tail skills move to the plugin surface")
+	assert.FileExists(t, filepath.Join(a.root, ".autopus", "plugins", "auto", "skills", "metrics", "SKILL.md"), "split compiler must materialize Codex long-tail skills in the plugin-scoped target")
+	assert.NoFileExists(t, filepath.Join(a.root, ".codex", "skills", "codex-metrics", "SKILL.md"), "stale repo-visible Codex long-tail artifact must be pruned when ownership moves to the plugin surface")
 }
 
 func TestAdapter_Update_SplitCompilerWritesCodexPluginSkillFrontmatter(t *testing.T) {

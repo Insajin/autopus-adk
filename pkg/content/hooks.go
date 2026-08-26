@@ -17,6 +17,8 @@ type GitHookScript struct {
 }
 
 // GenerateProjectHookConfigs generates hooks with access to feature flags.
+// @AX:ANCHOR [AUTO]: preserve the project-aware hook projection contract across platform adapters.
+// @AX:REASON [AUTO]: Claude, Codex, OpenCode, Antigravity, and compatibility callers depend on the same native-hook versus Git-only precedence.
 func GenerateProjectHookConfigs(cfg *config.HarnessConfig, platform string, supportsHooks bool) ([]adapter.HookConfig, []GitHookScript, error) {
 	if cfg == nil {
 		return GenerateHookConfigs(config.HooksConf{}, platform, supportsHooks)
@@ -27,18 +29,17 @@ func GenerateProjectHookConfigs(cfg *config.HarnessConfig, platform string, supp
 			return nil, nil, err
 		}
 		hooks = append(hooks, generateCC21Hooks(cfg.Features.CC21, platform)...)
-		return hooks, nil, nil
+		return hooks, generateGitOnlyHooks(cfg.Hooks), nil
 	}
 	return nil, generateGitHooks(cfg.Hooks), nil
 }
 
-// GenerateHookConfigs는 설정에 따라 훅 설정을 생성한다.
-// supportsHooks가 true이면 CLI 훅 설정을 반환하고,
-// false이면 .git/hooks/ 스크립트를 반환한다.
+// GenerateHookConfigs returns native CLI hooks plus Git-only checks that have
+// no matching CLI event. Platforms without hooks receive all Git checks.
 func GenerateHookConfigs(cfg config.HooksConf, platform string, supportsHooks bool) ([]adapter.HookConfig, []GitHookScript, error) {
 	if supportsHooks {
 		hooks, err := generateCLIHooks(cfg, platform)
-		return hooks, nil, err
+		return hooks, generateGitOnlyHooks(cfg), err
 	}
 	return nil, generateGitHooks(cfg), nil
 }
@@ -110,13 +111,9 @@ func generateCC21Hooks(cfg config.CC21FeaturesConf, platform string) []adapter.H
 
 	return []adapter.HookConfig{{
 		Event:   "TaskCreated",
-		Matcher: "",
 		Type:    "command",
-		Command: ".claude/hooks/task-created-validate.sh",
+		Command: "AUTOPUS_TASKCREATED_DEFAULT_MODE=" + mode + " .claude/hooks/task-created-validate.sh",
 		Timeout: 5,
-		Env: map[string]string{
-			"AUTOPUS_TASKCREATED_DEFAULT_MODE": mode,
-		},
 	}}
 }
 
@@ -195,6 +192,17 @@ func generateGitHooks(cfg config.HooksConf) []GitHookScript {
 	return hooks
 }
 
+// generateGitOnlyHooks returns checks that have no valid CLI-hook equivalent.
+func generateGitOnlyHooks(cfg config.HooksConf) []GitHookScript {
+	if !cfg.PreCommitLore {
+		return nil
+	}
+	return []GitHookScript{{
+		Path:    ".git/hooks/commit-msg",
+		Content: buildCommitMsgScript(),
+	}}
+}
+
 // buildPreCommitScript는 pre-commit 스크립트를 생성한다.
 // Uses --staged to only check git-staged files, avoiding submodule/worktree scans.
 func buildPreCommitScript(cfg config.HooksConf) string {
@@ -239,13 +247,15 @@ func DetectPermissions(projectRoot string, extra config.PermissionsConf) *adapte
 		"mcp__sequential-thinking__sequentialthinking",
 		"WebSearch",
 
-		// Pipeline: agent orchestration tools
+		// Pipeline: current Claude orchestration tools.
 		"Agent",
 		"AskUserQuestion",
 		"TaskCreate",
+		"TaskGet",
+		"TaskList",
 		"TaskUpdate",
-		"TeamCreate",
 		"SendMessage",
+		"Workflow",
 		"ToolSearch",
 	}
 

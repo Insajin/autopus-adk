@@ -127,6 +127,9 @@ func runCoverageGate(
 				if sName == "" {
 					sName = extractSkillNameFromPath(f.TargetPath)
 				}
+				if pName == "codex" {
+					sName = strings.TrimPrefix(sName, "codex-")
+				}
 				if sName != "" {
 					generatedSkills[sName] = true
 				}

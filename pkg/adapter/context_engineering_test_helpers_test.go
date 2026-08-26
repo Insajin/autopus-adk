@@ -40,12 +40,12 @@ func generateContextEngineeringSurfaces(t *testing.T) map[string]contextEngineer
 	generators := []generator{
 		{"claude", func(root string) (*adapter.PlatformFiles, error) {
 			return claude.NewWithRoot(root).Generate(context.Background(), config.DefaultFullConfig("context-engineering"))
-		}, ".claude/skills/autopus/agent-pipeline.md",
-			func(command string) string { return ".claude/skills/autopus/auto-" + command + ".md" }},
+		}, ".claude/skills/agent-pipeline/SKILL.md",
+			func(command string) string { return ".claude/skills/auto-" + command + "/SKILL.md" }},
 		{"codex", func(root string) (*adapter.PlatformFiles, error) {
 			return codex.NewWithRoot(root).Generate(context.Background(), config.DefaultFullConfig("context-engineering"))
-		}, ".codex/skills/agent-pipeline.md",
-			func(command string) string { return ".agents/skills/auto-" + command + "/SKILL.md" }},
+		}, ".codex/skills/codex-agent-pipeline/SKILL.md",
+			func(command string) string { return ".codex/skills/codex-auto-" + command + "/SKILL.md" }},
 		{"opencode", func(root string) (*adapter.PlatformFiles, error) {
 			return opencode.NewWithRoot(root).Generate(context.Background(), config.DefaultFullConfig("context-engineering"))
 		}, ".agents/skills/agent-pipeline/SKILL.md",
@@ -54,8 +54,8 @@ func generateContextEngineeringSurfaces(t *testing.T) map[string]contextEngineer
 			cfg := config.DefaultFullConfig("context-engineering")
 			cfg.Platforms = []string{"omp"}
 			return omp.NewWithRoot(root).Generate(context.Background(), cfg)
-		}, ".agents/skills/agent-pipeline/SKILL.md",
-			func(command string) string { return ".agents/skills/auto-" + command + "/SKILL.md" }},
+		}, ".omp/skills/agent-pipeline/SKILL.md",
+			func(command string) string { return ".omp/skills/auto-" + command + "/SKILL.md" }},
 		{"gemini", func(root string) (*adapter.PlatformFiles, error) {
 			return antigravity.NewWithRoot(root, antigravity.WithoutPluginInstall()).Generate(
 				context.Background(), config.DefaultFullConfig("context-engineering"))

@@ -136,10 +136,15 @@ func isUserOwnedCodexConfigKey(section, key string) bool {
 }
 
 func parseCodexConfigSection(trimmed string) (string, bool) {
-	if !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
+	header := strings.TrimSpace(codexTOMLValueWithoutComment(trimmed))
+	return parseCodexConfigSectionHeader(header)
+}
+
+func parseCodexConfigSectionHeader(header string) (string, bool) {
+	if !strings.HasPrefix(header, "[") || !strings.HasSuffix(header, "]") {
 		return "", false
 	}
-	section := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "["), "]"))
+	section := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(header, "["), "]"))
 	if section == "" || strings.Contains(section, "[") || strings.Contains(section, "]") {
 		return "", false
 	}

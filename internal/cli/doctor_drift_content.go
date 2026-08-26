@@ -8,11 +8,6 @@ import (
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
-	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
-	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/omp"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/codexruntime"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -69,37 +64,25 @@ func captureDriftGenerationSnapshot(
 	platform string,
 	probe driftCatalogProbe,
 ) driftGenerationSnapshot {
-	if platform != "codex" {
+	descriptor, ok := lookupPlatformDescriptor(platform)
+	if !ok || !descriptor.probeDriftCatalog {
 		return driftGenerationSnapshot{}
 	}
-	catalog, err := probe(ctx, "codex", driftCodexCatalogTimeout)
+	catalog, err := probe(ctx, descriptor.name, driftCodexCatalogTimeout)
 	if err != nil {
 		catalog = nil
 	}
 	return driftGenerationSnapshot{codexCatalog: catalog, codexCatalogFixed: true}
 }
 
-// driftAdapterFor returns the platform adapter rooted at root, or nil for an
-// unknown platform token. It mirrors validateDoctorPlatform's switch so the
-// drift gate reuses the same adapter contract the rest of doctor relies on.
+// driftAdapterFor returns the catalog adapter rooted at root, or nil for an
+// unknown platform token. External inputs are frozen for deterministic drift.
 func driftAdapterFor(platform, root string, snapshot driftGenerationSnapshot) adapter.PlatformAdapter {
-	switch platform {
-	case "claude-code":
-		return claude.NewWithRoot(root)
-	case "codex":
-		if snapshot.codexCatalogFixed {
-			return codex.NewWithRoot(root, codex.WithModelCatalog(snapshot.codexCatalog))
-		}
-		return codex.NewWithRoot(root)
-	case "antigravity-cli":
-		return antigravity.NewWithRoot(root, antigravity.WithoutPluginInstall())
-	case "opencode":
-		return opencode.NewWithRoot(root)
-	case "omp":
-		return omp.NewWithRoot(root)
-	default:
+	descriptor, ok := lookupPlatformDescriptor(platform)
+	if !ok {
 		return nil
 	}
+	return descriptor.driftAdapter(root, snapshot.codexCatalog, snapshot.codexCatalogFixed)
 }
 
 // collectContentDrift compares each configured platform's installed deterministic

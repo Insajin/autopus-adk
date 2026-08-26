@@ -13,12 +13,12 @@ var ompReadinessCapabilityIDs = []string{
 	"launch.rpc",
 	"launch.no_session",
 	"launch.cwd",
-	"launch.model",
-	"config.overlay_readback",
-	"catalog.models_json",
-	"rpc.command_discovery",
-	"rpc.tool_events",
-	"rpc.terminal",
+	"config.intent_tracing",
+	"rpc.protocol_v2",
+	"rpc.state",
+	"rpc.commands",
+	"rpc.dump_tools_pre_intent",
+	"rpc.subagent_subscription",
 }
 
 // OMPProbeRunner makes every readiness subprocess injectable and bounded by
@@ -62,30 +62,26 @@ type ompProbeResult struct {
 	reason string
 }
 
-// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-002: readiness exposes stable capability IDs and semantic reason enums only.
-// @AX:REASON [AUTO]: doctor text/JSON consumers depend on this report shape, and raw subprocess output or
-// task-owned absolute paths must not cross this public boundary.
-func ProbeOMPReadiness(ctx context.Context, opts OMPReadinessOptions) (report OMPReadinessReport) {
+// ProbeOMPReadiness inspects only local metadata, configuration, and RPC state.
+// It never selects a model, sends a prompt, starts a provider, or writes through
+// an agent tool.
+// @AX:ANCHOR [AUTO]: preserve this provider-free readiness API and its semantic report boundary.
+// @AX:REASON [AUTO]: doctor and external adapter consumers depend on stable capability IDs without model selection, prompt submission, provider startup, or agent-tool writes.
+func ProbeOMPReadiness(ctx context.Context, opts OMPReadinessOptions) OMPReadinessReport {
 	opts = normalizeOMPReadinessOptions(opts)
-	report = OMPReadinessReport{
-		Executable:   filepath.Base(opts.Executable),
-		Capabilities: make([]OMPCapabilityResult, 0, len(ompReadinessCapabilityIDs)),
+	report := OMPReadinessReport{
+		Executable:    filepath.Base(opts.Executable),
+		Capabilities:  make([]OMPCapabilityResult, 0, len(ompReadinessCapabilityIDs)),
+		CatalogReason: "not_probed_provider_free",
 	}
 
-	overlay, overlayErr := createOMPReadinessOverlay()
-	if overlay != "" {
-		defer func() {
-			if err := os.RemoveAll(filepath.Dir(overlay)); err != nil {
-				report = markOMPReadinessOverlayCleanupFailure(report)
-			}
-		}()
+	sandbox, err := createOMPReadinessSandbox()
+	if err != nil {
+		return ompIdentityFailureReport(report, nil, "output_invalid")
 	}
-
-	if overlayErr != nil {
-		return ompIdentityFailureReport(report, opts.Selectors, "output_invalid")
-	}
+	defer func() { _ = os.RemoveAll(sandbox) }()
 	if runner, ok := opts.Runner.(commandOMPProbeRunner); ok {
-		runner, resolved := configureOMPProbeRunner(runner, opts.Executable, overlay)
+		runner, resolved := configureOMPProbeRunner(runner, opts.Executable, sandbox, opts.Root)
 		opts.Runner = runner
 		if resolved != "" {
 			opts.Executable = resolved
@@ -98,7 +94,7 @@ func ProbeOMPReadiness(ctx context.Context, opts OMPReadinessOptions) (report OM
 	report.Version = observedVersion
 	report.Capabilities = append(report.Capabilities, versionResult)
 	if !versionResult.Supported {
-		return ompIdentityFailureReport(report, opts.Selectors, "identity_unverified")
+		return ompIdentityFailureReport(report, nil, "identity_unverified")
 	}
 
 	help := runOMPProbe(ctx, opts, "--help")
@@ -106,51 +102,28 @@ func ProbeOMPReadiness(ctx context.Context, opts OMPReadinessOptions) (report OM
 		evaluateOMPHelpCapability("launch.rpc", help, "--mode", "rpc"),
 		evaluateOMPHelpCapability("launch.no_session", help, "--no-session"),
 		evaluateOMPHelpCapability("launch.cwd", help, "--cwd"),
-		evaluateOMPHelpCapability("launch.model", help, "--model"),
 	)
-
-	configResult := runOMPProbe(ctx, opts,
-		"--config", overlay, "config", "get", "skills.customDirectories", "--json")
-	report.Capabilities = append(report.Capabilities, evaluateOMPConfigCapability(configResult))
-
-	catalogResult := runOMPProbe(ctx, opts, "--config", overlay, "models", "--json")
-	models, catalogReason, catalogCapability := evaluateOMPCatalog(catalogResult)
-	report.CatalogReason = catalogReason
-	report.Capabilities = append(report.Capabilities, catalogCapability)
-	report.SelectorResolutions = resolveOMPSelectors(opts.Selectors, models, catalogReason)
+	intent := runOMPProbe(ctx, opts, "config", "get", "tools.intentTracing", "--json")
+	report.Capabilities = append(report.Capabilities, evaluateOMPIntentTracing(intent))
 
 	var rpcResult ompProbeResult
 	if runner, ok := opts.Runner.(commandOMPProbeRunner); ok {
-		rpcResult = runOMPReadinessBehavioralProbe(ctx, opts, runner, overlay)
+		rpcResult = runOMPReadinessProviderFreeProbe(ctx, opts, runner)
 	} else {
-		rpcResult = runOMPProbe(ctx, opts, "--config", overlay, "--mode", "rpc",
-			"--no-session", "--cwd", opts.Root)
+		rpcResult = runOMPProbe(ctx, opts, ompProviderFreeRPCArgs(opts.Root)...)
 	}
-	report.Capabilities = append(report.Capabilities, evaluateOMPRPCCapabilities(rpcResult)...)
-	return report
-}
-
-func markOMPReadinessOverlayCleanupFailure(report OMPReadinessReport) OMPReadinessReport {
-	for index := range report.Capabilities {
-		if report.Capabilities[index].ID == "config.overlay_readback" {
-			report.Capabilities[index].Supported = false
-			report.Capabilities[index].Reason = "output_invalid"
-			break
-		}
-	}
+	report.Capabilities = append(report.Capabilities, evaluateOMPProviderFreeRPC(rpcResult)...)
 	return report
 }
 
 func ompIdentityFailureReport(
 	report OMPReadinessReport,
-	selectors []string,
+	_ []string,
 	reason string,
 ) OMPReadinessReport {
 	for _, id := range ompReadinessCapabilityIDs[len(report.Capabilities):] {
 		report.Capabilities = append(report.Capabilities, OMPCapabilityResult{ID: id, Reason: reason})
 	}
-	report.CatalogReason = reason
-	report.SelectorResolutions = resolveOMPSelectors(selectors, nil, reason)
 	return report
 }
 
@@ -161,8 +134,9 @@ func normalizeOMPReadinessOptions(opts OMPReadinessOptions) OMPReadinessOptions 
 	if opts.Timeout <= 0 {
 		opts.Timeout = 5 * time.Second
 	}
+	// @AX:NOTE [AUTO]: 256 KiB bounds the complete native RPC transcript while allowing all provider-free capability frames.
 	if opts.MaxOutput <= 0 {
-		opts.MaxOutput = 64 * 1024
+		opts.MaxOutput = 256 * 1024
 	}
 	if opts.Root == "" {
 		opts.Root = "."
@@ -173,7 +147,7 @@ func normalizeOMPReadinessOptions(opts OMPReadinessOptions) OMPReadinessOptions 
 	return opts
 }
 
-func createOMPReadinessOverlay() (string, error) {
+func createOMPReadinessSandbox() (string, error) {
 	dir, err := os.MkdirTemp("", "autopus-omp-readiness-")
 	if err != nil {
 		return "", err
@@ -190,13 +164,7 @@ func createOMPReadinessOverlay() (string, error) {
 			return "", err
 		}
 	}
-	path := filepath.Join(dir, "config.yml")
-	content := []byte("skills:\n  customDirectories:\n    - .agents/skills\n")
-	if err := os.WriteFile(path, content, 0o600); err != nil {
-		_ = os.RemoveAll(dir)
-		return "", err
-	}
-	return path, nil
+	return dir, nil
 }
 
 func runOMPProbe(parent context.Context, opts OMPReadinessOptions, args ...string) ompProbeResult {

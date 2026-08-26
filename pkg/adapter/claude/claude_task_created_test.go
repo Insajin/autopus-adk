@@ -86,12 +86,11 @@ func TestClaudeAdapter_Generate_TaskCreatedSettingFollowsFeatureFlag(t *testing.
 
 		hookEntry, ok := hooks[0].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, ".claude/hooks/task-created-validate.sh", hookEntry["command"])
+		assert.Equal(t, "AUTOPUS_TASKCREATED_DEFAULT_MODE=warn .claude/hooks/task-created-validate.sh", hookEntry["command"])
 		assert.Equal(t, float64(5), hookEntry["timeout"])
-
-		env, ok := hookEntry["env"].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "warn", env["AUTOPUS_TASKCREATED_DEFAULT_MODE"])
+		assert.NotContains(t, hookEntry, "env")
+		assert.NotContains(t, entry, "env")
+		assert.NotContains(t, entry, "matcher")
 	})
 
 	t.Run("disabled", func(t *testing.T) {

@@ -18,7 +18,7 @@ func mappingTargetSet(files []adapter.FileMapping) map[string]bool {
 	return out
 }
 
-func removeStableMapping(t *testing.T, root string, files []adapter.FileMapping) {
+func removeStableMapping(t *testing.T, root string, files []adapter.FileMapping) string {
 	t.Helper()
 	require.NotEmpty(t, files)
 	paths := make([]string, 0, len(files))
@@ -27,6 +27,7 @@ func removeStableMapping(t *testing.T, root string, files []adapter.FileMapping)
 	}
 	sort.Strings(paths)
 	require.NoError(t, os.Remove(filepath.Join(root, paths[0])))
+	return filepath.ToSlash(paths[0])
 }
 
 func itoa(value int) string {

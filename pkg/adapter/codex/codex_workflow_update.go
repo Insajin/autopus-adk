@@ -1,25 +1,6 @@
 package codex
 
 func updateWorkflowBody(name, summary string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — Harness Update",
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 원칙",
-		"",
-		"- 이 워크플로우는 `auto update` CLI wrapper입니다.",
-		"- 현재 디렉터리가 메타 workspace이면 `auto update`가 workspace mode를 자동 감지합니다.",
-		"- 사용자가 특정 repo 이름을 제공하면 `auto update <repo>` 형태로 전달합니다.",
-		"- 사용자가 현재 repo만 원하면 `auto update --local`을 사용합니다.",
-		"- 코딩 도구 내부 실행에서는 확인 프롬프트가 막히지 않도록 `auto --auto update`를 기본 실행 명령으로 사용합니다.",
-		"",
-		"## 실행 명령",
-		"",
-		"`auto --auto update`",
-	)
 
 	skill := compose(
 		"# "+name+" — Harness Update",
@@ -44,5 +25,5 @@ func updateWorkflowBody(name, summary string) customWorkflowBody {
 		"6. 결과에서 업데이트된 repo, 스킵된 repo, 추가 조치가 필요한 repo를 요약합니다.",
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }

@@ -10,43 +10,37 @@ import (
 	"strings"
 )
 
-// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: product skill surfaces are capped at 4 MiB and ambient OMP settings/config must be absent.
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: native product surfaces are capped at 4 MiB and an optional base config must match exactly.
 const workflowContextManagedProductSurfaceMaxBytes = 4 << 20
 
-// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: project command/skill authority must equal the isolated generated surface.
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: project-native command and skill authority must equal the isolated generated surface.
 // @AX:REASON [AUTO]: constructor admission and pre-run identity revalidation both depend on exact files plus an absent-only ambient denylist.
 func validateWorkflowContextManagedProductSurface(options WorkflowContextManagedRPCOptions) error {
-	if err := compareWorkflowContextManagedProductFile(
+	if err := compareWorkflowContextManagedOptionalProductFile(
 		filepath.Join(options.ProjectDir, ".omp", "config.yml"),
 		filepath.Join(options.Workspace, ".omp", "config.yml"),
 	); err != nil {
 		return fmt.Errorf("managed OMP project config is not authoritative: %w", err)
 	}
-	names, err := workflowContextManagedProductCommandNames(options.Prompts[0])
-	if err != nil {
-		return err
-	}
-	for _, name := range names {
-		project := filepath.Join(options.ProjectDir, ".agents", "skills", name)
-		expected := filepath.Join(options.Workspace, ".agents", "skills", name)
+	for _, relative := range []string{
+		filepath.Join(".omp", "skills"),
+		filepath.Join(".omp", "commands"),
+	} {
+		project := filepath.Join(options.ProjectDir, relative)
+		expected := filepath.Join(options.Workspace, relative)
 		if err := compareWorkflowContextManagedProductSurface(project, expected); err != nil {
-			return fmt.Errorf("managed OMP product skill %s is not authoritative: %w", name, err)
-		}
-		project = filepath.Join(options.ProjectDir, ".agents", "commands", name+".md")
-		expected = filepath.Join(options.Workspace, ".agents", "commands", name+".md")
-		if err := compareWorkflowContextManagedProductFile(project, expected); err != nil {
-			return fmt.Errorf("managed OMP product command %s is not authoritative: %w", name, err)
+			return fmt.Errorf("managed OMP native surface %s is not authoritative: %w", relative, err)
 		}
 	}
 	for _, relative := range []string{
-		".agent", ".agents/SYSTEM.md", ".agents/prompts",
+		".agent", ".agents/SYSTEM.md", ".agents/commands", ".agents/prompts", ".agents/skills",
 		".claude/SYSTEM.md", ".claude/commands", ".claude/extensions", ".claude/hooks",
 		".claude/plugins", ".claude/tools", ".claude-plugin",
 		".codex/AGENTS.md", ".codex/commands", ".codex/extensions", ".codex/hooks",
 		".codex/prompts", ".codex/tools",
 		".gemini/extensions", ".gemini/system.md", ".github/prompts",
 		".github/instructions", ".github/copilot-instructions.md",
-		".omp/SYSTEM.md", ".omp/agent", ".omp/commands", ".omp/hooks", ".omp/instructions",
+		".omp/SYSTEM.md", ".omp/agent", ".omp/hooks", ".omp/instructions",
 		".omp/plugins", ".omp/prompts", ".omp/tools", ".omp/settings.json",
 		".omp/config.json", ".omp/config.yaml",
 		".opencode/commands", ".opencode/plugins", ".pi",
@@ -93,6 +87,19 @@ func compareWorkflowContextManagedProductFile(actualPath, expectedPath string) e
 		return errors.New("content differs")
 	}
 	return nil
+}
+
+func compareWorkflowContextManagedOptionalProductFile(actualPath, expectedPath string) error {
+	actualInfo, actualErr := os.Lstat(actualPath)
+	expectedInfo, expectedErr := os.Lstat(expectedPath)
+	if errors.Is(actualErr, fs.ErrNotExist) && errors.Is(expectedErr, fs.ErrNotExist) {
+		return nil
+	}
+	if actualErr != nil || expectedErr != nil || actualInfo.Mode()&os.ModeSymlink != 0 ||
+		expectedInfo.Mode()&os.ModeSymlink != 0 {
+		return errors.New("optional source identity differs")
+	}
+	return compareWorkflowContextManagedProductFile(actualPath, expectedPath)
 }
 
 func compareWorkflowContextManagedProductSurface(actualRoot, expectedRoot string) error {

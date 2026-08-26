@@ -2,7 +2,6 @@ package codex
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
@@ -23,11 +22,26 @@ func (a *Adapter) prepareSkillTemplateMappings(cfg *config.HarnessConfig) ([]ada
 		}
 
 		skillFile := strings.TrimSuffix(entry.Name(), ".tmpl")
+		skillName := strings.TrimSuffix(skillFile, ".md")
 		emit, err := shouldEmitCodexRepoSkillTemplate(skillFile, cfg)
 		if err != nil {
 			return nil, fmt.Errorf("코덱스 스킬 템플릿 대상 판정 실패 %s: %w", entry.Name(), err)
 		}
 		if !emit {
+			continue
+		}
+
+		if spec, ok := codexWorkflowSpecByName(skillName); ok {
+			rendered, renderErr := a.renderWorkflowSkill(cfg, spec)
+			if renderErr != nil {
+				return nil, renderErr
+			}
+			files = append(files, adapter.FileMapping{
+				TargetPath:      codexProjectSkillPath(spec.Name),
+				OverwritePolicy: adapter.OverwriteAlways,
+				Checksum:        checksum(rendered),
+				Content:         []byte(rendered),
+			})
 			continue
 		}
 
@@ -44,11 +58,15 @@ func (a *Adapter) prepareSkillTemplateMappings(cfg *config.HarnessConfig) ([]ada
 			rendered = string(tmplContent)
 		}
 
-		rendered = normalizeCodexInvocationBody(rendered)
-		rendered = normalizeCodexHelperPaths(rendered)
-		rendered = normalizeCodexToolingBody(rendered)
+		rendered = normalizeCodexExtendedSkill(skillName, rendered)
+		rendered = ensureCodexSkillFrontmatter(
+			codexProjectSkillPath(skillName),
+			skillName,
+			skillName,
+			normalizeCodexToolingBody(normalizeCodexHelperPaths(normalizeCodexInvocationBody(rendered))),
+		)
 		files = append(files, adapter.FileMapping{
-			TargetPath:      filepath.Join(".codex", "skills", skillFile),
+			TargetPath:      codexProjectSkillPath(skillName),
 			OverwritePolicy: adapter.OverwriteAlways,
 			Checksum:        checksum(rendered),
 			Content:         []byte(rendered),
@@ -65,7 +83,7 @@ func (a *Adapter) prepareSkillTemplateMappings(cfg *config.HarnessConfig) ([]ada
 			return nil, err
 		}
 		files = append(files, adapter.FileMapping{
-			TargetPath:      filepath.Join(".codex", "skills", spec.Name+".md"),
+			TargetPath:      codexProjectSkillPath(spec.Name),
 			OverwritePolicy: adapter.OverwriteAlways,
 			Checksum:        checksum(rendered),
 			Content:         []byte(rendered),
@@ -73,4 +91,13 @@ func (a *Adapter) prepareSkillTemplateMappings(cfg *config.HarnessConfig) ([]ada
 	}
 
 	return files, nil
+}
+
+func codexWorkflowSpecByName(name string) (workflowSpec, bool) {
+	for _, spec := range workflowSpecs {
+		if spec.Name == name && spec.Name != "auto" {
+			return spec, true
+		}
+	}
+	return workflowSpec{}, false
 }

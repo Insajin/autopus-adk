@@ -20,7 +20,7 @@ var markerRe = regexp.MustCompile(`(?s)` + regexp.QuoteMeta(markerBegin) + `.*?`
 // injectMarkerSection creates or updates the AUTOPUS marker section in AGENTS.md.
 func (a *Adapter) injectMarkerSection(cfg *config.HarnessConfig) (string, error) {
 	agentsPath := filepath.Join(a.root, "AGENTS.md")
-	cfg = ensurePlatformInRootDoc(cfg, "codex")
+	cfg = ensureCodexRootDocConfig(cfg)
 
 	var existing string
 	if data, err := os.ReadFile(agentsPath); err == nil {
@@ -39,15 +39,6 @@ func (a *Adapter) injectMarkerSection(cfg *config.HarnessConfig) (string, error)
 	}
 	sectionContent += agentsSection
 
-	// Reference separate rule files instead of inlining.
-	sectionContent += "\n## Rules\n\n"
-	if containsPlatform(cfg.Platforms, "codex") {
-		sectionContent += "See .codex/rules/autopus/ for Codex guidance.\n"
-	}
-	if containsPlatform(cfg.Platforms, "opencode") {
-		sectionContent += "See .opencode/rules/autopus/ for OpenCode guidance.\n"
-	}
-
 	newSection := markerBegin + "\n" + sectionContent + "\n" + markerEnd
 
 	if strings.Contains(existing, markerBegin) && strings.Contains(existing, markerEnd) {
@@ -61,7 +52,7 @@ func (a *Adapter) injectMarkerSection(cfg *config.HarnessConfig) (string, error)
 }
 
 func replaceMarkerSection(content, newSection string) string {
-	return markerRe.ReplaceAllString(content, newSection)
+	return markerRe.ReplaceAllStringFunc(content, func(string) string { return newSection })
 }
 
 func removeMarkerSection(content string) string {
@@ -77,14 +68,11 @@ func containsPlatform(platforms []string, target string) bool {
 	return false
 }
 
-func ensurePlatformInRootDoc(cfg *config.HarnessConfig, platform string) *config.HarnessConfig {
-	if cfg == nil {
-		return nil
-	}
-	if containsPlatform(cfg.Platforms, platform) {
+func ensureCodexRootDocConfig(cfg *config.HarnessConfig) *config.HarnessConfig {
+	if cfg == nil || containsPlatform(cfg.Platforms, "codex") {
 		return cfg
 	}
 	cloned := *cfg
-	cloned.Platforms = append(append([]string{}, cfg.Platforms...), platform)
+	cloned.Platforms = append(append([]string(nil), cfg.Platforms...), "codex")
 	return &cloned
 }

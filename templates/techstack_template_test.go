@@ -56,7 +56,7 @@ func TestTechnologyStackFreshnessTemplateContracts(t *testing.T) {
 			"techstack-freshness",
 			"checked_at",
 		},
-		filepath.Join(root, "codex", "skills", "agent-pipeline.md.tmpl"): {
+		filepath.Join(root, "..", "pkg", "adapter", "codex", "codex_extended_skill_rewrites_pipeline_policy.go"): {
 			"Technology Stack Decision",
 			"version/source_ref/checked_at",
 			"techstack-freshness",

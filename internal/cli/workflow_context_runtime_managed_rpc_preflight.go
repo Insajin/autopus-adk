@@ -22,15 +22,15 @@ func verifyWorkflowContextManagedRPCConfig(
 			return err
 		}
 		wants = map[string]any{
-			"compaction.enabled": true, "compaction.strategy": "snapcompact",
+			"compaction.enabled": true, "compaction.methodOrder": []any{"snapcompact"},
 			"compaction.autoContinue": false, "memory.backend": "off",
 			"extensions": []any{}, "mcp.enableProjectConfig": false,
 			"commands.enableClaudeProject": false, "commands.enableClaudeUser": false,
 			"commands.enableOpencodeProject": false, "commands.enableOpencodeUser": false,
-			"skills.enableAgentsProject": true, "skills.enableAgentsUser": false,
+			"skills.enableAgentsProject": false, "skills.enableAgentsUser": false,
 			"skills.enableClaudeProject": false, "skills.enableClaudeUser": false,
-			"skills.enableCodexUser": false, "skills.enablePiProject": false,
-			"skills.enablePiUser": false,
+			"skills.enableCodexUser": false, "skills.enablePiProject": true,
+			"skills.enablePiUser": false, "skills.customDirectories": []any{},
 		}
 	}
 	for key, want := range wants {

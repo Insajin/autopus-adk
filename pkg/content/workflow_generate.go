@@ -135,8 +135,9 @@ func deriveWorkflowJS(schema workflow.Schema) string {
 	// string at runtime; normalize before reading).
 	sb.WriteString("// Workflow API globals: agent, phase, log, args.\n")
 	sb.WriteString(workflowArgvNormalizeJS)
-	sb.WriteString("const SEGMENT = (ARGV && ARGV.segment) || 'A';\n\n")
-
+	sb.WriteString("const ctx = ARGV;\n")
+	sb.WriteString("const SEGMENT = (ARGV && ARGV.segment) || 'A';\n")
+	sb.WriteString("let planningResult = null;\n\n")
 	// Split phases: segment A includes everything up to and including gate_build_test;
 	// segment B includes everything after gate_build_test.
 	var segA, segB []workflow.PhaseDef
@@ -163,6 +164,7 @@ func deriveWorkflowJS(schema workflow.Schema) string {
 		writePhaseBlock(&sb, p)
 	}
 	sb.WriteString("}\n")
+	sb.WriteString("\nreturn { planningResult };\n")
 
 	return sb.String()
 }
@@ -181,6 +183,12 @@ func writePhaseBlock(sb *strings.Builder, p workflow.PhaseDef) {
 		sb.WriteString("// Release hygiene: generated/runtime drift + staged source size gate.\n")
 		sb.WriteString("// This gate is executed outside the JS by the Go runtime.\n")
 		fmt.Fprintf(sb, "log('release_hygiene', '%s');\n", p.ID)
+	} else if p.ID == "planning" {
+		sb.WriteString("planningResult = await agent(`Plan SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}. Return an implementation plan with disjoint file ownership.`, { agentType: 'planner' });\n")
+		sb.WriteString("log('planning_result', planningResult);\n")
+	} else if p.ID == "implementation" {
+		sb.WriteString("const implementationResult = await agent(`Implement SPEC ${ctx.spec || ''} in ${ctx.workingDir || ''}. Planning result: ${JSON.stringify(planningResult)}`, { agentType: 'executor' });\n")
+		sb.WriteString("log('implementation_result', implementationResult);\n")
 	} else {
 		fmt.Fprintf(sb, "log('phase', '%s');\n", p.ID)
 	}

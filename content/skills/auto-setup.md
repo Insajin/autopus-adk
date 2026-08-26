@@ -30,4 +30,6 @@ Use `/auto setup` 또는 `/auto setup --auto`로 실행합니다. OpenCode에서
 - `.autopus/project/scenarios.md`
 - `.autopus/project/canary.md`
 
+`structure.md`는 package family와 경계만 요약하고 개별 파일을 전수 나열하지 않습니다. 목표 크기는 18,000 bytes 이하이며 doctor soft warning 경계인 20,000 bytes를 넘기지 않습니다. 세부 인벤토리는 본문 복제 대신 stable source path로 참조합니다.
+
 `workspace.md`에는 root repo role, nested git repo boundaries, generated/runtime paths, tracking/commit policy, source-of-truth repo, QA/Journey Pack target repos, and `auto qa init --project-dir <repo>` command routing을 기록합니다. meta workspace라면 root `.autopus/qa/**`를 제품 Journey Pack 위치로 쓰지 말고 runtime/generated evidence로 분리합니다.

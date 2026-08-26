@@ -421,19 +421,20 @@ auto init   # 지원되는 설치된 AI 코딩 CLI 자동 감지
 
 | 플랫폼 | 생성되는 파일 |
 |--------|-------------|
-| **Claude Code** | `.claude/rules/`, `.claude/skills/`, `.claude/agents/`, `CLAUDE.md` |
-| **Codex** | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
+| **Claude Code** | `.claude/rules/`, `.claude/skills/<name>/SKILL.md`, `.claude/agents/`, `.claude/workflows/`, `.claude/settings.json`, `CLAUDE.md` |
+| **Codex** | `.codex/skills/codex-<name>/SKILL.md`, `.codex/agents/`, `.codex/hooks.json`, `.codex/config.toml`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` |
 | **Antigravity CLI** | `.gemini/`, `GEMINI.md` |
 | **OpenCode** | `.opencode/rules/`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
-| **Oh My Pi (OMP)** | `.omp/rules/autopus-*.md`, `.omp/agents/`, `.omp/skills/`, `.omp/commands/`, `.omp/extensions/autopus-context.ts`, `.omp/config.yml`, `.agents/skills/` |
-동일한 16개 에이전트. 동일한 규칙. 공유 스킬은 기본적으로 전체가 생성됩니다. 기존 호환성을 유지하면서 mixed Codex + OpenCode 표면을 더 작게 만들고 싶다면 `skills.shared_surface`를 건드리는 대신 `skills.compiler.mode: split`을 opt-in 하세요.
+| **Oh My Pi (OMP)** | `.omp/rules/autopus-*.md`, `.omp/agents/`, `.omp/skills/<name>/SKILL.md`, `.omp/commands/`, 선택형 `.omp/extensions/` |
+
+현재 네이티브 기준 버전은 [Claude Code 2.1.246](https://github.com/anthropics/claude-code/releases/tag/v2.1.246), [Codex CLI 0.149.1](https://github.com/openai/codex/releases/tag/rust-v0.149.1), [OMP 18.0.5](https://github.com/can1357/oh-my-pi/releases/tag/v18.0.5)입니다. 규칙과 워크플로 의미는 플랫폼 간에 맞추되, 각 플랫폼이 실제로 발견하는 형식만 생성합니다.
 
 Codex 참고:
-- `auto init` 또는 `auto update` 직후에는 `$auto plan ...`, `$auto go ...`, `$auto idea ...`를 바로 사용할 수 있습니다
-- `.agents/plugins/marketplace.json`에 등록된 로컬 플러그인(`.autopus/plugins/auto`)을 설치하면 더 자연스러운 `@auto ...` 문법을 사용할 수 있습니다
-- 로컬 플러그인은 `@auto ...` 라우터 표면만 제공합니다. 상세 workflow 지침은 repo skill과 `.codex/prompts/`에 남겨 Codex에서 중복 `auto*` skill이 보이지 않게 합니다
-- `skills.compiler.mode: split`을 켜면 long-tail Codex skill은 `.autopus/plugins/auto/skills/`로 이동하고, repo-visible helper skill만 `.codex/skills/`에 남습니다
-- `.codex/hooks.json`은 기본 생성됩니다. 프로젝트 로컬 `.codex/config.toml`은 `[features].hooks`를 사용하며, legacy `[features].codex_hooks`는 생성하지 않아야 합니다.
+- `auto init` 또는 `auto update` 직후 `$codex-auto-plan ...`, `$codex-auto-go ...` 등 `$codex-auto-<route>` 스킬을 바로 사용할 수 있습니다
+- `.agents/plugins/marketplace.json`에 등록된 로컬 플러그인(`.autopus/plugins/auto`)을 설치하면 `@auto ...` 문법도 사용할 수 있습니다
+- 플러그인은 `@auto ...` 라우터만 제공합니다. 상세 워크플로는 `.codex/skills/codex-<name>/SKILL.md`에 고유한 네이티브 스킬로 생성하며, 저장소 안에 `.codex/prompts/`나 Markdown `.codex/rules/`를 만들지 않습니다
+- 멀티에이전트 모드는 `[features.multi_agent_v2]`와 현재의 협업 도구 6개를 사용합니다. 모든 worker가 같은 cwd와 파일시스템을 공유하며, 기존 `send_input`, `resume_agent`, `close_agent`는 사용하지 않습니다
+- `.codex/hooks.json`은 기본으로 생성하고, `.codex/config.toml`은 관련 없는 사용자 설정을 보존하도록 구조적으로 병합합니다
 
 OpenCode 참고:
 - `/auto ...`와 `/auto-plan ...` 같은 직접 alias가 `.opencode/commands/`에 생성됩니다
@@ -446,6 +447,8 @@ Oh My Pi 참고:
 - 규칙은 `.omp/rules/autopus-<name>.md` 평면 구조로 생성됩니다. OMP는 각 규칙 루트를 비재귀로만 탐색하므로 `rules/autopus/` 같은 하위 디렉터리는 세션에 도달하지 않습니다. 네임스페이스는 디렉터리가 아니라 `autopus-` 파일명 접두사입니다
 - ADK 소유는 manifest에 기록된 `autopus-` 접두사 파일뿐입니다. 같은 디렉터리에 둔 사용자 규칙(`.omp/rules/mine.md`)은 `auto update`와 `auto platform remove omp`가 건드리지 않습니다
 - `auto init`은 `.omp/rules/`를 디렉터리 패턴으로 gitignore에 넣습니다. `.omp/rules/autopus-*.md` 같은 파일명 글롭을 쓰면 생성된 규칙이 OMP 발견에서 전부 사라지기 때문에 디렉터리 형태를 씁니다. 무시된 상태에서도 자기 규칙을 추적하려면 `git add -f .omp/rules/mine.md`를 쓰거나(무시된 디렉터리 안에서는 gitignore negation이 동작하지 않습니다) 규칙을 `.omp/rules/` 밖에 두세요
+- OMP는 우선순위 100인 네이티브 `.omp/skills/<name>/SKILL.md`와 `.omp/commands/*.md`를 사용합니다. `.agents/skills`를 사용자 지정 디렉터리로 다시 등록하지 않으며, 프로젝트 관리 설정이 필요하지 않으면 기본 `.omp/config.yml`도 만들지 않습니다
+- `auto doctor`는 버전·도움말·설정 메타데이터와 provider-free RPC handshake로 OMP 18.0.5를 검증합니다. handshake는 로컬에서 bootstrap 모델만 선택하고 prompt나 provider 요청은 보내지 않습니다
 
 ### OMP 역할 라우팅과 컨텍스트 최적화(선택 적용)
 
@@ -542,7 +545,7 @@ omp_context_policy:
 ```
 
 - 정확한 capability probe가 성공하고 runtime이 task-owned(`isolated_task_owned`)이며, 최소 20개의 완전하고 균형 잡힌 AB/BA raw pair를 재집계한 최신 promotion attestation이 정확한 policy, session/binding, canary digest에 결합된 경우에만 `omp-active-probed`를 선택하세요. attestation이 없거나 오래됐거나 불일치하거나 duplicate/aggregate-only 주장인 경우 `shadow`를 유지하거나 차단합니다. session runtime이 전혀 없을 때만 `no_session`을 사용합니다.
-- 현재 생성된 OMP bridge가 증명하는 것은 hash-only event forwarding까지이며 long-lived supervisor ACK, authoritative `CanonicalSource`, real dispatch admission은 아직 증명하지 못합니다. 따라서 bridge만으로 active optimization을 시작할 수 없고 fail-closed를 유지합니다. `canonical_full` rollback은 authoritative new-session rebuild 검증과 delivery dispatch ACK가 모두 있을 때만 주장할 수 있으며, 그 증거가 없으면 rollback은 unverified 상태로 차단됩니다.
+- 관리형 OMP bridge는 현재 `compaction.methodOrder` 계약으로 long-lived supervisor ACK, 정확한 canonical reinjection, 같은 세션의 compaction·rehydration을 지원합니다. 다만 생성만으로 최적화를 활성화하지는 않습니다. `omp-active-probed`는 task-owned runtime receipt가 설치된 lifecycle과 cleanup을 최신 상태로 증명할 때까지 fail-closed를 유지합니다.
 - memory는 `off` 또는 관측 전용 `shadow`만 지원합니다. memory shadow에는 `memory_namespace`가 필요합니다. memory를 active로 주입하지 않으며, active receipt에는 memory injection이나 문서 생략을 기록할 수 없습니다.
 - 모델 해석 근거는 Git에서 제외되는 runtime artifact `.autopus/omp-model-resolution-v1.json`에 기록됩니다. task-scoped 컨텍스트 근거는 `.autopus/runtime/omp-context/<task-id>/<session-id>/receipt.json`을 사용합니다.
 - `auto doctor`(자동화에서는 `auto doctor --json`)로 설치된 CLI와 설정을 다시 probe하세요. receipt에는 credential, prompt 본문, 절대 경로가 들어가면 안 됩니다. 비용이 발생할 수 있는 live provider transport 확인은 `auto doctor --provider-smoke`로 명시적으로 opt-in한 경우에만 실행되며, 오래된 receipt는 현재 canary 통과 증거가 아닙니다.
@@ -552,16 +555,16 @@ omp_context_policy:
 | 항목 | Codex | OpenCode |
 |------|-------|----------|
 | 기본 명령 문법 | `@auto <subcommand> ...` | `/auto <subcommand> ...` |
-| `auto init` 직후 바로 되는 것 | `$auto ...` repo-skill fallback | `/auto ...`, `/auto-<subcommand> ...` 래퍼 |
-| 추가 설치 단계 | 있음. `.agents/plugins/marketplace.json`의 로컬 플러그인을 설치해야 `@auto ...` 사용 가능 | 라우터 기준 추가 설치 불필요. `opencode.json`이 관리형 plugin을 자동 연결 |
-| 생성되는 표면 | `.codex/`, `.agents/skills/`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` | `.opencode/commands/`, `.opencode/agents/`, `.opencode/rules/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
-| 지금 잘 되는 것 | 핵심 `auto` 워크플로우, repo skill, 로컬 플러그인 기반 `@auto` 라우팅 | 핵심 `auto` 워크플로우, 네이티브 명령 래퍼, 관리형 hook plugin wiring |
-| 현재 경계 | `@auto ...`는 로컬 플러그인 설치가 전제이며, 설치 전에는 `$auto ...`를 사용 | 현재 패리티 목표는 핵심 워크플로우 표면입니다. Claude식 native settings/statusline 폭까지 주장하지 않습니다 |
-| Worker 표면 | 지금은 선택 사항입니다. 플랫폼 연결 worker 실행이 필요하지 않다면 무시해도 됩니다 | 지금은 선택 사항입니다. 플랫폼 연결 worker 실행이 필요하지 않다면 무시해도 됩니다 |
+| `auto init` 직후 바로 되는 것 | `$codex-auto-<route> ...` 네이티브 스킬 | `/auto ...`, `/auto-<subcommand> ...` 래퍼 |
+| 추가 설치 단계 | `@auto ...`가 필요할 때만 `.agents/plugins/marketplace.json`의 로컬 플러그인을 설치합니다. `$codex-auto-<route>`는 추가 설치 없이 동작합니다 | 라우터 기준 추가 설치가 없습니다. `opencode.json`이 관리형 플러그인을 자동으로 연결합니다 |
+| 생성되는 표면 | `.codex/skills/codex-*/`, `.codex/agents/`, `.codex/hooks.json`, `.codex/config.toml`, `.agents/plugins/marketplace.json`, `.autopus/plugins/auto/`, `AGENTS.md` | `.opencode/commands/`, `.opencode/agents/`, `.opencode/rules/`, `.opencode/plugins/`, `.agents/skills/`, `AGENTS.md`, `opencode.json` |
+| 지금 잘 되는 것 | 네이티브 스킬, 로컬 플러그인 라우팅, Multi-Agent V2 Lead/Builder/Guardian 협업 | 네이티브 명령 래퍼, task 기반 worker, 관리형 hook plugin wiring |
+| 현재 경계 | Multi-Agent V2 worker는 cwd와 파일시스템을 공유하므로, 병렬 writer에는 겹치지 않는 소유 범위가 필요합니다 | Claude식 Agent Teams와 Workflow primitive는 지원 범위로 주장하지 않습니다 |
+| Worker 표면 | `spawn_agent`, `send_message`, `followup_task`, 대상 없는 `wait_agent`, `interrupt_agent`, `list_agents` | OpenCode `task(...)` worker |
 
 split compiler 참고:
-- `skills.compiler.mode: split`은 opt-in 입니다. 기본 `full`은 현재의 backward-compatible surface layout을 유지합니다.
-- split mode에서는 `.agents/skills/`를 shared/core skill 전용으로 예약하고, `.opencode/skills/`에는 OpenCode long-tail, `.autopus/plugins/auto/skills/`에는 Codex plugin-scoped long-tail을 배치합니다.
+- `skills.compiler.mode: split`은 opt-in입니다. 기본 `full`은 모든 Codex 네이티브 스킬을 고유한 `.codex/skills/codex-*` 이름으로 유지하고, 혼합 설치에서는 `.agents/skills/`를 OpenCode가 소유합니다.
+- split mode에서는 `.agents/skills/`에 OpenCode shared/core 스킬, `.opencode/skills/`에 OpenCode long-tail 스킬, `.autopus/plugins/auto/skills/`에 Codex plugin-scoped long-tail 스킬을 둡니다.
 
 ---
 
@@ -632,17 +635,17 @@ Claude Code statusline 참고:
 - 비대화형에서는 `--statusline-mode keep|merge|replace`로 같은 동작을 명시할 수 있습니다.
 
 플랫폼별 명령 문법:
-- Codex: 생성된 로컬 플러그인을 설치한 뒤 `@auto ...`를 사용하고, 그 전에는 `$auto ...`를 사용합니다
+- Codex: 생성된 로컬 플러그인을 설치하면 `@auto ...`를 사용하고, 설치 전에는 `$codex-auto-<route> ...`를 실행합니다
 - OpenCode: `/auto ...` 또는 `/auto-<subcommand> ...`를 사용합니다
 - Claude Code / Antigravity CLI / Oh My Pi: `/auto ...`를 사용합니다
 
 ```
 ✓ 감지됨: claude-code, codex, antigravity-cli, opencode, omp
-✓ 생성됨: .claude/rules/, .claude/skills/, .claude/agents/, CLAUDE.md
-✓ 생성됨: .codex/, AGENTS.md
+✓ 생성됨: .claude/rules/, .claude/skills/, .claude/agents/, .claude/workflows/, CLAUDE.md
+✓ 생성됨: .codex/skills/, .codex/agents/, .codex/hooks.json, .codex/config.toml, AGENTS.md
 ✓ 생성됨: .gemini/, GEMINI.md
 ✓ 생성됨: .opencode/, .agents/skills/, AGENTS.md, opencode.json
-✓ 생성됨: .omp/rules/, .omp/agents/, .omp/skills/, .omp/commands/, .omp/extensions/, .omp/config.yml
+✓ 생성됨: .omp/rules/, .omp/agents/, .omp/skills/, .omp/commands/, 선택형 .omp/extensions/
 ✓ 생성됨: autopus.yaml
 ```
 
@@ -653,7 +656,7 @@ Claude Code statusline 참고:
 ```bash
 /auto setup     # Claude Code, Antigravity CLI, OpenCode
 @auto setup     # Codex 로컬 플러그인 설치 후
-$auto setup     # Codex 플러그인 설치 전 fallback
+$codex-auto-setup  # Codex 플러그인 설치 전 네이티브 스킬
 ```
 
 코드베이스를 분석하여 5개의 컨텍스트 문서를 생성합니다:
@@ -674,7 +677,7 @@ ARCHITECTURE.md                    # 도메인, 레이어, 의존성 맵
 
 디자인 컨텍스트는 `.tsx`, `.jsx`, CSS 계열 파일, theme/token 파일, design-system 경로 같은 UI diff에만 주입됩니다. UI finding은 palette-role drift, typography hierarchy drift, component guardrail violation, layout/responsive regression, source-of-truth mismatch를 확인합니다. 리뷰 surface는 읽기 전용이며 직접 수정하지 않고 executor/fixer로 수정 작업을 위임합니다.
 
-생성된 플랫폼 surface는 canonical source가 아닙니다. `.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.agents/skills/*`, plugin surface를 고치려면 `autopus-adk`의 content/template을 수정한 뒤 대상 프로젝트에서 `auto update`로 갱신하세요.
+생성된 플랫폼 surface는 canonical source가 아닙니다. `.claude/*`, `.codex/*`, `.gemini/*`, `.opencode/*`, `.omp/*`, OpenCode 소유 `.agents/skills/*`, plugin surface를 고치려면 `autopus-adk`의 content/template을 수정한 뒤 대상 프로젝트에서 `auto update`를 실행하세요.
 
 외부 디자인 reference는 명시적으로 promote되기 전까지 신뢰하지 않는 supplemental context입니다. `auto design import`는 sanitized artifact를 `.autopus/design/imports/<import-id>/` 아래에 저장하며, 기존 사람이 관리하는 `DESIGN.md`를 기본으로 덮어쓰지 않습니다. URL import는 public HTTPS만 허용하는 SSRF 보호 경로로 동작하고 localhost/private/metadata 대상, unsafe redirect, 과도한 redirect, timeout, 1 MiB 초과 응답을 차단하며 거부 시 redacted diagnostics만 남깁니다.
 
@@ -785,7 +788,7 @@ auto update
 ```
 
 설치된 CLI의 템플릿으로 규칙, 스킬, 에이전트와 `.claude/*`, `.codex/*`, `.gemini/*`,
-`.opencode/*`, `.agents/skills/*` 같은 플랫폼별 파일을 갱신합니다.
+`.opencode/*`, `.omp/*`, OpenCode 소유 `.agents/skills/*` 같은 플랫폼별 파일을 갱신합니다.
 `skills.compiler.mode: split`을 사용하면 `.opencode/skills/*`와
 `.autopus/plugins/auto/skills/*`도 미리보기와 적용 대상에 포함하며, 오래된 생성 파일도 함께
 정리합니다. `AUTOPUS:BEGIN`~`AUTOPUS:END` 마커 바깥의 사용자 편집은 보존됩니다. 새로
@@ -865,7 +868,7 @@ Autopus Triage가 자동으로 요청을 분석합니다:
   Complexity: HIGH → /auto idea --multi (추천)
 ```
 
-Codex에서는 `.agents/plugins/marketplace.json`에 등록된 로컬 플러그인을 설치한 뒤 `@auto ...`를 쓰거나, 바로 `$auto ...`를 repo skill fallback으로 사용하면 됩니다. 플러그인은 라우터 표면만 추가하고, 상세 workflow 지침은 repo skill과 `.codex/prompts/`에 계속 유지됩니다.
+Codex에서는 `.agents/plugins/marketplace.json`의 로컬 플러그인을 설치한 뒤 `@auto ...`를 쓰거나, `$codex-auto-<route> ...`를 바로 실행하면 됩니다. 플러그인은 라우터만 추가하고, 상세 워크플로는 고유한 네이티브 `.codex/skills/codex-<name>/SKILL.md`에 둡니다.
 </details>
 
 ### 🔄 업데이트

@@ -1,314 +1,129 @@
 ---
 name: agent-teams
-description: Role-based team composition skill for Claude Code Agent Teams mode
+description: Native named-teammate orchestration for Claude Code Agent Teams
 triggers:
   - agent teams
   - teams
   - 에이전트 팀
-  - 팀 구성
 category: agentic
-level1_metadata: "Agent Teams, role-based, Lead-Builder-Guardian, SendMessage, worktree isolation"
+level1_metadata: "Claude native teams, named Agent teammates, SendMessage, shared task list"
 platforms:
   - claude
-  - codex
 ---
 
 # Agent Teams Skill
 
-## Overview
+## Purpose
 
-Agent Teams mode (`--team`) enables role-based team collaboration via Claude Code Agent Teams. Instead of spawning ephemeral subagents per task, this mode creates persistent teammates that communicate directly, share a task list, and self-coordinate through the pipeline.
+`/auto go SPEC-ID --team` uses Claude Code's native implicit team. It is not a
+Workflow alias and does not invoke `route_team`. The top-level interactive
+session is the lead; named `Agent` calls become teammates when the native team
+feature is available.
 
-**Activation flag**: `/auto go SPEC-ID --team`
+## Preflight
 
-## Canonical Semantic Contract
+Before dispatch:
 
-```json
-{
-  "schema": "orchestration-contract.v1",
-  "workflow": "team",
-  "semantics": {
-    "supervisor": "main_session",
-    "dispatch_evidence": true,
-    "disjoint_ownership": true,
-    "integration_gate": true,
-    "teardown": true,
-    "worker_receipt_fields": [
-      "owned_paths",
-      "changed_files",
-      "verification",
-      "blockers",
-      "next_required_step"
-    ]
-  }
-}
-```
+1. Confirm Claude Code is 2.1.246 or newer.
+2. Confirm `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is already present in the
+   session environment. Settings hooks do not inject it.
+3. Confirm the session is interactive. Native teams are not a headless or print
+   mode surface.
+4. Load the runtime schemas for `Agent`, `SendMessage`, and the shared task-list
+   tools when they are deferred.
 
-Claude binds this semantic contract to its native team lifecycle below. Codex
-uses its native multi-agent binding. Gemini and OpenCode do not compile this
-Claude/Codex-only team skill; their default subagent pipelines remain available.
+If any precondition fails, stop with a concrete blocker and suggest the default
+Route A subagent pipeline. Do not silently switch to `--workflow`.
 
-> **Team Workflow Substrate — claude-code platform note**: On the claude-code platform, when `auto workflow doctor --route route_team` passes and the team workflow substrate is not disabled (no `--no-workflow` flag and no `workflow.team_default=false` in `autopus.yaml` which maps to the real `WorkflowConf.TeamDefault` field), `/auto go --team` is served by the **deterministic team Workflow substrate** (`route_team`) documented in `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`). This substrate features faithful dispatching of specialized subagent types (`planner`, `tester`, `executor`, `annotator`, `reviewer`, `security-auditor`) with enriched role-task prompts, structured planner schema capture (`PLAN_SCHEMA`), and dynamic task-threaded parallel executors running with `isolation: 'worktree'`. The substrate is dispatched in **four segments** via `args.segment` — segment A (planning → test_scaffold → implementation → gate_build_test marker), then the dispatcher runs `auto workflow gate` as a hard exit-code barrier; only on pass it launches segment B (annotation → testing), after which it evaluates the coverage gate (`EvaluateCoverageGate`, default threshold 85) as a hard barrier; only on pass it launches segment C (review), after which it consolidates findings (`ConsolidateReviewVerdict`) and runs the review barrier (`RunReviewBarrier`) which blocks release_hygiene on a security FAIL / REQUEST_CHANGES until the retry budget clears; only on pass it launches segment D (release_hygiene marker → `auto check --hygiene --arch --quiet --staged`). See `content/skills/harness-workflow.md` (`### Segmented Dispatch Contract`) for the full dispatcher sequence. The manual Agent Teams orchestration in this skill (Step B1–B6 below) is the **disable/fallback path**: it activates when `--no-workflow` is set, when `auto workflow doctor --route route_team` fails (fail-fast → Route A, not Agent Teams), or on non-claude platforms where `--team` retains its existing platform-native semantics. The Agent Teams contract below remains fully authoritative for all disable/fallback scenarios.
+## Native Lifecycle
 
-## Activation
-
-### Prerequisites
-
-| Requirement | Value | How to verify |
-|-------------|-------|---------------|
-| Claude Code version | v2.1.32 or later | `claude --version` |
-| Environment variable | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | `echo $CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` |
-| Feature status | **Experimental** — disabled by default | Official: https://code.claude.com/docs/en/agent-teams |
-
-### Environment Setup
-
-```bash
-export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-```
-
-The Autopus harness injects this variable via `.claude/settings.json` automatically.
-
-### Failure Modes
-
-If the variable is not set OR Claude Code is below v2.1.32, the pipeline MUST error with:
-
-```
-Error: Agent Teams mode unavailable
-  Claude Code version: {detected} (required: v2.1.32+)
-  CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: {set|not set}
-Fallback: Run without --team to use the subagent pipeline mode.
-```
-
-## Team Constraints (Official)
-
-Agent Teams enforces these rules at the Claude Code layer — violating them fails at runtime:
-
-| Constraint | Rule |
-|-----------|------|
-| Nested teams | Teammates MUST NOT call `TeamCreate` — only the top-level session can create a team |
-| Cleanup authority | Only the Lead (team creator) may delete the team; teammates request cleanup via `SendMessage` |
-| Recommended size | **3–5 teammates** per team (official guidance). Autopus default (Lead + 1–2 Builders + Guardian) fits this range |
-| Persistence | Team config persists in `~/.claude/teams/{team-name}/config.json`; task list in `~/.claude/tasks/{team-name}/` |
-
-## Team Roles
-
-### Lead (1 agent)
-
-**Responsibilities**: planner + reviewer
-
-- The **top-level session** is the Lead and becomes a member when it calls `TeamCreate`; do not spawn a separate Lead. Teammates MUST NOT call `TeamCreate` because Claude Code rejects nested team creation.
-- Runs Phase 1 (Planning) to produce the execution plan
-- Coordinates tasks with Builder(s) and Guardian via `SendMessage`
-- Monitors task list and consolidates results
-- Runs Phase 4 (Review) and finalizes output
-- Re-assigns or requests fallback from the top-level session if a teammate fails
-
-### Builder (1–2 agents)
-
-**Responsibilities**: executor + tester + annotator + frontend-specialist
-
-- Implements code following TDD (RED → GREEN → REFACTOR)
-- Writes tests in Phase 1.5 (Test Scaffold) before implementation
-- Executes Phase 2 (Implementation) in an isolated worktree
-- Applies `@AX` annotation tags in Phase 2.5 (Annotation)
-- Communicates validation requests to Guardian via `SendMessage`
-- Reports completion to Lead via `SendMessage`
-
-### Guardian (1 agent)
-
-**Responsibilities**: validator + security-auditor + perf-engineer
-
-- Executes Gate 2 (Validation): coverage, lint, race conditions
-- Performs security audit on modified files
-- Monitors performance regressions
-- Responds to partial validation requests from Builder
-- Reports validation results to Lead via `SendMessage`
-
-## Team Creation Pattern
-
-All team lifecycle operations (create, spawn, delete) are owned by the **top-level session** — the Claude Code main session that receives the user's `/auto go --team` invocation. Teammates MUST NOT call `TeamCreate`; this is enforced by Claude Code at runtime.
-
-### Prerequisite — Load deferred tool schemas
-
-`TeamCreate`, `SendMessage`, and `TeamDelete` are deferred tools. Load their schemas once before first use:
-
-```
-ToolSearch(query="select:TeamCreate,SendMessage,TeamDelete")
-```
-
-### Spawn sequence (top-level session only)
+The runtime creates the implicit team when the lead launches named teammates.
+There is no manual create/delete step and no project-owned team configuration.
+Claude cleans the native team configuration automatically after teammates shut
+down.
 
 ```python
-TEAM_NAME = f"team-{spec_id.lower()}"         # e.g., "team-auth-001"
-
-# Step 1: Top-level session creates the team.
-# Side effect: the main session is AUTOMATICALLY registered as a member with
-# name="team-lead" and agentType=<agent_type>. Do NOT spawn a separate lead Agent().
-TeamCreate(
-    team_name   = TEAM_NAME,                  # NOTE: parameter is team_name, NOT name
-    description = "<SPEC title>",
-    agent_type  = "planner",
+builder = Agent(
+    description="Implement disjoint owned paths for the selected SPEC",
+    prompt="""Act as Builder. Modify only owned_paths and never forbidden_paths.
+    Follow TDD and return exactly: owned_paths, changed_files, verification,
+    blockers, next_required_step.""",
+    subagent_type="executor",
+    name="builder-1",
 )
 
-# Step 2: Top-level session spawns the 3 non-lead teammates in a SINGLE message.
-# Every successful observed dispatch increments dispatch_count.
-dispatch_count = 0
-Agent(
-    subagent_type="executor", team_name=TEAM_NAME, name="builder-1", isolation="worktree",
-    prompt="""Own only owned_paths; never modify forbidden_paths. Return exactly:
-    owned_paths, changed_files, verification, blockers, next_required_step.""",
+tester = Agent(
+    description="Write and verify tests in disjoint test-owned paths",
+    prompt="""Act as Tester. Own only test owned_paths. Do not modify production
+    paths. Return exactly: owned_paths, changed_files, verification, blockers,
+    next_required_step.""",
+    subagent_type="tester",
+    name="tester",
 )
-Agent(
-    subagent_type="tester", team_name=TEAM_NAME, name="tester",
-    prompt="""Own only test owned_paths; production paths are forbidden_paths. Return exactly:
-    owned_paths, changed_files, verification, blockers, next_required_step.""",
+
+guardian = Agent(
+    description="Validate the integrated shared working tree without editing",
+    prompt="""Act as Guardian. Treat every source path as read-only. Return
+    exactly: owned_paths, changed_files, verification, blockers,
+    next_required_step.""",
+    subagent_type="validator",
+    name="guardian",
 )
-Agent(
-    subagent_type="validator", team_name=TEAM_NAME, name="guardian",
-    prompt="""Read-only validation; all source paths are forbidden_paths. Return exactly:
-    owned_paths, changed_files, verification, blockers, next_required_step.""",
-)
-# After membership evidence confirms each teammate, dispatch_count must equal 3.
 ```
 
-Each teammate loads its agent definition from `.claude/agents/autopus/` and inherits its frontmatter (tools, model, skills, permissionMode). The `name` field becomes the addressable handle for `SendMessage({to: "<name>"})`. The main session is addressable as `team-lead`.
+Every call includes the required `description` and `prompt`. Model selection and
+effort come from the installed agent definition. Teammate calls do not set
+per-call effort, permission mode, team identity, or isolation.
 
-### Verification gate
+## Shared Task List
 
-After spawn, the top-level session MUST verify all 4 core members are registered (team-lead + 3 teammates):
+The lead decomposes work before teammate dispatch and records it in Claude's
+shared task list. Every writable task has a disjoint `owned_paths` set and an
+explicit `forbidden_paths` complement. Interdependent source and test files stay
+in one task so parallel teammates never need to edit the same file.
 
-```bash
-jq '.members | length' ~/.claude/teams/{TEAM_NAME}/config.json
-# expected: 4 (team-lead + builder-1 + tester + guardian)
-jq -r '.members[].name' ~/.claude/teams/{TEAM_NAME}/config.json
-# expected lines: team-lead, builder-1, tester, guardian
-```
+The lead assigns and updates tasks with the runtime-exposed task tools. It uses
+`SendMessage` for coordination, blockers, shutdown requests, and receipt
+clarification. Use the schema exposed by the current runtime rather than a
+handwritten legacy payload.
 
-If `.members | length < 4`, the team is **not** viable for multi-agent collaboration. Abort Route B and fall back to Route A (subagent pipeline).
+## Result Handoff
 
-Record observed dispatch evidence before work begins:
+Every teammate returns exactly these five fields:
 
-```json
-{"dispatch_count": 3, "observed_handles": ["builder-1", "tester", "guardian"], "membership_verified": true}
-```
+1. `owned_paths`
+2. `changed_files`
+3. `verification`
+4. `blockers`
+5. `next_required_step`
 
-### Teardown
+The lead checks that changed files are a subset of owned paths, then hands the
+integrated shared-tree result to Guardian and final review. A missing field or
+an ownership violation is a blocker, not a successful receipt.
 
-WHEN the pipeline terminates (success, abort, or circuit break), shut down teammates per-teammate (broadcast `to:"*"` accepts plain text only, not structured shutdown messages), then call `TeamDelete()`:
+## Teardown
 
-```python
-for name in ("builder-1", "tester", "guardian"):
-    SendMessage(to=name, message={"type": "shutdown_request", "reason": "pipeline complete"})
+On success, abort, or circuit break:
 
-# After teammates respond and exit (typically <10s)
-TeamDelete()     # fails if any active teammate remains
-```
+1. Send each live teammate a shutdown request through `SendMessage`.
+2. Wait for shutdown acknowledgements using the runtime's native delivery.
+3. Let Claude perform automatic team cleanup.
 
-After deletion, persist teardown evidence with `shutdown_acknowledged`,
-`team_config_absent`, and `teardown: "complete"`. A missing acknowledgement or
-remaining team config is a blocker, not a successful teardown.
+Do not call removed lifecycle tools, edit runtime team configuration, or delete
+runtime task directories manually.
 
-Task assignment via `SendMessage`:
+## Failure Policy
 
-```python
-# Lead → Builder
-SendMessage(to="builder-1", message={
-    "phase": "Phase 2",
-    "tasks": [...],
-    "owned_paths": ["<disjoint paths>"],
-    "forbidden_paths": ["<all paths owned by other workers>"],
-    "worktree": "<path>",
-    "return_fields": ["owned_paths", "changed_files", "verification", "blockers", "next_required_step"]
-})
+| Failure | Required action |
+|---|---|
+| Experimental environment missing | Stop and report the required environment variable. |
+| Non-interactive session | Fall back only after reporting that native teams require an interactive session. |
+| Teammate dispatch fails | Reassign the disjoint task to another named teammate or return a blocker. |
+| Ownership overlap | Stop both writers, repartition files, and dispatch again. |
+| Guardian fails | Run a read-only validator subagent with required description and prompt. |
 
-# Lead → Guardian
-SendMessage(to="guardian", message={
-    "phase": "Gate 2",
-    "target_branch": "<branch>",
-    "coverage_threshold": 85,
-    "owned_paths": [],
-    "forbidden_paths": ["<all source paths>"],
-    "return_fields": ["owned_paths", "changed_files", "verification", "blockers", "next_required_step"]
-})
-```
+## Separation from Workflows
 
-The Lead rejects a worker receipt that omits a required field or reports a
-change outside `owned_paths`. Only after all receipts are accepted may the Lead
-run the integration gate against the combined diff and record its command,
-exit status, and output digest.
-
-## Execution Flow
-
-```
-Lead: Phase 1 (Planning)
-  → Assigns tasks to Builder(s) and Guardian
-
-Builder: Phase 1.5 (Test Scaffold)
-  → Writes failing tests first (RED)
-
-Builder: Phase 2 (Implementation)
-  → GREEN phase in isolated worktree
-  → Merge back after completion
-
-Builder: Phase 2.5 (Annotation)
-  → Applies @AX tags to modified files
-
-Guardian: Gate 2 (Validation)
-  → go test -race ./...
-  → Coverage check (85%+)
-  → golangci-lint run
-  → Security audit
-
-Lead: Phase 4 (Review)
-  → Consolidates all results
-  → Final quality check
-  → Produces review report
-```
-
-## Builder-Guardian Direct Communication (P1-R3)
-
-Builder can request partial validation from Guardian without waiting for Lead coordination:
-
-```python
-# Builder → Guardian (partial validation request)
-SendMessage(to="guardian", message={
-    "type": "partial_validation",
-    "files": ["pkg/foo/bar.go"],
-    "reason": "security-sensitive change"
-})
-
-# Guardian → Builder (validation result)
-SendMessage(to="builder-1", message={
-    "type": "validation_result",
-    "status": "PASS",  # or FAIL
-    "issues": []
-})
-```
-
-All direct interactions are logged in the pipeline log:
-
-```
-[P1-R3] builder-1 → guardian: partial_validation request (pkg/foo/bar.go)
-[P1-R3] guardian → builder-1: PASS
-```
-
-## Subagent Fallback Strategy
-
-| Scenario | Action |
-|----------|--------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` not set | Error + fallback guidance to use subagent pipeline |
-| Builder teammate fails mid-task | Lead re-assigns task to another Builder or spawns a subagent |
-| Guardian teammate fails | Lead falls back to subagent validator with `Agent(subagent_type="validator")` |
-| Team creation fails | Abort and fall back to default subagent pipeline |
-
-## Worktree Isolation
-
-The same worktree isolation rules (R1–R5 from `worktree-isolation.md`) apply in Agent Teams mode:
-
-- Each Builder teammate works in an independent git worktree
-- Maximum 5 simultaneous worktrees
-- GC suppression: `git -c gc.auto=0 <command>` required during parallel execution
-- Exponential backoff on shared resource lock contention (3s → 6s → 12s)
-- Failed worktrees cleaned up with `git worktree remove --force <path>`
-
-**Ref**: SPEC-WORKTREE-001, `@.claude/skills/autopus/worktree-isolation.md`
+`--workflow` invokes the dynamic Route A script with `Workflow({scriptPath,
+args})`. `--team` invokes the native implicit team described here. The flags
+select different substrates and are never defaulted into one another.

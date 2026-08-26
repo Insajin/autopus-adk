@@ -7,6 +7,7 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
+	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 	"github.com/insajin/autopus-adk/templates"
 )
 
@@ -40,6 +41,15 @@ var claudeWorkflowRoutes = []claudeWorkflowRoute{
 	{name: "doctor", context: "core + workspace", customBody: claudeDoctorContract},
 }
 
+func isClaudeWorkflowDetailSource(filename string) bool {
+	for _, route := range claudeWorkflowRoutes {
+		if filename == "auto-"+route.name+".md" {
+			return true
+		}
+	}
+	return false
+}
+
 // @AX:ANCHOR [AUTO]: preserve the Claude workflow-skill mapping boundary.
 // @AX:REASON [AUTO]: two generation paths and a regression test consume the same rendered file mappings.
 func (a *Adapter) prepareWorkflowSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
@@ -62,8 +72,9 @@ func (a *Adapter) prepareWorkflowSkillMappings(cfg *config.HarnessConfig) ([]ada
 			}
 		}
 		content := renderClaudeWorkflowDetail(route, body)
+		outputName := pkgcontent.ResolveCatalogSkillOutputName("auto-"+route.name, "claude")
 		files = append(files, adapter.FileMapping{
-			TargetPath:      filepath.Join(".claude", "skills", "autopus", "auto-"+route.name+".md"),
+			TargetPath:      filepath.Join(".claude", "skills", outputName, "SKILL.md"),
 			OverwritePolicy: adapter.OverwriteAlways,
 			Checksum:        checksum(content),
 			Content:         []byte(content),
@@ -94,7 +105,6 @@ func renderClaudeWorkflowDetail(route claudeWorkflowRoute, body string) string {
 	return fmt.Sprintf(`---
 name: auto-%s
 description: Lazy-loaded Autopus %s workflow contract
-generated_from: templates/claude/commands/auto-workflows.md.tmpl
 ---
 
 # auto-%s

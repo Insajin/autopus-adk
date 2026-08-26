@@ -78,17 +78,18 @@ func TestIsRepoVisibleSkillTarget(t *testing.T) {
 	if isRepoVisibleSkillTarget(".autopus/plugins/auto/skills/x/SKILL.md") {
 		t.Error("plugin path must not be repo-visible")
 	}
-	if !isRepoVisibleSkillTarget(".codex/skills/x.md") {
-		t.Error("codex repo path must be repo-visible")
+	if !isRepoVisibleSkillTarget(".codex/skills/codex-x/SKILL.md") {
+		t.Error("codex native repo path must be repo-visible")
 	}
 }
 
 func TestResolveDefaultSkillTarget(t *testing.T) {
 	cases := map[string]string{
-		"claude":   ".claude/skills/autopus/foo.md",
-		"codex":    ".codex/skills/foo.md",
+		"claude":   ".claude/skills/foo/SKILL.md",
+		"codex":    ".codex/skills/codex-foo/SKILL.md",
 		"gemini":   ".gemini/skills/autopus/foo/SKILL.md",
 		"opencode": ".agents/skills/foo/SKILL.md",
+		"omp":      ".omp/skills/foo/SKILL.md",
 		"unknown":  "",
 	}
 	for platform, want := range cases {
@@ -148,11 +149,11 @@ func TestShouldCompileCatalogSkill_SplitBundleGating(t *testing.T) {
 func TestResolveCatalogSkillTarget_FullModeUsesDefault(t *testing.T) {
 	skill := CatalogSkill{Name: "metrics", CompileTargets: []string{"codex"}, Visibility: SkillVisibilityShared}
 	got := resolveCatalogSkillTarget(skill, "codex", cfgFull("codex"))
-	if got != ".codex/skills/metrics.md" {
-		t.Errorf("full-mode codex target = %q, want .codex/skills/metrics.md", got)
+	if got != ".codex/skills/codex-metrics/SKILL.md" {
+		t.Errorf("full-mode codex target = %q, want .codex/skills/codex-metrics/SKILL.md", got)
 	}
 	// nil cfg falls back to default target.
-	if got := resolveCatalogSkillTarget(skill, "claude", nil); got != ".claude/skills/autopus/metrics.md" {
+	if got := resolveCatalogSkillTarget(skill, "claude", nil); got != ".claude/skills/metrics/SKILL.md" {
 		t.Errorf("nil cfg target = %q", got)
 	}
 	// Unknown platform yields empty.
@@ -176,7 +177,7 @@ func TestResolveCatalogSkillTarget_SplitModePaths(t *testing.T) {
 	}
 	// Core codex skill goes to repo path.
 	core := CatalogSkill{Name: "planning", CompileTargets: []string{"codex"}, Visibility: SkillVisibilityShared}
-	if g := resolveCatalogSkillTarget(core, "codex", cfgSplit(nil, "codex")); g != ".codex/skills/planning.md" {
+	if g := resolveCatalogSkillTarget(core, "codex", cfgSplit(nil, "codex")); g != ".codex/skills/codex-planning/SKILL.md" {
 		t.Errorf("split codex core target = %q", g)
 	}
 	// Core opencode skill goes to shared .agents path.
@@ -202,8 +203,8 @@ func TestResolveCatalogSkillState(t *testing.T) {
 	// Repo-visible target.
 	core := CatalogSkill{Name: "planning", CompileTargets: []string{"codex"}, Visibility: SkillVisibilityShared}
 	st = ResolveCatalogSkillState(core, "codex", cfgFull("codex"))
-	if !st.Compiled || !st.Visible || st.TargetPath != ".codex/skills/planning.md" {
-		t.Errorf("core state = %+v, want compiled+visible repo path", st)
+	if !st.Compiled || !st.Visible || st.TargetPath != ".codex/skills/codex-planning/SKILL.md" {
+		t.Errorf("core state = %+v, want compiled+visible native repo path", st)
 	}
 }
 
@@ -212,12 +213,12 @@ func TestResolveCatalogSkillRefPath(t *testing.T) {
 		"planning": {Name: "planning", CompileTargets: []string{"codex"}, Visibility: SkillVisibilityShared},
 	}}
 	got := ResolveCatalogSkillRefPath(catalog, "planning", "codex", cfgFull("codex"))
-	if got != ".codex/skills/planning.md" {
+	if got != ".codex/skills/codex-planning/SKILL.md" {
 		t.Errorf("ref path for known skill = %q", got)
 	}
 	// Unknown skill falls back to default target.
 	miss := ResolveCatalogSkillRefPath(catalog, "ghost", "claude", cfgFull("claude"))
-	if miss != ".claude/skills/autopus/ghost.md" {
+	if miss != ".claude/skills/ghost/SKILL.md" {
 		t.Errorf("ref path for unknown skill = %q", miss)
 	}
 	// Nil catalog falls back to default target.

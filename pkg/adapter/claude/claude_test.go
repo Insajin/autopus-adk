@@ -61,8 +61,7 @@ func TestClaudeAdapter_Generate_CreatesDirectories(t *testing.T) {
 	// 디렉터리 생성 확인
 	expectedDirs := []string{
 		".claude/rules/autopus",
-		".claude/skills/autopus",
-		".claude/commands",
+		".claude/skills",
 		".claude/agents/autopus",
 	}
 	for _, d := range expectedDirs {

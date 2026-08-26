@@ -22,6 +22,12 @@ func (a *Adapter) validateConfig(errs *[]adapter.ValidationError) {
 	}
 
 	content := string(data)
+	if err := validateCodexTOMLStructure(content); err != nil {
+		*errs = append(*errs, adapter.ValidationError{
+			File: codexConfigRelPath, Message: "Codex config TOML이 malformed 상태임", Level: "error",
+		})
+		return
+	}
 	required := []string{"approval_policy", "sandbox_mode", "web_search"}
 	for _, key := range required {
 		if !containsConfigKey(content, key) {
@@ -64,6 +70,18 @@ func validateDeprecatedConfigKeys(content string, errs *[]adapter.ValidationErro
 			Message: "Codex config가 deprecated [sandbox] table을 사용함: sandbox_mode로 교체 필요",
 			Level:   "warning",
 		})
+	}
+	for section, keys := range codexObsoleteConfigKeys {
+		for key := range keys {
+			if !sectionHasConfigKey(content, section, key) {
+				continue
+			}
+			*errs = append(*errs, adapter.ValidationError{
+				File:    codexConfigRelPath,
+				Message: fmt.Sprintf("Codex config가 obsolete %s.%s 키를 사용함", section, key),
+				Level:   "warning",
+			})
+		}
 	}
 }
 
@@ -129,17 +147,26 @@ func validateBundledCodexPlugins(content string, errs *[]adapter.ValidationError
 
 func validateCodexFeatureFlags(content string, errs *[]adapter.ValidationError) {
 	required := map[string]string{
-		"goals":       "Codex goals feature가 enabled 상태가 아님",
-		"multi_agent": "Codex multi_agent feature가 enabled 상태가 아님",
+		"goals":        "Codex goals feature가 enabled 상태가 아님",
+		"hooks":        "Codex hooks feature가 enabled 상태가 아님",
+		"shell_tool":   "Codex shell_tool feature가 enabled 상태가 아님",
+		"unified_exec": "Codex unified_exec feature가 enabled 상태가 아님",
 	}
 	for key, message := range required {
 		if sectionHasKeyValue(content, "features", key, "true") {
 			continue
 		}
 		*errs = append(*errs, adapter.ValidationError{
+			File: codexConfigRelPath, Message: message, Level: "warning",
+		})
+	}
+	v2Valid := sectionHasKeyValue(content, "features.multi_agent_v2", "enabled", "true") &&
+		sectionHasKeyValue(content, "features.multi_agent_v2", "max_concurrent_threads_per_session", "4")
+	if !v2Valid {
+		*errs = append(*errs, adapter.ValidationError{
 			File:    codexConfigRelPath,
-			Message: message,
-			Level:   "warning",
+			Message: "Codex multi_agent_v2 feature 또는 session concurrency 설정이 올바르지 않음",
+			Level:   "error",
 		})
 	}
 }
@@ -161,6 +188,22 @@ func sectionHasKeyValue(content, wantSection, wantKey, wantValue string) bool {
 		}
 		key, value, ok := parseCodexConfigAssignment(trimmed)
 		if ok && key == wantKey && value == wantValue {
+			return true
+		}
+	}
+	return false
+}
+
+func sectionHasConfigKey(content, wantSection, wantKey string) bool {
+	var section string
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if parsed, ok := parseCodexConfigSection(trimmed); ok {
+			section = parsed
+			continue
+		}
+		key, _, ok := parseCodexConfigAssignment(trimmed)
+		if section == wantSection && ok && key == wantKey {
 			return true
 		}
 	}

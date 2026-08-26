@@ -19,8 +19,9 @@ Deferred tools appear by name in a `<system-reminder>` at the start of the sessi
 Common deferred tools in this workspace:
 
 - `AskUserQuestion` — interactive option picker (Triage flow, Gate 1 approval)
-- `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet`, `TaskOutput`, `TaskStop` — background/long-running task management
-- `TeamCreate`, `TeamDelete`, `SendMessage` — Agent Teams lifecycle
+- `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet` — shared task-list management
+- `SendMessage` — native named-teammate coordination and shutdown
+- `Workflow` — dynamic Workflow launch
 - `CronCreate`, `CronList`, `CronDelete`, `RemoteTrigger` — scheduling
 - `WebFetch`, `WebSearch` — web access (Phase 1.8 fallback)
 - `EnterPlanMode`, `ExitPlanMode`, `EnterWorktree`, `ExitWorktree`, `Monitor`, `PushNotification`
@@ -36,7 +37,7 @@ ToolSearch(query = "select:AskUserQuestion")
 Batch multiple tools in one call when they will all be used in the same flow:
 
 ```
-ToolSearch(query = "select:TeamCreate,SendMessage,TeamDelete")
+ToolSearch(query = "select:SendMessage,TaskCreate,TaskUpdate,TaskList,TaskGet")
 ```
 
 WHERE the schema is already loaded in the current session, skip — do not re-load.
@@ -51,7 +52,8 @@ Load schemas proactively at these points to avoid mid-flow failures:
 | `/auto idea` clarification gate (interactive, non-`--auto`) | `AskUserQuestion` |
 | `/auto plan` intent ledger gate (interactive, non-`--auto`) | `AskUserQuestion` |
 | `/auto go` Gate 1 Approval (non-`--auto`) | `AskUserQuestion` |
-| `/auto go --team` (Route B) | `TeamCreate`, `SendMessage`, `TeamDelete` |
+| `/auto go --team` (Route B) | `SendMessage`, `TaskCreate`, `TaskUpdate`, `TaskList`, `TaskGet` |
+| `/auto go --workflow` | `Workflow` |
 | `/auto` long-running operations | `TaskCreate`, `TaskUpdate`, `TaskList` |
 | Phase 1.8 Doc Fetch web fallback | `WebSearch`, `WebFetch` |
 | `/auto schedule` or `/loop` | `CronCreate`, `CronList`, `CronDelete` |

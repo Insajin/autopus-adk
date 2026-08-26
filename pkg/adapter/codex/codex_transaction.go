@@ -17,10 +17,12 @@ func (a *Adapter) buildUpdateTransactionPlan(
 ) (adapter.TransactionPlan, *adapter.PlatformFiles, error) {
 	finalFiles := make([]adapter.FileMapping, 0, len(newFiles))
 	writes := make([]adapter.TransactionWrite, 0, len(newFiles))
+	var skippedPaths []string
 
 	for _, file := range newFiles {
 		action := adapter.ResolveAction(a.root, file.TargetPath, file.OverwritePolicy, oldManifest)
 		if action == adapter.ActionSkip {
+			skippedPaths = append(skippedPaths, file.TargetPath)
 			continue
 		}
 		finalFiles = append(finalFiles, file)
@@ -41,6 +43,13 @@ func (a *Adapter) buildUpdateTransactionPlan(
 		Checksum: checksum(fmt.Sprintf("%d", len(finalFiles))),
 	}
 	manifest := adapter.ManifestFromFiles(adapterName, filterCodexManifestFiles(cfg, pf))
+	if oldManifest != nil {
+		for _, path := range skippedPaths {
+			if previous, ok := oldManifest.Files[path]; ok {
+				manifest.Files[path] = previous
+			}
+		}
+	}
 	plan := adapter.TransactionPlan{
 		Writes:   writes,
 		Removes:  removes,
@@ -55,18 +64,12 @@ func (a *Adapter) buildUpdateTransactionRemoves(
 ) ([]adapter.TransactionRemove, error) {
 	var removes []adapter.TransactionRemove
 	if oldManifest != nil {
-		diff := adapter.BuildManifestDiff(oldManifest, files, codexPruneRoots())
+		diff := adapter.BuildManifestDiff(oldManifest, files, PruneRoots())
 		for _, entry := range diff.Prune {
 			removes = append(removes, adapter.TransactionRemove{Path: entry.Path})
 		}
 	}
 	removes = append(removes, a.pluginWorkflowShimRemoves()...)
-
-	unexpected, err := a.unexpectedPluginSkillRemoves(files)
-	if err != nil {
-		return nil, err
-	}
-	removes = append(removes, unexpected...)
 
 	if remove, ok := a.legacyRootConfigRemove(); ok {
 		removes = append(removes, remove)
@@ -86,47 +89,6 @@ func (a *Adapter) pluginWorkflowShimRemoves() []adapter.TransactionRemove {
 		})
 	}
 	return removes
-}
-
-func (a *Adapter) unexpectedPluginSkillRemoves(files []adapter.FileMapping) ([]adapter.TransactionRemove, error) {
-	if len(files) == 0 {
-		return nil, nil
-	}
-
-	pluginSkillsRoot := filepath.ToSlash(filepath.Join(".autopus", "plugins", "auto", "skills"))
-	expected := make(map[string]bool)
-	for _, file := range files {
-		target := filepath.ToSlash(file.TargetPath)
-		if !strings.HasPrefix(target, pluginSkillsRoot+"/") {
-			continue
-		}
-		rest := strings.TrimPrefix(target, pluginSkillsRoot+"/")
-		name := strings.Split(rest, "/")[0]
-		if name != "" {
-			expected[name] = true
-		}
-	}
-
-	root := filepath.Join(a.root, ".autopus", "plugins", "auto", "skills")
-	entries, err := os.ReadDir(root)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("Codex plugin skill surface 읽기 실패 %s: %w", root, err)
-	}
-
-	var removes []adapter.TransactionRemove
-	for _, entry := range entries {
-		if expected[entry.Name()] {
-			continue
-		}
-		removes = append(removes, adapter.TransactionRemove{
-			Path:      filepath.Join(".autopus", "plugins", "auto", "skills", entry.Name()),
-			Recursive: true,
-		})
-	}
-	return removes, nil
 }
 
 func (a *Adapter) legacyRootConfigRemove() (adapter.TransactionRemove, bool) {

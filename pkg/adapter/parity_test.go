@@ -32,17 +32,10 @@ type platformResult struct {
 // classifyFile categorizes a FileMapping into agents, rules, or skills.
 // Returns the category name or empty string if uncategorized.
 //
-// The rule case precedes the agent case so a path that satisfies both lands in
-// the rules bucket. omp was the live instance of that collision while it wrote
-// rules to .agents/rules/autopus/; SPEC-OMP-001 relocated them to
-// .omp/rules/autopus-<name>.md, which carries no agents/ segment, so no path any
-// adapter emits today exercises the ordering. It stays because the failure mode
-// is silent — an agent-first switch reports omp as 0 rules and 14 agents — and
-// because a pre-relocation manifest can still name the legacy shape. No
-// incumbent path is affected either way: claude, codex, gemini, and opencode
-// emit rules under .claude/, .codex/, .gemini/, and .opencode/, and gemini's
-// mirrored .agents/plugins/autopus/rules/ copies are already dropped by the
-// first case.
+// Rule classification precedes agent classification so stale shared paths such
+// as .agents/rules/autopus still land in the rule bucket. Current Codex output
+// intentionally has no markdown rule mapping because .codex/rules is an
+// execpolicy surface in Codex 0.149.1.
 func classifyFile(f adapter.FileMapping) string {
 	p := strings.ToLower(f.TargetPath)
 	switch {
@@ -177,12 +170,12 @@ func TestParity_CrossPlatformFeatures(t *testing.T) {
 	t.Logf("%-10s %7s %7.1f%% %7.1f%%",
 		"Gemini", "-", geminiRulesParity, overallSkillsParity)
 
-	// P0 gate for this rollout: Codex must remain aligned with Claude on
-	// managed agents and rules. Other platforms are reported but not gated here.
+	// P0 gate: Codex keeps native agent parity. Its markdown-rule count is
+	// intentionally zero because policy moved to native skills and AGENTS.md.
 	assert.GreaterOrEqualf(t, codexAgentParity, 95.0,
 		"P0 FAIL: Codex agent parity %.1f%% < 95%%", codexAgentParity)
-	assert.GreaterOrEqualf(t, codexRulesParity, 95.0,
-		"P0 FAIL: Codex rules parity %.1f%% < 95%%", codexRulesParity)
+	assert.Zero(t, codexCounts.Rules,
+		"Codex 0.149.1 must not receive inert repository markdown rules")
 
 	// omp joins the report as of SPEC-OMP-001 REQ-012. Its rule count is pinned
 	// against claude rather than a second magic constant, and it is what proves
@@ -224,7 +217,6 @@ func TestParity_ClassifyFile(t *testing.T) {
 		{".codex/agents/planner.toml", "agents"},
 		{".gemini/agents/autopus/planner.md", "agents"},
 		{".claude/rules/autopus/branding.md", "rules"},
-		{".codex/rules-autopus-branding.md", "rules"},
 		{".gemini/rules/branding.md", "rules"},
 		// omp namespaces rules by file-name prefix inside .omp/rules/, the one
 		// directory it scans, and that scan is non-recursive (SPEC-OMP-001
@@ -240,7 +232,7 @@ func TestParity_ClassifyFile(t *testing.T) {
 		{".claude/hooks/autopus/conditional/lore-commit.md", "rules"},
 		{".claude/hooks/autopus/conditional-rules.json", ""},
 		{".claude/skills/auto/SKILL.md", "skills"},
-		{".codex/skills/auto-skill.md", "skills"},
+		{".codex/skills/codex-auto-skill/SKILL.md", "skills"},
 		{".agents/skills/auto/SKILL.md", "skills"},
 		{".agents/plugins/marketplace.json", ""},
 		{".autopus/plugins/auto/skills/auto/SKILL.md", ""},
@@ -257,10 +249,7 @@ func TestParity_ClassifyFile(t *testing.T) {
 	}
 }
 
-// TestParity_ExtractRuleName pins the generated-path-to-source-name mapping the
-// coverage gate compares against content/rules. Two platforms flatten their
-// rule surface behind a file-name prefix, and a prefix left on the name makes
-// every source rule read as missing for that platform.
+// TestParity_ExtractRuleName pins generated rule paths to source names.
 func TestParity_ExtractRuleName(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -268,7 +257,6 @@ func TestParity_ExtractRuleName(t *testing.T) {
 		want string
 	}{
 		{".claude/rules/autopus/branding.md", "branding.md"},
-		{".codex/rules-autopus-branding.md", "branding.md"},
 		{".gemini/rules/branding.md", "branding.md"},
 		{".omp/rules/autopus-branding.md", "branding.md"},
 		{".omp/rules/autopus-lore-commit.md", "lore-commit.md"},

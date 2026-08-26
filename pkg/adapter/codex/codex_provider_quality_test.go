@@ -60,7 +60,7 @@ func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 			}
 			cfg.Quality.SupervisorModelPolicy = config.SupervisorModelPolicyQuality
 
-			configFiles, err := adapter.generateConfig(cfg)
+			configFiles, err := adapter.prepareConfigFile(cfg)
 			require.NoError(t, err)
 			root := strings.SplitN(string(configFiles[0].Content), "[agents]", 2)[0]
 			assert.Contains(t, root, `model = "`+config.CodexSolModel+`"`)

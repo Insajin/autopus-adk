@@ -40,7 +40,8 @@ func (runner ompModelDoctorExecRunner) Run(
 
 func safeOMPModelDoctorProbeArgs(args []string) bool {
 	joined := strings.Join(args, " ")
-	if joined == "--version" || joined == "models --json --no-extensions" {
+	if joined == "--version" || joined == "models --json --no-extensions" ||
+		joined == "config list --json" {
 		return true
 	}
 	keyIndex := 2

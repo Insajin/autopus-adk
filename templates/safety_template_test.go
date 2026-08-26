@@ -19,7 +19,6 @@ func TestWorktreeSafetyTemplateContracts(t *testing.T) {
 	root := templateRoot()
 	templatePaths := []string{
 		filepath.Join(root, "claude", "commands", "auto-router.md.tmpl"),
-		filepath.Join(root, "codex", "skills", "worktree-isolation.md.tmpl"),
 		filepath.Join(root, "gemini", "commands", "auto-router.md.tmpl"),
 		filepath.Join(root, "gemini", "skills", "worktree-isolation", "SKILL.md.tmpl"),
 	}

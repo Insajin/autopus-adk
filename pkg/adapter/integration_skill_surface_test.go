@@ -12,6 +12,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/adapter/codex"
+	"github.com/insajin/autopus-adk/pkg/adapter/omp"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
@@ -32,7 +33,7 @@ func TestE2EInitMakeInterfacesFeelBetterSkill_AllPlatforms(t *testing.T) {
 				_, err := claude.NewWithRoot(dir).Generate(ctx, cfg)
 				return err
 			},
-			path: filepath.Join(".claude", "skills", "autopus", "make-interfaces-feel-better.md"),
+			path: filepath.Join(".claude", "skills", "make-interfaces-feel-better", "SKILL.md"),
 		},
 		{
 			name: "codex",
@@ -42,7 +43,7 @@ func TestE2EInitMakeInterfacesFeelBetterSkill_AllPlatforms(t *testing.T) {
 				_, err := codex.NewWithRoot(dir).Generate(ctx, cfg)
 				return err
 			},
-			path: filepath.Join(".codex", "skills", "make-interfaces-feel-better.md"),
+			path: filepath.Join(".codex", "skills", "codex-make-interfaces-feel-better", "SKILL.md"),
 		},
 		{
 			name: "gemini",
@@ -63,6 +64,16 @@ func TestE2EInitMakeInterfacesFeelBetterSkill_AllPlatforms(t *testing.T) {
 				return err
 			},
 			path: filepath.Join(".agents", "skills", "make-interfaces-feel-better", "SKILL.md"),
+		},
+		{
+			name: "omp",
+			generate: func(ctx context.Context, dir string) error {
+				cfg := config.DefaultFullConfig("polish-omp")
+				cfg.Platforms = []string{"omp"}
+				_, err := omp.NewWithRoot(dir).Generate(ctx, cfg)
+				return err
+			},
+			path: filepath.Join(".omp", "skills", "make-interfaces-feel-better", "SKILL.md"),
 		},
 	}
 

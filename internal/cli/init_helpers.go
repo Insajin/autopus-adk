@@ -12,22 +12,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
-	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
-	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/omp"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
-
-var initSupportedPlatforms = map[string]bool{
-	"claude-code":     true,
-	"codex":           true,
-	"antigravity-cli": true,
-	"opencode":        true,
-	"omp":             true,
-}
 
 var legacyRootGeneratedGitignorePatterns = map[string]string{
 	".claude/":     "/.claude/",
@@ -44,28 +31,12 @@ func generatePlatformFiles(ctx context.Context, dir string, cfg *config.HarnessC
 	effectiveCfg := applyFlagCC21Overrides(cfg, globalFlagsFromContext(cmd.Context()))
 
 	for _, p := range cfg.Platforms {
-		var err error
-		switch p {
-		case "claude-code":
-			a := claude.NewWithRoot(dir)
-			_, err = a.Generate(ctx, effectiveCfg)
-		case "codex":
-			a := codex.NewWithRoot(dir)
-			_, err = a.Generate(ctx, effectiveCfg)
-		case "antigravity-cli":
-			a := antigravity.NewWithRoot(dir)
-			_, err = a.Generate(ctx, effectiveCfg)
-		case "opencode":
-			a := opencode.NewWithRoot(dir)
-			_, err = a.Generate(ctx, effectiveCfg)
-		case "omp":
-			a := omp.NewWithRoot(dir)
-			_, err = a.Generate(ctx, effectiveCfg)
-		default:
+		descriptor, ok := lookupPlatformDescriptor(p)
+		if !ok {
 			tui.Warnf(cmd.OutOrStdout(), "알 수 없는 플랫폼 %q, 건너뜀", p)
 			continue
 		}
-		if err != nil {
+		if _, err := descriptor.Generate(ctx, dir, effectiveCfg); err != nil {
 			return fmt.Errorf("플랫폼 %q 파일 생성 실패: %w", p, err)
 		}
 		tui.Success(cmd.OutOrStdout(), p)
@@ -81,7 +52,7 @@ func detectDefaultPlatforms() []string {
 	platforms = append(platforms, detected...)
 
 	if len(platforms) == 0 {
-		return []string{"claude-code"}
+		return []string{lifecyclePlatformCatalog[0].name}
 	}
 	return platforms
 }
@@ -98,7 +69,7 @@ func detectInstalledPlatforms() []string {
 	seen := make(map[string]bool, len(detected))
 
 	for _, p := range detected {
-		if !initSupportedPlatforms[p.Name] || seen[p.Name] {
+		if _, supported := lookupPlatformDescriptor(p.Name); !supported || seen[p.Name] {
 			continue
 		}
 		platforms = append(platforms, p.Name)

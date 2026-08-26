@@ -164,28 +164,47 @@ func extractAgentMeta(content string) (name, desc string) {
 }
 
 func normalizeCodexAgentContracts(rendered string) string {
-	if strings.Contains(rendered, "`owned_paths`") &&
+	rendered = normalizeCodexNativeSkillReferences(rendered)
+	hasReceipt := strings.Contains(rendered, "`owned_paths`") &&
 		strings.Contains(rendered, "`changed_files`") &&
 		strings.Contains(rendered, "`verification`") &&
 		strings.Contains(rendered, "`blockers`") &&
-		strings.Contains(rendered, "`next_required_step`") {
+		strings.Contains(rendered, "`next_required_step`")
+	hasV2 := strings.Contains(rendered, codexV2ContractHeading)
+	if hasReceipt && hasV2 {
 		return rendered
 	}
 
-	contract := `
+	var contract strings.Builder
+	if !hasV2 {
+		contract.WriteString(`
+## Codex Multi-Agent V2 Contract
+
+When coordinating other workers, use exactly ` + "`spawn_agent(task_name, message, ...)`" + `,
+` + "`send_message(...)`" + `, ` + "`followup_task(...)`" + `, target-less
+` + "`wait_agent()`" + `, ` + "`interrupt_agent(...)`" + `, and ` + "`list_agents()`" + `.
+All workers use the same shared cwd and filesystem. Parallel writers require
+disjoint write ownership; otherwise schedule them sequentially. Use
+` + "`@auto`" + ` or ` + "`$codex-auto`" + ` for routing and load detailed
+` + "`$codex-auto-<route>`" + ` or ` + "`$codex-<skill>`" + ` contracts as needed.
+`)
+	}
+	if !hasReceipt {
+		contract.WriteString(`
 ## Supervisor Return Contract
 
-When spawned by a supervisor, the final response MUST include these machine-readable fields:
+When spawned by a supervisor, the final response MUST include exactly:
 
 - ` + "`owned_paths`" + `: exact files, directories, or modules the worker owned
 - ` + "`changed_files`" + `: files actually changed, or ` + "`none`" + `
 - ` + "`verification`" + `: commands, checks, or inspections run, including failures
 - ` + "`blockers`" + `: unresolved blockers, or ` + "`none`" + `
 - ` + "`next_required_step`" + `: the next gate, retry, handoff, or ` + "`none`" + `
-`
+`)
+	}
 	anchor := "\n'''"
 	if idx := strings.LastIndex(rendered, anchor); idx >= 0 {
-		return rendered[:idx] + contract + rendered[idx:]
+		return rendered[:idx] + contract.String() + rendered[idx:]
 	}
-	return strings.TrimRight(rendered, "\n") + "\n" + strings.TrimLeft(contract, "\n")
+	return strings.TrimRight(rendered, "\n") + "\n" + strings.TrimLeft(contract.String(), "\n")
 }

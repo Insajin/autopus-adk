@@ -1,0 +1,76 @@
+---
+name: auto-fix
+description: 버그 수정 — 재현과 최소 수정 중심으로 문제를 해결합니다
+compatibility: omp
+---
+
+# auto-fix — 버그 수정 스킬
+
+## OMP Invocation
+
+- `/auto fix ...`
+- `/auto-fix ...`
+- Load detail skill `auto-fix` for either entrypoint.
+
+
+**프로젝트**: autopus-adk | **모드**: full
+
+## 설명
+
+버그를 재현하고 최소한의 변경으로 수정합니다. 재현 테스트를 먼저 작성합니다.
+
+## 사용법
+
+```
+/auto fix "버그 설명"
+/auto fix --file path/to/file
+/auto fix "회귀 버그" --auto
+```
+
+### 플래그
+
+| Flag | Description |
+|------|-------------|
+| `--file <path>` | 수정 범위를 특정 파일로 좁힙니다. |
+| `--auto` | 확인 단계 없이 바로 수정 흐름을 진행합니다. |
+
+## 절차
+
+1. 버그 재현 테스트 작성 (먼저)
+2. 테스트 실패 확인
+3. symptom location, owning function/path, caller 목록 또는 grep evidence 확인
+4. caller/shared root-cause path 확인 후 패치 위치 결정
+5. 최소 코드 변경으로 수정
+6. 테스트 통과 확인
+7. 전체 테스트 스위트 실행
+
+## 규칙
+
+- 재현 테스트 없이 수정하지 않음
+- 버그 범위 외 코드 변경 금지
+- caller/shared root-cause evidence 없이 증상 위치만 고치는 계획은 `revise-target`으로 표시
+- focused patch는 증상 위치가 root cause이거나 affected caller가 하나뿐이라는 근거가 있을 때만 허용
+- final response에는 caller/shared root-cause checked, focused patch target, minimum sufficient verification을 receipt로 요약
+- 전체 복구/후속 가이드는 `/auto fix ...` 라우터 본문을 우선합니다.
+
+## Branding Formats
+
+### Error Recovery (show on fix failures)
+
+```
+✗ {subcommand} 실패: {error description}
+  복구 옵션:
+  1. 오류 내용을 확인하고 재시도: /auto fix {args}
+  2. /auto doctor  (시스템 상태 진단)
+```
+
+### Next Step Auto-Detection (show after fix completes)
+
+```
+다음 단계: {recommendation}
+```
+
+Detection order:
+1. SPEC status `implemented` → `✓ 구현 완료 → /auto sync {SPEC-ID}`
+2. SPEC status `approved` → `✓ SPEC {SPEC-ID} 승인됨 → /auto go {SPEC-ID}`
+3. No SPEC context → recommend running `/auto review` to verify the fix

@@ -91,8 +91,10 @@ func generateSkillTemplates(contentDir, templateDir string) error {
 		}
 
 		for _, skill := range transformed {
-			// Keep route contracts and team mode on their platform-native adapters.
-			if strings.HasPrefix(skill.Name, "auto-") || skill.Name == "agent-teams" {
+			// Route contracts and Codex capability-bound skills are maintained
+			// by their platform adapters, not mirrored from the shared source.
+			if strings.HasPrefix(skill.Name, "auto-") || skill.Name == "agent-teams" ||
+				(platform == "codex" && codexOwnsNativeSkillTemplate(skill.Name)) {
 				continue
 			}
 
@@ -112,6 +114,15 @@ func generateSkillTemplates(contentDir, templateDir string) error {
 	}
 
 	return nil
+}
+
+func codexOwnsNativeSkillTemplate(name string) bool {
+	switch name {
+	case "agent-pipeline", "worktree-isolation", "subagent-dev":
+		return true
+	default:
+		return false
+	}
 }
 
 // writeSkillTemplate writes a skill template to the correct platform path.

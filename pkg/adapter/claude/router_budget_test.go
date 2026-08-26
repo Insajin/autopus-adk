@@ -34,7 +34,7 @@ func TestRouterBudget_FullGenerate_RootIsThinAndEveryRouteHasOneDetail(t *testin
 		assert.Contains(t, router, token)
 	}
 	for _, route := range frozenAutoRoutes {
-		detailPath := filepath.Join(".claude", "skills", "autopus", "auto-"+route+".md")
+		detailPath := filepath.Join(".claude", "skills", "auto-"+route, "SKILL.md")
 		assert.Equal(t, 1, strings.Count(router, detailPath), "route %q must resolve exactly one detail", route)
 		detail := readClaudeSurface(t, root, detailPath)
 		assert.Contains(t, detail, "# auto-"+route)
@@ -43,7 +43,7 @@ func TestRouterBudget_FullGenerate_RootIsThinAndEveryRouteHasOneDetail(t *testin
 		assert.Contains(t, router, alias, "legacy alias %q must remain routable", alias)
 	}
 	assert.NotContains(t, router, "Triage Process")
-	assert.NoFileExists(t, filepath.Join(root, ".claude", "skills", "autopus", "auto-workflows.md"))
+	assert.NoFileExists(t, filepath.Join(root, ".claude", "skills", "auto-workflows", "SKILL.md"))
 }
 
 func TestWorkflowSkills_UpdateAndGenerate_ProduceMatchingDetails(t *testing.T) {
@@ -58,7 +58,7 @@ func TestWorkflowSkills_UpdateAndGenerate_ProduceMatchingDetails(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, route := range frozenAutoRoutes {
-		rel := filepath.Join(".claude", "skills", "autopus", "auto-"+route+".md")
+		rel := filepath.Join(".claude", "skills", "auto-"+route, "SKILL.md")
 		assert.Equal(t, readClaudeSurface(t, generateRoot, rel), readClaudeSurface(t, updateRoot, rel), rel)
 	}
 }

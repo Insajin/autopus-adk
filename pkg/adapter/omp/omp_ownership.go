@@ -20,14 +20,13 @@ import "github.com/insajin/autopus-adk/pkg/config"
 // listed even after omp yields the command surface, because opencode serves
 // commands from .opencode/commands/ — nothing ever overwrites the .md files omp
 // wrote under .agents/commands, so dropping the root would strand all of them.
-// .agents/skills is the opposite case: opencode and codex rewrite
-// .agents/skills/auto/SKILL.md in place, so once omp yields that surface the
-// file on disk belongs to them and omp must not delete it.
+// .agents/skills is the opposite case: OpenCode owns that shared surface in
+// mixed installations, so OMP must yield it instead of pruning an in-place file.
 // @AX:ANCHOR [AUTO]: Public prune-root contract shared by update, clean, preview, and manifest reconciliation.
 // @AX:REASON [AUTO]: Removing or narrowing this function can orphan generated OMP surfaces or delete another platform's ownership.
 func PruneRoots(cfg *config.HarnessConfig) []string {
 	roots := ompExclusivePruneRoots()
-	if ompOwnsSharedSkillSurface(cfg) {
+	if cfg != nil && !ompConfigHasPlatform(cfg, "opencode") {
 		roots = append(roots, ".agents/skills")
 	}
 	return roots
@@ -35,52 +34,35 @@ func PruneRoots(cfg *config.HarnessConfig) []string {
 
 // ompExclusivePruneRoots are the surfaces omp owns no matter which other
 // platforms are active. Clean falls back to this set when the harness config
-// cannot be read: without the platform list, assuming omp still owns the shared
-// skill surface would delete the .agents/skills/auto/SKILL.md that opencode or
-// codex rewrote in place. Losing another platform's live file is worse than
-// leaving an omp file behind, so unprovable ownership fails closed.
+// cannot be read: without the platform list, assuming OMP still owns the shared
+// skill surface could delete OpenCode's live `.agents/skills` files. Losing
+// another platform's live file is worse than leaving one legacy OMP file behind.
 func ompExclusivePruneRoots() []string {
 	return []string{
-		// Generated rules live directly in the shared, non-recursively scanned
-		// .omp/rules; the manifest restriction above is what keeps a user's
-		// unprefixed files in the same directory safe.
 		ompRuleDir,
-		// Legacy root: rules used to be written to .agents/rules/autopus/.
-		// It stays listed so an update whose previous manifest still records
-		// those paths prunes them (and collapses the emptied directories);
-		// nothing is written there anymore.
-		".agents/rules/autopus",
 		".omp/agents",
-		configFile,
-		".agents/commands",
+		".omp/skills",
+		".omp/commands",
 		ompContextBridgeTarget,
 		ompNativePipelineRouteTarget,
 		DefaultOMPModelOverlayPath,
 		OMPModelReceiptRelativePath,
 		OMPModelProjectOwnershipRelativePath,
+
+		// Legacy manifest-owned surfaces remain prune-eligible during cutover.
+		// BuildManifestDiff and Clean still require an old manifest entry, so
+		// user-authored files under these roots are never selected.
+		".agents/rules/autopus",
+		".agents/commands",
+		configFile,
 	}
 }
 
-func ompOwnsSharedSkillSurface(cfg *config.HarnessConfig) bool {
-	hasCodex := false
-	hasOpenCode := false
-	for _, p := range cfg.Platforms {
-		if p == "codex" {
-			hasCodex = true
-		}
-		if p == "opencode" {
-			hasOpenCode = true
+func ompConfigHasPlatform(cfg *config.HarnessConfig, name string) bool {
+	for _, platform := range cfg.Platforms {
+		if platform == name {
+			return true
 		}
 	}
-	return !hasCodex && !hasOpenCode
-}
-
-func ompOwnsCommandSurface(cfg *config.HarnessConfig) bool {
-	hasOpenCode := false
-	for _, p := range cfg.Platforms {
-		if p == "opencode" {
-			hasOpenCode = true
-		}
-	}
-	return !hasOpenCode
+	return false
 }

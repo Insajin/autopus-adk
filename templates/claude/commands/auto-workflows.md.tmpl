@@ -257,8 +257,8 @@ IMPORTANT: You MUST spawn an Explore agent to analyze the project. Do NOT skip t
 
 ```
 Agent(
+  description = "Explore the project structure and architecture boundaries",
   subagent_type = "explorer",
-  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
   prompt = """
     Explore the full project structure. Return:
     - Directory layout and package roles
@@ -287,6 +287,8 @@ Create or update the 4 files under `.autopus/project/` using the explorer's outp
 - `structure.md` — directory structure, package roles, entry points, file stats
 - `tech.md` — tech stack, build, testing, architecture patterns
 - `workspace.md` — root repo role, nested repo boundaries, generated/runtime paths, tracking/commit policy, source-of-truth locations, QA/Journey Pack target repos and `auto qa init --project-dir <repo>` commands
+
+`structure.md` MUST summarize package families and boundaries instead of enumerating every file. Target at most 18,000 bytes and never exceed the 20,000-byte doctor warning boundary; reference stable source paths for detail.
 
 > **⏭ POST-STEP**: Project docs written. NEXT REQUIRED STEP: Step 4: Generate scenarios.md. Do NOT skip to Completion.
 
@@ -507,7 +509,7 @@ Display max 3 recommendations, most relevant first. Each with a one-line descrip
 
 ## idea — Brainstorm and Evaluate Ideas
 
-@.claude/skills/autopus/idea.md
+@.claude/skills/idea/SKILL.md
 
 Brainstorm ideas using multi-provider orchestra, evaluate with ICE scoring, and save as BS file.
 
@@ -711,7 +713,7 @@ Otherwise:
 
 ## plan — Write a SPEC
 
-@.claude/skills/autopus/planning.md
+@.claude/skills/planning/SKILL.md
 
 Write a SPEC document. Delegate to the `spec-writer` agent to analyze the codebase and produce 4 SPEC files. Default to one Primary SPEC per Outcome Lock; create sibling SPECs only for the bounded exceptions below.
 
@@ -764,7 +766,7 @@ WHEN `FROM_IDEA` is set, use the BS file's `Clarification Ledger` and do not run
 
 #### [CONDITIONAL] Step 1.5: Generate PRD
 
-@.claude/skills/autopus/prd.md
+@.claude/skills/prd/SKILL.md
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -787,6 +789,7 @@ WHEN `SKIP_PRD = false`, THE SYSTEM SHALL generate a PRD before spawning the spe
 
 ```
 Agent(
+  description = "Generate the PRD and Outcome Lock for this feature",
   subagent_type = "planner",
   prompt = """
     Phase: PRD Generation (Step 1.5)
@@ -843,6 +846,7 @@ Spawn a `spec-writer` agent to generate the SPEC:
 
 ```
 Agent(
+  description = "Generate the SPEC set from the approved planning evidence",
   subagent_type = "spec-writer",
   prompt = """
     Feature description: {FEATURE_DESC}
@@ -972,9 +976,9 @@ After displaying, also show agent result summary:
 {{if not .IsFullMode}}
 > go is Full mode only. Upgrade with `auto init --full`.
 {{else}}
-@.claude/skills/autopus/tdd.md
-@.claude/skills/autopus/agent-pipeline.md
-@.claude/skills/autopus/worktree-isolation.md
+@.claude/skills/tdd/SKILL.md
+@.claude/skills/agent-pipeline/SKILL.md
+@.claude/skills/worktree-isolation/SKILL.md
 
 Implement code based on a SPEC document. Follows TDD methodology.
 
@@ -999,6 +1003,19 @@ Inherit from global flags:
 - `QUALITY` ← `--quality`
 - `EFFORT` ← `--effort`
 
+Topology flags are mutually exclusive. Treat booleans as 0/1:
+
+`TOPOLOGY_FLAG_COUNT = TEAMS_MODE + WORKFLOW_MODE + SOLO_MODE`
+
+WHEN `TOPOLOGY_FLAG_COUNT > 1`, emit this exact diagnostic and stop before
+loading the SPEC, running a doctor, creating tasks, or dispatching any agent:
+
+```
+[TOPOLOGY ERROR] --team, --workflow, and --solo are mutually exclusive; choose only one.
+```
+
+Do not apply precedence and do not silently drop a topology flag.
+
 Determine execution mode:
 - `WORKFLOW_MODE = true` → Deterministic Workflow route (claude-code only; auto fail-fast to Route A if doctor fails or platform is non-claude)
 - `TEAMS_MODE = true` → Agent Teams mode
@@ -1008,7 +1025,7 @@ Determine execution mode:
 After parsing, display the detected configuration:
 
 ```
-Mode: {subagent | teams | teams+multi | solo}
+Mode: {subagent | teams | teams+multi | workflow | solo}
 SPEC: {SPEC_ID}
 Target: {TARGET_MODULE}
 Quality: {ultra | balanced | pending selection}
@@ -1057,12 +1074,12 @@ The `go` workflow never edits SPEC status directly.
 **Per-iteration procedure**:
 
 1. Read `{SPEC_DIR}/review-findings.json`. Filter entries with `Status == "open"`.
-2. Spawn a `spec-writer` agent (`mode = "bypassPermissions"`) with a finding-scoped prompt:
+2. Spawn a `spec-writer` agent with a finding-scoped prompt:
 
    ```
    Agent(
+     description = "Close the current open SPEC review findings",
      subagent_type = "spec-writer",
-     mode = "bypassPermissions",
      prompt = """
        Phase: SPEC Quality Loop iteration {N}/3
        SPEC directory: {SPEC_DIR}
@@ -1122,206 +1139,89 @@ Route based on the execution mode determined in Step 0.
 
 #### Route A: Subagent Pipeline (default, no --team, no --solo)
 
-IMPORTANT: This is the DEFAULT route. It REQUIRES spawning subagents using the Agent tool. Each Phase below MUST use an Agent() call — do NOT implement these phases yourself in the main session.
+IMPORTANT: Route A dispatches real planner, tester, executor, validator, and
+reviewer agents. Every `Agent` call includes the current required fields
+`description` and `prompt`. Model and effort come from the installed agent
+definition; calls do not send permission mode or effort.
 
-Before Phase 1, run workflow authenticity preflight:
-- Initialize `subagent_dispatch_count = 0`, `subagent_roles_dispatched = []`, and `degraded-mode = "none"`.
-- Also emit the machine key `degraded_mode` with the same value for JSON/report consumers.
-- Initialize delegation safety metadata with `delegation_depth = 0`, default `delegation_depth_cap = 2`, and `safety_rail_decisions = []`.
-- A child dispatch at `delegation_depth >= delegation_depth_cap` is blocked unless `delegation_depth_override` and `override_reason` are present; record `delegation_depth_exceeded` with current depth, cap, requested role, and override status.
-- Verify the Agent tool can create and observe subagent dispatch in this runtime.
-- Each successful Agent call MUST increment `subagent_dispatch_count` and append the role or phase name.
-- If Route A cannot create or observe dispatch, stop with a workflow authenticity blocker before Phase 1.
-- The workflow authenticity blocker must tell the user to rerun with a working subagent surface or choose `--solo`.
-- In `--solo`, report `subagent_dispatch_count: 0` and label the run as solo mode, not as a degraded subagent pipeline.
+Initialize `subagent_dispatch_count = 0`, `subagent_roles_dispatched = []`, and
+`degraded-mode = "none"`. Increment the count only after an observable dispatch.
+If the Agent surface is unavailable, stop with an authenticity blocker instead
+of implementing the delegated phases in the main session.
 
-For parallel tasks, include `isolation: "worktree"` in Agent() calls to enable worktree isolation.
-
-#### Route B: Agent Teams (`--team`)
-
-IMPORTANT: This route uses Claude Code Agent Teams (experimental, disabled by default). Requires Claude Code v2.1.32+ AND `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
-
-Preflight check (run before TeamCreate):
-1. `claude --version` — must be ≥ v2.1.32
-2. `$CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — must be `1`
-
-If either check fails, abort with:
-```
-Agent Teams unavailable: Claude Code v2.1.32+ and CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 required.
-Fallback: /auto go SPEC-ID (subagent pipeline mode, no --team flag)
-```
-
-##### Team Workflow Substrate Selection (claude-code only, pre-route)
-
-Before creating the team, resolve which substrate serves `--team` on this platform:
-
-| Condition | Behavior |
-|-----------|----------|
-| platform=claude-code AND `auto workflow doctor --route route_team` overall=pass AND `--no-workflow` NOT set AND `workflow.team_default` NOT `false` | Serve via the **deterministic team Workflow substrate** (`route_team`). The installed `.claude/workflows/route_team.workflow.js` runs 8 ordered phases: planning → test_scaffold → implementation → gate_build_test → annotation → testing → review → release_hygiene. See `content/skills/harness-workflow.md` (`## Team Workflow Substrate — route_team`) for the full contract. (Note: `workflow.team_default` maps to the real `WorkflowConf.TeamDefault` config field.) |
-| `--no-workflow` set OR `autopus.yaml` → `workflow.team_default=false` | Skip the workflow substrate and run the existing Claude Code Agent Teams behavior below unchanged. This is a **pre-route opt-out** (distinct from `--no-workflow`) that maps to the real `WorkflowConf.TeamDefault` field. |
-| `auto workflow doctor --route route_team` overall=fail | Emit `[workflow] fallback-class=fail-fast reason=doctor_fail` and fall back to Route A (subagent pipeline). Do NOT enter the Agent Teams flow or any team workflow. |
-| Non-claude platform | The `--team` flag keeps its existing platform-native semantics. This substrate-selection logic is claude-code only and does not affect codex, antigravity-cli, or opencode. |
-
-Team composition stays within the official 3–5 member guidance (see agent-teams.md "Team Constraints"). Default 4-member core fits; phase-dependent members (below) should replace core members, not stack on top, to respect the size limit.
-
-Team composition — each member maps 1:1 to a specialized agent definition:
-
-**Core members (always spawned):**
-| Name | subagent_type | Agent Definition | Phase |
-|------|---------------|------------------|-------|
-| `lead` | `planner` | planner.md | Phase 1, coordination |
-| `builder-1` | `executor` | executor.md | Phase 2 |
-| `tester` | `tester` | tester.md | Phase 1.5, Phase 3 |
-| `guardian` | `validator` | validator.md | Gate 2 |
-
-**Phase-dependent members (spawned when needed):**
-| Name | subagent_type | Agent Definition | Condition |
-|------|---------------|------------------|-----------|
-| `builder-2` | `executor` | executor.md | 2+ parallel tasks |
-| `annotator` | `annotator` | annotator.md | Phase 2.5 |
-| `auditor` | `security-auditor` | security-auditor.md | Phase 4 |
-| `reviewer` | `reviewer` | reviewer.md | Phase 4 |
-
-Quality Mode applies to execution profile selection: Ultra forces the premium path for all builders. Balanced keeps per-role defaults, and Adaptive Quality only escalates HIGH-complexity tasks. LOW-complexity work stays on the standard path in this workspace (no haiku fallback).
-
-Reference: `.claude/skills/autopus/agent-teams.md`
-
-##### [REQUIRED] Team Orchestration Procedure
-
-IMPORTANT: The main (top-level) session owns ALL team lifecycle operations. `TeamCreate` automatically registers the main session itself as the `team-lead` member — do NOT spawn a separate Agent() for the lead role. Teammates cannot call `TeamCreate` (enforced by Claude Code at runtime).
-
-**Step B1: Load deferred tool schemas (once per pipeline)**
-
-`TeamCreate`, `SendMessage`, and `TeamDelete` are deferred tools — their JSON schemas must be loaded before first call:
-
-```
-ToolSearch(query="select:TeamCreate,SendMessage,TeamDelete")
-```
-
-Skip only if schemas were loaded in the current session already.
-
-**Step B2: Create the team (main session, single call)**
-
-```
-TEAM_NAME = "team-{spec-id-lowercase}"       # e.g., "team-auth-001"
-TeamCreate(
-  team_name   = TEAM_NAME,                   # NOTE: parameter is team_name (not name)
-  description = "<SPEC title>",
-  agent_type  = "planner"                    # the main session is registered with this agentType
+```python
+plan = Agent(
+  description = "Plan the selected SPEC and assign disjoint file ownership",
+  prompt = "Read spec.md, acceptance.md, and plan.md; return the task assignment table.",
+  subagent_type = "planner",
 )
-```
 
-**Side effect**: `~/.claude/teams/{TEAM_NAME}/config.json` is created with the **main session already registered** as a member — `name: "team-lead"`, `agentType: <agent_type>`, `leadSessionId: <main-session-uuid>`. No separate `Agent(name="lead")` is needed; attempting one would create a duplicate and break the 4-member contract.
-
-**Step B3: Spawn the 3 non-lead teammates (parallel Agent() calls in ONE message)**
-
-Because the main session is already `team-lead`, Step B3 spawns only 3 teammates:
-
-Initialize `dispatch_count = 0`. Increment it only after a teammate dispatch is
-observed in team membership evidence.
-
-```
-Agent(
+implementation = Agent(
+  description = "Implement the approved task assignment",
+  prompt = "Implement the planner result. Return exactly the required five-field receipt.",
   subagent_type = "executor",
-  team_name     = TEAM_NAME,
-  name          = "builder-1",
-  mode          = "bypassPermissions",
-  isolation     = "worktree",
-  prompt        = """Role: Builder. Modify only owned_paths and never forbidden_paths.
-                    Return exactly: owned_paths, changed_files, verification,
-                    blockers, next_required_step."""
 )
+```
+
+Pass each phase result into the next dependent prompt. For independent Route A
+writers, optional worktree isolation is allowed only when the runtime schema
+exposes it, and every isolated result must be integrated before validation.
+
+#### Route B: Native Agent Team (`--team`)
+
+`--team` uses Claude Code's native implicit team. It never dispatches a Workflow.
+
+Preflight:
+1. Claude Code is 2.1.246 or newer.
+2. `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` is present in the current session.
+3. The session is interactive.
+4. The current schemas for `Agent`, `SendMessage`, and shared task-list tools are loaded.
+
+If preflight fails, report the blocker and suggest Route A. Do not silently
+switch to `--workflow`.
+
+The lead creates shared tasks with disjoint `owned_paths` and explicit
+`forbidden_paths`, then launches named teammates:
+
+```python
 Agent(
+  description = "Implement disjoint owned paths for the selected SPEC",
+  prompt = """Role: Builder. Modify only owned_paths and never forbidden_paths.
+              Return exactly: owned_paths, changed_files, verification,
+              blockers, next_required_step.""",
+  subagent_type = "executor",
+  name = "builder-1",
+)
+
+Agent(
+  description = "Write failing and acceptance tests in test-owned paths",
+  prompt = """Role: Tester. Modify only test owned_paths. Return exactly:
+              owned_paths, changed_files, verification, blockers,
+              next_required_step.""",
   subagent_type = "tester",
-  team_name     = TEAM_NAME,
-  name          = "tester",
-  mode          = "bypassPermissions",
-  prompt        = """Role: Tester. Modify only test owned_paths; production paths are
-                    forbidden_paths. Return exactly: owned_paths, changed_files,
-                    verification, blockers, next_required_step."""
+  name = "tester",
 )
+
 Agent(
+  description = "Validate the integrated shared working tree without editing",
+  prompt = """Role: Guardian. Treat all source paths as read-only. Return exactly:
+              owned_paths, changed_files, verification, blockers,
+              next_required_step.""",
   subagent_type = "validator",
-  team_name     = TEAM_NAME,
-  name          = "guardian",
-  mode          = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
-  prompt        = """Role: Guardian. Read-only validation; all source paths are
-                    forbidden_paths. Return exactly: owned_paths, changed_files,
-                    verification, blockers, next_required_step."""
+  name = "guardian",
 )
 ```
 
-All 3 Agent() calls MUST be emitted in a **single** assistant message to spawn in parallel. Sequential spawning may leave the team with missing members.
+Named teammates share the working tree and task list. Do not pass call-level
+isolation, permission mode, effort, or a manual team identifier. Coordinate
+assignments and blockers through `SendMessage` using the runtime-exposed schema.
+Reject receipts with missing fields or out-of-scope changes.
 
-Ultra mode: add `model="opus"` to each Agent() call.
+At every terminal state, send each live teammate a shutdown request, wait for
+acknowledgements, and let Claude perform automatic team cleanup. Never edit or
+delete native runtime team configuration manually.
 
-**Step B4: Verify team membership (HARD GATE)**
-
-After spawn, `members` must contain exactly 4 entries (team-lead + 3 teammates):
-
-```bash
-jq '.members | length' ~/.claude/teams/{TEAM_NAME}/config.json
-# expected: 4 (team-lead + builder-1 + tester + guardian)
-jq -r '.members[].name' ~/.claude/teams/{TEAM_NAME}/config.json
-# expected lines: team-lead, builder-1, tester, guardian
-```
-
-If `.members | length < 4` → abort Route B:
-
-```
-[TEAM ERROR] Core teammate spawn incomplete ({N}/4). Falling back to Route A (subagent pipeline).
-```
-
-Then re-run the SPEC without `--team`.
-
-On success, record
-`{"dispatch_count":3,"observed_handles":["builder-1","tester","guardian"],"membership_verified":true}`.
-
-**Step B5: Phase orchestration via SendMessage**
-
-Route A's Phase 1–4 blocks apply, with one substitution: instead of spawning a fresh Agent() per phase, dispatch work to the already-spawned teammate via SendMessage. The main session acts as `team-lead`.
-
-| Phase / Gate | Teammate | Dispatch |
-|--------------|----------|----------|
-| Phase 1: Planning | main session (team-lead) | main session plans directly; no SendMessage needed |
-| Phase 1.5: Test Scaffold | `tester` | send disjoint test `owned_paths`, production `forbidden_paths`, and required receipt fields |
-| Phase 2: Implementation | `builder-1` (+ `builder-2` if parallel) | send disjoint `owned_paths`, all other owners' `forbidden_paths`, tasks, and required receipt fields |
-| Gate 2: Validation | `guardian` | send read-only target plus required receipt fields |
-| Phase 2.5: Annotation | `annotator` (phase-dependent) | new Agent() with `team_name=TEAM_NAME, name="annotator"` |
-| Phase 4: Review | `reviewer` + `auditor` (phase-dependent) | new Agent() calls with `team_name=TEAM_NAME` |
-
-Teammate replies are delivered automatically to the main session's next turn (no inbox polling). Main session consolidates Gate results and decides retry/abort per the Retry Limits Reference below.
-
-Each dispatch payload must name `owned_paths`, `forbidden_paths`, and
-`return_fields:[owned_paths, changed_files, verification, blockers,
-next_required_step]`. Reject incomplete receipts or out-of-scope changes. Once
-all receipts are accepted, run an integration gate on the combined diff and
-record the command, exit status, and output digest before proceeding.
-
-**Step B6: Teardown (mandatory on pipeline end)**
-
-WHEN the pipeline reaches a terminal state (success, abort, or circuit break), THE SYSTEM SHALL shut down teammates and delete the team:
-
-```
-# 1) Structured shutdown_request must be sent PER teammate — broadcast (to:"*") accepts plain text only
-SendMessage(to="builder-1", message={type:"shutdown_request", reason:"pipeline complete"})
-SendMessage(to="tester",    message={type:"shutdown_request", reason:"pipeline complete"})
-SendMessage(to="guardian",  message={type:"shutdown_request", reason:"pipeline complete"})
-
-# 2) Wait for teammates to process shutdown_response (typically <10s)
-sleep 8
-
-# 3) Delete the team — fails if any active teammate remains
-TeamDelete()
-```
-
-If `TeamDelete` returns an "active members" error, identify the remaining members via `jq -r '.members[].name' ~/.claude/teams/{TEAM_NAME}/config.json`, re-send `shutdown_request` to each, and retry.
-
-Persist teardown evidence only after every shutdown acknowledgement is
-observed and the team config is absent:
-`{"teardown":"complete","shutdown_acknowledged":true,"team_config_absent":true}`.
-
-Worktree safety rules R1-R5 apply equally — each builder teammate works in an independent worktree. See @.claude/skills/autopus/worktree-isolation.md and `.claude/rules/autopus/worktree-safety.md`.
+Reference: `.claude/skills/agent-teams/SKILL.md`
 
 #### Route C: Single Session (`--solo`)
 
@@ -1332,10 +1232,10 @@ Worktree safety rules R1-R5 apply equally — each builder teammate works in an 
 
 IMPORTANT: This route runs Route A as a deterministic Claude Code Workflow. It is **claude-code only** and **opt-in**. The non-claude platforms (codex, antigravity-cli, opencode) do not render this route and ignore the flag.
 
-Reference: `.claude/skills/autopus/harness-workflow.md`
+Reference: `.claude/skills/harness-workflow/SKILL.md`
 
 Preflight check (run before dispatching the workflow):
-1. `auto workflow doctor --route route_a` — capability gate (required vs advisory primitives; min version 2.1.154)
+1. `auto workflow doctor --route route_a` — capability gate for Claude Code 2.1.246
 2. Platform must be `claude`
 
 If `auto workflow doctor --route route_a` reports `overall: fail` OR the platform is not claude, emit a `fail-fast` fallback log line and enter Route A **without executing any workflow**:
@@ -1343,11 +1243,18 @@ If `auto workflow doctor --route route_a` reports `overall: fail` OR the platfor
 [workflow] fallback-class=fail-fast reason={doctor_fail|non_claude_platform}: deterministic workflow unavailable, running Route A subagent pipeline.
 ```
 
-Otherwise dispatch the generated `.claude/workflows/route_a.workflow.js` Workflow, which runs the four ordered phases and records a run journal:
-1. **planning** — implementation plan and task breakdown (no working-tree mutation beyond plan artifacts)
-2. **implementation** — repository-mutating work; worktree lifecycle stays in the Go runtime, the JS owns sequencing only
-3. **gate_build_test** — deterministic gate; verdict derives from build/test **exit codes** (`verdict_source: exit_code`) executed outside the JS via the Go runtime (calling `auto workflow gate`), not from an LLM verdict
-4. **release_hygiene** — generated/runtime drift gate + 300-line staged source limit (`auto check --hygiene --arch --quiet --staged`); commit-msg hooks enforce Lore format (`auto check --lore --message <msgfile>`), executed outside the JS via the Go runtime
+Otherwise invoke the generated workflow with structured args:
+
+```javascript
+Workflow({
+  scriptPath: ".claude/workflows/route_a.workflow.js",
+  args: { spec: SPEC_ID, workingDir: PROJECT_ROOT, quality: QUALITY, segment: "A" },
+})
+```
+
+The script runs planning, implementation, the deterministic build/test gate,
+and release hygiene. Planning and implementation dispatch real planner and
+executor Workflow agents, with the planning result handed into implementation.
 
 Inspect the planned run without executing it: `auto workflow render --dry-run`.
 
@@ -1366,19 +1273,18 @@ The manifest (`content/workflows/route_a.{md,schema.json}`) is the source of tru
 #### Subagent Pipeline Phases (Route A)
 
 ```
-Phase 0.5: Permission    → detect      (auto permission detect)
+Phase 0.5: Permission    → detect
 Phase 0.7: Authenticity  → main session (subagent surface preflight and evidence counters)
-Phase 1: Planning        → planner     (mode: plan)
-Phase 1.5: Test Scaffold → tester      (mode: bypassPermissions) — skip if --skip-scaffold
+Phase 1: Planning        → planner
+Phase 1.5: Test Scaffold → tester — skip if --skip-scaffold
 Gate 1:  Approval        → skip if AUTO_MODE
 Phase 1.8: Doc Fetch     → main session (Context7 MCP) — skip if no external libs detected
-Phase 2: Implementation  → executor×N  (mode: bypassPermissions, parallel with worktree isolation)
-Phase 2.1: Worktree Merge → main session (merge worktree branches into working branch)
-Gate 2:  Validation      → validator   (mode: plan)  — retry up to 3× on FAIL
-Phase 2.5: Annotation    → annotator   (mode: bypassPermissions) — @AX tags on modified files
-Phase 3: Testing         → tester      (mode: bypassPermissions)
+Phase 2: Implementation  → executor×N (parallel with explicit integration)
+Gate 2:  Validation      → validator — retry up to 3× on FAIL
+Phase 2.5: Annotation    → annotator — @AX tags on modified files
+Phase 3: Testing         → tester
 Gate 3:  Coverage        → verify 85%+ coverage
-Phase 4: Review          → reviewer + security-auditor (parallel, mode: plan)  — retry up to 2× on REQUEST_CHANGES
+Phase 4: Review          → reviewer + security-auditor — retry up to 2× on REQUEST_CHANGES
 ```
 
 ### Retry Limits Reference
@@ -1481,30 +1387,23 @@ comments, or reordered quality fields can appear between keys. The Codex
 provider override (`quality.providers.codex`) is independent and must not alter
 this Claude dispatcher.
 
-Quality mode determines the execution profile in Agent() calls:
-- **Ultra**: force the premium path for every agent
-- **Balanced**: omit explicit overrides and rely on each agent's default profile
+Quality mode is projected into each installed Claude agent definition as a
+model-and-effort pair. Ordinary `Agent` calls omit effort and normally omit
+model so the definition remains authoritative. A user-supplied per-run model
+override is the only reason to send the optional `model` call field.
 
-For the **team Workflow substrate** (`route_team`), quality mode resolves three dimensions simultaneously through the existing resolvers:
-- **Model tier** — `ModelForAgent`: ultra → Opus for all agents; balanced → per-agent defaults.
-- **Effort** — `ResolveEffort`: ultra → higher effort ceiling; balanced → per-agent defaults.
-- **Orchestration depth** — `ResolveDepth`: ultra = 3-vote adversarial verify + synthesis step; balanced = single-vote. Caps apply regardless of mode: verify_votes ≤ 3, fan_out_cap ≤ 5, retry ≤ 3.
+The retained `route_team` Workflow accepts its quality phase map through
+structured `args`, but it is not selected by `--team`. Before an explicit
+retained launch, run `auto workflow doctor --route route_team`; a failed doctor
+blocks the retained Workflow and does not change native `--team` routing.
+An explicit internal launch uses:
 
-The resolved quality is delivered through the Workflow `args` input (`args.quality`). The workflow JS reads `RT.<phase>` from `args.quality` to override the schema baseline literal for each phase.
-
-Before the first team Workflow launch, write the normalized changed-file paths to a bounded JSON array at `BINDING_FILES_FILE`. Keep the adaptive policy in Full Ultra shadow unless a previously verified canary receipt exists at `ROLLOUT_RECEIPT_FILE`. Resolve the pre-dispatch receipt exactly once using an argv array; never construct or execute a shell command string. Start with the base argv below and append `["--effort", EFFORT]` only when `EFFORT` is non-empty. Do not emit an empty `--effort` argument. The binding resolver accepts the five model efforts and normalizes Claude Code's session-only `ultracode` to phase effort `xhigh`:
-
-`bindingArgv = ["auto", "workflow", "binding", "--quality", QUALITY, "--risk-tier", "auto", "--files-file", BINDING_FILES_FILE, "--rollout-receipt", ROLLOUT_RECEIPT_FILE, "--format", "json"]; if EFFORT != "" then bindingArgv += ["--effort", EFFORT]; binding = parseJSON(run(bindingArgv))`
-
-Validate that `binding.quality` is a bare phase map and reuse that exact map for every segment launch. A missing, malformed, shadow, blocked, or rollback rollout receipt selects canonical Full Ultra. Only a verified `canary` receipt with `decision=CANARY`, `active_profile=compact_ultra`, matching low/medium risk, and canonical receipt hashes may select compact review. If the command invocation fails, JSON parsing fails, or the receipt/phase map is missing or malformed, fail closed before dispatch by selecting the canonical Full Ultra phase map (three review votes, mandatory security, synthesis, unchanged model/effort/fan-out). Do not use model output or within-run confidence to expand or reduce review calls; allocation is fixed before segment A.
-
-**Segment-launch dispatcher contract** (`args` schema: `{spec, workingDir, quality, segment}`, `segment` ∈ `{'A','B','C','D'}`). A segment ends after every phase that needs a deterministic dispatcher interposition before the next phase — `gate_build_test` (A), the coverage-gated `testing` phase (B), and `review` (C); `release_hygiene` is D:
-1. Launch segment A: `workflow({scriptPath}, {spec, workingDir, quality: binding.quality, segment:'A'})` — runs planning, test_scaffold, implementation, and the gate_build_test boundary marker. Then run `auto workflow gate` (Go, exit-code). If the gate returns `verdict: fail`, the dispatcher runs a RALF remediation loop computed by `pkg/workflow.RunGateRemediation`. It spawns a fixer (executor) agent and re-runs the failed segment. The retry budget is capped by `MaxRetry` (3) from `pkg/workflow/depth.go`. If two consecutive gate evaluations produce the same signature, the loop aborts early with `AbortReason="circuit_break_no_progress"`. Pass → continue.
-2. Launch segment B: `workflow({scriptPath}, {spec, workingDir, quality: binding.quality, segment:'B'})` — runs annotation and testing. After testing, evaluate the coverage gate using `pkg/workflow.EvaluateCoverageGate`. If coverage is below the threshold (default 85), it yields `verdict: fail` (exit-code style) and runs the fixer remediation loop. This blocks segment C until coverage passes. Pass → continue.
-3. Launch segment C: `workflow({scriptPath}, {spec, workingDir, quality: binding.quality, segment:'C'})` — runs review. When review completes, consolidate findings using `pkg/workflow.ConsolidateReviewVerdict` (a security FAIL — `Barrier=true`, `Reason="security_fail"` — outranks a code-quality REQUEST_CHANGES). If a barrier is triggered, the dispatcher runs the review barrier loop computed by `pkg/workflow.RunReviewBarrier` (budget capped by `MaxRetry`), spawning an executor to fix findings and re-running review. On budget exhaustion it aborts with `review_budget_exhausted` and does **not** launch release_hygiene. Pass → continue.
-4. Launch segment D: `workflow({scriptPath}, {spec, workingDir, quality: binding.quality, segment:'D'})` — runs the release_hygiene boundary marker, then run `auto check --hygiene --arch --quiet --staged`.
-
-The gate phases (`gate_build_test`, `release_hygiene`) are segment-boundary markers in the JS (no shell-out logic and no LLM verdict embedded); all exit-code/barrier adjudication is performed by the dispatcher between segment launches.
+```javascript
+Workflow({
+  scriptPath: ".claude/workflows/route_team.workflow.js",
+  args: { spec: SPEC_ID, workingDir: WORKING_DIR, quality: binding.quality, segment: "A" },
+})
+```
 
 Display after determination:
 ```
@@ -1546,9 +1445,8 @@ Skip silently if no matching entries or file doesn't exist.
 
 ```
 Agent(
+  description = "Plan implementation tasks with disjoint file ownership",
   subagent_type = "planner",
-  model = "opus",          ← Ultra only; omit for Balanced
-  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
   prompt = """
     SPEC file: {SPEC_PATH}
     Plan file: {SPEC_DIR}/plan.md
@@ -1580,8 +1478,8 @@ Display progress after completion:
 WHEN `SKIP_SCAFFOLD = false`:
 ```
 Agent(
+  description = "Write failing P0 and P1 test scaffolds before implementation",
   subagent_type = "tester",
-  mode = "bypassPermissions",
   prompt = """
     Phase: Test Scaffold (Phase 1.5)
     SPEC file: {SPEC_PATH}
@@ -1633,17 +1531,15 @@ Parallel tasks (Mode = "parallel" AND no file ownership conflict AND no migratio
 # Use git -c gc.auto=0 for all git commands during parallel execution (R5)
 # Include {ctx7_docs} from Phase 1.8 in each executor prompt
 Agent(
+  description = "Implement task T1 in its isolated owned paths",
   subagent_type = "executor",
-  model = "opus",          ← Ultra only; omit for Balanced
-  mode = "bypassPermissions",
-  isolation = "worktree",  ← R1: worktree isolation for parallel tasks
+  isolation = "worktree",
   prompt = "## Reference Documentation\n{ctx7_docs}\n\nImplement T1: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}. Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./..."
 )
 Agent(
+  description = "Implement task T2 in its isolated owned paths",
   subagent_type = "executor",
-  model = "opus",          ← Ultra only; omit for Balanced
-  mode = "bypassPermissions",
-  isolation = "worktree",  ← R1: worktree isolation for parallel tasks
+  isolation = "worktree",
   prompt = "## Reference Documentation\n{ctx7_docs}\n\nImplement T2: {task description}. Files: {file ownership}. SPEC requirements: {relevant requirements}. Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./..."
 )
 ```
@@ -1658,8 +1554,8 @@ Sequential tasks (Mode = "sequential" OR file ownership conflict OR migration-di
 # Call Agent() one at a time, passing previous result to next
 # Sequential: merge worktree branch immediately after each task before spawning next
 #   git -c gc.auto=0 merge <branch_T1> && git worktree remove <path_T1>
-result_t1 = Agent(subagent_type = "executor", prompt = "Implement T1: ... Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./...")
-Agent(subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ... Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./...")
+result_t1 = Agent(description = "Implement sequential task T1", subagent_type = "executor", prompt = "Implement T1: ... Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./...")
+Agent(description = "Implement dependent sequential task T2", subagent_type = "executor", prompt = "Implement T2 (depends on T1). T1 result: {result_t1}. ... Working directory: {WORKING_DIR}. Run all build/test commands inside {WORKING_DIR}: cd {WORKING_DIR} && go build ./...")
 ```
 
 > **⏭ POST-AGENT**: executor(s) returned. NEXT REQUIRED STEP: [REQUIRED] Phase 2.1: Worktree Merge. Do NOT skip to Completion.
@@ -1713,8 +1609,8 @@ After each executor, display:
 
 ```
 Agent(
+  description = "Validate the integrated implementation without editing",
   subagent_type = "validator",
-  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
   prompt = """
     Validate the implementation. Check:
     - go build ./... passes
@@ -1756,8 +1652,8 @@ After validation, display:
 
 ```
 Agent(
+  description = "Apply required AX annotations to changed source files",
   subagent_type = "annotator",
-  mode = "bypassPermissions",
   prompt = """
     Apply @AX tags to all files modified during Phase 2.
     Follow ax-annotation skill rules.
@@ -1772,8 +1668,8 @@ Agent(
 
 ```
 Agent(
+  description = "Raise coverage and verify the affected test surface",
   subagent_type = "tester",
-  mode = "bypassPermissions",
   prompt = """
     Raise test coverage to 85%+.
     Add missing edge case tests.
@@ -1805,8 +1701,8 @@ Run reviewer and security-auditor in **parallel**:
 ```
 # Call BOTH in a SINGLE message for parallel execution
 Agent(
+  description = "Review all changes against TRUST 5 and acceptance",
   subagent_type = "reviewer",
-  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
   prompt = """
     Review all changes using TRUST 5 criteria.
     For UI diffs, use any compact ## Design Context to check palette-role drift,
@@ -1821,8 +1717,8 @@ Agent(
   """
 )
 Agent(
+  description = "Audit all changed files for security vulnerabilities",
   subagent_type = "security-auditor",
-  mode = PERMISSION_MODE == "bypass" ? "bypassPermissions" : "plan",
   prompt = """
     Audit all changed files for security vulnerabilities.
     Return format:
@@ -1906,7 +1802,7 @@ Omit `--providers` only when absent. Require
 `schema=orchestration_cli_result.v1` and an embedded
 `receipt.schema=orchestration_run_receipt.v1` before accepting discovery.
 
-`--team --multi` is orthogonal: `--multi` activates risk-tiered provider review only in the review phase at high/critical risk tier and does NOT change substrate selection (the team Workflow substrate is still used when `auto workflow doctor --route route_team` passes and no disable flag is set).
+`--team --multi` is valid because `--multi` is a review modifier, not a topology flag. It does not change the native named-teammate substrate.
 
 Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent Teams), `/auto go SPEC-ID --solo` (single session), `/auto go SPEC-ID --quality ultra`, `/auto go SPEC-ID --auto --loop`
 
@@ -1919,7 +1815,6 @@ Usage: `/auto go SPEC-ID` (subagent pipeline), `/auto go SPEC-ID --team` (Agent 
 | `--continue` | Resume an interrupted implementation from a previous session |
 | `--team` | Agent Teams mode: use Claude Code Agent Teams (experimental) for multi-agent collaboration |
 | `--workflow` | Deterministic Route A workflow (claude-code only): run via the generated workflow JS with an exit-code build/test gate; auto fail-fast to Route A if `auto workflow doctor --route route_a` fails or platform is non-claude |
-| `--no-workflow` | Disable the team Workflow substrate for `--team`; run Agent Teams directly without the `route_team` workflow JS (pre-route opt-out) |
 | `--solo` | Single session mode: no subagents, main session implements directly |
 | `--multi` | Risk-tiered provider review: high/critical fan out when available, otherwise single-provider fallback |
 | `--strategy` | Multi-provider strategy: consensus, debate, pipeline, fastest (requires --multi) |
@@ -1998,7 +1893,7 @@ If the SPEC status is now `implemented`, also check project state:
 
 ## verify — Frontend UX Verification
 {{if .IsFullMode}}
-@.claude/skills/autopus/frontend-verify.md
+@.claude/skills/frontend-verify/SKILL.md
 
 Verify frontend UX changes using VLM-powered visual analysis and Playwright E2E tests.
 
@@ -2091,7 +1986,7 @@ Frontend UX verification requires Full mode. Run `/auto update` to upgrade.
 
 ## browse — Browser Automation
 
-@.claude/skills/autopus/browser-automation.md
+@.claude/skills/browser-automation/SKILL.md
 
 Open a browser and interact with web pages. Automatically selects cmux browser (in cmux terminal) or agent-browser (fallback) based on terminal detection.
 
@@ -2408,7 +2303,7 @@ Usage: `/auto canary`, `/auto canary --url https://example.com`, `/auto canary -
 
 ## fix — Fix a Bug
 
-@.claude/skills/autopus/debugging.md
+@.claude/skills/debugging/SKILL.md
 
 Reproduce the bug and fix it with minimal changes. Uses a Reproduction-First approach.
 
@@ -2521,7 +2416,7 @@ Usage: `/auto map`, `/auto map path/to/package`
 {{if not .IsFullMode}}
 > review is Full mode only. Upgrade with `auto init --full`.
 {{else}}
-@.claude/skills/autopus/review.md
+@.claude/skills/review/SKILL.md
 
 Review changed code against TRUST 5 criteria (Tested, Readable, Unified, Secured, Trackable).
 
@@ -2610,7 +2505,7 @@ Usage: `/auto review`, `/auto review HEAD~3..HEAD`, `/auto review --pr 123`
 {{if not .IsFullMode}}
 > spec review is Full mode only. Upgrade with `auto init --full`.
 {{else}}
-@.claude/skills/autopus/spec-review.md
+@.claude/skills/spec-review/SKILL.md
 
 Review a SPEC document using multiple providers (claude, gemini, etc.) to validate quality. Delivers a PASS/REVISE/REJECT verdict via the Orchestra engine.
 
@@ -2695,7 +2590,7 @@ Usage: `/auto spec review SPEC-ID`, `/auto spec review SPEC-ID --strategy debate
 {{if not .IsFullMode}}
 > secure is Full mode only. Upgrade with `auto init --full`.
 {{else}}
-@.claude/skills/autopus/security-audit.md
+@.claude/skills/security-audit/SKILL.md
 
 Detect security vulnerabilities in the codebase and suggest fixes. Includes OWASP Top 10 coverage.
 
@@ -3051,7 +2946,7 @@ Execute the complete plan → go → sync cycle in one command. The power-user w
 | go | `--auto --loop --team` (Agent Teams + RALF self-healing) |
 | sync | (no special flags) |
 
-User-provided flags **override** these defaults. For example, `--solo` overrides `--team` in the go stage.
+User-provided topology flags suppress the dev default `--team`; other user flags override matching defaults. After default expansion, the same topology conflict gate applies and any combination of `--team`, `--workflow`, and `--solo` fails closed.
 
 ### Pipeline
 
@@ -3104,7 +2999,7 @@ IF any item is unchecked → return to that stage. Do NOT display the milestone 
 | Flag | Description |
 |------|-------------|
 | `--team` | Run `go` with Agent Teams — **default ON** in dev |
-| `--solo` | Run `go` in single session mode (overrides --team) |
+| `--solo` | Run `go` in single session mode; mutually exclusive with `--team` and `--workflow` |
 | `--quality` | Quality mode: ultra or balanced |
 | `--effort` | Explicit model/workflow effort override: low, medium, high, xhigh, max. Claude Code also accepts session-only ultracode, normalized to xhigh for route-team binding. |
 | `--multi` | Enable multi-provider review — **default ON** in dev |

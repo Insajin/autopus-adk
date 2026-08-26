@@ -106,7 +106,7 @@ func TestAcceptance_TechstackFreshnessSemanticContractParity(t *testing.T) {
 		"fail closed",
 		"explicitly offline development",
 	}
-	for _, platform := range []string{"claude", "codex", "gemini", "opencode", "omp"} {
+	for _, platform := range []string{"claude", "gemini", "opencode", "omp"} {
 		platform := platform
 		t.Run(platform, func(t *testing.T) {
 			t.Parallel()
@@ -117,6 +117,22 @@ func TestAcceptance_TechstackFreshnessSemanticContractParity(t *testing.T) {
 			}
 		})
 	}
+	t.Run("codex native skill policy", func(t *testing.T) {
+		root := t.TempDir()
+		files, err := codex.NewWithRoot(root).Generate(context.Background(), config.DefaultFullConfig("parity-test"))
+		require.NoError(t, err)
+		var policy string
+		for _, file := range files.Files {
+			if file.TargetPath == ".codex/skills/codex-agent-pipeline/SKILL.md" {
+				policy = string(file.Content)
+				break
+			}
+		}
+		require.NotEmpty(t, policy)
+		for _, phrase := range expected {
+			assert.Contains(t, policy, phrase)
+		}
+	})
 }
 
 // S5: platform frontmatter 값이 어댑터 식별자와 일치 (Should, REQ-003).
@@ -126,11 +142,8 @@ func TestAcceptance_S5_PlatformFrontmatterValues(t *testing.T) {
 			assert.Equal(t, "antigravity-cli", val, "gemini rule %s platform value", name)
 		}
 	}
-	for name, content := range generatePlatformRules(t, "codex") {
-		if val, ok := parsePlatformFromFrontmatter(content); ok {
-			assert.Equal(t, "codex", val, "codex rule %s platform value", name)
-		}
-	}
+	assert.Empty(t, generatePlatformRules(t, "codex"),
+		"Codex policy must use native skills and AGENTS.md, not inert markdown rules")
 
 	// Gate reports exactly 0 platform-value mismatch findings.
 	findings, err := runCoverageGate(context.Background(), t.TempDir(), config.DefaultFullConfig("parity-test"),
@@ -147,22 +160,10 @@ func TestAcceptance_S5_PlatformFrontmatterValues(t *testing.T) {
 
 // S6: 기존 플랫폼 출력 후방호환 유지 (Must, REQ-005).
 func TestAcceptance_S6_ExistingPlatformsBackwardCompatible(t *testing.T) {
-	codexRules := generatePlatformRules(t, "codex")
-	assert.Len(t, codexRules, 14, "codex generates exactly 14 rules")
-	codexPlatformCount := 0
-	for _, content := range codexRules {
-		if val, ok := parsePlatformFromFrontmatter(content); ok {
-			assert.Equal(t, "codex", val)
-			codexPlatformCount++
-		}
-	}
-	// @AX:NOTE: [AUTO] magic constant — 9 of 14 codex rules carry platform: codex frontmatter; update when codex rule set changes
-	// Was 8 before SPEC-CONDRULE-001: worktree-safety.md had no frontmatter at
-	// all, so ensureCodexRulePlatform had no block to append platform onto.
-	// REQ-CONDRULE-MAP-02 gave it frontmatter, which makes it the ninth.
-	assert.Equal(t, 9, codexPlatformCount, "9 codex rules retain platform: codex frontmatter")
+	assert.Empty(t, generatePlatformRules(t, "codex"),
+		"Codex 0.149.1 has no repository markdown-rule surface")
 
-	// claude counts 11 baseline rules plus 3 relocated conditional bodies.
+	// Claude, OpenCode, Gemini, and OMP retain their native 14-rule sets.
 	assert.Len(t, generatePlatformRules(t, "claude"), 14, "claude generates exactly 14 rules")
 	assert.Len(t, generatePlatformRules(t, "opencode"), 14, "opencode generates exactly 14 rules")
 }
@@ -186,10 +187,12 @@ func TestAcceptance_S9_ParityGateCoversOMP(t *testing.T) {
 	// provably non-regressive.
 	ompRules := generatePlatformRules(t, "omp")
 	assert.Len(t, ompRules, 14, "omp generates exactly 14 rules")
-	for _, platform := range []string{"claude", "codex", "gemini", "opencode"} {
+	for _, platform := range []string{"claude", "gemini", "opencode"} {
 		assert.Len(t, generatePlatformRules(t, platform), 14,
 			"%s still generates exactly 14 rules after omp joins the gate", platform)
 	}
+	assert.Empty(t, generatePlatformRules(t, "codex"),
+		"Codex 0.149.1 carries policy through native skills and AGENTS.md")
 
 	// TransformRuleForOMP keeps only the seven omp-recognized frontmatter keys,
 	// so no platform key survives into an emitted omp rule. The gate compares
@@ -227,7 +230,7 @@ func TestAcceptance_S9_ParityGateCoversOMP(t *testing.T) {
 // invariant that keeps them unconditional: no trigger field reaches their
 // emitted frontmatter on any platform (REQ-CONDRULE-SCHEMA-02).
 func TestAcceptance_S8_UnconditionalRulesCarryNoTrigger(t *testing.T) {
-	for _, platform := range []string{"claude", "codex", "gemini", "opencode", "omp"} {
+	for _, platform := range []string{"claude", "gemini", "opencode", "omp"} {
 		platform := platform
 		t.Run(platform, func(t *testing.T) {
 			rules := generatePlatformRules(t, platform)

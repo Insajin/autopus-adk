@@ -58,8 +58,8 @@ func TestOMPNormalization_S12_PrefixTable(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"skills autopus namespace", "See `.claude/skills/autopus/prd.md`.", "`.agents/skills/prd/SKILL.md`"},
-		{"commands", "See `.claude/commands/auto.md`.", "`.agents/commands/auto.md`"},
+		{"skills autopus namespace", "See `.claude/skills/autopus/prd.md`.", "`.omp/skills/prd/SKILL.md`"},
+		{"commands", "See `.claude/commands/auto.md`.", "`.omp/commands/auto.md`"},
 		{"agents", "See `.claude/agents/autopus/executor.md`.", "`.omp/agents/autopus/executor.md`"},
 		{"rules already namespaced", "See `.claude/rules/autopus/branding.md`.", "`.omp/rules/autopus-branding.md`"},
 		{"rules bare", "See `.claude/rules/branding.md`.", "`.omp/rules/autopus-branding.md`"},
@@ -78,7 +78,7 @@ func TestOMPNormalization_S12_PrefixTable(t *testing.T) {
 // TestOMPNormalization_S12_SkillRefStageTwo covers the REQ-015 stage-2 rewrite.
 func TestOMPNormalization_S12_SkillRefStageTwo(t *testing.T) {
 	got := ReplacePlatformReferences("Reference: `.claude/skills/autopus/ax-annotation.md`", "omp")
-	assert.Contains(t, got, ".agents/skills/ax-annotation/SKILL.md")
+	assert.Contains(t, got, ".omp/skills/ax-annotation/SKILL.md")
 	assert.Empty(t, flatSkillRefRe.FindAllString(got, -1),
 		"stage-1-only form .agents/skills/<name>.md must not survive")
 }
@@ -117,8 +117,8 @@ func TestOMPNormalization_S12_WorkflowToolNames(t *testing.T) {
 func TestOMPNormalization_S12_AgentInvocationSyntax(t *testing.T) {
 	got := ReplacePlatformReferences(`Agent(subagent_type="executor", task="build")`, "omp")
 	for _, field := range []string{
-		`"context"`, `"tasks"`, `"agent"`, `"task"`, `"outputSchema"`,
-		`"schemaMode"`, `"isolated"`, `"owned_paths"`, `"changed_files"`,
+		`"i"`, `"context"`, `"tasks"`, `"agent"`, `"task"`, `"outputSchema"`,
+		`"schemaMode"`, `"owned_paths"`, `"changed_files"`,
 		`"verification"`, `"blockers"`, `"next_required_step"`,
 	} {
 		assert.Contains(t, got, field)

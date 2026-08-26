@@ -84,8 +84,8 @@ func TestMinimalityDisciplineSourceSurfaceParity(t *testing.T) {
 			tokens: []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"},
 		},
 		{
-			name:   "codex-agent-pipeline-template",
-			path:   filepath.Join(root, "codex", "skills", "agent-pipeline.md.tmpl"),
+			name:   "codex-agent-pipeline-native-source",
+			path:   filepath.Join(root, "..", "pkg", "adapter", "codex", "codex_extended_skill_rewrites_pipeline_completion.go"),
 			tokens: []string{"minimality ladder", "existing code/helper/pattern", "minimum sufficient verification", "receipt"},
 		},
 		{

@@ -17,11 +17,7 @@ type commandOMPProbeRunner struct {
 	resolveErr         error
 	environment        []string
 	prefixArgs         []string
-}
-
-type ompProbeInvocation struct {
-	args []string
-	env  []string
+	workingDirectory   string
 }
 
 func (runner commandOMPProbeRunner) Run(ctx context.Context, executable string, args ...string) ([]byte, error) {
@@ -73,22 +69,24 @@ func (runner commandOMPProbeRunner) command(
 			return nil, err
 		}
 	}
-	invocation := prepareOMPProbeInvocation(args)
-	commandArgs := append(append([]string(nil), runner.prefixArgs...), invocation.args...)
+	commandArgs := append(append([]string(nil), runner.prefixArgs...), args...)
 	cmd := exec.CommandContext(ctx, path, commandArgs...)
+	if dir == "" {
+		dir = runner.workingDirectory
+	}
 	cmd.Dir = dir
-	overrides := append(append([]string(nil), invocation.env...), runner.environment...)
-	cmd.Env = mergeOMPProbeEnvironment(os.Environ(), overrides)
+	cmd.Env = mergeOMPProbeEnvironment(os.Environ(), runner.environment)
 	return cmd, nil
 }
 
 func configureOMPProbeRunner(
 	runner commandOMPProbeRunner,
-	executable, overlay string,
+	executable, sandbox, root string,
 ) (commandOMPProbeRunner, string) {
 	resolved, err := resolveOMPProbeExecutable(executable)
 	runner.resolvedExecutable, runner.resolveErr = resolved, err
-	runner.environment = ompProbeTaskEnvironment(overlay)
+	runner.environment = ompProbeTaskEnvironment(sandbox)
+	runner.workingDirectory = root
 	return runner, resolved
 }
 
@@ -102,31 +100,6 @@ func resolveOMPProbeExecutable(executable string) (string, error) {
 		return "", err
 	}
 	return filepath.EvalSymlinks(path)
-}
-
-func prepareOMPProbeInvocation(args []string) ompProbeInvocation {
-	invocation := ompProbeInvocation{args: append([]string(nil), args...)}
-	if profileDir := ompProbeProfileDir(args); profileDir != "" {
-		invocation.env = append(invocation.env, "PI_CODING_AGENT_DIR="+profileDir)
-	}
-	if index, overlay, ok := ompConfigReadbackOverlay(args); ok {
-		invocation.args = append(append([]string(nil), args[:index]...), args[index+2:]...)
-		invocation.env = append(invocation.env, "PI_CONFIG_FILES="+overlay)
-	}
-	return invocation
-}
-
-func ompConfigReadbackOverlay(args []string) (int, string, bool) {
-	for index := 0; index+1 < len(args); index++ {
-		if args[index] != "--config" {
-			continue
-		}
-		remaining := append(append([]string(nil), args[:index]...), args[index+2:]...)
-		if len(remaining) >= 2 && remaining[0] == "config" && remaining[1] == "get" {
-			return index, args[index+1], true
-		}
-	}
-	return 0, "", false
 }
 
 func mergeOMPProbeEnvironment(base, overrides []string) []string {
@@ -158,30 +131,19 @@ func allowedOMPProbeBaseEnvironment(key string) bool {
 		key == "WINDIR" || key == "PATHEXT" || strings.HasPrefix(key, "LC_")
 }
 
-func ompProbeTaskEnvironment(overlay string) []string {
-	base := filepath.Dir(overlay)
+func ompProbeTaskEnvironment(sandbox string) []string {
 	return []string{
-		"HOME=" + filepath.Join(base, "home"),
-		"XDG_CONFIG_HOME=" + filepath.Join(base, "xdg-config"),
-		"XDG_CACHE_HOME=" + filepath.Join(base, "xdg-cache"),
-		"XDG_DATA_HOME=" + filepath.Join(base, "xdg-data"),
-		"XDG_STATE_HOME=" + filepath.Join(base, "xdg-state"),
-		"TMPDIR=" + filepath.Join(base, "tmp"),
-		"PI_CODING_AGENT_DIR=" + filepath.Join(base, "pi-agent"),
-		"PI_CONFIG_FILES=" + overlay,
+		"HOME=" + filepath.Join(sandbox, "home"),
+		"XDG_CONFIG_HOME=" + filepath.Join(sandbox, "xdg-config"),
+		"XDG_CACHE_HOME=" + filepath.Join(sandbox, "xdg-cache"),
+		"XDG_DATA_HOME=" + filepath.Join(sandbox, "xdg-data"),
+		"XDG_STATE_HOME=" + filepath.Join(sandbox, "xdg-state"),
+		"TMPDIR=" + filepath.Join(sandbox, "tmp"),
+		"PI_CODING_AGENT_DIR=" + filepath.Join(sandbox, "pi-agent"),
 		"NO_PROXY=127.0.0.1,localhost,::1",
 		"no_proxy=127.0.0.1,localhost,::1",
 		"HTTP_PROXY=http://127.0.0.1:1",
 		"HTTPS_PROXY=http://127.0.0.1:1",
 		"ALL_PROXY=http://127.0.0.1:1",
 	}
-}
-
-func ompProbeProfileDir(args []string) string {
-	for index := 0; index+1 < len(args); index++ {
-		if args[index] == "--config" {
-			return filepath.Dir(args[index+1])
-		}
-	}
-	return ""
 }

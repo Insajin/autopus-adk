@@ -28,11 +28,10 @@ ISOLATED_TIMEOUT    ?= 10m
 # 예산을 키우는 방식은 이 저장소에서 이미 세 번 실패했다. 격리는 억제가
 # 아니다 - 같은 테스트를 같은 -race 게이트로, 다만 -p 1 로 돌린다.
 #
-# TestDetect 는 접두사 전체를 잡는다. pkg/detect 는 개별 테스트가 아니라
-# 패키지 자체가 PATH 의 실제 CLI 를 실행하는 프로브이고, 이름을 하나씩
-# 추가하는 방식은 세 번 연속 다음 테스트에서 실패했다. 순수한 두어 개가
-# 함께 격리되는 비용은 없다 - 같은 -race 게이트로 돌아간다.
-PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetect|TestPOSIXInstaller)
+# TestDetect 와 TestProbeOMPIdentity_ 는 pkg/detect 의 PATH 기반 실제 CLI
+# 프로브를 함께 격리한다. 이름을 하나씩 추가하는 방식은 세 번 연속 다음
+# 테스트에서 실패했다. 순수한 두어 개가 함께 격리되는 비용은 없다.
+PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller)
 
 test:
 	go test -race -count=1 -timeout=$(INTEGRATION_TIMEOUT) -tags integration -skip '$(PROCESS_HEAVY_TESTS)' ./...

@@ -97,7 +97,6 @@ func TestDesignContextExamplesMentionTrustLabel(t *testing.T) {
 	paths := []string{
 		filepath.Join(templateRoot(), "codex", "agents", "frontend-specialist.toml.tmpl"),
 		filepath.Join(templateRoot(), "codex", "agents", "reviewer.toml.tmpl"),
-		filepath.Join(templateRoot(), "codex", "skills", "agent-pipeline.md.tmpl"),
 		filepath.Join(templateRoot(), "gemini", "agents", "frontend-specialist.md.tmpl"),
 		filepath.Join(templateRoot(), "gemini", "agents", "reviewer.md.tmpl"),
 		filepath.Join(templateRoot(), "gemini", "skills", "agent-pipeline", "SKILL.md.tmpl"),
@@ -126,8 +125,7 @@ func TestReviewPromptExamplesMentionTrustBoundary(t *testing.T) {
 	}{
 		{"claude-router-phase4", filepath.Join(templateRoot(), "claude", "commands", "auto-router.md.tmpl"), `subagent_type = "reviewer"`},
 		{"gemini-router-phase4", filepath.Join(templateRoot(), "gemini", "commands", "auto-router.md.tmpl"), `subagent_type = "reviewer"`},
-		{"codex-pipeline-reviewer", filepath.Join(templateRoot(), "codex", "skills", "agent-pipeline.md.tmpl"), `Agent(subagent_type = "reviewer"`},
-		{"gemini-pipeline-reviewer", filepath.Join(templateRoot(), "gemini", "skills", "agent-pipeline", "SKILL.md.tmpl"), `Agent(subagent_type = "reviewer"`},
+		{"gemini-pipeline-reviewer", filepath.Join(templateRoot(), "gemini", "skills", "agent-pipeline", "SKILL.md.tmpl"), `subagent_type = "reviewer"`},
 	}
 
 	for _, tc := range cases {

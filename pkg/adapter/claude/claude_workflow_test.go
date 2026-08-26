@@ -9,6 +9,7 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestGenerateProducesRouteAWorkflow verifies the S1 adapter half + REQ-004:
@@ -85,6 +86,10 @@ func TestGenerateInstallsBothWorkflowRoutes(t *testing.T) {
 		}
 		if !strings.Contains(firstLine, "GENERATED") || !strings.Contains(firstLine, "DO NOT EDIT") {
 			t.Errorf("%s first line missing generated/edit-forbidden warning: %q", name, firstLine)
+		}
+		if name == "route_team.workflow.js" {
+			assert.Contains(t, content, "explicit retained Workflow")
+			assert.NotContains(t, content, "Workflow substrate (claude-code --team)")
 		}
 	}
 }

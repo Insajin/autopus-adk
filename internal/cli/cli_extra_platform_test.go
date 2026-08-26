@@ -63,11 +63,11 @@ func TestPlatformRemoveCmd_NotFound(t *testing.T) {
 	initCmd.SetArgs([]string{"init", "--dir", dir, "--project", "test-proj", "--platforms", "claude-code"})
 	require.NoError(t, initCmd.Execute())
 
-	// 없는 플랫폼 제거 시도
+	// 설정에는 없는 유효한 플랫폼 제거 시도
 	var buf bytes.Buffer
 	removeCmd := newTestRootCmd()
 	removeCmd.SetOut(&buf)
-	removeCmd.SetArgs([]string{"platform", "remove", "nonexistent-platform", "--dir", dir})
+	removeCmd.SetArgs([]string{"platform", "remove", "codex", "--dir", dir})
 	err := removeCmd.Execute()
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), "찾을 수 없습니다")

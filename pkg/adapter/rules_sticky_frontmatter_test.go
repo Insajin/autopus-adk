@@ -20,7 +20,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
 	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
 	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
@@ -38,12 +37,10 @@ var stickyRules = []string{"language-policy.md", "objective-reasoning.md"}
 // source rather than synthesizing it for every rule.
 const stickyControlRule = "project-identity.md"
 
-// stickyPlatformRuleRoots lists every slash-form prefix under which a platform
-// may emit its rule surface. Gemini has two: the CLI rule directory and the
-// .agents plugin mirror that GEMINI.md actually imports.
+// stickyPlatformRuleRoots lists active markdown rule roots. Gemini has two:
+// the CLI rule directory and the .agents plugin mirror imported by GEMINI.md.
 var stickyPlatformRuleRoots = map[string][]string{
 	"claude":   {".claude/rules/autopus/"},
-	"codex":    {".codex/"},
 	"gemini":   {".gemini/rules/autopus/", ".agents/plugins/autopus/rules/"},
 	"opencode": {".opencode/rules/autopus/"},
 }
@@ -59,8 +56,6 @@ func stickyGenerate(t *testing.T, platform string) []adapter.FileMapping {
 	switch platform {
 	case "claude":
 		pf, err = claude.NewWithRoot(dir).Generate(ctx, cfg)
-	case "codex":
-		pf, err = codex.NewWithRoot(dir).Generate(ctx, cfg)
 	case "gemini":
 		pf, err = antigravity.NewWithRoot(dir).Generate(ctx, cfg)
 	case "opencode":
@@ -74,9 +69,7 @@ func stickyGenerate(t *testing.T, platform string) []adapter.FileMapping {
 }
 
 // stickyRuleEmission returns the content a platform emits for a rule source
-// file. Selection is path-shape agnostic: it matches whichever target path
-// ruleFilePath selects for codex and accepts every gemini mirror, and it
-// requires all copies to be byte-identical.
+// file and requires mirrored copies to be byte-identical.
 func stickyRuleEmission(t *testing.T, files []adapter.FileMapping, platform, ruleFile string) string {
 	t.Helper()
 	var found []string
@@ -137,15 +130,14 @@ func stickyGeminiTemplate(t *testing.T, ruleFile string) string {
 	return string(data)
 }
 
-// S8: the sticky key reaches codex, opencode, and gemini, stays inside
-// frontmatter, and is never synthesized for a non-sticky rule.
+// S8: the sticky key reaches active frontmatter-preserving rule surfaces, stays
+// inside frontmatter, and is never synthesized for a non-sticky rule.
 func TestStickyFrontmatter_S8_ReachesEveryFrontmatterPreservingPlatform(t *testing.T) {
 	wantPlatformLine := map[string]string{
-		"codex":  "platform: codex",
 		"gemini": "platform: antigravity-cli",
 	}
 
-	for _, platform := range []string{"codex", "opencode", "gemini"} {
+	for _, platform := range []string{"opencode", "gemini"} {
 		t.Run(platform, func(t *testing.T) {
 			files := stickyGenerate(t, platform)
 
@@ -194,26 +186,16 @@ func TestStickyFrontmatter_S8_SourcesDeclareTheKeyInFrontmatterOnly(t *testing.T
 	}
 }
 
-// S8: codex and opencode read content/rules directly, so their emissions must be
-// the source bytes transformed only by the platform-reference rewrite plus, for
-// codex, the appended platform line. Full-file equality proves every preserved
-// value is byte-identical and no body text changed apart from the added key.
-func TestStickyFrontmatter_S8_CodexAndOpencodeEmitSourceBytes(t *testing.T) {
-	codexFiles := stickyGenerate(t, "codex")
+// S8: OpenCode reads content/rules directly, so emission must equal the source
+// bytes after only the platform-reference rewrite.
+func TestStickyFrontmatter_S8_OpencodeEmitsSourceBytes(t *testing.T) {
 	opencodeFiles := stickyGenerate(t, "opencode")
 
 	for _, rule := range stickyRules {
 		source := stickyContentSource(t, rule)
-
 		wantOpencode := pkgcontent.ReplacePlatformReferences(source, "opencode")
 		assert.Equal(t, wantOpencode, stickyRuleEmission(t, opencodeFiles, "opencode", rule),
 			"opencode emission for %s must be the source bytes, sticky key included", rule)
-
-		replaced := pkgcontent.ReplacePlatformReferences(source, "codex")
-		frontmatter, body := stickySplitFrontmatter(t, replaced)
-		wantCodex := "---\n" + frontmatter + "\nplatform: codex\n---\n" + body
-		assert.Equal(t, wantCodex, stickyRuleEmission(t, codexFiles, "codex", rule),
-			"codex emission for %s must add only its platform line to the source bytes", rule)
 	}
 }
 

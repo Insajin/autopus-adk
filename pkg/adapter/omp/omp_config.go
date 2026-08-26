@@ -15,7 +15,7 @@ const (
 	configFile     = ".omp/config.yml"
 )
 
-func (a *Adapter) renderConfigDocument(cfg *config.HarnessConfig) (string, error) {
+func (a *Adapter) renderConfigDocument(_ *config.HarnessConfig) (string, error) {
 	// This read feeds the document that gets written back and checksummed, so a
 	// link here would merge an unrelated file's contents into managed output.
 	// Fail closed rather than letting the later write guard catch it, so the
@@ -32,5 +32,5 @@ func (a *Adapter) renderConfigDocument(cfg *config.HarnessConfig) (string, error
 		return "", fmt.Errorf("%s 읽기 실패: %w", configFile, err)
 	}
 
-	return mergeOMPConfigDocument(existing)
+	return existing, nil
 }

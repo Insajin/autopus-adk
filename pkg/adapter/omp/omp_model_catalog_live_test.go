@@ -100,7 +100,7 @@ func TestProbeOMPModelCatalog_LiveInstalledSchemaFailsClosedWhenSemanticMetadata
 		require.Equal(t, "catalog_metadata_insufficient", result.Reason)
 		require.Empty(t, result.Catalog.Models)
 	}
-	require.Equal(t, "omp/17.2.6", result.Version)
+	require.Equal(t, "omp/18.0.5", result.Version)
 	require.Zero(t, requests.Load(), "catalog discovery must not issue a model/provider request")
 	t.Logf("catalog-only schema: top_level=%s custom_row=%s required_metadata=%t missing=%s provider_requests=%d",
 		strings.Join(topSchema, ","), strings.Join(rowSchema, ","), hasRequiredMetadata,

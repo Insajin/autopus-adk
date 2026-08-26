@@ -14,14 +14,24 @@ import (
 )
 
 func (a *Adapter) prepareHooksAndPermissionsFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
+	if err := adapter.RejectSymlinkComponents(a.root, filepath.Join(".claude", "settings.json")); err != nil {
+		return nil, fmt.Errorf("settings.json 경로 확인 실패: %w", err)
+	}
 	a.statusLineMode = resolveStatusLineMode(cfg, InspectStatusLine(a.root))
-	hookConfigs, gitHooks, _ := content.GenerateProjectHookConfigs(cfg, "claude-code", a.SupportsHooks())
+	hookConfigs, gitHooks, err := content.GenerateProjectHookConfigs(cfg, "claude-code", a.SupportsHooks())
+	if err != nil {
+		return nil, fmt.Errorf("hook config 준비 실패: %w", err)
+	}
 	perms := content.DetectPermissions(a.root, cfg.Hooks.Permissions)
 	settings, err := a.prepareSettingsMapping(hookConfigs, perms)
 	if err != nil {
 		return nil, fmt.Errorf("hooks/permissions 준비 실패: %w", err)
 	}
-	files := []adapter.FileMapping{settings}
+	ledger, err := a.preparePermissionLedgerMapping(perms)
+	if err != nil {
+		return nil, fmt.Errorf("permission ledger 준비 실패: %w", err)
+	}
+	files := []adapter.FileMapping{settings, ledger}
 	for _, gh := range gitHooks {
 		files = append(files, adapter.FileMapping{
 			TargetPath:      gh.Path,
@@ -42,68 +52,53 @@ func (a *Adapter) InstallHooks(_ context.Context, hooks []adapter.HookConfig, pe
 	return writeClaudeMapping(a.root, mapping)
 }
 
+// @AX:WARN [AUTO]: settings projection contains more than eight conditional branches.
+// @AX:REASON [AUTO]: malformed input rejection, user hook preservation, managed-hook retraction, permissions, and status-line precedence converge here.
 func (a *Adapter) prepareSettingsMapping(hooks []adapter.HookConfig, perms *adapter.PermissionSet) (adapter.FileMapping, error) {
 	var settings map[string]interface{}
 	data, err := os.ReadFile(filepath.Join(a.root, ".claude", "settings.json"))
-	if err == nil {
+	switch {
+	case err == nil:
 		if err := json.Unmarshal(data, &settings); err != nil {
+			return adapter.FileMapping{}, fmt.Errorf("settings.json 파싱 실패: %w", err)
+		}
+		if settings == nil {
 			settings = make(map[string]interface{})
 		}
-	} else {
+	case os.IsNotExist(err):
 		settings = make(map[string]interface{})
+	default:
+		return adapter.FileMapping{}, fmt.Errorf("settings.json 읽기 실패: %w", err)
 	}
 
-	// Build hooks in Claude Code nested schema, merging with existing user hooks.
-	// Autopus-managed event keys are replaced entirely to prevent duplication;
-	// other event keys set by the user are preserved. UserPromptSubmit is the one
-	// exception: it is managed per entry, because the user may hook that event
-	// too (see claude_settings_sticky.go).
-	if len(hooks) > 0 {
-		existingHooks, _ := settings["hooks"].(map[string]any)
-		hooksMap := make(map[string]any)
-
-		// Collect which event keys autopus manages
-		managedEvents := make(map[string]bool)
-		for _, h := range hooks {
-			if h.Event == userPromptSubmitEvent {
-				continue
-			}
-			managedEvents[h.Event] = true
+	// Retract stale managed entries before appending the desired set. Event keys
+	// and entries owned by the user remain byte-semantically intact.
+	hooksMap := make(map[string]any)
+	if existing, exists := settings["hooks"]; exists {
+		typed, ok := existing.(map[string]any)
+		if !ok {
+			return adapter.FileMapping{}, fmt.Errorf("settings.json hooks 필드는 객체여야 함")
 		}
-		managedEvents["TaskCreated"] = true
-
-		// Preserve user-defined event keys that autopus does not manage
-		for k, v := range existingHooks {
-			if !managedEvents[k] {
-				hooksMap[k] = v
-			}
+		for event, entries := range typed {
+			hooksMap[event] = entries
 		}
-		// UserPromptSubmit was carried over whole above, so it still holds any
-		// previously installed autopus entry. Dropping just that one keeps
-		// regeneration idempotent without touching the user's own entries.
-		retractStickyEntry(hooksMap)
-
-		// Set autopus-managed events fresh (no append to existing)
-		for _, h := range hooks {
-			hookEntry := map[string]any{
-				"type":    h.Type,
-				"command": h.Command,
-				"timeout": h.Timeout,
-			}
-			if len(h.Env) > 0 {
-				hookEntry["env"] = h.Env
-			}
-			entry := map[string]any{
-				"matcher": h.Matcher,
-				"hooks":   []map[string]any{hookEntry},
-			}
-			hooksMap[h.Event] = appendHookEntry(hooksMap[h.Event], entry)
+	}
+	retractManagedHookEntries(hooksMap)
+	for _, hook := range hooks {
+		handler := map[string]any{
+			"type":    hook.Type,
+			"command": hook.Command,
 		}
+		if hook.Timeout > 0 {
+			handler["timeout"] = hook.Timeout
+		}
+		entry := claudeHookEntry(handler, hook.Matcher)
+		hooksMap[hook.Event] = appendHookEntry(hooksMap[hook.Event], entry)
+	}
+	if len(hooksMap) == 0 {
+		delete(settings, "hooks")
+	} else {
 		settings["hooks"] = hooksMap
-	} else if existingHooks, ok := settings["hooks"].(map[string]any); ok {
-		delete(existingHooks, "TaskCreated")
-		retractStickyEntry(existingHooks)
-		settings["hooks"] = existingHooks
 	}
 
 	// Merge permissions: append autopus defaults to existing user permissions.
@@ -113,9 +108,10 @@ func (a *Adapter) prepareSettingsMapping(hooks []adapter.HookConfig, perms *adap
 		for k, v := range existingPerms {
 			permMap[k] = v
 		}
-		if len(perms.Allow) > 0 {
-			existing := toStringSlice(permMap["allow"])
-			permMap["allow"] = mergeUnique(existing, perms.Allow)
+		existingAllow := toStringSlice(permMap["allow"])
+		filteredAllow := withoutObsoleteClaudePermissions(existingAllow)
+		if len(perms.Allow) > 0 || len(filteredAllow) != len(existingAllow) {
+			permMap["allow"] = mergeUnique(filteredAllow, perms.Allow)
 		}
 		if len(perms.Deny) > 0 {
 			existing := toStringSlice(permMap["deny"])
@@ -130,9 +126,9 @@ func (a *Adapter) prepareSettingsMapping(hooks []adapter.HookConfig, perms *adap
 	}
 	switch mode {
 	case config.StatusLineModeMerge:
-		settings["statusLine"] = defaultClaudeCombinedStatusLine()
+		settings["statusLine"] = projectClaudeStatusLine(settings["statusLine"], defaultClaudeCombinedStatusLine())
 	case config.StatusLineModeReplace:
-		settings["statusLine"] = defaultClaudeStatusLine()
+		settings["statusLine"] = projectClaudeStatusLine(settings["statusLine"], defaultClaudeStatusLine())
 	}
 
 	out, err := json.MarshalIndent(settings, "", "  ")
@@ -161,6 +157,9 @@ func writeClaudeMapping(root string, file adapter.FileMapping) error {
 
 func claudeFileMode(path string) os.FileMode {
 	clean := filepath.ToSlash(path)
+	if clean == claudePermissionLedgerPath {
+		return 0600
+	}
 	if strings.HasPrefix(clean, ".git/hooks/") || strings.HasSuffix(clean, ".sh") {
 		return 0755
 	}
@@ -193,6 +192,16 @@ func mergeUnique(base, add []string) []string {
 		if !seen[s] {
 			result = append(result, s)
 			seen[s] = true
+		}
+	}
+	return result
+}
+
+func withoutObsoleteClaudePermissions(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != "TeamCreate" && value != "TeamDelete" {
+			result = append(result, value)
 		}
 	}
 	return result

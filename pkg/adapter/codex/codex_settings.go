@@ -12,38 +12,6 @@ import (
 
 const codexConfigRelPath = ".codex/config.toml"
 
-// generateConfig renders the project-scoped Codex config template.
-func (a *Adapter) generateConfig(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	tmplContent, err := templates.FS.ReadFile("codex/config.toml.tmpl")
-	if err != nil {
-		return nil, fmt.Errorf("codex config 템플릿 읽기 실패: %w", err)
-	}
-
-	rendered, err := a.engine.RenderString(string(tmplContent), a.codexRenderData(cfg))
-	if err != nil {
-		return nil, fmt.Errorf("codex config 템플릿 렌더링 실패: %w", err)
-	}
-
-	targetPath := filepath.Join(a.root, codexConfigRelPath)
-	if existing, readErr := os.ReadFile(targetPath); readErr == nil {
-		preservation := codexModelSettingsToPreserve(existing, nil, false)
-		rendered = preserveUserCodexModelSettings(rendered, preservation)
-	}
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		return nil, fmt.Errorf("codex config 디렉터리 생성 실패: %w", err)
-	}
-	if err := os.WriteFile(targetPath, []byte(rendered), 0644); err != nil {
-		return nil, fmt.Errorf("codex config.toml 쓰기 실패: %w", err)
-	}
-
-	return []adapter.FileMapping{{
-		TargetPath:      codexConfigRelPath,
-		OverwritePolicy: adapter.OverwriteMerge,
-		Checksum:        checksum(rendered),
-		Content:         []byte(rendered),
-	}}, nil
-}
-
 // prepareConfigFile returns the project-scoped Codex config mapping without writing to disk.
 func (a *Adapter) prepareConfigFile(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	return a.prepareConfigFileWithManifest(cfg, nil)
@@ -62,10 +30,17 @@ func (a *Adapter) prepareConfigFileWithManifest(
 	if err != nil {
 		return nil, fmt.Errorf("codex config 템플릿 렌더링 실패: %w", err)
 	}
-	if existing, readErr := os.ReadFile(filepath.Join(a.root, codexConfigRelPath)); readErr == nil {
-		legacyPolicy := cfg.Quality.SupervisorModelPolicy == ""
+	targetPath := filepath.Join(a.root, codexConfigRelPath)
+	if existing, readErr := os.ReadFile(targetPath); readErr == nil {
+		legacyPolicy := cfg == nil || cfg.Quality.SupervisorModelPolicy == ""
 		preservation := codexModelSettingsToPreserve(existing, oldManifest, legacyPolicy)
+		rendered, err = mergeCodexConfig(string(existing), rendered)
+		if err != nil {
+			return nil, err
+		}
 		rendered = preserveUserCodexModelSettings(rendered, preservation)
+	} else if !os.IsNotExist(readErr) {
+		return nil, fmt.Errorf("existing Codex config 읽기 실패: %w", readErr)
 	}
 
 	return []adapter.FileMapping{{

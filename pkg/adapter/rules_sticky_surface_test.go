@@ -107,7 +107,7 @@ func TestStickyFrontmatter_S7_ClaudeRuleSurfaceIsUnchanged(t *testing.T) {
 // control, so a rule that picks up the key from a template edit or a synthesized
 // default is caught wherever it appears.
 func TestStickyFrontmatter_MapsExactlyTwoRules(t *testing.T) {
-	for _, platform := range []string{"claude", "codex", "opencode", "gemini"} {
+	for _, platform := range []string{"claude", "opencode", "gemini"} {
 		t.Run(platform, func(t *testing.T) {
 			rules := generatePlatformRules(t, platform)
 			require.NotEmpty(t, rules, "%s must emit rules", platform)

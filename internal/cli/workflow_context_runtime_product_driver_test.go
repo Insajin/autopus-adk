@@ -78,18 +78,16 @@ func TestWorkflowContextManagedRPCProduct_Validation(t *testing.T) {
 			managedProductWriteFile(t, filepath.Join(directory, "ambient.ts"), []byte("export {}\n"), 0o600)
 		}},
 		{name: "command source drift", setup: func(t *testing.T, options *WorkflowContextManagedRPCOptions) {
-			path := filepath.Join(options.ProjectDir, ".agents", "commands", "auto-go.md")
+			path := filepath.Join(options.ProjectDir, ".omp", "commands", "auto-go.md")
 			managedProductWriteFile(t, path, []byte("shadow command\n"), 0o600)
 		}},
 		{name: "skill source drift", setup: func(t *testing.T, options *WorkflowContextManagedRPCOptions) {
-			path := filepath.Join(options.ProjectDir, ".agents", "skills", "auto-go", "SKILL.md")
+			path := filepath.Join(options.ProjectDir, ".omp", "skills", "auto-go", "SKILL.md")
 			managedProductWriteFile(t, path, []byte("shadow skill\n"), 0o600)
 		}},
-		{name: "ambient dot agent source", setup: func(t *testing.T, options *WorkflowContextManagedRPCOptions) {
-			managedProductMkdir(t, filepath.Join(options.ProjectDir, ".agent", "commands"))
-		}},
-		{name: "native OMP command shadow", setup: func(t *testing.T, options *WorkflowContextManagedRPCOptions) {
-			managedProductMkdir(t, filepath.Join(options.ProjectDir, ".omp", "commands"))
+		{name: "extra native OMP command", setup: func(t *testing.T, options *WorkflowContextManagedRPCOptions) {
+			path := filepath.Join(options.ProjectDir, ".omp", "commands", "shadow.md")
+			managedProductWriteFile(t, path, []byte("shadow command\n"), 0o600)
 		}},
 		{name: "native OMP system shadow", setup: func(t *testing.T, options *WorkflowContextManagedRPCOptions) {
 			path := filepath.Join(options.ProjectDir, ".omp", "SYSTEM.md")

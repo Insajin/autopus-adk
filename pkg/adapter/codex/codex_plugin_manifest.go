@@ -193,34 +193,18 @@ func (a *Adapter) renderMarketplaceJSON() (string, error) {
 		}},
 	}
 
-	existingPath := filepath.Join(a.root, ".agents", "plugins", "marketplace.json")
-	if data, err := os.ReadFile(existingPath); err == nil {
-		var existing marketplaceDoc
-		if jsonErr := json.Unmarshal(data, &existing); jsonErr == nil {
-			if existing.Name != "" {
-				doc.Name = existing.Name
-			}
-			if existing.Interface.DisplayName != "" {
-				doc.Interface.DisplayName = existing.Interface.DisplayName
-			}
-			updated := false
-			for i := range existing.Plugins {
-				if existing.Plugins[i].Name == "auto" {
-					existing.Plugins[i] = doc.Plugins[0]
-					updated = true
-					break
-				}
-			}
-			if !updated {
-				existing.Plugins = append(existing.Plugins, doc.Plugins[0])
-			}
-			doc.Plugins = existing.Plugins
-		}
-	}
-
 	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("marketplace.json 직렬화 실패: %w", err)
+	}
+	existingPath := filepath.Join(a.root, ".agents", "plugins", "marketplace.json")
+	if existing, readErr := os.ReadFile(existingPath); readErr == nil {
+		data, err = mergeCodexMarketplace(existing, data)
+		if err != nil {
+			return "", err
+		}
+	} else if !os.IsNotExist(readErr) {
+		return "", fmt.Errorf("existing marketplace.json 읽기 실패: %w", readErr)
 	}
 	return string(data) + "\n", nil
 }

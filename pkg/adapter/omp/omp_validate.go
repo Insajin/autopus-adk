@@ -19,8 +19,10 @@ type ompSurfaceSet struct {
 	actual   map[string]bool
 }
 
-// @AX:WARN [AUTO]: installed-surface validation has cyclomatic complexity 15.
-// @AX:REASON [AUTO]: gocyclo reports 15 across cancellation, manifest, generated-file, config-marker, and stale-surface checks.
+// validateInstalledSurface checks the native path set and the integrity of
+// every compiler-owned file. The base config is optional for a plain install.
+// @AX:WARN [AUTO]: installed-surface validation contains more than eight conditional branches.
+// @AX:REASON [AUTO]: cancellation, config loading, generated-surface reconstruction, native path comparison, manifest integrity, and sensitive permissions converge here.
 func (a *Adapter) validateInstalledSurface(ctx context.Context) ([]adapter.ValidationError, error) {
 	if ctx != nil {
 		select {
@@ -29,117 +31,190 @@ func (a *Adapter) validateInstalledSurface(ctx context.Context) ([]adapter.Valid
 		default:
 		}
 	}
-
 	findings, incomplete := a.validateBaseSurface()
 	if incomplete {
 		return findings, nil
 	}
-	findings = append(findings, a.validateOMPConfigValue()...)
 
+	cfg, err := config.LoadPreview(a.root)
+	if err != nil {
+		return findings, err
+	}
+	modelCtx := ctx
+	if modelCtx == nil {
+		modelCtx = context.Background()
+	}
+	modelIntegration, err := a.prepareModelIntegration(modelCtx, cfg)
+	if err != nil {
+		return findings, err
+	}
 	rules, err := a.prepareRuleMappings()
 	if err != nil {
 		return findings, err
 	}
-	agents, err := a.prepareAgentMappings()
+	agentMappings := a.prepareAgentMappings
+	if modelIntegration != nil {
+		agentMappings = modelIntegration.prepareAgentMappings
+	}
+	agents, err := agentMappings()
 	if err != nil {
 		return findings, err
 	}
-	sets := []ompSurfaceSet{
-		ompRuleSurfaceSet(a.root, rules),
-		mappingSurfaceSet(a.root, ".omp/agents", "agents", agents),
+	workflow, err := a.prepareWorkflowSkillMappings(cfg)
+	if err != nil {
+		return findings, err
+	}
+	extended, err := a.prepareExtendedSkillMappings(cfg)
+	if err != nil {
+		return findings, err
+	}
+	commands, err := a.prepareCommandMappings(cfg)
+	if err != nil {
+		return findings, err
+	}
+	contextMappings, err := prepareOMPContextBridgeMappings(cfg)
+	if err != nil {
+		return findings, err
 	}
 
-	cfg, cfgErr := config.LoadPreview(a.root)
-	if cfgErr == nil && ompOwnsCommandSurface(cfg) {
-		commands, mapErr := a.prepareCommandMappings(cfg)
-		if mapErr != nil {
-			return findings, mapErr
-		}
-		sets = append(sets, mappingSurfaceSet(a.root, ".agents/commands", "commands", commands))
+	if finding := compareOMPSurfaceSet(ompRuleSurfaceSet(a.root, rules)); finding != nil {
+		findings = append(findings, *finding)
 	}
-	if cfgErr == nil && ompOwnsSharedSkillSurface(cfg) {
-		workflow, mapErr := a.prepareWorkflowSkillMappings(cfg)
-		if mapErr != nil {
-			return findings, mapErr
-		}
-		extended, mapErr := a.prepareExtendedSkillMappings(cfg)
-		if mapErr != nil {
-			return findings, mapErr
-		}
-		workflowSet, extendedSet := splitOMPSkillSurface(a.root, workflow, extended)
-		sets = append(sets, workflowSet, extendedSet)
-	}
-
-	for _, set := range sets {
-		if finding := compareOMPSurfaceSet(set); finding != nil {
-			findings = append(findings, *finding)
-		}
-	}
+	expected := append(append(append(append(append(
+		[]adapter.FileMapping{}, rules...), agents...), workflow...), extended...), commands...)
+	expected = append(expected, contextMappings...)
+	findings = append(findings, a.validateOMPExpectedMappings(expected)...)
+	findings = append(findings, a.validateOMPManifestIntegrity(expected)...)
+	findings = append(findings, a.validateOMPSensitivePermissions()...)
 	return findings, nil
 }
 
 func (a *Adapter) validateBaseSurface() ([]adapter.ValidationError, bool) {
 	checks := []struct{ path, message string }{
-		{configFile, ".omp/config.yml이 없음"},
+		{filepath.Join(".omp", "skills"), "omp skill 디렉터리가 없음"},
+		{filepath.Join(".omp", "commands"), "omp command 디렉터리가 없음"},
 		{filepath.Join(".omp", "agents"), "omp agent 디렉터리가 없음"},
 		{filepath.FromSlash(ompRuleDir), "omp rule 디렉터리가 없음"},
 	}
 	var findings []adapter.ValidationError
 	for _, check := range checks {
-		if _, err := os.Stat(filepath.Join(a.root, check.path)); os.IsNotExist(err) {
+		info, err := os.Lstat(filepath.Join(a.root, check.path))
+		if os.IsNotExist(err) {
 			findings = append(findings, adapter.ValidationError{
 				File: check.path, Message: check.message, Level: "error",
+			})
+			continue
+		}
+		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			findings = append(findings, adapter.ValidationError{
+				File: check.path, Message: "expected real directory", Level: "error",
 			})
 		}
 	}
 	return findings, len(findings) > 0
 }
 
-func (a *Adapter) validateOMPConfigValue() []adapter.ValidationError {
-	data, err := os.ReadFile(filepath.Join(a.root, configFile))
-	if err != nil {
-		return []adapter.ValidationError{{File: configFile, Message: err.Error(), Level: "error"}}
-	}
-	layout, err := parseOMPConfigLayout(string(data))
-	if err != nil {
-		return []adapter.ValidationError{{
-			File: configFile, Message: "YAML parse/structure error: " + err.Error(), Level: "error",
-		}}
-	}
-	got := ompCustomDirectories(layout)
-	if len(got) != 1 || got[0] != ".agents/skills" {
-		return []adapter.ValidationError{{
-			File: configFile,
-			Message: fmt.Sprintf("skills.customDirectories expected=[.agents/skills] got=[%s]",
-				strings.Join(got, ",")),
-			Level: "error",
-		}}
-	}
-	return nil
-}
-
-func ompCustomDirectories(layout ompConfigLayout) []string {
-	if layout.customKey == nil || layout.skillsValue == nil {
-		return nil
-	}
-	for index, node := range layout.skillsValue.Content {
-		if node != layout.customKey || index+1 >= len(layout.skillsValue.Content) {
+func (a *Adapter) validateOMPExpectedMappings(mappings []adapter.FileMapping) []adapter.ValidationError {
+	var findings []adapter.ValidationError
+	for _, mapping := range mappings {
+		path := filepath.ToSlash(mapping.TargetPath)
+		if err := adapter.RejectSymlinkComponents(a.root, path); err != nil {
+			findings = append(findings,
+				ompIntegrityFinding(path, "managed path must be a regular file, not a symlink"))
 			continue
 		}
-		value := layout.skillsValue.Content[index+1]
-		if value.ShortTag() != "!!seq" {
-			return []string{"<non-sequence>"}
+		fullPath := filepath.Join(a.root, filepath.FromSlash(path))
+		info, err := os.Lstat(fullPath)
+		if err != nil || !info.Mode().IsRegular() {
+			findings = append(findings,
+				ompIntegrityFinding(path, "managed path must be a regular file"))
+			continue
 		}
-		directories := make([]string, 0, len(value.Content))
-		for _, item := range value.Content {
-			if item.ShortTag() != "!!str" {
-				return []string{"<non-string>"}
-			}
-			directories = append(directories, item.Value)
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			findings = append(findings,
+				ompIntegrityFinding(path, "managed regular file is unreadable"))
+			continue
 		}
-		return directories
+		if adapter.Checksum(string(data)) != mapping.Checksum {
+			findings = append(findings, adapter.ValidationError{
+				File: path, Message: "managed content checksum mismatch", Level: "error",
+			})
+		}
 	}
-	return nil
+	return findings
+}
+
+func (a *Adapter) validateOMPManifestIntegrity(expectedMappings []adapter.FileMapping) []adapter.ValidationError {
+	manifest, err := adapter.LoadManifest(a.root, adapterName)
+	if err != nil || manifest == nil {
+		return []adapter.ValidationError{{
+			File:    filepath.Join(".autopus", adapterName+"-manifest.json"),
+			Message: "managed manifest unavailable", Level: "error",
+		}}
+	}
+	expected := make(map[string]bool, len(expectedMappings))
+	for _, mapping := range expectedMappings {
+		expected[filepath.ToSlash(mapping.TargetPath)] = true
+	}
+	var findings []adapter.ValidationError
+	for path, entry := range manifest.Files {
+		path = filepath.ToSlash(path)
+		extensible := strings.HasPrefix(path, ".omp/agents/") ||
+			strings.HasPrefix(path, ".omp/commands/") ||
+			strings.HasPrefix(path, ".omp/skills/")
+		if extensible && !expected[path] {
+			findings = append(findings, ompIntegrityFinding(path, "stale managed path is not part of the expected surface"))
+			continue
+		}
+		if err := adapter.RejectSymlinkComponents(a.root, path); err != nil {
+			findings = append(findings, ompIntegrityFinding(path, "managed path must be a regular file, not a symlink"))
+			continue
+		}
+		fullPath := filepath.Join(a.root, filepath.FromSlash(path))
+		info, err := os.Lstat(fullPath)
+		if err != nil || !info.Mode().IsRegular() {
+			findings = append(findings, ompIntegrityFinding(path, "managed path must be a regular file"))
+			continue
+		}
+		if path == configFile || entry.Policy == adapter.OverwriteMarker {
+			continue
+		}
+		data, err := os.ReadFile(fullPath)
+		if err != nil || adapter.Checksum(string(data)) != entry.Checksum {
+			findings = append(findings, ompIntegrityFinding(path, "managed content checksum mismatch"))
+		}
+	}
+	return findings
+}
+
+func (a *Adapter) validateOMPSensitivePermissions() []adapter.ValidationError {
+	paths := []string{
+		configFile,
+		DefaultOMPModelOverlayPath,
+		OMPModelReceiptRelativePath,
+		OMPModelProjectOwnershipRelativePath,
+	}
+	var findings []adapter.ValidationError
+	for _, path := range paths {
+		fullPath := filepath.Join(a.root, filepath.FromSlash(path))
+		info, err := os.Lstat(fullPath)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil || info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+			findings = append(findings, ompIntegrityFinding(path, "sensitive config must be a regular file"))
+			continue
+		}
+		if info.Mode().Perm()&0o077 != 0 {
+			findings = append(findings, ompIntegrityFinding(path, "sensitive config permission must be owner-only"))
+		}
+	}
+	return findings
+}
+
+func ompIntegrityFinding(path, message string) adapter.ValidationError {
+	return adapter.ValidationError{File: filepath.ToSlash(path), Message: message, Level: "error"}
 }
 
 func mappingSurfaceSet(root, prefix, label string, mappings []adapter.FileMapping) ompSurfaceSet {
@@ -156,11 +231,6 @@ func mappingSurfaceSet(root, prefix, label string, mappings []adapter.FileMappin
 	}
 }
 
-// ompRuleSurfaceSet compares only the rule files omp generated. oh-my-pi scans
-// .omp/rules non-recursively, so generated rules share that directory with
-// whatever rules the user keeps there; reporting those unprefixed files as
-// unexpected extras would make doctor fail on a healthy workspace. Missing or
-// stale autopus-prefixed files are still reported.
 func ompRuleSurfaceSet(root string, rules []adapter.FileMapping) ompSurfaceSet {
 	set := mappingSurfaceSet(root, ompRuleDir, "rules", rules)
 	for name := range set.actual {
@@ -169,28 +239,6 @@ func ompRuleSurfaceSet(root string, rules []adapter.FileMapping) ompSurfaceSet {
 		}
 	}
 	return set
-}
-
-func splitOMPSkillSurface(root string, workflow, extended []adapter.FileMapping) (ompSurfaceSet, ompSurfaceSet) {
-	prefix := ".agents/skills"
-	workflowSet := mappingSurfaceSet(root, prefix, "workflow skills", workflow)
-	extendedSet := mappingSurfaceSet(root, prefix, "compiled skills", extended)
-	all := collectOMPRegularFiles(filepath.Join(root, filepath.FromSlash(prefix)))
-	workflowSet.actual = make(map[string]bool)
-	extendedSet.actual = make(map[string]bool)
-	workflowNames := make(map[string]bool, len(workflowSpecs))
-	for _, spec := range workflowSpecs {
-		workflowNames[spec.Name] = true
-	}
-	for path := range all {
-		name := strings.SplitN(path, "/", 2)[0]
-		if workflowNames[name] {
-			workflowSet.actual[path] = true
-		} else {
-			extendedSet.actual[path] = true
-		}
-	}
-	return workflowSet, extendedSet
 }
 
 func collectOMPRegularFiles(root string) map[string]bool {

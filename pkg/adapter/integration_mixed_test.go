@@ -93,6 +93,8 @@ func TestE2EMixedCodexOpencode_CodexValidateSkipsSharedSurfaceChecks(t *testing.
 
 	_, err := codexAdapter.Generate(context.Background(), cfg)
 	require.NoError(t, err)
+	_, err = opencode.NewWithRoot(dir).Update(context.Background(), cfg)
+	require.NoError(t, err)
 
 	errs, err := codexAdapter.Validate(context.Background())
 	require.NoError(t, err)

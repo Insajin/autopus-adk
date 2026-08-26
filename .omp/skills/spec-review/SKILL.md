@@ -1,0 +1,125 @@
+---
+name: spec-review
+description: Multi-provider SPEC review gate skill
+compatibility: omp
+---
+
+# SPEC Review Gate Skill
+
+A review gate that validates SPEC document quality using multiple providers.
+Before Step 1, treat `content/rules/spec-quality.md` as the pre-review self-check that spec-writer should already have applied to `spec.md`, `plan.md`, `acceptance.md`, and `research.md`.
+
+The CLI writes the authoritative promotion receipt to
+`{SPEC_DIR}/review-receipt.json` with
+`schema=spec_review_promotion_receipt.v1`. Consumers bind it to the current
+invocation with `run_id` and `finished_at`, then preserve `analysis_verdict`,
+`gate_status`, `critical_veto`, `status_changed`, `degraded_reasons`, and
+`override_applied` without recomputing promotion.
+`--allow-degraded` is the only operator path that may promote a degraded PASS,
+and its audit reason remains present after promotion. An unresolved Critical
+security/correctness finding sets `critical_veto=true`, keeps
+`gate_status=blocked`, and leaves the prior status unchanged.
+
+## Review Process
+
+### Step 0: spec-writer self-verify
+
+Confirm that the draft went through a first-pass self-check using `content/rules/spec-quality.md`.
+Look for observable traces such as `research.md`'s `## Self-Verify Summary` or `spec.md`'s `## Open Issues`.
+Also prefer the draft's `## Outcome Lock`, `## Completion Debt`, `## Evolution Ideas`, `## Reviewer Brief`, `## Traceability Matrix`, and `## Reference Discipline` as scope-control evidence: review listed blockers and invariants first, treat Completion Debt as blocking, and treat Evolution Ideas or unrelated deeper-layer suggestions as advisory unless they expose critical/security/data integrity risk.
+Do not create or request follow-up/sibling SPECs from Evolution Ideas. A sibling SPEC request is valid only when the draft includes a `## Sibling SPEC Decision` with an allowed reason and bounded ownership.
+If the checklist was skipped or obviously not reflected in the draft, call that out as a completeness or style finding before continuing.
+
+### Step 1: Load SPEC
+
+Load `.autopus/specs/SPEC-{ID}/spec.md` and extract requirements.
+
+### Step 2: Collect Code Context
+
+If `spec.review_gate.auto_collect_context: true`:
+- Scan project source files
+- Collect relevant code within `context_max_lines` limit
+- Include collected code in the review prompt
+
+### Step 3: Multi-Provider Review
+
+Run the review via the Orchestra engine with configured providers (claude, gemini, etc.):
+- Each provider reviews the SPEC independently
+- Auxiliary documents (`plan.md`, `research.md`, `acceptance.md`) are injected in full by default under an adaptive total context budget. Structure-preserving compression is a fallback that triggers only when the combined budget is exceeded, and it keeps tail-critical sections (Self-Verify Summary, Traceability Matrix, Reviewer Brief, Completion Debt, Evolution Ideas, Open Issues) instead of dropping the document tail.
+- Provider quorum: the gate counts how many providers returned a usable review and compares it to the configured minimum (`spec.review_gate.min_providers`, default majority of configured providers).
+- Results are merged according to the strategy (debate, consensus, etc.)
+- Provider integrity retains requested, configured, resolved, attempted,
+  usable, and failed sets; configured-but-unavailable providers do not vanish
+  from the declared quorum denominator.
+- Structured findings are clustered by stable identity, preserve minority
+  evidence, and apply Critical veto before promotion.
+
+### Step 4: Verdict
+
+Parse results and determine the final verdict:
+- **PASS**: SPEC approved; promote status to "approved" only when observation is complete and the provider quorum is met
+- **REVISE**: Revision required, return with list of findings
+- **REJECT**: Fundamental redesign required
+
+A PASS produced under partial observation is a degraded PASS and does not auto-promote status. The verdict is annotated with a degraded reason:
+- `partial_doc_context`: a required auxiliary document was injected below 100 percent coverage because the document set exceeded the total context budget
+- `provider_quorum`: fewer providers returned a usable review than the configured minimum
+
+When any degraded reason is present, leave the prior SPEC status unchanged unless the operator passes `--allow-degraded`.
+Report `run_id`, `finished_at`, `analysis_verdict`, `gate_status`,
+`critical_veto`, `status_changed`, `degraded_reasons`, and `override_applied`
+in `{SPEC_DIR}/review-receipt.json` and the terminal handoff. Consumers must
+also verify `current_status`; they never edit SPEC status themselves. A clean
+re-review of an already-approved SPEC may report `status_changed=false` while
+remaining `gate_status=passed` and `current_status=approved`.
+
+### Step 5: Save Results
+
+Save `review.md` to the SPEC directory:
+- Final verdict, with any degraded reason on the verdict line
+- An `## Observation Coverage` section listing each auxiliary document with injected lines, source total lines, coverage percent, and a complete flag
+- Findings from each provider
+- Original responses
+- When `--allow-degraded` promoted a degraded PASS, an audit line recording the override reason
+
+The same per-document coverage is persisted in the `review-findings.json` sidecar as an additive, optional `DocCoverages` field, so older sidecars written without it still load.
+
+## CLI Usage
+
+```bash
+auto spec review SPEC-PIPE-001
+auto spec review SPEC-AUTH-001 --strategy debate --timeout 180
+auto spec review SPEC-AUTH-001 --strategy debate --providers claude,codex
+auto spec review SPEC-AUTH-001 --allow-degraded  # promote a degraded PASS; recorded as an audit line
+```
+
+`--providers` is an explicit comma-separated provider override. Forward the
+user-supplied list unchanged; omit the flag only when the user supplied no
+override.
+
+Do not wrap these commands with GNU `timeout` (for example,
+`timeout 540 auto spec review ...`). macOS does not include GNU `timeout` by
+default. Use the agent tool's native timeout/background control for wall-clock
+limits, and use `--timeout <seconds>` for Autopus provider execution limits.
+
+## Configuration (autopus.yaml)
+
+```yaml
+spec:
+  review_gate:
+    enabled: true
+    strategy: debate
+    providers: [claude, gemini]
+    judge: claude
+    max_revisions: 2
+    min_providers: 0      # 0 = default minimum quorum (majority: len/2+1 of configured providers)
+    auto_collect_context: true
+    context_max_lines: 0  # unset; adaptive limits are 500/1500/3000 by cited file count
+```
+
+## Provider Fallback
+
+If a configured provider binary is not installed:
+- Skip that provider and output a warning
+- Continue review with available providers only
+- Return an error if no providers are available

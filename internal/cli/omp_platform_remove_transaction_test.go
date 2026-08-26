@@ -52,7 +52,7 @@ func TestOMP002_S6_PlatformRemovePropagatesCleanFailureBeforeConfigMutation(t *t
 		"runtime ancestry or platform presence must never grant orchestra authority")
 }
 
-func TestOMP002_S6_PlatformRemoveLateSaveFailureReturnsRepairReceipt(t *testing.T) {
+func TestOMP002_S6_PlatformRemoveLateSaveFailureRollsBackWithoutRepairReceipt(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("permission fixture requires POSIX file modes")
 	}
@@ -84,18 +84,13 @@ func TestOMP002_S6_PlatformRemoveLateSaveFailureReturnsRepairReceipt(t *testing.
 	cmd.SetArgs([]string{"omp"})
 	err = cmd.Execute()
 	require.Error(t, err, "config save must fail after the OMP clean transaction")
-	assert.NotContains(t, stdout.String(), "removed", "a repair-required failure must not print success")
-	assert.Contains(t, err.Error(), "repair_required=true")
-
-	receiptPaths := parseOMPRepairPaths(t, err.Error())
-	require.NotEmpty(t, receiptPaths)
-	assert.True(t, sort.StringsAreSorted(receiptPaths), "changed_paths must be deterministic and sorted")
-	assert.Len(t, receiptPaths, len(uniqueOMPRemovePaths(receiptPaths)), "changed_paths must not contain duplicates")
+	assert.NotContains(t, stdout.String(), "removed")
+	assert.NotContains(t, err.Error(), "repair_required=true")
+	assert.Contains(t, err.Error(), "rollback 완료")
 
 	treeAfter := snapshotOMPRemoveFiles(t, dir)
-	actualChanged := changedOMPRemoveFiles(treeBefore, treeAfter)
-	assert.Equal(t, actualChanged, receiptPaths,
-		"the repair receipt must exactly identify every file changed by Clean before Save failed")
+	assert.Equal(t, treeBefore, treeAfter,
+		"successful rollback must restore every file changed before Save failed")
 
 	configAfter, readErr := os.ReadFile(configPath)
 	require.NoError(t, readErr)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -37,24 +36,10 @@ func countPathsWithPrefix(paths []string, prefix string) int {
 	return n
 }
 
-// TestOMPAcceptance_S6_ConfigMarkerSection covers REQ-007 managed-section emission.
-func TestOMPAcceptance_S6_ConfigMarkerSection(t *testing.T) {
+func TestOMPAcceptance_PlainInstallOmitsBaseConfig(t *testing.T) {
 	dir := generateOMPOnly(t)
-
-	raw, err := os.ReadFile(filepath.Join(dir, configFile))
-	require.NoError(t, err)
-	content := string(raw)
-
-	assert.Equal(t, 1, strings.Count(content, markerBeginYml), "exactly one begin marker")
-	assert.Equal(t, 1, strings.Count(content, markerEndYml), "exactly one end marker")
-
-	var parsed struct {
-		Skills struct {
-			CustomDirectories []string `yaml:"customDirectories"`
-		} `yaml:"skills"`
-	}
-	require.NoError(t, yaml.Unmarshal(raw, &parsed), ".omp/config.yml must parse as YAML")
-	assert.Equal(t, []string{".agents/skills"}, parsed.Skills.CustomDirectories)
+	assert.NoFileExists(t, filepath.Join(dir, configFile))
+	assert.NotContains(t, manifestPaths(t, dir), configFile)
 }
 
 // TestOMPAcceptance_S6_RuleAndAgentCounts covers REQ-002/REQ-005 surface scope.
@@ -66,7 +51,9 @@ func TestOMPAcceptance_S6_RuleAndAgentCounts(t *testing.T) {
 		"manifest must record 14 rules as .omp/rules/autopus-*.md")
 	assert.Equal(t, 16, countPathsWithPrefix(paths, ".omp/agents/"),
 		"manifest must record 16 agents")
-	assert.Contains(t, paths, configFile, "manifest must record .omp/config.yml")
+	assert.Equal(t, len(workflowSpecs), countPathsWithPrefix(paths, ".omp/commands/"))
+	assert.Greater(t, countPathsWithPrefix(paths, ".omp/skills/"), len(workflowSpecs))
+	assert.NotContains(t, paths, configFile)
 }
 
 // TestOMPAcceptance_S5_NoClaudeShadowing covers REQ-008 and the InstallHooks contract.
@@ -162,10 +149,12 @@ func TestOMPAcceptance_S4_OwnershipBoundaryAndManifestScope(t *testing.T) {
 	paths := manifestPaths(t, dir)
 	assert.Equal(t, 14, countPathsWithPrefix(paths, ompRuleDir+"/"+ompRuleFilePrefix))
 	assert.Equal(t, 16, countPathsWithPrefix(paths, ".omp/agents/"))
-	assert.Contains(t, paths, configFile)
+	assert.Equal(t, len(workflowSpecs), countPathsWithPrefix(paths, ".omp/commands/"))
+	assert.Greater(t, countPathsWithPrefix(paths, ".omp/skills/"), len(workflowSpecs))
+	assert.NotContains(t, paths, configFile)
 	for _, forbidden := range []string{".agents/skills/", ".agents/commands/", ".agents/plugins/", ".agents/hooks.json"} {
 		assert.Equal(t, 0, countPathsWithPrefix(paths, forbidden),
-			"manifest must not record a yielded/foreign path under %s", forbidden)
+			"manifest must not record a foreign path under %s", forbidden)
 	}
 
 	require.NoError(t, a.Clean(ctx))

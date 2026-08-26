@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,7 +54,7 @@ func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *te
 	assert.Contains(t, rootSection, codexUserModelMarker)
 }
 
-func TestUpdate_DeletedManagedFile_Skipped(t *testing.T) {
+func TestUpdate_DeletedManagedFile_PreservesManifestClaimAcrossUpdates(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -62,15 +63,29 @@ func TestUpdate_DeletedManagedFile_Skipped(t *testing.T) {
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	skillsDir := filepath.Join(dir, ".codex", "skills")
-	entries, _ := os.ReadDir(skillsDir)
-	if len(entries) > 0 {
-		require.NoError(t, os.Remove(filepath.Join(skillsDir, entries[0].Name())))
-	}
-
-	pf, err := a.Update(context.Background(), cfg)
+	relativeSkillPath := codexProjectSkillPath("adaptive-quality")
+	skillPath := filepath.Join(dir, relativeSkillPath)
+	originalManifest, err := adapter.LoadManifest(dir, adapterName)
 	require.NoError(t, err)
-	assert.NotNil(t, pf)
+	require.NotNil(t, originalManifest)
+	originalClaim, claimed := originalManifest.Files[relativeSkillPath]
+	require.True(t, claimed)
+	require.NoError(t, os.Remove(skillPath))
+
+	for update := 1; update <= 2; update++ {
+		pf, updateErr := a.Update(context.Background(), cfg)
+		require.NoError(t, updateErr)
+		require.NotNil(t, pf)
+		assert.NoFileExists(t, skillPath, "update %d must respect the user's deletion", update)
+
+		nextManifest, manifestErr := adapter.LoadManifest(dir, adapterName)
+		require.NoError(t, manifestErr)
+		require.NotNil(t, nextManifest)
+		require.Contains(t, nextManifest.Files, relativeSkillPath,
+			"update %d must retain the deleted managed path's claim", update)
+		assert.Equal(t, originalClaim, nextManifest.Files[relativeSkillPath],
+			"update %d must retain the deleted managed path's claim", update)
+	}
 }
 
 func TestUpdate_RemovesDeprecatedPluginWorkflowShims(t *testing.T) {
@@ -93,7 +108,7 @@ func TestUpdate_RemovesDeprecatedPluginWorkflowShims(t *testing.T) {
 	assert.True(t, os.IsNotExist(statErr), "deprecated plugin workflow shims should be pruned on update")
 }
 
-func TestUpdate_RemovesUnmanagedStalePluginLongTailSkills(t *testing.T) {
+func TestUpdate_PreservesUnmanagedPluginSkill(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -109,7 +124,7 @@ func TestUpdate_RemovesUnmanagedStalePluginLongTailSkills(t *testing.T) {
 	_, err = a.Update(context.Background(), cfg)
 	require.NoError(t, err)
 
-	assert.NoFileExists(t, filepath.Join(staleDir, "SKILL.md"), "unmanaged stale plugin long-tail skills should be pruned on update")
+	assert.FileExists(t, filepath.Join(staleDir, "SKILL.md"), "unmanaged plugin skills must be preserved")
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "plugins", "auto", "skills", "auto", "SKILL.md"))
 }
 

@@ -169,13 +169,10 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	catalogFiles, err := adapterUnderTest.prepareFiles(context.Background(), catalogOnly)
 	require.NoError(t, err)
 
-	// Content tripwire over the whole prepared set, so it moves whenever a shipped
-	// content file changes. Last moved when the 14 rules relocated from the
-	// non-discoverable `.agents/rules/autopus/<name>.md` subdirectory to
-	// `.omp/rules/autopus-<name>.md`, because omp scans each rule root
-	// non-recursively and therefore never loaded the nested files (SPEC-OMP-001
-	// REQ-002); rule bodies and the mapping structure are unchanged.
-	const priorPreparedFilesFingerprint = "ae894874f207d66c14399c117e25d1a774cba0bedeeb6e1d3c475877c01d27a4"
+	// Content tripwire over the whole prepared set. It moves when a shipped
+	// native file or target path changes; this value reflects the OMP 18.0.5
+	// native roots, current workflow metadata, and omission of the base config.
+	const priorPreparedFilesFingerprint = "ef075732674f13a07ac7c7bbb275847ff007e16462a03b10517b34adc137a662"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

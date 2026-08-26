@@ -9,8 +9,8 @@ import (
 	"github.com/insajin/autopus-adk/pkg/adapter"
 )
 
-// @AX:WARN [AUTO]: project config merge has cyclomatic complexity 20.
-// @AX:REASON [AUTO]: gocyclo reports 20 across ownership, journal, YAML merge, conflict, backup, and transaction preparation paths.
+// @AX:WARN [AUTO]: project config merge has high branch complexity.
+// @AX:REASON [AUTO]: ownership, journal, YAML merge, conflict, backup, and transaction preparation paths converge here.
 func (i *ompModelIntegration) mergeOMPIntegratedProjectConfig(
 	workspace *ompRootedWorkspace,
 	mapping adapter.FileMapping,
@@ -80,11 +80,7 @@ func (i *ompModelIntegration) mergeOMPIntegratedProjectConfig(
 	if err != nil {
 		return mapping, adapter.FileMapping{}, "", err
 	}
-	mergedDocument, err := mergeOMPConfigDocument(string(result.Bytes))
-	if err != nil {
-		return mapping, adapter.FileMapping{}, "", err
-	}
-	mapping.Content = []byte(mergedDocument)
+	mapping.Content = append([]byte(nil), result.Bytes...)
 	mapping.Checksum = adapter.Checksum(string(mapping.Content))
 	var ownershipData []byte
 	if managed {

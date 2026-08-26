@@ -22,7 +22,6 @@ func TestAutoGoSyncReadinessContracts(t *testing.T) {
 		filepath.Join(root, "claude", "commands", "auto-router.md.tmpl"),
 		filepath.Join(root, "codex", "prompts", "auto-go.md.tmpl"),
 		filepath.Join(root, "codex", "skills", "auto-go.md.tmpl"),
-		filepath.Join(root, "codex", "skills", "agent-pipeline.md.tmpl"),
 		filepath.Join(root, "gemini", "skills", "auto-go", "SKILL.md.tmpl"),
 		filepath.Join(root, "gemini", "skills", "agent-pipeline", "SKILL.md.tmpl"),
 	}

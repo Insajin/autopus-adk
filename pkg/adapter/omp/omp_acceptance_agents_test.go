@@ -54,8 +54,8 @@ func TestOMPAcceptance_S3_AgentToolMapping(t *testing.T) {
 		agent string
 		want  []string
 	}{
-		{"executor maps TodoWrite to todo", "executor",
-			[]string{"bash", "edit", "glob", "grep", "read", "todo", "write"}},
+		{"executor removes parent todo and adds native lsp", "executor",
+			[]string{"bash", "edit", "glob", "grep", "lsp", "read", "write"}},
 		{"architect passes mcp__ through unchanged", "architect",
 			[]string{"bash", "glob", "grep", "mcp__sequential-thinking__sequentialthinking", "read"}},
 		{"spec-writer dedups WebSearch and WebFetch", "spec-writer",
@@ -109,8 +109,8 @@ func TestOMPAcceptance_S3_AgentBodyNormalization(t *testing.T) {
 		staleRef  string
 		skillName string
 	}{
-		{"annotator", "`.agents/skills/ax-annotation/SKILL.md`", "`.agents/skills/ax-annotation.md`", "ax-annotation"},
-		{"frontend-specialist", "`.agents/skills/frontend-verify/SKILL.md`", "`.agents/skills/frontend-verify.md`", "frontend-verify"},
+		{"annotator", "`.omp/skills/ax-annotation/SKILL.md`", "`.agents/skills/ax-annotation.md`", "ax-annotation"},
+		{"frontend-specialist", "`.omp/skills/frontend-verify/SKILL.md`", "`.agents/skills/frontend-verify.md`", "frontend-verify"},
 	}
 
 	dir := generateOMPOnly(t)
@@ -127,7 +127,7 @@ func TestOMPAcceptance_S3_AgentBodyNormalization(t *testing.T) {
 				"no Claude-native path may survive omp normalization")
 
 			// The referenced path must match the file the skill surface actually emits.
-			emittedSkill := filepath.Join(dir, ".agents", "skills", tt.skillName, "SKILL.md")
+			emittedSkill := filepath.Join(dir, ".omp", "skills", tt.skillName, "SKILL.md")
 			assert.FileExists(t, emittedSkill,
 				"agent body points at %s so REQ-013 must emit that exact path", tt.wantRef)
 		})

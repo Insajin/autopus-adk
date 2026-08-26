@@ -45,7 +45,7 @@ func (a *Adapter) renderWorkflowSkill(spec workflowSpec, cfg *config.HarnessConf
 	if spec.Name == "auto" {
 		return a.renderRouterSkill(cfg)
 	}
-	if rendered, ok := renderCustomWorkflowSkill(spec); ok {
+	if rendered, ok := renderCustomWorkflowSkill(spec, cfg); ok {
 		return rendered, nil
 	}
 	return a.renderTemplateAsSkill(cfg, spec)
@@ -86,8 +86,9 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 		if !state.Compiled || state.TargetPath == "" {
 			continue
 		}
+		description := openCodeSkillDescription(cfg, skill.Description)
 		content := buildMarkdown(
-			fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", skill.Name, skill.Description),
+			fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", skill.Name, description),
 			skill.Content,
 		)
 		files = append(files, adapter.FileMapping{
@@ -129,9 +130,9 @@ func (a *Adapter) renderWorkflowPrompt(templatePath string, cfg *config.HarnessC
 }
 
 func (a *Adapter) renderRouterSkill(cfg *config.HarnessConfig) (string, error) {
-	_ = cfg
 	body := injectOpenCodeBrandingBlock(thinRouterSkillBody())
-	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", "auto", routerDescription())
+	description := openCodeSkillDescription(cfg, routerDescription())
+	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", "auto", description)
 	return buildMarkdown(frontmatter, body), nil
 }
 
@@ -154,6 +155,7 @@ func (a *Adapter) renderTemplateAsSkill(cfg *config.HarnessConfig, spec workflow
 	}
 	body = injectOpenCodeBrandingBlock(body)
 
-	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", spec.Name, spec.Description)
+	description := openCodeSkillDescription(cfg, spec.Description)
+	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", spec.Name, description)
 	return buildMarkdown(frontmatter, body), nil
 }

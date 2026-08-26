@@ -21,11 +21,8 @@ const contentRuleDir = "rules"
 // the compiled mapping path even though it classifies as paths-scoped.
 const fileSizeLimitRuleFile = "file-size-limit.md"
 
-// claudeConditionalSurface is the classification-aware compilation of the rule
-// sources for claude-code (SPEC-CONDRULE-001). Both the mapping path
-// (prepareContentFilesForConfig) and the disk-write path (copyContentFiles)
-// route through it, so Generate and prepareFiles cannot disagree on where a
-// rule lands.
+// claudeConditionalSurface is the shared classification for prepared mappings
+// and transactional generation, so every entry point agrees on rule placement.
 type claudeConditionalSurface struct {
 	// classes maps a rule source file name to its classification.
 	classes map[string]rulecond.Class

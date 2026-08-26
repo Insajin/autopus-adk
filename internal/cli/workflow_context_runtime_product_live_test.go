@@ -29,8 +29,7 @@ func TestWorkflowContextProductSession_InstalledOMPWithRealOverlay_AdmitsExactPr
 
 	request, input := newWorkflowContextProductLiveAuthority(t)
 	projectConfigPath := filepath.Join(input.ProjectDir, ".omp", "config.yml")
-	projectConfigBefore, err := os.ReadFile(projectConfigPath)
-	require.NoError(t, err)
+	assert.NoFileExists(t, projectConfigPath)
 	ambientMCPSentinel := filepath.Join(t.TempDir(), "ambient-mcp-started")
 	ambientMCP, err := json.Marshal(map[string]any{"mcpServers": map[string]any{
 		"ambient": map[string]any{"command": "/usr/bin/touch", "args": []string{ambientMCPSentinel}},
@@ -144,9 +143,7 @@ func TestWorkflowContextProductSession_InstalledOMPWithRealOverlay_AdmitsExactPr
 	assert.Zero(t, workflowContextLiveRootCount(layout.runtime))
 	assert.NoFileExists(t, ambientMCPSentinel, "project MCP discovery must remain disabled")
 	assertProductOMPConfigsUnchanged(t, input.ProjectDir)
-	projectConfigAfter, err := os.ReadFile(projectConfigPath)
-	require.NoError(t, err)
-	assert.Equal(t, projectConfigBefore, projectConfigAfter)
+	assert.NoFileExists(t, projectConfigPath)
 
 	serialized, err := json.Marshal(receipt)
 	require.NoError(t, err)
@@ -252,8 +249,8 @@ func writeWorkflowContextProductLiveConfig(layout workflowContextLiveLayout, end
 	if err != nil {
 		return err
 	}
-	updated := strings.Replace(string(overlay), "enableAgentsProject: false", "enableAgentsProject: true", 1)
-	updated += "  enableSkillCommands: true\n  customDirectories: [.agents/skills]\n"
+	updated := strings.Replace(string(overlay), "enablePiProject: false", "enablePiProject: true", 1)
+	updated += "  enableSkillCommands: true\n"
 	if updated == string(overlay) {
 		return fmt.Errorf("product skill discovery config was not applied")
 	}

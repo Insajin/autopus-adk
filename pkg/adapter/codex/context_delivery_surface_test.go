@@ -20,7 +20,7 @@ func TestCodexAdapter_AgentPipelineCarriesVerifiedRequiredContextContract(t *tes
 	root := t.TempDir()
 	_, err := codex.NewWithRoot(root).Generate(context.Background(), config.DefaultFullConfig("context-delivery"))
 	require.NoError(t, err)
-	body, err := os.ReadFile(filepath.Join(root, ".codex", "skills", "agent-pipeline.md"))
+	body, err := os.ReadFile(filepath.Join(root, ".codex", "skills", "codex-agent-pipeline", "SKILL.md"))
 	require.NoError(t, err)
 	content := string(body)
 	lower := strings.ToLower(content)
@@ -43,7 +43,7 @@ func TestCodexAdapter_AgentPipelineCarriesVerifiedRequiredContextContract(t *tes
 	assertSurfaceOmits(t, content, "fork_context")
 	assertSurfaceOmits(t, content, "agent_type")
 
-	autoGo, err := os.ReadFile(filepath.Join(root, ".agents", "skills", "auto-go", "SKILL.md"))
+	autoGo, err := os.ReadFile(filepath.Join(root, ".codex", "skills", "codex-auto-go", "SKILL.md"))
 	require.NoError(t, err)
 	autoGoContent := string(autoGo)
 	for _, required := range []string{

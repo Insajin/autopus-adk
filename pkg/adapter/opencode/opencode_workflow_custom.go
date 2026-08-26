@@ -3,18 +3,21 @@ package opencode
 import (
 	"fmt"
 	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 type customWorkflowBody struct {
 	skill string
 }
 
-func renderCustomWorkflowSkill(spec workflowSpec) (string, bool) {
+func renderCustomWorkflowSkill(spec workflowSpec, cfg *config.HarnessConfig) (string, bool) {
 	body, ok := customWorkflowBodies(spec)
 	if !ok {
 		return "", false
 	}
-	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", spec.Name, spec.Description)
+	description := openCodeSkillDescription(cfg, spec.Description)
+	frontmatter := fmt.Sprintf("name: %s\ndescription: %q\ncompatibility: opencode", spec.Name, description)
 	content := skillInvocationNote(spec.Name) + "\n" + body.skill
 	return buildMarkdown(frontmatter, injectOpenCodeBrandingBlock(content)), true
 }

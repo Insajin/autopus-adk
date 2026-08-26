@@ -134,7 +134,7 @@ func TestTemplates_FullModeConditionals(t *testing.T) {
 	require.NoError(t, err)
 
 	// Full 모드에서는 go/review/secure 서브커맨드의 스킬 참조가 포함됨
-	assert.Contains(t, result, "tdd.md")
+	assert.Contains(t, result, "tdd/SKILL.md")
 }
 
 func TestSemanticInvariantSourceContracts(t *testing.T) {
@@ -210,10 +210,8 @@ func TestWorkflowAuthenticityTemplateContracts(t *testing.T) {
 	cfg := config.DefaultFullConfig("authenticity-project")
 	root := templateRoot()
 	templatePaths := []string{
-		filepath.Join(root, "claude", "commands", "auto-router.md.tmpl"),
 		filepath.Join(root, "codex", "prompts", "auto-go.md.tmpl"),
 		filepath.Join(root, "codex", "skills", "auto-go.md.tmpl"),
-		filepath.Join(root, "codex", "skills", "agent-pipeline.md.tmpl"),
 		filepath.Join(root, "gemini", "commands", "auto-router.md.tmpl"),
 		filepath.Join(root, "gemini", "skills", "auto-go", "SKILL.md.tmpl"),
 		filepath.Join(root, "gemini", "skills", "agent-pipeline", "SKILL.md.tmpl"),

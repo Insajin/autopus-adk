@@ -150,7 +150,11 @@ func TestUpdate_NeverPrunesUnmanagedFiles(t *testing.T) {
 func TestPruneRoots_CoverBothSidesOfRelocation(t *testing.T) {
 	t.Parallel()
 	assert.Equal(t, []string{
-		".claude/skills/autopus",
+		".claude/skills",
+		".claude/agents/autopus",
+		".claude/workflows",
+		".claude/commands",
+		".git/hooks",
 		".claude/rules/autopus",
 		".claude/hooks/autopus/conditional",
 	}, PruneRoots())

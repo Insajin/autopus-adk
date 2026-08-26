@@ -21,7 +21,7 @@ func TestCodexAdapter_ContextProfilesKeepRouterCoreAndDetailsScoped(t *testing.T
 	_, err := codex.NewWithRoot(root).Generate(context.Background(), config.DefaultFullConfig("context-profile"))
 	require.NoError(t, err)
 
-	router := readCodexContextSurface(t, root, ".codex/prompts/auto.md")
+	router := readCodexContextSurface(t, root, ".codex/skills/codex-auto/SKILL.md")
 	assert.Contains(t, router, "core")
 	assert.Contains(t, router, "architecture")
 	assert.Contains(t, router, "plan = core + architecture + relevant SPEC")
@@ -29,18 +29,18 @@ func TestCodexAdapter_ContextProfilesKeepRouterCoreAndDetailsScoped(t *testing.T
 	assert.Contains(t, router, "canary = core + canary")
 	assert.NotContains(t, router, "Always load every project context document")
 
-	plan := readCodexContextSurface(t, root, ".agents/skills/auto-plan/SKILL.md")
+	plan := readCodexContextSurface(t, root, ".codex/skills/codex-auto-plan/SKILL.md")
 	assert.Contains(t, plan, "Context Profile: plan")
 	assert.Contains(t, plan, "relevant SPEC")
 	assert.NotContains(t, plan, ".autopus/project/scenarios.md")
 	assert.NotContains(t, plan, ".autopus/project/canary.md")
 
-	testSkill := readCodexContextSurface(t, root, ".agents/skills/auto-test/SKILL.md")
+	testSkill := readCodexContextSurface(t, root, ".codex/skills/codex-auto-test/SKILL.md")
 	assert.Contains(t, testSkill, "Context Profile: test")
 	assert.Contains(t, testSkill, ".autopus/project/scenarios.md")
 	assert.NotContains(t, testSkill, ".autopus/project/canary.md")
 
-	canary := readCodexContextSurface(t, root, ".agents/skills/auto-canary/SKILL.md")
+	canary := readCodexContextSurface(t, root, ".codex/skills/codex-auto-canary/SKILL.md")
 	assert.Contains(t, canary, "Context Profile: canary")
 	assert.Contains(t, canary, ".autopus/project/canary.md")
 	assert.NotContains(t, canary, ".autopus/project/scenarios.md")

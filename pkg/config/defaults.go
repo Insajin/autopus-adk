@@ -183,7 +183,6 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			SignatureMap: true,
 		},
 		Workflow: WorkflowConf{
-			TeamDefault:       true,
 			CoverageThreshold: 85,
 		},
 		Features: FeaturesConf{

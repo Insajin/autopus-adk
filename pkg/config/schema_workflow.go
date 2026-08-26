@@ -4,8 +4,7 @@ import "fmt"
 
 // WorkflowConf holds the workflow configuration settings.
 type WorkflowConf struct {
-	TeamDefault       bool `yaml:"team_default"`
-	CoverageThreshold int  `yaml:"coverage_threshold,omitempty"`
+	CoverageThreshold int `yaml:"coverage_threshold,omitempty"`
 }
 
 // Validate checks that the workflow configuration is valid.

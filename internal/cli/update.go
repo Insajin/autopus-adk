@@ -163,14 +163,14 @@ func newUpdateCmd() *cobra.Command {
 				return nil
 			}
 
-			addedPlatforms := appendDetectedPlatforms(cfg)
+			addedPlatforms := newlyDetectedPlatforms(cfg)
 
 			// Persist config migrations before rendering platform-owned files.
 			orchestraMigrated, migrateErr := config.MigrateOrchestraConfig(cfg)
 			if migrateErr != nil {
 				return fmt.Errorf("orchestra 마이그레이션 실패: %w", migrateErr)
 			}
-			if orchestraMigrated || len(addedPlatforms) > 0 || (designConfigMissing && cfg.Design.Enabled) {
+			if orchestraMigrated || (designConfigMissing && cfg.Design.Enabled) {
 				if saveErr := config.Save(dir, cfg); saveErr != nil {
 					return fmt.Errorf("마이그레이션 설정 저장 실패: %w", saveErr)
 				}
@@ -238,6 +238,15 @@ func newUpdateCmd() *cobra.Command {
 					}
 				}
 			}
+			var addedUpdated int
+			var addedCodexUpdated bool
+			var addedErrors []string
+			cfg, addedUpdated, addedCodexUpdated, addedErrors = updateDetectedHarnessPlatforms(
+				ctx, dir, cfg, addedPlatforms, globalFlagsFromContext(cmd.Context()), cmd.OutOrStdout(),
+			)
+			updated += addedUpdated
+			codexUpdated = codexUpdated || addedCodexUpdated
+			platformErrors = append(platformErrors, addedErrors...)
 			if supervisorMigrated {
 				if codexUpdated {
 					fmt.Fprintln(cmd.OutOrStdout(), "  + Codex supervisor model now inherits the user default")
@@ -276,19 +285,4 @@ func newUpdateCmd() *cobra.Command {
 	cmd.Flags().Var(&freshnessReexec, updateFreshnessReexecFlag, "internal one-shot freshness re-exec nonce")
 	_ = cmd.Flags().MarkHidden(updateFreshnessReexecFlag)
 	return cmd
-}
-
-// appendDetectedPlatforms adds newly detected platforms to the config.
-// Exec surface: detection runs `omp --version` for the REQ-019 identity gate,
-// so this executes one binary from PATH rather than only stat-ing it.
-func appendDetectedPlatforms(cfg *config.HarnessConfig) []string {
-	var added []string
-	for _, platform := range detectInstalledPlatforms() {
-		if containsPlatform(cfg.Platforms, platform) {
-			continue
-		}
-		cfg.Platforms = append(cfg.Platforms, platform)
-		added = append(added, platform)
-	}
-	return added
 }

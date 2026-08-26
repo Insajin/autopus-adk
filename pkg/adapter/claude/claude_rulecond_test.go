@@ -28,11 +28,8 @@ func ruleTargets(files []adapter.FileMapping) []string {
 	return targets
 }
 
-// TestClaudeRuleRoutingAgreesAcrossPaths guards the split the adapter carries:
-// Generate writes rules through copyContentFiles while prepareFiles maps them
-// through prepareContentFilesForConfig. A classification-aware route added to
-// only one of the two would relocate a rule on disk but not in the mapping the
-// installer and the drift check compare against.
+// TestClaudeRuleRoutingAgreesAcrossPaths verifies Generate and the pure mapping
+// compiler expose the same rule targets.
 func TestClaudeRuleRoutingAgreesAcrossPaths(t *testing.T) {
 	t.Parallel()
 	cfg := config.DefaultFullConfig("condrule")

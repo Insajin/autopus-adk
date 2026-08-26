@@ -18,9 +18,6 @@ var ompNativeExtendedSkillTemplates = map[string]string{
 }
 
 func (a *Adapter) prepareSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	if !ompOwnsSharedSkillSurface(cfg) {
-		return nil, nil
-	}
 
 	workflow, err := a.prepareWorkflowSkillMappings(cfg)
 	if err != nil {
@@ -40,8 +37,9 @@ func (a *Adapter) prepareWorkflowSkillMappings(cfg *config.HarnessConfig) ([]ada
 		if err != nil {
 			return nil, err
 		}
+		outputName := pkgcontent.ResolveCatalogSkillOutputName(spec.Name, "omp")
 		files = append(files, adapter.FileMapping{
-			TargetPath:      filepath.Join(".agents", "skills", spec.Name, "SKILL.md"),
+			TargetPath:      filepath.Join(".omp", "skills", outputName, "SKILL.md"),
 			OverwritePolicy: adapter.OverwriteAlways,
 			Checksum:        adapter.Checksum(rendered),
 			Content:         []byte(rendered),
@@ -86,7 +84,7 @@ func (a *Adapter) renderTemplateWorkflowSkill(spec workflowSpec, cfg *config.Har
 	body = normalizeOMPWorkflowBody(body)
 	body = injectOMPExecutionOwnerControl(body, spec.Name)
 	body = injectOMPInvocation(body, spec.Name)
-	return buildMarkdown(ompSkillFrontmatter(spec.Name, spec.Description), body), nil
+	return buildMarkdown(ompSkillFrontmatter(spec.Name, normalizeOMPDescription(spec.Description)), body), nil
 }
 
 func buildMarkdown(frontmatter, body string) string {
@@ -136,9 +134,10 @@ func (a *Adapter) prepareExtendedSkillMappings(cfg *config.HarnessConfig) ([]ada
 			}
 			body = pkgcontent.NormalizeOMPSemanticReferences(string(raw))
 		}
+		outputName := pkgcontent.ResolveCatalogSkillOutputName(skill.Name, "omp")
 		body = normalizeOMPExecutionOwnerContract(body)
 		content := buildMarkdown(
-			ompSkillFrontmatter(skill.Name, skill.Description),
+			ompSkillFrontmatter(outputName, skill.Description),
 			body,
 		)
 		files = append(files, adapter.FileMapping{

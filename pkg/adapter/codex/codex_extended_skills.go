@@ -41,6 +41,9 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 
 	var files []adapter.FileMapping
 	for _, s := range skills {
+		if isCodexWorkflowSkill(s.Name) {
+			continue
+		}
 		entry, ok := catalog.Get(s.Name)
 		if !ok {
 			continue
@@ -49,10 +52,14 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 		if !state.Compiled || state.TargetPath == "" {
 			continue
 		}
-		content := normalizeCodexInvocationBody(s.Content)
+		if hasCodexSkillTemplate(s.Name) &&
+			strings.HasPrefix(filepath.ToSlash(state.TargetPath), ".codex/skills/") {
+			continue
+		}
+		content := normalizeCodexExtendedSkill(s.Name, s.Content)
+		content = normalizeCodexInvocationBody(content)
 		content = normalizeCodexHelperPaths(content)
 		content = normalizeCodexToolingBody(content)
-		content = normalizeCodexExtendedSkill(s.Name, content)
 		relPath := filepath.FromSlash(state.TargetPath)
 		content = ensureCodexSkillFrontmatter(relPath, s.Name, s.Description, content)
 		files = append(files, adapter.FileMapping{
@@ -66,19 +73,44 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 	return files, nil
 }
 
+// @AX:WARN [AUTO]: native skill frontmatter projection contains eight conditional branches.
+// @AX:REASON [AUTO]: path shape, native naming, workflow contracts, existing metadata replacement, and missing-description fallback converge here.
 func ensureCodexSkillFrontmatter(targetPath, name, description, body string) string {
 	if filepath.Base(targetPath) != "SKILL.md" {
 		return body
 	}
+	nativeName := name
+	if strings.HasPrefix(filepath.ToSlash(targetPath), ".codex/skills/") {
+		nativeName = codexNativeSkillName(name)
+	}
 	frontmatter, parsedBody := splitSkillFrontmatter(body)
+	if isCodexWorkflowSkill(name) {
+		if frontmatter != "" {
+			parsedBody = ensureCodexV2WorkflowContract(parsedBody)
+		} else {
+			body = ensureCodexV2WorkflowContract(body)
+		}
+	}
 	if frontmatter != "" {
-		return frontmatter + "\n\n" + strings.TrimSpace(parsedBody) + "\n"
+		lines := strings.Split(frontmatter, "\n")
+		replaced := false
+		for index, line := range lines {
+			if strings.HasPrefix(strings.TrimSpace(line), "name:") {
+				lines[index] = "name: " + nativeName
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			lines = append(lines[:1], append([]string{"name: " + nativeName}, lines[1:]...)...)
+		}
+		return strings.Join(lines, "\n") + "\n\n" + strings.TrimSpace(parsedBody) + "\n"
 	}
 	if strings.TrimSpace(description) == "" {
 		description = name
 	}
 	return fmt.Sprintf("---\nname: %s\ndescription: >\n  %s\n---\n\n%s\n",
-		name,
+		nativeName,
 		description,
 		strings.TrimSpace(body),
 	)

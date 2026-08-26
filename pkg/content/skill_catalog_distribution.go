@@ -109,7 +109,7 @@ func resolveCatalogSkillTarget(skill CatalogSkill, platform string, cfg *config.
 		return filepath.ToSlash(filepath.Join(".opencode", "skills", skill.Name, "SKILL.md"))
 	case "codex":
 		if IsCoreSkill(skill.Name) || cfg.Skills.Compiler.EffectiveCodexLongTailTarget() == config.SkillLongTailTargetRepo {
-			return filepath.ToSlash(filepath.Join(".codex", "skills", skill.Name+".md"))
+			return filepath.ToSlash(filepath.Join(".codex", "skills", ResolveCatalogSkillOutputName(skill.Name, normalizedPlatform), "SKILL.md"))
 		}
 		return filepath.ToSlash(filepath.Join(".autopus", "plugins", "auto", "skills", skill.Name, "SKILL.md"))
 	default:
@@ -120,13 +120,15 @@ func resolveCatalogSkillTarget(skill CatalogSkill, platform string, cfg *config.
 func resolveDefaultSkillTarget(name, platform string) string {
 	switch normalizeCatalogPlatform(platform) {
 	case "claude":
-		return filepath.ToSlash(filepath.Join(".claude", "skills", "autopus", name+".md"))
+		return filepath.ToSlash(filepath.Join(".claude", "skills", name, "SKILL.md"))
 	case "codex":
-		return filepath.ToSlash(filepath.Join(".codex", "skills", name+".md"))
+		return filepath.ToSlash(filepath.Join(".codex", "skills", ResolveCatalogSkillOutputName(name, platform), "SKILL.md"))
 	case "gemini":
 		return filepath.ToSlash(filepath.Join(".gemini", "skills", "autopus", name, "SKILL.md"))
-	case "opencode", "omp":
+	case "opencode":
 		return filepath.ToSlash(filepath.Join(".agents", "skills", name, "SKILL.md"))
+	case "omp":
+		return filepath.ToSlash(filepath.Join(".omp", "skills", name, "SKILL.md"))
 	default:
 		return ""
 	}

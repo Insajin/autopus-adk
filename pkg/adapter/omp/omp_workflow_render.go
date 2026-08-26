@@ -52,7 +52,7 @@ func normalizeOMPWorkflowBody(body string) string {
 	).Replace(body)
 	body = pkgcontent.ReplacePlatformReferences(body, "omp")
 	body = normalizeOMPExecutionOwnerContract(body)
-	body = dedupeOMPReference(body, ".agents/skills/agent-pipeline/SKILL.md")
+	body = dedupeOMPReference(body, ".omp/skills/agent-pipeline/SKILL.md")
 	return strings.TrimSpace(body)
 }
 
@@ -136,14 +136,15 @@ func renderOMPCompactWorkflowSkill(spec workflowSpec) string {
 	if spec.Name == "auto-test" {
 		sections = append(sections, "", "## Context Profile: test", "", "- Required: core,test", "- Optional: signature,learning", "- Excluded: canary")
 	}
+	description := normalizeOMPDescription(spec.Description)
 	sections = append(sections,
-		"", "## 실행 계약", "", spec.Description,
+		"", "## 실행 계약", "", description,
 		"", "1. 대상 디렉터리와 전달된 인자를 확인합니다.",
 		"2. "+command,
 		"3. "+result,
 	)
 	content := strings.Join(sections, "\n")
-	return buildMarkdown(ompSkillFrontmatter(spec.Name, spec.Description), normalizeOMPWorkflowBody(content))
+	return buildMarkdown(ompSkillFrontmatter(spec.Name, description), normalizeOMPWorkflowBody(content))
 }
 
 func ompCompactWorkflowContract(name string) (string, string) {

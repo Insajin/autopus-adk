@@ -9,11 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
-	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
-	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/omp"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
@@ -87,6 +82,8 @@ func buildDesignPreviewItems(dir string, cfg *config.HarnessConfig) []previewIte
 	}}
 }
 
+// @AX:WARN [AUTO]: platform preview synthesis contains more than eight conditional branches.
+// @AX:REASON [AUTO]: generated mappings, manifest emit/retain/prune actions, backup detection, write decisions, and manifest projection converge here.
 func buildPlatformPreview(ctx context.Context, dir string, cfg *config.HarnessConfig, platform string) ([]previewItem, bool, error) {
 	tempRoot, err := os.MkdirTemp("", "autopus-update-preview-*")
 	if err != nil {
@@ -180,25 +177,12 @@ func buildPlatformPreview(ctx context.Context, dir string, cfg *config.HarnessCo
 }
 
 func generatePreviewMappings(ctx context.Context, root string, cfg *config.HarnessConfig, platform string) ([]adapter.FileMapping, error) {
-	switch platform {
-	case "claude-code":
-		pf, err := claude.NewWithRoot(root).Generate(ctx, cfg)
-		return previewMappings(platform, pf, err)
-	case "codex":
-		pf, err := codex.NewWithRoot(root).Generate(ctx, cfg)
-		return previewMappings(platform, pf, err)
-	case "antigravity-cli":
-		pf, err := antigravity.NewWithRoot(root).Generate(ctx, cfg)
-		return previewMappings(platform, pf, err)
-	case "opencode":
-		pf, err := opencode.NewWithRoot(root).Generate(ctx, cfg)
-		return previewMappings(platform, pf, err)
-	case "omp":
-		pf, err := omp.NewWithRoot(root).Generate(ctx, cfg)
-		return previewMappings(platform, pf, err)
-	default:
+	descriptor, ok := lookupPlatformDescriptor(platform)
+	if !ok {
 		return nil, fmt.Errorf("알 수 없는 플랫폼 %q", platform)
 	}
+	pf, err := descriptor.Generate(ctx, root, cfg)
+	return previewMappings(platform, pf, err)
 }
 
 func previewMappings(platform string, pf *adapter.PlatformFiles, err error) ([]adapter.FileMapping, error) {
@@ -221,22 +205,11 @@ func lookupPreviewFile(files []adapter.FileMapping, path string) (adapter.FileMa
 }
 
 func previewPruneRoots(platform string, cfg *config.HarnessConfig) []string {
-	switch platform {
-	case "claude-code":
-		// Delegate rather than restate: an inline copy drifts from the apply
-		// path, and the resulting preview promises prunes that never happen.
-		return claude.PruneRoots()
-	case "codex":
-		return []string{".codex/skills", filepath.ToSlash(filepath.Join(".autopus", "plugins", "auto", "skills"))}
-	case "opencode":
-		return []string{".agents/skills", ".opencode/skills"}
-	case "omp":
-		// omp gates the skill root on surface ownership, so the preview needs
-		// the same config the apply path sees.
-		return omp.PruneRoots(cfg)
-	default:
+	descriptor, ok := lookupPlatformDescriptor(platform)
+	if !ok {
 		return nil
 	}
+	return descriptor.PreviewPruneRoots(cfg)
 }
 
 func manifestDiffSummary(diff adapter.ManifestDiff) string {

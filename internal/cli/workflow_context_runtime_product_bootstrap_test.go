@@ -150,26 +150,42 @@ func TestDecodeWorkflowContextProductIntent_BoundsAndPropagatesReads(t *testing.
 	require.ErrorContains(t, err, "request JSON exceeds")
 }
 
-func TestWorkflowContextManagedProductCommandNames_RecognizesSupportedAutoForms(t *testing.T) {
+func TestWorkflowContextManagedProductCommandNames_RecognizesRouterForms(t *testing.T) {
 	tests := []struct {
+		name   string
 		prompt string
 		want   [2]string
 		valid  bool
 	}{
-		{prompt: "/auto go SPEC-OMP-004 --auto", want: [2]string{"auto", "auto-go"}, valid: true},
-		{prompt: "/auto-go SPEC-OMP-004 --auto", want: [2]string{"auto", "auto-go"}, valid: true},
-		{prompt: "/auto", valid: false},
-		{prompt: "go SPEC-OMP-004", valid: false},
+		{name: "exact root", prompt: "/auto", want: [2]string{"auto", "auto"}, valid: true},
+		{name: "subcommand", prompt: "/auto go SPEC-OMP-004 --auto", want: [2]string{"auto", "auto-go"}, valid: true},
+		{name: "flag first", prompt: "/auto --quality ultra go SPEC-OMP-004", want: [2]string{"auto", "auto-go"}, valid: true},
+		{name: "equals flag first", prompt: "/auto --quality=ultra go SPEC-OMP-004", want: [2]string{"auto", "auto-go"}, valid: true},
+		{name: "multiple flags first", prompt: "/auto --auto --model openai/gpt-5.6-sol --variant high go", want: [2]string{"auto", "auto-go"}, valid: true},
+		{name: "direct command", prompt: "/auto-go SPEC-OMP-004 --auto", want: [2]string{"auto", "auto-go"}, valid: true},
+		{name: "unknown route", prompt: "/auto deploy", valid: false},
+		{name: "unknown direct route", prompt: "/auto-deploy", valid: false},
+		{name: "unknown leading flag", prompt: "/auto --unknown go", valid: false},
+		{name: "missing flag value", prompt: "/auto --quality", valid: false},
+		{name: "flag followed by flag", prompt: "/auto --quality --auto go", valid: false},
+		{name: "empty equals flag value", prompt: "/auto --quality= go", valid: false},
+		{name: "flags without route", prompt: "/auto --auto", valid: false},
+		{name: "malformed direct command", prompt: "/auto--go", valid: false},
+		{name: "missing auto prefix", prompt: "go SPEC-OMP-004", valid: false},
 	}
 	for _, test := range tests {
-		t.Run(test.prompt, func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			got, err := workflowContextManagedProductCommandNames(test.prompt)
+			validationErr := validateWorkflowContextManagedProductPrompts([]string{test.prompt, "continue"})
 			if !test.valid {
 				require.Error(t, err)
+				require.Error(t, validationErr)
 				return
 			}
 			require.NoError(t, err)
+			require.NoError(t, validationErr)
 			assert.Equal(t, test.want, got)
+			assert.NotContains(t, got[1], "---")
 		})
 	}
 }

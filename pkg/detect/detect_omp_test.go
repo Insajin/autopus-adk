@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -115,10 +116,9 @@ func TestDetectInstalledPlatformsAppliesOMPIdentityGate(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "probe-executed")
 	writeOMPProbeScript(t, filepath.Join(dir, "omp"), `#!/bin/sh
-printf executed > "$AUTOPUS_TEST_OMP_PROBE_MARKER"
+printf executed > `+strconv.Quote(marker)+`
 printf 'omp 1.4.2\n'
 `)
-	t.Setenv("AUTOPUS_TEST_OMP_PROBE_MARKER", marker)
 	t.Setenv("PATH", dir)
 
 	assert.Empty(t, DetectInstalledPlatforms(),

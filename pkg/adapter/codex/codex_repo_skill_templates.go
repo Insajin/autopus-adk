@@ -29,5 +29,5 @@ func shouldEmitCodexRepoSkillTemplate(skillFile string, cfg *config.HarnessConfi
 	}
 
 	state := pkgcontent.ResolveCatalogSkillState(entry, "codex", cfg)
-	return filepath.ToSlash(state.TargetPath) == filepath.ToSlash(filepath.Join(".codex", "skills", name+".md")), nil
+	return filepath.ToSlash(state.TargetPath) == filepath.ToSlash(codexProjectSkillPath(name)), nil
 }

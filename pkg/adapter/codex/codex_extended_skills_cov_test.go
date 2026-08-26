@@ -32,7 +32,8 @@ func TestEnsureCodexSkillFrontmatter_ExistingFrontmatter(t *testing.T) {
 	t.Parallel()
 	body := "---\nname: keep\n---\n\nthe body"
 	out := ensureCodexSkillFrontmatter("skills/x/SKILL.md", "n", "d", body)
-	assert.Contains(t, out, "name: keep")
+	assert.Contains(t, out, "name: n")
+	assert.NotContains(t, out, "name: keep")
 	assert.Contains(t, out, "the body")
 }
 

@@ -1,26 +1,8 @@
-// @AX:NOTE: [AUTO] 248 lines — approaching 300-line source limit; split by workflow family (cli/task/goal/dev) when adding new body builders
 package codex
 
 import "strings"
 
 func cliWorkflowBody(name, title, summary, command, result string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — "+title,
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 원칙",
-		"",
-		"- 이 워크플로우는 `"+command+"` CLI thin wrapper입니다.",
-		"- 전달된 인자와 플래그를 그대로 유지합니다.",
-		"- Bash tool로 실제 명령을 실행하고 결과를 요약합니다.",
-		"",
-		"## 실행 명령",
-		"",
-		"`"+command+"`",
-	)
 
 	skill := compose(
 		"# "+name+" — "+title,
@@ -42,42 +24,10 @@ func cliWorkflowBody(name, title, summary, command, result string) customWorkflo
 		"3. "+result,
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }
 
 func goalWorkflowBody(name, summary string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — Codex Goal Wrapper",
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 역할",
-		"",
-		"`auto goal`은 Codex `/goal` thread 기능을 Autopus router에서 부르는 thin wrapper입니다. 별도 ADK persisted state를 만들거나 `.autopus` 파일에 목표 상태를 저장하지 않습니다.",
-		"",
-		"## 지원 호출",
-		"",
-		"- `@auto goal` 또는 `@auto goal status`: `get_goal`로 현재 Codex goal 상태를 확인합니다.",
-		"- `@auto goal \"<objective>\" [--budget N]`: 활성 goal이 없을 때 `create_goal`로 objective와 optional token budget을 설정합니다.",
-		"- `@auto goal complete`: 목표가 실제로 달성되었고 남은 필수 작업이 없을 때만 `update_goal(status=\"complete\")`를 호출합니다.",
-		"- `@auto goal blocked`: 같은 blocking condition이 goal turn 기준 3회 이상 반복되고 의미 있는 진행이 불가능할 때만 `update_goal(status=\"blocked\")`를 호출합니다.",
-		"- `@auto goal clear|pause|resume`: 현재 Codex tool surface에 대응 tool이 없으면 `/goal clear`, `/goal pause`, `/goal resume` slash command 사용을 안내합니다.",
-		"",
-		"## 실행 원칙",
-		"",
-		"- 새 goal을 만들기 전에 가능하면 `get_goal`로 active goal 존재 여부를 먼저 확인합니다.",
-		"- active goal이 있으면 덮어쓰려고 하지 말고 현재 objective/status/budget을 보고하고 다음 행동을 제안합니다.",
-		"- goal tool이 현재 런타임에 노출되지 않으면 실패로 숨기지 말고 `/goal <objective>` 또는 `/goal status` fallback을 안내합니다.",
-		"- 완료/blocked 표시는 Codex goal tool contract를 그대로 따르며, 편의상 premature completion을 만들지 않습니다.",
-		"",
-		"## 결과 형식",
-		"",
-		"- `goal_status`: active / complete / blocked / unavailable",
-		"- `objective`: 확인된 목표 또는 생성 요청 목표",
-		"- `next_required_step`: 이어서 실행할 `@auto ...` 명령 또는 `/goal ...` fallback",
-	)
 
 	skill := compose(
 		"# "+name+" — Codex Goal Wrapper",
@@ -117,31 +67,10 @@ func goalWorkflowBody(name, summary string) customWorkflowBody {
 		"- If a requested workflow would conflict with the active goal, report the conflict before starting the workflow.",
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }
 
 func taskWorkflowBody(name, title, summary, agentType, message string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — "+title,
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 원칙",
-		"",
-		"- Codex에서는 `spawn_agent(...)` 기반 subagent-first 로 진행합니다.",
-		"- 대상 path가 있으면 해당 범위를, 없으면 현재 프로젝트 루트를 분석합니다.",
-		"",
-		"## 권장 서브에이전트 호출",
-		"",
-		"```python",
-		"spawn_agent(",
-		"    agent_type=\""+agentType+"\",",
-		"    message=\""+message+"\",",
-		")",
-		"```",
-	)
 
 	skill := compose(
 		"# "+name+" — "+title,
@@ -163,23 +92,10 @@ func taskWorkflowBody(name, title, summary, agentType, message string) customWor
 		"3. 주요 findings와 다음 액션을 3개 이내로 정리합니다.",
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }
 
 func whyWorkflowBody(name, summary string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — Decision Rationale Query",
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 원칙",
-		"",
-		"- path가 주어지면 `auto lore context <path>`를 우선 사용합니다.",
-		"- path가 없으면 `ARCHITECTURE.md`, 관련 SPEC, CHANGELOG, Lore context를 근거로 답합니다.",
-		"- 근거가 부족하면 한 개의 짧은 질문으로 범위를 좁힙니다.",
-	)
 
 	skill := compose(
 		"# "+name+" — Decision Rationale Query",
@@ -201,24 +117,10 @@ func whyWorkflowBody(name, summary string) customWorkflowBody {
 		"3. 추가 근거가 필요하면 관련 SPEC / ARCHITECTURE / CHANGELOG를 읽고 이유를 요약합니다.",
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }
 
 func devWorkflowBody(name, summary string) customWorkflowBody {
-	prompt := compose(
-		"# "+name+" — Full Development Cycle",
-		"",
-		"## 설명",
-		"",
-		summary,
-		"",
-		"## 실행 순서",
-		"",
-		"1. 기능 설명을 기준으로 `auto-plan`을 먼저 수행합니다.",
-		"2. 생성된 SPEC-ID를 기준으로 `auto-go`를 진행합니다.",
-		"3. 구현이 끝나면 `auto-sync`를 수행합니다.",
-		"4. `--auto`, `--loop`, `--team`, `--multi`, `--quality` 플래그는 가능한 한 하위 단계로 전달합니다.",
-	)
 
 	skill := compose(
 		"# "+name+" — Full Development Cycle",
@@ -240,7 +142,7 @@ func devWorkflowBody(name, summary string) customWorkflowBody {
 		"- 각 단계가 실패하면 조용히 건너뛰지 말고 실패 지점과 재개 방법을 명시합니다.",
 	)
 
-	return customWorkflowBody{prompt: prompt, skill: skill}
+	return customWorkflowBody{skill: skill}
 }
 
 func compose(lines ...string) string {

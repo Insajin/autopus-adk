@@ -24,7 +24,7 @@ func TestGenerateConfig_CatalogDowngradesEffortOnSameModel(t *testing.T) {
 	cfg.Quality.Default = "ultra"
 	cfg.Quality.SupervisorModelPolicy = "quality"
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.Contains(t, root, `model = "gpt-5.6-sol"`)
@@ -45,7 +45,7 @@ func TestGenerateConfig_CatalogFallsBackToLegacyModel(t *testing.T) {
 	cfg.Quality.Default = "ultra"
 	cfg.Quality.SupervisorModelPolicy = "quality"
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.Contains(t, root, `model = "gpt-5.5"`)
@@ -63,7 +63,7 @@ func TestGenerateConfig_CatalogUnknownUsesLegacyModel(t *testing.T) {
 	cfg.Quality.Default = "ultra"
 	cfg.Quality.SupervisorModelPolicy = "quality"
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.Contains(t, root, `model = "gpt-5.5"`)
@@ -79,7 +79,7 @@ func TestGenerateConfig_CatalogUsesRuntimeDefaultWhenNoCompatibleModel(t *testin
 	a.codexCatalogJSON = []byte(`{"models":[{"slug":"other-model","supported_reasoning_levels":[{"effort":"medium"}]}]}`)
 	cfg := config.DefaultFullConfig("runtime-default-project")
 
-	files, err := a.generateConfig(cfg)
+	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.NotContains(t, root, "\nmodel =")
@@ -97,7 +97,7 @@ func TestGenerateConfig_RuntimeDefaultStillPreservesUserModel(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0755))
 	require.NoError(t, os.WriteFile(configPath, []byte("model = \"custom-model\"\nmodel_reasoning_effort = \"ultra\"\n"), 0644))
 
-	files, err := a.generateConfig(config.DefaultFullConfig("preserve-project"))
+	files, err := a.prepareConfigFile(config.DefaultFullConfig("preserve-project"))
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
 	assert.Contains(t, root, `model = "custom-model"`)

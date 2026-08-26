@@ -39,7 +39,7 @@ func TestGeneratePreviewMappings_OMPResolvesToAdapter(t *testing.T) {
 			surfaces["rules"]++
 		case strings.HasPrefix(target, ".omp/agents/"):
 			surfaces["agents"]++
-		case strings.HasPrefix(target, ".agents/commands/"):
+		case strings.HasPrefix(target, ".omp/commands/"):
 			surfaces["commands"]++
 		}
 	}

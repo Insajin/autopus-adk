@@ -59,7 +59,7 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 
 	requiredDirs := []string{
 		filepath.Join(".claude", "rules", "autopus"),
-		filepath.Join(".claude", "skills", "autopus"),
+		filepath.Join(".claude", "skills"),
 		filepath.Join(".claude", "agents", "autopus"),
 	}
 	for _, d := range requiredDirs {
@@ -118,43 +118,7 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 
 // Clean은 어댑터가 생성한 autopus 전용 파일과 디렉터리를 제거한다.
 func (a *Adapter) Clean(_ context.Context) error {
-	autopusDirs := []string{
-		filepath.Join(a.root, ".claude", "rules", "autopus"),
-		filepath.Join(a.root, ".claude", "skills", "autopus"),
-		filepath.Join(a.root, ".claude", "skills", "auto"),      // router skill dir
-		filepath.Join(a.root, ".claude", "commands", "autopus"), // legacy dir cleanup
-		filepath.Join(a.root, ".claude", "agents", "autopus"),
-	}
-	for _, d := range autopusDirs {
-		if err := os.RemoveAll(d); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("디렉터리 제거 실패 %s: %w", d, err)
-		}
-	}
-
-	// Remove legacy router command file
-	legacyAutoMD := filepath.Join(a.root, ".claude", "commands", "auto.md")
-	if err := os.Remove(legacyAutoMD); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("레거시 라우터 커맨드 삭제 실패: %w", err)
-	}
-
-	for _, name := range claudeRootHookFiles {
-		rootHookPath := filepath.Join(a.root, ".claude", "hooks", name)
-		if err := os.Remove(rootHookPath); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("루트 훅 파일 삭제 실패 %s: %w", rootHookPath, err)
-		}
-	}
-
-	// Remove marker section from CLAUDE.md
-	claudePath := filepath.Join(a.root, "CLAUDE.md")
-	data, err := os.ReadFile(claudePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("CLAUDE.md 읽기 실패: %w", err)
-	}
-	cleaned := removeMarkerSection(string(data))
-	return os.WriteFile(claudePath, []byte(cleaned), 0644)
+	return a.cleanManagedSurfaces()
 }
 
 // claudeMDTemplate은 CLAUDE.md AUTOPUS 섹션 템플릿이다.
@@ -169,8 +133,8 @@ const claudeMDTemplate = `# Autopus-ADK Harness
 ## 설치된 구성 요소
 
 - Rules: .claude/rules/autopus/
-- Skills: .claude/skills/autopus/
-- Commands: .claude/skills/auto/SKILL.md
+- Skills: .claude/skills/<name>/SKILL.md
+- Router: .claude/skills/auto/SKILL.md
 - Agents: .claude/agents/autopus/
 {{- if .IsolateRules}}
 

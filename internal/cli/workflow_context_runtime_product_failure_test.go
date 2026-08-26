@@ -101,19 +101,35 @@ func TestWorkflowContextManagedRPCProduct_RequiresNativeCommandDiscovery(t *test
 	for _, test := range []struct {
 		name     string
 		commands []any
+		response bool
 		wantErr  bool
 	}{
-		{name: "router and detail", commands: []any{"auto", map[string]any{"name": "auto-go"}}},
+		{name: "broadcast without response", commands: []any{"auto", map[string]any{"name": "auto-go"}}, wantErr: true},
+		{name: "router and detail response", commands: []any{map[string]any{"name": "auto"}, map[string]any{"name": "auto-go"}}, response: true},
 		{name: "missing detail", commands: []any{"auto"}, wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			frames := make(chan []byte, 2)
 			managedProductPushFrame(t, frames, workflowContextManagedRPCFrame{Type: "ready"})
-			body, err := json.Marshal(map[string]any{"type": "available_commands_update", "commands": test.commands})
+			body, err := json.Marshal(map[string]any{"commands": test.commands})
 			if err != nil {
 				t.Fatalf("encode command discovery: %v", err)
 			}
-			frames <- body
+			if test.response {
+				success := true
+				managedProductPushFrame(t, frames, workflowContextManagedRPCFrame{
+					ID: "managed-product-commands", Type: "response", Command: "get_available_commands",
+					Success: &success, Data: body,
+				})
+			} else {
+				broadcast, marshalErr := json.Marshal(map[string]any{
+					"type": "available_commands_update", "commands": test.commands,
+				})
+				if marshalErr != nil {
+					t.Fatalf("encode command broadcast: %v", marshalErr)
+				}
+				frames <- broadcast
+			}
 			close(frames)
 			done := make(chan error, 1)
 			done <- nil

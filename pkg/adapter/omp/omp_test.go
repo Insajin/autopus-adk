@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 	pkgcontent "github.com/insajin/autopus-adk/pkg/content"
 )
@@ -57,9 +58,10 @@ func TestOMP_S3_E2_AgentTransformation(t *testing.T) {
 	assert.Contains(t, transformed, "tools:")
 	assert.Contains(t, transformed, "- bash")
 	assert.Contains(t, transformed, "- edit")
-	assert.Contains(t, transformed, "- todo")
+	assert.NotContains(t, transformed, "- todo")
+	assert.Contains(t, transformed, "- lsp")
 	assert.Contains(t, transformed, "- write")
-	assert.Contains(t, transformed, ".agents/skills/ax-annotation/SKILL.md")
+	assert.Contains(t, transformed, ".omp/skills/ax-annotation/SKILL.md")
 	assert.NotContains(t, transformed, "yield")
 	assert.NotContains(t, transformed, "spawns")
 
@@ -71,7 +73,8 @@ func TestOMP_S3_E2_AgentTransformation(t *testing.T) {
 		Body: "Body",
 	}
 	transformedNoTools := pkgcontent.TransformAgentForOMP(srcNoTools)
-	assert.NotContains(t, transformedNoTools, "tools:")
+	assert.Contains(t, transformedNoTools, "tools:")
+	assert.Contains(t, transformedNoTools, "- lsp")
 }
 
 func TestOMP_S4_S5_S6_Lifecycle(t *testing.T) {
@@ -86,9 +89,11 @@ func TestOMP_S4_S5_S6_Lifecycle(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, pf)
 
-	// Check S6: generated files
-	assert.FileExists(t, filepath.Join(dir, configFile))
+	// Check S6: generated native files without an unnecessary base config.
+	assert.NoFileExists(t, filepath.Join(dir, configFile))
 	assert.FileExists(t, filepath.Join(dir, ".omp", "agents", "executor.md"))
+	assert.FileExists(t, filepath.Join(dir, ".omp", "skills", "auto", "SKILL.md"))
+	assert.FileExists(t, filepath.Join(dir, ".omp", "commands", "auto.md"))
 	assert.FileExists(t, filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md"))
 
 	// Check S5: no CLAUDE.md shadowed
@@ -102,61 +107,42 @@ func TestOMP_S4_S5_S6_Lifecycle(t *testing.T) {
 }
 
 func TestOMP_S10_S11_Ownership(t *testing.T) {
-	// S10: Skill ownership yield
-	cfgA := &config.HarnessConfig{Platforms: []string{"omp"}}
-	assert.True(t, ompOwnsSharedSkillSurface(cfgA))
-	assert.True(t, ompOwnsCommandSurface(cfgA))
+	mixed := PruneRoots(&config.HarnessConfig{Platforms: []string{"opencode", "codex", "omp"}})
+	for _, root := range []string{".omp/skills", ".omp/commands", ".agents/commands"} {
+		assert.Contains(t, mixed, root)
+	}
+	assert.NotContains(t, mixed, ".agents/skills")
 
-	cfgB := &config.HarnessConfig{Platforms: []string{"opencode", "omp"}}
-	assert.False(t, ompOwnsSharedSkillSurface(cfgB))
-	assert.False(t, ompOwnsCommandSurface(cfgB))
-
-	cfgC := &config.HarnessConfig{Platforms: []string{"codex", "omp"}}
-	assert.False(t, ompOwnsSharedSkillSurface(cfgC))
-	assert.True(t, ompOwnsCommandSurface(cfgC))
+	ompOnly := PruneRoots(&config.HarnessConfig{Platforms: []string{"omp"}})
+	assert.Contains(t, ompOnly, ".agents/skills")
 }
 
 func TestOMP_E6_StaleManifestClean(t *testing.T) {
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
-
 	cfg := config.DefaultFullConfig("omp-test")
 	cfg.Platforms = []string{"omp"}
-
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	// Skill file is generated since omp owns it
-	skillPath := filepath.Join(dir, ".agents", "skills", "auto", "SKILL.md")
-	assert.FileExists(t, skillPath)
+	legacyPath := filepath.Join(".agents", "skills", "auto", "SKILL.md")
+	skillPath := filepath.Join(dir, legacyPath)
+	require.NoError(t, os.MkdirAll(filepath.Dir(skillPath), 0o755))
+	require.NoError(t, os.WriteFile(skillPath, []byte("legacy omp content"), 0o644))
+	manifest, err := adapter.LoadManifest(dir, adapterName)
+	require.NoError(t, err)
+	require.NotNil(t, manifest)
+	manifest.Files[legacyPath] = adapter.ManifestFile{
+		Checksum: adapter.Checksum("legacy omp content"), Policy: adapter.OverwriteAlways,
+	}
+	require.NoError(t, manifest.Save(dir))
 
-	// Switch configuration to mixed, now opencode owns skill.
-	// Clean re-reads the on-disk config, so the mixed config must be persisted.
 	cfgMixed := config.DefaultFullConfig("omp-test")
 	cfgMixed.Platforms = []string{"opencode", "omp"}
 	require.NoError(t, config.Save(dir, cfgMixed))
+	require.NoError(t, os.WriteFile(skillPath, []byte("opencode content"), 0o644))
 
-	// Overwrite skill file content (as opencode would do)
-	err = os.WriteFile(skillPath, []byte("opencode content"), 0644)
-	require.NoError(t, err)
-
-	// Clean omp adapter.
-	// OMP manifest still tracks .agents/skills/auto/SKILL.md,
-	// but ompClean should re-evaluate ownership and SKIP skillPath because omp mixed configuration yields skill surface.
-	err = a.Clean(context.Background())
-	require.NoError(t, err)
-
-	// Skill path remains untouched, and no backup was made
-	assert.FileExists(t, skillPath)
-	data, err := os.ReadFile(skillPath)
-	require.NoError(t, err)
-	assert.Equal(t, "opencode content", string(data))
-
-	// A yielded surface is skipped before the checksum comparison, so the
-	// overwritten file must not be backed up.
-	assert.NoDirExists(t, filepath.Join(dir, ".autopus", "backup"))
-
-	// Surfaces omp still owns are removed as usual.
-	assert.NoFileExists(t, filepath.Join(dir, ompRuleDir, ompRuleFilePrefix+"branding.md"))
+	require.NoError(t, a.Clean(context.Background()))
+	assertFileBytesOMP(t, skillPath, "opencode content")
 	assert.NoFileExists(t, filepath.Join(dir, ".omp", "agents", "executor.md"))
 }

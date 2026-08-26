@@ -115,7 +115,7 @@ func ompWorkflowBodyContracts() []ompWorkflowBodyContract {
 			[]string{"## Context Profile: plan", "## 실행 순서", "## 요구사항 형식 (EARS)"}, []string{"Clarification Ledger", "auto spec validate"}),
 		template("auto-go", "codex/skills/auto-go.md.tmpl",
 			[]string{"## Context Profile: go", "## 구현 절차", "## 실행 계약", "## 품질 기준", "## Execution Owner Control Plane"},
-			[]string{"RED: 실패 테스트", ".agents/skills/agent-pipeline/SKILL.md", `"outputSchema"`, "single DAG owner invariant",
+			[]string{"RED: 실패 테스트", ".omp/skills/agent-pipeline/SKILL.md", `"outputSchema"`, "single DAG owner invariant",
 				"--execution-owner omp|orca", "pipeline_execution_owner_receipt.v1", "supervised Orca workers"}),
 		template("auto-fix", "codex/skills/auto-fix.md.tmpl",
 			[]string{"## 절차", "## 규칙"}, []string{"버그 재현 테스트", "최소 코드 변경"}),
@@ -172,8 +172,8 @@ func assertOMPNativeCoordinationContract(t *testing.T, body string) {
 	t.Helper()
 	assert.Equal(t, 1, strings.Count(body, "## OMP Coordination Contract"))
 	for _, field := range []string{
-		`"context"`, `"tasks"`, `"name"`, `"task"`,
-		`"outputSchema"`, `"schemaMode"`, `"isolated"`,
+		`"i"`, `"context"`, `"tasks"`, `"name"`, `"task"`,
+		`"outputSchema"`, `"schemaMode"`,
 		`"owned_paths"`, `"changed_files"`, `"verification"`,
 		`"blockers"`, `"next_required_step"`,
 	} {
@@ -186,10 +186,10 @@ func assertOMPNativeCoordinationContract(t *testing.T, body string) {
 	assert.Contains(t, body,
 		`"required": ["owned_paths", "changed_files", "verification", "blockers", "next_required_step"]`)
 	assert.Contains(t, body, `"schemaMode": "strict"`)
-	assert.Contains(t, body, `{"op":"send","to":"<same agent id>","message":"<follow-up>"}`)
-	assert.Contains(t, body, `{"op":"init","list":[{"phase":"Implementation","items":["..."]}]}`)
-	assert.Contains(t, body, `{"op":"start","task":"<exact task content>"}`)
-	assert.Contains(t, body, "that same agent")
+	assert.Contains(t, body, `{"i":"Following up with an existing worker","op":"send","to":"<same agent id>","message":"<follow-up>"}`)
+	assert.Contains(t, body, `{"i":"Updating parent-owned progress","op":"init","list":[{"phase":"Implementation","items":["..."]}]}`)
+	assert.Contains(t, body, `{"i":"Updating parent-owned progress","op":"start","task":"<exact task content>"}`)
+	assert.Contains(t, body, "that same id")
 	assert.Contains(t, body, "owner `omp`")
 	assert.Contains(t, body, "owner `orca`")
 	assert.Contains(t, body, "--execution-owner orca")

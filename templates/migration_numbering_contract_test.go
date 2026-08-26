@@ -74,10 +74,6 @@ func TestMigrationNumberingGuidanceContracts(t *testing.T) {
 			"Migration numbering rule",
 			"same owning repo and migration directory",
 		},
-		filepath.Join(root, "codex", "skills", "agent-pipeline.md.tmpl"): {
-			"Migration numbering rule",
-			"same owning repo and migration directory",
-		},
 		filepath.Join(root, "gemini", "skills", "agent-pipeline", "SKILL.md.tmpl"): {
 			"Migration numbering rule",
 			"same owning repo and migration directory",
@@ -91,10 +87,6 @@ func TestMigrationNumberingGuidanceContracts(t *testing.T) {
 			"no migration-directory conflict",
 		},
 		filepath.Join(root, "..", "content", "skills", "worktree-isolation.md"): {
-			"Migration numbering lane",
-			"same migration numbering lane",
-		},
-		filepath.Join(root, "codex", "skills", "worktree-isolation.md.tmpl"): {
 			"Migration numbering lane",
 			"same migration numbering lane",
 		},

@@ -53,6 +53,11 @@ func TestS1S19_TeamDeterministicGeneration(t *testing.T) {
 		t.Errorf("first line missing generated warning: %q", firstLine)
 	}
 
+	if !strings.Contains(js1, "explicit retained Workflow") ||
+		strings.Contains(js1, "Workflow substrate (claude-code --team)") {
+		t.Errorf("route_team metadata must not claim the native --team substrate")
+	}
+
 	jsIDs := extractPhaseIDsFromJS(js1)
 	jsSet := make([]string, 0, len(jsIDs))
 	for id := range jsIDs {
@@ -64,7 +69,7 @@ func TestS1S19_TeamDeterministicGeneration(t *testing.T) {
 	}
 
 	implBlock := phaseJSBlock(js1, "implementation")
-	for _, want := range []string{"parallel(", "agent(taskPrompt", "isolation: 'worktree'", "agentType: 'executor'", "fan_out_cap=5", "RT.implementation", "'claude-opus-5'"} {
+	for _, want := range []string{"parallel(", "agent(taskPrompt", "shared working tree", "agentType: 'executor'", "fan_out_cap=5", "RT.implementation", "'claude-opus-5'"} {
 		if !strings.Contains(implBlock, want) {
 			t.Errorf("implementation block missing %q, got:\n%s", want, implBlock)
 		}

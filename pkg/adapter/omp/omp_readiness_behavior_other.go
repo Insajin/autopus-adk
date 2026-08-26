@@ -8,10 +8,6 @@ import (
 	"os/exec"
 )
 
-func supportsOMPReadinessBehaviorProcessGroup() bool {
-	return false
-}
-
 func runOMPReadinessRPCCommand(
 	context.Context,
 	*exec.Cmd,

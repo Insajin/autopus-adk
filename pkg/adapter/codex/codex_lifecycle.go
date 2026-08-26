@@ -16,7 +16,7 @@ const minProjectDocMaxBytes = 262144
 func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error) {
 	var errs []adapter.ValidationError
 
-	if a.managesFile("AGENTS.md") {
+	if !a.openCodeOwnsRootDoc() && a.managesFile("AGENTS.md") {
 		agentsPath := filepath.Join(a.root, "AGENTS.md")
 		data, err := os.ReadFile(agentsPath)
 		if err != nil {
@@ -47,18 +47,6 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 		})
 	}
 
-	repoSkillRel := filepath.Join(".agents", "skills", "auto", "SKILL.md")
-	if a.managesFile(repoSkillRel) {
-		repoSkillPath := filepath.Join(a.root, repoSkillRel)
-		if _, err := os.Stat(repoSkillPath); os.IsNotExist(err) {
-			errs = append(errs, adapter.ValidationError{
-				File:    repoSkillRel,
-				Message: "Codex 표준 router skill이 없음",
-				Level:   "warning",
-			})
-		}
-	}
-
 	marketplacePath := filepath.Join(a.root, ".agents", "plugins", "marketplace.json")
 	if _, err := os.Stat(marketplacePath); os.IsNotExist(err) {
 		errs = append(errs, adapter.ValidationError{
@@ -70,50 +58,117 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 
 	a.validateRouterPrompt(&errs)
 	a.validateConfig(&errs)
-	a.validateContext7Rule(&errs)
-
+	a.validateNativeCodexSurface(&errs)
+	a.validateCodexNativeDocuments(&errs)
 	return errs, nil
 }
 
 // Clean removes files created by this adapter.
+// @AX:WARN [AUTO]: manifest-aware Codex cleanup contains more than eight conditional branches.
+// @AX:REASON [AUTO]: owned-file removal, shared-document preservation, structured hook/config cleanup, manifest deletion, and empty-directory pruning converge here.
 func (a *Adapter) Clean(_ context.Context) error {
-	if err := removeCodexHookAssets(a.root); err != nil {
-		return fmt.Errorf("Codex hook asset 제거 실패: %w", err)
+	manifestRel := filepath.Join(".autopus", adapterName+"-manifest.json")
+	if _, err := safeCodexCleanTarget(a.root, manifestRel); err != nil {
+		return fmt.Errorf("Codex manifest path 검증 실패: %w", err)
 	}
-	if err := os.RemoveAll(filepath.Join(a.root, ".codex", "skills")); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf(".codex/skills 제거 실패: %w", err)
+	if err := a.validateEmptyPruneRoots(); err != nil {
+		return fmt.Errorf("Codex prune root 검증 실패: %w", err)
 	}
-	if a.managesFile(filepath.Join(".agents", "skills", "auto", "SKILL.md")) {
-		autoSkillDirs := make([]string, 0, len(workflowSpecs))
-		for _, spec := range workflowSpecs {
-			autoSkillDirs = append(autoSkillDirs, spec.Name)
-		}
-		for _, dir := range autoSkillDirs {
-			if err := os.RemoveAll(filepath.Join(a.root, ".agents", "skills", dir)); err != nil && !os.IsNotExist(err) {
-				return fmt.Errorf(".agents/skills/%s 제거 실패: %w", dir, err)
-			}
-		}
+	manifest, err := adapter.LoadManifest(a.root, adapterName)
+	if err != nil {
+		return fmt.Errorf("Codex manifest 로드 실패: %w", err)
 	}
-	if err := os.Remove(filepath.Join(a.root, ".agents", "plugins", "marketplace.json")); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf(".agents/plugins/marketplace.json 제거 실패: %w", err)
-	}
-	if err := os.RemoveAll(filepath.Join(a.root, ".autopus", "plugins", "auto")); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf(".autopus/plugins/auto 제거 실패: %w", err)
+	if manifest == nil {
+		return a.cleanRootDocMarkerSafely()
 	}
 
-	if a.managesFile("AGENTS.md") {
-		agentsPath := filepath.Join(a.root, "AGENTS.md")
-		data, err := os.ReadFile(agentsPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil
-			}
-			return fmt.Errorf("AGENTS.md 읽기 실패: %w", err)
-		}
-		cleaned := removeMarkerSection(string(data))
-		return os.WriteFile(agentsPath, []byte(cleaned), 0644)
+	special := map[string]bool{
+		filepath.ToSlash("AGENTS.md"):                                             true,
+		filepath.ToSlash(filepath.Join(".codex", "hooks.json")):                   true,
+		filepath.ToSlash(filepath.Join(".agents", "plugins", "marketplace.json")): true,
+		filepath.ToSlash(codexConfigRelPath):                                      true,
 	}
-	return nil
+	allowedCleanPaths, err := codexCleanAllowedPaths()
+	if err != nil {
+		return err
+	}
+	openCodeOwnsSharedSkills := a.openCodeOwnsRootDoc()
+	for path, owned := range manifest.Files {
+		clean := filepath.ToSlash(path)
+		if special[clean] {
+			continue
+		}
+		if openCodeOwnsSharedSkills && strings.HasPrefix(clean, ".agents/skills/") {
+			continue
+		}
+		if !allowedCleanPaths[clean] {
+			return fmt.Errorf("Codex manifest-owned path가 managed allowlist 밖임: %s", path)
+		}
+		if err := removeUnmodifiedCodexManagedFile(a.root, clean, owned); err != nil {
+			return fmt.Errorf("Codex manifest-owned file 제거 실패 %s: %w", path, err)
+		}
+	}
+
+	if manifestOwnsCodexPath(manifest, filepath.Join(".codex", "hooks.json")) {
+		if err := cleanCodexManagedMergeFile(a.root, filepath.Join(".codex", "hooks.json"), cleanCodexHooksFile); err != nil {
+			return err
+		}
+	}
+	if manifestOwnsCodexPath(manifest, filepath.Join(".agents", "plugins", "marketplace.json")) {
+		if err := cleanCodexManagedMergeFile(a.root, filepath.Join(".agents", "plugins", "marketplace.json"), cleanCodexMarketplaceFile); err != nil {
+			return err
+		}
+	}
+	if manifestOwnsCodexPath(manifest, codexConfigRelPath) {
+		if err := cleanCodexManagedMergeFile(a.root, codexConfigRelPath, cleanCodexConfigFile); err != nil {
+			return err
+		}
+	}
+	if manifestOwnsCodexPath(manifest, "AGENTS.md") {
+		if err := a.cleanRootDocMarkerSafely(); err != nil {
+			return err
+		}
+	}
+	if err := removeCodexManifestSafely(a.root); err != nil {
+		return fmt.Errorf("Codex manifest 제거 실패: %w", err)
+	}
+	return a.pruneEmptyManagedDirs()
+}
+
+func manifestOwnsCodexPath(manifest *adapter.Manifest, path string) bool {
+	if manifest == nil {
+		return false
+	}
+	_, ok := manifest.Files[path]
+	if ok {
+		return true
+	}
+	_, ok = manifest.Files[filepath.ToSlash(path)]
+	return ok
+}
+
+func (a *Adapter) openCodeOwnsRootDoc() bool {
+	manifest, err := adapter.LoadManifest(a.root, "opencode")
+	if err == nil && manifest != nil {
+		return true
+	}
+	_, statErr := os.Stat(filepath.Join(a.root, ".autopus", "opencode-manifest.json"))
+	return statErr == nil
+}
+
+func (a *Adapter) cleanRootDocMarker() error {
+	if a.openCodeOwnsRootDoc() {
+		return nil
+	}
+	agentsPath := filepath.Join(a.root, "AGENTS.md")
+	data, err := os.ReadFile(agentsPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("AGENTS.md 읽기 실패: %w", err)
+	}
+	return os.WriteFile(agentsPath, []byte(removeMarkerSection(string(data))), 0o644)
 }
 
 // InstallHooks is a no-op — hooks are managed via .codex/hooks.json template.
@@ -139,85 +194,30 @@ func (a *Adapter) managesFile(targetPath string) bool {
 }
 
 func isSharedSurfacePath(targetPath string) bool {
-	if targetPath == "AGENTS.md" {
-		return true
-	}
 	return strings.HasPrefix(targetPath, filepath.Join(".agents", "skills")+string(os.PathSeparator))
 }
 
 func (a *Adapter) validateRouterPrompt(errs *[]adapter.ValidationError) {
-	routerPromptRel := filepath.Join(".codex", "prompts", "auto.md")
-	if !a.managesFile(routerPromptRel) {
+	routerSkillRel := codexProjectSkillPath("auto")
+	data, err := os.ReadFile(filepath.Join(a.root, routerSkillRel))
+	if err != nil {
+		*errs = append(*errs, adapter.ValidationError{
+			File: routerSkillRel, Message: "Codex native router skill을 읽을 수 없음", Level: "error",
+		})
 		return
 	}
-
-	data, err := os.ReadFile(filepath.Join(a.root, routerPromptRel))
-	if err != nil {
-		if os.IsNotExist(err) {
-			*errs = append(*errs, adapter.ValidationError{
-				File:    routerPromptRel,
-				Message: "Codex router prompt가 없음",
-				Level:   "warning",
-			})
-			return
+	content := string(data)
+	required := []string{
+		"name: codex-auto", "@auto", "$codex-auto", "## Router Execution Contract",
+		"## Codex Multi-Agent V2 Contract", "## SPEC Path Resolution",
+	}
+	for _, fragment := range required {
+		if strings.Contains(content, fragment) {
+			continue
 		}
 		*errs = append(*errs, adapter.ValidationError{
-			File:    routerPromptRel,
-			Message: "Codex router prompt를 읽을 수 없음",
-			Level:   "warning",
+			File: routerSkillRel, Message: "Codex native router skill 계약이 불완전함", Level: "error",
 		})
 		return
-	}
-
-	content := string(data)
-	if !strings.Contains(content, "## Autopus Branding") || !strings.Contains(content, "🐙 Autopus ─────────────────────────") {
-		*errs = append(*errs, adapter.ValidationError{
-			File:    routerPromptRel,
-			Message: "Codex router prompt에 Autopus 브랜딩 블록이 없음",
-			Level:   "warning",
-		})
-	}
-	hasProjectContextContract := strings.Contains(content, "ARCHITECTURE.md") &&
-		(strings.Contains(content, ".autopus/project/*") || strings.Contains(content, ".autopus/project/product.md"))
-	if !strings.Contains(content, "## Router Execution Contract") || !hasProjectContextContract || !strings.Contains(content, "## SPEC Path Resolution") {
-		*errs = append(*errs, adapter.ValidationError{
-			File:    routerPromptRel,
-			Message: "Codex router prompt에 상세 워크플로우/프로젝트 컨텍스트 계약이 없음",
-			Level:   "warning",
-		})
-	}
-}
-
-func (a *Adapter) validateContext7Rule(errs *[]adapter.ValidationError) {
-	ruleRel := filepath.Join(".codex", "rules", "autopus", "context7-docs.md")
-	if !a.managesFile(ruleRel) {
-		return
-	}
-
-	data, err := os.ReadFile(filepath.Join(a.root, ruleRel))
-	if err != nil {
-		if os.IsNotExist(err) {
-			*errs = append(*errs, adapter.ValidationError{
-				File:    ruleRel,
-				Message: "Codex Context7 규칙 파일이 없음",
-				Level:   "warning",
-			})
-			return
-		}
-		*errs = append(*errs, adapter.ValidationError{
-			File:    ruleRel,
-			Message: "Codex Context7 규칙 파일을 읽을 수 없음",
-			Level:   "warning",
-		})
-		return
-	}
-
-	content := string(data)
-	if !strings.Contains(content, "Context7 MCP") || !strings.Contains(content, "web search") {
-		*errs = append(*errs, adapter.ValidationError{
-			File:    ruleRel,
-			Message: "Codex Context7 규칙에 web fallback 계약이 없음",
-			Level:   "warning",
-		})
 	}
 }

@@ -17,14 +17,17 @@ Do not request isolation for `--solo`, read-only work, overlapping ownership, sh
 numbering, or an environment where the field is absent. Missing required isolation is a blocker,
 not permission to imitate it with shell commands.
 
-## Native Batch Contract
+## Native Dispatch Contract
 
-Dispatch independent isolated work in one batch with shared context. Each item uses a unique stable
-name, a discovered custom role when needed, a complete assignment, `isolated: true`, the strict
-five-field receipt schema, and `schemaMode: strict`.
+Inspect the current dynamic schema before each wave. When it exposes batch mode, dispatch
+independent isolated work in one batch with top-level `i` and shared `context`. Each item uses a
+unique stable name, a discovered custom role when needed, a complete assignment, the discovered
+isolation field enabled, the strict five-field receipt schema, and `schemaMode: strict`. When batch
+mode is absent, dispatch the corresponding flat calls and reference one shared `local://` context.
 
-The parent must check dynamic availability before including `isolated`; the field does not exist
-when `task.isolation.mode = none`. Omit it rather than sending an unsupported parameter.
+The parent must check dynamic availability before adding `isolated` or `effort`. `isolated` does
+not exist when `task.isolation.mode = none`, and `effort` does not exist when its setting is off.
+Omit either unsupported field rather than sending it from a static example.
 
 ## Ownership Preflight
 
@@ -70,7 +73,7 @@ Do not use an isolated batch to hide a dependency edge.
 - If integration fails, stop the next wave and report the exact OMP lifecycle error.
 - Never bypass a failed patch/branch integration with destructive git commands.
 - A correction is a new explicitly named task with freshly declared ownership and context.
-- Cancel still-running jobs through `hub`; preserve user-owned changes and unrelated jobs.
+- Cancel still-running jobs through `hub` with top-level `i`; preserve user-owned changes and unrelated jobs.
 
 ## Receipt Verification
 

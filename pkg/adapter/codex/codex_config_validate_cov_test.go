@@ -126,7 +126,7 @@ func TestValidateBundledCodexPlugins_Disabled(t *testing.T) {
 func TestValidateCodexFeatureFlags_AllEnabled(t *testing.T) {
 	t.Parallel()
 	var errs []adapter.ValidationError
-	content := "[features]\ngoals = true\nmulti_agent = true\n"
+	content := "[features]\ngoals = true\nhooks = true\nshell_tool = true\nunified_exec = true\n\n[features.multi_agent_v2]\nenabled = true\nmax_concurrent_threads_per_session = 4\n"
 	validateCodexFeatureFlags(content, &errs)
 	assert.Empty(t, errs)
 }
@@ -134,7 +134,7 @@ func TestValidateCodexFeatureFlags_AllEnabled(t *testing.T) {
 func TestValidateCodexFeatureFlags_MissingGoals(t *testing.T) {
 	t.Parallel()
 	var errs []adapter.ValidationError
-	content := "[features]\nmulti_agent = true\n"
+	content := "[features]\nhooks = true\nshell_tool = true\nunified_exec = true\n\n[features.multi_agent_v2]\nenabled = true\nmax_concurrent_threads_per_session = 4\n"
 	validateCodexFeatureFlags(content, &errs)
 	assert.True(t, hasValidationMessage(errs, "goals feature가 enabled 상태가 아님"))
 }

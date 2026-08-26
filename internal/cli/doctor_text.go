@@ -7,12 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
-	"github.com/insajin/autopus-adk/pkg/adapter"
-	"github.com/insajin/autopus-adk/pkg/adapter/antigravity"
-	"github.com/insajin/autopus-adk/pkg/adapter/claude"
-	"github.com/insajin/autopus-adk/pkg/adapter/codex"
-	"github.com/insajin/autopus-adk/pkg/adapter/omp"
-	"github.com/insajin/autopus-adk/pkg/adapter/opencode"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
 
@@ -37,29 +31,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	ctx := doctorCommandContext(cmd)
 	allOK := true
 	for _, p := range cfg.Platforms {
-		var validationErrs []adapter.ValidationError
-		var validateErr error
-
-		switch p {
-		case "claude-code":
-			a := claude.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		case "codex":
-			a := codex.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		case "antigravity-cli":
-			a := antigravity.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		case "opencode":
-			a := opencode.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		case "omp":
-			a := omp.NewWithRoot(opts.dir)
-			validationErrs, validateErr = a.Validate(ctx)
-		default:
-			tui.SKIP(out, fmt.Sprintf("알 수 없는 플랫폼: %s", p))
-			continue
-		}
+		validationErrs, validateErr := validateDoctorPlatform(ctx, opts.dir, p)
 
 		if validateErr != nil {
 			tui.FAIL(out, fmt.Sprintf("%s 검증 실패: %v", p, validateErr))

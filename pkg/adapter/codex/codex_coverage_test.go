@@ -31,11 +31,11 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 	t.Parallel()
 
 	teams := normalizeCodexExtendedSkill("agent-teams", "placeholder")
-	assert.Contains(t, teams, "Codex Team Mode Skill")
-	assert.Contains(t, teams, "native Codex multi-agent tool surface")
-	assert.Contains(t, teams, "Lead/Builder/Guardian")
-	assert.Contains(t, teams, "`/goal` is a Codex thread feature")
-	assert.Contains(t, teams, "`create_goal`")
+	assert.Contains(t, teams, "Codex Multi-Agent V2 Team Skill")
+	assert.Contains(t, teams, "same shared cwd and filesystem")
+	assert.Contains(t, teams, "Lead")
+	assert.Contains(t, teams, "followup_task")
+	assert.Contains(t, teams, "target-less `wait_agent()`")
 	assert.NotContains(t, teams, "TeamCreate")
 	assert.NotContains(t, teams, "SendMessage")
 	assert.NotContains(t, teams, "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS")
@@ -61,10 +61,11 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 	assert.NotContains(t, pipeline, "auto permission detect")
 
 	worktree := normalizeCodexExtendedSkill("worktree-isolation", "placeholder")
-	assert.Contains(t, worktree, "forked workspace")
+	assert.Contains(t, worktree, "shared cwd and filesystem")
+	assert.Contains(t, worktree, "disjoint write ownership")
 	assert.Contains(t, worktree, "owned_paths")
 	assert.Contains(t, worktree, "next_required_step")
-	assert.NotContains(t, worktree, "auto pipeline worktree")
+	assert.NotContains(t, worktree, "forked workspace")
 
 	prd := normalizeCodexExtendedSkill("prd", "사용자 입력이 불충분할 경우 AskUserQuestion으로 확인:")
 	assert.NotContains(t, prd, "AskUserQuestion")
@@ -155,23 +156,6 @@ func TestMergeHookCategories_EmptyDocs(t *testing.T) {
 	result := mergeHookCategories(empty, empty)
 	assert.NotNil(t, result.Hooks)
 	assert.Empty(t, result.Hooks)
-}
-
-// --- Settings ---
-
-func TestGenerateConfig_WritesToDisk(t *testing.T) {
-	t.Parallel()
-	dir := t.TempDir()
-	a := NewWithRoot(dir)
-	cfg := config.DefaultFullConfig("test-project")
-
-	files, err := a.generateConfig(cfg)
-	require.NoError(t, err)
-	require.Len(t, files, 1)
-
-	data, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
-	require.NoError(t, err)
-	assert.Equal(t, string(files[0].Content), string(data))
 }
 
 // --- Lifecycle ---

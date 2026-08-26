@@ -2,6 +2,7 @@ package codex
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -12,13 +13,15 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 	return a.prepareFilesWithManifest(cfg, nil)
 }
 
+// @AX:WARN [AUTO]: Codex surface preparation contains more than eight conditional branches.
+// @AX:REASON [AUTO]: shared root ownership, native skills, plugins, agents, hooks, structural config merge, Git hooks, and mapping deduplication converge here.
 func (a *Adapter) prepareFilesWithManifest(
 	cfg *config.HarnessConfig,
 	oldManifest *adapter.Manifest,
 ) ([]adapter.FileMapping, error) {
 	var files []adapter.FileMapping
 
-	if codexOwnsSharedSurface(cfg) {
+	if codexOwnsRootDoc(cfg) {
 		agentsMD, err := a.injectMarkerSection(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("AGENTS.md 마커 주입 실패: %w", err)
@@ -43,31 +46,17 @@ func (a *Adapter) prepareFilesWithManifest(
 	}
 	files = append(files, extSkillFiles...)
 
-	if codexOwnsSharedSurface(cfg) {
-		standardSkillFiles, err := a.prepareStandardSkillMappings(cfg)
-		if err != nil {
-			return nil, fmt.Errorf("표준 codex skill 준비 실패: %w", err)
-		}
-		files = append(files, standardSkillFiles...)
-	}
-
-	promptFiles, err := a.preparePromptFiles(cfg)
+	standardSkillFiles, err := a.prepareStandardSkillMappings(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("codex prompt 템플릿 준비 실패: %w", err)
+		return nil, fmt.Errorf("표준 codex skill 준비 실패: %w", err)
 	}
-	files = append(files, promptFiles...)
+	files = append(files, standardSkillFiles...)
 
 	pluginFiles, err := a.preparePluginMappings(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("codex plugin 준비 실패: %w", err)
 	}
 	files = append(files, pluginFiles...)
-
-	rulePrepFiles, err := a.prepareRuleMappings(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("codex rule 준비 실패: %w", err)
-	}
-	files = append(files, rulePrepFiles...)
 
 	agentPrepFiles, err := a.prepareAgentFiles(cfg)
 	if err != nil {
@@ -93,5 +82,20 @@ func (a *Adapter) prepareFilesWithManifest(
 	}
 	files = append(files, gitHookFiles...)
 
-	return files, nil
+	return uniqueCodexMappings(files), nil
+}
+
+func uniqueCodexMappings(files []adapter.FileMapping) []adapter.FileMapping {
+	result := make([]adapter.FileMapping, 0, len(files))
+	indices := make(map[string]int, len(files))
+	for _, file := range files {
+		path := filepath.ToSlash(file.TargetPath)
+		if index, ok := indices[path]; ok {
+			result[index] = file
+			continue
+		}
+		indices[path] = len(result)
+		result = append(result, file)
+	}
+	return result
 }

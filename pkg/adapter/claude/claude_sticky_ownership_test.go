@@ -83,9 +83,9 @@ func TestPrepareSettingsMapping_OwnedCommandsAreStillRetracted(t *testing.T) {
 			t.Parallel()
 
 			_, settings := mapSettings(t, seedUserPromptCommand(t, command), nil)
-			_, exists := hooksOf(t, settings)[stickyEvent]
-			assert.False(t, exists,
-				"an autopus invocation must be retracted whatever flags it carries")
+			_, hooksExist := settings["hooks"]
+			assert.False(t, hooksExist,
+				"an Autopus-only hooks object must be retracted whatever flags it carries")
 		})
 	}
 }

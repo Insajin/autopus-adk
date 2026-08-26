@@ -1,19 +1,15 @@
 # Route Team Workflow — Human Contract (Source of Truth)
 
-This document and its sibling `route_team.schema.json` are the **machine- and
-human-authoritative source of truth** for the harness `/auto go --team --workflow`
-Route Team. The Workflow JS adapter
-(`templates/claude/workflows/route_team.workflow.js.tmpl` and the installed
-`.claude/workflows/route_team.workflow.js`) is a **generated surface** derived
-from this manifest by `auto generate-templates`. Do not edit the JS by hand;
-edit the manifest and regenerate.
+This document and `route_team.schema.json` remain the source of truth for the
+retained Route Team dynamic Workflow. It is not selected by `/auto go --team`;
+that flag uses Claude's native implicit named-teammate team. The retained script
+is available only through an explicit Workflow launch.
 
-This route is **claude-code scoped** (the `--team` opt-in path) and reuses the
-shared deterministic workflow machinery already proven by Route A: the same
-parity gate, the same `auto workflow gate` exit-code bridge, and the same
-`auto check --hygiene` release-hygiene gate. Route Team only adds the additional
-team phases (test scaffolding, annotation, testing, review) between planning and
-release.
+The generated adapter lives at
+`templates/claude/workflows/route_team.workflow.js.tmpl` and installs as
+`.claude/workflows/route_team.workflow.js`. Generation remains parity-gated.
+Route Team reuses Route A's deterministic gate and release-hygiene bridges while
+adding test scaffolding, annotation, testing, and review phases.
 
 A parity gate compares the phase-id, retry, budget, result-type, and per-phase
 model/effort/depth tokens across this markdown, `route_team.schema.json`, and the
@@ -39,10 +35,11 @@ a concrete failing target to satisfy.
 
 ### implementation
 
-The implementation phase performs the repository-mutating work through a
-**bounded executor fan-out** (`fan_out_cap`). Worktree creation, branch naming,
-the worktree slot cap, and worktree reclaim stay in the Go runtime
-(`pkg/pipeline`); the workflow JS only owns sequencing and the bounded loop.
+The implementation phase performs repository-mutating work through a bounded
+executor fan-out (`fan_out_cap`) in one shared working tree. Planner assignments
+must own disjoint path sets and group interdependent files into the same task.
+The Workflow owns sequencing and the bounded loop; it does not request per-call
+worktree isolation or a merge lifecycle.
 
 ### gate_build_test
 

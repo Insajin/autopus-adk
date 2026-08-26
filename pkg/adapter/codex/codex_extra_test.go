@@ -118,7 +118,7 @@ func TestCodexAdapter_Generate_CreatesAgentMd(t *testing.T) {
 	require.NoError(t, statErr, "AGENTS.md가 생성되어야 함")
 }
 
-func TestCodexAdapter_Validate_WarnsWhenRouterPromptBrandingMissing(t *testing.T) {
+func TestCodexAdapter_Validate_ErrorsWhenNativeRouterContractMissing(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -128,15 +128,15 @@ func TestCodexAdapter_Validate_WarnsWhenRouterPromptBrandingMissing(t *testing.T
 	_, err := a.Generate(context.Background(), cfg)
 	require.NoError(t, err)
 
-	routerPrompt := filepath.Join(dir, ".codex", "prompts", "auto.md")
-	require.NoError(t, os.WriteFile(routerPrompt, []byte("---\ndescription: test\n---\n\n# auto\n"), 0644))
+	routerPrompt := filepath.Join(dir, ".codex", "skills", "codex-auto", "SKILL.md")
+	require.NoError(t, os.WriteFile(routerPrompt, []byte("---\nname: codex-auto\ndescription: test\n---\n\n# auto\n"), 0644))
 
 	errs, err := a.Validate(context.Background())
 	require.NoError(t, err)
 
 	found := false
 	for _, e := range errs {
-		if e.File == filepath.Join(".codex", "prompts", "auto.md") && e.Message == "Codex router prompt에 Autopus 브랜딩 블록이 없음" {
+		if e.File == filepath.Join(".codex", "skills", "codex-auto", "SKILL.md") && e.Message == "Codex native router skill 계약이 불완전함" {
 			found = true
 		}
 	}
@@ -205,7 +205,7 @@ func TestCodexAdapter_Validate_AllowsInheritedModelDefaults(t *testing.T) {
 	}
 }
 
-func TestCodexAdapter_Validate_WarnsWhenContext7FallbackMissing(t *testing.T) {
+func TestCodexAdapter_Validate_ErrorsOnObsoleteMarkdownRule(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -216,6 +216,7 @@ func TestCodexAdapter_Validate_WarnsWhenContext7FallbackMissing(t *testing.T) {
 	require.NoError(t, err)
 
 	rulePath := filepath.Join(dir, ".codex", "rules", "autopus", "context7-docs.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(rulePath), 0o755))
 	require.NoError(t, os.WriteFile(rulePath, []byte("# Context7\n"), 0644))
 
 	errs, err := a.Validate(context.Background())
@@ -223,7 +224,7 @@ func TestCodexAdapter_Validate_WarnsWhenContext7FallbackMissing(t *testing.T) {
 
 	found := false
 	for _, e := range errs {
-		if e.File == filepath.Join(".codex", "rules", "autopus", "context7-docs.md") && e.Message == "Codex Context7 규칙에 web fallback 계약이 없음" {
+		if e.File == filepath.Join(".codex", "rules", "autopus", "context7-docs.md") && e.Message == "obsolete Codex managed surface가 남아 있음" {
 			found = true
 		}
 	}

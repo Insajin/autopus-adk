@@ -1,0 +1,214 @@
+---
+name: auto-sync
+description: 문서 동기화 — 구현 이후 SPEC, CHANGELOG, 문서를 반영합니다
+compatibility: omp
+---
+
+# auto-sync — 문서 동기화 스킬
+
+## OMP Invocation
+
+- `/auto sync ...`
+- `/auto-sync ...`
+- Load detail skill `auto-sync` for either entrypoint.
+
+
+**프로젝트**: autopus-adk | **모드**: full
+
+## 설명
+
+구현 완료 후 코드와 문서를 동기화합니다.
+
+## 사용법
+
+```
+/auto-sync SPEC-ID
+/auto-sync
+```
+
+## OMP 기본 실행 모델
+
+- OMP에서는 `sync`도 기본적으로 `task` batch 기반 subagent-first를 따릅니다.
+- 메인 세션은 동기화 범위 결정, 최종 상태 갱신, 커밋 판단을 담당합니다.
+- 변경점 검토, 문서 영향 분석, 검증 로그 정리는 필요 시 서브에이전트로 위임합니다.
+- 사용자가 `--auto` 또는 `--solo`를 명시하지 않았고 현재 OMP 런타임 정책이 암묵적 `task` batch 호출을 제한하면, 진행을 멈추고 하네스 기본값과 제약을 명시한 뒤 서브에이전트 opt-in 또는 `--solo` 확인을 먼저 받아야 합니다.
+- 변경 범위가 작으면 메인 세션에서 직접 마무리할 수 있습니다.
+
+## 동기화 항목
+
+1. SPEC 상태 → completed
+2. API 문서 갱신
+3. 아키텍처 다이어그램 업데이트
+4. Lore 의사결정 기록
+5. CHANGELOG 갱신
+6. Lore 형식 자동 커밋
+
+## 구조 문서 동기화
+
+구조 변경이 감지되면 다음 문서를 함께 갱신합니다.
+- `ARCHITECTURE.md`
+- `.autopus/project/structure.md`
+- `.autopus/project/tech.md`
+- `.autopus/project/product.md`
+- `.autopus/project/workspace.md`
+
+특히 repo 경계, 빌드/릴리스 스크립트, desktop/browser/API surface가 바뀌면 `workspace.md`의 QA/Journey Pack 대상 리포와 `auto qa init --project-dir <repo>` 명령도 함께 갱신합니다. meta workspace의 root `.autopus/qa/**`는 runtime/generated evidence로 취급하고 제품 리포 Journey Pack 위치와 섞지 않습니다.
+
+## @AX Lifecycle Management
+
+동기화 시 코드베이스의 @AX 태그 수명주기를 관리합니다.
+
+### TODO Cycle Tracking
+
+1. `@AX:TODO` 태그를 찾습니다.
+2. `@AX:CYCLE:N` 카운터를 증가시키거나 없으면 `@AX:CYCLE:1`을 추가합니다.
+3. CYCLE이 3 이상이면 `@AX:WARN` 으로 승격하고 이유를 기록합니다.
+
+### ANCHOR Fan-In Verification
+
+1. `@AX:ANCHOR` 태그를 찾습니다.
+2. 함수 참조 수를 grep 기반으로 점검합니다.
+3. caller count가 3 미만이면 `@AX:NOTE` 로 내리고 이유를 갱신합니다.
+
+### NOTE Cleanup
+
+1. 특정 함수/심볼을 참조하는 `@AX:NOTE` 를 찾습니다.
+2. 해당 함수/심볼이 아직 존재하는지 확인합니다.
+3. orphan NOTE는 제거합니다.
+
+## 품질 게이트
+
+- 에러: 0 / 경고: 최대 10
+
+## Lore 커밋
+
+동기화 완료 후 변경 파일을 Lore 형식으로 자동 커밋합니다.
+- SPEC-ID가 있으면: `docs(<scope>): sync SPEC-{ID} 문서 및 상태 갱신`
+- SPEC-ID가 없으면: `docs(sync): 프로젝트 문서 동기화`
+- 구현 코드 포함 시 SPEC 주요 타입(feat, fix 등) 사용
+- 변경 사항 없으면 커밋 생략
+
+### 2-Phase Commit
+
+1. Module repo 커밋: `{TARGET_MODULE}` 내부 SPEC 및 모듈 변경
+2. Meta repo 커밋: 루트 문서(`ARCHITECTURE.md`, `.autopus/project/`, `CHANGELOG.md`)
+
+판단 기준:
+- `{TARGET_MODULE}/` 내부 파일 → module commit
+- 루트 문서 → meta commit
+- 구현 코드가 포함되면 SPEC의 주요 타입(feat/fix/refactor 등) 사용
+- 문서만 바뀌면 `docs` 사용
+
+
+## Completion Gates
+
+sync 완료를 선언하거나 workflow lifecycle bar를 표시하기 전에 아래 gate를 모두 기록해야 합니다.
+
+1. `Context Load` 결과
+   - 읽은 프로젝트 컨텍스트 파일 목록 또는 missing/no-op 사유를 남깁니다.
+2. `SPEC Path Resolution` 결과
+   - `SPEC_PATH`, `TARGET_MODULE`, `WORKING_DIR`를 명시합니다.
+3. `Completion Verdict` 결과
+   - `Outcome Lock` 만족 여부, mandatory requirements 충족 수, Must acceptance 충족 수를 기록합니다.
+   - `Completion Debt`가 하나라도 있으면 SPEC 상태를 `completed`로 바꾸지 말고 blocked reason을 남깁니다.
+   - `Evolution Ideas`는 사용자에게 optional improvement로만 표시하고, 자동 follow-up SPEC이나 sibling SPEC으로 추천하지 않습니다.
+4. `@AX Lifecycle Management` 결과
+   - TODO/ANCHOR/NOTE 처리 결과를 남기고, 대상 태그가 없으면 반드시 `@AX: no-op`로 기록합니다.
+5. Lore 커밋 결과
+   - 변경 사항이 있으면 Lore 커밋을 시도하고 commit hash를 남깁니다.
+   - 커밋이 실패했거나 보류되면 blocked reason을 남기고 sync를 completed로 선언하지 않습니다.
+6. 2-Phase Commit 판단 결과
+   - module commit / meta commit / skip 중 무엇을 했는지와 이유를 남깁니다.
+7. 완료 출력 순서
+   - 완료 배너, workflow lifecycle bar, 다음 단계 추천은 위 gate가 모두 기록된 뒤에만 표시합니다.
+
+## Completion Verdict Format
+
+```markdown
+## Completion Verdict
+- Outcome Lock: satisfied / blocked
+- Mandatory requirements: N/N
+- Must acceptance: N/N
+- Completion Debt: none / {items}
+- Evolution Ideas: surfaced as optional, not scheduled
+```
+
+## Branding Formats
+
+### Workflow Lifecycle (show after sync completes)
+
+```
+🐙 Workflow: {SPEC-ID}
+  ✓ plan  →  ✓ go  →  ● sync
+```
+
+### Milestone Celebration (show when full pipeline completes)
+
+```
+╭────────────────────────────────────╮
+│ 🐙 파이프라인 완료!                 │
+│ {SPEC-ID}: {title}                 │
+│ 태스크: N/N | 커버리지: N%          │
+│ 리뷰: {verdict}                    │
+╰────────────────────────────────────╯
+```
+
+Field mappings: `{title}` from spec.md, `N/N` = completed/total tasks, `{verdict}` = `APPROVE` or `N/A`.
+
+### Next Step Auto-Detection (show after sync completes)
+
+```
+다음 단계: {recommendation}
+```
+
+Detection order:
+1. SPEC status `completed` → `🐙 {SPEC-ID} 완료. 다음 기능: /auto plan "기능 설명"`
+2. Existing pending SPECs created by an approved Sibling SPEC Decision exist → recommend next SPEC to implement
+3. Do not recommend or create pending SPECs from Evolution Ideas
+4. Always append: `배포 후 검증: /auto canary`
+
+## OMP Coordination Contract
+
+### Ownership gate
+
+- Choose exactly one DAG owner with `--execution-owner omp|orca` before dispatch; omission selects owner `omp`.
+- Owner `omp` is the default. The current OMP session is the sole DAG owner and uses its native `task`, `hub`, and `todo` tools.
+- Owner `orca` is allowed only when `--execution-owner orca` is explicit. Before any Orca orchestration, run and read `orca skills get orchestration --full`.
+- The single DAG owner invariant is mandatory: owner `orca` creates no OMP task DAG, and owner `omp` creates no Orca Run.
+
+### Native field contracts
+
+```json
+{
+  "i": "Dispatching bounded OMP work",
+  "context": "Shared goal, constraints, owned-path boundaries, and cross-task contracts.",
+  "tasks": [
+    {
+      "name": "Worker",
+      "task": "Complete one self-contained assignment and return only the required receipt.",
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["owned_paths", "changed_files", "verification", "blockers", "next_required_step"],
+        "properties": {
+          "owned_paths": {"type": "array", "items": {"type": "string"}},
+          "changed_files": {"type": "array", "items": {"type": "string"}},
+          "verification": {"type": "array", "items": {"type": "string"}},
+          "blockers": {"type": "array", "items": {"type": "string"}},
+          "next_required_step": {"type": "string"}
+        }
+      },
+      "schemaMode": "strict"
+    }
+  ]
+}
+```
+
+- Inspect the current dynamic `task` schema before dispatch. Use the shown batch shape only when it exposes top-level `context` and `tasks`; otherwise use the discovered flat shape and place shared context in `local://`.
+- Every model-authored `task`, `hub`, and `todo` call includes a concise top-level `i` while `tools.intentTracing` is enabled.
+- Every `tasks` item uses `name` when a stable agent id is useful and carries per-item `task`, `outputSchema`, and `schemaMode`. Set `agent` only to select a custom agent type; omit it for OMP's default general worker.
+- `isolated` and `effort` are conditional dynamic fields. Add `isolated` or `effort` only after the current schema exposes that exact field; otherwise omit it.
+- `outputSchema` is the strict five-field receipt JSON Schema shown in the normalized batch: `owned_paths`, `changed_files`, `verification`, `blockers`, and `next_required_step`.
+- Retain the agent id returned by `task`. For a non-isolated or otherwise revivable worker, every follow-up goes to that same id with `hub` send fields `{"i":"Following up with an existing worker","op":"send","to":"<same agent id>","message":"<follow-up>"}`; do not create a replacement merely to continue revivable work.
+- An isolated worker is terminal after workspace cleanup and cannot be revived. A correction is a new explicitly named `task` item with freshly declared ownership and context, not a `hub` send to the terminal agent id.
+- The parent OMP session owns progress. A `todo` call contains one top-level operation and intent: initialize with `{"i":"Updating parent-owned progress","op":"init","list":[{"phase":"Implementation","items":["..."]}]}`, advance with `{"i":"Updating parent-owned progress","op":"start","task":"<exact task content>"}`, complete with `{"i":"Updating parent-owned progress","op":"done","task":"<exact task content>"}`, and block with `{"i":"Updating parent-owned progress","op":"block","task":"<exact task content>","reason":"<reason>"}`.

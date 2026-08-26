@@ -157,10 +157,6 @@ func newInitCmd() *cobra.Command {
 				return fmt.Errorf("orchestra 설정 정규화 실패: %w", err)
 			}
 
-			// Save config after all prompts.
-			if err := config.Save(dir, cfg); err != nil {
-				return fmt.Errorf("autopus.yaml 저장 실패: %w", err)
-			}
 			if err := validateStatusLineMode(statusLine); err != nil {
 				return err
 			}
@@ -187,8 +183,10 @@ func newInitCmd() *cobra.Command {
 			// Step 3: Platform Files
 			tui.Step(out, 3, 5, "Platform Files")
 			ctx := context.Background()
-			if err := generatePlatformFiles(ctx, dir, cfg, cmd); err != nil {
-				return err
+			if err := saveConfigWithGenerationRollback(dir, cfg, func() error {
+				return generatePlatformFiles(ctx, dir, cfg, cmd)
+			}); err != nil {
+				return fmt.Errorf("플랫폼 설정 적용 실패: %w", err)
 			}
 
 			if err := generateDefaultConstraints(dir, out); err != nil {
