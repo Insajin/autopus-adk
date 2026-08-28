@@ -90,6 +90,10 @@ func TestRotationWorkflowAuditsFixedImmutableSidecarWithoutMutation(t *testing.T
 		`.assertion_mode == "public"`,
 		"verify-rotation-ref-ruleset.sh --public",
 		"openssl base64 -d -A",
+		`document_roundtrip=$(openssl base64 -A -in "$incoming/adk-key-rotation-v1.json")`,
+		`signature_roundtrip=$(openssl base64 -A -in "$incoming/adk-key-rotation-v1.sig")`,
+		`[[ "$document_roundtrip" == "$ADK_CHANNEL_DOCUMENT_BASE64" ]]`,
+		`[[ "$signature_roundtrip" == "$ADK_CHANNEL_SIGNATURE_BASE64" ]]`,
 		"verify-rotation",
 		`source_commit="$(/usr/bin/git rev-parse --verify HEAD)"`,
 		`source_tree="$(/usr/bin/git rev-parse --verify 'HEAD^{tree}')"`,
@@ -110,6 +114,9 @@ func TestRotationWorkflowAuditsFixedImmutableSidecarWithoutMutation(t *testing.T
 	}
 	if strings.Contains(text, "adk-key-rotation-v1.json.sig") {
 		t.Fatal("workflow must use the fixed adk-key-rotation-v1.sig filename")
+	}
+	if strings.Contains(script, `[[ "$(openssl base64`) {
+		t.Fatal("workflow embeds a multiline command substitution directly in a conditional")
 	}
 	for _, forbidden := range []string{
 		"contents: write", "credential.helper", " push ", "git commit", "git add",

@@ -66,10 +66,10 @@ jobs:
             openssl base64 -d -A > "$incoming/adk-key-rotation-v1.json"
           printf '%s' "$ADK_CHANNEL_SIGNATURE_BASE64" |
             openssl base64 -d -A > "$incoming/adk-key-rotation-v1.sig"
-          [[ "$(openssl base64 -A -in "$incoming/adk-key-rotation-v1.json")" ==
-             "$ADK_CHANNEL_DOCUMENT_BASE64" ]]
-          [[ "$(openssl base64 -A -in "$incoming/adk-key-rotation-v1.sig")" ==
-             "$ADK_CHANNEL_SIGNATURE_BASE64" ]]
+          document_roundtrip=$(openssl base64 -A -in "$incoming/adk-key-rotation-v1.json")
+          signature_roundtrip=$(openssl base64 -A -in "$incoming/adk-key-rotation-v1.sig")
+          [[ "$document_roundtrip" == "$ADK_CHANNEL_DOCUMENT_BASE64" ]]
+          [[ "$signature_roundtrip" == "$ADK_CHANNEL_SIGNATURE_BASE64" ]]
           [[ -s "$incoming/adk-key-rotation-v1.json" &&
              "$(wc -c < "$incoming/adk-key-rotation-v1.sig" | tr -d ' ')" == 64 ]]
 
