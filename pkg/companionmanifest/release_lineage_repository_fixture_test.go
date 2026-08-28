@@ -19,7 +19,7 @@ func copyLineageRepository(t *testing.T, destination string) {
 		copyLineagePath(t, filepath.Join(root, name), filepath.Join(destination, name))
 	}
 	for _, name := range []string{
-		".goreleaser.yaml", "go.mod", "go.sum", "LICENSE", "README.md", "CHANGELOG.md",
+		".gitignore", ".goreleaser.yaml", "go.mod", "go.sum", "LICENSE", "README.md", "CHANGELOG.md",
 	} {
 		copyLineagePath(t, filepath.Join(root, name), filepath.Join(destination, name))
 	}
