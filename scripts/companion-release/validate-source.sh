@@ -156,17 +156,19 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
     case "${COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED-0}" in
       0) ;;
       1)
+        [[ "${ADK_KEY_ROTATION_VERIFIED-}" == '1' ]] ||
+          fail 'A22 R2 tag verification requires an independently verified rotation sidecar'
         script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) ||
           fail 'cannot resolve release signer trust root'
-        tag_public_key="$script_dir/release-tag-signing-2026-q3.pub"
-        tag_fingerprint="$script_dir/release-tag-signing-2026-q3.fingerprint"
+        tag_public_key="$script_dir/release-tag-signing-2026-q3-r2.pub"
+        tag_fingerprint="$script_dir/release-tag-signing-2026-q3-r2.fingerprint"
         [[ -f "$tag_public_key" && ! -L "$tag_public_key" &&
            -f "$tag_fingerprint" && ! -L "$tag_fingerprint" ]] ||
-          fail 'release signer trust root is missing or unsafe'
+          fail 'R2 release signer trust root is missing or unsafe'
         expected_fingerprint=$(<"$tag_fingerprint")
-        [[ "$expected_fingerprint" =~ ^SHA256:[A-Za-z0-9+/]{43}$ &&
+        [[ "$expected_fingerprint" == 'SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ' &&
            "$(ssh-keygen -lf "$tag_public_key" -E sha256 | awk '{print $2}')" == "$expected_fingerprint" ]] ||
-          fail 'release signer trust root fingerprint differs'
+          fail 'R2 release signer trust root fingerprint differs'
         allowed_signers=$(mktemp "${TMPDIR:-/tmp}/adk-release-tag-signers.XXXXXX") ||
           fail 'cannot create release tag verifier state'
         trap 'rm -f -- "$allowed_signers"' EXIT
@@ -175,7 +177,7 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
         chmod 0600 "$allowed_signers"
         git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$allowed_signers" \
           verify-tag "refs/tags/$GITHUB_REF_NAME" >/dev/null ||
-          fail 'A22 release tag signature or signer differs'
+          fail 'A22 release tag signature or R2 signer differs'
         rm -f -- "$allowed_signers"
         trap - EXIT
         ;;

@@ -18,6 +18,11 @@ homebrew_bridge="$script_dir/publish-homebrew-formula-bridge.sh"
 homebrew_git_helper="$script_dir/publish-homebrew-formula-bridge-git.sh"
 current_release_gate="$script_dir/verify-current-release.sh"
 current_signature_gate="$script_dir/verify-current-release-signatures.sh"
+prep="$script_dir/prepare-release.sh"
+publisher="$script_dir/publish-release-coordinates.sh"
+tag_ruleset_gate="$script_dir/verify-release-tag-ruleset.sh"
+rotation_ruleset_gate="$script_dir/verify-rotation-ref-ruleset.sh"
+rotation_publisher="$script_dir/publish-key-rotation-sidecar.sh"
 
 # GoReleaser must render, but never publish, the Cask or mutate tagged source.
 contains "$config" 'skip_upload: true'
@@ -42,6 +47,27 @@ contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.output
 contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
 not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
 contains "$producer_receipt" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
+# Only the exact operator actor may create, update, or delete the release tag.
+[[ -x "$tag_ruleset_gate" && ! -L "$tag_ruleset_gate" ]] ||
+  fail 'exact release tag ruleset verifier is missing or unsafe'
+contains "$prep" 'verify-release-tag-ruleset.sh'
+contains "$publisher" 'verify-release-tag-ruleset.sh'
+contains "$tag_ruleset_gate" "ruleset_name='autopus-v0.50.109-release-authority'"
+contains "$tag_ruleset_gate" "release_ref='refs/tags/v0.50.109'"
+contains "$tag_ruleset_gate" 'actor_type:"User"'
+contains "$tag_ruleset_gate" '["creation","deletion","update"]'
+contains "$tag_ruleset_gate" '.can_admins_bypass == false'
+contains "$tag_ruleset_gate" 'required_reviewers'
+[[ -x "$rotation_ruleset_gate" && -x "$rotation_publisher" &&
+   ! -L "$rotation_ruleset_gate" && ! -L "$rotation_publisher" ]] ||
+  fail 'immutable rotation ref publisher or ruleset verifier is unsafe'
+contains "$rotation_publisher" 'verify-rotation-ref-ruleset.sh'
+contains "$rotation_publisher" 'materialize-key-rotation-authority.sh'
+not_contains "$rotation_publisher" './internal/adkchannel/cmd'
+contains "$script_dir/verify-key-rotation-sidecar.sh" 'verify-rotation-ref-ruleset.sh'
+contains "$rotation_ruleset_gate" "ruleset_name='autopus-v0.50.109-rotation-ref-authority'"
+contains "$rotation_ruleset_gate" "rotation_ref='refs/heads/release-key-rotation-v0.50.109'"
+contains "$rotation_ruleset_gate" 'actor_type:"User"'
 # The tap coordinates advance with every publication, so pinning their exact
 # value here only forces a second edit; the publisher already enforces them
 # against the live tap. Assert the shape that keeps that enforcement possible.
@@ -61,25 +87,21 @@ contains "$homebrew_git_helper" '{base_tree:$base,tree:['
 contains "$homebrew_git_helper" "'{sha:\$sha,force:false}'"
 not_contains "$homebrew_git_helper" '--method PUT'
 
-# Production/recovery source coordinates must bind to externally approved exact values.
-for workflow in "$release" "$recovery"; do
-  contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_COMMIT'
-  contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
-  contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED='
-done
-# 좌표는 각 워크플로에서 무장 지점 한 곳에만 산다. 나머지는 모두 GITHUB_REF_NAME 파생이므로
-# 좌표 이동은 워크플로마다 한 줄이고, 옛 좌표 금지 목록을 매 릴리즈마다 늘릴 필요가 없다.
-exactly_one_coordinate() {
-  local count
-  count=$({ grep -Eo 'v?0\.50\.[0-9]+' "$1" || true; } | wc -l | tr -d '[:space:]')
-  [[ "$count" == '1' ]] || fail "$1 names a release coordinate ${count} times, want exactly 1"
-}
+# Production pins live source coordinates; recovery uses the signed tag and immutable release evidence.
+contains "$release" 'ADK_COMPANION_APPROVED_SOURCE_COMMIT'
+contains "$release" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
+contains "$release" 'COMPANION_SOURCE_PIN_REQUIRED=1'
+not_contains "$recovery" 'ADK_COMPANION_APPROVED_SOURCE_COMMIT'
+not_contains "$recovery" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
+contains "$recovery" 'COMPANION_SOURCE_PIN_REQUIRED=0'
+# The armed tag remains exact; the second .109 coordinate is the fixed,
+# independently signed rotation distribution namespace.
 contains "$release" "- 'v0.50.109'"
 contains "$release" "if: github.ref_type == 'tag'"
+contains "$script_dir/verify-key-rotation-sidecar.sh" 'refs/heads/release-key-rotation-v0.50.109'
 contains "$recovery" "if: github.ref == 'refs/tags/v0.50.109'"
-contains "$recovery" 'gh workflow run homebrew-formula-bridge-recovery.yaml --ref <current release tag>'
-exactly_one_coordinate "$release"
-exactly_one_coordinate "$recovery"
+contains "$release" 'canonical-full-bridge'
+contains "$recovery" 'canonical-full bridge'
 for workflow in "$release" "$recovery"; do
   contains "$workflow" 'autopus-$GITHUB_REF_NAME-checksums.txt'
   contains "$workflow" 'GITHUB_REF_NAME="$GITHUB_REF_NAME"'
@@ -119,6 +141,17 @@ contains "$current_release_gate" "download_release_asset 'checksums.txt.signatur
 contains "$current_signature_gate" 'verify_release_checksums_v1'
 contains "$current_signature_gate" 'cosign verify-blob'
 contains "$current_signature_gate" 'unset GITHUB_TOKEN GH_TOKEN'
+contains "$current_release_gate" "BRIDGE_MANIFEST_NAME='omp-context-bridge-release.v1.json'"
+contains "$current_release_gate" 'exactly sixteen A22 canonical-full bridge assets verified'
+for workflow in "$release" "$recovery"; do
+  not_contains "$workflow" 'OMP_CONTEXT_STATIC_POLICY_B64'
+  not_contains "$workflow" 'OMP_CONTEXT_EVIDENCE_'
+  not_contains "$workflow" 'omp-context-promotion-report.v1.json'
+  not_contains "$workflow" 'omp-context-promotion-attestation.v2.json'
+done
+contains "$current_release_gate" 'verify-rotation-historical'
+not_contains "$recovery" 'verify-key-rotation-sidecar.sh'
+not_contains "$release" '--historical'
 for workflow in "$release" "$recovery"; do
   contains "$workflow" 'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6'
   contains "$workflow" "cosign-release: 'v3.1.2'"

@@ -17,6 +17,9 @@ func writeReleaseCanaryFixture(t *testing.T, dir string) {
 	if err := os.Mkdir(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Chmod(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"home", "tmp"} {
 		if err := os.Mkdir(filepath.Join(root, name), 0o700); err != nil {
 			t.Fatal(err)
@@ -25,6 +28,9 @@ func writeReleaseCanaryFixture(t *testing.T, dir string) {
 	canary := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n[[ \"$#\" -eq 1 && \"$1\" == '--version' ]]\nprintf executed >%q\nprintf 'omp/17.2.7\\n'\n",
 		filepath.Join(dir, "omp-release-canary.executed"))
 	if err := os.WriteFile(filepath.Join(root, "omp-darwin-arm64"), []byte(canary), 0o555); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(root, "omp-darwin-arm64"), 0o555); err != nil {
 		t.Fatal(err)
 	}
 }

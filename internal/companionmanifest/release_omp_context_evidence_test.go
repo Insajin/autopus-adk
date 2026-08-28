@@ -8,65 +8,76 @@ import (
 	"testing"
 )
 
-func TestReleaseWorkflow_A22GatesOnPinnedOMPProductionEvidence(t *testing.T) {
-	release := readReleaseFile(t, ".github/workflows/release.yaml") + "\n" +
-		readReleaseFile(t, "scripts/companion-release/verify-omp-context-evidence-tag.sh")
+func TestReleaseWorkflow_A22UsesIndependentlyAuthorizedCanonicalBridge(t *testing.T) {
+	release := readReleaseFile(t, ".github/workflows/release.yaml")
+	sidecar := readReleaseFile(t, "scripts/companion-release/verify-key-rotation-sidecar.sh")
 	for _, required := range []string{
-		"omp-production-evidence:",
-		"permissions:\n      contents: read",
-		"needs: [ci, security, omp-production-evidence]",
-		"omp-context-evidence-v0.50.109",
-		"OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA",
-		"OMP_CONTEXT_EVIDENCE_COMMIT_SHA",
-		"OMP_CONTEXT_EVIDENCE_TREE_SHA",
-		"OMP_CONTEXT_EVIDENCE_REPORT_SHA256",
-		"OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256",
-		"scripts/companion-release/verify-omp-context-evidence-tag.sh",
-		"./scripts/companion-release/ompcontextverify",
-		"--mode active",
-		"--mode historical",
-		"--expected-signing-key-id 'omp-context-promotion-2026-q3-k2'",
-		"omp-context-promotion-report.v1.json",
-		"omp-context-promotion-attestation.v2.json",
+		"omp-canonical-bridge-candidate:",
+		"needs: [ci, security, omp-canonical-bridge-candidate]",
+		"verify-key-rotation-sidecar.sh",
+		"materialize-key-rotation-authority.sh",
+		"key-rotation-authority/verify-rotation.sh",
+		"refs/heads/release-key-rotation-v0.50.109",
+		"adk-key-rotation-v1.json",
+		"adk-key-rotation-v1.sig",
+		"verify-rotation",
+		"release-tag-signing-2026-q3-r2.pub",
+		"release-tag-signing-2026-q3-r2.fingerprint",
+		"ADK_KEY_ROTATION_VERIFIED=1",
+		"canonical-full-bridge",
 	} {
-		if !strings.Contains(release, required) {
-			t.Fatalf("A22 production evidence workflow missing %q", required)
+		if !strings.Contains(release+"\n"+sidecar, required) {
+			t.Fatalf("A22 canonical bridge authority missing %q", required)
 		}
 	}
+	if strings.Contains(release, "./internal/adkchannel/cmd") {
+		t.Fatal("release workflow rebuilds candidate-controlled rotation verifier")
+	}
 	for _, forbidden := range []string{
-		"environment:\n      name: omp-context-promotion",
-		"OMP_CONTEXT_PROMOTION_ED25519_PRIVATE_KEY_PEM",
-		"id-token: write\n    runs-on: ubuntu",
+		"omp-context-evidence-v0.50.109",
+		"OMP_CONTEXT_EVIDENCE_",
+		"OMP_CONTEXT_STATIC_POLICY_B64",
+		"--mode active",
+		"--mode historical",
+		"omp-context-promotion-2026-q3-k2",
 	} {
 		if strings.Contains(release, forbidden) {
-			t.Fatalf("no-secret evidence gate contains forbidden authority %q", forbidden)
+			t.Fatalf("A22 bridge workflow contains forbidden promotion authority %q", forbidden)
 		}
 	}
 }
 
-func TestReleaseWorkflow_A22CarriesSameRunEvidenceIntoExactFifteenAssets(t *testing.T) {
+func TestReleaseWorkflow_A22PublishesBridgeAndRotationAssets(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	config := readReleaseFile(t, ".goreleaser.yaml")
+	current := readReleaseFile(t, "scripts/companion-release/verify-current-release.sh")
 	for _, required := range []string{
-		"actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-		"actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
-		"retention-days: 1",
-		"OMP_CONTEXT_PROMOTION_REPORT_PATH",
-		"OMP_CONTEXT_PROMOTION_ATTESTATION_PATH",
 		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256",
-		"OMP_CONTEXT_STATIC_POLICY_B64",
-		"static-policy-sha256",
+		"OMP_CONTEXT_BRIDGE_MANIFEST_PATH",
 		"OMP_CONTEXT_RELEASE_LINEAGE_PATH",
+		"ADK_KEY_ROTATION_DOCUMENT_PATH",
+		"ADK_KEY_ROTATION_SIGNATURE_PATH",
+		"ADK_KEY_ROTATION_VERIFIER",
 		"OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH",
 		"verify-omp-context-release-binary.sh",
+		"omp-context-bridge-release.v1.json",
+		"exactly sixteen A22 canonical-full bridge assets",
+		"adk-key-rotation-v1.json",
+		"adk-key-rotation-v1.sig",
+		"verify-rotation-historical",
+		"OMP_CONTEXT_LINEAGE_VERIFIER",
+		"COMPANION_MANIFEST_VERIFIER",
+		"standalone and archived lineage bytes differ",
+		"canonical-full-bridge",
 	} {
-		if !strings.Contains(release+"\n"+config, required) {
-			t.Fatalf("A22 same-run evidence contract missing %q", required)
+		if !strings.Contains(release+"\n"+config+"\n"+current, required) {
+			t.Fatalf("A22 bridge release evidence contract missing %q", required)
 		}
 	}
 	for _, required := range []string{
-		`glob: "{{ .Env.OMP_CONTEXT_PROMOTION_REPORT_PATH }}"`,
-		`glob: "{{ .Env.OMP_CONTEXT_PROMOTION_ATTESTATION_PATH }}"`,
+		`glob: "{{ .Env.OMP_CONTEXT_BRIDGE_MANIFEST_PATH }}"`,
+		`glob: "{{ .Env.ADK_KEY_ROTATION_DOCUMENT_PATH }}"`,
+		`glob: "{{ .Env.ADK_KEY_ROTATION_SIGNATURE_PATH }}"`,
 		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_PATH }}"`,
 		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH }}"`,
 		`{{ if and (eq .Os "darwin") (eq .Arch "arm64") }}dist/auto_{{ .Target }}/release-lineage-v1.json`,
@@ -75,30 +86,23 @@ func TestReleaseWorkflow_A22CarriesSameRunEvidenceIntoExactFifteenAssets(t *test
 		"dst: release-lineage-v1.sig",
 	} {
 		if !strings.Contains(config, required) {
-			t.Fatalf("GoReleaser extra evidence asset missing %q", required)
+			t.Fatalf("GoReleaser bridge evidence asset missing %q", required)
 		}
 	}
-	// lineage 쌍은 좌표가 아니라 os/arch로만 무장한다 — 버전 항이 돌아오면 새 좌표에서 조용히 자산이 빠진다.
+	for _, forbidden := range []string{
+		"pipelineOMPActiveStaticPolicyB64",
+		"OMP_CONTEXT_STATIC_POLICY_B64",
+		"OMP_CONTEXT_PROMOTION_REPORT_PATH",
+		"OMP_CONTEXT_PROMOTION_ATTESTATION_PATH",
+		"omp-context-promotion-report.v1.json",
+		"omp-context-promotion-attestation.v2.json",
+	} {
+		if strings.Contains(release+"\n"+config, forbidden) {
+			t.Fatalf("bridge release contains forbidden active-promotion wiring %q", forbidden)
+		}
+	}
 	if strings.Contains(config, "eq .Version") {
 		t.Fatal("GoReleaser gates a release asset on a per-release version coordinate")
-	}
-	current := readReleaseFile(t, "scripts/companion-release/verify-current-release.sh")
-	for _, required := range []string{
-		"exactly fifteen A22 release assets",
-		"OMP_CONTEXT_EVIDENCE_VERIFIER",
-		"OMP_CONTEXT_LINEAGE_VERIFIER",
-		"COMPANION_MANIFEST_VERIFIER",
-		"OMP_CONTEXT_STATIC_POLICY_B64",
-		"release-lineage-v1.json",
-		"release-lineage-v1.sig",
-		"standalone and archived OMP context lineage bytes differ",
-		"--static-policy-b64",
-		"--expected-signing-key-id",
-		"omp-context-promotion-2026-q3-k2",
-	} {
-		if !strings.Contains(current, required) {
-			t.Fatalf("current release verifier missing V3/fifteen-asset contract %q", required)
-		}
 	}
 }
 

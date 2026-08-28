@@ -94,12 +94,13 @@ func TestReleaseSourceValidator_PhasesRejectUnsignedTagWhenProductionSignatureIs
 			runGit(t, dir, "tag", "-am", "unsigned "+phase.phase+" release candidate", phase.tag)
 			output, err := runReleaseSourceValidator(t, dir, phase.tag, sha,
 				"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
+				"ADK_KEY_ROTATION_VERIFIED=1",
 				"COMPANION_SOURCE_PIN_REQUIRED=1",
 				"COMPANION_APPROVED_SOURCE_COMMIT="+sha,
 				"COMPANION_APPROVED_SOURCE_TREE="+tree,
 			)
 			if err == nil || !strings.Contains(output,
-				phase.phase+" release tag signature or signer differs") {
+				phase.phase+" release tag signature or R2 signer differs") {
 				t.Fatalf("unsigned production %s result: %v\n%s", phase.phase, err, output)
 			}
 		})

@@ -97,9 +97,10 @@ func TestReleaseSigning_WorkflowMaterializesAndPreflightsKeyBeforeGoReleaser(t *
 			t.Fatalf("signing workflow missing derived coordinate contract %q", required)
 		}
 	}
-	// 좌표는 on.push.tags 한 줄에만 산다. 옛 좌표 목록을 늘리는 대신 좌표 리터럴 수를 고정한다.
+	// The release workflow owns only the exact armed tag. Rotation and verifier
+	// refs are fixed in their independently reviewed source scripts.
 	if got := strings.Count(workflowSource, "0.50."); got != 1 {
-		t.Fatalf("signing workflow names a release coordinate %d times, want exactly 1", got)
+		t.Fatalf("signing workflow release coordinate is not exact: count=%d", got)
 	}
 	prepareIndex, _ := releaseWorkflowStepContaining(t, workflow, "Prepare release credentials")
 	materializeIndex, materialize := releaseWorkflowStepContaining(t, workflow, "Materialize release signing key")

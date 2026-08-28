@@ -47,7 +47,10 @@ func TestReleaseWorkflow_A22BuildsCanonicalCandidateBeforeAuthority(t *testing.T
 			t.Fatalf("canonical candidate build contract missing %q", required)
 		}
 	}
-	for _, obsolete := range []string{`--format=%cI`, `${GITHUB_SHA:0:7}`} {
+	for _, obsolete := range []string{
+		`--format=%cI`, `${GITHUB_SHA:0:7}`,
+		"pipelineOMPActiveStaticPolicyB64=${OMP_CONTEXT_STATIC_POLICY_B64}",
+	} {
 		if strings.Contains(builder, obsolete) {
 			t.Fatalf("canonical candidate builder retains GoReleaser-incompatible input %q", obsolete)
 		}

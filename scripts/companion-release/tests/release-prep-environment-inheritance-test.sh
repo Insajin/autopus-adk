@@ -29,28 +29,29 @@ grep -Fq "trap 'cleanup \$?' EXIT" "$prep" ||
 
 builder_error="$temp_dir/builder-error"
 if env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
-  GITHUB_REF_NAME=v0.50.109 GITHUB_SHA=bad COMPANION_SOURCE_TREE=bad OMP_CONTEXT_STATIC_POLICY_B64=eA \
+  GITHUB_REF_NAME=v0.50.109 GITHUB_SHA=bad COMPANION_SOURCE_TREE=bad \
   /bin/bash "$candidate_builder" "$temp_dir/builder-output" >/dev/null 2>"$builder_error"; then
   fail 'candidate builder accepted the reserved GitHub tag variable'
 fi
 grep -Fq 'release tag is not exact A22' "$builder_error" ||
   fail 'candidate builder still reads the reserved GitHub tag variable'
 if env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
-  COMPANION_RELEASE_TAG=v0.50.109 GITHUB_SHA=bad COMPANION_SOURCE_TREE=bad OMP_CONTEXT_STATIC_POLICY_B64=eA \
+  COMPANION_RELEASE_TAG=v0.50.109 GITHUB_SHA=bad COMPANION_SOURCE_TREE=bad \
   /bin/bash "$candidate_builder" "$temp_dir/builder-output" >/dev/null 2>"$builder_error"; then
   fail 'candidate builder accepted a malformed source commit'
 fi
 grep -Fq 'source commit is malformed' "$builder_error" ||
   fail 'candidate builder rejected its dedicated release tag variable'
 
-validation_error="$temp_dir/validation-error"
-if (validate_canary "$temp_dir/missing-project" "$temp_dir/missing-output" "$temp_dir/missing-candidate") 2>"$validation_error"; then
-  fail 'missing production report validation succeeded'
+if env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+  COMPANION_RELEASE_TAG=v0.50.109 \
+  GITHUB_SHA="$(printf 'a%.0s' {1..40})" COMPANION_SOURCE_TREE="$(printf 'b%.0s' {1..40})" \
+  OMP_CONTEXT_STATIC_POLICY_B64=eA \
+  /bin/bash "$candidate_builder" "$temp_dir/static-output" >/dev/null 2>"$builder_error"; then
+  fail 'candidate builder accepted a compiled static policy'
 fi
-grep -Fq 'production report is absent' "$validation_error" ||
-  fail 'canary validation failed before deriving its report path'
-! grep -Fq 'unbound variable' "$validation_error" ||
-  fail 'canary validation derived its report path before binding project'
+grep -Fq 'canonical-full bridge forbids a compiled static policy' "$builder_error" ||
+  fail 'candidate builder did not fail closed on static policy presence'
 
 printf '%s\n' '[]' >"$state/environment-variables.json"
 environment_variables=$(gh variable list --repo "$repository" --env "$environment_name" --json name,value)
@@ -70,9 +71,8 @@ fi
 empty_cleanup_dir="$temp_dir/empty-cleanup"
 mkdir -p "$empty_cleanup_dir"
 (
-  evidence_source_commit=''
+  bridge_lock_commit=''
   retain_prep_lock=0
-  isolation_roots=()
   temp_dir="$empty_cleanup_dir"
   cleanup 0
 ) || fail 'empty isolation cleanup failed'
@@ -81,9 +81,8 @@ mkdir -p "$empty_cleanup_dir"
 failure_cleanup_dir="$temp_dir/failure-cleanup"
 mkdir -p "$failure_cleanup_dir"
 if (
-  evidence_source_commit=''
+  bridge_lock_commit=''
   retain_prep_lock=0
-  isolation_roots=()
   temp_dir="$failure_cleanup_dir"
   trap 'cleanup $?' EXIT
   false

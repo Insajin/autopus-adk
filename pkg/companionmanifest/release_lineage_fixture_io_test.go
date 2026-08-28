@@ -86,12 +86,16 @@ func produceUncachedGoReleaserFixtureEvidence(
 		t.Fatal(err)
 	}
 	toolEnv := darwinReleaseToolEnv(t, credentialRoot)
+	bridgeManifestPath := "omp-context-bridge-release.v1.json"
+	if err := os.WriteFile(filepath.Join(root, bridgeManifestPath), []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	environment := append(os.Environ(), toolEnv...)
 	environment = append(environment,
 		"GO_WANT_COMPANION_SIGNER_HELPER=1", "TMPDIR="+tmpDir,
 		"GITHUB_REF_NAME="+releaseTag, "COMPANION_SOURCE_COMMIT="+commit,
 		"COMPANION_SOURCE_TREE="+tree,
-		"OMP_CONTEXT_STATIC_POLICY_B64=eyJzY2hlbWEiOiJmaXh0dXJlIn0",
+		"OMP_CONTEXT_BRIDGE_MANIFEST_PATH="+bridgeManifestPath,
 		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="+strings.Repeat("0", 64),
 		"OMP_CONTEXT_RELEASE_CANARY_ROOT="+filepath.Join(credentialRoot, "omp-release-canary-root"),
 		"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="+filepath.Join(credentialRoot, "omp-release-canary-root", "omp-darwin-arm64"),

@@ -6,6 +6,7 @@ const (
 	OMPContextPromotionAttestationSchemaV2 = "autopus.omp_context_promotion_attestation.v2"
 	OMPContextPromotionKeyID2026Q3K1       = "omp-context-promotion-2026-q3-k1"
 	OMPContextPromotionKeyID2026Q3K2       = "omp-context-promotion-2026-q3-k2"
+	OMPContextPromotionKeyID2026Q3K3       = "omp-context-promotion-2026-q3-k3"
 	OMPContextPromotionTrustLaneV2         = "autopus-main-omp-context-promotion"
 	ompContextPromotionAttestationDomainV2 = "autopus.omp-context.promotion-attestation.v2\x00"
 )

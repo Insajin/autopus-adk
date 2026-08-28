@@ -3,6 +3,9 @@ package promptlayer
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -36,6 +39,9 @@ func TestOMPContextPromotionArtifactLoaderV2_RejectsUnsafeFilesAndDirectories(t 
 		reportPath := filepath.Join(root, ompContextPromotionReportRelativePathV2)
 		attestationPath := filepath.Join(root, ompContextPromotionAttestationRelativePathV2)
 		if err := os.WriteFile(reportPath, fixture.reportBytes, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(reportPath, 0o644); err != nil {
 			t.Fatal(err)
 		}
 		writePrivateOMPContextPromotionArtifactV2(t, attestationPath, fixture.attestationBytes)
@@ -142,21 +148,35 @@ func TestOMPContextPromotionArtifactLoaderV2_RejectsDirectoryAndFileSwapAfterRoo
 }
 
 func TestOMPContextPromotionTrustV2_ContainsCommittedRotationKeys(t *testing.T) {
+	const k3RawPublicSHA256 = "2a9b41dec1330f65937d9b25b20967cb29fd9209c722ce5fe1a9afd6ca45b937"
+	expected := map[string]string{
+		OMPContextPromotionKeyID2026Q3K1: "2ZO4NEHN+2yUw3huo8ZIXp/ITGd6WMN+EyiQVc9a3y8=",
+		OMPContextPromotionKeyID2026Q3K2: "vYEuNBwZoVzxi2WcRFUbYvdCXrY0s7XGy8K2qDilDPs=",
+		OMPContextPromotionKeyID2026Q3K3: "YkTuNcfWGTLgTglPmZq/Dj4OXwcoUwnkM2ExIGIz+jM=",
+	}
 	keys := committedOMPContextPromotionPublicKeysV2()
-	for _, keyID := range []string{
-		OMPContextPromotionKeyID2026Q3K1,
-		OMPContextPromotionKeyID2026Q3K2,
-	} {
-		if len(keys[keyID]) != ed25519.PublicKeySize {
-			t.Fatalf("production trust root %q is unavailable: %#v", keyID, keys)
+	if len(keys) != len(expected) {
+		t.Fatalf("unexpected production trust root: %#v", keys)
+	}
+	for keyID, encoded := range expected {
+		publicKey := keys[keyID]
+		if len(publicKey) != ed25519.PublicKeySize ||
+			base64.StdEncoding.EncodeToString(publicKey) != encoded {
+			t.Fatalf("production trust root %q is not exact: %#v", keyID, publicKey)
 		}
+		if ompContextPromotionRevokedKeysV2[keyID] {
+			t.Fatalf("committed rotation key %q is revoked", keyID)
+		}
+	}
+	k3Digest := sha256.Sum256(keys[OMPContextPromotionKeyID2026Q3K3])
+	if got := hex.EncodeToString(k3Digest[:]); got != k3RawPublicSHA256 {
+		t.Fatalf("K3 raw public SHA-256 = %q; want %q", got, k3RawPublicSHA256)
+	}
+	for keyID := range expected {
 		keys[keyID][0] ^= 0xff
 		if keys[keyID][0] == committedOMPContextPromotionPublicKeysV2()[keyID][0] {
 			t.Fatalf("trust root %q returned mutable backing storage", keyID)
 		}
-	}
-	if len(keys) != 2 {
-		t.Fatalf("unexpected production trust root: %#v", keys)
 	}
 }
 

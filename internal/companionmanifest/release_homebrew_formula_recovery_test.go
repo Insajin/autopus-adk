@@ -161,93 +161,98 @@ func TestFormulaRecoveryWorkflow_PinsCheckoutAndTapAppScope(t *testing.T) {
 	}
 }
 
-func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *testing.T) {
+func TestFormulaRecoveryWorkflow_ValidatesRotationSourceCandidateAndImmutableRelease(t *testing.T) {
 	raw, workflow := readRecoveryWorkflow(t)
 	for _, required := range []string{
-		"git rev-parse --verify 'HEAD^{commit}'", "mktemp",
-		`GITHUB_REF_NAME="$GITHUB_REF_NAME"`,
-		`autopus-$GITHUB_REF_NAME-checksums.txt`,
-		"GITHUB_REF_TYPE='tag'", `GITHUB_SHA="$actual_head"`,
-		`GITHUB_OUTPUT="$validation_output"`, "scripts/companion-release/validate-source.sh",
-		"COMPANION_SOURCE_PIN_REQUIRED=1", "ADK_COMPANION_APPROVED_SOURCE_COMMIT",
-		"ADK_COMPANION_APPROVED_SOURCE_TREE",
-		"COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}",
+		"git rev-parse --verify 'HEAD^{commit}'",
+		"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
+		"ADK_KEY_ROTATION_VERIFIED=1",
+		"scripts/companion-release/validate-source.sh",
+		"scripts/companion-release/build-omp-context-candidate.sh",
+		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256: ${{ steps.candidate.outputs.candidate-artifact-sha256 }}",
+		"ADK_KEY_ROTATION_VERIFIER: ${{ runner.temp }}/key-rotation-authority/verify-rotation.sh",
 		`scripts/companion-release/verify-current-release.sh "$checksums_path"`,
-		`printf 'checksums-path=%s\n' "$checksums_path" >> "$GITHUB_OUTPUT"`,
 	} {
 		if !strings.Contains(raw, required) {
-			t.Fatalf("recovery evidence gate missing %q", required)
+			t.Fatalf("recovery bridge gate missing %q", required)
 		}
 	}
-	build := recoveryStepNamed(t, workflow, "Build trusted current-release verifiers")
+	build := recoveryStepNamed(t, workflow,
+		"Materialize immutable rotation authority and build bridge verifiers")
 	for _, required := range []string{
-		`evidence_verifier="$RUNNER_TEMP/auto-omp-context-evidence-verifier"`,
+		`authority="$RUNNER_TEMP/key-rotation-authority"`,
+		"materialize-key-rotation-authority.sh",
 		`lineage_verifier="$RUNNER_TEMP/auto-omp-context-lineage-verifier"`,
 		`manifest_verifier="$RUNNER_TEMP/auto-companion-manifest-verifier"`,
-		"./scripts/companion-release/ompcontextverify",
 		"./scripts/companion-release/ompcontextlineageverify",
 		"./scripts/companion-release/manifestverify",
-		`chmod 0700 "$evidence_verifier" "$lineage_verifier" "$manifest_verifier"`,
-		`[[ -f "$verifier" && ! -L "$verifier" && -x "$verifier" ]]`,
-		`[[ "$(stat -f '%Lp' "$verifier")" == '700' ]]`,
 	} {
 		if !strings.Contains(build.Run, required) {
 			t.Fatalf("recovery verifier build contract missing %q", required)
 		}
 	}
-	if strings.Count(build.Run, `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP"`) != 3 {
+	if strings.Count(build.Run, `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP"`) != 2 {
 		t.Fatalf("recovery verifier builds escaped env -i isolation:\n%s", build.Run)
 	}
-	evidence := recoveryStepNamed(t, workflow, "Verify current immutable release evidence")
+	evidence := recoveryStepNamed(t, workflow,
+		"Verify current immutable canonical-full bridge release")
 	wantEnv := map[string]any{
-		"GITHUB_TOKEN":                            "${{ secrets.GITHUB_TOKEN }}",
-		"COMPANION_SOURCE_COMMIT":                 "${{ steps.release-source.outputs.source-commit }}",
-		"COMPANION_SOURCE_TREE":                   "${{ steps.release-source.outputs.source-tree }}",
-		"OMP_CONTEXT_EVIDENCE_REPORT_SHA256":      "${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}",
-		"OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256": "${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}",
-		"OMP_CONTEXT_STATIC_POLICY_B64":           "${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}",
-		"COMPANION_KEY_ID":                        "${{ vars.ADK_COMPANION_KEY_ID }}",
-		"COMPANION_HANDOFF":                       "${{ vars.ADK_COMPANION_HANDOFF }}",
-		"COMPANION_ROLLBACK_FLOOR":                "${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}",
-		"COMPANION_PUBLIC_KEY_SHA256":             "${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}",
+		"GITHUB_TOKEN":                          "${{ secrets.GITHUB_TOKEN }}",
+		"COMPANION_SOURCE_COMMIT":               "${{ steps.release-source.outputs.source-commit }}",
+		"COMPANION_SOURCE_TREE":                 "${{ steps.release-source.outputs.source-tree }}",
+		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256": "${{ steps.candidate.outputs.candidate-artifact-sha256 }}",
+		"ADK_KEY_ROTATION_VERIFIER":             "${{ runner.temp }}/key-rotation-authority/verify-rotation.sh",
 	}
 	if !reflect.DeepEqual(evidence.Env, wantEnv) {
-		t.Fatalf("recovery evidence environment = %#v, want exact repository bindings %#v", evidence.Env, wantEnv)
+		t.Fatalf("recovery evidence environment = %#v, want bridge bindings %#v",
+			evidence.Env, wantEnv)
 	}
-	wantInvocation := `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-  GITHUB_TOKEN="$GITHUB_TOKEN" \
-  COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
-  COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
-  OMP_CONTEXT_EVIDENCE_REPORT_SHA256="$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
-  OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256="$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
-  OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
-  OMP_CONTEXT_EVIDENCE_VERIFIER="$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
-  OMP_CONTEXT_LINEAGE_VERIFIER="$RUNNER_TEMP/auto-omp-context-lineage-verifier" \
-  COMPANION_MANIFEST_VERIFIER="$RUNNER_TEMP/auto-companion-manifest-verifier" \
-  COMPANION_KEY_ID="$COMPANION_KEY_ID" COMPANION_HANDOFF="$COMPANION_HANDOFF" \
-  COMPANION_ROLLBACK_FLOOR="$COMPANION_ROLLBACK_FLOOR" \
-  COMPANION_PUBLIC_KEY_SHA256="$COMPANION_PUBLIC_KEY_SHA256" \
-  scripts/companion-release/verify-current-release.sh "$checksums_path"`
-	if !strings.Contains(evidence.Run, wantInvocation) {
-		t.Fatalf("recovery current-release verifier invocation is incomplete:\n%s", evidence.Run)
+	for _, mutable := range []string{
+		"${{ vars.AUTOPUS_ADK_CHANNEL_KEY_ID }}",
+		"${{ vars.AUTOPUS_ADK_CHANNEL_PUBLIC_KEY }}",
+		"${{ vars.ADK_COMPANION_APPROVED_SOURCE_COMMIT }}",
+		"${{ vars.ADK_COMPANION_APPROVED_SOURCE_TREE }}",
+		"${{ vars.ADK_COMPANION_KEY_ID }}",
+		"${{ vars.ADK_COMPANION_HANDOFF }}",
+		"${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}",
+		"${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}",
+	} {
+		if strings.Contains(raw, mutable) {
+			t.Fatalf("historical recovery depends on mutable live authority %q", mutable)
+		}
+	}
+	for _, forbidden := range []string{
+		"OMP_CONTEXT_EVIDENCE_", "OMP_CONTEXT_STATIC_POLICY_B64",
+		"omp-context-promotion-report.v1.json", "omp-context-promotion-attestation.v2.json",
+		"--mode active", "--mode historical",
+	} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("recovery workflow contains forbidden promotion wiring %q", forbidden)
+		}
 	}
 	helper := readReleaseFile(t, "scripts/companion-release/verify-current-release.sh")
 	for _, required := range []string{
 		`repos/${RELEASE_REPOSITORY}/releases/tags/${RELEASE_TAG}`,
 		`.tag_name == $tag`, `.target_commitish == $commit`, `.draft == false`,
-		`.prerelease == false`, `.immutable == true`, `length) == ($expected | length)`,
+		`.prerelease == false`, `.immutable == true`,
 		`[.assets[].name] | unique`, `.state == "uploaded"`, `.size > 0`,
 		`Accept: application/octet-stream`, `.digest`, `^sha256:[0-9a-f]{64}$`,
-		"shasum -a 256", `"sha256:${downloaded_digest}" == "$api_digest"`,
+		"canonical-full-bridge", "omp-context-bridge-release.v1.json",
+		"adk-key-rotation-v1.json", "adk-key-rotation-v1.sig",
+		"verify-rotation-historical",
+		"BRIDGE_COMPANION_KEY_ID", "adk-channel-2026-q3-a0",
 	} {
 		if !strings.Contains(helper, required) {
-			t.Fatalf("shared release evidence gate missing %q", required)
+			t.Fatalf("shared bridge release gate missing %q", required)
 		}
 	}
 	ordered := []string{
-		"actions/checkout@", "sigstore/cosign-installer@", "scripts/companion-release/validate-source.sh",
+		"actions/checkout@", "sigstore/cosign-installer@",
+		"scripts/companion-release/validate-source.sh",
+		"scripts/companion-release/build-omp-context-candidate.sh",
 		"scripts/companion-release/verify-current-release.sh",
-		"actions/create-github-app-token@", "scripts/companion-release/publish-homebrew-formula-bridge.sh",
+		"actions/create-github-app-token@",
+		"scripts/companion-release/publish-homebrew-formula-bridge.sh",
 	}
 	previous := -1
 	for _, marker := range ordered {
@@ -256,43 +261,5 @@ func TestFormulaRecoveryWorkflow_ValidatesSourceAndImmutableReleaseEvidence(t *t
 			t.Fatalf("recovery order invalid at %q: prior=%d current=%d", marker, previous, index)
 		}
 		previous = index
-	}
-}
-
-func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA22CaskWithAllowlistedEnvironment(t *testing.T) {
-	_, workflow := readRecoveryWorkflow(t)
-	var bridge recoveryStep
-	for _, step := range workflow.Jobs["recover-formula-bridge"].Steps {
-		if step.Name == "Reconcile Homebrew Cask" {
-			bridge = step
-		}
-	}
-	wantBridge := `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-  GITHUB_REF_NAME="$GITHUB_REF_NAME" \
-  COMPANION_VERSION="${GITHUB_REF_NAME#v}" \
-  COMPANION_HOMEBREW_POLICY='cask-only' \
-  COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH" \
-  HOMEBREW_TAP_TOKEN="$HOMEBREW_TAP_TOKEN" \
-  scripts/companion-release/publish-homebrew-formula-bridge.sh`
-	if !strings.Contains(bridge.Run, wantBridge) {
-		t.Fatalf("recovery bridge environment is not the exact allowlist:\n%s", bridge.Run)
-	}
-	if len(bridge.Env) != 2 || bridge.Env["COMPANION_CHECKSUMS_PATH"] == nil ||
-		bridge.Env["HOMEBREW_TAP_TOKEN"] == nil {
-		t.Fatalf("recovery bridge step environment = %v, want checksum path and tap token only", bridge.Env)
-	}
-	mutation := regexp.MustCompile(`(?i)goreleaser|gh[[:space:]]+release|git[[:space:]]+(tag|push)|--method[=[:space:]]+(post|patch|put|delete)|curl[^\n]+-[Xx][[:space:]]*(post|patch|put|delete)`)
-	for _, step := range workflow.Jobs["recover-formula-bridge"].Steps {
-		if mutation.MatchString(step.Run) {
-			t.Fatalf("recovery step %q can mutate the immutable GitHub release", step.Name)
-		}
-		for _, forbidden := range []string{"--input", "--field", "--raw-field"} {
-			if strings.Contains(step.Run, forbidden) {
-				t.Fatalf("recovery step %q contains API mutation input %q", step.Name, forbidden)
-			}
-		}
-	}
-	if strings.Contains(bridge.Run, "GITHUB_TOKEN") || strings.Contains(bridge.Run, "GH_TOKEN") {
-		t.Fatal("repository token is forwarded to the tap bridge")
 	}
 }

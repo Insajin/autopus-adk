@@ -7,6 +7,7 @@ script_dir=$(cd -- "$tests_dir/.." && pwd)
 repo=$(cd -- "$script_dir/../.." && pwd)
 fail() { printf 'release runtime hardening test: %s\n' "$1" >&2; exit 1; }
 contains() { grep -Fq -- "$2" "$1" || fail "$1 missing $2"; }
+not_contains() { ! grep -Fq -- "$2" "$1" || fail "$1 unexpectedly contains $2"; }
 
 source_gate="$script_dir/validate-source.sh"
 environment_gate="$script_dir/validate-environment.sh"
@@ -16,25 +17,16 @@ temp=$(mktemp -d "${TMPDIR:-/tmp}/release-hardening-test.XXXXXX")
 trap 'rm -rf -- "$temp"' EXIT
 runtime_lib="$script_dir/prepare-release-runtime-lib.sh"
 source "$runtime_lib"
-contains "$runtime_lib" 'sandbox_args=(--omp "$isolated_omp")'
-contains "$runtime_lib" '"${sandbox_args[@]}" <"$input_jsonl"'
-printf '%s\n' \
-  '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"handshake"}' \
-  '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"error","error_code":"network_transport","error_stage":"call","failed_sequence":17}' \
-  >"$temp/canary-input.jsonl"
-canary_progress=$(capture_canary_progress "$temp/canary-output.jsonl" final \
-  <"$temp/canary-input.jsonl" 2>&1)
-cmp "$temp/canary-input.jsonl" "$temp/canary-output.jsonl" ||
-  fail 'canary progress capture changed transcript bytes'
-[[ "$canary_progress" == *'final production canary progress (1/42 records)'* &&
-   "$canary_progress" == *'final production canary progress (2/42 records)'* ]] ||
-  fail 'canary progress did not report each completed record'
-failure_status=0
-failure_receipt=$(canary_failure_receipt final 42 "$temp/canary-output.jsonl" 2>&1) ||
-  failure_status=$?
-[[ "$failure_status" -eq 42 ]] || fail 'canary failure receipt did not preserve exit status'
-[[ "$failure_receipt" == *'final production canary execution failed: exit=42 transcript_records=2/42 error_code=network_transport error_stage=call failed_sequence=17'* ]] ||
-  fail 'canary failure receipt omitted structured diagnostics'
+contains "$runtime_lib" 'build_bridge_candidate()'
+contains "$runtime_lib" 'produce_bridge_manifest()'
+contains "$runtime_lib" 'ensure_bridge_prep_lock()'
+contains "$runtime_lib" 'publish_bridge_coordinates()'
+contains "$runtime_lib" 'verify_homebrew_tap_pins()'
+not_contains "$runtime_lib" 'run_canary'
+not_contains "$runtime_lib" 'capture_canary_progress'
+not_contains "$runtime_lib" 'canary_failure_receipt'
+not_contains "$runtime_lib" 'OMP_CONTEXT_STATIC_POLICY_B64'
+not_contains "$runtime_lib" 'promotion'
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid

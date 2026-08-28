@@ -1,0 +1,135 @@
+name: Audit authorized ADK key rotation
+
+on:
+  workflow_dispatch:
+    inputs:
+      document_base64:
+        description: Canonical base64 of adk-key-rotation-v1.json
+        required: true
+        type: string
+      signature_base64:
+        description: Canonical base64 of the raw channel Ed25519 signature
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: adk-key-rotation-v0.50.109-audit
+  cancel-in-progress: false
+
+jobs:
+  receive:
+    if: github.ref == 'refs/heads/main' && github.event.repository.default_branch == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the dispatched auditor
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+
+      - name: Materialize immutable key-rotation authority
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          authority="$RUNNER_TEMP/key-rotation-authority"
+          scripts/companion-release/materialize-key-rotation-authority.sh "$authority" \
+            > "$RUNNER_TEMP/key-rotation-authority-receipt.json"
+          jq -e '.authority_commit | test("^[0-9a-f]{40}$")' \
+            "$RUNNER_TEMP/key-rotation-authority-receipt.json" >/dev/null
+
+      - name: Decode bounded audit inputs
+        shell: bash
+        env:
+          ADK_CHANNEL_DOCUMENT_BASE64: ${{ inputs.document_base64 }}
+          ADK_CHANNEL_SIGNATURE_BASE64: ${{ inputs.signature_base64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          incoming="$RUNNER_TEMP/adk-key-rotation-incoming"
+          [[ ! -e "$incoming" && ! -L "$incoming" ]]
+          mkdir -m 0700 "$incoming"
+          printf '%s' "$ADK_CHANNEL_DOCUMENT_BASE64" |
+            openssl base64 -d -A > "$incoming/adk-key-rotation-v1.json"
+          printf '%s' "$ADK_CHANNEL_SIGNATURE_BASE64" |
+            openssl base64 -d -A > "$incoming/adk-key-rotation-v1.sig"
+          [[ "$(openssl base64 -A -in "$incoming/adk-key-rotation-v1.json")" ==
+             "$ADK_CHANNEL_DOCUMENT_BASE64" ]]
+          [[ "$(openssl base64 -A -in "$incoming/adk-key-rotation-v1.sig")" ==
+             "$ADK_CHANNEL_SIGNATURE_BASE64" ]]
+          [[ -s "$incoming/adk-key-rotation-v1.json" &&
+             "$(wc -c < "$incoming/adk-key-rotation-v1.sig" | tr -d ' ')" == 64 ]]
+
+      - name: Audit the immutable rotation ref
+        shell: bash
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          set -euo pipefail
+          umask 077
+          incoming="$RUNNER_TEMP/adk-key-rotation-incoming"
+          audited="$RUNNER_TEMP/adk-key-rotation-audited"
+          verifier="$RUNNER_TEMP/key-rotation-authority/verify-rotation.sh"
+          rotation_ref="refs/heads/release-key-rotation-v0.50.109"
+          source_commit="$(/usr/bin/git rev-parse --verify HEAD)"
+          source_tree="$(/usr/bin/git rev-parse --verify 'HEAD^{tree}')"
+          [[ "$source_commit" == "$GITHUB_SHA" ]]
+          [[ -d "$incoming" && ! -L "$incoming" ]]
+          [[ ! -e "$audited" && ! -L "$audited" ]]
+          mkdir -m 0700 "$audited"
+          scripts/companion-release/verify-rotation-ref-ruleset.sh
+
+          remote_line="$(env -u GITHUB_TOKEN /usr/bin/git ls-remote --refs origin "$rotation_ref")"
+          rotation_commit="${remote_line%%$'\t'*}"
+          [[ "$rotation_commit" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$remote_line" == "$rotation_commit"$'\t'"$rotation_ref" ]]
+          env -u GITHUB_TOKEN /usr/bin/git fetch --no-tags origin "$rotation_ref"
+          [[ "$(/usr/bin/git rev-parse --verify 'FETCH_HEAD^{commit}')" == "$rotation_commit" ]]
+          [[ "$(/usr/bin/git cat-file -t "$rotation_commit")" == "commit" ]]
+          [[ "$(/usr/bin/git rev-list --parents -n 1 "$rotation_commit" | wc -w)" -eq 1 ]]
+
+          entries="$(/usr/bin/git ls-tree -r "$rotation_commit")"
+          names="$(/usr/bin/git ls-tree -r --name-only "$rotation_commit")"
+          [[ "$names" == $'adk-key-rotation-v1.json\nadk-key-rotation-v1.sig' ]]
+          while IFS= read -r entry; do
+            [[ "${entry%% *}" == "100644" ]]
+          done <<< "$entries"
+
+          /usr/bin/git cat-file blob "$rotation_commit:adk-key-rotation-v1.json" \
+            > "$audited/adk-key-rotation-v1.json"
+          /usr/bin/git cat-file blob "$rotation_commit:adk-key-rotation-v1.sig" \
+            > "$audited/adk-key-rotation-v1.sig"
+          cmp -s -- "$incoming/adk-key-rotation-v1.json" "$audited/adk-key-rotation-v1.json"
+          cmp -s -- "$incoming/adk-key-rotation-v1.sig" "$audited/adk-key-rotation-v1.sig"
+          env -u GITHUB_TOKEN "$verifier" verify-rotation \
+            --document "$audited/adk-key-rotation-v1.json" \
+            --signature "$audited/adk-key-rotation-v1.sig" \
+            --source-commit "$source_commit" \
+            --source-tree "$source_tree" \
+            --next-tag-public-key scripts/companion-release/release-tag-signing-2026-q3-r2.pub \
+            --next-tag-fingerprint scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint \
+            --next-promotion-public-key scripts/companion-release/omp-context-promotion-2026-q3-k3.pub \
+            > "$audited/verified-document"
+          cmp -s -- "$audited/adk-key-rotation-v1.json" "$audited/verified-document"
+
+          final_remote_line="$(env -u GITHUB_TOKEN /usr/bin/git ls-remote --refs origin "$rotation_ref")"
+          [[ "$final_remote_line" == "$remote_line" ]]
+          printf "Audited immutable rotation ref \`%s\` at \`%s\`.\n" \
+            "$rotation_ref" "$rotation_commit" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove auditor files
+        if: always()
+        shell: bash
+        run: |
+          rm -rf -- "$RUNNER_TEMP/adk-key-rotation-incoming" \
+            "$RUNNER_TEMP/adk-key-rotation-audited" \
+            "$RUNNER_TEMP/key-rotation-authority"
+          rm -f -- "$RUNNER_TEMP/key-rotation-authority-receipt.json"

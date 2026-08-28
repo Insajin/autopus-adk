@@ -102,12 +102,17 @@ func runGoReleaserFixture(
 	if err := os.WriteFile(canaryExecutable, []byte("#!/bin/sh\nexit 0\n"), 0o555); err != nil {
 		t.Fatal(err)
 	}
+	bridgeManifestPath := "omp-context-bridge-release.v1.json"
+	if err := os.WriteFile(filepath.Join(root, bridgeManifestPath), []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	command := exactGoReleaserCommand("release", "--clean", "--parallelism=2",
 		"--skip=announce,publish,sign,homebrew")
 	command.Dir = root
 	command.Env = append(os.Environ(), goReleaserReleaseEnv(
 		tools, keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable,
+		bridgeManifestPath,
 	)...)
 	productionGoReleaserFixtureRuns.Add(1)
 	output, err := command.CombinedOutput()
@@ -140,14 +145,15 @@ func exactGoReleaserCommand(arguments ...string) *exec.Cmd {
 
 func goReleaserReleaseEnv(
 	tools mockReleaseTools,
-	keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable string,
+	keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable,
+	bridgeManifestPath string,
 ) []string {
 	return []string{
 		"TMPDIR=" + tmpDir,
 		"GITHUB_REF_NAME=v0.50.69",
 		"COMPANION_SOURCE_COMMIT=" + commit,
 		"COMPANION_SOURCE_TREE=" + tree,
-		"OMP_CONTEXT_STATIC_POLICY_B64=eyJzY2hlbWEiOiJmaXh0dXJlIn0",
+		"OMP_CONTEXT_BRIDGE_MANIFEST_PATH=" + bridgeManifestPath,
 		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256=" + strings.Repeat("0", 64),
 		"OMP_CONTEXT_RELEASE_CANARY_ROOT=" + canaryRoot,
 		"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE=" + canaryExecutable,

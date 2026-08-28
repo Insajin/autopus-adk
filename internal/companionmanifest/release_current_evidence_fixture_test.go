@@ -70,6 +70,9 @@ func newCurrentReleaseFixture(t *testing.T) *currentReleaseFixture {
 	autoDigest := sha256.Sum256(autoBody)
 	lineage := []byte("{\"schema\":\"autopus.omp_context_release_lineage.v1\"}\n")
 	lineageSignature := bytes.Repeat([]byte{0x31}, 64)
+	rotationDocument := []byte(`{"fixture":"rotation"}`)
+	rotationDocumentDigest := sha256.Sum256(rotationDocument)
+	rotationSignature := bytes.Repeat([]byte{0x34}, 64)
 	archive := makeCurrentReleaseArchive(t, map[string][]byte{
 		"auto": autoBody,
 		"adk-companion-manifest.json": []byte(fmt.Sprintf(
@@ -80,7 +83,7 @@ func newCurrentReleaseFixture(t *testing.T) *currentReleaseFixture {
 		"release-lineage-v1.json":                                         lineage,
 		"release-lineage-v1.sig":                                          lineageSignature,
 	})
-	assetBodies := make(map[string][]byte, 15)
+	assetBodies := make(map[string][]byte, 16)
 	var checksums bytes.Buffer
 	for _, name := range currentReleaseArchives {
 		body := []byte("fixture archive " + name + "\n")
@@ -95,16 +98,33 @@ func newCurrentReleaseFixture(t *testing.T) *currentReleaseFixture {
 	assetBodies["checksums.txt.bundle"] = []byte("fixture cosign bundle\n")
 	assetBodies["checksums.txt.signatures"] = []byte("AUTOPUS-RELEASE-SIGNATURE-V1\n" +
 		"e1fdfe066484c7eae8ff16fa4b1ee6237b8d06299c2b66ced485f029af77837f\tMAYCAQECAQE=\n")
-	assetBodies["omp-context-promotion-report.v1.json"] = []byte(
-		`{"candidate":{"artifact_sha256":"sha256:` + strings.Repeat("a", 64) + `"}}`)
-	assetBodies["omp-context-promotion-attestation.v2.json"] = []byte("fixture attestation\n")
+	bridgeManifest, err := json.Marshal(map[string]string{
+		"schema_version":            "omp-context-bridge-release.v1",
+		"repository":                "Insajin/autopus-adk",
+		"release_mode":              "canonical-full-bridge",
+		"release_tag":               "v0.50.109",
+		"source_commit":             strings.Repeat("c", 40),
+		"source_tree":               strings.Repeat("d", 40),
+		"candidate_artifact_sha256": strings.Repeat("a", 64),
+		"rotation_ref":              "refs/heads/release-key-rotation-v0.50.109",
+		"rotation_ref_commit":       strings.Repeat("f", 40),
+		"rotation_document_sha256":  fmt.Sprintf("%x", rotationDocumentDigest),
+		"promotion_key_id":          "omp-context-promotion-2026-q3-k3",
+		"promotion_public_sha256":   "2a9b41dec1330f65937d9b25b20967cb29fd9209c722ce5fe1a9afd6ca45b937",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetBodies["omp-context-bridge-release.v1.json"] = append(bridgeManifest, '\n')
+	assetBodies["adk-key-rotation-v1.json"] = rotationDocument
+	assetBodies["adk-key-rotation-v1.sig"] = rotationSignature
 	assetBodies["release-lineage-v1.json"] = lineage
 	assetBodies["release-lineage-v1.sig"] = lineageSignature
 
 	assetNames := append(append([]string(nil), currentReleaseArchives...),
 		"checksums.txt", "checksums.txt.bundle", "checksums.txt.signatures",
-		"omp-context-promotion-report.v1.json", "omp-context-promotion-attestation.v2.json",
-		"release-lineage-v1.json", "release-lineage-v1.sig")
+		"omp-context-bridge-release.v1.json", "adk-key-rotation-v1.json",
+		"adk-key-rotation-v1.sig", "release-lineage-v1.json", "release-lineage-v1.sig")
 	assets := make([]currentReleaseAsset, 0, len(assetNames))
 	for index, name := range assetNames {
 		body := assetBodies[name]
@@ -198,22 +218,14 @@ func (f *currentReleaseFixture) run() (string, error) {
 		"GITHUB_TOKEN=fixture-token", "GH_TOKEN=fixture-fallback-token",
 		"COMPANION_SOURCE_COMMIT=" + strings.Repeat("c", 40),
 		"COMPANION_SOURCE_TREE=" + strings.Repeat("d", 40),
-		"OMP_CONTEXT_EVIDENCE_REPORT_SHA256=" + f.assetDigest("omp-context-promotion-report.v1.json"),
-		"OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256=" + f.assetDigest("omp-context-promotion-attestation.v2.json"),
-		"OMP_CONTEXT_STATIC_POLICY_B64=eyJzY2hlbWEiOiJmaXh0dXJlIn0",
-		"OMP_CONTEXT_EVIDENCE_VERIFIER=" + filepath.Join(f.root, "bin", "omp-context-verifier"),
+		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256=" + strings.Repeat("a", 64),
 		"OMP_CONTEXT_LINEAGE_VERIFIER=" + filepath.Join(f.root, "bin", "omp-context-lineage-verifier"),
 		"COMPANION_MANIFEST_VERIFIER=" + filepath.Join(f.root, "bin", "companion-manifest-verifier"),
-		"COMPANION_KEY_ID=fixture-key-v1", "COMPANION_HANDOFF=v1", "COMPANION_ROLLBACK_FLOOR=1",
-		"COMPANION_PUBLIC_KEY_SHA256=sha256:" + strings.Repeat("e", 64),
+		"ADK_KEY_ROTATION_VERIFIER=" + filepath.Join(f.root, "bin", "adk-channel-receiver"),
 		"MOCK_CURRENT_RELEASE_STATE=" + f.state,
 	}
 	output, err := command.CombinedOutput()
 	return string(output), err
-}
-
-func (f *currentReleaseFixture) assetDigest(name string) string {
-	return strings.TrimPrefix(f.asset(name).Digest, "sha256:")
 }
 
 func (f *currentReleaseFixture) writeCommandMocks(t *testing.T) {
@@ -233,7 +245,7 @@ esac
 	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(ghMock), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"omp-context-verifier", "omp-context-lineage-verifier", "companion-manifest-verifier"} {
+	for _, name := range []string{"omp-context-lineage-verifier", "companion-manifest-verifier"} {
 		body := fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
 [[ -z "${GITHUB_TOKEN+x}" && -z "${GH_TOKEN+x}" ]]
@@ -243,37 +255,23 @@ printf '%%s %%s\n' "${0##*/}" "$*" >> %q
 			t.Fatal(err)
 		}
 	}
-}
-
-func (f *currentReleaseFixture) writeSignatureMocks() error {
-	bin := filepath.Join(f.root, "bin")
-	cosignMock := fmt.Sprintf(`#!/usr/bin/env bash
+	rotationVerifier := fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
 [[ -z "${GITHUB_TOKEN+x}" && -z "${GH_TOKEN+x}" ]]
-printf 'cosign %%s\n' "$*" >> %q
-[[ "${1-}" == verify-blob ]]
-if [[ %t == true ]]; then exit 92; fi
-`, f.signatureLog, f.cosignFail)
-	if err := os.WriteFile(filepath.Join(bin, "cosign"), []byte(cosignMock), 0o700); err != nil {
-		return err
+[[ "${1-}" == verify-rotation-historical ]]
+shift
+document=''
+while (($#)); do
+  case "$1" in
+    --document) document=$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+[[ -n "$document" ]]
+printf 'adk-channel-receiver historical\n' >> %q
+cat "$document"
+`, f.verifierLog)
+	if err := os.WriteFile(filepath.Join(bin, "adk-channel-receiver"), []byte(rotationVerifier), 0o700); err != nil {
+		t.Fatal(err)
 	}
-	realOpenSSL, err := exec.LookPath("openssl")
-	if err != nil {
-		return err
-	}
-	opensslMock := fmt.Sprintf(`#!/usr/bin/env bash
-set -euo pipefail
-[[ -z "${GITHUB_TOKEN+x}" && -z "${GH_TOKEN+x}" ]]
-if [[ "${1-}" == dgst ]]; then
-  for argument in "$@"; do
-    if [[ "$argument" == -verify ]]; then
-      printf 'openssl-verify\n' >> %q
-      if [[ %t == true ]]; then exit 92; fi
-      exit 0
-    fi
-  done
-fi
-exec %q "$@"
-`, f.signatureLog, f.openSSLVerifyFail, realOpenSSL)
-	return os.WriteFile(filepath.Join(bin, "openssl"), []byte(opensslMock), 0o700)
 }

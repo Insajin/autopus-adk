@@ -1,8 +1,6 @@
 package companionmanifest
 
 import (
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -16,11 +14,14 @@ func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *test
 		"- 'v0.50.109'", "if: github.ref_type == 'tag'",
 		"environment:", "adk-companion-release",
 		"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
-		"Verify operator-owned draft release reservation",
+		"Verify operator-owned canonical-full bridge reservation",
 		`--arg tag "$GITHUB_REF_NAME"`,
 		`[$all[] | select(.draft == true and .name == $tag)]`,
 		"$tagged[0].id == $named[0].id",
 		"Verify reserved release was published",
+		`while IFS= read -r asset_id; do`,
+		`"repos/Insajin/autopus-adk/releases/assets/${asset_id}"`,
+		`.body == $body and (.assets | type == "array" and length == 0)`,
 		".author.id == 204883817", ".immutable == true",
 	} {
 		if !strings.Contains(release, required) {
@@ -30,11 +31,11 @@ func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *test
 	if strings.Contains(release, "- 'v*'") || strings.Contains(release, "- v*") {
 		t.Fatal("arbitrary version tags can enter the protected release job")
 	}
-	// 무장 좌표는 on.push.tags 한 줄에만 산다. 다른 좌표 리터럴이 남으면 릴리즈마다
-	// 워크플로를 손보는 의식이 되살아나므로, 옛 좌표 목록이 아니라 전수로 막는다.
 	for _, match := range regexp.MustCompile(`v?0\.50\.[0-9]+`).FindAllStringIndex(release, -1) {
-		if line := releaseWorkflowLineAt(release, match[0]); strings.TrimSpace(line) != "- 'v0.50.109'" {
-			t.Fatalf("release coordinate literal outside the single armed trigger: %q", line)
+		line := strings.TrimSpace(releaseWorkflowLineAt(release, match[0]))
+		if line != "- 'v0.50.109'" && !strings.Contains(line,
+			"refs/heads/release-key-rotation-v0.50.109") {
+			t.Fatalf("release coordinate literal outside armed trigger or fixed rotation ref: %q", line)
 		}
 	}
 	immutable := regexp.MustCompile(`^[^@[:space:]]+@[0-9a-f]{40}$`)
@@ -268,32 +269,4 @@ func TestReleaseWorkflow_HomebrewFormulaBridgeRunsAfterPublishBeforeCleanup(t *t
 	if strings.Contains(release, "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'") {
 		t.Fatal("Homebrew publication can consume unverified local checksums")
 	}
-}
-
-// releaseWorkflowLineAt은 offset이 속한 한 줄을 돌려준다.
-func releaseWorkflowLineAt(source string, offset int) string {
-	start := strings.LastIndexByte(source[:offset], '\n') + 1
-	end := strings.IndexByte(source[offset:], '\n')
-	if end < 0 {
-		return source[start:]
-	}
-	return source[start : offset+end]
-}
-
-func readReleaseFile(t *testing.T, name string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(repositoryRoot(t), filepath.FromSlash(name)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(data)
-}
-
-func repositoryRoot(t *testing.T) string {
-	t.Helper()
-	root, err := filepath.Abs(filepath.Join("..", ".."))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return root
 }

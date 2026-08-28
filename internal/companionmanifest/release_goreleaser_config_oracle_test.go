@@ -10,7 +10,8 @@ import (
 
 type executableGoReleaserConfig struct {
 	Builds []struct {
-		ID    string `yaml:"id"`
+		ID    string   `yaml:"id"`
+		Env   []string `yaml:"env"`
 		Hooks struct {
 			Post []struct {
 				Command string   `yaml:"cmd"`
@@ -39,6 +40,12 @@ func validateProductionGoReleaserWiring(source string) error {
 			continue
 		}
 		buildFound = true
+		if countString(build.Env, "GOTOOLCHAIN=go1.26.6") != 1 {
+			return errors.New("auto build Go toolchain pin differs")
+		}
+		if countString(build.Env, "GOENV=off") != 1 {
+			return errors.New("auto build ambient Go env isolation differs")
+		}
 		if err := validateCompanionPostHook(build.Hooks.Post); err != nil {
 			return err
 		}

@@ -32,31 +32,41 @@ func TestCurrentReleaseVerifier_RejectsUntrustedReleaseEvidence(t *testing.T) {
 	}{
 		{name: "mutable_release", mutate: func(f *currentReleaseFixture) {
 			f.release.Immutable = false
-		}, want: "not exact, final, immutable, complete, and digest-bound"},
+		}, want: "not exact, immutable, and complete"},
 		{name: "partial_asset_set", mutate: func(f *currentReleaseFixture) {
 			f.release.Assets = f.release.Assets[:len(f.release.Assets)-1]
-		}, want: "not exact, final, immutable, complete, and digest-bound"},
+		}, want: "not exact, immutable, and complete"},
 		{name: "duplicate_asset", mutate: func(f *currentReleaseFixture) {
 			f.release.Assets[len(f.release.Assets)-1].Name = f.release.Assets[0].Name
-		}, want: "not exact, final, immutable, complete, and digest-bound"},
+		}, want: "not exact, immutable, and complete"},
 		{name: "checksums_server_digest_mismatch", mutate: func(f *currentReleaseFixture) {
 			f.asset("checksums.txt").Digest = "sha256:" + strings.Repeat("f", 64)
-		}, want: "differs from its GitHub API digest"},
+		}, want: "differs from GitHub metadata"},
 		{name: "bundle_server_digest_mismatch", mutate: func(f *currentReleaseFixture) {
 			f.asset("checksums.txt.bundle").Digest = "sha256:" + strings.Repeat("f", 64)
-		}, want: "differs from its GitHub API digest"},
+		}, want: "differs from GitHub metadata"},
 		{name: "envelope_server_digest_mismatch", mutate: func(f *currentReleaseFixture) {
 			f.asset("checksums.txt.signatures").Digest = "sha256:" + strings.Repeat("f", 64)
-		}, want: "differs from its GitHub API digest"},
+		}, want: "differs from GitHub metadata"},
 		{name: "cask_archive_checksum_mismatch", mutate: func(f *currentReleaseFixture) {
 			f.asset(currentReleaseArchives[0]).Digest = "sha256:" + strings.Repeat("e", 64)
-		}, want: "checksums.txt differs from the API digest"},
+		}, want: "checksums.txt differs from GitHub API digest"},
 		{name: "windows_archive_checksum_mismatch", mutate: func(f *currentReleaseFixture) {
 			f.asset(currentReleaseArchives[7]).Digest = "sha256:" + strings.Repeat("d", 64)
-		}, want: "checksums.txt differs from the API digest"},
+		}, want: "checksums.txt differs from GitHub API digest"},
+		{name: "bridge_manifest_active_claim", mutate: func(f *currentReleaseFixture) {
+			f.replaceAsset("omp-context-bridge-release.v1.json",
+				[]byte(`{"release_mode":"active"}`+"\n"))
+		}, want: "released bridge manifest is not canonical-full"},
+		{name: "rotation_document_differs_from_bridge_manifest", mutate: func(f *currentReleaseFixture) {
+			f.replaceAsset("adk-key-rotation-v1.json", []byte(`{"fixture":"tampered"}`))
+		}, want: "rotation document differs from bridge manifest digest"},
+		{name: "rotation_signature_is_not_raw_ed25519", mutate: func(f *currentReleaseFixture) {
+			f.replaceAsset("adk-key-rotation-v1.sig", bytes.Repeat([]byte{0x34}, 63))
+		}, want: "rotation signature is not raw Ed25519 bytes"},
 		{name: "standalone_lineage_differs_from_archive", mutate: func(f *currentReleaseFixture) {
 			f.replaceAsset("release-lineage-v1.json", []byte("different standalone lineage\n"))
-		}, want: "standalone and archived OMP context lineage bytes differ"},
+		}, want: "standalone and archived lineage bytes differ"},
 		{name: "lineage_signature_is_not_raw_ed25519", mutate: func(f *currentReleaseFixture) {
 			f.replaceAsset("release-lineage-v1.sig", bytes.Repeat([]byte{0x31}, 63))
 		}, want: "lineage signature is not raw Ed25519 bytes"},
@@ -89,8 +99,7 @@ func assertCurrentReleaseVerifierLog(t *testing.T, path string) {
 	for _, required := range []string{
 		"companion-manifest-verifier --artifact ", "--platform darwin --architecture arm64",
 		"omp-context-lineage-verifier --lineage ", "--target darwin-arm64 --version 0.50.109",
-		"omp-context-verifier --mode historical ", "--static-policy-b64 eyJzY2hlbWEiOiJmaXh0dXJlIn0",
-		"--expected-signing-key-id omp-context-promotion-2026-q3-k2",
+		"adk-channel-receiver historical",
 	} {
 		if !bytes.Contains(log, []byte(required)) {
 			t.Fatalf("release verifier invocation missing %q: %s", required, log)

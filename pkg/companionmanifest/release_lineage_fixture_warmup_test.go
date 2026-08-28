@@ -39,6 +39,7 @@ func populateGoReleaserLineageCache(
 	cache := goReleaserLineageCaches[coordinate.tag]
 	if cache == nil {
 		t.Fatalf("missing GoReleaser lineage cache for %s", coordinate.tag)
+		return
 	}
 	cache.once.Do(func() {
 		cache.runs.Add(1)

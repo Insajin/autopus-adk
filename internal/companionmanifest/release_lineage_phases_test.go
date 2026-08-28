@@ -200,7 +200,8 @@ var releasePhases = []releasePhase{
 		ancestorSHA:   "b86fab067599f457261287552c5a9dd86460d7f4",
 		extraSourceGates: []string{
 			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
-			"release-tag-signing-2026-q3.pub",
+			"ADK_KEY_ROTATION_VERIFIED",
+			"release-tag-signing-2026-q3-r2.pub",
 			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
 		},
 		pinsRepository: true, pinsLinuxArchives: true, pinsReleaseID: true,

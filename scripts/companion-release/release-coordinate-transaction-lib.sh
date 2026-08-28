@@ -16,7 +16,8 @@ load_release_for_tag() {
     "repos/Insajin/autopus-adk/releases?per_page=100") || return 1
   jq -e 'type == "array" and all(.[]; type == "array")' <<<"$releases" >/dev/null ||
     return 1
-  release_matches=$(jq -c '[.[][] | select(.tag_name == "v0.50.109")]' <<<"$releases") ||
+  release_matches=$(jq -c --arg tag "$release_tag" \
+    '[.[][] | select(.tag_name == $tag)]' <<<"$releases") ||
     return 1
   draft_name_matches=$(jq -c --arg name "$reservation_name" \
     '[.[][] | select(.draft == true and .name == $name)]' <<<"$releases") ||
@@ -35,7 +36,7 @@ verify_owned_draft_reservation() {
     '.id | type == "number"' <<<"$release_json" >/dev/null || return 1
   jq -e --arg name "$reservation_name" --arg body "$reservation_body" \
     --arg source "$source_commit" \
-    '.tag_name == "v0.50.109" and .draft == true and .prerelease == false and
+    '.tag_name == $name and .draft == true and .prerelease == false and
      .author.id == 204883817 and .name == $name and .body == $body and
      .target_commitish == $source and (.assets | type == "array" and length == 0)' \
     <<<"$release_json" >/dev/null || return 1
@@ -47,7 +48,7 @@ verify_owned_draft_reservation() {
 verify_owned_release_record() {
   load_release_for_tag || return $?
   jq -e '.id | type == "number"' <<<"$release_json" >/dev/null || return 1
-  jq -e '.tag_name == "v0.50.109" and .author.id == 204883817' \
+  jq -e --arg tag "$release_tag" '.tag_name == $tag and .author.id == 204883817' \
     <<<"$release_json" >/dev/null || return 1
   if jq -e '.draft == true' <<<"$release_json" >/dev/null; then
     jq -e --arg name "$reservation_name" --arg body "$reservation_body" \
@@ -135,6 +136,27 @@ restore_scope() {
     jq -e --arg name "$name" 'all(.[]; .name != $name)' <<<"$after_json" >/dev/null
   fi
 }
+restore_deleted_scope() {
+  local snapshot=$1 name=$2
+  shift 2
+  local current_json after_json previous=''
+  current_json=$(scope_json "$@") || return 1
+  if jq -e --arg name "$name" 'any(.[]; .name == $name)' "$snapshot" >/dev/null; then
+    previous=$(jq -r --arg name "$name" '.[] | select(.name == $name) | .value' "$snapshot")
+    if jq -e --arg name "$name" --arg previous "$previous" \
+      'any(.[]; .name == $name and .value == $previous)' <<<"$current_json" >/dev/null; then
+      return 0
+    fi
+    jq -e --arg name "$name" 'all(.[]; .name != $name)' <<<"$current_json" >/dev/null ||
+      return 1
+    retry gh variable set "$name" "$@" --body "$previous" >/dev/null || return 1
+    after_json=$(scope_json "$@") || return 1
+    jq -e --arg name "$name" --arg previous "$previous" \
+      'any(.[]; .name == $name and .value == $previous)' <<<"$after_json" >/dev/null
+  else
+    jq -e --arg name "$name" 'all(.[]; .name != $name)' <<<"$current_json" >/dev/null
+  fi
+}
 release_owned_lock() {
   local remote_lock status=0
   remote_lock=$(git ls-remote --exit-code --refs origin "$prep_lock_ref" 2>/dev/null) || status=$?
@@ -145,11 +167,18 @@ release_owned_lock() {
   [[ "$status" -eq 2 ]]
 }
 rollback_coordinates() {
-  local index current_policies
+  local index name current_policies
   rollback_failed=0
   for index in "${!names[@]}"; do
-    restore_scope "$repository_snapshot" "${names[$index]}" "${values[$index]}" --repo "$repository" || rollback_failed=1
-    restore_scope "$environment_snapshot" "${names[$index]}" "${values[$index]}" --repo "$repository" --env "$environment_name" || rollback_failed=1
+    restore_scope "$repository_snapshot" "${names[$index]}" "${values[$index]}" --repo "$repository" ||
+      rollback_failed=1
+    restore_scope "$environment_snapshot" "${names[$index]}" "${values[$index]}" \
+      --repo "$repository" --env "$environment_name" || rollback_failed=1
+  done
+  for name in "${obsolete_names[@]}"; do
+    restore_deleted_scope "$repository_snapshot" "$name" --repo "$repository" || rollback_failed=1
+    restore_deleted_scope "$environment_snapshot" "$name" \
+      --repo "$repository" --env "$environment_name" || rollback_failed=1
   done
   if [[ -n "$created_policy_id" ]]; then
     retry gh api --method DELETE "repos/${repository}/environments/${environment_name}/deployment-branch-policies/${created_policy_id}" >/dev/null 2>&1 || rollback_failed=1
@@ -203,13 +232,26 @@ cleanup() {
   exit "$status"
 }
 verify_coordinates() {
-  local index policies
+  local index name policies repository_variables environment_variables
   for index in "${!names[@]}"; do
-    [[ "$(gh variable get "${names[$index]}" --repo "$repository")" == "${values[$index]}" ]] || return 1
-    [[ "$(gh variable get "${names[$index]}" --repo "$repository" --env "$environment_name")" == "${values[$index]}" ]] || return 1
+    [[ "$(gh variable get "${names[$index]}" --repo "$repository")" == "${values[$index]}" ]] ||
+      return 1
+    [[ "$(gh variable get "${names[$index]}" --repo "$repository" --env "$environment_name")" ==
+       "${values[$index]}" ]] || return 1
   done
-  policies=$(gh api "repos/${repository}/environments/${environment_name}/deployment-branch-policies") || return 1
-  jq -e --arg tag "$release_tag" '.branch_policies | any(.type == "tag" and .name == $tag)' <<<"$policies" >/dev/null
+  repository_variables=$(scope_json --repo "$repository") || return 1
+  environment_variables=$(scope_json --repo "$repository" --env "$environment_name") || return 1
+  for name in "${obsolete_names[@]}"; do
+    jq -e --arg name "$name" 'all(.[]; .name != $name)' <<<"$repository_variables" >/dev/null ||
+      return 1
+    jq -e --arg name "$name" 'all(.[]; .name != $name)' <<<"$environment_variables" >/dev/null ||
+      return 1
+  done
+  policies=$(gh api "repos/${repository}/environments/${environment_name}/deployment-branch-policies") ||
+    return 1
+  jq -e --arg tag "$release_tag" \
+    '[.branch_policies[] | select(.type == "tag" and .name == $tag)] | length == 1' \
+    <<<"$policies" >/dev/null
 }
 verify_remote_release() {
   local remote_line remote_object
@@ -224,9 +266,21 @@ verify_remote_release() {
 }
 emit_receipt() {
   local receipt_mode=$1
-  jq -cn --arg mode "$receipt_mode" --arg tag "$release_tag" --arg tag_object "$release_tag_object" \
-    --arg source_commit "$source_commit" --arg source_tree "$source_tree" --arg evidence_tag_object "$evidence_tag_object" \
-    --arg evidence_commit "$evidence_commit" --arg evidence_tree "$evidence_tree" --arg report_sha256 "$report_sha256" \
-    --arg attestation_sha256 "$attestation_sha256" --argjson github_release_id "$reservation_id" \
-    '{mode:$mode,release_tag:$tag,release_tag_object:$tag_object,github_release_id:$github_release_id,source_commit:$source_commit,source_tree:$source_tree,evidence_tag_object:$evidence_tag_object,evidence_commit:$evidence_commit,evidence_tree:$evidence_tree,report_sha256:$report_sha256,attestation_sha256:$attestation_sha256}'
+  jq -cn --arg mode "$receipt_mode" --arg release_mode "$release_mode" \
+    --arg tag "$release_tag" --arg tag_object "$release_tag_object" \
+    --arg source_commit "$source_commit" --arg source_tree "$source_tree" \
+    --arg candidate_sha256 "$candidate_sha256" \
+    --arg rotation_ref "$rotation_ref" --arg rotation_ref_commit "$rotation_ref_commit" \
+    --arg rotation_document_sha256 "$rotation_document_sha256" \
+    --arg promotion_key_id "$promotion_key_id" \
+    --arg promotion_public_sha256 "$promotion_public_sha256" \
+    --argjson github_release_id "$reservation_id" \
+    '{mode:$mode,release_mode:$release_mode,release_tag:$tag,
+      release_tag_object:$tag_object,github_release_id:$github_release_id,
+      source_commit:$source_commit,source_tree:$source_tree,
+      candidate_artifact_sha256:$candidate_sha256,rotation_ref:$rotation_ref,
+      rotation_ref_commit:$rotation_ref_commit,
+      rotation_document_sha256:$rotation_document_sha256,
+      promotion_key_id:$promotion_key_id,
+      promotion_public_sha256:$promotion_public_sha256}'
 }
