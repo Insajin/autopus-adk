@@ -3,6 +3,7 @@ package companionmanifest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +18,24 @@ func releaseWorkflowLineAt(source string, offset int) string {
 		end++
 	}
 	return source[start:end]
+}
+
+func assertHomebrewOpenSSL3Selection(t *testing.T, run string, env map[string]any) {
+	t.Helper()
+	const want = `set -euo pipefail
+openssl_prefix=$(brew --prefix openssl@3)
+[[ -n "$openssl_prefix" ]]
+openssl_bin="$openssl_prefix/bin"
+[[ -x "$openssl_bin/openssl" ]]
+openssl_version=$("$openssl_bin/openssl" version)
+[[ "$openssl_version" == "OpenSSL 3."* ]]
+printf '%s\n' "$openssl_bin" >> "$GITHUB_PATH"`
+	if strings.TrimSpace(run) != want {
+		t.Fatalf("OpenSSL selection must fail closed on the Homebrew openssl@3 executable:\n%s", run)
+	}
+	if len(env) != 0 {
+		t.Fatalf("OpenSSL selection receives step credentials or environment: %#v", env)
+	}
 }
 
 func readReleaseFile(t *testing.T, name string) string {

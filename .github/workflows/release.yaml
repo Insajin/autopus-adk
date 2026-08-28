@@ -127,6 +127,18 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Select Homebrew OpenSSL 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          openssl_prefix=$(brew --prefix openssl@3)
+          [[ -n "$openssl_prefix" ]]
+          openssl_bin="$openssl_prefix/bin"
+          [[ -x "$openssl_bin/openssl" ]]
+          openssl_version=$("$openssl_bin/openssl" version)
+          [[ "$openssl_version" == "OpenSSL 3."* ]]
+          printf '%s\n' "$openssl_bin" >> "$GITHUB_PATH"
+
       - name: Materialize matching protected key-rotation authority
         id: authority
         shell: bash

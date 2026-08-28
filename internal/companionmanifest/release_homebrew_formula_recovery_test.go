@@ -27,6 +27,7 @@ type recoveryJob struct {
 	Environment struct {
 		Name string `yaml:"name"`
 	} `yaml:"environment"`
+	Env         map[string]any    `yaml:"env"`
 	Permissions map[string]string `yaml:"permissions"`
 	RunsOn      string            `yaml:"runs-on"`
 	Steps       []recoveryStep    `yaml:"steps"`
@@ -84,6 +85,9 @@ func TestFormulaRecoveryWorkflow_ManualExactA22LeastPrivilege(t *testing.T) {
 	if job.Environment.Name != "adk-companion-release" || job.RunsOn != "macos-14" {
 		t.Fatalf("recovery boundary environment=%q runner=%q", job.Environment.Name, job.RunsOn)
 	}
+	if len(job.Env) != 0 {
+		t.Fatalf("recovery credentials escaped step scope: %#v", job.Env)
+	}
 	for _, forbidden := range []string{
 		"id-token:", "pull_request:", "repository_dispatch:", "schedule:",
 		"ADK_RELEASE_ECDSA_PRIVATE_KEY", "COMPANION_SIGNING_KEY", "COMPANION_SIGNER", "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
@@ -104,6 +108,24 @@ func TestFormulaRecoveryWorkflow_ManualExactA22LeastPrivilege(t *testing.T) {
 	}
 	if regexp.MustCompile(`(?m)^\s+contents:\s+write\s*$`).MatchString(raw) {
 		t.Fatal("recovery workflow grants repository contents: write")
+	}
+}
+
+func TestFormulaRecoveryWorkflow_SelectsHomebrewOpenSSL3BeforeRotationAuthority(t *testing.T) {
+	_, workflow := readRecoveryWorkflow(t)
+	job := workflow.Jobs["recover-formula-bridge"]
+	selectionIndex, authorityIndex, selectionCount := -1, -1, 0
+	for index, step := range job.Steps {
+		switch step.Name {
+		case "Select Homebrew OpenSSL 3":
+			selectionIndex, selectionCount = index, selectionCount+1
+			assertHomebrewOpenSSL3Selection(t, step.Run, step.Env)
+		case "Materialize immutable rotation authority and build bridge verifiers":
+			authorityIndex = index
+		}
+	}
+	if selectionCount != 1 || selectionIndex < 0 || selectionIndex >= authorityIndex {
+		t.Fatalf("recovery OpenSSL/authority order = %d/%d", selectionIndex, authorityIndex)
 	}
 }
 

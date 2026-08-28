@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestReleaseWorkflow_A22UsesIndependentlyAuthorizedCanonicalBridge(t *testing.T) {
@@ -44,6 +46,50 @@ func TestReleaseWorkflow_A22UsesIndependentlyAuthorizedCanonicalBridge(t *testin
 		if strings.Contains(release, forbidden) {
 			t.Fatalf("A22 bridge workflow contains forbidden promotion authority %q", forbidden)
 		}
+	}
+}
+
+func TestReleaseWorkflow_ProtectedMacOSSelectsHomebrewOpenSSL3BeforeRotationAuthority(t *testing.T) {
+	release := readReleaseFile(t, ".github/workflows/release.yaml")
+	var workflow struct {
+		Jobs map[string]struct {
+			Env    map[string]any `yaml:"env"`
+			RunsOn string         `yaml:"runs-on"`
+			Steps  []struct {
+				Name string         `yaml:"name"`
+				Env  map[string]any `yaml:"env"`
+				Run  string         `yaml:"run"`
+			} `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal([]byte(release), &workflow); err != nil {
+		t.Fatalf("parse release workflow: %v", err)
+	}
+	protected := workflow.Jobs["release"]
+	if protected.RunsOn != "macos-15" {
+		t.Fatalf("protected release runner = %q, want macos-15", protected.RunsOn)
+	}
+	if len(protected.Env) != 0 {
+		t.Fatalf("protected release credentials escaped step scope: %#v", protected.Env)
+	}
+	selectionIndex, authorityIndex, verifierIndex := -1, -1, -1
+	for index, step := range protected.Steps {
+		switch step.Name {
+		case "Select Homebrew OpenSSL 3":
+			selectionIndex = index
+			assertHomebrewOpenSSL3Selection(t, step.Run, step.Env)
+		case "Materialize matching protected key-rotation authority":
+			authorityIndex = index
+		case "Reverify independently signed exact key rotation":
+			verifierIndex = index
+		}
+	}
+	if selectionIndex < 0 || selectionIndex >= authorityIndex || authorityIndex >= verifierIndex {
+		t.Fatalf("protected OpenSSL/authority/verifier order = %d/%d/%d",
+			selectionIndex, authorityIndex, verifierIndex)
+	}
+	if strings.Count(release, "- name: Select Homebrew OpenSSL 3") != 1 {
+		t.Fatal("Homebrew OpenSSL selection escaped the protected macOS release job")
 	}
 }
 
