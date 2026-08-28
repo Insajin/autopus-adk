@@ -115,6 +115,9 @@ func (a *Adapter) Update(ctx context.Context, cfg *config.HarnessConfig) (pf *ad
 	if a.rootedWorkspaceHook != nil {
 		a.rootedWorkspaceHook()
 	}
+	if err := hardenLegacyOMPFilesForUpdate(workspace, adapterName); err != nil {
+		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)
+	}
 	oldManifest, err := loadOMPManifestAt(workspace, adapterName)
 	if err != nil {
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)

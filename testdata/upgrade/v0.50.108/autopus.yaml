@@ -1,0 +1,18 @@
+mode: full
+project_name: upgrade-canary-v0.50.108
+platforms:
+  - claude-code
+  - codex
+  - omp
+language:
+  comments: en
+  commits: en
+  ai_responses: en
+lore:
+  enabled: true
+  required_trailers:
+    - Constraint
+hooks:
+  pre_commit_arch: true
+  pre_commit_lore: true
+usage_profile: developer

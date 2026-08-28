@@ -291,10 +291,3 @@ func platformFilePaths(files *adapter.PlatformFiles) []string {
 	}
 	return paths
 }
-
-func lifecycleSaveError(saveErr, rollbackErr error) error {
-	if rollbackErr == nil {
-		return saveErr
-	}
-	return fmt.Errorf("%w; platform lifecycle rollback failed: %v", saveErr, rollbackErr)
-}

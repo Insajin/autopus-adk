@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -121,42 +119,4 @@ func snapshotOMPRemoveFiles(t *testing.T, root string) map[string]string {
 		return nil
 	}))
 	return files
-}
-
-func changedOMPRemoveFiles(before, after map[string]string) []string {
-	var changed []string
-	for path, content := range before {
-		if next, exists := after[path]; !exists || next != content {
-			changed = append(changed, path)
-		}
-	}
-	for path := range after {
-		if _, exists := before[path]; !exists {
-			changed = append(changed, path)
-		}
-	}
-	sort.Strings(changed)
-	return changed
-}
-
-func parseOMPRepairPaths(t *testing.T, message string) []string {
-	t.Helper()
-	const marker = "changed_paths=["
-	start := strings.Index(message, marker)
-	require.NotEqual(t, -1, start, "repair receipt must include changed_paths")
-	remainder := message[start+len(marker):]
-	end := strings.IndexByte(remainder, ']')
-	require.NotEqual(t, -1, end, "repair receipt must close changed_paths")
-	if remainder[:end] == "" {
-		return nil
-	}
-	return strings.Split(remainder[:end], ",")
-}
-
-func uniqueOMPRemovePaths(paths []string) map[string]bool {
-	unique := make(map[string]bool, len(paths))
-	for _, path := range paths {
-		unique[path] = true
-	}
-	return unique
 }

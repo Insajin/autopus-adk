@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "platform": "codex",
+  "generated_at": "2026-08-01T00:00:00Z",
+  "files": {
+    ".codex/prompts/auto.md": {
+      "checksum": "ca3dbb43b061f92d7df2cf0c933a07eb967a6b321674c0e47f37e4baedbc6c69",
+      "policy": "always"
+    },
+    ".codex/rules/autopus/context7-docs.md": {
+      "checksum": "ca3dbb43b061f92d7df2cf0c933a07eb967a6b321674c0e47f37e4baedbc6c69",
+      "policy": "always"
+    },
+    ".agents/skills/auto/SKILL.md": {
+      "checksum": "ca3dbb43b061f92d7df2cf0c933a07eb967a6b321674c0e47f37e4baedbc6c69",
+      "policy": "always"
+    }
+  }
+}

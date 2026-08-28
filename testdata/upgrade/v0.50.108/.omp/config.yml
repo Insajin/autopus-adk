@@ -1,0 +1,8 @@
+theme:
+  dark: canary-user
+
+# AUTOPUS:BEGIN
+skills:
+  customDirectories:
+    - .agents/skills
+# AUTOPUS:END

@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "platform": "omp",
+  "generated_at": "2026-08-01T00:00:00Z",
+  "files": {
+    ".omp/config.yml": {
+      "checksum": "664b7f072f4c71dccf95c6822ae84b908a7c84d083f8398807a0a79dce8d0401",
+      "policy": "marker"
+    }
+  }
+}

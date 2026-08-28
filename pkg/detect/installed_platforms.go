@@ -1,5 +1,7 @@
 package detect
 
+import "context"
+
 // DetectInstalledPlatforms returns supported coding CLIs found in PATH.
 // Results preserve knownCLIs order.
 //
@@ -15,12 +17,12 @@ package detect
 // Mitigation that is doing real work here: exec.LookPath returns ErrDot for a
 // relative PATH entry, so a binary dropped in the current directory is not
 // picked up. The version check itself is accident prevention rather than a
-// security control — see platformVersionMatchesIdentity.
+// security control — see OMPVersionMatchesIdentity.
 func DetectInstalledPlatforms() []Platform {
 	platforms := make([]Platform, 0, len(knownCLIs))
 	for _, cli := range knownCLIs {
 		if cli.name == "omp" {
-			if _, ok := ProbeOMPIdentity(nil, cli.binary); !ok {
+			if _, ok := ProbeOMPIdentity(context.Background(), cli.binary); !ok {
 				continue
 			}
 		} else if !IsInstalled(cli.binary) {

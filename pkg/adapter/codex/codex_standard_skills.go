@@ -1,33 +1,12 @@
 package codex
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
 )
-
-func (a *Adapter) renderStandardSkills(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	mappings, err := a.prepareStandardSkillMappings(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, m := range mappings {
-		destPath := filepath.Join(a.root, m.TargetPath)
-		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-			return nil, fmt.Errorf("codex standard skill dir 생성 실패 %s: %w", filepath.Dir(destPath), err)
-		}
-		if err := os.WriteFile(destPath, m.Content, 0644); err != nil {
-			return nil, fmt.Errorf("codex standard skill 쓰기 실패 %s: %w", destPath, err)
-		}
-	}
-
-	return mappings, nil
-}
 
 func (a *Adapter) prepareStandardSkillMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
 	routerContent, err := a.renderRouterSkill(cfg)
@@ -37,25 +16,6 @@ func (a *Adapter) prepareStandardSkillMappings(cfg *config.HarnessConfig) ([]ada
 	return []adapter.FileMapping{
 		newSkillMapping(codexProjectSkillPath("auto"), routerContent),
 	}, nil
-}
-
-func (a *Adapter) renderPluginFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	mappings, err := a.preparePluginMappings(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, m := range mappings {
-		destPath := filepath.Join(a.root, m.TargetPath)
-		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-			return nil, fmt.Errorf("codex plugin dir 생성 실패 %s: %w", filepath.Dir(destPath), err)
-		}
-		if err := os.WriteFile(destPath, m.Content, 0644); err != nil {
-			return nil, fmt.Errorf("codex plugin 파일 쓰기 실패 %s: %w", destPath, err)
-		}
-	}
-
-	return mappings, nil
 }
 
 func (a *Adapter) preparePluginMappings(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {

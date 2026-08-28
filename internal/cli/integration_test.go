@@ -34,18 +34,19 @@ func TestInit_CreatesCorrectFiles(t *testing.T) {
 	_, err := runCmd(t, "init", "--dir", dir, "--project", "test-project", "--platforms", "claude-code")
 	require.NoError(t, err)
 
-	// autopus.yaml이 생성되어야 함
-	yamlPath := filepath.Join(dir, "autopus.yaml")
-	require.FileExists(t, yamlPath)
-
-	// .claude/ 디렉터리 구조 생성 확인
-	assert.DirExists(t, filepath.Join(dir, ".claude", "rules", "autopus"))
-	assert.DirExists(t, filepath.Join(dir, ".claude", "skills", "autopus"))
-	assert.DirExists(t, filepath.Join(dir, ".claude", "skills", "auto"))
-	assert.DirExists(t, filepath.Join(dir, ".claude", "agents", "autopus"))
-	// 라우터 커맨드 파일 존재 확인
-	assert.FileExists(t, filepath.Join(dir, ".claude", "skills", "auto", "SKILL.md"))
-	// autopus 커맨드 디렉터리는 생성되지 않아야 함
+	requiredFiles := []string{
+		"autopus.yaml",
+		".claude/rules/autopus/subagent-delegation.md",
+		".claude/skills/auto/SKILL.md",
+		".claude/skills/auto-go/SKILL.md",
+		".claude/skills/planning/SKILL.md",
+		".claude/agents/autopus/executor.md",
+		".claude/settings.json",
+	}
+	for _, path := range requiredFiles {
+		assert.FileExists(t, filepath.Join(dir, filepath.FromSlash(path)))
+	}
+	assert.NoDirExists(t, filepath.Join(dir, ".claude", "skills", "autopus"))
 	assert.NoDirExists(t, filepath.Join(dir, ".claude", "commands", "autopus"))
 
 	// .gitignore 패턴 추가 확인
@@ -69,17 +70,19 @@ func TestInit_CreatesAllContent(t *testing.T) {
 	_, err := runCmd(t, "init", "--dir", dir, "--project", "full-project", "--platforms", "claude-code")
 	require.NoError(t, err)
 
-	// autopus.yaml 생성 확인
-	yamlPath := filepath.Join(dir, "autopus.yaml")
-	require.FileExists(t, yamlPath)
-
-	// .claude/ 디렉터리 구조 생성 확인
-	assert.DirExists(t, filepath.Join(dir, ".claude", "rules", "autopus"))
-	assert.DirExists(t, filepath.Join(dir, ".claude", "skills", "autopus"))
-	assert.DirExists(t, filepath.Join(dir, ".claude", "skills", "auto"))
-	assert.DirExists(t, filepath.Join(dir, ".claude", "agents", "autopus"))
-	// 라우터 커맨드 파일 존재 확인
-	assert.FileExists(t, filepath.Join(dir, ".claude", "skills", "auto", "SKILL.md"))
+	requiredFiles := []string{
+		"autopus.yaml",
+		".claude/rules/autopus/file-size-limit.md",
+		".claude/skills/auto/SKILL.md",
+		".claude/skills/auto-go/SKILL.md",
+		".claude/skills/planning/SKILL.md",
+		".claude/agents/autopus/executor.md",
+		".claude/settings.json",
+	}
+	for _, path := range requiredFiles {
+		assert.FileExists(t, filepath.Join(dir, filepath.FromSlash(path)))
+	}
+	assert.NoDirExists(t, filepath.Join(dir, ".claude", "skills", "autopus"))
 
 	// CLAUDE.md 생성 확인
 	claudePath := filepath.Join(dir, "CLAUDE.md")

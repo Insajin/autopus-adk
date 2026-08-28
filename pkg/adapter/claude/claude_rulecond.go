@@ -137,18 +137,3 @@ func claudeRulePaths(filename string) ([]string, error) {
 	}
 	return rule.Globs, nil
 }
-
-// writeConditionalRuleFiles writes the compiled conditional surface to disk and
-// returns its mappings.
-func (a *Adapter) writeConditionalRuleFiles() ([]adapter.FileMapping, error) {
-	surface, err := claudeConditionalRules()
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range surface.mappings {
-		if err := writeClaudeMapping(a.root, file); err != nil {
-			return nil, fmt.Errorf("조건부 룰 쓰기 실패: %w", err)
-		}
-	}
-	return surface.mappings, nil
-}

@@ -359,3 +359,36 @@ jobs:
         run: >-
           pwsh.exe -NoLogo -NoProfile -NonInteractive
           -File scripts/release-signing/tests/windows-installer-signing-test.ps1
+
+  upgrade-canary:
+    name: upgrade-canary-fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build source candidate for compatibility proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="${RUNNER_TEMP}/auto-0.50.109-canary"
+          go build -trimpath \
+            -ldflags "-s -w -X github.com/insajin/autopus-adk/pkg/version.version=0.50.109-canary -X github.com/insajin/autopus-adk/pkg/version.commit=candidate-source -X github.com/insajin/autopus-adk/pkg/version.date=1970-01-01T00:00:00Z" \
+            -o "$candidate" ./cmd/auto
+          printf 'UPGRADE_CANARY_BINARY=%s\n' "$candidate" >> "$GITHUB_ENV"
+
+      - name: Prove v0.50.108 fixture compatibility
+        shell: bash
+        env:
+          UPGRADE_CANARY_RECEIPT_DIR: ${{ runner.temp }}/upgrade-canary-fixture-receipt
+        run: |
+          set -euo pipefail
+          # This is candidate-source compatibility proof, not old/new release executable or signature proof.
+          scripts/release-signing/tests/posix-upgrade-canary.sh \
+            fixture "$UPGRADE_CANARY_BINARY"

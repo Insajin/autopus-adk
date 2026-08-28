@@ -8,12 +8,16 @@ import (
 	"fmt"
 	"os/exec"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
-const windowsProbeTerminationCode = 1
+const (
+	windowsProbeTerminationCode = 1
+	windowsProbeWaitDelayMargin = 250 * time.Millisecond
+)
 
 func init() {
 	outputCommand = outputWindowsCommand
@@ -59,7 +63,17 @@ func outputLimitedWindowsCommand(cmd *exec.Cmd, outputExceeded func() bool) erro
 	return runWindowsProbeCommand(cmd, outputExceeded)
 }
 
+// exec.Cmd starts WaitDelay only after observing the leader's exit. Reserve
+// cleanup time so the default delay remains an external ceiling, not just the
+// inherited-pipe drain interval.
+func reserveWindowsWaitDelayMargin(cmd *exec.Cmd) {
+	if cmd.WaitDelay == DefaultWaitDelay {
+		cmd.WaitDelay -= windowsProbeWaitDelayMargin
+	}
+}
+
 func runWindowsProbeCommand(cmd *exec.Cmd, outputExceeded func() bool) error {
+	reserveWindowsWaitDelayMargin(cmd)
 	job, err := newWindowsProbeJob()
 	if err != nil {
 		return err

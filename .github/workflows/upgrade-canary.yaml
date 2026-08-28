@@ -1,0 +1,52 @@
+name: Upgrade Canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_version:
+        description: Published version used to initialize the old harness
+        required: true
+        default: "0.50.108"
+        type: string
+      candidate_version:
+        description: Published candidate version admitted by this live lane
+        required: true
+        default: "0.50.109"
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  public-asset-admission:
+    name: public-asset-admission
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Admit published signed upgrade assets
+        shell: bash
+        env:
+          UPGRADE_CANARY_RECEIPT_DIR: ${{ runner.temp }}/upgrade-canary-live-receipt
+          PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+        run: |
+          set -euo pipefail
+          # This lane proves public asset admission only after both exact releases are published.
+          scripts/release-signing/tests/posix-upgrade-canary.sh \
+            live "$PREVIOUS_VERSION" "$CANDIDATE_VERSION"
+
+      - name: Upload public asset admission receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: upgrade-canary-${{ inputs.previous_version }}-to-${{ inputs.candidate_version }}
+          path: ${{ runner.temp }}/upgrade-canary-live-receipt
+          if-no-files-found: error
+          retention-days: 30

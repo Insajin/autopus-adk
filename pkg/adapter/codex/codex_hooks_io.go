@@ -69,36 +69,6 @@ func writeCodexManagedFile(rootPath, relativePath string, data []byte, mode os.F
 	return nil
 }
 
-func removeCodexHookAssets(rootPath string) (returnErr error) {
-	root, err := os.OpenRoot(rootPath)
-	if err != nil {
-		return fmt.Errorf("open repository root: %w", err)
-	}
-	defer func() {
-		if err := root.Close(); err != nil {
-			returnErr = errors.Join(returnErr, fmt.Errorf("close repository root: %w", err))
-		}
-	}()
-
-	assetDir := filepath.Join(".codex", "hooks", "autopus")
-	if err := ensureCodexManagedDirs(root, assetDir, false); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		return err
-	}
-	for _, name := range codexHookAssetNames {
-		path := filepath.Join(assetDir, name)
-		if err := root.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("remove managed Codex hook %s: %w", path, err)
-		}
-	}
-	// Keep directories that contain user-owned hooks; remove only empty shells.
-	_ = root.Remove(assetDir)
-	_ = root.Remove(filepath.Join(".codex", "hooks"))
-	return nil
-}
-
 func cleanCodexManagedPath(path string) (string, error) {
 	clean := filepath.Clean(path)
 	if clean == "." || filepath.IsAbs(clean) || !filepath.IsLocal(clean) {

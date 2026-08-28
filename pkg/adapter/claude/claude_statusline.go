@@ -120,26 +120,6 @@ func (a *Adapter) prepareStatuslineFiles(cfg *config.HarnessConfig) ([]adapter.F
 	return files, nil
 }
 
-func (a *Adapter) copyStatuslineFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping, error) {
-	files, err := a.prepareStatuslineFiles(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, file := range files {
-		targetPath := filepath.Join(a.root, file.TargetPath)
-		perm := os.FileMode(0644)
-		if strings.HasSuffix(file.TargetPath, ".sh") {
-			perm = 0755
-		}
-		if err := os.WriteFile(targetPath, file.Content, perm); err != nil {
-			return nil, fmt.Errorf("%s 쓰기 실패: %w", filepath.Base(file.TargetPath), err)
-		}
-	}
-
-	return files, nil
-}
-
 func (a *Adapter) resolveMergedUserStatusLineCommand(existing StatusLineState, mode config.StatusLineMode) string {
 	if mode != config.StatusLineModeMerge {
 		return ""

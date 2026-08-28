@@ -14,7 +14,6 @@ import (
 const ompModelDoctorProbeOutput = 128 * 1024
 
 type ompModelDoctorExecRunner struct {
-	root    string // retained for constructor compatibility; probes use an isolated cwd
 	process *omp.OMPModelProbeProcess
 	pinErr  error
 }

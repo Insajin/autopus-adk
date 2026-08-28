@@ -1,7 +1,6 @@
 package companionmanifest
 
 import (
-	"fmt"
 	"regexp"
 	"testing"
 )
@@ -78,8 +77,8 @@ func TestArmedReleaseCoordinateSiteCountIsBounded(t *testing.T) {
 	armed := regexp.MustCompile(`v0\.50\.\d+|0\.50\.\d+`)
 	for _, site := range sites {
 		if !armed.MatchString(readReleaseFile(t, site)) {
-			t.Fatal(fmt.Sprintf("%s stopped naming a coordinate; "+
-				"if it became derived, drop it from this list", site))
+			t.Fatalf("%s stopped naming a coordinate; "+
+				"if it became derived, drop it from this list", site)
 		}
 	}
 }
