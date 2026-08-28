@@ -260,10 +260,10 @@ esac
 verify_coordinates || fail 'bridge release coordinates differ after write'
 create_or_adopt_release_reservation || fail 'cannot reserve exact operator-owned bridge draft'
 verify_owned_draft_reservation || fail 'bridge draft changed before tag commit'
-[[ "$(git ls-remote --refs origin "$rotation_ref")" ==
-   "$rotation_ref_commit"$'\t'"$rotation_ref" ]] || fail 'rotation ref changed before tag commit'
-[[ "$(git ls-remote --refs origin "$prep_lock_ref")" ==
-   "$prep_lock_commit"$'\t'"$prep_lock_ref" ]] || fail 'bridge prep lock changed before tag commit'
+rotation_remote=$(git ls-remote --refs origin "$rotation_ref")
+[[ "$rotation_remote" == "$rotation_ref_commit"$'\t'"$rotation_ref" ]] || fail 'rotation ref changed before tag commit'
+lock_remote=$(git ls-remote --refs origin "$prep_lock_ref")
+[[ "$lock_remote" == "$prep_lock_commit"$'\t'"$prep_lock_ref" ]] || fail 'bridge prep lock changed before tag commit'
 scripts/companion-release/verify-release-tag-ruleset.sh || fail 'release tag authority ruleset changed'
 git fetch --no-tags origin main
 [[ "$(git rev-parse --verify origin/main)" == "$source_commit" ]] ||

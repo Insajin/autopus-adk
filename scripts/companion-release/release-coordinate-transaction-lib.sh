@@ -232,12 +232,13 @@ cleanup() {
   exit "$status"
 }
 verify_coordinates() {
-  local index name policies repository_variables environment_variables
+  local index name policies repository_variables environment_variables environment_value
   for index in "${!names[@]}"; do
     [[ "$(gh variable get "${names[$index]}" --repo "$repository")" == "${values[$index]}" ]] ||
       return 1
-    [[ "$(gh variable get "${names[$index]}" --repo "$repository" --env "$environment_name")" ==
-       "${values[$index]}" ]] || return 1
+    environment_value=$(gh variable get "${names[$index]}" --repo "$repository" --env "$environment_name") ||
+      return 1
+    [[ "$environment_value" == "${values[$index]}" ]] || return 1
   done
   repository_variables=$(scope_json --repo "$repository") || return 1
   environment_variables=$(scope_json --repo "$repository" --env "$environment_name") || return 1

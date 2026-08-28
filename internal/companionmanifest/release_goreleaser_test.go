@@ -1,6 +1,7 @@
 package companionmanifest
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/fs"
@@ -102,9 +103,24 @@ func runGoReleaserFixture(
 	if err := os.WriteFile(canaryExecutable, []byte("#!/bin/sh\nexit 0\n"), 0o555); err != nil {
 		t.Fatal(err)
 	}
-	bridgeManifestPath := "omp-context-bridge-release.v1.json"
-	if err := os.WriteFile(filepath.Join(root, bridgeManifestPath), []byte("{}\n"), 0o600); err != nil {
+	evidenceDir := filepath.Join(root, ".autopus", "runtime", "release-evidence")
+	if err := os.MkdirAll(evidenceDir, 0o700); err != nil {
 		t.Fatal(err)
+	}
+	bridgeManifestPath := filepath.Join(".autopus", "runtime", "release-evidence",
+		"omp-context-bridge-release.v1.json")
+	rotationDocumentPath := filepath.Join(".autopus", "runtime", "release-evidence",
+		"adk-key-rotation-v1.json")
+	rotationSignaturePath := filepath.Join(".autopus", "runtime", "release-evidence",
+		"adk-key-rotation-v1.sig")
+	for path, body := range map[string][]byte{
+		bridgeManifestPath:    []byte("{}\n"),
+		rotationDocumentPath:  []byte("{}"),
+		rotationSignaturePath: bytes.Repeat([]byte{0x41}, 64),
+	} {
+		if err := os.WriteFile(filepath.Join(root, path), body, 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	command := exactGoReleaserCommand("release", "--clean", "--parallelism=2",
@@ -112,7 +128,7 @@ func runGoReleaserFixture(
 	command.Dir = root
 	command.Env = append(os.Environ(), goReleaserReleaseEnv(
 		tools, keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable,
-		bridgeManifestPath,
+		bridgeManifestPath, rotationDocumentPath, rotationSignaturePath,
 	)...)
 	productionGoReleaserFixtureRuns.Add(1)
 	output, err := command.CombinedOutput()
@@ -146,7 +162,7 @@ func exactGoReleaserCommand(arguments ...string) *exec.Cmd {
 func goReleaserReleaseEnv(
 	tools mockReleaseTools,
 	keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable,
-	bridgeManifestPath string,
+	bridgeManifestPath, rotationDocumentPath, rotationSignaturePath string,
 ) []string {
 	return []string{
 		"TMPDIR=" + tmpDir,
@@ -154,6 +170,8 @@ func goReleaserReleaseEnv(
 		"COMPANION_SOURCE_COMMIT=" + commit,
 		"COMPANION_SOURCE_TREE=" + tree,
 		"OMP_CONTEXT_BRIDGE_MANIFEST_PATH=" + bridgeManifestPath,
+		"ADK_KEY_ROTATION_DOCUMENT_PATH=" + rotationDocumentPath,
+		"ADK_KEY_ROTATION_SIGNATURE_PATH=" + rotationSignaturePath,
 		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256=" + strings.Repeat("0", 64),
 		"OMP_CONTEXT_RELEASE_CANARY_ROOT=" + canaryRoot,
 		"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE=" + canaryExecutable,
@@ -190,7 +208,7 @@ func copyGoReleaserRepository(t *testing.T, destination string) {
 		copyReleasePath(t, filepath.Join(root, name), filepath.Join(destination, name))
 	}
 	for _, name := range []string{
-		".goreleaser.yaml", "go.mod", "go.sum", "LICENSE", "README.md", "CHANGELOG.md",
+		".gitignore", ".goreleaser.yaml", "go.mod", "go.sum", "LICENSE", "README.md", "CHANGELOG.md",
 	} {
 		copyReleasePath(t, filepath.Join(root, name), filepath.Join(destination, name))
 	}

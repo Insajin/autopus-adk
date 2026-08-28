@@ -105,8 +105,8 @@ env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
   >"$verified_document" || fail 'ADK channel authority rejected the rotation sidecar'
 cmp -s "$document" "$verified_document" || fail 'rotation verifier did not return exact canonical bytes'
 rm -f -- "$verified_document"
-[[ "$(git ls-remote --refs origin "$rotation_ref")" ==
-   "$rotation_ref_commit"$'\t'"$rotation_ref" ]] ||
+final_remote=$(git ls-remote --refs origin "$rotation_ref")
+[[ "$final_remote" == "$rotation_ref_commit"$'\t'"$rotation_ref" ]] ||
   fail 'rotation distribution ref changed during verification'
 rotation_document_sha256=$(shasum -a 256 "$document" | awk '{print $1}')
 [[ "$rotation_document_sha256" =~ ^[0-9a-f]{64}$ ]] || fail 'rotation document digest is malformed'
