@@ -65,9 +65,25 @@ contains "$rotation_publisher" 'verify-rotation-ref-ruleset.sh'
 contains "$rotation_publisher" 'materialize-key-rotation-authority.sh'
 not_contains "$rotation_publisher" './internal/adkchannel/cmd'
 contains "$script_dir/verify-key-rotation-sidecar.sh" 'verify-rotation-ref-ruleset.sh'
+contains "$script_dir/verify-key-rotation-sidecar.sh" '--public-ruleset'
+contains "$script_dir/verify-key-rotation-sidecar.sh" "assertion_mode='strict'"
+contains "$script_dir/verify-key-rotation-sidecar.sh" "assertion_mode='public'"
+contains "$script_dir/verify-key-rotation-sidecar.sh" 'git rev-list --parents -n 1 "$rotation_ref_commit"'
+contains "$rotation_ruleset_gate" 'verify-rotation-ref-ruleset.sh [--public]'
+contains "$rotation_ruleset_gate" '.source_type == "Repository" and .source == $repository'
 contains "$rotation_ruleset_gate" "ruleset_name='autopus-v0.50.109-rotation-ref-authority'"
 contains "$rotation_ruleset_gate" "rotation_ref='refs/heads/release-key-rotation-v0.50.109'"
 contains "$rotation_ruleset_gate" 'actor_type:"User"'
+contains "$release" 'authority-commit: ${{ steps.authority.outputs.authority-commit }}'
+contains "$release" 'CANDIDATE_AUTHORITY_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.authority-commit }}'
+contains "$release" 'PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}'
+contains "$release" '"$PROTECTED_AUTHORITY_COMMIT" == "$CANDIDATE_AUTHORITY_COMMIT"'
+contains "$release" 'verify-key-rotation-sidecar.sh --public-ruleset'
+contains "$recovery" 'REPOSITORY_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}'
+contains "$recovery" 'PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}'
+contains "$recovery" '"$PROTECTED_AUTHORITY_COMMIT" == "$REPOSITORY_AUTHORITY_COMMIT"'
+contains "$recovery" '--public "$PROTECTED_AUTHORITY_COMMIT" "$authority"'
+contains "$script_dir/materialize-key-rotation-authority.sh" "protected_variable_name='ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT'"
 # The tap coordinates advance with every publication, so pinning their exact
 # value here only forces a second edit; the publisher already enforces them
 # against the live tap. Assert the shape that keeps that enforcement possible.

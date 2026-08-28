@@ -35,22 +35,31 @@ jobs:
           go-version-file: go.mod
 
       - name: Materialize immutable rotation authority and build bridge verifiers
+        id: authority
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          REPOSITORY_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}
+          PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}
         run: |
           set -euo pipefail
           umask 077
+          [[ "${REPOSITORY_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$ &&
+             "${PROTECTED_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$ &&
+             "$PROTECTED_AUTHORITY_COMMIT" == "$REPOSITORY_AUTHORITY_COMMIT" ]]
           authority="$RUNNER_TEMP/key-rotation-authority"
+          receipt="$RUNNER_TEMP/key-rotation-authority-receipt.json"
           lineage_verifier="$RUNNER_TEMP/auto-omp-context-lineage-verifier"
           manifest_verifier="$RUNNER_TEMP/auto-companion-manifest-verifier"
           [[ ! -e "$authority" && ! -L "$authority" &&
              ! -e "$lineage_verifier" && ! -L "$lineage_verifier" &&
              ! -e "$manifest_verifier" && ! -L "$manifest_verifier" ]]
-          scripts/companion-release/materialize-key-rotation-authority.sh "$authority" \
-            > "$RUNNER_TEMP/key-rotation-authority-receipt.json"
-          jq -e '.authority_commit | test("^[0-9a-f]{40}$")' \
-            "$RUNNER_TEMP/key-rotation-authority-receipt.json" >/dev/null
+          scripts/companion-release/materialize-key-rotation-authority.sh \
+            --public "$PROTECTED_AUTHORITY_COMMIT" "$authority" > "$receipt"
+          authority_commit=$(jq -er --arg expected "$PROTECTED_AUTHORITY_COMMIT" '
+            select(.assertion_mode == "public" and .authority_commit == $expected) |
+            .authority_commit
+          ' "$receipt")
+          printf 'authority-commit=%s\n' "$authority_commit" >> "$GITHUB_OUTPUT"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             go build -trimpath -o "$lineage_verifier" \
             ./scripts/companion-release/ompcontextlineageverify

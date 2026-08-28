@@ -182,6 +182,12 @@ func TestFormulaRecoveryWorkflow_ValidatesRotationSourceCandidateAndImmutableRel
 	for _, required := range []string{
 		`authority="$RUNNER_TEMP/key-rotation-authority"`,
 		"materialize-key-rotation-authority.sh",
+		`"${REPOSITORY_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$`,
+		`"${PROTECTED_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$`,
+		`"$PROTECTED_AUTHORITY_COMMIT" == "$REPOSITORY_AUTHORITY_COMMIT"`,
+		`--public "$PROTECTED_AUTHORITY_COMMIT" "$authority"`,
+		`.assertion_mode == "public"`,
+		`printf 'authority-commit=%s\n' "$authority_commit" >> "$GITHUB_OUTPUT"`,
 		`lineage_verifier="$RUNNER_TEMP/auto-omp-context-lineage-verifier"`,
 		`manifest_verifier="$RUNNER_TEMP/auto-companion-manifest-verifier"`,
 		"./scripts/companion-release/ompcontextlineageverify",
@@ -190,6 +196,13 @@ func TestFormulaRecoveryWorkflow_ValidatesRotationSourceCandidateAndImmutableRel
 		if !strings.Contains(build.Run, required) {
 			t.Fatalf("recovery verifier build contract missing %q", required)
 		}
+	}
+	wantAuthorityEnv := map[string]any{
+		"REPOSITORY_AUTHORITY_COMMIT": "${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}",
+		"PROTECTED_AUTHORITY_COMMIT":  "${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}",
+	}
+	if !reflect.DeepEqual(build.Env, wantAuthorityEnv) {
+		t.Fatalf("recovery authority environment = %#v, want %#v", build.Env, wantAuthorityEnv)
 	}
 	if strings.Count(build.Run, `env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP"`) != 2 {
 		t.Fatalf("recovery verifier builds escaped env -i isolation:\n%s", build.Run)

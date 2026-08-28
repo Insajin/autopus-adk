@@ -27,6 +27,7 @@ jobs:
       candidate-artifact-sha256: ${{ steps.candidate.outputs.candidate-artifact-sha256 }}
       rotation-ref-commit: ${{ steps.rotation.outputs.rotation-ref-commit }}
       rotation-document-sha256: ${{ steps.rotation.outputs.rotation-document-sha256 }}
+      authority-commit: ${{ steps.authority.outputs.authority-commit }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -38,16 +39,21 @@ jobs:
           go-version-file: go.mod
 
       - name: Materialize immutable key-rotation authority
+        id: authority
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          EXPECTED_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}
         run: |
           set -euo pipefail
           authority="$RUNNER_TEMP/key-rotation-authority"
-          scripts/companion-release/materialize-key-rotation-authority.sh "$authority" \
-            > "$RUNNER_TEMP/key-rotation-authority-receipt.json"
-          jq -e '.authority_commit | test("^[0-9a-f]{40}$")' \
-            "$RUNNER_TEMP/key-rotation-authority-receipt.json" >/dev/null
+          receipt="$RUNNER_TEMP/key-rotation-authority-receipt.json"
+          scripts/companion-release/materialize-key-rotation-authority.sh \
+            --public "$EXPECTED_AUTHORITY_COMMIT" "$authority" > "$receipt"
+          authority_commit=$(jq -er --arg expected "$EXPECTED_AUTHORITY_COMMIT" '
+            select(.assertion_mode == "public" and .authority_commit == $expected) |
+            .authority_commit
+          ' "$receipt")
+          printf 'authority-commit=%s\n' "$authority_commit" >> "$GITHUB_OUTPUT"
 
       - name: Verify independently signed exact key rotation
         id: rotation
@@ -61,11 +67,12 @@ jobs:
           receipt=$(env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             AUTOPUS_ADK_CHANNEL_KEY_ID="$AUTOPUS_ADK_CHANNEL_KEY_ID" \
             AUTOPUS_ADK_CHANNEL_PUBLIC_KEY="$AUTOPUS_ADK_CHANNEL_PUBLIC_KEY" \
-            scripts/companion-release/verify-key-rotation-sidecar.sh \
+            scripts/companion-release/verify-key-rotation-sidecar.sh --public-ruleset \
             "$RUNNER_TEMP/key-rotation-authority/verify-rotation.sh" "$GITHUB_SHA" "$source_tree" \
             "$RUNNER_TEMP/verified-key-rotation")
           rotation_ref_commit=$(jq -er '.rotation_ref_commit' <<<"$receipt")
           rotation_document_sha256=$(jq -er '.rotation_document_sha256' <<<"$receipt")
+          [[ "$(jq -er '.assertion_mode' <<<"$receipt")" == 'public' ]]
           [[ "$rotation_ref_commit" =~ ^[0-9a-f]{40}$ ]]
           [[ "$rotation_document_sha256" =~ ^[0-9a-f]{64}$ ]]
           printf 'rotation-ref-commit=%s\n' "$rotation_ref_commit" >>"$GITHUB_OUTPUT"
@@ -120,17 +127,26 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Materialize immutable key-rotation authority
+      - name: Materialize matching protected key-rotation authority
+        id: authority
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_AUTHORITY_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.authority-commit }}
+          PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}
         run: |
           set -euo pipefail
+          [[ "$CANDIDATE_AUTHORITY_COMMIT" =~ ^[0-9a-f]{40}$ &&
+             "${PROTECTED_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$ &&
+             "$PROTECTED_AUTHORITY_COMMIT" == "$CANDIDATE_AUTHORITY_COMMIT" ]]
           authority="$RUNNER_TEMP/key-rotation-authority"
-          scripts/companion-release/materialize-key-rotation-authority.sh "$authority" \
-            > "$RUNNER_TEMP/key-rotation-authority-receipt.json"
-          jq -e '.authority_commit | test("^[0-9a-f]{40}$")' \
-            "$RUNNER_TEMP/key-rotation-authority-receipt.json" >/dev/null
+          receipt="$RUNNER_TEMP/key-rotation-authority-receipt.json"
+          scripts/companion-release/materialize-key-rotation-authority.sh \
+            --public "$PROTECTED_AUTHORITY_COMMIT" "$authority" > "$receipt"
+          authority_commit=$(jq -er --arg expected "$CANDIDATE_AUTHORITY_COMMIT" '
+            select(.assertion_mode == "public" and .authority_commit == $expected) |
+            .authority_commit
+          ' "$receipt")
+          printf 'authority-commit=%s\n' "$authority_commit" >> "$GITHUB_OUTPUT"
 
       - name: Reverify independently signed exact key rotation
         shell: bash
@@ -145,11 +161,12 @@ jobs:
           receipt=$(env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             AUTOPUS_ADK_CHANNEL_KEY_ID="$AUTOPUS_ADK_CHANNEL_KEY_ID" \
             AUTOPUS_ADK_CHANNEL_PUBLIC_KEY="$AUTOPUS_ADK_CHANNEL_PUBLIC_KEY" \
-            scripts/companion-release/verify-key-rotation-sidecar.sh \
+            scripts/companion-release/verify-key-rotation-sidecar.sh --public-ruleset \
             "$RUNNER_TEMP/key-rotation-authority/verify-rotation.sh" "$GITHUB_SHA" "$source_tree" \
             "$RUNNER_TEMP/verified-key-rotation")
           [[ "$(jq -er '.rotation_ref_commit' <<<"$receipt")" == "$EXPECTED_ROTATION_REF_COMMIT" ]]
           [[ "$(jq -er '.rotation_document_sha256' <<<"$receipt")" == "$EXPECTED_ROTATION_DOCUMENT_SHA256" ]]
+          [[ "$(jq -er '.assertion_mode' <<<"$receipt")" == 'public' ]]
 
       - name: Validate exact release source
         id: release-source

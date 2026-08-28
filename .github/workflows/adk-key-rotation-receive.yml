@@ -35,16 +35,21 @@ jobs:
 
 
       - name: Materialize immutable key-rotation authority
+        id: authority
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          EXPECTED_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}
         run: |
           set -euo pipefail
           authority="$RUNNER_TEMP/key-rotation-authority"
-          scripts/companion-release/materialize-key-rotation-authority.sh "$authority" \
-            > "$RUNNER_TEMP/key-rotation-authority-receipt.json"
-          jq -e '.authority_commit | test("^[0-9a-f]{40}$")' \
-            "$RUNNER_TEMP/key-rotation-authority-receipt.json" >/dev/null
+          receipt="$RUNNER_TEMP/key-rotation-authority-receipt.json"
+          scripts/companion-release/materialize-key-rotation-authority.sh \
+            --public "$EXPECTED_AUTHORITY_COMMIT" "$authority" > "$receipt"
+          authority_commit=$(jq -er --arg expected "$EXPECTED_AUTHORITY_COMMIT" '
+            select(.assertion_mode == "public" and .authority_commit == $expected) |
+            .authority_commit
+          ' "$receipt")
+          printf 'authority-commit=%s\n' "$authority_commit" >> "$GITHUB_OUTPUT"
 
       - name: Decode bounded audit inputs
         shell: bash
@@ -85,7 +90,7 @@ jobs:
           [[ -d "$incoming" && ! -L "$incoming" ]]
           [[ ! -e "$audited" && ! -L "$audited" ]]
           mkdir -m 0700 "$audited"
-          scripts/companion-release/verify-rotation-ref-ruleset.sh
+          scripts/companion-release/verify-rotation-ref-ruleset.sh --public
 
           remote_line="$(env -u GITHUB_TOKEN /usr/bin/git ls-remote --refs origin "$rotation_ref")"
           rotation_commit="${remote_line%%$'\t'*}"

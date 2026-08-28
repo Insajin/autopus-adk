@@ -14,6 +14,14 @@ func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *test
 		"- 'v0.50.109'", "if: github.ref_type == 'tag'",
 		"environment:", "adk-companion-release",
 		"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
+		`authority-commit: ${{ steps.authority.outputs.authority-commit }}`,
+		`EXPECTED_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}`,
+		`CANDIDATE_AUTHORITY_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.authority-commit }}`,
+		`PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}`,
+		`"${PROTECTED_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$`,
+		`"$PROTECTED_AUTHORITY_COMMIT" == "$CANDIDATE_AUTHORITY_COMMIT"`,
+		`--public "$PROTECTED_AUTHORITY_COMMIT" "$authority"`,
+		"verify-key-rotation-sidecar.sh --public-ruleset",
 		"Verify operator-owned canonical-full bridge reservation",
 		`--arg tag "$GITHUB_REF_NAME"`,
 		`[$all[] | select(.draft == true and .name == $tag)]`,
@@ -27,6 +35,13 @@ func TestReleaseWorkflow_ExactA22ProtectedEnvironmentAndImmutableActions(t *test
 		if !strings.Contains(release, required) {
 			t.Fatalf("release workflow missing %q", required)
 		}
+	}
+	protectedIndex := strings.Index(release, "\n  release:\n")
+	if protectedIndex < 0 {
+		t.Fatal("protected release job is missing")
+	}
+	if strings.Contains(release[protectedIndex:], "${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}") {
+		t.Fatal("protected release job reads repository vars instead of the runner-injected environment variable")
 	}
 	if strings.Contains(release, "- 'v*'") || strings.Contains(release, "- v*") {
 		t.Fatal("arbitrary version tags can enter the protected release job")

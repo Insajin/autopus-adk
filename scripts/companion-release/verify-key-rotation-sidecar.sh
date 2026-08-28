@@ -4,20 +4,31 @@ umask 077
 
 fail() { printf 'key rotation sidecar: %s\n' "$1" >&2; exit 1; }
 usage() {
-  printf '%s\n' 'usage: verify-key-rotation-sidecar.sh [--historical] VERIFIER SOURCE_COMMIT SOURCE_TREE OUTPUT_DIR [DOCUMENT SIGNATURE]' >&2
+  printf '%s\n' 'usage: verify-key-rotation-sidecar.sh [--public-ruleset] [--historical] VERIFIER SOURCE_COMMIT SOURCE_TREE OUTPUT_DIR [DOCUMENT SIGNATURE]' >&2
   exit 64
 }
+public_ruleset=0
 historical=0
-if [[ "${1-}" == '--historical' ]]; then
-  historical=1
+while [[ "${1-}" == --* ]]; do
+  case "$1" in
+    --public-ruleset)
+      [[ "$public_ruleset" -eq 0 ]] || usage
+      public_ruleset=1
+      ;;
+    --historical)
+      [[ "$historical" -eq 0 ]] || usage
+      historical=1
+      ;;
+    *) usage ;;
+  esac
   shift
-fi
+done
 [[ $# -eq 4 || $# -eq 6 ]] || usage
 readonly verifier=$1 source_commit=$2 source_tree=$3 output_dir=$4
 readonly supplied_document=${5-} supplied_signature=${6-}
 verify_command='verify-rotation'
 [[ "$historical" -eq 0 ]] || verify_command='verify-rotation-historical'
-readonly historical verify_command
+readonly public_ruleset historical verify_command
 readonly rotation_ref='refs/heads/release-key-rotation-v0.50.109'
 readonly document_name='adk-key-rotation-v1.json'
 readonly signature_name='adk-key-rotation-v1.sig'
@@ -59,8 +70,13 @@ done
   fail 'rotation verification must run at repository root'
 [[ "$(git remote get-url origin)" =~ ^(https://github\.com/|git@github\.com:)(Insajin|insajin)/autopus-adk(\.git)?$ ]] ||
   fail 'origin is not the production repository'
-scripts/companion-release/verify-rotation-ref-ruleset.sh ||
-  fail 'immutable rotation ref authority ruleset is unavailable'
+if [[ "$public_ruleset" -eq 1 ]]; then
+  scripts/companion-release/verify-rotation-ref-ruleset.sh --public ||
+    fail 'public immutable rotation ref authority ruleset is unavailable'
+else
+  scripts/companion-release/verify-rotation-ref-ruleset.sh ||
+    fail 'immutable rotation ref authority ruleset is unavailable'
+fi
 
 remote_line=$(git ls-remote --refs origin "$rotation_ref") || fail 'cannot inspect rotation distribution ref'
 rotation_ref_commit=${remote_line%%$'\t'*}
@@ -71,6 +87,8 @@ git fetch --no-tags origin "$rotation_ref" >/dev/null || fail 'cannot fetch rota
 [[ "$(git rev-parse --verify FETCH_HEAD)" == "$rotation_ref_commit" &&
    "$(git cat-file -t "$rotation_ref_commit")" == 'commit' ]] ||
   fail 'fetched rotation distribution commit differs'
+[[ "$(git rev-list --parents -n 1 "$rotation_ref_commit")" == "$rotation_ref_commit" ]] ||
+  fail 'rotation distribution commit is not orphaned'
 entries=$(git ls-tree -r "$rotation_ref_commit") || fail 'cannot inspect rotation distribution tree'
 names=$(git ls-tree -r --name-only "$rotation_ref_commit") || fail 'cannot inspect rotation distribution names'
 [[ "$names" == "$document_name"$'\n'"$signature_name" ]] ||
@@ -110,7 +128,11 @@ final_remote=$(git ls-remote --refs origin "$rotation_ref")
   fail 'rotation distribution ref changed during verification'
 rotation_document_sha256=$(shasum -a 256 "$document" | awk '{print $1}')
 [[ "$rotation_document_sha256" =~ ^[0-9a-f]{64}$ ]] || fail 'rotation document digest is malformed'
-jq -cn --arg rotation_ref "$rotation_ref" --arg rotation_ref_commit "$rotation_ref_commit" \
+assertion_mode='strict'
+[[ "$public_ruleset" -eq 0 ]] || assertion_mode='public'
+readonly assertion_mode
+jq -cn --arg assertion_mode "$assertion_mode" --arg rotation_ref "$rotation_ref" \
+  --arg rotation_ref_commit "$rotation_ref_commit" \
   --arg rotation_document_sha256 "$rotation_document_sha256" \
-  '{rotation_ref:$rotation_ref,rotation_ref_commit:$rotation_ref_commit,
+  '{assertion_mode:$assertion_mode,rotation_ref:$rotation_ref,rotation_ref_commit:$rotation_ref_commit,
     rotation_document_sha256:$rotation_document_sha256}'

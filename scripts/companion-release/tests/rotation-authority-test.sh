@@ -7,6 +7,7 @@ repo=$(cd -- "${BASH_SOURCE[0]%/*}/../../.." && pwd -P)
 release="$repo/scripts/companion-release"
 source_authority="$release/rotation-authority"
 materializer="$release/materialize-key-rotation-authority.sh"
+rotation_ruleset="$release/verify-rotation-ref-ruleset.sh"
 for tool in cmp dd git jq openssl sed ssh-keygen stat; do
   command -v "$tool" >/dev/null || fail "$tool is unavailable"
 done
@@ -169,12 +170,13 @@ canonical_tree=$(git -C "$temp/authority-repo" write-tree)
 canonical_commit=$(printf canonical | git -C "$temp/authority-repo" commit-tree "$canonical_tree")
 authority_ref='refs/heads/release-key-rotation-authority-v2'
 git -C "$temp/authority-repo" update-ref "$authority_ref" "$canonical_commit"
-printf '%s' "$canonical_commit" >"$temp/state/repository"; cp "$temp/state/repository" "$temp/state/environment"
+printf '%s' "$canonical_commit" >"$temp/state/repository"; cp "$temp/state/repository" "$temp/state/environment"; cp "$temp/state/repository" "$temp/state/protected"
 printf enabled >"$temp/state/ruleset"
 
 cat >"$temp/bin/git" <<EOF
 #!/usr/bin/env bash
-[[ -z "\${GH_TOKEN-}" && "\${GIT_TERMINAL_PROMPT-}" == 0 && "\${GIT_ASKPASS-}" == /usr/bin/false ]] || exit 90
+[[ -z "\${GH_TOKEN-}" && -z "\${GITHUB_TOKEN-}" &&
+   "\${GIT_TERMINAL_PROMPT-}" == 0 && "\${GIT_ASKPASS-}" == /usr/bin/false ]] || exit 90
 args=(); for arg in "\$@"; do
   [[ "\$arg" != 'https://github.com/Insajin/autopus-adk.git' ]] || arg='$temp/authority-repo'
   args+=("\$arg")
@@ -184,23 +186,44 @@ EOF
 cat >"$temp/bin/gh" <<EOF
 #!/usr/bin/env bash
 state='$temp/state'
+printf '%s\n' "\$*" >>"\$state/gh-calls"
+[[ ! -f "\$state/force-403" ]] || exit 1
 if [[ "\$1 \$2" == 'variable get' ]]; then
-  if [[ " \$* " == *' --env '* ]]; then cat "\$state/environment"; else cat "\$state/repository"; fi
+  if [[ " \$* " == *' --env '* ]]; then if [[ "\$3" == ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT ]]; then cat "\$state/protected"; else cat "\$state/environment"; fi; else cat "\$state/repository"; fi
 elif [[ "\$1" == api && "\$*" == *'/rulesets/991'* ]]; then
-  cat <<'JSON'
-{"name":"autopus-key-rotation-authority-v2","target":"branch","enforcement":"active","conditions":{"ref_name":{"exclude":[],"include":["refs/heads/release-key-rotation-authority-v2"]}},"bypass_actors":[{"actor_id":204883817,"actor_type":"User","bypass_mode":"always"}],"rules":[{"type":"creation"},{"type":"deletion"},{"type":"update"}]}
-JSON
-elif [[ "\$1" == api && -f "\$state/ruleset" ]]; then
+  printf '%s\n' '{"name":"autopus-key-rotation-authority-v2","target":"branch","enforcement":"active","conditions":{"ref_name":{"exclude":[],"include":["refs/heads/release-key-rotation-authority-v2"]}},"bypass_actors":[{"actor_id":204883817,"actor_type":"User","bypass_mode":"always"}],"rules":[{"type":"creation"},{"type":"deletion"},{"type":"update"}]}'
+elif [[ "\$1" == api && "\$*" == *'/rulesets/992'* ]]; then
+  printf '%s\n' '{"name":"autopus-v0.50.109-rotation-ref-authority","target":"branch","enforcement":"active","conditions":{"ref_name":{"exclude":[],"include":["refs/heads/release-key-rotation-v0.50.109"]}},"bypass_actors":[{"actor_id":204883817,"actor_type":"User","bypass_mode":"always"}],"rules":[{"type":"creation"},{"type":"deletion"},{"type":"update"}]}'
+elif [[ "\$1" == api && "\$*" == *'--paginate'* && -f "\$state/ruleset" ]]; then
   printf '%s\n' '[[{"id":991,"name":"autopus-key-rotation-authority-v2","target":"branch"}]]'
+elif [[ "\$1" == api ]]; then
+  printf '%s\n' '[{"id":992,"name":"autopus-v0.50.109-rotation-ref-authority","target":"branch"}]'
 else exit 1
+fi
+EOF
+cat >"$temp/bin/curl" <<EOF
+#!/usr/bin/env bash
+state='$temp/state'
+[[ -z "\${GH_TOKEN-}" && -z "\${GITHUB_TOKEN-}" && "\${1-}" == '--disable' &&
+   " \$* " != *' Authorization:'* ]] || exit 91
+printf '%s\n' "\$*" >>"\$state/curl-calls"
+url=\${!#}
+source='Insajin/autopus-adk'; [[ ! -f "\$state/public-bad" ]] || source='Other/repository'
+if [[ "\$url" == */rulesets/991 ]]; then
+  printf '{"source_type":"Repository","source":"%s","name":"autopus-key-rotation-authority-v2","target":"branch","enforcement":"active","conditions":{"ref_name":{"exclude":[],"include":["refs/heads/release-key-rotation-authority-v2"]}},"rules":[{"type":"creation"},{"type":"deletion"},{"type":"update"}]}\n' "\$source"
+elif [[ "\$url" == */rulesets/992 ]]; then
+  printf '{"source_type":"Repository","source":"%s","name":"autopus-v0.50.109-rotation-ref-authority","target":"branch","enforcement":"active","conditions":{"ref_name":{"exclude":[],"include":["refs/heads/release-key-rotation-v0.50.109"]}},"rules":[{"type":"creation"},{"type":"deletion"},{"type":"update"}]}\n' "\$source"
+else
+  printf '%s\n' '[{"id":991,"name":"autopus-key-rotation-authority-v2","target":"branch"},{"id":992,"name":"autopus-v0.50.109-rotation-ref-authority","target":"branch"}]'
 fi
 EOF
 chmod 0700 "$temp/bin/"*
 mock_path="$temp/bin:$PATH"
-receipt=$(GH_TOKEN=must-not-reach-git PATH="$mock_path" "$materializer" "$temp/output")
-jq -e --arg commit "$canonical_commit" '.authority_ref=="refs/heads/release-key-rotation-authority-v2" and
+receipt=$(GH_TOKEN=operator-token PATH="$mock_path" "$materializer" "$temp/output")
+jq -e --arg commit "$canonical_commit" '.assertion_mode=="strict" and
+  .authority_ref=="refs/heads/release-key-rotation-authority-v2" and
   .authority_commit==$commit and (.verifier_sha256|test("^[0-9a-f]{64}$")) and
-  (.policy_sha256|test("^[0-9a-f]{64}$"))' <<<"$receipt" >/dev/null || fail 'receipt differs'
+  (.policy_sha256|test("^[0-9a-f]{64}$"))' <<<"$receipt" >/dev/null || fail 'strict receipt differs'
 mode() { local value; if value=$(stat -f '%Lp' "$1" 2>/dev/null); then printf '%s' "$value"; else stat -c '%a' "$1"; fi; }
 [[ "$(mode "$temp/output/verify-rotation.sh")" == 700 &&
    "$(mode "$temp/output/adk-key-rotation-authority.v1.json")" == 600 ]] || fail 'output modes differ'
@@ -208,9 +231,36 @@ output_entries=("$temp/output/"*)
 [[ ${#output_entries[@]} -eq 2 && -f "$temp/output/verify-rotation.sh" &&
    -f "$temp/output/adk-key-rotation-authority.v1.json" ]] || fail 'output pair differs'
 [[ ! -e "$temp/state/go-called" ]] || fail 'candidate Go verifier was called'
+rm -f "$temp/state/gh-calls" "$temp/state/curl-calls"
+public_receipt=$(GH_TOKEN=must-not-authenticate GITHUB_TOKEN=must-not-authenticate \
+  PATH="$mock_path" "$materializer" --public "$canonical_commit" "$temp/output-public")
+jq -e --arg commit "$canonical_commit" '.assertion_mode=="public" and .authority_commit==$commit' \
+  <<<"$public_receipt" >/dev/null || fail 'public receipt differs'
+[[ ! -e "$temp/state/gh-calls" && "$(wc -l <"$temp/state/curl-calls" | tr -d ' ')" == 6 ]] ||
+  fail 'public materialization did not remain on the anonymous API path'
+rm -f "$temp/state/curl-calls"
+GH_TOKEN=must-not-authenticate GITHUB_TOKEN=must-not-authenticate PATH="$mock_path" \
+  "$rotation_ruleset" --public
+[[ ! -e "$temp/state/gh-calls" && "$(wc -l <"$temp/state/curl-calls" | tr -d ' ')" == 2 ]] ||
+  fail 'public rotation ruleset verification used an authenticated path'
 
 materializer_rejects() { local label=$1; reject "$label" env PATH="$mock_path" "$materializer" "$temp/out-$RANDOM"; }
+touch "$temp/state/force-403"; rm -f "$temp/state/curl-calls"
+materializer_rejects 'strict 403 without fallback'
+[[ ! -e "$temp/state/curl-calls" ]] || fail 'strict 403 fell back to public assertions'
+rm -f "$temp/state/gh-calls"
+reject 'strict rotation ruleset 403 without fallback' env PATH="$mock_path" "$rotation_ruleset"
+[[ -e "$temp/state/gh-calls" && ! -e "$temp/state/curl-calls" ]] ||
+  fail 'strict rotation ruleset 403 fell back to public assertions'
+rm "$temp/state/force-403"
+touch "$temp/state/public-bad"
+reject 'wrong public repository source' env PATH="$mock_path" "$materializer" \
+  --public "$canonical_commit" "$temp/output-public-bad"
+rm "$temp/state/public-bad"
+reject 'malformed public authority commit' env PATH="$mock_path" "$materializer" \
+  --public not-a-commit "$temp/output-public-malformed"
 printf '%040d' 0 >"$temp/state/environment"; materializer_rejects 'environment mismatch'; cp "$temp/state/repository" "$temp/state/environment"
+printf '%040d' 1 >"$temp/state/protected"; materializer_rejects 'distinct protected mismatch'; cp "$temp/state/repository" "$temp/state/protected"
 rm "$temp/state/ruleset"; materializer_rejects 'missing ruleset'; printf enabled >"$temp/state/ruleset"
 publish_tree() {
   local message=$1 parent=${2-} tree commit
@@ -219,7 +269,7 @@ publish_tree() {
   if [[ -n "$parent" ]]; then commit=$(printf '%s' "$message" | git -C "$temp/authority-repo" commit-tree "$tree" -p "$parent")
   else commit=$(printf '%s' "$message" | git -C "$temp/authority-repo" commit-tree "$tree"); fi
   git -C "$temp/authority-repo" update-ref "$authority_ref" "$commit"
-  printf '%s' "$commit" >"$temp/state/repository"; cp "$temp/state/repository" "$temp/state/environment"
+  printf '%s' "$commit" >"$temp/state/repository"; cp "$temp/state/repository" "$temp/state/environment"; cp "$temp/state/repository" "$temp/state/protected"
 }
 restore_tree() { git -C "$temp/authority-repo" checkout -q "$canonical_tree" -- .; rm -f "$temp/authority-repo/extra"; }
 printf extra >"$temp/authority-repo/extra"; publish_tree extra; materializer_rejects 'extra file'; restore_tree
@@ -233,9 +283,9 @@ printf '\n' >>"$temp/authority-repo/verify-rotation.sh"; publish_tree verifier-b
 materializer_rejects 'noncanonical verifier'; restore_tree
 publish_tree parent "$canonical_commit"; materializer_rejects 'non-orphan commit'; restore_tree
 publish_tree canonical-restored
-repacked=$(<"$temp/state/repository"); printf '%s' "$canonical_commit" >"$temp/state/repository"; cp "$temp/state/repository" "$temp/state/environment"
+repacked=$(<"$temp/state/repository"); printf '%s' "$canonical_commit" >"$temp/state/repository"; cp "$temp/state/repository" "$temp/state/environment"; cp "$temp/state/repository" "$temp/state/protected"
 materializer_rejects repack
-printf '%s' "$repacked" >"$temp/state/repository"; cp "$temp/state/repository" "$temp/state/environment"
+printf '%s' "$repacked" >"$temp/state/repository"; cp "$temp/state/repository" "$temp/state/environment"; cp "$temp/state/repository" "$temp/state/protected"
 git -C "$temp/authority-repo" update-ref "$authority_ref" "$canonical_commit"
 materializer_rejects 'ref swap'
 printf '%s\n' 'rotation authority tests: PASS'

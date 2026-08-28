@@ -3,20 +3,36 @@ set -euo pipefail
 umask 077
 
 fail() { printf 'rotation authority materializer: %s\n' "$1" >&2; exit 1; }
-[[ $# -eq 1 ]] || fail 'usage: materialize-key-rotation-authority.sh OUTPUT_DIR'
-readonly output_dir=$1
+usage() { fail 'usage: materialize-key-rotation-authority.sh [--public EXPECTED_COMMIT] OUTPUT_DIR'; }
+public_mode=0
+expected_authority_commit=''
+if [[ "${1-}" == '--public' ]]; then
+  [[ $# -eq 3 ]] || usage
+  public_mode=1
+  expected_authority_commit=$2
+  shift 2
+fi
+[[ $# -eq 1 ]] || usage
+readonly public_mode expected_authority_commit output_dir=$1
 readonly repository='Insajin/autopus-adk'
 readonly environment_name='adk-companion-release'
 readonly variable_name='ADK_KEY_ROTATION_AUTHORITY_COMMIT'
+readonly protected_variable_name='ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT'
 readonly authority_ref='refs/heads/release-key-rotation-authority-v2'
 readonly ruleset_name='autopus-key-rotation-authority-v2'
 readonly authority_actor_id=204883817
 readonly remote_url='https://github.com/Insajin/autopus-adk.git'
+readonly api_url='https://api.github.com/repos/Insajin/autopus-adk'
 readonly policy_name='adk-key-rotation-authority.v1.json'
 readonly verifier_name='verify-rotation.sh'
-for tool in env gh git install jq mktemp openssl rm; do
+for tool in env git install jq mktemp openssl rm; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is unavailable"
 done
+if [[ "$public_mode" -eq 1 ]]; then
+  command -v curl >/dev/null 2>&1 || fail 'curl is unavailable'
+else
+  command -v gh >/dev/null 2>&1 || fail 'gh is unavailable'
+fi
 [[ ! -e "$output_dir" && ! -L "$output_dir" ]] || fail 'output directory already exists'
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/adk-rotation-authority.XXXXXX") || fail 'cannot create private workspace'
 readonly temp_dir
@@ -35,14 +51,51 @@ cleanup() {
 trap cleanup EXIT
 
 read_variables() {
+  if [[ "$public_mode" -eq 1 ]]; then
+    repository_commit=$expected_authority_commit
+    [[ "$repository_commit" =~ ^[0-9a-f]{40}$ ]] ||
+      fail 'public authority commit assertion is malformed'
+    return
+  fi
   repository_commit=$(gh variable get "$variable_name" --repo "$repository") ||
     fail 'repository authority commit variable is unavailable'
   environment_commit=$(gh variable get "$variable_name" --repo "$repository" --env "$environment_name") ||
     fail 'protected-environment authority commit variable is unavailable'
-  [[ "$repository_commit" =~ ^[0-9a-f]{40}$ && "$repository_commit" == "$environment_commit" ]] ||
+  protected_commit=$(gh variable get "$protected_variable_name" --repo "$repository" --env "$environment_name") ||
+    fail 'distinct protected authority commit variable is unavailable'
+  [[ "$repository_commit" =~ ^[0-9a-f]{40}$ &&
+     "$repository_commit" == "$environment_commit" &&
+     "$repository_commit" == "$protected_commit" ]] ||
     fail 'repository and protected-environment authority commits differ or are malformed'
 }
+public_api() (
+  unset GH_TOKEN GITHUB_TOKEN
+  curl --disable --fail --silent --show-error --proto '=https' --tlsv1.2 \
+    --header 'Accept: application/vnd.github+json' \
+    --header 'X-GitHub-Api-Version: 2022-11-28' "$1"
+)
 verify_ruleset() {
+  if [[ "$public_mode" -eq 1 ]]; then
+    summaries=$(public_api "${api_url}/rulesets?includes_parents=true&targets=branch&per_page=100") ||
+      fail 'cannot publicly inspect authority ref rulesets'
+    jq -e 'type == "array" and length < 100' <<<"$summaries" >/dev/null ||
+      fail 'public authority ruleset listing is incomplete'
+    ruleset_id=$(jq -er --arg name "$ruleset_name" '
+      [.[] | select(.name == $name and .target == "branch")] |
+      if length == 1 then .[0].id else error("authority ruleset is missing or ambiguous") end
+    ' <<<"$summaries") || fail 'public authority ref ruleset is missing or ambiguous'
+    [[ "$ruleset_id" =~ ^[1-9][0-9]*$ ]] || fail 'public authority ref ruleset ID is malformed'
+    ruleset=$(public_api "${api_url}/rulesets/${ruleset_id}") ||
+      fail 'cannot publicly read exact authority ref ruleset'
+    jq -e --arg repository "$repository" --arg name "$ruleset_name" --arg ref "$authority_ref" '
+      .source_type == "Repository" and .source == $repository and
+      .name == $name and .target == "branch" and .enforcement == "active" and
+      .conditions == {ref_name:{exclude:[],include:[$ref]}} and
+      (.rules | sort_by(.type)) == [{type:"creation"},{type:"deletion"},{type:"update"}]
+    ' <<<"$ruleset" >/dev/null ||
+      fail 'public authority ref ruleset differs from exact immutable policy'
+    return
+  fi
   summaries=$(gh api --paginate --slurp \
     "repos/${repository}/rulesets?includes_parents=true&targets=branch&per_page=100") ||
     fail 'cannot inspect authority ref rulesets'
@@ -135,7 +188,7 @@ jq -en --rawfile raw "$materialized/$policy_name" --arg verifier_sha "$verifier_
 ' >/dev/null || fail 'external authority policy or verifier bytes are internally inconsistent'
 
 read_variables
-[[ "$repository_commit" == "$authority_commit" ]] || fail 'authority commit variables changed during materialization'
+[[ "$repository_commit" == "$authority_commit" ]] || fail 'authority commit assertion changed during materialization'
 verify_ruleset
 remote_authority
 install -d -m 0700 "$output_dir" || fail 'cannot create authority output directory'
@@ -143,10 +196,14 @@ output_created=1
 install -m 0700 "$materialized/$verifier_name" "$output_dir/$verifier_name" || fail 'cannot install authority verifier'
 install -m 0600 "$materialized/$policy_name" "$output_dir/$policy_name" || fail 'cannot install authority policy'
 read_variables
-[[ "$repository_commit" == "$authority_commit" ]] || fail 'authority commit variables changed after installation'
+[[ "$repository_commit" == "$authority_commit" ]] || fail 'authority commit assertion changed after installation'
 verify_ruleset
 remote_authority
-jq -cn --arg authority_ref "$authority_ref" --arg authority_commit "$authority_commit" \
-  --arg verifier_sha256 "$verifier_sha256" --arg policy_sha256 "$policy_sha256" \
-  '{authority_ref:$authority_ref,authority_commit:$authority_commit,
+assertion_mode='strict'
+[[ "$public_mode" -eq 0 ]] || assertion_mode='public'
+readonly assertion_mode
+jq -cn --arg assertion_mode "$assertion_mode" --arg authority_ref "$authority_ref" \
+  --arg authority_commit "$authority_commit" --arg verifier_sha256 "$verifier_sha256" \
+  --arg policy_sha256 "$policy_sha256" \
+  '{assertion_mode:$assertion_mode,authority_ref:$authority_ref,authority_commit:$authority_commit,
     verifier_sha256:$verifier_sha256,policy_sha256:$policy_sha256}'

@@ -57,11 +57,86 @@ for required in \
   'verify-rotation' '--source-commit' '--source-tree' \
   '--next-tag-public-key scripts/companion-release/release-tag-signing-2026-q3-r2.pub' \
   '--next-promotion-public-key scripts/companion-release/omp-context-promotion-2026-q3-k3.pub' \
+  'git rev-list --parents -n 1 "$rotation_ref_commit"' \
+  'rotation distribution commit is not orphaned' \
   'cmp -s "$document" "$verified_document"' \
   'rotation distribution ref changed during verification'
 do
   contains "$sidecar" "$required"
 done
+sidecar_temp=$(mktemp -d "${TMPDIR:-/tmp}/rotation-sidecar-orphan-test.XXXXXX")
+trap 'rm -rf -- "$sidecar_temp"' EXIT
+real_git=$(command -v git)
+distribution="$sidecar_temp/distribution"
+work="$sidecar_temp/work"
+mkdir -m 0700 "$sidecar_temp/bin"
+"$real_git" init -q "$distribution"
+"$real_git" -C "$distribution" config user.name rotation-sidecar-test
+"$real_git" -C "$distribution" config user.email rotation-sidecar-test@example.invalid
+printf '{}' >"$distribution/adk-key-rotation-v1.json"
+printf '%064d' 0 >"$distribution/adk-key-rotation-v1.sig"
+"$real_git" -C "$distribution" add .
+distribution_tree=$("$real_git" -C "$distribution" write-tree)
+orphan_commit=$(printf orphan | "$real_git" -C "$distribution" commit-tree "$distribution_tree")
+parented_commit=$(printf parented | "$real_git" -C "$distribution" \
+  commit-tree "$distribution_tree" -p "$orphan_commit")
+rotation_ref='refs/heads/release-key-rotation-v0.50.109'
+"$real_git" -C "$distribution" update-ref "$rotation_ref" "$parented_commit"
+"$real_git" init -q "$work"
+"$real_git" -C "$work" remote add origin 'https://github.com/Insajin/autopus-adk'
+mkdir -m 0700 -p "$work/scripts/companion-release"
+cat >"$work/scripts/companion-release/verify-rotation-ref-ruleset.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod 0700 "$work/scripts/companion-release/verify-rotation-ref-ruleset.sh"
+cat >"$sidecar_temp/bin/git" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1-}" == 'ls-remote' || "\${1-}" == 'fetch' ]]; then
+  args=()
+  for arg in "\$@"; do
+    [[ "\$arg" != origin ]] || arg='$distribution'
+    args+=("\$arg")
+  done
+  exec '$real_git' "\${args[@]}"
+fi
+exec '$real_git' "\$@"
+EOF
+cat >"$sidecar_temp/verifier" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >'$sidecar_temp/verifier-called'
+exit 93
+EOF
+chmod 0700 "$sidecar_temp/bin/git" "$sidecar_temp/verifier"
+source_commit='1111111111111111111111111111111111111111'
+source_tree='2222222222222222222222222222222222222222'
+if (cd "$work" && PATH="$sidecar_temp/bin:$PATH" "$sidecar" --historical \
+  "$sidecar_temp/verifier" "$source_commit" "$source_tree" "$sidecar_temp/parented-output") \
+  >/dev/null 2>&1; then
+  fail 'parented rotation distribution commit was accepted'
+fi
+[[ ! -e "$sidecar_temp/verifier-called" ]] ||
+  fail 'parented rotation distribution reached the external verifier'
+if (cd "$work" && PATH="$sidecar_temp/bin:$PATH" "$sidecar" --public-ruleset --historical \
+  "$sidecar_temp/verifier" "$source_commit" "$source_tree" "$sidecar_temp/public-parented-output") \
+  >/dev/null 2>&1; then
+  fail 'public-ruleset mode accepted a parented rotation distribution commit'
+fi
+[[ ! -e "$sidecar_temp/verifier-called" ]] ||
+  fail 'public-ruleset parented rotation distribution reached the external verifier'
+"$real_git" -C "$distribution" update-ref "$rotation_ref" "$orphan_commit"
+if (cd "$work" && PATH="$sidecar_temp/bin:$PATH" "$sidecar" --historical \
+  "$sidecar_temp/verifier" "$source_commit" "$source_tree" "$sidecar_temp/orphan-output") \
+  >/dev/null 2>&1; then
+  fail 'external verifier rejection was ignored'
+fi
+[[ -f "$sidecar_temp/verifier-called" ]] ||
+  fail 'canonical orphan did not reach the external verifier boundary'
+IFS= read -r verifier_call <"$sidecar_temp/verifier-called"
+[[ "$verifier_call" == verify-rotation-historical\ * ]] ||
+  fail 'canonical orphan reached the wrong verifier command'
+rm -rf -- "$sidecar_temp"
+trap - EXIT
 
 for required in \
   'autopus.adk_release_reservation.v2' \

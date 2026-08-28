@@ -52,7 +52,7 @@ func TestRotationWorkflowIsManualMainOnlyWithoutSigningAuthority(t *testing.T) {
 	text := string(contents)
 	lower := strings.ToLower(text)
 	for _, forbidden := range []string{
-		"secrets.", "private_key", "private-key", "environment:",
+		"secrets.", "private_key", "private-key", "environment:", "gh_token:",
 		"pull_request:", "repository_dispatch:", "schedule:", "ssh-keygen -y sign",
 		"openssl dgst -sign", "cosign sign",
 	} {
@@ -85,6 +85,10 @@ func TestRotationWorkflowAuditsFixedImmutableSidecarWithoutMutation(t *testing.T
 		"materialize-key-rotation-authority.sh",
 		"key-rotation-authority/verify-rotation.sh",
 		"verify-rotation-ref-ruleset.sh",
+		`EXPECTED_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}`,
+		`--public "$EXPECTED_AUTHORITY_COMMIT" "$authority"`,
+		`.assertion_mode == "public"`,
+		"verify-rotation-ref-ruleset.sh --public",
 		"openssl base64 -d -A",
 		"verify-rotation",
 		`source_commit="$(/usr/bin/git rev-parse --verify HEAD)"`,
