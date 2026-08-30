@@ -14,10 +14,16 @@ func TestCompanionOMPContextStaticPolicyCommand_IsRegistered(t *testing.T) {
 		t.Fatalf("registered command=%v error=%v", command, err)
 	}
 	for _, required := range []string{
-		"report", "target", "release-lineage-key-id", "release-lineage-handoff", "minimum-rollback-floor",
+		"report", "target", "promotion-signing-key-id", "release-lineage-key-id",
+		"release-lineage-handoff", "minimum-rollback-floor",
 	} {
 		if command.Flags().Lookup(required) == nil {
 			t.Fatalf("required flag %q is not registered", required)
+		}
+	}
+	for _, forbidden := range []string{"expected-key-id", "expected-signing-key-id"} {
+		if command.Flags().Lookup(forbidden) != nil {
+			t.Fatalf("split signer authority flag %q is registered", forbidden)
 		}
 	}
 }
@@ -39,6 +45,7 @@ func TestCompanionOMPContextStaticPolicy_RejectsInvalidReportWithoutOutput(t *te
 			command.SetArgs([]string{
 				"--report", path,
 				"--target", "darwin-arm64",
+				"--promotion-signing-key-id", "omp-context-promotion-2026-q3-k3",
 				"--release-lineage-key-id", "release-lineage-2026-q3-k1",
 				"--release-lineage-handoff", "v1",
 				"--minimum-rollback-floor", "5096",

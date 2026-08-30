@@ -23,6 +23,7 @@ readonly A19_A18_ANCESTOR_SHA='76f35d990e76511d169e239547d33bfedcea7948'
 readonly A20_A19_ANCESTOR_SHA='5bc41dccc72f8244943fd9e862cba07a36bf09d3'
 readonly A21_A20_ANCESTOR_SHA='7f44e4f143b2348c02553bab2209088c966f81ae'
 readonly A22_A21_ANCESTOR_SHA='b86fab067599f457261287552c5a9dd86460d7f4'
+readonly A23_A22_ANCESTOR_SHA='67f3def5d4a0a11aadd9e103389de6cc1cafc34e'
 
 fail() {
   printf 'companion release source: %s\n' "$1" >&2
@@ -57,7 +58,8 @@ case "$GITHUB_REF_NAME" in
   v0.50.91) release_phase='A20' ;;
   v0.50.92) release_phase='A21' ;;
   v0.50.109) release_phase='A22' ;;
-  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22 policy' ;;
+  v0.50.110) release_phase='A23' ;;
+  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'
 [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || fail 'source commit is not exact 40-hex'
@@ -81,11 +83,21 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
       "$release_phase" == 'A16' || "$release_phase" == 'A17' ||
       "$release_phase" == 'A18' || "$release_phase" == 'A19' ||
       "$release_phase" == 'A20' || "$release_phase" == 'A21' ||
-      "$release_phase" == 'A22' ]]; then
+      "$release_phase" == 'A22' || "$release_phase" == 'A23' ]]; then
   tag_object_type=$(git cat-file -t "refs/tags/$GITHUB_REF_NAME" 2>/dev/null) \
     || fail "cannot resolve exact ${release_phase} tag object"
   [[ "$tag_object_type" == 'tag' ]] \
     || fail "${release_phase} release tag must be annotated"
+  tag_header_identity=$(git cat-file tag "refs/tags/$GITHUB_REF_NAME" | awk '
+    NF == 0 { exit }
+    $1 == "object" { objects++; object = $2 }
+    $1 == "type" { types++; type = $2 }
+    $1 == "tag" { tags++; tag = $2 }
+    END { printf "%d:%s\t%d:%s\t%d:%s", objects, object, types, type, tags, tag }
+  ') || fail "${release_phase} annotated tag headers are unavailable"
+  expected_tag_headers="1:${GITHUB_SHA}"$'\t''1:commit'$'\t'"1:${GITHUB_REF_NAME}"
+  [[ "$tag_header_identity" == "$expected_tag_headers" ]] ||
+    fail "${release_phase} annotated tag object, type, or name headers differ"
   if [[ "$release_phase" == 'A2' ]]; then
     git merge-base --is-ancestor "$A2_A1_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A2 source does not contain the immutable A1 release'
@@ -148,16 +160,22 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
   elif [[ "$release_phase" == 'A21' ]]; then
     git merge-base --is-ancestor "$A21_A20_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A21 source does not contain the immutable A20 release'
-  else
+  elif [[ "$release_phase" == 'A22' ]]; then
     git merge-base --is-ancestor "$A22_A21_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A22 source does not contain the immutable A21 release'
+  else
+    git merge-base --is-ancestor "$A23_A22_ANCESTOR_SHA" "$GITHUB_SHA" \
+      >/dev/null 2>&1 || fail 'A23 source does not contain the immutable A22 release'
   fi
-  if [[ "$release_phase" == 'A22' ]]; then
+  if [[ "$release_phase" == 'A22' || "$release_phase" == 'A23' ]]; then
+    if [[ "$release_phase" == 'A22' &&
+          "${COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED-0}" == '1' ]]; then
+      [[ "${ADK_KEY_ROTATION_VERIFIED-}" == '1' ]] ||
+        fail 'A22 R2 tag verification requires an independently verified rotation sidecar'
+    fi
     case "${COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED-0}" in
       0) ;;
       1)
-        [[ "${ADK_KEY_ROTATION_VERIFIED-}" == '1' ]] ||
-          fail 'A22 R2 tag verification requires an independently verified rotation sidecar'
         script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd) ||
           fail 'cannot resolve release signer trust root'
         tag_public_key="$script_dir/release-tag-signing-2026-q3-r2.pub"
@@ -177,7 +195,7 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
         chmod 0600 "$allowed_signers"
         git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$allowed_signers" \
           verify-tag "refs/tags/$GITHUB_REF_NAME" >/dev/null ||
-          fail 'A22 release tag signature or R2 signer differs'
+          fail "${release_phase} release tag signature or R2 signer differs"
         rm -f -- "$allowed_signers"
         trap - EXIT
         ;;

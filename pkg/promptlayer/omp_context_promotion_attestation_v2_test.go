@@ -8,11 +8,11 @@ import (
 )
 
 func TestVerifyOMPContextPromotionArtifactV2_AcceptsSignedExternalCohort(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
 
 	verified, err := verifyOMPContextPromotionArtifactV2WithTrust(
 		fixture.reportBytes, fixture.attestationBytes, fixture.now, fixture.expectation,
-		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil,
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil,
 	)
 	if err != nil {
 		t.Fatalf("verify signed promotion: %v", err)
@@ -35,10 +35,10 @@ func TestVerifyOMPContextPromotionArtifactV2_AcceptsSignedExternalCohort(t *test
 }
 
 func TestVerifiedOMPContextPromotion_AccessorsPreserveCoordinatesAndDefensiveCopy(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
 	verified, err := verifyOMPContextPromotionArtifactV2WithTrust(
 		fixture.reportBytes, fixture.attestationBytes, fixture.now, fixture.expectation,
-		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil,
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestVerifiedOMPContextPromotion_AccessorsPreserveCoordinatesAndDefensiveCop
 }
 
 func TestVerifyOMPContextPromotionArtifactV2_RejectsUnsignedDowngradeAndTamper(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
 	tests := []struct {
 		name        string
 		report      []byte
@@ -96,7 +96,7 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsUnsignedDowngradeAndTamper(t
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := verifyOMPContextPromotionArtifactV2WithTrust(test.report, test.attestation, fixture.now, test.expectation,
-				map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil); err == nil {
+				map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil); err == nil {
 				t.Fatal("invalid artifact was accepted")
 			}
 		})
@@ -226,11 +226,11 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fixture := newOMPContextPromotionV2Fixture(t)
+			fixture := newOMPContextPromotionActiveV2Fixture(t)
 			test.mutate(&fixture.report)
 			fixture.resign(t)
 			if _, err := verifyOMPContextPromotionArtifactV2WithTrust(fixture.reportBytes, fixture.attestationBytes, fixture.now,
-				fixture.expectation, map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil); err == nil {
+				fixture.expectation, map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil); err == nil {
 				t.Fatal("invalid cohort was accepted")
 			}
 		})
@@ -238,14 +238,14 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsInvalidCohortFacts(t *testin
 }
 
 func TestVerifyOMPContextPromotionArtifactV2_AcceptsObservedSetupProviderRequestCounts(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
 	fixture.report.Observations[0].SetupProviderRequests = 1
 	fixture.report.Observations[0].TotalProviderRequests = 2
 	fixture.resign(t)
 
 	if _, err := verifyOMPContextPromotionArtifactV2WithTrust(
 		fixture.reportBytes, fixture.attestationBytes, fixture.now, fixture.expectation,
-		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil,
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil,
 	); err != nil {
 		t.Fatalf("observed setup request count rejected: %v", err)
 	}

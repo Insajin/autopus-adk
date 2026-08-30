@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-
 tests_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 script_dir=$(cd -- "$tests_dir/.." && pwd)
 fail() { printf 'release lineage pins hardening test: %s\n' "$1" >&2; exit 1; }
 contains() { grep -Fq -- "$2" "$1" || fail "$1 missing $2"; }
 not_contains() { ! grep -Fq -- "$2" "$1" || fail "$1 unexpectedly contains $2"; }
-
 source_gate="$script_dir/validate-source.sh"
 lineage="$script_dir/verify-public-key-lineage.sh"
 lineage_pins="$script_dir/verify-public-key-lineage-pins.sh"
 lineage_coordinates="$script_dir/verify-public-key-lineage-coordinates.sh"
 lineage_assets="$script_dir/verify-public-key-lineage-assets.sh"
-
 while IFS= read -r declaration; do
   contains "$source_gate" "$declaration"
 done <<'ANCESTORS'
@@ -34,18 +31,18 @@ readonly A19_A18_ANCESTOR_SHA='76f35d990e76511d169e239547d33bfedcea7948'
 readonly A20_A19_ANCESTOR_SHA='5bc41dccc72f8244943fd9e862cba07a36bf09d3'
 readonly A21_A20_ANCESTOR_SHA='7f44e4f143b2348c02553bab2209088c966f81ae'
 readonly A22_A21_ANCESTOR_SHA='b86fab067599f457261287552c5a9dd86460d7f4'
+readonly A23_A22_ANCESTOR_SHA='67f3def5d4a0a11aadd9e103389de6cc1cafc34e'
 ANCESTORS
-
 for helper_name in pins coordinates archive assets; do
   contains "$lineage" "[[ -f \"\$${helper_name}_helper\" && ! -L \"\$${helper_name}_helper\" ]]"
   contains "$lineage" "source \"\$${helper_name}_helper\""
 done
 contains "$lineage_assets" 'verify_public_key_lineage_assets()'
+contains "$lineage_assets" 'verify_a22_bridge_lineage_assets()'
 contains "$lineage_assets" '_linux_amd64.tar.gz'
 contains "$lineage_assets" '_linux_arm64.tar.gz'
-[[ "$(grep -Fc 'extract_bundle ' "$lineage_assets")" == '2' ]] \
-  || fail 'lineage asset helper must extract only two Darwin bundles'
-
+[[ "$(grep -Fc 'extract_bundle ' "$lineage_assets")" == '3' ]] \
+  || fail 'lineage asset helper must extract two general Darwin bundles and one A22 bridge bundle'
 while IFS= read -r declaration; do
   contains "$lineage_pins" "$declaration"
 done <<'PINS'
@@ -209,9 +206,23 @@ A21_LINUX_AMD64_ARCHIVE_SHA256='3058d0eec967a341c5eb9a176315f5093ba8a3763db6bb88
 A21_LINUX_ARM64_ARCHIVE_SHA256='a259b171cb5da9ad7ff6bae2d23f7e222297ff443456530928741bae118dbdc7'
 A21_AMD64_MANIFEST_SHA256='4ceb4c9fd59e53295a7846c5d018cb2b65798d6aba6a91c9b3b5373c1342dde9'
 A21_ARM64_MANIFEST_SHA256='5ab616a51d76c2606347caa0aa334467c21508e3f917307e264def17e58c5503'
+A22_RELEASE_ID='378814217'
+A22_COMMIT_SHA='67f3def5d4a0a11aadd9e103389de6cc1cafc34e'
+A22_TREE_SHA='79d97a6487c6607f2bf8ed1903b685e8eb95a0d9'
+A22_TAG_OBJECT_SHA='0b02eccccfd317b1e0fed0472155f2040bd45982'
+A22_CHECKSUMS_SHA256='96dae2e87d550fadb793ac11fbc6f61091703605abba072d83d954de25b12ce6'
+A22_CHECKSUMS_BUNDLE_SHA256='8ee3207365ea22b04cd50c7e7400a2e724c93c02ac6c05b79bc96b2ebf08497b'
+A22_CHECKSUMS_SIGNATURES_SHA256='325b23778f7d3e72c848e74bb20c608aeda7ad1a9349311c49c524b21f058dbf'
+A22_ARM64_ARCHIVE_SHA256='3c7901597a9e695c33148c224be1889260c2e6b10ab8662ff12b7d23da06779a'
+A22_ARM64_MANIFEST_SHA256='36a28fe8704ad02c51d294b6ea53ab9565991b043302fb198a01da58502ecfb2'
+A22_ARM64_MANIFEST_SIGNATURE_SHA256='c63cb5d0c7f4147103a9dc55c637f97f15928df35ce642debdeb3fa416956b1e'
+A22_BRIDGE_MANIFEST_SHA256='f0e49806a76db9a862b923ebd9c47cf312613676e42f3fe5ce6b8ad3064e547c'
+A22_LINEAGE_SHA256='66f747b6b89f9f483f4d004343b23b30c57e53ca474cc77457cf309ac97b26e4'
+A22_LINEAGE_SIGNATURE_SHA256='5273e6b461f3ff21dc44c9bd650c23d84b00cf20f8186b6036812d4be4721ad6'
+A22_UPSTREAM_SHA256='58eb962ccf618fceeb1e48a2d66d6425d47f96dd0ecfff655456846d026e3c4c'
+A22_EXECUTABLE_SHA256='4fd99057e9af024481ee369c849870a3ccecbe19a0546917013b88044d69c864'
 PINS
-
-for phase in A8 A9 A10 A11 A12 A13 A14 A15 A16 A17 A18 A19 A20 A21 A22; do
+for phase in A8 A9 A10 A11 A12 A13 A14 A15 A16 A17 A18 A19 A20 A21 A22 A23; do
   prior=$((10#${phase#A} - 1))
   contains "$lineage_coordinates" "release_phase='${phase}' prior_phase='A${prior}'"
 done
@@ -220,7 +231,6 @@ contains "$lineage_coordinates" \
 for phase in {0..13}; do
   not_contains "$lineage_pins" "A${phase}_LINUX_"
 done
-
 temp=$(mktemp -d "${TMPDIR:-/tmp}/release-lineage-helper-gate.XXXXXX")
 cleanup() { local status=$?; rm -rf -- "$temp" || status=$?; return "$status"; }
 trap cleanup EXIT
@@ -230,11 +240,10 @@ for helper in pins coordinates archive; do
 done
 install -m 0700 "$lineage" "$temp/verify-public-key-lineage.sh"
 ln -s -- "$lineage_assets" "$temp/verify-public-key-lineage-assets.sh"
-if output=$(GITHUB_REF_NAME=v0.50.109 PATH="$PATH" \
+if output=$(GITHUB_REF_NAME=v0.50.110 PATH="$PATH" \
   bash "$temp/verify-public-key-lineage.sh" 2>&1); then
   fail 'symlinked lineage asset helper passed'
 fi
 [[ "$output" == *'lineage asset verifier is invalid'* ]] \
   || fail "symlinked lineage asset helper diagnostic = ${output}"
-
 printf 'release lineage pins hardening test: PASS\n'

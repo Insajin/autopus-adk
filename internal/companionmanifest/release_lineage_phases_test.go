@@ -40,6 +40,8 @@ type releasePhase struct {
 	assetContract bool
 	// A0..A13에는 Linux 아카이브 핀이 존재해서는 안 된다.
 	forbidsHistoricalLinuxPins bool
+	// The A22 bridge predecessor has a dedicated immutable asset proof path.
+	bridgePredecessor bool
 }
 
 // priorPhase는 직전 좌표의 phase 이름이다.
@@ -205,6 +207,21 @@ var releasePhases = []releasePhase{
 			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
 		},
 		pinsRepository: true, pinsLinuxArchives: true, pinsReleaseID: true,
+	},
+	{
+		phase: "A23", tag: "v0.50.110", version: "0.50.110",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "67f3def5d4a0a11aadd9e103389de6cc1cafc34e",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
 	},
 }
 

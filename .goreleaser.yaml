@@ -27,9 +27,10 @@ builds:
       - -X github.com/insajin/autopus-adk/pkg/version.date={{.CommitDate}}
       - -X github.com/insajin/autopus-adk/pkg/version.sourceCommit={{.Env.COMPANION_SOURCE_COMMIT}}
       - -X github.com/insajin/autopus-adk/pkg/version.sourceTree={{.Env.COMPANION_SOURCE_TREE}}
+      - -X github.com/insajin/autopus-adk/internal/cli.pipelineOMPActiveStaticPolicyB64={{.Env.OMP_CONTEXT_STATIC_POLICY_B64}}
     hooks:
       post:
-        # Compare canonical-full bridge bytes before Developer ID signing.
+        # Compare reproducible policy-bearing bytes before Developer ID signing.
         - cmd: scripts/companion-release/verify-omp-context-release-binary.sh
           env:
             - COMPANION_ARTIFACT={{ .Path }}
@@ -76,16 +77,15 @@ archives:
         dst: release-lineage-v1.sig
 
 release:
-  replace_existing_artifacts: true
+  replace_existing_artifacts: false
   target_commitish: "{{ .Env.COMPANION_SOURCE_COMMIT }}"
   use_existing_draft: true
-  # Publish the operator-reserved draft and replace its machine-only marker
-  # with the generated release notes.
+  # Publish the operator-reserved empty draft and replace only its machine
+  # reservation body with generated release notes.
   mode: replace
   extra_files:
-    - glob: "{{ .Env.OMP_CONTEXT_BRIDGE_MANIFEST_PATH }}"
-    - glob: "{{ .Env.ADK_KEY_ROTATION_DOCUMENT_PATH }}"
-    - glob: "{{ .Env.ADK_KEY_ROTATION_SIGNATURE_PATH }}"
+    - glob: "{{ .Env.OMP_CONTEXT_PROMOTION_REPORT_PATH }}"
+    - glob: "{{ .Env.OMP_CONTEXT_PROMOTION_ATTESTATION_PATH }}"
     - glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_PATH }}"
     - glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH }}"
 

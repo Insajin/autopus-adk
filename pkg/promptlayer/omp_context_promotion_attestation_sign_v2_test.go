@@ -11,8 +11,8 @@ import (
 )
 
 func TestSignOMPContextPromotionAttestationV2_RoundTripsAgainstCommittedTrust(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
-	withOMPContextPromotionV3FixtureKey(t, fixture.publicKey)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
+	withOMPContextPromotionV3FixtureTrust(t, fixture.publicKey, OMPContextPromotionKeyID2026Q3K3)
 	issuedAt := fixture.now.Add(-time.Minute)
 	body, err := SignOMPContextPromotionAttestationV2(
 		OMPContextPromotionAttestationSignInputV2{
@@ -35,7 +35,7 @@ func TestSignOMPContextPromotionAttestationV2_RoundTripsAgainstCommittedTrust(t 
 		t.Fatalf("attestation is not canonical: marshal error=%v", err)
 	}
 	if attestation.SchemaVersion != OMPContextPromotionAttestationSchemaV2 ||
-		attestation.KeyID != OMPContextPromotionKeyID2026Q3K1 || attestation.Algorithm != "ed25519" ||
+		attestation.KeyID != OMPContextPromotionKeyID2026Q3K3 || attestation.Algorithm != "ed25519" ||
 		attestation.TrustLane != OMPContextPromotionTrustLaneV2 ||
 		attestation.ReportSHA256 != promotionSHA256(fixture.reportBytes) {
 		t.Fatalf("unexpected fixed attestation statement: %#v", attestation)

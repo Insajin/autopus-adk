@@ -1,181 +1,187 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-prep="$script_dir/prepare-release.sh"
-prep_lib="$script_dir/prepare-release-runtime-lib.sh"
-publisher="$script_dir/publish-release-coordinates.sh"
-transaction="$script_dir/release-coordinate-transaction-lib.sh"
-sidecar="$script_dir/verify-key-rotation-sidecar.sh"
-authority_materializer="$script_dir/materialize-key-rotation-authority.sh"
-lock_verifier="$script_dir/verify-release-prep-lock.sh"
-manifest="$script_dir/produce-omp-context-bridge-manifest.sh"
+umask 077
+tests_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+script_dir=$(cd -- "$tests_dir/.." && pwd)
+publisher="$script_dir/publish-release-coordinates.sh"; prep="$script_dir/prepare-release.sh"
+transaction="$script_dir/release-coordinate-transaction-lib.sh"; prep_lib="$script_dir/prepare-release-runtime-lib.sh"
+local_lib="$script_dir/prepare-release-local-lib.sh"; lock_verifier="$script_dir/verify-release-prep-lock.sh"
+ruleset_verifier="$script_dir/verify-release-tag-ruleset.sh"; mock_gh="$tests_dir/testdata/mock-release-prep-gh.sh"
 fail() { printf 'release prep hardening test: %s\n' "$1" >&2; exit 1; }
 contains() { grep -Fq -- "$2" "$1" || fail "$1 missing $2"; }
-not_contains() { if grep -Fq -- "$2" "$1"; then fail "$1 contains forbidden $2"; fi; }
-
-for file in "$prep" "$prep_lib" "$publisher" "$transaction" "$sidecar" \
-  "$authority_materializer" "$lock_verifier" "$manifest" \
-  "$script_dir/release-tag-signing-2026-q3.pub" \
-  "$script_dir/release-tag-signing-2026-q3.fingerprint" \
-  "$script_dir/release-tag-signing-2026-q3-r2.pub" \
-  "$script_dir/release-tag-signing-2026-q3-r2.fingerprint" \
-  "$script_dir/omp-context-promotion-2026-q3-k3.pub"
-do
-  [[ -f "$file" && ! -L "$file" ]] || fail "missing or unsafe release component $file"
+not_contains() { ! grep -Fq -- "$2" "$1" || fail "$1 unexpectedly contains $2"; }
+for file in "$publisher" "$transaction" "$prep" "$prep_lib" "$local_lib" "$lock_verifier" "$ruleset_verifier" "$mock_gh" \
+  "$script_dir/release-tag-signing-2026-q3-r2.pub" "$script_dir/release-tag-signing-2026-q3-r2.fingerprint" \
+  "$script_dir/omp-context-promotion-2026-q3-k3.pub"; do
+  [[ -f "$file" && ! -L "$file" ]] || fail "missing or unsafe release-prep component $file"
 done
-[[ ! -e "$script_dir/prepare-release-local-lib.sh" ]] || fail 'obsolete promotion prep helper remains'
-[[ ! -e "$script_dir/verify-omp-context-evidence-tag.sh" ]] || fail 'A22 evidence tag reader remains'
-
-contains "$prep" 'usage: prepare-release.sh --tag-signing-key PATH [--rotation-document PATH --rotation-signature PATH] [--apply]'
-for forbidden in '--endpoint' '--credential-locator' '--provider' '--model' \
-  '--model-context-window' '--omp' '--oracle-policy-digest' '--promotion-signing-key' \
-  'expected_promotion_key_id' 'static_policy' 'evidence_tag' 'run_canary'
-do
-  not_contains "$prep" "$forbidden"
-done
-for required in \
-  'source worktree is not clean' \
-  'source is not exact origin/main' \
-  'verify-key-rotation-sidecar.sh' \
-  'materialize-key-rotation-authority.sh' \
-  'AUTOPUS_ADK_CHANNEL_KEY_ID' \
-  'AUTOPUS_ADK_CHANNEL_PUBLIC_KEY' \
-  'release-tag-signing-2026-q3-r2.pub' \
-  'release-tag-signing-2026-q3-r2.fingerprint' \
-  'build_bridge_candidate' \
-  'produce_bridge_manifest' \
-  'remote_mutations:0'
-do
-  contains "$prep" "$required"
-done
-not_contains "$prep" './internal/adkchannel/cmd'
-
-for required in \
-  'refs/heads/release-key-rotation-v0.50.109' \
-  'adk-key-rotation-v1.json' 'adk-key-rotation-v1.sig' \
-  'verify-rotation' '--source-commit' '--source-tree' \
-  '--next-tag-public-key scripts/companion-release/release-tag-signing-2026-q3-r2.pub' \
-  '--next-promotion-public-key scripts/companion-release/omp-context-promotion-2026-q3-k3.pub' \
-  'git rev-list --parents -n 1 "$rotation_ref_commit"' \
-  'rotation distribution commit is not orphaned' \
-  'cmp -s "$document" "$verified_document"' \
-  'rotation distribution ref changed during verification'
-do
-  contains "$sidecar" "$required"
-done
-sidecar_temp=$(mktemp -d "${TMPDIR:-/tmp}/rotation-sidecar-orphan-test.XXXXXX")
-trap 'rm -rf -- "$sidecar_temp"' EXIT
-real_git=$(command -v git)
-distribution="$sidecar_temp/distribution"
-work="$sidecar_temp/work"
-mkdir -m 0700 "$sidecar_temp/bin"
-"$real_git" init -q "$distribution"
-"$real_git" -C "$distribution" config user.name rotation-sidecar-test
-"$real_git" -C "$distribution" config user.email rotation-sidecar-test@example.invalid
-printf '{}' >"$distribution/adk-key-rotation-v1.json"
-printf '%064d' 0 >"$distribution/adk-key-rotation-v1.sig"
-"$real_git" -C "$distribution" add .
-distribution_tree=$("$real_git" -C "$distribution" write-tree)
-orphan_commit=$(printf orphan | "$real_git" -C "$distribution" commit-tree "$distribution_tree")
-parented_commit=$(printf parented | "$real_git" -C "$distribution" \
-  commit-tree "$distribution_tree" -p "$orphan_commit")
-rotation_ref='refs/heads/release-key-rotation-v0.50.109'
-"$real_git" -C "$distribution" update-ref "$rotation_ref" "$parented_commit"
-"$real_git" init -q "$work"
-"$real_git" -C "$work" remote add origin 'https://github.com/Insajin/autopus-adk'
-mkdir -m 0700 -p "$work/scripts/companion-release"
-cat >"$work/scripts/companion-release/verify-rotation-ref-ruleset.sh" <<'EOF'
-#!/usr/bin/env bash
-exit 0
-EOF
-chmod 0700 "$work/scripts/companion-release/verify-rotation-ref-ruleset.sh"
-cat >"$sidecar_temp/bin/git" <<EOF
-#!/usr/bin/env bash
-if [[ "\${1-}" == 'ls-remote' || "\${1-}" == 'fetch' ]]; then
-  args=()
-  for arg in "\$@"; do
-    [[ "\$arg" != origin ]] || arg='$distribution'
-    args+=("\$arg")
-  done
-  exec '$real_git' "\${args[@]}"
-fi
-exec '$real_git' "\$@"
-EOF
-cat >"$sidecar_temp/verifier" <<EOF
-#!/usr/bin/env bash
-printf '%s\n' "\$*" >'$sidecar_temp/verifier-called'
-exit 93
-EOF
-chmod 0700 "$sidecar_temp/bin/git" "$sidecar_temp/verifier"
-source_commit='1111111111111111111111111111111111111111'
-source_tree='2222222222222222222222222222222222222222'
-if (cd "$work" && PATH="$sidecar_temp/bin:$PATH" "$sidecar" --historical \
-  "$sidecar_temp/verifier" "$source_commit" "$source_tree" "$sidecar_temp/parented-output") \
-  >/dev/null 2>&1; then
-  fail 'parented rotation distribution commit was accepted'
-fi
-[[ ! -e "$sidecar_temp/verifier-called" ]] ||
-  fail 'parented rotation distribution reached the external verifier'
-if (cd "$work" && PATH="$sidecar_temp/bin:$PATH" "$sidecar" --public-ruleset --historical \
-  "$sidecar_temp/verifier" "$source_commit" "$source_tree" "$sidecar_temp/public-parented-output") \
-  >/dev/null 2>&1; then
-  fail 'public-ruleset mode accepted a parented rotation distribution commit'
-fi
-[[ ! -e "$sidecar_temp/verifier-called" ]] ||
-  fail 'public-ruleset parented rotation distribution reached the external verifier'
-"$real_git" -C "$distribution" update-ref "$rotation_ref" "$orphan_commit"
-if (cd "$work" && PATH="$sidecar_temp/bin:$PATH" "$sidecar" --historical \
-  "$sidecar_temp/verifier" "$source_commit" "$source_tree" "$sidecar_temp/orphan-output") \
-  >/dev/null 2>&1; then
-  fail 'external verifier rejection was ignored'
-fi
-[[ -f "$sidecar_temp/verifier-called" ]] ||
-  fail 'canonical orphan did not reach the external verifier boundary'
-IFS= read -r verifier_call <"$sidecar_temp/verifier-called"
-[[ "$verifier_call" == verify-rotation-historical\ * ]] ||
-  fail 'canonical orphan reached the wrong verifier command'
-rm -rf -- "$sidecar_temp"
-trap - EXIT
-
-for required in \
-  'autopus.adk_release_reservation.v2' \
-  "release_mode='canonical-full-bridge'" \
-  'candidate_artifact_sha256:$candidate_sha256' \
-  'rotation_ref_commit:$rotation_ref_commit' \
-  'rotation_document_sha256:$rotation_document_sha256' \
-  'promotion_key_id:$promotion_key_id' \
-  'names=(ADK_COMPANION_APPROVED_SOURCE_COMMIT ADK_COMPANION_APPROVED_SOURCE_TREE)' \
-  'obsolete_names=(OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA' \
-  'gh variable delete "$name" --repo "$repository"' \
-  'verify-key-rotation-sidecar.sh' \
-  'The independently authorized R2 tag is the final external mutation.' \
-  'git push --atomic --force-with-lease=' \
-  'verify_remote_release'
-do
-  contains "$publisher" "$required"
-done
-for forbidden in \
-  'evidence_tag_object:$evidence_tag_object' \
-  'static_policy_sha256' \
-  'report_sha256:$report_sha256' \
-  'attestation_sha256:$attestation_sha256'
-do
-  not_contains "$publisher" "$forbidden"
-done
-sidecar_line=$(grep -nF 'verify-key-rotation-sidecar.sh' "$publisher" | cut -d: -f1)
-tag_line=$(grep -nF 'git tag -s "$release_tag"' "$publisher" | cut -d: -f1)
-[[ "$sidecar_line" -lt "$tag_line" ]] ||
-  fail 'R2 tag creation can run before independent sidecar verification'
-
-contains "$prep" "bridge_lock_ref='refs/heads/release-bridge-v0.50.109-prep-lock'"
-contains "$prep_lib" 'verify-release-prep-lock.sh'
-contains "$lock_verifier" "expected_ref='refs/heads/release-bridge-v0.50.109-prep-lock'"
-contains "$lock_verifier" "manifest_name='omp-context-bridge-release.v1.json'"
-contains "$transaction" 'restore_deleted_scope'
-contains "$transaction" 'all(.[]; .name != $name)'
+contains "$prep" 'usage: prepare-release.sh --endpoint URL'; contains "$prep" '(--preflight|--apply)'
+contains "$prep" "readonly release_tag='v0.50.110'"; contains "$prep" "expected_go_toolchain='go1.26.6'"
+contains "$prep" "expected_promotion_key_id='omp-context-promotion-2026-q3-k3'"
+contains "$prep" 'remote_mutations:0'; contains "$prep" 'canary_records:42,provider_calls:40,task_pairs:20'
+contains "$local_lib" '--endpoint "$endpoint" --credential-locator "$credential_locator"'
+contains "$local_lib" '--model-context-window "$model_context_window"'
+contains "$local_lib" '--promotion-signing-key-id "$expected_promotion_key_id"'
+contains "$local_lib" 'length == 42'; contains "$local_lib" 'length) == 40'; contains "$local_lib" 'length) == 20'
+contains "$prep_lib" 'production canary started (40 sequential provider calls, 20 task pairs)'
+contains "$prep_lib" '([.[] | select(.type == "call")] | length) == 40'
+contains "$prep_lib" '([.[] | select(.type == "call") | .task_id_digest] | unique | length) == 20'
+contains "$prep_lib" '/usr/bin/pgrep -u nobody'
+contains "$prep_lib" '/bin/cat "$input_jsonl"'
+not_contains "$prep_lib" 'provider-credential'
+not_contains "$prep_lib" 'credential_staging'
+contains "$local_lib" '--static-policy-b64 "$static_policy_b64"'; not_contains "$local_lib" '--expected-signing-key-id'
+contains "$publisher" 'static policy does not own the exact K3 signer'
+contains "$publisher" 'release-tag-signing-2026-q3-r2.pub'
+contains "$publisher" 'SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ'
+contains "$publisher" 'names=(ADK_COMPANION_APPROVED_SOURCE_COMMIT ADK_COMPANION_APPROVED_SOURCE_TREE OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA'
+contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository"'
+contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository" --env "$environment_name"'
+contains "$publisher" 'autopus.adk_release_reservation.v1'; contains "$publisher" 'verify_owned_draft_reservation'
+contains "$publisher" 'verify-release-tag-ruleset.sh --armed'; contains "$publisher" 'verify-release-tag-ruleset.sh --sealed'
+contains "$publisher" 'bypass_actors:[]'; contains "$publisher" 'git push --atomic --force-with-lease='
+contains "$publisher" 'immutable commit point'; contains "$publisher" 'exit 75'
 contains "$transaction" 'rollback incomplete; prep lock retained for reconciliation'
-contains "$manifest" "release_mode='canonical-full-bridge'"
-contains "$manifest" 'bridge manifest forbids ${name}'
+contains "$prep" 'scripts/companion-release/verify-homebrew-tap-pins.sh'
+for forbidden in 'canonical-full-bridge' 'omp-context-bridge-release.v1.json' 'rotation_document' 'rotation_ref_commit' \
+  'release-key-rotation-v0.50.109'; do
+  not_contains "$prep" "$forbidden"; not_contains "$publisher" "$forbidden"
+done
+first_seal_line=$(grep -nF 'if ! ensure_committed_release_tag_is_sealed' "$publisher" | sed -n '1p' | cut -d: -f1)
+last_seal_line=$(grep -nF 'if ! ensure_committed_release_tag_is_sealed' "$publisher" | sed -n '$p' | cut -d: -f1)
+first_coordinate_line=$(grep -nF '! verify_coordinates ||' "$publisher" | sed -n '1p' | cut -d: -f1)
+last_coordinate_line=$(grep -nF '! verify_coordinates ||' "$publisher" | sed -n '$p' | cut -d: -f1)
+[[ "$first_seal_line" -lt "$first_coordinate_line" && "$last_seal_line" -lt "$last_coordinate_line" ]] ||
+  fail 'committed tag coordinate checks can bypass immediate ruleset sealing'
+preflight_line=$(grep -nF 'if [[ "$operation" == '\''preflight'\'' ]]' "$prep" | cut -d: -f1)
+canary_line=$(grep -nF 'run_canary "$final_candidate"' "$prep" | cut -d: -f1)
+evidence_line=$(grep -nF 'publish_local_evidence "$final_report"' "$prep" | cut -d: -f1)
+[[ "$preflight_line" -lt "$canary_line" && "$preflight_line" -lt "$evidence_line" ]] || fail 'preflight can reach a remote mutation'
 
+temp=$(mktemp -d "${TMPDIR:-/tmp}/release-prep-hardening.XXXXXX")
+trap 'rm -rf -- "$temp"' EXIT
+ruleset_state="$temp/ruleset-state"; mkdir -p "$ruleset_state" "$temp/ruleset-bin"
+cp "$mock_gh" "$temp/ruleset-bin/gh"; chmod 0700 "$temp/ruleset-bin/gh"
+printf '0\n' >"$ruleset_state/write-count"; : >"$ruleset_state/calls.log"; printf armed >"$ruleset_state/ruleset-state"
+printf '%s\n' '[{"id":596,"type":"tag","name":"v0.50.110"}]' >"$ruleset_state/deployment-policies.json"
+env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --armed
+printf sealed >"$ruleset_state/ruleset-state"
+env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --sealed
+printf extra >"$ruleset_state/ruleset-state"
+if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --armed >/dev/null 2>&1; then
+  fail 'armed verifier accepted extra actor or rule'
+fi
+if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --sealed >/dev/null 2>&1; then
+  fail 'sealed verifier accepted extra actor or rule'
+fi
+ssh-keygen -q -t ed25519 -N '' -f "$temp/signing-key"
+ssh-keygen -q -t ed25519 -N '' -f "$temp/wrong-signing-key"
+printf 'release-test %s\n' "$(<"$temp/signing-key.pub")" >"$temp/allowed-signers"
+git_env=(GIT_CONFIG_COUNT=5 GIT_CONFIG_KEY_0=gpg.format GIT_CONFIG_VALUE_0=ssh
+  GIT_CONFIG_KEY_1=user.signingkey GIT_CONFIG_VALUE_1="$temp/signing-key"
+  GIT_CONFIG_KEY_2=gpg.ssh.allowedSignersFile GIT_CONFIG_VALUE_2="$temp/allowed-signers"
+  GIT_CONFIG_KEY_3=user.name GIT_CONFIG_VALUE_3='Release Test'
+  GIT_CONFIG_KEY_4=user.email GIT_CONFIG_VALUE_4='release-test@example.invalid')
+real_ssh_keygen=$(command -v ssh-keygen)
+policy_value() { jq -cnS --arg key "$1" '{promotion_signing_key_id:$key}' | base64 | tr '/+' '_-' | tr -d '=\n'; printf '\n'; }
+setup_fixture() {
+  local name=$1
+  fixture="$temp/$name"; state="$fixture/state"; work="$fixture/work"; remote="$fixture/remote.git"
+  mkdir -p "$state" "$fixture/bin"; cp "$mock_gh" "$fixture/bin/gh"; chmod 0700 "$fixture/bin/gh"
+  printf '%s\n' '[{"name":"UNRELATED","value":"repository-before"}]' >"$state/repository-variables.json"
+  printf '%s\n' '[{"name":"UNRELATED","value":"environment-before"}]' >"$state/environment-variables.json"
+  printf '%s\n' '[{"id":596,"type":"tag","name":"v0.50.110"}]' >"$state/deployment-policies.json"
+  printf '%s\n' '[]' >"$state/releases.json"
+  printf '0\n' >"$state/write-count"; : >"$state/calls.log"; printf armed >"$state/ruleset-state"
+  git init --quiet --bare "$remote"; git init --quiet "$work"; printf 'release source\n' >"$work/source.txt"
+  mkdir -p "$work/scripts/companion-release"
+  cp "$temp/signing-key.pub" "$work/scripts/companion-release/release-tag-signing-2026-q3-r2.pub"
+  cp "$transaction" "$work/scripts/companion-release/release-coordinate-transaction-lib.sh"
+  cp "$lock_verifier" "$work/scripts/companion-release/verify-release-prep-lock.sh"
+  printf '%s\n' 'SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ' >"$work/scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint"
+  cat >"$fixture/bin/ssh-keygen" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1-}" == '-lf' ]]; then
+  printf '%s\n' '256 SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ release-test (ED25519)'
+  exit 0
+fi
+exec '$real_ssh_keygen' "\$@"
+EOF
+  chmod 0700 "$fixture/bin/ssh-keygen"
+  cp "$ruleset_verifier" "$work/scripts/companion-release/verify-release-tag-ruleset.sh"
+  chmod 0700 "$work/scripts/companion-release/verify-release-tag-ruleset.sh" \
+    "$work/scripts/companion-release/verify-release-prep-lock.sh"
+  env "${git_env[@]}" git -C "$work" add .; env "${git_env[@]}" git -C "$work" commit --quiet -m source
+  git -C "$work" branch -M main; git -C "$work" remote add origin "$remote"; git -C "$work" push --quiet -u origin main
+  source_commit=$(git -C "$work" rev-parse HEAD); source_tree=$(git -C "$work" rev-parse 'HEAD^{tree}')
+  report_blob=$(printf 'report\n' | git -C "$work" hash-object -w --stdin)
+  prep_tree=$(printf '100644 blob %s\tomp-context-promotion-report.v1.json\n' "$report_blob" | git -C "$work" mktree)
+  prep_lock_commit=$(printf 'prep lock\n' | env "${git_env[@]}" git -C "$work" commit-tree "$prep_tree")
+  attestation_blob=$(printf 'attestation\n' | git -C "$work" hash-object -w --stdin)
+  evidence_tree=$(printf '100644 blob %s\tomp-context-promotion-report.v1.json\n100644 blob %s\tomp-context-promotion-attestation.v2.json\n' \
+    "$report_blob" "$attestation_blob" | git -C "$work" mktree)
+  evidence_commit=$(printf 'evidence\n' | env "${git_env[@]}" git -C "$work" commit-tree "$evidence_tree")
+  env "${git_env[@]}" git -C "$work" tag -s omp-context-evidence-v0.50.110 "$evidence_commit" -m evidence
+  evidence_tag_object=$(git -C "$work" rev-parse refs/tags/omp-context-evidence-v0.50.110)
+  git -C "$work" push --quiet origin refs/tags/omp-context-evidence-v0.50.110
+  git -C "$work" push --quiet origin "$prep_lock_commit:refs/heads/omp-context-evidence-v0.50.110-source"
+  git -C "$work" tag -d omp-context-evidence-v0.50.110 >/dev/null
+  printf 'report\n' >"$fixture/report"; printf 'attestation\n' >"$fixture/attestation"
+  policy_value omp-context-promotion-2026-q3-k3 >"$fixture/static-policy.b64"
+  chmod 0600 "$fixture/report" "$fixture/attestation" "$fixture/static-policy.b64"
+  mkdir -p "$remote/hooks"
+  cat >"$remote/hooks/pre-receive" <<'HOOK'
+#!/usr/bin/env bash
+set -euo pipefail
+while read -r _ _ ref; do
+  if [[ "$ref" == 'refs/tags/v0.50.110' ]]; then
+    printf '%s\n' release-tag-push >>"$MOCK_RELEASE_PREP_STATE/calls.log"
+    [[ "${MOCK_RELEASE_PREP_REJECT_TAG:-0}" -eq 0 ]] || exit 1
+  fi
+done
+HOOK
+  chmod 0700 "$remote/hooks/pre-receive"
+}
+run_publisher() {
+  local lock_argument=${RELEASE_PREP_LOCK_ARGUMENT:-fresh:$prep_lock_commit}
+  local signing_key=${RELEASE_PREP_SIGNING_KEY:-$temp/signing-key}
+  env "${git_env[@]}" PATH="$fixture/bin:$PATH" MOCK_RELEASE_PREP_STATE="$state" \
+    MOCK_RELEASE_PREP_FAIL_AT="${MOCK_RELEASE_PREP_FAIL_AT:-}" MOCK_RELEASE_PREP_FAIL_FROM="${MOCK_RELEASE_PREP_FAIL_FROM:-}" \
+    MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL="${MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL:-0}" \
+    MOCK_RELEASE_PREP_REJECT_TAG="${MOCK_RELEASE_PREP_REJECT_TAG:-0}" \
+    bash "$publisher" Insajin/autopus-adk adk-companion-release v0.50.110 "$source_commit" "$source_tree" \
+    "$fixture/static-policy.b64" "$evidence_tag_object" "$evidence_commit" "$evidence_tree" \
+    "$(shasum -a 256 "$fixture/report" | awk '{print $1}')" \
+    "$(shasum -a 256 "$fixture/attestation" | awk '{print $1}')" "$lock_argument" "$signing_key"
+}
+setup_fixture k3_mismatch
+policy_value omp-context-promotion-2026-q3-k2 >"$fixture/static-policy.b64"
+if (cd "$work" && run_publisher >/dev/null 2>&1); then fail 'publisher accepted a K2 active policy'; fi
+[[ "$(<"$state/write-count")" == '0' ]] || fail 'K3 mismatch mutated release state'
+setup_fixture r2_mismatch
+if (cd "$work" && RELEASE_PREP_SIGNING_KEY="$temp/wrong-signing-key" run_publisher >/dev/null 2>&1); then fail 'publisher accepted a non-R2 tag signer'; fi
+[[ "$(<"$state/write-count")" == '0' ]] || fail 'R2 mismatch mutated release state'
+setup_fixture success
+(cd "$work" && run_publisher >"$fixture/result.json")
+jq -e '.mode == "committed" and .release_tag == "v0.50.110" and .promotion_signing_key_id == "omp-context-promotion-2026-q3-k3"' "$fixture/result.json" >/dev/null || fail 'success receipt differs'
+[[ "$(jq 'length' "$state/repository-variables.json")" == '9' && "$(jq 'length' "$state/environment-variables.json")" == '9' ]] || fail 'coordinate transaction did not converge both variable scopes'
+jq -e 'length == 1 and .[0].draft == true and (.[0].assets | length) == 0 and (.[0].body | fromjson | .schema_version == "autopus.adk_release_reservation.v1")' "$state/releases.json" >/dev/null || fail 'operator draft reservation differs'
+tag_call=$(grep -n '^release-tag-push$' "$state/calls.log" | cut -d: -f1); seal_call=$(grep -n '^ruleset-seal$' "$state/calls.log" | cut -d: -f1)
+[[ "$tag_call" -lt "$seal_call" && "$(<"$state/ruleset-state")" == sealed ]] || fail 'ruleset was not sealed only after the R2 commit'
+calls_before=$(wc -l <"$state/calls.log" | tr -d ' ')
+(cd "$work" && RELEASE_PREP_LOCK_ARGUMENT=reconcile run_publisher >"$fixture/reconciled.json")
+jq -e '.mode == "reconciled"' "$fixture/reconciled.json" >/dev/null || fail 'committed release did not reconcile'
+[[ "$(wc -l <"$state/calls.log" | tr -d ' ')" == "$calls_before" ]] || fail 'reconciliation mutated release state'
+setup_fixture rollback
+cp "$state/repository-variables.json" "$fixture/repository-before.json"
+if (cd "$work" && MOCK_RELEASE_PREP_FAIL_AT=5 run_publisher >/dev/null 2>&1); then fail 'injected coordinate failure succeeded'; fi
+jq -e --slurpfile before "$fixture/repository-before.json" '. == $before[0]' \
+  "$state/repository-variables.json" >/dev/null || fail 'CAS rollback did not restore repository variables'
+[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.110)" ]] || fail 'rollback created a release tag'
+setup_fixture retained
+retained_status=0
+(cd "$work" && MOCK_RELEASE_PREP_REJECT_TAG=1 MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL=1 run_publisher >/dev/null 2>&1) || retained_status=$?
+[[ "$retained_status" -eq 75 ]] || fail 'incomplete rollback did not request reconciliation'
+(cd "$work" && RELEASE_PREP_LOCK_ARGUMENT="retained:$prep_lock_commit" run_publisher >"$fixture/retry.json")
+jq -e '.mode == "committed"' "$fixture/retry.json" >/dev/null || fail 'retained exit-75 transaction did not reconcile'
 printf 'release prep hardening test: PASS\n'

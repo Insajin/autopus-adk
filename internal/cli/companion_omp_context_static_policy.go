@@ -16,6 +16,7 @@ import (
 type companionOMPContextStaticPolicyOptions struct {
 	reportPath            string
 	target                string
+	promotionSigningKeyID string
 	releaseLineageKeyID   string
 	releaseLineageHandoff string
 	minimumRollbackFloor  uint64
@@ -35,11 +36,13 @@ func newCompanionOMPContextStaticPolicyCmd() *cobra.Command {
 	flags := command.Flags()
 	flags.StringVar(&options.reportPath, "report", "", "Canonical OMP context promotion report")
 	flags.StringVar(&options.target, "target", "", "Release target bound into active authority")
+	flags.StringVar(&options.promotionSigningKeyID, "promotion-signing-key-id", "", "Promotion attestation key identity")
 	flags.StringVar(&options.releaseLineageKeyID, "release-lineage-key-id", "", "Release lineage key identity")
 	flags.StringVar(&options.releaseLineageHandoff, "release-lineage-handoff", "", "Release lineage handoff contract")
 	flags.Uint64Var(&options.minimumRollbackFloor, "minimum-rollback-floor", 0, "Minimum accepted release rollback floor")
 	for _, name := range []string{
-		"report", "target", "release-lineage-key-id", "release-lineage-handoff", "minimum-rollback-floor",
+		"report", "target", "promotion-signing-key-id", "release-lineage-key-id",
+		"release-lineage-handoff", "minimum-rollback-floor",
 	} {
 		_ = command.MarkFlagRequired(name)
 	}
@@ -67,14 +70,18 @@ func runCompanionOMPContextStaticPolicy(
 	if err != nil || !bytes.Equal(canonical, body) {
 		return errors.New("OMP context promotion report is not canonical")
 	}
-	_, policy, err := promptlayer.BuildOMPContextPromotionStaticPolicyV3(
+	staticPolicy, policy, err := promptlayer.BuildOMPContextPromotionStaticPolicyV3(
 		report,
 		options.target,
+		options.promotionSigningKeyID,
 		options.releaseLineageKeyID,
 		options.releaseLineageHandoff,
 		options.minimumRollbackFloor,
 	)
 	if err != nil {
+		return err
+	}
+	if err := promptlayer.ValidateOMPContextPromotionActiveStaticPolicyV3(staticPolicy); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintln(command.OutOrStdout(), base64.RawURLEncoding.EncodeToString(policy)); err != nil {

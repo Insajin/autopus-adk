@@ -10,46 +10,98 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestReleaseWorkflow_A22UsesIndependentlyAuthorizedCanonicalBridge(t *testing.T) {
+func TestReleaseWorkflow_A23PublishesFreshPolicyOwnedK3Evidence(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
-	sidecar := readReleaseFile(t, "scripts/companion-release/verify-key-rotation-sidecar.sh")
+	config := readReleaseFile(t, ".goreleaser.yaml")
+	current := readReleaseFile(t, "scripts/companion-release/verify-current-release.sh")
+	combined := release + "\n" + config + "\n" + current
 	for _, required := range []string{
-		"omp-canonical-bridge-candidate:",
-		"needs: [ci, security, omp-canonical-bridge-candidate]",
-		"verify-key-rotation-sidecar.sh",
-		"materialize-key-rotation-authority.sh",
-		"key-rotation-authority/verify-rotation.sh",
-		"refs/heads/release-key-rotation-v0.50.109",
-		"adk-key-rotation-v1.json",
-		"adk-key-rotation-v1.sig",
-		"verify-rotation",
-		"release-tag-signing-2026-q3-r2.pub",
-		"release-tag-signing-2026-q3-r2.fingerprint",
-		"ADK_KEY_ROTATION_VERIFIED=1",
-		"canonical-full-bridge",
-	} {
-		if !strings.Contains(release+"\n"+sidecar, required) {
-			t.Fatalf("A22 canonical bridge authority missing %q", required)
-		}
-	}
-	if strings.Contains(release, "./internal/adkchannel/cmd") {
-		t.Fatal("release workflow rebuilds candidate-controlled rotation verifier")
-	}
-	for _, forbidden := range []string{
-		"omp-context-evidence-v0.50.109",
-		"OMP_CONTEXT_EVIDENCE_",
+		"refs/tags/v0.50.110",
+		"RELEASE_VERSION='0.50.110'",
+		"omp-production-evidence",
+		"omp-context-evidence-v0.50.110",
 		"OMP_CONTEXT_STATIC_POLICY_B64",
+		"omp-context-promotion-report.v1.json",
+		"omp-context-promotion-attestation.v2.json",
 		"--mode active",
 		"--mode historical",
-		"omp-context-promotion-2026-q3-k2",
+		"release-lineage-v1.json",
+		"release-lineage-v1.sig",
 	} {
-		if strings.Contains(release, forbidden) {
-			t.Fatalf("A22 bridge workflow contains forbidden promotion authority %q", forbidden)
+		if !strings.Contains(combined, required) {
+			t.Fatalf("A23 normal evidence contract missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"omp-context-bridge-release.v1.json",
+		"adk-key-rotation-v1.json",
+		"adk-key-rotation-v1.sig",
+		"--expected-signing-key-id",
+	} {
+		if strings.Contains(combined, forbidden) {
+			t.Fatalf("A23 normal evidence contract contains bridge authority %q", forbidden)
+		}
+	}
+	for _, required := range []string{
+		`glob: "{{ .Env.OMP_CONTEXT_PROMOTION_REPORT_PATH }}"`,
+		`glob: "{{ .Env.OMP_CONTEXT_PROMOTION_ATTESTATION_PATH }}"`,
+		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_PATH }}"`,
+		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH }}"`,
+		"dst: release-lineage-v1.json",
+		"dst: release-lineage-v1.sig",
+	} {
+		if !strings.Contains(config, required) {
+			t.Fatalf("GoReleaser A23 evidence asset missing %q", required)
+		}
+	}
+	for _, asset := range []string{
+		"_darwin_amd64.tar.gz",
+		"_darwin_arm64.tar.gz",
+		"_linux_amd64.tar.gz",
+		"_linux_arm64.tar.gz",
+		"_windows_amd64.tar.gz",
+		"_windows_amd64.zip",
+		"_windows_arm64.tar.gz",
+		"_windows_arm64.zip",
+		"checksums.txt",
+		"omp-context-promotion-report.v1.json",
+		"omp-context-promotion-attestation.v2.json",
+		"release-lineage-v1.json",
+		"release-lineage-v1.sig",
+		"checksums.txt.bundle",
+		"checksums.txt.signatures",
+	} {
+		if !strings.Contains(current, asset) {
+			t.Fatalf("current A23 verifier missing exact asset %q", asset)
 		}
 	}
 }
 
-func TestReleaseWorkflow_ProtectedMacOSSelectsHomebrewOpenSSL3BeforeRotationAuthority(t *testing.T) {
+func TestReleaseSourceValidator_A22RotationSidecarRemainsHistoricalOnly(t *testing.T) {
+	release := readReleaseFile(t, ".github/workflows/release.yaml")
+	source := readReleaseFile(t, "scripts/companion-release/validate-source.sh")
+	for _, required := range []string{
+		`if [[ "$release_phase" == 'A22' &&`,
+		`"${COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED-0}" == '1'`,
+		"ADK_KEY_ROTATION_VERIFIED",
+		"A22 R2 tag verification requires an independently verified rotation sidecar",
+	} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("A22 historical source gate missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"refs/tags/v0.50.109",
+		"verify-key-rotation-sidecar.sh",
+		"canonical-full-bridge",
+	} {
+		if strings.Contains(release, forbidden) {
+			t.Fatalf("A22 bridge authority escaped into active A23 workflow: %q", forbidden)
+		}
+	}
+}
+
+func TestReleaseWorkflow_ProtectedMacOSSelectsHomebrewOpenSSL3BeforeVerificationTools(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	var workflow struct {
 		Jobs map[string]struct {
@@ -72,95 +124,43 @@ func TestReleaseWorkflow_ProtectedMacOSSelectsHomebrewOpenSSL3BeforeRotationAuth
 	if len(protected.Env) != 0 {
 		t.Fatalf("protected release credentials escaped step scope: %#v", protected.Env)
 	}
-	selectionIndex, authorityIndex, verifierIndex := -1, -1, -1
+	selectionIndex, toolsIndex := -1, -1
 	for index, step := range protected.Steps {
 		switch step.Name {
 		case "Select Homebrew OpenSSL 3":
 			selectionIndex = index
 			assertHomebrewOpenSSL3Selection(t, step.Run, step.Env)
-		case "Materialize matching protected key-rotation authority":
-			authorityIndex = index
-		case "Reverify independently signed exact key rotation":
-			verifierIndex = index
+		case "Build companion release verification tools":
+			toolsIndex = index
 		}
 	}
-	if selectionIndex < 0 || selectionIndex >= authorityIndex || authorityIndex >= verifierIndex {
-		t.Fatalf("protected OpenSSL/authority/verifier order = %d/%d/%d",
-			selectionIndex, authorityIndex, verifierIndex)
+	if selectionIndex < 0 || toolsIndex < 0 || selectionIndex >= toolsIndex {
+		t.Fatalf("protected OpenSSL/tool build order = %d/%d", selectionIndex, toolsIndex)
 	}
 	if strings.Count(release, "- name: Select Homebrew OpenSSL 3") != 1 {
 		t.Fatal("Homebrew OpenSSL selection escaped the protected macOS release job")
 	}
 }
 
-func TestReleaseWorkflow_A22PublishesBridgeAndRotationAssets(t *testing.T) {
-	release := readReleaseFile(t, ".github/workflows/release.yaml")
-	config := readReleaseFile(t, ".goreleaser.yaml")
-	current := readReleaseFile(t, "scripts/companion-release/verify-current-release.sh")
-	for _, required := range []string{
-		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256",
-		"OMP_CONTEXT_BRIDGE_MANIFEST_PATH",
-		"OMP_CONTEXT_RELEASE_LINEAGE_PATH",
-		"ADK_KEY_ROTATION_DOCUMENT_PATH",
-		"ADK_KEY_ROTATION_SIGNATURE_PATH",
-		"ADK_KEY_ROTATION_VERIFIER",
-		"OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH",
-		"verify-omp-context-release-binary.sh",
-		"omp-context-bridge-release.v1.json",
-		"exactly sixteen A22 canonical-full bridge assets",
-		"adk-key-rotation-v1.json",
-		"adk-key-rotation-v1.sig",
-		"verify-rotation-historical",
-		"OMP_CONTEXT_LINEAGE_VERIFIER",
-		"COMPANION_MANIFEST_VERIFIER",
-		"standalone and archived lineage bytes differ",
-		"canonical-full-bridge",
-	} {
-		if !strings.Contains(release+"\n"+config+"\n"+current, required) {
-			t.Fatalf("A22 bridge release evidence contract missing %q", required)
-		}
-	}
-	for _, required := range []string{
-		`glob: "{{ .Env.OMP_CONTEXT_BRIDGE_MANIFEST_PATH }}"`,
-		`glob: "{{ .Env.ADK_KEY_ROTATION_DOCUMENT_PATH }}"`,
-		`glob: "{{ .Env.ADK_KEY_ROTATION_SIGNATURE_PATH }}"`,
-		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_PATH }}"`,
-		`glob: "{{ .Env.OMP_CONTEXT_RELEASE_LINEAGE_SIGNATURE_PATH }}"`,
-		`{{ if and (eq .Os "darwin") (eq .Arch "arm64") }}dist/auto_{{ .Target }}/release-lineage-v1.json`,
-		`{{ if and (eq .Os "darwin") (eq .Arch "arm64") }}dist/auto_{{ .Target }}/release-lineage-v1.sig`,
-		"dst: release-lineage-v1.json",
-		"dst: release-lineage-v1.sig",
-	} {
-		if !strings.Contains(config, required) {
-			t.Fatalf("GoReleaser bridge evidence asset missing %q", required)
-		}
-	}
-	for _, forbidden := range []string{
-		"pipelineOMPActiveStaticPolicyB64",
-		"OMP_CONTEXT_STATIC_POLICY_B64",
-		"OMP_CONTEXT_PROMOTION_REPORT_PATH",
-		"OMP_CONTEXT_PROMOTION_ATTESTATION_PATH",
-		"omp-context-promotion-report.v1.json",
-		"omp-context-promotion-attestation.v2.json",
-	} {
-		if strings.Contains(release+"\n"+config, forbidden) {
-			t.Fatalf("bridge release contains forbidden active-promotion wiring %q", forbidden)
-		}
-	}
-	if strings.Contains(config, "eq .Version") {
-		t.Fatal("GoReleaser gates a release asset on a per-release version coordinate")
-	}
-}
-
-func TestOMPContextEvidenceVerifier_UsesDistinctPublicTrustAPIs(t *testing.T) {
+func TestOMPContextEvidenceVerifier_UsesPolicyOwnedTrustAPIs(t *testing.T) {
 	source := readReleaseFile(t, "scripts/companion-release/ompcontextverify/main.go")
 	for _, required := range []string{
 		"promptlayer.VerifyOMPContextPromotionArtifactV2",
 		"promptlayer.VerifyOMPContextPromotionHistoricalArtifactV2",
+		"promptlayer.MarshalOMPContextPromotionStaticPolicyV3",
+		"promptlayer.ValidateOMPContextPromotionActiveStaticPolicyV3",
+		"policy.PromotionSigningKeyID",
+		"promptlayer.OMPContextPromotionProviderAuthorityDigestV1",
+		"policy.ProviderAuthorityDigest",
 		"candidate artifact digest differs from runtime binary digest",
 	} {
 		if !strings.Contains(source, required) {
 			t.Fatalf("OMP evidence verifier missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{"expectedSigningKeyID", "expected-signing-key-id"} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("OMP evidence verifier retains split signer authority %q", forbidden)
 		}
 	}
 }

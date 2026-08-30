@@ -21,8 +21,6 @@ current_signature_gate="$script_dir/verify-current-release-signatures.sh"
 prep="$script_dir/prepare-release.sh"
 publisher="$script_dir/publish-release-coordinates.sh"
 tag_ruleset_gate="$script_dir/verify-release-tag-ruleset.sh"
-rotation_ruleset_gate="$script_dir/verify-rotation-ref-ruleset.sh"
-rotation_publisher="$script_dir/publish-key-rotation-sidecar.sh"
 
 # GoReleaser must render, but never publish, the Cask or mutate tagged source.
 contains "$config" 'skip_upload: true'
@@ -47,43 +45,21 @@ contains "$release" 'COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.output
 contains "$release" 'COMPANION_CHECKSUMS_PATH="$COMPANION_CHECKSUMS_PATH"'
 not_contains "$release" "COMPANION_CHECKSUMS_PATH='dist/checksums.txt'"
 contains "$producer_receipt" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
-# Only the exact operator actor may create, update, or delete the release tag.
+# Only the exact operator may create the release tag; committed tags are sealed.
 [[ -x "$tag_ruleset_gate" && ! -L "$tag_ruleset_gate" ]] ||
   fail 'exact release tag ruleset verifier is missing or unsafe'
-contains "$prep" 'verify-release-tag-ruleset.sh'
-contains "$publisher" 'verify-release-tag-ruleset.sh'
-contains "$tag_ruleset_gate" "ruleset_name='autopus-v0.50.109-release-authority'"
-contains "$tag_ruleset_gate" "release_ref='refs/tags/v0.50.109'"
+contains "$prep" 'verify-release-tag-ruleset.sh --armed'
+contains "$publisher" 'verify-release-tag-ruleset.sh --sealed'
+contains "$tag_ruleset_gate" "ruleset_name='autopus-v0.50.110-release-authority'"
+contains "$tag_ruleset_gate" "release_ref='refs/tags/v0.50.110'"
+contains "$tag_ruleset_gate" 'usage: verify-release-tag-ruleset.sh --armed|--sealed'
 contains "$tag_ruleset_gate" 'actor_type:"User"'
+contains "$tag_ruleset_gate" 'else .bypass_actors == [] end'
 contains "$tag_ruleset_gate" '["creation","deletion","update"]'
 contains "$tag_ruleset_gate" '.can_admins_bypass == false'
 contains "$tag_ruleset_gate" 'required_reviewers'
-[[ -x "$rotation_ruleset_gate" && -x "$rotation_publisher" &&
-   ! -L "$rotation_ruleset_gate" && ! -L "$rotation_publisher" ]] ||
-  fail 'immutable rotation ref publisher or ruleset verifier is unsafe'
-contains "$rotation_publisher" 'verify-rotation-ref-ruleset.sh'
-contains "$rotation_publisher" 'materialize-key-rotation-authority.sh'
-not_contains "$rotation_publisher" './internal/adkchannel/cmd'
-contains "$script_dir/verify-key-rotation-sidecar.sh" 'verify-rotation-ref-ruleset.sh'
-contains "$script_dir/verify-key-rotation-sidecar.sh" '--public-ruleset'
-contains "$script_dir/verify-key-rotation-sidecar.sh" "assertion_mode='strict'"
-contains "$script_dir/verify-key-rotation-sidecar.sh" "assertion_mode='public'"
-contains "$script_dir/verify-key-rotation-sidecar.sh" 'git rev-list --parents -n 1 "$rotation_ref_commit"'
-contains "$rotation_ruleset_gate" 'verify-rotation-ref-ruleset.sh [--public]'
-contains "$rotation_ruleset_gate" '.source_type == "Repository" and .source == $repository'
-contains "$rotation_ruleset_gate" "ruleset_name='autopus-v0.50.109-rotation-ref-authority'"
-contains "$rotation_ruleset_gate" "rotation_ref='refs/heads/release-key-rotation-v0.50.109'"
-contains "$rotation_ruleset_gate" 'actor_type:"User"'
-contains "$release" 'authority-commit: ${{ steps.authority.outputs.authority-commit }}'
-contains "$release" 'CANDIDATE_AUTHORITY_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.authority-commit }}'
-contains "$release" 'PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}'
-contains "$release" '"$PROTECTED_AUTHORITY_COMMIT" == "$CANDIDATE_AUTHORITY_COMMIT"'
-contains "$release" 'verify-key-rotation-sidecar.sh --public-ruleset'
-contains "$recovery" 'REPOSITORY_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}'
-contains "$recovery" 'PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}'
-contains "$recovery" '"$PROTECTED_AUTHORITY_COMMIT" == "$REPOSITORY_AUTHORITY_COMMIT"'
-contains "$recovery" '--public "$PROTECTED_AUTHORITY_COMMIT" "$authority"'
-contains "$script_dir/materialize-key-rotation-authority.sh" "protected_variable_name='ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT'"
+contains "$tag_ruleset_gate" 'deployment-branch-policies?per_page=100'
+contains "$tag_ruleset_gate" 'select(.type == "tag" and .name == $tag)'
 # The tap coordinates advance with every publication, so pinning their exact
 # value here only forces a second edit; the publisher already enforces them
 # against the live tap. Assert the shape that keeps that enforcement possible.
@@ -103,33 +79,32 @@ contains "$homebrew_git_helper" '{base_tree:$base,tree:['
 contains "$homebrew_git_helper" "'{sha:\$sha,force:false}'"
 not_contains "$homebrew_git_helper" '--method PUT'
 
-# Production pins live source coordinates; recovery uses the signed tag and immutable release evidence.
-contains "$release" 'ADK_COMPANION_APPROVED_SOURCE_COMMIT'
-contains "$release" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
-contains "$release" 'COMPANION_SOURCE_PIN_REQUIRED=1'
-not_contains "$recovery" 'ADK_COMPANION_APPROVED_SOURCE_COMMIT'
-not_contains "$recovery" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
-contains "$recovery" 'COMPANION_SOURCE_PIN_REQUIRED=0'
-# The armed tag remains exact; the second .109 coordinate is the fixed,
-# independently signed rotation distribution namespace.
-contains "$release" "- 'v0.50.109'"
-contains "$release" "if: github.ref_type == 'tag'"
-contains "$script_dir/verify-key-rotation-sidecar.sh" 'refs/heads/release-key-rotation-v0.50.109'
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.109'"
-contains "$release" 'canonical-full-bridge'
-contains "$recovery" 'canonical-full bridge'
+# Production and recovery bind the exact frozen source and sealed release tag.
+for workflow in "$release" "$recovery"; do
+  contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_COMMIT'
+  contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
+  contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED=1'
+  contains "$workflow" 'verify-release-tag-ruleset.sh --sealed'
+done
+contains "$release" "- 'v0.50.110'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.110'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.110'"
+not_contains "$release" 'canonical-full-bridge'
+not_contains "$recovery" 'canonical-full bridge'
+not_contains "$release" 'omp-context-bridge-release.v1.json'
+not_contains "$recovery" 'omp-context-bridge-release.v1.json'
 for workflow in "$release" "$recovery"; do
   contains "$workflow" 'autopus-$GITHUB_REF_NAME-checksums.txt'
   contains "$workflow" 'GITHUB_REF_NAME="$GITHUB_REF_NAME"'
   contains "$workflow" 'COMPANION_VERSION="${GITHUB_REF_NAME#v}"'
 done
-contains "$release" 'release_version="${GITHUB_REF_NAME#v}"'
-contains "$release" 'autopus-adk_${release_version}_darwin_arm64.tar.gz'
-contains "$producer_receipt" 'v0.50.69 0.50.69 A0'
+contains "$release" "'autopus-adk_0.50.110_darwin_amd64.tar.gz'"
+contains "$release" "'autopus-adk_0.50.110_darwin_arm64.tar.gz'"
 contains "$producer_receipt" 'v0.50.109 0.50.109 A22'
+contains "$producer_receipt" 'v0.50.110 0.50.110 A23'
 contains "$producer_receipt" "fail 'public_key_receipt_release_identity_mismatch'"
-contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.109'"
-contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.109'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.110'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.110'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -140,8 +115,8 @@ for workflow in "$release" "$recovery"; do
   workflow_token_index=$(grep -n 'name: Create Homebrew tap token' "$workflow" | cut -d: -f1)
   (( workflow_evidence_index < workflow_token_index )) || fail 'tap token precedes release evidence'
 done
-contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.109'"
-contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.109'"
+contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.110'"
+contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.110'"
 contains "$current_release_gate" '.target_commitish == $commit'
 contains "$current_release_gate" '.immutable == true'
 contains "$current_release_gate" '(.assets | length) == ($expected | length)'
@@ -157,17 +132,20 @@ contains "$current_release_gate" "download_release_asset 'checksums.txt.signatur
 contains "$current_signature_gate" 'verify_release_checksums_v1'
 contains "$current_signature_gate" 'cosign verify-blob'
 contains "$current_signature_gate" 'unset GITHUB_TOKEN GH_TOKEN'
-contains "$current_release_gate" "BRIDGE_MANIFEST_NAME='omp-context-bridge-release.v1.json'"
-contains "$current_release_gate" 'exactly sixteen A22 canonical-full bridge assets verified'
+not_contains "$current_release_gate" 'omp-context-bridge-release.v1.json'
+contains "$current_release_gate" 'exactly fifteen A23 normal release assets verified'
 for workflow in "$release" "$recovery"; do
-  not_contains "$workflow" 'OMP_CONTEXT_STATIC_POLICY_B64'
-  not_contains "$workflow" 'OMP_CONTEXT_EVIDENCE_'
-  not_contains "$workflow" 'omp-context-promotion-report.v1.json'
-  not_contains "$workflow" 'omp-context-promotion-attestation.v2.json'
+  contains "$workflow" 'OMP_CONTEXT_STATIC_POLICY_B64'
+  contains "$workflow" 'OMP_CONTEXT_EVIDENCE_REPORT_SHA256'
+  not_contains "$workflow" '--expected-signing-key-id'
+  not_contains "$workflow" 'adk-key-rotation-v1.json'
 done
-contains "$current_release_gate" 'verify-rotation-historical'
-not_contains "$recovery" 'verify-key-rotation-sidecar.sh'
-not_contains "$release" '--historical'
+contains "$release" 'omp-context-promotion-report.v1.json'
+contains "$release" 'omp-context-promotion-attestation.v2.json'
+contains "$release" '--mode active'
+not_contains "$current_release_gate" '--mode active'
+contains "$current_release_gate" '--mode historical'
+not_contains "$current_release_gate" '--expected-signing-key-id'
 for workflow in "$release" "$recovery"; do
   contains "$workflow" 'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6'
   contains "$workflow" "cosign-release: 'v3.1.2'"

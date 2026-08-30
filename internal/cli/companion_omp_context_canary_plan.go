@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -26,10 +28,14 @@ type companionOMPContextCanaryPlanOptions struct {
 	autoVersion           string
 	provider              string
 	model                 string
+	endpoint              string
+	credentialLocator     string
+	modelContextWindow    int
 	policyID              string
 	oraclePolicyDigest    string
 	ompVersion            string
 	ompExecutableSHA256   string
+	promotionSigningKeyID string
 	releaseLineageKeyID   string
 	releaseLineageHandoff string
 	minimumRollbackFloor  uint64
@@ -59,17 +65,22 @@ func newCompanionOMPContextCanaryPlanCmd() *cobra.Command {
 	flags.StringVar(&options.autoVersion, "auto-version", "", "Candidate auto version")
 	flags.StringVar(&options.provider, "provider", "", "Provider identity")
 	flags.StringVar(&options.model, "model", "", "Provider model identity")
+	flags.StringVar(&options.endpoint, "endpoint", "", "Provider endpoint bound into runtime authority")
+	flags.StringVar(&options.credentialLocator, "credential-locator", "", "Dedicated credential environment key")
+	flags.IntVar(&options.modelContextWindow, "model-context-window", 0, "Provider model context window")
 	flags.StringVar(&options.policyID, "policy-id", "", "Active policy identity")
 	flags.StringVar(&options.oraclePolicyDigest, "oracle-policy-digest", "", "Quality oracle digest")
 	flags.StringVar(&options.ompVersion, "omp-version", "", "Pinned OMP version")
 	flags.StringVar(&options.ompExecutableSHA256, "omp-executable-sha256", "", "Pinned OMP executable digest")
+	flags.StringVar(&options.promotionSigningKeyID, "promotion-signing-key-id", "", "Promotion attestation key identity")
 	flags.StringVar(&options.releaseLineageKeyID, "release-lineage-key-id", "", "Release lineage key identity")
 	flags.StringVar(&options.releaseLineageHandoff, "release-lineage-handoff", "", "Release lineage handoff")
 	flags.Uint64Var(&options.minimumRollbackFloor, "minimum-rollback-floor", 0, "Minimum release rollback floor")
 	for _, name := range []string{
 		"project-dir", "input-output", "challenge-digest", "producer-repository", "producer-workflow-ref",
 		"candidate-repository", "source-commit", "source-tree", "target", "auto-version", "provider", "model",
-		"policy-id", "oracle-policy-digest", "omp-version", "omp-executable-sha256",
+		"endpoint", "credential-locator", "model-context-window", "policy-id", "oracle-policy-digest",
+		"omp-version", "omp-executable-sha256", "promotion-signing-key-id",
 		"release-lineage-key-id", "release-lineage-handoff", "minimum-rollback-floor",
 	} {
 		_ = command.MarkFlagRequired(name)
@@ -96,25 +107,46 @@ func runCompanionOMPContextCanaryPlan(command *cobra.Command, options companionO
 	if err != nil || providerScope != options.provider {
 		return errors.New("derive release canary model scope")
 	}
+	if !pipelineOMPContextCohortLocatorPattern.MatchString(options.credentialLocator) {
+		return errors.New("release canary credential locator is invalid")
+	}
+	credential, found := os.LookupEnv(options.credentialLocator)
+	if !found || strings.TrimSpace(credential) == "" ||
+		len(credential) > pipelineOMPActiveCredentialMaxBytes || strings.ContainsRune(credential, 0) {
+		return errors.New("release canary provider credential is unavailable")
+	}
+	implementationDigest := pipelineOMPActiveImplementationDigest()
+	providerAuthorityDigest, err := pipelineOMPActiveProviderAuthorityDigest(
+		policyDigest, implementationDigest, modelScopeDigest,
+		options.modelContextWindow, options.endpoint, credential,
+	)
+	if err != nil {
+		return errors.New("derive release canary provider authority")
+	}
 	taskBytes, err := json.Marshal(tasks)
 	if err != nil {
 		return errors.New("encode release canary task manifest")
 	}
 	cohortDigest := workflowContextRuntimeHash(string(taskBytes))
-	policyBytes, err := promptlayer.MarshalOMPContextPromotionStaticPolicyV3(
-		promptlayer.OMPContextPromotionStaticPolicyV3{
-			SchemaVersion:      promptlayer.OMPContextPromotionRuntimeSchemaV3,
-			ProducerRepository: options.producerRepository, ProducerWorkflowRef: options.producerWorkflowRef,
-			CandidateRepository: options.candidateRepository, SourceCommit: options.sourceCommit,
-			SourceTree: options.sourceTree, Target: options.target, AutoVersion: options.autoVersion,
-			PolicyID: options.policyID, PolicyDigest: policyDigest, OMPVersion: options.ompVersion,
-			OMPExecutableSHA256:          options.ompExecutableSHA256,
-			PipelineImplementationDigest: pipelineOMPActiveImplementationDigest(), Provider: options.provider,
-			ModelScopeDigest: modelScopeDigest, CohortManifestDigest: cohortDigest, OrderSeed: cohortDigest,
-			OraclePolicyDigest: options.oraclePolicyDigest, ReleaseLineageKeyID: options.releaseLineageKeyID,
-			ReleaseLineageHandoff: options.releaseLineageHandoff, MinimumRollbackFloor: options.minimumRollbackFloor,
-		},
-	)
+	staticPolicy := promptlayer.OMPContextPromotionStaticPolicyV3{
+		SchemaVersion:      promptlayer.OMPContextPromotionRuntimeSchemaV3,
+		ProducerRepository: options.producerRepository, ProducerWorkflowRef: options.producerWorkflowRef,
+		CandidateRepository: options.candidateRepository, SourceCommit: options.sourceCommit,
+		SourceTree: options.sourceTree, Target: options.target, AutoVersion: options.autoVersion,
+		PolicyID: options.policyID, PolicyDigest: policyDigest, OMPVersion: options.ompVersion,
+		OMPExecutableSHA256:          options.ompExecutableSHA256,
+		PipelineImplementationDigest: implementationDigest,
+		Provider:                     options.provider,
+		ProviderAuthorityDigest:      providerAuthorityDigest,
+		ModelScopeDigest:             modelScopeDigest, CohortManifestDigest: cohortDigest, OrderSeed: cohortDigest,
+		OraclePolicyDigest: options.oraclePolicyDigest, PromotionSigningKeyID: options.promotionSigningKeyID,
+		ReleaseLineageKeyID: options.releaseLineageKeyID, ReleaseLineageHandoff: options.releaseLineageHandoff,
+		MinimumRollbackFloor: options.minimumRollbackFloor,
+	}
+	if err := promptlayer.ValidateOMPContextPromotionActiveStaticPolicyV3(staticPolicy); err != nil {
+		return err
+	}
+	policyBytes, err := promptlayer.MarshalOMPContextPromotionStaticPolicyV3(staticPolicy)
 	if err != nil {
 		return err
 	}

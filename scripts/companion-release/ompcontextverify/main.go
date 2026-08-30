@@ -22,17 +22,14 @@ const (
 	maxStaticPolicyBytes = 16 * 1024
 )
 
-var (
-	lowerHex            = regexp.MustCompile(`^[0-9a-f]+$`)
-	promotionSigningKey = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
-)
+var lowerHex = regexp.MustCompile(`^[0-9a-f]+$`)
 
 type options struct {
 	mode, reportPath, attestationPath      string
 	reportSHA, attestationSHA              string
 	candidateRepository, candidateRevision string
 	candidateTree, candidateArtifactSHA    string
-	staticPolicyB64, expectedSigningKeyID  string
+	staticPolicyB64                        string
 }
 
 func main() {
@@ -107,9 +104,16 @@ func runWithVerifiers(
 	if report.Candidate.ArtifactSHA256 != report.Runtime.AutoBinarySHA256 {
 		return errors.New("candidate artifact digest differs from runtime binary digest")
 	}
-	expected := expectationFromStaticPolicy(policy, candidateArtifactSHA, opts.expectedSigningKeyID)
+	if promptlayer.OMPContextPromotionProviderAuthorityDigestV1(report) !=
+		policy.ProviderAuthorityDigest {
+		return errors.New("promotion provider authority differs from static policy")
+	}
+	expected := expectationFromStaticPolicy(policy, candidateArtifactSHA)
 	switch opts.mode {
 	case "active":
+		if err := promptlayer.ValidateOMPContextPromotionActiveStaticPolicyV3(policy); err != nil {
+			return fmt.Errorf("active evidence policy is invalid: %w", err)
+		}
 		valid, verifyErr := activeVerifier(reportBytes, attestationBytes, expected)
 		if verifyErr != nil || !valid {
 			return fmt.Errorf("active evidence verification failed: %w", verifyErr)
@@ -140,13 +144,11 @@ func parseOptions(arguments []string) (options, error) {
 	set.StringVar(&result.candidateTree, "candidate-tree", "", "candidate tree")
 	set.StringVar(&result.candidateArtifactSHA, "candidate-artifact-sha256", "", "candidate binary digest")
 	set.StringVar(&result.staticPolicyB64, "static-policy-b64", "", "canonical raw-base64url static policy")
-	set.StringVar(&result.expectedSigningKeyID, "expected-signing-key-id", "", "exact promotion signing key identity")
 	if err := set.Parse(arguments); err != nil || set.NArg() != 0 {
 		return result, errors.New("invalid arguments")
 	}
 	if result.mode == "" || result.reportPath == "" || result.attestationPath == "" ||
-		result.candidateRepository == "" || result.staticPolicyB64 == "" ||
-		result.expectedSigningKeyID == "" {
+		result.candidateRepository == "" || result.staticPolicyB64 == "" {
 		return result, errors.New("required argument is missing")
 	}
 	for _, value := range []struct {
@@ -161,9 +163,6 @@ func parseOptions(arguments []string) (options, error) {
 		if len(value.body) != value.size || !lowerHex.MatchString(value.body) {
 			return result, fmt.Errorf("%s is malformed", value.name)
 		}
-	}
-	if !promotionSigningKey.MatchString(result.expectedSigningKeyID) {
-		return result, errors.New("expected signing key identity is malformed")
 	}
 	return result, nil
 }
@@ -216,25 +215,23 @@ func decodeStaticPolicy(encoded string) (promptlayer.OMPContextPromotionStaticPo
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return policy, errors.New("static policy has trailing content")
 	}
-	canonical, err := json.Marshal(policy)
-	if err != nil || !bytes.Equal(canonical, body) {
-		return policy, errors.New("static policy is non-canonical")
-	}
-	if policy.SchemaVersion != promptlayer.OMPContextPromotionRuntimeSchemaV3 ||
-		policy.ReleaseLineageKeyID == "" || policy.ReleaseLineageHandoff == "" ||
-		policy.MinimumRollbackFloor == 0 {
+	canonical, err := promptlayer.MarshalOMPContextPromotionStaticPolicyV3(policy)
+	if err != nil {
 		return policy, errors.New("static policy authority is invalid")
+	}
+	if !bytes.Equal(canonical, body) {
+		return policy, errors.New("static policy is non-canonical")
 	}
 	return policy, nil
 }
 
 func expectationFromStaticPolicy(
 	policy promptlayer.OMPContextPromotionStaticPolicyV3,
-	candidateArtifactSHA, expectedSigningKeyID string,
+	candidateArtifactSHA string,
 ) promptlayer.OMPContextPromotionExpectationV2 {
 	return promptlayer.OMPContextPromotionExpectationV2{
 		ProducerRepository: policy.ProducerRepository, ProducerWorkflowRef: policy.ProducerWorkflowRef,
-		SigningKeyID: expectedSigningKeyID,
+		SigningKeyID: policy.PromotionSigningKeyID,
 		Candidate:    ompContextPromotionCandidateFromStaticPolicy(policy, candidateArtifactSHA),
 		PolicyID:     policy.PolicyID, PolicyDigest: policy.PolicyDigest,
 		AutoVersion: policy.AutoVersion, AutoBinarySHA256: candidateArtifactSHA,

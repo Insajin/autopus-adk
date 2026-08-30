@@ -7,19 +7,6 @@ import (
 	"testing"
 )
 
-// releaseWorkflowLineAt returns the source line containing offset.
-func releaseWorkflowLineAt(source string, offset int) string {
-	start := offset
-	for start > 0 && source[start-1] != '\n' {
-		start--
-	}
-	end := offset
-	for end < len(source) && source[end] != '\n' {
-		end++
-	}
-	return source[start:end]
-}
-
 func assertHomebrewOpenSSL3Selection(t *testing.T, run string, env map[string]any) {
 	t.Helper()
 	const want = `set -euo pipefail

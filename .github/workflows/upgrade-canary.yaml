@@ -1,18 +1,7 @@
 name: Upgrade Canary
 
 on:
-  workflow_dispatch:
-    inputs:
-      previous_version:
-        description: Published version used to initialize the old harness
-        required: true
-        default: "0.50.108"
-        type: string
-      candidate_version:
-        description: Published candidate version admitted by this live lane
-        required: true
-        default: "0.50.109"
-        type: string
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -30,23 +19,107 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Admit published signed upgrade assets
+      - name: Admit exact public signed A22 to A23 upgrade
         shell: bash
         env:
           UPGRADE_CANARY_RECEIPT_DIR: ${{ runner.temp }}/upgrade-canary-live-receipt
-          PREVIOUS_VERSION: ${{ inputs.previous_version }}
-          CANDIDATE_VERSION: ${{ inputs.candidate_version }}
         run: |
           set -euo pipefail
-          # This lane proves public asset admission only after both exact releases are published.
-          scripts/release-signing/tests/posix-upgrade-canary.sh \
-            live "$PREVIOUS_VERSION" "$CANDIDATE_VERSION"
+          scripts/release-signing/tests/posix-upgrade-canary.sh live 0.50.109 0.50.110
+          jq -e '
+            .mode == "live" and .status == "admitted" and
+            .proof == "public asset admission" and
+            .previous_public_version == "0.50.109" and
+            .candidate_public_version == "0.50.110" and
+            .actual_release_executables_verified == true and
+            .public_signed_installers_verified == true
+          ' "$UPGRADE_CANARY_RECEIPT_DIR/provenance.json" >/dev/null
 
+      - name: Bind public release and workflow provenance
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RECEIPT_DIR: ${{ runner.temp }}/upgrade-canary-live-receipt
+        run: |
+          set -euo pipefail
+          previous_release=$(gh api 'repos/Insajin/autopus-adk/releases/378814217')
+          previous_ref=$(gh api 'repos/Insajin/autopus-adk/git/ref/tags/v0.50.109')
+          previous_tag=$(gh api 'repos/Insajin/autopus-adk/git/tags/0b02eccccfd317b1e0fed0472155f2040bd45982')
+          previous_commit=$(gh api 'repos/Insajin/autopus-adk/commits/67f3def5d4a0a11aadd9e103389de6cc1cafc34e')
+          jq -e '
+            .id == 378814217 and .tag_name == "v0.50.109" and
+            .target_commitish == "67f3def5d4a0a11aadd9e103389de6cc1cafc34e" and
+            .draft == false and .prerelease == false and .immutable == true and
+            ([.assets[] | select(.name == "autopus-adk_0.50.109_darwin_arm64.tar.gz" and
+              .digest == "sha256:3c7901597a9e695c33148c224be1889260c2e6b10ab8662ff12b7d23da06779a")] | length) == 1
+          ' <<<"$previous_release" >/dev/null
+          jq -e '
+            .object.type == "tag" and
+            .object.sha == "0b02eccccfd317b1e0fed0472155f2040bd45982"
+          ' <<<"$previous_ref" >/dev/null
+          jq -e '
+            .sha == "0b02eccccfd317b1e0fed0472155f2040bd45982" and
+            .object.type == "commit" and
+            .object.sha == "67f3def5d4a0a11aadd9e103389de6cc1cafc34e"
+          ' <<<"$previous_tag" >/dev/null
+          jq -e '
+            .sha == "67f3def5d4a0a11aadd9e103389de6cc1cafc34e" and
+            .commit.tree.sha == "79d97a6487c6607f2bf8ed1903b685e8eb95a0d9"
+          ' <<<"$previous_commit" >/dev/null
+
+          candidate_release=$(gh api 'repos/Insajin/autopus-adk/releases/tags/v0.50.110')
+          candidate_ref=$(gh api 'repos/Insajin/autopus-adk/git/ref/tags/v0.50.110')
+          candidate_commit=$(jq -er '.target_commitish | select(test("^[0-9a-f]{40}$"))' \
+            <<<"$candidate_release")
+          candidate_commit_json=$(gh api "repos/Insajin/autopus-adk/commits/$candidate_commit")
+          jq -e '
+            .tag_name == "v0.50.110" and .draft == false and
+            .prerelease == false and .immutable == true and
+            ([.assets[] | select(.name == "autopus-adk_0.50.110_darwin_arm64.tar.gz" and
+              (.digest | type == "string" and test("^sha256:[0-9a-f]{64}$")))] | length) == 1
+          ' <<<"$candidate_release" >/dev/null
+          candidate_tag_object=$(jq -er '.object.sha | select(test("^[0-9a-f]{40}$"))' \
+            <<<"$candidate_ref")
+          [[ "$(jq -er '.object.type' <<<"$candidate_ref")" == 'tag' ]]
+          candidate_tag=$(gh api "repos/Insajin/autopus-adk/git/tags/$candidate_tag_object")
+          jq -e --arg commit "$candidate_commit" '
+            .object.type == "commit" and .object.sha == $commit
+          ' <<<"$candidate_tag" >/dev/null
+          candidate_tree=$(jq -er '.commit.tree.sha | select(test("^[0-9a-f]{40}$"))' \
+            <<<"$candidate_commit_json")
+          candidate_release_id=$(jq -er '.id | select(type == "number" and . > 0)' \
+            <<<"$candidate_release")
+          candidate_archive_digest=$(jq -er '
+            [.assets[] | select(.name == "autopus-adk_0.50.110_darwin_arm64.tar.gz")][0].digest
+          ' <<<"$candidate_release")
+
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg workflow_ref "$GITHUB_WORKFLOW_REF" --arg workflow_sha "$GITHUB_WORKFLOW_SHA" \
+            --arg run_id "$GITHUB_RUN_ID" --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg candidate_commit "$candidate_commit" --arg candidate_tree "$candidate_tree" \
+            --arg candidate_tag_object "$candidate_tag_object" \
+            --arg candidate_archive_digest "$candidate_archive_digest" \
+            --argjson candidate_release_id "$candidate_release_id" \
+            '{schema_version:"autopus-upgrade-canary-provenance.v1",repository:$repository,
+              workflow_ref:$workflow_ref,workflow_sha:$workflow_sha,run_id:$run_id,
+              run_attempt:$run_attempt,previous:{version:"0.50.109",release_id:378814217,
+              tag_object:"0b02eccccfd317b1e0fed0472155f2040bd45982",
+              source_commit:"67f3def5d4a0a11aadd9e103389de6cc1cafc34e",
+              source_tree:"79d97a6487c6607f2bf8ed1903b685e8eb95a0d9",
+              darwin_arm64_digest:"sha256:3c7901597a9e695c33148c224be1889260c2e6b10ab8662ff12b7d23da06779a"},
+              candidate:{version:"0.50.110",release_id:$candidate_release_id,
+              tag_object:$candidate_tag_object,source_commit:$candidate_commit,
+              source_tree:$candidate_tree,darwin_arm64_digest:$candidate_archive_digest}}' \
+            > "$RECEIPT_DIR/workflow-provenance.json"
+
+      # This receipt is diagnostic workflow output with bounded retention, not a
+      # substitute for the immutable public release or its signed assets.
       - name: Upload public asset admission receipt
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: upgrade-canary-${{ inputs.previous_version }}-to-${{ inputs.candidate_version }}
+          name: upgrade-canary-0.50.109-to-0.50.110
           path: ${{ runner.temp }}/upgrade-canary-live-receipt
           if-no-files-found: error
           retention-days: 30

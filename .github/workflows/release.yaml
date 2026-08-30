@@ -1,33 +1,26 @@
 name: Release
 on:
   push:
-    # This is the only armed release-tag trigger. The fixed A22 rotation
-    # distribution ref appears below only as pre-tag authorization, never as
-    # another release trigger. Wildcard release tags are forbidden.
     tags:
-      - 'v0.50.109'
+      - 'v0.50.110'
 permissions:
   contents: read
 jobs:
-  # Release gate: run the full CI suite (build/test/lint/e2e) on the tagged commit.
-  # If any CI job fails, the release job below is skipped — a red build cannot ship.
+  # Release gate: run the full CI suite on the tagged commit.
   ci:
     uses: ./.github/workflows/ci.yaml
-  # Security gate: run secret scan and govulncheck on the tagged commit.
-  # Blocks release if any vulnerability or secret leak is detected.
+  # Security gate: block release on a vulnerability or leaked secret.
   security:
     uses: ./.github/workflows/security.yml
 
-  omp-canonical-bridge-candidate:
+  omp-production-evidence:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       candidate-artifact-sha256: ${{ steps.candidate.outputs.candidate-artifact-sha256 }}
-      rotation-ref-commit: ${{ steps.rotation.outputs.rotation-ref-commit }}
-      rotation-document-sha256: ${{ steps.rotation.outputs.rotation-document-sha256 }}
-      authority-commit: ${{ steps.authority.outputs.authority-commit }}
+      static-policy-sha256: ${{ steps.candidate.outputs.static-policy-sha256 }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -38,47 +31,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Materialize immutable key-rotation authority
-        id: authority
-        shell: bash
-        env:
-          EXPECTED_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}
-        run: |
-          set -euo pipefail
-          authority="$RUNNER_TEMP/key-rotation-authority"
-          receipt="$RUNNER_TEMP/key-rotation-authority-receipt.json"
-          scripts/companion-release/materialize-key-rotation-authority.sh \
-            --public "$EXPECTED_AUTHORITY_COMMIT" "$authority" > "$receipt"
-          authority_commit=$(jq -er --arg expected "$EXPECTED_AUTHORITY_COMMIT" '
-            select(.assertion_mode == "public" and .authority_commit == $expected) |
-            .authority_commit
-          ' "$receipt")
-          printf 'authority-commit=%s\n' "$authority_commit" >> "$GITHUB_OUTPUT"
-
-      - name: Verify independently signed exact key rotation
-        id: rotation
-        shell: bash
-        env:
-          AUTOPUS_ADK_CHANNEL_KEY_ID: ${{ vars.AUTOPUS_ADK_CHANNEL_KEY_ID }}
-          AUTOPUS_ADK_CHANNEL_PUBLIC_KEY: ${{ vars.AUTOPUS_ADK_CHANNEL_PUBLIC_KEY }}
-        run: |
-          set -euo pipefail
-          source_tree=$(git rev-parse --verify 'HEAD^{tree}')
-          receipt=$(env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            AUTOPUS_ADK_CHANNEL_KEY_ID="$AUTOPUS_ADK_CHANNEL_KEY_ID" \
-            AUTOPUS_ADK_CHANNEL_PUBLIC_KEY="$AUTOPUS_ADK_CHANNEL_PUBLIC_KEY" \
-            scripts/companion-release/verify-key-rotation-sidecar.sh --public-ruleset \
-            "$RUNNER_TEMP/key-rotation-authority/verify-rotation.sh" "$GITHUB_SHA" "$source_tree" \
-            "$RUNNER_TEMP/verified-key-rotation")
-          rotation_ref_commit=$(jq -er '.rotation_ref_commit' <<<"$receipt")
-          rotation_document_sha256=$(jq -er '.rotation_document_sha256' <<<"$receipt")
-          [[ "$(jq -er '.assertion_mode' <<<"$receipt")" == 'public' ]]
-          [[ "$rotation_ref_commit" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$rotation_document_sha256" =~ ^[0-9a-f]{64}$ ]]
-          printf 'rotation-ref-commit=%s\n' "$rotation_ref_commit" >>"$GITHUB_OUTPUT"
-          printf 'rotation-document-sha256=%s\n' "$rotation_document_sha256" >>"$GITHUB_OUTPUT"
-
-      - name: Validate exact R2-signed A22 source
+      - name: Validate exact R2-signed A23 source
         id: release-source
         shell: bash
         run: |
@@ -86,31 +39,95 @@ jobs:
             GITHUB_REF_TYPE="$GITHUB_REF_TYPE" GITHUB_SHA="$GITHUB_SHA" \
             GITHUB_OUTPUT="$GITHUB_OUTPUT" COMPANION_SOURCE_PIN_REQUIRED=0 \
             COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1 \
-            ADK_KEY_ROTATION_VERIFIED=1 \
             scripts/companion-release/validate-source.sh
 
-      - name: Build canonical-full bridge candidate
+      - name: Extract pinned orphan production evidence
+        shell: bash
+        env:
+          OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA }}
+          OMP_CONTEXT_EVIDENCE_COMMIT_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_COMMIT_SHA }}
+          OMP_CONTEXT_EVIDENCE_TREE_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_TREE_SHA }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA="$OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA" \
+            OMP_CONTEXT_EVIDENCE_COMMIT_SHA="$OMP_CONTEXT_EVIDENCE_COMMIT_SHA" \
+            OMP_CONTEXT_EVIDENCE_TREE_SHA="$OMP_CONTEXT_EVIDENCE_TREE_SHA" \
+            OMP_CONTEXT_EVIDENCE_REPORT_SHA256="$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256="$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            scripts/companion-release/verify-omp-context-evidence-tag.sh \
+            "$RUNNER_TEMP/omp-context-production-evidence"
+
+      - name: Build trusted A23 evidence verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          verifier="$RUNNER_TEMP/auto-omp-context-evidence-verifier"
+          [[ ! -e "$verifier" && ! -L "$verifier" ]]
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$verifier" \
+            ./scripts/companion-release/ompcontextverify
+          chmod 0700 "$verifier"
+
+      - name: Build canonical policy-bearing production candidate
         id: candidate
         shell: bash
         env:
           COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
         run: |
           set -euo pipefail
-          candidate="$RUNNER_TEMP/auto-darwin-arm64-canonical-full-bridge"
+          candidate="$RUNNER_TEMP/auto-darwin-arm64-production-candidate"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             COMPANION_RELEASE_TAG="$GITHUB_REF_NAME" GITHUB_SHA="$GITHUB_SHA" \
             COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
+            OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
             scripts/companion-release/build-omp-context-candidate.sh "$candidate"
           candidate_sha=$(shasum -a 256 "$candidate" | awk '{print $1}')
           [[ "$candidate_sha" =~ ^[0-9a-f]{64}$ ]]
-          printf 'candidate-artifact-sha256=%s\n' "$candidate_sha" >>"$GITHUB_OUTPUT"
+          printf 'candidate-artifact-sha256=%s\n' "$candidate_sha" >> "$GITHUB_OUTPUT"
+          static_policy_sha=$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" |
+            shasum -a 256 | awk '{print $1}')
+          [[ "$static_policy_sha" =~ ^[0-9a-f]{64}$ ]]
+          printf 'static-policy-sha256=%s\n' "$static_policy_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Verify fresh K3-signed production evidence
+        shell: bash
+        env:
+          COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
+          CANDIDATE_ARTIFACT_SHA256: ${{ steps.candidate.outputs.candidate-artifact-sha256 }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+        run: |
+          evidence="$RUNNER_TEMP/omp-context-production-evidence"
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            "$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
+            --mode active \
+            --report "$evidence/omp-context-promotion-report.v1.json" \
+            --attestation "$evidence/omp-context-promotion-attestation.v2.json" \
+            --report-sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            --attestation-sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            --candidate-repository 'Insajin/autopus-adk' \
+            --candidate-revision "$GITHUB_SHA" \
+            --candidate-tree "$COMPANION_SOURCE_TREE" \
+            --candidate-artifact-sha256 "$CANDIDATE_ARTIFACT_SHA256" \
+            --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64"
+
+      - name: Carry verified evidence into the protected release job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: omp-context-evidence-v0.50.110
+          path: |
+            ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-report.v1.json
+            ${{ runner.temp }}/omp-context-production-evidence/omp-context-promotion-attestation.v2.json
+          if-no-files-found: error
+          retention-days: 1
 
   release:
-    needs: [ci, security, omp-canonical-bridge-candidate]
-    # Only the exact tag trigger can enter the protected release environment.
-    # The rotation sidecar and validate-source.sh then bind the authorized
-    # source, R2 signature, and protected source variables.
-    if: github.ref_type == 'tag'
+    needs: [ci, security, omp-production-evidence]
+    if: github.ref == 'refs/tags/v0.50.110'
     environment:
       name: adk-companion-release
     permissions:
@@ -123,6 +140,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
@@ -139,48 +157,7 @@ jobs:
           [[ "$openssl_version" == "OpenSSL 3."* ]]
           printf '%s\n' "$openssl_bin" >> "$GITHUB_PATH"
 
-      - name: Materialize matching protected key-rotation authority
-        id: authority
-        shell: bash
-        env:
-          CANDIDATE_AUTHORITY_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.authority-commit }}
-          PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}
-        run: |
-          set -euo pipefail
-          [[ "$CANDIDATE_AUTHORITY_COMMIT" =~ ^[0-9a-f]{40}$ &&
-             "${PROTECTED_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$ &&
-             "$PROTECTED_AUTHORITY_COMMIT" == "$CANDIDATE_AUTHORITY_COMMIT" ]]
-          authority="$RUNNER_TEMP/key-rotation-authority"
-          receipt="$RUNNER_TEMP/key-rotation-authority-receipt.json"
-          scripts/companion-release/materialize-key-rotation-authority.sh \
-            --public "$PROTECTED_AUTHORITY_COMMIT" "$authority" > "$receipt"
-          authority_commit=$(jq -er --arg expected "$CANDIDATE_AUTHORITY_COMMIT" '
-            select(.assertion_mode == "public" and .authority_commit == $expected) |
-            .authority_commit
-          ' "$receipt")
-          printf 'authority-commit=%s\n' "$authority_commit" >> "$GITHUB_OUTPUT"
-
-      - name: Reverify independently signed exact key rotation
-        shell: bash
-        env:
-          AUTOPUS_ADK_CHANNEL_KEY_ID: ${{ vars.AUTOPUS_ADK_CHANNEL_KEY_ID }}
-          AUTOPUS_ADK_CHANNEL_PUBLIC_KEY: ${{ vars.AUTOPUS_ADK_CHANNEL_PUBLIC_KEY }}
-          EXPECTED_ROTATION_REF_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.rotation-ref-commit }}
-          EXPECTED_ROTATION_DOCUMENT_SHA256: ${{ needs.omp-canonical-bridge-candidate.outputs.rotation-document-sha256 }}
-        run: |
-          set -euo pipefail
-          source_tree=$(git rev-parse --verify 'HEAD^{tree}')
-          receipt=$(env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            AUTOPUS_ADK_CHANNEL_KEY_ID="$AUTOPUS_ADK_CHANNEL_KEY_ID" \
-            AUTOPUS_ADK_CHANNEL_PUBLIC_KEY="$AUTOPUS_ADK_CHANNEL_PUBLIC_KEY" \
-            scripts/companion-release/verify-key-rotation-sidecar.sh --public-ruleset \
-            "$RUNNER_TEMP/key-rotation-authority/verify-rotation.sh" "$GITHUB_SHA" "$source_tree" \
-            "$RUNNER_TEMP/verified-key-rotation")
-          [[ "$(jq -er '.rotation_ref_commit' <<<"$receipt")" == "$EXPECTED_ROTATION_REF_COMMIT" ]]
-          [[ "$(jq -er '.rotation_document_sha256' <<<"$receipt")" == "$EXPECTED_ROTATION_DOCUMENT_SHA256" ]]
-          [[ "$(jq -er '.assertion_mode' <<<"$receipt")" == 'public' ]]
-
-      - name: Validate exact release source
+      - name: Validate exact protected release source
         id: release-source
         shell: bash
         env:
@@ -190,76 +167,79 @@ jobs:
           env -i PATH="$PATH" HOME="$HOME" GITHUB_REF_NAME="$GITHUB_REF_NAME" \
             GITHUB_REF_TYPE="$GITHUB_REF_TYPE" GITHUB_SHA="$GITHUB_SHA" \
             GITHUB_OUTPUT="$GITHUB_OUTPUT" COMPANION_SOURCE_PIN_REQUIRED=1 \
-            COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1 ADK_KEY_ROTATION_VERIFIED=1 \
+            COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1 \
             COMPANION_APPROVED_SOURCE_COMMIT="$COMPANION_APPROVED_SOURCE_COMMIT" \
             COMPANION_APPROVED_SOURCE_TREE="$COMPANION_APPROVED_SOURCE_TREE" \
             scripts/companion-release/validate-source.sh
 
-      - name: Verify operator-owned canonical-full bridge reservation
+      - name: Verify exact sealed release-tag authority
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          env -i PATH="$PATH" HOME="$HOME" GITHUB_TOKEN="$GITHUB_TOKEN" \
+            scripts/companion-release/verify-release-tag-ruleset.sh --sealed
+
+      - name: Verify operator-owned empty draft release reservation
         id: release-reservation
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
           COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
-          CANDIDATE_ARTIFACT_SHA256: ${{ needs.omp-canonical-bridge-candidate.outputs.candidate-artifact-sha256 }}
-          ROTATION_REF_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.rotation-ref-commit }}
-          ROTATION_DOCUMENT_SHA256: ${{ needs.omp-canonical-bridge-candidate.outputs.rotation-document-sha256 }}
+          OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA }}
+          OMP_CONTEXT_EVIDENCE_COMMIT_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_COMMIT_SHA }}
+          OMP_CONTEXT_EVIDENCE_TREE_SHA: ${{ vars.OMP_CONTEXT_EVIDENCE_TREE_SHA }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
         run: |
           set -euo pipefail
-          release_version="${GITHUB_REF_NAME#v}"
-          expected_assets=$(printf '%s\n' \
-            "autopus-adk_${release_version}_darwin_amd64.tar.gz" \
-            "autopus-adk_${release_version}_darwin_arm64.tar.gz" \
-            "autopus-adk_${release_version}_linux_amd64.tar.gz" \
-            "autopus-adk_${release_version}_linux_arm64.tar.gz" \
-            "autopus-adk_${release_version}_windows_amd64.tar.gz" \
-            "autopus-adk_${release_version}_windows_amd64.zip" \
-            "autopus-adk_${release_version}_windows_arm64.tar.gz" \
-            "autopus-adk_${release_version}_windows_arm64.zip" \
-            'checksums.txt' 'checksums.txt.bundle' 'checksums.txt.signatures' \
-            'omp-context-bridge-release.v1.json' \
-            'adk-key-rotation-v1.json' 'adk-key-rotation-v1.sig' \
-            'release-lineage-v1.json' 'release-lineage-v1.sig' |
-            jq -Rsc 'split("\n") | map(select(length > 0))')
           releases=$(gh api --paginate --slurp \
             'repos/Insajin/autopus-adk/releases?per_page=100')
-          reservation=$(jq -ce --arg tag "$GITHUB_REF_NAME" \
+          reservation=$(jq -ce \
             '[.[][]] as $all |
-             [$all[] | select(.tag_name == $tag)] as $tagged |
-             [$all[] | select(.draft == true and .name == $tag)] as $named |
+             [$all[] | select(.tag_name == "v0.50.110")] as $tagged |
+             [$all[] | select(.draft == true and .name == "v0.50.110")] as $named |
              if ($tagged | length) == 1 and ($named | length) == 1 and
                 $tagged[0].id == $named[0].id
              then $tagged[0]
-             else error("bridge reservation is missing, duplicated, or name-colliding")
+             else error("release reservation is missing, duplicated, or name-colliding")
              end' <<<"$releases")
-          jq -e --arg tag "$GITHUB_REF_NAME" --arg source "$GITHUB_SHA" \
-            --argjson expected "$expected_assets" \
+          static_policy_sha=$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" |
+            shasum -a 256 | awk '{print $1}')
+          jq -e --arg source "$GITHUB_SHA" --arg tree "$COMPANION_SOURCE_TREE" \
+            --arg evidence_tag_object "$OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA" \
+            --arg evidence_commit "$OMP_CONTEXT_EVIDENCE_COMMIT_SHA" \
+            --arg evidence_tree "$OMP_CONTEXT_EVIDENCE_TREE_SHA" \
+            --arg report_sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            --arg attestation_sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            --arg static_policy_sha256 "$static_policy_sha" \
+            '.id | type == "number"' <<<"$reservation" >/dev/null
+          jq -e --arg source "$GITHUB_SHA" --arg tree "$COMPANION_SOURCE_TREE" \
+            --arg evidence_tag_object "$OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA" \
+            --arg evidence_commit "$OMP_CONTEXT_EVIDENCE_COMMIT_SHA" \
+            --arg evidence_tree "$OMP_CONTEXT_EVIDENCE_TREE_SHA" \
+            --arg report_sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            --arg attestation_sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            --arg static_policy_sha256 "$static_policy_sha" \
             '.draft == true and .prerelease == false and .author.id == 204883817 and
-             .target_commitish == $source and .name == $tag and
-             (.assets | type == "array") and
-             ([.assets[].name] | unique | length) == (.assets | length) and
-             all(.assets[];
-               (.id | type == "number" and .id > 0) and
-               (.name as $name | $expected | index($name) != null))' \
-            <<<"$reservation" >/dev/null
-          reservation_body=$(jq -er '.body' <<<"$reservation")
-          while IFS= read -r asset_id; do
-            [[ "$asset_id" =~ ^[1-9][0-9]*$ ]]
-            gh api --method DELETE \
-              "repos/Insajin/autopus-adk/releases/assets/${asset_id}"
-          done < <(jq -r '.assets[].id' <<<"$reservation")
+             .target_commitish == $source and .name == "v0.50.110" and
+             (.assets | type == "array" and length == 0) and
+             ((.body | fromjson) == {
+               schema_version:"autopus.adk_release_reservation.v1",
+               release_tag:"v0.50.110",
+               source_commit:$source,
+               source_tree:$tree,
+               evidence_tag_object:$evidence_tag_object,
+               evidence_commit:$evidence_commit,
+               evidence_tree:$evidence_tree,
+               report_sha256:$report_sha256,
+               attestation_sha256:$attestation_sha256,
+               static_policy_sha256:$static_policy_sha256
+             })' <<<"$reservation" >/dev/null
           release_id=$(jq -r '.id' <<<"$reservation")
-          reservation=$(gh api "repos/Insajin/autopus-adk/releases/${release_id}")
-          jq -e --argjson release_id "$release_id" --arg source "$GITHUB_SHA" \
-            --arg body "$reservation_body" \
-            '.id == $release_id and .draft == true and .prerelease == false and
-             .author.id == 204883817 and .target_commitish == $source and
-             .body == $body and (.assets | type == "array" and length == 0)' \
-            <<<"$reservation" >/dev/null
-          release_id=$(jq -r '.id' <<<"$reservation")
-          [[ "$release_id" =~ ^[0-9]+$ ]]
+          [[ "$release_id" =~ ^[1-9][0-9]*$ ]]
           printf 'release-id=%s\n' "$release_id" >>"$GITHUB_OUTPUT"
-
 
       - name: Verify Darwin release execution support
         shell: bash
@@ -299,11 +279,13 @@ jobs:
           verifier="$RUNNER_TEMP/auto-companion-receipt-verifier"
           manifest_verifier="$RUNNER_TEMP/auto-companion-manifest-verifier"
           exec_smoke_gate="$RUNNER_TEMP/auto-companion-exec-smoke-gate"
+          omp_evidence_verifier="$RUNNER_TEMP/auto-omp-context-evidence-verifier"
           omp_lineage_verifier="$RUNNER_TEMP/auto-omp-context-lineage-verifier"
           [[ ! -e "$signer" && ! -L "$signer" &&
              ! -e "$verifier" && ! -L "$verifier" &&
              ! -e "$manifest_verifier" && ! -L "$manifest_verifier" &&
              ! -e "$exec_smoke_gate" && ! -L "$exec_smoke_gate" &&
+             ! -e "$omp_evidence_verifier" && ! -L "$omp_evidence_verifier" &&
              ! -e "$omp_lineage_verifier" && ! -L "$omp_lineage_verifier" ]]
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             go build -trimpath -o "$signer" ./cmd/auto
@@ -317,41 +299,74 @@ jobs:
             go build -trimpath -o "$exec_smoke_gate" \
             ./scripts/companion-release/execsmoke
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$omp_evidence_verifier" \
+            ./scripts/companion-release/ompcontextverify
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             go build -trimpath -o "$omp_lineage_verifier" \
             ./scripts/companion-release/ompcontextlineageverify
           chmod 0700 "$signer" "$verifier" "$manifest_verifier" \
-            "$exec_smoke_gate" "$omp_lineage_verifier"
+            "$exec_smoke_gate" "$omp_evidence_verifier" "$omp_lineage_verifier"
 
-      - name: Stage canonical-full bridge manifest for release
+      - name: Download same-run production evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: omp-context-evidence-v0.50.110
+          path: ${{ runner.temp }}/omp-context-production-evidence
+
+      - name: Reverify active K3 production evidence inside protected environment
         shell: bash
         env:
           COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
-          CANDIDATE_ARTIFACT_SHA256: ${{ needs.omp-canonical-bridge-candidate.outputs.candidate-artifact-sha256 }}
-          ROTATION_REF_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.rotation-ref-commit }}
-          ROTATION_DOCUMENT_SHA256: ${{ needs.omp-canonical-bridge-candidate.outputs.rotation-document-sha256 }}
+          CANDIDATE_ARTIFACT_SHA256: ${{ needs.omp-production-evidence.outputs.candidate-artifact-sha256 }}
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+          OMP_CONTEXT_STATIC_POLICY_SHA256: ${{ needs.omp-production-evidence.outputs.static-policy-sha256 }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/omp-context-production-evidence"
+          chmod 0600 "$evidence/omp-context-promotion-report.v1.json" \
+            "$evidence/omp-context-promotion-attestation.v2.json"
+          [[ "$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" |
+            shasum -a 256 | awk '{print $1}')" == "$OMP_CONTEXT_STATIC_POLICY_SHA256" ]]
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            "$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
+            --mode active \
+            --report "$evidence/omp-context-promotion-report.v1.json" \
+            --attestation "$evidence/omp-context-promotion-attestation.v2.json" \
+            --report-sha256 "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            --attestation-sha256 "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            --candidate-repository 'Insajin/autopus-adk' \
+            --candidate-revision "$GITHUB_SHA" \
+            --candidate-tree "$COMPANION_SOURCE_TREE" \
+            --candidate-artifact-sha256 "$CANDIDATE_ARTIFACT_SHA256" \
+            --static-policy-b64 "$OMP_CONTEXT_STATIC_POLICY_B64"
+
+      # GoReleaser extra_files must be repository-relative.
+      - name: Stage verified production evidence for release assets
+        shell: bash
+        env:
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
         run: |
           set -euo pipefail
           umask 077
+          evidence="$RUNNER_TEMP/omp-context-production-evidence"
           staged='.autopus/runtime/release-evidence'
           rm -rf -- "$staged"
           install -d -m 0700 "$staged"
-          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            COMPANION_RELEASE_TAG="$GITHUB_REF_NAME" \
-            COMPANION_SOURCE_COMMIT="$GITHUB_SHA" \
-            COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
-            OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="$CANDIDATE_ARTIFACT_SHA256" \
-            ADK_KEY_ROTATION_REF_COMMIT="$ROTATION_REF_COMMIT" \
-            ADK_KEY_ROTATION_DOCUMENT_SHA256="$ROTATION_DOCUMENT_SHA256" \
-            scripts/companion-release/produce-omp-context-bridge-manifest.sh \
-            "$staged/omp-context-bridge-release.v1.json"
-          install -m 0600 \
-            "$RUNNER_TEMP/verified-key-rotation/adk-key-rotation-v1.json" \
-            "$staged/adk-key-rotation-v1.json"
-          install -m 0600 \
-            "$RUNNER_TEMP/verified-key-rotation/adk-key-rotation-v1.sig" \
-            "$staged/adk-key-rotation-v1.sig"
+          install -m 0600 "$evidence/omp-context-promotion-report.v1.json" \
+            "$staged/omp-context-promotion-report.v1.json"
+          install -m 0600 "$evidence/omp-context-promotion-attestation.v2.json" \
+            "$staged/omp-context-promotion-attestation.v2.json"
+          [[ "$(shasum -a 256 "$staged/omp-context-promotion-report.v1.json" |
+            awk '{print $1}')" == "$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" ]] ||
+            { echo '::error::staged promotion report digest differs'; exit 1; }
+          [[ "$(shasum -a 256 "$staged/omp-context-promotion-attestation.v2.json" |
+            awk '{print $1}')" == "$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" ]] ||
+            { echo '::error::staged promotion attestation digest differs'; exit 1; }
           [[ -z "$(git status --porcelain)" ]] ||
-            { echo '::error::staging the bridge manifest dirtied the release worktree'; exit 1; }
+            { echo '::error::staging evidence dirtied the release worktree'; exit 1; }
       - name: Prepare release credentials
         id: release-credentials
         shell: bash
@@ -544,6 +559,7 @@ jobs:
           COMPANION_SIGNING_KEY_FILE: ${{ runner.temp }}/adk-release-credentials/companion-ed25519-private-key
           COMPANION_SIGNER: ${{ runner.temp }}/auto-companion-manifest-signer
           COMPANION_MANIFEST_VERIFIER: ${{ runner.temp }}/auto-companion-manifest-verifier
+          OMP_CONTEXT_LINEAGE_VERIFIER: ${{ runner.temp }}/auto-omp-context-lineage-verifier
           COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT }}
           COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT }}
           COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS: "31536000"
@@ -557,6 +573,7 @@ jobs:
             COMPANION_SIGNER="$COMPANION_SIGNER" \
             COMPANION_RECEIPT_VERIFIER="$RUNNER_TEMP/auto-companion-receipt-verifier" \
             COMPANION_MANIFEST_VERIFIER="$COMPANION_MANIFEST_VERIFIER" \
+            OMP_CONTEXT_LINEAGE_VERIFIER="$OMP_CONTEXT_LINEAGE_VERIFIER" \
             COMPANION_LINEAGE_MANIFEST_VERIFICATION_REQUIRED=1 \
             COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT="$COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT" \
             COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT="$COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT" \
@@ -601,10 +618,10 @@ jobs:
           COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_ISSUED_AT }}
           COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT: ${{ vars.ADK_COMPANION_PUBLIC_KEY_RECEIPT_EXPIRES_AT }}
           COMPANION_PUBLIC_KEY_RECEIPT_MINIMUM_LIFETIME_SECONDS: "31536000"
-          OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256: ${{ needs.omp-canonical-bridge-candidate.outputs.candidate-artifact-sha256 }}
-          OMP_CONTEXT_BRIDGE_MANIFEST_PATH: .autopus/runtime/release-evidence/omp-context-bridge-release.v1.json
-          ADK_KEY_ROTATION_DOCUMENT_PATH: .autopus/runtime/release-evidence/adk-key-rotation-v1.json
-          ADK_KEY_ROTATION_SIGNATURE_PATH: .autopus/runtime/release-evidence/adk-key-rotation-v1.sig
+          OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256: ${{ needs.omp-production-evidence.outputs.candidate-artifact-sha256 }}
+          OMP_CONTEXT_PROMOTION_REPORT_PATH: .autopus/runtime/release-evidence/omp-context-promotion-report.v1.json
+          OMP_CONTEXT_PROMOTION_ATTESTATION_PATH: .autopus/runtime/release-evidence/omp-context-promotion-attestation.v2.json
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
           OMP_CONTEXT_RELEASE_CANARY_ROOT: /private/tmp/autopus-adk-omp-canary-${{ github.run_id }}-${{ github.run_attempt }}
           OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE: /private/tmp/autopus-adk-omp-canary-${{ github.run_id }}-${{ github.run_attempt }}/omp-darwin-arm64
           OMP_CONTEXT_RELEASE_LINEAGE_PATH: dist/auto_darwin_arm64_v8.0/release-lineage-v1.json
@@ -635,9 +652,9 @@ jobs:
             COMPANION_SOURCE_COMMIT="${{ steps.release-source.outputs.source-commit }}" \
             COMPANION_SOURCE_TREE="${{ steps.release-source.outputs.source-tree }}" \
             OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="$OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256" \
-            OMP_CONTEXT_BRIDGE_MANIFEST_PATH="$OMP_CONTEXT_BRIDGE_MANIFEST_PATH" \
-            ADK_KEY_ROTATION_DOCUMENT_PATH="$ADK_KEY_ROTATION_DOCUMENT_PATH" \
-            ADK_KEY_ROTATION_SIGNATURE_PATH="$ADK_KEY_ROTATION_SIGNATURE_PATH" \
+            OMP_CONTEXT_PROMOTION_REPORT_PATH="$OMP_CONTEXT_PROMOTION_REPORT_PATH" \
+            OMP_CONTEXT_PROMOTION_ATTESTATION_PATH="$OMP_CONTEXT_PROMOTION_ATTESTATION_PATH" \
+            OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
             OMP_CONTEXT_RELEASE_CANARY_ROOT="$OMP_CONTEXT_RELEASE_CANARY_ROOT" \
             OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE" \
             OMP_CONTEXT_RELEASE_LINEAGE_PATH="$OMP_CONTEXT_RELEASE_LINEAGE_PATH" \
@@ -654,22 +671,19 @@ jobs:
           RELEASE_ID: ${{ steps.release-reservation.outputs.release-id }}
         run: |
           set -euo pipefail
-          [[ "$RELEASE_ID" =~ ^[0-9]+$ ]]
-          # 자산 이름은 트리거 태그에서 파생한다 — GoReleaser의 name_template과 동일한 좌표다.
-          release_version="${GITHUB_REF_NAME#v}"
-          [[ -n "$release_version" && "$release_version" != "$GITHUB_REF_NAME" ]]
+          [[ "$RELEASE_ID" =~ ^[1-9][0-9]*$ ]]
           expected_assets=$(printf '%s\n' \
-            "autopus-adk_${release_version}_darwin_amd64.tar.gz" \
-            "autopus-adk_${release_version}_darwin_arm64.tar.gz" \
-            "autopus-adk_${release_version}_linux_amd64.tar.gz" \
-            "autopus-adk_${release_version}_linux_arm64.tar.gz" \
-            "autopus-adk_${release_version}_windows_amd64.tar.gz" \
-            "autopus-adk_${release_version}_windows_amd64.zip" \
-            "autopus-adk_${release_version}_windows_arm64.tar.gz" \
-            "autopus-adk_${release_version}_windows_arm64.zip" \
+            'autopus-adk_0.50.110_darwin_amd64.tar.gz' \
+            'autopus-adk_0.50.110_darwin_arm64.tar.gz' \
+            'autopus-adk_0.50.110_linux_amd64.tar.gz' \
+            'autopus-adk_0.50.110_linux_arm64.tar.gz' \
+            'autopus-adk_0.50.110_windows_amd64.tar.gz' \
+            'autopus-adk_0.50.110_windows_amd64.zip' \
+            'autopus-adk_0.50.110_windows_arm64.tar.gz' \
+            'autopus-adk_0.50.110_windows_arm64.zip' \
             'checksums.txt' 'checksums.txt.bundle' 'checksums.txt.signatures' \
-            'omp-context-bridge-release.v1.json' \
-            'adk-key-rotation-v1.json' 'adk-key-rotation-v1.sig' \
+            'omp-context-promotion-report.v1.json' \
+            'omp-context-promotion-attestation.v2.json' \
             'release-lineage-v1.json' 'release-lineage-v1.sig' |
             jq -Rsc 'split("\n") | map(select(length > 0))')
           release=$(gh api "repos/Insajin/autopus-adk/releases/${RELEASE_ID}")
@@ -719,26 +733,35 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMPANION_RELEASE_ID: ${{ steps.release-reservation.outputs.release-id }}
           COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
           COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
-          OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256: ${{ needs.omp-canonical-bridge-candidate.outputs.candidate-artifact-sha256 }}
-          ADK_KEY_ROTATION_REF_COMMIT: ${{ needs.omp-canonical-bridge-candidate.outputs.rotation-ref-commit }}
-          ADK_KEY_ROTATION_DOCUMENT_SHA256: ${{ needs.omp-canonical-bridge-candidate.outputs.rotation-document-sha256 }}
-          ADK_KEY_ROTATION_VERIFIER: ${{ runner.temp }}/key-rotation-authority/verify-rotation.sh
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+          OMP_CONTEXT_STATIC_POLICY_SHA256: ${{ needs.omp-production-evidence.outputs.static-policy-sha256 }}
+          COMPANION_KEY_ID: ${{ vars.ADK_COMPANION_KEY_ID }}
+          COMPANION_HANDOFF: ${{ vars.ADK_COMPANION_HANDOFF }}
+          COMPANION_ROLLBACK_FLOOR: ${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}
+          COMPANION_PUBLIC_KEY_SHA256: ${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
-          checksums_path="$RUNNER_TEMP/autopus-$GITHUB_REF_NAME-checksums.txt"
-          [[ "$OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          checksums_path="$RUNNER_TEMP/autopus-v0.50.110-checksums.txt"
+          [[ "$(printf '%s' "$OMP_CONTEXT_STATIC_POLICY_B64" |
+            shasum -a 256 | awk '{print $1}')" == "$OMP_CONTEXT_STATIC_POLICY_SHA256" ]]
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_TOKEN="$GITHUB_TOKEN" \
+            GITHUB_TOKEN="$GITHUB_TOKEN" COMPANION_RELEASE_ID="$COMPANION_RELEASE_ID" \
             COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
             COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
-            OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="$OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256" \
-            ADK_KEY_ROTATION_REF_COMMIT="$ADK_KEY_ROTATION_REF_COMMIT" \
-            ADK_KEY_ROTATION_DOCUMENT_SHA256="$ADK_KEY_ROTATION_DOCUMENT_SHA256" \
-            ADK_KEY_ROTATION_VERIFIER="$ADK_KEY_ROTATION_VERIFIER" \
+            OMP_CONTEXT_EVIDENCE_REPORT_SHA256="$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256="$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
+            OMP_CONTEXT_EVIDENCE_VERIFIER="$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
             OMP_CONTEXT_LINEAGE_VERIFIER="$RUNNER_TEMP/auto-omp-context-lineage-verifier" \
             COMPANION_MANIFEST_VERIFIER="$RUNNER_TEMP/auto-companion-manifest-verifier" \
+            COMPANION_KEY_ID="$COMPANION_KEY_ID" COMPANION_HANDOFF="$COMPANION_HANDOFF" \
+            COMPANION_ROLLBACK_FLOOR="$COMPANION_ROLLBACK_FLOOR" \
+            COMPANION_PUBLIC_KEY_SHA256="$COMPANION_PUBLIC_KEY_SHA256" \
             scripts/companion-release/verify-current-release.sh "$checksums_path"
           printf 'checksums-path=%s\n' "$checksums_path" >> "$GITHUB_OUTPUT"
 

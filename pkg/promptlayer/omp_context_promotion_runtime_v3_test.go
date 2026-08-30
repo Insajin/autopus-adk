@@ -27,7 +27,7 @@ func ompContextPromotionRuntimeV3Fixture(t *testing.T) (
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture.resign(t)
+	fixture.resignWithKeyID(t, OMPContextPromotionKeyID2026Q3K3)
 	policy := OMPContextPromotionStaticPolicyV3{
 		SchemaVersion:       OMPContextPromotionRuntimeSchemaV3,
 		ProducerRepository:  fixture.report.Producer.Repository,
@@ -41,9 +41,11 @@ func ompContextPromotionRuntimeV3Fixture(t *testing.T) (
 		PipelineImplementationDigest: fixture.report.Runtime.PipelineImplementationDigest,
 		Provider:                     fixture.report.Provider, ModelScopeDigest: fixture.report.ModelScopeDigest,
 		CohortManifestDigest: fixture.report.CohortManifestDigest, OrderSeed: fixture.report.OrderSeed,
-		OraclePolicyDigest:    fixture.report.OraclePolicyDigest,
-		ReleaseLineageKeyID:   "release-lineage-2026-q3-k1",
-		ReleaseLineageHandoff: "v1", MinimumRollbackFloor: 5093,
+		OraclePolicyDigest:      fixture.report.OraclePolicyDigest,
+		ProviderAuthorityDigest: ompContextPromotionProviderAuthorityDigestV1(fixture.report),
+		PromotionSigningKeyID:   OMPContextPromotionKeyID2026Q3K3,
+		ReleaseLineageKeyID:     "release-lineage-2026-q3-k1",
+		ReleaseLineageHandoff:   "v1", MinimumRollbackFloor: 5093,
 	}
 	current := OMPContextPromotionCurrentRuntimeV3{
 		ExecutableSHA256: promotionSHA256([]byte("distributed")),
@@ -61,11 +63,18 @@ func ompContextPromotionRuntimeV3Fixture(t *testing.T) (
 
 func withOMPContextPromotionV3FixtureKey(t *testing.T, key ed25519.PublicKey) {
 	t.Helper()
+	withOMPContextPromotionV3FixtureTrust(t, key, OMPContextPromotionKeyID2026Q3K1)
+}
+
+func withOMPContextPromotionV3FixtureTrust(t *testing.T, key ed25519.PublicKey, keyIDs ...string) {
+	t.Helper()
 	original := ompContextPromotionPublicKeysV2
 	originalRevoked := ompContextPromotionRevokedKeysV2
-	ompContextPromotionPublicKeysV2 = map[string]ed25519.PublicKey{
-		OMPContextPromotionKeyID2026Q3K1: append(ed25519.PublicKey(nil), key...),
+	trusted := make(map[string]ed25519.PublicKey, len(keyIDs))
+	for _, keyID := range keyIDs {
+		trusted[keyID] = append(ed25519.PublicKey(nil), key...)
 	}
+	ompContextPromotionPublicKeysV2 = trusted
 	ompContextPromotionRevokedKeysV2 = map[string]bool{}
 	t.Cleanup(func() {
 		ompContextPromotionPublicKeysV2 = original
@@ -139,9 +148,10 @@ func TestOMPContextPromotionRuntimeBundleV3_ReadsFixedPrivateFiles(t *testing.T)
 	}
 }
 
-func TestVerifyOMPContextPromotionRuntimeV3_BindsSignedUToCurrentD(t *testing.T) {
+func TestVerifyOMPContextPromotionRuntimeV3_K3PolicyAndK3AttestationBindSignedUToCurrentD(t *testing.T) {
 	fixture, bundle, policy, current := ompContextPromotionRuntimeV3Fixture(t)
-	withOMPContextPromotionV3FixtureKey(t, fixture.publicKey)
+	withOMPContextPromotionV3FixtureTrust(t, fixture.publicKey,
+		OMPContextPromotionKeyID2026Q3K1, OMPContextPromotionKeyID2026Q3K2, OMPContextPromotionKeyID2026Q3K3)
 
 	called := false
 	verified, err := verifyOMPContextPromotionRuntimeV3WithLineageAt(
@@ -177,8 +187,11 @@ func TestVerifyOMPContextPromotionRuntimeV3_BindsSignedUToCurrentD(t *testing.T)
 
 func TestVerifyOMPContextPromotionRuntimeV3_StaticAndSignedCoordinatesFailClosed(t *testing.T) {
 	fixture, bundle, policy, current := ompContextPromotionRuntimeV3Fixture(t)
-	withOMPContextPromotionV3FixtureKey(t, fixture.publicKey)
+	withOMPContextPromotionV3FixtureTrust(t, fixture.publicKey,
+		OMPContextPromotionKeyID2026Q3K1, OMPContextPromotionKeyID2026Q3K2, OMPContextPromotionKeyID2026Q3K3)
+	lineageCalls := 0
 	acceptLineage := func(_ []byte, _ []byte, lineage companionmanifest.OMPContextReleaseLineagePolicy) (time.Time, error) {
+		lineageCalls++
 		if lineage.ExpectedExecutableSHA256 != current.ExecutableSHA256 {
 			return time.Time{}, errors.New("distributed executable does not match signed lineage")
 		}
@@ -202,14 +215,23 @@ func TestVerifyOMPContextPromotionRuntimeV3_StaticAndSignedCoordinatesFailClosed
 		"provider authority": func(_ *OMPContextPromotionStaticPolicyV3, current *OMPContextPromotionCurrentRuntimeV3) {
 			current.ProviderAuthorityDigest = promotionSHA256([]byte("other-provider-authority"))
 		},
+		"provider policy": func(policy *OMPContextPromotionStaticPolicyV3, current *OMPContextPromotionCurrentRuntimeV3) {
+			policy.ProviderAuthorityDigest = promotionSHA256([]byte("other-provider-authority"))
+			current.ProviderAuthorityDigest = policy.ProviderAuthorityDigest
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
+			lineageCalls = 0
 			mutatedPolicy, mutatedCurrent := policy, current
 			mutate(&mutatedPolicy, &mutatedCurrent)
+			expectedLineageCalls := 0
+			if name == "distributed executable" {
+				expectedLineageCalls = 1
+			}
 			if _, err := verifyOMPContextPromotionRuntimeV3WithLineageAt(
 				bundle, mutatedPolicy, mutatedCurrent, fixture.now, acceptLineage,
-			); err == nil {
-				t.Fatal("coordinate drift was accepted")
+			); err == nil || lineageCalls != expectedLineageCalls {
+				t.Fatalf("coordinate drift lineage calls=%d want=%d error=%v", lineageCalls, expectedLineageCalls, err)
 			}
 		})
 	}
@@ -236,7 +258,8 @@ func TestVerifyOMPContextPromotionRuntimeV3_StaticAndSignedCoordinatesFailClosed
 
 func TestVerifyOMPContextPromotionRuntimeV3_UsesEarliestAuthorityExpiry(t *testing.T) {
 	fixture, bundle, policy, current := ompContextPromotionRuntimeV3Fixture(t)
-	withOMPContextPromotionV3FixtureKey(t, fixture.publicKey)
+	withOMPContextPromotionV3FixtureTrust(t, fixture.publicKey,
+		OMPContextPromotionKeyID2026Q3K1, OMPContextPromotionKeyID2026Q3K2, OMPContextPromotionKeyID2026Q3K3)
 	lineageExpiry := fixture.now.Add(30 * time.Minute)
 
 	verified, err := verifyOMPContextPromotionRuntimeV3WithLineageAt(

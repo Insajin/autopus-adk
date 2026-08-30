@@ -10,9 +10,10 @@ import (
 
 type executableGoReleaserConfig struct {
 	Builds []struct {
-		ID    string   `yaml:"id"`
-		Env   []string `yaml:"env"`
-		Hooks struct {
+		ID      string   `yaml:"id"`
+		Env     []string `yaml:"env"`
+		Ldflags []string `yaml:"ldflags"`
+		Hooks   struct {
 			Post []struct {
 				Command string   `yaml:"cmd"`
 				Env     []string `yaml:"env"`
@@ -45,6 +46,10 @@ func validateProductionGoReleaserWiring(source string) error {
 		}
 		if countString(build.Env, "GOENV=off") != 1 {
 			return errors.New("auto build ambient Go env isolation differs")
+		}
+		if countString(build.Ldflags,
+			"-X github.com/insajin/autopus-adk/internal/cli.pipelineOMPActiveStaticPolicyB64={{.Env.OMP_CONTEXT_STATIC_POLICY_B64}}") != 1 {
+			return errors.New("auto build canonical static policy ldflag differs")
 		}
 		if err := validateCompanionPostHook(build.Hooks.Post); err != nil {
 			return err

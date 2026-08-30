@@ -51,6 +51,9 @@ func compiledPipelineOMPActiveStaticPolicy(
 	if err != nil || !bytes.Equal(canonical, body) {
 		return policy, errors.New("pipeline: compiled managed active trust policy is non-canonical")
 	}
+	if err := promptlayer.ValidateOMPContextPromotionActiveStaticPolicyV3(policy); err != nil {
+		return policy, errors.New("pipeline: compiled managed active trust policy is invalid")
+	}
 	return policy, nil
 }
 

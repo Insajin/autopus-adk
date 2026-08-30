@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA22CaskWithAllowlistedEnvironment(t *testing.T) {
+func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA23CaskWithAllowlistedEnvironment(t *testing.T) {
 	_, workflow := readRecoveryWorkflow(t)
 	var bridge recoveryStep
 	for _, step := range workflow.Jobs["recover-formula-bridge"].Steps {
@@ -28,14 +28,14 @@ func TestFormulaRecoveryWorkflow_RunsOnlyIdempotentA22CaskWithAllowlistedEnviron
 		bridge.Env["HOMEBREW_TAP_TOKEN"] == nil {
 		t.Fatalf("recovery bridge step environment = %v, want checksum path and tap token only", bridge.Env)
 	}
-	mutation := regexp.MustCompile(`(?i)goreleaser|gh[[:space:]]+release|git[[:space:]]+(tag|push)|--method[=[:space:]]+(post|patch|put|delete)|curl[^\n]+-[Xx][[:space:]]*(post|patch|put|delete)`)
+	mutation := regexp.MustCompile(`(?i)goreleaser|gh[[:space:]]+(release|variable|secret)|git[[:space:]]+(tag|push)|--method[=[:space:]]+(post|patch|put|delete)|curl[^\n]+-[Xx][[:space:]]*(post|patch|put|delete)`)
 	for _, step := range workflow.Jobs["recover-formula-bridge"].Steps {
 		if mutation.MatchString(step.Run) {
-			t.Fatalf("recovery step %q can mutate the immutable GitHub release", step.Name)
+			t.Fatalf("recovery step %q can mutate release, evidence, tag, or variables", step.Name)
 		}
-		for _, forbidden := range []string{"--input", "--field", "--raw-field"} {
+		for _, forbidden := range []string{"--input", "--field", "--raw-field", "vars set", "secret set"} {
 			if strings.Contains(step.Run, forbidden) {
-				t.Fatalf("recovery step %q contains API mutation input %q", step.Name, forbidden)
+				t.Fatalf("recovery step %q contains mutation input %q", step.Name, forbidden)
 			}
 		}
 	}

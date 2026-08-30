@@ -1,7 +1,7 @@
 package companionmanifest
 
 import (
-	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"io/fs"
@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/insajin/autopus-adk/pkg/promptlayer"
 )
 
 const productionGoReleaserModule = "github.com/goreleaser/goreleaser/v2@v2.17.0"
@@ -107,18 +109,12 @@ func runGoReleaserFixture(
 	if err := os.MkdirAll(evidenceDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	bridgeManifestPath := filepath.Join(".autopus", "runtime", "release-evidence",
-		"omp-context-bridge-release.v1.json")
-	rotationDocumentPath := filepath.Join(".autopus", "runtime", "release-evidence",
-		"adk-key-rotation-v1.json")
-	rotationSignaturePath := filepath.Join(".autopus", "runtime", "release-evidence",
-		"adk-key-rotation-v1.sig")
-	for path, body := range map[string][]byte{
-		bridgeManifestPath:    []byte("{}\n"),
-		rotationDocumentPath:  []byte("{}"),
-		rotationSignaturePath: bytes.Repeat([]byte{0x41}, 64),
-	} {
-		if err := os.WriteFile(filepath.Join(root, path), body, 0o600); err != nil {
+	promotionReportPath := filepath.Join(".autopus", "runtime", "release-evidence",
+		"omp-context-promotion-report.v1.json")
+	promotionAttestationPath := filepath.Join(".autopus", "runtime", "release-evidence",
+		"omp-context-promotion-attestation.v2.json")
+	for _, path := range []string{promotionReportPath, promotionAttestationPath} {
+		if err := os.WriteFile(filepath.Join(root, path), []byte("{}\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -128,7 +124,7 @@ func runGoReleaserFixture(
 	command.Dir = root
 	command.Env = append(os.Environ(), goReleaserReleaseEnv(
 		tools, keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable,
-		bridgeManifestPath, rotationDocumentPath, rotationSignaturePath,
+		promotionReportPath, promotionAttestationPath, fixtureOMPStaticPolicyB64(t, commit, tree),
 	)...)
 	productionGoReleaserFixtureRuns.Add(1)
 	output, err := command.CombinedOutput()
@@ -162,16 +158,16 @@ func exactGoReleaserCommand(arguments ...string) *exec.Cmd {
 func goReleaserReleaseEnv(
 	tools mockReleaseTools,
 	keyPath, apiKeyPath, tmpDir, commit, tree, canaryRoot, canaryExecutable,
-	bridgeManifestPath, rotationDocumentPath, rotationSignaturePath string,
+	promotionReportPath, promotionAttestationPath, staticPolicyB64 string,
 ) []string {
 	return []string{
 		"TMPDIR=" + tmpDir,
 		"GITHUB_REF_NAME=v0.50.69",
 		"COMPANION_SOURCE_COMMIT=" + commit,
 		"COMPANION_SOURCE_TREE=" + tree,
-		"OMP_CONTEXT_BRIDGE_MANIFEST_PATH=" + bridgeManifestPath,
-		"ADK_KEY_ROTATION_DOCUMENT_PATH=" + rotationDocumentPath,
-		"ADK_KEY_ROTATION_SIGNATURE_PATH=" + rotationSignaturePath,
+		"OMP_CONTEXT_PROMOTION_REPORT_PATH=" + promotionReportPath,
+		"OMP_CONTEXT_PROMOTION_ATTESTATION_PATH=" + promotionAttestationPath,
+		"OMP_CONTEXT_STATIC_POLICY_B64=" + staticPolicyB64,
 		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256=" + strings.Repeat("0", 64),
 		"OMP_CONTEXT_RELEASE_CANARY_ROOT=" + canaryRoot,
 		"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE=" + canaryExecutable,
@@ -196,6 +192,28 @@ func goReleaserReleaseEnv(
 		"COMPANION_SHASUM_TOOL=" + tools.tools["shasum"],
 		"HOMEBREW_TAP_TOKEN=fixture-token",
 	}
+}
+
+func fixtureOMPStaticPolicyB64(t *testing.T, commit, tree string) string {
+	t.Helper()
+	hash := "sha256:" + strings.Repeat("a", 64)
+	policy := promptlayer.OMPContextPromotionStaticPolicyV3{
+		SchemaVersion:      promptlayer.OMPContextPromotionRuntimeSchemaV3,
+		ProducerRepository: "Insajin/autopus-adk-evals", ProducerWorkflowRef: "release-fixture.yml@immutable",
+		CandidateRepository: "Insajin/autopus-adk", SourceCommit: commit, SourceTree: tree,
+		Target: "darwin-arm64", AutoVersion: "0.50.69", PolicyID: "fixture-policy", PolicyDigest: hash,
+		OMPVersion: "v17.2.7", OMPExecutableSHA256: hash, PipelineImplementationDigest: hash,
+		Provider: "openai", ProviderAuthorityDigest: hash, ModelScopeDigest: hash,
+		CohortManifestDigest: hash, OrderSeed: hash, OraclePolicyDigest: hash,
+		PromotionSigningKeyID: promptlayer.OMPContextPromotionKeyID2026Q3K3,
+		ReleaseLineageKeyID:   "fixture-lineage-key", ReleaseLineageHandoff: "v1",
+		MinimumRollbackFloor: 5069,
+	}
+	body, err := promptlayer.MarshalOMPContextPromotionStaticPolicyV3(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(body)
 }
 
 func copyGoReleaserRepository(t *testing.T, destination string) {

@@ -13,6 +13,7 @@ import (
 
 type ompContextPromotionV2Fixture struct {
 	now              time.Time
+	signingKeyID     string
 	privateKey       ed25519.PrivateKey
 	publicKey        ed25519.PublicKey
 	report           OMPContextPromotionReportV1
@@ -30,14 +31,28 @@ func newOMPContextPromotionV2Fixture(t *testing.T) *ompContextPromotionV2Fixture
 	fixture := &ompContextPromotionV2Fixture{
 		now: time.Date(2026, 8, 4, 3, 0, 0, 0, time.UTC), privateKey: privateKey,
 		publicKey: privateKey.Public().(ed25519.PublicKey), report: validOMPContextPromotionReportV1(),
+		signingKeyID: OMPContextPromotionKeyID2026Q3K1,
 	}
 	fixture.expectation = expectationFromOMPContextPromotionReportV1(fixture.report)
 	fixture.resign(t)
 	return fixture
 }
 
-func (f *ompContextPromotionV2Fixture) resign(t *testing.T) {
+func newOMPContextPromotionActiveV2Fixture(t *testing.T) *ompContextPromotionV2Fixture {
 	t.Helper()
+	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture.expectation.SigningKeyID = OMPContextPromotionKeyID2026Q3K3
+	fixture.resignWithKeyID(t, OMPContextPromotionKeyID2026Q3K3)
+	return fixture
+}
+
+func (f *ompContextPromotionV2Fixture) resign(t *testing.T) {
+	f.resignWithKeyID(t, f.signingKeyID)
+}
+
+func (f *ompContextPromotionV2Fixture) resignWithKeyID(t *testing.T, keyID string) {
+	t.Helper()
+	f.signingKeyID = keyID
 	reportBytes, err := json.Marshal(f.report)
 	if err != nil {
 		t.Fatalf("marshal report: %v", err)
@@ -45,7 +60,7 @@ func (f *ompContextPromotionV2Fixture) resign(t *testing.T) {
 	f.reportBytes = reportBytes
 	f.reportDigest = promotionSHA256(reportBytes)
 	f.attestation = OMPContextPromotionAttestationV2{
-		SchemaVersion: OMPContextPromotionAttestationSchemaV2, KeyID: OMPContextPromotionKeyID2026Q3K1,
+		SchemaVersion: OMPContextPromotionAttestationSchemaV2, KeyID: keyID,
 		Algorithm: "ed25519", ReportSHA256: f.reportDigest, IssuedAt: f.now.Add(-time.Minute).Format(time.RFC3339Nano),
 		NotBefore: f.now.Add(-time.Minute).Format(time.RFC3339Nano), ExpiresAt: f.now.Add(time.Hour).Format(time.RFC3339Nano),
 		TrustLane: OMPContextPromotionTrustLaneV2,

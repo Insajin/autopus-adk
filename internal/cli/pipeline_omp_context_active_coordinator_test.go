@@ -207,11 +207,12 @@ func pipelineOMPActiveCoordinatorFixture(t *testing.T, now time.Time) (
 		CandidateRepository: "Insajin/autopus-adk", SourceCommit: candidate.AutoSourceCommit,
 		SourceTree: candidate.AutoSourceTree, Target: "darwin-arm64",
 		PolicyID: "omp-active-v1", PolicyDigest: pipelineOMPContextCohortHash("policy"),
-		AutoVersion: "0.50.109",
-		OMPVersion:  "omp/17.2.7", OMPExecutableSHA256: pipelineOMPContextCohortHash("omp"),
+		AutoVersion: "0.50.110", PromotionSigningKeyID: promptlayer.OMPContextPromotionKeyID2026Q3K3,
+		OMPVersion: "omp/17.2.7", OMPExecutableSHA256: pipelineOMPContextCohortHash("omp"),
 		PipelineImplementationDigest: pipelineOMPActiveImplementationDigest(),
 		Provider:                     candidate.ScopeProvider, ModelScopeDigest: candidate.ModelScopeDigest,
-		CohortManifestDigest: pipelineOMPContextCohortHash("cohort"), OrderSeed: pipelineOMPContextCohortHash("order"),
+		ProviderAuthorityDigest: pipelineOMPContextCohortHash("provider-authority"),
+		CohortManifestDigest:    pipelineOMPContextCohortHash("cohort"), OrderSeed: pipelineOMPContextCohortHash("order"),
 		OraclePolicyDigest:  pipelineOMPContextCohortHash("oracle"),
 		ReleaseLineageKeyID: "release-lineage-2026-q3-k1", ReleaseLineageHandoff: "v1",
 		MinimumRollbackFloor: 5093,
@@ -244,6 +245,7 @@ func pipelineOMPActiveCurrentRuntimeFixture(
 		AutoVersion: policy.AutoVersion, OMPVersion: policy.OMPVersion,
 		OMPExecutableSHA256:          policy.OMPExecutableSHA256,
 		PipelineImplementationDigest: policy.PipelineImplementationDigest,
+		ProviderAuthorityDigest:      policy.ProviderAuthorityDigest,
 	}
 }
 

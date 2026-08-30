@@ -11,7 +11,7 @@ import (
 )
 
 func TestVerifyOMPContextPromotionArtifactV2_RejectsStrictJSONViolations(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
 	unknownReport := append(append([]byte(nil), fixture.reportBytes[:len(fixture.reportBytes)-1]...), []byte(`,"raw_body":"secret"}`)...)
 	credentialReport := append(append([]byte(nil), fixture.reportBytes[:len(fixture.reportBytes)-1]...), []byte(`,"credential":"sk-test-SECRET"}`)...)
 	duplicateReport := []byte(strings.Replace(string(fixture.reportBytes), `{"schema_version":`, `{"schema_version":"`+OMPContextPromotionReportSchemaV1+`","schema_version":`, 1))
@@ -32,7 +32,7 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsStrictJSONViolations(t *test
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if _, err := verifyOMPContextPromotionArtifactV2WithTrust(test.report, test.attestation, fixture.now, fixture.expectation,
-				map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil); err == nil {
+				map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil); err == nil {
 				t.Fatal("strict JSON violation was accepted")
 			}
 		})
@@ -62,14 +62,14 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsFreshnessAndRevocationViolat
 		{name: "overlong ttl", mutate: func(f *ompContextPromotionV2Fixture) {
 			f.attestation.ExpiresAt = f.now.Add(25 * time.Hour).Format(time.RFC3339Nano)
 		}},
-		{name: "revoked", mutate: func(*ompContextPromotionV2Fixture) {}, revoked: map[string]bool{OMPContextPromotionKeyID2026Q3K1: true}},
+		{name: "revoked", mutate: func(*ompContextPromotionV2Fixture) {}, revoked: map[string]bool{OMPContextPromotionKeyID2026Q3K3: true}},
 		{name: "bad signature", mutate: func(f *ompContextPromotionV2Fixture) {
 			f.attestation.SignatureBase64 = base64.StdEncoding.EncodeToString(make([]byte, ed25519.SignatureSize))
 		}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fixture := newOMPContextPromotionV2Fixture(t)
+			fixture := newOMPContextPromotionActiveV2Fixture(t)
 			test.mutate(fixture)
 			fixture.signAttestation(t)
 			if test.name == "bad signature" {
@@ -77,7 +77,7 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsFreshnessAndRevocationViolat
 				fixture.attestationBytes, _ = json.Marshal(fixture.attestation)
 			}
 			if _, err := verifyOMPContextPromotionArtifactV2WithTrust(fixture.reportBytes, fixture.attestationBytes, fixture.now,
-				fixture.expectation, map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, test.revoked); err == nil {
+				fixture.expectation, map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, test.revoked); err == nil {
 				t.Fatal("freshness or revocation violation was accepted")
 			}
 		})
@@ -85,7 +85,7 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsFreshnessAndRevocationViolat
 }
 
 func TestVerifyOMPContextPromotionArtifactV2_AcceptsProducerMaximumValidityWindow(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
 	fixture.attestation.IssuedAt = fixture.now.Format(time.RFC3339Nano)
 	fixture.attestation.NotBefore = fixture.now.Add(-5 * time.Minute).Format(time.RFC3339Nano)
 	fixture.attestation.ExpiresAt = fixture.now.Add(24 * time.Hour).Format(time.RFC3339Nano)
@@ -96,7 +96,7 @@ func TestVerifyOMPContextPromotionArtifactV2_AcceptsProducerMaximumValidityWindo
 		fixture.attestationBytes,
 		fixture.now,
 		fixture.expectation,
-		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey},
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey},
 		nil,
 	); err != nil {
 		t.Fatalf("producer maximum validity window rejected: %v", err)
@@ -113,7 +113,7 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsFutureAndStaleCohorts(t *tes
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fixture := newOMPContextPromotionV2Fixture(t)
+			fixture := newOMPContextPromotionActiveV2Fixture(t)
 			for index := range fixture.report.Observations {
 				observation := &fixture.report.Observations[index]
 				started, err := time.Parse(time.RFC3339Nano, observation.StartedAt)
@@ -135,7 +135,7 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsFutureAndStaleCohorts(t *tes
 				fixture.attestationBytes,
 				fixture.now,
 				fixture.expectation,
-				map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey},
+				map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey},
 				nil,
 			)
 			if !errors.Is(err, ErrOMPContextPromotionStale) {
@@ -174,11 +174,11 @@ func TestVerifyOMPContextPromotionArtifactV2_RejectsReplayCoordinateMismatch(t *
 	}
 	for name, mutate := range tests {
 		t.Run(name, func(t *testing.T) {
-			fixture := newOMPContextPromotionV2Fixture(t)
+			fixture := newOMPContextPromotionActiveV2Fixture(t)
 			expected := fixture.expectation
 			mutate(&expected)
 			if _, err := verifyOMPContextPromotionArtifactV2WithTrust(fixture.reportBytes, fixture.attestationBytes, fixture.now,
-				expected, map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil); err == nil {
+				expected, map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil); err == nil {
 				t.Fatal("replayed coordinate was accepted")
 			}
 		})

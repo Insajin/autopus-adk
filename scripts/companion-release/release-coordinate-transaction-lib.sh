@@ -175,7 +175,8 @@ rollback_coordinates() {
     restore_scope "$environment_snapshot" "${names[$index]}" "${values[$index]}" \
       --repo "$repository" --env "$environment_name" || rollback_failed=1
   done
-  for name in "${obsolete_names[@]}"; do
+  for name in "${obsolete_names[@]-}"; do
+    [[ -n "$name" ]] || continue
     restore_deleted_scope "$repository_snapshot" "$name" --repo "$repository" || rollback_failed=1
     restore_deleted_scope "$environment_snapshot" "$name" \
       --repo "$repository" --env "$environment_name" || rollback_failed=1
@@ -242,7 +243,8 @@ verify_coordinates() {
   done
   repository_variables=$(scope_json --repo "$repository") || return 1
   environment_variables=$(scope_json --repo "$repository" --env "$environment_name") || return 1
-  for name in "${obsolete_names[@]}"; do
+  for name in "${obsolete_names[@]-}"; do
+    [[ -n "$name" ]] || continue
     jq -e --arg name "$name" 'all(.[]; .name != $name)' <<<"$repository_variables" >/dev/null ||
       return 1
     jq -e --arg name "$name" 'all(.[]; .name != $name)' <<<"$environment_variables" >/dev/null ||

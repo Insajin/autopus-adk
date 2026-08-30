@@ -3,14 +3,18 @@ name: Recover Homebrew Formula Bridge
 on:
   workflow_dispatch: {}
 
-# Run only after the immutable bridge release exists and only to retry a
-# transient Homebrew tap write. The release tag's own source is the authority.
+# Canonical post-release recovery:
+# gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.110
+#
+# The checked-out tag owns every verifier and the Cask publisher. This job may
+# retry only the tap CAS after the exact immutable release and its historical K3
+# proof have been verified. It cannot repair a bad tag, release, or evidence set.
 permissions:
   contents: read
 
 jobs:
   recover-formula-bridge:
-    if: github.ref == 'refs/tags/v0.50.109'
+    if: github.ref == 'refs/tags/v0.50.110'
     environment:
       name: adk-companion-release
     permissions:
@@ -18,7 +22,7 @@ jobs:
     runs-on: macos-14
     timeout-minutes: 20
     steps:
-      - name: Check out exact dispatched bridge tag
+      - name: Check out exact A23 release tag
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ github.ref }}
@@ -46,100 +50,102 @@ jobs:
           [[ "$openssl_version" == "OpenSSL 3."* ]]
           printf '%s\n' "$openssl_bin" >> "$GITHUB_PATH"
 
-      - name: Materialize immutable rotation authority and build bridge verifiers
-        id: authority
+      - name: Build trusted current-release verifiers
         shell: bash
-        env:
-          REPOSITORY_AUTHORITY_COMMIT: ${{ vars.ADK_KEY_ROTATION_AUTHORITY_COMMIT }}
-          PROTECTED_AUTHORITY_COMMIT: ${{ vars.ADK_PROTECTED_KEY_ROTATION_AUTHORITY_COMMIT }}
         run: |
           set -euo pipefail
           umask 077
-          [[ "${REPOSITORY_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$ &&
-             "${PROTECTED_AUTHORITY_COMMIT:-}" =~ ^[0-9a-f]{40}$ &&
-             "$PROTECTED_AUTHORITY_COMMIT" == "$REPOSITORY_AUTHORITY_COMMIT" ]]
-          authority="$RUNNER_TEMP/key-rotation-authority"
-          receipt="$RUNNER_TEMP/key-rotation-authority-receipt.json"
+          evidence_verifier="$RUNNER_TEMP/auto-omp-context-evidence-verifier"
           lineage_verifier="$RUNNER_TEMP/auto-omp-context-lineage-verifier"
           manifest_verifier="$RUNNER_TEMP/auto-companion-manifest-verifier"
-          [[ ! -e "$authority" && ! -L "$authority" &&
+          [[ ! -e "$evidence_verifier" && ! -L "$evidence_verifier" &&
              ! -e "$lineage_verifier" && ! -L "$lineage_verifier" &&
              ! -e "$manifest_verifier" && ! -L "$manifest_verifier" ]]
-          scripts/companion-release/materialize-key-rotation-authority.sh \
-            --public "$PROTECTED_AUTHORITY_COMMIT" "$authority" > "$receipt"
-          authority_commit=$(jq -er --arg expected "$PROTECTED_AUTHORITY_COMMIT" '
-            select(.assertion_mode == "public" and .authority_commit == $expected) |
-            .authority_commit
-          ' "$receipt")
-          printf 'authority-commit=%s\n' "$authority_commit" >> "$GITHUB_OUTPUT"
+          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
+            go build -trimpath -o "$evidence_verifier" \
+            ./scripts/companion-release/ompcontextverify
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             go build -trimpath -o "$lineage_verifier" \
             ./scripts/companion-release/ompcontextlineageverify
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             go build -trimpath -o "$manifest_verifier" \
             ./scripts/companion-release/manifestverify
-          chmod 0700 "$lineage_verifier" "$manifest_verifier"
-
+          chmod 0700 "$evidence_verifier" "$lineage_verifier" "$manifest_verifier"
+          for verifier in "$evidence_verifier" "$lineage_verifier" "$manifest_verifier"; do
+            [[ -f "$verifier" && ! -L "$verifier" && -x "$verifier" ]]
+            [[ "$(stat -f '%Lp' "$verifier")" == '700' ]]
+          done
 
       - name: Validate exact R2-signed recovery source
         id: release-source
         shell: bash
+        env:
+          COMPANION_APPROVED_SOURCE_COMMIT: ${{ vars.ADK_COMPANION_APPROVED_SOURCE_COMMIT }}
+          COMPANION_APPROVED_SOURCE_TREE: ${{ vars.ADK_COMPANION_APPROVED_SOURCE_TREE }}
         run: |
           set -euo pipefail
+          umask 077
           actual_head=$(git rev-parse --verify 'HEAD^{commit}')
+          [[ "$actual_head" =~ ^[0-9a-f]{40}$ ]]
           validation_output=$(mktemp "$RUNNER_TEMP/formula-recovery-source.XXXXXX")
           trap 'rm -f -- "$validation_output"' EXIT
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_REF_NAME="$GITHUB_REF_NAME" GITHUB_REF_TYPE='tag' \
             GITHUB_SHA="$actual_head" GITHUB_OUTPUT="$validation_output" \
-            COMPANION_SOURCE_PIN_REQUIRED=0 COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1 \
-            ADK_KEY_ROTATION_VERIFIED=1 \
+            COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1 COMPANION_SOURCE_PIN_REQUIRED=1 \
+            COMPANION_APPROVED_SOURCE_COMMIT="$COMPANION_APPROVED_SOURCE_COMMIT" \
+            COMPANION_APPROVED_SOURCE_TREE="$COMPANION_APPROVED_SOURCE_TREE" \
             scripts/companion-release/validate-source.sh
+          [[ "$(grep -Ec '^source-commit=[0-9a-f]{40}$' "$validation_output")" == '1' ]]
+          [[ "$(grep -Ec '^source-tree=[0-9a-f]{40}$' "$validation_output")" == '1' ]]
           source_commit=$(sed -n 's/^source-commit=//p' "$validation_output")
           source_tree=$(sed -n 's/^source-tree=//p' "$validation_output")
           [[ "$source_commit" == "$actual_head" && "$source_tree" =~ ^[0-9a-f]{40}$ ]]
-          printf 'source-commit=%s\n' "$source_commit" >>"$GITHUB_OUTPUT"
-          printf 'source-tree=%s\n' "$source_tree" >>"$GITHUB_OUTPUT"
+          printf 'source-commit=%s\nsource-tree=%s\n' "$source_commit" "$source_tree" >> "$GITHUB_OUTPUT"
 
-      - name: Rebuild independent canonical-full bridge candidate
-        id: candidate
+      - name: Verify exact sealed release-tag authority
         shell: bash
         env:
-          COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
-          COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          candidate="$RUNNER_TEMP/auto-darwin-arm64-canonical-full-bridge"
-          env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            COMPANION_RELEASE_TAG="$GITHUB_REF_NAME" GITHUB_SHA="$COMPANION_SOURCE_COMMIT" \
-            COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
-            scripts/companion-release/build-omp-context-candidate.sh "$candidate"
-          candidate_sha=$(shasum -a 256 "$candidate" | awk '{print $1}')
-          [[ "$candidate_sha" =~ ^[0-9a-f]{64}$ ]]
-          printf 'candidate-artifact-sha256=%s\n' "$candidate_sha" >>"$GITHUB_OUTPUT"
+          env -i PATH="$PATH" HOME="$HOME" GITHUB_TOKEN="$GITHUB_TOKEN" \
+            scripts/companion-release/verify-release-tag-ruleset.sh --sealed
 
-      - name: Verify current immutable canonical-full bridge release
+      - name: Verify exact immutable release and historical K3 proof
         id: release-evidence
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COMPANION_SOURCE_COMMIT: ${{ steps.release-source.outputs.source-commit }}
           COMPANION_SOURCE_TREE: ${{ steps.release-source.outputs.source-tree }}
-          OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256: ${{ steps.candidate.outputs.candidate-artifact-sha256 }}
-          ADK_KEY_ROTATION_VERIFIER: ${{ runner.temp }}/key-rotation-authority/verify-rotation.sh
+          OMP_CONTEXT_EVIDENCE_REPORT_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_REPORT_SHA256 }}
+          OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256: ${{ vars.OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256 }}
+          OMP_CONTEXT_STATIC_POLICY_B64: ${{ vars.OMP_CONTEXT_STATIC_POLICY_B64 }}
+          COMPANION_KEY_ID: ${{ vars.ADK_COMPANION_KEY_ID }}
+          COMPANION_HANDOFF: v1
+          COMPANION_ROLLBACK_FLOOR: ${{ vars.ADK_COMPANION_ROLLBACK_FLOOR }}
+          COMPANION_PUBLIC_KEY_SHA256: ${{ vars.ADK_COMPANION_PUBLIC_KEY_SHA256 }}
         run: |
           set -euo pipefail
+          release_id=$(env -i PATH="$PATH" HOME="$HOME" GITHUB_TOKEN="$GITHUB_TOKEN" \
+            gh api "repos/Insajin/autopus-adk/releases/tags/$GITHUB_REF_NAME" | \
+            jq -er '.id | select(type == "number" and . > 0)')
           checksums_path="$RUNNER_TEMP/autopus-$GITHUB_REF_NAME-checksums.txt"
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
-            GITHUB_TOKEN="$GITHUB_TOKEN" \
+            GITHUB_TOKEN="$GITHUB_TOKEN" COMPANION_RELEASE_ID="$release_id" \
             COMPANION_SOURCE_COMMIT="$COMPANION_SOURCE_COMMIT" \
             COMPANION_SOURCE_TREE="$COMPANION_SOURCE_TREE" \
-            OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="$OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256" \
-            ADK_KEY_ROTATION_VERIFIER="$ADK_KEY_ROTATION_VERIFIER" \
+            OMP_CONTEXT_EVIDENCE_REPORT_SHA256="$OMP_CONTEXT_EVIDENCE_REPORT_SHA256" \
+            OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256="$OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256" \
+            OMP_CONTEXT_STATIC_POLICY_B64="$OMP_CONTEXT_STATIC_POLICY_B64" \
+            OMP_CONTEXT_EVIDENCE_VERIFIER="$RUNNER_TEMP/auto-omp-context-evidence-verifier" \
             OMP_CONTEXT_LINEAGE_VERIFIER="$RUNNER_TEMP/auto-omp-context-lineage-verifier" \
             COMPANION_MANIFEST_VERIFIER="$RUNNER_TEMP/auto-companion-manifest-verifier" \
+            COMPANION_KEY_ID="$COMPANION_KEY_ID" COMPANION_HANDOFF="$COMPANION_HANDOFF" \
+            COMPANION_ROLLBACK_FLOOR="$COMPANION_ROLLBACK_FLOOR" \
+            COMPANION_PUBLIC_KEY_SHA256="$COMPANION_PUBLIC_KEY_SHA256" \
             scripts/companion-release/verify-current-release.sh "$checksums_path"
-          printf 'checksums-path=%s\n' "$checksums_path" >>"$GITHUB_OUTPUT"
+          printf 'checksums-path=%s\n' "$checksums_path" >> "$GITHUB_OUTPUT"
 
       - name: Create Homebrew tap token
         id: homebrew-app-token
@@ -157,6 +163,7 @@ jobs:
           COMPANION_CHECKSUMS_PATH: ${{ steps.release-evidence.outputs.checksums-path }}
           HOMEBREW_TAP_TOKEN: ${{ steps.homebrew-app-token.outputs.token }}
         run: |
+          set -euo pipefail
           env -i PATH="$PATH" HOME="$HOME" TMPDIR="$RUNNER_TEMP" \
             GITHUB_REF_NAME="$GITHUB_REF_NAME" \
             COMPANION_VERSION="${GITHUB_REF_NAME#v}" \

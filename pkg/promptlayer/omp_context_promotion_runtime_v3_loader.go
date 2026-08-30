@@ -1,6 +1,7 @@
 package promptlayer
 
 import (
+	"errors"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/companionmanifest"
@@ -28,30 +29,52 @@ func loadVerifiedOMPContextPromotionRuntimeV3At(root string,
 	current OMPContextPromotionCurrentRuntimeV3,
 	now time.Time,
 ) (VerifiedOMPContextPromotion, error) {
-	bound, err := bindOMPContextPromotionCurrentExecutableV3(current)
-	if err != nil {
+	if err := ValidateOMPContextPromotionActiveStaticPolicyV3(expected); err != nil {
 		return VerifiedOMPContextPromotion{}, err
 	}
-	current = bound
 	report, attestation, lineage, lineageSignature, releaseKeyBundle, err :=
 		readOMPContextPromotionRuntimeBundleV3(root)
 	if err != nil {
 		return VerifiedOMPContextPromotion{}, err
 	}
-	trusted, err := companionmanifest.VerifyConfiguredPublicKeyReceiptBundle(
-		releaseKeyBundle,
-		companionmanifest.PublicKeyReceiptPolicy{
-			Now: now, ExpectedKeyID: expected.ReleaseLineageKeyID,
-			ExpectedHandoff:      expected.ReleaseLineageHandoff,
-			MinimumRollbackFloor: expected.MinimumRollbackFloor,
-		},
-	)
+	bound, err := bindOMPContextPromotionCurrentExecutableV3(current)
 	if err != nil {
 		return VerifiedOMPContextPromotion{}, err
 	}
-	return verifyOMPContextPromotionRuntimeV3At(OMPContextPromotionRuntimeBundleV3{
-		ReportBytes: report, AttestationBytes: attestation,
-		ReleaseLineageBytes: lineage, ReleaseLineageSignature: lineageSignature,
-		ReleaseKey: trusted,
-	}, expected, current, now)
+	current = bound
+	return verifyOMPContextPromotionRuntimeV3WithLineageAt(
+		OMPContextPromotionRuntimeBundleV3{
+			ReportBytes: report, AttestationBytes: attestation,
+			ReleaseLineageBytes: lineage, ReleaseLineageSignature: lineageSignature,
+		},
+		expected,
+		current,
+		now,
+		func(lineageBytes, signature []byte,
+			lineagePolicy companionmanifest.OMPContextReleaseLineagePolicy,
+		) (time.Time, error) {
+			trusted, err := companionmanifest.VerifyConfiguredPublicKeyReceiptBundle(
+				releaseKeyBundle,
+				companionmanifest.PublicKeyReceiptPolicy{
+					Now: lineagePolicy.Now, ExpectedKeyID: lineagePolicy.ExpectedKeyID,
+					ExpectedHandoff:      lineagePolicy.ExpectedHandoff,
+					MinimumRollbackFloor: lineagePolicy.MinimumRollbackFloor,
+				},
+			)
+			if err != nil {
+				return time.Time{}, err
+			}
+			verified, err := companionmanifest.VerifyOMPContextReleaseLineage(
+				lineageBytes, signature, lineagePolicy, trusted,
+			)
+			if err != nil {
+				return time.Time{}, err
+			}
+			expiresAt, ok := verified.ExpiresAt()
+			if !ok {
+				return time.Time{}, errors.New("OMP context release lineage expiry is unavailable")
+			}
+			return expiresAt, nil
+		},
+	)
 }

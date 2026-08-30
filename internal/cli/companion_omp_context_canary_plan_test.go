@@ -35,8 +35,10 @@ func TestWorkflowContextObserveSessionCanaryPlan_ProducesExactBalancedCohort(t *
 }
 
 func TestCompanionOMPContextCanaryPlan_BindsInputAndStaticPolicyToOnePlan(t *testing.T) {
-	t.Parallel()
 	root := t.TempDir()
+	const credentialLocator = "AUTOPUS_OMP_CONTEXT_PROVIDER_TEST_TOKEN"
+	const credential = "canary-provider-secret"
+	t.Setenv(credentialLocator, credential)
 	cfg := config.DefaultFullConfig("release-canary")
 	cfg.OMPContextPolicy = config.OMPContextPolicyConf{
 		Profile: "active",
@@ -55,13 +57,23 @@ func TestCompanionOMPContextCanaryPlan_BindsInputAndStaticPolicyToOnePlan(t *tes
 		projectDir: root, inputOutput: inputPath, challengeDigest: challenge,
 		producerRepository: "Insajin/autopus-adk", producerWorkflowRef: "local-release-prep@" + strings.Repeat("a", 40),
 		candidateRepository: "Insajin/autopus-adk", sourceCommit: strings.Repeat("a", 40), sourceTree: strings.Repeat("b", 40),
-		target: "darwin-arm64", autoVersion: "0.50.109", provider: "openai-codex", model: "gpt-5.6-sol",
+		target: "darwin-arm64", autoVersion: "0.50.110", provider: "openai-codex", model: "gpt-5.6-sol",
+		endpoint: "http://127.0.0.1:43123", credentialLocator: credentialLocator, modelContextWindow: 320000,
 		policyID: "omp-context-active-v1", oraclePolicyDigest: workflowContextRuntimeHash("oracle"),
 		ompVersion: "omp/17.2.7", ompExecutableSHA256: workflowContextRuntimeHash("omp"),
-		releaseLineageKeyID: "release-lineage-2026-q3-k1", releaseLineageHandoff: "v1", minimumRollbackFloor: 5101,
+		promotionSigningKeyID: promptlayer.OMPContextPromotionKeyID2026Q3K3,
+		releaseLineageKeyID:   "release-lineage-2026-q3-k1", releaseLineageHandoff: "v1", minimumRollbackFloor: 5101,
 	}
 	var output bytes.Buffer
 	command := newCompanionOMPContextCanaryPlanCmd()
+	for _, required := range []string{
+		"promotion-signing-key-id", "endpoint", "credential-locator", "model-context-window",
+	} {
+		assert.NotNil(t, command.Flags().Lookup(required))
+	}
+	for _, forbidden := range []string{"expected-signing-key-id", "credential", "provider-token"} {
+		assert.Nil(t, command.Flags().Lookup(forbidden))
+	}
 	command.SetOut(&output)
 	require.NoError(t, runCompanionOMPContextCanaryPlan(command, options))
 
@@ -93,5 +105,33 @@ func TestCompanionOMPContextCanaryPlan_BindsInputAndStaticPolicyToOnePlan(t *tes
 	assert.Equal(t, options.sourceCommit, policy.SourceCommit)
 	assert.Equal(t, options.sourceTree, policy.SourceTree)
 	assert.Equal(t, options.provider, policy.Provider)
+	assert.Equal(t, promptlayer.OMPContextPromotionKeyID2026Q3K3, policy.PromotionSigningKeyID)
+	expectedAuthority, err := pipelineOMPActiveProviderAuthorityDigest(
+		policy.PolicyDigest, policy.PipelineImplementationDigest, policy.ModelScopeDigest,
+		options.modelContextWindow, options.endpoint, credential,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, expectedAuthority, policy.ProviderAuthorityDigest)
+	assert.NotContains(t, output.String(), credential)
 	assert.Equal(t, os.FileMode(0o600), mustFileMode(t, inputPath))
+	outputSize := output.Len()
+	for _, keyID := range []string{
+		"",
+		promptlayer.OMPContextPromotionKeyID2026Q3K1,
+		promptlayer.OMPContextPromotionKeyID2026Q3K2,
+		"omp-context-promotion-unknown",
+	} {
+		invalid := options
+		invalid.inputOutput = filepath.Join(root, strings.ReplaceAll(keyID, "/", "-")+"-invalid-signer-input.jsonl")
+		invalid.promotionSigningKeyID = keyID
+		require.Error(t, runCompanionOMPContextCanaryPlan(command, invalid))
+		assert.NoFileExists(t, invalid.inputOutput)
+		assert.Equal(t, outputSize, output.Len())
+	}
+	missingCredential := options
+	missingCredential.inputOutput = filepath.Join(root, "missing-credential-input.jsonl")
+	missingCredential.credentialLocator = "AUTOPUS_OMP_CONTEXT_PROVIDER_MISSING_TOKEN"
+	require.Error(t, runCompanionOMPContextCanaryPlan(command, missingCredential))
+	assert.NoFileExists(t, missingCredential.inputOutput)
+	assert.Equal(t, outputSize, output.Len())
 }

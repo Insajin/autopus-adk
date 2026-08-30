@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestGoReleaser_A22UsesCommitTimeTrimmedReproducibleBuilds(t *testing.T) {
+func TestGoReleaser_A23UsesCommitTimeTrimmedReproducibleBuilds(t *testing.T) {
 	config := readReleaseFile(t, ".goreleaser.yaml")
 	for _, required := range []string{
 		"flags:\n      - -trimpath\n      - -buildvcs=false",
@@ -23,7 +23,7 @@ func TestGoReleaser_A22UsesCommitTimeTrimmedReproducibleBuilds(t *testing.T) {
 	}
 }
 
-func TestReleaseWorkflow_A22BuildsCanonicalCandidateBeforeAuthority(t *testing.T) {
+func TestReleaseWorkflow_A23BuildsPolicyBoundCanonicalCandidateBeforeAuthority(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	runtime := readReleaseFile(t, "scripts/companion-release/prepare-release-runtime-lib.sh")
 	builder := readReleaseFile(t, "scripts/companion-release/build-omp-context-candidate.sh")
@@ -42,6 +42,8 @@ func TestReleaseWorkflow_A22BuildsCanonicalCandidateBeforeAuthority(t *testing.T
 		"pkg/version.sourceTree=${COMPANION_SOURCE_TREE}",
 		`TZ=UTC git show -s --date='format-local:%Y-%m-%dT%H:%M:%SZ'`,
 		`short_commit=${GITHUB_SHA:0:8}`,
+		"pipelineOMPActiveStaticPolicyB64=${OMP_CONTEXT_STATIC_POLICY_B64}",
+		"OMP_CONTEXT_STATIC_POLICY_B64",
 	} {
 		if !strings.Contains(surface, required) {
 			t.Fatalf("canonical candidate build contract missing %q", required)
@@ -49,7 +51,6 @@ func TestReleaseWorkflow_A22BuildsCanonicalCandidateBeforeAuthority(t *testing.T
 	}
 	for _, obsolete := range []string{
 		`--format=%cI`, `${GITHUB_SHA:0:7}`,
-		"pipelineOMPActiveStaticPolicyB64=${OMP_CONTEXT_STATIC_POLICY_B64}",
 	} {
 		if strings.Contains(builder, obsolete) {
 			t.Fatalf("canonical candidate builder retains GoReleaser-incompatible input %q", obsolete)

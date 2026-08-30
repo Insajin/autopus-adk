@@ -24,11 +24,25 @@ assets_helper="$script_dir/verify-public-key-lineage-assets.sh"
 # shellcheck source=verify-public-key-lineage-assets.sh
 source "$assets_helper"
 nonzero_hex "$prior_commit" 40 || fail prior_evidence_unverifiable "${prior_phase} commit pin is not provisioned; ${LOCAL_EVIDENCE_ERROR}"
-for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
-  "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
-  nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
-done
-if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' || "$release_phase" == 'A12' || "$release_phase" == 'A13' || "$release_phase" == 'A14' || "$release_phase" == 'A15' || "$release_phase" == 'A16' || "$release_phase" == 'A17' || "$release_phase" == 'A18' || "$release_phase" == 'A19' || "$release_phase" == 'A20' || "$release_phase" == 'A21' || "$release_phase" == 'A22' ]]; then
+if [[ "$release_phase" == 'A23' ]]; then
+  for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
+    "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_arm64_archive" \
+    "$prior_arm64_manifest" "$A22_ARM64_MANIFEST_SIGNATURE_SHA256" \
+    "$A22_CHECKSUMS_BUNDLE_SHA256" "$A22_CHECKSUMS_SIGNATURES_SHA256" \
+    "$A22_BRIDGE_MANIFEST_SHA256" "$A22_LINEAGE_SHA256" \
+    "$A22_LINEAGE_SIGNATURE_SHA256" "$A22_UPSTREAM_SHA256" "$A22_EXECUTABLE_SHA256"; do
+    nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'A22 bridge trust pins are not provisioned'
+  done
+else
+  for pin in "$A0_RECEIPT_SHA256" "$A0_SIGNATURE_SHA256" "$A0_RECORD_SHA256" \
+    "$A0_PUBLIC_KEY_SHA256" "$prior_checksums" "$prior_amd64_manifest" "$prior_arm64_manifest"; do
+    nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable 'prior release trust pins are not provisioned'
+  done
+fi
+if [[ "$release_phase" == 'A23' ]]; then
+  nonzero_hex "$prior_tag_object" 40 \
+    || fail prior_evidence_unverifiable 'A22 annotated tag pin is not provisioned'
+elif [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' || "$release_phase" == 'A4' || "$release_phase" == 'A5' || "$release_phase" == 'A6' || "$release_phase" == 'A7' || "$release_phase" == 'A8' || "$release_phase" == 'A9' || "$release_phase" == 'A10' || "$release_phase" == 'A11' || "$release_phase" == 'A12' || "$release_phase" == 'A13' || "$release_phase" == 'A14' || "$release_phase" == 'A15' || "$release_phase" == 'A16' || "$release_phase" == 'A17' || "$release_phase" == 'A18' || "$release_phase" == 'A19' || "$release_phase" == 'A20' || "$release_phase" == 'A21' || "$release_phase" == 'A22' ]]; then
   nonzero_hex "$prior_tag_object" 40 || fail prior_evidence_unverifiable "${prior_phase} annotated tag pin is not provisioned"
   for pin in "$prior_amd64_archive" "$prior_arm64_archive"; do
     nonzero_hex "$pin" 64 || fail prior_evidence_unverifiable "${prior_phase} archive pins are not provisioned"
@@ -71,6 +85,11 @@ if [[ -n "${COMPANION_MANIFEST_VERIFIER-}" ]]; then
   [[ -f "$COMPANION_MANIFEST_VERIFIER" && ! -L "$COMPANION_MANIFEST_VERIFIER" &&
      -x "$COMPANION_MANIFEST_VERIFIER" ]] \
     || fail prior_evidence_unverifiable 'companion manifest verifier is invalid'
+fi
+if [[ "$release_phase" == 'A23' ]]; then
+  [[ -f "${OMP_CONTEXT_LINEAGE_VERIFIER-}" &&
+     ! -L "$OMP_CONTEXT_LINEAGE_VERIFIER" && -x "$OMP_CONTEXT_LINEAGE_VERIFIER" ]] \
+    || fail prior_evidence_unverifiable 'OMP context lineage verifier is invalid'
 fi
 [[ -f "$COMPANION_SIGNING_KEY_FILE" && ! -L "$COMPANION_SIGNING_KEY_FILE" ]] \
   || fail prior_evidence_unverifiable 'companion signing key file is invalid'
@@ -145,7 +164,11 @@ jq -e --arg bundle "$BUNDLE_NAME" --arg receipt "$RECEIPT_NAME" --arg signature 
   '[.assets[].name | select(. == $bundle or . == $receipt or . == $signature)] | length == 0' \
   "$release_json" >/dev/null \
   || fail prior_evidence_malformed 'independent receipt assets are forbidden'
-verify_public_key_lineage_assets
+if [[ "$release_phase" == 'A23' ]]; then
+  verify_a22_bridge_lineage_assets
+else
+  verify_public_key_lineage_assets
+fi
 receipt_sha256=$(sha256_file "$prior_receipt") \
   || fail prior_evidence_unverifiable 'cannot digest prior receipt'
 signature_sha256=$(sha256_file "$prior_signature") \

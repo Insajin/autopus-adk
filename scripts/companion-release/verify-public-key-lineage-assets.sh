@@ -82,3 +82,68 @@ verify_public_key_lineage_assets() {
   cmp -- "$prior_signature" "$temp_dir/arm64/$SIGNATURE_NAME" \
     || fail prior_signature_bytes_mismatch "${prior_phase} architecture signature bytes differ"
 }
+
+verify_a22_bridge_lineage_assets() {
+  local download_dir="$temp_dir/a22-downloads" asset expected api_digest destination
+  local checksum_line archive archive_lineage archive_lineage_signature receipt_bundle
+  install -m 0700 -d "$download_dir"
+  while read -r asset expected; do
+    api_digest=$(jq -er --arg name "$asset" \
+      '[.assets[] | select(.name == $name)] | select(length == 1) | .[0] |
+       select(.state == "uploaded") | .digest |
+       select(type == "string" and test("^sha256:[0-9a-f]{64}$"))' "$release_json") ||
+      fail prior_evidence_malformed "exact A22 asset metadata is missing for ${asset}"
+    [[ "$api_digest" == "sha256:$expected" ]] || fail prior_archive_digest_mismatch "A22 API digest differs for ${asset}"
+    destination="$download_dir/$asset"
+    env -i PATH="$PATH" HOME="${HOME-}" GITHUB_TOKEN="$GITHUB_TOKEN" \
+      gh release download "$prior_tag" --repo "$prior_repository" \
+      --pattern "$asset" --dir "$download_dir" ||
+      fail prior_evidence_absent "exact A22 asset is absent: ${asset}"
+    [[ -f "$destination" && ! -L "$destination" ]] || fail prior_evidence_absent "downloaded A22 asset is invalid: ${asset}"
+    [[ "$(sha256_file "$destination")" == "$api_digest" ]] || fail prior_evidence_unverifiable "A22 downloaded bytes differ for ${asset}"
+  done <<A22_ASSETS
+checksums.txt $A22_CHECKSUMS_SHA256
+checksums.txt.bundle $A22_CHECKSUMS_BUNDLE_SHA256
+checksums.txt.signatures $A22_CHECKSUMS_SIGNATURES_SHA256
+autopus-adk_0.50.109_darwin_arm64.tar.gz $A22_ARM64_ARCHIVE_SHA256
+omp-context-bridge-release.v1.json $A22_BRIDGE_MANIFEST_SHA256
+release-lineage-v1.json $A22_LINEAGE_SHA256
+release-lineage-v1.sig $A22_LINEAGE_SIGNATURE_SHA256
+A22_ASSETS
+  archive="$download_dir/autopus-adk_0.50.109_darwin_arm64.tar.gz"
+  checksum_line=$(grep -E \
+    '^[0-9a-f]{64}  autopus-adk_0\.50\.109_darwin_arm64\.tar\.gz$' "$download_dir/checksums.txt") ||
+    fail prior_checksums_malformed 'A22 arm64 checksum entry is absent'
+  [[ "$(grep -Ec '^[0-9a-f]{64}  autopus-adk_0\.50\.109_darwin_arm64\.tar\.gz$' \
+      "$download_dir/checksums.txt")" == '1' &&
+     "${checksum_line%% *}" == "$A22_ARM64_ARCHIVE_SHA256" ]] \
+    || fail prior_archive_checksum_mismatch 'A22 arm64 archive differs from checksums.txt'
+  extract_bundle "$archive" "$temp_dir/a22-arm64" arm64 "$A22_ARM64_MANIFEST_SHA256"
+  prior_receipt="$temp_dir/a22-arm64/$RECEIPT_NAME" prior_signature="$temp_dir/a22-arm64/$SIGNATURE_NAME"
+  [[ "$(sha256_file "$temp_dir/a22-arm64/$MANIFEST_SIGNATURE_NAME")" == \
+     "sha256:$A22_ARM64_MANIFEST_SIGNATURE_SHA256" ]] \
+    || fail prior_manifest_signature_mismatch 'A22 companion signature differs from its pin'
+  archive_lineage="$temp_dir/a22-archive-lineage.json" archive_lineage_signature="$temp_dir/a22-archive-lineage.sig"
+  tar -xOzf "$archive" release-lineage-v1.json >"$archive_lineage" \
+    || fail prior_evidence_absent 'A22 archived lineage is absent'
+  tar -xOzf "$archive" release-lineage-v1.sig >"$archive_lineage_signature" \
+    || fail prior_evidence_absent 'A22 archived lineage signature is absent'
+  cmp -- "$download_dir/release-lineage-v1.json" "$archive_lineage" \
+    || fail prior_evidence_unverifiable 'A22 standalone and archived lineage differ'
+  cmp -- "$download_dir/release-lineage-v1.sig" "$archive_lineage_signature" \
+    || fail prior_evidence_unverifiable 'A22 standalone and archived lineage signatures differ'
+  receipt_bundle="$temp_dir/a22-receipt-bundle"
+  install -m 0700 -d "$receipt_bundle"
+  install -m 0600 "$prior_receipt" "$prior_signature" "$receipt_bundle"
+  env -i PATH="$PATH" HOME="${HOME-}" TMPDIR="${TMPDIR:-/tmp}" \
+    "$OMP_CONTEXT_LINEAGE_VERIFIER" \
+    --lineage "$download_dir/release-lineage-v1.json" \
+    --signature "$download_dir/release-lineage-v1.sig" \
+    --receipt-bundle "$receipt_bundle" --key-id "$COMPANION_KEY_ID" \
+    --handoff "$COMPANION_HANDOFF" --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+    --upstream-sha256 "sha256:$A22_UPSTREAM_SHA256" \
+    --executable-sha256 "sha256:$A22_EXECUTABLE_SHA256" \
+    --source-repository "$prior_repository" --source-commit "$prior_commit" \
+    --source-tree "$prior_tree" --target darwin-arm64 --version "$prior_version" \
+    || fail prior_evidence_unverifiable 'A22 bridge lineage signature or coordinates differ'
+}

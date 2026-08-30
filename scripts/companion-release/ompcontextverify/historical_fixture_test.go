@@ -28,7 +28,6 @@ func (f historicalVerifierFixture) arguments(candidateArtifactSHA string) []stri
 		"--candidate-tree", strings.Repeat("d", 40),
 		"--candidate-artifact-sha256", candidateArtifactSHA,
 		"--static-policy-b64", f.staticPolicyB64,
-		"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K1,
 	}
 }
 
@@ -122,13 +121,16 @@ func newHistoricalVerifierFixture(t *testing.T) historicalVerifierFixture {
 		ProducerWorkflowRef: builtReport.Producer.WorkflowRef,
 		CandidateRepository: builtReport.Candidate.Repository,
 		SourceCommit:        builtReport.Candidate.Revision, SourceTree: builtReport.Candidate.TreeSHA,
-		Target: "darwin-arm64", AutoVersion: builtReport.Runtime.AutoVersion,
+		PromotionSigningKeyID: promptlayer.OMPContextPromotionKeyID2026Q3K1,
+		Target:                "darwin-arm64", AutoVersion: builtReport.Runtime.AutoVersion,
 		PolicyID: builtReport.Policy.PolicyID, PolicyDigest: builtReport.Policy.PolicyDigest,
 		OMPVersion:                   builtReport.Runtime.OMPVersion,
 		OMPExecutableSHA256:          builtReport.Runtime.OMPExecutableSHA256,
 		PipelineImplementationDigest: builtReport.Runtime.PipelineImplementationDigest,
-		Provider:                     builtReport.Provider, ModelScopeDigest: builtReport.ModelScopeDigest,
-		CohortManifestDigest: builtReport.CohortManifestDigest, OrderSeed: builtReport.OrderSeed,
+		Provider:                     builtReport.Provider,
+		ProviderAuthorityDigest:      promptlayer.OMPContextPromotionProviderAuthorityDigestV1(builtReport),
+		ModelScopeDigest:             builtReport.ModelScopeDigest,
+		CohortManifestDigest:         builtReport.CohortManifestDigest, OrderSeed: builtReport.OrderSeed,
 		OraclePolicyDigest:  builtReport.OraclePolicyDigest,
 		ReleaseLineageKeyID: "release-key", ReleaseLineageHandoff: "v1", MinimumRollbackFloor: 5093,
 	}
@@ -167,16 +169,15 @@ func promotionVerifierInputs(
 	return reportBytes, expectationFromStaticPolicy(
 		policy,
 		"sha256:"+strings.Repeat("e", 64),
-		promptlayer.OMPContextPromotionKeyID2026Q3K1,
 	)
 }
 
-func stalePromotionAttestation(t *testing.T, reportBytes []byte) []byte {
+func stalePromotionAttestation(t *testing.T, reportBytes []byte, keyID string) []byte {
 	t.Helper()
 	issuedAt := time.Date(2026, 8, 4, 3, 0, 0, 0, time.UTC)
 	body, err := json.Marshal(promptlayer.OMPContextPromotionAttestationV2{
 		SchemaVersion:   promptlayer.OMPContextPromotionAttestationSchemaV2,
-		KeyID:           promptlayer.OMPContextPromotionKeyID2026Q3K1,
+		KeyID:           keyID,
 		Algorithm:       "ed25519",
 		ReportSHA256:    "sha256:" + digest(reportBytes),
 		IssuedAt:        issuedAt.Format(time.RFC3339Nano),
@@ -189,4 +190,31 @@ func stalePromotionAttestation(t *testing.T, reportBytes []byte) []byte {
 		t.Fatalf("marshal stale attestation: %v", err)
 	}
 	return body
+}
+
+func TestRun_RejectsProviderAuthorityDriftBeforeVerification(t *testing.T) {
+	fixture := newHistoricalVerifierFixture(t)
+	policy, err := decodeStaticPolicy(fixture.staticPolicyB64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.ProviderAuthorityDigest = promotionTestHash("different-provider-authority")
+	body, err := promptlayer.MarshalOMPContextPromotionStaticPolicyV3(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.staticPolicyB64 = base64.RawURLEncoding.EncodeToString(body)
+	called := false
+	err = runWithVerifiers(
+		fixture.arguments(strings.Repeat("e", 64)),
+		verifyActivePromotionArtifact,
+		func([]byte, []byte, promptlayer.OMPContextPromotionExpectationV2) (bool, error) {
+			called = true
+			return true, nil
+		},
+	)
+	if called || err == nil ||
+		err.Error() != "promotion provider authority differs from static policy" {
+		t.Fatalf("provider authority drift result: called=%v error=%v", called, err)
+	}
 }

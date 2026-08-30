@@ -28,10 +28,12 @@ type OMPContextPromotionStaticPolicyV3 struct {
 	OMPExecutableSHA256          string `json:"omp_executable_sha256"`
 	PipelineImplementationDigest string `json:"pipeline_implementation_digest"`
 	Provider                     string `json:"provider"`
+	ProviderAuthorityDigest      string `json:"provider_authority_digest"`
 	ModelScopeDigest             string `json:"model_scope_digest"`
 	CohortManifestDigest         string `json:"cohort_manifest_digest"`
 	OrderSeed                    string `json:"order_seed"`
 	OraclePolicyDigest           string `json:"oracle_policy_digest"`
+	PromotionSigningKeyID        string `json:"promotion_signing_key_id"`
 	ReleaseLineageKeyID          string `json:"release_lineage_key_id"`
 	ReleaseLineageHandoff        string `json:"release_lineage_handoff"`
 	MinimumRollbackFloor         uint64 `json:"minimum_rollback_floor"`
@@ -118,22 +120,42 @@ func verifyOMPContextPromotionRuntimeV3At(bundle OMPContextPromotionRuntimeBundl
 	)
 }
 
+func decodeOMPContextPromotionActiveAttestationV3(
+	expected OMPContextPromotionStaticPolicyV3,
+	attestationBytes []byte,
+) (OMPContextPromotionAttestationV2, error) {
+	if err := ValidateOMPContextPromotionActiveStaticPolicyV3(expected); err != nil {
+		return OMPContextPromotionAttestationV2{}, err
+	}
+	attestation, err := decodeOMPContextPromotionAttestationV2(attestationBytes)
+	if err != nil {
+		return OMPContextPromotionAttestationV2{}, err
+	}
+	if attestation.KeyID != expected.PromotionSigningKeyID {
+		return OMPContextPromotionAttestationV2{}, ErrOMPContextPromotionMismatch
+	}
+	return attestation, nil
+}
+
 func verifyOMPContextPromotionRuntimeV3WithLineageAt(bundle OMPContextPromotionRuntimeBundleV3,
 	expected OMPContextPromotionStaticPolicyV3,
 	current OMPContextPromotionCurrentRuntimeV3,
 	now time.Time,
 	verifyLineage ompContextPromotionReleaseLineageVerifierV3,
 ) (VerifiedOMPContextPromotion, error) {
-	if !validOMPContextPromotionStaticPolicyV3(expected) ||
-		!matchesOMPContextPromotionCurrentRuntimeV3(expected, current) || now.IsZero() || verifyLineage == nil {
+	if now.IsZero() || verifyLineage == nil {
 		return VerifiedOMPContextPromotion{}, errors.New("OMP context promotion runtime v3 policy is invalid")
 	}
-	attestation, err := decodeOMPContextPromotionAttestationV2(bundle.AttestationBytes)
+	attestation, err := decodeOMPContextPromotionActiveAttestationV3(expected, bundle.AttestationBytes)
 	if err != nil {
 		return VerifiedOMPContextPromotion{}, err
 	}
+	if !matchesOMPContextPromotionCurrentRuntimeV3(expected, current) {
+		return VerifiedOMPContextPromotion{}, errors.New("OMP context promotion runtime v3 policy is invalid")
+	}
 	issuedAt, expiresAt, err := verifyOMPContextPromotionSignatureV2(
-		bundle.ReportBytes, attestation, now.UTC(), committedOMPContextPromotionPublicKeysV2(),
+		bundle.ReportBytes, attestation, now.UTC(),
+		committedOMPContextPromotionPublicKeyForIDV2(expected.PromotionSigningKeyID),
 		ompContextPromotionRevokedKeysV2,
 	)
 	if err != nil {
@@ -188,8 +210,10 @@ func validOMPContextPromotionStaticPolicyV3(value OMPContextPromotionStaticPolic
 		safeOMPContextMemoryMetadataV1(value.PolicyID) && validOMPContextMemoryHashV1(value.PolicyDigest) &&
 		safeOMPContextMemoryMetadataV1(value.OMPVersion) && validOMPContextMemoryHashV1(value.OMPExecutableSHA256) &&
 		validOMPContextMemoryHashV1(value.PipelineImplementationDigest) && safeOMPContextMemoryMetadataV1(value.Provider) &&
+		validOMPContextMemoryHashV1(value.ProviderAuthorityDigest) &&
 		validOMPContextMemoryHashV1(value.ModelScopeDigest) && validOMPContextMemoryHashV1(value.CohortManifestDigest) &&
 		validOMPContextMemoryHashV1(value.OrderSeed) && validOMPContextMemoryHashV1(value.OraclePolicyDigest) &&
+		validOMPContextPromotionSigningKeyIDV2(value.PromotionSigningKeyID) &&
 		safeOMPContextMemoryMetadataV1(value.ReleaseLineageKeyID) &&
 		safeOMPContextMemoryMetadataV1(value.ReleaseLineageHandoff) && value.MinimumRollbackFloor > 0
 }
@@ -199,6 +223,7 @@ func matchesOMPContextPromotionCurrentRuntimeV3(expected OMPContextPromotionStat
 ) bool {
 	return validOMPContextMemoryHashV1(current.ExecutableSHA256) &&
 		validOMPContextMemoryHashV1(current.ProviderAuthorityDigest) &&
+		sameOMPContextPromotionHashV3(current.ProviderAuthorityDigest, expected.ProviderAuthorityDigest) &&
 		current.SourceCommit == expected.SourceCommit && current.SourceTree == expected.SourceTree &&
 		current.Target == expected.Target && current.AutoVersion == expected.AutoVersion &&
 		current.OMPVersion == expected.OMPVersion && current.OMPExecutableSHA256 == expected.OMPExecutableSHA256 &&
@@ -216,7 +241,8 @@ func matchesOMPContextPromotionStaticPolicyV3(report OMPContextPromotionReportV1
 		report.Runtime.AutoVersion == current.AutoVersion && report.Runtime.OMPVersion == current.OMPVersion &&
 		report.Runtime.OMPExecutableSHA256 == current.OMPExecutableSHA256 &&
 		report.Runtime.PipelineImplementationDigest == current.PipelineImplementationDigest &&
-		ompContextPromotionProviderAuthorityDigestV1(report) == current.ProviderAuthorityDigest &&
+		sameOMPContextPromotionHashV3(ompContextPromotionProviderAuthorityDigestV1(report), expected.ProviderAuthorityDigest) &&
+		sameOMPContextPromotionHashV3(current.ProviderAuthorityDigest, expected.ProviderAuthorityDigest) &&
 		report.Provider == expected.Provider && report.ModelScopeDigest == expected.ModelScopeDigest &&
 		report.CohortManifestDigest == expected.CohortManifestDigest && report.OrderSeed == expected.OrderSeed &&
 		report.OraclePolicyDigest == expected.OraclePolicyDigest

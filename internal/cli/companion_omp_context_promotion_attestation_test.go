@@ -24,7 +24,10 @@ func TestCompanionOMPContextPromotionAttestationCommand_IsRegisteredWithoutSecre
 			t.Fatalf("required flag %q is not registered", required)
 		}
 	}
-	for _, forbidden := range []string{"key", "key-file", "private-key", "private-key-file", "signing-key"} {
+	for _, forbidden := range []string{
+		"key", "key-file", "private-key", "private-key-file", "signing-key",
+		"expected-key-id", "expected-signing-key-id",
+	} {
 		if command.Flags().Lookup(forbidden) != nil {
 			t.Fatalf("secret-bearing flag %q is registered", forbidden)
 		}

@@ -15,9 +15,9 @@ import (
 // The tap coordinates advance with every publication. Reading them from the
 // publisher keeps these fixtures from silently drifting out of the head check
 // and testing nothing; the frozen Formula blob is a real constant, so it stays.
-const a21FrozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
+const frozenFormulaBlob = "4ebc6c38925002dec00759823d4dd847a499818a"
 
-func a21TapPin(t *testing.T, name string) string {
+func tapPin(t *testing.T, name string) string {
 	t.Helper()
 	const bridge = "scripts/companion-release/publish-homebrew-formula-bridge.sh"
 	data, err := os.ReadFile(filepath.Join(repositoryRoot(t), filepath.FromSlash(bridge)))
@@ -36,7 +36,7 @@ var bridgeDigests = []string{
 	strings.Repeat("3", 64), strings.Repeat("4", 64),
 }
 
-func TestHomebrewFormulaBridge_A22UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
+func TestHomebrewFormulaBridge_A23UpdatesOnlyCaskThenIsIdempotent(t *testing.T) {
 	fixture := newHomebrewBridgeFixture(t)
 	frozenFormula, err := os.ReadFile(filepath.Join(fixture.state, "formula.json"))
 	if err != nil {
@@ -44,10 +44,10 @@ func TestHomebrewFormulaBridge_A22UpdatesOnlyCaskThenIsIdempotent(t *testing.T) 
 	}
 	output, err := fixture.run(nil)
 	if err != nil {
-		t.Fatalf("publish A22 Cask: %v\n%s", err, output)
+		t.Fatalf("publish A23 Cask: %v\n%s", err, output)
 	}
-	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.109"`) {
-		t.Fatalf("published Cask is not v0.50.109:\n%s", cask)
+	if cask := fixture.apiContent(t, "cask.json"); !strings.Contains(cask, `version "0.50.110"`) {
+		t.Fatalf("published Cask is not v0.50.110:\n%s", cask)
 	}
 	if got := fixture.updateCount(t, "cask"); got != "1" {
 		t.Fatalf("Cask update count = %q, want 1", got)
@@ -159,17 +159,17 @@ func newHomebrewBridgeFixture(t *testing.T) homebrewBridgeFixture {
 		}
 	}
 	fixture := homebrewBridgeFixture{root: root, state: state,
-		priorCommit: a21TapPin(t, "PRIOR_TAP_COMMIT")}
+		priorCommit: tapPin(t, "PRIOR_TAP_COMMIT")}
 	fixture.cask = homebrewBridgeCask()
 	fixture.checksumText = homebrewBridgeChecksums()
 	fixture.checksums = filepath.Join(root, "checksums.txt")
 	if err := os.WriteFile(fixture.checksums, []byte(fixture.checksumText), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	fixture.writeAPIContent(t, "cask.json", a21TapPin(t, "PRIOR_CASK_BLOB"), fixture.cask)
-	fixture.writeAPIContent(t, "formula.json", a21FrozenFormulaBlob, homebrewBridgeFormula(t))
+	fixture.writeAPIContent(t, "cask.json", tapPin(t, "PRIOR_CASK_BLOB"), fixture.cask)
+	fixture.writeAPIContent(t, "formula.json", frozenFormulaBlob, homebrewBridgeFormula(t))
 	branch := `{"ref":"refs/heads/main","object":{"type":"commit","sha":"` +
-		a21TapPin(t, "PRIOR_TAP_COMMIT") + `","url":"https://example.invalid/prior-commit"}}`
+		tapPin(t, "PRIOR_TAP_COMMIT") + `","url":"https://example.invalid/prior-commit"}}`
 	if err := os.WriteFile(filepath.Join(state, "branch.json"), []byte(branch), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func (fixture homebrewBridgeFixture) run(overrides map[string]string) ([]byte, e
 	environment := map[string]string{
 		"PATH":   filepath.Join(fixture.root, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"TMPDIR": filepath.Join(fixture.root, "tmp"), "MOCK_TAP_STATE": fixture.state,
-		"GITHUB_REF_NAME": "v0.50.109", "COMPANION_VERSION": "0.50.109",
+		"GITHUB_REF_NAME": "v0.50.110", "COMPANION_VERSION": "0.50.110",
 		"COMPANION_HOMEBREW_POLICY": "cask-only",
 		"MOCK_TAP_PRIOR_COMMIT":     fixture.priorCommit,
 		"COMPANION_CHECKSUMS_PATH":  fixture.checksums,
@@ -291,8 +291,8 @@ func homebrewBridgeChecksums() string {
 	names := []string{"darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"}
 	var output strings.Builder
 	for index, name := range names {
-		fmt.Fprintf(&output, "%s  autopus-adk_0.50.109_%s.tar.gz\n", bridgeDigests[index], name)
+		fmt.Fprintf(&output, "%s  autopus-adk_0.50.110_%s.tar.gz\n", bridgeDigests[index], name)
 	}
-	fmt.Fprintf(&output, "%s  autopus-adk_0.50.109_windows_amd64.zip\n", strings.Repeat("5", 64))
+	fmt.Fprintf(&output, "%s  autopus-adk_0.50.110_windows_amd64.zip\n", strings.Repeat("5", 64))
 	return output.String()
 }

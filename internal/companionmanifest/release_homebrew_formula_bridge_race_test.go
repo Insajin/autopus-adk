@@ -8,6 +8,25 @@ import (
 	"testing"
 )
 
+func TestHomebrewFormulaBridge_A23NonForceCASRejectsMovedPredecessor(t *testing.T) {
+	fixture := newHomebrewBridgeFixture(t)
+	priorCask := fixture.apiContent(t, "cask.json")
+	writeTapRaceMarker(t, fixture, "race-before-ref")
+	output, err := fixture.run(nil)
+	if err == nil {
+		t.Fatalf("moved predecessor CAS unexpectedly succeeded:\n%s", output)
+	}
+	if got := fixture.updateCount(t, "cask"); got != "0" {
+		t.Fatalf("moved predecessor CAS performed %s Cask updates", got)
+	}
+	if got := tapBranchHead(t, fixture); got != "4444444444444444444444444444444444444444" {
+		t.Fatalf("moved predecessor head = %s", got)
+	}
+	if got := fixture.apiContent(t, "cask.json"); got != priorCask {
+		t.Fatal("moved predecessor CAS changed the Cask")
+	}
+}
+
 func TestHomebrewFormulaBridge_RejectsAlreadyCurrentFormulaRace(t *testing.T) {
 	fixture := newHomebrewBridgeFixture(t)
 	if output, err := fixture.run(nil); err != nil {

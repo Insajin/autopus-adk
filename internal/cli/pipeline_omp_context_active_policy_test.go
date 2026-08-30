@@ -30,6 +30,8 @@ func TestCompiledPipelineOMPActiveStaticPolicy_ExactCanonicalBase64URLPasses(t *
 	for _, forbidden := range []string{`"artifact_sha256"`, `"auto_binary_sha256"`, `"report_sha256"`} {
 		assert.NotContains(t, string(body), forbidden)
 	}
+	assert.Contains(t, string(body), `"promotion_signing_key_id":"omp-context-promotion-2026-q3-k3"`)
+	assert.Contains(t, string(body), `"provider_authority_digest":"sha256:`)
 
 	original := pipelineOMPActiveStaticPolicyB64
 	pipelineOMPActiveStaticPolicyB64 = base64.RawURLEncoding.EncodeToString(body)

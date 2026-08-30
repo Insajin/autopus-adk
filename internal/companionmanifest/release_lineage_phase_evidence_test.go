@@ -9,7 +9,7 @@ const (
 	releaseLineageCallerScript     = "scripts/companion-release/verify-public-key-lineage.sh"
 	releaseLineageCoordinateScript = "scripts/companion-release/verify-public-key-lineage-coordinates.sh"
 	releaseLineageAssetScript      = "scripts/companion-release/verify-public-key-lineage-assets.sh"
-	releaseLineageAssetBundleCount = 2
+	releaseLineageAssetBundleCount = 3
 )
 
 func TestLineageVerifier_PhasesUseExactPredecessorCoordinate(t *testing.T) {
@@ -27,8 +27,12 @@ func TestLineageVerifier_PhasesUseExactPredecessorCoordinate(t *testing.T) {
 					t.Fatalf("%s lineage coordinate contract missing %q", phase.phase, want)
 				}
 			}
+			contractSurface := caller
+			if phase.bridgePredecessor {
+				contractSurface += "\n" + assets
+			}
 			for _, want := range phase.callerContract() {
-				if !strings.Contains(caller, want) {
+				if !strings.Contains(contractSurface, want) {
 					t.Fatalf("%s lineage caller contract missing %q", phase.phase, want)
 				}
 			}
@@ -49,7 +53,7 @@ func TestLineageVerifier_PhasesUseExactPredecessorCoordinate(t *testing.T) {
 				}
 			}
 			if strings.Count(assets, "extract_bundle ") != releaseLineageAssetBundleCount {
-				t.Fatal("only the two Darwin archives may be extracted as manifest bundles")
+				t.Fatal("only the two general Darwin bundles and one A22 bridge bundle may be extracted")
 			}
 		})
 	}
@@ -81,6 +85,11 @@ func (p releasePhase) coordinateContract(prior string) []string {
 	if p.pinsReleaseID {
 		required = append(required, `prior_release_id="$`+prior+`_RELEASE_ID"`)
 	}
+	if p.bridgePredecessor {
+		required = append(required,
+			`prior_amd64_archive='' prior_arm64_archive="$A22_ARM64_ARCHIVE_SHA256"`,
+			`prior_amd64_manifest='' prior_arm64_manifest="$A22_ARM64_MANIFEST_SHA256"`)
+	}
 	return required
 }
 
@@ -101,6 +110,14 @@ func (p releasePhase) callerContract() []string {
 	}
 	if p.callerReleaseID {
 		required = append(required, `[[ "$(jq -er '.id' "$release_json")" == "$prior_release_id" ]]`)
+	}
+	if p.bridgePredecessor {
+		required = append(required,
+			"verify_a22_bridge_lineage_assets",
+			`"$OMP_CONTEXT_LINEAGE_VERIFIER"`,
+			`--upstream-sha256 "sha256:$A22_UPSTREAM_SHA256"`,
+			`--executable-sha256 "sha256:$A22_EXECUTABLE_SHA256"`,
+			`cmp -- "$download_dir/release-lineage-v1.json" "$archive_lineage"`)
 	}
 	return required
 }

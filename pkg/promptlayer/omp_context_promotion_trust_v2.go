@@ -35,3 +35,25 @@ func committedOMPContextPromotionPublicKeysV2() map[string]ed25519.PublicKey {
 	}
 	return result
 }
+
+func committedOMPContextPromotionPublicKeyForIDV2(keyID string) map[string]ed25519.PublicKey {
+	publicKey, present := ompContextPromotionPublicKeysV2[keyID]
+	if !present {
+		return nil
+	}
+	return map[string]ed25519.PublicKey{
+		keyID: append(ed25519.PublicKey(nil), publicKey...),
+	}
+}
+
+func validOMPContextPromotionSigningKeyIDV2(keyID string) bool {
+	switch keyID {
+	case OMPContextPromotionKeyID2026Q3K1,
+		OMPContextPromotionKeyID2026Q3K2,
+		OMPContextPromotionKeyID2026Q3K3:
+		_, present := ompContextPromotionPublicKeysV2[keyID]
+		return present && !ompContextPromotionRevokedKeysV2[keyID]
+	default:
+		return false
+	}
+}

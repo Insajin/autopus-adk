@@ -8,7 +8,7 @@ import (
 )
 
 func TestVerifyOMPContextPromotionHistoricalArtifactV2_AcceptsExpiredImmutableProofWithoutActiveGrant(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
 	for index := range fixture.report.Observations {
 		observation := &fixture.report.Observations[index]
 		started, err := time.Parse(time.RFC3339Nano, observation.StartedAt)
@@ -30,12 +30,12 @@ func TestVerifyOMPContextPromotionHistoricalArtifactV2_AcceptsExpiredImmutablePr
 	fixture.signAttestation(t)
 
 	if _, err := verifyOMPContextPromotionArtifactV2WithTrust(fixture.reportBytes, fixture.attestationBytes, fixture.now,
-		fixture.expectation, map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil); err == nil {
+		fixture.expectation, map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil); err == nil {
 		t.Fatal("expired proof was accepted for active authority")
 	}
 	historical, err := verifyOMPContextPromotionHistoricalArtifactV2WithTrust(
 		fixture.reportBytes, fixture.attestationBytes, fixture.expectation,
-		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey}, nil,
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey}, nil,
 	)
 	if err != nil {
 		t.Fatalf("verify historical artifact: %v", err)
@@ -48,6 +48,24 @@ func TestVerifyOMPContextPromotionHistoricalArtifactV2_AcceptsExpiredImmutablePr
 	historicalType := reflect.TypeOf(VerifiedOMPContextPromotionHistoricalProof{})
 	if historicalType.AssignableTo(activeType) || historicalType.ConvertibleTo(activeType) {
 		t.Fatal("historical proof must not be assignable or convertible to an active grant")
+	}
+}
+
+func TestVerifyOMPContextPromotionHistoricalArtifactV2_K2ProofRemainsHistoricalOnly(t *testing.T) {
+	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture.expectation.SigningKeyID = OMPContextPromotionKeyID2026Q3K2
+	fixture.resignWithKeyID(t, OMPContextPromotionKeyID2026Q3K2)
+	trusted := map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K2: fixture.publicKey}
+	if _, err := verifyOMPContextPromotionArtifactV2WithTrust(
+		fixture.reportBytes, fixture.attestationBytes, fixture.now, fixture.expectation, trusted, nil,
+	); err == nil {
+		t.Fatal("K2 historical proof was accepted for active authority")
+	}
+	historical, err := verifyOMPContextPromotionHistoricalArtifactV2WithTrust(
+		fixture.reportBytes, fixture.attestationBytes, fixture.expectation, trusted, nil,
+	)
+	if err != nil || !historical.Valid() {
+		t.Fatalf("valid K2 historical proof rejected: proof=%#v error=%v", historical, err)
 	}
 }
 
@@ -83,13 +101,13 @@ func TestVerifyOMPContextPromotionHistoricalArtifactV2_StillRejectsInvalidTTLSig
 }
 
 func TestVerifiedOMPContextPromotion_Valid_RechecksExpiryAtUse(t *testing.T) {
-	fixture := newOMPContextPromotionV2Fixture(t)
+	fixture := newOMPContextPromotionActiveV2Fixture(t)
 	verified, err := verifyOMPContextPromotionArtifactV2WithTrust(
 		fixture.reportBytes,
 		fixture.attestationBytes,
 		fixture.now,
 		fixture.expectation,
-		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K1: fixture.publicKey},
+		map[string]ed25519.PublicKey{OMPContextPromotionKeyID2026Q3K3: fixture.publicKey},
 		nil,
 	)
 	if err != nil {

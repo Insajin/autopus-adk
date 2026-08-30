@@ -16,11 +16,21 @@ func testStaticPolicyB64(t *testing.T) string {
 	t.Helper()
 	policy := promptlayer.OMPContextPromotionStaticPolicyV3{
 		SchemaVersion:       promptlayer.OMPContextPromotionRuntimeSchemaV3,
+		ProducerRepository:  "Insajin/autopus-harness-bench",
+		ProducerWorkflowRef: "refs/heads/main@0123456789abcdef0123456789abcdef01234567",
 		CandidateRepository: "Insajin/autopus-adk", SourceCommit: strings.Repeat("c", 40),
-		SourceTree: strings.Repeat("d", 40), Target: "darwin-arm64",
-		ReleaseLineageKeyID: "release-key", ReleaseLineageHandoff: "v1", MinimumRollbackFloor: 5093,
+		SourceTree: strings.Repeat("d", 40), Target: "darwin-arm64", AutoVersion: "v0.50.110",
+		PolicyID: "omp-context-active-v1", PolicyDigest: promotionTestHash("policy"),
+		OMPVersion: "omp/17.2.7", OMPExecutableSHA256: promotionTestHash("omp"),
+		PipelineImplementationDigest: promotionTestHash("pipeline"),
+		Provider:                     "openai", ProviderAuthorityDigest: promotionTestHash("provider-authority"),
+		ModelScopeDigest:     promotionTestHash("models"),
+		CohortManifestDigest: promotionTestHash("cohort"), OrderSeed: promotionTestHash("order"),
+		OraclePolicyDigest:    promotionTestHash("oracle"),
+		PromotionSigningKeyID: promptlayer.OMPContextPromotionKeyID2026Q3K3,
+		ReleaseLineageKeyID:   "release-key", ReleaseLineageHandoff: "v1", MinimumRollbackFloor: 5093,
 	}
-	body, err := json.Marshal(policy)
+	body, err := promptlayer.MarshalOMPContextPromotionStaticPolicyV3(policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +56,6 @@ func TestRun_RejectsUnpinnedEvidenceBeforeSignatureVerification(t *testing.T) {
 		"--candidate-tree", strings.Repeat("d", 40),
 		"--candidate-artifact-sha256", strings.Repeat("e", 64),
 		"--static-policy-b64", testStaticPolicyB64(t),
-		"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K1,
 	})
 	if err == nil || !strings.Contains(err.Error(), "artifact digest differs") {
 		t.Fatalf("unpinned evidence result = %v", err)
@@ -63,7 +72,6 @@ func TestParseOptions_RejectsMalformedCoordinates(t *testing.T) {
 		"--candidate-tree", strings.Repeat("d", 40),
 		"--candidate-artifact-sha256", strings.Repeat("e", 64),
 		"--static-policy-b64", testStaticPolicyB64(t),
-		"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K1,
 	})
 	if err == nil || !strings.Contains(err.Error(), "candidate revision") {
 		t.Fatalf("malformed coordinate result = %v", err)
@@ -105,14 +113,20 @@ func TestPromotionVerifierWrappers_RejectMalformedTamperedAndStaleEvidence(t *te
 			}
 		})
 		t.Run(name+" intrinsically stale attestation", func(t *testing.T) {
-			valid, err := verifier(reportBytes, stalePromotionAttestation(t, reportBytes), expected)
+			keyID := promptlayer.OMPContextPromotionKeyID2026Q3K1
+			verifierExpected := expected
+			if name == "active" {
+				keyID = promptlayer.OMPContextPromotionKeyID2026Q3K3
+				verifierExpected.SigningKeyID = keyID
+			}
+			valid, err := verifier(reportBytes, stalePromotionAttestation(t, reportBytes, keyID), verifierExpected)
 			if valid || !errors.Is(err, promptlayer.ErrOMPContextPromotionStale) {
 				t.Fatalf("%s wrapper stale result: valid=%v error=%v", name, valid, err)
 			}
 		})
 	}
 
-	attestation := stalePromotionAttestation(t, reportBytes)
+	attestation := stalePromotionAttestation(t, reportBytes, promptlayer.OMPContextPromotionKeyID2026Q3K1)
 	tamperedReport := append(append([]byte(nil), reportBytes...), ' ')
 	if valid, err := verifyHistoricalPromotionArtifact(tamperedReport, attestation, expected); err == nil || valid {
 		t.Fatalf("historical wrapper accepted modified report: valid=%v error=%v", valid, err)
@@ -121,6 +135,16 @@ func TestPromotionVerifierWrappers_RejectMalformedTamperedAndStaleEvidence(t *te
 
 func TestRun_HistoricalAcceptsRawCandidateDigestAgainstCanonicalReport(t *testing.T) {
 	fixture := newHistoricalVerifierFixture(t)
+	policy, err := decodeStaticPolicy(fixture.staticPolicyB64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.PromotionSigningKeyID = promptlayer.OMPContextPromotionKeyID2026Q3K2
+	policyBytes, err := promptlayer.MarshalOMPContextPromotionStaticPolicyV3(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.staticPolicyB64 = base64.RawURLEncoding.EncodeToString(policyBytes)
 	canonicalDigest := "sha256:" + strings.Repeat("e", 64)
 	historicalVerifier := func(
 		reportBytes, _ []byte,
@@ -132,7 +156,8 @@ func TestRun_HistoricalAcceptsRawCandidateDigestAgainstCanonicalReport(t *testin
 		}
 		if report.Candidate.ArtifactSHA256 != canonicalDigest ||
 			expected.Candidate.ArtifactSHA256 != canonicalDigest ||
-			expected.AutoBinarySHA256 != canonicalDigest {
+			expected.AutoBinarySHA256 != canonicalDigest ||
+			expected.SigningKeyID != promptlayer.OMPContextPromotionKeyID2026Q3K2 {
 			t.Fatalf("candidate digest boundary = report %q, candidate %q, runtime %q",
 				report.Candidate.ArtifactSHA256, expected.Candidate.ArtifactSHA256,
 				expected.AutoBinarySHA256)
@@ -184,10 +209,89 @@ func TestParseOptions_RejectsNonCanonicalCandidateArtifactDigest(t *testing.T) {
 				"--candidate-tree", strings.Repeat("d", 40),
 				"--candidate-artifact-sha256", test.value,
 				"--static-policy-b64", testStaticPolicyB64(t),
-				"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K1,
 			})
 			if err == nil || err.Error() != "candidate artifact digest is malformed" {
 				t.Fatalf("non-canonical candidate digest result = %v", err)
+			}
+		})
+	}
+}
+
+func TestParseOptions_RejectsExternalExpectedSigningKeyAuthority(t *testing.T) {
+	arguments := []string{
+		"--mode", "active", "--report", "report", "--attestation", "attestation",
+		"--report-sha256", strings.Repeat("a", 64),
+		"--attestation-sha256", strings.Repeat("b", 64),
+		"--candidate-repository", "Insajin/autopus-adk",
+		"--candidate-revision", strings.Repeat("c", 40),
+		"--candidate-tree", strings.Repeat("d", 40),
+		"--candidate-artifact-sha256", strings.Repeat("e", 64),
+		"--static-policy-b64", testStaticPolicyB64(t),
+		"--expected-signing-key-id", promptlayer.OMPContextPromotionKeyID2026Q3K3,
+	}
+	if _, err := parseOptions(arguments); err == nil || err.Error() != "invalid arguments" {
+		t.Fatalf("external signing key authority result = %v", err)
+	}
+}
+
+func TestRun_ActiveConsumesPolicyOwnedK3SigningKey(t *testing.T) {
+	fixture := newHistoricalVerifierFixture(t)
+	policy, err := decodeStaticPolicy(fixture.staticPolicyB64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy.PromotionSigningKeyID = promptlayer.OMPContextPromotionKeyID2026Q3K3
+	body, err := json.Marshal(policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.staticPolicyB64 = base64.RawURLEncoding.EncodeToString(body)
+	arguments := fixture.arguments(strings.Repeat("e", 64))
+	arguments[1] = "active"
+	called := false
+	err = runWithVerifiers(arguments, func(
+		_ []byte, _ []byte, expected promptlayer.OMPContextPromotionExpectationV2,
+	) (bool, error) {
+		called = true
+		if expected.SigningKeyID != promptlayer.OMPContextPromotionKeyID2026Q3K3 {
+			t.Fatalf("active expectation signing key = %q", expected.SigningKeyID)
+		}
+		return true, nil
+	}, verifyHistoricalPromotionArtifact)
+	if err != nil || !called {
+		t.Fatalf("policy-owned K3 result: called=%v error=%v", called, err)
+	}
+}
+
+func TestRun_ActiveRejectsHistoricalPolicyKeysBeforeVerification(t *testing.T) {
+	for _, keyID := range []string{
+		promptlayer.OMPContextPromotionKeyID2026Q3K1,
+		promptlayer.OMPContextPromotionKeyID2026Q3K2,
+	} {
+		t.Run(keyID, func(t *testing.T) {
+			fixture := newHistoricalVerifierFixture(t)
+			policy, err := decodeStaticPolicy(fixture.staticPolicyB64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			policy.PromotionSigningKeyID = keyID
+			body, err := json.Marshal(policy)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fixture.staticPolicyB64 = base64.RawURLEncoding.EncodeToString(body)
+			arguments := fixture.arguments(strings.Repeat("e", 64))
+			arguments[1] = "active"
+			called := false
+			err = runWithVerifiers(arguments, func(
+				[]byte, []byte, promptlayer.OMPContextPromotionExpectationV2,
+			) (bool, error) {
+				called = true
+				return true, nil
+			}, verifyHistoricalPromotionArtifact)
+			if called || err == nil ||
+				!strings.Contains(err.Error(), "active static policy is invalid") {
+				t.Fatalf("historical key active result: called=%v error=%v", called, err)
 			}
 		})
 	}

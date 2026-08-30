@@ -3,9 +3,9 @@ set -euo pipefail
 
 fail() { printf 'OMP context release binary: %s\n' "$1" >&2; exit 1; }
 
-[[ "${COMPANION_RELEASE_TAG:-}" == 'v0.50.109' ]] || exit 0
-[[ "${OMP_CONTEXT_STATIC_POLICY_B64+x}" != x ]] ||
-  fail 'canonical-full bridge forbids a compiled static policy'
+[[ "${COMPANION_RELEASE_TAG:-}" == 'v0.50.110' ]] || exit 0
+[[ "${OMP_CONTEXT_STATIC_POLICY_B64:-}" =~ ^[A-Za-z0-9_-]+$ ]] ||
+  fail 'compiled static policy is missing or malformed'
 for name in COMPANION_ARTIFACT COMPANION_PLATFORM COMPANION_ARCHITECTURE \
   OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256
 do
@@ -25,4 +25,4 @@ else
   fail 'SHA-256 tool is unavailable'
 fi
 [[ "$actual" == "$OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256" ]] \
-  || fail 'GoReleaser Darwin arm64 binary differs from canonical-full bridge candidate'
+  || fail 'GoReleaser Darwin arm64 binary differs from signed candidate'

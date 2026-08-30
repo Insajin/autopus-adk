@@ -8,7 +8,7 @@ platforms:
     - omp
 isolate_rules: true
 omp_context_policy:
-    profile: omp-safe-default
+    profile: omp-active-probed
     profiles:
         omp-safe-default:
             history_mode: off

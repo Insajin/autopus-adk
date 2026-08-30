@@ -24,6 +24,7 @@ readonly A18_REPOSITORY='Insajin/autopus-adk' A19_TAG='v0.50.90' A19_VERSION='0.
 readonly A19_REPOSITORY='Insajin/autopus-adk' A20_TAG='v0.50.91' A20_VERSION='0.50.91'
 readonly A20_REPOSITORY='Insajin/autopus-adk' A21_TAG='v0.50.92' A21_VERSION='0.50.92'
 readonly A21_REPOSITORY='Insajin/autopus-adk' A22_TAG='v0.50.109' A22_VERSION='0.50.109'
+readonly A22_REPOSITORY='Insajin/autopus-adk' A23_TAG='v0.50.110' A23_VERSION='0.50.110'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 
 require_environment GITHUB_REF_NAME
@@ -105,6 +106,9 @@ elif [[ "$GITHUB_REF_NAME" == "$A21_TAG" && "$COMPANION_VERSION" == "$A21_VERSIO
 elif [[ "$GITHUB_REF_NAME" == "$A22_TAG" && "$COMPANION_VERSION" == "$A22_VERSION" ]]; then
   release_phase='A22' prior_phase='A21' prior_repository="$A21_REPOSITORY" prior_evidence_source='immutable A21 GitHub release' prior_tag="$A21_TAG" prior_version="$A21_VERSION" prior_commit="$A21_COMMIT_SHA" prior_release_id="$A21_RELEASE_ID" prior_tree="$A21_TREE_SHA"
   prior_tag_object="$A21_TAG_OBJECT_SHA" prior_checksums="$A21_CHECKSUMS_SHA256" prior_amd64_archive="$A21_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A21_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A21_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A21_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A21_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A21_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A23_TAG" && "$COMPANION_VERSION" == "$A23_VERSION" ]]; then
+  release_phase='A23' prior_phase='A22' prior_repository="$A22_REPOSITORY" prior_evidence_source='immutable A22 GitHub release' prior_tag="$A22_TAG" prior_version="$A22_VERSION" prior_commit="$A22_COMMIT_SHA" prior_release_id="$A22_RELEASE_ID" prior_tree="$A22_TREE_SHA"
+  prior_tag_object="$A22_TAG_OBJECT_SHA" prior_checksums="$A22_CHECKSUMS_SHA256" prior_amd64_archive='' prior_arm64_archive="$A22_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive='' prior_linux_arm64_archive='' prior_amd64_manifest='' prior_arm64_manifest="$A22_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23 policy'
 fi

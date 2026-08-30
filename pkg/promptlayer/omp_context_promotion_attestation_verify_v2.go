@@ -44,8 +44,9 @@ func VerifyOMPContextPromotionHistoricalArtifactV2(reportBytes, attestationBytes
 func verifyOMPContextPromotionArtifactV2WithTrust(reportBytes, attestationBytes []byte, now time.Time,
 	expected OMPContextPromotionExpectationV2, trusted map[string]ed25519.PublicKey,
 	revoked map[string]bool) (VerifiedOMPContextPromotion, error) {
-	if !validateOMPContextPromotionExpectationV2(expected) || now.IsZero() {
-		return VerifiedOMPContextPromotion{}, fmt.Errorf("%w: expectation or verification time", ErrOMPContextPromotionInvalid)
+	if !validateOMPContextPromotionExpectationV2(expected) || now.IsZero() ||
+		expected.SigningKeyID != OMPContextPromotionKeyID2026Q3K3 {
+		return VerifiedOMPContextPromotion{}, fmt.Errorf("%w: active expectation or verification time", ErrOMPContextPromotionInvalid)
 	}
 	if len(bytes.TrimSpace(attestationBytes)) == 0 {
 		return VerifiedOMPContextPromotion{}, ErrOMPContextPromotionUnsigned
@@ -53,6 +54,9 @@ func verifyOMPContextPromotionArtifactV2WithTrust(reportBytes, attestationBytes 
 	attestation, err := decodeOMPContextPromotionAttestationV2(attestationBytes)
 	if err != nil {
 		return VerifiedOMPContextPromotion{}, err
+	}
+	if attestation.KeyID != expected.SigningKeyID {
+		return VerifiedOMPContextPromotion{}, ErrOMPContextPromotionMismatch
 	}
 	issuedAt, expiresAt, err := verifyOMPContextPromotionSignatureV2(reportBytes, attestation, now.UTC(), trusted, revoked)
 	if err != nil {
@@ -62,7 +66,7 @@ func verifyOMPContextPromotionArtifactV2WithTrust(reportBytes, attestationBytes 
 	if err != nil {
 		return VerifiedOMPContextPromotion{}, fmt.Errorf("%w: %v", ErrOMPContextPromotionInvalid, err)
 	}
-	if report.TrustLane != attestation.TrustLane || attestation.KeyID != expected.SigningKeyID ||
+	if report.TrustLane != attestation.TrustLane ||
 		!matchesOMPContextPromotionExpectationV2(report, expected) {
 		return VerifiedOMPContextPromotion{}, ErrOMPContextPromotionMismatch
 	}

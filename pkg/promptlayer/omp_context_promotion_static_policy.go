@@ -10,7 +10,7 @@ import (
 // to the release-only coordinates that cannot be derived from live evidence.
 func BuildOMPContextPromotionStaticPolicyV3(
 	report OMPContextPromotionReportV1,
-	target, releaseLineageKeyID, releaseLineageHandoff string,
+	target, promotionSigningKeyID, releaseLineageKeyID, releaseLineageHandoff string,
 	minimumRollbackFloor uint64,
 ) (OMPContextPromotionStaticPolicyV3, []byte, error) {
 	canonical, _, err := BuildOMPContextPromotionReportV1(report)
@@ -33,10 +33,12 @@ func BuildOMPContextPromotionStaticPolicyV3(
 		OMPExecutableSHA256:          report.Runtime.OMPExecutableSHA256,
 		PipelineImplementationDigest: report.Runtime.PipelineImplementationDigest,
 		Provider:                     report.Provider,
+		ProviderAuthorityDigest:      ompContextPromotionProviderAuthorityDigestV1(report),
 		ModelScopeDigest:             report.ModelScopeDigest,
 		CohortManifestDigest:         report.CohortManifestDigest,
 		OrderSeed:                    report.OrderSeed,
 		OraclePolicyDigest:           report.OraclePolicyDigest,
+		PromotionSigningKeyID:        promotionSigningKeyID,
 		ReleaseLineageKeyID:          releaseLineageKeyID,
 		ReleaseLineageHandoff:        releaseLineageHandoff,
 		MinimumRollbackFloor:         minimumRollbackFloor,
@@ -59,4 +61,14 @@ func MarshalOMPContextPromotionStaticPolicyV3(policy OMPContextPromotionStaticPo
 		return nil, errors.New("marshal OMP context promotion static policy")
 	}
 	return body, nil
+}
+
+// ValidateOMPContextPromotionActiveStaticPolicyV3 rejects any policy that
+// does not select the current immutable active signer.
+func ValidateOMPContextPromotionActiveStaticPolicyV3(policy OMPContextPromotionStaticPolicyV3) error {
+	if !validOMPContextPromotionStaticPolicyV3(policy) ||
+		policy.PromotionSigningKeyID != OMPContextPromotionKeyID2026Q3K3 {
+		return errors.New("OMP context promotion active static policy is invalid")
+	}
+	return nil
 }

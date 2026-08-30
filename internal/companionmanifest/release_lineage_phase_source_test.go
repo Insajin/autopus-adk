@@ -92,13 +92,16 @@ func TestReleaseSourceValidator_PhasesRejectUnsignedTagWhenProductionSignatureIs
 			sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
 			tree := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD^{tree}"))
 			runGit(t, dir, "tag", "-am", "unsigned "+phase.phase+" release candidate", phase.tag)
-			output, err := runReleaseSourceValidator(t, dir, phase.tag, sha,
+			environment := []string{
 				"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
-				"ADK_KEY_ROTATION_VERIFIED=1",
 				"COMPANION_SOURCE_PIN_REQUIRED=1",
-				"COMPANION_APPROVED_SOURCE_COMMIT="+sha,
-				"COMPANION_APPROVED_SOURCE_TREE="+tree,
-			)
+				"COMPANION_APPROVED_SOURCE_COMMIT=" + sha,
+				"COMPANION_APPROVED_SOURCE_TREE=" + tree,
+			}
+			if phase.phase == "A22" {
+				environment = append(environment, "ADK_KEY_ROTATION_VERIFIED=1")
+			}
+			output, err := runReleaseSourceValidator(t, dir, phase.tag, sha, environment...)
 			if err == nil || !strings.Contains(output,
 				phase.phase+" release tag signature or R2 signer differs") {
 				t.Fatalf("unsigned production %s result: %v\n%s", phase.phase, err, output)
@@ -139,5 +142,17 @@ func TestReleaseSourceValidator_PhasesPinDirectPredecessorAncestor(t *testing.T)
 				}
 			}
 		})
+	}
+}
+
+func TestReleaseSourceValidator_A23RejectsCrossTagAnnotatedObjectReplay(t *testing.T) {
+	dir := cloneCurrentReleaseRepository(t)
+	sha := strings.TrimSpace(runGit(t, dir, "rev-parse", "HEAD"))
+	runGit(t, dir, "tag", "-am", "A22 replay object", "v0.50.109")
+	tagObject := strings.TrimSpace(runGit(t, dir, "rev-parse", "refs/tags/v0.50.109"))
+	runGit(t, dir, "update-ref", "refs/tags/v0.50.110", tagObject)
+	output, err := runReleaseSourceValidator(t, dir, "v0.50.110", sha)
+	if err == nil || !strings.Contains(output, "annotated tag object, type, or name headers differ") {
+		t.Fatalf("cross-tag A22 object replay result: %v\n%s", err, output)
 	}
 }
