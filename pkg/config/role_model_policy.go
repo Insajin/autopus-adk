@@ -5,6 +5,9 @@ const (
 
 	RoleModelConfigModeOverlay        = "overlay"
 	RoleModelConfigModeProjectManaged = "project-managed"
+
+	RoleModelCatalogTrustStrict           = "strict"
+	RoleModelCatalogTrustOperatorAttested = "operator-attested"
 )
 
 // RoleModelPolicyConf is an opt-in, provider-neutral OMP role routing policy.
@@ -17,6 +20,7 @@ type RoleModelPolicyConf struct {
 // RoleModelProfileConf owns capability routes and optional OMP projection policy.
 type RoleModelProfileConf struct {
 	ConfigMode      string                             `yaml:"config_mode,omitempty"`
+	CatalogTrust    string                             `yaml:"catalog_trust,omitempty"`
 	Capabilities    map[string]RoleCapabilityRouteConf `yaml:"capabilities,omitempty"`
 	Agents          map[string]RoleAgentOverrideConf   `yaml:"agents,omitempty"`
 	ManagedKeys     map[string]RoleManagedKeyClaimConf `yaml:"managed_keys,omitempty"`
@@ -76,6 +80,14 @@ func (c RoleModelPolicyConf) EffectiveVersion() string {
 		return RoleModelPolicyVersionV1
 	}
 	return c.Version
+}
+
+// EffectiveCatalogTrust returns the strict default for catalog normalization.
+func (c RoleModelProfileConf) EffectiveCatalogTrust() string {
+	if c.CatalogTrust == "" {
+		return RoleModelCatalogTrustStrict
+	}
+	return c.CatalogTrust
 }
 
 // SelectedRoleModelProfile returns the explicitly selected profile.

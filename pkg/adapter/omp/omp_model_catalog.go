@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
 
@@ -41,14 +42,15 @@ type OMPModelCatalogProbeOptions struct {
 }
 
 type OMPModelMetadata struct {
-	Provider     string   `json:"provider"`
-	Model        string   `json:"model"`
-	Family       string   `json:"family"`
-	Capabilities []string `json:"capabilities"`
-	Thinking     []string `json:"thinking"`
-	AuthEnabled  bool     `json:"auth_enabled"`
-	Keyless      bool     `json:"keyless"`
-	Disabled     bool     `json:"disabled"`
+	Provider         string   `json:"provider"`
+	Model            string   `json:"model"`
+	Family           string   `json:"family"`
+	Capabilities     []string `json:"capabilities"`
+	Thinking         []string `json:"thinking"`
+	AuthEnabled      bool     `json:"auth_enabled"`
+	Keyless          bool     `json:"keyless"`
+	Disabled         bool     `json:"disabled"`
+	OperatorAttested bool     `json:"operator_attested,omitempty"`
 }
 
 type OMPModelCatalog struct {
@@ -63,19 +65,32 @@ type OMPModelSettingSupport struct {
 }
 
 type OMPModelCatalogProbeResult struct {
-	Status   string                   `json:"status"`
-	Reason   string                   `json:"reason"`
-	Version  string                   `json:"version,omitempty"`
-	Catalog  OMPModelCatalog          `json:"catalog"`
-	Settings []OMPModelSettingSupport `json:"settings,omitempty"`
+	Status       string                   `json:"status"`
+	Reason       string                   `json:"reason"`
+	Version      string                   `json:"version,omitempty"`
+	CatalogTrust string                   `json:"catalog_trust"`
+	Catalog      OMPModelCatalog          `json:"catalog"`
+	Settings     []OMPModelSettingSupport `json:"settings,omitempty"`
 }
 
 // ProbeOMPModelCatalog observes only bounded, non-secret routing metadata.
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: public boundary for installed OMP model and setting discovery.
 // @AX:REASON [AUTO]: external CLI output is normalized here before routing, activation, or doctor consumers may trust it.
 func ProbeOMPModelCatalog(ctx context.Context, opts OMPModelCatalogProbeOptions) OMPModelCatalogProbeResult {
+	return probeOMPModelCatalog(ctx, opts, nil)
+}
+
+func probeOMPModelCatalog(
+	ctx context.Context,
+	opts OMPModelCatalogProbeOptions,
+	profile *config.RoleModelProfileConf,
+) OMPModelCatalogProbeResult {
 	opts = normalizeOMPModelCatalogProbeOptions(opts)
-	result := OMPModelCatalogProbeResult{Status: "blocked"}
+	trust := config.RoleModelCatalogTrustStrict
+	if profile != nil {
+		trust = profile.EffectiveCatalogTrust()
+	}
+	result := OMPModelCatalogProbeResult{Status: "blocked", CatalogTrust: trust}
 	if opts.Runner == nil {
 		result.Reason = "runner_missing"
 		return result
@@ -95,6 +110,10 @@ func ProbeOMPModelCatalog(ctx context.Context, opts OMPModelCatalogProbeOptions)
 		return result
 	}
 	result.Catalog, result.Reason = NormalizeOMPModelCatalog(output, opts.MaxOutput)
+	if result.Reason == "catalog_metadata_insufficient" &&
+		profile != nil && trust == config.RoleModelCatalogTrustOperatorAttested {
+		result.Catalog, result.Reason = normalizeOMPOperatorAttestedCatalog(output, opts.MaxOutput, *profile)
+	}
 	if result.Reason != "catalog_ready" {
 		return result
 	}

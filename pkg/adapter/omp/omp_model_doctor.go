@@ -108,7 +108,8 @@ func projectOMPModelDoctorRoles(resolutions []OMPModelRouteResolution) []OMPMode
 			Reason:          safeOMPModelDoctorReason(resolution.Reason),
 			FamilyDiversity: safeOMPModelDoctorToken(familyStatus),
 			FamilyReason:    safeOMPModelDoctorReason(familyReason),
-			EvidenceClass:   "availability", QuorumEvidence: false,
+			EvidenceClass:   safeOMPModelDoctorToken(resolution.EvidenceClass),
+			QuorumEvidence:  false,
 		})
 	}
 	sort.Slice(rows, func(i, j int) bool {

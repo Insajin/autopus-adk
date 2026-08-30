@@ -64,7 +64,7 @@ func runOMPRawDisplayCatalogCommand(
 			cmd, jsonStatusWarn, payload,
 			[]jsonMessage{{
 				Code:    "omp_catalog_metadata_insufficient",
-				Message: "observed native models are display-only; profile init/apply and routing remain blocked",
+				Message: "observed native models are display-only; automatic profile init and strict routing are blocked; explicit operator-attested profile apply is possible",
 			}},
 			[]jsonCheck{{
 				ID: "omp.catalog.semantic_metadata", Severity: "warning", Status: "warn",

@@ -6,6 +6,9 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"time"
+
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 const maxOMPModelDoctorReceiptBytes = 1 << 20
@@ -34,11 +37,26 @@ func readOMPModelDoctorReceiptAt(workspace *ompRootedWorkspace) (OMPModelResolut
 	if err != nil {
 		return OMPModelResolutionReceipt{}, "receipt_invalid"
 	}
+	if rejectDuplicateOMPModelReceiptJSON(data) != nil {
+		return OMPModelResolutionReceipt{}, "receipt_invalid"
+	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var receipt OMPModelResolutionReceipt
-	if decoder.Decode(&receipt) != nil || requireOMPModelDoctorJSONEOF(decoder) != nil ||
-		validateOMPModelReceipt(receipt) != nil {
+	if decoder.Decode(&receipt) != nil || requireOMPModelDoctorJSONEOF(decoder) != nil {
+		return OMPModelResolutionReceipt{}, "receipt_invalid"
+	}
+	if receipt.CatalogTrust == "" {
+		if !legacyOMPModelReceiptDigestMatches(receipt) {
+			return OMPModelResolutionReceipt{}, "receipt_invalid"
+		}
+		normalizeOMPModelReceiptTrust(&receipt)
+		if validateOMPModelReceipt(receipt) != nil {
+			return OMPModelResolutionReceipt{}, "receipt_invalid"
+		}
+		return receipt, ""
+	}
+	if validateOMPModelReceipt(receipt) != nil {
 		return OMPModelResolutionReceipt{}, "receipt_invalid"
 	}
 	canonical, _, err := CanonicalOMPModelResolutionReceipt(receipt)
@@ -60,6 +78,64 @@ func requireOMPModelDoctorJSONEOF(decoder *json.Decoder) error {
 	return err
 }
 
+type legacyOMPModelRoleReceipt struct {
+	Agent            string                           `json:"agent"`
+	Profile          string                           `json:"profile"`
+	ConfigSource     string                           `json:"config_source"`
+	RequestedRole    string                           `json:"requested_role"`
+	EffectiveRole    string                           `json:"effective_role"`
+	Capability       string                           `json:"capability"`
+	Provider         string                           `json:"provider"`
+	Model            string                           `json:"model"`
+	Selector         string                           `json:"selector"`
+	Thinking         string                           `json:"thinking"`
+	FallbackAttempts []OMPModelFallbackAttemptReceipt `json:"fallback_attempts"`
+	FallbackReason   string                           `json:"fallback_reason"`
+	DegradedReason   string                           `json:"degraded_reason"`
+	FamilyDiversity  OMPModelFamilyDiversityReceipt   `json:"family_diversity"`
+	SafetySource     string                           `json:"safety_source"`
+}
+
+type legacyOMPModelResolutionBody struct {
+	SchemaVersion          string                      `json:"schema_version"`
+	OMPVersion             string                      `json:"omp_version"`
+	CatalogFingerprint     string                      `json:"catalog_fingerprint"`
+	Profile                string                      `json:"profile"`
+	ConfigSource           string                      `json:"config_source"`
+	ProjectOwnershipDigest string                      `json:"project_ownership_digest,omitempty"`
+	Activation             OMPModelActivationReceipt   `json:"activation"`
+	Roles                  []legacyOMPModelRoleReceipt `json:"roles"`
+	Safety                 OMPModelSafetyReceipt       `json:"safety"`
+	GeneratedAt            time.Time                   `json:"generated_at"`
+}
+
+func legacyOMPModelReceiptDigestMatches(receipt OMPModelResolutionReceipt) bool {
+	roles := make([]legacyOMPModelRoleReceipt, 0, len(receipt.Roles))
+	for _, role := range receipt.Roles {
+		if role.EvidenceClass != "" || role.EffectiveFamily != "" {
+			return false
+		}
+		roles = append(roles, legacyOMPModelRoleReceipt{
+			Agent: role.Agent, Profile: role.Profile, ConfigSource: role.ConfigSource,
+			RequestedRole: role.RequestedRole, EffectiveRole: role.EffectiveRole,
+			Capability: role.Capability, Provider: role.Provider, Model: role.Model,
+			Selector: role.Selector, Thinking: role.Thinking,
+			FallbackAttempts: role.FallbackAttempts, FallbackReason: role.FallbackReason,
+			DegradedReason: role.DegradedReason, FamilyDiversity: role.FamilyDiversity,
+			SafetySource: role.SafetySource,
+		})
+	}
+	body := legacyOMPModelResolutionBody{
+		SchemaVersion: receipt.SchemaVersion, OMPVersion: receipt.OMPVersion,
+		CatalogFingerprint: receipt.CatalogFingerprint, Profile: receipt.Profile,
+		ConfigSource: receipt.ConfigSource, ProjectOwnershipDigest: receipt.ProjectOwnershipDigest,
+		Activation: receipt.Activation, Roles: roles, Safety: receipt.Safety,
+		GeneratedAt: receipt.GeneratedAt,
+	}
+	data, err := json.Marshal(body)
+	return err == nil && OMPModelSHA256(data) == receipt.ResolutionDigest
+}
+
 // @AX:WARN [AUTO]: model projection comparison has cyclomatic complexity 25.
 // @AX:REASON [AUTO]: gocyclo reports 25 across configured source, profile, route, fallback, and selected-model equivalence checks.
 func ompModelDoctorProjectionMatches(receipt OMPModelResolutionReceipt, input OMPModelDoctorInput) bool {
@@ -67,7 +143,12 @@ func ompModelDoctorProjectionMatches(receipt OMPModelResolutionReceipt, input OM
 	if configuredSource == "" {
 		configuredSource = input.ConfigSource
 	}
+	probeTrust := input.Probe.CatalogTrust
+	if probeTrust == "" {
+		probeTrust = config.RoleModelCatalogTrustStrict
+	}
 	if receipt.Profile != input.Profile || receipt.ConfigSource != input.ConfigSource ||
+		receipt.CatalogTrust != probeTrust ||
 		receipt.ConfigSource != configuredSource ||
 		receipt.ProjectOwnershipDigest != input.ProjectOwnershipDigest ||
 		receipt.Activation.ConfigHash != input.Activation.ConfigHash ||
@@ -100,8 +181,14 @@ func ompModelDoctorProjectionMatches(receipt OMPModelResolutionReceipt, input OM
 			role.RequestedRole != resolution.RequestedRole || role.EffectiveRole != resolution.RequestedRole ||
 			role.Capability != resolution.Capability || role.Provider != resolution.EffectiveProvider ||
 			role.Model != resolution.EffectiveModel || role.Thinking != resolution.Thinking ||
+			role.EvidenceClass != resolution.EvidenceClass ||
+			role.EffectiveFamily != resolution.EffectiveFamily ||
 			role.Selector != resolution.EffectiveProvider+"/"+resolution.EffectiveModel ||
-			role.FamilyDiversity.Status != ompModelDoctorFamilyStatus(resolution) {
+			role.FamilyDiversity.Status != ompModelDoctorFamilyStatus(resolution) ||
+			role.FamilyDiversity.ExecutorFamily != resolution.FamilyDiversity.Executor ||
+			role.FamilyDiversity.EffectiveFamily != resolution.FamilyDiversity.Reviewer ||
+			role.FamilyDiversity.Reason != resolution.FamilyDiversity.Reason ||
+			role.FamilyDiversity.IndependentProviderEvidence != resolution.IndependentProviderEvidence {
 			return false
 		}
 	}

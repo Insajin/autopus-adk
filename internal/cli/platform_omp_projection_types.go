@@ -17,19 +17,24 @@ type ompFallbackProjection struct {
 }
 
 type ompEffectiveModelProjection struct {
-	Agent            string                  `json:"agent"`
-	Role             string                  `json:"role"`
-	Capability       string                  `json:"capability"`
-	Provider         string                  `json:"provider,omitempty"`
-	Model            string                  `json:"model,omitempty"`
-	Thinking         string                  `json:"thinking,omitempty"`
-	Source           string                  `json:"source"`
-	ConfigSource     string                  `json:"config_source"`
-	Status           string                  `json:"status"`
-	Reason           string                  `json:"reason"`
-	Verified         bool                    `json:"verified"`
-	FallbackUsed     bool                    `json:"fallback_used"`
-	FallbackAttempts []ompFallbackProjection `json:"fallback_attempts"`
+	Agent              string                  `json:"agent"`
+	Role               string                  `json:"role"`
+	Capability         string                  `json:"capability"`
+	ModelAlias         string                  `json:"model_alias"`
+	EffectiveSelector  string                  `json:"effective_selector"`
+	Provider           string                  `json:"provider,omitempty"`
+	Model              string                  `json:"model,omitempty"`
+	Thinking           string                  `json:"thinking,omitempty"`
+	Source             string                  `json:"source"`
+	ConfigSource       string                  `json:"config_source"`
+	Status             string                  `json:"status"`
+	Reason             string                  `json:"reason"`
+	DefinitionPath     string                  `json:"definition_path"`
+	InstallStatus      string                  `json:"install_status"`
+	DefinitionVerified bool                    `json:"definition_verified"`
+	Verified           bool                    `json:"verified"`
+	FallbackUsed       bool                    `json:"fallback_used"`
+	FallbackAttempts   []ompFallbackProjection `json:"fallback_attempts"`
 }
 
 type ompModelOperatorProjection struct {
@@ -39,8 +44,14 @@ type ompModelOperatorProjection struct {
 	Reason             string                        `json:"reason"`
 	CatalogStatus      string                        `json:"catalog_status"`
 	CatalogReason      string                        `json:"catalog_reason"`
+	CatalogTrust       string                        `json:"catalog_trust"`
 	CatalogVersion     string                        `json:"catalog_version,omitempty"`
 	CatalogFingerprint string                        `json:"catalog_fingerprint,omitempty"`
+	AgentCatalogStatus string                        `json:"agent_catalog_status"`
+	AgentCatalogReason string                        `json:"agent_catalog_reason"`
+	ExpectedAgents     int                           `json:"expected_agents"`
+	InstalledAgents    int                           `json:"installed_agents"`
+	VerifiedAgents     int                           `json:"verified_agents"`
 	ReceiptStatus      string                        `json:"receipt_status"`
 	ReceiptVerified    bool                          `json:"receipt_verified"`
 	Models             []ompEffectiveModelProjection `json:"models"`
@@ -114,6 +125,7 @@ func defaultOMPPlatformProjection() ompPlatformProjection {
 		Models: ompModelOperatorProjection{
 			Status: "disabled", Reason: "profile_not_selected", CatalogStatus: "not_probed",
 			CatalogReason: "profile_not_selected", ReceiptStatus: "not_applicable",
+			AgentCatalogStatus: "not_evaluated", AgentCatalogReason: "platform_not_evaluated",
 			Models: []ompEffectiveModelProjection{},
 		},
 		Context: ompContextOperatorProjection{

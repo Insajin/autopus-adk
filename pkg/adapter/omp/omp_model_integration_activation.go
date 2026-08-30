@@ -178,7 +178,22 @@ func ReadOMPModelExpectedValues(
 	}
 	sort.Strings(keys)
 	readback := make(map[string]any, len(keys))
+	roleRunner, useRoleRPC := runner.(ompModelRoleRPCStateRunner)
+	if useRoleRPC {
+		roles, ok := expected["modelRoles"].(map[string]string)
+		if !ok || len(roles) == 0 {
+			return nil, fmt.Errorf("activation readback modelRoles are invalid")
+		}
+		resolved, err := readOMPModelRolesViaRPC(ctx, roleRunner, configPath, roles)
+		if err != nil {
+			return nil, err
+		}
+		readback["modelRoles"] = resolved
+	}
 	for _, key := range keys {
+		if useRoleRPC && key == "modelRoles" {
+			continue
+		}
 		output, runErr := runner.Run(ctx, cliBinary,
 			"--config", configPath, "config", "get", key, "--json")
 		if runErr != nil {

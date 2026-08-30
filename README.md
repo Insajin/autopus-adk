@@ -219,7 +219,7 @@ Every AI model has its own strengths and biases — Claude is thorough but verbo
 ```bash
 # Add --multi to any command for multi-model intelligence
 /auto idea "new feature" --multi          # 3 models brainstorm → cross-pollinate → ICE score
-/auto plan "new feature" --multi          # 3 models review your SPEC independently
+/auto plan "new feature" --multi          # 3-model read-only planning advisory → one SPEC writer → independent review
 /auto go SPEC-ID --multi                  # 3 models debate your code review
 ```
 
@@ -551,10 +551,13 @@ auto platform omp explain
 auto status --platform omp
 ```
 
-With the current upstream OMP 17.2.7 catalog, `models` returns the exact native selector, context window, reasoning flag, thinking levels, and input modes as a successful `degraded`/display-only result. OMP does not yet expose the family, Autopus capability, or authorization metadata required for safe automatic routing, so `strict_routing_ready` remains `false` and profile init/apply stays blocked with `catalog_metadata_insufficient`. Autopus does not guess those fields or inspect credentials.
+When the installed OMP catalog lacks family, capability, or authorization metadata, `models` still returns exact native selectors and thinking support as a `degraded` display-only result. Automatic profile generation and strict routing remain blocked with `catalog_metadata_insufficient`; Autopus does not infer those fields or inspect credentials. A pre-existing explicit profile may instead select `catalog_trust: operator-attested`: Autopus first runs the same bounded strict probe, then uses only the exact intersection of native selectors and operator declarations while keeping auth/keyless unobserved.
 
+Activation verifies every projected `@role` through an OMP RPC `get_state` session loaded with the generated overlay. It sends no prompt and makes no model-provider request; the resulting provider/model/thinking map is bound into the receipt and independently rechecked by `explain`/doctor.
 
-OMP policies are provider-neutral and inactive until a named profile is selected. Start with the non-destructive `overlay` mode only after the strict catalog is ready, then replace the illustrative selectors below with exact, authenticated `provider/model` selectors.
+`auto init` always emits the exact 16 managed OMP agent definitions. With no selected role profile they inherit the parent session model. `auto platform omp explain` and `auto status --platform omp` show all 16 agent→role→capability rows plus manifest/checksum installation integrity; a missing or modified generated definition blocks readiness.
+
+OMP policies are provider-neutral and inactive until a named profile is selected. Prefer the non-destructive `overlay` mode. Use strict mode when semantic catalog metadata is available; use operator-attested mode only for an explicitly stored profile whose exact selectors, families, capabilities, and thinking levels the operator has reviewed.
 
 ```yaml
 role_model_policy:
@@ -563,6 +566,7 @@ role_model_policy:
   profiles:
     omp-balanced:
       config_mode: overlay
+      catalog_trust: operator-attested
       capabilities:
         deep_reasoning:
           required: true
@@ -605,7 +609,7 @@ role_model_policy:
         roles: [advisor]
 ```
 
-- Candidate order is the fallback order. `selector`, `family`, and `thinking` must match the probed catalog; the placeholders above are not model recommendations.
+- Candidate order is the fallback order. In strict mode, `selector`, `family`, and `thinking` must match observed semantic catalog metadata. In operator-attested mode, selectors must exist in the bounded native catalog and family/capability/thinking come only from the explicit profile; this does not claim that authentication will succeed. The placeholders above are not model recommendations.
 - `safety` is optional. Add explicit `approval_mode` or `isolation_mode` values only after the installed-version capability probe reports support; omission leaves those keys unclaimed.
 - Use `project-managed` only when the project intentionally owns the target OMP keys. Every claimed key needs the observed `prior_fingerprint` and `complete: true`; an array claim such as `retry.fallbackChains` also needs `full_array_ownership: true`.
 
@@ -1170,7 +1174,7 @@ The spec-writer agent produces 5 documents:
 └── research.md     # Technical research + risks
 ```
 
-Options: `--multi` for multi-provider review · `--prd-mode minimal` for lightweight PRDs · `--skip-prd` to go straight to SPEC
+Options: `--multi` for a read-only multi-provider planning advisory plus final SPEC review · `--prd-mode minimal` for lightweight PRDs · `--skip-prd` to go straight to SPEC
 
 ### 🚀 Step 2 · `/auto go` — Build It
 

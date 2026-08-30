@@ -6,6 +6,7 @@ import "github.com/insajin/autopus-adk/pkg/orchestra"
 // silent breakage when call sites add or reorder command options.
 type OrchestraFlags struct {
 	NoDetach          bool
+	NoPersist         bool
 	KeepRelay         bool
 	NoJudge           bool
 	YieldRounds       bool

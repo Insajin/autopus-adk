@@ -172,7 +172,7 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	// Content tripwire over the whole prepared set. It moves when a shipped
 	// native file or target path changes; this value reflects the OMP 18.0.5
 	// native roots, current workflow metadata, and omission of the base config.
-	const priorPreparedFilesFingerprint = "ef075732674f13a07ac7c7bbb275847ff007e16462a03b10517b34adc137a662"
+	const priorPreparedFilesFingerprint = "c149a12434eff3fbbda3ba41dc3c49aabc94af4d50fd99f1eed50948911334f7"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

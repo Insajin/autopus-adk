@@ -199,6 +199,10 @@ func (workspace *ompRootedWorkspace) readFile(path string, limit int64) ([]byte,
 	if err != nil || limit > 0 && int64(len(data)) > limit {
 		return nil, nil, fmt.Errorf("read OMP path %s: size or IO failure", path)
 	}
+	after, statErr := workspace.lstat(path)
+	if statErr != nil || after.Mode()&os.ModeSymlink != 0 || !os.SameFile(info, after) {
+		return nil, nil, fmt.Errorf("read OMP path %s: identity changed", path)
+	}
 	return data, info, nil
 }
 

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -35,6 +36,22 @@ func (runner ompModelDoctorExecRunner) Run(
 		return nil, runner.pinErr
 	}
 	return runner.process.Run(ctx, args...)
+}
+
+func (runner ompModelDoctorExecRunner) RunWithInput(
+	ctx context.Context,
+	executable string,
+	input []byte,
+	args ...string,
+) ([]byte, error) {
+	if executable != "omp" || !bytes.Equal(input, []byte(`{"id":"autopus-model-state","type":"get_state"}`+"\n")) ||
+		!omp.SafeOMPModelRoleRPCArgs(args) {
+		return nil, errors.New("unsafe OMP model doctor role command")
+	}
+	if runner.pinErr != nil {
+		return nil, runner.pinErr
+	}
+	return runner.process.RunInput(ctx, input, args...)
 }
 
 func safeOMPModelDoctorProbeArgs(args []string) bool {
@@ -84,10 +101,10 @@ func buildOMPModelDoctorInput(
 		input.Probe = omp.OMPModelCatalogProbeResult{Status: "blocked", Reason: "identity_unverified"}
 		return input
 	}
-	input.Probe = omp.ProbeOMPModelCatalog(ctx, omp.OMPModelCatalogProbeOptions{
+	input.Probe = omp.ProbeOMPModelCatalogForProfile(ctx, omp.OMPModelCatalogProbeOptions{
 		Executable: "omp", Runner: runner, Timeout: ompDoctorProbeTimeout,
 		MaxOutput: ompModelDoctorProbeOutput,
-	})
+	}, profile)
 	if input.Probe.Status != "ready" || input.Probe.Reason != "catalog_ready" {
 		return input
 	}

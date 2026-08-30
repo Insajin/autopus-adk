@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/insajin/autopus-adk/pkg/adapter/omp"
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 type ompCatalogPayload struct {
@@ -49,12 +50,34 @@ func probeInstalledOMPCatalog(
 	ctx context.Context,
 	runner omp.OMPModelCatalogRunner,
 ) (omp.OMPModelCatalogProbeResult, error) {
-	result := omp.ProbeOMPModelCatalog(ctx, omp.OMPModelCatalogProbeOptions{
+	return requireReadyOMPCatalog(omp.ProbeOMPModelCatalog(ctx, omp.OMPModelCatalogProbeOptions{
 		Executable: "omp",
 		Runner:     runner,
 		Timeout:    ompDoctorProbeTimeout,
 		MaxOutput:  ompModelDoctorProbeOutput,
-	})
+	}))
+}
+
+func probeInstalledOMPCatalogForProfile(
+	ctx context.Context,
+	runner omp.OMPModelCatalogRunner,
+	profile config.RoleModelProfileConf,
+) (omp.OMPModelCatalogProbeResult, error) {
+	return requireReadyOMPCatalog(omp.ProbeOMPModelCatalogForProfile(
+		ctx,
+		omp.OMPModelCatalogProbeOptions{
+			Executable: "omp",
+			Runner:     runner,
+			Timeout:    ompDoctorProbeTimeout,
+			MaxOutput:  ompModelDoctorProbeOutput,
+		},
+		profile,
+	))
+}
+
+func requireReadyOMPCatalog(
+	result omp.OMPModelCatalogProbeResult,
+) (omp.OMPModelCatalogProbeResult, error) {
 	if result.Status != "ready" || result.Reason != "catalog_ready" {
 		reason := safeOMPOperatorReason(result.Reason)
 		if reason == "not_available" {
@@ -154,7 +177,7 @@ func renderOMPModelsText(cmd *cobra.Command, payload ompCatalogPayload) error {
 		)
 	}
 	if !payload.StrictRoutingReady && len(payload.Models) != 0 {
-		_, _ = fmt.Fprintln(out, "Routing/profile apply: blocked (catalog_metadata_insufficient)")
+		_, _ = fmt.Fprintln(out, "Automatic profile init/strict routing: blocked (catalog_metadata_insufficient); explicit operator-attested profile apply: possible")
 	}
 	return nil
 }

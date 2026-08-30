@@ -23,7 +23,7 @@ func (a *Adapter) probeIntegratedModelCatalog(
 	opts := OMPModelCatalogProbeOptions{
 		Executable: cliBinary, Runner: a.modelIntegrationRunner, Settings: settings,
 	}
-	probe := ProbeOMPModelCatalog(ctx, opts)
+	probe := ProbeOMPModelCatalogForProfile(ctx, opts, profile)
 	if probe.Status != "ready" || probe.Reason != "catalog_ready" {
 		return OMPModelCatalogProbeResult{}, fmt.Errorf("model_catalog_unavailable: %s", probe.Reason)
 	}

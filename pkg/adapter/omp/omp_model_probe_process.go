@@ -1,6 +1,7 @@
 package omp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -87,6 +88,23 @@ func safeOMPModelProbeDirectory(path, name string) (string, error) {
 }
 
 func (process *OMPModelProbeProcess) Run(ctx context.Context, args ...string) ([]byte, error) {
+	return process.run(ctx, nil, args...)
+}
+
+// RunInput executes the pinned metadata process with bounded, caller-supplied stdin.
+func (process *OMPModelProbeProcess) RunInput(
+	ctx context.Context,
+	input []byte,
+	args ...string,
+) ([]byte, error) {
+	return process.run(ctx, input, args...)
+}
+
+func (process *OMPModelProbeProcess) run(
+	ctx context.Context,
+	input []byte,
+	args ...string,
+) ([]byte, error) {
 	if process == nil || process.executable == "" || process.identity == nil {
 		return nil, fmt.Errorf("OMP model probe executable is not pinned")
 	}
@@ -106,6 +124,7 @@ func (process *OMPModelProbeProcess) Run(ctx context.Context, args ...string) ([
 	}
 	command := exec.CommandContext(ctx, process.executable, args...)
 	command.Dir = sandbox
+	command.Stdin = bytes.NewReader(input)
 	command.WaitDelay = time.Second
 	home := filepath.Join(sandbox, "home")
 	if process.home != "" {

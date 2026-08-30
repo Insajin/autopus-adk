@@ -15,6 +15,8 @@ func buildOMPPlatformProjection(
 	now time.Time,
 ) ompPlatformProjection {
 	projection := defaultOMPPlatformProjection()
+	rows, agentCatalog := buildOMPAgentCatalog(ctx, root, runner)
+	projection.Models = newOMPModelOperatorProjection(rows, agentCatalog)
 	if now.IsZero() {
 		now = time.Now().UTC()
 	} else {
@@ -37,7 +39,7 @@ func buildOMPPlatformProjection(
 		return projection
 	}
 	projection.Configured = true
-	projection.Models = buildOMPModelOperatorProjection(ctx, root, cfg, runner)
+	projection.Models = buildOMPModelOperatorProjection(ctx, root, cfg, runner, projection.Models)
 	projection.Context = buildOMPContextOperatorProjection(ctx, root, cfg, runner, now)
 	projection.ChildRuntime.EvidenceSource = projection.Context.EvidenceSource
 	projection.ReceiptVerification = ompReceiptVerificationProjection{
@@ -56,12 +58,8 @@ func buildOMPModelOperatorProjection(
 	root string,
 	cfg *config.HarnessConfig,
 	runner omp.OMPModelCatalogRunner,
+	result ompModelOperatorProjection,
 ) ompModelOperatorProjection {
-	result := ompModelOperatorProjection{
-		Status: "disabled", Reason: "profile_not_selected", CatalogStatus: "not_probed",
-		CatalogReason: "profile_not_selected", ReceiptStatus: "not_applicable",
-		Models: []ompEffectiveModelProjection{},
-	}
 	profileName, profile, selected := cfg.RoleModelPolicy.SelectedRoleModelProfileForQuality(cfg.Quality)
 	if !selected {
 		return result
@@ -77,47 +75,13 @@ func buildOMPModelOperatorProjection(
 	result.Reason = safeOMPOperatorReason(report.Reason)
 	result.CatalogStatus = safeOMPOperatorReason(input.Probe.Status)
 	result.CatalogReason = safeOMPOperatorReason(input.Probe.Reason)
+	result.CatalogTrust = safeOMPOperatorToken(input.Probe.CatalogTrust)
 	result.CatalogVersion = safeOMPOperatorVersion(input.Probe.Version)
 	result.CatalogFingerprint = input.Probe.Catalog.Fingerprint
 	result.ReceiptStatus = safeOMPOperatorReason(report.ReceiptStatus)
 	result.ReceiptVerified = result.ReceiptStatus == "valid" && result.Status != "blocked"
-	result.Models = projectOMPEffectiveModels(input.Compilation.Resolutions, profile, result.ReceiptVerified)
+	result.Models = overlayOMPAgentCatalog(result.Models, input.Compilation.Resolutions, profile, result.ReceiptVerified)
 	return result
-}
-
-func projectOMPEffectiveModels(
-	resolutions []omp.OMPModelRouteResolution,
-	profile config.RoleModelProfileConf,
-	receiptVerified bool,
-) []ompEffectiveModelProjection {
-	rows := make([]ompEffectiveModelProjection, 0, len(resolutions))
-	for _, resolution := range resolutions {
-		row := ompEffectiveModelProjection{
-			Agent:      safeOMPOperatorToken(resolution.Agent),
-			Role:       safeOMPOperatorToken(resolution.RequestedRole),
-			Capability: safeOMPOperatorToken(resolution.Capability),
-			Source:     "autopus.yaml", ConfigSource: safeOMPOperatorToken(profile.ConfigMode),
-			Status: safeOMPOperatorReason(resolution.Status), Reason: safeOMPOperatorReason(resolution.Reason),
-			Verified:         receiptVerified && resolution.Status == "selected",
-			FallbackAttempts: []ompFallbackProjection{},
-		}
-		if resolution.Status == "selected" {
-			row.Provider = safeOMPOperatorToken(resolution.EffectiveProvider)
-			row.Model = safeOMPOperatorToken(resolution.EffectiveModel)
-			row.Thinking = safeOMPOperatorToken(resolution.Thinking)
-		}
-		for _, attempt := range resolution.FallbackAttempts {
-			row.FallbackAttempts = append(row.FallbackAttempts, ompFallbackProjection{
-				Index: attempt.Index, Selector: safeOMPOperatorToken(attempt.Selector),
-				Status: safeOMPOperatorReason(attempt.Status), Reason: safeOMPOperatorReason(attempt.Reason),
-			})
-			if attempt.Status == "selected" && attempt.Index > 0 {
-				row.FallbackUsed = true
-			}
-		}
-		rows = append(rows, row)
-	}
-	return rows
 }
 
 func buildOMPContextOperatorProjection(
@@ -171,6 +135,9 @@ func buildOMPContextOperatorProjection(
 
 func collectOMPOperatorBlockers(projection ompPlatformProjection) []string {
 	var blockers []string
+	if projection.Models.AgentCatalogStatus != "ready" {
+		blockers = appendUniqueOMPBlocker(blockers, "agents:"+projection.Models.AgentCatalogReason)
+	}
 	if projection.Models.Enabled {
 		if projection.Models.CatalogStatus != "ready" || projection.Models.CatalogReason != "catalog_ready" {
 			blockers = appendUniqueOMPBlocker(blockers, "models:"+projection.Models.CatalogReason)
@@ -191,7 +158,8 @@ func collectOMPOperatorBlockers(projection ompPlatformProjection) []string {
 }
 
 func summarizeOMPOperatorStatus(projection ompPlatformProjection) (string, string) {
-	if projection.Models.Enabled && projection.Models.Status == "blocked" ||
+	if projection.Models.AgentCatalogStatus == "blocked" ||
+		projection.Models.Enabled && projection.Models.Status == "blocked" ||
 		projection.Context.Enabled && projection.Context.Status == "blocked" {
 		if len(projection.Blockers) != 0 {
 			return "blocked", projection.Blockers[0]

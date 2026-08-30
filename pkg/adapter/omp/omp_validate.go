@@ -116,6 +116,15 @@ func (a *Adapter) validateBaseSurface() ([]adapter.ValidationError, bool) {
 
 func (a *Adapter) validateOMPExpectedMappings(mappings []adapter.FileMapping) []adapter.ValidationError {
 	var findings []adapter.ValidationError
+	workspace, err := openOMPRootedWorkspace(a.root)
+	if err != nil {
+		for _, mapping := range mappings {
+			path := filepath.ToSlash(mapping.TargetPath)
+			findings = append(findings, ompIntegrityFinding(path, "managed workspace is unavailable"))
+		}
+		return findings
+	}
+	defer func() { _ = workspace.Close() }()
 	for _, mapping := range mappings {
 		path := filepath.ToSlash(mapping.TargetPath)
 		if err := adapter.RejectSymlinkComponents(a.root, path); err != nil {
@@ -123,17 +132,10 @@ func (a *Adapter) validateOMPExpectedMappings(mappings []adapter.FileMapping) []
 				ompIntegrityFinding(path, "managed path must be a regular file, not a symlink"))
 			continue
 		}
-		fullPath := filepath.Join(a.root, filepath.FromSlash(path))
-		info, err := os.Lstat(fullPath)
-		if err != nil || !info.Mode().IsRegular() {
-			findings = append(findings,
-				ompIntegrityFinding(path, "managed path must be a regular file"))
-			continue
-		}
-		data, err := os.ReadFile(fullPath)
+		data, _, err := workspace.readFile(path, int64(len(mapping.Content))+1)
 		if err != nil {
 			findings = append(findings,
-				ompIntegrityFinding(path, "managed regular file is unreadable"))
+				ompIntegrityFinding(path, "managed regular file is unreadable or changed"))
 			continue
 		}
 		if adapter.Checksum(string(data)) != mapping.Checksum {

@@ -18,20 +18,20 @@ effective provider/model과 선택 이유를 증명한다.
 - **User-visible outcome**: opt-in profile을 선택한 OMP 사용자는 planner/executor/reviewer 등 각
   Autopus 역할이 현재 설치된 OMP와 auth-enabled catalog에서 어떤 provider/model/thinking으로
   실행되는지 확인하고, availability fallback과 provider-family 독립 검토를 구분할 수 있다.
-- **Mandatory requirements**: REQ-001~REQ-018 전체다.
+- **Mandatory requirements**: strict observed-catalog 계약 REQ-001~REQ-018과 명시적 `operator-attested` 예외 REQ-019 전체다.
 - **Explicit non-goals**: OMP gateway, `orchestra.providers.omp`, worker `ProviderAdapter`, subprocess,
   pane, provider quorum 대체, credential 관리, SPEC-OMP-004의 context integrity 최적화다.
-- **Completion evidence**: S1~S18 hermetic oracle, routing-owned changed Go files 85%+ coverage,
+- **Completion evidence**: S1~S18과 S20~S24 hermetic oracle, routing-owned changed Go files 85%+ coverage,
   T1 package baseline no-regression, strict validation, full Go test/vet/build, receipt ignore hygiene,
   그리고 별도 명시 승인 시 S19 1-call live canary다.
 - **Dependency**: SPEC-OMP-002가 completed 상태여야 구현을 시작한다. SPEC-OMP-004는 독립 Primary다.
 
 ## Implementation Status
 
-- **Lifecycle state**: 기술 구현은 `implemented`이며 commit/push와 lifecycle `completed` 승격은 승인되지 않았다.
-- **Implemented evidence**: T2~T11의 provider-neutral policy, installed catalog normalization, deterministic routing/projection, 0600 overlay, agent mapping, receipt/doctor, safety와 integration surface가 현재 source tree에 존재한다.
+- **Lifecycle state**: REQ-001~REQ-019 기술 구현은 `implemented`이며 commit/push와 lifecycle `completed` 승격은 승인되지 않았다.
+- **Implemented evidence**: T2~T11 기존 surface와 T13~T15 trust validation, strict-gated exact intersection, synthetic attestation evidence, receipt/doctor binding이 source tree에 존재한다. strict/operator tests가 green이고 actual OMP 18.0.10 explicit apply/explain은 `catalog_trust=operator-attested`, `receipt_verified=true`, 16/16 agents를, strict no-profile init은 16/16 agents를 관측했다.
 - **Predecessor state**: T1의 SPEC-OMP-002 technical gate는 green이지만 exact integrated commit/HEAD에서의 lifecycle status promotion은 deferred다.
-- **Pending verification**: T12 integrated coverage, full test/vet/build, strict validation, git hygiene는 parent gate 전이며, S19는 `not-run: explicit approval required`로 S1~S18을 막지 않는다.
+- **Pending verification**: T12 `go test ./... -p 1 -count=1 -timeout=600s`(106 packages, 4 no tests), vet, build, strict SPEC validation은 green이다. parallel full run의 unrelated timing/provider 2건은 isolated green이며, changed-file 85%/T1 baseline과 git/tracked-ignore release hygiene만 pending이다. S19는 `not-run: explicit approval required`로 S1~S18과 S20~S24를 막지 않는다.
 
 ## Policy Contract
 
@@ -65,6 +65,12 @@ Agent override의 exact native role/capability pair가 있으면 이 기본값�
 다르면 `role_capability_mismatch`다. 동일 role의 후보 정렬은 profile 순서, exact selector,
 provider/model lexical tie-break 순이다. source `opus/sonnet/haiku`는 각각
 `deep_reasoning/plan`, `coding_tool_use/task`, `deterministic_transform/tiny`로만 변환한다.
+
+### Catalog trust modes
+
+`catalog_trust`의 빈 값은 `strict`이며 REQ-005/006의 observed-catalog 판정을 그대로 사용한다. 유일한 비-strict 값 `operator-attested`는 선택된 이름이 `role_model_policy.profiles`에 실제 저장된 explicit profile일 때만 유효하다. quality-derived built-in, default, 자동 proposal/init은 이 값을 생성하거나 상속하지 않는다.
+
+`operator-attested`도 먼저 동일한 bounded identity/version/settings/catalog probe를 수행한다. strict 결과가 정확히 `catalog_metadata_insufficient`일 때만 동일 bounded raw payload의 중복 없는 canonical selector와 profile candidate의 exact selector 교집합을 만들고, 교집합 행에는 operator가 선언한 family, 해당 route capability, thinking만 투영한다. identity/settings 실패와 `catalog_invalid`, `catalog_empty`, `catalog_timeout`, `catalog_oversized`는 우회하지 않는다. synthetic metadata는 `operator_attested=true`, `auth_enabled=false`, `keyless=false`로 표시해 auth/keyless가 observed가 아님을 보존한다. receipt는 top-level `catalog_trust=operator-attested`를, role row는 `evidence_class=operator_attested`와 operator-declared `effective_family`를 기록한다. operator-declared family 차이는 routing preference에 사용할 수 있지만 independent-provider, quorum, consensus, judge 증거로 승격하지 않는다.
 
 ## Requirements
 
@@ -243,6 +249,13 @@ provider call and records only redacted selection and usage metadata.
 - EARS type: Ubiquitous + Optional / Priority: Must
 - 관측 지점: test reports, coverage, canary consent and redacted receipt
 
+### REQ-019 — 명시적 operator-attested catalog trust
+
+WHERE a selected, explicitly stored profile sets `catalog_trust=operator-attested`, WHEN the bounded strict probe has verified OMP identity and required settings but returns exactly `catalog_metadata_insufficient`, THEN THE SYSTEM SHALL resolve only the exact selector intersection of the bounded native raw catalog and that profile's valid candidate declarations, project family/capability/thinking only from operator declarations, mark synthetic metadata as `operator_attested=true` with `auth_enabled=false` and `keyless=false`, bind receipt top-level `catalog_trust` and role `evidence_class`/`effective_family` into doctor comparison, and SHALL NOT claim observed authorization, keyless availability, reviewer-family independence, quorum, consensus, or judge evidence; IF any other probe reason occurs, the profile is derived/built-in/automatic, a declaration is incomplete or conflicting, or receipt trust/role evidence/family does not match doctor reprobe, THEN THE SYSTEM SHALL fail closed without applying the exception.
+
+- EARS type: Optional + Event-driven + Unwanted / Priority: Must
+- 관측 지점: stored profile source, exact intersection catalog, route attempts, receipt top-level trust와 role evidence/family fields
+
 ## 생성 파일 상세
 
 | 경로 | 역할 |
@@ -276,21 +289,22 @@ Sibling SPEC은 없다.
 | REQ-002 | T2 | S2, S3 | INV-002, INV-009 |
 | REQ-003 | T2, T4 | S3 | INV-003, INV-009 |
 | REQ-004 | T2, T11 | S2, S18 | INV-002 |
-| REQ-005 | T3 | S4, S5, S15 | INV-011 |
-| REQ-006 | T3, T4 | S4, S5 | INV-004 |
+| REQ-005 | T3, T14 | S4, S5, S15, S21, S22 | INV-011, INV-013, INV-015 |
+| REQ-006 | T3, T4, T14 | S4, S5, S20, S23 | INV-004, INV-014, INV-016 |
 | REQ-007 | T4 | S5, S6, S7 | INV-004 |
-| REQ-008 | T4, T10 | S6, S16 | INV-010 |
-| REQ-009 | T4 | S8, S9 | INV-005 |
+| REQ-008 | T4, T10, T15 | S6, S16, S23 | INV-010, INV-016 |
+| REQ-009 | T4, T15 | S8, S9, S23 | INV-005, INV-016 |
 | REQ-010 | T5, T7 | S2, S6 | INV-003, INV-004 |
 | REQ-011 | T6 | S10, S11 | INV-006, INV-007 |
 | REQ-012 | T6 | S11 | INV-007 |
 | REQ-013 | T6, T9 | S10, S12, S14 | INV-006, INV-008 |
 | REQ-014 | T6, T9 | S13 | INV-012 |
-| REQ-015 | T8 | S14, S17 | INV-002, INV-008 |
-| REQ-016 | T8 | S14, S15 | INV-008, INV-011 |
+| REQ-015 | T8, T15 | S14, S17, S20, S24 | INV-002, INV-008, INV-017 |
+| REQ-016 | T8, T15 | S14, S15, S20, S24 | INV-008, INV-011, INV-017 |
 | REQ-017 | T10 | S1, S16 | INV-001, INV-010 |
-| REQ-018 | T12 | S17, S18, S19 | INV-002, INV-011 |
+| REQ-018 | T12 | S17, S18, S19, S20~S24 | INV-002, INV-011, INV-013~017 |
+| REQ-019 | T13, T14, T15 | S20, S21, S22, S23, S24 | INV-013, INV-014, INV-015, INV-016, INV-017 |
 
 ## Out of Scope
 
-Outcome Boundary의 explicit non-goals와 동일하다.
+Outcome Boundary의 explicit non-goals와 동일하다. 추가로 automatic/built-in profile의 attestation 승격, auth/keyless 관측 주장, operator family를 독립-provider/quorum 증거로 사용하는 동작은 범위 밖이다.

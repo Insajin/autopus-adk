@@ -23,7 +23,8 @@ func TestPlatformOMPModelsNativeCatalogDegradesToSafeDisplayOnlyRows(t *testing.
 	assert.Contains(t, text, "Status: degraded (catalog_metadata_insufficient)")
 	assert.Contains(t, text, "openai-codex/gpt-5.4-mini")
 	assert.Contains(t, text, "semantic_metadata=unavailable")
-	assert.Contains(t, text, "Routing/profile apply: blocked")
+	assert.Contains(t, text, "Automatic profile init/strict routing: blocked")
+	assert.Contains(t, text, "explicit operator-attested profile apply: possible")
 	assert.NotContains(t, text, "$2.50")
 
 	encoded := executeOMPSubcommand(t, newPlatformOMPModelsCmd(&root, deps), "--json")

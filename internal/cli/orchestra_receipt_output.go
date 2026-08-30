@@ -67,8 +67,18 @@ func writeOrchestraReceiptArtifact(resultPath string, result *orchestra.Orchestr
 		return "", fmt.Errorf("marshal orchestra receipt: %w", err)
 	}
 	data = append(data, '\n')
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return "", fmt.Errorf("create orchestra receipt: %w", err)
+	}
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		_ = os.Remove(path)
 		return "", fmt.Errorf("write orchestra receipt: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", fmt.Errorf("close orchestra receipt: %w", err)
 	}
 	return path, nil
 }

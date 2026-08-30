@@ -52,7 +52,7 @@ func TestCanonicalOMPModelResolutionReceipt_DigestBindsGeneratedAt(t *testing.T)
 	if err := json.Unmarshal(firstBytes, &raw); err != nil {
 		t.Fatal(err)
 	}
-	wantKeys := []string{"schema_version", "omp_version", "catalog_fingerprint", "profile", "config_source", "activation", "roles", "safety", "generated_at", "resolution_digest"}
+	wantKeys := []string{"schema_version", "omp_version", "catalog_fingerprint", "catalog_trust", "profile", "config_source", "activation", "roles", "safety", "generated_at", "resolution_digest"}
 	if len(raw) != len(wantKeys) {
 		t.Fatalf("unexpected top-level fields: %+v", raw)
 	}

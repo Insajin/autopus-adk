@@ -46,7 +46,8 @@ func (i *ompModelIntegration) receiptMapping(
 	}
 	receipt := OMPModelResolutionReceipt{
 		OMPVersion: i.probe.Version, CatalogFingerprint: i.probe.Catalog.Fingerprint,
-		Profile: i.profileName, ConfigSource: configSource, GeneratedAt: generatedAt,
+		CatalogTrust: i.probe.CatalogTrust,
+		Profile:      i.profileName, ConfigSource: configSource, GeneratedAt: generatedAt,
 		ProjectOwnershipDigest: projectOwnershipDigest,
 		Activation: OMPModelActivationReceipt{
 			Argv:       []string{"--config", configRelative},
@@ -128,6 +129,7 @@ func ompIntegratedRoleReceipt(
 		Provider: resolution.EffectiveProvider, Model: resolution.EffectiveModel,
 		Selector: resolution.EffectiveProvider + "/" + resolution.EffectiveModel,
 		Thinking: resolution.Thinking, FallbackAttempts: attempts,
+		EvidenceClass: resolution.EvidenceClass, EffectiveFamily: resolution.EffectiveFamily,
 		FallbackReason: resolution.Reason, DegradedReason: resolution.DegradedReason,
 		FamilyDiversity: OMPModelFamilyDiversityReceipt{
 			Status: resolution.FamilyDiversity.Status, Reason: resolution.FamilyDiversity.Reason,

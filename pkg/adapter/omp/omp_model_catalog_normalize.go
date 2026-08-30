@@ -28,7 +28,8 @@ type rawOMPModelCatalog struct {
 type rawOMPModelMetadata struct {
 	Provider     string    `json:"provider"`
 	ID           string    `json:"id"`
-	Family       string    `json:"family"`
+	Selector     string    `json:"selector"`
+	Family       *string   `json:"family"`
 	Capabilities *[]string `json:"capabilities"`
 	Thinking     *[]string `json:"thinking"`
 	AuthEnabled  *bool     `json:"auth_enabled"`
@@ -41,6 +42,9 @@ type rawOMPModelMetadata struct {
 func NormalizeOMPModelCatalog(data []byte, maxOutput int) (OMPModelCatalog, string) {
 	if maxOutput <= 0 || len(data) > maxOutput {
 		return OMPModelCatalog{}, "catalog_oversized"
+	}
+	if rejectDuplicateOMPModelReceiptJSON(data) != nil {
+		return OMPModelCatalog{}, "catalog_invalid"
 	}
 	var raw rawOMPModelCatalog
 	if !decodeOMPModelCatalogJSON(data, &raw) {
@@ -103,60 +107,95 @@ func normalizeOMPModelMetadata(raw rawOMPModelMetadata) (OMPModelMetadata, strin
 	if !safeOMPModelToken(raw.Provider) || !safeOMPModelToken(raw.ID) {
 		return OMPModelMetadata{}, "catalog_invalid"
 	}
-	if raw.Family == "" || raw.Capabilities == nil || raw.Thinking == nil ||
+	selector := raw.Provider + "/" + raw.ID
+	if raw.Selector != "" && raw.Selector != selector {
+		return OMPModelMetadata{}, "catalog_invalid"
+	}
+	semantics, reason := normalizePresentOMPModelSemantics(raw)
+	if reason != "" {
+		return OMPModelMetadata{}, reason
+	}
+	if raw.Family == nil || raw.Capabilities == nil || raw.Thinking == nil ||
 		(!raw.Keyless && raw.AuthEnabled == nil && raw.Available == nil) {
 		return OMPModelMetadata{}, "catalog_metadata_insufficient"
-	}
-	if !safeOMPModelToken(raw.Family) || len(*raw.Capabilities) == 0 || len(*raw.Thinking) == 0 {
-		return OMPModelMetadata{}, "catalog_metadata_insufficient"
-	}
-	capabilities, ok := normalizeOMPAllowlistedValues(*raw.Capabilities, ompModelCapabilityAllowlist)
-	if !ok {
-		return OMPModelMetadata{}, "catalog_invalid"
-	}
-	thinking, ok := normalizeOMPNativeThinking(*raw.Thinking)
-	if !ok {
-		return OMPModelMetadata{}, "catalog_invalid"
 	}
 	authEnabled := raw.AuthEnabled != nil && *raw.AuthEnabled
 	if raw.AuthEnabled == nil && raw.Available != nil {
 		authEnabled = *raw.Available
 	}
 	return OMPModelMetadata{
-		Provider: raw.Provider, Model: raw.ID, Family: raw.Family,
-		Capabilities: capabilities, Thinking: thinking,
+		Provider: raw.Provider, Model: raw.ID, Family: semantics.family,
+		Capabilities: semantics.capabilities, Thinking: semantics.thinking,
 		AuthEnabled: authEnabled, Keyless: raw.Keyless, Disabled: raw.Disabled,
 	}, ""
+}
+
+type normalizedOMPModelSemantics struct {
+	family       string
+	capabilities []string
+	thinking     []string
+}
+
+func normalizePresentOMPModelSemantics(raw rawOMPModelMetadata) (normalizedOMPModelSemantics, string) {
+	var result normalizedOMPModelSemantics
+	if raw.Family != nil {
+		if !safeOMPModelToken(*raw.Family) {
+			return normalizedOMPModelSemantics{}, "catalog_invalid"
+		}
+		result.family = *raw.Family
+	}
+	if raw.Capabilities != nil {
+		if len(*raw.Capabilities) == 0 {
+			return normalizedOMPModelSemantics{}, "catalog_invalid"
+		}
+		values, ok := normalizeOMPAllowlistedValues(*raw.Capabilities, ompModelCapabilityAllowlist)
+		if !ok {
+			return normalizedOMPModelSemantics{}, "catalog_invalid"
+		}
+		result.capabilities = values
+	}
+	if raw.Thinking != nil {
+		if len(*raw.Thinking) == 0 {
+			return normalizedOMPModelSemantics{}, "catalog_invalid"
+		}
+		values, ok := normalizeOMPNativeThinking(*raw.Thinking)
+		if !ok {
+			return normalizedOMPModelSemantics{}, "catalog_invalid"
+		}
+		result.thinking = values
+	}
+	if raw.AuthEnabled != nil && raw.Available != nil && *raw.AuthEnabled != *raw.Available {
+		return normalizedOMPModelSemantics{}, "catalog_invalid"
+	}
+	return result, ""
 }
 
 func normalizeOMPAllowlistedValues(values []string, allowed map[string]struct{}) ([]string, bool) {
 	normalized := append([]string(nil), values...)
 	sort.Strings(normalized)
-	result := normalized[:0]
-	for _, value := range normalized {
+	for index, value := range normalized {
 		if _, ok := allowed[value]; !ok {
 			return nil, false
 		}
-		if len(result) == 0 || result[len(result)-1] != value {
-			result = append(result, value)
+		if index > 0 && normalized[index-1] == value {
+			return nil, false
 		}
 	}
-	return result, true
+	return normalized, true
 }
 
 func normalizeOMPNativeThinking(values []string) ([]string, bool) {
 	normalized := append([]string(nil), values...)
 	sort.Strings(normalized)
-	result := normalized[:0]
-	for _, value := range normalized {
+	for index, value := range normalized {
 		if !config.IsOMPNativeThinkingLevel(value) {
 			return nil, false
 		}
-		if len(result) == 0 || result[len(result)-1] != value {
-			result = append(result, value)
+		if index > 0 && normalized[index-1] == value {
+			return nil, false
 		}
 	}
-	return result, true
+	return normalized, true
 }
 
 func safeOMPModelToken(value string) bool {

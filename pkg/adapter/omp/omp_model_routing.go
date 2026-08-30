@@ -80,6 +80,8 @@ type evaluatedOMPRoutingCandidate struct {
 }
 
 // ResolveOMPModelRoute applies exact matching and declared-order fallback.
+// @AX:WARN [AUTO]: Route resolution has 9 conditional branches.
+// @AX:REASON [AUTO]: role validation, catalog state, fallback, degradation, and attested evidence converge here.
 func ResolveOMPModelRoute(
 	catalog OMPModelCatalog,
 	catalogReason string,
@@ -132,6 +134,9 @@ func ResolveOMPModelRoute(
 	result.EffectiveSelector = formatOMPRoutingSelector(selected.candidate)
 	result.EffectiveFamily = selected.model.Family
 	result.FamilyDiversity = resolveOMPFamilyDiversity(request, selected.model.Family)
+	if selected.model.OperatorAttested {
+		result.EvidenceClass = "operator_attested"
+	}
 	return result
 }
 
@@ -182,7 +187,7 @@ func matchOMPModelCandidate(
 		switch {
 		case model.Disabled:
 			return model, "disabled"
-		case !model.Keyless && !model.AuthEnabled:
+		case !model.OperatorAttested && !model.Keyless && !model.AuthEnabled:
 			return model, "unauthorized"
 		case !containsOMPModelValue(model.Capabilities, capability):
 			return model, "capability_mismatch"

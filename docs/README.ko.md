@@ -205,7 +205,7 @@ Autopus는 하나의 AI 어시스턴트가 아닌 — 역할 정의, 품질 게�
 ```bash
 # 어떤 명령에든 --multi를 추가하면 멀티 모델 지능이 활성화
 /auto idea "새 기능" --multi          # 3개 모델 브레인스토밍 → 교차 수분 → ICE 점수
-/auto plan "새 기능" --multi          # 3개 모델이 독립적으로 SPEC 리뷰
+/auto plan "새 기능" --multi          # 3개 모델의 읽기 전용 기획 검토 → 단일 SPEC 작성 → 독립 리뷰
 /auto go SPEC-ID --multi              # 3개 모델이 코드 리뷰 토론
 ```
 
@@ -462,10 +462,13 @@ auto platform omp explain
 auto status --platform omp
 ```
 
-현재 upstream OMP 17.2.7 카탈로그에서는 `models`가 정확한 native selector, context window, reasoning 여부, thinking 단계, input mode를 성공적인 `degraded`/조회 전용 결과로 표시합니다. OMP가 안전한 자동 라우팅에 필요한 family, Autopus capability, 인증 가능 여부 메타데이터를 아직 제공하지 않으므로 `strict_routing_ready`는 `false`이고 profile init/apply는 `catalog_metadata_insufficient`로 차단됩니다. Autopus는 이 값을 추측하거나 credential을 읽지 않습니다.
+설치된 OMP 카탈로그에 family, capability, 인증 가능 여부가 없더라도 `models`는 정확한 native selector와 thinking 지원 정보를 `degraded` 조회 결과로 표시합니다. 자동 프로필 생성과 strict 라우팅은 계속 `catalog_metadata_insufficient`로 차단되며, Autopus는 누락된 값을 추측하거나 credential을 읽지 않습니다. 대신 이미 저장된 명시적 프로필은 `catalog_trust: operator-attested`를 선택할 수 있습니다. 이 모드도 먼저 같은 bounded strict probe를 실행한 뒤, native selector와 운영자 선언의 정확한 교집합만 사용하며 auth/keyless는 관측하지 않은 상태로 유지합니다.
 
+활성화 단계에서는 생성한 overlay를 로드한 OMP RPC `get_state` 세션으로 모든 `@role`을 확인합니다. prompt나 모델 프로바이더 요청은 보내지 않습니다. 확인한 provider/model/thinking map은 receipt에 결속하며 `explain`과 doctor가 독립적으로 다시 검증합니다.
 
-OMP 정책은 프로바이더에 종속되지 않으며 이름 있는 프로필을 선택하기 전에는 활성화되지 않습니다. strict catalog가 준비된 뒤에만 기존 설정을 직접 소유하지 않는 `overlay` 모드로 시작하고, 아래 예시 selector는 정확한 인증 가능 `provider/model` 값으로 바꾸세요.
+`auto init`은 관리 대상 OMP 에이전트 정의 16개를 항상 생성합니다. 역할 프로필을 선택하지 않으면 모든 에이전트가 부모 세션 모델을 상속합니다. `auto platform omp explain`과 `auto status --platform omp`는 16개 agent→role→capability 행과 manifest/checksum 설치 무결성을 함께 표시합니다. 생성 파일이 없거나 수정되면 readiness를 차단합니다.
+
+OMP 정책은 특정 프로바이더에 종속되지 않으며 이름 있는 프로필을 선택하기 전에는 활성화되지 않습니다. 기존 설정을 직접 소유하지 않는 `overlay` 모드를 우선 사용하세요. semantic catalog metadata가 있으면 strict 모드를 사용하고, 운영자가 exact selector, family, capability, thinking을 직접 검토한 명시적 저장 프로필에만 operator-attested 모드를 사용하세요.
 
 ```yaml
 role_model_policy:
@@ -474,6 +477,7 @@ role_model_policy:
   profiles:
     omp-balanced:
       config_mode: overlay
+      catalog_trust: operator-attested
       capabilities:
         deep_reasoning:
           required: true
@@ -516,7 +520,7 @@ role_model_policy:
         roles: [advisor]
 ```
 
-- candidate 순서가 fallback 순서입니다. `selector`, `family`, `thinking`은 probe한 카탈로그와 일치해야 하며, 위 placeholder는 모델 추천이 아닙니다.
+- candidate 순서가 fallback 순서입니다. strict 모드에서는 `selector`, `family`, `thinking`이 관측된 semantic catalog metadata와 일치해야 합니다. operator-attested 모드에서는 bounded native catalog에 selector가 있어야 하며, family/capability/thinking은 명시적 프로필에서만 가져옵니다. 이 모드는 인증 성공을 보장하지 않습니다. 위 placeholder는 모델 추천이 아닙니다.
 - `safety`는 선택 사항입니다. 설치된 버전의 capability probe가 지원을 확인한 뒤에만 `approval_mode`나 `isolation_mode`를 명시하세요. 생략하면 해당 키를 소유하지 않습니다.
 - 프로젝트가 대상 OMP 키를 의도적으로 소유할 때만 `project-managed`를 사용하세요. 소유를 선언한 모든 키에는 관측한 `prior_fingerprint`와 `complete: true`가 필요하고, `retry.fallbackChains` 같은 배열에는 `full_array_ownership: true`도 필요합니다.
 
@@ -1070,7 +1074,7 @@ spec-writer 에이전트가 5개 문서를 생성합니다:
 └── research.md     # 기술 조사 + 리스크
 ```
 
-옵션: `--multi` 멀티 프로바이더 리뷰 · `--prd-mode minimal` 경량 PRD · `--skip-prd` PRD 건너뛰고 바로 SPEC
+옵션: `--multi` 읽기 전용 멀티 프로바이더 기획 검토와 최종 SPEC 리뷰 · `--prd-mode minimal` 경량 PRD · `--skip-prd` PRD 건너뛰고 바로 SPEC
 
 ### 🚀 2단계 · `/auto go` — 구현하기
 

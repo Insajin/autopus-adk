@@ -45,6 +45,10 @@ func validateRoleModelProfile(name string, profile RoleModelProfileConf) error {
 	if profile.ConfigMode != RoleModelConfigModeOverlay && profile.ConfigMode != RoleModelConfigModeProjectManaged {
 		return fmt.Errorf("role_model_policy.profiles[%s].config_mode_invalid: %q", name, profile.ConfigMode)
 	}
+	trust := profile.EffectiveCatalogTrust()
+	if trust != RoleModelCatalogTrustStrict && trust != RoleModelCatalogTrustOperatorAttested {
+		return fmt.Errorf("role_model_policy.profiles[%s].catalog_trust_invalid: %q", name, profile.CatalogTrust)
+	}
 	for _, capability := range providerNeutralCapabilities {
 		if _, ok := profile.Capabilities[capability]; !ok {
 			return fmt.Errorf("role_model_policy.profiles[%s].capability_missing: %q", name, capability)
@@ -55,6 +59,11 @@ func validateRoleModelProfile(name string, profile RoleModelProfileConf) error {
 			return fmt.Errorf("role_model_policy.profiles[%s].%w", name, err)
 		}
 		if err := validateCapabilityRoute(name, capability, route); err != nil {
+			return err
+		}
+	}
+	if trust == RoleModelCatalogTrustOperatorAttested {
+		if err := validateOperatorAttestedRoutes(name, profile); err != nil {
 			return err
 		}
 	}
@@ -74,6 +83,41 @@ func validateRoleModelProfile(name string, profile RoleModelProfileConf) error {
 	}
 	if err := validateRoleManagedKeys(name, profile); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validateOperatorAttestedRoutes(name string, profile RoleModelProfileConf) error {
+	families := make(map[string]string)
+	for _, capability := range providerNeutralCapabilities {
+		route := profile.Capabilities[capability]
+		if !route.Required || route.DegradedAction != "" {
+			return fmt.Errorf("role_model_policy.profiles[%s].operator_attestation_route_not_closed: %s", name, capability)
+		}
+		seen := make(map[string]struct{}, len(route.Candidates))
+		for index, candidate := range route.Candidates {
+			if candidate.Family == "" {
+				return fmt.Errorf(
+					"role_model_policy.profiles[%s].capabilities[%s].candidates[%d].operator_attestation_family_required",
+					name, capability, index,
+				)
+			}
+			if family, ok := families[candidate.Selector]; ok && family != candidate.Family {
+				return fmt.Errorf(
+					"role_model_policy.profiles[%s].operator_attestation_family_conflict: %s",
+					name, candidate.Selector,
+				)
+			}
+			families[candidate.Selector] = candidate.Family
+			declaration := candidate.Selector + "\x00" + candidate.Thinking
+			if _, duplicate := seen[declaration]; duplicate {
+				return fmt.Errorf(
+					"role_model_policy.profiles[%s].capabilities[%s].operator_attestation_declaration_duplicate: %s",
+					name, capability, candidate.Selector,
+				)
+			}
+			seen[declaration] = struct{}{}
+		}
 	}
 	return nil
 }

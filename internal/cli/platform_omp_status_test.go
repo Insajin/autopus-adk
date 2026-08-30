@@ -60,7 +60,7 @@ func TestOMPStatusProjectionReportsStaleCatalogAndMissingReceipt(t *testing.T) {
 	assert.False(t, statusEnvelope.Data.ReceiptVerification.ModelVerified)
 }
 
-func TestOMPStatusNoOptInIsReadyHubLimitedAndBareStatusIsCompatible(t *testing.T) {
+func TestOMPStatusNoOptInBlocksWhenGeneratedAgentCatalogIsMissingAndBareStatusIsCompatible(t *testing.T) {
 	root := t.TempDir()
 	cfg := config.DefaultFullConfig("omp-status")
 	cfg.Platforms = []string{"omp"}
@@ -76,7 +76,8 @@ func TestOMPStatusNoOptInIsReadyHubLimitedAndBareStatusIsCompatible(t *testing.T
 	status.SetErr(&operatorOut)
 	status.SetArgs([]string{"--dir", root, "--platform", "omp"})
 	require.NoError(t, status.Execute())
-	assert.Contains(t, operatorOut.String(), "status=ready")
+	assert.Contains(t, operatorOut.String(), "status=blocked")
+	assert.Contains(t, operatorOut.String(), "agent_catalog_incomplete")
 	assert.Contains(t, operatorOut.String(), ompLiveStateLimitation)
 	assert.Contains(t, operatorOut.String(), ompLiveStateNextCommand)
 	assert.Empty(t, runner.calls, "no opt-in must not probe OMP")
@@ -88,10 +89,11 @@ func TestOMPStatusNoOptInIsReadyHubLimitedAndBareStatusIsCompatible(t *testing.T
 	require.NoError(t, jsonStatusCmd.Execute())
 	var statusEnvelope ompCLIJSONEnvelope
 	require.NoError(t, json.Unmarshal(jsonOut.Bytes(), &statusEnvelope))
-	assert.Equal(t, jsonStatusOK, statusEnvelope.Status)
+	assert.Equal(t, jsonStatusWarn, statusEnvelope.Status)
 	var statusPayload ompPlatformProjection
 	require.NoError(t, json.Unmarshal(statusEnvelope.Data, &statusPayload))
-	assert.Equal(t, "ready", statusPayload.Status)
+	assert.Equal(t, "blocked", statusPayload.Status)
+	assert.Equal(t, "agent_catalog_incomplete", statusPayload.Models.AgentCatalogReason)
 	assert.Equal(t, ompLiveStateLimitation, statusPayload.ChildRuntime.Limitation)
 	assert.Empty(t, runner.calls, "JSON no opt-in must not probe OMP")
 

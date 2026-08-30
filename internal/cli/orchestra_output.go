@@ -31,8 +31,12 @@ func saveOrchestraResult(command, strategy string, providers []string, timeout R
 		return "", err
 	}
 	ts := time.Now().Format("20060102-150405")
-	filename := fmt.Sprintf("%s/%s-%s-%s.md", dir, command, strategy, ts)
-
+	pattern := fmt.Sprintf("%s-%s-%s-*.md", command, strategy, ts)
+	file, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return "", err
+	}
+	filename := file.Name()
 	header := fmt.Sprintf("# Orchestra: %s (%s)\n\n**Date**: %s  \n**Strategy**: %s  \n**Providers**: %s  \n**Duration**: %s  \n",
 		command, strategy,
 		time.Now().Format("2006-01-02 15:04:05"),
@@ -57,7 +61,13 @@ func saveOrchestraResult(command, strategy string, providers []string, timeout R
 	if diagnostics := renderProviderDiagnosticsMarkdown(timeout, result.FailedProviders); diagnostics != "" {
 		content += "\n" + diagnostics
 	}
-	if err := os.WriteFile(filename, []byte(content), 0o644); err != nil {
+	if _, err := file.WriteString(content); err != nil {
+		_ = file.Close()
+		_ = os.Remove(filename)
+		return filename, err
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(filename)
 		return filename, err
 	}
 	if result != nil && result.RunReceipt != nil {

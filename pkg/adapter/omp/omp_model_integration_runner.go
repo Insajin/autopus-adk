@@ -1,6 +1,7 @@
 package omp
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -28,6 +29,22 @@ func (r ompModelIntegrationExecRunner) Run(
 		return nil, r.pinErr
 	}
 	return r.process.Run(ctx, args...)
+}
+
+func (r ompModelIntegrationExecRunner) RunWithInput(
+	ctx context.Context,
+	executable string,
+	input []byte,
+	args ...string,
+) ([]byte, error) {
+	if executable != cliBinary || !bytes.Equal(input, ompModelRoleRPCRequest) ||
+		!SafeOMPModelRoleRPCArgs(args) {
+		return nil, fmt.Errorf("unsafe OMP model role command")
+	}
+	if r.pinErr != nil {
+		return nil, r.pinErr
+	}
+	return r.process.RunInput(ctx, input, args...)
 }
 
 func safeOMPModelIntegrationArgs(args []string) bool {

@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 const (
@@ -44,6 +46,8 @@ type OMPModelRoleReceipt struct {
 	Model            string                           `json:"model"`
 	Selector         string                           `json:"selector"`
 	Thinking         string                           `json:"thinking"`
+	EvidenceClass    string                           `json:"evidence_class"`
+	EffectiveFamily  string                           `json:"effective_family"`
 	FallbackAttempts []OMPModelFallbackAttemptReceipt `json:"fallback_attempts"`
 	FallbackReason   string                           `json:"fallback_reason"`
 	DegradedReason   string                           `json:"degraded_reason"`
@@ -61,6 +65,7 @@ type OMPModelResolutionReceipt struct {
 	SchemaVersion          string                    `json:"schema_version"`
 	OMPVersion             string                    `json:"omp_version"`
 	CatalogFingerprint     string                    `json:"catalog_fingerprint"`
+	CatalogTrust           string                    `json:"catalog_trust"`
 	Profile                string                    `json:"profile"`
 	ConfigSource           string                    `json:"config_source"`
 	ProjectOwnershipDigest string                    `json:"project_ownership_digest,omitempty"`
@@ -86,6 +91,7 @@ type ompModelResolutionBody struct {
 	SchemaVersion          string                    `json:"schema_version"`
 	OMPVersion             string                    `json:"omp_version"`
 	CatalogFingerprint     string                    `json:"catalog_fingerprint"`
+	CatalogTrust           string                    `json:"catalog_trust"`
 	Profile                string                    `json:"profile"`
 	ConfigSource           string                    `json:"config_source"`
 	ProjectOwnershipDigest string                    `json:"project_ownership_digest,omitempty"`
@@ -98,6 +104,7 @@ type ompModelResolutionBody struct {
 func CanonicalOMPModelResolutionReceipt(receipt OMPModelResolutionReceipt) (OMPModelResolutionReceipt, []byte, error) {
 	receipt.SchemaVersion = OMPModelReceiptSchemaVersion
 	receipt.ResolutionDigest = ""
+	normalizeOMPModelReceiptTrust(&receipt)
 	receipt.GeneratedAt = receipt.GeneratedAt.UTC()
 	receipt.Activation.Argv = append([]string(nil), receipt.Activation.Argv...)
 	receipt.Roles = append([]OMPModelRoleReceipt(nil), receipt.Roles...)
@@ -123,6 +130,7 @@ func CanonicalOMPModelResolutionReceipt(receipt OMPModelResolutionReceipt) (OMPM
 		SchemaVersion:          receipt.SchemaVersion,
 		OMPVersion:             receipt.OMPVersion,
 		CatalogFingerprint:     receipt.CatalogFingerprint,
+		CatalogTrust:           receipt.CatalogTrust,
 		Profile:                receipt.Profile,
 		ConfigSource:           receipt.ConfigSource,
 		ProjectOwnershipDigest: receipt.ProjectOwnershipDigest,
@@ -142,6 +150,20 @@ func CanonicalOMPModelResolutionReceipt(receipt OMPModelResolutionReceipt) (OMPM
 	}
 	data = append(data, '\n')
 	return receipt, data, nil
+}
+
+func normalizeOMPModelReceiptTrust(receipt *OMPModelResolutionReceipt) {
+	if receipt.CatalogTrust == "" {
+		receipt.CatalogTrust = config.RoleModelCatalogTrustStrict
+	}
+	if receipt.CatalogTrust != config.RoleModelCatalogTrustStrict {
+		return
+	}
+	for index := range receipt.Roles {
+		if receipt.Roles[index].EvidenceClass == "" {
+			receipt.Roles[index].EvidenceClass = "availability"
+		}
+	}
 }
 
 func WriteOMPModelResolutionReceipt(input OMPModelReceiptWriteInput) (evidence OMPModelReceiptWriteEvidence, returnErr error) {
@@ -187,6 +209,10 @@ func validateOMPModelReceipt(receipt OMPModelResolutionReceipt) error {
 	if receipt.Profile == "" || receipt.ConfigSource == "" || len(receipt.Roles) == 0 {
 		return fmt.Errorf("receipt profile, config source, and roles are required")
 	}
+	if receipt.CatalogTrust != config.RoleModelCatalogTrustStrict &&
+		receipt.CatalogTrust != config.RoleModelCatalogTrustOperatorAttested {
+		return fmt.Errorf("receipt catalog trust is invalid")
+	}
 	if receipt.ConfigSource == "project-managed" {
 		if !validOMPModelHash(receipt.ProjectOwnershipDigest) {
 			return fmt.Errorf("receipt project ownership digest is invalid")
@@ -203,6 +229,18 @@ func validateOMPModelReceipt(receipt OMPModelResolutionReceipt) error {
 	for _, role := range receipt.Roles {
 		if err := validateOMPModelRoleReceipt(role); err != nil {
 			return err
+		}
+		if receipt.CatalogTrust == config.RoleModelCatalogTrustStrict &&
+			role.EvidenceClass != "availability" {
+			return fmt.Errorf("strict receipt role requires availability evidence")
+		}
+		if receipt.CatalogTrust == config.RoleModelCatalogTrustOperatorAttested {
+			if role.EvidenceClass != "operator_attested" {
+				return fmt.Errorf("operator-attested receipt role requires attested evidence")
+			}
+			if role.FamilyDiversity.IndependentProviderEvidence {
+				return fmt.Errorf("operator-attested receipt cannot claim independent provider evidence")
+			}
 		}
 	}
 	all, err := json.Marshal(receipt)
@@ -238,6 +276,9 @@ func validateOMPModelRoleReceipt(role OMPModelRoleReceipt) error {
 			return fmt.Errorf("receipt role contains an invalid required value")
 		}
 	}
+	if role.EvidenceClass != "availability" && role.EvidenceClass != "operator_attested" {
+		return fmt.Errorf("receipt role evidence class is invalid")
+	}
 	if role.Selector != role.Provider+"/"+role.Model {
 		return fmt.Errorf("receipt selector does not match provider/model")
 	}
@@ -245,6 +286,14 @@ func validateOMPModelRoleReceipt(role OMPModelRoleReceipt) error {
 		if attempt.Selector == "" || attempt.Reason == "" {
 			return fmt.Errorf("receipt fallback attempt is incomplete")
 		}
+	}
+	if role.EvidenceClass == "operator_attested" && role.EffectiveFamily == "" {
+		return fmt.Errorf("operator-attested receipt role requires an effective family")
+	}
+	if role.EffectiveFamily != "" &&
+		(strings.TrimSpace(role.EffectiveFamily) != role.EffectiveFamily ||
+			strings.ContainsAny(role.EffectiveFamily, "\x00\r\n")) {
+		return fmt.Errorf("receipt role effective family is invalid")
 	}
 	return nil
 }

@@ -56,6 +56,8 @@ func runOMPProfileApplyCommand(
 	return nil
 }
 
+// @AX:WARN [AUTO]: Profile apply has 18 conditional branches.
+// @AX:REASON [AUTO]: validation, probing, persistence, activation, and rollback must fail closed in one transaction.
 func applyOMPProfile(
 	ctx context.Context,
 	root string,
@@ -66,12 +68,20 @@ func applyOMPProfile(
 	if !config.IsValidQualityPresetName(name) {
 		return ompProfileApplyPayload{}, ompProfilePlanError{reason: "profile_name_invalid"}
 	}
-	path, original, mode, err := readOwnedAutopusConfig(root)
+	snapshot, err := openAutopusConfigSnapshot(root)
 	if err != nil {
 		return ompProfileApplyPayload{}, err
 	}
-	cfg, err := config.LoadPreview(root)
-	if err != nil {
+	defer snapshot.Close()
+	original := snapshot.data
+	if err := validateOMPProfileSource(original); err != nil {
+		return ompProfileApplyPayload{}, err
+	}
+	cfg, loadErr := config.LoadPreview(snapshot.rootPath)
+	if err := snapshot.Verify(); err != nil {
+		return ompProfileApplyPayload{}, err
+	}
+	if loadErr != nil {
 		return ompProfileApplyPayload{}, errors.New("autopus_config_invalid")
 	}
 	if !containsOMPString(cfg.Platforms, "omp") {
@@ -80,12 +90,17 @@ func applyOMPProfile(
 	if activate == nil {
 		return ompProfileApplyPayload{}, errors.New("omp_activation_path_unavailable")
 	}
-	probe, err := probeInstalledOMPCatalog(ctx, runner)
+	profile, exists := cfg.RoleModelPolicy.Profiles[name]
+	var probe omp.OMPModelCatalogProbeResult
+	if exists {
+		probe, err = probeInstalledOMPCatalogForProfile(ctx, runner, profile)
+	} else {
+		probe, err = probeInstalledOMPCatalog(ctx, runner)
+	}
 	if err != nil {
 		return ompProfileApplyPayload{}, err
 	}
 
-	profile, exists := cfg.RoleModelPolicy.Profiles[name]
 	generated := !exists
 	if !exists {
 		proposal, proposalErr := buildOMPProfileProposal(name, probe.Catalog)
@@ -113,26 +128,23 @@ func applyOMPProfile(
 	if err != nil {
 		return ompProfileApplyPayload{}, err
 	}
-	if err := verifyAutopusConfigSnapshot(path, original, mode); err != nil {
-		return ompProfileApplyPayload{}, err
-	}
-	if err := atomicWriteAutopusConfig(root, path, encoded, mode); err != nil {
+	if err := snapshot.Replace(encoded); err != nil {
 		return ompProfileApplyPayload{}, fmt.Errorf("persist OMP profile: %w", err)
 	}
-	if err := activate(ctx, root, cfg); err != nil {
-		if verifyErr := verifyAutopusConfigSnapshot(path, encoded, mode); verifyErr != nil {
+	if err := activate(ctx, snapshot.rootPath, cfg); err != nil {
+		if verifyErr := snapshot.Verify(); verifyErr != nil {
 			return ompProfileApplyPayload{}, fmt.Errorf(
 				"activate OMP profile: %w; config rollback blocked: autopus_config_changed", err,
 			)
 		}
-		if rollbackErr := atomicWriteAutopusConfig(root, path, original, mode); rollbackErr != nil {
+		if rollbackErr := snapshot.Replace(original); rollbackErr != nil {
 			return ompProfileApplyPayload{}, fmt.Errorf(
 				"activate OMP profile: %w; config rollback failed: %v", err, rollbackErr,
 			)
 		}
 		return ompProfileApplyPayload{}, fmt.Errorf("activate OMP profile: %w", err)
 	}
-	if err := verifyAutopusConfigSnapshot(path, encoded, mode); err != nil {
+	if err := snapshot.Verify(); err != nil {
 		return ompProfileApplyPayload{}, errors.New("autopus_config_changed_during_activation")
 	}
 	return ompProfileApplyPayload{

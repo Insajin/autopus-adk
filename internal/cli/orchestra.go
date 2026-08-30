@@ -43,10 +43,6 @@ func newOrchestraCmd() *cobra.Command {
 }
 
 // newOrchestraReviewCmd and newOrchestraSecureCmd live in orchestra_file_cmds.go.
-
-// runOrchestraCommand resolves config and runs the orchestration.
-// It loads autopus.yaml first, resolves strategy and providers via config,
-// and falls back to buildProviderConfigs when config is unavailable.
 // @AX:ANCHOR: [AUTO] fan_in=4 CLI callers — shared strategy, provider, and judge-resolution boundary
 // @AX:REASON: [AUTO] four production command routes depend on this shared resolution and execution contract
 // @AX:WARN: [AUTO] high-branch orchestration path — provider, judge precedence, detach, output, and degraded states converge here
@@ -64,13 +60,11 @@ func runOrchestraCommand(
 	flags OrchestraFlags,
 ) error {
 	flagJudge := strings.TrimSpace(judge)
-	// @AX:NOTE [AUTO] REQ-11 opportunistic GC — fires on every orchestra invocation; 1h TTL
 	_, _ = orchestra.CleanupStaleJobs(os.TempDir(), 1*time.Hour)
 	if err := validateOrchestraOutputFormat(flags.OutputFormat); err != nil {
 		return err
 	}
 
-	// Attempt to load config; fall back to hardcoded defaults on failure.
 	runtimeFlags := globalFlagsFromContext(ctx)
 	harnessCfg, configErr := loadHarnessConfigForFlags(runtimeFlags)
 
@@ -82,7 +76,6 @@ func runOrchestraCommand(
 	)
 
 	if configErr != nil || harnessCfg == nil {
-		// Config load failed: use CLI flags directly or hardcoded defaults
 		strategyStr = flagStrategy
 		if strategyStr == "" {
 			strategyStr = "consensus"
@@ -94,13 +87,18 @@ func runOrchestraCommand(
 		providers = buildProviderConfigsForRuntime(names, runtimeFlags.Quality, runtimeFlags.Effort)
 	} else {
 		orchConf = &harnessCfg.Orchestra
-		// Config loaded: resolve strategy, providers, and judge with priority
 		strategyStr = resolveStrategy(orchConf, commandName, flagStrategy)
 		providers = resolveProviders(orchConf, commandName, flagProviders)
-		// Resolve judge from config when not explicitly set via CLI flag
 		if judge == "" {
 			judge = resolveJudge(orchConf, commandName, "")
 		}
+	}
+	if commandName == "plan" {
+		projected, planErr := applyPlanReadOnlyProviderPolicy(providers)
+		if planErr != nil {
+			return planErr
+		}
+		providers = projected
 	}
 	providers = resolveCodexProviderCapabilities(ctx, providers)
 	initialProviderNames := providerConfigNames(providers)
@@ -124,8 +122,12 @@ func runOrchestraCommand(
 	}
 	providers, riskTierSingleProvider := applyReviewProviderPolicy(
 		providers, commandName, flags.RiskTier, flags.RiskInputs, flags.ProvidersExplicit, os.Stderr)
+	if commandName == "plan" {
+		if providers, err = applyPlanReadOnlyProviderPolicy(providers); err != nil {
+			return err
+		}
+	}
 
-	// Validate --rounds: must be 1-10 and only with debate strategy
 	if rounds > 0 && s != orchestra.StrategyDebate {
 		return fmt.Errorf("--rounds는 debate 전략에서만 사용할 수 있습니다")
 	}
@@ -174,12 +176,10 @@ func runOrchestraCommand(
 	timeout = resolvedTimeout.Seconds
 	providers = applyResolvedProviderTimeouts(providers, resolvedTimeout)
 	term := runOrchestraTerminalDetector()
-	// Auto-enable interactive pane mode for cmux/tmux terminals (SPEC-ORCH-006)
 	interactive := term != nil && term.Name() != "plain"
 	monitorRuntime := resolveCC21MonitorRuntime(term, harnessCfg)
 	workingDir, _ := os.Getwd()
 
-	// Hook mode requires `auto init` to install hooks first (SPEC-ORCH-007 R5/R6).
 	sessionID := ""
 	if interactive && monitorRuntime.HookMode {
 		sessionID = orchestra.NewSessionID()
@@ -224,7 +224,6 @@ func runOrchestraCommand(
 	fmt.Fprintf(os.Stderr, "전략: %s, 프로바이더: %s, 백엔드: %s (terminal=%s, hook=%t)\n",
 		strategyStr, strings.Join(providerNames, ", "), orchestra.SelectBackend(cfg).Name(), termName, cfg.HookMode)
 
-	// @AX:NOTE [AUTO] REQ-1 auto-detach branch — returns job ID to stdout, status to stderr; skips RunOrchestra
 	if orchestra.ShouldDetach(termName, isStdoutTTY(), cfg.NoDetach) {
 		jobID, err := orchestra.RunPaneOrchestraDetached(ctx, cfg)
 		if err != nil {
@@ -240,7 +239,7 @@ func runOrchestraCommand(
 		err = synthesizeOrchestraFailureError(result)
 	}
 	if err != nil {
-		if result != nil {
+		if result != nil && !flags.NoPersist {
 			reportPath, reportErr := saveOrchestraFailureReport(commandName, strategyStr, providerNames, resolvedTimeout, result, err)
 			if reportErr != nil {
 				fmt.Fprintf(os.Stderr, "실패 보고서 저장 실패: %v\n", reportErr)
@@ -251,12 +250,14 @@ func runOrchestraCommand(
 	}
 
 	if flags.OutputFormat == orchestraOutputJSON {
-		resultPath, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, resolvedTimeout, result)
-		if saveErr != nil {
-			return fmt.Errorf("save orchestra result: %w", saveErr)
+		if !flags.NoPersist {
+			resultPath, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, resolvedTimeout, result)
+			if saveErr != nil {
+				return fmt.Errorf("save orchestra result: %w", saveErr)
+			}
+			fmt.Fprintf(os.Stderr, "결과 저장: %s\n", resultPath)
+			fmt.Fprintf(os.Stderr, "Receipt: %s.receipt.json\n", resultPath)
 		}
-		fmt.Fprintf(os.Stderr, "결과 저장: %s\n", resultPath)
-		fmt.Fprintf(os.Stderr, "Receipt: %s.receipt.json\n", resultPath)
 		if writeErr := writeOrchestraCLIOutput(os.Stdout, result, orchestraOutputJSON); writeErr != nil {
 			return fmt.Errorf("write JSON output: %w", writeErr)
 		}
@@ -269,21 +270,25 @@ func runOrchestraCommand(
 	}
 	if !structured {
 		fmt.Printf("%s\n", result.Merged)
-		if path, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, resolvedTimeout, result); saveErr == nil {
-			fmt.Fprintf(os.Stderr, "결과 저장: %s\n", path)
-			if result.RunReceipt != nil {
-				fmt.Fprintf(os.Stderr, "Receipt: %s.receipt.json\n", path)
+		if !flags.NoPersist {
+			if path, saveErr := saveOrchestraResult(commandName, strategyStr, providerNames, resolvedTimeout, result); saveErr == nil {
+				fmt.Fprintf(os.Stderr, "결과 저장: %s\n", path)
+				if result.RunReceipt != nil {
+					fmt.Fprintf(os.Stderr, "Receipt: %s.receipt.json\n", path)
+				}
 			}
 		}
 	}
 	if resultIsDegraded(result) {
-		reportPath, reportErr := saveOrchestraDegradedReport(commandName, strategyStr, providerNames, resolvedTimeout, result)
-		if reportErr != nil {
-			fmt.Fprintf(os.Stderr, "진단 보고서 저장 실패: %v\n", reportErr)
-		} else {
-			fmt.Fprintf(os.Stderr, "진단 저장: %s\n", reportPath)
+		if !flags.NoPersist {
+			reportPath, reportErr := saveOrchestraDegradedReport(commandName, strategyStr, providerNames, resolvedTimeout, result)
+			if reportErr != nil {
+				fmt.Fprintf(os.Stderr, "진단 보고서 저장 실패: %v\n", reportErr)
+			} else {
+				fmt.Fprintf(os.Stderr, "진단 저장: %s\n", reportPath)
+			}
+			fmt.Fprint(os.Stderr, renderOrchestraFailureSummary(resolvedTimeout, result, reportPath))
 		}
-		fmt.Fprint(os.Stderr, renderOrchestraFailureSummary(resolvedTimeout, result, reportPath))
 		fmt.Fprintf(os.Stderr, "상태: degraded\n")
 	}
 	if result.Reliability != nil && result.Reliability.ArtifactDir != "" {

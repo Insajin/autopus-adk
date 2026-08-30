@@ -104,6 +104,54 @@ func TestRunOrchestraCommand_AppliesRuntimeCodexQualityAndEffort(t *testing.T) {
 	require.Len(t, captured.Providers, 1)
 	assertCodexProfileInArgs(t, captured.Providers[0].Args, config.CodexSolModel, config.CodexEffortMax)
 	assertCodexProfileInArgs(t, captured.Providers[0].PaneArgs, config.CodexSolModel, config.CodexEffortMax)
+	assert.Contains(t, captured.Providers[0].Args, "read-only")
+	assert.Contains(t, captured.Providers[0].PaneArgs, "read-only")
+	assert.NotContains(t, captured.Providers[0].Args, "workspace-write")
+	assert.NotContains(t, captured.Providers[0].PaneArgs, "workspace-write")
+	for _, flag := range []string{"--ephemeral", "--ignore-user-config", "--ignore-rules"} {
+		assert.Contains(t, captured.Providers[0].Args, flag)
+		assert.Contains(t, captured.Providers[0].PaneArgs, flag)
+	}
+}
+
+func TestRunOrchestraCommand_PlanRejectsNoncanonicalCodexBeforeCatalogProbe(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.DefaultFullConfig("plan-binary-identity")
+	cfg.Platforms = []string{"codex"}
+	provider := managedCodexProviderForTest(cfg.Quality)
+	provider.Binary = "/tmp/malicious-codex"
+	cfg.Orchestra.Providers = map[string]config.ProviderEntry{"codex": provider}
+	cfg.Orchestra.Commands["plan"] = config.CommandEntry{Strategy: "consensus", Providers: []string{"codex"}}
+	require.NoError(t, config.Save(dir, cfg))
+
+	originalWD, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Chdir(originalWD) })
+	require.NoError(t, os.Chdir(dir))
+
+	originalProbe := runtimeCodexCatalogProbe
+	originalRun := runOrchestraExecute
+	t.Cleanup(func() {
+		runtimeCodexCatalogProbe = originalProbe
+		runOrchestraExecute = originalRun
+	})
+	probed := false
+	executed := false
+	runtimeCodexCatalogProbe = func(context.Context, string) ([]byte, error) {
+		probed = true
+		return nil, nil
+	}
+	runOrchestraExecute = func(context.Context, orchestra.OrchestraConfig) (*orchestra.OrchestraResult, error) {
+		executed = true
+		return &orchestra.OrchestraResult{Merged: "unexpected"}, nil
+	}
+
+	err = runOrchestraCommand(context.Background(), "plan", "", []string{"codex"}, 30, "", "topic", 0, 0, OrchestraFlags{NoDetach: true})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `requires native binary "codex"`)
+	assert.False(t, probed, "catalog probe must not execute an untrusted provider binary")
+	assert.False(t, executed, "provider execution must remain unreachable")
 }
 
 func installRuntimeCodexCatalogFixture(t *testing.T) {

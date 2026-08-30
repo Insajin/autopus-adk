@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"path/filepath"
@@ -31,6 +32,22 @@ func (runner ompOperatorExecRunner) Run(
 		return nil, runner.pinErr
 	}
 	return runner.process.Run(ctx, args...)
+}
+
+func (runner ompOperatorExecRunner) RunWithInput(
+	ctx context.Context,
+	executable string,
+	input []byte,
+	args ...string,
+) ([]byte, error) {
+	if executable != "omp" || !bytes.Equal(input, []byte(`{"id":"autopus-model-state","type":"get_state"}`+"\n")) ||
+		!omp.SafeOMPModelRoleRPCArgs(args) {
+		return nil, errors.New("unsafe OMP operator role command")
+	}
+	if runner.pinErr != nil {
+		return nil, runner.pinErr
+	}
+	return runner.process.RunInput(ctx, input, args...)
 }
 
 func safeOMPOperatorProbeArgs(args []string) bool {
