@@ -114,6 +114,7 @@ func produceUncachedGoReleaserFixtureEvidence(
 		"ADK_KEY_ROTATION_DOCUMENT_PATH="+rotationDocumentPath,
 		"ADK_KEY_ROTATION_SIGNATURE_PATH="+rotationSignaturePath,
 		"OMP_CONTEXT_CANDIDATE_ARTIFACT_SHA256="+strings.Repeat("0", 64),
+		"OMP_CONTEXT_STATIC_POLICY_B64=e30",
 		"OMP_CONTEXT_RELEASE_CANARY_ROOT="+filepath.Join(credentialRoot, "omp-release-canary-root"),
 		"OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="+filepath.Join(credentialRoot, "omp-release-canary-root", "omp-darwin-arm64"),
 		"COMPANION_BUILD_PROVENANCE=github-actions:Insajin/autopus-adk@"+commit,
