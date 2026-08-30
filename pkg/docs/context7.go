@@ -13,6 +13,8 @@ import (
 
 const defaultContext7BaseURL = "https://context7.com/api/v1"
 
+var context7TransportTemplate = http.DefaultTransport.(*http.Transport).Clone()
+
 // Context7Client fetches documentation from the Context7 API.
 type Context7Client struct {
 	baseURL string
@@ -25,9 +27,10 @@ func NewContext7Client(baseURL string) *Context7Client {
 	if baseURL == "" {
 		baseURL = defaultContext7BaseURL
 	}
+	transport := context7TransportTemplate.Clone()
 	return &Context7Client{
 		baseURL: baseURL,
-		http:    &http.Client{Timeout: 30 * time.Second},
+		http:    &http.Client{Transport: transport, Timeout: 30 * time.Second},
 	}
 }
 

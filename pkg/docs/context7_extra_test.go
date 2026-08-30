@@ -98,3 +98,15 @@ func TestContext7Client_NewContext7Client_DefaultURL(t *testing.T) {
 	client := NewContext7Client("")
 	assert.NotNil(t, client)
 }
+
+func TestNewContext7Client_OwnsIndependentTransport(t *testing.T) {
+	t.Parallel()
+
+	first := NewContext7Client("http://example.test")
+	second := NewContext7Client("http://example.test")
+
+	require.NotNil(t, first.http.Transport)
+	require.NotNil(t, second.http.Transport)
+	assert.NotSame(t, http.DefaultTransport, first.http.Transport)
+	assert.NotSame(t, first.http.Transport, second.http.Transport)
+}
