@@ -222,5 +222,8 @@ func ompWorkflowForbiddenTokens() []string {
 		"TeamCreate", "TeamDelete", "SendMessage", "ToolSearch",
 		"AskUserQuestion", "request_user_input",
 		`isolation: "worktree"`, `isolation = "worktree"`, "auto pipeline worktree",
+		"send_message", "followup_task", "interrupt_agent", "list_agents",
+		"get_goal", "create_goal", "update_goal", "Multi-Agent V2",
+		".omp/skills/agent-teams",
 	}
 }

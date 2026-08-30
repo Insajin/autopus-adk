@@ -83,6 +83,7 @@ func (a *Adapter) renderTemplateWorkflowSkill(spec workflowSpec, cfg *config.Har
 	}
 	body = normalizeOMPWorkflowBody(body)
 	body = injectOMPExecutionOwnerControl(body, spec.Name)
+	body = injectOMPTeamMultiControl(body, spec.Name)
 	body = injectOMPInvocation(body, spec.Name)
 	return buildMarkdown(ompSkillFrontmatter(spec.Name, normalizeOMPDescription(spec.Description)), body), nil
 }

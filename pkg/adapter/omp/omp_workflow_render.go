@@ -51,9 +51,37 @@ func normalizeOMPWorkflowBody(body string) string {
 		"@auto-", "/auto-",
 	).Replace(body)
 	body = pkgcontent.ReplacePlatformReferences(body, "omp")
+	body = normalizeOMPTeamMultiContract(body)
 	body = normalizeOMPExecutionOwnerContract(body)
 	body = dedupeOMPReference(body, ".omp/skills/agent-pipeline/SKILL.md")
 	return strings.TrimSpace(body)
+}
+
+func normalizeOMPTeamMultiContract(body string) string {
+	body = strings.ReplaceAll(
+		body,
+		"- `--team`은 OMP Multi-Agent V2 팀 프로파일입니다. 모든 worker는 같은 shared cwd/filesystem을 사용하며 병렬 writer는 disjoint write ownership을 가져야 합니다. 메인 세션은 `task` batch, `send_message`, `followup_task`, target-less `hub with {\"i\":\"Waiting for blocked work\",\"op\":\"wait\",\"ids\":[\"<job id>\"]}`, `interrupt_agent`, `list_agents`만 사용합니다.",
+		"- `--team` uses the OMP Team and Provider Axes contract plus the pipeline reference above; Lead/Builder/Guardian share cwd/filesystem, write only disjoint paths, dispatch through `task`, coordinate through `hub`, and leave parent progress to `todo`.",
+	)
+	body = strings.ReplaceAll(
+		body,
+		"- `/goal` active state가 있으면 `get_goal`로 목표를 확인하고 worker 프롬프트와 최종 `goal_status`에 반영합니다. 새 goal이 필요하면 `/auto goal \"<objective>\" [--budget N]`을 사용하고, `create_goal`/`update_goal`은 사용자가 명시했거나 goal tool contract가 충족될 때만 사용합니다.",
+		"- Use only a runtime-exposed OMP goal surface. If none is available, do not claim or create persisted goal state; `/auto goal` remains the explicit route.",
+	)
+	return strings.NewReplacer(
+		"OMP Multi-Agent V2", "OMP native task-batch",
+		".omp/skills/agent-teams/SKILL.md", ".omp/skills/agent-pipeline/SKILL.md",
+		"`--team` → OMP team profile", "`--team` → owner `omp` native task-batch team profile",
+		"spawn_agent", "task",
+		"send_message", "hub send",
+		"followup_task", "hub send",
+		"wait_agent()", "hub wait",
+		"interrupt_agent", "hub cancel",
+		"list_agents", "hub list",
+		"get_goal", "runtime-exposed goal state",
+		"create_goal", "/auto goal",
+		"update_goal", "/auto goal",
+	).Replace(body)
 }
 
 func dedupeOMPReference(body, ref string) string {
@@ -98,6 +126,23 @@ func injectOMPExecutionOwnerControl(body, name string) string {
 		"- Owner `omp`: the current OMP session is the sole DAG owner, uses native `task`, `hub`, and `todo`, and must not create an Orca Run.",
 		"- Owner `orca`: do not initialize an OMP task/todo DAG or call `task`. Run and read `orca skills get orchestration --full`, then use its supervised durable cross-worktree Run contract.",
 		"- At `auto pipeline run SPEC-ID --platform omp --execution-owner orca`, the tier integrity gate runs and the receipt is persisted before any Run, worker, or provider session exists, and the pipeline then executes its phases on supervised Orca workers. Never retry a failure as owner `omp`.",
+	}, "\n")
+	return injectOMPAfterHeading(body, block)
+}
+
+func injectOMPTeamMultiControl(body, name string) string {
+	if name != "auto-go" {
+		return body
+	}
+	block := strings.Join([]string{
+		"## OMP Team and Provider Axes",
+		"",
+		"- `--team` selects owner `omp` native `task` batch with explicit Lead/Builder/Guardian responsibilities.",
+		"- `--multi` selects provider-diverse planning and review, not team execution topology.",
+		"- `--team --multi` composes team execution with provider-diverse planning and review.",
+		"- without `--team` or `--solo`, owner `omp` uses the default native `task` batch pipeline.",
+		"- `--team` conflicts with `--solo` and owner `orca`.",
+		"- Lead, Builder, and Guardian coordinate only through native `task`, `hub`, and `todo`; the main OMP session owns the checklist and DAG.",
 	}, "\n")
 	return injectOMPAfterHeading(body, block)
 }

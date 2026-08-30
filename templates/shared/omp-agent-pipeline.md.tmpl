@@ -15,6 +15,15 @@ Autopus owns phase and quality policy; exactly one selected owner owns the task 
 | `--team` | owner `omp` task batch with explicit Lead/Builder/Guardian responsibilities |
 | `--multi` | selected owner's normal gates plus risk-tiered provider dissent review |
 
+The team and provider axes are orthogonal:
+
+- `--team` selects owner `omp` native `task` batch with explicit Lead/Builder/Guardian responsibilities.
+- `--multi` selects provider-diverse planning and review, not team execution topology.
+- `--team --multi` composes team execution with provider-diverse planning and review.
+- without `--team` or `--solo`, owner `omp` uses the default native `task` batch pipeline.
+- `--team` conflicts with `--solo` and owner `orca`.
+- Lead, Builder, and Guardian coordinate only through native `task`, `hub`, and `todo`; the main OMP session owns the checklist and DAG.
+
 Parse the owner exactly once before any `task`, DAG-owning `todo`, OMP subprocess, or Orca
 Run effect. Reject repeated, mixed, case-shifted, whitespace-padded, and aliased values; never
 fuzzy-correct or silently fall back. Omission alone selects `omp`. `--solo` and `--team` are

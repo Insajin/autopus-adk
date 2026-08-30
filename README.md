@@ -448,7 +448,7 @@ Terminal-aware: automatically selects `cmux browser` (in cmux) or `agent-browser
 
 ### 📺 Live Agent Dashboard
 
-In `--team` mode, each team member gets its own terminal pane with real-time log streaming.
+On pane-capable team runtimes, each team member can get a terminal pane with real-time log streaming.
 
 ```
 ┌─ lead ──────────┬─ builder-1 ───────┐
@@ -1111,11 +1111,13 @@ flowchart LR
 
 | Flag | Mode | Description |
 |------|------|-------------|
-| *(default)* | Subagent pipeline | Main session orchestrates Agent() calls |
-| `--team` | Agent Teams | Lead / Builder / Guardian role-based teams |
+| *(default)* | Subagent pipeline | Main session orchestrates the platform-native subagent surface |
+| `--team` | Team topology | Platform-native Lead / Builder / Guardian responsibility profile |
 | `--solo` | Single session | No subagents, direct TDD |
 | `--auto --loop` | Full autonomy | RALF self-healing, no human gates |
-| `--multi` | Multi-provider | Debate/consensus review with multiple models |
+| `--multi` | Provider diversity | Provider-diverse planning/review; not execution topology |
+
+OMP keeps these axes separate: `--team` selects the owner-`omp` native `task`/`hub`/`todo` topology, while `--multi` adds provider-diverse planning and review. `--team --multi` composes both.
 
 ---
 
