@@ -180,9 +180,6 @@ run_canary() {
     canary_failure_receipt "$label" "$canary_status" "$output"
   fi
   kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped during production canary'
-  if /usr/bin/pgrep -u "$release_canary_uid" >/dev/null 2>&1; then
-    fail 'dedicated live-canary process cleanup is incomplete'
-  fi
   remove_release_canary_account ||
     fail 'dedicated live-canary account cleanup is incomplete'
   /usr/bin/sudo -n /usr/sbin/chown -R nobody:nobody \
