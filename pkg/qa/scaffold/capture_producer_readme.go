@@ -126,6 +126,15 @@ func captureReadmeExploreSubset() []string {
 		"`unenforceable_forbidden_actions` in the `gui-policy-runtime` check evidence, so",
 		"the pack never claims a guarantee the harness does not provide.",
 		"",
+		"`gui.network_policy.mode` is enforced by the guard, not just validated:",
+		"`summary-only` observes without stopping anything, `local-only` aborts every",
+		"request whose origin is outside `allowed_origins`, and `blocked` also aborts",
+		"xhr/fetch to an allowed origin so the UI renders from static assets with no",
+		"data traffic. Aborted requests appear as `network_stopped` in the",
+		"`gui-policy-runtime` check and never fail the journey — the declared policy",
+		"working is not a violation of it. Pick `summary-only` if your specs need",
+		"third-party assets such as hosted fonts.",
+		"",
 	}
 }
 

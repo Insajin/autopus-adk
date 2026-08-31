@@ -71,7 +71,12 @@ capture:
 	assert.Contains(t, err.Error(), "may not publish raw screenshots, traces, or videos")
 }
 
-func TestGUICapturePolicy_RejectsBlockedNetworkWithNetworkStream(t *testing.T) {
+// TestGUICapturePolicy_AllowsBlockedNetworkWithNetworkStream inverts an earlier
+// rule. While `blocked` was a label with no runtime effect, pairing it with the
+// network stream looked contradictory. Now the mode actually aborts xhr/fetch, so
+// the network evidence is the list of requests the policy stopped — which is
+// exactly what proves the UI's empty and error states.
+func TestGUICapturePolicy_AllowsBlockedNetworkWithNetworkStream(t *testing.T) {
 	t.Parallel()
 
 	pack := loadGUICapturePack(t, `
@@ -80,9 +85,7 @@ capture:
   streams: [network]
 `)
 	pack.GUI.NetworkPolicy.Mode = "blocked"
-	err := Validate(pack, t.TempDir())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "contradicts gui.network_policy.mode blocked")
+	require.NoError(t, Validate(pack, t.TempDir()))
 }
 
 // TestGUICapturePolicy_RejectedOnNonGUIAdapter prevents a pack from promising

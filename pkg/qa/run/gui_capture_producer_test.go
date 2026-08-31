@@ -21,6 +21,12 @@ func captureProducerScript(mode string) string {
 		script = strings.Replace(script, `"url_ref": "/api/cart"`, `"url_ref": "origin:7/api/cart"`, 1)
 	case "drop-trace":
 		script = strings.Replace(script, "DROP_TRACE=0", "DROP_TRACE=1", 1)
+	case "stopped-request":
+		// The real guard writes this line when its route policy aborts a request.
+		script = strings.Replace(script,
+			`printf '{"t":"goto","origin":"http://127.0.0.1:4173","allowed":true}\n' >> "$AUTOPUS_QAMESH_GUI_GUARD_RECEIPT_PATH"`,
+			`printf '{"t":"goto","origin":"http://127.0.0.1:4173","allowed":true}\n{"t":"request","origin":"http://cdn.example","resource_type":"script","blocked":true,"reason":"off_origin"}\n' >> "$AUTOPUS_QAMESH_GUI_GUARD_RECEIPT_PATH"`,
+			1)
 	}
 	return script
 }

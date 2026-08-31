@@ -138,6 +138,11 @@ gui:
     - mutation
   selector_strategy: role-first
   network_policy:
+    # summary-only observes without stopping anything. local-only aborts every
+    # request whose origin is outside allowed_origins. blocked does that and also
+    # aborts xhr/fetch to an allowed origin, so the UI renders from static assets
+    # with no data traffic. Aborted requests are reported as network_stopped in
+    # the gui-policy-runtime check, and do not fail the journey.
     mode: local-only
   artifact_retention:
     publish_raw: false

@@ -22,23 +22,28 @@ const maxGuardReceiptBytes = 8 << 20
 type guardReceipt struct {
 	Navigations    int
 	Actions        int
+	Requests       int
 	OffOrigin      []string
 	BlockedActions []string
+	// BlockedRequests names requests the route policy aborted. These are the
+	// policy working, not a violation, so they are reported and never blocking.
+	BlockedRequests []string
 }
 
 // Enforced reports whether the guard demonstrably intercepted the journey.
-// Interception, not self-assertion, is the proof: a producer cannot forge it
-// because only the preload writes this file.
 func (r guardReceipt) Enforced() bool {
-	return r.Navigations > 0 || r.Actions > 0 || len(r.OffOrigin) > 0 || len(r.BlockedActions) > 0
+	return r.Navigations > 0 || r.Actions > 0 || r.Requests > 0 ||
+		len(r.OffOrigin) > 0 || len(r.BlockedActions) > 0 || len(r.BlockedRequests) > 0
 }
 
 type guardEvent struct {
-	T       string `json:"t"`
-	Origin  string `json:"origin"`
-	Allowed *bool  `json:"allowed"`
-	Method  string `json:"method"`
-	Blocked *bool  `json:"blocked"`
+	T            string `json:"t"`
+	Origin       string `json:"origin"`
+	Allowed      *bool  `json:"allowed"`
+	Method       string `json:"method"`
+	Blocked      *bool  `json:"blocked"`
+	ResourceType string `json:"resource_type"`
+	Reason       string `json:"reason"`
 }
 
 func readGuardReceipt(path string) (guardReceipt, error) {
@@ -55,6 +60,7 @@ func readGuardReceipt(path string) (guardReceipt, error) {
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	offOrigin := map[string]bool{}
 	blocked := map[string]bool{}
+	requests := map[string]bool{}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -65,14 +71,15 @@ func readGuardReceipt(path string) (guardReceipt, error) {
 			continue
 
 		}
-		applyGuardEvent(&receipt, event, offOrigin, blocked)
+		applyGuardEvent(&receipt, event, offOrigin, blocked, requests)
 	}
 	receipt.OffOrigin = sortedKeys(offOrigin)
 	receipt.BlockedActions = sortedKeys(blocked)
+	receipt.BlockedRequests = sortedKeys(requests)
 	return receipt, nil
 }
 
-func applyGuardEvent(receipt *guardReceipt, event guardEvent, offOrigin, blocked map[string]bool) {
+func applyGuardEvent(receipt *guardReceipt, event guardEvent, offOrigin, blocked, requests map[string]bool) {
 	switch event.T {
 	case "goto":
 		receipt.Navigations++
@@ -83,6 +90,11 @@ func applyGuardEvent(receipt *guardReceipt, event guardEvent, offOrigin, blocked
 		receipt.Actions++
 		if event.Blocked != nil && *event.Blocked {
 			blocked["forbidden_action:"+event.Method] = true
+		}
+	case "request":
+		receipt.Requests++
+		if event.Blocked != nil && *event.Blocked {
+			requests[event.Reason+":"+orUnknownOrigin(event.Origin)] = true
 		}
 	}
 }
@@ -119,6 +131,9 @@ func evaluateCapturePolicyEvidence(pack journey.Pack, result *commandResult) gui
 	eval.confirmed = receipt.Enforced()
 	eval.blockedAttempts = append(eval.blockedAttempts, receipt.OffOrigin...)
 	eval.blockedAttempts = append(eval.blockedAttempts, receipt.BlockedActions...)
+	// Route-stopped requests are the declared policy working, not a violation, so
+	// they are reported alongside the verdict instead of blocking the journey.
+	eval.networkStopped = receipt.BlockedRequests
 	index, err := loadCaptureIndexOnce(result)
 	if err != nil {
 		eval.missingEvidence = append(eval.missingEvidence, "capture_index: "+err.Error())

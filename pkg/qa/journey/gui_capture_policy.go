@@ -1,8 +1,6 @@
 package journey
 
 import (
-	"strings"
-
 	"github.com/insajin/autopus-adk/pkg/qa/capture"
 )
 
@@ -24,13 +22,10 @@ func validateGUICapturePolicy(pack Pack) error {
 	if err := capture.ValidatePolicy(policy); err != nil {
 		return validationError("qa_journey_gui_capture_invalid", err.Error())
 	}
-	if !policy.Enabled() {
-		return nil
-	}
-	// publish_raw is already rejected categorically by validateGUIPolicy, so no
-	// capture-level combination check is reachable here.
-	if policy.HasStream(capture.StreamNetwork) && strings.TrimSpace(pack.GUI.NetworkPolicy.Mode) == "blocked" {
-		return validationError("qa_journey_gui_capture_invalid", "gui.capture network stream contradicts gui.network_policy.mode blocked")
-	}
+	// No capture/network combination is contradictory anymore. publish_raw is
+	// rejected categorically by validateGUIPolicy, and `network_policy.mode:
+	// blocked` now actually aborts xhr/fetch, which makes the network stream more
+	// valuable rather than contradictory: the evidence is the list of requests the
+	// policy stopped, which is what proves the UI's empty and error states.
 	return nil
 }

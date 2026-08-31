@@ -65,6 +65,53 @@ function blockAction(method) {
   }
   recordEvent({ t: "action", method: String(method).toLowerCase(), blocked: false });
 }
+// networkMode decides whether requests are merely observed or actually stopped.
+// The three modes were validated enum labels with identical runtime behavior, so
+// a pack could declare local-only and still reach any origin.
+//   summary-only: no interception; requests are observed by the producer only.
+//   local-only:   abort every request whose origin is outside allowed_origins.
+//   blocked:      local-only, plus abort xhr/fetch even to an allowed origin, so
+//                 the UI renders from static assets with no data traffic.
+const networkMode = String((policy.network_policy && policy.network_policy.mode) || "").trim().toLowerCase();
+function isNetworkScheme(value) {
+  try {
+    const protocol = new URL(String(value)).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+function networkRouteHandler(route) {
+  let request;
+  try {
+    request = route.request();
+  } catch (_) {
+    return route.continue().catch(() => {});
+  }
+  const url = request.url();
+  // data:, blob:, and file: never leave the machine, so policy does not apply.
+  if (!isNetworkScheme(url)) return route.continue().catch(() => {});
+  const origin = originOfTarget(url);
+  const resourceType = String(request.resourceType() || "");
+  if (!allowedOrigins.has(origin)) {
+    recordEvent({ t: "request", origin: origin, resource_type: resourceType, blocked: true, reason: "off_origin" });
+    return route.abort("blockedbyclient").catch(() => {});
+  }
+  if (networkMode === "blocked" && (resourceType === "xhr" || resourceType === "fetch")) {
+    recordEvent({ t: "request", origin: origin, resource_type: resourceType, blocked: true, reason: "data_traffic_blocked" });
+    return route.abort("blockedbyclient").catch(() => {});
+  }
+  recordEvent({ t: "request", origin: origin, resource_type: resourceType, blocked: false });
+  return route.continue().catch(() => {});
+}
+function installNetworkPolicy(page) {
+  if (networkMode === "" || networkMode === "summary-only") return Promise.resolve();
+  try {
+    return page.route("**/*", networkRouteHandler).catch(() => {});
+  } catch (_) {
+    return Promise.resolve();
+  }
+}
 function patchMethod(target, name, wrapper) {
   if (!target || typeof target[name] !== "function") return;
   const original = target[name];
@@ -84,8 +131,12 @@ function patchLocator(locator) {
 function patchPage(page) {
   if (!page || page.__autopusQameshGuarded) return page;
   Object.defineProperty(page, "__autopusQameshGuarded", { value: true, configurable: true });
-  patchMethod(page, "goto", (original) => function(target, ...rest) {
+  // Route registration is async while patchPage is not, so goto awaits it. Without
+  // that barrier the first navigation can outrun the interception it declared.
+  const networkReady = installNetworkPolicy(page);
+  patchMethod(page, "goto", (original) => async function(target, ...rest) {
     ensureURLAllowed(target);
+    await networkReady;
     return original.call(this, target, ...rest);
   });
   patchMethod(page, "locator", (original) => function(...args) {

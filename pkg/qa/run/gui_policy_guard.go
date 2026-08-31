@@ -23,6 +23,10 @@ type guiPolicyEvaluation struct {
 	// is reported, never blocking: an existing pack keeps running while the gap
 	// becomes visible in the check evidence.
 	unenforceable []string
+	// networkStopped names requests the route policy aborted. Reported, never
+	// blocking: an abort under local-only or blocked mode is the pack's declared
+	// intent, not a violation of it.
+	networkStopped []string
 }
 
 func applyGUIPolicyOracle(projectDir string, pack journey.Pack, result *commandResult) (IndexCheck, bool) {
@@ -168,6 +172,7 @@ func actualGUIRuntimePolicy(eval guiPolicyEvaluation) string {
 	parts = append(parts, "target_availability="+joinOrNone(eval.unavailable))
 	parts = append(parts, "blocked_attempts="+joinOrNone(eval.blockedAttempts))
 	parts = append(parts, "network_outside_allowed="+joinOrNone(eval.outsideRequests))
+	parts = append(parts, "network_stopped="+joinOrNone(eval.networkStopped))
 	parts = append(parts, "missing_screens="+joinOrNone(eval.missingScreens))
 	parts = append(parts, "missing_screen_actions="+joinOrNone(eval.missingActions))
 	parts = append(parts, "unenforceable_forbidden_actions="+joinOrNone(eval.unenforceable))
