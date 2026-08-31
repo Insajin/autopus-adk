@@ -23,6 +23,7 @@ jobs:
         shell: bash
         env:
           UPGRADE_CANARY_RECEIPT_DIR: ${{ runner.temp }}/upgrade-canary-live-receipt
+          UPGRADE_CANARY_GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           scripts/release-signing/tests/posix-upgrade-canary.sh live 0.50.109 0.50.111

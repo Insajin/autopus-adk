@@ -195,7 +195,7 @@ EOF
 }
 
 run_update_and_assertions() {
-    "$AUTO" update --dir "$PROJECT" --local --yes \
+    AUTOPUS_GITHUB_TOKEN=${UPGRADE_CANARY_GITHUB_TOKEN:-} "$AUTO" update --dir "$PROJECT" --local --yes \
         > "$RECEIPT_DIR/update.log" 2>&1 || {
             cat "$RECEIPT_DIR/update.log" >&2
             fail 'candidate update failed'

@@ -78,7 +78,9 @@ func TestUpgradeCanary_ManualExactPublicSignedA22ToA23(t *testing.T) {
 			t.Fatalf("upgrade canary retains variable version authority %q", forbidden)
 		}
 	}
-	if len(admission.Env) != 1 || admission.Env["UPGRADE_CANARY_RECEIPT_DIR"] == nil {
+	if len(admission.Env) != 2 ||
+		admission.Env["UPGRADE_CANARY_RECEIPT_DIR"] == nil ||
+		admission.Env["UPGRADE_CANARY_GITHUB_TOKEN"] != "${{ github.token }}" {
 		t.Fatalf("upgrade canary admission env = %#v", admission.Env)
 	}
 }
@@ -145,5 +147,11 @@ func TestUpgradeCanary_ModelsPublicV109WithoutManagedOMPConfig(t *testing.T) {
 	}
 	if strings.Contains(raw, `cat "$PROJECT/.omp/config.yml"`) {
 		t.Fatal("upgrade canary still reads the absent v0.50.109 OMP config")
+	}
+	if !strings.Contains(
+		raw,
+		`AUTOPUS_GITHUB_TOKEN=${UPGRADE_CANARY_GITHUB_TOKEN:-} "$AUTO" update`,
+	) {
+		t.Fatal("upgrade canary does not scope authenticated freshness lookup to candidate update")
 	}
 }
