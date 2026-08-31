@@ -124,31 +124,20 @@ canary_failure_receipt() {
 }
 
 cleanup_live_canary_uid() {
-  local attempt
-  local -r live_canary_uid=59999
-  [[ "${live_canary_started:-0}" -eq 1 ]] || return 0
-  if /usr/bin/pgrep -u "$live_canary_uid" >/dev/null 2>&1; then
-    /usr/bin/sudo -n /usr/bin/pkill -TERM -u "$live_canary_uid" || return 1
-    for attempt in 1 2 3 4 5; do
-      /bin/sleep 1
-      /usr/bin/pgrep -u "$live_canary_uid" >/dev/null 2>&1 || break
-    done
-  fi
-  if /usr/bin/pgrep -u "$live_canary_uid" >/dev/null 2>&1; then
-    /usr/bin/sudo -n /usr/bin/pkill -KILL -u "$live_canary_uid" || return 1
-    /bin/sleep 1
-  fi
-  /usr/bin/pgrep -u "$live_canary_uid" >/dev/null 2>&1 && return 1
+  [[ "${release_canary_account_created:-0}" -eq 1 ]] || {
+    [[ "${live_canary_started:-0}" -eq 0 ]]
+    return
+  }
+  terminate_release_canary_processes || return 1
   live_canary_started=0
 }
 
 run_canary() {
   local candidate=$1 project=$2 output=$3 label=$4
   local sandbox_args=() root isolated_project isolated_home isolated_tmp
-  local isolated_candidate isolated_omp isolated_uidrunner
-  local root_identity record candidate_sha isolated_candidate_sha uidrunner_sha isolated_uidrunner_sha
-  local canary_status started_at
-  local -r live_canary_uid=59999 live_canary_gid=20
+  local isolated_candidate isolated_omp isolated_uidrunner root_identity record
+  local candidate_sha isolated_candidate_sha uidrunner_sha isolated_uidrunner_sha
+  local canary_status started_at process_status
   root="/private/tmp/autopus-adk-release-prep-${dispatch_nonce}-final"
   [[ "$label" == 'final' &&
      "$root" =~ ^/private/tmp/autopus-adk-release-prep-[0-9a-f]{32}-final$ &&
@@ -160,12 +149,9 @@ run_canary() {
   isolated_project="$root/project"; isolated_home="$root/home"; isolated_tmp="$root/tmp"
   isolated_candidate="$root/auto"; isolated_omp="$root/omp-darwin-arm64"
   isolated_uidrunner="$root/uidrunner"
-  create_release_canary_account "$isolated_home"
-  /usr/bin/sudo -n /usr/bin/install -d -m 0700 \
-    -o "$live_canary_uid" -g "$live_canary_gid" \
+  /usr/bin/sudo -n /usr/bin/install -d -m 0700 -o root -g wheel \
     "$isolated_project" "$isolated_home" "$isolated_tmp"
   /usr/bin/sudo -n /bin/cp -R "$project/." "$isolated_project/"
-  /usr/bin/sudo -n /usr/sbin/chown -R "${live_canary_uid}:${live_canary_gid}" "$isolated_project"
   /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$candidate" "$isolated_candidate"
   /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$omp_executable" "$isolated_omp"
   /usr/bin/sudo -n /usr/bin/install -m 0555 -o root -g wheel "$uidrunner" "$isolated_uidrunner"
@@ -180,16 +166,28 @@ run_canary() {
   sandbox_args=(--omp "$isolated_omp")
   if [[ "$inherit_parent_sandbox" -eq 1 ]]; then sandbox_args+=(--inherit-parent-sandbox); fi
   kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped before production canary'
-  if /usr/bin/pgrep -u "$live_canary_uid" >/dev/null 2>&1; then
-    fail 'dedicated live-canary UID changed before launch'
-  fi
+  while :; do
+    select_release_canary_account "$isolated_home" ||
+      fail 'no safe one-shot live-canary UID is available'
+    /usr/bin/sudo -n /usr/sbin/chown -R "${release_canary_uid}:${release_canary_gid}" \
+      "$isolated_project" "$isolated_home" "$isolated_tmp"
+    verify_release_canary_account ||
+      fail 'one-shot live-canary account changed before launch'
+    if release_canary_uid_is_process_free "$release_canary_uid"; then break; else process_status=$?; fi
+    [[ "$process_status" -eq 1 ]] || fail 'inspect one-shot live-canary UID before launch'
+    discard_release_canary_account ||
+      fail 'discard one-shot live-canary UID that changed before launch'
+    /usr/bin/sudo -n /usr/sbin/chown -R root:wheel \
+      "$isolated_project" "$isolated_home" "$isolated_tmp"
+  done
   live_canary_started=1
   printf 'companion release prep: %s production canary started (40 sequential provider calls, 20 task pairs)\n' "$label" >&2
   started_at=$SECONDS
   if {
-    printf '%s\n' "${!credential_locator}"
+    printf '%s\n' "$provider_credential"
     /bin/cat "$input_jsonl"
-  } | /usr/bin/sudo -n "$isolated_uidrunner" /usr/bin/env -i PATH='/usr/bin:/bin:/usr/sbin:/sbin' \
+  } | /usr/bin/sudo -n "$isolated_uidrunner" "$release_canary_uid" "$release_canary_gid" \
+    /usr/bin/env -i PATH='/usr/bin:/bin:/usr/sbin:/sbin' \
     HOME="$isolated_home" TMPDIR="$isolated_tmp" LC_ALL=C /bin/sh -c '
       credential_locator=$1; project=$2; candidate=$3; shift 3
       IFS= read -r credential || exit 1
@@ -211,9 +209,9 @@ run_canary() {
   fi
   kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped during production canary'
   cleanup_live_canary_uid ||
-    fail 'dedicated live-canary UID cleanup is incomplete'
+    fail 'one-shot live-canary UID cleanup is incomplete'
   remove_release_canary_account ||
-    fail 'dedicated live-canary account cleanup is incomplete'
+    fail 'one-shot live-canary account cleanup is incomplete'
   /usr/bin/sudo -n /usr/sbin/chown -R nobody:nobody \
     "$isolated_project" "$isolated_home" "$isolated_tmp"
   OMP_CONTEXT_RELEASE_CANARY_ROOT="$root" OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$isolated_omp" \

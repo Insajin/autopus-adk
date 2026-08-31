@@ -15,18 +15,27 @@ lineage_archive="$script_dir/verify-public-key-lineage-archive.sh"
 temp=$(mktemp -d "${TMPDIR:-/tmp}/release-hardening-test.XXXXXX")
 trap 'rm -rf -- "$temp"' EXIT
 runtime_lib="$script_dir/prepare-release-runtime-lib.sh"
+user_lib="$script_dir/prepare-release-user-lib.sh"
 source "$runtime_lib"
 contains "$runtime_lib" 'sandbox_args=(--omp "$isolated_omp")'
 contains "$runtime_lib" '/bin/cat "$input_jsonl"'
-contains "$runtime_lib" 'live_canary_uid=59999'
 contains "$runtime_lib" 'isolated_uidrunner="$root/uidrunner"'
-contains "$runtime_lib" 'sudo -n "$isolated_uidrunner"'
+contains "$runtime_lib" 'select_release_canary_account "$isolated_home"'
+contains "$runtime_lib" 'verify_release_canary_account'
+contains "$runtime_lib" 'sudo -n "$isolated_uidrunner" "$release_canary_uid" "$release_canary_gid"'
 contains "$runtime_lib" 'cleanup_live_canary_uid'
-contains "$runtime_lib" 'pkill -TERM -u "$live_canary_uid"'
+contains "$user_lib" 'pkill -TERM -u "$release_canary_uid"'
 contains "$runtime_lib" 'chown -R nobody:nobody'
-contains "$runtime_lib" 'create_release_canary_account "$isolated_home"'
 contains "$runtime_lib" 'remove_release_canary_account'
 contains "$runtime_lib" '"${sandbox_args[@]}" | capture_canary_progress'
+contains "$user_lib" 'release_canary_next_attempt=$((attempt + 1))'
+contains "$user_lib" 'discard_release_canary_account'
+contains "$user_lib" 'release_canary_stabilize_seconds=15'
+! grep -Fq -- 'live_canary_uid=59999' "$runtime_lib" ||
+  fail "$runtime_lib retains the fixed canary UID"
+for file in "$runtime_lib" "$user_lib"; do
+  ! grep -Fq -- 'sudo -n -u' "$file" || fail "$file opens a sudo user session"
+done
 printf '%s\n' \
   '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"handshake"}' \
   '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"error","error_code":"network_transport","error_stage":"call","failed_sequence":17}' \

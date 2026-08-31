@@ -80,7 +80,7 @@ The attestation is signed with K3 only after the final observation. The report a
 Before touching a remote coordinate, require all of the following:
 
 1. CI and Security Scan are green for the exact source to be frozen.
-2. The operator is on Darwin arm64, authenticated to GitHub as user ID `204883817`, has repository administration access, and can run `sudo -n -u nobody /usr/bin/true` after local authentication. UID `59999` and `_autopus_v110_*` must be unassigned before prep. Tooling creates only a hidden, no-login DirectoryService identity record for UID resolution, never opens a PAM/login session, and uses a root-owned fixed-policy runner to drop directly to UID `59999`/GID `20`; after process and record removal it uses `nobody` only for the credential-free executable smoke.
+2. The operator is on Darwin arm64, authenticated to GitHub as user ID `204883817`, has repository administration access, and has a current noninteractive `sudo -n -v` authorization. The bounded UID range `50000..59999` may contain existing accounts or processes; prep deterministically derives up to 64 one-shot candidates from the dispatch nonce and skips every occupied candidate. Tooling does not use `sudo -u`, PAM, or a login session.
 3. The worktree is clean, `HEAD` equals `origin/main`, and the remote is `Insajin/autopus-adk`.
 4. Go is exactly 1.26.6. The supplied OMP executable is a regular executable file, reports `omp/17.2.7`, and matches the digest pinned by the exact source.
 5. The R2 and K3 private-key files are local regular non-symlink files owned by the operator with mode `0600`. Their secret bytes have not entered GitHub or shell history.
@@ -188,6 +188,10 @@ printf '%s\n' "$apply_receipt" | jq -e \
 ```
 
 Apply performs the fresh 20-pair/40-call observation, derives the canonical policy with the K3 key ID, builds the policy-bound candidate, signs and publicly reverifies fresh evidence, acquires the one-shot prep lock, snapshots both variable scopes and deployment policies, creates the exact zero-asset draft, and stages the reviewed coordinates.
+
+Before credential launch, apply copies the project and installs and hashes the candidate, OMP, and root-owned UID runner while the isolated tree is still root-owned. It then creates an exact nonce/attempt-marked hidden DirectoryService record with `/usr/bin/false`, GID `20`, and the first candidate UID that has neither an account nor a process. The record is held for a 15-second stabilization window. Any stale launchd process is terminated, the exact owned record is deleted, and selection advances within the same authenticated apply; an unowned record or UID is never deleted or killed. After ownership is changed, a final zero-process check is immediately followed by the UID runner, which validates the selected `50000..59999` UID, fixed GID `20`, and absolute executable before dropping privileges and receiving the credential through an anonymous pipe.
+
+After the 42-record observation, apply converges selected-UID processes to zero and deletes the exact marked record before changing the isolated tree to `nobody` for the credential-free executable smoke. Exit traps preserve this process-then-record ordering. If exact ownership cannot be proved, cleanup fails loudly rather than deleting an unowned DirectoryService record.
 
 Before the remote R2-signed annotated tag exists, the publisher owns its mutations and may use compare-and-swap rollback. A fresh transaction failure restores only values it still owns, removes only its own new deployment policy and draft, and releases only its own prep lock. A compare-and-swap conflict never authorizes overwriting another value.
 

@@ -41,11 +41,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ "$operation" == 'preflight' || "$operation" == 'apply' ]] || usage
+[[ "$credential_locator" =~ ^AUTOPUS_OMP_CONTEXT_PROVIDER_[A-Z0-9_]{1,96}$ ]] || fail 'credential locator is malformed'
+provider_credential=${!credential_locator-}
+[[ -n "$provider_credential" && "$provider_credential" != *$'\n'* ]] ||
+  fail 'provider credential is unavailable or not single-line'
+export -n provider_credential
+unset "$credential_locator"
+readonly provider_credential
 [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'arm64' ]] || fail 'release prep requires Darwin arm64'
 [[ "$endpoint" =~ ^http://127\.0\.0\.1:[1-9][0-9]{0,4}$ ]] || fail 'endpoint is not exact loopback HTTP'
-[[ "$credential_locator" =~ ^AUTOPUS_OMP_CONTEXT_PROVIDER_[A-Z0-9_]{1,96}$ ]] || fail 'credential locator is malformed'
-[[ -n "${!credential_locator-}" && "${!credential_locator}" != *$'\n'* ]] ||
-  fail 'provider credential is unavailable or not single-line'
 [[ "$provider" =~ ^[A-Za-z0-9_.-]+$ && "$model" =~ ^[A-Za-z0-9_.:/-]+$ ]] || fail 'provider or model is malformed'
 [[ "$model_context_window" =~ ^[0-9]+$ && "$model_context_window" -ge 8192 ]] || fail 'model context window is invalid'
 [[ "$oracle_policy_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || fail 'oracle policy digest is malformed'
@@ -54,12 +58,10 @@ for tool in awk cmp cp gh git go install jq mktemp sed shasum ssh-keygen sudo ta
 done
 readonly runner_uid=$(/usr/bin/id -u)
 readonly runner_gid=$(/usr/bin/id -g)
-readonly nobody_uid=$(/usr/bin/id -u nobody)
 readonly private_tmp_identity=$(/usr/bin/stat -f '%d:%i' /private/tmp)
 readonly operator_actor_id=204883817
 if [[ "$operation" == 'apply' ]]; then
-  [[ "$runner_uid" != "$nobody_uid" ]] || fail 'release operator and canary identities must differ'
-  /usr/bin/sudo -n -u nobody /usr/bin/true || fail 'passwordless nobody execution is unavailable'
+  /usr/bin/sudo -n -v || fail 'noninteractive root authorization is unavailable'
 fi
 [[ -f "$omp_executable" && ! -L "$omp_executable" && -x "$omp_executable" ]] || fail 'OMP executable is unsafe'
 omp_executable=$(cd -- "$(dirname -- "$omp_executable")" && pwd)/$(basename -- "$omp_executable")
@@ -112,7 +114,8 @@ promotion_signing_key=$staged_promotion_signing_key
 evidence_source_commit=''; retain_prep_lock=0; prep_lock_mode='fresh'; isolation_roots=()
 sudo_keepalive_pid=''; live_canary_started=0
 release_canary_user=''; release_canary_uid=''; release_canary_gid=''; release_canary_home=''
-release_canary_marker=''; release_canary_account_created=0
+release_canary_marker=''; release_canary_attempt=''; release_canary_next_attempt=1
+release_canary_account_created=0
 for runtime_lib_name in prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh; do
   staged_runtime_lib="$temp_dir/$runtime_lib_name"
   runtime_lib_blob=$(git rev-parse --verify "${source_commit}:scripts/companion-release/${runtime_lib_name}") ||

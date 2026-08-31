@@ -3,7 +3,8 @@
 
 create_canary_plan() {
   local output=$1
-  "$policy_tool" companion-manifest omp-context-canary-plan \
+  env "$credential_locator=$provider_credential" \
+    "$policy_tool" companion-manifest omp-context-canary-plan \
     --project-dir "$repo_root" --input-output "$input_jsonl" --challenge-digest "$challenge_digest" \
     --producer-repository "$repository" --producer-workflow-ref "$producer_workflow_ref" \
     --candidate-repository "$repository" --source-commit "$source_commit" --source-tree "$source_tree" \

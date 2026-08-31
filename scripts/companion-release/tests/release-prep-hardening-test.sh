@@ -6,6 +6,7 @@ script_dir=$(cd -- "$tests_dir/.." && pwd)
 publisher="$script_dir/publish-release-coordinates.sh"; prep="$script_dir/prepare-release.sh"
 transaction="$script_dir/release-coordinate-transaction-lib.sh"; prep_lib="$script_dir/prepare-release-runtime-lib.sh"
 user_lib="$script_dir/prepare-release-user-lib.sh"; local_lib="$script_dir/prepare-release-local-lib.sh"
+uidrunner_dir="$script_dir/uidrunner"
 lock_verifier="$script_dir/verify-release-prep-lock.sh"
 ruleset_verifier="$script_dir/verify-release-tag-ruleset.sh"; mock_gh="$tests_dir/testdata/mock-release-prep-gh.sh"
 fail() { printf 'release prep hardening test: %s\n' "$1" >&2; exit 1; }
@@ -21,11 +22,28 @@ contains "$prep" "readonly release_tag='v0.50.110'"; contains "$prep" "expected_
 contains "$prep" "expected_promotion_key_id='omp-context-promotion-2026-q3-k3'"
 contains "$prep" 'prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh'
 contains "$prep" 'go build -trimpath -o "$uidrunner" ./scripts/companion-release/uidrunner'
+contains "$prep" 'export -n provider_credential'
+not_contains "$prep_lib" '${!credential_locator}'
+contains "$prep" 'unset "$credential_locator"'
+contains "$local_lib" 'env "$credential_locator=$provider_credential"'
+contains "$user_lib" 'readonly release_canary_uid_min=50000'
+contains "$user_lib" 'readonly release_canary_uid_max=59999'
+contains "$user_lib" 'readonly release_canary_uid_attempts=64'
+contains "$user_lib" '(seed + attempt - 1) % span'
+contains "$user_lib" '/usr/bin/dscl . -list /Users UniqueID'
 contains "$user_lib" '/usr/bin/dscl . -create'
 contains "$user_lib" '/usr/bin/dscl . -delete'
+contains "$user_lib" 'RealName "$release_canary_marker"'
 contains "$user_lib" 'UserShell /usr/bin/false'
 contains "$user_lib" 'IsHidden 1'
-not_contains "$user_lib" 'sudo -n -u'
+contains "$user_lib" 'verify_release_canary_account_ownership || return 1'
+contains "$user_lib" 'release_canary_uid_is_exclusively_owned'
+contains "$user_lib" 'discard_release_canary_account'
+for file in "$prep" "$prep_lib" "$user_lib"; do
+  not_contains "$file" 'sudo -n -u'
+  not_contains "$file" '/usr/bin/login'
+  not_contains "$file" 'pam_'
+done
 contains "$prep" 'remote_mutations:0'; contains "$prep" 'canary_records:42,provider_calls:40,task_pairs:20'
 contains "$local_lib" '--endpoint "$endpoint" --credential-locator "$credential_locator"'
 contains "$local_lib" '--model-context-window "$model_context_window"'
@@ -34,19 +52,45 @@ contains "$local_lib" 'length == 42'; contains "$local_lib" 'length) == 40'; con
 contains "$prep_lib" 'production canary started (40 sequential provider calls, 20 task pairs)'
 contains "$prep_lib" '([.[] | select(.type == "call")] | length) == 40'
 contains "$prep_lib" '([.[] | select(.type == "call") | .task_id_digest] | unique | length) == 20'
-contains "$prep_lib" 'live_canary_uid=59999'
-contains "$user_lib" '/usr/bin/dscl . -list /Users UniqueID'
 contains "$prep_lib" 'isolated_uidrunner="$root/uidrunner"'
-contains "$prep_lib" 'sudo -n "$isolated_uidrunner"'
+contains "$prep_lib" 'select_release_canary_account "$isolated_home"'
+contains "$prep_lib" 'sudo -n "$isolated_uidrunner" "$release_canary_uid" "$release_canary_gid"'
 contains "$prep_lib" 'cleanup_live_canary_uid'
-contains "$prep_lib" 'pkill -TERM -u "$live_canary_uid"'
-contains "$prep_lib" 'pgrep -u "$live_canary_uid"'
+contains "$user_lib" 'pkill -TERM -u "$release_canary_uid"'
+contains "$user_lib" 'pgrep -u "$1"'
 contains "$prep_lib" 'chown -R nobody:nobody'
-contains "$prep_lib" 'create_release_canary_account "$isolated_home"'
 contains "$prep_lib" 'remove_release_canary_account'
+contains "$prep_lib" 'printf '\''%s\n'\'' "$provider_credential"'
 contains "$prep_lib" '/bin/cat "$input_jsonl"'
 not_contains "$prep_lib" 'provider-credential'
 not_contains "$prep_lib" 'credential_staging'
+contains "$user_lib" '[[ "$status" -eq 1 ]] && continue'
+runner_install_line=$(grep -nF 'install -m 0555 -o root -g wheel "$uidrunner" "$isolated_uidrunner"' "$prep_lib" | cut -d: -f1)
+runner_hash_line=$(grep -nF 'isolated_uidrunner_sha=' "$prep_lib" | cut -d: -f1)
+selection_line=$(grep -nF 'select_release_canary_account "$isolated_home"' "$prep_lib" | cut -d: -f1)
+selected_chown_line=$(grep -nF 'chown -R "${release_canary_uid}:${release_canary_gid}"' "$prep_lib" | cut -d: -f1)
+final_zero_line=$(grep -nF 'if release_canary_uid_is_process_free "$release_canary_uid"; then break' "$prep_lib" | cut -d: -f1)
+credential_line=$(grep -nF 'printf '\''%s\n'\'' "$provider_credential"' "$prep_lib" | cut -d: -f1)
+runner_exec_line=$(grep -nF 'sudo -n "$isolated_uidrunner" "$release_canary_uid" "$release_canary_gid"' "$prep_lib" | cut -d: -f1)
+[[ "$runner_install_line" -lt "$runner_hash_line" && "$runner_hash_line" -lt "$selection_line" &&
+   "$selection_line" -lt "$selected_chown_line" && "$selected_chown_line" -lt "$final_zero_line" &&
+   "$final_zero_line" -lt "$credential_line" && "$credential_line" -lt "$runner_exec_line" ]] ||
+  fail 'one-shot UID selection is not immediately before credential launch'
+process_cleanup_line=$(grep -nF 'cleanup_live_canary_uid ||' "$prep_lib" | sed -n '$p' | cut -d: -f1)
+record_cleanup_line=$(grep -nF 'remove_release_canary_account ||' "$prep_lib" | sed -n '$p' | cut -d: -f1)
+nobody_smoke_line=$(grep -nF 'chown -R nobody:nobody' "$prep_lib" | cut -d: -f1)
+[[ "$process_cleanup_line" -lt "$record_cleanup_line" && "$record_cleanup_line" -lt "$nobody_smoke_line" ]] ||
+  fail 'live-canary cleanup does not precede credential-free nobody smoke'
+marker_create_line=$(grep -nF 'dscl . -create "/Users/${release_canary_user}" RealName' "$user_lib" | cut -d: -f1)
+uid_create_line=$(grep -nF 'dscl . -create "/Users/${release_canary_user}" UniqueID' "$user_lib" | cut -d: -f1)
+delete_guard_line=$(grep -nF 'verify_release_canary_account_ownership || return 1' "$user_lib" | sed -n '$p' | cut -d: -f1)
+delete_line=$(grep -nF 'dscl . -delete "/Users/${release_canary_user}"' "$user_lib" | cut -d: -f1)
+[[ "$marker_create_line" -lt "$uid_create_line" && "$delete_guard_line" -lt "$delete_line" ]] ||
+  fail 'DirectoryService ownership marker ordering is unsafe'
+for source in "$prep" "$prep_lib" "$user_lib" "$uidrunner_dir"/*.go \
+  "$tests_dir/release-prep-hardening-test.sh" "$tests_dir/release-runtime-hardening-test.sh"; do
+  (( $(wc -l <"$source") <= 300 )) || fail "$source exceeds 300 lines"
+done
 contains "$local_lib" '--static-policy-b64 "$static_policy_b64"'; not_contains "$local_lib" '--expected-signing-key-id'
 contains "$publisher" 'static policy does not own the exact K3 signer'
 contains "$publisher" 'release-tag-signing-2026-q3-r2.pub'
