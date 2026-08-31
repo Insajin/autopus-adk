@@ -23,6 +23,14 @@ cleanup() {
     printf 'companion release prep: dedicated live-canary UID cleanup failed\n' >&2
     cleanup_failed=1
   fi
+  if declare -F remove_release_canary_account >/dev/null 2>&1; then
+    if ! remove_release_canary_account; then
+      printf 'companion release prep: dedicated live-canary account cleanup failed\n' >&2
+      cleanup_failed=1
+    fi
+  elif [[ -n "${release_canary_user:-}" ]]; then
+    cleanup_failed=1
+  fi
   for record in "${isolation_roots[@]-}"; do
     [[ -n "$record" ]] || continue
     if ! remove_isolation_root "$record"; then
@@ -139,19 +147,12 @@ run_canary() {
   local sandbox_args=() root isolated_project isolated_home isolated_tmp
   local isolated_candidate isolated_omp isolated_uidrunner
   local root_identity record candidate_sha isolated_candidate_sha uidrunner_sha isolated_uidrunner_sha
-  local canary_status started_at account_name account_uid
+  local canary_status started_at
   local -r live_canary_uid=59999 live_canary_gid=20
   root="/private/tmp/autopus-adk-release-prep-${dispatch_nonce}-final"
   [[ "$label" == 'final' &&
      "$root" =~ ^/private/tmp/autopus-adk-release-prep-[0-9a-f]{32}-final$ &&
      ! -e "$root" && ! -L "$root" ]] || fail 'isolated canary root is unsafe'
-  while read -r account_name account_uid; do
-    [[ "$account_uid" != "$live_canary_uid" ]] ||
-      fail 'dedicated live-canary UID is already assigned to a local account'
-  done < <(/usr/bin/dscl . -list /Users UniqueID)
-  if /usr/bin/pgrep -u "$live_canary_uid" >/dev/null 2>&1; then
-    fail 'dedicated live-canary UID is already in use'
-  fi
   /usr/bin/sudo -n /usr/bin/install -d -m 0755 -o root -g wheel "$root"
   root_identity=$(/usr/bin/stat -f '%d:%i' "$root")
   record="${root}|${root_identity}|${private_tmp_identity}"
@@ -159,6 +160,7 @@ run_canary() {
   isolated_project="$root/project"; isolated_home="$root/home"; isolated_tmp="$root/tmp"
   isolated_candidate="$root/auto"; isolated_omp="$root/omp-darwin-arm64"
   isolated_uidrunner="$root/uidrunner"
+  create_release_canary_account "$isolated_home"
   /usr/bin/sudo -n /usr/bin/install -d -m 0700 \
     -o "$live_canary_uid" -g "$live_canary_gid" \
     "$isolated_project" "$isolated_home" "$isolated_tmp"
@@ -210,6 +212,8 @@ run_canary() {
   kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped during production canary'
   cleanup_live_canary_uid ||
     fail 'dedicated live-canary UID cleanup is incomplete'
+  remove_release_canary_account ||
+    fail 'dedicated live-canary account cleanup is incomplete'
   /usr/bin/sudo -n /usr/sbin/chown -R nobody:nobody \
     "$isolated_project" "$isolated_home" "$isolated_tmp"
   OMP_CONTEXT_RELEASE_CANARY_ROOT="$root" OMP_CONTEXT_RELEASE_CANARY_EXECUTABLE="$isolated_omp" \
