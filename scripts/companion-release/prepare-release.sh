@@ -110,7 +110,9 @@ staged_promotion_signing_key="$temp_dir/omp-context-promotion-signing-key"
 tag_signing_key=$staged_tag_signing_key
 promotion_signing_key=$staged_promotion_signing_key
 evidence_source_commit=''; retain_prep_lock=0; prep_lock_mode='fresh'; isolation_roots=(); sudo_keepalive_pid=''
-for runtime_lib_name in prepare-release-runtime-lib.sh prepare-release-local-lib.sh; do
+release_canary_user=''; release_canary_uid=''; release_canary_gid=''; release_canary_home=''
+release_canary_marker=''; release_canary_account_created=0
+for runtime_lib_name in prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh; do
   staged_runtime_lib="$temp_dir/$runtime_lib_name"
   runtime_lib_blob=$(git rev-parse --verify "${source_commit}:scripts/companion-release/${runtime_lib_name}") ||
     fail "release prep runtime helper ${runtime_lib_name} is absent from the exact source"
