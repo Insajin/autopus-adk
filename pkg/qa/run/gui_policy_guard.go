@@ -19,6 +19,10 @@ type guiPolicyEvaluation struct {
 	missingScreens  []string
 	missingActions  []string
 	missingEvidence []string
+	// unenforceable names declared forbidden actions the guard cannot act on. It
+	// is reported, never blocking: an existing pack keeps running while the gap
+	// becomes visible in the check evidence.
+	unenforceable []string
 }
 
 func applyGUIPolicyOracle(projectDir string, pack journey.Pack, result *commandResult) (IndexCheck, bool) {
@@ -26,6 +30,7 @@ func applyGUIPolicyOracle(projectDir string, pack journey.Pack, result *commandR
 		return IndexCheck{}, false
 	}
 	eval := evaluateGUIPolicyEvidence(projectDir, pack, result)
+	eval.unenforceable = unenforceableForbiddenActions(pack.GUI.ForbiddenActions)
 	check := IndexCheck{
 		ID:        guiPolicyRuntimeCheckID,
 		JourneyID: pack.ID,
@@ -165,6 +170,7 @@ func actualGUIRuntimePolicy(eval guiPolicyEvaluation) string {
 	parts = append(parts, "network_outside_allowed="+joinOrNone(eval.outsideRequests))
 	parts = append(parts, "missing_screens="+joinOrNone(eval.missingScreens))
 	parts = append(parts, "missing_screen_actions="+joinOrNone(eval.missingActions))
+	parts = append(parts, "unenforceable_forbidden_actions="+joinOrNone(eval.unenforceable))
 	if len(eval.missingEvidence) > 0 {
 		parts = append(parts, "missing="+strings.Join(eval.missingEvidence, ", "))
 	}

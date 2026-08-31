@@ -73,6 +73,7 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 - `gui-capture-contract` check는 schema, dense step order, totals 일치, policy conformance, local media digest/size를 fail-closed로 검증합니다. 실패는 blocked이며 `capture_index` artifact를 publish하지 않습니다.
 - 정책 집행 증거는 producer가 아니라 하네스가 소유한 guard receipt에서 옵니다. producer는 자신의 정책 준수를 자체 인증할 수 없습니다.
 - raw screenshot, trace, video, HAR은 절대 publish되지 않습니다. `capture-index.published.json`(kind `capture_index`)만 evidence가 되고, raw bytes는 `.autopus/qa/runs/**`에 local-only로 남으며 manifest `retention_class`가 `local-redacted-local-media`가 됩니다.
+- `gui.forbidden_actions`는 `mutation`과 정확한 Playwright method 이름(click, fill, press 등)만 런타임에서 집행됩니다. guard는 method 이름만 보고 business intent는 모르므로 `payment`, `email_send` 같은 label은 아무것도 차단하지 않습니다. 선언은 허용되지만 `gui-policy-runtime` check의 `unenforceable_forbidden_actions`에 보고되므로, pack이 제공하지 않는 보장을 주장하지 않습니다.
 - network evidence는 URL이 아니라 `origin:<index>/path` 또는 origin-relative `/path` reference입니다. 절대 URL, credential, query는 shape 자체로 거부됩니다.
 - `replay`는 합성 코드가 아니라 고정된 command와 spec digest입니다. inference 비용 없이 동일 spec을 재실행할 수 있습니다.
 

@@ -120,6 +120,12 @@ func captureReadmeExploreSubset() []string {
 		"check, uncheck, selectOption, setInputFiles, and dragTo, and the journey is then",
 		"reported `blocked` rather than failed.",
 		"",
+		"Only `mutation` and those exact method names are enforced. The guard observes",
+		"Playwright method names, never business intent, so a label like `payment` or",
+		"`email_send` blocks nothing. Declaring one is allowed but is reported as",
+		"`unenforceable_forbidden_actions` in the `gui-policy-runtime` check evidence, so",
+		"the pack never claims a guarantee the harness does not provide.",
+		"",
 	}
 }
 

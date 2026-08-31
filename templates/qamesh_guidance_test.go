@@ -104,6 +104,7 @@ func TestQAMESHCaptureContractGuidance(t *testing.T) {
 		"guard receipt",
 		"--embed-media",
 		".autopus/qa/capture/README.md",
+		"unenforceable_forbidden_actions",
 	}
 	for _, path := range paths {
 		path := path

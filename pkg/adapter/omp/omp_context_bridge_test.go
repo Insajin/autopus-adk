@@ -175,7 +175,7 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	// omission of the base config, and the auto-qa surface documenting the visual
 	// report, the typed GUI capture contract, and the `report` route in its
 	// command description.
-	const priorPreparedFilesFingerprint = "b714962d28732fe9543dd4fce00e52e3461161ca7846d172e7ce03c1a909fc7a"
+	const priorPreparedFilesFingerprint = "2579e6783d121af3addf979679961539c5b053e79401907c828fa18af2106029"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

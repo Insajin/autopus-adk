@@ -42,7 +42,9 @@ func TestBrowserGUIExplorePackExampleDeclaresTypedCapturePolicy(t *testing.T) {
 	assert.Equal(t, []string{"gui-explore"}, pack.Lanes)
 	assert.Equal(t, expectedCapturePolicy(), pack.GUI.Capture)
 	assert.Equal(t, []string{defaultBrowserGUIOrigin}, pack.GUI.AllowedOrigins)
-	assert.Equal(t, []string{"mutation", "payment", "email_send"}, pack.GUI.ForbiddenActions)
+	// Only enforceable labels ship: the guard matches Playwright method names, so a
+	// business label like `payment` would advertise a guarantee nothing provides.
+	assert.Equal(t, []string{"mutation"}, pack.GUI.ForbiddenActions)
 	assert.Equal(t, []string{"src/**", "e2e/**"}, pack.SourceRefs.OwnedPaths)
 	assert.Equal(t, "SPEC-QAMESH-003", pack.SourceRefs.SourceSpec)
 	// Capture-enabled packs declare no artifacts: the harness emits capture_index

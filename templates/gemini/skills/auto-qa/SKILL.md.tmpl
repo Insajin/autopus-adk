@@ -68,6 +68,7 @@ QAMESH는 project-level deterministic QA 실행, manifest validation, redaction,
 - The `gui-capture-contract` check validates schema, dense step order, totals consistency, policy conformance, and local media digest/size fail-closed; a violation blocks the journey and publishes no `capture_index` artifact.
 - Policy-enforcement evidence comes from a harness-owned guard receipt, so a producer cannot certify its own compliance.
 - Raw screenshots, traces, videos, and HARs are never published. Only the sanitized `capture-index.published.json` (kind `capture_index`) becomes evidence; raw bytes stay local and set `retention_class` to `local-redacted-local-media`.
+- `gui.forbidden_actions` is enforced only for `mutation` and the exact Playwright method names. A business label like `payment` blocks nothing and is reported as `unenforceable_forbidden_actions` in the check evidence.
 - Network evidence carries `origin:<index>/path` or origin-relative `/path` references, never URLs.
 - `replay` is a pinned command plus spec digests, not synthesized code, so a captured journey re-runs at zero inference cost.
 

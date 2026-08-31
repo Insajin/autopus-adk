@@ -129,10 +129,13 @@ checks:
 gui:
   allowed_origins:
     - %[5]s
+  # Only "mutation" and the exact Playwright method names (click, dblclick, tap,
+  # fill, press, check, uncheck, selectOption, setInputFiles, dragTo) are enforced
+  # at runtime. The guard sees method names, never business intent, so a label like
+  # "payment" would read as a guarantee nothing provides; labels outside this set
+  # are reported as unenforceable_forbidden_actions in the check evidence.
   forbidden_actions:
     - mutation
-    - payment
-    - email_send
   selector_strategy: role-first
   network_policy:
     mode: local-only
