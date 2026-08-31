@@ -19,7 +19,7 @@ func testStaticPolicyB64(t *testing.T) string {
 		ProducerRepository:  "Insajin/autopus-harness-bench",
 		ProducerWorkflowRef: "refs/heads/main@0123456789abcdef0123456789abcdef01234567",
 		CandidateRepository: "Insajin/autopus-adk", SourceCommit: strings.Repeat("c", 40),
-		SourceTree: strings.Repeat("d", 40), Target: "darwin-arm64", AutoVersion: "v0.50.110",
+		SourceTree: strings.Repeat("d", 40), Target: "darwin-arm64", AutoVersion: "v0.50.111",
 		PolicyID: "omp-context-active-v1", PolicyDigest: promotionTestHash("policy"),
 		OMPVersion: "omp/17.2.7", OMPExecutableSHA256: promotionTestHash("omp"),
 		PipelineImplementationDigest: promotionTestHash("pipeline"),

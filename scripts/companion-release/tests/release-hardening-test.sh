@@ -49,15 +49,19 @@ contains "$producer_receipt" '--signing-key "$COMPANION_SIGNING_KEY_FILE"'
 [[ -x "$tag_ruleset_gate" && ! -L "$tag_ruleset_gate" ]] ||
   fail 'exact release tag ruleset verifier is missing or unsafe'
 contains "$prep" 'verify-release-tag-ruleset.sh --armed'
+contains "$prep" 'verify-release-tag-ruleset.sh --sealed'
+contains "$publisher" 'verify-release-tag-ruleset.sh --armed'
 contains "$publisher" 'verify-release-tag-ruleset.sh --sealed'
-contains "$tag_ruleset_gate" "ruleset_name='autopus-v0.50.110-release-authority'"
-contains "$tag_ruleset_gate" "release_ref='refs/tags/v0.50.110'"
-contains "$tag_ruleset_gate" 'usage: verify-release-tag-ruleset.sh --armed|--sealed'
+contains "$tag_ruleset_gate" "ruleset_name='autopus-v0.50.111-release-authority'"
+contains "$tag_ruleset_gate" "release_ref='refs/tags/v0.50.111'"
+contains "$tag_ruleset_gate" 'usage: verify-release-tag-ruleset.sh --armed|--sealed|--sealed-runtime'
 contains "$tag_ruleset_gate" 'actor_type:"User"'
 contains "$tag_ruleset_gate" 'else .bypass_actors == [] end'
+contains "$tag_ruleset_gate" '(.bypass_actors == [] or .bypass_actors == null)'
 contains "$tag_ruleset_gate" '["creation","deletion","update"]'
 contains "$tag_ruleset_gate" '.can_admins_bypass == false'
 contains "$tag_ruleset_gate" 'required_reviewers'
+contains "$tag_ruleset_gate" 'if [[ "$mode" != '\''sealed-runtime'\'' ]]'
 contains "$tag_ruleset_gate" 'deployment-branch-policies?per_page=100'
 contains "$tag_ruleset_gate" 'select(.type == "tag" and .name == $tag)'
 # The tap coordinates advance with every publication, so pinning their exact
@@ -84,11 +88,11 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_COMMIT'
   contains "$workflow" 'ADK_COMPANION_APPROVED_SOURCE_TREE'
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED=1'
-  contains "$workflow" 'verify-release-tag-ruleset.sh --sealed'
+  contains "$workflow" 'verify-release-tag-ruleset.sh --sealed-runtime'
 done
-contains "$release" "- 'v0.50.110'"
-contains "$release" "if: github.ref == 'refs/tags/v0.50.110'"
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.110'"
+contains "$release" "- 'v0.50.111'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.111'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.111'"
 not_contains "$release" 'canonical-full-bridge'
 not_contains "$recovery" 'canonical-full bridge'
 not_contains "$release" 'omp-context-bridge-release.v1.json'
@@ -98,13 +102,13 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'GITHUB_REF_NAME="$GITHUB_REF_NAME"'
   contains "$workflow" 'COMPANION_VERSION="${GITHUB_REF_NAME#v}"'
 done
-contains "$release" "'autopus-adk_0.50.110_darwin_amd64.tar.gz'"
-contains "$release" "'autopus-adk_0.50.110_darwin_arm64.tar.gz'"
+contains "$release" "'autopus-adk_0.50.111_darwin_amd64.tar.gz'"
+contains "$release" "'autopus-adk_0.50.111_darwin_arm64.tar.gz'"
 contains "$producer_receipt" 'v0.50.109 0.50.109 A22'
-contains "$producer_receipt" 'v0.50.110 0.50.110 A23'
+contains "$producer_receipt" 'v0.50.111 0.50.111 A23'
 contains "$producer_receipt" "fail 'public_key_receipt_release_identity_mismatch'"
-contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.110'"
-contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.110'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.111'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.111'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -115,8 +119,8 @@ for workflow in "$release" "$recovery"; do
   workflow_token_index=$(grep -n 'name: Create Homebrew tap token' "$workflow" | cut -d: -f1)
   (( workflow_evidence_index < workflow_token_index )) || fail 'tap token precedes release evidence'
 done
-contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.110'"
-contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.110'"
+contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.111'"
+contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.111'"
 contains "$current_release_gate" '.target_commitish == $commit'
 contains "$current_release_gate" '.immutable == true'
 contains "$current_release_gate" '(.assets | length) == ($expected | length)'

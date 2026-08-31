@@ -209,7 +209,7 @@ var releasePhases = []releasePhase{
 		pinsRepository: true, pinsLinuxArchives: true, pinsReleaseID: true,
 	},
 	{
-		phase: "A23", tag: "v0.50.110", version: "0.50.110",
+		phase: "A23", tag: "v0.50.111", version: "0.50.111",
 		acceptedField: "source-tree",
 		rejects:       "unsignedTag",
 		ancestorSHA:   "67f3def5d4a0a11aadd9e103389de6cc1cafc34e",

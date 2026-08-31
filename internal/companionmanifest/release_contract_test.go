@@ -11,16 +11,16 @@ import (
 func TestReleaseWorkflow_ExactA23ProtectedNormalLane(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	for _, required := range []string{
-		"- 'v0.50.110'", "if: github.ref == 'refs/tags/v0.50.110'",
+		"- 'v0.50.111'", "if: github.ref == 'refs/tags/v0.50.111'",
 		"needs: [ci, security, omp-production-evidence]", "adk-companion-release",
 		"Validate exact R2-signed A23 source", "COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED=1",
 		"Verify exact sealed release-tag authority",
-		"scripts/companion-release/verify-release-tag-ruleset.sh --sealed",
+		"scripts/companion-release/verify-release-tag-ruleset.sh --sealed-runtime",
 		"Build canonical policy-bearing production candidate", "OMP_CONTEXT_STATIC_POLICY_B64",
 		"Verify fresh K3-signed production evidence",
 		"Reverify active K3 production evidence inside protected environment",
-		"name: omp-context-evidence-v0.50.110", "--mode active",
-		"autopus.adk_release_reservation.v1", "release_tag:\"v0.50.110\"",
+		"name: omp-context-evidence-v0.50.111", "--mode active",
+		"autopus.adk_release_reservation.v1", "release_tag:\"v0.50.111\"",
 		`(.assets | type == "array" and length == 0)`, ".author.id == 204883817",
 		"Verify reserved release was published", ".immutable == true",
 		"COMPANION_RELEASE_ID: ${{ steps.release-reservation.outputs.release-id }}",
@@ -58,14 +58,14 @@ func TestReleaseWorkflow_ExactA23ProtectedNormalLane(t *testing.T) {
 func TestReleaseWorkflow_ExactFifteenAssetSet(t *testing.T) {
 	release := readReleaseFile(t, ".github/workflows/release.yaml")
 	assets := []string{
-		"autopus-adk_0.50.110_darwin_amd64.tar.gz",
-		"autopus-adk_0.50.110_darwin_arm64.tar.gz",
-		"autopus-adk_0.50.110_linux_amd64.tar.gz",
-		"autopus-adk_0.50.110_linux_arm64.tar.gz",
-		"autopus-adk_0.50.110_windows_amd64.tar.gz",
-		"autopus-adk_0.50.110_windows_amd64.zip",
-		"autopus-adk_0.50.110_windows_arm64.tar.gz",
-		"autopus-adk_0.50.110_windows_arm64.zip",
+		"autopus-adk_0.50.111_darwin_amd64.tar.gz",
+		"autopus-adk_0.50.111_darwin_arm64.tar.gz",
+		"autopus-adk_0.50.111_linux_amd64.tar.gz",
+		"autopus-adk_0.50.111_linux_arm64.tar.gz",
+		"autopus-adk_0.50.111_windows_amd64.tar.gz",
+		"autopus-adk_0.50.111_windows_amd64.zip",
+		"autopus-adk_0.50.111_windows_arm64.tar.gz",
+		"autopus-adk_0.50.111_windows_arm64.zip",
 		"checksums.txt", "checksums.txt.bundle", "checksums.txt.signatures",
 		"omp-context-promotion-report.v1.json",
 		"omp-context-promotion-attestation.v2.json",

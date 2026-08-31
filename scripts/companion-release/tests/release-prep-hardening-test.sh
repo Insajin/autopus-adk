@@ -18,7 +18,7 @@ for file in "$publisher" "$transaction" "$prep" "$prep_lib" "$user_lib" "$local_
   [[ -f "$file" && ! -L "$file" ]] || fail "missing or unsafe release-prep component $file"
 done
 contains "$prep" 'usage: prepare-release.sh --endpoint URL'; contains "$prep" '(--preflight|--apply)'
-contains "$prep" "readonly release_tag='v0.50.110'"; contains "$prep" "expected_go_toolchain='go1.26.6'"
+contains "$prep" "readonly release_tag='v0.50.111'"; contains "$prep" "expected_go_toolchain='go1.26.6'"
 contains "$prep" "expected_promotion_key_id='omp-context-promotion-2026-q3-k3'"
 contains "$prep" 'prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh'
 contains "$prep" 'go build -trimpath -o "$uidrunner" ./scripts/companion-release/uidrunner'
@@ -124,16 +124,37 @@ trap 'rm -rf -- "$temp"' EXIT
 ruleset_state="$temp/ruleset-state"; mkdir -p "$ruleset_state" "$temp/ruleset-bin"
 cp "$mock_gh" "$temp/ruleset-bin/gh"; chmod 0700 "$temp/ruleset-bin/gh"
 printf '0\n' >"$ruleset_state/write-count"; : >"$ruleset_state/calls.log"; printf armed >"$ruleset_state/ruleset-state"
-printf '%s\n' '[{"id":596,"type":"tag","name":"v0.50.110"}]' >"$ruleset_state/deployment-policies.json"
+printf '%s\n' '[{"id":596,"type":"tag","name":"v0.50.111"}]' >"$ruleset_state/deployment-policies.json"
 env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --armed
 printf sealed >"$ruleset_state/ruleset-state"
 env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --sealed
+env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" \
+  MOCK_RELEASE_PREP_MASK_ENVIRONMENT=1 "$ruleset_verifier" --sealed-runtime
+if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" \
+  MOCK_RELEASE_PREP_MASK_ENVIRONMENT=1 "$ruleset_verifier" --sealed >/dev/null 2>&1; then
+  fail 'strict sealed verifier accepted masked reviewer authority'
+fi
+# The burned v0.50.110 deployment policy is failure history, not strict A23 authority.
+printf '%s\n' '[{"id":596,"type":"tag","name":"v0.50.110"}]' >"$ruleset_state/deployment-policies.json"
+if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" \
+  "$ruleset_verifier" --sealed >/dev/null 2>&1; then
+  fail 'strict sealed verifier accepted the burned v0.50.110 deployment tag policy'
+fi
+printf '%s\n' '[{"id":596,"type":"tag","name":"v0.50.111"}]' >"$ruleset_state/deployment-policies.json"
+printf armed >"$ruleset_state/ruleset-state"
+if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" \
+  "$ruleset_verifier" --sealed-runtime >/dev/null 2>&1; then
+  fail 'sealed-runtime verifier accepted armed authority'
+fi
 printf extra >"$ruleset_state/ruleset-state"
 if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --armed >/dev/null 2>&1; then
   fail 'armed verifier accepted extra actor or rule'
 fi
 if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --sealed >/dev/null 2>&1; then
   fail 'sealed verifier accepted extra actor or rule'
+fi
+if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "$ruleset_verifier" --sealed-runtime >/dev/null 2>&1; then
+  fail 'sealed-runtime verifier accepted extra actor or rule'
 fi
 ssh-keygen -q -t ed25519 -N '' -f "$temp/signing-key"
 ssh-keygen -q -t ed25519 -N '' -f "$temp/wrong-signing-key"
@@ -151,7 +172,7 @@ setup_fixture() {
   mkdir -p "$state" "$fixture/bin"; cp "$mock_gh" "$fixture/bin/gh"; chmod 0700 "$fixture/bin/gh"
   printf '%s\n' '[{"name":"UNRELATED","value":"repository-before"}]' >"$state/repository-variables.json"
   printf '%s\n' '[{"name":"UNRELATED","value":"environment-before"}]' >"$state/environment-variables.json"
-  printf '%s\n' '[{"id":596,"type":"tag","name":"v0.50.110"}]' >"$state/deployment-policies.json"
+  printf '%s\n' '[{"id":596,"type":"tag","name":"v0.50.111"}]' >"$state/deployment-policies.json"
   printf '%s\n' '[]' >"$state/releases.json"
   printf '0\n' >"$state/write-count"; : >"$state/calls.log"; printf armed >"$state/ruleset-state"
   git init --quiet --bare "$remote"; git init --quiet "$work"; printf 'release source\n' >"$work/source.txt"
@@ -182,11 +203,11 @@ EOF
   evidence_tree=$(printf '100644 blob %s\tomp-context-promotion-report.v1.json\n100644 blob %s\tomp-context-promotion-attestation.v2.json\n' \
     "$report_blob" "$attestation_blob" | git -C "$work" mktree)
   evidence_commit=$(printf 'evidence\n' | env "${git_env[@]}" git -C "$work" commit-tree "$evidence_tree")
-  env "${git_env[@]}" git -C "$work" tag -s omp-context-evidence-v0.50.110 "$evidence_commit" -m evidence
-  evidence_tag_object=$(git -C "$work" rev-parse refs/tags/omp-context-evidence-v0.50.110)
-  git -C "$work" push --quiet origin refs/tags/omp-context-evidence-v0.50.110
-  git -C "$work" push --quiet origin "$prep_lock_commit:refs/heads/omp-context-evidence-v0.50.110-source"
-  git -C "$work" tag -d omp-context-evidence-v0.50.110 >/dev/null
+  env "${git_env[@]}" git -C "$work" tag -s omp-context-evidence-v0.50.111 "$evidence_commit" -m evidence
+  evidence_tag_object=$(git -C "$work" rev-parse refs/tags/omp-context-evidence-v0.50.111)
+  git -C "$work" push --quiet origin refs/tags/omp-context-evidence-v0.50.111
+  git -C "$work" push --quiet origin "$prep_lock_commit:refs/heads/omp-context-evidence-v0.50.111-source"
+  git -C "$work" tag -d omp-context-evidence-v0.50.111 >/dev/null
   printf 'report\n' >"$fixture/report"; printf 'attestation\n' >"$fixture/attestation"
   policy_value omp-context-promotion-2026-q3-k3 >"$fixture/static-policy.b64"
   chmod 0600 "$fixture/report" "$fixture/attestation" "$fixture/static-policy.b64"
@@ -195,7 +216,7 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 while read -r _ _ ref; do
-  if [[ "$ref" == 'refs/tags/v0.50.110' ]]; then
+  if [[ "$ref" == 'refs/tags/v0.50.111' ]]; then
     printf '%s\n' release-tag-push >>"$MOCK_RELEASE_PREP_STATE/calls.log"
     [[ "${MOCK_RELEASE_PREP_REJECT_TAG:-0}" -eq 0 ]] || exit 1
   fi
@@ -210,7 +231,7 @@ run_publisher() {
     MOCK_RELEASE_PREP_FAIL_AT="${MOCK_RELEASE_PREP_FAIL_AT:-}" MOCK_RELEASE_PREP_FAIL_FROM="${MOCK_RELEASE_PREP_FAIL_FROM:-}" \
     MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL="${MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL:-0}" \
     MOCK_RELEASE_PREP_REJECT_TAG="${MOCK_RELEASE_PREP_REJECT_TAG:-0}" \
-    bash "$publisher" Insajin/autopus-adk adk-companion-release v0.50.110 "$source_commit" "$source_tree" \
+    bash "$publisher" Insajin/autopus-adk adk-companion-release v0.50.111 "$source_commit" "$source_tree" \
     "$fixture/static-policy.b64" "$evidence_tag_object" "$evidence_commit" "$evidence_tree" \
     "$(shasum -a 256 "$fixture/report" | awk '{print $1}')" \
     "$(shasum -a 256 "$fixture/attestation" | awk '{print $1}')" "$lock_argument" "$signing_key"
@@ -224,7 +245,7 @@ if (cd "$work" && RELEASE_PREP_SIGNING_KEY="$temp/wrong-signing-key" run_publish
 [[ "$(<"$state/write-count")" == '0' ]] || fail 'R2 mismatch mutated release state'
 setup_fixture success
 (cd "$work" && run_publisher >"$fixture/result.json")
-jq -e '.mode == "committed" and .release_tag == "v0.50.110" and .promotion_signing_key_id == "omp-context-promotion-2026-q3-k3"' "$fixture/result.json" >/dev/null || fail 'success receipt differs'
+jq -e '.mode == "committed" and .release_tag == "v0.50.111" and .promotion_signing_key_id == "omp-context-promotion-2026-q3-k3"' "$fixture/result.json" >/dev/null || fail 'success receipt differs'
 [[ "$(jq 'length' "$state/repository-variables.json")" == '9' && "$(jq 'length' "$state/environment-variables.json")" == '9' ]] || fail 'coordinate transaction did not converge both variable scopes'
 jq -e 'length == 1 and .[0].draft == true and (.[0].assets | length) == 0 and (.[0].body | fromjson | .schema_version == "autopus.adk_release_reservation.v1")' "$state/releases.json" >/dev/null || fail 'operator draft reservation differs'
 tag_call=$(grep -n '^release-tag-push$' "$state/calls.log" | cut -d: -f1); seal_call=$(grep -n '^ruleset-seal$' "$state/calls.log" | cut -d: -f1)
@@ -238,7 +259,7 @@ cp "$state/repository-variables.json" "$fixture/repository-before.json"
 if (cd "$work" && MOCK_RELEASE_PREP_FAIL_AT=5 run_publisher >/dev/null 2>&1); then fail 'injected coordinate failure succeeded'; fi
 jq -e --slurpfile before "$fixture/repository-before.json" '. == $before[0]' \
   "$state/repository-variables.json" >/dev/null || fail 'CAS rollback did not restore repository variables'
-[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.110)" ]] || fail 'rollback created a release tag'
+[[ -z "$(git -C "$work" ls-remote --refs origin refs/tags/v0.50.111)" ]] || fail 'rollback created a release tag'
 setup_fixture retained
 retained_status=0
 (cd "$work" && MOCK_RELEASE_PREP_REJECT_TAG=1 MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL=1 run_publisher >/dev/null 2>&1) || retained_status=$?

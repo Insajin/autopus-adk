@@ -173,6 +173,7 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 		{name: "failed_A22_tag_94", tag: "v0.50.94", sha: headSHA, message: frozenReleasePhasePolicy},
 		{name: "failed_A22_tag_95", tag: "v0.50.95", sha: headSHA, message: frozenReleasePhasePolicy},
 		{name: "failed_A22_tag_96", tag: "v0.50.96", sha: headSHA, message: frozenReleasePhasePolicy},
+		{name: "burned_A23_tag_110", tag: "v0.50.110", sha: headSHA, message: frozenReleasePhasePolicy},
 	} {
 		output, err := runReleaseSourceValidator(t, dir, test.tag, test.sha)
 		if err == nil || !strings.Contains(output, test.message) {
@@ -212,7 +213,7 @@ func TestLineageVerifier_A0BootstrapsWhileA1ThroughA23WithoutLiveEvidenceFailClo
 		{name: "A20", tag: "v0.50.91", message: "missing GITHUB_TOKEN"},
 		{name: "A21", tag: "v0.50.92", message: "missing GITHUB_TOKEN"},
 		{name: "A22", tag: "v0.50.109", message: "missing GITHUB_TOKEN"},
-		{name: "A23", tag: "v0.50.110", message: "missing GITHUB_TOKEN"},
+		{name: "A23", tag: "v0.50.111", message: "missing GITHUB_TOKEN"},
 		{name: "failed_A6_tag_75", tag: "v0.50.75", message: frozenReleasePhasePolicy},
 		{name: "failed_A6_tag_76", tag: "v0.50.76", message: frozenReleasePhasePolicy},
 		{name: "failed_A22_tag_93", tag: "v0.50.93", message: frozenReleasePhasePolicy},
@@ -223,6 +224,7 @@ func TestLineageVerifier_A0BootstrapsWhileA1ThroughA23WithoutLiveEvidenceFailClo
 		{name: "failed_A22_tag_98", tag: "v0.50.98", message: frozenReleasePhasePolicy},
 		{name: "failed_A22_tag_99", tag: "v0.50.99", message: frozenReleasePhasePolicy},
 		{name: "failed_A22_tag_100", tag: "v0.50.100", message: frozenReleasePhasePolicy},
+		{name: "burned_A23_tag_110", tag: "v0.50.110", message: frozenReleasePhasePolicy},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {

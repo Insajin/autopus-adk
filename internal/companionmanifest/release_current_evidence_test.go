@@ -140,7 +140,7 @@ func assertCurrentReleaseVerifierLog(t *testing.T, path string) {
 	}
 	for _, required := range []string{
 		"companion-manifest-verifier --artifact ", "--platform darwin --architecture arm64",
-		"omp-context-lineage-verifier --lineage ", "--target darwin-arm64 --version 0.50.110",
+		"omp-context-lineage-verifier --lineage ", "--target darwin-arm64 --version 0.50.111",
 		"omp-context-evidence-verifier --mode historical",
 	} {
 		if !bytes.Contains(log, []byte(required)) {

@@ -1,10 +1,10 @@
-# Autopus ADK v0.50.110 Release
+# Autopus ADK v0.50.111 Release
 
 ## Purpose and stop conditions
 
-This runbook publishes the normal protected A23 release at `v0.50.110`. It restores the normal 15-asset release topology after the one-time v0.50.109 key-rotation bridge.
+This runbook publishes the normal protected A23 release at `v0.50.111`. It restores the normal 15-asset release topology after the one-time v0.50.109 key-rotation bridge.
 
-This document is a procedure, not proof that v0.50.110 evidence or a release already exists. Record every live result during execution. Stop on any mismatch. Never repair a mismatch by moving, deleting, overwriting, or reusing an existing tag, evidence tag, release, or predecessor coordinate.
+This document is a procedure, not proof that v0.50.111 evidence or a release already exists. Record every live result during execution. Stop on any mismatch. Never repair a mismatch by moving, deleting, overwriting, or reusing an existing tag, evidence tag, release, or predecessor coordinate.
 
 Private keys and provider credentials remain outside the repository in owner-only storage. Never paste secret values into command arguments, workflow inputs, logs, issues, commits, artifacts, release bodies, or this runbook.
 
@@ -14,12 +14,12 @@ Private keys and provider credentials remain outside the repository in owner-onl
 |---|---|
 | Repository | `Insajin/autopus-adk` |
 | Release phase | `A23` |
-| Release tag / ref | `v0.50.110` / `refs/tags/v0.50.110` |
-| Version | `0.50.110` |
-| Workflow trigger | only `refs/tags/v0.50.110` |
-| Evidence tag / ref | `omp-context-evidence-v0.50.110` / `refs/tags/omp-context-evidence-v0.50.110` |
-| Prep-lock ref | `refs/heads/omp-context-evidence-v0.50.110-source` |
-| Release tag ruleset | `autopus-v0.50.110-release-authority` |
+| Release tag / ref | `v0.50.111` / `refs/tags/v0.50.111` |
+| Version | `0.50.111` |
+| Workflow trigger | only `refs/tags/v0.50.111` |
+| Evidence tag / ref | `omp-context-evidence-v0.50.111` / `refs/tags/omp-context-evidence-v0.50.111` |
+| Prep-lock ref | `refs/heads/omp-context-evidence-v0.50.111-source` |
+| Release tag ruleset | `autopus-v0.50.111-release-authority` |
 | Protected environment | `adk-companion-release` |
 | Release operator user ID | `204883817` |
 | Tag signer | R2, `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ` |
@@ -29,6 +29,14 @@ Private keys and provider credentials remain outside the repository in owner-onl
 | OMP oracle | `omp/17.2.7`, with the source-pinned executable digest |
 
 The A23 source commit and tree are not filled in here. Freeze them from the exact clean `origin/main` used for the release. All later coordinates must bind those observed values.
+
+## Burned v0.50.110 failure coordinate
+
+`v0.50.110` is failed release history, not a successful phase. Its immutable release tag and `omp-context-evidence-v0.50.110` evidence tag now exist and must never be moved, deleted, recreated, or reused. GitHub release ID `379549016` remains an unpublished failed draft. No v0.50.110 asset was published.
+
+The v0.50.110 protected job failed before credential materialization and before any asset upload. The repository `GITHUB_TOKEN` masks required-reviewer details from the environment response, so the job's strict local `--sealed` authority check could not observe fields that GitHub had already enforced by placing the job inside `adk-companion-release`.
+
+A23 maps only to `v0.50.111`. Its lineage still points directly to A22/v0.50.109, and it requires a new one-shot evidence object and fresh K3 report and attestation. Never copy or reuse the failed v0.50.110 report, attestation, evidence commit, evidence tag object, draft, or workflow artifacts.
 
 ## Immutable v0.50.109 predecessor
 
@@ -47,7 +55,7 @@ A23's direct release predecessor is the immutable v0.50.109 bridge. The lineage 
 | Companion manifest digest | `36a28fe8704ad02c51d294b6ea53ab9565991b043302fb198a01da58502ecfb2` |
 | Companion signature digest | `c63cb5d0c7f4147103a9dc55c637f97f15928df35ce642debdeb3fa416956b1e` |
 
-Run the committed lineage verifier and require it to identify A23 → A22 with these exact values. The v0.50.109 release ID, tag, bridge manifest, rotation sidecar, rotation ref, and asset bytes are immutable history. They are predecessor proof only: the normal v0.50.110 lane must not consume the A22 rotation sidecar/ref as an active release input or copy, rename, re-upload, or otherwise reuse any v0.50.109 asset.
+Run the committed lineage verifier and require it to identify A23 → A22 with these exact values. The v0.50.109 release ID, tag, bridge manifest, rotation sidecar, rotation ref, and asset bytes are immutable history. They are predecessor proof only: the normal v0.50.111 lane must not consume the A22 rotation sidecar/ref as an active release input or copy, rename, re-upload, or otherwise reuse any v0.50.109 asset.
 
 ## Active K3 policy and fresh evidence
 
@@ -64,7 +72,7 @@ attestation.key_id
   == omp-context-promotion-2026-q3-k3
 ```
 
-K1, K2, and K3 public keys remain in the verifier keyring so old releases can still be proved. That keyring does not grant active authority. K1 or K2 is forbidden for the v0.50.110 active attestation. Do not add or pass a separate `--expected-signing-key-id`; that would create a split authority outside the reviewed policy.
+K1, K2, and K3 public keys remain in the verifier keyring so old releases can still be proved. That keyring does not grant active authority. K1 or K2 is forbidden for the v0.50.111 active attestation. Do not add or pass a separate `--expected-signing-key-id`; that would create a split authority outside the reviewed policy.
 
 The evidence must be generated after the A23 source is frozen. It must be a fresh AB/BA cohort of 20 task pairs and 40 sequential provider calls through the authorized OAuth subscription gateway. The transcript has exactly 42 JSONL records: one handshake, 40 calls covering 20 unique task digests, and one verified shutdown. Its signed provider authority digest must equal `static_policy.provider_authority_digest`. A local fixture, a direct provider call, an old report, or any v0.50.109 observation is stale and inadmissible.
 
@@ -90,7 +98,7 @@ Before touching a remote coordinate, require all of the following:
 9. The authorized gateway is already running on an exact loopback HTTP URL, `http://127.0.0.1:PORT`. Do not substitute a public provider endpoint.
 10. Provider, model, model context window (at least 8192), and `sha256:` oracle-policy digest are reviewed production values.
 11. The v0.50.109 predecessor pins above reverify. The live Homebrew tap still has head `4b210f2c2c253a8354a4452c12ce106a1cc58e2c` and Cask blob `a5043042db00f714ba0d4cccf91b76c9a57c64fd`.
-12. No `v0.50.110` release tag, evidence tag, colliding draft, or unrelated prep lock exists. A retained exact A23 transaction is handled only by the reconciliation procedure below.
+12. No `v0.50.111` release tag, evidence tag, colliding draft, or unrelated prep lock exists. The burned v0.50.110 failure coordinates above remain untouched. A retained exact A23 transaction is handled only by the reconciliation procedure below.
 
 Freeze the source and retain the values in the current shell:
 
@@ -111,10 +119,10 @@ Do not continue after any source change. A source change requires a new freeze a
 
 Preflight and apply enforce these coordinates; operators must not set them manually:
 
-- The active tag ruleset is `autopus-v0.50.110-release-authority`. It targets only `refs/tags/v0.50.110`, is active, and protects creation, update, and deletion. Its sole operator bypass identity is user ID `204883817`.
-- `adk-companion-release` has administrator bypass disabled, one required-reviewer rule for the authorized user, and custom deployment policies enabled. Its exact tag deployment policy is `v0.50.110`.
+- The active tag ruleset is `autopus-v0.50.111-release-authority`. It targets only `refs/tags/v0.50.111`, is active, and protects creation, update, and deletion. Its sole operator bypass identity is user ID `204883817`.
+- `adk-companion-release` has administrator bypass disabled, one required-reviewer rule for the authorized user, and custom deployment policies enabled. Its exact tag deployment policy is `v0.50.111`.
 - The repository scope and protected-environment scope receive the same eight values: `ADK_COMPANION_APPROVED_SOURCE_COMMIT`, `ADK_COMPANION_APPROVED_SOURCE_TREE`, `OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA`, `OMP_CONTEXT_EVIDENCE_COMMIT_SHA`, `OMP_CONTEXT_EVIDENCE_TREE_SHA`, `OMP_CONTEXT_EVIDENCE_REPORT_SHA256`, `OMP_CONTEXT_EVIDENCE_ATTESTATION_SHA256`, and `OMP_CONTEXT_STATIC_POLICY_B64`.
-- The draft reservation has tag and name `v0.50.110`, target commit equal to the frozen A23 source, author ID `204883817`, `draft=true`, `prerelease=false`, the canonical coordinate body, and zero assets. Do not create, edit, populate, or delete it by hand.
+- The draft reservation has tag and name `v0.50.111`, target commit equal to the frozen A23 source, author ID `204883817`, `draft=true`, `prerelease=false`, the canonical coordinate body, and zero assets. Do not create, edit, populate, or delete it by hand.
 
 Check the fixed tag ruleset and protected environment through the committed gate:
 
@@ -162,7 +170,7 @@ preflight_receipt=$(
 printf '%s\n' "$preflight_receipt" | jq -e \
   --arg commit "$SOURCE_COMMIT" --arg tree "$SOURCE_TREE" '
     .mode == "preflight" and
-    .release_tag == "v0.50.110" and
+    .release_tag == "v0.50.111" and
     .source_commit == $commit and .source_tree == $tree and
     .remote_mutations == 0
   '
@@ -182,7 +190,7 @@ apply_receipt=$(
 printf '%s\n' "$apply_receipt" | jq -e \
   --arg commit "$SOURCE_COMMIT" --arg tree "$SOURCE_TREE" '
     .mode == "committed" and
-    .release_tag == "v0.50.110" and
+    .release_tag == "v0.50.111" and
     .source_commit == $commit and .source_tree == $tree
   '
 ```
@@ -195,25 +203,27 @@ After the 42-record observation, apply converges selected-UID processes to zero 
 
 Before the remote R2-signed annotated tag exists, the publisher owns its mutations and may use compare-and-swap rollback. A fresh transaction failure restores only values it still owns, removes only its own new deployment policy and draft, and releases only its own prep lock. A compare-and-swap conflict never authorizes overwriting another value.
 
-The atomic push of the R2-signed `refs/tags/v0.50.110`, together with deletion of the owned prep lock, is the release commit point. As soon as the remote tag is observed, rollback is permanently disabled. Never move, delete, recreate, force-push, or reuse `v0.50.110`, even if the release workflow, notarization, Homebrew publication, or canary later fails.
+The atomic push of the R2-signed `refs/tags/v0.50.111`, together with deletion of the owned prep lock, is the release commit point. As soon as the remote tag is observed, rollback is permanently disabled. Never move, delete, recreate, force-push, or reuse `v0.50.111`, even if the release workflow, notarization, Homebrew publication, or canary later fails.
 
 ## Protected approval and release workflow
 
 The exact tag push starts `release.yaml`; never dispatch a different ref or wildcard lane. Before approving `adk-companion-release`, the authorized reviewer must confirm:
 
-1. The run is for `refs/tags/v0.50.110` at the frozen source commit.
+1. The run is for `refs/tags/v0.50.111` at the frozen source commit.
 2. CI and Security Scan succeeded for that tag.
 3. The R2 tag signature and fingerprint reverified.
 4. The fresh evidence ref and all eight release coordinates match both variable scopes.
 5. The policy-owned K3 ID matches the attestation key ID; there is no external expected-key input.
 6. The draft is the exact operator-owned zero-asset reservation.
-7. The environment has no administrator bypass and has the exact `v0.50.110` deployment policy.
+7. The environment has no administrator bypass and has the exact `v0.50.111` deployment policy.
+
+The protected release and recovery jobs use `--sealed-runtime`. This mode requires the exact sealed tag ruleset and exact deployment tag policy but does not require reviewer or administrator fields that the repository `GITHUB_TOKEN` cannot authoritatively observe. GitHub itself enforces the environment approval because each job runs inside `adk-companion-release`. Local preflight and publisher paths continue to use strict `--armed` and `--sealed`, including the full reviewer and administrator assertions.
 
 Approve only that protected job, then watch it to completion:
 
 ```bash
 run_id=$(gh run list --workflow release.yaml --event push \
-  --branch v0.50.110 --limit 1 --json databaseId \
+  --branch v0.50.111 --limit 1 --json databaseId \
   --jq '.[0].databaseId')
 gh run watch "$run_id" --exit-status
 ```
@@ -224,14 +234,14 @@ The protected job must independently repeat source, R2, evidence, K3-policy, res
 
 The final release must be non-draft, non-prerelease, immutable, bound to the frozen A23 source, and contain exactly these 15 uniquely named assets:
 
-1. `autopus-adk_0.50.110_darwin_amd64.tar.gz`
-2. `autopus-adk_0.50.110_darwin_arm64.tar.gz`
-3. `autopus-adk_0.50.110_linux_amd64.tar.gz`
-4. `autopus-adk_0.50.110_linux_arm64.tar.gz`
-5. `autopus-adk_0.50.110_windows_amd64.tar.gz`
-6. `autopus-adk_0.50.110_windows_amd64.zip`
-7. `autopus-adk_0.50.110_windows_arm64.tar.gz`
-8. `autopus-adk_0.50.110_windows_arm64.zip`
+1. `autopus-adk_0.50.111_darwin_amd64.tar.gz`
+2. `autopus-adk_0.50.111_darwin_arm64.tar.gz`
+3. `autopus-adk_0.50.111_linux_amd64.tar.gz`
+4. `autopus-adk_0.50.111_linux_arm64.tar.gz`
+5. `autopus-adk_0.50.111_windows_amd64.tar.gz`
+6. `autopus-adk_0.50.111_windows_amd64.zip`
+7. `autopus-adk_0.50.111_windows_arm64.tar.gz`
+8. `autopus-adk_0.50.111_windows_arm64.zip`
 9. `checksums.txt`
 10. `checksums.txt.bundle`
 11. `checksums.txt.signatures`
@@ -243,16 +253,16 @@ The final release must be non-draft, non-prerelease, immutable, bound to the fro
 Fetch and check the public release shape without assuming it exists:
 
 ```bash
-release_json=$(gh api repos/Insajin/autopus-adk/releases/tags/v0.50.110)
+release_json=$(gh api repos/Insajin/autopus-adk/releases/tags/v0.50.111)
 expected_assets='[
-  "autopus-adk_0.50.110_darwin_amd64.tar.gz",
-  "autopus-adk_0.50.110_darwin_arm64.tar.gz",
-  "autopus-adk_0.50.110_linux_amd64.tar.gz",
-  "autopus-adk_0.50.110_linux_arm64.tar.gz",
-  "autopus-adk_0.50.110_windows_amd64.tar.gz",
-  "autopus-adk_0.50.110_windows_amd64.zip",
-  "autopus-adk_0.50.110_windows_arm64.tar.gz",
-  "autopus-adk_0.50.110_windows_arm64.zip",
+  "autopus-adk_0.50.111_darwin_amd64.tar.gz",
+  "autopus-adk_0.50.111_darwin_arm64.tar.gz",
+  "autopus-adk_0.50.111_linux_amd64.tar.gz",
+  "autopus-adk_0.50.111_linux_arm64.tar.gz",
+  "autopus-adk_0.50.111_windows_amd64.tar.gz",
+  "autopus-adk_0.50.111_windows_amd64.zip",
+  "autopus-adk_0.50.111_windows_arm64.tar.gz",
+  "autopus-adk_0.50.111_windows_arm64.zip",
   "checksums.txt",
   "checksums.txt.bundle",
   "checksums.txt.signatures",
@@ -263,7 +273,7 @@ expected_assets='[
 ]'
 printf '%s\n' "$release_json" | jq -e \
   --arg source "$SOURCE_COMMIT" --argjson expected "$expected_assets" '
-    .tag_name == "v0.50.110" and
+    .tag_name == "v0.50.111" and
     .target_commitish == $source and
     .draft == false and .prerelease == false and .immutable == true and
     (.assets | length) == 15 and
@@ -272,31 +282,31 @@ printf '%s\n' "$release_json" | jq -e \
   '
 ```
 
-Exact equality forbids every extra asset. In particular, v0.50.110 must not contain `omp-context-bridge-release.v1.json`, `adk-key-rotation-v1.json`, or `adk-key-rotation-v1.sig`. A bridge manifest or rotation pair is v0.50.109-only history and burns v0.50.110 if published.
+Exact equality forbids every extra asset. In particular, v0.50.111 must not contain `omp-context-bridge-release.v1.json`, `adk-key-rotation-v1.json`, or `adk-key-rotation-v1.sig`. A bridge manifest or rotation pair is v0.50.109-only history and burns v0.50.111 if published.
 
 ## Homebrew compare-and-swap
 
 Homebrew is post-release publication or recovery only; it is not part of the release commit point. Before issuing a tap token, the publisher must verify the exact immutable R2-tagged release, all 15 assets, K3 evidence, checksum signatures, and lineage.
 
-The normal publisher starts from tap head `4b210f2c2c253a8354a4452c12ce106a1cc58e2c` and Cask blob `a5043042db00f714ba0d4cccf91b76c9a57c64fd`. It renders the v0.50.110 Cask, preserves the Formula blob byte-for-byte, and updates only the Cask through the Git Data API with `force:false`. The ref update is a compare-and-swap: a changed tap head or Cask blob fails closed and must not be forced.
+The normal publisher starts from tap head `4b210f2c2c253a8354a4452c12ce106a1cc58e2c` and Cask blob `a5043042db00f714ba0d4cccf91b76c9a57c64fd`. It renders the v0.50.111 Cask, preserves the Formula blob byte-for-byte, and updates only the Cask through the Git Data API with `force:false`. The ref update is a compare-and-swap: a changed tap head or Cask blob fails closed and must not be forced.
 
 If the immutable release succeeded but normal Homebrew publication failed, use only the protected recovery workflow:
 
 ```bash
-gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.110
+gh workflow run homebrew-formula-bridge-recovery.yaml --ref v0.50.111
 ```
 
 Approve recovery only after it independently verifies the exact R2 tag, 15 assets, K3 proof, signatures, lineage, and pinned tap predecessor. Recovery may issue the minimum-scope tap credential and retry the same Cask-only compare-and-swap. It may not modify the ADK release, evidence, tag, variables, static policy, Formula, or predecessor pins.
 
-## Public v0.50.109 → v0.50.110 canary
+## Public v0.50.109 → v0.50.111 canary
 
-Run the public canary only after v0.50.110 is immutable and publicly downloadable:
+Run the public canary only after v0.50.111 is immutable and publicly downloadable:
 
 ```bash
-gh workflow run upgrade-canary.yaml --ref v0.50.110
+gh workflow run upgrade-canary.yaml --ref v0.50.111
 ```
 
-The workflow must install v0.50.109 and v0.50.110 from their signed public assets, upgrade an actual v0.50.109 project, preserve user-owned state, remove only obsolete bridge-era surfaces, exercise the real hook rejection/approval path, and require `auto doctor --json` to pass the v0.50.110 config, hook, and OMP checks. Preserve the workflow run and uploaded receipt only after the live public lane succeeds. A fixture or locally built candidate is not a substitute.
+The workflow must install v0.50.109 and v0.50.111 from their signed public assets, upgrade an actual v0.50.109 project, preserve user-owned state, remove only obsolete bridge-era surfaces, exercise the real hook rejection/approval path, and require `auto doctor --json` to pass the v0.50.111 config, hook, and OMP checks. Preserve the workflow run and uploaded receipt only after the live public lane succeeds. A fixture or locally built candidate is not a substitute.
 
 ## Reconciliation and rollback boundaries
 
@@ -306,6 +316,6 @@ The workflow must install v0.50.109 and v0.50.110 from their signed public asset
 - **Evidence tag exists but release tag does not:** it is admissible only when the committed verifier proves it is the exact fresh A23 orphan evidence and the retained prep transaction owns the matching lock. v0.50.109 evidence or any differently bound evidence is stale and forbidden.
 - **Remote tag exists:** this is at or beyond the commit point. Run only the publisher's reconcile path to verify convergence. Tag movement, deletion, replacement, and reuse are forbidden.
 - **Release workflow fails after tag:** preserve the tag, evidence, draft/release record, and run logs. Do not upload replacement assets or republish the same version. Fix the defect on `main` and allocate a new release coordinate.
-- **Only Homebrew fails:** keep v0.50.110 immutable and use the protected recovery workflow above. Never roll back the release tag to repair the tap.
-- **Public canary fails:** preserve the immutable release and receipt as incident evidence. Do not move v0.50.109 or v0.50.110. Fix forward at a new coordinate.
+- **Only Homebrew fails:** keep v0.50.111 immutable and use the protected recovery workflow above. Never roll back the release tag to repair the tap.
+- **Public canary fails:** preserve the immutable release and receipt as incident evidence. Do not move v0.50.109 or v0.50.111. Fix forward at a new coordinate.
 - **Any stale evidence, K1/K2 active signature, split expected-key authority, bridge asset, rotation asset, predecessor mismatch, or post-tag mutation attempt:** fail closed and escalate. None is recoverable by operator override.

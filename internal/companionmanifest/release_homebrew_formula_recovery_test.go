@@ -96,12 +96,12 @@ func TestFormulaRecoveryWorkflow_ManualExactA23LeastPrivilege(t *testing.T) {
 		}
 	}
 	for _, version := range regexp.MustCompile(`v?[0-9]+\.[0-9]+\.[0-9]+`).FindAllString(raw, -1) {
-		if version != "v0.50.110" && version != "v4.1.2" && version != "v3.1.2" {
+		if version != "v0.50.111" && version != "v4.1.2" && version != "v3.1.2" {
 			t.Fatalf("recovery workflow references non-A23 version %q", version)
 		}
 	}
-	if strings.Count(raw, "v0.50.110") != 2 {
-		t.Fatalf("recovery workflow must name v0.50.110 only in invocation guidance and exact job guard")
+	if strings.Count(raw, "v0.50.111") != 2 {
+		t.Fatalf("recovery workflow must name v0.50.111 only in invocation guidance and exact job guard")
 	}
 }
 
@@ -146,7 +146,7 @@ func TestFormulaRecoveryWorkflow_RequiresExactSealedTagAuthorityBeforeTapToken(t
 	}
 	for _, required := range []string{
 		`env -i PATH="$PATH" HOME="$HOME" GITHUB_TOKEN="$GITHUB_TOKEN"`,
-		"scripts/companion-release/verify-release-tag-ruleset.sh --sealed",
+		"scripts/companion-release/verify-release-tag-ruleset.sh --sealed-runtime",
 	} {
 		if !strings.Contains(sealed.Run, required) {
 			t.Fatalf("sealed tag authority step missing %q", required)
@@ -154,8 +154,9 @@ func TestFormulaRecoveryWorkflow_RequiresExactSealedTagAuthorityBeforeTapToken(t
 	}
 	ruleset := readReleaseFile(t, "scripts/companion-release/verify-release-tag-ruleset.sh")
 	for _, required := range []string{
-		`readonly release_ref='refs/tags/v0.50.110'`, `--sealed) mode=sealed`,
-		`else .bypass_actors == [] end`, `["creation","deletion","update"]`,
+		`readonly release_ref='refs/tags/v0.50.111'`, `--sealed-runtime) mode=sealed-runtime`,
+		`elif $mode == "sealed-runtime"`, `(.bypass_actors == [] or .bypass_actors == null)`,
+		`if [[ "$mode" != 'sealed-runtime' ]]`, `["creation","deletion","update"]`,
 	} {
 		if !strings.Contains(ruleset, required) {
 			t.Fatalf("sealed tag authority verifier missing %q", required)
