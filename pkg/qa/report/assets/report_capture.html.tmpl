@@ -1,0 +1,111 @@
+{{define "capture"}}
+<div class="capture">
+  <div class="capture-head">
+    <b>Capture</b>
+    <span class="tag">{{.Mode}}</span>
+    {{range .Streams}}<span class="tag">{{.}}</span>{{end}}
+  </div>
+  <div class="meta">
+    <span>steps <b>{{.Totals.Steps}}</b></span>
+    <span>actions <b>{{.Totals.Actions}}</b></span>
+    <span>console errors <b>{{.Totals.ConsoleErrors}}</b></span>
+    <span>network failures <b>{{.Totals.NetworkFailures}}</b></span>
+    <span>screenshots <b>{{.Totals.Screenshots}}</b></span>
+    <span>media <b>{{bytes .Totals.MediaBytes}}</b></span>
+    {{if .StartedAt}}<span>window <b>{{.StartedAt}} → {{nz .EndedAt}}</b></span>{{end}}
+  </div>
+
+  {{if .Steps}}
+  <div class="film">
+    {{range .Steps}}
+    {{$step := .}}
+    <figure class="frame">
+      <div class="frame-head">
+        <span class="frame-ord">#{{.Order}}</span>
+        <span class="frame-id mono" title="{{.StepID}}">{{.StepID}}</span>
+        <span class="pill v-{{.Status}}">{{.Status}}</span>
+      </div>
+      {{with .Screenshot}}
+        {{if .Embedded}}
+        <img src="{{imgsrc .DataURI}}" loading="lazy" decoding="async"
+             alt="{{if $step.Title}}{{$step.Title}}{{else}}step {{$step.StepID}}{{end}}">
+        {{else}}
+        <div class="frame-none">
+          <span>no image inlined</span>
+          <span>{{digest .Digest}}</span>
+          <span>{{.Width}}×{{.Height}} · {{bytes .Bytes}}</span>
+          {{with .MediaError}}<span class="withheld">{{.}}</span>{{end}}
+        </div>
+        {{end}}
+      {{else}}
+      <div class="frame-none"><span>no screenshot</span></div>
+      {{end}}
+      <figcaption class="frame-foot">
+        <span class="frame-title">{{nz .Title}}</span>
+        <span class="mono">{{dur .DurationMS}}</span>
+      </figcaption>
+      <span class="tl-track"><span class="tl-bar v-{{.Status}}" style="left:{{pctf .Bar.OffsetPercent}}%;width:{{pctf .Bar.WidthPercent}}%"></span></span>
+    </figure>
+    {{end}}
+  </div>
+  {{end}}
+
+  {{range .Steps}}
+  {{if or .Actions .Console .Network .FailureSummary}}
+  <details>
+    <summary>
+      <span class="frame-ord">#{{.Order}}</span>
+      <span class="mono">{{.StepID}}</span>
+      <span class="pill v-{{.Status}}">{{.Status}}</span>
+      <span class="sub">{{dur .DurationMS}}{{with .ScreenRef}} · {{.}}{{end}}</span>
+    </summary>
+    <div class="body">
+      {{with .FailureSummary}}<div class="fail-note">{{.}}</div>{{end}}
+      {{if .Actions}}
+      <table>
+        <thead><tr><th>Action</th><th>Target</th><th>Duration</th></tr></thead>
+        <tbody>{{range .Actions}}<tr><td class="mono">{{.API}}</td><td class="mono">{{nz .TargetRef}}</td><td>{{dur .DurationMS}}</td></tr>{{end}}</tbody>
+      </table>
+      {{end}}
+      {{with .Console}}
+      <div class="meta"><span>console errors <b>{{.Errors}}</b></span><span>warnings <b>{{.Warnings}}</b></span><span>infos <b>{{.Infos}}</b></span></div>
+      {{if .Messages}}
+      <table>
+        <thead><tr><th>Severity</th><th>Message</th><th>Source</th></tr></thead>
+        <tbody>{{range .Messages}}<tr><td class="sev-{{.Severity}}">{{.Severity}}</td><td>{{.Text}}</td><td class="mono">{{nz .SourceRef}}</td></tr>{{end}}</tbody>
+      </table>
+      {{end}}
+      {{end}}
+      {{with .Network}}
+      <div class="meta"><span>requests <b>{{.Requests}}</b></span><span>failures <b>{{.Failures}}</b></span></div>
+      {{if .Entries}}
+      <table>
+        <thead><tr><th>Method</th><th>Reference</th><th>Status</th><th>Duration</th><th>Bytes</th></tr></thead>
+        <tbody>{{range .Entries}}<tr><td class="mono">{{.Method}}</td><td class="mono">{{.URLRef}}</td><td>{{.Status}}</td><td>{{dur .DurationMS}}</td><td>{{bytes .Bytes}}</td></tr>{{end}}</tbody>
+      </table>
+      {{end}}
+      {{end}}
+    </div>
+  </details>
+  {{end}}
+  {{end}}
+
+  {{if .Media}}
+  <table>
+    <thead><tr><th>Media</th><th>Reference</th><th>Digest</th><th>Bytes</th><th>Retention</th></tr></thead>
+    <tbody>{{range .Media}}<tr><td>{{.Kind}}</td><td class="mono">{{.Ref}}</td><td class="mono">{{digest .Digest}}</td><td>{{bytes .Bytes}}</td><td>{{.Retention}}</td></tr>{{end}}</tbody>
+  </table>
+  {{end}}
+
+  {{with .Replay}}
+  <div class="replay">
+    <div><b>Replay</b> <span class="tag">{{.Kind}}</span> <span class="sub">{{.StepCount}} step(s)</span></div>
+    <code>{{.Command}}</code>
+    <div class="meta">
+      {{range .SpecRefs}}<span class="tag">{{.}}</span>{{end}}
+      <span>digest <b class="mono">{{.Digest}}</b></span>
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}

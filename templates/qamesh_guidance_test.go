@@ -55,6 +55,69 @@ func TestQAMESHRouterTemplateGuidance(t *testing.T) {
 	}
 }
 
+// TestQAMESHVisualReportGuidance keeps the human-facing evidence report
+// discoverable on every detailed QA surface. Router surfaces only need to reach
+// the `qa` namespace, so they are intentionally excluded.
+func TestQAMESHVisualReportGuidance(t *testing.T) {
+	t.Parallel()
+
+	root := templateRoot()
+	paths := []string{
+		filepath.Join(root, "claude", "commands", "auto-workflows.md.tmpl"),
+		filepath.Join(root, "codex", "prompts", "auto-qa.md.tmpl"),
+		filepath.Join(root, "codex", "skills", "auto-qa.md.tmpl"),
+		filepath.Join(root, "gemini", "commands", "auto", "qa.toml.tmpl"),
+		filepath.Join(root, "gemini", "skills", "auto-qa", "SKILL.md.tmpl"),
+	}
+	for _, path := range paths {
+		path := path
+		t.Run(filepath.Base(filepath.Dir(path))+"-"+filepath.Base(path), func(t *testing.T) {
+			t.Parallel()
+			body, err := os.ReadFile(path)
+			require.NoError(t, err)
+			assert.Contains(t, string(body), "auto qa report")
+			assert.Contains(t, string(body), "report.html")
+		})
+	}
+}
+
+// TestQAMESHCaptureContractGuidance keeps the typed GUI capture contract and its
+// publication boundary documented wherever the capture policy is authored, so an
+// agent cannot invent artifact kinds the harness no longer accepts.
+func TestQAMESHCaptureContractGuidance(t *testing.T) {
+	t.Parallel()
+
+	root := templateRoot()
+	paths := []string{
+		filepath.Join(root, "claude", "commands", "auto-workflows.md.tmpl"),
+		filepath.Join(root, "codex", "prompts", "auto-qa.md.tmpl"),
+		filepath.Join(root, "codex", "skills", "auto-qa.md.tmpl"),
+		filepath.Join(root, "gemini", "skills", "auto-qa", "SKILL.md.tmpl"),
+	}
+	tokens := []string{
+		"gui.capture",
+		"capture-index.json",
+		"capture_index",
+		"AUTOPUS_QAMESH_GUI_CAPTURE_",
+		"gui-capture-contract",
+		"local-redacted-local-media",
+		"guard receipt",
+		"--embed-media",
+		".autopus/qa/capture/README.md",
+	}
+	for _, path := range paths {
+		path := path
+		t.Run(filepath.Base(filepath.Dir(path))+"-"+filepath.Base(path), func(t *testing.T) {
+			t.Parallel()
+			body, err := os.ReadFile(path)
+			require.NoError(t, err)
+			for _, token := range tokens {
+				assert.Contains(t, string(body), token)
+			}
+		})
+	}
+}
+
 func TestAutoGoQAMESHScopeBudgetGuidance(t *testing.T) {
 	t.Parallel()
 

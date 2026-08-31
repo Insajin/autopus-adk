@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<title>{{.Title}}</title>
+<style>{{.CSS}}</style>
+</head>
+<body>
+<main>
+  <div class="head">
+    <div class="head-main">
+      <h1>{{.Title}}</h1>
+      <div class="sub">
+        generated {{.GeneratedAt}} · schema {{.SchemaVersion}}
+        {{- with .Run}} · profile <b>{{nz .Profile}}</b> · lane <b>{{nz .Lane}}</b> · repo <b>{{nz .RepoID}}</b>{{end}}
+      </div>
+    </div>
+    <span class="pill pill-lg v-{{.Verdict}}">{{.Verdict}}</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>{{.Summary.JourneyCount}}</b><span>journeys</span></div>
+    <div class="stat"><b>{{.Summary.JourneysPassed}} / {{.Summary.JourneysFailed}}</b><span>passed / failed</span></div>
+    <div class="stat"><b>{{.Summary.CheckCount}}</b><span>checks</span></div>
+    <div class="stat"><b>{{.Summary.ChecksFailed}}</b><span>failed checks</span></div>
+    <div class="stat"><b>{{.Summary.ArtifactCount}}</b><span>artifacts</span></div>
+    <div class="stat"><b>{{.Summary.PreviewCount}} / {{.Summary.WithheldCount}}</b><span>inlined / withheld</span></div>
+    {{if gt .Summary.CaptureStepCount 0}}
+    <div class="stat"><b>{{.Summary.CaptureStepCount}}</b><span>capture steps</span></div>
+    <div class="stat"><b>{{.Summary.ScreenshotCount}}</b><span>screenshots</span></div>
+    <div class="stat"><b>{{.Summary.ConsoleErrors}} / {{.Summary.NetworkFailures}}</b><span>console / network errors</span></div>
+    {{end}}
+    <div class="stat"><b>{{.Summary.SetupGapCount}}</b><span>setup gaps</span></div>
+    <div class="stat"><b>{{dur .Summary.DurationMS}}</b><span>wall clock</span></div>
+  </div>
+
+  {{if eq .Retention "local-only"}}
+  <div class="banner banner-local">
+    <strong>Local-only report — do not publish, attach, or share this file</strong>
+    This report inlines raw screenshots read from the local capture directory. Those bytes never
+    passed the evidence publication boundary and may contain anything that was on screen. Keep the
+    file on the machine that produced it; regenerate without <code>--embed-media</code> to share.
+  </div>
+  {{end}}
+
+  {{if ne .Ingestion.Status "complete"}}
+  <div class="banner banner-{{.Ingestion.Status}}">
+    <strong>Evidence ingestion {{.Ingestion.Status}} — {{len .Ingestion.Rejections}} source(s) refused</strong>
+    <ul>
+      {{range .Ingestion.Rejections}}<li><code>{{.Ref}}</code> — {{.Reason}}</li>{{end}}
+    </ul>
+  </div>
+  {{end}}
+
+  {{if gt .Timeline.SpanMS 0}}
+  <h2>Timeline</h2>
+  <div class="timeline">
+    {{range .Journeys}}
+    <div class="tl-row">
+      <span class="tl-name" title="{{.JourneyID}}">{{.JourneyID}}</span>
+      <span class="tl-track"><span class="tl-bar v-{{.Verdict}}" style="left:{{pctf .Bar.OffsetPercent}}%;width:{{pctf .Bar.WidthPercent}}%"></span></span>
+      <span class="tl-dur">{{dur .DurationMS}}</span>
+    </div>
+    {{end}}
+    <div class="tl-axis"><span>{{.Timeline.StartedAt}}</span><span>{{.Timeline.EndedAt}}</span></div>
+  </div>
+  {{end}}
+
+  {{with .Release}}
+  <h2>Release gate — {{nz .ReleaseID}} <span class="pill v-{{.Status}}">{{nz .Status}}</span></h2>
+  <div class="card">
+    <div class="meta">
+      <span>profile <b>{{nz .Profile}}</b></span>
+      <span>deterministic authority <b>{{.DeterministicAuthority}}</b></span>
+      <span>redaction <b>{{.RedactionStatus}}</b></span>
+      <span>window <b>{{nz .StartedAt}} → {{nz .EndedAt}}</b></span>
+    </div>
+    {{if .Lanes}}
+    <table>
+      <thead><tr><th>Lane</th><th>Policy</th><th>Status</th><th>Verdict</th><th>Severity</th><th>Setup gap</th><th>Owner</th><th>Evidence</th></tr></thead>
+      <tbody>
+        {{range .Lanes}}
+        <tr>
+          <td class="mono">{{.Lane}}</td>
+          <td>{{nz .Policy}}</td>
+          <td><span class="pill v-{{.Status}}">{{.Status}}</span></td>
+          <td><span class="pill v-{{.Verdict}}">{{.Verdict}}</span></td>
+          <td>{{.Severity}}</td>
+          <td>{{.SetupGapClass}}</td>
+          <td class="mono">{{nz .OwnerSpec}}</td>
+          <td>{{.ManifestCount}} manifest / {{.FeedbackCount}} feedback</td>
+        </tr>
+        {{if or .FailureSummary .SkippedReason}}
+        <tr><td colspan="8" class="sub">{{if .FailedJourneyID}}<b>{{.FailedJourneyID}}</b> — {{end}}{{nz .FailureSummary}}{{with .SkippedReason}} · skipped: {{.}}{{end}}</td></tr>
+        {{end}}
+        {{end}}
+      </tbody>
+    </table>
+    {{end}}
+    {{if .Blockers}}<div class="fail-note"><b>Blockers</b><ul>{{range .Blockers}}<li>{{.}}</li>{{end}}</ul></div>{{end}}
+  </div>
+  {{end}}
+
+  <h2>Journeys</h2>
+  {{if not .Journeys}}<p class="empty">No evidence manifest was ingested for this run.</p>{{end}}
+  {{range .Journeys}}
+  <section class="card">
+    <div class="card-head">
+      <div class="grow">
+        <h3>{{.JourneyID}}{{with .StepID}} <span class="tag">{{.}}</span>{{end}}</h3>
+        <div class="meta">
+          <span>adapter <b>{{nz .Adapter}}</b></span>
+          <span>surface <b>{{.Surface}}</b></span>
+          <span>lane <b>{{.Lane}}</b></span>
+          <span>runner <b>{{.RunnerName}}{{with .RunnerVersion}} {{.}}{{end}}</b></span>
+          <span>duration <b>{{dur .DurationMS}}</b></span>
+          <span>retention <b>{{.RetentionClass}}</b></span>
+        </div>
+      </div>
+      <span class="pill v-{{.Verdict}}">{{.Verdict}}</span>
+    </div>
+
+    {{with .FailureSummary}}<div class="fail-note">{{.}}</div>{{end}}
+
+    {{if .Checks}}
+    <table>
+      <thead><tr><th>Check</th><th>Type</th><th>Status</th><th>Expected</th><th>Actual</th></tr></thead>
+      <tbody>
+        {{range .Checks}}
+        <tr>
+          <td class="mono">{{.ID}}</td>
+          <td>{{.Type}}</td>
+          <td><span class="pill v-{{.Status}}">{{.Status}}</span></td>
+          <td>{{nz .Expected}}</td>
+          <td>{{nz .Actual}}</td>
+        </tr>
+        {{with .FailureSummary}}<tr><td colspan="5" class="sub">{{.}}</td></tr>{{end}}
+        {{end}}
+      </tbody>
+    </table>
+    {{end}}
+
+    {{with .A11y}}
+    <div class="meta"><span>a11y critical <b>{{.CriticalCount}}</b></span><span>serious <b>{{.SeriousCount}}</b></span>{{range .FailedTargets}}<span class="tag">{{.}}</span>{{end}}</div>
+    {{end}}
+
+    {{with .Desktop}}
+    <details>
+      <summary><b>Desktop observation</b> <span class="tag">{{.NodeCount}} nodes</span> <span class="tag">{{.CheckCount}} checks</span></summary>
+      <div class="body meta">
+        <span>app <b>{{nz .AppRef}}</b></span>
+        <span>window <b>{{nz .WindowRef}}</b></span>
+        <span>state <b>{{nz .StateRef}}</b></span>
+        <span>root role <b>{{nz .RootRole}}</b></span>
+        <span>digest <b class="mono">{{nz .Digest}}</b></span>
+        {{with .TimeoutClass}}<span>timeout <b>{{.}}</b></span>{{end}}
+      </div>
+    </details>
+    {{end}}
+
+    {{with .Capture}}{{template "capture" .}}{{end}}
+    {{with .CaptureError}}<div class="capture"><div class="capture-head"><b>Capture</b> <span class="withheld">index refused: {{.}}</span></div></div>{{end}}
+
+    {{range .Artifacts}}
+    <details>
+      <summary>
+        <span class="tag">{{.Kind}}</span>
+        <span class="mono">{{.Ref}}</span>
+        <span class="sub">{{bytes .Bytes}} · {{.Redaction}}{{if not .Publishable}} · local-only{{end}}</span>
+        {{with .Withheld}}<span class="withheld">withheld: {{.}}</span>{{end}}
+      </summary>
+      <div class="body">
+        {{if .Preview}}<pre>{{.Preview}}</pre>{{if .Truncated}}<div class="sub">preview truncated</div>{{end}}
+        {{else if eq .Withheld "empty_artifact"}}<div class="sub">Artifact is empty.</div>
+        {{else}}<div class="sub">No inline preview. {{if not .Publishable}}Artifact is local-only evidence and is never embedded in a shareable report.{{else}}Reason: {{nz .Withheld}}.{{end}}</div>{{end}}
+      </div>
+    </details>
+    {{end}}
+
+    <details>
+      <summary><b>Provenance</b> <span class="mono">{{.ManifestRef}}</span></summary>
+      <div class="body meta">
+        <span>qa result <b class="mono">{{nz .QAResultID}}</b></span>
+        <span>scenario <b class="mono">{{nz .ScenarioRef}}</b></span>
+        <span>schema <b class="mono">{{nz .SchemaVersion}}</b></span>
+        <span>spec <b class="mono">{{nz .Source.SourceSpec}}</b></span>
+        {{range .Source.AcceptanceRefs}}<span class="tag">{{.}}</span>{{end}}
+        {{with .Source.MobileDigest}}<span>app digest <b class="mono">{{.}}</b></span>{{end}}
+        {{with .Source.MobileDeviceRef}}<span>device <b class="mono">{{.}}</b></span>{{end}}
+        {{with .RepairPromptRef}}<span>repair prompt <b class="mono">{{.}}</b></span>{{end}}
+        {{with .ReproductionCommand}}<span>reproduce <b class="mono">{{.}}</b></span>{{end}}
+      </div>
+    </details>
+  </section>
+  {{end}}
+
+  {{if .SetupGaps}}
+  <h2>Setup gaps</h2>
+  <table class="card">
+    <thead><tr><th>Adapter</th><th>Journey</th><th>Reason</th></tr></thead>
+    <tbody>{{range .SetupGaps}}<tr><td class="mono">{{.Adapter}}</td><td class="mono">{{nz .JourneyID}}</td><td>{{.Reason}}</td></tr>{{end}}</tbody>
+  </table>
+  {{end}}
+
+  {{if .NextCommands}}
+  <h2>Next</h2>
+  <ul class="cmds">{{range .NextCommands}}<li>{{.}}</li>{{end}}</ul>
+  {{end}}
+
+  <footer>
+    QAMESH evidence report · {{.SchemaVersion}} · retention {{.Retention}}
+    <span class="mono">run index: {{nz .Ingestion.RunIndexRef}}{{with .Ingestion.ReleaseIndexRef}} · release index: {{.}}{{end}} · manifests ingested: {{.Ingestion.ManifestCount}}</span>
+    {{with .Run}}<span class="mono">{{range .SourceRefs}}{{.}} {{end}}</span>{{end}}
+  </footer>
+</main>
+</body>
+</html>

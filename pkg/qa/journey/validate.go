@@ -30,6 +30,9 @@ func Validate(pack Pack, projectDir string) error {
 	if err := validateGUIPolicy(pack); err != nil {
 		return err
 	}
+	if err := validateGUICapturePolicy(pack); err != nil {
+		return err
+	}
 	if err := validateMobilePolicy(pack, projectDir); err != nil {
 		return err
 	}

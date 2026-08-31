@@ -18,6 +18,7 @@ const (
 	guiAllowedOriginsEnv      = "AUTOPUS_QAMESH_GUI_ALLOWED_ORIGINS"
 	guiForbiddenActionsEnv    = "AUTOPUS_QAMESH_GUI_FORBIDDEN_ACTIONS"
 	guiGuardReadyPathEnv      = "AUTOPUS_QAMESH_GUI_GUARD_READY_PATH"
+	guiGuardReceiptPathEnv    = "AUTOPUS_QAMESH_GUI_GUARD_RECEIPT_PATH"
 	guiPolicyRuntimeCheckID   = "gui-policy-runtime"
 	guiPolicyRuntimeCheckType = "gui_runtime_policy"
 	guiGuardPreflightTimeout  = 15 * time.Second
@@ -26,6 +27,9 @@ const (
 type guiRuntimeInput struct {
 	Env            []string
 	GuardReadyPath string
+	// GuardReceiptPath is harness-owned append-only enforcement evidence. It is
+	// the only source trusted to assert that policy was actually applied.
+	GuardReceiptPath string
 }
 
 func prepareGUIPolicyInput(pack journey.Pack, artifactDir string) (guiRuntimeInput, error) {
@@ -53,6 +57,7 @@ func prepareGUIPolicyInput(pack journey.Pack, artifactDir string) (guiRuntimeInp
 	path := filepath.Join(artifactDir, "gui-policy.json")
 	guardPath := filepath.Join(artifactDir, "gui-policy-guard.cjs")
 	readyPath := filepath.Join(artifactDir, "gui-policy-guard-ready.json")
+	receiptPath := filepath.Join(artifactDir, "gui-policy-guard-receipt.jsonl")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return guiRuntimeInput{}, err
 	}
@@ -74,13 +79,19 @@ func prepareGUIPolicyInput(pack journey.Pack, artifactDir string) (guiRuntimeInp
 	if err != nil {
 		return guiRuntimeInput{}, err
 	}
+	absReceiptPath, err := filepath.Abs(receiptPath)
+	if err != nil {
+		return guiRuntimeInput{}, err
+	}
 	return guiRuntimeInput{
-		GuardReadyPath: absReadyPath,
+		GuardReadyPath:   absReadyPath,
+		GuardReceiptPath: absReceiptPath,
 		Env: []string{
 			guiPolicyPathEnv + "=" + absPath,
 			guiAllowedOriginsEnv + "=" + strings.Join(allowed, ","),
 			guiForbiddenActionsEnv + "=" + strings.Join(forbidden, ","),
 			guiGuardReadyPathEnv + "=" + absReadyPath,
+			guiGuardReceiptPathEnv + "=" + absReceiptPath,
 			"NODE_OPTIONS=" + appendNodeRequire(os.Getenv("NODE_OPTIONS"), absGuardPath),
 		},
 	}, nil

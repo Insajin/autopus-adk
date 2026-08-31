@@ -25,7 +25,11 @@ func TestRegistryContainsRequiredAdapters(t *testing.T) {
 	gui, ok := ByID("gui-explore")
 	require.True(t, ok)
 	assert.Contains(t, gui.ArtifactCapabilities, "journey_graph")
-	assert.Contains(t, gui.ArtifactCapabilities, "screenshot_quarantine_ref")
+	assert.Contains(t, gui.ArtifactCapabilities, "capture_index")
+	assert.Contains(t, gui.ArtifactCapabilities, "capture_trace_local")
+	// Kinds the harness never produced must not be advertised as capabilities.
+	assert.NotContains(t, gui.ArtifactCapabilities, "a11y_violations")
+	assert.NotContains(t, gui.ArtifactCapabilities, "dom_snapshot_digest")
 	designVisual, ok := ByID("design-visual")
 	require.True(t, ok)
 	assert.Equal(t, []string{"design-visual"}, designVisual.DefaultLanes)

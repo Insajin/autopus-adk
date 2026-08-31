@@ -1,7 +1,7 @@
 ---
 name: auto-qa
 version: "1.0.0"
-description: QAMESH project QA mesh — auto qa full/init/plan/run/explore/release/coverage/profile/evidence/feedback guidance
+description: QAMESH project QA mesh — auto qa full/init/plan/run/explore/release/coverage/report/profile/evidence/feedback guidance
 platform: antigravity-cli
 project: {{.ProjectName}}
 mode: {{.Mode}}
@@ -10,6 +10,7 @@ triggers:
   - "qamesh"
   - "auto qa full"
   - "auto qa coverage"
+  - "auto qa report"
   - "auto qa profile"
   - "auto qa init"
   - "auto qa plan"
@@ -44,6 +45,9 @@ QAMESH는 project-level deterministic QA 실행, manifest validation, redaction,
 
 - Use `auto qa full --format json` as the easiest default entrypoint for full project QA planning. It inspects the release-style lane matrix, Journey Packs, setup gaps, and domain-readiness catalog without running commands. Add `--bootstrap` to create safe starter files first, and add `--run` only when the caller explicitly wants the full gate executed.
 - Use `auto qa coverage --format json` after a run/release to summarize lane, journey, manifest, setup-gap, and domain-readiness coverage.
+- Use `auto qa report --format json` to render a self-contained `report.html` beside the run index. It is the visual handoff surface: verdict, journey timeline, release lane gate matrix, per-check expected/actual drill-down, inlined artifact previews, and setup gaps in one shareable file with no external assets. Add `--no-write` to inspect the projection without writing the file.
+- `auto qa report` inlines publishable text artifacts only. Local-only quarantine refs, raw media, and non-text artifacts stay metadata-only, and a run index that fails the schema or redaction gate renders as degraded/blocked ingestion.
+- Use `auto qa report --embed-media` only when raw local screenshots must be inlined as data URIs; that marks the report `retention: local-only` with a do-not-share banner. The default `shareable` report shows digests, dimensions, and byte sizes.
 - Use `auto qa profile check --format json` when GUI/auth/profile capability readiness matters before execution.
 - Use `auto qa plan --format json` before execution to inspect Journey Packs, detected adapters, lanes, setup gaps, and output paths without running commands.
 - Use `auto qa init --format json` as the simple default release-QA setup command. It creates project-local starter Journey Packs and a generic GitHub Actions release gate from detected Go, Node, Python, Rust, Playwright, and desktop signals. Existing files are preserved and generated files require human review before execution.
@@ -55,6 +59,17 @@ QAMESH는 project-level deterministic QA 실행, manifest validation, redaction,
 - Use `auto qa evidence` when a producer already wrote a QAMESH manifest and the task is validation, redaction, or publication.
 - Use `auto qa feedback` to convert failed QAMESH evidence into Claude, Codex, Gemini, or OpenCode repair prompt bundles.
 - ADK is a harness: concrete commands, origins, oracles, and artifact policy belong in a project-local Journey Pack under `.autopus/qa/journeys/**`.
+
+## GUI Capture Contract
+
+- A `gui-explore` Journey Pack declares per-step evidence through `gui.capture`: `mode` (`off|on-failure|always`), `streams` (`screenshot,console,network,trace,video`), `screenshot` (`off|on-failure|per-step`), `console_severity`, `retain_local`, and `replay_script`. An undefined key rejects the whole pack, so a typo cannot silently disable evidence.
+- `auto qa init` deliberately does NOT generate a `gui-explore` Journey Pack: it could not pass until the project supplies a read-only exploration subset, and `gui-explore` is a `must` lane in the default `prelaunch` profile. With no pack, `auto qa explore` reports a setup gap; the pack to copy lives in `.autopus/qa/capture/README.md`.
+- The harness does not drive Playwright. It allocates the capture directory and policy, exports `AUTOPUS_QAMESH_GUI_CAPTURE_DIR`, `AUTOPUS_QAMESH_GUI_CAPTURE_POLICY_PATH`, and `AUTOPUS_QAMESH_GUI_CAPTURE_INDEX_PATH`, and reads back the producer-written `capture-index.json` (`qamesh.gui_capture_index.v1`) that `auto qa init` scaffolds into `.autopus/qa/capture/**`.
+- The `gui-capture-contract` check validates schema, dense step order, totals consistency, policy conformance, and local media digest/size fail-closed; a violation blocks the journey and publishes no `capture_index` artifact.
+- Policy-enforcement evidence comes from a harness-owned guard receipt, so a producer cannot certify its own compliance.
+- Raw screenshots, traces, videos, and HARs are never published. Only the sanitized `capture-index.published.json` (kind `capture_index`) becomes evidence; raw bytes stay local and set `retention_class` to `local-redacted-local-media`.
+- Network evidence carries `origin:<index>/path` or origin-relative `/path` references, never URLs.
+- `replay` is a pinned command plus spec digests, not synthesized code, so a captured journey re-runs at zero inference cost.
 
 ## Guardrails
 

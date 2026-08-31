@@ -14,6 +14,7 @@ import (
 
 const (
 	DesktopGUIJourneyID = "desktop-gui-explore"
+	BrowserGUIJourneyID = "browser-gui-explore"
 	journeyRootRel      = ".autopus/qa/journeys"
 )
 

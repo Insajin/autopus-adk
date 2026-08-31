@@ -35,6 +35,10 @@ type projectSignals struct {
 	HasAndroidSignals bool
 	HasIOSSignals     bool
 	PackageManager    string
+	// BaseOrigin is the Playwright baseURL origin when the project states one, so
+	// the gui-explore example in the capture README targets the real dev server
+	// instead of a guess.
+	BaseOrigin string
 }
 
 type packageManifest struct {
@@ -49,14 +53,24 @@ func detectJourneyStarters(projectDir string, release bool) []starterFile {
 	if fast, ok := fastStarter(signals); ok {
 		starters = append(starters, fast)
 	}
-	if signals.HasPlaywright || (release && signals.HasBrowser) {
+	browserLane := signals.HasPlaywright || (release && signals.HasBrowser)
+	if browserLane {
 		starters = append(starters, browserStagingStarter(signals))
 	}
 	if signals.HasDesktopGUI {
 		if desktop, ok := desktopNativeStarter(signals); ok {
 			starters = append(starters, desktop)
 		}
-		starters = append(starters, desktopGUIStarter(signals))
+	}
+	// No gui-explore Journey Pack is generated on purpose. Such a pack cannot pass
+	// until the project supplies a read-only exploration suite: the whole test suite
+	// trips the forbidden `mutation` action, and an empty selection trips the capture
+	// contract's minimum-one-step rule. Since gui-explore is a `must` lane in the
+	// default prelaunch profile, shipping an unrunnable pack turns the release gate
+	// red, while a missing pack is a setup gap that reads as "configure this".
+	// The capture README carries the pack to copy when the project opts in.
+	if browserLane || signals.HasDesktopGUI {
+		starters = append(starters, captureProducerStarters(signals)...)
 	}
 	if signals.HasAndroidSignals || signals.HasIOSSignals {
 		starters = append(starters, mobileScriptedStarter(signals))
@@ -112,6 +126,9 @@ func detectSignals(projectDir string) projectSignals {
 	}
 	signals.HasBrowser = qaproject.HasBrowserSignals(projectDir)
 	signals.HasPlaywright = hasPlaywright(projectDir, signals.Package)
+	if signals.HasPlaywright || signals.HasBrowser {
+		signals.BaseOrigin = detectBaseOrigin(projectDir)
+	}
 	signals.HasAndroidSignals = qaproject.HasAndroidSignals(projectDir)
 	signals.HasIOSSignals = qaproject.HasIOSSignals(projectDir)
 	return signals

@@ -19,6 +19,9 @@ func buildManifest(opts Options, pack journey.Pack, result commandResult, checks
 	if !blocksGUIArtifactPublication(checks) {
 		artifacts = append(artifacts, declaredArtifacts(opts.ProjectDir, pack)...)
 	}
+	if result.CaptureArtifact != nil {
+		artifacts = append(artifacts, *result.CaptureArtifact)
+	}
 	refs := sourceRefs(pack)
 	// @AX:NOTE: [AUTO] magic constants — fallback SPEC and AC refs for the mobile-scripted lane when the pack omits source_refs
 	if strings.EqualFold(opts.Lane, laneMobileScripted) && strings.TrimSpace(pack.SourceRefs.SourceSpec) == "" {
@@ -42,7 +45,7 @@ func buildManifest(opts Options, pack journey.Pack, result commandResult, checks
 		OracleResults:       qaevidence.OracleResults{Checks: manifestChecks(pack, checks, artifacts)},
 		RedactionStatus:     qaevidence.RedactionStatus{Status: "passed"},
 		SourceRefs:          refs,
-		RetentionClass:      "local-redacted",
+		RetentionClass:      retentionClassFor(result),
 		ReproductionCommand: result.Command,
 	}
 }
@@ -112,6 +115,9 @@ func manifestChecks(pack journey.Pack, checks []IndexCheck, artifacts []qaeviden
 func manifestCheckType(pack journey.Pack, check IndexCheck) string {
 	if check.ID == guiPolicyRuntimeCheckID {
 		return guiPolicyRuntimeCheckType
+	}
+	if check.ID == guiCaptureCheckID {
+		return guiCaptureCheckType
 	}
 	if check.ID == guiArtifactPublicationCheckID {
 		return guiArtifactPublicationCheckType

@@ -5,6 +5,7 @@ func guiPolicyGuardScript() string {
 const Module = require("module");
 const policyPath = process.env.AUTOPUS_QAMESH_GUI_POLICY_PATH;
 const readyPath = process.env.AUTOPUS_QAMESH_GUI_GUARD_READY_PATH;
+const receiptPath = process.env.AUTOPUS_QAMESH_GUI_GUARD_RECEIPT_PATH;
 let policy = {
   allowed_origins: (process.env.AUTOPUS_QAMESH_GUI_ALLOWED_ORIGINS || "").split(",").filter(Boolean),
   forbidden_actions: (process.env.AUTOPUS_QAMESH_GUI_FORBIDDEN_ACTIONS || "").split(",").filter(Boolean)
@@ -34,11 +35,23 @@ function originOfTarget(value) {
   }
   return "";
 }
+// recordEvent appends one JSONL line to the harness-owned receipt. The guard is
+// the only trustworthy witness that policy was enforced: the producer must not
+// be able to certify its own enforcement. Appends are line-sized and O_APPEND,
+// so concurrent Playwright workers interleave safely.
+function recordEvent(event) {
+  if (!receiptPath) return;
+  try {
+    fs.appendFileSync(receiptPath, JSON.stringify(event) + "\n");
+  } catch (_) {}
+}
 function ensureURLAllowed(target) {
   const origin = originOfTarget(target);
   if (!origin || !allowedOrigins.has(origin)) {
+    recordEvent({ t: "goto", origin: origin, allowed: false });
     throw new Error("AUTOPUS_QAMESH_GUI_OFF_ORIGIN:" + origin);
   }
+  recordEvent({ t: "goto", origin: origin, allowed: true });
 }
 function shouldBlockAction(method) {
   method = String(method).toLowerCase();
@@ -47,8 +60,10 @@ function shouldBlockAction(method) {
 }
 function blockAction(method) {
   if (shouldBlockAction(method)) {
+    recordEvent({ t: "action", method: String(method).toLowerCase(), blocked: true });
     throw new Error("AUTOPUS_QAMESH_GUI_FORBIDDEN_ACTION:" + method);
   }
+  recordEvent({ t: "action", method: String(method).toLowerCase(), blocked: false });
 }
 function patchMethod(target, name, wrapper) {
   if (!target || typeof target[name] !== "function") return;

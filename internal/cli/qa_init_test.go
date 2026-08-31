@@ -13,7 +13,12 @@ import (
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
 )
 
-func TestQAInitCmd_CreatesValidatedDesktopGUIJourneyPack(t *testing.T) {
+// TestQAInitCmd_EmitsCaptureProducerWithoutGUIExplorePack pins the deliberate
+// absence: a generated gui-explore pack cannot pass until the project supplies a
+// read-only exploration subset, and gui-explore is a `must` lane in the default
+// prelaunch profile, so shipping one would turn the release gate red. The capture
+// producer and its README (which carries the pack to copy) still ship.
+func TestQAInitCmd_EmitsCaptureProducerWithoutGUIExplorePack(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -31,20 +36,21 @@ func TestQAInitCmd_CreatesValidatedDesktopGUIJourneyPack(t *testing.T) {
 	data := payload["data"].(map[string]any)
 	assert.Equal(t, "created", data["status"])
 
-	journeyPath := filepath.Join(dir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml")
-	assert.FileExists(t, journeyPath)
-	created := data["created"].([]any)
-	assertContainsCreatedID(t, created, "desktop-gui-explore")
-	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
+	journeyDir := filepath.Join(dir, ".autopus", "qa", "journeys")
+	assert.NoFileExists(t, filepath.Join(journeyDir, "desktop-gui-explore.yaml"))
+	assert.NoFileExists(t, filepath.Join(journeyDir, "browser-gui-explore.yaml"))
+	assert.FileExists(t, filepath.Join(journeyDir, "canary-explicit.yaml"))
 	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 
-	pack, err := journey.LoadFile(journeyPath)
+	captureDir := filepath.Join(dir, ".autopus", "qa", "capture")
+	for _, name := range []string{"autopus-capture.fixture.cjs", "autopus-capture.reporter.cjs", "README.md"} {
+		assert.FileExists(t, filepath.Join(captureDir, name))
+	}
+	readme, err := os.ReadFile(filepath.Join(captureDir, "README.md"))
 	require.NoError(t, err)
-	require.NoError(t, journey.Validate(pack, dir))
-	assert.Equal(t, "gui-explore", pack.Adapter.ID)
-	assert.Contains(t, pack.Lanes, "gui-explore")
-	assert.Contains(t, pack.GUI.AllowedOrigins, "http://127.0.0.1:1420")
+	assert.Contains(t, string(readme), "browser-gui-explore.yaml",
+		"the README must carry the pack a project copies when it opts in")
 }
 
 func TestQAInitCmd_CreatesDetectedGoFastJourneyPack(t *testing.T) {
@@ -236,7 +242,9 @@ func TestQAInitCmd_DefaultResolvesNestedWorkspaceTarget(t *testing.T) {
 	assert.Equal(t, realPath(t, root), data["requested_project_dir"])
 	assert.Equal(t, realPath(t, root), data["workspace_root"])
 	assert.Contains(t, data["target_reason"], "autopus-desktop")
-	assert.FileExists(t, filepath.Join(desktopDir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml"))
+	// The gui-explore pack is intentionally not generated, so assert on a starter
+	// that still proves the desktop repo was the resolved target.
+	assert.FileExists(t, filepath.Join(desktopDir, ".autopus", "qa", "capture", "README.md"))
 	assert.FileExists(t, filepath.Join(desktopDir, ".github", "workflows", "autopus-qa-release.yml"))
 	assert.NoFileExists(t, filepath.Join(root, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
 	assertNextStepContains(t, data["next_steps"].([]any), "auto qa plan --project-dir autopus-desktop --format json")

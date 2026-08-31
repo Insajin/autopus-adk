@@ -25,7 +25,7 @@ func applyGUIPolicyOracle(projectDir string, pack journey.Pack, result *commandR
 	if pack.Adapter.ID != "gui-explore" {
 		return IndexCheck{}, false
 	}
-	eval := evaluateGUIPolicyEvidence(projectDir, pack, result.GUIGuardReadyPath)
+	eval := evaluateGUIPolicyEvidence(projectDir, pack, result)
 	check := IndexCheck{
 		ID:        guiPolicyRuntimeCheckID,
 		JourneyID: pack.ID,
@@ -44,9 +44,12 @@ func applyGUIPolicyOracle(projectDir string, pack journey.Pack, result *commandR
 	return check, true
 }
 
-func evaluateGUIPolicyEvidence(projectDir string, pack journey.Pack, guardReadyPath string) guiPolicyEvaluation {
+func evaluateGUIPolicyEvidence(projectDir string, pack journey.Pack, result *commandResult) guiPolicyEvaluation {
+	if pack.GUI.Capture.Enabled() {
+		return evaluateCapturePolicyEvidence(pack, result)
+	}
 	eval := guiPolicyEvaluation{}
-	if !guiGuardReady(guardReadyPath) {
+	if !guiGuardReady(result.GUIGuardReadyPath) {
 		eval.missingEvidence = append(eval.missingEvidence, "gui_policy_guard.ready")
 	}
 	graph, err := readDeclaredJSON(projectDir, pack, "journey_graph")
@@ -58,12 +61,12 @@ func evaluateGUIPolicyEvidence(projectDir string, pack journey.Pack, guardReadyP
 	eval.unavailable = append(eval.unavailable, guiAvailabilityFailures(graph)...)
 	eval.blockedAttempts = append(eval.blockedAttempts, stoppedPolicyAttempts(graph, pack)...)
 	eval.missingScreens, eval.missingActions = evaluateGUIScreenMatrix(graph, pack.GUI.ScreenMatrix)
-	network, err := readDeclaredJSON(projectDir, pack, "network_summary")
-	if err != nil {
-		eval.missingEvidence = append(eval.missingEvidence, err.Error())
+	outside, missing := evaluateGUINetworkEvidence(projectDir, pack, result)
+	if len(missing) > 0 {
+		eval.missingEvidence = append(eval.missingEvidence, missing...)
 		return eval
 	}
-	eval.outsideRequests = outsideAllowedNetworkRequests(network, pack.GUI.AllowedOrigins)
+	eval.outsideRequests = outside
 	if !eval.confirmed && len(eval.blockedAttempts) == 0 {
 		eval.missingEvidence = append(eval.missingEvidence, "journey_graph.runtime_policy_enforced")
 	}

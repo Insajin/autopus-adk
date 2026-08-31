@@ -70,15 +70,19 @@ func metadata(id string, surfaces, binaries []string) Metadata {
 	}
 	if id == "gui-explore" {
 		item.DefaultLanes = []string{"gui-explore"}
+		// These are the capabilities the harness can actually account for: the
+		// journey_graph safety oracle input, the typed capture index, and the
+		// local-only media streams the capture contract declares. Kinds with no
+		// producer were removed rather than left advertised.
 		item.ArtifactCapabilities = append(item.ArtifactCapabilities,
 			"journey_graph",
-			"aria_snapshot",
-			"a11y_violations",
-			"console_summary",
-			"network_summary",
-			"screenshot_quarantine_ref",
-			"video_trace_ref",
-			"dom_snapshot_digest",
+			"capture_index",
+			"capture_step_screenshot_local",
+			"capture_console",
+			"capture_network",
+			"capture_trace_local",
+			"capture_video_local",
+			"capture_replay_ref",
 		)
 	}
 	if id == "design-visual" {

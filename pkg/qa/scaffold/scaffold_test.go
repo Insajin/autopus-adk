@@ -38,9 +38,9 @@ func TestInitResolvesWorkspaceTargetIntoDesktopRepo(t *testing.T) {
 	assert.Equal(t, realPath(t, root), result.RequestedProjectDir)
 	assert.Equal(t, realPath(t, root), result.WorkspaceRoot)
 	assert.Contains(t, result.TargetReason, "autopus-desktop")
-	assertCreatedID(t, result, "desktop-gui-explore")
+	assertCreatedID(t, result, "desktop-native")
 	assertCreatedID(t, result, "github-actions-release-gate")
-	assert.FileExists(t, filepath.Join(desktopDir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml"))
+	assert.FileExists(t, filepath.Join(desktopDir, ".autopus", "qa", "journeys", "desktop-native.yaml"))
 	assert.NoFileExists(t, filepath.Join(root, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
 	assertNextStepContains(t, result.NextSteps, "auto qa plan --project-dir autopus-desktop --format json")
 }
@@ -153,9 +153,12 @@ func TestInitCreatesDesktopNativeStarterForTauriRustProject(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(body), `argv: ["cargo", "test"]`)
 	assert.Contains(t, string(body), "  cwd: src-tauri")
-	guiBody, err := os.ReadFile(filepath.Join(dir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml"))
-	require.NoError(t, err)
-	assert.Contains(t, string(guiBody), `argv: ["pnpm", "exec", "playwright", "test"]`)
+
+	// auto qa init writes no gui-explore pack; the capture README carries the example
+	// this project copies once it owns a read-only exploration subset.
+	assert.NoFileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "desktop-gui-explore.yaml"))
+	readme := readString(t, filepath.Join(dir, ".autopus", "qa", "capture", "README.md"))
+	assert.Contains(t, readme, `argv: ["pnpm", "exec", "playwright", "test", "--grep", "@explore"]`)
 }
 
 func mkdirAll(t *testing.T, path string) {

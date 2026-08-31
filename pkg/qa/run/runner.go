@@ -197,6 +197,13 @@ func executePack(opts Options, pack journey.Pack, rawRoot, runDir string) (Adapt
 	if publicationCheck, ok := applyGUIArtifactPublicationOracle(opts.ProjectDir, pack, &cmdResult); ok {
 		checks = append(checks, publicationCheck)
 	}
+	if captureCheck, ok := applyGUICaptureOracle(pack, &cmdResult); ok {
+		if captureCheck.Status == "blocked" {
+			checks[0].Status = "blocked"
+			checks[0].FailureSummary = captureCheck.FailureSummary
+		}
+		checks = append(checks, captureCheck)
+	}
 	manifest := buildManifest(opts, pack, cmdResult, checks)
 	manifestPath, err := qaevidence.WriteFinalManifest(manifest, manifestOutputDir(runDir, pack.ID))
 	if err != nil {

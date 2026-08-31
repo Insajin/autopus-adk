@@ -31,7 +31,13 @@ ISOLATED_TIMEOUT    ?= 10m
 # TestDetect 와 TestProbeOMPIdentity_ 는 pkg/detect 의 PATH 기반 실제 CLI
 # 프로브를 함께 격리한다. 이름을 하나씩 추가하는 방식은 세 번 연속 다음
 # 테스트에서 실패했다. 순수한 두어 개가 함께 격리되는 비용은 없다.
-PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller)
+#
+# TestExecuteDesktopObservation_ 은 실제 provider subprocess 를 2초 고정 시계로
+# 잰다 (desktop_observe_resolver_test.go 의 "strict two-second subprocess
+# integration clock"). 같은 패키지의 GUI capture 테스트가 npm/node 프로세스를
+# 띄우기 시작하면서 공유 스케줄러에서는 그 2초가 예산이 아니라 부하 측정이
+# 된다. 억제가 아니라 격리다 - 같은 테스트를 -p 1 로 그대로 돌린다.
+PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller|TestExecuteDesktopObservation_)
 
 test:
 	go test -race -count=1 -timeout=$(INTEGRATION_TIMEOUT) -tags integration -skip '$(PROCESS_HEAVY_TESTS)' ./...

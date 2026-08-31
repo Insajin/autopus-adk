@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
 	qarun "github.com/insajin/autopus-adk/pkg/qa/run"
@@ -53,6 +51,7 @@ func runQAExplore(cmd *cobra.Command, opts qaRunOptions) error {
 		if jsonMode {
 			return writeJSONResultAndExit(cmd, jsonStatusError, err, "qa_explore_failed", result, nil, nil)
 		}
+		writeQARunSummary(cmd, result.Status, result.RunIndexPath, "", opts.ProjectDir)
 		return err
 	}
 	status := jsonStatusOK
@@ -62,6 +61,6 @@ func runQAExplore(cmd *cobra.Command, opts qaRunOptions) error {
 	if jsonMode {
 		return writeJSONResult(cmd, status, result, nil, nil)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", result.Status, result.RunIndexPath)
+	writeQARunSummary(cmd, result.Status, result.RunIndexPath, "", opts.ProjectDir)
 	return nil
 }

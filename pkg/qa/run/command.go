@@ -10,21 +10,37 @@ import (
 	"strings"
 	"time"
 
+	"github.com/insajin/autopus-adk/pkg/qa/capture"
+	qaevidence "github.com/insajin/autopus-adk/pkg/qa/evidence"
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
 )
 
 type commandResult struct {
-	Status            string
-	ExitCode          int
-	FailureSummary    string
-	StdoutText        string
-	StdoutPath        string
-	StderrPath        string
-	StartedAt         time.Time
-	EndedAt           time.Time
-	DurationMS        int64
-	Command           string
-	GUIGuardReadyPath string
+	Status              string
+	ExitCode            int
+	FailureSummary      string
+	StdoutText          string
+	StdoutPath          string
+	StderrPath          string
+	StartedAt           time.Time
+	EndedAt             time.Time
+	DurationMS          int64
+	Command             string
+	GUIGuardReadyPath   string
+	GUIGuardReceiptPath string
+	// CaptureDir and CaptureIndexPath are set only for GUI packs that opted into
+	// typed capture; the oracle reads the producer index back from them.
+	CaptureDir       string
+	CaptureIndexPath string
+	// CaptureArtifact is the sanitized publishable projection produced after the
+	// capture contract passed. Nil means no capture evidence reached publication.
+	CaptureArtifact *qaevidence.ArtifactRef
+	// CaptureLocalMedia records that raw screenshots, traces, or videos remain in
+	// the local capture directory, which changes the manifest retention class.
+	CaptureLocalMedia bool
+	// captureIndex memoizes the validated producer index for the oracles that
+	// read it; loading it twice would double-validate the same bytes.
+	captureIndex *capture.Index
 }
 
 func runCommand(projectDir string, pack journey.Pack, artifactDir string) commandResult {
@@ -53,6 +69,16 @@ func runCommandWithEnv(projectDir string, pack journey.Pack, artifactDir string,
 		return finishCommandResult(result, artifactDir, nil, nil)
 	}
 	result.GUIGuardReadyPath = guiInput.GuardReadyPath
+	result.GUIGuardReceiptPath = guiInput.GuardReceiptPath
+	captureInput, err := prepareGUICaptureInput(pack, artifactDir)
+	if err != nil {
+		result.Status = "blocked"
+		result.ExitCode = -1
+		result.FailureSummary = "qa gui capture setup failed: " + err.Error()
+		return finishCommandResult(result, artifactDir, nil, nil)
+	}
+	result.CaptureDir = captureInput.Dir
+	result.CaptureIndexPath = captureInput.IndexPath
 	commandCache, err := prepareCommandGoCache(projectDir)
 	if err != nil {
 		result.Status = "blocked"
@@ -66,7 +92,8 @@ func runCommandWithEnv(projectDir string, pack journey.Pack, artifactDir string,
 	defer cancel()
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = filepath.Join(projectDir, pack.Command.CWD)
-	cmd.Env = authoritativeCommandEnv(commandCache.Paths, pack.Command.EnvAllowlist, append(append([]string{}, guiInput.Env...), extraEnv...))
+	overrides := append(append([]string{}, guiInput.Env...), captureInput.Env...)
+	cmd.Env = authoritativeCommandEnv(commandCache.Paths, pack.Command.EnvAllowlist, append(overrides, extraEnv...))
 	if err := verifyGUIGuardPreflight(ctx, cmd.Dir, cmd.Env, guiInput, args); err != nil {
 		result.Status = "blocked"
 		result.ExitCode = -1

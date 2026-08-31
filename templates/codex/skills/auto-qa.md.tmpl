@@ -1,7 +1,7 @@
 ---
 name: auto-qa
 description: >
-  QAMESH project QA mesh — auto qa full/init/plan/run/explore/release/coverage/profile/evidence/feedback guidance
+  QAMESH project QA mesh — auto qa full/init/plan/run/explore/release/coverage/report/profile/evidence/feedback guidance
 ---
 
 # auto-qa — QAMESH Project QA Mesh
@@ -31,6 +31,9 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 @auto qa full --bootstrap --format json
 @auto qa full --run --format json
 @auto qa coverage --format json
+@auto qa report --format json
+@auto qa report --no-write --format json
+@auto qa report --embed-media --format json
 @auto qa profile check --format json
 @auto qa plan --format json
 @auto qa init --format json
@@ -47,6 +50,9 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 
 - `auto qa full`: 가장 쉬운 기본 진입점입니다. 기본은 full release-style lane matrix, Journey Pack, setup gap, domain-readiness catalog를 실행 없이 계획합니다. starter 파일까지 만들 때는 `--bootstrap`, 실제 전체 gate 실행은 명시적으로 `--run`을 사용합니다.
 - `auto qa coverage`: 최신 run/release index를 읽어 lane, journey, manifest, setup gap, domain-readiness coverage를 요약합니다.
+- `auto qa report`: 최신 run/release index를 읽어 self-contained `report.html`을 run 디렉터리에 생성합니다. verdict, timeline, lane gate matrix, check drill-down, artifact preview, setup gap을 한 화면에서 사람이 확인할 때 사용합니다. `--no-write`는 파일을 만들지 않고 projection만 반환합니다.
+- `auto qa report`는 publishable text artifact만 inline하며 local-only quarantine ref, raw media, 비-text artifact는 metadata로만 표시합니다. redaction이 실패하거나 index schema/redaction gate를 통과하지 못하면 ingestion을 degraded/blocked로 표시하고 그 사실을 리포트에 남깁니다.
+- `auto qa report --embed-media`: local capture screenshot을 data URI로 report에 인라인합니다. 이때 report는 `retention: local-only`가 되고 배너로 공유 금지를 명시합니다. 기본값은 embed 없음(`shareable`)이며 digest, 크기, 해상도만 표시합니다.
 - `auto qa profile check`: Journey Pack capability 요구사항과 `standalone/local/ci/prod` test profile capability를 비교합니다.
 - `auto qa plan`: Journey Pack, detected adapter, lane, setup gap, output path를 확인합니다. 프로젝트 명령을 실행하지 않습니다.
 - `auto qa init`: 여러 프로젝트에 적용하는 기본 release-ready 명령입니다. Go/Node/Python/Rust/Playwright/desktop 신호에 맞춰 Journey Pack과 `.github/workflows/autopus-qa-release.yml` 초안을 생성합니다. 기존 파일은 덮어쓰지 않으며, 생성 후 사람이 command, origin, forbidden action, oracle, env를 검토해야 합니다.
@@ -58,6 +64,17 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 - `auto qa evidence`: producer가 이미 만든 QAMESH manifest를 검증, redaction, publish 경계로 보냅니다.
 - `auto qa feedback`: 기존 failed evidence를 Claude, Codex, Gemini, OpenCode용 repair prompt bundle로 변환합니다.
 - ADK is a harness: concrete commands, origins, oracles, artifact policy는 `.autopus/qa/journeys/**` 아래 project-local Journey Pack에 둡니다.
+
+## GUI Capture Contract
+
+- `gui-explore` Journey Pack은 `gui.capture`로 per-step evidence를 선언합니다: `mode` (`off|on-failure|always`), `streams` (`screenshot,console,network,trace,video`), `screenshot` (`off|on-failure|per-step`), `console_severity`, `retain_local`, `replay_script`. 정의되지 않은 key는 pack 전체를 reject합니다 — 오타가 조용히 evidence를 끄는 일이 없습니다.
+- `auto qa init`은 `gui-explore` Journey Pack을 **의도적으로 생성하지 않습니다**. 생성된 팩은 프로젝트가 read-only 탐색 subset을 만들기 전까지 통과할 수 없고(전체 스위트는 `mutation` 금지 액션에 걸리고, 빈 선택은 capture contract의 최소 1 step 규칙에 걸립니다), `gui-explore`는 기본 `prelaunch` profile의 `must` lane이라 실행 불가능한 팩은 release gate를 빨갛게 만듭니다. 팩이 없으면 `auto qa explore`가 setup gap으로 보고합니다 — 복사할 팩 예시는 `.autopus/qa/capture/README.md`에 있습니다.
+- 하네스는 Playwright를 직접 구동하지 않습니다. capture directory와 policy JSON을 할당하고 `AUTOPUS_QAMESH_GUI_CAPTURE_DIR`, `AUTOPUS_QAMESH_GUI_CAPTURE_POLICY_PATH`, `AUTOPUS_QAMESH_GUI_CAPTURE_INDEX_PATH`로 넘긴 뒤, producer가 쓴 `capture-index.json`(`qamesh.gui_capture_index.v1`)을 읽습니다. producer asset은 `auto qa init`이 `.autopus/qa/capture/**`에 생성합니다.
+- `gui-capture-contract` check는 schema, dense step order, totals 일치, policy conformance, local media digest/size를 fail-closed로 검증합니다. 실패는 blocked이며 `capture_index` artifact를 publish하지 않습니다.
+- 정책 집행 증거는 producer가 아니라 하네스가 소유한 guard receipt에서 옵니다. producer는 자신의 정책 준수를 자체 인증할 수 없습니다.
+- raw screenshot, trace, video, HAR은 절대 publish되지 않습니다. `capture-index.published.json`(kind `capture_index`)만 evidence가 되고, raw bytes는 `.autopus/qa/runs/**`에 local-only로 남으며 manifest `retention_class`가 `local-redacted-local-media`가 됩니다.
+- network evidence는 URL이 아니라 `origin:<index>/path` 또는 origin-relative `/path` reference입니다. 절대 URL, credential, query는 shape 자체로 거부됩니다.
+- `replay`는 합성 코드가 아니라 고정된 command와 spec digest입니다. inference 비용 없이 동일 spec을 재실행할 수 있습니다.
 
 ## Guardrails
 

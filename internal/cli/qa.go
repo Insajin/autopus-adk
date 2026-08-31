@@ -24,6 +24,7 @@ func newQACmd() *cobra.Command {
 	cmd.AddCommand(newQAAdaptersCmd())
 	cmd.AddCommand(newQARunCmd())
 	cmd.AddCommand(newQACoverageCmd())
+	cmd.AddCommand(newQAReportCmd())
 	cmd.AddCommand(newQAProfileCmd())
 	cmd.AddCommand(newQAExploreCmd())
 	cmd.AddCommand(newQAReleaseCmd())

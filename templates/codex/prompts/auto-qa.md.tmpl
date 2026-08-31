@@ -1,5 +1,5 @@
 ---
-description: "QAMESH project QA mesh — auto qa full/init/plan/run/explore/release/coverage/profile/evidence/feedback guidance"
+description: "QAMESH project QA mesh — auto qa full/init/plan/run/explore/release/coverage/report/profile/evidence/feedback guidance"
 ---
 
 # auto-qa — QAMESH Project QA Mesh
@@ -26,6 +26,12 @@ QAMESH는 project-level deterministic QA 실행과 evidence/feedback handoff를 
 
 - Use `auto qa full --format json` as the easiest default entrypoint for full project QA planning. It inspects the release-style lane matrix, Journey Packs, setup gaps, and domain-readiness catalog without executing commands. Add `--bootstrap` to create safe starter files first, and add `--run` only when the caller explicitly wants the full gate executed.
 - Use `auto qa coverage --format json` after a run/release to summarize lane, journey, manifest, setup-gap, and domain-readiness coverage.
+- Use `auto qa report --format json` to render a self-contained `report.html` beside the run index for human review: verdict, journey timeline, release lane gate matrix, per-check expected/actual drill-down, inlined publishable text artifact previews, and setup gaps. Add `--no-write` for the projection only.
+- `auto qa report` never inlines local-only quarantine refs, raw media, or non-text artifacts, and marks ingestion degraded/blocked when an index fails its schema or redaction gate.
+- Use `auto qa report --embed-media` only when raw local screenshots must be inlined; that marks the report `retention: local-only` with a do-not-share banner.
+- A `gui-explore` pack declares per-step evidence through `gui.capture` (`mode`, `streams`, `screenshot`, `console_severity`, `retain_local`, `replay_script`); an undefined key rejects the pack. The harness allocates the capture directory and policy, exports `AUTOPUS_QAMESH_GUI_CAPTURE_{DIR,POLICY_PATH,INDEX_PATH}`, and validates the producer-written `capture-index.json` through the `gui-capture-contract` check. `auto qa init` scaffolds the producer into `.autopus/qa/capture/**`.
+- `auto qa init` deliberately does NOT generate a `gui-explore` Journey Pack (it cannot pass without a project-owned read-only exploration subset, and the lane is `must` in the default `prelaunch` profile). Missing pack means setup gap, and `.autopus/qa/capture/README.md` carries the pack to copy.
+- Raw screenshots, traces, videos, and HARs are never published: only the sanitized `capture_index` projection is evidence, raw bytes stay local, and `retention_class` becomes `local-redacted-local-media`. Policy enforcement is witnessed by a harness-owned guard receipt, never self-certified by the producer. Network evidence uses `origin:<index>/path` references, never URLs. `replay` is a pinned command plus spec digests, not synthesized code.
 - Use `auto qa profile check --format json` when GUI/auth/profile capability readiness matters before execution.
 - Use `auto qa plan --format json` to inspect Journey Packs, detected adapters, selected lanes, setup gaps, and output paths without executing project commands.
 - Use `auto qa init --format json` as the simple default release-QA setup command. It scaffolds project-local `.autopus/qa/journeys/**` files and a generic GitHub Actions release gate from detected Go, Node, Python, Rust, Playwright, and desktop signals, but it must not overwrite existing packs and generated files require human review before execution.

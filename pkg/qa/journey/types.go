@@ -1,5 +1,7 @@
 package journey
 
+import "github.com/insajin/autopus-adk/pkg/qa/capture"
+
 type Pack struct {
 	ID                  string                   `yaml:"id" json:"id"`
 	Title               string                   `yaml:"title" json:"title"`
@@ -61,6 +63,7 @@ type GUIPolicy struct {
 	NetworkPolicy     GUINetworkPolicy     `yaml:"network_policy,omitempty" json:"network_policy,omitempty"`
 	ArtifactRetention GUIArtifactRetention `yaml:"artifact_retention,omitempty" json:"artifact_retention,omitempty"`
 	ScreenMatrix      []GUIScreenMatrixRow `yaml:"screen_matrix,omitempty" json:"screen_matrix,omitempty"`
+	Capture           capture.Policy       `yaml:"capture,omitempty" json:"capture,omitempty"`
 }
 
 type GUIScreenMatrixRow struct {

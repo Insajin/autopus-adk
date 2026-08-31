@@ -247,6 +247,11 @@ func qaCoverageNextCommands(opts qaCoverageOptions, payload qaCoveragePayload) [
 	if payload.Status == "missing_evidence" || payload.Status == "failed" {
 		commands = append(commands, qaFullCommandString(qaFullOptions{ProjectDir: opts.ProjectDir, Run: true}, true))
 	}
+	// A renderable report needs at least one ingested manifest; suggesting it
+	// without evidence would send the caller to a command that cannot succeed.
+	if payload.Summary.ManifestCount > 0 {
+		commands = append(commands, qaReportNextCommand(opts.ProjectDir))
+	}
 	return uniqueCommands(commands)
 }
 
