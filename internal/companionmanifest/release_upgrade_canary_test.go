@@ -129,3 +129,21 @@ func TestUpgradeCanary_PinsActionsAndUploadsDiagnosticReceipt(t *testing.T) {
 		t.Fatal("upgrade canary receipt does not disclaim immutable authority")
 	}
 }
+
+func TestUpgradeCanary_ModelsPublicV109WithoutManagedOMPConfig(t *testing.T) {
+	raw := readReleaseFile(t, "scripts/release-signing/tests/posix-upgrade-canary.sh")
+	absence := `assert_absent "$PROJECT/.omp/config.yml"`
+	creation := `printf 'theme:\n  dark: canary-user\n' > "$PROJECT/.omp/config.yml"`
+	if !strings.Contains(raw, absence) {
+		t.Fatalf("upgrade canary does not verify the v0.50.109 OMP config absence")
+	}
+	if !strings.Contains(raw, creation) {
+		t.Fatalf("upgrade canary does not create the user-owned OMP config fixture")
+	}
+	if strings.Index(raw, absence) > strings.Index(raw, creation) {
+		t.Fatal("upgrade canary verifies the legacy fixture after mutating it")
+	}
+	if strings.Contains(raw, `cat "$PROJECT/.omp/config.yml"`) {
+		t.Fatal("upgrade canary still reads the absent v0.50.109 OMP config")
+	}
+}

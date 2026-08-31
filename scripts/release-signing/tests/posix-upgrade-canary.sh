@@ -54,13 +54,30 @@ validate_release_version() {
         fail "release version must have three numeric parts: $value"
 }
 
-assert_legacy_fixture() {
+assert_legacy_paths() {
     assert_file "$PROJECT/.claude/skills/autopus/auto-go.md"
     assert_file "$PROJECT/.codex/prompts/auto.md"
     assert_file "$PROJECT/.codex/rules/autopus/context7-docs.md"
     assert_file "$PROJECT/.agents/skills/auto/SKILL.md"
+}
+
+assert_legacy_fixture() {
+    assert_legacy_paths
     assert_contains "$PROJECT/.omp/config.yml" 'customDirectories:'
     assert_contains "$PROJECT/.omp/config.yml" '.agents/skills'
+}
+
+assert_public_previous_fixture() {
+    assert_file "$PROJECT/.claude/skills/auto-go/SKILL.md"
+    assert_file "$PROJECT/.codex/skills/codex-auto/SKILL.md"
+    assert_contains "$PROJECT/.codex/config.toml" '[features.multi_agent_v2]'
+    assert_file "$PROJECT/.omp/skills/auto/SKILL.md"
+    assert_file "$PROJECT/.omp/commands/auto.md"
+    assert_file "$PROJECT/.omp/agents/executor.md"
+    assert_absent "$PROJECT/.omp/config.yml"
+    assert_file "$PROJECT/.autopus/omp-manifest.json"
+    assert_not_contains "$PROJECT/.autopus/omp-manifest.json" '".omp/config.yml"'
+    assert_not_contains "$PROJECT/.autopus/omp-manifest.json" '.agents/skills/'
 }
 
 assert_current_surface() {
@@ -253,13 +270,9 @@ case "$MODE" in
                 cat "$RECEIPT_DIR/old-init.log" >&2
                 fail 'previous release init failed'
             }
+        assert_public_previous_fixture
         printf 'AUTOPUS-UPGRADE-CANARY-USER-SENTINEL\n' > "$PROJECT/user-sentinel.txt"
-        {
-            printf 'theme:\n  dark: canary-user\n\n'
-            cat "$PROJECT/.omp/config.yml"
-        } > "$WORK/omp-config.yml"
-        mv "$WORK/omp-config.yml" "$PROJECT/.omp/config.yml"
-        assert_legacy_fixture
+        printf 'theme:\n  dark: canary-user\n' > "$PROJECT/.omp/config.yml"
         (
             cd "$REPO_ROOT"
             VERSION=$NEW_VERSION sh ./install.sh
