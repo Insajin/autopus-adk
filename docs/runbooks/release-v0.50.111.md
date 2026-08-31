@@ -306,7 +306,9 @@ Run the public canary only after v0.50.111 is immutable and publicly downloadabl
 gh workflow run upgrade-canary.yaml --ref v0.50.111
 ```
 
-The workflow must install v0.50.109 and v0.50.111 from their signed public assets, upgrade an actual v0.50.109 project, preserve user-owned state, remove only obsolete bridge-era surfaces, exercise the real hook rejection/approval path, and require `auto doctor --json` to pass the v0.50.111 config, hook, and OMP checks. Preserve the workflow run and uploaded receipt only after the live public lane succeeds. A fixture or locally built candidate is not a substitute.
+The workflow must install v0.50.109 and v0.50.111 from their signed public assets, upgrade an actual v0.50.109 project, preserve user-owned state, keep the current managed surfaces, ensure obsolete bridge-era paths remain absent, exercise the real hook rejection/approval path, and require `auto doctor --json` to pass the v0.50.111 config, hook, and OMP checks. Preserve the workflow run and uploaded receipt only after the live public lane succeeds. A fixture or locally built candidate is not a substitute.
+
+The tag-owned run `33374000420` exposed a stale verifier assumption that public v0.50.109 generated a managed `.omp/config.yml`; it did not. The first fixed-main retry, run `33374790693` at `3c210cb18cadc08daaeb0b94e59fb981319bd9c6`, then exhausted the shared runner's anonymous GitHub API quota during the candidate freshness check. Neither failure established a public-asset or product defect. Commit `b139be2da84d3a1d10b28214cc4b223766e9a2d7` scoped the read-only workflow token to that freshness request while keeping both signed installers anonymous. Run `33375069786` succeeded and uploaded artifact `9751547670`; its receipt binds v0.50.109 to v0.50.111, the immutable release ID `379595447`, tag object `b751c5beba4374534b1a73615ff0d6d57bdb4131`, source commit `954f60a77acb59fd4106537020693fdcadb3d640`, and source tree `fcd3f2aed498955235ae7807ba031d32a053db09`.
 
 ## Reconciliation and rollback boundaries
 
@@ -317,5 +319,5 @@ The workflow must install v0.50.109 and v0.50.111 from their signed public asset
 - **Remote tag exists:** this is at or beyond the commit point. Run only the publisher's reconcile path to verify convergence. Tag movement, deletion, replacement, and reuse are forbidden.
 - **Release workflow fails after tag:** preserve the tag, evidence, draft/release record, and run logs. Do not upload replacement assets or republish the same version. Fix the defect on `main` and allocate a new release coordinate.
 - **Only Homebrew fails:** keep v0.50.111 immutable and use the protected recovery workflow above. Never roll back the release tag to repair the tap.
-- **Public canary fails:** preserve the immutable release and receipt as incident evidence. Do not move v0.50.109 or v0.50.111. Fix forward at a new coordinate.
+- **Public canary fails:** preserve the immutable release, failed run, and any receipt as incident evidence. Do not move v0.50.109 or v0.50.111. A verification-harness defect may be fixed only at a new workflow commit and rerun against the unchanged public assets; the successful receipt must bind that workflow commit. An asset or installed-product contract failure requires a new release coordinate.
 - **Any stale evidence, K1/K2 active signature, split expected-key authority, bridge asset, rotation asset, predecessor mismatch, or post-tag mutation attempt:** fail closed and escalate. None is recoverable by operator override.
