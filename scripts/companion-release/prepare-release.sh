@@ -109,10 +109,9 @@ staged_promotion_signing_key="$temp_dir/omp-context-promotion-signing-key"
   fail 'staged release signing key ownership or mode is unsafe'
 tag_signing_key=$staged_tag_signing_key
 promotion_signing_key=$staged_promotion_signing_key
-evidence_source_commit=''; retain_prep_lock=0; prep_lock_mode='fresh'; isolation_roots=(); sudo_keepalive_pid=''
-release_canary_user=''; release_canary_uid=''; release_canary_gid=''; release_canary_home=''
-release_canary_marker=''; release_canary_account_created=0
-for runtime_lib_name in prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh; do
+evidence_source_commit=''; retain_prep_lock=0; prep_lock_mode='fresh'; isolation_roots=()
+sudo_keepalive_pid=''; live_canary_started=0
+for runtime_lib_name in prepare-release-runtime-lib.sh prepare-release-local-lib.sh; do
   staged_runtime_lib="$temp_dir/$runtime_lib_name"
   runtime_lib_blob=$(git rev-parse --verify "${source_commit}:scripts/companion-release/${runtime_lib_name}") ||
     fail "release prep runtime helper ${runtime_lib_name} is absent from the exact source"
@@ -176,10 +175,10 @@ release_count=$(jq '[.[][] | select(.tag_name == "v0.50.110")] | length' <<<"$re
 [[ "$release_count" == '0' || "$release_present" -eq 1 || -n "$retained_lock_commit" ]] ||
   fail 'GitHub Release exists without its source tag or retained prep lock'
 input_jsonl="$temp_dir/observe-session-input.jsonl"; policy_tool="$temp_dir/auto-policy"
-verifier="$temp_dir/ompcontextverify"; execsmoke="$temp_dir/execsmoke"
+verifier="$temp_dir/ompcontextverify"; execsmoke="$temp_dir/execsmoke"; uidrunner="$temp_dir/uidrunner"
 final_candidate="$temp_dir/auto-final"; static_policy_file="$temp_dir/static-policy.b64"
 final_static_policy_file="$temp_dir/final-static-policy.b64"
-readonly input_jsonl policy_tool verifier execsmoke final_candidate static_policy_file final_static_policy_file
+readonly input_jsonl policy_tool verifier execsmoke uidrunner final_candidate static_policy_file final_static_policy_file
 producer_run_id=$(date -u '+%Y%m%d%H%M%S')
 producer_workflow_ref="local-release-prep@${source_commit}"
 dispatch_nonce=$(printf '%s' "${source_commit}:${producer_run_id}:$$:${temp_dir}" | shasum -a 256 | awk '{print substr($1,1,32)}')
@@ -224,6 +223,7 @@ if [[ "$evidence_present" -eq 1 ]]; then
   ensure_prep_lock "$verified_report"; publish_coordinates "$evidence_source_commit"; exit 0
 fi
 env GOENV=off GOTOOLCHAIN="$expected_go_toolchain" go build -trimpath -o "$execsmoke" ./scripts/companion-release/execsmoke
+env GOENV=off GOTOOLCHAIN="$expected_go_toolchain" go build -trimpath -o "$uidrunner" ./scripts/companion-release/uidrunner
 (
   while /bin/sleep 30; do /usr/bin/sudo -n -v || exit 1; done
 ) &

@@ -18,10 +18,11 @@ runtime_lib="$script_dir/prepare-release-runtime-lib.sh"
 source "$runtime_lib"
 contains "$runtime_lib" 'sandbox_args=(--omp "$isolated_omp")'
 contains "$runtime_lib" '/bin/cat "$input_jsonl"'
-contains "$runtime_lib" 'create_release_canary_account "$isolated_home"'
-contains "$runtime_lib" 'remove_release_canary_account'
-contains "$runtime_lib" 'sudo -n -u "$release_canary_user"'
-contains "$runtime_lib" 'pgrep -u "$release_canary_uid"'
+contains "$runtime_lib" 'live_canary_uid=59999'
+contains "$runtime_lib" 'isolated_uidrunner="$root/uidrunner"'
+contains "$runtime_lib" 'sudo -n "$isolated_uidrunner"'
+contains "$runtime_lib" 'cleanup_live_canary_uid'
+contains "$runtime_lib" 'pkill -TERM -u "$live_canary_uid"'
 contains "$runtime_lib" 'chown -R nobody:nobody'
 contains "$runtime_lib" '"${sandbox_args[@]}" | capture_canary_progress'
 printf '%s\n' \

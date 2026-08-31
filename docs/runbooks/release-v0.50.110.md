@@ -80,7 +80,7 @@ The attestation is signed with K3 only after the final observation. The report a
 Before touching a remote coordinate, require all of the following:
 
 1. CI and Security Scan are green for the exact source to be frozen.
-2. The operator is on Darwin arm64, authenticated to GitHub as user ID `204883817`, has repository administration access, and can run `sudo -n -u nobody /usr/bin/true` after local authentication. UID `59999` and `_autopus_v110_*` must be unassigned before prep; tooling creates a hidden, no-login account only for the credential-bearing live canary, deletes it, and uses `nobody` only for the later credential-free executable smoke.
+2. The operator is on Darwin arm64, authenticated to GitHub as user ID `204883817`, has repository administration access, and can run `sudo -n -u nobody /usr/bin/true` after local authentication. UID `59999` must be unassigned before prep; a root-owned fixed-policy runner drops directly to UID `59999`/GID `20` without creating a login account, terminates every residual process for that UID, and uses `nobody` only for the later credential-free executable smoke.
 3. The worktree is clean, `HEAD` equals `origin/main`, and the remote is `Insajin/autopus-adk`.
 4. Go is exactly 1.26.6. The supplied OMP executable is a regular executable file, reports `omp/17.2.7`, and matches the digest pinned by the exact source.
 5. The R2 and K3 private-key files are local regular non-symlink files owned by the operator with mode `0600`. Their secret bytes have not entered GitHub or shell history.

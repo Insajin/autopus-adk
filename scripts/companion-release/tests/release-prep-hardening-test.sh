@@ -5,13 +5,12 @@ tests_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 script_dir=$(cd -- "$tests_dir/.." && pwd)
 publisher="$script_dir/publish-release-coordinates.sh"; prep="$script_dir/prepare-release.sh"
 transaction="$script_dir/release-coordinate-transaction-lib.sh"; prep_lib="$script_dir/prepare-release-runtime-lib.sh"
-user_lib="$script_dir/prepare-release-user-lib.sh"; local_lib="$script_dir/prepare-release-local-lib.sh"
-lock_verifier="$script_dir/verify-release-prep-lock.sh"
+local_lib="$script_dir/prepare-release-local-lib.sh"; lock_verifier="$script_dir/verify-release-prep-lock.sh"
 ruleset_verifier="$script_dir/verify-release-tag-ruleset.sh"; mock_gh="$tests_dir/testdata/mock-release-prep-gh.sh"
 fail() { printf 'release prep hardening test: %s\n' "$1" >&2; exit 1; }
 contains() { grep -Fq -- "$2" "$1" || fail "$1 missing $2"; }
 not_contains() { ! grep -Fq -- "$2" "$1" || fail "$1 unexpectedly contains $2"; }
-for file in "$publisher" "$transaction" "$prep" "$prep_lib" "$user_lib" "$local_lib" "$lock_verifier" "$ruleset_verifier" "$mock_gh" \
+for file in "$publisher" "$transaction" "$prep" "$prep_lib" "$local_lib" "$lock_verifier" "$ruleset_verifier" "$mock_gh" \
   "$script_dir/release-tag-signing-2026-q3-r2.pub" "$script_dir/release-tag-signing-2026-q3-r2.fingerprint" \
   "$script_dir/omp-context-promotion-2026-q3-k3.pub"; do
   [[ -f "$file" && ! -L "$file" ]] || fail "missing or unsafe release-prep component $file"
@@ -19,7 +18,8 @@ done
 contains "$prep" 'usage: prepare-release.sh --endpoint URL'; contains "$prep" '(--preflight|--apply)'
 contains "$prep" "readonly release_tag='v0.50.110'"; contains "$prep" "expected_go_toolchain='go1.26.6'"
 contains "$prep" "expected_promotion_key_id='omp-context-promotion-2026-q3-k3'"
-contains "$prep" 'prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh'
+contains "$prep" 'prepare-release-runtime-lib.sh prepare-release-local-lib.sh'
+contains "$prep" 'go build -trimpath -o "$uidrunner" ./scripts/companion-release/uidrunner'
 contains "$prep" 'remote_mutations:0'; contains "$prep" 'canary_records:42,provider_calls:40,task_pairs:20'
 contains "$local_lib" '--endpoint "$endpoint" --credential-locator "$credential_locator"'
 contains "$local_lib" '--model-context-window "$model_context_window"'
@@ -28,15 +28,13 @@ contains "$local_lib" 'length == 42'; contains "$local_lib" 'length) == 40'; con
 contains "$prep_lib" 'production canary started (40 sequential provider calls, 20 task pairs)'
 contains "$prep_lib" '([.[] | select(.type == "call")] | length) == 40'
 contains "$prep_lib" '([.[] | select(.type == "call") | .task_id_digest] | unique | length) == 20'
-contains "$user_lib" "release_canary_uid='59999'"
-contains "$user_lib" '/usr/bin/dscl . -create'
-contains "$user_lib" '/usr/bin/dscl . -delete'
-contains "$user_lib" 'UserShell /usr/bin/false'
-contains "$user_lib" 'IsHidden 1'
-contains "$user_lib" 'pkill -TERM -u "$release_canary_uid"'
-contains "$prep_lib" 'create_release_canary_account "$isolated_home"'
-contains "$prep_lib" 'remove_release_canary_account'
-contains "$prep_lib" 'pgrep -u "$release_canary_uid"'
+contains "$prep_lib" 'live_canary_uid=59999'
+contains "$prep_lib" '/usr/bin/dscl . -list /Users UniqueID'
+contains "$prep_lib" 'isolated_uidrunner="$root/uidrunner"'
+contains "$prep_lib" 'sudo -n "$isolated_uidrunner"'
+contains "$prep_lib" 'cleanup_live_canary_uid'
+contains "$prep_lib" 'pkill -TERM -u "$live_canary_uid"'
+contains "$prep_lib" 'pgrep -u "$live_canary_uid"'
 contains "$prep_lib" 'chown -R nobody:nobody'
 contains "$prep_lib" '/bin/cat "$input_jsonl"'
 not_contains "$prep_lib" 'provider-credential'
