@@ -5,7 +5,7 @@ real provider; they are not satisfied by unit tests.
 
 ## AC-QAMESH13-001 — Parses a real localized tree
 
-GIVEN the Finder tree captured in `research.md` (152 elements, 5598 bytes, role
+GIVEN the Finder tree captured in `research.md` (152 elements, 5598 characters (7364 bytes), role
 phrases in Korean)
 WHEN `parseDesktopTree` runs
 THEN it yields 152 nodes with correct depths, `AppIdentifier` `com.apple.finder`,
@@ -15,7 +15,7 @@ Satisfies REQ-1, REQ-2.
 
 ## AC-QAMESH13-002 — Parses a real English tree
 
-GIVEN the Autopus Desktop tree captured in `research.md` (7 elements, 406 bytes)
+GIVEN the Autopus Desktop tree captured in `research.md` (7 elements, 406 characters (484 bytes))
 WHEN `parseDesktopTree` runs
 THEN it yields 7 nodes, `WindowTitle` `Autopus Desktop`, and records the
 `Secondary Actions` attribute on the full-screen button.

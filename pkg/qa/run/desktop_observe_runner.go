@@ -25,6 +25,19 @@ func (runner *desktopObservationRunner) Run(
 			desktopobserve.OperationCapabilities,
 		)
 	}
+	// Every receipt scope below is built from these two refs, so an unset one
+	// would publish a scope that matches anything. Refuse before addressing a
+	// provider: there is nothing to observe under an alias nobody declared.
+	if !desktopobserve.SafePublicRef(request.AppRef) ||
+		!desktopobserve.SafePublicRef(request.WindowRef) {
+		return desktopFailureOutcome(
+			desktopobserve.FailureAppAliasUnmatched,
+			expectedIdentity,
+			desktopProviderScope(expectedIdentity),
+			desktopUnsupportedCapabilities(),
+			"",
+		)
+	}
 	ctx, cancel := runner.operationContext(ctx)
 	defer cancel()
 
@@ -38,6 +51,12 @@ func (runner *desktopObservationRunner) Run(
 			desktopUnsupportedCapabilities(),
 			"",
 		)
+	}
+	// Address the app the pack named. Only clients that drive an external
+	// provider need a target, so the assertion is optional by design: the local
+	// and fake clients carry their own binding.
+	if targeted, ok := client.(desktopTargetedClient); ok {
+		targeted.applyTarget(targetFromRequest(request))
 	}
 	identity, err := client.Handshake(ctx)
 	err = desktopBoundedError(ctx, err)
@@ -99,7 +118,7 @@ func (runner *desktopObservationRunner) Run(
 		return desktopFailureOutcome(
 			desktopobserve.FailureProtocolVersion,
 			identity,
-			desktopobserve.ReceiptScope{Kind: desktopobserve.ScopeApplication, PublicRef: "autopus-desktop"},
+			desktopAppScope(request.AppRef),
 			capabilities,
 			"",
 		)
@@ -108,7 +127,7 @@ func (runner *desktopObservationRunner) Run(
 		return desktopFailureOutcome(
 			desktopobserve.FailureAppAliasUnmatched,
 			identity,
-			desktopobserve.ReceiptScope{Kind: desktopobserve.ScopeApplication, PublicRef: "autopus-desktop"},
+			desktopAppScope(request.AppRef),
 			capabilities,
 			"",
 		)
@@ -120,7 +139,7 @@ func (runner *desktopObservationRunner) Run(
 		return desktopFailureFromError(
 			err,
 			identity,
-			desktopobserve.ReceiptScope{Kind: desktopobserve.ScopeApplication, PublicRef: "autopus-desktop"},
+			desktopAppScope(request.AppRef),
 			capabilities,
 		)
 	}
@@ -129,7 +148,7 @@ func (runner *desktopObservationRunner) Run(
 		return desktopFailureOutcome(
 			desktopobserve.FailureProtocolVersion,
 			identity,
-			desktopWindowScope("main-window"),
+			desktopWindowScope(request.WindowRef),
 			capabilities,
 			"",
 		)
@@ -138,7 +157,7 @@ func (runner *desktopObservationRunner) Run(
 		return desktopFailureOutcome(
 			desktopobserve.FailureWindowAliasUnmatched,
 			identity,
-			desktopWindowScope("main-window"),
+			desktopWindowScope(request.WindowRef),
 			capabilities,
 			"",
 		)
@@ -147,20 +166,20 @@ func (runner *desktopObservationRunner) Run(
 	projection, err := client.GetState(ctx, request.AppRef, request.WindowRef)
 	err = desktopBoundedError(ctx, err)
 	if err != nil {
-		return desktopFailureFromError(err, identity, desktopWindowScope("main-window"), capabilities)
+		return desktopFailureFromError(err, identity, desktopWindowScope(request.WindowRef), capabilities)
 	}
 	if !desktopProjectionMatchesRequest(projection, request) {
 		return desktopFailureOutcome(
 			desktopobserve.FailureProtocolVersion,
 			identity,
-			desktopWindowScope("main-window"),
+			desktopWindowScope(request.WindowRef),
 			capabilities,
 			"",
 		)
 	}
 	projection, err = desktopobserve.NormalizeProjection(projection, request.Redactor)
 	if err != nil {
-		return desktopFailureFromError(err, identity, desktopWindowScope("main-window"), capabilities)
+		return desktopFailureFromError(err, identity, desktopWindowScope(request.WindowRef), capabilities)
 	}
 	return runner.evaluateProjection(request, identity, capabilities, projection)
 }
@@ -183,7 +202,7 @@ func (runner *desktopObservationRunner) evaluateProjection(
 		return desktopFailureOutcome(
 			desktopobserve.FailureStateRefRejected,
 			identity,
-			desktopWindowScope("main-window"),
+			desktopWindowScope(request.WindowRef),
 			capabilities,
 			"",
 		)
@@ -193,12 +212,12 @@ func (runner *desktopObservationRunner) evaluateProjection(
 		return desktopFailureOutcome(
 			desktopobserve.FailureLandmarksInsufficient,
 			identity,
-			desktopWindowScope("main-window"),
+			desktopWindowScope(request.WindowRef),
 			capabilities,
 			"",
 		)
 	}
-	receipt := desktopSuccessReceipt(identity, desktopWindowScope("main-window"), capabilities)
+	receipt := desktopSuccessReceipt(identity, desktopWindowScope(request.WindowRef), capabilities)
 	return desktopobserve.EvaluateOracle(desktopobserve.OracleInput{
 		Projection: projection,
 		Ledger:     ledger,

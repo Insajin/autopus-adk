@@ -137,11 +137,27 @@ func desktopRequestFromPack(opts Options, pack journey.Pack) DesktopObservationR
 		Operations:      operations,
 		AppRef:          pack.DesktopObservation.AppRef,
 		WindowRef:       pack.DesktopObservation.WindowRef,
+		ProviderAppID:   pack.DesktopObservation.ProviderAppID,
+		AppName:         declaredLandmarkName(pack, "AXApplication"),
+		WindowTitle:     declaredLandmarkName(pack, "AXWindow"),
 		Policy:          policy,
 		Redactor: func(value string) (string, error) {
 			return value, nil
 		},
 	}
+}
+
+// declaredLandmarkName returns the accessibility label the pack declared for a
+// role. The journey layer guarantees exactly one application and one window
+// landmark, so a miss means the caller bypassed validation; an empty string then
+// fails the header match rather than silently matching anything.
+func declaredLandmarkName(pack journey.Pack, role string) string {
+	for _, landmark := range pack.DesktopObservation.RequiredLandmarks {
+		if landmark.Role == role {
+			return landmark.Name
+		}
+	}
+	return ""
 }
 
 func desktopObservationEvidence(outcome desktopobserve.OracleOutcome) desktopobserve.ObservationEvidence {

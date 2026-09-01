@@ -21,7 +21,12 @@ func TestRuntimeReceipt_ProviderIdentityAndScopeValuesAreStrict(t *testing.T) {
 		{name: "provider path", mutate: func(value *RuntimeReceipt) { value.Provider.Version = "/Applications/helper" }},
 		{name: "protocol", mutate: func(value *RuntimeReceipt) { value.Provider.ProtocolVersion++ }},
 		{name: "scope kind", mutate: func(value *RuntimeReceipt) { value.Scope.Kind = "process" }},
-		{name: "scope alias", mutate: func(value *RuntimeReceipt) { value.Scope.PublicRef = "window-42" }},
+		// Was `"window-42"`, which proved the scope ref equalled the literal
+		// "main-window". SPEC-QAMESH-013 removed that pin - "window-42" is a
+		// perfectly good alias and a pack may name it - so the case now proves what
+		// the rule actually is: a scope ref must be a lowercase opaque alias.
+		// Uppercase and spaces are refused; the sibling case below covers a path.
+		{name: "scope alias", mutate: func(value *RuntimeReceipt) { value.Scope.PublicRef = "Window 42" }},
 		{name: "scope path", mutate: func(value *RuntimeReceipt) { value.Scope.PublicRef = "/Users/alice/window" }},
 	}
 

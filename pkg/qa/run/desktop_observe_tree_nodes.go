@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 )
 
 // desktopTreeNodeStart matches a line that opens a new node: tab indentation
@@ -43,8 +45,15 @@ func parseDesktopTreeNodes(body []string) ([]desktopTreeNode, error) {
 		if err != nil {
 			return nil, err
 		}
+		// REQ-6: a crossed bound is refused by the name of the bound, not as a
+		// generic parse fault. A bare treeError carries no reason code, so it
+		// routes to provider_unavailable - the misreport this SPEC removes. The
+		// limit comes from the constant so the bound and the reported limit
+		// cannot drift. Every other treeError here stays bare on purpose: a
+		// malformed tree is not a bound violation.
 		if depth > desktopTreeMaxDepth {
-			return nil, treeError(lineNumber, "depth %d exceeds the %d bound", depth, desktopTreeMaxDepth)
+			return nil, desktopobserve.ObservedTreeBoundExceeded(
+				desktopobserve.ObservedTreeBoundDepth, desktopTreeMaxDepth, depth)
 		}
 		// A jump of more than one means a node was dropped by the renderer or by
 		// us; either way the hierarchy is no longer trustworthy.
@@ -65,7 +74,8 @@ func parseDesktopTreeNodes(body []string) ([]desktopTreeNode, error) {
 		nodes = append(nodes, node)
 		previousDepth = depth
 		if len(nodes) > desktopTreeMaxNodes {
-			return nil, treeError(lineNumber, "node count exceeds the %d bound", desktopTreeMaxNodes)
+			return nil, desktopobserve.ObservedTreeBoundExceeded(
+				desktopobserve.ObservedTreeBoundNodes, desktopTreeMaxNodes, len(nodes))
 		}
 	}
 	if len(nodes) == 0 {

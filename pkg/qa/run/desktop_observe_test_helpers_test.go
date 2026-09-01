@@ -99,6 +99,14 @@ func (client *fakeDesktopClient) Screenshot(context.Context) error {
 	return nil
 }
 
+// desktopRunRequest is the request the fake-client tests share. It deliberately
+// carries no ProviderAppID, AppName, or WindowTitle: fakeDesktopClient is not a
+// desktopTargetedClient, so a target would be dead data here, and the parity
+// tests need one identity across both providers while the Orca fixtures speak
+// the real captured labels. A test that drives the real Orca client wants
+// orcaFixtureRunRequest instead - filling these three in here would leave the
+// declared landmarks naming "Autopus" while the observed window is titled
+// "Autopus Desktop", which is a landmark mismatch dressed up as a helper.
 func desktopRunRequest(provider desktopobserve.RuntimeProvider) DesktopObservationRunRequest {
 	return DesktopObservationRunRequest{
 		RuntimeProvider: provider,
@@ -150,8 +158,11 @@ func desktopObservationPack() journey.Pack {
 		Adapter: journey.AdapterRef{ID: "desktop-accessibility-observe"},
 		Checks:  []journey.Check{{ID: "semantic-landmarks", Type: "desktop_accessibility_semantic"}},
 		DesktopObservation: journey.DesktopObservationPolicy{
-			Platform: "macos", Operations: []string{"capabilities", "permissions", "list_apps", "list_windows", "get_state"},
-			AppRef: "autopus-desktop", WindowRef: "main-window",
+			Platform:      "macos",
+			ProviderAppID: "co.autopus.desktop",
+			Operations:    []string{"capabilities", "permissions", "list_apps", "list_windows", "get_state"},
+			AppRef:        "autopus-desktop",
+			WindowRef:     "main-window",
 			RequiredLandmarks: []journey.DesktopObservationLandmark{
 				{Role: "AXApplication", Name: "Autopus", RequiredState: "enabled"},
 				{Role: "AXWindow", Name: "Autopus", RequiredState: "focused"},

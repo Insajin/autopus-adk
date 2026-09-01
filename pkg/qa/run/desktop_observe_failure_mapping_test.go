@@ -55,6 +55,12 @@ func TestFailureNormalizer_ActualRunnerTriggersMapToExactSafeReasons(t *testing.
 		{name: "protocol version", condition: desktopobserve.FailureProtocolVersion, reason: desktopobserve.ReasonProviderProtocolMismatch, configure: func(client *fakeDesktopClient, _ *DesktopObservationRunRequest) {
 			client.protocolVersion = desktopobserve.ProtocolVersion + 1
 		}},
+		{name: "declared landmark absent", condition: desktopobserve.FailureDeclaredLandmarkAbsent, reason: desktopobserve.ReasonDeclaredLandmarkNotFound, leak: "Autopus Desktop", configure: func(client *fakeDesktopClient, _ *DesktopObservationRunRequest) {
+			client.getStateErr = desktopobserve.DeclaredLandmarkNotFound(desktopobserve.RoleWindow, "Autopus Desktop")
+		}},
+		{name: "observed tree bound", condition: desktopobserve.FailureObservedTreeBound, reason: desktopobserve.ReasonObservedTreeBoundExceeded, configure: func(client *fakeDesktopClient, _ *DesktopObservationRunRequest) {
+			client.getStateErr = desktopobserve.ObservedTreeBoundExceeded(desktopobserve.ObservedTreeBoundBytes, orcaTreeMaxBytes, orcaTreeMaxBytes+1)
+		}},
 	}
 
 	emitted := make([]desktopobserve.ReasonCode, 0, len(tests))

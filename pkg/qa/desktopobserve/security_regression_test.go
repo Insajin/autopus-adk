@@ -105,7 +105,14 @@ func TestFailureNormalizer_InvalidSignalsFailClosedWithoutReceipt(t *testing.T) 
 	}{
 		{name: "unknown condition", mutate: func(signal *FailureSignal) { signal.Condition = "unknown" }},
 		{name: "invalid provider", mutate: func(signal *FailureSignal) { signal.Provider.Name = "orca-secret-path" }},
-		{name: "invalid scope", mutate: func(signal *FailureSignal) { signal.Scope.PublicRef = "other-window" }},
+		// Was `"other-window"`, which only differed from the literal
+		// "main-window" that SPEC-QAMESH-013 removed; a pack may legitimately name
+		// that ref. The security property is that a scope ref cannot carry
+		// arbitrary text into a published receipt, so the case now uses a path -
+		// the same class as the "orca-secret-path" provider case above it.
+		{name: "invalid scope", mutate: func(signal *FailureSignal) {
+			signal.Scope.PublicRef = "/Users/alice/Library/window"
+		}},
 		{name: "invalid capabilities", mutate: func(signal *FailureSignal) { signal.CapabilitySummary = nil }},
 	}
 	for _, test := range tests {

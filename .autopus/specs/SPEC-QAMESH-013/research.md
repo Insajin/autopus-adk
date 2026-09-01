@@ -60,7 +60,7 @@ Measured with `orca computer get-app-state --app <id> --no-screenshot --json`.
 `--window-index`, `--restore-window`, `--no-screenshot`, `--json`. The tree is
 available exclusively as rendered text.
 
-### Autopus Desktop (`co.autopus.desktop`), 7 elements, 406 bytes
+### Autopus Desktop (`co.autopus.desktop`), 7 elements, 406 characters (484 bytes)
 
 ```
 App=co.autopus.desktop (pid 31492)
@@ -77,7 +77,7 @@ Window: "Autopus Desktop", App: Autopus Desktop.
 The focused UI element is 2 HTML content Autopus Desktop — AI가 회사를 운영합니다.
 ```
 
-### Finder (`com.apple.finder`), 152 elements, 5598 bytes
+### Finder (`com.apple.finder`), 152 elements, 5598 characters (7364 bytes)
 
 ```
 App=com.apple.finder (pid 532)
@@ -93,14 +93,17 @@ Window: "응용 프로그램", App: Finder.
 ```
 
 ### Consequences
-
 1. **Role phrases are localized by the OS.** Finder yields `표준 윈도우`,
    `자르기 그룹`, `스크롤 영역`, `셀`, `텍스트`, `이미지`. Autopus Desktop yields
    English only because its UI is a web view. Mapping role phrases to
    `AXApplication`/`AXWindow`/`AXButton` by string comparison would work in one
    locale and silently mis-type in every other.
-2. **The 2048-byte cap and `elementCount == 9` pin fail on real apps.** The two
-   measured apps produce 406/7 and 5598/152.
+2. **The 2048-byte cap and `elementCount == 9` pin fail on real apps.** Measured
+   with `wc -c`: 484 bytes/7 nodes and 7364 bytes/152 nodes. The localized tree
+   exceeds the removed cap by 3.6x, because Korean role phrases cost three bytes
+   per rune while Go's `len()` and that cap both count bytes. An earlier draft of
+   this document reported character counts as byte counts; corrected here after a
+   reviewer measured it.
 3. **Real trees contain user content.** Finder exposes the user's folder names;
    Autopus Desktop exposes in-flight UI copy. Any design that publishes tree
    text publishes user data.

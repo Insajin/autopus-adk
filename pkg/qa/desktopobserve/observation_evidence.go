@@ -110,9 +110,22 @@ func validateObservationEvidence(evidence ObservationEvidence) error {
 		if evidence.SemanticProjection == nil || check.Status != CheckPassed || check.ReasonCode != nil {
 			return fmt.Errorf("%w: contradictory success evidence", ErrMalformedEnvelope)
 		}
+		// The scope is taken from the projection under validation, not from a
+		// literal "main-window". There is no request here to compare against -
+		// this is a re-validation of finished evidence - so pinning a ref meant
+		// refusing to publish any pack that named its own window_ref, which is
+		// where SPEC-QAMESH-013's live run failed with a scope binding mismatch.
+		//
+		// The check this keeps is the load-bearing one: validateSuccessBinding
+		// still requires the receipt to be scoped to the window the projection
+		// describes, or to its state ref. safePublicRef inside that function
+		// rejects an empty ref, so an unscoped projection refuses.
 		request := Request{
 			ProtocolVersion: ProtocolVersion, RequestID: "evidence-validation",
-			Operation: OperationGetState, Scope: ReceiptScope{Kind: ScopeWindow, PublicRef: "main-window"},
+			Operation: OperationGetState,
+			Scope: ReceiptScope{
+				Kind: ScopeWindow, PublicRef: evidence.SemanticProjection.WindowRef,
+			},
 		}
 		result := Result{RuntimeReceipt: receipt, Status: ResultPassed}
 		if err := validateSuccessBinding(request, result, *evidence.SemanticProjection); err != nil {

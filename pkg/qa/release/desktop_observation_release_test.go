@@ -102,6 +102,7 @@ checks:
 artifacts: []
 desktop_observation:
   platform: macos
+  provider_app_id: co.autopus.desktop
   operations: [capabilities, permissions, list_apps, list_windows, get_state]
   app_ref: autopus-desktop
   window_ref: main-window

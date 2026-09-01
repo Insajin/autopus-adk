@@ -18,7 +18,15 @@ func TestDecodeExchange_GetStateBindsRequestProjectionReceiptAndProvider(t *test
 		mutate func(*SemanticProjection, *RuntimeReceipt)
 	}{
 		{name: "projection window", mutate: func(projection *SemanticProjection, _ *RuntimeReceipt) { projection.WindowRef = "other-window" }},
-		{name: "projection app", mutate: func(projection *SemanticProjection, _ *RuntimeReceipt) { projection.AppRef = "other-app" }},
+		// "projection app" is gone. It set AppRef to "other-app" and relied on
+		// validateSuccessBinding comparing AppRef against the literal
+		// "autopus-desktop", which SPEC-QAMESH-013 removed: this layer receives a
+		// WINDOW-scoped request and so cannot know which app the pack named, and
+		// the literal refused every project but ours. The app ref is now bound
+		// where it is known, against request.AppRef in the runner - see
+		// TestDesktopRunner_PublishesPackDeclaredScopes. A malformed app ref
+		// cannot be expressed here either, because NormalizeProjection rejects it
+		// before DecodeExchange is reached.
 		{name: "projection provider", mutate: func(projection *SemanticProjection, _ *RuntimeReceipt) { projection.ProviderRef = "provider-orca" }},
 		{name: "receipt state", mutate: func(_ *SemanticProjection, receipt *RuntimeReceipt) {
 			receipt.Scope = ReceiptScope{Kind: ScopeState, PublicRef: "state-other"}

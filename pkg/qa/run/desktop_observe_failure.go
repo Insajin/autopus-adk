@@ -64,6 +64,16 @@ func desktopFailureCondition(err error) (desktopobserve.FailureCondition, deskto
 	if errors.As(err, &providerFailure) {
 		return providerFailure.condition, providerFailure.operation
 	}
+	// An error that explicitly carries a taxonomy code routes by that code, so a
+	// landmark or bound refusal reports itself instead of degrading into
+	// FailureProviderStart. The guard is deliberately narrow: an error with no
+	// code, or a code with no condition, falls through to the sentinel switch
+	// below and an unknown error stays unknown.
+	if reason := desktopobserve.ReasonCodeOf(err); reason != "" {
+		if condition, ok := desktopFailureConditionForReason(reason); ok {
+			return condition, ""
+		}
+	}
 	switch {
 	case errors.Is(err, desktopobserve.ErrRawOnlyEvidence):
 		return desktopobserve.FailureRawOnlyQuarantine, ""
@@ -114,6 +124,8 @@ func desktopFailureConditionForReason(
 		desktopobserve.ReasonRedactionFailed:                desktopobserve.FailureRedaction,
 		desktopobserve.ReasonEvidenceQuarantined:            desktopobserve.FailureRawOnlyQuarantine,
 		desktopobserve.ReasonProviderProtocolMismatch:       desktopobserve.FailureProtocolVersion,
+		desktopobserve.ReasonDeclaredLandmarkNotFound:       desktopobserve.FailureDeclaredLandmarkAbsent,
+		desktopobserve.ReasonObservedTreeBoundExceeded:      desktopobserve.FailureObservedTreeBound,
 	}[reason]
 	return condition, ok
 }

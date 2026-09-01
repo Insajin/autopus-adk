@@ -122,14 +122,15 @@ func TestDesktopObservationPolicy_ThirdPartyAppShapeIsValid(t *testing.T) {
 	t.Parallel()
 
 	targets := []struct {
-		name      string
-		appRef    string
-		windowRef string
-		landmark  string
+		name          string
+		providerAppID string
+		appRef        string
+		windowRef     string
+		landmark      string
 	}{
-		{name: "finder", appRef: "finder", windowRef: "finder-main", landmark: "Finder"},
-		{name: "bundle id", appRef: "com.apple.finder", windowRef: "window_1", landmark: "Finder"},
-		{name: "spaced landmark name", appRef: "system-settings", windowRef: "main-window", landmark: "System Settings"},
+		{name: "finder", providerAppID: "com.apple.finder", appRef: "finder", windowRef: "finder-main", landmark: "Finder"},
+		{name: "bundle id", providerAppID: "com.apple.finder", appRef: "com.apple.finder", windowRef: "window_1", landmark: "Finder"},
+		{name: "spaced landmark name", providerAppID: "com.apple.systempreferences", appRef: "system-settings", windowRef: "main-window", landmark: "System Settings"},
 	}
 	for _, target := range targets {
 		target := target
@@ -137,6 +138,7 @@ func TestDesktopObservationPolicy_ThirdPartyAppShapeIsValid(t *testing.T) {
 			t.Parallel()
 			pack := validDesktopObservationPack()
 			pack.ID = "desktop-" + target.name
+			pack.DesktopObservation.ProviderAppID = target.providerAppID
 			pack.DesktopObservation.AppRef = target.appRef
 			pack.DesktopObservation.WindowRef = target.windowRef
 			pack.DesktopObservation.RequiredLandmarks[0].Name = target.landmark
@@ -202,10 +204,11 @@ func validDesktopObservationPack() Pack {
 			Type: "desktop_accessibility_semantic",
 		}},
 		DesktopObservation: DesktopObservationPolicy{
-			Platform:   "macos",
-			Operations: []string{"capabilities", "permissions", "list_apps", "list_windows", "get_state"},
-			AppRef:     "autopus-desktop",
-			WindowRef:  "main-window",
+			Platform:      "macos",
+			ProviderAppID: "co.autopus.desktop",
+			Operations:    []string{"capabilities", "permissions", "list_apps", "list_windows", "get_state"},
+			AppRef:        "autopus-desktop",
+			WindowRef:     "main-window",
 			RequiredLandmarks: []DesktopObservationLandmark{
 				{Role: "AXApplication", Name: "Autopus", RequiredState: "enabled"},
 				{Role: "AXWindow", Name: "Autopus", RequiredState: "focused"},
@@ -233,6 +236,7 @@ checks:
 artifacts: []
 desktop_observation:
   platform: macos
+  provider_app_id: co.autopus.desktop
   operations: [capabilities, permissions, list_apps, list_windows, get_state]
   app_ref: autopus-desktop
   window_ref: main-window

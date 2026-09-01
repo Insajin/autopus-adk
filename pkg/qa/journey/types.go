@@ -90,7 +90,12 @@ type MobilePolicy struct {
 }
 
 type DesktopObservationPolicy struct {
-	Platform          string                       `yaml:"platform" json:"platform"`
+	Platform string `yaml:"platform" json:"platform"`
+	// ProviderAppID is the platform identifier the provider resolves, such as a
+	// macOS bundle id. It is request-only: it addresses the app under
+	// observation and must never reach a manifest, artifact, receipt, or
+	// projection. AppRef and WindowRef remain the publishable opaque aliases.
+	ProviderAppID     string                       `yaml:"provider_app_id" json:"provider_app_id"`
 	Operations        []string                     `yaml:"operations" json:"operations"`
 	AppRef            string                       `yaml:"app_ref" json:"app_ref"`
 	WindowRef         string                       `yaml:"window_ref" json:"window_ref"`

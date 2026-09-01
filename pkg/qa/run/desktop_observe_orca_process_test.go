@@ -40,9 +40,7 @@ func TestOrcaProductionResolver_ExplicitSelectionInvokesInstalledCLIOnly(t *test
 	t.Setenv("PATH", directory)
 
 	runner := newProductionDesktopObservationRunner(Options{})
-	request := desktopRunRequest(desktopobserve.RuntimeProviderOrca)
-	request.Policy.AllowedNames = append(request.Policy.AllowedNames, "Disclosure")
-	outcome, err := runner.Run(context.Background(), request)
+	outcome, err := runner.Run(context.Background(), orcaFixtureRunRequest())
 	require.NoError(t, err)
 	assert.Equal(t, desktopobserve.VerdictPassed, outcome.Verdict)
 	calls, err := os.ReadFile(callPath)
@@ -136,6 +134,9 @@ func TestOrcaDesktopClient_MethodOrderAliasesAndRandomFailureFailClosed(t *testi
 	_, err = client.GetState(context.Background(), "other-app", "other-window")
 	assert.ErrorIs(t, err, desktopobserve.ErrMalformedEnvelope)
 
+	// A CSPRNG failure must surface as the envelope sentinel, never as its own
+	// message: the projection's refs come from that reader, and the reader's error
+	// text is not publishable evidence.
 	client, _ = newHermeticOrcaClient(t)
 	client.random = errorOrcaReader{}
 	ctx := context.Background()
@@ -149,6 +150,7 @@ func TestOrcaDesktopClient_MethodOrderAliasesAndRandomFailureFailClosed(t *testi
 	require.NoError(t, err)
 	projection, err := client.GetState(ctx, "autopus-desktop", "main-window")
 	assert.ErrorIs(t, err, desktopobserve.ErrMalformedEnvelope)
+	assert.NotContains(t, err.Error(), "private random source failure")
 	assert.Empty(t, projection)
 }
 
@@ -160,7 +162,7 @@ func (errorOrcaReader) Read([]byte) (int, error) {
 
 func orcaProviderScript(t *testing.T, callPath string) string {
 	t.Helper()
-	responses := orcaTestResponses(false)
+	responses := orcaTestResponses(orcaTreeFixture{})
 	var cases strings.Builder
 	for arguments, response := range responses {
 		require.NotContains(t, string(response), "'")

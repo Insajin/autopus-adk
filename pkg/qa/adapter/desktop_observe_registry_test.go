@@ -49,6 +49,8 @@ func TestDesktopObserveRegistry_ExactFailureTaxonomyWithoutOrcaDependency(t *tes
 		"redaction_failed",
 		"evidence_quarantined",
 		"provider_protocol_mismatch",
+		"declared_landmark_not_found",
+		"observed_tree_bound_exceeded",
 	}, metadata.SetupGapReasonCodes)
 	assert.NotEmpty(t, metadata.SetupGapReason)
 	for _, binary := range metadata.RequiredBinaries {

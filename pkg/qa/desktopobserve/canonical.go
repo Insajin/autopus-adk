@@ -55,8 +55,8 @@ func NormalizeProjection(projection SemanticProjection, redact Redactor) (Semant
 		return SemanticProjection{}, ErrRedactionFailed
 	}
 	if projection.SchemaVersion != SemanticProjectionSchemaVersion ||
-		!safePublicRef(projection.ProviderRef) || !safePublicRef(projection.AppRef) ||
-		!safePublicRef(projection.WindowRef) || !safePublicRef(projection.StateRef) {
+		!SafePublicRef(projection.ProviderRef) || !SafePublicRef(projection.AppRef) ||
+		!SafePublicRef(projection.WindowRef) || !SafePublicRef(projection.StateRef) {
 		return SemanticProjection{}, fmt.Errorf("%w: projection scope", ErrMalformedEnvelope)
 	}
 	count := 0

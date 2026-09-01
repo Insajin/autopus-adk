@@ -66,14 +66,23 @@ func validProvider(provider ProviderIdentity) bool {
 	return safeVersion.MatchString(provider.Version) && provider.ProtocolVersion == ProtocolVersion
 }
 
+// validReceiptScope checks that a scope's ref is well formed for its kind.
+//
+// SPEC-QAMESH-013: the application and window cases compared against the
+// literals "autopus-desktop" and "main-window", so RuntimeReceipt.Validate
+// refused any receipt scoped to a pack's own refs. That made this the deepest of
+// the pin layers - it rejected the receipt itself, after the pack had validated,
+// the provider had run, and the projection had been built.
+//
+// safePublicRefPattern rejects the empty string, so an unset ref refuses rather
+// than matching. The provider names stay pinned: those name the two adapters
+// this repository ships, which is not something a pack chooses.
 func validReceiptScope(scope ReceiptScope) bool {
 	switch scope.Kind {
 	case ScopeProvider:
 		return scope.PublicRef == "autopus-desktop-local" || scope.PublicRef == "orca-computer-use-macos"
-	case ScopeApplication:
-		return scope.PublicRef == "autopus-desktop"
-	case ScopeWindow:
-		return scope.PublicRef == "main-window"
+	case ScopeApplication, ScopeWindow:
+		return SafePublicRef(scope.PublicRef)
 	case ScopeState:
 		return validOpaqueRef(scope.PublicRef, "state-")
 	default:

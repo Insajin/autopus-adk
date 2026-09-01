@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFailureNormalizer_MapsTenSignalsToSafeNonPassOutcomes(t *testing.T) {
+func TestFailureNormalizer_MapsTwelveSignalsToSafeNonPassOutcomes(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -26,6 +26,8 @@ func TestFailureNormalizer_MapsTenSignalsToSafeNonPassOutcomes(t *testing.T) {
 		{FailureRedaction, ReasonRedactionFailed},
 		{FailureRawOnlyQuarantine, ReasonEvidenceQuarantined},
 		{FailureProtocolVersion, ReasonProviderProtocolMismatch},
+		{FailureDeclaredLandmarkAbsent, ReasonDeclaredLandmarkNotFound},
+		{FailureObservedTreeBound, ReasonObservedTreeBoundExceeded},
 	}
 	emitted := make([]ReasonCode, 0, len(tests))
 	for _, test := range tests {

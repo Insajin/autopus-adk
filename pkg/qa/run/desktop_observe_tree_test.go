@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 )
 
 func readDesktopTreeFixture(t *testing.T, name string) string {
@@ -186,22 +188,50 @@ func TestParseDesktopTree_FoldsContinuationWithoutCreatingMatchableNames(t *test
 	}
 }
 
-// REQ-6: bounds are refused by name, never truncated.
+// REQ-6: bounds are refused by name, never truncated. Asserting only the message
+// substring is what let the node and depth bounds report provider_unavailable
+// for a while, so the reason code is asserted too.
 func TestParseDesktopTree_RefusesOversizedTreeByName(t *testing.T) {
 	t.Parallel()
 
-	var builder strings.Builder
-	builder.WriteString("App=com.example.app (pid 4242)\n")
-	builder.WriteString("Window: \"Main\", App: Example.\n\n")
-	builder.WriteString("0 standard window Main\n")
-	for index := 1; index <= desktopTreeMaxNodes+5; index++ {
-		builder.WriteString("\t" + itoaDesktopTest(index) + " button Item\n")
+	tests := map[string]struct {
+		body  func(*strings.Builder)
+		bound desktopobserve.ObservedTreeBound
+	}{
+		"node count": {bound: desktopobserve.ObservedTreeBoundNodes, body: func(builder *strings.Builder) {
+			builder.WriteString("0 standard window Main\n")
+			for index := 1; index <= desktopTreeMaxNodes+5; index++ {
+				builder.WriteString("\t" + itoaDesktopTest(index) + " button Item\n")
+			}
+		}},
+		// Depth climbs one level per node, so the depth bound is crossed while the
+		// node count is still well inside its own bound.
+		"depth": {bound: desktopobserve.ObservedTreeBoundDepth, body: func(builder *strings.Builder) {
+			for depth := 0; depth <= desktopTreeMaxDepth+1; depth++ {
+				builder.WriteString(strings.Repeat("\t", depth) +
+					itoaDesktopTest(depth) + " group Item\n")
+			}
+		}},
 	}
-	builder.WriteString("\nThe focused UI element is 0 standard window Main.")
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	_, err := parseDesktopTree(builder.String())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "node count exceeds")
+			var builder strings.Builder
+			builder.WriteString("App=com.example.app (pid 4242)\n")
+			builder.WriteString("Window: \"Main\", App: Example.\n\n")
+			test.body(&builder)
+			builder.WriteString("\nThe focused UI element is 0 standard window Main.")
+
+			_, err := parseDesktopTree(builder.String())
+			require.Error(t, err)
+			assert.Equal(t, desktopobserve.ReasonObservedTreeBoundExceeded,
+				desktopobserve.ReasonCodeOf(err),
+				"a crossed bound must not report as provider unavailability")
+			assert.Contains(t, err.Error(), string(test.bound))
+		})
+	}
 }
 
 func itoaDesktopTest(value int) string {

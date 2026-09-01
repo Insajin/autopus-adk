@@ -39,8 +39,18 @@ type DesktopObservationRunRequest struct {
 	Operations      []desktopobserve.Operation
 	AppRef          string
 	WindowRef       string
-	Policy          desktopobserve.OraclePolicy
-	Redactor        desktopobserve.Redactor
+	// ProviderAppID is the platform identifier the provider resolves, taken from
+	// the pack's desktop_observation.provider_app_id. It addresses the provider
+	// and is never published: app_ref and window_ref remain the publishable
+	// aliases. SPEC-QAMESH-013 REQ-3.
+	ProviderAppID string
+	// AppName and WindowTitle are the accessibility labels the pack declared
+	// through required_landmarks. They are the only place a real window title
+	// containing a space can be stated, since a ref grammar forbids spaces.
+	AppName     string
+	WindowTitle string
+	Policy      desktopobserve.OraclePolicy
+	Redactor    desktopobserve.Redactor
 }
 
 type desktopObservationRunner struct {
@@ -172,6 +182,17 @@ func desktopProviderScope(identity desktopobserve.ProviderIdentity) desktopobser
 
 func desktopWindowScope(windowRef string) desktopobserve.ReceiptScope {
 	return desktopobserve.ReceiptScope{Kind: desktopobserve.ScopeWindow, PublicRef: windowRef}
+}
+
+// desktopAppScope and desktopWindowScope take the refs the pack declared.
+//
+// SPEC-QAMESH-013: every receipt scope in the runner used to be built from the
+// literals "autopus-desktop" and "main-window", so a run whose pack named its own
+// refs published a receipt describing a different window than the projection it
+// carried, and validation refused it as a scope binding mismatch. The refs are
+// opaque publishable aliases either way; whose they are is the pack's business.
+func desktopAppScope(appRef string) desktopobserve.ReceiptScope {
+	return desktopobserve.ReceiptScope{Kind: desktopobserve.ScopeApplication, PublicRef: appRef}
 }
 
 func desktopProviderPublicRef(provider desktopobserve.RuntimeProvider) string {

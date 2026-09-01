@@ -23,7 +23,7 @@ New `pkg/qa/run/desktop_observe_tree.go`.
    id, a missing header, a missing focus line.
 
 Verification: table tests over the two real trees captured in `research.md`
-(Autopus Desktop 7 nodes/406 B English, Finder 152 nodes/5598 B Korean) plus
+(Autopus Desktop 7 nodes/484 B English, Finder 152 nodes/7364 B Korean) plus
 malformed variants. No production wiring in this phase, so nothing can regress.
 
 ## Phase 2 — Reason codes and bounds

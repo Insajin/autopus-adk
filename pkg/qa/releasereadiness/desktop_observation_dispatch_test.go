@@ -193,8 +193,11 @@ func readinessDesktopObservationPack() journey.Pack {
 		Adapter: journey.AdapterRef{ID: "desktop-accessibility-observe"},
 		Checks:  []journey.Check{{ID: "semantic-landmarks", Type: "desktop_accessibility_semantic"}},
 		DesktopObservation: journey.DesktopObservationPolicy{
-			Platform: "macos", Operations: []string{"capabilities", "permissions", "list_apps", "list_windows", "get_state"},
-			AppRef: "autopus-desktop", WindowRef: "main-window",
+			Platform:      "macos",
+			ProviderAppID: "co.autopus.desktop",
+			Operations:    []string{"capabilities", "permissions", "list_apps", "list_windows", "get_state"},
+			AppRef:        "autopus-desktop",
+			WindowRef:     "main-window",
 			RequiredLandmarks: []journey.DesktopObservationLandmark{
 				{Role: "AXApplication", Name: "Autopus", RequiredState: "enabled"},
 				{Role: "AXWindow", Name: "Autopus", RequiredState: "focused"},

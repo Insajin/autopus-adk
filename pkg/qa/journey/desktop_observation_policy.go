@@ -2,6 +2,7 @@ package journey
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -14,6 +15,13 @@ const (
 	// through a field that ends up in evidence, logs, and provider requests.
 	desktopObservationRefMaxLen  = 64
 	desktopObservationNameMaxLen = 96
+
+	// provider_app_id is never published, so it is not bounded by the evidence
+	// budget the refs answer to. It is bounded anyway because it is
+	// interpolated into an argv element handed to an external provider CLI:
+	// 128 bytes is well past any real reverse-DNS bundle identifier and far
+	// short of anything that could be a smuggled payload.
+	desktopObservationProviderAppIDMaxLen = 128
 )
 
 var (
@@ -78,6 +86,18 @@ func validateDesktopObservationTarget(
 	if !slices.Equal(policy.Operations, desktopObservationOperations) {
 		return invalid("desktop observation operations must match the read-only sequence")
 	}
+	// Absence is called out separately from malformation: REQ-3 requires the
+	// setup gap to name the missing field, and there is deliberately no
+	// compiled-in identifier to fall back to.
+	if policy.ProviderAppID == "" {
+		return invalid("desktop observation provider_app_id is required: the pack must " +
+			"declare the platform identifier of the app under observation")
+	}
+	if !safeDesktopObservationProviderAppID(policy.ProviderAppID) {
+		return invalid("desktop observation provider_app_id must be at most " +
+			strconv.Itoa(desktopObservationProviderAppIDMaxLen) + " characters of letters, " +
+			"digits, dot, underscore, or hyphen, not beginning with a separator")
+	}
 	if !safeDesktopObservationRef(policy.AppRef) {
 		return invalid("desktop observation app_ref must be a short alias of " +
 			"letters, digits, dot, underscore, or hyphen")
@@ -134,8 +154,49 @@ func safeDesktopObservationRef(value string) bool {
 	return true
 }
 
-// safeDesktopObservationName accepts a human accessibility label, which may
-// contain spaces, but never control characters or surrounding whitespace.
+// safeDesktopObservationProviderAppID accepts the platform identifier the
+// provider resolves. It is deliberately NOT validated with
+// safeDesktopObservationRef: that grammar exists to keep a ref safe as an
+// evidence path component, and it is also applied to values that are published,
+// whereas provider_app_id is request-only. The two grammars happen to overlap,
+// but they answer different questions and must be free to diverge.
+//
+// The value is interpolated into a single argv element handed to an external
+// provider CLI. That is not a shell, so quoting is not the threat; the threats
+// are argument injection and a value the provider cannot round-trip. So the
+// grammar is an ASCII allowlist — letters, digits, dot, underscore, hyphen —
+// which excludes whitespace, quotes, backticks, `$`, `;`, path separators, NUL,
+// every other control character, and all non-ASCII. A leading dot, underscore,
+// or hyphen is rejected because a leading hyphen turns the value into a flag
+// and a leading dot makes it path-relative if a provider ever resolves it as
+// one. Reverse-DNS bundle identifiers such as `co.autopus.desktop` and
+// `com.apple.finder` satisfy this unchanged.
+func safeDesktopObservationProviderAppID(value string) bool {
+	if value == "" || len(value) > desktopObservationProviderAppIDMaxLen {
+		return false
+	}
+	for index, char := range value {
+		switch {
+		case char >= 'a' && char <= 'z', char >= 'A' && char <= 'Z', char >= '0' && char <= '9':
+			continue
+		case (char == '.' || char == '_' || char == '-') && index > 0:
+			continue
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// safeDesktopObservationName accepts a human accessibility label. It may contain
+// spaces but never a control character, a line break, or surrounding whitespace.
+//
+// Unicode space separators are accepted deliberately. Go's unicode.IsPrint counts
+// only the ASCII space as printable among spaces, so it rejects U+00A0 - and a
+// measured macOS Finder window title is "맥북판매의 Mac\u00a0Studio". Rejecting a
+// real window title as unprintable made the landmark undeclarable, which is the
+// lane being unreachable again for a new reason. Line separators stay rejected:
+// the label must remain single-line.
 func safeDesktopObservationName(value string) bool {
 	if value == "" || len(value) > desktopObservationNameMaxLen {
 		return false
@@ -144,6 +205,9 @@ func safeDesktopObservationName(value string) bool {
 		return false
 	}
 	for _, char := range value {
+		if unicode.Is(unicode.Zs, char) {
+			continue
+		}
 		if !unicode.IsPrint(char) {
 			return false
 		}

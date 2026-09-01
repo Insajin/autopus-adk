@@ -144,15 +144,21 @@ func DecodeExchange(requestRaw, resultRaw []byte) (Exchange, error) {
 	return Exchange{Request: request, Result: result}, nil
 }
 
+// validRequestScope checks that a request is scoped to the right KIND of thing
+// and that its ref is well formed. SPEC-QAMESH-013 REQ-3: the app and window
+// cases compared against the literals "autopus-desktop" and "main-window", so
+// any pack naming its own refs was refused here. Which app and window a run is
+// about is the pack's business. SafePublicRef rejects the empty string, so an
+// unset ref refuses rather than matching; the provider names stay pinned because
+// they name the two adapters this repository ships.
 func validRequestScope(operation Operation, scope ReceiptScope) bool {
-	expected := ScopeProvider
 	switch operation {
 	case OperationListWindows:
-		return scope.Kind == ScopeApplication && scope.PublicRef == "autopus-desktop"
+		return scope.Kind == ScopeApplication && SafePublicRef(scope.PublicRef)
 	case OperationGetState:
-		return scope.Kind == ScopeWindow && scope.PublicRef == "main-window"
+		return scope.Kind == ScopeWindow && SafePublicRef(scope.PublicRef)
 	}
-	return scope.Kind == expected &&
+	return scope.Kind == ScopeProvider &&
 		(scope.PublicRef == "autopus-desktop-local" || scope.PublicRef == "orca-computer-use-macos")
 }
 
@@ -215,12 +221,18 @@ func validateOperationPayload(operation Operation, raw json.RawMessage) (Semanti
 	return SemanticProjection{}, nil
 }
 
+// validApps and validWindows enforce exactly one match with a publishable alias.
+// The count is the real invariant - an ambiguous target is not observable - and
+// it is what the literals "autopus-desktop" and "main-window" used to smuggle in
+// alongside an identity assertion no other project could satisfy. The refs a run
+// is about come from the pack; whether the run resolved to one of them is
+// checked here.
 func validApps(apps []AppSummary) bool {
-	return len(apps) == 1 && apps[0].AppRef == "autopus-desktop"
+	return len(apps) == 1 && SafePublicRef(apps[0].AppRef)
 }
 
 func validWindows(windows []WindowSummary) bool {
-	return len(windows) == 1 && windows[0].WindowRef == "main-window"
+	return len(windows) == 1 && SafePublicRef(windows[0].WindowRef)
 }
 
 func validateSuccessBinding(request Request, result Result, projection SemanticProjection) error {
@@ -232,7 +244,7 @@ func validateSuccessBinding(request Request, result Result, projection SemanticP
 			return ErrScopeMismatch
 		}
 	case OperationListWindows:
-		if request.Scope.Kind != ScopeApplication || request.Scope.PublicRef != "autopus-desktop" ||
+		if request.Scope.Kind != ScopeApplication || !SafePublicRef(request.Scope.PublicRef) ||
 			receipt.Scope != request.Scope {
 			return ErrScopeMismatch
 		}
@@ -240,8 +252,19 @@ func validateSuccessBinding(request Request, result Result, projection SemanticP
 		if err := validateStateReceipt(receipt); err != nil {
 			return err
 		}
+		// The app ref is checked for shape, not identity: this layer is given a
+		// window-scoped request and so does not know which app the pack named.
+		// Identity is bound where it is known - the runner compares the
+		// projection's app and window refs against the request's, and the tree
+		// header is compared against the pack's provider_app_id in the adapter.
+		// The literal that used to sit here asserted "you are Autopus" and was one
+		// of the four layers that made this lane unpassable for anyone else.
+		// safePublicRef on the window ref is what keeps an unset scope from
+		// matching: without it, an empty request ref and an empty projection ref
+		// compare equal and a receipt scoped to nothing is accepted.
 		if projection.ProviderRef != providerRef(receipt.Provider.Name) ||
-			projection.AppRef != "autopus-desktop" || projection.WindowRef != request.Scope.PublicRef ||
+			!SafePublicRef(projection.AppRef) || !SafePublicRef(projection.WindowRef) ||
+			projection.WindowRef != request.Scope.PublicRef ||
 			!validOpaqueRef(projection.StateRef, "state-") {
 			return ErrScopeMismatch
 		}
@@ -267,6 +290,11 @@ func providerRef(providerName string) string {
 	}
 }
 
-func safePublicRef(value string) bool {
+// SafePublicRef reports whether a value is a publishable opaque alias. Exported
+// because the runner must refuse an unset app_ref or window_ref before it
+// addresses a provider: every scope the runner publishes is built from those refs
+// (SPEC-QAMESH-013), and two empty refs compare equal, so a scope built from
+// nothing would accept anything.
+func SafePublicRef(value string) bool {
 	return len(value) <= 96 && safePublicRefPattern.MatchString(value)
 }

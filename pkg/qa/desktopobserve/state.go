@@ -73,6 +73,6 @@ func (binding StateBinding) scopeKey() string {
 }
 
 func validStateBinding(binding StateBinding) bool {
-	return safePublicRef(binding.StateRef) && safePublicRef(binding.ProviderRef) &&
-		safePublicRef(binding.AppRef) && safePublicRef(binding.WindowRef) && binding.Digest != ""
+	return SafePublicRef(binding.StateRef) && SafePublicRef(binding.ProviderRef) &&
+		SafePublicRef(binding.AppRef) && SafePublicRef(binding.WindowRef) && binding.Digest != ""
 }

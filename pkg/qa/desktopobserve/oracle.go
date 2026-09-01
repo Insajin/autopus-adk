@@ -15,19 +15,26 @@ const (
 	FailureRedaction             FailureCondition = "redaction"
 	FailureRawOnlyQuarantine     FailureCondition = "raw_only_quarantine"
 	FailureProtocolVersion       FailureCondition = "protocol_version"
+	// SPEC-QAMESH-013 REQ-5, REQ-6: without these two conditions the new reason
+	// codes have no emission path, and a landmark or bound refusal keeps
+	// degrading into FailureProviderStart.
+	FailureDeclaredLandmarkAbsent FailureCondition = "declared_landmark_absent"
+	FailureObservedTreeBound      FailureCondition = "observed_tree_bound"
 )
 
 var failureReasons = map[FailureCondition]ReasonCode{
-	FailureProviderStart:         ReasonProviderUnavailable,
-	FailureOperationMissing:      ReasonCapabilityUnsupported,
-	FailureAccessibilityDenied:   ReasonAccessibilityPermissionMissing,
-	FailureAppAliasUnmatched:     ReasonTargetAppNotFound,
-	FailureWindowAliasUnmatched:  ReasonTargetWindowNotFound,
-	FailureStateRefRejected:      ReasonStaleState,
-	FailureLandmarksInsufficient: ReasonSemanticProjectionUnavailable,
-	FailureRedaction:             ReasonRedactionFailed,
-	FailureRawOnlyQuarantine:     ReasonEvidenceQuarantined,
-	FailureProtocolVersion:       ReasonProviderProtocolMismatch,
+	FailureProviderStart:          ReasonProviderUnavailable,
+	FailureOperationMissing:       ReasonCapabilityUnsupported,
+	FailureAccessibilityDenied:    ReasonAccessibilityPermissionMissing,
+	FailureAppAliasUnmatched:      ReasonTargetAppNotFound,
+	FailureWindowAliasUnmatched:   ReasonTargetWindowNotFound,
+	FailureStateRefRejected:       ReasonStaleState,
+	FailureLandmarksInsufficient:  ReasonSemanticProjectionUnavailable,
+	FailureRedaction:              ReasonRedactionFailed,
+	FailureRawOnlyQuarantine:      ReasonEvidenceQuarantined,
+	FailureProtocolVersion:        ReasonProviderProtocolMismatch,
+	FailureDeclaredLandmarkAbsent: ReasonDeclaredLandmarkNotFound,
+	FailureObservedTreeBound:      ReasonObservedTreeBoundExceeded,
 }
 
 type Verdict string

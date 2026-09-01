@@ -173,6 +173,8 @@ func desktopObservationMetadata() Metadata {
 			"redaction_failed",
 			"evidence_quarantined",
 			"provider_protocol_mismatch",
+			"declared_landmark_not_found",
+			"observed_tree_bound_exceeded",
 		},
 	}
 }

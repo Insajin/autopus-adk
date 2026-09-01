@@ -63,24 +63,30 @@ func (client *orcaDesktopClient) ListApps(
 	if err := client.requireHandshakeLocked(ctx); err != nil {
 		return nil, err
 	}
+	if !client.target.resolved() {
+		return nil, desktopobserve.ErrMalformedEnvelope
+	}
 	raw, err := client.runLocked(ctx, "computer", "list-apps", "--json")
 	if err != nil {
 		return nil, err
 	}
-	pid, matches, err := decodeOrcaApps(raw, client.runtimeID)
+	pid, matches, err := decodeOrcaApps(
+		raw, client.runtimeID, client.appArgument(), client.expectedAppName(),
+	)
 	if err != nil {
 		return nil, err
 	}
 	client.targetPID = 0
+	label := client.appRefLabel()
 	if matches != 1 {
 		apps := make([]desktopobserve.AppSummary, matches)
 		for index := range apps {
-			apps[index] = desktopobserve.AppSummary{AppRef: "autopus-desktop"}
+			apps[index] = desktopobserve.AppSummary{AppRef: label}
 		}
 		return apps, nil
 	}
 	client.targetPID = pid
-	return []desktopobserve.AppSummary{{AppRef: "autopus-desktop"}}, nil
+	return []desktopobserve.AppSummary{{AppRef: label}}, nil
 }
 
 func (client *orcaDesktopClient) ListWindows(
@@ -89,29 +95,33 @@ func (client *orcaDesktopClient) ListWindows(
 ) ([]desktopobserve.WindowSummary, error) {
 	client.mu.Lock()
 	defer client.mu.Unlock()
-	if appRef != "autopus-desktop" || client.targetPID <= 1 {
+	if appRef != client.appRefLabel() || client.targetPID <= 1 {
 		return nil, desktopobserve.ErrMalformedEnvelope
 	}
 	raw, err := client.runLocked(
-		ctx, "computer", "list-windows", "--app", orcaAppBundleID, "--json",
+		ctx, "computer", "list-windows", "--app", client.appArgument(), "--json",
 	)
 	if err != nil {
 		return nil, err
 	}
-	binding, matches, err := decodeOrcaWindows(raw, client.runtimeID, client.targetPID)
+	binding, matches, err := decodeOrcaWindows(
+		raw, client.runtimeID, client.targetPID, client.appArgument(),
+		client.expectedAppName(), client.expectedWindowTitle(),
+	)
 	if err != nil {
 		return nil, err
 	}
 	client.window = orcaWindowBinding{}
+	label := client.windowRefLabel()
 	if matches != 1 {
 		windows := make([]desktopobserve.WindowSummary, matches)
 		for index := range windows {
-			windows[index] = desktopobserve.WindowSummary{WindowRef: "main-window"}
+			windows[index] = desktopobserve.WindowSummary{WindowRef: label}
 		}
 		return windows, nil
 	}
 	client.window = binding
-	return []desktopobserve.WindowSummary{{WindowRef: "main-window"}}, nil
+	return []desktopobserve.WindowSummary{{WindowRef: label}}, nil
 }
 
 func (client *orcaDesktopClient) GetState(
@@ -121,18 +131,18 @@ func (client *orcaDesktopClient) GetState(
 ) (desktopobserve.SemanticProjection, error) {
 	client.mu.Lock()
 	defer client.mu.Unlock()
-	if appRef != "autopus-desktop" || windowRef != "main-window" ||
+	if appRef != client.appRefLabel() || windowRef != client.windowRefLabel() ||
 		client.window.pid <= 1 || client.window.id <= 0 {
 		return desktopobserve.SemanticProjection{}, desktopobserve.ErrMalformedEnvelope
 	}
 	raw, err := client.runLocked(
 		ctx,
-		"computer", "get-app-state", "--app", orcaAppBundleID, "--no-screenshot", "--json",
+		"computer", "get-app-state", "--app", client.appArgument(), "--no-screenshot", "--json",
 	)
 	if err != nil {
 		return desktopobserve.SemanticProjection{}, err
 	}
-	return decodeOrcaState(raw, client.runtimeID, client.window, client.random)
+	return decodeOrcaState(raw, client.runtimeID, client.window, client.random, client.target)
 }
 
 func (client *orcaDesktopClient) requireHandshakeLocked(ctx context.Context) error {

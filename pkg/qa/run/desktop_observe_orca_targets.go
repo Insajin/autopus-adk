@@ -20,10 +20,19 @@ type orcaAppRecord struct {
 	UseCount   json.RawMessage `json:"useCount"`
 }
 
-func decodeOrcaApps(raw []byte, expectedRuntime string) (int, int, error) {
+// decodeOrcaApps matches the app the pack named. SPEC-QAMESH-013 REQ-3: the
+// expected identity arrives from the request, never from a compiled-in constant,
+// so a project observes its own app instead of Autopus's.
+func decodeOrcaApps(
+	raw []byte,
+	expectedRuntime string,
+	expectedAppID string,
+	expectedName string,
+) (int, int, error) {
 	var result orcaAppsResult
 	runtimeID, err := decodeOrcaSuccess(raw, &result, "apps")
-	if err != nil || runtimeID != expectedRuntime || result.Apps == nil {
+	if err != nil || runtimeID != expectedRuntime || result.Apps == nil ||
+		expectedAppID == "" || expectedName == "" {
 		return 0, 0, desktopobserve.ErrMalformedEnvelope
 	}
 	pid, matches := 0, 0
@@ -31,10 +40,10 @@ func decodeOrcaApps(raw []byte, expectedRuntime string) (int, int, error) {
 		if !validOrcaAppRecord(app) {
 			return 0, 0, desktopobserve.ErrMalformedEnvelope
 		}
-		if *app.BundleID != orcaAppBundleID {
+		if *app.BundleID != expectedAppID {
 			continue
 		}
-		if *app.Name != orcaAppName || !*app.IsRunning || *app.PID <= 1 {
+		if *app.Name != expectedName || !*app.IsRunning || *app.PID <= 1 {
 			return 0, 0, desktopobserve.ErrMalformedEnvelope
 		}
 		pid = *app.PID
@@ -86,11 +95,15 @@ func decodeOrcaWindows(
 	raw []byte,
 	expectedRuntime string,
 	expectedPID int,
+	expectedAppID string,
+	expectedName string,
+	expectedTitle string,
 ) (orcaWindowBinding, int, error) {
 	var result orcaWindowsResult
 	runtimeID, err := decodeOrcaSuccess(raw, &result, "app", "windows")
 	if err != nil || runtimeID != expectedRuntime || !validOrcaAppRecord(result.App) ||
-		*result.App.Name != orcaAppName || *result.App.BundleID != orcaAppBundleID ||
+		expectedAppID == "" || expectedName == "" || expectedTitle == "" ||
+		*result.App.Name != expectedName || *result.App.BundleID != expectedAppID ||
 		!*result.App.IsRunning || *result.App.PID != expectedPID || result.Windows == nil {
 		return orcaWindowBinding{}, 0, desktopobserve.ErrMalformedEnvelope
 	}
@@ -103,10 +116,11 @@ func decodeOrcaWindows(
 		return orcaWindowBinding{}, len(result.Windows), nil
 	}
 	window := result.Windows[0]
-	if *window.Title != orcaWindowTitle {
+	if *window.Title != expectedTitle {
 		return orcaWindowBinding{}, 0, nil
 	}
-	if !validOrcaSnapshotApp(window.App, expectedPID) || *window.IsMinimized || *window.IsOffscreen ||
+	if !validOrcaSnapshotApp(window.App, expectedPID, expectedAppID, expectedName) ||
+		*window.IsMinimized || *window.IsOffscreen ||
 		*window.Index < 0 || *window.ID <= 0 || *window.ScreenIndex < 0 ||
 		*window.Width <= 0 || *window.Height <= 0 || *window.Width > 100_000 || *window.Height > 100_000 ||
 		*window.X < -100_000 || *window.X > 100_000 || *window.Y < -100_000 || *window.Y > 100_000 ||
@@ -128,9 +142,19 @@ func validOrcaWindowSchema(window orcaWindow) bool {
 		window.Platform.Alpha != nil && window.ID != nil && window.X != nil
 }
 
-func validOrcaSnapshotApp(app orcaSnapshotApp, expectedPID int) bool {
-	return app.Name != nil && *app.Name == orcaAppName && app.BundleID != nil &&
-		*app.BundleID == orcaAppBundleID && app.PID != nil && *app.PID == expectedPID
+// validOrcaSnapshotApp confirms the provider answered about the app the pack
+// named. SPEC-QAMESH-013 REQ-3: the expected identity is supplied, not compiled
+// in, so this check works for any project's app.
+func validOrcaSnapshotApp(
+	app orcaSnapshotApp,
+	expectedPID int,
+	expectedAppID string,
+	expectedName string,
+) bool {
+	return expectedAppID != "" && expectedName != "" &&
+		app.Name != nil && *app.Name == expectedName &&
+		app.BundleID != nil && *app.BundleID == expectedAppID &&
+		app.PID != nil && *app.PID == expectedPID
 }
 
 func validNullableOrcaBool(raw json.RawMessage) bool {

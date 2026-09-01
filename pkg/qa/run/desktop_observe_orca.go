@@ -14,11 +14,12 @@ import (
 	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 )
 
+// No compiled-in app identity lives here any more. SPEC-QAMESH-013 REQ-3: the
+// bundle id, app name, and window title arrive per run from the pack through
+// desktopProviderTarget, because a constant here made `desktop-native`
+// observable only for Autopus's own desktop app.
 const (
 	orcaExecutableName = "orca"
-	orcaAppBundleID    = "co.autopus.desktop"
-	orcaAppName        = "Autopus Desktop"
-	orcaWindowTitle    = "Autopus"
 	orcaMaxOutputBytes = 64 * 1024
 )
 
@@ -120,6 +121,41 @@ type orcaDesktopClient struct {
 	capabilities []desktopobserve.Operation
 	targetPID    int
 	window       orcaWindowBinding
+	target       desktopProviderTarget
+}
+
+// applyTarget records which app this client observes. The runner calls it once
+// before the handshake, so every provider request addresses the pack's app.
+func (client *orcaDesktopClient) applyTarget(target desktopProviderTarget) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	client.target = target
+}
+
+// appArgument is the value passed to the provider's --app flag. A pack with no
+// provider_app_id cannot reach here: the journey layer rejects it, and the empty
+// fallback below would address nothing rather than silently observing Autopus.
+func (client *orcaDesktopClient) appArgument() string {
+	return client.target.ProviderAppID
+}
+
+func (client *orcaDesktopClient) expectedAppName() string {
+	return client.target.AppName
+}
+
+func (client *orcaDesktopClient) expectedWindowTitle() string {
+	return client.target.WindowTitle
+}
+
+// appRefLabel and windowRefLabel are the aliases the harness speaks internally.
+// They echo the pack's refs so the runner's request and the client's replies
+// agree on identity without either side inventing one.
+func (client *orcaDesktopClient) appRefLabel() string {
+	return client.target.AppRef
+}
+
+func (client *orcaDesktopClient) windowRefLabel() string {
+	return client.target.WindowRef
 }
 
 func newOrcaDesktopClient(path string) (desktopProviderClient, error) {
