@@ -67,7 +67,7 @@ The companion manifest and signature digests are not restated here. Read them fr
 | Input | Source |
 |---|---|
 | `release-lineage-v1.json` + `release-lineage-v1.sig` | published v0.50.111 assets |
-| A0 receipt bundle: receipt bytes + signature | produced by release prep from the operator's Ed25519 key, then opened through the fd-pinned transaction in `pkg/companionmanifest/public_key_receipt_bundle_unix.go` |
+| A0 receipt bundle: receipt bytes + signature | produced inside the release workflow from repository secret `ADK_COMPANION_ED25519_PRIVATE_KEY`, then opened through the fd-pinned transaction in `pkg/companionmanifest/public_key_receipt_bundle_unix.go` |
 | A0 anchor pins | committed at `pkg/companionmanifest/public_key_receipt_trust.go:15-18` |
 
 The anchor is four committed SHA-256 pins over the receipt, its signature, the public key, and the record. They are immutable source, so the gate cannot be satisfied by substituting a different receipt.
@@ -83,7 +83,7 @@ An earlier draft of this section said the lineage signing key `adk-release-2026-
 
 Those two digests are equal — `sha256` of the decoded variable equals the compiled pin. So the key's public half ships inside the binary that verifies it, which is a stronger position than "unpublished": a stale or substituted release key cannot pass, and the pin cannot be changed without shipping a new binary.
 
-What is genuinely operator-only is the receipt bundle, because it must be signed by that key's private half. So the boundary is narrower than first written: the A23 lineage signature is verifiable by anyone holding a valid A0 receipt bundle, and the bundle is what only the operator can produce. Do not describe the lineage signature as publicly verifiable in release notes, and do not weaken the gate to route around the bundle.
+What produces the receipt bundle is that key's private half, which lives in the repository secret `ADK_COMPANION_ED25519_PRIVATE_KEY` and is materialized inside the workflow. So the bundle is reachable by the release workflow and not by a developer machine, and the A23 lineage signature is verifiable by anyone holding a valid bundle. Do not describe the lineage signature as publicly verifiable in release notes, and do not weaken the gate to route around the bundle.
 
 Note also that the v0.50.109 rotation sidecar carries the channel, tag, and promotion keys and not this one. The release key is rotated through the companion variables above, not through that sidecar — two separate rotation surfaces that are easy to conflate.
 
@@ -160,20 +160,24 @@ Ruleset `21986875` was created in the open shape and field-compared against the 
 
 ### Operator-held material, and why the procedure stops without it
 
-Everything the operator must bring reduces to key material. Two key sets, and the rest is generated from them — so this is one blocker wearing four hats, not four hunts.
+An earlier draft of this section claimed four operator-held inputs. Three of them are GitHub Actions secrets that the workflow materializes, and checking that changed the blocker from four to one.
 
-| Input | Origin | State observed while writing this runbook |
+| Input | Actual custody | State |
 |---|---|---|
-| R2 tag signing private key | operator-held SSH key; `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`, extracted from the v0.50.111 tag signature and matching `scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint` | absent; the only local key is `SHA256:GIa3VFVWeCqBJamdDCJdxDzXE+XxQBC1xsx/iZ9XlF8` and `ssh-add -l` reports no identities |
-| `COMPANION_SIGNING_KEY_FILE` | operator-held Ed25519 private key, mode 0600 | absent |
-| Nine `COMPANION_*` variables | operator-supplied; validated by `bash scripts/companion-release/validate-environment.sh` | absent; fails at `COMPANION_BUILD_PROVENANCE` |
-| A0 receipt bundle | **generated, not located.** `auto companion-manifest public-key-receipt --key-file … --bundle-output …`, driven by `produce_public_key_receipt_bundle` in `scripts/companion-release/produce-public-key-receipt.sh` | cannot be produced here; no key file |
+| `COMPANION_SIGNING_KEY_FILE` | repository secret `ADK_COMPANION_ED25519_PRIVATE_KEY`, written to `${runner.temp}/adk-release-credentials/companion-ed25519-private-key` by `.github/workflows/release.yaml:519` | alive |
+| A0 receipt bundle | generated inside the workflow from that key, via `produce_public_key_receipt_bundle` | reachable |
+| Promotion evidence key | repository secret `OMP_CONTEXT_EVIDENCE_SIGNING_KEY` | alive |
+| `checksums.txt.signatures` signer K1 | environment secret `ADK_RELEASE_ECDSA_PRIVATE_KEY` in `adk-companion-release`; confirmed as the `e1fdfe06…` record in the published v0.50.111 envelope | alive |
+| Nine `COMPANION_*` variables | operator-supplied at prep time | supplied by the operator, not secret material |
+| **R2 tag signing private key** | **operator only** | **destroyed; see `release-key-custody-loss.md`** |
 
-The last row was worth checking rather than assuming. An earlier draft of this runbook told the operator to locate the A0 bundle, which would have sent them looking for a file that release prep creates. Nothing is missing from disk; the key that signs it is missing.
+So the evidence layer is not blocked. The workflow can produce the receipt bundle, the lineage signature, the promotion attestation, and the K1 envelope without any key from a developer machine.
 
-Signing the tag with a different key is not a smaller version of this release. The v0.50.109 rotation established R2 through a signed sidecar, and every consumer that checks a v0.50.112 tag will check it against R2. A tag signed by another key is a tag that fails verification for everyone downstream while looking finished locally.
+The single blocker is the tag signature. `verify_tag_signing_authority` in `scripts/companion-release/prepare-release-local-lib.sh` requires an SSH key whose public half equals the R2 pin and whose fingerprint equals a value hard-coded at line 42, then signs a probe tag and verifies it. R2 was destroyed and the channel key that could have authorized a replacement was destroyed with it.
 
-So the procedure runs to the tag boundary and stops there. Everything before it — ruleset, content gates, lineage inputs, evidence plan — is repository work and is done or specified. The tag, the evidence signing, and the workflow trigger need the operator.
+Signing the tag with a different key is not a smaller version of this release. The published v0.50.109 rotation sidecar names R2 as the authorized signer, so another key contradicts immutable published history. Consumers are unaffected either way — nothing a consumer runs verifies a git tag signature — which is exactly why the decision must be recorded rather than absorbed silently.
+
+Resolve it through `release-key-custody-loss.md` before returning here. That document holds the two options and their costs.
 
 ### Generating a new key on the release machine
 

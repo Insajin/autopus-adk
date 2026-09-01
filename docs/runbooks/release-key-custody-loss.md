@@ -57,17 +57,31 @@ This is the recovery affordance the design already bought. **Every deployed inst
 
 `VerifyReleaseSignature` is fail-closed against this compiled set, so if both K1 and K2 are gone, no new release can satisfy an already-installed binary. That case is a re-install migration, not a rotation.
 
-## What is lost, and what each loss costs
+## Custody, measured
 
-| Key | Role | Consequence |
-|---|---|---|
-| R2, SSH ed25519 `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ` | git tag signature | new release tags cannot carry the expected signature |
-| `adk-channel-2026-q3-a0` | rotation authority for tag and promotion keys | no key can authorize a replacement tag or promotion key |
-| `adk-release-2026-q3-b0` | public-key receipt, feeding the lineage gate | the A0 receipt bundle cannot be produced, so `VerifyOMPContextReleaseLineage` cannot run |
-| `omp-context-promotion-2026-q3-k3` | promotion attestation | fresh K3 evidence cannot be signed |
-| K1 ECDSA | `checksums.txt.signatures` | self-update breaks unless K2 signs instead |
+Most of these keys were never in the operator's hands. They are GitHub Actions secrets, and they still exist. Checking this before planning changed the incident from "the release chain is dead" to "one audit link is dead."
 
-The public halves are all still pinned and are not secrets: the channel key in `AUTOPUS_ADK_CHANNEL_PUBLIC_KEY` and the committed authority document, the release key in `ADK_COMPANION_PUBLIC_KEY_BASE64` whose digest equals the compiled `configuredA0PublicKeySHA256`, and K1/K2 in `pinnedkey.go`. Nothing needs recovering from the repository. Only private halves are gone.
+| Key | Role | Custody | State |
+|---|---|---|---|
+| K1 ECDSA `e1fdfe06…` | signs `checksums.txt.signatures`, consumed by self-update | environment secret `ADK_RELEASE_ECDSA_PRIVATE_KEY` in `adk-companion-release`, created 2026-07-17 | **alive** |
+| `adk-release-2026-q3-b0` | public-key receipt, feeding the lineage gate | repository secret `ADK_COMPANION_ED25519_PRIVATE_KEY`, created 2026-07-14; materialized at `COMPANION_SIGNING_KEY_FILE` inside the workflow | **alive** |
+| `omp-context-promotion-2026-q3-k3` | promotion attestation | repository secret `OMP_CONTEXT_EVIDENCE_SIGNING_KEY`, created 2026-08-05 | **alive** |
+| Sigstore keyless | `checksums.txt.bundle` | none; workflow OIDC | **alive** |
+| R2 SSH ed25519 `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ` | git tag signature | operator | **destroyed** |
+| `adk-channel-2026-q3-a0` | rotation authority for the tag signer | operator | **destroyed** |
+| K2 ECDSA `93d9f681…` | prepositioned next release signer | unknown; no secret corresponds to it and it has never signed | **unknown** |
+
+Evidence for the K1 row: the published `checksums.txt.signatures` for v0.50.111 carries exactly one record, fingerprint `e1fdfe06…`, which is K1. The workflow produced it from the environment secret, so K1 is not operator-held and is not lost. K2 remains unused, which is why its custody is unknown rather than confirmed — it does not currently matter, because K1 works.
+
+The public halves are all still pinned and are not secrets: the channel key in `AUTOPUS_ADK_CHANNEL_PUBLIC_KEY` and the committed authority document, the release key in `ADK_COMPANION_PUBLIC_KEY_BASE64` whose digest equals the compiled `configuredA0PublicKeySHA256`, and K1/K2 in `pinnedkey.go`.
+
+## What the loss actually costs
+
+Consumer-facing integrity is untouched. Users install release archives and verify them through `checksums.txt`, the K1 envelope, and the sigstore bundle. Nothing a consumer runs verifies a git tag signature: `pkg/selfupdate` checks the compiled ECDSA anchors, and the Homebrew formula pins an archive digest.
+
+What is lost is one internal audit link — the guarantee that a release tag was signed by the expected key — plus the ability to rotate that key legitimately, since only the channel key could authorize a replacement and it is gone.
+
+That link is also a hard precondition of the current procedure. `verify_tag_signing_authority` in `scripts/companion-release/prepare-release-local-lib.sh` derives the public key from the operator's SSH key, requires it to equal the R2 pin, requires the fingerprint to equal a value **hard-coded at line 42**, then signs a probe tag and verifies it. Editing the pinned `.pub` and `.fingerprint` files does not get past it, and should not: the published, immutable v0.50.109 rotation sidecar names R2 as the authorized signer, so a different key contradicts published history.
 
 ## The shortcut that must not be taken
 
@@ -81,14 +95,27 @@ If the root must be replaced, it is a deliberate, announced re-anchoring with it
 
 Ordered by what it protects, not by convenience.
 
-1. **Establish lost versus compromised.** If compromised, revoke first: the channel authority ref, the tag ruleset expectations, and a public statement naming the affected window.
-2. **Confirm K2 custody.** This single fact decides whether existing installations can be reached at all. Test it by signing a scratch payload and verifying against the compiled K2 anchor before relying on it.
-3. **Keep shipping artifact integrity on sigstore.** It needs nothing from the operator and it already verifies.
-4. **Decide the fate of the companion evidence layer.** Lineage, promotion attestation, and the signed tag all need new anchors that no surviving key can authorize. Options are a fresh out-of-band root ceremony, or narrowing releases to the sigstore-plus-K2 guarantee and retiring the companion layer rather than leaving it present and unverifiable.
-5. **Only then plan the next release.** A release that silently omits a layer it used to carry is worse than a delayed one, because consumers cannot see what stopped being true.
+1. **Establish lost versus compromised.** Recorded as destroyed on 2026-09-02, so no revocation announcement is required and published releases stay trustworthy. Had it been compromised, revocation would come before anything else.
+2. **Leave the working layers alone.** Artifact integrity, the lineage receipt, and the promotion attestation all sign from secrets that still exist, and sigstore needs no key. Nothing here requires recovery, and touching it would only add risk.
+3. **Decide the fate of the tag-signature link.** This is the whole remaining decision. Two honest options, below.
+4. **Re-establish off-repository custody going forward, whichever option is chosen.** Every surviving signing key now lives in GitHub. That is why the release chain still works, and also why the property the channel key provided — that repository access alone cannot authorize a release — is currently not held by anything. Restoring it needs a new key in custody outside GitHub, held by someone who can refuse.
+
+### Option A: retire the tag-signature precondition, on the record
+
+Amend `verify_tag_signing_authority` so the procedure no longer requires a key that cannot exist, and state in the runbook and the release notes that release tags from v0.50.112 onward are not signed by R2 and that verification rests on the K1 envelope and the sigstore bundle.
+
+Cost: the audit trail loses a link, permanently and visibly. Consumers are unaffected. This is reversible in the sense that a future signer can be introduced, but the gap in history stays.
+
+### Option B: re-anchor the tag signer through a new ceremony
+
+Generate a new channel key in off-repository custody, publish a new authority document and ref, and cut a `canonical-full-bridge` release carrying the new public keys before any release uses them.
+
+Cost: two releases instead of one, and an honest caveat — with the old channel key destroyed, the new root can only be introduced by repository admin. The ceremony restores the property *going forward*, from the moment the new key is in real custody; it cannot retroactively make this transition anything other than admin-authorized. Claiming otherwise in release notes would be the same silent spend this document refuses.
+
+Do not resolve the stop by signing with an unexpected key and saying nothing. That contradicts the published v0.50.109 sidecar and leaves the contradiction for someone else to discover.
 
 ## Effect on v0.50.112
 
-`release-v0.50.112.md` is written and its repository-side work is complete: the ruleset exists, content gates pass, the asset gate and lineage invocation are pinned. It stops at the tag boundary and stays stopped until this document's step 4 is decided.
+`release-v0.50.112.md` is written and its repository-side work is complete: the ruleset exists, content gates pass, the asset gate and lineage invocation are pinned. Its blocker is now exactly one thing — the R2 precondition in step 3 above — because every other input it listed as operator-held is in fact a GitHub secret that the workflow materializes.
 
-Do not resolve that stop by signing with a different key. A tag signed by a key nobody expects fails verification for every downstream consumer while looking finished locally.
+That correction matters for planning. An earlier draft of this document, and of the v0.50.112 runbook, treated the evidence layer as dead. It is not. Re-read both before acting.
