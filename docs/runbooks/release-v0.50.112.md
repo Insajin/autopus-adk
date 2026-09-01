@@ -72,9 +72,20 @@ The companion manifest and signature digests are not restated here. Read them fr
 
 The anchor is four committed SHA-256 pins over the receipt, its signature, the public key, and the record. They are immutable source, so the gate cannot be satisfied by substituting a different receipt.
 
-State the boundary plainly: the lineage signing key `adk-release-2026-q3-b0` is published in no A22 or A23 asset and is not in the source tree. It appears only as the `key_id` field of the artifact it signs. The v0.50.109 rotation sidecar carries the channel, tag, and promotion keys, not this one. Therefore the A23 lineage signature is verifiable by the release operator holding the A0 bundle, and is not independently verifiable by a third party from published assets alone.
+An earlier draft of this section said the lineage signing key `adk-release-2026-q3-b0` had no published provenance and appeared only as the `key_id` of the artifact it signs. That was too pessimistic, and checking it changed the conclusion. Its public half is pinned in two places:
 
-That is a boundary of the current trust chain, not a defect this release must fix. Do not weaken the gate to route around it, and do not describe the lineage signature as publicly verifiable in release notes.
+| Where | Value |
+|---|---|
+| Repository variable `ADK_COMPANION_KEY_ID` | `adk-release-2026-q3-b0` |
+| Repository variable `ADK_COMPANION_PUBLIC_KEY_BASE64` | `lxdZaGsN1ZHutUtoYdRZa/JWB2gbG33HtMehzV4DG18=` |
+| Repository variable `ADK_COMPANION_PUBLIC_KEY_SHA256` | `sha256:c387da9e9c43dbaa2605207a00635c84937ff397a8b6ed73414d2e66b89941a4` |
+| Compiled into every shipped binary | `configuredA0PublicKeySHA256` at `pkg/companionmanifest/public_key_receipt_trust.go:17` |
+
+Those two digests are equal — `sha256` of the decoded variable equals the compiled pin. So the key's public half ships inside the binary that verifies it, which is a stronger position than "unpublished": a stale or substituted release key cannot pass, and the pin cannot be changed without shipping a new binary.
+
+What is genuinely operator-only is the receipt bundle, because it must be signed by that key's private half. So the boundary is narrower than first written: the A23 lineage signature is verifiable by anyone holding a valid A0 receipt bundle, and the bundle is what only the operator can produce. Do not describe the lineage signature as publicly verifiable in release notes, and do not weaken the gate to route around the bundle.
+
+Note also that the v0.50.109 rotation sidecar carries the channel, tag, and promotion keys and not this one. The release key is rotated through the companion variables above, not through that sidecar — two separate rotation surfaces that are easy to conflate.
 
 The committed verifier is `scripts/companion-release/ompcontextlineageverify`. Every flag is required — there is no coordinate-only mode, so `--receipt-bundle` cannot be omitted to get a partial check. The invocation below has every publicly derivable pin already filled from the A23 assets, leaving only the operator's own inputs:
 
@@ -163,6 +174,27 @@ The last row was worth checking rather than assuming. An earlier draft of this r
 Signing the tag with a different key is not a smaller version of this release. The v0.50.109 rotation established R2 through a signed sidecar, and every consumer that checks a v0.50.112 tag will check it against R2. A tag signed by another key is a tag that fails verification for everyone downstream while looking finished locally.
 
 So the procedure runs to the tag boundary and stops there. Everything before it — ruleset, content gates, lineage inputs, evidence plan — is repository work and is done or specified. The tag, the evidence signing, and the workflow trigger need the operator.
+
+### Generating a new key on the release machine
+
+A tempting shortcut when R2 is not at hand is to generate a fresh signer locally. The design anticipates a lost tag key — that is exactly why the channel key, not the tag key, is the rotation authority — but the path is a procedure of its own and it does not fit inside this release.
+
+What generating a new tag signer requires, in order:
+
+| Step | Reachable from this machine |
+|---|---|
+| Generate the new Ed25519 tag key | yes |
+| Write a new `adk-key-rotation-authority.v1.json` with a new `bridge_tag` and `next_tag_*` | yes |
+| Publish it on a new immutable ref `release-key-rotation-authority-v3` with its own ruleset | yes; the authority actor is `204883817` |
+| **Sign the rotation document with the channel key `adk-channel-2026-q3-a0`** | **no** |
+| Publish the signed sidecar, then cut a `canonical-full-bridge` release carrying the new public keys | needs the step above |
+| Use the new key — only from the release *after* the bridge | needs the step above |
+
+The committed authority document is pinned to `bridge_tag: v0.50.109` and hard-codes `next_tag_fingerprint: SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`. It authorizes exactly one rotation, the one already performed. It cannot be reused to bless a third key, and the rotation tooling only ever verifies a document and signature pair — `publish-key-rotation-sidecar.sh` takes them as arguments and `rotation-authority/verify-rotation.sh` checks them. Nothing in the repository signs. That is deliberate: the channel private key never touches the repository.
+
+Local key material was checked rather than assumed. `~/.ssh` holds one Ed25519 key, raw public `IdUKgFll1QQlfdpojHMyv3v7vuljNFgTkYmBWpWJ5yI=`, which is neither R2 nor the channel key `1IqFilCntaMPUxg7ndOZnyy6Lj1NBQXkXBJp3rEu6kI=`. `ssh-add -l` reports no identities. This machine therefore holds no release authority key of any kind.
+
+One further option exists and should be named so it is rejected on purpose rather than by omission: replacing the channel key itself. The channel public key lives in the repository variable `AUTOPUS_ADK_CHANNEL_PUBLIC_KEY` and in the committed authority document, both writable with repository admin. Rewriting them would let a new trust root mint releases. That removes the property the whole apparatus exists to provide — that repository access alone cannot authorize a release — and it must not be done to work around a missing key. If the channel key is genuinely lost, that is an incident with its own runbook, not a step in a feature release.
 
 ### Content gates
 
