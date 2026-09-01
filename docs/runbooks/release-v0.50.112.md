@@ -215,6 +215,28 @@ The third item matters for this release specifically: releases cut before v0.50.
 
 Sections "Static remote coordinates" through "Reconciliation and rollback boundaries" in `release-v0.50.111.md` apply unchanged, with `v0.50.111` replaced by `v0.50.112`, `A23` by `A24`, and the predecessor table above substituted for the v0.50.109 predecessor table. Do not paraphrase those sections here; a second copy is a second thing to drift.
 
+## Exact asset gate
+
+A23 published fifteen assets. A24 must publish the same fifteen names with the version substituted, no more and no fewer. Read from the A23 release rather than trusting this list, then compare:
+
+```sh
+gh release view v0.50.111 --json assets --jq '[.assets[].name]|sort' |
+  sed 's/0\.50\.111/0.50.112/g' > /tmp/a24-expected.json
+gh release view v0.50.112 --json assets --jq '[.assets[].name]|sort' > /tmp/a24-actual.json
+diff /tmp/a24-expected.json /tmp/a24-actual.json && echo ASSET_SHAPE_OK
+```
+
+The expected names, for review before the release exists:
+
+| Group | Names |
+|---|---|
+| Archives | `autopus-adk_0.50.112_{darwin,linux}_{amd64,arm64}.tar.gz`, `autopus-adk_0.50.112_windows_{amd64,arm64}.{tar.gz,zip}` |
+| Checksums and signatures | `checksums.txt`, `checksums.txt.bundle`, `checksums.txt.signatures` |
+| Evidence | `omp-context-promotion-report.v1.json`, `omp-context-promotion-attestation.v2.json` |
+| Lineage | `release-lineage-v1.json`, `release-lineage-v1.sig` |
+
+An extra asset is as much a stop as a missing one: it means the workflow uploaded something this procedure did not describe.
+
 ## Stop conditions specific to A24
 
 Stop and escalate rather than improvising if any of these hold.
