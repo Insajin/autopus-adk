@@ -61,6 +61,7 @@ func Execute(opts Options) (Result, error) {
 			}
 		}
 	}
+	noteEmptyExecution(&result, opts.Lane)
 	result.Status = aggregateStatus(result)
 	if hasBlockedAdapter(result.AdapterResults) {
 		result.Status = "blocked"

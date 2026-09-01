@@ -61,8 +61,12 @@ func executeDesktopObservationPack(
 	}}
 	manifestPath, err := qaevidence.WriteFinalManifest(manifest, manifestOutputDir(runDir, pack.ID))
 	if err != nil {
+		// The reason must survive. Publication rejects for distinguishable causes
+		// (artifact outside the evidence root, an unsafe publishable ref, a failed
+		// redaction gate) and a bare "publication failed" leaves a caller with no
+		// way to tell which - the same dead end an empty exec detail creates.
 		check.Status = "blocked"
-		check.FailureSummary = "desktop observation publication failed"
+		check.FailureSummary = "desktop observation publication failed: " + err.Error()
 		return AdapterResult{
 			Adapter: pack.Adapter.ID, JourneyID: pack.ID, Status: "blocked",
 			FailureSummary: check.FailureSummary,
@@ -92,10 +96,14 @@ func applyDesktopObservationManifestProfile(
 		ID: typedCheck.ID, Type: "desktop_accessibility_semantic",
 		Status: string(typedCheck.Status), FailureSummary: failureSummary,
 	}}
-	manifest.SourceRefs.OwnedPaths = nil
-	manifest.SourceRefs.DoNotModifyPaths = nil
-	manifest.SourceRefs.OracleThresholds = nil
-	manifest.SourceRefs.Mobile = nil
+	// Provenance is harness-owned for this adapter: the harness builds the
+	// manifest, the typed projection, and the artifact, so a project-declared
+	// source_spec or acceptance_ref is not authoritative and cannot be made so.
+	// Before this, a third-party pack had to type Autopus's own SPEC-QAMESH-012
+	// and AC-QAMESH12-NNN to get past the publication contract, which made the
+	// lane unreachable in practice even after the app-identity pin was removed.
+	manifest.SourceRefs = qaevidence.DesktopObservationProvenance()
+	manifest.ScenarioRef = qaevidence.DesktopObservationScenarioRef()
 	manifest.RepairPromptRef = ""
 	manifest.ReproductionCommand = ""
 	return true

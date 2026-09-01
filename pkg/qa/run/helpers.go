@@ -3,6 +3,7 @@ package run
 import (
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -132,6 +133,32 @@ func availableCapabilities(projectDir, profile string) []string {
 		return config.DefaultTestProfileCapabilities(profile)
 	}
 	return cfg.AvailableTestCapabilities(profile)
+}
+
+// noteEmptyExecution refuses to let a run that executed nothing be reported as a
+// pass. A lane no Journey Pack declares runs zero adapters and produces zero
+// checks; with its setup gaps satisfied, aggregateStatus would otherwise see no
+// failure and no gap and return "passed" over an empty result. A green lane with
+// no evidence is worse than a declared setup gap, because nothing downstream can
+// tell the two apart. Recording the gap here also makes the status follow from
+// the existing rule instead of adding a second one.
+func noteEmptyExecution(result *Result, lane string) {
+	if len(result.AdapterResults) > 0 || len(result.Checks) > 0 {
+		return
+	}
+	if len(result.SetupGaps) > 0 {
+		return
+	}
+	target := strings.TrimSpace(lane)
+	if target == "" {
+		target = "the selected lane"
+	} else {
+		target = strconv.Quote(target)
+	}
+	result.SetupGaps = append(result.SetupGaps, SetupGap{
+		Adapter: "harness",
+		Reason:  "missing_journey_pack: no Journey Pack declares lane " + target + "; nothing was executed",
+	})
 }
 
 func aggregateStatus(result Result) string {
