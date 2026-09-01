@@ -1,0 +1,195 @@
+App=com.apple.finder (pid 532)
+Window: "응용 프로그램", App: Finder.
+
+0 표준 윈도우 응용 프로그램
+	1 자르기 그룹
+		2 스크롤 영역, Secondary Actions: scroll up, scroll down
+			3 윤곽체 사이드바
+				4 윤곽체 행 최근 항목
+					5 셀 최근 항목, Secondary Actions: open
+						6 텍스트, Value: 최근 항목
+						7 이미지 시계
+				8 윤곽체 행 공유
+					9 셀 공유, Secondary Actions: open
+						10 텍스트, Value: 공유
+						11 이미지 공유 폴더
+				12 윤곽체 행 즐겨찾기
+					13 셀 즐겨찾기
+						14 텍스트, Value: 즐겨찾기
+				15 윤곽체 행 (selected) 응용 프로그램
+					16 셀 (selected) 응용 프로그램, Secondary Actions: open
+						17 텍스트, Value: 응용 프로그램
+						18 이미지
+				19 윤곽체 행 데스크탑
+					20 셀 데스크탑, Secondary Actions: open
+						21 텍스트, Value: 데스크탑
+						22 이미지
+				23 윤곽체 행 문서
+					24 셀 문서, Secondary Actions: open
+						25 텍스트, Value: 문서
+						26 이미지 문서
+				27 윤곽체 행 다운로드
+					28 셀 다운로드, Secondary Actions: open
+						29 텍스트, Value: 다운로드
+						30 이미지 원형 아래쪽 화살표
+				31 윤곽체 행 위치
+					32 셀 위치
+						33 텍스트, Value: 위치
+				34 윤곽체 행 iCloud Drive
+					35 셀 iCloud Drive, Secondary Actions: open
+						36 텍스트, Value: iCloud Drive
+						37 이미지 iCloud
+				38 윤곽체 행 bitgapnam
+					39 셀 bitgapnam, Secondary Actions: open
+						40 텍스트, Value: bitgapnam
+						41 이미지 집
+				42 윤곽체 행 Macintosh HD
+					43 셀 Macintosh HD, Secondary Actions: open
+						44 텍스트, Value: Macintosh HD
+						45 이미지
+				46 윤곽체 행 AirDrop
+					47 셀 AirDrop, Secondary Actions: open
+						48 텍스트, Value: AirDrop
+						49 이미지
+				50 윤곽체 행 휴지통
+					51 셀 휴지통, Secondary Actions: open
+						52 텍스트, Value: 휴지통
+						53 이미지 휴지통
+				54 윤곽체 행 태그
+					55 셀 태그
+						56 텍스트, Value: 태그
+				57 윤곽체 행 빨간색
+					58 셀 빨간색, Secondary Actions: open
+						59 텍스트, Value: 빨간색
+						60 이미지
+				61 윤곽체 행 주황색
+					62 셀 주황색, Secondary Actions: open
+						63 텍스트, Value: 주황색
+						64 이미지
+				65 윤곽체 행 노란색
+					66 셀 노란색, Secondary Actions: open
+						67 텍스트, Value: 노란색
+						68 이미지
+				69 윤곽체 행 초록색
+					70 셀 초록색, Secondary Actions: open
+						71 텍스트, Value: 초록색
+						72 이미지
+				73 윤곽체 행 파란색
+					74 셀 파란색, Secondary Actions: open
+						75 텍스트, Value: 파란색
+						76 이미지
+				77 윤곽체 행 보라색
+					78 셀 보라색, Secondary Actions: open
+						79 텍스트, Value: 보라색
+						80 이미지
+			81 스크롤 막대, Value: 0
+				82 값 표시기, Value: 0
+				83 화살표 증가 버튼
+				84 화살표 감소 버튼
+				85 페이지 증가 버튼
+				86 페이지 감소 버튼
+		87 자르기 도구, Value: 190
+		88 자르기 그룹
+			89 스크롤 영역, Secondary Actions: scroll up, scroll down
+				90 모음 아이콘 보기
+					91 섹션
+						92 이미지 cmux, Secondary Actions: open
+						93 이미지 Discord, Secondary Actions: open
+						94 이미지 Docker, Secondary Actions: open
+						95 이미지 FaceTime, Secondary Actions: open
+						96 이미지 Freeform, Secondary Actions: open
+						97 이미지 Games, Secondary Actions: open
+						98 이미지 Google Chrome, Secondary Actions: open
+						99 이미지 Image Playground, Secondary Actions: open
+						100 이미지 iPhone 미러링, Secondary Actions: open
+						101 이미지 JANDI, Secondary Actions: open
+						102 이미지 Mail, Secondary Actions: open
+						103 이미지 Microsoft 365 Copilot, Secondary Actions: open
+						104 이미지 Microsoft Defender, Secondary Actions: open
+						105 이미지 Microsoft Excel, Secondary Actions: open
+						106 이미지 Microsoft OneNote, Secondary Actions: open
+						107 이미지 Microsoft Outlook, Secondary Actions: open
+						108 이미지 Microsoft PowerPoint, Secondary Actions: open
+						109 이미지 Microsoft Teams, Secondary Actions: open
+						110 이미지 Microsoft Word, Secondary Actions: open
+						111 이미지 Mission Control, Secondary Actions: open
+						112 이미지 Notion, Secondary Actions: open
+						113 이미지 OneDrive, Secondary Actions: open
+						114 이미지 (selected) Orca, Secondary Actions: open
+						115 이미지 Photo Booth, Secondary Actions: open
+						116 이미지 QuickTime Player, Secondary Actions: open
+						117 이미지 Safari, Secondary Actions: open
+						118 이미지 Siri, Secondary Actions: open
+						119 이미지 Slack, Secondary Actions: open
+						120 이미지 Telegram, Secondary Actions: open
+						121 이미지 Time Machine, Secondary Actions: open
+				122 스크롤 막대, Value: 0.8021015761821366
+					123 값 표시기, Value: 0.8021015761821366
+					124 화살표 증가 버튼
+					125 화살표 감소 버튼
+					126 페이지 증가 버튼
+					127 페이지 감소 버튼
+			128 텍스트, Value: 1/76 선택됨, 100.26GB 사용 가능
+			129 슬라이더 (settable) 아이콘 크기 조절, Value: 24, Secondary Actions: increment, decrement
+				130 값 표시기, Value: 24
+	131 도구 막대
+		132 container, Secondary Actions: name:다음으로 이동
+ target:0x0
+ selector:(null), name:도구 막대에서 제거
+ target:0x0
+ selector:(null)
+			133 container 뒤로/앞으로
+				134 버튼 (disabled) 뒤로
+				135 버튼 (disabled) 앞으로
+		136 container, Secondary Actions: name:이전으로 이동
+ target:0x0
+ selector:(null), name:다음으로 이동
+ target:0x0
+ selector:(null), name:도구 막대에서 제거
+ target:0x0
+ selector:(null)
+			137 라디오 그룹
+				138 라디오 버튼 아이콘 보기, Value: 1
+				139 라디오 버튼 목록 보기, Value: 0
+				140 라디오 버튼 계층 보기, Value: 0
+				141 라디오 버튼 갤러리 보기, Value: 0
+		142 메뉴 버튼 그룹, Secondary Actions: name:이전으로 이동
+ target:0x0
+ selector:(null), name:다음으로 이동
+ target:0x0
+ selector:(null), name:도구 막대에서 제거
+ target:0x0
+ selector:(null)
+		143 버튼 공유, Secondary Actions: name:이전으로 이동
+ target:0x0
+ selector:(null), name:다음으로 이동
+ target:0x0
+ selector:(null), name:도구 막대에서 제거
+ target:0x0
+ selector:(null)
+		144 버튼 태그 추가, Secondary Actions: name:이전으로 이동
+ target:0x0
+ selector:(null), name:다음으로 이동
+ target:0x0
+ selector:(null), name:도구 막대에서 제거
+ target:0x0
+ selector:(null)
+		145 메뉴 버튼 동작, Secondary Actions: name:이전으로 이동
+ target:0x0
+ selector:(null), name:다음으로 이동
+ target:0x0
+ selector:(null), name:도구 막대에서 제거
+ target:0x0
+ selector:(null)
+		146 container, Secondary Actions: name:이전으로 이동
+ target:0x0
+ selector:(null), name:도구 막대에서 제거
+ target:0x0
+ selector:(null)
+			147 버튼 검색
+	148 닫기 버튼
+	149 전체 화면 버튼, Secondary Actions: zoom the window
+	150 최소화 버튼
+	151 텍스트, Value: 응용 프로그램
+
+The focused UI element is 90 모음 아이콘 보기.
