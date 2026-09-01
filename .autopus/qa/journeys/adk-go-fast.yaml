@@ -1,13 +1,30 @@
 id: adk-go-fast
-title: Autopus ADK deterministic Go test suite
+title: Autopus ADK deterministic Go test suite, parallel-safe tests
 surface: cli
 lanes: [fast]
 adapter:
   id: go-test
+# Mirrors the Makefile's test-unit split. A bare `go test ./...` puts the
+# process-heavy tests on the shared parallel scheduler, which is what
+# PROCESS_HEAVY_TESTS exists to prevent, and 600s is under the measured cost of
+# this suite: the skip lane took 856s and 1092s in two runs on an M2 Ultra. The
+# old pack could therefore never report anything but a timeout here.
+#
+# The race detector is deliberately absent. It belongs to `make test-unit`,
+# which CI runs on its own budget; adding it here multiplies the lane cost past
+# any timeout a developer machine would tolerate, and the fast lane's contract
+# is a deterministic pass/fail over the same test set.
 command:
-  argv: ["go", "test", "./..."]
+  argv:
+    - go
+    - test
+    - ./...
+    - -count=1
+    - -timeout=25m
+    - -skip
+    - ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller|TestExecuteDesktopObservation_)
   cwd: .
-  timeout: 600s
+  timeout: 1800s
 checks:
   - id: adk-go-test
     type: unit_test

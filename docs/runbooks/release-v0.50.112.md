@@ -103,7 +103,7 @@ Follow `release-v0.50.111.md` "Prerequisites" unchanged, plus these A24-specific
 
 ### Release-authority ruleset
 
-`autopus-v0.50.112-release-authority` does not exist yet. The rulesets present are:
+`autopus-v0.50.112-release-authority` now exists as ruleset `21986875`, created for this release. The rulesets present are:
 
 | Ruleset | ID |
 |---|---|
@@ -111,8 +111,33 @@ Follow `release-v0.50.111.md` "Prerequisites" unchanged, plus these A24-specific
 | `autopus-v0.50.109-rotation-ref-authority` | `21713791` |
 | `autopus-v0.50.110-release-authority` | `21901908` |
 | `autopus-v0.50.111-release-authority` | `21909571` |
+| `autopus-v0.50.112-release-authority` | `21986875` |
 
-Create the v0.50.112 ruleset before any tag push, mirroring the v0.50.111 ruleset's rules exactly. Never widen an existing ruleset's ref pattern to cover a new tag: a per-version ruleset is what makes the authority boundary auditable.
+Never widen an existing ruleset's ref pattern to cover a new tag: a per-version ruleset is what makes the authority boundary auditable.
+
+The seal is two phases, which the A23 runbook does not state and which the A23 ruleset history proves. Ruleset `21909571` was created at 16:50:54 with the release operator as an `always` bypass actor, the tag was created at 17:07:11, and the ruleset was updated at 17:07:19 — eight seconds later — to remove the bypass. Reading only the current ruleset shows the sealed end state, and creating a new ruleset in that shape blocks the operator's own tag push.
+
+| Phase | `bypass_actors` | When |
+|---|---|---|
+| Open | `[{actor_id: 204883817, actor_type: "User", bypass_mode: "always"}]` | before tag push |
+| Sealed | `[]` | immediately after the tag exists |
+
+Ruleset `21986875` was created in the open shape and field-compared against the A23 creation-time state: target, enforcement, ref pattern, bypass actor, and the creation/update/deletion rule set all match with only the version string differing. Sealing it is a step of this procedure, not a follow-up: an unsealed release tag is mutable by the operator, which is the property the ruleset exists to remove.
+
+### Operator-held material, and why the procedure stops without it
+
+Four inputs exist only on the release operator's machine. None can be reconstructed from the repository, and substituting any of them changes the trust chain the release claims.
+
+| Input | Checked how | State observed while writing this runbook |
+|---|---|---|
+| R2 tag signing private key | `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`, extracted from the v0.50.111 tag signature and matching `scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint` | absent; the only local key is `SHA256:GIa3VFVWeCqBJamdDCJdxDzXE+XxQBC1xsx/iZ9XlF8` and `ssh-add -l` reports no identities |
+| Nine `COMPANION_*` variables | `bash scripts/companion-release/validate-environment.sh` | absent; fails at `COMPANION_BUILD_PROVENANCE` |
+| `COMPANION_SIGNING_KEY_FILE` | same validator, plus its `secure_regular_file` check | absent |
+| A0 receipt bundle | required by the lineage gate above | not located |
+
+Signing the tag with a different key is not a smaller version of this release. The v0.50.109 rotation established R2 through a signed sidecar, and every consumer that checks a v0.50.112 tag will check it against R2. A tag signed by another key is a tag that fails verification for everyone downstream while looking finished locally.
+
+So the procedure runs to the tag boundary and stops there. Everything before it — ruleset, content gates, lineage inputs, evidence plan — is repository work and is done or specified. The tag, the evidence signing, and the workflow trigger need the operator.
 
 ### Content gates
 

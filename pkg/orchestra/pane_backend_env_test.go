@@ -73,19 +73,40 @@ func TestExecute_ExportsSessionEnvWhenHookMode(t *testing.T) {
 		Provider: "claude",
 		Config:   ProviderConfig{Name: "claude", Binary: "claude"},
 		Prompt:   "review this",
-		Timeout:  1 * time.Second, // bound so the FileIPC wait does not block the test
+		// Generous on purpose. A one-second bound used to cut the FileIPC wait
+		// short, but it also raced pane setup: under parallel package load the
+		// deadline expired before Execute reached the export and the assertion
+		// saw an empty command list. The wait is cut by cancelling below
+		// instead, so the test no longer depends on how fast this machine is.
+		Timeout: 2 * time.Minute,
 	}
-	_, _ = b.Execute(context.Background(), req)
 
-	found := false
-	for _, c := range mock.commands {
-		if strings.Contains(c, "export AUTOPUS_SESSION_ID="+sid) {
-			found = true
-			break
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, _ = b.Execute(ctx, req)
+	}()
+
+	export := "export AUTOPUS_SESSION_ID=" + sid
+	require.Eventually(t, func() bool {
+		for _, c := range mock.commandsSnapshot() {
+			if strings.Contains(c, export) {
+				return true
+			}
 		}
+		return false
+	}, 60*time.Second, 10*time.Millisecond,
+		"Execute must export AUTOPUS_SESSION_ID into the pane when HookMode is on; sent commands: %v",
+		mock.commandsSnapshot())
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("Execute did not return after context cancellation")
 	}
-	require.True(t, found,
-		"Execute must export AUTOPUS_SESSION_ID into the pane when HookMode is on; sent commands: %v", mock.commands)
 }
 
 // TestExecute_NoSessionEnvWhenHookModeOff verifies the export is gated: with

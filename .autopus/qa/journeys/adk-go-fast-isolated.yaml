@@ -1,0 +1,50 @@
+id: adk-go-fast-isolated
+title: Autopus ADK deterministic Go test suite, process-heavy tests serialized
+surface: cli
+lanes: [fast]
+adapter:
+  id: go-test
+# The companion to adk-go-fast. These tests spawn and signal real process
+# groups, install binaries, and probe provider CLIs, so `-p 1` is load-bearing:
+# on the shared scheduler they reap each other's children and fail as flakes.
+# Splitting them out is what lets the sibling pack keep a plain parallel run.
+#
+# Both packs declare lane `fast`, so the lane covers the same set as a bare
+# `go test ./...` with no test left unclaimed. Dropping either pack silently
+# narrows the gate.
+command:
+  argv:
+    - go
+    - test
+    - ./...
+    - -count=1
+    - -timeout=10m
+    - -p
+    - "1"
+    - -run
+    - ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller|TestExecuteDesktopObservation_)
+  cwd: .
+  timeout: 900s
+checks:
+  - id: adk-go-test-isolated
+    type: unit_test
+    expected:
+      exit_code: 0
+artifacts:
+  - root: .autopus/qa/runs
+source_refs:
+  source_spec: SPEC-QAMESH-002
+  acceptance_refs: [AC-QAMESH2-005]
+  owned_paths:
+    - cmd/**
+    - content/**
+    - internal/**
+    - pkg/**
+    - templates/**
+    - tests/**
+    - go.mod
+    - go.sum
+  do_not_modify_paths:
+    - .codex/**
+    - .opencode/**
+    - .autopus/plugins/**

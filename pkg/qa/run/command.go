@@ -55,7 +55,7 @@ func runCommandWithEnv(projectDir string, pack journey.Pack, artifactDir string,
 	started := time.Now().UTC()
 	_ = os.MkdirAll(artifactDir, 0o755)
 	args := commandArgs(pack)
-	result := commandResult{Status: "passed", StartedAt: started, Command: strings.Join(args, " ")}
+	result := commandResult{Status: "passed", StartedAt: started, Command: renderReproductionCommand(args)}
 	if len(args) == 0 {
 		result.Status = "blocked"
 		result.FailureSummary = "empty command"

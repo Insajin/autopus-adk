@@ -9,7 +9,20 @@ import (
 	"time"
 )
 
+// unsafeShellTokens guards command.run, which is a shell string and therefore
+// really does hand these bytes to a shell.
 var unsafeShellTokens = regexp.MustCompile(`[;&|<>$` + "`" + `]|\|\||&&|\r|\n`)
+
+// argvControlCharacters guards command.argv, which is handed to exec with no
+// shell between. No shell means shell metacharacters are inert, and a pack
+// legitimately needs them: `go test -skip '^(TestA|TestB)$'` cannot be written
+// without alternation and an anchor. What still has to be refused is bytes that
+// forge structure in the places argv is written down — a newline or carriage
+// return can invent a line in a log or a manifest field, and NUL truncates.
+//
+// Faithful reproduction is a separate concern, handled by quoting at render
+// time rather than by narrowing what a pack may run.
+var argvControlCharacters = regexp.MustCompile(`[\x00-\x1f\x7f]`)
 
 // MaxCommandTimeout is the hard upper bound shared by validation and execution.
 const MaxCommandTimeout = 30 * time.Minute
@@ -156,8 +169,8 @@ func validateArgv(argv []string) error {
 		if strings.TrimSpace(arg) == "" {
 			return fmt.Errorf("command.argv contains empty value")
 		}
-		if unsafeShellTokens.MatchString(arg) {
-			return fmt.Errorf("command.argv contains shell metacharacters")
+		if argvControlCharacters.MatchString(arg) {
+			return fmt.Errorf("command.argv contains control characters")
 		}
 	}
 	return nil
