@@ -32,9 +32,9 @@ Observed candidate at the time of writing, for orientation only — re-freeze at
 
 | Observation | Value |
 |---|---|
-| `origin/main` commit | `15ce794bd90d4bb9d56759d649ff1428db5ee8a7` |
-| `origin/main` tree | `cf015f92ecde0d5a007be9fd2c667f9530f1047b` |
-| Commits since v0.50.111 | 15 |
+| `origin/main` commit | `fb5c281347bf9a5d4414cc0441305694f8c00366` |
+| `origin/main` tree | `4ba6a3daedfdca248fc058e3115de0db93c9536d` |
+| Commits since v0.50.111 | 17 |
 
 ## Immutable v0.50.111 predecessor
 
@@ -73,6 +73,27 @@ The anchor is four committed SHA-256 pins over the receipt, its signature, the p
 State the boundary plainly: the lineage signing key `adk-release-2026-q3-b0` is published in no A22 or A23 asset and is not in the source tree. It appears only as the `key_id` field of the artifact it signs. The v0.50.109 rotation sidecar carries the channel, tag, and promotion keys, not this one. Therefore the A23 lineage signature is verifiable by the release operator holding the A0 bundle, and is not independently verifiable by a third party from published assets alone.
 
 That is a boundary of the current trust chain, not a defect this release must fix. Do not weaken the gate to route around it, and do not describe the lineage signature as publicly verifiable in release notes.
+
+The committed verifier is `scripts/companion-release/ompcontextlineageverify`. Every flag is required — there is no coordinate-only mode, so `--receipt-bundle` cannot be omitted to get a partial check. The invocation below has every publicly derivable pin already filled from the A23 assets, leaving only the operator's own inputs:
+
+```sh
+go run ./scripts/companion-release/ompcontextlineageverify \
+  --lineage release-lineage-v1.json \
+  --signature release-lineage-v1.sig \
+  --receipt-bundle "$A0_RECEIPT_BUNDLE" \
+  --key-id adk-release-2026-q3-b0 \
+  --handoff v1 \
+  --minimum-rollback-floor "$COMPANION_ROLLBACK_FLOOR" \
+  --upstream-sha256 fed7ee0fa4bfd47d3f60d983e2ce1a4b10e0d6aee1b9464be02b31cad0e27817 \
+  --executable-sha256 5a9ef6b41fea1a3b794288f069f344275850905b743a8095b0eeec41f69decfb \
+  --source-repository Insajin/autopus-adk \
+  --source-commit 954f60a77acb59fd4106537020693fdcadb3d640 \
+  --source-tree fcd3f2aed498955235ae7807ba031d32a053db09 \
+  --target darwin-arm64 \
+  --version 0.50.111
+```
+
+Download the two lineage files from the v0.50.111 release rather than reusing a local copy, so the check reads what the public sees.
 
 ## Burned failure coordinates
 
@@ -151,13 +172,28 @@ Freeze `origin/main` only after all of these pass on the exact release commit.
 | Test lane 1 | `go test ./... -count=1 -timeout 25m -skip "$SKIP"` | zero failures |
 | Test lane 2 | `go test ./... -count=1 -timeout 10m -p 1 -run "$SKIP"` | zero failures |
 
-`$SKIP` is the process-heavy isolation list in `Makefile`. Both lanes are required; a single `./...` run is not a substitute, because the skip list exists to keep process-heavy tests off the shared parallel scheduler.
+`$SKIP` is the process-heavy isolation list in `Makefile`. Both lanes are required; a single `./...` run is not a substitute, because the skip list exists to keep process-heavy tests off the shared parallel scheduler. The split is exhaustive and disjoint, measured on this tree: 8982 top-level tests = 204 isolated + 8778 parallel, zero overlap.
 
 Known environment collision, not a release blocker: `pkg/connect`'s `TestWaitForCallback_Timeout` binds `127.0.0.1:1455` and fails when another process holds that port. Confirm with `lsof -nP -iTCP:1455` before attributing it to the release, and re-run the package once the port is free. Do not skip it silently.
 
+### The harness applied to itself
+
+`./bin/auto qa release --profile release-candidate` was run against this repository as a preflight. Result on the frozen candidate:
+
+| Lane | Policy | Verdict |
+|---|---|---|
+| `fast` | must | pass |
+| `browser-staging`, `desktop-native`, `gui-explore`, `mobile-readiness` | deferred | warn, deferred |
+| `canary-explicit` | must | block, `setup_gap:canary-template` |
+| `evidence-dashboard` | optional | warn |
+
+Two findings came out of that run and are fixed on the candidate: the `adk-go-fast` pack ran a bare `go test ./...` under a 600s budget and could only ever time out, and `pkg/orchestra`'s `TestExecute_ExportsSessionEnvWhenHookMode` failed under parallel load because a one-second bound raced pane setup. The pack is now split to mirror the Makefile lanes and the test no longer depends on machine speed.
+
+`canary-explicit` remains an open project decision, not a defect. The adapter refuses to guess — its gap message is `explicit safe canary command is required` — and there is no pack for that lane in this repository. The operator verifier `scripts/companion-release/verify-current-release.sh` is not a candidate: it requires ten pinned inputs including `COMPANION_PUBLIC_KEY_SHA256` and three prebuilt verifier binaries, so wiring it here would make every RC gate run depend on operator-held material. Choose the command deliberately and declare it in a pack; inventing one to turn the lane green would produce exactly the evidence-free pass this profile exists to refuse.
+
 ## Release content
 
-A24 carries fifteen commits, all QAMESH work: `git log v0.50.111..HEAD`.
+A24 carries seventeen commits: QAMESH work plus this release's own runbook and preflight fixes. Enumerate with `git log v0.50.111..HEAD`.
 
 Derive the scope from that range, not from `CHANGELOG.md` `[Unreleased]`. The changelog's released sections stop at `[v0.50.10]`, so `[Unreleased]` accumulates roughly two hundred entries spanning versions that already shipped. It is the right place to read *wording* for an entry and the wrong place to read *scope*. Cross-check that every commit in the range has a matching changelog entry; a commit with no entry is a stop, because the release description is the only place a user learns what changed.
 
