@@ -15,6 +15,7 @@ triggers:
   - "auto qa init"
   - "auto qa plan"
   - "auto qa run"
+  - "auto qa scenario"
   - "auto qa explore"
   - "auto qa release"
   - "auto qa evidence"
@@ -55,6 +56,7 @@ QAMESH는 project-level deterministic QA 실행, manifest validation, redaction,
 - Use `auto qa init --local-only --format json` only when the caller wants Journey Pack starters without release lanes or workflow scaffolding.
 - Use `auto qa run --format json` to execute deterministic project QA and produce run-index/evidence output.
 - Use `auto qa explore --dry-run --format json` before explicit GUI exploration, and run it only when the Journey Pack declares allowed origins, forbidden actions, redaction, and artifact retention policy.
+- Use `auto qa scenario init --format json` to write an example user scenario, and `auto qa scenario compile --format json` to render `.autopus/qa/scenarios/*.yaml` into Playwright specs under the project's own `testDir`; `--dry-run` validates without writing.
 - Use `auto qa release --dry-run --format json` to inspect release lanes, setup gaps, blocker rules, redacted command previews, sibling SPEC readiness, and the `canary-explicit` post-deploy smoke bridge lane before executing a release gate; use `auto qa release --roadmap --format json` for roadmap governance.
 - Use `auto qa evidence` when a producer already wrote a QAMESH manifest and the task is validation, redaction, or publication.
 - Use `auto qa feedback` to convert failed QAMESH evidence into Claude, Codex, Gemini, or OpenCode repair prompt bundles.
@@ -72,6 +74,13 @@ QAMESH는 project-level deterministic QA 실행, manifest validation, redaction,
 - `gui.network_policy.mode` is real runtime behavior: `summary-only` observes only, `local-only` aborts requests outside `allowed_origins`, and `blocked` also aborts xhr/fetch to allowed origins. Aborted requests are reported as `network_stopped` and do not fail the journey.
 - Network evidence carries `origin:<index>/path` or origin-relative `/path` references, never URLs.
 - `replay` is a pinned command plus spec digests, not synthesized code, so a captured journey re-runs at zero inference cost.
+
+## Scenario Authoring Contract
+
+- `.autopus/qa/scenarios/*.yaml` is the project's own declaration of what a user sees; the harness translates it into the runner dialect and never invents assertions. Each file states `schema_version: qamesh.scenario.v1`. An omitted `origin` is inherited from the named Journey Pack's `allowed_origins[0]`, so a compiled spec can only navigate where the guard already allows.
+- The step vocabulary is closed and read-only: `expect_title`, `expect_url`, `expect_text`, `expect_role`, `expect_count`. `click`, `fill`, and `press` are not schema fields, so a compiled scenario cannot trip the forbidden-action guard. Unknown keys and non-ARIA roles reject the whole file.
+- Each screen compiles to one runner test that pushes an `autopus-screen` annotation, which the capture producer records as the step's `screen_ref` — that is what makes `gui.screen_matrix` enforceable. Hand-authored specs derive `screen_ref` from their first `goto`.
+- `compile` reports the `screen_matrix` projection rather than rewriting the pack, because a YAML round-trip would destroy the generated pack's explanatory comments.
 
 ## Guardrails
 

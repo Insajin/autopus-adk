@@ -145,6 +145,8 @@ function stepFrom(shard, order, seen) {
   if (shard.started_at) step.started_at = String(shard.started_at);
   if (shard.ended_at) step.ended_at = String(shard.ended_at);
   if (count(shard.duration_ms) > 0) step.duration_ms = count(shard.duration_ms);
+  // screen_ref keys the gui.screen_matrix oracle; dropping it reports every screen missing.
+  if (shard.screen_ref) step.screen_ref = clip(shard.screen_ref, MAX.ref);
   const summary = failureSummary(shard, status);
   if (summary) step.failure_summary = summary;
   if (Array.isArray(shard.actions) && shard.actions.length) step.actions = shard.actions.map(actionOf);

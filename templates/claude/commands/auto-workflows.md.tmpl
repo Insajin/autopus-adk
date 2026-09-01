@@ -2165,6 +2165,7 @@ Use QAMESH when the task is project-level deterministic QA execution or evidence
 - `auto qa init --format json` is the simple default release-QA setup command. Use `auto qa init --local-only --format json` only when Journey Pack starters are needed without release lanes or workflow scaffolding. Review commands, env, installer version, and required-gate policy before relying on generated files.
 - Use `auto qa run --format json` to execute deterministic project QA and produce QAMESH run-index/evidence output.
 - Use `auto qa explore --dry-run --format json` before explicit GUI exploration, and run it only for local/staging Journey Packs with allowed origins, forbidden actions, deterministic oracles, and redacted artifact retention.
+- Use `auto qa scenario init --format json` to write an example user scenario and `auto qa scenario compile --format json` to render `.autopus/qa/scenarios/*.yaml` into Playwright specs under the project's own `testDir`. `--dry-run` validates and renders without writing.
 - Use `auto qa release --dry-run --format json` to inspect release lanes, setup gaps, blocker rules, redacted command previews, sibling SPEC readiness, and the `canary-explicit` post-deploy smoke bridge lane before executing a release gate; use `auto qa release --roadmap --format json` for roadmap governance.
 - Use `auto qa evidence` when a producer already wrote a QAMESH manifest and the task is validation, redaction, and publication.
 - Use `auto qa feedback` to turn existing failed QAMESH evidence into provider-specific repair prompt bundles.
@@ -2183,6 +2184,14 @@ Use QAMESH when the task is project-level deterministic QA execution or evidence
 - Network evidence carries `origin:<index>/path` or origin-relative `/path` references, never URLs, so credentials and query secrets are rejected by shape.
 - `replay` is a pinned command plus spec digests rather than synthesized code, so a captured journey re-runs deterministically at zero inference cost.
 
+### Scenario Authoring Contract
+
+- `.autopus/qa/scenarios/*.yaml` is the project's declaration of what a user sees. The harness never invents assertions; it only translates the declaration into the runner dialect. `schema_version: qamesh.scenario.v1`, `id`, `title`, `journey`, and `screens[]` are required; an omitted `origin` is inherited from the named Journey Pack's `allowed_origins[0]`, so a compiled spec can only navigate where the guard already allows.
+- The step vocabulary is read-only and closed: `expect_title`, `expect_url`, `expect_text`, `expect_role`, `expect_count`. `click`, `fill`, and `press` are not fields in the schema, so a compiled scenario cannot trip the `gui.forbidden_actions` guard — that is a safety property, not an omission. Write mutating flows as hand-authored specs instead.
+- Elements are addressed by ARIA role only, matching the pack's `selector_strategy: role-first`; a CSS escape hatch would let compiled specs contradict the strategy the pack advertises. An unknown key or unknown role rejects the whole file.
+- Each screen compiles to exactly one runner test that pushes an `autopus-screen` annotation. The capture producer records it as the step's `screen_ref`, which is what makes `gui.screen_matrix` genuinely enforceable. A hand-authored spec with no annotation derives `screen_ref` from its first `goto`, so a path-keyed matrix row is satisfied with no edit.
+- `compile` reports the `screen_matrix` projection instead of writing it into the pack, because the generated pack carries explanatory comments that a YAML round-trip would destroy. Paste the reported rows into the pack to enforce declared coverage.
+
 ### Guardrails
 
 - MUST call the Bash tool for the actual `auto qa ...` command. Do not simulate QAMESH results.
@@ -2191,7 +2200,7 @@ Use QAMESH when the task is project-level deterministic QA execution or evidence
 - Keep GUI exploration local/staging and deterministic-oracle bound; do not accept production mutation authority or AI-only pass/fail judgment.
 - Do not edit generated root surfaces (`.claude/**`, `.codex/**`, `.gemini/**`, `.opencode/**`, `.autopus/plugins/**`) directly.
 
-Usage: `/auto qa full --format json`, `/auto qa full --bootstrap --format json`, `/auto qa full --run --format json`, `/auto qa coverage --format json`, `/auto qa report --format json`, `/auto qa profile check --format json`, `/auto qa init --format json`, `/auto qa init --local-only --format json`, `/auto qa plan --format json`, `/auto qa run --feedback-to codex --format json`, `/auto qa explore --dry-run --format json`, `/auto qa release --dry-run --format json`, `/auto qa release --roadmap --format json`, `/auto qa evidence --input manifest.json --output .autopus/qa/evidence --surface browser --lane golden --scenario S1`, `/auto qa feedback --to codex --evidence manifest.json`
+Usage: `/auto qa full --format json`, `/auto qa full --bootstrap --format json`, `/auto qa full --run --format json`, `/auto qa coverage --format json`, `/auto qa report --format json`, `/auto qa profile check --format json`, `/auto qa init --format json`, `/auto qa init --local-only --format json`, `/auto qa plan --format json`, `/auto qa scenario init --format json`, `/auto qa scenario compile --format json`, `/auto qa run --feedback-to codex --format json`, `/auto qa explore --dry-run --format json`, `/auto qa release --dry-run --format json`, `/auto qa release --roadmap --format json`, `/auto qa evidence --input manifest.json --output .autopus/qa/evidence --surface browser --lane golden --scenario S1`, `/auto qa feedback --to codex --evidence manifest.json`
 
 ---
 

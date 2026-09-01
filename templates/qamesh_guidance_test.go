@@ -120,6 +120,45 @@ func TestQAMESHCaptureContractGuidance(t *testing.T) {
 	}
 }
 
+// TestQAMESHScenarioContractGuidance keeps the scenario authoring contract
+// documented wherever QA commands are authored. The load-bearing facts are that
+// the harness does not invent assertions and that the step vocabulary is closed:
+// an agent that believes it can emit a click step would author scenarios the
+// compiler rejects.
+func TestQAMESHScenarioContractGuidance(t *testing.T) {
+	t.Parallel()
+
+	root := templateRoot()
+	paths := []string{
+		filepath.Join(root, "claude", "commands", "auto-workflows.md.tmpl"),
+		filepath.Join(root, "codex", "prompts", "auto-qa.md.tmpl"),
+		filepath.Join(root, "codex", "skills", "auto-qa.md.tmpl"),
+		filepath.Join(root, "gemini", "skills", "auto-qa", "SKILL.md.tmpl"),
+	}
+	tokens := []string{
+		"auto qa scenario",
+		".autopus/qa/scenarios",
+		"qamesh.scenario.v1",
+		"expect_role",
+		"expect_count",
+		"autopus-screen",
+		"screen_ref",
+		"gui.screen_matrix",
+		"allowed_origins[0]",
+	}
+	for _, path := range paths {
+		path := path
+		t.Run(filepath.Base(filepath.Dir(path))+"-"+filepath.Base(path), func(t *testing.T) {
+			t.Parallel()
+			body, err := os.ReadFile(path)
+			require.NoError(t, err)
+			for _, token := range tokens {
+				assert.Contains(t, string(body), token)
+			}
+		})
+	}
+}
+
 func TestAutoGoQAMESHScopeBudgetGuidance(t *testing.T) {
 	t.Parallel()
 

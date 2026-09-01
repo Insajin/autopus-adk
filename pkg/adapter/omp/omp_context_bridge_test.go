@@ -173,9 +173,11 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	// native file, a target path, a rendered skill body, or a workflow spec
 	// description changes; this value reflects the OMP 18.0.5 native roots,
 	// omission of the base config, and the auto-qa surface documenting the visual
-	// report, the typed GUI capture contract, and the `report` route in its
-	// command description.
-	const priorPreparedFilesFingerprint = "11f1ecc3c7ee29870711aad775ce63ea26b30278419b186b094067db3aa7337a"
+	// report, the typed GUI capture contract, the `report` route in its command
+	// description, and the scenario authoring contract (`auto qa scenario`, the
+	// closed read-only step vocabulary, and the screen_ref link that makes
+	// gui.screen_matrix enforceable).
+	const priorPreparedFilesFingerprint = "c2ad563e81da5cd3fbe6feed1b1976568af533c5a0de02ffc3f3db26b5ba0a99"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

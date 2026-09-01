@@ -38,6 +38,9 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 @auto qa plan --format json
 @auto qa init --format json
 @auto qa init --local-only --format json
+@auto qa scenario init --format json
+@auto qa scenario compile --format json
+@auto qa scenario compile --dry-run --format json
 @auto qa run --format json
 @auto qa explore --dry-run --format json
 @auto qa release --dry-run --format json
@@ -60,6 +63,7 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 - `auto qa init --local-only`: release lane과 workflow scaffold 없이 Journey Pack starter만 생성합니다.
 - `auto qa run`: deterministic project QA를 실행하고 run index, QAMESH evidence, 선택된 feedback bundle을 생성합니다.
 - `auto qa explore`: explicit GUI Journey Pack만 대상으로 실제 UI 탐색 evidence를 생성합니다. 먼저 `--dry-run`으로 allowed origins, forbidden actions, artifact retention, setup gap을 확인합니다.
+- `auto qa scenario`: 프로젝트가 선언한 user scenario를 runner spec으로 컴파일합니다. `init`은 편집할 예시 시나리오를 만들고, `compile`은 `.autopus/qa/scenarios/*.yaml`을 프로젝트 Playwright `testDir` 아래 `autopus-generated/<id>.spec.ts`로 렌더링합니다. `--dry-run`은 검증과 렌더링만 하고 파일을 쓰지 않습니다.
 - `auto qa release`: fixed release lane set, sibling SPEC readiness, redacted command previews, blocker matrix, and release index aggregation을 계획/실행합니다. `canary-explicit`은 post-deploy smoke bridge lane이며 explicit Journey Pack 없이는 setup gap입니다.
 - `auto qa evidence`: producer가 이미 만든 QAMESH manifest를 검증, redaction, publish 경계로 보냅니다.
 - `auto qa feedback`: 기존 failed evidence를 Claude, Codex, Gemini, OpenCode용 repair prompt bundle로 변환합니다.
@@ -77,6 +81,14 @@ Project-level QA를 QAMESH evidence와 feedback bundle로 연결합니다. 이 �
 - `gui.network_policy.mode`는 실제 런타임 동작입니다. `summary-only`는 관찰만 하고, `local-only`는 `allowed_origins` 밖 origin의 요청을 abort하며, `blocked`는 거기에 더해 allowed origin의 xhr/fetch까지 abort해 UI가 데이터 트래픽 없이 static asset만으로 렌더되게 합니다. abort된 요청은 `gui-policy-runtime` check의 `network_stopped`에 보고되고 journey를 실패시키지 않습니다 — 선언한 정책이 작동한 것이지 위반이 아닙니다.
 - network evidence는 URL이 아니라 `origin:<index>/path` 또는 origin-relative `/path` reference입니다. 절대 URL, credential, query는 shape 자체로 거부됩니다.
 - `replay`는 합성 코드가 아니라 고정된 command와 spec digest입니다. inference 비용 없이 동일 spec을 재실행할 수 있습니다.
+
+## Scenario Authoring Contract
+
+- `.autopus/qa/scenarios/*.yaml`는 프로젝트가 "사용자가 무엇을 보는가"를 선언하는 파일입니다. 하네스는 assertion을 발명하지 않고, 선언을 runner 방언으로 번역만 합니다. `schema_version: qamesh.scenario.v1`, `id`, `title`, `journey`, `screens[]`가 필수이고 `origin`은 생략하면 named Journey Pack의 `allowed_origins[0]`을 상속합니다 — 컴파일된 spec은 guard가 이미 허용한 origin으로만 이동할 수 있습니다.
+- step 어휘는 읽기 전용으로 닫혀 있습니다: `expect_title`, `expect_url`, `expect_text`, `expect_role`, `expect_count`. `click`, `fill`, `press`는 스키마에 존재하지 않으므로 컴파일된 spec은 `gui.forbidden_actions` guard를 트립시킬 수 없습니다 — 누락이 아니라 안전 속성입니다. mutation flow는 직접 작성한 spec으로 다룹니다.
+- element는 ARIA role로만 지정합니다. pack의 `selector_strategy: role-first`와 일치시키기 위한 제약이며, CSS 탈출구는 pack이 광고하는 전략과 모순되는 spec을 허용하게 됩니다. 알 수 없는 key나 알 수 없는 role은 파일 전체를 reject합니다.
+- 각 screen은 정확히 하나의 runner test로 컴파일되고 `autopus-screen` annotation을 push합니다. capture producer가 이를 step의 `screen_ref`로 기록하므로 pack의 `gui.screen_matrix`가 실제로 집행됩니다. annotation이 없는 직접 작성 spec은 첫 `goto`의 경로에서 `screen_ref`가 유도되므로, path로 선언한 matrix row는 수정 없이 만족됩니다.
+- `compile`은 `screen_matrix` 투영을 출력만 하고 pack에 쓰지 않습니다. 생성된 pack에는 설명 주석이 있고 YAML round-trip이 그것을 파괴하기 때문입니다. 선언 커버리지를 집행하려면 출력된 row를 pack에 붙여 넣습니다.
 
 ## Guardrails
 
